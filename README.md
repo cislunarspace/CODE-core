@@ -6,29 +6,29 @@
 
 ## 主要功能
 
-### 🌍→🌙 地球到月球转移
+### 地球到月球转移
 - 直接转移轨道设计
 - 低能转移轨道（经平动点L1/L2）
 - 基于不变流形的转移
 
-### 🌙→🌍 月球到地球转移
+### 月球到地球转移
 - 直接返回轨道
 - 低能返回路径
 - 流形辅助返回
 
-### 🔄 轨道间转移
+### 轨道间转移
 - 同族轨道转移（如不同Halo轨道之间）
 - 异族轨道转移（如Lyapunov → Halo）
 - L1-L2异宿连接
 - 同宿轨道转移
 
-### 🛰️ 三体轨道设计
+### 三体轨道设计
 - 平动点轨道（Halo、Lyapunov、Vertical等）
 - 微分修正算法（多种对称性配置）
 - 轨道族延拓（自然参数/伪弧长）
 - 稳定性分析与分岔检测
 
-### 📊 可视化
+### 可视化
 - 3D轨道绘制
 - 2D投影图
 - 轨道族演化图
@@ -47,9 +47,10 @@ pip install -e .
 ```python
 import e2m2e
 
-# 1. 创建地月系统
-system = e2m2e.CR3BP_System.from_known_system("earth_moon")
-system.compute_libration_points()
+# 1. 创建地月系统，为后续计算提供常数接口、数据存储接口等功能
+system = e2m2e.core.system.CR3BP_System.from_known_system("earth_moon") # 也可以自定义系统参数
+# system = e2m2e.core.system.CR3BP_System(mu=0.0121505856, primary="Earth", secondary="Moon") # 直接指定质量比
+system.compute_libration_points() # 计算平动点位置（根据系统初始化的mu来计算）
 system.set_characteristic_scales(distance=384400, period=27.32 * 86400)
 
 print(f"地月系统: {system}")
@@ -57,10 +58,10 @@ print(f"L1点: {system.L1}")
 print(f"L2点: {system.L2}")
 
 # 2. 创建动力学对象
-dynamics = e2m2e.CR3BP_Dynamics(system)
+dynamics = e2m2e.core.dynamics.CR3BP_Dynamics(system)
 
 # 3. 设计Lyapunov轨道（微分修正）
-dc = e2m2e.DifferentialCorrection(dynamics)
+dc = e2m2e.algorithms.differential_correction.DifferentialCorrection(dynamics)
 dc.setup_2D_symmetric_x_fixed_x0(x0=system.L1[0] + 0.01)
 
 # 初始猜测
@@ -71,12 +72,12 @@ if orbit is not None:
     print(f"Lyapunov轨道周期: {orbit.period:.4f}")
 
     # 4. 可视化
-    viz = e2m2e.OrbitVisualizer(system)
+    viz = e2m2e.visualization.plotting.OrbitVisualizer(system)
     viz.create_overview_plot(orbit)
     viz.show()
 
 # 5. 轨道族延拓
-cont = e2m2e.Continuation(dc, param="x0", step=0.001)
+cont = e2m2e.algorithms.continuation.Continuation(dc, param="x0", step=0.001)
 family = cont.natural_continuation(
     seed_state=result['state'],
     seed_t_half=result['t_half'],
@@ -84,7 +85,7 @@ family = cont.natural_continuation(
 )
 
 # 6. 转移轨道设计
-transfer = e2m2e.EarthMoonTransfer(system, dynamics)
+transfer = e2m2e.transfer.earth_moon.EarthMoonTransfer(system, dynamics) 
 # ... 设计具体的转移轨道
 ```
 
