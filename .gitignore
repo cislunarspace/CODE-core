@@ -1,111 +1,35 @@
-# Byte-compiled / optimized / DLL files
+# Python 字节码和缓存文件
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
+*.pyo
+*.pyd
 .Python
+
+# 包构建和分发文件
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
-MANIFEST
+.eggs/
+pip-wheel-metadata/
+wheels/
+*.whl
+*.tar.gz
+sdist/
 
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
+# 安装和包管理文件
+.pip/
+Pipfile
 Pipfile.lock
-
-# poetry
 poetry.lock
-
-# pdm
+pdm.lock
+pyproject.toml.lock
 .pdm.toml
-
-# pdm-builder
-dist/
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+.pdm-build/
 __pypackages__/
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
+# 虚拟环境和环境文件
 .env
 .venv
 env/
@@ -113,50 +37,83 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.conda/
+conda-env/
+conda-meta/
+*.conda
 
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
+# 测试和覆盖率报告
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# VS Code
-.vscode/
-*.code-workspace
-
-# PyCharm
-.idea/
-
-# macOS
-.DS_Store
-
-# Windows
-Thumbs.db
-
-# Temporary files
-*.tmp
-*.temp
-
-# Logs
+test_output/
+test-results/
 *.log
 
-# Test output
-test_output/
+# IDE 和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.code-workspace
+
+# 操作系统临时文件
+*.tmp
+*.temp
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# 特定于项目的临时文件
+temp.py
+*.ipynb
+.ipynb_checkpoints/
+*.mat
+*.npy
+*.npz
+*.pkl
+*.pickle
+
+# 文档构建文件
+docs/_build/
+site/
+
+# Ruff 缓存
+.ruff_cache/
+
+# 其他缓存目录
+.cache/
+.mypy_cache/
+.pytype/
+.pyre/
+
+# 特定于 e2m2e 项目的临时文件
+# 添加您项目特有的临时文件模式
+*.dat
+*.out
+*.err
+output/
+results/
+data/
+plots/
+figures/
+
+# 确保所有子目录中的 __pycache__ 都被忽略
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
