@@ -121,28 +121,73 @@ class DifferentialCorrection:
     def setup_2D_symmetric_x_fixed_x0(self, x0):
         """配置平面问题中固定初始x坐标的对称周期轨道搜索
 
-        利用CR3BP关于x轴的对称性，搜索从x轴垂直出发的周期轨道。
-        固定初始x坐标x0，调整y_dot0和T/2满足终点垂直穿越x轴条件。
+        在平面圆形限制性三体问题（PCRTBP）模型中，动力学方程关于会合坐标系的x轴具有对称性。
+        利用这一性质，周期轨道的搜索可以简化为寻找合适的初始条件：
+        从x轴上一点垂直出发（y=0, x_dot=0），经过半周期T/2后再次垂直穿越x轴（y=0, x_dot=0）。
+
+        本函数针对这种对称性设置微分修正问题，固定初始x坐标x0，将初始y方向速度y_dot0
+        和半周期T/2作为自由变量进行调整，以满足终点处的垂直穿越条件。
 
         参数:
-            x0 (float): 固定的初始x坐标
+            x0 (float): 固定的初始x坐标，轨道从点(x0, 0)垂直出发
 
         返回:
-            self: 配置好的微分修正器实例
+            self: 返回配置好的微分修正器实例
+
+        配置说明:
+            - 自由变量: [y_dot0, T_half] - 初始y方向速度和半周期时间
+            - 目标约束: [y(T/2)=0, x_dot(T/2)=0] - 终点处再次垂直穿越x轴
+            - 状态向量索引: [1, 3] 分别对应y坐标和x方向速度
+
+        应用场景:
+            此配置对应于Broucke(1968)等经典文献中寻找对称周期轨道的基本方法，
+            可用于生成围绕平动点或主天体的各类周期轨道家族。
+
+        参考文献：
+            [1] Broucke R A. Periodic orbits in the restricted three body problem with Earth-moon masses[R]. 1968.
         """
+        # 设置配置类型
         self.setup_type = "2D_symmetric_x_fixed_x0"
         self.symmetry_condition = "x_axis"
         self.fixed_parameters = {"x0": x0}
 
+        # 定义自由变量
+        # 在2D对称x轴的情况下，从x轴垂直出发的初始条件为: [x0, 0, 0, y_dot]
+        # 自由变量是初始y方向速度 y_dot 和飞行时间 T/2
         self.free_variables = ["y_dot0", "T_half"]
-        self.free_variable_indices = [4, 6]  # y_dot索引4, 时间作为额外变量索引6
+        self.free_variable_indices = [
+            4,
+            6,
+        ]  # 状态向量中索引4是y_dot，索引6表示时间（作为变量）
 
-        self.target_conditions = {"y": 0.0, "x_dot": 0.0}
+        # 定义目标约束条件
+        # 对于对称x轴的周期轨道，在半周期处应满足：y(T/2)=0, x_dot(T/2)=0
+        # 即轨道再次垂直穿越x轴
+        self.target_conditions = {
+            "y": 0.0,  # 终点y坐标为0
+            "x_dot": 0.0,  # 终点x方向速度为0
+        }
+
+        # 设置约束索引
+        # 状态向量为 [x, y, z, x_dot, y_dot, z_dot]
         self.constraint_indices = [1, 3]  # y和x_dot在状态向量中的索引
+
+        # 设置约束权重（可选，用于加权最小二乘）
         self.constraint_weights = {"y": 1.0, "x_dot": 1.0}
+
+        # 设置约束类型
         self.constraint_types = {"y": "equality", "x_dot": "equality"}
 
+        # 更新固定参数到目标条件中（可选）
+        self.fixed_parameters.update({"x0": x0})
+
+        # 重置收敛历史
         self._reset_history()
+
+        print(
+            f"2D对称x轴配置完成：固定x0={x0}，自由变量={self.free_variables}，目标约束={list(self.target_conditions.keys())}"
+        )
+
         return self
 
     def setup_2D_symmetric_x_fixed_t(self, t_half):
@@ -353,61 +398,92 @@ class DifferentialCorrection:
         self.performance_stats["jacobian_evaluations"] += 1
         return jacobian
 
-    def iterate_correction(self, initial_state, t_half, verbose=True):
-        """迭代修正主算法
+    def iterate_correction(self, initial_guess):
+        """迭代修正主算法（基于STM的牛顿法）
+
+        通过状态转移矩阵(STM)构建雅可比矩阵，使用牛顿迭代法修正自由变量，
+        使终点状态满足目标约束条件，从而找到精确的周期轨道。
 
         参数:
-            initial_state (np.ndarray): 初始状态向量 [x, y, z, vx, vy, vz]
-            t_half (float): 初始半周期估计
-            verbose (bool): 是否打印迭代信息
+            initial_guess (Orbit): 初始猜测轨道，包含初始状态和时间信息
 
         返回:
-            dict: 包含修正结果的字典
-                - 'state': 修正后的初始状态
-                - 'period': 修正后的完整周期
-                - 'success': 是否收敛
-                - 'iterations': 迭代次数
-                - 'error': 最终误差
-                - 'history': 收敛历史
+            Orbit: 修正后的精确周期轨道
+
+        算法步骤:
+            1. 从初始猜测出发，带STM积分到当前估计的半周期时间
+            2. 计算终点状态与目标约束的残差
+            3. 如果残差小于容差，收敛成功
+            4. 利用STM和终点状态导数构建雅可比矩阵
+            5. 求解线性系统得到牛顿修正量
+            6. 更新自由变量
+            7. 重复直到收敛或达到最大迭代次数
         """
-        self._reset_history()
-        current_state = initial_state.copy()
-        current_time = t_half
+        # 状态索引到目标条件键的映射
+        _STATE_INDEX_TO_KEY = {
+            0: "x",
+            1: "y",
+            2: "z",
+            3: "x_dot",
+            4: "y_dot",
+            5: "z_dot",
+        }
 
-        if verbose:
-            print(f"\n{'=' * 60}")
-            print(f"开始微分修正迭代 (配置: {self.setup_type})")
-            print(f"{'=' * 60}")
+        # 保存初始猜测
+        self.initial_guess = initial_guess
+        self.iteration_count = 0
+        self.converged = False
 
+        # 从初始猜测中提取初始状态和时间
+        current_state = initial_guess.states[0].copy()
+        current_time = initial_guess.period / 2  # 半周期时间
+
+        print(f"\n{'=' * 60}")
+        print(f"开始微分修正迭代（STM牛顿法）...")
+        print(f"{'=' * 60}")
+        print(
+            f"初始状态: x={current_state[0]:.6f}, y={current_state[1]:.6f}, z={current_state[2]:.6f}"
+        )
+        print(
+            f"         x_dot={current_state[3]:.6f}, y_dot={current_state[4]:.6f}, z_dot={current_state[5]:.6f}"
+        )
+        print(f"初始半周期: T/2={current_time:.6f}")
+        print(f"{'=' * 60}")
+
+        # 迭代循环
         for iteration in range(self.max_iterations):
             self.iteration_count = iteration + 1
 
-            # 1. 积分到半周期
+            # 1. 带STM传播到半周期时间
             try:
-                result = integrate.solve_ivp(
-                    self.dynamics.equations_of_motion,
-                    (0, current_time),
+                result = self.dynamics.propagate(
                     current_state,
-                    method="DOP853",
+                    (0, current_time),
                     t_eval=np.linspace(0, current_time, 1000),
-                    rtol=1e-12,
-                    atol=1e-12,
+                    with_stm=True,
                 )
-                if not result.success:
-                    self.termination_reason = f"积分失败: {result.message}"
-                    if verbose:
-                        print(f"  积分失败: {result.message}")
-                    return self._build_result(current_state, current_time)
 
-                final_state = result.y[:, -1]
+                final_state = result["states"][-1]
+                final_stm = result["stm"][-1]
+
                 self.performance_stats["stm_evaluations"] += 1
 
             except Exception as e:
-                self.termination_reason = f"积分异常: {e}"
-                return self._build_result(current_state, current_time)
+                print(f"  积分失败: {e}")
+                self.termination_reason = f"积分失败: {e}"
+                return None
 
-            # 2. 计算误差
-            error_vector = self._compute_error_vector(final_state)
+            # 2. 计算约束残差
+            constraint = np.array(
+                [final_state[idx] for idx in self.constraint_indices]
+            )
+            target = np.array(
+                [
+                    self.target_conditions[_STATE_INDEX_TO_KEY[idx]]
+                    for idx in self.constraint_indices
+                ]
+            )
+            error_vector = constraint - target
             current_error = np.linalg.norm(error_vector)
 
             # 保存历史
@@ -418,70 +494,121 @@ class DifferentialCorrection:
                     "error": current_error,
                     "state": current_state.copy(),
                     "time": current_time,
+                    "constraints": constraint.copy(),
                     "final_state": final_state.copy(),
                 }
             )
 
-            if verbose:
-                print(f"  迭代 {iteration + 1}: 误差 = {current_error:.4e}")
+            print(f"\n迭代 {iteration + 1}: 约束残差范数 = {current_error:.2e}")
 
             # 3. 检查收敛
             if current_error < self.tolerance:
                 self.converged = True
-                self.success = True
-                self.termination_reason = "收敛成功"
-                if verbose:
-                    print(f"\n✓ 收敛成功！最终误差: {current_error:.2e}")
+                self.termination_reason = "收敛成功：误差小于容差"
+                print(f"✓ 收敛成功！最终误差: {current_error:.2e}")
                 break
 
             # 4. 检查发散
             if current_error > self.divergence_limit:
-                self.termination_reason = "发散"
-                if verbose:
-                    print(f"\n✗ 迭代发散，误差 = {current_error:.2e}")
+                self.termination_reason = "发散：误差超过限制"
+                print(f"✗ 警告：迭代发散，误差 = {current_error:.2e}")
                 break
 
-            # 5. 计算雅可比矩阵
-            self.jacobian_matrix = self._compute_jacobian_finite_diff(current_state, current_time)
+            # 5. 构建雅可比矩阵（基于STM和终点状态导数）
+            # 计算终点处的状态导数（速度和加速度）
+            state_derivative = self.dynamics.equations_of_motion(
+                current_time, final_state
+            )
 
-            # 6. 计算修正量
+            n_constraints = len(self.constraint_indices)
+            n_variables = len(self.free_variable_indices)
+            self.jacobian_matrix = np.zeros((n_constraints, n_variables))
+
+            for j, var_idx in enumerate(self.free_variable_indices):
+                if var_idx < 6:  # 状态变量：从STM获取偏导 ∂(终点状态)/∂(初始状态)
+                    for i, c_idx in enumerate(self.constraint_indices):
+                        self.jacobian_matrix[i, j] = final_stm[c_idx, var_idx]
+                elif var_idx == 6:  # 时间变量：从状态导数获取 ∂(终点状态)/∂t
+                    for i, c_idx in enumerate(self.constraint_indices):
+                        self.jacobian_matrix[i, j] = state_derivative[c_idx]
+
+            self.performance_stats["jacobian_evaluations"] += 1
+
+            # 6. 求解牛顿修正量: J * delta = F => delta = J^{-1} * F
             try:
-                self.pseudoinverse_matrix = np.linalg.pinv(self.jacobian_matrix)
-                correction = -self.pseudoinverse_matrix @ error_vector
+                if n_constraints == n_variables:
+                    delta = np.linalg.solve(self.jacobian_matrix, error_vector)
+                else:
+                    delta = np.linalg.lstsq(
+                        self.jacobian_matrix, error_vector, rcond=None
+                    )[0]
             except np.linalg.LinAlgError:
-                correction = -np.linalg.lstsq(self.jacobian_matrix, error_vector, rcond=None)[0]
+                print("  雅可比矩阵奇异，无法求解修正量。")
+                self.termination_reason = "雅可比矩阵奇异"
+                break
 
-            # 应用阻尼
-            correction *= self.damping_factor
-
-            # 限制步长
-            correction_norm = np.linalg.norm(correction)
-            if correction_norm > self.step_size_limit:
-                correction *= self.step_size_limit / correction_norm
-
+            correction_norm = np.linalg.norm(delta)
             self.correction_history.append(correction_norm)
 
-            # 7. 更新自由变量
+            # 7. 牛顿更新: X_new = X_old - J^{-1} * F
             for j, var_idx in enumerate(self.free_variable_indices):
-                if var_idx < 6:
-                    current_state[var_idx] += correction[j]
-                elif var_idx == 6:
-                    current_time += correction[j]
+                if var_idx < 6:  # 更新状态变量
+                    current_state[var_idx] -= delta[j]
+                elif var_idx == 6:  # 更新时间变量
+                    current_time -= delta[j]
 
-            # 确保时间为正
+            # 确保时间正数
             if current_time <= 0:
-                current_time = abs(current_time) if abs(current_time) > 1e-6 else 1e-6
+                current_time = 1e-6
+                print("  警告：时间调整为正值")
+
+            print(f"  修正量范数: {correction_norm:.2e}")
+            print(
+                f"  新状态: x={current_state[0]:.6f}, y_dot={current_state[4]:.6f}"
+            )
+            print(f"  新半周期: T/2={current_time:.6f}")
 
             # 检查停滞
             if correction_norm < self.stagnation_limit:
-                self.termination_reason = "停滞"
+                self.termination_reason = "停滞：修正量过小"
+                print(f"  停滞：修正量 = {correction_norm:.2e}")
                 break
 
-        # 存储最终解
-        self.final_solution = current_state.copy()
-        self.solution_time = current_time
+        # 迭代结束，处理结果
+        if self.converged:
+            self.success = True
+            self.final_solution = current_state.copy()
+            self.solution_time = current_time
 
-        return self._build_result(current_state, current_time)
+            # 构建最终轨道：积分完整周期 (2 * T_half)
+            full_period = 2 * current_time
+            n_points = 1000
+
+            result = self.dynamics.propagate(
+                current_state,
+                (0, full_period),
+                t_eval=np.linspace(0, full_period, n_points),
+            )
+
+            from ..core.orbit import Orbit
+
+            corrected_orbit = Orbit(
+                states=result["states"],
+                times=result["time"],
+            )
+
+            print(f"\n{'=' * 60}")
+            print(f"微分修正成功完成")
+            print(f"{'=' * 60}")
+            print(f"  最终周期: T = {full_period:.6f}")
+            print(f"  最终误差: {current_error:.2e}")
+            print(f"  迭代次数: {self.iteration_count}")
+            print(f"{'=' * 60}")
+
+            return corrected_orbit
+        else:
+            print(f"\n微分修正失败: {self.termination_reason}")
+            return None
 
     def _build_result(self, state, t_half):
         """构建结果字典"""
