@@ -1,0 +1,293 @@
+"""
+DifferentialCorrection 微分修正算法测试模块
+
+测试基于STM牛顿法的微分修正算法在不同对称性配置下的正确性。
+
+参考论文：
+  Cui et al. (2025) "Two-Impulse Transfers from Lunar Distant Retrograde Orbits
+  to Resonant Orbits", JGCD, Vol.48, No.6
+
+地月系统参数：
+  μ = 1.21506683 × 10⁻² (地月系统质量比)
+  DU = 3.84405 × 10⁵ km, TU = 4.34811305 天
+"""
+
+import numpy as np
+import pytest
+
+import e2m2e
+from e2m2e import DifferentialCorrection, CR3BP_Dynamics, Orbit
+
+# 地月系统质量比
+MU = 1.21506683e-2
+
+
+# ============================================================
+# Fixtures
+# ============================================================
+@pytest.fixture
+def earth_moon_system():
+    """创建地月CR3BP系统"""
+    system = e2m2e.core.system.CR3BP_System(mu=MU, primary="earth", secondary="moon")
+    system.compute_libration_points()
+    return system
+
+
+@pytest.fixture
+def dynamics(earth_moon_system):
+    """创建动力学对象"""
+    return CR3BP_Dynamics(earth_moon_system)
+
+
+@pytest.fixture
+def corrector_2d_fixed_x0(dynamics):
+    """创建2D对称x轴、固定x0的微分修正器"""
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_2D_symmetric_x_fixed_x0(x0=0.79188556619742)
+    return corrector
+
+
+@pytest.fixture
+def dro_initial_guess():
+    """DRO初始猜测轨道"""
+    x0 = 0.79188556619742
+    guess = Orbit(
+        states=[[x0, 0.0, 0.0, 0.0, 0.573665890385585, 0.0]],
+        times=[0],
+    )
+    guess.period = 6.307498
+    return guess
+
+
+@pytest.fixture
+def corrected_dro(corrector_2d_fixed_x0, dro_initial_guess):
+    """执行微分修正后的DRO轨道（缓存结果供多个测试复用）"""
+    return corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+
+
+# ============================================================
+# 配置类测试
+# ============================================================
+class TestSetup:
+    """测试各种对称性配置的正确性"""
+
+    def test_setup_2d_symmetric_x_fixed_x0(self, dynamics):
+        """2D对称x轴、固定x0配置"""
+        corrector = DifferentialCorrection(dynamics)
+        result = corrector.setup_2D_symmetric_x_fixed_x0(x0=0.8)
+
+        assert result is corrector
+        assert corrector.setup_type == "2D_symmetric_x_fixed_x0"
+        assert corrector.free_variables == ["y_dot0", "T_half"]
+        assert corrector.free_variable_indices == [4, 6]
+        assert corrector.constraint_indices == [1, 3]
+        assert corrector.target_conditions == {"y": 0.0, "x_dot": 0.0}
+        assert corrector.fixed_parameters["x0"] == 0.8
+
+    def test_setup_2d_symmetric_x_fixed_t(self, dynamics):
+        """2D对称x轴、固定T配置"""
+        corrector = DifferentialCorrection(dynamics)
+        result = corrector.setup_2D_symmetric_x_fixed_t(t_half=3.0)
+
+        assert result is corrector
+        assert corrector.setup_type == "2D_symmetric_x_fixed_t"
+        assert corrector.free_variables == ["x0", "y_dot0"]
+        assert corrector.free_variable_indices == [0, 4]
+        assert corrector.constraint_indices == [1, 3]
+
+    def test_setup_3d_symmetric_x_fixed_x0(self, dynamics):
+        """3D对称x轴、固定x0配置（Halo轨道）"""
+        corrector = DifferentialCorrection(dynamics)
+        result = corrector.setup_3D_symmetric_x_fixed_x0(x0=0.8)
+
+        assert result is corrector
+        assert corrector.setup_type == "3D_symmetric_x_fixed_x0"
+        assert corrector.free_variables == ["z0", "y_dot0", "T_half"]
+        assert corrector.free_variable_indices == [2, 4, 6]
+        assert corrector.constraint_indices == [1, 3, 5]
+        assert corrector.target_conditions == {"y": 0.0, "x_dot": 0.0, "z_dot": 0.0}
+
+    def test_setup_3d_symmetric_xz_fixed_x0(self, dynamics):
+        """3D XZ对称、固定x0配置"""
+        corrector = DifferentialCorrection(dynamics)
+        corrector.setup_3D_symmetric_xz_fixed_x0(x0=0.8)
+
+        assert corrector.setup_type == "3D_symmetric_xz_fixed_x0"
+        assert corrector.free_variable_indices == [2, 4, 6]
+        assert corrector.constraint_indices == [1, 3, 5]
+
+    def test_setup_3d_symmetric_xz_fixed_z0(self, dynamics):
+        """3D XZ对称、固定z0配置"""
+        corrector = DifferentialCorrection(dynamics)
+        corrector.setup_3D_symmetric_xz_fixed_z0(z0=0.1)
+
+        assert corrector.setup_type == "3D_symmetric_xz_fixed_z0"
+        assert corrector.free_variable_indices == [0, 4, 6]
+        assert corrector.fixed_parameters["z0"] == 0.1
+
+    def test_setup_resets_history(self, dynamics):
+        """配置时应重置收敛历史"""
+        corrector = DifferentialCorrection(dynamics)
+        corrector.error_history = [1.0, 0.5]
+        corrector.converged = True
+
+        corrector.setup_2D_symmetric_x_fixed_x0(x0=0.8)
+
+        assert corrector.error_history == []
+        assert corrector.converged is False
+
+
+# ============================================================
+# 微分修正收敛测试
+# ============================================================
+class TestIterateCorrection:
+    """测试微分修正迭代的收敛性"""
+
+    def test_correction_converges(self, corrected_dro):
+        """微分修正应成功收敛"""
+        assert corrected_dro is not None
+
+    def test_corrector_state_after_convergence(self, corrector_2d_fixed_x0, dro_initial_guess):
+        """收敛后修正器内部状态正确"""
+        corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+
+        assert corrector_2d_fixed_x0.converged is True
+        assert corrector_2d_fixed_x0.success is True
+        assert corrector_2d_fixed_x0.check_convergence() is True
+        assert corrector_2d_fixed_x0.final_solution is not None
+        assert corrector_2d_fixed_x0.solution_time is not None
+
+    def test_error_below_tolerance(self, corrector_2d_fixed_x0, dro_initial_guess):
+        """最终误差应小于默认容差 1e-12"""
+        corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+
+        history = corrector_2d_fixed_x0.get_convergence_history()
+        final_error = history["errors"][-1]
+        assert final_error < corrector_2d_fixed_x0.tolerance
+
+    def test_error_monotonically_decreasing_near_convergence(
+        self, corrector_2d_fixed_x0, dro_initial_guess
+    ):
+        """收敛阶段误差应大致递减"""
+        corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+
+        errors = corrector_2d_fixed_x0.error_history
+        # 至少最后3次迭代误差递减
+        assert len(errors) >= 3
+        for i in range(-3, -1):
+            assert errors[i] > errors[i + 1]
+
+    def test_converges_within_reasonable_iterations(
+        self, corrector_2d_fixed_x0, dro_initial_guess
+    ):
+        """应在合理的迭代次数内收敛"""
+        corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+        assert corrector_2d_fixed_x0.iteration_count <= 20
+
+
+# ============================================================
+# 修正轨道物理性质测试
+# ============================================================
+class TestCorrectedOrbit:
+    """测试修正后轨道的物理正确性"""
+
+    def test_orbit_is_orbit_object(self, corrected_dro):
+        """返回值应为Orbit对象"""
+        assert isinstance(corrected_dro, Orbit)
+
+    def test_orbit_has_states_and_times(self, corrected_dro):
+        """轨道应包含状态和时间序列"""
+        assert corrected_dro.states.shape[1] == 6
+        assert len(corrected_dro.times) == corrected_dro.states.shape[0]
+        assert corrected_dro.states.shape[0] == 1000
+
+    def test_initial_state_x_preserved(self, corrected_dro):
+        """修正后初始x坐标应保持不变（固定量）"""
+        x0_expected = 0.79188556619742
+        np.testing.assert_allclose(corrected_dro.states[0, 0], x0_expected, atol=1e-10)
+
+    def test_initial_state_symmetry(self, corrected_dro):
+        """初始状态应满足x轴对称条件: y=0, x_dot=0"""
+        state0 = corrected_dro.states[0]
+        np.testing.assert_allclose(state0[1], 0.0, atol=1e-10)  # y = 0
+        np.testing.assert_allclose(state0[3], 0.0, atol=1e-10)  # x_dot = 0
+
+    def test_half_period_crossing_condition(self, corrector_2d_fixed_x0, dro_initial_guess):
+        """半周期处应满足垂直穿越条件: y(T/2)≈0, x_dot(T/2)≈0"""
+        corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+
+        history = corrector_2d_fixed_x0.convergence_history
+        final_entry = history[-1]
+        final_state = final_entry["final_state"]
+
+        np.testing.assert_allclose(final_state[1], 0.0, atol=1e-10)   # y(T/2) ≈ 0
+        np.testing.assert_allclose(final_state[3], 0.0, atol=1e-10)   # x_dot(T/2) ≈ 0
+
+    def test_orbit_period_positive(self, corrector_2d_fixed_x0, dro_initial_guess):
+        """修正后的轨道周期应为正数"""
+        corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+        full_period = 2 * corrector_2d_fixed_x0.solution_time
+        assert full_period > 0
+
+    def test_orbit_is_planar(self, corrected_dro):
+        """DRO应为平面轨道: z=0, z_dot=0"""
+        np.testing.assert_allclose(corrected_dro.states[:, 2], 0.0, atol=1e-10)
+        np.testing.assert_allclose(corrected_dro.states[:, 5], 0.0, atol=1e-10)
+
+    def test_orbit_closure(self, corrected_dro):
+        """完整周期轨道首尾应闭合"""
+        state_start = corrected_dro.states[0]
+        state_end = corrected_dro.states[-1]
+        np.testing.assert_allclose(state_start, state_end, atol=1e-6)
+
+
+# ============================================================
+# 收敛历史 API 测试
+# ============================================================
+class TestConvergenceHistory:
+    """测试收敛历史记录接口"""
+
+    def test_get_convergence_history_keys(self, corrector_2d_fixed_x0, dro_initial_guess):
+        """get_convergence_history 应返回正确的字段"""
+        corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+
+        history = corrector_2d_fixed_x0.get_convergence_history()
+        assert "errors" in history
+        assert "corrections" in history
+        assert "iterations" in history
+        assert "converged" in history
+        assert "termination_reason" in history
+
+    def test_convergence_history_length(self, corrector_2d_fixed_x0, dro_initial_guess):
+        """误差历史长度应等于迭代次数"""
+        corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+
+        history = corrector_2d_fixed_x0.get_convergence_history()
+        assert len(history["errors"]) == history["iterations"]
+
+
+# ============================================================
+# 失败场景测试
+# ============================================================
+class TestFailureCases:
+    """测试微分修正的失败场景"""
+
+    def test_bad_initial_guess_returns_none(self, dynamics):
+        """极差的初始猜测应返回None或发散"""
+        corrector = DifferentialCorrection(dynamics)
+        corrector.setup_2D_symmetric_x_fixed_x0(x0=0.5)
+        corrector.max_iterations = 5
+
+        bad_guess = Orbit(states=[[0.5, 0.0, 0.0, 0.0, 10.0, 0.0]], times=[0])
+        bad_guess.period = 0.1
+
+        result = corrector.iterate_correction(bad_guess)
+        # 极差猜测可能收敛或不收敛，但不应崩溃
+        assert result is None or isinstance(result, Orbit)
+
+    def test_repr_and_str(self, corrector_2d_fixed_x0):
+        """__str__ 和 __repr__ 不应抛出异常"""
+        s = str(corrector_2d_fixed_x0)
+        r = repr(corrector_2d_fixed_x0)
+        assert "DifferentialCorrection" in s
+        assert "DifferentialCorrection" in r

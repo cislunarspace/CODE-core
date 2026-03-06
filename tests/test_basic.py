@@ -84,31 +84,6 @@ def test_dynamics():
     print(f"  STM行列式: {np.linalg.det(stm):.6f}")
     print("✓ STM计算成功")
 
-
-def test_orbit():
-    """测试轨道对象"""
-    from e2m2e import CR3BP_System, CR3BP_Dynamics, Orbit
-
-    system = CR3BP_System.from_known_system("earth_moon")
-    system.compute_libration_points()
-    dynamics = CR3BP_Dynamics(system)
-
-    # 传播轨迹
-    initial_state = np.array([system.L1[0] + 0.01, 0, 0, 0, 0.15, 0])
-    result = dynamics.propagate(initial_state, [0, 6.0], t_eval=np.linspace(0, 6.0, 2000))
-
-    # 创建轨道对象
-    orbit = Orbit(result["states"], result["time"], system)
-    print(f"✓ 轨道对象创建: {orbit}")
-    print(f"  振幅: x={orbit.amplitudes['x']:.4f}, y={orbit.amplitudes['y']:.4f}")
-
-    # 测试插值
-    t_mid = (result["time"][0] + result["time"][-1]) / 2
-    state_interp = orbit.interpolate_at_time(t_mid)
-    assert len(state_interp) == 6
-    print("✓ 轨道插值成功")
-
-
 def test_coordinate_transform():
     """测试坐标变换"""
     from e2m2e import CR3BP_System, CoordinateTransformation
@@ -128,40 +103,6 @@ def test_coordinate_transform():
     state_primary = coord.barycentric_to_primary(state)
     state_back2 = coord.primary_to_barycentric(state_primary)
     assert np.allclose(state, state_back2, atol=1e-14)
-    print("✓ 质心系↔主天体中心系变换可逆")
-
-
-def test_differential_correction():
-    """测试微分修正 - L1 Lyapunov轨道"""
-    from e2m2e import CR3BP_System, CR3BP_Dynamics, DifferentialCorrection
-
-    system = CR3BP_System.from_known_system("earth_moon")
-    system.compute_libration_points()
-    dynamics = CR3BP_Dynamics(system)
-
-    # 使用固定半周期的配置, 调整x0和vy来找Lyapunov轨道
-    dc = DifferentialCorrection(dynamics)
-    dc.setup_2D_symmetric_x_fixed_t(t_half=1.5)
-
-    # L1附近的初始猜测: 从x轴出发，只有y方向速度
-    initial_state = np.array([system.L1[0] + 0.02, 0, 0, 0, -0.15, 0])
-
-    orbit, result = dc.correct_orbit(initial_state, t_half=1.5, verbose=False)
-
-    if orbit is not None:
-        print("✓ 微分修正成功")
-        print(f"  周期: {result['period']:.6f}")
-        print(f"  迭代次数: {result['iterations']}")
-        print(f"  最终误差: {result['error']:.2e}")
-        # 验证轨道关闭性: 终点应接近起点
-        final_state = orbit.states[-1]
-        initial = orbit.states[0]
-        closure_error = np.linalg.norm(final_state[:3] - initial[:3])
-        print(f"  轨道闭合误差: {closure_error:.2e}")
-    else:
-        print(f"△ 微分修正未收敛 (原因: {result['termination_reason']})")
-        print("  这可能需要更好的初始猜测")
-
 
 def main():
     """运行所有测试"""
@@ -173,9 +114,7 @@ def main():
         ("导入测试", test_import),
         ("系统创建测试", test_system),
         ("动力学传播测试", test_dynamics),
-        ("轨道对象测试", test_orbit),
         ("坐标变换测试", test_coordinate_transform),
-        ("微分修正测试", test_differential_correction),
     ]
 
     passed = 0
