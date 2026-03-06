@@ -112,18 +112,7 @@ class Orbit:
         }
 
         # 初始化计算
-        self._initialize_interpolators()
         self.compute_basic_properties()
-
-    def _initialize_interpolators(self):
-        """初始化插值函数"""
-        for i, component in enumerate(self.VALID_COMPONENTS):
-            self.interpolators[component] = interpolate.interp1d(
-                self.times,
-                self.states[:, i],
-                kind=self.interpolation_kind,
-                fill_value="extrapolate",
-            )
 
     def compute_basic_properties(self):
         """计算基本轨道属性"""
@@ -145,6 +134,16 @@ class Orbit:
 
         # 计算轨道中心（位置分量的平均值）
         self.center = self.mean_state[:3]
+
+        # 构建插值函数（需要至少2个点）
+        if len(self.times) >= 2:
+            for i, component in enumerate(self.VALID_COMPONENTS):
+                self.interpolators[component] = interpolate.interp1d(
+                    self.times,
+                    self.states[:, i],
+                    kind=self.interpolation_kind if len(self.times) >= 4 else "linear",
+                    fill_value="extrapolate",
+                )
 
         # 估计周期（如果轨道是周期的）
         self._estimate_period()
