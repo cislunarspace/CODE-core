@@ -81,96 +81,102 @@ class CR3BP_Dynamics:
 
     def equations_of_motion(self, t, state):
         """6维状态向量的运动方程
-        
+
         参数：
         - t: 时间
         - state: 状态向量 [x, y, z, vx, vy, vz]
-        
+
         返回：
         - 状态导数 [vx, vy, vz, ax, ay, az]
         """
         mu = self.system.mu
-        
+
         # 解包状态
         x, y, z, vx, vy, vz = state
-        
+
         # 计算到两个天体的距离
-        r1 = np.sqrt((x + mu)**2 + y**2 + z**2)
-        r2 = np.sqrt((x - 1 + mu)**2 + y**2 + z**2)
-        
+        r1 = np.sqrt((x + mu) ** 2 + y**2 + z**2)
+        r2 = np.sqrt((x - 1 + mu) ** 2 + y**2 + z**2)
+
         # 计算加速度
-        ax = 2*vy + x - (1-mu)*(x+mu)/r1**3 - mu*(x-1+mu)/r2**3
-        ay = -2*vx + y - (1-mu)*y/r1**3 - mu*y/r2**3
-        az = -(1-mu)*z/r1**3 - mu*z/r2**3
-        
+        ax = 2 * vy + x - (1 - mu) * (x + mu) / r1**3 - mu * (x - 1 + mu) / r2**3
+        ay = -2 * vx + y - (1 - mu) * y / r1**3 - mu * y / r2**3
+        az = -(1 - mu) * z / r1**3 - mu * z / r2**3
+
         return np.array([vx, vy, vz, ax, ay, az])
 
     def equations_with_stm(self, t, augmented_state):
         """42维增广状态向量的运动方程（包含状态转移矩阵）
-        
+
         参数：
         - t: 时间
         - augmented_state: 增广状态向量 [6状态 + 36个STM元素]
-        
+
         返回：
         - 增广状态导数
         """
         mu = self.system.mu
-        
+
         # 解包状态
         x, y, z, vx, vy, vz = augmented_state[:6]
-        
+
         # 计算到两个天体的距离
-        r1 = np.sqrt((x + mu)**2 + y**2 + z**2)
-        r2 = np.sqrt((x - 1 + mu)**2 + y**2 + z**2)
-        
+        r1 = np.sqrt((x + mu) ** 2 + y**2 + z**2)
+        r2 = np.sqrt((x - 1 + mu) ** 2 + y**2 + z**2)
+
         # 计算加速度
-        ax = 2*vy + x - (1-mu)*(x+mu)/r1**3 - mu*(x-1+mu)/r2**3
-        ay = -2*vx + y - (1-mu)*y/r1**3 - mu*y/r2**3
-        az = -(1-mu)*z/r1**3 - mu*z/r2**3
-        
+        ax = 2 * vy + x - (1 - mu) * (x + mu) / r1**3 - mu * (x - 1 + mu) / r2**3
+        ay = -2 * vx + y - (1 - mu) * y / r1**3 - mu * y / r2**3
+        az = -(1 - mu) * z / r1**3 - mu * z / r2**3
+
         # 状态导数
         state_derivative = np.array([vx, vy, vz, ax, ay, az])
-        
+
         # 提取状态转移矩阵
         stm = augmented_state[6:].reshape((6, 6))
-        
+
         # 计算雅可比矩阵 A(t)
         # 计算二阶导数
-        U_xx = 1 - (1-mu)*(1/r1**3 - 3*(x+mu)**2/r1**5) - mu*(1/r2**3 - 3*(x-1+mu)**2/r2**5)
-        U_yy = 1 - (1-mu)*(1/r1**3 - 3*y**2/r1**5) - mu*(1/r2**3 - 3*y**2/r2**5)
-        U_zz = -(1-mu)/r1**3 - mu/r2**3
-        U_xy = 3*(1-mu)*(x+mu)*y/r1**5 + 3*mu*(x-1+mu)*y/r2**5
-        U_xz = 3*(1-mu)*(x+mu)*z/r1**5 + 3*mu*(x-1+mu)*z/r2**5
-        U_yz = 3*(1-mu)*y*z/r1**5 + 3*mu*y*z/r2**5
-        
+        U_xx = (
+            1
+            - (1 - mu) * (1 / r1**3 - 3 * (x + mu) ** 2 / r1**5)
+            - mu * (1 / r2**3 - 3 * (x - 1 + mu) ** 2 / r2**5)
+        )
+        U_yy = 1 - (1 - mu) * (1 / r1**3 - 3 * y**2 / r1**5) - mu * (1 / r2**3 - 3 * y**2 / r2**5)
+        U_zz = -(1 - mu) / r1**3 - mu / r2**3
+        U_xy = 3 * (1 - mu) * (x + mu) * y / r1**5 + 3 * mu * (x - 1 + mu) * y / r2**5
+        U_xz = 3 * (1 - mu) * (x + mu) * z / r1**5 + 3 * mu * (x - 1 + mu) * z / r2**5
+        U_yz = 3 * (1 - mu) * y * z / r1**5 + 3 * mu * y * z / r2**5
+
         # 构建雅可比矩阵
-        A = np.array([
-            [0, 0, 0, 1, 0, 0],
-            [0, 0, 0, 0, 1, 0],
-            [0, 0, 0, 0, 0, 1],
-            [U_xx, U_xy, U_xz, 0, 2, 0],
-            [U_xy, U_yy, U_yz, -2, 0, 0],
-            [U_xz, U_yz, U_zz, 0, 0, 0]
-        ])
-        
+        A = np.array(
+            [
+                [0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 1],
+                [U_xx, U_xy, U_xz, 0, 2, 0],
+                [U_xy, U_yy, U_yz, -2, 0, 0],
+                [U_xz, U_yz, U_zz, 0, 0, 0],
+            ]
+        )
+
         # 计算STM导数
         stm_dot = A @ stm
-        
+
         # 组合导数
         derivative = np.concatenate([state_derivative, stm_dot.flatten()])
-        
+
         return derivative
 
     def propagate(self, initial_state, t_span, t_eval=None, with_stm=False):
         """传播轨迹
-        
+
         参数：
         - initial_state: 初始状态向量
         - t_span: 时间区间 [t0, tf]
         - t_eval: 评估时间点数组（可选）
         - with_stm: 是否计算状态转移矩阵
-        
+
         返回：
         - 轨迹结果对象
         """
@@ -178,7 +184,7 @@ class CR3BP_Dynamics:
             # 创建增广状态（初始STM为单位矩阵）
             initial_stm = np.eye(6).flatten()
             augmented_state = np.concatenate([initial_state, initial_stm])
-            
+
             # 积分增广状态方程
             result = solve_ivp(
                 self.equations_with_stm,
@@ -188,28 +194,28 @@ class CR3BP_Dynamics:
                 t_eval=t_eval,
                 rtol=self.rtol,
                 atol=self.atol,
-                max_step=self.max_step
+                max_step=self.max_step,
             )
-            
+
             # 分离状态和STM
             states = result.y[:6, :].T
             stm_matrices = result.y[6:, :].T.reshape(-1, 6, 6)
-            
+
             # 存储结果
             self.last_trajectory = (result.t, states)
             self.last_stm = stm_matrices
-            
+
             # 计算Jacobi常数历史
             self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
             if len(self.jacobi_history) > 1:
                 self.jacobi_error = np.max(np.abs(np.diff(self.jacobi_history)))
-            
+
             return {
-                'time': result.t,
-                'states': states,
-                'stm': stm_matrices,
-                'jacobi': self.jacobi_history,
-                'jacobi_error': self.jacobi_error
+                "time": result.t,
+                "states": states,
+                "stm": stm_matrices,
+                "jacobi": self.jacobi_history,
+                "jacobi_error": self.jacobi_error,
             }
         else:
             # 积分普通状态方程
@@ -221,48 +227,48 @@ class CR3BP_Dynamics:
                 t_eval=t_eval,
                 rtol=self.rtol,
                 atol=self.atol,
-                max_step=self.max_step
+                max_step=self.max_step,
             )
-            
+
             states = result.y.T
-            
+
             # 存储结果
             self.last_trajectory = (result.t, states)
-            
+
             # 计算Jacobi常数历史
             self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
             if len(self.jacobi_history) > 1:
                 self.jacobi_error = np.max(np.abs(np.diff(self.jacobi_history)))
-            
+
             return {
-                'time': result.t,
-                'states': states,
-                'jacobi': self.jacobi_history,
-                'jacobi_error': self.jacobi_error
+                "time": result.t,
+                "states": states,
+                "jacobi": self.jacobi_history,
+                "jacobi_error": self.jacobi_error,
             }
 
     def compute_state_transition_matrix(self, initial_state, t):
         """计算状态转移矩阵
-        
+
         参数：
         - initial_state: 初始状态向量
         - t: 时间
-        
+
         返回：
         - 状态转移矩阵 (6x6)
         """
         # 传播轨迹并计算STM
         result = self.propagate(initial_state, [0, t], with_stm=True)
-        
+
         # 返回最终时刻的STM
-        return result['stm'][-1]
+        return result["stm"][-1]
 
     def compute_jacobi_constant(self, state):
         """实时计算Jacobi常数
-        
+
         参数：
         - state: 状态向量 [x, y, z, vx, vy, vz]
-        
+
         返回：
         - Jacobi常数
         """
@@ -270,20 +276,20 @@ class CR3BP_Dynamics:
 
     def check_cross_section(self, state, plane, value):
         """检查是否穿过指定截面
-        
+
         参数：
         - state: 状态向量
         - plane: 截面平面 ('x', 'y', 'z')
         - value: 平面值
-        
+
         返回：
         - 布尔值，表示是否穿过截面
         """
-        if plane == 'x':
+        if plane == "x":
             return abs(state[0] - value) < self.cross_section_tolerance
-        elif plane == 'y':
+        elif plane == "y":
             return abs(state[1] - value) < self.cross_section_tolerance
-        elif plane == 'z':
+        elif plane == "z":
             return abs(state[2] - value) < self.cross_section_tolerance
         else:
             raise ValueError(f"无效的平面: {plane}。可用平面: 'x', 'y', 'z'")
@@ -294,5 +300,7 @@ class CR3BP_Dynamics:
 
     def __repr__(self):
         """详细表示"""
-        return f"CR3BP_Dynamics(system={self.system}, integrator='{self.integrator}', " \
-               f"rtol={self.rtol}, atol={self.atol}, max_step={self.max_step})"
+        return (
+            f"CR3BP_Dynamics(system={self.system}, integrator='{self.integrator}', "
+            f"rtol={self.rtol}, atol={self.atol}, max_step={self.max_step})"
+        )

@@ -6,12 +6,12 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from enum import Enum
 
 
 class ProjectionPlane(Enum):
     """投影平面枚举"""
+
     XY = "xy"
     XZ = "xz"
     YZ = "yz"
@@ -99,12 +99,20 @@ class OrbitVisualizer:
         if color is None:
             color = self._get_next_color()
 
-        ax.plot(x, y, z, color=color, label=label,
-                linewidth=self.orbit_linewidth, alpha=self.orbit_alpha)
+        ax.plot(
+            x,
+            y,
+            z,
+            color=color,
+            label=label,
+            linewidth=self.orbit_linewidth,
+            alpha=self.orbit_alpha,
+        )
 
         if show_start and len(x) > 0:
-            ax.scatter(x[0], y[0], z[0], color=color, marker="o", s=50,
-                       edgecolors="black", linewidth=1)
+            ax.scatter(
+                x[0], y[0], z[0], color=color, marker="o", s=50, edgecolors="black", linewidth=1
+            )
 
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
@@ -112,8 +120,9 @@ class OrbitVisualizer:
 
         return ax
 
-    def plot_2d_projection(self, orbit, plane=ProjectionPlane.XY, color=None,
-                            label=None, ax=None, show_start=True):
+    def plot_2d_projection(
+        self, orbit, plane=ProjectionPlane.XY, color=None, label=None, ax=None, show_start=True
+    ):
         """绘制2D投影
 
         参数：
@@ -154,12 +163,12 @@ class OrbitVisualizer:
         else:
             raise ValueError(f"未知投影平面: {plane}")
 
-        ax.plot(px, py, color=color, label=label,
-                linewidth=self.orbit_linewidth, alpha=self.orbit_alpha)
+        ax.plot(
+            px, py, color=color, label=label, linewidth=self.orbit_linewidth, alpha=self.orbit_alpha
+        )
 
         if show_start and len(px) > 0:
-            ax.scatter(px[0], py[0], color=color, marker="o", s=50,
-                       edgecolors="black", linewidth=1)
+            ax.scatter(px[0], py[0], color=color, marker="o", s=50, edgecolors="black", linewidth=1)
 
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
@@ -194,7 +203,7 @@ class OrbitVisualizer:
                 return ax
 
         from ..core.system import LibrationPoint
-        
+
         for i, lp in enumerate(LibrationPoint):
             coord = self.system.L_points[lp]
             color = self.libration_point_colors[i]
@@ -203,18 +212,23 @@ class OrbitVisualizer:
             label_text = self.libration_point_labels[i]
 
             if is_3d:
-                ax.scatter(coord[0], coord[1], coord[2], color=color,
-                           marker=marker, s=size, zorder=5)
+                ax.scatter(
+                    coord[0], coord[1], coord[2], color=color, marker=marker, s=size, zorder=5
+                )
                 if show_labels:
-                    ax.text(coord[0], coord[1], coord[2] + 0.02, label_text,
-                            fontsize=10, ha='center')
+                    ax.text(
+                        coord[0], coord[1], coord[2] + 0.02, label_text, fontsize=10, ha="center"
+                    )
             else:
-                ax.scatter(coord[0], coord[1], color=color,
-                           marker=marker, s=size, zorder=5)
+                ax.scatter(coord[0], coord[1], color=color, marker=marker, s=size, zorder=5)
                 if show_labels:
-                    ax.annotate(label_text, (coord[0], coord[1]),
-                                textcoords="offset points", xytext=(5, 5),
-                                fontsize=10)
+                    ax.annotate(
+                        label_text,
+                        (coord[0], coord[1]),
+                        textcoords="offset points",
+                        xytext=(5, 5),
+                        fontsize=10,
+                    )
 
         return ax
 
@@ -245,24 +259,49 @@ class OrbitVisualizer:
         secondary_label = self.system.secondary_body if self.system else "Secondary"
 
         if is_3d:
-            ax.scatter(*[-self.mu, 0, 0], color=self.primary_body_color,
-                       s=self.primary_body_size, edgecolors="black",
-                       linewidth=1, zorder=10, label=primary_label)
-            ax.scatter(*[1-self.mu, 0, 0], color=self.secondary_body_color,
-                       s=self.secondary_body_size, edgecolors="black",
-                       linewidth=1, zorder=10, label=secondary_label)
+            ax.scatter(
+                *[-self.mu, 0, 0],
+                color=self.primary_body_color,
+                s=self.primary_body_size,
+                edgecolors="black",
+                linewidth=1,
+                zorder=10,
+                label=primary_label,
+            )
+            ax.scatter(
+                *[1 - self.mu, 0, 0],
+                color=self.secondary_body_color,
+                s=self.secondary_body_size,
+                edgecolors="black",
+                linewidth=1,
+                zorder=10,
+                label=secondary_label,
+            )
         else:
-            ax.scatter(*primary_pos, color=self.primary_body_color,
-                       s=self.primary_body_size, edgecolors="black",
-                       linewidth=1, zorder=10, label=primary_label)
-            ax.scatter(*secondary_pos, color=self.secondary_body_color,
-                       s=self.secondary_body_size, edgecolors="black",
-                       linewidth=1, zorder=10, label=secondary_label)
+            ax.scatter(
+                *primary_pos,
+                color=self.primary_body_color,
+                s=self.primary_body_size,
+                edgecolors="black",
+                linewidth=1,
+                zorder=10,
+                label=primary_label,
+            )
+            ax.scatter(
+                *secondary_pos,
+                color=self.secondary_body_color,
+                s=self.secondary_body_size,
+                edgecolors="black",
+                linewidth=1,
+                zorder=10,
+                label=secondary_label,
+            )
 
         return ax
 
-    def plot_orbit_family(self, family_result, plane=ProjectionPlane.XY,
-                           colormap="viridis", ax=None):
+    def plot_orbit_family(
+        self, family_result, plane=ProjectionPlane.XY, colormap="viridis", ax=None
+    ):
         """绘制轨道族
 
         参数：
@@ -278,7 +317,7 @@ class OrbitVisualizer:
             self.figure, self.axes = plt.subplots(1, 1, figsize=self.figsize, dpi=self.dpi)
             ax = self.axes
 
-        orbits = family_result['orbits']
+        orbits = family_result["orbits"]
         n_orbits = len(orbits)
         cmap = plt.cm.get_cmap(colormap)
 
@@ -363,8 +402,8 @@ class OrbitVisualizer:
             self.figure, self.axes = plt.subplots(1, 1, figsize=self.figsize, dpi=self.dpi)
             ax = self.axes
 
-        if hasattr(orbit, 'jacobi_constants') and orbit.jacobi_constants is not None:
-            ax.plot(orbit.times, orbit.jacobi_constants, 'b-', linewidth=1)
+        if hasattr(orbit, "jacobi_constants") and orbit.jacobi_constants is not None:
+            ax.plot(orbit.times, orbit.jacobi_constants, "b-", linewidth=1)
             ax.set_xlabel("Time")
             ax.set_ylabel("Jacobi Constant")
             ax.set_title("Jacobi Constant Conservation")
@@ -386,9 +425,9 @@ class OrbitVisualizer:
             self.figure, self.axes = plt.subplots(1, 1, figsize=self.figsize, dpi=self.dpi)
             ax = self.axes
 
-        periods = family_result.get('periods', [])
+        periods = family_result.get("periods", [])
         if len(periods) > 0:
-            ax.plot(range(len(periods)), periods, 'bo-', markersize=3)
+            ax.plot(range(len(periods)), periods, "bo-", markersize=3)
             ax.set_xlabel("Orbit Index")
             ax.set_ylabel("Period")
             ax.set_title("Period Evolution")
@@ -408,7 +447,7 @@ class OrbitVisualizer:
         fig = plt.figure(figsize=(16, 12), dpi=self.dpi)
 
         # 3D轨道
-        ax1 = fig.add_subplot(221, projection='3d')
+        ax1 = fig.add_subplot(221, projection="3d")
         self.plot_3d_orbit(orbit, ax=ax1, label="Orbit")
         ax1.set_title("3D Orbit")
 
@@ -446,12 +485,11 @@ class OrbitVisualizer:
             dpi: 分辨率
         """
         if self.figure is not None:
-            self.figure.savefig(filename, dpi=dpi or self.dpi,
-                                bbox_inches="tight", pad_inches=0.1)
+            self.figure.savefig(filename, dpi=dpi or self.dpi, bbox_inches="tight", pad_inches=0.1)
 
     def _extract_states(self, orbit):
         """从Orbit对象或数组中提取状态数据"""
-        if hasattr(orbit, 'states'):
+        if hasattr(orbit, "states"):
             states = orbit.states
         else:
             states = np.array(orbit)

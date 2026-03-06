@@ -5,12 +5,12 @@
 """
 
 import numpy as np
-from scipy import linalg
 from enum import Enum
 
 
 class StabilityType(Enum):
     """稳定性类型枚举"""
+
     STABLE = "stable"
     UNSTABLE = "unstable"
     MARGINALLY_STABLE = "marginally_stable"
@@ -21,6 +21,7 @@ class StabilityType(Enum):
 
 class BifurcationType(Enum):
     """分岔类型枚举"""
+
     NONE = "none"
     PERIOD_DOUBLING = "period_doubling"
     SADDLE_NODE = "saddle_node"
@@ -126,9 +127,7 @@ class StabilityAnalysis:
         period = self.orbit.period
 
         # 使用动力学对象计算STM
-        self.monodromy_matrix = self.dynamics.compute_state_transition_matrix(
-            initial_state, period
-        )
+        self.monodromy_matrix = self.dynamics.compute_state_transition_matrix(initial_state, period)
 
         self.has_monodromy = True
 
@@ -310,7 +309,7 @@ class StabilityAnalysis:
         # 检查特征值是否穿过单位圆
         for lam in self.eigenvalues:
             mag = abs(lam)
-            
+
             # 鞍结分岔：特征值穿过 +1
             if abs(lam - 1.0) < tol:
                 self.bifurcation_type = BifurcationType.SADDLE_NODE
@@ -361,5 +360,7 @@ class StabilityAnalysis:
         return f"StabilityAnalysis(type={status})"
 
     def __repr__(self):
-        return f"StabilityAnalysis(orbit={self.orbit}, " \
-               f"type={self.stability_type}, complete={self.analysis_complete})"
+        return (
+            f"StabilityAnalysis(orbit={self.orbit}, "
+            f"type={self.stability_type}, complete={self.analysis_complete})"
+        )

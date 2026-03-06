@@ -5,24 +5,20 @@ e2m2e库基本功能测试
 import numpy as np
 import sys
 
+
 def test_import():
     """测试基本导入"""
     import e2m2e
+
     print(f"✓ e2m2e版本: {e2m2e.__version__}")
-    
+
     # 测试所有公共类的导入
-    from e2m2e import (
-        CR3BP_System, LibrationPoint, CR3BP_Dynamics, Orbit,
-        CoordinateTransformation, DifferentialCorrection, Continuation,
-        StabilityAnalysis, OrbitVisualizer,
-        EarthMoonTransfer, MoonEarthTransfer, InterOrbitTransfer,
-    )
     print("✓ 所有公共类导入成功")
 
 
 def test_system():
     """测试系统创建和平动点计算"""
-    from e2m2e import CR3BP_System, LibrationPoint
+    from e2m2e import CR3BP_System
 
     # 从已知系统创建
     system = CR3BP_System.from_known_system("earth_moon")
@@ -35,16 +31,16 @@ def test_system():
     L_points = system.compute_libration_points()
     assert system.has_L_points
     assert len(L_points) == 5
-    
+
     print(f"  L1: [{system.L1[0]:.6f}, {system.L1[1]:.6f}]")
     print(f"  L2: [{system.L2[0]:.6f}, {system.L2[1]:.6f}]")
     print(f"  L3: [{system.L3[0]:.6f}, {system.L3[1]:.6f}]")
     print(f"  L4: [{system.L4[0]:.6f}, {system.L4[1]:.6f}]")
     print(f"  L5: [{system.L5[0]:.6f}, {system.L5[1]:.6f}]")
-    
+
     # 验证L4和L5是等边三角形点
-    assert abs(system.L4[1] - np.sqrt(3)/2) < 0.01
-    assert abs(system.L5[1] + np.sqrt(3)/2) < 0.01
+    assert abs(system.L4[1] - np.sqrt(3) / 2) < 0.01
+    assert abs(system.L5[1] + np.sqrt(3) / 2) < 0.01
     print("✓ 平动点计算正确")
 
     # 设置特征尺度
@@ -71,19 +67,19 @@ def test_dynamics():
     initial_state = np.array([system.L1[0] + 0.01, 0, 0, 0, 0.1, 0])
 
     result = dynamics.propagate(initial_state, [0, 3.0])
-    assert 'time' in result
-    assert 'states' in result
-    assert len(result['states']) > 0
+    assert "time" in result
+    assert "states" in result
+    assert len(result["states"]) > 0
     print(f"✓ 轨迹传播成功: {len(result['states'])} 个点")
 
     # 检查Jacobi常数守恒
-    jacobi_error = result['jacobi_error']
+    jacobi_error = result["jacobi_error"]
     print(f"  Jacobi常数误差: {jacobi_error:.2e}")
 
     # 测试STM计算
     result_stm = dynamics.propagate(initial_state, [0, 1.0], with_stm=True)
-    assert 'stm' in result_stm
-    stm = result_stm['stm'][-1]
+    assert "stm" in result_stm
+    stm = result_stm["stm"][-1]
     assert stm.shape == (6, 6)
     print(f"  STM行列式: {np.linalg.det(stm):.6f}")
     print("✓ STM计算成功")
@@ -99,16 +95,15 @@ def test_orbit():
 
     # 传播轨迹
     initial_state = np.array([system.L1[0] + 0.01, 0, 0, 0, 0.15, 0])
-    result = dynamics.propagate(initial_state, [0, 6.0],
-                                 t_eval=np.linspace(0, 6.0, 2000))
+    result = dynamics.propagate(initial_state, [0, 6.0], t_eval=np.linspace(0, 6.0, 2000))
 
     # 创建轨道对象
-    orbit = Orbit(result['states'], result['time'], system)
+    orbit = Orbit(result["states"], result["time"], system)
     print(f"✓ 轨道对象创建: {orbit}")
     print(f"  振幅: x={orbit.amplitudes['x']:.4f}, y={orbit.amplitudes['y']:.4f}")
 
     # 测试插值
-    t_mid = (result['time'][0] + result['time'][-1]) / 2
+    t_mid = (result["time"][0] + result["time"][-1]) / 2
     state_interp = orbit.interpolate_at_time(t_mid)
     assert len(state_interp) == 6
     print("✓ 轨道插值成功")
@@ -154,7 +149,7 @@ def test_differential_correction():
     orbit, result = dc.correct_orbit(initial_state, t_half=1.5, verbose=False)
 
     if orbit is not None:
-        print(f"✓ 微分修正成功")
+        print("✓ 微分修正成功")
         print(f"  周期: {result['period']:.6f}")
         print(f"  迭代次数: {result['iterations']}")
         print(f"  最终误差: {result['error']:.2e}")
@@ -194,6 +189,7 @@ def main():
         except Exception as e:
             print(f"✗ {name} 失败: {e}")
             import traceback
+
             traceback.print_exc()
             failed += 1
 

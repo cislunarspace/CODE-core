@@ -10,6 +10,7 @@ from enum import Enum
 
 class ContinuationDirection(Enum):
     """延拓方向枚举"""
+
     FORWARD = 1
     BACKWARD = -1
     BOTH = 0
@@ -17,6 +18,7 @@ class ContinuationDirection(Enum):
 
 class ContinuationMethod(Enum):
     """延拓方法枚举"""
+
     NATURAL = "natural"
     PSEUDO_ARCLENGTH = "pseudo_arclength"
 
@@ -93,8 +95,9 @@ class Continuation:
         self.max_orbits = 100
         self.termination_reason = None
 
-    def natural_continuation(self, seed_state, seed_t_half, n_orbits=50, 
-                             param_index=None, verbose=True):
+    def natural_continuation(
+        self, seed_state, seed_t_half, n_orbits=50, param_index=None, verbose=True
+    ):
         """自然参数延拓
 
         从种子轨道出发，逐步改变延拓参数，生成一族周期轨道。
@@ -110,31 +113,31 @@ class Continuation:
             dict: 包含轨道族数据的字典
         """
         if verbose:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"开始自然参数延拓 (参数: {self.continuation_parameter})")
             print(f"步长: {self.step_size}, 目标轨道数: {n_orbits}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
         # 首先修正种子轨道
         seed_orbit, seed_result = self.correction.correct_orbit(
             seed_state, seed_t_half, verbose=False
         )
-        
+
         if seed_orbit is None:
             print("种子轨道修正失败！")
             return None
 
         # 存储种子轨道
         self.family_orbits.append(seed_orbit)
-        self.family_states.append(seed_result['state'].copy())
-        self.family_periods.append(seed_result['period'])
+        self.family_states.append(seed_result["state"].copy())
+        self.family_periods.append(seed_result["period"])
 
         # 推断延拓参数索引
         if param_index is None:
             param_index = self._infer_param_index()
 
-        current_state = seed_result['state'].copy()
-        current_t_half = seed_result['t_half']
+        current_state = seed_result["state"].copy()
+        current_t_half = seed_result["t_half"]
 
         for i in range(n_orbits - 1):
             self.continuation_stats["total_steps"] += 1
@@ -153,31 +156,28 @@ class Continuation:
                 predicted_state, predicted_t_half, verbose=False
             )
 
-            if orbit is not None and result['success']:
+            if orbit is not None and result["success"]:
                 self.family_orbits.append(orbit)
-                self.family_states.append(result['state'].copy())
-                self.family_periods.append(result['period'])
+                self.family_states.append(result["state"].copy())
+                self.family_periods.append(result["period"])
 
-                current_state = result['state'].copy()
-                current_t_half = result['t_half']
+                current_state = result["state"].copy()
+                current_t_half = result["t_half"]
 
                 self.continuation_stats["successful_steps"] += 1
 
                 if verbose and (i + 1) % 10 == 0:
-                    print(f"  第 {i + 1}/{n_orbits - 1} 条轨道，"
-                          f"误差={result['error']:.2e}")
+                    print(f"  第 {i + 1}/{n_orbits - 1} 条轨道，误差={result['error']:.2e}")
 
                 # 自适应步长
                 if self.step_size_adaptation:
-                    if result['iterations'] < 3:
+                    if result["iterations"] < 3:
                         self.step_size = min(
-                            self.step_size * self.step_growth_factor,
-                            self.max_step_size
+                            self.step_size * self.step_growth_factor, self.max_step_size
                         )
-                    elif result['iterations'] > 8:
+                    elif result["iterations"] > 8:
                         self.step_size = max(
-                            self.step_size * self.step_reduction_factor,
-                            self.min_step_size
+                            self.step_size * self.step_reduction_factor, self.min_step_size
                         )
             else:
                 self.continuation_stats["failed_steps"] += 1
@@ -202,8 +202,7 @@ class Continuation:
 
         return self._build_family_result()
 
-    def pseudo_arclength_continuation(self, seed_state, seed_t_half, n_orbits=50,
-                                       verbose=True):
+    def pseudo_arclength_continuation(self, seed_state, seed_t_half, n_orbits=50, verbose=True):
         """伪弧长延拓
 
         使用伪弧长参数化方法，可以跟踪轨道族中的折返点。
@@ -218,9 +217,9 @@ class Continuation:
             dict: 包含轨道族数据的字典
         """
         if verbose:
-            print(f"\n{'='*60}")
-            print(f"开始伪弧长延拓")
-            print(f"{'='*60}")
+            print(f"\n{'=' * 60}")
+            print("开始伪弧长延拓")
+            print(f"{'=' * 60}")
 
         # 首先用自然延拓获取前两条轨道
         seed_orbit, seed_result = self.correction.correct_orbit(
@@ -231,29 +230,27 @@ class Continuation:
             return None
 
         self.family_orbits.append(seed_orbit)
-        self.family_states.append(seed_result['state'].copy())
-        self.family_periods.append(seed_result['period'])
+        self.family_states.append(seed_result["state"].copy())
+        self.family_periods.append(seed_result["period"])
 
         # 获取第二条轨道（微小扰动）
         param_index = self._infer_param_index()
-        state_2 = seed_result['state'].copy()
-        t_half_2 = seed_result['t_half']
-        
+        state_2 = seed_result["state"].copy()
+        t_half_2 = seed_result["t_half"]
+
         if param_index < 6:
             state_2[param_index] += self.step_size * 0.1
         else:
             t_half_2 += self.step_size * 0.1
 
-        orbit_2, result_2 = self.correction.correct_orbit(
-            state_2, t_half_2, verbose=False
-        )
+        orbit_2, result_2 = self.correction.correct_orbit(state_2, t_half_2, verbose=False)
         if orbit_2 is None:
             print("第二条轨道修正失败！")
             return None
 
         self.family_orbits.append(orbit_2)
-        self.family_states.append(result_2['state'].copy())
-        self.family_periods.append(result_2['period'])
+        self.family_states.append(result_2["state"].copy())
+        self.family_periods.append(result_2["period"])
 
         # 伪弧长延拓主循环
         for i in range(n_orbits - 2):
@@ -284,10 +281,10 @@ class Continuation:
                 predicted_state, predicted_t_half, verbose=False
             )
 
-            if orbit is not None and result['success']:
+            if orbit is not None and result["success"]:
                 self.family_orbits.append(orbit)
-                self.family_states.append(result['state'].copy())
-                self.family_periods.append(result['period'])
+                self.family_states.append(result["state"].copy())
+                self.family_periods.append(result["period"])
                 self.continuation_stats["successful_steps"] += 1
 
                 if verbose and (i + 1) % 10 == 0:
@@ -307,25 +304,32 @@ class Continuation:
     def _infer_param_index(self):
         """根据延拓参数名称推断索引"""
         param_map = {
-            "x0": 0, "y0": 1, "z0": 2,
-            "vx0": 3, "vy0": 4, "vz0": 5,
-            "period": 6, "energy": 6, "amplitude": 2,
+            "x0": 0,
+            "y0": 1,
+            "z0": 2,
+            "vx0": 3,
+            "vy0": 4,
+            "vz0": 5,
+            "period": 6,
+            "energy": 6,
+            "amplitude": 2,
         }
         return param_map.get(self.continuation_parameter, 0)
 
     def _build_family_result(self):
         """构建轨道族结果字典"""
         return {
-            'orbits': self.family_orbits,
-            'states': np.array(self.family_states),
-            'periods': np.array(self.family_periods),
-            'n_orbits': len(self.family_orbits),
-            'stats': self.continuation_stats,
-            'termination_reason': self.termination_reason,
+            "orbits": self.family_orbits,
+            "states": np.array(self.family_states),
+            "periods": np.array(self.family_periods),
+            "n_orbits": len(self.family_orbits),
+            "stats": self.continuation_stats,
+            "termination_reason": self.termination_reason,
         }
 
-    def generate_family(self, family_type, seed_state, seed_t_half,
-                         n_orbits=50, method="natural", verbose=True):
+    def generate_family(
+        self, family_type, seed_state, seed_t_half, n_orbits=50, method="natural", verbose=True
+    ):
         """生成轨道族的便捷接口
 
         参数：
@@ -348,9 +352,7 @@ class Continuation:
             self.continuation_parameter = "x0"
 
         if method == "natural":
-            return self.natural_continuation(
-                seed_state, seed_t_half, n_orbits, verbose=verbose
-            )
+            return self.natural_continuation(seed_state, seed_t_half, n_orbits, verbose=verbose)
         elif method == "pseudo_arclength":
             return self.pseudo_arclength_continuation(
                 seed_state, seed_t_half, n_orbits, verbose=verbose
@@ -359,9 +361,12 @@ class Continuation:
             raise ValueError(f"未知延拓方法: {method}")
 
     def __str__(self):
-        return f"Continuation(param={self.continuation_parameter}, " \
-               f"n_orbits={len(self.family_orbits)})"
+        return (
+            f"Continuation(param={self.continuation_parameter}, n_orbits={len(self.family_orbits)})"
+        )
 
     def __repr__(self):
-        return f"Continuation(correction={self.correction}, " \
-               f"param={self.continuation_parameter}, step={self.step_size})"
+        return (
+            f"Continuation(correction={self.correction}, "
+            f"param={self.continuation_parameter}, step={self.step_size})"
+        )

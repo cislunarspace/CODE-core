@@ -290,9 +290,12 @@ class DifferentialCorrection:
                 state_fwd[var_idx] += eps
                 result_fwd = integrate.solve_ivp(
                     self.dynamics.equations_of_motion,
-                    (0, current_time), state_fwd,
-                    method="DOP853", t_eval=[current_time],
-                    rtol=1e-12, atol=1e-12,
+                    (0, current_time),
+                    state_fwd,
+                    method="DOP853",
+                    t_eval=[current_time],
+                    rtol=1e-12,
+                    atol=1e-12,
                 )
                 final_fwd = result_fwd.y[:, -1]
 
@@ -301,9 +304,12 @@ class DifferentialCorrection:
                 state_bwd[var_idx] -= eps
                 result_bwd = integrate.solve_ivp(
                     self.dynamics.equations_of_motion,
-                    (0, current_time), state_bwd,
-                    method="DOP853", t_eval=[current_time],
-                    rtol=1e-12, atol=1e-12,
+                    (0, current_time),
+                    state_bwd,
+                    method="DOP853",
+                    t_eval=[current_time],
+                    rtol=1e-12,
+                    atol=1e-12,
                 )
                 final_bwd = result_bwd.y[:, -1]
 
@@ -317,9 +323,12 @@ class DifferentialCorrection:
                 t_fwd = current_time + eps
                 result_fwd = integrate.solve_ivp(
                     self.dynamics.equations_of_motion,
-                    (0, t_fwd), current_state,
-                    method="DOP853", t_eval=[t_fwd],
-                    rtol=1e-12, atol=1e-12,
+                    (0, t_fwd),
+                    current_state,
+                    method="DOP853",
+                    t_eval=[t_fwd],
+                    rtol=1e-12,
+                    atol=1e-12,
                 )
                 final_fwd = result_fwd.y[:, -1]
 
@@ -327,9 +336,12 @@ class DifferentialCorrection:
                 t_bwd = current_time - eps
                 result_bwd = integrate.solve_ivp(
                     self.dynamics.equations_of_motion,
-                    (0, t_bwd), current_state,
-                    method="DOP853", t_eval=[t_bwd],
-                    rtol=1e-12, atol=1e-12,
+                    (0, t_bwd),
+                    current_state,
+                    method="DOP853",
+                    t_eval=[t_bwd],
+                    rtol=1e-12,
+                    atol=1e-12,
                 )
                 final_bwd = result_bwd.y[:, -1]
 
@@ -363,9 +375,9 @@ class DifferentialCorrection:
         current_time = t_half
 
         if verbose:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"开始微分修正迭代 (配置: {self.setup_type})")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
         for iteration in range(self.max_iterations):
             self.iteration_count = iteration + 1
@@ -374,10 +386,12 @@ class DifferentialCorrection:
             try:
                 result = integrate.solve_ivp(
                     self.dynamics.equations_of_motion,
-                    (0, current_time), current_state,
+                    (0, current_time),
+                    current_state,
                     method="DOP853",
                     t_eval=np.linspace(0, current_time, 1000),
-                    rtol=1e-12, atol=1e-12,
+                    rtol=1e-12,
+                    atol=1e-12,
                 )
                 if not result.success:
                     self.termination_reason = f"积分失败: {result.message}"
@@ -398,13 +412,15 @@ class DifferentialCorrection:
 
             # 保存历史
             self.error_history.append(current_error)
-            self.convergence_history.append({
-                "iteration": iteration,
-                "error": current_error,
-                "state": current_state.copy(),
-                "time": current_time,
-                "final_state": final_state.copy(),
-            })
+            self.convergence_history.append(
+                {
+                    "iteration": iteration,
+                    "error": current_error,
+                    "state": current_state.copy(),
+                    "time": current_time,
+                    "final_state": final_state.copy(),
+                }
+            )
 
             if verbose:
                 print(f"  迭代 {iteration + 1}: 误差 = {current_error:.4e}")
@@ -426,18 +442,14 @@ class DifferentialCorrection:
                 break
 
             # 5. 计算雅可比矩阵
-            self.jacobian_matrix = self._compute_jacobian_finite_diff(
-                current_state, current_time
-            )
+            self.jacobian_matrix = self._compute_jacobian_finite_diff(current_state, current_time)
 
             # 6. 计算修正量
             try:
                 self.pseudoinverse_matrix = np.linalg.pinv(self.jacobian_matrix)
                 correction = -self.pseudoinverse_matrix @ error_vector
             except np.linalg.LinAlgError:
-                correction = -np.linalg.lstsq(
-                    self.jacobian_matrix, error_vector, rcond=None
-                )[0]
+                correction = -np.linalg.lstsq(self.jacobian_matrix, error_vector, rcond=None)[0]
 
             # 应用阻尼
             correction *= self.damping_factor
@@ -474,14 +486,14 @@ class DifferentialCorrection:
     def _build_result(self, state, t_half):
         """构建结果字典"""
         return {
-            'state': state.copy(),
-            'period': 2 * t_half,
-            't_half': t_half,
-            'success': self.success,
-            'iterations': self.iteration_count,
-            'error': self.error_history[-1] if self.error_history else float('inf'),
-            'history': self.convergence_history,
-            'termination_reason': self.termination_reason,
+            "state": state.copy(),
+            "period": 2 * t_half,
+            "t_half": t_half,
+            "success": self.success,
+            "iterations": self.iteration_count,
+            "error": self.error_history[-1] if self.error_history else float("inf"),
+            "history": self.convergence_history,
+            "termination_reason": self.termination_reason,
         }
 
     def correct_orbit(self, initial_state, t_half, verbose=True):
@@ -499,15 +511,17 @@ class DifferentialCorrection:
 
         result = self.iterate_correction(initial_state, t_half, verbose)
 
-        if result['success']:
+        if result["success"]:
             # 积分完整周期获得周期轨道
-            full_period = result['period']
+            full_period = result["period"]
             propagation = integrate.solve_ivp(
                 self.dynamics.equations_of_motion,
-                (0, full_period), result['state'],
+                (0, full_period),
+                result["state"],
                 method="DOP853",
                 t_eval=np.linspace(0, full_period, 2000),
-                rtol=1e-12, atol=1e-12,
+                rtol=1e-12,
+                atol=1e-12,
             )
 
             orbit = Orbit(
@@ -546,16 +560,18 @@ class DifferentialCorrection:
             dict: 收敛历史数据
         """
         return {
-            'errors': self.error_history,
-            'corrections': self.correction_history,
-            'iterations': self.iteration_count,
-            'converged': self.converged,
-            'termination_reason': self.termination_reason,
+            "errors": self.error_history,
+            "corrections": self.correction_history,
+            "iterations": self.iteration_count,
+            "converged": self.converged,
+            "termination_reason": self.termination_reason,
         }
 
     def __str__(self):
         return f"DifferentialCorrection(setup={self.setup_type}, converged={self.converged})"
 
     def __repr__(self):
-        return f"DifferentialCorrection(dynamics={self.dynamics}, " \
-               f"setup={self.setup_type}, tol={self.tolerance})"
+        return (
+            f"DifferentialCorrection(dynamics={self.dynamics}, "
+            f"setup={self.setup_type}, tol={self.tolerance})"
+        )

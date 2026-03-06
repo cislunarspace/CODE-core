@@ -44,8 +44,7 @@ class InterOrbitTransfer:
         self.transfer_time = None
         self.transfer_arcs = []
 
-    def design_direct_transfer(self, orbit_departure, orbit_arrival,
-                                n_search=20, verbose=True):
+    def design_direct_transfer(self, orbit_departure, orbit_arrival, n_search=20, verbose=True):
         """设计直接轨道间转移
 
         通过搜索出发和到达轨道上的最优切入/切出点实现转移。
@@ -60,7 +59,7 @@ class InterOrbitTransfer:
             dict: 转移设计结果
         """
         if verbose:
-            print(f"\n设计直接轨道间转移")
+            print("\n设计直接轨道间转移")
 
         best_dv = np.inf
         best_result = None
@@ -81,23 +80,21 @@ class InterOrbitTransfer:
                 # 尝试Lambert求解（在CR3BP中用打靶法近似）
                 for tof in np.linspace(1.0, 10.0, 5):
                     try:
-                        result = self._solve_transfer_arc(
-                            dep_state, arr_state, tof
-                        )
+                        result = self._solve_transfer_arc(dep_state, arr_state, tof)
 
-                        if result is not None and result['total_dv'] < best_dv:
-                            best_dv = result['total_dv']
+                        if result is not None and result["total_dv"] < best_dv:
+                            best_dv = result["total_dv"]
                             best_result = result
-                            best_result['t_departure'] = t_dep
-                            best_result['t_arrival'] = t_arr
+                            best_result["t_departure"] = t_dep
+                            best_result["t_arrival"] = t_arr
 
                     except Exception:
                         continue
 
         if best_result is not None:
-            self.transfer_trajectory = best_result.get('trajectory')
+            self.transfer_trajectory = best_result.get("trajectory")
             self.delta_v_total = best_dv
-            self.transfer_time = best_result.get('transfer_time')
+            self.transfer_time = best_result.get("transfer_time")
 
             if verbose:
                 print(f"  最优总ΔV: {best_dv:.6f}")
@@ -105,9 +102,15 @@ class InterOrbitTransfer:
 
         return best_result
 
-    def design_manifold_intersection(self, orbit_departure, orbit_arrival,
-                                      n_manifold=50, poincare_plane="y",
-                                      poincare_value=0.0, verbose=True):
+    def design_manifold_intersection(
+        self,
+        orbit_departure,
+        orbit_arrival,
+        n_manifold=50,
+        poincare_plane="y",
+        poincare_value=0.0,
+        verbose=True,
+    ):
         """利用不变流形交叉设计转移
 
         计算出发轨道的不稳定流形和到达轨道的稳定流形，
@@ -125,23 +128,27 @@ class InterOrbitTransfer:
             dict: 流形交叉转移结果
         """
         if verbose:
-            print(f"\n设计流形交叉转移")
+            print("\n设计流形交叉转移")
             print(f"  庞加莱截面: {poincare_plane}={poincare_value}")
 
         # 计算出发轨道的不稳定流形截面交叉
         unstable_crossings = self._compute_manifold_crossings(
-            orbit_departure, manifold_type="unstable",
+            orbit_departure,
+            manifold_type="unstable",
             n_trajectories=n_manifold,
-            plane=poincare_plane, value=poincare_value,
-            direction="forward"
+            plane=poincare_plane,
+            value=poincare_value,
+            direction="forward",
         )
 
         # 计算到达轨道的稳定流形截面交叉
         stable_crossings = self._compute_manifold_crossings(
-            orbit_arrival, manifold_type="stable",
+            orbit_arrival,
+            manifold_type="stable",
             n_trajectories=n_manifold,
-            plane=poincare_plane, value=poincare_value,
-            direction="backward"
+            plane=poincare_plane,
+            value=poincare_value,
+            direction="backward",
         )
 
         if verbose:
@@ -155,24 +162,24 @@ class InterOrbitTransfer:
         for uc in unstable_crossings:
             for sc in stable_crossings:
                 # 在截面上的状态差异
-                dv = np.linalg.norm(uc['state'][3:] - sc['state'][3:])
+                dv = np.linalg.norm(uc["state"][3:] - sc["state"][3:])
 
                 if dv < best_dv:
                     best_dv = dv
                     best_pair = {
-                        'unstable_crossing': uc,
-                        'stable_crossing': sc,
-                        'delta_v_at_section': dv,
+                        "unstable_crossing": uc,
+                        "stable_crossing": sc,
+                        "delta_v_at_section": dv,
                     }
 
         if best_pair is not None and verbose:
             print(f"  最优截面ΔV: {best_dv:.6f}")
 
         return {
-            'unstable_crossings': unstable_crossings,
-            'stable_crossings': stable_crossings,
-            'best_pair': best_pair,
-            'delta_v': best_dv if best_pair else None,
+            "unstable_crossings": unstable_crossings,
+            "stable_crossings": stable_crossings,
+            "best_pair": best_pair,
+            "delta_v": best_dv if best_pair else None,
         }
 
     def design_heteroclinic_transfer(self, orbit_L1, orbit_L2, verbose=True):
@@ -190,7 +197,7 @@ class InterOrbitTransfer:
             dict: 异宿转移结果
         """
         if verbose:
-            print(f"\n设计L1-L2异宿转移")
+            print("\n设计L1-L2异宿转移")
 
         # 使用流形交叉方法
         result = self.design_manifold_intersection(
@@ -199,10 +206,10 @@ class InterOrbitTransfer:
             n_manifold=100,
             poincare_plane="y",
             poincare_value=0.0,
-            verbose=verbose
+            verbose=verbose,
         )
 
-        if result and result.get('best_pair'):
+        if result and result.get("best_pair"):
             if verbose:
                 print(f"  异宿转移ΔV: {result['delta_v']:.6f}")
 
@@ -222,13 +229,10 @@ class InterOrbitTransfer:
             dict: 同宿转移结果
         """
         if verbose:
-            print(f"\n设计同宿转移")
+            print("\n设计同宿转移")
 
         result = self.design_manifold_intersection(
-            orbit_departure=orbit,
-            orbit_arrival=orbit,
-            n_manifold=100,
-            verbose=verbose
+            orbit_departure=orbit, orbit_arrival=orbit, n_manifold=100, verbose=verbose
         )
 
         return result
@@ -245,19 +249,19 @@ class InterOrbitTransfer:
         if transfer_result is None:
             return None
 
-        dv = transfer_result.get('delta_v', transfer_result.get('total_dv', None))
-        tof = transfer_result.get('transfer_time', None)
+        dv = transfer_result.get("delta_v", transfer_result.get("total_dv", None))
+        tof = transfer_result.get("transfer_time", None)
 
         cost = {
-            'delta_v': dv,
-            'transfer_time': tof,
+            "delta_v": dv,
+            "transfer_time": tof,
         }
 
         # 如果有物理单位
         if dv is not None and self.system.characteristic_velocity:
-            cost['delta_v_km_s'] = dv * self.system.characteristic_velocity
+            cost["delta_v_km_s"] = dv * self.system.characteristic_velocity
         if tof is not None and self.system.characteristic_time:
-            cost['transfer_time_days'] = tof * self.system.characteristic_time / 86400
+            cost["transfer_time_days"] = tof * self.system.characteristic_time / 86400
 
         return cost
 
@@ -285,21 +289,21 @@ class InterOrbitTransfer:
             try:
                 result = solve_ivp(
                     self.dynamics.equations_of_motion,
-                    (0, tof), state,
+                    (0, tof),
+                    state,
                     method="DOP853",
-                    rtol=1e-10, atol=1e-10,
+                    rtol=1e-10,
+                    atol=1e-10,
                 )
                 if result.success:
                     final_pos = result.y[:3, -1]
-                    return np.linalg.norm(final_pos - arr_pos)**2
+                    return np.linalg.norm(final_pos - arr_pos) ** 2
                 return 1e10
             except Exception:
                 return 1e10
 
         result = minimize(
-            objective, v_guess,
-            method='Nelder-Mead',
-            options={'maxiter': 500, 'xatol': 1e-8}
+            objective, v_guess, method="Nelder-Mead", options={"maxiter": 500, "xatol": 1e-8}
         )
 
         if result.fun < 1e-4:  # 位置精度足够
@@ -309,10 +313,12 @@ class InterOrbitTransfer:
             # 积分最优轨迹
             prop = solve_ivp(
                 self.dynamics.equations_of_motion,
-                (0, tof), state,
+                (0, tof),
+                state,
                 method="DOP853",
                 t_eval=np.linspace(0, tof, 1000),
-                rtol=1e-12, atol=1e-12,
+                rtol=1e-12,
+                atol=1e-12,
             )
 
             vf = prop.y[3:, -1]
@@ -322,20 +328,21 @@ class InterOrbitTransfer:
             dv_arrival = np.linalg.norm(arr_state[3:] - vf)
 
             return {
-                'trajectory': prop.y.T,
-                'times': prop.t,
-                'v_departure': v0_opt,
-                'v_arrival': vf,
-                'dv_departure': dv_departure,
-                'dv_arrival': dv_arrival,
-                'total_dv': dv_departure + dv_arrival,
-                'transfer_time': tof,
+                "trajectory": prop.y.T,
+                "times": prop.t,
+                "v_departure": v0_opt,
+                "v_arrival": vf,
+                "dv_departure": dv_departure,
+                "dv_arrival": dv_arrival,
+                "total_dv": dv_departure + dv_arrival,
+                "transfer_time": tof,
             }
 
         return None
 
-    def _compute_manifold_crossings(self, orbit, manifold_type, n_trajectories,
-                                     plane, value, direction):
+    def _compute_manifold_crossings(
+        self, orbit, manifold_type, n_trajectories, plane, value, direction
+    ):
         """计算流形与庞加莱截面的交叉点
 
         参数：
@@ -391,10 +398,12 @@ class InterOrbitTransfer:
             try:
                 result = solve_ivp(
                     self.dynamics.equations_of_motion,
-                    t_span, perturbed,
+                    t_span,
+                    perturbed,
                     method="DOP853",
                     t_eval=np.linspace(t_span[0], t_span[1], 3000),
-                    rtol=1e-12, atol=1e-12,
+                    rtol=1e-12,
+                    atol=1e-12,
                 )
 
                 if result.success:
@@ -406,11 +415,13 @@ class InterOrbitTransfer:
                             cross_state = result.y[:, j] + frac * (
                                 result.y[:, j + 1] - result.y[:, j]
                             )
-                            crossings.append({
-                                'state': cross_state,
-                                'time': result.t[j] + frac * (result.t[j+1] - result.t[j]),
-                                'orbit_index': int(i),
-                            })
+                            crossings.append(
+                                {
+                                    "state": cross_state,
+                                    "time": result.t[j] + frac * (result.t[j + 1] - result.t[j]),
+                                    "orbit_index": int(i),
+                                }
+                            )
                             break  # 取第一个穿越点
 
             except Exception:

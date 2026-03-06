@@ -11,7 +11,7 @@
 
 import numpy as np
 from scipy.integrate import solve_ivp
-from scipy.optimize import minimize, minimize_scalar
+from scipy.optimize import minimize
 
 
 class EarthMoonTransfer:
@@ -49,8 +49,9 @@ class EarthMoonTransfer:
         self.departure_state = None
         self.arrival_state = None
 
-    def design_direct_transfer(self, r_departure, r_arrival, v_departure_guess=None,
-                                t_transfer_guess=None, n_revolutions=0):
+    def design_direct_transfer(
+        self, r_departure, r_arrival, v_departure_guess=None, t_transfer_guess=None, n_revolutions=0
+    ):
         """设计直接转移轨道
 
         从地球附近的圆轨道出发，直接转移到月球附近。
@@ -69,22 +70,26 @@ class EarthMoonTransfer:
         # 在旋转系中，地球位于(-mu, 0, 0)
         departure_pos = self.earth_pos + np.array([r_departure, 0, 0])
 
-        # 圆轨道速度（近似，二体问题）
-        v_circular_earth = np.sqrt((1 - self.mu) / r_departure)
-
         # 出发速度（圆轨道速度 + 转移增量）
         if v_departure_guess is None:
             # 粗略估计Hohmann转移速度增量
             a_transfer = (r_departure + (1.0)) / 2  # 近似转移半长轴
-            v_departure_guess = np.sqrt(2 * (1 - self.mu) * (1 / r_departure - 1 / (2 * a_transfer)))
+            v_departure_guess = np.sqrt(
+                2 * (1 - self.mu) * (1 / r_departure - 1 / (2 * a_transfer))
+            )
 
         # 初始状态（旋转系中）
         # 从地球附近圆轨道出发，垂直于连线方向
-        initial_state = np.array([
-            departure_pos[0], departure_pos[1], 0,
-            0, v_departure_guess + departure_pos[0],  # 包含旋转系修正
-            0
-        ])
+        initial_state = np.array(
+            [
+                departure_pos[0],
+                departure_pos[1],
+                0,
+                0,
+                v_departure_guess + departure_pos[0],  # 包含旋转系修正
+                0,
+            ]
+        )
 
         # 转移时间
         if t_transfer_guess is None:
@@ -92,14 +97,13 @@ class EarthMoonTransfer:
             t_transfer_guess = np.pi  # 约半个周期
 
         # 使用打靶法优化转移参数
-        result = self._shooting_method(
-            initial_state, t_transfer_guess, r_arrival
-        )
+        result = self._shooting_method(initial_state, t_transfer_guess, r_arrival)
 
         return result
 
-    def design_low_energy_transfer(self, target_orbit, libration_point="L1",
-                                    departure_altitude=200, verbose=True):
+    def design_low_energy_transfer(
+        self, target_orbit, libration_point="L1", departure_altitude=200, verbose=True
+    ):
         """设计低能转移轨道
 
         利用平动点附近的动力学结构实现低能转移。
@@ -144,24 +148,22 @@ class EarthMoonTransfer:
 
             # 反向积分从目标轨道到达地球附近
             try:
-                result = self._backward_propagate(
-                    arrival_state, r_departure, max_time=20.0
-                )
+                result = self._backward_propagate(arrival_state, r_departure, max_time=20.0)
 
                 if result is not None:
-                    dv = result['delta_v']
+                    dv = result["delta_v"]
                     if dv < best_dv:
                         best_dv = dv
                         best_transfer = result
-                        best_transfer['arrival_time_on_orbit'] = t_arrival
+                        best_transfer["arrival_time_on_orbit"] = t_arrival
 
             except Exception:
                 continue
 
         if best_transfer is not None:
-            self.transfer_trajectory = best_transfer.get('trajectory')
+            self.transfer_trajectory = best_transfer.get("trajectory")
             self.delta_v_total = best_dv
-            self.transfer_time = best_transfer.get('transfer_time')
+            self.transfer_time = best_transfer.get("transfer_time")
 
             if verbose:
                 print(f"  最优ΔV: {best_dv:.6f}")
@@ -169,8 +171,9 @@ class EarthMoonTransfer:
 
         return best_transfer
 
-    def design_manifold_transfer(self, target_orbit, manifold_type="stable",
-                                  n_trajectories=100, verbose=True):
+    def design_manifold_transfer(
+        self, target_orbit, manifold_type="stable", n_trajectories=100, verbose=True
+    ):
         """利用不变流形设计转移轨道
 
         计算目标轨道的稳定/不稳定流形，找到与地球低轨道相交的流形臂。
@@ -189,6 +192,7 @@ class EarthMoonTransfer:
 
         # 计算目标轨道的单值矩阵和特征向量
         from ..algorithms.stability import StabilityAnalysis
+
         stability = StabilityAnalysis(target_orbit, self.dynamics)
         stability.compute_floquet_multipliers()
 
@@ -235,29 +239,31 @@ class EarthMoonTransfer:
             try:
                 result = solve_ivp(
                     self.dynamics.equations_of_motion,
-                    t_span, perturbed_state,
+                    t_span,
+                    perturbed_state,
                     method="DOP853",
                     t_eval=np.linspace(t_span[0], t_span[1], 2000),
-                    rtol=1e-12, atol=1e-12,
+                    rtol=1e-12,
+                    atol=1e-12,
                 )
                 if result.success:
                     manifold_trajectories.append(result.y.T)
 
                     # 检查是否经过地球附近
                     positions = result.y[:3, :].T
-                    distances_to_earth = np.linalg.norm(
-                        positions - self.earth_pos, axis=1
-                    )
+                    distances_to_earth = np.linalg.norm(positions - self.earth_pos, axis=1)
                     min_dist = np.min(distances_to_earth)
 
                     if min_dist < 0.05:  # 接近地球
                         min_idx = np.argmin(distances_to_earth)
-                        departure_states.append({
-                            'state': result.y[:, min_idx],
-                            'time': result.t[min_idx],
-                            'distance_to_earth': min_dist,
-                            'orbit_index': i,
-                        })
+                        departure_states.append(
+                            {
+                                "state": result.y[:, min_idx],
+                                "time": result.t[min_idx],
+                                "distance_to_earth": min_dist,
+                                "orbit_index": i,
+                            }
+                        )
             except Exception:
                 continue
 
@@ -268,14 +274,14 @@ class EarthMoonTransfer:
         # 找到最优转移
         best_transfer = None
         if departure_states:
-            departure_states.sort(key=lambda x: x['distance_to_earth'])
+            departure_states.sort(key=lambda x: x["distance_to_earth"])
             best_transfer = departure_states[0]
 
         return {
-            'manifold_trajectories': manifold_trajectories,
-            'departure_candidates': departure_states,
-            'best_transfer': best_transfer,
-            'manifold_type': manifold_type,
+            "manifold_trajectories": manifold_trajectories,
+            "departure_candidates": departure_states,
+            "best_transfer": best_transfer,
+            "manifold_type": manifold_type,
         }
 
     def compute_delta_v(self, departure_state, arrival_state):
@@ -302,6 +308,7 @@ class EarthMoonTransfer:
         返回：
             dict: 打靶法结果
         """
+
         def objective(params):
             vy0, tf = params
             state = initial_state.copy()
@@ -310,26 +317,27 @@ class EarthMoonTransfer:
             try:
                 result = solve_ivp(
                     self.dynamics.equations_of_motion,
-                    (0, tf), state,
+                    (0, tf),
+                    state,
                     method="DOP853",
-                    rtol=1e-12, atol=1e-12,
+                    rtol=1e-12,
+                    atol=1e-12,
                 )
                 if result.success:
                     final_pos = result.y[:3, -1]
                     dist_to_moon = np.linalg.norm(final_pos - self.moon_pos)
-                    return (dist_to_moon - r_target)**2
+                    return (dist_to_moon - r_target) ** 2
                 else:
                     return 1e10
             except Exception:
                 return 1e10
 
         # 优化
-        from scipy.optimize import minimize
         result = minimize(
             objective,
             x0=[initial_state[4], t_transfer],
-            method='Nelder-Mead',
-            options={'maxiter': 1000, 'xatol': 1e-10}
+            method="Nelder-Mead",
+            options={"maxiter": 1000, "xatol": 1e-10},
         )
 
         if result.success:
@@ -340,23 +348,25 @@ class EarthMoonTransfer:
             # 积分最优轨迹
             prop = solve_ivp(
                 self.dynamics.equations_of_motion,
-                (0, tf_opt), state,
+                (0, tf_opt),
+                state,
                 method="DOP853",
                 t_eval=np.linspace(0, tf_opt, 2000),
-                rtol=1e-12, atol=1e-12,
+                rtol=1e-12,
+                atol=1e-12,
             )
 
             return {
-                'trajectory': prop.y.T,
-                'times': prop.t,
-                'departure_state': state,
-                'arrival_state': prop.y[:, -1],
-                'transfer_time': tf_opt,
-                'delta_v': abs(vy0_opt - initial_state[4]),
-                'success': True,
+                "trajectory": prop.y.T,
+                "times": prop.t,
+                "departure_state": state,
+                "arrival_state": prop.y[:, -1],
+                "transfer_time": tf_opt,
+                "delta_v": abs(vy0_opt - initial_state[4]),
+                "success": True,
             }
 
-        return {'success': False, 'message': result.message}
+        return {"success": False, "message": result.message}
 
     def _backward_propagate(self, arrival_state, r_departure, max_time=20.0):
         """从到达状态反向传播到地球附近
@@ -371,10 +381,12 @@ class EarthMoonTransfer:
         """
         result = solve_ivp(
             self.dynamics.equations_of_motion,
-            (0, -max_time), arrival_state,
+            (0, -max_time),
+            arrival_state,
             method="DOP853",
             t_eval=np.linspace(0, -max_time, 5000),
-            rtol=1e-12, atol=1e-12,
+            rtol=1e-12,
+            atol=1e-12,
         )
 
         if not result.success:
@@ -396,13 +408,13 @@ class EarthMoonTransfer:
             dv = abs(v_actual - v_circular)
 
             return {
-                'trajectory': result.y.T,
-                'times': result.t,
-                'departure_state': departure_state,
-                'arrival_state': arrival_state,
-                'transfer_time': abs(result.t[min_dist_idx]),
-                'delta_v': dv,
-                'min_earth_distance': min_dist,
+                "trajectory": result.y.T,
+                "times": result.t,
+                "departure_state": departure_state,
+                "arrival_state": arrival_state,
+                "transfer_time": abs(result.t[min_dist_idx]),
+                "delta_v": dv,
+                "min_earth_distance": min_dist,
             }
 
         return None

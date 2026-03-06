@@ -10,7 +10,6 @@
 
 import numpy as np
 from scipy.integrate import solve_ivp
-from scipy.optimize import minimize
 
 
 class MoonEarthTransfer:
@@ -45,8 +44,9 @@ class MoonEarthTransfer:
         self.delta_v_total = None
         self.transfer_time = None
 
-    def design_direct_return(self, departure_orbit, r_reentry=None,
-                              n_search_points=20, verbose=True):
+    def design_direct_return(
+        self, departure_orbit, r_reentry=None, n_search_points=20, verbose=True
+    ):
         """设计直接返回地球轨道
 
         从月球附近的目标轨道出发，直接返回地球。
@@ -61,7 +61,7 @@ class MoonEarthTransfer:
             dict: 返回轨道设计结果
         """
         if verbose:
-            print(f"\n设计直接返回地球轨道")
+            print("\n设计直接返回地球轨道")
 
         # 再入轨道参数
         if r_reentry is None:
@@ -83,22 +83,20 @@ class MoonEarthTransfer:
             # 尝试不同的转移时间
             for t_transfer in np.linspace(2.0, 15.0, 10):
                 try:
-                    result = self._propagate_to_earth(
-                        dep_state, t_transfer, r_reentry
-                    )
+                    result = self._propagate_to_earth(dep_state, t_transfer, r_reentry)
 
-                    if result is not None and result['delta_v'] < best_dv:
-                        best_dv = result['delta_v']
+                    if result is not None and result["delta_v"] < best_dv:
+                        best_dv = result["delta_v"]
                         best_result = result
-                        best_result['departure_time_on_orbit'] = t_dep
+                        best_result["departure_time_on_orbit"] = t_dep
 
                 except Exception:
                     continue
 
         if best_result is not None:
-            self.transfer_trajectory = best_result.get('trajectory')
+            self.transfer_trajectory = best_result.get("trajectory")
             self.delta_v_total = best_dv
-            self.transfer_time = best_result.get('transfer_time')
+            self.transfer_time = best_result.get("transfer_time")
 
             if verbose:
                 print(f"  最优ΔV: {best_dv:.6f}")
@@ -106,8 +104,7 @@ class MoonEarthTransfer:
 
         return best_result
 
-    def design_low_energy_return(self, departure_orbit, target_altitude=200,
-                                  verbose=True):
+    def design_low_energy_return(self, departure_orbit, target_altitude=200, verbose=True):
         """设计低能返回地球轨道
 
         利用三体动力学结构实现低能量的月球-地球转移。
@@ -121,10 +118,11 @@ class MoonEarthTransfer:
             dict: 低能返回设计结果
         """
         if verbose:
-            print(f"\n设计低能返回轨道")
+            print("\n设计低能返回轨道")
 
         # 利用不变流形
         from ..algorithms.stability import StabilityAnalysis
+
         stability = StabilityAnalysis(departure_orbit, self.dynamics)
 
         try:
@@ -162,17 +160,17 @@ class MoonEarthTransfer:
                 try:
                     result = solve_ivp(
                         self.dynamics.equations_of_motion,
-                        (0, 20), perturbed,
+                        (0, 20),
+                        perturbed,
                         method="DOP853",
                         t_eval=np.linspace(0, 20, 5000),
-                        rtol=1e-12, atol=1e-12,
+                        rtol=1e-12,
+                        atol=1e-12,
                     )
 
                     if result.success:
                         positions = result.y[:3, :].T
-                        distances = np.linalg.norm(
-                            positions - self.earth_pos, axis=1
-                        )
+                        distances = np.linalg.norm(positions - self.earth_pos, axis=1)
                         min_idx = np.argmin(distances)
                         min_dist = distances[min_idx]
 
@@ -186,27 +184,26 @@ class MoonEarthTransfer:
                             if dv < best_dv:
                                 best_dv = dv
                                 best_result = {
-                                    'trajectory': result.y.T,
-                                    'times': result.t,
-                                    'departure_state': perturbed,
-                                    'arrival_state': earth_state,
-                                    'transfer_time': result.t[min_idx],
-                                    'delta_v': dv,
-                                    'min_earth_distance': min_dist,
-                                    'orbit_index': int(i),
+                                    "trajectory": result.y.T,
+                                    "times": result.t,
+                                    "departure_state": perturbed,
+                                    "arrival_state": earth_state,
+                                    "transfer_time": result.t[min_idx],
+                                    "delta_v": dv,
+                                    "min_earth_distance": min_dist,
+                                    "orbit_index": int(i),
                                 }
                 except Exception:
                     continue
 
         if best_result is not None and verbose:
-            print(f"  找到低能返回轨迹")
+            print("  找到低能返回轨迹")
             print(f"  ΔV: {best_dv:.6f}")
             print(f"  转移时间: {best_result['transfer_time']:.4f}")
 
         return best_result
 
-    def design_manifold_return(self, departure_orbit, n_trajectories=100,
-                                verbose=True):
+    def design_manifold_return(self, departure_orbit, n_trajectories=100, verbose=True):
         """利用不变流形设计返回轨道
 
         计算出发轨道的不稳定流形，找到接近地球的流形臂。
@@ -221,13 +218,13 @@ class MoonEarthTransfer:
         """
         # 复用EarthMoonTransfer中的流形计算，但使用不稳定流形
         from .earth_moon import EarthMoonTransfer
-        
+
         e2m = EarthMoonTransfer(self.system, self.dynamics)
         result = e2m.design_manifold_transfer(
             departure_orbit,
             manifold_type="unstable",
             n_trajectories=n_trajectories,
-            verbose=verbose
+            verbose=verbose,
         )
 
         return result
@@ -253,25 +250,22 @@ class MoonEarthTransfer:
         v_mag = np.linalg.norm(v_rel)
 
         # 飞行路径角
-        flight_path_angle = np.arcsin(
-            np.dot(r_rel, v_rel) / (r_mag * v_mag)
-        )
+        flight_path_angle = np.arcsin(np.dot(r_rel, v_rel) / (r_mag * v_mag))
 
         # 再入速度估计（转换为物理单位）
-        v_reentry = v_mag
         if self.system.characteristic_velocity:
             v_reentry_km_s = v_mag * self.system.characteristic_velocity
         else:
             v_reentry_km_s = None
 
         return {
-            'relative_position': r_rel,
-            'relative_velocity': v_rel,
-            'distance_to_earth': r_mag,
-            'velocity_magnitude': v_mag,
-            'velocity_km_s': v_reentry_km_s,
-            'flight_path_angle_deg': np.degrees(flight_path_angle),
-            'target_reentry_angle_deg': reentry_angle,
+            "relative_position": r_rel,
+            "relative_velocity": v_rel,
+            "distance_to_earth": r_mag,
+            "velocity_magnitude": v_mag,
+            "velocity_km_s": v_reentry_km_s,
+            "flight_path_angle_deg": np.degrees(flight_path_angle),
+            "target_reentry_angle_deg": reentry_angle,
         }
 
     def _propagate_to_earth(self, departure_state, t_transfer, r_target):
@@ -287,10 +281,12 @@ class MoonEarthTransfer:
         """
         result = solve_ivp(
             self.dynamics.equations_of_motion,
-            (0, t_transfer), departure_state,
+            (0, t_transfer),
+            departure_state,
             method="DOP853",
             t_eval=np.linspace(0, t_transfer, 2000),
-            rtol=1e-12, atol=1e-12,
+            rtol=1e-12,
+            atol=1e-12,
         )
 
         if not result.success:
@@ -310,13 +306,13 @@ class MoonEarthTransfer:
             dv = abs(v_actual - v_circ)
 
             return {
-                'trajectory': result.y.T,
-                'times': result.t,
-                'departure_state': departure_state,
-                'arrival_state': arrival_state,
-                'transfer_time': result.t[min_idx],
-                'delta_v': dv,
-                'min_earth_distance': min_dist,
+                "trajectory": result.y.T,
+                "times": result.t,
+                "departure_state": departure_state,
+                "arrival_state": arrival_state,
+                "transfer_time": result.t[min_idx],
+                "delta_v": dv,
+                "min_earth_distance": min_dist,
             }
 
         return None
