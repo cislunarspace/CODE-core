@@ -37,6 +37,7 @@ class CR3BP_System:
     - dimensionless_to_physical(state): 无量纲化转物理单位
     - physical_to_dimensionless(state): 物理单位转无量纲化
     - compute_stability_index(L_point): 计算平动点稳定性指标
+    - info(): 输出系统信息
     """
 
     # 类属性（物理常数）
@@ -360,3 +361,69 @@ class CR3BP_System:
         """详细表示"""
         return f"CR3BP_System(mu={self.mu}, primary='{self.primary_body}', secondary='{self.secondary_body}', " \
                f"initialized={self.is_initialized}, has_L_points={self.has_L_points})"
+
+    def info(self):
+        """输出系统信息
+        
+        该方法直接打印系统详细信息，不返回任何值。
+        """
+        print("=" * 60)
+        print("CR3BP 系统信息")
+        print("=" * 60)
+        
+        # 基本参数
+        print(f"系统名称: {self.primary_body}-{self.secondary_body}")
+        print(f"质量参数 μ: {self.mu:.6e}")
+        print(f"主天体: {self.primary_body}")
+        print(f"次天体: {self.secondary_body}")
+        print()
+        
+        # 系统状态
+        print("系统状态:")
+        print(f"  是否初始化: {self.is_initialized}")
+        print(f"  是否已计算平动点: {self.has_L_points}")
+        print()
+        
+        # 特征尺度（如果已设置）
+        if self.is_initialized:
+            print("特征尺度:")
+            print(f"  特征长度: {self.characteristic_length:.2f} km")
+            print(f"  特征时间: {self.characteristic_time:.2f} s")
+            print(f"  特征速度: {self.characteristic_velocity:.2f} km/s")
+            print(f"  平均角速度: {self.mean_motion:.6e} rad/s")
+            print(f"  轨道周期: {self.orbital_period:.2f} s ({self.orbital_period/86400:.2f} 天)")
+            print(f"  半长轴: {self.semi_major_axis:.2f} km")
+        else:
+            print("特征尺度: 未设置 (请使用 set_characteristic_scales() 方法设置)")
+        print()
+        
+        # 平动点信息（如果已计算）
+        if self.has_L_points:
+            print("平动点位置 (无量纲坐标):")
+            for point_name, point_coords in self.L_points.items():
+                name = point_name.name
+                x, y, z = point_coords
+                print(f"  {name}: ({x:.6f}, {y:.6f}, {z:.6f})")
+        else:
+            print("平动点: 未计算 (请使用 compute_libration_points() 方法计算)")
+        print()
+        
+        # 质量信息（如果已设置）
+        if self.mass_primary is not None and self.mass_secondary is not None:
+            print("质量信息:")
+            print(f"  主天体质量: {self.mass_primary:.3e} kg")
+            print(f"  次天体质量: {self.mass_secondary:.3e} kg")
+            print(f"  总质量: {self.total_mass:.3e} kg")
+        else:
+            print("质量信息: 未设置")
+        print()
+        
+        # 已知系统信息
+        print("已知系统:")
+        for sys_name, sys_params in self.KNOWN_SYSTEMS.items():
+            primary = sys_params["primary"]
+            secondary = sys_params["secondary"]
+            mu = sys_params["mu"]
+            print(f"  {sys_name}: {primary}-{secondary} (μ={mu:.6e})")
+        
+        print("=" * 60)
