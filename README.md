@@ -43,6 +43,29 @@ jacobi_constant = system.get_jacobi_constant(state)
 print(f"Jacobi常数: {jacobi_constant:.4f}")
 ```
 
+## 可视化功能
+
+`e2m2e` 提供了强大的轨道可视化功能：
+
+```python
+from e2m2e.visualization.plotting import OrbitVisualizer
+
+# 创建可视化器
+viz = OrbitVisualizer(system)
+
+# 绘制2D投影（假设orbit是轨道数据）
+viz.plot_2d_projection(orbit, plane='xy', color='blue', label='My Orbit')
+viz.plot_primary_bodies()      # 添加天体
+viz.plot_libration_points()    # 添加平动点
+viz.show()                     # 显示图形
+
+# 创建综合概览图
+viz.create_overview_plot(orbit)
+viz.show()
+```
+
+更多可视化功能和使用示例，请参考 [可视化模块使用指南](docs/visualization_guide.md)。
+
 ## 开发与贡献
 
 ### 运行测试
