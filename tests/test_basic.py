@@ -84,6 +84,7 @@ def test_dynamics():
     print(f"  STM行列式: {np.linalg.det(stm):.6f}")
     print("✓ STM计算成功")
 
+
 def test_coordinate_transform():
     """测试坐标变换"""
     from e2m2e import CR3BP_System, CoordinateTransformation
@@ -103,6 +104,7 @@ def test_coordinate_transform():
     state_primary = coord.barycentric_to_primary(state)
     state_back2 = coord.primary_to_barycentric(state_primary)
     assert np.allclose(state, state_back2, atol=1e-14)
+
 
 def main():
     """运行所有测试"""

@@ -149,4 +149,3 @@ class TestInfoDifferentSystems:
         output = _capture_info(system)
         assert "Star-Planet" in output
         assert "1.000000e-03" in output
-

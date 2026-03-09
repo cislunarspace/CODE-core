@@ -177,9 +177,7 @@ class TestIterateCorrection:
         for i in range(-3, -1):
             assert errors[i] > errors[i + 1]
 
-    def test_converges_within_reasonable_iterations(
-        self, corrector_2d_fixed_x0, dro_initial_guess
-    ):
+    def test_converges_within_reasonable_iterations(self, corrector_2d_fixed_x0, dro_initial_guess):
         """应在合理的迭代次数内收敛"""
         corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
         assert corrector_2d_fixed_x0.iteration_count <= 20
@@ -220,8 +218,8 @@ class TestCorrectedOrbit:
         final_entry = history[-1]
         final_state = final_entry["final_state"]
 
-        np.testing.assert_allclose(final_state[1], 0.0, atol=1e-10)   # y(T/2) ≈ 0
-        np.testing.assert_allclose(final_state[3], 0.0, atol=1e-10)   # x_dot(T/2) ≈ 0
+        np.testing.assert_allclose(final_state[1], 0.0, atol=1e-10)  # y(T/2) ≈ 0
+        np.testing.assert_allclose(final_state[3], 0.0, atol=1e-10)  # x_dot(T/2) ≈ 0
 
     def test_orbit_period_positive(self, corrector_2d_fixed_x0, dro_initial_guess):
         """修正后的轨道周期应为正数"""

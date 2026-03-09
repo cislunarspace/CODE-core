@@ -474,9 +474,7 @@ class DifferentialCorrection:
                 return None
 
             # 2. 计算约束残差
-            constraint = np.array(
-                [final_state[idx] for idx in self.constraint_indices]
-            )
+            constraint = np.array([final_state[idx] for idx in self.constraint_indices])
             target = np.array(
                 [
                     self.target_conditions[_STATE_INDEX_TO_KEY[idx]]
@@ -516,9 +514,7 @@ class DifferentialCorrection:
 
             # 5. 构建雅可比矩阵（基于STM和终点状态导数）
             # 计算终点处的状态导数（速度和加速度）
-            state_derivative = self.dynamics.equations_of_motion(
-                current_time, final_state
-            )
+            state_derivative = self.dynamics.equations_of_motion(current_time, final_state)
 
             n_constraints = len(self.constraint_indices)
             n_variables = len(self.free_variable_indices)
@@ -539,9 +535,7 @@ class DifferentialCorrection:
                 if n_constraints == n_variables:
                     delta = np.linalg.solve(self.jacobian_matrix, error_vector)
                 else:
-                    delta = np.linalg.lstsq(
-                        self.jacobian_matrix, error_vector, rcond=None
-                    )[0]
+                    delta = np.linalg.lstsq(self.jacobian_matrix, error_vector, rcond=None)[0]
             except np.linalg.LinAlgError:
                 print("  雅可比矩阵奇异，无法求解修正量。")
                 self.termination_reason = "雅可比矩阵奇异"
@@ -563,9 +557,7 @@ class DifferentialCorrection:
                 print("  警告：时间调整为正值")
 
             print(f"  修正量范数: {correction_norm:.2e}")
-            print(
-                f"  新状态: x={current_state[0]:.6f}, y_dot={current_state[4]:.6f}"
-            )
+            print(f"  新状态: x={current_state[0]:.6f}, y_dot={current_state[4]:.6f}")
             print(f"  新半周期: T/2={current_time:.6f}")
 
             # 检查停滞
