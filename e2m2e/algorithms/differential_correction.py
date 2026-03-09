@@ -6,7 +6,7 @@
 
 import numpy as np
 from scipy import integrate
-
+from ..core.orbit import Orbit
 
 class DifferentialCorrection:
     """微分修正算法
@@ -118,7 +118,7 @@ class DifferentialCorrection:
         self.termination_reason = None
         self.success = False
 
-    def setup_2D_symmetric_x_fixed_x0(self, x0 = 0):
+    def setup_2D_symmetric_x_fixed_x0(self, x0=0):
         """配置平面问题中固定初始x坐标的对称周期轨道搜索
 
         在平面圆形限制性三体问题（PCRTBP）模型中，动力学方程关于会合坐标系的x轴具有对称性。
@@ -581,8 +581,6 @@ class DifferentialCorrection:
                 (0, full_period),
                 t_eval=np.linspace(0, full_period, n_points),
             )
-
-            from ..core.orbit import Orbit
 
             corrected_orbit = Orbit(
                 states=result["states"],
