@@ -1,7 +1,76 @@
 """
-轨道可视化模块
+轨道可视化模块 (Orbit Visualization Module)
 
-提供3D轨道绘制、2D投影、平动点标注、天体绘制、庞加莱截面等可视化功能。
+提供圆形限制性三体问题（CR3BP）中轨道的各种可视化功能，包括：
+- 3D轨道绘制
+- 2D投影（XY, XZ, YZ平面）
+- 平动点（Libration Points）标注
+- 主天体和次天体绘制
+- 庞加莱截面（Poincaré Section）
+- 轨道族可视化
+- Jacobi常数变化图
+- 稳定性分析图
+
+使用指南：
+==========
+
+1. 基本使用：
+   ```python
+   from e2m2e.core.system import CR3BP_System
+   from e2m2e.visualization.plotting import OrbitVisualizer
+
+   # 创建系统
+   system = CR3BP_System.from_known_system("earth_moon")
+   system.set_characteristic_scales(384400, 27.32 * 86400)
+   system.compute_libration_points()
+
+   # 创建可视化器
+   viz = OrbitVisualizer(system)
+
+   # 绘制轨道（假设orbit是Orbit对象或状态数组）
+   viz.plot_2d_projection(orbit, plane='xy')
+   viz.plot_primary_bodies()
+   viz.plot_libration_points()
+   viz.show()
+   ```
+
+2. 高级功能：
+   - 创建概览图：viz.create_overview_plot(orbit)
+   - 绘制3D轨道：viz.plot_3d_orbit(orbit)
+   - 绘制轨道族：viz.plot_orbit_family(family_result)
+   - 绘制庞加莱截面：viz.plot_poincare_section(orbit, plane='y', value=0.0)
+   - 绘制Jacobi常数：viz.plot_jacobi_constant(orbit)
+
+3. 自定义设置：
+   ```python
+   # 修改图形大小
+   viz.figsize = (10, 6)
+
+   # 修改轨道样式
+   viz.orbit_linewidth = 2.0
+   viz.orbit_alpha = 0.9
+
+   # 修改天体颜色
+   viz.primary_body_color = 'orange'
+   viz.secondary_body_color = 'gray'
+   ```
+
+4. 保存图形：
+   ```python
+   viz.save('orbit_plot.png', dpi=300)  # 保存为PNG
+   viz.save('orbit_plot.pdf')           # 保存为PDF
+   ```
+
+依赖：
+------
+- numpy >= 1.20.0
+- matplotlib >= 3.5.0
+
+注意：
+------
+1. 在Jupyter notebook中使用时，可能需要添加 `%matplotlib inline`
+2. 可以多次调用绘图函数在同一图形上叠加多个轨道
+3. 使用 `viz.figure` 和 `viz.axes` 可以访问底层的matplotlib对象进行进一步自定义
 """
 
 import numpy as np
@@ -18,55 +87,118 @@ class ProjectionPlane(Enum):
 
 
 class OrbitVisualizer:
-    """轨道可视化器
+    """轨道可视化器 (Orbit Visualizer)
 
-    提供CR3BP轨道的各种可视化方法。
+    提供圆形限制性三体问题（CR3BP）中轨道的各种可视化方法。
+
+    主要功能：
+    ----------
+    1. 3D轨道可视化
+    2. 2D投影（XY, XZ, YZ平面）
+    3. 平动点（L1-L5）标注
+    4. 主天体和次天体绘制
+    5. 轨道族可视化
+    6. 庞加莱截面
+    7. Jacobi常数变化图
+    8. 稳定性分析图
 
     属性：
-        system: CR3BP_System对象
-        figsize: 图形大小
-        dpi: 分辨率
+    -----
+    system : CR3BP_System
+        关联的CR3BP系统对象
+    figsize : tuple
+        图形大小，默认 (12, 8)
+    dpi : int
+        图形分辨率，默认 100
+    orbit_linewidth : float
+        轨道线宽，默认 1.5
+    orbit_alpha : float
+        轨道透明度，默认 0.8
+    primary_body_color : str
+        主天体颜色，默认 "gold"
+    secondary_body_color : str
+        次天体颜色，默认 "silver"
+
+    示例：
+    -----
+    ```python
+    # 创建可视化器
+    viz = OrbitVisualizer(system)
+
+    # 绘制2D投影
+    viz.plot_2d_projection(orbit, plane='xy')
+    viz.plot_primary_bodies()
+    viz.plot_libration_points()
+    viz.show()
+
+    # 创建概览图
+    viz.create_overview_plot(orbit)
+    viz.show()
+    ```
     """
 
     DEFAULT_FIGURE_SIZE = (12, 8)
     DEFAULT_DPI = 100
 
     def __init__(self, system):
-        """初始化可视化器
+        """初始化轨道可视化器
 
         参数：
-        - system: CR3BP_System对象（可选）
-        这里引入 system 对象的目的是，在画图时从 system 对象中获取mu值。
+        ----------
+        system : CR3BP_System
+            关联的CR3BP系统对象。用于获取系统参数（如质量参数mu）和计算平动点位置。
+
+        注意：
+        ----
+        系统对象是必需的，因为可视化需要知道：
+        1. 质量参数mu（用于定位主天体和次天体）
+        2. 平动点位置
+        3. 特征尺度（用于坐标转换）
+
+        示例：
+        -----
+        ```python
+        from e2m2e.core.system import CR3BP_System
+        from e2m2e.visualization.plotting import OrbitVisualizer
+
+        # 创建系统
+        system = CR3BP_System.from_known_system("earth_moon")
+        system.set_characteristic_scales(384400, 27.32 * 86400)
+        system.compute_libration_points()
+
+        # 创建可视化器
+        viz = OrbitVisualizer(system)
+        ```
         """
         self.system = system
         self.mu = system.mu
 
         # 图形对象
-        self.figure = None
-        self.axes = None
-        self.axes_3d = None
+        self.figure = None  # 当前图形对象
+        self.axes = None  # 当前2D坐标轴
+        self.axes_3d = None  # 当前3D坐标轴
 
         # 设置
-        self.figsize = self.DEFAULT_FIGURE_SIZE
-        self.dpi = self.DEFAULT_DPI
+        self.figsize = self.DEFAULT_FIGURE_SIZE  # 图形大小
+        self.dpi = self.DEFAULT_DPI  # 分辨率
 
         # 绘图样式
-        self.orbit_linewidth = 1.5
-        self.orbit_alpha = 0.8
-        self.color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-        self.color_index = 0
+        self.orbit_linewidth = 1.5  # 轨道线宽
+        self.orbit_alpha = 0.8  # 轨道透明度
+        self.color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]  # 颜色循环
+        self.color_index = 0  # 当前颜色索引
 
-        # 天体颜色
-        self.primary_body_color = "gold"
-        self.primary_body_size = 200
-        self.secondary_body_color = "silver"
-        self.secondary_body_size = 100
+        # 天体颜色和大小
+        self.primary_body_color = "gold"  # 主天体颜色（如地球）
+        self.primary_body_size = 200  # 主天体大小
+        self.secondary_body_color = "silver"  # 次天体颜色（如月球）
+        self.secondary_body_size = 100  # 次天体大小
 
-        # 平动点设置
-        self.libration_point_colors = ["red", "blue", "green", "purple", "orange"]
-        self.libration_point_markers = ["o", "s", "^", "D", "*"]
-        self.libration_point_sizes = [100, 100, 100, 150, 150]
-        self.libration_point_labels = ["L1", "L2", "L3", "L4", "L5"]
+        # 平动点设置（L1-L5）
+        self.libration_point_colors = ["red", "blue", "green", "purple", "orange"]  # 颜色
+        self.libration_point_markers = ["o", "s", "^", "D", "*"]  # 标记符号
+        self.libration_point_sizes = [100, 100, 100, 150, 150]  # 大小
+        self.libration_point_labels = ["L1", "L2", "L3", "L4", "L5"]  # 标签
 
     def _get_next_color(self):
         """获取下一个颜色"""
@@ -77,15 +209,50 @@ class OrbitVisualizer:
     def plot_3d_orbit(self, orbit, color=None, label=None, ax=None, show_start=True):
         """绘制3D轨道
 
+        在3D空间中绘制轨道，可以显示轨道的三维形状和空间分布。
+
         参数：
-            orbit: Orbit对象或状态数组 (n, 6)
-            color: 轨道颜色
-            label: 标签
-            ax: matplotlib 3D坐标轴
-            show_start: 是否标记起点
+        ----------
+        orbit : Orbit 或 numpy.ndarray
+            轨道数据。可以是：
+            - Orbit对象（包含states属性）
+            - 形状为 (n, 6) 的numpy数组，每行包含 [x, y, z, vx, vy, vz]
+        color : str, 可选
+            轨道颜色。如果为None，使用自动颜色循环
+        label : str, 可选
+            图例标签
+        ax : matplotlib.axes._subplots.Axes3DSubplot, 可选
+            现有的3D坐标轴。如果为None，创建新的坐标轴
+        show_start : bool, 可选
+            是否在轨道起点标记点，默认 True
 
         返回：
-            ax: 3D坐标轴
+        -------
+        ax : matplotlib.axes._subplots.Axes3DSubplot
+            3D坐标轴对象
+
+        示例：
+        -----
+        ```python
+        # 绘制3D轨道
+        ax = viz.plot_3d_orbit(orbit, color='blue', label='Lyapunov Orbit')
+
+        # 添加天体和平动点
+        viz.plot_primary_bodies(ax=ax, is_3d=True)
+        viz.plot_libration_points(ax=ax, is_3d=True)
+
+        # 添加图例
+        ax.legend()
+
+        # 显示图形
+        viz.show()
+        ```
+
+        注意：
+        ----
+        1. 如果orbit是Orbit对象，会自动提取states属性
+        2. 可以多次调用此函数在同一坐标轴上叠加多个轨道
+        3. 使用ax参数可以将轨道绘制到现有的3D坐标轴上
         """
         if ax is None:
             if self.axes_3d is None:
@@ -126,16 +293,58 @@ class OrbitVisualizer:
     ):
         """绘制2D投影
 
+        将3D轨道投影到指定的2D平面上，便于分析轨道在特定平面上的形状。
+
         参数：
-            orbit: Orbit对象或状态数组
-            plane: 投影平面
-            color: 颜色
-            label: 标签
-            ax: matplotlib坐标轴
-            show_start: 是否标记起点
+        ----------
+        orbit : Orbit 或 numpy.ndarray
+            轨道数据。可以是：
+            - Orbit对象（包含states属性）
+            - 形状为 (n, 6) 的numpy数组
+        plane : ProjectionPlane 或 str, 可选
+            投影平面，默认 ProjectionPlane.XY
+            可选值：
+            - 'xy' 或 ProjectionPlane.XY: XY平面投影
+            - 'xz' 或 ProjectionPlane.XZ: XZ平面投影  
+            - 'yz' 或 ProjectionPlane.YZ: YZ平面投影
+        color : str, 可选
+            轨道颜色。如果为None，使用自动颜色循环
+        label : str, 可选
+            图例标签
+        ax : matplotlib.axes._axes.Axes, 可选
+            现有的2D坐标轴。如果为None，创建新的坐标轴
+        show_start : bool, 可选
+            是否在轨道起点标记点，默认 True
 
         返回：
-            ax: 坐标轴
+        -------
+        ax : matplotlib.axes._axes.Axes
+            2D坐标轴对象
+
+        示例：
+        -----
+        ```python
+        # 绘制XY平面投影
+        ax = viz.plot_2d_projection(orbit, plane='xy', color='red', label='XY Projection')
+        
+        # 添加天体和平动点
+        viz.plot_primary_bodies(ax=ax)
+        viz.plot_libration_points(ax=ax)
+        
+        # 显示图形
+        viz.show()
+        
+        # 绘制XZ平面投影
+        viz.plot_2d_projection(orbit, plane='xz', color='green', label='XZ Projection')
+        viz.show()
+        ```
+
+        注意：
+        ----
+        1. 投影平面使用无量纲坐标
+        2. 自动设置等比例坐标轴（ax.set_aspect('equal')）
+        3. 添加网格线便于观察
+        4. 可以多次调用此函数在同一坐标轴上叠加多个轨道
         """
         if ax is None:
             if self.axes is None:
@@ -439,11 +648,47 @@ class OrbitVisualizer:
     def create_overview_plot(self, orbit):
         """创建轨道概览图（四子图）
 
+        创建一个包含四个子图的综合视图，显示轨道的3D视图和三个2D投影。
+        这是快速了解轨道整体特性的最佳方式。
+
         参数：
-            orbit: Orbit对象
+        ----------
+        orbit : Orbit 或 numpy.ndarray
+            轨道数据。可以是：
+            - Orbit对象（包含states属性）
+            - 形状为 (n, 6) 的numpy数组
 
         返回：
-            figure: matplotlib图形
+        -------
+        figure : matplotlib.figure.Figure
+            matplotlib图形对象
+
+        子图布局：
+        ---------
+        1. 左上 (221): 3D轨道视图
+        2. 右上 (222): XY平面投影（包含天体和平动点）
+        3. 左下 (223): XZ平面投影
+        4. 右下 (224): YZ平面投影
+
+        示例：
+        -----
+        ```python
+        # 创建概览图
+        fig = viz.create_overview_plot(orbit)
+        
+        # 显示图形
+        viz.show()
+        
+        # 保存图形
+        viz.save('orbit_overview.png', dpi=300)
+        ```
+
+        注意：
+        ----
+        1. 图形大小为 (16, 12)，适合详细观察
+        2. 使用tight_layout自动调整子图间距
+        3. XY投影子图中会自动添加天体和平动点
+        4. 3D子图中只显示轨道，不添加其他元素以保持清晰
         """
         fig = plt.figure(figsize=(16, 12), dpi=self.dpi)
 
