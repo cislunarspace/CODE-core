@@ -8,6 +8,7 @@ import numpy as np
 from scipy import interpolate
 import json
 from datetime import datetime
+import os
 
 
 class Orbit:
@@ -287,6 +288,15 @@ class Orbit:
         参数：
         - filename: 文件名
         """
+        # 自动创建目录
+        dirpath = os.path.dirname(filename)
+        if dirpath and not os.path.exists(dirpath):
+            os.makedirs(dirpath)
+
+        # 加入时间戳字段
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.metadata["saved_timestamp"] = timestamp
+
         data = {
             "states": self.states.tolist(),
             "times": self.times.tolist(),
@@ -297,9 +307,10 @@ class Orbit:
                 "extrema": self.extrema,
                 "mean_state": self.mean_state.tolist() if self.mean_state is not None else None,
                 "family_type": self.family_type,
-                "is_periodic": self.is_periodic,
+                "is_periodic": bool(self.is_periodic),  # 转换为Python布尔值
                 "periodicity_error": self.periodicity_error,
             },
+            "timestamp": timestamp,
         }
 
         with open(filename, "w") as f:
