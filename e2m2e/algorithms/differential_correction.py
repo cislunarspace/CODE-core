@@ -8,6 +8,7 @@ import numpy as np
 from scipy import integrate
 from ..core.orbit import Orbit
 
+
 class DifferentialCorrection:
     """微分修正算法
 
