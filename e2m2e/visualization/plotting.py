@@ -31,14 +31,15 @@ class OrbitVisualizer:
     DEFAULT_FIGURE_SIZE = (12, 8)
     DEFAULT_DPI = 100
 
-    def __init__(self, system=None):
+    def __init__(self, system):
         """初始化可视化器
 
         参数：
         - system: CR3BP_System对象（可选）
+        这里引入 system 对象的目的是，在画图时从 system 对象中获取mu值。
         """
         self.system = system
-        self.mu = system.mu if system and hasattr(system, "mu") else None
+        self.mu = system.mu
 
         # 图形对象
         self.figure = None
