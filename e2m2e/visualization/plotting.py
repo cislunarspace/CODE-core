@@ -305,7 +305,7 @@ class OrbitVisualizer:
             投影平面，默认 ProjectionPlane.XY
             可选值：
             - 'xy' 或 ProjectionPlane.XY: XY平面投影
-            - 'xz' 或 ProjectionPlane.XZ: XZ平面投影  
+            - 'xz' 或 ProjectionPlane.XZ: XZ平面投影
             - 'yz' 或 ProjectionPlane.YZ: YZ平面投影
         color : str, 可选
             轨道颜色。如果为None，使用自动颜色循环
@@ -326,14 +326,14 @@ class OrbitVisualizer:
         ```python
         # 绘制XY平面投影
         ax = viz.plot_2d_projection(orbit, plane='xy', color='red', label='XY Projection')
-        
+
         # 添加天体和平动点
         viz.plot_primary_bodies(ax=ax)
         viz.plot_libration_points(ax=ax)
-        
+
         # 显示图形
         viz.show()
-        
+
         # 绘制XZ平面投影
         viz.plot_2d_projection(orbit, plane='xz', color='green', label='XZ Projection')
         viz.show()
@@ -675,10 +675,10 @@ class OrbitVisualizer:
         ```python
         # 创建概览图
         fig = viz.create_overview_plot(orbit)
-        
+
         # 显示图形
         viz.show()
-        
+
         # 保存图形
         viz.save('orbit_overview.png', dpi=300)
         ```

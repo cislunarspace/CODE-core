@@ -63,23 +63,23 @@ def demo_2d_projection(system, viz, orbit_states):
 
     # XY平面投影
     print("绘制XY平面投影...")
-    viz.plot_2d_projection(orbit_states, plane='xy', color='blue', label='Lyapunov Orbit')
+    viz.plot_2d_projection(orbit_states, plane="xy", color="blue", label="Lyapunov Orbit")
     viz.plot_primary_bodies()
     viz.plot_libration_points()
     viz.axes.legend()
-    viz.axes.set_title('XY Projection - Lyapunov Orbit around L1')
+    viz.axes.set_title("XY Projection - Lyapunov Orbit around L1")
     viz.show()
 
     # XZ平面投影
     print("绘制XZ平面投影...")
-    viz.plot_2d_projection(orbit_states, plane='xz', color='green', label='XZ View')
-    viz.axes.set_title('XZ Projection')
+    viz.plot_2d_projection(orbit_states, plane="xz", color="green", label="XZ View")
+    viz.axes.set_title("XZ Projection")
     viz.show()
 
     # YZ平面投影
     print("绘制YZ平面投影...")
-    viz.plot_2d_projection(orbit_states, plane='yz', color='purple', label='YZ View')
-    viz.axes.set_title('YZ Projection')
+    viz.plot_2d_projection(orbit_states, plane="yz", color="purple", label="YZ View")
+    viz.axes.set_title("YZ Projection")
     viz.show()
 
 
@@ -89,11 +89,11 @@ def demo_3d_orbit(viz, orbit_states):
     print("-" * 40)
 
     print("绘制3D轨道...")
-    viz.plot_3d_orbit(orbit_states, color='red', label='3D Orbit')
+    viz.plot_3d_orbit(orbit_states, color="red", label="3D Orbit")
     viz.plot_primary_bodies(ax=viz.axes_3d, is_3d=True)
     viz.plot_libration_points(ax=viz.axes_3d, is_3d=True)
     viz.axes_3d.legend()
-    viz.axes_3d.set_title('3D View - Lyapunov Orbit')
+    viz.axes_3d.set_title("3D View - Lyapunov Orbit")
     viz.show()
 
 
@@ -104,12 +104,12 @@ def demo_overview_plot(viz, orbit_states):
 
     print("创建综合概览图...")
     fig = viz.create_overview_plot(orbit_states)
-    fig.suptitle('Orbit Overview - All Projections', fontsize=16)
+    fig.suptitle("Orbit Overview - All Projections", fontsize=16)
     viz.show()
 
     # 保存图形
     print("保存概览图为PNG文件...")
-    viz.save('orbit_overview_demo.png', dpi=200)
+    viz.save("orbit_overview_demo.png", dpi=200)
     print("图形已保存为 'orbit_overview_demo.png'")
 
 
@@ -122,8 +122,8 @@ def demo_customization(viz, orbit_states):
     viz.figsize = (10, 6)
     viz.orbit_linewidth = 2.0
     viz.orbit_alpha = 0.9
-    viz.primary_body_color = 'orange'
-    viz.secondary_body_color = 'gray'
+    viz.primary_body_color = "orange"
+    viz.secondary_body_color = "gray"
 
     print("自定义设置应用完成:")
     print(f"  图形大小: {viz.figsize}")
@@ -133,11 +133,11 @@ def demo_customization(viz, orbit_states):
     print(f"  次天体颜色: {viz.secondary_body_color}")
 
     # 使用新设置绘制图形
-    viz.plot_2d_projection(orbit_states, plane='xy', color='darkblue', label='Custom Orbit')
+    viz.plot_2d_projection(orbit_states, plane="xy", color="darkblue", label="Custom Orbit")
     viz.plot_primary_bodies()
     viz.plot_libration_points()
     viz.axes.legend()
-    viz.axes.set_title('Customized Visualization')
+    viz.axes.set_title("Customized Visualization")
     viz.show()
 
 
@@ -170,6 +170,7 @@ def main():
     except Exception as e:
         print(f"\n错误: {e}")
         import traceback
+
         traceback.print_exc()
 
 

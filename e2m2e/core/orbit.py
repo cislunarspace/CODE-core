@@ -294,7 +294,7 @@ class Orbit:
             os.makedirs(dirpath)
 
         # 加入时间戳字段
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.metadata["saved_timestamp"] = timestamp
 
         data = {
