@@ -7,6 +7,8 @@
 import numpy as np
 from enum import Enum
 
+import e2m2e
+
 
 class ContinuationDirection(Enum):
     """延拓方向枚举"""
@@ -118,10 +120,10 @@ class Continuation:
             print(f"步长: {self.step_size}, 目标轨道数: {n_orbits}")
             print(f"{'=' * 60}")
 
+        corrector = e2m2e.algorithms.DifferentialCorrection(seed_state.dynamic)
+
         # 首先修正种子轨道
-        seed_orbit, seed_result = self.correction.correct_orbit(
-            seed_state, seed_t_half, verbose=False
-        )
+        seed_orbit = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
 
         if seed_orbit is None:
             print("种子轨道修正失败！")
@@ -129,15 +131,15 @@ class Continuation:
 
         # 存储种子轨道
         self.family_orbits.append(seed_orbit)
-        self.family_states.append(seed_result["state"].copy())
-        self.family_periods.append(seed_result["period"])
+        self.family_states.append(seed_orbit["state"].copy())
+        self.family_periods.append(seed_orbit["period"])
 
         # 推断延拓参数索引
         if param_index is None:
             param_index = self._infer_param_index()
 
-        current_state = seed_result["state"].copy()
-        current_t_half = seed_result["t_half"]
+        current_state = seed_orbit["state"].copy()
+        current_t_half = seed_orbit["t_half"]
 
         for i in range(n_orbits - 1):
             self.continuation_stats["total_steps"] += 1
@@ -151,31 +153,29 @@ class Continuation:
             elif param_index == 6:
                 predicted_t_half += self.step_size * self.direction.value
 
-            # 修正步
-            orbit, result = self.correction.correct_orbit(
-                predicted_state, predicted_t_half, verbose=False
-            )
+            # 修正步 //TODO 在自然延拓的算法中，这里又使用了一次迭代算法，为什么？可能需要删掉
+            orbit = corrector.iterate_correction(predicted_state, predicted_t_half, verbose=False)
 
-            if orbit is not None and result["success"]:
+            if orbit is not None and orbit["success"]:
                 self.family_orbits.append(orbit)
-                self.family_states.append(result["state"].copy())
-                self.family_periods.append(result["period"])
+                self.family_states.append(orbit["state"].copy())
+                self.family_periods.append(orbit["period"])
 
-                current_state = result["state"].copy()
-                current_t_half = result["t_half"]
+                current_state = orbit["state"].copy()
+                current_t_half = orbit["t_half"]
 
                 self.continuation_stats["successful_steps"] += 1
 
                 if verbose and (i + 1) % 10 == 0:
-                    print(f"  第 {i + 1}/{n_orbits - 1} 条轨道，误差={result['error']:.2e}")
+                    print(f"  第 {i + 1}/{n_orbits - 1} 条轨道，误差={orbit['error']:.2e}")
 
                 # 自适应步长
                 if self.step_size_adaptation:
-                    if result["iterations"] < 3:
+                    if orbit["iterations"] < 3:
                         self.step_size = min(
                             self.step_size * self.step_growth_factor, self.max_step_size
                         )
-                    elif result["iterations"] > 8:
+                    elif orbit["iterations"] > 8:
                         self.step_size = max(
                             self.step_size * self.step_reduction_factor, self.min_step_size
                         )
@@ -221,36 +221,36 @@ class Continuation:
             print("开始伪弧长延拓")
             print(f"{'=' * 60}")
 
+        corrector = e2m2e.algorithms.DifferentialCorrection(seed_state.dynamic)
+
         # 首先用自然延拓获取前两条轨道
-        seed_orbit, seed_result = self.correction.correct_orbit(
-            seed_state, seed_t_half, verbose=False
-        )
+        seed_orbit = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
         if seed_orbit is None:
             print("种子轨道修正失败！")
             return None
 
         self.family_orbits.append(seed_orbit)
-        self.family_states.append(seed_result["state"].copy())
-        self.family_periods.append(seed_result["period"])
+        self.family_states.append(seed_orbit["state"].copy())
+        self.family_periods.append(seed_orbit["period"])
 
         # 获取第二条轨道（微小扰动）
         param_index = self._infer_param_index()
-        state_2 = seed_result["state"].copy()
-        t_half_2 = seed_result["t_half"]
+        state_2 = seed_orbit["state"].copy()
+        t_half_2 = seed_orbit["t_half"]
 
         if param_index < 6:
             state_2[param_index] += self.step_size * 0.1
         else:
             t_half_2 += self.step_size * 0.1
 
-        orbit_2, result_2 = self.correction.correct_orbit(state_2, t_half_2, verbose=False)
+        orbit_2 = corrector.iterate_correction(state_2, t_half_2, verbose=False)
         if orbit_2 is None:
             print("第二条轨道修正失败！")
             return None
 
         self.family_orbits.append(orbit_2)
-        self.family_states.append(result_2["state"].copy())
-        self.family_periods.append(result_2["period"])
+        self.family_states.append(orbit_2["state"].copy())
+        self.family_periods.append(orbit_2["period"])
 
         # 伪弧长延拓主循环
         for i in range(n_orbits - 2):
@@ -277,14 +277,12 @@ class Continuation:
             predicted_t_half = t_curr + self.step_size * tangent[6] if len(tangent) > 6 else t_curr
 
             # 修正步
-            orbit, result = self.correction.correct_orbit(
-                predicted_state, predicted_t_half, verbose=False
-            )
+            orbit = corrector.iterate_correction(predicted_state, predicted_t_half, verbose=False)
 
-            if orbit is not None and result["success"]:
+            if orbit is not None and orbit["success"]:
                 self.family_orbits.append(orbit)
-                self.family_states.append(result["state"].copy())
-                self.family_periods.append(result["period"])
+                self.family_states.append(orbit["state"].copy())
+                self.family_periods.append(orbit["period"])
                 self.continuation_stats["successful_steps"] += 1
 
                 if verbose and (i + 1) % 10 == 0:

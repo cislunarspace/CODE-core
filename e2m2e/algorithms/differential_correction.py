@@ -657,26 +657,6 @@ class DifferentialCorrection:
             "termination_reason": self.termination_reason,
         }
 
-    def correct_orbit(self, initial_state, t_half, verbose=True):
-        """修正轨道并返回完整周期轨道  //TODO 这个函数有些多余，因为用户完全可以直接调用iterate_correction来获取修正结果，然后再根据需要生成Orbit对象
-
-        参数:
-            initial_state (np.ndarray): 初始状态向量
-            t_half (float): 初始半周期估计
-            verbose (bool): 是否打印信息
-
-        返回:
-            tuple: (Orbit对象或None, 修正结果字典)
-        """
-        # 调用微分修正算法
-        result = self.iterate_correction(initial_state, t_half=t_half, verbose=verbose)
-
-        if result["success"]:
-            orbit = self._create_corrected_orbit(result)
-            return orbit, result
-        else:
-            return None, result
-
     def _infer_family_type(self):
         """根据配置推断轨道族类型"""
         if self.setup_type and "3D" in self.setup_type:

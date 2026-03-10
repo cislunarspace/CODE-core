@@ -52,7 +52,7 @@ def design_lyapunov_orbit():
     print("\n5. 进行微分修正")
     print("正在计算...")
 
-    orbit, result = dc.correct_orbit(initial_state, t_half=t_half_guess)
+    orbit, result = dc.iterate_correction(initial_state, t_half=t_half_guess)
 
     if orbit is not None:
         print("\n✓ 轨道设计成功!")
