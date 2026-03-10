@@ -119,7 +119,7 @@ class DifferentialCorrection:
         self.termination_reason = None
         self.success = False
 
-    def setup_2D_symmetric_x_fixed_x0(self, x0=0):
+    def setup_2D_symmetric_x_fixed_x0(self, x0=0.0):
         """配置平面问题中固定初始x坐标的对称周期轨道搜索
 
         在平面圆形限制性三体问题（PCRTBP）模型中，动力学方程关于会合坐标系的x轴具有对称性。
@@ -130,7 +130,7 @@ class DifferentialCorrection:
         和半周期T/2作为自由变量进行调整，以满足终点处的垂直穿越条件。
 
         参数:
-            x0 (float): 固定的初始x坐标，轨道从点(x0, 0)垂直出发，这里将值设置为0，是因为在这个函数中只需要使用x0进行初始化
+            x0 (float): 固定的初始x坐标，轨道从点(x0, 0)垂直出发，这里将值设置为0.0，是因为在这个函数中只需要使用x0进行初始化
 
         返回:
             self: 返回配置好的微分修正器实例
