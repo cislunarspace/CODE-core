@@ -528,14 +528,14 @@ class DifferentialCorrection:
                 self.converged = True
                 self.termination_reason = "收敛成功：误差小于容差"
                 if verbose:
-                    print(f"✓ 收敛成功！最终误差: {current_error:.2e}")
+                    print(f"[OK] 收敛成功！最终误差: {current_error:.2e}")
                 break
 
             # 4. 检查发散
             if current_error > self.divergence_limit:
                 self.termination_reason = "发散：误差超过限制"
                 if verbose:
-                    print(f"✗ 警告：迭代发散，误差 = {current_error:.2e}")
+                    print(f"[WARN] 警告：迭代发散，误差 = {current_error:.2e}")
                 break
 
             # 5. 构建雅可比矩阵（基于STM和终点状态导数）
@@ -641,7 +641,7 @@ class DifferentialCorrection:
         )
         orbit.period = full_period
         orbit.is_periodic = True
-        orbit.family_type = self._infer_family_type()
+        orbit.family_type = self._infer_family_type()  # //TODO 这里的赋值逻辑需要修改
         return orbit
 
     def _build_result(self, state, t_half):
@@ -658,7 +658,7 @@ class DifferentialCorrection:
         }
 
     def correct_orbit(self, initial_state, t_half, verbose=True):
-        """修正轨道并返回完整周期轨道
+        """修正轨道并返回完整周期轨道  //TODO 这个函数有些多余，因为用户完全可以直接调用iterate_correction来获取修正结果，然后再根据需要生成Orbit对象
 
         参数:
             initial_state (np.ndarray): 初始状态向量
