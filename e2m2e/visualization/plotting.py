@@ -73,9 +73,17 @@
 3. 使用 `viz.figure` 和 `viz.axes` 可以访问底层的matplotlib对象进行进一步自定义
 """
 
+from __future__ import annotations
+
 import numpy as np
 import matplotlib.pyplot as plt
 from enum import Enum
+from typing import Dict, List, Tuple, Optional, Any, Union
+
+import numpy.typing as npt
+
+from ..core.system import CR3BP_System
+from ..core.orbit import Orbit
 
 
 class ProjectionPlane(Enum):
@@ -140,7 +148,7 @@ class OrbitVisualizer:
     DEFAULT_FIGURE_SIZE = (12, 8)
     DEFAULT_DPI = 100
 
-    def __init__(self, system):
+    def __init__(self, system: CR3BP_System) -> None:
         """初始化轨道可视化器
 
         参数：
@@ -200,13 +208,20 @@ class OrbitVisualizer:
         self.libration_point_sizes = [100, 100, 100, 150, 150]  # 大小
         self.libration_point_labels = ["L1", "L2", "L3", "L4", "L5"]  # 标签
 
-    def _get_next_color(self):
+    def _get_next_color(self) -> str:
         """获取下一个颜色"""
         color = self.color_cycle[self.color_index % len(self.color_cycle)]
         self.color_index += 1
         return color
 
-    def plot_3d_orbit(self, orbit, color=None, label=None, ax=None, show_start=True):
+    def plot_3d_orbit(
+        self,
+        orbit: Union[Orbit, npt.ArrayLike],
+        color: Optional[str] = None,
+        label: Optional[str] = None,
+        ax: Optional[Any] = None,
+        show_start: bool = True,
+    ) -> Any:
         """绘制3D轨道
 
         在3D空间中绘制轨道，可以显示轨道的三维形状和空间分布。
@@ -289,8 +304,14 @@ class OrbitVisualizer:
         return ax
 
     def plot_2d_projection(
-        self, orbit, plane=ProjectionPlane.XY, color=None, label=None, ax=None, show_start=True
-    ):
+        self,
+        orbit: Union[Orbit, npt.ArrayLike],
+        plane: Union[ProjectionPlane, str] = ProjectionPlane.XY,
+        color: Optional[str] = None,
+        label: Optional[str] = None,
+        ax: Optional[Any] = None,
+        show_start: bool = True,
+    ) -> Any:
         """绘制2D投影
 
         将3D轨道投影到指定的2D平面上，便于分析轨道在特定平面上的形状。
@@ -387,7 +408,9 @@ class OrbitVisualizer:
 
         return ax
 
-    def plot_libration_points(self, ax=None, show_labels=True, is_3d=False):
+    def plot_libration_points(
+        self, ax: Optional[Any] = None, show_labels: bool = True, is_3d: bool = False
+    ) -> Any:
         """绘制平动点
 
         参数：
@@ -442,7 +465,7 @@ class OrbitVisualizer:
 
         return ax
 
-    def plot_primary_bodies(self, ax=None, is_3d=False):
+    def plot_primary_bodies(self, ax: Optional[Any] = None, is_3d: bool = False) -> Any:
         """绘制主天体和次天体
 
         参数：
@@ -645,7 +668,7 @@ class OrbitVisualizer:
 
         return ax
 
-    def create_overview_plot(self, orbit):
+    def create_overview_plot(self, orbit: Union[Orbit, npt.ArrayLike]) -> Any:
         """创建轨道概览图（四子图）
 
         创建一个包含四个子图的综合视图，显示轨道的3D视图和三个2D投影。
@@ -719,11 +742,11 @@ class OrbitVisualizer:
         self.figure = fig
         return fig
 
-    def show(self):
+    def show(self) -> None:
         """显示图形"""
         plt.show()
 
-    def save(self, filename, dpi=None):
+    def save(self, filename: str, dpi: Optional[int] = None) -> None:
         """保存图形
 
         参数：

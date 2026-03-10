@@ -4,10 +4,16 @@
 提供自然参数延拓和伪弧长延拓方法，用于生成轨道族。
 """
 
+from __future__ import annotations
+
 import numpy as np
 from enum import Enum
+from typing import Dict, List, Tuple, Optional, Any
+
+import numpy.typing as npt
 
 import e2m2e
+from .differential_correction import DifferentialCorrection
 
 
 class ContinuationDirection(Enum):
@@ -44,7 +50,12 @@ class Continuation:
     MAX_STEP_SIZE = 0.1
     DEFAULT_PREDICTOR_ORDER = 1
 
-    def __init__(self, correction, param="energy", step=None):
+    def __init__(
+        self,
+        correction: DifferentialCorrection,
+        param: str = "energy",
+        step: Optional[float] = None,
+    ) -> None:
         """初始化延拓器
 
         参数：

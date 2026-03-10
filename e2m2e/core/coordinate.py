@@ -4,8 +4,15 @@
 包含CoordinateTransformation类，用于在不同参考系之间转换轨道状态。
 """
 
+from __future__ import annotations
+
 import numpy as np
 from enum import Enum
+from typing import Dict, List, Tuple, Optional, Union, Any
+
+import numpy.typing as npt
+
+from .system import CR3BP_System
 
 
 class ReferenceFrame(Enum):
@@ -41,7 +48,7 @@ class CoordinateTransformation:
     CACHE_ROTATION_MATRICES = True  # 是否缓存旋转矩阵
     MAX_CACHE_SIZE = 1000  # 最大缓存大小
 
-    def __init__(self, system):
+    def __init__(self, system: CR3BP_System) -> None:
         """初始化变换器
 
         参数：
@@ -58,7 +65,7 @@ class CoordinateTransformation:
         # 变换状态
         self.initialized = True  # 初始化完成标志
 
-    def compute_rotation_matrix(self, time):
+    def compute_rotation_matrix(self, time: float) -> npt.NDArray[np.floating]:
         """计算旋转矩阵
 
         参数：
@@ -100,7 +107,9 @@ class CoordinateTransformation:
 
         return rotation_matrix
 
-    def rotating_to_inertial(self, state, time):
+    def rotating_to_inertial(
+        self, state: npt.ArrayLike, time: float
+    ) -> npt.NDArray[np.floating]:
         """旋转系到惯性系
 
         参数：
@@ -130,7 +139,9 @@ class CoordinateTransformation:
 
         return np.concatenate([position_inertial, velocity_inertial])
 
-    def inertial_to_rotating(self, state, time):
+    def inertial_to_rotating(
+        self, state: npt.ArrayLike, time: float
+    ) -> npt.NDArray[np.floating]:
         """惯性系到旋转系
 
         参数：
@@ -160,7 +171,7 @@ class CoordinateTransformation:
 
         return np.concatenate([position_rotating, velocity_rotating])
 
-    def barycentric_to_primary(self, state):
+    def barycentric_to_primary(self, state: npt.ArrayLike) -> npt.NDArray[np.floating]:
         """质心系到主天体中心
 
         参数：
@@ -187,7 +198,7 @@ class CoordinateTransformation:
 
         return np.concatenate([position_primary, velocity_primary])
 
-    def primary_to_barycentric(self, state):
+    def primary_to_barycentric(self, state: npt.ArrayLike) -> npt.NDArray[np.floating]:
         """主天体中心到质心系
 
         参数：
@@ -214,7 +225,7 @@ class CoordinateTransformation:
 
         return np.concatenate([position_barycentric, velocity_barycentric])
 
-    def barycentric_to_secondary(self, state):
+    def barycentric_to_secondary(self, state: npt.ArrayLike) -> npt.NDArray[np.floating]:
         """质心系到次天体中心
 
         参数：
@@ -241,7 +252,7 @@ class CoordinateTransformation:
 
         return np.concatenate([position_secondary, velocity_secondary])
 
-    def secondary_to_barycentric(self, state):
+    def secondary_to_barycentric(self, state: npt.ArrayLike) -> npt.NDArray[np.floating]:
         """次天体中心到质心系
 
         参数：
@@ -268,7 +279,13 @@ class CoordinateTransformation:
 
         return np.concatenate([position_barycentric, velocity_barycentric])
 
-    def transform(self, state, from_frame, to_frame, time=0.0):
+    def transform(
+        self,
+        state: npt.ArrayLike,
+        from_frame: Union[ReferenceFrame, str],
+        to_frame: Union[ReferenceFrame, str],
+        time: float = 0.0,
+    ) -> npt.NDArray[np.floating]:
         """通用坐标变换
 
         参数：

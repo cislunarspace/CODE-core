@@ -4,11 +4,21 @@
 包含Orbit类，用于表示和处理三体问题中的轨道数据。
 """
 
+from __future__ import annotations
+
+import os
 import numpy as np
 from scipy import interpolate
+from scipy.interpolate import interp1d
 import json
 from datetime import datetime
-import os
+from typing import Dict, List, Tuple, Optional, Any, Callable, Union
+from pathlib import Path
+
+import numpy.typing as npt
+
+from .system import CR3BP_System
+from .dynamics import CR3BP_Dynamics
 
 
 class Orbit:
@@ -45,7 +55,12 @@ class Orbit:
     VALID_COMPONENTS = ["x", "y", "z", "vx", "vy", "vz"]
     DEFAULT_INTERPOLATION_KIND = "cubic"  # 插值类型
 
-    def __init__(self, states, times, system=None):
+    def __init__(
+        self,
+        states: npt.ArrayLike,
+        times: npt.ArrayLike,
+        system: Optional[CR3BP_System] = None,
+    ) -> None:
         """初始化轨道
 
         参数：
@@ -115,7 +130,7 @@ class Orbit:
         # 初始化计算
         self.compute_basic_properties()
 
-    def compute_basic_properties(self):
+    def compute_basic_properties(self) -> None:
         """计算基本轨道属性"""
         # 计算Jacobi常数
         if self.system is not None:
@@ -149,7 +164,7 @@ class Orbit:
         # 估计周期（如果轨道是周期的）
         self._estimate_period()
 
-    def _estimate_period(self):
+    def _estimate_period(self) -> None:
         """估计轨道周期"""
         if len(self.times) < 2:
             return
@@ -167,7 +182,7 @@ class Orbit:
             # 检查周期性
             self._check_periodicity()
 
-    def _check_periodicity(self):
+    def _check_periodicity(self) -> None:
         """检查轨道周期性"""
         if self.period is None:
             return
@@ -188,7 +203,7 @@ class Orbit:
         else:
             self.metadata["description"] = "Non-periodic trajectory"
 
-    def interpolate_at_time(self, t):
+    def interpolate_at_time(self, t: float) -> npt.NDArray[np.floating]:
         """在指定时间插值轨道状态
 
         参数：
@@ -202,7 +217,7 @@ class Orbit:
             state[i] = self.interpolators[component](t)
         return state
 
-    def compute_monodromy_matrix(self, dynamics):
+    def compute_monodromy_matrix(self, dynamics: CR3BP_Dynamics) -> npt.NDArray[np.floating]:
         """计算单值矩阵
 
         参数：
@@ -223,7 +238,7 @@ class Orbit:
 
         return self.monodromy_matrix
 
-    def compute_stability(self, dynamics):
+    def compute_stability(self, dynamics: CR3BP_Dynamics) -> Dict[str, Any]:
         """计算轨道稳定性
 
         参数：
@@ -261,7 +276,7 @@ class Orbit:
             "lyapunov_exponents": self.lyapunov_exponents,
         }
 
-    def get_period(self):
+    def get_period(self) -> Optional[float]:
         """获取轨道周期
 
         返回：
@@ -269,7 +284,7 @@ class Orbit:
         """
         return self.period
 
-    def get_amplitude(self, direction):
+    def get_amplitude(self, direction: str) -> float:
         """获取指定方向振幅
 
         参数：
@@ -282,7 +297,7 @@ class Orbit:
             raise ValueError(f"无效的方向: {direction}。可用方向: {list(self.amplitudes.keys())}")
         return self.amplitudes[direction]
 
-    def save_to_file(self, filename):
+    def save_to_file(self, filename: Union[str, Path]) -> None:
         """保存轨道数据到文件
 
         参数：
@@ -317,7 +332,9 @@ class Orbit:
             json.dump(data, f, indent=2)
 
     @classmethod
-    def load_from_file(cls, filename, system=None):
+    def load_from_file(
+        cls, filename: Union[str, Path], system: Optional[CR3BP_System] = None
+    ) -> "Orbit":
         """从文件加载轨道数据
 
         参数：

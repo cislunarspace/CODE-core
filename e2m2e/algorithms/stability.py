@@ -4,8 +4,16 @@
 提供轨道稳定性分析功能，包括单值矩阵计算、Floquet乘子分析、分岔检测等。
 """
 
+from __future__ import annotations
+
 import numpy as np
 from enum import Enum
+from typing import Dict, List, Tuple, Optional, Any
+
+import numpy.typing as npt
+
+from ..core.orbit import Orbit
+from ..core.dynamics import CR3BP_Dynamics
 
 
 class StabilityType(Enum):
@@ -49,7 +57,9 @@ class StabilityAnalysis:
     STABILITY_THRESHOLD = 1e-6
     BIFURCATION_TOLERANCE = 1e-8
 
-    def __init__(self, orbit, dynamics=None):
+    def __init__(
+        self, orbit: Orbit, dynamics: Optional[CR3BP_Dynamics] = None
+    ) -> None:
         """初始化分析器
 
         参数：
