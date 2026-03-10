@@ -668,8 +668,7 @@ class DifferentialCorrection:
         返回:
             tuple: (Orbit对象或None, 修正结果字典)
         """
-        from ..core.orbit import Orbit
-
+        # 调用微分修正算法
         result = self.iterate_correction(initial_state, t_half=t_half, verbose=verbose)
 
         if result["success"]:

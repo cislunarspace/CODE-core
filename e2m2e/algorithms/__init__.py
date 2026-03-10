@@ -5,11 +5,13 @@ e2m2e算法模块
 """
 
 from .differential_correction import DifferentialCorrection
-from .continuation import Continuation
+from .continuation import Continuation, ContinuationDirection, ContinuationMethod
 from .stability import StabilityAnalysis
 
 __all__ = [
     "DifferentialCorrection",
     "Continuation",
+    "ContinuationDirection",
+    "ContinuationMethod",
     "StabilityAnalysis",
 ]

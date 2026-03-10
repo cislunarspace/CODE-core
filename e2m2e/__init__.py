@@ -27,7 +27,7 @@ from .core.coordinate import CoordinateTransformation
 
 # 导入算法模块
 from .algorithms.differential_correction import DifferentialCorrection
-from .algorithms.continuation import Continuation
+from .algorithms.continuation import Continuation, ContinuationDirection, ContinuationMethod
 from .algorithms.stability import StabilityAnalysis
 
 # 导入可视化模块
@@ -49,6 +49,8 @@ __all__ = [
     # 算法模块
     "DifferentialCorrection",
     "Continuation",
+    "ContinuationDirection",
+    "ContinuationMethod",
     "StabilityAnalysis",
     # 可视化模块
     "OrbitVisualizer",
