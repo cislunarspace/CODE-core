@@ -9,8 +9,7 @@ import json
 
 import numpy as np
 import pytest
-
-from e2m2e import Orbit
+from e2m2e.core.orbit import Orbit
 
 
 @pytest.fixture

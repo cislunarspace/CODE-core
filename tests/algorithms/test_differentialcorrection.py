@@ -16,7 +16,8 @@ import numpy as np
 import pytest
 
 import e2m2e
-from e2m2e import DifferentialCorrection, CR3BP_Dynamics, Orbit
+from e2m2e.algorithms import DifferentialCorrection
+from e2m2e.core import CR3BP_Dynamics, Orbit
 
 # 地月系统质量比
 MU = 1.21506683e-2

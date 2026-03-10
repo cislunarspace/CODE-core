@@ -5,6 +5,8 @@ e2m2e库基本功能测试
 import numpy as np
 import sys
 
+from e2m2e.core import CR3BP_System, CR3BP_Dynamics, CoordinateTransformation
+
 
 def test_import():
     """测试基本导入"""
@@ -18,8 +20,6 @@ def test_import():
 
 def test_system():
     """测试系统创建和平动点计算"""
-    from e2m2e import CR3BP_System
-
     # 从已知系统创建
     system = CR3BP_System.from_known_system("earth_moon")
     assert system.mu == 0.01215
@@ -57,8 +57,6 @@ def test_system():
 
 def test_dynamics():
     """测试动力学传播"""
-    from e2m2e import CR3BP_System, CR3BP_Dynamics
-
     system = CR3BP_System.from_known_system("earth_moon")
     dynamics = CR3BP_Dynamics(system)
 
@@ -87,8 +85,6 @@ def test_dynamics():
 
 def test_coordinate_transform():
     """测试坐标变换"""
-    from e2m2e import CR3BP_System, CoordinateTransformation
-
     system = CR3BP_System.from_known_system("earth_moon")
     coord = CoordinateTransformation(system)
 

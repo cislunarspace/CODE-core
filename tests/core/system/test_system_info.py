@@ -8,8 +8,7 @@ import numpy as np
 import pytest
 from io import StringIO
 from contextlib import redirect_stdout
-
-from e2m2e import CR3BP_System
+from e2m2e.core import CR3BP_System
 
 
 @pytest.fixture
