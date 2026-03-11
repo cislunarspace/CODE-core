@@ -412,7 +412,7 @@ class DifferentialCorrection:
         return jacobian
 
     def iterate_correction(self, initial_guess, verbose=True):
-        """迭代修正主算法（基于STM的牛顿法） //TODO 这个算法被AI改了之后变得异常复杂，需要我审查
+        """迭代修正主算法（基于STM的牛顿法） 
 
         通过状态转移矩阵(STM)构建雅可比矩阵，使用牛顿迭代法修正自由变量，
         使终点状态满足目标约束条件，从而找到精确的周期轨道。
