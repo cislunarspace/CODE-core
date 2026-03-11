@@ -262,6 +262,9 @@ class CR3BP_System:
         if not self.is_initialized:
             raise ValueError("系统未初始化，请先设置特征尺度")
 
+        # 转换为numpy数组
+        # state = np.asarray(state)
+
         # 位置转换
         position = state[:3] * self.characteristic_length
 
@@ -281,6 +284,9 @@ class CR3BP_System:
         """
         if not self.is_initialized:
             raise ValueError("系统未初始化，请先设置特征尺度")
+
+        # 转换为numpy数组
+        # state = np.asarray(state)
 
         # 位置转换
         position = state[:3] / self.characteristic_length
