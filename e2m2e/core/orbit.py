@@ -480,7 +480,17 @@ class OrbitFamily:
         - family_type: 轨道族类型
         - system: CR3BP_System对象
         """
-        self.orbits = orbits if orbits is not None else []
+        self.orbits: List[Orbit] = []
+        if orbits is not None:
+            if type(orbits) is Orbit:
+                self.orbits = [orbits]
+            else:
+                if type(orbits) is list and type(orbits[0]) is Orbit:
+                    self.orbits = orbits
+                else:
+                    self.orbits = []
+        else:
+            self.orbits = []
         self.family_type = family_type
         self.system = system
         self.metadata = {
@@ -520,16 +530,8 @@ class OrbitFamily:
         """迭代轨道"""
         return iter(self.orbits)
 
-    def append(self, orbit: Orbit) -> None:
-        """添加轨道到族中
-
-        参数：
-        - orbit: Orbit对象
-        """
-        self.orbits.append(orbit)
-
     def add_orbit(self, orbit: Orbit) -> None:
-        """添加轨道到族中 (append的别名)
+        """添加轨道到族中
 
         参数：
         - orbit: Orbit对象

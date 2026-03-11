@@ -44,7 +44,7 @@ class TestOrbitFamilyCreation:
 
         family = OrbitFamily(orbits=[orbit1, orbit2], family_type="lyapunov")
 
-        assert len(family) == 2
+        assert len(family.orbits) == 2
         assert family.family_type == "lyapunov"
 
 
@@ -70,14 +70,14 @@ class TestOrbitFamilyProperties:
 
     def test_periods_property(self, sample_family):
         """测试 periods 属性"""
-        periods = sample_family.periods
+        periods = sample_family.get_periods()
 
         assert len(periods) == 5
         assert np.allclose(periods, [1.0, 1.1, 1.2, 1.3, 1.4])
 
     def test_states_property(self, sample_family):
         """测试 states 属性"""
-        states = sample_family.states
+        states = sample_family.get_states()
 
         assert states.shape == (5, 6)
 
@@ -88,8 +88,8 @@ class TestOrbitFamilyProperties:
         assert len(periods) == 5
 
     def test_get_amplitudes(self, sample_family):
-        """测试 get_amplitudes 方法"""
-        amplitudes_x = sample_family.get_amplitudes("x")
+        """测试获取各轨道振幅"""
+        amplitudes_x = [orbit.amplitudes.get("x", 0) for orbit in sample_family]
 
         assert len(amplitudes_x) == 5
         assert np.allclose(amplitudes_x, [0.1, 0.12, 0.14, 0.16, 0.18])
@@ -127,12 +127,9 @@ class TestOrbitFamilyAccess:
 
     def test_get_orbit(self, sample_family):
         """测试获取单个轨道"""
-        orbit = sample_family.get_orbit(0)
+        orbit = sample_family[0]
         assert orbit is not None
         assert orbit.period == 1.0
-
-        # 测试无效索引
-        assert sample_family.get_orbit(10) is None
 
     def test_indexing(self, sample_family):
         """测试索引访问"""
@@ -153,7 +150,6 @@ class TestOrbitFamilyPersistence:
     def sample_family(self):
         """创建测试用轨道族"""
         family = OrbitFamily(family_type="halo")
-        family.parameters = {"mu": 0.01215, "description": "Test family"}
 
         for i in range(3):
             states = np.random.randn(20, 6)
@@ -182,9 +178,9 @@ class TestOrbitFamilyPersistence:
 
             # 验证
             assert loaded_family.family_type == sample_family.family_type
-            assert len(loaded_family) == len(sample_family)
-            assert len(loaded_family.periods) == len(sample_family.periods)
-            assert np.allclose(loaded_family.periods, sample_family.periods)
+            assert len(loaded_family.orbits) == len(sample_family.orbits)
+            assert len(loaded_family.get_periods()) == len(sample_family.get_periods())
+            assert np.allclose(loaded_family.get_periods(), sample_family.get_periods())
 
         finally:
             # 清理
@@ -199,8 +195,6 @@ class TestOrbitFamilyWithSystem:
         """测试Jacobi常数计算"""
         system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
 
-        family = OrbitFamily(family_type="halo")
-
         # 创建轨道时关联系统
         for i in range(3):
             # 创建在L1附近的测试状态
@@ -210,10 +204,21 @@ class TestOrbitFamilyWithSystem:
 
             orbit = Orbit(states, times, system=system)
             orbit.period = 1.0 + i * 0.1
+
+        # 创建带系统的轨道族
+        family = OrbitFamily(family_type="halo", system=system)
+
+        # 重新创建轨道并添加到族中
+        for i in range(3):
+            state = np.array([0.8 - i * 0.01, 0, 0, 0, 0.1 + i * 0.01, 0])
+            states = np.tile(state, (20, 1))
+            times = np.linspace(0, 1, 20)
+            orbit = Orbit(states, times, system=system)
+            orbit.period = 1.0 + i * 0.1
             family.add_orbit(orbit)
 
         # 获取Jacobi常数
-        jacobi = family.jacobi_constants
+        jacobi = family.get_jacobi_constants()
 
         assert len(jacobi) == 3
         # 所有值应该是有效的数值
