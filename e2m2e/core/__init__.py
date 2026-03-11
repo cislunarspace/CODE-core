@@ -11,7 +11,7 @@ from . import coordinate
 
 from .system import CR3BP_System, LibrationPoint
 from .dynamics import CR3BP_Dynamics
-from .orbit import Orbit
+from .orbit import Orbit, OrbitFamily
 from .coordinate import CoordinateTransformation
 
 __all__ = [
@@ -19,5 +19,6 @@ __all__ = [
     "LibrationPoint",
     "CR3BP_Dynamics",
     "Orbit",
+    "OrbitFamily",
     "CoordinateTransformation",
 ]

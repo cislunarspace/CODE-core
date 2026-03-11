@@ -83,17 +83,17 @@ class TestDROCorrection:
         # 验证结果
         assert result is not None, "DRO种子修正应该成功"
         assert result["success"], f"修正应该成功: {result.get('termination_reason')}"
-        
+
         # 验证轨道属性 - iterate_correction 返回字典，不是 Orbit 对象
         assert "state" in result, "结果应包含state"
         assert "period" in result, "结果应包含period"
         assert result["period"] > 0, "周期应该为正"
-        
+
         # 验证对称性条件（通过 propagate 验证）
         # 使用修正后的状态重新传播，检查周期性条件
         corrected_state = result["state"]
         t_half = result["t_half"]
-        
+
         # 重新传播验证
         dynamics = corrector.dynamics
         prop_result = dynamics.propagate(
@@ -102,7 +102,7 @@ class TestDROCorrection:
             t_eval=np.linspace(0, t_half, 100),
         )
         final_state = prop_result["states"][-1]
-        
+
         # 验证周期性条件（对称性）
         assert abs(final_state[1]) < 1e-6, f"y(T/2) 应该接近0，实际: {final_state[1]}"
         assert abs(final_state[3]) < 1e-6, f"vx(T/2) 应该接近0，实际: {final_state[3]}"
@@ -115,7 +115,7 @@ class TestDROCorrection:
         seed_t_half = 3.420385 / 2
 
         result = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
-        
+
         if result is not None and result["success"]:
             # DRO周期通常在2-7个无量纲时间单位之间
             period = result["period"]
@@ -129,11 +129,11 @@ class TestDROCorrection:
         seed_t_half = 3.420385 / 2
 
         result = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
-        
+
         if result is not None and result["success"]:
             # 计算初始状态的Jacobi常数
             C = earth_moon_system.get_jacobi_constant(seed_state)
-            
+
             # DRO的Jacobi常数通常在3.0-3.5之间
             assert 2.5 < C < 4.0, f"Jacobi常数应该在合理范围内: {C}"
 
@@ -145,12 +145,12 @@ class TestDROCorrection:
         seed_t_half = 3.420385 / 2
 
         result = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
-        
+
         if result is not None and result["success"]:
             # 从结果字典创建Orbit对象进行保存测试
             corrected_state = result["state"]
             period = result["period"]
-            
+
             # 重新传播获取完整轨道
             dynamics = corrector.dynamics
             prop_result = dynamics.propagate(
@@ -158,7 +158,7 @@ class TestDROCorrection:
                 (0, period),
                 t_eval=np.linspace(0, period, 1000),
             )
-            
+
             orbit = Orbit(
                 states=prop_result["states"],
                 times=prop_result["time"],
@@ -166,14 +166,14 @@ class TestDROCorrection:
             )
             orbit.period = period
             orbit.is_periodic = True
-            
+
             # 创建临时目录并保存
             temp_dir = tempfile.mkdtemp()
             try:
                 filepath = os.path.join(temp_dir, "test_dro.json")
                 orbit.save_to_file(filepath)
                 assert os.path.exists(filepath), "文件应该被创建"
-                
+
                 # 加载轨道
                 loaded_orbit = Orbit.load_from_file(filepath, system=earth_moon_system)
                 assert loaded_orbit is not None
@@ -191,7 +191,7 @@ class TestDRONaturalContinuation:
     def test_continuation_setup(self, corrector):
         """测试延拓器配置"""
         continuation = Continuation(corrector, param="x0", step=0.02)
-        
+
         assert continuation.continuation_parameter == "x0"
         assert continuation.step_size == 0.02
         assert continuation.direction == ContinuationDirection.FORWARD
@@ -211,7 +211,7 @@ class TestDRONaturalContinuation:
 
         # 先修正种子轨道
         seed_result = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
-        
+
         if seed_result is not None and seed_result["success"]:
             # 执行单步延拓
             result = continuation.natural_continuation(
@@ -221,7 +221,7 @@ class TestDRONaturalContinuation:
                 param_index=0,
                 verbose=False,
             )
-            
+
             # 验证结果
             assert result is not None, "延拓应该返回结果"
             assert "orbits" in result
@@ -242,7 +242,7 @@ class TestDRONaturalContinuation:
 
         # 先修正种子轨道
         seed_result = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
-        
+
         if seed_result is not None and seed_result["success"]:
             # 执行延拓
             result = continuation.natural_continuation(
@@ -252,12 +252,12 @@ class TestDRONaturalContinuation:
                 param_index=0,
                 verbose=False,
             )
-            
+
             # 验证结果
             if result is not None:
                 assert "orbits" in result
                 assert len(result["orbits"]) >= 1, "应该至少生成一条轨道"
-                
+
                 # 验证轨道周期性
                 for orbit in result["orbits"]:
                     if orbit is not None:
@@ -278,7 +278,7 @@ class TestDRONaturalContinuation:
 
         # 先修正种子轨道
         seed_result = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
-        
+
         if seed_result is not None and seed_result["success"]:
             # 执行延拓
             result = continuation.natural_continuation(
@@ -288,7 +288,7 @@ class TestDRONaturalContinuation:
                 param_index=0,
                 verbose=False,
             )
-            
+
             if result is not None and "periods" in result:
                 periods = result["periods"]
                 # 验证周期数据
@@ -307,26 +307,26 @@ class TestDROGenerationPipeline:
         """测试完整的DRO生成和延拓流程"""
         # 1. 创建系统
         assert earth_moon_system.mu == MU
-        
+
         # 2. 创建动力学和微分修正器
         dynamics = CR3BP_Dynamics(earth_moon_system)
         corrector = DifferentialCorrection(dynamics)
         x0 = 0.79188556619742
         corrector.setup_2D_symmetric_x_fixed_x0(x0)
-        
+
         # 3. 修正种子轨道
         vy0 = 0.53682
         seed_state = np.array([x0, 0.0, 0.0, 0.0, vy0, 0.0])
         seed_t_half = 3.420385 / 2
-        
+
         seed_result = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
         assert seed_result is not None, "种子轨道修正应该成功"
         assert seed_result["success"], "种子轨道应该成功收敛"
-        
+
         # 4. 延拓生成轨道族
         continuation = Continuation(corrector, param="x0", step=0.01)
         continuation.direction = ContinuationDirection.FORWARD
-        
+
         family_result = continuation.natural_continuation(
             seed_result["state"],
             seed_result["t_half"],
@@ -334,12 +334,12 @@ class TestDROGenerationPipeline:
             param_index=0,
             verbose=False,
         )
-        
+
         # 5. 验证结果
         assert family_result is not None
         assert "orbits" in family_result
         assert len(family_result["orbits"]) > 0
-        
+
         # 验证每条轨道
         for orbit in family_result["orbits"]:
             if orbit is not None:
@@ -352,19 +352,19 @@ class TestDROGenerationPipeline:
         corrector = DifferentialCorrection(dynamics)
         x0 = 0.79188556619742
         corrector.setup_2D_symmetric_x_fixed_x0(x0)
-        
+
         # 种子轨道
         vy0 = 0.53682
         seed_state = np.array([x0, 0.0, 0.0, 0.0, vy0, 0.0])
         seed_t_half = 3.420385 / 2
-        
+
         seed_result = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
-        
+
         if seed_result is not None and seed_result["success"]:
             # 反向延拓
             continuation = Continuation(corrector, param="x0", step=-0.01)
             continuation.direction = ContinuationDirection.BACKWARD
-            
+
             result = continuation.natural_continuation(
                 seed_result["state"],
                 seed_result["t_half"],
@@ -372,6 +372,6 @@ class TestDROGenerationPipeline:
                 param_index=0,
                 verbose=False,
             )
-            
+
             if result is not None:
                 assert "orbits" in result

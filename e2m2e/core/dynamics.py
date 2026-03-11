@@ -293,9 +293,7 @@ class CR3BP_Dynamics:
         """
         return self.system.get_jacobi_constant(state)
 
-    def check_cross_section(
-        self, state: npt.ArrayLike, plane: str, value: float
-    ) -> bool:
+    def check_cross_section(self, state: npt.ArrayLike, plane: str, value: float) -> bool:
         """检查是否穿过指定截面
 
         参数：

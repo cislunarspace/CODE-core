@@ -411,32 +411,20 @@ class DifferentialCorrection:
         self.performance_stats["jacobian_evaluations"] += 1
         return jacobian
 
-    def iterate_correction(self, initial_guess, t_half=None, verbose=True):
+    def iterate_correction(self, initial_guess, verbose=True):
         """迭代修正主算法（基于STM的牛顿法） //TODO 这个算法被AI改了之后变得异常复杂，需要我审查
 
         通过状态转移矩阵(STM)构建雅可比矩阵，使用牛顿迭代法修正自由变量，
         使终点状态满足目标约束条件，从而找到精确的周期轨道。
 
         参数:
-            initial_guess (Orbit | np.ndarray | list):
+            initial_guess (Orbit):
                 初始猜测轨道，或初始状态向量
-            t_half (float | None):
-                当 initial_guess 为状态向量时，对应的半周期初值
             verbose (bool):
                 是否打印迭代过程信息
 
         返回:
-            - 当 initial_guess 为 Orbit 时，返回修正后的 Orbit 或 None
-            - 当 initial_guess 为状态向量时，返回包含修正结果的字典
-
-        算法步骤:
-            1. 从初始猜测出发，带STM积分到当前估计的半周期时间
-            2. 计算终点状态与目标约束的残差
-            3. 如果残差小于容差，收敛成功
-            4. 利用STM和终点状态导数构建雅可比矩阵
-            5. 求解线性系统得到牛顿修正量
-            6. 更新自由变量
-            7. 重复直到收敛或达到最大迭代次数
+            - 返回修正后的 Orbit 对象
         """
         # 状态索引到目标条件键的映射
         _STATE_INDEX_TO_KEY = {
@@ -449,45 +437,34 @@ class DifferentialCorrection:
         }
 
         # 保存初始猜测
-        self.initial_guess = initial_guess
+        self.initial_guess = initial_guess.states[0]
         self.iteration_count = 0
         self.converged = False
         self.success = False
+        half_period_time = initial_guess.period / 2
 
-        # 兼容两种调用方式：Orbit对象，或(state, t_half)
-        return_orbit = isinstance(initial_guess, Orbit)
-
-        if return_orbit:
-            if initial_guess.period is None:
-                raise ValueError("当 initial_guess 为 Orbit 时，必须先设置 period")
-            current_state = initial_guess.states[0].copy()
-            current_time = initial_guess.period / 2
-        else:
-            if t_half is None:
-                raise ValueError("当 initial_guess 为状态向量时，必须提供 t_half")
-            current_state = np.array(initial_guess, dtype=float).copy()
-            if current_state.shape != (6,):
-                raise ValueError("初始状态向量必须为长度6的数组")
-            current_time = float(t_half)
+        # 初始化当前状态和时间（用于牛顿迭代）
+        current_state = self.initial_guess.copy()
+        current_time = half_period_time
 
         if verbose:
             print(f"\n{'=' * 60}")
             print("开始微分修正迭代（STM牛顿法）...")
             print(f"{'=' * 60}")
             print(
-                f"初始状态: x={current_state[0]:.6f}, y={current_state[1]:.6f}, z={current_state[2]:.6f}"
+                f"初始状态: x={self.initial_guess[0]:.6f}, y={self.initial_guess[1]:.6f}, z={self.initial_guess[2]:.6f}"
             )
             print(
-                f"         x_dot={current_state[3]:.6f}, y_dot={current_state[4]:.6f}, z_dot={current_state[5]:.6f}"
+                f"         x_dot={self.initial_guess[3]:.6f}, y_dot={self.initial_guess[4]:.6f}, z_dot={self.initial_guess[5]:.6f}"
             )
-            print(f"初始半周期: T/2={current_time:.6f}")
+            print(f"初始半周期: T/2={half_period_time:.6f}")
             print(f"{'=' * 60}")
 
         # 迭代循环
         for iteration in range(self.max_iterations):
             self.iteration_count = iteration + 1
 
-            # 1. 带STM传播到半周期时间
+            # 1. 带STM传播到半周期时间（使用修正后的当前状态）
             try:
                 result = self.dynamics.propagate(
                     current_state,
@@ -505,8 +482,6 @@ class DifferentialCorrection:
                 if verbose:
                     print(f"  积分失败: {e}")
                 self.termination_reason = f"积分失败: {e}"
-                result_dict = self._build_result(current_state, current_time)
-                return None if return_orbit else result_dict
 
             # 2. 计算约束残差
             constraint = np.array([final_state[idx] for idx in self.constraint_indices])
@@ -519,26 +494,13 @@ class DifferentialCorrection:
             error_vector = constraint - target
             current_error = np.linalg.norm(error_vector)
 
-            # 保存历史
-            self.error_history.append(current_error)
-            self.convergence_history.append(
-                {
-                    "iteration": iteration,
-                    "error": current_error,
-                    "state": current_state.copy(),
-                    "time": current_time,
-                    "constraints": constraint.copy(),
-                    "final_state": final_state.copy(),
-                }
-            )
-
             if verbose:
                 print(f"\n迭代 {iteration + 1}: 约束残差范数 = {current_error:.2e}")
 
-            # 3. 检查收敛
             if current_error < self.tolerance:
                 self.converged = True
                 self.termination_reason = "收敛成功：误差小于容差"
+                self.current_error = current_error  # 保存误差值
                 if verbose:
                     print(f"[OK] 收敛成功！最终误差: {current_error:.2e}")
                 break
@@ -624,14 +586,29 @@ class DifferentialCorrection:
                 print(f"{'=' * 60}")
 
             result_dict = self._build_result(current_state, current_time)
-            if return_orbit:
-                return self._create_corrected_orbit(result_dict)
-            return result_dict
+            return self._create_corrected_orbit(result_dict)
         else:
             if verbose:
                 print(f"\n微分修正失败: {self.termination_reason}")
-            result_dict = self._build_result(current_state, current_time)
-            return None if return_orbit else result_dict
+
+    def _build_result(self, final_state, half_period):
+        """构建修正结果字典
+
+        参数:
+            final_state: 修正后的最终状态向量
+            half_period: 修正后的半周期时间
+
+        返回:
+            dict: 包含状态、周期等信息的字典
+        """
+        return {
+            "state": final_state,
+            "period": 2 * half_period,
+            "half_period": half_period,
+            "setup_type": self.setup_type,
+            "converged": self.converged,
+            "error": self.current_error if hasattr(self, "current_error") else None,
+        }
 
     def _create_corrected_orbit(self, result):
         """根据修正结果积分生成完整周期轨道。"""
@@ -653,21 +630,15 @@ class DifferentialCorrection:
         )
         orbit.period = full_period
         orbit.is_periodic = True
-        orbit.family_type = self._infer_family_type()  # //TODO 这里的赋值逻辑需要修改
-        return orbit
+        orbit.family_type = self._infer_family_type()
 
-    def _build_result(self, state, t_half):
-        """构建结果字典"""
-        return {
-            "state": state.copy(),
-            "period": 2 * t_half,
-            "t_half": t_half,
-            "success": self.success,
-            "iterations": self.iteration_count,
-            "error": self.error_history[-1] if self.error_history else float("inf"),
-            "history": self.convergence_history,
-            "termination_reason": self.termination_reason,
-        }
+        # 保存修正结果信息到 Orbit 对象
+        orbit.correction_success = self.success
+        orbit.correction_iterations = self.iteration_count
+        orbit.correction_error = result.get("error")
+        orbit.correction_termination_reason = self.termination_reason
+
+        return orbit
 
     def _infer_family_type(self):
         """根据配置推断轨道族类型"""

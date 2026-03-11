@@ -9,13 +9,12 @@ from . import continuation
 from . import stability
 
 from .differential_correction import DifferentialCorrection
-from .continuation import Continuation, ContinuationDirection, ContinuationMethod
+from .continuation import Continuation, ContinuationMethod
 from .stability import StabilityAnalysis
 
 __all__ = [
     "DifferentialCorrection",
     "Continuation",
-    "ContinuationDirection",
     "ContinuationMethod",
     "StabilityAnalysis",
 ]

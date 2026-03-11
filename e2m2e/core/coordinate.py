@@ -107,9 +107,7 @@ class CoordinateTransformation:
 
         return rotation_matrix
 
-    def rotating_to_inertial(
-        self, state: npt.ArrayLike, time: float
-    ) -> npt.NDArray[np.floating]:
+    def rotating_to_inertial(self, state: npt.ArrayLike, time: float) -> npt.NDArray[np.floating]:
         """旋转系到惯性系
 
         参数：
@@ -139,9 +137,7 @@ class CoordinateTransformation:
 
         return np.concatenate([position_inertial, velocity_inertial])
 
-    def inertial_to_rotating(
-        self, state: npt.ArrayLike, time: float
-    ) -> npt.NDArray[np.floating]:
+    def inertial_to_rotating(self, state: npt.ArrayLike, time: float) -> npt.NDArray[np.floating]:
         """惯性系到旋转系
 
         参数：

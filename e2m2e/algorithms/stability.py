@@ -57,9 +57,7 @@ class StabilityAnalysis:
     STABILITY_THRESHOLD = 1e-6
     BIFURCATION_TOLERANCE = 1e-8
 
-    def __init__(
-        self, orbit: Orbit, dynamics: Optional[CR3BP_Dynamics] = None
-    ) -> None:
+    def __init__(self, orbit: Orbit, dynamics: Optional[CR3BP_Dynamics] = None) -> None:
         """初始化分析器
 
         参数：
