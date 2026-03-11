@@ -143,11 +143,11 @@ class Continuation:
                 guess_orbit = current_orbit.copy()
                 guess_orbit.states[0, param_index] += step_size
                 orbit = corrector.iterate_correction(guess_orbit)
-            else:
+            else: # //TODO 这个目前还没用到
                 # 修改时间 - 通过复制并修改orbit的period属性
                 guess_orbit = current_orbit.copy()
                 guess_orbit.period = current_orbit.period + step_size * 2
-                orbit = corrector.iterate_correction(guess_orbit, verbose=False)
+                orbit = corrector.iterate_correction(guess_orbit, verbose=True)
 
             if orbit is not None and orbit.correction_success:
                 # 添加到轨道族

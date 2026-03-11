@@ -107,6 +107,7 @@ site/
 *.out
 *.err
 output/
+out/
 results/
 data/
 plots/
