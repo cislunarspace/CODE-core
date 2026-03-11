@@ -412,7 +412,7 @@ class DifferentialCorrection:
         return jacobian
 
     def iterate_correction(self, initial_guess, verbose=True):
-        """迭代修正主算法（基于STM的牛顿法） 
+        """迭代修正主算法（基于STM的牛顿法）
 
         通过状态转移矩阵(STM)构建雅可比矩阵，使用牛顿迭代法修正自由变量，
         使终点状态满足目标约束条件，从而找到精确的周期轨道。
@@ -493,6 +493,20 @@ class DifferentialCorrection:
             )
             error_vector = constraint - target
             current_error = np.linalg.norm(error_vector)
+
+            # 记录误差历史
+            self.error_history.append(current_error)
+
+            # 记录收敛历史
+            self.convergence_history.append(
+                {
+                    "iteration": iteration + 1,
+                    "error": current_error,
+                    "state": current_state.copy(),
+                    "time": current_time,
+                    "final_state": final_state.copy(),
+                }
+            )
 
             if verbose:
                 print(f"\n迭代 {iteration + 1}: 约束残差范数 = {current_error:.2e}")
