@@ -4,9 +4,14 @@
 包含CR3BP_System类和LibrationPoint枚举，用于定义和操作圆型限制性三体问题系统。
 """
 
+from __future__ import annotations
+
 import numpy as np
 from scipy.optimize import fsolve
 from enum import Enum
+from typing import Dict, List, Tuple, Optional, Union, Any
+
+import numpy.typing as npt
 
 
 class LibrationPoint(Enum):
@@ -73,7 +78,7 @@ class CR3BP_System:
     }
 
     @classmethod
-    def from_known_system(cls, system_name):
+    def from_known_system(cls, system_name: str) -> "CR3BP_System":
         """从已知系统创建CR3BP系统
 
         参数：
@@ -92,7 +97,7 @@ class CR3BP_System:
             secondary=system_params["secondary"],
         )
 
-    def __init__(self, mu, primary, secondary):
+    def __init__(self, mu: float, primary: str, secondary: str) -> None:
         """初始化系统参数
 
         参数：
@@ -101,9 +106,9 @@ class CR3BP_System:
         - secondary: 次天体名称
         """
         # 基本实例属性
-        self.mu = mu
-        self.primary_body = primary
-        self.secondary_body = secondary
+        self.mu: float = mu
+        self.primary_body: str = primary
+        self.secondary_body: str = secondary
 
         # 特征尺度属性（初始化为None，后续可以设置）
         self.characteristic_length = None
@@ -132,7 +137,7 @@ class CR3BP_System:
         self.is_initialized = False  # 是否完全初始化
         self.has_L_points = False  # 是否已计算平动点
 
-    def set_characteristic_scales(self, distance, period):
+    def set_characteristic_scales(self, distance: float, period: float) -> None:
         """设置特征尺度
 
         参数：
@@ -152,7 +157,7 @@ class CR3BP_System:
 
         self.is_initialized = True
 
-    def compute_libration_points(self):
+    def compute_libration_points(self) -> Dict[LibrationPoint, npt.NDArray[np.floating]]:
         """计算五个平动点
 
         返回：
@@ -207,7 +212,7 @@ class CR3BP_System:
         self.has_L_points = True
         return self.L_points
 
-    def get_libration_point(self, point):
+    def get_libration_point(self, point: LibrationPoint) -> npt.NDArray[np.floating]:
         """获取指定平动点
 
         参数：
@@ -224,7 +229,7 @@ class CR3BP_System:
 
         return self.L_points[point]
 
-    def get_jacobi_constant(self, state):
+    def get_jacobi_constant(self, state: npt.ArrayLike) -> float:
         """计算Jacobi常数
 
         参数：
@@ -250,7 +255,7 @@ class CR3BP_System:
 
         return C
 
-    def dimensionless_to_physical(self, state):
+    def dimensionless_to_physical(self, state: npt.ArrayLike) -> npt.NDArray[np.floating]:
         """无量纲化转物理单位
 
         参数：
@@ -273,7 +278,7 @@ class CR3BP_System:
 
         return np.concatenate([position, velocity])
 
-    def physical_to_dimensionless(self, state):
+    def physical_to_dimensionless(self, state: npt.ArrayLike) -> npt.NDArray[np.floating]:
         """物理单位转无量纲化
 
         参数：
@@ -296,7 +301,7 @@ class CR3BP_System:
 
         return np.concatenate([position, velocity])
 
-    def compute_stability_index(self, L_point):
+    def compute_stability_index(self, L_point: LibrationPoint) -> Dict[str, Any]:
         """计算平动点稳定性指标
 
         参数：

@@ -4,8 +4,15 @@
 包含CR3BP_Dynamics类，用于计算和积分圆型限制性三体问题的动力学方程。
 """
 
+from __future__ import annotations
+
 import numpy as np
 from scipy.integrate import solve_ivp
+from typing import Dict, List, Tuple, Optional, Any, Callable
+
+import numpy.typing as npt
+
+from .system import CR3BP_System
 
 
 class CR3BP_Dynamics:
@@ -49,7 +56,7 @@ class CR3BP_Dynamics:
     DEFAULT_MAX_STEP = 0.01  # 默认最大步长
     STM_DIMENSION = 42  # 状态转移矩阵维度 (6x6 + 6状态)
 
-    def __init__(self, system):
+    def __init__(self, system: CR3BP_System) -> None:
         """初始化动力学
 
         参数：
@@ -79,7 +86,9 @@ class CR3BP_Dynamics:
         # 计算标志
         self.initialized = True  # 初始化完成
 
-    def equations_of_motion(self, t, state):
+    def equations_of_motion(
+        self, t: float, state: npt.NDArray[np.floating]
+    ) -> npt.NDArray[np.floating]:
         """6维状态向量的运动方程
 
         参数：
@@ -105,7 +114,9 @@ class CR3BP_Dynamics:
 
         return np.array([vx, vy, vz, ax, ay, az])
 
-    def equations_with_stm(self, t, augmented_state):
+    def equations_with_stm(
+        self, t: float, augmented_state: npt.NDArray[np.floating]
+    ) -> npt.NDArray[np.floating]:
         """42维增广状态向量的运动方程（包含状态转移矩阵）
 
         参数：
@@ -168,7 +179,13 @@ class CR3BP_Dynamics:
 
         return derivative
 
-    def propagate(self, initial_state, t_span, t_eval=None, with_stm=False):
+    def propagate(
+        self,
+        initial_state: npt.ArrayLike,
+        t_span: Tuple[float, float],
+        t_eval: Optional[npt.ArrayLike] = None,
+        with_stm: bool = False,
+    ) -> Dict[str, Any]:
         """传播轨迹
 
         参数：
@@ -247,7 +264,9 @@ class CR3BP_Dynamics:
                 "jacobi_error": self.jacobi_error,
             }
 
-    def compute_state_transition_matrix(self, initial_state, t):
+    def compute_state_transition_matrix(
+        self, initial_state: npt.ArrayLike, t: float
+    ) -> npt.NDArray[np.floating]:
         """计算状态转移矩阵
 
         参数：
@@ -263,7 +282,7 @@ class CR3BP_Dynamics:
         # 返回最终时刻的STM
         return result["stm"][-1]
 
-    def compute_jacobi_constant(self, state):
+    def compute_jacobi_constant(self, state: npt.ArrayLike) -> float:
         """实时计算Jacobi常数
 
         参数：
@@ -274,7 +293,9 @@ class CR3BP_Dynamics:
         """
         return self.system.get_jacobi_constant(state)
 
-    def check_cross_section(self, state, plane, value):
+    def check_cross_section(
+        self, state: npt.ArrayLike, plane: str, value: float
+    ) -> bool:
         """检查是否穿过指定截面
 
         参数：

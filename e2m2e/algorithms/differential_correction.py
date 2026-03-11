@@ -4,9 +4,16 @@
 提供用于求解周期轨道的微分修正算法，支持多种对称性配置。
 """
 
+from __future__ import annotations
+
 import numpy as np
 from scipy import integrate
+from typing import Dict, List, Tuple, Optional, Any, Callable
+
+import numpy.typing as npt
+
 from ..core.orbit import Orbit
+from ..core.dynamics import CR3BP_Dynamics
 
 
 class DifferentialCorrection:
@@ -42,7 +49,12 @@ class DifferentialCorrection:
         "3D_symmetric_xz_fixed_z0",
     ]
 
-    def __init__(self, dynamics, target=None, free_vars=None):
+    def __init__(
+        self,
+        dynamics: CR3BP_Dynamics,
+        target: Optional[Dict[str, Any]] = None,
+        free_vars: Optional[List[str]] = None,
+    ) -> None:
         """初始化修正器
 
         参数：

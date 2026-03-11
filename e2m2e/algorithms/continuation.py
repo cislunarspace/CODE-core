@@ -4,10 +4,16 @@
 提供自然参数延拓和伪弧长延拓方法，用于生成轨道族。
 """
 
+from __future__ import annotations
+
 import numpy as np
 from enum import Enum
+from typing import Dict, List, Tuple, Optional, Any
+
+import numpy.typing as npt
 
 import e2m2e
+from .differential_correction import DifferentialCorrection
 
 
 class ContinuationDirection(Enum):
@@ -44,7 +50,12 @@ class Continuation:
     MAX_STEP_SIZE = 0.1
     DEFAULT_PREDICTOR_ORDER = 1
 
-    def __init__(self, correction, param="energy", step=None):
+    def __init__(
+        self,
+        correction: DifferentialCorrection,
+        param: str = "energy",
+        step: Optional[float] = None,
+    ) -> None:
         """初始化延拓器
 
         参数：
@@ -120,7 +131,7 @@ class Continuation:
             print(f"步长: {self.step_size}, 目标轨道数: {n_orbits}")
             print(f"{'=' * 60}")
 
-        corrector = e2m2e.algorithms.DifferentialCorrection(seed_state.dynamic)
+        corrector = e2m2e.algorithms.DifferentialCorrection(self.dynamics)
 
         # 首先修正种子轨道
         seed_orbit = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
@@ -221,7 +232,7 @@ class Continuation:
             print("开始伪弧长延拓")
             print(f"{'=' * 60}")
 
-        corrector = e2m2e.algorithms.DifferentialCorrection(seed_state.dynamic)
+        corrector = e2m2e.algorithms.DifferentialCorrection(self.dynamics)
 
         # 首先用自然延拓获取前两条轨道
         seed_orbit = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
