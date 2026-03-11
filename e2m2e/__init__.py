@@ -15,7 +15,7 @@ e2m2e - Earth to Moon, Moon to Earth Transfer Orbit Design Library
 版本: 2.0.0
 """
 
-__version__ = "3.1.3"
+__version__ = "3.1.4"
 __author__ = "天疆说"
 __email__ = "ouyangjiahong22@nudt.edu.cn"
 

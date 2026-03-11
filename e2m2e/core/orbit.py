@@ -381,6 +381,68 @@ class Orbit:
             f"period={self.period}, system={self.system})"
         )
 
+    def copy(self) -> "Orbit":
+        """创建轨道的深拷贝
+
+        返回:
+            Orbit: 一个新的 Orbit 对象，包含相同的数据但独立引用
+        """
+        new_orbit = Orbit(
+            states=self.states.copy(),
+            times=self.times.copy(),
+            system=self.system,
+        )
+
+        # 复制所有属性
+        new_orbit.jacobi_constants = (
+            self.jacobi_constants.copy() if self.jacobi_constants is not None else None
+        )
+        new_orbit.stability_indices = (
+            self.stability_indices.copy() if self.stability_indices is not None else None
+        )
+        new_orbit.family_type = self.family_type
+        new_orbit.parameters = self.parameters.copy()
+
+        # 轨道属性
+        new_orbit.period = self.period
+        new_orbit.amplitudes = self.amplitudes.copy()
+        new_orbit.extrema = self.extrema.copy()
+        new_orbit.mean_state = self.mean_state.copy() if self.mean_state is not None else None
+
+        # 单值矩阵和稳定性
+        new_orbit.monodromy_matrix = (
+            self.monodromy_matrix.copy() if self.monodromy_matrix is not None else None
+        )
+        new_orbit.eigenvalues = self.eigenvalues.copy() if self.eigenvalues is not None else None
+        new_orbit.stability = self.stability
+        new_orbit.lyapunov_exponents = (
+            self.lyapunov_exponents.copy() if self.lyapunov_exponents is not None else None
+        )
+
+        # 插值对象（重新构建）
+        new_orbit.interpolation_kind = self.interpolation_kind
+
+        # 轨道几何特征
+        new_orbit.center = self.center.copy() if self.center is not None else None
+        new_orbit.radius = self.radius
+        new_orbit.shape = self.shape
+        new_orbit.orientation = self.orientation
+
+        # 轨道分类
+        new_orbit.is_periodic = self.is_periodic
+        new_orbit.is_quasi_periodic = self.is_quasi_periodic
+        new_orbit.is_chaotic = self.is_chaotic
+        new_orbit.periodicity_error = self.periodicity_error
+
+        # 轨道段
+        new_orbit.segments = self.segments.copy()
+        new_orbit.segment_indices = self.segment_indices.copy()
+
+        # 元数据
+        new_orbit.metadata = self.metadata.copy()
+
+        return new_orbit
+
 
 class OrbitFamily:
     """轨道族容器
@@ -428,6 +490,24 @@ class OrbitFamily:
             "tags": [],
         }
 
+    @property
+    def states(self) -> npt.NDArray[np.floating]:
+        """获取所有轨道的初始状态数组 (property版本)
+
+        返回：
+        - np.ndarray, shape (n, 6)
+        """
+        return self.get_states()
+
+    @property
+    def periods(self) -> npt.NDArray[np.floating]:
+        """获取所有轨道的周期数组 (property版本)
+
+        返回：
+        - np.ndarray, shape (n,)
+        """
+        return self.get_periods()
+
     def __len__(self) -> int:
         """返回轨道数量"""
         return len(self.orbits)
@@ -442,6 +522,14 @@ class OrbitFamily:
 
     def append(self, orbit: Orbit) -> None:
         """添加轨道到族中
+
+        参数：
+        - orbit: Orbit对象
+        """
+        self.orbits.append(orbit)
+
+    def add_orbit(self, orbit: Orbit) -> None:
+        """添加轨道到族中 (append的别名)
 
         参数：
         - orbit: Orbit对象
