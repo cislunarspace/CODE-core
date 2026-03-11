@@ -130,68 +130,6 @@ class Orbit:
         # 初始化计算
         self.compute_basic_properties()
 
-    def copy(self) -> "Orbit":
-        """创建轨道的深拷贝
-
-        返回:
-            Orbit: 一个新的 Orbit 对象，包含相同的数据但独立引用
-        """
-        new_orbit = Orbit(
-            states=self.states.copy(),
-            times=self.times.copy(),
-            system=self.system,
-        )
-
-        # 复制所有属性
-        new_orbit.jacobi_constants = (
-            self.jacobi_constants.copy() if self.jacobi_constants is not None else None
-        )
-        new_orbit.stability_indices = (
-            self.stability_indices.copy() if self.stability_indices is not None else None
-        )
-        new_orbit.family_type = self.family_type
-        new_orbit.parameters = self.parameters.copy()
-
-        # 轨道属性
-        new_orbit.period = self.period
-        new_orbit.amplitudes = self.amplitudes.copy()
-        new_orbit.extrema = self.extrema.copy()
-        new_orbit.mean_state = self.mean_state.copy() if self.mean_state is not None else None
-
-        # 单值矩阵和稳定性
-        new_orbit.monodromy_matrix = (
-            self.monodromy_matrix.copy() if self.monodromy_matrix is not None else None
-        )
-        new_orbit.eigenvalues = self.eigenvalues.copy() if self.eigenvalues is not None else None
-        new_orbit.stability = self.stability
-        new_orbit.lyapunov_exponents = (
-            self.lyapunov_exponents.copy() if self.lyapunov_exponents is not None else None
-        )
-
-        # 插值对象（重新构建）
-        new_orbit.interpolation_kind = self.interpolation_kind
-
-        # 轨道几何特征
-        new_orbit.center = self.center.copy() if self.center is not None else None
-        new_orbit.radius = self.radius
-        new_orbit.shape = self.shape
-        new_orbit.orientation = self.orientation
-
-        # 轨道分类
-        new_orbit.is_periodic = self.is_periodic
-        new_orbit.is_quasi_periodic = self.is_quasi_periodic
-        new_orbit.is_chaotic = self.is_chaotic
-        new_orbit.periodicity_error = self.periodicity_error
-
-        # 轨道段
-        new_orbit.segments = self.segments.copy()
-        new_orbit.segment_indices = self.segment_indices.copy()
-
-        # 元数据
-        new_orbit.metadata = self.metadata.copy()
-
-        return new_orbit
-
     def compute_basic_properties(self) -> None:
         """计算基本轨道属性"""
         # 计算Jacobi常数
@@ -445,167 +383,102 @@ class Orbit:
 
 
 class OrbitFamily:
-    """轨道族类，包含多个相关轨道
+    """轨道族容器
 
-    用于管理和分析一组相关的周期轨道（如Lyapunov轨道族、Halo轨道族等）。
+    用于存储和管理多个Orbit对象组成的轨道族。
 
     属性：
-        orbits: 轨道列表
-        family_type: 轨道族类型 (halo, lyapunov, vertical, etc.)
-        parameters: 轨道族参数字典
+    - orbits: Orbit对象列表
+    - family_type: 轨道族类型 (halo, lyapunov, dro, ro, etc.)
+    - system: 关联的CR3BP_System对象
 
     方法：
-        - add_orbit(orbit): 添加轨道到族中
-        - get_orbits(): 获取所有轨道
-        - get_states(): 获取所有初始状态
-        - get_periods(): 获取所有周期
-        - get_jacobi_constants(): 获取所有Jacobi常数
-        - save_to_file(filename): 保存轨道族到文件
-        - load_from_file(filename): 从文件加载轨道族
+    - __init__(orbits, family_type, system): 初始化轨道族
+    - __len__(): 返回轨道数量
+    - __getitem__(i): 获取第i条轨道
+    - __iter__(): 迭代轨道
+    - append(orbit): 添加轨道
+    - get_states(): 获取所有初始状态数组 (n, 6)
+    - get_periods(): 获取所有周期数组 (n,)
+    - get_jacobi_constants(): 获取所有Jacobi常数数组 (n,)
+    - save_to_file(filename): 保存到文件
+    - load_from_file(filename): 从文件加载
     """
 
     def __init__(
         self,
         orbits: Optional[List[Orbit]] = None,
         family_type: Optional[str] = None,
-    ):
+        system: Optional[CR3BP_System] = None,
+    ) -> None:
         """初始化轨道族
 
         参数：
-            orbits: Orbit对象列表，或单个Orbit对象（可选）
-            family_type: 轨道族类型（可选）
+        - orbits: Orbit对象列表
+        - family_type: 轨道族类型
+        - system: CR3BP_System对象
         """
-        # 处理单个Orbit对象或列表
-        if orbits is None:
-            orbit_list = []
-        elif isinstance(orbits, Orbit):
-            orbit_list = [orbits]
-        else:
-            orbit_list = orbits
-
-        self.orbits = orbit_list
+        self.orbits = orbits if orbits is not None else []
         self.family_type = family_type
-        self.parameters = {}
-
-        # 派生数据（延迟计算）
-        self._periods = None
-        self._states = None
-        self._jacobi_constants = None
-
-    @property
-    def periods(self) -> np.ndarray:
-        """获取所有轨道的周期"""
-        if self._periods is None:
-            self._periods = np.array(
-                [orbit.period for orbit in self.orbits if orbit.period is not None]
-            )
-        return self._periods
-
-    @property
-    def states(self) -> np.ndarray:
-        """获取所有轨道的初始状态"""
-        if self._states is None:
-            self._states = np.array([orbit.states[0] for orbit in self.orbits])
-        return self._states
-
-    @property
-    def jacobi_constants(self) -> np.ndarray:
-        """获取所有轨道的Jacobi常数"""
-        if self._jacobi_constants is None:
-            constants = []
-            for orbit in self.orbits:
-                if orbit.jacobi_constants is not None and len(orbit.jacobi_constants) > 0:
-                    constants.append(orbit.jacobi_constants[0])
-                elif orbit.system is not None:
-                    constants.append(orbit.system.get_jacobi_constant(orbit.states[0]))
-                else:
-                    constants.append(None)
-            self._jacobi_constants = np.array(constants)
-        return self._jacobi_constants
-
-    def add_orbit(self, orbit: Orbit) -> None:
-        """添加轨道到轨道族
-
-        参数：
-            orbit: Orbit对象
-        """
-        self.orbits.append(orbit)
-        # 清除缓存，强制重新计算派生数据
-        self._invalidate_cache()
-
-    def _invalidate_cache(self) -> None:
-        """清除派生数据缓存"""
-        self._periods = None
-        self._states = None
-        self._jacobi_constants = None
-
-    def get_orbit(self, index: int) -> Optional[Orbit]:
-        """获取指定索引的轨道
-
-        参数：
-            index: 轨道索引
-
-        返回：
-            Orbit对象，如果索引无效则返回None
-        """
-        if 0 <= index < len(self.orbits):
-            return self.orbits[index]
-        return None
-
-    def get_orbits(self) -> List[Orbit]:
-        """获取所有轨道
-
-        返回：
-            Orbit对象列表
-        """
-        return self.orbits
+        self.system = system
+        self.metadata = {
+            "created": datetime.now().isoformat(),
+            "source": "e2m2e library",
+            "description": "",
+            "tags": [],
+        }
 
     def __len__(self) -> int:
-        """返回轨道族中的轨道数量"""
+        """返回轨道数量"""
         return len(self.orbits)
 
     def __getitem__(self, index: int) -> Orbit:
-        """通过索引访问轨道"""
+        """获取指定索引的轨道"""
         return self.orbits[index]
 
     def __iter__(self):
-        """迭代轨道族中的轨道"""
+        """迭代轨道"""
         return iter(self.orbits)
 
-    def get_periods(self) -> np.ndarray:
-        """获取所有轨道的周期（属性别名）"""
-        return self.periods
-
-    def get_states(self) -> np.ndarray:
-        """获取所有轨道的初始状态（属性别名）"""
-        return self.states
-
-    def get_jacobi_constants(self) -> np.ndarray:
-        """获取所有轨道的Jacobi常数（属性别名）"""
-        return self.jacobi_constants
-
-    def get_amplitudes(self, direction: str = "x") -> np.ndarray:
-        """获取指定方向的振幅列表
+    def append(self, orbit: Orbit) -> None:
+        """添加轨道到族中
 
         参数：
-            direction: 方向 ('x', 'y', 'z')
+        - orbit: Orbit对象
+        """
+        self.orbits.append(orbit)
+
+    def get_states(self) -> npt.NDArray[np.floating]:
+        """获取所有轨道的初始状态数组
 
         返回：
-            振幅数组
+        - np.ndarray, shape (n, 6)
         """
-        amplitudes = []
-        for orbit in self.orbits:
-            if orbit.amplitudes and direction in orbit.amplitudes:
-                amplitudes.append(orbit.amplitudes[direction])
-            else:
-                amplitudes.append(None)
-        return np.array(amplitudes)
+        return np.array([orbit.states[0] for orbit in self.orbits])
+
+    def get_periods(self) -> npt.NDArray[np.floating]:
+        """获取所有轨道的周期数组
+
+        返回：
+        - np.ndarray, shape (n,)
+        """
+        return np.array([orbit.period for orbit in self.orbits if orbit.period is not None])
+
+    def get_jacobi_constants(self) -> npt.NDArray[np.floating]:
+        """获取所有轨道的Jacobi常数数组
+
+        返回：
+        - np.ndarray, shape (n,)
+        """
+        if self.system is None:
+            return np.array([])
+        return np.array([self.system.get_jacobi_constant(orbit.states[0]) for orbit in self.orbits])
 
     def save_to_file(self, filename: Union[str, Path]) -> None:
         """保存轨道族到文件
 
         参数：
-            filename: 文件名
+        - filename: 文件名
         """
         import os
 
@@ -614,27 +487,24 @@ class OrbitFamily:
         if dirpath and not os.path.exists(dirpath):
             os.makedirs(dirpath)
 
-        # 加入时间戳
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        # 收集轨道数据
-        orbits_data = []
-        for orbit in self.orbits:
-            orbit_data = {
-                "states": orbit.states.tolist(),
-                "times": orbit.times.tolist(),
-                "period": orbit.period,
-                "family_type": orbit.family_type,
-                "is_periodic": bool(orbit.is_periodic),
-                "amplitudes": orbit.amplitudes,
-            }
-            orbits_data.append(orbit_data)
+        self.metadata["saved_timestamp"] = timestamp
 
         data = {
-            "family_type": self.family_type,
-            "parameters": self.parameters,
             "n_orbits": len(self.orbits),
-            "orbits": orbits_data,
+            "family_type": self.family_type,
+            "metadata": self.metadata,
+            "orbits": [
+                {
+                    "states": orbit.states.tolist(),
+                    "times": orbit.times.tolist(),
+                    "period": orbit.period,
+                    "amplitudes": orbit.amplitudes,
+                    "family_type": orbit.family_type,
+                    "is_periodic": orbit.is_periodic,
+                }
+                for orbit in self.orbits
+            ],
             "timestamp": timestamp,
         }
 
@@ -643,43 +513,37 @@ class OrbitFamily:
 
     @classmethod
     def load_from_file(
-        cls,
-        filename: Union[str, Path],
-        system: Optional[CR3BP_System] = None,
+        cls, filename: Union[str, Path], system: Optional[CR3BP_System] = None
     ) -> "OrbitFamily":
         """从文件加载轨道族
 
         参数：
-            filename: 文件名
-            system: CR3BP_System对象（可选）
+        - filename: 文件名
+        - system: CR3BP_System对象
 
         返回：
-            OrbitFamily对象
+        - OrbitFamily对象
         """
         with open(filename, "r") as f:
             data = json.load(f)
 
-        # 创建轨道族对象
-        family = cls(family_type=data.get("family_type"))
-        family.parameters = data.get("parameters", {})
-
-        # 恢复轨道
-        for orbit_data in data.get("orbits", []):
+        orbits = []
+        for orbit_data in data["orbits"]:
             states = np.array(orbit_data["states"])
             times = np.array(orbit_data["times"])
             orbit = Orbit(states, times, system)
             orbit.period = orbit_data.get("period")
+            orbit.amplitudes = orbit_data.get("amplitudes", {})
             orbit.family_type = orbit_data.get("family_type")
             orbit.is_periodic = orbit_data.get("is_periodic", False)
-            orbit.amplitudes = orbit_data.get("amplitudes", {})
-            family.add_orbit(orbit)
+            orbits.append(orbit)
 
+        family = cls(orbits, data.get("family_type"), system)
+        family.metadata = data.get("metadata", {})
         return family
 
-    def __str__(self) -> str:
-        """字符串表示"""
-        return f"OrbitFamily(family_type={self.family_type}, n_orbits={len(self.orbits)})"
+    def __str__(self):
+        return f"OrbitFamily(n_orbits={len(self.orbits)}, family_type={self.family_type})"
 
-    def __repr__(self) -> str:
-        """详细表示"""
-        return f"OrbitFamily(family_type={self.family_type}, n_orbits={len(self.orbits)}, periods={self.periods[:3]}...)"
+    def __repr__(self):
+        return f"OrbitFamily(orbits={len(self.orbits)}, system={self.system})"
