@@ -102,11 +102,13 @@ class Continuation:
         """自然参数延拓
 
         从种子轨道出发，逐步改变延拓参数，生成一族周期轨道。
+        支持双向延拓：如果param_range的最小值小于种子轨道参数值，则向小值方向延拓；
+        如果param_range的最大值大于种子轨道参数值，则向大值方向延拓。
 
         参数：
             seed_orbit: Orbit, 种子轨道
             param_range: tuple, 延拓参数范围 (param_min, param_max)
-            step_size: float, 步长
+            step_size: float, 步长（始终为正值，延拓方向由参数范围自动确定）
             verbose: 是否打印信息
 
         返回：
@@ -118,16 +120,27 @@ class Continuation:
         # 获取延拓参数索引
         param_index = self._infer_param_index()
 
+        # 获取种子轨道的延拓参数值
+        if param_index < 6:
+            seed_param_value = seed_orbit.states[0, param_index]
+        else:
+            seed_param_value = seed_orbit.period
+
+        param_min, param_max = param_range
+
+        # 确定延拓方向
+        forward = param_max > seed_param_value  # 向大值方向延拓
+        backward = param_min < seed_param_value  # 向小值方向延拓
+
         print(f"\n{'=' * 60}")
         print(f"开始自然参数延拓 (参数: {self.continuation_parameter})")
-        print(f"步长: {self.step_size}, 参数范围: {param_range}")
+        print(f"种子轨道参数值: {seed_param_value:.6f}")
+        print(f"参数范围: {param_range}")
+        print(f"延拓方向: {'正向' if forward else ''}{'反向' if backward else ''}")
+        print(f"步长: {step_size}")
         print(f"{'=' * 60}")
 
         corrector = e2m2e.algorithms.DifferentialCorrection(self.dynamics)
-
-        # 计算目标轨道数量
-        param_min, param_max = param_range
-        n_orbits = int(abs(param_max - param_min) / step_size) + 1
 
         # 初始化当前轨道（使用种子轨道作为初始状态）
         current_orbit = seed_orbit.copy()
@@ -135,53 +148,138 @@ class Continuation:
         # 步长历史记录
         step_size_history = []
 
-        for i in range(n_orbits - 1):
-            # 生成待修正的下一个延拓位置的初始猜测
-            # 修改延拓参数
-            if param_index < 6:
-                # 修改状态分量
-                guess_orbit = current_orbit.copy()
-                guess_orbit.states[0, param_index] += step_size
-                orbit = corrector.iterate_correction(guess_orbit)
-            else: # //TODO 这个目前还没用到
-                # 修改时间 - 通过复制并修改orbit的period属性
-                guess_orbit = current_orbit.copy()
-                guess_orbit.period = current_orbit.period + step_size * 2
-                orbit = corrector.iterate_correction(guess_orbit, verbose=True)
+        # 执行正向延拓（向大值方向）
+        if forward:
+            if verbose:
+                print("\n--- 正向延拓 (参数增大方向) ---")
 
-            if orbit is not None and orbit.correction_success:
-                # 添加到轨道族
-                orbit_family.add_orbit(orbit)
+            target_forward = param_max
+            i = 0
+            while True:
+                # 获取当前参数值
+                if param_index < 6:
+                    current_param_value = current_orbit.states[0, param_index]
+                else:
+                    current_param_value = current_orbit.period
 
-                # 更新当前轨道
-                current_orbit = orbit
-
-                self.continuation_stats["successful_steps"] += 1
-
-                if verbose and (i + 1) % 10 == 0:
-                    print(f"  第 {i + 1}/{n_orbits - 1} 条轨道，周期={orbit.period:.4f}")
-
-                # 自适应步长
-                if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
-                    if orbit.correction_iterations < 3:
-                        step_size = min(step_size * self.step_growth_factor, self.max_step_size)
-                    elif orbit.correction_iterations > 8:
-                        step_size = max(step_size * self.step_reduction_factor, self.min_step_size)
-            else:
-                self.continuation_stats["failed_steps"] += 1
-
-                # 步长减半重试
-                step_size *= self.step_reduction_factor
-                if step_size < self.min_step_size:
-                    self.termination_reason = "步长过小，延拓终止"
-                    if verbose:
-                        print(f"\n步长过小，延拓终止于第 {len(orbit_family)} 条轨道")
+                # 检查是否到达目标
+                if current_param_value >= target_forward:
                     break
 
-                if verbose:
-                    print(f"  第 {i + 1} 步修正失败，减小步长至 {step_size:.6f}")
+                # 生成待修正的下一个延拓位置的初始猜测
+                if param_index < 6:
+                    # 修改状态分量
+                    guess_orbit = current_orbit.copy()
+                    guess_orbit.states[0, param_index] += step_size
+                    orbit = corrector.iterate_correction(guess_orbit)
+                else:
+                    # 修改时间 - 通过复制并修改orbit的period属性
+                    guess_orbit = current_orbit.copy()
+                    guess_orbit.period = current_orbit.period + step_size * 2
+                    orbit = corrector.iterate_correction(guess_orbit, verbose=True)
 
-            step_size_history.append(step_size)
+                if orbit is not None and orbit.correction_success:
+                    # 添加到轨道族
+                    orbit_family.add_orbit(orbit)
+
+                    # 更新当前轨道
+                    current_orbit = orbit
+
+                    self.continuation_stats["successful_steps"] += 1
+
+                    if verbose and (i + 1) % 10 == 0:
+                        print(f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}")
+
+                    # 自适应步长
+                    if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
+                        if orbit.correction_iterations < 3:
+                            step_size = min(step_size * self.step_growth_factor, self.max_step_size)
+                        elif orbit.correction_iterations > 8:
+                            step_size = max(step_size * self.step_reduction_factor, self.min_step_size)
+                else:
+                    self.continuation_stats["failed_steps"] += 1
+
+                    # 步长减半重试
+                    step_size *= self.step_reduction_factor
+                    if step_size < self.min_step_size:
+                        self.termination_reason = "步长过小，延拓终止"
+                        if verbose:
+                            print(f"\n正向步长过小，延拓终止于第 {len(orbit_family)} 条轨道")
+                        break
+
+                    if verbose:
+                        print(f"  第 {i + 1} 步修正失败，减小步长至 {step_size:.6f}")
+
+                step_size_history.append(step_size)
+                i += 1
+
+        # 执行反向延拓（向小值方向）
+        if backward:
+            # 重置当前轨道为种子轨道
+            current_orbit = seed_orbit.copy()
+
+            if verbose:
+                print("\n--- 反向延拓 (参数减小方向) ---")
+
+            target_backward = param_min
+            i = 0
+            while True:
+                # 获取当前参数值
+                if param_index < 6:
+                    current_param_value = current_orbit.states[0, param_index]
+                else:
+                    current_param_value = current_orbit.period
+
+                # 检查是否到达目标
+                if current_param_value <= target_backward:
+                    break
+
+                # 生成待修正的下一个延拓位置的初始猜测（减小参数值）
+                if param_index < 6:
+                    # 修改状态分量
+                    guess_orbit = current_orbit.copy()
+                    guess_orbit.states[0, param_index] -= step_size
+                    orbit = corrector.iterate_correction(guess_orbit)
+                else:
+                    # 修改时间 - 通过复制并修改orbit的period属性
+                    guess_orbit = current_orbit.copy()
+                    guess_orbit.period = current_orbit.period - step_size * 2
+                    orbit = corrector.iterate_correction(guess_orbit, verbose=True)
+
+                if orbit is not None and orbit.correction_success:
+                    # 添加到轨道族
+                    orbit_family.add_orbit(orbit)
+
+                    # 更新当前轨道
+                    current_orbit = orbit
+
+                    self.continuation_stats["successful_steps"] += 1
+
+                    if verbose and (i + 1) % 10 == 0:
+                        print(f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}")
+
+                    # 自适应步长
+                    if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
+                        if orbit.correction_iterations < 3:
+                            step_size = min(step_size * self.step_growth_factor, self.max_step_size)
+                        elif orbit.correction_iterations > 8:
+                            step_size = max(step_size * self.step_reduction_factor, self.min_step_size)
+                else:
+                    self.continuation_stats["failed_steps"] += 1
+
+                    # 步长减半重试
+                    step_size *= self.step_reduction_factor
+                    if step_size < self.min_step_size:
+                        self.termination_reason = "步长过小，延拓终止"
+                        if verbose:
+                            print(f"\n反向步长过小，延拓终止于第 {len(orbit_family)} 条轨道")
+                        break
+
+                    if verbose:
+                        print(f"  第 {i + 1} 步修正失败，减小步长至 {step_size:.6f}")
+
+                step_size_history.append(step_size)
+                i += 1
 
         if verbose:
             print(f"\n延拓完成：共生成 {len(orbit_family)} 条轨道")
