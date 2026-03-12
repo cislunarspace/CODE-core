@@ -14,7 +14,7 @@ import numpy.typing as npt
 
 import e2m2e
 from .differential_correction import DifferentialCorrection
-from ..core.orbit import OrbitFamily
+from ..core.orbit import OrbitFamily, Orbit
 
 
 class ContinuationMethod(Enum):
@@ -97,7 +97,7 @@ class Continuation:
         seed_orbit,
         param_range,
         step_size,
-        verbose=True,
+        verbose=False,
     ):
         """自然参数延拓
 
@@ -140,7 +140,8 @@ class Continuation:
         print(f"步长: {step_size}")
         print(f"{'=' * 60}")
 
-        corrector = e2m2e.algorithms.DifferentialCorrection(self.dynamics)
+        # 复用已初始化的corrector，确保修正模式（如setup_2D_symmetric_x_fixed_x0）被正确使用
+        corrector = self.correction
 
         # 初始化当前轨道（使用种子轨道作为初始状态）
         current_orbit = seed_orbit.copy()
@@ -176,7 +177,7 @@ class Continuation:
                     # 修改时间 - 通过复制并修改orbit的period属性
                     guess_orbit = current_orbit.copy()
                     guess_orbit.period = current_orbit.period + step_size * 2
-                    orbit = corrector.iterate_correction(guess_orbit, verbose=True)
+                    orbit = corrector.iterate_correction(guess_orbit, verbose=False)
 
                 if orbit is not None and orbit.correction_success:
                     # 添加到轨道族
@@ -188,14 +189,18 @@ class Continuation:
                     self.continuation_stats["successful_steps"] += 1
 
                     if verbose and (i + 1) % 10 == 0:
-                        print(f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}")
+                        print(
+                            f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}"
+                        )
 
                     # 自适应步长
                     if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
                         if orbit.correction_iterations < 3:
                             step_size = min(step_size * self.step_growth_factor, self.max_step_size)
                         elif orbit.correction_iterations > 8:
-                            step_size = max(step_size * self.step_reduction_factor, self.min_step_size)
+                            step_size = max(
+                                step_size * self.step_reduction_factor, self.min_step_size
+                            )
                 else:
                     self.continuation_stats["failed_steps"] += 1
 
@@ -237,14 +242,16 @@ class Continuation:
                 # 生成待修正的下一个延拓位置的初始猜测（减小参数值）
                 if param_index < 6:
                     # 修改状态分量
-                    guess_orbit = current_orbit.copy()
-                    guess_orbit.states[0, param_index] -= step_size
+                    guess_orbit_state = current_orbit.states[0]
+                    guess_orbit_state[param_index] -= step_size
+                    guess_orbit = Orbit(guess_orbit_state, [0])
+                    guess_orbit.period = current_orbit.period
                     orbit = corrector.iterate_correction(guess_orbit)
                 else:
                     # 修改时间 - 通过复制并修改orbit的period属性
                     guess_orbit = current_orbit.copy()
                     guess_orbit.period = current_orbit.period - step_size * 2
-                    orbit = corrector.iterate_correction(guess_orbit, verbose=True)
+                    orbit = corrector.iterate_correction(guess_orbit, verbose=False)
 
                 if orbit is not None and orbit.correction_success:
                     # 添加到轨道族
@@ -256,14 +263,18 @@ class Continuation:
                     self.continuation_stats["successful_steps"] += 1
 
                     if verbose and (i + 1) % 10 == 0:
-                        print(f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}")
+                        print(
+                            f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}"
+                        )
 
                     # 自适应步长
                     if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
                         if orbit.correction_iterations < 3:
                             step_size = min(step_size * self.step_growth_factor, self.max_step_size)
                         elif orbit.correction_iterations > 8:
-                            step_size = max(step_size * self.step_reduction_factor, self.min_step_size)
+                            step_size = max(
+                                step_size * self.step_reduction_factor, self.min_step_size
+                            )
                 else:
                     self.continuation_stats["failed_steps"] += 1
 
@@ -307,7 +318,8 @@ class Continuation:
             print("开始伪弧长延拓")
             print(f"{'=' * 60}")
 
-        corrector = e2m2e.algorithms.DifferentialCorrection(self.dynamics)
+        # 复用已初始化的corrector，确保修正模式被正确使用
+        corrector = self.correction
 
         # 首先用自然延拓获取前两条轨道
         seed_orbit = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)

@@ -411,7 +411,7 @@ class DifferentialCorrection:
         self.performance_stats["jacobian_evaluations"] += 1
         return jacobian
 
-    def iterate_correction(self, initial_guess, verbose=True):
+    def iterate_correction(self, initial_guess, verbose=False):
         """迭代修正主算法（基于STM的牛顿法）
 
         通过状态转移矩阵(STM)构建雅可比矩阵，使用牛顿迭代法修正自由变量，
