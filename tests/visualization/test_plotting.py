@@ -1,0 +1,233 @@
+"""
+OrbitVisualizer 类测试
+
+测试轨道可视化器的核心功能，包括3D轨道族绘图功能。
+"""
+
+import numpy as np
+import pytest
+import os
+import tempfile
+import matplotlib
+matplotlib.use('Agg')  # 使用非交互式后端
+
+from e2m2e.core import Orbit, OrbitFamily, CR3BP_System
+from e2m2e.visualization.plotting import OrbitVisualizer
+
+
+class TestOrbitVisualizerCreation:
+    """测试可视化器创建"""
+
+    def test_visualizer_creation(self):
+        """测试可视化器基本创建"""
+        system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
+        system.compute_libration_points()
+        
+        viz = OrbitVisualizer(system)
+        
+        assert viz.system is system
+        assert viz.mu == 0.01215
+
+    def test_visualizer_default_settings(self):
+        """测试可视化器默认设置"""
+        system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
+        
+        viz = OrbitVisualizer(system)
+        
+        assert viz.figsize == (12, 8)
+        assert viz.dpi == 100
+        assert viz.orbit_linewidth == 1.5
+        assert viz.orbit_alpha == 0.8
+
+
+class TestPlot3DOrbitFamily:
+    """测试3D轨道族绘图功能"""
+
+    @pytest.fixture
+    def sample_system(self):
+        """创建测试用CR3BP系统"""
+        system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
+        system.compute_libration_points()
+        return system
+
+    @pytest.fixture
+    def sample_family(self):
+        """创建测试用轨道族"""
+        family = OrbitFamily(family_type="test")
+        
+        # 创建3条简单的测试轨道
+        for i in range(3):
+            # 创建椭圆形状的测试状态
+            t = np.linspace(0, 2 * np.pi, 50)
+            x = 0.9 + 0.1 * np.cos(t)
+            y = 0.1 * np.sin(t)
+            z = 0.02 * np.sin(2 * t)
+            vx = -0.1 * np.sin(t)
+            vy = 0.1 * np.cos(t)
+            vz = 0.04 * np.cos(2 * t)
+            
+            states = np.column_stack([x, y, z, vx, vy, vz])
+            times = t
+            
+            orbit = Orbit(states, times)
+            orbit.period = 2 * np.pi
+            orbit.system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
+            
+            family.add_orbit(orbit)
+        
+        return family
+
+    def test_plot_3d_orbit_family_basic(self, sample_system, sample_family):
+        """测试3D轨道族基本绘图"""
+        viz = OrbitVisualizer(sample_system)
+        
+        # 测试基本调用（不保存到文件）
+        ax = viz.plot_3d_orbit_family(
+            sample_family,
+            jacobi_values=[3.0, 3.1, 3.2],
+            center=(0.99, 0.0, 0.0),
+            radius=0.40,
+            show_colorbar=True,
+            show_legend=True,
+            seed_label="Test Seed",
+        )
+        
+        assert ax is not None
+        assert ax.name == '3d'
+
+    def test_plot_3d_orbit_family_with_save(self, sample_system, sample_family):
+        """测试3D轨道族绘图并保存到文件"""
+        viz = OrbitVisualizer(sample_system)
+        
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            temp_path = f.name
+        
+        try:
+            # 绘图并保存
+            ax = viz.plot_3d_orbit_family(sample_family)
+            viz.save(temp_path)
+            
+            # 验证文件已创建
+            assert os.path.exists(temp_path)
+            assert os.path.getsize(temp_path) > 0
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def test_plot_3d_orbit_family_empty(self, sample_system):
+        """测试空轨道族绘图"""
+        viz = OrbitVisualizer(sample_system)
+        empty_family = OrbitFamily(family_type="empty")
+        
+        # 空轨道族应该返回None
+        ax = viz.plot_3d_orbit_family(empty_family)
+        # 空族不会创建坐标轴，所以ax应该为None
+        assert ax is None or ax.name == '3d'
+
+    def test_plot_3d_orbit_family_single_orbit(self, sample_system):
+        """测试单轨道绘图"""
+        viz = OrbitVisualizer(sample_system)
+        
+        # 创建单条轨道
+        t = np.linspace(0, 2 * np.pi, 50)
+        x = 0.9 + 0.1 * np.cos(t)
+        y = 0.1 * np.sin(t)
+        z = 0.02 * np.sin(2 * t)
+        vx = -0.1 * np.sin(t)
+        vy = 0.1 * np.cos(t)
+        vz = 0.04 * np.cos(2 * t)
+        
+        states = np.column_stack([x, y, z, vx, vy, vz])
+        
+        family = OrbitFamily(family_type="single")
+        orbit = Orbit(states, t)
+        orbit.period = 2 * np.pi
+        orbit.system = sample_system
+        family.add_orbit(orbit)
+        
+        ax = viz.plot_3d_orbit_family(
+            family,
+            jacobi_values=[3.0],
+            center=(0.99, 0.0, 0.0),
+            radius=0.40,
+        )
+        
+        assert ax is not None
+
+    def test_plot_3d_orbit_family_custom_view(self, sample_system, sample_family):
+        """测试自定义视角参数"""
+        viz = OrbitVisualizer(sample_system)
+        
+        # 测试不同的中心点和半径
+        ax = viz.plot_3d_orbit_family(
+            sample_family,
+            center=(1.0, 0.1, 0.0),
+            radius=0.5,
+            show_colorbar=False,
+            show_legend=False,
+        )
+        
+        # 验证坐标轴范围
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        zlim = ax.get_zlim()
+        
+        assert xlim[1] - xlim[0] == 1.0  # radius * 2
+        assert ylim[1] - ylim[0] == 1.0
+        assert zlim[1] - zlim[0] == 1.0
+
+    def test_plot_3d_orbit_family_with_jacobi_none(self, sample_system, sample_family):
+        """测试Jacobi为None时的处理"""
+        viz = OrbitVisualizer(sample_system)
+        
+        # 不提供jacobi_values
+        ax = viz.plot_3d_orbit_family(
+            sample_family,
+            jacobi_values=None,
+            center=(0.99, 0.0, 0.0),
+            radius=0.40,
+        )
+        
+        assert ax is not None
+
+
+class TestPlot3DOrbitFamilyWithBodies:
+    """测试3D轨道族绘图（包含天体）"""
+
+    @pytest.fixture
+    def system_with_libration(self):
+        """创建带拉格朗日点的系统"""
+        system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
+        system.compute_libration_points()
+        return system
+
+    def test_plot_3d_with_primary_bodies(self, system_with_libration):
+        """测试3D图中的主次天体"""
+        viz = OrbitVisualizer(system_with_libration)
+        
+        # 创建简单轨道
+        t = np.linspace(0, 2 * np.pi, 50)
+        x = 0.9 + 0.1 * np.cos(t)
+        y = 0.1 * np.sin(t)
+        z = 0.02 * np.sin(2 * t)
+        vx = -0.1 * np.sin(t)
+        vy = 0.1 * np.cos(t)
+        vz = 0.04 * np.cos(2 * t)
+        
+        states = np.column_stack([x, y, z, vx, vy, vz])
+        
+        family = OrbitFamily(family_type="test")
+        orbit = Orbit(states, t)
+        orbit.period = 2 * np.pi
+        orbit.system = system_with_libration
+        family.add_orbit(orbit)
+        
+        # 绘图（默认会添加天体和平动点）
+        ax = viz.plot_3d_orbit_family(
+            family,
+            jacobi_values=[3.0],
+            center=(0.99, 0.0, 0.0),
+            radius=0.40,
+        )
+        
+        assert ax is not None

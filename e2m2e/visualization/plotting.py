@@ -897,6 +897,158 @@ class OrbitVisualizer:
         self.figure = fig
         return fig
 
+    def plot_3d_orbit_family(
+        self,
+        family_result,
+        jacobi_values: Optional[List[float]] = None,
+        center: Tuple[float, float, float] = (0.99, 0.0, 0.0),
+        radius: float = 0.40,
+        show_colorbar: bool = True,
+        show_legend: bool = False,
+        seed_label: Optional[str] = None,
+        ax: Optional[Any] = None,
+    ) -> Any:
+        """绘制3D轨道族（局部放大视图）
+
+        在3D空间中绘制轨道族，聚焦于指定区域（类似2D放大图）。
+
+        参数：
+        ----------
+        family_result : OrbitFamily
+            轨道族对象，包含多条轨道
+        jacobi_values : list of float, 可选
+            Jacobi常数列表，用于颜色映射。如果为None，将自动计算
+        center : tuple of float, 可选
+            3D视图中心坐标 (x, y, z)，默认 (0.99, 0.0, 0.0)
+        radius : float, 可选
+            视图半径，默认 0.40
+        show_colorbar : bool, 可选
+            是否显示颜色条，默认 True
+        show_legend : bool, 可选
+            是否显示图例，默认 False
+        seed_label : str, 可选
+            种子轨道的图例标签
+        ax : matplotlib.axes._subplots.Axes3DSubplot, 可选
+            现有的3D坐标轴。如果为None，创建新的坐标轴
+
+        返回：
+        -------
+        ax : matplotlib.axes._subplots.Axes3DSubplot
+            3D坐标轴对象
+
+        示例：
+        -----
+        ```python
+        # 绘制3D轨道族（局部放大）
+        ax = viz.plot_3d_orbit_family(
+            family_result,
+            jacobi_values=jacobi_values,
+            center=(0.99, 0.0, 0.0),
+            radius=0.40,
+            seed_label="Seed DRO"
+        )
+        viz.show()
+        ```
+
+        注意：
+        ----
+        1. 该方法类似于2D的局部放大图，但是是在3D空间中展示
+        2. 使用coolwarm颜色映射，Jacobi常数从低到高（能量高到能量低）
+        3. 种子轨道（第一条）用红色绘制，后续轨道用颜色映射
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+
+        n_orbits = len(family_result) if family_result is not None else 0
+        if n_orbits == 0:
+            return ax
+
+        # 创建坐标轴
+        if ax is None:
+            self.figure = plt.figure(figsize=self.figsize, dpi=self.dpi)
+            ax = self.figure.add_subplot(111, projection="3d")
+
+        # 获取或计算Jacobi常数
+        if jacobi_values is None:
+            if hasattr(family_result, 'get_jacobi_constants'):
+                jacobi_values = family_result.get_jacobi_constants().tolist()
+            else:
+                jacobi_values = [3.0] * n_orbits  # 默认值
+        
+        # 处理空列表情况
+        if not jacobi_values:
+            jacobi_values = [3.0] * n_orbits
+
+        # 颜色映射
+        cmap = matplotlib.colormaps["coolwarm"]
+        jacobi_min = min(jacobi_values)
+        jacobi_max = max(jacobi_values)
+        jacobi_range = jacobi_max - jacobi_min if jacobi_max != jacobi_min else 1.0
+
+        # 绘制种子轨道（第一条）
+        if n_orbits > 0:
+            seed_orbit = family_result[0]
+            self.plot_3d_orbit(
+                seed_orbit,
+                color="red",
+                label=seed_label or "Seed DRO",
+                ax=ax,
+                show_start=True,
+            )
+
+        # 绘制其他轨道
+        for idx in range(1, n_orbits):
+            orbit = family_result[idx]
+            norm_jacobi = (jacobi_values[idx] - jacobi_min) / jacobi_range
+            color = cmap(norm_jacobi)
+            self.plot_3d_orbit(
+                orbit,
+                color=color,
+                ax=ax,
+                show_start=False,
+            )
+
+        # 设置坐标轴范围（局部放大）
+        ax.set_xlim(center[0] - radius, center[0] + radius)
+        ax.set_ylim(center[1] - radius, center[1] + radius)
+        ax.set_zlim(center[2] - radius, center[2] + radius)
+
+        # 添加主次天体（地球和月球）到3D图中
+        self.plot_primary_bodies(ax=ax, is_3d=True)
+
+        # 添加拉格朗日点（平动点）到3D图中
+        self.plot_libration_points(ax=ax, show_labels=True, is_3d=True)
+
+        # 坐标轴标签
+        ax.set_xlabel("X (nondimensional)", fontsize=12)
+        ax.set_ylabel("Y (nondimensional)", fontsize=12)
+        ax.set_zlabel("Z (nondimensional)", fontsize=12)
+
+        # 标题
+        ax.set_title(
+            f"DRO Family (3D Zoomed View)\n"
+            f"X: [{center[0] - radius:.2f}, {center[0] + radius:.2f}], "
+            f"Y/Z: [±{radius:.2f}], {n_orbits} orbits",
+            fontsize=12
+        )
+
+        # 颜色条
+        if show_colorbar and jacobi_values:
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max))
+            sm.set_array([])
+            cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.1)
+            cbar.set_label("Jacobi Constant", fontsize=11)
+
+        # 图例
+        if show_legend:
+            ax.legend(loc="upper right", fontsize=10)
+
+        # 调整视角：地球在左侧、月球在右侧（azim=90从+Y方向看）
+        ax.view_init(elev=20, azim=90)
+
+        self.axes_3d = ax
+        return ax
+
     def show(self) -> None:
         """显示图形"""
         plt.show()
