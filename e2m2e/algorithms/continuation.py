@@ -51,7 +51,7 @@ class Continuation:
         - step: 初始步长
         """
         self.correction = corrector
-        self.dynamics = corrector.dynamics if hasattr(corrector, "dynamics") else None
+        self.dynamics = corrector.dynamics if hasattr(corrector, "dynamic") else None
 
         # 延拓参数
         self.continuation_parameter = param

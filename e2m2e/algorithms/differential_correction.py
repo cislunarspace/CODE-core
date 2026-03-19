@@ -29,7 +29,7 @@ class DifferentialCorrection:
     - 3D对称XZ固定Z0: 空间XZ对称周期轨道，固定Z0
 
     属性：
-        dynamics: CR3BP_Dynamics对象
+        dynamic: CR3BP_Dynamics对象
         target_conditions: 目标约束条件字典
         free_variables: 自由变量列表
         tolerance: 收敛容差
@@ -52,19 +52,19 @@ class DifferentialCorrection:
 
     def __init__(
         self,
-        dynamics: CR3BP_Dynamics,
+        dynamic: CR3BP_Dynamics,
         target: Optional[Dict[str, Any]] = None,
         free_vars: Optional[List[str]] = None,
     ) -> None:
         """初始化修正器
 
         参数：
-        - dynamics: CR3BP_Dynamics对象
+        - dynamic: CR3BP_Dynamics对象
         - target: 目标约束条件字典（可选）
         - free_vars: 自由变量列表（可选）
         """
         # 核心对象
-        self.dynamics = dynamics
+        self.dynamics = dynamic
         self.target_conditions = target or {}
         self.free_variables = free_vars or []
 
@@ -737,6 +737,6 @@ class DifferentialCorrection:
 
     def __repr__(self):
         return (
-            f"DifferentialCorrection(dynamics={self.dynamics}, "
+            f"DifferentialCorrection(dynamic={self.dynamics}, "
             f"setup={self.setup_type}, tol={self.tolerance})"
         )

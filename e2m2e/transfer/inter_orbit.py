@@ -32,7 +32,7 @@ class InterOrbitTransfer:
 
         参数：
         - system: CR3BP_System对象
-        - dynamics: CR3BP_Dynamics对象
+        - dynamic: CR3BP_Dynamics对象
         """
         self.system = system
         self.dynamics = dynamics

@@ -221,7 +221,7 @@ class Orbit:
         """计算单值矩阵
 
         参数：
-        - dynamics: CR3BP_Dynamics对象
+        - dynamic: CR3BP_Dynamics对象
 
         返回：
         - 单值矩阵 (6x6)
@@ -242,7 +242,7 @@ class Orbit:
         """计算轨道稳定性
 
         参数：
-        - dynamics: CR3BP_Dynamics对象
+        - dynamic: CR3BP_Dynamics对象
 
         返回：
         - 稳定性分析结果字典

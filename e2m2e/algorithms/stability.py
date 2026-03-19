@@ -47,7 +47,7 @@ class StabilityAnalysis:
 
     属性：
         orbit: Orbit对象
-        dynamics: CR3BP_Dynamics对象
+        dynamic: CR3BP_Dynamics对象
         monodromy_matrix: 单值矩阵
         eigenvalues: 特征值
         stability_indices: 稳定性指数
@@ -62,7 +62,7 @@ class StabilityAnalysis:
 
         参数：
         - orbit: Orbit对象
-        - dynamics: CR3BP_Dynamics对象（可选，如果orbit关联了system则自动创建）
+        - dynamic: CR3BP_Dynamics对象（可选，如果orbit关联了system则自动创建）
         """
         self.orbit = orbit
         self.dynamics = dynamics
