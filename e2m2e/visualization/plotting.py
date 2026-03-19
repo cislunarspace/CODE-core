@@ -83,6 +83,7 @@ from typing import Dict, List, Tuple, Optional, Any, Union
 
 import numpy.typing as npt
 
+from ..core import CR3BP_Dynamics
 from ..core.system import CR3BP_System
 from ..core.orbit import Orbit
 
@@ -129,17 +130,15 @@ class ProjectionPlane(Enum):
 
 
 def compute_stability_for_family(family_result, system):
-    """计算轨道族的稳定性指数
+    """计算轨道族的稳定性指数  //TODO 需要审查，什么是稳定性指数？？我还没认真看过这里的代码。之前的结果也显示出，稳定性指数的计算方法可能有误。
 
     参数：
         family_result: OrbitFamily对象
-        system: CR3BP_System对象
+        system: CR3BP_System对象 //TODO 这里不应该指定为CRTBP实例，应该随意是什么系统
 
     返回：
         list: 稳定性指数列表
     """
-    from ..core.dynamics import CR3BP_Dynamics
-
     dynamics = CR3BP_Dynamics(system)
 
     stability_values = []
