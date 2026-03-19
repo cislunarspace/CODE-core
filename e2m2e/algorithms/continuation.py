@@ -178,12 +178,12 @@ class Continuation:
                     # 修改状态分量
                     guess_orbit = current_orbit.copy()
                     guess_orbit.states[0, param_index] += step_size
-                    orbit = corrector.iterate_correction(guess_orbit)
+                    orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
                 else:
                     # 修改时间 - 通过复制并修改orbit的period属性
                     guess_orbit = current_orbit.copy()
                     guess_orbit.period = current_orbit.period + step_size * 2
-                    orbit = corrector.iterate_correction(guess_orbit, verbose=False)
+                    orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
 
                 if orbit is not None and orbit.correction_success:
                     # 添加到轨道族
@@ -252,12 +252,12 @@ class Continuation:
                     guess_orbit_state[param_index] -= step_size
                     guess_orbit = Orbit(guess_orbit_state, [0])
                     guess_orbit.period = current_orbit.period
-                    orbit = corrector.iterate_correction(guess_orbit)
+                    orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
                 else:
                     # 修改时间 - 通过复制并修改orbit的period属性
                     guess_orbit = current_orbit.copy()
                     guess_orbit.period = current_orbit.period - step_size * 2
-                    orbit = corrector.iterate_correction(guess_orbit, verbose=False)
+                    orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
 
                 if orbit is not None and orbit.correction_success:
                     # 添加到轨道族

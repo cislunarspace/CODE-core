@@ -163,6 +163,46 @@ class ProjectionPlane(Enum):
     YZ = "yz"
 
 
+def compute_stability_for_family(family_result, system):
+    """计算轨道族的稳定性指数
+
+    参数：
+        family_result: OrbitFamily对象
+        system: CR3BP_System对象
+
+    返回：
+        list: 稳定性指数列表
+    """
+    from ..core.dynamics import CR3BP_Dynamics
+
+    dynamics = CR3BP_Dynamics(system)
+
+    stability_values = []
+    if family_result is None or len(family_result) == 0:
+        return stability_values
+
+    for i, orbit in enumerate(family_result):
+        if orbit.system is None:
+            orbit.system = system
+
+        try:
+            if orbit.period is None:
+                stability_values.append(1.0)
+                continue
+
+            monodromy = dynamics.compute_state_transition_matrix(
+                orbit.states[0], orbit.period
+            )
+            eigenvalues = np.linalg.eigvals(monodromy)
+            magnitudes = np.abs(eigenvalues)
+            stability_idx = np.max(magnitudes)
+            stability_values.append(stability_idx)
+        except Exception:
+            stability_values.append(1.0)
+
+    return stability_values
+
+
 class OrbitVisualizer:
     """轨道可视化器 (Orbit Visualizer)
 
@@ -1051,6 +1091,275 @@ class OrbitVisualizer:
 
         self.axes_3d = ax
         return ax
+
+    def plot_resonant_orbit_family(
+        self,
+        family_result,
+        label: str = "RO",
+        target_period: Optional[float] = None,
+        jacobi_values: Optional[List[float]] = None,
+        stability_values: Optional[List[float]] = None,
+        show_plots: bool = True,
+    ) -> Tuple[Any, ...]:
+        """绘制共振轨道族（Resonant Orbit Family）四视图
+
+        创建四个子图展示共振轨道族的完整信息：
+        1. XY平面投影（全局视图）
+        2. XY平面投影（局部放大视图）
+        3. 3D全局视图
+        4. 3D局部放大视图
+
+        参数：
+        ----------
+        family_result : OrbitFamily
+            轨道族对象，包含多条共振轨道
+        label : str, 可选
+            轨道族标签，默认 "RO"。用于标题，如 "3:2 RO"
+        target_period : float, 可选
+            目标轨道周期。如果为None，自动选择周期最接近的轨道
+        jacobi_values : list of float, 可选
+            Jacobi常数列表。如果为None，自动计算
+        stability_values : list of float, 可选
+            稳定性指数列表。如果为None，自动计算
+        show_plots : bool, 可选
+            是否调用plt.show()显示图形，默认True
+
+        返回：
+        -------
+        tuple : (fig_xy, ax_zoom, fig_3d, ax_3d_zoom)
+            四个图像/坐标轴对象的元组
+
+        示例：
+        -----
+        ```python
+        # 创建可视化器
+        viz = OrbitVisualizer(system)
+
+        # 绘制RO族四视图
+        fig_xy, ax_zoom, fig_3d, ax_3d_zoom = viz.plot_resonant_orbit_family(
+            family_result,
+            label="3:2",
+            target_period=12.566,
+        )
+
+        # 保存图形
+        fig_xy.savefig('ro_family_xy.png', dpi=300)
+        ```
+        """
+        n_orbits = len(family_result) if family_result else 0
+        if n_orbits == 0:
+            return None, None, None, None
+
+        # 确保system关联
+        if family_result.system is None:
+            family_result.system = self.system
+        for orbit in family_result:
+            if orbit.system is None:
+                orbit.system = self.system
+
+        # 计算Jacobi常数
+        if jacobi_values is None:
+            jacobi_values = family_result.get_jacobi_constants().tolist()
+
+        # 计算稳定性指数
+        if stability_values is None:
+            stability_values = compute_stability_for_family(family_result, self.system)
+
+        # 颜色映射
+        cmap = matplotlib.colormaps["coolwarm"]
+        jacobi_min = min(jacobi_values)
+        jacobi_max = max(jacobi_values)
+        jacobi_range = jacobi_max - jacobi_min if jacobi_max != jacobi_min else 1.0
+
+        # 打印轨道信息摘要
+        print(f"\n{label} RO族信息:")
+        print(f"  轨道数量: {n_orbits}")
+        print(f"  Jacobi常数: {jacobi_min:.6f} ~ {jacobi_max:.6f}")
+        if stability_values:
+            print(f"  稳定性指数: {min(stability_values):.6f} ~ {max(stability_values):.6f}")
+
+        # 选择目标轨道
+        if target_period is not None:
+            periods = family_result.get_periods()
+            idx_target = np.argmin(np.abs(periods - target_period))
+        else:
+            idx_target = 0
+        orbit_target = family_result[idx_target]
+
+        # 计算轨道范围
+        all_x = np.concatenate([family_result[i].states[:, 0] for i in range(n_orbits)])
+        all_y = np.concatenate([family_result[i].states[:, 1] for i in range(n_orbits)])
+        zoom_center_x = (np.min(all_x) + np.max(all_x)) / 2
+        zoom_range_x = (np.max(all_x) - np.min(all_x)) / 2 + 0.1
+        zoom_range_y = np.max(np.abs(all_y)) + 0.1
+
+        # ============================================================
+        # 图1: RO族轨道（XY平面投影）- 全局视图
+        # ============================================================
+        fig_xy, ax_xy = plt.subplots(figsize=(12, 8))
+
+        for idx in range(n_orbits):
+            orbit = family_result[idx]
+            norm_jacobi = (jacobi_values[idx] - jacobi_min) / jacobi_range
+            color = cmap(norm_jacobi)
+            self.plot_2d_projection(
+                orbit, plane="xy", color=color, show_start=False, ax=ax_xy
+            )
+
+        # 标记目标RO
+        self.plot_2d_projection(
+            orbit_target,
+            plane="xy",
+            color="black",
+            label=f"Target {label} (T={orbit_target.period:.4f})",
+            ax=ax_xy,
+        )
+
+        # 添加天体和拉格朗日点
+        self.plot_primary_bodies(ax=ax_xy)
+        self.plot_libration_points(ax=ax_xy)
+
+        # 颜色条
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max)
+        )
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax_xy, shrink=0.8)
+        cbar.set_label("Jacobi Constant", fontsize=12)
+
+        # 标签
+        ax_xy.set_xlabel("X (nondimensional)", fontsize=12)
+        ax_xy.set_ylabel("Y (nondimensional)", fontsize=12)
+        stability_str = ""
+        if stability_values:
+            stability_str = f", lambda_max = [{min(stability_values):.4f}, {max(stability_values):.4f}]"
+        ax_xy.set_title(
+            f"{label} RO Family in Earth-Moon CR3BP (XY Plane) - {n_orbits} orbits\n"
+            f"C = [{jacobi_min:.4f}, {jacobi_max:.4f}]{stability_str}",
+            fontsize=12,
+        )
+        ax_xy.legend(loc="upper right")
+        ax_xy.set_aspect("equal")
+        plt.tight_layout()
+
+        # ============================================================
+        # 图2: 局部放大图（RO族区域）- 2D视图
+        # ============================================================
+        fig_zoom, ax_zoom = plt.subplots(figsize=(10, 8))
+
+        for idx in range(n_orbits):
+            orbit = family_result[idx]
+            norm_jacobi = (jacobi_values[idx] - jacobi_min) / jacobi_range
+            color = cmap(norm_jacobi)
+            self.plot_2d_projection(
+                orbit, plane="xy", color=color, show_start=False, ax=ax_zoom
+            )
+
+        # 标记目标RO
+        self.plot_2d_projection(
+            orbit_target,
+            plane="xy",
+            color="black",
+            label=f"Target {label} (T={orbit_target.period:.4f})",
+            ax=ax_zoom,
+        )
+
+        # 添加天体和拉格朗日点
+        self.plot_primary_bodies(ax=ax_zoom)
+        self.plot_libration_points(ax=ax_zoom)
+
+        # 设置坐标轴范围
+        ax_zoom.set_xlim(zoom_center_x - zoom_range_x, zoom_center_x + zoom_range_x)
+        ax_zoom.set_ylim(-zoom_range_y, zoom_range_y)
+
+        ax_zoom.set_xlabel("X (nondimensional)", fontsize=12)
+        ax_zoom.set_ylabel("Y (nondimensional)", fontsize=12)
+        ax_zoom.set_title(
+            f"{label} RO Family (Full View)\n"
+            f"X: [{zoom_center_x - zoom_range_x:.2f}, {zoom_center_x + zoom_range_x:.2f}], "
+            f"Y: [{-zoom_range_y:.2f}, {zoom_range_y:.2f}]",
+            fontsize=12,
+        )
+        ax_zoom.legend(loc="upper right")
+        ax_zoom.set_aspect("equal")
+        plt.tight_layout()
+
+        # ============================================================
+        # 图3: 全局三维视图
+        # ============================================================
+        fig_3d, ax_3d = plt.subplots(figsize=(12, 10), subplot_kw={"projection": "3d"})
+
+        global_radius = 1.2  # 覆盖整个RO族范围
+
+        # 绘制轨道
+        for idx in range(n_orbits):
+            orbit = family_result[idx]
+            norm_jacobi = (jacobi_values[idx] - jacobi_min) / jacobi_range
+            color = cmap(norm_jacobi)
+            self.plot_3d_orbit(orbit, color=color, ax=ax_3d, show_start=False)
+
+        # 标记目标RO
+        self.plot_3d_orbit(
+            orbit_target,
+            color="black",
+            label=f"Target {label} (T={orbit_target.period:.4f})",
+            ax=ax_3d,
+            show_start=True,
+        )
+
+        # 设置坐标轴范围
+        ax_3d.set_xlim(-global_radius, global_radius)
+        ax_3d.set_ylim(-global_radius, global_radius)
+        ax_3d.set_zlim(-global_radius, global_radius)
+
+        # 添加天体
+        self.plot_primary_bodies(ax=ax_3d, is_3d=True)
+        self.plot_libration_points(ax=ax_3d, show_labels=True, is_3d=True)
+
+        ax_3d.set_xlabel("X (nondimensional)", fontsize=12)
+        ax_3d.set_ylabel("Y (nondimensional)", fontsize=12)
+        ax_3d.set_zlabel("Z (nondimensional)", fontsize=12)
+        ax_3d.set_title(
+            f"{label} RO Family in Earth-Moon CR3BP (3D View) - {n_orbits} orbits\n"
+            f"C = [{jacobi_min:.4f}, {jacobi_max:.4f}]",
+            fontsize=12,
+        )
+
+        # 颜色条
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max)
+        )
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax_3d, shrink=0.6, pad=0.1)
+        cbar.set_label("Jacobi Constant", fontsize=11)
+
+        ax_3d.legend(loc="upper right")
+        ax_3d.view_init(elev=0, azim=-90)
+        plt.tight_layout()
+
+        # ============================================================
+        # 图4: 全范围三维视图（使用已有的plot_3d_orbit_family）
+        # ============================================================
+        seed_label_3d = f"Target {label} (C={jacobi_values[idx_target]:.4f})"
+        radius_3d = max(zoom_range_x, zoom_range_y)
+        ax_3d_zoom = self.plot_3d_orbit_family(
+            family_result,
+            jacobi_values=jacobi_values,
+            center=(zoom_center_x, 0.0, 0.0),
+            radius=radius_3d,
+            show_colorbar=True,
+            show_legend=True,
+            seed_label=seed_label_3d,
+        )
+
+        ax_3d_zoom.view_init(elev=0, azim=-90)
+        plt.tight_layout()
+
+        # 一次性显示所有图表
+        if show_plots:
+            plt.show()
+
+        return fig_xy, ax_zoom, fig_3d, ax_3d_zoom
 
     def show(self) -> None:
         """显示图形"""

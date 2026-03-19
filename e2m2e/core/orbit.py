@@ -88,9 +88,9 @@ class Orbit:
         self.parameters = {}  # 轨道参数字典
 
         # 轨道属性
-        self.period = None  # 轨道周期
-        self.amplitudes = {}  # 各方向振幅 {'x': amp_x, 'y': amp_y, 'z': amp_z}
-        self.extrema = {}  # 极值点 {'x_max': xmax, 'x_min': xmin, ...}
+        self.period: float | None = None  # 轨道周期
+        self.amplitudes: dict = {}  # 各方向振幅 {'x': amp_x, 'y': amp_y, 'z': amp_z}
+        self.extrema: dict = {}  # 极值点 {'x_max': xmax, 'x_min': xmin, ...}
         self.mean_state = None  # 平均状态
 
         # 单值矩阵和稳定性

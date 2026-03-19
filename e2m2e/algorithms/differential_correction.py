@@ -625,8 +625,8 @@ class DifferentialCorrection:
                 print(f"  新状态: x={current_state[0]:.6f}, y_dot={current_state[4]:.6f}")
                 print(f"  新半周期: T/2={current_time:.6f}")
 
-            # 检查停滞
-            if correction_norm < self.stagnation_limit:
+            # 检查停滞（仅在未收敛的情况下检查）
+            if not self.converged and correction_norm < self.stagnation_limit:
                 self.termination_reason = "停滞：修正量过小"
                 if verbose:
                     print(f"  停滞：修正量 = {correction_norm:.2e}")
