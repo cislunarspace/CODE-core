@@ -190,9 +190,7 @@ def compute_stability_for_family(family_result, system):
                 stability_values.append(1.0)
                 continue
 
-            monodromy = dynamics.compute_state_transition_matrix(
-                orbit.states[0], orbit.period
-            )
+            monodromy = dynamics.compute_state_transition_matrix(orbit.states[0], orbit.period)
             eigenvalues = np.linalg.eigvals(monodromy)
             magnitudes = np.abs(eigenvalues)
             stability_idx = np.max(magnitudes)
@@ -1202,9 +1200,7 @@ class OrbitVisualizer:
             orbit = family_result[idx]
             norm_jacobi = (jacobi_values[idx] - jacobi_min) / jacobi_range
             color = cmap(norm_jacobi)
-            self.plot_2d_projection(
-                orbit, plane="xy", color=color, show_start=False, ax=ax_xy
-            )
+            self.plot_2d_projection(orbit, plane="xy", color=color, show_start=False, ax=ax_xy)
 
         # 标记目标RO
         self.plot_2d_projection(
@@ -1220,9 +1216,7 @@ class OrbitVisualizer:
         self.plot_libration_points(ax=ax_xy)
 
         # 颜色条
-        sm = plt.cm.ScalarMappable(
-            cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max)
-        )
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max))
         sm.set_array([])
         cbar = plt.colorbar(sm, ax=ax_xy, shrink=0.8)
         cbar.set_label("Jacobi Constant", fontsize=12)
@@ -1232,7 +1226,9 @@ class OrbitVisualizer:
         ax_xy.set_ylabel("Y (nondimensional)", fontsize=12)
         stability_str = ""
         if stability_values:
-            stability_str = f", lambda_max = [{min(stability_values):.4f}, {max(stability_values):.4f}]"
+            stability_str = (
+                f", lambda_max = [{min(stability_values):.4f}, {max(stability_values):.4f}]"
+            )
         ax_xy.set_title(
             f"{label} RO Family in Earth-Moon CR3BP (XY Plane) - {n_orbits} orbits\n"
             f"C = [{jacobi_min:.4f}, {jacobi_max:.4f}]{stability_str}",
@@ -1251,9 +1247,7 @@ class OrbitVisualizer:
             orbit = family_result[idx]
             norm_jacobi = (jacobi_values[idx] - jacobi_min) / jacobi_range
             color = cmap(norm_jacobi)
-            self.plot_2d_projection(
-                orbit, plane="xy", color=color, show_start=False, ax=ax_zoom
-            )
+            self.plot_2d_projection(orbit, plane="xy", color=color, show_start=False, ax=ax_zoom)
 
         # 标记目标RO
         self.plot_2d_projection(
@@ -1326,9 +1320,7 @@ class OrbitVisualizer:
         )
 
         # 颜色条
-        sm = plt.cm.ScalarMappable(
-            cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max)
-        )
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max))
         sm.set_array([])
         cbar = plt.colorbar(sm, ax=ax_3d, shrink=0.6, pad=0.1)
         cbar.set_label("Jacobi Constant", fontsize=11)
