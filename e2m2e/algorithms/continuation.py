@@ -40,7 +40,6 @@ class Continuation:
     def __init__(
         self,
         corrector: DifferentialCorrection,
-        param: str = "energy",
         step: Optional[float] = None,
     ) -> None:
         """初始化延拓器
@@ -54,7 +53,7 @@ class Continuation:
         self.dynamics = corrector.dynamics if hasattr(corrector, "dynamic") else None
 
         # 延拓参数
-        self.continuation_parameter = param
+        self.continuation_parameter = next(iter(corrector.fixed_parameters))
         self.step_size = step or self.DEFAULT_STEP_SIZE
         self.initial_step_size = self.step_size
         self.method = ContinuationMethod.NATURAL

@@ -175,14 +175,14 @@ class TestDRONaturalContinuation:
 
     def test_continuation_setup(self, corrector):
         """测试延拓器配置"""
-        continuation = Continuation(corrector, param="x0", step=0.02)
+        continuation = Continuation(corrector, step=0.02)
 
         assert continuation.continuation_parameter == "x0"
         assert continuation.step_size == 0.02
 
     def test_continuation_single_orbit(self, corrector):
         """测试生成单条延拓轨道"""
-        continuation = Continuation(corrector, param="x0", step=0.01)
+        continuation = Continuation(corrector, step=0.01)
 
         # 种子轨道
         x0 = 0.79188556619742
@@ -210,7 +210,7 @@ class TestDRONaturalContinuation:
 
     def test_continuation_multiple_orbits(self, corrector):
         """测试生成多条延拓轨道"""
-        continuation = Continuation(corrector, param="x0", step=0.005)
+        continuation = Continuation(corrector, step=0.005)
 
         # 种子轨道
         x0 = 0.79188556619742
@@ -243,7 +243,7 @@ class TestDRONaturalContinuation:
 
     def test_continuation_period_trend(self, corrector):
         """测试延拓过程中周期变化趋势"""
-        continuation = Continuation(corrector, param="x0", step=0.005)
+        continuation = Continuation(corrector, step=0.005)
 
         # 种子轨道
         x0 = 0.79188556619742
@@ -302,7 +302,7 @@ class TestDROGenerationPipeline:
         assert corrector.success is True, "种子轨道应该成功收敛"
 
         # 4. 延拓生成轨道族
-        continuation = Continuation(corrector, param="x0", step=0.01)
+        continuation = Continuation(corrector, step=0.01)
 
         family_result = continuation.natural_continuation(
             corrected_orbit,
@@ -338,7 +338,7 @@ class TestDROGenerationPipeline:
 
         if corrected_orbit is not None and corrector.success:
             # 反向延拓
-            continuation = Continuation(corrector, param="x0", step=0.01)
+            continuation = Continuation(corrector, step=0.01)
 
             result_family = continuation.natural_continuation(
                 corrected_orbit,
