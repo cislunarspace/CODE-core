@@ -1207,7 +1207,9 @@ class OrbitVisualizer:
         self.plot_libration_points(ax=ax_xy)
 
         # 颜色条
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=mcolors.Normalize(vmin=jacobi_min, vmax=jacobi_max))
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap, norm=mcolors.Normalize(vmin=jacobi_min, vmax=jacobi_max)
+        )
         sm.set_array([])
         cbar = plt.colorbar(sm, ax=ax_xy, shrink=0.8)
         cbar.set_label("Jacobi Constant", fontsize=12)
