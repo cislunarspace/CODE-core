@@ -120,41 +120,6 @@ def configure_academic_fonts():
     matplotlib.rcParams["legend.shadow"] = False
 
 
-def download_image(url: str, cache_path: Path) -> Optional[Any]:
-    """下载并缓存图像
-
-    参数：
-        url: 图像URL
-        cache_path: 缓存路径
-
-    返回：
-        PIL Image对象或None
-    """
-    try:
-        from PIL import Image
-    except ImportError:
-        return None
-
-    # 创建缓存目录
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
-    # 检查缓存
-    if cache_path.exists():
-        try:
-            return Image.open(cache_path)
-        except:
-            pass
-
-    # 下载图像
-    try:
-        print(f"下载图像: {url}")
-        urlretrieve(url, cache_path)
-        return Image.open(cache_path)
-    except Exception as e:
-        print(f"下载失败: {e}")
-        return None
-
-
 class ProjectionPlane(Enum):
     """投影平面枚举"""
 
