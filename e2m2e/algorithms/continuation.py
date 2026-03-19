@@ -5,14 +5,9 @@
 """
 
 from __future__ import annotations
-
 import numpy as np
 from enum import Enum
-from typing import Dict, List, Tuple, Optional, Any
-
-import numpy.typing as npt
-
-import e2m2e
+from typing import Optional
 from .differential_correction import DifferentialCorrection
 from ..core.orbit import OrbitFamily, Orbit
 
@@ -30,10 +25,9 @@ class Continuation:
     通过延拓算法生成一族周期轨道，支持自然参数延拓和伪弧长延拓。
 
     属性：
-        correction: DifferentialCorrection对象
+        corrector: DifferentialCorrection对象
         continuation_parameter: 延拓参数名称
-        step_size: 当前步长
-        direction: 延拓方向
+        step_size: 延拓步长
         family_orbits: 轨道族列表
     """
 
@@ -45,19 +39,19 @@ class Continuation:
 
     def __init__(
         self,
-        correction: DifferentialCorrection,
+        corrector: DifferentialCorrection,
         param: str = "energy",
         step: Optional[float] = None,
     ) -> None:
         """初始化延拓器
 
         参数：
-        - correction: DifferentialCorrection对象
+        - corrector: DifferentialCorrection对象
         - param: 延拓参数（如 "energy", "period", "amplitude", "x0", "z0"）
         - step: 初始步长
         """
-        self.correction = correction
-        self.dynamics = correction.dynamics if hasattr(correction, "dynamics") else None
+        self.correction = corrector
+        self.dynamics = corrector.dynamics if hasattr(corrector, "dynamics") else None
 
         # 延拓参数
         self.continuation_parameter = param
@@ -90,9 +84,9 @@ class Continuation:
 
         # 步长控制
         self.step_reduction_factor = 0.5  # 步长缩减因子
-        self.step_increase_factor = 1.2   # 步长增大因子
-        self.min_step_size = 1e-5        # 最小步长
-        self.max_step_size = 0.1         # 最大步长
+        self.step_increase_factor = 1.2  # 步长增大因子
+        self.min_step_size = 1e-5  # 最小步长
+        self.max_step_size = 0.1  # 最大步长
 
         # 终止条件
         self.max_orbits = 100
@@ -436,6 +430,6 @@ class Continuation:
 
     def __repr__(self):
         return (
-            f"Continuation(correction={self.correction}, "
+            f"Continuation(corrector={self.correction}, "
             f"param={self.continuation_parameter}, step={self.step_size})"
         )
