@@ -591,6 +591,7 @@ class OrbitFamily:
                     "amplitudes": orbit.amplitudes,
                     "family_type": orbit.family_type,
                     "is_periodic": orbit.is_periodic,
+                    "closure_error": getattr(orbit, "closure_error", None),
                 }
                 for orbit in self.orbits
             ],

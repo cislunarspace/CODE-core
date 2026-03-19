@@ -673,25 +673,70 @@ class DifferentialCorrection:
         }
 
     def _create_corrected_orbit(self, result):
-        """根据修正结果积分生成完整周期轨道。"""
+        """根据修正结果积分生成完整周期轨道。
+
+        参数:
+            result: 包含修正结果的字典，包含 state (半周期对称点状态) 和 period (完整周期)
+
+        返回:
+            Orbit: 完整的周期轨道对象
+        """
         full_period = result["period"]
+        initial_state = result["state"]
+
+        # 第一次积分完整周期
         propagation = integrate.solve_ivp(
             self.dynamics.equations_of_motion,
             (0, full_period),
-            result["state"],
+            initial_state,
             method="DOP853",
             t_eval=np.linspace(0, full_period, 1000),
             rtol=1e-12,
             atol=1e-12,
         )
 
+        final_state = propagation.y[:, -1]
+        closure_error = np.linalg.norm(final_state - initial_state)
+
+        # 检查闭合性，如果不闭合则尝试修正
+        if closure_error > 1e-10:
+            closure_error_vector = final_state - initial_state
+            pos_error = np.linalg.norm(closure_error_vector[:3])
+            vel_error = np.linalg.norm(closure_error_vector[3:])
+
+            if pos_error > 1e-14 and vel_error > 1e-14:
+                # 调整初始速度来修正位置误差
+                adjustment = -0.5 * closure_error_vector[3:]
+                new_state = initial_state.copy()
+                new_state[4] += adjustment[1]
+
+                # 重新积分
+                propagation = integrate.solve_ivp(
+                    self.dynamics.equations_of_motion,
+                    (0, full_period),
+                    new_state,
+                    method="DOP853",
+                    t_eval=np.linspace(0, full_period, 1000),
+                    rtol=1e-12,
+                    atol=1e-12,
+                )
+                final_state = propagation.y[:, -1]
+                new_closure_error = np.linalg.norm(final_state - new_state)
+
+                if new_closure_error < closure_error:
+                    initial_state = new_state
+                    closure_error = new_closure_error
+
+        # 确保 states 是独立的副本（避免与 propagation.y 共享内存）
+        orbit_states = np.array(propagation.y.T, copy=True)
+
         orbit = Orbit(
-            states=propagation.y.T,
-            times=propagation.t,
+            states=orbit_states,
+            times=propagation.t.copy(),
             system=self.dynamics.system,
         )
         orbit.period = full_period
-        orbit.is_periodic = True
+        orbit.is_periodic = bool(closure_error < 1e-8)
         orbit.family_type = self._infer_family_type()
 
         # 保存修正结果信息到 Orbit 对象
@@ -699,6 +744,7 @@ class DifferentialCorrection:
         orbit.correction_iterations = self.iteration_count
         orbit.correction_error = result.get("error")
         orbit.correction_termination_reason = self.termination_reason
+        orbit.closure_error = float(closure_error)
 
         return orbit
 
