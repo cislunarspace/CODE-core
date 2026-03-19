@@ -570,7 +570,6 @@ class OrbitFamily:
         参数：
         - filename: 文件名
         """
-        import os
 
         # 自动创建目录
         dirpath = os.path.dirname(filename)
