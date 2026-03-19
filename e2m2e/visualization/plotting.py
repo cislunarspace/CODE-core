@@ -76,15 +76,18 @@
 from __future__ import annotations
 
 import matplotlib
+import matplotlib.colors as mcolors
+import matplotlib.offsetbox as offsetbox
 import matplotlib.pyplot as plt
 import numpy as np
 from enum import Enum
 from typing import Dict, List, Tuple, Optional, Any, Union
 
 import numpy.typing as npt
+from mpl_toolkits.mplot3d import Axes3D
 
 from ..core import CR3BP_Dynamics
-from ..core.system import CR3BP_System
+from ..core.system import CR3BP_System, LibrationPoint
 from ..core.orbit import Orbit
 
 
@@ -130,36 +133,66 @@ class ProjectionPlane(Enum):
 
 
 def compute_stability_for_family(family_result, system):
-    """计算轨道族的稳定性指数  //TODO 需要审查，什么是稳定性指数？？我还没认真看过这里的代码。之前的结果也显示出，稳定性指数的计算方法可能有误。
+    """计算轨道族的稳定性指数
+
+    稳定性指数（Stability Index）是判断轨道长期稳定性的重要指标。
+    在圆形限制性三体问题中，通过计算单值矩阵（Monodromy Matrix）
+    的特征值来确定轨道的稳定性：
+        - λ_max = 1：线性中性稳定
+        - λ_max < 1：渐近稳定（小扰动会衰减）
+        - λ_max > 1：不稳定（小扰动会放大）
 
     参数：
-        family_result: OrbitFamily对象
-        system: CR3BP_System对象 //TODO 这里不应该指定为CRTBP实例，应该随意是什么系统
+        family_result: OrbitFamily对象，包含多条轨道的轨道族
+        system: CR3BP_System对象，用于提供动力学模型
 
     返回：
-        list: 稳定性指数列表
+        list: 稳定性指数列表，每个元素对应一条轨道的最大特征值模长
     """
+    # 创建CR3BP动力学模型，用于后续计算状态转移矩阵
     dynamics = CR3BP_Dynamics(system)
 
     stability_values = []
+
+    # 处理空轨道族的边界情况
     if family_result is None or len(family_result) == 0:
         return stability_values
 
+    # 遍历轨道族中的每一条轨道，计算其稳定性指数
     for i, orbit in enumerate(family_result):
+        # 确保每条轨道关联到指定的系统（用于动力学计算）
         if orbit.system is None:
             orbit.system = system
 
         try:
+            # 如果轨道没有周期信息，假设为中性稳定（稳定性指数=1.0）
             if orbit.period is None:
                 stability_values.append(1.0)
                 continue
 
+            # =========================================================
+            # 核心计算步骤：
+            # 1. 计算单值矩阵（Monodromy Matrix）
+            #    沿轨道积分一个周期得到的状态转移矩阵 M
+            # 2. 求单值矩阵的特征值 λ_i（CR3BP是4维状态空间，有4个特征值）
+            # 3. 取特征值模长的最大值作为稳定性指数
+            # =========================================================
+
+            # 计算单值矩阵：从轨道起点出发，积分一个周期返回的状态转移矩阵
             monodromy = dynamics.compute_state_transition_matrix(orbit.states[0], orbit.period)
+
+            # 计算单值矩阵的特征值
             eigenvalues = np.linalg.eigvals(monodromy)
+
+            # 取所有特征值的模长
             magnitudes = np.abs(eigenvalues)
+
+            # 稳定性指数 = 最大特征值模长
             stability_idx = np.max(magnitudes)
             stability_values.append(stability_idx)
+
         except Exception:
+            # 计算失败时，假设为中性稳定 //TODO 这个假设可能不太好，正式这个假设，使得我之前画图的时候存在间断点。
             stability_values.append(1.0)
 
     return stability_values
@@ -518,8 +551,6 @@ class OrbitVisualizer:
             else:
                 return ax
 
-        from ..core.system import LibrationPoint
-
         for i, lp in enumerate(LibrationPoint):
             coord = self.system.L_points[lp]
             color = self.libration_point_colors[i]
@@ -626,7 +657,7 @@ class OrbitVisualizer:
         position: np.ndarray,
         image: Any,
         size: float,
-        label: str = None,
+        label: Optional[str] = None,
         zorder: int = 10,
     ):
         """使用图像绘制天体
@@ -641,7 +672,6 @@ class OrbitVisualizer:
         """
         try:
             from PIL import Image
-            import matplotlib.offsetbox as offsetbox
 
             # 计算图像在数据坐标中的尺寸
             # 获取坐标轴的数据limits和图形尺寸
@@ -959,9 +989,6 @@ class OrbitVisualizer:
         2. 使用coolwarm颜色映射，Jacobi常数从低到高（能量高到能量低）
         3. 种子轨道（第一条）用红色绘制，后续轨道用颜色映射
         """
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D
-
         n_orbits = len(family_result) if family_result is not None else 0
         if n_orbits == 0:
             return ax
@@ -1038,7 +1065,7 @@ class OrbitVisualizer:
         # 颜色条
         if show_colorbar and jacobi_values:
             sm = plt.cm.ScalarMappable(
-                cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max)
+                cmap=cmap, norm=mcolors.Normalize(vmin=jacobi_min, vmax=jacobi_max)
             )
             sm.set_array([])
             cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.1)
@@ -1180,7 +1207,7 @@ class OrbitVisualizer:
         self.plot_libration_points(ax=ax_xy)
 
         # 颜色条
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max))
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=mcolors.Normalize(vmin=jacobi_min, vmax=jacobi_max))
         sm.set_array([])
         cbar = plt.colorbar(sm, ax=ax_xy, shrink=0.8)
         cbar.set_label("Jacobi Constant", fontsize=12)
