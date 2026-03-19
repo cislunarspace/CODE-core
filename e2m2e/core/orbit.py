@@ -608,7 +608,7 @@ class OrbitFamily:
 
         参数：
         - filename: 文件名
-        - system: CR3BP_System对象
+        - system: CR3BP_System对象 //TODO 这里目前默认都是CRTBP，以后还是得重构这部分代码
 
         返回：
         - OrbitFamily对象

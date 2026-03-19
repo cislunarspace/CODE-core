@@ -187,10 +187,14 @@ class Continuation:
 
                     self.continuation_stats["successful_steps"] += 1
 
-                    if verbose and (i + 1) % 10 == 0:
-                        print(
-                            f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}"
-                        )
+                    # 打印进度信息
+                    if (i + 1) % 10 == 0:
+                        if verbose:
+                            print(
+                                f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}"
+                            )
+                        else:
+                            print(f"  正向延拓进度：已完成 {i + 1} 条轨道")
 
                     # 自适应步长
                     if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
@@ -261,10 +265,14 @@ class Continuation:
 
                     self.continuation_stats["successful_steps"] += 1
 
-                    if verbose and (i + 1) % 10 == 0:
-                        print(
-                            f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}"
-                        )
+                    # 打印进度信息
+                    if (i + 1) % 10 == 0:
+                        if verbose:
+                            print(
+                                f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}"
+                            )
+                        else:
+                            print(f"  反向延拓进度：已完成 {i + 1} 条轨道")
 
                     # 自适应步长
                     if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:

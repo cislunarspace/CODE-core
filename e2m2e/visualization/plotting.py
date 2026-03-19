@@ -165,7 +165,7 @@ def compute_stability_for_family(family_result, system):
             orbit.system = system
 
         try:
-            # 如果轨道没有周期信息，假设为中性稳定（稳定性指数=1.0）
+            # 如果轨道没有周期信息，假设为中性稳定（稳定性指数=1.0）  \\TODO 这也是不合适的，正是这个假设，使得我之前画图的时候存在间断点。
             if orbit.period is None:
                 stability_values.append(1.0)
                 continue
@@ -192,7 +192,7 @@ def compute_stability_for_family(family_result, system):
             stability_values.append(stability_idx)
 
         except Exception:
-            # 计算失败时，假设为中性稳定 //TODO 这个假设可能不太好，正式这个假设，使得我之前画图的时候存在间断点。
+            # 计算失败时，假设为中性稳定 //TODO 这个假设可能不太好，正是这个假设，使得我之前画图的时候存在间断点。
             stability_values.append(1.0)
 
     return stability_values
