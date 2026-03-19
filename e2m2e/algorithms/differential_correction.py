@@ -44,6 +44,7 @@ class DifferentialCorrection:
     VALID_SETUP_TYPES = [
         "2D_symmetric_x_fixed_x0",
         "2D_symmetric_x_fixed_t",
+        "2D_symmetric_y_fixed_y0",
         "3D_symmetric_x_fixed_x0",
         "3D_symmetric_xz_fixed_x0",
         "3D_symmetric_xz_fixed_z0",
@@ -227,6 +228,53 @@ class DifferentialCorrection:
         self.constraint_types = {"y": "equality", "x_dot": "equality"}
 
         self._reset_history()
+        return self
+
+    def setup_2D_symmetric_y_fixed_y0(self, y0=0.0):
+        """配置平面问题中固定初始y坐标的y轴对称周期轨道搜索
+
+        适用于共振轨道(RO)等从y轴出发的周期轨道。
+        轨道从点(0, y0)出发（x=0, x_dot=0），经过半周期T/2后再次穿越y轴（x=0, x_dot=0）。
+
+        参数:
+            y0 (float): 固定的初始y坐标
+
+        返回:
+            self: 配置好的微分修正器实例
+
+        配置说明:
+            - 自由变量: [x_dot0, T_half] - 初始x方向速度和半周期时间
+            - 目标约束: [x(T/2)=0, x_dot(T/2)=0] - 终点处再次穿越y轴
+            - 状态向量索引: [0, 3] 分别对应x坐标和x方向速度
+        """
+        self.setup_type = "2D_symmetric_y_fixed_y0"
+        self.symmetry_condition = "y_axis"
+        self.fixed_parameters = {"y0": y0}
+
+        # 对于y轴对称轨道，从(0, y0)出发，初始状态: [0, y0, 0, x_dot, 0, 0]
+        # 自由变量是初始x方向速度 x_dot 和半周期 T/2
+        self.free_variables = ["x_dot0", "T_half"]
+        self.free_variable_indices = [3, 6]  # x_dot索引3，索引6表示时间
+
+        # 目标约束条件
+        # 半周期处应满足: x(T/2)=0, x_dot(T/2)=0
+        self.target_conditions = {
+            "x": 0.0,  # 终点x坐标为0
+            "x_dot": 0.0,  # 终点x方向速度为0
+        }
+
+        # 状态向量为 [x, y, z, x_dot, y_dot, z_dot]
+        self.constraint_indices = [0, 3]  # x和x_dot在状态向量中的索引
+
+        self.constraint_weights = {"x": 1.0, "x_dot": 1.0}
+        self.constraint_types = {"x": "equality", "x_dot": "equality"}
+
+        self._reset_history()
+
+        print(
+            f"2D对称y轴配置完成：固定y0={y0}，自由变量={self.free_variables}，目标约束={list(self.target_conditions.keys())}"
+        )
+
         return self
 
     def setup_3D_symmetric_x_fixed_x0(self, x0):

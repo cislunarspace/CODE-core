@@ -88,6 +88,12 @@ class Continuation:
             "failed_steps": 0,
         }
 
+        # 步长控制
+        self.step_reduction_factor = 0.5  # 步长缩减因子
+        self.step_increase_factor = 1.2   # 步长增大因子
+        self.min_step_size = 1e-5        # 最小步长
+        self.max_step_size = 0.1         # 最大步长
+
         # 终止条件
         self.max_orbits = 100
         self.termination_reason = None

@@ -89,44 +89,44 @@ from ..core.orbit import Orbit
 
 def configure_academic_fonts():
     """配置学术规范的字体设置
-    
+
     此函数配置matplotlib使用学术出版标准的字体：
     - 英文使用Times New Roman
     - 设置合适的字号大小
     - 配置数学字体为stix（符合学术规范）
     """
     # 使用Times New Roman作为主字体，DejaVu Serif作为后备处理特殊符号
-    matplotlib.rcParams['font.family'] = 'serif'
-    matplotlib.rcParams['font.serif'] = ['Times New Roman', 'DejaVu Serif']
-    matplotlib.rcParams['font.size'] = 11
-    matplotlib.rcParams['axes.labelsize'] = 12
-    matplotlib.rcParams['axes.titlesize'] = 13
-    matplotlib.rcParams['xtick.labelsize'] = 10
-    matplotlib.rcParams['ytick.labelsize'] = 10
-    matplotlib.rcParams['legend.fontsize'] = 9
-    
+    matplotlib.rcParams["font.family"] = "serif"
+    matplotlib.rcParams["font.serif"] = ["Times New Roman", "DejaVu Serif"]
+    matplotlib.rcParams["font.size"] = 11
+    matplotlib.rcParams["axes.labelsize"] = 12
+    matplotlib.rcParams["axes.titlesize"] = 13
+    matplotlib.rcParams["xtick.labelsize"] = 10
+    matplotlib.rcParams["ytick.labelsize"] = 10
+    matplotlib.rcParams["legend.fontsize"] = 9
+
     # 设置数学字体 - 使用stix但允许特殊符号回退
-    matplotlib.rcParams['mathtext.fontset'] = 'stix'
-    matplotlib.rcParams['mathtext.rm'] = 'serif'
-    matplotlib.rcParams['mathtext.it'] = 'serif:italic'
-    matplotlib.rcParams['mathtext.bf'] = 'serif:bold'
+    matplotlib.rcParams["mathtext.fontset"] = "stix"
+    matplotlib.rcParams["mathtext.rm"] = "serif"
+    matplotlib.rcParams["mathtext.it"] = "serif:italic"
+    matplotlib.rcParams["mathtext.bf"] = "serif:bold"
     # 允许Unicode字符
-    matplotlib.rcParams['axes.unicode_minus'] = False
-    
+    matplotlib.rcParams["axes.unicode_minus"] = False
+
     # 改进图例样式
-    matplotlib.rcParams['legend.frameon'] = True
-    matplotlib.rcParams['legend.framealpha'] = 0.9
-    matplotlib.rcParams['legend.fancybox'] = True
-    matplotlib.rcParams['legend.shadow'] = False
+    matplotlib.rcParams["legend.frameon"] = True
+    matplotlib.rcParams["legend.framealpha"] = 0.9
+    matplotlib.rcParams["legend.fancybox"] = True
+    matplotlib.rcParams["legend.shadow"] = False
 
 
 def download_image(url: str, cache_path: Path) -> Optional[Any]:
     """下载并缓存图像
-    
+
     参数：
         url: 图像URL
         cache_path: 缓存路径
-        
+
     返回：
         PIL Image对象或None
     """
@@ -134,17 +134,17 @@ def download_image(url: str, cache_path: Path) -> Optional[Any]:
         from PIL import Image
     except ImportError:
         return None
-    
+
     # 创建缓存目录
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     # 检查缓存
     if cache_path.exists():
         try:
             return Image.open(cache_path)
         except:
             pass
-    
+
     # 下载图像
     try:
         print(f"下载图像: {url}")
@@ -282,7 +282,7 @@ class OrbitVisualizer:
         self.secondary_body_use_marker = True
         self.primary_body_marker = "o"  # 地球标记形状
         self.secondary_body_marker = "o"  # 月球标记形状
-        
+
         # 平动点设置（L1-L5）
         self.libration_point_colors = ["red", "blue", "green", "purple", "orange"]  # 颜色
         self.libration_point_markers = ["o", "s", "^", "D", "*"]  # 标记符号
@@ -546,9 +546,7 @@ class OrbitVisualizer:
 
         return ax
 
-    def plot_primary_bodies(
-        self, ax: Optional[Any] = None, is_3d: bool = False
-    ) -> Any:
+    def plot_primary_bodies(self, ax: Optional[Any] = None, is_3d: bool = False) -> Any:
         """绘制主天体和次天体
 
         参数：
@@ -572,8 +570,8 @@ class OrbitVisualizer:
         secondary_pos = np.array([1 - self.mu, 0])
 
         # 获取天体名称
-        primary_name = getattr(self.system, 'primary_body', None) or "Earth"
-        secondary_name = getattr(self.system, 'secondary_body', None) or "Moon"
+        primary_name = getattr(self.system, "primary_body", None) or "Earth"
+        secondary_name = getattr(self.system, "secondary_body", None) or "Moon"
 
         if is_3d:
             ax.scatter(
@@ -599,20 +597,20 @@ class OrbitVisualizer:
             # 地球 - 蓝色圆形
             ax.scatter(
                 *primary_pos,
-                color='#2E86AB',  # 蓝色
+                color="#2E86AB",  # 蓝色
                 s=self.primary_body_size,
-                edgecolors='#1A5276',  # 深蓝色边框
+                edgecolors="#1A5276",  # 深蓝色边框
                 linewidth=1.5,
                 zorder=10,
                 label=primary_name,
             )
-            
+
             # 月球 - 灰色圆形
             ax.scatter(
                 *secondary_pos,
-                color='#95A5A6',  # 灰色
+                color="#95A5A6",  # 灰色
                 s=self.secondary_body_size,
-                edgecolors='#566573',  # 深灰色边框
+                edgecolors="#566573",  # 深灰色边框
                 linewidth=1.5,
                 zorder=10,
                 label=secondary_name,
@@ -621,11 +619,16 @@ class OrbitVisualizer:
         return ax
 
     def _plot_body_with_image(
-        self, ax: Any, position: np.ndarray, image: Any, size: float, 
-        label: str = None, zorder: int = 10
+        self,
+        ax: Any,
+        position: np.ndarray,
+        image: Any,
+        size: float,
+        label: str = None,
+        zorder: int = 10,
     ):
         """使用图像绘制天体
-        
+
         参数：
             ax: 坐标轴
             position: 位置 [x, y]
@@ -637,26 +640,26 @@ class OrbitVisualizer:
         try:
             from PIL import Image
             import matplotlib.offsetbox as offsetbox
-            
+
             # 计算图像在数据坐标中的尺寸
             # 获取坐标轴的数据limits和图形尺寸
             xlim = ax.get_xlim()
             ylim = ax.get_ylim()
             fig = ax.get_figure()
             fig_width, fig_height = fig.get_size_inches() * fig.dpi
-            
+
             # 将points转换为数据坐标
             # 假设图像是圆形的，计算直径
             data_width = (xlim[1] - xlim[0]) * size / fig_width
             data_height = (ylim[1] - ylim[0]) * size / fig_height
             data_size = min(data_width, data_height)
-            
+
             # 创建图像 annotation
             imagebox = offsetbox.OffsetImage(image, zoom=0.15, resample=True)
-            
+
             # 创建 annotation
             ab = offsetbox.AnnotationBbox(
-                imagebox, 
+                imagebox,
                 position,
                 frameon=False,
                 boxcoords="data",
@@ -664,22 +667,20 @@ class OrbitVisualizer:
                 zorder=zorder,
             )
             ax.add_artist(ab)
-            
+
             # 添加图例（使用标记）
             if label:
                 ax.scatter(
-                    [position[0]], [position[1]],
-                    marker='o', s=0, zorder=zorder-1,
-                    label=label
+                    [position[0]], [position[1]], marker="o", s=0, zorder=zorder - 1, label=label
                 )
         except Exception as e:
             # 如果失败，回退到简单绘制
             print(f"图像绘制失败: {e}")
             ax.scatter(
                 *position,
-                color='blue' if 'Earth' in label or 'earth' in label else 'gray',
+                color="blue" if "Earth" in label or "earth" in label else "gray",
                 s=size,
-                edgecolors='black',
+                edgecolors="black",
                 linewidth=1,
                 zorder=zorder,
                 label=label,
@@ -970,11 +971,11 @@ class OrbitVisualizer:
 
         # 获取或计算Jacobi常数
         if jacobi_values is None:
-            if hasattr(family_result, 'get_jacobi_constants'):
+            if hasattr(family_result, "get_jacobi_constants"):
                 jacobi_values = family_result.get_jacobi_constants().tolist()
             else:
                 jacobi_values = [3.0] * n_orbits  # 默认值
-        
+
         # 处理空列表情况
         if not jacobi_values:
             jacobi_values = [3.0] * n_orbits
@@ -1029,12 +1030,14 @@ class OrbitVisualizer:
             f"DRO Family (3D Zoomed View)\n"
             f"X: [{center[0] - radius:.2f}, {center[0] + radius:.2f}], "
             f"Y/Z: [±{radius:.2f}], {n_orbits} orbits",
-            fontsize=12
+            fontsize=12,
         )
 
         # 颜色条
         if show_colorbar and jacobi_values:
-            sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max))
+            sm = plt.cm.ScalarMappable(
+                cmap=cmap, norm=plt.Normalize(vmin=jacobi_min, vmax=jacobi_max)
+            )
             sm.set_array([])
             cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.1)
             cbar.set_label("Jacobi Constant", fontsize=11)

@@ -126,6 +126,27 @@ class TestSetup:
         assert corrector.free_variable_indices == [0, 4, 6]
         assert corrector.fixed_parameters["z0"] == 0.1
 
+    def test_setup_2d_symmetric_y_fixed_y0(self, dynamics):
+        """2D对称y轴、固定y0配置（RO轨道）"""
+        corrector = DifferentialCorrection(dynamics)
+        result = corrector.setup_2D_symmetric_y_fixed_y0(y0=0.4633)
+
+        assert result is corrector
+        assert corrector.setup_type == "2D_symmetric_y_fixed_y0"
+        assert corrector.symmetry_condition == "y_axis"
+        assert corrector.free_variables == ["x_dot0", "T_half"]
+        assert corrector.free_variable_indices == [3, 6]
+        assert corrector.constraint_indices == [0, 3]
+        assert corrector.target_conditions == {"x": 0.0, "x_dot": 0.0}
+        assert corrector.fixed_parameters["y0"] == 0.4633
+
+    def test_setup_2d_symmetric_y_fixed_y0_default(self, dynamics):
+        """2D对称y轴配置默认y0=0"""
+        corrector = DifferentialCorrection(dynamics)
+        corrector.setup_2D_symmetric_y_fixed_y0()
+
+        assert corrector.fixed_parameters["y0"] == 0.0
+
     def test_setup_resets_history(self, dynamics):
         """配置时应重置收敛历史"""
         corrector = DifferentialCorrection(dynamics)
