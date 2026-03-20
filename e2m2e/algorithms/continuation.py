@@ -245,10 +245,8 @@ class Continuation:
                 # 生成待修正的下一个延拓位置的初始猜测（减小参数值）
                 if param_index < 6:
                     # 修改状态分量
-                    guess_orbit_state = current_orbit.states[0]
-                    guess_orbit_state[param_index] -= step_size
-                    guess_orbit = Orbit(guess_orbit_state, [0])
-                    guess_orbit.period = current_orbit.period
+                    guess_orbit = current_orbit.copy()
+                    guess_orbit.states[0, param_index] -= step_size
                     orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
                 else:
                     # 修改时间 - 通过复制并修改orbit的period属性
