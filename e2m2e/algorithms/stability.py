@@ -372,3 +372,99 @@ class StabilityAnalysis:
             f"StabilityAnalysis(orbit={self.orbit}, "
             f"type={self.stability_type}, complete={self.analysis_complete})"
         )
+
+    @staticmethod
+    def detect_bifurcation_in_family(
+        orbits: List[Orbit],
+        dynamics: CR3BP_Dynamics,
+        tolerance: float = 1e-8,
+    ) -> List[Dict[str, Any]]:
+        """检测轨道族中的分岔点
+
+        遍历轨道族中的每条轨道，计算其单值矩阵特征值，
+        检测是否有特征值接近 +1（切分岔/saddle-node bifurcation）。
+
+        参数：
+            orbits: Orbit对象列表（轨道族）
+            dynamics: CR3BP_Dynamics对象
+            tolerance: 特征值接近 +1 的容差，默认 1e-8
+
+        返回：
+            List[Dict[str, Any]]: 分岔点列表，每个元素包含：
+                - orbit_index: 轨道在族中的索引
+                - orbit: Orbit对象
+                - eigenvalues: 特征值数组
+                - eigenvalue_diff: |λ - 1| 的最小值
+                - bifurcation_type: 分岔类型
+        """
+        bifurcation_points = []
+
+        for i, orbit in enumerate(orbits):
+            try:
+                # 创建稳定性分析器
+                analysis = StabilityAnalysis(orbit=orbit, dynamics=dynamics)
+                analysis.compute_floquet_multipliers()
+
+                # 检查是否有特征值接近 +1
+                for j, lam in enumerate(analysis.eigenvalues):
+                    diff = abs(lam - 1.0)
+                    if diff < tolerance:
+                        bifurcation_points.append({
+                            "orbit_index": i,
+                            "orbit": orbit,
+                            "eigenvalues": analysis.eigenvalues,
+                            "eigenvalue_diff": diff,
+                            "bifurcation_type": BifurcationType.SADDLE_NODE,
+                            "eigenvalue_index": j,
+                            "eigenvalue": lam,
+                        })
+
+            except Exception:
+                # 跳过无法分析的点
+                continue
+
+        return bifurcation_points
+
+    @staticmethod
+    def find_nearest_bifurcation(
+        orbits: List[Orbit],
+        dynamics: CR3BP_Dynamics,
+        target_x0: Optional[float] = None,
+        tolerance: float = 1e-4,
+    ) -> Optional[Dict[str, Any]]:
+        """在轨道族中找到最接近目标参数的分岔点
+
+        参数：
+            orbits: Orbit对象列表
+            dynamics: CR3BP_Dynamics对象
+            target_x0: 目标x0坐标（可选）
+            tolerance: 搜索容差
+
+        返回：
+            分岔点字典，如果未找到则返回None
+        """
+        bifurcation_points = StabilityAnalysis.detect_bifurcation_in_family(
+            orbits=orbits,
+            dynamics=dynamics,
+            tolerance=tolerance,
+        )
+
+        if not bifurcation_points:
+            return None
+
+        if target_x0 is None:
+            # 返回第一个找到的分岔点
+            return bifurcation_points[0]
+
+        # 找到最接近目标x0的分岔点
+        best_bp = None
+        best_dist = float('inf')
+
+        for bp in bifurcation_points:
+            x0 = bp["orbit"].states[0][0]  # 初始状态的x坐标
+            dist = abs(x0 - target_x0)
+            if dist < best_dist:
+                best_dist = dist
+                best_bp = bp
+
+        return best_bp
