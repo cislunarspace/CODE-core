@@ -4,50 +4,86 @@
 
 ## 文档结构
 
+文档组织与代码模块结构一一对应：
+
 ```
 docs/
 ├── index.md              # 本文档
-├── guides/               # 用户指南
-│   ├── system-overview.md
-│   ├── orbit-generation.md
-│   ├── transfer-design.md
-│   └── visualization-guide.md
-└── reference/            # 技术参考
-    ├── api-reference.md
-    └── algorithms.md
+├── core/                 # 核心模块
+│   ├── system.md         # CR3BP_System - 系统参数
+│   ├── dynamics.md       # CR3BP_Dynamics - 动力学
+│   ├── orbit.md          # Orbit, OrbitFamily - 轨道
+│   └── coordinate.md     # CoordinateTransformation - 坐标变换
+├── algorithms/          # 算法模块
+│   ├── continuation.md       # 延拓法
+│   ├── differential_correction.md  # 微分修正
+│   └── stability.md          # 稳定性分析
+├── transfer/            # 转移模块
+│   ├── inter_orbit.md       # DROROTransferSearch - 轨道间转移
+│   ├── earth_moon.md        # EarthMoonTransfer - 地月转移
+│   └── moon_earth.md        # MoonEarthTransfer - 月地转移
+└── visualization/       # 可视化模块
+    └── plotting.md          # 绘图函数
 ```
 
-### 用户指南
+## 模块索引
 
-| 文档 | 说明 |
-|------|------|
-| [系统总览](guides/system-overview.md) | 系统架构、模块关系、设计理念 |
-| [快速开始](reference/api-reference.md#快速开始) | 5分钟上手指南 |
-| [轨道生成](guides/orbit-generation.md) | DRO、Halo、Lyapunov等轨道生成教程 |
-| [转移轨道设计](guides/transfer-design.md) | 轨道间转移、低能转移设计指南 |
+### 核心模块 (core)
 
-### 技术参考
+| 类/模块 | 文件 | 说明 |
+|---------|------|------|
+| `CR3BP_System` | [core/system.md](core/system.md) | 系统参数与平动点计算 |
+| `CR3BP_Dynamics` | [core/dynamics.md](core/dynamics.md) | 运动方程与数值积分 |
+| `Orbit` | [core/orbit.md](core/orbit.md) | 轨道数据管理 |
+| `OrbitFamily` | [core/orbit.md](core/orbit.md) | 轨道族管理 |
+| `CoordinateTransformation` | [core/coordinate.md](core/coordinate.md) | 坐标系变换 |
 
-| 文档 | 说明 |
-|------|------|
-| [API 参考](reference/api-reference.md) | 完整API参考、数学基础、设计原理 |
-| [CR3BP算法](reference/algorithms.md) | 微分修正、延拓、稳定性分析算法详解 |
-| [可视化指南](guides/visualization-guide.md) | 绘图功能、使用示例、自定义设置 |
+### 算法模块 (algorithms)
 
-### 资源
+| 类/模块 | 文件 | 说明 |
+|---------|------|------|
+| `ContinuationMethod` | [algorithms/continuation.md](algorithms/continuation.md) | 弧长延拓法 |
+| `DifferentialCorrection` | [algorithms/differential_correction.md](algorithms/differential_correction.md) | 周期轨道修正 |
+| `StabilityAnalysis` | [algorithms/stability.md](algorithms/stability.md) | Floquet稳定性分析 |
+
+### 转移模块 (transfer)
+
+| 类/模块 | 文件 | 说明 |
+|---------|------|------|
+| `DROROTransferSearch` | [transfer/inter_orbit.md](transfer/inter_orbit.md) | DRO→RO转移搜索 |
+| `EarthMoonTransfer` | [transfer/earth_moon.md](transfer/earth_moon.md) | 地月转移设计 |
+| `MoonEarthTransfer` | [transfer/moon_earth.md](transfer/moon_earth.md) | 月地返回设计 |
+
+### 可视化模块 (visualization)
+
+| 函数 | 文件 | 说明 |
+|------|------|------|
+| `plot_orbit_2d/3d` | [visualization/plotting.md](visualization/plotting.md) | 轨道绘图 |
+| `plot_transfer_2d/3d` | [visualization/plotting.md](visualization/plotting.md) | 转移轨迹绘图 |
+| `plot_system_geometry` | [visualization/plotting.md](visualization/plotting.md) | 系统几何绘图 |
+
+## 快速开始
+
+```python
+from e2m2e.core.system import CR3BP_System
+from e2m2e.core.dynamics import CR3BP_Dynamics
+from e2m2e.core.orbit import Orbit
+
+# 创建系统
+system = CR3BP_System.from_known_system("earth_moon")
+
+# 创建动力学模型
+dynamics = CR3BP_Dynamics(system)
+
+# 传播轨道
+result = dynamics.propagate(initial_state=state, t_span=(0, 10.0))
+```
+
+## 资源
 
 - [API 参考](../e2m2e/) - 代码中的 docstring
 - [示例代码](../examples/) - 实际使用示例
-- [测试用例](../tests/) - 单元测试，覆盖核心功能
-
-## 快速链接
-
-### 核心概念
-
-- [CR3BP_System](../e2m2e/core/system.py) - 系统参数与平动点
-- [CR3BP_Dynamics](../e2m2e/core/dynamics.py) - 动力学方程与数值积分
-- [Orbit](../e2m2e/core/orbit.py) - 轨道数据与周期检测
-- [DifferentialCorrection](../e2m2e/algorithms/differential_correction.py) - 周期轨道求解
+- [测试用例](../tests/) - 单元测试
 
 ### 常用任务
 

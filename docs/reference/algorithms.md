@@ -364,6 +364,101 @@ $$M = \begin{bmatrix} \Phi_{xx} & \Phi_{xy} \\ \Phi_{yx} & \Phi_{yy} \end{bmatri
 - 稳定轨道: 所有特征值在单位圆上（纯虚数共轭对）
 - 不稳定轨道: 至少一个特征值在单位圆外
 
+### 7.2 分岔检测
+
+**文件**: `e2m2e/algorithms/stability.py`
+
+**功能**: 检测轨道族中的分岔点（Bifurcation Detection）。
+
+#### 7.2.1 分岔类型
+
+| 分岔类型 | 特征 | 识别方法 |
+|----------|------|----------|
+| **Saddle-Node (切分岔)** | 特征值 $\lambda = 1$ | 检测接近 +1 的特征值 |
+| **Period-Doubling (倍周期分岔)** | 特征值 $\lambda = -1$ | 检测接近 -1 的特征值 |
+| **secondary Hopf** | 特征值在单位圆上共轭 | 检测复特征值模长接近1 |
+
+#### 7.2.2 `detect_bifurcation_in_family` 方法
+
+遍历轨道族中的每条轨道，计算其 Floquet 乘子，检测是否存在接近 +1 的特征值以识别 saddle-node 分岔：
+
+```python
+@staticmethod
+def detect_bifurcation_in_family(
+    orbits: List[Orbit],
+    dynamics: CR3BP_Dynamics,
+    tolerance: float = 1e-8,
+) -> List[Dict[str, Any]]:
+    """检测轨道族中的分岔点
+
+    参数：
+        orbits: Orbit对象列表（轨道族）
+        dynamics: CR3BP_Dynamics对象
+        tolerance: 特征值接近 +1 的容差，默认 1e-8
+
+    返回：
+        List[Dict[str, Any]]: 分岔点列表，每个元素包含：
+            - orbit_index: 轨道在族中的索引
+            - orbit: Orbit对象
+            - eigenvalues: 特征值数组
+            - eigenvalue_diff: |λ - 1| 的最小值
+            - bifurcation_type: 分岔类型
+    """
+```
+
+#### 7.2.3 `find_nearest_bifurcation` 方法
+
+在轨道族中定位最接近目标参数的分岔点：
+
+```python
+@staticmethod
+def find_nearest_bifurcation(
+    orbits: List[Orbit],
+    dynamics: CR3BP_Dynamics,
+    target_x0: Optional[float] = None,
+    tolerance: float = 1e-4,
+) -> Optional[Dict[str, Any]]:
+    """在轨道族中找到最接近目标参数的分岔点
+
+    参数：
+        orbits: Orbit对象列表
+        dynamics: CR3BP_Dynamics对象
+        target_x0: 目标x0坐标（可选）
+        tolerance: 搜索容差
+
+    返回：
+        分岔点字典，如果未找到则返回None
+    """
+```
+
+#### 7.2.4 使用示例
+
+```python
+from e2m2e.algorithms.stability import StabilityAnalysis
+
+# 加载轨道族
+family = OrbitFamily.load_from_file("output/dro/dro_family.json")
+
+# 创建动力学模型
+system = CR3BP_System(mu=0.0121506683)
+dynamics = CR3BP_Dynamics(system)
+
+# 检测分岔点
+bifurcations = StabilityAnalysis.detect_bifurcation_in_family(
+    orbits=family.orbits,
+    dynamics=dynamics,
+    tolerance=1e-8
+)
+
+# 找到最接近 x0=0.8 的分岔点
+nearest = StabilityAnalysis.find_nearest_bifurcation(
+    orbits=family.orbits,
+    dynamics=dynamics,
+    target_x0=0.8,
+    tolerance=1e-4
+)
+```
+
 ---
 
 ## 8. DRO 生成完整流程
