@@ -1372,5 +1372,109 @@ class OrbitVisualizer:
 
         return states
 
+    def _sort_points_by_nearest_neighbor(self, x, y):
+        """将点按最近邻顺序排序，解决轨道绘图时的交叉线问题
+
+        对于闭合或近似闭合的轨道，直接按数据顺序连接会产生交叉线。
+        此方法使用贪婪算法将点重新排序为最近邻顺序，形成平滑的轨道曲线。
+
+        参数：
+            x: numpy数组，点 的X坐标
+            y: numpy数组，点 的Y坐标
+
+        返回：
+            tuple: (排序后的x数组, 排序后的y数组)
+        """
+        points = np.column_stack((x, y))
+        n = len(points)
+
+        if n <= 2:
+            return x, y
+
+        # 找到距离原点最远的点作为起点（适用于包含原点的轨道）
+        distances_from_origin = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2)
+        start_idx = np.argmax(distances_from_origin)
+
+        visited = np.zeros(n, dtype=bool)
+        sorted_indices = np.zeros(n, dtype=int)
+
+        current_idx = start_idx
+        for i in range(n):
+            visited[current_idx] = True
+            sorted_indices[i] = current_idx
+
+            if i == n - 1:
+                break
+
+            # 找到当前点最近且未访问的邻点
+            min_dist = np.inf
+            nearest_idx = -1
+            for j in range(n):
+                if not visited[j]:
+                    dist = np.sqrt(
+                        (points[current_idx, 0] - points[j, 0]) ** 2
+                        + (points[current_idx, 1] - points[j, 1]) ** 2
+                    )
+                    if dist < min_dist:
+                        min_dist = dist
+                        nearest_idx = j
+
+            current_idx = nearest_idx
+
+        return points[sorted_indices, 0], points[sorted_indices, 1]
+
+    def _sort_3d_points_by_nearest_neighbor(self, x, y, z):
+        """将3D点按最近邻顺序排序，解决轨道绘图时的交叉线问题
+
+        对于闭合或近似闭合的轨道，直接按数据顺序连接会产生交叉线。
+        此方法使用贪婪算法将点重新排序为最近邻顺序，形成平滑的轨道曲线。
+
+        参数：
+            x: numpy数组，点的X坐标
+            y: numpy数组，点的Y坐标
+            z: numpy数组，点的Z坐标
+
+        返回：
+            tuple: (排序后的x数组, 排序后的y数组, 排序后的z数组)
+        """
+        points = np.column_stack((x, y, z))
+        n = len(points)
+
+        if n <= 2:
+            return x, y, z
+
+        # 找到距离原点最远的点作为起点（适用于包含原点的轨道）
+        distances_from_origin = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2 + points[:, 2] ** 2)
+        start_idx = np.argmax(distances_from_origin)
+
+        visited = np.zeros(n, dtype=bool)
+        sorted_indices = np.zeros(n, dtype=int)
+
+        current_idx = start_idx
+        for i in range(n):
+            visited[current_idx] = True
+            sorted_indices[i] = current_idx
+
+            if i == n - 1:
+                break
+
+            # 找到当前点最近且未访问的邻点
+            min_dist = np.inf
+            nearest_idx = -1
+            for j in range(n):
+                if not visited[j]:
+                    dist = np.sqrt(
+                        (points[current_idx, 0] - points[j, 0]) ** 2
+                        + (points[current_idx, 1] - points[j, 1]) ** 2
+                        + (points[current_idx, 2] - points[j, 2]) ** 2
+                    )
+                    if dist < min_dist:
+                        min_dist = dist
+                        nearest_idx = j
+
+            current_idx = nearest_idx
+
+        return points[sorted_indices, 0], points[sorted_indices, 1], points[sorted_indices, 2]
+
     def __str__(self):
         return f"OrbitVisualizer(system={self.system})"
