@@ -627,10 +627,19 @@ class DifferentialCorrection:
 
             # 检查停滞（仅在未收敛的情况下检查）
             if not self.converged and correction_norm < self.stagnation_limit:
-                self.termination_reason = "停滞：修正量过小"
-                if verbose:
-                    print(f"  停滞：修正量 = {correction_norm:.2e}")
-                break
+                # 修正量过小时，若误差已足够小，也视为收敛成功
+                if current_error < 1e-8:
+                    self.converged = True
+                    self.termination_reason = "收敛成功：修正量过小但误差足够小"
+                    self.current_error = current_error
+                    if verbose:
+                        print(f"  收敛成功：修正量过小({correction_norm:.2e})但误差已足够小({current_error:.2e})")
+                    break
+                else:
+                    self.termination_reason = "停滞：修正量过小"
+                    if verbose:
+                        print(f"  停滞：修正量 = {correction_norm:.2e}")
+                    break
 
         # 迭代结束，处理结果
         if self.converged:
