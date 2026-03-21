@@ -592,6 +592,7 @@ class OrbitFamily:
                     "family_type": orbit.family_type,
                     "is_periodic": orbit.is_periodic,
                     "closure_error": getattr(orbit, "closure_error", None),
+                    "metadata": getattr(orbit, "metadata", {}),
                 }
                 for orbit in self.orbits
             ],
@@ -626,6 +627,7 @@ class OrbitFamily:
             orbit.amplitudes = orbit_data.get("amplitudes", {})
             orbit.family_type = orbit_data.get("family_type")
             orbit.is_periodic = orbit_data.get("is_periodic", False)
+            orbit.metadata = orbit_data.get("metadata", {})
             orbits.append(orbit)
 
         family = cls(orbits, data.get("family_type"), system)

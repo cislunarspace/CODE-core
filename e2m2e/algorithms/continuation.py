@@ -145,6 +145,10 @@ class Continuation:
         # 初始化当前轨道（使用种子轨道作为初始状态）
         current_orbit = seed_orbit.copy()
 
+        # 临时存储轨道和对应步数（用于后续排序）
+        # 步数定义：从种子轨道出发，正向延拓 step 1, 2, 3...，反向延拓 -1, -2, -3...
+        temp_orbits_with_steps = []
+
         # 步长历史记录
         step_size_history = []
 
@@ -179,8 +183,9 @@ class Continuation:
                     orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
 
                 if orbit is not None and orbit.correction_success:
-                    # 添加到轨道族
-                    orbit_family.add_orbit(orbit)
+                    # 临时存储轨道和步数（步数为正向 i+1）
+                    orbit.metadata["continuation_step"] = i + 1
+                    temp_orbits_with_steps.append((orbit, i + 1))
 
                     # 更新当前轨道
                     current_orbit = orbit
@@ -255,8 +260,9 @@ class Continuation:
                     orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
 
                 if orbit is not None and orbit.correction_success:
-                    # 添加到轨道族
-                    orbit_family.add_orbit(orbit)
+                    # 添加到轨道族（步数为反向 -i-1）
+                    orbit.metadata["continuation_step"] = -(i + 1)
+                    temp_orbits_with_steps.append((orbit, -(i + 1)))
 
                     # 更新当前轨道
                     current_orbit = orbit
@@ -297,10 +303,28 @@ class Continuation:
                 step_size_history.append(step_size)
                 i += 1
 
+        # 按步数排序：种子轨道(step=0)在最前，然后按绝对值从小到大排列
+        # 排序顺序：0, 1, -1, 2, -2, 3, -3, ...
+        seed_orbit.metadata["continuation_step"] = 0
+        all_orbits_with_steps = [(seed_orbit, 0)] + temp_orbits_with_steps
+        
+        # 自定义排序：先按绝对值排序，再按正负排序（正数在前）
+        def sort_key(item):
+            orbit, step = item
+            return (abs(step), step > 0)
+        
+        all_orbits_with_steps.sort(key=sort_key)
+        
+        # 清空并重新按排序顺序添加轨道
+        orbit_family.orbits = []
+        for orbit, step in all_orbits_with_steps:
+            orbit_family.add_orbit(orbit)
+        
         if verbose:
             print(f"\n延拓完成：共生成 {len(orbit_family)} 条轨道")
             stats = self.continuation_stats
             print(f"  成功: {stats['successful_steps']}, 失败: {stats['failed_steps']}")
+            print(f"  轨道已按距离种子轨道的步数排序: 0, 1, -1, 2, -2, ...")
 
         return orbit_family
 
