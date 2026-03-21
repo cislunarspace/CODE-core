@@ -643,6 +643,16 @@ class DifferentialCorrection:
 
         # 迭代结束，处理结果
         if self.converged:
+            # 验证周期合理性（防止收敛到无效解如周期接近0的轨道）
+            min_valid_period = 1e-6  # 最小有效周期阈值
+            if 2 * current_time < min_valid_period:
+                self.converged = False
+                self.success = False
+                self.termination_reason = f"收敛但周期无效: T={2 * current_time:.6e} < {min_valid_period}"
+                if verbose:
+                    print(f"\n微分修正失败: {self.termination_reason}")
+                return None
+
             self.success = True
             self.final_solution = current_state.copy()
             self.solution_time = current_time
