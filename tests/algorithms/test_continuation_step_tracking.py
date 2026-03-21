@@ -112,9 +112,9 @@ class TestContinuationOrbitSorting:
         # 验证排序后的顺序（按绝对值排序）
         sorted_steps = [step for _, step in temp_orbits_with_steps]
         
-        # 排序应为: 0, 1, -1, 2, -2, 3, -3
+        # 排序应为: 0, -1, 1, -2, 2, -3, 3
         # 即先按绝对值，再按正负（负数在前因为False<True）
-        expected_order = [0, 1, -1, 2, -2, 3, -3]
+        expected_order = [0, -1, 1, -2, 2, -3, 3]
         assert sorted_steps == expected_order
 
     def test_seed_included_in_sorting(self, continuation, seed_orbit):
@@ -142,8 +142,8 @@ class TestContinuationOrbitSorting:
         # 0 应该在第一位
         assert sorted_steps[0] == 0
         # 相同绝对值时，负数在前（因为False < True）
-        assert sorted_steps[1] == 1
-        assert sorted_steps[2] == -1
+        assert sorted_steps[1] == -1
+        assert sorted_steps[2] == 1
 
     def test_sort_key_uses_tuple_comparison(self, continuation):
         """测试排序键使用元组比较"""

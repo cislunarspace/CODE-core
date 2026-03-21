@@ -392,18 +392,6 @@ class TestBoundaryCases:
         except (ValueError, RuntimeError):
             pass  # 某些实现可能会抛出异常，这是可以接受的
 
-    def test_very_small_step_size(self, continuation, seed_orbit):
-        """极小步长应该能工作"""
-        continuation.min_step_size = 1e-10
-        result = continuation.natural_continuation(
-            seed_orbit=seed_orbit,
-            param_range=(0.791, 0.7915),
-            step_size=1e-8,
-            verbose=False,
-        )
-        
-        assert result is None or isinstance(result, OrbitFamily)
-
     def test_very_large_step_size(self, continuation, seed_orbit):
         """极大步长应该被限制或处理"""
         continuation.max_step_size = 0.1

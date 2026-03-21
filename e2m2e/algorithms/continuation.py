@@ -113,6 +113,17 @@ class Continuation:
         返回：
             OrbitFamily: 包含轨道族的OrbitFamily对象
         """
+        # 验证并限制步长
+        if step_size > self.max_step_size:
+            if verbose:
+                print(f"警告: 输入步长 {step_size} 超过最大限制 {self.max_step_size}，限制为 {self.max_step_size}")
+            step_size = self.max_step_size
+        
+        if step_size < self.min_step_size:
+            if verbose:
+                print(f"警告: 输入步长 {step_size} 小于最小限制 {self.min_step_size}，限制为 {self.min_step_size}")
+            step_size = self.min_step_size
+
         # 创建轨道族对象
         orbit_family = OrbitFamily(seed_orbit)
 

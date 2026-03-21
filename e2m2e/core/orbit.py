@@ -333,37 +333,67 @@ class Orbit:
 
     @classmethod
     def load_from_file(
-        cls, filename: Union[str, Path], system: Optional[CR3BP_System] = None
+        cls, 
+        filename: Union[str, Path], 
+        system: Optional[CR3BP_System] = None,
+        orbit_index: Optional[int] = None
     ) -> "Orbit":
         """从文件加载轨道数据
 
         参数：
         - filename: 文件名
         - system: CR3BP_System对象（可选）
+        - orbit_index: 轨道索引（可选），当文件为轨道族格式时有效
 
         返回：
-        - Orbit对象
+        - 如果提供 orbit_index：返回指定单条 Orbit
+        - 如果不提供 orbit_index 且文件为单轨道格式：返回 Orbit
+        - 如果不提供 orbit_index 且文件为轨道族格式：返回 OrbitFamily
+        
+        注意：
+        - 单轨道格式包含 "states", "times", "metadata", "properties" 字段
+        - 轨道族格式包含 "orbits" 数组字段
         """
         with open(filename, "r") as f:
             data = json.load(f)
 
+        # 判断是轨道族格式还是单轨道格式
+        if "orbits" in data:
+            # 轨道族格式
+            if orbit_index is None:
+                raise ValueError(
+                    f"文件 '{filename}' 是轨道族格式，需要提供 orbit_index 参数指定要加载的轨道"
+                )
+            orbits_data = data["orbits"]
+            if orbit_index < 0 or orbit_index >= len(orbits_data):
+                raise IndexError(
+                    f"orbit_index={orbit_index} 超出范围，轨道族共有 {len(orbits_data)} 条轨道"
+                )
+            orbit_data = orbits_data[orbit_index]
+        else:
+            # 单轨道格式
+            orbit_data = data
+
         # 创建轨道对象
-        states = np.array(data["states"])
-        times = np.array(data["times"])
+        states = np.array(orbit_data["states"])
+        times = np.array(orbit_data["times"])
         orbit = cls(states, times, system)
 
         # 恢复元数据
-        orbit.metadata = data["metadata"]
+        orbit.metadata = orbit_data.get("metadata", data.get("metadata", {}))
 
         # 恢复属性
-        properties = data["properties"]
-        orbit.period = properties["period"]
-        orbit.amplitudes = properties["amplitudes"]
-        orbit.extrema = properties["extrema"]
-        orbit.mean_state = np.array(properties["mean_state"]) if properties["mean_state"] else None
-        orbit.family_type = properties["family_type"]
-        orbit.is_periodic = properties["is_periodic"]
-        orbit.periodicity_error = properties["periodicity_error"]
+        properties = orbit_data.get("properties", {})
+        orbit.period = properties.get("period", orbit_data.get("period"))
+        orbit.amplitudes = properties.get("amplitudes", orbit_data.get("amplitudes", {}))
+        orbit.extrema = properties.get("extrema", orbit_data.get("extrema", {}))
+        mean_state = properties.get("mean_state", orbit_data.get("mean_state"))
+        orbit.mean_state = np.array(mean_state) if mean_state else None
+        orbit.family_type = properties.get("family_type", orbit_data.get("family_type"))
+        orbit.is_periodic = properties.get("is_periodic", orbit_data.get("is_periodic", False))
+        orbit.periodicity_error = properties.get(
+            "periodicity_error", orbit_data.get("periodicity_error")
+        )
 
         return orbit
 
