@@ -280,13 +280,28 @@ def natural_continuation(
     """
 ```
 
-#### 5.1.2 延拓参数
+#### 5.1.2 延拓参数语义：`fixed_parameters` 与 `free_variables`
 
-| 参数 | 符号 | 物理意义 |
-|------|------|----------|
-| x0 | $x_0$ | 初始 x 坐标 |
-| z0 | $z_0$ | 初始 z 振幅 |
-| period | $T$ | 轨道周期 |
+`Continuation` 的延拓参数来源于 `DifferentialCorrection` 的 `fixed_parameters`，而非 `free_variables`。两者在 corrector 层面和 continuation 层面的语义如下：
+
+| 层级 | `fixed_parameters` | `free_variables` |
+|---|---|---|
+| **DifferentialCorrection** | 单次修正迭代中**固定**的值（不参与迭代调整） | 单次修正迭代中被**调整**的变量 |
+| **Continuation** | **延拓参数**（沿轨道族变化，用于参数化轨道族） | 非延拓参数 |
+
+**配置示例**（以 `setup_2D_symmetric_x_fixed_x0` 为例）：
+
+```python
+corrector.setup_2D_symmetric_x_fixed_x0(x0=0.8)
+# fixed_parameters = {"x0": 0.8}  → 沿轨道族变化的 x0 是延拓参数
+# free_variables  = ["y_dot0", "T_half"]  → 修正迭代中调整的变量
+```
+
+`Continuation` 初始化时自动从 `corrector.fixed_parameters` 获取延拓参数名称，再通过 `_infer_param_index()` 映射到状态向量中的索引，用于自然延拓中的参数步进：
+
+```python
+self.continuation_parameter = next(iter(corrector.fixed_parameters))
+```
 
 #### 5.1.3 伪弧长延拓（备选）
 
