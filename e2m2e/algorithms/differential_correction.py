@@ -489,7 +489,12 @@ class DifferentialCorrection:
         self.iteration_count = 0
         self.converged = False
         self.success = False
-        half_period_time = initial_guess.period / 2
+
+        # 固定T模式下使用预设的T_half，否则从轨道周期计算
+        if "T_half" in self.fixed_parameters:
+            half_period_time = self.fixed_parameters["T_half"]
+        else:
+            half_period_time = initial_guess.period / 2
 
         # 初始化当前状态和时间（用于牛顿迭代）
         current_state = self.initial_guess.copy()
