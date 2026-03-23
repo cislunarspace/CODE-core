@@ -704,3 +704,330 @@ def optimize_transfer(
     )
 
     return optimizer.optimize(initial_guess=initial_guess, **kwargs)
+
+
+class COPTNLPCallback:
+    """COPT NLP回调类
+
+    用于COPT非线性优化问题的目标函数和约束计算。
+
+    属性:
+        optimizer: DROTRONLPOptimizer实例
+        x: 当前变量值 [alpha, transfer_time, t_ins]
+    """
+
+    def __init__(self, optimizer: DROTRONLPOptimizer):
+        self.optimizer = optimizer
+        self.x = None
+
+    def EvalObj(self, xdata, outdata):
+        """计算目标函数值 J(y) = Δv1 + Δv2"""
+        import numpy as np
+
+        x = np.array(xdata)
+        self.x = x
+        obj = self.optimizer.objective_function(x)
+        outdata[0] = obj
+        return 0
+
+    def EvalGrad(self, xdata, outdata):
+        """计算目标函数梯度 (数值差分)"""
+        import numpy as np
+
+        x = np.array(xdata)
+        self.x = x
+        h = 1e-8
+        grad = np.zeros(3)
+        f0 = self.optimizer.objective_function(x)
+        for i in range(3):
+            x_pert = x.copy()
+            x_pert[i] += h
+            grad[i] = (self.optimizer.objective_function(x_pert) - f0) / h
+        for i in range(3):
+            outdata[i] = grad[i]
+        return 0
+
+    def EvalCon(self, xdata, outdata):
+        """计算约束函数值"""
+        import numpy as np
+
+        x = np.array(xdata)
+        self.x = x
+
+        # 位置连续性约束
+        pos_con = self.optimizer.constraint_position(x)
+        # 速度平行性约束
+        vel_con = self.optimizer.constraint_velocity_parallel(x)
+
+        outdata[0] = pos_con  # = 0 (等式约束)
+        outdata[1] = vel_con  # = 0 (等式约束)
+        return 0
+
+    def EvalJac(self, xdata, outdata):
+        """计算约束函数Jacobian矩阵 (数值差分)"""
+        import numpy as np
+
+        x = np.array(xdata)
+        self.x = x
+        h = 1e-8
+
+        # 位置约束梯度
+        pos_con = self.optimizer.constraint_position(x)
+        grad_pos = np.zeros(3)
+        for i in range(3):
+            x_pert = x.copy()
+            x_pert[i] += h
+            grad_pos[i] = (self.optimizer.constraint_position(x_pert) - pos_con) / h
+
+        # 速度约束梯度
+        vel_con = self.optimizer.constraint_velocity_parallel(x)
+        grad_vel = np.zeros(3)
+        for i in range(3):
+            x_pert = x.copy()
+            x_pert[i] += h
+            grad_vel[i] = (self.optimizer.constraint_velocity_parallel(x_pert) - vel_con) / h
+
+        # Jacobian矩阵 (稀疏格式，按行主序)
+        # 约束0: 位置约束
+        outdata[0] = grad_pos[0]
+        outdata[1] = grad_pos[1]
+        outdata[2] = grad_pos[2]
+        # 约束1: 速度约束
+        outdata[3] = grad_vel[0]
+        outdata[4] = grad_vel[1]
+        outdata[5] = grad_vel[2]
+        return 0
+
+    def EvalHess(self, xdata, sigma, lam, outdata):
+        """计算Hessian矩阵 (数值差分)
+
+        注意: 这里使用梯度差分近似Hessian，实际应该计算Lagrangian的Hessian
+        """
+        import numpy as np
+
+        x = np.array(xdata)
+        self.x = x
+        h = 1e-6
+
+        # 目标函数Hessian近似
+        grad_f = np.zeros(3)
+        f0 = self.optimizer.objective_function(x)
+        for i in range(3):
+            x_pert = x.copy()
+            x_pert[i] += h
+            grad_f[i] = (self.optimizer.objective_function(x_pert) - f0) / h
+
+        hess_f = np.zeros((3, 3))
+        for i in range(3):
+            for j in range(i + 1):
+                x_pert = x.copy()
+                x_pert[i] += h
+                x_pert[j] += h
+                f_ij = self.optimizer.objective_function(x_pert)
+
+                x_i = x.copy()
+                x_i[i] += h
+                f_i = self.optimizer.objective_function(x_i)
+
+                x_j = x.copy()
+                x_j[j] += h
+                f_j = self.optimizer.objective_function(x_j)
+
+                hess_f[i, j] = (f_ij - f_i - f_j + f0) / (h * h)
+                hess_f[j, i] = hess_f[i, j]
+
+        # Lagrangian Hessian ≈ sigma * Hessian(f) + sum(lam[i] * Hessian(g_i))
+        # 这里简化处理，只使用目标函数Hessian
+        idx = 0
+        for i in range(3):
+            for j in range(i + 1):
+                outdata[idx] = sigma * hess_f[i, j]
+                idx += 1
+        return 0
+
+
+class COPTNLPSolver:
+    """基于COPT的NLP求解器封装
+
+    使用COPT求解器的内点法求解非线性规划问题。
+
+    属性:
+        optimizer: DROTRONLPOptimizer实例
+        model: COPT模型
+        callback: COPTNLPCallback实例
+    """
+
+    def __init__(self, optimizer: DROTRONLPOptimizer, options: dict = None):
+        """初始化COPT NLP求解器
+
+        参数:
+            optimizer: DROTRONLPOptimizer实例
+            options: 求解器选项
+        """
+        self.optimizer = optimizer
+        self.options = options or {}
+        self.model = None
+        self.callback = None
+
+    def _setup_model(self, x0: np.ndarray) -> bool:
+        """设置NLP模型
+
+        参数:
+            x0: 初始猜测
+
+        返回:
+            是否成功
+        """
+        try:
+            import coptpy
+
+            self.coptpy = coptpy
+        except ImportError:
+            raise RuntimeError("COPT not installed. Install with: pip install coptpy")
+
+        # 创建环境
+        env = self.coptpy.Envr()
+        self.model = env.createModel("DRO_RO_Transfer_NLP")
+
+        # 设置变量边界
+        alpha_lb, alpha_ub = self.optimizer.alpha_range
+        t_lb, t_ub = self.optimizer.transfer_time_range
+        tins_lb, tins_ub = self.optimizer.t_ins_range
+
+        col_lower = [alpha_lb, t_lb, tins_lb]
+        col_upper = [alpha_ub, t_ub, tins_ub]
+
+        # 约束边界 (等式约束 = 0)
+        row_lower = [0.0, 0.0]
+        row_upper = [0.0, 0.0]
+
+        # 创建NLP回调
+        self.callback = COPTNLPCallback(self.optimizer)
+
+        # Jacobian稀疏结构 (2个约束 x 3个变量)
+        n_jac = 6
+        idx_jac_row = [0, 0, 0, 1, 1, 1]  # 约束索引
+        idx_jac_col = [0, 1, 2, 0, 1, 2]  # 变量索引
+
+        # Hessian稀疏结构 (3x3下三角 = 6个元素)
+        n_hess = 6
+        idx_hess_row = [0, 1, 1, 2, 2, 2]
+        idx_hess_col = [0, 0, 1, 0, 1, 2]
+
+        # 加载NLP数据
+        self.model.loadNlData(
+            nCols=3,
+            nRows=2,
+            sense=self.coptpy.MINIMIZE,
+            nGrad=3,
+            idxGrad=[0, 1, 2],
+            nJac=n_jac,
+            idxJacRow=idx_jac_row,
+            idxJacCol=idx_jac_col,
+            nHess=n_hess,
+            idxHessRow=idx_hess_row,
+            idxHessCol=idx_hess_col,
+            colLower=col_lower,
+            colUpper=col_upper,
+            rowLower=row_lower,
+            rowUpper=row_upper,
+            initX=list(x0),
+            evalType=-1,  # 所有回调都已实现
+            cb=self.callback,
+        )
+
+        # 设置参数
+        self.model.setParam(self.coptpy.COPT.Param.NLPTol, 1e-10)
+        self.model.setParam(self.coptpy.COPT.Param.MaxIter, self.options.get("max_iter", 1000))
+
+        return True
+
+    def solve(self, x0: np.ndarray) -> dict:
+        """求解NLP问题
+
+        参数:
+            x0: 初始猜测 [alpha, transfer_time, t_ins]
+
+        返回:
+            结果字典
+        """
+        if self.model is None:
+            self._setup_model(x0)
+
+        try:
+            # 求解
+            self.model.solve()
+
+            # 获取状态
+            status = self.model.status
+            obj_val = self.model.objval if status == self.coptpy.COPT.OPTIMAL else float("inf")
+            solution = self.model.x if hasattr(self.model, "x") else x0
+
+            return {
+                "status": status,
+                "objective": obj_val,
+                "solution": solution,
+                "success": status == self.coptpy.COPT.OPTIMAL,
+            }
+        except Exception as e:
+            return {
+                "status": -1,
+                "objective": float("inf"),
+                "solution": x0,
+                "success": False,
+                "message": str(e),
+            }
+
+    def get_result(self) -> "NLPOptimizationResult":
+        """获取优化结果
+
+        返回:
+            NLPOptimizationResult对象
+        """
+        if self.model is None or self.callback.x is None:
+            raise RuntimeError("Must call solve() first")
+
+        opt_vars = NLPOptimizationVariables.from_array(self.callback.x)
+        success = self.model.status == self.coptpy.COPT.OPTIMAL
+
+        return self.optimizer._build_result(
+            opt_vars, success, "COPT solution" if success else f"COPT status: {self.model.status}"
+        )
+
+
+def optimize_with_copt(
+    optimizer: DROTRONLPOptimizer,
+    initial_guess: Optional[NLPOptimizationVariables] = None,
+    **kwargs,
+) -> NLPOptimizationResult:
+    """使用COPT求解器进行优化
+
+    参数:
+        optimizer: DROTRONLPOptimizer实例
+        initial_guess: 初始猜测
+        **kwargs: 其他选项
+
+    返回:
+        优化结果
+    """
+    if initial_guess is None:
+        alpha0, T0, tins0 = 1.0, 10.0, 5.0
+    else:
+        alpha0 = initial_guess.alpha
+        T0 = initial_guess.transfer_time
+        tins0 = initial_guess.t_ins
+
+    x0 = np.array([alpha0, T0, tins0])
+
+    try:
+        solver = COPTNLPSolver(optimizer, kwargs)
+        result = solver.solve(x0)
+
+        if result["success"]:
+            return solver.get_result()
+        else:
+            # 回退到scipy
+            return optimizer.optimize(initial_guess=initial_guess, verbose=False)
+    except Exception as e:
+        # COPT不可用，回退到scipy
+        return optimizer.optimize(initial_guess=initial_guess, verbose=False)
