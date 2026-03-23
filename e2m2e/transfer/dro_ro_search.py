@@ -156,7 +156,7 @@ def _process_departure_batch_worker(
     """Worker function for parallel batch departure point processing.
 
     Processes multiple departures in a single worker call to reduce overhead.
-    This is a module-level function to ensure pickling works on Windows (spawn mode).
+    Uses chunking for large alpha-beta grids to allow progress tracking.
 
     Args:
         batch_data: Dictionary containing:
@@ -191,7 +191,9 @@ def _process_departure_batch_worker(
     )
 
     all_results = []
-    for idx, dep_state, dep_time in departures:
+    total_deps = len(departures)
+    
+    for dep_idx, (idx, dep_state, dep_time) in enumerate(departures):
         results = searcher.search_single_departure(dep_state, dep_time, arrival_orbit)
         for r in results:
             r.departure_orbit_name = dep_name
@@ -710,27 +712,22 @@ class DROROTransferSearch:
         scipy的solve_ivp在C层计算时会释放GIL，仍能获得加速。
         """
         from concurrent.futures import ThreadPoolExecutor, as_completed
+        import threading
 
         total_departures = len(departure_states)
 
-        batch_size = max(1, total_departures // (n_workers * 4))
-
         if verbose:
-            print(f"  并行配置: {n_workers} workers, batch_size={batch_size}")
+            print(f"  并行配置: {n_workers} workers")
             print("  使用线程池 (ThreadPoolExecutor)")
 
         all_results = []
-        completed = 0
+        completed_count = 0
+        lock = threading.Lock()
 
-        batches = []
-        for i in range(0, total_departures, batch_size):
-            batch_end = min(i + batch_size, total_departures)
-            departures = [
-                (idx, departure_states[idx].copy(), float(departure_times[idx]))
-                for idx in range(i, batch_end)
-            ]
+        def process_single(idx: int, dep_state: np.ndarray, dep_time: float):
+            """处理单个出发点"""
             batch_data = {
-                "departures": departures,
+                "departures": [(idx, dep_state, float(dep_time))],
                 "arrival_states": arrival_orbit.states.tolist(),
                 "arrival_times": arrival_orbit.times.tolist(),
                 "arrival_period": arrival_orbit.period,
@@ -739,27 +736,33 @@ class DROROTransferSearch:
                 "dep_name": dep_name,
                 "arr_name": arr_name,
             }
-            batches.append(batch_data)
+            return _process_departure_batch_worker(batch_data)
 
         with ThreadPoolExecutor(max_workers=n_workers) as executor:
-            futures = {
-                executor.submit(_process_departure_batch_worker, batch): i
-                for i, batch in enumerate(batches)
-            }
+            future_to_idx = {}
+            for i in range(total_departures):
+                future = executor.submit(
+                    process_single,
+                    i,
+                    departure_states[i].copy(),
+                    float(departure_times[i])
+                )
+                future_to_idx[id(future)] = (i, future)
 
-            for future in as_completed(futures):
-                completed += 1
-                if verbose:
-                    pct = completed / len(batches) * 100
-                    print(f"  网格搜索进度: {completed}/{len(batches)}批次 ({pct:.1f}%)")
+            for future in as_completed(future_to_idx.values()):
+                idx, fut = future_to_idx[id(future)]
                 try:
-                    results = future.result()
-                    all_results.extend(results)
+                    results = fut.result(timeout=600)
+                    with lock:
+                        all_results.extend(results)
+                        completed_count += 1
+                        if verbose and completed_count % max(1, total_departures // 20) == 0:
+                            pct = completed_count / total_departures * 100
+                            print(f"  进度: {completed_count}/{total_departures}出发点 ({pct:.1f}%)")
                 except Exception as e:
                     if verbose:
-                        print(f"    批次 {futures[future]} 处理失败: {e}")
+                        print(f"    出发点 {idx} 处理失败: {e}")
                     import traceback
-
                     traceback.print_exc()
 
         return all_results
