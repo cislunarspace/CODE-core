@@ -10,7 +10,6 @@ from __future__ import annotations
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Tuple, List, Optional, Dict, Any
-from concurrent.futures import ProcessPoolExecutor, as_completed
 import warnings
 
 from ..core.orbit import Orbit
@@ -19,509 +18,820 @@ from ..core.system import CR3BP_System
 
 
 @dataclass
-class TransferSearchVariables:
-    """转移搜索变量
-    
-    用于网格搜索阶段的变量集合。
-    
-    属性:
-        departure_orbit: 出发点所在轨道
-        departure_time_index: 出发点时间索引 (0到n_departure-1)
-        alpha: 切向速度比 (0.5-2.5)
-        beta: 法向速度比 (-0.5-0.5), 平面转移固定为0
+class TransferSearchConfig:
+    """转移搜索配置
+
+    搜索参数配置类，包含搜索范围、网格密度、阈值等参数。
+    按照论文Table 3设置默认值。
     """
-    departure_orbit: Orbit
-    departure_time_index: int
-    alpha: float
-    beta: float = 0.0
-    
-    def __post_init__(self):
-        """验证变量范围"""
-        if not 0 <= self.departure_time_index:
-            raise ValueError(f"departure_time_index必须为非负整数，当前为{self.departure_time_index}")
-        if not 0.5 <= self.alpha <= 2.5:
-            warnings.warn(f"alpha={self.alpha}超出推荐范围[0.5, 2.5]")
-        if not -0.5 <= self.beta <= 0.5:
-            warnings.warn(f"beta={self.beta}超出推荐范围[-0.5, 0.5]")
-    
+
+    # α (切向速度比) 搜索范围
+    alpha_min: float = 0.5
+    alpha_max: float = 2.5
+    n_alpha: int = 101
+
+    # β (法向速度比) 搜索范围
+    beta_min: float = -0.5
+    beta_max: float = 0.5
+    n_beta: int = 21
+
+    # 出发点采样数量
+    n_departure: int = 200
+
+    # 最大转移时间 (CR3BP无量纲时间)
+    max_transfer_time: float = 15.0
+
+    # 检测阈值
+    intersection_threshold: float = 0.001  # 相交检测阈值
+    min_distance_threshold: float = 0.05  # 最小距离阈值
+
+    # 碰撞检测半径 (无量纲)
+    # 注意: CR3BP无量纲单位中，距离单位是Earth-Moon距离(≈384400km)
+    # 地球物理半径: 6371km → 无量纲值 ≈ 0.0166
+    # 月球物理半径: 1737km → 无量纲值 ≈ 0.0045
+    # 使用略大的值(0.02/0.005)作为安全边界
+    collision_earth_radius: float = 0.02  # Earth exclusion radius (~120km安全边界)
+    collision_moon_radius: float = 0.005  # Moon exclusion radius (~20km安全边界)
+
+    # 积分参数
+    # 注意: dt=0.001时15秒积分产生15000步，太慢
+    # 增大到0.01可减少到1500步，10倍加速
+    integration_dt: float = 0.01  # 积分时间步长
+
     @property
-    def departure_state(self) -> np.ndarray:
-        """获取出发点状态向量 [x, y, z, vx, vy, vz]"""
-        n_states = len(self.departure_orbit.times)
-        t_dep = (self.departure_time_index / n_states) * self.departure_orbit.period
-        return self.departure_orbit.interpolate_at_time(t_dep)
-    
+    def alpha_grid(self) -> np.ndarray:
+        """α网格点"""
+        return np.linspace(self.alpha_min, self.alpha_max, self.n_alpha)
+
     @property
-    def departure_time(self) -> float:
-        """获取出发点对应的时间"""
-        n_states = len(self.departure_orbit.times)
-        return (self.departure_time_index / n_states) * self.departure_orbit.period
-    
-    @property
-    def velocity_ratios(self) -> Tuple[float, float]:
-        """获取速度比例(α, β)"""
-        return (self.alpha, self.beta)
+    def beta_grid(self) -> np.ndarray:
+        """β网格点"""
+        return np.linspace(self.beta_min, self.beta_max, self.n_beta)
 
 
 @dataclass
 class TransferSearchResult:
     """转移搜索结果
-    
-    存储单次搜索尝试的结果。
-    
-    属性:
-        search_vars: 搜索变量
-        transfer_trajectory: 转移轨迹状态序列 [n_steps, 6]
-        transfer_times: 转移轨迹时间序列 [n_steps]
-        transfer_time: 总转移时间
-        min_distance: 与目标轨道的最小距离
-        intersection_found: 是否找到相交
-        intersection_point: 相交点状态(如果有)
-        intersection_idx: 相交点索引
+
+    存储单次搜索尝试的完整结果。
     """
-    search_vars: TransferSearchVariables
-    transfer_trajectory: Optional[np.ndarray] = None
-    transfer_times: Optional[np.ndarray] = None
+
+    # 搜索变量标识
+    departure_orbit_name: str = ""
+    arrival_orbit_name: str = ""
+    departure_time_index: int = 0
+    alpha: float = 0.0
+    beta: float = 0.0
+
+    # 出发点状态
+    departure_state: Optional[np.ndarray] = None  # [x, y, z, vx, vy, vz]
+    departure_time: float = 0.0  # CR3BP时间
+
+    # 转移轨迹
+    transfer_trajectory: Optional[np.ndarray] = None  # [n_steps, 6]
+    transfer_times: Optional[np.ndarray] = None  # [n_steps]
     transfer_time: float = 0.0
-    min_distance: float = np.inf
+
+    # 与目标轨道相交信息
     intersection_found: bool = False
     intersection_point: Optional[np.ndarray] = None
     intersection_idx: int = -1
-    status: str = "pending"  # pending, success, failed, no_solution
-    
+
+    # 距离信息
+    min_distance: float = np.inf
+    min_distance_idx: int = -1
+
+    # 局部最小检测
+    local_minimum_found: bool = False
+    local_minimum_distance: float = np.inf
+    local_minimum_idx: int = -1
+
+    # 碰撞信息
+    collision_found: bool = False
+    collision_body: Optional[str] = None  # 'earth' or 'moon'
+    collision_idx: int = -1
+
+    # 状态
+    status: str = "pending"  # pending, success, no_intersection, collision, integration_failed
+
     @property
     def is_feasible(self) -> bool:
         """判断是否为可行候选解"""
-        return self.intersection_found or self.min_distance < 0.05
+        has_approach = (
+            self.intersection_found or self.min_distance < 0.05 or self.local_minimum_found
+        )
+        no_collision = not self.collision_found
+        return has_approach and no_collision
+
+    @property
+    def dv_departure(self) -> float:
+        """计算departure impulse (如果已知transfer trajectory)"""
+        if self.departure_state is None or self.transfer_trajectory is None:
+            return 0.0
+        dv = self.transfer_trajectory[0, 3:] - self.departure_state[3:]
+        return np.linalg.norm(dv)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            "departure_orbit_name": self.departure_orbit_name,
+            "arrival_orbit_name": self.arrival_orbit_name,
+            "departure_time_index": self.departure_time_index,
+            "alpha": self.alpha,
+            "beta": self.beta,
+            "departure_time": self.departure_time,
+            "transfer_time": self.transfer_time,
+            "intersection_found": self.intersection_found,
+            "min_distance": self.min_distance,
+            "local_minimum_found": self.local_minimum_found,
+            "collision_found": self.collision_found,
+            "status": self.status,
+            "is_feasible": self.is_feasible,
+        }
+
+
+def _process_departure_worker(
+    idx: int,
+    dep_state: np.ndarray,
+    dep_time: float,
+    arrival_states: np.ndarray,
+    arrival_times: np.ndarray,
+    arrival_period: float,
+    mu: float,
+    config: TransferSearchConfig,
+    dep_name: str,
+    arr_name: str,
+) -> List[TransferSearchResult]:
+    """Worker function for parallel departure point processing.
+
+    This is a module-level function to ensure pickling works on Windows (spawn mode).
+    """
+    arrival_orbit = Orbit(states=arrival_states, times=arrival_times)
+    arrival_orbit.period = arrival_period
+
+    searcher = DROROTransferSearch(
+        system=CR3BP_System(mu=mu, primary="earth", secondary="moon"),
+        dynamics=CR3BP_Dynamics(system=CR3BP_System(mu=mu, primary="earth", secondary="moon")),
+        config=config,
+    )
+    results = searcher.search_single_departure(dep_state, dep_time, arrival_orbit)
+    for r in results:
+        r.departure_orbit_name = dep_name
+        r.arrival_orbit_name = arr_name
+        r.departure_time_index = idx
+    return results
 
 
 class DROROTransferSearch:
     """DRO到RO转移轨道搜索算法
-    
+
     实现论文Section III.A的搜索阶段算法:
     1. 从出发点轨道等时间间隔采样
     2. 对每个出发点，网格化搜索α, β
     3. 前向积分获取转移轨迹
     4. 筛选与目标轨道相交或距离局部最小的候选解
-    
+
     属性:
         system: CR3BP系统对象
         dynamics: CR3BP动力学对象
-        max_transfer_time: 最大转移时间(无量纲)
-        intersection_threshold: 相交检测阈值
-        min_distance_threshold: 最小距离阈值
+        config: 搜索配置
     """
-    
-    # 搜索参数默认值
-    DEFAULT_ALPHA_RANGE = (0.5, 2.5)
-    DEFAULT_BETA_RANGE = (-0.5, 0.5)
-    DEFAULT_N_ALPHA = 101  # 切向速度比网格数
-    DEFAULT_N_BETA = 21   # 法向速度比网格数
-    DEFAULT_N_DEPARTURE = 200  # 出发点采样数
-    DEFAULT_MAX_TRANSFER_TIME = 15.0  # 最大转移时间(无量纲CR3BP时间)
-    
+
     def __init__(
         self,
         system: CR3BP_System,
         dynamics: CR3BP_Dynamics,
-        max_transfer_time: float = DEFAULT_MAX_TRANSFER_TIME,
-        intersection_threshold: float = 0.001,
-        min_distance_threshold: float = 0.05,
+        config: Optional[TransferSearchConfig] = None,
     ):
         """初始化搜索算法
-        
+
         参数:
             system: CR3BP系统对象
             dynamics: CR3BP动力学对象
-            max_transfer_time: 最大转移时间(无量纲)
-            intersection_threshold: 相交检测阈值
-            min_distance_threshold: 最小距离阈值
+            config: 搜索配置 (默认使用论文Table 3)
         """
         self.system = system
         self.dynamics = dynamics
         self.mu = system.mu
-        
-        # 搜索参数
-        self.max_transfer_time = max_transfer_time
-        self.intersection_threshold = intersection_threshold
-        self.min_distance_threshold = min_distance_threshold
-        
-        # 缓存
-        self._departure_cache: Dict[int, np.ndarray] = {}
-        self._velocity_cache: Dict[Tuple, np.ndarray] = {}
-    
-    def sample_departure_points(
-        self,
-        orbit: Orbit,
-        n_points: int = DEFAULT_N_DEPARTURE
-    ) -> List[np.ndarray]:
-        """从轨道中等时间间隔采样出发点
-        
+        self.config = config or TransferSearchConfig()
+
+    def sample_departure_points(self, departure_orbit: Orbit) -> Tuple[np.ndarray, np.ndarray]:
+        """从轨道等时间间隔采样出发点
+
         参数:
-            orbit: 采样轨道
-            n_points: 采样点数量
-        
+            departure_orbit: 出发点轨道 (DRO)
+
         返回:
-            状态向量列表 [n_points, 6]
+            departure_states: 出发点状态序列 [n_departure, 6]
+            departure_times: 出发点时间序列 [n_departure]
         """
-        if orbit.period is None:
-            raise ValueError("轨道必须具有周期属性")
-        
-        states = []
-        times = np.linspace(0, orbit.period, n_points, endpoint=False)
-        
-        for t in times:
-            state = orbit.interpolate_at_time(t)
-            states.append(state)
-        
-        return states
-    
+        n = self.config.n_departure
+        times = np.linspace(0, departure_orbit.period, n, endpoint=False)
+
+        # 使用Orbit的插值方法获取各时间点的状态
+        states = np.array([departure_orbit.interpolate_at_time(t) for t in times])
+
+        return states, times
+
     def compute_departure_velocity(
-        self,
-        state: np.ndarray,
-        alpha: float,
-        beta: float = 0.0
+        self, orbit_state: np.ndarray, alpha: float, beta: float = 0.0
     ) -> np.ndarray:
-        """根据α, β计算出发速度
-        
-        速度计算公式(基于论文Eq.11-12):
-        v_injection = alpha * v_tangential + beta * v_normal
-        
+        """计算出发点速度扰动
+
+        论文中的定义为:
+        - α: 切向速度比 (tangential velocity ratio)
+        - β: 法向速度比 (normal velocity ratio)
+
+        速度扰动在轨道的切向和法向方向进行。
+
         参数:
-            state: 出发点状态 [x, y, z, vx, vy, vz]
+            orbit_state: 轨道状态 [x, y, z, vx, vy, vz]
             alpha: 切向速度比
-            beta: 法向速度比(平面转移为0)
-        
+            beta: 法向速度比 (平面转移时为0)
+
         返回:
-            注入速度向量 [vx, vy, vz]
+            扰动后的速度向量 [vx, vy, vz]
         """
-        pos = state[:3]
-        vel = state[3:]
-        
-        # 轨道面法向(CR3BP中为z轴)
-        normal = np.array([0.0, 0.0, 1.0])
-        
-        # 速度大小
-        v_mag = np.linalg.norm(vel)
-        if v_mag < 1e-10:
-            warnings.warn("出发点速度接近零")
-            return vel
-        
-        # 切向单位向量(沿速度方向)
-        tangential = vel / v_mag
-        
-        # 法向单位向量(垂直于速度和法向组成的平面)
-        normal_dir = np.cross(tangential, normal)
-        norm_nd = np.linalg.norm(normal_dir)
-        if norm_nd < 1e-10:
-            # 速度平行于z轴，使用x轴作为备份
-            normal_dir = np.array([1.0, 0.0, 0.0])
-        else:
-            normal_dir = normal_dir / norm_nd
-        
-        # 注入速度 = alpha * 切向分量 + beta * 法向分量
-        v_injection = alpha * v_mag * tangential + beta * v_mag * normal_dir
-        
-        return v_injection
-    
+        pos = orbit_state[:3]
+        vel = orbit_state[3:]
+
+        # 计算轨道面内的位置平面投影
+        r_xy = np.sqrt(pos[0] ** 2 + pos[1] ** 2)
+        if r_xy < 1e-10:
+            # 靠近原点，使用原始速度
+            warnings.warn("位置靠近原点，使用原始速度")
+            return vel.copy()
+
+        # 计算切向方向 (垂直于位置矢量的轨道面内方向)
+        # 对于xy平面内的轨道，切向方向为 [-y, x, 0] / r
+        tangential = np.array([-pos[1], pos[0], 0.0]) / r_xy
+
+        # 计算径向方向 (位置矢量方向)
+        radial = pos / np.linalg.norm(pos)
+
+        # 计算法向方向 (轨道面法向，out of plane)
+        # 使用叉乘: normal = radial × tangential
+        normal = np.cross(radial, tangential)
+
+        # 分解速度到切向和法向分量
+        v_radial_comp = np.dot(vel, radial)
+        v_tangential_comp = np.dot(vel, tangential)
+        v_normal_comp = np.dot(vel, normal)
+
+        # 构造新的速度向量
+        # α控制切向速度的缩放
+        # β控制法向速度的缩放
+        new_vel = (
+            v_radial_comp * radial  # 保持径向分量
+            + alpha * v_tangential_comp * tangential  # 切向缩放α倍
+            + beta * v_normal_comp * normal  # 法向缩放β倍
+        )
+
+        return new_vel
+
     def forward_integrate(
         self,
         initial_state: np.ndarray,
-        t_span: Tuple[float, float],
-        t_eval: Optional[np.ndarray] = None
+        transfer_time: float,
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """前向积分转移弧
-        
+        """前向积分转移轨迹
+
         参数:
             initial_state: 初始状态 [x, y, z, vx, vy, vz]
-            t_span: 积分时间范围 (t0, tf)
-            t_eval: 评估时间点
-        
+            transfer_time: 转移时间 (CR3BP无量纲时间)
+
         返回:
-            (times, states): 时间序列和状态序列
+            states: 轨迹状态序列 [n_steps, 6]
+            times: 轨迹时间序列 [n_steps]
         """
-        if t_eval is None:
-            # 自动生成评估点
-            n_steps = int((t_span[1] - t_span[0]) / 0.01) + 1
-            t_eval = np.linspace(t_span[0], t_span[1], n_steps)
-        
-        # 扩展初始状态(如果需要STM)
+        # 创建时间评估点
+        n_steps = max(int(transfer_time / self.config.integration_dt) + 1, 100)
+        t_eval = np.linspace(0, transfer_time, n_steps)
+
+        # 使用dynamics.propagate进行积分
         result = self.dynamics.propagate(
             initial_state=initial_state,
-            t_span=t_span,
+            t_span=[0, transfer_time],
             t_eval=t_eval,
-            with_stm=False
+            with_stm=False,
         )
-        
-        times = result.times
-        states = result.states
-        
-        return times, states
-    
-    def compute_min_distance_to_orbit(
-        self,
-        trajectory_states: np.ndarray,
-        target_orbit: Orbit
+
+        states = result["states"]
+        times = result["time"]
+
+        return states, times
+
+    def compute_min_distance(
+        self, trajectory_states: np.ndarray, arrival_orbit: Orbit
     ) -> Tuple[float, int]:
-        """计算轨迹与目标轨道的最小距离
-        
+        """计算轨迹到目标轨道的最小距离 (向量化实现)
+
+        使用广播计算，效率远高于嵌套循环。
+
         参数:
             trajectory_states: 转移轨迹状态 [n_steps, 6]
-            target_orbit: 目标轨道
-        
+            arrival_orbit: 目标轨道
+
         返回:
-            (min_distance, min_idx): 最小距离和对应的轨迹索引
+            min_distance: 最小距离
+            min_idx: 最小距离对应的轨迹索引
         """
-        min_dist = np.inf
-        min_idx = -1
-        
-        target_states = target_orbit.states
-        
-        for i, traj_state in enumerate(trajectory_states):
-            pos_traj = traj_state[:3]
-            for orb_state in target_states:
-                pos_orb = orb_state[:3]
-                dist = np.linalg.norm(pos_traj - pos_orb)
-                if dist < min_dist:
-                    min_dist = dist
-                    min_idx = i
-        
-        return min_dist, min_idx
-    
-    def find_intersection(
+        # 提取轨迹位置: shape (n_steps, 3)
+        traj_positions = trajectory_states[:, :3]
+
+        # 提取目标轨道位置: shape (n_orbit, 3)
+        orbit_positions = arrival_orbit.states[:, :3]
+
+        # 使用广播计算所有距离对: shape (n_steps, n_orbit)
+        # diff[i,j,k] = traj_pos[i,k] - orbit_pos[j,k]
+        diff = traj_positions[:, np.newaxis, :] - orbit_positions[np.newaxis, :, :]
+
+        # 计算欧氏距离: shape (n_steps, n_orbit)
+        distances = np.sqrt(np.sum(diff**2, axis=2))
+
+        # 找到全局最小值
+        flat_distances = distances.flatten()
+        min_flat_idx = np.argmin(flat_distances)
+        min_distance = flat_distances[min_flat_idx]
+
+        # 转换为(step_idx, orbit_idx)
+        n_orbit = len(orbit_positions)
+        step_idx = min_flat_idx // n_orbit
+        orbit_idx = min_flat_idx % n_orbit
+
+        return min_distance, step_idx
+
+    def detect_intersection(
         self,
         trajectory_states: np.ndarray,
-        target_orbit: Orbit
-    ) -> Tuple[bool, np.ndarray, int]:
-        """检测转移轨迹与目标轨道是否相交
-        
+        arrival_orbit: Orbit,
+    ) -> Tuple[bool, Optional[np.ndarray], int]:
+        """检测轨迹是否与目标轨道相交
+
         参数:
             trajectory_states: 转移轨迹状态 [n_steps, 6]
-            target_orbit: 目标轨道
-        
+            arrival_orbit: 目标轨道
+
         返回:
-            (found, intersection_state, idx): 是否找到相交、相交点状态、轨迹索引
+            intersection_found: 是否找到相交
+            intersection_point: 相交点状态 (如果找到)
+            intersection_idx: 相交点在轨迹中的索引
         """
-        target_states = target_orbit.states
-        
-        for i, traj_state in enumerate(trajectory_states):
-            pos_traj = traj_state[:3]
-            for j, orb_state in enumerate(target_states):
-                pos_orb = orb_state[:3]
-                dist = np.linalg.norm(pos_traj - pos_orb)
-                if dist < self.intersection_threshold:
-                    return True, traj_state, i
-        
-        return False, np.zeros(6), -1
-    
+        min_dist, step_idx = self.compute_min_distance(trajectory_states, arrival_orbit)
+
+        if min_dist < self.config.intersection_threshold:
+            return True, trajectory_states[step_idx], step_idx
+
+        return False, None, -1
+
+    def detect_local_minimum(
+        self,
+        trajectory_states: np.ndarray,
+        arrival_orbit: Orbit,
+    ) -> Tuple[bool, float, int]:
+        """检测轨迹到目标轨道的距离是否出现局部最小
+
+        使用有限差分检测: d'dt = 0, d²/dt² > 0
+
+        参数:
+            trajectory_states: 转移轨迹状态 [n_steps, 6]
+            arrival_orbit: 目标轨道
+
+        返回:
+            local_min_found: 是否找到局部最小
+            local_min_distance: 局部最小距离
+            local_min_idx: 局部最小点对应的轨迹索引
+        """
+        # 计算轨迹上每个点到目标轨道的距离
+        traj_positions = trajectory_states[:, :3]
+        orbit_positions = arrival_orbit.states[:, :3]
+
+        # 向量化距离计算
+        diff = traj_positions[:, np.newaxis, :] - orbit_positions[np.newaxis, :, :]
+        distances = np.sqrt(np.sum(diff**2, axis=2))
+        min_distances = np.min(distances, axis=1)  # shape: (n_steps,)
+
+        # 检测局部最小: 前一点和后一点都比当前点距离大
+        local_mins = []
+        for i in range(1, len(min_distances) - 1):
+            # 局部最小条件:
+            # dist[i+1] > dist[i] AND dist[i-1] > dist[i]
+            if min_distances[i + 1] > min_distances[i] and min_distances[i - 1] > min_distances[i]:
+                local_mins.append((i, min_distances[i]))
+
+        if local_mins:
+            # 返回距离最小的局部最小
+            best = min(local_mins, key=lambda x: x[1])
+            return True, best[1], best[0]
+
+        return False, np.inf, -1
+
+    def check_collision(
+        self,
+        trajectory_states: np.ndarray,
+    ) -> Tuple[bool, Optional[str], int]:
+        """检测轨迹是否与地球或月球碰撞
+
+        参数:
+            trajectory_states: 转移轨迹状态 [n_steps, 6]
+
+        返回:
+            collision_found: 是否发生碰撞
+            collision_body: 碰撞天体 ('earth' 或 'moon')
+            collision_idx: 碰撞点索引
+        """
+        positions = trajectory_states[:, :3]
+
+        # 地球中心位置 (CR3BP无量纲)
+        earth_center = np.array([-self.mu, 0.0, 0.0])
+
+        # 月球中心位置 (CR3BP无量纲)
+        moon_center = np.array([1.0 - self.mu, 0.0, 0.0])
+
+        # 计算到各天体中心的距离
+        dist_earth = np.linalg.norm(positions - earth_center, axis=1)
+        dist_moon = np.linalg.norm(positions - moon_center, axis=1)
+
+        # 检测碰撞 (距离小于阈值)
+        earth_collision_idx = np.where(dist_earth < self.config.collision_earth_radius)[0]
+        moon_collision_idx = np.where(dist_moon < self.config.collision_moon_radius)[0]
+
+        if len(earth_collision_idx) > 0:
+            return True, "earth", int(earth_collision_idx[0])
+        if len(moon_collision_idx) > 0:
+            return True, "moon", int(moon_collision_idx[0])
+
+        return False, None, -1
+
     def search_single_departure(
         self,
         departure_state: np.ndarray,
+        departure_time: float,
         arrival_orbit: Orbit,
-        alpha_range: Tuple[float, float] = DEFAULT_ALPHA_RANGE,
-        beta_range: Tuple[float, float] = DEFAULT_BETA_RANGE,
-        n_alpha: int = DEFAULT_N_ALPHA,
-        n_beta: int = DEFAULT_N_BETA
     ) -> List[TransferSearchResult]:
-        """对单个出发点进行网格搜索
-        
+        """对单个出发点搜索α,β网格
+
         参数:
-            departure_state: 出发点状态
-            arrival_orbit: 目标轨道
-            alpha_range: α搜索范围
-            beta_range: β搜索范围
-            n_alpha: α方向网格数
-            n_beta: β方向网格数
-        
+            departure_state: 出发点状态 [x, y, z, vx, vy, vz]
+            departure_time: 出发点对应的时间
+            arrival_orbit: 目标轨道 (RO)
+
         返回:
-            可行候选解列表
+            results: 搜索结果列表
         """
         results = []
-        
-        # 生成网格
-        alphas = np.linspace(alpha_range[0], alpha_range[1], n_alpha)
-        betas = np.linspace(beta_range[0], beta_range[1], n_beta)
-        
-        for alpha in alphas:
-            for beta in betas:
-                # 计算出发速度
-                v_injection = self.compute_departure_velocity(departure_state, alpha, beta)
-                
-                # 构建完整状态
-                full_state = np.concatenate([departure_state[:3], v_injection])
-                
+
+        # 构建初始状态 (位置用出发点，速度用扰动后速度)
+        # 注意: 这里v_dep_new已经是扰动后的速度
+        # 转移轨道的初始速度 = departure velocity + Δv
+
+        # 遍历α,β网格
+        for alpha in self.config.alpha_grid:
+            for beta in self.config.beta_grid:
+                # 计算扰动后的速度
+                new_vel = self.compute_departure_velocity(departure_state, alpha, beta)
+
+                # 构建转移轨道初始状态
+                initial_state = np.concatenate(
+                    [
+                        departure_state[:3],  # 位置
+                        new_vel,  # 速度
+                    ]
+                )
+
                 # 前向积分
                 try:
-                    times, states = self.forward_integrate(
-                        initial_state=full_state,
-                        t_span=(0.0, self.max_transfer_time)
+                    traj_states, traj_times = self.forward_integrate(
+                        initial_state,
+                        self.config.max_transfer_time,
                     )
-                    
-                    # 检测相交
-                    intersection_found, int_state, int_idx = self.find_intersection(
-                        states, arrival_orbit
-                    )
-                    
-                    # 计算最小距离
-                    min_dist, min_idx = self.compute_min_distance_to_orbit(
-                        states, arrival_orbit
-                    )
-                    
-                    # 创建搜索变量
-                    search_vars = TransferSearchVariables(
-                        departure_orbit=arrival_orbit,  # 临时借用，实际需要传入真实orbit
-                        departure_time_index=0,  # 临时值
-                        alpha=alpha,
-                        beta=beta
-                    )
-                    
-                    # 创建结果
-                    result = TransferSearchResult(
-                        search_vars=search_vars,
-                        transfer_trajectory=states,
-                        transfer_times=times,
-                        transfer_time=times[-1] if len(times) > 0 else 0.0,
-                        min_distance=min_dist,
-                        intersection_found=intersection_found,
-                        intersection_point=int_state if intersection_found else None,
-                        intersection_idx=int_idx if intersection_found else -1,
-                        status="success" if (intersection_found or min_dist < self.min_distance_threshold) else "no_solution"
-                    )
-                    
-                    results.append(result)
-                    
                 except Exception as e:
                     # 积分失败，跳过
+                    result = TransferSearchResult(
+                        status="integration_failed",
+                        departure_state=departure_state,
+                        departure_time=departure_time,
+                        alpha=alpha,
+                        beta=beta,
+                    )
+                    results.append(result)
                     continue
-        
+
+                # 检查碰撞
+                collision, body, col_idx = self.check_collision(traj_states)
+
+                # 计算到目标轨道的最小距离
+                min_dist, min_idx = self.compute_min_distance(traj_states, arrival_orbit)
+
+                # 检测相交
+                intersection, int_point, int_idx = self.detect_intersection(
+                    traj_states, arrival_orbit
+                )
+
+                # 检测局部最小
+                local_min, local_min_dist, local_min_idx = self.detect_local_minimum(
+                    traj_states, arrival_orbit
+                )
+
+                # 构建结果
+                result = TransferSearchResult(
+                    departure_state=departure_state,
+                    departure_time=departure_time,
+                    alpha=alpha,
+                    beta=beta,
+                    transfer_trajectory=traj_states,
+                    transfer_times=traj_times,
+                    transfer_time=traj_times[-1],
+                    intersection_found=intersection,
+                    intersection_point=int_point,
+                    intersection_idx=int_idx,
+                    min_distance=min_dist,
+                    min_distance_idx=min_idx,
+                    local_minimum_found=local_min,
+                    local_minimum_distance=local_min_dist,
+                    local_minimum_idx=local_min_idx,
+                    collision_found=collision,
+                    collision_body=body,
+                    collision_idx=col_idx,
+                )
+
+                # 设置状态
+                if collision:
+                    result.status = "collision"
+                elif intersection:
+                    result.status = "success"
+                elif min_dist < self.config.min_distance_threshold:
+                    result.status = "success"  # 足够接近也算成功
+                else:
+                    result.status = "no_intersection"
+
+                results.append(result)
+
         return results
-    
+
     def grid_search(
         self,
         departure_orbit: Orbit,
         arrival_orbit: Orbit,
-        alpha_range: Tuple[float, float] = DEFAULT_ALPHA_RANGE,
-        beta_range: Tuple[float, float] = DEFAULT_BETA_RANGE,
-        n_alpha: int = DEFAULT_N_ALPHA,
-        n_beta: int = DEFAULT_N_BETA,
-        n_departure: int = DEFAULT_N_DEPARTURE,
-        parallel: bool = True,
-        n_workers: int = 4
+        verbose: bool = True,
+        n_workers: Optional[int] = None,
     ) -> List[TransferSearchResult]:
-        """网格搜索DRO到RO的所有可能转移
-        
+        """网格搜索主函数
+
+        在出发点轨道上采样，在α,β网格上搜索，
+        寻找与目标轨道相交或距离局部最小的转移轨道。
+
         参数:
-            departure_orbit: 出发点轨道
-            arrival_orbit: 目标轨道
-            alpha_range: α搜索范围
-            beta_range: β搜索范围
-            n_alpha: α方向网格数
-            n_beta: β方向网格数
-            n_departure: 出发点采样数
-            parallel: 是否并行搜索
-            n_workers: 并行worker数
-        
+            departure_orbit: 出发点轨道 (DRO)
+            arrival_orbit: 目标轨道 (RO)
+            verbose: 是否输出进度信息
+            n_workers: 并行worker数量 (默认: CPU核心数)
+
         返回:
-            可行候选解列表
+            results: 所有搜索结果列表
         """
-        print(f"\n开始网格搜索:")
-        print(f"  出发点采样数: {n_departure}")
-        print(f"  α范围: [{alpha_range[0]}, {alpha_range[1]}], 网格数: {n_alpha}")
-        print(f"  β范围: [{beta_range[0]}, {beta_range[1]}], 网格数: {n_beta}")
-        print(f"  总搜索点数: {n_departure * n_alpha * n_beta}")
-        
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        import multiprocessing
+
+        # 获取轨道名称 (如果可用)
+        dep_name = getattr(departure_orbit, "name", "unknown")
+        arr_name = getattr(arrival_orbit, "name", "unknown")
+
         # 采样出发点
-        departure_states = self.sample_departure_points(departure_orbit, n_departure)
-        
-        all_results = []
-        total_combinations = len(departure_states) * n_alpha * n_beta
-        processed = 0
-        
-        if parallel:
-            # 并行搜索
-            with ProcessPoolExecutor(max_workers=n_workers) as executor:
-                futures = []
-                for dep_state in departure_states:
-                    future = executor.submit(
-                        self.search_single_departure,
-                        dep_state,
-                        arrival_orbit,
-                        alpha_range,
-                        beta_range,
-                        n_alpha,
-                        n_beta
-                    )
-                    futures.append(future)
-                
-                for future in as_completed(futures):
-                    try:
-                        results = future.result()
-                        all_results.extend(results)
-                        processed += 1
-                        if processed % 20 == 0:
-                            print(f"  进度: {processed}/{len(departure_states)} ({100*processed/len(departure_states):.1f}%)")
-                    except Exception as e:
-                        print(f"  搜索失败: {e}")
+        if verbose:
+            print(f"采样出发点: n_departure={self.config.n_departure}")
+
+        departure_states, departure_times = self.sample_departure_points(departure_orbit)
+
+        total_departures = len(departure_states)
+        total_grid_points = total_departures * self.config.n_alpha * self.config.n_beta
+
+        if verbose:
+            print(f"\n{'=' * 60}")
+            print(f"开始网格搜索")
+            print(f"  出发点数量: {total_departures}")
+            print(
+                f"  α网格: {self.config.n_alpha}点 [{self.config.alpha_min}, {self.config.alpha_max}]"
+            )
+            print(
+                f"  β网格: {self.config.n_beta}点 [{self.config.beta_min}, {self.config.beta_max}]"
+            )
+            print(f"  总候选解数量: {total_grid_points}")
+            if n_workers is None:
+                n_workers = multiprocessing.cpu_count()
+            print(f"  并行worker数量: {n_workers}")
+            print(f"{'=' * 60}\n")
+
+        if n_workers == 1:
+            all_results = self._grid_search_sequential(
+                departure_orbit, arrival_orbit, dep_name, arr_name, verbose
+            )
         else:
-            # 串行搜索
-            for i, dep_state in enumerate(departure_states):
-                results = self.search_single_departure(
-                    dep_state,
-                    arrival_orbit,
-                    alpha_range,
-                    beta_range,
-                    n_alpha,
-                    n_beta
-                )
-                all_results.extend(results)
-                processed += 1
-                if processed % 20 == 0:
-                    print(f"  进度: {processed}/{len(departure_states)} ({100*processed/len(departure_states):.1f}%)")
-        
-        # 筛选可行解
-        feasible_results = [r for r in all_results if r.is_feasible]
-        
-        print(f"\n搜索完成:")
-        print(f"  总搜索点数: {total_combinations}")
-        print(f"  可行候选解: {len(feasible_results)}")
-        
-        return feasible_results
-    
-    def filter_candidates_by_local_minimum(
+            all_results = self._grid_search_parallel(
+                departure_states,
+                departure_times,
+                arrival_orbit,
+                dep_name,
+                arr_name,
+                verbose,
+                n_workers,
+            )
+
+        if verbose:
+            # 统计结果
+            feasible = [r for r in all_results if r.is_feasible]
+            print(f"\n{'=' * 60}")
+            print(f"网格搜索完成")
+            print(f"  总候选解: {len(all_results)}")
+            print(f"  可行解: {len(feasible)}")
+            print(f"{'=' * 60}")
+
+        return all_results
+
+    def _grid_search_sequential(
         self,
-        results: List[TransferSearchResult]
+        departure_orbit: Orbit,
+        arrival_orbit: Orbit,
+        dep_name: str,
+        arr_name: str,
+        verbose: bool,
     ) -> List[TransferSearchResult]:
-        """筛选距离局部最小的候选解
-        
+        """串行网格搜索"""
+        departure_states, departure_times = self.sample_departure_points(departure_orbit)
+        all_results = []
+        total_departures = len(departure_states)
+
+        for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times)):
+            if verbose:
+                pct = (i + 1) / total_departures * 100
+                print(f"  网格搜索进度: {i + 1}/{total_departures}出发点 ({pct:.1f}%)")
+            results = self.search_single_departure(dep_state, dep_time, arrival_orbit)
+            for r in results:
+                r.departure_orbit_name = dep_name
+                r.arrival_orbit_name = arr_name
+                r.departure_time_index = i
+            all_results.extend(results)
+
+        return all_results
+
+    def _grid_search_parallel(
+        self,
+        departure_states: np.ndarray,
+        departure_times: np.ndarray,
+        arrival_orbit: Orbit,
+        dep_name: str,
+        arr_name: str,
+        verbose: bool,
+        n_workers: int,
+    ) -> List[TransferSearchResult]:
+        """并行网格搜索 (按出发点并行) - 使用线程池
+
+        注意: Windows下ProcessPoolExecutor使用spawn模式有兼容问题，
+        因此使用ThreadPoolExecutor。虽然受GIL限制，但scipy的solve_ivp
+        在C层计算时会释放GIL，仍能获得加速。
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        total_departures = len(departure_states)
+
+        all_results = []
+        completed = 0
+
+        with ThreadPoolExecutor(max_workers=n_workers) as executor:
+            futures = {
+                executor.submit(
+                    self.search_single_departure,
+                    dep_state,
+                    dep_time,
+                    arrival_orbit,
+                ): i
+                for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times))
+            }
+
+            for future in as_completed(futures):
+                completed += 1
+                if verbose:
+                    pct = completed / total_departures * 100
+                    print(f"  网格搜索进度: {completed}/{total_departures}出发点 ({pct:.1f}%)")
+                try:
+                    results = future.result()
+                    for r in results:
+                        r.departure_orbit_name = dep_name
+                        r.arrival_orbit_name = arr_name
+                        r.departure_time_index = futures[future]
+                    all_results.extend(results)
+                except Exception as e:
+                    if verbose:
+                        print(f"    出发点 {futures[future]} 处理失败: {e}")
+
+        return all_results
+
+    def filter_local_minima(
+        self,
+        results: List[TransferSearchResult],
+    ) -> List[TransferSearchResult]:
+        """从结果中筛选满足局部最小条件的候选解
+
+        按α值分组，在每组内检测局部最小。
+
         参数:
-            results: 搜索结果列表
-        
+            results: 所有搜索结果
+
         返回:
-            满足局部最小条件的候选解
+            filtered: 筛选后的候选解列表
         """
         # 按alpha值分组
         alpha_groups: Dict[float, List[TransferSearchResult]] = {}
         for r in results:
-            alpha = round(r.search_vars.alpha, 2)  # 离散化
+            alpha = round(r.alpha, 2)  # 离散化
             if alpha not in alpha_groups:
                 alpha_groups[alpha] = []
             alpha_groups[alpha].append(r)
-        
+
         filtered = []
-        
+
         for alpha, group in alpha_groups.items():
             # 按转移时间排序
             group.sort(key=lambda x: x.transfer_time)
-            
-            # 检查相邻点的距离梯度
+
+            # 检测相邻点的距离梯度
             for i in range(1, len(group) - 1):
-                prev_dist = group[i-1].min_distance
+                prev_dist = group[i - 1].min_distance
                 curr_dist = group[i].min_distance
-                next_dist = group[i+1].min_distance
-                
+                next_dist = group[i + 1].min_distance
+
                 # 局部最小: 前一个和后一个都比当前大
                 if curr_dist < prev_dist and curr_dist < next_dist:
-                    if curr_dist < self.min_distance_threshold:
+                    if curr_dist < self.config.min_distance_threshold:
                         filtered.append(group[i])
-        
+
         return filtered
+
+
+def load_orbit_from_json(filepath: str) -> Orbit:
+    """从JSON文件加载轨道数据
+
+    参数:
+        filepath: JSON文件路径
+
+    返回:
+        Orbit对象
+    """
+    import json
+
+    with open(filepath, "r") as f:
+        data = json.load(f)
+
+    # 提取状态和时间
+    states = np.array(data["states"])
+    times = np.array(data["times"])
+
+    # 创建Orbit对象
+    orbit = Orbit(states=states, times=times)
+
+    # 设置元数据
+    if "orbit_type" in data:
+        orbit.metadata["orbit_type"] = data["orbit_type"]
+    if "period_ratio" in data:
+        orbit.metadata["period_ratio"] = data["period_ratio"]
+
+    return orbit
+
+
+def save_search_results(
+    results: List[TransferSearchResult],
+    filepath: str,
+) -> None:
+    """保存搜索结果到JSON文件
+
+    参数:
+        results: 搜索结果列表
+        filepath: 输出文件路径
+    """
+    import json
+
+    # 转换为可序列化的字典
+    output = []
+    for r in results:
+        result_dict = {
+            "departure_orbit_name": r.departure_orbit_name,
+            "arrival_orbit_name": r.arrival_orbit_name,
+            "departure_time_index": r.departure_time_index,
+            "departure_time": float(r.departure_time),
+            "alpha": float(r.alpha),
+            "beta": float(r.beta),
+            "transfer_time": float(r.transfer_time),
+            "intersection_found": r.intersection_found,
+            "min_distance": float(r.min_distance),
+            "local_minimum_found": r.local_minimum_found,
+            "collision_found": r.collision_found,
+            "status": r.status,
+            "is_feasible": r.is_feasible,
+        }
+
+        # 如果有转移轨迹数据，不保存完整轨迹(太大)
+        # 只保存元数据
+        output.append(result_dict)
+
+    with open(filepath, "w") as f:
+        json.dump(output, f, indent=2)

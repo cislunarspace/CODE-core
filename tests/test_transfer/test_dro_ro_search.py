@@ -1,7 +1,7 @@
 """
-测试 dro_ro_search_v2 模块
+测试 dro_ro_search 模块
 
-测试 DROROTransferSearchV2 类的各项功能。
+测试 DROROTransferSearch 类的各项功能。
 """
 
 import pytest
@@ -10,10 +10,10 @@ import numpy as np
 from e2m2e.core.orbit import Orbit
 from e2m2e.core.dynamics import CR3BP_Dynamics
 from e2m2e.core.system import CR3BP_System
-from e2m2e.transfer.dro_ro_search_v2 import (
+from e2m2e.transfer.dro_ro_search import (
     TransferSearchConfig,
-    TransferSearchResultV2,
-    DROROTransferSearchV2,
+    TransferSearchResult,
+    DROROTransferSearch,
 )
 
 
@@ -72,7 +72,7 @@ def search_config():
 @pytest.fixture
 def searcher(em_system, em_dynamics, search_config):
     """DRO-RO转移搜索器"""
-    return DROROTransferSearchV2(
+    return DROROTransferSearch(
         system=em_system,
         dynamics=em_dynamics,
         config=search_config,
@@ -123,14 +123,14 @@ class TestTransferSearchConfig:
         assert np.isclose(grid[-1], 0.5)
 
 
-# ===== Test TransferSearchResultV2 =====
+# ===== Test TransferSearchResult =====
 
-class TestTransferSearchResultV2:
-    """测试 TransferSearchResultV2 类"""
+class TestTransferSearchResult:
+    """测试 TransferSearchResult 类"""
     
     def test_default_values(self):
         """测试默认值"""
-        result = TransferSearchResultV2()
+        result = TransferSearchResult()
         
         assert result.intersection_found is False
         assert result.collision_found is False
@@ -139,7 +139,7 @@ class TestTransferSearchResultV2:
     
     def test_is_feasible(self):
         """测试is_feasible判断逻辑"""
-        result = TransferSearchResultV2()
+        result = TransferSearchResult()
         
         # 无碰撞但无接近 -> 不可行
         assert result.is_feasible is False
@@ -155,7 +155,7 @@ class TestTransferSearchResultV2:
     
     def test_dv_departure(self):
         """测试dv_departure计算"""
-        result = TransferSearchResultV2()
+        result = TransferSearchResult()
         
         # 无数据时返回0
         assert result.dv_departure == 0.0
@@ -169,10 +169,10 @@ class TestTransferSearchResultV2:
         assert np.isclose(dv, 0.1)
 
 
-# ===== Test DROROTransferSearchV2 =====
+# ===== Test DROROTransferSearch =====
 
-class TestDROROTransferSearchV2:
-    """测试 DROROTransferSearchV2 类"""
+class TestDROROTransferSearch:
+    """测试 DROROTransferSearch 类"""
     
     def test_init(self, searcher, em_system, em_dynamics, search_config):
         """测试初始化"""
