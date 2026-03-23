@@ -51,11 +51,17 @@ class TransferSearchConfig:
     min_distance_threshold: float = 0.05   # 最小距离阈值
     
     # 碰撞检测半径 (无量纲)
-    collision_earth_radius: float = 0.999    # Earth exclusion radius
-    collision_moon_radius: float = 0.999     # Moon exclusion radius
+    # 注意: CR3BP无量纲单位中，距离单位是Earth-Moon距离(≈384400km)
+    # 地球物理半径: 6371km → 无量纲值 ≈ 0.0166
+    # 月球物理半径: 1737km → 无量纲值 ≈ 0.0045
+    # 使用略大的值(0.02/0.005)作为安全边界
+    collision_earth_radius: float = 0.02     # Earth exclusion radius (~120km安全边界)
+    collision_moon_radius: float = 0.005     # Moon exclusion radius (~20km安全边界)
     
     # 积分参数
-    integration_dt: float = 0.001  # 积分时间步长
+    # 注意: dt=0.001时15秒积分产生15000步，太慢
+    # 增大到0.01可减少到1500步，10倍加速
+    integration_dt: float = 0.01  # 积分时间步长
     
     @property
     def alpha_grid(self) -> np.ndarray:
