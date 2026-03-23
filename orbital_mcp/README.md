@@ -32,7 +32,7 @@ uv run mcp install orbital_mcp/server.py
 | `compute_jacobi` | Compute Jacobi constant for a given state |
 | `get_orbit_period` | Calculate period of an orbit |
 | `get_orbit_amplitude` | Calculate amplitude in x, y, or z direction |
-| `check_crossing` | Check if trajectory crosses a Poicaré section |
+| `check_crossing` | Check if trajectory crosses a Poincaré section |
 
 ## Configuration
 

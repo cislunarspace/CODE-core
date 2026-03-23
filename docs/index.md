@@ -106,14 +106,14 @@ result = dynamics.propagate(initial_state=state, t_span=(0, 10.0))
 
 ## 资源
 
-- [API 参考](../e2m2e/) - 代码中的 docstring
+- [API 参考](reference/api-reference.md) - 完整 API 文档
 - [示例代码](../examples/) - 实际使用示例
 - [测试用例](../tests/) - 单元测试
 
 ### 常用任务
 
 1. **设计DRO轨道** → 参考 [轨道生成 - DRO](guides/orbit-generation.md#distant-retrograde-orbit-dro)
-2. **设计Halo轨道** → 参考 [轨道生成 - Halo](guides/orbit-generation.md#halo轨道)
+2. **设计Halo轨道** → 参考 [轨道生成 - Halo](guides/orbit-generation.md#halo-轨道)
 3. **生成轨道族** → 参考 [轨道族延拓](reference/algorithms.md#5-轨道族延拓算法)
 4. **分析稳定性** → 参考 [稳定性分析](reference/algorithms.md#7-稳定性分析)
 
