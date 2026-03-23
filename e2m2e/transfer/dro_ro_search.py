@@ -704,13 +704,12 @@ class DROROTransferSearch:
         verbose: bool,
         n_workers: int,
     ) -> List[TransferSearchResult]:
-        """并行网格搜索 (按出发点并行) - 使用进程池
+        """并行网格搜索 (按出发点并行) - 使用线程池
 
-        使用批量处理减少进程间通信开销。
-        尝试使用ProcessPoolExecutor，如果失败则回退到ThreadPoolExecutor。
+        Windows下使用ThreadPoolExecutor避免进程池的pickle问题。
+        scipy的solve_ivp在C层计算时会释放GIL，仍能获得加速。
         """
-        import platform
-        import os
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         total_departures = len(departure_states)
 
@@ -718,22 +717,7 @@ class DROROTransferSearch:
 
         if verbose:
             print(f"  并行配置: {n_workers} workers, batch_size={batch_size}")
-
-        try:
-            if platform.system() == "Windows":
-                ctx = __import__("concurrent.futures").concurrent.futures.ProcessPoolExecutor
-            else:
-                ctx = __import__("concurrent.futures").concurrent.futures.ProcessPoolExecutor
-
-            use_process = True
-            if verbose:
-                print("  使用进程池 (ProcessPoolExecutor)")
-        except Exception:
-            from concurrent.futures import ThreadPoolExecutor
-            ctx = ThreadPoolExecutor
-            use_process = False
-            if verbose:
-                print("  使用线程池 (ThreadPoolExecutor) - 进程池初始化失败")
+            print("  使用线程池 (ThreadPoolExecutor)")
 
         all_results = []
         completed = 0
@@ -757,22 +741,11 @@ class DROROTransferSearch:
             }
             batches.append(batch_data)
 
-        with ctx(max_workers=n_workers) as executor:
-            if use_process:
-                futures = {
-                    executor.submit(_process_departure_batch_worker, batch): i
-                    for i, batch in enumerate(batches)
-                }
-            else:
-                futures = {
-                    executor.submit(
-                        _process_departure_batch_worker,
-                        batch,
-                    ): i
-                    for i, batch in enumerate(batches)
-                }
-
-            from concurrent.futures import as_completed
+        with ThreadPoolExecutor(max_workers=n_workers) as executor:
+            futures = {
+                executor.submit(_process_departure_batch_worker, batch): i
+                for i, batch in enumerate(batches)
+            }
 
             for future in as_completed(futures):
                 completed += 1
