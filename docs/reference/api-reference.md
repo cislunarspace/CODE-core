@@ -521,98 +521,9 @@ $$\nu = \frac{|\lambda_1| + |\lambda_2| + |\lambda_3| + |\lambda_4|}{4}$$
 
 ---
 
-## 3. Transfer Module (转移模块)
+## 3. Visualization Module (可视化模块)
 
-### 3.1 EarthMoonTransfer
-
-**文件**: `e2m2e/transfer/earth_moon.py`
-
-**类签名**:
-```python
-class EarthMoonTransfer:
-    """地球到月球转移轨道设计"""
-```
-
-#### 设计原理
-
-`EarthMoonTransfer` 提供从地球低轨道（LEO）到月球轨道或平动点轨道的转移设计。
-
-#### 转移策略
-
-1. **直接转移 (Direct Transfer)**: 简单的二脉冲 Hohmann-like 转移
-2. **低能转移 (Low-Energy Transfer)**: 利用平动点 $L_1$ 或 $L_2$ 附近的动力学结构
-3. **流形转移 (Manifold Transfer)**: 利用目标轨道的不变流形
-
-#### 核心方法
-
-| 方法 | 说明 |
-|------|------|
-| `design_direct_transfer(r_departure, r_arrival, ...)` | 设计直接转移 |
-| `design_low_energy_transfer(target_orbit, libration_point, ...)` | 设计低能转移 |
-| `design_manifold_transfer(target_orbit, manifold_type, ...)` | 利用流形设计转移 |
-| `compute_delta_v(departure_state, arrival_state)` | 计算ΔV |
-
----
-
-### 3.2 MoonEarthTransfer
-
-**文件**: `e2m2e/transfer/moon_earth.py`
-
-**类签名**:
-```python
-class MoonEarthTransfer:
-    """月球到地球转移轨道设计"""
-```
-
-#### 核心方法
-
-| 方法 | 说明 |
-|------|------|
-| `design_direct_return(departure_orbit, ...)` | 设计直接返回 |
-| `design_low_energy_return(departure_orbit, ...)` | 设计低能返回 |
-| `design_manifold_return(departure_orbit, ...)` | 利用流形返回 |
-| `compute_reentry_conditions(arrival_state, ...)` | 计算再入条件 |
-
----
-
-### 3.3 InterOrbitTransfer
-
-**文件**: `e2m2e/transfer/inter_orbit.py`
-
-**类签名**:
-```python
-class InterOrbitTransfer:
-    """轨道间转移设计"""
-```
-
-#### 转移类型
-
-1. **同宿转移 (Homoclinic Transfer)**: 同一轨道的不稳定流形与稳定流形的交叉
-2. **异宿转移 (Heteroclinic Transfer)**: 不同轨道（通常连接 $L_1$ 和 $L_2$ 轨道）流形的交叉
-3. **直接转移 (Direct Transfer)**: 在两条轨道间直接设计转移
-
-#### 庞加莱截面法
-
-流形交叉转移通过庞加莱截面实现：
-1. 在选定截面（如 $y=0$）上记录不稳定流形穿越点
-2. 同样记录稳定流形的穿越点
-3. 寻找截面上的最近状态对
-
-#### 核心方法
-
-| 方法 | 说明 |
-|------|------|
-| `design_direct_transfer(orbit_departure, orbit_arrival, ...)` | 直接轨道间转移 |
-| `design_manifold_intersection(orbit_departure, orbit_arrival, ...)` | 流形交叉转移 |
-| `design_heteroclinic_transfer(orbit_L1, orbit_L2, ...)` | L1-L2异宿转移 |
-| `design_homoclinic_transfer(orbit, ...)` | 同宿转移 |
-| `compute_transfer_cost(transfer_result)` | 计算转移代价 |
-
----
-
-## 4. Visualization Module (可视化模块)
-
-### 4.1 OrbitVisualizer & ProjectionPlane
+### 3.1 OrbitVisualizer & ProjectionPlane
 
 **文件**: `e2m2e/visualization/plotting.py`
 
@@ -657,7 +568,7 @@ viz.save('orbit.png', dpi=300)
 
 ---
 
-### 4.2 compute_stability_for_family
+### 3.2 compute_stability_for_family
 
 **文件**: `e2m2e/visualization/plotting.py`
 
