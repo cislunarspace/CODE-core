@@ -4,29 +4,44 @@
 
 ## 文档结构
 
-文档组织与代码模块结构一一对应：
-
 ```
 docs/
-├── index.md              # 本文档
+├── index.md              # 本文档（文档索引）
+├── guides/               # 使用指南
+│   ├── system-overview.md    # 系统架构与设计
+│   ├── orbit-generation.md  # 轨道生成教程
+│   ├── transfer-design.md   # 转移轨道设计
+│   └── visualization-guide.md # 可视化教程
 ├── core/                 # 核心模块
 │   ├── system.md         # CR3BP_System - 系统参数
 │   ├── dynamics.md       # CR3BP_Dynamics - 动力学
 │   ├── orbit.md          # Orbit, OrbitFamily - 轨道
 │   └── coordinate.md     # CoordinateTransformation - 坐标变换
-├── algorithms/          # 算法模块
+├── algorithms/           # 算法模块
 │   ├── continuation.md       # 延拓法
 │   ├── differential_correction.md  # 微分修正
 │   └── stability.md          # 稳定性分析
 ├── transfer/            # 转移模块
-│   ├── inter_orbit.md       # DROROTransferSearch - 轨道间转移
+│   ├── inter_orbit.md       # InterOrbitTransfer - 轨道间转移
 │   ├── earth_moon.md        # EarthMoonTransfer - 地月转移
 │   └── moon_earth.md        # MoonEarthTransfer - 月地转移
-└── visualization/       # 可视化模块
-    └── plotting.md          # 绘图函数
+├── visualization/       # 可视化模块
+│   └── plotting.md          # 绘图函数
+└── reference/           # 技术参考
+    ├── api-reference.md     # 完整API文档
+    └── algorithms.md        # 算法技术细节
 ```
 
-## 模块索引
+## 快速导航
+
+### 使用指南 (guides)
+
+| 文档 | 说明 |
+|------|------|
+| [系统总览](guides/system-overview.md) | 架构设计、模块职责、数据流、典型工作流 |
+| [轨道生成](guides/orbit-generation.md) | DRO、Halo、Lissajous 轨道生成教程 |
+| [转移设计](guides/transfer-design.md) | 地月/月地转移、轨道间转移设计 |
+| [可视化指南](guides/visualization-guide.md) | 绘图功能详解、2D/3D 可视化 |
 
 ### 核心模块 (core)
 
@@ -65,6 +80,13 @@ docs/
 | `plot_transfer_2d/3d` | [visualization/plotting.md](visualization/plotting.md) | 转移轨迹绘图 |
 | `plot_system_geometry` | [visualization/plotting.md](visualization/plotting.md) | 系统几何绘图 |
 
+### 技术参考 (reference)
+
+| 文档 | 说明 |
+|------|------|
+| [API 参考](reference/api-reference.md) | 完整 API 文档、类与方法说明 |
+| [算法参考](reference/algorithms.md) | CR3BP 理论、算法数学基础 |
+
 ## 快速开始
 
 ```python
@@ -84,14 +106,14 @@ result = dynamics.propagate(initial_state=state, t_span=(0, 10.0))
 
 ## 资源
 
-- [API 参考](../e2m2e/) - 代码中的 docstring
+- [API 参考](reference/api-reference.md) - 完整 API 文档
 - [示例代码](../examples/) - 实际使用示例
 - [测试用例](../tests/) - 单元测试
 
 ### 常用任务
 
 1. **设计DRO轨道** → 参考 [轨道生成 - DRO](guides/orbit-generation.md#distant-retrograde-orbit-dro)
-2. **设计Halo轨道** → 参考 [轨道生成 - Halo](guides/orbit-generation.md#halo轨道)
+2. **设计Halo轨道** → 参考 [轨道生成 - Halo](guides/orbit-generation.md#halo-轨道)
 3. **生成轨道族** → 参考 [轨道族延拓](reference/algorithms.md#5-轨道族延拓算法)
 4. **分析稳定性** → 参考 [稳定性分析](reference/algorithms.md#7-稳定性分析)
 

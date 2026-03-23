@@ -125,7 +125,7 @@ CR3BP 计算对精度非常敏感，修改时注意：
 ```
 1. 写/改代码  →  e2m2e/e2m2e/ 下对应模块
 2. 跑测试验证 →  python tests/test_basic.py
-3. 外部脚本调用 →  在 transfer-orbit-design/ 根目录或其他项目中 import e2m2e
+3. 外部脚本调用 →  在项目根目录或其他项目中 import e2m2e
 4. 发现问题   →  回到步骤1
 ```
 
