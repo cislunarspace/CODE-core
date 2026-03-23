@@ -50,9 +50,12 @@ docs/
 
 | 类/模块 | 文件 | 说明 |
 |---------|------|------|
-| `DROROTransferSearch` | [transfer/inter_orbit.md](transfer/inter_orbit.md) | DRO→RO转移搜索 |
+| `InterOrbitTransfer` | [transfer/inter_orbit.md](transfer/inter_orbit.md) | 轨道间转移设计 |
+| `DROROTransferSearch` | [transfer/inter_orbit.md](transfer/inter_orbit.md) | DRO→RO转移搜索 (见下方注意事项) |
 | `EarthMoonTransfer` | [transfer/earth_moon.md](transfer/earth_moon.md) | 地月转移设计 |
 | `MoonEarthTransfer` | [transfer/moon_earth.md](transfer/moon_earth.md) | 月地返回设计 |
+
+> **注意**: `DROROTransferSearch` 类实际位于 `e2m2e/transfer/dro_ro_search.py`（原始版本）和 `e2m2e/transfer/dro_ro_search_v2.py`（修复bug版本）。`inter_orbit.md` 文档描述的是该类的使用方法。
 
 ### 可视化模块 (visualization)
 

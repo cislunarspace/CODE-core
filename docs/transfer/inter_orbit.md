@@ -1,6 +1,6 @@
 # DROROTransferSearch
 
-**文件**: `e2m2e/transfer/inter_orbit.py`
+**文件**: `e2m2e/transfer/dro_ro_search.py` 或 `e2m2e/transfer/dro_ro_search_v2.py`
 
 **类签名**:
 ```python
@@ -52,7 +52,7 @@ DRO ──[脉冲1: 出发]──→ 转移轨道 ──[脉冲2: 到达]──�
 ## 使用示例
 
 ```python
-from e2m2e.transfer.inter_orbit import DROROTransferSearch
+from e2m2e.transfer.dro_ro_search import DROROTransferSearch
 
 # 创建搜索器
 searcher = DROROTransferSearch(
@@ -77,6 +77,8 @@ optimal_transfer = searcher.optimize_transfer(
     feasible_solutions[0]
 )
 ```
+
+> **注意**: `dro_ro_search.py` 是原始版本，`dro_ro_search_v2.py` 是修复了多个 bug 的改进版本（BUG-001 到 BUG-004）。
 
 ## 输出格式
 
