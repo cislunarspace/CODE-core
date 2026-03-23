@@ -606,6 +606,9 @@ class DROROTransferSearch:
         total_departures = len(departure_states)
         total_grid_points = total_departures * self.config.n_alpha * self.config.n_beta
 
+        if n_workers is None:
+            n_workers = multiprocessing.cpu_count()
+
         if verbose:
             print(f"\n{'=' * 60}")
             print(f"开始网格搜索")
@@ -617,8 +620,6 @@ class DROROTransferSearch:
                 f"  β网格: {self.config.n_beta}点 [{self.config.beta_min}, {self.config.beta_max}]"
             )
             print(f"  总候选解数量: {total_grid_points}")
-            if n_workers is None:
-                n_workers = multiprocessing.cpu_count()
             print(f"  并行worker数量: {n_workers}")
             print(f"{'=' * 60}\n")
 
