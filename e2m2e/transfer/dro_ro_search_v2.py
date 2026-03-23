@@ -585,16 +585,23 @@ class DROROTransferSearchV2:
         
         all_results = []
         total_departures = len(departure_states)
-        
+        total_grid_points = total_departures * self.config.n_alpha * self.config.n_beta
+
         if verbose:
-            print(f"开始网格搜索: {total_departures}出发点 × {self.config.n_alpha}α × {self.config.n_beta}β")
-        
+            print(f"\n{'=' * 60}")
+            print(f"开始网格搜索")
+            print(f"  出发点数量: {total_departures}")
+            print(f"  α网格: {self.config.n_alpha}点 [{self.config.alpha_min}, {self.config.alpha_max}]")
+            print(f"  β网格: {self.config.n_beta}点 [{self.config.beta_min}, {self.config.beta_max}]")
+            print(f"  总候选解数量: {total_grid_points}")
+            print(f"{'=' * 60}\n")
+
         # 遍历每个出发点
         for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times)):
-            if verbose and (i + 1) % 20 == 0:
-                print(f"  进度: {i+1}/{total_departures}出发点 ({(i+1)/total_departures*100:.1f}%)")
-            
-            # 对单个出发点搜索α,β网格
+            if verbose:
+                # 进度百分比 (基于出发点)
+                pct = (i + 1) / total_departures * 100
+                print(f"  网格搜索进度: {i+1}/{total_departures}出发点 ({pct:.1f}%)")
             results = self.search_single_departure(
                 dep_state, dep_time, arrival_orbit
             )
@@ -610,10 +617,14 @@ class DROROTransferSearchV2:
         if verbose:
             # 统计结果
             feasible = [r for r in all_results if r.is_feasible]
-            print(f"搜索完成: {len(all_results)}个候选解, {len(feasible)}个可行")
-        
+            print(f"\n{'=' * 60}")
+            print(f"网格搜索完成")
+            print(f"  总候选解: {len(all_results)}")
+            print(f"  可行解: {len(feasible)}")
+            print(f"{'=' * 60}")
+
         return all_results
-    
+
     def filter_local_minima(
         self,
         results: List[TransferSearchResultV2],
