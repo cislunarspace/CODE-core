@@ -150,22 +150,37 @@ class TransferSearchResult:
         }
 
 
-def _process_departure_worker(
-    idx: int,
-    dep_state: np.ndarray,
-    dep_time: float,
-    arrival_states: np.ndarray,
-    arrival_times: np.ndarray,
-    arrival_period: float,
-    mu: float,
-    config: TransferSearchConfig,
-    dep_name: str,
-    arr_name: str,
+def _process_departure_batch_worker(
+    batch_data: Dict[str, Any],
 ) -> List[TransferSearchResult]:
-    """Worker function for parallel departure point processing.
+    """Worker function for parallel batch departure point processing.
 
+    Processes multiple departures in a single worker call to reduce overhead.
     This is a module-level function to ensure pickling works on Windows (spawn mode).
+
+    Args:
+        batch_data: Dictionary containing:
+            - departures: List of (idx, dep_state, dep_time) tuples
+            - arrival_states: numpy array of arrival orbit states
+            - arrival_times: numpy array of arrival orbit times
+            - arrival_period: arrival orbit period
+            - mu: CR3BP mass ratio
+            - config: TransferSearchConfig instance
+            - dep_name: departure orbit name
+            - arr_name: arrival orbit name
+
+    Returns:
+        List of TransferSearchResult objects
     """
+    departures = batch_data["departures"]
+    arrival_states = np.array(batch_data["arrival_states"])
+    arrival_times = np.array(batch_data["arrival_times"])
+    arrival_period = batch_data["arrival_period"]
+    mu = batch_data["mu"]
+    config = batch_data["config"]
+    dep_name = batch_data["dep_name"]
+    arr_name = batch_data["arr_name"]
+
     arrival_orbit = Orbit(states=arrival_states, times=arrival_times)
     arrival_orbit.period = arrival_period
 
@@ -174,12 +189,17 @@ def _process_departure_worker(
         dynamics=CR3BP_Dynamics(system=CR3BP_System(mu=mu, primary="earth", secondary="moon")),
         config=config,
     )
-    results = searcher.search_single_departure(dep_state, dep_time, arrival_orbit)
-    for r in results:
-        r.departure_orbit_name = dep_name
-        r.arrival_orbit_name = arr_name
-        r.departure_time_index = idx
-    return results
+
+    all_results = []
+    for idx, dep_state, dep_time in departures:
+        results = searcher.search_single_departure(dep_state, dep_time, arrival_orbit)
+        for r in results:
+            r.departure_orbit_name = dep_name
+            r.arrival_orbit_name = arr_name
+            r.departure_time_index = idx
+        all_results.extend(results)
+
+    return all_results
 
 
 class DROROTransferSearch:
@@ -402,27 +422,26 @@ class DROROTransferSearch:
             local_min_distance: 局部最小距离
             local_min_idx: 局部最小点对应的轨迹索引
         """
-        # 计算轨迹上每个点到目标轨道的距离
         traj_positions = trajectory_states[:, :3]
         orbit_positions = arrival_orbit.states[:, :3]
 
-        # 向量化距离计算
         diff = traj_positions[:, np.newaxis, :] - orbit_positions[np.newaxis, :, :]
         distances = np.sqrt(np.sum(diff**2, axis=2))
-        min_distances = np.min(distances, axis=1)  # shape: (n_steps,)
+        min_distances = np.min(distances, axis=1)
 
-        # 检测局部最小: 前一点和后一点都比当前点距离大
-        local_mins = []
-        for i in range(1, len(min_distances) - 1):
-            # 局部最小条件:
-            # dist[i+1] > dist[i] AND dist[i-1] > dist[i]
-            if min_distances[i + 1] > min_distances[i] and min_distances[i - 1] > min_distances[i]:
-                local_mins.append((i, min_distances[i]))
+        if len(min_distances) < 3:
+            return False, np.inf, -1
 
-        if local_mins:
-            # 返回距离最小的局部最小
-            best = min(local_mins, key=lambda x: x[1])
-            return True, best[1], best[0]
+        local_min_mask = (
+            (min_distances[1:-1] < min_distances[:-2]) &
+            (min_distances[1:-1] < min_distances[2:])
+        )
+
+        local_min_indices = np.where(local_min_mask)[0] + 1
+
+        if len(local_min_indices) > 0:
+            best_idx = local_min_indices[np.argmin(min_distances[local_min_indices])]
+            return True, float(min_distances[best_idx]), int(best_idx)
 
         return False, np.inf, -1
 
@@ -685,45 +704,90 @@ class DROROTransferSearch:
         verbose: bool,
         n_workers: int,
     ) -> List[TransferSearchResult]:
-        """并行网格搜索 (按出发点并行) - 使用线程池
+        """并行网格搜索 (按出发点并行) - 使用进程池
 
-        注意: Windows下ProcessPoolExecutor使用spawn模式有兼容问题，
-        因此使用ThreadPoolExecutor。虽然受GIL限制，但scipy的solve_ivp
-        在C层计算时会释放GIL，仍能获得加速。
+        使用批量处理减少进程间通信开销。
+        尝试使用ProcessPoolExecutor，如果失败则回退到ThreadPoolExecutor。
         """
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import platform
+        import os
 
         total_departures = len(departure_states)
+
+        batch_size = max(1, total_departures // (n_workers * 4))
+
+        if verbose:
+            print(f"  并行配置: {n_workers} workers, batch_size={batch_size}")
+
+        try:
+            if platform.system() == "Windows":
+                ctx = __import__("concurrent.futures").concurrent.futures.ProcessPoolExecutor
+            else:
+                ctx = __import__("concurrent.futures").concurrent.futures.ProcessPoolExecutor
+
+            use_process = True
+            if verbose:
+                print("  使用进程池 (ProcessPoolExecutor)")
+        except Exception:
+            from concurrent.futures import ThreadPoolExecutor
+            ctx = ThreadPoolExecutor
+            use_process = False
+            if verbose:
+                print("  使用线程池 (ThreadPoolExecutor) - 进程池初始化失败")
 
         all_results = []
         completed = 0
 
-        with ThreadPoolExecutor(max_workers=n_workers) as executor:
-            futures = {
-                executor.submit(
-                    self.search_single_departure,
-                    dep_state,
-                    dep_time,
-                    arrival_orbit,
-                ): i
-                for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times))
+        batches = []
+        for i in range(0, total_departures, batch_size):
+            batch_end = min(i + batch_size, total_departures)
+            departures = [
+                (idx, departure_states[idx].copy(), float(departure_times[idx]))
+                for idx in range(i, batch_end)
+            ]
+            batch_data = {
+                "departures": departures,
+                "arrival_states": arrival_orbit.states.tolist(),
+                "arrival_times": arrival_orbit.times.tolist(),
+                "arrival_period": arrival_orbit.period,
+                "mu": self.mu,
+                "config": self.config,
+                "dep_name": dep_name,
+                "arr_name": arr_name,
             }
+            batches.append(batch_data)
+
+        with ctx(max_workers=n_workers) as executor:
+            if use_process:
+                futures = {
+                    executor.submit(_process_departure_batch_worker, batch): i
+                    for i, batch in enumerate(batches)
+                }
+            else:
+                futures = {
+                    executor.submit(
+                        _process_departure_batch_worker,
+                        batch,
+                    ): i
+                    for i, batch in enumerate(batches)
+                }
+
+            from concurrent.futures import as_completed
 
             for future in as_completed(futures):
                 completed += 1
                 if verbose:
-                    pct = completed / total_departures * 100
-                    print(f"  网格搜索进度: {completed}/{total_departures}出发点 ({pct:.1f}%)")
+                    pct = completed / len(batches) * 100
+                    print(f"  网格搜索进度: {completed}/{len(batches)}批次 ({pct:.1f}%)")
                 try:
                     results = future.result()
-                    for r in results:
-                        r.departure_orbit_name = dep_name
-                        r.arrival_orbit_name = arr_name
-                        r.departure_time_index = futures[future]
                     all_results.extend(results)
                 except Exception as e:
                     if verbose:
-                        print(f"    出发点 {futures[future]} 处理失败: {e}")
+                        print(f"    批次 {futures[future]} 处理失败: {e}")
+                    import traceback
+
+                    traceback.print_exc()
 
         return all_results
 
