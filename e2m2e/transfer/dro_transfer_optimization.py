@@ -23,6 +23,9 @@ try:
     import coptpy
 except ImportError:
     coptpy = None
+    NlpCallbackBase = None
+else:
+    NlpCallbackBase = coptpy.NlpCallbackBase
 
 
 class TransferType(Enum):
@@ -711,124 +714,125 @@ def optimize_transfer(
     return optimizer.optimize(initial_guess=initial_guess, **kwargs)
 
 
-class COPTNLPCallback(coptpy.NlpCallbackBase):
-    """COPT NLP回调类
+if NlpCallbackBase is not None:
+    class COPTNLPCallback(NlpCallbackBase):
+        """COPT NLP回调类
 
-    用于COPT非线性优化问题的目标函数和约束计算。
-    继承自coptpy.NlpCallbackBase以正确处理SWIG绑定。
+        用于COPT非线性优化问题的目标函数和约束计算。
+        继承自coptpy.NlpCallbackBase以正确处理SWIG绑定。
 
-    属性:
-        optimizer: DROTRONLPOptimizer实例
-        x: 当前变量值 [alpha, transfer_time, t_ins]
-    """
+        属性:
+            optimizer: DROTRONLPOptimizer实例
+            x: 当前变量值 [alpha, transfer_time, t_ins]
+        """
 
-    def __init__(self, optimizer: DROTRONLPOptimizer):
-        import coptpy
-        super().__init__()
-        self.optimizer = optimizer
-        self.x = None
+        def __init__(self, optimizer: DROTRONLPOptimizer):
+            import coptpy
+            super().__init__()
+            self.optimizer = optimizer
+            self.x = None
 
-    def EvalObj(self, xdata, outdata):
-        """计算目标函数值 J(y) = Δv1 + Δv2"""
-        x = np.array(xdata)
-        self.x = x
-        obj = self.optimizer.objective_function(x)
-        outdata[0] = obj
-        return 0
+        def EvalObj(self, xdata, outdata):
+            """计算目标函数值 J(y) = Δv1 + Δv2"""
+            x = np.array(xdata)
+            self.x = x
+            obj = self.optimizer.objective_function(x)
+            outdata[0] = obj
+            return 0
 
-    def EvalGrad(self, xdata, outdata):
-        """计算目标函数梯度 (数值差分)"""
-        x = np.array(xdata)
-        self.x = x
-        h = 1e-8
-        grad = np.zeros(3)
-        f0 = self.optimizer.objective_function(x)
-        for i in range(3):
-            x_pert = x.copy()
-            x_pert[i] += h
-            grad[i] = (self.optimizer.objective_function(x_pert) - f0) / h
-        for i in range(3):
-            outdata[i] = grad[i]
-        return 0
-
-    def EvalCon(self, xdata, outdata):
-        """计算约束函数值"""
-        x = np.array(xdata)
-        self.x = x
-
-        pos_con = self.optimizer.constraint_position(x)
-        vel_con = self.optimizer.constraint_velocity_parallel(x)
-
-        outdata[0] = pos_con
-        outdata[1] = vel_con
-        return 0
-
-    def EvalJac(self, xdata, outdata):
-        """计算约束函数Jacobian矩阵 (数值差分)"""
-        x = np.array(xdata)
-        self.x = x
-        h = 1e-8
-
-        pos_con = self.optimizer.constraint_position(x)
-        grad_pos = np.zeros(3)
-        for i in range(3):
-            x_pert = x.copy()
-            x_pert[i] += h
-            grad_pos[i] = (self.optimizer.constraint_position(x_pert) - pos_con) / h
-
-        vel_con = self.optimizer.constraint_velocity_parallel(x)
-        grad_vel = np.zeros(3)
-        for i in range(3):
-            x_pert = x.copy()
-            x_pert[i] += h
-            grad_vel[i] = (self.optimizer.constraint_velocity_parallel(x_pert) - vel_con) / h
-
-        outdata[0] = grad_pos[0]
-        outdata[1] = grad_pos[1]
-        outdata[2] = grad_pos[2]
-        outdata[3] = grad_vel[0]
-        outdata[4] = grad_vel[1]
-        outdata[5] = grad_vel[2]
-        return 0
-
-    def EvalHess(self, xdata, sigma, lam, outdata):
-        """计算Hessian矩阵 (数值差分)"""
-        x = np.array(xdata)
-        self.x = x
-        h = 1e-6
-
-        grad_f = np.zeros(3)
-        f0 = self.optimizer.objective_function(x)
-        for i in range(3):
-            x_pert = x.copy()
-            x_pert[i] += h
-            grad_f[i] = (self.optimizer.objective_function(x_pert) - f0) / h
-
-        hess_f = np.zeros((3, 3))
-        for i in range(3):
-            for j in range(i + 1):
+        def EvalGrad(self, xdata, outdata):
+            """计算目标函数梯度 (数值差分)"""
+            x = np.array(xdata)
+            self.x = x
+            h = 1e-8
+            grad = np.zeros(3)
+            f0 = self.optimizer.objective_function(x)
+            for i in range(3):
                 x_pert = x.copy()
                 x_pert[i] += h
-                x_pert[j] += h
-                f_ij = self.optimizer.objective_function(x_pert)
+                grad[i] = (self.optimizer.objective_function(x_pert) - f0) / h
+            for i in range(3):
+                outdata[i] = grad[i]
+            return 0
 
-                x_i = x.copy()
-                x_i[i] += h
-                f_i = self.optimizer.objective_function(x_i)
+        def EvalCon(self, xdata, outdata):
+            """计算约束函数值"""
+            x = np.array(xdata)
+            self.x = x
 
-                x_j = x.copy()
-                x_j[j] += h
-                f_j = self.optimizer.objective_function(x_j)
+            pos_con = self.optimizer.constraint_position(x)
+            vel_con = self.optimizer.constraint_velocity_parallel(x)
 
-                hess_f[i, j] = (f_ij - f_i - f_j + f0) / (h * h)
-                hess_f[j, i] = hess_f[i, j]
+            outdata[0] = pos_con
+            outdata[1] = vel_con
+            return 0
 
-        idx = 0
-        for i in range(3):
-            for j in range(i + 1):
-                outdata[idx] = sigma * hess_f[i, j]
-                idx += 1
-        return 0
+        def EvalJac(self, xdata, outdata):
+            """计算约束函数Jacobian矩阵 (数值差分)"""
+            x = np.array(xdata)
+            self.x = x
+            h = 1e-8
+
+            pos_con = self.optimizer.constraint_position(x)
+            grad_pos = np.zeros(3)
+            for i in range(3):
+                x_pert = x.copy()
+                x_pert[i] += h
+                grad_pos[i] = (self.optimizer.constraint_position(x_pert) - pos_con) / h
+
+            vel_con = self.optimizer.constraint_velocity_parallel(x)
+            grad_vel = np.zeros(3)
+            for i in range(3):
+                x_pert = x.copy()
+                x_pert[i] += h
+                grad_vel[i] = (self.optimizer.constraint_velocity_parallel(x_pert) - vel_con) / h
+
+            outdata[0] = grad_pos[0]
+            outdata[1] = grad_pos[1]
+            outdata[2] = grad_pos[2]
+            outdata[3] = grad_vel[0]
+            outdata[4] = grad_vel[1]
+            outdata[5] = grad_vel[2]
+            return 0
+
+        def EvalHess(self, xdata, sigma, lam, outdata):
+            """计算Hessian矩阵 (数值差分)"""
+            x = np.array(xdata)
+            self.x = x
+            h = 1e-6
+
+            grad_f = np.zeros(3)
+            f0 = self.optimizer.objective_function(x)
+            for i in range(3):
+                x_pert = x.copy()
+                x_pert[i] += h
+                grad_f[i] = (self.optimizer.objective_function(x_pert) - f0) / h
+
+            hess_f = np.zeros((3, 3))
+            for i in range(3):
+                for j in range(i + 1):
+                    x_pert = x.copy()
+                    x_pert[i] += h
+                    x_pert[j] += h
+                    f_ij = self.optimizer.objective_function(x_pert)
+
+                    x_i = x.copy()
+                    x_i[i] += h
+                    f_i = self.optimizer.objective_function(x_i)
+
+                    x_j = x.copy()
+                    x_j[j] += h
+                    f_j = self.optimizer.objective_function(x_j)
+
+                    hess_f[i, j] = (f_ij - f_i - f_j + f0) / (h * h)
+                    hess_f[j, i] = hess_f[i, j]
+
+            idx = 0
+            for i in range(3):
+                for j in range(i + 1):
+                    outdata[idx] = sigma * hess_f[i, j]
+                    idx += 1
+            return 0
 
 
 class COPTNLPSolver:

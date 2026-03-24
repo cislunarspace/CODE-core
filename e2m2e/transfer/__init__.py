@@ -24,7 +24,6 @@ e2m2e转移轨道设计模块
 from . import earth_moon_transfer
 from . import moon_earth_transfer
 from . import orbit_to_orbit_transfer
-from . import dro_transfer_optimization
 from . import transfer_base
 
 from .earth_moon_transfer import EarthMoonTransfer
@@ -38,13 +37,25 @@ from .dro_transfer_search import (
     load_orbit_from_json,
     save_search_results,
 )
-from .dro_transfer_optimization import (
-    DROTRONLPOptimizer,
-    NLPOptimizationVariables,
-    NLPOptimizationResult,
-    TransferType,
-    optimize_transfer,
-)
+
+# coptpy 是可选依赖，只有安装了才导入 NLP 优化模块
+try:
+    from . import dro_transfer_optimization
+except ImportError:
+    dro_transfer_optimization = None
+    _HAVE_COPT = False
+else:
+    try:
+        from .dro_transfer_optimization import (
+            DROTRONLPOptimizer,
+            NLPOptimizationVariables,
+            NLPOptimizationResult,
+            TransferType,
+            optimize_transfer,
+        )
+        _HAVE_COPT = True
+    except ImportError:
+        _HAVE_COPT = False
 
 # 导出基础模块的类
 from .transfer_base import (
@@ -65,6 +76,7 @@ __all__ = [
     "InterOrbitTransfer",
     "DROTransferSearch",
     "DROROTransferSearch",
+    # NLP优化类 (仅在coptpy可用时)
     "DROTRONLPOptimizer",
     # 配置类
     "TransferSearchConfig",
@@ -87,4 +99,6 @@ __all__ = [
     "load_orbit_from_json",
     "save_search_results",
     "optimize_transfer",
+    # 元信息
+    "_HAVE_COPT",
 ]
