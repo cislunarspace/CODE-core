@@ -129,10 +129,9 @@ e2m2e/
 │   ├── continuation.py            # 轨道延拓
 │   └── stability.py              # 稳定性分析
 ├── transfer/            # 转移轨道设计
-│   ├── dro_transfer_search.py    # DRO 转移搜索
-│   ├── dro_transfer_optimization.py  # NLP 优化
-│   ├── earth_moon_transfer.py     # 地球到月球
-│   └── moon_earth_transfer.py    # 月球到地球
+│   ├── transfer_search.py         # DRO 转移搜索
+│   ├── transfer_optimization.py   # NLP 优化
+│   └── transfer_base.py           # 基础类
 └── visualization/       # 可视化
     └── plotting.py     # 绘图工具
 ```

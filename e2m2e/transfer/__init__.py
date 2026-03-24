@@ -1,10 +1,9 @@
 """
 e2m2e转移轨道设计模块
 
-提供地球到月球、月球到地球以及轨道间转移的设计工具。
+提供DRO到RO平面转移轨道的搜索和优化工具。
 
 使用方式:
-    # 新的推荐方式
     from e2m2e.transfer import DROTransferSearch
 
     transfer = DROTransferSearch(system, dynamics)
@@ -12,52 +11,28 @@ e2m2e转移轨道设计模块
     transfer.set_arrival_orbit(ro_orbit)
     transfer.configure_search(alpha_range=(0.5, 2.5))
     results = transfer.search()
-
-    # 传统方式 (保持向后兼容)
-    from e2m2e.transfer import DROROTransferSearch, TransferSearchConfig
-
-    config = TransferSearchConfig()
-    searcher = DROROTransferSearch(system, dynamics)
-    results = searcher.grid_search(departure_orbit, arrival_orbit)
 """
 
-from . import earth_moon_transfer
-from . import moon_earth_transfer
-from . import orbit_to_orbit_transfer
 from . import transfer_base
+from . import transfer_search
+from . import transfer_optimization
 
-from .earth_moon_transfer import EarthMoonTransfer
-from .moon_earth_transfer import MoonEarthTransfer
-from .orbit_to_orbit_transfer import InterOrbitTransfer
-from .dro_transfer_search import (
+from .transfer_search import (
     DROTransferSearch,
     DROROTransferSearch,
-    TransferSearchConfig,
     TransferSearchResult,
     load_orbit_from_json,
     save_search_results,
 )
 
-# coptpy 是可选依赖，只有安装了才导入 NLP 优化模块
-try:
-    from . import dro_transfer_optimization
-except ImportError:
-    dro_transfer_optimization = None
-    _HAVE_COPT = False
-else:
-    try:
-        from .dro_transfer_optimization import (
-            DROTRONLPOptimizer,
-            NLPOptimizationVariables,
-            NLPOptimizationResult,
-            TransferType,
-            optimize_transfer,
-        )
-        _HAVE_COPT = True
-    except ImportError:
-        _HAVE_COPT = False
+from .transfer_optimization import (
+    DROTRONLPOptimizer,
+    NLPOptimizationVariables,
+    NLPOptimizationResult,
+    TransferType,
+    optimize_transfer,
+)
 
-# 导出基础模块的类
 from .transfer_base import (
     BaseTransfer,
     TransferStrategy,
@@ -69,17 +44,15 @@ from .transfer_base import (
     OptimizationResult,
 )
 
+_HAVE_COPT = transfer_optimization is not None
+
 __all__ = [
     # 转移设计类
-    "EarthMoonTransfer",
-    "MoonEarthTransfer",
-    "InterOrbitTransfer",
     "DROTransferSearch",
     "DROROTransferSearch",
-    # NLP优化类 (仅在coptpy可用时)
+    # NLP优化类
     "DROTRONLPOptimizer",
     # 配置类
-    "TransferSearchConfig",
     "TransferConfig",
     "SearchConfig",
     "OptimizationConfig",

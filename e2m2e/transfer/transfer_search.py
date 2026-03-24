@@ -38,60 +38,6 @@ from .transfer_base import (
 )
 
 
-class TransferSearchConfig:
-    """平面转移轨道搜索配置
-
-    搜索参数配置类，包含搜索范围、网格密度、阈值等参数。
-    专门用于平面转移轨道设计，只使用α(切向速度比)参数。
-    按照论文Table 3设置默认值。
-
-    警告:此类已被迁移到 base.SearchConfig，建议使用新类。
-    """
-
-    def __init__(
-        self,
-        alpha_min: float = 0.5,
-        alpha_max: float = 2.5,
-        n_alpha: int = 101,
-        n_departure: int = 200,
-        max_transfer_time: float = 15.0,
-        intersection_threshold: float = 0.001,
-        min_distance_threshold: float = 0.05,
-        collision_earth_radius: float = 0.02,
-        collision_moon_radius: float = 0.005,
-        integration_dt: float = 0.01,
-    ):
-        self.alpha_min = alpha_min
-        self.alpha_max = alpha_max
-        self.n_alpha = n_alpha
-        self.n_departure = n_departure
-        self.max_transfer_time = max_transfer_time
-        self.intersection_threshold = intersection_threshold
-        self.min_distance_threshold = min_distance_threshold
-        self.collision_earth_radius = collision_earth_radius
-        self.collision_moon_radius = collision_moon_radius
-        self.integration_dt = integration_dt
-
-    @property
-    def alpha_grid(self) -> np.ndarray:
-        return np.linspace(self.alpha_min, self.alpha_max, self.n_alpha)
-
-    def to_search_config(self) -> SearchConfig:
-        """转换为新的 SearchConfig"""
-        return SearchConfig(
-            alpha_min=self.alpha_min,
-            alpha_max=self.alpha_max,
-            n_alpha=self.n_alpha,
-            n_departure=self.n_departure,
-            max_transfer_time=self.max_transfer_time,
-            intersection_threshold=self.intersection_threshold,
-            min_distance_threshold=self.min_distance_threshold,
-            collision_earth_radius=self.collision_earth_radius,
-            collision_moon_radius=self.collision_moon_radius,
-            integration_dt=self.integration_dt,
-        )
-
-
 class TransferSearchResult(SearchResult):
     """平面转移轨道搜索结果
 
@@ -207,7 +153,7 @@ class DROTransferSearch(BaseTransfer):
         返回:
             优化结果
         """
-        from .dro_transfer_optimization import DROTRONLPOptimizer, NLPOptimizationVariables
+        from .transfer_optimization import DROTRONLPOptimizer, NLPOptimizationVariables
 
         if self._departure_orbit is None or self._arrival_orbit is None:
             raise ValueError("必须先设置departure_orbit和arrival_orbit")
@@ -320,9 +266,7 @@ class DROTransferSearch(BaseTransfer):
                 pct = (i + 1) / total_departures * 100
                 print(f"  进度: {i + 1}/{total_departures} ({pct:.1f}%)")
 
-            results = self._search_single_departure(
-                dep_state, dep_time, arrival_orbit, config
-            )
+            results = self._search_single_departure(dep_state, dep_time, arrival_orbit, config)
             for r in results:
                 r.departure_orbit_name = dep_name
                 r.arrival_orbit_name = arr_name
@@ -358,9 +302,7 @@ class DROTransferSearch(BaseTransfer):
                     arrival_orbit,
                     config,
                 ): i
-                for i, (dep_state, dep_time) in enumerate(
-                    zip(departure_states, departure_times)
-                )
+                for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times))
             }
 
             for future in as_completed(futures):
@@ -395,10 +337,12 @@ class DROTransferSearch(BaseTransfer):
         for alpha in config.alpha_grid:
             new_vel = self._compute_departure_velocity(departure_state, alpha)
 
-            initial_state = np.concatenate([
-                departure_state[:3],
-                new_vel,
-            ])
+            initial_state = np.concatenate(
+                [
+                    departure_state[:3],
+                    new_vel,
+                ]
+            )
 
             try:
                 traj_states, traj_times = self._forward_integrate(
@@ -458,9 +402,7 @@ class DROTransferSearch(BaseTransfer):
 
         return results
 
-    def _compute_departure_velocity(
-        self, orbit_state: np.ndarray, alpha: float
-    ) -> np.ndarray:
+    def _compute_departure_velocity(self, orbit_state: np.ndarray, alpha: float) -> np.ndarray:
         """计算出发点速度扰动 (平面)"""
         pos = orbit_state[:3]
         vel = orbit_state[3:]
@@ -592,7 +534,7 @@ def _process_departure_worker(
     arrival_times: np.ndarray,
     arrival_period: float,
     mu: float,
-    config: TransferSearchConfig,
+    config: SearchConfig,
     dep_name: str,
     arr_name: str,
 ) -> List[TransferSearchResult]:
@@ -621,9 +563,7 @@ def _process_departure_worker(
     )
 
     new_config = searcher._search_config
-    results = searcher._search_single_departure(
-        dep_state, dep_time, arrival_orbit, new_config
-    )
+    results = searcher._search_single_departure(dep_state, dep_time, arrival_orbit, new_config)
     for r in results:
         r.departure_orbit_name = dep_name
         r.arrival_orbit_name = arr_name

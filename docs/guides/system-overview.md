@@ -46,9 +46,9 @@ E2M2E 采用模块化设计，包含四个核心模块：
 
 | 文件 | 类 | 职责 |
 |------|---|------|
-| `earth_moon_transfer.py` | `EarthMoonTransfer` | 地球→月球转移 |
-| `moon_earth_transfer.py` | `MoonEarthTransfer` | 月球→地球返回 |
-| `orbit_to_orbit_transfer.py` | `InterOrbitTransfer` | 轨道间转移（Homoclinic/Heteroclinic） |
+| `transfer_search.py` | `DROTransferSearch` | DRO→RO平面转移搜索 |
+| `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP优化 |
+| `transfer_base.py` | `SearchConfig` | 搜索配置基类 |
 
 ### Visualization（可视化模块）
 

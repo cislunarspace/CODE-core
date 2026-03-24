@@ -87,7 +87,6 @@ plt.show()
 | `algorithms.continuation` | `algorithms/continuation.py` | `ContinuationMethod` |
 | `algorithms.differential_correction` | `algorithms/differential_correction.py` | `DifferentialCorrection` |
 | `algorithms.stability` | `algorithms/stability.py` | `StabilityAnalysis` |
-| `transfer.inter_orbit` | `transfer/orbit_to_orbit_transfer.py` | `InterOrbitTransfer` |
-| `transfer.earth_moon` | `transfer/earth_moon_transfer.py` | `EarthMoonTransfer` |
-| `transfer.moon_earth` | `transfer/moon_earth_transfer.py` | `MoonEarthTransfer` |
+| `transfer.transfer_search` | `transfer/transfer_search.py` | `DROTransferSearch` |
+| `transfer.transfer_optimization` | `transfer/transfer_optimization.py` | `DROTRONLPOptimizer` |
 | `visualization.plotting` | `visualization/plotting.py` | Plotting functions |

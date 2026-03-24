@@ -46,9 +46,9 @@ Implements orbit transfer design based on core modules:
 
 | File | Class | Responsibilities |
 |------|-------|------------------|
-| `earth_moon_transfer.py` | `EarthMoonTransfer` | Earth→Moon transfer |
-| `moon_earth_transfer.py` | `MoonEarthTransfer` | Moon→Earth return |
-| `orbit_to_orbit_transfer.py` | `InterOrbitTransfer` | Orbit-to-orbit transfer (Homoclinic/Heteroclinic) |
+| `transfer_search.py` | `DROTransferSearch` | DRO→RO planar transfer search |
+| `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP optimization |
+| `transfer_base.py` | `SearchConfig` | Search configuration base |
 
 ### Visualization Module
 
