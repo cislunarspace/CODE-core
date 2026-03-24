@@ -19,6 +19,11 @@ from ..core.orbit import Orbit
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.system import CR3BP_System
 
+try:
+    import coptpy
+except ImportError:
+    coptpy = None
+
 
 class TransferType(Enum):
     """转移类型枚举"""
@@ -706,10 +711,11 @@ def optimize_transfer(
     return optimizer.optimize(initial_guess=initial_guess, **kwargs)
 
 
-class COPTNLPCallback:
+class COPTNLPCallback(coptpy.NlpCallbackBase):
     """COPT NLP回调类
 
     用于COPT非线性优化问题的目标函数和约束计算。
+    继承自coptpy.NlpCallbackBase以正确处理SWIG绑定。
 
     属性:
         optimizer: DROTRONLPOptimizer实例
@@ -717,13 +723,13 @@ class COPTNLPCallback:
     """
 
     def __init__(self, optimizer: DROTRONLPOptimizer):
+        import coptpy
+        super().__init__()
         self.optimizer = optimizer
         self.x = None
 
     def EvalObj(self, xdata, outdata):
         """计算目标函数值 J(y) = Δv1 + Δv2"""
-        import numpy as np
-
         x = np.array(xdata)
         self.x = x
         obj = self.optimizer.objective_function(x)
@@ -732,8 +738,6 @@ class COPTNLPCallback:
 
     def EvalGrad(self, xdata, outdata):
         """计算目标函数梯度 (数值差分)"""
-        import numpy as np
-
         x = np.array(xdata)
         self.x = x
         h = 1e-8
@@ -749,29 +753,22 @@ class COPTNLPCallback:
 
     def EvalCon(self, xdata, outdata):
         """计算约束函数值"""
-        import numpy as np
-
         x = np.array(xdata)
         self.x = x
 
-        # 位置连续性约束
         pos_con = self.optimizer.constraint_position(x)
-        # 速度平行性约束
         vel_con = self.optimizer.constraint_velocity_parallel(x)
 
-        outdata[0] = pos_con  # = 0 (等式约束)
-        outdata[1] = vel_con  # = 0 (等式约束)
+        outdata[0] = pos_con
+        outdata[1] = vel_con
         return 0
 
     def EvalJac(self, xdata, outdata):
         """计算约束函数Jacobian矩阵 (数值差分)"""
-        import numpy as np
-
         x = np.array(xdata)
         self.x = x
         h = 1e-8
 
-        # 位置约束梯度
         pos_con = self.optimizer.constraint_position(x)
         grad_pos = np.zeros(3)
         for i in range(3):
@@ -779,7 +776,6 @@ class COPTNLPCallback:
             x_pert[i] += h
             grad_pos[i] = (self.optimizer.constraint_position(x_pert) - pos_con) / h
 
-        # 速度约束梯度
         vel_con = self.optimizer.constraint_velocity_parallel(x)
         grad_vel = np.zeros(3)
         for i in range(3):
@@ -787,29 +783,20 @@ class COPTNLPCallback:
             x_pert[i] += h
             grad_vel[i] = (self.optimizer.constraint_velocity_parallel(x_pert) - vel_con) / h
 
-        # Jacobian矩阵 (稀疏格式，按行主序)
-        # 约束0: 位置约束
         outdata[0] = grad_pos[0]
         outdata[1] = grad_pos[1]
         outdata[2] = grad_pos[2]
-        # 约束1: 速度约束
         outdata[3] = grad_vel[0]
         outdata[4] = grad_vel[1]
         outdata[5] = grad_vel[2]
         return 0
 
     def EvalHess(self, xdata, sigma, lam, outdata):
-        """计算Hessian矩阵 (数值差分)
-
-        注意: 这里使用梯度差分近似Hessian，实际应该计算Lagrangian的Hessian
-        """
-        import numpy as np
-
+        """计算Hessian矩阵 (数值差分)"""
         x = np.array(xdata)
         self.x = x
         h = 1e-6
 
-        # 目标函数Hessian近似
         grad_f = np.zeros(3)
         f0 = self.optimizer.objective_function(x)
         for i in range(3):
@@ -836,8 +823,6 @@ class COPTNLPCallback:
                 hess_f[i, j] = (f_ij - f_i - f_j + f0) / (h * h)
                 hess_f[j, i] = hess_f[i, j]
 
-        # Lagrangian Hessian ≈ sigma * Hessian(f) + sum(lam[i] * Hessian(g_i))
-        # 这里简化处理，只使用目标函数Hessian
         idx = 0
         for i in range(3):
             for j in range(i + 1):
@@ -918,7 +903,7 @@ class COPTNLPSolver:
         self.model.loadNlData(
             nCols=3,
             nRows=2,
-            sense=self.coptpy.MINIMIZE,
+            sense=self.coptpy.COPT.MINIMIZE,
             nGrad=3,
             idxGrad=[0, 1, 2],
             nJac=n_jac,
@@ -938,7 +923,7 @@ class COPTNLPSolver:
 
         # 设置参数
         self.model.setParam(self.coptpy.COPT.Param.NLPTol, 1e-10)
-        self.model.setParam(self.coptpy.COPT.Param.MaxIter, self.options.get("max_iter", 1000))
+        self.model.setParam(self.coptpy.COPT.Param.NLPIterLimit, self.options.get("max_iter", 1000))
 
         return True
 

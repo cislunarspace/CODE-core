@@ -10,7 +10,6 @@ docs/
 ├── guides/               # 使用指南
 │   ├── system-overview.md    # 系统架构与设计
 │   ├── orbit-generation.md  # 轨道生成教程
-│   ├── transfer-design.md   # 转移轨道设计
 │   └── visualization-guide.md # 可视化教程
 ├── core/                 # 核心模块
 │   ├── system.md         # CR3BP_System - 系统参数
@@ -21,10 +20,6 @@ docs/
 │   ├── continuation.md       # 延拓法
 │   ├── differential_correction.md  # 微分修正
 │   └── stability.md          # 稳定性分析
-├── transfer/            # 转移模块
-│   ├── inter_orbit.md       # InterOrbitTransfer - 轨道间转移
-│   ├── earth_moon.md        # EarthMoonTransfer - 地月转移
-│   └── moon_earth.md        # MoonEarthTransfer - 月地转移
 ├── visualization/       # 可视化模块
 │   └── plotting.md          # 绘图函数
 └── reference/           # 技术参考
@@ -40,7 +35,6 @@ docs/
 |------|------|
 | [系统总览](guides/system-overview.md) | 架构设计、模块职责、数据流、典型工作流 |
 | [轨道生成](guides/orbit-generation.md) | DRO、Halo、Lissajous 轨道生成教程 |
-| [转移设计](guides/transfer-design.md) | 地月/月地转移、轨道间转移设计 |
 | [可视化指南](guides/visualization-guide.md) | 绘图功能详解、2D/3D 可视化 |
 
 ### 核心模块 (core)
@@ -60,17 +54,6 @@ docs/
 | `ContinuationMethod` | [algorithms/continuation.md](algorithms/continuation.md) | 弧长延拓法 |
 | `DifferentialCorrection` | [algorithms/differential_correction.md](algorithms/differential_correction.md) | 周期轨道修正 |
 | `StabilityAnalysis` | [algorithms/stability.md](algorithms/stability.md) | Floquet稳定性分析 |
-
-### 转移模块 (transfer)
-
-| 类/模块 | 文件 | 说明 |
-|---------|------|------|
-| `InterOrbitTransfer` | [transfer/inter_orbit.md](transfer/inter_orbit.md) | 轨道间转移设计 |
-| `DROROTransferSearch` | [transfer/inter_orbit.md](transfer/inter_orbit.md) | DRO→RO转移搜索 (见下方注意事项) |
-| `EarthMoonTransfer` | [transfer/earth_moon.md](transfer/earth_moon.md) | 地月转移设计 |
-| `MoonEarthTransfer` | [transfer/moon_earth.md](transfer/moon_earth.md) | 月地返回设计 |
-
-> **注意**: `DROROTransferSearch` 类实际位于 `e2m2e/transfer/dro_ro_search.py`（原始版本）和 `e2m2e/transfer/dro_ro_search_v2.py`（修复bug版本）。`inter_orbit.md` 文档描述的是该类的使用方法。
 
 ### 可视化模块 (visualization)
 
