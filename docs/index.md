@@ -10,7 +10,8 @@ docs/
 ├── guides/               # 使用指南
 │   ├── system-overview.md    # 系统架构与设计
 │   ├── orbit-generation.md  # 轨道生成教程
-│   └── visualization-guide.md # 可视化教程
+│   ├── visualization-guide.md # 可视化教程
+│   └── release.md            # PyPI 发布指南
 ├── core/                 # 核心模块
 │   ├── system.md         # CR3BP_System - 系统参数
 │   ├── dynamics.md       # CR3BP_Dynamics - 动力学
@@ -36,6 +37,7 @@ docs/
 | [系统总览](guides/system-overview.md) | 架构设计、模块职责、数据流、典型工作流 |
 | [轨道生成](guides/orbit-generation.md) | DRO、Halo、Lissajous 轨道生成教程 |
 | [可视化指南](guides/visualization-guide.md) | 绘图功能详解、2D/3D 可视化 |
+| [发布指南](guides/release.md) | PyPI 发布流程、版本管理 |
 
 ### 核心模块 (core)
 
