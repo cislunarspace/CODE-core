@@ -13,7 +13,7 @@ sys.path.insert(0, str(project_root))
 from e2m2e.core.system import CR3BP_System
 from e2m2e.core.dynamics import CR3BP_Dynamics
 from e2m2e.core.orbit import Orbit
-from e2m2e.transfer.dro_ro_nlp import (
+from e2m2e.transfer.dro_transfer_optimization import (
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
     NLPOptimizationResult,

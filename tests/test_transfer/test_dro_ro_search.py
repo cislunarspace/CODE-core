@@ -10,7 +10,7 @@ import numpy as np
 from e2m2e.core.orbit import Orbit
 from e2m2e.core.dynamics import CR3BP_Dynamics
 from e2m2e.core.system import CR3BP_System
-from e2m2e.transfer.dro_ro_search import (
+from e2m2e.transfer.dro_transfer_search import (
     TransferSearchConfig,
     TransferSearchResult,
     DROROTransferSearch,

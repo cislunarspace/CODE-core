@@ -217,7 +217,7 @@ class MoonEarthTransfer:
             dict: 流形返回设计结果
         """
         # 复用EarthMoonTransfer中的流形计算，但使用不稳定流形
-        from .earth_moon import EarthMoonTransfer
+        from .earth_moon_transfer import EarthMoonTransfer
 
         e2m = EarthMoonTransfer(self.system, self.dynamics)
         result = e2m.design_manifold_transfer(
