@@ -64,7 +64,7 @@ viz.create_overview_plot(orbit)
 viz.show()
 ```
 
-更多可视化功能和使用示例，请参考 [可视化模块使用指南](docs/visualization_guide.md)。
+更多可视化功能和使用示例，请参考 [可视化模块使用指南](docs/guides/visualization-guide.md)。
 
 ## 开发与贡献
 
