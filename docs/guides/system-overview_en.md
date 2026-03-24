@@ -46,9 +46,9 @@ Implements orbit transfer design based on core modules:
 
 | File | Class | Responsibilities |
 |------|-------|------------------|
-| `earth_moon.py` | `EarthMoonTransfer` | Earth→Moon transfer |
-| `moon_earth.py` | `MoonEarthTransfer` | Moon→Earth return |
-| `inter_orbit.py` | `InterOrbitTransfer` | Orbit-to-orbit transfer (Homoclinic/Heteroclinic) |
+| `earth_moon_transfer.py` | `EarthMoonTransfer` | Earth→Moon transfer |
+| `moon_earth_transfer.py` | `MoonEarthTransfer` | Moon→Earth return |
+| `orbit_to_orbit_transfer.py` | `InterOrbitTransfer` | Orbit-to-orbit transfer (Homoclinic/Heteroclinic) |
 
 ### Visualization Module
 
