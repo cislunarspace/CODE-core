@@ -3,78 +3,170 @@
 **地月空间转移轨道设计库**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![Status](https://img.shields.io/badge/Status-Alpha-orange)](https://www.python.org/)
 
-`e2m2e` 是一个设计地月空间**运行轨道**和**转移轨道**的Python库。该库使用了面向对象编程，提供了模块化的设计。
+`e2m2e` 是一个用于设计地月空间**运行轨道**和**转移轨道**的 Python 库，基于圆型限制性三体问题 (CR3BP) 的轨道动力学建模。
+
+## 核心功能
+
+- **CR3BP 系统建模**：支持地月、日地、日木等常见天体系统
+- **多种轨道类型**：DRO、ARO、RO、Halo、Lyapunov、Lissajous、Butterfly 等
+- **轨道设计算法**：微分修正、自然延拓、伪弧长延拓、稳定性分析
+- **转移轨道搜索**：网格搜索、NLP 优化、脉冲转移设计
+- **可视化工具**：2D/3D 轨道绘图、Jacobi 常数图、稳定性分析图
+
+## 支持的轨道类型
+
+| 轨道类型 | 描述 |
+|---------|------|
+| **DRO** | 远距离逆行轨道 (Distant Retrograde Orbit) |
+| **RO** | 共振轨道 (Resonant Orbit)，支持 3:2、4:3 等多种共振 |
+| **ARO** | 轴向共振轨道 (Axial Resonant Orbit) |
+| **Halo** | Halo 轨道，周期轨道的一种 |
+| **Lyapunov** | Lyapunov 轨道，平面周期轨道 |
+| **Lissajous** | Lissajous 轨道，拟周期轨道 |
+| **Butterfly** | Butterfly 轨道，关于 xy 面对称 |
+| **Dragonfly** | Dragonfly 轨道，多重对称性 |
 
 ## 安装
 
 ### 从源码安装
 
 ```bash
-# 克隆仓库
-git clone https://gitee.com/cislunarspace/e2m2e.git
+git clone https://github.com/cislunarspace/e2m2e.git
 cd e2m2e
-
-# 安装依赖
 python -m pip install -e .
+```
+
+### 开发依赖
+
+```bash
+pip install -e ".[dev]"
 ```
 
 ## 快速开始
 
+### 1. 创建系统并计算平动点
+
 ```python
 import e2m2e
-from e2m2e.core.system import CR3BP_System
+from e2m2e.core import CR3BP_System
 
-# 1. 创建地月系统
+# 创建地月系统
 system = CR3BP_System.from_known_system("earth_moon")
 system.set_characteristic_scales(distance=384400, period=27.32 * 86400)
 system.compute_libration_points()
-
-# 使用 info() 方法查看系统信息
 system.info()
-
-# 2. 获取平动点信息
-print(f"L1点位置: {system.L1}")
-print(f"L2点位置: {system.L2}")
-
-# 3. 计算Jacobi常数
-state = [0.8, 0.1, 0.0, 0.0, 0.2, 0.0]
-jacobi_constant = system.get_jacobi_constant(state)
-print(f"Jacobi常数: {jacobi_constant:.4f}")
 ```
 
-## 可视化功能
-
-`e2m2e` 提供了强大的轨道可视化功能：
+### 2. 生成 DRO 轨道族
 
 ```python
-from e2m2e.visualization.plotting import OrbitVisualizer
+import e2m2e
+from e2m2e.core import CR3BP_System, Orbit
+from e2m2e.algorithms import DifferentialCorrection, Continuation
 
-# 创建可视化器
+# 初始化
+system = CR3BP_System(mu=0.01215, primary="earth", secondary="moon")
+dynamics = e2m2e.core.dynamics.CR3BP_Dynamics(system=system)
+
+# 种子轨道
+x0 = 0.79188556619742
+vy0 = 0.53682
+initial_state = [x0, 0.0, 0.0, 0.0, vy0, 0.0]
+seed_orbit = Orbit(states=[initial_state], times=[0])
+seed_orbit.period = 3.472526005624708
+
+# 微分修正
+corrector = DifferentialCorrection(dynamic=dynamics)
+corrector.setup_2D_symmetric_x_fixed_x0(x0=x0)
+seed_dro = corrector.iterate_correction(initial_guess=seed_orbit)
+
+# 自然延拓生成轨道族
+continuation = Continuation(corrector=corrector)
+family = continuation.natural_continuation(
+    seed_orbit=seed_dro,
+    param_range=(0.14, 0.9),
+    step_size=0.005,
+)
+```
+
+### 3. 转移轨道搜索
+
+```python
+from e2m2e.transfer import DROTransferSearch
+
+searcher = DROTransferSearch(system, dynamics)
+searcher.set_departure_orbit(departure_orbit)
+searcher.set_arrival_orbit(arrival_orbit)
+results = searcher.search()
+```
+
+### 4. 可视化
+
+```python
+from e2m2e.visualization import OrbitVisualizer
+
 viz = OrbitVisualizer(system)
-
-# 绘制2D投影（假设orbit是轨道数据）
-viz.plot_2d_projection(orbit, plane='xy', color='blue', label='My Orbit')
-viz.plot_primary_bodies()      # 添加天体
-viz.plot_libration_points()    # 添加平动点
-viz.show()                     # 显示图形
-
-# 创建综合概览图
-viz.create_overview_plot(orbit)
+viz.plot_2d_projection(orbit, plane='xy', color='blue')
+viz.plot_primary_bodies()
+viz.plot_libration_points()
 viz.show()
 ```
 
-更多可视化功能和使用示例，请参考 [可视化模块使用指南](docs/guides/visualization-guide.md)。
+## 项目结构
+
+```
+e2m2e/
+├── core/                 # 核心模块
+│   ├── system.py         # CR3BP 系统定义
+│   ├── dynamics.py       # 动力学模型
+│   ├── orbit.py          # 轨道数据结构
+│   └── coordinate.py     # 坐标变换
+├── algorithms/           # 算法模块
+│   ├── differential_correction.py  # 微分修正
+│   ├── continuation.py            # 轨道延拓
+│   └── stability.py              # 稳定性分析
+├── transfer/            # 转移轨道设计
+│   ├── dro_transfer_search.py    # DRO 转移搜索
+│   ├── dro_transfer_optimization.py  # NLP 优化
+│   ├── earth_moon_transfer.py     # 地球到月球
+│   └── moon_earth_transfer.py    # 月球到地球
+└── visualization/       # 可视化
+    └── plotting.py     # 绘图工具
+```
+
+## 算法介绍
+
+### 微分修正 (Differential Correction)
+
+通过迭代修正轨道初始状态，使轨道满足周期性边界条件：
+
+- 2D X 对称固定 x0
+- 3D XZ 对称固定 z0
+- 垂直轨道修正
+
+### 轨道延拓 (Continuation)
+
+从种子轨道出发，参数化延拓生成完整轨道族：
+
+- **自然延拓**：逐步改变参数值
+- **伪弧长延拓**：跨越分岔点
+
+### 稳定性分析 (Stability Analysis)
+
+计算 Floquet 乘子，分析轨道稳定性：
+
+- 特征值计算
+- 分岔点检测
+- 稳定性指标
 
 ## 开发与贡献
 
 ### 运行测试
 
 ```bash
-# 安装开发依赖
-pip install -e ".[dev]"
-
-# 运行测试
 pytest tests/
 ```
 
@@ -83,25 +175,44 @@ pytest tests/
 本项目使用 [Ruff](https://github.com/astral-sh/ruff) 进行代码格式化：
 
 ```bash
-# 检查代码格式
-ruff check .
-
-# 自动修复代码格式
-ruff check --fix .
-
-# 格式化代码
-ruff format .
+ruff check .          # 检查
+ruff check --fix .    # 自动修复
+ruff format .         # 格式化
 ```
 
 ### 提交贡献
 
 1. Fork 本仓库
 2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add some amazing feature'`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 开启 Pull Request
 
-## 🙏 致谢
+## 文档
+
+更多文档请参考 [`docs/`](docs/) 目录：
+
+- [系统架构](docs/guides/system-overview.md)
+- [轨道生成教程](docs/guides/orbit-generation.md)
+- [可视化指南](docs/guides/visualization-guide.md)
+- [发布指南](docs/guides/release.md)
+
+## 致谢
 
 - 感谢所有三体问题研究者的开创性工作
 - 感谢开源社区提供的优秀工具和库
+
+## 引用
+
+如果您在学术工作中使用了 e2m2e，请引用：
+
+```bibtex
+@software{e2m2e,
+  title = {e2m2e: Earth to Moon, Moon to Earth Transfer Orbit Design Library},
+  author = {ouyangjiahong},
+  email = {ouyangjiahong22@nudt.edu.cn},
+  url = {https://github.com/cislunarspace/e2m2e},
+  version = {3.1.11},
+  year = {2026},
+}
+```
