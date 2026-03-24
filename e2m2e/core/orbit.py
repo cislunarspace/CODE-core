@@ -21,6 +21,36 @@ from .system import CR3BP_System
 from .dynamics import CR3BP_Dynamics
 
 
+def _validate_path_within_cwd(filepath: Union[str, Path]) -> Path:
+    """验证文件路径是否在当前工作目录内，防止路径遍历攻击。
+
+    参数：
+    - filepath: 文件路径
+
+    返回：
+    - 验证后的绝对路径
+
+    异常：
+    - ValueError: 当路径指向当前工作目录之外时抛出
+    """
+    filepath = Path(filepath)
+    if not filepath.is_absolute():
+        filepath = Path.cwd() / filepath
+
+    resolved_path = filepath.resolve()
+    cwd = Path.cwd().resolve()
+
+    try:
+        resolved_path.relative_to(cwd)
+    except ValueError:
+        raise ValueError(
+            f"路径遍历检测：文件路径 '{filepath}' 指向当前工作目录 '{cwd}' 之外，"
+            f"为防止安全风险，已拒绝此操作。"
+        )
+
+    return resolved_path
+
+
 class Orbit:
     """轨道数据和处理
 
@@ -301,12 +331,17 @@ class Orbit:
         """保存轨道数据到文件
 
         参数：
-        - filename: 文件名
+        - filename: 文件名（必须是相对路径，且指向当前工作目录内）
+
+        异常：
+        - ValueError: 当路径指向当前工作目录之外时抛出
         """
+        validated_path = _validate_path_within_cwd(filename)
+
         # 自动创建目录
-        dirpath = os.path.dirname(filename)
-        if dirpath and not os.path.exists(dirpath):
-            os.makedirs(dirpath)
+        dirpath = validated_path.parent
+        if not dirpath.exists():
+            dirpath.mkdir(parents=True)
 
         # 加入时间戳字段
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -322,26 +357,26 @@ class Orbit:
                 "extrema": self.extrema,
                 "mean_state": self.mean_state.tolist() if self.mean_state is not None else None,
                 "family_type": self.family_type,
-                "is_periodic": bool(self.is_periodic),  # 转换为Python布尔值
+                "is_periodic": bool(self.is_periodic),
                 "periodicity_error": self.periodicity_error,
             },
             "timestamp": timestamp,
         }
 
-        with open(filename, "w") as f:
+        with open(validated_path, "w") as f:
             json.dump(data, f, indent=2)
 
     @classmethod
     def load_from_file(
-        cls, 
-        filename: Union[str, Path], 
+        cls,
+        filename: Union[str, Path],
         system: Optional[CR3BP_System] = None,
         orbit_index: Optional[int] = None
     ) -> "Orbit":
         """从文件加载轨道数据
 
         参数：
-        - filename: 文件名
+        - filename: 文件名（必须是相对路径，且指向当前工作目录内）
         - system: CR3BP_System对象（可选）
         - orbit_index: 轨道索引（可选），当文件为轨道族格式时有效
 
@@ -349,12 +384,16 @@ class Orbit:
         - 如果提供 orbit_index：返回指定单条 Orbit
         - 如果不提供 orbit_index 且文件为单轨道格式：返回 Orbit
         - 如果不提供 orbit_index 且文件为轨道族格式：返回 OrbitFamily
-        
+
         注意：
         - 单轨道格式包含 "states", "times", "metadata", "properties" 字段
         - 轨道族格式包含 "orbits" 数组字段
+
+        异常：
+        - ValueError: 当路径指向当前工作目录之外时抛出
         """
-        with open(filename, "r") as f:
+        validated_path = _validate_path_within_cwd(filename)
+        with open(validated_path, "r") as f:
             data = json.load(f)
 
         # 判断是轨道族格式还是单轨道格式
@@ -598,13 +637,17 @@ class OrbitFamily:
         """保存轨道族到文件
 
         参数：
-        - filename: 文件名
+        - filename: 文件名（必须是相对路径，且指向当前工作目录内）
+
+        异常：
+        - ValueError: 当路径指向当前工作目录之外时抛出
         """
+        validated_path = _validate_path_within_cwd(filename)
 
         # 自动创建目录
-        dirpath = os.path.dirname(filename)
-        if dirpath and not os.path.exists(dirpath):
-            os.makedirs(dirpath)
+        dirpath = validated_path.parent
+        if not dirpath.exists():
+            dirpath.mkdir(parents=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.metadata["saved_timestamp"] = timestamp
@@ -629,7 +672,7 @@ class OrbitFamily:
             "timestamp": timestamp,
         }
 
-        with open(filename, "w") as f:
+        with open(validated_path, "w") as f:
             json.dump(data, f, indent=2)
 
     @classmethod
@@ -639,13 +682,17 @@ class OrbitFamily:
         """从文件加载轨道族
 
         参数：
-        - filename: 文件名
-        - system: CR3BP_System对象 //TODO 这里目前默认都是CRTBP，以后还是得重构这部分代码
+        - filename: 文件名（必须是相对路径，且指向当前工作目录内）
+        - system: CR3BP_System对象
 
         返回：
         - OrbitFamily对象
+
+        异常：
+        - ValueError: 当路径指向当前工作目录之外时抛出
         """
-        with open(filename, "r") as f:
+        validated_path = _validate_path_within_cwd(filename)
+        with open(validated_path, "r") as f:
             data = json.load(f)
 
         orbits = []
