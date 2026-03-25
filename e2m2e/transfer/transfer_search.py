@@ -250,9 +250,11 @@ class DROTransferSearch(BaseTransfer):
         n_workers: Optional[int],
     ) -> List[Dict[str, Any]]:
         """执行网格搜索的内部方法"""
+        # 获取出发轨道和目标轨道的名称
         dep_name = getattr(departure_orbit, "name", "unknown")
         arr_name = getattr(arrival_orbit, "name", "unknown")
 
+        # //TODO 这是什么？
         departure_states, departure_times = self._sample_departure_points(departure_orbit)
         total_departures = len(departure_states)
 
@@ -280,11 +282,32 @@ class DROTransferSearch(BaseTransfer):
             )
 
     def _sample_departure_points(self, departure_orbit: Orbit) -> Tuple[np.ndarray, np.ndarray]:
-        """从轨道等时间间隔采样出发点"""
-        n = self.n_departure
-        times = np.linspace(0, departure_orbit.period, n, endpoint=False)
-        states = np.array([departure_orbit.interpolate_at_time(t) for t in times])
-        return states, times
+        """从星历中均匀下采样出发点：直接使用 ``Orbit.states`` / ``Orbit.times`` 已有行，不积分。
+
+        要求 ``n_departure <= len(times)``，否则报错。
+        """
+        times = departure_orbit.times
+        states = departure_orbit.states
+        n_pts = len(times)
+        if n_pts == 0:
+            raise ValueError("出发轨道无数据点")
+        n = int(self.n_departure)
+        if n <= 0:
+            raise ValueError("n_departure 须为正整数")
+        if n > n_pts:
+            raise ValueError(
+                f"n_departure（{n}）不能大于出发轨道星历点数（{n_pts}），请减小 n_departure 或增加星历密度"
+            )
+
+        n_sample = n
+        if n_sample == 1:
+            idx = np.array([0], dtype=int)
+        else:
+            idx = (np.arange(n_sample, dtype=float) * (n_pts - 1) / (n_sample - 1)).round().astype(
+                int
+            )
+
+        return states[idx].copy(), times[idx].copy()
 
     def _grid_search_sequential(
         self,
@@ -463,7 +486,7 @@ class DROTransferSearch(BaseTransfer):
         dt: float,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """前向积分转移轨迹"""
-        n_steps = max(int(transfer_time / dt) + 1, 100)
+        n_steps = max(int(transfer_time / dt) + 1, 2)
         t_eval = np.linspace(0, transfer_time, n_steps)
 
         result = self.dynamics.propagate(

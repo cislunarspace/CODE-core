@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.integrate import solve_ivp
-from typing import Dict, List, Tuple, Optional, Any, Callable
+from typing import Dict, List, Tuple, Optional, Any, Callable, TYPE_CHECKING
 
 import numpy.typing as npt
 
 from .system import System, CR3BP_System
+
+if TYPE_CHECKING:
+    from .orbit import Orbit
 
 
 class Dynamics:
@@ -387,6 +390,43 @@ class CR3BP_Dynamics(Dynamics):
                 "jacobi_error": self.jacobi_error,
             }
 
+    def propagate_orbit_state_at_time(
+        self,
+        orbit: Orbit,
+        t: float,
+        integration_dt: float = 0.01,
+    ) -> npt.NDArray[np.floating]:
+        """从轨道首点状态沿本对象的 :meth:`propagate` 积分到给定时刻对应的相位（周期轨道上对周期取模）。
+
+        参数：
+        - orbit: 周期轨道数据（须含 ``states``、``times``、有效 ``period``）
+        - t: 与轨道 ``times`` 一致的时间坐标（绝对时间）
+        - integration_dt: 构造 ``t_eval`` 的步长
+
+        返回：
+        - 积分末端状态 ``[x, y, z, vx, vy, vz]``
+        """
+        if orbit.states.shape[0] < 1:
+            raise ValueError("轨道无状态")
+        if orbit.period is None or orbit.period <= 0:
+            raise ValueError("轨道周期无效，无法沿周期外推")
+
+        t0 = float(orbit.times[0])
+        period = float(orbit.period)
+        t_rel = float(np.mod(t - t0, period))
+        if t_rel < 1e-14:
+            return np.asarray(orbit.states[0], dtype=float).copy()
+
+        n_steps = max(int(np.ceil(t_rel / integration_dt)) + 1, 2)
+        t_eval = np.linspace(t0, t0 + t_rel, n_steps)
+        result = self.propagate(
+            initial_state=orbit.states[0],
+            t_span=(t0, t0 + t_rel),
+            t_eval=t_eval,
+            with_stm=False,
+        )
+        return np.asarray(result["states"][-1], dtype=float)
+
     def compute_state_transition_matrix(
         self, initial_state: npt.ArrayLike, t: float
     ) -> npt.NDArray[np.floating]:
@@ -400,7 +440,7 @@ class CR3BP_Dynamics(Dynamics):
         - 状态转移矩阵 (6x6)
         """
         # 传播轨迹并计算STM
-        result = self.propagate(initial_state, [0, t], with_stm=True)
+        result = self.propagate(initial_state, (0.0, float(t)), with_stm=True)
 
         # 返回最终时刻的STM
         return result["stm"][-1]
@@ -446,3 +486,13 @@ class CR3BP_Dynamics(Dynamics):
             f"CR3BP_Dynamics(system={self.system}, integrator='{self.integrator}', "
             f"rtol={self.rtol}, atol={self.atol}, max_step={self.max_step})"
         )
+
+
+def propagate_state_at_orbit_time(
+    orbit: Any,
+    t: float,
+    dynamics: CR3BP_Dynamics,
+    integration_dt: float = 0.01,
+) -> npt.NDArray[np.floating]:
+    """委托 :meth:`CR3BP_Dynamics.propagate_orbit_state_at_time`，便于与 ``from e2m2e.core import ...`` 兼容。"""
+    return dynamics.propagate_orbit_state_at_time(orbit, t, integration_dt)

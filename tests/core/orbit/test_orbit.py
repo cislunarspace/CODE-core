@@ -89,31 +89,6 @@ class TestComputeBasicProperties:
         assert "x_min" in orbit.extrema
 
 
-class TestInterpolateAtTime:
-    """测试时间插值"""
-
-    def test_interpolate_at_time(self):
-        """测试指定时间插值"""
-        # 创建简单轨道数据
-        states = np.array(
-            [
-                [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-                [0.0, 1.0, 0.0, -1.0, 0.0, 0.0],
-                [-1.0, 0.0, 0.0, 0.0, -1.0, 0.0],
-                [0.0, -1.0, 0.0, 1.0, 0.0, 0.0],
-                [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-            ]
-        )
-        times = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
-
-        orbit = Orbit(states, times)
-
-        # 在中间时间插值
-        interpolated = orbit.interpolate_at_time(0.5)
-
-        assert interpolated.shape == (6,)
-
-
 class TestSaveAndLoad:
     """测试保存和加载"""
 

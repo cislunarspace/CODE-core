@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import os
 import numpy as np
-from scipy import interpolate
-from scipy.interpolate import interp1d
 import json
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Any, Callable, Union
@@ -38,7 +36,6 @@ class Orbit:
     - compute_stability(): 计算稳定性
     - get_period(): 获取轨道周期
     - get_amplitude(direction): 获取指定方向振幅
-    - interpolate_at_time(t): 时间插值
     - save_to_file(filename): 保存轨道数据
     - load_from_file(filename): 加载轨道数据
     """
@@ -53,7 +50,6 @@ class Orbit:
         "dragonfly",
     ]
     VALID_COMPONENTS = ["x", "y", "z", "vx", "vy", "vz"]
-    DEFAULT_INTERPOLATION_KIND = "cubic"  # 插值类型
 
     def __init__(
         self,
@@ -98,10 +94,6 @@ class Orbit:
         self.eigenvalues = None  # 特征值
         self.stability = None  # 稳定性标签 ('stable', 'unstable', 'marginally_stable')
         self.lyapunov_exponents = None  # Lyapunov指数
-
-        # 插值对象
-        self.interpolators = {}  # 各分量的插值函数 {'x': interp_func, ...}
-        self.interpolation_kind = self.DEFAULT_INTERPOLATION_KIND  # 插值类型
 
         # 轨道几何特征
         self.center = None  # 轨道中心点
@@ -151,16 +143,6 @@ class Orbit:
         # 计算轨道中心（位置分量的平均值）
         self.center = self.mean_state[:3]
 
-        # 构建插值函数（需要至少2个点）
-        if len(self.times) >= 2:
-            for i, component in enumerate(self.VALID_COMPONENTS):
-                self.interpolators[component] = interpolate.interp1d(
-                    self.times,
-                    self.states[:, i],
-                    kind=self.interpolation_kind if len(self.times) >= 4 else "linear",
-                    fill_value="extrapolate",
-                )
-
         # 估计周期（如果轨道是周期的）
         self._estimate_period()
 
@@ -187,9 +169,11 @@ class Orbit:
         if self.period is None:
             return
 
-        # 计算轨道起点和终点状态
+        # 计算轨道起点与 t0+T 时刻最近采样点的状态（避免插值）
         start_state = self.states[0]
-        end_state = self.interpolate_at_time(self.period)
+        target_t = float(self.times[0]) + float(self.period)
+        idx = int(np.argmin(np.abs(self.times - target_t)))
+        end_state = self.states[idx]
 
         # 计算周期性误差
         self.periodicity_error = np.linalg.norm(start_state - end_state)
@@ -202,20 +186,6 @@ class Orbit:
             self.metadata["description"] = "Periodic orbit"
         else:
             self.metadata["description"] = "Non-periodic trajectory"
-
-    def interpolate_at_time(self, t: float) -> npt.NDArray[np.floating]:
-        """在指定时间插值轨道状态
-
-        参数：
-        - t: 时间值
-
-        返回：
-        - 插值后的状态向量
-        """
-        state = np.zeros(6)
-        for i, component in enumerate(self.VALID_COMPONENTS):
-            state[i] = self.interpolators[component](t)
-        return state
 
     def compute_monodromy_matrix(self, dynamics: CR3BP_Dynamics) -> npt.NDArray[np.floating]:
         """计算单值矩阵
@@ -457,9 +427,6 @@ class Orbit:
         new_orbit.lyapunov_exponents = (
             self.lyapunov_exponents.copy() if self.lyapunov_exponents is not None else None
         )
-
-        # 插值对象（重新构建）
-        new_orbit.interpolation_kind = self.interpolation_kind
 
         # 轨道几何特征
         new_orbit.center = self.center.copy() if self.center is not None else None
