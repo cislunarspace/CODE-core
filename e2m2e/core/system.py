@@ -25,7 +25,8 @@ class LibrationPoint(Enum):
 
 
 class System:
-    """通用天体系统基类
+    """通用天体系统基类 
+    //TODO 这个类设计的其实有问题，我希望System只负责基础的参数定义，后续我还需要基于这个类去定义CRTBP模型的系统、高精度星历模型的系统、椭圆限制性三体问题模型的系统等。现在System类还无法适应后续的修改。
 
     属性：
     - primary_body: 主天体名称
