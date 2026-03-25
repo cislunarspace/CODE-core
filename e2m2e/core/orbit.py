@@ -17,38 +17,8 @@ from pathlib import Path
 
 import numpy.typing as npt
 
-from .system import CR3BP_System
+from .system import System, CR3BP_System
 from .dynamics import CR3BP_Dynamics
-
-
-def _validate_path_within_cwd(filepath: Union[str, Path]) -> Path:
-    """验证文件路径是否在当前工作目录内，防止路径遍历攻击。
-
-    参数：
-    - filepath: 文件路径
-
-    返回：
-    - 验证后的绝对路径
-
-    异常：
-    - ValueError: 当路径指向当前工作目录之外时抛出
-    """
-    filepath = Path(filepath)
-    if not filepath.is_absolute():
-        filepath = Path.cwd() / filepath
-
-    resolved_path = filepath.resolve()
-    cwd = Path.cwd().resolve()
-
-    try:
-        resolved_path.relative_to(cwd)
-    except ValueError:
-        raise ValueError(
-            f"路径遍历检测：文件路径 '{filepath}' 指向当前工作目录 '{cwd}' 之外，"
-            f"为防止安全风险，已拒绝此操作。"
-        )
-
-    return resolved_path
 
 
 class Orbit:
@@ -336,10 +306,10 @@ class Orbit:
         异常：
         - ValueError: 当路径指向当前工作目录之外时抛出
         """
-        validated_path = _validate_path_within_cwd(filename)
+        filepath = Path(filename)
 
         # 自动创建目录
-        dirpath = validated_path.parent
+        dirpath = filepath.parent
         if not dirpath.exists():
             dirpath.mkdir(parents=True)
 
@@ -363,7 +333,7 @@ class Orbit:
             "timestamp": timestamp,
         }
 
-        with open(validated_path, "w") as f:
+        with open(filepath, "w") as f:
             json.dump(data, f, indent=2)
 
     @classmethod
@@ -392,8 +362,8 @@ class Orbit:
         异常：
         - ValueError: 当路径指向当前工作目录之外时抛出
         """
-        validated_path = _validate_path_within_cwd(filename)
-        with open(validated_path, "r") as f:
+        filepath = Path(filename)
+        with open(filepath, "r") as f:
             data = json.load(f)
 
         # 判断是轨道族格式还是单轨道格式
@@ -642,10 +612,10 @@ class OrbitFamily:
         异常：
         - ValueError: 当路径指向当前工作目录之外时抛出
         """
-        validated_path = _validate_path_within_cwd(filename)
+        filepath = Path(filename)
 
         # 自动创建目录
-        dirpath = validated_path.parent
+        dirpath = filepath.parent
         if not dirpath.exists():
             dirpath.mkdir(parents=True)
 
@@ -672,7 +642,7 @@ class OrbitFamily:
             "timestamp": timestamp,
         }
 
-        with open(validated_path, "w") as f:
+        with open(filepath, "w") as f:
             json.dump(data, f, indent=2)
 
     @classmethod
@@ -691,8 +661,8 @@ class OrbitFamily:
         异常：
         - ValueError: 当路径指向当前工作目录之外时抛出
         """
-        validated_path = _validate_path_within_cwd(filename)
-        with open(validated_path, "r") as f:
+        filepath = Path(filename)
+        with open(filepath, "r") as f:
             data = json.load(f)
 
         orbits = []
