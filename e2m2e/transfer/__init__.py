@@ -20,7 +20,6 @@ from . import transfer_optimization
 from .transfer_search import (
     DROTransferSearch,
     DROROTransferSearch,
-    TransferSearchResult,
     load_orbit_from_json,
     save_search_results,
 )
@@ -57,7 +56,6 @@ __all__ = [
     "SearchConfig",
     "OptimizationConfig",
     # 结果类
-    "TransferSearchResult",
     "TransferResult",
     "SearchResult",
     "NLPOptimizationResult",

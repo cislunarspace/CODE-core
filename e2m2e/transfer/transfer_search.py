@@ -38,17 +38,6 @@ from .transfer_base import (
 )
 
 
-class TransferSearchResult(SearchResult):
-    """平面转移轨道搜索结果
-
-    存储单次搜索尝试的完整结果。
-
-    警告:此类已被迁移到 base.SearchResult，建议使用新类。
-    """
-
-    pass
-
-
 class DROTransferSearch(BaseTransfer):
     """DRO到RO平面转移轨道搜索算法
 
@@ -76,6 +65,17 @@ class DROTransferSearch(BaseTransfer):
         self._verbose = True
         self._n_workers = None
 
+        self.alpha_min = 0.5
+        self.alpha_max = 2.5
+        self.n_alpha = 101
+        self.n_departure = 200
+        self.max_transfer_time = 15.0
+        self.intersection_threshold = 0.001
+        self.min_distance_threshold = 0.05
+        self.collision_earth_radius = 1.0 - 0.999
+        self.collision_moon_radius = 0.999
+        self.integration_dt = 0.01
+
     def set_verbose(self, verbose: bool) -> "DROTransferSearch":
         """设置是否输出详细信息"""
         self._verbose = verbose
@@ -87,13 +87,10 @@ class DROTransferSearch(BaseTransfer):
         return self
 
     def configure_search(self, **kwargs) -> "DROTransferSearch":
-        """配置搜索参数"""
-        if self._search_config is None:
-            self._search_config = SearchConfig(**kwargs)
-        else:
-            for key, value in kwargs.items():
-                if hasattr(self._search_config, key):
-                    setattr(self._search_config, key, value)
+        """配置搜索参数（向后兼容，推荐直接设置实例属性）"""
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
         return self
 
     def search(self, **kwargs) -> List[SearchResult]:
@@ -110,7 +107,6 @@ class DROTransferSearch(BaseTransfer):
         if self._departure_orbit is None or self._arrival_orbit is None:
             raise ValueError("必须先设置departure_orbit和arrival_orbit")
 
-        config = self._search_config or SearchConfig()
         verbose = kwargs.get("verbose", self._verbose)
         n_workers = kwargs.get("n_workers", self._n_workers)
 
@@ -120,14 +116,13 @@ class DROTransferSearch(BaseTransfer):
             print(f"{'=' * 60}")
             print(f"出发点: {self._departure_orbit}")
             print(f"目标: {self._arrival_orbit}")
-            print(f"α范围: [{config.alpha_min}, {config.alpha_max}], n={config.n_alpha}")
-            print(f"出发点数量: {config.n_departure}")
+            print(f"α范围: [{self.alpha_min}, {self.alpha_max}], n={self.n_alpha}")
+            print(f"出发点数量: {self.n_departure}")
             print(f"{'=' * 60}\n")
 
         results = self._grid_search(
             self._departure_orbit,
             self._arrival_orbit,
-            config,
             verbose,
             n_workers,
         )
@@ -199,7 +194,6 @@ class DROTransferSearch(BaseTransfer):
         self,
         departure_orbit: Orbit,
         arrival_orbit: Orbit,
-        config: SearchConfig,
         verbose: bool,
         n_workers: Optional[int],
     ) -> List[SearchResult]:
@@ -210,7 +204,7 @@ class DROTransferSearch(BaseTransfer):
         dep_name = getattr(departure_orbit, "name", "unknown")
         arr_name = getattr(arrival_orbit, "name", "unknown")
 
-        departure_states, departure_times = self._sample_departure_points(departure_orbit, config)
+        departure_states, departure_times = self._sample_departure_points(departure_orbit)
         total_departures = len(departure_states)
 
         if n_workers is None:
@@ -221,7 +215,6 @@ class DROTransferSearch(BaseTransfer):
                 departure_states,
                 departure_times,
                 arrival_orbit,
-                config,
                 dep_name,
                 arr_name,
                 verbose,
@@ -231,7 +224,6 @@ class DROTransferSearch(BaseTransfer):
                 departure_states,
                 departure_times,
                 arrival_orbit,
-                config,
                 dep_name,
                 arr_name,
                 verbose,
@@ -239,10 +231,10 @@ class DROTransferSearch(BaseTransfer):
             )
 
     def _sample_departure_points(
-        self, departure_orbit: Orbit, config: SearchConfig
+        self, departure_orbit: Orbit
     ) -> Tuple[np.ndarray, np.ndarray]:
         """从轨道等时间间隔采样出发点"""
-        n = config.n_departure
+        n = self.n_departure
         times = np.linspace(0, departure_orbit.period, n, endpoint=False)
         states = np.array([departure_orbit.interpolate_at_time(t) for t in times])
         return states, times
@@ -252,7 +244,6 @@ class DROTransferSearch(BaseTransfer):
         departure_states: np.ndarray,
         departure_times: np.ndarray,
         arrival_orbit: Orbit,
-        config: SearchConfig,
         dep_name: str,
         arr_name: str,
         verbose: bool,
@@ -266,7 +257,7 @@ class DROTransferSearch(BaseTransfer):
                 pct = (i + 1) / total_departures * 100
                 print(f"  进度: {i + 1}/{total_departures} ({pct:.1f}%)")
 
-            results = self._search_single_departure(dep_state, dep_time, arrival_orbit, config)
+            results = self._search_single_departure(dep_state, dep_time, arrival_orbit)
             for r in results:
                 r.departure_orbit_name = dep_name
                 r.arrival_orbit_name = arr_name
@@ -280,7 +271,6 @@ class DROTransferSearch(BaseTransfer):
         departure_states: np.ndarray,
         departure_times: np.ndarray,
         arrival_orbit: Orbit,
-        config: SearchConfig,
         dep_name: str,
         arr_name: str,
         verbose: bool,
@@ -300,7 +290,6 @@ class DROTransferSearch(BaseTransfer):
                     dep_state,
                     dep_time,
                     arrival_orbit,
-                    config,
                 ): i
                 for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times))
             }
@@ -329,12 +318,13 @@ class DROTransferSearch(BaseTransfer):
         departure_state: np.ndarray,
         departure_time: float,
         arrival_orbit: Orbit,
-        config: SearchConfig,
     ) -> List[SearchResult]:
         """对单个出发点搜索α网格"""
         results = []
 
-        for alpha in config.alpha_grid:
+        alpha_grid = np.linspace(self.alpha_min, self.alpha_max, self.n_alpha)
+
+        for alpha in alpha_grid:
             new_vel = self._compute_departure_velocity(departure_state, alpha)
 
             initial_state = np.concatenate(
@@ -346,7 +336,7 @@ class DROTransferSearch(BaseTransfer):
 
             try:
                 traj_states, traj_times = self._forward_integrate(
-                    initial_state, config.max_transfer_time, config.integration_dt
+                    initial_state, self.max_transfer_time, self.integration_dt
                 )
             except Exception:
                 result = SearchResult(
@@ -359,10 +349,10 @@ class DROTransferSearch(BaseTransfer):
                 results.append(result)
                 continue
 
-            collision, body, col_idx = self._check_collision(traj_states, config)
+            collision, body, col_idx = self._check_collision(traj_states)
             min_dist, min_idx = self._compute_min_distance(traj_states, arrival_orbit)
             intersection, int_point, int_idx = self._detect_intersection(
-                traj_states, arrival_orbit, config.intersection_threshold
+                traj_states, arrival_orbit, self.intersection_threshold
             )
             local_min, local_min_dist, local_min_idx = self._detect_local_minimum(
                 traj_states, arrival_orbit
@@ -393,7 +383,7 @@ class DROTransferSearch(BaseTransfer):
                 result.status = "collision"
             elif intersection:
                 result.status = "success"
-            elif min_dist < config.min_distance_threshold:
+            elif min_dist < self.min_distance_threshold:
                 result.status = "success"
             else:
                 result.status = "no_intersection"
@@ -500,7 +490,6 @@ class DROTransferSearch(BaseTransfer):
     def _check_collision(
         self,
         trajectory_states: np.ndarray,
-        config: SearchConfig,
     ) -> Tuple[bool, Optional[str], int]:
         """检测轨迹是否与地球或月球碰撞"""
         positions = trajectory_states[:, :3]
@@ -511,8 +500,8 @@ class DROTransferSearch(BaseTransfer):
         dist_earth = np.linalg.norm(positions - earth_center, axis=1)
         dist_moon = np.linalg.norm(positions - moon_center, axis=1)
 
-        earth_collision_idx = np.where(dist_earth < config.collision_earth_radius)[0]
-        moon_collision_idx = np.where(dist_moon < config.collision_moon_radius)[0]
+        earth_collision_idx = np.where(dist_earth < self.collision_earth_radius)[0]
+        moon_collision_idx = np.where(dist_moon < self.collision_moon_radius)[0]
 
         if len(earth_collision_idx) > 0:
             return True, "earth", int(earth_collision_idx[0])
@@ -537,7 +526,7 @@ def _process_departure_worker(
     config: SearchConfig,
     dep_name: str,
     arr_name: str,
-) -> List[TransferSearchResult]:
+) -> List[SearchResult]:
     """Worker function for parallel departure point processing.
 
     This is a module-level function to ensure pickling works on Windows (spawn mode).
@@ -549,6 +538,7 @@ def _process_departure_worker(
         system=CR3BP_System(mu=mu, primary="earth", secondary="moon"),
         dynamics=CR3BP_Dynamics(system=CR3BP_System(mu=mu, primary="earth", secondary="moon")),
     )
+
     searcher.configure_search(
         alpha_min=config.alpha_min,
         alpha_max=config.alpha_max,
@@ -562,8 +552,7 @@ def _process_departure_worker(
         integration_dt=config.integration_dt,
     )
 
-    new_config = searcher._search_config
-    results = searcher._search_single_departure(dep_state, dep_time, arrival_orbit, new_config)
+    results = searcher._search_single_departure(dep_state, dep_time, arrival_orbit)
     for r in results:
         r.departure_orbit_name = dep_name
         r.arrival_orbit_name = arr_name
