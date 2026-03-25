@@ -65,16 +65,51 @@ class DROTransferSearch(BaseTransfer):
         self._verbose = True
         self._n_workers = None
 
-        self.alpha_min = 0.5
-        self.alpha_max = 2.5
-        self.n_alpha = 101
-        self.n_departure = 200
-        self.max_transfer_time = 15.0
-        self.intersection_threshold = 0.001
-        self.min_distance_threshold = 0.05
-        self.collision_earth_radius = 1.0 - 0.999
-        self.collision_moon_radius = 0.999
-        self.integration_dt = 0.01
+        # α (切向速度比) 搜索范围
+        # 推荐值: alpha_min ∈ (0, 1.0], alpha_max ∈ [1.0, 3.0]
+        # 约束: 0 < alpha_min < alpha_max
+        self.alpha_min = None
+        self.alpha_max = None
+
+        # α 方向网格点数
+        # 推荐值: n_alpha ∈ [51, 2001], 典型值 101 或 201
+        # 约束: n_alpha >= 2
+        self.n_alpha = None
+
+        # 出发点采样数量
+        # 推荐值: n_departure ∈ [50, 500], 典型值 200
+        # 约束: n_departure >= 2
+        self.n_departure = None
+
+        # 最大转移时间 (CR3BP 无量纲时间单位)
+        # 推荐值: max_transfer_time ∈ [5.0, 30.0], 典型值 15.0
+        # 约束: max_transfer_time > 0
+        self.max_transfer_time = None
+
+        # 相交判定阈值 (无量纲距离)
+        # 推荐值: intersection_threshold ∈ [1e-4, 1e-2], 典型值 0.001
+        # 约束: intersection_threshold > 0
+        self.intersection_threshold = None
+
+        # 候选解最小距离阈值 (无量纲距离)
+        # 推荐值: min_distance_threshold ∈ [0.01, 0.1], 典型值 0.05
+        # 约束: min_distance_threshold > 0
+        self.min_distance_threshold = None
+
+        # 地球碰撞检测半径 (无量纲距离)
+        # 推荐值: 200 km ≈ 0.0005 (相对于地月距离 384405 km)
+        # 约束: collision_earth_radius > 0
+        self.collision_earth_radius = None
+
+        # 月球碰撞检测半径 (无量纲距离)
+        # 推荐值: 100 km ≈ 0.00026
+        # 约束: collision_moon_radius > 0
+        self.collision_moon_radius = None
+
+        # 积分时间步长 (CR3BP 无量纲时间)
+        # 推荐值: integration_dt ∈ [1e-4, 0.1], 典型值 0.01
+        # 约束: integration_dt > 0
+        self.integration_dt = None
 
     def set_verbose(self, verbose: bool) -> "DROTransferSearch":
         """设置是否输出详细信息"""
@@ -93,6 +128,71 @@ class DROTransferSearch(BaseTransfer):
                 setattr(self, key, value)
         return self
 
+    def _validate_search_parameters(self) -> None:
+        """验证搜索参数是否已正确设置
+
+        约束条件:
+            - alpha_min, alpha_max: 0 < alpha_min < alpha_max
+            - n_alpha, n_departure: >= 2
+            - max_transfer_time, intersection_threshold, min_distance_threshold: > 0
+            - collision_earth_radius, collision_moon_radius: > 0
+            - integration_dt: > 0
+        """
+        errors = []
+
+        if self.alpha_min is None:
+            errors.append("alpha_min 未设置 (推荐值: 0.5)")
+        if self.alpha_max is None:
+            errors.append("alpha_max 未设置 (推荐值: 2.5)")
+        if self.alpha_min is not None and self.alpha_max is not None:
+            if not (0 < self.alpha_min < self.alpha_max):
+                errors.append(f"alpha_min ({self.alpha_min}) 必须小于 alpha_max ({self.alpha_max})")
+
+        if self.n_alpha is None:
+            errors.append("n_alpha 未设置 (推荐值: 101)")
+        elif self.n_alpha < 2:
+            errors.append(f"n_alpha ({self.n_alpha}) 必须 >= 2")
+
+        if self.n_departure is None:
+            errors.append("n_departure 未设置 (推荐值: 200)")
+        elif self.n_departure < 2:
+            errors.append(f"n_departure ({self.n_departure}) 必须 >= 2")
+
+        if self.max_transfer_time is None:
+            errors.append("max_transfer_time 未设置 (推荐值: 15.0)")
+        elif self.max_transfer_time <= 0:
+            errors.append(f"max_transfer_time ({self.max_transfer_time}) 必须 > 0")
+
+        if self.intersection_threshold is None:
+            errors.append("intersection_threshold 未设置 (推荐值: 0.001)")
+        elif self.intersection_threshold <= 0:
+            errors.append(f"intersection_threshold ({self.intersection_threshold}) 必须 > 0")
+
+        if self.min_distance_threshold is None:
+            errors.append("min_distance_threshold 未设置 (推荐值: 0.05)")
+        elif self.min_distance_threshold <= 0:
+            errors.append(f"min_distance_threshold ({self.min_distance_threshold}) 必须 > 0")
+
+        if self.collision_earth_radius is None:
+            errors.append("collision_earth_radius 未设置 (推荐值: 0.0005)")
+        elif self.collision_earth_radius <= 0:
+            errors.append(f"collision_earth_radius ({self.collision_earth_radius}) 必须 > 0")
+
+        if self.collision_moon_radius is None:
+            errors.append("collision_moon_radius 未设置 (推荐值: 0.00026)")
+        elif self.collision_moon_radius <= 0:
+            errors.append(f"collision_moon_radius ({self.collision_moon_radius}) 必须 > 0")
+
+        if self.integration_dt is None:
+            errors.append("integration_dt 未设置 (推荐值: 0.01)")
+        elif self.integration_dt <= 0:
+            errors.append(f"integration_dt ({self.integration_dt}) 必须 > 0")
+
+        if errors:
+            raise ValueError(
+                "搜索参数验证失败:\n  - " + "\n  - ".join(errors)
+            )
+
     def search(self, **kwargs) -> List[SearchResult]:
         """执行网格搜索
 
@@ -106,6 +206,8 @@ class DROTransferSearch(BaseTransfer):
         """
         if self._departure_orbit is None or self._arrival_orbit is None:
             raise ValueError("必须先设置departure_orbit和arrival_orbit")
+
+        self._validate_search_parameters()
 
         verbose = kwargs.get("verbose", self._verbose)
         n_workers = kwargs.get("n_workers", self._n_workers)
