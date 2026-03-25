@@ -10,7 +10,6 @@ DRO到RO转移轨道NLP优化模块
 from __future__ import annotations
 
 import numpy as np
-from dataclasses import dataclass, field
 from typing import Tuple, List, Optional, Dict, Any, Callable
 from enum import Enum
 import warnings
@@ -29,14 +28,11 @@ else:
 
 
 class TransferType(Enum):
-    """转移类型枚举"""
-
-    DIRECT = "direct"  # 直接转移
-    LGA = "lga"  # 月球引力辅助转移
-    EXTERNAL = "external"  # 外部转移
+    DIRECT = "direct"
+    LGA = "lga"
+    EXTERNAL = "external"
 
 
-@dataclass
 class NLPOptimizationVariables:
     """NLP优化变量
 
@@ -48,9 +44,10 @@ class NLPOptimizationVariables:
         t_ins: 从轨道远地点到插入点的时间
     """
 
-    alpha: float
-    transfer_time: float
-    t_ins: float
+    def __init__(self, alpha: float, transfer_time: float, t_ins: float):
+        self.alpha = alpha
+        self.transfer_time = transfer_time
+        self.t_ins = t_ins
 
     def to_array(self) -> np.ndarray:
         """转换为numpy数组"""
@@ -62,12 +59,13 @@ class NLPOptimizationVariables:
         return cls(alpha=arr[0], transfer_time=arr[1], t_ins=arr[2])
 
 
-@dataclass
 class NLPOptimizationResult:
     """NLP优化结果
 
     属性:
-        variables: 优化变量
+        alpha: 切向速度比
+        transfer_time: 转移时间
+        t_ins: 插入时间
         objective_value: 目标函数值(总ΔV)
         delta_v1: 出发脉冲
         delta_v2: 插入脉冲
@@ -81,19 +79,39 @@ class NLPOptimizationResult:
         transfer_type: 转移类型
     """
 
-    variables: NLPOptimizationVariables
-    objective_value: float = 0.0
-    delta_v1: float = 0.0
-    delta_v2: float = 0.0
-    transfer_trajectory: Optional[np.ndarray] = None
-    transfer_times: Optional[np.ndarray] = None
-    departure_state: Optional[np.ndarray] = None
-    insertion_state: Optional[np.ndarray] = None
-    final_state: Optional[np.ndarray] = None
-    success: bool = False
-    message: str = ""
-    transfer_type: TransferType = TransferType.DIRECT
-    constraints_violation: Dict[str, float] = field(default_factory=dict)
+    def __init__(
+        self,
+        alpha: float = 0.0,
+        transfer_time: float = 0.0,
+        t_ins: float = 0.0,
+        objective_value: float = 0.0,
+        delta_v1: float = 0.0,
+        delta_v2: float = 0.0,
+        transfer_trajectory: Optional[np.ndarray] = None,
+        transfer_times: Optional[np.ndarray] = None,
+        departure_state: Optional[np.ndarray] = None,
+        insertion_state: Optional[np.ndarray] = None,
+        final_state: Optional[np.ndarray] = None,
+        success: bool = False,
+        message: str = "",
+        transfer_type: TransferType = TransferType.DIRECT,
+        constraints_violation: Optional[Dict[str, float]] = None,
+    ):
+        self.alpha = alpha
+        self.transfer_time = transfer_time
+        self.t_ins = t_ins
+        self.objective_value = objective_value
+        self.delta_v1 = delta_v1
+        self.delta_v2 = delta_v2
+        self.transfer_trajectory = transfer_trajectory
+        self.transfer_times = transfer_times
+        self.departure_state = departure_state
+        self.insertion_state = insertion_state
+        self.final_state = final_state
+        self.success = success
+        self.message = message
+        self.transfer_type = transfer_type
+        self.constraints_violation = constraints_violation or {}
 
 
 class DROTRONLPOptimizer:
@@ -546,9 +564,9 @@ class DROTRONLPOptimizer:
             print(f"\n优化结果:")
             print(f"  成功: {opt_result.success}")
             print(f"  消息: {opt_result.message}")
-            print(f"  α={opt_result.variables.alpha:.6f}")
-            print(f"  T={opt_result.variables.transfer_time:.6f}")
-            print(f"  t_ins={opt_result.variables.t_ins:.6f}")
+            print(f"  α={opt_result.alpha:.6f}")
+            print(f"  T={opt_result.transfer_time:.6f}")
+            print(f"  t_ins={opt_result.t_ins:.6f}")
             print(f"  ΔV1={opt_result.delta_v1:.6f}")
             print(f"  ΔV2={opt_result.delta_v2:.6f}")
             print(f"  总ΔV={opt_result.objective_value:.6f}")
@@ -633,7 +651,9 @@ class DROTRONLPOptimizer:
                 violation["velocity"] = abs(self.constraint_velocity_parallel(variables.to_array()))
 
         return NLPOptimizationResult(
-            variables=variables,
+            alpha=alpha,
+            transfer_time=transfer_time,
+            t_ins=t_ins,
             objective_value=dv1 + dv2,
             delta_v1=dv1,
             delta_v2=dv2,
@@ -715,6 +735,7 @@ def optimize_transfer(
 
 
 if NlpCallbackBase is not None:
+
     class COPTNLPCallback(NlpCallbackBase):
         """COPT NLP回调类
 
@@ -728,6 +749,7 @@ if NlpCallbackBase is not None:
 
         def __init__(self, optimizer: DROTRONLPOptimizer):
             import coptpy
+
             super().__init__()
             self.optimizer = optimizer
             self.x = None

@@ -37,9 +37,6 @@ from .transfer_optimization import (
 from .transfer_base import (
     BaseTransfer,
     TransferStrategy,
-    TransferResult,
-    SearchResult,
-    OptimizationResult,
 )
 
 _HAVE_COPT = transfer_optimization.coptpy is not None
@@ -51,8 +48,6 @@ __all__ = [
     # NLP优化类
     "DROTRONLPOptimizer",
     # 结果类
-    "TransferResult",
-    "SearchResult",
     "NLPOptimizationResult",
     # 变量类
     "NLPOptimizationVariables",

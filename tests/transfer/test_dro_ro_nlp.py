@@ -129,10 +129,10 @@ def test_nlp_result_structure():
     """测试NLP结果结构"""
     print("\n=== 测试NLP结果结构 ===")
 
-    vars = NLPOptimizationVariables(alpha=1.2, transfer_time=15.0, t_ins=3.0)
-
     result = NLPOptimizationResult(
-        variables=vars,
+        alpha=1.2,
+        transfer_time=15.0,
+        t_ins=3.0,
         objective_value=0.5,
         delta_v1=0.2,
         delta_v2=0.3,
@@ -140,7 +140,9 @@ def test_nlp_result_structure():
         message="Test",
     )
 
-    assert result.variables.alpha == 1.2
+    assert result.alpha == 1.2
+    assert result.transfer_time == 15.0
+    assert result.t_ins == 3.0
     assert result.objective_value == 0.5
     assert result.delta_v1 == 0.2
     assert result.delta_v2 == 0.3

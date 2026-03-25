@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 import numpy as np
 
@@ -18,155 +17,18 @@ if TYPE_CHECKING:
 
 
 class TransferStrategy(Enum):
-    """转移策略枚举"""
-
-    GRID_SEARCH = "grid_search"  # 网格搜索
-    NLP_OPTIMIZATION = "nlp_optimization"  # NLP优化
-    MANIFOLD = "manifold"  # 流形转移
-    DIRECT = "direct"  # 直接转移
+    GRID_SEARCH = "grid_search"
+    NLP_OPTIMIZATION = "nlp_optimization"
+    MANIFOLD = "manifold"
+    DIRECT = "direct"
 
 
 class TransferType(Enum):
-    """转移类型枚举"""
-
-    PLANAR = "planar"  # 平面转移
-    THREE_DIMENSIONAL = "3d"  # 三维转移
-    DIRECT = "direct"  # 直接转移
-    LGA = "lga"  # 月球引力辅助转移
-    EXTERNAL = "external"  # 外部转移
-
-
-@dataclass
-class TransferResult:
-    """转移结果基类
-
-    存储转移设计的结果数据。
-    子类应继承并扩展此结果类。
-
-    属性:
-        success: 是否成功
-        message: 结果消息
-        departure_orbit_name: 出发点轨道名称
-        arrival_orbit_name: 目标轨道名称
-        transfer_trajectory: 转移轨迹状态序列 [n_steps, 6]
-        transfer_times: 转移轨迹时间序列 [n_steps]
-        transfer_time: 转移时间
-        total_delta_v: 总速度增量
-    """
-
-    success: bool = False
-    message: str = ""
-    departure_orbit_name: str = ""
-    arrival_orbit_name: str = ""
-    transfer_trajectory: Optional[np.ndarray] = None
-    transfer_times: Optional[np.ndarray] = None
-    transfer_time: float = 0.0
-    total_delta_v: float = 0.0
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        result = {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
-        if self.transfer_trajectory is not None:
-            result["transfer_trajectory_shape"] = self.transfer_trajectory.shape
-        return result
-
-
-@dataclass
-class SearchResult(TransferResult):
-    """网格搜索结果
-
-    存储网格搜索阶段的结果。
-
-    属性:
-        departure_state: 出发点状态 [6]
-        departure_time: 出发点时间
-        alpha: 切向速度比
-        min_distance: 到目标轨道最小距离
-        min_distance_idx: 最小距离对应索引
-        intersection_found: 是否与目标轨道相交
-        intersection_point: 相交点状态
-        local_minimum_found: 是否找到局部最小
-        collision_found: 是否发生碰撞
-        collision_body: 碰撞天体 ('earth' or 'moon')
-        status: 状态标识
-    """
-
-    departure_state: Optional[np.ndarray] = None
-    departure_time: float = 0.0
-    alpha: float = 0.0
-    min_distance: float = np.inf
-    min_distance_idx: int = -1
-    intersection_found: bool = False
-    intersection_point: Optional[np.ndarray] = None
-    intersection_idx: int = -1
-    local_minimum_found: bool = False
-    local_minimum_distance: float = np.inf
-    local_minimum_idx: int = -1
-    collision_found: bool = False
-    collision_body: Optional[str] = None
-    collision_idx: int = -1
-    status: str = "pending"
-
-    @property
-    def is_feasible(self) -> bool:
-        """判断是否为可行候选解"""
-        has_approach = (
-            self.intersection_found
-            or self.min_distance < 0.05
-            or self.local_minimum_found
-        )
-        no_collision = not self.collision_found
-        return has_approach and no_collision
-
-    @property
-    def dv_departure(self) -> float:
-        """计算departure impulse"""
-        if self.departure_state is None or self.transfer_trajectory is None:
-            return 0.0
-        dv = self.transfer_trajectory[0, 3:] - self.departure_state[3:]
-        return np.linalg.norm(dv)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        base_dict = super().to_dict()
-        base_dict["is_feasible"] = self.is_feasible
-        base_dict["dv_departure"] = self.dv_departure
-        return base_dict
-
-
-@dataclass
-class OptimizationResult(TransferResult):
-    """优化结果
-
-    存储优化阶段的结果。
-
-    属性:
-        alpha: 优化后的切向速度比
-        transfer_time: 优化后的转移时间
-        t_ins: 优化后的插入时间
-        delta_v1: 出发脉冲
-        delta_v2: 插入脉冲
-        insertion_state: 插入点状态
-        departure_state: 出发点状态
-        transfer_type: 转移类型
-        constraints_violation: 约束违反量
-    """
-
-    alpha: float = 0.0
-    transfer_time: float = 0.0
-    t_ins: float = 0.0
-    delta_v1: float = 0.0
-    delta_v2: float = 0.0
-    insertion_state: Optional[np.ndarray] = None
-    departure_state: Optional[np.ndarray] = None
-    transfer_type: TransferType = TransferType.DIRECT
-    constraints_violation: Dict[str, float] = field(default_factory=dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        base_dict = super().to_dict()
-        base_dict["transfer_type"] = self.transfer_type.value
-        return base_dict
+    PLANAR = "planar"
+    THREE_DIMENSIONAL = "3d"
+    DIRECT = "direct"
+    LGA = "lga"
+    EXTERNAL = "external"
 
 
 class BaseTransfer:
@@ -203,8 +65,9 @@ class BaseTransfer:
 
         self._departure_orbit: Optional[Orbit] = None
         self._arrival_orbit: Optional[Orbit] = None
-        self._search_results: Optional[List[SearchResult]] = None
-        self._optimized_result: Optional[OptimizationResult] = None
+
+        self._search_results: Optional[List[Dict[str, Any]]] = None
+        self._optimized_result: Any = None
 
     @property
     def departure_orbit(self) -> Optional[Orbit]:
@@ -217,12 +80,12 @@ class BaseTransfer:
         return self._arrival_orbit
 
     @property
-    def search_results(self) -> Optional[List[SearchResult]]:
+    def search_results(self) -> Optional[List[Dict[str, Any]]]:
         """搜索结果"""
         return self._search_results
 
     @property
-    def optimized_result(self) -> Optional[OptimizationResult]:
+    def optimized_result(self) -> Any:
         """优化结果"""
         return self._optimized_result
 
@@ -250,7 +113,7 @@ class BaseTransfer:
         self._arrival_orbit = orbit
         return self
 
-    def search(self, **kwargs) -> List[SearchResult]:
+    def search(self, **kwargs) -> List[Dict[str, Any]]:
         """执行网格搜索
 
         子类应重写此方法实现具体搜索算法。
@@ -263,7 +126,7 @@ class BaseTransfer:
         """
         raise NotImplementedError("Subclass must implement search()")
 
-    def optimize(self, initial_guess: Optional[SearchResult] = None) -> OptimizationResult:
+    def optimize(self, initial_guess: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """执行优化
 
         子类应重写此方法实现具体优化算法。
@@ -276,11 +139,21 @@ class BaseTransfer:
         """
         raise NotImplementedError("Subclass must implement optimize()")
 
-    def get_feasible_results(self) -> List[SearchResult]:
+    def _is_feasible(self, result: Dict[str, Any]) -> bool:
+        """判断搜索结果是否为可行候选解"""
+        has_approach = (
+            result.get("intersection_found", False)
+            or result.get("min_distance", float("inf")) < 0.05
+            or result.get("local_minimum_found", False)
+        )
+        no_collision = not result.get("collision_found", False)
+        return has_approach and no_collision
+
+    def get_feasible_results(self) -> List[Dict[str, Any]]:
         """获取所有可行搜索结果"""
         if self._search_results is None:
             return []
-        return [r for r in self._search_results if r.is_feasible]
+        return [r for r in self._search_results if self._is_feasible(r)]
 
     def info(self) -> None:
         """输出转移设计器信息"""

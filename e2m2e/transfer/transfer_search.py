@@ -26,8 +26,6 @@ from ..core.system import CR3BP_System
 
 from .transfer_base import (
     BaseTransfer,
-    SearchResult,
-    OptimizationResult,
     TransferType,
 )
 
@@ -200,11 +198,9 @@ class DROTransferSearch(BaseTransfer):
             errors.append(f"integration_dt ({self.integration_dt}) 必须 > 0")
 
         if errors:
-            raise ValueError(
-                "搜索参数验证失败:\n  - " + "\n  - ".join(errors)
-            )
+            raise ValueError("搜索参数验证失败:\n  - " + "\n  - ".join(errors))
 
-    def search(self, **kwargs) -> List[SearchResult]:
+    def search(self, **kwargs) -> List[Dict[str, Any]]:
         """执行网格搜索
 
         参数:
@@ -243,7 +239,7 @@ class DROTransferSearch(BaseTransfer):
         self._search_results = results
 
         if verbose:
-            feasible = [r for r in results if r.is_feasible]
+            feasible = [r for r in results if self._is_feasible(r)]
             print(f"\n{'=' * 60}")
             print(f"搜索完成")
             print(f"  总候选解: {len(results)}")
@@ -252,7 +248,7 @@ class DROTransferSearch(BaseTransfer):
 
         return results
 
-    def optimize(self, initial_guess: Optional[SearchResult] = None) -> OptimizationResult:
+    def optimize(self, initial_guess: Optional[Dict[str, Any]] = None) -> "NLPOptimizationResult":
         """执行优化
 
         参数:
@@ -261,7 +257,11 @@ class DROTransferSearch(BaseTransfer):
         返回:
             优化结果
         """
-        from .transfer_optimization import DROTRONLPOptimizer, NLPOptimizationVariables
+        from .transfer_optimization import (
+            DROTRONLPOptimizer,
+            NLPOptimizationVariables,
+            NLPOptimizationResult,
+        )
 
         if self._departure_orbit is None or self._arrival_orbit is None:
             raise ValueError("必须先设置departure_orbit和arrival_orbit")
@@ -281,14 +281,14 @@ class DROTransferSearch(BaseTransfer):
             dynamics=self.dynamics,
             departure_orbit=self._departure_orbit,
             arrival_orbit=self._arrival_orbit,
-            departure_state=initial_guess.departure_state,
+            departure_state=initial_guess["departure_state"],
         )
 
         transfer_time = self.transfer_time_range[1] / 2 if self.transfer_time_range else 15.0
 
         nlp_vars = NLPOptimizationVariables(
-            alpha=initial_guess.alpha,
-            transfer_time=initial_guess.transfer_time or transfer_time,
+            alpha=initial_guess.get("alpha", 1.0),
+            transfer_time=initial_guess.get("transfer_time") or transfer_time,
             t_ins=0.0,
         )
 
@@ -309,7 +309,7 @@ class DROTransferSearch(BaseTransfer):
         arrival_orbit: Orbit,
         verbose: bool,
         n_workers: Optional[int],
-    ) -> List[SearchResult]:
+    ) -> List[Dict[str, Any]]:
         """执行网格搜索的内部方法"""
         import multiprocessing
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -343,9 +343,7 @@ class DROTransferSearch(BaseTransfer):
                 n_workers,
             )
 
-    def _sample_departure_points(
-        self, departure_orbit: Orbit
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def _sample_departure_points(self, departure_orbit: Orbit) -> Tuple[np.ndarray, np.ndarray]:
         """从轨道等时间间隔采样出发点"""
         n = self.n_departure
         times = np.linspace(0, departure_orbit.period, n, endpoint=False)
@@ -360,7 +358,7 @@ class DROTransferSearch(BaseTransfer):
         dep_name: str,
         arr_name: str,
         verbose: bool,
-    ) -> List[SearchResult]:
+    ) -> List[Dict[str, Any]]:
         """串行网格搜索"""
         all_results = []
         total_departures = len(departure_states)
@@ -372,9 +370,9 @@ class DROTransferSearch(BaseTransfer):
 
             results = self._search_single_departure(dep_state, dep_time, arrival_orbit)
             for r in results:
-                r.departure_orbit_name = dep_name
-                r.arrival_orbit_name = arr_name
-                r.departure_time_index = i
+                r["departure_orbit_name"] = dep_name
+                r["arrival_orbit_name"] = arr_name
+                r["departure_time_index"] = i
             all_results.extend(results)
 
         return all_results
@@ -388,7 +386,7 @@ class DROTransferSearch(BaseTransfer):
         arr_name: str,
         verbose: bool,
         n_workers: int,
-    ) -> List[SearchResult]:
+    ) -> List[Dict[str, Any]]:
         """并行网格搜索"""
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -416,9 +414,9 @@ class DROTransferSearch(BaseTransfer):
                 try:
                     results = future.result()
                     for r in results:
-                        r.departure_orbit_name = dep_name
-                        r.arrival_orbit_name = arr_name
-                        r.departure_time_index = futures[future]
+                        r["departure_orbit_name"] = dep_name
+                        r["arrival_orbit_name"] = arr_name
+                        r["departure_time_index"] = futures[future]
                     all_results.extend(results)
                 except Exception as e:
                     if verbose:
@@ -431,7 +429,7 @@ class DROTransferSearch(BaseTransfer):
         departure_state: np.ndarray,
         departure_time: float,
         arrival_orbit: Orbit,
-    ) -> List[SearchResult]:
+    ) -> List[Dict[str, Any]]:
         """对单个出发点搜索α网格"""
         results = []
 
@@ -452,13 +450,13 @@ class DROTransferSearch(BaseTransfer):
                     initial_state, self.max_transfer_time, self.integration_dt
                 )
             except Exception:
-                result = SearchResult(
-                    success=False,
-                    departure_state=departure_state,
-                    departure_time=departure_time,
-                    alpha=alpha,
-                    status="integration_failed",
-                )
+                result = {
+                    "success": False,
+                    "departure_state": departure_state,
+                    "departure_time": departure_time,
+                    "alpha": alpha,
+                    "status": "integration_failed",
+                }
                 results.append(result)
                 continue
 
@@ -471,35 +469,35 @@ class DROTransferSearch(BaseTransfer):
                 traj_states, arrival_orbit
             )
 
-            result = SearchResult(
-                success=True,
-                departure_state=departure_state,
-                departure_time=departure_time,
-                alpha=alpha,
-                transfer_trajectory=traj_states,
-                transfer_times=traj_times,
-                transfer_time=traj_times[-1],
-                min_distance=min_dist,
-                min_distance_idx=min_idx,
-                intersection_found=intersection,
-                intersection_point=int_point,
-                intersection_idx=int_idx,
-                local_minimum_found=local_min,
-                local_minimum_distance=local_min_dist,
-                local_minimum_idx=local_min_idx,
-                collision_found=collision,
-                collision_body=body,
-                collision_idx=col_idx,
-            )
+            result = {
+                "success": True,
+                "departure_state": departure_state,
+                "departure_time": departure_time,
+                "alpha": alpha,
+                "transfer_trajectory": traj_states,
+                "transfer_times": traj_times,
+                "transfer_time": traj_times[-1],
+                "min_distance": min_dist,
+                "min_distance_idx": min_idx,
+                "intersection_found": intersection,
+                "intersection_point": int_point,
+                "intersection_idx": int_idx,
+                "local_minimum_found": local_min,
+                "local_minimum_distance": local_min_dist,
+                "local_minimum_idx": local_min_idx,
+                "collision_found": collision,
+                "collision_body": body,
+                "collision_idx": col_idx,
+            }
 
             if collision:
-                result.status = "collision"
+                result["status"] = "collision"
             elif intersection:
-                result.status = "success"
+                result["status"] = "success"
             elif min_dist < self.min_distance_threshold:
-                result.status = "success"
+                result["status"] = "success"
             else:
-                result.status = "no_intersection"
+                result["status"] = "no_intersection"
 
             results.append(result)
 
@@ -648,7 +646,7 @@ def _process_departure_worker(
     integration_dt: float,
     dep_name: str,
     arr_name: str,
-) -> List[SearchResult]:
+) -> List[Dict[str, Any]]:
     """Worker function for parallel departure point processing.
 
     This is a module-level function to ensure pickling works on Windows (spawn mode).
@@ -676,9 +674,9 @@ def _process_departure_worker(
 
     results = searcher._search_single_departure(dep_state, dep_time, arrival_orbit)
     for r in results:
-        r.departure_orbit_name = dep_name
-        r.arrival_orbit_name = arr_name
-        r.departure_time_index = idx
+        r["departure_orbit_name"] = dep_name
+        r["arrival_orbit_name"] = arr_name
+        r["departure_time_index"] = idx
     return results
 
 
@@ -710,7 +708,7 @@ def load_orbit_from_json(filepath: str) -> Orbit:
 
 
 def save_search_results(
-    results: List[SearchResult],
+    results: List[Dict[str, Any]],
     filepath: str,
 ) -> None:
     """保存搜索结果到JSON文件
@@ -724,18 +722,17 @@ def save_search_results(
     output = []
     for r in results:
         result_dict = {
-            "departure_orbit_name": r.departure_orbit_name,
-            "arrival_orbit_name": r.arrival_orbit_name,
-            "departure_time_index": r.departure_time_index,
-            "departure_time": float(r.departure_time),
-            "alpha": float(r.alpha),
-            "transfer_time": float(r.transfer_time),
-            "intersection_found": r.intersection_found,
-            "min_distance": float(r.min_distance),
-            "local_minimum_found": r.local_minimum_found,
-            "collision_found": r.collision_found,
-            "status": r.status,
-            "is_feasible": r.is_feasible,
+            "departure_orbit_name": r.get("departure_orbit_name", ""),
+            "arrival_orbit_name": r.get("arrival_orbit_name", ""),
+            "departure_time_index": r.get("departure_time_index", -1),
+            "departure_time": float(r.get("departure_time", 0.0)),
+            "alpha": float(r.get("alpha", 0.0)),
+            "transfer_time": float(r.get("transfer_time", 0.0)),
+            "intersection_found": r.get("intersection_found", False),
+            "min_distance": float(r.get("min_distance", float("inf"))),
+            "local_minimum_found": r.get("local_minimum_found", False),
+            "collision_found": r.get("collision_found", False),
+            "status": r.get("status", "unknown"),
         }
         output.append(result_dict)
 
