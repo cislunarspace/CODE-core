@@ -9,7 +9,9 @@ e2m2e转移轨道设计模块
     transfer = DROTransferSearch(system, dynamics)
     transfer.set_departure_orbit(dro_orbit)
     transfer.set_arrival_orbit(ro_orbit)
-    transfer.configure_search(alpha_range=(0.5, 2.5))
+    transfer.alpha_min = 0.5
+    transfer.alpha_max = 2.5
+    # ... 设置其他参数
     results = transfer.search()
 """
 
@@ -35,9 +37,6 @@ from .transfer_optimization import (
 from .transfer_base import (
     BaseTransfer,
     TransferStrategy,
-    TransferConfig,
-    SearchConfig,
-    OptimizationConfig,
     TransferResult,
     SearchResult,
     OptimizationResult,
@@ -51,10 +50,6 @@ __all__ = [
     "DROROTransferSearch",
     # NLP优化类
     "DROTRONLPOptimizer",
-    # 配置类
-    "TransferConfig",
-    "SearchConfig",
-    "OptimizationConfig",
     # 结果类
     "TransferResult",
     "SearchResult",

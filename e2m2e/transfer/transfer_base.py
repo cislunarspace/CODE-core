@@ -37,83 +37,6 @@ class TransferType(Enum):
 
 
 @dataclass
-class TransferConfig:
-    """转移配置基类
-
-    包含转移设计所需的通用配置参数。
-    子类应继承并扩展此配置。
-
-    属性:
-        max_transfer_time: 最大转移时间 (CR3BP无量纲时间)
-        collision_earth_radius: 地球碰撞检测半径 (无量纲)
-        collision_moon_radius: 月球碰撞检测半径 (无量纲)
-        integration_dt: 积分时间步长
-    """
-
-    max_transfer_time: float = 15.0
-    collision_earth_radius: float = 0.02
-    collision_moon_radius: float = 0.005
-    integration_dt: float = 0.01
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
-
-
-@dataclass
-class SearchConfig(TransferConfig):
-    """网格搜索配置
-
-    专门用于网格搜索阶段的配置参数。
-
-    属性:
-        alpha_min: α(切向速度比)最小值
-        alpha_max: α(切向速度比)最大值
-        n_alpha: α方向网格点数
-        n_departure: 出发点采样数量
-        intersection_threshold: 相交检测阈值
-        min_distance_threshold: 最小距离阈值
-    """
-
-    alpha_min: float = 0.5
-    alpha_max: float = 2.5
-    n_alpha: int = 101
-    n_departure: int = 200
-    intersection_threshold: float = 0.001
-    min_distance_threshold: float = 0.05
-
-    @property
-    def alpha_grid(self) -> np.ndarray:
-        """α网格点"""
-        return np.linspace(self.alpha_min, self.alpha_max, self.n_alpha)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        base_dict = super().to_dict()
-        base_dict["alpha_grid"] = self.alpha_grid.tolist()
-        return base_dict
-
-
-@dataclass
-class OptimizationConfig(TransferConfig):
-    """优化配置
-
-    专门用于优化阶段的配置参数。
-
-    属性:
-        alpha_range: α搜索范围
-        transfer_time_range: 转移时间范围
-        t_ins_range: 插入时间范围
-        velocity_angle_tolerance: 速度平行性容差
-    """
-
-    alpha_range: Tuple[float, float] = (0.5, 2.5)
-    transfer_time_range: Tuple[float, float] = (1.0, 30.0)
-    t_ins_range: Tuple[float, float] = (0.0, 10.0)
-    velocity_angle_tolerance: float = 1e-6
-
-
-@dataclass
 class TransferResult:
     """转移结果基类
 
@@ -280,8 +203,6 @@ class BaseTransfer:
 
         self._departure_orbit: Optional[Orbit] = None
         self._arrival_orbit: Optional[Orbit] = None
-        self._search_config: Optional[SearchConfig] = None
-        self._optimization_config: Optional[OptimizationConfig] = None
         self._search_results: Optional[List[SearchResult]] = None
         self._optimized_result: Optional[OptimizationResult] = None
 
@@ -294,16 +215,6 @@ class BaseTransfer:
     def arrival_orbit(self) -> Optional[Orbit]:
         """目标轨道"""
         return self._arrival_orbit
-
-    @property
-    def search_config(self) -> Optional[SearchConfig]:
-        """搜索配置"""
-        return self._search_config
-
-    @property
-    def optimization_config(self) -> Optional[OptimizationConfig]:
-        """优化配置"""
-        return self._optimization_config
 
     @property
     def search_results(self) -> Optional[List[SearchResult]]:
@@ -337,40 +248,6 @@ class BaseTransfer:
             self: 支持链式调用
         """
         self._arrival_orbit = orbit
-        return self
-
-    def configure_search(self, **kwargs) -> "BaseTransfer":
-        """配置搜索参数
-
-        参数:
-            **kwargs: SearchConfig 字段
-
-        返回:
-            self: 支持链式调用
-        """
-        if self._search_config is None:
-            self._search_config = SearchConfig(**kwargs)
-        else:
-            for key, value in kwargs.items():
-                if hasattr(self._search_config, key):
-                    setattr(self._search_config, key, value)
-        return self
-
-    def configure_optimization(self, **kwargs) -> "BaseTransfer":
-        """配置优化参数
-
-        参数:
-            **kwargs: OptimizationConfig 字段
-
-        返回:
-            self: 支持链式调用
-        """
-        if self._optimization_config is None:
-            self._optimization_config = OptimizationConfig(**kwargs)
-        else:
-            for key, value in kwargs.items():
-                if hasattr(self._optimization_config, key):
-                    setattr(self._optimization_config, key, value)
         return self
 
     def search(self, **kwargs) -> List[SearchResult]:
@@ -414,10 +291,6 @@ class BaseTransfer:
         print(f"μ: {self.mu:.6f}")
         print(f"Departure orbit: {self._departure_orbit}")
         print(f"Arrival orbit: {self._arrival_orbit}")
-        if self._search_config:
-            print(f"Search config: {self._search_config}")
-        if self._optimization_config:
-            print(f"Optimization config: {self._optimization_config}")
         if self._search_results:
             feasible = self.get_feasible_results()
             print(f"Search results: {len(self._search_results)} total, {len(feasible)} feasible")

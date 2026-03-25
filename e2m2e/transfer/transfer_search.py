@@ -5,17 +5,13 @@
 专门用于平面转移轨道设计，搜索变量: 出发点位置、α(切向速度比)
 
 使用方式:
-    # 方式1: 使用新架构 (推荐)
     transfer = DROTransferSearch(system, dynamics)
     transfer.set_departure_orbit(dro_orbit).set_arrival_orbit(ro_orbit)
-    transfer.configure_search(alpha_range=(0.5, 2.5), n_departure=200)
+    transfer.alpha_min = 0.5
+    transfer.alpha_max = 2.5
+    transfer.n_alpha = 101
+    # ... 设置其他参数
     results = transfer.search()
-    optimized = transfer.optimize(results[0])
-
-    # 方式2: 使用传统方式 (保持向后兼容)
-    config = TransferSearchConfig(alpha_min=0.5, alpha_max=2.5, n_alpha=101)
-    searcher = DROROTransferSearch(system, dynamics, config)
-    results = searcher.grid_search(departure_orbit, arrival_orbit)
 """
 
 from __future__ import annotations
@@ -30,9 +26,7 @@ from ..core.system import CR3BP_System
 
 from .transfer_base import (
     BaseTransfer,
-    SearchConfig,
     SearchResult,
-    OptimizationConfig,
     OptimizationResult,
     TransferType,
 )
@@ -110,6 +104,23 @@ class DROTransferSearch(BaseTransfer):
         # 推荐值: integration_dt ∈ [1e-4, 0.1], 典型值 0.01
         # 约束: integration_dt > 0
         self.integration_dt = None
+
+        # 优化参数
+        # alpha 搜索范围
+        # 推荐值: (0.5, 2.5)
+        self.alpha_range = None
+
+        # 转移时间范围
+        # 推荐值: (1.0, 30.0)
+        self.transfer_time_range = None
+
+        # 插入时间范围
+        # 推荐值: (0.0, 10.0)
+        self.t_ins_range = None
+
+        # 速度平行性容差
+        # 推荐值: 1e-6
+        self.velocity_angle_tolerance = None
 
     def set_verbose(self, verbose: bool) -> "DROTransferSearch":
         """设置是否输出详细信息"""
@@ -265,8 +276,6 @@ class DROTransferSearch(BaseTransfer):
             else:
                 raise ValueError("必须提供initial_guess或先运行search()")
 
-        config = self._optimization_config or OptimizationConfig()
-
         optimizer = DROTRONLPOptimizer(
             system=self.system,
             dynamics=self.dynamics,
@@ -275,17 +284,19 @@ class DROTransferSearch(BaseTransfer):
             departure_state=initial_guess.departure_state,
         )
 
+        transfer_time = self.transfer_time_range[1] / 2 if self.transfer_time_range else 15.0
+
         nlp_vars = NLPOptimizationVariables(
             alpha=initial_guess.alpha,
-            transfer_time=initial_guess.transfer_time or config.transfer_time_range[1] / 2,
+            transfer_time=initial_guess.transfer_time or transfer_time,
             t_ins=0.0,
         )
 
         result = optimizer.optimize(
             initial_guess=nlp_vars,
-            alpha_range=config.alpha_range,
-            transfer_time_range=config.transfer_time_range,
-            t_ins_range=config.t_ins_range,
+            alpha_range=self.alpha_range or (0.5, 2.5),
+            transfer_time_range=self.transfer_time_range or (1.0, 30.0),
+            t_ins_range=self.t_ins_range or (0.0, 10.0),
             verbose=self._verbose,
         )
 
@@ -625,7 +636,16 @@ def _process_departure_worker(
     arrival_times: np.ndarray,
     arrival_period: float,
     mu: float,
-    config: SearchConfig,
+    alpha_min: float,
+    alpha_max: float,
+    n_alpha: int,
+    n_departure: int,
+    max_transfer_time: float,
+    intersection_threshold: float,
+    min_distance_threshold: float,
+    collision_earth_radius: float,
+    collision_moon_radius: float,
+    integration_dt: float,
     dep_name: str,
     arr_name: str,
 ) -> List[SearchResult]:
@@ -642,16 +662,16 @@ def _process_departure_worker(
     )
 
     searcher.configure_search(
-        alpha_min=config.alpha_min,
-        alpha_max=config.alpha_max,
-        n_alpha=config.n_alpha,
-        n_departure=config.n_departure,
-        max_transfer_time=config.max_transfer_time,
-        intersection_threshold=config.intersection_threshold,
-        min_distance_threshold=config.min_distance_threshold,
-        collision_earth_radius=config.collision_earth_radius,
-        collision_moon_radius=config.collision_moon_radius,
-        integration_dt=config.integration_dt,
+        alpha_min=alpha_min,
+        alpha_max=alpha_max,
+        n_alpha=n_alpha,
+        n_departure=n_departure,
+        max_transfer_time=max_transfer_time,
+        intersection_threshold=intersection_threshold,
+        min_distance_threshold=min_distance_threshold,
+        collision_earth_radius=collision_earth_radius,
+        collision_moon_radius=collision_moon_radius,
+        integration_dt=integration_dt,
     )
 
     results = searcher._search_single_departure(dep_state, dep_time, arrival_orbit)
