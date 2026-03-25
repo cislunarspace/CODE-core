@@ -22,7 +22,7 @@ import os
 import queue
 import sys
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from typing import Tuple, List, Optional, Dict, Any
 import warnings
 
@@ -97,6 +97,8 @@ class DROTransferSearch(BaseTransfer):
         self.name = name
         self._verbose = True
         self._n_workers = None
+        # "processes" 多进程，利于 CPU 密集积分绕过 GIL；"threads" 保留线程内 tqdm 细粒度进度
+        self._parallel_backend: str = "processes"
 
         # α (切向速度比) 搜索范围
         # 推荐值: alpha_min ∈ (0, 1.0], alpha_max ∈ [1.0, 3.0]
@@ -171,6 +173,14 @@ class DROTransferSearch(BaseTransfer):
         self._n_workers = n_workers
         return self
 
+    def set_parallel_backend(self, backend: str) -> "DROTransferSearch":
+        """设置并行后端：``processes``（默认，多进程）或 ``threads``（多线程）。"""
+        b = backend.strip().lower()
+        if b not in ("processes", "threads"):
+            raise ValueError("parallel_backend 须为 'processes' 或 'threads'")
+        self._parallel_backend = b
+        return self
+
     def configure_search(self, **kwargs) -> "DROTransferSearch":
         """配置搜索参数（向后兼容，推荐直接设置实例属性）"""
         for key, value in kwargs.items():
@@ -185,6 +195,7 @@ class DROTransferSearch(BaseTransfer):
             **kwargs: 搜索参数，可选:
                 - verbose: 是否输出详细信息（含进度）
                 - n_workers: 并行 worker 数量
+                - parallel_backend: ``processes``（默认）或 ``threads``
 
         返回:
             搜索结果列表
@@ -194,6 +205,7 @@ class DROTransferSearch(BaseTransfer):
 
         verbose = kwargs.get("verbose", self._verbose)
         n_workers = kwargs.get("n_workers", self._n_workers)
+        parallel_backend = kwargs.get("parallel_backend", self._parallel_backend)
 
         if verbose:
             print(f"\n{'=' * 60}")
@@ -210,6 +222,7 @@ class DROTransferSearch(BaseTransfer):
             self._arrival_orbit,
             verbose,
             n_workers,
+            parallel_backend,
         )
 
         self._search_results = results
@@ -279,6 +292,7 @@ class DROTransferSearch(BaseTransfer):
         arrival_orbit: Orbit,
         verbose: bool,
         n_workers: Optional[int],
+        parallel_backend: str,
     ) -> List[Dict[str, Any]]:
         """执行网格搜索的内部方法"""
         # 获取出发轨道和目标轨道的名称
@@ -292,6 +306,10 @@ class DROTransferSearch(BaseTransfer):
         if n_workers is None:
             n_workers = multiprocessing.cpu_count()
 
+        pb = parallel_backend.strip().lower()
+        if pb not in ("processes", "threads"):
+            raise ValueError("parallel_backend 须为 'processes' 或 'threads'")
+
         if n_workers == 1:
             return self._grid_search_sequential(
                 departure_states,
@@ -301,8 +319,18 @@ class DROTransferSearch(BaseTransfer):
                 arr_name,
                 verbose,
             )
+        elif pb == "processes":
+            return self._grid_search_parallel_processes(
+                departure_states,
+                departure_times,
+                arrival_orbit,
+                dep_name,
+                arr_name,
+                verbose,
+                n_workers,
+            )
         else:
-            return self._grid_search_parallel(
+            return self._grid_search_parallel_threads(
                 departure_states,
                 departure_times,
                 arrival_orbit,
@@ -466,7 +494,7 @@ class DROTransferSearch(BaseTransfer):
                 pbar.close()
         return all_results
 
-    def _grid_search_parallel(
+    def _grid_search_parallel_processes(
         self,
         departure_states: np.ndarray,
         departure_times: np.ndarray,
@@ -476,13 +504,90 @@ class DROTransferSearch(BaseTransfer):
         verbose: bool,
         n_workers: int,
     ) -> List[Dict[str, Any]]:
-        """对多个出发点并行做与 `_grid_search_sequential` 相同的网格搜索。
+        """多进程并行：每进程独立 Python 解释器，利于 CPU 密集积分。"""
+        total_departures = len(departure_states)
+        n_alpha = int(self.n_alpha)
+        total_steps = total_departures * n_alpha
+        all_results: List[Dict[str, Any]] = []
 
-        每个出发点调用 `_search_single_departure`（对 α 网格逐点求解转移）。
-        使用 `ThreadPoolExecutor`：任务提交顺序为 0..N-1，但完成顺序由 `as_completed`
-        决定；通过 `futures[future] -> i` 把每条结果标回原始出发点下标 `departure_time_index`。
+        arrival_states = np.asarray(arrival_orbit.states)
+        arrival_times_a = np.asarray(arrival_orbit.times)
+        ap = getattr(arrival_orbit, "period", None)
+        arrival_period: Optional[float] = float(ap) if ap is not None else None
 
-        与串行版的差异：某出发点若抛错，仅跳过该点并（在 verbose 下）打印，不中断整批。
+        pbar = None
+        if verbose and total_steps > 0:
+            tqdm.write(
+                f"  并行搜索(进程): {total_departures}×{n_alpha}={total_steps} 步 | {n_workers} 进程"
+            )
+            pbar = self._open_search_progress_bar(total_steps, "并行网格搜索(进程)")
+
+        dyn = self.dynamics
+        pack_base = (
+            self.mu,
+            float(self.alpha_min),
+            float(self.alpha_max),
+            int(self.n_alpha),
+            int(self.n_departure),
+            float(self.max_transfer_time),
+            float(self.intersection_threshold),
+            float(self.min_distance_threshold),
+            float(self.collision_earth_radius),
+            float(self.collision_moon_radius),
+            float(self.integration_dt),
+            str(dyn.integrator),
+            float(dyn.rtol),
+            float(dyn.atol),
+            float(dyn.max_step),
+            dep_name,
+            arr_name,
+        )
+
+        try:
+            with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                futures = {}
+                for i, (dep_state, dep_time) in enumerate(
+                    zip(departure_states, departure_times)
+                ):
+                    packed = (
+                        i,
+                        np.asarray(dep_state, dtype=float),
+                        float(dep_time),
+                        arrival_states,
+                        arrival_times_a,
+                        arrival_period,
+                    ) + pack_base
+                    fut = executor.submit(_process_departure_worker_packed, packed)
+                    futures[fut] = i
+
+                for fut in as_completed(futures):
+                    idx = futures[fut]
+                    try:
+                        results = fut.result()
+                        all_results.extend(results)
+                        if pbar is not None:
+                            pbar.update(n_alpha)
+                    except Exception as e:
+                        if verbose:
+                            tqdm.write(f"    出发点 {idx} 处理失败: {e}")
+        finally:
+            if pbar is not None:
+                pbar.close()
+        return all_results
+
+    def _grid_search_parallel_threads(
+        self,
+        departure_states: np.ndarray,
+        departure_times: np.ndarray,
+        arrival_orbit: Orbit,
+        dep_name: str,
+        arr_name: str,
+        verbose: bool,
+        n_workers: int,
+    ) -> List[Dict[str, Any]]:
+        """多线程并行：支持细粒度 tqdm；受 GIL 限制，CPU 利用率常低于多进程。
+
+        每个出发点调用 `_search_single_departure`。抛错时跳过该点，verbose 下打印。
         """
         total_departures = len(departure_states)
         n_alpha = int(self.n_alpha)
@@ -826,7 +931,7 @@ def _process_departure_worker(
     dep_time: float,
     arrival_states: np.ndarray,
     arrival_times: np.ndarray,
-    arrival_period: float,
+    arrival_period: Optional[float],
     mu: float,
     alpha_min: float,
     alpha_max: float,
@@ -838,20 +943,26 @@ def _process_departure_worker(
     collision_earth_radius: float,
     collision_moon_radius: float,
     integration_dt: float,
+    integrator: str,
+    rtol: float,
+    atol: float,
+    max_step: float,
     dep_name: str,
     arr_name: str,
 ) -> List[Dict[str, Any]]:
-    """Worker function for parallel departure point processing.
-
-    This is a module-level function to ensure pickling works on Windows (spawn mode).
-    """
+    """子进程入口（模块级，便于 Windows spawn 下 pickle）。"""
     arrival_orbit = Orbit(states=arrival_states, times=arrival_times)
-    arrival_orbit.period = arrival_period
+    if arrival_period is not None:
+        arrival_orbit.period = float(arrival_period)
 
-    searcher = DROROTransferSearch(
-        system=CR3BP_System(mu=mu, primary="earth", secondary="moon"),
-        dynamics=CR3BP_Dynamics(system=CR3BP_System(mu=mu, primary="earth", secondary="moon")),
-    )
+    system = CR3BP_System(mu=mu, primary="earth", secondary="moon")
+    dynamics = CR3BP_Dynamics(system=system)
+    dynamics.integrator = integrator
+    dynamics.rtol = rtol
+    dynamics.atol = atol
+    dynamics.max_step = max_step
+
+    searcher = DROROTransferSearch(system=system, dynamics=dynamics)
 
     searcher.configure_search(
         alpha_min=alpha_min,
@@ -872,6 +983,11 @@ def _process_departure_worker(
         r["arrival_orbit_name"] = arr_name
         r["departure_time_index"] = idx
     return results
+
+
+def _process_departure_worker_packed(packed: Tuple[Any, ...]) -> List[Dict[str, Any]]:
+    """单元组打包，供 ``ProcessPoolExecutor`` 提交。"""
+    return _process_departure_worker(*packed)
 
 
 def load_orbit_from_json(filepath: str) -> Orbit:
