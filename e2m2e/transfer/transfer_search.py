@@ -18,11 +18,42 @@ from __future__ import annotations
 
 import json
 import multiprocessing
+import os
+import queue
+import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Tuple, List, Optional, Dict, Any
 import warnings
 
 import numpy as np
+from tqdm.auto import tqdm
+
+
+class _AggregatePbarWithSlot:
+    """共享总进度：转发 update/postfix，加锁并加槽位前缀。"""
+
+    __slots__ = ("_inner", "_lock", "_slot")
+
+    def __init__(self, inner: Any, lock: Optional[threading.Lock], slot: int) -> None:
+        self._inner = inner
+        self._lock = lock
+        self._slot = slot
+
+    def update(self, n: int = 1) -> None:
+        if self._lock is not None:
+            with self._lock:
+                self._inner.update(n)
+        else:
+            self._inner.update(n)
+
+    def set_postfix_str(self, s: str, refresh: bool = True) -> None:
+        merged = f"W{self._slot} {s}"
+        if self._lock is not None:
+            with self._lock:
+                self._inner.set_postfix_str(merged, refresh=refresh)
+        else:
+            self._inner.set_postfix_str(merged, refresh=refresh)
 
 from ..core.orbit import Orbit
 from ..core.dynamics import CR3BP_Dynamics
@@ -152,8 +183,8 @@ class DROTransferSearch(BaseTransfer):
 
         参数:
             **kwargs: 搜索参数，可选:
-                - verbose: 是否输出详细信息
-                - n_workers: 并行worker数量
+                - verbose: 是否输出详细信息（含进度）
+                - n_workers: 并行 worker 数量
 
         返回:
             搜索结果列表
@@ -309,6 +340,91 @@ class DROTransferSearch(BaseTransfer):
 
         return states[idx].copy(), times[idx].copy()
 
+    def _open_search_progress_bar(self, total: int, desc: str) -> Optional[Any]:
+        """``total <= 0`` 时返回 None。"""
+        if total <= 0:
+            return None
+        return tqdm(
+            total=total,
+            desc=desc,
+            unit="it",
+            file=sys.stderr,
+            dynamic_ncols=True,
+            mininterval=0.2,
+        )
+
+    @staticmethod
+    def _use_multiline_worker_tqdm(n_workers: int) -> bool:
+        """非 TTY 用单行总进度；否则可分槽多行。环境变量 ``E2M2E_TQDM_MULTILINE`` 可强制开/关；槽数>32 只用单行。"""
+        env = os.environ.get("E2M2E_TQDM_MULTILINE", "").strip().lower()
+        if env in ("0", "false", "no", "off"):
+            return False
+        if env in ("1", "true", "yes", "on"):
+            return True
+        if n_workers > 32:
+            return False
+        return sys.stderr.isatty()
+
+    @staticmethod
+    def _reset_tqdm_bar(bar: Any, total: int) -> None:
+        """复用进度条时重置 total。"""
+        if hasattr(bar, "reset"):
+            bar.reset(total=total)
+        else:
+            bar.n = 0
+            bar.total = total
+
+    def _open_parallel_worker_progress_bars(self, n_workers: int, n_alpha: int) -> List[Any]:
+        """每槽一行，每行 ``n_alpha`` 步。"""
+        return [
+            tqdm(
+                total=n_alpha,
+                position=i,
+                desc=f"W{i}",
+                leave=True,
+                unit="α",
+                file=sys.stderr,
+                dynamic_ncols=True,
+                mininterval=0.1,
+            )
+            for i in range(n_workers)
+        ]
+
+    def _run_departure_with_worker_slot(
+        self,
+        slot_queue: "queue.Queue[int]",
+        n_alpha: int,
+        departure_index: int,
+        departure_state: np.ndarray,
+        departure_time: float,
+        arrival_orbit: Orbit,
+        worker_bars: Optional[List[Any]],
+        aggregate_pbar: Optional[Any],
+        aggregate_lock: Optional[threading.Lock],
+    ) -> List[Dict[str, Any]]:
+        """取槽 → 跑单出发点 α 网格 → 还槽。``worker_bars`` 与 ``aggregate_pbar`` 二选一。"""
+        slot = slot_queue.get()
+        try:
+            if worker_bars is not None:
+                bar = worker_bars[slot]
+                self._reset_tqdm_bar(bar, n_alpha)
+                bar.set_description_str(f"W{slot} dep={departure_index}", refresh=False)
+                pbar: Any = bar
+            elif aggregate_pbar is not None:
+                pbar = _AggregatePbarWithSlot(aggregate_pbar, aggregate_lock, slot)
+            else:
+                raise RuntimeError("worker_bars 与 aggregate_pbar 至少传入其一")
+            return self._search_single_departure(
+                departure_state,
+                departure_time,
+                arrival_orbit,
+                verbose=False,
+                pbar=pbar,
+                departure_index=departure_index,
+            )
+        finally:
+            slot_queue.put(slot)
+
     def _grid_search_sequential(
         self,
         departure_states: np.ndarray,
@@ -321,21 +437,33 @@ class DROTransferSearch(BaseTransfer):
         """串行网格搜索"""
         all_results = []
         total_departures = len(departure_states)
+        n_alpha = int(self.n_alpha)
+        total_steps = total_departures * n_alpha
+        pbar = None
+        if verbose and total_steps > 0:
+            pbar = self._open_search_progress_bar(total_steps, "网格搜索")
 
-        for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times)):
-            if verbose:
-                pct = (i + 1) / total_departures * 100
-                print(f"  进度: {i + 1}/{total_departures} ({pct:.1f}%)")
+        if verbose and total_steps <= 0:
+            print(f"  总迭代步数: {total_steps}（出发点 × α），无进度条", flush=True)
 
-            results = self._search_single_departure(
-                dep_state, dep_time, arrival_orbit, verbose=verbose
-            )
-            for r in results:
-                r["departure_orbit_name"] = dep_name
-                r["arrival_orbit_name"] = arr_name
-                r["departure_time_index"] = i
-            all_results.extend(results)
-
+        try:
+            for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times)):
+                results = self._search_single_departure(
+                    dep_state,
+                    dep_time,
+                    arrival_orbit,
+                    verbose=(verbose and pbar is None),
+                    pbar=pbar,
+                    departure_index=i,
+                )
+                for r in results:
+                    r["departure_orbit_name"] = dep_name
+                    r["arrival_orbit_name"] = arr_name
+                    r["departure_time_index"] = i
+                all_results.extend(results)
+        finally:
+            if pbar is not None:
+                pbar.close()
         return all_results
 
     def _grid_search_parallel(
@@ -355,52 +483,105 @@ class DROTransferSearch(BaseTransfer):
         决定；通过 `futures[future] -> i` 把每条结果标回原始出发点下标 `departure_time_index`。
 
         与串行版的差异：某出发点若抛错，仅跳过该点并（在 verbose 下）打印，不中断整批。
-
-        进度说明：verbose 下外层进度按「整段 `_search_single_departure` 完成」计；为免多线程
-        交错打印，不在此模式下列出 α 子进度。串行模式下若 verbose，会在每个出发点内打印 α 进度。
         """
         total_departures = len(departure_states)
-        all_results = []
-        completed = 0
+        n_alpha = int(self.n_alpha)
+        total_steps = total_departures * n_alpha
+        all_results: List[Dict[str, Any]] = []
 
-        with ThreadPoolExecutor(max_workers=n_workers) as executor:
-            # Future -> 该任务在 departure_states/times 中的下标 i（完成顺序乱序时仍能对上号）
-            futures = {
-                executor.submit(
-                    self._search_single_departure,
-                    dep_state,
-                    dep_time,
-                    arrival_orbit,
-                    False,
-                ): i
-                for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times))
-            }
+        worker_bars: Optional[List[Any]] = None
+        aggregate_pbar: Optional[Any] = None
+        aggregate_lock: Optional[threading.Lock] = None
+        slot_queue: Optional["queue.Queue[int]"] = None
 
-            if verbose:
-                print(
-                    f"  并行搜索: 已提交 {total_departures} 个出发点（{n_workers} 个工作线程），"
-                    "按完成顺序汇报进度…",
-                    flush=True,
+        if verbose and total_steps > 0:
+            use_multiline = self._use_multiline_worker_tqdm(n_workers)
+            if use_multiline:
+                tqdm.write(
+                    f"  并行搜索: {total_departures}×{n_alpha}={total_steps} 步 | {n_workers} 槽（分槽）"
                 )
+                worker_bars = self._open_parallel_worker_progress_bars(n_workers, n_alpha)
+            else:
+                tqdm.write(
+                    f"  并行搜索: {total_departures}×{n_alpha}={total_steps} 步 | {n_workers} 槽（单行）"
+                )
+                aggregate_lock = threading.Lock()
+                aggregate_pbar = self._open_search_progress_bar(total_steps, "并行网格搜索")
+            slot_queue = queue.Queue()
+            for slot in range(n_workers):
+                slot_queue.put(slot)
 
-            # 按“谁先算完”迭代，不是按 i 从小到大；首个 future 完成前本循环不会进入
-            for future in as_completed(futures):
-                completed += 1
-                if verbose:
-                    pct = completed / total_departures * 100
-                    print(f"  进度: {completed}/{total_departures} ({pct:.1f}%)", flush=True)
+        try:
+            with ThreadPoolExecutor(max_workers=n_workers) as executor:
+                if worker_bars is not None and slot_queue is not None:
+                    futures = {
+                        executor.submit(
+                            self._run_departure_with_worker_slot,
+                            slot_queue,
+                            n_alpha,
+                            i,
+                            dep_state,
+                            dep_time,
+                            arrival_orbit,
+                            worker_bars,
+                            None,
+                            None,
+                        ): i
+                        for i, (dep_state, dep_time) in enumerate(
+                            zip(departure_states, departure_times)
+                        )
+                    }
+                elif aggregate_pbar is not None and slot_queue is not None:
+                    futures = {
+                        executor.submit(
+                            self._run_departure_with_worker_slot,
+                            slot_queue,
+                            n_alpha,
+                            i,
+                            dep_state,
+                            dep_time,
+                            arrival_orbit,
+                            None,
+                            aggregate_pbar,
+                            aggregate_lock,
+                        ): i
+                        for i, (dep_state, dep_time) in enumerate(
+                            zip(departure_states, departure_times)
+                        )
+                    }
+                else:
+                    futures = {
+                        executor.submit(
+                            self._search_single_departure,
+                            dep_state,
+                            dep_time,
+                            arrival_orbit,
+                            False,
+                            None,
+                            i,
+                        ): i
+                        for i, (dep_state, dep_time) in enumerate(
+                            zip(departure_states, departure_times)
+                        )
+                    }
 
-                try:
-                    results = future.result()  # 单出发点：α 网格上所有可行解的列表
-                    for r in results:
-                        r["departure_orbit_name"] = dep_name
-                        r["arrival_orbit_name"] = arr_name
-                        r["departure_time_index"] = futures[future]
-                    all_results.extend(results)
-                except Exception as e:
-                    if verbose:
-                        print(f"    出发点 {futures[future]} 处理失败: {e}", flush=True)
-
+                for future in as_completed(futures):
+                    try:
+                        results = future.result()
+                        for r in results:
+                            r["departure_orbit_name"] = dep_name
+                            r["arrival_orbit_name"] = arr_name
+                            r["departure_time_index"] = futures[future]
+                        all_results.extend(results)
+                    except Exception as e:
+                        if verbose:
+                            tqdm.write(f"    出发点 {futures[future]} 处理失败: {e}")
+        finally:
+            if worker_bars is not None:
+                for bar in worker_bars:
+                    bar.close()
+            if aggregate_pbar is not None:
+                aggregate_pbar.close()
         return all_results
 
     def _search_single_departure(
@@ -409,12 +590,15 @@ class DROTransferSearch(BaseTransfer):
         departure_time: float,
         arrival_orbit: Orbit,
         verbose: bool = False,
+        pbar: Optional[Any] = None,
+        departure_index: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """对单个出发点搜索α网格
 
         参数:
-            verbose: 若为 True，在 α 网格循环内打印子进度（串行搜索时与 ``search(..., verbose=True)`` 配合；
-                并行搜索应传 False，避免多线程输出交错）。
+            verbose: 未传 ``pbar`` 时是否打印 α 文本进度。
+            pbar: 每 α 步 ``update(1)``；可为分槽条或 ``_AggregatePbarWithSlot``。
+            departure_index: 当前出发点下标，用于 postfix。
         """
         results = []
 
@@ -422,73 +606,78 @@ class DROTransferSearch(BaseTransfer):
         n_alpha = int(self.n_alpha)
 
         for i_alpha, alpha in enumerate(alpha_grid, start=1):
-            if verbose:
-                pct = i_alpha / n_alpha * 100
-                print(f"    α 进度: {i_alpha}/{n_alpha} ({pct:.1f}%)", flush=True)
-            new_vel = self._compute_departure_velocity(departure_state, alpha)
-
-            initial_state = np.concatenate(
-                [
-                    departure_state[:3],
-                    new_vel,
-                ]
-            )
-
             try:
-                traj_states, traj_times = self._forward_integrate(
-                    initial_state, self.max_transfer_time, self.integration_dt
-                ) # //TODO 这个地方积分特别耗时
-            except Exception:
-                result = {
-                    "success": False,
-                    "departure_state": departure_state,
-                    "departure_time": departure_time,
-                    "alpha": alpha,
-                    "status": "integration_failed",
-                }
-                results.append(result)
-                continue
+                if verbose:
+                    pct = i_alpha / n_alpha * 100
+                    print(f"    α 进度: {i_alpha}/{n_alpha} ({pct:.1f}%)", flush=True)
+                new_vel = self._compute_departure_velocity(departure_state, alpha)
 
-            collision, body, col_idx = self._check_collision(traj_states)
-            min_dist, min_idx = self._compute_min_distance(traj_states, arrival_orbit)
-            intersection, int_point, int_idx = self._detect_intersection(
-                traj_states, arrival_orbit, self.intersection_threshold
-            )
-            local_min, local_min_dist, local_min_idx = self._detect_local_minimum(
-                traj_states, arrival_orbit
-            )
+                initial_state = np.concatenate(
+                    [
+                        departure_state[:3],
+                        new_vel,
+                    ]
+                )
 
-            result = {
-                "success": True,
-                "departure_state": departure_state,
-                "departure_time": departure_time,
-                "alpha": alpha,
-                "transfer_trajectory": traj_states,
-                "transfer_times": traj_times,
-                "transfer_time": traj_times[-1],
-                "min_distance": min_dist,
-                "min_distance_idx": min_idx,
-                "intersection_found": intersection,
-                "intersection_point": int_point,
-                "intersection_idx": int_idx,
-                "local_minimum_found": local_min,
-                "local_minimum_distance": local_min_dist,
-                "local_minimum_idx": local_min_idx,
-                "collision_found": collision,
-                "collision_body": body,
-                "collision_idx": col_idx,
-            }
+                try:
+                    traj_states, traj_times = self._forward_integrate(
+                        initial_state, self.max_transfer_time, self.integration_dt
+                    )  # //TODO 这个地方积分特别耗时
+                except Exception:
+                    result = {
+                        "success": False,
+                        "departure_state": departure_state,
+                        "departure_time": departure_time,
+                        "alpha": alpha,
+                        "status": "integration_failed",
+                    }
+                    results.append(result)
+                else:
+                    collision, body, col_idx = self._check_collision(traj_states)
+                    min_dist, min_idx = self._compute_min_distance(traj_states, arrival_orbit)
+                    intersection, int_point, int_idx = self._detect_intersection(
+                        traj_states, arrival_orbit, self.intersection_threshold
+                    )
+                    local_min, local_min_dist, local_min_idx = self._detect_local_minimum(
+                        traj_states, arrival_orbit
+                    )
 
-            if collision:
-                result["status"] = "collision"
-            elif intersection:
-                result["status"] = "success"
-            elif min_dist < self.min_distance_threshold:
-                result["status"] = "success"
-            else:
-                result["status"] = "no_intersection"
+                    result = {
+                        "success": True,
+                        "departure_state": departure_state,
+                        "departure_time": departure_time,
+                        "alpha": alpha,
+                        "transfer_trajectory": traj_states,
+                        "transfer_times": traj_times,
+                        "transfer_time": traj_times[-1],
+                        "min_distance": min_dist,
+                        "min_distance_idx": min_idx,
+                        "intersection_found": intersection,
+                        "intersection_point": int_point,
+                        "intersection_idx": int_idx,
+                        "local_minimum_found": local_min,
+                        "local_minimum_distance": local_min_dist,
+                        "local_minimum_idx": local_min_idx,
+                        "collision_found": collision,
+                        "collision_body": body,
+                        "collision_idx": col_idx,
+                    }
 
-            results.append(result)
+                    if collision:
+                        result["status"] = "collision"
+                    elif intersection:
+                        result["status"] = "success"
+                    elif min_dist < self.min_distance_threshold:
+                        result["status"] = "success"
+                    else:
+                        result["status"] = "no_intersection"
+
+                    results.append(result)
+            finally:
+                if pbar is not None:
+                    pbar.update(1)
+                    if departure_index is not None:
+                        pbar.set_postfix_str(f"dep={departure_index} α={alpha:.4f}")
 
         return results
 
