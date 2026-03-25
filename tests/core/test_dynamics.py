@@ -97,14 +97,14 @@ class TestCR3BPDynamicsPropagate:
         """Test propagate returns expected dictionary structure"""
         result = earth_moon_dynamics.propagate(
             initial_state=sample_state,
-            t_span=[0, 1.0]
+            t_span=[0, 1.0],
         )
-        
+
         assert isinstance(result, dict)
         assert "time" in result
         assert "states" in result
-        assert "jacobi" in result
-        assert "jacobi_error" in result
+        assert "jacobi" not in result
+        assert "jacobi_error" not in result
 
     def test_propagate_time_points(self, earth_moon_dynamics, sample_state):
         """Test propagate with specific evaluation times"""
@@ -155,9 +155,10 @@ class TestCR3BPDynamicsPropagate:
         """Test Jacobi constant is approximately conserved"""
         result = earth_moon_dynamics.propagate(
             initial_state=sample_state,
-            t_span=[0, 2.0]
+            t_span=[0, 2.0],
+            with_jacobi=True,
         )
-        
+
         # Jacobi constant should be nearly constant
         jacobi_variation = np.max(np.abs(np.diff(result["jacobi"])))
         assert jacobi_variation < 1e-6
@@ -166,9 +167,10 @@ class TestCR3BPDynamicsPropagate:
         """Test jacobi_error is computed and stored"""
         result = earth_moon_dynamics.propagate(
             initial_state=sample_state,
-            t_span=[0, 1.0]
+            t_span=[0, 1.0],
+            with_jacobi=True,
         )
-        
+
         assert isinstance(result["jacobi_error"], float)
         assert result["jacobi_error"] >= 0
 

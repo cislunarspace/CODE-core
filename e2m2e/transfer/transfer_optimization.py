@@ -246,7 +246,11 @@ class DROTRONLPOptimizer:
             t_eval = np.linspace(t_span[0], t_span[1], n_steps)
 
         result = self.dynamics.propagate(
-            initial_state=initial_state, t_span=t_span, t_eval=t_eval, with_stm=False
+            initial_state=initial_state,
+            t_span=t_span,
+            t_eval=t_eval,
+            with_stm=False,
+            with_jacobi=False,
         )
 
         times = result["time"]

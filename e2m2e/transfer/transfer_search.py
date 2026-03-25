@@ -424,7 +424,7 @@ class DROTransferSearch(BaseTransfer):
             try:
                 traj_states, traj_times = self._forward_integrate(
                     initial_state, self.max_transfer_time, self.integration_dt
-                )
+                ) # //TODO 这个地方积分特别耗时
             except Exception:
                 result = {
                     "success": False,
@@ -504,7 +504,7 @@ class DROTransferSearch(BaseTransfer):
         transfer_time: float,
         dt: float,
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """前向积分转移轨迹"""
+        """前向积分转移轨迹""" # //TODO 需要审查这一部分的代码，看看积分速度为什么这么慢
         n_steps = max(int(transfer_time / dt) + 1, 2)
         t_eval = np.linspace(0, transfer_time, n_steps)
 
@@ -513,6 +513,7 @@ class DROTransferSearch(BaseTransfer):
             t_span=[0, transfer_time],
             t_eval=t_eval,
             with_stm=False,
+            with_jacobi=False,
         )
 
         return result["states"], result["time"]
