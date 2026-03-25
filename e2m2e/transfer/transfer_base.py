@@ -49,7 +49,6 @@ class BaseTransfer:
         self,
         system: CR3BP_System,
         dynamics: CR3BP_Dynamics,
-        name: str = "BaseTransfer",
     ):
         """初始化转移设计器
 
@@ -61,7 +60,6 @@ class BaseTransfer:
         self.system = system
         self.dynamics = dynamics
         self.mu = system.mu
-        self.name = name
 
         self._departure_orbit: Optional[Orbit] = None
         self._arrival_orbit: Optional[Orbit] = None
