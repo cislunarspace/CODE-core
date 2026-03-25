@@ -2,13 +2,17 @@
 轨道族延拓算法模块
 
 提供自然参数延拓和伪弧长延拓方法，用于生成轨道族。
+包括Halo轨道、Lyapunov轨道等的生成功能。
 """
 
 from __future__ import annotations
 import numpy as np
 from enum import Enum
-from typing import Optional
-from .differential_correction import DifferentialCorrection
+from typing import List, Optional
+from .differential_correction import (
+    DifferentialCorrection,
+    compute_halo_initial_guess,
+)
 from ..core.orbit import OrbitFamily, Orbit
 
 
@@ -50,10 +54,13 @@ class Continuation:
         - step: 初始步长
         """
         self.correction = corrector
-        self.dynamics = corrector.dynamics if hasattr(corrector, "dynamic") else None
+        self.dynamics = corrector.dynamics if corrector.dynamics is not None else None
 
         # 延拓参数
-        self.continuation_parameter = next(iter(corrector.fixed_parameters))
+        if corrector.fixed_parameters:
+            self.continuation_parameter = next(iter(corrector.fixed_parameters))
+        else:
+            self.continuation_parameter = None
         self.step_size = step or self.DEFAULT_STEP_SIZE
         self.initial_step_size = self.step_size
         self.method = ContinuationMethod.NATURAL
@@ -116,12 +123,16 @@ class Continuation:
         # 验证并限制步长
         if step_size > self.max_step_size:
             if verbose:
-                print(f"警告: 输入步长 {step_size} 超过最大限制 {self.max_step_size}，限制为 {self.max_step_size}")
+                print(
+                    f"警告: 输入步长 {step_size} 超过最大限制 {self.max_step_size}，限制为 {self.max_step_size}"
+                )
             step_size = self.max_step_size
-        
+
         if step_size < self.min_step_size:
             if verbose:
-                print(f"警告: 输入步长 {step_size} 小于最小限制 {self.min_step_size}，限制为 {self.min_step_size}")
+                print(
+                    f"警告: 输入步长 {step_size} 小于最小限制 {self.min_step_size}，限制为 {self.min_step_size}"
+                )
             step_size = self.min_step_size
 
         # 创建轨道族对象
@@ -318,24 +329,24 @@ class Continuation:
         # 排序顺序：0, 1, -1, 2, -2, 3, -3, ...
         seed_orbit.metadata["continuation_step"] = 0
         all_orbits_with_steps = [(seed_orbit, 0)] + temp_orbits_with_steps
-        
+
         # 自定义排序：先按绝对值排序，再按正负排序（正数在前）
         def sort_key(item):
             orbit, step = item
             return (abs(step), step > 0)
-        
+
         all_orbits_with_steps.sort(key=sort_key)
-        
+
         # 清空并重新按排序顺序添加轨道
         orbit_family.orbits = []
         for orbit, step in all_orbits_with_steps:
             orbit_family.add_orbit(orbit)
-        
+
         if verbose:
             print(f"\n延拓完成：共生成 {len(orbit_family)} 条轨道")
             stats = self.continuation_stats
             print(f"  成功: {stats['successful_steps']}, 失败: {stats['failed_steps']}")
-            print(f"  轨道已按距离种子轨道的步数排序: 0, 1, -1, 2, -2, ...")
+            print("  轨道已按距离种子轨道的步数排序: 0, 1, -1, 2, -2, ...")
 
         return orbit_family
 
@@ -462,6 +473,167 @@ class Continuation:
             "stats": self.continuation_stats,
             "termination_reason": self.termination_reason,
         }
+
+    # =============================================================================
+    # Halo轨道生成方法
+    # =============================================================================
+
+    def generate_halo_seed_orbit(
+        self,
+        libration_point: int,
+        amplitude_z: float,
+        halo_class: int = 0,
+        verbose: bool = False,
+    ) -> Orbit:
+        """生成Halo轨道初始猜测并修正
+
+        使用Richardson三阶近似生成初始猜测，然后通过微分修正
+        得到精确的周期轨道。
+
+        参数：
+            libration_point: 拉格朗日点 (1=L1, 2=L2)
+            amplitude_z: Z方向振幅
+            halo_class: 0=北Halo, 1=南Halo
+            verbose: 是否打印详细信息
+
+        返回：
+            Orbit: Halo周期轨道
+        """
+        if libration_point not in [1, 2]:
+            raise ValueError(f"libration_point必须是1或2，当前为{libration_point}")
+        if amplitude_z <= 0:
+            raise ValueError(f"amplitude_z必须为正数，当前为{amplitude_z}")
+        if halo_class not in [0, 1]:
+            raise ValueError(f"halo_class必须是0或1，当前为{halo_class}")
+
+        if verbose:
+            print(f"\n生成Halo轨道: L{libration_point} {'北' if halo_class == 0 else '南'} Halo")
+            print(f"  Z振幅: {amplitude_z}")
+
+        mu = self.dynamics.system.mu
+
+        guess = compute_halo_initial_guess(
+            mu=mu,
+            z_amplitude=amplitude_z,
+            L=libration_point,
+            halo_class=halo_class,
+        )
+
+        if halo_class == 0:
+            initial_z = amplitude_z
+        else:
+            initial_z = -amplitude_z
+
+        initial_state = np.array(
+            [
+                guess["x0"],
+                0.0,
+                initial_z,
+                guess["vx0"],
+                guess["vy0"],
+                guess["vz0"],
+            ]
+        )
+
+        if halo_class == 0:
+            self.correction.setup_halo_orbit_fixed_z0(
+                z0=amplitude_z,
+                libration_point=libration_point,
+            )
+        else:
+            self.correction.setup_halo_orbit_fixed_z0(
+                z0=-amplitude_z,
+                libration_point=libration_point,
+            )
+
+        initial_orbit = Orbit(
+            states=initial_state.reshape(1, -1),
+            times=np.array([0.0]),
+            system=self.dynamics.system,
+        )
+        initial_orbit.period = 2.0 * guess["T_half"]
+
+        self.correction.max_iterations = 150
+        self.correction.tolerance = 1e-6
+
+        if verbose:
+            print(f"  初始猜测: x0={guess['x0']:.6f}, vy0={guess['vy0']:.6f}")
+            print(f"  预估周期: {initial_orbit.period:.4f} TU")
+
+        orbit = self.correction.iterate_correction(
+            initial_guess=initial_orbit,
+            verbose=verbose,
+        )
+
+        if orbit is not None:
+            orbit.family_type = "halo"
+            orbit.parameters["libration_point"] = libration_point
+            orbit.parameters["amplitude_z"] = amplitude_z
+            orbit.parameters["halo_class"] = halo_class
+            if verbose:
+                print(f"[ok] Halo轨道生成成功: 周期={orbit.period:.6f} TU")
+
+        return orbit
+
+    def generate_halo_family(
+        self,
+        seed_orbit: Orbit,
+        n_orbits: int = 50,
+        direction: str = "positive",
+        step_size: float = 0.001,
+    ) -> List[Orbit]:
+        """生成Halo轨道族
+
+        使用自然参数延拓法生成Halo轨道族。
+
+        参数：
+            seed_orbit: 种子轨道
+            n_orbits: 目标轨道数量
+            direction: 延拓方向 ("positive", "negative", "both")
+            step_size: 步长
+
+        返回：
+            List[Orbit]: Halo轨道族
+        """
+        if n_orbits < 1:
+            raise ValueError(f"n_orbits必须大于0，当前为{n_orbits}")
+        if direction not in ["positive", "negative", "both"]:
+            raise ValueError(f"direction必须是positive/negative/both，当前为{direction}")
+
+        family = [seed_orbit]
+
+        directions = ["positive", "negative"] if direction == "both" else [direction]
+
+        print(f"\n开始生成Halo轨道族: 目标数量={n_orbits}, 方向={direction}")
+        print(
+            f"  种子轨道: L{seed_orbit.parameters.get('libration_point', 1)} "
+            f"{'北' if seed_orbit.parameters.get('halo_class', 0) == 0 else '南'} Halo"
+        )
+
+        for direction in directions:
+            z_amplitude = seed_orbit.parameters.get("amplitude_z", 0.1)
+            step = step_size if direction == "positive" else -step_size
+
+            for i in range(n_orbits - 1):
+                new_z = z_amplitude + step * (i + 1)
+                if new_z <= 0:
+                    break
+
+                try:
+                    new_orbit = self.generate_halo_seed_orbit(
+                        libration_point=seed_orbit.parameters.get("libration_point", 1),
+                        amplitude_z=new_z,
+                        halo_class=seed_orbit.parameters.get("halo_class", 0),
+                        verbose=False,
+                    )
+                    if new_orbit is not None:
+                        family.append(new_orbit)
+                except Exception:
+                    break
+
+        print(f"[ok] 轨道族生成完成: 共{len(family)}条轨道")
+
+        return family
 
     def __str__(self):
         return (
