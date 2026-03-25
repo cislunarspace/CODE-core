@@ -62,7 +62,8 @@ class DROTransferSearch(BaseTransfer):
         dynamics: CR3BP_Dynamics,
         name: str = "DROTransferSearch",
     ):
-        super().__init__(system, dynamics, name)
+        super().__init__(system, dynamics)
+        self.name = name
         self._verbose = True
         self._n_workers = None
 
@@ -146,69 +147,6 @@ class DROTransferSearch(BaseTransfer):
                 setattr(self, key, value)
         return self
 
-    def _validate_search_parameters(self) -> None:
-        """验证搜索参数是否已正确设置
-
-        约束条件:
-            - alpha_min, alpha_max: 0 < alpha_min < alpha_max
-            - n_alpha, n_departure: >= 2
-            - max_transfer_time, intersection_threshold, min_distance_threshold: > 0
-            - collision_earth_radius, collision_moon_radius: > 0
-            - integration_dt: > 0
-        """
-        errors = []
-
-        if self.alpha_min is None:
-            errors.append("alpha_min 未设置 (推荐值: 0.5)")
-        if self.alpha_max is None:
-            errors.append("alpha_max 未设置 (推荐值: 2.5)")
-        if self.alpha_min is not None and self.alpha_max is not None:
-            if not (0 < self.alpha_min < self.alpha_max):
-                errors.append(f"alpha_min ({self.alpha_min}) 必须小于 alpha_max ({self.alpha_max})")
-
-        if self.n_alpha is None:
-            errors.append("n_alpha 未设置 (推荐值: 101)")
-        elif self.n_alpha < 2:
-            errors.append(f"n_alpha ({self.n_alpha}) 必须 >= 2")
-
-        if self.n_departure is None:
-            errors.append("n_departure 未设置 (推荐值: 200)")
-        elif self.n_departure < 2:
-            errors.append(f"n_departure ({self.n_departure}) 必须 >= 2")
-
-        if self.max_transfer_time is None:
-            errors.append("max_transfer_time 未设置 (推荐值: 15.0)")
-        elif self.max_transfer_time <= 0:
-            errors.append(f"max_transfer_time ({self.max_transfer_time}) 必须 > 0")
-
-        if self.intersection_threshold is None:
-            errors.append("intersection_threshold 未设置 (推荐值: 0.001)")
-        elif self.intersection_threshold <= 0:
-            errors.append(f"intersection_threshold ({self.intersection_threshold}) 必须 > 0")
-
-        if self.min_distance_threshold is None:
-            errors.append("min_distance_threshold 未设置 (推荐值: 0.05)")
-        elif self.min_distance_threshold <= 0:
-            errors.append(f"min_distance_threshold ({self.min_distance_threshold}) 必须 > 0")
-
-        if self.collision_earth_radius is None:
-            errors.append("collision_earth_radius 未设置 (推荐值: 0.0005)")
-        elif self.collision_earth_radius <= 0:
-            errors.append(f"collision_earth_radius ({self.collision_earth_radius}) 必须 > 0")
-
-        if self.collision_moon_radius is None:
-            errors.append("collision_moon_radius 未设置 (推荐值: 0.00026)")
-        elif self.collision_moon_radius <= 0:
-            errors.append(f"collision_moon_radius ({self.collision_moon_radius}) 必须 > 0")
-
-        if self.integration_dt is None:
-            errors.append("integration_dt 未设置 (推荐值: 0.01)")
-        elif self.integration_dt <= 0:
-            errors.append(f"integration_dt ({self.integration_dt}) 必须 > 0")
-
-        if errors:
-            raise ValueError("搜索参数验证失败:\n  - " + "\n  - ".join(errors))
-
     def search(self, **kwargs) -> List[Dict[str, Any]]:
         """执行网格搜索
 
@@ -222,8 +160,6 @@ class DROTransferSearch(BaseTransfer):
         """
         if self._departure_orbit is None or self._arrival_orbit is None:
             raise ValueError("必须先设置departure_orbit和arrival_orbit")
-
-        self._validate_search_parameters()
 
         verbose = kwargs.get("verbose", self._verbose)
         n_workers = kwargs.get("n_workers", self._n_workers)
