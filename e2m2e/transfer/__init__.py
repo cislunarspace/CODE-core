@@ -43,7 +43,7 @@ from .transfer_base import (
     OptimizationResult,
 )
 
-_HAVE_COPT = transfer_optimization is not None
+_HAVE_COPT = transfer_optimization.coptpy is not None
 
 __all__ = [
     # 转移设计类
