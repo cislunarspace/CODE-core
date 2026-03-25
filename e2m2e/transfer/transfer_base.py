@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from ..core.system import CR3BP_System
+    from ..core.system import System, CR3BP_System
     from ..core.dynamics import CR3BP_Dynamics
     from ..core.orbit import Orbit
 
@@ -47,15 +47,14 @@ class BaseTransfer:
 
     def __init__(
         self,
-        system: CR3BP_System,
+        system: System,
         dynamics: CR3BP_Dynamics,
     ):
         """初始化转移设计器
 
         参数:
-            system: CR3BP系统对象
+            system: System类或其子类的实例（如CR3BP_System）
             dynamics: CR3BP动力学对象
-            name: 转移名称
         """
         self.system = system
         self.dynamics = dynamics
