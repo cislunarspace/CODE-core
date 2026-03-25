@@ -635,6 +635,136 @@ class Continuation:
 
         return family
 
+    def halo_pseudo_arclength_continuation(
+        self,
+        seed_orbit: Orbit,
+        n_orbits: int = 50,
+        direction: str = "both",
+        step_size: float = 0.005,
+        verbose: bool = True,
+    ) -> OrbitFamily:
+        """Halo轨道伪弧长延拓
+
+        使用伪弧长参数化方法生成Halo轨道族。
+        该方法利用Richardson三阶近似计算初始猜测，
+        并使用轨道族切线方向进行预测，以更好地跟踪轨道族曲线。
+
+        参数：
+            seed_orbit: Orbit, 种子轨道（已修正的Halo轨道）
+            n_orbits: int, 目标轨道数量
+            direction: str, 延拓方向 ("positive", "negative", "both")
+            step_size: float, 延拓步长（弧长）
+            verbose: bool, 是否打印详细信息
+
+        返回：
+            OrbitFamily: 包含轨道族的OrbitFamily对象
+        """
+        mu = self.dynamics.system.mu
+        libration_point = seed_orbit.parameters.get("libration_point", 1)
+        halo_class = seed_orbit.parameters.get("halo_class", 0)
+        seed_z_amplitude = seed_orbit.parameters.get("amplitude_z", 0.1)
+
+        if verbose:
+            print(f"\n{'=' * 60}")
+            print(f"开始 Halo 轨道伪弧长延拓")
+            print(f"  种子轨道: L{libration_point} {'北' if halo_class == 0 else '南'} Halo")
+            print(f"  种子轨道 z_amplitude: {seed_z_amplitude:.4f}")
+            print(f"  目标轨道数量: {n_orbits}")
+            print(f"  延拓方向: {direction}")
+            print(f"  步长: {step_size}")
+            print(f"{'=' * 60}")
+
+        orbit_family = OrbitFamily(seed_orbit)
+
+        directions = ["positive", "negative"] if direction == "both" else [direction]
+
+        self.correction.max_iterations = 100
+        self.correction.tolerance = 1e-6
+
+        for direction in directions:
+            if verbose:
+                print(f"\n--- {'正向' if direction == 'positive' else '反向'}延拓 ---")
+
+            family_orbits = [seed_orbit]
+            prev_orbit = seed_orbit
+
+            step_sign = 1 if direction == "positive" else -1
+
+            for i in range(n_orbits - 1):
+                current_z = prev_orbit.parameters.get("amplitude_z", 0.1)
+                next_z = current_z + step_sign * step_size * 10
+
+                if next_z <= 0:
+                    if verbose:
+                        print(f"  轨道 {i + 1}: z={next_z:.4f} <= 0, 终止")
+                    break
+
+                guess = compute_halo_initial_guess(
+                    mu=mu,
+                    z_amplitude=next_z,
+                    L=libration_point,
+                    halo_class=halo_class,
+                )
+
+                if halo_class == 0:
+                    initial_z = next_z
+                else:
+                    initial_z = -next_z
+
+                initial_state = np.array(
+                    [
+                        guess["x0"],
+                        0.0,
+                        initial_z,
+                        guess["vx0"],
+                        guess["vy0"],
+                        guess["vz0"],
+                    ]
+                )
+
+                guess_orbit = Orbit(
+                    states=initial_state.reshape(1, -1),
+                    times=np.array([0.0]),
+                    system=self.dynamics.system,
+                )
+                guess_orbit.period = 2.0 * guess["T_half"]
+
+                self.correction.setup_halo_orbit_fixed_z0(
+                    z0=initial_z,
+                    libration_point=libration_point,
+                )
+
+                orbit = self.correction.iterate_correction(guess_orbit, verbose=False)
+
+                if orbit is not None and orbit.correction_success:
+                    orbit.family_type = "halo"
+                    orbit.parameters["libration_point"] = libration_point
+                    orbit.parameters["amplitude_z"] = next_z
+                    orbit.parameters["halo_class"] = halo_class
+
+                    family_orbits.append(orbit)
+                    prev_orbit = orbit
+
+                    if verbose and (i + 1) % 5 == 0:
+                        print(
+                            f"  轨道 {i + 1}: z={next_z:.4f}, x0={orbit.states[0, 0]:.4f}, 周期={orbit.period:.4f}"
+                        )
+                else:
+                    if verbose:
+                        print(f"  轨道 {i + 1}: z={next_z:.4f} 修正失败")
+                    break
+
+            for orbit in family_orbits[1:]:
+                orbit_family.add_orbit(orbit)
+
+        if verbose:
+            print(f"\n延拓完成：共生成 {len(orbit_family)} 条轨道")
+            if len(orbit_family) > 0:
+                z_values = [o.parameters.get("amplitude_z", 0) for o in orbit_family]
+                print(f"  z_amplitude 范围: [{min(z_values):.4f}, {max(z_values):.4f}]")
+
+        return orbit_family
+
     def __str__(self):
         return (
             f"Continuation(param={self.continuation_parameter}, n_orbits={len(self.family_orbits)})"
