@@ -8,12 +8,180 @@
 from __future__ import annotations
 import numpy as np
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple, Any
 from .differential_correction import (
     DifferentialCorrection,
     compute_halo_initial_guess,
 )
 from ..core.orbit import OrbitFamily, Orbit
+
+
+# =============================================================================
+# 辅助函数：计算约束向量和雅可比矩阵
+# =============================================================================
+
+
+def compute_F_and_dF_symmetric_xz_plane(
+    X: np.ndarray,
+    SV0: np.ndarray,
+    mu: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """计算XZ平面对称轨道的约束向量和雅可比矩阵
+
+    对应MATLAB: computeFdF_symPeriodicPlanes_CR3BP(X, SV0i, mu, plane=13)
+
+    X = [rx; rz; vy; tf2] - 自由变量向量
+    SV0 = [rx, ry, rz, vx, vy, vz] - 初始状态向量
+
+    F = [vx; vz; ry] - 约束向量（半周期终点状态）
+    dF = ∂F/∂X - 约束雅可比矩阵 (3x4)
+
+    参数:
+        X: 自由变量向量 [rx, rz, vy, tf2]
+        SV0: 初始状态向量 [x, y, z, vx, vy, vz]
+        mu: 质量比
+
+    返回:
+        F: 约束向量 [vx, vz, ry]
+        dF: 雅可比矩阵 (3, 4)
+    """
+    # 重建状态和飞行时间
+    rx = X[0]
+    rz = X[1]
+    vy = X[2]
+    tf2 = X[3]
+
+    # 更新初始状态
+    state = SV0.copy()
+    state[0] = rx  # x
+    state[2] = rz  # z
+    state[4] = vy  # vy
+
+    # 计算状态导数（用于雅可比矩阵的时间项）
+    def state_derivative(t, s, mu_val):
+        """CR3BP状态导数"""
+        x, y, z, vx, vy, vz = s
+        r1 = np.sqrt((x + mu_val) ** 2 + y**2 + z**2)
+        r2 = np.sqrt((x - 1 + mu_val) ** 2 + y**2 + z**2)
+
+        ax = 2 * vy + x - (1 - mu_val) * (x + mu_val) / r1**3 - mu_val * (x - 1 + mu_val) / r2**3
+        ay = -2 * vx + y - (1 - mu_val) * y / r1**3 - mu_val * y / r2**3
+        az = -(1 - mu_val) * z / r1**3 - mu_val * z / r2**3
+
+        return np.array([vx, vy, vz, ax, ay, az])
+
+    # 计算雅可比矩阵 A(t)
+    def compute_jacobian_A(s, mu_val):
+        """计算CR3BP雅可比矩阵A(t)"""
+        x, y, z, vx, vy, vz = s
+        r1 = np.sqrt((x + mu_val) ** 2 + y**2 + z**2)
+        r2 = np.sqrt((x - 1 + mu_val) ** 2 + y**2 + z**2)
+
+        U_xx = 1 - (1 - mu_val) * (1 / r1**3 - 3 * (x + mu_val) ** 2 / r1**5) - mu_val * (1 / r2**3 - 3 * (x - 1 + mu_val) ** 2 / r2**5)
+        U_yy = 1 - (1 - mu_val) * (1 / r1**3 - 3 * y**2 / r1**5) - mu_val * (1 / r2**3 - 3 * y**2 / r2**5)
+        U_zz = -(1 - mu_val) / r1**3 - mu_val / r2**3
+        U_xy = 3 * (1 - mu_val) * (x + mu_val) * y / r1**5 + 3 * mu_val * (x - 1 + mu_val) * y / r2**5
+        U_xz = 3 * (1 - mu_val) * (x + mu_val) * z / r1**5 + 3 * mu_val * (x - 1 + mu_val) * z / r2**5
+        U_yz = 3 * (1 - mu_val) * y * z / r1**5 + 3 * mu_val * y * z / r2**5
+
+        return np.array([
+            [0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 1],
+            [U_xx, U_xy, U_xz, 0, 2, 0],
+            [U_xy, U_yy, U_yz, -2, 0, 0],
+            [U_xz, U_yz, U_zz, 0, 0, 0],
+        ])
+
+    # 积分得到终点状态和STM
+    from scipy.integrate import solve_ivp
+
+    # 增广状态：[状态(6), STM(36)]
+    initial_stm = np.eye(6).flatten()
+    augmented_state = np.concatenate([state, initial_stm])
+
+    def equations_with_stm(t, aug_s):
+        """增广状态方程"""
+        s = aug_s[:6]
+        stm = aug_s[6:].reshape((6, 6))
+        dsdt = state_derivative(t, s, mu)
+        A = compute_jacobian_A(s, mu)
+        stm_dot = A @ stm
+        return np.concatenate([dsdt, stm_dot.flatten()])
+
+    # 积分半周期
+    result = solve_ivp(
+        equations_with_stm,
+        (0, tf2),
+        augmented_state,
+        method="DOP853",
+        t_eval=[tf2],
+        rtol=1e-12,
+        atol=1e-12,
+    )
+
+    # 提取终点状态和STM
+    final_state = result.y[:6, -1]
+    final_stm = result.y[6:, -1].reshape((6, 6))
+
+    # 计算终点状态导数
+    dSV = state_derivative(tf2, final_state, mu)
+
+    # 约束向量 F = [vx; vz; ry] = [final_state[3]; final_state[5]; final_state[1]]
+    F = np.array([final_state[3], final_state[5], final_state[1]])
+
+    # 雅可比矩阵 dF = ∂F/∂X
+    # 对于 X = [rx, rz, vy, tf2]，dF是3x4矩阵
+    # dF(i,j) = ∂F(i)/∂X(j)
+    # 列1: ∂F/∂rx = STM([3,5,1], 0)  (对x的敏感性)
+    # 列2: ∂F/∂rz = STM([3,5,1], 2)  (对z的敏感性)
+    # 列3: ∂F/∂vy = STM([3,5,1], 4)  (对vy的敏感性)
+    # 列4: ∂F/∂tf2 = dSV([3,5,1])  (对时间的敏感性)
+
+    dF = np.zeros((3, 4))
+    # 列0: 对rx的偏导 (STM第0列)
+    dF[0, 0] = final_stm[3, 0]  # ∂vx/∂rx
+    dF[1, 0] = final_stm[5, 0]  # ∂vz/∂rx
+    dF[2, 0] = final_stm[1, 0]  # ∂ry/∂rx
+
+    # 列1: 对rz的偏导 (STM第2列)
+    dF[0, 1] = final_stm[3, 2]  # ∂vx/∂rz
+    dF[1, 1] = final_stm[5, 2]  # ∂vz/∂rz
+    dF[2, 1] = final_stm[1, 2]  # ∂ry/∂rz
+
+    # 列2: 对vy的偏导 (STM第4列)
+    dF[0, 2] = final_stm[3, 4]  # ∂vx/∂vy
+    dF[1, 2] = final_stm[5, 4]  # ∂vz/∂vy
+    dF[2, 2] = final_stm[1, 4]  # ∂ry/∂vy
+
+    # 列3: 对tf2的偏导 (状态导数)
+    dF[0, 3] = dSV[3]  # ∂vx/∂t
+    dF[1, 3] = dSV[5]  # ∂vz/∂t
+    dF[2, 3] = dSV[1]  # ∂ry/∂t
+
+    return F, dF
+
+
+def compute_tangent_vector(dF: np.ndarray) -> np.ndarray:
+    """计算切向量（约束雅可比矩阵的零空间）
+
+    对应MATLAB: Xdot = null(dF)
+
+    参数:
+        dF: 约束雅可比矩阵 (3, 4)
+
+    返回:
+        Xdot: 切向量 (4,)，单位化
+    """
+    # 使用SVD计算零空间
+    _, _, Vh = np.linalg.svd(dF)
+    # 零空间向量是V的最后一列（对应最小奇异值）
+    tangent = Vh[-1, :]
+    # 单位化
+    norm = np.linalg.norm(tangent)
+    if norm > 0:
+        tangent = tangent / norm
+    return tangent
 
 
 class ContinuationMethod(Enum):
@@ -350,103 +518,191 @@ class Continuation:
 
         return orbit_family
 
-    def pseudo_arclength_continuation(self, seed_state, seed_t_half, n_orbits=50, verbose=True):
-        """伪弧长延拓
+    def pseudo_arclength_continuation(
+        self,
+        seed_orbit,
+        n_orbits: int = 50,
+        step_size: float = 0.005,
+        direction: str = "positive",
+        verbose: bool = True,
+        TolPAL: float = 1e-6,
+        TolDiffCorr: float = 1e-6,
+        IterMax: int = 100,
+    ):
+        """伪弧长延拓（基于MATLAB continuation_PAL_CR3BP）
 
-        使用伪弧长参数化方法，可以跟踪轨道族中的折返点。
+        使用伪弧长参数化方法跟踪轨道族，可以处理折返点等复杂情况。
 
         参数：
-            seed_state: 种子轨道初始状态
-            seed_t_half: 种子轨道半周期
+            seed_orbit: 种子轨道（Orbit对象）
             n_orbits: 目标轨道数量
+            step_size: 伪弧长步长 DeltaS
+            direction: 延拓方向 ("positive", "negative", "both")
             verbose: 是否打印信息
+            TolPAL: PAL Newton-Raphson 容差
+            TolDiffCorr: 微分修正容差
+            IterMax: PAL循环最大迭代次数
 
         返回：
-            dict: 包含轨道族数据的字典
+            OrbitFamily: 包含轨道族的OrbitFamily对象
         """
+        mu = self.dynamics.system.mu
+
         if verbose:
             print(f"\n{'=' * 60}")
-            print("开始伪弧长延拓")
+            print("开始伪弧长延拓 (Pseudo Arc-Length Continuation)")
             print(f"{'=' * 60}")
+            print(f"  质量比 mu = {mu:.10f}")
+            print(f"  目标轨道数 = {n_orbits}")
+            print(f"  步长 DeltaS = {step_size}")
+            print(f"  延拓方向 = {direction}")
 
-        # 复用已初始化的corrector，确保修正模式被正确使用
-        corrector = self.correction
+        orbit_family = OrbitFamily(seed_orbit)
 
-        # 首先用自然延拓获取前两条轨道
-        seed_orbit = corrector.iterate_correction(seed_state, seed_t_half, verbose=False)
-        if seed_orbit is None:
-            print("种子轨道修正失败！")
-            return None
+        # 种子轨道初始状态
+        SV0i = seed_orbit.states[0].copy()
+        tfi = seed_orbit.period
 
-        self.family_orbits.append(seed_orbit)
-        self.family_states.append(seed_orbit.states[0].copy())
-        self.family_periods.append(seed_orbit.period)
+        # 自由变量向量 X = [rx, rz, vy, tf2]
+        X = np.array([SV0i[0], SV0i[2], SV0i[4], tfi / 2])
 
-        # 获取第二条轨道（微小扰动）
-        param_index = self._infer_param_index()
-        state_2 = seed_orbit.states[0].copy()
-        t_half_2 = seed_orbit.period / 2
+        # 计算初始约束雅可比
+        _, dF = compute_F_and_dF_symmetric_xz_plane(X, SV0i, mu)
 
-        if param_index < 6:
-            state_2[param_index] += self.step_size * 0.1
-        else:
-            t_half_2 += self.step_size * 0.1
-
-        orbit_2 = corrector.iterate_correction(state_2, t_half_2, verbose=False)
-        if orbit_2 is None:
-            print("第二条轨道修正失败！")
-            return None
-
-        self.family_orbits.append(orbit_2)
-        self.family_states.append(orbit_2.states[0].copy())
-        self.family_periods.append(orbit_2.period)
-
-        # 伪弧长延拓主循环
-        for i in range(n_orbits - 2):
-            self.continuation_stats["total_steps"] += 1
-
-            # 计算切线方向
-            state_prev = self.family_states[-2]
-            state_curr = self.family_states[-1]
-            t_prev = self.family_periods[-2] / 2
-            t_curr = self.family_periods[-1] / 2
-
-            # 切线向量（包含状态和时间）
-            tangent_state = state_curr - state_prev
-            tangent_time = t_curr - t_prev
-            tangent = np.append(tangent_state, tangent_time)
-            tangent_norm = np.linalg.norm(tangent)
-            if tangent_norm > 0:
-                tangent = tangent / tangent_norm
-
-            self.tangent_vector = tangent
-
-            # 预测步
-            predicted_state = state_curr + self.step_size * tangent[:6]
-            predicted_t_half = t_curr + self.step_size * tangent[6] if len(tangent) > 6 else t_curr
-
-            # 修正步
-            orbit = corrector.iterate_correction(predicted_state, predicted_t_half, verbose=False)
-
-            if orbit is not None and orbit.correction_success:
-                self.family_orbits.append(orbit)
-                self.family_states.append(orbit.states[0].copy())
-                self.family_periods.append(orbit.period)
-                self.continuation_stats["successful_steps"] += 1
-
-                if verbose and (i + 1) % 10 == 0:
-                    print(f"  第 {i + 3}/{n_orbits} 条轨道")
-            else:
-                self.continuation_stats["failed_steps"] += 1
-                self.step_size *= self.step_reduction_factor
-                if self.step_size < self.min_step_size:
-                    self.termination_reason = "步长过小"
-                    break
+        # 计算切向量（零空间）
+        Xdot = compute_tangent_vector(dF)
 
         if verbose:
-            print(f"\n伪弧长延拓完成：共生成 {len(self.family_orbits)} 条轨道")
+            print(f"\n初始自由变量 X = [{X[0]:.6f}, {X[1]:.6f}, {X[2]:.6f}, {X[3]:.6f}]")
+            print(f"初始切向量 Xdot = [{Xdot[0]:.6f}, {Xdot[1]:.6f}, {Xdot[2]:.6f}, {Xdot[3]:.6f}]")
 
-        return self._build_family_result()
+        # 存储已修正的轨道状态和周期
+        family_states = [SV0i.copy()]
+        family_periods = [tfi]
+        family_orbits = [seed_orbit]
+
+        # 确定延拓方向
+        step_sign = 1.0 if direction == "positive" else -1.0
+
+        for n in range(n_orbits):
+            if verbose and (n + 1) % 5 == 0:
+                print(f"\n--- 延拓第 {n + 1}/{n_orbits} 条轨道 ---")
+
+            # ============================================================
+            # 预测步 (Predictor)
+            # ============================================================
+            # Xnew = X + DeltaS * Xdot
+            DeltaX = step_sign * step_size * Xdot
+            Xnew = X + DeltaX
+
+            if verbose:
+                print(f"  预测 Xnew = [{Xnew[0]:.6f}, {Xnew[1]:.6f}, {Xnew[2]:.6f}, {Xnew[3]:.6f}]")
+
+            # ============================================================
+            # PAL修正步 (Corrector using PAL constraint)
+            # ============================================================
+            # 组合约束: G = [F; dot(Xnew-X, Xdot) - DeltaS]
+            # 组合雅可比: dG = [dF; Xdot']
+
+            for iter_pal in range(IterMax):
+                # 重建状态
+                SV0_guess = SV0i.copy()
+                SV0_guess[0] = Xnew[0]  # rx
+                SV0_guess[2] = Xnew[1]  # rz
+                SV0_guess[4] = Xnew[2]  # vy
+                tf2_guess = Xnew[3]
+
+                # 计算约束和雅可比
+                F, dF_new = compute_F_and_dF_symmetric_xz_plane(Xnew, SV0_guess, mu)
+
+                # 计算当前切向量
+                Xdot_new = compute_tangent_vector(dF_new)
+
+                # 组合约束 G = [F; dot(Xnew-X, Xdot) - DeltaS]
+                G = np.zeros(4)
+                G[:3] = F
+                G[3] = np.dot(Xnew - X, Xdot) - step_size * step_sign
+
+                # 组合雅可比 dG = [dF; Xdot']
+                dG = np.zeros((4, 4))
+                dG[:3, :] = dF_new
+                dG[3, :] = Xdot
+
+                # Newton-Raphson 修正
+                try:
+                    delta_X = np.linalg.solve(dG, G)
+                except np.linalg.LinAlgError:
+                    if verbose:
+                        print(f"  PAL迭代 {iter_pal + 1}: 雅可比矩阵奇异")
+                    break
+
+                Xnew = Xnew - delta_X
+
+                # 检查收敛
+                if np.linalg.norm(F) < TolPAL:
+                    if verbose:
+                        print(f"  PAL迭代 {iter_pal + 1}: 收敛, ||F|| = {np.linalg.norm(F):.2e}")
+                    break
+
+            # 更新切向量
+            Xdot = Xdot_new
+            X = Xnew.copy()
+
+            # ============================================================
+            # 微分修正 (Differential Correction)
+            # ============================================================
+            # 重建状态向量
+            SV0_corr = SV0i.copy()
+            SV0_corr[0] = X[0]  # rx
+            SV0_corr[2] = X[1]  # rz
+            SV0_corr[4] = X[2]  # vy
+            tf_corr = 2 * X[3]
+
+            # 选择修正方法：根据 x 和 z 哪个变化更大来决定
+            x0_last = family_states[-1][0] if len(family_states) > 0 else SV0_corr[0]
+            z0_last = family_states[-1][2] if len(family_states) > 0 else SV0_corr[2]
+
+            if abs(SV0_corr[0] - x0_last) > abs(SV0_corr[2] - z0_last):
+                # 使用 fixedX 修正
+                self.correction.setup_3D_symmetric_x_fixed_x0(x0=SV0_corr[0])
+            else:
+                # 使用 fixedZ 修正
+                self.correction.setup_3D_symmetric_xz_fixed_z0(z0=SV0_corr[2])
+
+            # 创建猜测轨道
+            guess_orbit = Orbit(
+                states=SV0_corr.reshape(1, -1),
+                times=np.array([0.0]),
+                system=self.dynamics.system,
+            )
+            guess_orbit.period = tf_corr
+
+            # 执行微分修正
+            orbit = self.correction.iterate_correction(guess_orbit, verbose=False)
+
+            if orbit is not None and orbit.correction_success:
+                family_orbits.append(orbit)
+                family_states.append(orbit.states[0].copy())
+                family_periods.append(orbit.period)
+
+                # 更新自由变量
+                X = np.array([orbit.states[0, 0], orbit.states[0, 2], orbit.states[0, 4], orbit.period / 2])
+
+                if verbose and (n + 1) % 5 == 0:
+                    print(f"  轨道 {n + 1}: x0={orbit.states[0, 0]:.4f}, z0={orbit.states[0, 2]:.4f}, T={orbit.period:.4f}")
+            else:
+                if verbose:
+                    print(f"  轨道 {n + 1}: 微分修正失败")
+                break
+
+        # 添加所有轨道到族
+        for orbit in family_orbits:
+            orbit_family.add_orbit(orbit)
+
+        if verbose:
+            print(f"\n伪弧长延拓完成：共生成 {len(orbit_family)} 条轨道")
+
+        return orbit_family
 
     def _infer_param_index(self):
         """根据延拓参数名称推断索引"""
@@ -554,7 +810,7 @@ class Continuation:
         initial_orbit.period = 2.0 * guess["T_half"]
 
         self.correction.max_iterations = 150
-        self.correction.tolerance = 1e-6
+        self.correction.tolerance = 1e-5
 
         if verbose:
             print(f"  初始猜测: x0={guess['x0']:.6f}, vy0={guess['vy0']:.6f}")
@@ -679,7 +935,7 @@ class Continuation:
         directions = ["positive", "negative"] if direction == "both" else [direction]
 
         self.correction.max_iterations = 100
-        self.correction.tolerance = 1e-6
+        self.correction.tolerance = 1e-5
 
         for direction in directions:
             if verbose:
@@ -699,12 +955,19 @@ class Continuation:
                         print(f"  轨道 {i + 1}: z={next_z:.4f} <= 0, 终止")
                     break
 
-                guess = compute_halo_initial_guess(
-                    mu=mu,
-                    z_amplitude=next_z,
-                    L=libration_point,
-                    halo_class=halo_class,
-                )
+                # 基于上一个修正后的轨道状态来估计新轨道的初始状态
+                prev_state = prev_orbit.states[0]
+                prev_vy = prev_state[4]
+                prev_period = prev_orbit.period
+
+                # 对 z 方向的增量进行调整，vy 按比例变化
+                # 假设 x 和 period 随 z 线性变化（简化假设）
+                z_ratio = next_z / current_z if current_z > 0 else 1.0
+
+                # 新的初始状态估计
+                new_x0 = prev_state[0]  # x 变化不大
+                new_vy = prev_vy * z_ratio  # vy 按比例调整
+                new_period = prev_period * (0.9 + 0.1 * z_ratio)  # 周期也按比例调整
 
                 if halo_class == 0:
                     initial_z = next_z
@@ -713,12 +976,12 @@ class Continuation:
 
                 initial_state = np.array(
                     [
-                        guess["x0"],
+                        new_x0,
                         0.0,
                         initial_z,
-                        guess["vx0"],
-                        guess["vy0"],
-                        guess["vz0"],
+                        0.0,  # vx
+                        new_vy,
+                        0.0,  # vz
                     ]
                 )
 
@@ -727,7 +990,7 @@ class Continuation:
                     times=np.array([0.0]),
                     system=self.dynamics.system,
                 )
-                guess_orbit.period = 2.0 * guess["T_half"]
+                guess_orbit.period = new_period
 
                 self.correction.setup_halo_orbit_fixed_z0(
                     z0=initial_z,

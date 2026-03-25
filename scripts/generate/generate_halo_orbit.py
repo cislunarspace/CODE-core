@@ -46,7 +46,7 @@ amplitude_z = 0.23  # Z方向振幅
 halo_class = 0  # 0=北Halo (Class I), 1=南Halo (Class II)
 
 # 目标参数
-target_period = 1.8397  # 完整周期（无量纲时间单位）
+target_period = 1.839732  # 完整周期（无量纲时间单位）
 t_half = target_period / 2  # 半周期
 
 print(f"目标轨道: L{libration_point} {'北' if halo_class == 0 else '南'} Halo")
@@ -71,9 +71,14 @@ print(f"  约束条件: {list(corrector.target_conditions.keys())}")
 # =============================================================================
 # 4. 初始猜测（来自Richardson三阶近似）
 # =============================================================================
-x0 = 0.9305  # L1位置附近
-vy0 = 0.1043 * amplitude_z / 0.23  # 按振幅缩放
-z0 = amplitude_z if halo_class == 0 else -amplitude_z
+# x0 = 0.9305269194214338  # L1位置附近
+# vy0 = 0.1043 * amplitude_z / 0.23  # 按振幅缩放
+# z0 = amplitude_z if halo_class == 0 else -amplitude_z
+# 采用计算之后的值
+x0 = 0.9305269194214338  # L1位置附近
+z0 = 0.23
+vy0 = 0.10431508546142665
+
 
 initial_state = [x0, 0.0, z0, 0.0, vy0, 0.0]
 times = [0]

@@ -253,14 +253,19 @@ def compute_halo_initial_guess(
     else:
         delta_sign = 1
 
+    # 初始猜测基于 MATLAB 参考值
+    # 参考: FAMILY_L1Halo_North.m
+    # SV0 = [0.9305,0,0.2300,0,0.1043,0]', tf = 1.8397
     if L == 1:
         x0 = 0.9305
         vy0 = 0.1043 * z_amplitude / 0.23
+        # 对于 L1，半周期随振幅变化不大，约为 0.92
+        T_half = 0.91985
     else:
         x0 = 1.15
         vy0 = 0.1043 * z_amplitude / 0.23
-
-    T_half = np.pi * (0.91985 / np.pi)
+        # 对于 L2，半周期也约为 0.92
+        T_half = 0.91985
 
     return {
         "x0": x0,
