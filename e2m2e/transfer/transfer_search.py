@@ -346,12 +346,23 @@ class DROTransferSearch(BaseTransfer):
         verbose: bool,
         n_workers: int,
     ) -> List[Dict[str, Any]]:
-        """并行网格搜索"""
+        """对多个出发点并行做与 `_grid_search_sequential` 相同的网格搜索。
+
+        每个出发点调用 `_search_single_departure`（对 α 网格逐点求解转移）。
+        使用 `ThreadPoolExecutor`：任务提交顺序为 0..N-1，但完成顺序由 `as_completed`
+        决定；通过 `futures[future] -> i` 把每条结果标回原始出发点下标 `departure_time_index`。
+
+        与串行版的差异：某出发点若抛错，仅跳过该点并（在 verbose 下）打印，不中断整批。
+
+        进度说明：verbose 下进度按「整段 `_search_single_departure` 完成」计，不会在 α 步或积分
+        中途刷新；首个进度行须等待至少一个出发点算完（可能很久）。提交任务后会立刻打印一行提示。
+        """
         total_departures = len(departure_states)
         all_results = []
         completed = 0
 
         with ThreadPoolExecutor(max_workers=n_workers) as executor:
+            # Future -> 该任务在 departure_states/times 中的下标 i（完成顺序乱序时仍能对上号）
             futures = {
                 executor.submit(
                     self._search_single_departure,
@@ -362,14 +373,22 @@ class DROTransferSearch(BaseTransfer):
                 for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times))
             }
 
+            if verbose:
+                print(
+                    f"  并行搜索: 已提交 {total_departures} 个出发点（{n_workers} 个工作线程），"
+                    "按完成顺序汇报进度…",
+                    flush=True,
+                )
+
+            # 按“谁先算完”迭代，不是按 i 从小到大；首个 future 完成前本循环不会进入
             for future in as_completed(futures):
                 completed += 1
                 if verbose:
                     pct = completed / total_departures * 100
-                    print(f"  进度: {completed}/{total_departures} ({pct:.1f}%)")
+                    print(f"  进度: {completed}/{total_departures} ({pct:.1f}%)", flush=True)
 
                 try:
-                    results = future.result()
+                    results = future.result()  # 单出发点：α 网格上所有可行解的列表
                     for r in results:
                         r["departure_orbit_name"] = dep_name
                         r["arrival_orbit_name"] = arr_name
@@ -377,7 +396,7 @@ class DROTransferSearch(BaseTransfer):
                     all_results.extend(results)
                 except Exception as e:
                     if verbose:
-                        print(f"    出发点 {futures[future]} 处理失败: {e}")
+                        print(f"    出发点 {futures[future]} 处理失败: {e}", flush=True)
 
         return all_results
 
