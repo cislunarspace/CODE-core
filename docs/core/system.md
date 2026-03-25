@@ -1,10 +1,33 @@
+# System
+
+**文件**: `e2m2e/core/system.py`
+
+**类签名**:
+```python
+class System:
+    """天体系统基类"""
+```
+
+## 设计原理
+
+`System` 是所有系统参数类的抽象基类，定义了获取系统参数、计算平动点等通用接口。
+
+## 核心方法
+
+| 方法 | 说明 |
+|------|------|
+| `get_libration_point(point)` | 获取平动点坐标 |
+| `get_jacobi_constant(state)` | 计算 Jacobi 常数 |
+
+---
+
 # CR3BP_System
 
 **文件**: `e2m2e/core/system.py`
 
 **类签名**:
 ```python
-class CR3BP_System:
+class CR3BP_System(System):
     """圆型限制性三体问题系统参数"""
 ```
 

@@ -1,10 +1,33 @@
+# System
+
+**File**: `e2m2e/core/system.py`
+
+**Class Signature**:
+```python
+class System:
+    """Base class for celestial system"""
+```
+
+## Design Principles
+
+`System` is the abstract base class for all system parameter classes, defining common interfaces for getting system parameters and computing libration points.
+
+## Core Methods
+
+| Method | Description |
+|--------|-------------|
+| `get_libration_point(point)` | Get libration point coordinates |
+| `get_jacobi_constant(state)` | Calculate Jacobi constant |
+
+---
+
 # CR3BP_System
 
 **File**: `e2m2e/core/system.py`
 
 **Class Signature**:
 ```python
-class CR3BP_System:
+class CR3BP_System(System):
     """Circular Restricted Three-Body Problem system parameters"""
 ```
 

@@ -1,10 +1,34 @@
+# Dynamics
+
+**File**: `e2m2e/core/dynamics.py`
+
+**Class Signature**:
+```python
+class Dynamics:
+    """Base class for celestial system dynamics"""
+```
+
+## Design Principles
+
+`Dynamics` is the abstract base class for all dynamics models, defining common interfaces for trajectory propagation, energy constant calculation, and section crossing detection.
+
+## Core Methods
+
+| Method | Description |
+|--------|-------------|
+| `propagate(initial_state, t_span, with_stm=False)` | Propagate trajectory |
+| `compute_jacobi_constant(state)` | Calculate energy constant |
+| `check_cross_section(state, plane, value)` | Check section crossing |
+
+---
+
 # CR3BP_Dynamics
 
 **File**: `e2m2e/core/dynamics.py`
 
 **Class Signature**:
 ```python
-class CR3BP_Dynamics:
+class CR3BP_Dynamics(Dynamics):
     """CR3BP dynamics equations"""
 ```
 

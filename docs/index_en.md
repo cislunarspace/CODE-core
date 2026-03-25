@@ -41,7 +41,9 @@ docs/
 
 | Class/Module | File | Description |
 |--------------|------|-------------|
+| `System` | [core/system.md](core/system.md) | Base class for celestial system |
 | `CR3BP_System` | [core/system.md](core/system.md) | System parameters and libration point calculation |
+| `Dynamics` | [core/dynamics.md](core/dynamics.md) | Base class for dynamics |
 | `CR3BP_Dynamics` | [core/dynamics.md](core/dynamics.md) | Equations of motion and numerical integration |
 | `Orbit` | [core/orbit.md](core/orbit.md) | Orbit data management |
 | `OrbitFamily` | [core/orbit.md](core/orbit.md) | Orbit family management |

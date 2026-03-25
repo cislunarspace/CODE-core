@@ -1,10 +1,34 @@
+# Dynamics
+
+**文件**: `e2m2e/core/dynamics.py`
+
+**类签名**:
+```python
+class Dynamics:
+    """通用天体系统动力学基类"""
+```
+
+## 设计原理
+
+`Dynamics` 是所有动力学模型的抽象基类，定义了传播轨迹、计算能量常数、检查截面穿越等通用接口。
+
+## 核心方法
+
+| 方法 | 说明 |
+|------|------|
+| `propagate(initial_state, t_span, with_stm=False)` | 传播轨迹 |
+| `compute_jacobi_constant(state)` | 计算能量常数 |
+| `check_cross_section(state, plane, value)` | 检查截面穿越 |
+
+---
+
 # CR3BP_Dynamics
 
 **文件**: `e2m2e/core/dynamics.py`
 
 **类签名**:
 ```python
-class CR3BP_Dynamics:
+class CR3BP_Dynamics(Dynamics):
     """CR3BP动力学方程"""
 ```
 

@@ -43,7 +43,9 @@ docs/
 
 | 类/模块 | 文件 | 说明 |
 |---------|------|------|
+| `System` | [core/system.md](core/system.md) | 天体系统基类 |
 | `CR3BP_System` | [core/system.md](core/system.md) | 系统参数与平动点计算 |
+| `Dynamics` | [core/dynamics.md](core/dynamics.md) | 动力学基类 |
 | `CR3BP_Dynamics` | [core/dynamics.md](core/dynamics.md) | 运动方程与数值积分 |
 | `Orbit` | [core/orbit.md](core/orbit.md) | 轨道数据管理 |
 | `OrbitFamily` | [core/orbit.md](core/orbit.md) | 轨道族管理 |
