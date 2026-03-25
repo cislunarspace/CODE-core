@@ -109,7 +109,7 @@ class DROTransferSearch(BaseTransfer):
         self.collision_moon_radius = None
 
         # 积分时间步长 (CR3BP 无量纲时间)
-        # 推荐值: integration_dt ∈ [1e-4, 0.1], 典型值 0.01
+        # 推荐值: integration_dt ∈ [1e-4, 0.1], 典型值 0.01 //TODO 这里的典型值需要修改，这里的单位是无量纲量，所以不能以0.01为单位，而应该以转换之后的10s或者60s作为典型值
         # 约束: integration_dt > 0
         self.integration_dt = None
 
@@ -327,7 +327,9 @@ class DROTransferSearch(BaseTransfer):
                 pct = (i + 1) / total_departures * 100
                 print(f"  进度: {i + 1}/{total_departures} ({pct:.1f}%)")
 
-            results = self._search_single_departure(dep_state, dep_time, arrival_orbit)
+            results = self._search_single_departure(
+                dep_state, dep_time, arrival_orbit, verbose=verbose
+            )
             for r in results:
                 r["departure_orbit_name"] = dep_name
                 r["arrival_orbit_name"] = arr_name
@@ -354,8 +356,8 @@ class DROTransferSearch(BaseTransfer):
 
         与串行版的差异：某出发点若抛错，仅跳过该点并（在 verbose 下）打印，不中断整批。
 
-        进度说明：verbose 下进度按「整段 `_search_single_departure` 完成」计，不会在 α 步或积分
-        中途刷新；首个进度行须等待至少一个出发点算完（可能很久）。提交任务后会立刻打印一行提示。
+        进度说明：verbose 下外层进度按「整段 `_search_single_departure` 完成」计；为免多线程
+        交错打印，不在此模式下列出 α 子进度。串行模式下若 verbose，会在每个出发点内打印 α 进度。
         """
         total_departures = len(departure_states)
         all_results = []
@@ -369,6 +371,7 @@ class DROTransferSearch(BaseTransfer):
                     dep_state,
                     dep_time,
                     arrival_orbit,
+                    False,
                 ): i
                 for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times))
             }
@@ -405,13 +408,23 @@ class DROTransferSearch(BaseTransfer):
         departure_state: np.ndarray,
         departure_time: float,
         arrival_orbit: Orbit,
+        verbose: bool = False,
     ) -> List[Dict[str, Any]]:
-        """对单个出发点搜索α网格"""
+        """对单个出发点搜索α网格
+
+        参数:
+            verbose: 若为 True，在 α 网格循环内打印子进度（串行搜索时与 ``search(..., verbose=True)`` 配合；
+                并行搜索应传 False，避免多线程输出交错）。
+        """
         results = []
 
         alpha_grid = np.linspace(self.alpha_min, self.alpha_max, self.n_alpha)
+        n_alpha = int(self.n_alpha)
 
-        for alpha in alpha_grid:
+        for i_alpha, alpha in enumerate(alpha_grid, start=1):
+            if verbose:
+                pct = i_alpha / n_alpha * 100
+                print(f"    α 进度: {i_alpha}/{n_alpha} ({pct:.1f}%)", flush=True)
             new_vel = self._compute_departure_velocity(departure_state, alpha)
 
             initial_state = np.concatenate(
@@ -504,7 +517,22 @@ class DROTransferSearch(BaseTransfer):
         transfer_time: float,
         dt: float,
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """前向积分转移轨迹""" # //TODO 需要审查这一部分的代码，看看积分速度为什么这么慢
+        """在 CR3BP 下从 ``initial_state`` 前向积分到 ``transfer_time``，得到等间隔采样轨迹。
+
+        使用 ``self.dynamics.propagate``（``solve_ivp`` + 稠密 ``t_eval``）。``with_stm=False``、
+        ``with_jacobi=False`` 避免 STM 增广维与逐点 Jacobi，减轻搜索阶段开销。输出步数约为
+        ``transfer_time / dt``，供后续碰撞检测、与目标轨道的距离/相交分析使用；积分总耗时主要取决于
+        ``max_transfer_time``、``integration_dt`` 以及动力学对象上的 ``rtol`` / ``atol`` /
+        ``max_step``，而非本函数本身。
+
+        参数:
+            initial_state: 六维状态 ``[x,y,z,vx,vy,vz]``（无量纲）。
+            transfer_time: 积分时长上界（与 ``self.max_transfer_time`` 一致，无量纲）。
+            dt: 输出时间步长 ``self.integration_dt``；过密会增大 ``t_eval`` 长度与插值开销。
+
+        返回:
+            ``(states, times)``，与 ``propagate`` 返回的 ``states`` / ``time`` 一致。
+        """
         n_steps = max(int(transfer_time / dt) + 1, 2)
         t_eval = np.linspace(0, transfer_time, n_steps)
 
