@@ -48,6 +48,8 @@ class DifferentialCorrection:
         "3D_symmetric_x_fixed_x0",
         "3D_symmetric_xz_fixed_x0",
         "3D_symmetric_xz_fixed_z0",
+        "halo_orbit_fixed_z0",
+        "halo_orbit_fixed_x0",
     ]
 
     def __init__(
@@ -345,6 +347,80 @@ class DifferentialCorrection:
         self._reset_history()
         return self
 
+    def setup_halo_orbit_fixed_z0(self, z0, libration_point=1):
+        """配置 Halo 轨道微分修正，固定初始 Z0（XZ 对称）
+
+        Halo 轨道具有 XZ 平面对称性，利用该对称性可以将问题简化为：
+        从 XZ 平面上一点 (x0, 0, z0) 出发，经过半周期 T/2 后再次到达 XZ 平面。
+
+        参数:
+            z0 (float): 固定的初始 z 坐标
+            libration_point (int): 平动点编号 (1=L1, 2=L2)，默认 L1
+
+        返回:
+            self: 配置好的微分修正器实例
+
+        配置说明:
+            - 自由变量: [x0, y_dot0, T_half] - 初始 x 坐标、y 方向速度和半周期时间
+            - 目标约束: [y(T/2)=0, x_dot(T/2)=0, z(T/2)=z0] - 半周期处再次位于 XZ 平面
+            - 状态向量索引: [0, 4, 6] 分别对应 x0、y_dot0 和时间 T_half
+        """
+        self.setup_type = "halo_orbit_fixed_z0"
+        self.symmetry_condition = "xz_plane"
+        self.fixed_parameters = {"z0": z0, "libration_point": libration_point}
+
+        self.free_variables = ["x0", "y_dot0", "T_half"]
+        self.free_variable_indices = [0, 4, 6]
+
+        self.target_conditions = {"y": 0.0, "x_dot": 0.0, "z": z0}
+        self.constraint_indices = [1, 3, 2]
+
+        self._reset_history()
+
+        print(
+            f"Halo 轨道配置完成（固定 Z0）：z0={z0}，平动点=L{libration_point}，"
+            f"自由变量={self.free_variables}，目标约束={list(self.target_conditions.keys())}"
+        )
+
+        return self
+
+    def setup_halo_orbit_fixed_x0(self, x0, libration_point=1):
+        """配置 Halo 轨道微分修正，固定初始 X0（XZ 对称）
+
+        Halo 轨道具有 XZ 平面对称性，利用该对称性可以将问题简化为：
+        从 XZ 平面上一点 (x0, 0, z0) 出发，经过半周期 T/2 后再次到达 XZ 平面。
+
+        参数:
+            x0 (float): 固定的初始 x 坐标
+            libration_point (int): 平动点编号 (1=L1, 2=L2)，默认 L1
+
+        返回:
+            self: 配置好的微分修正器实例
+
+        配置说明:
+            - 自由变量: [z0, y_dot0, T_half] - 初始 z 坐标、y 方向速度和半周期时间
+            - 目标约束: [y(T/2)=0, x_dot(T/2)=0, z_dot(T/2)=0] - 半周期处再次位于 XZ 平面且垂直穿越
+            - 状态向量索引: [2, 4, 6] 分别对应 z0、y_dot0 和时间 T_half
+        """
+        self.setup_type = "halo_orbit_fixed_x0"
+        self.symmetry_condition = "xz_plane"
+        self.fixed_parameters = {"x0": x0, "libration_point": libration_point}
+
+        self.free_variables = ["z0", "y_dot0", "T_half"]
+        self.free_variable_indices = [2, 4, 6]
+
+        self.target_conditions = {"y": 0.0, "x_dot": 0.0, "z_dot": 0.0}
+        self.constraint_indices = [1, 3, 5]
+
+        self._reset_history()
+
+        print(
+            f"Halo 轨道配置完成（固定 X0）：x0={x0}，平动点=L{libration_point}，"
+            f"自由变量={self.free_variables}，目标约束={list(self.target_conditions.keys())}"
+        )
+
+        return self
+
     def _reset_history(self):
         """重置收敛历史"""
         self.convergence_history = []
@@ -638,7 +714,9 @@ class DifferentialCorrection:
                     self.termination_reason = "收敛成功：修正量过小但误差足够小"
                     self.current_error = current_error
                     if verbose:
-                        print(f"  收敛成功：修正量过小({correction_norm:.2e})但误差已足够小({current_error:.2e})")
+                        print(
+                            f"  收敛成功：修正量过小({correction_norm:.2e})但误差已足够小({current_error:.2e})"
+                        )
                     break
                 else:
                     self.termination_reason = "停滞：修正量过小"
@@ -653,7 +731,9 @@ class DifferentialCorrection:
             if 2 * current_time < min_valid_period:
                 self.converged = False
                 self.success = False
-                self.termination_reason = f"收敛但周期无效: T={2 * current_time:.6e} < {min_valid_period}"
+                self.termination_reason = (
+                    f"收敛但周期无效: T={2 * current_time:.6e} < {min_valid_period}"
+                )
                 if verbose:
                     print(f"\n微分修正失败: {self.termination_reason}")
                 return None
