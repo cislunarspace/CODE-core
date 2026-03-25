@@ -8,9 +8,8 @@ from __future__ import annotations
 
 import numpy as np
 from enum import Enum
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Optional, Any
 
-import numpy.typing as npt
 
 from ..core.orbit import Orbit
 from ..core.dynamics import CR3BP_Dynamics
