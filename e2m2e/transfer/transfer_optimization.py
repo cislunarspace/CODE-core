@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 from typing import Tuple, List, Optional, Dict, Any, Callable
 from enum import Enum
+from scipy.optimize import minimize, Bounds
 import warnings
 
 from ..core.orbit import Orbit
@@ -483,8 +484,6 @@ class DROTRONLPOptimizer:
         返回:
             优化结果
         """
-        from scipy.optimize import minimize, Bounds
-
         # 设置搜索范围
         if alpha_range is not None:
             self.alpha_range = alpha_range
@@ -748,8 +747,6 @@ if NlpCallbackBase is not None:
         """
 
         def __init__(self, optimizer: DROTRONLPOptimizer):
-            import coptpy
-
             super().__init__()
             self.optimizer = optimizer
             self.x = None
@@ -889,12 +886,10 @@ class COPTNLPSolver:
         返回:
             是否成功
         """
-        try:
-            import coptpy
-
-            self.coptpy = coptpy
-        except ImportError:
+        if coptpy is None:
             raise RuntimeError("COPT not installed. Install with: pip install coptpy")
+
+        self.coptpy = coptpy
 
         # 创建环境
         env = self.coptpy.Envr()

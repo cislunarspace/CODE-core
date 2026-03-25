@@ -16,9 +16,13 @@
 
 from __future__ import annotations
 
-import numpy as np
+import json
+import multiprocessing
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Tuple, List, Optional, Dict, Any
 import warnings
+
+import numpy as np
 
 from ..core.orbit import Orbit
 from ..core.dynamics import CR3BP_Dynamics
@@ -27,6 +31,11 @@ from ..core.system import CR3BP_System
 from .transfer_base import (
     BaseTransfer,
     TransferType,
+)
+from .transfer_optimization import (
+    DROTRONLPOptimizer,
+    NLPOptimizationVariables,
+    NLPOptimizationResult,
 )
 
 
@@ -257,12 +266,6 @@ class DROTransferSearch(BaseTransfer):
         返回:
             优化结果
         """
-        from .transfer_optimization import (
-            DROTRONLPOptimizer,
-            NLPOptimizationVariables,
-            NLPOptimizationResult,
-        )
-
         if self._departure_orbit is None or self._arrival_orbit is None:
             raise ValueError("必须先设置departure_orbit和arrival_orbit")
 
@@ -311,9 +314,6 @@ class DROTransferSearch(BaseTransfer):
         n_workers: Optional[int],
     ) -> List[Dict[str, Any]]:
         """执行网格搜索的内部方法"""
-        import multiprocessing
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
         dep_name = getattr(departure_orbit, "name", "unknown")
         arr_name = getattr(arrival_orbit, "name", "unknown")
 
@@ -388,8 +388,6 @@ class DROTransferSearch(BaseTransfer):
         n_workers: int,
     ) -> List[Dict[str, Any]]:
         """并行网格搜索"""
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
         total_departures = len(departure_states)
         all_results = []
         completed = 0
@@ -689,8 +687,6 @@ def load_orbit_from_json(filepath: str) -> Orbit:
     返回:
         Orbit对象
     """
-    import json
-
     with open(filepath, "r") as f:
         data = json.load(f)
 
@@ -717,8 +713,6 @@ def save_search_results(
         results: 搜索结果列表
         filepath: 输出文件路径
     """
-    import json
-
     output = []
     for r in results:
         result_dict = {
