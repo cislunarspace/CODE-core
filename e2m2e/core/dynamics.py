@@ -1,7 +1,7 @@
 """
 三体问题动力学模块
 
-包含CR3BP_Dynamics类，用于计算和积分圆型限制性三体问题的动力学方程。
+包含通用 Dynamics 基类和 CR3BP_Dynamics 类，用于计算和积分圆型限制性三体问题的动力学方程。
 """
 
 from __future__ import annotations
@@ -12,10 +12,158 @@ from typing import Dict, List, Tuple, Optional, Any, Callable
 
 import numpy.typing as npt
 
-from .system import CR3BP_System
+from .system import System, CR3BP_System
 
 
-class CR3BP_Dynamics:
+class Dynamics:
+    """通用天体系统动力学基类
+
+    属性：
+        system: 关联的系统对象
+        integrator: 数值积分器类型
+        rtol: 相对积分容差
+        atol: 绝对积分容差
+        max_step: 最大积分步长
+        last_trajectory: 最近一次积分的轨迹 [t, y]
+        last_stm: 最近一次积分的状态转移矩阵
+        cross_section_tolerance: 截面检测容差
+        last_crossing: 上次穿过截面的点和时间
+        jacobi_history: Jacobi常数历史记录
+        jacobi_error: Jacobi常数误差
+        initialized: 初始化完成标志
+
+    方法：
+        __init__(system): 初始化动力学对象
+        propagate(): 传播轨迹（模板方法）
+        compute_jacobi_constant(): 计算能量常数
+        check_cross_section(): 检查截面穿越
+    """
+
+    DEFAULT_TOLERANCE = 1e-12
+    DEFAULT_MAX_STEP = 0.01
+
+    def __init__(self, system: System) -> None:
+        """初始化动力学
+
+        参数：
+        - system: System对象
+        """
+        self.system = system
+
+        self.integrator = "RK45"
+        self.rtol = self.DEFAULT_TOLERANCE
+        self.atol = self.DEFAULT_TOLERANCE
+        self.max_step = self.DEFAULT_MAX_STEP
+
+        self.last_trajectory = None
+        self.last_stm = None
+
+        self.cross_section_tolerance = 1e-8
+        self.last_crossing = None
+
+        self.jacobi_history = []
+        self.jacobi_error = 0.0
+
+        self.initialized = True
+
+    def equations_of_motion(
+        self, t: float, state: npt.NDArray[np.floating]
+    ) -> npt.NDArray[np.floating]:
+        """运动方程（子类需实现）
+
+        参数：
+        - t: 时间
+        - state: 状态向量
+
+        返回：
+        - 状态导数
+        """
+        raise NotImplementedError("子类必须实现此方法")
+
+    def propagate(
+        self,
+        initial_state: npt.ArrayLike,
+        t_span: Tuple[float, float],
+        t_eval: Optional[npt.ArrayLike] = None,
+        with_stm: bool = False,
+    ) -> Dict[str, Any]:
+        """传播轨迹
+
+        参数：
+        - initial_state: 初始状态向量
+        - t_span: 时间区间 [t0, tf]
+        - t_eval: 评估时间点数组（可选）
+        - with_stm: 是否计算状态转移矩阵
+
+        返回：
+        - 轨迹结果对象
+        """
+        result = solve_ivp(
+            self.equations_of_motion,
+            t_span,
+            initial_state,
+            method=self.integrator,
+            t_eval=t_eval,
+            rtol=self.rtol,
+            atol=self.atol,
+            max_step=self.max_step,
+        )
+
+        states = result.y.T
+
+        self.last_trajectory = (result.t, states)
+
+        if hasattr(self, "compute_jacobi_constant"):
+            self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
+            if len(self.jacobi_history) > 1:
+                self.jacobi_error = np.max(np.abs(np.diff(self.jacobi_history)))
+
+        return {
+            "time": result.t,
+            "states": states,
+            "jacobi": self.jacobi_history,
+            "jacobi_error": self.jacobi_error,
+        }
+
+    def compute_jacobi_constant(self, state: npt.ArrayLike) -> float:
+        """计算能量常数（子类需实现）
+
+        参数：
+        - state: 状态向量
+
+        返回：
+        - 能量常数
+        """
+        raise NotImplementedError("子类必须实现此方法")
+
+    def check_cross_section(self, state: npt.ArrayLike, plane: str, value: float) -> bool:
+        """检查是否穿过指定截面
+
+        参数：
+        - state: 状态向量
+        - plane: 截面平面 ('x', 'y', 'z')
+        - value: 平面值
+
+        返回：
+        - 布尔值
+        """
+        if plane == "x":
+            return abs(state[0] - value) < self.cross_section_tolerance
+        elif plane == "y":
+            return abs(state[1] - value) < self.cross_section_tolerance
+        elif plane == "z":
+            return abs(state[2] - value) < self.cross_section_tolerance
+        else:
+            raise ValueError(f"无效的平面: {plane}。可用平面: 'x', 'y', 'z'")
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(system={self.system})"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(system={self.system}, integrator='{self.integrator}', rtol={self.rtol})"
+
+
+class CR3BP_Dynamics(Dynamics):
     """CR3BP动力学方程
 
     本类封装了CR3BP的动力学模型，提供状态传播、状态转移矩阵计算、Jacobi常数计算等核心功能。
@@ -51,10 +199,7 @@ class CR3BP_Dynamics:
         check_cross_section(state, plane, value): 检查是否穿过指定截面
     """
 
-    # 类属性
-    DEFAULT_TOLERANCE = 1e-12  # 默认积分容差
-    DEFAULT_MAX_STEP = 0.01  # 默认最大步长
-    STM_DIMENSION = 42  # 状态转移矩阵维度 (6x6 + 6状态)
+    STM_DIMENSION = 42
 
     def __init__(self, system: CR3BP_System) -> None:
         """初始化动力学
@@ -62,29 +207,7 @@ class CR3BP_Dynamics:
         参数：
         - system: CR3BP_System对象
         """
-        # 关联的CR3BP系统
-        self.system = system
-
-        # 积分器设置
-        self.integrator = "RK45"  # 默认积分器
-        self.rtol = self.DEFAULT_TOLERANCE  # 相对容差
-        self.atol = self.DEFAULT_TOLERANCE  # 绝对容差
-        self.max_step = self.DEFAULT_MAX_STEP  # 最大步长
-
-        # 缓存最近的积分结果
-        self.last_trajectory = None  # 最近的轨迹 [t, y]
-        self.last_stm = None  # 最近的状态转移矩阵
-
-        # 截面检测设置
-        self.cross_section_tolerance = 1e-8  # 截面检测容差
-        self.last_crossing = None  # 上次穿过截面的点和时间
-
-        # 能量监控
-        self.jacobi_history = []  # Jacobi常数历史
-        self.jacobi_error = 0.0  # Jacobi常数误差
-
-        # 计算标志
-        self.initialized = True  # 初始化完成
+        super().__init__(system)
 
     def equations_of_motion(
         self, t: float, state: npt.NDArray[np.floating]
