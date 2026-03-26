@@ -103,65 +103,65 @@ class DROTransferSearch(BaseTransfer):
         # α (切向速度比) 搜索范围
         # 推荐值: alpha_min ∈ (0, 1.0], alpha_max ∈ [1.0, 3.0]
         # 约束: 0 < alpha_min < alpha_max
-        self.alpha_min = None
-        self.alpha_max = None
+        self.alpha_min: float | None = None
+        self.alpha_max: float | None = None
 
         # α 方向网格点数
         # 推荐值: n_alpha ∈ [51, 2001], 典型值 101 或 201
         # 约束: n_alpha >= 2
-        self.n_alpha = None
+        self.n_alpha: int | None = None
 
         # 出发点采样数量
         # 推荐值: n_departure ∈ [50, 500], 典型值 200
         # 约束: n_departure >= 2
-        self.n_departure = None
+        self.n_departure: int | None = None
 
         # 最大转移时间 (CR3BP 无量纲时间单位)
         # 推荐值: max_transfer_time ∈ [5.0, 30.0], 典型值 15.0
         # 约束: max_transfer_time > 0
-        self.max_transfer_time = None
+        self.max_transfer_time: float | None = None
 
         # 相交判定阈值 (无量纲距离)
         # 推荐值: intersection_threshold ∈ [1e-4, 1e-2], 典型值 0.001
         # 约束: intersection_threshold > 0
-        self.intersection_threshold = None
+        self.intersection_threshold: float | None = None
 
         # 候选解最小距离阈值 (无量纲距离)
         # 推荐值: min_distance_threshold ∈ [0.01, 0.1], 典型值 0.05
         # 约束: min_distance_threshold > 0
-        self.min_distance_threshold = None
+        self.min_distance_threshold: float | None = None
 
         # 地球碰撞检测半径 (无量纲距离)
         # 推荐值: 200 km ≈ 0.0005 (相对于地月距离 384405 km)
         # 约束: collision_earth_radius > 0
-        self.collision_earth_radius = None
+        self.collision_earth_radius: float | None = None
 
         # 月球碰撞检测半径 (无量纲距离)
         # 推荐值: 100 km ≈ 0.00026
         # 约束: collision_moon_radius > 0
-        self.collision_moon_radius = None
+        self.collision_moon_radius: float | None = None
 
         # 积分时间步长 (CR3BP 无量纲时间)
         # 推荐值: integration_dt ∈ [1e-4, 0.1], 典型值 0.01 //TODO 这里的典型值需要修改，这里的单位是无量纲量，所以不能以0.01为单位，而应该以转换之后的10s或者60s作为典型值
         # 约束: integration_dt > 0
-        self.integration_dt = None
+        self.integration_dt: float | None = None
 
         # 优化参数
         # alpha 搜索范围
         # 推荐值: (0.5, 2.5)
-        self.alpha_range = None
+        self.alpha_range: Tuple[float, float] | None = None
 
         # 转移时间范围
         # 推荐值: (1.0, 30.0)
-        self.transfer_time_range = None
+        self.transfer_time_range: Tuple[float, float] | None = None
 
         # 插入时间范围
         # 推荐值: (0.0, 10.0)
-        self.t_ins_range = None
+        self.t_ins_range: Tuple[float, float] | None = None
 
         # 速度平行性容差
         # 推荐值: 1e-6
-        self.velocity_angle_tolerance = None
+        self.velocity_angle_tolerance: float | None = None
 
     def set_verbose(self, verbose: bool) -> "DROTransferSearch":
         """设置是否输出详细信息"""
@@ -350,7 +350,10 @@ class DROTransferSearch(BaseTransfer):
         n_pts = len(times)
         if n_pts == 0:
             raise ValueError("出发轨道无数据点")
-        n = int(self.n_departure)
+        n_dep = self.n_departure
+        if n_dep is None:
+            raise ValueError("n_departure 未设置")
+        n = int(n_dep)
         if n <= 0:
             raise ValueError("n_departure 须为正整数")
         if n > n_pts:
@@ -465,7 +468,10 @@ class DROTransferSearch(BaseTransfer):
         """串行网格搜索"""
         all_results = []
         total_departures = len(departure_states)
-        n_alpha = int(self.n_alpha)
+        n_alpha_v = self.n_alpha
+        if n_alpha_v is None:
+            raise ValueError("n_alpha 未设置")
+        n_alpha = int(n_alpha_v)
         total_steps = total_departures * n_alpha
         pbar = None
         if verbose and total_steps > 0:
@@ -506,7 +512,10 @@ class DROTransferSearch(BaseTransfer):
     ) -> List[Dict[str, Any]]:
         """多进程并行：每进程独立 Python 解释器，利于 CPU 密集积分。"""
         total_departures = len(departure_states)
-        n_alpha = int(self.n_alpha)
+        n_alpha_v = self.n_alpha
+        if n_alpha_v is None:
+            raise ValueError("n_alpha 未设置")
+        n_alpha = int(n_alpha_v)
         total_steps = total_departures * n_alpha
         all_results: List[Dict[str, Any]] = []
 
@@ -523,18 +532,45 @@ class DROTransferSearch(BaseTransfer):
             pbar = self._open_search_progress_bar(total_steps, "并行网格搜索(进程)")
 
         dyn = self.dynamics
+        a0 = self.alpha_min
+        a1 = self.alpha_max
+        na = self.n_alpha
+        nd = self.n_departure
+        mtt = self.max_transfer_time
+        ith = self.intersection_threshold
+        mdt = self.min_distance_threshold
+        cer = self.collision_earth_radius
+        cmr = self.collision_moon_radius
+        idt = self.integration_dt
+        if (
+            a0 is None
+            or a1 is None
+            or na is None
+            or nd is None
+            or mtt is None
+            or ith is None
+            or mdt is None
+            or cer is None
+            or cmr is None
+            or idt is None
+        ):
+            raise ValueError(
+                "请先设置 alpha_min, alpha_max, n_alpha, n_departure, max_transfer_time, "
+                "intersection_threshold, min_distance_threshold, collision_earth_radius, "
+                "collision_moon_radius, integration_dt"
+            )
         pack_base = (
             self.mu,
-            float(self.alpha_min),
-            float(self.alpha_max),
-            int(self.n_alpha),
-            int(self.n_departure),
-            float(self.max_transfer_time),
-            float(self.intersection_threshold),
-            float(self.min_distance_threshold),
-            float(self.collision_earth_radius),
-            float(self.collision_moon_radius),
-            float(self.integration_dt),
+            float(a0),
+            float(a1),
+            int(na),
+            int(nd),
+            float(mtt),
+            float(ith),
+            float(mdt),
+            float(cer),
+            float(cmr),
+            float(idt),
             str(dyn.integrator),
             float(dyn.rtol),
             float(dyn.atol),
@@ -590,7 +626,10 @@ class DROTransferSearch(BaseTransfer):
         每个出发点调用 `_search_single_departure`。抛错时跳过该点，verbose 下打印。
         """
         total_departures = len(departure_states)
-        n_alpha = int(self.n_alpha)
+        n_alpha_v = self.n_alpha
+        if n_alpha_v is None:
+            raise ValueError("n_alpha 未设置")
+        n_alpha = int(n_alpha_v)
         total_steps = total_departures * n_alpha
         all_results: List[Dict[str, Any]] = []
 
@@ -707,8 +746,20 @@ class DROTransferSearch(BaseTransfer):
         """
         results = []
 
-        alpha_grid = np.linspace(self.alpha_min, self.alpha_max, self.n_alpha)
-        n_alpha = int(self.n_alpha)
+        a0 = self.alpha_min
+        a1 = self.alpha_max
+        na = self.n_alpha
+        mtt = self.max_transfer_time
+        idt = self.integration_dt
+        ith = self.intersection_threshold
+        mdt = self.min_distance_threshold
+        if a0 is None or a1 is None or na is None or mtt is None or idt is None or ith is None or mdt is None:
+            raise ValueError(
+                "请先设置 alpha_min, alpha_max, n_alpha, max_transfer_time, integration_dt, "
+                "intersection_threshold, min_distance_threshold"
+            )
+        alpha_grid = np.linspace(a0, a1, na)
+        n_alpha = int(na)
 
         for i_alpha, alpha in enumerate(alpha_grid, start=1):
             try:
@@ -726,7 +777,7 @@ class DROTransferSearch(BaseTransfer):
 
                 try:
                     traj_states, traj_times = self._forward_integrate(
-                        initial_state, self.max_transfer_time, self.integration_dt
+                        initial_state, mtt, idt
                     )  # //TODO 这个地方积分特别耗时
                 except Exception:
                     result = {
@@ -741,7 +792,7 @@ class DROTransferSearch(BaseTransfer):
                     collision, body, col_idx = self._check_collision(traj_states)
                     min_dist, min_idx = self._compute_min_distance(traj_states, arrival_orbit)
                     intersection, int_point, int_idx = self._detect_intersection(
-                        traj_states, arrival_orbit, self.intersection_threshold
+                        traj_states, arrival_orbit, ith
                     )
                     local_min, local_min_dist, local_min_idx = self._detect_local_minimum(
                         traj_states, arrival_orbit
@@ -772,7 +823,7 @@ class DROTransferSearch(BaseTransfer):
                         result["status"] = "collision"
                     elif intersection:
                         result["status"] = "success"
-                    elif min_dist < self.min_distance_threshold:
+                    elif min_dist < mdt:
                         result["status"] = "success"
                     else:
                         result["status"] = "no_intersection"
@@ -832,7 +883,7 @@ class DROTransferSearch(BaseTransfer):
 
         result = self.dynamics.propagate(
             initial_state=initial_state,
-            t_span=[0, transfer_time],
+            t_span=(0.0, transfer_time),
             t_eval=t_eval,
             with_stm=False,
             with_jacobi=False,
@@ -855,7 +906,7 @@ class DROTransferSearch(BaseTransfer):
         min_distance = flat_distances[min_flat_idx]
 
         n_orbit = len(orbit_positions)
-        step_idx = min_flat_idx // n_orbit
+        step_idx = int(min_flat_idx // n_orbit)
 
         return min_distance, step_idx
 
