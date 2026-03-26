@@ -20,12 +20,16 @@ from ..core.dynamics import CR3BP_Dynamics
 from ..core.system import CR3BP_System
 
 try:
-    import coptpy
+    import coptpy as cp
+    from coptpy import COPT
+
+    NlpCallbackBase = cp.NlpCallbackBase
+    coptpy = cp  # 与既有 ``_HAVE_COPT`` 等检查兼容
 except ImportError:
+    cp = None
+    COPT = None
     coptpy = None
     NlpCallbackBase = None
-else:
-    NlpCallbackBase = coptpy.NlpCallbackBase
 
 
 class TransferType(Enum):
@@ -754,7 +758,7 @@ if NlpCallbackBase is not None:
         """COPT NLP回调类
 
         用于COPT非线性优化问题的目标函数和约束计算。
-        继承自coptpy.NlpCallbackBase以正确处理SWIG绑定。
+        继承自 cp.NlpCallbackBase 以正确处理 SWIG 绑定。
 
         属性:
             optimizer: DROTRONLPOptimizer实例
@@ -877,172 +881,124 @@ if NlpCallbackBase is not None:
                     idx += 1
             return 0
 
+    def _apply_copt_nlp_params(model: Any, options: Dict[str, Any]) -> None:
+        """与参考脚本一致：``model.setParam(COPT.Param.*, ...)``（NLP 项 + 可选 TimeLimit）。"""
+        assert COPT is not None
+        model.setParam(COPT.Param.NLPTol, 1e-10)
+        model.setParam(COPT.Param.NLPIterLimit, int(options.get("max_iter", 1000)))
+        model.setParam(COPT.Param.Threads, int(options.get("threads", 1)))
+        model.setParam(COPT.Param.BarThreads, int(options.get("bar_threads", 1)))
+        tl = options.get("time_limit", None)
+        if tl is not None:
+            model.setParam(COPT.Param.TimeLimit, float(tl))
 
-class COPTNLPSolver:
-    """基于COPT的NLP求解器封装
+    class COPTNLPSolver:
+        """基于 COPT 的 NLP 封装：``cp.Envr()`` → ``createModel`` → ``loadNlData`` → ``solve``。"""
 
-    使用COPT求解器的内点法求解非线性规划问题。
+        def __init__(self, optimizer: DROTRONLPOptimizer, options: Optional[Dict[str, Any]] = None):
+            self.optimizer = optimizer
+            self.options = options or {}
+            self.model = None
+            self.callback = None
 
-    属性:
-        optimizer: DROTRONLPOptimizer实例
-        model: COPT模型
-        callback: COPTNLPCallback实例
-    """
+        def _setup_model(self, x0: np.ndarray) -> bool:
+            if cp is None or COPT is None:
+                raise RuntimeError("COPT not installed. Install with: pip install coptpy")
 
-    def __init__(self, optimizer: DROTRONLPOptimizer, options: dict = None):
-        """初始化COPT NLP求解器
+            env = cp.Envr()
+            self.model = env.createModel("DRO_RO_Transfer_NLP")
+            _apply_copt_nlp_params(self.model, self.options)
 
-        参数:
-            optimizer: DROTRONLPOptimizer实例
-            options: 求解器选项
-        """
-        self.optimizer = optimizer
-        self.options = options or {}
-        self.model = None
-        self.callback = None
+            alpha_lb, alpha_ub = self.optimizer.alpha_range
+            t_lb, t_ub = self.optimizer.transfer_time_range
+            tins_lb, tins_ub = self.optimizer.t_ins_range
 
-    def _setup_model(self, x0: np.ndarray) -> bool:
-        """设置NLP模型
+            col_lower = [alpha_lb, t_lb, tins_lb]
+            col_upper = [alpha_ub, t_ub, tins_ub]
 
-        参数:
-            x0: 初始猜测
+            row_lower = [0.0, 0.0]
+            row_upper = [0.0, 0.0]
 
-        返回:
-            是否成功
-        """
-        if coptpy is None:
-            raise RuntimeError("COPT not installed. Install with: pip install coptpy")
+            self.callback = COPTNLPCallback(self.optimizer)
 
-        self.coptpy = coptpy
+            n_jac = 6
+            idx_jac_row = [0, 0, 0, 1, 1, 1]
+            idx_jac_col = [0, 1, 2, 0, 1, 2]
 
-        # 创建环境
-        env = self.coptpy.Envr()
-        self.model = env.createModel("DRO_RO_Transfer_NLP")
+            n_hess = 6
+            idx_hess_row = [0, 1, 1, 2, 2, 2]
+            idx_hess_col = [0, 0, 1, 0, 1, 2]
 
-        # 在 loadNlData 之前设置线程：BarThreads 默认 -1 时会跟随全局 Threads，NLP barrier 易仍用多核
-        self.model.setParam(self.coptpy.COPT.Param.NLPTol, 1e-10)
-        self.model.setParam(
-            self.coptpy.COPT.Param.NLPIterLimit, self.options.get("max_iter", 1000)
-        )
-        self.model.setParam(
-            self.coptpy.COPT.Param.Threads, int(self.options.get("threads", 1))
-        )
-        self.model.setParam(
-            self.coptpy.COPT.Param.BarThreads, int(self.options.get("bar_threads", 1))
-        )
+            self.model.loadNlData(
+                nCols=3,
+                nRows=2,
+                sense=COPT.MINIMIZE,
+                nGrad=3,
+                idxGrad=[0, 1, 2],
+                nJac=n_jac,
+                idxJacRow=idx_jac_row,
+                idxJacCol=idx_jac_col,
+                nHess=n_hess,
+                idxHessRow=idx_hess_row,
+                idxHessCol=idx_hess_col,
+                colLower=col_lower,
+                colUpper=col_upper,
+                rowLower=row_lower,
+                rowUpper=row_upper,
+                initX=list(x0),
+                evalType=-1,
+                cb=self.callback,
+            )
 
-        # 设置变量边界
-        alpha_lb, alpha_ub = self.optimizer.alpha_range
-        t_lb, t_ub = self.optimizer.transfer_time_range
-        tins_lb, tins_ub = self.optimizer.t_ins_range
+            _apply_copt_nlp_params(self.model, self.options)
 
-        col_lower = [alpha_lb, t_lb, tins_lb]
-        col_upper = [alpha_ub, t_ub, tins_ub]
+            return True
 
-        # 约束边界 (等式约束 = 0)
-        row_lower = [0.0, 0.0]
-        row_upper = [0.0, 0.0]
+        def solve(self, x0: np.ndarray) -> dict:
+            if self.model is None:
+                self._setup_model(x0)
 
-        # 创建NLP回调
-        self.callback = COPTNLPCallback(self.optimizer)
+            try:
+                self.model.solve()
 
-        # Jacobian稀疏结构 (2个约束 x 3个变量)
-        n_jac = 6
-        idx_jac_row = [0, 0, 0, 1, 1, 1]  # 约束索引
-        idx_jac_col = [0, 1, 2, 0, 1, 2]  # 变量索引
+                status = self.model.status
+                assert COPT is not None
+                obj_val = self.model.objval if status == COPT.OPTIMAL else float("inf")
+                solution = self.model.x if hasattr(self.model, "x") else x0
 
-        # Hessian稀疏结构 (3x3下三角 = 6个元素)
-        n_hess = 6
-        idx_hess_row = [0, 1, 1, 2, 2, 2]
-        idx_hess_col = [0, 0, 1, 0, 1, 2]
+                return {
+                    "status": status,
+                    "objective": obj_val,
+                    "solution": solution,
+                    "success": status == COPT.OPTIMAL,
+                }
+            except Exception as e:
+                return {
+                    "status": -1,
+                    "objective": float("inf"),
+                    "solution": x0,
+                    "success": False,
+                    "message": str(e),
+                }
 
-        # 加载NLP数据
-        self.model.loadNlData(
-            nCols=3,
-            nRows=2,
-            sense=self.coptpy.COPT.MINIMIZE,
-            nGrad=3,
-            idxGrad=[0, 1, 2],
-            nJac=n_jac,
-            idxJacRow=idx_jac_row,
-            idxJacCol=idx_jac_col,
-            nHess=n_hess,
-            idxHessRow=idx_hess_row,
-            idxHessCol=idx_hess_col,
-            colLower=col_lower,
-            colUpper=col_upper,
-            rowLower=row_lower,
-            rowUpper=row_upper,
-            initX=list(x0),
-            evalType=-1,  # 所有回调都已实现
-            cb=self.callback,
-        )
+        def get_result(self) -> "NLPOptimizationResult":
+            if self.model is None or self.callback.x is None:
+                raise RuntimeError("Must call solve() first")
 
-        # 再次写入（部分版本在 loadNlData 后生效）
-        self.model.setParam(self.coptpy.COPT.Param.NLPTol, 1e-10)
-        self.model.setParam(
-            self.coptpy.COPT.Param.NLPIterLimit, self.options.get("max_iter", 1000)
-        )
-        self.model.setParam(
-            self.coptpy.COPT.Param.Threads, int(self.options.get("threads", 1))
-        )
-        self.model.setParam(
-            self.coptpy.COPT.Param.BarThreads, int(self.options.get("bar_threads", 1))
-        )
+            assert COPT is not None
+            opt_vars = NLPOptimizationVariables.from_array(self.callback.x)
+            success = self.model.status == COPT.OPTIMAL
 
-        return True
+            return self.optimizer._build_result(
+                opt_vars, success, "COPT solution" if success else f"COPT status: {self.model.status}"
+            )
 
-    def solve(self, x0: np.ndarray) -> dict:
-        """求解NLP问题
 
-        参数:
-            x0: 初始猜测 [alpha, transfer_time, t_ins]
+else:
+    COPTNLPSolver = None  # type: ignore[misc, assignment]
 
-        返回:
-            结果字典
-        """
-        if self.model is None:
-            self._setup_model(x0)
-
-        try:
-            # 求解
-            self.model.solve()
-
-            # 获取状态
-            status = self.model.status
-            obj_val = self.model.objval if status == self.coptpy.COPT.OPTIMAL else float("inf")
-            solution = self.model.x if hasattr(self.model, "x") else x0
-
-            return {
-                "status": status,
-                "objective": obj_val,
-                "solution": solution,
-                "success": status == self.coptpy.COPT.OPTIMAL,
-            }
-        except Exception as e:
-            return {
-                "status": -1,
-                "objective": float("inf"),
-                "solution": x0,
-                "success": False,
-                "message": str(e),
-            }
-
-    def get_result(self) -> "NLPOptimizationResult":
-        """获取优化结果
-
-        返回:
-            NLPOptimizationResult对象
-        """
-        if self.model is None or self.callback.x is None:
-            raise RuntimeError("Must call solve() first")
-
-        opt_vars = NLPOptimizationVariables.from_array(self.callback.x)
-        success = self.model.status == self.coptpy.COPT.OPTIMAL
-
-        return self.optimizer._build_result(
-            opt_vars, success, "COPT solution" if success else f"COPT status: {self.model.status}"
-        )
+    def _apply_copt_nlp_params(model: Any, options: Dict[str, Any]) -> None:
+        pass
 
 
 def optimize_with_copt(
@@ -1053,20 +1009,24 @@ def optimize_with_copt(
     max_iter: int = 1000,
     threads: int = 1,
     bar_threads: int = 1,
+    time_limit: Optional[float] = None,
     scipy_fallback_kwargs: Optional[Dict[str, Any]] = None,
 ) -> NLPOptimizationResult:
-    """使用 COPT 求解器进行 NLP 优化（等式速度约束；与 ``DROTRONLPOptimizer.optimize`` 一致）。
+    """使用 COPT 求解 NLP（与 ``data_processing_module`` 中用法一致：``cp.Envr`` / ``createModel`` / ``COPT.Param`` / ``solve``）。
+
+    数学形式与 ``DROTRONLPOptimizer.optimize`` 相同（等式约束 + 最小化 Δv）。
 
     参数:
-        optimizer: DROTRONLPOptimizer 实例（须已设置 ``alpha_range`` / ``transfer_time_range`` / ``t_ins_range``）
-        initial_guess: 初始猜测
-        fallback_to_scipy: COPT 失败或未安装时是否回退到 SciPy SLSQP
-        max_iter: COPT 内点法迭代上限
-        threads / bar_threads: 传给 COPT 的 ``Threads`` / ``BarThreads``；Python 回调下建议保持 1
-        scipy_fallback_kwargs: 回退时传给 ``optimizer.optimize`` 的关键字（如 ``verbose``、边界与松弛约束等）
+        optimizer: 已设置 ``alpha_range`` / ``transfer_time_range`` / ``t_ins_range`` 的 ``DROTRONLPOptimizer``
+        initial_guess: 初始猜测 ``(α, T, t_ins)``；默认 ``(1, 10, 5)``
+        fallback_to_scipy: 未安装 COPT 或求解失败时是否回退 SciPy SLSQP
+        max_iter: ``COPT.Param.NLPIterLimit``
+        threads / bar_threads: ``COPT.Param.Threads`` / ``BarThreads``（Python 回调建议为 1）
+        time_limit: 若给定，则设置 ``COPT.Param.TimeLimit``（秒），与参考脚本中 MILP 用法一致
+        scipy_fallback_kwargs: 回退时传给 ``optimizer.optimize`` 的额外参数
 
     返回:
-        NLPOptimizationResult
+        ``NLPOptimizationResult``
     """
     if scipy_fallback_kwargs is None:
         scipy_fallback_kwargs = {}
@@ -1074,7 +1034,7 @@ def optimize_with_copt(
     def _run_scipy() -> NLPOptimizationResult:
         return optimizer.optimize(initial_guess=initial_guess, **scipy_fallback_kwargs)
 
-    if coptpy is None or NlpCallbackBase is None:
+    if cp is None or COPT is None or NlpCallbackBase is None:
         if fallback_to_scipy:
             return _run_scipy()
         raise RuntimeError("coptpy 未安装，无法使用 COPT；请安装 coptpy 或设置 fallback_to_scipy=True")
@@ -1086,17 +1046,18 @@ def optimize_with_copt(
         T0 = initial_guess.transfer_time
         tins0 = initial_guess.t_ins
 
-    x0 = np.array([alpha0, T0, tins0])
+    x0 = np.array([alpha0, T0, tins0], dtype=float)
+
+    copt_options: Dict[str, Any] = {
+        "max_iter": max_iter,
+        "threads": threads,
+        "bar_threads": bar_threads,
+    }
+    if time_limit is not None:
+        copt_options["time_limit"] = time_limit
 
     try:
-        solver = COPTNLPSolver(
-            optimizer,
-            {
-                "max_iter": max_iter,
-                "threads": threads,
-                "bar_threads": bar_threads,
-            },
-        )
+        solver = COPTNLPSolver(optimizer, copt_options)
         result = solver.solve(x0)
 
         if result["success"]:
