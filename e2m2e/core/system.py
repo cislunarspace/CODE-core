@@ -47,6 +47,8 @@ class System:
     AU = 149597870.7
     DAY = 86400
     YEAR = 365.25 * DAY
+    # 地月平均距离 (km)；CR3BP 中 1 DU 通常取此值（与 KNOWN_SYSTEMS earth_moon 一致）
+    EARTH_MOON_DISTANCE_KM = 384_400.0
 
     def __init__(self, primary: str, secondary: str) -> None:
         """初始化系统参数
@@ -156,7 +158,7 @@ class CR3BP_System(System):
             "primary": "Earth",
             "secondary": "Moon",
             "mu": 0.01215,
-            "distance": 384400,
+            "distance": System.EARTH_MOON_DISTANCE_KM,
             "period": 27.32 * 86400,
         },
         "sun_earth": {

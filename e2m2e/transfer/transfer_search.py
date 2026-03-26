@@ -127,8 +127,8 @@ class DROTransferSearch(BaseTransfer):
         self.intersection_threshold: float | None = None
 
         # 候选解最小距离阈值 (无量纲距离)
-        # 推荐值: min_distance_threshold ∈ [0.01, 0.1], 典型值 0.05
-        # 约束: min_distance_threshold > 0
+        # 默认与基类一致：100 km / 地月距离；若需自定义可设为正数
+        # 约束: min_distance_threshold > 0（当非 None 时）
         self.min_distance_threshold: float | None = None
 
         # 地球碰撞检测半径 (无量纲距离)

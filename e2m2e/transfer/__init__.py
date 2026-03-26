@@ -36,6 +36,7 @@ from .transfer_optimization import (
 
 from .transfer_base import (
     BaseTransfer,
+    DEFAULT_MIN_DISTANCE_THRESHOLD_DU,
     TransferStrategy,
 )
 
@@ -56,6 +57,7 @@ __all__ = [
     "TransferStrategy",
     # 基类
     "BaseTransfer",
+    "DEFAULT_MIN_DISTANCE_THRESHOLD_DU",
     # 工具函数
     "load_orbit_from_json",
     "save_search_results",

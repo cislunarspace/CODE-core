@@ -7,6 +7,7 @@ import pytest
 
 from e2m2e.core import Orbit, CR3BP_System, CR3BP_Dynamics
 from e2m2e.transfer import DROTransferSearch
+from e2m2e.transfer.transfer_base import DEFAULT_MIN_DISTANCE_THRESHOLD_DU
 
 
 @pytest.fixture
@@ -32,7 +33,7 @@ def searcher(system, dynamics):
     s.n_departure = 10
     s.max_transfer_time = 0.5
     s.intersection_threshold = 1e-3
-    s.min_distance_threshold = 0.05
+    s.min_distance_threshold = DEFAULT_MIN_DISTANCE_THRESHOLD_DU
     s.collision_earth_radius = 5e-4
     s.collision_moon_radius = 3e-4
     s.integration_dt = 0.02
@@ -86,12 +87,13 @@ class TestIsFeasible:
         assert not searcher._is_feasible(r)
 
     def test_local_minimum_feasible_when_below_threshold(self, searcher):
+        below = DEFAULT_MIN_DISTANCE_THRESHOLD_DU * 0.5
         r = {
             "collision_found": False,
             "intersection_found": False,
             "min_distance": 0.2,
             "local_minimum_found": True,
-            "local_minimum_distance": 0.04,
+            "local_minimum_distance": below,
         }
         assert searcher._is_feasible(r)
 

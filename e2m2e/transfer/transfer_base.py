@@ -15,12 +15,18 @@ if TYPE_CHECKING:
     from ..core.dynamics import CR3BP_Dynamics
     from ..core.orbit import Orbit
 
+from ..core.system import System
+
 
 class TransferStrategy(Enum):
     GRID_SEARCH = "grid_search"
     NLP_OPTIMIZATION = "nlp_optimization"
     MANIFOLD = "manifold"
     DIRECT = "direct"
+
+
+# 可行解默认距离阈值：100 km，换算为无量纲 DU（见 ``System.EARTH_MOON_DISTANCE_KM``）
+DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / System.EARTH_MOON_DISTANCE_KM
 
 
 class TransferType(Enum):
@@ -137,10 +143,13 @@ class BaseTransfer:
         raise NotImplementedError("Subclass must implement optimize()")
 
     def _is_feasible(self, result: Dict[str, Any]) -> bool:
-        """判断搜索结果是否为可行候选解（无碰撞；相交或距离低于阈值；局部极小须同时满足距离阈值）。"""
+        """判断搜索结果是否为可行候选解（无碰撞；相交或距离低于阈值；局部极小须同时满足距离阈值）。
+
+        距离阈值默认对应 100 km（无量纲 ``DEFAULT_MIN_DISTANCE_THRESHOLD_DU``）。
+        """
         if result.get("collision_found", False):
             return False
-        mdt = 0.05
+        mdt = DEFAULT_MIN_DISTANCE_THRESHOLD_DU
         md = float(result.get("min_distance", float("inf")))
         lmd = float(result.get("local_minimum_distance", float("inf")))
         if result.get("intersection_found", False):
