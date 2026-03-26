@@ -542,11 +542,40 @@ class DROTransferSearch(BaseTransfer):
         arrival_period: Optional[float] = float(ap) if ap is not None else None
 
         pbar = None
+        progress_queue: Optional[Any] = None
+        progress_manager: Optional[Any] = None
+        poll_stop: Optional[threading.Event] = None
+        poll_thread: Optional[threading.Thread] = None
+
         if verbose and total_steps > 0:
             tqdm.write(
                 f"  并行搜索(进程): {total_departures}×{n_alpha}={total_steps} 步 | {n_workers} 进程"
             )
             pbar = self._open_search_progress_bar(total_steps, "并行网格搜索(进程)")
+            # 多进程下主进程无法把 tqdm 传入子进程；子进程每 α 步向队列 put，主进程消费更新总条。
+            # 须用 Manager().Queue()：原生 Value/Queue 不能经 ProcessPoolExecutor 参数传入 worker。
+            progress_manager = multiprocessing.Manager()
+            progress_queue = progress_manager.Queue()
+            poll_stop = threading.Event()
+
+            def _poll_process_progress() -> None:
+                while True:
+                    if poll_stop.is_set():
+                        break
+                    try:
+                        progress_queue.get(timeout=0.25)
+                        pbar.update(1)
+                    except queue.Empty:
+                        continue
+                while True:
+                    try:
+                        progress_queue.get_nowait()
+                        pbar.update(1)
+                    except queue.Empty:
+                        break
+
+            poll_thread = threading.Thread(target=_poll_process_progress, daemon=True)
+            poll_thread.start()
 
         dyn = self.dynamics
         a0 = self.alpha_min
@@ -609,7 +638,7 @@ class DROTransferSearch(BaseTransfer):
                         arrival_states,
                         arrival_times_a,
                         arrival_period,
-                    ) + pack_base
+                    ) + pack_base + (progress_queue,)
                     fut = executor.submit(_process_departure_worker_packed, packed)
                     futures[fut] = i
 
@@ -618,14 +647,25 @@ class DROTransferSearch(BaseTransfer):
                     try:
                         results = fut.result()
                         all_results.extend(results)
-                        if pbar is not None:
-                            pbar.update(n_alpha)
                     except Exception as e:
                         if verbose:
                             tqdm.write(f"    出发点 {idx} 处理失败: {e}")
         finally:
+            if poll_stop is not None:
+                poll_stop.set()
+            if poll_thread is not None:
+                poll_thread.join(timeout=30.0)
+            if pbar is not None and progress_queue is not None:
+                while True:
+                    try:
+                        progress_queue.get_nowait()
+                        pbar.update(1)
+                    except queue.Empty:
+                        break
             if pbar is not None:
                 pbar.close()
+            if progress_manager is not None:
+                progress_manager.shutdown()
         return all_results
 
     def _grid_search_parallel_threads(
@@ -753,6 +793,7 @@ class DROTransferSearch(BaseTransfer):
         verbose: bool = False,
         pbar: Optional[Any] = None,
         departure_index: Optional[int] = None,
+        progress_queue: Optional[Any] = None,
     ) -> List[Dict[str, Any]]:
         """对单个出发点搜索α网格
 
@@ -760,6 +801,8 @@ class DROTransferSearch(BaseTransfer):
             verbose: 未传 ``pbar`` 时是否打印 α 文本进度。
             pbar: 每 α 步 ``update(1)``；可为分槽条或 ``_AggregatePbarWithSlot``。
             departure_index: 当前出发点下标，用于 postfix。
+            progress_queue: 可选 ``Manager().Queue()`` 代理；每完成一 α 步 ``put(1)``，
+                供主进程消费并更新总 tqdm。
         """
         results = []
 
@@ -865,6 +908,8 @@ class DROTransferSearch(BaseTransfer):
                     pbar.update(1)
                     if departure_index is not None:
                         pbar.set_postfix_str(f"dep={departure_index} α={alpha:.4f}")
+                if progress_queue is not None:
+                    progress_queue.put(1)
 
         return results
 
@@ -1058,6 +1103,7 @@ def _process_departure_worker(
     max_step: float,
     dep_name: str,
     arr_name: str,
+    progress_queue: Optional[Any] = None,
 ) -> List[Dict[str, Any]]:
     """子进程入口（模块级，便于 Windows spawn 下 pickle）。"""
     arrival_orbit = Orbit(states=arrival_states, times=arrival_times)
@@ -1086,7 +1132,12 @@ def _process_departure_worker(
         integration_dt=integration_dt,
     )
 
-    results = searcher._search_single_departure(dep_state, dep_time, arrival_orbit)
+    results = searcher._search_single_departure(
+        dep_state,
+        dep_time,
+        arrival_orbit,
+        progress_queue=progress_queue,
+    )
     for r in results:
         r["departure_orbit_name"] = dep_name
         r["arrival_orbit_name"] = arr_name
