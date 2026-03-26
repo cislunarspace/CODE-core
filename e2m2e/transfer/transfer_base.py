@@ -137,14 +137,19 @@ class BaseTransfer:
         raise NotImplementedError("Subclass must implement optimize()")
 
     def _is_feasible(self, result: Dict[str, Any]) -> bool:
-        """判断搜索结果是否为可行候选解"""
-        has_approach = (
-            result.get("intersection_found", False)
-            or result.get("min_distance", float("inf")) < 0.05
-            or result.get("local_minimum_found", False)
-        )
-        no_collision = not result.get("collision_found", False)
-        return has_approach and no_collision
+        """判断搜索结果是否为可行候选解（无碰撞；相交或距离低于阈值；局部极小须同时满足距离阈值）。"""
+        if result.get("collision_found", False):
+            return False
+        mdt = 0.05
+        md = float(result.get("min_distance", float("inf")))
+        lmd = float(result.get("local_minimum_distance", float("inf")))
+        if result.get("intersection_found", False):
+            return True
+        if md < mdt:
+            return True
+        if result.get("local_minimum_found", False) and lmd < mdt:
+            return True
+        return False
 
     def get_feasible_results(self) -> List[Dict[str, Any]]:
         """获取所有可行搜索结果"""

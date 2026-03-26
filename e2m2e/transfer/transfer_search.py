@@ -106,8 +106,8 @@ class DROTransferSearch(BaseTransfer):
         self.alpha_min: float | None = None
         self.alpha_max: float | None = None
 
-        # α 方向网格点数
-        # 推荐值: n_alpha ∈ [51, 2001], 典型值 101 或 201
+        # α 方向网格点数（Cui et al. 2025 Table 3 平面搜索为 1001）
+        # 推荐值: n_alpha ∈ [51, 2001]
         # 约束: n_alpha >= 2
         self.n_alpha: int | None = None
 
@@ -187,6 +187,23 @@ class DROTransferSearch(BaseTransfer):
             if hasattr(self, key):
                 setattr(self, key, value)
         return self
+
+    def _is_feasible(self, result: Dict[str, Any]) -> bool:
+        """可行候选：无碰撞，且（相交 / 全局最小距离或局部极小距离小于 ``min_distance_threshold``）。"""
+        mdt = self.min_distance_threshold
+        if mdt is None:
+            return super()._is_feasible(result)
+        if result.get("collision_found", False):
+            return False
+        md = float(result.get("min_distance", float("inf")))
+        lmd = float(result.get("local_minimum_distance", float("inf")))
+        if result.get("intersection_found", False):
+            return True
+        if md < mdt:
+            return True
+        if result.get("local_minimum_found", False) and lmd < mdt:
+            return True
+        return False
 
     def search(self, **kwargs) -> List[Dict[str, Any]]:
         """执行网格搜索
@@ -767,6 +784,9 @@ class DROTransferSearch(BaseTransfer):
                     pct = i_alpha / n_alpha * 100
                     print(f"    α 进度: {i_alpha}/{n_alpha} ({pct:.1f}%)", flush=True)
                 new_vel = self._compute_departure_velocity(departure_state, alpha)
+                dv_departure = float(
+                    np.linalg.norm(new_vel - departure_state[3:6])
+                )
 
                 initial_state = np.concatenate(
                     [
@@ -786,11 +806,19 @@ class DROTransferSearch(BaseTransfer):
                         "departure_time": departure_time,
                         "alpha": alpha,
                         "status": "integration_failed",
+                        "dv_departure": dv_departure,
+                        "dv_insertion": None,
+                        "min_distance_orbit_idx": None,
                     }
                     results.append(result)
                 else:
                     collision, body, col_idx = self._check_collision(traj_states)
-                    min_dist, min_idx = self._compute_min_distance(traj_states, arrival_orbit)
+                    min_dist, min_idx, orbit_idx = self._compute_min_distance(
+                        traj_states, arrival_orbit
+                    )
+                    v_tr = traj_states[min_idx][3:6]
+                    v_ro = arrival_orbit.states[orbit_idx][3:6]
+                    dv_insertion = float(np.linalg.norm(v_tr - v_ro))  # 粗估：最近几何点处速度差
                     intersection, int_point, int_idx = self._detect_intersection(
                         traj_states, arrival_orbit, ith
                     )
@@ -808,6 +836,9 @@ class DROTransferSearch(BaseTransfer):
                         "transfer_time": traj_times[-1],
                         "min_distance": min_dist,
                         "min_distance_idx": min_idx,
+                        "min_distance_orbit_idx": int(orbit_idx),
+                        "dv_departure": dv_departure,
+                        "dv_insertion": dv_insertion,
                         "intersection_found": intersection,
                         "intersection_point": int_point,
                         "intersection_idx": int_idx,
@@ -893,8 +924,8 @@ class DROTransferSearch(BaseTransfer):
 
     def _compute_min_distance(
         self, trajectory_states: np.ndarray, arrival_orbit: Orbit
-    ) -> Tuple[float, int]:
-        """计算轨迹到目标轨道的最小距离"""
+    ) -> Tuple[float, int, int]:
+        """计算轨迹到目标轨道的最小距离及最近点（轨迹步、目标轨道采样下标）。"""
         traj_positions = trajectory_states[:, :3]
         orbit_positions = arrival_orbit.states[:, :3]
 
@@ -907,8 +938,16 @@ class DROTransferSearch(BaseTransfer):
 
         n_orbit = len(orbit_positions)
         step_idx = int(min_flat_idx // n_orbit)
+        orbit_idx = int(min_flat_idx % n_orbit)
 
-        return min_distance, step_idx
+        return min_distance, step_idx, orbit_idx
+
+    def compute_min_distance_to_orbit(
+        self, trajectory_states: np.ndarray, arrival_orbit: Orbit
+    ) -> Tuple[float, int]:
+        """轨迹到目标轨道的最小距离及对应轨迹步索引（公开 API）。"""
+        md, si, _ = self._compute_min_distance(trajectory_states, arrival_orbit)
+        return md, si
 
     def _detect_intersection(
         self,
@@ -917,12 +956,31 @@ class DROTransferSearch(BaseTransfer):
         threshold: float,
     ) -> Tuple[bool, Optional[np.ndarray], int]:
         """检测轨迹是否与目标轨道相交"""
-        min_dist, step_idx = self._compute_min_distance(trajectory_states, arrival_orbit)
+        min_dist, step_idx, _ = self._compute_min_distance(
+            trajectory_states, arrival_orbit
+        )
 
         if min_dist < threshold:
             return True, trajectory_states[step_idx], step_idx
 
         return False, None, -1
+
+    def find_intersection(
+        self,
+        trajectory_states: np.ndarray,
+        arrival_orbit: Orbit,
+        threshold: Optional[float] = None,
+    ) -> Tuple[bool, np.ndarray, int]:
+        """检测轨迹是否与目标轨道相交（与 ``_detect_intersection`` 相同，默认使用 ``intersection_threshold``）。"""
+        ith = threshold if threshold is not None else self.intersection_threshold
+        if ith is None:
+            raise ValueError("intersection_threshold 未设置且未传入 threshold")
+        found, pt, idx = self._detect_intersection(
+            trajectory_states, arrival_orbit, float(ith)
+        )
+        if pt is None:
+            return False, np.zeros(6), idx
+        return found, pt, idx
 
     def _detect_local_minimum(
         self,
