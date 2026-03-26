@@ -32,6 +32,7 @@ from .transfer_optimization import (
     NLPOptimizationResult,
     TransferType,
     optimize_transfer,
+    optimize_with_copt,
 )
 
 from .transfer_base import (
@@ -62,6 +63,7 @@ __all__ = [
     "load_orbit_from_json",
     "save_search_results",
     "optimize_transfer",
+    "optimize_with_copt",
     # 元信息
     "_HAVE_COPT",
 ]

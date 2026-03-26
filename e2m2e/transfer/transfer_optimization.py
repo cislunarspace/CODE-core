@@ -830,41 +830,50 @@ if NlpCallbackBase is not None:
             return 0
 
         def EvalHess(self, xdata, sigma, lam, outdata):
-            """计算Hessian矩阵 (数值差分)"""
-            x = np.array(xdata)
+            """拉格朗日函数 Hessian 下三角（与 COPT 文档一致）。
+
+            L(x) = σ·f(x) + λᵀc(x)，须返回 ∇²L 在 idxHess 指定位置的值；
+            仅 σ·∇²f 而忽略约束曲率会导致错误步长/收敛行为。
+            """
+            x = np.asarray(xdata, dtype=np.float64).ravel()
+            lam_v = np.asarray(lam, dtype=np.float64).ravel()
+            if lam_v.size < 2:
+                lam_v = np.pad(lam_v, (0, max(0, 2 - lam_v.size)))
+            sigma = float(sigma)
+            l0, l1 = float(lam_v[0]), float(lam_v[1])
             self.x = x
             h = 1e-6
 
-            grad_f = np.zeros(3)
-            f0 = self.optimizer.objective_function(x)
-            for i in range(3):
-                x_pert = x.copy()
-                x_pert[i] += h
-                grad_f[i] = (self.optimizer.objective_function(x_pert) - f0) / h
+            def lagrangian(xv: np.ndarray) -> float:
+                fv = self.optimizer.objective_function(xv)
+                c1 = self.optimizer.constraint_position(xv)
+                c2 = self.optimizer.constraint_velocity_parallel(xv)
+                return sigma * fv + l0 * c1 + l1 * c2
 
-            hess_f = np.zeros((3, 3))
+            L0 = lagrangian(x)
+            hess_L = np.zeros((3, 3))
             for i in range(3):
                 for j in range(i + 1):
-                    x_pert = x.copy()
-                    x_pert[i] += h
-                    x_pert[j] += h
-                    f_ij = self.optimizer.objective_function(x_pert)
+                    x_ij = x.copy()
+                    x_ij[i] += h
+                    x_ij[j] += h
+                    L_ij = lagrangian(x_ij)
 
                     x_i = x.copy()
                     x_i[i] += h
-                    f_i = self.optimizer.objective_function(x_i)
+                    L_i = lagrangian(x_i)
 
                     x_j = x.copy()
                     x_j[j] += h
-                    f_j = self.optimizer.objective_function(x_j)
+                    L_j = lagrangian(x_j)
 
-                    hess_f[i, j] = (f_ij - f_i - f_j + f0) / (h * h)
-                    hess_f[j, i] = hess_f[i, j]
+                    hess_L[i, j] = (L_ij - L_i - L_j + L0) / (h * h)
+                    hess_L[j, i] = hess_L[i, j]
 
             idx = 0
             for i in range(3):
                 for j in range(i + 1):
-                    outdata[idx] = sigma * hess_f[i, j]
+                    outdata[idx] = hess_L[i, j]
                     idx += 1
             return 0
 
@@ -909,6 +918,18 @@ class COPTNLPSolver:
         # 创建环境
         env = self.coptpy.Envr()
         self.model = env.createModel("DRO_RO_Transfer_NLP")
+
+        # 在 loadNlData 之前设置线程：BarThreads 默认 -1 时会跟随全局 Threads，NLP barrier 易仍用多核
+        self.model.setParam(self.coptpy.COPT.Param.NLPTol, 1e-10)
+        self.model.setParam(
+            self.coptpy.COPT.Param.NLPIterLimit, self.options.get("max_iter", 1000)
+        )
+        self.model.setParam(
+            self.coptpy.COPT.Param.Threads, int(self.options.get("threads", 1))
+        )
+        self.model.setParam(
+            self.coptpy.COPT.Param.BarThreads, int(self.options.get("bar_threads", 1))
+        )
 
         # 设置变量边界
         alpha_lb, alpha_ub = self.optimizer.alpha_range
@@ -957,9 +978,17 @@ class COPTNLPSolver:
             cb=self.callback,
         )
 
-        # 设置参数
+        # 再次写入（部分版本在 loadNlData 后生效）
         self.model.setParam(self.coptpy.COPT.Param.NLPTol, 1e-10)
-        self.model.setParam(self.coptpy.COPT.Param.NLPIterLimit, self.options.get("max_iter", 1000))
+        self.model.setParam(
+            self.coptpy.COPT.Param.NLPIterLimit, self.options.get("max_iter", 1000)
+        )
+        self.model.setParam(
+            self.coptpy.COPT.Param.Threads, int(self.options.get("threads", 1))
+        )
+        self.model.setParam(
+            self.coptpy.COPT.Param.BarThreads, int(self.options.get("bar_threads", 1))
+        )
 
         return True
 
@@ -1019,18 +1048,37 @@ class COPTNLPSolver:
 def optimize_with_copt(
     optimizer: DROTRONLPOptimizer,
     initial_guess: Optional[NLPOptimizationVariables] = None,
-    **kwargs,
+    *,
+    fallback_to_scipy: bool = True,
+    max_iter: int = 1000,
+    threads: int = 1,
+    bar_threads: int = 1,
+    scipy_fallback_kwargs: Optional[Dict[str, Any]] = None,
 ) -> NLPOptimizationResult:
-    """使用COPT求解器进行优化
+    """使用 COPT 求解器进行 NLP 优化（等式速度约束；与 ``DROTRONLPOptimizer.optimize`` 一致）。
 
     参数:
-        optimizer: DROTRONLPOptimizer实例
+        optimizer: DROTRONLPOptimizer 实例（须已设置 ``alpha_range`` / ``transfer_time_range`` / ``t_ins_range``）
         initial_guess: 初始猜测
-        **kwargs: 其他选项
+        fallback_to_scipy: COPT 失败或未安装时是否回退到 SciPy SLSQP
+        max_iter: COPT 内点法迭代上限
+        threads / bar_threads: 传给 COPT 的 ``Threads`` / ``BarThreads``；Python 回调下建议保持 1
+        scipy_fallback_kwargs: 回退时传给 ``optimizer.optimize`` 的关键字（如 ``verbose``、边界与松弛约束等）
 
     返回:
-        优化结果
+        NLPOptimizationResult
     """
+    if scipy_fallback_kwargs is None:
+        scipy_fallback_kwargs = {}
+
+    def _run_scipy() -> NLPOptimizationResult:
+        return optimizer.optimize(initial_guess=initial_guess, **scipy_fallback_kwargs)
+
+    if coptpy is None or NlpCallbackBase is None:
+        if fallback_to_scipy:
+            return _run_scipy()
+        raise RuntimeError("coptpy 未安装，无法使用 COPT；请安装 coptpy 或设置 fallback_to_scipy=True")
+
     if initial_guess is None:
         alpha0, T0, tins0 = 1.0, 10.0, 5.0
     else:
@@ -1041,14 +1089,29 @@ def optimize_with_copt(
     x0 = np.array([alpha0, T0, tins0])
 
     try:
-        solver = COPTNLPSolver(optimizer, kwargs)
+        solver = COPTNLPSolver(
+            optimizer,
+            {
+                "max_iter": max_iter,
+                "threads": threads,
+                "bar_threads": bar_threads,
+            },
+        )
         result = solver.solve(x0)
 
         if result["success"]:
             return solver.get_result()
-        else:
-            # 回退到scipy
-            return optimizer.optimize(initial_guess=initial_guess, verbose=False)
-    except Exception as e:
-        # COPT不可用，回退到scipy
-        return optimizer.optimize(initial_guess=initial_guess, verbose=False)
+        if fallback_to_scipy:
+            return _run_scipy()
+        try:
+            return solver.get_result()
+        except RuntimeError:
+            return optimizer._build_result(
+                NLPOptimizationVariables.from_array(np.asarray(x0, dtype=float)),
+                False,
+                "COPT 未收敛且无可用解向量",
+            )
+    except Exception:
+        if fallback_to_scipy:
+            return _run_scipy()
+        raise
