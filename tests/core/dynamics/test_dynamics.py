@@ -128,8 +128,8 @@ class TestPropagate:
 
         assert "time" in result
         assert "states" in result
-        assert "jacobi" in result
-        assert "jacobi_error" in result
+        assert "jacobi" not in result
+        assert "jacobi_error" not in result
         assert len(result["states"]) > 0
         assert len(result["time"]) == len(result["states"])
 
@@ -149,7 +149,7 @@ class TestPropagate:
 
     def test_propagate_jacobi_conservation(self, dynamics, sample_state):
         """Test that Jacobi constant is approximately conserved."""
-        result = dynamics.propagate(sample_state, [0, 2.0])
+        result = dynamics.propagate(sample_state, [0, 2.0], with_jacobi=True)
 
         # Jacobi error should be small
         assert result["jacobi_error"] < 1e-4
@@ -265,7 +265,7 @@ class TestComputeJacobiConstant:
 
     def test_jacobi_history_during_propagation(self, dynamics, sample_state):
         """Test that Jacobi history is recorded during propagation."""
-        result = dynamics.propagate(sample_state, [0, 1.0])
+        result = dynamics.propagate(sample_state, [0, 1.0], with_jacobi=True)
 
         assert len(result["jacobi"]) > 0
         assert isinstance(result["jacobi"], list)

@@ -64,7 +64,7 @@ def test_dynamics():
     system.compute_libration_points()
     initial_state = np.array([system.L1[0] + 0.01, 0, 0, 0, 0.1, 0])
 
-    result = dynamics.propagate(initial_state, [0, 3.0])
+    result = dynamics.propagate(initial_state, [0, 3.0], with_jacobi=True)
     assert "time" in result
     assert "states" in result
     assert len(result["states"]) > 0

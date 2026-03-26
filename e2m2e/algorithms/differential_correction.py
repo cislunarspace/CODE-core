@@ -865,6 +865,7 @@ class DifferentialCorrection:
                     (0, current_time),
                     t_eval=np.linspace(0, current_time, 1000),
                     with_stm=True,
+                    with_jacobi=False,
                 )
 
                 final_state = result["states"][-1]

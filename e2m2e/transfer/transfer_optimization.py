@@ -246,7 +246,11 @@ class DROTRONLPOptimizer:
             t_eval = np.linspace(t_span[0], t_span[1], n_steps)
 
         result = self.dynamics.propagate(
-            initial_state=initial_state, t_span=t_span, t_eval=t_eval, with_stm=False
+            initial_state=initial_state,
+            t_span=t_span,
+            t_eval=t_eval,
+            with_stm=False,
+            with_jacobi=False,
         )
 
         times = result["time"]
@@ -299,8 +303,10 @@ class DROTRONLPOptimizer:
         # 从远地点开始计算插入点时间
         t_from_apogee = t_ins % self.arrival_orbit.period
 
-        # 在目标轨道上插值
-        arrival_state = self.arrival_orbit.interpolate_at_time(t_from_apogee)
+        t_query = float(self.arrival_orbit.times[0]) + float(t_from_apogee)
+        arrival_state = self.dynamics.propagate_orbit_state_at_time(
+            self.arrival_orbit, t_query
+        )
 
         return arrival_state[:3], arrival_state[3:]
 
@@ -332,8 +338,9 @@ class DROTRONLPOptimizer:
         # 获取转移轨迹末端状态
         final_state = states[-1]
 
-        # 获取插入点状态
-        insertion_state = self.arrival_orbit.interpolate_at_time(t_ins)
+        insertion_state = self.dynamics.propagate_orbit_state_at_time(
+            self.arrival_orbit, float(t_ins)
+        )
 
         # 计算ΔV
         dv1 = self.compute_delta_v1(self.departure_state, v_injection)
@@ -367,7 +374,9 @@ class DROTRONLPOptimizer:
             return 1e6
 
         final_state = states[-1]
-        insertion_state = self.arrival_orbit.interpolate_at_time(t_ins)
+        insertion_state = self.dynamics.propagate_orbit_state_at_time(
+            self.arrival_orbit, float(t_ins)
+        )
 
         # 位置连续性
         pos_diff = final_state[:3] - insertion_state[:3]
@@ -401,7 +410,9 @@ class DROTRONLPOptimizer:
             return 1e6
 
         final_state = states[-1]
-        insertion_state = self.arrival_orbit.interpolate_at_time(t_ins)
+        insertion_state = self.dynamics.propagate_orbit_state_at_time(
+            self.arrival_orbit, float(t_ins)
+        )
 
         v_f = final_state[3:]
         v_ins = insertion_state[3:]
@@ -587,7 +598,9 @@ class DROTRONLPOptimizer:
             return -1.0
 
         final_state = states[-1]
-        insertion_state = self.arrival_orbit.interpolate_at_time(t_ins)
+        insertion_state = self.dynamics.propagate_orbit_state_at_time(
+            self.arrival_orbit, float(t_ins)
+        )
 
         v_f = final_state[3:]
         v_ins = insertion_state[3:]
@@ -621,7 +634,9 @@ class DROTRONLPOptimizer:
         )
 
         # 获取各种状态
-        insertion_state = self.arrival_orbit.interpolate_at_time(t_ins)
+        insertion_state = self.dynamics.propagate_orbit_state_at_time(
+            self.arrival_orbit, float(t_ins)
+        )
         final_state = states[-1] if len(states) > 0 else None
 
         # 计算ΔV

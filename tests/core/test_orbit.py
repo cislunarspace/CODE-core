@@ -117,35 +117,22 @@ class TestOrbitBasicProperties:
         assert np.isclose(orbit.extrema["x_max"], 0.6, atol=1e-6)
 
 
-class TestOrbitInterpolation:
-    """Tests for interpolate_at_time method"""
+class TestPropagateStateAtOrbitTime:
+    """Tests for CR3BP_Dynamics.propagate_orbit_state_at_time (uses propagate)"""
 
-    def test_interpolate_inside_range(self, sample_orbit):
-        """Test interpolation within time range"""
-        t_interp = 0.5
-        state = sample_orbit.interpolate_at_time(t=t_interp)
-        
-        assert len(state) == 6
+    def test_propagate_at_epoch_matches_state0(self, sample_orbit, earth_moon_dynamics):
+        state = earth_moon_dynamics.propagate_orbit_state_at_time(
+            sample_orbit, float(sample_orbit.times[0])
+        )
+        np.testing.assert_allclose(state, sample_orbit.states[0], rtol=1e-9, atol=1e-12)
+
+    def test_propagate_returns_finite_vector(self, sample_orbit, earth_moon_dynamics):
+        t = float(sample_orbit.times[0]) + 0.05
+        state = earth_moon_dynamics.propagate_orbit_state_at_time(
+            sample_orbit, t, integration_dt=0.005
+        )
+        assert state.shape == (6,)
         assert not np.any(np.isnan(state))
-
-    def test_interpolate_outside_range(self, sample_orbit):
-        """Test extrapolation outside time range"""
-        t_interp = 5.0  # Outside original range
-        state = sample_orbit.interpolate_at_time(t=t_interp)
-        
-        assert len(state) == 6
-        assert not np.any(np.isnan(state))
-
-    def test_interpolate_at_endpoints(self, sample_orbit):
-        """Test interpolation at endpoints"""
-        t_start = sample_orbit.times[0]
-        t_end = sample_orbit.times[-1]
-        
-        state_start = sample_orbit.interpolate_at_time(t=t_start)
-        state_end = sample_orbit.interpolate_at_time(t=t_end)
-        
-        assert len(state_start) == 6
-        assert len(state_end) == 6
 
 
 class TestOrbitPeriod:

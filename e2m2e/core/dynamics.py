@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.integrate import solve_ivp
-from typing import Dict, List, Tuple, Optional, Any, Callable
+from typing import Dict, List, Tuple, Optional, Any, Callable, TYPE_CHECKING
 
 import numpy.typing as npt
 
 from .system import System, CR3BP_System
+
+if TYPE_CHECKING:
+    from .orbit import Orbit
 
 
 class Dynamics:
@@ -86,6 +89,7 @@ class Dynamics:
         t_span: Tuple[float, float],
         t_eval: Optional[npt.ArrayLike] = None,
         with_stm: bool = False,
+        with_jacobi: bool = False,
     ) -> Dict[str, Any]:
         """传播轨迹
 
@@ -94,9 +98,10 @@ class Dynamics:
         - t_span: 时间区间 [t0, tf]
         - t_eval: 评估时间点数组（可选）
         - with_stm: 是否计算状态转移矩阵
+        - with_jacobi: 是否沿轨迹逐点计算 Jacobi 常数并写入 ``jacobi`` / ``jacobi_error``（默认关闭以减轻粗积分负担）
 
         返回：
-        - 轨迹结果对象
+        - 轨迹结果对象；仅当 ``with_jacobi=True`` 时包含 ``jacobi`` 与 ``jacobi_error`` 键
         """
         result = solve_ivp(
             self.equations_of_motion,
@@ -113,17 +118,24 @@ class Dynamics:
 
         self.last_trajectory = (result.t, states)
 
-        if hasattr(self, "compute_jacobi_constant"):
-            self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
-            if len(self.jacobi_history) > 1:
-                self.jacobi_error = np.max(np.abs(np.diff(self.jacobi_history)))
-
-        return {
+        out: Dict[str, Any] = {
             "time": result.t,
             "states": states,
-            "jacobi": self.jacobi_history,
-            "jacobi_error": self.jacobi_error,
         }
+
+        if with_jacobi and hasattr(self, "compute_jacobi_constant"):
+            self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
+            if len(self.jacobi_history) > 1:
+                self.jacobi_error = float(np.max(np.abs(np.diff(self.jacobi_history))))
+            else:
+                self.jacobi_error = 0.0
+            out["jacobi"] = self.jacobi_history
+            out["jacobi_error"] = self.jacobi_error
+        else:
+            self.jacobi_history = []
+            self.jacobi_error = 0.0
+
+        return out
 
     def compute_jacobi_constant(self, state: npt.ArrayLike) -> float:
         """计算能量常数（子类需实现）
@@ -193,7 +205,7 @@ class CR3BP_Dynamics(Dynamics):
         __init__(system): 初始化动力学对象
         equations_of_motion(t, state): 6维状态向量的运动方程
         equations_with_stm(t, augmented_state): 42维增广状态向量的运动方程
-        propagate(initial_state, t_span, t_eval=None, with_stm=False): 传播轨迹
+        propagate(initial_state, t_span, t_eval=None, with_stm=False, with_jacobi=False): 传播轨迹
         compute_state_transition_matrix(initial_state, t): 计算状态转移矩阵
         compute_jacobi_constant(state): 实时计算Jacobi常数
         check_cross_section(state, plane, value): 检查是否穿过指定截面
@@ -308,6 +320,7 @@ class CR3BP_Dynamics(Dynamics):
         t_span: Tuple[float, float],
         t_eval: Optional[npt.ArrayLike] = None,
         with_stm: bool = False,
+        with_jacobi: bool = False,
     ) -> Dict[str, Any]:
         """传播轨迹
 
@@ -316,9 +329,10 @@ class CR3BP_Dynamics(Dynamics):
         - t_span: 时间区间 [t0, tf]
         - t_eval: 评估时间点数组（可选）
         - with_stm: 是否计算状态转移矩阵
+        - with_jacobi: 是否逐点计算 Jacobi 常数（默认 ``False``，搜索/大量积分时可显著减少开销）
 
         返回：
-        - 轨迹结果对象
+        - 轨迹结果对象；``jacobi`` / ``jacobi_error`` 仅当 ``with_jacobi=True`` 时返回
         """
         if with_stm:
             # 创建增广状态（初始STM为单位矩阵）
@@ -345,18 +359,25 @@ class CR3BP_Dynamics(Dynamics):
             self.last_trajectory = (result.t, states)
             self.last_stm = stm_matrices
 
-            # 计算Jacobi常数历史
-            self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
-            if len(self.jacobi_history) > 1:
-                self.jacobi_error = np.max(np.abs(np.diff(self.jacobi_history)))
-
-            return {
+            out: Dict[str, Any] = {
                 "time": result.t,
                 "states": states,
                 "stm": stm_matrices,
-                "jacobi": self.jacobi_history,
-                "jacobi_error": self.jacobi_error,
             }
+
+            if with_jacobi:
+                self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
+                if len(self.jacobi_history) > 1:
+                    self.jacobi_error = float(np.max(np.abs(np.diff(self.jacobi_history))))
+                else:
+                    self.jacobi_error = 0.0
+                out["jacobi"] = self.jacobi_history
+                out["jacobi_error"] = self.jacobi_error
+            else:
+                self.jacobi_history = []
+                self.jacobi_error = 0.0
+
+            return out
         else:
             # 积分普通状态方程
             result = solve_ivp(
@@ -375,17 +396,62 @@ class CR3BP_Dynamics(Dynamics):
             # 存储结果
             self.last_trajectory = (result.t, states)
 
-            # 计算Jacobi常数历史
-            self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
-            if len(self.jacobi_history) > 1:
-                self.jacobi_error = np.max(np.abs(np.diff(self.jacobi_history)))
-
-            return {
+            out = {
                 "time": result.t,
                 "states": states,
-                "jacobi": self.jacobi_history,
-                "jacobi_error": self.jacobi_error,
             }
+
+            if with_jacobi:
+                self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
+                if len(self.jacobi_history) > 1:
+                    self.jacobi_error = float(np.max(np.abs(np.diff(self.jacobi_history))))
+                else:
+                    self.jacobi_error = 0.0
+                out["jacobi"] = self.jacobi_history
+                out["jacobi_error"] = self.jacobi_error
+            else:
+                self.jacobi_history = []
+                self.jacobi_error = 0.0
+
+            return out
+
+    def propagate_orbit_state_at_time(
+        self,
+        orbit: Orbit,
+        t: float,
+        integration_dt: float = 0.01,
+    ) -> npt.NDArray[np.floating]:
+        """从轨道首点状态沿本对象的 :meth:`propagate` 积分到给定时刻对应的相位（周期轨道上对周期取模）。
+
+        参数：
+        - orbit: 周期轨道数据（须含 ``states``、``times``、有效 ``period``）
+        - t: 与轨道 ``times`` 一致的时间坐标（绝对时间）
+        - integration_dt: 构造 ``t_eval`` 的步长
+
+        返回：
+        - 积分末端状态 ``[x, y, z, vx, vy, vz]``
+        """
+        if orbit.states.shape[0] < 1:
+            raise ValueError("轨道无状态")
+        if orbit.period is None or orbit.period <= 0:
+            raise ValueError("轨道周期无效，无法沿周期外推")
+
+        t0 = float(orbit.times[0])
+        period = float(orbit.period)
+        t_rel = float(np.mod(t - t0, period))
+        if t_rel < 1e-14:
+            return np.asarray(orbit.states[0], dtype=float).copy()
+
+        n_steps = max(int(np.ceil(t_rel / integration_dt)) + 1, 2)
+        t_eval = np.linspace(t0, t0 + t_rel, n_steps)
+        result = self.propagate(
+            initial_state=orbit.states[0],
+            t_span=(t0, t0 + t_rel),
+            t_eval=t_eval,
+            with_stm=False,
+            with_jacobi=False,
+        )
+        return np.asarray(result["states"][-1], dtype=float)
 
     def compute_state_transition_matrix(
         self, initial_state: npt.ArrayLike, t: float
@@ -400,7 +466,9 @@ class CR3BP_Dynamics(Dynamics):
         - 状态转移矩阵 (6x6)
         """
         # 传播轨迹并计算STM
-        result = self.propagate(initial_state, [0, t], with_stm=True)
+        result = self.propagate(
+            initial_state, (0.0, float(t)), with_stm=True, with_jacobi=False
+        )
 
         # 返回最终时刻的STM
         return result["stm"][-1]
@@ -446,3 +514,13 @@ class CR3BP_Dynamics(Dynamics):
             f"CR3BP_Dynamics(system={self.system}, integrator='{self.integrator}', "
             f"rtol={self.rtol}, atol={self.atol}, max_step={self.max_step})"
         )
+
+
+def propagate_state_at_orbit_time(
+    orbit: Any,
+    t: float,
+    dynamics: CR3BP_Dynamics,
+    integration_dt: float = 0.01,
+) -> npt.NDArray[np.floating]:
+    """委托 :meth:`CR3BP_Dynamics.propagate_orbit_state_at_time`，便于与 ``from e2m2e.core import ...`` 兼容。"""
+    return dynamics.propagate_orbit_state_at_time(orbit, t, integration_dt)
