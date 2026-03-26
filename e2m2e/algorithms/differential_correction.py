@@ -960,8 +960,11 @@ class DifferentialCorrection:
                 elif var_idx == 6:  # 更新时间变量
                     current_time -= delta[j]
 
-            # 确保时间正数
-            if current_time <= 0:
+            # Halo：仅当 T/2 已崩溃到极小（寄生根）时拉回，避免一律钳位导致无法收敛到真实 ~0.92 TU
+            if self.setup_type in ("halo_orbit_fixed_x0", "halo_orbit_fixed_z0"):
+                if current_time < 0.02:
+                    current_time = 0.25
+            elif current_time <= 0:
                 current_time = 1e-6
                 if verbose:
                     print("  警告：时间调整为正值")
@@ -992,7 +995,10 @@ class DifferentialCorrection:
         # 迭代结束，处理结果
         if self.converged:
             # 验证周期合理性（防止收敛到无效解如周期接近0的轨道）
-            min_valid_period = 1e-6  # 最小有效周期阈值
+            if self.setup_type in ("halo_orbit_fixed_z0", "halo_orbit_fixed_x0"):
+                min_valid_period = 0.5
+            else:
+                min_valid_period = 1e-6
             if 2 * current_time < min_valid_period:
                 self.converged = False
                 self.success = False

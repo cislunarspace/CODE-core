@@ -47,7 +47,7 @@ from scripts.utils.common import MU
 # 用户配置：已生成的轨道族 JSON（与 generate_halo_family.py 输出一致）
 # 命令行未传入路径且未使用 --latest 时，使用此处路径。
 # =============================================================================
-FAMILY_JSON_PATH = project_root / "output" / "halo" / "halo_L1_N_family_3857278535.json"
+FAMILY_JSON_PATH = project_root / "output" / "halo" / "halo_L1_N_family_3857325998.json"
 
 DEFAULT_HALO_DIR = project_root / "output" / "halo"
 

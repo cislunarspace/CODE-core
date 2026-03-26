@@ -443,7 +443,12 @@ $$\frac{d\mathbf{u}}{ds} = \frac{\mathbf{t}}{\|\mathbf{t}\|}$$
 | 方法 | 说明 |
 |------|------|
 | `natural_continuation(seed_orbit, param_range, step_size, verbose)` | 自然参数延拓 |
-| `pseudo_arclength_continuation(seed_state, seed_t_half, n_orbits, verbose)` | 伪弧长延拓 |
+| `pseudo_arclength_continuation(seed_orbit, n_orbits, step_size, direction, ..., dc_scheme, ...)` | XZ 对称伪弧长延拓（`direction`: `positive` / `negative`） |
+| `generate_halo_seed_orbit(libration_point, amplitude_z, halo_class, ...)` | Halo 种子轨道 |
+| `generate_halo_family(seed_orbit, n_orbits, direction, step_size)` | 按 `amplitude_z` 的自然参数式族生成 |
+| `halo_pseudo_arclength_continuation(seed_orbit, n_orbits, direction, step_size, step_size_negative, ...)` | Halo 伪弧长族（双向支、可选 MATLAB 对齐参数） |
+
+详见 [Halo 算法文档](../algorithms/halo.md)。
 
 #### 使用示例
 

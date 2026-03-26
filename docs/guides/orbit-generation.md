@@ -88,18 +88,56 @@ def generate_dro(x0=0.8, y_dot_guess=0.5, t_half_guess=1.6):
 
 Halo 轨道是围绕平动点（L1 或 L2）的三维周期轨道，呈现扭曲的"8"字形或马蹄形。
 
-### 3D 对称配置
+**完整说明（API、伪弧长延拓、脚本、与 MATLAB 对照）见 [算法文档：Halo](../algorithms/halo.md)。**
+
+### 库内推荐流程
+
+1. **单条轨道**：Richardson 初值由 `compute_halo_initial_guess` 提供，`DifferentialCorrection.setup_halo_orbit_fixed_z0`（或 `fixed_x0`）后调用 `iterate_correction`。
+2. **种子 + 轨道族**：`Continuation.generate_halo_seed_orbit` 得到收敛种子，再 `halo_pseudo_arclength_continuation` 沿伪弧长生成族（默认 `dc_scheme='adaptive'`，步长可与 `CR3BP_MATLAB_Library/examples/FAMILY_L1Halo_North.m` 对齐）。
+
+```python
+from e2m2e.algorithms import Continuation, DifferentialCorrection
+
+dc = DifferentialCorrection(dynamic=dynamics)
+cont = Continuation(corrector=dc)
+
+seed = cont.generate_halo_seed_orbit(
+    libration_point=1,
+    amplitude_z=0.23,
+    halo_class=0,
+    verbose=False,
+)
+family = cont.halo_pseudo_arclength_continuation(
+    seed_orbit=seed,
+    n_orbits=10,
+    direction="both",
+    step_size=0.0045,
+    step_size_negative=0.009,
+    verbose=True,
+)
+```
+
+### 命令行脚本
+
+| 脚本 | 作用 |
+|------|------|
+| `scripts/generate/generate_halo_orbit.py` | 生成单条 Halo 并写入 `output/halo/` |
+| `scripts/generate/generate_halo_family.py` | 种子 + 伪弧长轨道族 JSON |
+| `scripts/plot/plot_halo_orbit.py` | 单轨/多轨绘图 |
+| `scripts/plot/plot_halo_family.py` | 轨道族概览与稳定性图 |
+
+### 3D 对称配置（底层）
 
 ```python
 # 配置 3D 对称 x 轴固定 x0
 dc.setup_3D_symmetric_x_fixed_x0(x0=0.8)
 
-# 初始猜测（含 z 方向分量）
-initial_state = np.array([0.8, 0.0, 0.1, 0.0, 0.5, 0.0])
 t_half_guess = 1.6
+initial_state = np.array([0.8, 0.0, 0.1, 0.0, 0.5, 0.0])
+orbit = Orbit(states=[initial_state], times=[0.0])
+orbit.period = 2 * t_half_guess
 
-# 迭代修正
-orbit, result = dc.iterate_correction(initial_state, t_half_guess, verbose=True)
+orbit_result = dc.iterate_correction(orbit, verbose=True)
 ```
 
 ### L1 vs L2 Halo

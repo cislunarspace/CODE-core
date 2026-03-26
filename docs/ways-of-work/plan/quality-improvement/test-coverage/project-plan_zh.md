@@ -285,6 +285,16 @@ jobs:
 
 ---
 
+## 附录：Halo 轨道专题路线图
+
+Halo 单轨生成、伪弧长延拓（`continuation_PAL_CR3BP` 对齐）、`generate_halo_family` 脚本及后续数值与测试工作，见独立文档：
+
+- **[Halo 后续开发路线图](../../halo-roadmap_zh.md)**（`docs/ways-of-work/plan/halo-roadmap_zh.md`）
+
+与 **Algorithm 模块测试** Epic 的衔接建议：在 `tests/algorithms/` 中为 `continuation.py` 的 PAL 步与 `generate_halo_seed_orbit` 增加回归用例（见路线图「短期」一节）。
+
+---
+
 ## Issue 创建检查清单
 
 ### 创建前准备

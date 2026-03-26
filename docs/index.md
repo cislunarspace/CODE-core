@@ -19,6 +19,7 @@ docs/
 │   └── coordinate.md     # CoordinateTransformation - 坐标变换
 ├── algorithms/           # 算法模块
 │   ├── continuation.md       # 延拓法
+│   ├── halo.md               # Halo 轨道与伪弧长轨道族
 │   ├── differential_correction.md  # 微分修正
 │   └── stability.md          # 稳定性分析
 ├── visualization/       # 可视化模块
@@ -56,6 +57,7 @@ docs/
 | 类/模块 | 文件 | 说明 |
 |---------|------|------|
 | `ContinuationMethod` | [algorithms/continuation.md](algorithms/continuation.md) | 弧长延拓法 |
+| Halo / PAL 轨道族 | [algorithms/halo.md](algorithms/halo.md) | Halo 初值、伪弧长延拓、脚本与 MATLAB 对照 |
 | `DifferentialCorrection` | [algorithms/differential_correction.md](algorithms/differential_correction.md) | 周期轨道修正 |
 | `StabilityAnalysis` | [algorithms/stability.md](algorithms/stability.md) | Floquet稳定性分析 |
 
@@ -96,6 +98,7 @@ result = dynamics.propagate(initial_state=state, t_span=(0, 10.0))
 - [API 参考](reference/api-reference.md) - 完整 API 文档
 - [示例代码](../examples/) - 实际使用示例
 - [测试用例](../tests/) - 单元测试
+- [Halo 后续开发路线图](ways-of-work/plan/halo-roadmap_zh.md) - PAL / 轨道族演进计划
 
 ### 常用任务
 

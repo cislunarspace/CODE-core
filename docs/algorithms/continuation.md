@@ -1,49 +1,45 @@
-# ContinuationMethod
+# Continuation（轨道族延拓）
 
 **文件**: `e2m2e/algorithms/continuation.py`
 
 **类签名**:
 ```python
 class ContinuationMethod(Enum):
-    NATURAL = "natural"           # 自然延拓
-    PREDICTOR_CORRECTOR = "predictor_corrector"  # 预估校正
-    ARC_LENGTH = "arc_length"     # 弧长延拓
+    NATURAL = "natural"
+    PSEUDO_ARCLENGTH = "pseudo_arclength"
+
+class Continuation:
+    """轨道族延拓：自然参数、伪弧长（XZ 对称）、Halo 种子与族生成"""
 ```
 
 ## 设计原理
 
-延拓法（Continuation Method）用于追踪参数空间中的解曲线，特别适合处理解的分叉和转向问题。
+延拓从已知周期轨道（种子）出发，沿参数或伪弧长逐步生成轨道族。自然参数延拓在参数单调时简单有效；伪弧长延拓在自由变量 \(\mathbf{X}=[r_x,r_z,\dot y,T/2]\) 上引入切向与约束，用于跟踪含折返的族曲线。
 
-## 弧长延拓法 (Arc-Length Continuation)
-
-核心思想：将参数 $\lambda$ 作为弧长 $s$ 的函数，通过预估-校正步骤沿解曲线前进。
-
-### 预估步骤 (Predictor)
-$$\begin{pmatrix} \mathbf{f}(\mathbf{x}_k) \\ \mathbf{g}(\mathbf{x}_k, s_k) \end{pmatrix} = \mathbf{0}$$
-
-其中 $\mathbf{g}$ 是弧长约束条件。
-
-### 校正步骤 (Corrector)
-使用 Newton-Raphson 迭代求解：
-$$\mathbf{J} \Delta \mathbf{x} = -\mathbf{f}$$
-
-其中 $\mathbf{J}$ 是扩展 Jacobian 矩阵。
-
-## 核心方法
+## 核心方法（节选）
 
 | 方法 | 说明 |
 |------|------|
-| `predict(state, tangent, ds)` | 预估下一个点 |
-| `correct(state, constraints)` | 校正求解 |
-| `compute_tangent(jacobian)` | 计算切向量 |
-| `find_bifurcation(points)` | 检测分叉点 |
+| `natural_continuation(...)` | 自然参数延拓 |
+| `pseudo_arclength_continuation(seed_orbit, ...)` | XZ 对称伪弧长延拓（单方向 `positive` / `negative`） |
+| `generate_halo_seed_orbit(...)` | Halo 种子轨道 |
+| `generate_halo_family(...)` | 按 `amplitude_z` 步进的 Halo 族（独立 Richardson 初值） |
+| `halo_pseudo_arclength_continuation(...)` | Halo 专用：双向支、步长与 MATLAB 脚本可对齐 |
+
+**Halo 初值、PAL 细节、脚本入口与 MATLAB 对照**见 **[Halo 轨道算法文档](halo.md)**。
 
 ## 使用示例
 
 ```python
-from e2m2e.algorithms.continuation import ContinuationMethod
+from e2m2e.algorithms.continuation import Continuation
 
-# 沿参数曲线延拓
-continuer = ArcLengthContinuation(f, jacobian)
-curve = continuer.continue_curve(x0, lambda_range, ds=0.01)
+continuation = Continuation(corrector, step=0.01)
+family = continuation.natural_continuation(
+    seed_orbit=seed_orbit,
+    param_range=(0.8, 1.0),
+    step_size=0.01,
+    verbose=True,
+)
 ```
+
+伪弧长与 Halo 族示例见 [Halo](halo.md) 与 [轨道生成指南 - Halo](../guides/orbit-generation.md#halo-轨道)。

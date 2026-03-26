@@ -285,6 +285,17 @@ jobs:
 
 ---
 
+## Appendix: Halo orbit roadmap
+
+Feature work for Halo single-orbit generation, pseudo-arclength continuation (MATLAB `continuation_PAL_CR3BP` alignment), CLI scripts, and follow-up tests is tracked in:
+
+- Chinese roadmap: [halo-roadmap_zh.md](../../halo-roadmap_zh.md)
+- Feature overview (EN): [halo_en.md](../../../../algorithms/halo_en.md)
+
+Tie-in: extend the **Algorithm module tests** epic with PAL / `generate_halo_seed_orbit` regression cases when feasible.
+
+---
+
 ## Issue Creation Checklist
 
 ### Pre-Creation Preparation

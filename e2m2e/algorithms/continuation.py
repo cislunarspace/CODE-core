@@ -528,107 +528,118 @@ class Continuation:
         TolPAL: float = 1e-6,
         TolDiffCorr: float = 1e-6,
         IterMax: int = 100,
+        dc_scheme: str = "adaptive",
+        libration_point: int = 1,
+        directional_increment: bool = False,
+        target_vector: int = 0,
+        target_direction: int = 1,
     ):
-        """伪弧长延拓（基于MATLAB continuation_PAL_CR3BP）
+        """伪弧长延拓（对应 MATLAB ``continuation_PAL_CR3BP``，plane=13 / XZ 对称）
 
-        使用伪弧长参数化方法跟踪轨道族，可以处理折返点等复杂情况。
+        自由变量 ``X = [rx, rz, vy, T/2]``，``Xdot = null(dF)``，PAL 约束
+        ``G = [F; (Xnew-X)·Xdot - DeltaS]``；内层用 ``Xnew`` 计算 ``F``（与 MATLAB 中
+        仅用固定 ``X`` 相比更一致）。每步后用微分修正闭合。
 
         参数：
             seed_orbit: 种子轨道（Orbit对象）
-            n_orbits: 目标轨道数量
-            step_size: 伪弧长步长 DeltaS
-            direction: 延拓方向 ("positive", "negative", "both")
-            verbose: 是否打印信息
-            TolPAL: PAL Newton-Raphson 容差
-            TolDiffCorr: 微分修正容差
-            IterMax: PAL循环最大迭代次数
+            n_orbits: 本支要生成的新轨道条数（与 MATLAB 中 ``N`` 一致）
+            step_size: 伪弧长步长 ``|DeltaS|``（正数；``direction`` 决定符号）
+            direction: ``positive`` 或 ``negative``（双侧延拓请调用两次或使用
+                ``halo_pseudo_arclength_continuation(..., direction='both')``）
+            dc_scheme: 见 ``Continuation`` 文档字符串
+            target_vector: 与 MATLAB ``TargetVector`` 对应的 0 基下标：``0=rx,1=rz,2=vy,3=T/2``
 
         返回：
-            OrbitFamily: 包含轨道族的OrbitFamily对象
+            OrbitFamily: 仅含种子 + 本支新轨道（不重复添加种子）
         """
         mu = self.dynamics.system.mu
+
+        if direction not in ("positive", "negative"):
+            raise ValueError("direction 须为 positive 或 negative（双侧请用 halo_pseudo_arclength_continuation）")
+
+        step_sign = 1.0 if direction == "positive" else -1.0
 
         if verbose:
             print(f"\n{'=' * 60}")
             print("开始伪弧长延拓 (Pseudo Arc-Length Continuation)")
             print(f"{'=' * 60}")
             print(f"  质量比 mu = {mu:.10f}")
-            print(f"  目标轨道数 = {n_orbits}")
-            print(f"  步长 DeltaS = {step_size}")
+            print(f"  本支新轨道数 N = {n_orbits}")
+            print(f"  步长 |DeltaS| = {step_size}")
             print(f"  延拓方向 = {direction}")
+            print(f"  dc_scheme = {dc_scheme}")
 
         orbit_family = OrbitFamily(seed_orbit)
+        self.correction.tolerance = TolDiffCorr
 
-        # 种子轨道初始状态
         SV0i = seed_orbit.states[0].copy()
-        tfi = seed_orbit.period
-
-        # 自由变量向量 X = [rx, rz, vy, tf2]
+        tfi = float(seed_orbit.period)
         X = np.array([SV0i[0], SV0i[2], SV0i[4], tfi / 2])
 
-        # 计算初始约束雅可比
         _, dF = compute_F_and_dF_symmetric_xz_plane(X, SV0i, mu)
-
-        # 计算切向量（零空间）
         Xdot = compute_tangent_vector(dF)
 
+        family_states: List[np.ndarray] = [SV0i.copy()]
+
         if verbose:
-            print(f"\n初始自由变量 X = [{X[0]:.6f}, {X[1]:.6f}, {X[2]:.6f}, {X[3]:.6f}]")
-            print(f"初始切向量 Xdot = [{Xdot[0]:.6f}, {Xdot[1]:.6f}, {Xdot[2]:.6f}, {Xdot[3]:.6f}]")
+            print(
+                f"\n初始自由变量 X = [{X[0]:.6f}, {X[1]:.6f}, {X[2]:.6f}, {X[3]:.6f}]"
+            )
+            print(
+                f"初始切向量 Xdot = [{Xdot[0]:.6f}, {Xdot[1]:.6f}, {Xdot[2]:.6f}, {Xdot[3]:.6f}]"
+            )
 
-        # 存储已修正的轨道状态和周期
-        family_states = [SV0i.copy()]
-        family_periods = [tfi]
-        family_orbits = [seed_orbit]
-
-        # 确定延拓方向
-        step_sign = 1.0 if direction == "positive" else -1.0
+        ds = float(step_sign * step_size)
+        tv = target_vector
+        td = target_direction
 
         for n in range(n_orbits):
             if verbose and (n + 1) % 5 == 0:
                 print(f"\n--- 延拓第 {n + 1}/{n_orbits} 条轨道 ---")
 
-            # ============================================================
-            # 预测步 (Predictor)
-            # ============================================================
-            # Xnew = X + DeltaS * Xdot
-            DeltaX = step_sign * step_size * Xdot
-            Xnew = X + DeltaX
+            delta_dir = ds * Xdot
+            if directional_increment:
+                if td * delta_dir[tv] > 0:
+                    Xnew = X + ds * Xdot
+                else:
+                    Xnew = X - ds * Xdot
+            else:
+                Xnew = X + ds * Xdot
 
             if verbose:
-                print(f"  预测 Xnew = [{Xnew[0]:.6f}, {Xnew[1]:.6f}, {Xnew[2]:.6f}, {Xnew[3]:.6f}]")
+                print(
+                    f"  预测 Xnew = [{Xnew[0]:.6f}, {Xnew[1]:.6f}, {Xnew[2]:.6f}, {Xnew[3]:.6f}]"
+                )
 
-            # ============================================================
-            # PAL修正步 (Corrector using PAL constraint)
-            # ============================================================
-            # 组合约束: G = [F; dot(Xnew-X, Xdot) - DeltaS]
-            # 组合雅可比: dG = [dF; Xdot']
+            # 仅欧拉预测时的自由变量（PAL 若跳入 F=0 的非物理根则回退到此）
+            X_predictor_only = Xnew.copy()
 
+            Xdot_new = Xdot
             for iter_pal in range(IterMax):
-                # 重建状态
                 SV0_guess = SV0i.copy()
-                SV0_guess[0] = Xnew[0]  # rx
-                SV0_guess[2] = Xnew[1]  # rz
-                SV0_guess[4] = Xnew[2]  # vy
-                tf2_guess = Xnew[3]
+                SV0_guess[0] = Xnew[0]
+                SV0_guess[2] = Xnew[1]
+                SV0_guess[4] = Xnew[2]
 
-                # 计算约束和雅可比
                 F, dF_new = compute_F_and_dF_symmetric_xz_plane(Xnew, SV0_guess, mu)
-
-                # 计算当前切向量
                 Xdot_new = compute_tangent_vector(dF_new)
 
-                # 组合约束 G = [F; dot(Xnew-X, Xdot) - DeltaS]
                 G = np.zeros(4)
                 G[:3] = F
-                G[3] = np.dot(Xnew - X, Xdot) - step_size * step_sign
+                G[3] = np.dot(Xnew - X, Xdot) - ds
 
-                # 组合雅可比 dG = [dF; Xdot']
                 dG = np.zeros((4, 4))
                 dG[:3, :] = dF_new
                 dG[3, :] = Xdot
 
-                # Newton-Raphson 修正
+                # 与 MATLAB continuation_PAL_CR3BP 一致：先判收敛，再更新 Xnew
+                if np.linalg.norm(F) < TolPAL:
+                    if verbose:
+                        print(
+                            f"  PAL迭代 {iter_pal + 1}: 收敛, ||F|| = {np.linalg.norm(F):.2e}"
+                        )
+                    break
+
                 try:
                     delta_X = np.linalg.solve(dG, G)
                 except np.linalg.LinAlgError:
@@ -636,40 +647,60 @@ class Continuation:
                         print(f"  PAL迭代 {iter_pal + 1}: 雅可比矩阵奇异")
                     break
 
+                # 限制牛顿步，避免 PAL 收敛到 rx 极大的非 Halo 物理解（F=0 多根）
+                max_step = np.array([0.04, 0.12, 0.12, 0.08], dtype=float)
+                delta_X = np.clip(delta_X, -max_step, max_step)
                 Xnew = Xnew - delta_X
 
-                # 检查收敛
-                if np.linalg.norm(F) < TolPAL:
-                    if verbose:
-                        print(f"  PAL迭代 {iter_pal + 1}: 收敛, ||F|| = {np.linalg.norm(F):.2e}")
-                    break
-
-            # 更新切向量
             Xdot = Xdot_new
             X = Xnew.copy()
 
-            # ============================================================
-            # 微分修正 (Differential Correction)
-            # ============================================================
-            # 重建状态向量
+            # PAL 可能在 F=0 的另一支上“收敛”，偏离 L1 Halo 族；回退为欧拉预测初值
+            _x, _z, _tf2 = X[0], X[1], X[3]
+            pal_plausible = (
+                0.75 < _x < 1.05
+                and abs(_z) > 1e-3
+                and abs(_z) < 0.55
+                and 0.35 < _tf2 < 1.35
+                and abs(_x - X_predictor_only[0]) < 0.25
+                and abs(_z - X_predictor_only[1]) < 0.25
+            )
+            if not pal_plausible:
+                if verbose:
+                    print(
+                        f"  PAL 结果偏离物理 Halo 支 (x={_x:.4f}, z={_z:.4f}, T/2={_tf2:.4f})，"
+                        f"回退为欧拉预测初值"
+                    )
+                X = X_predictor_only.copy()
+
             SV0_corr = SV0i.copy()
-            SV0_corr[0] = X[0]  # rx
-            SV0_corr[2] = X[1]  # rz
-            SV0_corr[4] = X[2]  # vy
+            SV0_corr[0] = X[0]
+            SV0_corr[2] = X[1]
+            SV0_corr[4] = X[2]
             tf_corr = 2 * X[3]
 
-            # 选择修正方法：根据 x 和 z 哪个变化更大来决定
-            x0_last = family_states[-1][0] if len(family_states) > 0 else SV0_corr[0]
-            z0_last = family_states[-1][2] if len(family_states) > 0 else SV0_corr[2]
+            x0_last = family_states[-1][0]
+            z0_last = family_states[-1][2]
 
-            if abs(SV0_corr[0] - x0_last) > abs(SV0_corr[2] - z0_last):
-                # 使用 fixedX 修正
-                self.correction.setup_3D_symmetric_x_fixed_x0(x0=SV0_corr[0])
+            if dc_scheme == "matlab_halo_type1":
+                self.correction.setup_halo_orbit_fixed_x0(
+                    x0=SV0_corr[0], libration_point=libration_point
+                )
+            elif dc_scheme == "matlab_halo_type2":
+                if abs(SV0_corr[0] - x0_last) > abs(SV0_corr[2] - z0_last):
+                    self.correction.setup_halo_orbit_fixed_x0(
+                        x0=SV0_corr[0], libration_point=libration_point
+                    )
+                else:
+                    self.correction.setup_halo_orbit_fixed_z0(
+                        z0=SV0_corr[2], libration_point=libration_point
+                    )
             else:
-                # 使用 fixedZ 修正
-                self.correction.setup_3D_symmetric_xz_fixed_z0(z0=SV0_corr[2])
+                if abs(SV0_corr[0] - x0_last) > abs(SV0_corr[2] - z0_last):
+                    self.correction.setup_3D_symmetric_x_fixed_x0(x0=SV0_corr[0])
+                else:
+                    self.correction.setup_3D_symmetric_xz_fixed_z0(z0=SV0_corr[2])
 
-            # 创建猜测轨道
             guess_orbit = Orbit(
                 states=SV0_corr.reshape(1, -1),
                 times=np.array([0.0]),
@@ -677,27 +708,37 @@ class Continuation:
             )
             guess_orbit.period = tf_corr
 
-            # 执行微分修正
             orbit = self.correction.iterate_correction(guess_orbit, verbose=False)
 
-            if orbit is not None and orbit.correction_success:
-                family_orbits.append(orbit)
-                family_states.append(orbit.states[0].copy())
-                family_periods.append(orbit.period)
+            # PAL 初值在固定 x0 下常落入寄生根或与 STM 牛顿不兼容；与种子生成一致改用固定 z0 再试
+            if (orbit is None or not orbit.correction_success) and dc_scheme == "matlab_halo_type1":
+                self.correction.setup_halo_orbit_fixed_z0(
+                    z0=SV0_corr[2], libration_point=libration_point
+                )
+                orbit = self.correction.iterate_correction(guess_orbit, verbose=False)
 
-                # 更新自由变量
-                X = np.array([orbit.states[0, 0], orbit.states[0, 2], orbit.states[0, 4], orbit.period / 2])
+            if orbit is not None and orbit.correction_success:
+                orbit_family.add_orbit(orbit)
+                family_states.append(orbit.states[0].copy())
+                X = np.array(
+                    [
+                        orbit.states[0, 0],
+                        orbit.states[0, 2],
+                        orbit.states[0, 4],
+                        orbit.period / 2,
+                    ]
+                )
+                _, dF = compute_F_and_dF_symmetric_xz_plane(X, orbit.states[0].copy(), mu)
+                Xdot = compute_tangent_vector(dF)
 
                 if verbose and (n + 1) % 5 == 0:
-                    print(f"  轨道 {n + 1}: x0={orbit.states[0, 0]:.4f}, z0={orbit.states[0, 2]:.4f}, T={orbit.period:.4f}")
+                    print(
+                        f"  轨道 {n + 1}: x0={orbit.states[0, 0]:.4f}, z0={orbit.states[0, 2]:.4f}, T={orbit.period:.4f}"
+                    )
             else:
                 if verbose:
                     print(f"  轨道 {n + 1}: 微分修正失败")
                 break
-
-        # 添加所有轨道到族
-        for orbit in family_orbits:
-            orbit_family.add_orbit(orbit)
 
         if verbose:
             print(f"\n伪弧长延拓完成：共生成 {len(orbit_family)} 条轨道")
@@ -896,134 +937,108 @@ class Continuation:
         seed_orbit: Orbit,
         n_orbits: int = 50,
         direction: str = "both",
-        step_size: float = 0.005,
+        step_size: float = 0.0045,
+        step_size_negative: Optional[float] = None,
         verbose: bool = True,
+        TolPAL: float = 1e-6,
+        TolDiffCorr: float = 1e-6,
+        IterMax: int = 100,
+        dc_scheme: str = "adaptive",
+        directional_increment: bool = True,
     ) -> OrbitFamily:
-        """Halo轨道伪弧长延拓
+        """Halo 轨道族伪弧长延拓（对齐 ``CR3BP_MATLAB_Library``）
 
-        使用伪弧长参数化方法生成Halo轨道族。
-        该方法利用Richardson三阶近似计算初始猜测，
-        并使用轨道族切线方向进行预测，以更好地跟踪轨道族曲线。
+        对应 ``continuation_PAL_CR3BP`` + XZ 对称（``X = [rx,rz,vy,T/2]``），与
+        ``examples/FAMILY_L1Halo_North.m`` 的 PAL 步一致。
+
+        微分修正：MATLAB 脚本在 PAL 后使用 ``type=1``（固定 ``x0``）。当前 Python 在 PAL
+        初值下 ``setup_halo_orbit_fixed_x0`` 易与 STM 牛顿耦合到非物理解，故默认
+        ``dc_scheme='adaptive'``（按 Δx/Δz 在 fixed x / fixed z 间切换，与原
+        ``pseudo_arclength_continuation`` 一致）。若需对齐 MATLAB 的 fixedX，可设
+        ``matlab_halo_type1``（失败时会自动再试 ``fixed_z0``）。
+        - ``DirectionalIncrement``、``TargetVector``、``TargetDirection`` 与脚本一致：
+          正向支 ``TargetVector=2``（``rz``）、``TargetDirection=+1``；负向支
+          ``TargetVector=1``（``rx``）、``TargetDirection=-1``（0 基下标见
+          ``pseudo_arclength_continuation``）。
+
+        ``FAMILY_L1Halo_North.m`` 中正负支 ``DeltaS`` 不同（0.0045 与 0.009），可用
+        ``step_size_negative`` 单独指定负向步长模长。
 
         参数：
-            seed_orbit: Orbit, 种子轨道（已修正的Halo轨道）
-            n_orbits: int, 目标轨道数量
-            direction: str, 延拓方向 ("positive", "negative", "both")
-            step_size: float, 延拓步长（弧长）
-            verbose: bool, 是否打印详细信息
+            seed_orbit: 已收敛的 Halo 种子轨道
+            n_orbits: 每一支的新轨道条数 ``N``（与 MATLAB 一致；``direction=both`` 时
+                正向、负向各生成 ``n_orbits`` 条）
+            step_size: 正向伪弧长步长 ``|DeltaS|``（默认 0.0045）
+            step_size_negative: 负向步长模长，默认与 ``step_size`` 相同
+            dc_scheme: ``matlab_halo_type1`` / ``matlab_halo_type2`` / ``adaptive``
 
         返回：
-            OrbitFamily: 包含轨道族的OrbitFamily对象
+            OrbitFamily: 种子 + 各支新轨道（无重复种子）
         """
-        mu = self.dynamics.system.mu
-        libration_point = seed_orbit.parameters.get("libration_point", 1)
+        libration_point = int(seed_orbit.parameters.get("libration_point", 1))
         halo_class = seed_orbit.parameters.get("halo_class", 0)
         seed_z_amplitude = seed_orbit.parameters.get("amplitude_z", 0.1)
 
+        if direction not in ("positive", "negative", "both"):
+            raise ValueError("direction 须为 positive / negative / both")
+
+        if step_size_negative is None:
+            step_size_negative = step_size
+
+        self.correction.max_iterations = 150
+
         if verbose:
             print(f"\n{'=' * 60}")
-            print(f"开始 Halo 轨道伪弧长延拓")
-            print(f"  种子轨道: L{libration_point} {'北' if halo_class == 0 else '南'} Halo")
-            print(f"  种子轨道 z_amplitude: {seed_z_amplitude:.4f}")
-            print(f"  目标轨道数量: {n_orbits}")
-            print(f"  延拓方向: {direction}")
-            print(f"  步长: {step_size}")
+            print("Halo 伪弧长延拓（对齐 continuation_PAL_CR3BP + FAMILY_L1Halo_North）")
+            print(f"  种子: L{libration_point} {'北' if halo_class == 0 else '南'} Halo")
+            print(f"  z_amplitude(参数): {seed_z_amplitude:.4f}")
+            print(f"  每支新轨道数 N = {n_orbits}")
+            print(f"  正向 |DeltaS| = {step_size}, 负向 |DeltaS| = {step_size_negative}")
+            print(f"  dc_scheme = {dc_scheme}, DirectionalIncrement = {directional_increment}")
             print(f"{'=' * 60}")
 
         orbit_family = OrbitFamily(seed_orbit)
 
-        directions = ["positive", "negative"] if direction == "both" else [direction]
+        def _tag_halo_family(orb: Orbit) -> None:
+            orb.family_type = "halo"
+            orb.parameters["libration_point"] = libration_point
+            orb.parameters["halo_class"] = halo_class
+            z0 = float(orb.states[0, 2])
+            orb.parameters["amplitude_z"] = abs(z0)
 
-        self.correction.max_iterations = 100
-        self.correction.tolerance = 1e-5
+        branches: List[Tuple[str, float, int, int]] = []
+        if direction in ("positive", "both"):
+            branches.append(("positive", step_size, 1, 1))
+        if direction in ("negative", "both"):
+            branches.append(("negative", step_size_negative, 0, -1))
 
-        for direction in directions:
+        for br_name, ds_mag, tv, td in branches:
             if verbose:
-                print(f"\n--- {'正向' if direction == 'positive' else '反向'}延拓 ---")
+                print(f"\n--- Halo 延拓支: {br_name} (|DeltaS|={ds_mag}) ---")
 
-            family_orbits = [seed_orbit]
-            prev_orbit = seed_orbit
-
-            step_sign = 1 if direction == "positive" else -1
-
-            for i in range(n_orbits - 1):
-                current_z = prev_orbit.parameters.get("amplitude_z", 0.1)
-                next_z = current_z + step_sign * step_size * 10
-
-                if next_z <= 0:
-                    if verbose:
-                        print(f"  轨道 {i + 1}: z={next_z:.4f} <= 0, 终止")
-                    break
-
-                # 基于上一个修正后的轨道状态来估计新轨道的初始状态
-                prev_state = prev_orbit.states[0]
-                prev_vy = prev_state[4]
-                prev_period = prev_orbit.period
-
-                # 对 z 方向的增量进行调整，vy 按比例变化
-                # 假设 x 和 period 随 z 线性变化（简化假设）
-                z_ratio = next_z / current_z if current_z > 0 else 1.0
-
-                # 新的初始状态估计
-                new_x0 = prev_state[0]  # x 变化不大
-                new_vy = prev_vy * z_ratio  # vy 按比例调整
-                new_period = prev_period * (0.9 + 0.1 * z_ratio)  # 周期也按比例调整
-
-                if halo_class == 0:
-                    initial_z = next_z
-                else:
-                    initial_z = -next_z
-
-                initial_state = np.array(
-                    [
-                        new_x0,
-                        0.0,
-                        initial_z,
-                        0.0,  # vx
-                        new_vy,
-                        0.0,  # vz
-                    ]
-                )
-
-                guess_orbit = Orbit(
-                    states=initial_state.reshape(1, -1),
-                    times=np.array([0.0]),
-                    system=self.dynamics.system,
-                )
-                guess_orbit.period = new_period
-
-                self.correction.setup_halo_orbit_fixed_z0(
-                    z0=initial_z,
-                    libration_point=libration_point,
-                )
-
-                orbit = self.correction.iterate_correction(guess_orbit, verbose=False)
-
-                if orbit is not None and orbit.correction_success:
-                    orbit.family_type = "halo"
-                    orbit.parameters["libration_point"] = libration_point
-                    orbit.parameters["amplitude_z"] = next_z
-                    orbit.parameters["halo_class"] = halo_class
-
-                    family_orbits.append(orbit)
-                    prev_orbit = orbit
-
-                    if verbose and (i + 1) % 5 == 0:
-                        print(
-                            f"  轨道 {i + 1}: z={next_z:.4f}, x0={orbit.states[0, 0]:.4f}, 周期={orbit.period:.4f}"
-                        )
-                else:
-                    if verbose:
-                        print(f"  轨道 {i + 1}: z={next_z:.4f} 修正失败")
-                    break
-
-            for orbit in family_orbits[1:]:
-                orbit_family.add_orbit(orbit)
+            sub = self.pseudo_arclength_continuation(
+                seed_orbit,
+                n_orbits=n_orbits,
+                step_size=ds_mag,
+                direction="positive" if br_name == "positive" else "negative",
+                verbose=verbose,
+                TolPAL=TolPAL,
+                TolDiffCorr=TolDiffCorr,
+                IterMax=IterMax,
+                dc_scheme=dc_scheme,
+                libration_point=libration_point,
+                directional_increment=directional_increment,
+                target_vector=tv,
+                target_direction=td,
+            )
+            for o in sub.orbits[1:]:
+                _tag_halo_family(o)
+                orbit_family.add_orbit(o)
 
         if verbose:
-            print(f"\n延拓完成：共生成 {len(orbit_family)} 条轨道")
-            if len(orbit_family) > 0:
-                z_values = [o.parameters.get("amplitude_z", 0) for o in orbit_family]
+            print(f"\n延拓完成：共 {len(orbit_family)} 条轨道")
+            z_values = [o.parameters.get("amplitude_z", 0) for o in orbit_family]
+            if z_values:
                 print(f"  z_amplitude 范围: [{min(z_values):.4f}, {max(z_values):.4f}]")
 
         return orbit_family

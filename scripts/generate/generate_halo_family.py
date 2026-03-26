@@ -9,8 +9,9 @@
 
 注意:
     Halo轨道族延拓是一个非线性问题。Richardson三阶近似仅对小幅度的
-    Halo轨道准确。对于大幅度Halo轨道，需要使用伪弧长延拓配合极小步长。
-    MATLAB参考代码使用DeltaS=0.0045~0.009的步长。
+    Halo轨道准确。伪弧长步长与 CR3BP_MATLAB_Library 中
+    examples/FAMILY_L1Halo_North.m 一致：正向 DeltaS=0.0045，负向 |DeltaS|=0.009
+    （由 step_size / step_size_negative 控制）。
 """
 
 import sys
@@ -67,17 +68,18 @@ print(f"  x0={seed_halo.states[0, 0]:.6f}, z0={seed_halo.states[0, 2]:.6f}")
 # =============================================================================
 # 4. 使用halo_pseudo_arclength_continuation生成轨道族
 # =============================================================================
-print(f"\n开始Halo轨道族伪弧长延拓...")
-print(f"  (注意: Halo轨道族延拓需要极小步长,参考MATLAB使用DeltaS~0.005)")
+print(f"\n开始Halo轨道族伪弧长延拓（continuation_PAL_CR3BP 流程）...")
 
 n_orbits = 20
-step_size = 0.001  # 使用更小的步长
+step_size = 0.0045
+step_size_negative = 0.009
 
 family_result = continuation.halo_pseudo_arclength_continuation(
     seed_orbit=seed_halo,
     n_orbits=n_orbits,
     direction="both",
     step_size=step_size,
+    step_size_negative=step_size_negative,
     verbose=True,
 )
 
