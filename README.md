@@ -97,10 +97,34 @@ family = continuation.natural_continuation(
 ```python
 from e2m2e.transfer import DROTransferSearch
 
-searcher = DROTransferSearch(system, dynamics)
-searcher.set_departure_orbit(departure_orbit)
-searcher.set_arrival_orbit(arrival_orbit)
-results = searcher.search()
+# 创建搜索器
+searcher = DROTransferSearch(system=system, dynamics=dynamics)
+
+# 设置搜索参数（直接在实例上设置属性）
+searcher.alpha_min = 0.5
+searcher.alpha_max = 2.5
+searcher.n_alpha = 101
+searcher.n_departure = 200
+
+# 执行搜索
+results = searcher.search(dro_orbit, ro_orbit, n_workers=None)
+```
+
+### 4. NLP 优化
+
+```python
+from e2m2e.transfer import DROTRONLPOptimizer, NLPOptimizationVariables
+
+# 创建优化器
+optimizer = DROTRONLPOptimizer(system=system, dynamics=dynamics)
+optimizer.dro_orbit = dro_orbit
+optimizer.ro_orbit = ro_orbit
+
+# 设置初始猜测
+initial_vars = NLPOptimizationVariables(alpha=1.0, transfer_time=5.0, t_ins=3.0)
+
+# 执行优化
+result = optimizer.optimize(initial_vars)
 ```
 
 ### 4. 可视化
@@ -129,9 +153,9 @@ e2m2e/
 │   ├── continuation.py            # 轨道延拓
 │   └── stability.py              # 稳定性分析
 ├── transfer/            # 转移轨道设计
-│   ├── transfer_search.py         # DRO 转移搜索
-│   ├── transfer_optimization.py   # NLP 优化
-│   └── transfer_base.py           # 基础类
+│   ├── transfer_search.py         # DROTransferSearch - 网格搜索
+│   ├── transfer_optimization.py   # DROTRONLPOptimizer - NLP 优化
+│   └── transfer_base.py           # BaseTransfer - 基类
 └── visualization/       # 可视化
     └── plotting.py     # 绘图工具
 ```

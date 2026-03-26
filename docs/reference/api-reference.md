@@ -49,16 +49,17 @@
       - [稳定性指数](#稳定性指数)
       - [核心方法](#核心方法-7)
   - [3. Transfer Module (转移模块)](#3-transfer-module-转移模块)
-    - [3.1 EarthMoonTransfer](#31-earthmoontransfer)
+    - [3.1 DROTransferSearch](#31-drotransfersearch)
       - [设计原理](#设计原理-5)
-      - [转移策略](#转移策略)
+      - [搜索参数](#搜索参数直接在实例上设置)
       - [核心方法](#核心方法-8)
-    - [3.2 MoonEarthTransfer](#32-moonearthtransfer)
+    - [3.2 DROTRONLPOptimizer](#32-drotronlpoptimizer)
+      - [设计原理](#设计原理-6)
+      - [TransferType 枚举](#transfertype-枚举)
       - [核心方法](#核心方法-9)
-    - [3.3 InterOrbitTransfer](#33-interorbittransfer)
-      - [转移类型](#转移类型)
-      - [庞加莱截面法](#庞加莱截面法)
-      - [核心方法](#核心方法-10)
+    - [3.3 transfer_base](#33-transfer_base)
+      - [TransferStrategy 枚举](#transferstrategy-枚举)
+    - [3.4 工具函数](#34-工具函数)
   - [4. Visualization Module (可视化模块)](#4-visualization-module-可视化模块)
     - [4.1 OrbitVisualizer \& ProjectionPlane](#41-orbitvisualizer--projectionplane)
       - [功能列表](#功能列表)
@@ -526,7 +527,149 @@ $$\nu = \frac{|\lambda_1| + |\lambda_2| + |\lambda_3| + |\lambda_4|}{4}$$
 
 ---
 
-## 3. Visualization Module (可视化模块)
+## 3. Transfer Module (转移模块)
+
+### 3.1 DROTransferSearch
+
+**文件**: `e2m2e/transfer/transfer_search.py`
+
+**类签名**:
+```python
+class DROTransferSearch:
+    """DRO到RO平面转移轨道的网格搜索"""
+```
+
+#### 设计原理
+
+`DROTransferSearch` 实现从远距离逆行轨道（DRO）到共振轨道（RO）的两脉冲转移的网格搜索阶段：
+
+1. 在出发 DRO 上采样多个出发点
+2. 对每个出发点，沿切向施加不同速度比 $\alpha$ 进行前向积分
+3. 检测轨迹是否与目标 RO 相交或距离局部最小
+4. 标记可行候选解
+
+#### 搜索参数（直接在实例上设置）
+
+|| 属性 | 类型 | 默认值 | 说明 |
+||------|------|--------|------|
+|| `alpha_min` | float | 0.5 | 切向速度比下界 |
+|| `alpha_max` | float | 2.5 | 切向速度比上界 |
+|| `n_alpha` | int | 101 | $\alpha$ 方向网格点数 |
+|| `n_departure` | int | 200 | 出发点采样数 |
+|| `max_transfer_time` | float | 200/TU | 最大转移时间（无量纲） |
+|| `intersection_threshold` | float | 0.001 | 相交判定阈值（DU） |
+|| `min_distance_threshold` | float | 100/DU | 最小距离阈值 |
+|| `collision_earth_radius` | float | 200/DU | 地球碰撞半径 |
+|| `collision_moon_radius` | float | 100/DU | 月球碰撞半径 |
+|| `integration_dt` | float | 1/(24·TU) | 积分步长 |
+
+#### 核心方法
+
+|| 方法 | 说明 |
+||------|------|
+|| `search(dro_orbit, ro_orbit, n_workers=None, parallel_backend="processes")` | 执行网格搜索 |
+
+#### 使用示例
+
+```python
+from e2m2e.transfer import DROTransferSearch
+
+transfer_search = DROTransferSearch(system=system, dynamics=dynamics)
+transfer_search.alpha_min = 0.5
+transfer_search.alpha_max = 2.5
+transfer_search.n_alpha = 101
+transfer_search.n_departure = 200
+
+results = transfer_search.search(dro_orbit, ro_orbit, n_workers=None)
+```
+
+---
+
+### 3.2 DROTRONLPOptimizer
+
+**文件**: `e2m2e/transfer/transfer_optimization.py`
+
+**类签名**:
+```python
+class DROTRONLPOptimizer:
+    """DRO到RO两脉冲转移的NLP优化器"""
+```
+
+#### 设计原理
+
+将两脉冲转移问题转化为非线性规划（NLP）问题：
+
+- **优化变量**: $y = \{\alpha, T, t_{ins}\}$
+- **目标函数**: $J(y) = \Delta v_1 + \Delta v_2$
+- **约束条件**: 位置连续、速度平行、撞星约束
+
+默认使用 SciPy `minimize(method="SLSQP")` 求解。
+
+#### TransferType 枚举
+
+|| 值 | 说明 |
+||------|------|
+|| `DIRECT` | 直接转移 |
+|| `LGA` | 月球借力转移 |
+|| `EXTERNAL` | 外部转移 |
+
+#### 核心方法
+
+|| 方法 | 说明 |
+||------|------|
+|| `optimize(initial_variables, ...)` | 执行NLP优化 |
+|| `optimize_with_copt(...)` | 使用COPT求解器（需安装coptpy） |
+
+#### 使用示例
+
+```python
+from e2m2e.transfer import DROTRONLPOptimizer, NLPOptimizationVariables
+
+optimizer = DROTRONLPOptimizer(system=system, dynamics=dynamics)
+optimizer.dro_orbit = dro_orbit
+optimizer.ro_orbit = ro_orbit
+
+initial_vars = NLPOptimizationVariables(alpha=1.0, transfer_time=5.0, t_ins=3.0)
+result = optimizer.optimize(initial_vars)
+```
+
+---
+
+### 3.3 transfer_base
+
+**文件**: `e2m2e/transfer/transfer_base.py`
+
+**类签名**:
+```python
+class BaseTransfer:
+    """转移轨道基类"""
+```
+
+#### TransferStrategy 枚举
+
+|| 值 | 说明 |
+||------|------|
+|| `GRID_SEARCH` | 网格搜索 |
+|| `OPTIMIZATION` | NLP优化 |
+|| `MULTI_SHOOTING` | 多段射击法 |
+
+---
+
+### 3.4 工具函数
+
+```python
+from e2m2e.transfer import load_orbit_from_json, save_search_results
+
+# 从JSON加载轨道
+orbit = load_orbit_from_json("path/to/orbit.json")
+
+# 保存搜索结果
+save_search_results(results, "path/to/results.json")
+```
+
+---
+
+## 4. Visualization Module (可视化模块)
 
 ### 3.1 OrbitVisualizer & ProjectionPlane
 

@@ -69,6 +69,15 @@ docs/
 | `plot_transfer_2d/3d` | [visualization/plotting.md](visualization/plotting.md) | 转移轨迹绘图 |
 | `plot_system_geometry` | [visualization/plotting.md](visualization/plotting.md) | 系统几何绘图 |
 
+### 转移模块 (transfer)
+
+| 类/函数 | 文件 | 说明 |
+|---------|------|------|
+| `DROTransferSearch` | [reference/api-reference.md](reference/api-reference.md#31-drotransfersearch) | DRO到RO转移网格搜索 |
+| `DROTRONLPOptimizer` | [reference/api-reference.md](reference/api-reference.md#32-drotronlpoptimizer) | 两脉冲转移NLP优化 |
+| `load_orbit_from_json` | [reference/api-reference.md](reference/api-reference.md#34-工具函数) | 从JSON加载轨道数据 |
+| `save_search_results` | [reference/api-reference.md](reference/api-reference.md#34-工具函数) | 保存搜索结果 |
+
 ### 技术参考 (reference)
 
 | 文档 | 说明 |
