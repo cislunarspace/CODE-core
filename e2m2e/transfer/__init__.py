@@ -1,14 +1,14 @@
 """
 e2m2e转移轨道设计模块
 
-提供DRO到RO平面转移轨道的搜索和优化工具。
+提供轨道转移轨道的搜索和优化工具。
 
 使用方式:
-    from e2m2e.transfer import DROTransferSearch
+    from e2m2e.transfer import TransferSearch
 
-    transfer = DROTransferSearch(system, dynamics)
-    transfer.set_departure_orbit(dro_orbit)
-    transfer.set_arrival_orbit(ro_orbit)
+    transfer = TransferSearch(system, dynamics)
+    transfer.set_departure_orbit(departure_orbit)
+    transfer.set_arrival_orbit(arrival_orbit)
     transfer.alpha_min = 0.5
     transfer.alpha_max = 2.5
     # ... 设置其他参数
@@ -20,6 +20,7 @@ from . import transfer_search
 from . import transfer_optimization
 
 from .transfer_search import (
+    TransferSearch,
     DROTransferSearch,
     DROROTransferSearch,
     load_orbit_from_json,
@@ -45,6 +46,7 @@ _HAVE_COPT = transfer_optimization.coptpy is not None
 
 __all__ = [
     # 转移设计类
+    "TransferSearch",
     "DROTransferSearch",
     "DROROTransferSearch",
     # NLP优化类

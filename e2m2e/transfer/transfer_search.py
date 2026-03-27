@@ -1,12 +1,12 @@
 """
-平面DRO到RO转移轨道搜索模块
+轨道转移搜索模块
 
 实现论文Cui et al. (2025)中的"搜索-优化"两步法的搜索阶段。
 专门用于平面转移轨道设计，搜索变量: 出发点位置、α(切向速度比)
 
 使用方式:
-    transfer = DROTransferSearch(system, dynamics)
-    transfer.set_departure_orbit(dro_orbit).set_arrival_orbit(ro_orbit)
+    transfer = TransferSearch(system, dynamics)
+    transfer.set_departure_orbit(departure_orbit).set_arrival_orbit(arrival_orbit)
     transfer.alpha_min = 0.5
     transfer.alpha_max = 2.5
     transfer.n_alpha = 101
@@ -70,8 +70,8 @@ from .transfer_optimization import (
 )
 
 
-class DROTransferSearch(BaseTransfer):
-    """DRO到RO平面转移轨道搜索算法
+class TransferSearch(BaseTransfer):
+    """通用轨道转移搜索算法
 
     实现论文Section III.A的搜索阶段算法:
     1. 从出发点轨道等时间间隔采样
@@ -80,9 +80,9 @@ class DROTransferSearch(BaseTransfer):
     4. 筛选与目标轨道相交或距离局部最小的候选解
 
     使用方式:
-        transfer = DROTransferSearch(system, dynamics)
-        transfer.set_departure_orbit(dro_orbit)
-        transfer.set_arrival_orbit(ro_orbit)
+        transfer = TransferSearch(system, dynamics)
+        transfer.set_departure_orbit(departure_orbit)
+        transfer.set_arrival_orbit(arrival_orbit)
         transfer.configure_search(alpha_min=0.5, alpha_max=2.5, n_alpha=101)
         results = transfer.search()
     """
@@ -91,7 +91,7 @@ class DROTransferSearch(BaseTransfer):
         self,
         system: CR3BP_System,
         dynamics: CR3BP_Dynamics,
-        name: str = "DROTransferSearch",
+        name: str = "TransferSearch",
     ):
         super().__init__(system, dynamics)
         self.name = name
@@ -163,17 +163,17 @@ class DROTransferSearch(BaseTransfer):
         # 推荐值: 1e-6
         self.velocity_angle_tolerance: float | None = None
 
-    def set_verbose(self, verbose: bool) -> "DROTransferSearch":
+    def set_verbose(self, verbose: bool) -> "TransferSearch":
         """设置是否输出详细信息"""
         self._verbose = verbose
         return self
 
-    def set_n_workers(self, n_workers: int) -> "DROTransferSearch":
+    def set_n_workers(self, n_workers: int) -> "TransferSearch":
         """设置并行worker数量"""
         self._n_workers = n_workers
         return self
 
-    def set_parallel_backend(self, backend: str) -> "DROTransferSearch":
+    def set_parallel_backend(self, backend: str) -> "TransferSearch":
         """设置并行后端：``processes``（默认，多进程）或 ``threads``（多线程）。"""
         b = backend.strip().lower()
         if b not in ("processes", "threads"):
@@ -181,7 +181,7 @@ class DROTransferSearch(BaseTransfer):
         self._parallel_backend = b
         return self
 
-    def configure_search(self, **kwargs) -> "DROTransferSearch":
+    def configure_search(self, **kwargs) -> "TransferSearch":
         """配置搜索参数（向后兼容，推荐直接设置实例属性）"""
         for key, value in kwargs.items():
             if hasattr(self, key):
@@ -226,7 +226,7 @@ class DROTransferSearch(BaseTransfer):
 
         if verbose:
             print(f"\n{'=' * 60}")
-            print(f"DRO-RO转移轨道网格搜索")
+            print(f"转移轨道网格搜索")
             print(f"{'=' * 60}")
             print(f"出发点: {self._departure_orbit}")
             print(f"目标: {self._arrival_orbit}")
@@ -1076,7 +1076,8 @@ class DROTransferSearch(BaseTransfer):
 
 
 # 向后兼容别名
-DROROTransferSearch = DROTransferSearch
+DROTransferSearch = TransferSearch
+DROROTransferSearch = TransferSearch
 
 
 def _process_departure_worker(
@@ -1117,7 +1118,7 @@ def _process_departure_worker(
     dynamics.atol = atol
     dynamics.max_step = max_step
 
-    searcher = DROROTransferSearch(system=system, dynamics=dynamics)
+    searcher = TransferSearch(system=system, dynamics=dynamics)
 
     searcher.configure_search(
         alpha_min=alpha_min,
