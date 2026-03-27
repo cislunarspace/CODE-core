@@ -189,43 +189,6 @@ class DROTRONLPOptimizer:
         # 缓存
         self._last_trajectory: Optional[Tuple[np.ndarray, np.ndarray]] = None
 
-        # 迭代进度追踪（SLSQP callback）
-        self._iteration_count: int = 0
-        self._current_objective: float = float("inf")
-        self._iteration_history: list = []  # [(iter, obj, pos_con, vel_con), ...]
-        self._callback_fn: callable = None  # 可选的外部回调函数
-
-    # ------------------------------------------------------------------
-    # 迭代追踪工具
-    # ------------------------------------------------------------------
-    def reset_iteration_tracking(self) -> None:
-        """重置迭代计数器，供每次 optimize() 调用前使用。"""
-        self._iteration_count = 0
-        self._current_objective = float("inf")
-        self._iteration_history.clear()
-
-    def set_progress_callback(self, fn: callable) -> None:
-        """设置外部回调函数，每次 SLSQP 迭代时被调用。
-
-        回调签名: fn(iter_count, current_obj, alpha, transfer_time, t_ins)
-        """
-        self._callback_fn = fn
-
-    def _slsqp_callback(self, xk: np.ndarray) -> bool:
-        """SLSQP 内部迭代回调，记录迭代数与当前目标值。"""
-        self._iteration_count += 1
-        obj = self.objective_function(xk)
-        self._current_objective = obj
-        alpha, T, tins = float(xk[0]), float(xk[1]), float(xk[2])
-        pos_c = self.constraint_position(xk)
-        vel_c = self._compute_cos_angle(xk)
-        self._iteration_history.append(
-            (self._iteration_count, obj, pos_c, vel_c)
-        )
-        if self._callback_fn is not None:
-            self._callback_fn(self._iteration_count, obj, alpha, T, tins)
-        return False  # 返回 False = 继续优化；SLSQP 不使用此返回值
-
     def compute_departure_velocity(
         self, state: np.ndarray, alpha: float, beta: float = 0.0
     ) -> np.ndarray:
@@ -546,9 +509,6 @@ class DROTRONLPOptimizer:
             T0 = initial_guess.transfer_time
             t_ins0 = initial_guess.t_ins
 
-        # 重置迭代追踪
-        self.reset_iteration_tracking()
-
         y0 = np.array([alpha0, T0, t_ins0])
 
         if verbose:
@@ -588,8 +548,7 @@ class DROTRONLPOptimizer:
                 method="SLSQP",
                 bounds=bounds,
                 constraints=constraints,
-                options={"ftol": 1e-10, "maxiter": 1000, "disp": False},
-                callback=self._slsqp_callback,
+                options={"ftol": 1e-10, "maxiter": 1000, "disp": verbose},
             )
 
             success = result.success
