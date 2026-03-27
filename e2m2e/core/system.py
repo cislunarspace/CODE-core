@@ -49,7 +49,7 @@ class CR3BP_System:
     """
 
     # 天文常量
-    EARTH_MOON_DISTANCE_KM = 384400.0
+    EARTH_MOON_DISTANCE_KM = 384400.0 # //TODO 这个值不准确，需要需要在e2m2e中专门定义一个PARAMETER类来管理。
     AU = 149597870.7
 
     # 常见天体系统的参数
