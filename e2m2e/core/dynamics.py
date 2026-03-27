@@ -12,10 +12,11 @@ from typing import Dict, List, Tuple, Optional, Any, Callable, TYPE_CHECKING
 
 import numpy.typing as npt
 
-from .system import System, CR3BP_System
+from .system import CR3BP_System
 
 if TYPE_CHECKING:
     from .orbit import Orbit
+    from .system import CR3BP_System as SystemType
 
 
 class Dynamics:
@@ -45,11 +46,11 @@ class Dynamics:
     DEFAULT_TOLERANCE = 1e-12
     DEFAULT_MAX_STEP = 0.01
 
-    def __init__(self, system: System) -> None:
+    def __init__(self, system: CR3BP_System) -> None:
         """初始化动力学
 
         参数：
-        - system: System对象
+        - system: CR3BP_System对象
         """
         self.system = system
 

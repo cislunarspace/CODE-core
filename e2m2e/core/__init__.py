@@ -9,13 +9,12 @@ from . import dynamics
 from . import orbit
 from . import coordinate
 
-from .system import System, CR3BP_System, LibrationPoint
+from .system import CR3BP_System, LibrationPoint
 from .dynamics import Dynamics, CR3BP_Dynamics, propagate_state_at_orbit_time
 from .orbit import Orbit, OrbitFamily
 from .coordinate import CoordinateTransformation
 
 __all__ = [
-    "System",
     "CR3BP_System",
     "LibrationPoint",
     "Dynamics",

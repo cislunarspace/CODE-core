@@ -11,11 +11,11 @@ from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from ..core.system import System, CR3BP_System
+    from ..core.system import CR3BP_System
     from ..core.dynamics import CR3BP_Dynamics
     from ..core.orbit import Orbit
 
-from ..core.system import System
+from ..core.system import CR3BP_System
 
 
 class TransferStrategy(Enum):
@@ -25,8 +25,8 @@ class TransferStrategy(Enum):
     DIRECT = "direct"
 
 
-# 可行解默认距离阈值：100 km，换算为无量纲 DU（见 ``System.EARTH_MOON_DISTANCE_KM``）
-DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / System.EARTH_MOON_DISTANCE_KM
+# 可行解默认距离阈值：100 km，换算为无量纲 DU（见 ``CR3BP_System.EARTH_MOON_DISTANCE_KM``）
+DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / CR3BP_System.EARTH_MOON_DISTANCE_KM
 
 
 class TransferType(Enum):

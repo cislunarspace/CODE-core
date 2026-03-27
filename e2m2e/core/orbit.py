@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy.typing as npt
 
-from .system import System, CR3BP_System
+from .system import CR3BP_System
 from .dynamics import CR3BP_Dynamics
 
 

@@ -1,7 +1,7 @@
 """
 三体问题系统模块
 
-包含通用 System 基类和 CR3BP_System 类，用于定义和操作圆型限制性三体问题系统。
+包含 CR3BP_System 类，用于定义和操作圆型限制性三体问题系统。
 """
 
 from __future__ import annotations
@@ -24,133 +24,33 @@ class LibrationPoint(Enum):
     L5 = 5
 
 
-class System:
-    """通用天体系统基类 
-    //TODO 这个类设计的其实有问题，我希望System只负责基础的参数定义，后续我还需要基于这个类去定义CRTBP模型的系统、高精度星历模型的系统、椭圆限制性三体问题模型的系统等。现在System类还无法适应后续的修改。
-
-    属性：
-    - primary_body: 主天体名称
-    - secondary_body: 次天体名称
-    - characteristic_length: 特征长度
-    - characteristic_time: 特征时间
-    - characteristic_velocity: 特征速度
-    - is_initialized: 是否完全初始化
-
-    类属性（物理常数）：
-    - G: 引力常数 (km^3/kg/s^2)
-    - AU: 天文单位 (km)
-    - DAY: 一天的秒数
-    - YEAR: 一年的秒数
-    """
-
-    G = 6.67430e-20
-    AU = 149597870.7
-    DAY = 86400
-    YEAR = 365.25 * DAY
-    # 地月平均距离 (km)；CR3BP 中 1 DU 通常取此值（与 KNOWN_SYSTEMS earth_moon 一致）
-    EARTH_MOON_DISTANCE_KM = 384_400.0
-
-    def __init__(self, primary: str, secondary: str) -> None:
-        """初始化系统参数
-
-        参数：
-        - primary: 主天体名称
-        - secondary: 次天体名称
-        """
-        self.primary_body: str = primary
-        self.secondary_body: str = secondary
-
-        self.characteristic_length: Optional[float] = None
-        self.characteristic_time: Optional[float] = None
-        self.characteristic_velocity: Optional[float] = None
-
-        self.is_initialized: bool = False
-
-    def set_characteristic_scales(self, distance: float, period: float) -> None:
-        """设置特征尺度
-
-        参数：
-        - distance: 两天体之间的距离 (km)
-        - period: 轨道周期 (s)
-        """
-        self.characteristic_length = distance
-        self.characteristic_time = period / (2 * np.pi)
-        self.characteristic_velocity = distance / self.characteristic_time
-        self.is_initialized = True
-
-    def dimensionless_to_physical(self, state: npt.ArrayLike) -> npt.NDArray[np.floating]:
-        """无量纲化转物理单位（基类方法，子类需重写）
-
-        参数：
-        - state: 无量纲状态向量 [x, y, z, vx, vy, vz]
-
-        返回：
-        - 物理状态向量
-        """
-        if not self.is_initialized:
-            raise ValueError("系统未初始化，请先设置特征尺度")
-        raise NotImplementedError("子类必须实现此方法")
-
-    def physical_to_dimensionless(self, state: npt.ArrayLike) -> npt.NDArray[np.floating]:
-        """物理单位转无量纲化（基类方法，子类需重写）
-
-        参数：
-        - state: 物理状态向量 [x, y, z, vx, vy, vz] (km, km/s)
-
-        返回：
-        - 无量纲状态向量
-        """
-        if not self.is_initialized:
-            raise ValueError("系统未初始化，请先设置特征尺度")
-        raise NotImplementedError("子类必须实现此方法")
-
-    def info(self, mode: str = "default") -> None:
-        """输出系统信息
-
-        参数：
-        - mode: 信息模式，"default" 为基础信息，"all" 为详细信息。
-        """
-        print("=" * 60)
-        print(f"系统信息 ({self.__class__.__name__})")
-        print("=" * 60)
-        print(f"主天体：{self.primary_body}")
-        print(f"次天体：{self.secondary_body}")
-
-        if mode == "all" and self.is_initialized:
-            print(f"特征长度：{self.characteristic_length:.2f} km")
-            print(f"特征时间：{self.characteristic_time:.2f} s")
-            print(f"特征速度：{self.characteristic_velocity:.2f} km/s")
-
-        print("=" * 60)
-
-    def __str__(self):
-        return f"{self.__class__.__name__}(primary='{self.primary_body}', secondary='{self.secondary_body}')"
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(primary='{self.primary_body}', secondary='{self.secondary_body}', initialized={self.is_initialized})"
-
-
-class CR3BP_System(System):
+class CR3BP_System:
     """圆型限制性三体问题系统参数
 
     属性：
     - mu: 质量参数
-    - primary_body: 主天体名称 (继承自System)
-    - secondary_body: 次天体名称 (继承自System)
+    - primary_body: 主天体名称
+    - secondary_body: 次天体名称
     - L_points: 平动点位置列表
-    - characteristic_length: 特征长度 (继承自System)
-    - characteristic_time: 特征时间 (继承自System)
-    - characteristic_velocity: 特征速度 (继承自System)
+    - characteristic_length: 特征长度
+    - characteristic_time: 特征时间
+    - characteristic_velocity: 特征速度
 
     方法：
     - __init__(mu, primary, secondary): 初始化系统
+    - set_characteristic_scales(distance, period): 设置特征尺度
     - compute_libration_points(): 计算五个平动点
+    - get_libration_point(point): 获取指定平动点
     - get_jacobi_constant(state): 计算Jacobi常数
     - dimensionless_to_physical(state): 无量纲化转物理单位
     - physical_to_dimensionless(state): 物理单位转无量纲化
     - compute_stability_index(L_point): 计算平动点稳定性指标
-    - info(): 输出系统信息
+    - info(mode): 输出系统信息
     """
+
+    # 天文常量
+    EARTH_MOON_DISTANCE_KM = 384400.0
+    AU = 149597870.7
 
     # 常见天体系统的参数
     KNOWN_SYSTEMS = {
@@ -158,21 +58,21 @@ class CR3BP_System(System):
             "primary": "Earth",
             "secondary": "Moon",
             "mu": 0.01215,
-            "distance": System.EARTH_MOON_DISTANCE_KM,
+            "distance": EARTH_MOON_DISTANCE_KM,
             "period": 27.32 * 86400,
         },
         "sun_earth": {
             "primary": "Sun",
             "secondary": "Earth",
             "mu": 3.0039e-6,
-            "distance": System.AU,
+            "distance": AU,
             "period": 365.25 * 86400,
         },
         "sun_jupiter": {
             "primary": "Sun",
             "secondary": "Jupiter",
             "mu": 0.0009535,
-            "distance": 5.2 * System.AU,
+            "distance": 5.2 * AU,
             "period": 11.86 * 365.25 * 86400,
         },
     }
@@ -205,8 +105,13 @@ class CR3BP_System(System):
         - primary: 主天体名称
         - secondary: 次天体名称
         """
-        super().__init__(primary, secondary)
+        self.primary_body: str = primary
+        self.secondary_body: str = secondary
         self.mu: float = mu
+
+        self.characteristic_length: Optional[float] = None
+        self.characteristic_time: Optional[float] = None
+        self.characteristic_velocity: Optional[float] = None
 
         self.L_points: Optional[Dict[LibrationPoint, npt.NDArray[np.floating]]] = None
         self.L1: Optional[npt.NDArray[np.floating]] = None
