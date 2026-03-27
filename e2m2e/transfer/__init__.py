@@ -6,13 +6,20 @@ e2m2e转移轨道设计模块
 使用方式:
     from e2m2e.transfer import TransferSearch
 
-    transfer = TransferSearch(system, dynamics)
-    transfer.set_departure_orbit(departure_orbit)
-    transfer.set_arrival_orbit(arrival_orbit)
-    transfer.alpha_min = 0.5
-    transfer.alpha_max = 2.5
-    # ... 设置其他参数
-    results = transfer.search()
+    results = TransferSearch(system, dynamics).search(
+        alpha_min=0.5,
+        alpha_max=2.5,
+        n_alpha=101,
+        n_departure=200,
+        max_transfer_time=15.0,
+        intersection_threshold=0.001,
+        min_distance_threshold=0.001,
+        collision_earth_radius=0.0005,
+        collision_moon_radius=0.0003,
+        integration_dt=0.01,
+        departure_orbit=departure_orbit,
+        arrival_orbit=arrival_orbit,
+    )
 """
 
 from . import transfer_base

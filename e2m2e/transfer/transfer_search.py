@@ -89,11 +89,10 @@ class TransferSearch(BaseTransfer):
 
     def __init__(
         self,
-        system: CR3BP_System,
         dynamics: CR3BP_Dynamics,
         name: str = "TransferSearch",
     ):
-        super().__init__(system, dynamics)
+        super().__init__(dynamics)
         self.name = name
         self._verbose = True
         self._n_workers = None
@@ -205,38 +204,83 @@ class TransferSearch(BaseTransfer):
             return True
         return False
 
-    def search(self, **kwargs) -> List[Dict[str, Any]]:
+    def search(
+        self,
+        *,
+        alpha_min: float,
+        alpha_max: float,
+        n_alpha: int,
+        n_departure: int,
+        max_transfer_time: float,
+        intersection_threshold: float,
+        min_distance_threshold: float,
+        collision_earth_radius: float,
+        collision_moon_radius: float,
+        integration_dt: float,
+        departure_orbit: Optional[Orbit] = None,
+        arrival_orbit: Optional[Orbit] = None,
+        verbose: bool = True,
+        n_workers: Optional[int] = None,
+        parallel_backend: str = "processes",
+    ) -> List[Dict[str, Any]]:
         """执行网格搜索
 
         参数:
-            **kwargs: 搜索参数，可选:
-                - verbose: 是否输出详细信息（含进度）
-                - n_workers: 并行 worker 数量
-                - parallel_backend: ``processes``（默认）或 ``threads``
+            alpha_min: α 下界
+            alpha_max: α 上界
+            n_alpha: α 方向网格点数
+            n_departure: 出发点采样数量
+            max_transfer_time: 最大转移时间 (CR3BP 无量纲时间)
+            intersection_threshold: 相交判定距离阈值
+            min_distance_threshold: 候选解距离阈值
+            collision_earth_radius: 地球碰撞检测半径
+            collision_moon_radius: 月球碰撞检测半径
+            integration_dt: 积分时间步长
+            departure_orbit: 出发轨道（可选，未提供则使用已设置的轨道）
+            arrival_orbit: 目标轨道（可选，未提供则使用已设置的轨道）
+            verbose: 是否输出详细信息（含进度）
+            n_workers: 并行 worker 数量
+            parallel_backend: ``processes``（默认）或 ``threads``
 
         返回:
             搜索结果列表
         """
-        if self._departure_orbit is None or self._arrival_orbit is None:
-            raise ValueError("必须先设置departure_orbit和arrival_orbit")
+        # 确定出发轨道和目标轨道
+        dep_orbit = departure_orbit if departure_orbit is not None else self._departure_orbit
+        arr_orbit = arrival_orbit if arrival_orbit is not None else self._arrival_orbit
 
-        verbose = kwargs.get("verbose", self._verbose)
-        n_workers = kwargs.get("n_workers", self._n_workers)
-        parallel_backend = kwargs.get("parallel_backend", self._parallel_backend)
+        if dep_orbit is None or arr_orbit is None:
+            raise ValueError("必须提供 departure_orbit 和 arrival_orbit")
+
+        # 设置搜索参数
+        self.alpha_min = alpha_min
+        self.alpha_max = alpha_max
+        self.n_alpha = n_alpha
+        self.n_departure = n_departure
+        self.max_transfer_time = max_transfer_time
+        self.intersection_threshold = intersection_threshold
+        self.min_distance_threshold = min_distance_threshold
+        self.collision_earth_radius = collision_earth_radius
+        self.collision_moon_radius = collision_moon_radius
+        self.integration_dt = integration_dt
+
+        # 设置轨道
+        self._departure_orbit = dep_orbit
+        self._arrival_orbit = arr_orbit
 
         if verbose:
             print(f"\n{'=' * 60}")
             print(f"转移轨道网格搜索")
             print(f"{'=' * 60}")
-            print(f"出发点: {self._departure_orbit}")
-            print(f"目标: {self._arrival_orbit}")
-            print(f"α范围: [{self.alpha_min}, {self.alpha_max}], n={self.n_alpha}")
-            print(f"出发点数量: {self.n_departure}")
+            print(f"出发点: {dep_orbit}")
+            print(f"目标: {arr_orbit}")
+            print(f"α范围: [{alpha_min}, {alpha_max}], n={n_alpha}")
+            print(f"出发点数量: {n_departure}")
             print(f"{'=' * 60}\n")
 
         results = self._grid_search(
-            self._departure_orbit,
-            self._arrival_orbit,
+            dep_orbit,
+            arr_orbit,
             verbose,
             n_workers,
             parallel_backend,
