@@ -1346,6 +1346,87 @@ class OrbitVisualizer:
 
         return fig_xy, ax_zoom, fig_3d, ax_3d_zoom
 
+    def plot_solution_plane(
+        self,
+        results,
+        color_by: Optional[str] = None,
+        ax: Optional[Any] = None,
+        show_colorbar: bool = True,
+    ) -> Any:
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 6), dpi=self.dpi)
+
+        parsed = self._parse_solution_results(results)
+        valid = [r for r in parsed if r["success"]]
+        if not valid:
+            ax.text(
+                0.5,
+                0.5,
+                "No valid data",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=14,
+                color="gray",
+            )
+            ax.set_xlabel("Transfer Time (T)")
+            ax.set_ylabel(r"Total $\Delta v$")
+            return ax
+
+        times = np.array([r["transfer_time"] for r in valid])
+        dvs = np.array([r["delta_v1"] + r["delta_v2"] for r in valid])
+
+        type_colors = {
+            "direct": "#1f77b4",
+            "lga": "#ff7f0e",
+            "external": "#2ca02c",
+        }
+
+        if color_by == "transfer_type":
+            for ttype, color in type_colors.items():
+                mask = np.array([str(r.get("transfer_type", "")).lower() == ttype for r in valid])
+                if mask.any():
+                    label = ttype.upper()
+                    ax.scatter(
+                        times[mask],
+                        dvs[mask],
+                        c=color,
+                        s=10,
+                        alpha=0.7,
+                        label=label,
+                    )
+            ax.legend()
+        else:
+            ax.scatter(times, dvs, s=10, alpha=0.7)
+
+        ax.set_xlabel("Transfer Time (T)")
+        ax.set_ylabel(r"Total $\Delta v$")
+        ax.grid(True, alpha=0.3, linestyle="--")
+
+        return ax
+
+    def _parse_solution_results(self, results) -> list:
+        if not results:
+            return []
+        parsed = []
+        for r in results:
+            if isinstance(r, dict):
+                parsed.append(r)
+            else:
+                parsed.append(
+                    {
+                        "transfer_time": r.transfer_time,
+                        "delta_v1": r.delta_v1,
+                        "delta_v2": r.delta_v2,
+                        "objective_value": r.objective_value,
+                        "success": r.success,
+                        "transfer_type": r.transfer_type.value
+                        if hasattr(r.transfer_type, "value")
+                        else str(r.transfer_type),
+                    }
+                )
+        return parsed
+
     def show(self) -> None:
         """显示图形"""
         plt.show()
