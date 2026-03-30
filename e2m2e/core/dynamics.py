@@ -165,6 +165,7 @@ class Dynamics:
         Raises:
             ValueError: 无效的平面参数
         """
+        state = np.asarray(state, dtype=float)
         if plane == "x":
             return abs(state[0] - value) < self.cross_section_tolerance
         elif plane == "y":
@@ -466,6 +467,7 @@ class CR3BP_Dynamics(Dynamics):
         Raises:
             ValueError: 无效的平面参数
         """
+        state = np.asarray(state, dtype=float)
         if plane == "x":
             return abs(state[0] - value) < self.cross_section_tolerance
         elif plane == "y":

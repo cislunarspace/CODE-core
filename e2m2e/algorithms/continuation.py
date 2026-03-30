@@ -210,7 +210,7 @@ class Continuation:
         - step: 初始步长
         """
         self.correction = corrector
-        self.dynamics = corrector.dynamics if corrector.dynamics is not None else None
+        self.dynamics = corrector.dynamics
 
         # 延拓参数
         if corrector.fixed_parameters:
@@ -245,6 +245,8 @@ class Continuation:
         }
 
         # 步长控制
+        self.step_size_adaptation = True
+        self.step_growth_factor = 1.2
         self.step_reduction_factor = 0.5  # 步长缩减因子
         self.step_increase_factor = 1.2  # 步长增大因子
         self.min_step_size = 1e-5  # 最小步长
@@ -291,7 +293,7 @@ class Continuation:
                 )
             step_size = self.min_step_size
 
-        orbit_family = OrbitFamily(seed_orbit)
+        orbit_family = OrbitFamily([seed_orbit])
 
         param_index = self._infer_param_index()
 
@@ -504,7 +506,7 @@ class Continuation:
         Returns:
             OrbitFamily: 仅含种子 + 本支新轨道（不重复添加种子）
         """
-        mu = self.dynamics.system.mu
+        mu = self.correction.dynamics.system.mu
 
         if direction not in ("positive", "negative"):
             raise ValueError(
@@ -523,7 +525,7 @@ class Continuation:
             print(f"  延拓方向 = {direction}")
             print(f"  dc_scheme = {dc_scheme}")
 
-        orbit_family = OrbitFamily(seed_orbit)
+        orbit_family = OrbitFamily([seed_orbit])
         self.correction.tolerance = TolDiffCorr
 
         SV0i = seed_orbit.states[0].copy()
@@ -650,7 +652,7 @@ class Continuation:
             guess_orbit = Orbit(
                 states=SV0_corr.reshape(1, -1),
                 times=np.array([0.0]),
-                system=self.dynamics.system,
+                system=self.correction.dynamics.system,
             )
             guess_orbit.period = tf_corr
 
@@ -704,7 +706,7 @@ class Continuation:
             "energy": 6,
             "amplitude": 2,
         }
-        return param_map.get(self.continuation_parameter, 0)
+        return param_map.get(self.continuation_parameter or "", 0)
 
     def _build_family_result(self):
         """构建轨道族结果字典"""
@@ -749,7 +751,7 @@ class Continuation:
             print(f"\n生成Halo轨道: L{libration_point} {'北' if halo_class == 0 else '南'} Halo")
             print(f"  Z振幅: {amplitude_z}")
 
-        mu = self.dynamics.system.mu
+        mu = self.correction.dynamics.system.mu
 
         guess = compute_halo_initial_guess(
             mu=mu,
@@ -788,7 +790,7 @@ class Continuation:
         initial_orbit = Orbit(
             states=initial_state.reshape(1, -1),
             times=np.array([0.0]),
-            system=self.dynamics.system,
+            system=self.correction.dynamics.system,
         )
         initial_orbit.period = 2.0 * guess["T_half"]
 
@@ -939,7 +941,7 @@ class Continuation:
             print(f"  dc_scheme = {dc_scheme}, DirectionalIncrement = {directional_increment}")
             print(f"{'=' * 60}")
 
-        orbit_family = OrbitFamily(seed_orbit)
+        orbit_family = OrbitFamily([seed_orbit])
 
         def _tag_halo_family(orb: Orbit) -> None:
             orb.family_type = "halo"

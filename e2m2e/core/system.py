@@ -236,7 +236,7 @@ class CR3BP_System:
         Returns:
             Jacobi常数
         """
-        x, y, z, vx, vy, vz = state
+        x, y, z, vx, vy, vz = np.asarray(state, dtype=float)
 
         r1 = np.sqrt((x + self.mu) ** 2 + y**2 + z**2)
         r2 = np.sqrt((x - 1 + self.mu) ** 2 + y**2 + z**2)
@@ -264,6 +264,7 @@ class CR3BP_System:
         if not self.is_initialized:
             raise ValueError("系统未初始化，请先设置特征尺度")
 
+        state = np.asarray(state, dtype=float)
         position = state[:3] * self.characteristic_length
         velocity = state[3:] * self.characteristic_velocity
 
@@ -284,6 +285,7 @@ class CR3BP_System:
         if not self.is_initialized:
             raise ValueError("系统未初始化，请先设置特征尺度")
 
+        state = np.asarray(state, dtype=float)
         position = state[:3] / self.characteristic_length
         velocity = state[3:] / self.characteristic_velocity
 

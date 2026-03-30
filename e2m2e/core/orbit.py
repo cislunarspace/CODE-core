@@ -86,7 +86,7 @@ class Orbit:
 
         self.jacobi_constants = None
         self.stability_indices = None
-        self.family_type = None
+        self.family_type: Optional[str] = None
         self.parameters = {}
 
         self.period: float | None = None

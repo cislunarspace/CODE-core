@@ -113,6 +113,7 @@ class CoordinateTransformation:
         Returns:
             惯性系状态向量 [x, y, z, vx, vy, vz]
         """
+        state = np.asarray(state, dtype=float)
         position = state[:3]
         velocity = state[3:]
 
@@ -138,6 +139,7 @@ class CoordinateTransformation:
         Returns:
             旋转系状态向量 [x, y, z, vx, vy, vz]
         """
+        state = np.asarray(state, dtype=float)
         position = state[:3]
         velocity = state[3:]
 
@@ -168,10 +170,10 @@ class CoordinateTransformation:
         if self.mu is None:
             raise ValueError("系统未初始化，无法进行坐标变换")
 
+        state = np.asarray(state, dtype=float)
         position = state[:3]
         velocity = state[3:]
 
-        # 主天体在质心系中的位置（在旋转系中位于(-mu, 0, 0)）
         primary_position = np.array([-self.mu, 0, 0])
 
         position_primary = position - primary_position
@@ -194,10 +196,10 @@ class CoordinateTransformation:
         if self.mu is None:
             raise ValueError("系统未初始化，无法进行坐标变换")
 
+        state = np.asarray(state, dtype=float)
         position = state[:3]
         velocity = state[3:]
 
-        # 主天体在质心系中的位置（在旋转系中位于(-mu, 0, 0)）
         primary_position = np.array([-self.mu, 0, 0])
 
         position_barycentric = position + primary_position
@@ -220,10 +222,10 @@ class CoordinateTransformation:
         if self.mu is None:
             raise ValueError("系统未初始化，无法进行坐标变换")
 
+        state = np.asarray(state, dtype=float)
         position = state[:3]
         velocity = state[3:]
 
-        # 次天体在质心系中的位置（在旋转系中位于(1-mu, 0, 0)）
         secondary_position = np.array([1 - self.mu, 0, 0])
 
         position_secondary = position - secondary_position
@@ -246,10 +248,10 @@ class CoordinateTransformation:
         if self.mu is None:
             raise ValueError("系统未初始化，无法进行坐标变换")
 
+        state = np.asarray(state, dtype=float)
         position = state[:3]
         velocity = state[3:]
 
-        # 次天体在质心系中的位置（在旋转系中位于(1-mu, 0, 0)）
         secondary_position = np.array([1 - self.mu, 0, 0])
 
         position_barycentric = position + secondary_position
@@ -284,7 +286,7 @@ class CoordinateTransformation:
             to_frame = ReferenceFrame(to_frame)
 
         if from_frame == to_frame:
-            return state
+            return np.asarray(state, dtype=float)
 
         if from_frame == ReferenceFrame.ROTATING and to_frame == ReferenceFrame.INERTIAL:
             return self.rotating_to_inertial(state, time)
