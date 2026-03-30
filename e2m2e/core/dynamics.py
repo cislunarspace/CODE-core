@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class Dynamics:
     """通用天体系统动力学基类
 
-    属性：
+    Attributes:
         system: 关联的系统对象
         integrator: 数值积分器类型
         rtol: 相对积分容差
@@ -35,12 +35,6 @@ class Dynamics:
         jacobi_history: Jacobi常数历史记录
         jacobi_error: Jacobi常数误差
         initialized: 初始化完成标志
-
-    方法：
-        __init__(system): 初始化动力学对象
-        propagate(): 传播轨迹（模板方法）
-        compute_jacobi_constant(): 计算能量常数
-        check_cross_section(): 检查截面穿越
     """
 
     DEFAULT_TOLERANCE = 1e-12
@@ -49,8 +43,8 @@ class Dynamics:
     def __init__(self, system: CR3BP_System) -> None:
         """初始化动力学
 
-        参数：
-        - system: CR3BP_System对象
+        Args:
+            system: CR3BP_System对象
         """
         self.system = system
 
@@ -75,12 +69,15 @@ class Dynamics:
     ) -> npt.NDArray[np.floating]:
         """运动方程（子类需实现）
 
-        参数：
-        - t: 时间
-        - state: 状态向量
+        Args:
+            t: 时间
+            state: 状态向量
 
-        返回：
-        - 状态导数
+        Returns:
+            状态导数
+
+        Raises:
+            NotImplementedError: 子类未实现此方法
         """
         raise NotImplementedError("子类必须实现此方法")
 
@@ -94,15 +91,17 @@ class Dynamics:
     ) -> Dict[str, Any]:
         """传播轨迹
 
-        参数：
-        - initial_state: 初始状态向量
-        - t_span: 时间区间 [t0, tf]
-        - t_eval: 评估时间点数组（可选）
-        - with_stm: 是否计算状态转移矩阵
-        - with_jacobi: 是否沿轨迹逐点计算 Jacobi 常数并写入 ``jacobi`` / ``jacobi_error``（默认关闭以减轻粗积分负担）
+        Args:
+            initial_state: 初始状态向量
+            t_span: 时间区间 [t0, tf]
+            t_eval: 评估时间点数组（可选）
+            with_stm: 是否计算状态转移矩阵
+            with_jacobi: 是否沿轨迹逐点计算 Jacobi 常数并写入
+                ``jacobi`` / ``jacobi_error``（默认关闭以减轻粗积分负担）
 
-        返回：
-        - 轨迹结果对象；仅当 ``with_jacobi=True`` 时包含 ``jacobi`` 与 ``jacobi_error`` 键
+        Returns:
+            轨迹结果字典，包含 ``time`` 和 ``states`` 键；
+            仅当 ``with_jacobi=True`` 时额外包含 ``jacobi`` 与 ``jacobi_error`` 键
         """
         result = solve_ivp(
             self.equations_of_motion,
@@ -141,24 +140,30 @@ class Dynamics:
     def compute_jacobi_constant(self, state: npt.ArrayLike) -> float:
         """计算能量常数（子类需实现）
 
-        参数：
-        - state: 状态向量
+        Args:
+            state: 状态向量
 
-        返回：
-        - 能量常数
+        Returns:
+            能量常数
+
+        Raises:
+            NotImplementedError: 子类未实现此方法
         """
         raise NotImplementedError("子类必须实现此方法")
 
     def check_cross_section(self, state: npt.ArrayLike, plane: str, value: float) -> bool:
         """检查是否穿过指定截面
 
-        参数：
-        - state: 状态向量
-        - plane: 截面平面 ('x', 'y', 'z')
-        - value: 平面值
+        Args:
+            state: 状态向量
+            plane: 截面平面 ('x', 'y', 'z')
+            value: 平面值
 
-        返回：
-        - 布尔值
+        Returns:
+            是否穿过截面
+
+        Raises:
+            ValueError: 无效的平面参数
         """
         if plane == "x":
             return abs(state[0] - value) < self.cross_section_tolerance
@@ -179,46 +184,21 @@ class Dynamics:
 class CR3BP_Dynamics(Dynamics):
     """CR3BP动力学方程
 
-    本类封装了CR3BP的动力学模型，提供状态传播、状态转移矩阵计算、Jacobi常数计算等核心功能。
-    支持6维状态向量（位置+速度）和42维增广状态向量（状态+状态转移矩阵）的数值积分。
+    封装了CR3BP的动力学模型，提供状态传播、状态转移矩阵计算、
+    Jacobi常数计算等核心功能。支持6维状态向量（位置+速度）和
+    42维增广状态向量（状态+状态转移矩阵）的数值积分。
 
-    主要功能：
-        - 运动方程定义与数值积分
-        - 状态转移矩阵(STM)的计算与传播
-        - Jacobi常数的实时监控与守恒性检验
-        - 截面穿越检测（用于Poincaré映射和周期轨道搜索）
-
-    属性：
-        system (CR3BP_System): CR3BP系统对象，包含质量参数μ等系统常数
-        integrator (str): 数值积分器类型（默认'RK45'）
-        rtol (float): 相对积分容差
-        atol (float): 绝对积分容差
-        max_step (float): 最大积分步长
-        last_trajectory (array): 最近一次积分的轨迹 [t, y]
-        last_stm (array): 最近一次积分的状态转移矩阵
-        cross_section_tolerance (float): 截面检测容差
-        last_crossing (tuple): 上次穿过截面的点和时间
-        jacobi_history (list): Jacobi常数历史记录
-        jacobi_error (float): Jacobi常数误差（用于精度检验）
-        initialized (bool): 初始化完成标志
-
-    方法：
-        __init__(system): 初始化动力学对象
-        equations_of_motion(t, state): 6维状态向量的运动方程
-        equations_with_stm(t, augmented_state): 42维增广状态向量的运动方程
-        propagate(initial_state, t_span, t_eval=None, with_stm=False, with_jacobi=False): 传播轨迹
-        compute_state_transition_matrix(initial_state, t): 计算状态转移矩阵
-        compute_jacobi_constant(state): 实时计算Jacobi常数
-        check_cross_section(state, plane, value): 检查是否穿过指定截面
+    Attributes:
+        STM_DIMENSION: 增广状态向量维度（6状态 + 36个STM元素 = 42）
     """
 
     STM_DIMENSION = 42
 
     def __init__(self, system: CR3BP_System) -> None:
-        """初始化动力学
+        """初始化CR3BP动力学
 
-        参数：
-        - system: CR3BP_System对象
+        Args:
+            system: CR3BP_System对象，包含质量参数μ等系统常数
         """
         super().__init__(system)
 
@@ -227,23 +207,20 @@ class CR3BP_Dynamics(Dynamics):
     ) -> npt.NDArray[np.floating]:
         """6维状态向量的运动方程
 
-        参数：
-        - t: 时间
-        - state: 状态向量 [x, y, z, vx, vy, vz]
+        Args:
+            t: 时间
+            state: 状态向量 [x, y, z, vx, vy, vz]
 
-        返回：
-        - 状态导数 [vx, vy, vz, ax, ay, az]
+        Returns:
+            状态导数 [vx, vy, vz, ax, ay, az]
         """
         mu = self.system.mu
 
-        # 解包状态
         x, y, z, vx, vy, vz = state
 
-        # 计算到两个天体的距离
         r1 = np.sqrt((x + mu) ** 2 + y**2 + z**2)
         r2 = np.sqrt((x - 1 + mu) ** 2 + y**2 + z**2)
 
-        # 计算加速度
         ax = 2 * vy + x - (1 - mu) * (x + mu) / r1**3 - mu * (x - 1 + mu) / r2**3
         ay = -2 * vx + y - (1 - mu) * y / r1**3 - mu * y / r2**3
         az = -(1 - mu) * z / r1**3 - mu * z / r2**3
@@ -255,35 +232,31 @@ class CR3BP_Dynamics(Dynamics):
     ) -> npt.NDArray[np.floating]:
         """42维增广状态向量的运动方程（包含状态转移矩阵）
 
-        参数：
-        - t: 时间
-        - augmented_state: 增广状态向量 [6状态 + 36个STM元素]
+        同时积分状态向量和状态转移矩阵(STM)，满足 dΦ/dt = A(t)·Φ。
 
-        返回：
-        - 增广状态导数
+        Args:
+            t: 时间
+            augmented_state: 增广状态向量 [6状态 + 36个STM元素]
+
+        Returns:
+            增广状态导数
         """
         mu = self.system.mu
 
-        # 解包状态
         x, y, z, vx, vy, vz = augmented_state[:6]
 
-        # 计算到两个天体的距离
         r1 = np.sqrt((x + mu) ** 2 + y**2 + z**2)
         r2 = np.sqrt((x - 1 + mu) ** 2 + y**2 + z**2)
 
-        # 计算加速度
         ax = 2 * vy + x - (1 - mu) * (x + mu) / r1**3 - mu * (x - 1 + mu) / r2**3
         ay = -2 * vx + y - (1 - mu) * y / r1**3 - mu * y / r2**3
         az = -(1 - mu) * z / r1**3 - mu * z / r2**3
 
-        # 状态导数
         state_derivative = np.array([vx, vy, vz, ax, ay, az])
 
-        # 提取状态转移矩阵
         stm = augmented_state[6:].reshape((6, 6))
 
-        # 计算雅可比矩阵 A(t)
-        # 计算二阶导数
+        # 伪势能二阶偏导数
         U_xx = (
             1
             - (1 - mu) * (1 / r1**3 - 3 * (x + mu) ** 2 / r1**5)
@@ -295,7 +268,7 @@ class CR3BP_Dynamics(Dynamics):
         U_xz = 3 * (1 - mu) * (x + mu) * z / r1**5 + 3 * mu * (x - 1 + mu) * z / r2**5
         U_yz = 3 * (1 - mu) * y * z / r1**5 + 3 * mu * y * z / r2**5
 
-        # 构建雅可比矩阵
+        # 状态方程雅可比矩阵 A(t)
         A = np.array(
             [
                 [0, 0, 0, 1, 0, 0],
@@ -307,10 +280,8 @@ class CR3BP_Dynamics(Dynamics):
             ]
         )
 
-        # 计算STM导数
         stm_dot = A @ stm
 
-        # 组合导数
         derivative = np.concatenate([state_derivative, stm_dot.flatten()])
 
         return derivative
@@ -325,22 +296,23 @@ class CR3BP_Dynamics(Dynamics):
     ) -> Dict[str, Any]:
         """传播轨迹
 
-        参数：
-        - initial_state: 初始状态向量
-        - t_span: 时间区间 [t0, tf]
-        - t_eval: 评估时间点数组（可选）
-        - with_stm: 是否计算状态转移矩阵
-        - with_jacobi: 是否逐点计算 Jacobi 常数（默认 ``False``，搜索/大量积分时可显著减少开销）
+        Args:
+            initial_state: 初始状态向量
+            t_span: 时间区间 [t0, tf]
+            t_eval: 评估时间点数组（可选）
+            with_stm: 是否计算状态转移矩阵
+            with_jacobi: 是否逐点计算 Jacobi 常数（默认 ``False``，
+                搜索/大量积分时可显著减少开销）
 
-        返回：
-        - 轨迹结果对象；``jacobi`` / ``jacobi_error`` 仅当 ``with_jacobi=True`` 时返回
+        Returns:
+            轨迹结果字典。始终包含 ``time`` 和 ``states`` 键；
+            当 ``with_stm=True`` 时额外包含 ``stm`` 键；
+            当 ``with_jacobi=True`` 时额外包含 ``jacobi`` 与 ``jacobi_error`` 键
         """
         if with_stm:
-            # 创建增广状态（初始STM为单位矩阵）
             initial_stm = np.eye(6).flatten()
             augmented_state = np.concatenate([initial_state, initial_stm])
 
-            # 积分增广状态方程
             result = solve_ivp(
                 self.equations_with_stm,
                 t_span,
@@ -352,11 +324,9 @@ class CR3BP_Dynamics(Dynamics):
                 max_step=self.max_step,
             )
 
-            # 分离状态和STM
             states = result.y[:6, :].T
             stm_matrices = result.y[6:, :].T.reshape(-1, 6, 6)
 
-            # 存储结果
             self.last_trajectory = (result.t, states)
             self.last_stm = stm_matrices
 
@@ -380,7 +350,6 @@ class CR3BP_Dynamics(Dynamics):
 
             return out
         else:
-            # 积分普通状态方程
             result = solve_ivp(
                 self.equations_of_motion,
                 t_span,
@@ -394,7 +363,6 @@ class CR3BP_Dynamics(Dynamics):
 
             states = result.y.T
 
-            # 存储结果
             self.last_trajectory = (result.t, states)
 
             out = {
@@ -422,15 +390,18 @@ class CR3BP_Dynamics(Dynamics):
         t: float,
         integration_dt: float = 0.01,
     ) -> npt.NDArray[np.floating]:
-        """从轨道首点状态沿本对象的 :meth:`propagate` 积分到给定时刻对应的相位（周期轨道上对周期取模）。
+        """从轨道首点状态积分到给定时刻对应的相位（周期轨道上对周期取模）
 
-        参数：
-        - orbit: 周期轨道数据（须含 ``states``、``times``、有效 ``period``）
-        - t: 与轨道 ``times`` 一致的时间坐标（绝对时间）
-        - integration_dt: 构造 ``t_eval`` 的步长
+        Args:
+            orbit: 周期轨道数据（须含 ``states``、``times``、有效 ``period``）
+            t: 与轨道 ``times`` 一致的时间坐标（绝对时间）
+            integration_dt: 构造 ``t_eval`` 的步长
 
-        返回：
-        - 积分末端状态 ``[x, y, z, vx, vy, vz]``
+        Returns:
+            积分末端状态 ``[x, y, z, vx, vy, vz]``
+
+        Raises:
+            ValueError: 轨道无状态或周期无效
         """
         if orbit.states.shape[0] < 1:
             raise ValueError("轨道无状态")
@@ -459,42 +430,41 @@ class CR3BP_Dynamics(Dynamics):
     ) -> npt.NDArray[np.floating]:
         """计算状态转移矩阵
 
-        参数：
-        - initial_state: 初始状态向量
-        - t: 时间
+        Args:
+            initial_state: 初始状态向量
+            t: 积分终止时间
 
-        返回：
-        - 状态转移矩阵 (6x6)
+        Returns:
+            状态转移矩阵 (6x6)
         """
-        # 传播轨迹并计算STM
-        result = self.propagate(
-            initial_state, (0.0, float(t)), with_stm=True, with_jacobi=False
-        )
+        result = self.propagate(initial_state, (0.0, float(t)), with_stm=True, with_jacobi=False)
 
-        # 返回最终时刻的STM
         return result["stm"][-1]
 
     def compute_jacobi_constant(self, state: npt.ArrayLike) -> float:
-        """实时计算Jacobi常数
+        """计算Jacobi常数
 
-        参数：
-        - state: 状态向量 [x, y, z, vx, vy, vz]
+        Args:
+            state: 状态向量 [x, y, z, vx, vy, vz]
 
-        返回：
-        - Jacobi常数
+        Returns:
+            Jacobi常数
         """
         return self.system.get_jacobi_constant(state)
 
     def check_cross_section(self, state: npt.ArrayLike, plane: str, value: float) -> bool:
         """检查是否穿过指定截面
 
-        参数：
-        - state: 状态向量
-        - plane: 截面平面 ('x', 'y', 'z')
-        - value: 平面值
+        Args:
+            state: 状态向量
+            plane: 截面平面 ('x', 'y', 'z')
+            value: 平面值
 
-        返回：
-        - 布尔值，表示是否穿过截面
+        Returns:
+            是否穿过截面
+
+        Raises:
+            ValueError: 无效的平面参数
         """
         if plane == "x":
             return abs(state[0] - value) < self.cross_section_tolerance
@@ -506,11 +476,9 @@ class CR3BP_Dynamics(Dynamics):
             raise ValueError(f"无效的平面: {plane}。可用平面: 'x', 'y', 'z'")
 
     def __str__(self):
-        """字符串表示"""
         return f"CR3BP_Dynamics(system={self.system}, integrator='{self.integrator}')"
 
     def __repr__(self):
-        """详细表示"""
         return (
             f"CR3BP_Dynamics(system={self.system}, integrator='{self.integrator}', "
             f"rtol={self.rtol}, atol={self.atol}, max_step={self.max_step})"
@@ -523,5 +491,15 @@ def propagate_state_at_orbit_time(
     dynamics: CR3BP_Dynamics,
     integration_dt: float = 0.01,
 ) -> npt.NDArray[np.floating]:
-    """委托 :meth:`CR3BP_Dynamics.propagate_orbit_state_at_time`，便于与 ``from e2m2e.core import ...`` 兼容。"""
+    """委托 :meth:`CR3BP_Dynamics.propagate_orbit_state_at_time`，便于顶层导入兼容
+
+    Args:
+        orbit: 周期轨道数据
+        t: 目标时间（绝对时间）
+        dynamics: CR3BP动力学对象
+        integration_dt: 积分步长
+
+    Returns:
+        积分末端状态
+    """
     return dynamics.propagate_orbit_state_at_time(orbit, t, integration_dt)

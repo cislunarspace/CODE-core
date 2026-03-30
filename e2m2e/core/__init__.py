@@ -1,7 +1,18 @@
-"""
-e2m2e核心模块
+"""e2m2e 核心模块
 
-包含三体问题系统、动力学、轨道和坐标变换的核心类。
+包含三体问题系统定义、动力学方程、轨道数据结构和坐标变换的核心类。
+
+Classes:
+    CR3BP_System: 圆型限制性三体问题系统
+    LibrationPoint: 平动点枚举
+    Dynamics: 通用动力学基类
+    CR3BP_Dynamics: CR3BP 动力学方程
+    Orbit: 轨道数据容器
+    OrbitFamily: 轨道族容器
+    CoordinateTransformation: 坐标系变换
+
+Functions:
+    propagate_state_at_orbit_time: 沿轨道周期外推状态
 """
 
 from . import system
