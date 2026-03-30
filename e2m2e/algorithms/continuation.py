@@ -16,11 +16,6 @@ from .differential_correction import (
 from ..core.orbit import OrbitFamily, Orbit
 
 
-# =============================================================================
-# 辅助函数：计算约束向量和雅可比矩阵
-# =============================================================================
-
-
 def compute_F_and_dF_symmetric_xz_plane(
     X: np.ndarray,
     SV0: np.ndarray,
@@ -36,28 +31,25 @@ def compute_F_and_dF_symmetric_xz_plane(
     F = [vx; vz; ry] - 约束向量（半周期终点状态）
     dF = ∂F/∂X - 约束雅可比矩阵 (3x4)
 
-    参数:
+    Args:
         X: 自由变量向量 [rx, rz, vy, tf2]
         SV0: 初始状态向量 [x, y, z, vx, vy, vz]
         mu: 质量比
 
-    返回:
+    Returns:
         F: 约束向量 [vx, vz, ry]
         dF: 雅可比矩阵 (3, 4)
     """
-    # 重建状态和飞行时间
     rx = X[0]
     rz = X[1]
     vy = X[2]
     tf2 = X[3]
 
-    # 更新初始状态
     state = SV0.copy()
     state[0] = rx  # x
     state[2] = rz  # z
     state[4] = vy  # vy
 
-    # 计算状态导数（用于雅可比矩阵的时间项）
     def state_derivative(t, s, mu_val):
         """CR3BP状态导数"""
         x, y, z, vx, vy, vz = s
@@ -70,33 +62,44 @@ def compute_F_and_dF_symmetric_xz_plane(
 
         return np.array([vx, vy, vz, ax, ay, az])
 
-    # 计算雅可比矩阵 A(t)
     def compute_jacobian_A(s, mu_val):
         """计算CR3BP雅可比矩阵A(t)"""
         x, y, z, vx, vy, vz = s
         r1 = np.sqrt((x + mu_val) ** 2 + y**2 + z**2)
         r2 = np.sqrt((x - 1 + mu_val) ** 2 + y**2 + z**2)
 
-        U_xx = 1 - (1 - mu_val) * (1 / r1**3 - 3 * (x + mu_val) ** 2 / r1**5) - mu_val * (1 / r2**3 - 3 * (x - 1 + mu_val) ** 2 / r2**5)
-        U_yy = 1 - (1 - mu_val) * (1 / r1**3 - 3 * y**2 / r1**5) - mu_val * (1 / r2**3 - 3 * y**2 / r2**5)
+        U_xx = (
+            1
+            - (1 - mu_val) * (1 / r1**3 - 3 * (x + mu_val) ** 2 / r1**5)
+            - mu_val * (1 / r2**3 - 3 * (x - 1 + mu_val) ** 2 / r2**5)
+        )
+        U_yy = (
+            1
+            - (1 - mu_val) * (1 / r1**3 - 3 * y**2 / r1**5)
+            - mu_val * (1 / r2**3 - 3 * y**2 / r2**5)
+        )
         U_zz = -(1 - mu_val) / r1**3 - mu_val / r2**3
-        U_xy = 3 * (1 - mu_val) * (x + mu_val) * y / r1**5 + 3 * mu_val * (x - 1 + mu_val) * y / r2**5
-        U_xz = 3 * (1 - mu_val) * (x + mu_val) * z / r1**5 + 3 * mu_val * (x - 1 + mu_val) * z / r2**5
+        U_xy = (
+            3 * (1 - mu_val) * (x + mu_val) * y / r1**5 + 3 * mu_val * (x - 1 + mu_val) * y / r2**5
+        )
+        U_xz = (
+            3 * (1 - mu_val) * (x + mu_val) * z / r1**5 + 3 * mu_val * (x - 1 + mu_val) * z / r2**5
+        )
         U_yz = 3 * (1 - mu_val) * y * z / r1**5 + 3 * mu_val * y * z / r2**5
 
-        return np.array([
-            [0, 0, 0, 1, 0, 0],
-            [0, 0, 0, 0, 1, 0],
-            [0, 0, 0, 0, 0, 1],
-            [U_xx, U_xy, U_xz, 0, 2, 0],
-            [U_xy, U_yy, U_yz, -2, 0, 0],
-            [U_xz, U_yz, U_zz, 0, 0, 0],
-        ])
+        return np.array(
+            [
+                [0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 1],
+                [U_xx, U_xy, U_xz, 0, 2, 0],
+                [U_xy, U_yy, U_yz, -2, 0, 0],
+                [U_xz, U_yz, U_zz, 0, 0, 0],
+            ]
+        )
 
-    # 积分得到终点状态和STM
     from scipy.integrate import solve_ivp
 
-    # 增广状态：[状态(6), STM(36)]
     initial_stm = np.eye(6).flatten()
     augmented_state = np.concatenate([state, initial_stm])
 
@@ -109,7 +112,6 @@ def compute_F_and_dF_symmetric_xz_plane(
         stm_dot = A @ stm
         return np.concatenate([dsdt, stm_dot.flatten()])
 
-    # 积分半周期
     result = solve_ivp(
         equations_with_stm,
         (0, tf2),
@@ -120,23 +122,12 @@ def compute_F_and_dF_symmetric_xz_plane(
         atol=1e-12,
     )
 
-    # 提取终点状态和STM
     final_state = result.y[:6, -1]
     final_stm = result.y[6:, -1].reshape((6, 6))
 
-    # 计算终点状态导数
     dSV = state_derivative(tf2, final_state, mu)
 
-    # 约束向量 F = [vx; vz; ry] = [final_state[3]; final_state[5]; final_state[1]]
     F = np.array([final_state[3], final_state[5], final_state[1]])
-
-    # 雅可比矩阵 dF = ∂F/∂X
-    # 对于 X = [rx, rz, vy, tf2]，dF是3x4矩阵
-    # dF(i,j) = ∂F(i)/∂X(j)
-    # 列1: ∂F/∂rx = STM([3,5,1], 0)  (对x的敏感性)
-    # 列2: ∂F/∂rz = STM([3,5,1], 2)  (对z的敏感性)
-    # 列3: ∂F/∂vy = STM([3,5,1], 4)  (对vy的敏感性)
-    # 列4: ∂F/∂tf2 = dSV([3,5,1])  (对时间的敏感性)
 
     dF = np.zeros((3, 4))
     # 列0: 对rx的偏导 (STM第0列)
@@ -167,17 +158,14 @@ def compute_tangent_vector(dF: np.ndarray) -> np.ndarray:
 
     对应MATLAB: Xdot = null(dF)
 
-    参数:
+    Args:
         dF: 约束雅可比矩阵 (3, 4)
 
-    返回:
+    Returns:
         Xdot: 切向量 (4,)，单位化
     """
-    # 使用SVD计算零空间
     _, _, Vh = np.linalg.svd(dF)
-    # 零空间向量是V的最后一列（对应最小奇异值）
     tangent = Vh[-1, :]
-    # 单位化
     norm = np.linalg.norm(tangent)
     if norm > 0:
         tangent = tangent / norm
@@ -196,7 +184,7 @@ class Continuation:
 
     通过延拓算法生成一族周期轨道，支持自然参数延拓和伪弧长延拓。
 
-    属性：
+    Attributes:
         corrector: DifferentialCorrection对象
         continuation_parameter: 延拓参数名称
         step_size: 延拓步长
@@ -216,7 +204,7 @@ class Continuation:
     ) -> None:
         """初始化延拓器
 
-        参数：
+        Args:
         - corrector: DifferentialCorrection对象
         - param: 延拓参数（如 "energy", "period", "amplitude", "x0", "z0"）
         - step: 初始步长
@@ -279,13 +267,13 @@ class Continuation:
         支持双向延拓：如果param_range的最小值小于种子轨道参数值，则向小值方向延拓；
         如果param_range的最大值大于种子轨道参数值，则向大值方向延拓。
 
-        参数：
+        Args:
             seed_orbit: Orbit, 种子轨道
             param_range: tuple, 延拓参数范围 (param_min, param_max)
             step_size: float, 步长（始终为正值，延拓方向由参数范围自动确定）
             verbose: 是否打印信息
 
-        返回：
+        Returns:
             OrbitFamily: 包含轨道族的OrbitFamily对象
         """
         # 验证并限制步长
@@ -303,13 +291,10 @@ class Continuation:
                 )
             step_size = self.min_step_size
 
-        # 创建轨道族对象
         orbit_family = OrbitFamily(seed_orbit)
 
-        # 获取延拓参数索引
         param_index = self._infer_param_index()
 
-        # 获取种子轨道的延拓参数值
         if param_index < 6:
             seed_param_value = seed_orbit.states[0, param_index]
         else:
@@ -317,9 +302,8 @@ class Continuation:
 
         param_min, param_max = param_range
 
-        # 确定延拓方向
-        forward = param_max > seed_param_value  # 向大值方向延拓
-        backward = param_min < seed_param_value  # 向小值方向延拓
+        forward = param_max > seed_param_value
+        backward = param_min < seed_param_value
 
         print(f"\n{'=' * 60}")
         print(f"开始自然参数延拓 (参数: {self.continuation_parameter})")
@@ -329,20 +313,14 @@ class Continuation:
         print(f"步长: {step_size}")
         print(f"{'=' * 60}")
 
-        # 复用已初始化的corrector，确保修正模式（如setup_2D_symmetric_x_fixed_x0）被正确使用
         corrector = self.correction
 
-        # 初始化当前轨道（使用种子轨道作为初始状态）
         current_orbit = seed_orbit.copy()
 
-        # 临时存储轨道和对应步数（用于后续排序）
-        # 步数定义：从种子轨道出发，正向延拓 step 1, 2, 3...，反向延拓 -1, -2, -3...
         temp_orbits_with_steps = []
 
-        # 步长历史记录
         step_size_history = []
 
-        # 执行正向延拓（向大值方向）
         if forward:
             if verbose:
                 print("\n--- 正向延拓 (参数增大方向) ---")
@@ -350,39 +328,31 @@ class Continuation:
             target_forward = param_max
             i = 0
             while True:
-                # 获取当前参数值
                 if param_index < 6:
                     current_param_value = current_orbit.states[0, param_index]
                 else:
                     current_param_value = current_orbit.period
 
-                # 检查是否到达目标
                 if current_param_value >= target_forward:
                     break
 
-                # 生成待修正的下一个延拓位置的初始猜测
                 if param_index < 6:
-                    # 修改状态分量
                     guess_orbit = current_orbit.copy()
                     guess_orbit.states[0, param_index] += step_size
                     orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
                 else:
-                    # 修改时间 - 通过复制并修改orbit的period属性
                     guess_orbit = current_orbit.copy()
                     guess_orbit.period = current_orbit.period + step_size * 2
                     orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
 
                 if orbit is not None and orbit.correction_success:
-                    # 临时存储轨道和步数（步数为正向 i+1）
                     orbit.metadata["continuation_step"] = i + 1
                     temp_orbits_with_steps.append((orbit, i + 1))
 
-                    # 更新当前轨道
                     current_orbit = orbit
 
                     self.continuation_stats["successful_steps"] += 1
 
-                    # 打印进度信息
                     if (i + 1) % 10 == 0:
                         if verbose:
                             print(
@@ -391,7 +361,6 @@ class Continuation:
                         else:
                             print(f"  正向延拓进度：已完成 {i + 1} 条轨道")
 
-                    # 自适应步长
                     if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
                         if orbit.correction_iterations < 3:
                             step_size = min(step_size * self.step_growth_factor, self.max_step_size)
@@ -402,7 +371,6 @@ class Continuation:
                 else:
                     self.continuation_stats["failed_steps"] += 1
 
-                    # 步长减半重试
                     step_size *= self.step_reduction_factor
                     if step_size < self.min_step_size:
                         self.termination_reason = "步长过小，延拓终止"
@@ -416,9 +384,7 @@ class Continuation:
                 step_size_history.append(step_size)
                 i += 1
 
-        # 执行反向延拓（向小值方向）
         if backward:
-            # 重置当前轨道为种子轨道
             current_orbit = seed_orbit.copy()
 
             if verbose:
@@ -427,39 +393,31 @@ class Continuation:
             target_backward = param_min
             i = 0
             while True:
-                # 获取当前参数值
                 if param_index < 6:
                     current_param_value = current_orbit.states[0, param_index]
                 else:
                     current_param_value = current_orbit.period
 
-                # 检查是否到达目标
                 if current_param_value <= target_backward:
                     break
 
-                # 生成待修正的下一个延拓位置的初始猜测（减小参数值）
                 if param_index < 6:
-                    # 修改状态分量
                     guess_orbit = current_orbit.copy()
                     guess_orbit.states[0, param_index] -= step_size
                     orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
                 else:
-                    # 修改时间 - 通过复制并修改orbit的period属性
                     guess_orbit = current_orbit.copy()
                     guess_orbit.period = current_orbit.period - step_size * 2
                     orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
 
                 if orbit is not None and orbit.correction_success:
-                    # 添加到轨道族（步数为反向 -i-1）
                     orbit.metadata["continuation_step"] = -(i + 1)
                     temp_orbits_with_steps.append((orbit, -(i + 1)))
 
-                    # 更新当前轨道
                     current_orbit = orbit
 
                     self.continuation_stats["successful_steps"] += 1
 
-                    # 打印进度信息
                     if (i + 1) % 10 == 0:
                         if verbose:
                             print(
@@ -468,7 +426,6 @@ class Continuation:
                         else:
                             print(f"  反向延拓进度：已完成 {i + 1} 条轨道")
 
-                    # 自适应步长
                     if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
                         if orbit.correction_iterations < 3:
                             step_size = min(step_size * self.step_growth_factor, self.max_step_size)
@@ -479,7 +436,6 @@ class Continuation:
                 else:
                     self.continuation_stats["failed_steps"] += 1
 
-                    # 步长减半重试
                     step_size *= self.step_reduction_factor
                     if step_size < self.min_step_size:
                         self.termination_reason = "步长过小，延拓终止"
@@ -493,19 +449,15 @@ class Continuation:
                 step_size_history.append(step_size)
                 i += 1
 
-        # 按步数排序：种子轨道(step=0)在最前，然后按绝对值从小到大排列
-        # 排序顺序：0, 1, -1, 2, -2, 3, -3, ...
         seed_orbit.metadata["continuation_step"] = 0
         all_orbits_with_steps = [(seed_orbit, 0)] + temp_orbits_with_steps
 
-        # 自定义排序：先按绝对值排序，再按正负排序（正数在前）
         def sort_key(item):
             orbit, step = item
             return (abs(step), step > 0)
 
         all_orbits_with_steps.sort(key=sort_key)
 
-        # 清空并重新按排序顺序添加轨道
         orbit_family.orbits = []
         for orbit, step in all_orbits_with_steps:
             orbit_family.add_orbit(orbit)
@@ -540,7 +492,7 @@ class Continuation:
         ``G = [F; (Xnew-X)·Xdot - DeltaS]``；内层用 ``Xnew`` 计算 ``F``（与 MATLAB 中
         仅用固定 ``X`` 相比更一致）。每步后用微分修正闭合。
 
-        参数：
+        Args:
             seed_orbit: 种子轨道（Orbit对象）
             n_orbits: 本支要生成的新轨道条数（与 MATLAB 中 ``N`` 一致）
             step_size: 伪弧长步长 ``|DeltaS|``（正数；``direction`` 决定符号）
@@ -549,13 +501,15 @@ class Continuation:
             dc_scheme: 见 ``Continuation`` 文档字符串
             target_vector: 与 MATLAB ``TargetVector`` 对应的 0 基下标：``0=rx,1=rz,2=vy,3=T/2``
 
-        返回：
+        Returns:
             OrbitFamily: 仅含种子 + 本支新轨道（不重复添加种子）
         """
         mu = self.dynamics.system.mu
 
         if direction not in ("positive", "negative"):
-            raise ValueError("direction 须为 positive 或 negative（双侧请用 halo_pseudo_arclength_continuation）")
+            raise ValueError(
+                "direction 须为 positive 或 negative（双侧请用 halo_pseudo_arclength_continuation）"
+            )
 
         step_sign = 1.0 if direction == "positive" else -1.0
 
@@ -582,12 +536,8 @@ class Continuation:
         family_states: List[np.ndarray] = [SV0i.copy()]
 
         if verbose:
-            print(
-                f"\n初始自由变量 X = [{X[0]:.6f}, {X[1]:.6f}, {X[2]:.6f}, {X[3]:.6f}]"
-            )
-            print(
-                f"初始切向量 Xdot = [{Xdot[0]:.6f}, {Xdot[1]:.6f}, {Xdot[2]:.6f}, {Xdot[3]:.6f}]"
-            )
+            print(f"\n初始自由变量 X = [{X[0]:.6f}, {X[1]:.6f}, {X[2]:.6f}, {X[3]:.6f}]")
+            print(f"初始切向量 Xdot = [{Xdot[0]:.6f}, {Xdot[1]:.6f}, {Xdot[2]:.6f}, {Xdot[3]:.6f}]")
 
         ds = float(step_sign * step_size)
         tv = target_vector
@@ -607,9 +557,7 @@ class Continuation:
                 Xnew = X + ds * Xdot
 
             if verbose:
-                print(
-                    f"  预测 Xnew = [{Xnew[0]:.6f}, {Xnew[1]:.6f}, {Xnew[2]:.6f}, {Xnew[3]:.6f}]"
-                )
+                print(f"  预测 Xnew = [{Xnew[0]:.6f}, {Xnew[1]:.6f}, {Xnew[2]:.6f}, {Xnew[3]:.6f}]")
 
             # 仅欧拉预测时的自由变量（PAL 若跳入 F=0 的非物理根则回退到此）
             X_predictor_only = Xnew.copy()
@@ -635,9 +583,7 @@ class Continuation:
                 # 与 MATLAB continuation_PAL_CR3BP 一致：先判收敛，再更新 Xnew
                 if np.linalg.norm(F) < TolPAL:
                     if verbose:
-                        print(
-                            f"  PAL迭代 {iter_pal + 1}: 收敛, ||F|| = {np.linalg.norm(F):.2e}"
-                        )
+                        print(f"  PAL迭代 {iter_pal + 1}: 收敛, ||F|| = {np.linalg.norm(F):.2e}")
                     break
 
                 try:
@@ -771,10 +717,6 @@ class Continuation:
             "termination_reason": self.termination_reason,
         }
 
-    # =============================================================================
-    # Halo轨道生成方法
-    # =============================================================================
-
     def generate_halo_seed_orbit(
         self,
         libration_point: int,
@@ -787,13 +729,13 @@ class Continuation:
         使用Richardson三阶近似生成初始猜测，然后通过微分修正
         得到精确的周期轨道。
 
-        参数：
+        Args:
             libration_point: 拉格朗日点 (1=L1, 2=L2)
             amplitude_z: Z方向振幅
             halo_class: 0=北Halo, 1=南Halo
             verbose: 是否打印详细信息
 
-        返回：
+        Returns:
             Orbit: Halo周期轨道
         """
         if libration_point not in [1, 2]:
@@ -883,13 +825,13 @@ class Continuation:
 
         使用自然参数延拓法生成Halo轨道族。
 
-        参数：
+        Args:
             seed_orbit: 种子轨道
             n_orbits: 目标轨道数量
             direction: 延拓方向 ("positive", "negative", "both")
             step_size: 步长
 
-        返回：
+        Returns:
             List[Orbit]: Halo轨道族
         """
         if n_orbits < 1:
@@ -964,7 +906,7 @@ class Continuation:
         ``FAMILY_L1Halo_North.m`` 中正负支 ``DeltaS`` 不同（0.0045 与 0.009），可用
         ``step_size_negative`` 单独指定负向步长模长。
 
-        参数：
+        Args:
             seed_orbit: 已收敛的 Halo 种子轨道
             n_orbits: 每一支的新轨道条数 ``N``（与 MATLAB 一致；``direction=both`` 时
                 正向、负向各生成 ``n_orbits`` 条）
@@ -972,7 +914,7 @@ class Continuation:
             step_size_negative: 负向步长模长，默认与 ``step_size`` 相同
             dc_scheme: ``matlab_halo_type1`` / ``matlab_halo_type2`` / ``adaptive``
 
-        返回：
+        Returns:
             OrbitFamily: 种子 + 各支新轨道（无重复种子）
         """
         libration_point = int(seed_orbit.parameters.get("libration_point", 1))
