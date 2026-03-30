@@ -130,9 +130,7 @@ class TestTransferCreation:
 class TestTransferOptimization:
     """Test Transfer.optimize() method."""
 
-    def test_optimize_with_auto_departure_sampling(
-        self, dynamics, dro_orbit, ro_orbit
-    ):
+    def test_optimize_with_auto_departure_sampling(self, dynamics, dro_orbit, ro_orbit):
         """optimize() should work without explicit departure_state (auto-sample)."""
         from e2m2e.transfer import Transfer
 
@@ -170,13 +168,9 @@ class TestTransferOptimization:
         )
 
         assert result is not None
-        np.testing.assert_array_almost_equal(
-            result.departure_state, dro_departure_state
-        )
+        np.testing.assert_array_almost_equal(result.departure_state, dro_departure_state)
 
-    def test_optimize_with_t_ins_range(
-        self, dynamics, dro_orbit, ro_orbit, dro_departure_state
-    ):
+    def test_optimize_with_t_ins_range(self, dynamics, dro_orbit, ro_orbit, dro_departure_state):
         """optimize() should accept t_ins_range parameter."""
         from e2m2e.transfer import Transfer
 
@@ -309,14 +303,13 @@ class TestTransferOptimizationResult:
             velocity_angle_tol=0.05,
         )
 
-        np.testing.assert_almost_equal(
-            result.total_delta_v, result.delta_v1 + result.delta_v2
-        )
+        np.testing.assert_almost_equal(result.total_delta_v, result.delta_v1 + result.delta_v2)
 
 
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def project_root():
@@ -325,12 +318,12 @@ def project_root():
 
 @pytest.fixture
 def dro_file(project_root):
-    return project_root / "output/dro/dro_31_3857199098.json"
+    return project_root / "output/dro/dro_31_3857117441.json"
 
 
 @pytest.fixture
 def ro_file(project_root):
-    return project_root / "output/ro/ro_31_3857328571.json"
+    return project_root / "output/ro/ro_31_3857122799.json"
 
 
 @pytest.fixture

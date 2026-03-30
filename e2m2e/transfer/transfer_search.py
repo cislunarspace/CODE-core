@@ -55,22 +55,21 @@ class _AggregatePbarWithSlot:
         else:
             self._inner.set_postfix_str(merged, refresh=refresh)
 
+
 from ..core.orbit import Orbit
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.system import CR3BP_System
 
-from .transfer_base import (
-    BaseTransfer,
-    TransferType,
-)
 from .transfer_optimization import (
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
     NLPOptimizationResult,
 )
 
+DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / CR3BP_System.EARTH_MOON_DISTANCE_KM
 
-class TransferSearch(BaseTransfer):
+
+class TransferSearch:
     """通用轨道转移搜索算法
 
     实现论文Section III.A的搜索阶段算法:
@@ -92,8 +91,14 @@ class TransferSearch(BaseTransfer):
         dynamics: CR3BP_Dynamics,
         name: str = "TransferSearch",
     ):
-        super().__init__(dynamics)
+        self.system = dynamics.system
+        self.dynamics = dynamics
+        self.mu = self.system.mu
         self.name = name
+        self._departure_orbit: Optional[Orbit] = None
+        self._arrival_orbit: Optional[Orbit] = None
+        self._search_results: Optional[List[Dict[str, Any]]] = None
+        self._optimized_result: Any = None
         self._verbose = True
         self._n_workers = None
         # "processes" 多进程，利于 CPU 密集积分绕过 GIL；"threads" 保留线程内 tqdm 细粒度进度
@@ -191,7 +196,7 @@ class TransferSearch(BaseTransfer):
         """可行候选：无碰撞，且（相交 / 全局最小距离或局部极小距离小于 ``min_distance_threshold``）。"""
         mdt = self.min_distance_threshold
         if mdt is None:
-            return super()._is_feasible(result)
+            mdt = DEFAULT_MIN_DISTANCE_THRESHOLD_DU
         if result.get("collision_found", False):
             return False
         md = float(result.get("min_distance", float("inf")))
@@ -203,6 +208,12 @@ class TransferSearch(BaseTransfer):
         if result.get("local_minimum_found", False) and lmd < mdt:
             return True
         return False
+
+    def get_feasible_results(self) -> List[Dict[str, Any]]:
+        """获取所有可行搜索结果"""
+        if self._search_results is None:
+            return []
+        return [r for r in self._search_results if self._is_feasible(r)]
 
     def search(
         self,
@@ -426,8 +437,10 @@ class TransferSearch(BaseTransfer):
         if n_sample == 1:
             idx = np.array([0], dtype=int)
         else:
-            idx = (np.arange(n_sample, dtype=float) * (n_pts - 1) / (n_sample - 1)).round().astype(
-                int
+            idx = (
+                (np.arange(n_sample, dtype=float) * (n_pts - 1) / (n_sample - 1))
+                .round()
+                .astype(int)
             )
 
         return states[idx].copy(), times[idx].copy()
@@ -672,17 +685,19 @@ class TransferSearch(BaseTransfer):
         try:
             with ProcessPoolExecutor(max_workers=n_workers) as executor:
                 futures = {}
-                for i, (dep_state, dep_time) in enumerate(
-                    zip(departure_states, departure_times)
-                ):
+                for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times)):
                     packed = (
-                        i,
-                        np.asarray(dep_state, dtype=float),
-                        float(dep_time),
-                        arrival_states,
-                        arrival_times_a,
-                        arrival_period,
-                    ) + pack_base + (progress_queue,)
+                        (
+                            i,
+                            np.asarray(dep_state, dtype=float),
+                            float(dep_time),
+                            arrival_states,
+                            arrival_times_a,
+                            arrival_period,
+                        )
+                        + pack_base
+                        + (progress_queue,)
+                    )
                     fut = executor.submit(_process_departure_worker_packed, packed)
                     futures[fut] = i
 
@@ -857,7 +872,15 @@ class TransferSearch(BaseTransfer):
         idt = self.integration_dt
         ith = self.intersection_threshold
         mdt = self.min_distance_threshold
-        if a0 is None or a1 is None or na is None or mtt is None or idt is None or ith is None or mdt is None:
+        if (
+            a0 is None
+            or a1 is None
+            or na is None
+            or mtt is None
+            or idt is None
+            or ith is None
+            or mdt is None
+        ):
             raise ValueError(
                 "请先设置 alpha_min, alpha_max, n_alpha, max_transfer_time, integration_dt, "
                 "intersection_threshold, min_distance_threshold"
@@ -871,9 +894,7 @@ class TransferSearch(BaseTransfer):
                     pct = i_alpha / n_alpha * 100
                     print(f"    α 进度: {i_alpha}/{n_alpha} ({pct:.1f}%)", flush=True)
                 new_vel = self._compute_departure_velocity(departure_state, alpha)
-                dv_departure = float(
-                    np.linalg.norm(new_vel - departure_state[3:6])
-                )
+                dv_departure = float(np.linalg.norm(new_vel - departure_state[3:6]))
 
                 initial_state = np.concatenate(
                     [
@@ -1045,9 +1066,7 @@ class TransferSearch(BaseTransfer):
         threshold: float,
     ) -> Tuple[bool, Optional[np.ndarray], int]:
         """检测轨迹是否与目标轨道相交"""
-        min_dist, step_idx, _ = self._compute_min_distance(
-            trajectory_states, arrival_orbit
-        )
+        min_dist, step_idx, _ = self._compute_min_distance(trajectory_states, arrival_orbit)
 
         if min_dist < threshold:
             return True, trajectory_states[step_idx], step_idx
@@ -1064,9 +1083,7 @@ class TransferSearch(BaseTransfer):
         ith = threshold if threshold is not None else self.intersection_threshold
         if ith is None:
             raise ValueError("intersection_threshold 未设置且未传入 threshold")
-        found, pt, idx = self._detect_intersection(
-            trajectory_states, arrival_orbit, float(ith)
-        )
+        found, pt, idx = self._detect_intersection(trajectory_states, arrival_orbit, float(ith))
         if pt is None:
             return False, np.zeros(6), idx
         return found, pt, idx
@@ -1162,7 +1179,7 @@ def _process_departure_worker(
     dynamics.atol = atol
     dynamics.max_step = max_step
 
-    searcher = TransferSearch(system=system, dynamics=dynamics)
+    searcher = TransferSearch(dynamics=dynamics)
 
     searcher.configure_search(
         alpha_min=alpha_min,
@@ -1218,34 +1235,3 @@ def load_orbit_from_json(filepath: str) -> Orbit:
         orbit.metadata["period_ratio"] = data["period_ratio"]
 
     return orbit
-
-
-def save_search_results(
-    results: List[Dict[str, Any]],
-    filepath: str,
-) -> None:
-    """保存搜索结果到JSON文件
-
-    参数:
-        results: 搜索结果列表
-        filepath: 输出文件路径
-    """
-    output = []
-    for r in results:
-        result_dict = {
-            "departure_orbit_name": r.get("departure_orbit_name", ""),
-            "arrival_orbit_name": r.get("arrival_orbit_name", ""),
-            "departure_time_index": r.get("departure_time_index", -1),
-            "departure_time": float(r.get("departure_time", 0.0)),
-            "alpha": float(r.get("alpha", 0.0)),
-            "transfer_time": float(r.get("transfer_time", 0.0)),
-            "intersection_found": r.get("intersection_found", False),
-            "min_distance": float(r.get("min_distance", float("inf"))),
-            "local_minimum_found": r.get("local_minimum_found", False),
-            "collision_found": r.get("collision_found", False),
-            "status": r.get("status", "unknown"),
-        }
-        output.append(result_dict)
-
-    with open(filepath, "w") as f:
-        json.dump(output, f, indent=2)

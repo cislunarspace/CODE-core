@@ -6,8 +6,7 @@ import numpy as np
 import pytest
 
 from e2m2e.core import Orbit, CR3BP_System, CR3BP_Dynamics
-from e2m2e.transfer import DROTransferSearch
-from e2m2e.transfer.transfer_base import DEFAULT_MIN_DISTANCE_THRESHOLD_DU
+from e2m2e.transfer import DROTransferSearch, DEFAULT_MIN_DISTANCE_THRESHOLD_DU
 
 
 @pytest.fixture
@@ -26,7 +25,7 @@ def dynamics(system):
 
 @pytest.fixture
 def searcher(system, dynamics):
-    s = DROTransferSearch(system, dynamics)
+    s = DROTransferSearch(dynamics)
     s.alpha_min = 0.5
     s.alpha_max = 2.5
     s.n_alpha = 5
