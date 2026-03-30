@@ -1427,6 +1427,95 @@ class OrbitVisualizer:
                 )
         return parsed
 
+    def plot_transfer_orbit(
+        self,
+        departure_orbit: Orbit,
+        arrival_orbit: Orbit,
+        transfer_trajectory: npt.ArrayLike,
+        departure_state: npt.ArrayLike,
+        insertion_state: npt.ArrayLike,
+        ax: Optional[Any] = None,
+        label: Optional[str] = None,
+        color: Optional[str] = None,
+    ) -> Any:
+        transfer_states = np.asarray(transfer_trajectory)
+        dep_states = self._extract_states(departure_orbit)
+        arr_states = self._extract_states(arrival_orbit)
+
+        if ax is None:
+            self.figure = plt.figure(figsize=self.figsize, dpi=self.dpi)
+            ax = self.figure.add_subplot(111, projection="3d")
+            self.axes_3d = ax
+
+        if color is None:
+            color = self._get_next_color()
+
+        ax.plot(
+            dep_states[:, 0],
+            dep_states[:, 1],
+            dep_states[:, 2],
+            color="steelblue",
+            linewidth=self.orbit_linewidth,
+            alpha=self.orbit_alpha,
+            label="DRO",
+        )
+        ax.plot(
+            arr_states[:, 0],
+            arr_states[:, 1],
+            arr_states[:, 2],
+            color="darkorange",
+            linewidth=self.orbit_linewidth,
+            alpha=self.orbit_alpha,
+            label="RO",
+        )
+        ax.plot(
+            transfer_states[:, 0],
+            transfer_states[:, 1],
+            transfer_states[:, 2],
+            color=color,
+            linewidth=2.0,
+            alpha=0.9,
+            label=label,
+        )
+
+        dep = np.asarray(departure_state)
+        ins = np.asarray(insertion_state)
+        ax.scatter(
+            dep[0],
+            dep[1],
+            dep[2],
+            color="green",
+            marker="^",
+            s=80,
+            edgecolors="black",
+            linewidth=1,
+            zorder=10,
+            label="Departure",
+        )
+        ax.scatter(
+            ins[0],
+            ins[1],
+            ins[2],
+            color="red",
+            marker="v",
+            s=80,
+            edgecolors="black",
+            linewidth=1,
+            zorder=10,
+            label="Insertion",
+        )
+
+        self.plot_primary_bodies(ax=ax, is_3d=True)
+        self.plot_libration_points(ax=ax, is_3d=True)
+
+        ax.set_xlabel("X (nondimensional)")
+        ax.set_ylabel("Y (nondimensional)")
+        ax.set_zlabel("Z (nondimensional)")
+
+        ax.legend()
+
+        return ax
+
     def show(self) -> None:
         """显示图形"""
         plt.show()
