@@ -181,6 +181,10 @@ class DROTRONLPOptimizer:
         self.moon_radius = self.MOON_RADIUS_ND
 
         self._last_trajectory: Optional[Tuple[np.ndarray, np.ndarray]] = None
+        self._progress_callback: Optional[Callable] = None
+
+    def set_progress_callback(self, callback: Optional[Callable]) -> None:
+        self._progress_callback = callback
 
     def compute_departure_velocity(
         self, state: np.ndarray, alpha: float, beta: float = 0.0
@@ -234,7 +238,8 @@ class DROTRONLPOptimizer:
             (times, states): 时间序列和状态序列
         """
         if t_eval is None:
-            n_steps = int((t_span[1] - t_span[0]) / 0.01) + 1
+            step = max(0.01, self.dynamics.max_step)
+            n_steps = int((t_span[1] - t_span[0]) / step) + 1
             t_eval = np.linspace(t_span[0], t_span[1], n_steps)
 
         result = self.dynamics.propagate(
@@ -504,6 +509,15 @@ class DROTRONLPOptimizer:
             ub=[self.alpha_range[1], self.transfer_time_range[1], self.t_ins_range[1]],
         )
 
+        iteration_counter = [0]
+
+        def _scipy_callback(xk):
+            iteration_counter[0] += 1
+            if self._progress_callback is not None:
+                alpha_k, T_k, tins_k = float(xk[0]), float(xk[1]), float(xk[2])
+                obj_k = float(self.objective_function(xk))
+                self._progress_callback(iteration_counter[0], obj_k, alpha_k, T_k, tins_k)
+
         try:
             result = minimize(
                 self.objective_function,
@@ -512,6 +526,7 @@ class DROTRONLPOptimizer:
                 bounds=bounds,
                 constraints=constraints,
                 options={"ftol": 1e-10, "maxiter": 1000, "disp": verbose},
+                callback=_scipy_callback,
             )
 
             success = result.success
