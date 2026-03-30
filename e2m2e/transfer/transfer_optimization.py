@@ -43,7 +43,7 @@ class NLPOptimizationVariables:
 
     优化变量: y = {α, T, t_ins}
 
-    属性:
+    Attributes:
         alpha: 切向速度比
         transfer_time: 转移时间T
         t_ins: 从轨道远地点到插入点的时间
@@ -67,7 +67,7 @@ class NLPOptimizationVariables:
 class NLPOptimizationResult:
     """NLP优化结果
 
-    属性:
+    Attributes:
         alpha: 切向速度比
         transfer_time: 转移时间
         t_ins: 插入时间
@@ -125,7 +125,7 @@ class DROTRONLPOptimizer:
     实现论文Section III.B的优化阶段算法。
     使用SQP(序贯二次规划)方法求解NLP问题。
 
-    属性:
+    Attributes:
         system: CR3BP系统对象
         dynamics: CR3BP动力学对象
         departure_orbit: 出发点轨道
@@ -137,17 +137,14 @@ class DROTRONLPOptimizer:
         moon_radius: 月球半径(无量纲)
     """
 
-    # 默认参数
     DEFAULT_ALPHA_RANGE = (0.5, 2.5)
-    DEFAULT_TRANSFER_TIME_RANGE = (1.0, 30.0)  # 无量纲时间
-    DEFAULT_T_INS_RANGE = (0.0, 10.0)  # 无量纲时间
+    DEFAULT_TRANSFER_TIME_RANGE = (1.0, 30.0)
+    DEFAULT_T_INS_RANGE = (0.0, 10.0)
 
-    # 撞星约束半径(无量纲)
-    EARTH_RADIUS_ND = 1.0 / 389703.0 * 6378.137  # ~0.0163 DU
-    MOON_RADIUS_ND = 1738.1 / 384400.0  # ~0.00452 DU
+    EARTH_RADIUS_ND = 1.0 / 389703.0 * 6378.137
+    MOON_RADIUS_ND = 1738.1 / 384400.0
 
-    # 速度平行性容差
-    DEFAULT_VELOCITY_ANGLE_TOL = 1e-6  # 弧度
+    DEFAULT_VELOCITY_ANGLE_TOL = 1e-6
 
     def __init__(
         self,
@@ -159,7 +156,7 @@ class DROTRONLPOptimizer:
     ):
         """初始化NLP优化器
 
-        参数:
+        Args:
             system: CR3BP系统对象
             dynamics: CR3BP动力学对象
             departure_orbit: 出发点轨道
@@ -174,19 +171,15 @@ class DROTRONLPOptimizer:
         self.arrival_orbit = arrival_orbit
         self.departure_state = departure_state
 
-        # 默认搜索范围
         self.alpha_range = self.DEFAULT_ALPHA_RANGE
         self.transfer_time_range = self.DEFAULT_TRANSFER_TIME_RANGE
         self.t_ins_range = self.DEFAULT_T_INS_RANGE
 
-        # 约束容差
         self.velocity_angle_tol = self.DEFAULT_VELOCITY_ANGLE_TOL
 
-        # 地球和月球半径(无量纲)
         self.earth_radius = self.EARTH_RADIUS_ND
         self.moon_radius = self.MOON_RADIUS_ND
 
-        # 缓存
         self._last_trajectory: Optional[Tuple[np.ndarray, np.ndarray]] = None
 
     def compute_departure_velocity(
@@ -194,29 +187,25 @@ class DROTRONLPOptimizer:
     ) -> np.ndarray:
         """根据α计算出发速度
 
-        参数:
+        Args:
             state: 出发点状态 [x, y, z, vx, vy, vz]
             alpha: 切向速度比
 
-        返回:
+        Returns:
             注入速度向量 [vx, vy, vz]
         """
         pos = state[:3]
         vel = state[3:]
 
-        # 轨道面法向(CR3BP中为z轴)
         normal = np.array([0.0, 0.0, 1.0])
 
-        # 速度大小
         v_mag = np.linalg.norm(vel)
         if v_mag < 1e-10:
             warnings.warn("出发点速度接近零")
             return vel
 
-        # 切向单位向量(沿速度方向)
         tangential = vel / v_mag
 
-        # 法向单位向量
         normal_dir = np.cross(tangential, normal)
         norm_nd = np.linalg.norm(normal_dir)
         if norm_nd < 1e-10:
@@ -224,7 +213,6 @@ class DROTRONLPOptimizer:
         else:
             normal_dir = normal_dir / norm_nd
 
-        # 注入速度
         v_injection = alpha * v_mag * tangential + beta * v_mag * normal_dir
 
         return v_injection
@@ -237,12 +225,12 @@ class DROTRONLPOptimizer:
     ) -> Tuple[np.ndarray, np.ndarray]:
         """前向积分转移弧
 
-        参数:
+        Args:
             initial_state: 初始状态 [x, y, z, vx, vy, vz]
             t_span: 积分时间范围 (t0, tf)
             t_eval: 评估时间点
 
-        返回:
+        Returns:
             (times, states): 时间序列和状态序列
         """
         if t_eval is None:
@@ -260,7 +248,6 @@ class DROTRONLPOptimizer:
         times = result["time"]
         states = result["states"]
 
-        # 缓存
         self._last_trajectory = (times, states)
 
         return times, states
@@ -268,11 +255,11 @@ class DROTRONLPOptimizer:
     def compute_delta_v1(self, departure_state: np.ndarray, initial_velocity: np.ndarray) -> float:
         """计算出发脉冲ΔV1
 
-        参数:
+        Args:
             departure_state: 出发点状态 [x, y, z, vx, vy, vz]
             initial_velocity: 注入速度 [vx, vy, vz]
 
-        返回:
+        Returns:
             ΔV1 大小
         """
         original_vel = departure_state[3:]
@@ -282,11 +269,11 @@ class DROTRONLPOptimizer:
     def compute_delta_v2(self, final_velocity: np.ndarray, insertion_velocity: np.ndarray) -> float:
         """计算插入脉冲ΔV2
 
-        参数:
+        Args:
             final_velocity: 转移轨迹末端速度
             insertion_velocity: 目标轨道插入点速度
 
-        返回:
+        Returns:
             ΔV2 大小
         """
         dv2 = np.linalg.norm(final_velocity - insertion_velocity)
@@ -295,10 +282,10 @@ class DROTRONLPOptimizer:
     def get_arrival_state_at_t_ins(self, t_ins: float) -> Tuple[np.ndarray, np.ndarray]:
         """获取目标轨道上 t_ins（绝对时间）对应的状态
 
-        参数:
+        Args:
             t_ins: 绝对时间（与 orbit.times 同一坐标系）
 
-        返回:
+        Returns:
             (position, velocity): 位置和速度
         """
         arrival_state = self.dynamics.propagate_orbit_state_at_time(
@@ -309,36 +296,30 @@ class DROTRONLPOptimizer:
     def objective_function(self, y: np.ndarray) -> float:
         """目标函数 J(y) = Δv1 + Δv2
 
-        参数:
+        Args:
             y: 优化变量 [alpha, T, t_ins]
 
-        返回:
+        Returns:
             总脉冲代价
         """
         alpha, transfer_time, t_ins = y
 
-        # 构建出发速度
         v_injection = self.compute_departure_velocity(self.departure_state, alpha)
-
-        # 完整初始状态
         initial_state = np.concatenate([self.departure_state[:3], v_injection])
 
-        # 前向积分
         times, states = self.forward_integrate(
             initial_state=initial_state, t_span=(0.0, transfer_time)
         )
 
         if len(states) == 0:
-            return 1e10  # 积分失败
+            return 1e10
 
-        # 获取转移轨迹末端状态
         final_state = states[-1]
 
         insertion_state = self.dynamics.propagate_orbit_state_at_time(
             self.arrival_orbit, float(t_ins)
         )
 
-        # 计算ΔV
         dv1 = self.compute_delta_v1(self.departure_state, v_injection)
         dv2 = self.compute_delta_v2(final_state[3:], insertion_state[3:])
 
@@ -349,19 +330,17 @@ class DROTRONLPOptimizer:
 
         (x_f - x_ins)^2 + (y_f - y_ins)^2 + (z_f - z_ins)^2 = 0
 
-        参数:
+        Args:
             y: 优化变量 [alpha, T, t_ins]
 
-        返回:
+        Returns:
             约束违反量
         """
         alpha, transfer_time, t_ins = y
 
-        # 构建出发速度
         v_injection = self.compute_departure_velocity(self.departure_state, alpha)
         initial_state = np.concatenate([self.departure_state[:3], v_injection])
 
-        # 前向积分
         times, states = self.forward_integrate(
             initial_state=initial_state, t_span=(0.0, transfer_time)
         )
@@ -374,7 +353,6 @@ class DROTRONLPOptimizer:
             self.arrival_orbit, float(t_ins)
         )
 
-        # 位置连续性
         pos_diff = final_state[:3] - insertion_state[:3]
         constraint = np.dot(pos_diff, pos_diff)
 
@@ -385,19 +363,17 @@ class DROTRONLPOptimizer:
 
         v_f · v_ins / (||v_f|| ||v_ins||) - 1 = 0
 
-        参数:
+        Args:
             y: 优化变量 [alpha, T, t_ins]
 
-        返回:
+        Returns:
             约束违反量
         """
         alpha, transfer_time, t_ins = y
 
-        # 构建出发速度
         v_injection = self.compute_departure_velocity(self.departure_state, alpha)
         initial_state = np.concatenate([self.departure_state[:3], v_injection])
 
-        # 前向积分
         times, states = self.forward_integrate(
             initial_state=initial_state, t_span=(0.0, transfer_time)
         )
@@ -421,7 +397,6 @@ class DROTRONLPOptimizer:
 
         cos_angle = np.dot(v_f, v_ins) / (v_f_norm * v_ins_norm)
 
-        # 约束: cos_angle - 1 = 0 (速度平行)
         constraint = cos_angle - 1.0
 
         return constraint
@@ -429,19 +404,17 @@ class DROTRONLPOptimizer:
     def check_collision(self, y: np.ndarray) -> Tuple[bool, bool]:
         """检查是否撞击地球或月球
 
-        参数:
+        Args:
             y: 优化变量 [alpha, T, t_ins]
 
-        返回:
+        Returns:
             (earth_collision, moon_collision): 是否撞击地球、月球
         """
         alpha, transfer_time, t_ins = y
 
-        # 构建出发速度
         v_injection = self.compute_departure_velocity(self.departure_state, alpha)
         initial_state = np.concatenate([self.departure_state[:3], v_injection])
 
-        # 前向积分
         times, states = self.forward_integrate(
             initial_state=initial_state, t_span=(0.0, transfer_time)
         )
@@ -455,12 +428,10 @@ class DROTRONLPOptimizer:
         for state in states:
             pos = state[:3]
 
-            # 到地球距离(地球在-mu处)
             r_earth = np.sqrt((pos[0] + self.mu) ** 2 + pos[1] ** 2 + pos[2] ** 2)
             if r_earth < self.earth_radius:
                 earth_collision = True
 
-            # 到月球距离(月球在1-mu处)
             r_moon = np.sqrt((pos[0] - 1 + self.mu) ** 2 + pos[1] ** 2 + pos[2] ** 2)
             if r_moon < self.moon_radius:
                 moon_collision = True
@@ -479,7 +450,7 @@ class DROTRONLPOptimizer:
     ) -> NLPOptimizationResult:
         """执行NLP优化
 
-        参数:
+        Args:
             initial_guess: 初始猜测
             alpha_range: α范围
             transfer_time_range: 转移时间范围
@@ -488,10 +459,9 @@ class DROTRONLPOptimizer:
             velocity_angle_constraint: 松弛速度约束角度(弧度)
             verbose: 是否打印信息
 
-        返回:
+        Returns:
             优化结果
         """
-        # 设置搜索范围
         if alpha_range is not None:
             self.alpha_range = alpha_range
         if transfer_time_range is not None:
@@ -499,7 +469,6 @@ class DROTRONLPOptimizer:
         if t_ins_range is not None:
             self.t_ins_range = t_ins_range
 
-        # 默认初始猜测
         if initial_guess is None:
             alpha0 = 1.0
             T0 = 10.0
@@ -518,15 +487,11 @@ class DROTRONLPOptimizer:
             print(f"  T范围: [{self.transfer_time_range[0]}, {self.transfer_time_range[1]}]")
             print(f"  t_ins范围: [{self.t_ins_range[0]}, {self.t_ins_range[1]}]")
 
-        # 定义约束
         constraints = []
 
-        # 位置连续性约束
         constraints.append({"type": "eq", "fun": self.constraint_position})
 
-        # 速度平行性约束
         if use_relaxed_velocity_constraint:
-            # 松弛约束: cos(θ) - cos(θ_max) <= 0
             cos_theta_max = np.cos(velocity_angle_constraint)
             constraints.append(
                 {"type": "ineq", "fun": lambda y: cos_theta_max - self._compute_cos_angle(y)}
@@ -534,13 +499,11 @@ class DROTRONLPOptimizer:
         else:
             constraints.append({"type": "eq", "fun": self.constraint_velocity_parallel})
 
-        # 边界
         bounds = Bounds(
             lb=[self.alpha_range[0], self.transfer_time_range[0], self.t_ins_range[0]],
             ub=[self.alpha_range[1], self.transfer_time_range[1], self.t_ins_range[1]],
         )
 
-        # 执行优化
         try:
             result = minimize(
                 self.objective_function,
@@ -560,7 +523,6 @@ class DROTRONLPOptimizer:
             message = f"优化失败: {str(e)}"
             final_y = y0
 
-        # 构建优化结果
         opt_vars = NLPOptimizationVariables.from_array(final_y)
         opt_result = self._build_result(
             opt_vars, success, message, use_relaxed_velocity_constraint, velocity_angle_constraint
@@ -622,32 +584,26 @@ class DROTRONLPOptimizer:
         transfer_time = variables.transfer_time
         t_ins = variables.t_ins
 
-        # 计算轨迹
         v_injection = self.compute_departure_velocity(self.departure_state, alpha)
         initial_state = np.concatenate([self.departure_state[:3], v_injection])
         times, states = self.forward_integrate(
             initial_state=initial_state, t_span=(0.0, transfer_time)
         )
 
-        # 获取各种状态
         insertion_state = self.dynamics.propagate_orbit_state_at_time(
             self.arrival_orbit, float(t_ins)
         )
         final_state = states[-1] if len(states) > 0 else None
 
-        # 计算ΔV
         dv1 = self.compute_delta_v1(self.departure_state, v_injection)
         dv2 = self.compute_delta_v2(
             final_state[3:] if final_state is not None else np.zeros(3), insertion_state[3:]
         )
 
-        # 检查撞星
         earth_col, moon_col = self.check_collision(variables.to_array())
 
-        # 确定转移类型(基于转移时间和特征)
         transfer_type = self._classify_transfer(transfer_time, times, states, insertion_state)
 
-        # 约束违反量
         violation = {}
         if success:
             violation["position"] = self.constraint_position(variables.to_array())
@@ -695,18 +651,14 @@ class DROTRONLPOptimizer:
         if len(states) == 0:
             return TransferType.DIRECT
 
-        # 计算远地点
         x_max_traj = np.max(states[:, 0])
 
-        # 直接转移: 转移时间短,轨迹紧凑
         if transfer_time < 20.0 and x_max_traj < 1.5:
             return TransferType.DIRECT
 
-        # 外部转移: 远地点非常大
         if x_max_traj > 3.0:
             return TransferType.EXTERNAL
 
-        # LGA转移: 其他情况
         return TransferType.LGA
 
 
@@ -721,7 +673,7 @@ def optimize_transfer(
 ) -> NLPOptimizationResult:
     """便捷函数: 优化DRO到RO转移
 
-    参数:
+    Args:
         system: CR3BP系统
         dynamics: CR3BP动力学
         departure_orbit: 出发点轨道
@@ -730,7 +682,7 @@ def optimize_transfer(
         initial_guess: 初始猜测
         **kwargs: 其他优化参数
 
-    返回:
+    Returns:
         优化结果
     """
     optimizer = DROTRONLPOptimizer(
@@ -752,7 +704,7 @@ if NlpCallbackBase is not None:
         用于COPT非线性优化问题的目标函数和约束计算。
         继承自 cp.NlpCallbackBase 以正确处理 SWIG 绑定。
 
-        属性:
+        Attributes:
             optimizer: DROTRONLPOptimizer实例
             x: 当前变量值 [alpha, transfer_time, t_ins]
         """
@@ -982,7 +934,9 @@ if NlpCallbackBase is not None:
             success = self.model.status == COPT.OPTIMAL
 
             return self.optimizer._build_result(
-                opt_vars, success, "COPT solution" if success else f"COPT status: {self.model.status}"
+                opt_vars,
+                success,
+                "COPT solution" if success else f"COPT status: {self.model.status}",
             )
 
 
@@ -1008,7 +962,7 @@ def optimize_with_copt(
 
     数学形式与 ``DROTRONLPOptimizer.optimize`` 相同（等式约束 + 最小化 Δv）。
 
-    参数:
+    Args:
         optimizer: 已设置 ``alpha_range`` / ``transfer_time_range`` / ``t_ins_range`` 的 ``DROTRONLPOptimizer``
         initial_guess: 初始猜测 ``(α, T, t_ins)``；默认 ``(1, 10, 5)``
         fallback_to_scipy: 未安装 COPT 或求解失败时是否回退 SciPy SLSQP
@@ -1017,7 +971,7 @@ def optimize_with_copt(
         time_limit: 若给定，则设置 ``COPT.Param.TimeLimit``（秒），与参考脚本中 MILP 用法一致
         scipy_fallback_kwargs: 回退时传给 ``optimizer.optimize`` 的额外参数
 
-    返回:
+    Returns:
         ``NLPOptimizationResult``
     """
     if scipy_fallback_kwargs is None:
@@ -1029,7 +983,9 @@ def optimize_with_copt(
     if cp is None or COPT is None or NlpCallbackBase is None:
         if fallback_to_scipy:
             return _run_scipy()
-        raise RuntimeError("coptpy 未安装，无法使用 COPT；请安装 coptpy 或设置 fallback_to_scipy=True")
+        raise RuntimeError(
+            "coptpy 未安装，无法使用 COPT；请安装 coptpy 或设置 fallback_to_scipy=True"
+        )
 
     if initial_guess is None:
         alpha0, T0, tins0 = 1.0, 10.0, 5.0

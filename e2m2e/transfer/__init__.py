@@ -1,17 +1,17 @@
-"""
-e2m2e转移轨道设计模块
+"""e2m2e 转移轨道设计模块
 
-提供轨道转移轨道的搜索和优化工具。
+提供 DRO-RO 转移轨道的网格搜索和 NLP 优化工具，实现 Cui et al. (2025) 的"搜索-优化"两步法。
 
-使用方式:
-    from e2m2e.transfer import Transfer
+Classes:
+    TransferSearch: 通用轨道转移网格搜索
+    Transfer: 简化的转移轨道优化接口
+    DROTRONLPOptimizer: DRO-RO 转移轨道 NLP 优化器
+    COPTNLPSolver: 基于 COPT 的 NLP 求解器封装
 
-    transfer = Transfer(dynamics)
-    transfer.set_orbit(start=dro_orbit, end=ro_orbit)
-    result = transfer.optimize(
-        initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
-        alpha_range=(0.5, 2.5),
-    )
+Functions:
+    load_orbit_from_json: 从 JSON 文件加载轨道数据
+    optimize_transfer: 便捷函数：优化 DRO 到 RO 转移
+    optimize_with_copt: 使用 COPT 求解 NLP
 """
 
 from . import transfer_search

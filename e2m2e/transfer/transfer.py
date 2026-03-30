@@ -1,8 +1,6 @@
-"""
-Transfer class for DRO-RO transfer trajectory optimization.
+"""DRO-RO 转移轨迹优化模块
 
-This module provides a simplified interface for transfer trajectory optimization
-using NLP methods (Cui et al. 2025).
+提供基于 NLP 方法（Cui et al. 2025）的简化转移轨迹优化接口。
 """
 
 from __future__ import annotations
@@ -31,17 +29,17 @@ DU = 3.84405000e5
 
 @dataclass
 class TransferConfig:
-    """Configuration for transfer optimization.
+    """转移优化配置
 
     Attributes:
-        alpha_min: Minimum tangential velocity ratio
-        alpha_max: Maximum tangential velocity ratio
-        earth_radius: Earth radius for collision checking (in DU)
-        moon_radius: Moon radius for collision checking (in DU)
-        use_relaxed_velocity: Whether to use relaxed velocity constraint
-        velocity_angle_tol: Velocity angle tolerance for relaxed constraint (radians)
-        use_copt: Whether to use COPT optimizer if available
-        fallback_to_scipy: Whether to fallback to SciPy if COPT fails
+        alpha_min: 切向速度比下界
+        alpha_max: 切向速度比上界
+        earth_radius: 地球碰撞检测半径（无量纲）
+        moon_radius: 月球碰撞检测半径（无量纲）
+        use_relaxed_velocity: 是否使用松弛速度约束
+        velocity_angle_tol: 松弛速度约束角度容差（弧度）
+        use_copt: 是否优先使用 COPT 优化器
+        fallback_to_scipy: COPT 失败时是否回退到 SciPy
     """
 
     alpha_min: float = 0.5
@@ -56,24 +54,24 @@ class TransferConfig:
 
 @dataclass
 class TransferOptimizationResult:
-    """Result of transfer optimization.
+    """转移优化结果
 
     Attributes:
-        success: Whether optimization succeeded
-        message: Solver message
-        departure_state: Departure state [x, y, z, vx, vy, vz]
-        departure_alpha: Tangential velocity ratio at departure
-        departure_beta: Normal velocity ratio at departure
-        insertion_state: Insertion state on RO [x, y, z, vx, vy, vz]
-        final_state: Final state after insertion [x, y, z, vx, vy, vz]
-        delta_v1: Departure impulse magnitude
-        delta_v2: Insertion impulse magnitude
-        total_delta_v: Total delta-v (delta_v1 + delta_v2)
-        transfer_time: Transfer duration
-        t_ins: Insertion time on RO
-        transfer_trajectory: Full transfer trajectory [n_steps, 6]
-        transfer_trajectory_times: Time values for trajectory [n_steps]
-        constraints_violation: Maximum constraint violation
+        success: 优化是否成功
+        message: 求解器消息
+        departure_state: 出发点状态 [x, y, z, vx, vy, vz]
+        departure_alpha: 出发点切向速度比
+        departure_beta: 出发点法向速度比
+        insertion_state: RO 上的插入点状态 [x, y, z, vx, vy, vz]
+        final_state: 插入后最终状态 [x, y, z, vx, vy, vz]
+        delta_v1: 出发脉冲大小
+        delta_v2: 插入脉冲大小
+        total_delta_v: 总脉冲（delta_v1 + delta_v2）
+        transfer_time: 转移时长
+        t_ins: RO 上的插入时间
+        transfer_trajectory: 完整转移轨迹 [n_steps, 6]
+        transfer_trajectory_times: 轨迹时间序列 [n_steps]
+        constraints_violation: 最大约束违反量
     """
 
     success: bool = False
@@ -94,11 +92,9 @@ class TransferOptimizationResult:
 
 
 class Transfer:
-    """DRO-RO transfer trajectory optimizer.
+    """DRO-RO 转移轨迹优化器
 
-    Provides a simplified interface for optimizing transfer trajectories
-    between DRO (Distant Retrograde Orbit) and RO (Rectilinear Orbit)
-    using NLP methods.
+    提供基于 NLP 方法的 DRO（远距逆行轨道）到 RO（直线轨道）转移轨迹优化简化接口。
 
     Example:
         >>> from e2m2e.transfer import Transfer, TransferConfig
@@ -118,10 +114,10 @@ class Transfer:
     """
 
     def __init__(self, dynamics: CR3BP_Dynamics):
-        """Initialize Transfer optimizer.
+        """初始化转移优化器
 
         Args:
-            dynamics: CR3BP dynamics instance for propagation
+            dynamics: CR3BP 动力学实例，用于轨道传播
         """
         self.dynamics = dynamics
         self.system = dynamics.system
@@ -134,33 +130,33 @@ class Transfer:
 
     @property
     def departure_orbit(self) -> Optional[Orbit]:
-        """Departure orbit (DRO)."""
+        """出发轨道（DRO）。"""
         return self._departure_orbit
 
     @property
     def arrival_orbit(self) -> Optional[Orbit]:
-        """Arrival orbit (RO)."""
+        """到达轨道（RO）。"""
         return self._arrival_orbit
 
     @property
     def config(self) -> TransferConfig:
-        """Transfer configuration."""
+        """转移优化配置。"""
         return self._config
 
     @property
     def result(self) -> Optional[TransferOptimizationResult]:
-        """Latest optimization result."""
+        """最新优化结果。"""
         return self._result
 
     def set_orbit(self, start: Orbit, end: Orbit) -> "Transfer":
-        """Set departure and arrival orbits.
+        """设置出发轨道和到达轨道
 
         Args:
-            start: Departure orbit (DRO)
-            end: Arrival orbit (RO)
+            start: 出发轨道（DRO）
+            end: 到达轨道（RO）
 
         Returns:
-            self for method chaining
+            self，支持链式调用
         """
         self._departure_orbit = start
         self._arrival_orbit = end
@@ -175,18 +171,18 @@ class Transfer:
         use_relaxed_velocity: Optional[bool] = None,
         velocity_angle_tol: Optional[float] = None,
     ) -> TransferOptimizationResult:
-        """Optimize transfer trajectory.
+        """优化转移轨迹
 
         Args:
-            initial_guess: Initial guess containing 'alpha', 'transfer_time', 't_ins'
-            alpha_range: Range for alpha parameter (min, max)
-            departure_state: Manual departure state [6], if None auto-samples from DRO
-            t_ins_range: Range for insertion time on RO, defaults to full RO period
-            use_relaxed_velocity: Override config use_relaxed_velocity
-            velocity_angle_tol: Override config velocity_angle_tol
+            initial_guess: 初始猜测，包含 'alpha'、'transfer_time'、't_ins'
+            alpha_range: α 参数范围 (min, max)
+            departure_state: 手动指定出发点状态 [6]；None 时自动从 DRO 采样
+            t_ins_range: RO 上的插入时间范围，默认为完整 RO 周期
+            use_relaxed_velocity: 覆盖配置中的 use_relaxed_velocity
+            velocity_angle_tol: 覆盖配置中的 velocity_angle_tol
 
         Returns:
-            TransferOptimizationResult with optimization details
+            TransferOptimizationResult，包含优化详情
         """
         if self._departure_orbit is None or self._arrival_orbit is None:
             raise ValueError("Must call set_orbit() before optimize()")
@@ -246,20 +242,17 @@ class Transfer:
         return self._result
 
     def _sample_departure_state_from_dro(self) -> np.ndarray:
-        """Sample a departure state from the DRO.
-
-        Returns the first state of the DRO orbit.
-        """
+        """从 DRO 采样出发点状态，返回 DRO 轨道的第一个状态点。"""
         if self._departure_orbit is None:
             raise ValueError("Departure orbit not set")
 
         return self._departure_orbit.states[0].copy()
 
     def _get_ro_period(self) -> float:
-        """Get RO orbit period.
+        """获取 RO 轨道周期
 
         Returns:
-            RO period, or default if not available
+            RO 周期；不可用时返回默认值 10.0
         """
         if self._arrival_orbit is None:
             return 10.0
@@ -276,11 +269,11 @@ class Transfer:
     def _convert_nlp_result(
         self, nlp_result, departure_state: np.ndarray
     ) -> TransferOptimizationResult:
-        """Convert NLPOptimizationResult to TransferOptimizationResult.
+        """将 NLPOptimizationResult 转换为 TransferOptimizationResult
 
         Args:
-            nlp_result: NLP optimization result from DROTRONLPOptimizer
-            departure_state: The actual departure state used
+            nlp_result: DROTRONLPOptimizer 的 NLP 优化结果
+            departure_state: 实际使用的出发点状态
 
         Returns:
             TransferOptimizationResult

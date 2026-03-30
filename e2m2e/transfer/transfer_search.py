@@ -236,12 +236,12 @@ class TransferSearch:
     ) -> List[Dict[str, Any]]:
         """执行网格搜索
 
-        参数:
+        Args:
             alpha_min: α 下界
             alpha_max: α 上界
             n_alpha: α 方向网格点数
             n_departure: 出发点采样数量
-            max_transfer_time: 最大转移时间 (CR3BP 无量纲时间)
+            max_transfer_time: 最大转移时间（CR3BP 无量纲时间）
             intersection_threshold: 相交判定距离阈值
             min_distance_threshold: 候选解距离阈值
             collision_earth_radius: 地球碰撞检测半径
@@ -253,17 +253,15 @@ class TransferSearch:
             n_workers: 并行 worker 数量
             parallel_backend: ``processes``（默认）或 ``threads``
 
-        返回:
+        Returns:
             搜索结果列表
         """
-        # 确定出发轨道和目标轨道
         dep_orbit = departure_orbit if departure_orbit is not None else self._departure_orbit
         arr_orbit = arrival_orbit if arrival_orbit is not None else self._arrival_orbit
 
         if dep_orbit is None or arr_orbit is None:
             raise ValueError("必须提供 departure_orbit 和 arrival_orbit")
 
-        # 设置搜索参数
         self.alpha_min = alpha_min
         self.alpha_max = alpha_max
         self.n_alpha = n_alpha
@@ -275,7 +273,6 @@ class TransferSearch:
         self.collision_moon_radius = collision_moon_radius
         self.integration_dt = integration_dt
 
-        # 设置轨道
         self._departure_orbit = dep_orbit
         self._arrival_orbit = arr_orbit
 
@@ -312,10 +309,10 @@ class TransferSearch:
     def optimize(self, initial_guess: Optional[Dict[str, Any]] = None) -> "NLPOptimizationResult":
         """执行优化
 
-        参数:
+        Args:
             initial_guess: 优化初始猜测（通常来自搜索结果）
 
-        返回:
+        Returns:
             优化结果
         """
         if self._departure_orbit is None or self._arrival_orbit is None:
@@ -367,7 +364,6 @@ class TransferSearch:
         parallel_backend: str,
     ) -> List[Dict[str, Any]]:
         """执行网格搜索的内部方法"""
-        # 获取出发轨道和目标轨道的名称
         dep_name = getattr(departure_orbit, "name", "unknown")
         arr_name = getattr(arrival_orbit, "name", "unknown")
 
@@ -854,9 +850,9 @@ class TransferSearch:
         departure_index: Optional[int] = None,
         progress_queue: Optional[Any] = None,
     ) -> List[Dict[str, Any]]:
-        """对单个出发点搜索α网格
+        """对单个出发点搜索 α 网格
 
-        参数:
+        Args:
             verbose: 未传 ``pbar`` 时是否打印 α 文本进度。
             pbar: 每 α 步 ``update(1)``；可为分槽条或 ``_AggregatePbarWithSlot``。
             departure_index: 当前出发点下标，用于 postfix。
@@ -1011,12 +1007,12 @@ class TransferSearch:
         ``max_transfer_time``、``integration_dt`` 以及动力学对象上的 ``rtol`` / ``atol`` /
         ``max_step``，而非本函数本身。
 
-        参数:
+        Args:
             initial_state: 六维状态 ``[x,y,z,vx,vy,vz]``（无量纲）。
             transfer_time: 积分时长上界（与 ``self.max_transfer_time`` 一致，无量纲）。
             dt: 输出时间步长 ``self.integration_dt``；过密会增大 ``t_eval`` 长度与插值开销。
 
-        返回:
+        Returns:
             ``(states, times)``，与 ``propagate`` 返回的 ``states`` / ``time`` 一致。
         """
         n_steps = max(int(transfer_time / dt) + 1, 2)
@@ -1136,7 +1132,6 @@ class TransferSearch:
         return False, None, -1
 
 
-# 向后兼容别名
 DROTransferSearch = TransferSearch
 DROROTransferSearch = TransferSearch
 
@@ -1213,13 +1208,13 @@ def _process_departure_worker_packed(packed: Tuple[Any, ...]) -> List[Dict[str, 
 
 
 def load_orbit_from_json(filepath: str) -> Orbit:
-    """从JSON文件加载轨道数据
+    """从 JSON 文件加载轨道数据
 
-    参数:
-        filepath: JSON文件路径
+    Args:
+        filepath: JSON 文件路径
 
-    返回:
-        Orbit对象
+    Returns:
+        Orbit 对象
     """
     with open(filepath, "r") as f:
         data = json.load(f)
