@@ -563,5 +563,15 @@ e2m2e/
 │       ├── continuation.py            # Orbit family continuation
 │       └── stability.py              # Stability analysis
 └── docs/
-    └── cr3bp_algorithms.md   # This document
+    ├── reference/
+    │   ├── algorithms_en.md      # This document
+    │   └── api-reference_en.md   # Complete API documentation
+    ├── algorithms/
+    │   ├── continuation_en.md
+    │   ├── halo_en.md
+    │   ├── differential_correction_en.md
+    │   └── stability_en.md
+    └── guides/
+        ├── orbit-generation_en.md
+        └── system-overview_en.md
 ```

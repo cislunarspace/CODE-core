@@ -46,9 +46,9 @@ Implements orbit transfer design based on core modules:
 
 | File | Class | Responsibilities |
 |------|-------|------------------|
-| `transfer_search.py` | `DROTransferSearch` | DRO→RO planar transfer search |
+| `transfer.py` | `Transfer` | Simplified chainable API |
+| `transfer_search.py` | `TransferSearch` | DRO→RO planar transfer grid search (parallel) |
 | `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP optimization |
-| `transfer_base.py` | `SearchConfig` | Search configuration base |
 
 ### Visualization Module
 

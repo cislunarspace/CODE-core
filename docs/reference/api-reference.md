@@ -57,8 +57,7 @@
       - [设计原理](#设计原理-6)
       - [TransferType 枚举](#transfertype-枚举)
       - [核心方法](#核心方法-9)
-    - [3.3 transfer_base](#33-transfer_base)
-      - [TransferStrategy 枚举](#transferstrategy-枚举)
+    - [3.3 Transfer（简化 API）](#33-transfer简化-api)
     - [3.4 工具函数](#34-工具函数)
   - [4. Visualization Module (可视化模块)](#4-visualization-module-可视化模块)
     - [4.1 OrbitVisualizer \& ProjectionPlane](#41-orbitvisualizer--projectionplane)
@@ -522,26 +521,33 @@ $$\nu = \frac{|\lambda_1| + |\lambda_2| + |\lambda_3| + |\lambda_4|}{4}$$
 |------|------|
 | `compute_monodromy()` | 计算单值矩阵 |
 | `compute_floquet_multipliers()` | 计算Floquet乘子 |
-| `analyze_stability()` | 分析稳定性类型 |
-| `detect_bifurcation()` | 检测分岔类型 |
+| `compute_stability_index()` | 计算稳定性指数 (nu1, nu2, nu3, broucke) |
+| `classify_orbit()` | 分析稳定性类型 |
+| `analyze_bifurcation()` | 检测分岔类型 |
+| `full_analysis()` | 运行完整分析 |
+| `detect_bifurcation_in_family(orbits, dynamics)` | 静态方法：检测轨道族中的分岔 |
+| `find_nearest_bifurcation(orbits, dynamics, target_x0)` | 静态方法：查找最近分岔点 |
 
 ---
 
 ## 3. Transfer Module (转移模块)
 
-### 3.1 DROTransferSearch
+### 3.1 TransferSearch / DROTransferSearch
 
 **文件**: `e2m2e/transfer/transfer_search.py`
 
 **类签名**:
 ```python
-class DROTransferSearch:
+class TransferSearch:
     """DRO到RO平面转移轨道的网格搜索"""
+
+DROTransferSearch = TransferSearch   # 别名
+DROROTransferSearch = TransferSearch # 别名
 ```
 
 #### 设计原理
 
-`DROTransferSearch` 实现从远距离逆行轨道（DRO）到共振轨道（RO）的两脉冲转移的网格搜索阶段：
+`TransferSearch` 实现从远距离逆行轨道（DRO）到共振轨道（RO）的两脉冲转移的网格搜索阶段：
 
 1. 在出发 DRO 上采样多个出发点
 2. 对每个出发点，沿切向施加不同速度比 $\alpha$ 进行前向积分
@@ -567,20 +573,26 @@ class DROTransferSearch:
 
 || 方法 | 说明 |
 ||------|------|
-|| `search(dro_orbit, ro_orbit, n_workers=None, parallel_backend="processes")` | 执行网格搜索 |
+|| `search(*, alpha_min, alpha_max, n_alpha, n_departure, max_transfer_time, departure_orbit, arrival_orbit, ...)` | 执行网格搜索 |
+|| `get_feasible_results()` | 获取最近一次搜索的可行结果 |
+|| `optimize(initial_guess)` | 用 NLP 优化最佳搜索结果 |
+|| `set_verbose(verbose)` | 设置详细输出（可链式调用） |
+|| `set_n_workers(n_workers)` | 设置并行工作数（可链式调用） |
+|| `set_parallel_backend(backend)` | 设置后端：`"threads"` / `"processes"`（可链式调用） |
 
 #### 使用示例
 
 ```python
-from e2m2e.transfer import DROTransferSearch
+from e2m2e.transfer import TransferSearch
 
-transfer_search = DROTransferSearch(system=system, dynamics=dynamics)
-transfer_search.alpha_min = 0.5
-transfer_search.alpha_max = 2.5
-transfer_search.n_alpha = 101
-transfer_search.n_departure = 200
-
-results = transfer_search.search(dro_orbit, ro_orbit, n_workers=None)
+transfer_search = TransferSearch(dynamics=dynamics)
+results = transfer_search.search(
+    alpha_min=0.5, alpha_max=2.5,
+    n_alpha=101, n_departure=200,
+    max_transfer_time=200.0,
+    departure_orbit=dro_orbit,
+    arrival_orbit=ro_orbit,
+)
 ```
 
 ---
@@ -625,53 +637,64 @@ class DROTRONLPOptimizer:
 ```python
 from e2m2e.transfer import DROTRONLPOptimizer, NLPOptimizationVariables
 
-optimizer = DROTRONLPOptimizer(system=system, dynamics=dynamics)
-optimizer.dro_orbit = dro_orbit
-optimizer.ro_orbit = ro_orbit
+optimizer = DROTRONLPOptimizer(
+    system=system, dynamics=dynamics,
+    departure_orbit=dro_orbit, arrival_orbit=ro_orbit,
+    departure_state=dro_orbit.states[0],
+)
 
 initial_vars = NLPOptimizationVariables(alpha=1.0, transfer_time=5.0, t_ins=3.0)
-result = optimizer.optimize(initial_vars)
+result = optimizer.optimize(initial_guess=initial_vars)
 ```
 
 ---
 
-### 3.3 transfer_base
+### 3.3 Transfer（简化 API）
 
-**文件**: `e2m2e/transfer/transfer_base.py`
+**文件**: `e2m2e/transfer/transfer.py`
 
 **类签名**:
 ```python
-class BaseTransfer:
-    """转移轨道基类"""
+class Transfer:
+    """DRO-RO 转移轨迹优化的简化链式接口"""
 ```
 
-#### TransferStrategy 枚举
+`Transfer` 封装了 `DROTRONLPOptimizer`，提供流畅的链式调用风格。
 
-|| 值 | 说明 |
-||------|------|
-|| `GRID_SEARCH` | 网格搜索 |
-|| `OPTIMIZATION` | NLP优化 |
-|| `MULTI_SHOOTING` | 多段射击法 |
+#### 使用示例
+
+```python
+from e2m2e.transfer import Transfer
+
+transfer = Transfer(dynamics)
+result = transfer.set_orbit(start=dro_orbit, end=ro_orbit).optimize(
+    initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
+    alpha_range=(0.5, 2.5),
+)
+```
 
 ---
 
 ### 3.4 工具函数
 
 ```python
-from e2m2e.transfer import load_orbit_from_json, save_search_results
+from e2m2e.transfer import load_orbit_from_json, optimize_transfer, optimize_with_copt
 
 # 从JSON加载轨道
 orbit = load_orbit_from_json("path/to/orbit.json")
 
-# 保存搜索结果
-save_search_results(results, "path/to/results.json")
+# 便捷优化函数
+result = optimize_transfer(system, dynamics, departure_orbit, arrival_orbit, departure_state)
+
+# 使用COPT求解器（需安装coptpy）
+result = optimize_with_copt(optimizer, initial_guess, fallback_to_scipy=True)
 ```
 
 ---
 
 ## 4. Visualization Module (可视化模块)
 
-### 3.1 OrbitVisualizer & ProjectionPlane
+### 4.1 OrbitVisualizer & ProjectionPlane
 
 **文件**: `e2m2e/visualization/plotting.py`
 
@@ -695,9 +718,13 @@ class OrbitVisualizer:
 | 主/次天体 | `plot_primary_bodies()` |
 | 平动点标注 | `plot_libration_points()` |
 | 轨道族 | `plot_orbit_family()` |
+| 3D轨道族（缩放） | `plot_3d_orbit_family()` |
+| 共振轨道族 | `plot_resonant_orbit_family()` |
 | 庞加莱截面 | `plot_poincare_section()` |
 | Jacobi常数 | `plot_jacobi_constant()` |
-| 稳定性分析 | `plot_stability_indices()` |
+| 稳定性图 | `plot_stability_diagram()` |
+| 解平面 | `plot_solution_plane()` |
+| 转移轨迹 | `plot_transfer_orbit()` |
 | 概览图 | `create_overview_plot()` |
 
 #### 使用示例
@@ -716,7 +743,7 @@ viz.save('orbit.png', dpi=300)
 
 ---
 
-### 3.2 compute_stability_for_family
+### 4.2 compute_stability_for_family
 
 **文件**: `e2m2e/visualization/plotting.py`
 

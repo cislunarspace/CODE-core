@@ -46,9 +46,9 @@ E2M2E 采用模块化设计，包含四个核心模块：
 
 | 文件 | 类 | 职责 |
 |------|---|------|
-| `transfer_search.py` | `DROTransferSearch` | DRO→RO平面转移搜索 |
-| `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP优化 |
-| `transfer_base.py` | `SearchConfig` | 搜索配置基类 |
+| `transfer.py` | `Transfer` | 简化链式 API |
+| `transfer_search.py` | `TransferSearch` | DRO→RO 平面转移网格搜索（并行） |
+| `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP 优化 |
 
 ### Visualization（可视化模块）
 

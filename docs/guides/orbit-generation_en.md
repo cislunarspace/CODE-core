@@ -260,5 +260,5 @@ The algorithm has built-in adaptive damping; if it still doesn't converge, manua
 
 ## References
 
-- See [Technical Documentation - Differential Correction](e2m2e_technical_documentation.md#21-differentialcorrection)
-- See [CR3BP Algorithms - Orbit Family Continuation](cr3bp_algorithms.md#5-orbit-family-continuation-algorithm)
+- See [API Reference - DifferentialCorrection](../reference/api-reference_en.md#21-differentialcorrection)
+- See [Algorithm Reference - Orbit Family Continuation](../reference/algorithms_en.md#5-orbit-family-continuation-algorithm)

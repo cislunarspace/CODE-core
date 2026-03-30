@@ -10,7 +10,8 @@ docs/
 ├── guides/               # User guides
 │   ├── system-overview.md    # System architecture and design
 │   ├── orbit-generation.md  # Orbit generation tutorial
-│   └── visualization-guide.md # Visualization tutorial
+│   ├── visualization-guide.md # Visualization tutorial
+│   └── release.md            # PyPI release guide
 ├── core/                 # Core modules
 │   ├── system.md         # CR3BP_System - System parameters
 │   ├── dynamics.md       # CR3BP_Dynamics - Dynamics
@@ -18,6 +19,7 @@ docs/
 │   └── coordinate.md     # CoordinateTransformation - Coordinate transforms
 ├── algorithms/           # Algorithm modules
 │   ├── continuation.md       # Continuation method
+│   ├── halo.md               # Halo orbit & pseudo-arclength continuation
 │   ├── differential_correction.md  # Differential correction
 │   └── stability.md          # Stability analysis
 ├── visualization/       # Visualization module
@@ -36,6 +38,7 @@ docs/
 | [System Overview](guides/system-overview.md) | Architecture design, module responsibilities, data flow, typical workflows |
 | [Orbit Generation](guides/orbit-generation.md) | DRO, Halo, Lissajous orbit generation tutorials |
 | [Visualization Guide](guides/visualization-guide.md) | Plotting features, 2D/3D visualization |
+| [Release Guide](guides/release.md) | PyPI release process, version management |
 
 ### Core Modules (core)
 
@@ -53,7 +56,8 @@ docs/
 
 | Class/Module | File | Description |
 |--------------|------|-------------|
-| `ContinuationMethod` | [algorithms/continuation.md](algorithms/continuation.md) | Arc-length continuation method |
+| `ContinuationMethod` | [algorithms/continuation.md](algorithms/continuation.md) | Natural / pseudo-arclength continuation |
+| Halo / PAL orbit family | [algorithms/halo.md](algorithms/halo.md) | Halo initial guess, PAL continuation, scripts vs MATLAB |
 | `DifferentialCorrection` | [algorithms/differential_correction.md](algorithms/differential_correction.md) | Periodic orbit correction |
 | `StabilityAnalysis` | [algorithms/stability.md](algorithms/stability.md) | Floquet stability analysis |
 
@@ -64,6 +68,15 @@ docs/
 | `plot_orbit_2d/3d` | [visualization/plotting.md](visualization/plotting.md) | Orbit plotting |
 | `plot_transfer_2d/3d` | [visualization/plotting.md](visualization/plotting.md) | Transfer trajectory plotting |
 | `plot_system_geometry` | [visualization/plotting.md](visualization/plotting.md) | System geometry plotting |
+
+### Transfer Module (transfer)
+
+| Class/Function | File | Description |
+|----------------|------|-------------|
+| `DROTransferSearch` | [reference/api-reference.md](reference/api-reference.md#31-drotransfersearch) | DRO-to-RO transfer grid search |
+| `DROTRONLPOptimizer` | [reference/api-reference.md](reference/api-reference.md#32-drotronlpoptimizer) | Two-impulse transfer NLP optimizer |
+| `Transfer` | [reference/api-reference.md](reference/api-reference.md#33-transfer) | Simplified chainable transfer API |
+| `load_orbit_from_json` | [reference/api-reference.md](reference/api-reference.md#34-utility-functions) | Load orbit from JSON |
 
 ### Technical Reference (reference)
 

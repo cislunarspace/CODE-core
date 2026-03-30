@@ -562,5 +562,15 @@ e2m2e/
 │       ├── continuation.py            # 轨道族延拓
 │       └── stability.py              # 稳定性分析
 └── docs/
-    └── cr3bp_algorithms.md   # 本文档
+    ├── reference/
+    │   ├── algorithms.md        # 本文档
+    │   └── api-reference.md     # 完整 API 文档
+    ├── algorithms/
+    │   ├── continuation.md
+    │   ├── halo.md
+    │   ├── differential_correction.md
+    │   └── stability.md
+    └── guides/
+        ├── orbit-generation.md
+        └── system-overview.md
 ```

@@ -298,5 +298,5 @@ orbit = Orbit.load_from_file("output/dro_single.json")
 
 ## 参考
 
-- 详见 [技术文档 - 微分修正](e2m2e_technical_documentation.md#21-differentialcorrection)
-- 详见 [CR3BP算法 - 轨道族延拓](cr3bp_algorithms.md#5-轨道族延拓算法)
+- 详见 [API 参考 - DifferentialCorrection](../reference/api-reference.md#21-differentialcorrection)
+- 详见 [算法参考 - 轨道族延拓](../reference/algorithms.md#5-轨道族延拓算法)

@@ -92,39 +92,40 @@ family = continuation.natural_continuation(
 )
 ```
 
-### 3. 转移轨道搜索
+### 3. 转移轨道设计
 
 ```python
-from e2m2e.transfer import DROTransferSearch
+from e2m2e.transfer import Transfer
 
-# 创建搜索器
-searcher = DROTransferSearch(system=system, dynamics=dynamics)
-
-# 设置搜索参数（直接在实例上设置属性）
-searcher.alpha_min = 0.5
-searcher.alpha_max = 2.5
-searcher.n_alpha = 101
-searcher.n_departure = 200
-
-# 执行搜索
-results = searcher.search(dro_orbit, ro_orbit, n_workers=None)
+# 简化链式 API
+transfer = Transfer(dynamics)
+result = transfer.set_orbit(start=dro_orbit, end=ro_orbit).optimize(
+    initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
+    alpha_range=(0.5, 2.5),
+)
 ```
 
-### 4. NLP 优化
+或使用底层搜索 + NLP 两步法：
 
 ```python
-from e2m2e.transfer import DROTRONLPOptimizer, NLPOptimizationVariables
+from e2m2e.transfer import TransferSearch, DROTRONLPOptimizer, NLPOptimizationVariables
 
-# 创建优化器
-optimizer = DROTRONLPOptimizer(system=system, dynamics=dynamics)
-optimizer.dro_orbit = dro_orbit
-optimizer.ro_orbit = ro_orbit
+# 网格搜索
+searcher = TransferSearch(dynamics=dynamics)
+results = searcher.search(
+    alpha_min=0.5, alpha_max=2.5,
+    n_alpha=101, n_departure=200,
+    max_transfer_time=200.0,
+    departure_orbit=dro_orbit, arrival_orbit=ro_orbit,
+)
 
-# 设置初始猜测
-initial_vars = NLPOptimizationVariables(alpha=1.0, transfer_time=5.0, t_ins=3.0)
-
-# 执行优化
-result = optimizer.optimize(initial_vars)
+# NLP 优化
+optimizer = DROTRONLPOptimizer(system=system, dynamics=dynamics,
+                                departure_orbit=dro_orbit, arrival_orbit=ro_orbit,
+                                departure_state=dro_orbit.states[0])
+result = optimizer.optimize(
+    initial_guess=NLPOptimizationVariables(alpha=1.0, transfer_time=5.0, t_ins=3.0),
+)
 ```
 
 ### 4. 可视化
@@ -144,20 +145,20 @@ viz.show()
 ```
 e2m2e/
 ├── core/                 # 核心模块
-│   ├── system.py         # CR3BP 系统定义
-│   ├── dynamics.py       # 动力学模型
-│   ├── orbit.py          # 轨道数据结构
-│   └── coordinate.py     # 坐标变换
+│   ├── system.py         # CR3BP_System - 系统定义、平动点、Jacobi 常数
+│   ├── dynamics.py       # CR3BP_Dynamics - 运动方程、STM、数值积分
+│   ├── orbit.py          # Orbit, OrbitFamily - 轨道数据结构与序列化
+│   └── coordinate.py     # CoordinateTransformation - 坐标变换
 ├── algorithms/           # 算法模块
-│   ├── differential_correction.py  # 微分修正
-│   ├── continuation.py            # 轨道延拓
-│   └── stability.py              # 稳定性分析
-├── transfer/            # 转移轨道设计
-│   ├── transfer_search.py         # DROTransferSearch - 网格搜索
-│   ├── transfer_optimization.py   # DROTRONLPOptimizer - NLP 优化
-│   └── transfer_base.py           # BaseTransfer - 基类
-└── visualization/       # 可视化
-    └── plotting.py     # 绘图工具
+│   ├── differential_correction.py  # DifferentialCorrection - 微分修正
+│   ├── continuation.py             # Continuation - 自然/伪弧长延拓
+│   └── stability.py                # StabilityAnalysis - 稳定性分析
+├── transfer/             # 转移轨道设计
+│   ├── transfer.py                 # Transfer - 简化链式 API
+│   ├── transfer_search.py          # TransferSearch - 网格搜索（并行）
+│   └── transfer_optimization.py    # DROTRONLPOptimizer - NLP 优化
+└── visualization/        # 可视化
+    └── plotting.py                 # OrbitVisualizer - 2D/3D 绘图
 ```
 
 ## 算法介绍

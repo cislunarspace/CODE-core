@@ -49,16 +49,16 @@
       - [Stability Index](#stability-index)
       - [Core Methods](#core-methods-7)
   - [3. Transfer Module](#3-transfer-module)
-    - [3.1 EarthMoonTransfer](#31-earthmoontransfer)
+    - [3.1 TransferSearch / DROTransferSearch](#31-transfersearch--drotransfersearch)
       - [Design Principles](#design-principles-5)
-      - [Transfer Strategies](#transfer-strategies)
+      - [Search Parameters](#search-parameters)
       - [Core Methods](#core-methods-8)
-    - [3.2 MoonEarthTransfer](#32-moonearthtransfer)
+    - [3.2 DROTRONLPOptimizer](#32-drotronlpoptimizer)
+      - [Design Principles](#design-principles-6)
+      - [TransferType Enum](#transfertype-enum)
       - [Core Methods](#core-methods-9)
-    - [3.3 InterOrbitTransfer](#33-interorbittransfer)
-      - [Transfer Types](#transfer-types)
-      - [Poincaré Section Method](#poincare-section-method)
-      - [Core Methods](#core-methods-10)
+    - [3.3 Transfer (Simplified API)](#33-transfer-simplified-api)
+    - [3.4 Utility Functions](#34-utility-functions)
   - [4. Visualization Module](#4-visualization-module)
     - [4.1 OrbitVisualizer \& ProjectionPlane](#41-orbitvisualizer--projectionplane)
       - [Feature List](#feature-list)
@@ -262,12 +262,14 @@ Where $\Phi$ is the state transition matrix.
 
 | Method | Description |
 |--------|-------------|
+| `compute_basic_properties()` | Compute basic orbit properties |
 | `compute_monodromy_matrix(dynamics)` | Compute monodromy matrix |
 | `compute_stability(dynamics)` | Compute stability |
-| `interpolate_at_time(t)` | Time interpolation |
+| `get_period()` | Get orbit period |
 | `get_amplitude(direction)` | Get amplitude |
 | `save_to_file(filename)` | Save to file |
-| `load_from_file(filename)` | Load from file |
+| `load_from_file(filename)` | Load from file (classmethod) |
+| `copy()` | Create a copy |
 
 ---
 
@@ -443,7 +445,12 @@ Where $\mathbf{t}$ is the tangent vector, $\mathbf{u} = [\mathbf{x}; T/2]$ is th
 | Method | Description |
 |--------|-------------|
 | `natural_continuation(seed_orbit, param_range, step_size, verbose)` | Natural parameter continuation |
-| `pseudo_arclength_continuation(seed_state, seed_t_half, n_orbits, verbose)` | Pseudo-arclength continuation |
+| `pseudo_arclength_continuation(seed_orbit, n_orbits, step_size, direction, ..., dc_scheme, ...)` | XZ symmetric pseudo-arclength continuation (`direction`: `positive` / `negative`) |
+| `generate_halo_seed_orbit(libration_point, amplitude_z, halo_class, ...)` | Generate Halo seed orbit |
+| `generate_halo_family(seed_orbit, n_orbits, direction, step_size)` | Halo family by `amplitude_z` natural parameter stepping |
+| `halo_pseudo_arclength_continuation(seed_orbit, n_orbits, direction, step_size, step_size_negative, ...)` | Halo pseudo-arclength family (bi-directional, optional MATLAB alignment params) |
+
+See [Halo Algorithm Documentation](../algorithms/halo.md) for details.
 
 #### Usage Example
 
@@ -516,14 +523,176 @@ For stable orbits, $\nu = 1$.
 |--------|-------------|
 | `compute_monodromy()` | Compute monodromy matrix |
 | `compute_floquet_multipliers()` | Compute Floquet multipliers |
-| `analyze_stability()` | Analyze stability type |
-| `detect_bifurcation()` | Detect bifurcation type |
+| `compute_stability_index()` | Compute stability index (nu1, nu2, nu3, broucke) |
+| `classify_orbit()` | Classify stability type |
+| `analyze_bifurcation()` | Detect bifurcation type |
+| `full_analysis()` | Run complete analysis |
+| `detect_bifurcation_in_family(orbits, dynamics)` | Static: detect bifurcations in orbit family |
+| `find_nearest_bifurcation(orbits, dynamics, target_x0)` | Static: find nearest bifurcation point |
 
 ---
 
-## 3. Visualization Module
+## 3. Transfer Module
 
-### 3.1 OrbitVisualizer & ProjectionPlane
+### 3.1 TransferSearch / DROTransferSearch
+
+**File**: `e2m2e/transfer/transfer_search.py`
+
+**Class Signature**:
+```python
+class TransferSearch:
+    """Grid search for DRO-to-RO planar transfer trajectories"""
+
+DROTransferSearch = TransferSearch   # alias
+DROROTransferSearch = TransferSearch # alias
+```
+
+#### Design Principles
+
+`TransferSearch` implements the grid search phase of the Cui et al. (2025) "search-then-optimize" method for two-impulse transfers from Distant Retrograde Orbit (DRO) to Resonant Orbit (RO):
+
+1. Sample multiple departure points on the DRO
+2. For each departure point, apply different tangential velocity ratios $\alpha$ and forward-integrate
+3. Detect whether the trajectory intersects or reaches local minimum distance to the target RO
+4. Mark feasible candidate solutions
+
+#### Search Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `alpha_min` | float | 0.5 | Lower bound of tangential velocity ratio |
+| `alpha_max` | float | 2.5 | Upper bound of tangential velocity ratio |
+| `n_alpha` | int | 101 | Grid points in $\alpha$ direction |
+| `n_departure` | int | 200 | Number of departure point samples |
+| `max_transfer_time` | float | 200/TU | Maximum transfer time (dimensionless) |
+| `intersection_threshold` | float | 0.001 | Intersection detection threshold (DU) |
+| `min_distance_threshold` | float | 100/DU | Minimum distance threshold |
+| `collision_earth_radius` | float | 200/DU | Earth collision radius |
+| `collision_moon_radius` | float | 100/DU | Moon collision radius |
+| `integration_dt` | float | 1/(24·TU) | Integration step size |
+
+#### Core Methods
+
+| Method | Description |
+|--------|-------------|
+| `search(*, alpha_min, alpha_max, n_alpha, n_departure, max_transfer_time, departure_orbit, arrival_orbit, ...)` | Execute grid search |
+| `get_feasible_results()` | Get feasible results from last search |
+| `optimize(initial_guess)` | Optimize best search result using NLP |
+| `set_verbose(verbose)` | Set verbosity (chainable) |
+| `set_n_workers(n_workers)` | Set parallel worker count (chainable) |
+| `set_parallel_backend(backend)` | Set backend: `"threads"` / `"processes"` (chainable) |
+
+#### Usage Example
+
+```python
+from e2m2e.transfer import TransferSearch
+
+searcher = TransferSearch(dynamics=dynamics)
+results = searcher.search(
+    alpha_min=0.5, alpha_max=2.5,
+    n_alpha=101, n_departure=200,
+    max_transfer_time=200.0,
+    departure_orbit=dro_orbit,
+    arrival_orbit=ro_orbit,
+)
+```
+
+---
+
+### 3.2 DROTRONLPOptimizer
+
+**File**: `e2m2e/transfer/transfer_optimization.py`
+
+**Class Signature**:
+```python
+class DROTRONLPOptimizer:
+    """NLP optimizer for DRO-to-RO two-impulse transfer"""
+```
+
+#### Design Principles
+
+Formulates the two-impulse transfer problem as a Nonlinear Programming (NLP) problem:
+
+- **Optimization variables**: $y = \{\alpha, T, t_{ins}\}$
+- **Objective function**: $J(y) = \Delta v_1 + \Delta v_2$
+- **Constraints**: position continuity, velocity parallelism, collision avoidance
+
+Uses SciPy `minimize(method="SLSQP")` by default. Optionally uses [COPT](https://www.shanshu.ai/copt) solver when `coptpy` is installed.
+
+#### TransferType Enum
+
+| Value | Description |
+|-------|-------------|
+| `DIRECT` | Direct transfer |
+| `LGA` | Lunar gravity assist transfer |
+| `EXTERNAL` | External transfer |
+
+#### Core Methods
+
+| Method | Description |
+|--------|-------------|
+| `optimize(initial_guess, alpha_range, t_ins_range, ...)` | Execute NLP optimization |
+| `compute_departure_velocity(state, alpha, beta)` | Compute departure velocity vector |
+| `forward_integrate(initial_state, t_span)` | Forward integrate trajectory |
+| `set_progress_callback(callback)` | Set iteration progress callback |
+
+#### Usage Example
+
+```python
+from e2m2e.transfer import DROTRONLPOptimizer, NLPOptimizationVariables
+
+optimizer = DROTRONLPOptimizer(
+    system=system, dynamics=dynamics,
+    departure_orbit=dro_orbit, arrival_orbit=ro_orbit,
+    departure_state=dro_orbit.states[0],
+)
+initial_vars = NLPOptimizationVariables(alpha=1.0, transfer_time=5.0, t_ins=3.0)
+result = optimizer.optimize(initial_guess=initial_vars)
+```
+
+---
+
+### 3.3 Transfer (Simplified API)
+
+**File**: `e2m2e/transfer/transfer.py`
+
+**Class Signature**:
+```python
+class Transfer:
+    """Simplified DRO-RO transfer trajectory optimizer with chainable API"""
+```
+
+`Transfer` provides a high-level interface that wraps `DROTRONLPOptimizer` with a fluent API pattern.
+
+#### Usage Example
+
+```python
+from e2m2e.transfer import Transfer
+
+transfer = Transfer(dynamics)
+result = transfer.set_orbit(start=dro_orbit, end=ro_orbit).optimize(
+    initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
+    alpha_range=(0.5, 2.5),
+)
+```
+
+---
+
+### 3.4 Utility Functions
+
+```python
+from e2m2e.transfer import load_orbit_from_json, optimize_transfer, optimize_with_copt
+
+orbit = load_orbit_from_json("path/to/orbit.json")
+result = optimize_transfer(system, dynamics, departure_orbit, arrival_orbit, departure_state)
+result = optimize_with_copt(optimizer, initial_guess, fallback_to_scipy=True)
+```
+
+---
+
+## 4. Visualization Module
+
+### 4.1 OrbitVisualizer & ProjectionPlane
 
 **File**: `e2m2e/visualization/plotting.py`
 
@@ -547,9 +716,13 @@ class OrbitVisualizer:
 | Primary/secondary bodies | `plot_primary_bodies()` |
 | Libration point annotation | `plot_libration_points()` |
 | Orbit family | `plot_orbit_family()` |
+| 3D orbit family (zoomed) | `plot_3d_orbit_family()` |
+| Resonant orbit family | `plot_resonant_orbit_family()` |
 | Poincaré section | `plot_poincare_section()` |
 | Jacobi constant | `plot_jacobi_constant()` |
-| Stability analysis | `plot_stability_indices()` |
+| Stability diagram | `plot_stability_diagram()` |
+| Solution plane | `plot_solution_plane()` |
+| Transfer trajectory | `plot_transfer_orbit()` |
 | Overview plot | `create_overview_plot()` |
 
 #### Usage Example
@@ -568,7 +741,7 @@ viz.save('orbit.png', dpi=300)
 
 ---
 
-### 3.2 compute_stability_for_family
+### 4.2 compute_stability_for_family
 
 **File**: `e2m2e/visualization/plotting.py`
 

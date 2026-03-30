@@ -1,49 +1,45 @@
-# ContinuationMethod
+# Continuation（Orbit Family Continuation）
 
 **File**: `e2m2e/algorithms/continuation.py`
 
 **Class Signature**:
 ```python
 class ContinuationMethod(Enum):
-    NATURAL = "natural"           # Natural continuation
-    PREDICTOR_CORRECTOR = "predictor_corrector"  # Predictor-corrector
-    ARC_LENGTH = "arc_length"     # Arc-length continuation
+    NATURAL = "natural"                # Natural parameter continuation
+    PSEUDO_ARCLENGTH = "pseudo_arclength"  # Pseudo-arclength continuation
+
+class Continuation:
+    """Orbit family continuation: natural parameter, pseudo-arclength (XZ symmetric), Halo seed & family generation"""
 ```
 
 ## Design Principles
 
-Continuation methods are used to trace solution curves in parameter space, especially suitable for handling solution bifurcations and turning points.
-
-## Arc-Length Continuation
-
-Core idea: Treat parameter $\lambda$ as a function of arc length $s$, and advance along the solution curve through predictor-corrector steps.
-
-### Predictor Step
-$$\begin{pmatrix} \mathbf{f}(\mathbf{x}_k) \\ \mathbf{g}(\mathbf{x}_k, s_k) \end{pmatrix} = \mathbf{0}$$
-
-Where $\mathbf{g}$ is the arc-length constraint condition.
-
-### Corrector Step
-Use Newton-Raphson iteration to solve:
-$$\mathbf{J} \Delta \mathbf{x} = -\mathbf{f}$$
-
-Where $\mathbf{J}$ is the extended Jacobian matrix.
+Continuation starts from a known periodic orbit (seed) and incrementally generates orbit families along parameter or pseudo-arclength directions. Natural parameter continuation is simple and effective when the parameter varies monotonically; pseudo-arclength continuation introduces tangent and constraint terms on free variables \(\mathbf{X}=[r_x,r_z,\dot y,T/2]\) to trace family curves with fold-back points.
 
 ## Core Methods
 
 | Method | Description |
 |--------|-------------|
-| `predict(state, tangent, ds)` | Predict next point |
-| `correct(state, constraints)` | Corrector solve |
-| `compute_tangent(jacobian)` | Compute tangent vector |
-| `find_bifurcation(points)` | Detect bifurcation points |
+| `natural_continuation(...)` | Natural parameter continuation |
+| `pseudo_arclength_continuation(seed_orbit, ...)` | XZ symmetric pseudo-arclength continuation (direction: `positive` / `negative`) |
+| `generate_halo_seed_orbit(...)` | Generate Halo seed orbit |
+| `generate_halo_family(...)` | Halo family by `amplitude_z` stepping (independent Richardson initial guess) |
+| `halo_pseudo_arclength_continuation(...)` | Halo-specific: bi-directional branches, step size & MATLAB script alignment |
+
+For Halo initial guess, PAL details, script entry points and MATLAB comparison, see **[Halo Orbit Algorithm Documentation](halo.md)**.
 
 ## Usage Example
 
 ```python
-from e2m2e.algorithms.continuation import ContinuationMethod
+from e2m2e.algorithms.continuation import Continuation
 
-# Continue along parameter curve
-continuer = ArcLengthContinuation(f, jacobian)
-curve = continuer.continue_curve(x0, lambda_range, ds=0.01)
+continuation = Continuation(corrector, step=0.01)
+family = continuation.natural_continuation(
+    seed_orbit=seed_orbit,
+    param_range=(0.8, 1.0),
+    step_size=0.01,
+    verbose=True,
+)
 ```
+
+For pseudo-arclength and Halo family examples, see [Halo](halo.md) and [Orbit Generation Guide - Halo](../guides/orbit-generation.md#halo-orbit).
