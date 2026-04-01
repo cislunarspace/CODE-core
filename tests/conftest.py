@@ -2,9 +2,14 @@
 pytest configuration and shared fixtures for e2m2e tests
 """
 
+import os
 import pytest
 import numpy as np
 from e2m2e.core import CR3BP_System, CR3BP_Dynamics, CoordinateTransformation, Orbit
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "spice: marks tests requiring SPICE kernel files")
 
 
 @pytest.fixture
@@ -65,3 +70,49 @@ def initialized_system(earth_moon_system):
     system = CR3BP_System.from_known_system("earth_moon")
     system.set_characteristic_scales(distance=384400, period=27.32 * 86400)
     return system
+
+
+# =============================================================================
+# Ephemeris model fixtures (需求: DRO CR3BP→星历模型转换)
+# =============================================================================
+SPICE_KERNEL_DIR = os.environ.get(
+    "SPICE_KERNEL_DIR",
+    os.path.join(os.path.dirname(__file__), "..", "kernels"),
+)
+
+# 地月系统物理参数
+MU = 1.21506683e-2
+DU = 3.84405e5  # km
+TU_SECONDS = 4.34811305 * 86400  # 秒
+VU = DU / TU_SECONDS  # km/s
+
+
+@pytest.fixture
+def spice_kernel_path():
+    """返回DE440内核文件路径，不存在则跳过"""
+    kernel_file = os.path.join(SPICE_KERNEL_DIR, "de440.bsp")
+    if not os.path.exists(kernel_file):
+        kernel_file = os.path.join(SPICE_KERNEL_DIR, "de440s.bsp")
+    if not os.path.exists(kernel_file):
+        kernel_file = os.path.join(SPICE_KERNEL_DIR, "de438.bsp")
+    if not os.path.exists(kernel_file):
+        pytest.skip("DE440/DE438 SPICE kernel not found, set SPICE_KERNEL_DIR")
+    return kernel_file
+
+
+@pytest.fixture
+def reference_epoch():
+    """参考历元: 2025-06-21 11:00:06 UTC (J2000后的ET秒数)"""
+    return "2025-06-21T11:00:06"
+
+
+@pytest.fixture
+def dro_31_state():
+    """3:1 DRO初始状态（CR3BP旋转系，无量纲）"""
+    return np.array([1.1202109158830986, 0.0, 0.0, 0.0, -0.46178983697629084, 0.0])
+
+
+@pytest.fixture
+def dro_31_period():
+    """3:1 DRO周期（无量纲TU）"""
+    return 2.095
