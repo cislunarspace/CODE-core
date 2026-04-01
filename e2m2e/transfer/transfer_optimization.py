@@ -182,9 +182,79 @@ class DROTRONLPOptimizer:
 
         self._last_trajectory: Optional[Tuple[np.ndarray, np.ndarray]] = None
         self._progress_callback: Optional[Callable] = None
+        self._eval_cache: Optional[Dict[str, Any]] = None
+        self._eval_cache_key: Optional[bytes] = None
+        self._cache_enabled: bool = False
 
     def set_progress_callback(self, callback: Optional[Callable]) -> None:
         self._progress_callback = callback
+
+    def enable_cache(self, enabled: bool = True) -> None:
+        self._cache_enabled = enabled
+
+    def _y_key(self, y: np.ndarray) -> bytes:
+        return y.tobytes()
+
+    def _evaluate_all(self, y: np.ndarray) -> Dict[str, Any]:
+        key = self._y_key(y)
+        if self._cache_enabled and self._eval_cache_key == key and self._eval_cache is not None:
+            return self._eval_cache
+
+        alpha, transfer_time, t_ins = y
+
+        v_injection = self.compute_departure_velocity(self.departure_state, alpha)
+        initial_state = np.concatenate([self.departure_state[:3], v_injection])
+
+        times, states = self.forward_integrate(
+            initial_state=initial_state, t_span=(0.0, transfer_time)
+        )
+
+        empty = len(states) == 0
+
+        if not empty:
+            final_state = states[-1]
+        else:
+            final_state = np.zeros(6)
+
+        insertion_state = self.dynamics.propagate_orbit_state_at_time(
+            self.arrival_orbit, float(t_ins)
+        ) if not empty else np.zeros(6)
+
+        dv1 = self.compute_delta_v1(self.departure_state, v_injection) if not empty else 1e10
+        dv2 = self.compute_delta_v2(final_state[3:], insertion_state[3:]) if not empty else 1e10
+
+        pos_diff = final_state[:3] - insertion_state[:3]
+        pos_violation = np.dot(pos_diff, pos_diff) if not empty else 1e6
+
+        v_f = final_state[3:]
+        v_ins = insertion_state[3:]
+        v_f_norm = np.linalg.norm(v_f)
+        v_ins_norm = np.linalg.norm(v_ins)
+        if not empty and v_f_norm > 1e-10 and v_ins_norm > 1e-10:
+            cos_angle = np.dot(v_f, v_ins) / (v_f_norm * v_ins_norm)
+        else:
+            cos_angle = -1.0
+
+        cache = {
+            "v_injection": v_injection,
+            "times": times,
+            "states": states,
+            "final_state": final_state,
+            "insertion_state": insertion_state,
+            "dv1": dv1,
+            "dv2": dv2,
+            "objective": dv1 + dv2,
+            "pos_violation": pos_violation if not empty else 1e6,
+            "cos_angle": cos_angle,
+            "vel_constraint": cos_angle - 1.0 if not empty else 1e6,
+            "empty": empty,
+        }
+
+        if self._cache_enabled:
+            self._eval_cache = cache
+            self._eval_cache_key = key
+
+        return cache
 
     def compute_departure_velocity(
         self, state: np.ndarray, alpha: float, beta: float = 0.0
@@ -307,28 +377,10 @@ class DROTRONLPOptimizer:
         Returns:
             总脉冲代价
         """
-        alpha, transfer_time, t_ins = y
-
-        v_injection = self.compute_departure_velocity(self.departure_state, alpha)
-        initial_state = np.concatenate([self.departure_state[:3], v_injection])
-
-        times, states = self.forward_integrate(
-            initial_state=initial_state, t_span=(0.0, transfer_time)
-        )
-
-        if len(states) == 0:
+        cache = self._evaluate_all(y)
+        if cache["empty"]:
             return 1e10
-
-        final_state = states[-1]
-
-        insertion_state = self.dynamics.propagate_orbit_state_at_time(
-            self.arrival_orbit, float(t_ins)
-        )
-
-        dv1 = self.compute_delta_v1(self.departure_state, v_injection)
-        dv2 = self.compute_delta_v2(final_state[3:], insertion_state[3:])
-
-        return dv1 + dv2
+        return cache["objective"]
 
     def constraint_position(self, y: np.ndarray) -> float:
         """位置连续性约束 Eq.(13)
@@ -341,27 +393,8 @@ class DROTRONLPOptimizer:
         Returns:
             约束违反量
         """
-        alpha, transfer_time, t_ins = y
-
-        v_injection = self.compute_departure_velocity(self.departure_state, alpha)
-        initial_state = np.concatenate([self.departure_state[:3], v_injection])
-
-        times, states = self.forward_integrate(
-            initial_state=initial_state, t_span=(0.0, transfer_time)
-        )
-
-        if len(states) == 0:
-            return 1e6
-
-        final_state = states[-1]
-        insertion_state = self.dynamics.propagate_orbit_state_at_time(
-            self.arrival_orbit, float(t_ins)
-        )
-
-        pos_diff = final_state[:3] - insertion_state[:3]
-        constraint = np.dot(pos_diff, pos_diff)
-
-        return constraint
+        cache = self._evaluate_all(y)
+        return cache["pos_violation"]
 
     def constraint_velocity_parallel(self, y: np.ndarray) -> float:
         """速度平行性约束 Eq.(14) 或relaxed Eq.(17)
@@ -374,37 +407,8 @@ class DROTRONLPOptimizer:
         Returns:
             约束违反量
         """
-        alpha, transfer_time, t_ins = y
-
-        v_injection = self.compute_departure_velocity(self.departure_state, alpha)
-        initial_state = np.concatenate([self.departure_state[:3], v_injection])
-
-        times, states = self.forward_integrate(
-            initial_state=initial_state, t_span=(0.0, transfer_time)
-        )
-
-        if len(states) == 0:
-            return 1e6
-
-        final_state = states[-1]
-        insertion_state = self.dynamics.propagate_orbit_state_at_time(
-            self.arrival_orbit, float(t_ins)
-        )
-
-        v_f = final_state[3:]
-        v_ins = insertion_state[3:]
-
-        v_f_norm = np.linalg.norm(v_f)
-        v_ins_norm = np.linalg.norm(v_ins)
-
-        if v_f_norm < 1e-10 or v_ins_norm < 1e-10:
-            return 1e6
-
-        cos_angle = np.dot(v_f, v_ins) / (v_f_norm * v_ins_norm)
-
-        constraint = cos_angle - 1.0
-
-        return constraint
+        cache = self._evaluate_all(y)
+        return cache["vel_constraint"]
 
     def check_collision(self, y: np.ndarray) -> Tuple[bool, bool]:
         """检查是否撞击地球或月球
@@ -485,6 +489,8 @@ class DROTRONLPOptimizer:
 
         y0 = np.array([alpha0, T0, t_ins0])
 
+        self.enable_cache(True)
+
         if verbose:
             print("\n开始NLP优化:")
             print(f"  初始猜测: α={alpha0:.4f}, T={T0:.4f}, t_ins={t_ins0:.4f}")
@@ -558,33 +564,8 @@ class DROTRONLPOptimizer:
 
     def _compute_cos_angle(self, y: np.ndarray) -> float:
         """计算速度夹角余弦"""
-        alpha, transfer_time, t_ins = y
-
-        v_injection = self.compute_departure_velocity(self.departure_state, alpha)
-        initial_state = np.concatenate([self.departure_state[:3], v_injection])
-
-        times, states = self.forward_integrate(
-            initial_state=initial_state, t_span=(0.0, transfer_time)
-        )
-
-        if len(states) == 0:
-            return -1.0
-
-        final_state = states[-1]
-        insertion_state = self.dynamics.propagate_orbit_state_at_time(
-            self.arrival_orbit, float(t_ins)
-        )
-
-        v_f = final_state[3:]
-        v_ins = insertion_state[3:]
-
-        v_f_norm = np.linalg.norm(v_f)
-        v_ins_norm = np.linalg.norm(v_ins)
-
-        if v_f_norm < 1e-10 or v_ins_norm < 1e-10:
-            return -1.0
-
-        return np.dot(v_f, v_ins) / (v_f_norm * v_ins_norm)
+        cache = self._evaluate_all(y)
+        return cache["cos_angle"]
 
     def _build_result(
         self,
