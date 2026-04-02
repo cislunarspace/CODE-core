@@ -1,11 +1,18 @@
 """
-e2m2e可视化模块
-
-提供轨道绘图、庞加莱截面图、稳定性图等可视化工具。
+e2m2e visualization module
 """
 
-from . import plotting
+from .config import PlotConfig
+from .base import OrbitVisualizer, ProjectionPlane
+from .family import FamilyPlotter
+from .transfer import TransferPlotter
+from .stability import compute_stability_for_family
 
-from .plotting import OrbitVisualizer
-
-__all__ = ["OrbitVisualizer"]
+__all__ = [
+    "PlotConfig",
+    "OrbitVisualizer",
+    "ProjectionPlane",
+    "FamilyPlotter",
+    "TransferPlotter",
+    "compute_stability_for_family",
+]
