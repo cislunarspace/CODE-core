@@ -75,6 +75,9 @@
 
 from __future__ import annotations
 
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 import matplotlib
 import matplotlib.colors as mcolors
 import matplotlib.offsetbox as offsetbox
@@ -132,8 +135,24 @@ class ProjectionPlane(Enum):
     YZ = "yz"
 
 
-def compute_stability_for_family(family_result, system):
-    """计算轨道族的稳定性指数
+def _compute_single_stability(args):
+    """单条轨道的稳定性指数计算（供并行调用）"""
+    i, initial_state, period, system = args
+    if period is None:
+        return (i, 1.0)
+    try:
+        dynamics = CR3BP_Dynamics(system)
+        monodromy = dynamics.compute_state_transition_matrix(initial_state, period)
+        eigenvalues = np.linalg.eigvals(monodromy)
+        magnitudes = np.abs(eigenvalues)
+        stability_idx = float(np.max(magnitudes))
+        return (i, stability_idx)
+    except Exception:
+        return (i, 1.0)
+
+
+def compute_stability_for_family(family_result, system, max_workers=None):
+    """计算轨道族的稳定性指数（并行版本）
 
     稳定性指数（Stability Index）是判断轨道长期稳定性的重要指标。
     在圆形限制性三体问题中，通过计算单值矩阵（Monodromy Matrix）
@@ -145,57 +164,36 @@ def compute_stability_for_family(family_result, system):
     参数：
         family_result: OrbitFamily对象，包含多条轨道的轨道族
         system: CR3BP_System对象，用于提供动力学模型
+        max_workers: 并行进程数，默认使用CPU核心数
 
     返回：
         list: 稳定性指数列表，每个元素对应一条轨道的最大特征值模长
     """
-    # 创建CR3BP动力学模型，用于后续计算状态转移矩阵
-    dynamics = CR3BP_Dynamics(system)
-
-    stability_values = []
-
-    # 处理空轨道族的边界情况
     if family_result is None or len(family_result) == 0:
-        return stability_values
+        return []
 
-    # 遍历轨道族中的每一条轨道，计算其稳定性指数
-    for i, orbit in enumerate(family_result):
-        # 确保每条轨道关联到指定的系统（用于动力学计算）
+    for orbit in family_result:
         if orbit.system is None:
             orbit.system = system
 
-        try:
-            # 如果轨道没有周期信息，假设为中性稳定（稳定性指数=1.0）  \\TODO 这也是不合适的，正是这个假设，使得我之前画图的时候存在间断点。
-            if orbit.period is None:
-                stability_values.append(1.0)
-                continue
+    tasks = []
+    for i, orbit in enumerate(family_result):
+        tasks.append((i, orbit.states[0].copy(), orbit.period, system))
 
-            # =========================================================
-            # 核心计算步骤：
-            # 1. 计算单值矩阵（Monodromy Matrix）
-            #    沿轨道积分一个周期得到的状态转移矩阵 M
-            # 2. 求单值矩阵的特征值 λ_i（CR3BP是4维状态空间，有4个特征值）
-            # 3. 取特征值模长的最大值作为稳定性指数
-            # =========================================================
+    if max_workers is None:
+        max_workers = min(multiprocessing.cpu_count(), len(tasks))
 
-            # 计算单值矩阵：从轨道起点出发，积分一个周期返回的状态转移矩阵
-            monodromy = dynamics.compute_state_transition_matrix(orbit.states[0], orbit.period)
+    results: list[float] = [1.0] * len(tasks)
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        future_to_idx = {
+            executor.submit(_compute_single_stability, task): task[0]
+            for task in tasks
+        }
+        for future in as_completed(future_to_idx):
+            idx, value = future.result()
+            results[idx] = value
 
-            # 计算单值矩阵的特征值
-            eigenvalues = np.linalg.eigvals(monodromy)
-
-            # 取所有特征值的模长
-            magnitudes = np.abs(eigenvalues)
-
-            # 稳定性指数 = 最大特征值模长
-            stability_idx = np.max(magnitudes)
-            stability_values.append(stability_idx)
-
-        except Exception:
-            # 计算失败时，假设为中性稳定 //TODO 这个假设可能不太好，正是这个假设，使得我之前画图的时候存在间断点。
-            stability_values.append(1.0)
-
-    return stability_values
+    return results
 
 
 class OrbitVisualizer:
