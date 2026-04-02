@@ -78,6 +78,10 @@ Thumbs.db
 *.seed
 *.pid.lock
 
+# SPICE kernel 大文件（超过 Gitee 100MB 限制）
+# 下载方式：https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/
+kernels/*.bsp
+
 # 特定于项目的临时文件
 temp.py
 *.ipynb
