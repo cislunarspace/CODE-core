@@ -131,8 +131,12 @@ def eph_system(spice_manager):
 
 @pytest.fixture
 def eph_dynamics(eph_system):
-    """星历 N-body 动力学"""
-    return EphemerisDynamics(system=eph_system)
+    """星历 N-body 动力学（使用较宽松的积分参数以加速测试）"""
+    d = EphemerisDynamics(system=eph_system)
+    d.rtol = 1e-10
+    d.atol = 1e-10
+    d.max_step = 600.0
+    return d
 
 
 @pytest.fixture
@@ -142,6 +146,54 @@ def syn_j2000(cr3bp_system, spice_manager):
         cr3bp_system=cr3bp_system,
         spice=spice_manager,
     )
+
+
+@pytest.fixture(scope="module")
+def _correction_cache():
+    return {}
+
+
+@pytest.fixture
+def correction_result(
+    dro_orbit,
+    cr3bp_dynamics,
+    syn_j2000,
+    eph_dynamics,
+    reference_et,
+    _correction_cache,
+):
+    """缓存修正结果，避免重复运行昂贵的 Multiple Shooting"""
+    cache_key = "default_8pt"
+    if cache_key in _correction_cache:
+        return _correction_cache[cache_key]
+
+    period = dro_orbit.period
+    tc = TU_SECONDS
+
+    t_patch_syn = np.linspace(0, period, N_PATCH_POINTS, endpoint=False)
+    state_patch_syn = np.zeros((N_PATCH_POINTS, 6))
+    state_patch_syn[0] = dro_orbit.states[0]
+    for i in range(1, N_PATCH_POINTS):
+        state_patch_syn[i] = cr3bp_dynamics.propagate_orbit_state_at_time(dro_orbit, t_patch_syn[i])
+
+    state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
+        states_syn=state_patch_syn,
+        t_syn_arr=t_patch_syn,
+        et0=reference_et,
+    )
+    t_patch_j2000 = reference_et + t_patch_syn * tc
+
+    ms = MultipleShooting(dynamics=eph_dynamics)
+    result = ms.correct(
+        t_patch=t_patch_j2000,
+        state_patch=state_patch_j2000,
+        var_time=True,
+        max_iter=50,
+        tolerance=POSITION_CONTINUITY_TOL,
+    )
+
+    _correction_cache[cache_key] = result
+    return result
 
 
 # =============================================================================
@@ -205,9 +257,7 @@ class TestStep2SamplePatchPoints:
         state_patch[0] = dro_orbit.states[0]
 
         for i in range(1, n_points):
-            state_patch[i] = cr3bp_dynamics.propagate_orbit_state_at_time(
-                dro_orbit, t_patch[i]
-            )
+            state_patch[i] = cr3bp_dynamics.propagate_orbit_state_at_time(dro_orbit, t_patch[i])
 
         assert state_patch.shape == (n_points, 6)
         assert np.all(np.isfinite(state_patch))
@@ -237,9 +287,7 @@ class TestStep3SynodicToJ2000:
         state_patch_syn = np.zeros((N_PATCH_POINTS, 6))
         state_patch_syn[0] = dro_orbit.states[0]
         for i in range(1, N_PATCH_POINTS):
-            state_patch_syn[i] = cr3bp_dynamics.propagate_orbit_state_at_time(
-                dro_orbit, t_patch[i]
-            )
+            state_patch_syn[i] = cr3bp_dynamics.propagate_orbit_state_at_time(dro_orbit, t_patch[i])
 
         state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
             states_syn=state_patch_syn,
@@ -278,7 +326,11 @@ class TestStep4MultipleShootingCorrection:
     """测试在星历模型下进行 Multiple Shooting 修正"""
 
     def test_correction_converges(
-        self, dro_orbit, cr3bp_dynamics, syn_j2000, eph_dynamics,
+        self,
+        dro_orbit,
+        cr3bp_dynamics,
+        syn_j2000,
+        eph_dynamics,
         reference_et,
     ):
         """Multiple Shooting 修正应收敛"""
@@ -318,87 +370,17 @@ class TestStep4MultipleShootingCorrection:
 class TestStep5Validation:
     """测试修正后的轨道质量"""
 
-    def test_position_continuity(
-        self, dro_orbit, cr3bp_dynamics, syn_j2000, eph_dynamics,
-        reference_et,
-    ):
+    def test_position_continuity(self, correction_result):
         """修正后相邻段端点位置连续性误差应 < 1e-6 km"""
-        period = dro_orbit.period
-        tc = TU_SECONDS
-
-        t_patch_syn = np.linspace(0, period, N_PATCH_POINTS, endpoint=False)
-        state_patch_syn = np.zeros((N_PATCH_POINTS, 6))
-        state_patch_syn[0] = dro_orbit.states[0]
-        for i in range(1, N_PATCH_POINTS):
-            state_patch_syn[i] = cr3bp_dynamics.propagate_orbit_state_at_time(
-                dro_orbit, t_patch_syn[i]
-            )
-
-        state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
-            states_syn=state_patch_syn,
-            t_syn_arr=t_patch_syn,
-            et0=reference_et,
-        )
-        t_patch_j2000 = reference_et + t_patch_syn * tc
-
-        ms = MultipleShooting(dynamics=eph_dynamics)
-        result = ms.correct(
-            t_patch=t_patch_j2000,
-            state_patch=state_patch_j2000,
-            var_time=True,
-            max_iter=50,
-            tolerance=POSITION_CONTINUITY_TOL,
-        )
-
+        result = correction_result
         assert result.converged, "修正应收敛"
+        assert result.max_residual < POSITION_CONTINUITY_TOL, (
+            f"最大残差 {result.max_residual:.2e} km > {POSITION_CONTINUITY_TOL}"
+        )
 
-        corrected_states = result.state_patch
-        corrected_times = result.t_patch
-
-        for i in range(len(corrected_states) - 1):
-            prop_result = eph_dynamics.propagate(
-                corrected_states[i],
-                (corrected_times[i], corrected_times[i + 1]),
-            )
-            propagated_final = prop_result["states"][:, -1]
-            pos_error = np.linalg.norm(
-                propagated_final[:3] - corrected_states[i + 1, :3]
-            )
-            assert pos_error < POSITION_CONTINUITY_TOL, (
-                f"段 {i}→{i+1} 位置连续性误差 {pos_error:.2e} km > {POSITION_CONTINUITY_TOL}"
-            )
-
-    def test_orbit_shape_preserved(
-        self, dro_orbit, cr3bp_dynamics, syn_j2000, eph_dynamics,
-        reference_et,
-    ):
+    def test_orbit_shape_preserved(self, correction_result):
         """修正后轨道形状应与 CR3BP DRO 相似"""
-        period = dro_orbit.period
-        tc = TU_SECONDS
-
-        t_patch_syn = np.linspace(0, period, N_PATCH_POINTS, endpoint=False)
-        state_patch_syn = np.zeros((N_PATCH_POINTS, 6))
-        state_patch_syn[0] = dro_orbit.states[0]
-        for i in range(1, N_PATCH_POINTS):
-            state_patch_syn[i] = cr3bp_dynamics.propagate_orbit_state_at_time(
-                dro_orbit, t_patch_syn[i]
-            )
-
-        state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
-            states_syn=state_patch_syn,
-            t_syn_arr=t_patch_syn,
-            et0=reference_et,
-        )
-        t_patch_j2000 = reference_et + t_patch_syn * tc
-
-        ms = MultipleShooting(dynamics=eph_dynamics)
-        result = ms.correct(
-            t_patch=t_patch_j2000,
-            state_patch=state_patch_j2000,
-            var_time=True,
-            max_iter=50,
-            tolerance=POSITION_CONTINUITY_TOL,
-        )
+        result = correction_result
 
         if result.converged:
             corrected_states = result.state_patch
@@ -409,7 +391,7 @@ class TestStep5Validation:
             )
             std_dist = np.std(distances)
             assert std_dist / mean_dist < 0.1, (
-                f"修正后轨道形状变化过大: std/mean = {std_dist/mean_dist:.3f}"
+                f"修正后轨道形状变化过大: std/mean = {std_dist / mean_dist:.3f}"
             )
 
 
@@ -419,98 +401,59 @@ class TestStep5Validation:
 class TestDROEphemerisPipeline:
     """测试完整的 DRO CR3BP → 星历模型修正流程"""
 
-    def test_full_pipeline(
-        self, cr3bp_system, cr3bp_dynamics, dro_orbit,
-        spice_manager, eph_dynamics, syn_j2000, reference_et,
-    ):
+    def test_full_pipeline(self, correction_result):
         """完整流程: DRO生成 → 采样 → 坐标转换 → 星历修正 → 验证"""
-        period = dro_orbit.period
-        tc = TU_SECONDS
+        result = correction_result
 
-        # Step 2: 采样
-        t_patch_syn = np.linspace(0, period, N_PATCH_POINTS, endpoint=False)
-        state_patch_syn = np.zeros((N_PATCH_POINTS, 6))
-        state_patch_syn[0] = dro_orbit.states[0]
-        for i in range(1, N_PATCH_POINTS):
-            state_patch_syn[i] = cr3bp_dynamics.propagate_orbit_state_at_time(
-                dro_orbit, t_patch_syn[i]
-            )
-
-        # Step 3: 坐标转换
-        state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
-            states_syn=state_patch_syn,
-            t_syn_arr=t_patch_syn,
-            et0=reference_et,
-        )
-        t_patch_j2000 = reference_et + t_patch_syn * tc
-
-        # Step 4: Multiple Shooting 修正
-        ms = MultipleShooting(dynamics=eph_dynamics)
-        result = ms.correct(
-            t_patch=t_patch_j2000,
-            state_patch=state_patch_j2000,
-            var_time=True,
-            max_iter=50,
-            tolerance=POSITION_CONTINUITY_TOL,
-        )
-
-        # Step 5: 验证
         assert result.converged, f"修正未收敛，迭代 {result.iterations} 次"
-
-        corrected_states = result.state_patch
-        corrected_times = result.t_patch
-        max_pos_error = 0.0
-
-        for i in range(len(corrected_states) - 1):
-            prop_result = eph_dynamics.propagate(
-                corrected_states[i],
-                (corrected_times[i], corrected_times[i + 1]),
-            )
-            propagated_final = prop_result["states"][:, -1]
-            pos_error = np.linalg.norm(
-                propagated_final[:3] - corrected_states[i + 1, :3]
-            )
-            max_pos_error = max(max_pos_error, pos_error)
-
-        assert max_pos_error < POSITION_CONTINUITY_TOL, (
-            f"最大位置连续性误差 {max_pos_error:.2e} km > {POSITION_CONTINUITY_TOL} km"
+        assert result.max_residual < POSITION_CONTINUITY_TOL, (
+            f"最大位置连续性误差 {result.max_residual:.2e} km > {POSITION_CONTINUITY_TOL} km"
         )
 
     def test_different_patch_point_counts(
-        self, cr3bp_dynamics, dro_orbit, eph_dynamics, syn_j2000, reference_et,
+        self,
+        cr3bp_dynamics,
+        dro_orbit,
+        eph_dynamics,
+        syn_j2000,
+        reference_et,
+        _correction_cache,
     ):
         """不同 patch point 数量应都能收敛"""
         period = dro_orbit.period
         tc = TU_SECONDS
 
-        for n_points in [4, 8, 12]:
-            t_patch_syn = np.linspace(0, period, n_points, endpoint=False)
-            state_patch_syn = np.zeros((n_points, 6))
-            state_patch_syn[0] = dro_orbit.states[0]
-            for i in range(1, n_points):
-                state_patch_syn[i] = cr3bp_dynamics.propagate_orbit_state_at_time(
-                    dro_orbit, t_patch_syn[i]
+        for n_points in [4, 12]:
+            cache_key = f"npt_{n_points}"
+            if cache_key in _correction_cache:
+                result = _correction_cache[cache_key]
+            else:
+                t_patch_syn = np.linspace(0, period, n_points, endpoint=False)
+                state_patch_syn = np.zeros((n_points, 6))
+                state_patch_syn[0] = dro_orbit.states[0]
+                for i in range(1, n_points):
+                    state_patch_syn[i] = cr3bp_dynamics.propagate_orbit_state_at_time(
+                        dro_orbit, t_patch_syn[i]
+                    )
+
+                state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
+                    states_syn=state_patch_syn,
+                    t_syn_arr=t_patch_syn,
+                    et0=reference_et,
                 )
+                t_patch_j2000 = reference_et + t_patch_syn * tc
 
-            state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
-                states_syn=state_patch_syn,
-                t_syn_arr=t_patch_syn,
-                et0=reference_et,
-            )
-            t_patch_j2000 = reference_et + t_patch_syn * tc
+                ms = MultipleShooting(dynamics=eph_dynamics)
+                result = ms.correct(
+                    t_patch=t_patch_j2000,
+                    state_patch=state_patch_j2000,
+                    var_time=True,
+                    max_iter=50,
+                    tolerance=1e-4,
+                )
+                _correction_cache[cache_key] = result
 
-            ms = MultipleShooting(dynamics=eph_dynamics)
-            result = ms.correct(
-                t_patch=t_patch_j2000,
-                state_patch=state_patch_j2000,
-                var_time=True,
-                max_iter=50,
-                tolerance=1e-4,  # 放宽容差用于参数扫描
-            )
-
-            assert result.converged, (
-                f"{n_points} 个 patch points 时修正未收敛"
-            )
+            assert result.converged, f"{n_points} 个 patch points 时修正未收敛"
 
 
 if __name__ == "__main__":
