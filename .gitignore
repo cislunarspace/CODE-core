@@ -101,18 +101,6 @@ site/
 .pytype/
 .pyre/
 
-# 特定于 e2m2e 项目的临时文件
-# 添加您项目特有的临时文件模式
-*.dat
-*.out
-*.err
-output/
-out/
-results/
-data/
-plots/
-figures/
-
 # 确保所有子目录中的 __pycache__ 都被忽略
 **/__pycache__/
 **/*.pyc

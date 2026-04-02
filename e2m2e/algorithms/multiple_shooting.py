@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+from tqdm.auto import tqdm
 from typing import Optional
 
 
@@ -29,6 +30,7 @@ class MultipleShooting:
         var_time: bool = False,
         max_iter: Optional[int] = None,
         tolerance: Optional[float] = None,
+        verbose: bool = False,
     ) -> MultipleShootingResult:
         t_patch = np.asarray(t_patch, dtype=float)
         state_patch = np.asarray(state_patch, dtype=float)
@@ -50,77 +52,90 @@ class MultipleShooting:
         residual_history = []
         converged = False
 
-        for iteration in range(_max_iter):
-            stms = []
-            final_states = []
-            f_starts = []
-            f_ends = []
+        pbar = tqdm(
+            total=_max_iter,
+            desc="Multiple Shooting",
+            unit="iter",
+            disable=not verbose,
+        )
 
-            for i in range(n_seg):
-                result = self.dynamics.propagate(
-                    state_work[i],
-                    (t_work[i], t_work[i + 1]),
-                    with_stm=True,
-                )
-                final_state = result["states"][:, -1]
-                final_stm = result["stm"][:, :, -1]
-                final_states.append(final_state)
-                stms.append(final_stm)
-                f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
-                f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
-
-            F = np.zeros(n_seg * 6)
-            for i in range(n_seg):
-                F[i * 6 : (i + 1) * 6] = final_states[i] - state_work[i + 1]
-
-            max_res = np.max(np.abs(F))
-            residual_history.append(float(max_res))
-
-            if max_res < _tolerance:
-                converged = True
-                return MultipleShootingResult(
-                    t_patch=t_work,
-                    state_patch=state_work,
-                    converged=True,
-                    iterations=iteration + 1,
-                    max_residual=max_res,
-                    residual_history=residual_history,
-                )
-
-            n_constraints = n_seg * 6
-
-            if var_time:
-                n_vars = N * 6 + N
-                DF = np.zeros((n_constraints, n_vars))
+        try:
+            for iteration in range(_max_iter):
+                stms = []
+                final_states = []
+                f_starts = []
+                f_ends = []
 
                 for i in range(n_seg):
-                    r_start = i * 6
-                    r_end = (i + 1) * 6
-                    DF[r_start:r_end, i * 6 : (i + 1) * 6] = stms[i]
-                    DF[r_start:r_end, (i + 1) * 6 : (i + 2) * 6] = -I6
-                    DF[r_start:r_end, N * 6 + i] = -f_starts[i]
-                    DF[r_start:r_end, N * 6 + i + 1] = f_ends[i]
-            else:
-                n_vars = N * 6
-                DF = np.zeros((n_constraints, n_vars))
+                    result = self.dynamics.propagate(
+                        state_work[i],
+                        (t_work[i], t_work[i + 1]),
+                        with_stm=True,
+                    )
+                    final_state = result["states"][:, -1]
+                    final_stm = result["stm"][:, :, -1]
+                    final_states.append(final_state)
+                    stms.append(final_stm)
+                    f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
+                    f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
 
+                F = np.zeros(n_seg * 6)
                 for i in range(n_seg):
-                    r_start = i * 6
-                    r_end = (i + 1) * 6
-                    DF[r_start:r_end, i * 6 : (i + 1) * 6] = stms[i]
-                    DF[r_start:r_end, (i + 1) * 6 : (i + 2) * 6] = -I6
+                    F[i * 6 : (i + 1) * 6] = final_states[i] - state_work[i + 1]
 
-            dX, _, _, _ = np.linalg.lstsq(DF, -F, rcond=None)
+                max_res = np.max(np.abs(F))
+                residual_history.append(float(max_res))
 
-            state_work = state_work.copy()
-            t_work = t_work.copy()
+                pbar.update(1)
+                pbar.set_postfix(residual=f"{max_res:.2e}", refresh=False)
 
-            X_flat = state_work.flatten()
-            X_flat += dX[: N * 6]
-            state_work = X_flat.reshape(N, 6)
+                if max_res < _tolerance:
+                    converged = True
+                    return MultipleShootingResult(
+                        t_patch=t_work,
+                        state_patch=state_work,
+                        converged=True,
+                        iterations=iteration + 1,
+                        max_residual=max_res,
+                        residual_history=residual_history,
+                    )
 
-            if var_time:
-                t_work += dX[N * 6 : N * 6 + N]
+                n_constraints = n_seg * 6
+
+                if var_time:
+                    n_vars = N * 6 + N
+                    DF = np.zeros((n_constraints, n_vars))
+
+                    for i in range(n_seg):
+                        r_start = i * 6
+                        r_end = (i + 1) * 6
+                        DF[r_start:r_end, i * 6 : (i + 1) * 6] = stms[i]
+                        DF[r_start:r_end, (i + 1) * 6 : (i + 2) * 6] = -I6
+                        DF[r_start:r_end, N * 6 + i] = -f_starts[i]
+                        DF[r_start:r_end, N * 6 + i + 1] = f_ends[i]
+                else:
+                    n_vars = N * 6
+                    DF = np.zeros((n_constraints, n_vars))
+
+                    for i in range(n_seg):
+                        r_start = i * 6
+                        r_end = (i + 1) * 6
+                        DF[r_start:r_end, i * 6 : (i + 1) * 6] = stms[i]
+                        DF[r_start:r_end, (i + 1) * 6 : (i + 2) * 6] = -I6
+
+                dX, _, _, _ = np.linalg.lstsq(DF, -F, rcond=None)
+
+                state_work = state_work.copy()
+                t_work = t_work.copy()
+
+                X_flat = state_work.flatten()
+                X_flat += dX[: N * 6]
+                state_work = X_flat.reshape(N, 6)
+
+                if var_time:
+                    t_work += dX[N * 6 : N * 6 + N]
+        finally:
+            pbar.close()
 
         return MultipleShootingResult(
             t_patch=t_work,

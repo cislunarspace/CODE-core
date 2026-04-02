@@ -325,5 +325,168 @@ class TestMultipleShootingConvergence:
         assert result.iterations <= 5
 
 
+# =============================================================================
+# 需求: MultipleShooting.correct() 添加 verbose 参数支持 tqdm 进度条
+# =============================================================================
+class TestMultipleShootingVerbose:
+    """
+    需求: MultipleShooting.correct() 添加 verbose 参数
+
+    功能:
+      1. correct() 接受 verbose 参数 (bool, 默认 False)
+      2. verbose=True 时，使用 tqdm 显示迭代进度条
+      3. 进度条显示: 当前迭代/最大迭代、当前残差
+      4. verbose=False (默认) 时，行为与当前完全一致，无 tqdm 输出
+      5. 提前收敛时进度条正确关闭
+
+    参考:
+      e2m2e.transfer.TransferSearch 中 tqdm 的使用方式
+
+    依赖:
+      tqdm>=4.66 (已在 pyproject.toml 中声明)
+    """
+
+    def test_verbose_parameter_exists(self, ms_corrector):
+        """correct() 方法应接受 verbose 参数"""
+        import inspect
+
+        sig = inspect.signature(ms_corrector.correct)
+        assert "verbose" in sig.parameters
+
+    def test_verbose_default_false(self, ms_corrector):
+        """verbose 参数默认值应为 False"""
+        import inspect
+
+        sig = inspect.signature(ms_corrector.correct)
+        assert sig.parameters["verbose"].default is False
+
+    def test_backward_compatible(self, ms_corrector, simple_patch_points):
+        """不传 verbose 时行为与之前完全一致"""
+        t_patch, state_patch = simple_patch_points
+        result = ms_corrector.correct(
+            t_patch=t_patch,
+            state_patch=state_patch,
+            max_iter=5,
+        )
+        assert result is not None
+        assert hasattr(result, "converged")
+        assert hasattr(result, "iterations")
+
+    def test_verbose_false_no_tqdm_output(self, ms_corrector, simple_patch_points, capsys):
+        """verbose=False 时 stderr 不包含 tqdm 进度条输出"""
+        t_patch, state_patch = simple_patch_points
+        ms_corrector.correct(
+            t_patch=t_patch,
+            state_patch=state_patch,
+            max_iter=5,
+            verbose=False,
+        )
+        captured = capsys.readouterr()
+        assert "%" not in captured.err
+
+    @pytest.mark.parametrize("verbose", [True, False])
+    def test_verbose_does_not_affect_result(
+        self, ms_corrector, simple_patch_points, verbose
+    ):
+        """verbose 设置不影响修正结果的数值正确性"""
+        t_patch, state_patch = simple_patch_points
+        result = ms_corrector.correct(
+            t_patch=t_patch,
+            state_patch=state_patch,
+            max_iter=10,
+            verbose=verbose,
+        )
+        result_ref = ms_corrector.correct(
+            t_patch=t_patch,
+            state_patch=state_patch,
+            max_iter=10,
+            verbose=False,
+        )
+        assert result.converged == result_ref.converged
+        assert result.iterations == result_ref.iterations
+        np.testing.assert_allclose(
+            result.max_residual, result_ref.max_residual, rtol=1e-12
+        )
+        if result.residual_history and result_ref.residual_history:
+            np.testing.assert_allclose(
+                result.residual_history, result_ref.residual_history, rtol=1e-12
+            )
+
+    def test_verbose_true_invokes_tqdm(self, ms_corrector, simple_patch_points):
+        """verbose=True 时应调用 tqdm 创建进度条"""
+        from unittest.mock import patch, MagicMock
+
+        t_patch, state_patch = simple_patch_points
+        with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
+            mock_bar = MagicMock()
+            mock_tqdm.return_value = mock_bar
+
+            ms_corrector.correct(
+                t_patch=t_patch,
+                state_patch=state_patch,
+                max_iter=5,
+                verbose=True,
+            )
+            assert mock_tqdm.called
+
+    def test_verbose_true_updates_per_iteration(
+        self, ms_corrector, simple_patch_points
+    ):
+        """进度条应在每次迭代中更新残差信息"""
+        from unittest.mock import patch, MagicMock
+
+        t_patch, state_patch = simple_patch_points
+        with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
+            mock_bar = MagicMock()
+            mock_tqdm.return_value = mock_bar
+
+            result = ms_corrector.correct(
+                t_patch=t_patch,
+                state_patch=state_patch,
+                max_iter=5,
+                verbose=True,
+            )
+
+            n_calls = result.iterations if result.converged else 5
+            assert mock_bar.set_postfix.call_count >= n_calls or mock_bar.update.call_count >= n_calls
+
+    def test_verbose_early_convergence(self, ms_corrector, simple_patch_points):
+        """提前收敛时进度条应正确关闭，不报错"""
+        from unittest.mock import patch, MagicMock
+
+        t_patch, state_patch = simple_patch_points
+        with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
+            mock_bar = MagicMock()
+            mock_tqdm.return_value = mock_bar
+
+            result = ms_corrector.correct(
+                t_patch=t_patch,
+                state_patch=state_patch,
+                max_iter=100,
+                tolerance=1e-3,
+                verbose=True,
+            )
+            assert result is not None
+
+    def test_verbose_with_var_time(self, ms_corrector, simple_patch_points):
+        """verbose=True 与 var_time=True 组合正常工作"""
+        from unittest.mock import patch, MagicMock
+
+        t_patch, state_patch = simple_patch_points
+        with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
+            mock_bar = MagicMock()
+            mock_tqdm.return_value = mock_bar
+
+            result = ms_corrector.correct(
+                t_patch=t_patch,
+                state_patch=state_patch,
+                var_time=True,
+                max_iter=10,
+                verbose=True,
+            )
+            assert result is not None
+            assert mock_tqdm.called
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
