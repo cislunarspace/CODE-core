@@ -23,7 +23,12 @@ docs/
 │   ├── differential_correction.md  # 微分修正
 │   └── stability.md          # 稳定性分析
 ├── visualization/       # 可视化模块
-│   └── plotting.md          # 绘图函数
+│   ├── config.md             # PlotConfig 配置
+│   ├── base.md               # BasePlotter 基类
+│   ├── family.md             # FamilyPlotter 轨道族绘图
+│   ├── transfer.md           # TransferPlotter 转移绘图
+│   ├── stability.md          # 稳定性可视化
+│   └── plotting.md           # 向后兼容 shim
 └── reference/           # 技术参考
     ├── api-reference.md     # 完整API文档
     └── algorithms.md        # 算法技术细节
@@ -63,11 +68,13 @@ docs/
 
 ### 可视化模块 (visualization)
 
-| 函数 | 文件 | 说明 |
-|------|------|------|
-| `plot_orbit_2d/3d` | [visualization/plotting.md](visualization/plotting.md) | 轨道绘图 |
-| `plot_transfer_2d/3d` | [visualization/plotting.md](visualization/plotting.md) | 转移轨迹绘图 |
-| `plot_system_geometry` | [visualization/plotting.md](visualization/plotting.md) | 系统几何绘图 |
+| 类/函数 | 文件 | 说明 |
+|---------|------|------|
+| `PlotConfig` | [visualization/config.md](visualization/config.md) | 绘图配置（颜色、线型、字体等） |
+| `FamilyPlotter` | [visualization/family.md](visualization/family.md) | 轨道族绘图（2D/3D） |
+| `TransferPlotter` | [visualization/transfer.md](visualization/transfer.md) | 转移轨迹绘图 |
+| 稳定性绘图 | [visualization/stability.md](visualization/stability.md) | 稳定性指数与特征值可视化 |
+| `plotting` shim | [visualization/plotting.md](visualization/plotting.md) | 向后兼容旧 API |
 
 ### 转移模块 (transfer)
 

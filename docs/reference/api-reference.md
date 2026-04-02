@@ -60,10 +60,13 @@
     - [3.3 Transfer（简化 API）](#33-transfer简化-api)
     - [3.4 工具函数](#34-工具函数)
   - [4. Visualization Module (可视化模块)](#4-visualization-module-可视化模块)
-    - [4.1 OrbitVisualizer \& ProjectionPlane](#41-orbitvisualizer--projectionplane)
+    - [4.1 PlotConfig](#41-plotconfig)
+    - [4.2 OrbitVisualizer \& ProjectionPlane](#42-orbitvisualizer--projectionplane)
       - [功能列表](#功能列表)
       - [使用示例](#使用示例-3)
-    - [4.2 compute\_stability\_for\_family](#42-compute_stability_for_family)
+    - [4.3 FamilyPlotter](#43-familyplotter)
+    - [4.4 TransferPlotter](#44-transferplotter)
+    - [4.5 compute\_stability\_for\_family](#45-compute_stability_for_family)
       - [功能说明](#功能说明)
   - [附录](#附录)
     - [A. 物理常数](#a-物理常数)
@@ -694,9 +697,44 @@ result = optimize_with_copt(optimizer, initial_guess, fallback_to_scipy=True)
 
 ## 4. Visualization Module (可视化模块)
 
-### 4.1 OrbitVisualizer & ProjectionPlane
+> `plotting.py` 已拆分为 `config.py`、`base.py`、`family.py`、`transfer.py`、`stability.py`，原路径仍作为重导出兼容层可用。
 
-**文件**: `e2m2e/visualization/plotting.py`
+### 4.1 PlotConfig
+
+**文件**: `e2m2e/visualization/config.py`
+
+**类签名**:
+```python
+@dataclass
+class PlotConfig:
+    """可视化全局配置"""
+```
+
+#### 主要字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `figsize` | `tuple` | 图像尺寸 (width, height) |
+| `dpi` | `int` | 分辨率 |
+| `style` | `str` | matplotlib 风格 |
+| `color_scheme` | `str` | 配色方案 |
+| `show_grid` | `bool` | 是否显示网格 |
+| `show_legend` | `bool` | 是否显示图例 |
+| `save_format` | `str` | 保存格式 (png/pdf/svg) |
+
+#### 使用示例
+
+```python
+from e2m2e.visualization import PlotConfig
+
+config = PlotConfig(figsize=(12, 8), dpi=150, style="dark_background")
+```
+
+---
+
+### 4.2 OrbitVisualizer & ProjectionPlane
+
+**文件**: `e2m2e/visualization/base.py`
 
 **类签名**:
 ```python
@@ -717,20 +755,15 @@ class OrbitVisualizer:
 | 2D投影 | `plot_2d_projection()` |
 | 主/次天体 | `plot_primary_bodies()` |
 | 平动点标注 | `plot_libration_points()` |
-| 轨道族 | `plot_orbit_family()` |
-| 3D轨道族（缩放） | `plot_3d_orbit_family()` |
-| 共振轨道族 | `plot_resonant_orbit_family()` |
 | 庞加莱截面 | `plot_poincare_section()` |
 | Jacobi常数 | `plot_jacobi_constant()` |
 | 稳定性图 | `plot_stability_diagram()` |
-| 解平面 | `plot_solution_plane()` |
-| 转移轨迹 | `plot_transfer_orbit()` |
 | 概览图 | `create_overview_plot()` |
 
 #### 使用示例
 
 ```python
-from e2m2e.visualization.plotting import OrbitVisualizer
+from e2m2e.visualization.base import OrbitVisualizer
 
 viz = OrbitVisualizer(system)
 
@@ -743,9 +776,69 @@ viz.save('orbit.png', dpi=300)
 
 ---
 
-### 4.2 compute_stability_for_family
+### 4.3 FamilyPlotter
 
-**文件**: `e2m2e/visualization/plotting.py`
+**文件**: `e2m2e/visualization/family.py`
+
+**类签名**:
+```python
+class FamilyPlotter:
+    """轨道族可视化器"""
+```
+
+#### 核心方法
+
+| 方法 | 说明 |
+|------|------|
+| `plot_family_2d()` | 绘制轨道族 2D 投影图 |
+| `plot_family_3d()` | 绘制轨道族 3D 图 |
+| `plot_jacobi_period_stability()` | 绘制 Jacobi 常数–周期–稳定性关系图 |
+| `plot_family_overview()` | 绘制轨道族综合概览图 |
+
+#### 使用示例
+
+```python
+from e2m2e.visualization import FamilyPlotter
+
+plotter = FamilyPlotter(system)
+plotter.plot_family_2d(family)
+plotter.plot_family_overview(family)
+```
+
+---
+
+### 4.4 TransferPlotter
+
+**文件**: `e2m2e/visualization/transfer.py`
+
+**类签名**:
+```python
+class TransferPlotter:
+    """转移轨道可视化器"""
+```
+
+#### 核心方法
+
+| 方法 | 说明 |
+|------|------|
+| `plot_solution_plane()` | 绘制解平面图 |
+| `plot_transfer_orbit()` | 绘制转移轨迹图 |
+
+#### 使用示例
+
+```python
+from e2m2e.visualization import TransferPlotter
+
+plotter = TransferPlotter(system)
+plotter.plot_solution_plane(search_results)
+plotter.plot_transfer_orbit(transfer_result)
+```
+
+---
+
+### 4.5 compute_stability_for_family
+
+**文件**: `e2m2e/visualization/stability.py`
 
 **函数签名**:
 ```python

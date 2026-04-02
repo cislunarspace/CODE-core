@@ -60,10 +60,13 @@
     - [3.3 Transfer (Simplified API)](#33-transfer-simplified-api)
     - [3.4 Utility Functions](#34-utility-functions)
   - [4. Visualization Module](#4-visualization-module)
-    - [4.1 OrbitVisualizer \& ProjectionPlane](#41-orbitvisualizer--projectionplane)
+    - [4.1 PlotConfig](#41-plotconfig)
+    - [4.2 OrbitVisualizer \& ProjectionPlane](#42-orbitvisualizer--projectionplane)
       - [Feature List](#feature-list)
       - [Usage Example](#usage-example-3)
-    - [4.2 compute\_stability\_for\_family](#42-compute_stability_for_family)
+    - [4.3 FamilyPlotter](#43-familyplotter)
+    - [4.4 TransferPlotter](#44-transferplotter)
+    - [4.5 compute\_stability\_for\_family](#45-compute_stability_for_family)
       - [Feature Description](#feature-description)
   - [Appendix](#appendix)
     - [A. Physical Constants](#a-physical-constants)
@@ -692,9 +695,44 @@ result = optimize_with_copt(optimizer, initial_guess, fallback_to_scipy=True)
 
 ## 4. Visualization Module
 
-### 4.1 OrbitVisualizer & ProjectionPlane
+> `plotting.py` has been split into `config.py`, `base.py`, `family.py`, `transfer.py`, and `stability.py`. The original path still works as a re-export shim for backward compatibility.
 
-**File**: `e2m2e/visualization/plotting.py`
+### 4.1 PlotConfig
+
+**File**: `e2m2e/visualization/config.py`
+
+**Class Signature**:
+```python
+@dataclass
+class PlotConfig:
+    """Global visualization configuration"""
+```
+
+#### Key Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `figsize` | `tuple` | Figure size (width, height) |
+| `dpi` | `int` | Resolution |
+| `style` | `str` | matplotlib style |
+| `color_scheme` | `str` | Color scheme |
+| `show_grid` | `bool` | Whether to show grid |
+| `show_legend` | `bool` | Whether to show legend |
+| `save_format` | `str` | Save format (png/pdf/svg) |
+
+#### Usage Example
+
+```python
+from e2m2e.visualization import PlotConfig
+
+config = PlotConfig(figsize=(12, 8), dpi=150, style="dark_background")
+```
+
+---
+
+### 4.2 OrbitVisualizer & ProjectionPlane
+
+**File**: `e2m2e/visualization/base.py`
 
 **Class Signature**:
 ```python
@@ -715,20 +753,15 @@ class OrbitVisualizer:
 | 2D projection | `plot_2d_projection()` |
 | Primary/secondary bodies | `plot_primary_bodies()` |
 | Libration point annotation | `plot_libration_points()` |
-| Orbit family | `plot_orbit_family()` |
-| 3D orbit family (zoomed) | `plot_3d_orbit_family()` |
-| Resonant orbit family | `plot_resonant_orbit_family()` |
 | Poincaré section | `plot_poincare_section()` |
 | Jacobi constant | `plot_jacobi_constant()` |
 | Stability diagram | `plot_stability_diagram()` |
-| Solution plane | `plot_solution_plane()` |
-| Transfer trajectory | `plot_transfer_orbit()` |
 | Overview plot | `create_overview_plot()` |
 
 #### Usage Example
 
 ```python
-from e2m2e.visualization.plotting import OrbitVisualizer
+from e2m2e.visualization.base import OrbitVisualizer
 
 viz = OrbitVisualizer(system)
 
@@ -741,9 +774,69 @@ viz.save('orbit.png', dpi=300)
 
 ---
 
-### 4.2 compute_stability_for_family
+### 4.3 FamilyPlotter
 
-**File**: `e2m2e/visualization/plotting.py`
+**File**: `e2m2e/visualization/family.py`
+
+**Class Signature**:
+```python
+class FamilyPlotter:
+    """Orbit family visualizer"""
+```
+
+#### Core Methods
+
+| Method | Description |
+|--------|-------------|
+| `plot_family_2d()` | Plot 2D projection of orbit family |
+| `plot_family_3d()` | Plot 3D view of orbit family |
+| `plot_jacobi_period_stability()` | Plot Jacobi constant–period–stability relationship |
+| `plot_family_overview()` | Plot comprehensive orbit family overview |
+
+#### Usage Example
+
+```python
+from e2m2e.visualization import FamilyPlotter
+
+plotter = FamilyPlotter(system)
+plotter.plot_family_2d(family)
+plotter.plot_family_overview(family)
+```
+
+---
+
+### 4.4 TransferPlotter
+
+**File**: `e2m2e/visualization/transfer.py`
+
+**Class Signature**:
+```python
+class TransferPlotter:
+    """Transfer trajectory visualizer"""
+```
+
+#### Core Methods
+
+| Method | Description |
+|--------|-------------|
+| `plot_solution_plane()` | Plot solution plane |
+| `plot_transfer_orbit()` | Plot transfer trajectory |
+
+#### Usage Example
+
+```python
+from e2m2e.visualization import TransferPlotter
+
+plotter = TransferPlotter(system)
+plotter.plot_solution_plane(search_results)
+plotter.plot_transfer_orbit(transfer_result)
+```
+
+---
+
+### 4.5 compute_stability_for_family
+
+**File**: `e2m2e/visualization/stability.py`
 
 **Function Signature**:
 ```python

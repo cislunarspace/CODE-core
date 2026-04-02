@@ -131,13 +131,14 @@ result = optimizer.optimize(
 ### 4. 可视化
 
 ```python
-from e2m2e.visualization import OrbitVisualizer
+from e2m2e.visualization import PlotConfig, FamilyPlotter
 
-viz = OrbitVisualizer(system)
-viz.plot_2d_projection(orbit, plane='xy', color='blue')
-viz.plot_primary_bodies()
-viz.plot_libration_points()
-viz.show()
+config = PlotConfig(title=32, label=28)
+config.apply_rcparams()
+
+plotter = FamilyPlotter(system, config)
+plotter.plot_family_2d(family, jacobi_values, title="DRO Family")
+plotter.plot_jacobi_period_stability(jacobi_values, periods, stability_values)
 ```
 
 ## 项目结构
@@ -158,7 +159,11 @@ e2m2e/
 │   ├── transfer_search.py          # TransferSearch - 网格搜索（并行）
 │   └── transfer_optimization.py    # DROTRONLPOptimizer - NLP 优化
 └── visualization/        # 可视化
-    └── plotting.py                 # OrbitVisualizer - 2D/3D 绘图
+    ├── config.py                    # PlotConfig - 字体/颜色/尺寸等全局配置
+    ├── base.py                      # OrbitVisualizer - 2D/3D 绘图基类
+    ├── family.py                    # FamilyPlotter - 轨道族可视化（高层 API）
+    ├── transfer.py                  # TransferPlotter - 转移轨道可视化
+    └── stability.py                 # compute_stability_for_family - 并行稳定性计算
 ```
 
 ## 算法介绍

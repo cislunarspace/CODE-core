@@ -23,7 +23,12 @@ docs/
 │   ├── differential_correction.md  # Differential correction
 │   └── stability.md          # Stability analysis
 ├── visualization/       # Visualization module
-│   └── plotting.md          # Plotting functions
+│   ├── config.md             # PlotConfig configuration
+│   ├── base.md               # BasePlotter base class
+│   ├── family.md             # FamilyPlotter orbit family plotting
+│   ├── transfer.md           # TransferPlotter transfer plotting
+│   ├── stability.md          # Stability visualization
+│   └── plotting.md           # Backward-compat shim
 └── reference/           # Technical reference
     ├── api-reference.md     # Complete API documentation
     └── algorithms.md        # Algorithm technical details
@@ -63,11 +68,13 @@ docs/
 
 ### Visualization Module (visualization)
 
-| Function | File | Description |
-|----------|------|-------------|
-| `plot_orbit_2d/3d` | [visualization/plotting.md](visualization/plotting.md) | Orbit plotting |
-| `plot_transfer_2d/3d` | [visualization/plotting.md](visualization/plotting.md) | Transfer trajectory plotting |
-| `plot_system_geometry` | [visualization/plotting.md](visualization/plotting.md) | System geometry plotting |
+| Class/Function | File | Description |
+|----------------|------|-------------|
+| `PlotConfig` | [visualization/config.md](visualization/config.md) | Plot configuration (colors, linestyles, fonts, etc.) |
+| `FamilyPlotter` | [visualization/family.md](visualization/family.md) | Orbit family plotting (2D/3D) |
+| `TransferPlotter` | [visualization/transfer.md](visualization/transfer.md) | Transfer trajectory plotting |
+| Stability plots | [visualization/stability.md](visualization/stability.md) | Stability index & eigenvalue visualization |
+| `plotting` shim | [visualization/plotting.md](visualization/plotting.md) | Backward-compatible legacy API |
 
 ### Transfer Module (transfer)
 

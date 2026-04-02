@@ -10,10 +10,12 @@ E2M2E adopts a modular design with four core modules:
 ├─────────────┬─────────────┬─────────────┬─────────────────┤
 │    core     │ algorithms  │  transfer   │  visualization  │
 ├─────────────┼─────────────┼─────────────┼─────────────────┤
-│ system.py   │ differential │ earth_moon  │   plotting.py   │
-│ dynamics.py │ correction.py│ moon_earth  │                 │
-│ orbit.py    │continuation.py│inter_orbit │                 │
-│coordinate.py│ stability.py │             │                 │
+│ system.py   │ differential │ earth_moon  │   config.py     │
+│ dynamics.py │ correction.py│ moon_earth  │   base.py       │
+│ orbit.py    │continuation.py│inter_orbit │   family.py     │
+│coordinate.py│ stability.py │             │   transfer.py   │
+│             │             │             │   stability.py   │
+│             │             │             │   plotting.py    │
 └─────────────┴─────────────┴─────────────┴─────────────────┘
 ```
 
@@ -54,8 +56,12 @@ Implements orbit transfer design based on core modules:
 
 | File | Class/Function | Responsibilities |
 |------|---------------|------------------|
-| `plotting.py` | `OrbitVisualizer` | 2D/3D orbit plotting, Poincaré sections, overview plots |
-| `plotting.py` | `compute_stability_for_family` | Orbit family stability computation |
+| `config.py` | `PlotConfig` | Visualization configuration (colors, labels, styles) |
+| `base.py` | `OrbitVisualizer`, `ProjectionPlane` | 2D/3D orbit plotting, Poincaré sections, overview plots |
+| `family.py` | `FamilyPlotter` | Orbit family visualization |
+| `transfer.py` | `TransferPlotter` | Transfer orbit visualization |
+| `stability.py` | `compute_stability_for_family` | Orbit family stability computation |
+| `plotting.py` | *(re-export shim)* | Backward-compat re-export |
 
 ## Data Flow
 

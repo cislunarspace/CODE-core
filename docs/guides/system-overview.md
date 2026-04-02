@@ -10,10 +10,12 @@ E2M2E 采用模块化设计，包含四个核心模块：
 ├─────────────┬─────────────┬─────────────┬─────────────────┤
 │    core     │ algorithms  │  transfer   │  visualization  │
 ├─────────────┼─────────────┼─────────────┼─────────────────┤
-│ system.py   │ differential │ earth_moon  │   plotting.py   │
-│ dynamics.py │ correction.py│ moon_earth  │                 │
-│ orbit.py    │continuation.py│inter_orbit │                 │
-│coordinate.py│ stability.py │             │                 │
+│ system.py   │ differential │ earth_moon  │   config.py     │
+│ dynamics.py │ correction.py│ moon_earth  │   base.py       │
+│ orbit.py    │continuation.py│inter_orbit │   family.py     │
+│coordinate.py│ stability.py │             │   transfer.py   │
+│             │             │             │   stability.py   │
+│             │             │             │   plotting.py    │
 └─────────────┴─────────────┴─────────────┴─────────────────┘
 ```
 
@@ -54,8 +56,12 @@ E2M2E 采用模块化设计，包含四个核心模块：
 
 | 文件 | 类/函数 | 职责 |
 |------|---------|------|
-| `plotting.py` | `OrbitVisualizer` | 2D/3D轨道绘制、庞加莱截面、概览图 |
-| `plotting.py` | `compute_stability_for_family` | 轨道族稳定性计算 |
+| `config.py` | `PlotConfig` | 可视化配置（颜色、标签、样式） |
+| `base.py` | `OrbitVisualizer`, `ProjectionPlane` | 2D/3D轨道绘制、庞加莱截面、概览图 |
+| `family.py` | `FamilyPlotter` | 轨道族可视化 |
+| `transfer.py` | `TransferPlotter` | 转移轨道可视化 |
+| `stability.py` | `compute_stability_for_family` | 轨道族稳定性计算 |
+| `plotting.py` | *(re-export shim)* | 向后兼容重导出 |
 
 ## 数据流
 

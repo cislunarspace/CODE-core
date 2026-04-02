@@ -45,23 +45,17 @@ print(f"Jacobi constant: {jacobi_constant:.4f}")
 
 ## Visualization Features
 
-`e2m2e` provides powerful orbit visualization capabilities:
+`e2m2e` provides powerful orbit visualization with a unified `PlotConfig` and specialized plotters:
 
 ```python
-from e2m2e.visualization.plotting import OrbitVisualizer
+from e2m2e.visualization import PlotConfig, FamilyPlotter
 
-# Create visualizer
-viz = OrbitVisualizer(system)
+config = PlotConfig(title=32, label=28)
+config.apply_rcparams()
 
-# Plot 2D projection (assuming orbit is orbit data)
-viz.plot_2d_projection(orbit, plane='xy', color='blue', label='My Orbit')
-viz.plot_primary_bodies()      # Add celestial bodies
-viz.plot_libration_points()    # Add libration points
-viz.show()                     # Display figure
-
-# Create comprehensive overview plot
-viz.create_overview_plot(orbit)
-viz.show()
+plotter = FamilyPlotter(system, config)
+plotter.plot_family_2d(family, jacobi_values, title="DRO Family")
+plotter.plot_jacobi_period_stability(jacobi_values, periods, stability_values)
 ```
 
 For more visualization features and usage examples, refer to the [Visualization Module Guide](docs/guides/visualization-guide.md).
