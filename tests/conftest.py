@@ -77,7 +77,7 @@ def initialized_system(earth_moon_system):
 # =============================================================================
 SPICE_KERNEL_DIR = os.environ.get(
     "SPICE_KERNEL_DIR",
-    os.path.join(os.path.dirname(__file__), "..", "kernels"),
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "kernels"),
 )
 
 # 地月系统物理参数
