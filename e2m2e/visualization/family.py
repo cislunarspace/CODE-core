@@ -25,11 +25,11 @@ class FamilyPlotter(OrbitVisualizer):
         return jmin, jmax, jrange
 
     def _draw_orbit_loop_2d(self, family_result, jacobi_values, ax,
-                            plane="xy", start=0, end=None):
+                            plane="xy", start=0, end=None, step=1):
         jmin, jmax, jrange = self._get_jacobi_norm(jacobi_values)
         cmap = self.config.get_cmap()
         n = len(family_result) if end is None else min(end + 1, len(family_result))
-        for idx in range(start, n):
+        for idx in range(start, n, step):
             orbit = family_result[idx]
             norm_j = (jacobi_values[idx] - jmin) / jrange
             color = cmap(norm_j)
@@ -37,11 +37,11 @@ class FamilyPlotter(OrbitVisualizer):
                 orbit, plane=plane, color=color, show_start=False, ax=ax)
 
     def _draw_orbit_loop_3d(self, family_result, jacobi_values, ax,
-                            start=0, end=None):
+                            start=0, end=None, step=1):
         jmin, jmax, jrange = self._get_jacobi_norm(jacobi_values)
         cmap = self.config.get_cmap()
         n = len(family_result) if end is None else min(end + 1, len(family_result))
-        for idx in range(start, n):
+        for idx in range(start, n, step):
             orbit = family_result[idx]
             norm_j = (jacobi_values[idx] - jmin) / jrange
             color = cmap(norm_j)
@@ -86,13 +86,14 @@ class FamilyPlotter(OrbitVisualizer):
         show_colorbar: bool = True,
         start: int = 0,
         end: Optional[int] = None,
+        step: int = 1,
         save_path: Optional[str] = None,
         show: bool = True,
     ):
         fig, ax = plt.subplots(figsize=self.config.figsize_2d, dpi=self.config.dpi)
 
         self._draw_orbit_loop_2d(family_result, jacobi_values, ax,
-                                 plane=plane, start=start, end=end)
+                                 plane=plane, start=start, end=end, step=step)
 
         if show_bodies:
             self.plot_primary_bodies(ax=ax)
@@ -139,6 +140,7 @@ class FamilyPlotter(OrbitVisualizer):
         show_colorbar: bool = True,
         start: int = 0,
         end: Optional[int] = None,
+        step: int = 1,
         save_path: Optional[str] = None,
         show: bool = True,
     ):
@@ -146,7 +148,7 @@ class FamilyPlotter(OrbitVisualizer):
         ax = fig.add_subplot(111, projection="3d")
 
         self._draw_orbit_loop_3d(family_result, jacobi_values, ax,
-                                 start=start, end=end)
+                                 start=start, end=end, step=step)
 
         if show_bodies:
             self.plot_primary_bodies(ax=ax, is_3d=True)
@@ -243,6 +245,7 @@ class FamilyPlotter(OrbitVisualizer):
         elev: int = 0,
         azim: int = -90,
         target_period: Optional[float] = None,
+        step: int = 1,
         save_path: Optional[str] = None,
         show: bool = True,
     ):
@@ -252,7 +255,7 @@ class FamilyPlotter(OrbitVisualizer):
 
         # Subplot 1: Global 2D
         ax1 = fig.add_subplot(221)
-        self._draw_orbit_loop_2d(family_result, jacobi_values, ax1, plane=plane)
+        self._draw_orbit_loop_2d(family_result, jacobi_values, ax1, plane=plane, step=step)
         self.plot_primary_bodies(ax=ax1)
         self.plot_libration_points(ax=ax1)
         self._add_colorbar(ax1, jacobi_values)
@@ -267,7 +270,7 @@ class FamilyPlotter(OrbitVisualizer):
 
         # Subplot 2: Zoomed 2D
         ax2 = fig.add_subplot(222)
-        self._draw_orbit_loop_2d(family_result, jacobi_values, ax2, plane=plane)
+        self._draw_orbit_loop_2d(family_result, jacobi_values, ax2, plane=plane, step=step)
         self.plot_primary_bodies(ax=ax2)
         self.plot_libration_points(ax=ax2)
         if zoom_xlim:
@@ -304,7 +307,7 @@ class FamilyPlotter(OrbitVisualizer):
 
         # Subplot 4: 3D
         ax4 = fig.add_subplot(224, projection="3d")
-        self._draw_orbit_loop_3d(family_result, jacobi_values, ax4)
+        self._draw_orbit_loop_3d(family_result, jacobi_values, ax4, step=step)
         self.plot_primary_bodies(ax=ax4, is_3d=True)
         ax4.set_xlim(center_3d[0] - radius_3d, center_3d[0] + radius_3d)
         ax4.set_ylim(center_3d[1] - radius_3d, center_3d[1] + radius_3d)
