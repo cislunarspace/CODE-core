@@ -188,13 +188,18 @@ class FamilyPlotter(OrbitVisualizer):
     ):
         fig, ax1 = plt.subplots(figsize=self.config.figsize_dual, dpi=self.config.dpi)
 
+        sorted_indices = sorted(range(len(jacobi_values)), key=lambda i: jacobi_values[i])
+        j_sorted = [jacobi_values[i] for i in sorted_indices]
+        p_sorted = [periods[i] for i in sorted_indices]
+        s_sorted = [stability_values[i] for i in sorted_indices]
+
         color_period = "tab:blue"
         ax1.set_xlabel("Jacobi Constant", fontsize=self.config.label)
         ax1.set_ylabel("Period (nondimensional)", color=color_period,
                         fontsize=self.config.label)
         (line_period,) = ax1.plot(
-            jacobi_values, periods, "o-", color=color_period,
-            markersize=5, label="Period")
+            j_sorted, p_sorted, "-", color=color_period,
+            linewidth=2, label="Period")
         ax1.tick_params(axis="y", labelcolor=color_period, labelsize=self.config.tick)
         ax1.tick_params(axis="x", labelsize=self.config.tick)
 
@@ -207,8 +212,8 @@ class FamilyPlotter(OrbitVisualizer):
         ax2.set_ylabel("Stability Index (λmax)", color=color_stability,
                         fontsize=self.config.label)
         (line_stability,) = ax2.plot(
-            jacobi_values, stability_values, "s-", color=color_stability,
-            markersize=5, label="Stability Index (λmax)")
+            j_sorted, s_sorted, "-", color=color_stability,
+            linewidth=2, label="Stability Index (λmax)")
         ax2.tick_params(axis="y", labelcolor=color_stability, labelsize=self.config.tick)
 
         lines = [line_period, line_stability]
