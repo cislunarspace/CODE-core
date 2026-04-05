@@ -86,6 +86,6 @@ Halo 收敛结果会校验完整周期 \(T\) 的下限（避免 \(T\to 0\) 的�
 
 ## 另见
 
-- [轨道生成指南](../guides/orbit-generation.md#halo-轨道) — 教程入口  
+- [轨道生成指南](../guides/orbit-generation.md) — 教程入口  
 - [延拓模块总述](continuation.md) — `Continuation` 类索引  
 - [后续开发路线图](../ways-of-work/plan/halo-roadmap_zh.md)

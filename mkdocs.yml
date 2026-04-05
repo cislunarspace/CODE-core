@@ -1,0 +1,63 @@
+site_name: E2M2E Documentation
+site_description: Earth-to-Moon-to-Earth (E2M2E) 轨道力学库文档
+site_author: E2M2E Team
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+
+nav:
+  - 首页: index.md
+  - 使用指南:
+    - 系统总览: guides/system-overview.md
+    - 轨道生成: guides/orbit-generation.md
+    - 可视化指南: guides/visualization-guide.md
+    - 发布指南: guides/release.md
+  - 核心模块:
+    - 系统参数: core/system.md
+    - 动力学: core/dynamics.md
+    - 轨道: core/orbit.md
+    - 坐标变换: core/coordinate.md
+  - 算法模块:
+    - 延拓法: algorithms/continuation.md
+    - Halo轨道: algorithms/halo.md
+    - 微分修正: algorithms/differential_correction.md
+    - 稳定性分析: algorithms/stability.md
+  - 技术参考:
+    - API参考: reference/api-reference.md
+    - 算法细节: reference/algorithms.md
+  - 可视化:
+    - 绘图模块: visualization/plotting.md
+  - 英文文档:
+    - Home: index_en.md
+    - User Guides:
+      - System Overview: guides/system-overview_en.md
+      - Orbit Generation: guides/orbit-generation_en.md
+      - Visualization Guide: guides/visualization-guide_en.md
+    - Core Modules:
+      - System Parameters: core/system_en.md
+      - Dynamics: core/dynamics_en.md
+      - Orbit: core/orbit_en.md
+      - Coordinate Transformation: core/coordinate_en.md
+    - Algorithms:
+      - Continuation: algorithms/continuation_en.md
+      - Halo Orbit: algorithms/halo_en.md
+      - Differential Correction: algorithms/differential_correction_en.md
+      - Stability Analysis: algorithms/stability_en.md
+    - Technical Reference:
+      - API Reference: reference/api-reference_en.md
+      - Algorithm Details: reference/algorithms_en.md
+    - Visualization:
+      - Plotting Module: visualization/plotting_en.md
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true

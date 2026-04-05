@@ -144,4 +144,4 @@ result = transfer.design_heteroclinic_transfer(orbit_L1, orbit_L2)
 2. 继承基础类实现具体策略
 3. 在 `__init__.py` 中导出
 
-详见 [贡献指南](../CONTRIBUTING.md)。
+详见项目根目录的 CONTRIBUTING.md 文件。

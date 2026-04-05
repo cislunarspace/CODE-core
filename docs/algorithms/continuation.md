@@ -42,4 +42,4 @@ family = continuation.natural_continuation(
 )
 ```
 
-伪弧长与 Halo 族示例见 [Halo](halo.md) 与 [轨道生成指南 - Halo](../guides/orbit-generation.md#halo-轨道)。
+伪弧长与 Halo 族示例见 [Halo](halo.md) 与 [轨道生成指南 - Halo](../guides/orbit-generation.md)。

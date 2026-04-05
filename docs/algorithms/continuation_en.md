@@ -42,4 +42,4 @@ family = continuation.natural_continuation(
 )
 ```
 
-For pseudo-arclength and Halo family examples, see [Halo](halo.md) and [Orbit Generation Guide - Halo](../guides/orbit-generation.md#halo-orbit).
+For pseudo-arclength and Halo family examples, see [Halo](halo.md) and [Orbit Generation Guide - Halo](../guides/orbit-generation.md).

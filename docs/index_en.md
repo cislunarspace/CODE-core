@@ -23,12 +23,7 @@ docs/
 │   ├── differential_correction.md  # Differential correction
 │   └── stability.md          # Stability analysis
 ├── visualization/       # Visualization module
-│   ├── config.md             # PlotConfig configuration
-│   ├── base.md               # BasePlotter base class
-│   ├── family.md             # FamilyPlotter orbit family plotting
-│   ├── transfer.md           # TransferPlotter transfer plotting
-│   ├── stability.md          # Stability visualization
-│   └── plotting.md           # Backward-compat shim
+│   └── plotting.md           # Plotting features (backward-compat)
 └── reference/           # Technical reference
     ├── api-reference.md     # Complete API documentation
     └── algorithms.md        # Algorithm technical details
@@ -70,20 +65,16 @@ docs/
 
 | Class/Function | File | Description |
 |----------------|------|-------------|
-| `PlotConfig` | [visualization/config.md](visualization/config.md) | Plot configuration (colors, linestyles, fonts, etc.) |
-| `FamilyPlotter` | [visualization/family.md](visualization/family.md) | Orbit family plotting (2D/3D) |
-| `TransferPlotter` | [visualization/transfer.md](visualization/transfer.md) | Transfer trajectory plotting |
-| Stability plots | [visualization/stability.md](visualization/stability.md) | Stability index & eigenvalue visualization |
-| `plotting` shim | [visualization/plotting.md](visualization/plotting.md) | Backward-compatible legacy API |
+| `plotting` module | [visualization/plotting.md](visualization/plotting.md) | Plotting features (backward-compatible) |
 
 ### Transfer Module (transfer)
 
 | Class/Function | File | Description |
 |----------------|------|-------------|
-| `DROTransferSearch` | [reference/api-reference.md](reference/api-reference.md#31-drotransfersearch) | DRO-to-RO transfer grid search |
-| `DROTRONLPOptimizer` | [reference/api-reference.md](reference/api-reference.md#32-drotronlpoptimizer) | Two-impulse transfer NLP optimizer |
-| `Transfer` | [reference/api-reference.md](reference/api-reference.md#33-transfer) | Simplified chainable transfer API |
-| `load_orbit_from_json` | [reference/api-reference.md](reference/api-reference.md#34-utility-functions) | Load orbit from JSON |
+| `DROTransferSearch` | [reference/api-reference.md](reference/api-reference.md) | DRO-to-RO transfer grid search |
+| `DROTRONLPOptimizer` | [reference/api-reference.md](reference/api-reference.md) | Two-impulse transfer NLP optimizer |
+| `Transfer` | [reference/api-reference.md](reference/api-reference.md) | Simplified chainable transfer API |
+| `load_orbit_from_json` | [reference/api-reference.md](reference/api-reference.md) | Load orbit from JSON |
 
 ### Technical Reference (reference)
 
@@ -118,9 +109,9 @@ result = dynamics.propagate(initial_state=state, t_span=(0, 10.0))
 ### Common Tasks
 
 1. **Design DRO orbit** → Refer to [Orbit Generation - DRO](guides/orbit-generation.md#distant-retrograde-orbit-dro)
-2. **Design Halo orbit** → Refer to [Orbit Generation - Halo](guides/orbit-generation.md#halo-orbit)
-3. **Generate orbit family** → Refer to [Orbit Family Continuation](reference/algorithms.md#5-orbit-family-continuation-algorithm)
-4. **Analyze stability** → Refer to [Stability Analysis](reference/algorithms.md#7-stability-analysis)
+2. **Design Halo orbit** → Refer to [Orbit Generation - Halo](guides/orbit-generation.md)
+3. **Generate orbit family** → Refer to [Orbit Family Continuation](reference/algorithms.md)
+4. **Analyze stability** → Refer to [Stability Analysis](reference/algorithms.md)
 
 ## Physical Background
 
@@ -129,4 +120,4 @@ E2M2E implements orbit design based on the **Circular Restricted Three-Body Prob
 - Characteristic distance: 384,400 km (Earth-Moon distance)
 - Characteristic period: 27.32 days
 
-See [CR3BP Theory](reference/algorithms.md#1-overview) and [System Overview](guides/system-overview.md) for details.
+See [CR3BP Theory](reference/algorithms.md) and [System Overview](guides/system-overview.md) for details.

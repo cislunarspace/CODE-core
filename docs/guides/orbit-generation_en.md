@@ -82,7 +82,7 @@ def generate_dro(x0=0.8, y_dot_guess=0.5, t_half_guess=1.6):
 
 ---
 
-## Halo Orbit
+## Halo Orbit {#halo-orbit}
 
 ### Theoretical Background
 
