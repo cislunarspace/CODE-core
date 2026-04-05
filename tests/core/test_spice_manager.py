@@ -216,5 +216,77 @@ class TestSPICEBodyParameters:
         assert_allclose(gm, 398600.0, rtol=1e-3)
 
 
+# =============================================================================
+# Test 星历内核搜索
+# =============================================================================
+class TestSPICEManagerFindEphemerisKernel:
+    """需求: SPICEManager 应提供公开方法在指定目录中搜索星历内核文件。
+
+    背景:
+        transfer-orbit-design 的 correct_dro_to_ephemeris.py 中有 find_spice_kernel()
+        函数，硬编码了 e2m2e/kernels 路径并按优先级搜索 .bsp 文件。
+        此逻辑应属于 e2m2e 的 SPICEManager，使上层脚本无需重复实现。
+
+    接口:
+        spice_manager.find_ephemeris_kernel(search_dir: str) -> str
+        - search_dir: 要搜索的目录路径
+        - 返回: 找到的第一个 .bsp 内核文件的绝对路径
+        - 按优先级搜索: de440.bsp > de440s.bsp > de435.bsp > de438.bsp
+        - 找不到则抛出 FileNotFoundError
+    """
+
+    def test_has_find_ephemeris_kernel_method(self, spice_manager):
+        """SPICEManager 应有 find_ephemeris_kernel 方法"""
+        assert hasattr(spice_manager, "find_ephemeris_kernel")
+        assert callable(spice_manager.find_ephemeris_kernel)
+
+    def test_find_kernel_in_valid_directory(self, spice_manager, spice_kernel_dir):
+        """在包含内核文件的目录中应能找到并返回路径"""
+        path = spice_manager.find_ephemeris_kernel(spice_kernel_dir)
+        assert os.path.exists(path)
+        assert path.endswith(".bsp")
+
+    def test_find_kernel_returns_existing_file(self, spice_manager, spice_kernel_dir):
+        """返回的路径应指向一个实际存在的文件"""
+        path = spice_manager.find_ephemeris_kernel(spice_kernel_dir)
+        assert os.path.isfile(path)
+
+    def test_find_kernel_priority_de440_over_de438(self, spice_manager, tmp_path):
+        """当 de440 和 de438 同时存在时，应返回 de440"""
+        (tmp_path / "de440.bsp").write_bytes(b"fake")
+        (tmp_path / "de438.bsp").write_bytes(b"fake")
+        path = spice_manager.find_ephemeris_kernel(str(tmp_path))
+        assert path.endswith("de440.bsp")
+
+    def test_find_kernel_priority_de440s_over_de435(self, spice_manager, tmp_path):
+        """当 de440s 和 de435 同时存在时，应返回 de440s"""
+        (tmp_path / "de440s.bsp").write_bytes(b"fake")
+        (tmp_path / "de435.bsp").write_bytes(b"fake")
+        path = spice_manager.find_ephemeris_kernel(str(tmp_path))
+        assert path.endswith("de440s.bsp")
+
+    def test_find_kernel_fallback_to_de435(self, spice_manager, tmp_path):
+        """当只有 de435 存在时，应返回 de435"""
+        (tmp_path / "de435.bsp").write_bytes(b"fake")
+        path = spice_manager.find_ephemeris_kernel(str(tmp_path))
+        assert path.endswith("de435.bsp")
+
+    def test_find_kernel_fallback_to_de438(self, spice_manager, tmp_path):
+        """当只有 de438 存在时，应返回 de438"""
+        (tmp_path / "de438.bsp").write_bytes(b"fake")
+        path = spice_manager.find_ephemeris_kernel(str(tmp_path))
+        assert path.endswith("de438.bsp")
+
+    def test_find_kernel_raises_when_not_found(self, spice_manager, tmp_path):
+        """目录中无内核文件时应抛出 FileNotFoundError"""
+        with pytest.raises(FileNotFoundError):
+            spice_manager.find_ephemeris_kernel(str(tmp_path))
+
+    def test_find_kernel_raises_when_dir_not_exists(self, spice_manager):
+        """目录不存在时应抛出 FileNotFoundError"""
+        with pytest.raises(FileNotFoundError):
+            spice_manager.find_ephemeris_kernel("/nonexistent/path/to/kernels")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

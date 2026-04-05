@@ -88,6 +88,14 @@ VU = DU / TU_SECONDS  # km/s
 
 
 @pytest.fixture
+def spice_kernel_dir():
+    """返回 SPICE 内核文件所在目录，不存在则跳过"""
+    if not os.path.isdir(SPICE_KERNEL_DIR):
+        pytest.skip("SPICE kernel directory not found, set SPICE_KERNEL_DIR")
+    return SPICE_KERNEL_DIR
+
+
+@pytest.fixture
 def spice_kernel_path():
     """返回DE440内核文件路径，不存在则跳过"""
     kernel_file = os.path.join(SPICE_KERNEL_DIR, "de440.bsp")

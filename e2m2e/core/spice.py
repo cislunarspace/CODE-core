@@ -169,6 +169,32 @@ class SPICEManager:
         position, _lt = spiceypy.spkpos(target, et, frame, "NONE", observer)
         return np.array(position)
 
+    _EPHEMERIS_KERNEL_PRIORITY = ["de440.bsp", "de440s.bsp", "de435.bsp", "de438.bsp"]
+
+    def find_ephemeris_kernel(self, search_dir: str) -> str:
+        """在指定目录中按优先级搜索星历内核文件（.bsp）。
+
+        优先级：de440.bsp > de440s.bsp > de435.bsp > de438.bsp。
+
+        Args:
+            search_dir: 要搜索的目录路径。
+
+        Returns:
+            找到的第一个 .bsp 内核文件的绝对路径。
+
+        Raises:
+            FileNotFoundError: 目录不存在或其中无匹配的内核文件。
+        """
+        if not os.path.isdir(search_dir):
+            raise FileNotFoundError(
+                f"Ephemeris kernel search directory does not exist: {search_dir}"
+            )
+        for candidate in self._EPHEMERIS_KERNEL_PRIORITY:
+            path = os.path.join(search_dir, candidate)
+            if os.path.isfile(path):
+                return os.path.abspath(path)
+        raise FileNotFoundError(f"No ephemeris kernel found in {search_dir}")
+
     def get_gm(self, body: str) -> float:
         """获取天体的引力参数 GM（km³/s²）。
 
