@@ -217,11 +217,38 @@ def sample_patch_points(
     orbit,
     n_points: int,
 ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    """沿周期轨道均匀采样 patch points（打靶节点）。
+
+    该方法用于多重打靶法（Multiple Shooting）的前处理，将一条周期轨道
+    在时间上均匀分割为 n_points 个节点，并通过线性插值获取每个节点处的状态。
+
+    Args:
+        orbit: 轨道对象，需包含以下属性：
+            - period: 轨道周期（归一化时间单位）
+            - times: 时间数组，形状 (M,)
+            - states: 状态数组，形状 (M, 6)，每行 [x, y, z, vx, vy, vz]
+        n_points: 需要采样的节点数量
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: 包含两个数组的元组：
+            - t_patch: 采样时间节点数组，形状 (n_points,)，归一化时间单位
+            - states: 采样状态数组，形状 (n_points, 6)，每行 [x, y, z, vx, vy, vz]
+
+    Raises:
+        ValueError: 当轨道对象没有 period 属性时抛出
+
+    Notes:
+        - 采样时间范围为 [0, period)，不包含周期终点（endpoint=False）
+        - 使用线性插值从原始轨道数据中获取节点状态
+        - 适用于 CR3BP 归一化坐标系下的周期轨道采样
+    """
     if orbit.period is None:
         raise ValueError("Orbit must have a period attribute")
 
+    # 在轨道周期内均匀生成 n_points 个时间节点
     t_patch = np.linspace(0, orbit.period, n_points, endpoint=False)
 
+    # 为每个状态分量进行线性插值
     states = np.empty((n_points, 6))
     for i in range(6):
         states[:, i] = np.interp(t_patch, orbit.times, orbit.states[:, i])
@@ -236,11 +263,39 @@ def convert_to_j2000(
     reference_et: float,
     tu_seconds: float,
 ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    """将 synodic 坐标系下的 patch points 转换到 J2000 惯性坐标系。
+
+    该方法用于将 CR3BP 归一化 synodic 坐标系中的轨道节点转换到
+    J2000 惯性坐标系，以便在星历模型（Ephemeris）中进行高精度轨道修正。
+
+    Args:
+        t_patch_syn: synodic 坐标系下的时间节点数组，归一化时间单位（TU）
+        states_syn: synodic 坐标系下的状态数组，形状 (N, 6)，
+                   每行 [x, y, z, vx, vy, vz]，归一化单位（DU, DU/TU）
+        syn_j2000: SynodicJ2000Transformation 对象，提供坐标转换功能
+        reference_et: 参考历元的 SPICE ephemeris time（ET），单位秒
+        tu_seconds: 归一化时间单位（TU）对应的秒数
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: 包含两个数组的元组：
+            - t_patch_j2000: J2000 坐标系下的时间数组，SPICE ET（秒）
+            - states_j2000: J2000 坐标系下的状态数组，形状 (N, 6)，
+                            每行 [x, y, z, vx, vy, vz]，单位（km, km/s）
+
+    Notes:
+        - 时间转换公式：t_j2000 = reference_et + t_syn * tu_seconds
+        - 状态转换使用 SynodicJ2000Transformation.batch_synodic_to_j2000() 方法
+        - 适用于将 CR3BP 轨道转换到星历模型进行高精度修正的场景
+        - 转换后的状态可用于 EphemerisDynamics 进行轨道传播
+    """
+    # 确保输入为 numpy 数组
     t_patch_syn = np.asarray(t_patch_syn, dtype=float)
     states_syn = np.asarray(states_syn, dtype=float)
 
+    # 时间转换：归一化时间 → SPICE ephemeris time（秒）
     t_patch_j2000 = reference_et + t_patch_syn * tu_seconds
 
+    # 状态转换：synodic 坐标系 → J2000 惯性坐标系
     states_j2000 = syn_j2000.batch_synodic_to_j2000(
         states_syn=states_syn,
         t_syn_arr=t_patch_syn,
