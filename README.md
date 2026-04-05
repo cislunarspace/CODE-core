@@ -307,6 +307,24 @@ ruff check --fix .    # 自动修复
 ruff format .         # 格式化
 ```
 
+### 文档构建
+
+项目使用 MkDocs + Material 主题构建文档网站：
+
+```bash
+# 安装文档构建依赖
+pip install mkdocs mkdocs-material
+
+# 本地预览文档
+mkdocs serve
+
+# 构建静态网站
+mkdocs build
+
+# 部署到 GitHub Pages
+mkdocs gh-deploy
+```
+
 ### AI 助手开发指南
 
 项目包含 `AGENTS.md` 文件，为 AI 助手（如 OpenCode）提供仓库特定的开发指导：
@@ -328,6 +346,16 @@ ruff format .         # 格式化
 5. 开启 Pull Request
 
 ## 文档
+
+### 在线文档网站
+
+项目文档已通过 MkDocs + Material 主题发布为在线网站：
+
+- **本地预览**：`mkdocs serve`（访问 http://127.0.0.1:8000）
+- **构建静态网站**：`mkdocs build`（输出到 `site/` 目录）
+- **部署到 GitHub Pages**：`mkdocs gh-deploy`
+
+### 文档目录结构
 
 更多文档请参考 [`docs/`](docs/) 目录：
 
