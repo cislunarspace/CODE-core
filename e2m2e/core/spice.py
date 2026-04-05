@@ -4,12 +4,57 @@
 提供天体星历查询、时间转换、以及内核文件管理等常用功能，
 使其更易于在轨道设计流程中使用。
 
-典型用法::
+SPICE 内核文件说明
+==================
+
+SPICE 内核是 NASA NAIF 提供的数据文件，包含天体星历、姿态、时间转换等信息。
+本模块使用两类内核：
+
+1. **闰秒内核**（``.tls``）：提供 UTC ↔ ET 时间转换所需的闰秒表。
+   模块会自动在 ``kernels/`` 目录和 ``SPICE_KERNEL_DIR`` 环境变量指定的路径中
+   搜索并加载 ``.tls`` 文件，无需手动操作。
+
+2. **星历内核**（``.bsp``）：包含天体位置/速度数据（如 JPL DE440）。
+   需要手动加载，可通过 ``find_ephemeris_kernel()`` 搜索或 ``load_kernel()`` 加载。
+
+支持的星历内核（按推荐优先级）：
+
+    ============  ====================================
+    文件名        说明
+    ============  ====================================
+    de440.bsp     JPL DE440（推荐，覆盖 1550–2650 年）
+    de440s.bsp    JPL DE440 精简版（覆盖 1849–2150 年）
+    de435.bsp     JPL DE435（覆盖 1550–2650 年）
+    de438.bsp     JPL DE438（覆盖 1550–2650 年）
+    ============  ====================================
+
+内核文件获取：从 `NASA NAIF <https://naif.jpl.nasa.gov/naif/data.html>`_ 下载，
+或设置 ``SPICE_KERNEL_DIR`` 环境变量指向已下载的内核目录。
+
+典型用法
+========
+
+手动指定路径加载::
+
+    from e2m2e.core import SPICEManager
 
     mgr = SPICEManager()
-    mgr.load_kernel("path/to/ephemeris.bsp")
+    mgr.load_kernel("path/to/de440.bsp")
+
     et = mgr.utc_to_et("2024-01-01T00:00:00")
     state = mgr.get_body_state("MOON", et, "J2000", "EARTH")
+    mgr.unload_kernel("path/to/de440.bsp")
+
+自动搜索内核文件::
+
+    from e2m2e.core import SPICEManager
+
+    mgr = SPICEManager()
+    kernel = mgr.find_ephemeris_kernel("/path/to/kernels")
+    mgr.load_kernel(kernel)
+
+    # ... 使用完毕后卸载
+    mgr.unload_kernel(kernel)
 """
 
 from __future__ import annotations
@@ -68,6 +113,20 @@ class SPICEManager:
 
     负责自动加载闰秒内核、提供星历查询接口（位置/状态）、
     时间格式转换（UTC ↔ ET）以及天体引力参数查询。
+
+    使用流程::
+
+        mgr = SPICEManager()
+        # 搜索并加载星历内核
+        kernel = mgr.find_ephemeris_kernel("/path/to/kernels")
+        mgr.load_kernel(kernel)
+
+        # 查询天体状态
+        et = mgr.utc_to_et("2025-06-21T11:00:00")
+        state = mgr.get_body_state("MOON", et, "J2000", "EARTH")
+
+        # 使用完毕后卸载
+        mgr.unload_kernel(kernel)
 
     Attributes:
         _leapseconds_loaded: 标记闰秒内核是否已加载，避免重复加载。
