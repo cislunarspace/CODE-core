@@ -22,18 +22,16 @@ from . import coordinate
 from . import spice
 from . import ephemeris_system
 from . import ephemeris_dynamics
-from . import synodic_j2000
 from . import homotopy_dynamics
 
 from .system import CR3BP_System, LibrationPoint
 from .dynamics import Dynamics, CR3BP_Dynamics, propagate_state_at_orbit_time
 from .orbit import Orbit, OrbitFamily
-from .coordinate import CoordinateTransformation
+from .coordinate import CoordinateTransformation, SynodicJ2000Transformation
 from .spice import SPICEManager
 from .ephemeris_system import EphemerisSystem
 from .ephemeris_dynamics import EphemerisDynamics
 from .homotopy_dynamics import HomotopyEphemerisDynamics
-from .synodic_j2000 import SynodicJ2000Transformation
 
 __all__ = [
     "CR3BP_System",
