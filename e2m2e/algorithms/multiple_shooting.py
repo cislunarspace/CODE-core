@@ -261,7 +261,7 @@ def convert_to_j2000(
     states_syn: npt.ArrayLike,
     syn_j2000,
     reference_et: float,
-    tu_seconds: float,
+    tu_days: float = 4.34811305,
 ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """将 synodic 坐标系下的 patch points 转换到 J2000 惯性坐标系。
 
@@ -274,7 +274,7 @@ def convert_to_j2000(
                    每行 [x, y, z, vx, vy, vz]，归一化单位（DU, DU/TU）
         syn_j2000: SynodicJ2000Transformation 对象，提供坐标转换功能
         reference_et: 参考历元的 SPICE ephemeris time（ET），单位秒
-        tu_seconds: 归一化时间单位（TU）对应的秒数
+        tu_days: 归一化时间单位（TU）对应的天数，默认值为 4.34811305 天
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: 包含两个数组的元组：
@@ -283,7 +283,7 @@ def convert_to_j2000(
                             每行 [x, y, z, vx, vy, vz]，单位（km, km/s）
 
     Notes:
-        - 时间转换公式：t_j2000 = reference_et + t_syn * tu_seconds
+        - 时间转换公式：t_j2000 = reference_et + t_syn * (tu_days * 86400)
         - 状态转换使用 SynodicJ2000Transformation.batch_synodic_to_j2000() 方法
         - 适用于将 CR3BP 轨道转换到星历模型进行高精度修正的场景
         - 转换后的状态可用于 EphemerisDynamics 进行轨道传播
@@ -293,6 +293,7 @@ def convert_to_j2000(
     states_syn = np.asarray(states_syn, dtype=float)
 
     # 时间转换：归一化时间 → SPICE ephemeris time（秒）
+    tu_seconds = tu_days * 86400  # 将 TU 天数转换为秒数
     t_patch_j2000 = reference_et + t_patch_syn * tu_seconds
 
     # 状态转换：synodic 坐标系 → J2000 惯性坐标系

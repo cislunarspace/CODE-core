@@ -43,6 +43,7 @@ from e2m2e.algorithms import sample_patch_points, convert_to_j2000
 MU = 1.21506683e-2
 DU = 3.84405e5
 TU_SECONDS = 4.34811305 * 86400
+TU_DAYS = 4.34811305
 VU = DU / TU_SECONDS
 
 DRO_31_X0 = 1.1202109158830986
@@ -187,7 +188,7 @@ class TestConvertToJ2000:
         """返回值形状应正确"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 8)
         t_j2000, states_j2000 = convert_to_j2000(
-            t_syn, states_syn, syn_j2000, reference_et, TU_SECONDS
+            t_syn, states_syn, syn_j2000, reference_et, TU_DAYS
         )
 
         assert t_j2000.shape == (8,)
@@ -196,19 +197,19 @@ class TestConvertToJ2000:
     def test_time_starts_at_reference_et(self, dro_orbit, syn_j2000, reference_et):
         """J2000 时间起点应等于 reference_et"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
-        t_j2000, _ = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_SECONDS)
+        t_j2000, _ = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
         assert_allclose(t_j2000[0], reference_et)
 
     def test_time_is_monotonically_increasing(self, dro_orbit, syn_j2000, reference_et):
         """J2000 时间应单调递增"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 8)
-        t_j2000, _ = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_SECONDS)
+        t_j2000, _ = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
         assert np.all(np.diff(t_j2000) > 0)
 
     def test_time_span_matches_period(self, dro_orbit, syn_j2000, reference_et):
         """J2000 时间跨度应等于 orbit period * TU_SECONDS"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
-        t_j2000, _ = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_SECONDS)
+        t_j2000, _ = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
         expected_span = dro_orbit.period * TU_SECONDS
         actual_span = t_j2000[-1] - t_j2000[0]
         # endpoint=False so last point is not a full period
@@ -217,13 +218,13 @@ class TestConvertToJ2000:
     def test_states_are_finite(self, dro_orbit, syn_j2000, reference_et):
         """所有 J2000 状态值应为有限数"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 8)
-        _, states_j2000 = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_SECONDS)
+        _, states_j2000 = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
         assert np.all(np.isfinite(states_j2000))
 
     def test_position_near_moon_distance(self, dro_orbit, syn_j2000, reference_et):
         """J2000 下的 DRO 位置应在月球距离附近 (300000-500000 km)"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
-        _, states_j2000 = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_SECONDS)
+        _, states_j2000 = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
         for i in range(len(states_j2000)):
             r = np.linalg.norm(states_j2000[i, :3])
             assert 300000 < r < 500000, f"Patch {i} 距地球 {r:.0f} km，超出合理范围"
@@ -231,7 +232,7 @@ class TestConvertToJ2000:
     def test_velocity_is_reasonable(self, dro_orbit, syn_j2000, reference_et):
         """J2000 下的速度应在合理范围 (< 5 km/s)"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
-        _, states_j2000 = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_SECONDS)
+        _, states_j2000 = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
         for i in range(len(states_j2000)):
             v = np.linalg.norm(states_j2000[i, 3:])
             assert v < 5.0, f"Patch {i} 速度 {v:.2f} km/s 过大"
@@ -241,7 +242,7 @@ class TestConvertToJ2000:
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
 
         t_j2000, states_j2000 = convert_to_j2000(
-            t_syn, states_syn, syn_j2000, reference_et, TU_SECONDS
+            t_syn, states_syn, syn_j2000, reference_et, TU_DAYS
         )
 
         expected_states = syn_j2000.batch_synodic_to_j2000(
@@ -249,7 +250,7 @@ class TestConvertToJ2000:
             t_syn_arr=t_syn,
             et0=reference_et,
         )
-        expected_times = reference_et + t_syn * TU_SECONDS
+        expected_times = reference_et + t_syn * TU_SECONDS  # TU_SECONDS = TU_DAYS * 86400
 
         assert_allclose(states_j2000, expected_states, rtol=1e-12)
         assert_allclose(t_j2000, expected_times, rtol=1e-12)
@@ -260,7 +261,7 @@ class TestConvertToJ2000:
         assert len(t_syn) == 1
 
         t_j2000, states_j2000 = convert_to_j2000(
-            t_syn, states_syn, syn_j2000, reference_et, TU_SECONDS
+            t_syn, states_syn, syn_j2000, reference_et, TU_DAYS
         )
         assert t_j2000.shape == (1,)
         assert states_j2000.shape == (1, 6)
