@@ -144,4 +144,4 @@ result = transfer.design_heteroclinic_transfer(orbit_L1, orbit_L2)
 2. Inherit base class to implement specific strategy
 3. Export in `__init__.py`
 
-See [Contributing Guide](../CONTRIBUTING.md) for details.
+See the CONTRIBUTING.md file in the project root for details.

@@ -82,7 +82,7 @@ def generate_dro(x0=0.8, y_dot_guess=0.5, t_half_guess=1.6):
 
 ---
 
-## Halo 轨道
+## Halo 轨道 {#halo-轨道}
 
 ### 理论背景
 
@@ -299,4 +299,4 @@ orbit = Orbit.load_from_file("output/dro_single.json")
 ## 参考
 
 - 详见 [API 参考 - DifferentialCorrection](../reference/api-reference.md#21-differentialcorrection)
-- 详见 [算法参考 - 轨道族延拓](../reference/algorithms.md#5-轨道族延拓算法)
+- 详见 [算法参考 - 轨道族延拓](../reference/algorithms.md)

@@ -200,4 +200,4 @@ result = transfer.design_heteroclinic_transfer(orbit_L1, orbit_L2)
 3. 提供完整的收敛性和误差分析
 4. 添加性能基准测试
 
-详见 [贡献指南](../CONTRIBUTING.md) 和 [算法参考文档](../reference/algorithms.md)。
+详见项目根目录的 CONTRIBUTING.md 文件和 [算法参考文档](../reference/algorithms.md)。

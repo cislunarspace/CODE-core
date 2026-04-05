@@ -28,12 +28,7 @@ docs/
 │   ├── stability.md          # 稳定性分析
 │   └── multiple_shooting.md  # 多重打靶法
 ├── visualization/       # 可视化模块
-│   ├── config.md             # PlotConfig 配置
-│   ├── base.md               # BasePlotter 基类
-│   ├── family.md             # FamilyPlotter 轨道族绘图
-│   ├── transfer.md           # TransferPlotter 转移绘图
-│   ├── stability.md          # 稳定性可视化
-│   └── plotting.md           # 向后兼容 shim
+│   └── plotting.md           # 绘图功能（向后兼容）
 └── reference/           # 技术参考
     ├── api-reference.md     # 完整API文档
     └── algorithms.md        # 算法技术细节
@@ -80,20 +75,16 @@ docs/
 
 | 类/函数 | 文件 | 说明 |
 |---------|------|------|
-| `PlotConfig` | [visualization/config.md](visualization/config.md) | 绘图配置（颜色、线型、字体等） |
-| `FamilyPlotter` | [visualization/family.md](visualization/family.md) | 轨道族绘图（2D/3D） |
-| `TransferPlotter` | [visualization/transfer.md](visualization/transfer.md) | 转移轨迹绘图 |
-| 稳定性绘图 | [visualization/stability.md](visualization/stability.md) | 稳定性指数与特征值可视化 |
-| `plotting` shim | [visualization/plotting.md](visualization/plotting.md) | 向后兼容旧 API |
+| `plotting` 模块 | [visualization/plotting.md](visualization/plotting.md) | 绘图功能（向后兼容） |
 
 ### 转移模块 (transfer)
 
 | 类/函数 | 文件 | 说明 |
 |---------|------|------|
-| `DROTransferSearch` | [reference/api-reference.md](reference/api-reference.md#31-drotransfersearch) | DRO到RO转移网格搜索 |
-| `DROTRONLPOptimizer` | [reference/api-reference.md](reference/api-reference.md#32-drotronlpoptimizer) | 两脉冲转移NLP优化 |
-| `load_orbit_from_json` | [reference/api-reference.md](reference/api-reference.md#34-工具函数) | 从JSON加载轨道数据 |
-| `save_search_results` | [reference/api-reference.md](reference/api-reference.md#34-工具函数) | 保存搜索结果 |
+| `DROTransferSearch` | [reference/api-reference.md](reference/api-reference.md) | DRO到RO转移网格搜索 |
+| `DROTRONLPOptimizer` | [reference/api-reference.md](reference/api-reference.md) | 两脉冲转移NLP优化 |
+| `load_orbit_from_json` | [reference/api-reference.md](reference/api-reference.md) | 从JSON加载轨道数据 |
+| `save_search_results` | [reference/api-reference.md](reference/api-reference.md) | 保存搜索结果 |
 
 ### 技术参考 (reference)
 
@@ -129,9 +120,9 @@ result = dynamics.propagate(initial_state=state, t_span=(0, 10.0))
 ### 常用任务
 
 1. **设计DRO轨道** → 参考 [轨道生成 - DRO](guides/orbit-generation.md#distant-retrograde-orbit-dro)
-2. **设计Halo轨道** → 参考 [轨道生成 - Halo](guides/orbit-generation.md#halo-轨道)
-3. **生成轨道族** → 参考 [轨道族延拓](reference/algorithms.md#5-轨道族延拓算法)
-4. **分析稳定性** → 参考 [稳定性分析](reference/algorithms.md#7-稳定性分析)
+2. **设计Halo轨道** → 参考 [轨道生成 - Halo](guides/orbit-generation.md)
+3. **生成轨道族** → 参考 [轨道族延拓](reference/algorithms.md)
+4. **分析稳定性** → 参考 [稳定性分析](reference/algorithms.md)
 
 ## 物理背景
 
@@ -140,4 +131,4 @@ E2M2E 基于**圆型限制性三体问题 (CR3BP)** 实现轨道设计。地月�
 - 特征距离：384,400 km（地月距离）
 - 特征周期：27.32 天
 
-详见 [CR3BP理论](reference/algorithms.md#1-概述) 和 [系统概述](guides/system-overview.md)。
+详见 [CR3BP理论](reference/algorithms.md) 和 [系统概述](guides/system-overview.md)。
