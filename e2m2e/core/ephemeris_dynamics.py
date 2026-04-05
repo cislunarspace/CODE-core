@@ -103,7 +103,7 @@ class EphemerisDynamics(Dynamics):
         self.initialized = True
 
     def equations_of_motion(
-        self, et: float, state: npt.NDArray[np.floating]
+        self, t: float, state: npt.NDArray[np.floating]
     ) -> npt.NDArray[np.floating]:
         """计算受限 N 体问题的运动方程右端项（加速度）。
 
@@ -114,7 +114,7 @@ class EphemerisDynamics(Dynamics):
 
         Parameters
         ----------
-        et : float
+        t : float
             历元时刻（ephemeris seconds past J2000），用于查询天体星历位置。
         state : ndarray
             航天器状态向量，形状 ``(6,)``，前 3 个元素为位置 [km]，
@@ -138,7 +138,7 @@ class EphemerisDynamics(Dynamics):
             else:
                 # 摄动天体：第三体摄动 + 间接项
                 r_ob = self.system.spice.get_body_position(
-                    body, et, self.system.frame, self.system.origin
+                    body, t, self.system.frame, self.system.origin
                 )
                 r_bsc = r_sc - r_ob  # 航天器到摄动天体的位置向量
                 r_bsc_norm = np.linalg.norm(r_bsc)
@@ -149,7 +149,7 @@ class EphemerisDynamics(Dynamics):
         return np.concatenate([v_sc, acc])
 
     def equations_with_stm(
-        self, et: float, augmented_state: npt.NDArray[np.floating]
+        self, t: float, augmented_state: npt.NDArray[np.floating]
     ) -> npt.NDArray[np.floating]:
         """计算含状态转移矩阵 (STM) 的增广运动方程右端项。
 
@@ -167,7 +167,7 @@ class EphemerisDynamics(Dynamics):
 
         Parameters
         ----------
-        et : float
+        t : float
             历元时刻（ephemeris seconds past J2000）。
         augmented_state : ndarray
             增广状态向量，形状 ``(42,)``。
@@ -197,7 +197,7 @@ class EphemerisDynamics(Dynamics):
             else:
                 # 摄动天体：第三体摄动及其 Jacobian（仅直接项贡献）
                 r_ob = self.system.spice.get_body_position(
-                    body, et, self.system.frame, self.system.origin
+                    body, t, self.system.frame, self.system.origin
                 )
                 r_bsc = r_sc - r_ob
                 r_bsc_norm = np.linalg.norm(r_bsc)
@@ -227,7 +227,7 @@ class EphemerisDynamics(Dynamics):
         t_span: Tuple[float, float],
         t_eval: Optional[npt.ArrayLike] = None,
         with_stm: bool = False,
-        **kwargs,
+        with_jacobi: bool = False,
     ) -> Dict[str, Any]:
         """数值积分传播航天器轨道。
 
@@ -250,6 +250,8 @@ class EphemerisDynamics(Dynamics):
             指定输出时间点序列。若为 ``None``，由积分器自动选择。
         with_stm : bool, default False
             是否同时求解状态转移矩阵。
+        with_jacobi : bool, default False
+            是否沿轨迹逐点计算 Jacobi 常数。
 
         Returns
         -------
