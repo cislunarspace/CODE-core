@@ -4,6 +4,15 @@
 
 本文档描述了 Earth-to-Moon-to-Earth (E2M2E) 项目中实现的圆型限制性三体问题 (Circular Restricted Three-Body Problem, CR3BP) 轨道力学算法。这些算法用于生成月球远距离逆行轨道 (Distant Retrograde Orbit, DRO) 及其他周期轨道。
 
+### 1.3 新增算法功能
+
+除了基础的 CR3BP 算法外，项目还实现了以下高级功能：
+
+- **星历动力学**：基于 NASA SPICE 内核的精确多天体引力计算
+- **同伦动力学**：通过同伦参数平滑过渡从基础模型到完整星历模型
+- **多重打靶法**：适用于复杂约束和长周期轨道的数值修正方法
+- **SPICE 集成**：支持加载和使用标准 SPICE 内核文件进行精确星历计算
+
 ### 1.1 CR3BP 模型简介
 
 CR3BP 描述一个小质量天体在两个大质量天体（主天体和次天体）引力作用下的运动。在地月系统中：
@@ -547,29 +556,166 @@ family.save_to_file("output/dro/dro_family.json")
 
 ---
 
-## 10. 附录：文件结构
+## 10. 星历动力学与同伦方法
+
+### 10.1 星历动力学 (Ephemeris Dynamics)
+
+星历动力学基于 NASA SPICE 内核提供精确的多天体引力计算，考虑了实际天体的非球形引力和精确星历位置。
+
+**核心类**:
+- `EphemerisSystem`: 星历系统定义，指定参与计算的天体列表和参考历元
+- `EphemerisDynamics`: 星历动力学计算，继承自 `Dynamics` 基类
+- `SPICEManager`: SPICE 内核管理，支持从目录加载内核文件
+
+**使用方法**:
+```python
+from e2m2e.core import EphemerisSystem, EphemerisDynamics
+from e2m2e.core.spice import SPICEManager
+
+# 初始化 SPICE 管理器
+spice_manager = SPICEManager()
+spice_manager.load_kernels_from_directory("./kernels/")
+
+# 创建星历系统
+ephemeris_system = EphemerisSystem(
+    bodies=["EARTH", "MOON", "SUN"],
+    reference_epoch="2025-06-21T11:00:06"
+)
+
+# 创建星历动力学
+ephemeris_dynamics = EphemerisDynamics(system=ephemeris_system)
+```
+
+### 10.2 同伦动力学 (Homotopy Dynamics)
+
+同伦动力学通过同伦参数 λ 平滑过渡从基础模型到完整星历模型，适用于轨道修正和延续。
+
+**物理含义**:
+- λ=0: 仅基础天体（如地月）的引力（接近 CRTBP 的星历等效）
+- λ=1: 所有天体的完整引力（完整星历模型）
+
+**加速度公式**:
+$$a(r, t, λ) = \sum_{b \in \text{base}} a_b(r, t) + λ \cdot \sum_{p \in \text{perturbation}} a_p(r, t)$$
+
+**使用方法**:
+```python
+from e2m2e.core import HomotopyEphemerisDynamics
+
+homotopy_dynamics = HomotopyEphemerisDynamics(
+    system=ephemeris_system,
+    base_bodies=["EARTH", "MOON"],      # 基础天体，始终满引力
+    perturbation_bodies=["SUN"],        # 摄动天体，引力乘以 λ
+    homotopy_param=0.5                  # 同伦参数 λ ∈ [0, 1]
+)
+```
+
+### 10.3 多重打靶法 (Multiple Shooting)
+
+多重打靶法将轨迹分为多个节点和弧段，通过匹配相邻段端点状态进行数值修正，适用于复杂约束和长周期轨道。
+
+**算法特点**:
+- 支持固定时间和自由时间问题
+- 利用状态转移矩阵构建雅可比矩阵
+- 适用于难以用单次积分满足边界条件的情况
+
+**核心类**:
+- `MultipleShooting`: 多重打靶法修正器
+- `MultipleShootingResult`: 修正结果容器
+
+**工具函数**:
+- `sample_patch_points()`: 从轨道中均匀采样打靶点
+- `convert_to_j2000()`: 将状态转换到 J2000 惯性系
+
+**使用方法**:
+```python
+from e2m2e.algorithms import MultipleShooting, sample_patch_points
+
+# 创建多重打靶法修正器
+multiple_shooting = MultipleShooting(dynamics=dynamics)
+
+# 从轨道中采样打靶点
+t_patch, state_patch = sample_patch_points(
+    orbit=seed_orbit,
+    n_segments=5  # 分为 5 段弧段
+)
+
+# 执行多重打靶法修正
+result = multiple_shooting.correct(
+    t_patch=t_patch,
+    state_patch=state_patch,
+    max_iter=50,
+    tol=1e-10,
+    var_time=True  # 允许时间节点变化
+)
+```
+
+### 10.4 SPICE 内核配置
+
+星历动力学功能需要 NASA SPICE 内核文件。内核文件应放置在以下目录之一：
+1. `$SPICE_KERNEL_DIR` 环境变量指定的目录
+2. 项目根目录下的 `kernels/` 文件夹
+
+**常用内核文件**:
+- 行星/卫星星历：`de440.bsp`, `moon_pa_de440_200625.bsp`
+- 行星/卫星形状模型：`moon_080317.tpc`
+- 行星常数：`pck00011.tpc`
+
+**参考测试历元**: `"2025-06-21T11:00:06"`
+
+---
+
+## 11. 参考文献
+
+1. Broucke, R. A. (1968). Periodic orbits in the restricted three body problem with Earth-moon masses. NASA JPL.
+
+2. Cui, P., et al. (2025). Two-Impulse Transfers from Lunar Distant Retrograde Orbits to Resonant Orbits. Journal of Guidance, Control, and Dynamics, Vol. 48, No. 6.
+
+3. Koon, W. S., et al. (2011). Dynamical Systems, the Three-Body Problem and Space Mission Design. Springer.
+
+4. NASA NAIF. (2024). SPICE Toolkit Documentation. https://naif.jpl.nasa.gov/naif/
+
+5. Howell, K. C. (1984). Three-dimensional, periodic, 'halo' orbits. Celestial Mechanics, 32(1), 53-71.
+
+---
+
+## 12. 附录：文件结构
 
 ```
 e2m2e/
 ├── e2m2e/
 │   ├── core/
-│   │   ├── system.py          # CR3BP 系统参数
-│   │   ├── dynamics.py        # 动力学方程
-│   │   ├── orbit.py          # Orbit 和 OrbitFamily 类
-│   │   └── coordinate.py     # 坐标变换
+│   │   ├── system.py                 # CR3BP 系统参数
+│   │   ├── dynamics.py               # CR3BP 动力学方程
+│   │   ├── orbit.py                  # Orbit 和 OrbitFamily 类
+│   │   ├── coordinate.py             # 坐标变换
+│   │   ├── ephemeris_system.py       # EphemerisSystem - 星历系统定义
+│   │   ├── ephemeris_dynamics.py     # EphemerisDynamics - 星历动力学
+│   │   ├── homotopy_dynamics.py      # HomotopyEphemerisDynamics - 同伦星历动力学
+│   │   └── spice.py                  # SPICE 内核管理与工具函数
 │   └── algorithms/
 │       ├── differential_correction.py  # 微分修正
 │       ├── continuation.py            # 轨道族延拓
-│       └── stability.py              # 稳定性分析
+│       ├── stability.py              # 稳定性分析
+│       ├── multiple_shooting.py      # MultipleShooting - 多重打靶法
+│       └── patch_point_utils.py      # sample_patch_points, convert_to_j2000 - 打靶点工具
 └── docs/
     ├── reference/
-    │   ├── algorithms.md        # 本文档
-    │   └── api-reference.md     # 完整 API 文档
+    │   ├── algorithms.md             # 本文档
+    │   └── api-reference.md          # 完整 API 文档
     ├── algorithms/
     │   ├── continuation.md
     │   ├── halo.md
     │   ├── differential_correction.md
-    │   └── stability.md
+    │   ├── stability.md
+    │   └── multiple_shooting.md
+    ├── core/
+    │   ├── system.md
+    │   ├── dynamics.md
+    │   ├── orbit.md
+    │   ├── coordinate.md
+    │   ├── ephemeris_system.md
+    │   ├── ephemeris_dynamics.md
+    │   └── homotopy_dynamics.md
     └── guides/
         ├── orbit-generation.md
         └── system-overview.md

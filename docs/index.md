@@ -16,12 +16,17 @@ docs/
 │   ├── system.md         # CR3BP_System - 系统参数
 │   ├── dynamics.md       # CR3BP_Dynamics - 动力学
 │   ├── orbit.md          # Orbit, OrbitFamily - 轨道
-│   └── coordinate.md     # CoordinateTransformation - 坐标变换
+│   ├── coordinate.md     # CoordinateTransformation - 坐标变换
+│   ├── ephemeris_system.md      # EphemerisSystem - 星历系统
+│   ├── ephemeris_dynamics.md    # EphemerisDynamics - 星历动力学
+│   ├── homotopy_dynamics.md    # HomotopyEphemerisDynamics - 同伦动力学
+│   └── spice.md                 # SPICE 内核管理
 ├── algorithms/           # 算法模块
 │   ├── continuation.md       # 延拓法
 │   ├── halo.md               # Halo 轨道与伪弧长轨道族
 │   ├── differential_correction.md  # 微分修正
-│   └── stability.md          # 稳定性分析
+│   ├── stability.md          # 稳定性分析
+│   └── multiple_shooting.md  # 多重打靶法
 ├── visualization/       # 可视化模块
 │   ├── config.md             # PlotConfig 配置
 │   ├── base.md               # BasePlotter 基类
@@ -51,11 +56,15 @@ docs/
 |---------|------|------|
 | `System` | [core/system.md](core/system.md) | 天体系统基类 |
 | `CR3BP_System` | [core/system.md](core/system.md) | 系统参数与平动点计算 |
+| `EphemerisSystem` | [core/ephemeris_system.md](core/ephemeris_system.md) | 星历系统定义 |
 | `Dynamics` | [core/dynamics.md](core/dynamics.md) | 动力学基类 |
 | `CR3BP_Dynamics` | [core/dynamics.md](core/dynamics.md) | 运动方程与数值积分 |
+| `EphemerisDynamics` | [core/ephemeris_dynamics.md](core/ephemeris_dynamics.md) | 星历动力学 |
+| `HomotopyEphemerisDynamics` | [core/homotopy_dynamics.md](core/homotopy_dynamics.md) | 同伦星历动力学 |
 | `Orbit` | [core/orbit.md](core/orbit.md) | 轨道数据管理 |
 | `OrbitFamily` | [core/orbit.md](core/orbit.md) | 轨道族管理 |
 | `CoordinateTransformation` | [core/coordinate.md](core/coordinate.md) | 坐标系变换 |
+| `SPICEManager` | [core/spice.md](core/spice.md) | SPICE 内核管理 |
 
 ### 算法模块 (algorithms)
 
@@ -65,6 +74,7 @@ docs/
 | Halo / PAL 轨道族 | [algorithms/halo.md](algorithms/halo.md) | Halo 初值、伪弧长延拓、脚本与 MATLAB 对照 |
 | `DifferentialCorrection` | [algorithms/differential_correction.md](algorithms/differential_correction.md) | 周期轨道修正 |
 | `StabilityAnalysis` | [algorithms/stability.md](algorithms/stability.md) | Floquet稳定性分析 |
+| `MultipleShooting` | [algorithms/multiple_shooting.md](algorithms/multiple_shooting.md) | 多重打靶法修正器 |
 
 ### 可视化模块 (visualization)
 

@@ -11,8 +11,10 @@
 ## 核心功能
 
 - **CR3BP 系统建模**：支持地月、日地、日木等常见天体系统
+- **星历动力学建模**：基于 SPICE 内核的精确星历计算，支持多天体引力
+- **同伦动力学**：通过同伦参数平滑过渡从基础模型到完整星历模型
 - **多种轨道类型**：DRO、ARO、RO、Halo、Lyapunov、Lissajous、Butterfly 等
-- **轨道设计算法**：微分修正、自然延拓、伪弧长延拓、稳定性分析
+- **轨道设计算法**：微分修正、多重打靶法、自然延拓、伪弧长延拓、稳定性分析
 - **转移轨道搜索**：网格搜索、NLP 优化、脉冲转移设计
 - **可视化工具**：2D/3D 轨道绘图、Jacobi 常数图、稳定性分析图
 
@@ -45,6 +47,21 @@ python -m pip install -e .
 pip install -e ".[dev]"
 ```
 
+### SPICE 内核配置
+
+星历动力学功能需要 NASA SPICE 内核文件。内核文件应放置在以下目录之一：
+
+1. `$SPICE_KERNEL_DIR` 环境变量指定的目录
+2. 项目根目录下的 `kernels/` 文件夹
+
+内核文件可以从 [NASA NAIF 网站](https://naif.jpl.nasa.gov/naif/data.html) 下载。常用的内核包括：
+
+- 行星/卫星星历（如 `de440.bsp`, `moon_pa_de440_200625.bsp`）
+- 行星/卫星形状模型（如 `moon_080317.tpc`）
+- 行星常数（如 `pck00011.tpc`）
+
+参考测试历元：`"2025-06-21T11:00:06"`
+
 ## 快速开始
 
 ### 1. 创建系统并计算平动点
@@ -60,7 +77,36 @@ system.compute_libration_points()
 system.info()
 ```
 
-### 2. 生成 DRO 轨道族
+### 2. 使用星历动力学
+
+```python
+from e2m2e.core import EphemerisSystem, EphemerisDynamics
+from e2m2e.core.spice import SPICEManager
+
+# 初始化 SPICE 管理器并加载内核
+spice_manager = SPICEManager()
+spice_manager.load_kernels_from_directory("./kernels/")
+
+# 创建星历系统
+ephemeris_system = EphemerisSystem(
+    bodies=["EARTH", "MOON", "SUN"],
+    reference_epoch="2025-06-21T11:00:06"
+)
+
+# 创建星历动力学
+ephemeris_dynamics = EphemerisDynamics(system=ephemeris_system)
+
+# 使用同伦动力学平滑过渡
+from e2m2e.core import HomotopyEphemerisDynamics
+homotopy_dynamics = HomotopyEphemerisDynamics(
+    system=ephemeris_system,
+    base_bodies=["EARTH", "MOON"],
+    perturbation_bodies=["SUN"],
+    homotopy_param=0.5  # 50% 太阳引力
+)
+```
+
+### 3. 生成 DRO 轨道族
 
 ```python
 import e2m2e
@@ -92,7 +138,36 @@ family = continuation.natural_continuation(
 )
 ```
 
-### 3. 转移轨道设计
+### 4. 使用多重打靶法
+
+```python
+from e2m2e.algorithms import MultipleShooting, sample_patch_points, convert_to_j2000
+
+# 创建多重打靶法修正器
+multiple_shooting = MultipleShooting(dynamics=dynamics)
+
+# 从轨道中采样打靶点
+t_patch, state_patch = sample_patch_points(
+    orbit=seed_dro,
+    n_segments=5  # 分为 5 段弧段
+)
+
+# 执行多重打靶法修正
+result = multiple_shooting.correct(
+    t_patch=t_patch,
+    state_patch=state_patch,
+    max_iter=50,
+    tol=1e-10,
+    var_time=True  # 允许时间节点变化
+)
+
+if result.converged:
+    print(f"收敛于 {result.iterations} 次迭代，最大残差: {result.max_residual}")
+    # 将修正后的状态转换到 J2000 惯性系
+    state_j2000 = convert_to_j2000(result.state_patch, system)
+```
+
+### 5. 转移轨道设计
 
 ```python
 from e2m2e.transfer import Transfer
@@ -128,7 +203,7 @@ result = optimizer.optimize(
 )
 ```
 
-### 4. 可视化
+### 6. 可视化
 
 ```python
 from e2m2e.visualization import PlotConfig, FamilyPlotter
@@ -149,11 +224,17 @@ e2m2e/
 │   ├── system.py         # CR3BP_System - 系统定义、平动点、Jacobi 常数
 │   ├── dynamics.py       # CR3BP_Dynamics - 运动方程、STM、数值积分
 │   ├── orbit.py          # Orbit, OrbitFamily - 轨道数据结构与序列化
-│   └── coordinate.py     # CoordinateTransformation - 坐标变换
+│   ├── coordinate.py     # CoordinateTransformation - 坐标变换
+│   ├── ephemeris_system.py      # EphemerisSystem - 星历系统定义
+│   ├── ephemeris_dynamics.py    # EphemerisDynamics - 星历动力学
+│   ├── homotopy_dynamics.py    # HomotopyEphemerisDynamics - 同伦星历动力学
+│   └── spice.py                 # SPICE 内核管理与工具函数
 ├── algorithms/           # 算法模块
 │   ├── differential_correction.py  # DifferentialCorrection - 微分修正
 │   ├── continuation.py             # Continuation - 自然/伪弧长延拓
-│   └── stability.py                # StabilityAnalysis - 稳定性分析
+│   ├── stability.py                # StabilityAnalysis - 稳定性分析
+│   ├── multiple_shooting.py       # MultipleShooting - 多重打靶法
+│   └── patch_point_utils.py       # sample_patch_points, convert_to_j2000 - 打靶点工具
 ├── transfer/             # 转移轨道设计
 │   ├── transfer.py                 # Transfer - 简化链式 API
 │   ├── transfer_search.py          # TransferSearch - 网格搜索（并行）
@@ -176,6 +257,14 @@ e2m2e/
 - 3D XZ 对称固定 z0
 - 垂直轨道修正
 
+### 多重打靶法 (Multiple Shooting)
+
+将轨迹分为多个节点和弧段，通过匹配相邻段端点状态进行修正：
+
+- 支持固定时间和自由时间问题
+- 利用状态转移矩阵构建雅可比矩阵
+- 适用于复杂约束和长周期轨道
+
 ### 轨道延拓 (Continuation)
 
 从种子轨道出发，参数化延拓生成完整轨道族：
@@ -190,6 +279,15 @@ e2m2e/
 - 特征值计算
 - 分岔点检测
 - 稳定性指标
+
+### 同伦动力学 (Homotopy Dynamics)
+
+通过同伦参数平滑过渡从基础模型到完整星历模型：
+
+- 基础天体（如地月）始终满引力
+- 摄动天体（如太阳）引力乘以同伦参数 λ
+- λ=0：仅基础天体引力（接近 CRTBP 的星历等效）
+- λ=1：所有天体完整引力（完整星历模型）
 
 ## 开发与贡献
 
@@ -209,6 +307,18 @@ ruff check --fix .    # 自动修复
 ruff format .         # 格式化
 ```
 
+### AI 助手开发指南
+
+项目包含 `AGENTS.md` 文件，为 AI 助手（如 OpenCode）提供仓库特定的开发指导：
+
+- **开发命令**：安装、测试、代码质量检查的标准流程
+- **项目结构**：核心模块、算法、转移轨道、可视化的组织方式
+- **架构要点**：CR3BP 中心、轨道数据结构、量纲单位、SPICE 集成
+- **测试注意事项**：SPICE 依赖测试、参考历元、测试夹具
+- **工作流约定**：开发安装、代码格式化、SPICE 功能测试、可视化配置
+
+详细指南请参考 [AGENTS.md](AGENTS.md)。
+
 ### 提交贡献
 
 1. Fork 本仓库
@@ -225,6 +335,9 @@ ruff format .         # 格式化
 - [轨道生成教程](docs/guides/orbit-generation.md)
 - [可视化指南](docs/guides/visualization-guide.md)
 - [发布指南](docs/guides/release.md)
+- [算法参考](docs/reference/algorithms.md) - 微分修正、延拓、稳定性分析、多重打靶法
+- [核心模块参考](docs/core/) - 系统、动力学、轨道、坐标变换、星历动力学
+- [AI 助手开发指南](AGENTS.md) - 为 AI 助手提供的仓库特定开发指导
 
 ## 致谢
 
