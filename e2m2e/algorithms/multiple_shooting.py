@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 from tqdm.auto import tqdm
 from typing import Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy.typing as npt
 
@@ -38,18 +39,27 @@ class MultipleShooting:
     当 var_time=True 时，时间节点也作为自由变量参与修正（适用于自由时间问题）。
     """
 
-    def __init__(self, dynamics) -> None:
+    def __init__(self, dynamics, n_workers: int = 1) -> None:
         """
         Args:
             dynamics: 动力学模型对象，需提供以下接口：
                 - propagate(state, time_span, with_stm=True): 积分传播，返回含 "states" 和 "stm" 的字典
                 - equations_of_motion(t, state): 计算状态导数（右端函数值）
+            n_workers: 并行传播的工作线程数，默认 1（串行）。大于 1 时使用 ThreadPoolExecutor
+                       并行传播各弧段。适用于星历模型（SPICE 内核在主线程加载后，
+                       线程共享内存可直接查询），线程安全前提是积分过程中不修改 SPICE 内核状态。
         """
         if dynamics is None:
             raise TypeError("dynamics must not be None")
         self.dynamics = dynamics
         self.max_iter = 50
         self.tolerance = 1e-8
+        self.n_workers = n_workers
+
+    @staticmethod
+    def _propagate_segment(dynamics, state, t_span):
+        """传播单段弧段（含 STM），供 ThreadPoolExecutor 调用。"""
+        return dynamics.propagate(state, t_span, with_stm=True)
 
     def correct(
         self,
@@ -112,18 +122,40 @@ class MultipleShooting:
                 f_starts = []  # 各段起始点处的状态导数 f(t_i, x_i)
                 f_ends = []  # 各段终止点处的状态导数 f(t_{i+1}, x_{i+1})
 
-                for i in range(n_seg):
-                    result = self.dynamics.propagate(
-                        state_work[i],
-                        (t_work[i], t_work[i + 1]),
-                        with_stm=True,
-                    )
-                    final_state = result["states"][:, -1]
-                    final_stm = result["stm"][:, :, -1]
-                    final_states.append(final_state)
-                    stms.append(final_stm)
-                    f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
-                    f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
+                if self.n_workers > 1 and n_seg > 1:
+                    with ThreadPoolExecutor(max_workers=self.n_workers) as executor:
+                        futures = [
+                            executor.submit(
+                                MultipleShooting._propagate_segment,
+                                self.dynamics,
+                                state_work[i],
+                                (t_work[i], t_work[i + 1]),
+                            )
+                            for i in range(n_seg)
+                        ]
+                        prop_results = [f.result() for f in futures]
+
+                    for i in range(n_seg):
+                        result = prop_results[i]
+                        final_state = result["states"][:, -1]
+                        final_stm = result["stm"][:, :, -1]
+                        final_states.append(final_state)
+                        stms.append(final_stm)
+                        f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
+                        f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
+                else:
+                    for i in range(n_seg):
+                        result = self.dynamics.propagate(
+                            state_work[i],
+                            (t_work[i], t_work[i + 1]),
+                            with_stm=True,
+                        )
+                        final_state = result["states"][:, -1]
+                        final_stm = result["stm"][:, :, -1]
+                        final_states.append(final_state)
+                        stms.append(final_stm)
+                        f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
+                        f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
 
                 # === 第二步：构建残差向量 F ===
                 # 残差定义：F_i = φ(t_{i+1}; t_i, x_i) - x_{i+1}
