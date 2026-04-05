@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 from tqdm.auto import tqdm
-from typing import Optional
+from typing import Optional, Tuple
+
+import numpy.typing as npt
 
 
 class MultipleShootingResult:
@@ -201,7 +203,6 @@ class MultipleShooting:
         finally:
             pbar.close()
 
-        # 达到最大迭代次数仍未收敛
         return MultipleShootingResult(
             t_patch=t_work,
             state_patch=state_work,
@@ -210,3 +211,40 @@ class MultipleShooting:
             max_residual=residual_history[-1] if residual_history else float("inf"),
             residual_history=residual_history,
         )
+
+
+def sample_patch_points(
+    orbit,
+    n_points: int,
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    if orbit.period is None:
+        raise ValueError("Orbit must have a period attribute")
+
+    t_patch = np.linspace(0, orbit.period, n_points, endpoint=False)
+
+    states = np.empty((n_points, 6))
+    for i in range(6):
+        states[:, i] = np.interp(t_patch, orbit.times, orbit.states[:, i])
+
+    return t_patch, states
+
+
+def convert_to_j2000(
+    t_patch_syn: npt.ArrayLike,
+    states_syn: npt.ArrayLike,
+    syn_j2000,
+    reference_et: float,
+    tu_seconds: float,
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    t_patch_syn = np.asarray(t_patch_syn, dtype=float)
+    states_syn = np.asarray(states_syn, dtype=float)
+
+    t_patch_j2000 = reference_et + t_patch_syn * tu_seconds
+
+    states_j2000 = syn_j2000.batch_synodic_to_j2000(
+        states_syn=states_syn,
+        t_syn_arr=t_patch_syn,
+        et0=reference_et,
+    )
+
+    return t_patch_j2000, states_j2000

@@ -104,7 +104,9 @@ def spice_kernel_path():
     if not os.path.exists(kernel_file):
         kernel_file = os.path.join(SPICE_KERNEL_DIR, "de438.bsp")
     if not os.path.exists(kernel_file):
-        pytest.skip("DE440/DE438 SPICE kernel not found, set SPICE_KERNEL_DIR")
+        kernel_file = os.path.join(SPICE_KERNEL_DIR, "de435.bsp")
+    if not os.path.exists(kernel_file):
+        pytest.skip("DE440/DE438/DE435 SPICE kernel not found, set SPICE_KERNEL_DIR")
     return kernel_file
 
 

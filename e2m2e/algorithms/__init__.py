@@ -18,6 +18,7 @@ from .differential_correction import (
 from .continuation import Continuation, ContinuationMethod
 from .stability import StabilityAnalysis
 from .multiple_shooting import MultipleShooting
+from .multiple_shooting import sample_patch_points, convert_to_j2000
 
 __all__ = [
     "differential_correction",
@@ -32,4 +33,6 @@ __all__ = [
     "ContinuationMethod",
     "StabilityAnalysis",
     "MultipleShooting",
+    "sample_patch_points",
+    "convert_to_j2000",
 ]
