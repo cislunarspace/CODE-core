@@ -192,7 +192,7 @@ class SPICEManager:
         Returns:
             ISO 格式的 UTC 时间字符串。
         """
-        return spiceypy.et2utc(et, "ISOC", 0)
+        return str(spiceypy.et2utc(et, "ISOC", 0))
 
     def get_body_state(
         self, target: str, et: float, frame: str, observer: str
@@ -269,5 +269,5 @@ class SPICEManager:
         if name_upper in _GM_VALUES:
             return _GM_VALUES[name_upper]
         body_id = _NAIF_IDS.get(name_upper, body)
-        vals = spiceypy.bodvrd(body_id, "GM", 1)
-        return float(vals[0][0])
+        vals = spiceypy.bodvrd(str(body_id), "GM", 1)
+        return float(vals[1][0])
