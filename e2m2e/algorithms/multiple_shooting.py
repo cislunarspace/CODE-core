@@ -3,9 +3,107 @@ from __future__ import annotations
 import numpy as np
 from tqdm.auto import tqdm
 from typing import Optional, Tuple
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 import numpy.typing as npt
+
+# Unicode sparkline 字符，用于在终端内渲染残差收敛曲线
+_SPARK_CHARS = " ▁▂▃▄▅▆▇█"
+
+# ---------------------------------------------------------------------------
+# 多进程 worker 支持
+# ---------------------------------------------------------------------------
+# SPICE 内核存储在进程级 C 全局状态（CSPICE KEEPER 子系统）中，无法跨进程共享。
+# 每个子进程在启动时需通过 initializer 重新加载内核，并将 EphemerisDynamics
+# 实例保存到进程全局变量 _worker_dynamics，供 worker 函数直接调用。
+_worker_dynamics = None  # 进程全局：仅在子进程中被 _worker_init 赋值
+
+
+def _worker_init(
+    kernel_dir: str,
+    bodies: list[str],
+    origin: str,
+    frame: str,
+    rtol: float,
+    atol: float,
+    max_step: float,
+) -> None:
+    """子进程初始化：重载 SPICE 内核并构建 EphemerisDynamics。
+
+    该函数由 ProcessPoolExecutor(initializer=...) 在每个工作进程启动时调用一次。
+    内核加载结果写入进程全局 CSPICE 内核池，动力学对象保存在 ``_worker_dynamics``。
+
+    Args:
+        kernel_dir: 包含 ``.bsp`` 和 ``.tls`` 内核文件的目录路径。
+        bodies: 引力天体名称列表，如 ``["EARTH", "MOON", "SUN"]``。
+        origin: 坐标原点天体，如 ``"EARTH"``。
+        frame: 参考坐标系，如 ``"J2000"``。
+        rtol: ODE 积分相对容差。
+        atol: ODE 积分绝对容差。
+        max_step: ODE 最大步长（秒）。
+    """
+    import os
+    import spiceypy
+    from e2m2e.core import SPICEManager, EphemerisSystem, EphemerisDynamics
+
+    global _worker_dynamics
+
+    spice = SPICEManager()
+
+    # 加载闰秒内核（naif0012.tls）
+    tls_path = os.path.join(kernel_dir, "naif0012.tls")
+    if os.path.isfile(tls_path):
+        spiceypy.furnsh(tls_path)
+        spice._leapseconds_loaded = True
+
+    # 加载星历内核（de440.bsp 或同目录下优先级最高的 .bsp 文件）
+    bsp_path = spice.find_ephemeris_kernel(kernel_dir)
+    spiceypy.furnsh(bsp_path)
+
+    # 构建动力学对象并覆盖积分参数
+    eph_system = EphemerisSystem(bodies=bodies, spice=spice, origin=origin, frame=frame)
+    dyn = EphemerisDynamics(system=eph_system)
+    dyn.rtol = rtol
+    dyn.atol = atol
+    dyn.max_step = max_step
+
+    _worker_dynamics = dyn
+
+
+def _worker_propagate(state: np.ndarray, t_span: tuple[float, float]) -> dict:
+    """子进程 worker：使用进程本地的 EphemerisDynamics 积分单段弧段（含 STM）。
+
+    Args:
+        state: 初始状态向量，形状 ``(6,)``，单位 km / km/s。
+        t_span: ``(t0, tf)``，SPICE ET（秒）。
+
+    Returns:
+        包含 ``"states"``（6×n）、``"stm"``（6×6×n）、``"time"``（n,）的字典，
+        但仅返回终端切片以减少 IPC 数据量：
+        ``{"final_state": (6,), "final_stm": (6,6), "t_end": float}``。
+    """
+    result = _worker_dynamics.propagate(state, t_span, with_stm=True)  # type: ignore[union-attr]
+    return {
+        "final_state": result["states"][:, -1],
+        "final_stm": result["stm"][:, :, -1],
+    }
+
+
+def _sparkline(values: list[float]) -> str:
+    """将浮点序列渲染为单行 Unicode sparkline。
+
+    对序列取 log10 后线性映射到 _SPARK_CHARS，以便在数量级跨越较大时
+    也能清晰反映收敛趋势。序列长度为 0 或 1 时返回空字符串或单字符。
+    """
+    if not values:
+        return ""
+    import math
+
+    logs = [math.log10(v) if v > 0 else -999.0 for v in values]
+    lo, hi = min(logs), max(logs)
+    span = hi - lo if hi != lo else 1.0
+    n = len(_SPARK_CHARS) - 1
+    return "".join(_SPARK_CHARS[max(0, min(n, int((x - lo) / span * n)))] for x in logs)
 
 
 class MultipleShootingResult:
@@ -37,17 +135,34 @@ class MultipleShooting:
     进行最小二乘修正，反复迭代直到残差满足容差。
 
     当 var_time=True 时，时间节点也作为自由变量参与修正（适用于自由时间问题）。
+
+    并行策略
+    ---------
+    - ``n_workers=1``：串行（默认）。
+    - ``n_workers>1, kernel_dir=None``：多线程（``ThreadPoolExecutor``）。
+      适合 CR3BP 等纯 Python/NumPy 动力学，但受 GIL 限制，并发收益有限。
+    - ``n_workers>1, kernel_dir=<路径>``：**多进程**（``ProcessPoolExecutor``）。
+      每个子进程重载 SPICE 内核，绕过 GIL，可充分利用多核 CPU。
+      仅适用于 ``EphemerisDynamics``（需 SPICE 内核）。
     """
 
-    def __init__(self, dynamics, n_workers: int = 1) -> None:
+    def __init__(
+        self,
+        dynamics,
+        n_workers: int = 1,
+        kernel_dir: Optional[str] = None,
+    ) -> None:
         """
         Args:
             dynamics: 动力学模型对象，需提供以下接口：
                 - propagate(state, time_span, with_stm=True): 积分传播，返回含 "states" 和 "stm" 的字典
                 - equations_of_motion(t, state): 计算状态导数（右端函数值）
-            n_workers: 并行传播的工作线程数，默认 1（串行）。大于 1 时使用 ThreadPoolExecutor
-                       并行传播各弧段。适用于星历模型（SPICE 内核在主线程加载后，
-                       线程共享内存可直接查询），线程安全前提是积分过程中不修改 SPICE 内核状态。
+            n_workers: 并行工作进程/线程数，默认 1（串行）。
+                - ``n_workers>1`` 且 ``kernel_dir`` 已设置：使用 ProcessPoolExecutor（多进程，推荐）。
+                - ``n_workers>1`` 且 ``kernel_dir=None``：使用 ThreadPoolExecutor（多线程，受 GIL 限制）。
+            kernel_dir: SPICE 内核目录路径（含 ``de440.bsp`` 和 ``naif0012.tls``）。
+                仅在 ``n_workers>1`` 时需要。设置后自动启用多进程模式。
+                例：``kernel_dir=os.environ.get("SPICE_KERNEL_DIR", "../e2m2e/kernels")``
         """
         if dynamics is None:
             raise TypeError("dynamics must not be None")
@@ -55,11 +170,35 @@ class MultipleShooting:
         self.max_iter = 50
         self.tolerance = 1e-8
         self.n_workers = n_workers
+        self.kernel_dir = kernel_dir
 
     @staticmethod
     def _propagate_segment(dynamics, state, t_span):
         """传播单段弧段（含 STM），供 ThreadPoolExecutor 调用。"""
         return dynamics.propagate(state, t_span, with_stm=True)
+
+    def _make_process_pool(self) -> ProcessPoolExecutor:
+        """构建并返回已初始化 SPICE 内核的 ProcessPoolExecutor。
+
+        从 ``self.dynamics`` 中提取积分参数和系统配置，传递给每个子进程的
+        ``_worker_init`` initializer，确保子进程拥有独立的 SPICE 内核池
+        和 ``EphemerisDynamics`` 实例。
+        """
+        dyn = self.dynamics
+        system = dyn.system
+        return ProcessPoolExecutor(
+            max_workers=self.n_workers,
+            initializer=_worker_init,
+            initargs=(
+                self.kernel_dir,
+                list(system.bodies),
+                system.origin,
+                system.frame,
+                dyn.rtol,
+                dyn.atol,
+                dyn.max_step,
+            ),
+        )
 
     def correct(
         self,
@@ -104,7 +243,7 @@ class MultipleShooting:
         n_seg = N - 1  # 弧段数
         I6 = np.eye(6)
 
-        residual_history = []
+        residual_history: list[float] = []
         converged = False
 
         pbar = tqdm(
@@ -112,9 +251,33 @@ class MultipleShooting:
             desc="Multiple Shooting",
             unit="iter",
             disable=not verbose,
+            leave=True,
+            bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
         )
 
+        # 串行模式下，段级子进度条
+        seg_pbar: Optional[tqdm] = None  # type: ignore[type-arg]
+        if verbose and self.n_workers <= 1 and n_seg > 1:
+            seg_pbar = tqdm(
+                total=n_seg,
+                desc="  Segments",
+                unit="seg",
+                leave=False,
+                bar_format="  {desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}",
+            )
+
+        # 决定并行后端：多进程（ProcessPool）或多线程（ThreadPool）
+        use_multiprocess = self.n_workers > 1 and self.kernel_dir is not None
+        use_multithread = self.n_workers > 1 and self.kernel_dir is None
+
+        # 多进程模式：在 correct() 整个生命周期内保持一个 Pool，避免每次迭代重建子进程
+        process_pool: Optional[ProcessPoolExecutor] = None
+        if use_multiprocess and n_seg > 1:
+            process_pool = self._make_process_pool()
+            process_pool.__enter__()
+
         try:
+            prev_res: Optional[float] = None
             for iteration in range(_max_iter):
                 # === 第一步：逐段积分，收集 STM、终端状态和端点处的状态导数 ===
                 stms = []  # 各段的状态转移矩阵 Φ(t_{i+1}; t_i)
@@ -122,28 +285,73 @@ class MultipleShooting:
                 f_starts = []  # 各段起始点处的状态导数 f(t_i, x_i)
                 f_ends = []  # 各段终止点处的状态导数 f(t_{i+1}, x_{i+1})
 
-                if self.n_workers > 1 and n_seg > 1:
+                if use_multiprocess and n_seg > 1:
+                    # ---- 多进程模式 ----
+                    # 只传纯数据（ndarray + tuple），结果仅返回终端切片，减少 IPC 开销
+                    seg_results_mp: dict[int, dict] = {}
+                    future_to_idx_mp = {
+                        process_pool.submit(  # type: ignore[union-attr]
+                            _worker_propagate,
+                            state_work[i].copy(),
+                            (float(t_work[i]), float(t_work[i + 1])),
+                        ): i
+                        for i in range(n_seg)
+                    }
+                    done_count = 0
+                    for future in as_completed(future_to_idx_mp):
+                        idx = future_to_idx_mp[future]
+                        seg_results_mp[idx] = future.result()
+                        done_count += 1
+                        pbar.set_postfix_str(
+                            f"propagating {done_count}/{n_seg} segs [mp]",
+                            refresh=True,
+                        )
+
+                    for i in range(n_seg):
+                        r = seg_results_mp[i]
+                        final_state = r["final_state"]
+                        final_stm = r["final_stm"]
+                        final_states.append(final_state)
+                        stms.append(final_stm)
+                        f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
+                        f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
+
+                elif use_multithread and n_seg > 1:
+                    # ---- 多线程模式 ----
+                    seg_results: dict[int, object] = {}
                     with ThreadPoolExecutor(max_workers=self.n_workers) as executor:
-                        futures = [
+                        future_to_idx = {
                             executor.submit(
                                 MultipleShooting._propagate_segment,
                                 self.dynamics,
                                 state_work[i],
                                 (t_work[i], t_work[i + 1]),
-                            )
+                            ): i
                             for i in range(n_seg)
-                        ]
-                        prop_results = [f.result() for f in futures]
+                        }
+                        done_count = 0
+                        for future in as_completed(future_to_idx):
+                            idx = future_to_idx[future]
+                            seg_results[idx] = future.result()
+                            done_count += 1
+                            pbar.set_postfix_str(
+                                f"propagating {done_count}/{n_seg} segs",
+                                refresh=True,
+                            )
 
                     for i in range(n_seg):
-                        result = prop_results[i]
-                        final_state = result["states"][:, -1]
-                        final_stm = result["stm"][:, :, -1]
+                        result = seg_results[i]  # type: ignore[index]
+                        final_state = result["states"][:, -1]  # type: ignore[index]
+                        final_stm = result["stm"][:, :, -1]  # type: ignore[index]
                         final_states.append(final_state)
                         stms.append(final_stm)
                         f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
                         f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
+
                 else:
+                    # ---- 串行模式 ----
+                    if seg_pbar is not None:
+                        seg_pbar.reset()
                     for i in range(n_seg):
                         result = self.dynamics.propagate(
                             state_work[i],
@@ -156,6 +364,8 @@ class MultipleShooting:
                         stms.append(final_stm)
                         f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
                         f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
+                        if seg_pbar is not None:
+                            seg_pbar.update(1)
 
                 # === 第二步：构建残差向量 F ===
                 # 残差定义：F_i = φ(t_{i+1}; t_i, x_i) - x_{i+1}
@@ -167,12 +377,32 @@ class MultipleShooting:
                 max_res = np.max(np.abs(F))
                 residual_history.append(float(max_res))
 
+                # 构建丰富的 postfix 字符串
+                if prev_res is not None and prev_res > 0:
+                    ratio = max_res / prev_res
+                    arrow = "↓" if ratio < 1 else "↑"
+                    postfix = (
+                        f"res={max_res:.2e} {arrow}{ratio:.2f} tol={_tolerance:.0e}"
+                    )
+                else:
+                    postfix = f"res={max_res:.2e} tol={_tolerance:.0e}"
+                pbar.set_postfix_str(postfix, refresh=False)
+                prev_res = max_res
+
                 pbar.update(1)
-                pbar.set_postfix(residual=f"{max_res:.2e}", refresh=False)
 
                 # 判断收敛：最大残差是否小于容差
                 if max_res < _tolerance:
                     converged = True
+                    # 更新描述，明确标出收敛成功
+                    pbar.set_description_str("Multiple Shooting [converged]")
+                    pbar.set_postfix_str(
+                        f"res={max_res:.2e} < tol={_tolerance:.0e}  spark={_sparkline(residual_history)}",
+                        refresh=True,
+                    )
+                    if seg_pbar is not None:
+                        seg_pbar.close()
+                    pbar.close()
                     return MultipleShootingResult(
                         t_patch=t_work,
                         state_patch=state_work,
@@ -233,6 +463,17 @@ class MultipleShooting:
                 if var_time:
                     t_work += dX[N * 6 : N * 6 + N]
         finally:
+            if process_pool is not None:
+                process_pool.__exit__(None, None, None)
+            if seg_pbar is not None:
+                seg_pbar.close()
+            # 未收敛时在最终状态更新描述
+            if not converged:
+                pbar.set_description_str("Multiple Shooting [max_iter]")
+                pbar.set_postfix_str(
+                    f"res={residual_history[-1]:.2e} tol={_tolerance:.0e}  spark={_sparkline(residual_history)}",
+                    refresh=True,
+                )
             pbar.close()
 
         return MultipleShootingResult(
