@@ -90,7 +90,7 @@ pip install e2m2e
 pip install e2m2e==3.1.12
 
 # 从 TestPyPI 安装
-pip install --index-url https://test.pypi.org/simple/ e2m2e==3.1.11
+pip install --index-url https://test.pypi.org/simple/ e2m2e==3.2.0
 ```
 
 ## 注意事项
