@@ -23,7 +23,7 @@ Python-Markdown 默认的 `slugify` 函数会剔除非 ASCII 字符（中文）�
 - [x] 3. 修正 `docs/reference/api-reference_en.md`：双连字符 5 处 + 重复标题后缀 19 处 + 3.1 标题锚点 1 处
 - [x] 4. 修正 `docs/guides/visualization-guide_en.md`：双连字符 1 处
 - [x] 5. 运行 `mkdocs build` 验证所有锚点警告已消除（90 → 0）
-- [ ] 6. 提交修复
+- [x] 6. 提交修复（commit 3d31943）
 
 ## 备注
 
