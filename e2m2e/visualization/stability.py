@@ -24,6 +24,19 @@ def _compute_single_stability(args):
 
 
 def compute_stability_for_family(family_result, system, max_workers=None):
+    """计算轨道族的稳定性指标（Floquet 乘子最大模）。
+
+    对轨道族中每条轨道，通过 monodromy matrix（单周期状态转移矩阵）
+    计算 eigenvalue（特征值），取最大模作为稳定性指标。
+
+    Args:
+        family_result: OrbitFamily 或轨道列表
+        system: CR3BP_System 实例
+        max_workers: 并行进程数，默认为 min(cpu_count, 轨道数)
+
+    Returns:
+        list[float]: 每条轨道的稳定性指标（Floquet 乘子最大模）
+    """
     if family_result is None or len(family_result) == 0:
         return []
 

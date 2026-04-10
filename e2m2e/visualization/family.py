@@ -19,6 +19,8 @@ class FamilyPlotter(OrbitVisualizer):
         super().__init__(system, config)
 
     def _get_jacobi_norm(self, jacobi_values):
+        if not jacobi_values:
+            return 0.0, 1.0, 1.0
         jmin = min(jacobi_values)
         jmax = max(jacobi_values)
         jrange = jmax - jmin if jmax != jmin else 1.0
@@ -146,6 +148,13 @@ class FamilyPlotter(OrbitVisualizer):
     ):
         fig = plt.figure(figsize=self.config.figsize_3d, dpi=self.config.dpi)
         ax = fig.add_subplot(111, projection="3d")
+
+        if not family_result or len(family_result) == 0:
+            self._style_3d_ax(ax)
+            return fig, ax
+
+        if jacobi_values is None:
+            jacobi_values = [0.0] * len(family_result)
 
         self._draw_orbit_loop_3d(family_result, jacobi_values, ax,
                                  start=start, end=end, step=step)

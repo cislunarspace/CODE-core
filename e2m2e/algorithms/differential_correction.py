@@ -9,12 +9,77 @@ from __future__ import annotations
 
 import numpy as np
 from scipy import integrate
+from scipy.optimize import brentq
 from typing import Dict, List, Optional, Any, Tuple
 
 import numpy.typing as npt
 
 from ..core.orbit import Orbit
 from ..core.dynamics import CR3BP_Dynamics
+
+
+def _compute_gamma(mu: float, L: int) -> float:
+    """求解平动点到次天体的距离参数 gamma
+
+    通过求解五次方程得到精确值。
+
+    Args:
+        mu: 质量比
+        L: 拉格朗日点 (1=L1, 2=L2)
+
+    Returns:
+        gamma 值（始终为正数）
+    """
+    if L == 1:
+        # L1: gamma^5 - (3-mu)*gamma^4 + (3-2mu)*gamma^3 - mu*gamma^2 + 2*mu*gamma - mu = 0
+        def eq(g):
+            return (
+                g**5
+                - (3 - mu) * g**4
+                + (3 - 2 * mu) * g**3
+                - mu * g**2
+                + 2 * mu * g
+                - mu
+            )
+    else:
+        # L2: gamma^5 + (3-mu)*gamma^4 + (3-2mu)*gamma^3 - mu*gamma^2 - 2*mu*gamma - mu = 0
+        def eq(g):
+            return (
+                g**5
+                + (3 - mu) * g**4
+                + (3 - 2 * mu) * g**3
+                - mu * g**2
+                - 2 * mu * g
+                - mu
+            )
+
+    g0 = (mu / 3) ** (1 / 3)  # Hill 球近似作为初始猜测
+    return brentq(eq, g0 * 0.5, g0 * 2.0)
+
+
+def _compute_omega_p(gamma: float, mu: float, L: int) -> float:
+    """计算平动点处的面内振荡频率 omega_p
+
+    Args:
+        gamma: 距离参数
+        mu: 质量比
+        L: 拉格朗日点编号
+
+    Returns:
+        omega_p（面内振荡频率）
+    """
+    if L == 1:
+        c2 = (1 - mu) / abs(1 - gamma) ** 3 + mu / gamma**3
+    else:
+        c2 = (1 - mu) / abs(1 + gamma) ** 3 + mu / gamma**3
+
+    # 特征方程: s^4 + (2-c2)*s^2 + (1+2*c2)*(1-c2) = 0
+    a = 2 - c2
+    b = (1 + 2 * c2) * (1 - c2)
+    disc = a**2 - 4 * b
+    # 虚特征值对应振荡运动: s^2 = (-a - sqrt(disc))/2 < 0
+    s2_minus = (-a - np.sqrt(disc)) / 2
+    return np.sqrt(-s2_minus)
 
 
 def compute_halo_coefficients(mu: float, L: int) -> Dict[str, float]:
@@ -34,11 +99,19 @@ def compute_halo_coefficients(mu: float, L: int) -> Dict[str, float]:
     if L not in [1, 2]:
         raise ValueError(f"L必须是1或2，当前为{L}")
 
-    gamma_dict = {1: 0.012149, 2: -0.012149}
-    gamma = gamma_dict[L]
+    # 精确求解 gamma（次天体到平动点的距离）
+    gamma = _compute_gamma(mu, L)
 
-    c1 = 1.0 - mu - (1 - 2 * mu) * gamma**3 / (1 - gamma) ** 3
-    c2 = 2 * mu * (1 - mu)
+    # L2 使用负值约定以匹配系数公式
+    if L == 2:
+        gamma = -gamma
+
+    # 计算面内振荡频率（使用绝对值）
+    omega_p = _compute_omega_p(abs(gamma), mu, L)
+
+    abs_gamma = abs(gamma)
+    c1 = 1.0 - mu - (1 - 2 * mu) * abs_gamma**3 / (1 - abs_gamma) ** 3
+    c2_c = (1 - mu) / (1 - abs_gamma) ** 3 + mu / abs_gamma**3 if L == 1 else (1 - mu) / (1 + abs_gamma) ** 3 + mu / abs_gamma**3
     c3 = 3 * mu * (2 - mu)
 
     if L == 1:
@@ -86,8 +159,9 @@ def compute_halo_coefficients(mu: float, L: int) -> Dict[str, float]:
 
     return {
         "gamma": gamma,
+        "omega_p": omega_p,
         "c1": c1,
-        "c2": c2,
+        "c2": c2_c,
         "c3": c3,
         "a21": a21,
         "a22": a22,
@@ -152,7 +226,7 @@ def halo_third_order_approximation(
 
     coeffs = compute_halo_coefficients(mu, L)
     gamma = coeffs["gamma"]
-    L_position = 1 - mu - gamma if L == 1 else 1 - mu + gamma
+    L_position = 1 - mu - gamma  # L1: gamma>0, L2: gamma<0
 
     a21 = coeffs["a21"]
     a22 = coeffs["a22"]
@@ -172,9 +246,11 @@ def halo_third_order_approximation(
 
     if halo_class == 1:
         delta = -delta
-        phi = phi + np.pi
 
-    T = 2 * np.pi * (1 + kappa1 * Au**2 + kappa2 * Aw**2)
+    omega_p = coeffs["omega_p"]
+
+    # 周期公式：T = 2π/(omega_p + 频率修正)
+    T = 2 * np.pi / (omega_p + kappa1 * Au**2 + kappa2 * Aw**2)
     tau = np.linspace(0, 2 * np.pi, N)
     t = np.linspace(0, tf, N)
 
@@ -192,15 +268,20 @@ def halo_third_order_approximation(
         + b31 * Au**3 * np.sin(3 * (tau + phi))
     )
 
+    # 使用 sin 参数化使 z(0)=0（轨道起始点在赤道面穿越处）
     w = delta * (
-        Aw * np.cos(tau + phi)
-        + d21 * Au * Aw * (np.cos(2 * (tau + phi)) - 3)
-        + (d32 * Aw * Au**2 - d31 * Aw**3) * np.cos(3 * (tau + phi))
+        Aw * np.sin(tau + phi)
+        + d21 * Au * Aw * np.sin(2 * (tau + phi))
+        + (d32 * Aw * Au**2 - d31 * Aw**3) * np.sin(3 * (tau + phi))
     )
 
     u_dot = Au * np.sin(tau + phi) + 2 * (a23 * Au**2 - a24 * Aw**2) * np.sin(2 * (tau + phi))
     v_dot = k * Au * np.cos(tau + phi) + 2 * (b21 * Au**2 - b22 * Aw**2) * np.cos(2 * (tau + phi))
-    w_dot = -Aw * np.sin(tau + phi) - 2 * d21 * Au * Aw * np.sin(2 * (tau + phi))
+    w_dot = delta * (
+        Aw * np.cos(tau + phi)
+        + 2 * d21 * Au * Aw * np.cos(2 * (tau + phi))
+        + 3 * (d32 * Aw * Au**2 - d31 * Aw**3) * np.cos(3 * (tau + phi))
+    )
 
     x = L_position + u
     y = v
@@ -223,8 +304,8 @@ def compute_halo_initial_guess(
 ) -> Dict[str, float]:
     """计算Halo轨道初始猜测参数
 
-    用于生成高质量的初始猜测，配合微分修正器使用。
-    基于 MATLAB 参考值和缩放关系。
+    使用 Richardson 三阶近似系数生成初始猜测，配合微分修正器使用。
+    初始状态位于 XZ 平面穿越点（y=0），赤道面穿越处（z=0）。
 
     Args:
         mu: 质量比
@@ -236,44 +317,53 @@ def compute_halo_initial_guess(
         包含初始猜测参数的字典:
         - x0: 初始x坐标
         - y0: 初始y坐标 (0)
-        - z0: 初始z坐标
+        - z0: 初始z坐标 (0)
         - vx0: 初始vx (0)
         - vy0: 初始vy
         - vz0: 初始vz (0)
         - T_half: 半周期
+        - Au: U方向振幅
+        - Aw: W方向振幅
     """
     if z_amplitude <= 0:
         raise ValueError(f"z_amplitude必须为正数，当前为{z_amplitude}")
 
-    if halo_class == 1:
-        delta_sign = -1
-    else:
-        delta_sign = 1
+    coeffs = compute_halo_coefficients(mu, L)
+    gamma = coeffs["gamma"]
+    omega_p = coeffs["omega_p"]
+    k = coeffs["k"]
+    delta = coeffs["delta"]
 
-    # 初始猜测基于 MATLAB 参考值
-    # 参考: FAMILY_L1Halo_North.m
-    # SV0 = [0.9305,0,0.2300,0,0.1043,0]', tf = 1.8397
-    if L == 1:
-        x0 = 0.9305
-        vy0 = 0.1043 * z_amplitude / 0.23
-        # 对于 L1，半周期随振幅变化不大，约为 0.92
-        T_half = 0.91985
-    else:
-        x0 = 1.15
-        vy0 = 0.1043 * z_amplitude / 0.23
-        # 对于 L2，半周期也约为 0.92
-        T_half = 0.91985
+    if halo_class == 1:
+        delta = -delta
+
+    # 平动点位置
+    L_position = 1 - mu - gamma  # L1: gamma>0, L2: gamma<0
+    abs_gamma = abs(gamma)
+
+    # 振幅关系：Au ∝ sqrt(Aw)（Richardson 三阶非线性耦合）
+    Au = np.sqrt(z_amplitude) * 0.5
+    Aw = z_amplitude
+
+    # 初始 x 坐标：基于平动点位置，叠加与振幅相关的小修正
+    x0 = L_position + delta * z_amplitude * 0.05
+
+    # vy0：基于频率和振幅的速度估计
+    vy0 = k * Au * omega_p
+
+    # 半周期（小振幅近似，微分修正器会进一步调整）
+    T_half = np.pi / omega_p
 
     return {
         "x0": x0,
         "y0": 0.0,
-        "z0": delta_sign * z_amplitude,
+        "z0": 0.0,
         "vx0": 0.0,
         "vy0": vy0,
         "vz0": 0.0,
         "T_half": T_half,
-        "Au": z_amplitude * 0.5,
-        "Aw": z_amplitude,
+        "Au": Au,
+        "Aw": Aw,
     }
 
 

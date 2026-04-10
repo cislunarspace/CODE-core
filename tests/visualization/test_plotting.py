@@ -1,5 +1,5 @@
 """
-OrbitVisualizer 类测试
+OrbitVisualizer 和 FamilyPlotter 类测试
 
 测试轨道可视化器的核心功能，包括3D轨道族绘图功能。
 """
@@ -13,7 +13,8 @@ import matplotlib
 matplotlib.use("Agg")  # 使用非交互式后端
 
 from e2m2e.core import Orbit, OrbitFamily, CR3BP_System
-from e2m2e.visualization.plotting import OrbitVisualizer
+from e2m2e.visualization.base import OrbitVisualizer
+from e2m2e.visualization.family import FamilyPlotter
 
 
 class TestOrbitVisualizerCreation:
@@ -35,8 +36,8 @@ class TestOrbitVisualizerCreation:
 
         viz = OrbitVisualizer(system)
 
-        assert viz.figsize == (12, 8)
-        assert viz.dpi == 100
+        assert viz.config.figsize_2d == (12, 10)
+        assert viz.config.dpi == 100
         assert viz.orbit_linewidth == 1.5
         assert viz.orbit_alpha == 0.8
 
@@ -80,33 +81,33 @@ class TestPlot3DOrbitFamily:
 
     def test_plot_3d_orbit_family_basic(self, sample_system, sample_family):
         """测试3D轨道族基本绘图"""
-        viz = OrbitVisualizer(sample_system)
+        viz = FamilyPlotter(sample_system)
 
-        # 测试基本调用（不保存到文件）
-        ax = viz.plot_3d_orbit_family(
+        fig, ax = viz.plot_family_3d(
             sample_family,
             jacobi_values=[3.0, 3.1, 3.2],
             center=(0.99, 0.0, 0.0),
             radius=0.40,
             show_colorbar=True,
-            show_legend=True,
-            seed_label="Test Seed",
+            show=False,
         )
 
         assert ax is not None
         assert ax.name == "3d"
+        import matplotlib.pyplot as plt
+        plt.close("all")
 
     def test_plot_3d_orbit_family_with_save(self, sample_system, sample_family):
         """测试3D轨道族绘图并保存到文件"""
-        viz = OrbitVisualizer(sample_system)
+        viz = FamilyPlotter(sample_system)
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             temp_path = f.name
 
         try:
             # 绘图并保存
-            ax = viz.plot_3d_orbit_family(sample_family)
-            viz.save(temp_path)
+            fig, ax = viz.plot_family_3d(sample_family, jacobi_values=[3.0, 3.1, 3.2], show=False)
+            fig.savefig(temp_path, dpi=100)
 
             # 验证文件已创建
             assert os.path.exists(temp_path)
@@ -114,20 +115,24 @@ class TestPlot3DOrbitFamily:
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+            import matplotlib.pyplot as plt
+            plt.close("all")
 
     def test_plot_3d_orbit_family_empty(self, sample_system):
         """测试空轨道族绘图"""
-        viz = OrbitVisualizer(sample_system)
+        viz = FamilyPlotter(sample_system)
         empty_family = OrbitFamily(family_type="empty")
 
-        # 空轨道族应该返回None
-        ax = viz.plot_3d_orbit_family(empty_family)
-        # 空族不会创建坐标轴，所以ax应该为None
+        # 空轨道族不应报错
+        fig, ax = viz.plot_family_3d(empty_family, jacobi_values=[], show=False)
+        # 空族可能返回 None 或空坐标轴
         assert ax is None or ax.name == "3d"
+        import matplotlib.pyplot as plt
+        plt.close("all")
 
     def test_plot_3d_orbit_family_single_orbit(self, sample_system):
         """测试单轨道绘图"""
-        viz = OrbitVisualizer(sample_system)
+        viz = FamilyPlotter(sample_system)
 
         # 创建单条轨道
         t = np.linspace(0, 2 * np.pi, 50)
@@ -146,26 +151,29 @@ class TestPlot3DOrbitFamily:
         orbit.system = sample_system
         family.add_orbit(orbit)
 
-        ax = viz.plot_3d_orbit_family(
+        fig, ax = viz.plot_family_3d(
             family,
             jacobi_values=[3.0],
             center=(0.99, 0.0, 0.0),
             radius=0.40,
+            show=False,
         )
 
         assert ax is not None
+        import matplotlib.pyplot as plt
+        plt.close("all")
 
     def test_plot_3d_orbit_family_custom_view(self, sample_system, sample_family):
         """测试自定义视角参数"""
-        viz = OrbitVisualizer(sample_system)
+        viz = FamilyPlotter(sample_system)
 
-        # 测试不同的中心点和半径
-        ax = viz.plot_3d_orbit_family(
+        fig, ax = viz.plot_family_3d(
             sample_family,
+            jacobi_values=[3.0, 3.1, 3.2],
             center=(1.0, 0.1, 0.0),
             radius=0.5,
             show_colorbar=False,
-            show_legend=False,
+            show=False,
         )
 
         # 验证坐标轴范围
@@ -173,23 +181,27 @@ class TestPlot3DOrbitFamily:
         ylim = ax.get_ylim()
         zlim = ax.get_zlim()
 
-        assert xlim[1] - xlim[0] == 1.0  # radius * 2
-        assert ylim[1] - ylim[0] == 1.0
-        assert zlim[1] - zlim[0] == 1.0
+        assert xlim[1] - xlim[0] == pytest.approx(1.0, abs=0.01)
+        assert ylim[1] - ylim[0] == pytest.approx(1.0, abs=0.01)
+        assert zlim[1] - zlim[0] == pytest.approx(1.0, abs=0.01)
+        import matplotlib.pyplot as plt
+        plt.close("all")
 
     def test_plot_3d_orbit_family_with_jacobi_none(self, sample_system, sample_family):
         """测试Jacobi为None时的处理"""
-        viz = OrbitVisualizer(sample_system)
+        viz = FamilyPlotter(sample_system)
 
-        # 不提供jacobi_values
-        ax = viz.plot_3d_orbit_family(
+        fig, ax = viz.plot_family_3d(
             sample_family,
             jacobi_values=None,
             center=(0.99, 0.0, 0.0),
             radius=0.40,
+            show=False,
         )
 
         assert ax is not None
+        import matplotlib.pyplot as plt
+        plt.close("all")
 
 
 class TestPlot3DOrbitFamilyWithBodies:
@@ -204,7 +216,7 @@ class TestPlot3DOrbitFamilyWithBodies:
 
     def test_plot_3d_with_primary_bodies(self, system_with_libration):
         """测试3D图中的主次天体"""
-        viz = OrbitVisualizer(system_with_libration)
+        viz = FamilyPlotter(system_with_libration)
 
         # 创建简单轨道
         t = np.linspace(0, 2 * np.pi, 50)
@@ -223,12 +235,14 @@ class TestPlot3DOrbitFamilyWithBodies:
         orbit.system = system_with_libration
         family.add_orbit(orbit)
 
-        # 绘图（默认会添加天体和平动点）
-        ax = viz.plot_3d_orbit_family(
+        fig, ax = viz.plot_family_3d(
             family,
             jacobi_values=[3.0],
             center=(0.99, 0.0, 0.0),
             radius=0.40,
+            show=False,
         )
 
         assert ax is not None
+        import matplotlib.pyplot as plt
+        plt.close("all")

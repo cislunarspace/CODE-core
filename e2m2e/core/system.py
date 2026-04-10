@@ -52,6 +52,9 @@ class CR3BP_System:
     # 天文常量
     EARTH_MOON_DISTANCE_KM = 384400.0
     AU = 149597870.7
+    G = 6.67430e-20  # km^3 / (kg * s^2)
+    DAY = 86400  # seconds
+    YEAR = 365.25 * 86400  # seconds
 
     # 常见天体系统的参数
     KNOWN_SYSTEMS = {
@@ -133,6 +136,7 @@ class CR3BP_System:
         self.mean_motion: Optional[float] = None
 
         self.has_L_points: bool = False
+        self.is_initialized: bool = False
 
     def set_characteristic_scales(self, distance: float, period: float) -> None:
         """设置特征尺度

@@ -5,7 +5,7 @@
 支持单条和多条转移轨迹叠加绘制，标注出发/到达点，绘制天体（地球、月球）和拉格朗日点。
 
 验收标准:
-  1. OrbitVisualizer 新增 plot_transfer_orbit() 方法
+  1. TransferPlotter 新增 plot_transfer_orbit() 方法
   2. 输入:
      - departure_orbit: Orbit (DRO)
      - arrival_orbit: Orbit (RO)
@@ -37,7 +37,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 from e2m2e.core import Orbit, CR3BP_System
-from e2m2e.visualization.plotting import OrbitVisualizer
+from e2m2e.visualization.transfer import TransferPlotter
 
 
 @pytest.fixture
@@ -103,14 +103,14 @@ def transfer_trajectory():
 
 class TestPlotTransferOrbitMethod:
     def test_method_exists(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         assert hasattr(viz, "plot_transfer_orbit")
         assert callable(viz.plot_transfer_orbit)
 
 
 class TestPlotTransferOrbitBasic:
     def test_returns_3d_axes(self, system, dro, ro, transfer_trajectory):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         dep_state = dro.states[0]
         ins_state = ro.states[0]
         ax = viz.plot_transfer_orbit(
@@ -125,7 +125,7 @@ class TestPlotTransferOrbitBasic:
         plt.close("all")
 
     def test_contains_dro_line(self, system, dro, ro, transfer_trajectory):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         ax = viz.plot_transfer_orbit(
             departure_orbit=dro,
             arrival_orbit=ro,
@@ -138,7 +138,7 @@ class TestPlotTransferOrbitBasic:
         plt.close("all")
 
     def test_contains_scatter_points(self, system, dro, ro, transfer_trajectory):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         ax = viz.plot_transfer_orbit(
             departure_orbit=dro,
             arrival_orbit=ro,
@@ -153,7 +153,7 @@ class TestPlotTransferOrbitBasic:
 
 class TestPlotTransferOrbitLabels:
     def test_axis_labels(self, system, dro, ro, transfer_trajectory):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         ax = viz.plot_transfer_orbit(
             departure_orbit=dro,
             arrival_orbit=ro,
@@ -168,7 +168,7 @@ class TestPlotTransferOrbitLabels:
 
 class TestPlotTransferOrbitMultiple:
     def test_overlay_two_transfers(self, system, dro, ro):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         ax = None
         for i in range(2):
             traj = _make_transfer(60 + i * 10)
@@ -188,7 +188,7 @@ class TestPlotTransferOrbitMultiple:
 
 class TestPlotTransferOrbitExternalAxes:
     def test_accepts_external_ax(self, system, dro, ro, transfer_trajectory):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
         returned_ax = viz.plot_transfer_orbit(
@@ -205,7 +205,7 @@ class TestPlotTransferOrbitExternalAxes:
 
 class TestPlotTransferOrbitCustomStyle:
     def test_custom_color(self, system, dro, ro, transfer_trajectory):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         ax = viz.plot_transfer_orbit(
             departure_orbit=dro,
             arrival_orbit=ro,
@@ -220,7 +220,7 @@ class TestPlotTransferOrbitCustomStyle:
         plt.close("all")
 
     def test_custom_label(self, system, dro, ro, transfer_trajectory):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         ax = viz.plot_transfer_orbit(
             departure_orbit=dro,
             arrival_orbit=ro,

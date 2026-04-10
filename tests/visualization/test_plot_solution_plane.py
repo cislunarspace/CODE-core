@@ -5,7 +5,7 @@
 支持按 transfer_type（DIRECT/LGA/EXTERNAL）着色，对应论文中不同的转移路径。
 
 验收标准:
-  1. OrbitVisualizer 新增 plot_solution_plane() 方法
+  1. TransferPlotter 新增 plot_solution_plane() 方法
   2. 输入: results（NLPOptimizationResult 列表或等价 dict 列表）,
          color_by（可选，按 transfer_type 着色）,
          ax（可选，复用已有 Axes）,
@@ -25,7 +25,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 from e2m2e.core import CR3BP_System
-from e2m2e.visualization.plotting import OrbitVisualizer
+from e2m2e.visualization.transfer import TransferPlotter
 from e2m2e.transfer import NLPOptimizationResult, TransferType
 
 
@@ -71,21 +71,21 @@ def _make_results(n: int, seed: int = 42) -> list:
 
 class TestPlotSolutionPlaneMethod:
     def test_method_exists(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         assert hasattr(viz, "plot_solution_plane")
         assert callable(viz.plot_solution_plane)
 
 
 class TestPlotSolutionPlaneBasic:
     def test_returns_axes(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         results = _make_results(10)
         ax = viz.plot_solution_plane(results)
         assert ax is not None
         plt.close("all")
 
     def test_axes_has_scatter(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         results = _make_results(10)
         ax = viz.plot_solution_plane(results)
         collections = ax.collections
@@ -93,7 +93,7 @@ class TestPlotSolutionPlaneBasic:
         plt.close("all")
 
     def test_x_axis_label(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         results = _make_results(10)
         ax = viz.plot_solution_plane(results)
         xlabel = ax.get_xlabel().lower()
@@ -101,7 +101,7 @@ class TestPlotSolutionPlaneBasic:
         plt.close("all")
 
     def test_y_axis_label(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         results = _make_results(10)
         ax = viz.plot_solution_plane(results)
         ylabel = ax.get_ylabel().lower()
@@ -111,13 +111,13 @@ class TestPlotSolutionPlaneBasic:
 
 class TestPlotSolutionPlaneEmptyData:
     def test_empty_list_no_error(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         ax = viz.plot_solution_plane([])
         assert ax is not None
         plt.close("all")
 
     def test_all_failed_no_error(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         results = [_make_result(5.0, 0.1, 0.1, success=False)]
         ax = viz.plot_solution_plane(results)
         assert ax is not None
@@ -126,7 +126,7 @@ class TestPlotSolutionPlaneEmptyData:
 
 class TestPlotSolutionPlaneColoredByType:
     def test_color_by_transfer_type(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         results = _make_results(30)
         ax = viz.plot_solution_plane(results, color_by="transfer_type")
         assert ax is not None
@@ -135,7 +135,7 @@ class TestPlotSolutionPlaneColoredByType:
         plt.close("all")
 
     def test_color_by_with_single_type(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         results = [_make_result(5.0, 0.1, 0.1, transfer_type=TransferType.DIRECT)] * 5
         ax = viz.plot_solution_plane(results, color_by="transfer_type")
         assert ax is not None
@@ -144,7 +144,7 @@ class TestPlotSolutionPlaneColoredByType:
 
 class TestPlotSolutionPlaneExternalAxes:
     def test_accepts_external_ax(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         results = _make_results(10)
         fig, ax = plt.subplots()
         returned_ax = viz.plot_solution_plane(results, ax=ax)
@@ -152,7 +152,7 @@ class TestPlotSolutionPlaneExternalAxes:
         plt.close("all")
 
     def test_multiple_plots_on_same_ax(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         results1 = _make_results(10, seed=1)
         results2 = _make_results(10, seed=2)
         fig, ax = plt.subplots()
@@ -164,7 +164,7 @@ class TestPlotSolutionPlaneExternalAxes:
 
 class TestPlotSolutionPlaneDictInput:
     def test_accepts_dict_list(self, system):
-        viz = OrbitVisualizer(system)
+        viz = TransferPlotter(system)
         results = [
             {"transfer_time": 5.0, "delta_v1": 0.1, "delta_v2": 0.05,
              "objective_value": 0.15, "transfer_type": "direct", "success": True},
