@@ -20,23 +20,39 @@ $$\boldsymbol{\Phi}(T) \mathbf{v} = \lambda \mathbf{v}$$
 
 $\boldsymbol{\Phi}(T)$ 是单值矩阵，$\lambda$ 是 Floquet 乘子。
 
-## 稳定性分类
+## 枚举类型
 
-| 稳定性类型 | 乘子特征 | 轨道性质 |
-|------------|----------|----------|
-| 稳定 (Stable) | 所有 $\|\lambda\| = 1$ | Lyapunov 稳定 |
-| 不稳定 (Unstable) | 存在 $\|\lambda\| > 1$ | 指数发散 |
-| 椭圆型 (Elliptic) | 乘子在单位圆上 | KAM 适用 |
-| 抛物型 (Parabolic) | 乘子 $= 1$ | 临界情况 |
+### StabilityType（稳定性类型）
+
+| 值 | 说明 |
+|----|------|
+| `STABLE` | 所有 $\|\lambda\| = 1$，Lyapunov 稳定 |
+| `UNSTABLE` | 存在 $\|\lambda\| > 1$，指数发散 |
+| `MARGINALLY_STABLE` | 临界稳定 |
+| `HYPERBOLIC` | 双曲型 |
+| `ELLIPTIC` | 椭圆型，乘子在单位圆上 |
+| `PARABOLIC` | 抛物型，乘子 $= 1$ |
+
+### BifurcationType（分岔类型）
+
+| 值 | 说明 |
+|----|------|
+| `NONE` | 无分岔 |
+| `PERIOD_DOUBLING` | 倍周期分岔 |
+| `SADDLE_NODE` | 鞍结分岔 |
+| `TORUS` | 环面分岔 |
+| `PITCHFORK` | 叉形分岔 |
+| `TRANSCRITICAL` | 跨临界分岔 |
+| `SECONDARY_HOPF` | 次 Hopf 分岔 |
 
 ## 核心方法
 
 | 方法 | 说明 |
 |------|------|
-| `compute_floquet_multipliers(orbit)` | 计算 Floquet 乘子 |
-| `classify_stability(multipliers)` | 分类稳定性 |
-| `compute_stability_index(multipliers)` | 计算稳定性指数 |
-| `analyze_lyapunov(orbit, dt, n_orbits)` | Lyapunov 指数分析 |
+| `analyze()` | 执行完整稳定性分析，返回 `StabilityType` 和分岔信息 |
+| `compute_stability_index()` | 计算最大 Floquet 乘子模 |
+| `classify_stability()` | 分类稳定性类型 |
+| `detect_bifurcation()` | 检测分岔类型 |
 
 ## 稳定性指数
 
@@ -47,13 +63,25 @@ $$\nu = \frac{1}{n} \sum_{i=1}^{n} \ln |\lambda_i|$$
 ## 使用示例
 
 ```python
-from e2m2e.algorithms.stability import StabilityAnalysis
+from e2m2e.core import CR3BP_System, CR3BP_Dynamics, Orbit
+from e2m2e.algorithms import StabilityAnalysis, StabilityType, BifurcationType
 
-analyzer = StabilityAnalysis(system, dynamics)
+system = CR3BP_System.from_known_system("earth_moon")
+dynamics = CR3BP_Dynamics(system)
 
-# 分析轨道稳定性
-multipliers = analyzer.compute_floquet_multipliers(orbit)
-stability_type, index = analyzer.classify_stability(multipliers)
+# 创建轨道对象
+orbit = Orbit(states=[initial_state], times=[0])
+orbit.period = 3.0
+orbit.system = system
 
-print(f"稳定性: {stability_type}, 指数: {index}")
+# 创建分析器
+analyzer = StabilityAnalysis(orbit=orbit, dynamics=dynamics)
+
+# 执行稳定性分析
+result = analyzer.analyze()
+print(f"稳定性类型: {result.stability_type}")
+print(f"最大乘子模: {result.max_multiplier_magnitude}")
+
+if result.bifurcation_type != BifurcationType.NONE:
+    print(f"检测到分岔: {result.bifurcation_type}")
 ```

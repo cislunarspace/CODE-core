@@ -4,10 +4,6 @@
 
 **类签名**:
 ```python
-class ContinuationMethod(Enum):
-    NATURAL = "natural"
-    PSEUDO_ARCLENGTH = "pseudo_arclength"
-
 class Continuation:
     """轨道族延拓：自然参数、伪弧长（XZ 对称）、Halo 种子与族生成"""
 ```

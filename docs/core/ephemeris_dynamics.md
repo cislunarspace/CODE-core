@@ -21,7 +21,6 @@ class EphemerisDynamics(Dynamics):
 Dynamics (基类)
     ├── CR3BP_Dynamics (CR3BP 动力学)
     └── EphemerisDynamics (星历动力学)
-        └── HomotopyEphemerisDynamics (同伦星历动力学)
 ```
 
 ## 主要方法
@@ -155,6 +154,5 @@ corrected_orbit = corrector.iterate_correction(initial_guess=initial_guess)
 ## 相关类
 
 - [`EphemerisSystem`](ephemeris_system.md): 星历系统定义
-- [`HomotopyEphemerisDynamics`](homotopy_dynamics.md): 同伦星历动力学
 - [`CR3BP_Dynamics`](dynamics.md): CR3BP 动力学（简化模型）
 - [`Dynamics`](dynamics.md): 动力学基类

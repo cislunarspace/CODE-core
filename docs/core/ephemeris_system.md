@@ -110,5 +110,4 @@ result = dynamics.propagate(initial_state, time_span=[0, 86400])
 ## 相关类
 
 - [`EphemerisDynamics`](ephemeris_dynamics.md): 星历动力学计算
-- [`HomotopyEphemerisDynamics`](homotopy_dynamics.md): 同伦星历动力学
 - [`SPICEManager`](spice.md): SPICE 内核管理

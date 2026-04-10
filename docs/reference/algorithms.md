@@ -9,7 +9,6 @@
 除了基础的 CR3BP 算法外，项目还实现了以下高级功能：
 
 - **星历动力学**：基于 NASA SPICE 内核的精确多天体引力计算
-- **同伦动力学**：通过同伦参数平滑过渡从基础模型到完整星历模型
 - **多重打靶法**：适用于复杂约束和长周期轨道的数值修正方法
 - **SPICE 集成**：支持加载和使用标准 SPICE 内核文件进行精确星历计算
 
@@ -586,30 +585,7 @@ ephemeris_system = EphemerisSystem(
 ephemeris_dynamics = EphemerisDynamics(system=ephemeris_system)
 ```
 
-### 10.2 同伦动力学 (Homotopy Dynamics)
-
-同伦动力学通过同伦参数 λ 平滑过渡从基础模型到完整星历模型，适用于轨道修正和延续。
-
-**物理含义**:
-- λ=0: 仅基础天体（如地月）的引力（接近 CRTBP 的星历等效）
-- λ=1: 所有天体的完整引力（完整星历模型）
-
-**加速度公式**:
-$$a(r, t, λ) = \sum_{b \in \text{base}} a_b(r, t) + λ \cdot \sum_{p \in \text{perturbation}} a_p(r, t)$$
-
-**使用方法**:
-```python
-from e2m2e.core import HomotopyEphemerisDynamics
-
-homotopy_dynamics = HomotopyEphemerisDynamics(
-    system=ephemeris_system,
-    base_bodies=["EARTH", "MOON"],      # 基础天体，始终满引力
-    perturbation_bodies=["SUN"],        # 摄动天体，引力乘以 λ
-    homotopy_param=0.5                  # 同伦参数 λ ∈ [0, 1]
-)
-```
-
-### 10.3 多重打靶法 (Multiple Shooting)
+### 10.2 多重打靶法 (Multiple Shooting)
 
 多重打靶法将轨迹分为多个节点和弧段，通过匹配相邻段端点状态进行数值修正，适用于复杂约束和长周期轨道。
 
@@ -690,7 +666,6 @@ e2m2e/
 │   │   ├── coordinate.py             # 坐标变换
 │   │   ├── ephemeris_system.py       # EphemerisSystem - 星历系统定义
 │   │   ├── ephemeris_dynamics.py     # EphemerisDynamics - 星历动力学
-│   │   ├── homotopy_dynamics.py      # HomotopyEphemerisDynamics - 同伦星历动力学
 │   │   └── spice.py                  # SPICE 内核管理与工具函数
 │   └── algorithms/
 │       ├── differential_correction.py  # 微分修正

@@ -10,7 +10,7 @@ class DifferentialCorrection:
 
 ## 设计原理
 
-微分修正通过线性化 Poincaré 映射来精确找到周期轨道。在周期轨道问题中，状态需要满足周期条件：
+微分修正通过线性化周期条件来精确找到周期轨道。在周期轨道问题中，状态需要满足周期条件：
 $$\mathbf{x}(T) - \mathbf{x}(0) = \mathbf{0}$$
 
 ## 单参数修正法
@@ -30,10 +30,10 @@ $$\mathbf{J} \Delta \mathbf{x} = -\mathbf{F}$$
 
 | 方法 | 说明 |
 |------|------|
-| `correct_period(orbit, target_state)` | 周期轨道修正 |
-| `correct_poincare(state, section)` | Poincaré 截面修正 |
-| `compute_poincare_map(state, section)` | 计算 Poincaré 映射 |
-| `compute_monodromy(state)` | 计算单值矩阵 |
+| `setup_2D_symmetric_x_fixed_x0(x0)` | 配置 2D 对称、固定 x0 的搜索 |
+| `setup_2D_symmetric_x_fixed_t(t_half)` | 配置 2D 对称、固定周期的搜索 |
+| `setup_3D_symmetric_x_fixed_x0(x0)` | 配置 3D 对称搜索 |
+| `iterate_correction(initial_guess, ...)` | 执行迭代修正 |
 
 ## 周期轨道检测
 
@@ -43,14 +43,17 @@ $$\|\mathbf{x}(T) - \mathbf{x}(0)\| < \epsilon_{period}$$
 ## 使用示例
 
 ```python
-from e2m2e.algorithms.differential_correction import DifferentialCorrection
+from e2m2e.core import CR3BP_System, CR3BP_Dynamics, Orbit
+from e2m2e.algorithms import DifferentialCorrection
 
-corrector = DifferentialCorrection(system, dynamics)
+system = CR3BP_System.from_known_system("earth_moon")
+dynamics = CR3BP_Dynamics(system)
 
-# 修正周期轨道
-corrected_orbit = corrector.correct_period(
-    initial_guess=orbit,
-    max_iterations=50,
-    tolerance=1e-10
-)
+corrector = DifferentialCorrection(dynamic=dynamics)
+corrector.setup_2D_symmetric_x_fixed_x0(x0=0.8)
+
+seed_orbit = Orbit(states=[initial_state], times=[0])
+seed_orbit.period = 3.0
+
+corrected_orbit = corrector.iterate_correction(initial_guess=seed_orbit)
 ```

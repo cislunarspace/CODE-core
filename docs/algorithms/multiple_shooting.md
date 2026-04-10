@@ -274,33 +274,6 @@ def add_intermediate_constraint(state):
     return state[0] - target_x  # x 坐标约束
 ```
 
-### 3. 同伦法结合
-```python
-from e2m2e.core import HomotopyEphemerisDynamics
-
-# 使用同伦法逐步增加摄动
-homotopy_dynamics = HomotopyEphemerisDynamics(
-    system=ephemeris_system,
-    base_bodies=["EARTH", "MOON"],
-    perturbation_bodies=["SUN"],
-    homotopy_param=0.0
-)
-
-multiple_shooting = MultipleShooting(dynamics=homotopy_dynamics)
-
-# 逐步增加 λ
-for lambda_val in [0.0, 0.25, 0.5, 0.75, 1.0]:
-    homotopy_dynamics.set_homotopy_param(lambda_val)
-    result = multiple_shooting.correct(
-        t_patch=t_patch,
-        state_patch=state_patch,
-        max_iter=50,
-        tol=1e-10
-    )
-    # 使用结果作为下一步初值
-    t_patch, state_patch = result.t_patch, result.state_patch
-```
-
 ## 性能优化
 
 ### 1. 并行计算

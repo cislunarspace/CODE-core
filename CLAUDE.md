@@ -45,14 +45,14 @@ CR3BP_System → CR3BP_Dynamics → DifferentialCorrection
                   Orbit          Continuation, StabilityAnalysis
 
 Dynamics (base) → CR3BP_Dynamics
-                → EphemerisDynamics → HomotopyEphemerisDynamics
+                → EphemerisDynamics
 ```
 
 ### Module responsibilities
 
-- **core/** — `CR3BP_System` (system definition, mass parameter, libration points, Jacobi constant), `Dynamics`/`CR3BP_Dynamics` (equations of motion, STM, propagation), `Orbit`/`OrbitFamily` (trajectory containers with JSON serialization), `CoordinateTransformation` (rotating/inertial frame conversions), `SPICEManager` (kernel management), `EphemerisDynamics` (N-body in J2000), `HomotopyEphemerisDynamics` (smooth CR3BP↔ephemeris transition)
+- **core/** — `CR3BP_System` (system definition, mass parameter, libration points, Jacobi constant), `Dynamics`/`CR3BP_Dynamics` (equations of motion, STM, propagation), `Orbit`/`OrbitFamily` (trajectory containers with JSON serialization), `CoordinateTransformation` (rotating/inertial frame conversions), `SPICEManager` (kernel management), `EphemerisDynamics` (N-body in J2000)
 - **algorithms/** — `DifferentialCorrection` (periodic orbit correction + Richardson 3rd-order halo approximation), `Continuation` (natural and pseudo-arclength), `StabilityAnalysis` (Floquet multipliers, bifurcation detection), `MultipleShooting` (parallel propagation via `n_workers`)
-- **transfer/** — `TransferSearch`/`DROTransferSearch`/`GeoTransferSearch` (parallel grid search), `DROTRONLPOptimizer` (Cui et al. 2025 two-step NLP method, optional COPT solver), `Transfer` (chainable API: `.set_orbit().optimize()`)
+- **transfer/** — `TransferSearch`/`DROTransferSearch` (parallel grid search), `DROTRONLPOptimizer` (Cui et al. 2025 two-step NLP method, optional COPT solver), `Transfer` (chainable API: `.set_orbit().optimize()`)
 - **visualization/** — `PlotConfig` (centralized font/size/color), `FamilyPlotter`, `TransferPlotter`
 
 ## Critical conventions

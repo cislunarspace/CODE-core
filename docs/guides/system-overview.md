@@ -15,8 +15,7 @@ E2M2E 采用模块化设计，包含四个核心模块：
 │ orbit.py    │continuation.py│inter_orbit │   family.py     │
 │coordinate.py│ stability.py │             │   transfer.py   │
 │ephemeris_*  │multiple_     │             │   stability.py   │
-│homotopy_*   │shooting.py   │             │   plotting.py    │
-│spice.py     │             │             │                  │
+│spice.py     │shooting.py   │             │   plotting.py    │
 └─────────────┴─────────────┴─────────────┴─────────────────┘
 ```
 
@@ -34,7 +33,6 @@ E2M2E 采用模块化设计，包含四个核心模块：
 | `coordinate.py` | `CoordinateTransformation` | 坐标系变换（旋转系↔惯性系） |
 | `ephemeris_system.py` | `EphemerisSystem` | 星历系统定义，多天体配置 |
 | `ephemeris_dynamics.py` | `EphemerisDynamics` | 基于 SPICE 的精确星历动力学 |
-| `homotopy_dynamics.py` | `HomotopyEphemerisDynamics` | 同伦星历动力学，平滑过渡模型 |
 | `spice.py` | `SPICEManager` | SPICE 内核管理与工具函数 |
 
 ### Algorithms（算法模块）
@@ -76,7 +74,6 @@ E2M2E 采用模块化设计，包含四个核心模块：
 ┌──────────────┐     ┌───────────────┐     ┌──────────────┐
 │ CR3BP_System │────▶│ CR3BP_Dynamics│────▶│    Orbit     │
 │EphemerisSystem│───▶│EphemerisDynamics│───▶│   OrbitFamily│
-│              │     │HomotopyDynamics│     │              │
 └──────────────┘     └───────────────┘     └──────────────┘
                             │                     │
                             ▼                     ▼
@@ -125,7 +122,7 @@ family = continuation.natural_continuation(
 )
 ```
 
-### 3. 星历动力学与同伦方法
+### 3. 星历动力学与多重打靶法
 
 ```python
 # 6. 使用星历动力学
@@ -141,16 +138,7 @@ ephemeris_system = EphemerisSystem(
 )
 ephemeris_dynamics = EphemerisDynamics(system=ephemeris_system)
 
-# 7. 使用同伦动力学平滑过渡
-from e2m2e.core import HomotopyEphemerisDynamics
-homotopy_dynamics = HomotopyEphemerisDynamics(
-    system=ephemeris_system,
-    base_bodies=["EARTH", "MOON"],
-    perturbation_bodies=["SUN"],
-    homotopy_param=0.5
-)
-
-# 8. 使用多重打靶法
+# 7. 使用多重打靶法
 from e2m2e.algorithms import MultipleShooting, sample_patch_points
 multiple_shooting = MultipleShooting(dynamics=ephemeris_dynamics)
 t_patch, state_patch = sample_patch_points(orbit=orbit, n_segments=5)

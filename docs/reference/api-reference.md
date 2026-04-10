@@ -39,7 +39,7 @@
       - [支持的对称性配置](#支持的对称性配置)
       - [配置方法](#配置方法)
       - [核心方法](#核心方法-5)
-    - [2.2 Continuation \& ContinuationMethod](#22-continuation--continuationmethod)
+    - [2.2 Continuation](#22-continuation)
       - [自然参数延拓 (Natural Continuation)](#自然参数延拓-natural-continuation)
       - [伪弧长延拓 (Pseudo-Arclength Continuation)](#伪弧长延拓-pseudo-arclength-continuation)
       - [核心方法](#核心方法-6)
@@ -409,16 +409,12 @@ corrector.setup_3D_symmetric_x_fixed_x0(x0=0.8)
 
 ---
 
-### 2.2 Continuation & ContinuationMethod
+### 2.2 Continuation
 
 **文件**: `e2m2e/algorithms/continuation.py`
 
 **类签名**:
 ```python
-class ContinuationMethod(Enum):
-    NATURAL = "natural"
-    PSEUDO_ARCLENGTH = "pseudo_arclength"
-
 class Continuation:
     """轨道族延拓"""
 ```

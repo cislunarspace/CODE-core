@@ -12,7 +12,6 @@
 
 - **CR3BP 系统建模**：支持地月、日地、日木等常见天体系统
 - **星历动力学建模**：基于 SPICE 内核的精确星历计算，支持多天体引力
-- **同伦动力学**：通过同伦参数平滑过渡从基础模型到完整星历模型
 - **多种轨道类型**：DRO、ARO、RO、Halo、Lyapunov、Lissajous、Butterfly 等
 - **轨道设计算法**：微分修正、多重打靶法、自然延拓、伪弧长延拓、稳定性分析
 - **转移轨道搜索**：网格搜索、NLP 优化、脉冲转移设计
@@ -95,15 +94,6 @@ ephemeris_system = EphemerisSystem(
 
 # 创建星历动力学
 ephemeris_dynamics = EphemerisDynamics(system=ephemeris_system)
-
-# 使用同伦动力学平滑过渡
-from e2m2e.core import HomotopyEphemerisDynamics
-homotopy_dynamics = HomotopyEphemerisDynamics(
-    system=ephemeris_system,
-    base_bodies=["EARTH", "MOON"],
-    perturbation_bodies=["SUN"],
-    homotopy_param=0.5  # 50% 太阳引力
-)
 ```
 
 ### 3. 生成 DRO 轨道族
@@ -227,7 +217,6 @@ e2m2e/
 │   ├── coordinate.py     # CoordinateTransformation - 坐标变换
 │   ├── ephemeris_system.py      # EphemerisSystem - 星历系统定义
 │   ├── ephemeris_dynamics.py    # EphemerisDynamics - 星历动力学
-│   ├── homotopy_dynamics.py    # HomotopyEphemerisDynamics - 同伦星历动力学
 │   └── spice.py                 # SPICE 内核管理与工具函数
 ├── algorithms/           # 算法模块
 │   ├── differential_correction.py  # DifferentialCorrection - 微分修正
@@ -279,15 +268,6 @@ e2m2e/
 - 特征值计算
 - 分岔点检测
 - 稳定性指标
-
-### 同伦动力学 (Homotopy Dynamics)
-
-通过同伦参数平滑过渡从基础模型到完整星历模型：
-
-- 基础天体（如地月）始终满引力
-- 摄动天体（如太阳）引力乘以同伦参数 λ
-- λ=0：仅基础天体引力（接近 CRTBP 的星历等效）
-- λ=1：所有天体完整引力（完整星历模型）
 
 ## 开发与贡献
 

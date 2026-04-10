@@ -4,10 +4,6 @@
 
 **Class Signature**:
 ```python
-class ContinuationMethod(Enum):
-    NATURAL = "natural"                # Natural parameter continuation
-    PSEUDO_ARCLENGTH = "pseudo_arclength"  # Pseudo-arclength continuation
-
 class Continuation:
     """Orbit family continuation: natural parameter, pseudo-arclength (XZ symmetric), Halo seed & family generation"""
 ```

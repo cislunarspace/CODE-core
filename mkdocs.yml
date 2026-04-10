@@ -24,11 +24,15 @@ nav:
     - 动力学: core/dynamics.md
     - 轨道: core/orbit.md
     - 坐标变换: core/coordinate.md
+    - 星历系统: core/ephemeris_system.md
+    - 星历动力学: core/ephemeris_dynamics.md
+    - SPICE管理: core/spice.md
   - 算法模块:
     - 延拓法: algorithms/continuation.md
     - Halo轨道: algorithms/halo.md
     - 微分修正: algorithms/differential_correction.md
     - 稳定性分析: algorithms/stability.md
+    - 多重打靶法: algorithms/multiple_shooting.md
   - 技术参考:
     - API参考: reference/api-reference.md
     - 算法细节: reference/algorithms.md

@@ -56,7 +56,7 @@ docs/
 
 | Class/Module | File | Description |
 |--------------|------|-------------|
-| `ContinuationMethod` | [algorithms/continuation.md](algorithms/continuation.md) | Natural / pseudo-arclength continuation |
+| `Continuation` | [algorithms/continuation.md](algorithms/continuation.md) | Natural / pseudo-arclength continuation |
 | Halo / PAL orbit family | [algorithms/halo.md](algorithms/halo.md) | Halo initial guess, PAL continuation, scripts vs MATLAB |
 | `DifferentialCorrection` | [algorithms/differential_correction.md](algorithms/differential_correction.md) | Periodic orbit correction |
 | `StabilityAnalysis` | [algorithms/stability.md](algorithms/stability.md) | Floquet stability analysis |

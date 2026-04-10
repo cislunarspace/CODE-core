@@ -19,7 +19,6 @@ docs/
 │   ├── coordinate.md     # CoordinateTransformation - 坐标变换
 │   ├── ephemeris_system.md      # EphemerisSystem - 星历系统
 │   ├── ephemeris_dynamics.md    # EphemerisDynamics - 星历动力学
-│   ├── homotopy_dynamics.md    # HomotopyEphemerisDynamics - 同伦动力学
 │   └── spice.md                 # SPICE 内核管理
 ├── algorithms/           # 算法模块
 │   ├── continuation.md       # 延拓法
@@ -55,7 +54,6 @@ docs/
 | `Dynamics` | [core/dynamics.md](core/dynamics.md) | 动力学基类 |
 | `CR3BP_Dynamics` | [core/dynamics.md](core/dynamics.md) | 运动方程与数值积分 |
 | `EphemerisDynamics` | [core/ephemeris_dynamics.md](core/ephemeris_dynamics.md) | 星历动力学 |
-| `HomotopyEphemerisDynamics` | [core/homotopy_dynamics.md](core/homotopy_dynamics.md) | 同伦星历动力学 |
 | `Orbit` | [core/orbit.md](core/orbit.md) | 轨道数据管理 |
 | `OrbitFamily` | [core/orbit.md](core/orbit.md) | 轨道族管理 |
 | `CoordinateTransformation` | [core/coordinate.md](core/coordinate.md) | 坐标系变换 |
@@ -65,7 +63,7 @@ docs/
 
 | 类/模块 | 文件 | 说明 |
 |---------|------|------|
-| `ContinuationMethod` | [algorithms/continuation.md](algorithms/continuation.md) | 弧长延拓法 |
+| `Continuation` | [algorithms/continuation.md](algorithms/continuation.md) | 自然/伪弧长延拓 |
 | Halo / PAL 轨道族 | [algorithms/halo.md](algorithms/halo.md) | Halo 初值、伪弧长延拓、脚本与 MATLAB 对照 |
 | `DifferentialCorrection` | [algorithms/differential_correction.md](algorithms/differential_correction.md) | 周期轨道修正 |
 | `StabilityAnalysis` | [algorithms/stability.md](algorithms/stability.md) | Floquet稳定性分析 |

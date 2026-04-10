@@ -39,7 +39,7 @@
       - [Supported Symmetry Configurations](#supported-symmetry-configurations)
       - [Configuration Methods](#configuration-methods)
       - [Core Methods](#core-methods-5)
-    - [2.2 Continuation \& ContinuationMethod](#22-continuation--continuationmethod)
+    - [2.2 Continuation](#22-continuation)
       - [Natural Parameter Continuation](#natural-parameter-continuation)
       - [Pseudo-Arclength Continuation](#pseudo-arclength-continuation)
       - [Core Methods](#core-methods-6)
@@ -411,16 +411,12 @@ corrector.setup_3D_symmetric_x_fixed_x0(x0=0.8)
 
 ---
 
-### 2.2 Continuation & ContinuationMethod
+### 2.2 Continuation
 
 **File**: `e2m2e/algorithms/continuation.py`
 
 **Class Signature**:
 ```python
-class ContinuationMethod(Enum):
-    NATURAL = "natural"
-    PSEUDO_ARCLENGTH = "pseudo_arclength"
-
 class Continuation:
     """Orbit family continuation"""
 ```
