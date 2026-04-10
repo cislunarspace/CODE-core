@@ -10,7 +10,7 @@ Classes:
     Orbit: 轨道数据容器
     OrbitFamily: 轨道族容器
     CoordinateTransformation: 坐标系变换
-    BodyName: 天体名称字符串常量类
+    ReferenceFrame: 参考坐标系枚举
 
 Functions:
     propagate_state_at_orbit_time: 沿轨道周期外推状态
@@ -23,18 +23,14 @@ from . import coordinate
 from . import spice
 from . import ephemeris_system
 from . import ephemeris_dynamics
-from . import homotopy_dynamics
-from . import bodies
 
 from .system import CR3BP_System, LibrationPoint
 from .dynamics import Dynamics, CR3BP_Dynamics, propagate_state_at_orbit_time
 from .orbit import Orbit, OrbitFamily
-from .coordinate import CoordinateTransformation, SynodicJ2000Transformation
+from .coordinate import CoordinateTransformation, SynodicJ2000Transformation, ReferenceFrame
 from .spice import SPICEManager
 from .ephemeris_system import EphemerisSystem
 from .ephemeris_dynamics import EphemerisDynamics
-from .homotopy_dynamics import HomotopyEphemerisDynamics
-from .bodies import BodyName
 
 __all__ = [
     "CR3BP_System",
@@ -45,10 +41,9 @@ __all__ = [
     "OrbitFamily",
     "propagate_state_at_orbit_time",
     "CoordinateTransformation",
+    "SynodicJ2000Transformation",
+    "ReferenceFrame",
     "SPICEManager",
     "EphemerisSystem",
     "EphemerisDynamics",
-    "HomotopyEphemerisDynamics",
-    "SynodicJ2000Transformation",
-    "BodyName",
 ]

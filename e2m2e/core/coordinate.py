@@ -76,13 +76,16 @@ class CoordinateTransformation:
         Returns:
             3x3旋转矩阵
         """
+        # 优先从缓存中获取旋转矩阵，避免重复计算
         if self.CACHE_ROTATION_MATRICES and time in self.rotation_matrices:
             return self.rotation_matrices[time]
 
-        # 计算旋转角度（假设平均角速度为1）
+        # 在 CR3BP 旋转系中，角速度归一化为 1，故旋转角度等于无量纲时间
         angle = time
 
-        # 构建旋转矩阵（绕z轴旋转）
+        # 绕 z 轴的旋转矩阵 R(t) 及其导数 dR/dt
+        # R(t) = [[cos(t), -sin(t), 0], [sin(t), cos(t), 0], [0, 0, 1]]
+        # dR/dt = [[-sin(t), -cos(t), 0], [cos(t), -sin(t), 0], [0, 0, 0]]
         cos_angle = np.cos(angle)
         sin_angle = np.sin(angle)
 
@@ -94,6 +97,7 @@ class CoordinateTransformation:
             [[-sin_angle, -cos_angle, 0], [cos_angle, -sin_angle, 0], [0, 0, 0]]
         )
 
+        # LRU 缓存：达到上限时删除最早缓存的项
         if self.CACHE_ROTATION_MATRICES:
             if len(self.rotation_matrices) >= self.MAX_CACHE_SIZE:
                 oldest_key = next(iter(self.rotation_matrices))
@@ -122,8 +126,10 @@ class CoordinateTransformation:
         R = self.compute_rotation_matrix(time)
         R_dot = self.rotation_matrix_derivatives[time]
 
+        # 位置变换：r_inertial = R^T * r_rotating
         position_inertial = R.T @ position
 
+        # 速度变换：v_inertial = R^T * v + dR^T/dt * r（含科里奥利项）
         if self.VELOCITY_TRANSFORM_INCLUDE_CORIOLIS:
             velocity_inertial = R.T @ velocity + R_dot.T @ position
         else:
@@ -148,8 +154,10 @@ class CoordinateTransformation:
         R = self.compute_rotation_matrix(time)
         R_dot = self.rotation_matrix_derivatives[time]
 
+        # 位置变换：r_rotating = R * r_inertial
         position_rotating = R @ position
 
+        # 速度变换：v_rotating = R * v - dR/dt * R * r（逆变换的科里奥利项）
         if self.VELOCITY_TRANSFORM_INCLUDE_CORIOLIS:
             velocity_rotating = R @ velocity - R_dot @ position_rotating
         else:
@@ -176,8 +184,10 @@ class CoordinateTransformation:
         position = state[:3]
         velocity = state[3:]
 
+        # 主天体在质心系中的位置：(-μ, 0, 0)
         primary_position = np.array([-self.mu, 0, 0])
 
+        # 平移变换（无速度分量，因两参考系间无相对旋转）
         position_primary = position - primary_position
         velocity_primary = velocity
 
@@ -228,6 +238,7 @@ class CoordinateTransformation:
         position = state[:3]
         velocity = state[3:]
 
+        # 次天体在质心系中的位置：(1-μ, 0, 0)
         secondary_position = np.array([1 - self.mu, 0, 0])
 
         position_secondary = position - secondary_position
@@ -386,10 +397,10 @@ class SynodicJ2000Transformation:
         Returns:
             3x3旋转矩阵
         """
-        e1 = r_m / np.linalg.norm(r_m)
-        h = np.cross(r_m, v_m)
-        e3 = h / np.linalg.norm(h)
-        e2 = np.cross(e3, e1)
+        e1 = r_m / np.linalg.norm(r_m)  # e1 指向月球方向
+        h = np.cross(r_m, v_m)  # 轨道角动量方向
+        e3 = h / np.linalg.norm(h)  # e3 为轨道法线（角动量单位向量）
+        e2 = np.cross(e3, e1)  # e2 = e3 × e1，完成右手坐标系
         return np.column_stack([e1, e2, e3])
 
     def _get_moon_frame(self, et: float):
@@ -409,10 +420,11 @@ class SynodicJ2000Transformation:
                 - omega: 角速度向量（rad/s）
         """
         moon_state = self.spice.get_body_state("MOON", et, "J2000", "EARTH")
-        r_m = moon_state[:3]
-        v_m = moon_state[3:]
-        l_c = np.linalg.norm(r_m)
-        R = self._build_rotation_matrix(r_m, v_m)
+        r_m = moon_state[:3]  # 月球相对地球位置 (km)
+        v_m = moon_state[3:]  # 月球相对地球速度 (km/s)
+        l_c = np.linalg.norm(r_m)  # 特征长度 = 月地距离
+        R = self._build_rotation_matrix(r_m, v_m)  # 瞬时旋转矩阵
+        # 角速度 ω = r × v / |r|²（瞬时轨道角速度向量）
         omega = np.cross(r_m, v_m) / np.dot(r_m, r_m)
         return r_m, v_m, l_c, R, omega
 
@@ -431,14 +443,19 @@ class SynodicJ2000Transformation:
         mu = self.cr3bp_system.mu
         t_c = self._get_time_unit()
 
-        et = et0 + t_syn * t_c
+        et = et0 + t_syn * t_c  # 计算绝对 SPICE 时间
         r_m, v_m, l_c, R, omega = self._get_moon_frame(et)
 
+        # synodic → 有量纲：r_dim = r_syn * l_c
         r_dim = state_syn[:3] * l_c
+        # 质心系 → 地心系：减去地球在质心系的位置偏移
         r_from_earth = r_dim - np.array([-mu, 0.0, 0.0]) * l_c
+        # 旋转系 → J2000：应用旋转矩阵 R
         r_j2000 = R @ r_from_earth
 
+        # 速度量纲化：v_dim = v_syn * l_c / t_c
         v_dim = state_syn[3:] * l_c / t_c
+        # 速度变换：含科里奥利项 ω × r
         v_j2000 = R @ v_dim + np.cross(omega, r_j2000)
 
         return np.concatenate([r_j2000, v_j2000])
@@ -461,10 +478,14 @@ class SynodicJ2000Transformation:
         et = et0 + t_syn * t_c
         r_m, v_m, l_c, R, omega = self._get_moon_frame(et)
 
+        # J2000 → 地心系：逆旋转
         r_from_earth = R.T @ state_j2000[:3]
+        # 地心系 → 质心系：加上地球偏移
         r_dim = r_from_earth + np.array([-mu, 0.0, 0.0]) * l_c
+        # 质心系 → synodic 无量纲：除以特征长度
         r_syn = r_dim / l_c
 
+        # 速度逆变换：先消除科里奥利项，再旋转回 synodic 系
         v_from_earth = R.T @ (state_j2000[3:] - np.cross(omega, state_j2000[:3]))
         v_syn = v_from_earth * t_c / l_c
 

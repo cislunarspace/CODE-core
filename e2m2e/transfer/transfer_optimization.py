@@ -137,12 +137,14 @@ class DROTRONLPOptimizer:
         moon_radius: 月球半径(无量纲)
     """
 
+    # 优化变量的默认搜索范围
     DEFAULT_ALPHA_RANGE = (0.5, 2.5)
     DEFAULT_TRANSFER_TIME_RANGE = (1.0, 30.0)
     DEFAULT_T_INS_RANGE = (0.0, 10.0)
 
-    EARTH_RADIUS_ND = 1.0 / 389703.0 * 6378.137
-    MOON_RADIUS_ND = 1738.1 / 384400.0
+    # 地月天体碰撞检测半径（无量纲单位）
+    EARTH_RADIUS_ND = 1.0 / 389703.0 * 6378.137  # 地球半径 / 地月距离
+    MOON_RADIUS_ND = 1738.1 / 384400.0  # 月球半径 / 地月距离
 
     DEFAULT_VELOCITY_ANGLE_TOL = 1e-6
 

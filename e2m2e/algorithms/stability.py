@@ -125,15 +125,17 @@ class StabilityAnalysis:
         period = self.orbit.period
 
         # 使用动力学对象计算STM
+        # 从轨道初始状态出发，积分一个完整周期得到 STM(T)，即单值矩阵
         self.monodromy_matrix = self.dynamics.compute_state_transition_matrix(initial_state, period)
 
         self.has_monodromy = True
 
-        # 计算数值误差
+        # 辛矩阵行列式恒为 1，若偏差过大则说明积分精度不够
         det = np.linalg.det(self.monodromy_matrix)
         self.numerical_errors["determinant_error"] = abs(det - 1.0)
 
-        # 检查辛性质
+        # 检查辛性质：M^T J M - J 应为零矩阵
+        # 其中 J = [[0, I], [-I, 0]] 为辛结构矩阵
         J = np.zeros((6, 6))
         J[:3, 3:] = np.eye(3)
         J[3:, :3] = -np.eye(3)
@@ -151,11 +153,13 @@ class StabilityAnalysis:
         if not self.has_monodromy:
             self.compute_monodromy()
 
+        # 求单值矩阵的特征值，即 Floquet 乘子 λ
         self.eigenvalues, self.eigenvectors = np.linalg.eig(self.monodromy_matrix)
 
-        self.eigenvalue_magnitudes = np.abs(self.eigenvalues)
-        self.eigenvalue_arguments = np.angle(self.eigenvalues)
+        self.eigenvalue_magnitudes = np.abs(self.eigenvalues)  # |λ|
+        self.eigenvalue_arguments = np.angle(self.eigenvalues)  # arg(λ)
 
+        # 按幅值降序排列，方便识别主导模态
         sort_idx = np.argsort(-self.eigenvalue_magnitudes)
         self.sorted_eigenvalues = self.eigenvalues[sort_idx]
 
@@ -202,6 +206,7 @@ class StabilityAnalysis:
             self.compute_floquet_multipliers()
 
         for i, (lam1, lam2) in enumerate(self.eigenvalue_pairs):
+            # Broucke 稳定性参数：ν = λ + 1/λ = λ + λ_conj（倒数关系）
             nu = np.real(lam1 + lam2)  # ν = λ + 1/λ
             key = f"nu{i + 1}"
             if key in self.stability_indices:
@@ -231,6 +236,7 @@ class StabilityAnalysis:
 
         threshold = self.STABILITY_THRESHOLD
 
+        # 所有 Floquet 乘子都在单位圆上 → Lyapunov 稳定
         all_on_unit_circle = np.all(np.abs(magnitudes - 1.0) < threshold)
 
         if all_on_unit_circle:
@@ -243,7 +249,7 @@ class StabilityAnalysis:
             self.stability_type = StabilityType.MARGINALLY_STABLE
             self.is_critical = True
 
-        # 更精细的分类
+        # 更精细分类：区分双曲型（实数不稳定）和椭圆型（复数不稳定）
         has_real_unstable = False
         has_complex_unstable = False
 
@@ -297,7 +303,7 @@ class StabilityAnalysis:
         for lam in self.eigenvalues:
             mag = abs(lam)
 
-            # 鞍结分岔：特征值穿过 +1
+            # 鞍结分岔：特征值穿过 +1（稳定分支消失或创建）
             if abs(lam - 1.0) < tol:
                 self.bifurcation_type = BifurcationType.SADDLE_NODE
                 self.bifurcation_detected = True

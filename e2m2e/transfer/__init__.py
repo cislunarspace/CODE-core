@@ -17,7 +17,6 @@ Functions:
 from . import transfer_search
 from . import transfer_optimization
 from . import transfer
-from . import geo_transfer_search
 
 from .transfer_search import (
     TransferSearch,
@@ -26,8 +25,6 @@ from .transfer_search import (
     load_orbit_from_json,
     DEFAULT_MIN_DISTANCE_THRESHOLD_DU,
 )
-
-from .geo_transfer_search import GeoTransferSearch
 
 from .transfer_optimization import (
     DROTRONLPOptimizer,
@@ -50,7 +47,6 @@ __all__ = [
     "TransferSearch",
     "DROTransferSearch",
     "DROROTransferSearch",
-    "GeoTransferSearch",
     "Transfer",
     "TransferConfig",
     "TransferOptimizationResult",

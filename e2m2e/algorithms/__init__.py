@@ -15,8 +15,8 @@ from .differential_correction import (
     halo_third_order_approximation,
     compute_halo_initial_guess,
 )
-from .continuation import Continuation, ContinuationMethod
-from .stability import StabilityAnalysis
+from .continuation import Continuation
+from .stability import StabilityAnalysis, StabilityType, BifurcationType
 from .multiple_shooting import MultipleShooting
 from .multiple_shooting import sample_patch_points, convert_to_j2000
 
@@ -30,8 +30,9 @@ __all__ = [
     "compute_halo_initial_guess",
     "DifferentialCorrection",
     "Continuation",
-    "ContinuationMethod",
     "StabilityAnalysis",
+    "StabilityType",
+    "BifurcationType",
     "MultipleShooting",
     "sample_patch_points",
     "convert_to_j2000",

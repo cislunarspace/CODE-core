@@ -187,21 +187,25 @@ class Transfer:
         if self._departure_orbit is None or self._arrival_orbit is None:
             raise ValueError("Must call set_orbit() before optimize()")
 
+        # 若用户未指定覆盖值，使用配置中的默认值
         if use_relaxed_velocity is None:
             use_relaxed_velocity = self._config.use_relaxed_velocity
         if velocity_angle_tol is None:
             velocity_angle_tol = self._config.velocity_angle_tol
 
+        # 出发点状态：用户手动指定或从 DRO 轨道采样
         if departure_state is None:
             departure_state = self._sample_departure_state_from_dro()
         else:
             departure_state = np.asarray(departure_state)
 
+        # 插入时间范围：未指定时默认为一个完整 RO 周期
         if t_ins_range is None:
             t0 = self._arrival_orbit.times[0]
             period = self._get_ro_period()
             t_ins_range = (t0, t0 + period)
 
+        # 构造 NLP 优化变量（α、转移时间、插入时间）
         ig = NLPOptimizationVariables(
             alpha=initial_guess["alpha"],
             transfer_time=initial_guess["transfer_time"],

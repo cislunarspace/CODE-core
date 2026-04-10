@@ -1,3 +1,8 @@
+"""基础可视化模块
+
+提供轨道可视化的核心类 OrbitVisualizer，支持 2D 投影和 3D 轨道绑图。
+"""
+
 from __future__ import annotations
 
 from typing import Any, Optional, Union
@@ -15,26 +20,41 @@ from .config import PlotConfig
 
 
 class ProjectionPlane(Enum):
-    XY = "xy"
-    XZ = "xz"
-    YZ = "yz"
+    """轨道投影视图平面枚举。"""
+
+    XY = "xy"  # X-Y 平面（轨道面内投影）
+    XZ = "xz"  # X-Z 平面（侧视图）
+    YZ = "yz"  # Y-Z 平面（正视图）
 
 
 class OrbitVisualizer:
+    """轨道可视化器，支持 2D 投影和 3D 轨道绑定绘图。
+
+    提供统一接口绘制单条轨道的 2D 投影、3D 轨道、天体标记和平动点标注。
+    支持自定义颜色、线条宽度等样式参数。
+
+    Args:
+        system: CR3BP 系统对象，用于获取天体位置和平动点坐标。
+        config: 绘图配置，未指定时使用默认 PlotConfig。
+    """
+
     def __init__(self, system: CR3BP_System, config: Optional[PlotConfig] = None) -> None:
         self.system = system
-        self.mu = system.mu
+        self.mu = system.mu  # 质量参数，用于天体位置计算
         self.config = config or PlotConfig()
 
+        # matplotlib 对象引用，延迟创建以避免不必要开销
         self.figure = None
         self.axes = None
         self.axes_3d = None
 
+        # 轨道样式参数
         self.orbit_linewidth = self.config.orbit_linewidth
         self.orbit_alpha = self.config.orbit_alpha
         self.color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-        self.color_index = 0
+        self.color_index = 0  # 颜色循环索引
 
+        # 天体标记样式
         self.primary_body_color = self.config.primary_body_color
         self.primary_body_size = self.config.primary_body_size
         self.secondary_body_color = self.config.secondary_body_color
@@ -45,6 +65,7 @@ class OrbitVisualizer:
         self.primary_body_marker = "o"
         self.secondary_body_marker = "o"
 
+        # 平动点标记样式（5 个平动点独立配置）
         self.libration_point_colors = list(self.config.lp_colors)
         self.libration_point_markers = list(self.config.lp_markers)
         self.libration_point_sizes = list(self.config.lp_sizes)
@@ -52,11 +73,13 @@ class OrbitVisualizer:
         self.libration_point_fontsize = self.config.lp_label
 
     def _get_next_color(self) -> str:
+        """从颜色循环中获取下一个颜色。"""
         color = self.color_cycle[self.color_index % len(self.color_cycle)]
         self.color_index += 1
         return color
 
     def _extract_states(self, orbit):
+        """从轨道对象或数组中提取状态矩阵 (n, 6)。"""
         if hasattr(orbit, "states"):
             states = orbit.states
         else:
@@ -73,6 +96,18 @@ class OrbitVisualizer:
         ax: Optional[Any] = None,
         show_start: bool = True,
     ) -> Any:
+        """绘制 3D 轨道。
+
+        Args:
+            orbit: 轨道对象或状态数组。
+            color: 线条颜色，未指定时自动从颜色循环取。
+            label: 图例标签。
+            ax: 目标 axes 对象，未指定时自动创建。
+            show_start: 是否标记轨道起始点。
+
+        Returns:
+            matplotlib 3D axes 对象。
+        """
         if ax is None:
             if self.axes_3d is None:
                 self.figure = plt.figure(figsize=self.config.figsize_3d, dpi=self.config.dpi)
@@ -80,7 +115,7 @@ class OrbitVisualizer:
             ax = self.axes_3d
 
         states = self._extract_states(orbit)
-        x, y, z = states[:, 0], states[:, 1], states[:, 2]
+        x, y, z = states[:, 0], states[:, 1], states[:, 2]  # 提取位置分量
 
         if color is None:
             color = self._get_next_color()
@@ -103,6 +138,19 @@ class OrbitVisualizer:
         ax: Optional[Any] = None,
         show_start: bool = True,
     ) -> Any:
+        """绘制轨道在指定平面上的 2D 投影。
+
+        Args:
+            orbit: 轨道对象或状态数组。
+            plane: 投影平面（XY/XZ/YZ）。
+            color: 线条颜色。
+            label: 图例标签。
+            ax: 目标 axes 对象。
+            show_start: 是否标记轨道起始点。
+
+        Returns:
+            matplotlib axes 对象。
+        """
         if ax is None:
             if self.axes is None:
                 self.figure, self.axes = plt.subplots(
@@ -118,6 +166,7 @@ class OrbitVisualizer:
         if isinstance(plane, str):
             plane = ProjectionPlane(plane)
 
+        # 根据投影平面选择坐标轴
         if plane == ProjectionPlane.XY:
             px, py = x, y
         elif plane == ProjectionPlane.XZ:
@@ -139,6 +188,16 @@ class OrbitVisualizer:
     def plot_libration_points(
         self, ax: Optional[Any] = None, show_labels: bool = True, is_3d: bool = False
     ) -> Any:
+        """绘制五个平动点标记。
+
+        Args:
+            ax: 目标 axes 对象。
+            show_labels: 是否显示 L1-L5 标签。
+            is_3d: 是否在 3D 坐标系中绘制。
+
+        Returns:
+            matplotlib axes 对象。
+        """
         if self.system is None or not self.system.has_L_points:
             if self.system is not None:
                 self.system.compute_libration_points()
@@ -153,6 +212,7 @@ class OrbitVisualizer:
             else:
                 return ax
 
+        # 遍历五个平动点，逐个绘制标记和标签
         for i, lp in enumerate(LibrationPoint):
             coord = self.system.L_points[lp]
             color = self.libration_point_colors[i]
@@ -178,6 +238,17 @@ class OrbitVisualizer:
         return ax
 
     def plot_primary_bodies(self, ax: Optional[Any] = None, is_3d: bool = False) -> Any:
+        """绘制主天体和次天体标记。
+
+        天体位置：主天体在 (-μ, 0, 0)，次天体在 (1-μ, 0, 0)（旋转系坐标）。
+
+        Args:
+            ax: 目标 axes 对象。
+            is_3d: 是否在 3D 坐标系中绘制。
+
+        Returns:
+            matplotlib axes 对象。
+        """
         if self.mu is None:
             return ax
         if ax is None:
@@ -185,6 +256,7 @@ class OrbitVisualizer:
             if ax is None:
                 return ax
 
+        # 获取天体名称，回退为默认值
         primary_name = getattr(self.system, "primary_body", None) or "Earth"
         secondary_name = getattr(self.system, "secondary_body", None) or "Moon"
 
@@ -205,14 +277,22 @@ class OrbitVisualizer:
         return ax
 
     def show(self) -> None:
+        """显示绘图窗口。"""
         plt.show()
 
     def save(self, filename: str, dpi: Optional[int] = None) -> None:
+        """保存图像到文件。
+
+        Args:
+            filename: 输出文件路径。
+            dpi: 输出分辨率，未指定时使用配置中的默认值。
+        """
         if self.figure is not None:
             self.figure.savefig(filename, dpi=dpi or self.config.dpi,
                                 bbox_inches="tight", pad_inches=0.1)
 
     def _sort_points_by_nearest_neighbor(self, x, y):
+        """使用最近邻算法排序散点，使绘制的连线不交叉。"""
         points = np.column_stack((x, y))
         n = len(points)
         if n <= 2:
@@ -242,6 +322,7 @@ class OrbitVisualizer:
         return points[sorted_indices, 0], points[sorted_indices, 1]
 
     def _sort_3d_points_by_nearest_neighbor(self, x, y, z):
+        """使用最近邻算法排序 3D 散点，使绘制的连线不交叉。"""
         points = np.column_stack((x, y, z))
         n = len(points)
         if n <= 2:

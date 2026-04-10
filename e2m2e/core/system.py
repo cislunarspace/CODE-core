@@ -50,13 +50,13 @@ class CR3BP_System:
     """
 
     # 天文常量
-    EARTH_MOON_DISTANCE_KM = 384400.0
-    AU = 149597870.7
-    G = 6.67430e-20  # km^3 / (kg * s^2)
-    DAY = 86400  # seconds
-    YEAR = 365.25 * 86400  # seconds
+    EARTH_MOON_DISTANCE_KM = 384400.0  # 地月平均距离 (km)
+    AU = 149597870.7  # 天文单位 (km)
+    G = 6.67430e-20  # 万有引力常数 (km^3 / (kg * s^2))
+    DAY = 86400  # 一天的秒数
+    YEAR = 365.25 * 86400  # 一年的秒数（儒略年）
 
-    # 常见天体系统的参数
+    # 预定义的常见三体系统参数
     KNOWN_SYSTEMS = {
         "earth_moon": {
             "primary": "Earth",
@@ -164,33 +164,36 @@ class CR3BP_System:
         """
         mu = self.mu
 
-        # L1点 (在两天体之间)
+        # L1点：位于两天体之间，引力与离心力平衡
+        # 平衡方程: x - (1-μ)/(x+μ)² + μ/(x-1+μ)² = 0
         def f1(x):
             return x - (1 - mu) / (x + mu) ** 2 + mu / (x - 1 + mu) ** 2
 
-        # L2点 (在次天体外侧)
+        # L2点：位于次天体外侧，引力与离心力平衡（两体同侧）
         def f2(x):
             return x - (1 - mu) / (x + mu) ** 2 - mu / (x - 1 + mu) ** 2
 
-        # L3点 (在主天体外侧)
+        # L3点：位于主天体外侧（远离次天体一侧）
         def f3(x):
             return x + (1 - mu) / (x + mu) ** 2 + mu / (x - 1 + mu) ** 2
 
-        # 初始猜测值
-        L1_guess = 1 - mu ** (1 / 3)
-        L2_guess = 1 + mu ** (1 / 3)
-        L3_guess = -1 - (5 / 12) * mu
+        # 初始猜测值：基于级数展开的近似解
+        L1_guess = 1 - mu ** (1 / 3)  # L1 约在 1 - μ^(1/3) 处
+        L2_guess = 1 + mu ** (1 / 3)  # L2 约在 1 + μ^(1/3) 处
+        L3_guess = -1 - (5 / 12) * mu  # L3 约在 -1 - 5μ/12 处
 
+        # 使用 scipy.fsolve 迭代求解非线性方程
         L1_x = fsolve(f1, L1_guess)[0]
         L2_x = fsolve(f2, L2_guess)[0]
         L3_x = fsolve(f3, L3_guess)[0]
 
-        # L4和L5点 (等边三角形点)
+        # L4和L5点：等边三角形点，解析解精确
+        # 位于与两天体构成等边三角形的顶点
         L4_x = 0.5 - mu
-        L4_y = np.sqrt(3) / 2
+        L4_y = np.sqrt(3) / 2  # 上三角（北）
 
         L5_x = 0.5 - mu
-        L5_y = -np.sqrt(3) / 2
+        L5_y = -np.sqrt(3) / 2  # 下三角（南）
 
         self.L1 = np.array([L1_x, 0.0, 0.0])
         self.L2 = np.array([L2_x, 0.0, 0.0])

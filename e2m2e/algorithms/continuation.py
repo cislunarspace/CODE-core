@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 import numpy as np
-from enum import Enum
 from typing import List, Optional, Dict, Tuple, Any
 from .differential_correction import (
     DifferentialCorrection,
@@ -172,13 +171,6 @@ def compute_tangent_vector(dF: np.ndarray) -> np.ndarray:
     return tangent
 
 
-class ContinuationMethod(Enum):
-    """延拓方法枚举"""
-
-    NATURAL = "natural"
-    PSEUDO_ARCLENGTH = "pseudo_arclength"
-
-
 class Continuation:
     """轨道族延拓
 
@@ -219,7 +211,6 @@ class Continuation:
             self.continuation_parameter = None
         self.step_size = step or self.DEFAULT_STEP_SIZE
         self.initial_step_size = self.step_size
-        self.method = ContinuationMethod.NATURAL
 
         # 轨道族
         self.family_orbits = []

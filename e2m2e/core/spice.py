@@ -289,6 +289,7 @@ class SPICEManager:
         name_upper = body.upper()
         if name_upper in _GM_VALUES:
             return _GM_VALUES[name_upper]
+        # 缓存未命中时，通过 NAIF ID 从 SPICE 内核实时读取
         body_id = _NAIF_IDS.get(name_upper, body)
         vals = spiceypy.bodvrd(str(body_id), "GM", 1)
         return float(vals[1][0])

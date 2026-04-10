@@ -55,35 +55,21 @@ from .ephemeris_system import EphemerisSystem
 class EphemerisDynamics(Dynamics):
     """星历 N 体动力学类，提供运动方程、STM 变分方程与轨道传播功能。
 
-    Parameters
-    ----------
-    system : EphemerisSystem
-        星历系统配置，包含天体列表、SPICE 内核接口、参考系与原点天体等信息。
+    Args:
+        system: 星历系统配置，包含天体列表、SPICE 内核接口、参考系与原点天体等信息。
 
-    Attributes
-    ----------
-    integrator : str
-        SciPy 积分器名称，默认 ``"DOP853"``（8 阶 Runge-Kutta）。
-    rtol : float
-        相对积分容差。
-    atol : float
-        绝对积分容差。
-    max_step : float
-        积分器最大步长（秒）。
-    last_trajectory : tuple or None
-        最近一次传播的时间与状态轨迹 ``(t, states)``。
-    last_stm : ndarray or None
-        最近一次含 STM 传播的状态转移矩阵序列，形状 ``(6, 6, n_times)``。
-    cross_section_tolerance : float
-        Poincaré 截面穿越检测容差。
-    last_crossing : dict or None
-        最近一次检测到的截面穿越信息。
-    jacobi_history : list
-        Jacobi 常数历史记录（用于能量守恒检验）。
-    jacobi_error : float
-        Jacobi 常数最大偏差。
-    initialized : bool
-        实例是否已完成初始化的标志。
+    Attributes:
+        integrator: SciPy 积分器名称，默认 ``"DOP853"``（8 阶 Runge-Kutta）。
+        rtol: 相对积分容差。
+        atol: 绝对积分容差。
+        max_step: 积分器最大步长（秒）。
+        last_trajectory: 最近一次传播的时间与状态轨迹 ``(t, states)``。
+        last_stm: 最近一次含 STM 传播的状态转移矩阵序列，形状 ``(6, 6, n_times)``。
+        cross_section_tolerance: Poincaré 截面穿越检测容差。
+        last_crossing: 最近一次检测到的截面穿越信息。
+        jacobi_history: Jacobi 常数历史记录（用于能量守恒检验）。
+        jacobi_error: Jacobi 常数最大偏差。
+        initialized: 实例是否已完成初始化的标志。
     """
 
     STM_DIMENSION = 42
@@ -112,17 +98,12 @@ class EphemerisDynamics(Dynamics):
         - **摄动天体**：第三体摄动 ``-μᵢ [(r-rᵢ)/|r-rᵢ|³ + rᵢ/|rᵢ|³]``，
           第二项为间接项（扣除摄动天体对原点的引力）。
 
-        Parameters
-        ----------
-        t : float
-            历元时刻（ephemeris seconds past J2000），用于查询天体星历位置。
-        state : ndarray
-            航天器状态向量，形状 ``(6,)``，前 3 个元素为位置 [km]，
-            后 3 个元素为速度 [km/s]。
+        Args:
+            t: 历元时刻（ephemeris seconds past J2000），用于查询天体星历位置。
+            state: 航天器状态向量，形状 ``(6,)``，前 3 个元素为位置 [km]，
+                后 3 个元素为速度 [km/s]。
 
-        Returns
-        -------
-        ndarray
+        Returns:
             状态导数向量，形状 ``(6,)``，即 ``[v, a]``。
         """
         r_sc = state[:3]
@@ -165,16 +146,11 @@ class EphemerisDynamics(Dynamics):
 
             ∂a/∂r = -μ (I₃ / |r|³ - 3 r⊗r / |r|⁵)
 
-        Parameters
-        ----------
-        t : float
-            历元时刻（ephemeris seconds past J2000）。
-        augmented_state : ndarray
-            增广状态向量，形状 ``(42,)``。
+        Args:
+            t: 历元时刻（ephemeris seconds past J2000）。
+            augmented_state: 增广状态向量，形状 ``(42,)``。
 
-        Returns
-        -------
-        ndarray
+        Returns:
             增广状态导数向量，形状 ``(42,)``，即 ``[v, a, dΦ/dt_flat]``。
         """
         state = augmented_state[:6]
@@ -233,32 +209,22 @@ class EphemerisDynamics(Dynamics):
 
         使用 SciPy 的 :func:`solve_ivp` 进行数值积分，支持两种模式：
 
-        1. **纯状态传播** (``with_stm=False``)：
-           仅积分 6 维状态向量 ``[r, v]``。
+        1. **纯状态传播** (``with_stm=False``)：仅积分 6 维状态向量 ``[r, v]``。
+        2. **含 STM 传播** (``with_stm=True``)：积分 42 维增广状态，
+           同时求解状态转移矩阵，STM 初始值设为 6×6 单位矩阵。
 
-        2. **含 STM 传播** (``with_stm=True``)：
-           积分 42 维增广状态 ``[r, v, Φ_flat]``，同时求解状态转移矩阵。
-           STM 初始值设为 6×6 单位矩阵。
+        Args:
+            initial_state: 初始状态向量，形状 ``(6,)``，``[x, y, z, vx, vy, vz]``。
+            t_span: 积分时间区间 ``(t0, tf)``，单位为 ephemeris seconds。
+            t_eval: 指定输出时间点序列。若为 ``None``，由积分器自动选择。
+            with_stm: 是否同时求解状态转移矩阵。
+            with_jacobi: 是否沿轨迹逐点计算 Jacobi 常数。
 
-        Parameters
-        ----------
-        initial_state : array_like
-            初始状态向量，形状 ``(6,)``，``[x, y, z, vx, vy, vz]``。
-        t_span : tuple of float
-            积分时间区间 ``(t0, tf)``，单位为 ephemeris seconds。
-        t_eval : array_like, optional
-            指定输出时间点序列。若为 ``None``，由积分器自动选择。
-        with_stm : bool, default False
-            是否同时求解状态转移矩阵。
-        with_jacobi : bool, default False
-            是否沿轨迹逐点计算 Jacobi 常数。
-
-        Returns
-        -------
-        dict
-            - ``"time"`` : ndarray, 形状 ``(n_times,)`` — 时间序列。
-            - ``"states"`` : ndarray, 形状 ``(6, n_times)`` — 状态序列。
-            - ``"stm"`` : ndarray, 形状 ``(6, 6, n_times)`` — 仅在 ``with_stm=True`` 时返回。
+        Returns:
+            包含传播结果的字典：
+            - ``"time"``: 时间序列，形状 ``(n_times,)``。
+            - ``"states"``: 状态序列，形状 ``(6, n_times)``。
+            - ``"stm"``: 状态转移矩阵序列，形状 ``(6, 6, n_times)``（仅 ``with_stm=True``）。
         """
         # 根据传播时长自适应调整最大步长，防止短弧段步长过大
         span_duration = abs(t_span[1] - t_span[0])

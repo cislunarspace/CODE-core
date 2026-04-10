@@ -19,19 +19,31 @@ from ..core.dynamics import CR3BP_Dynamics
 
 
 def _compute_gamma(mu: float, L: int) -> float:
-    """求解平动点到次天体的距离参数 gamma
+    """求解平动点到次天体的距离参数 gamma。
 
-    通过求解五次方程得到精确值。
+    通过求解共线平动点位置的五次方程（由引力与离心力平衡条件导出），
+    使用 Brent 方法得到精确的 gamma 值。gamma 定义为次天体到平动点的距离，
+    以两个主天体间的距离（=1，归一化单位）为参考。
+
+    对于 L1（位于两天体之间）和 L2（位于次天体外侧），五次方程的系数不同。
 
     Args:
-        mu: 质量比
-        L: 拉格朗日点 (1=L1, 2=L2)
+        mu: 三体系统质量比 mu = m2 / (m1 + m2)，m2 为次天体质量。
+        L: 拉格朗日点编号（1=L1, 2=L2）。
 
     Returns:
-        gamma 值（始终为正数）
+        float: gamma 值（始终为正数），表示次天体到平动点的归一化距离。
+
+    Raises:
+        ValueError: 当 L 不为 1 或 2 时。
+
+    References:
+        Richardson, D. L. (1980). Analytic construction of periodic orbits
+        about the collinear points. Celestial Mechanics, 22(3), 303-320.
     """
     if L == 1:
-        # L1: gamma^5 - (3-mu)*gamma^4 + (3-2mu)*gamma^3 - mu*gamma^2 + 2*mu*gamma - mu = 0
+        # L1 五次方程：由 L1 处引力加速度与旋转坐标系离心加速度平衡条件导出
+        # gamma^5 - (3-mu)*gamma^4 + (3-2mu)*gamma^3 - mu*gamma^2 + 2*mu*gamma - mu = 0
         def eq(g):
             return (
                 g**5
@@ -42,7 +54,8 @@ def _compute_gamma(mu: float, L: int) -> float:
                 - mu
             )
     else:
-        # L2: gamma^5 + (3-mu)*gamma^4 + (3-2mu)*gamma^3 - mu*gamma^2 - 2*mu*gamma - mu = 0
+        # L2 五次方程：由 L2 处引力加速度与旋转坐标系离心加速度平衡条件导出
+        # gamma^5 + (3-mu)*gamma^4 + (3-2mu)*gamma^3 - mu*gamma^2 - 2*mu*gamma - mu = 0
         def eq(g):
             return (
                 g**5
@@ -53,86 +66,132 @@ def _compute_gamma(mu: float, L: int) -> float:
                 - mu
             )
 
-    g0 = (mu / 3) ** (1 / 3)  # Hill 球近似作为初始猜测
+    # Hill 球近似 (mu/3)^{1/3} 作为初始猜测，用于确定 Brent 方法的搜索区间
+    g0 = (mu / 3) ** (1 / 3)
+    # Brent 方法在 [g0/2, 2*g0] 区间上求解，保证收敛到物理上有意义的根
     return brentq(eq, g0 * 0.5, g0 * 2.0)
 
 
 def _compute_omega_p(gamma: float, mu: float, L: int) -> float:
-    """计算平动点处的面内振荡频率 omega_p
+    """计算平动点处的面内振荡频率 omega_p。
+
+    在平动点附近线性化 CR3BP 方程后，面内运动 (x-y) 的特征方程为：
+    s^4 + (2 - c2)*s^2 + (1 + 2*c2)*(1 - c2) = 0
+    其中 c2 是有效引力势在平动点处的二阶偏导数（Legendre 系数）。
+    该特征方程有两对纯虚根 s = ±i*omega_p 和 s = ±i*omega_v，
+    omega_p 对应面内振荡（较小的频率），omega_v 对应纵向振荡（较大的频率）。
+    这里取较小的频率 omega_p 作为 Halo 轨道三阶近似中的基本频率。
 
     Args:
-        gamma: 距离参数
-        mu: 质量比
-        L: 拉格朗日点编号
+        gamma: 距离参数（次天体到平动点的归一化距离，始终取正值）。
+        mu: 质量比。
+        L: 拉格朗日点编号（1=L1, 2=L2）。
 
     Returns:
-        omega_p（面内振荡频率）
+        float: omega_p，面内振荡频率（归一化角速度单位）。
     """
+    # Legendre 系数 c2：来自有效引力势 U 的二阶展开
+    # c2 = (1-mu)/d1^3 + mu/d2^3，其中 d1、d2 分别为主天体和次天体到平动点的距离
     if L == 1:
         c2 = (1 - mu) / abs(1 - gamma) ** 3 + mu / gamma**3
     else:
         c2 = (1 - mu) / abs(1 + gamma) ** 3 + mu / gamma**3
 
-    # 特征方程: s^4 + (2-c2)*s^2 + (1+2*c2)*(1-c2) = 0
+    # 面内特征方程: s^4 + (2-c2)*s^2 + (1+2*c2)*(1-c2) = 0
+    # 令 s^2 = S，化为二次方程: S^2 + a*S + b = 0
     a = 2 - c2
     b = (1 + 2 * c2) * (1 - c2)
     disc = a**2 - 4 * b
-    # 虚特征值对应振荡运动: s^2 = (-a - sqrt(disc))/2 < 0
+    # 取负根 S_minus = (-a - sqrt(disc))/2 < 0，对应纯虚特征值
+    # 因为 S_minus < 0，所以 s = ±sqrt(-S_minus) 为纯虚数，对应面内振荡
     s2_minus = (-a - np.sqrt(disc)) / 2
     return np.sqrt(-s2_minus)
 
 
 def compute_halo_coefficients(mu: float, L: int) -> Dict[str, float]:
-    """计算Halo轨道三阶近似的系数
+    """计算 Halo 轨道 Richardson 三阶近似所需的全部系数。
+
+    根据 Richardson (1980) 的三阶解析构造方法，在共线平动点附近将 CR3BP 运动方程
+    展开为非线性扰动级数。三阶近似将轨道位移分解为面内（u-v）和面外（w）分量，
+    用 Fourier 级数表示，包含基频 omega_p 的各阶谐波。
+
+    核心系数包括：
+    - a_ij: u 方向（沿主天体连线）的振幅修正系数
+    - b_ij: v 方向（面内垂直方向）的振幅修正系数
+    - d_ij: w 方向（面外方向）的振幅修正系数
+    - k, delta: 与平动点位置相关的符号因子
+    - kappa1, kappa2: 频率修正系数（用于计算非线性周期）
 
     Args:
-        mu: 质量比
-        L: 拉格朗日点 (1=L1, 2=L2)
+        mu: 质量比 mu = m2 / (m1 + m2)。
+        L: 拉格朗日点编号（1=L1, 2=L2）。
 
     Returns:
-        包含所有系数的字典
+        Dict[str, float]: 包含所有 Richardson 三阶近似系数的字典，键包括：
+            - gamma: 次天体到平动点的距离（L2 时取负值）
+            - omega_p: 面内振荡基频
+            - c1, c2, c3: Legendre 系数（有效势展开的前三阶）
+            - a21~a31, b21~b31, d21~d32: 各方向振幅修正系数
+            - k, delta: 符号因子
+            - l1~l3, kappa1, kappa2: 频率和周期修正系数
 
-    Reference:
+    Raises:
+        ValueError: 当 L 不为 1 或 2 时。
+
+    References:
         Richardson, D. L. (1980). Analytic construction of periodic orbits
-        about the collinear points. Celestial Mechanics.
+        about the collinear points. Celestial Mechanics, 22(3), 303-320.
     """
     if L not in [1, 2]:
         raise ValueError(f"L必须是1或2，当前为{L}")
 
-    # 精确求解 gamma（次天体到平动点的距离）
+    # 精确求解 gamma（次天体到平动点的距离），通过五次方程的 Brent 法求解
     gamma = _compute_gamma(mu, L)
 
-    # L2 使用负值约定以匹配系数公式
+    # L2 使用负值约定以匹配 Richardson 公式中的符号约定
+    # （L1 的 gamma > 0，L2 的 gamma < 0，使得 x_L = 1 - mu - gamma 统一表达）
     if L == 2:
         gamma = -gamma
 
-    # 计算面内振荡频率（使用绝对值）
+    # 计算面内振荡频率 omega_p（使用 gamma 的绝对值）
     omega_p = _compute_omega_p(abs(gamma), mu, L)
 
     abs_gamma = abs(gamma)
+
+    # Legendre 系数：来自有效引力势在平动点处的 Taylor 展开
+    # c_n = (1/gamma^3) * [(-1)^n * (1-mu) * (gamma/(1∓gamma))^{n+1} + mu]
+    # 其中 ∓ 对应 L1/L2
     c1 = 1.0 - mu - (1 - 2 * mu) * abs_gamma**3 / (1 - abs_gamma) ** 3
     c2_c = (1 - mu) / (1 - abs_gamma) ** 3 + mu / abs_gamma**3 if L == 1 else (1 - mu) / (1 + abs_gamma) ** 3 + mu / abs_gamma**3
     c3 = 3 * mu * (2 - mu)
 
+    # Richardson 三阶近似系数（L1 和 L2 的公式不同，符号和分母略有差异）
+    # 下标含义：第一个数字表示阶数，第二个数字表示谐波阶次
+    # 例如 a21 = 二阶修正 × 一次谐波，a31 = 三阶修正 × 一次谐波
     if L == 1:
+        # u 方向修正系数（沿 x 轴，主天体连线方向）
         a21 = 1.0 / (2 * gamma)
         a22 = (3 * gamma + 1) / (4 * gamma**2)
         a23 = -(3 * gamma + 1) / (8 * gamma**3)
         a24 = -(3 * gamma - 1) / (8 * gamma**3)
         a31 = 1.0 / (8 * gamma**2)
 
+        # v 方向修正系数（面内垂直于 x 轴方向）
         b21 = (3 * gamma + 2) / (4 * gamma)
         b22 = (3 * gamma - 1) / (4 * gamma)
         b31 = 1.0 / (16 * gamma**2)
 
+        # w 方向修正系数（面外方向，z 轴）
         d21 = (3 * gamma + 1) / (4 * gamma**2)
         d31 = (3 * gamma + 2) / (32 * gamma**3)
         d32 = (3 * gamma - 1) / (32 * gamma**3)
 
+        # 符号因子：k 控制面内运动方向，delta 控制面外运动方向
         k = 1.0
         delta = -1.0
 
     else:
+        # L2 的系数公式（gamma 为负值，导致分母和分子中的符号变化）
         a21 = -1.0 / (2 * gamma)
         a22 = (3 * gamma - 1) / (4 * gamma**2)
         a23 = (3 * gamma - 1) / (8 * gamma**3)
@@ -150,6 +209,8 @@ def compute_halo_coefficients(mu: float, L: int) -> Dict[str, float]:
         k = -1.0
         delta = 1.0
 
+    # 频率修正系数：用于计算非线性效应对轨道周期的修正
+    # 周期公式 T = 2π / (omega_p + kappa1*Au^2 + kappa2*Aw^2)
     l1 = -1.0 / (2 * gamma)
     l2 = (3 * gamma**2 + 3 * gamma + 1) / (4 * gamma**2)
     l3 = (3 * gamma**2 + 9 * gamma + 4) / (32 * gamma**3)
