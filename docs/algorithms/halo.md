@@ -1,5 +1,61 @@
 # Halo 轨道生成与轨道族延拓
 
+> Halo 轨道是围绕 L1/L2 平动点的三维周期轨道。本页涵盖 Richardson 初值、微分修正、伪弧长延拓和命令行脚本。
+
+## 快速开始：从零生成一条 Halo 轨道
+
+```python
+import numpy as np
+from e2m2e.core import CR3BP_System, CR3BP_Dynamics
+from e2m2e.algorithms import DifferentialCorrection
+
+system = CR3BP_System.from_known_system("earth_moon")
+system.set_characteristic_scales(distance=384400, period=27.32*86400)
+system.compute_libration_points()
+dynamics = CR3BP_Dynamics(system)
+
+# Richardson 三阶近似提供初值
+from e2m2e.algorithms import compute_halo_initial_guess
+initial_state, t_half = compute_halo_initial_guess(
+    system=system, libration_point=1, amplitude_z=0.1
+)
+
+# 微分修正
+dc = DifferentialCorrection(dynamic=dynamics)
+dc.setup_halo_orbit_fixed_z0(z0=initial_state[2], libration_point=1)
+orbit, result = dc.iterate_correction(initial_state, t_half=t_half)
+
+print(f"周期: {orbit.period:.4f}, Jacobi: {orbit.jacobi_constant:.6f}")
+```
+
+## 快速开始：生成 Halo 轨道族
+
+```python
+from e2m2e.algorithms import Continuation
+
+dc = DifferentialCorrection(dynamic=dynamics)
+cont = Continuation(corrector=dc)
+
+# 生成种子轨道
+seed = cont.generate_halo_seed_orbit(
+    libration_point=1, amplitude_z=0.23, halo_class=0,
+)
+
+# 伪弧长延拓
+family = cont.halo_pseudo_arclength_continuation(
+    seed_orbit=seed,
+    n_orbits=10,
+    direction="both",
+    step_size=0.0045,
+    verbose=True,
+)
+
+family.save_to_file("output/halo_family.json")
+print(f"生成了 {len(family)} 条 Halo 轨道")
+```
+
+---
+
 **相关源码**：
 
 | 模块 | 路径 |
@@ -86,6 +142,6 @@ Halo 收敛结果会校验完整周期 \(T\) 的下限（避免 \(T\to 0\) 的�
 
 ## 另见
 
-- [轨道生成指南](../guides/orbit-generation.md) — 教程入口  
-- [延拓模块总述](continuation.md) — `Continuation` 类索引  
-- [后续开发路线图](../ways-of-work/plan/halo-roadmap_zh.md)
+- [轨道生成指南](../guides/orbit-generation.md) — 教程入口
+- [延拓模块总述](continuation.md) — `Continuation` 类索引
+- [微分修正](differential_correction.md) — 对称性配置详解

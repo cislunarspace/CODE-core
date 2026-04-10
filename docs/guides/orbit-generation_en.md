@@ -1,264 +1,182 @@
 # Orbit Generation Guide
 
-## Overview
+> From initial guess to converged periodic orbit, and on to a complete orbit family.
 
-This guide introduces how to generate various periodic orbits using E2M2E: DRO, Halo, Lyapunov, etc.
+## General Procedure
 
-## General Process
-
-The general steps for all orbit generation:
+All periodic orbit generation follows the same steps:
 
 ```python
 import numpy as np
-from e2m2e.core.system import CR3BP_System
-from e2m2e.core.dynamics import CR3BP_Dynamics
-from e2m2e.algorithms.differential_correction import DifferentialCorrection
+from e2m2e.core import CR3BP_System, CR3BP_Dynamics
+from e2m2e.algorithms import DifferentialCorrection
 
-# 1. Initialize system
+# 1. Create the system
 system = CR3BP_System.from_known_system("earth_moon")
 system.set_characteristic_scales(distance=384400, period=27.32*86400)
 system.compute_libration_points()
 
-# 2. Create dynamics model
+# 2. Create the dynamics model
 dynamics = CR3BP_Dynamics(system)
 
-# 3. Create differential corrector
-dc = DifferentialCorrection(dynamics)
-
-# 4. Configure and solve
-dc.setup_2D_symmetric_x_fixed_x0(x0=0.8)  # or other configurations
-orbit, result = dc.iterate_correction(initial_guess, t_half_guess)
+# 3. Create the corrector and select a symmetry configuration
+dc = DifferentialCorrection(dynamic=dynamics)
 ```
+
+The next step depends on the orbit type you want to design. Continue reading and choose the relevant section.
 
 ---
 
-## Distant Retrograde Orbit (DRO)
+## DRO (Distant Retrograde Orbit)
 
-### Theoretical Background
+A DRO is a large-amplitude retrograde orbit around the Moon, forming a teardrop shape in the rotating frame.
 
-DRO is a large-amplitude retrograde orbit around the Moon, appearing as a teardrop shape in the rotating frame. Its characteristics:
-- Symmetric about x-axis
-- Initial conditions: $[x_0, 0, 0, 0, \dot{y}_0, 0]$
-- Half-period conditions: $y=0$, $\dot{x}=0$
-
-### Generation Steps
+**Characteristics**: Symmetric about the x-axis, initial conditions $[x_0, 0, 0, 0, \dot{y}_0, 0]$, with $y=0, \dot{x}=0$ at half-period.
 
 ```python
-# Configure 2D symmetric x-axis fixed x0
 dc.setup_2D_symmetric_x_fixed_x0(x0=0.8)
 
-# Initial guess (near x0=0.8)
 initial_state = np.array([0.8, 0.0, 0.0, 0.0, 0.5, 0.0])
-t_half_guess = 1.6  # Half-period guess
+t_half_guess = 1.6
 
-# Iterate to correct
-orbit, result = dc.iterate_correction(initial_state, t_half_guess, verbose=True)
+orbit, result = dc.iterate_correction(initial_state, t_half=t_half_guess)
+print(f"Period: {orbit.period:.4f}, Jacobi: {orbit.jacobi_constant:.6f}")
 ```
 
-### Parameter Ranges
+### Parameter Range Reference
 
 | Parameter | Typical Range | Description |
-|-----------|---------------|-------------|
-| $x_0$ | 0.6 - 0.95 | Initial x coordinate (relative to L1/L2) |
+|-----------|--------------|-------------|
+| $x_0$ | 0.6 - 0.95 | Initial x-coordinate (relative to L1/L2) |
 | $\dot{y}_0$ | 0.3 - 0.8 | Initial y-direction velocity |
 | $T/2$ | 1.4 - 1.8 | Half-period (dimensionless) |
 
-### Complete Example
+### DRO with Fixed Period
+
+If you need to specify the period exactly, use `setup_2D_symmetric_x_fixed_t`:
 
 ```python
-def generate_dro(x0=0.8, y_dot_guess=0.5, t_half_guess=1.6):
-    """Generate DRO orbit"""
-    system = CR3BP_System.from_known_system("earth_moon")
-    system.compute_libration_points()
-    dynamics = CR3BP_Dynamics(system)
-    dc = DifferentialCorrection(dynamics)
-    
-    dc.setup_2D_symmetric_x_fixed_x0(x0=x0)
-    initial_state = np.array([x0, 0.0, 0.0, 0.0, y_dot_guess, 0.0])
-    
-    orbit, result = dc.iterate_correction(initial_state, t_half_guess)
-    return orbit, result, system
+dc.setup_2D_symmetric_x_fixed_t(t_half=1.6)
+# Here x0 and vy are automatically solved by the corrector
 ```
+
+-> For detailed differential correction configuration, see [Differential Correction](../algorithms/differential_correction_en.md)
 
 ---
 
-## Halo Orbit {#halo-orbit}
+## Halo Orbits
 
-### Theoretical Background
+Halo orbits are three-dimensional periodic orbits around the L1/L2 libration points.
 
-Halo orbits are three-dimensional periodic orbits around libration points (L1 or L2), appearing as distorted "figure-8" or horseshoe shapes.
-
-### 3D Symmetric Configuration
+### Generate with Richardson Initial Guess
 
 ```python
-# Configure 3D symmetric x-axis fixed x0
-dc.setup_3D_symmetric_x_fixed_x0(x0=0.8)
+from e2m2e.algorithms import compute_halo_initial_guess
 
-# Initial guess (with z-direction component)
-initial_state = np.array([0.8, 0.0, 0.1, 0.0, 0.5, 0.0])
-t_half_guess = 1.6
+initial_state, t_half = compute_halo_initial_guess(
+    system=system, libration_point=1, amplitude_z=0.1
+)
 
-# Iterate to correct
-orbit, result = dc.iterate_correction(initial_state, t_half_guess, verbose=True)
+dc.setup_halo_orbit_fixed_z0(z0=initial_state[2], libration_point=1)
+orbit, result = dc.iterate_correction(initial_state, t_half=t_half)
 ```
 
-### L1 vs L2 Halo
+### Generate a Halo Orbit Family
+
+```python
+from e2m2e.algorithms import Continuation
+
+cont = Continuation(corrector=dc)
+seed = cont.generate_halo_seed_orbit(
+    libration_point=1, amplitude_z=0.23, halo_class=0,
+)
+family = cont.halo_pseudo_arclength_continuation(
+    seed_orbit=seed, n_orbits=10, direction="both",
+    step_size=0.0045, verbose=True,
+)
+```
+
+### L1 vs L2
 
 | Property | L1 Halo | L2 Halo |
 |----------|---------|---------|
 | Location | Near L1 point | Near L2 point |
 | $x_0$ range | $0.8 < x_0 < 1.0$ | $1.0 < x_0 < 1.2$ |
-| Amplitude | Usually smaller | Usually larger |
+| Amplitude | Generally smaller | Generally larger |
 
-```python
-# L1 Halo
-L1_x0 = system.L1[0] + 0.01  # Right of L1
-dc.setup_3D_symmetric_x_fixed_x0(x0=L1_x0)
-
-# L2 Halo
-L2_x0 = system.L2[0] - 0.01  # Left of L2
-dc.setup_3D_symmetric_x_fixed_x0(x0=L2_x0)
-```
+-> For detailed Halo documentation (Richardson initial guess, PAL implementation, MATLAB comparison, command-line scripts), see [Halo Orbits](../algorithms/halo_en.md)
 
 ---
 
-## Lyapunov Orbit
+## Lyapunov Orbits
 
-### Theoretical Background
-
-Lyapunov orbits are two-dimensional periodic orbits in the libration point plane (z=0), appearing as elliptical or banana-shaped.
-
-### Configuration
+Lyapunov orbits are two-dimensional periodic orbits in the libration-point plane ($z=0$).
 
 ```python
-# Use 2D symmetric configuration
-dc.setup_2D_symmetric_x_fixed_x0(x0=0.8)
+dc.setup_2D_symmetric_x_fixed_x0(x0=system.L1[0] + 0.01)
 
-# Initial guess
-initial_state = np.array([0.8, 0.0, 0.0, 0.0, 0.3, 0.0])
-t_half_guess = 1.5
+initial_state = np.array([system.L1[0] + 0.01, 0.0, 0.0, 0.0, 0.3, 0.0])
+orbit, result = dc.iterate_correction(initial_state, t_half=1.5)
 ```
 
-### Difference from DRO
-
-| Property | Lyapunov | DRO |
-|----------|----------|-----|
-| Location | Near L1/L2 | Near Moon |
-| z amplitude | 0 | > 0 (3D) |
-| Period | Shorter | Longer |
+The difference between Lyapunov and DRO: Lyapunov orbits are near L1/L2 with shorter periods; DRO orbits are near the Moon with longer periods.
 
 ---
 
 ## Orbit Family Continuation
 
-### Natural Parameter Continuation
+Starting from a converged seed orbit, generate a family of orbits:
 
 ```python
-from e2m2e.algorithms.continuation import Continuation
+from e2m2e.algorithms import Continuation
 
-# Create continuer
-continuation = Continuation(dc, step=0.005)
+cont = Continuation(corrector=dc, step=0.01)
 
-# Continue from seed orbit
-family = continuation.natural_continuation(
-    seed_orbit=seed_orbit,
-    param_range=(0.6, 0.95),  # x0 range
-    step_size=0.005,
-    verbose=True
+# Natural continuation (use when parameters change monotonically)
+family = cont.natural_continuation(
+    seed_orbit=orbit,
+    param_range=(0.8, 0.95),
+    step_size=0.01,
 )
 ```
 
-### Bidirectional Continuation
-
-```python
-# Forward continuation (increasing x0)
-family_forward = continuation.natural_continuation(
-    seed_orbit=seed_orbit,
-    param_range=(seed_x0, 0.95),
-    step_size=0.005
-)
-
-# Backward continuation (decreasing x0)
-family_backward = continuation.natural_continuation(
-    seed_orbit=seed_orbit,
-    param_range=(seed_x0, 0.6),
-    step_size=-0.005  # Negative step size
-)
-```
-
-### Pseudo-Arclength Continuation (Bypassing Turning Points)
-
-```python
-# Use when natural continuation fails at turning points
-family = continuation.pseudo_arclength_continuation(
-    seed_state=seed_state,
-    seed_t_half=seed_t_half,
-    n_orbits=100,
-    verbose=True
-)
-```
+**When to use natural continuation vs pseudo-arclength continuation**, along with parameter details, see [Orbit Family Continuation](../algorithms/continuation_en.md).
 
 ---
 
 ## Save and Load
 
-### Saving Orbit Family
-
 ```python
-# Save to JSON file
+# Save
 family.save_to_file("output/dro_family.json")
-
-# Or single orbit
 orbit.save_to_file("output/dro_single.json")
-```
 
-### Loading Orbit Family
-
-```python
+# Load
 from e2m2e.core.orbit import OrbitFamily, Orbit
-
-# Load orbit family
-family = OrbitFamily.load_from_file("output/dro_family.json")
-
-# Load single orbit
-orbit = Orbit.load_from_file("output/dro_single.json")
+family = OrbitFamily.load_from_file("output/dro_family.json", system=system)
+orbit = Orbit.load_from_file("output/dro_single.json", system=system)
 ```
 
 ---
 
-## Frequently Asked Questions
+## Troubleshooting
 
-### 1. How to Determine Initial Guess?
+### Initial Value Does Not Converge
 
-**Rules of thumb**:
-- $x_0$: Start from target region center, e.g., L1+0.01
-- $\dot{y}_0$: Start from 0.5, adjust based on error
-- $T/2$: Start from 1.5, adjust based on period estimate
+- First propagate the initial value and check whether it is close to periodic ($y$ and $\dot{x}$ should be near 0 at half-period)
+- Start from small amplitude / short period and gradually continue
+- For Halo orbits, use `compute_halo_initial_guess` rather than manual construction
 
-**Debugging tips**:
-- First propagate the initial guess to check if it's close to periodic
-- Observe final errors in $y$ and $\dot{x}$
+### Large-Amplitude Orbits Needed
 
-### 2. What if Iteration Doesn't Converge?
-
-**Check items**:
-1. Is the initial guess in a reasonable range?
-2. Is the integrator tolerance sufficient (currently 1e-12)?
-3. Try different initial guesses
-
-**Adaptive damping**:
-The algorithm has built-in adaptive damping; if it still doesn't converge, manually reduce the step size.
-
-### 3. How to Generate Large-Amplitude Orbits?
-
-**Strategy**:
-1. Start from small-amplitude orbits
-2. Use pseudo-arclength continuation to pass through turning points
-3. Gradually increase amplitude
+Start from a small-amplitude seed and use the [continuation algorithm](../algorithms/continuation_en.md) to gradually increase the amplitude. Natural continuation will fail at turning points of the family curve; switch to pseudo-arclength continuation at that point.
 
 ---
 
-## References
+## Reference
 
-- See [API Reference - DifferentialCorrection](../reference/api-reference_en.md#21-differentialcorrection)
-- See [Algorithm Reference - Orbit Family Continuation](../reference/algorithms_en.md#5-orbit-family-continuation-algorithm)
+- [Differential Correction](../algorithms/differential_correction_en.md) — Symmetry configuration selection, convergence troubleshooting
+- [Orbit Family Continuation](../algorithms/continuation_en.md) — Natural vs pseudo-arclength continuation
+- [Halo Orbits](../algorithms/halo_en.md) — Richardson initial guess, PAL, MATLAB comparison
+- [Stability Analysis](../algorithms/stability_en.md) — Floquet analysis, bifurcation detection
+- [Visualization Guide](visualization-guide_en.md) — Orbit family and transfer trajectory visualization

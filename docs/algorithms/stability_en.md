@@ -1,59 +1,108 @@
-# StabilityAnalysis
+# Stability Analysis: StabilityAnalysis
 
-**File**: `e2m2e/algorithms/stability.py`
+> **File**: `e2m2e/algorithms/stability.py`
 
-**Class Signature**:
+Stability analysis uses Floquet multipliers to determine the local stability of periodic orbits and detect bifurcation points. This is a key tool for understanding the topological structure of orbit families.
+
+## How to Determine Whether an Orbit Is Stable
+
 ```python
-class StabilityAnalysis:
-    """Orbit stability analysis"""
+from e2m2e.core import CR3BP_System, CR3BP_Dynamics, Orbit
+from e2m2e.algorithms import StabilityAnalysis
+
+system = CR3BP_System.from_known_system("earth_moon")
+dynamics = CR3BP_Dynamics(system)
+
+# Assume orbit is an existing periodic orbit
+analyzer = StabilityAnalysis(orbit=orbit, dynamics=dynamics)
+result = analyzer.analyze()
+
+print(f"Stability type: {result.stability_type}")
+print(f"Max multiplier magnitude: {result.max_multiplier_magnitude:.6f}")
 ```
 
-## Floquet Theory
+**How to interpret**:
 
-For a periodic orbit $\mathbf{x}(t)$, small perturbations nearby satisfy:
-$$\Delta \dot{\mathbf{x}}(t) = \mathbf{A}(t) \Delta \mathbf{x}(t)$$
+- Max multiplier magnitude $\approx 1.0$: orbit is stable (multipliers on the unit circle)
+- Max multiplier magnitude $> 1.0$: orbit is unstable (exponential divergence direction exists)
+- Multiplier exactly crossing the unit circle: possible bifurcation
 
-Where $\mathbf{A}(t)$ is the state transition matrix, periodic: $\mathbf{A}(t+T) = \mathbf{A}(t)$.
+## How to Find Bifurcation Points in an Orbit Family
 
-### Floquet Multipliers
-$$\boldsymbol{\Phi}(T) \mathbf{v} = \lambda \mathbf{v}$$
+Bifurcation points are "turning points" of the orbit family -- at these points, the topological structure of the orbits changes (e.g., a planar orbit bifurcates into a 3D orbit).
 
-$\boldsymbol{\Phi}(T)$ is the monodromy matrix, $\lambda$ is the Floquet multiplier.
+```python
+from e2m2e.algorithms import StabilityAnalysis, BifurcationType
 
-## Stability Classification
+# Analyze stability for each orbit in the family
+for orbit in family:
+    analyzer = StabilityAnalysis(orbit=orbit, dynamics=dynamics)
+    result = analyzer.analyze()
 
-| Stability Type | Multiplier Characteristics | Orbit Property |
-|----------------|---------------------------|----------------|
-| Stable | All $\|\lambda\| = 1$ | Lyapunov stable |
-| Unstable | Exists $\|\lambda\| > 1$ | Exponential divergence |
-| Elliptic | Multipliers on unit circle | KAM applicable |
-| Parabolic | Multipliers $= 1$ | Critical case |
+    if result.bifurcation_type != BifurcationType.NONE:
+        print(f"Jacobi={orbit.jacobi_constant:.4f}: detected {result.bifurcation_type}")
+```
 
-## Core Methods
+### Common Bifurcation Types
+
+| Bifurcation Type | Physical Meaning | Impact on Continuation |
+|-----------------|------------------|----------------------|
+| `SADDLE_NODE` | Saddle-node bifurcation: endpoint of the family curve | Continuation terminates here; change direction |
+| `PERIOD_DOUBLING` | Period-doubling bifurcation: period doubles | Produces a new period-doubled family |
+| `PITCHFORK` | Pitchfork bifurcation: symmetry breaking | Produces two symmetric new families |
+| `TORUS` | Torus bifurcation: multipliers leave the unit circle | Produces quasi-periodic motion |
+
+### Stability Type Quick Reference
+
+| Type | Meaning |
+|------|---------|
+| `STABLE` | All multipliers on the unit circle, Lyapunov stable |
+| `UNSTABLE` | Multipliers exist outside the unit circle |
+| `HYPERBOLIC` | Hyperbolic: multipliers not on the unit circle |
+| `ELLIPTIC` | Elliptic: all multipliers on the unit circle |
+| `MARGINALLY_STABLE` | Marginally stable |
+| `PARABOLIC` | Parabolic: multipliers exactly equal to 1 |
+
+## Batch Stability Computation
+
+Batch-compute stability for an orbit family (the visualization module provides a parallel version):
+
+```python
+from e2m2e.visualization import compute_stability_for_family
+
+stability_values = compute_stability_for_family(family, system)
+# Returns the max multiplier magnitude for each orbit
+```
+
+See [Visualization Guide](../guides/visualization-guide_en.md#stability-computation) for details.
+
+## API Quick Reference
 
 | Method | Description |
 |--------|-------------|
-| `compute_floquet_multipliers(orbit)` | Compute Floquet multipliers |
-| `classify_stability(multipliers)` | Classify stability |
-| `compute_stability_index(multipliers)` | Compute stability index |
-| `analyze_lyapunov(orbit, dt, n_orbits)` | Lyapunov exponent analysis |
+| `analyze()` | Full analysis: stability type + bifurcation detection |
+| `compute_stability_index()` | Compute stability index (max multiplier magnitude) |
+| `classify_stability()` | Classify stability type |
+| `detect_bifurcation()` | Detect bifurcation type |
 
-## Stability Index
+For the full API documentation, see [API Reference](../reference/api-reference_en.md).
 
-$$\nu = \frac{1}{n} \sum_{i=1}^{n} \ln |\lambda_i|$$
+## Mathematical Background
 
-Where $\lambda_i$ are Floquet multipliers.
+### Floquet Theory
 
-## Usage Example
+For a periodic orbit $\mathbf{x}(t)$, small perturbations nearby satisfy:
 
-```python
-from e2m2e.algorithms.stability import StabilityAnalysis
+$$\Delta \dot{\mathbf{x}}(t) = \mathbf{A}(t) \Delta \mathbf{x}(t)$$
 
-analyzer = StabilityAnalysis(system, dynamics)
+where $\mathbf{A}(t)$ is a periodic coefficient matrix. The eigenvalues of the Monodromy matrix $\boldsymbol{\Phi}(T)$ are the Floquet multipliers:
 
-# Analyze orbit stability
-multipliers = analyzer.compute_floquet_multipliers(orbit)
-stability_type, index = analyzer.classify_stability(multipliers)
+$$\boldsymbol{\Phi}(T) \mathbf{v} = \lambda \mathbf{v}$$
 
-print(f"Stability: {stability_type}, Index: {index}")
-```
+Multipliers inside/outside/on the unit circle correspond to stable/unstable/critical states, respectively.
+
+### Stability Index
+
+$$\nu = \max_i |\lambda_i|$$
+
+where $\lambda_i$ are the Floquet multipliers. $\nu > 1$ indicates instability.

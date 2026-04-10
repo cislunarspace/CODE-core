@@ -1,123 +1,116 @@
-# E2M2E Documentation
+# E2M2E — Cislunar Transfer Orbit Design Library
 
-> Complete documentation for the Earth-to-Moon-to-Earth (E2M2E) orbital mechanics library
+An orbital mechanics toolkit based on the Circular Restricted Three-Body Problem (CR3BP) for designing periodic orbits and transfer trajectories in the Earth-Moon space.
 
-## Documentation Structure
+## Get Started in 30 Seconds
 
+```bash
+pip install e2m2e
 ```
-docs/
-├── index.md              # This file (documentation index)
-├── guides/               # User guides
-│   ├── system-overview.md    # System architecture and design
-│   ├── orbit-generation.md  # Orbit generation tutorial
-│   ├── visualization-guide.md # Visualization tutorial
-│   └── release.md            # PyPI release guide
-├── core/                 # Core modules
-│   ├── system.md         # CR3BP_System - System parameters
-│   ├── dynamics.md       # CR3BP_Dynamics - Dynamics
-│   ├── orbit.md          # Orbit, OrbitFamily - Orbits
-│   └── coordinate.md     # CoordinateTransformation - Coordinate transforms
-├── algorithms/           # Algorithm modules
-│   ├── continuation.md       # Continuation method
-│   ├── halo.md               # Halo orbit & pseudo-arclength continuation
-│   ├── differential_correction.md  # Differential correction
-│   └── stability.md          # Stability analysis
-├── visualization/       # Visualization module
-│   └── plotting.md           # Plotting features (backward-compat)
-└── reference/           # Technical reference
-    ├── api-reference.md     # Complete API documentation
-    └── algorithms.md        # Algorithm technical details
-```
-
-## Quick Navigation
-
-### User Guides (guides)
-
-| Document | Description |
-|----------|-------------|
-| [System Overview](guides/system-overview.md) | Architecture design, module responsibilities, data flow, typical workflows |
-| [Orbit Generation](guides/orbit-generation.md) | DRO, Halo, Lissajous orbit generation tutorials |
-| [Visualization Guide](guides/visualization-guide.md) | Plotting features, 2D/3D visualization |
-| [Release Guide](guides/release.md) | PyPI release process, version management |
-
-### Core Modules (core)
-
-| Class/Module | File | Description |
-|--------------|------|-------------|
-| `System` | [core/system.md](core/system.md) | Base class for celestial system |
-| `CR3BP_System` | [core/system.md](core/system.md) | System parameters and libration point calculation |
-| `Dynamics` | [core/dynamics.md](core/dynamics.md) | Base class for dynamics |
-| `CR3BP_Dynamics` | [core/dynamics.md](core/dynamics.md) | Equations of motion and numerical integration |
-| `Orbit` | [core/orbit.md](core/orbit.md) | Orbit data management |
-| `OrbitFamily` | [core/orbit.md](core/orbit.md) | Orbit family management |
-| `CoordinateTransformation` | [core/coordinate.md](core/coordinate.md) | Coordinate system transforms |
-
-### Algorithm Modules (algorithms)
-
-| Class/Module | File | Description |
-|--------------|------|-------------|
-| `Continuation` | [algorithms/continuation.md](algorithms/continuation.md) | Natural / pseudo-arclength continuation |
-| Halo / PAL orbit family | [algorithms/halo.md](algorithms/halo.md) | Halo initial guess, PAL continuation, scripts vs MATLAB |
-| `DifferentialCorrection` | [algorithms/differential_correction.md](algorithms/differential_correction.md) | Periodic orbit correction |
-| `StabilityAnalysis` | [algorithms/stability.md](algorithms/stability.md) | Floquet stability analysis |
-
-### Visualization Module (visualization)
-
-| Class/Function | File | Description |
-|----------------|------|-------------|
-| `plotting` module | [visualization/plotting.md](visualization/plotting.md) | Plotting features (backward-compatible) |
-
-### Transfer Module (transfer)
-
-| Class/Function | File | Description |
-|----------------|------|-------------|
-| `DROTransferSearch` | [reference/api-reference.md](reference/api-reference.md) | DRO-to-RO transfer grid search |
-| `DROTRONLPOptimizer` | [reference/api-reference.md](reference/api-reference.md) | Two-impulse transfer NLP optimizer |
-| `Transfer` | [reference/api-reference.md](reference/api-reference.md) | Simplified chainable transfer API |
-| `load_orbit_from_json` | [reference/api-reference.md](reference/api-reference.md) | Load orbit from JSON |
-
-### Technical Reference (reference)
-
-| Document | Description |
-|----------|-------------|
-| [API Reference](reference/api-reference.md) | Complete API documentation, class and method descriptions |
-| [Algorithm Reference](reference/algorithms.md) | CR3BP theory, algorithm mathematical foundations |
-
-## Quick Start
 
 ```python
-from e2m2e.core.system import CR3BP_System
-from e2m2e.core.dynamics import CR3BP_Dynamics
-from e2m2e.core.orbit import Orbit
+from e2m2e.core import CR3BP_System, CR3BP_Dynamics
+from e2m2e.algorithms import DifferentialCorrection
+import numpy as np
 
-# Create system
+# Create the Earth-Moon system and design a DRO
 system = CR3BP_System.from_known_system("earth_moon")
+system.set_characteristic_scales(distance=384400, period=27.32*86400)
+system.compute_libration_points()
 
-# Create dynamics model
 dynamics = CR3BP_Dynamics(system)
+dc = DifferentialCorrection(dynamics)
+dc.setup_2D_symmetric_x_fixed_x0(x0=0.8)
 
-# Propagate orbit
-result = dynamics.propagate(initial_state=state, t_span=(0, 10.0))
+initial_state = np.array([0.8, 0.0, 0.0, 0.0, 0.5, 0.0])
+orbit, result = dc.iterate_correction(initial_state, t_half=1.6)
+
+print(f"Period: {orbit.period:.4f}")
+print(f"Jacobi constant: {orbit.jacobi_constant:.6f}")
 ```
 
-## Resources
+## What You Can Do
 
-- [API Reference](reference/api-reference.md) - Complete API documentation
-- [Example Code](../examples/) - Practical usage examples
-- [Test Cases](../tests/) - Unit tests
+### Design Periodic Orbits
 
-### Common Tasks
+DRO, Halo, Lyapunov — from initial guess to converged orbit, then continue to an entire family.
 
-1. **Design DRO orbit** → Refer to [Orbit Generation - DRO](guides/orbit-generation.md#distant-retrograde-orbit-dro)
-2. **Design Halo orbit** → Refer to [Orbit Generation - Halo](guides/orbit-generation.md)
-3. **Generate orbit family** → Refer to [Orbit Family Continuation](reference/algorithms.md)
-4. **Analyze stability** → Refer to [Stability Analysis](reference/algorithms.md)
+- [Orbit Generation Tutorial](guides/orbit-generation_en.md) — DRO / Halo / Lyapunov generation workflows
+- [Differential Correction](algorithms/differential_correction_en.md) — How to correct a seed into a precise periodic orbit
+- [Continuation](algorithms/continuation_en.md) — How to generate a family of periodic orbits
+- [Halo Orbits](algorithms/halo_en.md) — Richardson initial guess, pseudo-arclength continuation, CLI scripts
 
-## Physical Background
+### Analyze Orbital Stability
 
-E2M2E implements orbit design based on the **Circular Restricted Three-Body Problem (CR3BP)**. In the Earth-Moon system:
-- Mass parameter $\mu \approx 0.01215$
-- Characteristic distance: 384,400 km (Earth-Moon distance)
-- Characteristic period: 27.32 days
+Floquet multipliers, bifurcation detection, stability indices — understand the dynamical properties of your orbits.
 
-See [CR3BP Theory](reference/algorithms.md) and [System Overview](guides/system-overview.md) for details.
+- [Stability Analysis](algorithms/stability_en.md) — How to assess stability and find bifurcation points
+
+### Visualize Orbit Families and Transfer Trajectories
+
+2D/3D projections, Jacobi-colored plots, stability diagrams — publication-quality orbital mechanics figures.
+
+- [Visualization Guide](guides/visualization-guide_en.md) — Full workflow from single orbits to family plots
+
+## Library Structure
+
+```
+core/           Foundation — system definition, equations of motion, orbit data
+  ↓
+algorithms/     Numerical — differential correction, continuation, stability, multiple shooting
+  ↓
+transfer/       Design — DRO→RO transfer search, NLP optimization
+  ↓
+visualization/  Display — orbit family plots, transfer trajectory visualization
+```
+
+| Layer | Purpose | Entry classes |
+|-------|---------|---------------|
+| `core` | Define celestial systems, integrate equations, manage orbit data | `CR3BP_System`, `CR3BP_Dynamics`, `Orbit` |
+| `algorithms` | Correct periodic orbits, continue families, analyze stability | `DifferentialCorrection`, `Continuation`, `StabilityAnalysis` |
+| `transfer` | Search and optimize orbit transfers | `Transfer`, `DROTransferSearch` |
+| `visualization` | Plot orbits, families, and transfer trajectories | `OrbitVisualizer`, `FamilyPlotter`, `TransferPlotter` |
+
+## Typical Workflow
+
+```python
+from e2m2e.core import CR3BP_System, CR3BP_Dynamics, Orbit
+from e2m2e.algorithms import DifferentialCorrection, Continuation
+from e2m2e.visualization import OrbitVisualizer
+
+# 1. Define the system
+system = CR3BP_System.from_known_system("earth_moon")
+system.set_characteristic_scales(distance=384400, period=27.32*86400)
+system.compute_libration_points()
+
+# 2. Create the dynamics model
+dynamics = CR3BP_Dynamics(system)
+
+# 3. Design a periodic orbit
+dc = DifferentialCorrection(dynamics)
+dc.setup_2D_symmetric_x_fixed_x0(x0=0.8)
+orbit, result = dc.iterate_correction(
+    np.array([0.8, 0.0, 0.0, 0.0, 0.5, 0.0]), t_half=1.6
+)
+
+# 4. Continue to get an orbit family
+cont = Continuation(corrector=dc, step=0.01)
+family = cont.natural_continuation(
+    seed_orbit=orbit, param_range=(0.8, 0.95), step_size=0.01
+)
+
+# 5. Visualize
+viz = OrbitVisualizer(system)
+for orb in family:
+    viz.plot_2d_projection(orb, plane="xy")
+viz.show()
+```
+
+## Learn More
+
+| What you might want to know | Where to look |
+|-----------------------------|---------------|
+| CR3BP physics and math | [Algorithm Details](reference/algorithms_en.md) |
+| Complete list of classes and methods | [API Reference](reference/api-reference_en.md) |
+| Coordinate transformations (rotating ↔ inertial) | [Coordinate Transformation](core/coordinate_en.md) |
+| Project architecture details | [System Overview](guides/system-overview_en.md) |

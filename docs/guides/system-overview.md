@@ -1,191 +1,90 @@
 # 系统总览
 
-## 架构设计
+> E2M2E 的架构设计、模块职责和扩展指南。
 
-E2M2E 采用模块化设计，包含四个核心模块：
+## 四层架构
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         e2m2e                               │
-├─────────────┬─────────────┬─────────────┬─────────────────┤
-│    core     │ algorithms  │  transfer   │  visualization  │
-├─────────────┼─────────────┼─────────────┼─────────────────┤
-│ system.py   │ differential │ earth_moon  │   config.py     │
-│ dynamics.py │ correction.py│ moon_earth  │   base.py       │
-│ orbit.py    │continuation.py│inter_orbit │   family.py     │
-│coordinate.py│ stability.py │             │   transfer.py   │
-│ephemeris_*  │multiple_     │             │   stability.py   │
-│spice.py     │shooting.py   │             │   plotting.py    │
-└─────────────┴─────────────┴─────────────┴─────────────────┘
+core/           基础层 — 数据结构和物理模型
+  ↓
+algorithms/     算法层 — 微分修正、延拓、稳定性、多重打靶
+  ↓
+transfer/       设计层 — 网格搜索、NLP 优化
+  ↓
+visualization/  展示层 — 轨道族绘图、转移轨迹可视化
 ```
+
+层与层之间严格单向依赖：上层可以使用下层的功能，下层不能引用上层。
 
 ## 模块职责
 
 ### Core（核心模块）
 
-提供 CR3BP 轨道力学的基础构建块和高级星历功能：
-
-| 文件 | 类/函数 | 职责 |
-|------|---------|------|
-| `system.py` | `CR3BP_System` | 系统参数、平动点计算、坐标转换 |
-| `dynamics.py` | `CR3BP_Dynamics` | 运动方程、数值积分、STM传播 |
-| `orbit.py` | `Orbit`, `OrbitFamily` | 轨道数据管理、周期检测、稳定性分析 |
-| `coordinate.py` | `CoordinateTransformation` | 坐标系变换（旋转系↔惯性系） |
-| `ephemeris_system.py` | `EphemerisSystem` | 星历系统定义，多天体配置 |
-| `ephemeris_dynamics.py` | `EphemerisDynamics` | 基于 SPICE 的精确星历动力学 |
-| `spice.py` | `SPICEManager` | SPICE 内核管理与工具函数 |
+| 文件 | 类 | 做什么 |
+|------|-----|--------|
+| `system.py` | `CR3BP_System` | 系统参数、平动点、Jacobi 常数、单位转换 |
+| `dynamics.py` | `CR3BP_Dynamics` | 运动方程、数值积分、STM 传播 |
+| `orbit.py` | `Orbit`, `OrbitFamily` | 轨道数据容器、周期检测、JSON 序列化 |
+| `coordinate.py` | `CoordinateTransformation` | 旋转系 ↔ 惯性系坐标变换 |
+| `spice.py` | `SPICEManager` | SPICE 内核管理 |
+| `ephemeris_system.py` | `EphemerisSystem` | 多天体星历系统 |
+| `ephemeris_dynamics.py` | `EphemerisDynamics` | 基于 SPICE 的 N 体动力学 |
 
 ### Algorithms（算法模块）
 
-实现周期轨道设计所需的数值算法：
-
-| 文件 | 类/函数 | 职责 |
-|------|---------|------|
-| `differential_correction.py` | `DifferentialCorrection` | 牛顿迭代求解周期轨道 |
-| `continuation.py` | `Continuation` | 轨道族延拓（自然/伪弧长） |
-| `stability.py` | `StabilityAnalysis` | Floquet乘子、稳定性判定、分岔检测 |
-| `multiple_shooting.py` | `MultipleShooting` | 多重打靶法，复杂约束轨道修正 |
-| `patch_point_utils.py` | `sample_patch_points`, `convert_to_j2000` | 打靶点采样和坐标转换工具 |
+| 文件 | 类 | 做什么 |
+|------|-----|--------|
+| `differential_correction.py` | `DifferentialCorrection` | Newton-Raphson 迭代求解周期轨道 |
+| `continuation.py` | `Continuation` | 自然/伪弧长轨道族延拓 |
+| `stability.py` | `StabilityAnalysis` | Floquet 乘子、分岔检测 |
+| `multiple_shooting.py` | `MultipleShooting` | 多重打靶法，复杂约束修正 |
 
 ### Transfer（转移模块）
 
-基于核心模块实现轨道转移设计：
-
-| 文件 | 类 | 职责 |
-|------|---|------|
-| `transfer.py` | `Transfer` | 简化链式 API |
-| `transfer_search.py` | `TransferSearch` | DRO→RO 平面转移网格搜索（并行） |
-| `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP 优化 |
+| 文件 | 类 | 做什么 |
+|------|-----|--------|
+| `transfer.py` | `Transfer` | 链式 API：`set_orbit().optimize()` |
+| `transfer_search.py` | `DROTransferSearch` | DRO→RO 平面转移网格搜索（并行） |
+| `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP 优化（可选 COPT 求解器） |
 
 ### Visualization（可视化模块）
 
-| 文件 | 类/函数 | 职责 |
-|------|---------|------|
-| `config.py` | `PlotConfig` | 可视化配置（颜色、标签、样式） |
-| `base.py` | `OrbitVisualizer`, `ProjectionPlane` | 2D/3D轨道绘制、庞加莱截面、概览图 |
-| `family.py` | `FamilyPlotter` | 轨道族可视化 |
-| `transfer.py` | `TransferPlotter` | 转移轨道可视化 |
-| `stability.py` | `compute_stability_for_family` | 轨道族稳定性计算 |
-| `plotting.py` | *(re-export shim)* | 向后兼容重导出 |
+| 文件 | 类 | 做什么 |
+|------|-----|--------|
+| `config.py` | `PlotConfig` | 样式配置（字体、颜色、尺寸） |
+| `base.py` | `OrbitVisualizer` | 2D/3D 轨道绘制基类 |
+| `family.py` | `FamilyPlotter` | 轨道族可视化（Jacobi 着色） |
+| `transfer.py` | `TransferPlotter` | 转移轨迹可视化 |
 
 ## 数据流
 
 ```
-┌──────────────┐     ┌───────────────┐     ┌──────────────┐
-│ CR3BP_System │────▶│ CR3BP_Dynamics│────▶│    Orbit     │
-│EphemerisSystem│───▶│EphemerisDynamics│───▶│   OrbitFamily│
-└──────────────┘     └───────────────┘     └──────────────┘
-                            │                     │
-                            ▼                     ▼
-                     ┌───────────────┐     ┌──────────────┐
-                     │Differential   │     │   Orbit      │
-                     │Correction     │────▶│   Family     │
-                     │MultipleShooting│    │              │
-                     └───────────────┘     └──────────────┘
-                            │                     │
-                            ▼                     ▼
-                     ┌───────────────┐     ┌──────────────┐
-                     │ Continuation  │────▶│  Transfer    │
-                     │StabilityAnalysis│   │  Design      │
-                     └───────────────┘     └──────────────┘
+CR3BP_System → CR3BP_Dynamics → Orbit/OrbitFamily
+                    ↓                    ↓
+          DifferentialCorrection →  Transfer Design
+                    ↓
+              Continuation → Visualization
 ```
 
-## 典型工作流
+## 关键约定
 
-### 1. 周期轨道设计
-
-```python
-# 1. 创建系统
-system = CR3BP_System.from_known_system("earth_moon")
-system.compute_libration_points()
-
-# 2. 创建动力学模型
-dynamics = CR3BP_Dynamics(system)
-
-# 3. 配置微分修正器
-dc = DifferentialCorrection(dynamics)
-dc.setup_2D_symmetric_x_fixed_x0(x0=0.8)
-
-# 4. 迭代求解
-orbit, result = dc.iterate_correction(initial_state, t_half=1.5)
-```
-
-### 2. 轨道族延拓
-
-```python
-# 5. 延拓轨道族
-continuation = Continuation(dc, step=0.01)
-family = continuation.natural_continuation(
-    seed_orbit=orbit,
-    param_range=(0.8, 1.2),
-    step_size=0.01
-)
-```
-
-### 3. 星历动力学与多重打靶法
-
-```python
-# 6. 使用星历动力学
-from e2m2e.core import EphemerisSystem, EphemerisDynamics
-from e2m2e.core.spice import SPICEManager
-
-spice_manager = SPICEManager()
-spice_manager.load_kernels_from_directory("./kernels/")
-
-ephemeris_system = EphemerisSystem(
-    bodies=["EARTH", "MOON", "SUN"],
-    reference_epoch="2025-06-21T11:00:06"
-)
-ephemeris_dynamics = EphemerisDynamics(system=ephemeris_system)
-
-# 7. 使用多重打靶法
-from e2m2e.algorithms import MultipleShooting, sample_patch_points
-multiple_shooting = MultipleShooting(dynamics=ephemeris_dynamics)
-t_patch, state_patch = sample_patch_points(orbit=orbit, n_segments=5)
-result = multiple_shooting.correct(t_patch, state_patch, var_time=True)
-```
-
-### 4. 转移设计
-
-```python
-# 9. 设计转移轨道
-transfer = InterOrbitTransfer(system, dynamics)
-result = transfer.design_heteroclinic_transfer(orbit_L1, orbit_L2)
-```
-
-## 设计原则
-
-1. **物理驱动**：所有算法基于CR3BP严格数学模型
-2. **模块化**：各模块独立可测试，接口清晰
-3. **数值稳健**：使用高阶积分器、自适应步长、收敛检测
-4. **用户友好**：丰富的中文注释和错误提示
+- **状态向量顺序**始终为 `[x, y, z, vx, vy, vz]`，全局一致
+- **数值精度**：积分器 `rtol=atol=1e-12`，有限差分步长不可增大
+- **无量纲单位**：DU（距离）、TU（时间）、VU（速度）；物理计算前必须调用 `set_characteristic_scales()`
+- **接口稳定性**：公共方法签名不可破坏向后兼容性；新参数必须有默认值
 
 ## 扩展指南
 
-### 添加新轨道类型
+### 添加新的轨道类型
 
-1. 在 `differential_correction.py` 中添加新的对称性配置
-2. 实现对应的 `setup_*` 方法
-3. 添加测试用例
+在 `differential_correction.py` 中添加对应的 `setup_*` 方法和对称性配置。
 
-### 添加新转移策略
+### 添加新的动力学模型
 
-1. 在 `transfer/` 目录创建新模块
-2. 继承基础类实现具体策略
-3. 在 `__init__.py` 中导出
+创建 `Dynamics` 的子类，实现 `equations_of_motion()` 和 `propagate()`。不要修改基类。
 
-### 扩展星历功能
+### 添加新的算法
 
-1. 在 `core/` 目录添加新的动力学模型
-2. 继承 `Dynamics` 或 `EphemerisDynamics` 基类
-3. 实现 `equations_of_motion` 和 `propagate` 方法
-4. 添加对应的 SPICE 内核支持
+在 `algorithms/` 目录创建新模块，遵循现有接口设计，在 `__init__.py` 中导出。
 
-### 添加新数值算法
-
-1. 在 `algorithms/` 目录创建新模块
-2. 遵循现有的算法接口设计
-3. 提供完整的收敛性和误差分析
-4. 添加性能基准测试
-
-详见项目根目录的 CONTRIBUTING.md 文件和 [算法参考文档](../reference/algorithms.md)。
+→ 各模块的详细用法见对应文档页面。

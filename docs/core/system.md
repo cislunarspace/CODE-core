@@ -1,97 +1,113 @@
-# System
+# 系统定义：CR3BP_System
 
-**文件**: `e2m2e/core/system.py`
+> **文件**: `e2m2e/core/system.py`
 
-**类签名**:
-```python
-class System:
-    """天体系统基类"""
-```
+`CR3BP_System` 封装了圆型限制性三体问题 (CR3BP) 的系统参数——质量参数、特征尺度、平动点位置、Jacobi 常数。它是使用 e2m2e 的第一步：所有动力学模型、轨道算法和可视化都需要一个系统对象。
 
-## 设计原理
+## 怎么创建一个天体系统
 
-`System` 是所有系统参数类的抽象基类，定义了获取系统参数、计算平动点等通用接口。
-
-## 核心方法
-
-| 方法 | 说明 |
-|------|------|
-| `get_libration_point(point)` | 获取平动点坐标 |
-| `get_jacobi_constant(state)` | 计算 Jacobi 常数 |
-
----
-
-# CR3BP_System
-
-**文件**: `e2m2e/core/system.py`
-
-**类签名**:
-```python
-class CR3BP_System(System):
-    """圆型限制性三体问题系统参数"""
-```
-
-## 设计原理
-
-`CR3BP_System` 类封装了圆型限制性三体问题 (Circular Restricted Three-Body Problem) 的系统参数。在CR3BP模型中：
-- 两个大质量天体（主天体 $m_1$ 和次天体 $m_2$）在它们相互的引力作用下围绕共同的质心做圆轨道运动
-- 一个小质量天体（探测器）在上述两个大天体的引力场中运动，其质量对两个大天体的运动没有影响
-
-质量参数定义为：
-$$\mu = \frac{m_2}{m_1 + m_2}$$
-
-地月系统的 $\mu \approx 0.01215$
-
-## 数学基础
-
-### 平动点（Libration Points）计算
-平动点是相对于两个大天体保持静止的特殊点，满足：
-$$\nabla U(\mathbf{r}) = 0$$
-
-其中 $U$ 是有效势函数：
-$$U = \frac{x^2 + y^2}{2} + \frac{1-\mu}{r_1} + \frac{\mu}{r_2}$$
-
-### Jacobi常数
-$$C = 2U - v^2 = x^2 + y^2 + \frac{2(1-\mu)}{r_1} + \frac{2\mu}{r_2} - (v_x^2 + v_y^2 + v_z^2)$$
-
-## 属性
-
-| 属性名 | 类型 | 说明 |
-|--------|------|------|
-| `mu` | `float` | 质量参数 $\mu = m_2/(m_1+m_2)$ |
-| `primary_body` | `str` | 主天体名称 |
-| `secondary_body` | `str` | 次天体名称 |
-| `L1-L5` | `np.ndarray` | 五个平动点的坐标 |
-| `characteristic_length` | `float` | 特征长度（两天体间距离） |
-| `characteristic_time` | `float` | 特征时间 |
-| `characteristic_velocity` | `float` | 特征速度 |
-
-## 核心方法
-
-| 方法 | 说明 |
-|------|------|
-| `compute_libration_points()` | 计算五个平动点位置 |
-| `get_libration_point(point)` | 获取指定平动点坐标 |
-| `get_jacobi_constant(state)` | 计算Jacobi常数 |
-| `dimensionless_to_physical(state)` | 无量纲→物理单位 |
-| `physical_to_dimensionless(state)` | 物理单位→无量纲 |
-| `compute_stability_index(L_point)` | 计算平动点稳定性指标 |
-
-## 使用示例
+### 内置系统（推荐）
 
 ```python
-from e2m2e.core.system import CR3BP_System, LibrationPoint
+from e2m2e.core import CR3BP_System
 
-# 从已知系统创建
 system = CR3BP_System.from_known_system("earth_moon")
-system.set_characteristic_scales(distance=384400, period=27.32*86400)
+# 其他可选: "sun_earth", "sun_jupiter"
+```
+
+`from_known_system` 会自动设置质量参数 $\mu$ 和天体名称。
+
+### 自定义系统
+
+```python
+system = CR3BP_System(mu=0.01215, primary_body="Earth", secondary_body="Moon")
+```
+
+### 设置特征尺度
+
+如果需要在无量纲和物理单位之间转换，必须先设置特征尺度：
+
+```python
+system.set_characteristic_scales(
+    distance=384400,       # 地月距离 (km)
+    period=27.32 * 86400,  # 月球轨道周期 (s)
+)
+```
+
+设置后可以使用 `dimensionless_to_physical()` 和 `physical_to_dimensionless()` 进行单位转换。
+
+## 怎么使用系统信息
+
+### 计算平动点
+
+```python
 system.compute_libration_points()
 
-# 获取平动点
-L1 = system.get_libration_point(LibrationPoint.L1)
-print(f"L1位置: {L1}")
-
-# 计算Jacobi常数
-state = np.array([0.8, 0, 0, 0, 1.5, 0])
-C = system.get_jacobi_constant(state)
+# 获取 L1 点位置
+L1 = system.L1  # 或 system.get_libration_point(LibrationPoint.L1)
+print(f"L1: {L1}")
 ```
+
+五个平动点 `L1` ~ `L5` 计算后直接作为属性可用。
+
+### 计算 Jacobi 常数
+
+Jacobi 常数是 CR3BP 中的守恒量，用于衡量轨道的能量水平：
+
+```python
+import numpy as np
+
+state = np.array([0.8, 0.1, 0.0, 0.0, 0.2, 0.0])
+C = system.get_jacobi_constant(state)
+print(f"Jacobi 常数: {C:.6f}")
+```
+
+Jacobi 常数越大，轨道能量越低。平动点的 Jacobi 常数是区分不同运动区域的关键阈值。
+
+### 单位转换
+
+```python
+# 无量纲 → 物理 (km, km/s)
+physical = system.dimensionless_to_physical(state)
+
+# 物理 → 无量纲
+dimensionless = system.physical_to_dimensionless(physical)
+```
+
+## API 速查
+
+| 方法 | 说明 |
+|------|------|
+| `from_known_system(name)` | 创建内置系统（"earth_moon" / "sun_earth" / "sun_jupiter"） |
+| `set_characteristic_scales(distance, period)` | 设置特征尺度（物理单位转换前置步骤） |
+| `compute_libration_points()` | 计算五个平动点位置 |
+| `get_libration_point(point)` | 获取指定平动点坐标 |
+| `get_jacobi_constant(state)` | 计算 Jacobi 常数 |
+| `dimensionless_to_physical(state)` | 无量纲 → 物理单位 |
+| `physical_to_dimensionless(state)` | 物理单位 → 无量纲 |
+| `compute_stability_index(L_point)` | 计算平动点线性化稳定性指标 |
+| `info(mode)` | 打印系统信息 |
+
+完整 API 文档见 [API 参考](../reference/api-reference.md)。
+
+## 数学背景
+
+### 质量参数
+
+$$\mu = \frac{m_2}{m_1 + m_2}$$
+
+地月系统 $\mu \approx 0.01215$。
+
+### 平动点
+
+平动点满足有效势函数梯度为零：$\nabla U(\mathbf{r}) = 0$，其中
+
+$$U = \frac{x^2 + y^2}{2} + \frac{1-\mu}{r_1} + \frac{\mu}{r_2}$$
+
+L1、L2、L3 位于 $x$ 轴上（共线平动点），L4、L5 构成等边三角形。
+
+### Jacobi 常数
+
+$$C = 2U - v^2 = x^2 + y^2 + \frac{2(1-\mu)}{r_1} + \frac{2\mu}{r_2} - (v_x^2 + v_y^2 + v_z^2)$$
+
+在无量纲旋转坐标系中，Jacobi 常数沿轨迹守恒。

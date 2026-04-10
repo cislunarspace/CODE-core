@@ -1,147 +1,90 @@
 # System Overview
 
-## Architecture Design
+> E2M2E architecture design, module responsibilities, and extension guide.
 
-E2M2E adopts a modular design with four core modules:
+## Four-Layer Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         e2m2e                               │
-├─────────────┬─────────────┬─────────────┬─────────────────┤
-│    core     │ algorithms  │  transfer   │  visualization  │
-├─────────────┼─────────────┼─────────────┼─────────────────┤
-│ system.py   │ differential │ earth_moon  │   config.py     │
-│ dynamics.py │ correction.py│ moon_earth  │   base.py       │
-│ orbit.py    │continuation.py│inter_orbit │   family.py     │
-│coordinate.py│ stability.py │             │   transfer.py   │
-│             │             │             │   stability.py   │
-│             │             │             │   plotting.py    │
-└─────────────┴─────────────┴─────────────┴─────────────────┘
+core/           Foundation — data structures and physics models
+  ↓
+algorithms/     Algorithm layer — differential correction, continuation, stability, multiple shooting
+  ↓
+transfer/       Design layer — grid search, NLP optimization
+  ↓
+visualization/  Presentation layer — orbit family plotting, transfer trajectory visualization
 ```
+
+Dependencies between layers are strictly unidirectional: upper layers may use lower-layer functionality, but lower layers cannot reference upper layers.
 
 ## Module Responsibilities
 
-### Core Module
+### Core
 
-Provides basic building blocks for CR3BP orbital mechanics:
-
-| File | Class/Function | Responsibilities |
-|------|---------------|------------------|
-| `system.py` | `CR3BP_System` | System parameters, libration point calculation, coordinate transforms |
+| File | Class | Purpose |
+|------|-------|---------|
+| `system.py` | `CR3BP_System` | System parameters, libration points, Jacobi constant, unit conversion |
 | `dynamics.py` | `CR3BP_Dynamics` | Equations of motion, numerical integration, STM propagation |
-| `orbit.py` | `Orbit`, `OrbitFamily` | Orbit data management, period detection, stability analysis |
-| `coordinate.py` | `CoordinateTransformation` | Coordinate system transforms (rotating↔inertial) |
+| `orbit.py` | `Orbit`, `OrbitFamily` | Orbit data containers, period detection, JSON serialization |
+| `coordinate.py` | `CoordinateTransformation` | Rotating <-> inertial frame coordinate transformation |
+| `spice.py` | `SPICEManager` | SPICE kernel management |
+| `ephemeris_system.py` | `EphemerisSystem` | Multi-body ephemeris system |
+| `ephemeris_dynamics.py` | `EphemerisDynamics` | SPICE-based N-body dynamics |
 
-### Algorithms Module
+### Algorithms
 
-Implements numerical algorithms required for periodic orbit design:
+| File | Class | Purpose |
+|------|-------|---------|
+| `differential_correction.py` | `DifferentialCorrection` | Newton-Raphson iteration for periodic orbit correction |
+| `continuation.py` | `Continuation` | Natural / pseudo-arclength orbit family continuation |
+| `stability.py` | `StabilityAnalysis` | Floquet multipliers, bifurcation detection |
+| `multiple_shooting.py` | `MultipleShooting` | Multiple shooting method, complex constraint correction |
 
-| File | Class/Function | Responsibilities |
-|------|---------------|------------------|
-| `differential_correction.py` | `DifferentialCorrection` | Newton iteration for periodic orbit solution |
-| `continuation.py` | `Continuation` | Orbit family continuation (natural/pseudo-arclength) |
-| `stability.py` | `StabilityAnalysis` | Floquet multipliers, stability determination, bifurcation detection |
+### Transfer
 
-### Transfer Module
+| File | Class | Purpose |
+|------|-------|---------|
+| `transfer.py` | `Transfer` | Chaining API: `set_orbit().optimize()` |
+| `transfer_search.py` | `DROTransferSearch` | DRO->RO planar transfer grid search (parallel) |
+| `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP optimization (optional COPT solver) |
 
-Implements orbit transfer design based on core modules:
+### Visualization
 
-| File | Class | Responsibilities |
-|------|-------|------------------|
-| `transfer.py` | `Transfer` | Simplified chainable API |
-| `transfer_search.py` | `TransferSearch` | DRO→RO planar transfer grid search (parallel) |
-| `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP optimization |
-
-### Visualization Module
-
-| File | Class/Function | Responsibilities |
-|------|---------------|------------------|
-| `config.py` | `PlotConfig` | Visualization configuration (colors, labels, styles) |
-| `base.py` | `OrbitVisualizer`, `ProjectionPlane` | 2D/3D orbit plotting, Poincaré sections, overview plots |
-| `family.py` | `FamilyPlotter` | Orbit family visualization |
-| `transfer.py` | `TransferPlotter` | Transfer orbit visualization |
-| `stability.py` | `compute_stability_for_family` | Orbit family stability computation |
-| `plotting.py` | *(re-export shim)* | Backward-compat re-export |
+| File | Class | Purpose |
+|------|-------|---------|
+| `config.py` | `PlotConfig` | Style configuration (fonts, colors, sizes) |
+| `base.py` | `OrbitVisualizer` | 2D/3D orbit plotting base class |
+| `family.py` | `FamilyPlotter` | Orbit family visualization (Jacobi coloring) |
+| `transfer.py` | `TransferPlotter` | Transfer trajectory visualization |
 
 ## Data Flow
 
 ```
-┌──────────────┐     ┌───────────────┐     ┌──────────────┐
-│ CR3BP_System │────▶│ CR3BP_Dynamics│────▶│    Orbit     │
-└──────────────┘     └───────────────┘     └──────────────┘
-                             │                     │
-                             ▼                     ▼
-                      ┌───────────────┐     ┌──────────────┐
-                      │Differential   │     │   Orbit      │
-                      │Correction     │────▶│   Family     │
-                      └───────────────┘     └──────────────┘
-                             │
-                             ▼
-                      ┌───────────────┐     ┌──────────────┐
-                      │ Continuation  │────▶│  Transfer    │
-                      └───────────────┘     │  Design      │
-                                             └──────────────┘
+CR3BP_System -> CR3BP_Dynamics -> Orbit/OrbitFamily
+                    ↓                    ↓
+          DifferentialCorrection ->  Transfer Design
+                    ↓
+              Continuation -> Visualization
 ```
 
-## Typical Workflows
+## Key Conventions
 
-### 1. Periodic Orbit Design
-
-```python
-# 1. Create system
-system = CR3BP_System.from_known_system("earth_moon")
-system.compute_libration_points()
-
-# 2. Create dynamics model
-dynamics = CR3BP_Dynamics(system)
-
-# 3. Configure differential corrector
-dc = DifferentialCorrection(dynamics)
-dc.setup_2D_symmetric_x_fixed_x0(x0=0.8)
-
-# 4. Iterate to solve
-orbit, result = dc.iterate_correction(initial_state, t_half=1.5)
-```
-
-### 2. Orbit Family Continuation
-
-```python
-# 5. Continue orbit family
-continuation = Continuation(dc, step=0.01)
-family = continuation.natural_continuation(
-    seed_orbit=orbit,
-    param_range=(0.8, 1.2),
-    step_size=0.01
-)
-```
-
-### 3. Transfer Design
-
-```python
-# 6. Design transfer orbit
-transfer = InterOrbitTransfer(system, dynamics)
-result = transfer.design_heteroclinic_transfer(orbit_L1, orbit_L2)
-```
-
-## Design Principles
-
-1. **Physics-driven**: All algorithms based on rigorous CR3BP mathematical models
-2. **Modular**: Each module is independently testable with clear interfaces
-3. **Numerically robust**: Uses high-order integrators, adaptive step sizes, convergence detection
-4. **User-friendly**: Rich comments and error messages
+- **State vector order** is always `[x, y, z, vx, vy, vz]`, consistent throughout
+- **Numerical precision**: integrator `rtol=atol=1e-12`; finite difference step sizes must not be increased
+- **Dimensionless units**: DU (distance), TU (time), VU (velocity); call `set_characteristic_scales()` before physical calculations
+- **Interface stability**: public method signatures must not break backward compatibility; new parameters must have default values
 
 ## Extension Guide
 
-### Adding New Orbit Types
+### Adding a New Orbit Type
 
-1. Add new symmetry configurations in `differential_correction.py`
-2. Implement corresponding `setup_*` methods
-3. Add test cases
+Add the corresponding `setup_*` method and symmetry configuration in `differential_correction.py`.
 
-### Adding New Transfer Strategies
+### Adding a New Dynamics Model
 
-1. Create new module under `transfer/` directory
-2. Inherit base class to implement specific strategy
-3. Export in `__init__.py`
+Create a subclass of `Dynamics`, implementing `equations_of_motion()` and `propagate()`. Do not modify the base class.
 
-See the CONTRIBUTING.md file in the project root for details.
+### Adding a New Algorithm
+
+Create a new module in the `algorithms/` directory, follow the existing interface design, and export it in `__init__.py`.
+
+-> For detailed usage of each module, see the corresponding documentation page.
