@@ -63,6 +63,7 @@ test-results/
 # IDE 和编辑器文件
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
