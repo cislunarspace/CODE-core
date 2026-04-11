@@ -3,7 +3,7 @@
 将 algorithms/ 层的所有组件注册到 MBSE 组件注册表中。
 """
 
-from mbse.architecture.components import Component
+from .components import Component
 
 ALGORITHMS_COMPONENTS = [
     Component(

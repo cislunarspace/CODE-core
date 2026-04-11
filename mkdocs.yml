@@ -29,6 +29,18 @@ nav:
   - 技术参考:
     - API 参考: reference/api-reference.md
     - 算法细节: reference/algorithms.md
+  - MBSE 模型:
+    - 系统总览: mbse/system-overview.md
+    - 需求追溯矩阵: mbse/traceability-matrix.md
+    - Core 层 BDD: mbse/bdd-core.md
+    - Algorithms 层 BDD: mbse/bdd-algorithms.md
+    - 需求定义: mbse/requirements.md
+    - 收敛状态机: mbse/state-convergence.md
+    - 轨道生命周期: mbse/state-orbit-lifecycle.md
+    - 轨道设计活动图: mbse/activity-orbit-design.md
+    - 微分修正活动图: mbse/activity-differential-correction.md
+    - 传播序列图: mbse/sequence-propagation.md
+    - 修正序列图: mbse/sequence-correction.md
   - 其他:
     - 坐标变换: core/coordinate.md
     - 星历系统: core/ephemeris_system.md
@@ -68,6 +80,11 @@ markdown_extensions:
       slugify: !!python/name:markdown.extensions.toc.slugify_unicode
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 extra_javascript:
   - javascripts/mathjax.js

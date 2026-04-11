@@ -4,7 +4,7 @@
 稳定性分析、多点射击法等核心数值算法。需求 ID 范围：REQ-100 ~ REQ-119。
 """
 
-from mbse.requirements.base import Requirement, RequirementCategory, RequirementPriority
+from .base import Requirement, RequirementCategory, RequirementPriority
 
 ALGORITHMS_REQUIREMENTS = [
     # ---- 微分修正 ----

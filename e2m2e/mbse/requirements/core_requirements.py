@@ -4,7 +4,7 @@
 坐标变换等基础功能。需求 ID 范围：REQ-001 ~ REQ-030。
 """
 
-from mbse.requirements.base import Requirement, RequirementCategory, RequirementPriority
+from .base import Requirement, RequirementCategory, RequirementPriority
 
 CORE_REQUIREMENTS = [
     # ---- 状态向量与数据格式 ----

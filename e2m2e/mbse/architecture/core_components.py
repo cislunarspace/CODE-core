@@ -3,7 +3,7 @@
 将 core/ 层的所有组件注册到 MBSE 组件注册表中。
 """
 
-from mbse.architecture.components import Component
+from .components import Component
 
 CORE_COMPONENTS = [
     Component(

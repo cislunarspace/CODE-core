@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 import numpy as np
 
 if TYPE_CHECKING:
-    from mbse.data.core_models import PropagationResult
+    from e2m2e.mbse.data.core_models import PropagationResult
 
 
 @runtime_checkable
