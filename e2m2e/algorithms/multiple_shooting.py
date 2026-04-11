@@ -84,8 +84,8 @@ def _worker_propagate(state: np.ndarray, t_span: tuple[float, float]) -> dict:
     """
     result = _worker_dynamics.propagate(state, t_span, with_stm=True)  # type: ignore[union-attr]
     return {
-        "final_state": result["states"][:, -1],
-        "final_stm": result["stm"][:, :, -1],
+        "final_state": result["states"][-1],
+        "final_stm": result["stm"][-1],
     }
 
 
@@ -341,8 +341,8 @@ class MultipleShooting:
 
                     for i in range(n_seg):
                         result = seg_results[i]  # type: ignore[index]
-                        final_state = result["states"][:, -1]  # type: ignore[index]
-                        final_stm = result["stm"][:, :, -1]  # type: ignore[index]
+                        final_state = result["states"][-1]  # type: ignore[index]
+                        final_stm = result["stm"][-1]  # type: ignore[index]
                         final_states.append(final_state)
                         stms.append(final_stm)
                         f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
@@ -358,8 +358,8 @@ class MultipleShooting:
                             (t_work[i], t_work[i + 1]),
                             with_stm=True,
                         )
-                        final_state = result["states"][:, -1]
-                        final_stm = result["stm"][:, :, -1]
+                        final_state = result["states"][-1]
+                        final_stm = result["stm"][-1]
                         final_states.append(final_state)
                         stms.append(final_stm)
                         f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))

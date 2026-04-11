@@ -1,0 +1,264 @@
+"""Mermaid 图表统一生成编排器
+
+从 MBSE 模型定义自动生成 SysML 风格的 Mermaid 图表，嵌入 MkDocs 文档。
+
+支持的图表类型：
+- BDD (Block Definition Diagram) → classDiagram
+- IBD (Internal Block Diagram) → graph
+- Activity Diagram → flowchart
+- Sequence Diagram → sequenceDiagram
+- State Machine → stateDiagram-v2
+- Requirement Diagram → requirementDiagram
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Optional
+
+from ..architecture.components import ComponentRegistry
+from ..requirements.base import Requirement, RequirementCategory, RequirementRegistry
+
+
+class DiagramGenerator:
+    """MBSE 图表生成编排器
+
+    从 RequirementRegistry 和 ComponentRegistry 生成 Mermaid 图表。
+    """
+
+    def __init__(
+        self,
+        requirements: Optional[RequirementRegistry] = None,
+        components: Optional[ComponentRegistry] = None,
+    ):
+        self.requirements = requirements or RequirementRegistry()
+        self.components = components or ComponentRegistry()
+
+    def generate_bdd(self, layer: Optional[str] = None) -> str:
+        """生成 BDD (Block Definition Diagram) — Mermaid classDiagram
+
+        Args:
+            layer: 可选，仅生成指定层的组件图
+
+        Returns:
+            Mermaid classDiagram 语法字符串
+        """
+        components = (
+            self.components.by_layer(layer) if layer else self.components.all()
+        )
+
+        lines = ["classDiagram"]
+
+        for comp in components:
+            # 组件定义
+            lines.append(f"    class {comp.name} {{")
+            lines.append(f"        &lt;&lt;{comp.layer}&gt;&gt;")
+            lines.append(f"        {comp.description}" if comp.description else "")
+            lines.append("    }")
+
+            # Protocol 实现（实现关系）
+            for proto in comp.protocols:
+                lines.append(f"    {comp.name} ..|> {proto} : implements")
+
+            # 依赖关系
+            for dep in comp.dependencies:
+                lines.append(f"    {comp.name} --> {dep} : uses")
+
+        return "\n".join(lines)
+
+    def generate_requirement_diagram(self) -> str:
+        """生成 Requirement Diagram — Mermaid requirementDiagram
+
+        Returns:
+            Mermaid requirementDiagram 语法字符串
+        """
+        lines = ["requirementDiagram"]
+
+        for req in self.requirements:
+            type_label = {
+                RequirementCategory.FUNCTIONAL: "functional",
+                RequirementCategory.PERFORMANCE: "performance",
+                RequirementCategory.INTERFACE: "interface",
+                RequirementCategory.VERIFICATION: "verification",
+                RequirementCategory.CONSTRAINT: "constraint",
+            }.get(req.category, "functional")
+
+            lines.append(f"    requirement {req.id.replace('-', '_')} {{")
+            lines.append(f"        title: {req.title}")
+            lines.append(f"        type: {type_label}")
+            lines.append(f"        risk: {req.priority.value}")
+            lines.append(f"    }}")
+
+            # 父需求关系
+            if req.parent:
+                lines.append(
+                    f"    {req.parent.replace('-', '_')} -traces-> {req.id.replace('-', '_')}"
+                )
+
+            # 代码追溯
+            for code_path in req.linked_code:
+                safe_name = code_path.replace(".", "_").replace("/", "_")
+                lines.append(f"    {safe_name} -satisfies-> {req.id.replace('-', '_')}")
+
+        return "\n".join(lines)
+
+    def generate_state_machine(
+        self, name: str, states: list[str], transitions: list[tuple[str, str, str]]
+    ) -> str:
+        """生成 State Machine Diagram — Mermaid stateDiagram-v2
+
+        Args:
+            name: 状态机名称
+            states: 状态列表
+            transitions: 转换列表 [(from_state, to_state, trigger)]
+
+        Returns:
+            Mermaid stateDiagram-v2 语法字符串
+        """
+        lines = ["stateDiagram-v2"]
+        lines.append(f"    [*] --> {states[0]}")
+
+        for from_state, to_state, trigger in transitions:
+            lines.append(f"    {from_state} --> {to_state} : {trigger}")
+
+        # 终止状态：如果存在终止状态（如 "complete", "failed"）
+        terminal_states = {"complete", "converged", "failed", "diverged"}
+        for state in states:
+            if state.lower() in terminal_states:
+                lines.append(f"    {state} --> [*]")
+
+        return "\n".join(lines)
+
+    def generate_activity(
+        self, name: str, steps: list[dict], decision_nodes: Optional[list[dict]] = None
+    ) -> str:
+        """生成 Activity Diagram — Mermaid flowchart
+
+        Args:
+            name: 活动名称
+            steps: 步骤列表 [{"id": str, "label": str, "type": "process|io|start|end"}]
+            decision_nodes: 决策节点 [{"id": str, "label": str, "branches": [{"target": str, "condition": str}]}]
+
+        Returns:
+            Mermaid flowchart 语法字符串
+        """
+        lines = ["flowchart TD"]
+
+        for step in steps:
+            step_id = step["id"]
+            label = step["label"]
+            step_type = step.get("type", "process")
+
+            if step_type == "start":
+                lines.append(f"    {step_id}([{label}])")
+            elif step_type == "end":
+                lines.append(f"    {step_id}([{label}])")
+            elif step_type == "io":
+                lines.append(f"    {step_id}[/{label}/]")
+            else:
+                lines.append(f"    {step_id}[{label}]")
+
+        # 顺序连接
+        for i in range(len(steps) - 1):
+            lines.append(f"    {steps[i]['id']} --> {steps[i + 1]['id']}")
+
+        # 决策节点
+        if decision_nodes:
+            for decision in decision_nodes:
+                lines.append(f"    {decision['id']}{{{decision['label']}}}")
+                for branch in decision["branches"]:
+                    lines.append(
+                        f"    {decision['id']} -->|{branch['condition']}| {branch['target']}"
+                    )
+
+        return "\n".join(lines)
+
+    def generate_sequence(
+        self, participants: list[str], interactions: list[tuple[str, str, str]]
+    ) -> str:
+        """生成 Sequence Diagram — Mermaid sequenceDiagram
+
+        Args:
+            participants: 参与者列表
+            interactions: 交互列表 [(from, to, message)]
+
+        Returns:
+            Mermaid sequenceDiagram 语法字符串
+        """
+        lines = ["sequenceDiagram"]
+
+        for p in participants:
+            lines.append(f"    participant {p}")
+
+        for from_p, to_p, message in interactions:
+            lines.append(f"    {from_p}->>{to_p}: {message}")
+
+        return "\n".join(lines)
+
+    def generate_ibd(self, component_name: str, attributes: list[dict]) -> str:
+        """生成 IBD (Internal Block Diagram) — Mermaid graph
+
+        Args:
+            component_name: 组件名称
+            attributes: 属性列表 [{"name": str, "type": str, "direction": "input|output|internal"}]
+
+        Returns:
+            Mermaid graph 语法字符串
+        """
+        lines = ["graph LR"]
+
+        lines.append(f"    subgraph {component_name}")
+        for attr in attributes:
+            direction = attr.get("direction", "internal")
+            name = attr["name"]
+            type_str = attr.get("type", "any")
+            if direction == "input":
+                lines.append(f"        in_{name}([{name}: {type_str}])")
+                lines.append(f"        in_{name} --> {component_name}_core")
+            elif direction == "output":
+                lines.append(f"        out_{name}([{name}: {type_str}])")
+                lines.append(f"        {component_name}_core --> out_{name}")
+            else:
+                lines.append(f"        {name}[{name}: {type_str}]")
+        lines.append("    end")
+
+        return "\n".join(lines)
+
+    def write_diagram(self, content: str, output_path: str) -> None:
+        """将 Mermaid 图表写入 Markdown 文件
+
+        Args:
+            content: Mermaid 语法字符串
+            output_path: 输出文件路径（.md）
+        """
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(f"```mermaid\n{content}\n```\n")
+
+    def generate_all(self, output_dir: str) -> list[str]:
+        """生成所有图表并写入文件
+
+        Args:
+            output_dir: 输出目录路径
+
+        Returns:
+            生成的文件路径列表
+        """
+        generated = []
+
+        # BDD for each layer
+        for layer in ["core", "algorithms", "transfer", "visualization"]:
+            bdd_content = self.generate_bdd(layer)
+            if bdd_content != "classDiagram":  # 非空
+                path = os.path.join(output_dir, f"bdd-{layer}.md")
+                self.write_diagram(bdd_content, path)
+                generated.append(path)
+
+        # Requirement diagram
+        if len(self.requirements) > 0:
+            req_content = self.generate_requirement_diagram()
+            path = os.path.join(output_dir, "requirements.md")
+            self.write_diagram(req_content, path)
+            generated.append(path)
+
+        return generated

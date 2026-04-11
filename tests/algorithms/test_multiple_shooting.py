@@ -236,7 +236,7 @@ class TestMultipleShootingCorrection:
                     corrected_states[i],
                     (result.t_patch[i], result.t_patch[i + 1]),
                 )
-                final_prop = propagated["states"][:, -1]
+                final_prop = propagated["states"][-1]
                 pos_error = np.linalg.norm(final_prop[:3] - corrected_states[i + 1, :3])
                 assert pos_error < 1.0, f"位置连续性误差 {pos_error:.2e} km 过大"
 

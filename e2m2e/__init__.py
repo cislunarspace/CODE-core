@@ -24,10 +24,12 @@ from . import core
 from . import algorithms
 from . import visualization
 from . import transfer
+from . import mbse
 
 __all__ = [
     "core",
     "algorithms",
     "visualization",
     "transfer",
+    "mbse",
 ]

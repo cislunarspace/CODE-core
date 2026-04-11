@@ -237,8 +237,8 @@ class TestEphemerisPropagation:
         result = eph_dynamics.propagate(leo_state, t_span)
         assert "time" in result
         assert "states" in result
-        assert result["states"].shape[0] == 6
-        assert result["states"].shape[1] > 1
+        assert result["states"].shape[1] == 6
+        assert result["states"].shape[0] > 1
 
     def test_propagate_state_is_finite(self, eph_dynamics, reference_et, leo_state):
         """传播结果不应包含 NaN 或 Inf"""
@@ -257,15 +257,15 @@ class TestEphemerisPropagation:
         """STM 应为 6x6 矩阵序列"""
         t_span = (reference_et, reference_et + 3600)
         result = eph_dynamics.propagate(leo_state, t_span, with_stm=True)
-        n_times = result["states"].shape[1]
-        assert result["stm"].shape == (6, 6, n_times)
+        n_times = result["states"].shape[0]
+        assert result["stm"].shape == (n_times, 6, 6)
 
     def test_propagate_stm_initial_is_identity(self, eph_dynamics, reference_et, leo_state):
         """初始 STM 应为单位矩阵"""
         t_span = (reference_et, reference_et + 3600)
         t_eval = np.linspace(t_span[0], t_span[1], 100)
         result = eph_dynamics.propagate(leo_state, t_span, t_eval=t_eval, with_stm=True)
-        stm0 = result["stm"][:, :, 0]
+        stm0 = result["stm"][0]
         assert_allclose(stm0, np.eye(6), atol=1e-6)
 
     def test_propagate_leo_returns_near_circular(self, eph_dynamics, reference_et, leo_state):
@@ -273,7 +273,7 @@ class TestEphemerisPropagation:
         period = 2 * np.pi * np.sqrt(6778**3 / 398600.436)
         t_span = (reference_et, reference_et + period)
         result = eph_dynamics.propagate(leo_state, t_span)
-        final_state = result["states"][:, -1]
+        final_state = result["states"][-1]
         r_final = np.linalg.norm(final_state[:3])
         r_initial = np.linalg.norm(leo_state[:3])
         assert_allclose(r_final, r_initial, rtol=0.01)
@@ -285,7 +285,7 @@ class TestEphemerisPropagation:
         t_span = (reference_et, reference_et + dro_period)
         result = eph_dynamics.propagate(dro_state, t_span)
         assert np.all(np.isfinite(result["states"]))
-        final_r = np.linalg.norm(result["states"][:3, -1])
+        final_r = np.linalg.norm(result["states"][-1, :3])
         initial_r = np.linalg.norm(dro_state[:3])
         assert_allclose(final_r, initial_r, rtol=0.2)
 
