@@ -1,7 +1,9 @@
 """绘图配置模块
 
-定义 PlotConfig 数据类，统一管理 matplotlib 的字体、颜色、尺寸等绘图参数。
+定义 PlotConfig 配置类，统一管理 matplotlib 的字体、颜色、尺寸等绘图参数。
 包含自动检测系统 DPI 缩放的逻辑，确保高分辨率屏幕上的正确显示。
+
+v4.0 MBSE 重构：从 dataclass 迁移到 Pydantic BaseModel，获得运行时验证。
 """
 
 from __future__ import annotations
@@ -9,8 +11,9 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -179,10 +182,10 @@ if _detected_scale > 1.01:
 import matplotlib
 
 
-@dataclass
-class PlotConfig:
+class PlotConfig(BaseModel):
     """统一绘图配置，管理字体大小、颜色、线宽、图像尺寸等参数。
 
+    基于 Pydantic BaseModel，提供运行时类型验证。
     提供 apply_rcparams() 方法可将配置直接应用到 matplotlib 全局设置。
     支持高 DPI 屏幕的自动缩放。
 
@@ -214,6 +217,8 @@ class PlotConfig:
         scale_factor: 实际缩放倍数。
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     # 字体大小参数
     title: float = 16
     label: float = 14
@@ -229,9 +234,9 @@ class PlotConfig:
     primary_body_size: int = 200
     secondary_body_color: str = "silver"
     secondary_body_size: int = 100
-    lp_colors: List[str] = field(default_factory=lambda: ["gray"] * 5)
-    lp_markers: List[str] = field(default_factory=lambda: ["^"] * 5)
-    lp_sizes: List[int] = field(default_factory=lambda: [60] * 5)
+    lp_colors: List[str] = Field(default_factory=lambda: ["gray"] * 5)
+    lp_markers: List[str] = Field(default_factory=lambda: ["^"] * 5)
+    lp_sizes: List[int] = Field(default_factory=lambda: [60] * 5)
 
     # 线条和图像尺寸参数
     orbit_linewidth: float = 1.5
@@ -250,7 +255,7 @@ class PlotConfig:
 
     # 缩放参数
     auto_scale: bool = True
-    scale_factor: float = field(default_factory=lambda: _detected_scale)
+    scale_factor: float = Field(default_factory=lambda: _detected_scale)
 
     def apply_rcparams(self) -> None:
         """将配置应用到 matplotlib 全局参数。

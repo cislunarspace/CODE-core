@@ -1,11 +1,13 @@
 """基础可视化模块
 
 提供轨道可视化的核心类 OrbitVisualizer，支持 2D 投影和 3D 轨道绑图。
+
+v4.0 MBSE 重构：参数类型使用 OrbitContainer Protocol，满足 Visualizer Protocol 接口。
 """
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import matplotlib
 import matplotlib.offsetbox as offsetbox
@@ -17,6 +19,9 @@ from enum import Enum
 from ..core.system import CR3BP_System, LibrationPoint
 from ..core.orbit import Orbit
 from .config import PlotConfig
+
+if TYPE_CHECKING:
+    from ..mbse.architecture.ports import OrbitContainer
 
 
 class ProjectionPlane(Enum):
@@ -78,8 +83,12 @@ class OrbitVisualizer:
         self.color_index += 1
         return color
 
-    def _extract_states(self, orbit):
-        """从轨道对象或数组中提取状态矩阵 (n, 6)。"""
+    def _extract_states(self, orbit: Any) -> np.ndarray:
+        """从轨道对象或数组中提取状态矩阵 (n, 6)。
+
+        接受任何满足 OrbitContainer Protocol 的对象（有 .states 属性）
+        或直接的 numpy 数组 / array-like。
+        """
         if hasattr(orbit, "states"):
             states = orbit.states
         else:
@@ -88,9 +97,37 @@ class OrbitVisualizer:
             states = states.reshape(1, -1)
         return states
 
+    # ------------------------------------------------------------------
+    # Visualizer Protocol compliance
+    # ------------------------------------------------------------------
+
+    def plot(self, data: Any, config: object = None, **kwargs) -> Any:
+        """Visualizer Protocol 入口方法。
+
+        委托到 plot_3d_orbit，将 data 作为轨道参数传入。
+        如果 config 不是 None，则替换当前 config（不修改原始对象）。
+
+        Args:
+            data: 待绘制的轨道数据（Orbit、OrbitContainer 或 array-like）。
+            config: 可选的 PlotConfig 配置对象。
+            **kwargs: 传递给 plot_3d_orbit 的额外参数。
+
+        Returns:
+            matplotlib axes 对象。
+        """
+        if config is not None and isinstance(config, PlotConfig):
+            # 仅在本次调用中使用新 config，不修改实例属性
+            saved = self.config
+            self.config = config
+            try:
+                return self.plot_3d_orbit(data, **kwargs)
+            finally:
+                self.config = saved
+        return self.plot_3d_orbit(data, **kwargs)
+
     def plot_3d_orbit(
         self,
-        orbit: Union[Orbit, npt.ArrayLike],
+        orbit: Any,
         color: Optional[str] = None,
         label: Optional[str] = None,
         ax: Optional[Any] = None,
@@ -99,7 +136,8 @@ class OrbitVisualizer:
         """绘制 3D 轨道。
 
         Args:
-            orbit: 轨道对象或状态数组。
+            orbit: 轨道对象或状态数组。接受任何满足 OrbitContainer Protocol
+                的对象（具有 .states 属性），或直接的 array-like。
             color: 线条颜色，未指定时自动从颜色循环取。
             label: 图例标签。
             ax: 目标 axes 对象，未指定时自动创建。
@@ -131,7 +169,7 @@ class OrbitVisualizer:
 
     def plot_2d_projection(
         self,
-        orbit: Union[Orbit, npt.ArrayLike],
+        orbit: Any,
         plane: Union[ProjectionPlane, str] = ProjectionPlane.XY,
         color: Optional[str] = None,
         label: Optional[str] = None,
@@ -141,7 +179,8 @@ class OrbitVisualizer:
         """绘制轨道在指定平面上的 2D 投影。
 
         Args:
-            orbit: 轨道对象或状态数组。
+            orbit: 轨道对象或状态数组。接受任何满足 OrbitContainer Protocol
+                的对象（具有 .states 属性），或直接的 array-like。
             plane: 投影平面（XY/XZ/YZ）。
             color: 线条颜色。
             label: 图例标签。

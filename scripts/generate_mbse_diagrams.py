@@ -25,19 +25,37 @@ def register_core_requirements(registry: RequirementRegistry) -> None:
     registry.register_many(CORE_REQUIREMENTS)
 
 
+def register_algorithms_requirements(registry: RequirementRegistry) -> None:
+    """注册 Algorithms 层需求"""
+    from mbse.requirements.algorithms_requirements import ALGORITHMS_REQUIREMENTS
+    registry.register_many(ALGORITHMS_REQUIREMENTS)
+
+
 def register_core_components(registry: ComponentRegistry) -> None:
     """注册 Core 层组件"""
     from mbse.architecture.core_components import CORE_COMPONENTS
     registry.register_many(CORE_COMPONENTS)
 
 
+def register_algorithms_components(registry: ComponentRegistry) -> None:
+    """注册 Algorithms 层组件"""
+    from mbse.architecture.algorithms_components import ALGORITHMS_COMPONENTS
+    registry.register_many(ALGORITHMS_COMPONENTS)
+
+
 def main():
     req_registry = RequirementRegistry()
     comp_registry = ComponentRegistry()
 
+    # 清空已有注册（单例模式，重新运行时需要）
+    req_registry.clear()
+    comp_registry.clear()
+
     # 注册
     register_core_requirements(req_registry)
+    register_algorithms_requirements(req_registry)
     register_core_components(comp_registry)
+    register_algorithms_components(comp_registry)
 
     print(f"已注册 {len(req_registry)} 条需求")
     print(f"已注册 {len(comp_registry)} 个组件")
@@ -107,6 +125,53 @@ def main():
     )
     path = os.path.join(output_dir, "sequence-propagation.md")
     generator.write_diagram(propagation_sequence, path)
+    generated.append(path)
+
+    # ---- Algorithms 层额外图表 ----
+
+    # 活动图：微分修正 Newton 迭代流程
+    correction_activity = generator.generate_activity(
+        "DifferentialCorrection",
+        [
+            {"id": "start", "label": "开始修正", "type": "start"},
+            {"id": "config", "label": "加载 CorrectionConfig 策略", "type": "process"},
+            {"id": "propagate", "label": "传播半周期 (with_stm=True)", "type": "process"},
+            {"id": "error", "label": "计算约束误差向量", "type": "process"},
+            {"id": "check", "label": "收敛?", "type": "process"},
+            {"id": "update", "label": "Newton 更新自由变量", "type": "process"},
+            {"id": "end", "label": "返回收敛轨道", "type": "end"},
+        ],
+        decision_nodes=[
+            {
+                "id": "check",
+                "label": "收敛?",
+                "branches": [
+                    {"target": "end", "condition": "是 (error < tol)"},
+                    {"target": "update", "condition": "否"},
+                ],
+            },
+        ],
+    )
+    path = os.path.join(output_dir, "activity-differential-correction.md")
+    generator.write_diagram(correction_activity, path)
+    generated.append(path)
+
+    # 序列图：微分修正交互
+    correction_sequence = generator.generate_sequence(
+        ["Client", "DiffCorrection", "Strategy", "Dynamics"],
+        [
+            ("Client", "DiffCorrection", "correct(initial_state, period)"),
+            ("DiffCorrection", "Strategy", "get_free_variable_indices()"),
+            ("DiffCorrection", "Dynamics", "propagate(state, T/2, with_stm=True)"),
+            ("Dynamics", "DiffCorrection", "states, stm"),
+            ("DiffCorrection", "Strategy", "compute_error(orbit, dynamics)"),
+            ("Strategy", "DiffCorrection", "error_vector"),
+            ("DiffCorrection", "DiffCorrection", "Newton update: dx = -J_inv * error"),
+            ("DiffCorrection", "Client", "corrected Orbit"),
+        ],
+    )
+    path = os.path.join(output_dir, "sequence-correction.md")
+    generator.write_diagram(correction_sequence, path)
     generated.append(path)
 
     # 覆盖率报告

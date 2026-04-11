@@ -10,7 +10,8 @@ DRO到RO转移轨道NLP优化模块
 from __future__ import annotations
 
 import numpy as np
-from typing import Tuple, List, Optional, Dict, Any, Callable
+from typing import Tuple, Optional, Dict, Any, Callable
+from dataclasses import dataclass, field
 from enum import Enum
 from scipy.optimize import minimize, Bounds
 import warnings
@@ -38,6 +39,7 @@ class TransferType(Enum):
     EXTERNAL = "external"
 
 
+@dataclass
 class NLPOptimizationVariables:
     """NLP优化变量
 
@@ -49,10 +51,9 @@ class NLPOptimizationVariables:
         t_ins: 从轨道远地点到插入点的时间
     """
 
-    def __init__(self, alpha: float, transfer_time: float, t_ins: float):
-        self.alpha = alpha
-        self.transfer_time = transfer_time
-        self.t_ins = t_ins
+    alpha: float = 0.0
+    transfer_time: float = 0.0
+    t_ins: float = 0.0
 
     def to_array(self) -> np.ndarray:
         """转换为numpy数组"""
@@ -64,6 +65,7 @@ class NLPOptimizationVariables:
         return cls(alpha=arr[0], transfer_time=arr[1], t_ins=arr[2])
 
 
+@dataclass
 class NLPOptimizationResult:
     """NLP优化结果
 
@@ -82,41 +84,24 @@ class NLPOptimizationResult:
         success: 优化是否成功
         message: 结果消息
         transfer_type: 转移类型
+        constraints_violation: 约束违反量字典
     """
 
-    def __init__(
-        self,
-        alpha: float = 0.0,
-        transfer_time: float = 0.0,
-        t_ins: float = 0.0,
-        objective_value: float = 0.0,
-        delta_v1: float = 0.0,
-        delta_v2: float = 0.0,
-        transfer_trajectory: Optional[np.ndarray] = None,
-        transfer_times: Optional[np.ndarray] = None,
-        departure_state: Optional[np.ndarray] = None,
-        insertion_state: Optional[np.ndarray] = None,
-        final_state: Optional[np.ndarray] = None,
-        success: bool = False,
-        message: str = "",
-        transfer_type: TransferType = TransferType.DIRECT,
-        constraints_violation: Optional[Dict[str, float]] = None,
-    ):
-        self.alpha = alpha
-        self.transfer_time = transfer_time
-        self.t_ins = t_ins
-        self.objective_value = objective_value
-        self.delta_v1 = delta_v1
-        self.delta_v2 = delta_v2
-        self.transfer_trajectory = transfer_trajectory
-        self.transfer_times = transfer_times
-        self.departure_state = departure_state
-        self.insertion_state = insertion_state
-        self.final_state = final_state
-        self.success = success
-        self.message = message
-        self.transfer_type = transfer_type
-        self.constraints_violation = constraints_violation or {}
+    alpha: float = 0.0
+    transfer_time: float = 0.0
+    t_ins: float = 0.0
+    objective_value: float = 0.0
+    delta_v1: float = 0.0
+    delta_v2: float = 0.0
+    transfer_trajectory: Optional[np.ndarray] = None
+    transfer_times: Optional[np.ndarray] = None
+    departure_state: Optional[np.ndarray] = None
+    insertion_state: Optional[np.ndarray] = None
+    final_state: Optional[np.ndarray] = None
+    success: bool = False
+    message: str = ""
+    transfer_type: TransferType = TransferType.DIRECT
+    constraints_violation: Dict[str, float] = field(default_factory=dict)
 
 
 class DROTRONLPOptimizer:

@@ -1,12 +1,14 @@
 """轨道族可视化模块
 
 提供轨道族的 2D/3D 绘图、Jacobi-周期-稳定性分析图和概览图。
+
+v4.0 MBSE 重构：满足 Visualizer Protocol 接口，参数类型兼容 OrbitContainer Protocol。
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -17,6 +19,9 @@ from .base import OrbitVisualizer, ProjectionPlane
 from .config import PlotConfig
 from .stability import compute_stability_for_family
 from ..core.system import CR3BP_System
+
+if TYPE_CHECKING:
+    from ..mbse.architecture.ports import OrbitContainer
 
 
 class FamilyPlotter(OrbitVisualizer):
@@ -31,6 +36,29 @@ class FamilyPlotter(OrbitVisualizer):
 
     def __init__(self, system: CR3BP_System, config: Optional[PlotConfig] = None) -> None:
         super().__init__(system, config)
+
+    # ------------------------------------------------------------------
+    # Visualizer Protocol compliance
+    # ------------------------------------------------------------------
+
+    def plot(self, data: Any, config: object = None, **kwargs) -> Any:
+        """Visualizer Protocol 入口方法。
+
+        委托到 plot_family_2d，将 data 作为 family_result 传入。
+        data 应为可迭代的轨道集合（OrbitFamily、List[Orbit] 等）。
+
+        Args:
+            data: 轨道族数据（OrbitFamily 或轨道列表）。
+            config: 可选的 PlotConfig 配置对象。
+            **kwargs: 传递给 plot_family_2d 的额外参数（如 jacobi_values 等）。
+
+        Returns:
+            (fig, ax) 元组。
+        """
+        jacobi_values = kwargs.pop("jacobi_values", None)
+        if jacobi_values is None:
+            jacobi_values = []
+        return self.plot_family_2d(data, jacobi_values=jacobi_values, **kwargs)
 
     def _get_jacobi_norm(self, jacobi_values):
         """计算 Jacobi 常数的归一化范围 [0, 1]。"""

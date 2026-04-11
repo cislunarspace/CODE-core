@@ -1,11 +1,13 @@
 """转移轨迹可视化模块
 
 提供转移轨道、搜索结果的可视化工具。
+
+v4.0 MBSE 重构：满足 Visualizer Protocol 接口，参数类型兼容 OrbitContainer Protocol。
 """
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,6 +17,9 @@ from .base import OrbitVisualizer
 from .config import PlotConfig
 from ..core.orbit import Orbit
 from ..core.system import CR3BP_System
+
+if TYPE_CHECKING:
+    from ..mbse.architecture.ports import OrbitContainer
 
 
 class TransferPlotter(OrbitVisualizer):
@@ -29,6 +34,26 @@ class TransferPlotter(OrbitVisualizer):
 
     def __init__(self, system: CR3BP_System, config: Optional[PlotConfig] = None) -> None:
         super().__init__(system, config)
+
+    # ------------------------------------------------------------------
+    # Visualizer Protocol compliance
+    # ------------------------------------------------------------------
+
+    def plot(self, data: Any, config: object = None, **kwargs) -> Any:
+        """Visualizer Protocol 入口方法。
+
+        委托到 plot_solution_plane，将 data 作为 results 传入。
+        data 应为搜索结果列表（NLPOptimizationResult 列表或 dict 列表）。
+
+        Args:
+            data: 搜索结果列表。
+            config: 可选的 PlotConfig 配置对象。
+            **kwargs: 传递给 plot_solution_plane 的额外参数。
+
+        Returns:
+            matplotlib axes 对象。
+        """
+        return self.plot_solution_plane(data, **kwargs)
 
     def plot_solution_plane(
         self,
@@ -89,8 +114,8 @@ class TransferPlotter(OrbitVisualizer):
 
     def plot_transfer_orbit(
         self,
-        departure_orbit: Orbit,
-        arrival_orbit: Orbit,
+        departure_orbit: Any,
+        arrival_orbit: Any,
         transfer_trajectory: npt.ArrayLike,
         departure_state: npt.ArrayLike,
         insertion_state: npt.ArrayLike,
@@ -101,8 +126,8 @@ class TransferPlotter(OrbitVisualizer):
         """绘制 3D 转移轨道（出发轨道 + 到达轨道 + 转移弧段）。
 
         Args:
-            departure_orbit: 出发轨道（DRO）。
-            arrival_orbit: 到达轨道（RO）。
+            departure_orbit: 出发轨道（DRO）。接受任何满足 OrbitContainer Protocol 的对象。
+            arrival_orbit: 到达轨道（RO）。接受任何满足 OrbitContainer Protocol 的对象。
             transfer_trajectory: 转移轨迹状态数组 (n, 6)。
             departure_state: 出发点状态 [6]。
             insertion_state: 插入点状态 [6]。

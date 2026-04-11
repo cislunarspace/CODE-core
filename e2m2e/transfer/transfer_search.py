@@ -60,6 +60,7 @@ from ..core.orbit import Orbit
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.system import CR3BP_System
 
+from .search_config import SearchConfig
 from .transfer_optimization import (
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
@@ -78,21 +79,49 @@ class TransferSearch:
     3. 前向积分获取转移轨迹
     4. 筛选与目标轨道相交或距离局部最小的候选解
 
+    搜索参数集中存储在 ``self.config``（:class:`SearchConfig` dataclass）中，
+    同时通过属性代理提供向后兼容的直接读写访问（``self.alpha_min`` 等）。
+
     使用方式:
-        transfer = TransferSearch(system, dynamics)
-        transfer.set_departure_orbit(departure_orbit)
-        transfer.set_arrival_orbit(arrival_orbit)
+        transfer = TransferSearch(dynamics)
         transfer.configure_search(alpha_min=0.5, alpha_max=2.5, n_alpha=101)
-        results = transfer.search()
+        results = transfer.search(...)
+
+    或通过 SearchConfig:
+        from e2m2e.transfer import SearchConfig
+        cfg = SearchConfig(alpha_min=0.5, alpha_max=2.5, n_alpha=101)
+        transfer = TransferSearch(dynamics, config=cfg)
     """
+
+    # --- 搜索配置属性名（与 SearchConfig 字段一一对应） ---
+    _CONFIG_FIELDS: Tuple[str, ...] = (
+        "alpha_min",
+        "alpha_max",
+        "n_alpha",
+        "n_departure",
+        "max_transfer_time",
+        "intersection_threshold",
+        "min_distance_threshold",
+        "collision_earth_radius",
+        "collision_moon_radius",
+        "integration_dt",
+        "alpha_range",
+        "transfer_time_range",
+        "t_ins_range",
+        "velocity_angle_tolerance",
+    )
 
     def __init__(
         self,
         dynamics: CR3BP_Dynamics,
         name: str = "TransferSearch",
+        config: Optional[SearchConfig] = None,
     ):
         self.system = dynamics.system
-        self.dynamics = dynamics
+        # dynamics 类型说明：
+        # - 内部搜索积分（_forward_integrate）仅调用 propagate()，满足 Propagator Protocol
+        # - 但 __init__ 还访问 dynamics.system 与 system.mu，因此保留 CR3BP_Dynamics 具体类型
+        self.dynamics: CR3BP_Dynamics = dynamics
         self.mu = self.system.mu
         self.name = name
         self._departure_orbit: Optional[Orbit] = None
@@ -104,68 +133,31 @@ class TransferSearch:
         # "processes" 多进程，利于 CPU 密集积分绕过 GIL；"threads" 保留线程内 tqdm 细粒度进度
         self._parallel_backend: str = "processes"
 
-        # α (切向速度比) 搜索范围
-        # 推荐值: alpha_min ∈ (0, 1.0], alpha_max ∈ [1.0, 3.0]
-        # 约束: 0 < alpha_min < alpha_max
-        self.alpha_min: float | None = None
-        self.alpha_max: float | None = None
+        # 搜索 + 优化配置（集中管理）
+        self._config: SearchConfig = config if config is not None else SearchConfig()
 
-        # α 方向网格点数（Cui et al. 2025 Table 3 平面搜索为 1001）
-        # 推荐值: n_alpha ∈ [51, 2001]
-        # 约束: n_alpha >= 2
-        self.n_alpha: int | None = None
+    # --- 向后兼容属性代理：读/写直接转发到 _config ---
 
-        # 出发点采样数量
-        # 推荐值: n_departure ∈ [50, 500], 典型值 200
-        # 约束: n_departure >= 2
-        self.n_departure: int | None = None
+    @property
+    def config(self) -> SearchConfig:
+        """搜索/优化配置对象。"""
+        return self._config
 
-        # 最大转移时间 (CR3BP 无量纲时间单位)
-        # 推荐值: max_transfer_time ∈ [5.0, 30.0], 典型值 15.0
-        # 约束: max_transfer_time > 0
-        self.max_transfer_time: float | None = None
+    @config.setter
+    def config(self, value: SearchConfig) -> None:
+        self._config = value
 
-        # 相交判定阈值 (无量纲距离)
-        # 推荐值: intersection_threshold ∈ [1e-4, 1e-2], 典型值 0.001
-        # 约束: intersection_threshold > 0
-        self.intersection_threshold: float | None = None
+    def __getattr__(self, name: str) -> Any:
+        # 仅代理 _CONFIG_FIELDS 中的字段，避免干扰其他属性查找
+        if name in TransferSearch._CONFIG_FIELDS:
+            return getattr(self._config, name)
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
-        # 候选解最小距离阈值 (无量纲距离)
-        # 默认与基类一致：100 km / 地月距离；若需自定义可设为正数
-        # 约束: min_distance_threshold > 0（当非 None 时）
-        self.min_distance_threshold: float | None = None
-
-        # 地球碰撞检测半径 (无量纲距离)
-        # 推荐值: 200 km ≈ 0.0005 (相对于地月距离 384405 km)
-        # 约束: collision_earth_radius > 0
-        self.collision_earth_radius: float | None = None
-
-        # 月球碰撞检测半径 (无量纲距离)
-        # 推荐值: 100 km ≈ 0.00026
-        # 约束: collision_moon_radius > 0
-        self.collision_moon_radius: float | None = None
-
-        # 积分时间步长 (CR3BP 无量纲时间)
-        # 推荐值: integration_dt ∈ [1e-4, 0.1], 典型值 0.01 //TODO 这里的典型值需要修改，这里的单位是无量纲量，所以不能以0.01为单位，而应该以转换之后的10s或者60s作为典型值
-        # 约束: integration_dt > 0
-        self.integration_dt: float | None = None
-
-        # 优化参数
-        # alpha 搜索范围
-        # 推荐值: (0.5, 2.5)
-        self.alpha_range: Tuple[float, float] | None = None
-
-        # 转移时间范围
-        # 推荐值: (1.0, 30.0)
-        self.transfer_time_range: Tuple[float, float] | None = None
-
-        # 插入时间范围
-        # 推荐值: (0.0, 10.0)
-        self.t_ins_range: Tuple[float, float] | None = None
-
-        # 速度平行性容差
-        # 推荐值: 1e-6
-        self.velocity_angle_tolerance: float | None = None
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in TransferSearch._CONFIG_FIELDS:
+            setattr(self._config, name, value)
+        else:
+            super().__setattr__(name, value)
 
     def set_verbose(self, verbose: bool) -> "TransferSearch":
         """设置是否输出详细信息"""

@@ -87,4 +87,65 @@ requirementDiagram
         risk: should
     }
     e2m2e_core_ephemeris_dynamics -satisfies-> REQ_026
+    requirement REQ_100 {
+        title: 微分修正 50 次迭代内收敛
+        type: performance
+        risk: shall
+    }
+    e2m2e_algorithms_differential_correction -satisfies-> REQ_100
+    requirement REQ_101 {
+        title: 收敛容差默认 1e-12
+        type: performance
+        risk: shall
+    }
+    e2m2e_algorithms_differential_correction -satisfies-> REQ_101
+    requirement REQ_102 {
+        title: 策略模式分离配置与迭代
+        type: interface
+        risk: should
+    }
+    e2m2e_algorithms_strategies -satisfies-> REQ_102
+    e2m2e_algorithms_differential_correction -satisfies-> REQ_102
+    requirement REQ_103 {
+        title: Continuation 不重复 CR3BP 物理
+        type: interface
+        risk: shall
+    }
+    e2m2e_algorithms_continuation -satisfies-> REQ_103
+    requirement REQ_104 {
+        title: 算法层 STM 解析计算
+        type: functional
+        risk: shall
+    }
+    e2m2e_algorithms_differential_correction -satisfies-> REQ_104
+    requirement REQ_105 {
+        title: Richardson 三阶近似精度
+        type: functional
+        risk: should
+    }
+    e2m2e_algorithms_differential_correction -satisfies-> REQ_105
+    requirement REQ_110 {
+        title: 稳定性指标满足 v1*v2 = 1
+        type: performance
+        risk: should
+    }
+    e2m2e_algorithms_stability -satisfies-> REQ_110
+    requirement REQ_111 {
+        title: MultipleShooting 并行传播
+        type: functional
+        risk: should
+    }
+    e2m2e_algorithms_multiple_shooting -satisfies-> REQ_111
+    requirement REQ_112 {
+        title: 延拓步长自适应
+        type: functional
+        risk: should
+    }
+    e2m2e_algorithms_continuation -satisfies-> REQ_112
+    requirement REQ_113 {
+        title: 伪弧长延拓切向量计算
+        type: functional
+        risk: shall
+    }
+    e2m2e_algorithms_continuation -satisfies-> REQ_113
 ```

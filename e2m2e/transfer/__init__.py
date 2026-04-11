@@ -3,6 +3,7 @@
 提供 DRO-RO 转移轨道的网格搜索和 NLP 优化工具，实现 Cui et al. (2025) 的"搜索-优化"两步法。
 
 Classes:
+    SearchConfig: 搜索/优化参数配置 dataclass
     TransferSearch: 通用轨道转移网格搜索
     Transfer: 简化的转移轨道优化接口
     DROTRONLPOptimizer: DRO-RO 转移轨道 NLP 优化器
@@ -17,6 +18,8 @@ Functions:
 from . import transfer_search
 from . import transfer_optimization
 from . import transfer
+
+from .search_config import SearchConfig
 
 from .transfer_search import (
     TransferSearch,
@@ -44,6 +47,7 @@ from .transfer import (
 _HAVE_COPT = transfer_optimization.coptpy is not None
 
 __all__ = [
+    "SearchConfig",
     "TransferSearch",
     "DROTransferSearch",
     "DROROTransferSearch",
