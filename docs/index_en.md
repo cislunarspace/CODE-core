@@ -62,6 +62,8 @@ algorithms/     Numerical — differential correction, continuation, stability, 
 transfer/       Design — DRO→RO transfer search, NLP optimization
   ↓
 visualization/  Display — orbit family plots, transfer trajectory visualization
+
+mbse/           Cross-cutting — Protocol interfaces, Pydantic models, requirement tracing, diagram generation
 ```
 
 | Layer | Purpose | Entry classes |
@@ -70,6 +72,7 @@ visualization/  Display — orbit family plots, transfer trajectory visualizatio
 | `algorithms` | Correct periodic orbits, continue families, analyze stability | `DifferentialCorrection`, `Continuation`, `StabilityAnalysis` |
 | `transfer` | Search and optimize orbit transfers | `Transfer`, `DROTransferSearch` |
 | `visualization` | Plot orbits, families, and transfer trajectories | `OrbitVisualizer`, `FamilyPlotter`, `TransferPlotter` |
+| `mbse` | Protocol interfaces, data models, requirement tracing | Protocols, Pydantic models, `RequirementRegistry` |
 
 ## Typical Workflow
 

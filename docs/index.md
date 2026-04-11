@@ -62,6 +62,8 @@ algorithms/     算法层 — 微分修正、延拓、稳定性分析、多重�
 transfer/       设计层 — DRO→RO 转移搜索、NLP 优化
   ↓
 visualization/  展示层 — 轨道族绘图、转移轨迹可视化
+
+mbse/           横切层 — Protocol 接口、Pydantic 模型、需求追溯、图表生成
 ```
 
 | 层 | 做什么 | 入口类 |
@@ -70,6 +72,7 @@ visualization/  展示层 — 轨道族绘图、转移轨迹可视化
 | `algorithms` | 修正周期轨道、延拓轨道族、分析稳定性 | `DifferentialCorrection`, `Continuation`, `StabilityAnalysis` |
 | `transfer` | 搜索和优化轨道转移 | `Transfer`, `DROTransferSearch` |
 | `visualization` | 绘制轨道、族、转移轨迹 | `OrbitVisualizer`, `FamilyPlotter`, `TransferPlotter` |
+| `mbse` | Protocol 接口、数据模型、需求追溯 | Protocols, Pydantic models, `RequirementRegistry` |
 
 ## 典型工作流
 

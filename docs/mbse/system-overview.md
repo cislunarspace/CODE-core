@@ -20,9 +20,9 @@ graph TD
 | 层 | 模块 | 职责 |
 |----|------|------|
 | Core | system, dynamics, orbit, coordinate, spice | 物理模型、数据结构 |
-| Algorithms | differential_correction, continuation, stability, multiple_shooting | 数值求解器 |
+| Algorithms | differential_correction, continuation, stability, multiple_shooting, strategies | 数值求解器 |
 | Transfer | transfer_search, transfer_optimization, transfer | 转移轨迹设计 |
-| Visualization | config, base, family, transfer | 绘图可视化 |
+| Visualization | config, base, family, transfer, stability | 绘图可视化 |
 
 ## Protocol 接口
 

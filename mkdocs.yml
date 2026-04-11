@@ -71,6 +71,18 @@ nav:
       - Coordinate Transformation: core/coordinate_en.md
       - System Overview: guides/system-overview_en.md
       - Plotting Module: visualization/plotting_en.md
+    - MBSE Models:
+      - System Overview: mbse/system-overview.md
+      - Traceability Matrix: mbse/traceability-matrix.md
+      - Core BDD: mbse/bdd-core.md
+      - Algorithms BDD: mbse/bdd-algorithms.md
+      - Requirements: mbse/requirements.md
+      - Convergence State Machine: mbse/state-convergence.md
+      - Orbit Lifecycle: mbse/state-orbit-lifecycle.md
+      - Orbit Design Activity: mbse/activity-orbit-design.md
+      - Differential Correction Activity: mbse/activity-differential-correction.md
+      - Propagation Sequence: mbse/sequence-propagation.md
+      - Correction Sequence: mbse/sequence-correction.md
 
 markdown_extensions:
   - admonition

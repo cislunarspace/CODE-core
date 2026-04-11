@@ -38,6 +38,7 @@ visualization/  展示层 — 轨道族绘图、转移轨迹可视化
 | `continuation.py` | `Continuation` | 自然/伪弧长轨道族延拓 |
 | `stability.py` | `StabilityAnalysis` | Floquet 乘子、分岔检测 |
 | `multiple_shooting.py` | `MultipleShooting` | 多重打靶法，复杂约束修正 |
+| `strategies/` | `CorrectionConfig` + 策略函数 | 修正配置的不可变数据类 + 8 种对称性策略 |
 
 ### Transfer（转移模块）
 
@@ -46,6 +47,7 @@ visualization/  展示层 — 轨道族绘图、转移轨迹可视化
 | `transfer.py` | `Transfer` | 链式 API：`set_orbit().optimize()` |
 | `transfer_search.py` | `DROTransferSearch` | DRO→RO 平面转移网格搜索（并行） |
 | `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP 优化（可选 COPT 求解器） |
+| `search_config.py` | `SearchConfig` | 搜索/优化参数配置 dataclass |
 
 ### Visualization（可视化模块）
 
@@ -55,6 +57,7 @@ visualization/  展示层 — 轨道族绘图、转移轨迹可视化
 | `base.py` | `OrbitVisualizer` | 2D/3D 轨道绘制基类 |
 | `family.py` | `FamilyPlotter` | 轨道族可视化（Jacobi 着色） |
 | `transfer.py` | `TransferPlotter` | 转移轨迹可视化 |
+| `stability.py` | `compute_stability_for_family` | 轨道族稳定性批量计算 |
 
 ## 数据流
 

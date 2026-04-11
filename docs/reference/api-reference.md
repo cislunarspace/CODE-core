@@ -57,8 +57,9 @@
       - [设计原理](#设计原理_6)
       - [TransferType 枚举](#transfertype-枚举)
       - [核心方法](#核心方法_9)
-    - [3.3 Transfer（简化 API）](#33-transfer简化-api)
-    - [3.4 工具函数](#34-工具函数)
+    - [3.3 SearchConfig](#33-searchconfig)
+    - [3.4 Transfer（简化 API）](#34-transfer简化-api)
+    - [3.5 工具函数](#35-工具函数)
   - [4. Visualization Module (可视化模块)](#4-visualization-module-可视化模块)
     - [4.1 PlotConfig](#41-plotconfig)
     - [4.2 OrbitVisualizer \& ProjectionPlane](#42-orbitvisualizer-projectionplane)
@@ -529,6 +530,62 @@ $$\nu = \frac{|\lambda_1| + |\lambda_2| + |\lambda_3| + |\lambda_4|}{4}$$
 
 ---
 
+### 2.4 CorrectionConfig & 策略函数
+
+**文件**: `e2m2e/algorithms/strategies/`
+
+v3.2 引入的策略模式将微分修正的配置逻辑从 `DifferentialCorrection` 类中分离为独立的不可变配置和策略函数。
+
+#### CorrectionConfig
+
+**类签名**:
+```python
+@dataclass(frozen=True)
+class CorrectionConfig:
+    """微分修正策略的不可变配置"""
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `setup_type` | `str` | 修正配置类型标识 |
+| `symmetry_condition` | `str` | 利用的对称性（如 `'x_axis'`） |
+| `fixed_parameters` | `Dict[str, float]` | 修正期间保持不变的参数 |
+| `free_variables` | `List[str]` | Newton 求解器调整的变量名 |
+| `free_variable_indices` | `List[int]` | 自由变量对应的状态向量索引 |
+| `target_conditions` | `Dict[str, float]` | 约束名称到目标值的映射 |
+| `constraint_indices` | `List[int]` | 约束评估对应的状态向量索引 |
+| `constraint_weights` | `Dict[str, float]` | 雅可比矩阵的逐约束权重 |
+| `constraint_types` | `Dict[str, str]` | 逐约束分类（如 `'equality'`） |
+
+#### 策略函数
+
+| 函数 | 对称性 | 自由变量 | 目标约束 |
+|------|--------|---------|---------|
+| `symmetric_2d_fixed_x0(x0)` | x 轴 | $[v_{y0}, T_{half}]$ | $y=0, \dot{x}=0$ |
+| `symmetric_2d_fixed_t(t_half)` | x 轴 | $[x_0, v_{y0}]$ | $y=0, \dot{x}=0$ |
+| `symmetric_2d_fixed_y0(y0)` | y 轴 | $[\dot{x}_0, T_{half}]$ | $x=0, \dot{y}=0$ |
+| `symmetric_3d_fixed_x0(x0)` | x 轴 | $[z_0, v_{y0}, T_{half}]$ | $y=0, \dot{x}=0, \dot{z}=0$ |
+| `symmetric_xz_fixed_x0(x0)` | xz 平面 | $[z_0, v_{y0}, T_{half}]$ | $y=0, \dot{x}=0, \dot{z}=0$ |
+| `symmetric_xz_fixed_z0(z0)` | xz 平面 | $[x_0, v_{y0}, T_{half}]$ | $y=0, \dot{x}=0, \dot{z}=0$ |
+| `halo_fixed_x0(x0, libration_point)` | xz 平面 | $[z_0, v_{y0}, T_{half}]$ | $y=0, \dot{x}=0, \dot{z}=0$ |
+| `halo_fixed_z0(z0, libration_point)` | xz 平面 | $[x_0, v_{y0}, T_{half}]$ | $y=0, \dot{x}=0, \dot{z}=0$ |
+
+#### 使用示例
+
+```python
+from e2m2e.algorithms.strategies import CorrectionConfig, halo_fixed_z0
+
+# 使用策略函数生成配置
+config = halo_fixed_z0(z0=0.1, libration_point=1)
+# config 是一个不可变的 CorrectionConfig 实例
+
+# 传给 DifferentialCorrection 使用
+corrector = DifferentialCorrection(dynamics)
+corrector.setup_halo_orbit_fixed_z0(z0=0.1, libration_point=1)
+```
+
+---
+
 ## 3. Transfer Module (转移模块)
 
 ### 3.1 TransferSearch / DROTransferSearch
@@ -648,7 +705,41 @@ result = optimizer.optimize(initial_guess=initial_vars)
 
 ---
 
-### 3.3 Transfer（简化 API）
+### 3.3 SearchConfig
+
+**文件**: `e2m2e/transfer/search_config.py`
+
+**类签名**:
+```python
+@dataclass
+class SearchConfig:
+    """TransferSearch 网格搜索配置"""
+```
+
+`SearchConfig` 将搜索和优化参数集中管理为可复用的 dataclass，便于序列化和类型检查。
+
+#### 字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `alpha_min` | `float` | α（切向速度比）下界 |
+| `alpha_max` | `float` | α 上界 |
+| `n_alpha` | `int` | α 方向网格点数 |
+| `n_departure` | `int` | 出发点采样数量 |
+| `max_transfer_time` | `float` | 最大转移时间（无量纲） |
+| `intersection_threshold` | `float` | 相交判定距离阈值 |
+| `min_distance_threshold` | `float` | 候选解最小距离阈值 |
+| `collision_earth_radius` | `float` | 地球碰撞检测半径（无量纲） |
+| `collision_moon_radius` | `float` | 月球碰撞检测半径（无量纲） |
+| `integration_dt` | `float` | 积分时间步长（无量纲） |
+| `alpha_range` | `Tuple[float, float]` | 优化阶段 α 搜索范围 |
+| `transfer_time_range` | `Tuple[float, float]` | 优化阶段转移时间范围 |
+| `t_ins_range` | `Tuple[float, float]` | 优化阶段插入时间范围 |
+| `velocity_angle_tolerance` | `float` | 速度平行性容差（弧度） |
+
+---
+
+### 3.4 Transfer（简化 API）
 
 **文件**: `e2m2e/transfer/transfer.py`
 
@@ -674,7 +765,7 @@ result = transfer.set_orbit(start=dro_orbit, end=ro_orbit).optimize(
 
 ---
 
-### 3.4 工具函数
+### 3.5 工具函数
 
 ```python
 from e2m2e.transfer import load_orbit_from_json, optimize_transfer, optimize_with_copt

@@ -38,6 +38,7 @@ Dependencies between layers are strictly unidirectional: upper layers may use lo
 | `continuation.py` | `Continuation` | Natural / pseudo-arclength orbit family continuation |
 | `stability.py` | `StabilityAnalysis` | Floquet multipliers, bifurcation detection |
 | `multiple_shooting.py` | `MultipleShooting` | Multiple shooting method, complex constraint correction |
+| `strategies/` | `CorrectionConfig` + strategy functions | Immutable correction config dataclass + 8 symmetry strategies |
 
 ### Transfer
 
@@ -46,6 +47,7 @@ Dependencies between layers are strictly unidirectional: upper layers may use lo
 | `transfer.py` | `Transfer` | Chaining API: `set_orbit().optimize()` |
 | `transfer_search.py` | `DROTransferSearch` | DRO->RO planar transfer grid search (parallel) |
 | `transfer_optimization.py` | `DROTRONLPOptimizer` | NLP optimization (optional COPT solver) |
+| `search_config.py` | `SearchConfig` | Search/optimization parameter configuration dataclass |
 
 ### Visualization
 
@@ -55,6 +57,7 @@ Dependencies between layers are strictly unidirectional: upper layers may use lo
 | `base.py` | `OrbitVisualizer` | 2D/3D orbit plotting base class |
 | `family.py` | `FamilyPlotter` | Orbit family visualization (Jacobi coloring) |
 | `transfer.py` | `TransferPlotter` | Transfer trajectory visualization |
+| `stability.py` | `compute_stability_for_family` | Batch stability computation for orbit families |
 
 ## Data Flow
 

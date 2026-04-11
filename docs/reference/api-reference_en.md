@@ -48,6 +48,7 @@
       - [Stability Analysis Mathematical Foundation](#stability-analysis-mathematical-foundation)
       - [Stability Index](#stability-index)
       - [Core Methods](#core-methods_7)
+    - [2.4 CorrectionConfig & Strategy Functions](#24-correctionconfig-strategy-functions)
   - [3. Transfer Module](#3-transfer-module)
     - [3.1 TransferSearch / DROTransferSearch](#31-transfersearch-drotransfersearch)
       - [Design Principles](#design-principles_5)
@@ -57,8 +58,9 @@
       - [Design Principles](#design-principles_6)
       - [TransferType Enum](#transfertype-enum)
       - [Core Methods](#core-methods_9)
-    - [3.3 Transfer (Simplified API)](#33-transfer-simplified-api)
-    - [3.4 Utility Functions](#34-utility-functions)
+    - [3.3 SearchConfig](#33-searchconfig)
+    - [3.4 Transfer (Simplified API)](#34-transfer-simplified-api)
+    - [3.5 Utility Functions](#35-utility-functions)
   - [4. Visualization Module](#4-visualization-module)
     - [4.1 PlotConfig](#41-plotconfig)
     - [4.2 OrbitVisualizer \& ProjectionPlane](#42-orbitvisualizer-projectionplane)
@@ -531,6 +533,62 @@ For stable orbits, $\nu = 1$.
 
 ---
 
+### 2.4 CorrectionConfig & Strategy Functions
+
+**File**: `e2m2e/algorithms/strategies/`
+
+The strategy pattern introduced in v3.2 separates correction configuration logic from the `DifferentialCorrection` class into independent immutable configs and strategy functions.
+
+#### CorrectionConfig
+
+**Class Signature**:
+```python
+@dataclass(frozen=True)
+class CorrectionConfig:
+    """Immutable configuration for a differential correction strategy"""
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `setup_type` | `str` | Correction setup type identifier |
+| `symmetry_condition` | `str` | Symmetry exploited by the correction (e.g. `'x_axis'`) |
+| `fixed_parameters` | `Dict[str, float]` | Parameter values held constant during correction |
+| `free_variables` | `List[str]` | Variable names the Newton solver adjusts |
+| `free_variable_indices` | `List[int]` | State-vector indices corresponding to free variables |
+| `target_conditions` | `Dict[str, float]` | Constraint names mapped to their target values |
+| `constraint_indices` | `List[int]` | State-vector indices for constraint evaluation |
+| `constraint_weights` | `Dict[str, float]` | Per-constraint weighting factors for the Jacobian |
+| `constraint_types` | `Dict[str, str]` | Per-constraint classification (e.g. `'equality'`) |
+
+#### Strategy Functions
+
+| Function | Symmetry | Free Variables | Target Constraints |
+|----------|----------|----------------|--------------------|
+| `symmetric_2d_fixed_x0(x0)` | x-axis | $[v_{y0}, T_{half}]$ | $y=0, \dot{x}=0$ |
+| `symmetric_2d_fixed_t(t_half)` | x-axis | $[x_0, v_{y0}]$ | $y=0, \dot{x}=0$ |
+| `symmetric_2d_fixed_y0(y0)` | y-axis | $[\dot{x}_0, T_{half}]$ | $x=0, \dot{y}=0$ |
+| `symmetric_3d_fixed_x0(x0)` | x-axis | $[z_0, v_{y0}, T_{half}]$ | $y=0, \dot{x}=0, \dot{z}=0$ |
+| `symmetric_xz_fixed_x0(x0)` | xz-plane | $[z_0, v_{y0}, T_{half}]$ | $y=0, \dot{x}=0, \dot{z}=0$ |
+| `symmetric_xz_fixed_z0(z0)` | xz-plane | $[x_0, v_{y0}, T_{half}]$ | $y=0, \dot{x}=0, \dot{z}=0$ |
+| `halo_fixed_x0(x0, libration_point)` | xz-plane | $[z_0, v_{y0}, T_{half}]$ | $y=0, \dot{x}=0, \dot{z}=0$ |
+| `halo_fixed_z0(z0, libration_point)` | xz-plane | $[x_0, v_{y0}, T_{half}]$ | $y=0, \dot{x}=0, \dot{z}=0$ |
+
+#### Usage Example
+
+```python
+from e2m2e.algorithms.strategies import CorrectionConfig, halo_fixed_z0
+
+# Use a strategy function to generate configuration
+config = halo_fixed_z0(z0=0.1, libration_point=1)
+# config is an immutable CorrectionConfig instance
+
+# Pass to DifferentialCorrection
+corrector = DifferentialCorrection(dynamics)
+corrector.setup_halo_orbit_fixed_z0(z0=0.1, libration_point=1)
+```
+
+---
+
 ## 3. Transfer Module
 
 ### 3.1 TransferSearch / DROTransferSearch
@@ -651,7 +709,41 @@ result = optimizer.optimize(initial_guess=initial_vars)
 
 ---
 
-### 3.3 Transfer (Simplified API)
+### 3.3 SearchConfig
+
+**File**: `e2m2e/transfer/search_config.py`
+
+**Class Signature**:
+```python
+@dataclass
+class SearchConfig:
+    """TransferSearch grid search configuration"""
+```
+
+`SearchConfig` centralizes search and optimization parameters into a reusable dataclass for serialization and type safety.
+
+#### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `alpha_min` | `float` | Lower bound of tangential velocity ratio α |
+| `alpha_max` | `float` | Upper bound of tangential velocity ratio α |
+| `n_alpha` | `int` | Grid points in α direction |
+| `n_departure` | `int` | Number of departure point samples |
+| `max_transfer_time` | `float` | Maximum transfer time (dimensionless) |
+| `intersection_threshold` | `float` | Intersection detection distance threshold |
+| `min_distance_threshold` | `float` | Candidate solution minimum distance threshold |
+| `collision_earth_radius` | `float` | Earth collision detection radius (dimensionless) |
+| `collision_moon_radius` | `float` | Moon collision detection radius (dimensionless) |
+| `integration_dt` | `float` | Integration time step (dimensionless) |
+| `alpha_range` | `Tuple[float, float]` | Optimization phase α search range |
+| `transfer_time_range` | `Tuple[float, float]` | Optimization phase transfer time range |
+| `t_ins_range` | `Tuple[float, float]` | Optimization phase insertion time range |
+| `velocity_angle_tolerance` | `float` | Velocity parallelism tolerance (radians) |
+
+---
+
+### 3.4 Transfer (Simplified API)
 
 **File**: `e2m2e/transfer/transfer.py`
 
@@ -677,7 +769,7 @@ result = transfer.set_orbit(start=dro_orbit, end=ro_orbit).optimize(
 
 ---
 
-### 3.4 Utility Functions
+### 3.5 Utility Functions
 
 ```python
 from e2m2e.transfer import load_orbit_from_json, optimize_transfer, optimize_with_copt

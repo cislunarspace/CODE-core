@@ -12,7 +12,7 @@ e2m2e - Earth to Moon, Moon to Earth Transfer Orbit Design Library
 6. 可视化工具
 
 作者: 天疆说
-版本: 2.0.0
+版本: 3.2.0
 """
 
 __version__ = "3.2.0"
