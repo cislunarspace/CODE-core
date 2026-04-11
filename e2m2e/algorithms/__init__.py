@@ -8,6 +8,7 @@ from . import differential_correction
 from . import continuation
 from . import stability
 from . import multiple_shooting
+from . import strategies
 
 from .differential_correction import (
     DifferentialCorrection,
@@ -19,12 +20,14 @@ from .continuation import Continuation
 from .stability import StabilityAnalysis, StabilityType, BifurcationType
 from .multiple_shooting import MultipleShooting
 from .multiple_shooting import sample_patch_points, convert_to_j2000
+from .strategies import CorrectionConfig
 
 __all__ = [
     "differential_correction",
     "continuation",
     "stability",
     "multiple_shooting",
+    "strategies",
     "compute_halo_coefficients",
     "halo_third_order_approximation",
     "compute_halo_initial_guess",
@@ -36,4 +39,5 @@ __all__ = [
     "MultipleShooting",
     "sample_patch_points",
     "convert_to_j2000",
+    "CorrectionConfig",
 ]

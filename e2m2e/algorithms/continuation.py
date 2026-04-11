@@ -13,12 +13,13 @@ from .differential_correction import (
     compute_halo_initial_guess,
 )
 from ..core.orbit import OrbitFamily, Orbit
+from ..core.dynamics import CR3BP_Dynamics
 
 
 def compute_F_and_dF_symmetric_xz_plane(
     X: np.ndarray,
     SV0: np.ndarray,
-    mu: float,
+    dynamics: CR3BP_Dynamics,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """计算XZ平面对称轨道的约束向量和雅可比矩阵
 
@@ -33,7 +34,7 @@ def compute_F_and_dF_symmetric_xz_plane(
     Args:
         X: 自由变量向量 [rx, rz, vy, tf2]
         SV0: 初始状态向量 [x, y, z, vx, vy, vz]
-        mu: 质量比
+        dynamics: CR3BP_Dynamics实例，提供运动方程和雅可比矩阵
 
     Returns:
         F: 约束向量 [vx, vz, ry]
@@ -49,65 +50,17 @@ def compute_F_and_dF_symmetric_xz_plane(
     state[2] = rz  # z
     state[4] = vy  # vy
 
-    def state_derivative(t, s, mu_val):
-        """CR3BP状态导数"""
-        x, y, z, vx, vy, vz = s
-        r1 = np.sqrt((x + mu_val) ** 2 + y**2 + z**2)
-        r2 = np.sqrt((x - 1 + mu_val) ** 2 + y**2 + z**2)
-
-        ax = 2 * vy + x - (1 - mu_val) * (x + mu_val) / r1**3 - mu_val * (x - 1 + mu_val) / r2**3
-        ay = -2 * vx + y - (1 - mu_val) * y / r1**3 - mu_val * y / r2**3
-        az = -(1 - mu_val) * z / r1**3 - mu_val * z / r2**3
-
-        return np.array([vx, vy, vz, ax, ay, az])
-
-    def compute_jacobian_A(s, mu_val):
-        """计算CR3BP雅可比矩阵A(t)"""
-        x, y, z, vx, vy, vz = s
-        r1 = np.sqrt((x + mu_val) ** 2 + y**2 + z**2)
-        r2 = np.sqrt((x - 1 + mu_val) ** 2 + y**2 + z**2)
-
-        U_xx = (
-            1
-            - (1 - mu_val) * (1 / r1**3 - 3 * (x + mu_val) ** 2 / r1**5)
-            - mu_val * (1 / r2**3 - 3 * (x - 1 + mu_val) ** 2 / r2**5)
-        )
-        U_yy = (
-            1
-            - (1 - mu_val) * (1 / r1**3 - 3 * y**2 / r1**5)
-            - mu_val * (1 / r2**3 - 3 * y**2 / r2**5)
-        )
-        U_zz = -(1 - mu_val) / r1**3 - mu_val / r2**3
-        U_xy = (
-            3 * (1 - mu_val) * (x + mu_val) * y / r1**5 + 3 * mu_val * (x - 1 + mu_val) * y / r2**5
-        )
-        U_xz = (
-            3 * (1 - mu_val) * (x + mu_val) * z / r1**5 + 3 * mu_val * (x - 1 + mu_val) * z / r2**5
-        )
-        U_yz = 3 * (1 - mu_val) * y * z / r1**5 + 3 * mu_val * y * z / r2**5
-
-        return np.array(
-            [
-                [0, 0, 0, 1, 0, 0],
-                [0, 0, 0, 0, 1, 0],
-                [0, 0, 0, 0, 0, 1],
-                [U_xx, U_xy, U_xz, 0, 2, 0],
-                [U_xy, U_yy, U_yz, -2, 0, 0],
-                [U_xz, U_yz, U_zz, 0, 0, 0],
-            ]
-        )
-
     from scipy.integrate import solve_ivp
 
     initial_stm = np.eye(6).flatten()
     augmented_state = np.concatenate([state, initial_stm])
 
     def equations_with_stm(t, aug_s):
-        """增广状态方程"""
+        """增广状态方程：使用 CR3BP_Dynamics 提供的运动方程和雅可比矩阵"""
         s = aug_s[:6]
         stm = aug_s[6:].reshape((6, 6))
-        dsdt = state_derivative(t, s, mu)
-        A = compute_jacobian_A(s, mu)
+        dsdt = dynamics.equations_of_motion(t, s)
+        A = dynamics.compute_jacobian_A(s)
         stm_dot = A @ stm
         return np.concatenate([dsdt, stm_dot.flatten()])
 
@@ -124,7 +77,7 @@ def compute_F_and_dF_symmetric_xz_plane(
     final_state = result.y[:6, -1]
     final_stm = result.y[6:, -1].reshape((6, 6))
 
-    dSV = state_derivative(tf2, final_state, mu)
+    dSV = dynamics.equations_of_motion(tf2, final_state)
 
     F = np.array([final_state[3], final_state[5], final_state[1]])
 
@@ -497,7 +450,7 @@ class Continuation:
         Returns:
             OrbitFamily: 仅含种子 + 本支新轨道（不重复添加种子）
         """
-        mu = self.correction.dynamics.system.mu
+        dynamics = self.correction.dynamics
 
         if direction not in ("positive", "negative"):
             raise ValueError(
@@ -510,7 +463,7 @@ class Continuation:
             print(f"\n{'=' * 60}")
             print("开始伪弧长延拓 (Pseudo Arc-Length Continuation)")
             print(f"{'=' * 60}")
-            print(f"  质量比 mu = {mu:.10f}")
+            print(f"  质量比 mu = {dynamics.system.mu:.10f}")
             print(f"  本支新轨道数 N = {n_orbits}")
             print(f"  步长 |DeltaS| = {step_size}")
             print(f"  延拓方向 = {direction}")
@@ -523,7 +476,7 @@ class Continuation:
         tfi = float(seed_orbit.period)
         X = np.array([SV0i[0], SV0i[2], SV0i[4], tfi / 2])
 
-        _, dF = compute_F_and_dF_symmetric_xz_plane(X, SV0i, mu)
+        _, dF = compute_F_and_dF_symmetric_xz_plane(X, SV0i, dynamics)
         Xdot = compute_tangent_vector(dF)
 
         family_states: List[np.ndarray] = [SV0i.copy()]
@@ -562,7 +515,7 @@ class Continuation:
                 SV0_guess[2] = Xnew[1]
                 SV0_guess[4] = Xnew[2]
 
-                F, dF_new = compute_F_and_dF_symmetric_xz_plane(Xnew, SV0_guess, mu)
+                F, dF_new = compute_F_and_dF_symmetric_xz_plane(Xnew, SV0_guess, dynamics)
                 Xdot_new = compute_tangent_vector(dF_new)
 
                 G = np.zeros(4)
@@ -667,7 +620,7 @@ class Continuation:
                         orbit.period / 2,
                     ]
                 )
-                _, dF = compute_F_and_dF_symmetric_xz_plane(X, orbit.states[0].copy(), mu)
+                _, dF = compute_F_and_dF_symmetric_xz_plane(X, orbit.states[0].copy(), dynamics)
                 Xdot = compute_tangent_vector(dF)
 
                 if verbose and (n + 1) % 5 == 0:

@@ -563,19 +563,10 @@ class DifferentialCorrection:
             Broucke R A. Periodic orbits in the restricted three body problem
             with Earth-moon masses[R]. 1968.
         """
-        self.setup_type = "2D_symmetric_x_fixed_x0"
-        self.symmetry_condition = "x_axis"
-        self.fixed_parameters = {"x0": x0}
+        from .strategies import symmetric_2d_fixed_x0
 
-        self.free_variables = ["y_dot0", "T_half"]
-        self.free_variable_indices = [4, 6]
-
-        self.target_conditions = {"y": 0.0, "x_dot": 0.0}
-        self.constraint_indices = [1, 3]
-        self.constraint_weights = {"y": 1.0, "x_dot": 1.0}
-        self.constraint_types = {"y": "equality", "x_dot": "equality"}
-
-        self.fixed_parameters.update({"x0": x0})
+        config = symmetric_2d_fixed_x0(x0)
+        self._apply_config(config)
 
         self._reset_history()
 
@@ -596,17 +587,10 @@ class DifferentialCorrection:
         Returns:
             配置好的微分修正器实例
         """
-        self.setup_type = "2D_symmetric_x_fixed_t"
-        self.symmetry_condition = "x_axis"
-        self.fixed_parameters = {"T_half": t_half}
+        from .strategies import symmetric_2d_fixed_t
 
-        self.free_variables = ["x0", "y_dot0"]
-        self.free_variable_indices = [0, 4]  # x0索引0, y_dot索引4
-
-        self.target_conditions = {"y": 0.0, "x_dot": 0.0}
-        self.constraint_indices = [1, 3]
-        self.constraint_weights = {"y": 1.0, "x_dot": 1.0}
-        self.constraint_types = {"y": "equality", "x_dot": "equality"}
+        config = symmetric_2d_fixed_t(t_half)
+        self._apply_config(config)
 
         self._reset_history()
         return self
@@ -628,22 +612,10 @@ class DifferentialCorrection:
             - 目标约束: [x(T/2)=0, x_dot(T/2)=0] - 终点处再次穿越y轴
             - 状态向量索引: [0, 3] 分别对应x坐标和x方向速度
         """
-        self.setup_type = "2D_symmetric_y_fixed_y0"
-        self.symmetry_condition = "y_axis"
-        self.fixed_parameters = {"y0": y0}
+        from .strategies import symmetric_2d_fixed_y0
 
-        self.free_variables = ["x_dot0", "T_half"]
-        self.free_variable_indices = [3, 6]
-
-        self.target_conditions = {
-            "x": 0.0,
-            "x_dot": 0.0,
-        }
-
-        self.constraint_indices = [0, 3]
-
-        self.constraint_weights = {"x": 1.0, "x_dot": 1.0}
-        self.constraint_types = {"x": "equality", "x_dot": "equality"}
+        config = symmetric_2d_fixed_y0(y0)
+        self._apply_config(config)
 
         self._reset_history()
 
@@ -662,17 +634,10 @@ class DifferentialCorrection:
         Returns:
             self: 配置好的微分修正器实例
         """
-        self.setup_type = "3D_symmetric_x_fixed_x0"
-        self.symmetry_condition = "x_axis"
-        self.fixed_parameters = {"x0": x0}
+        from .strategies import symmetric_3d_fixed_x0
 
-        self.free_variables = ["z0", "y_dot0", "T_half"]
-        self.free_variable_indices = [2, 4, 6]
-
-        self.target_conditions = {"y": 0.0, "x_dot": 0.0, "z_dot": 0.0}
-        self.constraint_indices = [1, 3, 5]
-        self.constraint_weights = {"y": 1.0, "x_dot": 1.0, "z_dot": 1.0}
-        self.constraint_types = {"y": "equality", "x_dot": "equality", "z_dot": "equality"}
+        config = symmetric_3d_fixed_x0(x0)
+        self._apply_config(config)
 
         self._reset_history()
         return self
@@ -686,15 +651,10 @@ class DifferentialCorrection:
         Returns:
             self: 配置好的微分修正器实例
         """
-        self.setup_type = "3D_symmetric_xz_fixed_x0"
-        self.symmetry_condition = "xz_plane"
-        self.fixed_parameters = {"x0": x0}
+        from .strategies import symmetric_xz_fixed_x0
 
-        self.free_variables = ["z0", "y_dot0", "T_half"]
-        self.free_variable_indices = [2, 4, 6]
-
-        self.target_conditions = {"y": 0.0, "x_dot": 0.0, "z_dot": 0.0}
-        self.constraint_indices = [1, 3, 5]
+        config = symmetric_xz_fixed_x0(x0)
+        self._apply_config(config)
 
         self._reset_history()
         return self
@@ -708,15 +668,10 @@ class DifferentialCorrection:
         Returns:
             self: 配置好的微分修正器实例
         """
-        self.setup_type = "3D_symmetric_xz_fixed_z0"
-        self.symmetry_condition = "xz_plane"
-        self.fixed_parameters = {"z0": z0}
+        from .strategies import symmetric_xz_fixed_z0
 
-        self.free_variables = ["x0", "y_dot0", "T_half"]
-        self.free_variable_indices = [0, 4, 6]
-
-        self.target_conditions = {"y": 0.0, "x_dot": 0.0, "z_dot": 0.0}
-        self.constraint_indices = [1, 3, 5]
+        config = symmetric_xz_fixed_z0(z0)
+        self._apply_config(config)
 
         self._reset_history()
         return self
@@ -740,15 +695,10 @@ class DifferentialCorrection:
             - 状态向量索引: [0, 4, 6] 分别对应 x0、y_dot0 和时间 T_half
             - 注意: z 在半周期时会改变符号，不作为约束
         """
-        self.setup_type = "halo_orbit_fixed_z0"
-        self.symmetry_condition = "xz_plane"
-        self.fixed_parameters = {"z0": z0, "libration_point": libration_point}
+        from .strategies import halo_fixed_z0
 
-        self.free_variables = ["x0", "y_dot0", "T_half"]
-        self.free_variable_indices = [0, 4, 6]
-
-        self.target_conditions = {"y": 0.0, "x_dot": 0.0, "z_dot": 0.0}
-        self.constraint_indices = [1, 3, 5]
+        config = halo_fixed_z0(z0, libration_point)
+        self._apply_config(config)
 
         self._reset_history()
 
@@ -777,15 +727,10 @@ class DifferentialCorrection:
             - 目标约束: [y(T/2)=0, x_dot(T/2)=0, z_dot(T/2)=0] - 半周期处再次位于 XZ 平面且垂直穿越
             - 状态向量索引: [2, 4, 6] 分别对应 z0、y_dot0 和时间 T_half
         """
-        self.setup_type = "halo_orbit_fixed_x0"
-        self.symmetry_condition = "xz_plane"
-        self.fixed_parameters = {"x0": x0, "libration_point": libration_point}
+        from .strategies import halo_fixed_x0
 
-        self.free_variables = ["z0", "y_dot0", "T_half"]
-        self.free_variable_indices = [2, 4, 6]
-
-        self.target_conditions = {"y": 0.0, "x_dot": 0.0, "z_dot": 0.0}
-        self.constraint_indices = [1, 3, 5]
+        config = halo_fixed_x0(x0, libration_point)
+        self._apply_config(config)
 
         self._reset_history()
 
@@ -795,6 +740,22 @@ class DifferentialCorrection:
         )
 
         return self
+
+    def _apply_config(self, config: "CorrectionConfig") -> None:
+        """Apply an immutable CorrectionConfig to this corrector instance.
+
+        Args:
+            config: A CorrectionConfig produced by a strategy function.
+        """
+        self.setup_type = config.setup_type
+        self.symmetry_condition = config.symmetry_condition
+        self.fixed_parameters = dict(config.fixed_parameters)
+        self.free_variables = list(config.free_variables)
+        self.free_variable_indices = list(config.free_variable_indices)
+        self.target_conditions = dict(config.target_conditions)
+        self.constraint_indices = list(config.constraint_indices)
+        self.constraint_weights = dict(config.constraint_weights)
+        self.constraint_types = dict(config.constraint_types)
 
     def _reset_history(self):
         """重置收敛历史"""
