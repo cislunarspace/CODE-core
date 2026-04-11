@@ -74,13 +74,13 @@ class TestOrbitProperties:
         props = OrbitProperties()
         assert props.period is None
 
-    def test_amplitudes_defaults_to_empty_dict(self):
+    def test_amplitudes_defaults_to_none(self):
         props = OrbitProperties()
-        assert props.amplitudes == {}
+        assert props.amplitudes is None
 
-    def test_extrema_defaults_to_empty_dict(self):
+    def test_extrema_defaults_to_none(self):
         props = OrbitProperties()
-        assert props.extrema == {}
+        assert props.extrema is None
 
     def test_is_periodic_defaults_to_false(self):
         props = OrbitProperties()

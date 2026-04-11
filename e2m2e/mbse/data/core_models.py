@@ -87,8 +87,8 @@ class OrbitProperties(_NumpyModel):
     """
 
     period: Optional[float] = None
-    amplitudes: dict[str, float] = {}
-    extrema: dict[str, float] = {}
+    amplitudes: Optional[dict[str, float]] = None
+    extrema: Optional[dict[str, float]] = None
     mean_state: Optional[np.ndarray] = None
     center: Optional[np.ndarray] = None
     is_periodic: bool = False
