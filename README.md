@@ -4,7 +4,8 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![Status](https://img.shields.io/badge/Status-Alpha-orange)](https://www.python.org/)
+[![PyPI](https://img.shields.io/pypi/v/e2m2e)](https://pypi.org/project/e2m2e/)
+[![CI](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml/badge.svg)](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml)
 
 `e2m2e` 是一个用于设计地月空间**运行轨道**和**转移轨道**的 Python 库，基于圆型限制性三体问题 (CR3BP) 的轨道动力学建模。
 
@@ -31,6 +32,12 @@
 | **Dragonfly** | Dragonfly 轨道，多重对称性 |
 
 ## 安装
+
+### 从 PyPI 安装（推荐）
+
+```bash
+pip install e2m2e
+```
 
 ### 从源码安装
 
@@ -362,7 +369,7 @@ mkdocs gh-deploy
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {3.2.0},
+  version = {4.0.0},
   year = {2026},
 }
 ```

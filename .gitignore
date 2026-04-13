@@ -64,6 +64,8 @@ test-results/
 .vscode/
 .idea/
 .claude/
+.cursor/
+.cursorrules
 *.swp
 *.swo
 *~
@@ -74,7 +76,6 @@ Thumbs.db
 # 操作系统临时文件
 *.tmp
 *.temp
-*.log
 *.pid
 *.seed
 *.pid.lock
@@ -99,6 +100,20 @@ site/
 
 # Ruff 缓存
 .ruff_cache/
+
+# 编译扩展
+*.so
+*.dylib
+*.dll
+
+# cibuildwheel
+.cibuildwheel/
+
+# pyenv
+.python-version
+
+# 性能分析
+*.prof
 
 # 其他缓存目录
 .cache/

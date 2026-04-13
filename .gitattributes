@@ -1,0 +1,69 @@
+# Auto-detect text files and normalize line endings to LF
+* text=auto
+
+# Python
+*.py text diff=python
+*.pyi text
+
+# Documentation
+*.md text
+*.rst text
+*.txt text
+
+# Configuration
+*.toml text
+*.yaml text
+*.yml text
+*.json text
+*.ini text
+*.cfg text
+
+# Shell scripts — always LF
+*.sh text eol=lf
+
+# Windows batch — always CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Notebooks and data files — binary
+*.ipynb binary
+*.npy binary
+*.npz binary
+*.pkl binary
+*.pickle binary
+*.mat binary
+*.bsp binary
+
+# Compiled / build artifacts — binary
+*.so binary
+*.dylib binary
+*.dll binary
+*.whl binary
+
+# Graphics
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg text
+*.ico binary
+
+# Fonts
+*.ttf binary
+*.woff binary
+*.woff2 binary
+
+# Export-ignore: files excluded from git archive (sdist)
+.gitattributes export-ignore
+.gitignore export-ignore
+.editorconfig export-ignore
+.github/ export-ignore
+tests/ export-ignore
+docs/ export-ignore
+scripts/ export-ignore
+mkdocs.yml export-ignore
+CHANGELOG.md export-ignore
+CONTRIBUTING.md export-ignore
+CONTRIBUTING_ZH.md export-ignore
+AGENTS.md export-ignore
+CLAUDE.md export-ignore

@@ -110,12 +110,12 @@ CR3BP calculations are very sensitive to precision. When modifying, pay attentio
 
 ### 3.5 Version Management
 
-When making substantial changes, update `__version__` in `__init__.py`:
+The version is defined in `pyproject.toml` as the single source of truth. `__init__.py` reads it via `importlib.metadata`. Follow [Semantic Versioning](https://semver.org/):
 
 ```
-0.1.0 → 0.1.1  Bug fixes/minor adjustments
-0.1.0 → 0.2.0  New feature modules added
-0.1.0 → 1.0.0  Breaking interface changes
+4.0.0 → 4.0.1  Bug fixes / minor adjustments
+4.0.0 → 4.1.0  New feature modules added
+4.0.0 → 5.0.0  Breaking interface changes
 ```
 
 ---
@@ -148,3 +148,44 @@ pytest tests/ -v
 | Add new subpackage | New directory + `__init__.py` + top-level registration |
 
 **Core Principle: Be cautious when modifying core, extending algorithms/transfer is flexible, run tests after changes.**
+
+---
+
+## 6. Release Process
+
+### Prerequisites
+
+- PyPI account with trusted publisher configured for `cislunarspace/e2m2e`
+- All changes merged to `master`
+
+### Steps
+
+1. **Update version** in `pyproject.toml`:
+   ```toml
+   version = "4.x.x"
+   ```
+
+2. **Update CHANGELOG.md** with the new version entry
+
+3. **Commit and tag**:
+   ```bash
+   git add pyproject.toml CHANGELOG.md
+   git commit -m "chore: bump version to 4.x.x"
+   git tag v4.x.x
+   git push origin master --tags
+   ```
+
+4. **Create GitHub Release**:
+   - Go to GitHub → Releases → "Draft a new release"
+   - Select the tag `v4.x.x`
+   - Publish the release
+   - The `publish.yml` workflow will automatically build and upload to PyPI
+
+### CI/CD Workflows
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Push/PR to master, tag push `v*` | Lint + test on 3 OS × 4 Python versions; auto-creates GitHub Release after tests pass |
+| `publish.yml` | GitHub Release | Build and publish to PyPI via trusted publishing |
+
+The release flow is: tag push → CI runs tests → if all pass → auto-create GitHub Release → publish.yml publishes to PyPI.
