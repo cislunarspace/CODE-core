@@ -61,13 +61,14 @@ class Dynamics:
         last_stm: 最近一次积分的状态转移矩阵
         cross_section_tolerance: 截面检测容差
         last_crossing: 上次穿过截面的点和时间
-        jacobi_history: Jacobi常数历史记录
-        jacobi_error: Jacobi常数误差
         initialized: 初始化完成标志
     """
 
     DEFAULT_TOLERANCE = 1e-12  # 默认积分容差，双精度机器精度量级，确保数值解精度
-    DEFAULT_MAX_STEP = 0.01  # 默认最大积分步长（无量纲时间），约为主天体轨道周期的 0.16%
+    DEFAULT_MAX_STEP = 0.01  # 无量纲（CR3BP），EphemerisDynamics 覆写为秒
+
+    STATE_DIM = 6  # 状态向量维度 [x, y, z, vx, vy, vz]
+    STM_DIMENSION = STATE_DIM + STATE_DIM * STATE_DIM  # 42 = 6 + 36
 
     def __init__(self, system: Any) -> None:
         """初始化动力学
@@ -90,10 +91,6 @@ class Dynamics:
         # 截面检测参数
         self.cross_section_tolerance = 1e-8
         self.last_crossing = None
-
-        # Jacobi 常数监测
-        self.jacobi_history: list[float] = []
-        self.jacobi_error: float = 0.0
 
         self.initialized = True
 
@@ -186,9 +183,9 @@ class Dynamics:
     ) -> Dict[str, Any]:
         """增广状态积分（含 STM）
 
-        初始 STM 设为单位矩阵，拼接为 42 维增广状态后积分。
+        初始 STM 设为单位矩阵，拼接为 STATE_DIM + STATE_DIM² 维增广状态后积分。
         """
-        initial_stm = np.eye(6).flatten()
+        initial_stm = np.eye(self.STATE_DIM).flatten()
         augmented_state = np.concatenate([initial_state, initial_stm])
 
         eom_func = self._get_eom_func(with_stm=True)
@@ -203,12 +200,10 @@ class Dynamics:
             max_step=max_step,
         )
 
-        # 从 42 维结果中分离状态和 STM
-        # result.y 形状为 (42, n_points)
-        # states: 前 6 行转置为 (n_points, 6) — REQ-002
-        states = result.y[:6, :].T
-        # stm: 后 36 行转置后 reshape 为 (n_points, 6, 6)
-        stm_matrices = result.y[6:, :].T.reshape(-1, 6, 6)
+        # 从增广结果中分离状态和 STM
+        n = self.STATE_DIM
+        states = result.y[:n, :].T
+        stm_matrices = result.y[n:, :].T.reshape(-1, n, n)
 
         self.last_trajectory = (result.t, states)
         self.last_stm = stm_matrices
@@ -220,10 +215,7 @@ class Dynamics:
         }
 
         if with_jacobi:
-            try:
-                out = self._compute_jacobi_along_trajectory(states, out)
-            except NotImplementedError:
-                pass  # EphemerisDynamics 等子类不支持 Jacobi 常数
+            out = self._handle_jacobi(states, out)
 
         return out
 
@@ -259,24 +251,23 @@ class Dynamics:
         }
 
         if with_jacobi:
-            try:
-                out = self._compute_jacobi_along_trajectory(states, out)
-            except NotImplementedError:
-                pass  # EphemerisDynamics 等子类不支持 Jacobi 常数
+            out = self._handle_jacobi(states, out)
 
         return out
 
-    def _compute_jacobi_along_trajectory(
-        self, states: np.ndarray, out: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """沿轨迹逐点计算 Jacobi 常数"""
-        self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
-        if len(self.jacobi_history) > 1:
-            self.jacobi_error = float(np.max(np.abs(np.diff(self.jacobi_history))))
-        else:
-            self.jacobi_error = 0.0
-        out["jacobi"] = self.jacobi_history
-        out["jacobi_error"] = self.jacobi_error
+    def _handle_jacobi(self, states: np.ndarray, out: Dict[str, Any]) -> Dict[str, Any]:
+        """沿轨迹计算 Jacobi 常数的钩子方法。
+
+        基类默认为 no-op。CR3BP_Dynamics 覆写此方法以计算 Jacobi 常数。
+        EphemerisDynamics 继承 no-op（N 体问题无 Jacobi 积分）。
+
+        Args:
+            states: 状态序列，形状 (n, 6)
+            out: 输出字典
+
+        Returns:
+            更新后的输出字典（基类直接返回不修改）
+        """
         return out
 
     def compute_jacobi_constant(self, state: npt.ArrayLike) -> float:
@@ -340,12 +331,7 @@ class CR3BP_Dynamics(Dynamics):
     等号左侧的 2ẏ、-2ẋ 项为科里奥利力（Coriolis），伪势能中
     已包含离心力项 x²/2 + y²/2。
 
-    Attributes:
-        STM_DIMENSION: 增广状态向量维度（6状态 + 36个STM元素 = 42）
     """
-
-    # 增广状态向量维度：6维状态 [x,y,z,vx,vy,vz] + 6x6=36维状态转移矩阵元素
-    STM_DIMENSION = 42
 
     def __init__(self, system: CR3BP_System) -> None:
         """初始化CR3BP动力学
@@ -354,6 +340,9 @@ class CR3BP_Dynamics(Dynamics):
             system: CR3BP_System对象，包含质量参数μ等系统常数
         """
         super().__init__(system)
+        # Jacobi 常数监测（仅 CR3BP 有定义，不在基类中）
+        self.jacobi_history: list[float] = []
+        self.jacobi_error: float = 0.0
 
     def _get_eom_func(self, with_stm: bool) -> Callable:
         """返回 CR3BP 运动方程函数"""
@@ -555,6 +544,17 @@ class CR3BP_Dynamics(Dynamics):
             Jacobi常数
         """
         return self.system.get_jacobi_constant(state)
+
+    def _handle_jacobi(self, states: np.ndarray, out: Dict[str, Any]) -> Dict[str, Any]:
+        """沿轨迹逐点计算 Jacobi 常数"""
+        self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
+        if len(self.jacobi_history) > 1:
+            self.jacobi_error = float(np.max(np.abs(np.diff(self.jacobi_history))))
+        else:
+            self.jacobi_error = 0.0
+        out["jacobi"] = self.jacobi_history
+        out["jacobi_error"] = self.jacobi_error
+        return out
 
     def __str__(self):
         return f"CR3BP_Dynamics(system={self.system}, integrator='{self.integrator}')"

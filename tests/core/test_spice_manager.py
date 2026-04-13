@@ -29,6 +29,8 @@ from numpy.testing import assert_allclose
 
 from e2m2e.core import SPICEManager
 
+pytestmark = pytest.mark.spice
+
 
 # =============================================================================
 # Fixtures
@@ -112,9 +114,9 @@ class TestSPICETimeConversion:
         assert isinstance(et, float)
 
     def test_j2000_epoch_et_zero(self, loaded_spice):
-        """J2000 历元 (2000-01-01 12:00:00) 的 ET 应接近 0"""
+        """J2000 历元 (2000-01-01 12:00:00) 的 ET 应接近 0（TDB-TT 偏差约 64s）"""
         et = loaded_spice.utc_to_et("2000-01-01T12:00:00")
-        assert_allclose(et, 0.0, atol=100.0)
+        assert_allclose(et, 0.0, atol=65.0)
 
     def test_et_increases_with_time(self, loaded_spice):
         """ET 应随时间递增"""

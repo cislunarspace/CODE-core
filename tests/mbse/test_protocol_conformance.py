@@ -101,3 +101,38 @@ class TestPlotConfigConformance:
     def test_can_instantiate_with_defaults(self):
         config = PlotConfig()
         assert config is not None
+
+
+class TestEphemerisDynamicsConformance:
+    """EphemerisDynamics must satisfy Propagator and EOMProvider protocols (REQ-025)."""
+
+    @pytest.fixture()
+    def eph_dynamics(self):
+        from e2m2e.core import SPICEManager, EphemerisSystem, EphemerisDynamics
+
+        system = EphemerisSystem(
+            bodies=["EARTH", "MOON", "SUN"],
+            spice=SPICEManager(),
+        )
+        return EphemerisDynamics(system)
+
+    def test_satisfies_propagator(self, eph_dynamics):
+        assert hasattr(eph_dynamics, "propagate")
+        assert callable(eph_dynamics.propagate)
+
+    def test_satisfies_eom_provider(self, eph_dynamics):
+        assert hasattr(eph_dynamics, "equations_of_motion")
+        assert callable(eph_dynamics.equations_of_motion)
+
+    def test_inherits_from_dynamics_base(self, eph_dynamics):
+        assert isinstance(eph_dynamics, Dynamics)
+
+    def test_runtime_checkable_propagator(self, eph_dynamics):
+        from e2m2e.mbse.architecture.ports import Propagator
+
+        assert isinstance(eph_dynamics, Propagator)
+
+    def test_runtime_checkable_eom_provider(self, eph_dynamics):
+        from e2m2e.mbse.architecture.ports import EOMProvider
+
+        assert isinstance(eph_dynamics, EOMProvider)

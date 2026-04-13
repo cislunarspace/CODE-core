@@ -34,11 +34,11 @@ References
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Tuple, Optional, Any
+import warnings
+from typing import Callable, Tuple
 
 import numpy as np
 import numpy.typing as npt
-from scipy.integrate import solve_ivp
 
 from .dynamics import Dynamics
 from .ephemeris_system import EphemerisSystem
@@ -57,14 +57,14 @@ class EphemerisDynamics(Dynamics):
         max_step: 积分器最大步长（秒）。
     """
 
-    STM_DIMENSION = 42
+    MIN_DISTANCE = 1e-6  # km (1 米)，防止除零的最小距离钳位
 
     def __init__(self, system: EphemerisSystem) -> None:
         # 调用基类 __init__（REQ-005），基类设置通用属性
         super().__init__(system)
         # 覆写星历动力学特有的配置
         self.integrator = "DOP853"
-        self.max_step = 60.0  # 星历动力学使用物理单位（秒），步长需适配轨道周期
+        self.max_step = 60.0  # 秒（物理单位），非无量纲
 
     def _get_eom_func(self, with_stm: bool) -> Callable:
         """返回星历 N 体运动方程函数"""
@@ -78,6 +78,70 @@ class EphemerisDynamics(Dynamics):
         if span_duration > 0:
             return min(self.max_step, span_duration / 10.0)
         return self.max_step
+
+    def _compute_acc_and_jacobian(
+        self,
+        t: float,
+        r_sc: npt.NDArray[np.floating],
+        need_jacobian: bool = False,
+    ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
+        """单次遍历所有天体，同时计算加速度和（可选）雅可比矩阵。
+
+        将加速度计算和雅可比计算合并到一次循环中，避免对 SPICE 的重复查询。
+
+        Args:
+            t: 历元时刻（ephemeris seconds past J2000）。
+            r_sc: 航天器位置向量，形状 ``(3,)``。
+            need_jacobian: 是否同时计算 ∂a/∂r。
+
+        Returns:
+            (acc, dacc_dr) 元组。acc 形状 (3,)，dacc_dr 形状 (3,3) 或 None。
+        """
+        acc = np.zeros(3)
+        dacc_dr = np.zeros((3, 3)) if need_jacobian else None
+
+        for body in self.system.bodies:
+            gm = self.system.get_gm(body)
+            if body == self.system.origin:
+                r_norm = np.linalg.norm(r_sc)
+                if r_norm < self.MIN_DISTANCE:
+                    warnings.warn(
+                        f"Spacecraft at origin body center (|r|={r_norm:.2e} km), "
+                        f"clamping to MIN_DISTANCE={self.MIN_DISTANCE} km",
+                        stacklevel=3,
+                    )
+                    r_norm = self.MIN_DISTANCE
+                acc -= gm * r_sc / r_norm**3
+                if need_jacobian:
+                    dacc_dr -= gm * (
+                        np.eye(3) / r_norm**3
+                        - 3.0 * np.outer(r_sc, r_sc) / r_norm**5
+                    )
+            else:
+                r_ob = self.system.get_body_position(body, t)
+                r_bsc = r_sc - r_ob
+                r_bsc_norm = np.linalg.norm(r_bsc)
+                r_ob_norm = np.linalg.norm(r_ob)
+                if r_bsc_norm < self.MIN_DISTANCE:
+                    warnings.warn(
+                        f"Spacecraft at perturbing body {body} center "
+                        f"(|r_bsc|={r_bsc_norm:.2e} km), "
+                        f"clamping to MIN_DISTANCE={self.MIN_DISTANCE} km",
+                        stacklevel=3,
+                    )
+                    r_bsc_norm = self.MIN_DISTANCE
+                if r_ob_norm < self.MIN_DISTANCE:
+                    r_ob_norm = self.MIN_DISTANCE
+                acc -= gm * (r_bsc / r_bsc_norm**3 + r_ob / r_ob_norm**3)
+                # 间接项 r_ob/r_ob_norm³ 不依赖于航天器位置，故 ∂/∂r_sc = 0，
+                # 仅对主项 r_bsc/r_bsc_norm³ 求偏导
+                if need_jacobian:
+                    dacc_dr -= gm * (
+                        np.eye(3) / r_bsc_norm**3
+                        - 3.0 * np.outer(r_bsc, r_bsc) / r_bsc_norm**5
+                    )
+
+        return acc, dacc_dr
 
     def equations_of_motion(
         self, t: float, state: npt.NDArray[np.floating]
@@ -100,22 +164,35 @@ class EphemerisDynamics(Dynamics):
         r_sc = state[:3]
         v_sc = state[3:]
 
-        acc = np.zeros(3)
-        for body in self.system.bodies:
-            gm = self.system.spice.get_gm(body)
-            if body == self.system.origin:
-                r_norm = np.linalg.norm(r_sc)
-                acc -= gm * r_sc / r_norm**3
-            else:
-                r_ob = self.system.spice.get_body_position(
-                    body, t, self.system.frame, self.system.origin
-                )
-                r_bsc = r_sc - r_ob
-                r_bsc_norm = np.linalg.norm(r_bsc)
-                r_ob_norm = np.linalg.norm(r_ob)
-                acc -= gm * (r_bsc / r_bsc_norm**3 + r_ob / r_ob_norm**3)
-
+        acc, _ = self._compute_acc_and_jacobian(t, r_sc, need_jacobian=False)
         return np.concatenate([v_sc, acc])
+
+    def compute_jacobian_A(
+        self, t: float, state: npt.NDArray[np.floating]
+    ) -> npt.NDArray[np.floating]:
+        """计算星历 N 体状态方程的雅可比矩阵 A(t)。
+
+        A = | 0₃ₓ₃  I₃ₓ₃ |
+            | U₃ₓ₃  0₃ₓ₃ |
+
+        其中 U = ∂a/∂r 是加速度对位置的偏导数 (3x3)。
+        N 体问题中无速度相关力，因此 ∂a/∂v = 0。
+
+        Args:
+            t: 历元时刻（ephemeris seconds past J2000）。
+            state: 航天器状态向量，形状 ``(6,)``。
+
+        Returns:
+            雅可比矩阵，形状 ``(6, 6)``。
+        """
+        r_sc = state[:3]
+
+        _, dacc_dr = self._compute_acc_and_jacobian(t, r_sc, need_jacobian=True)
+
+        A = np.zeros((6, 6))
+        A[:3, 3:] = np.eye(3)
+        A[3:, :3] = dacc_dr
+        return A
 
     def equations_with_stm(
         self, t: float, augmented_state: npt.NDArray[np.floating]
@@ -134,36 +211,24 @@ class EphemerisDynamics(Dynamics):
         """
         state = augmented_state[:6]
         r_sc = state[:3]
-
         stm = augmented_state[6:].reshape((6, 6))
 
-        acc = np.zeros(3)
-        dacc_dr = np.zeros((3, 3))
-
-        for body in self.system.bodies:
-            gm = self.system.spice.get_gm(body)
-            if body == self.system.origin:
-                r_norm = np.linalg.norm(r_sc)
-                acc -= gm * r_sc / r_norm**3
-                dacc_dr -= gm * (np.eye(3) / r_norm**3 - 3.0 * np.outer(r_sc, r_sc) / r_norm**5)
-            else:
-                r_ob = self.system.spice.get_body_position(
-                    body, t, self.system.frame, self.system.origin
-                )
-                r_bsc = r_sc - r_ob
-                r_bsc_norm = np.linalg.norm(r_bsc)
-                r_ob_norm = np.linalg.norm(r_ob)
-                acc -= gm * (r_bsc / r_bsc_norm**3 + r_ob / r_ob_norm**3)
-                dacc_dr -= gm * (
-                    np.eye(3) / r_bsc_norm**3 - 3.0 * np.outer(r_bsc, r_bsc) / r_bsc_norm**5
-                )
-
-        state_deriv = np.concatenate([state[3:], acc])
+        # 单次遍历同时获取加速度和雅可比，避免重复 SPICE 查询
+        acc, dacc_dr = self._compute_acc_and_jacobian(t, r_sc, need_jacobian=True)
 
         A = np.zeros((6, 6))
         A[:3, 3:] = np.eye(3)
         A[3:, :3] = dacc_dr
-
         stm_dot = A @ stm
 
+        state_deriv = np.concatenate([state[3:], acc])
         return np.concatenate([state_deriv, stm_dot.flatten()])
+
+    def __str__(self):
+        return f"EphemerisDynamics(system={self.system}, integrator='{self.integrator}')"
+
+    def __repr__(self):
+        return (
+            f"EphemerisDynamics(system={self.system}, integrator='{self.integrator}', "
+            f"rtol={self.rtol}, atol={self.atol}, max_step={self.max_step})"
+        )

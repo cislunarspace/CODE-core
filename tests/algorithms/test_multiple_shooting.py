@@ -49,6 +49,8 @@ from e2m2e.core import (
 )
 from e2m2e.algorithms import MultipleShooting
 
+pytestmark = pytest.mark.spice
+
 
 # =============================================================================
 # Fixtures
@@ -224,9 +226,10 @@ class TestMultipleShootingCorrection:
             tolerance=1e-6,
         )
 
-        if result.converged:
-            corrected_states = result.state_patch
-            for i in range(len(corrected_states) - 1):
+        if not result.converged:
+            pytest.skip(f"多重打靶未收敛 (residual={result.max_residual:.2e})")
+        corrected_states = result.state_patch
+        for i in range(len(corrected_states) - 1):
                 dt = (
                     t_patch[i + 1] - t_patch[i]
                     if not hasattr(result, "t_patch")
@@ -276,8 +279,9 @@ class TestMultipleShootingTimeOptions:
             var_time=False,
             max_iter=20,
         )
-        if result.converged:
-            assert_allclose(result.t_patch, t_patch, atol=1e-10)
+        if not result.converged:
+            pytest.skip(f"多重打靶未收敛 (residual={result.max_residual:.2e})")
+        assert_allclose(result.t_patch, t_patch, atol=1e-10)
 
     def test_variable_time_correction(self, ms_corrector, simple_patch_points):
         """可变时间修正应允许时间节点微调"""
@@ -288,9 +292,10 @@ class TestMultipleShootingTimeOptions:
             var_time=True,
             max_iter=20,
         )
-        if result.converged:
-            assert result.t_patch is not None
-            assert len(result.t_patch) == len(t_patch)
+        if not result.converged:
+            pytest.skip(f"多重打靶未收敛 (residual={result.max_residual:.2e})")
+        assert result.t_patch is not None
+        assert len(result.t_patch) == len(t_patch)
 
 
 # =============================================================================
@@ -310,7 +315,7 @@ class TestMultipleShootingConvergence:
         if hasattr(result, "residual_history") and result.residual_history:
             residuals = result.residual_history
             for i in range(1, len(residuals)):
-                assert residuals[i] <= residuals[i - 1] * 1e3, (
+                assert residuals[i] <= residuals[i - 1] * 10.0, (
                     f"残差在第 {i} 步增大: {residuals[i]:.2e} > {residuals[i - 1]:.2e}"
                 )
 

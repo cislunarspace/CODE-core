@@ -36,15 +36,15 @@ from e2m2e.core import (
 )
 from e2m2e.algorithms import sample_patch_points, convert_to_j2000
 
+pytestmark = pytest.mark.spice
+
 
 # =============================================================================
 # 物理参数
 # =============================================================================
-MU = 1.21506683e-2
-DU = 3.84405e5
-TU_SECONDS = 4.34811305 * 86400
-TU_DAYS = 4.34811305
-VU = DU / TU_SECONDS
+from tests.conftest import MU, DU, TU_SECONDS, VU
+
+TU_DAYS = TU_SECONDS / 86400
 
 DRO_31_X0 = 1.1202109158830986
 DRO_31_VY0 = -0.46178983697629084

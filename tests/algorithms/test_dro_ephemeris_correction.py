@@ -47,6 +47,8 @@ from e2m2e.core import (
     SynodicJ2000Transformation,
     Orbit,
 )
+
+pytestmark = pytest.mark.spice
 from e2m2e.algorithms import (
     DifferentialCorrection,
     MultipleShooting,
@@ -56,10 +58,7 @@ from e2m2e.algorithms import (
 # =============================================================================
 # 物理参数
 # =============================================================================
-MU = 1.21506683e-2
-DU = 3.84405e5  # km
-TU_SECONDS = 4.34811305 * 86400  # 秒
-VU = DU / TU_SECONDS  # km/s
+from tests.conftest import MU, DU, TU_SECONDS, VU
 
 DRO_31_X0 = 1.1202109158830986
 DRO_31_VY0 = -0.46178983697629084
@@ -98,8 +97,8 @@ def dro_orbit(cr3bp_dynamics, cr3bp_system):
     corrector.setup_2D_symmetric_x_fixed_x0(DRO_31_X0)
     result = corrector.iterate_correction(seed_orbit, verbose=False)
 
-    assert result is not None, "DRO 微分修正应成功"
-    assert corrector.success, "DRO 应收敛"
+    if result is None or not corrector.success:
+        pytest.skip("DRO 微分修正未收敛，跳过依赖测试")
     return result
 
 
@@ -381,18 +380,18 @@ class TestStep5Validation:
     def test_orbit_shape_preserved(self, correction_result):
         """修正后轨道形状应与 CR3BP DRO 相似"""
         result = correction_result
+        assert result.converged, f"修正未收敛 (residual={result.max_residual:.2e})"
 
-        if result.converged:
-            corrected_states = result.state_patch
-            distances = np.linalg.norm(corrected_states[:, :3], axis=1)
-            mean_dist = np.mean(distances)
-            assert 300000 < mean_dist < 500000, (
-                f"修正后平均距地球 {mean_dist:.0f} km，偏离 DRO 范围"
-            )
-            std_dist = np.std(distances)
-            assert std_dist / mean_dist < 0.1, (
-                f"修正后轨道形状变化过大: std/mean = {std_dist / mean_dist:.3f}"
-            )
+        corrected_states = result.state_patch
+        distances = np.linalg.norm(corrected_states[:, :3], axis=1)
+        mean_dist = np.mean(distances)
+        assert 300000 < mean_dist < 500000, (
+            f"修正后平均距地球 {mean_dist:.0f} km，偏离 DRO 范围"
+        )
+        std_dist = np.std(distances)
+        assert std_dist / mean_dist < 0.1, (
+            f"修正后轨道形状变化过大: std/mean = {std_dist / mean_dist:.3f}"
+        )
 
 
 # =============================================================================

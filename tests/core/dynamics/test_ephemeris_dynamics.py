@@ -45,6 +45,8 @@ from e2m2e.core import (
     Dynamics,
 )
 
+pytestmark = pytest.mark.spice
+
 
 # =============================================================================
 # Fixtures
@@ -190,7 +192,7 @@ class TestEphemerisEquationsOfMotion:
         a_mag = np.linalg.norm(a)
         r = np.linalg.norm(leo_state[:3])
         a_expected = 398600.436 / r**2
-        assert_allclose(a_mag, a_expected, rtol=0.1)
+        assert_allclose(a_mag, a_expected, rtol=0.05)
 
     def test_eom_at_moon_distance(self, eph_dynamics, reference_et):
         """在月球距离处，加速度应包含月球和太阳摄动"""
@@ -287,7 +289,7 @@ class TestEphemerisPropagation:
         assert np.all(np.isfinite(result["states"]))
         final_r = np.linalg.norm(result["states"][-1, :3])
         initial_r = np.linalg.norm(dro_state[:3])
-        assert_allclose(final_r, initial_r, rtol=0.2)
+        assert_allclose(final_r, initial_r, rtol=0.15)
 
 
 # =============================================================================
@@ -300,7 +302,8 @@ class TestEphemerisDynamicsEdgeCases:
         """传播零时间应返回初始状态"""
         t_span = (reference_et, reference_et)
         result = eph_dynamics.propagate(leo_state, t_span)
-        assert result["states"].shape[1] >= 1
+        assert result["states"].shape[0] >= 1
+        assert result["states"].shape[1] == 6
 
     def test_propagate_backward_time(self, eph_dynamics, reference_et, leo_state):
         """应能向后传播（t_span 终点 < 起点）"""

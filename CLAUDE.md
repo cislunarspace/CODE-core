@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 e2m2e (Earth to Moon, Moon to Earth) is a Python library for designing cislunar transfer orbits, built on Circular Restricted Three-Body Problem (CR3BP) orbital dynamics. It provides system modeling, numerical algorithms, transfer trajectory design, and visualization.
 
-v4.0.0 introduces MBSE (Model-Based Systems Engineering) infrastructure with SysML-style Protocol interfaces, Pydantic data models, requirement tracking, and automated Mermaid diagram generation.
+MBSE (Model-Based Systems Engineering) infrastructure with SysML-style Protocol interfaces, Pydantic data models, requirement tracking, and automated Mermaid diagram generation.
 
 ## Commands
 
@@ -19,14 +19,20 @@ pip install -e ".[dev]"          # with pytest, ruff
 pytest tests/                    # all tests
 pytest tests/core/test_system.py # single test file
 pytest tests/mbse/               # MBSE-specific tests
-
-# MBSE diagram generation
-python scripts/generate_mbse_diagrams.py
+pytest -m spice                  # only SPICE-dependent tests (require kernels)
 
 # Lint and format (Ruff, 100-char line length)
 ruff check .
 ruff check --fix .
 ruff format .
+
+# Documentation (MkDocs + Material theme)
+pip install mkdocs mkdocs-material
+mkdocs serve                     # local preview at http://127.0.0.1:8000
+mkdocs build                     # static site → site/
+
+# MBSE diagram generation
+python scripts/generate_mbse_diagrams.py
 ```
 
 ## Architecture
@@ -49,17 +55,17 @@ Cross-cutting: `mbse/` — Protocol interfaces, Pydantic models, requirement/com
 
 ```
 Dynamics (base, Template Method)
-  → CR3BP_Dynamics    [Propagator, EOMProvider, SystemModel]
-  → EphemerisDynamics [Propagator, EOMProvider]
+  → CR3BP_Dynamics    [implements Propagator, EOMProvider; requires SystemModel]
+  → EphemerisDynamics [implements Propagator, EOMProvider]
 
 CR3BP_System → CR3BP_Dynamics → DifferentialCorrection
                     ↑                    ↑
                   Orbit          Continuation, StabilityAnalysis
 
-CorrectionConfig (frozen dataclass) ← strategy functions
-  ← symmetric_2d_fixed_x0, symmetric_2d_fixed_t, ...
-  ← symmetric_3d_fixed_x0, symmetric_xz_fixed_*, ...
-  ← halo_fixed_z0, halo_fixed_x0
+CorrectionConfig (frozen dataclass) ← strategy functions in algorithms/strategies/
+  ← symmetric_2d.py: symmetric_2d_fixed_x0, symmetric_2d_fixed_t, symmetric_2d_fixed_y0
+  ← symmetric_3d.py: symmetric_3d_fixed_x0, symmetric_xz_fixed_x0, symmetric_xz_fixed_z0
+  ← halo.py: halo_fixed_z0, halo_fixed_x0
 
 PlotConfig (Pydantic BaseModel) → OrbitVisualizer, FamilyPlotter, TransferPlotter [Visualizer Protocol]
 ```
@@ -67,19 +73,11 @@ PlotConfig (Pydantic BaseModel) → OrbitVisualizer, FamilyPlotter, TransferPlot
 ### MBSE infrastructure (e2m2e/mbse/)
 
 - **architecture/ports.py** — 7 `@runtime_checkable` Protocols: SystemModel, EOMProvider, Propagator, OrbitContainer, CorrectorStrategy, Optimizer, Visualizer
-- **architecture/components.py** — Component registry with 17 registered components
+- **architecture/components.py** — Component registry with registered components
 - **data/core_models.py** — Pydantic models: PropagationResult (states validated to (n,6)), OrbitProperties, OrbitStability, JacobiResult
 - **data/enums.py** — Shared enums: OrbitFamilyType, StabilityLabel, ConvergenceState, etc.
-- **requirements/base.py** — Requirement dataclass + RequirementRegistry singleton (24 requirements, 100% coverage)
+- **requirements/base.py** — Requirement dataclass + RequirementRegistry singleton
 - **diagrams/generator.py** — Mermaid diagram generation (BDD, IBD, state machine, activity, sequence, requirement)
-
-### Module responsibilities
-
-- **core/** — `CR3BP_System` (system definition, mass parameter, libration points, Jacobi constant), `Dynamics`/`CR3BP_Dynamics` (Template Method pattern, equations of motion, STM, propagation), `Orbit`/`OrbitFamily` (composition pattern with property proxies), `CoordinateTransformation` (rotating/inertial frame conversions), `SPICEManager` (kernel management), `EphemerisDynamics` (N-body in J2000, unified (n,6) states shape)
-- **algorithms/** — `DifferentialCorrection` (strategy pattern with CorrectionConfig, Richardson 3rd-order halo approximation), `Continuation` (natural and pseudo-arclength, uses CR3BP_Dynamics for physics), `StabilityAnalysis` (Floquet multipliers, bifurcation detection), `MultipleShooting` (parallel propagation via `n_workers`)
-- **transfer/** — `TransferSearch`/`DROTransferSearch` (parallel grid search, SearchConfig dataclass), `DROTRONLPOptimizer` (Cui et al. 2025 two-step NLP method, NLPOptimizationVariables/Result dataclasses), `Transfer` (chainable API: `.set_orbit().optimize()`)
-- **visualization/** — `PlotConfig` (Pydantic BaseModel, centralized font/size/color), `FamilyPlotter`, `TransferPlotter` (all satisfy Visualizer Protocol)
-- **mbse/** — Cross-cutting MBSE infrastructure (Protocols, Pydantic models, requirement/component registries, diagram generation)
 
 ## Critical conventions
 
@@ -92,6 +90,15 @@ PlotConfig (Pydantic BaseModel) → OrbitVisualizer, FamilyPlotter, TransferPlot
 - **New dynamics models**: create a new subclass overriding `_get_eom_func()` and `_get_max_step()`, don't modify the base class
 - **Protocol conformance**: new classes should satisfy the appropriate Protocol from `e2m2e.mbse.architecture.ports`
 
+## Testing
+
+- SPICE-dependent tests are marked `@pytest.mark.spice` and auto-skip if kernels unavailable
+- Kernels searched in `$SPICE_KERNEL_DIR` or `./kernels/`
+- Reference epoch: `"2025-06-21T11:00:06"`
+- Shared fixtures in `tests/conftest.py` provide pre-configured Earth-Moon, Sun-Earth, Sun-Jupiter systems
+- Modifying `core/` requires running the full test suite; `algorithms/` or `transfer/` changes can be verified with targeted tests
+- MBSE tests in `tests/mbse/` verify Protocol conformance, requirement coverage, and Pydantic model validation
+
 ## Adding new modules
 
 1. Create file in the appropriate subpackage (e.g., `e2m2e/algorithms/new_algo.py`)
@@ -101,14 +108,9 @@ PlotConfig (Pydantic BaseModel) → OrbitVisualizer, FamilyPlotter, TransferPlot
 5. If adding a new component, register it in `e2m2e/mbse/architecture/` and add requirements to `e2m2e/mbse/requirements/`
 6. Regenerate MBSE diagrams: `python scripts/generate_mbse_diagrams.py`
 
-## Testing
+## Optional dependencies
 
-- SPICE-dependent tests are marked `@pytest.mark.spice` and auto-skip if kernels unavailable
-- Kernels searched in `$SPICE_KERNEL_DIR` or `./kernels/`
-- Reference epoch: `"2025-06-21T11:00:06"`
-- Shared fixtures in `tests/conftest.py` provide pre-configured Earth-Moon, Sun-Earth, Sun-Jupiter systems
-- Modifying `core/` requires running the full test suite; `algorithms/` or `transfer/` changes can be verified with targeted tests
-- MBSE tests in `tests/mbse/` verify Protocol conformance, requirement coverage, and Pydantic model validation
+- **COPT** (`coptpy`): Required for `optimize_with_copt()` in transfer NLP optimization. Falls back to scipy if not installed. Check `_HAVE_COPT` flag in `e2m2e/transfer/__init__.py`.
 
 ## Typical workflow
 

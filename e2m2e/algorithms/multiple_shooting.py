@@ -54,7 +54,7 @@ def _worker_init(
     tls_path = os.path.join(kernel_dir, "naif0012.tls")
     if os.path.isfile(tls_path):
         spiceypy.furnsh(tls_path)
-        spice._leapseconds_loaded = True
+        SPICEManager._leapseconds_loaded = True
 
     # 加载星历内核（de440.bsp 或同目录下优先级最高的 .bsp 文件）
     bsp_path = spice.find_ephemeris_kernel(kernel_dir)

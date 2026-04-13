@@ -42,13 +42,13 @@ from e2m2e.core import (
     SynodicJ2000Transformation,
 )
 
+pytestmark = pytest.mark.spice
+
 
 # =============================================================================
 # Fixtures
 # =============================================================================
-MU = 1.21506683e-2
-DU = 3.84405e5
-TU_SECONDS = 4.34811305 * 86400
+from tests.conftest import MU, DU, TU_SECONDS
 
 
 @pytest.fixture

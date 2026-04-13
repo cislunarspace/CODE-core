@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from typing import List
 
+import numpy as np
+import numpy.typing as npt
+
 from .spice import SPICEManager
 
 
@@ -44,10 +47,49 @@ class EphemerisSystem:
         self.origin = origin
         self.frame = frame
 
-    def get_gm_values(self) -> List[float]:
+    def get_body_position(self, body: str, et: float) -> npt.NDArray[np.floating]:
+        """获取天体相对于原点的位置向量。
+
+        自动使用初始化时设定的 frame 和 origin。
+
+        Args:
+            body: 天体名称，如 "MOON"、"SUN"。
+            et: 历书时（秒）。
+
+        Returns:
+            位置向量，形状 (3,)，单位 km。
+        """
+        return self.spice.get_body_position(body, et, self.frame, self.origin)
+
+    def get_body_state(self, body: str, et: float) -> npt.NDArray[np.floating]:
+        """获取天体相对于原点的状态向量。
+
+        自动使用初始化时设定的 frame 和 origin。
+
+        Args:
+            body: 天体名称，如 "MOON"、"SUN"。
+            et: 历书时（秒）。
+
+        Returns:
+            状态向量，形状 (6,)，前 3 元素为位置 [km]，后 3 元素为速度 [km/s]。
+        """
+        return self.spice.get_body_state(body, et, self.frame, self.origin)
+
+    def get_gm(self, body: str) -> float:
+        """获取天体的引力参数 GM。
+
+        Args:
+            body: 天体名称。
+
+        Returns:
+            GM 值，单位 km³/s²。
+        """
+        return self.spice.get_gm(body)
+
+    def get_gm_values(self) -> npt.NDArray[np.floating]:
         """获取所有管理天体的引力常数 (GM) 值。
 
         Returns:
-            与 self.bodies 顺序对应的 GM 值列表，单位通常为 km³/s²。
+            与 self.bodies 顺序对应的 GM 值数组，单位通常为 km³/s²。
         """
-        return [self.spice.get_gm(body) for body in self.bodies]
+        return np.array([self.spice.get_gm(body) for body in self.bodies])

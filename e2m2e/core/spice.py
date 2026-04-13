@@ -60,6 +60,7 @@ SPICE 内核是 NASA NAIF 提供的数据文件，包含天体星历、姿态、
 from __future__ import annotations
 
 import os
+import threading
 from typing import Dict
 
 import numpy as np
@@ -153,21 +154,27 @@ class SPICEManager:
         _leapseconds_loaded: 标记闰秒内核是否已加载，避免重复加载。
     """
 
+    _leapseconds_loaded: bool = False
+    _leapseconds_lock = threading.Lock()
+
     def __init__(self) -> None:
-        self._leapseconds_loaded = False
+        """初始化 SPICE 管理器。"""
 
     def _ensure_leapseconds(self):
-        """确保闰秒内核已加载。
+        """确保闰秒内核已加载（线程安全）。
 
-        首次调用时会自动搜索并加载 .tls 闰秒内核文件，
-        后续调用直接跳过。这是 load_kernel 的前置步骤。
+        使用类级标志 + 双检锁，避免多实例/多线程重复加载。
+        SPICE 内核池是进程全局的，因此标志也必须是类级别的。
         """
-        if self._leapseconds_loaded:
+        if SPICEManager._leapseconds_loaded:
             return
-        path = _find_leapseconds_kernel()
-        if path:
-            spiceypy.furnsh(path)
-            self._leapseconds_loaded = True
+        with SPICEManager._leapseconds_lock:
+            if SPICEManager._leapseconds_loaded:
+                return
+            path = _find_leapseconds_kernel()
+            if path:
+                spiceypy.furnsh(path)
+                SPICEManager._leapseconds_loaded = True
 
     def load_kernel(self, path: str) -> None:
         """加载一个 SPICE 内核文件（.bsp / .bpc / .tf 等）。
