@@ -91,9 +91,12 @@ VU = DU / TU_SECONDS  # km/s
 
 @pytest.fixture
 def spice_kernel_dir():
-    """返回 SPICE 内核文件所在目录，不存在则跳过"""
+    """返回 SPICE 内核文件所在目录，不存在或无内核文件则跳过"""
     if not os.path.isdir(SPICE_KERNEL_DIR):
         pytest.skip("SPICE kernel directory not found, set SPICE_KERNEL_DIR")
+    bsp_files = [f for f in os.listdir(SPICE_KERNEL_DIR) if f.endswith(".bsp")]
+    if not bsp_files:
+        pytest.skip("No .bsp kernel files found in SPICE kernel directory")
     return SPICE_KERNEL_DIR
 
 
