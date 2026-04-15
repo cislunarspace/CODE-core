@@ -97,6 +97,9 @@ temp.py
 # 文档构建文件
 docs/_build/
 site/
+website/build/
+website/.docusaurus/
+website/node_modules/
 
 # Ruff 缓存
 .ruff_cache/
