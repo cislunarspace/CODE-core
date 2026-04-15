@@ -7,15 +7,18 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
+import numpy.typing as npt
 from scipy import integrate
 from scipy.optimize import brentq
-from typing import Dict, List, Optional, Any, Tuple
 
-import numpy.typing as npt
-
-from ..core.orbit import Orbit
 from ..core.dynamics import CR3BP_Dynamics
+from ..core.orbit import Orbit
+
+if TYPE_CHECKING:
+    from .strategies.base import CorrectionConfig
 
 
 def _compute_gamma(mu: float, L: int) -> float:
@@ -45,26 +48,12 @@ def _compute_gamma(mu: float, L: int) -> float:
         # L1 五次方程：由 L1 处引力加速度与旋转坐标系离心加速度平衡条件导出
         # gamma^5 - (3-mu)*gamma^4 + (3-2mu)*gamma^3 - mu*gamma^2 + 2*mu*gamma - mu = 0
         def eq(g):
-            return (
-                g**5
-                - (3 - mu) * g**4
-                + (3 - 2 * mu) * g**3
-                - mu * g**2
-                + 2 * mu * g
-                - mu
-            )
+            return g**5 - (3 - mu) * g**4 + (3 - 2 * mu) * g**3 - mu * g**2 + 2 * mu * g - mu
     else:
         # L2 五次方程：由 L2 处引力加速度与旋转坐标系离心加速度平衡条件导出
         # gamma^5 + (3-mu)*gamma^4 + (3-2mu)*gamma^3 - mu*gamma^2 - 2*mu*gamma - mu = 0
         def eq(g):
-            return (
-                g**5
-                + (3 - mu) * g**4
-                + (3 - 2 * mu) * g**3
-                - mu * g**2
-                - 2 * mu * g
-                - mu
-            )
+            return g**5 + (3 - mu) * g**4 + (3 - 2 * mu) * g**3 - mu * g**2 - 2 * mu * g - mu
 
     # Hill 球近似 (mu/3)^{1/3} 作为初始猜测，用于确定 Brent 方法的搜索区间
     g0 = (mu / 3) ** (1 / 3)
@@ -108,7 +97,7 @@ def _compute_omega_p(gamma: float, mu: float, L: int) -> float:
     return np.sqrt(-s2_minus)
 
 
-def compute_halo_coefficients(mu: float, L: int) -> Dict[str, float]:
+def compute_halo_coefficients(mu: float, L: int) -> dict[str, float]:
     """计算 Halo 轨道 Richardson 三阶近似所需的全部系数。
 
     根据 Richardson (1980) 的三阶解析构造方法，在共线平动点附近将 CR3BP 运动方程
@@ -162,7 +151,10 @@ def compute_halo_coefficients(mu: float, L: int) -> Dict[str, float]:
     # c_n = (1/gamma^3) * [(-1)^n * (1-mu) * (gamma/(1∓gamma))^{n+1} + mu]
     # 其中 ∓ 对应 L1/L2
     c1 = 1.0 - mu - (1 - 2 * mu) * abs_gamma**3 / (1 - abs_gamma) ** 3
-    c2_c = (1 - mu) / (1 - abs_gamma) ** 3 + mu / abs_gamma**3 if L == 1 else (1 - mu) / (1 + abs_gamma) ** 3 + mu / abs_gamma**3
+    if L == 1:
+        c2_c = (1 - mu) / (1 - abs_gamma) ** 3 + mu / abs_gamma**3
+    else:
+        c2_c = (1 - mu) / (1 + abs_gamma) ** 3 + mu / abs_gamma**3
     c3 = 3 * mu * (2 - mu)
 
     # Richardson 三阶近似系数（L1 和 L2 的公式不同，符号和分母略有差异）
@@ -254,7 +246,7 @@ def halo_third_order_approximation(
     tf: float,
     N: int,
     halo_class: int = 0,
-) -> Tuple[npt.NDArray, npt.NDArray, float]:
+) -> tuple[npt.NDArray, npt.NDArray, float]:
     """计算Halo轨道三阶解析近似
 
     Args:
@@ -362,7 +354,7 @@ def compute_halo_initial_guess(
     z_amplitude: float,
     L: int = 1,
     halo_class: int = 0,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """计算Halo轨道初始猜测参数
 
     使用 Richardson 三阶近似系数生成初始猜测，配合微分修正器使用。
@@ -400,7 +392,7 @@ def compute_halo_initial_guess(
 
     # 平动点位置
     L_position = 1 - mu - gamma  # L1: gamma>0, L2: gamma<0
-    abs_gamma = abs(gamma)
+    abs(gamma)
 
     # 振幅关系：Au ∝ sqrt(Aw)（Richardson 三阶非线性耦合）
     Au = np.sqrt(z_amplitude) * 0.5
@@ -467,8 +459,8 @@ class DifferentialCorrection:
     def __init__(
         self,
         dynamic: CR3BP_Dynamics,
-        target: Optional[Dict[str, Any]] = None,
-        free_vars: Optional[List[str]] = None,
+        target: dict[str, Any] | None = None,
+        free_vars: list[str] | None = None,
     ) -> None:
         """初始化修正器
 
@@ -741,7 +733,7 @@ class DifferentialCorrection:
 
         return self
 
-    def _apply_config(self, config: "CorrectionConfig") -> None:
+    def _apply_config(self, config: CorrectionConfig) -> None:
         """Apply an immutable CorrectionConfig to this corrector instance.
 
         Args:
@@ -907,10 +899,12 @@ class DifferentialCorrection:
             print("开始微分修正迭代（STM牛顿法）...")
             print(f"{'=' * 60}")
             print(
-                f"初始状态: x={self.initial_guess[0]:.6f}, y={self.initial_guess[1]:.6f}, z={self.initial_guess[2]:.6f}"
+                f"初始状态: x={self.initial_guess[0]:.6f},"
+                f" y={self.initial_guess[1]:.6f}, z={self.initial_guess[2]:.6f}"
             )
             print(
-                f"         x_dot={self.initial_guess[3]:.6f}, y_dot={self.initial_guess[4]:.6f}, z_dot={self.initial_guess[5]:.6f}"
+                f"         x_dot={self.initial_guess[3]:.6f},"
+                f" y_dot={self.initial_guess[4]:.6f}, z_dot={self.initial_guess[5]:.6f}"
             )
             print(f"初始半周期: T/2={half_period_time:.6f}")
             print(f"{'=' * 60}")
@@ -1042,7 +1036,8 @@ class DifferentialCorrection:
                     self.current_error = current_error
                     if verbose:
                         print(
-                            f"  收敛成功：修正量过小({correction_norm:.2e})但误差已足够小({current_error:.2e})"
+                            f"  收敛成功：修正量过小({correction_norm:.2e})"
+                            f"但误差已足够小({current_error:.2e})"
                         )
                     break
                 else:

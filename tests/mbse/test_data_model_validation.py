@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 from e2m2e.mbse.data.core_models import OrbitProperties, OrbitStability, PropagationResult
 
@@ -18,14 +19,14 @@ class TestPropagationResult:
         assert result.states.shape == (100, 6)
 
     def test_rejects_wrong_states_shape(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             PropagationResult(
                 time=np.linspace(0, 1, 100),
                 states=np.random.randn(6, 100),  # wrong shape
             )
 
     def test_rejects_1d_states(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             PropagationResult(
                 time=np.linspace(0, 1, 100),
                 states=np.random.randn(100),
@@ -43,7 +44,7 @@ class TestPropagationResult:
 
     def test_rejects_wrong_stm_shape(self):
         states = np.random.randn(50, 6)
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             PropagationResult(
                 time=np.linspace(0, 1, 50),
                 states=states,
@@ -110,7 +111,7 @@ class TestOrbitStability:
         assert stab.stability is None
 
     def test_rejects_wrong_monodromy_shape(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             OrbitStability(monodromy_matrix=np.eye(5))
 
     def test_eigenvalues_optional(self):

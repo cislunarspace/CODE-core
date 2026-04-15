@@ -7,9 +7,9 @@ StabilityAnalysis 类测试
 import numpy as np
 import pytest
 
-from e2m2e.core import Orbit, CR3BP_System, CR3BP_Dynamics
 from e2m2e.algorithms import StabilityAnalysis
-from e2m2e.algorithms.stability import StabilityType, BifurcationType
+from e2m2e.algorithms.stability import BifurcationType, StabilityType
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
 
 
 class TestStabilityAnalysisCreation:
@@ -126,7 +126,7 @@ class TestAnalyzeBifurcation:
         stability = StabilityAnalysis(orbit)
 
         assert stability.bifurcation_type == BifurcationType.NONE
-        assert stability.bifurcation_detected == False
+        assert not stability.bifurcation_detected
 
 
 class TestStabilityIndices:

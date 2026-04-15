@@ -2,8 +2,9 @@
 Unit tests for CR3BP_System class
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from e2m2e.core.system import CR3BP_System, LibrationPoint
 
 
@@ -84,7 +85,7 @@ class TestCR3BPSystemLibrationPoints:
     def test_compute_libration_points(self, earth_moon_system):
         """Test libration points computation"""
         L_points = earth_moon_system.compute_libration_points()
-        
+
         assert earth_moon_system.has_L_points is True
         assert len(L_points) == 5
         assert LibrationPoint.L1 in L_points
@@ -96,7 +97,7 @@ class TestCR3BPSystemLibrationPoints:
     def test_libration_points_stored(self, earth_moon_system):
         """Test libration points are stored in system"""
         earth_moon_system.compute_libration_points()
-        
+
         assert earth_moon_system.L1 is not None
         assert earth_moon_system.L2 is not None
         assert earth_moon_system.L3 is not None
@@ -106,12 +107,11 @@ class TestCR3BPSystemLibrationPoints:
     def test_l4_l5_triangle_points(self, earth_moon_system):
         """Test L4 and L5 are equilateral triangle points"""
         earth_moon_system.compute_libration_points()
-        mu = earth_moon_system.mu
-        
+
         # L4 should be at (0.5 - mu, sqrt(3)/2)
         expected_l4_y = np.sqrt(3) / 2
         assert abs(earth_moon_system.L4[1] - expected_l4_y) < 0.01
-        
+
         # L5 should be at (0.5 - mu, -sqrt(3)/2)
         expected_l5_y = -np.sqrt(3) / 2
         assert abs(earth_moon_system.L5[1] - expected_l5_y) < 0.01
@@ -167,9 +167,9 @@ class TestCR3BPSystemCharacteristicScales:
         """Test setting characteristic scales"""
         distance = 384400  # km
         period = 27.32 * 86400  # seconds
-        
+
         earth_moon_system.set_characteristic_scales(distance=distance, period=period)
-        
+
         assert earth_moon_system.characteristic_length == distance
         assert earth_moon_system.characteristic_time is not None
         assert earth_moon_system.characteristic_velocity is not None
@@ -179,9 +179,9 @@ class TestCR3BPSystemCharacteristicScales:
         """Test characteristic time is period/(2*pi)"""
         distance = 384400
         period = 27.32 * 86400
-        
+
         earth_moon_system.set_characteristic_scales(distance=distance, period=period)
-        
+
         expected_time = period / (2 * np.pi)
         assert abs(earth_moon_system.characteristic_time - expected_time) < 1e-10
 
@@ -189,9 +189,9 @@ class TestCR3BPSystemCharacteristicScales:
         """Test characteristic velocity is distance/time"""
         distance = 384400
         period = 27.32 * 86400
-        
+
         earth_moon_system.set_characteristic_scales(distance=distance, period=period)
-        
+
         expected_velocity = distance / earth_moon_system.characteristic_time
         assert abs(earth_moon_system.characteristic_velocity - expected_velocity) < 1e-10
 
@@ -215,7 +215,7 @@ class TestCR3BPSystemUnitConversion:
         """Test dimensionless to physical position conversion"""
         dim_state = np.array([0.5, 0.0, 0.0, 0.0, 0.0, 0.0])
         phys_state = initialized_system.dimensionless_to_physical(state=dim_state)
-        
+
         expected_position = 0.5 * initialized_system.characteristic_length
         assert abs(phys_state[0] - expected_position) < 1e-10
 
@@ -224,7 +224,7 @@ class TestCR3BPSystemUnitConversion:
         phys_position = initialized_system.characteristic_length / 2
         phys_state = np.array([phys_position, 0.0, 0.0, 0.0, 0.0, 0.0])
         dim_state = initialized_system.physical_to_dimensionless(state=phys_state)
-        
+
         assert abs(dim_state[0] - 0.5) < 1e-10
 
     def test_round_trip_conversion(self, initialized_system):
@@ -232,7 +232,7 @@ class TestCR3BPSystemUnitConversion:
         original = np.array([0.5, 0.1, 0.0, 0.01, 0.02, 0.0])
         converted = initialized_system.dimensionless_to_physical(state=original)
         back = initialized_system.physical_to_dimensionless(state=converted)
-        
+
         assert np.allclose(original, back, atol=1e-10)
 
 
@@ -254,4 +254,4 @@ class TestCR3BPSystemPhysicalConstants:
     def test_year_constant(self):
         """Test year in seconds"""
         expected = 365.25 * 86400
-        assert CR3BP_System.YEAR == expected
+        assert expected == CR3BP_System.YEAR

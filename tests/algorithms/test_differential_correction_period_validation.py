@@ -7,13 +7,11 @@ with invalid periods (T < 1e-6) to prevent convergence to invalid solutions.
 Reference: Commit 584c44d - fix: 添加周期合理性验证防止收敛到无效解
 """
 
-import numpy as np
 import pytest
 
 import e2m2e
 from e2m2e.algorithms import DifferentialCorrection
 from e2m2e.core import CR3BP_Dynamics, Orbit
-
 
 # 地月系统质量比
 MU = 1.21506683e-2
@@ -64,7 +62,7 @@ class TestPeriodValidation:
         """测试周期验证阈值为1e-6"""
         # 这个测试验证 min_valid_period = 1e-6 这个常量存在且正确
         min_valid_period = 1e-6
-        
+
         # 验证1e-6是合理的周期阈值
         assert min_valid_period > 0
         assert min_valid_period < 1e-3  # 应该是非常小的值
@@ -137,7 +135,9 @@ class TestPeriodValidationFailureMode:
         # 无效周期应该导致返回None或success=False
         if result is None:
             assert not corrector.success
-            assert "周期" in corrector.termination_reason or "period" in corrector.termination_reason.lower()
+            assert "周期" in corrector.termination_reason or (
+                "period" in corrector.termination_reason.lower()
+            )
 
 
 class TestCorrectionNormTermination:
@@ -155,7 +155,7 @@ class TestCorrectionNormTermination:
         )
         orbit.period = 6.307498
 
-        result = corrector.iterate_correction(orbit, verbose=False)
+        corrector.iterate_correction(orbit, verbose=False)
 
         # 如果成功，验证终止原因
         if corrector.success:
@@ -165,7 +165,7 @@ class TestCorrectionNormTermination:
             assert corrector.termination_reason in [
                 "收敛成功：误差小于容差",
                 "收敛成功：修正量过小但误差足够小",
-                "收敛成功"
+                "收敛成功",
             ]
 
     def test_correction_history_tracked(self, corrector):

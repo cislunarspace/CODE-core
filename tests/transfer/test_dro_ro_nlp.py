@@ -1,30 +1,29 @@
 """测试DRO到RO转移NLP优化模块"""
 
-import numpy as np
 import json
-import os
 import sys
 from pathlib import Path
+
+import numpy as np
 
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from e2m2e.core.system import CR3BP_System
-from e2m2e.core.dynamics import CR3BP_Dynamics
-from e2m2e.core.orbit import Orbit
-from e2m2e.transfer.transfer_optimization import (
+from e2m2e.core.dynamics import CR3BP_Dynamics  # noqa: E402
+from e2m2e.core.orbit import Orbit  # noqa: E402
+from e2m2e.core.system import CR3BP_System  # noqa: E402
+from e2m2e.transfer.transfer_optimization import (  # noqa: E402
     DROTRONLPOptimizer,
-    NLPOptimizationVariables,
     NLPOptimizationResult,
+    NLPOptimizationVariables,
     TransferType,
-    optimize_transfer,
 )
 
 
 def load_orbit_data(json_path: str) -> dict:
     """加载轨道数据"""
-    with open(json_path, "r") as f:
+    with open(json_path) as f:
         return json.load(f)
 
 
@@ -146,7 +145,7 @@ def test_nlp_result_structure():
     assert result.objective_value == 0.5
     assert result.delta_v1 == 0.2
     assert result.delta_v2 == 0.3
-    assert result.success == True
+    assert result.success
 
     print("✓ NLP结果结构测试通过")
 
@@ -169,8 +168,8 @@ def test_module_import():
     # 从主模块导入
     from e2m2e.transfer import (
         DROTRONLPOptimizer,
-        NLPOptimizationVariables,
         NLPOptimizationResult,
+        NLPOptimizationVariables,
         TransferType,
         optimize_transfer,
     )

@@ -2,10 +2,11 @@
 e2m2e库基本功能测试
 """
 
-import numpy as np
 import sys
 
-from e2m2e.core import CR3BP_System, CR3BP_Dynamics, CoordinateTransformation
+import numpy as np
+
+from e2m2e.core import CoordinateTransformation, CR3BP_Dynamics, CR3BP_System
 
 
 def test_import():

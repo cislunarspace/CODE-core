@@ -25,11 +25,7 @@ __author__ = "天疆说"
 __email__ = "ouyangjiahong22@nudt.edu.cn"
 
 # 导入子包
-from . import core
-from . import algorithms
-from . import visualization
-from . import transfer
-from . import mbse
+from . import algorithms, core, mbse, transfer, visualization
 
 __all__ = [
     "core",

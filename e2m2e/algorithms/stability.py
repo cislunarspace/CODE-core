@@ -6,13 +6,13 @@
 
 from __future__ import annotations
 
-import numpy as np
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import Any
 
+import numpy as np
 
-from ..core.orbit import Orbit
 from ..core.dynamics import CR3BP_Dynamics
+from ..core.orbit import Orbit
 
 
 class StabilityType(Enum):
@@ -56,7 +56,7 @@ class StabilityAnalysis:
     STABILITY_THRESHOLD = 1e-6
     BIFURCATION_TOLERANCE = 1e-8
 
-    def __init__(self, orbit: Orbit, dynamics: Optional[CR3BP_Dynamics] = None) -> None:
+    def __init__(self, orbit: Orbit, dynamics: CR3BP_Dynamics | None = None) -> None:
         """初始化分析器
 
         Args:
@@ -360,10 +360,10 @@ class StabilityAnalysis:
 
     @staticmethod
     def detect_bifurcation_in_family(
-        orbits: List[Orbit],
+        orbits: list[Orbit],
         dynamics: CR3BP_Dynamics,
         tolerance: float = 1e-8,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """检测轨道族中的分岔点
 
         遍历轨道族中的每条轨道，计算其单值矩阵特征值，
@@ -411,11 +411,11 @@ class StabilityAnalysis:
 
     @staticmethod
     def find_nearest_bifurcation(
-        orbits: List[Orbit],
+        orbits: list[Orbit],
         dynamics: CR3BP_Dynamics,
-        target_x0: Optional[float] = None,
+        target_x0: float | None = None,
         tolerance: float = 1e-4,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """在轨道族中找到最接近目标参数的分岔点
 
         Args:

@@ -6,9 +6,10 @@
 """
 
 import numpy as np
-from e2m2e.core.system import CR3BP_System
-from e2m2e.core.dynamics import CR3BP_Dynamics
+
 from e2m2e.algorithms.differential_correction import DifferentialCorrection
+from e2m2e.core.dynamics import CR3BP_Dynamics
+from e2m2e.core.system import CR3BP_System
 
 
 def design_lyapunov_orbit():

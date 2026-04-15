@@ -32,8 +32,8 @@ e2m2e 需要实现 CR3BP 旋转系 (synodic frame) 与 J2000 惯性系之间的�
   CR3BP_System (已有)
 """
 
-import pytest
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.core import (
@@ -48,7 +48,7 @@ pytestmark = pytest.mark.spice
 # =============================================================================
 # Fixtures
 # =============================================================================
-from tests.conftest import MU, DU, TU_SECONDS
+from tests.conftest import MU  # noqa: E402
 
 
 @pytest.fixture
@@ -152,9 +152,7 @@ class TestSynodicToJ2000:
             et0=reference_et,
         )
         r_from_earth = np.linalg.norm(state_j2000[:3])
-        assert 300000 < r_from_earth < 500000, (
-            f"DRO距地球 {r_from_earth:.0f} km，超出合理范围"
-        )
+        assert 300000 < r_from_earth < 500000, f"DRO距地球 {r_from_earth:.0f} km，超出合理范围"
 
     def test_velocity_physical_range(self, syn_j2000, reference_et, dro_synodic_state):
         """DRO 在 J2000 下的速度应合理"""
@@ -184,7 +182,6 @@ class TestSynodicToJ2000:
 
     def test_different_times_different_positions(self, syn_j2000, reference_et, dro_synodic_state):
         """不同 CR3BP 时刻转换到 J2000 应给出不同位置"""
-        tc = TU_SECONDS
         state_t0 = syn_j2000.synodic_to_j2000(
             state_syn=dro_synodic_state, t_syn=0.0, et0=reference_et
         )
@@ -261,12 +258,8 @@ class TestSynodicJ2000RoundTrip:
         spice_state = syn_j2000.spice.get_body_state(
             target="MOON", et=reference_et, frame="J2000", observer="EARTH"
         )
-        state_syn = syn_j2000.j2000_to_synodic(
-            state_j2000=spice_state, t_syn=0.0, et0=reference_et
-        )
-        state_back = syn_j2000.synodic_to_j2000(
-            state_syn=state_syn, t_syn=0.0, et0=reference_et
-        )
+        state_syn = syn_j2000.j2000_to_synodic(state_j2000=spice_state, t_syn=0.0, et0=reference_et)
+        state_back = syn_j2000.synodic_to_j2000(state_syn=state_syn, t_syn=0.0, et0=reference_et)
         assert_allclose(state_back, spice_state, atol=1e-3)
 
 
@@ -278,7 +271,6 @@ class TestBatchConversion:
 
     def test_batch_synodic_to_j2000(self, syn_j2000, reference_et, dro_synodic_state):
         """应能批量转换多个时间点的状态"""
-        tc = TU_SECONDS
         t_syn_arr = np.linspace(0, 2.095, 50)
         states_syn = np.array([dro_synodic_state] * 50)
 

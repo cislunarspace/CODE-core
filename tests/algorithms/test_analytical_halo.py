@@ -17,8 +17,8 @@ import pytest
 
 from e2m2e.algorithms import (
     compute_halo_coefficients,
-    halo_third_order_approximation,
     compute_halo_initial_guess,
+    halo_third_order_approximation,
 )
 
 MU = 0.012150585

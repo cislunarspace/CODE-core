@@ -12,15 +12,13 @@ Continuation 延拓算法测试模块
 - "feat(continuation): 改进延拓算法进度显示"
 """
 
-import numpy as np
+import contextlib
+
 import pytest
-from io import StringIO
-import sys
 
 import e2m2e
-from e2m2e.algorithms import DifferentialCorrection, Continuation
+from e2m2e.algorithms import Continuation, DifferentialCorrection
 from e2m2e.core import CR3BP_Dynamics, Orbit, OrbitFamily
-
 
 # 地月系统质量比
 MU = 1.21506683e-2
@@ -82,8 +80,10 @@ class TestContinuationParameterRemoval:
     def test_continuation_parameter_from_corrector(self, continuation, corrector):
         """延拓参数应该自动从修正器的 fixed_parameters 获取"""
         expected_param = next(iter(corrector.fixed_parameters))
-        assert continuation.continuation_parameter == expected_param, \
-            f"continuation_parameter should be '{expected_param}', got '{continuation.continuation_parameter}'"
+        assert continuation.continuation_parameter == expected_param, (
+            f"continuation_parameter should be '{expected_param}',"
+            f" got '{continuation.continuation_parameter}'"
+        )
 
     def test_continuation_initialization_without_param(self, corrector):
         """Continuation 初始化不应需要 param 参数"""
@@ -116,33 +116,29 @@ class TestProgressDisplay:
     def test_verbose_mode_output(self, continuation, seed_orbit, capsys):
         """verbose 模式应该输出详细信息"""
         # 只延拓很少的步数来加快测试
-        try:
+        with contextlib.suppress(Exception):
             continuation.natural_continuation(
                 seed_orbit=seed_orbit,
                 param_range=(0.791, 0.792),
                 step_size=0.0001,
                 verbose=True,
             )
-        except Exception:
-            pass  # 可能失败，我们只检查输出
-        
+
         captured = capsys.readouterr()
         # verbose 模式应该输出标题和详细信息
         assert "自然参数延拓" in captured.out or "延拓" in captured.out or captured.out != ""
 
     def test_non_verbose_mode_minimal_output(self, continuation, seed_orbit, capsys):
         """非 verbose 模式应该只有最小输出"""
-        try:
+        with contextlib.suppress(Exception):
             continuation.natural_continuation(
                 seed_orbit=seed_orbit,
                 param_range=(0.791, 0.792),
                 step_size=0.0001,
                 verbose=False,
             )
-        except Exception:
-            pass
-        
-        captured = capsys.readouterr()
+
+        capsys.readouterr()
         # 非 verbose 模式可能输出进度信息
         # 注意：改进后的版本即使非 verbose 也会显示基本进度
 
@@ -169,7 +165,7 @@ class TestBidirectionalContinuation:
             step_size=0.0005,
             verbose=False,
         )
-        
+
         assert result is not None
         assert isinstance(result, OrbitFamily)
 
@@ -182,7 +178,7 @@ class TestBidirectionalContinuation:
             step_size=0.0005,
             verbose=False,
         )
-        
+
         assert result is not None
         assert isinstance(result, OrbitFamily)
 
@@ -195,7 +191,7 @@ class TestBidirectionalContinuation:
             step_size=0.0005,
             verbose=False,
         )
-        
+
         assert result is not None
         assert isinstance(result, OrbitFamily)
         # 双向延拓后，轨道数量应该大于 1
@@ -210,45 +206,39 @@ class TestStepSizeControl:
 
     def test_step_size_history_recorded(self, continuation, seed_orbit, capsys):
         """步长历史应该被记录"""
-        try:
+        with contextlib.suppress(Exception):
             continuation.natural_continuation(
                 seed_orbit=seed_orbit,
                 param_range=(0.791, 0.793),
                 step_size=0.0005,
                 verbose=False,
             )
-        except Exception:
-            pass
 
     def test_step_reduction_on_failure(self, continuation, seed_orbit):
         """修正失败时步长应该减小"""
         # 设置较大的初始步长
         continuation.step_size = 0.01
         continuation.min_step_size = 0.0001
-        
+
         # 使用一个可能失败的参数范围
-        try:
+        with contextlib.suppress(Exception):
             continuation.natural_continuation(
                 seed_orbit=seed_orbit,
                 param_range=(0.791, 0.792),
                 step_size=0.005,  # 较大的步长
                 verbose=False,
             )
-        except Exception:
-            pass
 
     def test_continuation_stats_updated(self, continuation, seed_orbit):
         """延拓统计应该被更新"""
-        try:
+        with contextlib.suppress(Exception):
             continuation.natural_continuation(
                 seed_orbit=seed_orbit,
                 param_range=(0.791, 0.792),
                 step_size=0.0003,
                 verbose=False,
             )
-        except Exception:
-            pass
-        
+
         # 至少 total_steps 应该增加
         # 注意：即使延拓失败，total_steps 也会增加
         assert continuation.continuation_stats["total_steps"] >= 0
@@ -283,7 +273,7 @@ class TestTerminationConditions:
         # max_orbits是存储属性，实际限制在迭代中生效
         continuation.max_orbits = 3
         assert continuation.max_orbits == 3
-        
+
         # 验证可以正常完成延拓（max_orbits不会导致提前终止）
         result = continuation.natural_continuation(
             seed_orbit=seed_orbit,
@@ -298,16 +288,14 @@ class TestTerminationConditions:
         """终止原因应该被设置"""
         # 使用一个会导致终止的范围
         continuation.max_orbits = 2
-        try:
+        with contextlib.suppress(Exception):
             continuation.natural_continuation(
                 seed_orbit=seed_orbit,
                 param_range=(0.78, 0.85),
                 step_size=0.001,
                 verbose=False,
             )
-        except Exception:
-            pass
-        
+
         # 如果延拓达到最大轨道数，应该设置终止原因
         if len(continuation.family_orbits) >= continuation.max_orbits:
             assert continuation.termination_reason is not None
@@ -327,33 +315,29 @@ class TestOrbitFamilyAttributes:
             step_size=0.0005,
             verbose=False,
         )
-        
+
         if result is not None:
             assert len(continuation.family_orbits) >= 0
 
     def test_family_parameters_list(self, continuation, seed_orbit):
         """family_parameters 列表应该被填充"""
-        try:
+        with contextlib.suppress(Exception):
             continuation.natural_continuation(
                 seed_orbit=seed_orbit,
                 param_range=(0.791, 0.7925),
                 step_size=0.0003,
                 verbose=False,
             )
-        except Exception:
-            pass
 
     def test_current_previous_orbit_tracking(self, continuation, seed_orbit):
         """当前和历史轨道应该被跟踪"""
-        try:
+        with contextlib.suppress(Exception):
             continuation.natural_continuation(
                 seed_orbit=seed_orbit,
                 param_range=(0.791, 0.792),
                 step_size=0.0002,
                 verbose=False,
             )
-        except Exception:
-            pass
 
 
 # ============================================================
@@ -372,7 +356,7 @@ class TestBoundaryCases:
             step_size=0.001,
             verbose=False,
         )
-        
+
         # 应该返回 OrbitFamily 对象
         assert result is None or isinstance(result, OrbitFamily)
 
@@ -380,17 +364,15 @@ class TestBoundaryCases:
         """无效步长应该被处理"""
         continuation.step_size = -0.001  # 负步长
         continuation.initial_step_size = -0.001
-        
+
         # 不应崩溃
-        try:
+        with contextlib.suppress(ValueError, RuntimeError):
             continuation.natural_continuation(
                 seed_orbit=seed_orbit,
                 param_range=(0.791, 0.792),
                 step_size=-0.001,
                 verbose=False,
             )
-        except (ValueError, RuntimeError):
-            pass  # 某些实现可能会抛出异常，这是可以接受的
 
     def test_very_large_step_size(self, continuation, seed_orbit):
         """极大步长应该被限制或处理"""
@@ -401,6 +383,6 @@ class TestBoundaryCases:
             step_size=0.5,  # 过大的步长
             verbose=False,
         )
-        
+
         # 应该返回结果或优雅地处理
         assert result is None or isinstance(result, OrbitFamily)

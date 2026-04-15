@@ -32,7 +32,10 @@ ALGORITHMS_REQUIREMENTS = [
         id="REQ-102",
         title="策略模式分离配置与迭代",
         category=RequirementCategory.INTERFACE,
-        description="DifferentialCorrection 使用 CorrectionConfig 策略对象将修正配置与 Newton 迭代循环分离。",
+        description=(
+            "DifferentialCorrection 使用 CorrectionConfig 策略对象"
+            " 将修正配置与 Newton 迭代循环分离。"
+        ),
         priority=RequirementPriority.SHOULD,
         verification_method="inspection",
         linked_code=["e2m2e.algorithms.strategies", "e2m2e.algorithms.differential_correction"],
@@ -42,7 +45,11 @@ ALGORITHMS_REQUIREMENTS = [
         id="REQ-103",
         title="Continuation 不重复 CR3BP 物理",
         category=RequirementCategory.INTERFACE,
-        description="Continuation 模块的 compute_F_and_dF_symmetric_xz_plane 必须通过 CR3BP_Dynamics 实例调用运动方程和 Jacobian，不得本地复制物理公式。",
+        description=(
+            "Continuation 模块的 compute_F_and_dF_symmetric_xz_plane"
+            " 必须通过 CR3BP_Dynamics 实例调用运动方程和 Jacobian，"
+            "不得本地复制物理公式。"
+        ),
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
         linked_code=["e2m2e.algorithms.continuation"],
@@ -52,7 +59,10 @@ ALGORITHMS_REQUIREMENTS = [
         id="REQ-104",
         title="算法层 STM 解析计算",
         category=RequirementCategory.FUNCTIONAL,
-        description="DifferentialCorrection 的 iterate_correction 必须使用解析 STM（来自 propagate(with_stm=True)），默认不使用有限差分。",
+        description=(
+            "DifferentialCorrection 的 iterate_correction 必须使用解析 STM"
+            "（来自 propagate(with_stm=True)），默认不使用有限差分。"
+        ),
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
         linked_code=["e2m2e.algorithms.differential_correction"],
@@ -62,7 +72,9 @@ ALGORITHMS_REQUIREMENTS = [
         id="REQ-105",
         title="Richardson 三阶近似精度",
         category=RequirementCategory.FUNCTIONAL,
-        description="compute_halo_initial_guess 生成的初始猜测经过微分修正后能收敛到 Halo 周期轨道。",
+        description=(
+            "compute_halo_initial_guess 生成的初始猜测经过微分修正后能收敛到 Halo 周期轨道。"
+        ),
         priority=RequirementPriority.SHOULD,
         verification_method="test",
         linked_code=["e2m2e.algorithms.differential_correction"],
@@ -95,7 +107,9 @@ ALGORITHMS_REQUIREMENTS = [
         id="REQ-112",
         title="延拓步长自适应",
         category=RequirementCategory.FUNCTIONAL,
-        description="Continuation 在修正成功时增大步长、失败时减小步长，步长范围 [min_step, max_step]。",
+        description=(
+            "Continuation 在修正成功时增大步长、失败时减小步长，步长范围 [min_step, max_step]。"
+        ),
         priority=RequirementPriority.SHOULD,
         verification_method="test",
         linked_code=["e2m2e.algorithms.continuation"],

@@ -6,8 +6,6 @@
 
 from __future__ import annotations
 
-from typing import List
-
 import numpy as np
 import numpy.typing as npt
 
@@ -29,7 +27,7 @@ class EphemerisSystem:
 
     def __init__(
         self,
-        bodies: List[str],
+        bodies: list[str],
         spice: SPICEManager,
         origin: str = "EARTH",
         frame: str = "J2000",

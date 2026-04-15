@@ -6,10 +6,9 @@
 
 from __future__ import annotations
 
-import numpy as np
 from enum import Enum
-from typing import Dict, List, Tuple, Optional, Union, Any
 
+import numpy as np
 import numpy.typing as npt
 
 from .system import CR3BP_System
@@ -275,8 +274,8 @@ class CoordinateTransformation:
     def transform(
         self,
         state: npt.ArrayLike,
-        from_frame: Union[ReferenceFrame, str],
-        to_frame: Union[ReferenceFrame, str],
+        from_frame: ReferenceFrame | str,
+        to_frame: ReferenceFrame | str,
         time: float = 0.0,
     ) -> npt.NDArray[np.floating]:
         """通用坐标变换接口

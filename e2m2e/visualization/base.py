@@ -7,21 +7,17 @@ v4.0 MBSE 重构：参数类型使用 OrbitContainer Protocol，满足 Visualize
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional, Union
+from enum import Enum
+from typing import TYPE_CHECKING, Any
 
-import matplotlib
-import matplotlib.offsetbox as offsetbox
 import matplotlib.pyplot as plt
 import numpy as np
-import numpy.typing as npt
-from enum import Enum
 
 from ..core.system import CR3BP_System, LibrationPoint
-from ..core.orbit import Orbit
 from .config import PlotConfig
 
 if TYPE_CHECKING:
-    from ..mbse.architecture.ports import OrbitContainer
+    pass
 
 
 class ProjectionPlane(Enum):
@@ -43,7 +39,7 @@ class OrbitVisualizer:
         config: 绘图配置，未指定时使用默认 PlotConfig。
     """
 
-    def __init__(self, system: CR3BP_System, config: Optional[PlotConfig] = None) -> None:
+    def __init__(self, system: CR3BP_System, config: PlotConfig | None = None) -> None:
         self.system = system
         self.mu = system.mu  # 质量参数，用于天体位置计算
         self.config = config or PlotConfig()
@@ -89,10 +85,7 @@ class OrbitVisualizer:
         接受任何满足 OrbitContainer Protocol 的对象（有 .states 属性）
         或直接的 numpy 数组 / array-like。
         """
-        if hasattr(orbit, "states"):
-            states = orbit.states
-        else:
-            states = np.array(orbit)
+        states = orbit.states if hasattr(orbit, "states") else np.array(orbit)
         if states.ndim == 1:
             states = states.reshape(1, -1)
         return states
@@ -128,9 +121,9 @@ class OrbitVisualizer:
     def plot_3d_orbit(
         self,
         orbit: Any,
-        color: Optional[str] = None,
-        label: Optional[str] = None,
-        ax: Optional[Any] = None,
+        color: str | None = None,
+        label: str | None = None,
+        ax: Any | None = None,
         show_start: bool = True,
     ) -> Any:
         """绘制 3D 轨道。
@@ -158,22 +151,30 @@ class OrbitVisualizer:
         if color is None:
             color = self._get_next_color()
 
-        ax.plot(x, y, z, color=color, label=label,
-                linewidth=self.orbit_linewidth, alpha=self.orbit_alpha)
+        ax.plot(
+            x,
+            y,
+            z,
+            color=color,
+            label=label,
+            linewidth=self.orbit_linewidth,
+            alpha=self.orbit_alpha,
+        )
 
         if show_start and len(x) > 0:
-            ax.scatter(x[0], y[0], z[0], color=color, marker="o", s=50,
-                       edgecolors="black", linewidth=1)
+            ax.scatter(
+                x[0], y[0], z[0], color=color, marker="o", s=50, edgecolors="black", linewidth=1
+            )
 
         return ax
 
     def plot_2d_projection(
         self,
         orbit: Any,
-        plane: Union[ProjectionPlane, str] = ProjectionPlane.XY,
-        color: Optional[str] = None,
-        label: Optional[str] = None,
-        ax: Optional[Any] = None,
+        plane: ProjectionPlane | str = ProjectionPlane.XY,
+        color: str | None = None,
+        label: str | None = None,
+        ax: Any | None = None,
         show_start: bool = True,
     ) -> Any:
         """绘制轨道在指定平面上的 2D 投影。
@@ -193,7 +194,8 @@ class OrbitVisualizer:
         if ax is None:
             if self.axes is None:
                 self.figure, self.axes = plt.subplots(
-                    1, 1, figsize=self.config.figsize_2d, dpi=self.config.dpi)
+                    1, 1, figsize=self.config.figsize_2d, dpi=self.config.dpi
+                )
             ax = self.axes
 
         states = self._extract_states(orbit)
@@ -215,17 +217,17 @@ class OrbitVisualizer:
         else:
             raise ValueError(f"Unknown projection plane: {plane}")
 
-        ax.plot(px, py, color=color, label=label,
-                linewidth=self.orbit_linewidth, alpha=self.orbit_alpha)
+        ax.plot(
+            px, py, color=color, label=label, linewidth=self.orbit_linewidth, alpha=self.orbit_alpha
+        )
 
         if show_start and len(px) > 0:
-            ax.scatter(px[0], py[0], color=color, marker="o", s=50,
-                       edgecolors="black", linewidth=1)
+            ax.scatter(px[0], py[0], color=color, marker="o", s=50, edgecolors="black", linewidth=1)
 
         return ax
 
     def plot_libration_points(
-        self, ax: Optional[Any] = None, show_labels: bool = True, is_3d: bool = False
+        self, ax: Any | None = None, show_labels: bool = True, is_3d: bool = False
     ) -> Any:
         """绘制五个平动点标记。
 
@@ -260,23 +262,31 @@ class OrbitVisualizer:
             label_text = self.libration_point_labels[i]
 
             if is_3d:
-                ax.scatter(coord[0], coord[1], coord[2], color=color,
-                           marker=marker, s=size, zorder=5)
+                ax.scatter(
+                    coord[0], coord[1], coord[2], color=color, marker=marker, s=size, zorder=5
+                )
                 if show_labels:
-                    ax.text(coord[0], coord[1], coord[2] + 0.02, label_text,
-                            fontsize=self.libration_point_fontsize, ha="center")
+                    ax.text(
+                        coord[0],
+                        coord[1],
+                        coord[2] + 0.02,
+                        label_text,
+                        fontsize=self.libration_point_fontsize,
+                        ha="center",
+                    )
             else:
-                ax.scatter(coord[0], coord[1], color=color, marker=marker,
-                           s=size, zorder=5)
+                ax.scatter(coord[0], coord[1], color=color, marker=marker, s=size, zorder=5)
                 if show_labels:
                     ax.annotate(
-                        label_text, (coord[0], coord[1]),
-                        textcoords="offset points", xytext=(5, 5),
+                        label_text,
+                        (coord[0], coord[1]),
+                        textcoords="offset points",
+                        xytext=(5, 5),
                         fontsize=self.libration_point_fontsize,
                     )
         return ax
 
-    def plot_primary_bodies(self, ax: Optional[Any] = None, is_3d: bool = False) -> Any:
+    def plot_primary_bodies(self, ax: Any | None = None, is_3d: bool = False) -> Any:
         """绘制主天体和次天体标记。
 
         天体位置：主天体在 (-μ, 0, 0)，次天体在 (1-μ, 0, 0)（旋转系坐标）。
@@ -300,26 +310,56 @@ class OrbitVisualizer:
         secondary_name = getattr(self.system, "secondary_body", None) or "Moon"
 
         if is_3d:
-            ax.scatter(-self.mu, 0, 0, color=self.primary_body_color,
-                       s=self.primary_body_size, edgecolors="black", linewidth=1,
-                       zorder=10, label=primary_name)
-            ax.scatter(1 - self.mu, 0, 0, color=self.secondary_body_color,
-                       s=self.secondary_body_size, edgecolors="black", linewidth=1,
-                       zorder=10, label=secondary_name)
+            ax.scatter(
+                -self.mu,
+                0,
+                0,
+                color=self.primary_body_color,
+                s=self.primary_body_size,
+                edgecolors="black",
+                linewidth=1,
+                zorder=10,
+                label=primary_name,
+            )
+            ax.scatter(
+                1 - self.mu,
+                0,
+                0,
+                color=self.secondary_body_color,
+                s=self.secondary_body_size,
+                edgecolors="black",
+                linewidth=1,
+                zorder=10,
+                label=secondary_name,
+            )
         else:
             primary_pos = np.array([-self.mu, 0])
             secondary_pos = np.array([1 - self.mu, 0])
-            ax.scatter(*primary_pos, color="#2E86AB", s=self.primary_body_size,
-                       edgecolors="#1A5276", linewidth=1.5, zorder=10, label=primary_name)
-            ax.scatter(*secondary_pos, color="#95A5A6", s=self.secondary_body_size,
-                       edgecolors="#566573", linewidth=1.5, zorder=10, label=secondary_name)
+            ax.scatter(
+                *primary_pos,
+                color="#2E86AB",
+                s=self.primary_body_size,
+                edgecolors="#1A5276",
+                linewidth=1.5,
+                zorder=10,
+                label=primary_name,
+            )
+            ax.scatter(
+                *secondary_pos,
+                color="#95A5A6",
+                s=self.secondary_body_size,
+                edgecolors="#566573",
+                linewidth=1.5,
+                zorder=10,
+                label=secondary_name,
+            )
         return ax
 
     def show(self) -> None:
         """显示绘图窗口。"""
         plt.show()
 
-    def save(self, filename: str, dpi: Optional[int] = None) -> None:
+    def save(self, filename: str, dpi: int | None = None) -> None:
         """保存图像到文件。
 
         Args:
@@ -327,8 +367,9 @@ class OrbitVisualizer:
             dpi: 输出分辨率，未指定时使用配置中的默认值。
         """
         if self.figure is not None:
-            self.figure.savefig(filename, dpi=dpi or self.config.dpi,
-                                bbox_inches="tight", pad_inches=0.1)
+            self.figure.savefig(
+                filename, dpi=dpi or self.config.dpi, bbox_inches="tight", pad_inches=0.1
+            )
 
     def _sort_points_by_nearest_neighbor(self, x, y):
         """使用最近邻算法排序散点，使绘制的连线不交叉。"""
@@ -366,8 +407,7 @@ class OrbitVisualizer:
         n = len(points)
         if n <= 2:
             return x, y, z
-        distances_from_origin = np.sqrt(
-            points[:, 0] ** 2 + points[:, 1] ** 2 + points[:, 2] ** 2)
+        distances_from_origin = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2 + points[:, 2] ** 2)
         start_idx = np.argmax(distances_from_origin)
         visited = np.zeros(n, dtype=bool)
         sorted_indices = np.zeros(n, dtype=int)

@@ -9,15 +9,17 @@ DRO到RO转移轨道NLP优化模块
 
 from __future__ import annotations
 
-import numpy as np
-from typing import Tuple, Optional, Dict, Any, Callable
+import warnings
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from scipy.optimize import minimize, Bounds
-import warnings
+from typing import Any
 
-from ..core.orbit import Orbit
+import numpy as np
+from scipy.optimize import Bounds, minimize
+
 from ..core.dynamics import CR3BP_Dynamics
+from ..core.orbit import Orbit
 from ..core.system import CR3BP_System
 
 try:
@@ -60,7 +62,7 @@ class NLPOptimizationVariables:
         return np.array([self.alpha, self.transfer_time, self.t_ins])
 
     @classmethod
-    def from_array(cls, arr: np.ndarray) -> "NLPOptimizationVariables":
+    def from_array(cls, arr: np.ndarray) -> NLPOptimizationVariables:
         """从numpy数组创建"""
         return cls(alpha=arr[0], transfer_time=arr[1], t_ins=arr[2])
 
@@ -93,15 +95,15 @@ class NLPOptimizationResult:
     objective_value: float = 0.0
     delta_v1: float = 0.0
     delta_v2: float = 0.0
-    transfer_trajectory: Optional[np.ndarray] = None
-    transfer_times: Optional[np.ndarray] = None
-    departure_state: Optional[np.ndarray] = None
-    insertion_state: Optional[np.ndarray] = None
-    final_state: Optional[np.ndarray] = None
+    transfer_trajectory: np.ndarray | None = None
+    transfer_times: np.ndarray | None = None
+    departure_state: np.ndarray | None = None
+    insertion_state: np.ndarray | None = None
+    final_state: np.ndarray | None = None
     success: bool = False
     message: str = ""
     transfer_type: TransferType = TransferType.DIRECT
-    constraints_violation: Dict[str, float] = field(default_factory=dict)
+    constraints_violation: dict[str, float] = field(default_factory=dict)
 
 
 class DROTRONLPOptimizer:
@@ -167,13 +169,13 @@ class DROTRONLPOptimizer:
         self.earth_radius = self.EARTH_RADIUS_ND
         self.moon_radius = self.MOON_RADIUS_ND
 
-        self._last_trajectory: Optional[Tuple[np.ndarray, np.ndarray]] = None
-        self._progress_callback: Optional[Callable] = None
-        self._eval_cache: Optional[Dict[str, Any]] = None
-        self._eval_cache_key: Optional[bytes] = None
+        self._last_trajectory: tuple[np.ndarray, np.ndarray] | None = None
+        self._progress_callback: Callable | None = None
+        self._eval_cache: dict[str, Any] | None = None
+        self._eval_cache_key: bytes | None = None
         self._cache_enabled: bool = False
 
-    def set_progress_callback(self, callback: Optional[Callable]) -> None:
+    def set_progress_callback(self, callback: Callable | None) -> None:
         self._progress_callback = callback
 
     def enable_cache(self, enabled: bool = True) -> None:
@@ -182,7 +184,7 @@ class DROTRONLPOptimizer:
     def _y_key(self, y: np.ndarray) -> bytes:
         return y.tobytes()
 
-    def _evaluate_all(self, y: np.ndarray) -> Dict[str, Any]:
+    def _evaluate_all(self, y: np.ndarray) -> dict[str, Any]:
         key = self._y_key(y)
         if self._cache_enabled and self._eval_cache_key == key and self._eval_cache is not None:
             return self._eval_cache
@@ -198,14 +200,13 @@ class DROTRONLPOptimizer:
 
         empty = len(states) == 0
 
-        if not empty:
-            final_state = states[-1]
-        else:
-            final_state = np.zeros(6)
+        final_state = states[-1] if not empty else np.zeros(6)
 
-        insertion_state = self.dynamics.propagate_orbit_state_at_time(
-            self.arrival_orbit, float(t_ins)
-        ) if not empty else np.zeros(6)
+        insertion_state = (
+            self.dynamics.propagate_orbit_state_at_time(self.arrival_orbit, float(t_ins))
+            if not empty
+            else np.zeros(6)
+        )
 
         dv1 = self.compute_delta_v1(self.departure_state, v_injection) if not empty else 1e10
         dv2 = self.compute_delta_v2(final_state[3:], insertion_state[3:]) if not empty else 1e10
@@ -255,24 +256,21 @@ class DROTRONLPOptimizer:
         Returns:
             注入速度向量 [vx, vy, vz]
         """
-        pos = state[:3]
+        state[:3]
         vel = state[3:]
 
         normal = np.array([0.0, 0.0, 1.0])
 
         v_mag = np.linalg.norm(vel)
         if v_mag < 1e-10:
-            warnings.warn("出发点速度接近零")
+            warnings.warn("出发点速度接近零", stacklevel=2)
             return vel
 
         tangential = vel / v_mag
 
         normal_dir = np.cross(tangential, normal)
         norm_nd = np.linalg.norm(normal_dir)
-        if norm_nd < 1e-10:
-            normal_dir = np.array([1.0, 0.0, 0.0])
-        else:
-            normal_dir = normal_dir / norm_nd
+        normal_dir = np.array([1.0, 0.0, 0.0]) if norm_nd < 1e-10 else normal_dir / norm_nd
 
         v_injection = alpha * v_mag * tangential + beta * v_mag * normal_dir
 
@@ -281,9 +279,9 @@ class DROTRONLPOptimizer:
     def forward_integrate(
         self,
         initial_state: np.ndarray,
-        t_span: Tuple[float, float],
-        t_eval: Optional[np.ndarray] = None,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        t_span: tuple[float, float],
+        t_eval: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """前向积分转移弧
 
         Args:
@@ -341,7 +339,7 @@ class DROTRONLPOptimizer:
         dv2 = np.linalg.norm(final_velocity - insertion_velocity)
         return dv2
 
-    def get_arrival_state_at_t_ins(self, t_ins: float) -> Tuple[np.ndarray, np.ndarray]:
+    def get_arrival_state_at_t_ins(self, t_ins: float) -> tuple[np.ndarray, np.ndarray]:
         """获取目标轨道上 t_ins（绝对时间）对应的状态
 
         Args:
@@ -397,7 +395,7 @@ class DROTRONLPOptimizer:
         cache = self._evaluate_all(y)
         return cache["vel_constraint"]
 
-    def check_collision(self, y: np.ndarray) -> Tuple[bool, bool]:
+    def check_collision(self, y: np.ndarray) -> tuple[bool, bool]:
         """检查是否撞击地球或月球
 
         Args:
@@ -436,10 +434,10 @@ class DROTRONLPOptimizer:
 
     def optimize(
         self,
-        initial_guess: Optional[NLPOptimizationVariables] = None,
-        alpha_range: Optional[Tuple[float, float]] = None,
-        transfer_time_range: Optional[Tuple[float, float]] = None,
-        t_ins_range: Optional[Tuple[float, float]] = None,
+        initial_guess: NLPOptimizationVariables | None = None,
+        alpha_range: tuple[float, float] | None = None,
+        transfer_time_range: tuple[float, float] | None = None,
+        t_ins_range: tuple[float, float] | None = None,
         use_relaxed_velocity_constraint: bool = False,
         velocity_angle_constraint: float = 0.0,
         verbose: bool = True,
@@ -537,7 +535,7 @@ class DROTRONLPOptimizer:
         )
 
         if verbose:
-            print(f"\n优化结果:")
+            print("\n优化结果:")
             print(f"  成功: {opt_result.success}")
             print(f"  消息: {opt_result.message}")
             print(f"  α={opt_result.alpha:.6f}")
@@ -651,7 +649,7 @@ def optimize_transfer(
     departure_orbit: Orbit,
     arrival_orbit: Orbit,
     departure_state: np.ndarray,
-    initial_guess: Optional[NLPOptimizationVariables] = None,
+    initial_guess: NLPOptimizationVariables | None = None,
     **kwargs,
 ) -> NLPOptimizationResult:
     """便捷函数: 优化DRO到RO转移
@@ -808,21 +806,21 @@ if NlpCallbackBase is not None:
                     idx += 1
             return 0
 
-    def _apply_copt_nlp_params(model: Any, options: Dict[str, Any]) -> None:
+    def _apply_copt_nlp_params(model: Any, options: dict[str, Any]) -> None:
         """与参考脚本一致：``model.setParam(COPT.Param.*, ...)``（NLP 项 + 可选 TimeLimit）。"""
         assert COPT is not None
         model.setParam(COPT.Param.NLPTol, 1e-10)
         model.setParam(COPT.Param.NLPIterLimit, int(options.get("max_iter", 1000)))
         model.setParam(COPT.Param.Threads, int(options.get("threads", 1)))
         model.setParam(COPT.Param.BarThreads, int(options.get("bar_threads", 1)))
-        tl = options.get("time_limit", None)
+        tl = options.get("time_limit")
         if tl is not None:
             model.setParam(COPT.Param.TimeLimit, float(tl))
 
     class COPTNLPSolver:
         """基于 COPT 的 NLP 封装：``cp.Envr()`` → ``createModel`` → ``loadNlData`` → ``solve``。"""
 
-        def __init__(self, optimizer: DROTRONLPOptimizer, options: Optional[Dict[str, Any]] = None):
+        def __init__(self, optimizer: DROTRONLPOptimizer, options: dict[str, Any] | None = None):
             self.optimizer = optimizer
             self.options = options or {}
             self.model = None
@@ -908,7 +906,7 @@ if NlpCallbackBase is not None:
                     "message": str(e),
                 }
 
-        def get_result(self) -> "NLPOptimizationResult":
+        def get_result(self) -> NLPOptimizationResult:
             if self.model is None or self.callback.x is None:
                 raise RuntimeError("Must call solve() first")
 
@@ -926,27 +924,29 @@ if NlpCallbackBase is not None:
 else:
     COPTNLPSolver = None  # type: ignore[misc, assignment]
 
-    def _apply_copt_nlp_params(model: Any, options: Dict[str, Any]) -> None:
+    def _apply_copt_nlp_params(model: Any, options: dict[str, Any]) -> None:
         pass
 
 
 def optimize_with_copt(
     optimizer: DROTRONLPOptimizer,
-    initial_guess: Optional[NLPOptimizationVariables] = None,
+    initial_guess: NLPOptimizationVariables | None = None,
     *,
     fallback_to_scipy: bool = True,
     max_iter: int = 1000,
     threads: int = 1,
     bar_threads: int = 1,
-    time_limit: Optional[float] = None,
-    scipy_fallback_kwargs: Optional[Dict[str, Any]] = None,
+    time_limit: float | None = None,
+    scipy_fallback_kwargs: dict[str, Any] | None = None,
 ) -> NLPOptimizationResult:
-    """使用 COPT 求解 NLP（与 ``data_processing_module`` 中用法一致：``cp.Envr`` / ``createModel`` / ``COPT.Param`` / ``solve``）。
+    """使用 COPT 求解 NLP（与 ``data_processing_module`` 中用法一致：
+    ``cp.Envr`` / ``createModel`` / ``COPT.Param`` / ``solve``）。
 
     数学形式与 ``DROTRONLPOptimizer.optimize`` 相同（等式约束 + 最小化 Δv）。
 
     Args:
-        optimizer: 已设置 ``alpha_range`` / ``transfer_time_range`` / ``t_ins_range`` 的 ``DROTRONLPOptimizer``
+        optimizer: 已设置 ``alpha_range`` / ``transfer_time_range`` / ``t_ins_range`` 的
+            ``DROTRONLPOptimizer``
         initial_guess: 初始猜测 ``(α, T, t_ins)``；默认 ``(1, 10, 5)``
         fallback_to_scipy: 未安装 COPT 或求解失败时是否回退 SciPy SLSQP
         max_iter: ``COPT.Param.NLPIterLimit``
@@ -979,7 +979,7 @@ def optimize_with_copt(
 
     x0 = np.array([alpha0, T0, tins0], dtype=float)
 
-    copt_options: Dict[str, Any] = {
+    copt_options: dict[str, Any] = {
         "max_iter": max_iter,
         "threads": threads,
         "bar_threads": bar_threads,

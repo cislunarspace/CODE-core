@@ -7,39 +7,43 @@
     python scripts/generate_mbse_diagrams.py
 """
 
-import sys
 import os
+import sys
 
 # 确保项目根目录在 sys.path 中
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(project_root, "e2m2e"))
 
-from mbse.requirements.base import RequirementRegistry
-from mbse.architecture.components import ComponentRegistry
-from mbse.diagrams.generator import DiagramGenerator
+from mbse.architecture.components import ComponentRegistry  # noqa: E402
+from mbse.diagrams.generator import DiagramGenerator  # noqa: E402
+from mbse.requirements.base import RequirementRegistry  # noqa: E402
 
 
 def register_core_requirements(registry: RequirementRegistry) -> None:
     """注册 Core 层需求"""
     from mbse.requirements.core_requirements import CORE_REQUIREMENTS
+
     registry.register_many(CORE_REQUIREMENTS)
 
 
 def register_algorithms_requirements(registry: RequirementRegistry) -> None:
     """注册 Algorithms 层需求"""
     from mbse.requirements.algorithms_requirements import ALGORITHMS_REQUIREMENTS
+
     registry.register_many(ALGORITHMS_REQUIREMENTS)
 
 
 def register_core_components(registry: ComponentRegistry) -> None:
     """注册 Core 层组件"""
     from mbse.architecture.core_components import CORE_COMPONENTS
+
     registry.register_many(CORE_COMPONENTS)
 
 
 def register_algorithms_components(registry: ComponentRegistry) -> None:
     """注册 Algorithms 层组件"""
     from mbse.architecture.algorithms_components import ALGORITHMS_COMPONENTS
+
     registry.register_many(ALGORITHMS_COMPONENTS)
 
 

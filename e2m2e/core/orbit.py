@@ -9,7 +9,8 @@
 - 核心数据（states, times, system）直接持有
 - 计算属性（period, amplitudes, extrema, center 等）通过 property 代理
 - 稳定性属性（monodromy_matrix, eigenvalues, stability 等）通过 property 代理
-- 删除所有未使用的保留字段（radius, shape, orientation, is_quasi_periodic, is_chaotic, segments, segment_indices）
+- 删除所有未使用的保留字段
+  （radius, shape, orientation, is_quasi_periodic, is_chaotic, segments, segment_indices）
 - 保持 v3 JSON 格式向后兼容
 
 主要类：
@@ -19,17 +20,16 @@
 
 from __future__ import annotations
 
-import os
-import numpy as np
 import json
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional, Any, Callable, Union
 from pathlib import Path
+from typing import Any
 
+import numpy as np
 import numpy.typing as npt
 
-from .system import CR3BP_System
 from .dynamics import CR3BP_Dynamics
+from .system import CR3BP_System
 
 
 class Orbit:
@@ -67,7 +67,7 @@ class Orbit:
         self,
         states: npt.ArrayLike,
         times: npt.ArrayLike,
-        system: Optional[CR3BP_System] = None,
+        system: CR3BP_System | None = None,
     ) -> None:
         """初始化轨道对象
 
@@ -93,25 +93,25 @@ class Orbit:
             raise ValueError("时间序列长度必须与状态序列长度一致")
 
         # 外部填充属性
-        self.jacobi_constants: Optional[np.ndarray] = None
-        self.stability_indices: Optional[dict] = None
-        self.family_type: Optional[str] = None
+        self.jacobi_constants: np.ndarray | None = None
+        self.stability_indices: dict | None = None
+        self.family_type: str | None = None
         self.parameters: dict = {}
 
         # ---- 内部计算属性（通过 property 代理） ----
-        self._period: Optional[float] = None
+        self._period: float | None = None
         self._amplitudes: dict = {}
         self._extrema: dict = {}
-        self._mean_state: Optional[np.ndarray] = None
-        self._center: Optional[np.ndarray] = None
+        self._mean_state: np.ndarray | None = None
+        self._center: np.ndarray | None = None
         self._is_periodic: bool = False
-        self._periodicity_error: Optional[float] = None
+        self._periodicity_error: float | None = None
 
         # 稳定性属性
-        self._monodromy_matrix: Optional[np.ndarray] = None
-        self._eigenvalues: Optional[np.ndarray] = None
-        self._stability: Optional[str] = None
-        self._lyapunov_exponents: Optional[np.ndarray] = None
+        self._monodromy_matrix: np.ndarray | None = None
+        self._eigenvalues: np.ndarray | None = None
+        self._stability: str | None = None
+        self._lyapunov_exponents: np.ndarray | None = None
 
         # 元数据
         self.metadata: dict = {
@@ -127,11 +127,11 @@ class Orbit:
     # ---- Property 代理（保持向后兼容） ----
 
     @property
-    def period(self) -> Optional[float]:
+    def period(self) -> float | None:
         return self._period
 
     @period.setter
-    def period(self, value: Optional[float]) -> None:
+    def period(self, value: float | None) -> None:
         self._period = value
 
     @property
@@ -151,19 +151,19 @@ class Orbit:
         self._extrema = value
 
     @property
-    def mean_state(self) -> Optional[np.ndarray]:
+    def mean_state(self) -> np.ndarray | None:
         return self._mean_state
 
     @mean_state.setter
-    def mean_state(self, value: Optional[np.ndarray]) -> None:
+    def mean_state(self, value: np.ndarray | None) -> None:
         self._mean_state = value
 
     @property
-    def center(self) -> Optional[np.ndarray]:
+    def center(self) -> np.ndarray | None:
         return self._center
 
     @center.setter
-    def center(self, value: Optional[np.ndarray]) -> None:
+    def center(self, value: np.ndarray | None) -> None:
         self._center = value
 
     @property
@@ -175,43 +175,43 @@ class Orbit:
         self._is_periodic = value
 
     @property
-    def periodicity_error(self) -> Optional[float]:
+    def periodicity_error(self) -> float | None:
         return self._periodicity_error
 
     @periodicity_error.setter
-    def periodicity_error(self, value: Optional[float]) -> None:
+    def periodicity_error(self, value: float | None) -> None:
         self._periodicity_error = value
 
     @property
-    def monodromy_matrix(self) -> Optional[np.ndarray]:
+    def monodromy_matrix(self) -> np.ndarray | None:
         return self._monodromy_matrix
 
     @monodromy_matrix.setter
-    def monodromy_matrix(self, value: Optional[np.ndarray]) -> None:
+    def monodromy_matrix(self, value: np.ndarray | None) -> None:
         self._monodromy_matrix = value
 
     @property
-    def eigenvalues(self) -> Optional[np.ndarray]:
+    def eigenvalues(self) -> np.ndarray | None:
         return self._eigenvalues
 
     @eigenvalues.setter
-    def eigenvalues(self, value: Optional[np.ndarray]) -> None:
+    def eigenvalues(self, value: np.ndarray | None) -> None:
         self._eigenvalues = value
 
     @property
-    def stability(self) -> Optional[str]:
+    def stability(self) -> str | None:
         return self._stability
 
     @stability.setter
-    def stability(self, value: Optional[str]) -> None:
+    def stability(self, value: str | None) -> None:
         self._stability = value
 
     @property
-    def lyapunov_exponents(self) -> Optional[np.ndarray]:
+    def lyapunov_exponents(self) -> np.ndarray | None:
         return self._lyapunov_exponents
 
     @lyapunov_exponents.setter
-    def lyapunov_exponents(self, value: Optional[np.ndarray]) -> None:
+    def lyapunov_exponents(self, value: np.ndarray | None) -> None:
         self._lyapunov_exponents = value
 
     # ---- 核心方法 ----
@@ -291,11 +291,13 @@ class Orbit:
             raise ValueError("无法计算单值矩阵：轨道周期未知")
 
         initial_state = self.states[0]
-        self._monodromy_matrix = dynamics.compute_state_transition_matrix(initial_state, self._period)
+        self._monodromy_matrix = dynamics.compute_state_transition_matrix(
+            initial_state, self._period
+        )
         self._eigenvalues = np.linalg.eigvals(self._monodromy_matrix)
         return self._monodromy_matrix
 
-    def compute_stability(self, dynamics: CR3BP_Dynamics) -> Dict[str, Any]:
+    def compute_stability(self, dynamics: CR3BP_Dynamics) -> dict[str, Any]:
         """计算轨道的稳定性指标
 
         Args:
@@ -327,7 +329,7 @@ class Orbit:
             "lyapunov_exponents": self._lyapunov_exponents,
         }
 
-    def get_period(self) -> Optional[float]:
+    def get_period(self) -> float | None:
         return self._period
 
     def get_amplitude(self, direction: str) -> float:
@@ -336,7 +338,7 @@ class Orbit:
             raise ValueError(f"无效的方向: {direction}。可用方向: {list(self._amplitudes.keys())}")
         return self._amplitudes[direction]
 
-    def save_to_file(self, filename: Union[str, Path]) -> None:
+    def save_to_file(self, filename: str | Path) -> None:
         """将轨道数据序列化保存到 JSON 文件（v3 格式兼容）"""
         filepath = Path(filename)
         dirpath = filepath.parent
@@ -368,20 +370,18 @@ class Orbit:
     @classmethod
     def load_from_file(
         cls,
-        filename: Union[str, Path],
-        system: Optional[CR3BP_System] = None,
-        orbit_index: Optional[int] = None,
-    ) -> "Orbit":
+        filename: str | Path,
+        system: CR3BP_System | None = None,
+        orbit_index: int | None = None,
+    ) -> Orbit:
         """从 JSON 文件反序列化加载轨道数据（v3 格式兼容）"""
         filepath = Path(filename)
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             data = json.load(f)
 
         if "orbits" in data:
             if orbit_index is None:
-                raise ValueError(
-                    f"文件 '{filename}' 是轨道族格式，需要提供 orbit_index 参数"
-                )
+                raise ValueError(f"文件 '{filename}' 是轨道族格式，需要提供 orbit_index 参数")
             orbits_data = data["orbits"]
             if orbit_index < 0 or orbit_index >= len(orbits_data):
                 raise IndexError(
@@ -423,7 +423,7 @@ class Orbit:
             f"period={self._period}, system={self.system})"
         )
 
-    def copy(self) -> "Orbit":
+    def copy(self) -> Orbit:
         """创建轨道的深拷贝"""
         new_orbit = Orbit(
             states=self.states.copy(),
@@ -488,11 +488,11 @@ class OrbitFamily:
 
     def __init__(
         self,
-        orbits: Optional[List[Orbit]] = None,
-        family_type: Optional[str] = None,
-        system: Optional[CR3BP_System] = None,
+        orbits: list[Orbit] | None = None,
+        family_type: str | None = None,
+        system: CR3BP_System | None = None,
     ) -> None:
-        self.orbits: List[Orbit] = []
+        self.orbits: list[Orbit] = []
         if orbits is not None:
             if type(orbits) is Orbit:
                 self.orbits = [orbits]
@@ -543,7 +543,7 @@ class OrbitFamily:
             return np.array([])
         return np.array([self.system.get_jacobi_constant(orbit.states[0]) for orbit in self.orbits])
 
-    def save_to_file(self, filename: Union[str, Path]) -> None:
+    def save_to_file(self, filename: str | Path) -> None:
         filepath = Path(filename)
         dirpath = filepath.parent
         if not dirpath.exists():
@@ -577,10 +577,10 @@ class OrbitFamily:
 
     @classmethod
     def load_from_file(
-        cls, filename: Union[str, Path], system: Optional[CR3BP_System] = None
-    ) -> "OrbitFamily":
+        cls, filename: str | Path, system: CR3BP_System | None = None
+    ) -> OrbitFamily:
         filepath = Path(filename)
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             data = json.load(f)
 
         orbits = []

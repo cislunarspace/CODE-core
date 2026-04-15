@@ -7,13 +7,11 @@ orbits are ordered by step number from the seed orbit (0, 1, -1, 2, -2, ...).
 Reference: Commit 071cd09 - feat(continuation): 添加轨道延拓步数跟踪与排序功能
 """
 
-import numpy as np
 import pytest
 
 import e2m2e
-from e2m2e.algorithms import DifferentialCorrection, Continuation
+from e2m2e.algorithms import Continuation, DifferentialCorrection
 from e2m2e.core import CR3BP_Dynamics, Orbit, OrbitFamily
-
 
 # 地月系统质量比
 MU = 1.21506683e-2
@@ -106,12 +104,12 @@ class TestContinuationOrbitSorting:
         def sort_key(item):
             orbit, step = item
             return (abs(step), step > 0)
-        
+
         temp_orbits_with_steps.sort(key=sort_key)
 
         # 验证排序后的顺序（按绝对值排序）
         sorted_steps = [step for _, step in temp_orbits_with_steps]
-        
+
         # 排序应为: 0, -1, 1, -2, 2, -3, 3
         # 即先按绝对值，再按正负（负数在前因为False<True）
         expected_order = [0, -1, 1, -2, 2, -3, 3]
@@ -147,6 +145,7 @@ class TestContinuationOrbitSorting:
 
     def test_sort_key_uses_tuple_comparison(self, continuation):
         """测试排序键使用元组比较"""
+
         def sort_key(item):
             orbit, step = item
             return (abs(step), step > 0)
@@ -179,10 +178,10 @@ class TestContinuationStats:
     def test_stats_update_on_success(self, continuation):
         """测试成功延拓时统计更新"""
         initial_success_count = continuation.continuation_stats["successful_steps"]
-        
+
         # 模拟成功延拓
         continuation.continuation_stats["successful_steps"] += 1
-        
+
         assert continuation.continuation_stats["successful_steps"] == initial_success_count + 1
 
 
@@ -193,7 +192,7 @@ class TestBidirectionalContinuation:
         """测试正向延拓步数为正数"""
         # 正向延拓时 step = 1, 2, 3, ...
         forward_steps = [1, 2, 3, 10]
-        
+
         for step in forward_steps:
             assert step > 0
 
@@ -201,7 +200,7 @@ class TestBidirectionalContinuation:
         """测试反向延拓步数为负数"""
         # 反向延拓时 step = -1, -2, -3, ...
         backward_steps = [-1, -2, -3, -10]
-        
+
         for step in backward_steps:
             assert step < 0
 
@@ -209,10 +208,10 @@ class TestBidirectionalContinuation:
         """测试步数的绝对值随距离增加而增大"""
         # 距离种子轨道越远，绝对值越大
         steps = [0, 1, 2, 10, -1, -2, -10]
-        
+
         # 按绝对值排序
         steps_by_abs = sorted(steps, key=abs)
-        
+
         # 0 最小，然后绝对值递增
         assert steps_by_abs[0] == 0
         assert abs(steps_by_abs[1]) == 1

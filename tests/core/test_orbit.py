@@ -2,11 +2,13 @@
 Unit tests for Orbit class
 """
 
-import pytest
-import numpy as np
-import tempfile
 import os
+import tempfile
 from pathlib import Path
+
+import numpy as np
+import pytest
+
 from e2m2e.core.orbit import Orbit
 
 
@@ -18,7 +20,7 @@ class TestOrbitInit:
         states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
         orbit = Orbit(states=states, times=times)
-        
+
         assert orbit.states is not None
         assert orbit.times is not None
         assert len(orbit.states) == 10
@@ -28,7 +30,7 @@ class TestOrbitInit:
         states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
         orbit = Orbit(states=states, times=times, system=earth_moon_system)
-        
+
         assert orbit.system is earth_moon_system
 
     def test_init_single_state(self):
@@ -36,14 +38,14 @@ class TestOrbitInit:
         state = np.array([0.5, 0.1, 0.0, 0.01, 0.02, 0.0])
         time = np.array([0.0])
         orbit = Orbit(states=state, times=time)
-        
+
         assert orbit.states.shape[0] == 1
 
     def test_init_invalid_state_dimension(self):
         """Test initialization with wrong state dimension raises error"""
         states = np.random.rand(10, 5)  # Wrong: 5 components instead of 6
         times = np.linspace(0, 1, 10)
-        
+
         with pytest.raises(ValueError, match="必须包含6个分量"):
             Orbit(states=states, times=times)
 
@@ -51,7 +53,7 @@ class TestOrbitInit:
         """Test initialization with mismatched lengths raises error"""
         states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 8)  # 8 times for 10 states
-        
+
         with pytest.raises(ValueError, match="长度必须与状态序列长度一致"):
             Orbit(states=states, times=times)
 
@@ -60,13 +62,13 @@ class TestOrbitInit:
         states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
         orbit = Orbit(states=states, times=times)
-        
+
         assert orbit.jacobi_constants is None
         assert orbit.stability_indices is None
         assert orbit.family_type is None
         # period may be auto-computed via _estimate_period from zero crossings
         assert orbit.monodromy_matrix is None
-        assert orbit.is_periodic == False
+        assert not orbit.is_periodic
 
 
 class TestOrbitBasicProperties:
@@ -77,7 +79,7 @@ class TestOrbitBasicProperties:
         states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
         orbit = Orbit(states=states, times=times, system=earth_moon_system)
-        
+
         # Should compute jacobi constants when system is provided
         assert orbit.jacobi_constants is not None
         assert len(orbit.jacobi_constants) == 10
@@ -87,7 +89,7 @@ class TestOrbitBasicProperties:
         states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
         orbit = Orbit(states=states, times=times, system=earth_moon_system)
-        
+
         expected_mean = np.mean(states, axis=0)
         assert np.allclose(orbit.mean_state, expected_mean)
 
@@ -96,10 +98,11 @@ class TestOrbitBasicProperties:
         # Create data with known amplitude
         t = np.linspace(0, 1, 50)
         x = 0.5 + 0.1 * np.cos(2 * np.pi * t)
-        states = np.column_stack([x, np.zeros(50), np.zeros(50),
-                                   np.zeros(50), np.zeros(50), np.zeros(50)])
+        states = np.column_stack(
+            [x, np.zeros(50), np.zeros(50), np.zeros(50), np.zeros(50), np.zeros(50)]
+        )
         orbit = Orbit(states=states, times=t)
-        
+
         assert "x" in orbit.amplitudes
         # amplitude = (max - min) / 2, which should be approximately 0.1
         assert orbit.amplitudes["x"] > 0
@@ -108,10 +111,11 @@ class TestOrbitBasicProperties:
         """Test extrema computation"""
         t = np.linspace(0, 1, 50)
         x = 0.5 + 0.1 * np.cos(2 * np.pi * t)
-        states = np.column_stack([x, np.zeros(50), np.zeros(50),
-                                   np.zeros(50), np.zeros(50), np.zeros(50)])
+        states = np.column_stack(
+            [x, np.zeros(50), np.zeros(50), np.zeros(50), np.zeros(50), np.zeros(50)]
+        )
         orbit = Orbit(states=states, times=t)
-        
+
         assert "x_max" in orbit.extrema
         assert "x_min" in orbit.extrema
         assert np.isclose(orbit.extrema["x_max"], 0.6, atol=1e-6)
@@ -143,7 +147,7 @@ class TestOrbitPeriod:
         states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
         orbit = Orbit(states=states, times=times)
-        
+
         # get_period returns the period attribute which may be auto-computed
         result = orbit.get_period()
         assert result is None or isinstance(result, (float, np.floating))
@@ -151,7 +155,7 @@ class TestOrbitPeriod:
     def test_get_period_with_estimate(self, sample_orbit):
         """Test get_period returns period when estimated"""
         # sample_orbit should have some period estimation
-        period = sample_orbit.get_period()
+        sample_orbit.get_period()
         # Period may or may not be estimated depending on orbit shape
 
 
@@ -177,11 +181,11 @@ class TestOrbitSaveLoad:
         """Test save and load returns equivalent orbit"""
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             filename = f.name
-        
+
         try:
             sample_orbit.save_to_file(filename=filename)
             loaded_orbit = Orbit.load_from_file(filename=filename)
-            
+
             assert np.allclose(loaded_orbit.states, sample_orbit.states, atol=1e-10)
             assert np.allclose(loaded_orbit.times, sample_orbit.times, atol=1e-10)
         finally:
@@ -192,11 +196,11 @@ class TestOrbitSaveLoad:
         """Test load_from_file accepts Path objects"""
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             filename = Path(f.name)
-        
+
         try:
             sample_orbit.save_to_file(filename=filename)
             loaded_orbit = Orbit.load_from_file(filename=filename)
-            
+
             assert np.allclose(loaded_orbit.states, sample_orbit.states, atol=1e-10)
         finally:
             if filename.exists():
@@ -209,7 +213,7 @@ class TestOrbitMonodromy:
     def test_monodromy_requires_period(self, sample_orbit, earth_moon_dynamics):
         """Test compute_monodromy_matrix raises error without period"""
         sample_orbit.period = None
-        
+
         with pytest.raises(ValueError, match="轨道周期未知"):
             sample_orbit.compute_monodromy_matrix(dynamics=earth_moon_dynamics)
 
@@ -221,10 +225,10 @@ class TestOrbitStability:
         """Test compute_stability requires monodromy matrix"""
         sample_orbit.monodromy_matrix = None
         sample_orbit.period = 1.0  # Set period to avoid period error
-        
+
         # This should trigger monodromy computation
         result = sample_orbit.compute_stability(dynamics=earth_moon_dynamics)
-        
+
         assert "stability" in result
         assert "eigenvalues" in result
 

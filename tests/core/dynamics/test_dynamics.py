@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.core import CR3BP_System, CR3BP_Dynamics
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System
 
 
 # =============================================================================
@@ -217,24 +217,24 @@ class TestCrossSection:
         state_on = np.array([0.5, 0.0, 0.0, 0.0, 0.0, 0.0])
         state_off = np.array([0.6, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-        assert dynamics.check_cross_section(state_on, "x", 0.5) == True
-        assert dynamics.check_cross_section(state_off, "x", 0.5) == False
+        assert dynamics.check_cross_section(state_on, "x", 0.5)
+        assert not dynamics.check_cross_section(state_off, "x", 0.5)
 
     def test_check_cross_section_y_plane(self, dynamics):
         """Test crossing detection on y-plane."""
         state_on = np.array([0.0, 0.3, 0.0, 0.0, 0.0, 0.0])
         state_off = np.array([0.0, 0.4, 0.0, 0.0, 0.0, 0.0])
 
-        assert dynamics.check_cross_section(state_on, "y", 0.3) == True
-        assert dynamics.check_cross_section(state_off, "y", 0.3) == False
+        assert dynamics.check_cross_section(state_on, "y", 0.3)
+        assert not dynamics.check_cross_section(state_off, "y", 0.3)
 
     def test_check_cross_section_z_plane(self, dynamics):
         """Test crossing detection on z-plane."""
         state_on = np.array([0.0, 0.0, 0.1, 0.0, 0.0, 0.0])
         state_off = np.array([0.0, 0.0, 0.2, 0.0, 0.0, 0.0])
 
-        assert dynamics.check_cross_section(state_on, "z", 0.1) == True
-        assert dynamics.check_cross_section(state_off, "z", 0.1) == False
+        assert dynamics.check_cross_section(state_on, "z", 0.1)
+        assert not dynamics.check_cross_section(state_off, "z", 0.1)
 
     def test_check_cross_section_invalid_plane(self, dynamics, sample_state):
         """Test that invalid plane raises ValueError."""

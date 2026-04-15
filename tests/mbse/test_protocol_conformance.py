@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.system import CR3BP_System
 from e2m2e.core.dynamics import CR3BP_Dynamics, Dynamics
 from e2m2e.core.orbit import Orbit
+from e2m2e.core.system import CR3BP_System
 from e2m2e.visualization.config import PlotConfig
 
 
@@ -108,7 +108,7 @@ class TestEphemerisDynamicsConformance:
 
     @pytest.fixture()
     def eph_dynamics(self):
-        from e2m2e.core import SPICEManager, EphemerisSystem, EphemerisDynamics
+        from e2m2e.core import EphemerisDynamics, EphemerisSystem, SPICEManager
 
         system = EphemerisSystem(
             bodies=["EARTH", "MOON", "SUN"],

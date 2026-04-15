@@ -6,6 +6,7 @@
 """
 
 import numpy as np
+
 from e2m2e.core.system import CR3BP_System
 from e2m2e.visualization.plotting import OrbitVisualizer
 

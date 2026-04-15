@@ -7,9 +7,9 @@ methods in OrbitVisualizer that solve orbit plot crossing issues.
 Reference: Commit cf9337a - 添加最近邻排序方法解决轨道绘图交叉线问题
 """
 
+import matplotlib
 import numpy as np
 import pytest
-import matplotlib
 
 matplotlib.use("Agg")
 
@@ -43,15 +43,16 @@ class TestSortPointsByNearestNeighbor:
         assert len(sorted_y) == len(y)
 
         # 验证所有点都被保留（作为集合相等）
-        original_points = set(zip(x, y))
-        sorted_points = set(zip(sorted_x, sorted_y))
+        original_points = set(zip(x, y, strict=False))
+        sorted_points = set(zip(sorted_x, sorted_y, strict=False))
         assert original_points == sorted_points
 
         # 验证排序后相邻点之间的距离递增或保持较小
         # （即不存在大跳跃）
         for i in range(len(sorted_x) - 1):
-            dist = np.sqrt((sorted_x[i+1] - sorted_x[i])**2 + 
-                          (sorted_y[i+1] - sorted_y[i])**2)
+            dist = np.sqrt(
+                (sorted_x[i + 1] - sorted_x[i]) ** 2 + (sorted_y[i + 1] - sorted_y[i]) ** 2
+            )
             # 在正方形例子中，排序后相邻点应该是相邻顶点，距离应为1
             assert dist < 3.0  # 不应该有大跳跃
 
@@ -88,10 +89,10 @@ class TestSortPointsByNearestNeighbor:
     def test_sort_ellipse_shape(self, visualizer):
         """测试椭圆形状的点（可能产生交叉）"""
         # 创建一个椭圆上的点，但打乱顺序
-        t = np.linspace(0, 2*np.pi, 20)
+        t = np.linspace(0, 2 * np.pi, 20)
         x_orig = 0.8 + 0.2 * np.cos(t)
         y_orig = 0.1 * np.sin(t)
-        
+
         # 打乱顺序
         np.random.seed(42)
         idx = np.random.permutation(len(x_orig))
@@ -102,14 +103,15 @@ class TestSortPointsByNearestNeighbor:
 
         # 验证所有点都保留了
         assert len(sorted_x) == len(x_orig)
-        
+
         # 验证没有大的跳跃（椭圆上相邻点距离较小）
         max_dist = 0
         for i in range(len(sorted_x) - 1):
-            dist = np.sqrt((sorted_x[i+1] - sorted_x[i])**2 + 
-                          (sorted_y[i+1] - sorted_y[i])**2)
+            dist = np.sqrt(
+                (sorted_x[i + 1] - sorted_x[i]) ** 2 + (sorted_y[i + 1] - sorted_y[i]) ** 2
+            )
             max_dist = max(max_dist, dist)
-        
+
         # 椭圆周长约 2*pi*a ≈ 3.2，每段距离应小于1
         assert max_dist < 1.5
 
@@ -146,8 +148,8 @@ class TestSort3DPointsByNearestNeighbor:
         assert len(sorted_z) == len(z)
 
         # 验证所有点都被保留
-        original_points = set(zip(x, y, z))
-        sorted_points = set(zip(sorted_x, sorted_y, sorted_z))
+        original_points = set(zip(x, y, z, strict=False))
+        sorted_points = set(zip(sorted_x, sorted_y, sorted_z, strict=False))
         assert original_points == sorted_points
 
     def test_sort_3d_two_points(self, visualizer):
@@ -177,11 +179,11 @@ class TestSort3DPointsByNearestNeighbor:
     def test_sort_3d_circular_helix(self, visualizer):
         """测试3D螺旋线点（可能产生交叉）"""
         # 创建螺旋线点并打乱
-        t = np.linspace(0, 4*np.pi, 40)
+        t = np.linspace(0, 4 * np.pi, 40)
         x_orig = np.cos(t)
         y_orig = np.sin(t)
-        z_orig = t / (4*np.pi)
-        
+        z_orig = t / (4 * np.pi)
+
         # 打乱顺序
         np.random.seed(123)
         idx = np.random.permutation(len(x_orig))
@@ -198,9 +200,11 @@ class TestSort3DPointsByNearestNeighbor:
 
         # 验证相邻点之间距离连续且较小（螺旋线相邻点应该接近）
         for i in range(len(sorted_x) - 1):
-            dist = np.sqrt((sorted_x[i+1] - sorted_x[i])**2 + 
-                          (sorted_y[i+1] - sorted_y[i])**2 +
-                          (sorted_z[i+1] - sorted_z[i])**2)
+            dist = np.sqrt(
+                (sorted_x[i + 1] - sorted_x[i]) ** 2
+                + (sorted_y[i + 1] - sorted_y[i]) ** 2
+                + (sorted_z[i + 1] - sorted_z[i]) ** 2
+            )
             # 螺旋线每圈约 2*pi 弧长，相邻点距离应较小
             assert dist < 2.0  # 不应该有大跳跃
 
@@ -209,15 +213,15 @@ class TestSort3DPointsByNearestNeighbor:
         # 创建球面上的随机点
         np.random.seed(456)
         n_points = 30
-        
+
         # 使用球面坐标生成均匀分布的点
-        phi = np.random.uniform(0, 2*np.pi, n_points)
+        phi = np.random.uniform(0, 2 * np.pi, n_points)
         theta = np.random.uniform(0, np.pi, n_points)
-        
+
         x_orig = np.sin(theta) * np.cos(phi)
         y_orig = np.sin(theta) * np.sin(phi)
         z_orig = np.cos(theta)
-        
+
         # 打乱顺序
         idx = np.random.permutation(n_points)
         x_shuffled = x_orig[idx]
@@ -234,11 +238,13 @@ class TestSort3DPointsByNearestNeighbor:
         # 验证没有非常大的跳跃（相邻点应该在球面上接近）
         max_dist = 0
         for i in range(len(sorted_x) - 1):
-            dist = np.sqrt((sorted_x[i+1] - sorted_x[i])**2 + 
-                          (sorted_y[i+1] - sorted_y[i])**2 +
-                          (sorted_z[i+1] - sorted_z[i])**2)
+            dist = np.sqrt(
+                (sorted_x[i + 1] - sorted_x[i]) ** 2
+                + (sorted_y[i + 1] - sorted_y[i]) ** 2
+                + (sorted_z[i + 1] - sorted_z[i]) ** 2
+            )
             max_dist = max(max_dist, dist)
-        
+
         # 球面上相邻点最大距离应该较小
         assert max_dist < 3.0
 
@@ -249,26 +255,26 @@ class TestNearestNeighborSortingIntegration:
     def test_sorting_used_in_3d_plot(self, visualizer):
         """测试排序功能是否在实际3D绘图中的使用"""
         # 创建一个有明显交叉的轨道数据
-        t = np.linspace(0, 2*np.pi, 50)
+        t = np.linspace(0, 2 * np.pi, 50)
         # 制作一个"8"字形轨道（两个圆交叉）
         x = np.sin(t)
         y = np.sin(t) * np.cos(t)
-        z = 0.1 * np.sin(3*t)
-        
+        z = 0.1 * np.sin(3 * t)
+
         # 打乱数据顺序来模拟真实场景
         np.random.seed(789)
         idx = np.arange(50)
         np.random.shuffle(idx)
-        
-        states = np.column_stack([x[idx], y[idx], z[idx], 
-                                  -np.cos(t)[idx], np.cos(2*t)[idx], 
-                                  0.3*np.cos(3*t)[idx]])
-        
+
+        states = np.column_stack(
+            [x[idx], y[idx], z[idx], -np.cos(t)[idx], np.cos(2 * t)[idx], 0.3 * np.cos(3 * t)[idx]]
+        )
+
         # 验证排序后数据仍有效（不为空）
         sorted_x, sorted_y, sorted_z = visualizer._sort_3d_points_by_nearest_neighbor(
             states[:, 0], states[:, 1], states[:, 2]
         )
-        
+
         assert len(sorted_x) == 50
         assert not np.any(np.isnan(sorted_x))
         assert not np.any(np.isnan(sorted_y))

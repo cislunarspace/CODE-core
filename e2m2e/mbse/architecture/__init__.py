@@ -7,8 +7,8 @@ from .components import Component, ComponentRegistry
 from .ports import (
     CorrectorStrategy,
     EOMProvider,
-    OrbitContainer,
     Optimizer,
+    OrbitContainer,
     Propagator,
     SystemModel,
     Visualizer,

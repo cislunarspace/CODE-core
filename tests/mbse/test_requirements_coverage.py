@@ -2,11 +2,13 @@
 
 import re
 
-import pytest
-
-from e2m2e.mbse.requirements.base import RequirementCategory, RequirementPriority, RequirementRegistry
-from e2m2e.mbse.requirements.core_requirements import CORE_REQUIREMENTS
 from e2m2e.mbse.requirements.algorithms_requirements import ALGORITHMS_REQUIREMENTS
+from e2m2e.mbse.requirements.base import (
+    RequirementCategory,
+    RequirementPriority,
+    RequirementRegistry,
+)
+from e2m2e.mbse.requirements.core_requirements import CORE_REQUIREMENTS
 
 ALL_REQUIREMENTS = CORE_REQUIREMENTS + ALGORITHMS_REQUIREMENTS
 
@@ -75,7 +77,9 @@ def test_algorithms_requirements_in_correct_range():
     """Algorithms requirements must have IDs in the 100-199 range."""
     for req in ALGORITHMS_REQUIREMENTS:
         num = int(req.id.split("-")[1])
-        assert 100 <= num < 200, f"{req.id} is an algorithms requirement but ID is outside 100-199 range"
+        assert 100 <= num < 200, (
+            f"{req.id} is an algorithms requirement but ID is outside 100-199 range"
+        )
 
 
 def test_requirement_registry_coverage():

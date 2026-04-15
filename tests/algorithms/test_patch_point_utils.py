@@ -23,18 +23,18 @@
   - e2m2e.core.SynodicJ2000Transformation.batch_synodic_to_j2000
 """
 
-import pytest
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 
+from e2m2e.algorithms import convert_to_j2000, sample_patch_points
 from e2m2e.core import (
-    CR3BP_System,
     CR3BP_Dynamics,
+    CR3BP_System,
     Orbit,
-    SynodicJ2000Transformation,
     SPICEManager,
+    SynodicJ2000Transformation,
 )
-from e2m2e.algorithms import sample_patch_points, convert_to_j2000
 
 pytestmark = pytest.mark.spice
 
@@ -42,7 +42,7 @@ pytestmark = pytest.mark.spice
 # =============================================================================
 # 物理参数
 # =============================================================================
-from tests.conftest import MU, DU, TU_SECONDS, VU
+from tests.conftest import MU, TU_SECONDS  # noqa: E402
 
 TU_DAYS = TU_SECONDS / 86400
 

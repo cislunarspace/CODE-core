@@ -4,10 +4,11 @@ CR3BP_System.info() 方法测试模块
 测试 info() 方法在不同模式和系统状态下的输出。
 """
 
-import numpy as np
-import pytest
-from io import StringIO
 from contextlib import redirect_stdout
+from io import StringIO
+
+import pytest
+
 from e2m2e.core import CR3BP_System
 
 

@@ -30,13 +30,15 @@
 参考论文: Cui et al. (2025), Fig. 8a-d, Fig. 9a-d, Fig. 10a-d
 """
 
+import matplotlib
 import numpy as np
 import pytest
-import matplotlib
+
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-from e2m2e.core import Orbit, CR3BP_System
+
+from e2m2e.core import CR3BP_System, Orbit
 from e2m2e.visualization.transfer import TransferPlotter
 
 
@@ -181,7 +183,7 @@ class TestPlotTransferOrbitMultiple:
                 ax=ax,
             )
         lines = ax.get_lines()
-        transfer_lines = [l for l in lines if l.get_linewidth() >= 1.5]
+        transfer_lines = [line for line in lines if line.get_linewidth() >= 1.5]
         assert len(transfer_lines) >= 2, "应有至少 2 条转移轨迹线"
         plt.close("all")
 
@@ -215,8 +217,8 @@ class TestPlotTransferOrbitCustomStyle:
             color="magenta",
         )
         lines = ax.get_lines()
-        transfer_line = [l for l in lines if l.get_linewidth() >= 1.5]
-        assert any(l.get_color() == "magenta" for l in transfer_line)
+        transfer_line = [line for line in lines if line.get_linewidth() >= 1.5]
+        assert any(line.get_color() == "magenta" for line in transfer_line)
         plt.close("all")
 
     def test_custom_label(self, system, dro, ro, transfer_trajectory):

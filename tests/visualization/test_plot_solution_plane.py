@@ -18,15 +18,17 @@
 参考论文: Cui et al. (2025), Fig. 6a-d
 """
 
+import matplotlib
 import numpy as np
 import pytest
-import matplotlib
+
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+
 from e2m2e.core import CR3BP_System
-from e2m2e.visualization.transfer import TransferPlotter
 from e2m2e.transfer import NLPOptimizationResult, TransferType
+from e2m2e.visualization.transfer import TransferPlotter
 
 
 @pytest.fixture
@@ -166,10 +168,22 @@ class TestPlotSolutionPlaneDictInput:
     def test_accepts_dict_list(self, system):
         viz = TransferPlotter(system)
         results = [
-            {"transfer_time": 5.0, "delta_v1": 0.1, "delta_v2": 0.05,
-             "objective_value": 0.15, "transfer_type": "direct", "success": True},
-            {"transfer_time": 15.0, "delta_v1": 0.2, "delta_v2": 0.1,
-             "objective_value": 0.3, "transfer_type": "lga", "success": True},
+            {
+                "transfer_time": 5.0,
+                "delta_v1": 0.1,
+                "delta_v2": 0.05,
+                "objective_value": 0.15,
+                "transfer_type": "direct",
+                "success": True,
+            },
+            {
+                "transfer_time": 15.0,
+                "delta_v1": 0.2,
+                "delta_v2": 0.1,
+                "objective_value": 0.3,
+                "transfer_type": "lga",
+                "success": True,
+            },
         ]
         ax = viz.plot_solution_plane(results)
         assert ax is not None

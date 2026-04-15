@@ -10,9 +10,6 @@
 所有模型均为 living artifacts，随实现代码同步更新。
 """
 
-from . import architecture
-from . import data
-from . import diagrams
-from . import requirements
+from . import architecture, data, diagrams, requirements
 
 __all__ = ["architecture", "data", "diagrams", "requirements"]

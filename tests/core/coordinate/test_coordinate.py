@@ -7,7 +7,7 @@ CoordinateTransformation 类测试
 import numpy as np
 import pytest
 
-from e2m2e.core import CR3BP_System, CoordinateTransformation
+from e2m2e.core import CoordinateTransformation, CR3BP_System
 
 
 class TestRotationMatrix:
@@ -29,7 +29,7 @@ class TestRotationMatrix:
         system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
         coord = CoordinateTransformation(system)
 
-        R0 = coord.compute_rotation_matrix(0.0)
+        coord.compute_rotation_matrix(0.0)
         R_pi_2 = coord.compute_rotation_matrix(np.pi / 2)
 
         # 验证旋转角度正确

@@ -7,19 +7,18 @@ v4.0 MBSE 重构：满足 Visualizer Protocol 接口，参数类型兼容 OrbitC
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 
+from ..core.system import CR3BP_System
 from .base import OrbitVisualizer
 from .config import PlotConfig
-from ..core.orbit import Orbit
-from ..core.system import CR3BP_System
 
 if TYPE_CHECKING:
-    from ..mbse.architecture.ports import OrbitContainer
+    pass
 
 
 class TransferPlotter(OrbitVisualizer):
@@ -32,7 +31,7 @@ class TransferPlotter(OrbitVisualizer):
         config: 绘图配置。
     """
 
-    def __init__(self, system: CR3BP_System, config: Optional[PlotConfig] = None) -> None:
+    def __init__(self, system: CR3BP_System, config: PlotConfig | None = None) -> None:
         super().__init__(system, config)
 
     # ------------------------------------------------------------------
@@ -58,8 +57,8 @@ class TransferPlotter(OrbitVisualizer):
     def plot_solution_plane(
         self,
         results,
-        color_by: Optional[str] = None,
-        ax: Optional[Any] = None,
+        color_by: str | None = None,
+        ax: Any | None = None,
         show_colorbar: bool = True,
     ) -> Any:
         """绘制搜索结果散点图（转移时间 vs 总 Δv）。
@@ -80,8 +79,16 @@ class TransferPlotter(OrbitVisualizer):
         parsed = self._parse_solution_results(results)
         valid = [r for r in parsed if r["success"]]
         if not valid:
-            ax.text(0.5, 0.5, "No valid data", transform=ax.transAxes,
-                    ha="center", va="center", fontsize=14, color="gray")
+            ax.text(
+                0.5,
+                0.5,
+                "No valid data",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=14,
+                color="gray",
+            )
             ax.set_xlabel("Transfer Time (T)")
             ax.set_ylabel(r"Total $\Delta v$")
             return ax
@@ -98,11 +105,11 @@ class TransferPlotter(OrbitVisualizer):
 
         if color_by == "transfer_type":
             for ttype, color in type_colors.items():
-                mask = np.array(
-                    [str(r.get("transfer_type", "")).lower() == ttype for r in valid])
+                mask = np.array([str(r.get("transfer_type", "")).lower() == ttype for r in valid])
                 if mask.any():
-                    ax.scatter(times[mask], dvs[mask], c=color, s=10, alpha=0.7,
-                               label=ttype.upper())
+                    ax.scatter(
+                        times[mask], dvs[mask], c=color, s=10, alpha=0.7, label=ttype.upper()
+                    )
             ax.legend()
         else:
             ax.scatter(times, dvs, s=10, alpha=0.7)
@@ -119,9 +126,9 @@ class TransferPlotter(OrbitVisualizer):
         transfer_trajectory: npt.ArrayLike,
         departure_state: npt.ArrayLike,
         insertion_state: npt.ArrayLike,
-        ax: Optional[Any] = None,
-        label: Optional[str] = None,
-        color: Optional[str] = None,
+        ax: Any | None = None,
+        label: str | None = None,
+        color: str | None = None,
     ) -> Any:
         """绘制 3D 转移轨道（出发轨道 + 到达轨道 + 转移弧段）。
 
@@ -151,22 +158,61 @@ class TransferPlotter(OrbitVisualizer):
             color = self._get_next_color()
 
         # 分别绘制 DRO、RO 和转移弧段（DRO=蓝色，RO=橙色）
-        ax.plot(dep_states[:, 0], dep_states[:, 1], dep_states[:, 2],
-                color="steelblue", linewidth=self.orbit_linewidth,
-                alpha=self.orbit_alpha, label="DRO")
-        ax.plot(arr_states[:, 0], arr_states[:, 1], arr_states[:, 2],
-                color="darkorange", linewidth=self.orbit_linewidth,
-                alpha=self.orbit_alpha, label="RO")
-        ax.plot(transfer_states[:, 0], transfer_states[:, 1], transfer_states[:, 2],
-                color=color, linewidth=2.0, alpha=0.9, label=label)
+        ax.plot(
+            dep_states[:, 0],
+            dep_states[:, 1],
+            dep_states[:, 2],
+            color="steelblue",
+            linewidth=self.orbit_linewidth,
+            alpha=self.orbit_alpha,
+            label="DRO",
+        )
+        ax.plot(
+            arr_states[:, 0],
+            arr_states[:, 1],
+            arr_states[:, 2],
+            color="darkorange",
+            linewidth=self.orbit_linewidth,
+            alpha=self.orbit_alpha,
+            label="RO",
+        )
+        ax.plot(
+            transfer_states[:, 0],
+            transfer_states[:, 1],
+            transfer_states[:, 2],
+            color=color,
+            linewidth=2.0,
+            alpha=0.9,
+            label=label,
+        )
 
         # 标记出发点和插入点
         dep = np.asarray(departure_state)
         ins = np.asarray(insertion_state)
-        ax.scatter(dep[0], dep[1], dep[2], color="green", marker="^", s=80,
-                   edgecolors="black", linewidth=1, zorder=10, label="Departure")
-        ax.scatter(ins[0], ins[1], ins[2], color="red", marker="v", s=80,
-                   edgecolors="black", linewidth=1, zorder=10, label="Insertion")
+        ax.scatter(
+            dep[0],
+            dep[1],
+            dep[2],
+            color="green",
+            marker="^",
+            s=80,
+            edgecolors="black",
+            linewidth=1,
+            zorder=10,
+            label="Departure",
+        )
+        ax.scatter(
+            ins[0],
+            ins[1],
+            ins[2],
+            color="red",
+            marker="v",
+            s=80,
+            edgecolors="black",
+            linewidth=1,
+            zorder=10,
+            label="Insertion",
+        )
 
         self.plot_primary_bodies(ax=ax, is_3d=True)
         self.plot_libration_points(ax=ax, is_3d=True)
@@ -186,13 +232,16 @@ class TransferPlotter(OrbitVisualizer):
             if isinstance(r, dict):
                 parsed.append(r)
             else:
-                parsed.append({
-                    "transfer_time": r.transfer_time,
-                    "delta_v1": r.delta_v1,
-                    "delta_v2": r.delta_v2,
-                    "objective_value": r.objective_value,
-                    "success": r.success,
-                    "transfer_type": r.transfer_type.value
-                    if hasattr(r.transfer_type, "value") else str(r.transfer_type),
-                })
+                parsed.append(
+                    {
+                        "transfer_time": r.transfer_time,
+                        "delta_v1": r.delta_v1,
+                        "delta_v2": r.delta_v2,
+                        "objective_value": r.objective_value,
+                        "success": r.success,
+                        "transfer_type": r.transfer_type.value
+                        if hasattr(r.transfer_type, "value")
+                        else str(r.transfer_type),
+                    }
+                )
         return parsed

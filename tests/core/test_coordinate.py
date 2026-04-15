@@ -2,8 +2,8 @@
 Unit tests for CoordinateTransformation class
 """
 
-import pytest
 import numpy as np
+
 from e2m2e.core.coordinate import CoordinateTransformation, ReferenceFrame
 
 
@@ -104,7 +104,7 @@ class TestCoordinateTransformationRotatingToInertial:
         """Test position transformation at t=pi/2"""
         state = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # on x-axis
         result = earth_moon_coordinate.rotating_to_inertial(state=state, time=np.pi / 2)
-        
+
         # Rotated 90 degrees: x -> y, y -> -x
         assert np.isclose(result[0], 0.0, atol=1e-10)
         assert np.isclose(result[1], -1.0, atol=1e-10)
@@ -137,10 +137,10 @@ class TestCoordinateTransformationReversibility:
         # Use zero velocity to avoid Coriolis complications in velocity
         original = np.array([0.5, 0.1, 0.0, 0.0, 0.0, 0.0])
         time = 0.5
-        
+
         rotated = earth_moon_coordinate.rotating_to_inertial(state=original, time=time)
         back = earth_moon_coordinate.inertial_to_rotating(state=rotated, time=time)
-        
+
         # Position should round-trip correctly
         assert np.allclose(original[:3], back[:3], atol=1e-10)
 
@@ -149,10 +149,10 @@ class TestCoordinateTransformationReversibility:
         # Use zero velocity to avoid Coriolis complications in velocity
         original = np.array([0.5, 0.1, 0.0, 0.0, 0.0, 0.0])
         time = 0.5
-        
+
         inertial = earth_moon_coordinate.inertial_to_rotating(state=original, time=time)
         back = earth_moon_coordinate.rotating_to_inertial(state=inertial, time=time)
-        
+
         # Position should round-trip correctly
         assert np.allclose(original[:3], back[:3], atol=1e-10)
 
@@ -175,10 +175,10 @@ class TestCoordinateTransformationBarycentric:
     def test_barycentric_primary_round_trip(self, earth_moon_coordinate):
         """Test barycentric->primary->barycentric returns original"""
         original = np.array([0.5, 0.1, 0.0, 0.01, 0.02, 0.0])
-        
+
         primary = earth_moon_coordinate.barycentric_to_primary(state=original)
         back = earth_moon_coordinate.primary_to_barycentric(state=primary)
-        
+
         assert np.allclose(original, back, atol=1e-10)
 
     def test_barycentric_to_secondary_shape(self, earth_moon_coordinate):
@@ -196,10 +196,10 @@ class TestCoordinateTransformationBarycentric:
     def test_barycentric_secondary_round_trip(self, earth_moon_coordinate):
         """Test barycentric->secondary->barycentric returns original"""
         original = np.array([0.5, 0.1, 0.0, 0.01, 0.02, 0.0])
-        
+
         secondary = earth_moon_coordinate.barycentric_to_secondary(state=original)
         back = earth_moon_coordinate.secondary_to_barycentric(state=secondary)
-        
+
         assert np.allclose(original, back, atol=1e-10)
 
 
@@ -213,7 +213,7 @@ class TestCoordinateTransformationGeneralTransform:
             state=state,
             from_frame=ReferenceFrame.ROTATING,
             to_frame=ReferenceFrame.INERTIAL,
-            time=0.0
+            time=0.0,
         )
         assert len(result) == 6
 
@@ -224,7 +224,7 @@ class TestCoordinateTransformationGeneralTransform:
             state=state,
             from_frame=ReferenceFrame.INERTIAL,
             to_frame=ReferenceFrame.ROTATING,
-            time=0.0
+            time=0.0,
         )
         assert len(result) == 6
 
@@ -232,10 +232,7 @@ class TestCoordinateTransformationGeneralTransform:
         """Test transform accepts string frame names"""
         state = np.array([0.5, 0.1, 0.0, 0.01, 0.02, 0.0])
         result = earth_moon_coordinate.transform(
-            state=state,
-            from_frame="rotating",
-            to_frame="inertial",
-            time=0.0
+            state=state, from_frame="rotating", to_frame="inertial", time=0.0
         )
         assert len(result) == 6
 
@@ -246,6 +243,6 @@ class TestCoordinateTransformationGeneralTransform:
             state=state,
             from_frame=ReferenceFrame.ROTATING,
             to_frame=ReferenceFrame.ROTATING,
-            time=0.5
+            time=0.5,
         )
         assert np.allclose(result, state, atol=1e-10)

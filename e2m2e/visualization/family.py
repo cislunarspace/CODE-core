@@ -7,21 +7,17 @@ v4.0 MBSE 重构：满足 Visualizer Protocol 接口，参数类型兼容 OrbitC
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
-import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
-import numpy as np
 
-from .base import OrbitVisualizer, ProjectionPlane
-from .config import PlotConfig
-from .stability import compute_stability_for_family
 from ..core.system import CR3BP_System
+from .base import OrbitVisualizer
+from .config import PlotConfig
 
 if TYPE_CHECKING:
-    from ..mbse.architecture.ports import OrbitContainer
+    pass
 
 
 class FamilyPlotter(OrbitVisualizer):
@@ -34,7 +30,7 @@ class FamilyPlotter(OrbitVisualizer):
         config: 绘图配置。
     """
 
-    def __init__(self, system: CR3BP_System, config: Optional[PlotConfig] = None) -> None:
+    def __init__(self, system: CR3BP_System, config: PlotConfig | None = None) -> None:
         super().__init__(system, config)
 
     # ------------------------------------------------------------------
@@ -69,8 +65,9 @@ class FamilyPlotter(OrbitVisualizer):
         jrange = jmax - jmin if jmax != jmin else 1.0
         return jmin, jmax, jrange
 
-    def _draw_orbit_loop_2d(self, family_result, jacobi_values, ax,
-                            plane="xy", start=0, end=None, step=1):
+    def _draw_orbit_loop_2d(
+        self, family_result, jacobi_values, ax, plane="xy", start=0, end=None, step=1
+    ):
         """按 Jacobi 常数着色批量绘制轨道族的 2D 投影。"""
         jmin, jmax, jrange = self._get_jacobi_norm(jacobi_values)
         cmap = self.config.get_cmap()
@@ -79,11 +76,9 @@ class FamilyPlotter(OrbitVisualizer):
             orbit = family_result[idx]
             norm_j = (jacobi_values[idx] - jmin) / jrange
             color = cmap(norm_j)
-            self.plot_2d_projection(
-                orbit, plane=plane, color=color, show_start=False, ax=ax)
+            self.plot_2d_projection(orbit, plane=plane, color=color, show_start=False, ax=ax)
 
-    def _draw_orbit_loop_3d(self, family_result, jacobi_values, ax,
-                            start=0, end=None, step=1):
+    def _draw_orbit_loop_3d(self, family_result, jacobi_values, ax, start=0, end=None, step=1):
         """按 Jacobi 常数着色批量绘制轨道族的 3D 视图。"""
         jmin, jmax, jrange = self._get_jacobi_norm(jacobi_values)
         cmap = self.config.get_cmap()
@@ -108,8 +103,7 @@ class FamilyPlotter(OrbitVisualizer):
         cbar.ax.tick_params(labelsize=self.config.tick)
         return cbar
 
-    def _style_2d_ax(self, ax, xlabel="X (nondimensional)",
-                     ylabel="Y (nondimensional)"):
+    def _style_2d_ax(self, ax, xlabel="X (nondimensional)", ylabel="Y (nondimensional)"):
         """设置 2D axes 的标签、刻度和等比例。"""
         ax.set_xlabel(xlabel, fontsize=self.config.label)
         ax.set_ylabel(ylabel, fontsize=self.config.label)
@@ -126,7 +120,7 @@ class FamilyPlotter(OrbitVisualizer):
     def plot_family_2d(
         self,
         family_result,
-        jacobi_values: List[float],
+        jacobi_values: list[float],
         title: str = "",
         plane: str = "xy",
         xlim=None,
@@ -135,9 +129,9 @@ class FamilyPlotter(OrbitVisualizer):
         show_libration: bool = True,
         show_colorbar: bool = True,
         start: int = 0,
-        end: Optional[int] = None,
+        end: int | None = None,
         step: int = 1,
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
         show: bool = True,
     ):
         """绘制轨道族的 2D 投影图，按 Jacobi 常数着色。
@@ -163,8 +157,9 @@ class FamilyPlotter(OrbitVisualizer):
         """
         fig, ax = plt.subplots(figsize=self.config.figsize_2d, dpi=self.config.dpi)
 
-        self._draw_orbit_loop_2d(family_result, jacobi_values, ax,
-                                 plane=plane, start=start, end=end, step=step)
+        self._draw_orbit_loop_2d(
+            family_result, jacobi_values, ax, plane=plane, start=start, end=end, step=step
+        )
 
         if show_bodies:
             self.plot_primary_bodies(ax=ax)
@@ -200,9 +195,9 @@ class FamilyPlotter(OrbitVisualizer):
     def plot_family_3d(
         self,
         family_result,
-        jacobi_values: List[float],
+        jacobi_values: list[float],
         title: str = "",
-        center: Tuple[float, float, float] = (0.5, 0.0, 0.0),
+        center: tuple[float, float, float] = (0.5, 0.0, 0.0),
         radius: float = 0.65,
         elev: int = 0,
         azim: int = -90,
@@ -210,9 +205,9 @@ class FamilyPlotter(OrbitVisualizer):
         show_libration: bool = True,
         show_colorbar: bool = True,
         start: int = 0,
-        end: Optional[int] = None,
+        end: int | None = None,
         step: int = 1,
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
         show: bool = True,
     ):
         """绘制轨道族的 3D 视图，按 Jacobi 常数着色。
@@ -247,8 +242,7 @@ class FamilyPlotter(OrbitVisualizer):
         if jacobi_values is None:
             jacobi_values = [0.0] * len(family_result)
 
-        self._draw_orbit_loop_3d(family_result, jacobi_values, ax,
-                                 start=start, end=end, step=step)
+        self._draw_orbit_loop_3d(family_result, jacobi_values, ax, start=start, end=end, step=step)
 
         if show_bodies:
             self.plot_primary_bodies(ax=ax, is_3d=True)
@@ -266,8 +260,7 @@ class FamilyPlotter(OrbitVisualizer):
             self._add_colorbar(ax, jacobi_values, shrink=0.6, pad=0.1)
 
         if title:
-            ax.set_title(title, fontsize=self.config.title,
-                         y=self.config.title_y_offset_3d)
+            ax.set_title(title, fontsize=self.config.title, y=self.config.title_y_offset_3d)
 
         plt.tight_layout()
         if save_path:
@@ -278,12 +271,12 @@ class FamilyPlotter(OrbitVisualizer):
 
     def plot_jacobi_period_stability(
         self,
-        jacobi_values: List[float],
+        jacobi_values: list[float],
         periods,
-        stability_values: List[float],
+        stability_values: list[float],
         title: str = "",
-        target_period: Optional[float] = None,
-        save_path: Optional[str] = None,
+        target_period: float | None = None,
+        save_path: str | None = None,
         show: bool = True,
     ):
         """绘制双 Y 轴图：Jacobi 常数 vs 周期 + 稳定性指标。
@@ -312,37 +305,44 @@ class FamilyPlotter(OrbitVisualizer):
 
         color_period = "tab:blue"
         ax1.set_xlabel("Jacobi Constant", fontsize=self.config.label)
-        ax1.set_ylabel("Period (nondimensional)", color=color_period,
-                        fontsize=self.config.label)
+        ax1.set_ylabel("Period (nondimensional)", color=color_period, fontsize=self.config.label)
         (line_period,) = ax1.plot(
-            j_sorted, p_sorted, "-", color=color_period,
-            linewidth=2, label="Period")
+            j_sorted, p_sorted, "-", color=color_period, linewidth=2, label="Period"
+        )
         ax1.tick_params(axis="y", labelcolor=color_period, labelsize=self.config.tick)
         ax1.tick_params(axis="x", labelsize=self.config.tick)
 
         if target_period is not None:
-            ax1.axhline(y=target_period, color="green", linestyle="--",
-                        linewidth=1.5, label=f"Target T={target_period:.3f}")
+            ax1.axhline(
+                y=target_period,
+                color="green",
+                linestyle="--",
+                linewidth=1.5,
+                label=f"Target T={target_period:.3f}",
+            )
 
         ax2 = ax1.twinx()
         color_stability = "tab:red"
-        ax2.set_ylabel("Stability Index (λmax)", color=color_stability,
-                        fontsize=self.config.label)
+        ax2.set_ylabel("Stability Index (λmax)", color=color_stability, fontsize=self.config.label)
         (line_stability,) = ax2.plot(
-            j_sorted, s_sorted, "-", color=color_stability,
-            linewidth=2, label="Stability Index (λmax)")
+            j_sorted,
+            s_sorted,
+            "-",
+            color=color_stability,
+            linewidth=2,
+            label="Stability Index (λmax)",
+        )
         ax2.tick_params(axis="y", labelcolor=color_stability, labelsize=self.config.tick)
 
         lines = [line_period, line_stability]
-        labels_str = [str(l.get_label()) for l in lines]
+        labels_str = [str(line.get_label()) for line in lines]
         if target_period is not None:
             lines.append(ax1.get_lines()[-1])
             labels_str.append(f"Target T={target_period:.3f}")
         ax1.legend(lines, labels_str, loc="upper right", fontsize=self.config.legend)
 
         if title:
-            ax1.set_title(title, fontsize=self.config.title,
-                          y=self.config.title_y_offset_dual)
+            ax1.set_title(title, fontsize=self.config.title, y=self.config.title_y_offset_dual)
 
         ax1.grid(True, alpha=0.3)
         plt.tight_layout()
@@ -355,20 +355,20 @@ class FamilyPlotter(OrbitVisualizer):
     def plot_family_overview(
         self,
         family_result,
-        jacobi_values: List[float],
+        jacobi_values: list[float],
         periods,
-        stability_values: List[float],
+        stability_values: list[float],
         suptitle: str = "",
         plane: str = "xy",
-        center_3d: Tuple[float, float, float] = (0.5, 0.0, 0.0),
+        center_3d: tuple[float, float, float] = (0.5, 0.0, 0.0),
         radius_3d: float = 0.65,
         zoom_xlim=None,
         zoom_ylim=None,
         elev: int = 0,
         azim: int = -90,
-        target_period: Optional[float] = None,
+        target_period: float | None = None,
         step: int = 1,
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
         show: bool = True,
     ):
         """绘制轨道族概览图（2x2 子图布局）。
@@ -410,8 +410,11 @@ class FamilyPlotter(OrbitVisualizer):
         self.plot_primary_bodies(ax=ax1)
         self.plot_libration_points(ax=ax1)
         self._add_colorbar(ax1, jacobi_values)
-        ax1.set_title(f"Global {plane.upper()} View ({n_orbits} orbits)",
-                       fontsize=fs.title, y=fs.title_y_offset_subplot)
+        ax1.set_title(
+            f"Global {plane.upper()} View ({n_orbits} orbits)",
+            fontsize=fs.title,
+            y=fs.title_y_offset_subplot,
+        )
         xlabel = "X" if plane in ("xy", "xz") else "Y"
         ylabel = "Y" if plane == "xy" else "Z"
         ax1.set_xlabel(xlabel, fontsize=fs.label)
@@ -428,8 +431,9 @@ class FamilyPlotter(OrbitVisualizer):
             ax2.set_xlim(*zoom_xlim)
         if zoom_ylim:
             ax2.set_ylim(*zoom_ylim)
-        ax2.set_title(f"Zoomed {plane.upper()} View", fontsize=fs.title,
-                       y=fs.title_y_offset_subplot)
+        ax2.set_title(
+            f"Zoomed {plane.upper()} View", fontsize=fs.title, y=fs.title_y_offset_subplot
+        )
         ax2.set_xlabel(xlabel, fontsize=fs.label)
         ax2.set_ylabel(ylabel, fontsize=fs.label)
         ax2.tick_params(labelsize=fs.tick)
@@ -439,21 +443,21 @@ class FamilyPlotter(OrbitVisualizer):
         ax3 = fig.add_subplot(223)
         ax3.set_xlabel("Jacobi Constant", fontsize=fs.label)
         ax3.set_ylabel("Period", color="tab:blue", fontsize=fs.label)
-        (line_p,) = ax3.plot(jacobi_values, periods, "o-",
-                              color="tab:blue", markersize=4)
+        (line_p,) = ax3.plot(jacobi_values, periods, "o-", color="tab:blue", markersize=4)
         ax3.tick_params(axis="y", labelcolor="tab:blue", labelsize=fs.tick)
         ax3.tick_params(axis="x", labelsize=fs.tick)
         if target_period is not None:
             ax3.axhline(y=target_period, color="green", linestyle="--", linewidth=1.5)
         ax3_right = ax3.twinx()
         ax3_right.set_ylabel("λmax", color="tab:red", fontsize=fs.label)
-        (line_s,) = ax3_right.plot(jacobi_values, stability_values, "s-",
-                                    color="tab:red", markersize=4)
+        (line_s,) = ax3_right.plot(
+            jacobi_values, stability_values, "s-", color="tab:red", markersize=4
+        )
         ax3_right.tick_params(axis="y", labelcolor="tab:red", labelsize=fs.tick)
-        ax3.set_title("Jacobi vs Period & Stability", fontsize=fs.title,
-                       y=fs.title_y_offset_subplot)
-        ax3.legend([line_p, line_s], ["Period", "λmax"],
-                    loc="upper right", fontsize=fs.legend)
+        ax3.set_title(
+            "Jacobi vs Period & Stability", fontsize=fs.title, y=fs.title_y_offset_subplot
+        )
+        ax3.legend([line_p, line_s], ["Period", "λmax"], loc="upper right", fontsize=fs.legend)
         ax3.grid(True, alpha=0.3)
 
         # 子图 4：3D 视图

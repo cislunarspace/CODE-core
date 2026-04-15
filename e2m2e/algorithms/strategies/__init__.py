@@ -7,6 +7,7 @@ configuration logic is separated from the iterative solver.
 """
 
 from .base import CorrectionConfig
+from .halo import halo_fixed_x0, halo_fixed_z0
 from .symmetric_2d import (
     symmetric_2d_fixed_t,
     symmetric_2d_fixed_x0,
@@ -17,7 +18,6 @@ from .symmetric_3d import (
     symmetric_xz_fixed_x0,
     symmetric_xz_fixed_z0,
 )
-from .halo import halo_fixed_x0, halo_fixed_z0
 
 __all__ = [
     "CorrectionConfig",

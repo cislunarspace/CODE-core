@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List
 
 
 @dataclass(frozen=True)
@@ -27,10 +26,10 @@ class CorrectionConfig:
 
     setup_type: str
     symmetry_condition: str
-    fixed_parameters: Dict[str, float] = field(default_factory=dict)
-    free_variables: List[str] = field(default_factory=list)
-    free_variable_indices: List[int] = field(default_factory=list)
-    target_conditions: Dict[str, float] = field(default_factory=dict)
-    constraint_indices: List[int] = field(default_factory=list)
-    constraint_weights: Dict[str, float] = field(default_factory=dict)
-    constraint_types: Dict[str, str] = field(default_factory=dict)
+    fixed_parameters: dict[str, float] = field(default_factory=dict)
+    free_variables: list[str] = field(default_factory=list)
+    free_variable_indices: list[int] = field(default_factory=list)
+    target_conditions: dict[str, float] = field(default_factory=dict)
+    constraint_indices: list[int] = field(default_factory=list)
+    constraint_weights: dict[str, float] = field(default_factory=dict)
+    constraint_types: dict[str, str] = field(default_factory=dict)

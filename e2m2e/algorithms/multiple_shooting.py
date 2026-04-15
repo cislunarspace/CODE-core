@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import numpy as np
-from tqdm.auto import tqdm
-from typing import Optional, Tuple
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
+import numpy as np
 import numpy.typing as npt
+from tqdm.auto import tqdm
 
 # Unicode sparkline 字符，用于在终端内渲染残差收敛曲线
 _SPARK_CHARS = " ▁▂▃▄▅▆▇█"
@@ -43,8 +42,10 @@ def _worker_init(
         max_step: ODE 最大步长（秒）。
     """
     import os
+
     import spiceypy
-    from e2m2e.core import SPICEManager, EphemerisSystem, EphemerisDynamics
+
+    from e2m2e.core import EphemerisDynamics, EphemerisSystem, SPICEManager
 
     global _worker_dynamics
 
@@ -150,19 +151,25 @@ class MultipleShooting:
         self,
         dynamics,
         n_workers: int = 1,
-        kernel_dir: Optional[str] = None,
+        kernel_dir: str | None = None,
     ) -> None:
         """
         Args:
             dynamics: 动力学模型对象，需提供以下接口：
-                - propagate(state, time_span, with_stm=True): 积分传播，返回含 "states" 和 "stm" 的字典
-                - equations_of_motion(t, state): 计算状态导数（右端函数值）
+                - propagate(state, time_span, with_stm=True):
+                  积分传播，返回含 "states" 和 "stm" 的字典
+                - equations_of_motion(t, state):
+                  计算状态导数（右端函数值）
             n_workers: 并行工作进程/线程数，默认 1（串行）。
-                - ``n_workers>1`` 且 ``kernel_dir`` 已设置：使用 ProcessPoolExecutor（多进程，推荐）。
-                - ``n_workers>1`` 且 ``kernel_dir=None``：使用 ThreadPoolExecutor（多线程，受 GIL 限制）。
-            kernel_dir: SPICE 内核目录路径（含 ``de440.bsp`` 和 ``naif0012.tls``）。
+                - ``n_workers>1`` 且 ``kernel_dir`` 已设置：
+                  使用 ProcessPoolExecutor（多进程，推荐）。
+                - ``n_workers>1`` 且 ``kernel_dir=None``：
+                  使用 ThreadPoolExecutor（多线程，受 GIL 限制）。
+            kernel_dir: SPICE 内核目录路径
+                （含 ``de440.bsp`` 和 ``naif0012.tls``）。
                 仅在 ``n_workers>1`` 时需要。设置后自动启用多进程模式。
-                例：``kernel_dir=os.environ.get("SPICE_KERNEL_DIR", "../e2m2e/kernels")``
+                例：``kernel_dir=os.environ.get("SPICE_KERNEL_DIR",
+                "../e2m2e/kernels")``
         """
         if dynamics is None:
             raise TypeError("dynamics must not be None")
@@ -205,8 +212,8 @@ class MultipleShooting:
         t_patch: np.ndarray,
         state_patch: np.ndarray,
         var_time: bool = False,
-        max_iter: Optional[int] = None,
-        tolerance: Optional[float] = None,
+        max_iter: int | None = None,
+        tolerance: float | None = None,
         verbose: bool = False,
     ) -> MultipleShootingResult:
         """执行多重打靶修正。
@@ -252,11 +259,14 @@ class MultipleShooting:
             unit="iter",
             disable=not verbose,
             leave=True,
-            bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
+            bar_format=(
+                "{desc}: {percentage:3.0f}%|{bar}|"
+                " {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}"
+            ),
         )
 
         # 串行模式下，段级子进度条
-        seg_pbar: Optional[tqdm] = None  # type: ignore[type-arg]
+        seg_pbar: tqdm | None = None  # type: ignore[type-arg]
         if verbose and self.n_workers <= 1 and n_seg > 1:
             seg_pbar = tqdm(
                 total=n_seg,
@@ -271,13 +281,13 @@ class MultipleShooting:
         use_multithread = self.n_workers > 1 and self.kernel_dir is None
 
         # 多进程模式：在 correct() 整个生命周期内保持一个 Pool，避免每次迭代重建子进程
-        process_pool: Optional[ProcessPoolExecutor] = None
+        process_pool: ProcessPoolExecutor | None = None
         if use_multiprocess and n_seg > 1:
             process_pool = self._make_process_pool()
             process_pool.__enter__()
 
         try:
-            prev_res: Optional[float] = None
+            prev_res: float | None = None
             for iteration in range(_max_iter):
                 # === 第一步：逐段积分，收集 STM、终端状态和端点处的状态导数 ===
                 stms = []  # 各段的状态转移矩阵 Φ(t_{i+1}; t_i)
@@ -298,12 +308,11 @@ class MultipleShooting:
                         for i in range(n_seg)
                     }
                     done_count = 0
-                    for future in as_completed(future_to_idx_mp):
+                    for done_count, future in enumerate(as_completed(future_to_idx_mp)):
                         idx = future_to_idx_mp[future]
                         seg_results_mp[idx] = future.result()
-                        done_count += 1
                         pbar.set_postfix_str(
-                            f"propagating {done_count}/{n_seg} segs [mp]",
+                            f"propagating {done_count + 1}/{n_seg} segs [mp]",
                             refresh=True,
                         )
 
@@ -330,12 +339,11 @@ class MultipleShooting:
                             for i in range(n_seg)
                         }
                         done_count = 0
-                        for future in as_completed(future_to_idx):
+                        for done_count, future in enumerate(as_completed(future_to_idx)):
                             idx = future_to_idx[future]
                             seg_results[idx] = future.result()
-                            done_count += 1
                             pbar.set_postfix_str(
-                                f"propagating {done_count}/{n_seg} segs",
+                                f"propagating {done_count + 1}/{n_seg} segs",
                                 refresh=True,
                             )
 
@@ -381,9 +389,7 @@ class MultipleShooting:
                 if prev_res is not None and prev_res > 0:
                     ratio = max_res / prev_res
                     arrow = "↓" if ratio < 1 else "↑"
-                    postfix = (
-                        f"res={max_res:.2e} {arrow}{ratio:.2f} tol={_tolerance:.0e}"
-                    )
+                    postfix = f"res={max_res:.2e} {arrow}{ratio:.2f} tol={_tolerance:.0e}"
                 else:
                     postfix = f"res={max_res:.2e} tol={_tolerance:.0e}"
                 pbar.set_postfix_str(postfix, refresh=False)
@@ -397,7 +403,8 @@ class MultipleShooting:
                     # 更新描述，明确标出收敛成功
                     pbar.set_description_str("Multiple Shooting [converged]")
                     pbar.set_postfix_str(
-                        f"res={max_res:.2e} < tol={_tolerance:.0e}  spark={_sparkline(residual_history)}",
+                        f"res={max_res:.2e} < tol={_tolerance:.0e}"
+                        f"  spark={_sparkline(residual_history)}",
                         refresh=True,
                     )
                     if seg_pbar is not None:
@@ -471,7 +478,8 @@ class MultipleShooting:
             if not converged:
                 pbar.set_description_str("Multiple Shooting [max_iter]")
                 pbar.set_postfix_str(
-                    f"res={residual_history[-1]:.2e} tol={_tolerance:.0e}  spark={_sparkline(residual_history)}",
+                    f"res={residual_history[-1]:.2e} tol={_tolerance:.0e}"
+                    f"  spark={_sparkline(residual_history)}",
                     refresh=True,
                 )
             pbar.close()
@@ -489,7 +497,7 @@ class MultipleShooting:
 def sample_patch_points(
     orbit,
     n_points: int,
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """沿周期轨道均匀采样 patch points（打靶节点）。
 
     该方法用于多重打靶法（Multiple Shooting）的前处理，将一条周期轨道
@@ -535,7 +543,7 @@ def convert_to_j2000(
     syn_j2000,
     reference_et: float,
     tu_days: float = 4.34811305,
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """将 synodic 坐标系下的 patch points 转换到 J2000 惯性坐标系。
 
     该方法用于将 CR3BP 归一化 synodic 坐标系中的轨道节点转换到

@@ -71,8 +71,7 @@ def compute_stability_for_family(family_result, system, max_workers=None):
     results: list[float] = [1.0] * len(tasks)
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         future_to_idx = {
-            executor.submit(_compute_single_stability, task): task[0]
-            for task in tasks
+            executor.submit(_compute_single_stability, task): task[0] for task in tasks
         }
         for future in as_completed(future_to_idx):
             idx, value = future.result()

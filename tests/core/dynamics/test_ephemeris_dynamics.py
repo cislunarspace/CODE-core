@@ -34,15 +34,15 @@ e2m2e 需要在 J2000 惯性系下实现包含 Earth + Moon + Sun 引力的 N-bo
   Layer 1a (SPICEManager)
 """
 
-import pytest
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.core import (
-    SPICEManager,
-    EphemerisSystem,
-    EphemerisDynamics,
     Dynamics,
+    EphemerisDynamics,
+    EphemerisSystem,
+    SPICEManager,
 )
 
 pytestmark = pytest.mark.spice

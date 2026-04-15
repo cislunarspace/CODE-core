@@ -6,12 +6,12 @@
 
 from __future__ import annotations
 
-import numpy as np
-from scipy.optimize import fsolve
 from enum import Enum
-from typing import Dict, List, Tuple, Optional, Union, Any
+from typing import Any
 
+import numpy as np
 import numpy.typing as npt
+from scipy.optimize import fsolve
 
 
 class LibrationPoint(Enum):
@@ -82,7 +82,7 @@ class CR3BP_System:
     }
 
     @classmethod
-    def from_known_system(cls, system_name: str) -> "CR3BP_System":
+    def from_known_system(cls, system_name: str) -> CR3BP_System:
         """从已知系统创建CR3BP系统
 
         Args:
@@ -116,24 +116,24 @@ class CR3BP_System:
         self.secondary_body: str = secondary
         self.mu: float = mu
 
-        self.characteristic_length: Optional[float] = None
-        self.characteristic_time: Optional[float] = None
-        self.characteristic_velocity: Optional[float] = None
+        self.characteristic_length: float | None = None
+        self.characteristic_time: float | None = None
+        self.characteristic_velocity: float | None = None
 
-        self.L_points: Optional[Dict[LibrationPoint, npt.NDArray[np.floating]]] = None
-        self.L1: Optional[npt.NDArray[np.floating]] = None
-        self.L2: Optional[npt.NDArray[np.floating]] = None
-        self.L3: Optional[npt.NDArray[np.floating]] = None
-        self.L4: Optional[npt.NDArray[np.floating]] = None
-        self.L5: Optional[npt.NDArray[np.floating]] = None
+        self.L_points: dict[LibrationPoint, npt.NDArray[np.floating]] | None = None
+        self.L1: npt.NDArray[np.floating] | None = None
+        self.L2: npt.NDArray[np.floating] | None = None
+        self.L3: npt.NDArray[np.floating] | None = None
+        self.L4: npt.NDArray[np.floating] | None = None
+        self.L5: npt.NDArray[np.floating] | None = None
 
-        self.mass_primary: Optional[float] = None
-        self.mass_secondary: Optional[float] = None
-        self.total_mass: Optional[float] = None
+        self.mass_primary: float | None = None
+        self.mass_secondary: float | None = None
+        self.total_mass: float | None = None
 
-        self.semi_major_axis: Optional[float] = None
-        self.orbital_period: Optional[float] = None
-        self.mean_motion: Optional[float] = None
+        self.semi_major_axis: float | None = None
+        self.orbital_period: float | None = None
+        self.mean_motion: float | None = None
 
         self.has_L_points: bool = False
         self.is_initialized: bool = False
@@ -156,7 +156,7 @@ class CR3BP_System:
 
         self.is_initialized = True
 
-    def compute_libration_points(self) -> Dict[LibrationPoint, npt.NDArray[np.floating]]:
+    def compute_libration_points(self) -> dict[LibrationPoint, npt.NDArray[np.floating]]:
         """计算五个平动点
 
         Returns:
@@ -298,7 +298,7 @@ class CR3BP_System:
 
         return np.concatenate([position, velocity])
 
-    def compute_stability_index(self, L_point: LibrationPoint) -> Dict[str, Any]:
+    def compute_stability_index(self, L_point: LibrationPoint) -> dict[str, Any]:
         """计算平动点稳定性指标
 
         通过线性化运动方程的特征值分析平动点稳定性。
@@ -370,12 +370,16 @@ class CR3BP_System:
 
     def __str__(self):
         """字符串表示"""
-        return f"CR3BP_System(mu={self.mu}, primary='{self.primary_body}', secondary='{self.secondary_body}')"
+        return (
+            f"CR3BP_System(mu={self.mu}, "
+            f"primary='{self.primary_body}', secondary='{self.secondary_body}')"
+        )
 
     def __repr__(self):
         """详细表示"""
         return (
-            f"CR3BP_System(mu={self.mu}, primary='{self.primary_body}', secondary='{self.secondary_body}', "
+            f"CR3BP_System(mu={self.mu}, "
+            f"primary='{self.primary_body}', secondary='{self.secondary_body}', "
             f"initialized={self.is_initialized}, has_L_points={self.has_L_points})"
         )
 
@@ -408,7 +412,8 @@ class CR3BP_System:
                 print(f"  特征速度：{self.characteristic_velocity:.2f} km/s")
                 print(f"  平均角速度：{self.mean_motion:.6e} rad/s")
                 print(
-                    f"  轨道周期：{self.orbital_period:.2f} s ({self.orbital_period / 86400:.2f} 天)"
+                    f"  轨道周期：{self.orbital_period:.2f} s "
+                    f"({self.orbital_period / 86400:.2f} 天)"
                 )
                 print(f"  半长轴：{self.semi_major_axis:.2f} km")
             else:

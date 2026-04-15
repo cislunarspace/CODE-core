@@ -28,17 +28,17 @@
 
 from __future__ import annotations
 
-import numpy as np
-from scipy.integrate import solve_ivp
-from typing import Dict, List, Tuple, Optional, Any, Callable, TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
+import numpy as np
 import numpy.typing as npt
+from scipy.integrate import solve_ivp
 
 from .system import CR3BP_System
 
 if TYPE_CHECKING:
     from .orbit import Orbit
-    from .system import CR3BP_System as SystemType
 
 
 class Dynamics:
@@ -107,7 +107,7 @@ class Dynamics:
             raise NotImplementedError("子类须实现 equations_with_stm 或覆写 _get_eom_func")
         return self.equations_of_motion
 
-    def _get_max_step(self, t_span: Tuple[float, float]) -> float:
+    def _get_max_step(self, t_span: tuple[float, float]) -> float:
         """获取当前传播的最大步长（钩子方法，子类可覆写）
 
         默认实现直接返回 self.max_step。子类（如 EphemerisDynamics）
@@ -141,11 +141,11 @@ class Dynamics:
     def propagate(
         self,
         initial_state: npt.ArrayLike,
-        t_span: Tuple[float, float],
-        t_eval: Optional[npt.ArrayLike] = None,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None = None,
         with_stm: bool = False,
         with_jacobi: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """传播轨迹（Template Method）
 
         统一的传播入口，保证：
@@ -176,11 +176,11 @@ class Dynamics:
     def _propagate_with_stm(
         self,
         initial_state: np.ndarray,
-        t_span: Tuple[float, float],
-        t_eval: Optional[npt.ArrayLike],
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
         max_step: float,
         with_jacobi: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """增广状态积分（含 STM）
 
         初始 STM 设为单位矩阵，拼接为 STATE_DIM + STATE_DIM² 维增广状态后积分。
@@ -208,7 +208,7 @@ class Dynamics:
         self.last_trajectory = (result.t, states)
         self.last_stm = stm_matrices
 
-        out: Dict[str, Any] = {
+        out: dict[str, Any] = {
             "time": result.t,
             "states": states,
             "stm": stm_matrices,
@@ -222,11 +222,11 @@ class Dynamics:
     def _propagate_state_only(
         self,
         initial_state: np.ndarray,
-        t_span: Tuple[float, float],
-        t_eval: Optional[npt.ArrayLike],
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
         max_step: float,
         with_jacobi: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """纯状态积分（不含 STM）"""
         eom_func = self._get_eom_func(with_stm=False)
         result = solve_ivp(
@@ -245,7 +245,7 @@ class Dynamics:
 
         self.last_trajectory = (result.t, states)
 
-        out: Dict[str, Any] = {
+        out: dict[str, Any] = {
             "time": result.t,
             "states": states,
         }
@@ -255,7 +255,7 @@ class Dynamics:
 
         return out
 
-    def _handle_jacobi(self, states: np.ndarray, out: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_jacobi(self, states: np.ndarray, out: dict[str, Any]) -> dict[str, Any]:
         """沿轨迹计算 Jacobi 常数的钩子方法。
 
         基类默认为 no-op。CR3BP_Dynamics 覆写此方法以计算 Jacobi 常数。
@@ -312,7 +312,10 @@ class Dynamics:
         return f"{self.__class__.__name__}(system={self.system})"
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(system={self.system}, integrator='{self.integrator}', rtol={self.rtol})"
+        return (
+            f"{self.__class__.__name__}("
+            f"system={self.system}, integrator='{self.integrator}', rtol={self.rtol})"
+        )
 
 
 class CR3BP_Dynamics(Dynamics):
@@ -545,7 +548,7 @@ class CR3BP_Dynamics(Dynamics):
         """
         return self.system.get_jacobi_constant(state)
 
-    def _handle_jacobi(self, states: np.ndarray, out: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_jacobi(self, states: np.ndarray, out: dict[str, Any]) -> dict[str, Any]:
         """沿轨迹逐点计算 Jacobi 常数"""
         self.jacobi_history = [self.compute_jacobi_constant(state) for state in states]
         if len(self.jacobi_history) > 1:

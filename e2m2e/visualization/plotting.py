@@ -5,12 +5,6 @@
 
 from __future__ import annotations
 
-from .config import PlotConfig
-from .base import OrbitVisualizer, ProjectionPlane
-from .family import FamilyPlotter
-from .transfer import TransferPlotter
-from .stability import compute_stability_for_family
-
 
 def configure_academic_fonts():
     """配置学术论文标准的 matplotlib 字体。
@@ -19,6 +13,7 @@ def configure_academic_fonts():
     适用于 IEEE/Elsevier 等学术期刊的插图要求。
     """
     import matplotlib
+
     # 字体族：Times New Roman（学术标准）
     matplotlib.rcParams["font.family"] = "serif"
     matplotlib.rcParams["font.serif"] = ["Times New Roman", "DejaVu Serif"]

@@ -12,10 +12,11 @@
 """
 
 import numpy as np
-from e2m2e.core.system import CR3BP_System
-from e2m2e.core.dynamics import CR3BP_Dynamics
+
 from e2m2e.algorithms.differential_correction import DifferentialCorrection
+from e2m2e.core.dynamics import CR3BP_Dynamics
 from e2m2e.core.orbit import Orbit
+from e2m2e.core.system import CR3BP_System
 
 
 def design_fixed_period_dro(target_period):
@@ -52,15 +53,13 @@ def design_fixed_period_dro(target_period):
     # 5. 执行迭代修正
     orbit = corrector.iterate_correction(
         initial_guess=Orbit(
-            states=initial_state.reshape(1, -1),
-            times=np.array([0.0]),
-            system=system
+            states=initial_state.reshape(1, -1), times=np.array([0.0]), system=system
         ),
-        verbose=True
+        verbose=True,
     )
 
     if orbit is not None:
-        print(f"\n✓ 成功找到周期轨道!")
+        print("\n✓ 成功找到周期轨道!")
         print(f"  实际周期: {orbit.period:.6f}")
         print(f"  误差: {abs(orbit.period - target_period):.6e}")
         return orbit
@@ -107,7 +106,7 @@ def example_workflow():
     orbit_result = corrector.iterate_correction(initial_guess=orbit_init, verbose=False)
 
     if orbit_result is not None:
-        print(f"\n步骤 5: 验证结果")
+        print("\n步骤 5: 验证结果")
         print(f"  - 收敛状态: {corrector.converged}")
         print(f"  - 最终周期: {orbit_result.period:.6f}")
         print(f"  - 最终误差: {corrector.current_error:.2e}")

@@ -34,31 +34,30 @@
   Layer 2 (MultipleShooting)
 """
 
-import pytest
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.core import (
-    CR3BP_System,
     CR3BP_Dynamics,
-    SPICEManager,
-    EphemerisSystem,
+    CR3BP_System,
     EphemerisDynamics,
-    SynodicJ2000Transformation,
+    EphemerisSystem,
     Orbit,
+    SPICEManager,
+    SynodicJ2000Transformation,
 )
 
 pytestmark = pytest.mark.spice
-from e2m2e.algorithms import (
+from e2m2e.algorithms import (  # noqa: E402
     DifferentialCorrection,
     MultipleShooting,
 )
 
-
 # =============================================================================
 # 物理参数
 # =============================================================================
-from tests.conftest import MU, DU, TU_SECONDS, VU
+from tests.conftest import MU, TU_SECONDS  # noqa: E402
 
 DRO_31_X0 = 1.1202109158830986
 DRO_31_VY0 = -0.46178983697629084
@@ -385,9 +384,7 @@ class TestStep5Validation:
         corrected_states = result.state_patch
         distances = np.linalg.norm(corrected_states[:, :3], axis=1)
         mean_dist = np.mean(distances)
-        assert 300000 < mean_dist < 500000, (
-            f"修正后平均距地球 {mean_dist:.0f} km，偏离 DRO 范围"
-        )
+        assert 300000 < mean_dist < 500000, f"修正后平均距地球 {mean_dist:.0f} km，偏离 DRO 范围"
         std_dist = np.std(distances)
         assert std_dist / mean_dist < 0.1, (
             f"修正后轨道形状变化过大: std/mean = {std_dist / mean_dist:.3f}"

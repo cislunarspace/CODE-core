@@ -3,9 +3,11 @@ pytest configuration and shared fixtures for e2m2e tests
 """
 
 import os
-import pytest
+
 import numpy as np
-from e2m2e.core import CR3BP_System, CR3BP_Dynamics, CoordinateTransformation, Orbit
+import pytest
+
+from e2m2e.core import CoordinateTransformation, CR3BP_Dynamics, CR3BP_System, Orbit
 
 
 def pytest_configure(config):

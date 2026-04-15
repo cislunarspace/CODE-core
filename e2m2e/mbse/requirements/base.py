@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 class RequirementCategory(enum.Enum):
@@ -54,7 +53,7 @@ class Requirement:
     description: str
     priority: RequirementPriority = RequirementPriority.SHALL
     verification_method: str = "test"
-    parent: Optional[str] = None
+    parent: str | None = None
     linked_code: list[str] = field(default_factory=list)
     linked_tests: list[str] = field(default_factory=list)
 
@@ -65,7 +64,7 @@ class RequirementRegistry:
     集中管理所有需求定义，支持按分类、层次、追溯关系查询。
     """
 
-    _instance: Optional[RequirementRegistry] = None
+    _instance: RequirementRegistry | None = None
     _requirements: dict[str, Requirement]
 
     def __new__(cls) -> RequirementRegistry:
@@ -115,7 +114,8 @@ class RequirementRegistry:
         """构建需求追溯矩阵
 
         Returns:
-            {req_id: {"requirement": Requirement, "code": [...], "tests": [...], "has_coverage": bool}}
+            {req_id: {"requirement": Requirement, "code": [...],
+                       "tests": [...], "has_coverage": bool}}
         """
         matrix = {}
         for req in self._requirements.values():

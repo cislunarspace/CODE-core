@@ -12,7 +12,9 @@ CORE_REQUIREMENTS = [
         id="REQ-001",
         title="状态向量顺序",
         category=RequirementCategory.INTERFACE,
-        description="状态向量必须按 [x, y, z, vx, vy, vz] 顺序排列，即前 3 分量为位置，后 3 分量为速度。",
+        description=(
+            "状态向量必须按 [x, y, z, vx, vy, vz] 顺序排列，即前 3 分量为位置，后 3 分量为速度。"
+        ),
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.orbit", "e2m2e.core.dynamics"],
@@ -22,11 +24,16 @@ CORE_REQUIREMENTS = [
         id="REQ-002",
         title="传播结果 states 形状",
         category=RequirementCategory.INTERFACE,
-        description="所有 Dynamics 子类的 propagate() 方法返回的 states 必须为 (n_points, 6) 形状。",
+        description=(
+            "所有 Dynamics 子类的 propagate() 方法返回的 states 必须为 (n_points, 6) 形状。"
+        ),
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.dynamics", "e2m2e.core.ephemeris_dynamics"],
-        linked_tests=["tests/core/test_dynamics.py", "tests/core/dynamics/test_ephemeris_dynamics.py"],
+        linked_tests=[
+            "tests/core/test_dynamics.py",
+            "tests/core/dynamics/test_ephemeris_dynamics.py",
+        ],
     ),
     Requirement(
         id="REQ-003",
@@ -42,7 +49,9 @@ CORE_REQUIREMENTS = [
         id="REQ-004",
         title="STM 解析 Jacobian",
         category=RequirementCategory.FUNCTIONAL,
-        description="状态转移矩阵必须通过解析 Jacobian（compute_jacobian_A）计算，不得使用有限差分。",
+        description=(
+            "状态转移矩阵必须通过解析 Jacobian（compute_jacobian_A）计算，不得使用有限差分。"
+        ),
         priority=RequirementPriority.SHALL,
         verification_method="analysis",
         linked_code=["e2m2e.core.dynamics"],
@@ -146,7 +155,9 @@ CORE_REQUIREMENTS = [
         id="REQ-026",
         title="EphemerisDynamics 自适应步长",
         category=RequirementCategory.FUNCTIONAL,
-        description="EphemerisDynamics 根据传播时长自适应调整最大步长（max_step = min(60s, duration/10)）。",
+        description=(
+            "EphemerisDynamics 根据传播时长自适应调整最大步长（max_step = min(60s, duration/10)）。"
+        ),
         priority=RequirementPriority.SHOULD,
         verification_method="test",
         linked_code=["e2m2e.core.ephemeris_dynamics"],

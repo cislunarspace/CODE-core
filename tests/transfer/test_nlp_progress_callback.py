@@ -18,7 +18,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core import Orbit, CR3BP_System, CR3BP_Dynamics
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
 from e2m2e.transfer import DROTRONLPOptimizer, NLPOptimizationVariables
 
 
@@ -102,7 +102,7 @@ class TestCallbackInvoked:
             records.append((it, obj, alpha, T, tins))
 
         optimizer.set_progress_callback(cb)
-        result = optimizer.optimize(
+        optimizer.optimize(
             initial_guess=NLPOptimizationVariables(alpha=1.0, transfer_time=5.0, t_ins=3.0),
             alpha_range=(0.5, 2.5),
             transfer_time_range=(1.0, 20.0),
@@ -128,15 +128,11 @@ class TestCallbackInvoked:
         )
 
         for it, obj, alpha, T, tins in records:
-            assert isinstance(it, int) or isinstance(it, np.integer), (
-                f"iteration 应为 int, 实际 {type(it)}"
-            )
-            assert isinstance(obj, float) or isinstance(obj, np.floating), (
-                f"objective 应为 float, 实际 {type(obj)}"
-            )
-            assert isinstance(alpha, float) or isinstance(alpha, np.floating)
-            assert isinstance(T, float) or isinstance(T, np.floating)
-            assert isinstance(tins, float) or isinstance(tins, np.floating)
+            assert isinstance(it, (int, np.integer)), f"iteration 应为 int, 实际 {type(it)}"
+            assert isinstance(obj, (float, np.floating)), f"objective 应为 float, 实际 {type(obj)}"
+            assert isinstance(alpha, (float, np.floating))
+            assert isinstance(T, (float, np.floating))
+            assert isinstance(tins, (float, np.floating))
 
     def test_iteration_numbers_monotonically_increase(self, optimizer):
         records = []

@@ -120,8 +120,9 @@ class TestSetup:
         if result_orbit is not None:
             # 检查轨道周期是否接近目标周期
             target_period = 2 * t_half
-            assert abs(result_orbit.period - target_period) < 1e-4, \
+            assert abs(result_orbit.period - target_period) < 1e-4, (
                 f"周期误差过大: 期望 {target_period}, 实际 {result_orbit.period}"
+            )
             assert corrector.converged is True
         # 如果 result_orbit 为 None，可能是初始猜测导致发散，不强制失败
 

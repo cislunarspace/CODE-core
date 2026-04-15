@@ -8,10 +8,10 @@ v4.0 MBSE 重构：从 dataclass 迁移到 Pydantic BaseModel，获得运行时�
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import subprocess
-from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -51,7 +51,10 @@ def _detect_system_scale() -> float:
     # 优先级 3：通过 xrandr 查询实际显示器 DPI
     try:
         r = subprocess.run(
-            ["xrandr", "--query"], capture_output=True, text=True, timeout=3,
+            ["xrandr", "--query"],
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
         best_dpi = _STANDARD_DPI
         for line in r.stdout.splitlines():
@@ -77,10 +80,14 @@ def _detect_system_scale() -> float:
             # 查找物理尺寸（mm 单位，如 "345mm x 194mm"）
             mm_w = mm_h = None
             for i, p in enumerate(parts):
-                if (p.endswith("mm") and i + 2 < len(parts)
-                        and parts[i + 1] == "x" and parts[i + 2].endswith("mm")):
-                    mm_w = int(p.rstrip("mm"))
-                    mm_h = int(parts[i + 2].rstrip("mm"))
+                if (
+                    p.endswith("mm")
+                    and i + 2 < len(parts)
+                    and parts[i + 1] == "x"
+                    and parts[i + 2].endswith("mm")
+                ):
+                    mm_w = int(p.removesuffix("mm"))
+                    mm_h = int(parts[i + 2].removesuffix("mm"))
                     break
             if not mm_w or not mm_h or mm_w <= 0 or mm_h <= 0:
                 continue
@@ -105,45 +112,51 @@ _detected_scale = _detect_system_scale()
 # 检测系统缩放，若大于标准值则自动补丁 tkinter 以适配高 DPI
 if _detected_scale > 1.01:
     os.environ.setdefault("TK_SCALE", str(_detected_scale))
-    import tkinter as _tk
     import shutil as _shutil
+    import tkinter as _tk
+
     _tk_scaling_val = _detected_scale * 96.0 / 72.0
     _orig_tk_init = _tk.Tk.__init__
     _orig_toplevel_init = _tk.Toplevel.__init__
 
     def _patched_tk_init(self, *args, **kwargs):
         _orig_tk_init(self, *args, **kwargs)
-        try:
+        with contextlib.suppress(Exception):
             self.tk.call("tk", "scaling", _tk_scaling_val)
-        except Exception:
-            pass
 
     def _patched_toplevel_init(self, *args, **kwargs):
         _orig_toplevel_init(self, *args, **kwargs)
-        try:
+        with contextlib.suppress(Exception):
             self.tk.call("tk", "scaling", _tk_scaling_val)
-        except Exception:
-            pass
 
     _tk.Tk.__init__ = _patched_tk_init
     _tk.Toplevel.__init__ = _patched_toplevel_init
 
     if _shutil.which("zenity"):
         import tkinter.filedialog as _fd
+
         _orig_askopen = _fd.askopenfilename
         _orig_asksave = _fd.asksaveasfilename
 
-        def _zenity_save(title="Save file", initialdir=None, initialfile=None,
-                         filetypes=None, defaultextension=None, **kwargs):
+        def _zenity_save(
+            title="Save file",
+            initialdir=None,
+            initialfile=None,
+            filetypes=None,
+            defaultextension=None,
+            **kwargs,
+        ):
             cmd = ["zenity", "--file-selection", "--save", "--confirm-overwrite"]
             if title:
                 cmd.extend(["--title", title])
             if initialfile:
                 import pathlib as _p
+
                 d = _p.Path(initialdir) / initialfile if initialdir else _p.Path(initialfile)
                 cmd.extend(["--filename", str(d)])
             elif initialdir:
                 import pathlib as _p
+
                 cmd.extend(["--filename", str(_p.Path(initialdir) / "")])
             if filetypes:
                 for name, patterns in filetypes:
@@ -163,6 +176,7 @@ if _detected_scale > 1.01:
                 cmd.extend(["--title", title])
             if initialdir:
                 import pathlib as _p
+
                 cmd.extend(["--filename", str(_p.Path(initialdir) / "")])
             if filetypes:
                 for name, patterns in filetypes:
@@ -179,7 +193,7 @@ if _detected_scale > 1.01:
         _fd.asksaveasfilename = _zenity_save
         _fd.askopenfilename = _zenity_open
 
-import matplotlib
+import matplotlib  # noqa: E402
 
 
 class PlotConfig(BaseModel):
@@ -234,9 +248,9 @@ class PlotConfig(BaseModel):
     primary_body_size: int = 200
     secondary_body_color: str = "silver"
     secondary_body_size: int = 100
-    lp_colors: List[str] = Field(default_factory=lambda: ["gray"] * 5)
-    lp_markers: List[str] = Field(default_factory=lambda: ["^"] * 5)
-    lp_sizes: List[int] = Field(default_factory=lambda: [60] * 5)
+    lp_colors: list[str] = Field(default_factory=lambda: ["gray"] * 5)
+    lp_markers: list[str] = Field(default_factory=lambda: ["^"] * 5)
+    lp_sizes: list[int] = Field(default_factory=lambda: [60] * 5)
 
     # 线条和图像尺寸参数
     orbit_linewidth: float = 1.5
@@ -284,14 +298,16 @@ class PlotConfig(BaseModel):
         matplotlib.rcParams["legend.fancybox"] = True
         matplotlib.rcParams["legend.shadow"] = False
 
-        plt.rcParams.update({
-            "font.size": self.tick,
-            "axes.titlesize": self.title,
-            "axes.labelsize": self.label,
-            "xtick.labelsize": self.tick,
-            "ytick.labelsize": self.tick,
-            "legend.fontsize": self.legend,
-        })
+        plt.rcParams.update(
+            {
+                "font.size": self.tick,
+                "axes.titlesize": self.title,
+                "axes.labelsize": self.label,
+                "xtick.labelsize": self.tick,
+                "ytick.labelsize": self.tick,
+                "legend.fontsize": self.legend,
+            }
+        )
 
     def get_cmap(self):
         """获取配置指定的颜色映射对象。"""

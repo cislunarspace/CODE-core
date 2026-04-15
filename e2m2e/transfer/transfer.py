@@ -5,15 +5,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional, Tuple, Dict, Any
+from dataclasses import dataclass
 
 import numpy as np
 
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
-from ..core.system import CR3BP_System
-
 from . import transfer_optimization
 from .transfer_optimization import (
     DROTRONLPOptimizer,
@@ -76,18 +73,18 @@ class TransferOptimizationResult:
 
     success: bool = False
     message: str = ""
-    departure_state: Optional[np.ndarray] = None
+    departure_state: np.ndarray | None = None
     departure_alpha: float = 0.0
     departure_beta: float = 0.0
-    insertion_state: Optional[np.ndarray] = None
-    final_state: Optional[np.ndarray] = None
+    insertion_state: np.ndarray | None = None
+    final_state: np.ndarray | None = None
     delta_v1: float = 0.0
     delta_v2: float = 0.0
     total_delta_v: float = 0.0
     transfer_time: float = 0.0
     t_ins: float = 0.0
-    transfer_trajectory: Optional[np.ndarray] = None
-    transfer_trajectory_times: Optional[np.ndarray] = None
+    transfer_trajectory: np.ndarray | None = None
+    transfer_trajectory_times: np.ndarray | None = None
     constraints_violation: float = 0.0
 
 
@@ -123,18 +120,18 @@ class Transfer:
         self.system = dynamics.system
         self.mu = self.system.mu
 
-        self._departure_orbit: Optional[Orbit] = None
-        self._arrival_orbit: Optional[Orbit] = None
+        self._departure_orbit: Orbit | None = None
+        self._arrival_orbit: Orbit | None = None
         self._config = TransferConfig()
-        self._result: Optional[TransferOptimizationResult] = None
+        self._result: TransferOptimizationResult | None = None
 
     @property
-    def departure_orbit(self) -> Optional[Orbit]:
+    def departure_orbit(self) -> Orbit | None:
         """出发轨道（DRO）。"""
         return self._departure_orbit
 
     @property
-    def arrival_orbit(self) -> Optional[Orbit]:
+    def arrival_orbit(self) -> Orbit | None:
         """到达轨道（RO）。"""
         return self._arrival_orbit
 
@@ -144,11 +141,11 @@ class Transfer:
         return self._config
 
     @property
-    def result(self) -> Optional[TransferOptimizationResult]:
+    def result(self) -> TransferOptimizationResult | None:
         """最新优化结果。"""
         return self._result
 
-    def set_orbit(self, start: Orbit, end: Orbit) -> "Transfer":
+    def set_orbit(self, start: Orbit, end: Orbit) -> Transfer:
         """设置出发轨道和到达轨道
 
         Args:
@@ -164,12 +161,12 @@ class Transfer:
 
     def optimize(
         self,
-        initial_guess: Dict[str, float],
-        alpha_range: Tuple[float, float],
-        departure_state: Optional[np.ndarray] = None,
-        t_ins_range: Optional[Tuple[float, float]] = None,
-        use_relaxed_velocity: Optional[bool] = None,
-        velocity_angle_tol: Optional[float] = None,
+        initial_guess: dict[str, float],
+        alpha_range: tuple[float, float],
+        departure_state: np.ndarray | None = None,
+        t_ins_range: tuple[float, float] | None = None,
+        use_relaxed_velocity: bool | None = None,
+        velocity_angle_tol: float | None = None,
     ) -> TransferOptimizationResult:
         """优化转移轨迹
 

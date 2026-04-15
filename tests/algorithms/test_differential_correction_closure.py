@@ -7,10 +7,10 @@
 - closure_error 计算
 - orbit.is_periodic 标记
 - 轨道闭合性修正尝试
-- correction_success, correction_iterations, correction_error, correction_termination_reason, closure_error 等属性
+- correction_success, correction_iterations, correction_error,
+  correction_termination_reason, closure_error 等属性
 """
 
-import numpy as np
 import pytest
 
 import e2m2e
@@ -73,24 +73,26 @@ class TestClosureErrorAttribute:
 
     def test_corrected_orbit_has_closure_error_attribute(self, corrected_dro):
         """修正后的轨道应有 closure_error 属性"""
-        assert hasattr(corrected_dro, "closure_error"), \
-            "Orbit should have closure_error attribute"
+        assert hasattr(corrected_dro, "closure_error"), "Orbit should have closure_error attribute"
 
     def test_closure_error_is_float(self, corrected_dro):
         """closure_error 应该是浮点数类型"""
-        assert isinstance(corrected_dro.closure_error, float), \
+        assert isinstance(corrected_dro.closure_error, float), (
             f"closure_error should be float, got {type(corrected_dro.closure_error)}"
+        )
 
     def test_closure_error_is_positive(self, corrected_dro):
         """closure_error 应该为非负值"""
-        assert corrected_dro.closure_error >= 0, \
+        assert corrected_dro.closure_error >= 0, (
             f"closure_error should be non-negative, got {corrected_dro.closure_error}"
+        )
 
     def test_closure_error_reasonable_magnitude(self, corrected_dro):
         """成功的修正后，closure_error 应该在合理范围内"""
         # 成功的修正应该使 closure_error 非常小
-        assert corrected_dro.closure_error < 1e-6, \
+        assert corrected_dro.closure_error < 1e-6, (
             f"closure_error should be small after correction, got {corrected_dro.closure_error}"
+        )
 
 
 # ============================================================
@@ -101,20 +103,21 @@ class TestPeriodicFlag:
 
     def test_corrected_orbit_has_is_periodic_attribute(self, corrected_dro):
         """修正后的轨道应有 is_periodic 属性"""
-        assert hasattr(corrected_dro, "is_periodic"), \
-            "Orbit should have is_periodic attribute"
+        assert hasattr(corrected_dro, "is_periodic"), "Orbit should have is_periodic attribute"
 
     def test_is_periodic_is_bool(self, corrected_dro):
         """is_periodic 应该是布尔类型"""
-        assert isinstance(corrected_dro.is_periodic, bool), \
+        assert isinstance(corrected_dro.is_periodic, bool), (
             f"is_periodic should be bool, got {type(corrected_dro.is_periodic)}"
+        )
 
     def test_successful_correction_is_periodic(self, corrected_dro):
         """成功的修正后，轨道应该被标记为周期轨道"""
         # closure_error < 1e-8 时 is_periodic 应为 True
         if corrected_dro.closure_error < 1e-8:
-            assert corrected_dro.is_periodic is True, \
+            assert corrected_dro.is_periodic is True, (
                 "Orbit with small closure_error should be periodic"
+            )
 
     def test_large_closure_error_not_periodic(self, dynamics):
         """closure_error 较大时，轨道不应被标记为周期轨道"""
@@ -132,10 +135,10 @@ class TestPeriodicFlag:
 
         result = corrector.iterate_correction(bad_guess)
         # 如果返回了结果，检查 is_periodic
-        if result is not None and hasattr(result, 'closure_error'):
-            if result.closure_error >= 1e-8:
-                assert result.is_periodic is False, \
-                    "Orbit with large closure_error should not be periodic"
+        if result is not None and hasattr(result, "closure_error") and result.closure_error >= 1e-8:
+            assert result.is_periodic is False, (
+                "Orbit with large closure_error should not be periodic"
+            )
 
 
 # ============================================================
@@ -146,39 +149,47 @@ class TestCorrectionResultAttributes:
 
     def test_correction_success_attribute(self, corrected_dro):
         """轨道应有 correction_success 属性"""
-        assert hasattr(corrected_dro, "correction_success"), \
+        assert hasattr(corrected_dro, "correction_success"), (
             "Orbit should have correction_success attribute"
+        )
 
     def test_correction_iterations_attribute(self, corrected_dro):
         """轨道应有 correction_iterations 属性"""
-        assert hasattr(corrected_dro, "correction_iterations"), \
+        assert hasattr(corrected_dro, "correction_iterations"), (
             "Orbit should have correction_iterations attribute"
+        )
 
     def test_correction_iterations_is_int(self, corrected_dro):
         """correction_iterations 应该是整数类型"""
-        assert isinstance(corrected_dro.correction_iterations, int), \
+        assert isinstance(corrected_dro.correction_iterations, int), (
             f"correction_iterations should be int, got {type(corrected_dro.correction_iterations)}"
+        )
 
     def test_correction_iterations_non_negative(self, corrected_dro):
         """correction_iterations 应该为非负值"""
-        assert corrected_dro.correction_iterations >= 0, \
-            f"correction_iterations should be non-negative, got {corrected_dro.correction_iterations}"
+        assert corrected_dro.correction_iterations >= 0, (
+            f"correction_iterations should be non-negative,"
+            f" got {corrected_dro.correction_iterations}"
+        )
 
     def test_correction_error_attribute(self, corrected_dro):
         """轨道应有 correction_error 属性"""
-        assert hasattr(corrected_dro, "correction_error"), \
+        assert hasattr(corrected_dro, "correction_error"), (
             "Orbit should have correction_error attribute"
+        )
 
     def test_correction_termination_reason_attribute(self, corrected_dro):
         """轨道应有 correction_termination_reason 属性"""
-        assert hasattr(corrected_dro, "correction_termination_reason"), \
+        assert hasattr(corrected_dro, "correction_termination_reason"), (
             "Orbit should have correction_termination_reason attribute"
+        )
 
     def test_successful_correction_has_convergence_reason(self, corrected_dro):
         """成功的修正应该有收敛的 termination_reason"""
         if corrected_dro.correction_success:
-            assert corrected_dro.correction_termination_reason is not None, \
+            assert corrected_dro.correction_termination_reason is not None, (
                 "Successful correction should have termination_reason"
+            )
 
 
 # ============================================================
@@ -192,16 +203,18 @@ class TestOrbitStateIndependence:
         # 修改返回的 states 不应该影响内部的 propagation.y
         original_first_element = corrected_dro.states[0, 0]
         corrected_dro.states[0, 0] += 1.0
-        assert corrected_dro.states[0, 0] != original_first_element, \
+        assert corrected_dro.states[0, 0] != original_first_element, (
             "Modification to orbit states should affect the returned object"
+        )
 
     def test_orbit_times_independent(self, corrected_dro):
         """轨道的 times 数组应该是独立的副本"""
         original_first_element = corrected_dro.times[0]
         if len(corrected_dro.times) > 1:
             corrected_dro.times[0] += 1.0
-            assert corrected_dro.times[0] != original_first_element, \
+            assert corrected_dro.times[0] != original_first_element, (
                 "Modification to orbit times should affect the returned object"
+            )
 
 
 # ============================================================
@@ -214,14 +227,15 @@ class TestFamilyTypeInference:
         """2D 对称轨道应该被识别为 lyapunov 类型"""
         orbit = corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
         if orbit is not None:
-            assert orbit.family_type == "lyapunov", \
+            assert orbit.family_type == "lyapunov", (
                 f"2D orbit should have family_type='lyapunov', got {orbit.family_type}"
+            )
 
     def test_3d_orbit_family_type_halo(self, dynamics):
         """3D 对称轨道应该被识别为 halo 类型"""
         corrector = DifferentialCorrection(dynamics)
         corrector.setup_3D_symmetric_x_fixed_x0(x0=0.8)
-        
+
         # 创建 3D 初始猜测
         z0 = 0.01
         orbit = Orbit(
@@ -229,11 +243,12 @@ class TestFamilyTypeInference:
             times=[0],
         )
         orbit.period = 3.0
-        
+
         result = corrector.iterate_correction(orbit, verbose=False)
-        if result is not None and hasattr(result, 'family_type'):
-            assert result.family_type == "halo", \
+        if result is not None and hasattr(result, "family_type"):
+            assert result.family_type == "halo", (
                 f"3D orbit should have family_type='halo', got {result.family_type}"
+            )
 
 
 # ============================================================
@@ -244,20 +259,25 @@ class TestOrbitStateShape:
 
     def test_states_2d_array(self, corrected_dro):
         """轨道 states 应该是 2D 数组 (N, 6)"""
-        assert corrected_dro.states.ndim == 2, \
+        assert corrected_dro.states.ndim == 2, (
             f"states should be 2D array, got {corrected_dro.states.ndim}D"
-        assert corrected_dro.states.shape[1] == 6, \
+        )
+        assert corrected_dro.states.shape[1] == 6, (
             f"states should have 6 columns (x,y,z,vx,vy,vz), got {corrected_dro.states.shape[1]}"
+        )
 
     def test_times_1d_array(self, corrected_dro):
         """轨道 times 应该是 1D 数组"""
-        assert corrected_dro.times.ndim == 1, \
+        assert corrected_dro.times.ndim == 1, (
             f"times should be 1D array, got {corrected_dro.times.ndim}D"
+        )
 
     def test_states_and_times_same_length(self, corrected_dro):
         """states 和 times 应该有相同的长度"""
-        assert len(corrected_dro.states) == len(corrected_dro.times), \
-            f"states ({len(corrected_dro.states)}) and times ({len(corrected_dro.times)}) should have same length"
+        assert len(corrected_dro.states) == len(corrected_dro.times), (
+            f"states ({len(corrected_dro.states)}) and times"
+            f" ({len(corrected_dro.times)}) should have same length"
+        )
 
 
 # ============================================================
@@ -278,14 +298,14 @@ class TestBoundaryCases:
         corrector = DifferentialCorrection(dynamics)
         corrector.setup_2D_symmetric_x_fixed_x0(x0=0.3)
         corrector.max_iterations = 1
-        
+
         # 使用一个会失败的初始猜测
         bad_orbit = Orbit(
             states=[[0.3, 0.0, 0.0, 0.0, 10.0, 0.0]],
             times=[0],
         )
         bad_orbit.period = 0.01
-        
+
         result = corrector.iterate_correction(bad_orbit)
         # 应该返回 None
         assert result is None

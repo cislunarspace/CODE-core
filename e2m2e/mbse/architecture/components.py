@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -45,7 +44,7 @@ class ComponentRegistry:
     集中管理所有组件定义，支持按层、按接口查询。
     """
 
-    _instance: Optional[ComponentRegistry] = None
+    _instance: ComponentRegistry | None = None
     _components: dict[str, Component]
 
     def __new__(cls) -> ComponentRegistry:
@@ -81,9 +80,7 @@ class ComponentRegistry:
 
     def by_protocol(self, protocol_name: str) -> list[Component]:
         """按满足的 Protocol 接口筛选组件"""
-        return [
-            c for c in self._components.values() if protocol_name in c.protocols
-        ]
+        return [c for c in self._components.values() if protocol_name in c.protocols]
 
     def dependency_graph(self) -> dict[str, list[str]]:
         """构建组件依赖图

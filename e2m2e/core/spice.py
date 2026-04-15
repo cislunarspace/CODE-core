@@ -61,7 +61,6 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import Dict
 
 import numpy as np
 import numpy.typing as npt
@@ -70,40 +69,40 @@ import spiceypy
 # 常用天体的引力参数 GM（km³/s²）。
 # 键名为 NAIF 标准天体名称的大写形式。
 # 数值来源：JPL DE440 行星历表（TDB 时间框架）。
-_GM_VALUES: Dict[str, float] = {
+_GM_VALUES: dict[str, float] = {
     # 太阳
-    "SUN":     1.32712440018e11,
+    "SUN": 1.32712440018e11,
     # 内太阳系
     "MERCURY": 22031.868551,
-    "VENUS":   324858.592000,
-    "EARTH":   398600.435507,
-    "MOON":    4902.800118,
-    "MARS":    42828.375816,
+    "VENUS": 324858.592000,
+    "EARTH": 398600.435507,
+    "MOON": 4902.800118,
+    "MARS": 42828.375816,
     # 外太阳系
     "JUPITER": 126712764.100000,
-    "SATURN":  37940584.841800,
-    "URANUS":  5794556.400000,
+    "SATURN": 37940584.841800,
+    "URANUS": 5794556.400000,
     "NEPTUNE": 6836527.100580,
     # 质心
-    "EMB":     403503.235502,    # 地月质心（Earth-Moon Barycenter）
-    "PLUTO":   975.500000,       # 矮行星，供扩展使用
+    "EMB": 403503.235502,  # 地月质心（Earth-Moon Barycenter）
+    "PLUTO": 975.500000,  # 矮行星，供扩展使用
 }
 
 # 常用天体的 NAIF ID 映射表。
 # 用于将天体名称转换为 SPICE 所需的整数 ID。
-_NAIF_IDS: Dict[str, int] = {
-    "SUN":     10,
+_NAIF_IDS: dict[str, int] = {
+    "SUN": 10,
     "MERCURY": 199,
-    "VENUS":   299,
-    "EARTH":   399,
-    "MOON":    301,
-    "MARS":    499,
+    "VENUS": 299,
+    "EARTH": 399,
+    "MOON": 301,
+    "MARS": 499,
     "JUPITER": 599,
-    "SATURN":  699,
-    "URANUS":  799,
+    "SATURN": 699,
+    "URANUS": 799,
     "NEPTUNE": 899,
-    "EMB":     3,
-    "PLUTO":   999,
+    "EMB": 3,
+    "PLUTO": 999,
 }
 
 # 闰秒内核（.tls 文件）的搜索路径列表。
@@ -123,7 +122,7 @@ def _find_leapseconds_kernel():
     for search_dir in _LEAPSECOND_SEARCH_PATHS:
         if not search_dir or not os.path.isdir(search_dir):
             continue
-        for root, dirs, files in os.walk(search_dir):
+        for root, _dirs, files in os.walk(search_dir):
             for f in files:
                 if f.endswith(".tls"):
                     return os.path.join(root, f)

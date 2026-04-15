@@ -41,7 +41,7 @@ def fix_html_file(filepath: Path) -> int:
 
     # Match href="..." — capture the URL value (group 1)
     content = re.sub(
-        r'''href=["']([^"']*?)["']''',
+        r"""href=["']([^"']*?)["']""",
         replace_href,
         content,
     )

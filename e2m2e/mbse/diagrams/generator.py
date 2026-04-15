@@ -14,10 +14,9 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from ..architecture.components import ComponentRegistry
-from ..requirements.base import Requirement, RequirementCategory, RequirementRegistry
+from ..requirements.base import RequirementCategory, RequirementRegistry
 
 
 class DiagramGenerator:
@@ -28,13 +27,13 @@ class DiagramGenerator:
 
     def __init__(
         self,
-        requirements: Optional[RequirementRegistry] = None,
-        components: Optional[ComponentRegistry] = None,
+        requirements: RequirementRegistry | None = None,
+        components: ComponentRegistry | None = None,
     ):
         self.requirements = requirements or RequirementRegistry()
         self.components = components or ComponentRegistry()
 
-    def generate_bdd(self, layer: Optional[str] = None) -> str:
+    def generate_bdd(self, layer: str | None = None) -> str:
         """生成 BDD (Block Definition Diagram) — Mermaid classDiagram
 
         Args:
@@ -43,9 +42,7 @@ class DiagramGenerator:
         Returns:
             Mermaid classDiagram 语法字符串
         """
-        components = (
-            self.components.by_layer(layer) if layer else self.components.all()
-        )
+        components = self.components.by_layer(layer) if layer else self.components.all()
 
         lines = ["classDiagram"]
 
@@ -87,7 +84,7 @@ class DiagramGenerator:
             lines.append(f"        title: {req.title}")
             lines.append(f"        type: {type_label}")
             lines.append(f"        risk: {req.priority.value}")
-            lines.append(f"    }}")
+            lines.append("    }")
 
             # 父需求关系
             if req.parent:
@@ -130,14 +127,15 @@ class DiagramGenerator:
         return "\n".join(lines)
 
     def generate_activity(
-        self, name: str, steps: list[dict], decision_nodes: Optional[list[dict]] = None
+        self, name: str, steps: list[dict], decision_nodes: list[dict] | None = None
     ) -> str:
         """生成 Activity Diagram — Mermaid flowchart
 
         Args:
             name: 活动名称
             steps: 步骤列表 [{"id": str, "label": str, "type": "process|io|start|end"}]
-            decision_nodes: 决策节点 [{"id": str, "label": str, "branches": [{"target": str, "condition": str}]}]
+            decision_nodes: 决策节点
+                [{"id": str, "label": str, "branches": [{"target": str, "condition": str}]}]
 
         Returns:
             Mermaid flowchart 语法字符串
@@ -149,9 +147,7 @@ class DiagramGenerator:
             label = step["label"]
             step_type = step.get("type", "process")
 
-            if step_type == "start":
-                lines.append(f"    {step_id}([{label}])")
-            elif step_type == "end":
+            if step_type == "start" or step_type == "end":
                 lines.append(f"    {step_id}([{label}])")
             elif step_type == "io":
                 lines.append(f"    {step_id}[/{label}/]")

@@ -6,21 +6,22 @@
 """
 
 from __future__ import annotations
+
 import numpy as np
-from typing import List, Optional, Dict, Tuple, Any
+
+from ..core.dynamics import CR3BP_Dynamics
+from ..core.orbit import Orbit, OrbitFamily
 from .differential_correction import (
     DifferentialCorrection,
     compute_halo_initial_guess,
 )
-from ..core.orbit import OrbitFamily, Orbit
-from ..core.dynamics import CR3BP_Dynamics
 
 
 def compute_F_and_dF_symmetric_xz_plane(
     X: np.ndarray,
     SV0: np.ndarray,
     dynamics: CR3BP_Dynamics,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """计算XZ平面对称轨道的约束向量和雅可比矩阵
 
     对应MATLAB: computeFdF_symPeriodicPlanes_CR3BP(X, SV0i, mu, plane=13)
@@ -145,7 +146,7 @@ class Continuation:
     def __init__(
         self,
         corrector: DifferentialCorrection,
-        step: Optional[float] = None,
+        step: float | None = None,
     ) -> None:
         """初始化延拓器
 
@@ -226,14 +227,16 @@ class Continuation:
         if step_size > self.max_step_size:
             if verbose:
                 print(
-                    f"警告: 输入步长 {step_size} 超过最大限制 {self.max_step_size}，限制为 {self.max_step_size}"
+                    f"警告: 输入步长 {step_size} 超过最大限制"
+                    f" {self.max_step_size}，限制为 {self.max_step_size}"
                 )
             step_size = self.max_step_size
 
         if step_size < self.min_step_size:
             if verbose:
                 print(
-                    f"警告: 输入步长 {step_size} 小于最小限制 {self.min_step_size}，限制为 {self.min_step_size}"
+                    f"警告: 输入步长 {step_size} 小于最小限制"
+                    f" {self.min_step_size}，限制为 {self.min_step_size}"
                 )
             step_size = self.min_step_size
 
@@ -301,8 +304,12 @@ class Continuation:
 
                     if (i + 1) % 10 == 0:
                         if verbose:
+                            param_val = (
+                                orbit.states[0, param_index] if param_index < 6 else orbit.period
+                            )
                             print(
-                                f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}"
+                                f"  第 {i + 1} 条轨道，参数值={param_val:.6f}，"
+                                f"周期={orbit.period:.4f}"
                             )
                         else:
                             print(f"  正向延拓进度：已完成 {i + 1} 条轨道")
@@ -366,8 +373,12 @@ class Continuation:
 
                     if (i + 1) % 10 == 0:
                         if verbose:
+                            param_val = (
+                                orbit.states[0, param_index] if param_index < 6 else orbit.period
+                            )
                             print(
-                                f"  第 {i + 1} 条轨道，参数值={orbit.states[0, param_index] if param_index < 6 else orbit.period:.6f}，周期={orbit.period:.4f}"
+                                f"  第 {i + 1} 条轨道，参数值={param_val:.6f}，"
+                                f"周期={orbit.period:.4f}"
                             )
                         else:
                             print(f"  反向延拓进度：已完成 {i + 1} 条轨道")
@@ -405,7 +416,7 @@ class Continuation:
         all_orbits_with_steps.sort(key=sort_key)
 
         orbit_family.orbits = []
-        for orbit, step in all_orbits_with_steps:
+        for orbit, _step in all_orbits_with_steps:
             orbit_family.add_orbit(orbit)
 
         if verbose:
@@ -479,7 +490,7 @@ class Continuation:
         _, dF = compute_F_and_dF_symmetric_xz_plane(X, SV0i, dynamics)
         Xdot = compute_tangent_vector(dF)
 
-        family_states: List[np.ndarray] = [SV0i.copy()]
+        family_states: list[np.ndarray] = [SV0i.copy()]
 
         if verbose:
             print(f"\n初始自由变量 X = [{X[0]:.6f}, {X[1]:.6f}, {X[2]:.6f}, {X[3]:.6f}]")
@@ -495,10 +506,7 @@ class Continuation:
 
             delta_dir = ds * Xdot
             if directional_increment:
-                if td * delta_dir[tv] > 0:
-                    Xnew = X + ds * Xdot
-                else:
-                    Xnew = X - ds * Xdot
+                Xnew = X + ds * Xdot if td * delta_dir[tv] > 0 else X - ds * Xdot
             else:
                 Xnew = X + ds * Xdot
 
@@ -625,7 +633,8 @@ class Continuation:
 
                 if verbose and (n + 1) % 5 == 0:
                     print(
-                        f"  轨道 {n + 1}: x0={orbit.states[0, 0]:.4f}, z0={orbit.states[0, 2]:.4f}, T={orbit.period:.4f}"
+                        f"  轨道 {n + 1}: x0={orbit.states[0, 0]:.4f},"
+                        f" z0={orbit.states[0, 2]:.4f}, T={orbit.period:.4f}"
                     )
             else:
                 if verbose:
@@ -704,10 +713,7 @@ class Continuation:
             halo_class=halo_class,
         )
 
-        if halo_class == 0:
-            initial_z = amplitude_z
-        else:
-            initial_z = -amplitude_z
+        initial_z = amplitude_z if halo_class == 0 else -amplitude_z
 
         initial_state = np.array(
             [
@@ -766,7 +772,7 @@ class Continuation:
         n_orbits: int = 50,
         direction: str = "positive",
         step_size: float = 0.001,
-    ) -> List[Orbit]:
+    ) -> list[Orbit]:
         """生成Halo轨道族
 
         使用自然参数延拓法生成Halo轨道族。
@@ -826,7 +832,7 @@ class Continuation:
         n_orbits: int = 50,
         direction: str = "both",
         step_size: float = 0.0045,
-        step_size_negative: Optional[float] = None,
+        step_size_negative: float | None = None,
         verbose: bool = True,
         TolPAL: float = 1e-6,
         TolDiffCorr: float = 1e-6,
@@ -894,7 +900,7 @@ class Continuation:
             z0 = float(orb.states[0, 2])
             orb.parameters["amplitude_z"] = abs(z0)
 
-        branches: List[Tuple[str, float, int, int]] = []
+        branches: list[tuple[str, float, int, int]] = []
         if direction in ("positive", "both"):
             branches.append(("positive", step_size, 1, 1))
         if direction in ("negative", "both"):

@@ -348,8 +348,9 @@ def ro_orbit(ro_file):
 
 @pytest.fixture
 def dynamics():
-    from e2m2e.core import CR3BP_System, CR3BP_Dynamics
     from scripts.utils.common import MU
+
+    from e2m2e.core import CR3BP_Dynamics, CR3BP_System
 
     system = CR3BP_System(mu=MU, primary="earth", secondary="moon")
     dyn = CR3BP_Dynamics(system=system)

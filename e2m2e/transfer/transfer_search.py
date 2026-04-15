@@ -22,9 +22,9 @@ import os
 import queue
 import sys
 import threading
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from typing import Tuple, List, Optional, Dict, Any
 import warnings
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from typing import Any
 
 import numpy as np
 from tqdm.auto import tqdm
@@ -35,7 +35,7 @@ class _AggregatePbarWithSlot:
 
     __slots__ = ("_inner", "_lock", "_slot")
 
-    def __init__(self, inner: Any, lock: Optional[threading.Lock], slot: int) -> None:
+    def __init__(self, inner: Any, lock: threading.Lock | None, slot: int) -> None:
         self._inner = inner
         self._lock = lock
         self._slot = slot
@@ -56,15 +56,14 @@ class _AggregatePbarWithSlot:
             self._inner.set_postfix_str(merged, refresh=refresh)
 
 
-from ..core.orbit import Orbit
-from ..core.dynamics import CR3BP_Dynamics
-from ..core.system import CR3BP_System
-
-from .search_config import SearchConfig
-from .transfer_optimization import (
+from ..core.dynamics import CR3BP_Dynamics  # noqa: E402
+from ..core.orbit import Orbit  # noqa: E402
+from ..core.system import CR3BP_System  # noqa: E402
+from .search_config import SearchConfig  # noqa: E402
+from .transfer_optimization import (  # noqa: E402
     DROTRONLPOptimizer,
-    NLPOptimizationVariables,
     NLPOptimizationResult,
+    NLPOptimizationVariables,
 )
 
 DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / CR3BP_System.EARTH_MOON_DISTANCE_KM
@@ -94,7 +93,7 @@ class TransferSearch:
     """
 
     # --- 搜索配置属性名（与 SearchConfig 字段一一对应） ---
-    _CONFIG_FIELDS: Tuple[str, ...] = (
+    _CONFIG_FIELDS: tuple[str, ...] = (
         "alpha_min",
         "alpha_max",
         "n_alpha",
@@ -115,7 +114,7 @@ class TransferSearch:
         self,
         dynamics: CR3BP_Dynamics,
         name: str = "TransferSearch",
-        config: Optional[SearchConfig] = None,
+        config: SearchConfig | None = None,
     ):
         self.system = dynamics.system
         # dynamics 类型说明：
@@ -124,9 +123,9 @@ class TransferSearch:
         self.dynamics: CR3BP_Dynamics = dynamics
         self.mu = self.system.mu
         self.name = name
-        self._departure_orbit: Optional[Orbit] = None
-        self._arrival_orbit: Optional[Orbit] = None
-        self._search_results: Optional[List[Dict[str, Any]]] = None
+        self._departure_orbit: Orbit | None = None
+        self._arrival_orbit: Orbit | None = None
+        self._search_results: list[dict[str, Any]] | None = None
         self._optimized_result: Any = None
         self._verbose = True
         self._n_workers = None
@@ -159,17 +158,17 @@ class TransferSearch:
         else:
             super().__setattr__(name, value)
 
-    def set_verbose(self, verbose: bool) -> "TransferSearch":
+    def set_verbose(self, verbose: bool) -> TransferSearch:
         """设置是否输出详细信息"""
         self._verbose = verbose
         return self
 
-    def set_n_workers(self, n_workers: int) -> "TransferSearch":
+    def set_n_workers(self, n_workers: int) -> TransferSearch:
         """设置并行worker数量"""
         self._n_workers = n_workers
         return self
 
-    def set_parallel_backend(self, backend: str) -> "TransferSearch":
+    def set_parallel_backend(self, backend: str) -> TransferSearch:
         """设置并行后端：``processes``（默认，多进程）或 ``threads``（多线程）。"""
         b = backend.strip().lower()
         if b not in ("processes", "threads"):
@@ -177,15 +176,16 @@ class TransferSearch:
         self._parallel_backend = b
         return self
 
-    def configure_search(self, **kwargs) -> "TransferSearch":
+    def configure_search(self, **kwargs) -> TransferSearch:
         """配置搜索参数（向后兼容，推荐直接设置实例属性）"""
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
         return self
 
-    def _is_feasible(self, result: Dict[str, Any]) -> bool:
-        """可行候选：无碰撞，且（相交 / 全局最小距离或局部极小距离小于 ``min_distance_threshold``）。"""
+    def _is_feasible(self, result: dict[str, Any]) -> bool:
+        """可行候选：无碰撞，且（相交 / 全局最小距离或局部极小距离小于
+        ``min_distance_threshold``）。"""
         mdt = self.min_distance_threshold
         if mdt is None:
             mdt = DEFAULT_MIN_DISTANCE_THRESHOLD_DU
@@ -197,11 +197,9 @@ class TransferSearch:
             return True
         if md < mdt:
             return True
-        if result.get("local_minimum_found", False) and lmd < mdt:
-            return True
-        return False
+        return bool(result.get("local_minimum_found", False) and lmd < mdt)
 
-    def get_feasible_results(self) -> List[Dict[str, Any]]:
+    def get_feasible_results(self) -> list[dict[str, Any]]:
         """获取所有可行搜索结果"""
         if self._search_results is None:
             return []
@@ -220,12 +218,12 @@ class TransferSearch:
         collision_earth_radius: float,
         collision_moon_radius: float,
         integration_dt: float,
-        departure_orbit: Optional[Orbit] = None,
-        arrival_orbit: Optional[Orbit] = None,
+        departure_orbit: Orbit | None = None,
+        arrival_orbit: Orbit | None = None,
         verbose: bool = True,
-        n_workers: Optional[int] = None,
+        n_workers: int | None = None,
         parallel_backend: str = "processes",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """执行网格搜索
 
         Args:
@@ -270,7 +268,7 @@ class TransferSearch:
 
         if verbose:
             print(f"\n{'=' * 60}")
-            print(f"转移轨道网格搜索")
+            print("转移轨道网格搜索")
             print(f"{'=' * 60}")
             print(f"出发点: {dep_orbit}")
             print(f"目标: {arr_orbit}")
@@ -291,14 +289,14 @@ class TransferSearch:
         if verbose:
             feasible = [r for r in results if self._is_feasible(r)]
             print(f"\n{'=' * 60}")
-            print(f"搜索完成")
+            print("搜索完成")
             print(f"  总候选解: {len(results)}")
             print(f"  可行解: {len(feasible)}")
             print(f"{'=' * 60}")
 
         return results
 
-    def optimize(self, initial_guess: Optional[Dict[str, Any]] = None) -> "NLPOptimizationResult":
+    def optimize(self, initial_guess: dict[str, Any] | None = None) -> NLPOptimizationResult:
         """执行优化
 
         Args:
@@ -313,10 +311,7 @@ class TransferSearch:
         if initial_guess is None:
             if self._search_results:
                 feasible = self.get_feasible_results()
-                if feasible:
-                    initial_guess = feasible[0]
-                else:
-                    initial_guess = self._search_results[0]
+                initial_guess = feasible[0] if feasible else self._search_results[0]
             else:
                 raise ValueError("必须提供initial_guess或先运行search()")
 
@@ -352,16 +347,16 @@ class TransferSearch:
         departure_orbit: Orbit,
         arrival_orbit: Orbit,
         verbose: bool,
-        n_workers: Optional[int],
+        n_workers: int | None,
         parallel_backend: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """执行网格搜索的内部方法"""
         dep_name = getattr(departure_orbit, "name", "unknown")
         arr_name = getattr(arrival_orbit, "name", "unknown")
 
         # //TODO 这是什么？
         departure_states, departure_times = self._sample_departure_points(departure_orbit)
-        total_departures = len(departure_states)
+        len(departure_states)
 
         if n_workers is None:
             n_workers = multiprocessing.cpu_count()
@@ -400,7 +395,7 @@ class TransferSearch:
                 n_workers,
             )
 
-    def _sample_departure_points(self, departure_orbit: Orbit) -> Tuple[np.ndarray, np.ndarray]:
+    def _sample_departure_points(self, departure_orbit: Orbit) -> tuple[np.ndarray, np.ndarray]:
         """从星历中均匀下采样出发点：直接使用 ``Orbit.states`` / ``Orbit.times`` 已有行，不积分。
 
         要求 ``n_departure <= len(times)``，否则报错。
@@ -418,7 +413,8 @@ class TransferSearch:
             raise ValueError("n_departure 须为正整数")
         if n > n_pts:
             raise ValueError(
-                f"n_departure（{n}）不能大于出发轨道星历点数（{n_pts}），请减小 n_departure 或增加星历密度"
+                f"n_departure（{n}）不能大于出发轨道星历点数（{n_pts}），"
+                f"请减小 n_departure 或增加星历密度"
             )
 
         n_sample = n
@@ -433,7 +429,7 @@ class TransferSearch:
 
         return states[idx].copy(), times[idx].copy()
 
-    def _open_search_progress_bar(self, total: int, desc: str) -> Optional[Any]:
+    def _open_search_progress_bar(self, total: int, desc: str) -> Any | None:
         """``total <= 0`` 时返回 None。"""
         if total <= 0:
             return None
@@ -448,7 +444,8 @@ class TransferSearch:
 
     @staticmethod
     def _use_multiline_worker_tqdm(n_workers: int) -> bool:
-        """非 TTY 用单行总进度；否则可分槽多行。环境变量 ``E2M2E_TQDM_MULTILINE`` 可强制开/关；槽数>32 只用单行。"""
+        """非 TTY 用单行总进度；否则可分槽多行。
+        环境变量 ``E2M2E_TQDM_MULTILINE`` 可强制开/关；槽数>32 只用单行。"""
         env = os.environ.get("E2M2E_TQDM_MULTILINE", "").strip().lower()
         if env in ("0", "false", "no", "off"):
             return False
@@ -467,7 +464,7 @@ class TransferSearch:
             bar.n = 0
             bar.total = total
 
-    def _open_parallel_worker_progress_bars(self, n_workers: int, n_alpha: int) -> List[Any]:
+    def _open_parallel_worker_progress_bars(self, n_workers: int, n_alpha: int) -> list[Any]:
         """每槽一行，每行 ``n_alpha`` 步。"""
         return [
             tqdm(
@@ -485,16 +482,16 @@ class TransferSearch:
 
     def _run_departure_with_worker_slot(
         self,
-        slot_queue: "queue.Queue[int]",
+        slot_queue: queue.Queue[int],
         n_alpha: int,
         departure_index: int,
         departure_state: np.ndarray,
         departure_time: float,
         arrival_orbit: Orbit,
-        worker_bars: Optional[List[Any]],
-        aggregate_pbar: Optional[Any],
-        aggregate_lock: Optional[threading.Lock],
-    ) -> List[Dict[str, Any]]:
+        worker_bars: list[Any] | None,
+        aggregate_pbar: Any | None,
+        aggregate_lock: threading.Lock | None,
+    ) -> list[dict[str, Any]]:
         """取槽 → 跑单出发点 α 网格 → 还槽。``worker_bars`` 与 ``aggregate_pbar`` 二选一。"""
         slot = slot_queue.get()
         try:
@@ -526,7 +523,7 @@ class TransferSearch:
         dep_name: str,
         arr_name: str,
         verbose: bool,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """串行网格搜索"""
         all_results = []
         total_departures = len(departure_states)
@@ -543,7 +540,9 @@ class TransferSearch:
             print(f"  总迭代步数: {total_steps}（出发点 × α），无进度条", flush=True)
 
         try:
-            for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times)):
+            for i, (dep_state, dep_time) in enumerate(
+                zip(departure_states, departure_times, strict=False)
+            ):
                 results = self._search_single_departure(
                     dep_state,
                     dep_time,
@@ -571,7 +570,7 @@ class TransferSearch:
         arr_name: str,
         verbose: bool,
         n_workers: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """多进程并行：每进程独立 Python 解释器，利于 CPU 密集积分。"""
         total_departures = len(departure_states)
         n_alpha_v = self.n_alpha
@@ -579,22 +578,23 @@ class TransferSearch:
             raise ValueError("n_alpha 未设置")
         n_alpha = int(n_alpha_v)
         total_steps = total_departures * n_alpha
-        all_results: List[Dict[str, Any]] = []
+        all_results: list[dict[str, Any]] = []
 
         arrival_states = np.asarray(arrival_orbit.states)
         arrival_times_a = np.asarray(arrival_orbit.times)
         ap = getattr(arrival_orbit, "period", None)
-        arrival_period: Optional[float] = float(ap) if ap is not None else None
+        arrival_period: float | None = float(ap) if ap is not None else None
 
         pbar = None
-        progress_queue: Optional[Any] = None
-        progress_manager: Optional[Any] = None
-        poll_stop: Optional[threading.Event] = None
-        poll_thread: Optional[threading.Thread] = None
+        progress_queue: Any | None = None
+        progress_manager: Any | None = None
+        poll_stop: threading.Event | None = None
+        poll_thread: threading.Thread | None = None
 
         if verbose and total_steps > 0:
             tqdm.write(
-                f"  并行搜索(进程): {total_departures}×{n_alpha}={total_steps} 步 | {n_workers} 进程"
+                f"  并行搜索(进程): {total_departures}×{n_alpha}"
+                f"={total_steps} 步 | {n_workers} 进程"
             )
             pbar = self._open_search_progress_bar(total_steps, "并行网格搜索(进程)")
             # 多进程下主进程无法把 tqdm 传入子进程；子进程每 α 步向队列 put，主进程消费更新总条。
@@ -673,7 +673,9 @@ class TransferSearch:
         try:
             with ProcessPoolExecutor(max_workers=n_workers) as executor:
                 futures = {}
-                for i, (dep_state, dep_time) in enumerate(zip(departure_states, departure_times)):
+                for i, (dep_state, dep_time) in enumerate(
+                    zip(departure_states, departure_times, strict=False)
+                ):
                     packed = (
                         (
                             i,
@@ -724,7 +726,7 @@ class TransferSearch:
         arr_name: str,
         verbose: bool,
         n_workers: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """多线程并行：支持细粒度 tqdm；受 GIL 限制，CPU 利用率常低于多进程。
 
         每个出发点调用 `_search_single_departure`。抛错时跳过该点，verbose 下打印。
@@ -735,23 +737,25 @@ class TransferSearch:
             raise ValueError("n_alpha 未设置")
         n_alpha = int(n_alpha_v)
         total_steps = total_departures * n_alpha
-        all_results: List[Dict[str, Any]] = []
+        all_results: list[dict[str, Any]] = []
 
-        worker_bars: Optional[List[Any]] = None
-        aggregate_pbar: Optional[Any] = None
-        aggregate_lock: Optional[threading.Lock] = None
-        slot_queue: Optional["queue.Queue[int]"] = None
+        worker_bars: list[Any] | None = None
+        aggregate_pbar: Any | None = None
+        aggregate_lock: threading.Lock | None = None
+        slot_queue: queue.Queue[int] | None = None
 
         if verbose and total_steps > 0:
             use_multiline = self._use_multiline_worker_tqdm(n_workers)
             if use_multiline:
                 tqdm.write(
-                    f"  并行搜索: {total_departures}×{n_alpha}={total_steps} 步 | {n_workers} 槽（分槽）"
+                    f"  并行搜索: {total_departures}×{n_alpha}"
+                    f"={total_steps} 步 | {n_workers} 槽（分槽）"
                 )
                 worker_bars = self._open_parallel_worker_progress_bars(n_workers, n_alpha)
             else:
                 tqdm.write(
-                    f"  并行搜索: {total_departures}×{n_alpha}={total_steps} 步 | {n_workers} 槽（单行）"
+                    f"  并行搜索: {total_departures}×{n_alpha}"
+                    f"={total_steps} 步 | {n_workers} 槽（单行）"
                 )
                 aggregate_lock = threading.Lock()
                 aggregate_pbar = self._open_search_progress_bar(total_steps, "并行网格搜索")
@@ -776,7 +780,7 @@ class TransferSearch:
                             None,
                         ): i
                         for i, (dep_state, dep_time) in enumerate(
-                            zip(departure_states, departure_times)
+                            zip(departure_states, departure_times, strict=False)
                         )
                     }
                 elif aggregate_pbar is not None and slot_queue is not None:
@@ -794,7 +798,7 @@ class TransferSearch:
                             aggregate_lock,
                         ): i
                         for i, (dep_state, dep_time) in enumerate(
-                            zip(departure_states, departure_times)
+                            zip(departure_states, departure_times, strict=False)
                         )
                     }
                 else:
@@ -809,7 +813,7 @@ class TransferSearch:
                             i,
                         ): i
                         for i, (dep_state, dep_time) in enumerate(
-                            zip(departure_states, departure_times)
+                            zip(departure_states, departure_times, strict=False)
                         )
                     }
 
@@ -838,10 +842,10 @@ class TransferSearch:
         departure_time: float,
         arrival_orbit: Orbit,
         verbose: bool = False,
-        pbar: Optional[Any] = None,
-        departure_index: Optional[int] = None,
-        progress_queue: Optional[Any] = None,
-    ) -> List[Dict[str, Any]]:
+        pbar: Any | None = None,
+        departure_index: int | None = None,
+        progress_queue: Any | None = None,
+    ) -> list[dict[str, Any]]:
         """对单个出发点搜索 α 网格
 
         Args:
@@ -948,9 +952,7 @@ class TransferSearch:
 
                     if collision:
                         result["status"] = "collision"
-                    elif intersection:
-                        result["status"] = "success"
-                    elif min_dist < mdt:
+                    elif intersection or min_dist < mdt:
                         result["status"] = "success"
                     else:
                         result["status"] = "no_intersection"
@@ -973,7 +975,7 @@ class TransferSearch:
 
         r_xy = np.sqrt(pos[0] ** 2 + pos[1] ** 2)
         if r_xy < 1e-10:
-            warnings.warn("位置靠近原点，使用原始速度")
+            warnings.warn("位置靠近原点，使用原始速度", stacklevel=2)
             return vel.copy()
 
         tangential = np.array([-pos[1], pos[0], 0.0]) / r_xy
@@ -990,7 +992,7 @@ class TransferSearch:
         initial_state: np.ndarray,
         transfer_time: float,
         dt: float,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """在 CR3BP 下从 ``initial_state`` 前向积分到 ``transfer_time``，得到等间隔采样轨迹。
 
         使用 ``self.dynamics.propagate``（``solve_ivp`` + 稠密 ``t_eval``）。``with_stm=False``、
@@ -1022,7 +1024,7 @@ class TransferSearch:
 
     def _compute_min_distance(
         self, trajectory_states: np.ndarray, arrival_orbit: Orbit
-    ) -> Tuple[float, int, int]:
+    ) -> tuple[float, int, int]:
         """计算轨迹到目标轨道的最小距离及最近点（轨迹步、目标轨道采样下标）。"""
         traj_positions = trajectory_states[:, :3]
         orbit_positions = arrival_orbit.states[:, :3]
@@ -1042,7 +1044,7 @@ class TransferSearch:
 
     def compute_min_distance_to_orbit(
         self, trajectory_states: np.ndarray, arrival_orbit: Orbit
-    ) -> Tuple[float, int]:
+    ) -> tuple[float, int]:
         """轨迹到目标轨道的最小距离及对应轨迹步索引（公开 API）。"""
         md, si, _ = self._compute_min_distance(trajectory_states, arrival_orbit)
         return md, si
@@ -1052,7 +1054,7 @@ class TransferSearch:
         trajectory_states: np.ndarray,
         arrival_orbit: Orbit,
         threshold: float,
-    ) -> Tuple[bool, Optional[np.ndarray], int]:
+    ) -> tuple[bool, np.ndarray | None, int]:
         """检测轨迹是否与目标轨道相交"""
         min_dist, step_idx, _ = self._compute_min_distance(trajectory_states, arrival_orbit)
 
@@ -1065,9 +1067,10 @@ class TransferSearch:
         self,
         trajectory_states: np.ndarray,
         arrival_orbit: Orbit,
-        threshold: Optional[float] = None,
-    ) -> Tuple[bool, np.ndarray, int]:
-        """检测轨迹是否与目标轨道相交（与 ``_detect_intersection`` 相同，默认使用 ``intersection_threshold``）。"""
+        threshold: float | None = None,
+    ) -> tuple[bool, np.ndarray, int]:
+        """检测轨迹是否与目标轨道相交（与 ``_detect_intersection`` 相同，
+        默认使用 ``intersection_threshold``）。"""
         ith = threshold if threshold is not None else self.intersection_threshold
         if ith is None:
             raise ValueError("intersection_threshold 未设置且未传入 threshold")
@@ -1080,7 +1083,7 @@ class TransferSearch:
         self,
         trajectory_states: np.ndarray,
         arrival_orbit: Orbit,
-    ) -> Tuple[bool, float, int]:
+    ) -> tuple[bool, float, int]:
         """检测轨迹到目标轨道的距离是否出现局部最小"""
         traj_positions = trajectory_states[:, :3]
         orbit_positions = arrival_orbit.states[:, :3]
@@ -1103,7 +1106,7 @@ class TransferSearch:
     def _check_collision(
         self,
         trajectory_states: np.ndarray,
-    ) -> Tuple[bool, Optional[str], int]:
+    ) -> tuple[bool, str | None, int]:
         """检测轨迹是否与地球或月球碰撞"""
         positions = trajectory_states[:, :3]
 
@@ -1134,7 +1137,7 @@ def _process_departure_worker(
     dep_time: float,
     arrival_states: np.ndarray,
     arrival_times: np.ndarray,
-    arrival_period: Optional[float],
+    arrival_period: float | None,
     mu: float,
     alpha_min: float,
     alpha_max: float,
@@ -1152,8 +1155,8 @@ def _process_departure_worker(
     max_step: float,
     dep_name: str,
     arr_name: str,
-    progress_queue: Optional[Any] = None,
-) -> List[Dict[str, Any]]:
+    progress_queue: Any | None = None,
+) -> list[dict[str, Any]]:
     """子进程入口（模块级，便于 Windows spawn 下 pickle）。"""
     arrival_orbit = Orbit(states=arrival_states, times=arrival_times)
     if arrival_period is not None:
@@ -1194,7 +1197,7 @@ def _process_departure_worker(
     return results
 
 
-def _process_departure_worker_packed(packed: Tuple[Any, ...]) -> List[Dict[str, Any]]:
+def _process_departure_worker_packed(packed: tuple[Any, ...]) -> list[dict[str, Any]]:
     """单元组打包，供 ``ProcessPoolExecutor`` 提交。"""
     return _process_departure_worker(*packed)
 
@@ -1208,7 +1211,7 @@ def load_orbit_from_json(filepath: str) -> Orbit:
     Returns:
         Orbit 对象
     """
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         data = json.load(f)
 
     states = np.array(data["states"])

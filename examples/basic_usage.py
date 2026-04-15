@@ -6,8 +6,9 @@ e2m2e 基础使用示例
 """
 
 import numpy as np
-from e2m2e.core.system import CR3BP_System
+
 from e2m2e.core.dynamics import CR3BP_Dynamics
+from e2m2e.core.system import CR3BP_System
 
 
 def main():

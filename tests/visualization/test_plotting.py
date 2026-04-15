@@ -4,15 +4,16 @@ OrbitVisualizer 和 FamilyPlotter 类测试
 测试轨道可视化器的核心功能，包括3D轨道族绘图功能。
 """
 
-import numpy as np
-import pytest
 import os
 import tempfile
+
 import matplotlib
+import numpy as np
+import pytest
 
 matplotlib.use("Agg")  # 使用非交互式后端
 
-from e2m2e.core import Orbit, OrbitFamily, CR3BP_System
+from e2m2e.core import CR3BP_System, Orbit, OrbitFamily
 from e2m2e.visualization.base import OrbitVisualizer
 from e2m2e.visualization.family import FamilyPlotter
 
@@ -58,7 +59,7 @@ class TestPlot3DOrbitFamily:
         family = OrbitFamily(family_type="test")
 
         # 创建3条简单的测试轨道
-        for i in range(3):
+        for _i in range(3):
             # 创建椭圆形状的测试状态
             t = np.linspace(0, 2 * np.pi, 50)
             x = 0.9 + 0.1 * np.cos(t)
@@ -95,6 +96,7 @@ class TestPlot3DOrbitFamily:
         assert ax is not None
         assert ax.name == "3d"
         import matplotlib.pyplot as plt
+
         plt.close("all")
 
     def test_plot_3d_orbit_family_with_save(self, sample_system, sample_family):
@@ -116,6 +118,7 @@ class TestPlot3DOrbitFamily:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
             import matplotlib.pyplot as plt
+
             plt.close("all")
 
     def test_plot_3d_orbit_family_empty(self, sample_system):
@@ -128,6 +131,7 @@ class TestPlot3DOrbitFamily:
         # 空族可能返回 None 或空坐标轴
         assert ax is None or ax.name == "3d"
         import matplotlib.pyplot as plt
+
         plt.close("all")
 
     def test_plot_3d_orbit_family_single_orbit(self, sample_system):
@@ -161,6 +165,7 @@ class TestPlot3DOrbitFamily:
 
         assert ax is not None
         import matplotlib.pyplot as plt
+
         plt.close("all")
 
     def test_plot_3d_orbit_family_custom_view(self, sample_system, sample_family):
@@ -185,6 +190,7 @@ class TestPlot3DOrbitFamily:
         assert ylim[1] - ylim[0] == pytest.approx(1.0, abs=0.01)
         assert zlim[1] - zlim[0] == pytest.approx(1.0, abs=0.01)
         import matplotlib.pyplot as plt
+
         plt.close("all")
 
     def test_plot_3d_orbit_family_with_jacobi_none(self, sample_system, sample_family):
@@ -201,6 +207,7 @@ class TestPlot3DOrbitFamily:
 
         assert ax is not None
         import matplotlib.pyplot as plt
+
         plt.close("all")
 
 
@@ -245,4 +252,5 @@ class TestPlot3DOrbitFamilyWithBodies:
 
         assert ax is not None
         import matplotlib.pyplot as plt
+
         plt.close("all")

@@ -35,7 +35,7 @@ References
 from __future__ import annotations
 
 import warnings
-from typing import Callable, Tuple
+from collections.abc import Callable
 
 import numpy as np
 import numpy.typing as npt
@@ -72,7 +72,7 @@ class EphemerisDynamics(Dynamics):
             return self.equations_with_stm
         return self.equations_of_motion
 
-    def _get_max_step(self, t_span: Tuple[float, float]) -> float:
+    def _get_max_step(self, t_span: tuple[float, float]) -> float:
         """自适应步长：根据传播时长调整最大步长，防止短弧段步长过大"""
         span_duration = abs(t_span[1] - t_span[0])
         if span_duration > 0:
@@ -84,7 +84,7 @@ class EphemerisDynamics(Dynamics):
         t: float,
         r_sc: npt.NDArray[np.floating],
         need_jacobian: bool = False,
-    ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
+    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
         """单次遍历所有天体，同时计算加速度和（可选）雅可比矩阵。
 
         将加速度计算和雅可比计算合并到一次循环中，避免对 SPICE 的重复查询。
@@ -113,10 +113,7 @@ class EphemerisDynamics(Dynamics):
                     r_norm = self.MIN_DISTANCE
                 acc -= gm * r_sc / r_norm**3
                 if need_jacobian:
-                    dacc_dr -= gm * (
-                        np.eye(3) / r_norm**3
-                        - 3.0 * np.outer(r_sc, r_sc) / r_norm**5
-                    )
+                    dacc_dr -= gm * (np.eye(3) / r_norm**3 - 3.0 * np.outer(r_sc, r_sc) / r_norm**5)
             else:
                 r_ob = self.system.get_body_position(body, t)
                 r_bsc = r_sc - r_ob
@@ -137,8 +134,7 @@ class EphemerisDynamics(Dynamics):
                 # 仅对主项 r_bsc/r_bsc_norm³ 求偏导
                 if need_jacobian:
                     dacc_dr -= gm * (
-                        np.eye(3) / r_bsc_norm**3
-                        - 3.0 * np.outer(r_bsc, r_bsc) / r_bsc_norm**5
+                        np.eye(3) / r_bsc_norm**3 - 3.0 * np.outer(r_bsc, r_bsc) / r_bsc_norm**5
                     )
 
         return acc, dacc_dr

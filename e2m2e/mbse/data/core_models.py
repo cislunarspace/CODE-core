@@ -7,8 +7,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -18,6 +16,7 @@ class NumpyArray(np.ndarray):
 
     实际使用中通过 validator 确保 numpy 数组的正确处理。
     """
+
     pass
 
 
@@ -47,27 +46,22 @@ class PropagationResult(_NumpyModel):
 
     time: np.ndarray
     states: np.ndarray
-    stm: Optional[np.ndarray] = None
-    jacobi: Optional[list[float]] = None
+    stm: np.ndarray | None = None
+    jacobi: list[float] | None = None
     jacobi_error: float = 0.0
 
     @field_validator("states")
     @classmethod
     def validate_states_shape(cls, v: np.ndarray) -> np.ndarray:
         if v.ndim != 2 or v.shape[1] != 6:
-            raise ValueError(
-                f"states 形状必须为 (n, 6)，实际为 {v.shape}"
-            )
+            raise ValueError(f"states 形状必须为 (n, 6)，实际为 {v.shape}")
         return v
 
     @field_validator("stm")
     @classmethod
-    def validate_stm_shape(cls, v: Optional[np.ndarray]) -> Optional[np.ndarray]:
-        if v is not None:
-            if v.ndim != 3 or v.shape[1] != 6 or v.shape[2] != 6:
-                raise ValueError(
-                    f"stm 形状必须为 (n, 6, 6)，实际为 {v.shape}"
-                )
+    def validate_stm_shape(cls, v: np.ndarray | None) -> np.ndarray | None:
+        if v is not None and (v.ndim != 3 or v.shape[1] != 6 or v.shape[2] != 6):
+            raise ValueError(f"stm 形状必须为 (n, 6, 6)，实际为 {v.shape}")
         return v
 
 
@@ -86,13 +80,13 @@ class OrbitProperties(_NumpyModel):
         periodicity_error: 周期性误差（首末状态欧氏距离）
     """
 
-    period: Optional[float] = None
-    amplitudes: Optional[dict[str, float]] = None
-    extrema: Optional[dict[str, float]] = None
-    mean_state: Optional[np.ndarray] = None
-    center: Optional[np.ndarray] = None
+    period: float | None = None
+    amplitudes: dict[str, float] | None = None
+    extrema: dict[str, float] | None = None
+    mean_state: np.ndarray | None = None
+    center: np.ndarray | None = None
     is_periodic: bool = False
-    periodicity_error: Optional[float] = None
+    periodicity_error: float | None = None
 
 
 class OrbitStability(_NumpyModel):
@@ -108,18 +102,17 @@ class OrbitStability(_NumpyModel):
         lyapunov_exponents: Lyapunov 指数数组
     """
 
-    monodromy_matrix: Optional[np.ndarray] = None
-    eigenvalues: Optional[np.ndarray] = None
-    stability: Optional[str] = None
-    stability_indices: Optional[dict] = None
-    lyapunov_exponents: Optional[np.ndarray] = None
+    monodromy_matrix: np.ndarray | None = None
+    eigenvalues: np.ndarray | None = None
+    stability: str | None = None
+    stability_indices: dict | None = None
+    lyapunov_exponents: np.ndarray | None = None
 
     @field_validator("monodromy_matrix")
     @classmethod
-    def validate_monodromy(cls, v: Optional[np.ndarray]) -> Optional[np.ndarray]:
-        if v is not None:
-            if v.shape != (6, 6):
-                raise ValueError(f"monodromy_matrix 形状必须为 (6, 6)，实际为 {v.shape}")
+    def validate_monodromy(cls, v: np.ndarray | None) -> np.ndarray | None:
+        if v is not None and v.shape != (6, 6):
+            raise ValueError(f"monodromy_matrix 形状必须为 (6, 6)，实际为 {v.shape}")
         return v
 
 
@@ -151,5 +144,5 @@ class SystemConfig(BaseModel):
     primary_body: str = "Earth"
     secondary_body: str = "Moon"
     mu: float = 0.01215
-    semi_major_axis: Optional[float] = None
-    orbital_period: Optional[float] = None
+    semi_major_axis: float | None = None
+    orbital_period: float | None = None

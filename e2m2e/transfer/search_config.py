@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 
 @dataclass
@@ -34,19 +33,19 @@ class SearchConfig:
     """
 
     # --- 搜索阶段参数 ---
-    alpha_min: Optional[float] = None
-    alpha_max: Optional[float] = None
-    n_alpha: Optional[int] = None
-    n_departure: Optional[int] = None
-    max_transfer_time: Optional[float] = None
-    intersection_threshold: Optional[float] = None
-    min_distance_threshold: Optional[float] = None
-    collision_earth_radius: Optional[float] = None
-    collision_moon_radius: Optional[float] = None
-    integration_dt: Optional[float] = None
+    alpha_min: float | None = None
+    alpha_max: float | None = None
+    n_alpha: int | None = None
+    n_departure: int | None = None
+    max_transfer_time: float | None = None
+    intersection_threshold: float | None = None
+    min_distance_threshold: float | None = None
+    collision_earth_radius: float | None = None
+    collision_moon_radius: float | None = None
+    integration_dt: float | None = None
 
     # --- 优化阶段参数 ---
-    alpha_range: Optional[Tuple[float, float]] = None
-    transfer_time_range: Optional[Tuple[float, float]] = None
-    t_ins_range: Optional[Tuple[float, float]] = None
-    velocity_angle_tolerance: Optional[float] = None
+    alpha_range: tuple[float, float] | None = None
+    transfer_time_range: tuple[float, float] | None = None
+    t_ins_range: tuple[float, float] | None = None
+    velocity_angle_tolerance: float | None = None

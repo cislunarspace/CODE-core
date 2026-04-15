@@ -7,15 +7,14 @@
 - "refactor(plotting): 优化可视化模块代码结构与稳定性指数计算文档"
 """
 
+import matplotlib
 import numpy as np
 import pytest
-import matplotlib
 
 matplotlib.use("Agg")  # 使用非交互式后端
 
-from e2m2e.core import Orbit, OrbitFamily, CR3BP_System
-from e2m2e.visualization.plotting import compute_stability_for_family, OrbitVisualizer
-
+from e2m2e.core import CR3BP_System, Orbit, OrbitFamily
+from e2m2e.visualization.plotting import OrbitVisualizer, compute_stability_for_family
 
 # 地月系统质量比
 MU = 1.21506683e-2
@@ -38,7 +37,7 @@ def sample_orbit(earth_moon_system):
     # 创建一条简单的 DRO 轨道
     x0 = 0.79188556619742
     vy0 = 0.53682
-    
+
     # 创建状态数组（简化版，实际应该通过积分得到）
     t = np.linspace(0, 3.42, 100)
     states = np.zeros((len(t), 6))
@@ -48,7 +47,7 @@ def sample_orbit(earth_moon_system):
     states[:, 3] = 0.0  # vx
     states[:, 4] = vy0 * np.cos(t)  # vy
     states[:, 5] = 0.0  # vz
-    
+
     orbit = Orbit(states=states, times=t)
     orbit.period = 3.42
     orbit.system = earth_moon_system
@@ -59,12 +58,12 @@ def sample_orbit(earth_moon_system):
 def sample_family(earth_moon_system):
     """创建测试用轨道族"""
     family = OrbitFamily(family_type="test_dro")
-    
+
     # 创建3条简单的测试轨道
     for i in range(3):
         x0 = 0.79 + i * 0.005
         t = np.linspace(0, 3.5, 100)
-        
+
         states = np.zeros((len(t), 6))
         states[:, 0] = x0 * np.ones(len(t))
         states[:, 1] = 0.1 * np.sin(t + i)
@@ -72,12 +71,12 @@ def sample_family(earth_moon_system):
         states[:, 3] = 0.0
         states[:, 4] = 0.5 * np.cos(t + i)
         states[:, 5] = 0.0
-        
+
         orbit = Orbit(states=states, times=t)
         orbit.period = 3.0 + i * 0.2
         orbit.system = earth_moon_system
         family.add_orbit(orbit)
-    
+
     return family
 
 
@@ -95,15 +94,17 @@ class TestComputeStabilityForFamily:
     def test_same_length_as_family(self, sample_family, earth_moon_system):
         """返回列表长度应该与轨道族中轨道数量相同"""
         result = compute_stability_for_family(sample_family, earth_moon_system)
-        assert len(result) == len(sample_family), \
+        assert len(result) == len(sample_family), (
             f"Result length ({len(result)}) should match family length ({len(sample_family)})"
+        )
 
     def test_stability_values_are_floats(self, sample_family, earth_moon_system):
         """稳定性指数应该是浮点数"""
         result = compute_stability_for_family(sample_family, earth_moon_system)
         for val in result:
-            assert isinstance(val, (float, np.floating)), \
+            assert isinstance(val, (float, np.floating)), (
                 f"Stability value should be float, got {type(val)}"
+            )
 
     def test_stability_values_non_negative(self, sample_family, earth_moon_system):
         """稳定性指数应该非负"""
@@ -133,14 +134,14 @@ class TestStabilityBoundaryCases:
         """单条轨道的轨道族应该正常工作"""
         single_family = OrbitFamily(family_type="single")
         single_family.add_orbit(sample_orbit)
-        
+
         result = compute_stability_for_family(single_family, earth_moon_system)
         assert len(result) == 1, "Single orbit family should return list of length 1"
 
     def test_orbit_without_period(self, earth_moon_system):
         """没有周期信息的轨道应返回稳定性指数 1.0"""
         family = OrbitFamily(family_type="no_period")
-        
+
         # 创建没有 period 的轨道
         t = np.linspace(0, 1, 50)
         states = np.zeros((len(t), 6))
@@ -149,7 +150,7 @@ class TestStabilityBoundaryCases:
         orbit.period = None  # 没有周期
         orbit.system = earth_moon_system
         family.add_orbit(orbit)
-        
+
         result = compute_stability_for_family(family, earth_moon_system)
         assert len(result) == 1
         # 根据 TODO 注释，没有 period 的轨道应假设为中性稳定（1.0）
@@ -193,18 +194,19 @@ class TestSystemAssociation:
 
     def test_orbit_system_assignment(self, sample_family, earth_moon_system):
         """轨道应该关联到指定的系统"""
-        result = compute_stability_for_family(sample_family, earth_moon_system)
-        
+        compute_stability_for_family(sample_family, earth_moon_system)
+
         # 检查每条轨道的系统是否被设置
         for orbit in sample_family:
             if orbit.period is not None:
-                assert orbit.system is not None, \
+                assert orbit.system is not None, (
                     "Orbit should have system assigned after compute_stability_for_family"
+                )
 
     def test_none_system_orbit_gets_assigned(self, earth_moon_system):
         """没有关联系统的轨道应该获得系统"""
         family = OrbitFamily(family_type="no_system")
-        
+
         t = np.linspace(0, 3.0, 100)
         states = np.zeros((len(t), 6))
         states[:, 0] = 0.8 * np.ones(len(t))
@@ -212,10 +214,10 @@ class TestSystemAssociation:
         orbit.period = 3.0
         orbit.system = None  # 没有系统
         family.add_orbit(orbit)
-        
+
         # 计算稳定性
-        result = compute_stability_for_family(family, earth_moon_system)
-        
+        compute_stability_for_family(family, earth_moon_system)
+
         # 轨道应该获得系统
         assert orbit.system == earth_moon_system
 
@@ -229,7 +231,7 @@ class TestExceptionHandling:
     def test_computation_failure_returns_one(self, earth_moon_system):
         """计算失败时应返回 1.0（中性稳定）"""
         family = OrbitFamily(family_type="problematic")
-        
+
         # 创建一条可能导致计算失败的轨道
         t = np.linspace(0, 1, 50)
         states = np.zeros((len(t), 6))
@@ -238,7 +240,7 @@ class TestExceptionHandling:
         orbit.period = 0.0  # 零周期可能导致计算失败
         orbit.system = earth_moon_system
         family.add_orbit(orbit)
-        
+
         result = compute_stability_for_family(family, earth_moon_system)
         assert len(result) == 1
         # 根据代码，计算失败时返回 1.0
@@ -253,15 +255,15 @@ class TestVisualizerIntegration:
 
     def test_visualizer_with_stability_plot(self, earth_moon_system, sample_family):
         """测试可视化器绘制稳定性图"""
-        viz = OrbitVisualizer(earth_moon_system)
-        
+        OrbitVisualizer(earth_moon_system)
+
         # 创建一些带周期信息的轨道
         for i, orbit in enumerate(sample_family):
             orbit.period = 3.0 + i * 0.2
-        
+
         # 测试稳定性计算功能
         stability_values = compute_stability_for_family(sample_family, earth_moon_system)
-        
+
         assert len(stability_values) == len(sample_family)
         assert all(isinstance(v, (float, np.floating)) for v in stability_values)
 
@@ -274,19 +276,20 @@ class TestDocumentation:
 
     def test_function_has_docstring(self):
         """compute_stability_for_family 应该有文档字符串"""
-        assert compute_stability_for_family.__doc__ is not None, \
-            "Function should have docstring"
+        assert compute_stability_for_family.__doc__ is not None, "Function should have docstring"
 
     def test_docstring_mentions_monodromy(self):
         """文档字符串应该提及单值矩阵 (Monodromy Matrix)"""
         doc = compute_stability_for_family.__doc__
         assert doc is not None
-        assert "monodromy" in doc.lower() or "单值矩阵" in doc, \
+        assert "monodromy" in doc.lower() or "单值矩阵" in doc, (
             "Docstring should mention Monodromy Matrix"
+        )
 
     def test_docstring_mentions_eigenvalues(self):
         """文档字符串应该提及特征值"""
         doc = compute_stability_for_family.__doc__
         assert doc is not None
-        assert "eigenvalue" in doc.lower() or "特征值" in doc, \
+        assert "eigenvalue" in doc.lower() or "特征值" in doc, (
             "Docstring should mention eigenvalues"
+        )

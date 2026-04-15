@@ -4,12 +4,13 @@ Orbit 类测试
 测试轨道类的核心功能，包括轨道创建、属性计算、插值、保存/加载等。
 """
 
-import numpy as np
-import pytest
 import os
 import tempfile
 
-from e2m2e.core import Orbit, CR3BP_System
+import numpy as np
+import pytest
+
+from e2m2e.core import CR3BP_System, Orbit
 
 
 class TestOrbitCreation:

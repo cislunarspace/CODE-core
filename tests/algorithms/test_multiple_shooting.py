@@ -38,16 +38,16 @@ points 之间位置和速度连续。这是将 CR3BP 轨道转换到高精度星
   Layer 1b (EphemerisDynamics)
 """
 
-import pytest
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.core import (
-    SPICEManager,
-    EphemerisSystem,
-    EphemerisDynamics,
-)
 from e2m2e.algorithms import MultipleShooting
+from e2m2e.core import (
+    EphemerisDynamics,
+    EphemerisSystem,
+    SPICEManager,
+)
 
 pytestmark = pytest.mark.spice
 
@@ -230,18 +230,18 @@ class TestMultipleShootingCorrection:
             pytest.skip(f"多重打靶未收敛 (residual={result.max_residual:.2e})")
         corrected_states = result.state_patch
         for i in range(len(corrected_states) - 1):
-                dt = (
-                    t_patch[i + 1] - t_patch[i]
-                    if not hasattr(result, "t_patch")
-                    else result.t_patch[i + 1] - result.t_patch[i]
-                )
-                propagated = ms_corrector.dynamics.propagate(
-                    corrected_states[i],
-                    (result.t_patch[i], result.t_patch[i + 1]),
-                )
-                final_prop = propagated["states"][-1]
-                pos_error = np.linalg.norm(final_prop[:3] - corrected_states[i + 1, :3])
-                assert pos_error < 1.0, f"位置连续性误差 {pos_error:.2e} km 过大"
+            (
+                t_patch[i + 1] - t_patch[i]
+                if not hasattr(result, "t_patch")
+                else result.t_patch[i + 1] - result.t_patch[i]
+            )
+            propagated = ms_corrector.dynamics.propagate(
+                corrected_states[i],
+                (result.t_patch[i], result.t_patch[i + 1]),
+            )
+            final_prop = propagated["states"][-1]
+            pos_error = np.linalg.norm(final_prop[:3] - corrected_states[i + 1, :3])
+            assert pos_error < 1.0, f"位置连续性误差 {pos_error:.2e} km 过大"
 
 
 # =============================================================================
@@ -390,9 +390,7 @@ class TestMultipleShootingVerbose:
         assert "%" not in captured.err
 
     @pytest.mark.parametrize("verbose", [True, False])
-    def test_verbose_does_not_affect_result(
-        self, ms_corrector, simple_patch_points, verbose
-    ):
+    def test_verbose_does_not_affect_result(self, ms_corrector, simple_patch_points, verbose):
         """verbose 设置不影响修正结果的数值正确性"""
         t_patch, state_patch = simple_patch_points
         result = ms_corrector.correct(
@@ -409,9 +407,7 @@ class TestMultipleShootingVerbose:
         )
         assert result.converged == result_ref.converged
         assert result.iterations == result_ref.iterations
-        np.testing.assert_allclose(
-            result.max_residual, result_ref.max_residual, rtol=1e-12
-        )
+        np.testing.assert_allclose(result.max_residual, result_ref.max_residual, rtol=1e-12)
         if result.residual_history and result_ref.residual_history:
             np.testing.assert_allclose(
                 result.residual_history, result_ref.residual_history, rtol=1e-12
@@ -419,7 +415,7 @@ class TestMultipleShootingVerbose:
 
     def test_verbose_true_invokes_tqdm(self, ms_corrector, simple_patch_points):
         """verbose=True 时应调用 tqdm 创建进度条"""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         t_patch, state_patch = simple_patch_points
         with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
@@ -434,11 +430,9 @@ class TestMultipleShootingVerbose:
             )
             assert mock_tqdm.called
 
-    def test_verbose_true_updates_per_iteration(
-        self, ms_corrector, simple_patch_points
-    ):
+    def test_verbose_true_updates_per_iteration(self, ms_corrector, simple_patch_points):
         """进度条应在每次迭代中更新残差信息"""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         t_patch, state_patch = simple_patch_points
         with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
@@ -453,11 +447,13 @@ class TestMultipleShootingVerbose:
             )
 
             n_calls = result.iterations if result.converged else 5
-            assert mock_bar.set_postfix.call_count >= n_calls or mock_bar.update.call_count >= n_calls
+            assert (
+                mock_bar.set_postfix.call_count >= n_calls or mock_bar.update.call_count >= n_calls
+            )
 
     def test_verbose_early_convergence(self, ms_corrector, simple_patch_points):
         """提前收敛时进度条应正确关闭，不报错"""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         t_patch, state_patch = simple_patch_points
         with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
@@ -475,7 +471,7 @@ class TestMultipleShootingVerbose:
 
     def test_verbose_with_var_time(self, ms_corrector, simple_patch_points):
         """verbose=True 与 var_time=True 组合正常工作"""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         t_patch, state_patch = simple_patch_points
         with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
