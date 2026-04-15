@@ -57,7 +57,7 @@ class CR3BP_System:
     YEAR = 365.25 * 86400  # 一年的秒数（儒略年）
 
     # 预定义的常见三体系统参数
-    KNOWN_SYSTEMS = {
+    KNOWN_SYSTEMS: dict[str, dict[str, str | float]] = {
         "earth_moon": {
             "primary": "Earth",
             "secondary": "Moon",
@@ -99,9 +99,9 @@ class CR3BP_System:
 
         system_params = cls.KNOWN_SYSTEMS[system_name]
         return cls(
-            mu=system_params["mu"],
-            primary=system_params["primary"],
-            secondary=system_params["secondary"],
+            mu=float(system_params["mu"]),
+            primary=str(system_params["primary"]),
+            secondary=str(system_params["secondary"]),
         )
 
     def __init__(self, mu: float, primary: str, secondary: str) -> None:
@@ -229,6 +229,7 @@ class CR3BP_System:
         if not self.has_L_points:
             self.compute_libration_points()
 
+        assert self.L_points is not None
         if point not in self.L_points:
             raise ValueError(f"无效的平动点: {point}")
 
@@ -405,12 +406,13 @@ class CR3BP_System:
             print(f"  是否已计算平动点：{self.has_L_points}")
             print()
 
-            if self.is_initialized:
+            if self.is_initialized and self.characteristic_length is not None:
                 print("特征尺度:")
                 print(f"  特征长度：{self.characteristic_length:.2f} km")
                 print(f"  特征时间：{self.characteristic_time:.2f} s")
                 print(f"  特征速度：{self.characteristic_velocity:.2f} km/s")
                 print(f"  平均角速度：{self.mean_motion:.6e} rad/s")
+                assert self.orbital_period is not None
                 print(
                     f"  轨道周期：{self.orbital_period:.2f} s "
                     f"({self.orbital_period / 86400:.2f} 天)"
@@ -420,7 +422,7 @@ class CR3BP_System:
                 print("特征尺度：未设置 (请使用 set_characteristic_scales() 方法设置)")
             print()
 
-            if self.has_L_points:
+            if self.has_L_points and self.L_points is not None:
                 print("平动点位置 (无量纲坐标):")
                 for point_name, point_coords in self.L_points.items():
                     name = point_name.name

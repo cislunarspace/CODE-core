@@ -195,8 +195,8 @@ class MultipleShooting:
         system = dyn.system
         return ProcessPoolExecutor(
             max_workers=self.n_workers,
-            initializer=_worker_init,
-            initargs=(
+            initializer=_worker_init,  # type: ignore[arg-type]
+            initargs=(  # type: ignore[arg-type]
                 self.kernel_dir,
                 list(system.bodies),
                 system.origin,

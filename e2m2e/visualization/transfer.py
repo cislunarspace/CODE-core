@@ -150,8 +150,9 @@ class TransferPlotter(OrbitVisualizer):
         arr_states = self._extract_states(arrival_orbit)
 
         if ax is None:
-            self.figure = plt.figure(figsize=self.config.figsize_3d, dpi=self.config.dpi)
-            ax = self.figure.add_subplot(111, projection="3d")
+            fig = plt.figure(figsize=self.config.figsize_3d, dpi=self.config.dpi)
+            self.figure = fig
+            ax = fig.add_subplot(111, projection="3d")
             self.axes_3d = ax
 
         if color is None:

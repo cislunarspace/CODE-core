@@ -13,6 +13,10 @@ from typing import TYPE_CHECKING, Any
 import matplotlib.pyplot as plt
 import numpy as np
 
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
+
 from ..core.system import CR3BP_System, LibrationPoint
 from .config import PlotConfig
 
@@ -45,9 +49,9 @@ class OrbitVisualizer:
         self.config = config or PlotConfig()
 
         # matplotlib 对象引用，延迟创建以避免不必要开销
-        self.figure = None
-        self.axes = None
-        self.axes_3d = None
+        self.figure: Figure | None = None
+        self.axes: Axes | None = None
+        self.axes_3d: Any | None = None
 
         # 轨道样式参数
         self.orbit_linewidth = self.config.orbit_linewidth
@@ -245,6 +249,8 @@ class OrbitVisualizer:
             else:
                 return ax
 
+        assert self.system.L_points is not None
+
         if ax is None:
             if is_3d and self.axes_3d is not None:
                 ax = self.axes_3d
@@ -263,14 +269,20 @@ class OrbitVisualizer:
 
             if is_3d:
                 ax.scatter(
-                    coord[0], coord[1], coord[2], color=color, marker=marker, s=size, zorder=5
+                    coord[0],
+                    coord[1],
+                    coord[2],
+                    color=color,
+                    marker=marker,
+                    s=size,
+                    zorder=5,  # type: ignore[misc]
                 )
                 if show_labels:
                     ax.text(
                         coord[0],
                         coord[1],
                         coord[2] + 0.02,
-                        label_text,
+                        label_text,  # type: ignore[arg-type]
                         fontsize=self.libration_point_fontsize,
                         ha="center",
                     )
@@ -315,7 +327,7 @@ class OrbitVisualizer:
                 0,
                 0,
                 color=self.primary_body_color,
-                s=self.primary_body_size,
+                s=self.primary_body_size,  # type: ignore[misc]
                 edgecolors="black",
                 linewidth=1,
                 zorder=10,
@@ -326,7 +338,7 @@ class OrbitVisualizer:
                 0,
                 0,
                 color=self.secondary_body_color,
-                s=self.secondary_body_size,
+                s=self.secondary_body_size,  # type: ignore[misc]
                 edgecolors="black",
                 linewidth=1,
                 zorder=10,
@@ -338,7 +350,7 @@ class OrbitVisualizer:
             ax.scatter(
                 *primary_pos,
                 color="#2E86AB",
-                s=self.primary_body_size,
+                s=self.primary_body_size,  # type: ignore[misc]
                 edgecolors="#1A5276",
                 linewidth=1.5,
                 zorder=10,
@@ -347,7 +359,7 @@ class OrbitVisualizer:
             ax.scatter(
                 *secondary_pos,
                 color="#95A5A6",
-                s=self.secondary_body_size,
+                s=self.secondary_body_size,  # type: ignore[misc]
                 edgecolors="#566573",
                 linewidth=1.5,
                 zorder=10,

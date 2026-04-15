@@ -158,19 +158,17 @@ class Continuation:
         self.correction = corrector
         self.dynamics = corrector.dynamics
 
-        # 延拓参数
+        self.continuation_parameter: str | None = None
         if corrector.fixed_parameters:
             self.continuation_parameter = next(iter(corrector.fixed_parameters))
-        else:
-            self.continuation_parameter = None
         self.step_size = step or self.DEFAULT_STEP_SIZE
         self.initial_step_size = self.step_size
 
         # 轨道族
-        self.family_orbits = []
-        self.family_parameters = []
-        self.family_states = []  # 初始状态列表
-        self.family_periods = []  # 周期列表
+        self.family_orbits: list[Orbit] = []
+        self.family_parameters: list[float] = []
+        self.family_states: list[np.ndarray] = []
+        self.family_periods: list[float] = []
 
         # 当前/历史轨道
         self.current_orbit = None

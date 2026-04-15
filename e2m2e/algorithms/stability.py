@@ -67,14 +67,14 @@ class StabilityAnalysis:
         self.dynamics = dynamics
 
         self.monodromy_matrix = None
-        self.stm_history = []
+        self.stm_history: list[np.ndarray] = []
 
         self.eigenvalues = None
         self.eigenvectors = None
         self.eigenvalue_magnitudes = None
         self.eigenvalue_arguments = None
         self.sorted_eigenvalues = None
-        self.eigenvalue_pairs = []
+        self.eigenvalue_pairs: list[tuple[complex, complex]] = []
 
         self.stability_indices = {
             "nu1": None,
@@ -86,7 +86,7 @@ class StabilityAnalysis:
         self.floquet_multipliers = None
         self.floquet_exponents = None
 
-        self.lyapunov_exponents = []
+        self.lyapunov_exponents: list[float] | np.ndarray = []
         self.max_lyapunov_exponent = None
 
         self.stability_type = None
@@ -382,12 +382,15 @@ class StabilityAnalysis:
                 - eigenvalue_diff: |λ - 1| 的最小值
                 - bifurcation_type: 分岔类型
         """
-        bifurcation_points = []
+        bifurcation_points: list[dict[str, Any]] = []
 
         for i, orbit in enumerate(orbits):
             try:
                 analysis = StabilityAnalysis(orbit=orbit, dynamics=dynamics)
                 analysis.compute_floquet_multipliers()
+
+                if analysis.eigenvalues is None:
+                    continue
 
                 for j, lam in enumerate(analysis.eigenvalues):
                     diff = abs(lam - 1.0)

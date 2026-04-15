@@ -248,6 +248,8 @@ class Orbit:
             return
 
         x_values = self.states[:, 0]
+        if self._center is None:
+            return
         zero_crossings = np.where(np.diff(np.sign(x_values - self._center[0])))[0]
 
         if len(zero_crossings) >= 2:
@@ -266,9 +268,11 @@ class Orbit:
         idx = int(np.argmin(np.abs(self.times - target_t)))
         end_state = self.states[idx]
 
-        self._periodicity_error = np.linalg.norm(start_state - end_state)
+        self._periodicity_error = float(np.linalg.norm(start_state - end_state))
         tolerance = 1e-6
-        self._is_periodic = self._periodicity_error < tolerance
+        self._is_periodic = (
+            self._periodicity_error is not None and self._periodicity_error < tolerance
+        )
 
         if self._is_periodic:
             self.metadata["description"] = "Periodic orbit"
@@ -309,6 +313,7 @@ class Orbit:
         if self._monodromy_matrix is None:
             self.compute_monodromy_matrix(dynamics)
 
+        assert self._eigenvalues is not None
         eigenvalues = self._eigenvalues
         magnitudes = np.abs(eigenvalues)
         max_deviation = np.max(np.abs(magnitudes - 1.0))

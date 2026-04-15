@@ -85,7 +85,7 @@ class Dynamics:
         self.max_step: float = self.DEFAULT_MAX_STEP
 
         # 缓存最近一次积分结果
-        self.last_trajectory = None  # (time_array, states_array)
+        self.last_trajectory: tuple[np.ndarray, np.ndarray] | None = None
         self.last_stm = None  # STM 矩阵数组
 
         # 截面检测参数

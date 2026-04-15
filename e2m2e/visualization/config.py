@@ -129,8 +129,8 @@ if _detected_scale > 1.01:
         with contextlib.suppress(Exception):
             self.tk.call("tk", "scaling", _tk_scaling_val)
 
-    _tk.Tk.__init__ = _patched_tk_init
-    _tk.Toplevel.__init__ = _patched_toplevel_init
+    _tk.Tk.__init__ = _patched_tk_init  # type: ignore[method-assign]
+    _tk.Toplevel.__init__ = _patched_toplevel_init  # type: ignore[method-assign]
 
     if _shutil.which("zenity"):
         import tkinter.filedialog as _fd

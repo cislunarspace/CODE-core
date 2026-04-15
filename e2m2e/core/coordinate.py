@@ -62,8 +62,8 @@ class CoordinateTransformation:
         """
         self.system = system
         self.mu = system.mu if hasattr(system, "mu") else None
-        self.rotation_matrices = {}
-        self.rotation_matrix_derivatives = {}
+        self.rotation_matrices: dict[float, npt.NDArray[np.floating]] = {}
+        self.rotation_matrix_derivatives: dict[float, npt.NDArray[np.floating]] = {}
         self.initialized = True
 
     def compute_rotation_matrix(self, time: float) -> npt.NDArray[np.floating]:

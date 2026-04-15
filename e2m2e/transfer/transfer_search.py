@@ -128,7 +128,7 @@ class TransferSearch:
         self._search_results: list[dict[str, Any]] | None = None
         self._optimized_result: Any = None
         self._verbose = True
-        self._n_workers = None
+        self._n_workers: int | None = None
         # "processes" 多进程，利于 CPU 密集积分绕过 GIL；"threads" 保留线程内 tqdm 细粒度进度
         self._parallel_backend: str = "processes"
 
@@ -604,6 +604,7 @@ class TransferSearch:
             poll_stop = threading.Event()
 
             def _poll_process_progress() -> None:
+                assert pbar is not None
                 while True:
                     if poll_stop.is_set():
                         break

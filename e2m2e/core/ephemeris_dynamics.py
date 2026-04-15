@@ -103,22 +103,22 @@ class EphemerisDynamics(Dynamics):
         for body in self.system.bodies:
             gm = self.system.get_gm(body)
             if body == self.system.origin:
-                r_norm = np.linalg.norm(r_sc)
+                r_norm: float = float(np.linalg.norm(r_sc))
                 if r_norm < self.MIN_DISTANCE:
                     warnings.warn(
                         f"Spacecraft at origin body center (|r|={r_norm:.2e} km), "
                         f"clamping to MIN_DISTANCE={self.MIN_DISTANCE} km",
                         stacklevel=3,
                     )
-                    r_norm = self.MIN_DISTANCE
+                    r_norm = float(self.MIN_DISTANCE)
                 acc -= gm * r_sc / r_norm**3
                 if need_jacobian:
                     dacc_dr -= gm * (np.eye(3) / r_norm**3 - 3.0 * np.outer(r_sc, r_sc) / r_norm**5)
             else:
                 r_ob = self.system.get_body_position(body, t)
                 r_bsc = r_sc - r_ob
-                r_bsc_norm = np.linalg.norm(r_bsc)
-                r_ob_norm = np.linalg.norm(r_ob)
+                r_bsc_norm: float = float(np.linalg.norm(r_bsc))
+                r_ob_norm: float = float(np.linalg.norm(r_ob))
                 if r_bsc_norm < self.MIN_DISTANCE:
                     warnings.warn(
                         f"Spacecraft at perturbing body {body} center "
@@ -126,9 +126,9 @@ class EphemerisDynamics(Dynamics):
                         f"clamping to MIN_DISTANCE={self.MIN_DISTANCE} km",
                         stacklevel=3,
                     )
-                    r_bsc_norm = self.MIN_DISTANCE
+                    r_bsc_norm = float(self.MIN_DISTANCE)
                 if r_ob_norm < self.MIN_DISTANCE:
-                    r_ob_norm = self.MIN_DISTANCE
+                    r_ob_norm = float(self.MIN_DISTANCE)
                 acc -= gm * (r_bsc / r_bsc_norm**3 + r_ob / r_ob_norm**3)
                 # 间接项 r_ob/r_ob_norm³ 不依赖于航天器位置，故 ∂/∂r_sc = 0，
                 # 仅对主项 r_bsc/r_bsc_norm³ 求偏导

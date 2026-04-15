@@ -480,9 +480,9 @@ class DifferentialCorrection:
         self.min_damping = 0.1
         self.max_damping = 2.0
 
-        self.convergence_history = []
-        self.error_history = []
-        self.correction_history = []
+        self.convergence_history: list[float] = []
+        self.error_history: list[float] = []
+        self.correction_history: list[float] = []
         self.iteration_count = 0
         self.converged = False
 
@@ -499,14 +499,14 @@ class DifferentialCorrection:
         self.correction_matrix = None
         self.pseudoinverse_matrix = None
 
-        self.constraint_indices = []
-        self.constraint_weights = {}
-        self.constraint_types = {}
-        self.free_variable_indices = []
+        self.constraint_indices: list[int] = []
+        self.constraint_weights: dict[str, float] = {}
+        self.constraint_types: dict[str, str] = {}
+        self.free_variable_indices: list[int] = []
 
-        self.setup_type = None
-        self.symmetry_condition = None
-        self.fixed_parameters = {}
+        self.setup_type: str | None = None
+        self.symmetry_condition: str | None = None
+        self.fixed_parameters: dict[str, float] = {}
 
         self.use_analytic_stm = True
         self.finite_difference_step = 1e-7

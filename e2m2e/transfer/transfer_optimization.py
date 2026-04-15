@@ -323,7 +323,7 @@ class DROTRONLPOptimizer:
             ΔV1 大小
         """
         original_vel = departure_state[3:]
-        dv1 = np.linalg.norm(initial_velocity - original_vel)
+        dv1 = float(np.linalg.norm(initial_velocity - original_vel))
         return dv1
 
     def compute_delta_v2(self, final_velocity: np.ndarray, insertion_velocity: np.ndarray) -> float:
@@ -336,7 +336,7 @@ class DROTRONLPOptimizer:
         Returns:
             ΔV2 大小
         """
-        dv2 = np.linalg.norm(final_velocity - insertion_velocity)
+        dv2 = float(np.linalg.norm(final_velocity - insertion_velocity))
         return dv2
 
     def get_arrival_state_at_t_ins(self, t_ins: float) -> tuple[np.ndarray, np.ndarray]:
@@ -679,7 +679,7 @@ def optimize_transfer(
 
 if NlpCallbackBase is not None:
 
-    class COPTNLPCallback(NlpCallbackBase):
+    class COPTNLPCallback(NlpCallbackBase):  # type: ignore[misc, valid-type]
         """COPT NLP回调类
 
         用于COPT非线性优化问题的目标函数和约束计算。
@@ -823,8 +823,8 @@ if NlpCallbackBase is not None:
         def __init__(self, optimizer: DROTRONLPOptimizer, options: dict[str, Any] | None = None):
             self.optimizer = optimizer
             self.options = options or {}
-            self.model = None
-            self.callback = None
+            self.model: Any = None
+            self.callback: COPTNLPCallback | None = None
 
         def _setup_model(self, x0: np.ndarray) -> bool:
             if cp is None or COPT is None:
@@ -907,10 +907,11 @@ if NlpCallbackBase is not None:
                 }
 
         def get_result(self) -> NLPOptimizationResult:
-            if self.model is None or self.callback.x is None:
+            if self.model is None or self.callback is None or self.callback.x is None:
                 raise RuntimeError("Must call solve() first")
 
             assert COPT is not None
+            assert self.callback is not None
             opt_vars = NLPOptimizationVariables.from_array(self.callback.x)
             success = self.model.status == COPT.OPTIMAL
 
