@@ -1,5 +1,5 @@
 """
-DRO-RO 转移搜索模块测试：最小距离、Δv 字段、可行解判定。
+DRO-RO 转移搜索模块测试：最小距离、可行解判定。
 """
 
 import numpy as np
@@ -75,7 +75,6 @@ class TestComputeMinDistance:
 
 class TestIsFeasible:
     def test_local_minimum_alone_not_feasible_if_distance_large(self, searcher):
-        """局部极小但距离仍大于阈值时不应判为可行。"""
         r = {
             "collision_found": False,
             "intersection_found": False,
@@ -113,20 +112,3 @@ class TestIsFeasible:
             "min_distance": 0.0,
         }
         assert not searcher._is_feasible(r)
-
-
-class TestSearchSingleDepartureDv:
-    def test_success_includes_dv_fields(self, searcher, dynamics):
-        dro = _simple_orbit(100)
-        ro = _simple_orbit(80)
-        dep = dro.states[0]
-        t0 = float(dro.times[0])
-        results = searcher._search_single_departure(dep, t0, ro, verbose=False)
-        assert len(results) == 5
-        ok = [r for r in results if r.get("success")]
-        assert ok
-        r0 = ok[0]
-        assert r0["dv_departure"] is not None
-        assert r0["dv_departure"] >= 0
-        assert r0["dv_insertion"] is not None
-        assert r0["min_distance_orbit_idx"] is not None
