@@ -14,7 +14,7 @@ import pytest
 matplotlib.use("Agg")
 
 from e2m2e.core import CR3BP_System
-from e2m2e.visualization.plotting import OrbitVisualizer
+from e2m2e.visualization.base import OrbitVisualizer
 
 
 @pytest.fixture
