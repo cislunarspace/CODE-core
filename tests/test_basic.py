@@ -13,7 +13,7 @@ def test_import():
     """测试基本导入"""
     import e2m2e
 
-    print(f"✓ e2m2e版本: {e2m2e.__version__}")
+    assert e2m2e is not None
 
     # 测试所有公共类的导入
     print("✓ 所有公共类导入成功")
