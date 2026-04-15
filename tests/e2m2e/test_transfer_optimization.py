@@ -328,6 +328,9 @@ def ro_file(project_root):
 
 @pytest.fixture
 def dro_orbit(dro_file):
+    pytest.importorskip("_dro_data", reason="DRO data file not available")
+    if not dro_file.exists():
+        pytest.skip("DRO orbit data file not found")
     from e2m2e.transfer import load_orbit_from_json
 
     return load_orbit_from_json(str(dro_file))
@@ -335,6 +338,8 @@ def dro_orbit(dro_file):
 
 @pytest.fixture
 def ro_orbit(ro_file):
+    if not ro_file.exists():
+        pytest.skip("RO orbit data file not found")
     from e2m2e.transfer import load_orbit_from_json
 
     with open(ro_file, encoding="utf-8") as f:
@@ -348,7 +353,7 @@ def ro_orbit(ro_file):
 
 @pytest.fixture
 def dynamics():
-    from scripts.utils.common import MU
+    MU = 1.21506683e-2
 
     from e2m2e.core import CR3BP_Dynamics, CR3BP_System
 

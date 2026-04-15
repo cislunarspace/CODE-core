@@ -243,12 +243,14 @@ class TestSPICEManagerFindEphemerisKernel:
         assert hasattr(spice_manager, "find_ephemeris_kernel")
         assert callable(spice_manager.find_ephemeris_kernel)
 
+    @pytest.mark.spice
     def test_find_kernel_in_valid_directory(self, spice_manager, spice_kernel_dir):
         """在包含内核文件的目录中应能找到并返回路径"""
         path = spice_manager.find_ephemeris_kernel(spice_kernel_dir)
         assert os.path.exists(path)
         assert path.endswith(".bsp")
 
+    @pytest.mark.spice
     def test_find_kernel_returns_existing_file(self, spice_manager, spice_kernel_dir):
         """返回的路径应指向一个实际存在的文件"""
         path = spice_manager.find_ephemeris_kernel(spice_kernel_dir)
