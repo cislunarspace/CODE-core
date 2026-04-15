@@ -14,7 +14,8 @@ import pytest
 matplotlib.use("Agg")  # 使用非交互式后端
 
 from e2m2e.core import CR3BP_System, Orbit, OrbitFamily
-from e2m2e.visualization.plotting import OrbitVisualizer, compute_stability_for_family
+from e2m2e.visualization.base import OrbitVisualizer
+from e2m2e.visualization.stability import compute_stability_for_family
 
 # 地月系统质量比
 MU = 1.21506683e-2
