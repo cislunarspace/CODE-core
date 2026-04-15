@@ -1,10 +1,11 @@
 ---
-title: Halo Orbit Generation and Family Continuation
+format: md
+title: Halo Orbit Generation and Orbit Family Continuation
 ---
 
-# Halo Orbit Generation and Family Continuation
+# Halo Orbit Generation and Orbit Family Continuation
 
-> Halo orbits are three-dimensional periodic orbits around the L1/L2 libration points. This page covers Richardson initial guesses, differential correction, pseudo-arclength continuation, and command-line scripts.
+> Halo orbits are three-dimensional periodic orbits around the L1/L2 libration points. This page covers Richardson initial guesses, differential correction, pseudo-arclength continuation, and CLI scripts.
 
 ## Quick Start: Generate a Halo Orbit from Scratch
 
@@ -60,12 +61,12 @@ print(f"Generated {len(family)} Halo orbits")
 
 ---
 
-**Related source code**:
+**Related Source Code**:
 
 | Module | Path |
 |--------|------|
-| Continuation & Halo family | `e2m2e/algorithms/continuation.py` |
-| Richardson initial guess & Halo differential correction | `e2m2e/algorithms/differential_correction.py` |
+| Continuation and Halo families | `e2m2e/algorithms/continuation.py` |
+| Richardson initial guess and Halo differential correction | `e2m2e/algorithms/differential_correction.py` |
 | Single orbit / family generation scripts | `scripts/generate/generate_halo_orbit.py`, `scripts/generate/generate_halo_family.py` |
 | Plotting scripts | `scripts/plot/plot_halo_orbit.py`, `scripts/plot/plot_halo_family.py` |
 | Analytical initial guess tests | `tests/algorithms/test_analytical_halo.py` |
@@ -74,10 +75,10 @@ print(f"Generated {len(family)} Halo orbits")
 
 ## Feature Overview
 
-1. **Single Halo periodic orbit**: Richardson third-order initial guess + `DifferentialCorrection` (fixing `z0` or `x0`).
-2. **Seed orbit**: `Continuation.generate_halo_seed_orbit` -- same pipeline as single orbit, with `parameters` populated (`libration_point`, `amplitude_z`, `halo_class`).
-3. **Pseudo-arclength continuation (XZ symmetric)**: `Continuation.pseudo_arclength_continuation` -- free variables \(\mathbf{X}=[r_x, r_z, \dot{y}, T/2]\), isomorphic to `continuation_PAL_CR3BP` (`plane=13`) in `CR3BP_MATLAB_Library`.
-4. **Halo orbit family**: `Continuation.halo_pseudo_arclength_continuation` -- configures positive/negative branch step sizes, `DirectionalIncrement`, and target components following the script `FAMILY_L1Halo_North.m`; differential correction strategy is selectable (see below).
+1. **Single Halo periodic orbit**: Richardson third-order approximation initial guess + `DifferentialCorrection` (fixed `z0` or `x0`).
+2. **Seed orbit**: `Continuation.generate_halo_seed_orbit` — same as the single-orbit workflow, with `parameters` populated (`libration_point`, `amplitude_z`, `halo_class`).
+3. **Pseudo-arclength continuation (XZ symmetric)**: `Continuation.pseudo_arclength_continuation` — free variables \(\mathbf{X}=[r_x, r_z, \dot{y}, T/2]\), isomorphic to `continuation_PAL_CR3BP` (with `plane=13`) from the `CR3BP_MATLAB_Library`.
+4. **Halo orbit family**: `Continuation.halo_pseudo_arclength_continuation` — built on PAL with positive/negative branch step sizes, `DirectionalIncrement`, and target component configuration aligned with the script `FAMILY_L1Halo_North.m`; differential correction strategy is selectable (see below).
 
 ---
 
@@ -98,54 +99,54 @@ Halo convergence results validate a lower bound on the full period \(T\) (to avo
 | Method | Purpose |
 |--------|---------|
 | `generate_halo_seed_orbit(libration_point, amplitude_z, halo_class, ...)` | Generate and correct a single seed Halo |
-| `generate_halo_family(seed_orbit, ...)` | Step by `amplitude_z` with independent Richardson initial guesses (natural parameter style, not PAL) |
-| `pseudo_arclength_continuation(seed_orbit, ...)` | General XZ symmetric pseudo-arclength continuation (single direction `positive` / `negative`) |
-| `halo_pseudo_arclength_continuation(seed_orbit, ...)` | Halo-specific: bidirectional branches, default step sizes aligned with MATLAB scripts |
+| `generate_halo_family(seed_orbit, ...)` | Independent Richardson initial guesses by `amplitude_z` stepping (natural parameter, not PAL) |
+| `pseudo_arclength_continuation(seed_orbit, ...)` | General XZ-symmetric pseudo-arclength continuation (single direction: `positive` / `negative`) |
+| `halo_pseudo_arclength_continuation(seed_orbit, ...)` | Halo-specific: bidirectional branches, default step sizes and optional parameters aligned with MATLAB scripts |
 
-**Key parameters for `pseudo_arclength_continuation`**:
+**`pseudo_arclength_continuation` key parameters**:
 
 - `step_size`: \(|\Delta S|\) (positive; direction determined by `direction`).
-- `dc_scheme`: `adaptive` (switches between 3D symmetric fixed-x / fixed-z based on \(\Delta x\), \(\Delta z\)), `matlab_halo_type1` (always `setup_halo_orbit_fixed_x0`), `matlab_halo_type2` (switches between fixed-x / fixed-z by amplitude).
-- `directional_increment`, `target_vector` (0-based: \(0=r_x, 1=r_z, 2=\dot{y}, 3=T/2\)), `target_direction`: consistent with MATLAB `DirectionalIncrement` / `TargetVector` / `TargetDirection`.
+- `dc_scheme`: `adaptive` (switches between 3D symmetric fixed-x / fixed-z based on \(\Delta x\), \(\Delta z\)), `matlab_halo_type1` (always `setup_halo_orbit_fixed_x0`), `matlab_halo_type2` (switches between fixed-x / fixed-z based on amplitude).
+- `directional_increment`, `target_vector` (0-indexed: \(0=r_x,1=r_z,2=\dot y,3=T/2\)), `target_direction`: consistent with MATLAB `DirectionalIncrement` / `TargetVector` / `TargetDirection`.
 
-**Key points for `halo_pseudo_arclength_continuation`**:
+**`halo_pseudo_arclength_continuation` key points**:
 
-- `step_size` / `step_size_negative`: correspond to `DeltaS approx 0.0045` (positive branch) and `|DeltaS| approx 0.009` (negative branch) in the MATLAB scripts.
-- Default `dc_scheme='adaptive'`: more robust when PAL-derived initial guesses do not perfectly match MATLAB's fixed-`x0` behavior under the Python STM Newton solver; set to `matlab_halo_type1` for MATLAB `type=1` alignment (implementation may retry with fixed-z when fixed-x fails).
+- `step_size` / `step_size_negative`: correspond to the positive branch `DeltaS~0.0045` and negative branch `|DeltaS|~0.009` in the script.
+- Default `dc_scheme='adaptive'`: more robust when PAL initial guesses under Python STM Newton behave differently than MATLAB's fixed `x0` approach; to align with MATLAB `type=1`, set `matlab_halo_type1` (the implementation can retry fixed-z after fixed-x failure).
 
 ---
 
 ## PAL Implementation Notes (Differences from MATLAB and Safeguards)
 
-- **Inner Newton ordering**: Consistent with `continuation_PAL_CR3BP.m`, when \(\|F\|\) is already below tolerance, no extra step is taken on \(\mathbf{X}_{new}\), avoiding pushing the point away from the physical solution.
-- **Newton step clamping**: Upper bounds are applied to \(\Delta\mathbf{X}\) components, reducing the risk of jumping into a different branch of \(F=0\) (e.g., \(|r_x|\gg 1\)).
-- **Physical solution filtering**: If a PAL endpoint明显 deviates from the typical L1 Halo range, the algorithm **falls back** to Euler prediction \(\mathbf{X}+\Delta S\,\dot{\mathbf{X}}\) followed by differential correction.
-- **MATLAB inner loop uses fixed `X` for `F`**: This library uses the current iterate \(\mathbf{X}_{new}\) to compute \(F\) in the PAL inner loop, which is theoretically more self-consistent; reproducing MATLAB numerics line-by-line would require a separate branch implementation.
+- **Inner Newton termination**: Consistent with `continuation_PAL_CR3BP.m`, when \(\|F\|\) is already below tolerance, an extra Newton step on \(\mathbf{X}_{new}\) is **not** taken, to avoid pushing the point away from the physical solution.
+- **Newton step clamping**: An upper bound is imposed on \(\Delta\mathbf{X}\) components to mitigate the risk of jumping to a different branch of \(F=0\) (e.g., \(|r_x|\gg 1\)).
+- **Physical solution filtering**: If the PAL endpoint clearly deviates from the typical L1 Halo range, it **falls back** to the Euler prediction \(\mathbf{X}+\Delta S\,\dot{\mathbf{X}}\) followed by differential correction.
+- **MATLAB inner loop uses fixed `X` for `F`**: This library computes \(F\) using the current iteration's \(\mathbf{X}_{new}\) in the PAL inner loop, which is theoretically more self-consistent; reproducing MATLAB numerics line-by-line requires a separate branch.
 
 ---
 
-## Command-Line Scripts
+## CLI Scripts
 
 | Script | Description |
 |--------|-------------|
-| `scripts/generate/generate_halo_orbit.py` | Single Halo with adjustable `libration_point`, `amplitude_z`, `halo_class` |
-| `scripts/generate/generate_halo_family.py` | Starts from seed and calls `halo_pseudo_arclength_continuation`, outputs to `output/halo/*.json` |
-| `scripts/plot/plot_halo_orbit.py` | Plot single orbit or multiple orbits from JSON |
+| `scripts/generate/generate_halo_orbit.py` | Single Halo, with configurable `libration_point`, `amplitude_z`, `halo_class` |
+| `scripts/generate/generate_halo_family.py` | Calls `halo_pseudo_arclength_continuation` from a seed, outputs `output/halo/*.json` |
+| `scripts/plot/plot_halo_orbit.py` | Single orbit or multi-orbit plotting from JSON |
 | `scripts/plot/plot_halo_family.py` | Orbit family JSON: 2D/3D, Jacobi, stability, etc. |
 
-Common constants (e.g., \(\mu\)) can be found in `scripts/utils/common.py`.
+Common constants (e.g., \(\mu\)) are in `scripts/utils/common.py`.
 
 ---
 
-## References and Comparisons
+## References and Comparison
 
 - Richardson, D. L. (1980). Analytic construction of periodic orbits about the collinear points. *Celestial Mechanics*.
-- Local comparison implementation: `CR3BP_MATLAB_Library` -- `continuation_PAL_CR3BP.m`, `examples/FAMILY_L1Halo_North.m`.
+- Local reference implementation: `CR3BP_MATLAB_Library` — `continuation_PAL_CR3BP.m`, `examples/FAMILY_L1Halo_North.m`.
 
 ---
 
 ## See Also
 
-- [Orbit Generation Guide](../guides/orbit-generation_en.md) -- Tutorial entry point
-- [Continuation Module Overview](continuation_en.md) -- `Continuation` class index
-- [Differential Correction](differential_correction_en.md) -- Symmetry configuration details
+- [Orbit Generation Guide](../guides/orbit-generation.md) — tutorial entry point
+- [Continuation Module Overview](continuation.md) — `Continuation` class index
+- [Differential Correction](differential_correction.md) — symmetry configuration details

@@ -94,4 +94,4 @@ Create a subclass of `Dynamics`, implementing `equations_of_motion()` and `propa
 
 Create a new module in the `algorithms/` directory, follow the existing interface design, and export it in `__init__.py`.
 
--> For detailed usage of each module, see the corresponding documentation page.
+→ For detailed usage of each module, see the corresponding documentation page.

@@ -18,7 +18,7 @@ Improve code quality, test coverage, and complete incomplete features in the e2m
 
 ### Key Milestones
 1. Transfer module test coverage
-2. Algorithm module test coverage  
+2. Algorithm module test coverage
 3. Stability analysis completion
 4. Coordinate transformation completion
 5. Documentation update
@@ -294,8 +294,8 @@ jobs:
 
 Feature work for Halo single-orbit generation, pseudo-arclength continuation (MATLAB `continuation_PAL_CR3BP` alignment), CLI scripts, and follow-up tests is tracked in:
 
-- Chinese roadmap: [halo-roadmap.md](halo-roadmap.md)
-- Feature overview (EN): [halo.md](../algorithms/halo.md)
+- Halo roadmap: [halo-roadmap.md](./halo-roadmap.md)
+- Feature overview: [halo.md](../algorithms/halo.md)
 
 Tie-in: extend the **Algorithm module tests** epic with PAL / `generate_halo_seed_orbit` regression cases when feasible.
 

@@ -1,12 +1,12 @@
 ---
-title: 'Stability Analysis: StabilityAnalysis'
+title: "Stability Analysis"
 ---
 
 # Stability Analysis: StabilityAnalysis
 
 > **File**: `e2m2e/algorithms/stability.py`
 
-Stability analysis uses Floquet multipliers to determine the local stability of periodic orbits and detect bifurcation points. This is a key tool for understanding the topological structure of orbit families.
+Stability analysis determines the local stability of periodic orbits through Floquet multipliers and detects bifurcation points. This is the key tool for understanding the topological structure of orbit families.
 
 ## How to Determine Whether an Orbit Is Stable
 
@@ -25,15 +25,15 @@ print(f"Stability type: {result.stability_type}")
 print(f"Max multiplier magnitude: {result.max_multiplier_magnitude:.6f}")
 ```
 
-**How to interpret**:
+**How to interpret the results**:
 
-- Max multiplier magnitude $\approx 1.0$: orbit is stable (multipliers on the unit circle)
-- Max multiplier magnitude $> 1.0$: orbit is unstable (exponential divergence direction exists)
-- Multiplier exactly crossing the unit circle: possible bifurcation
+- Max multiplier magnitude $\approx 1.0$: orbit is stable (multipliers lie on the unit circle)
+- Max multiplier magnitude $> 1.0$: orbit is unstable (there is an exponentially divergent direction)
+- Multipliers crossing the unit circle: bifurcation may be present
 
 ## How to Find Bifurcation Points in an Orbit Family
 
-Bifurcation points are "turning points" of the orbit family -- at these points, the topological structure of the orbits changes (e.g., a planar orbit bifurcates into a 3D orbit).
+Bifurcation points are "inflection points" of an orbit family — at these points, the topological structure of the orbit changes (e.g., a 3D orbit branches off from a planar orbit).
 
 ```python
 from e2m2e.algorithms import StabilityAnalysis, BifurcationType
@@ -44,17 +44,17 @@ for orbit in family:
     result = analyzer.analyze()
 
     if result.bifurcation_type != BifurcationType.NONE:
-        print(f"Jacobi={orbit.jacobi_constant:.4f}: detected {result.bifurcation_type}")
+        print(f"Jacobi={orbit.jacobi_constant:.4f}: Detected {result.bifurcation_type}")
 ```
 
 ### Common Bifurcation Types
 
 | Bifurcation Type | Physical Meaning | Impact on Continuation |
-|-----------------|------------------|----------------------|
+|-----------------|-----------------|----------------------|
 | `SADDLE_NODE` | Saddle-node bifurcation: endpoint of the family curve | Continuation terminates here; change direction |
-| `PERIOD_DOUBLING` | Period-doubling bifurcation: period doubles | Produces a new period-doubled family |
+| `PERIOD_DOUBLING` | Period-doubling bifurcation: period doubles | Produces a new doubled-period family |
 | `PITCHFORK` | Pitchfork bifurcation: symmetry breaking | Produces two symmetric new families |
-| `TORUS` | Torus bifurcation: multipliers leave the unit circle | Produces quasi-periodic motion |
+| `TORUS` | Neimark-Sacker (torus) bifurcation: multipliers leave the unit circle | Produces quasi-periodic motion |
 
 ### Stability Type Quick Reference
 
@@ -69,16 +69,16 @@ for orbit in family:
 
 ## Batch Stability Computation
 
-Batch-compute stability for an orbit family (the visualization module provides a parallel version):
+Compute stability for an entire orbit family in batch (the visualization module provides a parallel version):
 
 ```python
 from e2m2e.visualization import compute_stability_for_family
 
 stability_values = compute_stability_for_family(family, system)
-# Returns the max multiplier magnitude for each orbit
+# Returns the maximum multiplier magnitude for each orbit
 ```
 
-See [Visualization Guide](../guides/visualization-guide_en.md#stability-computation) for details.
+See [Visualization Guide](../guides/visualization-guide.md#stability-computation)
 
 ## API Quick Reference
 
@@ -89,13 +89,13 @@ See [Visualization Guide](../guides/visualization-guide_en.md#stability-computat
 | `classify_stability()` | Classify stability type |
 | `detect_bifurcation()` | Detect bifurcation type |
 
-For the full API documentation, see [API Reference](../reference/api-reference_en.md).
+For the complete API documentation, see [API Reference](../reference/api-reference.md).
 
 ## Mathematical Background
 
 ### Floquet Theory
 
-For a periodic orbit $\mathbf{x}(t)$, small perturbations nearby satisfy:
+For a periodic orbit $\mathbf{x}(t)$, small perturbations in its vicinity satisfy:
 
 $$\Delta \dot{\mathbf{x}}(t) = \mathbf{A}(t) \Delta \mathbf{x}(t)$$
 
@@ -103,7 +103,7 @@ where $\mathbf{A}(t)$ is a periodic coefficient matrix. The eigenvalues of the M
 
 $$\boldsymbol{\Phi}(T) \mathbf{v} = \lambda \mathbf{v}$$
 
-Multipliers inside/outside/on the unit circle correspond to stable/unstable/critical states, respectively.
+Multipliers inside/on/outside the unit circle correspond to stable/unstable/marginal states, respectively.
 
 ### Stability Index
 

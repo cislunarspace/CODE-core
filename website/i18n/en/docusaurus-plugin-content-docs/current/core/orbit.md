@@ -53,7 +53,7 @@ print(f"Stability: {stability['type']}")
 print(f"Lyapunov exponents: {stability['lyapunov_exponents']}")
 ```
 
--> See [Stability Analysis](../algorithms/stability_en.md)
+-> See [Stability Analysis](../algorithms/stability.md)
 
 ## How to Save and Load Orbits
 
@@ -79,7 +79,7 @@ The JSON format contains the complete state sequence and metadata, and can be re
 
 ## How to Manage Orbit Families
 
-`OrbitFamily` is typically generated automatically by the [Continuation](../algorithms/continuation_en.md) algorithm. Manual construction:
+`OrbitFamily` is typically generated automatically by the [Continuation](../algorithms/continuation.md) algorithm. Manual construction:
 
 ```python
 from e2m2e.core.orbit import OrbitFamily
@@ -95,8 +95,8 @@ for orbit in family:
     print(orbit.period)
 ```
 
--> For continuation generation of orbit families, see [Orbit Family Continuation](../algorithms/continuation_en.md)
--> For orbit family visualization, see [Visualization Guide](../guides/visualization-guide_en.md)
+-> For continuation generation of orbit families, see [Orbit Family Continuation](../algorithms/continuation.md)
+-> For orbit family visualization, see [Visualization Guide](../guides/visualization-guide.md)
 
 ## API Quick Reference
 
@@ -123,4 +123,4 @@ for orbit in family:
 | `save_to_file(filename)` | Save to JSON |
 | `load_from_file(filename, system)` | Load from JSON |
 
-For the full API documentation, see [API Reference](../reference/api-reference_en.md).
+For the full API documentation, see [API Reference](../reference/api-reference.md).

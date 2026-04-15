@@ -70,7 +70,7 @@ print(stm.shape)  # (6, 6)
 
 The STM is the core tool for differential correction — it tells you "how small changes in the initial state affect the final state."
 
--> See [Differential Correction - How to Correct Precise Periodic Orbits](../algorithms/differential_correction_en.md)
+-> See [Differential Correction - How to Correct Precise Periodic Orbits](../algorithms/differential_correction.md)
 
 ## API Quick Reference
 
@@ -83,7 +83,7 @@ The STM is the core tool for differential correction — it tells you "how small
 | `compute_jacobi_constant(state)` | Compute the Jacobi constant |
 | `check_cross_section(state, plane, value)` | Detect Poincare section crossings |
 
-For the full API documentation, see [API Reference](../reference/api-reference_en.md).
+For the full API documentation, see [API Reference](../reference/api-reference.md).
 
 ## Equations of Motion
 

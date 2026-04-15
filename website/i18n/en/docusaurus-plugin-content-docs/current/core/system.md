@@ -92,7 +92,7 @@ dimensionless = system.physical_to_dimensionless(physical)
 | `compute_stability_index(L_point)` | Compute the linearized stability index at a libration point |
 | `info(mode)` | Print system information |
 
-For the full API documentation, see [API Reference](../reference/api-reference_en.md).
+For the full API documentation, see [API Reference](../reference/api-reference.md).
 
 ## Mathematical Background
 

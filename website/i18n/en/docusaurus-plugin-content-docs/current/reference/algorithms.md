@@ -569,7 +569,7 @@ e2m2e/
 └── docs/
     ├── reference/
     │   ├── algorithms_en.md      # This document
-    │   └── api-reference_en.md   # Complete API documentation
+    │   └── api-reference.md      # Complete API documentation
     ├── algorithms/
     │   ├── continuation_en.md
     │   ├── halo_en.md

@@ -5,7 +5,7 @@ title: Halo 轨道功能 — 后续开发路线图
 
 # Halo 轨道功能 — 后续开发路线图
 
-本文档在 [质量改进总计划](quality-improvement/test-coverage/project-plan_zh.md) 之外，单独跟踪 **Halo 单轨 / 轨道族 / PAL 延拓** 的演进，便于与 Continuation、微分修正、测试与文档工作对齐。
+本文档在 [质量改进总计划](test-coverage-project-plan.md) 之外，单独跟踪 **Halo 单轨 / 轨道族 / PAL 延拓** 的演进，便于与 Continuation、微分修正、测试与文档工作对齐。
 
 ---
 

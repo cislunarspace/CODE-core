@@ -64,7 +64,7 @@ dc.setup_2D_symmetric_x_fixed_t(t_half=1.6)
 # Here x0 and vy are automatically solved by the corrector
 ```
 
--> For detailed differential correction configuration, see [Differential Correction](../algorithms/differential_correction_en.md)
+→ For detailed differential correction configuration, see [Differential Correction](../algorithms/differential_correction.md)
 
 ---
 
@@ -108,7 +108,7 @@ family = cont.halo_pseudo_arclength_continuation(
 | $x_0$ range | $0.8 < x_0 < 1.0$ | $1.0 < x_0 < 1.2$ |
 | Amplitude | Generally smaller | Generally larger |
 
--> For detailed Halo documentation (Richardson initial guess, PAL implementation, MATLAB comparison, command-line scripts), see [Halo Orbits](../algorithms/halo_en.md)
+→ For detailed Halo documentation (Richardson initial guess, PAL implementation, MATLAB comparison, command-line scripts), see [Halo Orbits](../algorithms/halo.md)
 
 ---
 
@@ -144,7 +144,7 @@ family = cont.natural_continuation(
 )
 ```
 
-**When to use natural continuation vs pseudo-arclength continuation**, along with parameter details, see [Orbit Family Continuation](../algorithms/continuation_en.md).
+**When to use natural continuation vs pseudo-arclength continuation**, along with parameter details, see [Orbit Family Continuation](../algorithms/continuation.md).
 
 ---
 
@@ -173,14 +173,14 @@ orbit = Orbit.load_from_file("output/dro_single.json", system=system)
 
 ### Large-Amplitude Orbits Needed
 
-Start from a small-amplitude seed and use the [continuation algorithm](../algorithms/continuation_en.md) to gradually increase the amplitude. Natural continuation will fail at turning points of the family curve; switch to pseudo-arclength continuation at that point.
+Start from a small-amplitude seed and use the [continuation algorithm](../algorithms/continuation.md) to gradually increase the amplitude. Natural continuation will fail at turning points of the family curve; switch to pseudo-arclength continuation at that point.
 
 ---
 
 ## Reference
 
-- [Differential Correction](../algorithms/differential_correction_en.md) — Symmetry configuration selection, convergence troubleshooting
-- [Orbit Family Continuation](../algorithms/continuation_en.md) — Natural vs pseudo-arclength continuation
-- [Halo Orbits](../algorithms/halo_en.md) — Richardson initial guess, PAL, MATLAB comparison
-- [Stability Analysis](../algorithms/stability_en.md) — Floquet analysis, bifurcation detection
-- [Visualization Guide](visualization-guide_en.md) — Orbit family and transfer trajectory visualization
+- [Differential Correction](../algorithms/differential_correction.md) — Symmetry configuration selection, convergence troubleshooting
+- [Orbit Family Continuation](../algorithms/continuation.md) — Natural vs pseudo-arclength continuation
+- [Halo Orbits](../algorithms/halo.md) — Richardson initial guess, PAL, MATLAB comparison
+- [Stability Analysis](../algorithms/stability.md) — Floquet analysis, bifurcation detection
+- [Visualization Guide](visualization-guide.md) — Orbit family and transfer trajectory visualization

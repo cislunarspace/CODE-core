@@ -1,12 +1,12 @@
 ---
-title: 'Orbit Family Continuation: Continuation'
+title: "Orbit Family Continuation"
 ---
 
 # Orbit Family Continuation: Continuation
 
 > **File**: `e2m2e/algorithms/continuation.py`
 
-Continuation starts from a converged periodic orbit (seed) and incrementally tracks along parameter directions to generate a family of orbits. This is the core tool for systematic exploration of orbit space.
+Continuation starts from a converged periodic orbit (the seed) and traces along a parameter direction step by step to generate a family of orbits. This is the core tool for systematically exploring orbit space.
 
 ## How to Generate a Family of Periodic Orbits
 
@@ -30,7 +30,7 @@ seed_orbit, _ = dc.iterate_correction(
 cont = Continuation(corrector=dc, step=0.01)
 family = cont.natural_continuation(
     seed_orbit=seed_orbit,
-    param_range=(0.8, 0.95),  # range of x0
+    param_range=(0.8, 0.95),  # x0 range
     step_size=0.01,
     verbose=True,
 )
@@ -40,16 +40,16 @@ family.save_to_file("output/dro_family.json")
 print(f"Generated {len(family)} orbits")
 ```
 
-## Natural Continuation vs Pseudo-Arclength Continuation?
+## Natural Continuation vs. Pseudo-Arclength Continuation
 
 | | Natural Continuation | Pseudo-Arclength Continuation |
-|---|---------------------|-------------------------------|
-| **Principle** | Fix one parameter, vary it step by step | Track along the curve tangent in parameter space |
-| **Advantages** | Simple, fewer parameters | Can navigate around turning points |
-| **Disadvantages** | Fails at turning points | More parameters, more complex tuning |
-| **Best for** | Families with monotonic parameter variation | Families with inflection/folding points (e.g., Halo families) |
+|---|---------|-----------|
+| **Principle** | Fix one parameter and vary it step by step | Trace along the tangent to the curve in parameter space |
+| **Advantage** | Simple, few parameters | Can navigate around turning points |
+| **Disadvantage** | Fails at turning points | More parameters, harder to tune |
+| **Best for** | Families with monotonically changing parameters | Families with inflection/fold points (e.g., Halo families) |
 
-**Recommendation**: Try natural continuation first. If it fails at a certain parameter value (error or orbit jump), switch to pseudo-arclength continuation.
+**Recommendation**: Try natural continuation first. If it fails at a certain parameter value (error or orbit jumping), switch to pseudo-arclength continuation.
 
 ### Pseudo-Arclength Continuation
 
@@ -65,7 +65,7 @@ family = cont.pseudo_arclength_continuation(
 Key parameters:
 - `n_orbits`: number of orbits to generate
 - `direction`: continuation direction ("positive" or "negative")
-- Initial step size is set via `Continuation(step=...)`; the algorithm adapts automatically
+- Initial step size is set via `Continuation(step=...)`; the algorithm adjusts adaptively
 
 ## How to Generate a Halo Orbit Family
 
@@ -84,26 +84,26 @@ seed = cont.generate_halo_seed_orbit(
     halo_class=0,        # Northern halo
 )
 
-# Pseudo-arclength continuation to generate the family
+# Pseudo-arclength continuation to generate family
 family = cont.halo_pseudo_arclength_continuation(
     seed_orbit=seed,
     n_orbits=10,
-    direction="both",    # bidirectional
+    direction="both",    # bidirectional continuation
     step_size=0.0045,
     verbose=True,
 )
 ```
 
-See [Halo Orbits](halo_en.md) for details (including Richardson initial guess, PAL details, and command-line scripts).
+See [Halo Orbits](halo.md) for details (including Richardson initial guess, PAL details, CLI scripts)
 
 ## API Quick Reference
 
 | Method | Description |
-|--------|-------------|
+|------|------|
 | `natural_continuation(seed_orbit, param_range, step_size)` | Natural parameter continuation |
 | `pseudo_arclength_continuation(seed_orbit, n_orbits, direction)` | Pseudo-arclength continuation |
 | `generate_halo_seed_orbit(libration_point, amplitude_z, halo_class)` | Generate a Halo seed orbit |
 | `generate_halo_family(seed_orbit, ...)` | Halo family by amplitude stepping |
 | `halo_pseudo_arclength_continuation(seed_orbit, n_orbits, direction)` | Halo-specific pseudo-arclength continuation |
 
-For the full API documentation, see [API Reference](../reference/api-reference_en.md).
+For the complete API documentation, see [API Reference](../reference/api-reference.md).

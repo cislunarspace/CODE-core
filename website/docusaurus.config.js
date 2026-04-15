@@ -8,7 +8,7 @@ import rehypeKatex from 'rehype-katex';
 const config = {
   title: 'E2M2E',
   tagline: '地月转移轨道设计库 — Cislunar Transfer Orbit Design Library',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/favicon.svg',
 
   future: {
     v4: true,
@@ -20,7 +20,7 @@ const config = {
   organizationName: 'cislunarspace',
   projectName: 'e2m2e',
 
-  onBrokenLinks: 'warn',
+  onBrokenLinks: 'throw',
 
   i18n: {
     defaultLocale: 'zh-Hans',
@@ -92,7 +92,7 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
-      image: 'img/docusaurus-social-card.jpg',
+      image: 'img/logo.svg',
       colorMode: {
         respectPrefersColorScheme: true,
       },
@@ -133,11 +133,11 @@ const config = {
             items: [
               {
                 label: '快速上手',
-                to: '/docs/intro',
+                to: '/docs',
               },
               {
-                label: '算法详解',
-                to: '/docs/category/algorithms',
+                label: '微分修正',
+                to: '/docs/algorithms/differential_correction',
               },
             ],
           },
