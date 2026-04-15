@@ -36,7 +36,7 @@ compute_stability_for_family (stability.py)  — standalone function
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [Core Classes & Configuration](#core-classes-configuration)
+2. [Core Classes & Configuration](#core-classes--configuration)
 3. [Basic Visualization (OrbitVisualizer)](#basic-visualization-orbitvisualizer)
 4. [Orbit Family Visualization (FamilyPlotter)](#orbit-family-visualization-familyplotter)
 5. [Transfer Orbit Visualization (TransferPlotter)](#transfer-orbit-visualization-transferplotter)

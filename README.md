@@ -296,20 +296,20 @@ ruff format .         # 格式化
 
 ### 文档构建
 
-项目使用 MkDocs + Material 主题构建文档网站：
+项目使用 Docusaurus 构建文档网站：
 
 ```bash
 # 安装文档构建依赖
-pip install mkdocs mkdocs-material
+cd website && npm install
 
 # 本地预览文档
-mkdocs serve
+npm run start
 
 # 构建静态网站
-mkdocs build
+npm run build
 
-# 部署到 GitHub Pages
-mkdocs gh-deploy
+# 本地预览构建产物
+npm run serve
 ```
 
 ### AI 助手开发指南
@@ -336,22 +336,21 @@ mkdocs gh-deploy
 
 ### 在线文档网站
 
-项目文档已通过 MkDocs + Material 主题发布为在线网站：
+项目文档已通过 Docusaurus 发布为在线网站（通过 GitHub Actions 自动部署到 GitHub Pages）：
 
-- **本地预览**：`mkdocs serve`（访问 http://127.0.0.1:8000）
-- **构建静态网站**：`mkdocs build`（输出到 `site/` 目录）
-- **部署到 GitHub Pages**：`mkdocs gh-deploy`
+- **本地预览**：`cd website && npm run start`
+- **构建静态网站**：`npm run build`（输出到 `website/build/` 目录）
 
 ### 文档目录结构
 
-更多文档请参考 [`docs/`](docs/) 目录：
+文档源文件位于 [`website/docs/`](website/docs/) 目录：
 
-- [系统架构](docs/guides/system-overview.md)
-- [轨道生成教程](docs/guides/orbit-generation.md)
-- [可视化指南](docs/guides/visualization-guide.md)
-- [发布指南](docs/guides/release.md)
-- [算法参考](docs/reference/algorithms.md) - 微分修正、延拓、稳定性分析、多重打靶法
-- [核心模块参考](docs/core/) - 系统、动力学、轨道、坐标变换、星历动力学
+- [系统架构](website/docs/guides/system-overview.md)
+- [轨道生成教程](website/docs/guides/orbit-generation.md)
+- [可视化指南](website/docs/guides/visualization-guide.md)
+- [发布指南](website/docs/guides/release.md)
+- [算法参考](website/docs/reference/algorithms.md) - 微分修正、延拓、稳定性分析、多重打靶法
+- [核心模块参考](website/docs/core/) - 系统、动力学、轨道、坐标变换、星历动力学
 - [AI 助手开发指南](AGENTS.md) - 为 AI 助手提供的仓库特定开发指导
 
 ## 致谢

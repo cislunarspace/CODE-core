@@ -26,10 +26,10 @@ ruff check .
 ruff check --fix .
 ruff format .
 
-# Documentation (MkDocs + Material theme)
-pip install mkdocs mkdocs-material
-mkdocs serve                     # local preview at http://127.0.0.1:8000
-mkdocs build                     # static site → site/
+# Documentation (Docusaurus)
+cd website && npm install
+npm run start                    # local preview
+npm run build                    # static site → website/build/
 
 # MBSE diagram generation
 python scripts/generate_mbse_diagrams.py

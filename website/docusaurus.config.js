@@ -44,7 +44,7 @@ const config = {
       ({
         docs: {
           sidebarPath: './sidebars.js',
-          editUrl: 'https://github.com/cislunarspace/e2m2e/tree/docs/docusaurus/website/',
+          editUrl: 'https://github.com/cislunarspace/e2m2e/tree/master/website/',
           remarkPlugins: [remarkMath],
           rehypePlugins: [rehypeKatex],
         },
