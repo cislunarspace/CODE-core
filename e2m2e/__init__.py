@@ -19,7 +19,19 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__ = version("e2m2e")
 except PackageNotFoundError:
-    __version__ = "0.0.0"
+    try:
+        from pathlib import Path
+
+        import tomllib
+
+        _pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        if _pyproject.exists():
+            with open(_pyproject, "rb") as _f:
+                __version__ = tomllib.load(_f)["project"]["version"]
+        else:
+            __version__ = "0.0.0"
+    except Exception:
+        __version__ = "0.0.0"
 
 __author__ = "天疆说"
 __email__ = "ouyangjiahong22@nudt.edu.cn"
