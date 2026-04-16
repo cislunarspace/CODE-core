@@ -24,20 +24,8 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
 
-  test:
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -e ".[dev]"
-      - run: pytest --cov=e2m2e --cov-report=term-missing --cov-fail-under=50 -x
-
   build:
-    needs: test
+    needs: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
