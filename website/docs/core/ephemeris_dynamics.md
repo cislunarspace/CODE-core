@@ -1,8 +1,8 @@
 ---
-title: EphemerisDynamics - 星历动力学
+title: 星历动力学 EphemerisDynamics
 ---
 
-# EphemerisDynamics - 星历动力学
+# 星历动力学（EphemerisDynamics）
 
 `EphemerisDynamics` 类继承自 `Dynamics` 基类，提供基于 NASA SPICE 内核的精确多天体引力计算。
 

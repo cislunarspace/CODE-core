@@ -10,7 +10,7 @@ title: E2M2E 技术文档
 
 ---
 
-## 1. Core Module (核心模块)
+## 1. 核心模块
 
 ### 1.1 CR3BP_System
 
@@ -288,7 +288,7 @@ $$\mathbf{v}_{inertial} = R_z(\theta)^T \mathbf{v}_{rotating} + \dot{R}_z(\theta
 
 ---
 
-## 2. Algorithms Module (算法模块)
+## 2. 算法模块
 
 ### 2.1 DifferentialCorrection
 
@@ -520,7 +520,7 @@ corrector.setup_halo_orbit_fixed_z0(z0=0.1, libration_point=1)
 
 ---
 
-## 3. Transfer Module (转移模块)
+## 3. 转移模块
 
 ### 3.1 TransferSearch / DROTransferSearch
 
@@ -716,7 +716,7 @@ result = optimize_with_copt(optimizer, initial_guess, fallback_to_scipy=True)
 
 ---
 
-## 4. Visualization Module (可视化模块)
+## 4. 可视化模块
 
 > `plotting.py` 已拆分为 `config.py`、`base.py`、`family.py`、`transfer.py`、`stability.py`，原路径仍作为重导出兼容层可用。
 

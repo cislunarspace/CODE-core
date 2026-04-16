@@ -560,22 +560,30 @@ e2m2e/
 │   ├── core/
 │   │   ├── system.py          # CR3BP system parameters
 │   │   ├── dynamics.py        # Dynamics equations
-│   │   ├── orbit.py          # Orbit and OrbitFamily classes
-│   │   └── coordinate.py     # Coordinate transformations
+│   │   ├── orbit.py           # Orbit and OrbitFamily classes
+│   │   └── coordinate.py      # Coordinate transformations
 │   └── algorithms/
 │       ├── differential_correction.py  # Differential correction
-│       ├── continuation.py            # Orbit family continuation
-│       └── stability.py              # Stability analysis
-└── docs/
-    ├── reference/
-    │   ├── algorithms_en.md      # This document
-    │   └── api-reference.md      # Complete API documentation
-    ├── algorithms/
-    │   ├── continuation_en.md
-    │   ├── halo_en.md
-    │   ├── differential_correction_en.md
-    │   └── stability_en.md
-    └── guides/
-        ├── orbit-generation_en.md
-        └── system-overview_en.md
+│       ├── continuation.py             # Orbit family continuation
+│       └── stability.py               # Stability analysis
+└── website/
+    ├── docs/                    # Chinese (default locale)
+    │   ├── reference/
+    │   │   ├── algorithms.md
+    │   │   └── api-reference.md
+    │   ├── algorithms/
+    │   │   ├── continuation.md
+    │   │   ├── halo.md
+    │   │   ├── differential_correction.md
+    │   │   └── stability.md
+    │   └── guides/
+    │       ├── orbit-generation.md
+    │       └── system-overview.md
+    └── i18n/en/                 # English locale
+        └── docusaurus-plugin-content-docs/current/
+            ├── reference/
+            │   ├── algorithms.md   # This document
+            │   └── api-reference.md
+            ├── algorithms/
+            └── guides/
 ```

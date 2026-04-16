@@ -1,5 +1,5 @@
 ---
-title: BDD Algorithms
+title: 算法模块 BDD
 ---
 
 ```mermaid

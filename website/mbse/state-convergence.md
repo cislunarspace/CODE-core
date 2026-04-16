@@ -1,5 +1,5 @@
 ---
-title: State Convergence
+title: 收敛状态机
 ---
 
 ```mermaid

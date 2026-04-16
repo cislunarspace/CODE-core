@@ -16,7 +16,7 @@ title: Halo 轨道功能 — 后续开发路线图
 - `halo_pseudo_arclength_continuation`（双向支、步长与方向参数可对齐 MATLAB 示例脚本）。
 - PAL 内层数值防护：收敛判定顺序、牛顿步限幅、非物理支回退、必要时 DC 策略回退。
 - 绘图脚本：`plot_halo_orbit.py`、`plot_halo_family.py`。
-- 文档：`docs/algorithms/halo.md`（及英文摘要 `halo_en.md`）。
+- 文档：`algorithms/halo.md`（中英双语，英文版通过 Docusaurus i18n 提供）。
 
 ---
 

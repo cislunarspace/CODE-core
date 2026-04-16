@@ -1,5 +1,5 @@
 ---
-title: Activity Differential Correction
+title: 微分修正活动图
 ---
 
 ```mermaid

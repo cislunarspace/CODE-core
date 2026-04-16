@@ -1,154 +1,154 @@
 ---
 format: md
-title: 'Project Plan: e2m2e Quality Improvement & Test Coverage'
+title: '项目计划：e2m2e 质量改进与测试覆盖'
 ---
 
-# Project Plan: e2m2e Quality Improvement & Test Coverage
+# 项目计划：e2m2e 质量改进与测试覆盖
 
-## 1. Project Overview
+## 1. 项目概述
 
-### Feature Summary
-Improve code quality, test coverage, and complete incomplete features in the e2m2e orbital mechanics library.
+### 功能摘要
+提升 e2m2e 轨道力学库的代码质量、测试覆盖率，并完成不完整的功能。
 
-### Success Criteria
-- Test coverage for all public modules (transfer, algorithms) >80%
-- All TODO comments addressed or tracked in issues
-- All NotImplementedError cases either implemented or documented
-- Stable API with backward compatibility
+### 成功标准
+- 所有公共模块（transfer, algorithms）的测试覆盖率 >80%
+- 所有 TODO 注释都已处理或在 issues 中跟踪
+- 所有 NotImplementedError 案例都已实现或已记录
+- 稳定的 API 和向后兼容性
 
-### Key Milestones
-1. Transfer module test coverage
-2. Algorithm module test coverage  
-3. Stability analysis completion
-4. Coordinate transformation completion
-5. Documentation update
+### 关键里程碑
+1. Transfer 模块测试覆盖率
+2. Algorithm 模块测试覆盖率
+3. 稳定性分析完善
+4. 坐标变换完善
+5. 文档更新
 
-### Risk Assessment
-- **Risk**: Some features may require API changes that break backward compatibility
-- **Mitigation**: Version bump and deprecation warnings before removal
-- **Risk**: Complex orbital mechanics may make testing difficult
-- **Mitigation**: Use integration tests with known orbital solutions
+### 风险评估
+- **风险**：某些功能可能需要 API 更改，从而破坏向后兼容性
+- **缓解措施**：在移除之前进行版本升级和弃用警告
+- **风险**：复杂的轨道力学可能使测试变得困难
+- **缓解措施**：使用已知轨道解的集成测试
 
 ---
 
-## 2. Work Item Hierarchy
+## 2. 工作项层次结构
 
 ```mermaid
 graph TD
-    A[Epic: Quality Improvement] --> B[Feature: Transfer Module Tests]
-    A --> C[Feature: Algorithm Module Tests]
-    A --> D[Feature: Stability Analysis Completion]
-    A --> E[Feature: Coordinate Transform Completion]
+    A[Epic: 质量改进] --> B[Feature: Transfer 模块测试]
+    A --> C[Feature: Algorithm 模块测试]
+    A --> D[Feature: 稳定性分析完善]
+    A --> E[Feature: 坐标变换完善]
     
-    B --> F[Story: EarthMoonTransfer Tests]
-    B --> G[Story: MoonEarthTransfer Tests]
-    B --> H[Story: InterOrbitTransfer Tests]
+    B --> F[Story: EarthMoonTransfer 测试]
+    B --> G[Story: MoonEarthTransfer 测试]
+    B --> H[Story: InterOrbitTransfer 测试]
     
-    C --> I[Story: Continuation Tests]
-    C --> J[Story: DifferentialCorrection Tests]
-    C --> K[Story: StabilityAnalysis Tests]
+    C --> I[Story: Continuation 测试]
+    C --> J[Story: DifferentialCorrection 测试]
+    C --> K[Story: StabilityAnalysis 测试]
     
-    D --> L[Enabler: StabilityIndex Implementation]
-    D --> M[Enabler: Monodromy Matrix Computation]
+    D --> L[Enabler: StabilityIndex 实现]
+    D --> M[Enabler: Monodromy Matrix 计算]
     
-    E --> N[Enabler: Frame Conversion Implementation]
+    E --> N[Enabler: Frame Conversion 实现]
     
-    I --> O[Task: continuation.py unit tests]
-    J --> P[Task: differential_correction.py unit tests]
-    K --> Q[Task: stability.py unit tests]
+    I --> O[Task: continuation.py 单元测试]
+    J --> P[Task: differential_correction.py 单元测试]
+    K --> Q[Task: stability.py 单元测试]
 ```
 
 ---
 
-## 3. GitHub Issues Breakdown
+## 3. GitHub Issues 分解
 
-### Epic Issue Template
+### Epic Issue 模板
 
 ```markdown
-# Epic: e2m2e Quality Improvement
+# Epic: e2m2e 质量改进
 
-## Epic Description
+## Epic 描述
 
-Improve code quality, test coverage, and complete incomplete features across the e2m2e orbital mechanics library.
+提升 e2m2e 轨道力学库的代码质量、测试覆盖率，并完成不完整的功能。
 
-## Business Value
+## 业务价值
 
-- **Primary Goal**: Increase project reliability and maintainability
-- **Success Metrics**: >80% test coverage on core modules
-- **User Impact**: More stable library for researchers and engineers
+- **主要目标**：提高项目可靠性和可维护性
+- **成功指标**：核心模块测试覆盖率 >80%
+- **用户影响**：为研究人员和工程师提供更稳定的库
 
-## Epic Acceptance Criteria
+## Epic 验收标准
 
-- [ ] All transfer modules have >80% test coverage
-- [ ] All algorithm modules have >80% test coverage
-- [ ] All TODOs addressed or converted to tracked issues
-- [ ] All NotImplementedError cases resolved
+- [ ] 所有 transfer 模块测试覆盖率 >80%
+- [ ] 所有 algorithm 模块测试覆盖率 >80%
+- [ ] 所有 TODO 已处理或转换为跟踪的 issues
+- [ ] 所有 NotImplementedError 案例已解决
 
-## Features in this Epic
+## 此 Epic 中的功能
 
-- [ ] #{issue} - Transfer Module Tests
-- [ ] #{issue} - Algorithm Module Tests
-- [ ] #{issue} - Stability Analysis Completion
-- [ ] #{issue} - Coordinate Transform Completion
+- [ ] #{issue} - Transfer 模块测试
+- [ ] #{issue} - Algorithm 模块测试
+- [ ] #{issue} - 稳定性分析完善
+- [ ] #{issue} - 坐标变换完善
 
-## Definition of Done
+## 完成定义
 
-- [ ] All feature stories completed
-- [ ] Test coverage metrics met
-- [ ] Documentation updated
-- [ ] No new TODOs introduced
+- [ ] 所有功能 story 已完成
+- [ ] 测试覆盖率指标已达到
+- [ ] 文档已更新
+- [ ] 没有引入新的 TODO
 
-## Labels
+## 标签
 
 `epic`, `priority-high`, `quality`
 
-## Milestone
+## 里程碑
 
 v0.2.0
 
-## Estimate
+## 估算
 
 XL
 ```
 
-### Feature Issue Template
+### Feature Issue 模板
 
 ```markdown
-# Feature: Transfer Module Test Coverage
+# Feature: Transfer 模块测试覆盖率
 
-## Feature Description
+## 功能描述
 
-Add comprehensive unit and integration tests for all transfer orbit modules.
+为所有转移轨道模块添加全面的单元测试和集成测试。
 
-## User Stories in this Feature
+## 此功能中的用户故事
 
-- [ ] #{issue} - EarthMoonTransfer Tests
-- [ ] #{issue} - MoonEarthTransfer Tests
-- [ ] #{issue} - InterOrbitTransfer Tests
+- [ ] #{issue} - EarthMoonTransfer 测试
+- [ ] #{issue} - MoonEarthTransfer 测试
+- [ ] #{issue} - InterOrbitTransfer 测试
 
-## Technical Enablers
+## 技术支持
 
-N/A - User-facing feature testing
+N/A - 用户面向功能测试
 
-## Dependencies
+## 依赖关系
 
-**Blocked by**: None
-**Blocks**: Algorithm Module Tests (can run in parallel)
+**被阻塞**：无
+**阻塞**：Algorithm 模块测试（可并行运行）
 
-## Acceptance Criteria
+## 验收标准
 
-- [ ] EarthMoonTransfer has >80% coverage
-- [ ] MoonEarthTransfer has >80% coverage
-- [ ] InterOrbitTransfer has >80% coverage
-- [ ] Integration tests with known solutions pass
+- [ ] EarthMoonTransfer 覆盖率 >80%
+- [ ] MoonEarthTransfer 覆盖率 >80%
+- [ ] InterOrbitTransfer 覆盖率 >80%
+- [ ] 与已知解的集成测试通过
 
-## Definition of Done
+## 完成定义
 
-- [ ] All transfer classes tested
-- [ ] Test fixtures established
-- [ ] Integration tests with reference solutions
+- [ ] 所有 transfer 类已测试
+- [ ] 测试夹具已建立
+- [ ] 使用参考解的集成测试
 
-## Labels
+## 标签
 
 `feature`, `priority-high`, `testing`, `transfer`
 
@@ -156,106 +156,106 @@ N/A - User-facing feature testing
 
 #{epic-issue-number}
 
-## Estimate
+## 估算
 
 M (13-20 story points)
 ```
 
 ---
 
-## 4. Priority and Value Matrix
+## 4. 优先级和价值矩阵
 
-| Priority | Value  | Criteria                                      | Labels                          |
+| 优先级 | 价值 | 标准 | 标签 |
 | -------- | ------ | -------------------------------------------- | ------------------------------- |
-| P0       | High   | Critical path - transfer tests               | `priority-critical`, `value-high` |
-| P1       | High   | Core functionality - algorithm tests         | `priority-high`, `value-high`     |
-| P1       | Medium | Core functionality - stability completion    | `priority-high`, `value-medium`   |
-| P2       | Medium | Important but not blocking - coord transform  | `priority-medium`, `value-medium` |
-| P3       | Low    | Nice to have - documentation                 | `priority-low`, `value-low`       |
+| P0 | 高 | 关键路径 - transfer 测试 | `priority-critical`, `value-high` |
+| P1 | 高 | 核心功能 - algorithm 测试 | `priority-high`, `value-high` |
+| P1 | 中 | 核心功能 - 稳定性完善 | `priority-high`, `value-medium` |
+| P2 | 中 | 重要但不阻塞 - coord transform | `priority-medium`, `value-medium` |
+| P3 | 低 | 锦上添花 - 文档 | `priority-low`, `value-low` |
 
 ---
 
-## 5. Estimation Guidelines
+## 5. 估算指南
 
-### Story Point Scale (Fibonacci)
+### Story Point 规模（斐波那契）
 
-- **1 point**: Simple test case, <4 hours
-- **2 points**: Standard unit test, <1 day
-- **3 points**: Multiple test scenarios, 1-2 days
-- **5 points**: Complex integration test, 3-5 days
-- **8 points**: Complete module coverage, 1-2 weeks
-- **13+ points**: Epic-level work, needs breakdown
+- **1 分**：简单测试用例，<4 小时
+- **2 分**：标准单元测试，<1 天
+- **3 分**：多个测试场景，1-2 天
+- **5 分**：复杂集成测试，3-5 天
+- **8 分**：完整模块覆盖，1-2 周
+- **13+ 分**：Epic 级别工作，需要分解
 
-### T-Shirt Sizing (Epics/Features)
+### T 恤尺码（Epic/Feature）
 
-- **Transfer Module Tests**: L (20-40 story points)
-- **Algorithm Module Tests**: L (20-40 story points)
-- **Stability Analysis**: M (8-20 story points)
-- **Coordinate Transform**: S (3-8 story points)
+- **Transfer 模块测试**：L（20-40 story points）
+- **Algorithm 模块测试**：L（20-40 story points）
+- **稳定性分析**：M（8-20 story points）
+- **坐标变换**：S（3-8 story points）
 
 ---
 
-## 6. Dependency Management
+## 6. 依赖关系管理
 
 ```mermaid
 graph LR
-    A[Epic Start] --> B[Transfer Tests]
-    A --> C[Algorithm Tests]
-    B --> D[Integration Tests]
+    A[Epic 开始] --> B[Transfer 测试]
+    A --> C[Algorithm 测试]
+    B --> D[集成测试]
     C --> D
-    D --> E[Stability Completion]
-    E --> F[Coord Transform]
+    D --> E[稳定性完善]
+    E --> F[坐标变换]
 ```
 
-### Dependency Types
+### 依赖类型
 
-- **Blocks**: Transfer/Algorithm tests must complete before integration tests
-- **Related**: Stability and Coord Transform can run in parallel
-- **Parallel**: Transfer and Algorithm tests are independent
+- **阻塞**：Transfer/Algorithm 测试必须在集成测试前完成
+- **相关**：稳定性和坐标变换可并行运行
+- **并行**：Transfer 和 Algorithm 测试相互独立
 
 ---
 
-## 7. Sprint Planning Template
+## 7. Sprint 计划模板
 
-### Sprint 1: Transfer Module Coverage
-- **Stories**: EarthMoonTransfer, MoonEarthTransfer, InterOrbitTransfer tests
-- **Total**: ~20 story points
-- **Focus**: Get transfer module to >80% coverage
+### Sprint 1: Transfer 模块覆盖率
+- **Stories**: EarthMoonTransfer, MoonEarthTransfer, InterOrbitTransfer 测试
+- **总计**：约 20 story points
+- **重点**：使 transfer 模块达到 >80% 覆盖率
 
-### Sprint 2: Algorithm Module Coverage
-- **Stories**: Continuation, DifferentialCorrection, StabilityAnalysis tests
-- **Total**: ~20 story points
-- **Focus**: Get algorithm module to >80% coverage
+### Sprint 2: Algorithm 模块覆盖率
+- **Stories**: Continuation, DifferentialCorrection, StabilityAnalysis 测试
+- **总计**：约 20 story points
+- **重点**：使 algorithm 模块达到 >80% 覆盖率
 
-### Sprint 3: Feature Completion
+### Sprint 3: 功能完善
 - **Stories**: StabilityIndex, MonodromyMatrix, FrameConversion
-- **Total**: ~15 story points
-- **Focus**: Complete incomplete implementations
+- **总计**：约 15 story points
+- **重点**：完成未实现的实现
 
 ---
 
-## 8. GitHub Project Board Configuration
+## 8. GitHub 项目看板配置
 
-### Column Structure (Kanban)
-1. **Backlog**: Prioritized and ready for planning
-2. **Sprint Ready**: Detailed and estimated, ready for development
-3. **In Progress**: Currently being worked on
-4. **In Review**: Code review, testing, or stakeholder review
-5. **Testing**: QA validation and acceptance testing
-6. **Done**: Completed and accepted
+### 列结构（Kanban）
+1. **Backlog**：已排序并准备好计划
+2. **Sprint Ready**：已详细说明和估算，准备开发
+3. **In Progress**：正在工作
+4. **In Review**：代码审查、测试或相关方审查
+5. **Testing**：QA 验证和验收测试
+6. **Done**：已完成并接受
 
-### Custom Fields Configuration
-- **Priority**: P0, P1, P2, P3
-- **Value**: High, Medium, Low
-- **Component**: Transfer, Algorithms, Core, Visualization
-- **Estimate**: Story points (1, 2, 3, 5, 8, 13)
-- **Test Coverage**: Current %, Target %
+### 自定义字段配置
+- **优先级**：P0, P1, P2, P3
+- **价值**：高, 中, 低
+- **组件**：Transfer, Algorithms, Core, Visualization
+- **估算**：Story points (1, 2, 3, 5, 8, 13)
+- **测试覆盖率**：当前 %, 目标 %
 
 ---
 
-## 9. Automation and GitHub Actions
+## 9. 自动化和 GitHub Actions
 
-### Automated Test Coverage Reporting
+### 自动测试覆盖率报告
 
 ```yaml
 name: Test Coverage Report
@@ -290,38 +290,37 @@ jobs:
 
 ---
 
-## Appendix: Halo orbit roadmap
+## 附录：Halo 轨道专题路线图
 
-Feature work for Halo single-orbit generation, pseudo-arclength continuation (MATLAB `continuation_PAL_CR3BP` alignment), CLI scripts, and follow-up tests is tracked in:
+Halo 单轨生成、伪弧长延拓（`continuation_PAL_CR3BP` 对齐）、`generate_halo_family` 脚本及后续数值与测试工作，见独立文档：
 
-- Chinese roadmap: [halo-roadmap.md](halo-roadmap.md)
-- Feature overview (EN): [halo.md](../algorithms/halo.md)
+- **[Halo 后续开发路线图](halo-roadmap.md)**（`docs/ways-of-work/halo-roadmap.md`）
 
-Tie-in: extend the **Algorithm module tests** epic with PAL / `generate_halo_seed_orbit` regression cases when feasible.
+与 **Algorithm 模块测试** Epic 的衔接建议：在 `tests/algorithms/` 中为 `continuation.py` 的 PAL 步与 `generate_halo_seed_orbit` 增加回归用例（见路线图「短期」一节）。
 
 ---
 
-## Issue Creation Checklist
+## Issue 创建检查清单
 
-### Pre-Creation Preparation
-- [x] Feature artifacts complete: This project plan
-- [x] Epic exists: Epic issue created with proper labels and milestone
-- [ ] Project board configured: Kanban columns, custom fields
-- [ ] Team capacity assessed: 3 sprints planned
+### 创建前准备
+- [x] 功能工件完成：本项目计划
+- [x] Epic 存在：带有适当标签和里程碑的 Epic issue 已创建
+- [ ] 项目看板配置：Kanban 列、自定义字段
+- [ ] 团队容量评估：已计划 3 个 sprint
 
-### Epic Level Issues
-- [ ] **Epic issue created** with comprehensive description
-- [ ] **Epic milestone created** with target release date (v0.2.0)
-- [ ] **Epic labels applied**: `epic`, `priority-high`, `quality`
-- [ ] **Epic added to project board** in appropriate column
+### Epic 级别 Issues
+- [ ] **Epic issue 已创建** 并有全面描述
+- [ ] **Epic 里程碑已创建** 目标发布日期 (v0.2.0)
+- [ ] **Epic 标签已应用**：`epic`, `priority-high`, `quality`
+- [ ] **Epic 已添加到项目看板** 适当列中
 
-### Feature Level Issues
-- [ ] **Feature issue: Transfer Module Tests** linking to parent epic
-- [ ] **Feature issue: Algorithm Module Tests** linking to parent epic
-- [ ] **Feature issue: Stability Analysis Completion** linking to parent epic
-- [ ] **Feature issue: Coordinate Transform Completion** linking to parent epic
+### Feature 级别 Issues
+- [ ] **Feature issue: Transfer 模块测试** 链接到父 epic
+- [ ] **Feature issue: Algorithm 模块测试** 链接到父 epic
+- [ ] **Feature issue: 稳定性分析完善** 链接到父 epic
+- [ ] **Feature issue: 坐标变换完善** 链接到父 epic
 
-### Story/Enabler Level Issues
+### Story/Enabler 级别 Issues
 - [ ] **Transfer Stories**: EarthMoonTransfer, MoonEarthTransfer, InterOrbitTransfer
 - [ ] **Algorithm Stories**: Continuation, DifferentialCorrection, StabilityAnalysis
 - [ ] **Enablers**: StabilityIndex, MonodromyMatrix, FrameConversion

@@ -1,8 +1,8 @@
 ---
-title: EphemerisSystem - 星历系统
+title: 星历系统 EphemerisSystem
 ---
 
-# EphemerisSystem - 星历系统
+# 星历系统（EphemerisSystem）
 
 `EphemerisSystem` 类用于定义基于 NASA SPICE 内核的星历系统，支持多天体引力计算。
 

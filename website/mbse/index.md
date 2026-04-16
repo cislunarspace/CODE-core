@@ -1,43 +1,43 @@
 ---
-title: MBSE Models
+title: MBSE 模型
 ---
 
-# MBSE Models
+# MBSE 模型
 
-Model-Based Systems Engineering (MBSE) models for e2m2e, built with SysML-style Protocol interfaces, Pydantic data models, and requirement traceability.
+e2m2e 基于模型的系统工程（Model-Based Systems Engineering, MBSE）模型，使用 SysML 风格的 Protocol 接口、Pydantic 数据模型和需求追溯构建。
 
-## Architecture
+## 架构
 
-| Document | Description |
-|----------|-------------|
-| [System Overview](system-overview) | Block Definition Diagram (BDD) and component architecture |
-| [BDD: Core](bdd-core) | Core module block definitions — SystemModel, EOMProvider, Propagator |
-| [BDD: Algorithms](bdd-algorithms) | Algorithm module block definitions — CorrectorStrategy, Continuation, Stability |
-| [Requirements](requirements) | Functional requirements registry with traceability |
+| 文档 | 说明 |
+|------|------|
+| [系统总览](system-overview) | 块定义图（BDD）与组件架构 |
+| [BDD：核心模块](bdd-core) | 核心模块块定义 — SystemModel, EOMProvider, Propagator |
+| [BDD：算法模块](bdd-algorithms) | 算法模块块定义 — CorrectorStrategy, Continuation, Stability |
+| [功能需求](requirements) | 功能需求登记与追溯 |
 
-## Activity Diagrams
+## 活动图
 
-| Document | Description |
-|----------|-------------|
-| [Orbit Design Activity](activity-orbit-design) | End-to-end orbit design workflow |
-| [Differential Correction Activity](activity-differential-correction) | Correction iteration lifecycle |
+| 文档 | 说明 |
+|------|------|
+| [轨道设计活动](activity-orbit-design) | 端到端轨道设计工作流 |
+| [微分修正活动](activity-differential-correction) | 修正迭代生命周期 |
 
-## Sequence Diagrams
+## 序列图
 
-| Document | Description |
-|----------|-------------|
-| [Propagation Sequence](sequence-propagation) | State propagation call chain |
-| [Correction Sequence](sequence-correction) | Differential correction message flow |
+| 文档 | 说明 |
+|------|------|
+| [传播序列](sequence-propagation) | 状态传播调用链 |
+| [修正序列](sequence-correction) | 微分修正消息流 |
 
-## State Machines
+## 状态机
 
-| Document | Description |
-|----------|-------------|
-| [Orbit Lifecycle](state-orbit-lifecycle) | Orbit state transitions |
-| [Convergence State](state-convergence) | Correction convergence states |
+| 文档 | 说明 |
+|------|------|
+| [轨道生命周期](state-orbit-lifecycle) | 轨道状态转换 |
+| [收敛状态](state-convergence) | 修正收敛状态 |
 
-## Traceability
+## 追溯
 
-| Document | Description |
-|----------|-------------|
-| [Traceability Matrix](traceability-matrix) | Requirements-to-components mapping |
+| 文档 | 说明 |
+|------|------|
+| [追溯矩阵](traceability-matrix) | 需求到组件的映射 |

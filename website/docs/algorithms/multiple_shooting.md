@@ -1,8 +1,8 @@
 ---
-title: MultipleShooting - 多重打靶法
+title: 多重打靶法 MultipleShooting
 ---
 
-# MultipleShooting - 多重打靶法
+# 多重打靶法（MultipleShooting）
 
 `MultipleShooting` 类实现多重打靶法（Multiple Shooting）数值修正器，适用于复杂约束和长周期轨道的数值修正。
 

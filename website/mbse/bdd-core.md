@@ -1,5 +1,5 @@
 ---
-title: BDD Core
+title: 核心模块 BDD
 ---
 
 ```mermaid

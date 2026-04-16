@@ -1,5 +1,5 @@
 ---
-title: Sequence Correction
+title: 修正序列
 ---
 
 ```mermaid

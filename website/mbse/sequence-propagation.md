@@ -1,5 +1,5 @@
 ---
-title: Sequence Propagation
+title: 传播序列
 ---
 
 ```mermaid
