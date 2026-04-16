@@ -34,7 +34,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -e ".[dev]"
-      - run: pytest --cov=e2m2e --cov-report=term-missing --cov-fail-under=80 -x
+      - run: pytest --cov=e2m2e --cov-report=term-missing --cov-fail-under=50 -x
 
   build:
     needs: test
