@@ -6,8 +6,12 @@
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![PyPI](https://img.shields.io/pypi/v/e2m2e)](https://pypi.org/project/e2m2e/)
 [![CI](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml/badge.svg)](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml)
+[![Release](https://github.com/cislunarspace/e2m2e/actions/workflows/release.yml/badge.svg)](https://github.com/cislunarspace/e2m2e/actions/workflows/release.yml)
+[![Docs](https://github.com/cislunarspace/e2m2e/actions/workflows/deploy-docs.yml/badge.svg)](https://cislunarspace.github.io/e2m2e/)
 
 `e2m2e` 是一个用于设计地月空间**运行轨道**和**转移轨道**的 Python 库，基于圆型限制性三体问题 (CR3BP) 的轨道动力学建模。
+
+> **[在线文档](https://cislunarspace.github.io/e2m2e/)** | **[PyPI](https://pypi.org/project/e2m2e/)** | **[GitHub](https://github.com/cislunarspace/e2m2e)**
 
 ## 核心功能
 
@@ -235,6 +239,11 @@ e2m2e/
 │   ├── transfer.py                 # Transfer - 简化链式 API
 │   ├── transfer_search.py          # TransferSearch - 网格搜索（并行）
 │   └── transfer_optimization.py    # DROTRONLPOptimizer - NLP 优化
+├── mbse/                 # 基于模型的系统工程
+│   ├── architecture/     # 系统架构建模（组件、端口、连接）
+│   ├── data/             # 核心数据模型与枚举
+│   ├── diagrams/         # 架构图自动生成
+│   └── requirements/     # 需求追溯与管理
 └── visualization/        # 可视化
     ├── config.py                    # PlotConfig - 字体/颜色/尺寸等全局配置
     ├── base.py                      # OrbitVisualizer - 2D/3D 绘图基类
@@ -334,24 +343,18 @@ npm run serve
 
 ## 文档
 
-### 在线文档网站
+- **在线文档**：https://cislunarspace.github.io/e2m2e/
+- **PyPI**：https://pypi.org/project/e2m2e/
 
-项目文档已通过 Docusaurus 发布为在线网站（通过 GitHub Actions 自动部署到 GitHub Pages）：
+### 本地预览
 
-- **本地预览**：`cd website && npm run start`
-- **构建静态网站**：`npm run build`（输出到 `website/build/` 目录）
+```bash
+cd website && npm install && npm run start
+```
 
-### 文档目录结构
+### 文档源文件
 
-文档源文件位于 [`website/docs/`](website/docs/) 目录：
-
-- [系统架构](website/docs/guides/system-overview.md)
-- [轨道生成教程](website/docs/guides/orbit-generation.md)
-- [可视化指南](website/docs/guides/visualization-guide.md)
-- [发布指南](website/docs/guides/release.md)
-- [算法参考](website/docs/reference/algorithms.md) - 微分修正、延拓、稳定性分析、多重打靶法
-- [核心模块参考](website/docs/core/) - 系统、动力学、轨道、坐标变换、星历动力学
-- [AI 助手开发指南](AGENTS.md) - 为 AI 助手提供的仓库特定开发指导
+位于 [`website/docs/`](website/docs/) 目录，涵盖系统架构、轨道生成教程、算法参考等。
 
 ## 致谢
 
