@@ -9,18 +9,26 @@ import styles from './index.module.css';
 function HomepageHeader() {
   const {siteConfig} = useDocusaurusContext();
   return (
-    <header className={clsx('hero hero--primary', styles.heroBanner)}>
+    <header className={styles.heroBanner}>
       <div className="container">
-        <Heading as="h1" className="hero__title">
-          {siteConfig.title}
-        </Heading>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
-        <div className={styles.buttons}>
-          <Link
-            className="button button--secondary button--lg"
-            to="/docs">
-            30 秒上手
-          </Link>
+        <div className={styles.heroContent}>
+          <Heading as="h1" className={styles.heroTitle}>
+            {siteConfig.title}
+          </Heading>
+          <p className={styles.heroSubtitle}>{siteConfig.tagline}</p>
+          <div className={styles.heroCta}>
+            <Link className={styles.ctaPrimary} to="/docs">
+              快速上手
+            </Link>
+            <Link className={styles.ctaSecondary} to="/docs">
+              阅读文档
+            </Link>
+          </div>
+        </div>
+        <div className={styles.heroCode}>
+          <pre className={styles.codeBlock}><code>
+{"# 安装\npip install -e .\n\n# 创建地月系统\nfrom e2m2e.core import CR3BP_System\nsystem = CR3BP_System.from_known_system(\"earth_moon\")"}
+          </code></pre>
         </div>
       </div>
     </header>
