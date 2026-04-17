@@ -13,9 +13,9 @@ MBSE (Model-Based Systems Engineering) infrastructure with SysML-style Protocol 
 ```bash
 # Install (editable mode, required for development)
 pip install -e .
-pip install -e ".[dev]"          # with pytest, ruff
+pip install -e ".[dev]"          # with pytest, ruff, mypy
 
-# Tests
+# Tests (CI requires 80% coverage)
 pytest tests/                    # all tests
 pytest tests/core/test_system.py # single test file
 pytest tests/mbse/               # MBSE-specific tests
@@ -25,6 +25,9 @@ pytest -m spice                  # only SPICE-dependent tests (require kernels)
 ruff check .
 ruff check --fix .
 ruff format .
+
+# Type checking (required for CI)
+mypy e2m2e/ --ignore-missing-imports
 
 # Documentation (Docusaurus)
 cd website && npm install
@@ -51,24 +54,32 @@ visualization/  Plotting — unified PlotConfig, orbit families, transfer trajec
 
 Cross-cutting: `mbse/` — Protocol interfaces, Pydantic models, requirement/component registries, diagram generation
 
-### Key class hierarchy
+### Key imports
+
+```python
+from e2m2e.core import CR3BP_System, CR3BP_Dynamics, Orbit, EphemerisSystem, EphemerisDynamics
+from e2m2e.algorithms import DifferentialCorrection, Continuation, MultipleShooting, StabilityAnalysis
+from e2m2e.algorithms.strategies import halo_fixed_z0, halo_fixed_x0  # strategy functions
+from e2m2e.transfer import Transfer
+from e2m2e.visualization import PlotConfig, FamilyPlotter
+```
+
+### Dynamics hierarchy
 
 ```
 Dynamics (base, Template Method)
   → CR3BP_Dynamics    [implements Propagator, EOMProvider; requires SystemModel]
-  → EphemerisDynamics [implements Propagator, EOMProvider]
+  → EphemerisDynamics [implements Propagator, EOMProvider; requires SPICE kernels]
 
 CR3BP_System → CR3BP_Dynamics → DifferentialCorrection
                     ↑                    ↑
                   Orbit          Continuation, StabilityAnalysis
-
-CorrectionConfig (frozen dataclass) ← strategy functions in algorithms/strategies/
-  ← symmetric_2d.py: symmetric_2d_fixed_x0, symmetric_2d_fixed_t, symmetric_2d_fixed_y0
-  ← symmetric_3d.py: symmetric_3d_fixed_x0, symmetric_xz_fixed_x0, symmetric_xz_fixed_z0
-  ← halo.py: halo_fixed_z0, halo_fixed_x0
-
-PlotConfig (Pydantic BaseModel) → OrbitVisualizer, FamilyPlotter, TransferPlotter [Visualizer Protocol]
 ```
+
+Correction strategies in `algorithms/strategies/`:
+- `symmetric_2d.py`: symmetric_2d_fixed_x0, symmetric_2d_fixed_t, symmetric_2d_fixed_y0
+- `symmetric_3d.py`: symmetric_3d_fixed_x0, symmetric_xz_fixed_x0, symmetric_xz_fixed_z0
+- `halo.py`: halo_fixed_z0, halo_fixed_x0
 
 ### MBSE infrastructure (e2m2e/mbse/)
 
@@ -108,25 +119,12 @@ PlotConfig (Pydantic BaseModel) → OrbitVisualizer, FamilyPlotter, TransferPlot
 5. If adding a new component, register it in `e2m2e/mbse/architecture/` and add requirements to `e2m2e/mbse/requirements/`
 6. Regenerate MBSE diagrams: `python scripts/generate_mbse_diagrams.py`
 
+## Release workflow
+
+- Version tags (`v*`) trigger release pipeline; tag must match `pyproject.toml` version
+- CI runs lint, typecheck (mypy), security audit (pip-audit), and tests with 80% coverage threshold
+- Multi-platform testing: Ubuntu, macOS, Windows on Python 3.10–3.13
+
 ## Optional dependencies
 
 - **COPT** (`coptpy`): Required for `optimize_with_copt()` in transfer NLP optimization. Falls back to scipy if not installed. Check `_HAVE_COPT` flag in `e2m2e/transfer/__init__.py`.
-
-## Typical workflow
-
-```python
-from e2m2e.core import CR3BP_System, CR3BP_Dynamics, Orbit
-from e2m2e.algorithms import DifferentialCorrection, Continuation
-from e2m2e.algorithms.strategies import halo_fixed_z0
-from e2m2e.transfer import Transfer
-
-system = CR3BP_System.from_known_system("earth_moon")
-dynamics = CR3BP_Dynamics(system)
-
-# Strategy-based correction setup
-corrector = DifferentialCorrection(dynamic=dynamics)
-corrector.setup_halo_orbit_fixed_z0(z0=0.1, libration_point=1)
-
-continuation = Continuation(corrector=corrector)
-transfer = Transfer(dynamics)
-```
