@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from e2m2e.core.orbit import Orbit
+from e2m2e.core.orbit import Orbit, OrbitFamily
 
 
 class TestOrbitInit:
@@ -261,3 +261,17 @@ class TestOrbitMetadata:
     def test_metadata_description(self, sample_orbit):
         """Test metadata can store description"""
         assert "description" in sample_orbit.metadata
+
+
+class TestOrbitFamilyInit:
+    """Tests for OrbitFamily initialization"""
+
+    def test_orbit_family_rejects_non_orbit_list(self):
+        """OrbitFamily should raise TypeError when given a list of non-Orbit objects"""
+        with pytest.raises(TypeError, match="Orbit instances"):
+            OrbitFamily(orbits=[1, 2, 3])
+
+    def test_orbit_family_accepts_single_orbit(self, sample_orbit):
+        """OrbitFamily should accept a single Orbit object"""
+        family = OrbitFamily(orbits=sample_orbit)
+        assert len(family) == 1

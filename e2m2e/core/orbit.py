@@ -507,15 +507,12 @@ class OrbitFamily:
     ) -> None:
         self.orbits: list[Orbit] = []
         if orbits is not None:
-            if type(orbits) is Orbit:
+            if isinstance(orbits, Orbit):
                 self.orbits = [orbits]
-            else:
-                if type(orbits) is list and len(orbits) > 0 and type(orbits[0]) is Orbit:
-                    self.orbits = orbits
-                else:
-                    self.orbits = []
-        else:
-            self.orbits = []
+            elif isinstance(orbits, list):
+                if len(orbits) > 0 and not all(isinstance(o, Orbit) for o in orbits):
+                    raise TypeError("All elements in orbits list must be Orbit instances")
+                self.orbits = list(orbits)
         self.family_type = family_type
         self.system = system
         self.metadata = {
