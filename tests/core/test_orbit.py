@@ -232,6 +232,18 @@ class TestOrbitStability:
         assert "stability" in result
         assert "eigenvalues" in result
 
+    def test_compute_stability_with_zero_period(self, earth_moon_dynamics, earth_moon_system):
+        """compute_stability should handle zero period gracefully."""
+        orbit = Orbit(
+            states=np.array([[0.8, 0.0, 0.0, 0.0, 0.1, 0.0]]),
+            times=np.array([0.0]),
+            system=earth_moon_system,
+        )
+        orbit.period = 0.0
+        result = orbit.compute_stability(earth_moon_dynamics)
+        assert result["stability"] == "unknown"
+        assert result["eigenvalues"] is None
+
 
 class TestOrbitMetadata:
     """Tests for orbit metadata"""

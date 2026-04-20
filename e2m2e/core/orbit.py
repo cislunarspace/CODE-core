@@ -310,6 +310,13 @@ class Orbit:
         Returns:
             稳定性分析结果字典
         """
+        if self._period is None or self._period <= 0:
+            return {
+                "stability": "unknown",
+                "eigenvalues": None,
+                "max_deviation": None,
+                "lyapunov_exponents": None,
+            }
         if self._monodromy_matrix is None:
             self.compute_monodromy_matrix(dynamics)
 
