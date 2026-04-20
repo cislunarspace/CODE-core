@@ -159,6 +159,19 @@ class TestCR3BPSystemJacobiConstant:
         C = earth_moon_system.get_jacobi_constant(state)
         assert isinstance(C, float)
 
+    def test_jacobi_constant_no_inf_at_body_position(self, earth_moon_system):
+        """Jacobi constant at a body position should return nan with warning, not inf."""
+        import warnings
+
+        mu = earth_moon_system.mu
+        state_at_primary = np.array([-mu, 0.0, 0.0, 0.0, 0.0, 0.0])
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = earth_moon_system.get_jacobi_constant(state_at_primary)
+            assert np.isnan(result), f"Expected NaN at singularity, got {result}"
+            assert len(w) == 1
+            assert issubclass(w[0].category, RuntimeWarning)
+
 
 class TestCR3BPSystemCharacteristicScales:
     """Tests for set_characteristic_scales method"""

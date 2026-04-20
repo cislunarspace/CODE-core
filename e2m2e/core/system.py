@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import warnings
 from enum import Enum
 from typing import Any
 
@@ -248,6 +249,14 @@ class CR3BP_System:
 
         r1 = np.sqrt((x + self.mu) ** 2 + y**2 + z**2)
         r2 = np.sqrt((x - 1 + self.mu) ** 2 + y**2 + z**2)
+
+        if r1 < 1e-12 or r2 < 1e-12:
+            warnings.warn(
+                "State at singularity in Jacobi constant calculation (r1={:.2e}, r2={:.2e})".format(r1, r2),
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return float("nan")
 
         U = (x**2 + y**2) / 2 + (1 - self.mu) / r1 + self.mu / r2
 
