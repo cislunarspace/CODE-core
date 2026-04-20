@@ -237,6 +237,14 @@ class TestCR3BPSystemCharacteristicScales:
         expected_velocity = distance / earth_moon_system.characteristic_time
         assert abs(earth_moon_system.characteristic_velocity - expected_velocity) < 1e-10
 
+    def test_set_characteristic_scales_rejects_non_positive(self):
+        """Test that non-positive distance and period are rejected"""
+        system = CR3BP_System(mu=0.012, primary="Earth", secondary="Moon")
+        with pytest.raises(ValueError, match="distance must be positive"):
+            system.set_characteristic_scales(distance=0, period=100)
+        with pytest.raises(ValueError, match="period must be positive"):
+            system.set_characteristic_scales(distance=100, period=-1)
+
 
 class TestCR3BPSystemUnitConversion:
     """Tests for dimensionless/physical unit conversion"""

@@ -152,6 +152,11 @@ class CR3BP_System:
             distance: 两天体之间的距离 (km)
             period: 轨道周期 (s)
         """
+        if distance <= 0:
+            raise ValueError(f"distance must be positive, got {distance}")
+        if period <= 0:
+            raise ValueError(f"period must be positive, got {period}")
+
         self.characteristic_length = distance
         self.characteristic_time = period / (2 * np.pi)
         self.characteristic_velocity = distance / self.characteristic_time
