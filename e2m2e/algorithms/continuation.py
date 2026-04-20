@@ -7,7 +7,11 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit, OrbitFamily
@@ -224,17 +228,17 @@ class Continuation:
         # 验证并限制步长
         if step_size > self.max_step_size:
             if verbose:
-                print(
-                    f"警告: 输入步长 {step_size} 超过最大限制"
-                    f" {self.max_step_size}，限制为 {self.max_step_size}"
+                logger.warning(
+                    "输入步长 %.6f 超过最大限制 %.6f，限制为 %.6f",
+                    step_size, self.max_step_size, self.max_step_size,
                 )
             step_size = self.max_step_size
 
         if step_size < self.min_step_size:
             if verbose:
-                print(
-                    f"警告: 输入步长 {step_size} 小于最小限制"
-                    f" {self.min_step_size}，限制为 {self.min_step_size}"
+                logger.warning(
+                    "输入步长 %.6f 小于最小限制 %.6f，限制为 %.6f",
+                    step_size, self.min_step_size, self.min_step_size,
                 )
             step_size = self.min_step_size
 
@@ -252,13 +256,13 @@ class Continuation:
         forward = param_max > seed_param_value
         backward = param_min < seed_param_value
 
-        print(f"\n{'=' * 60}")
-        print(f"开始自然参数延拓 (参数: {self.continuation_parameter})")
-        print(f"种子轨道参数值: {seed_param_value:.6f}")
-        print(f"参数范围: {param_range}")
-        print(f"延拓方向: {'正向' if forward else ''}{'反向' if backward else ''}")
-        print(f"步长: {step_size}")
-        print(f"{'=' * 60}")
+        logger.info("=" * 30)
+        logger.info("开始自然参数延拓 (参数: %s)", self.continuation_parameter)
+        logger.info("种子轨道参数值: %.6f", seed_param_value)
+        logger.info("参数范围: %s", param_range)
+        logger.info("延拓方向: %s%s", "正向" if forward else "", "反向" if backward else "")
+        logger.info("步长: %s", step_size)
+        logger.info("=" * 30)
 
         corrector = self.correction
 
@@ -270,7 +274,7 @@ class Continuation:
 
         if forward:
             if verbose:
-                print("\n--- 正向延拓 (参数增大方向) ---")
+                logger.info("--- 正向延拓 (参数增大方向) ---")
 
             target_forward = param_max
             i = 0
@@ -305,12 +309,12 @@ class Continuation:
                             param_val = (
                                 orbit.states[0, param_index] if param_index < 6 else orbit.period
                             )
-                            print(
-                                f"  第 {i + 1} 条轨道，参数值={param_val:.6f}，"
-                                f"周期={orbit.period:.4f}"
+                            logger.info(
+                                "  第 %d 条轨道，参数值=%.6f，周期=%.4f",
+                                i + 1, param_val, orbit.period,
                             )
                         else:
-                            print(f"  正向延拓进度：已完成 {i + 1} 条轨道")
+                            logger.info("  正向延拓进度：已完成 %d 条轨道", i + 1)
 
                     if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
                         if orbit.correction_iterations < 3:
@@ -326,11 +330,11 @@ class Continuation:
                     if step_size < self.min_step_size:
                         self.termination_reason = "步长过小，延拓终止"
                         if verbose:
-                            print(f"\n正向步长过小，延拓终止于第 {len(orbit_family)} 条轨道")
+                            logger.info("正向步长过小，延拓终止于第 %d 条轨道", len(orbit_family))
                         break
 
                     if verbose:
-                        print(f"  第 {i + 1} 步修正失败，减小步长至 {step_size:.6f}")
+                        logger.info("  第 %d 步修正失败，减小步长至 %.6f", i + 1, step_size)
 
                 step_size_history.append(step_size)
                 i += 1
@@ -339,7 +343,7 @@ class Continuation:
             current_orbit = seed_orbit.copy()
 
             if verbose:
-                print("\n--- 反向延拓 (参数减小方向) ---")
+                logger.info("--- 反向延拓 (参数减小方向) ---")
 
             target_backward = param_min
             i = 0
@@ -374,12 +378,12 @@ class Continuation:
                             param_val = (
                                 orbit.states[0, param_index] if param_index < 6 else orbit.period
                             )
-                            print(
-                                f"  第 {i + 1} 条轨道，参数值={param_val:.6f}，"
-                                f"周期={orbit.period:.4f}"
+                            logger.info(
+                                "  第 %d 条轨道，参数值=%.6f，周期=%.4f",
+                                i + 1, param_val, orbit.period,
                             )
                         else:
-                            print(f"  反向延拓进度：已完成 {i + 1} 条轨道")
+                            logger.info("  反向延拓进度：已完成 %d 条轨道", i + 1)
 
                     if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
                         if orbit.correction_iterations < 3:
@@ -395,11 +399,11 @@ class Continuation:
                     if step_size < self.min_step_size:
                         self.termination_reason = "步长过小，延拓终止"
                         if verbose:
-                            print(f"\n反向步长过小，延拓终止于第 {len(orbit_family)} 条轨道")
+                            logger.info("反向步长过小，延拓终止于第 %d 条轨道", len(orbit_family))
                         break
 
                     if verbose:
-                        print(f"  第 {i + 1} 步修正失败，减小步长至 {step_size:.6f}")
+                        logger.info("  第 %d 步修正失败，减小步长至 %.6f", i + 1, step_size)
 
                 step_size_history.append(step_size)
                 i += 1
@@ -418,10 +422,10 @@ class Continuation:
             orbit_family.add_orbit(orbit)
 
         if verbose:
-            print(f"\n延拓完成：共生成 {len(orbit_family)} 条轨道")
+            logger.info("延拓完成：共生成 %d 条轨道", len(orbit_family))
             stats = self.continuation_stats
-            print(f"  成功: {stats['successful_steps']}, 失败: {stats['failed_steps']}")
-            print("  轨道已按距离种子轨道的步数排序: 0, 1, -1, 2, -2, ...")
+            logger.info("  成功: %d, 失败: %d", stats["successful_steps"], stats["failed_steps"])
+            logger.info("  轨道已按距离种子轨道的步数排序: 0, 1, -1, 2, -2, ...")
 
         return orbit_family
 
@@ -469,14 +473,14 @@ class Continuation:
         step_sign = 1.0 if direction == "positive" else -1.0
 
         if verbose:
-            print(f"\n{'=' * 60}")
-            print("开始伪弧长延拓 (Pseudo Arc-Length Continuation)")
-            print(f"{'=' * 60}")
-            print(f"  质量比 mu = {dynamics.system.mu:.10f}")
-            print(f"  本支新轨道数 N = {n_orbits}")
-            print(f"  步长 |DeltaS| = {step_size}")
-            print(f"  延拓方向 = {direction}")
-            print(f"  dc_scheme = {dc_scheme}")
+            logger.info("=" * 30)
+            logger.info("开始伪弧长延拓 (Pseudo Arc-Length Continuation)")
+            logger.info("=" * 30)
+            logger.info("  质量比 mu = %.10f", dynamics.system.mu)
+            logger.info("  本支新轨道数 N = %d", n_orbits)
+            logger.info("  步长 |DeltaS| = %s", step_size)
+            logger.info("  延拓方向 = %s", direction)
+            logger.info("  dc_scheme = %s", dc_scheme)
 
         orbit_family = OrbitFamily([seed_orbit])
         self.correction.tolerance = TolDiffCorr
@@ -491,8 +495,8 @@ class Continuation:
         family_states: list[np.ndarray] = [SV0i.copy()]
 
         if verbose:
-            print(f"\n初始自由变量 X = [{X[0]:.6f}, {X[1]:.6f}, {X[2]:.6f}, {X[3]:.6f}]")
-            print(f"初始切向量 Xdot = [{Xdot[0]:.6f}, {Xdot[1]:.6f}, {Xdot[2]:.6f}, {Xdot[3]:.6f}]")
+            logger.info("初始自由变量 X = [%.6f, %.6f, %.6f, %.6f]", X[0], X[1], X[2], X[3])
+            logger.info("初始切向量 Xdot = [%.6f, %.6f, %.6f, %.6f]", Xdot[0], Xdot[1], Xdot[2], Xdot[3])
 
         ds = float(step_sign * step_size)
         tv = target_vector
@@ -500,7 +504,7 @@ class Continuation:
 
         for n in range(n_orbits):
             if verbose and (n + 1) % 5 == 0:
-                print(f"\n--- 延拓第 {n + 1}/{n_orbits} 条轨道 ---")
+                logger.info("--- 延拓第 %d/%d 条轨道 ---", n + 1, n_orbits)
 
             delta_dir = ds * Xdot
             if directional_increment:
@@ -509,7 +513,7 @@ class Continuation:
                 Xnew = X + ds * Xdot
 
             if verbose:
-                print(f"  预测 Xnew = [{Xnew[0]:.6f}, {Xnew[1]:.6f}, {Xnew[2]:.6f}, {Xnew[3]:.6f}]")
+                logger.debug("  预测 Xnew = [%.6f, %.6f, %.6f, %.6f]", Xnew[0], Xnew[1], Xnew[2], Xnew[3])
 
             # 仅欧拉预测时的自由变量（PAL 若跳入 F=0 的非物理根则回退到此）
             X_predictor_only = Xnew.copy()
@@ -535,14 +539,14 @@ class Continuation:
                 # 与 MATLAB continuation_PAL_CR3BP 一致：先判收敛，再更新 Xnew
                 if np.linalg.norm(F) < TolPAL:
                     if verbose:
-                        print(f"  PAL迭代 {iter_pal + 1}: 收敛, ||F|| = {np.linalg.norm(F):.2e}")
+                        logger.info("  PAL迭代 %d: 收敛, ||F|| = %.2e", iter_pal + 1, np.linalg.norm(F))
                     break
 
                 try:
                     delta_X = np.linalg.solve(dG, G)
                 except np.linalg.LinAlgError:
                     if verbose:
-                        print(f"  PAL迭代 {iter_pal + 1}: 雅可比矩阵奇异")
+                        logger.warning("  PAL迭代 %d: 雅可比矩阵奇异", iter_pal + 1)
                     break
 
                 # 限制牛顿步，避免 PAL 收敛到 rx 极大的非 Halo 物理解（F=0 多根）
@@ -565,9 +569,9 @@ class Continuation:
             )
             if not pal_plausible:
                 if verbose:
-                    print(
-                        f"  PAL 结果偏离物理 Halo 支 (x={_x:.4f}, z={_z:.4f}, T/2={_tf2:.4f})，"
-                        f"回退为欧拉预测初值"
+                    logger.warning(
+                        "  PAL 结果偏离物理 Halo 支 (x=%.4f, z=%.4f, T/2=%.4f)，回退为欧拉预测初值",
+                        _x, _z, _tf2,
                     )
                 X = X_predictor_only.copy()
 
@@ -630,17 +634,17 @@ class Continuation:
                 Xdot = compute_tangent_vector(dF)
 
                 if verbose and (n + 1) % 5 == 0:
-                    print(
-                        f"  轨道 {n + 1}: x0={orbit.states[0, 0]:.4f},"
-                        f" z0={orbit.states[0, 2]:.4f}, T={orbit.period:.4f}"
+                    logger.info(
+                        "  轨道 %d: x0=%.4f, z0=%.4f, T=%.4f",
+                        n + 1, orbit.states[0, 0], orbit.states[0, 2], orbit.period,
                     )
             else:
                 if verbose:
-                    print(f"  轨道 {n + 1}: 微分修正失败")
+                    logger.warning("  轨道 %d: 微分修正失败", n + 1)
                 break
 
         if verbose:
-            print(f"\n伪弧长延拓完成：共生成 {len(orbit_family)} 条轨道")
+            logger.info("伪弧长延拓完成：共生成 %d 条轨道", len(orbit_family))
 
         return orbit_family
 
@@ -699,8 +703,8 @@ class Continuation:
             raise ValueError(f"halo_class必须是0或1，当前为{halo_class}")
 
         if verbose:
-            print(f"\n生成Halo轨道: L{libration_point} {'北' if halo_class == 0 else '南'} Halo")
-            print(f"  Z振幅: {amplitude_z}")
+            logger.info("生成Halo轨道: L%d %s Halo", libration_point, "北" if halo_class == 0 else "南")
+            logger.info("  Z振幅: %s", amplitude_z)
 
         mu = self.correction.dynamics.system.mu
 
@@ -746,8 +750,8 @@ class Continuation:
         self.correction.tolerance = 1e-5
 
         if verbose:
-            print(f"  初始猜测: x0={guess['x0']:.6f}, vy0={guess['vy0']:.6f}")
-            print(f"  预估周期: {initial_orbit.period:.4f} TU")
+            logger.info("  初始猜测: x0=%.6f, vy0=%.6f", guess["x0"], guess["vy0"])
+            logger.info("  预估周期: %.4f TU", initial_orbit.period)
 
         orbit = self.correction.iterate_correction(
             initial_guess=initial_orbit,
@@ -760,7 +764,7 @@ class Continuation:
             orbit.parameters["amplitude_z"] = amplitude_z
             orbit.parameters["halo_class"] = halo_class
             if verbose:
-                print(f"[ok] Halo轨道生成成功: 周期={orbit.period:.6f} TU")
+                logger.info("[ok] Halo轨道生成成功: 周期=%.6f TU", orbit.period)
 
         return orbit
 
@@ -793,10 +797,11 @@ class Continuation:
 
         directions = ["positive", "negative"] if direction == "both" else [direction]
 
-        print(f"\n开始生成Halo轨道族: 目标数量={n_orbits}, 方向={direction}")
-        print(
-            f"  种子轨道: L{seed_orbit.parameters.get('libration_point', 1)} "
-            f"{'北' if seed_orbit.parameters.get('halo_class', 0) == 0 else '南'} Halo"
+        logger.info("开始生成Halo轨道族: 目标数量=%d, 方向=%s", n_orbits, direction)
+        logger.info(
+            "  种子轨道: L%d %s Halo",
+            seed_orbit.parameters.get("libration_point", 1),
+            "北" if seed_orbit.parameters.get("halo_class", 0) == 0 else "南",
         )
 
         for direction in directions:
@@ -820,7 +825,7 @@ class Continuation:
                 except Exception:
                     break
 
-        print(f"[ok] 轨道族生成完成: 共{len(family)}条轨道")
+        logger.info("[ok] 轨道族生成完成: 共%d条轨道", len(family))
 
         return family
 
@@ -880,14 +885,14 @@ class Continuation:
         self.correction.max_iterations = 150
 
         if verbose:
-            print(f"\n{'=' * 60}")
-            print("Halo 伪弧长延拓（对齐 continuation_PAL_CR3BP + FAMILY_L1Halo_North）")
-            print(f"  种子: L{libration_point} {'北' if halo_class == 0 else '南'} Halo")
-            print(f"  z_amplitude(参数): {seed_z_amplitude:.4f}")
-            print(f"  每支新轨道数 N = {n_orbits}")
-            print(f"  正向 |DeltaS| = {step_size}, 负向 |DeltaS| = {step_size_negative}")
-            print(f"  dc_scheme = {dc_scheme}, DirectionalIncrement = {directional_increment}")
-            print(f"{'=' * 60}")
+            logger.info("=" * 30)
+            logger.info("Halo 伪弧长延拓（对齐 continuation_PAL_CR3BP + FAMILY_L1Halo_North）")
+            logger.info("  种子: L%d %s Halo", libration_point, "北" if halo_class == 0 else "南")
+            logger.info("  z_amplitude(参数): %.4f", seed_z_amplitude)
+            logger.info("  每支新轨道数 N = %d", n_orbits)
+            logger.info("  正向 |DeltaS| = %s, 负向 |DeltaS| = %s", step_size, step_size_negative)
+            logger.info("  dc_scheme = %s, DirectionalIncrement = %s", dc_scheme, directional_increment)
+            logger.info("=" * 30)
 
         orbit_family = OrbitFamily([seed_orbit])
 
@@ -906,7 +911,7 @@ class Continuation:
 
         for br_name, ds_mag, tv, td in branches:
             if verbose:
-                print(f"\n--- Halo 延拓支: {br_name} (|DeltaS|={ds_mag}) ---")
+                logger.info("--- Halo 延拓支: %s (|DeltaS|=%s) ---", br_name, ds_mag)
 
             sub = self.pseudo_arclength_continuation(
                 seed_orbit,
@@ -928,10 +933,10 @@ class Continuation:
                 orbit_family.add_orbit(o)
 
         if verbose:
-            print(f"\n延拓完成：共 {len(orbit_family)} 条轨道")
+            logger.info("延拓完成：共 %d 条轨道", len(orbit_family))
             z_values = [o.parameters.get("amplitude_z", 0) for o in orbit_family]
             if z_values:
-                print(f"  z_amplitude 范围: [{min(z_values):.4f}, {max(z_values):.4f}]")
+                logger.info("  z_amplitude 范围: [%.4f, %.4f]", min(z_values), max(z_values))
 
         return orbit_family
 
