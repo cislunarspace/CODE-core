@@ -6,10 +6,13 @@
 
 from __future__ import annotations
 
+import logging
 from enum import Enum
 from typing import Any
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
@@ -408,7 +411,16 @@ class StabilityAnalysis:
                         )
 
             except Exception:
+                logger.debug("Bifurcation analysis failed for orbit %d", i, exc_info=True)
                 continue
+
+        n_failed = len(orbits) - len(bifurcation_points)
+        if n_failed > 0:
+            logger.warning(
+                "Bifurcation analysis failed for %d/%d orbits",
+                n_failed,
+                len(orbits),
+            )
 
         return bifurcation_points
 
