@@ -1030,6 +1030,13 @@ class TransferSearch:
         traj_positions = trajectory_states[:, :3]
         orbit_positions = arrival_orbit.states[:, :3]
 
+        n_traj = len(traj_positions)
+        n_orbit = len(orbit_positions)
+        max_pairs = 10_000_000  # ~240 MB for float64 (n * 3 * 8 bytes)
+
+        if n_traj * n_orbit > max_pairs:
+            return self._compute_min_distance_chunked(traj_positions, orbit_positions)
+
         diff = traj_positions[:, np.newaxis, :] - orbit_positions[np.newaxis, :, :]
         distances = np.sqrt(np.sum(diff**2, axis=2))
 
@@ -1037,11 +1044,41 @@ class TransferSearch:
         min_flat_idx = np.argmin(flat_distances)
         min_distance = flat_distances[min_flat_idx]
 
-        n_orbit = len(orbit_positions)
         step_idx = int(min_flat_idx // n_orbit)
         orbit_idx = int(min_flat_idx % n_orbit)
 
         return min_distance, step_idx, orbit_idx
+
+    def _compute_min_distance_chunked(
+        self, traj_positions: np.ndarray, orbit_positions: np.ndarray
+    ) -> tuple[float, int, int]:
+        """分块计算最小距离，避免内存溢出。"""
+        n_traj = len(traj_positions)
+        n_orbit = len(orbit_positions)
+        chunk_size = max(1, 10_000_000 // n_orbit)
+
+        global_min_dist = float("inf")
+        global_step_idx = 0
+        global_orbit_idx = 0
+
+        for start in range(0, n_traj, chunk_size):
+            end = min(start + chunk_size, n_traj)
+            chunk = traj_positions[start:end]
+
+            diff = chunk[:, np.newaxis, :] - orbit_positions[np.newaxis, :, :]
+            distances = np.sqrt(np.sum(diff**2, axis=2))
+
+            flat_distances = distances.flatten()
+            min_flat_idx = np.argmin(flat_distances)
+            min_distance = flat_distances[min_flat_idx]
+
+            if min_distance < global_min_dist:
+                global_min_dist = min_distance
+                local_step = int(min_flat_idx // n_orbit)
+                global_step_idx = start + local_step
+                global_orbit_idx = int(min_flat_idx % n_orbit)
+
+        return global_min_dist, global_step_idx, global_orbit_idx
 
     def compute_min_distance_to_orbit(
         self, trajectory_states: np.ndarray, arrival_orbit: Orbit
