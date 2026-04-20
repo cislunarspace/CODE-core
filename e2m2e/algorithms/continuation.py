@@ -495,8 +495,8 @@ class Continuation:
         family_states: list[np.ndarray] = [SV0i.copy()]
 
         if verbose:
-            logger.info("初始自由变量 X = [%.6f, %.6f, %.6f, %.6f]", X[0], X[1], X[2], X[3])
-            logger.info("初始切向量 Xdot = [%.6f, %.6f, %.6f, %.6f]", Xdot[0], Xdot[1], Xdot[2], Xdot[3])
+            logger.debug("初始自由变量 X = [%.6f, %.6f, %.6f, %.6f]", X[0], X[1], X[2], X[3])
+            logger.debug("初始切向量 Xdot = [%.6f, %.6f, %.6f, %.6f]", Xdot[0], Xdot[1], Xdot[2], Xdot[3])
 
         ds = float(step_sign * step_size)
         tv = target_vector
@@ -539,7 +539,7 @@ class Continuation:
                 # 与 MATLAB continuation_PAL_CR3BP 一致：先判收敛，再更新 Xnew
                 if np.linalg.norm(F) < TolPAL:
                     if verbose:
-                        logger.info("  PAL迭代 %d: 收敛, ||F|| = %.2e", iter_pal + 1, np.linalg.norm(F))
+                        logger.debug("  PAL迭代 %d: 收敛, ||F|| = %.2e", iter_pal + 1, np.linalg.norm(F))
                     break
 
                 try:
