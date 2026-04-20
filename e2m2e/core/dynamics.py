@@ -69,6 +69,7 @@ class Dynamics:
 
     STATE_DIM = 6  # 状态向量维度 [x, y, z, vx, vy, vz]
     STM_DIMENSION = STATE_DIM + STATE_DIM * STATE_DIM  # 42 = 6 + 36
+    MIN_DISTANCE = 1e-10  # km (dimensionless), prevents division by zero at singularities
 
     def __init__(self, system: Any) -> None:
         """初始化动力学
@@ -390,9 +391,9 @@ class CR3BP_Dynamics(Dynamics):
         x, y, z, vx, vy, vz = state
 
         # r₁：航天器到较大天体（质量 1-μ，位于 x=-μ）的距离
-        r1 = np.sqrt((x + mu) ** 2 + y**2 + z**2)
+        r1 = max(np.sqrt((x + mu) ** 2 + y**2 + z**2), self.MIN_DISTANCE)
         # r₂：航天器到较小天体（质量 μ，位于 x=1-μ）的距离
-        r2 = np.sqrt((x - 1 + mu) ** 2 + y**2 + z**2)
+        r2 = max(np.sqrt((x - 1 + mu) ** 2 + y**2 + z**2), self.MIN_DISTANCE)
 
         # --- x 方向加速度 ---
         ax = 2 * vy + x - (1 - mu) * (x + mu) / r1**3 - mu * (x - 1 + mu) / r2**3
@@ -422,8 +423,8 @@ class CR3BP_Dynamics(Dynamics):
         mu = self.system.mu
         x, y, z = state[0], state[1], state[2]
 
-        r1 = np.sqrt((x + mu) ** 2 + y**2 + z**2)
-        r2 = np.sqrt((x - 1 + mu) ** 2 + y**2 + z**2)
+        r1 = max(np.sqrt((x + mu) ** 2 + y**2 + z**2), self.MIN_DISTANCE)
+        r2 = max(np.sqrt((x - 1 + mu) ** 2 + y**2 + z**2), self.MIN_DISTANCE)
 
         # 伪势能 Hessian 矩阵元素 U_ij = ∂²Ω/∂rᵢ∂rⱼ
         U_xx = (

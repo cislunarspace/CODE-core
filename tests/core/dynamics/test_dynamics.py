@@ -310,5 +310,40 @@ class TestClassConstants:
         assert CR3BP_Dynamics.DEFAULT_MAX_STEP == 0.01
 
 
+# =============================================================================
+# Test Singularity Protection
+# =============================================================================
+class TestSingularityProtection:
+    """Test singularity protection at primary/secondary body positions (H-SEC-01)."""
+
+    def test_cr3bp_eom_no_nan_at_primary_body_position(self, earth_moon_dynamics):
+        """State exactly at the primary body position should not produce NaN."""
+        mu = earth_moon_dynamics.system.mu
+        state_at_primary = np.array([-mu, 0.0, 0.0, 0.0, 0.1, 0.0])
+        derivative = earth_moon_dynamics.equations_of_motion(0.0, state_at_primary)
+        assert np.all(np.isfinite(derivative)), f"Non-finite values in derivative: {derivative}"
+
+    def test_cr3bp_eom_no_nan_at_secondary_body_position(self, earth_moon_dynamics):
+        """State exactly at the secondary body position should not produce NaN."""
+        mu = earth_moon_dynamics.system.mu
+        state_at_secondary = np.array([1 - mu, 0.0, 0.0, 0.0, 0.1, 0.0])
+        derivative = earth_moon_dynamics.equations_of_motion(0.0, state_at_secondary)
+        assert np.all(np.isfinite(derivative)), f"Non-finite values in derivative: {derivative}"
+
+    def test_cr3bp_jacobian_no_nan_at_primary_body_position(self, earth_moon_dynamics):
+        """Jacobian at the primary body position should not produce NaN."""
+        mu = earth_moon_dynamics.system.mu
+        state_at_primary = np.array([-mu, 0.0, 0.0, 0.0, 0.1, 0.0])
+        jacobian = earth_moon_dynamics.compute_jacobian_A(state_at_primary)
+        assert np.all(np.isfinite(jacobian)), f"Non-finite values in Jacobian: {jacobian}"
+
+    def test_cr3bp_jacobian_no_nan_at_secondary_body_position(self, earth_moon_dynamics):
+        """Jacobian at the secondary body position should not produce NaN."""
+        mu = earth_moon_dynamics.system.mu
+        state_at_secondary = np.array([1 - mu, 0.0, 0.0, 0.0, 0.1, 0.0])
+        jacobian = earth_moon_dynamics.compute_jacobian_A(state_at_secondary)
+        assert np.all(np.isfinite(jacobian)), f"Non-finite values in Jacobian: {jacobian}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
