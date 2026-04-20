@@ -339,6 +339,10 @@ class Continuation:
                 step_size_history.append(step_size)
                 i += 1
 
+                if len(orbit_family) >= self.max_orbits:
+                    self.termination_reason = "达到最大轨道数限制"
+                    break
+
         if backward:
             current_orbit = seed_orbit.copy()
 
@@ -407,6 +411,10 @@ class Continuation:
 
                 step_size_history.append(step_size)
                 i += 1
+
+                if len(orbit_family) >= self.max_orbits:
+                    self.termination_reason = "达到最大轨道数限制"
+                    break
 
         seed_orbit.metadata["continuation_step"] = 0
         all_orbits_with_steps = [(seed_orbit, 0)] + temp_orbits_with_steps
