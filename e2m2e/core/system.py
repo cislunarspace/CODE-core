@@ -117,6 +117,12 @@ class CR3BP_System:
         self.secondary_body: str = secondary
         self.mu: float = mu
 
+        if not (0 < mu < 0.5):
+            raise ValueError(
+                f"mu must be in (0, 0.5), got {mu}. "
+                f"mu = m2/(m1+m2) where m2 is the smaller body mass."
+            )
+
         self.characteristic_length: float | None = None
         self.characteristic_time: float | None = None
         self.characteristic_velocity: float | None = None

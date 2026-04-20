@@ -46,6 +46,35 @@ class TestCR3BPSystemInit:
         assert system.characteristic_velocity is None
 
 
+class TestCR3BPMuValidation:
+    """Tests for mu parameter validation"""
+
+    def test_mu_validation_rejects_zero(self):
+        """Test mu=0 is rejected"""
+        with pytest.raises(ValueError, match="mu must be in"):
+            CR3BP_System(mu=0.0, primary="A", secondary="B")
+
+    def test_mu_validation_rejects_negative(self):
+        """Test negative mu is rejected"""
+        with pytest.raises(ValueError, match="mu must be in"):
+            CR3BP_System(mu=-0.01, primary="A", secondary="B")
+
+    def test_mu_validation_rejects_half(self):
+        """Test mu=0.5 is rejected"""
+        with pytest.raises(ValueError, match="mu must be in"):
+            CR3BP_System(mu=0.5, primary="A", secondary="B")
+
+    def test_mu_validation_rejects_out_of_range(self):
+        """Test mu>0.5 is rejected"""
+        with pytest.raises(ValueError, match="mu must be in"):
+            CR3BP_System(mu=1.0, primary="A", secondary="B")
+
+    def test_mu_validation_accepts_valid(self):
+        """Test valid mu is accepted"""
+        system = CR3BP_System(mu=0.012, primary="Earth", secondary="Moon")
+        assert system.mu == 0.012
+
+
 class TestCR3BPSystemKnownSystems:
     """Tests for from_known_system class method"""
 
