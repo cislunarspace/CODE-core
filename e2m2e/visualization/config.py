@@ -37,7 +37,7 @@ def _detect_system_scale() -> float:
         try:
             return max(1.0, float(env))
         except ValueError:
-            pass
+            logger.debug("Invalid MPL_SCALE value: %s", env)
 
     # 优先级 2：桌面环境的缩放设置
     for var in ("GDK_SCALE", "QT_SCALE_FACTOR"):
@@ -46,7 +46,7 @@ def _detect_system_scale() -> float:
             try:
                 return max(1.0, float(val))
             except ValueError:
-                pass
+                logger.debug("Invalid %s value: %s", var, val)
 
     # 优先级 3：通过 xrandr 查询实际显示器 DPI
     try:
@@ -101,9 +101,9 @@ def _detect_system_scale() -> float:
         if best_dpi > _STANDARD_DPI * 1.25:
             return round(best_dpi / _STANDARD_DPI, 2)
     except FileNotFoundError:
-        pass
+        logger.debug("xrandr not found, skipping DPI detection")
     except Exception:
-        pass
+        logger.debug("xrandr query failed", exc_info=True)
 
     return 1.0
 
@@ -167,7 +167,7 @@ if _detected_scale > 1.01:
                 if r.returncode == 0:
                     return r.stdout.strip()
             except Exception:
-                pass
+                logger.debug("zenity file dialog failed", exc_info=True)
             return ""
 
         def _zenity_open(title="Open file", initialdir=None, filetypes=None, **kwargs):
@@ -187,7 +187,7 @@ if _detected_scale > 1.01:
                 if r.returncode == 0:
                     return r.stdout.strip()
             except Exception:
-                pass
+                logger.debug("zenity file dialog failed", exc_info=True)
             return ""
 
         _fd.asksaveasfilename = _zenity_save
