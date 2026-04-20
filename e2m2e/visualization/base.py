@@ -249,7 +249,8 @@ class OrbitVisualizer:
             else:
                 return ax
 
-        assert self.system.L_points is not None
+        if self.system.L_points is None:
+            raise ValueError("Libration points not computed on system. Call compute_libration_points() first.")
 
         if ax is None:
             if is_3d and self.axes_3d is not None:

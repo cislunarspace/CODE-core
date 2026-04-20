@@ -320,7 +320,8 @@ class Orbit:
         if self._monodromy_matrix is None:
             self.compute_monodromy_matrix(dynamics)
 
-        assert self._eigenvalues is not None
+        if self._eigenvalues is None:
+            raise ValueError("Eigenvalues not computed. Call compute_monodromy_matrix first.")
         eigenvalues = self._eigenvalues
         magnitudes = np.abs(eigenvalues)
         max_deviation = np.max(np.abs(magnitudes - 1.0))

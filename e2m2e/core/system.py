@@ -236,7 +236,8 @@ class CR3BP_System:
         if not self.has_L_points:
             self.compute_libration_points()
 
-        assert self.L_points is not None
+        if self.L_points is None:
+            raise ValueError("Libration points not computed. Call compute_libration_points() first.")
         if point not in self.L_points:
             raise ValueError(f"无效的平动点: {point}")
 
@@ -427,7 +428,8 @@ class CR3BP_System:
                 print(f"  特征时间：{self.characteristic_time:.2f} s")
                 print(f"  特征速度：{self.characteristic_velocity:.2f} km/s")
                 print(f"  平均角速度：{self.mean_motion:.6e} rad/s")
-                assert self.orbital_period is not None
+                if self.orbital_period is None:
+                    raise ValueError("Orbital period not computed.")
                 print(
                     f"  轨道周期：{self.orbital_period:.2f} s "
                     f"({self.orbital_period / 86400:.2f} 天)"
