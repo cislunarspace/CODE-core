@@ -251,7 +251,7 @@ API 文档通过 `sphinx.ext.autodoc` 从代码中的 docstring 自动提取。
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {4.0.0},
+  version = {4.1.0},
   year = {2026},
 }
 ```
