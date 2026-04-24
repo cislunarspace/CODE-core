@@ -16,6 +16,7 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
 
    core/system
    core/dynamics
+   core/ephemeris
    core/orbit
    core/coordinate
 
