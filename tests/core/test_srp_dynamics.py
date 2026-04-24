@@ -10,6 +10,7 @@
 import numpy as np
 import pytest
 
+from e2m2e.core.dynamics import CR3BP_Dynamics
 from e2m2e.core.system import CR3BP_System
 from e2m2e.core.srp_dynamics import CR3BP_SRP_Dynamics
 
@@ -48,12 +49,12 @@ class TestOpticalCoefficients:
     def test_b1_coefficient(self, srp_dynamics):
         """测试 b1 系数计算"""
         expected = 0.5 * (1.0 - 0.975 * 0.999)
-        assert abs(srp_dynamics.b1 - expected) < 1e-10
+        assert srp_dynamics.b1 == pytest.approx(expected)
 
     def test_b2_coefficient(self, srp_dynamics):
         """测试 b2 系数计算"""
         expected = 0.975 * 0.999
-        assert abs(srp_dynamics.b2 - expected) < 1e-10
+        assert srp_dynamics.b2 == pytest.approx(expected)
 
     def test_b3_coefficient(self, srp_dynamics):
         """测试 b3 系数计算"""
@@ -67,7 +68,7 @@ class TestOpticalCoefficients:
             Bf * (1.0 - s) * p
             + (1.0 - p) * (ef * Bf - eb * Bb) / (ef + eb)
         )
-        assert abs(srp_dynamics.b3 - expected) < 1e-10
+        assert srp_dynamics.b3 == pytest.approx(expected)
 
 
 class TestBetaCoefficient:
@@ -80,7 +81,7 @@ class TestBetaCoefficient:
         Cr = 1.5
         mass = 1000.0
         expected = P_srp * area * Cr / (2.0 * mass)
-        assert abs(srp_dynamics.beta - expected) < 1e-15
+        assert srp_dynamics.beta == pytest.approx(expected, abs=1e-15)
 
     def test_zero_area_gives_zero_beta(self, zero_srp_dynamics):
         """测试面积为 0 时 beta 为 0"""
@@ -104,7 +105,6 @@ class TestSRPForce:
         eom = zero_srp_dynamics._get_eom_func(with_stm=False)
         ds_zero = eom(0.0, state)
 
-        from e2m2e.core.dynamics import CR3BP_Dynamics
         cr3bp = CR3BP_Dynamics(zero_srp_dynamics.system)
         ds_cr3bp = cr3bp.equations_of_motion(0.0, state)
 
