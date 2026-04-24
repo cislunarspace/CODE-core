@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 
 from e2m2e.core.dynamics import CR3BP_Dynamics
-from e2m2e.core.system import CR3BP_System
 from e2m2e.core.srp_dynamics import CR3BP_SRP_Dynamics
+from e2m2e.core.system import CR3BP_System
 
 
 @pytest.fixture
@@ -64,10 +64,7 @@ class TestOpticalCoefficients:
         p = 0.999
         ef = 0.8
         eb = 0.2
-        expected = 0.5 * (
-            Bf * (1.0 - s) * p
-            + (1.0 - p) * (ef * Bf - eb * Bb) / (ef + eb)
-        )
+        expected = 0.5 * (Bf * (1.0 - s) * p + (1.0 - p) * (ef * Bf - eb * Bb) / (ef + eb))
         assert srp_dynamics.b3 == pytest.approx(expected)
 
 

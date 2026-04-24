@@ -19,11 +19,11 @@ Functions:
 from . import coordinate, dynamics, ephemeris_dynamics, ephemeris_system, orbit, spice, system
 from .coordinate import CoordinateTransformation, ReferenceFrame, SynodicJ2000Transformation
 from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
-from .srp_dynamics import CR3BP_SRP_Dynamics
 from .ephemeris_dynamics import EphemerisDynamics
 from .ephemeris_system import EphemerisSystem
 from .orbit import Orbit, OrbitFamily
 from .spice import SPICEManager
+from .srp_dynamics import CR3BP_SRP_Dynamics
 from .system import CR3BP_System, LibrationPoint
 
 __all__ = [

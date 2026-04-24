@@ -28,7 +28,6 @@ References:
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -118,10 +117,7 @@ class CR3BP_SRP_Dynamics(CR3BP_Dynamics):
 
         self.b1 = 0.5 * (1.0 - s * p)
         self.b2 = s * p
-        self.b3 = 0.5 * (
-            Bf * (1.0 - s) * p
-            + (1.0 - p) * (ef * Bf - eb * Bb) / (ef + eb)
-        )
+        self.b3 = 0.5 * (Bf * (1.0 - s) * p + (1.0 - p) * (ef * Bf - eb * Bb) / (ef + eb))
 
         # SRP 加速度系数
         self.beta = self._compute_beta()
@@ -181,10 +177,7 @@ class CR3BP_SRP_Dynamics(CR3BP_Dynamics):
 
         # 切向单位矢量（在旋转平面内垂直于径向）
         r_xy = np.sqrt((x + mu) ** 2 + y**2)
-        if r_xy > 1e-15:
-            ut = np.array([-y, x + mu, 0.0]) / r_xy
-        else:
-            ut = np.array([0.0, 0.0, 0.0])
+        ut = np.array([-y, x + mu, 0.0]) / r_xy if r_xy > 1e-15 else np.array([0.0, 0.0, 0.0])
 
         # 径向和切向 SRP 力分量（来自 EXOSIMS）
         F_radial = self.b1 + 0.25 * self.b2 + 0.5 * self.b3
@@ -194,8 +187,9 @@ class CR3BP_SRP_Dynamics(CR3BP_Dynamics):
         a_srp = self.beta * (F_radial * ur + F_tangential * ut)
 
         # 构造新数组，避免修改基类返回值
-        return np.array([base[0], base[1], base[2],
-                         base[3] + a_srp[0], base[4] + a_srp[1], base[5] + a_srp[2]])
+        return np.array(
+            [base[0], base[1], base[2], base[3] + a_srp[0], base[4] + a_srp[1], base[5] + a_srp[2]]
+        )
 
     def _equations_with_stm_srp(
         self, t: float, augmented_state: npt.NDArray[np.floating]
@@ -222,9 +216,7 @@ class CR3BP_SRP_Dynamics(CR3BP_Dynamics):
 
         return np.concatenate([state_derivative, stm_dot.flatten()])
 
-    def _compute_jacobian_numerical(
-        self, state: npt.NDArray[np.floating]
-    ) -> np.ndarray:
+    def _compute_jacobian_numerical(self, state: npt.NDArray[np.floating]) -> np.ndarray:
         """数值计算雅可比矩阵
 
         使用中心差分计算包含 SRP 的雅可比矩阵。

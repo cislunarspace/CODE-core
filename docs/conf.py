@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Sphinx configuration for e2m2e documentation."""
 
 import os
@@ -32,7 +31,7 @@ copyright = "2026, ouyangjiahong"
 author = "ouyangjiahong"
 
 # 版本信息
-from e2m2e import __version__
+from e2m2e import __version__  # noqa: E402
 
 release = __version__
 
