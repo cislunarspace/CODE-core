@@ -305,33 +305,36 @@ ruff format .         # 格式化
 
 ### 文档构建
 
-项目使用 Docusaurus 构建文档网站：
+项目使用 Sphinx 构建文档网站，源文件为 RST 格式，位于 `docs/` 目录。
 
 ```bash
-# 安装文档构建依赖
-cd website && npm install
+# 安装文档依赖
+pip install -e ".[docs]"
 
-# 本地预览文档
-npm run start
+# 构建 HTML 文档
+cd docs && make html
 
-# 构建静态网站
-npm run build
-
-# 本地预览构建产物
-npm run serve
+# 本地预览
+# 构建产物在 docs/_build/html/，用浏览器打开 index.html
 ```
 
-### AI 助手开发指南
+文档目录结构：
 
-项目包含 `AGENTS.md` 文件，为 AI 助手（如 OpenCode）提供仓库特定的开发指导：
+```
+docs/
+├── conf.py              # Sphinx 配置（扩展、主题、语言）
+├── index.rst            # 文档首页与导航
+├── Makefile             # 构建脚本
+├── getting-started/     # 安装、快速入门、可视化
+├── core/                # 系统、动力学、轨道、坐标系
+├── algorithms/          # 微分修正、延拓法、稳定性
+├── transfer/            # 转移轨道搜索与优化
+├── api/                 # 从 docstring 自动生成的 API 文档
+├── reference/           # 算法参考、术语表
+└── _static/             # 图片等静态资源
+```
 
-- **开发命令**：安装、测试、代码质量检查的标准流程
-- **项目结构**：核心模块、算法、转移轨道、可视化的组织方式
-- **架构要点**：CR3BP 中心、轨道数据结构、量纲单位、SPICE 集成
-- **测试注意事项**：SPICE 依赖测试、参考历元、测试夹具
-- **工作流约定**：开发安装、代码格式化、SPICE 功能测试、可视化配置
-
-详细指南请参考 [AGENTS.md](AGENTS.md)。
+API 文档通过 `sphinx.ext.autodoc` 从代码中的 docstring 自动提取，无需手动维护。
 
 ### 提交贡献
 
@@ -349,12 +352,13 @@ npm run serve
 ### 本地预览
 
 ```bash
-cd website && npm install && npm run start
+cd docs && make html
+# 用浏览器打开 docs/_build/html/index.html
 ```
 
 ### 文档源文件
 
-位于 [`website/docs/`](website/docs/) 目录，涵盖系统架构、轨道生成教程、算法参考等。
+位于 [`docs/`](docs/) 目录，涵盖系统架构、轨道生成教程、算法参考、API 文档等。
 
 ## 致谢
 
