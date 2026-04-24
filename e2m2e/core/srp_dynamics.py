@@ -164,11 +164,11 @@ class CR3BP_SRP_Dynamics(CR3BP_Dynamics):
             状态导数 [vx, vy, vz, ax, ay, az]
         """
         # 基础 CR3BP 方程
-        ds = super().equations_of_motion(t, state)
+        base = super().equations_of_motion(t, state)
 
         # 如果 beta 为 0，跳过 SRP 计算
         if self.beta == 0.0:
-            return ds
+            return base
 
         x, y, z = state[:3]
         mu = self.system.mu
@@ -193,12 +193,9 @@ class CR3BP_SRP_Dynamics(CR3BP_Dynamics):
         # SRP 扰动加速度
         a_srp = self.beta * (F_radial * ur + F_tangential * ut)
 
-        # 添加到加速度分量
-        ds[3] += a_srp[0]
-        ds[4] += a_srp[1]
-        ds[5] += a_srp[2]
-
-        return ds
+        # 构造新数组，避免修改基类返回值
+        return np.array([base[0], base[1], base[2],
+                         base[3] + a_srp[0], base[4] + a_srp[1], base[5] + a_srp[2]])
 
     def _equations_with_stm_srp(
         self, t: float, augmented_state: npt.NDArray[np.floating]
