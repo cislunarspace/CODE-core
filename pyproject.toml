@@ -49,6 +49,12 @@ dev = [
     "pytest-cov>=4.0",
     "ruff>=0.1",
 ]
+docs = [
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=2.0",
+    "sphinxcontrib-mermaid>=0.9",
+    "sphinx-copybutton>=0.5",
+]
 
 [project.urls]
 Homepage = "https://github.com/cislunarspace/e2m2e"
@@ -79,3 +85,8 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 fail_under = 50
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
