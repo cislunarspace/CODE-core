@@ -1,147 +1,279 @@
 """
-Orbit 类测试
-
-测试轨道类的核心功能，包括轨道创建、属性计算、插值、保存/加载等。
+Unit tests for Orbit class
 """
 
 import os
 import tempfile
+from pathlib import Path
 
 import numpy as np
 import pytest
 
-from e2m2e.core import CR3BP_System, Orbit
+from e2m2e.core.orbit import Orbit, OrbitFamily
 
 
-class TestOrbitCreation:
-    """测试轨道创建"""
+class TestOrbitInit:
+    """Tests for Orbit initialization"""
 
-    def test_orbit_creation(self):
-        """测试轨道基本创建"""
-        states = np.random.randn(10, 6)
+    def test_init_basic(self):
+        """Test basic initialization with states and times"""
+        states = np.random.rand(10, 6)
+        times = np.linspace(0, 1, 10)
+        orbit = Orbit(states=states, times=times)
+
+        assert orbit.states is not None
+        assert orbit.times is not None
+        assert len(orbit.states) == 10
+
+    def test_init_with_system(self, earth_moon_system):
+        """Test initialization with associated system"""
+        states = np.random.rand(10, 6)
+        times = np.linspace(0, 1, 10)
+        orbit = Orbit(states=states, times=times, system=earth_moon_system)
+
+        assert orbit.system is earth_moon_system
+
+    def test_init_single_state(self):
+        """Test initialization with single state (1D array)"""
+        state = np.array([0.5, 0.1, 0.0, 0.01, 0.02, 0.0])
+        time = np.array([0.0])
+        orbit = Orbit(states=state, times=time)
+
+        assert orbit.states.shape[0] == 1
+
+    def test_init_invalid_state_dimension(self):
+        """Test initialization with wrong state dimension raises error"""
+        states = np.random.rand(10, 5)  # Wrong: 5 components instead of 6
         times = np.linspace(0, 1, 10)
 
-        orbit = Orbit(states, times)
+        with pytest.raises(ValueError, match="必须包含6个分量"):
+            Orbit(states=states, times=times)
 
-        assert orbit.states.shape == (10, 6)
-        assert orbit.times.shape == (10,)
+    def test_init_mismatched_lengths(self):
+        """Test initialization with mismatched lengths raises error"""
+        states = np.random.rand(10, 6)
+        times = np.linspace(0, 1, 8)  # 8 times for 10 states
 
-    def test_orbit_with_system(self):
-        """测试带系统的轨道创建"""
-        system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
+        with pytest.raises(ValueError, match="长度必须与状态序列长度一致"):
+            Orbit(states=states, times=times)
 
-        states = np.random.randn(10, 6)
+    def test_init_default_attributes(self):
+        """Test initialization sets correct defaults - period may be auto-computed"""
+        states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
+        orbit = Orbit(states=states, times=times)
 
-        orbit = Orbit(states, times, system=system)
-
-        assert orbit.system is system
-
-    def test_orbit_invalid_states(self):
-        """测试无效状态维度"""
-        with pytest.raises(ValueError):
-            # 状态维度不正确
-            states = np.random.randn(10, 5)  # 应该是6维
-            times = np.linspace(0, 1, 10)
-            Orbit(states, times)
-
-    def test_orbit_times_mismatch(self):
-        """测试时间与状态长度不匹配"""
-        with pytest.raises(ValueError):
-            states = np.random.randn(10, 6)
-            times = np.linspace(0, 1, 5)  # 长度不匹配
-            Orbit(states, times)
+        assert orbit.jacobi_constants is None
+        assert orbit.stability_indices is None
+        assert orbit.family_type is None
+        assert orbit.monodromy_matrix is None
+        assert not orbit.is_periodic
 
 
-class TestComputeBasicProperties:
-    """测试基本属性计算"""
+class TestOrbitBasicProperties:
+    """Tests for compute_basic_properties method"""
 
-    def test_jacobi_constant_computed(self):
-        """测试Jacobi常数计算"""
-        system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
-
-        states = np.random.randn(10, 6)
+    def test_compute_properties_with_system(self, earth_moon_system):
+        """Test compute_basic_properties with associated system"""
+        states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
-
-        orbit = Orbit(states, times, system=system)
+        orbit = Orbit(states=states, times=times, system=earth_moon_system)
 
         assert orbit.jacobi_constants is not None
         assert len(orbit.jacobi_constants) == 10
 
-    def test_amplitudes_computed(self):
-        """测试振幅计算"""
-        states = np.random.randn(10, 6)
+    def test_compute_properties_mean_state(self, earth_moon_system):
+        """Test mean state computation"""
+        states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
+        orbit = Orbit(states=states, times=times, system=earth_moon_system)
 
-        orbit = Orbit(states, times)
+        expected_mean = np.mean(states, axis=0)
+        assert np.allclose(orbit.mean_state, expected_mean)
+
+    def test_compute_properties_amplitudes(self):
+        """Test amplitude computation"""
+        t = np.linspace(0, 1, 50)
+        x = 0.5 + 0.1 * np.cos(2 * np.pi * t)
+        states = np.column_stack(
+            [x, np.zeros(50), np.zeros(50), np.zeros(50), np.zeros(50), np.zeros(50)]
+        )
+        orbit = Orbit(states=states, times=t)
 
         assert "x" in orbit.amplitudes
-        assert "y" in orbit.amplitudes
-        assert "z" in orbit.amplitudes
+        assert orbit.amplitudes["x"] > 0
 
-    def test_extrema_computed(self):
-        """测试极值计算"""
-        states = np.random.randn(10, 6)
-        times = np.linspace(0, 1, 10)
-
-        orbit = Orbit(states, times)
+    def test_compute_properties_extrema(self):
+        """Test extrema computation"""
+        t = np.linspace(0, 1, 50)
+        x = 0.5 + 0.1 * np.cos(2 * np.pi * t)
+        states = np.column_stack(
+            [x, np.zeros(50), np.zeros(50), np.zeros(50), np.zeros(50), np.zeros(50)]
+        )
+        orbit = Orbit(states=states, times=t)
 
         assert "x_max" in orbit.extrema
         assert "x_min" in orbit.extrema
+        assert np.isclose(orbit.extrema["x_max"], 0.6, atol=1e-6)
 
 
-class TestSaveAndLoad:
-    """测试保存和加载"""
+class TestPropagateStateAtOrbitTime:
+    """Tests for CR3BP_Dynamics.propagate_orbit_state_at_time (uses propagate)"""
 
-    def test_save_to_file(self):
-        """测试保存轨道数据"""
-        states = np.random.randn(10, 6)
+    def test_propagate_at_epoch_matches_state0(self, sample_orbit, earth_moon_dynamics):
+        state = earth_moon_dynamics.propagate_orbit_state_at_time(
+            sample_orbit, float(sample_orbit.times[0])
+        )
+        np.testing.assert_allclose(state, sample_orbit.states[0], rtol=1e-9, atol=1e-12)
+
+    def test_propagate_returns_finite_vector(self, sample_orbit, earth_moon_dynamics):
+        t = float(sample_orbit.times[0]) + 0.05
+        state = earth_moon_dynamics.propagate_orbit_state_at_time(
+            sample_orbit, t, integration_dt=0.005
+        )
+        assert state.shape == (6,)
+        assert not np.any(np.isnan(state))
+
+
+class TestOrbitPeriod:
+    """Tests for get_period method"""
+
+    def test_get_period_returns_value(self):
+        """Test get_period returns period value (auto-computed or None)"""
+        states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
+        orbit = Orbit(states=states, times=times)
 
-        orbit = Orbit(states, times)
+        result = orbit.get_period()
+        assert result is None or isinstance(result, (float, np.floating))
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
-            temp_file = f.name
+    def test_get_period_with_estimate(self, sample_orbit):
+        """Test get_period returns period when estimated"""
+        sample_orbit.get_period()
+
+
+class TestOrbitAmplitude:
+    """Tests for get_amplitude method"""
+
+    def test_get_amplitude_valid_direction(self, sample_orbit):
+        """Test get_amplitude with valid direction"""
+        amp = sample_orbit.get_amplitude(direction="x")
+        assert isinstance(amp, float)
+        assert amp >= 0
+
+    def test_get_amplitude_invalid_direction(self, sample_orbit):
+        """Test get_amplitude raises error for invalid direction"""
+        with pytest.raises(ValueError, match="无效的方向"):
+            sample_orbit.get_amplitude(direction="invalid")
+
+
+class TestOrbitSaveLoad:
+    """Tests for save_to_file and load_from_file methods"""
+
+    def test_save_load_roundtrip(self, sample_orbit):
+        """Test save and load returns equivalent orbit"""
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            filename = f.name
 
         try:
-            orbit.save_to_file(temp_file)
+            sample_orbit.save_to_file(filename=filename)
+            loaded_orbit = Orbit.load_from_file(filename=filename)
 
-            # 检查文件是否创建
-            assert os.path.exists(temp_file)
+            assert np.allclose(loaded_orbit.states, sample_orbit.states, atol=1e-10)
+            assert np.allclose(loaded_orbit.times, sample_orbit.times, atol=1e-10)
         finally:
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
+            if os.path.exists(filename):
+                os.remove(filename)
 
-    def test_load_from_file(self):
-        """测试加载轨道数据"""
-        # 创建并保存轨道
-        states = np.random.randn(10, 6)
-        times = np.linspace(0, 1, 10)
-
-        orbit = Orbit(states, times)
-
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
-            temp_file = f.name
+    def test_load_from_file_pathlib(self, sample_orbit):
+        """Test load_from_file accepts Path objects"""
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            filename = Path(f.name)
 
         try:
-            orbit.save_to_file(temp_file)
+            sample_orbit.save_to_file(filename=filename)
+            loaded_orbit = Orbit.load_from_file(filename=filename)
 
-            # 加载轨道
-            loaded_orbit = Orbit.load_from_file(temp_file)
-
-            assert loaded_orbit.states.shape == orbit.states.shape
-            assert np.allclose(loaded_orbit.times, orbit.times)
+            assert np.allclose(loaded_orbit.states, sample_orbit.states, atol=1e-10)
         finally:
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
+            if filename.exists():
+                os.remove(filename)
 
 
-class TestOrbitGeometricFeatures:
-    """测试轨道几何特征"""
+class TestOrbitMonodromy:
+    """Tests for compute_monodromy_matrix method"""
+
+    def test_monodromy_requires_period(self, sample_orbit, earth_moon_dynamics):
+        """Test compute_monodromy_matrix raises error without period"""
+        sample_orbit.period = None
+
+        with pytest.raises(ValueError, match="轨道周期未知"):
+            sample_orbit.compute_monodromy_matrix(dynamics=earth_moon_dynamics)
+
+
+class TestOrbitStability:
+    """Tests for compute_stability method"""
+
+    def test_stability_requires_monodromy(self, sample_orbit, earth_moon_dynamics):
+        """Test compute_stability requires monodromy matrix"""
+        sample_orbit.monodromy_matrix = None
+        sample_orbit.period = 1.0
+
+        result = sample_orbit.compute_stability(dynamics=earth_moon_dynamics)
+
+        assert "stability" in result
+        assert "eigenvalues" in result
+
+    def test_compute_stability_with_zero_period(self, earth_moon_dynamics, earth_moon_system):
+        """compute_stability should handle zero period gracefully."""
+        orbit = Orbit(
+            states=np.array([[0.8, 0.0, 0.0, 0.0, 0.1, 0.0]]),
+            times=np.array([0.0]),
+            system=earth_moon_system,
+        )
+        orbit.period = 0.0
+        result = orbit.compute_stability(earth_moon_dynamics)
+        assert result["stability"] == "unknown"
+        assert result["eigenvalues"] is None
+
+
+class TestOrbitMetadata:
+    """Tests for orbit metadata"""
+
+    def test_metadata_created_timestamp(self, sample_orbit):
+        """Test metadata contains creation timestamp"""
+        assert "created" in sample_orbit.metadata
+        assert sample_orbit.metadata["created"] is not None
+
+    def test_metadata_source(self, sample_orbit):
+        """Test metadata contains source"""
+        assert "source" in sample_orbit.metadata
+        assert sample_orbit.metadata["source"] == "e2m2e library"
+
+    def test_metadata_description(self, sample_orbit):
+        """Test metadata can store description"""
+        assert "description" in sample_orbit.metadata
+
+
+class TestOrbitFamilyInit:
+    """Tests for OrbitFamily initialization"""
+
+    def test_orbit_family_rejects_non_orbit_list(self):
+        """OrbitFamily should raise TypeError when given a list of non-Orbit objects"""
+        with pytest.raises(TypeError, match="Orbit instances"):
+            OrbitFamily(orbits=[1, 2, 3])
+
+    def test_orbit_family_accepts_single_orbit(self, sample_orbit):
+        """OrbitFamily should accept a single Orbit object"""
+        family = OrbitFamily(orbits=sample_orbit)
+        assert len(family) == 1
+
+
+class TestOrbitPeriodicityCheck:
+    """Tests for periodicity detection"""
 
     def test_periodicity_check(self):
-        """测试周期性检测"""
-        # 创建近似周期轨道
+        """Test periodicity detection with closed orbit data"""
         states = np.array(
             [
                 [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
@@ -155,37 +287,28 @@ class TestOrbitGeometricFeatures:
 
         orbit = Orbit(states, times)
 
-        # 检查轨道属性
         assert orbit.period is not None
 
 
 class TestOrbitFamilyType:
-    """测试轨道族类型"""
+    """Tests for orbit family type"""
 
     def test_set_family_type(self):
-        """测试设置轨道族类型"""
+        """Test setting orbit family type"""
         states = np.random.randn(10, 6)
         times = np.linspace(0, 1, 10)
 
         orbit = Orbit(states, times)
-
-        # 设置轨道族类型
         orbit.family_type = "halo"
 
         assert orbit.family_type == "halo"
 
     def test_invalid_family_type(self):
-        """测试无效轨道族类型"""
+        """Test family_type accepts arbitrary string values"""
         states = np.random.randn(10, 6)
         times = np.linspace(0, 1, 10)
 
         orbit = Orbit(states, times)
-
-        # 应该不设置无效类型（或者可以被设置为任何字符串）
         orbit.family_type = "invalid_type"
 
         assert orbit.family_type == "invalid_type"
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
