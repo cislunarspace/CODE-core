@@ -2,6 +2,9 @@
 Unit tests for CR3BP_System class
 """
 
+from contextlib import redirect_stdout
+from io import StringIO
+
 import numpy as np
 import pytest
 
@@ -160,11 +163,9 @@ class TestCR3BPSystemLibrationPoints:
         """Test L4 and L5 are equilateral triangle points"""
         earth_moon_system.compute_libration_points()
 
-        # L4 should be at (0.5 - mu, sqrt(3)/2)
         expected_l4_y = np.sqrt(3) / 2
         assert abs(earth_moon_system.L4[1] - expected_l4_y) < 0.01
 
-        # L5 should be at (0.5 - mu, -sqrt(3)/2)
         expected_l5_y = -np.sqrt(3) / 2
         assert abs(earth_moon_system.L5[1] - expected_l5_y) < 0.01
 
@@ -176,7 +177,6 @@ class TestCR3BPSystemLibrationPoints:
 
     def test_get_libration_point_auto_compute(self, earth_moon_system):
         """Test get_libration_point computes if not already computed"""
-        # Don't call compute_libration_points first
         L1 = earth_moon_system.get_libration_point(LibrationPoint.L1)
         assert L1 is not None
         assert earth_moon_system.has_L_points is True
@@ -197,7 +197,7 @@ class TestCR3BPSystemJacobiConstant:
         state = np.array([earth_moon_system.L1[0], 0, 0, 0, 0, 0])
         C = earth_moon_system.get_jacobi_constant(state)
         assert isinstance(C, float)
-        assert C > 0  # L1 has positive Jacobi constant in normalized units
+        assert C > 0
 
     def test_jacobi_constant_zero_velocity(self, earth_moon_system):
         """Test Jacobi constant with zero velocity"""
@@ -346,3 +346,139 @@ class TestCR3BPSystemPhysicalConstants:
         """Test year in seconds"""
         expected = 365.25 * 86400
         assert expected == CR3BP_System.YEAR
+
+
+# --- Ported from tests/core/system/test_system_info.py ---
+# info() method tests — unique coverage not in the main system test suite
+
+
+@pytest.fixture
+def uninitialized_system():
+    """Create Earth-Moon system without initialized characteristic scales."""
+    return CR3BP_System(mu=1.21506683e-2, primary="Earth", secondary="Moon")
+
+
+@pytest.fixture
+def full_system(initialized_system):
+    """Create fully initialized system with libration points and mass info."""
+    initialized_system.compute_libration_points()
+    initialized_system.mass_primary = 5.972e24
+    initialized_system.mass_secondary = 7.342e22
+    initialized_system.total_mass = 5.972e24 + 7.342e22
+    return initialized_system
+
+
+def _capture_info(system, mode="default"):
+    """Capture printed output from info() method."""
+    buf = StringIO()
+    with redirect_stdout(buf):
+        system.info(mode=mode)
+    return buf.getvalue()
+
+
+class TestInfoDefault:
+    """Tests for info() default mode"""
+
+    def test_default_header_footer(self, earth_moon_system):
+        """Default mode includes header and footer separators."""
+        output = _capture_info(earth_moon_system)
+        lines = output.strip().split("\n")
+        assert lines[0] == "=" * 60
+        assert lines[1] == "CR3BP 系统信息"
+        assert lines[2] == "=" * 60
+        assert lines[-1] == "=" * 60
+
+    def test_default_basic_params(self, earth_moon_system):
+        """Default mode includes basic parameters."""
+        output = _capture_info(earth_moon_system)
+        assert "Earth-Moon" in output
+        assert "1.215067e-02" in output
+        assert "主天体：Earth" in output
+        assert "次天体：Moon" in output
+
+    def test_default_no_extended_info(self, earth_moon_system):
+        """Default mode does not include extended information."""
+        output = _capture_info(earth_moon_system)
+        assert "系统状态:" not in output
+        assert "特征尺度:" not in output
+        assert "平动点位置" not in output
+        assert "质量信息:" not in output
+
+
+class TestInfoAll:
+    """Tests for info(mode='all') mode"""
+
+    def test_all_includes_system_state(self, uninitialized_system):
+        """All mode includes system state information."""
+        output = _capture_info(uninitialized_system, mode="all")
+        assert "系统状态:" in output
+        assert "是否初始化：False" in output
+        assert "是否已计算平动点：False" in output
+
+    def test_all_uninitialized_scales(self, uninitialized_system):
+        """All mode shows hint when characteristic scales are not set."""
+        output = _capture_info(uninitialized_system, mode="all")
+        assert "特征尺度：未设置" in output
+
+    def test_all_initialized_scales(self, initialized_system):
+        """All mode shows specific values when characteristic scales are set."""
+        output = _capture_info(initialized_system, mode="all")
+        assert "特征尺度:" in output
+        assert "特征长度：384405.00 km" in output
+        assert "特征速度" in output
+        assert "平均角速度" in output
+        assert "轨道周期" in output
+        assert "半长轴：384405.00 km" in output
+
+    def test_all_no_libration_points(self, uninitialized_system):
+        """All mode shows hint when libration points are not computed."""
+        output = _capture_info(uninitialized_system, mode="all")
+        assert "平动点：未计算" in output
+
+    def test_all_with_libration_points(self, full_system):
+        """All mode shows coordinates when libration points are computed."""
+        output = _capture_info(full_system, mode="all")
+        assert "平动点位置 (无量纲坐标):" in output
+        assert "L1:" in output
+        assert "L2:" in output
+        assert "L3:" in output
+        assert "L4:" in output
+        assert "L5:" in output
+
+    def test_all_no_mass_info(self, earth_moon_system):
+        """All mode shows hint when mass is not set."""
+        output = _capture_info(earth_moon_system, mode="all")
+        assert "质量信息：未设置" in output
+
+    def test_all_with_mass_info(self, full_system):
+        """All mode shows specific values when mass is set."""
+        output = _capture_info(full_system, mode="all")
+        assert "主天体质量" in output
+        assert "次天体质量" in output
+        assert "总质量" in output
+
+    def test_all_state_flags_after_init(self, full_system):
+        """All mode shows correct flags after full initialization."""
+        output = _capture_info(full_system, mode="all")
+        assert "是否初始化：True" in output
+        assert "是否已计算平动点：True" in output
+
+
+class TestInfoDifferentSystems:
+    """Tests for info() output across different systems"""
+
+    def test_sun_earth_system(self):
+        system = CR3BP_System.from_known_system("sun_earth")
+        output = _capture_info(system)
+        assert "Sun-Earth" in output
+
+    def test_sun_jupiter_system(self):
+        system = CR3BP_System.from_known_system("sun_jupiter")
+        output = _capture_info(system)
+        assert "Sun-Jupiter" in output
+
+    def test_custom_system(self):
+        system = CR3BP_System(mu=0.001, primary="Star", secondary="Planet")
+        output = _capture_info(system)
+        assert "Star-Planet" in output
+        assert "1.000000e-03" in output
