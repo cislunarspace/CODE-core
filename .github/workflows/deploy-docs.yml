@@ -14,20 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: |
-          pip install -e ".[docs]"
-
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --group docs
       - name: Build docs
         run: |
           cd docs
-          make html
+          uv run make html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -1,69 +1,140 @@
 # AGENTS.md - e2m2e Repository Guidance
 
-## Development Commands
+e2m2e (Earth to Moon, Moon to Earth) is a Python library for designing cislunar transfer orbits, built on CR3BP orbital dynamics. It provides system modeling, numerical algorithms, transfer trajectory design, and visualization.
 
-### Installation
+MBSE (Model-Based Systems Engineering) infrastructure with SysML-style Protocol interfaces, Pydantic data models, requirement tracking, and automated Mermaid diagram generation.
+
+## Commands
+
 ```bash
-# Install in development mode (preferred)
-python -m pip install -e .
+# Install (editable mode, required for development)
+uv sync
+uv sync --group dev              # with pytest, ruff, mypy
 
-# Install with development dependencies
-pip install -e ".[dev]"
+# Tests (CI requires 80% coverage)
+uv run pytest tests/             # all tests
+uv run pytest tests/core/test_system.py  # single test file
+uv run pytest tests/mbse/        # MBSE-specific tests
+uv run pytest -m spice           # only SPICE-dependent tests (require kernels)
+
+# Lint and format (Ruff, 100-char line length)
+uv run ruff check .
+uv run ruff check --fix .
+uv run ruff format .
+
+# Type checking (required for CI)
+uv run mypy e2m2e/ --ignore-missing-imports
+
+# Documentation (Sphinx)
+uv sync --group docs
+uv run --directory docs make html
+
+# MBSE diagram generation
+uv run python scripts/generate_mbse_diagrams.py
 ```
 
-### Testing
-```bash
-# Run all tests
-pytest tests/
+## Architecture
 
-# Tests requiring SPICE kernels are marked with @pytest.mark.spice
-# SPICE kernel directory: $SPICE_KERNEL_DIR or ./kernels/
+Four-layer dependency graph (strictly one-directional):
+
+```text
+core/           Foundation — data structures and physics models
+  ↓
+algorithms/     Numerical solvers — differential correction, continuation, stability, multiple shooting
+  ↓
+transfer/       Transfer design — grid search, NLP optimization
+  ↓
+visualization/  Plotting — unified PlotConfig, orbit families, transfer trajectories
 ```
 
-### Code Quality
-```bash
-# Format and lint with Ruff (line length: 100)
-ruff check .          # Check
-ruff check --fix .    # Auto-fix
-ruff format .         # Format
+Cross-cutting: `mbse/` — Protocol interfaces, Pydantic models, requirement/component registries, diagram generation
+
+### Key imports
+
+```python
+from e2m2e.core import CR3BP_System, CR3BP_Dynamics, Orbit, EphemerisSystem, EphemerisDynamics
+from e2m2e.algorithms import DifferentialCorrection, Continuation, MultipleShooting, StabilityAnalysis
+from e2m2e.algorithms.strategies import halo_fixed_z0, halo_fixed_x0  # strategy functions
+from e2m2e.transfer import Transfer
+from e2m2e.visualization import PlotConfig, FamilyPlotter
 ```
 
-## Project Structure
+### Dynamics hierarchy
 
-- **Core module** (`e2m2e/core/`): CR3BP system, dynamics, orbits, coordinate transforms
-- **Algorithms** (`e2m2e/algorithms/`): Differential correction, continuation, stability analysis
-- **Transfer** (`e2m2e/transfer/`): Orbit transfer design and optimization
-- **Visualization** (`e2m2e/visualization/`): Plotting with unified `PlotConfig`
+```text
+Dynamics (base, Template Method)
+  → CR3BP_Dynamics    [implements Propagator, EOMProvider; requires SystemModel]
+  → EphemerisDynamics [implements Propagator, EOMProvider; requires SPICE kernels]
 
-## Key Architecture Notes
+CR3BP_System → CR3BP_Dynamics → DifferentialCorrection
+                    ↑                    ↑
+                  Orbit          Continuation, StabilityAnalysis
+```
 
-1. **CR3BP-centric**: All orbits are in circular restricted three-body problem frame
-2. **Orbit data structure**: `Orbit` class stores states and times; `OrbitFamily` for families
-3. **Dimensional units**: Uses characteristic scales (DU, TU, VU) - set via `set_characteristic_scales()`
-4. **SPICE integration**: Ephemeris models require SPICE kernels in `$SPICE_KERNEL_DIR` or `./kernels/`
+Correction strategies in `algorithms/strategies/`:
 
-## Testing Gotchas
+- `symmetric_2d.py`: symmetric_2d_fixed_x0, symmetric_2d_fixed_t, symmetric_2d_fixed_y0
+- `symmetric_3d.py`: symmetric_3d_fixed_x0, symmetric_xz_fixed_x0, symmetric_xz_fixed_z0
+- `halo.py`: halo_fixed_z0, halo_fixed_x0
 
-- SPICE-dependent tests skip if kernels not found
-- Reference epoch for ephemeris tests: "2025-06-21T11:00:06"
-- Test fixtures provide pre-configured Earth-Moon, Sun-Earth, Sun-Jupiter systems
+### MBSE infrastructure (e2m2e/mbse/)
 
-## Package Configuration
+- **architecture/ports.py** — 7 `@runtime_checkable` Protocols: SystemModel, EOMProvider, Propagator, OrbitContainer, CorrectorStrategy, Optimizer, Visualizer
+- **architecture/components.py** — Component registry with registered components
+- **data/core_models.py** — Pydantic models: PropagationResult (states validated to (n,6)), OrbitProperties, OrbitStability, JacobiResult
+- **data/enums.py** — Shared enums: OrbitFamilyType, StabilityLabel, ConvergenceState, etc.
+- **requirements/base.py** — Requirement dataclass + RequirementRegistry singleton
+- **diagrams/generator.py** — Mermaid diagram generation (BDD, IBD, state machine, activity, sequence, requirement)
 
-- **Primary config**: `pyproject.toml` (not `setup.py`)
-- **Python version**: ≥3.10
-- **Core dependencies**: numpy, scipy, matplotlib, tqdm, spiceypy
-- **Development dependencies**: pytest, pytest-cov, ruff
+## Critical conventions
 
-## Workflow Conventions
+- **State vector order** is `[x, y, z, vx, vy, vz]` — changing it causes global failures
+- **States shape** is `(n_points, 6)` for all Dynamics subclasses — `(6, n)` is the old convention, no longer used
+- **STM shape** is `(n_points, 6, 6)` for all Dynamics subclasses
+- **Numerical tolerance**: always `rtol=atol=1e-12`; never increase finite difference step sizes
+- **Dimensionless units** throughout (DU, TU, VU); call `set_characteristic_scales()` before physical calculations
+- **Interface stability**: public method signatures must not break backward compatibility; add new params with defaults
+- **New dynamics models**: create a new subclass overriding `_get_eom_func()` and `_get_max_step()`, don't modify the base class
+- **Protocol conformance**: new classes should satisfy the appropriate Protocol from `e2m2e.mbse.architecture.ports`
 
-1. **Always use development install** (`-e .`) for code changes
-2. **Run Ruff before committing** - project enforces 100-character line length
-3. **Test SPICE features separately** - they require external kernel files
-4. **Visualization uses `PlotConfig`** - configure fonts/sizes via this class
+## Testing
 
-## Entry Points
+- SPICE-dependent tests are marked `@pytest.mark.spice` and auto-skip if kernels unavailable
+- Kernels searched in `$SPICE_KERNEL_DIR` or `./kernels/`
+- Reference epoch: `"2025-06-21T11:00:06"`
+- Shared fixtures in `tests/conftest.py` provide pre-configured Earth-Moon, Sun-Earth, Sun-Jupiter systems
+- Modifying `core/` requires running the full test suite; `algorithms/` or `transfer/` changes can be verified with targeted tests
+- MBSE tests in `tests/mbse/` verify Protocol conformance, requirement coverage, and Pydantic model validation
 
-- Main imports: `from e2m2e.core import CR3BP_System, CR3BP_Dynamics, Orbit`
-- System creation: `CR3BP_System.from_known_system("earth_moon")`
-- Characteristic scales must be set before physical calculations
+## Adding new modules
+
+1. Create file in the appropriate subpackage (e.g., `e2m2e/algorithms/new_algo.py`)
+2. Export in subpackage `__init__.py`
+3. Register in top-level `e2m2e/__init__.py` and add to `__all__`
+4. If adding dependencies, update `pyproject.toml` and re-run `uv sync`
+5. If adding a new component, register it in `e2m2e/mbse/architecture/` and add requirements to `e2m2e/mbse/requirements/`
+6. Regenerate MBSE diagrams: `uv run python scripts/generate_mbse_diagrams.py`
+
+## Release workflow
+
+- Version tags (`v*`) trigger release pipeline; tag must match `pyproject.toml` version
+- CI runs lint, typecheck (mypy), and tests with 80% coverage threshold
+- Multi-platform testing: Ubuntu, macOS, Windows on Python 3.10–3.13
+
+## Optional dependencies
+
+- **COPT** (`coptpy`): Required for `optimize_with_copt()` in transfer NLP optimization. Falls back to scipy if not installed. Check `_HAVE_COPT` flag in `e2m2e/transfer/__init__.py`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues for this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Uses the five canonical labels: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

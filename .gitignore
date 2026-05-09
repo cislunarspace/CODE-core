@@ -113,7 +113,7 @@ website/node_modules/
 .cibuildwheel/
 
 # pyenv
-.python-version
+# Note: .python-version is tracked for uv
 
 # 性能分析
 *.prof

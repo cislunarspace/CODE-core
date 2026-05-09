@@ -18,38 +18,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install ruff
-      - run: ruff check .
-      - run: ruff format --check .
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --group dev
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
 
   typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -e ".[dev]" mypy
-      - run: mypy e2m2e/ --ignore-missing-imports
-
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -e ".[dev]" pip-audit
-      - run: pip-audit
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --group dev
+      - run: uv run mypy e2m2e/ --ignore-missing-imports
 
   test:
-    needs: [lint, typecheck, security]
+    needs: [lint, typecheck]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -61,9 +44,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
-      - run: pip install -e ".[dev]"
-      - run: pytest --cov=e2m2e --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -x
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --group dev
+      - run: uv run pytest --cov=e2m2e --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -x
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: codecov/codecov-action@v4

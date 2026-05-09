@@ -33,13 +33,13 @@ pip install e2m2e
 ```bash
 git clone https://github.com/cislunarspace/e2m2e.git
 cd e2m2e
-pip install -e .
+uv sync
 ```
 
 开发依赖:
 
 ```bash
-pip install -e ".[dev]"
+uv sync --group dev
 ```
 
 ### SPICE 内核
@@ -175,7 +175,7 @@ plotter.plot_family_2d(family, jacobi_values, title="DRO Family")
 
 ## 项目结构
 
-```
+```text
 e2m2e/
 ├── core/                 # 系统、动力学、轨道、坐标系、星历
 │   ├── system.py         # CR3BP_System - 系统定义、平动点
@@ -195,15 +195,15 @@ e2m2e/
 ## 测试
 
 ```bash
-pytest tests/
+uv run pytest tests/
 ```
 
 ## 代码规范
 
 ```bash
-ruff check .          # 检查
-ruff check --fix .    # 自动修复
-ruff format .         # 格式化
+uv run ruff check .          # 检查
+uv run ruff check --fix .    # 自动修复
+uv run ruff format .         # 格式化
 ```
 
 ## 文档
@@ -211,16 +211,16 @@ ruff format .         # 格式化
 文档使用 Sphinx 构建，源文件位于 `docs/` 目录。
 
 ```bash
-pip install -e ".[docs]"
-cd docs && make html
+uv sync --group docs
+uv run --directory docs make html
 # 用浏览器打开 docs/_build/html/index.html
 ```
 
-在线文档: https://cislunarspace.github.io/e2m2e/
+在线文档: <https://cislunarspace.github.io/e2m2e/>
 
 ### 文档结构
 
-```
+```text
 docs/
 ├── conf.py              # Sphinx 配置
 ├── index.rst            # 首页与导航
