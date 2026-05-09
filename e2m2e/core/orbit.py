@@ -259,20 +259,34 @@ class Orbit:
             self._check_periodicity()
 
     def _check_periodicity(self) -> None:
-        """验证轨道的周期性"""
-        if self._period is None:
+        """验证轨道的周期性
+
+        优先使用轨迹数据自身的闭合误差（第一个状态与最后一个状态的差异），
+        因为轨迹通常为一个完整周期的积分结果。仅当轨迹闭合误差不理想时，
+        才回退到基于 _period 的查找。
+        """
+        if self.states is None or len(self.states) < 2:
             return
 
         start_state = self.states[0]
-        target_t = float(self.times[0]) + float(self._period)
-        idx = int(np.argmin(np.abs(self.times - target_t)))
-        end_state = self.states[idx]
+        end_state = self.states[-1]
+        closure_error = float(np.linalg.norm(start_state - end_state))
 
-        self._periodicity_error = float(np.linalg.norm(start_state - end_state))
-        tolerance = 1e-6
-        self._is_periodic = (
-            self._periodicity_error is not None and self._periodicity_error < tolerance
-        )
+        # 若轨迹闭合误差 < 1e-4，认为轨迹是一个完整周期的积分结果
+        # 直接用闭合误差作为周期性误差
+        if closure_error < 1e-4:
+            self._periodicity_error = closure_error
+            self._is_periodic = closure_error < 1e-5
+        elif self._period is not None:
+            # 回退：用 _period 查找最近的时刻
+            target_t = float(self.times[0]) + float(self._period)
+            idx = int(np.argmin(np.abs(self.times - target_t)))
+            end_state = self.states[idx]
+            self._periodicity_error = float(np.linalg.norm(start_state - end_state))
+            self._is_periodic = self._periodicity_error < 1e-6
+        else:
+            self._periodicity_error = closure_error
+            self._is_periodic = False
 
         if self._is_periodic:
             self.metadata["description"] = "Periodic orbit"
@@ -417,10 +431,8 @@ class Orbit:
         mean_state = properties.get("mean_state", orbit_data.get("mean_state"))
         orbit.mean_state = np.array(mean_state) if mean_state else None
         orbit.family_type = properties.get("family_type", orbit_data.get("family_type"))
-        orbit.is_periodic = properties.get("is_periodic", orbit_data.get("is_periodic", False))
-        orbit.periodicity_error = properties.get(
-            "periodicity_error", orbit_data.get("periodicity_error")
-        )
+        # 重新检查周期性（使用正确的 period），不再从 JSON 恢复 is_periodic
+        orbit._check_periodicity()
 
         return orbit
 

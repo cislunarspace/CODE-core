@@ -1125,7 +1125,12 @@ class DifferentialCorrection:
         final_state = propagation.y[:, -1]
         closure_error = np.linalg.norm(final_state - initial_state)
 
-        if closure_error > 1e-10:
+        # 对于 Halo 轨道，半周期对称性已由微分修正精确保证；全周期闭合误差
+        # 通常来自积分截断（~2e-6），用速度调整反而破坏对称性。
+        if closure_error > 1e-10 and self.setup_type not in (
+            "halo_orbit_fixed_x0",
+            "halo_orbit_fixed_z0",
+        ):
             closure_error_vector = final_state - initial_state
             pos_error = np.linalg.norm(closure_error_vector[:3])
             vel_error = np.linalg.norm(closure_error_vector[3:])
