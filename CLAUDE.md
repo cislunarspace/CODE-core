@@ -141,4 +141,4 @@ Uses the five canonical labels: needs-triage, needs-info, ready-for-agent, ready
 
 ### Domain docs
 
-Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Multi-context — `CONTEXT-MAP.md` at the repo root pointing to per-context `CONTEXT.md` files. See `docs/agents/domain.md`.
