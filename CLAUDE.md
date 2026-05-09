@@ -128,3 +128,17 @@ Correction strategies in `algorithms/strategies/`:
 ## Optional dependencies
 
 - **COPT** (`coptpy`): Required for `optimize_with_copt()` in transfer NLP optimization. Falls back to scipy if not installed. Check `_HAVE_COPT` flag in `e2m2e/transfer/__init__.py`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues for this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Uses the five canonical labels: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
