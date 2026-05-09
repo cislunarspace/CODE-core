@@ -96,6 +96,26 @@ class TestEquationsOfMotion:
         assert derivatives[1] == 2.0
         assert derivatives[2] == 3.0
 
+    def test_equations_z_plane_motion(self, dynamics):
+        """Test motion in z=0 plane stays in z=0 plane."""
+        state = np.array([0.8, 0.0, 0.0, 0.0, 0.0, 0.0])
+        derivatives = dynamics.equations_of_motion(0.0, state)
+
+        assert derivatives[2] == 0.0  # dz/dt = vz = 0
+        assert derivatives[5] == 0.0  # z acceleration is zero
+
+    def test_equations_symmetry(self, dynamics):
+        """Test symmetry of equations at ±y."""
+        state1 = np.array([0.8, 0.1, 0.0, 0.0, 0.1, 0.0])
+        state2 = np.array([0.8, -0.1, 0.0, 0.0, 0.1, 0.0])
+
+        deriv1 = dynamics.equations_of_motion(0.0, state1)
+        deriv2 = dynamics.equations_of_motion(0.0, state2)
+
+        # x and z accelerations should be same for symmetric y states
+        assert deriv1[0] == deriv2[0]
+        assert deriv1[2] == deriv2[2]
+
 
 # =============================================================================
 # Test STM Equations
@@ -114,6 +134,13 @@ class TestSTMEquations:
         augmented = np.concatenate([sample_state, np.eye(6).flatten()])
         derivatives = dynamics.equations_with_stm(0.0, augmented)
         assert np.all(np.isfinite(derivatives))
+
+    def test_stm_equations_first_six_match_regular(self, dynamics, sample_state):
+        """Test first 6 components of augmented EOM match regular EOM."""
+        augmented = np.concatenate([sample_state, np.eye(6).flatten()])
+        deriv_regular = dynamics.equations_of_motion(0.0, sample_state)
+        deriv_augmented = dynamics.equations_with_stm(0.0, augmented)
+        assert_allclose(deriv_regular, deriv_augmented[:6])
 
 
 # =============================================================================
