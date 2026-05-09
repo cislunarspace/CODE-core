@@ -51,7 +51,8 @@ class CR3BP_System:
     """
 
     # 天文常量
-    EARTH_MOON_DISTANCE_KM = 384400.0  # 地月平均距离 (km)
+    EARTH_MOON_DISTANCE_KM = 384400.0  # 地月平均距离 (km) — 旧值，保留以兼容
+    EARTH_MOON_DISTANCE_KM_PRECISE = 384405.0  # 地月距离精确值 (km), Cui et al. 2025
     AU = 149597870.7  # 天文单位 (km)
     G = 6.67430e-20  # 万有引力常数 (km^3 / (kg * s^2))
     DAY = 86400  # 一天的秒数
@@ -62,8 +63,8 @@ class CR3BP_System:
         "earth_moon": {
             "primary": "Earth",
             "secondary": "Moon",
-            "mu": 0.01215,
-            "distance": EARTH_MOON_DISTANCE_KM,
+            "mu": 1.21506683e-2,
+            "distance": EARTH_MOON_DISTANCE_KM_PRECISE,
             "period": 27.32 * 86400,
         },
         "sun_earth": {
@@ -99,11 +100,16 @@ class CR3BP_System:
             raise ValueError(f"未知系统: {system_name}。可用系统: {list(cls.KNOWN_SYSTEMS.keys())}")
 
         system_params = cls.KNOWN_SYSTEMS[system_name]
-        return cls(
+        system = cls(
             mu=float(system_params["mu"]),
             primary=str(system_params["primary"]),
             secondary=str(system_params["secondary"]),
         )
+        system.set_characteristic_scales(
+            distance=float(system_params["distance"]),
+            period=float(system_params["period"]),
+        )
+        return system
 
     def __init__(self, mu: float, primary: str, secondary: str) -> None:
         """初始化系统参数
@@ -144,6 +150,27 @@ class CR3BP_System:
 
         self.has_L_points: bool = False
         self.is_initialized: bool = False
+
+    @property
+    def DU(self) -> float:
+        """特征长度 (km)"""
+        if self.characteristic_length is None:
+            raise ValueError("系统未初始化，请先设置特征尺度")
+        return self.characteristic_length
+
+    @property
+    def TU(self) -> float:
+        """特征时间 (天) — TOD 约定"""
+        if self.characteristic_time is None:
+            raise ValueError("系统未初始化，请先设置特征尺度")
+        return self.characteristic_time / self.DAY
+
+    @property
+    def VU(self) -> float:
+        """特征速度 (m/s) — TOD 约定"""
+        if self.characteristic_velocity is None:
+            raise ValueError("系统未初始化，请先设置特征尺度")
+        return self.characteristic_velocity * 1000.0
 
     def set_characteristic_scales(self, distance: float, period: float) -> None:
         """设置特征尺度

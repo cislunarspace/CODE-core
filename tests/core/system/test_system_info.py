@@ -13,6 +13,12 @@ from e2m2e.core import CR3BP_System
 
 
 @pytest.fixture
+def uninitialized_system():
+    """创建未初始化特征尺度的地月系统实例"""
+    return CR3BP_System(mu=1.21506683e-2, primary="Earth", secondary="Moon")
+
+
+@pytest.fixture
 def earth_moon_system():
     """创建地月系统实例"""
     return CR3BP_System.from_known_system("earth_moon")
@@ -21,7 +27,6 @@ def earth_moon_system():
 @pytest.fixture
 def initialized_system(earth_moon_system):
     """创建已初始化特征尺度的地月系统"""
-    earth_moon_system.set_characteristic_scales(distance=384400, period=27.32 * 86400)
     return earth_moon_system
 
 
@@ -59,7 +64,7 @@ class TestInfoDefault:
         """默认模式包含基础参数"""
         output = _capture_info(earth_moon_system)
         assert "Earth-Moon" in output
-        assert "1.215000e-02" in output
+        assert "1.215067e-02" in output
         assert "主天体：Earth" in output
         assert "次天体：Moon" in output
 
@@ -75,31 +80,31 @@ class TestInfoDefault:
 class TestInfoAll:
     """测试 info(mode='all') 模式"""
 
-    def test_all_includes_system_state(self, earth_moon_system):
+    def test_all_includes_system_state(self, uninitialized_system):
         """all 模式包含系统状态信息"""
-        output = _capture_info(earth_moon_system, mode="all")
+        output = _capture_info(uninitialized_system, mode="all")
         assert "系统状态:" in output
         assert "是否初始化：False" in output
         assert "是否已计算平动点：False" in output
 
-    def test_all_uninitialized_scales(self, earth_moon_system):
+    def test_all_uninitialized_scales(self, uninitialized_system):
         """all 模式 - 未设置特征尺度时的提示"""
-        output = _capture_info(earth_moon_system, mode="all")
+        output = _capture_info(uninitialized_system, mode="all")
         assert "特征尺度：未设置" in output
 
     def test_all_initialized_scales(self, initialized_system):
         """all 模式 - 已设置特征尺度时显示具体数值"""
         output = _capture_info(initialized_system, mode="all")
         assert "特征尺度:" in output
-        assert "特征长度：384400.00 km" in output
+        assert "特征长度：384405.00 km" in output
         assert "特征速度" in output
         assert "平均角速度" in output
         assert "轨道周期" in output
-        assert "半长轴：384400.00 km" in output
+        assert "半长轴：384405.00 km" in output
 
-    def test_all_no_libration_points(self, earth_moon_system):
+    def test_all_no_libration_points(self, uninitialized_system):
         """all 模式 - 未计算平动点时的提示"""
-        output = _capture_info(earth_moon_system, mode="all")
+        output = _capture_info(uninitialized_system, mode="all")
         assert "平动点：未计算" in output
 
     def test_all_with_libration_points(self, full_system):

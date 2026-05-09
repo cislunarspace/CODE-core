@@ -69,9 +69,7 @@ def sample_orbit():
 @pytest.fixture
 def initialized_system(earth_moon_system):
     """Earth-Moon system with characteristic scales set"""
-    system = CR3BP_System.from_known_system("earth_moon")
-    system.set_characteristic_scales(distance=384400, period=27.32 * 86400)
-    return system
+    return earth_moon_system
 
 
 # =============================================================================

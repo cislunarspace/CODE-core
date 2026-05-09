@@ -5,6 +5,7 @@ e2m2e库基本功能测试
 import sys
 
 import numpy as np
+import pytest
 
 from e2m2e.core import CoordinateTransformation, CR3BP_Dynamics, CR3BP_System
 
@@ -23,7 +24,7 @@ def test_system():
     """测试系统创建和平动点计算"""
     # 从已知系统创建
     system = CR3BP_System.from_known_system("earth_moon")
-    assert system.mu == 0.01215
+    assert system.mu == pytest.approx(1.21506683e-2, abs=1e-12)
     assert system.primary_body == "Earth"
     assert system.secondary_body == "Moon"
     print(f"✓ 地月系统创建成功: {system}")

@@ -80,9 +80,32 @@ class TestCR3BPSystemKnownSystems:
 
     def test_earth_moon_system(self, earth_moon_system):
         """Test Earth-Moon system creation"""
-        assert earth_moon_system.mu == 0.01215
+        assert earth_moon_system.mu == pytest.approx(1.21506683e-2, abs=1e-12)
         assert earth_moon_system.primary_body == "Earth"
         assert earth_moon_system.secondary_body == "Moon"
+
+    def test_earth_moon_mu_full_precision(self):
+        """Earth-Moon mu must match Cui et al. 2025 Table 1 to 10 digits."""
+        system = CR3BP_System.from_known_system("earth_moon")
+        assert system.mu == pytest.approx(1.21506683e-2, rel=0, abs=1e-12)
+
+    def test_from_known_system_auto_sets_scales(self):
+        """from_known_system should auto-initialize characteristic scales."""
+        system = CR3BP_System.from_known_system("earth_moon")
+        assert system.is_initialized is True
+        assert system.characteristic_length is not None
+        assert system.characteristic_time is not None
+        assert system.characteristic_velocity is not None
+
+    def test_earth_moon_distance_matches_paper(self):
+        """Earth-Moon characteristic length must be 384405 km (Cui et al. 2025)."""
+        system = CR3BP_System.from_known_system("earth_moon")
+        assert system.characteristic_length == pytest.approx(384405.0, abs=1e-6)
+
+    def test_earth_moon_TU_days(self):
+        """Earth-Moon characteristic time must match 4.34811305 days."""
+        system = CR3BP_System.from_known_system("earth_moon")
+        assert system.characteristic_time / 86400 == pytest.approx(4.34811305, abs=1e-8)
 
     def test_sun_earth_system(self, sun_earth_system):
         """Test Sun-Earth system creation"""
@@ -249,17 +272,19 @@ class TestCR3BPSystemCharacteristicScales:
 class TestCR3BPSystemUnitConversion:
     """Tests for dimensionless/physical unit conversion"""
 
-    def test_dimensionless_to_physical_requires_init(self, earth_moon_system):
+    def test_dimensionless_to_physical_requires_init(self):
         """Test conversion raises error without initialization"""
+        system = CR3BP_System(mu=0.012, primary="Earth", secondary="Moon")
         state = np.array([0.5, 0.0, 0.0, 0.0, 0.0, 0.0])
         with pytest.raises(ValueError, match="系统未初始化"):
-            earth_moon_system.dimensionless_to_physical(state=state)
+            system.dimensionless_to_physical(state=state)
 
-    def test_physical_to_dimensionless_requires_init(self, earth_moon_system):
+    def test_physical_to_dimensionless_requires_init(self):
         """Test conversion raises error without initialization"""
+        system = CR3BP_System(mu=0.012, primary="Earth", secondary="Moon")
         state = np.array([192200, 0.0, 0.0, 0.0, 0.5, 0.0])  # km, km/s
         with pytest.raises(ValueError, match="系统未初始化"):
-            earth_moon_system.physical_to_dimensionless(state=state)
+            system.physical_to_dimensionless(state=state)
 
     def test_dimensionless_to_physical_position(self, initialized_system):
         """Test dimensionless to physical position conversion"""
@@ -284,6 +309,22 @@ class TestCR3BPSystemUnitConversion:
         back = initialized_system.physical_to_dimensionless(state=converted)
 
         assert np.allclose(original, back, atol=1e-10)
+
+
+class TestCR3BPSystemDUTUVUProperties:
+    """Tests for DU/TU/VU property aliases (TOD convention: km, days, m/s)"""
+
+    def test_DU_returns_kilometers(self, earth_moon_system):
+        """DU returns characteristic length in km."""
+        assert earth_moon_system.DU == pytest.approx(384405.0, abs=1e-6)
+
+    def test_TU_returns_days(self, earth_moon_system):
+        """TU returns characteristic time in days (TOD convention)."""
+        assert earth_moon_system.TU == pytest.approx(4.34811305, abs=1e-8)
+
+    def test_VU_returns_meters_per_second(self, earth_moon_system):
+        """VU returns characteristic velocity in m/s (TOD convention)."""
+        assert earth_moon_system.VU == pytest.approx(1023.23281, abs=0.01)
 
 
 class TestCR3BPSystemPhysicalConstants:
