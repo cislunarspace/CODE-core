@@ -11,10 +11,9 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
-from scipy import integrate
 from scipy.optimize import brentq
 
-from ..core.dynamics import CR3BP_Dynamics
+from ..core.dynamics import Dynamics
 from ..core.orbit import Orbit
 
 if TYPE_CHECKING:
@@ -458,7 +457,7 @@ class DifferentialCorrection:
 
     def __init__(
         self,
-        dynamic: CR3BP_Dynamics,
+        dynamic: Dynamics,
         target: dict[str, Any] | None = None,
         free_vars: list[str] | None = None,
     ) -> None:
@@ -796,29 +795,17 @@ class DifferentialCorrection:
             if var_idx < 6:
                 state_fwd = current_state.copy()
                 state_fwd[var_idx] += eps
-                result_fwd = integrate.solve_ivp(
-                    self.dynamics.equations_of_motion,
-                    (0, current_time),
-                    state_fwd,
-                    method="DOP853",
-                    t_eval=[current_time],
-                    rtol=1e-12,
-                    atol=1e-12,
+                result_fwd = self.dynamics.propagate(
+                    state_fwd, (0, current_time), t_eval=[current_time],
                 )
-                final_fwd = result_fwd.y[:, -1]
+                final_fwd = result_fwd["states"][-1]
 
                 state_bwd = current_state.copy()
                 state_bwd[var_idx] -= eps
-                result_bwd = integrate.solve_ivp(
-                    self.dynamics.equations_of_motion,
-                    (0, current_time),
-                    state_bwd,
-                    method="DOP853",
-                    t_eval=[current_time],
-                    rtol=1e-12,
-                    atol=1e-12,
+                result_bwd = self.dynamics.propagate(
+                    state_bwd, (0, current_time), t_eval=[current_time],
                 )
-                final_bwd = result_bwd.y[:, -1]
+                final_bwd = result_bwd["states"][-1]
 
                 sensitivity = (final_fwd - final_bwd) / (2 * eps)
                 for i, c_idx in enumerate(self.constraint_indices):
@@ -826,28 +813,16 @@ class DifferentialCorrection:
 
             elif var_idx == 6:
                 t_fwd = current_time + eps
-                result_fwd = integrate.solve_ivp(
-                    self.dynamics.equations_of_motion,
-                    (0, t_fwd),
-                    current_state,
-                    method="DOP853",
-                    t_eval=[t_fwd],
-                    rtol=1e-12,
-                    atol=1e-12,
+                result_fwd = self.dynamics.propagate(
+                    current_state, (0, t_fwd), t_eval=[t_fwd],
                 )
-                final_fwd = result_fwd.y[:, -1]
+                final_fwd = result_fwd["states"][-1]
 
                 t_bwd = current_time - eps
-                result_bwd = integrate.solve_ivp(
-                    self.dynamics.equations_of_motion,
-                    (0, t_bwd),
-                    current_state,
-                    method="DOP853",
-                    t_eval=[t_bwd],
-                    rtol=1e-12,
-                    atol=1e-12,
+                result_bwd = self.dynamics.propagate(
+                    current_state, (0, t_bwd), t_eval=[t_bwd],
                 )
-                final_bwd = result_bwd.y[:, -1]
+                final_bwd = result_bwd["states"][-1]
 
                 sensitivity = (final_fwd - final_bwd) / (2 * eps)
                 for i, c_idx in enumerate(self.constraint_indices):
@@ -1112,17 +1087,13 @@ class DifferentialCorrection:
         full_period = result["period"]
         initial_state = result["state"]
 
-        propagation = integrate.solve_ivp(
-            self.dynamics.equations_of_motion,
-            (0, full_period),
+        prop_result = self.dynamics.propagate(
             initial_state,
-            method="DOP853",
+            (0, full_period),
             t_eval=np.linspace(0, full_period, 1000),
-            rtol=1e-12,
-            atol=1e-12,
         )
 
-        final_state = propagation.y[:, -1]
+        final_state = prop_result["states"][-1]
         closure_error = np.linalg.norm(final_state - initial_state)
 
         # 对于 Halo 轨道，半周期对称性已由微分修正精确保证；全周期闭合误差
@@ -1142,28 +1113,24 @@ class DifferentialCorrection:
                 new_state[4] += adjustment[1]
 
                 # 重新积分
-                propagation = integrate.solve_ivp(
-                    self.dynamics.equations_of_motion,
-                    (0, full_period),
+                prop_result = self.dynamics.propagate(
                     new_state,
-                    method="DOP853",
+                    (0, full_period),
                     t_eval=np.linspace(0, full_period, 1000),
-                    rtol=1e-12,
-                    atol=1e-12,
                 )
-                final_state = propagation.y[:, -1]
+                final_state = prop_result["states"][-1]
                 new_closure_error = np.linalg.norm(final_state - new_state)
 
                 if new_closure_error < closure_error:
                     initial_state = new_state
                     closure_error = new_closure_error
 
-        # 确保 states 是独立的副本（避免与 propagation.y 共享内存）
-        orbit_states = np.array(propagation.y.T, copy=True)
+        # 确保 states 是独立的副本
+        orbit_states = np.array(prop_result["states"], copy=True)
 
         orbit = Orbit(
             states=orbit_states,
-            times=propagation.t.copy(),
+            times=prop_result["time"].copy(),
             system=self.dynamics.system,
         )
         orbit.period = full_period
