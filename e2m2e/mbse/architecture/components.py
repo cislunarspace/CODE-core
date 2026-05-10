@@ -1,8 +1,8 @@
 """组件模型
 
-将 Protocol 接口与具体实现类关联，形成 SysML BDD 中的组件层次。
+将具体实现类关联为 SysML BDD 中的组件层次。
 
-每个 Component 记录其满足的 Protocol、源代码位置和依赖关系。
+每个 Component 记录其源代码位置和依赖关系。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ class Component:
     Attributes:
         name: 组件名称（如 "CR3BP_Dynamics"）
         module_path: 源代码模块路径（如 "e2m2e.core.dynamics"）
-        protocols: 该组件满足的 Protocol 接口列表
+        protocols: 预留字段（ADR 0001 后为空列表）
         dependencies: 该组件依赖的其他组件名称
         layer: 所属架构层（core/algorithms/transfer/visualization）
         description: 组件功能简述
@@ -79,7 +79,7 @@ class ComponentRegistry:
         return [c for c in self._components.values() if c.layer == layer]
 
     def by_protocol(self, protocol_name: str) -> list[Component]:
-        """按满足的 Protocol 接口筛选组件"""
+        """按接口名称筛选组件（ADR 0001 后 protocols 均为空，始终返回 []）"""
         return [c for c in self._components.values() if protocol_name in c.protocols]
 
     def dependency_graph(self) -> dict[str, list[str]]:

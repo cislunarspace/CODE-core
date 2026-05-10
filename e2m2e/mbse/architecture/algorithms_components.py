@@ -9,7 +9,7 @@ ALGORITHMS_COMPONENTS = [
     Component(
         name="DifferentialCorrection",
         module_path="e2m2e.algorithms.differential_correction",
-        protocols=["CorrectorStrategy"],
+        protocols=[],
         dependencies=["CR3BP_Dynamics"],
         layer="algorithms",
         description="微分修正 Newton 迭代求解器",
@@ -25,7 +25,7 @@ ALGORITHMS_COMPONENTS = [
     Component(
         name="Symmetric2DFixedX0",
         module_path="e2m2e.algorithms.strategies.symmetric_2d",
-        protocols=["CorrectorStrategy"],
+        protocols=[],
         dependencies=["CorrectionConfig"],
         layer="algorithms",
         description="2D 对称固定 X0 策略",
@@ -33,7 +33,7 @@ ALGORITHMS_COMPONENTS = [
     Component(
         name="SymmetricXZFixedZ0",
         module_path="e2m2e.algorithms.strategies.halo",
-        protocols=["CorrectorStrategy"],
+        protocols=[],
         dependencies=["CorrectionConfig"],
         layer="algorithms",
         description="Halo 固定 Z0 策略",

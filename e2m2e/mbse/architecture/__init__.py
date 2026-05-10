@@ -1,27 +1,11 @@
 """架构模型子包
 
-提供 Protocol 接口定义和组件模型。
+提供组件模型（ADR 0001: Protocol 接缝已移除，多态通过 Dynamics 基类实现）。
 """
 
 from .components import Component, ComponentRegistry
-from .ports import (
-    CorrectorStrategy,
-    EOMProvider,
-    Optimizer,
-    OrbitContainer,
-    Propagator,
-    SystemModel,
-    Visualizer,
-)
 
 __all__ = [
-    "CorrectorStrategy",
-    "EOMProvider",
-    "OrbitContainer",
-    "Optimizer",
-    "Propagator",
-    "SystemModel",
-    "Visualizer",
     "Component",
     "ComponentRegistry",
 ]

@@ -9,7 +9,7 @@ CORE_COMPONENTS = [
     Component(
         name="CR3BP_System",
         module_path="e2m2e.core.system",
-        protocols=["SystemModel"],
+        protocols=[],
         dependencies=[],
         layer="core",
         description="CR3BP 系统定义（质量参数、平动点、Jacobi 常数）",
@@ -25,7 +25,7 @@ CORE_COMPONENTS = [
     Component(
         name="CR3BP_Dynamics",
         module_path="e2m2e.core.dynamics",
-        protocols=["Propagator", "EOMProvider"],
+        protocols=[],
         dependencies=["Dynamics", "CR3BP_System"],
         layer="core",
         description="CR3BP 动力学方程与 STM 计算",
@@ -33,7 +33,7 @@ CORE_COMPONENTS = [
     Component(
         name="EphemerisDynamics",
         module_path="e2m2e.core.ephemeris_dynamics",
-        protocols=["Propagator", "EOMProvider"],
+        protocols=[],
         dependencies=["Dynamics", "EphemerisSystem"],
         layer="core",
         description="星历 N 体动力学",
@@ -41,7 +41,7 @@ CORE_COMPONENTS = [
     Component(
         name="Orbit",
         module_path="e2m2e.core.orbit",
-        protocols=["OrbitContainer"],
+        protocols=[],
         dependencies=["CR3BP_System", "CR3BP_Dynamics"],
         layer="core",
         description="轨道数据容器（组合模式）",

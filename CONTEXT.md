@@ -52,8 +52,6 @@ Earth to Moon, Moon to Earth — A Python library for designing cislunar transfe
 
 ### MBSE infrastructure
 
-**Protocol** — Python `@runtime_checkable` Protocol class defining an interface. Seven core protocols: SystemModel, EOMProvider, Propagator, OrbitContainer, CorrectorStrategy, Optimizer, Visualizer.
-
 **Pydantic Model** — Data validation model. Core models: PropagationResult, OrbitProperties, OrbitStability, JacobiResult.
 
 **Requirement** — A system requirement tracked via RequirementRegistry. Has ID, text, status, and links to verifying components.
