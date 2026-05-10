@@ -21,6 +21,7 @@ from scipy.optimize import Bounds, minimize
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
 from ..core.system import CR3BP_System
+from .cost import compute_transfer_cost
 
 try:
     import coptpy as cp
@@ -208,8 +209,16 @@ class DROTRONLPOptimizer:
             else np.zeros(6)
         )
 
-        dv1 = self.compute_delta_v1(self.departure_state, v_injection) if not empty else 1e10
-        dv2 = self.compute_delta_v2(final_state[3:], insertion_state[3:]) if not empty else 1e10
+        if not empty:
+            cost = compute_transfer_cost(
+                self.departure_state, v_injection, final_state[3:], insertion_state[3:]
+            )
+            dv1 = cost.dv1
+            dv2 = cost.dv2
+        else:
+            dv1 = 1e10
+            dv2 = 1e10
+            cost = None
 
         pos_diff = final_state[:3] - insertion_state[:3]
         pos_violation = np.dot(pos_diff, pos_diff) if not empty else 1e6
@@ -231,7 +240,7 @@ class DROTRONLPOptimizer:
             "insertion_state": insertion_state,
             "dv1": dv1,
             "dv2": dv2,
-            "objective": dv1 + dv2,
+            "objective": cost.total if cost is not None else 2e10,
             "pos_violation": pos_violation if not empty else 1e6,
             "cos_angle": cos_angle,
             "vel_constraint": cos_angle - 1.0 if not empty else 1e6,
@@ -311,33 +320,6 @@ class DROTRONLPOptimizer:
         self._last_trajectory = (times, states)
 
         return times, states
-
-    def compute_delta_v1(self, departure_state: np.ndarray, initial_velocity: np.ndarray) -> float:
-        """计算出发脉冲ΔV1
-
-        Args:
-            departure_state: 出发点状态 [x, y, z, vx, vy, vz]
-            initial_velocity: 注入速度 [vx, vy, vz]
-
-        Returns:
-            ΔV1 大小
-        """
-        original_vel = departure_state[3:]
-        dv1 = float(np.linalg.norm(initial_velocity - original_vel))
-        return dv1
-
-    def compute_delta_v2(self, final_velocity: np.ndarray, insertion_velocity: np.ndarray) -> float:
-        """计算插入脉冲ΔV2
-
-        Args:
-            final_velocity: 转移轨迹末端速度
-            insertion_velocity: 目标轨道插入点速度
-
-        Returns:
-            ΔV2 大小
-        """
-        dv2 = float(np.linalg.norm(final_velocity - insertion_velocity))
-        return dv2
 
     def get_arrival_state_at_t_ins(self, t_ins: float) -> tuple[np.ndarray, np.ndarray]:
         """获取目标轨道上 t_ins（绝对时间）对应的状态
@@ -576,9 +558,11 @@ class DROTRONLPOptimizer:
         )
         final_state = states[-1] if len(states) > 0 else None
 
-        dv1 = self.compute_delta_v1(self.departure_state, v_injection)
-        dv2 = self.compute_delta_v2(
-            final_state[3:] if final_state is not None else np.zeros(3), insertion_state[3:]
+        cost = compute_transfer_cost(
+            self.departure_state,
+            v_injection,
+            final_state[3:] if final_state is not None else np.zeros(3),
+            insertion_state[3:],
         )
 
         earth_col, moon_col = self.check_collision(variables.to_array())
@@ -601,9 +585,9 @@ class DROTRONLPOptimizer:
             alpha=alpha,
             transfer_time=transfer_time,
             t_ins=t_ins,
-            objective_value=dv1 + dv2,
-            delta_v1=dv1,
-            delta_v2=dv2,
+            objective_value=cost.total,
+            delta_v1=cost.dv1,
+            delta_v2=cost.dv2,
             transfer_trajectory=states,
             transfer_times=times,
             departure_state=self.departure_state.copy(),
