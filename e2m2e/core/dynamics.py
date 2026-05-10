@@ -35,6 +35,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy.integrate import solve_ivp
 
+from .potential import pseudo_potential_hessian
 from .system import CR3BP_System
 
 if TYPE_CHECKING:
@@ -423,31 +424,13 @@ class CR3BP_Dynamics(Dynamics):
         mu = self.system.mu
         x, y, z = state[0], state[1], state[2]
 
-        r1 = max(np.sqrt((x + mu) ** 2 + y**2 + z**2), self.MIN_DISTANCE)
-        r2 = max(np.sqrt((x - 1 + mu) ** 2 + y**2 + z**2), self.MIN_DISTANCE)
+        H = pseudo_potential_hessian(mu, x, y, z)
 
-        # 伪势能 Hessian 矩阵元素 U_ij = ∂²Ω/∂rᵢ∂rⱼ
-        U_xx = (
-            1
-            - (1 - mu) * (1 / r1**3 - 3 * (x + mu) ** 2 / r1**5)
-            - mu * (1 / r2**3 - 3 * (x - 1 + mu) ** 2 / r2**5)
-        )
-        U_yy = 1 - (1 - mu) * (1 / r1**3 - 3 * y**2 / r1**5) - mu * (1 / r2**3 - 3 * y**2 / r2**5)
-        U_zz = -(1 - mu) / r1**3 - mu / r2**3
-        U_xy = 3 * (1 - mu) * (x + mu) * y / r1**5 + 3 * mu * (x - 1 + mu) * y / r2**5
-        U_xz = 3 * (1 - mu) * (x + mu) * z / r1**5 + 3 * mu * (x - 1 + mu) * z / r2**5
-        U_yz = 3 * (1 - mu) * y * z / r1**5 + 3 * mu * y * z / r2**5
-
-        A = np.array(
-            [
-                [0, 0, 0, 1, 0, 0],
-                [0, 0, 0, 0, 1, 0],
-                [0, 0, 0, 0, 0, 1],
-                [U_xx, U_xy, U_xz, 0, 2, 0],
-                [U_xy, U_yy, U_yz, -2, 0, 0],
-                [U_xz, U_yz, U_zz, 0, 0, 0],
-            ]
-        )
+        A = np.zeros((6, 6))
+        A[:3, 3:] = np.eye(3)
+        A[3:, :3] = H
+        A[3, 4] = 2.0
+        A[4, 3] = -2.0
         return A
 
     def equations_with_stm(

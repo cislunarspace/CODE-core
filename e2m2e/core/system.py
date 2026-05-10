@@ -14,6 +14,8 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import fsolve
 
+from .potential import pseudo_potential_hessian
+
 
 class LibrationPoint(Enum):
     """平动点枚举"""
@@ -365,38 +367,13 @@ class CR3BP_System:
         point = self.get_libration_point(L_point)
         x, y, z = point
 
-        r1 = np.sqrt((x + self.mu) ** 2 + y**2 + z**2)
-        r2 = np.sqrt((x - 1 + self.mu) ** 2 + y**2 + z**2)
+        H = pseudo_potential_hessian(self.mu, x, y, z)
 
-        U_xx = (
-            1
-            - (1 - self.mu) * (1 / r1**3 - 3 * (x + self.mu) ** 2 / r1**5)
-            - self.mu * (1 / r2**3 - 3 * (x - 1 + self.mu) ** 2 / r2**5)
-        )
-
-        U_yy = (
-            1
-            - (1 - self.mu) * (1 / r1**3 - 3 * y**2 / r1**5)
-            - self.mu * (1 / r2**3 - 3 * y**2 / r2**5)
-        )
-
-        U_zz = -(1 - self.mu) / r1**3 - self.mu / r2**3
-
-        U_xy = (
-            3 * (1 - self.mu) * (x + self.mu) * y / r1**5
-            + 3 * self.mu * (x - 1 + self.mu) * y / r2**5
-        )
-
-        A = np.array(
-            [
-                [0, 0, 0, 1, 0, 0],
-                [0, 0, 0, 0, 1, 0],
-                [0, 0, 0, 0, 0, 1],
-                [U_xx, U_xy, 0, 0, 2, 0],
-                [U_xy, U_yy, 0, -2, 0, 0],
-                [0, 0, U_zz, 0, 0, 0],
-            ]
-        )
+        A = np.zeros((6, 6))
+        A[:3, 3:] = np.eye(3)
+        A[3:, :3] = H
+        A[3, 4] = 2.0
+        A[4, 3] = -2.0
 
         eigenvalues = np.linalg.eigvals(A)
 
