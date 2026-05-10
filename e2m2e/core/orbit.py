@@ -226,7 +226,7 @@ class Orbit:
         4. 轨道中心
         5. 周期估计（零交叉检测）
         """
-        if self.system is not None:
+        if self.system is not None and hasattr(self.system, "get_jacobi_constant"):
             self.jacobi_constants = np.array(
                 [self.system.get_jacobi_constant(state) for state in self.states]
             )
