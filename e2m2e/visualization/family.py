@@ -269,6 +269,65 @@ class FamilyPlotter(OrbitVisualizer):
             plt.show()
         return fig, ax
 
+    def plot_jacobi_period(
+        self,
+        jacobi_values: list[float],
+        periods,
+        title: str = "",
+        target_period: float | None = None,
+        save_path: str | None = None,
+        show: bool = True,
+    ):
+        """绘制 Jacobi 常数 vs 周期的单 Y 轴折线图。
+
+        按 Jacobi 常数排序后绘制周期曲线，可选 target_period 参考线。
+
+        Args:
+            jacobi_values: Jacobi 常数序列。
+            periods: 轨道周期序列。
+            title: 图标题。
+            target_period: 目标周期参考线。
+            save_path: 保存路径。
+            show: 是否显示窗口。
+
+        Returns:
+            (fig, ax) 元组。
+        """
+        sorted_indices = sorted(range(len(jacobi_values)), key=lambda i: jacobi_values[i])
+        j_sorted = [jacobi_values[i] for i in sorted_indices]
+        p_sorted = [periods[i] for i in sorted_indices]
+
+        fig, ax = plt.subplots(figsize=self.config.figsize_dual, dpi=self.config.dpi)
+
+        color_period = "tab:blue"
+        ax.set_xlabel("Jacobi Constant", fontsize=self.config.label)
+        ax.set_ylabel("Period (nondimensional)", color=color_period, fontsize=self.config.label)
+        ax.plot(j_sorted, p_sorted, "-", color=color_period, linewidth=2, label="Period")
+        ax.tick_params(axis="y", labelcolor=color_period, labelsize=self.config.tick)
+        ax.tick_params(axis="x", labelsize=self.config.tick)
+
+        if target_period is not None:
+            ax.axhline(
+                y=target_period,
+                color="green",
+                linestyle="--",
+                linewidth=1.5,
+                label=f"Target T={target_period:.3f}",
+            )
+
+        ax.legend(loc="upper right", fontsize=self.config.legend)
+
+        if title:
+            ax.set_title(title, fontsize=self.config.title, y=self.config.title_y_offset_dual)
+
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        if save_path:
+            fig.savefig(save_path, dpi=300, bbox_inches="tight")
+        if show:
+            plt.show()
+        return fig, ax
+
     def plot_jacobi_period_stability(
         self,
         jacobi_values: list[float],
