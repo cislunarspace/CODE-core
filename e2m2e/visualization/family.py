@@ -1,8 +1,6 @@
 """轨道族可视化模块
 
 提供轨道族的 2D/3D 绘图、Jacobi-周期-稳定性分析图和概览图。
-
-v4.0 MBSE 重构：满足 Visualizer Protocol 接口，参数类型兼容 OrbitContainer Protocol。
 """
 
 from __future__ import annotations
@@ -33,14 +31,8 @@ class FamilyPlotter(OrbitVisualizer):
     def __init__(self, system: CR3BP_System, config: PlotConfig | None = None) -> None:
         super().__init__(system, config)
 
-    # ------------------------------------------------------------------
-    # Visualizer Protocol compliance
-    # ------------------------------------------------------------------
-
     def plot(self, data: Any, config: object = None, **kwargs) -> Any:
-        """Visualizer Protocol 入口方法。
-
-        委托到 plot_family_2d，将 data 作为 family_result 传入。
+        """统一绘图入口，委托到 plot_family_2d。
         data 应为可迭代的轨道集合（OrbitFamily、List[Orbit] 等）。
 
         Args:

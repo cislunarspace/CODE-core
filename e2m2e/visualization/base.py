@@ -1,8 +1,6 @@
 """基础可视化模块
 
-提供轨道可视化的核心类 OrbitVisualizer，支持 2D 投影和 3D 轨道绑图。
-
-v4.0 MBSE 重构：参数类型使用 OrbitContainer Protocol，满足 Visualizer Protocol 接口。
+提供轨道可视化的核心类 OrbitVisualizer，支持 2D 投影和 3D 轨道绘图。
 """
 
 from __future__ import annotations
@@ -94,14 +92,8 @@ class OrbitVisualizer:
             states = states.reshape(1, -1)
         return states
 
-    # ------------------------------------------------------------------
-    # Visualizer Protocol compliance
-    # ------------------------------------------------------------------
-
     def plot(self, data: Any, config: object = None, **kwargs) -> Any:
-        """Visualizer Protocol 入口方法。
-
-        委托到 plot_3d_orbit，将 data 作为轨道参数传入。
+        """统一绘图入口，委托到 plot_3d_orbit。
         如果 config 不是 None，则替换当前 config（不修改原始对象）。
 
         Args:

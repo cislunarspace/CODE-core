@@ -1,8 +1,6 @@
 """转移轨迹可视化模块
 
 提供转移轨道、搜索结果的可视化工具。
-
-v4.0 MBSE 重构：满足 Visualizer Protocol 接口，参数类型兼容 OrbitContainer Protocol。
 """
 
 from __future__ import annotations
@@ -34,14 +32,8 @@ class TransferPlotter(OrbitVisualizer):
     def __init__(self, system: CR3BP_System, config: PlotConfig | None = None) -> None:
         super().__init__(system, config)
 
-    # ------------------------------------------------------------------
-    # Visualizer Protocol compliance
-    # ------------------------------------------------------------------
-
     def plot(self, data: Any, config: object = None, **kwargs) -> Any:
-        """Visualizer Protocol 入口方法。
-
-        委托到 plot_solution_plane，将 data 作为 results 传入。
+        """统一绘图入口，委托到 plot_solution_plane。
         data 应为搜索结果列表（NLPOptimizationResult 列表或 dict 列表）。
 
         Args:
