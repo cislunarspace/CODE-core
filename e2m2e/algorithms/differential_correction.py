@@ -831,7 +831,7 @@ class DifferentialCorrection:
         self.performance_stats["jacobian_evaluations"] += 1
         return jacobian
 
-    def iterate_correction(self, initial_guess, verbose=False):
+    def iterate_correction(self, initial_guess, verbose=False, callback=None):
         """迭代修正主算法（基于STM的牛顿法）
 
         通过状态转移矩阵(STM)构建雅可比矩阵，使用牛顿迭代法修正自由变量，
@@ -939,6 +939,8 @@ class DifferentialCorrection:
                 self.current_error = current_error  # 保存误差值
                 if verbose:
                     print(f"[OK] 收敛成功！最终误差: {current_error:.2e}")
+                if callback:
+                    callback(iteration + 1, current_error, True)
                 break
 
             # 4. 检查发散
@@ -946,6 +948,8 @@ class DifferentialCorrection:
                 self.termination_reason = "发散：误差超过限制"
                 if verbose:
                     print(f"[WARN] 警告：迭代发散，误差 = {current_error:.2e}")
+                if callback:
+                    callback(iteration + 1, current_error, False)
                 break
 
             # 5. 构建雅可比矩阵（基于STM和终点状态导数）
@@ -976,6 +980,8 @@ class DifferentialCorrection:
                 if verbose:
                     print("  雅可比矩阵奇异，无法求解修正量。")
                 self.termination_reason = "雅可比矩阵奇异"
+                if callback:
+                    callback(iteration + 1, current_error, False)
                 break
 
             correction_norm = np.linalg.norm(delta)
@@ -1014,12 +1020,19 @@ class DifferentialCorrection:
                             f"  收敛成功：修正量过小({correction_norm:.2e})"
                             f"但误差已足够小({current_error:.2e})"
                         )
+                    if callback:
+                        callback(iteration + 1, current_error, True)
                     break
                 else:
                     self.termination_reason = "停滞：修正量过小"
                     if verbose:
                         print(f"  停滞：修正量 = {correction_norm:.2e}")
+                    if callback:
+                        callback(iteration + 1, current_error, False)
                     break
+
+            if callback:
+                callback(iteration + 1, current_error, False)
 
         if self.converged:
             # 验证周期合理性（防止收敛到无效解如周期接近0的轨道）

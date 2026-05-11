@@ -341,3 +341,46 @@ class TestFailureCases:
         r = repr(corrector_2d_fixed_x0)
         assert "DifferentialCorrection" in s
         assert "DifferentialCorrection" in r
+
+
+# ============================================================
+# Callback 测试
+# ============================================================
+class TestCallback:
+    """测试 iterate_correction 的 callback 参数"""
+
+    def test_callback_called_on_convergence(self, corrector_2d_fixed_x0, dro_initial_guess):
+        """收敛时 callback 应在每次迭代被调用，最终一次 converged=True"""
+        calls = []
+
+        def on_iteration(iteration, error, converged):
+            calls.append((iteration, error, converged))
+
+        corrector_2d_fixed_x0.iterate_correction(dro_initial_guess, callback=on_iteration)
+
+        assert len(calls) >= 1, "callback 应至少被调用一次"
+        for i, (iteration, error, converged) in enumerate(calls):
+            assert iteration == i + 1
+            assert isinstance(error, float)
+            assert error > 0
+        # 最后一次应为 converged
+        assert calls[-1][2] is True, f"最终迭代 converged 应为 True，实际为 {calls[-1]}"
+
+    def test_callback_receives_decreasing_errors(self, corrector_2d_fixed_x0, dro_initial_guess):
+        """callback 收到的 error 应在收敛阶段递减"""
+        calls = []
+
+        def on_iteration(iteration, error, converged):
+            calls.append(error)
+
+        corrector_2d_fixed_x0.iterate_correction(dro_initial_guess, callback=on_iteration)
+
+        errors = calls
+        for i in range(-3, -1):
+            assert errors[i] > errors[i + 1], f"误差未递减: iter {i} = {errors[i]}, iter {i+1} = {errors[i+1]}"
+
+    def test_callback_none_does_not_affect_result(self, corrector_2d_fixed_x0, dro_initial_guess):
+        """callback=None（默认值）不影响迭代修正行为"""
+        result = corrector_2d_fixed_x0.iterate_correction(dro_initial_guess, callback=None)
+        assert result is not None
+        assert corrector_2d_fixed_x0.converged is True
