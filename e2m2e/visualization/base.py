@@ -159,7 +159,7 @@ class OrbitVisualizer:
 
         if show_start and len(x) > 0:
             ax.scatter(
-                x[0], y[0], z[0], color=color, marker="o", s=50, edgecolors="black", linewidth=1
+                x[0], y[0], z[0], color=color, marker="o", s=50, edgecolors="black", linewidth=1,
             )
 
         return ax
@@ -261,14 +261,12 @@ class OrbitVisualizer:
             label_text = self.libration_point_labels[i]
 
             if is_3d:
-                ax.scatter(
-                    coord[0],
-                    coord[1],
-                    coord[2],
-                    color=color,
+                ax.plot(
+                    [coord[0]], [coord[1]], [coord[2]],
                     marker=marker,
-                    s=size,
-                    zorder=5,  # type: ignore[misc]
+                    color=color,
+                    markersize=(size ** 0.5),
+                    linestyle="None",
                 )
                 if show_labels:
                     ax.text(
@@ -315,26 +313,24 @@ class OrbitVisualizer:
         secondary_name = getattr(self.system, "secondary_body", None) or "Moon"
 
         if is_3d:
-            ax.scatter(
-                -self.mu,
-                0,
-                0,
+            ax.plot(
+                [-self.mu], [0], [0],
+                marker="o",
                 color=self.primary_body_color,
-                s=self.primary_body_size,  # type: ignore[misc]
-                edgecolors="black",
-                linewidth=1,
-                zorder=10,
+                markersize=(self.primary_body_size ** 0.5),
+                markeredgecolor="black",
+                markeredgewidth=1,
+                linestyle="None",
                 label=primary_name,
             )
-            ax.scatter(
-                1 - self.mu,
-                0,
-                0,
+            ax.plot(
+                [1 - self.mu], [0], [0],
+                marker="o",
                 color=self.secondary_body_color,
-                s=self.secondary_body_size,  # type: ignore[misc]
-                edgecolors="black",
-                linewidth=1,
-                zorder=10,
+                markersize=(self.secondary_body_size ** 0.5),
+                markeredgecolor="black",
+                markeredgewidth=1,
+                linestyle="None",
                 label=secondary_name,
             )
         else:

@@ -234,12 +234,13 @@ class FamilyPlotter(OrbitVisualizer):
         if jacobi_values is None:
             jacobi_values = [0.0] * len(family_result)
 
-        self._draw_orbit_loop_3d(family_result, jacobi_values, ax, start=start, end=end, step=step)
-
+        # 天体/平动点用 plot+marker 而非 scatter，保证 3D 深度排序正确
+        # （scatter 的 Path3DCollection 会被整体推到前景，导致挡住后方轨道线）
         if show_bodies:
             self.plot_primary_bodies(ax=ax, is_3d=True)
         if show_libration:
             self.plot_libration_points(ax=ax, show_labels=True, is_3d=True)
+        self._draw_orbit_loop_3d(family_result, jacobi_values, ax, start=start, end=end, step=step)
 
         ax.set_xlim(center[0] - radius, center[0] + radius)
         ax.set_ylim(center[1] - radius, center[1] + radius)
@@ -513,8 +514,8 @@ class FamilyPlotter(OrbitVisualizer):
 
         # 子图 4：3D 视图
         ax4 = fig.add_subplot(224, projection="3d")
-        self._draw_orbit_loop_3d(family_result, jacobi_values, ax4, step=step)
         self.plot_primary_bodies(ax=ax4, is_3d=True)
+        self._draw_orbit_loop_3d(family_result, jacobi_values, ax4, step=step)
         ax4.set_xlim(center_3d[0] - radius_3d, center_3d[0] + radius_3d)
         ax4.set_ylim(center_3d[1] - radius_3d, center_3d[1] + radius_3d)
         ax4.set_zlim(center_3d[2] - radius_3d, center_3d[2] + radius_3d)
