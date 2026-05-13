@@ -42,6 +42,8 @@ Earth to Moon, Moon to Earth — A Python library for designing cislunar transfe
 
 **Multiple Shooting** — Splits a long trajectory into segments, adds state variables at intermediate nodes, and solves a boundary value problem. Reduces sensitivity to integration errors.
 
+**Two-Level Multiple Shooting** — A multiple shooting correction that alternates two Newton levels: level 1 enforces position continuity by adjusting segment departure velocities, and level 2 reduces velocity discontinuities by adjusting internal patch-point positions and epochs. Public APIs use patch states shaped `(n_points, 6)`.
+
 ### Transfer design
 
 **Transfer** — A trajectory that moves a spacecraft from one orbit to another. May be impulsive (instantaneous velocity change) or low-thrust.
