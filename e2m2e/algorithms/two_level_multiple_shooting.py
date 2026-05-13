@@ -49,7 +49,7 @@ def _build_level2_patch_jacobian(
     left_arrival_acceleration: np.ndarray,
     right_departure_acceleration: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    left_inverse_stm = np.linalg.pinv(left_stm)
+    left_inverse_stm = np.linalg.pinv(left_stm)  # 用伪逆而非逆矩阵，STM 子块在周期轨道分岔点附近可能奇异
     left_b_inverse = np.linalg.pinv(left_inverse_stm[0:3, 3:6])
     left_a = left_inverse_stm[0:3, 0:3]
     right_b_inverse = np.linalg.pinv(right_stm[0:3, 3:6])
@@ -98,6 +98,9 @@ class TwoLevelMultipleShooting:
         boundary: str = "fixed_endpoints",
         verbose: bool = False,
     ) -> TwoLevelMultipleShootingResult:
+        # 两层修正策略：Level 1 逐段调整出发速度使位置连续（局部问题），
+        # Level 2 联合调整内部节点的位置和时间使速度连续（全局问题）。
+        # 这种分解将高维耦合问题拆解为交替求解的低维子问题。
         t_values = np.asarray(t_patch, dtype=float)
         states = np.asarray(state_patch, dtype=float)
         self._validate_inputs(
@@ -132,7 +135,7 @@ class TwoLevelMultipleShooting:
                 position_tolerance,
             )
             level1_iterations.extend(segment_iterations)
-            had_level1_failure = had_level1_failure or had_failure
+            had_level1_failure = had_level1_failure or had_failure  # Level 1 单段不收敛不中止，留给 Level 2 修复
             final_position, final_velocity = self._compute_residuals(t_work, state_work)
             position_residual = float(np.sum(final_position))
             velocity_residual = float(np.sum(final_velocity))
@@ -312,12 +315,14 @@ class TwoLevelMultipleShooting:
                 (1, blocks[4], blocks[5]),
             ):
                 target_patch = patch_index + block_offset
-                if 0 < target_patch < n_points - 1:
+                if 0 < target_patch < n_points - 1:  # 跳过固定端点，仅修正内部节点
                     column = 4 * (target_patch - 1)
                     jacobian[row : row + 3, column : column + 3] = position_block
                     jacobian[row : row + 3, column + 3] = time_block
 
         delta, _, _, _ = np.linalg.lstsq(jacobian, -residuals, rcond=None)
+        # 几何衰减回溯线搜索：优先取全步长，若残差不降或时间节点逆序则逐步折半，
+        # 直到找到同时满足单调时间序和残差下降的步长。
         for damping in (1.0, 0.5, 0.25, 0.125, 0.0625):
             candidate_t = t_next.copy()
             candidate_states = states.copy()
@@ -330,7 +335,7 @@ class TwoLevelMultipleShooting:
                 candidate_t[internal_index] = (
                     candidate_t[internal_index] + damping * delta[column + 3]
                 )
-            if np.any(np.diff(candidate_t) <= 0):
+            if np.any(np.diff(candidate_t) <= 0):  # 修正后时间节点可能逆序，导致积分失败，需拒绝该步
                 continue
             position_residuals, velocity_residuals = self._compute_residuals(
                 candidate_t,
