@@ -139,9 +139,8 @@ class Continuation:
         """初始化延拓器
 
         Args:
-        - corrector: DifferentialCorrection对象
-        - param: 延拓参数（如 "energy", "period", "amplitude", "x0", "z0"）
-        - step: 初始步长
+            corrector: DifferentialCorrection对象，已配置好对称性和约束
+            step: 初始延拓步长（默认 0.01）
         """
         self.correction = corrector
         self.dynamics = corrector.dynamics
@@ -177,9 +176,9 @@ class Continuation:
 
         # 步长控制
         self.step_size_adaptation = True
-        self.step_growth_factor = 1.2
+        self.step_growth_factor = 1.2  # natural_continuation 专用：根据迭代次数自适应调整
         self.step_reduction_factor = 0.5  # 步长缩减因子
-        self.step_increase_factor = 1.2  # 步长增大因子
+        self.step_increase_factor = 1.2  # 与 step_growth_factor 同值，供 generate_halo_family 使用
         self.min_step_size = 1e-5  # 最小步长
         self.max_step_size = 0.1  # 最大步长
 

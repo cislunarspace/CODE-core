@@ -1,4 +1,4 @@
-"""2D symmetric correction strategies (planar CR3BP)."""
+"""二维对称修正策略（平面 CR3BP）。"""
 
 from __future__ import annotations
 
@@ -6,16 +6,15 @@ from .base import CorrectionConfig
 
 
 def symmetric_2d_fixed_x0(x0: float = 0.0) -> CorrectionConfig:
-    """Fixed x0: free variables are y_dot0 and T_half.
+    """固定 x0 的二维对称修正：自由变量为 y_dot0 和 T_half。
 
-    Used for planar symmetric periodic orbits that cross the x-axis
-    perpendicularly at both start and half-period.
+    用于在起点和半周期处均垂直穿越 x 轴的平面对称周期轨道。
 
     Args:
-        x0: Fixed initial x coordinate.
+        x0: 固定的初始 x 坐标。
 
     Returns:
-        CorrectionConfig with the corresponding correction parameters.
+        包含对应修正参数的 CorrectionConfig。
     """
     return CorrectionConfig(
         setup_type="2D_symmetric_x_fixed_x0",
@@ -31,13 +30,13 @@ def symmetric_2d_fixed_x0(x0: float = 0.0) -> CorrectionConfig:
 
 
 def symmetric_2d_fixed_t(t_half: float) -> CorrectionConfig:
-    """Fixed half-period: free variables are x0 and y_dot0.
+    """固定半周期的二维对称修正：自由变量为 x0 和 y_dot0。
 
     Args:
-        t_half: Fixed half-period value.
+        t_half: 固定的半周期值。
 
     Returns:
-        CorrectionConfig with the corresponding correction parameters.
+        包含对应修正参数的 CorrectionConfig。
     """
     return CorrectionConfig(
         setup_type="2D_symmetric_x_fixed_t",
@@ -53,15 +52,15 @@ def symmetric_2d_fixed_t(t_half: float) -> CorrectionConfig:
 
 
 def symmetric_2d_fixed_y0(y0: float = 0.0) -> CorrectionConfig:
-    """Fixed y0 (y-axis symmetric): free variables are x_dot0 and T_half.
+    """固定 y0 的 y 轴对称修正：自由变量为 x_dot0 和 T_half。
 
-    Suitable for resonant orbits that depart from the y-axis.
+    适用于从 y 轴出发的共振轨道（RO）等周期轨道。
 
     Args:
-        y0: Fixed initial y coordinate.
+        y0: 固定的初始 y 坐标。
 
     Returns:
-        CorrectionConfig with the corresponding correction parameters.
+        包含对应修正参数的 CorrectionConfig。
     """
     return CorrectionConfig(
         setup_type="2D_symmetric_y_fixed_y0",

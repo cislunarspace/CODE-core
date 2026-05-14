@@ -1,4 +1,4 @@
-"""Base configuration dataclass for differential correction strategies."""
+"""微分修正策略的基础配置数据类。"""
 
 from __future__ import annotations
 
@@ -7,21 +7,21 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class CorrectionConfig:
-    """Immutable configuration for a differential correction strategy.
+    """微分修正策略的不可变配置。
 
-    Encapsulates all correction parameters that were previously scattered
-    across individual setup_* method bodies in DifferentialCorrection.
+    将原本散布在 DifferentialCorrection 各 setup_* 方法中的
+    修正参数封装为单一数据对象。
 
     Attributes:
-        setup_type: Identifier string for the correction setup type.
-        symmetry_condition: Symmetry exploited by the correction (e.g. 'x_axis').
-        fixed_parameters: Parameter values held constant during correction.
-        free_variables: Names of variables the Newton solver adjusts.
-        free_variable_indices: State-vector indices corresponding to free variables.
-        target_conditions: Constraint names mapped to their target values.
-        constraint_indices: State-vector indices for constraint evaluation.
-        constraint_weights: Per-constraint weighting factors for the Jacobian.
-        constraint_types: Per-constraint classification (e.g. 'equality').
+        setup_type: 修正配置类型标识符。
+        symmetry_condition: 修正所利用的对称性（如 'x_axis'）。
+        fixed_parameters: 修正过程中保持不变的参数值。
+        free_variables: 牛顿求解器可调整的变量名列表。
+        free_variable_indices: 自由变量在状态向量中对应的索引。
+        target_conditions: 约束名称到目标值的映射。
+        constraint_indices: 约束在状态向量中的求值索引。
+        constraint_weights: 各约束的雅可比加权因子。
+        constraint_types: 各约束的分类（如 'equality'）。
     """
 
     setup_type: str

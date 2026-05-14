@@ -391,7 +391,6 @@ def compute_halo_initial_guess(
 
     # 平动点位置
     L_position = 1 - mu - gamma  # L1: gamma>0, L2: gamma<0
-    abs(gamma)
 
     # 振幅关系：Au ∝ sqrt(Aw)（Richardson 三阶非线性耦合）
     Au = np.sqrt(z_amplitude) * 0.5
@@ -842,9 +841,14 @@ class DifferentialCorrection:
                 初始猜测轨道，或初始状态向量
             verbose (bool):
                 是否打印迭代过程信息
+            callback (Callable[[int, float, bool], None] | None):
+                每次迭代结束后的回调函数，参数为
+                (iteration, error, converged)。converged 为 True 表示
+                本次迭代后已收敛或因发散/停滞而终止。
 
         Returns:
-            - 返回修正后的 Orbit 对象
+            Orbit | None: 修正后的周期轨道对象；
+                若修正失败（发散、雅可比奇异、周期无效等）则返回 None。
         """
         _STATE_INDEX_TO_KEY = {
             0: "x",

@@ -1,3 +1,12 @@
+"""多重打靶法模块
+
+提供多重打靶法（Multiple Shooting）修正器，将一条轨迹分为多段弧段，
+通过匹配相邻段端点状态构建残差向量，利用状态转移矩阵（STM）组装
+雅可比矩阵进行最小二乘迭代修正。
+
+支持串行、多线程和多进程（SPICE 内核独立加载）三种并行模式。
+"""
+
 from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed

@@ -178,7 +178,14 @@ class StabilityAnalysis:
         return self.floquet_multipliers
 
     def _pair_eigenvalues(self):
-        """配对特征值（辛矩阵特征值成倒数对）"""
+        """配对特征值（辛矩阵特征值成倒数对）。
+
+        辛矩阵的特征值成倒数对出现，即 λ_i * λ_j ≈ 1。
+        使用贪心匹配将每个特征值与最接近其倒数的特征值配对。
+
+        Returns:
+            None（结果存入 self.eigenvalue_pairs）
+        """
         self.eigenvalue_pairs = []
         used = set()
 
@@ -188,7 +195,8 @@ class StabilityAnalysis:
             for j in range(i + 1, len(self.eigenvalues)):
                 if j in used:
                     continue
-                # 检查是否为倒数对
+                # 检查是否为倒数对；容差 0.01 远大于数值误差（~1e-12）但足够容忍
+                # 辛矩阵在积分精度有限时 product 偏离 1 的典型量级
                 product = self.eigenvalues[i] * self.eigenvalues[j]
                 if abs(product - 1.0) < 0.01:
                     self.eigenvalue_pairs.append((self.eigenvalues[i], self.eigenvalues[j]))
@@ -209,7 +217,7 @@ class StabilityAnalysis:
             self.compute_floquet_multipliers()
 
         for i, (lam1, lam2) in enumerate(self.eigenvalue_pairs):
-            # Broucke 稳定性参数：ν = λ + 1/λ = λ + λ_conj（倒数关系）
+            # Broucke 稳定性参数：ν = λ + 1/λ（倒数对之和）
             nu = np.real(lam1 + lam2)  # ν = λ + 1/λ
             key = f"nu{i + 1}"
             if key in self.stability_indices:
@@ -386,6 +394,7 @@ class StabilityAnalysis:
                 - bifurcation_type: 分岔类型
         """
         bifurcation_points: list[dict[str, Any]] = []
+        n_failed = 0
 
         for i, orbit in enumerate(orbits):
             try:
@@ -411,10 +420,9 @@ class StabilityAnalysis:
                         )
 
             except Exception:
+                n_failed += 1
                 logger.debug("Bifurcation analysis failed for orbit %d", i, exc_info=True)
                 continue
-
-        n_failed = len(orbits) - len(bifurcation_points)
         if n_failed > 0:
             logger.warning(
                 "Bifurcation analysis failed for %d/%d orbits",
