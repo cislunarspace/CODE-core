@@ -23,7 +23,15 @@ if TYPE_CHECKING:
 
 
 class ProjectionPlane(Enum):
-    """轨道投影视图平面枚举。"""
+    """轨道投影视图平面枚举。
+
+    指定绘制 2D 投影时保留哪两个坐标轴。
+
+    Attributes:
+        XY: X-Y 平面，轨道面内投影，最常用的标准视图。
+        XZ: X-Z 平面，侧视图，观察轨道的面外偏移。
+        YZ: Y-Z 平面，正视图，沿 X 轴方向观察。
+    """
 
     XY = "xy"  # X-Y 平面（轨道面内投影）
     XZ = "xz"  # X-Z 平面（侧视图）
@@ -54,6 +62,8 @@ class OrbitVisualizer:
         # 轨道样式参数
         self.orbit_linewidth = self.config.orbit_linewidth
         self.orbit_alpha = self.config.orbit_alpha
+        # 在构造时从 matplotlib rcParams 捕获颜色循环，
+        # 避免后续调用时 rcParams 已被修改导致颜色不一致
         self.color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
         self.color_index = 0  # 颜色循环索引
 
@@ -301,6 +311,8 @@ class OrbitVisualizer:
         Returns:
             matplotlib axes 对象。
         """
+        # mu=None 时静默返回而非 raise：允许无系统上下文的纯装饰性绘图，
+        # 部分子类方法可能不需要天体标记
         if self.mu is None:
             return ax
         if ax is None:
@@ -373,11 +385,23 @@ class OrbitVisualizer:
             )
 
     def _sort_points_by_nearest_neighbor(self, x, y):
-        """使用最近邻算法排序散点，使绘制的连线不交叉。"""
+        """使用最近邻算法排序散点，使绘制的连线不交叉。
+
+        采用贪心最近邻策略：从离原点最远的点出发，每步选择最近的未访问点。
+        选择最远点作为起点是为了让排序方向与轨道自然延伸一致。
+
+        Args:
+            x: 散点的 x 坐标数组。
+            y: 散点的 y 坐标数组。
+
+        Returns:
+            (sorted_x, sorted_y) 排序后的坐标元组。
+        """
         points = np.column_stack((x, y))
         n = len(points)
         if n <= 2:
             return x, y
+        # 选择离原点最远的点作为起点，确保排序从轨道外侧开始
         distances_from_origin = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2)
         start_idx = np.argmax(distances_from_origin)
         visited = np.zeros(n, dtype=bool)
@@ -403,11 +427,24 @@ class OrbitVisualizer:
         return points[sorted_indices, 0], points[sorted_indices, 1]
 
     def _sort_3d_points_by_nearest_neighbor(self, x, y, z):
-        """使用最近邻算法排序 3D 散点，使绘制的连线不交叉。"""
+        """使用最近邻算法排序 3D 散点，使绘制的连线不交叉。
+
+        三维版本，逻辑与 _sort_points_by_nearest_neighbor 相同，
+        但距离计算包含 z 分量。
+
+        Args:
+            x: 散点的 x 坐标数组。
+            y: 散点的 y 坐标数组。
+            z: 散点的 z 坐标数组。
+
+        Returns:
+            (sorted_x, sorted_y, sorted_z) 排序后的坐标元组。
+        """
         points = np.column_stack((x, y, z))
         n = len(points)
         if n <= 2:
             return x, y, z
+        # 选择离原点最远的点作为起点，确保排序从轨道外侧开始
         distances_from_origin = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2 + points[:, 2] ** 2)
         start_idx = np.argmax(distances_from_origin)
         visited = np.zeros(n, dtype=bool)

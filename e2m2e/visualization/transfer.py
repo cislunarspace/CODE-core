@@ -217,7 +217,17 @@ class TransferPlotter(OrbitVisualizer):
         return ax
 
     def _parse_solution_results(self, results) -> list:
-        """将搜索结果解析为统一的 dict 格式。"""
+        """将搜索结果解析为统一的 dict 格式。
+
+        支持两种输入：原始 dict 直接透传，NLPOptimizationResult 对象提取字段。
+
+        Args:
+            results: 搜索结果列表，元素为 dict 或 NLPOptimizationResult。
+
+        Returns:
+            统一的 dict 列表，每个 dict 包含 transfer_time/delta_v1/delta_v2/
+            objective_value/success/transfer_type 字段。
+        """
         if not results:
             return []
         parsed = []
@@ -232,6 +242,8 @@ class TransferPlotter(OrbitVisualizer):
                         "delta_v2": r.delta_v2,
                         "objective_value": r.objective_value,
                         "success": r.success,
+                        # transfer_type 可能是枚举值（.value 取字符串）
+                        # 也可能已经是字符串（来自反序列化结果），两种情况统一处理
                         "transfer_type": r.transfer_type.value
                         if hasattr(r.transfer_type, "value")
                         else str(r.transfer_type),

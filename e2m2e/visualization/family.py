@@ -49,7 +49,14 @@ class FamilyPlotter(OrbitVisualizer):
         return self.plot_family_2d(data, jacobi_values=jacobi_values, **kwargs)
 
     def _get_jacobi_norm(self, jacobi_values):
-        """计算 Jacobi 常数的归一化范围 [0, 1]。"""
+        """计算 Jacobi 常数的归一化范围 [0, 1]。
+
+        Args:
+            jacobi_values: Jacobi 常数列表。
+
+        Returns:
+            (jmin, jmax, jrange) 元组，jrange 防止除零（全相等时为 1.0）。
+        """
         if not jacobi_values:
             return 0.0, 1.0, 1.0
         jmin = min(jacobi_values)
@@ -60,7 +67,17 @@ class FamilyPlotter(OrbitVisualizer):
     def _draw_orbit_loop_2d(
         self, family_result, jacobi_values, ax, plane="xy", start=0, end=None, step=1
     ):
-        """按 Jacobi 常数着色批量绘制轨道族的 2D 投影。"""
+        """按 Jacobi 常数着色批量绘制轨道族的 2D 投影。
+
+        Args:
+            family_result: 轨道族（可迭代的轨道集合）。
+            jacobi_values: 各轨道对应的 Jacobi 常数。
+            ax: 目标 axes 对象。
+            plane: 投影平面（"xy"/"xz"/"yz"）。
+            start: 起始轨道索引。
+            end: 终止轨道索引（含），None 表示到末尾。
+            step: 绘图步长（用于降采样）。
+        """
         jmin, jmax, jrange = self._get_jacobi_norm(jacobi_values)
         cmap = self.config.get_cmap()
         n = len(family_result) if end is None else min(end + 1, len(family_result))
@@ -71,7 +88,16 @@ class FamilyPlotter(OrbitVisualizer):
             self.plot_2d_projection(orbit, plane=plane, color=color, show_start=False, ax=ax)
 
     def _draw_orbit_loop_3d(self, family_result, jacobi_values, ax, start=0, end=None, step=1):
-        """按 Jacobi 常数着色批量绘制轨道族的 3D 视图。"""
+        """按 Jacobi 常数着色批量绘制轨道族的 3D 视图。
+
+        Args:
+            family_result: 轨道族（可迭代的轨道集合）。
+            jacobi_values: 各轨道对应的 Jacobi 常数。
+            ax: 目标 3D axes 对象。
+            start: 起始轨道索引。
+            end: 终止轨道索引（含），None 表示到末尾。
+            step: 绘图步长（用于降采样）。
+        """
         jmin, jmax, jrange = self._get_jacobi_norm(jacobi_values)
         cmap = self.config.get_cmap()
         n = len(family_result) if end is None else min(end + 1, len(family_result))
@@ -82,7 +108,17 @@ class FamilyPlotter(OrbitVisualizer):
             self.plot_3d_orbit(orbit, color=color, ax=ax, show_start=False)
 
     def _add_colorbar(self, ax, jacobi_values, shrink=0.8, pad=None):
-        """添加 Jacobi 常数颜色条到 axes 旁。"""
+        """添加 Jacobi 常数颜色条到 axes 旁。
+
+        Args:
+            ax: 目标 axes 对象。
+            jacobi_values: Jacobi 常数列表，用于确定颜色条范围。
+            shrink: 颜色条高度缩放比例。
+            pad: 颜色条与 axes 的间距。
+
+        Returns:
+            matplotlib Colorbar 对象。
+        """
         jmin, jmax, _ = self._get_jacobi_norm(jacobi_values)
         cmap = self.config.get_cmap()
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=Normalize(vmin=jmin, vmax=jmax))
@@ -96,14 +132,24 @@ class FamilyPlotter(OrbitVisualizer):
         return cbar
 
     def _style_2d_ax(self, ax, xlabel="X (nondimensional)", ylabel="Y (nondimensional)"):
-        """设置 2D axes 的标签、刻度和等比例。"""
+        """设置 2D axes 的标签、刻度和等比例。
+
+        Args:
+            ax: 目标 axes 对象。
+            xlabel: x 轴标签文本。
+            ylabel: y 轴标签文本。
+        """
         ax.set_xlabel(xlabel, fontsize=self.config.label)
         ax.set_ylabel(ylabel, fontsize=self.config.label)
         ax.tick_params(labelsize=self.config.tick)
         ax.set_aspect("equal")
 
     def _style_3d_ax(self, ax):
-        """设置 3D axes 的标签和刻度。"""
+        """设置 3D axes 的标签和刻度。
+
+        Args:
+            ax: 目标 3D axes 对象。
+        """
         ax.set_xlabel("X (nondimensional)", fontsize=self.config.label)
         ax.set_ylabel("Y (nondimensional)", fontsize=self.config.label)
         ax.set_zlabel("Z (nondimensional)", fontsize=self.config.label)

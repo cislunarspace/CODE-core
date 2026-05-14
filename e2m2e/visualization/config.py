@@ -115,6 +115,9 @@ if _detected_scale > 1.01:
     import shutil as _shutil
     import tkinter as _tk
 
+    # tkinter scaling 使用 point 为单位（1 point = 1/72 inch），
+    # 而系统 DPI 基于每英寸像素数（1 inch = 96 px 在标准 DPI 下），
+    # 因此缩放倍数需乘以 96/72 将 DPI 比率转换为 point 缩放比率
     _tk_scaling_val = _detected_scale * 96.0 / 72.0
     _orig_tk_init = _tk.Tk.__init__
     _orig_toplevel_init = _tk.Toplevel.__init__
@@ -132,6 +135,9 @@ if _detected_scale > 1.01:
     _tk.Tk.__init__ = _patched_tk_init  # type: ignore[method-assign]
     _tk.Toplevel.__init__ = _patched_toplevel_init  # type: ignore[method-assign]
 
+    # 在高 DPI 环境下，tkinter 原生文件对话框无法跟随缩放，
+    # 会出现极小的窗口。用 zenity（Linux 桌面原生对话框）替代，
+    # zenity 由 GTK 渲染，自动适配系统缩放设置
     if _shutil.which("zenity"):
         import tkinter.filedialog as _fd
 
@@ -226,7 +232,10 @@ class PlotConfig(BaseModel):
         figsize_dual: 双图并排图像尺寸。
         figsize_overview: 概览图图像尺寸。
         dpi: 输出图像 DPI。
-        title_y_offset: 标题 y 方向偏移量（避免与子图重叠）。
+        title_y_offset: 标题 y 方向偏移量（2D 标准图）。
+        title_y_offset_3d: 标题 y 方向偏移量（3D 图，因 3D 轴标签占位不同）。
+        title_y_offset_dual: 标题 y 方向偏移量（双 Y 轴图，留出右轴标签空间）。
+        title_y_offset_subplot: 标题 y 方向偏移量（子图布局，避免与相邻子图重叠）。
         auto_scale: 是否启用自动 DPI 缩放。
         scale_factor: 实际缩放倍数。
     """
@@ -310,5 +319,9 @@ class PlotConfig(BaseModel):
         )
 
     def get_cmap(self):
-        """获取配置指定的颜色映射对象。"""
+        """获取配置指定的颜色映射对象。
+
+        Returns:
+            matplotlib.colors.Colormap 颜色映射实例。
+        """
         return matplotlib.colormaps[self.colormap]
