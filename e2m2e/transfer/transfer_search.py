@@ -66,6 +66,7 @@ from .transfer_optimization import (  # noqa: E402
     NLPOptimizationVariables,
 )
 
+# 100 km 换算为 CR3BP 无量纲单位：用于判断轨迹-轨道最近距离是否"足够近"
 DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / CR3BP_System.EARTH_MOON_DISTANCE_KM
 
 
@@ -116,6 +117,13 @@ class TransferSearch:
         name: str = "TransferSearch",
         config: SearchConfig | None = None,
     ):
+        """初始化转移搜索器。
+
+        Args:
+            dynamics: CR3BP 动力学对象（需提供 ``system``、``propagate`` 等）。
+            name: 搜索器实例名称，用于日志输出。
+            config: 搜索/优化配置；为 ``None`` 时使用默认 ``SearchConfig()``。
+        """
         self.system = dynamics.system
         # dynamics 类型说明：
         # - 内部搜索积分（_forward_integrate）仅调用 propagate()，满足 Propagator Protocol
@@ -147,12 +155,14 @@ class TransferSearch:
         self._config = value
 
     def __getattr__(self, name: str) -> Any:
+        """属性代理：读取 ``_CONFIG_FIELDS`` 中的字段时转发到 ``self._config``。"""
         # 仅代理 _CONFIG_FIELDS 中的字段，避免干扰其他属性查找
         if name in TransferSearch._CONFIG_FIELDS:
             return getattr(self._config, name)
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     def __setattr__(self, name: str, value: Any) -> None:
+        """属性代理：写入 ``_CONFIG_FIELDS`` 中的字段时转发到 ``self._config``。"""
         if name in TransferSearch._CONFIG_FIELDS:
             setattr(self._config, name, value)
         else:
@@ -350,13 +360,22 @@ class TransferSearch:
         n_workers: int | None,
         parallel_backend: str,
     ) -> list[dict[str, Any]]:
-        """执行网格搜索的内部方法"""
+        """网格搜索分发：根据 worker 数和后端选择串行/多进程/多线程。
+
+        Args:
+            departure_orbit: 出发轨道。
+            arrival_orbit: 目标轨道。
+            verbose: 是否输出进度信息。
+            n_workers: 并行 worker 数；``None`` 时使用 CPU 核心数。
+            parallel_backend: ``"processes"`` 或 ``"threads"``。
+
+        Returns:
+            搜索结果列表。
+        """
         dep_name = getattr(departure_orbit, "name", "unknown")
         arr_name = getattr(arrival_orbit, "name", "unknown")
 
-        # //TODO 这是什么？
         departure_states, departure_times = self._sample_departure_points(departure_orbit)
-        len(departure_states)
 
         if n_workers is None:
             n_workers = multiprocessing.cpu_count()
@@ -524,7 +543,19 @@ class TransferSearch:
         arr_name: str,
         verbose: bool,
     ) -> list[dict[str, Any]]:
-        """串行网格搜索"""
+        """串行网格搜索：逐出发点、逐α执行搜索。
+
+        Args:
+            departure_states: 出发点状态数组，形状 ``(n, 6)``。
+            departure_times: 出发点时间数组。
+            arrival_orbit: 目标轨道。
+            dep_name: 出发轨道名称（写入结果字典）。
+            arr_name: 目标轨道名称。
+            verbose: 是否显示进度条。
+
+        Returns:
+            所有出发点的搜索结果列表。
+        """
         all_results = []
         total_departures = len(departure_states)
         n_alpha_v = self.n_alpha
@@ -728,9 +759,22 @@ class TransferSearch:
         verbose: bool,
         n_workers: int,
     ) -> list[dict[str, Any]]:
-        """多线程并行：支持细粒度 tqdm；受 GIL 限制，CPU 利用率常低于多进程。
+        """多线程并行搜索：支持细粒度 tqdm 进度条。
 
-        每个出发点调用 `_search_single_departure`。抛错时跳过该点，verbose 下打印。
+        受 GIL 限制，CPU 利用率常低于多进程；适用于 I/O 或需实时进度的场景。
+        每个出发点调用 ``_search_single_departure``，抛错时跳过。
+
+        Args:
+            departure_states: 出发点状态数组。
+            departure_times: 出发点时间数组。
+            arrival_orbit: 目标轨道。
+            dep_name: 出发轨道名称。
+            arr_name: 目标轨道名称。
+            verbose: 是否显示进度条。
+            n_workers: 线程数。
+
+        Returns:
+            搜索结果列表。
         """
         total_departures = len(departure_states)
         n_alpha_v = self.n_alpha
@@ -847,14 +891,22 @@ class TransferSearch:
         departure_index: int | None = None,
         progress_queue: Any | None = None,
     ) -> list[dict[str, Any]]:
-        """对单个出发点搜索 α 网格
+        """对单个出发点搜索 α 网格。
+
+        对每个 α 值计算出发速度、前向积分，然后检测碰撞/相交/最近距离。
 
         Args:
+            departure_state: 出发点六维状态 ``[x,y,z,vx,vy,vz]``。
+            departure_time: 出发点时间。
+            arrival_orbit: 目标轨道。
             verbose: 未传 ``pbar`` 时是否打印 α 文本进度。
             pbar: 每 α 步 ``update(1)``；可为分槽条或 ``_AggregatePbarWithSlot``。
             departure_index: 当前出发点下标，用于 postfix。
             progress_queue: 可选 ``Manager().Queue()`` 代理；每完成一 α 步 ``put(1)``，
                 供主进程消费并更新总 tqdm。
+
+        Returns:
+            该出发点下所有 α 对应的搜索结果字典列表。
         """
         results = []
 
@@ -899,7 +951,7 @@ class TransferSearch:
                 try:
                     traj_states, traj_times = self._forward_integrate(
                         initial_state, mtt, idt
-                    )  # //TODO 这个地方积分特别耗时
+                    )
                 except Exception:
                     result = {
                         "success": False,
@@ -1032,7 +1084,9 @@ class TransferSearch:
 
         n_traj = len(traj_positions)
         n_orbit = len(orbit_positions)
-        max_pairs = 10_000_000  # ~240 MB for float64 (n * 3 * 8 bytes)
+        # 10_000_000 对 × 3坐标 × 8字节 ≈ 240 MB float64；
+        # 超过此阈值时分块计算，避免内存溢出
+        max_pairs = 10_000_000
 
         if n_traj * n_orbit > max_pairs:
             return self._compute_min_distance_chunked(traj_positions, orbit_positions)

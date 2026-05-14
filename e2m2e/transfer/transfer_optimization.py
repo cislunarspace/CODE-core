@@ -37,9 +37,11 @@ except ImportError:
 
 
 class TransferType(Enum):
-    DIRECT = "direct"
-    LGA = "lga"
-    EXTERNAL = "external"
+    """转移轨道类型分类。"""
+
+    DIRECT = "direct"      # 直接转移：短时间，近地点变化小
+    LGA = "lga"            # 月球引力助推：中等时间，轨迹经过月球附近
+    EXTERNAL = "external"  # 外部转移：长时间，远地点超出地月系统
 
 
 @dataclass
@@ -59,12 +61,23 @@ class NLPOptimizationVariables:
     t_ins: float = 0.0
 
     def to_array(self) -> np.ndarray:
-        """转换为numpy数组"""
+        """转换为numpy数组。
+
+        Returns:
+            ``[alpha, transfer_time, t_ins]`` 一维数组。
+        """
         return np.array([self.alpha, self.transfer_time, self.t_ins])
 
     @classmethod
     def from_array(cls, arr: np.ndarray) -> NLPOptimizationVariables:
-        """从numpy数组创建"""
+        """从numpy数组创建实例。
+
+        Args:
+            arr: ``[alpha, transfer_time, t_ins]`` 一维数组。
+
+        Returns:
+            对应的 ``NLPOptimizationVariables`` 实例。
+        """
         return cls(alpha=arr[0], transfer_time=arr[1], t_ins=arr[2])
 
 
@@ -177,15 +190,35 @@ class DROTRONLPOptimizer:
         self._cache_enabled: bool = False
 
     def set_progress_callback(self, callback: Callable | None) -> None:
+        """设置迭代进度回调函数。
+
+        Args:
+            callback: 签名 ``(iteration, obj, alpha, T, t_ins) -> None``，
+                或 ``None`` 清除回调。
+        """
         self._progress_callback = callback
 
     def enable_cache(self, enabled: bool = True) -> None:
+        """启用/禁用 ``_evaluate_all`` 结果缓存，避免同一点重复积分。
+
+        Args:
+            enabled: ``True`` 开启缓存。
+        """
         self._cache_enabled = enabled
 
     def _y_key(self, y: np.ndarray) -> bytes:
+        """将优化变量序列化为字节键，用于缓存匹配。"""
         return y.tobytes()
 
     def _evaluate_all(self, y: np.ndarray) -> dict[str, Any]:
+        """一次性计算目标函数和所有约束，结果缓存以避免重复积分。
+
+        Args:
+            y: 优化变量 ``[alpha, transfer_time, t_ins]``。
+
+        Returns:
+            包含 ``objective``、``pos_violation``、``cos_angle`` 等键的字典。
+        """
         key = self._y_key(y)
         if self._cache_enabled and self._eval_cache_key == key and self._eval_cache is not None:
             return self._eval_cache
@@ -216,6 +249,7 @@ class DROTRONLPOptimizer:
             dv1 = cost.dv1
             dv2 = cost.dv2
         else:
+            # 积分失败时用大惩罚值 dv=1e10，使优化器远离此区域
             dv1 = 1e10
             dv2 = 1e10
             cost = None
@@ -228,8 +262,10 @@ class DROTRONLPOptimizer:
         v_f_norm = np.linalg.norm(v_f)
         v_ins_norm = np.linalg.norm(v_ins)
         if not empty and v_f_norm > 1e-10 and v_ins_norm > 1e-10:
+            # cos_angle 接近 1 表示两速度几乎同向（理想情况）
             cos_angle = np.dot(v_f, v_ins) / (v_f_norm * v_ins_norm)
         else:
+            # cos_angle = -1.0 标记"反向"惩罚，优化器会避开此区域
             cos_angle = -1.0
 
         cache = {
@@ -256,11 +292,15 @@ class DROTRONLPOptimizer:
     def compute_departure_velocity(
         self, state: np.ndarray, alpha: float, beta: float = 0.0
     ) -> np.ndarray:
-        """根据α计算出发速度
+        """根据α和β计算出发注入速度。
+
+        速度分解为切向和法向分量：v = α·|v|·t̂ + β·|v|·n̂，
+        其中 t̂ 为原始速度方向，n̂ 为轨道面法向。
 
         Args:
             state: 出发点状态 [x, y, z, vx, vy, vz]
-            alpha: 切向速度比
+            alpha: 切向速度比（缩放切向分量）
+            beta: 法向速度比（缩放法向分量），默认 0.0（纯切向）
 
         Returns:
             注入速度向量 [vx, vy, vz]
@@ -503,7 +543,7 @@ class DROTRONLPOptimizer:
             )
 
             success = result.success
-            message = result.message if success else result.message
+            message = result.message
             final_y = result.x
 
         except Exception as e:
@@ -618,9 +658,12 @@ class DROTRONLPOptimizer:
 
         x_max_traj = np.max(states[:, 0])
 
+        # 20.0 无量纲时间 ≈ 地月系中短时间转移阈值
+        # 1.5 无量纲距离 ≈ 月球轨道半径（地月距离单位），限制轨迹在月球以内
         if transfer_time < 20.0 and x_max_traj < 1.5:
             return TransferType.DIRECT
 
+        # 3.0 无量纲距离 ≈ 远超月球轨道，表明轨迹绕到地月系统外侧
         if x_max_traj > 3.0:
             return TransferType.EXTERNAL
 
@@ -675,6 +718,11 @@ if NlpCallbackBase is not None:
         """
 
         def __init__(self, optimizer: DROTRONLPOptimizer):
+            """初始化回调。
+
+            Args:
+                optimizer: 关联的 NLP 优化器实例。
+            """
             super().__init__()
             self.optimizer = optimizer
             self.x = None
@@ -802,7 +850,12 @@ if NlpCallbackBase is not None:
             model.setParam(COPT.Param.TimeLimit, float(tl))
 
     class COPTNLPSolver:
-        """基于 COPT 的 NLP 封装：``cp.Envr()`` → ``createModel`` → ``loadNlData`` → ``solve``。"""
+        """基于 COPT 的 NLP 封装：``cp.Envr()`` → ``createModel`` → ``loadNlData`` → ``solve``。
+
+        Args:
+            optimizer: DROTRONLPOptimizer 实例。
+            options: COPT 求解参数（max_iter、threads 等）。
+        """
 
         def __init__(self, optimizer: DROTRONLPOptimizer, options: dict[str, Any] | None = None):
             self.optimizer = optimizer
@@ -811,6 +864,14 @@ if NlpCallbackBase is not None:
             self.callback: COPTNLPCallback | None = None
 
         def _setup_model(self, x0: np.ndarray) -> bool:
+            """构建 COPT NLP 模型（变量、约束、Jacobian/Hessian 结构）。
+
+            Args:
+                x0: 初始变量 ``[alpha, T, t_ins]``。
+
+            Returns:
+                ``True`` 表示模型构建成功。
+            """
             if cp is None or COPT is None:
                 raise RuntimeError("COPT not installed. Install with: pip install coptpy")
 
@@ -864,6 +925,14 @@ if NlpCallbackBase is not None:
             return True
 
         def solve(self, x0: np.ndarray) -> dict:
+            """求解 NLP 模型。
+
+            Args:
+                x0: 初始变量 ``[alpha, T, t_ins]``。
+
+            Returns:
+                含 ``status``、``objective``、``solution``、``success`` 的字典。
+            """
             if self.model is None:
                 self._setup_model(x0)
 
@@ -891,6 +960,11 @@ if NlpCallbackBase is not None:
                 }
 
         def get_result(self) -> NLPOptimizationResult:
+            """从 COPT 求解结果构建 ``NLPOptimizationResult``。
+
+            Raises:
+                RuntimeError: 尚未调用 ``solve()`` 时。
+            """
             if self.model is None or self.callback is None or self.callback.x is None:
                 raise RuntimeError("Must call solve() first")
 
