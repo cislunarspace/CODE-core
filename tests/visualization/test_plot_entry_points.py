@@ -99,10 +99,14 @@ class TestVisualizationPackageImport:
             TransferPlotter,
         )
 
-        assert all(
-            cls is not None
-            for cls in [OrbitVisualizer, FamilyPlotter, TransferPlotter, PlotConfig, ProjectionPlane]
-        )
+        classes = [
+            OrbitVisualizer,
+            FamilyPlotter,
+            TransferPlotter,
+            PlotConfig,
+            ProjectionPlane,
+        ]
+        assert all(cls is not None for cls in classes)
 
     def test_plotting_module_not_in_public_api(self):
         import e2m2e.visualization

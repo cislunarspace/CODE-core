@@ -795,14 +795,18 @@ class DifferentialCorrection:
                 state_fwd = current_state.copy()
                 state_fwd[var_idx] += eps
                 result_fwd = self.dynamics.propagate(
-                    state_fwd, (0, current_time), t_eval=[current_time],
+                    state_fwd,
+                    (0, current_time),
+                    t_eval=[current_time],
                 )
                 final_fwd = result_fwd["states"][-1]
 
                 state_bwd = current_state.copy()
                 state_bwd[var_idx] -= eps
                 result_bwd = self.dynamics.propagate(
-                    state_bwd, (0, current_time), t_eval=[current_time],
+                    state_bwd,
+                    (0, current_time),
+                    t_eval=[current_time],
                 )
                 final_bwd = result_bwd["states"][-1]
 
@@ -813,13 +817,17 @@ class DifferentialCorrection:
             elif var_idx == 6:
                 t_fwd = current_time + eps
                 result_fwd = self.dynamics.propagate(
-                    current_state, (0, t_fwd), t_eval=[t_fwd],
+                    current_state,
+                    (0, t_fwd),
+                    t_eval=[t_fwd],
                 )
                 final_fwd = result_fwd["states"][-1]
 
                 t_bwd = current_time - eps
                 result_bwd = self.dynamics.propagate(
-                    current_state, (0, t_bwd), t_eval=[t_bwd],
+                    current_state,
+                    (0, t_bwd),
+                    t_eval=[t_bwd],
                 )
                 final_bwd = result_bwd["states"][-1]
 

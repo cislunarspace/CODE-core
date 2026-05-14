@@ -6,11 +6,10 @@
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![PyPI](https://img.shields.io/pypi/v/e2m2e)](https://pypi.org/project/e2m2e/)
 [![CI](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml/badge.svg)](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml)
-[![Docs](https://github.com/cislunarspace/e2m2e/actions/workflows/deploy-docs.yml/badge.svg)](https://cislunarspace.github.io/e2m2e/)
 
 e2m2e 是一个用于设计地月空间运行轨道和转移轨道的 Python 库，基于圆型限制性三体问题 (CR3BP) 和星历 N 体动力学建模。
 
-> **[在线文档](https://cislunarspace.github.io/e2m2e/)** | **[PyPI](https://pypi.org/project/e2m2e/)**
+> **[PyPI](https://pypi.org/project/e2m2e/)**
 
 ## 功能
 
@@ -205,35 +204,6 @@ uv run ruff check .          # 检查
 uv run ruff check --fix .    # 自动修复
 uv run ruff format .         # 格式化
 ```
-
-## 文档
-
-文档使用 Sphinx 构建，源文件位于 `docs/` 目录。
-
-```bash
-uv sync --group docs
-uv run --directory docs make html
-# 用浏览器打开 docs/_build/html/index.html
-```
-
-在线文档: <https://cislunarspace.github.io/e2m2e/>
-
-### 文档结构
-
-```text
-docs/
-├── conf.py              # Sphinx 配置
-├── index.rst            # 首页与导航
-├── getting-started/     # 安装、快速入门、可视化
-├── core/                # 系统、动力学、星历、轨道、坐标系
-├── algorithms/          # 微分修正、延拓法、稳定性
-├── transfer/            # 转移轨道搜索与优化
-├── api/                 # 从 docstring 自动生成的 API 文档
-├── reference/           # 算法参考、术语表、MBSE 文档
-└── _static/             # 图片等静态资源
-```
-
-API 文档通过 `sphinx.ext.autodoc` 从代码中的 docstring 自动提取。
 
 ## 贡献
 

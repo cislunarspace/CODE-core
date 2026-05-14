@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core import CR3BP_System, CR3BP_Dynamics, LibrationPoint
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System, LibrationPoint
 from e2m2e.core.potential import pseudo_potential_hessian
 
 
@@ -115,9 +115,7 @@ class TestRegressionStabilityIndex:
     )
     def test_max_real_part(self, system, lp, expected_max_real):
         result = system.compute_stability_index(lp)
-        np.testing.assert_allclose(
-            result["max_real_part"], expected_max_real, rtol=1e-8
-        )
+        np.testing.assert_allclose(result["max_real_part"], expected_max_real, rtol=1e-8)
 
     @pytest.mark.parametrize(
         "lp, expected_max_imag",
@@ -129,9 +127,7 @@ class TestRegressionStabilityIndex:
     )
     def test_max_imag_part(self, system, lp, expected_max_imag):
         result = system.compute_stability_index(lp)
-        np.testing.assert_allclose(
-            result["max_imag_part"], expected_max_imag, rtol=1e-8
-        )
+        np.testing.assert_allclose(result["max_imag_part"], expected_max_imag, rtol=1e-8)
 
     def test_collinear_points_unstable(self, system):
         for lp in [LibrationPoint.L1, LibrationPoint.L2, LibrationPoint.L3]:
@@ -157,7 +153,7 @@ class TestRegressionJacobianA:
 
     @pytest.fixture
     def dynamics(self):
-        from e2m2e.core import CR3BP_System, CR3BP_Dynamics
+        from e2m2e.core import CR3BP_System
 
         sys = CR3BP_System.from_known_system("earth_moon")
         return CR3BP_Dynamics(system=sys)

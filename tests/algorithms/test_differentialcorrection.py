@@ -359,7 +359,7 @@ class TestCallback:
         corrector_2d_fixed_x0.iterate_correction(dro_initial_guess, callback=on_iteration)
 
         assert len(calls) >= 1, "callback 应至少被调用一次"
-        for i, (iteration, error, converged) in enumerate(calls):
+        for i, (iteration, error, _converged) in enumerate(calls):
             assert iteration == i + 1
             assert isinstance(error, float)
             assert error > 0
@@ -377,7 +377,9 @@ class TestCallback:
 
         errors = calls
         for i in range(-3, -1):
-            assert errors[i] > errors[i + 1], f"误差未递减: iter {i} = {errors[i]}, iter {i+1} = {errors[i+1]}"
+            assert errors[i] > errors[i + 1], (
+                f"误差未递减: iter {i} = {errors[i]}, iter {i + 1} = {errors[i + 1]}"
+            )
 
     def test_callback_none_does_not_affect_result(self, corrector_2d_fixed_x0, dro_initial_guess):
         """callback=None（默认值）不影响迭代修正行为"""

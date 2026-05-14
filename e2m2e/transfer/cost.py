@@ -3,8 +3,9 @@
 提供 ΔV 出发/插入脉冲及总代价的计算。
 """
 
-import numpy as np
 from typing import NamedTuple
+
+import numpy as np
 
 
 class TransferCost(NamedTuple):

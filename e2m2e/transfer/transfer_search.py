@@ -949,9 +949,7 @@ class TransferSearch:
                 )
 
                 try:
-                    traj_states, traj_times = self._forward_integrate(
-                        initial_state, mtt, idt
-                    )
+                    traj_states, traj_times = self._forward_integrate(initial_state, mtt, idt)
                 except Exception:
                     result = {
                         "success": False,

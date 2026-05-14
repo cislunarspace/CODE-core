@@ -271,7 +271,9 @@ class CR3BP_System:
             self.compute_libration_points()
 
         if self.L_points is None:
-            raise ValueError("Libration points not computed. Call compute_libration_points() first.")
+            raise ValueError(
+                "Libration points not computed. Call compute_libration_points() first."
+            )
         if point not in self.L_points:
             raise ValueError(f"无效的平动点: {point}")
 
@@ -293,7 +295,7 @@ class CR3BP_System:
 
         if r1 < 1e-12 or r2 < 1e-12:
             warnings.warn(
-                "State at singularity in Jacobi constant calculation (r1={:.2e}, r2={:.2e})".format(r1, r2),
+                f"State at singularity in Jacobi constant calculation (r1={r1:.2e}, r2={r2:.2e})",
                 RuntimeWarning,
                 stacklevel=2,
             )

@@ -62,9 +62,9 @@ class TestSortedByJacobi:
 
         try:
             fig, ax = plotter.plot_jacobi_period(JACOBI, PERIODS, show=False)
-            xdata = list(ax.get_lines()[0].get_xdata())
             ydata = list(ax.get_lines()[0].get_ydata())
-            expected_periods = [PERIODS[i] for i in sorted(range(len(JACOBI)), key=lambda i: JACOBI[i])]
+            sort_idx = sorted(range(len(JACOBI)), key=lambda i: JACOBI[i])
+            expected_periods = [PERIODS[i] for i in sort_idx]
             assert np.allclose(ydata, expected_periods)
         finally:
             plt.close("all")
@@ -75,11 +75,9 @@ class TestTargetPeriod:
         import matplotlib.pyplot as plt
 
         try:
-            fig, ax = plotter.plot_jacobi_period(
-                JACOBI, PERIODS, target_period=5.9, show=False
-            )
+            fig, ax = plotter.plot_jacobi_period(JACOBI, PERIODS, target_period=5.9, show=False)
             lines = ax.get_lines()
-            ref_lines = [l for l in lines if l.get_linestyle() == "--"]
+            ref_lines = [line for line in lines if line.get_linestyle() == "--"]
             assert len(ref_lines) >= 1
             ref = ref_lines[0]
             assert ref.get_color() == "green"
@@ -92,7 +90,7 @@ class TestTargetPeriod:
 
         try:
             fig, ax = plotter.plot_jacobi_period(JACOBI, PERIODS, show=False)
-            ref_lines = [l for l in ax.get_lines() if l.get_linestyle() == "--"]
+            ref_lines = [line for line in ax.get_lines() if line.get_linestyle() == "--"]
             assert len(ref_lines) == 0
         finally:
             plt.close("all")
@@ -104,9 +102,7 @@ class TestSavePath:
 
         save_file = str(tmp_path / "jacobi_period.png")
         try:
-            plotter.plot_jacobi_period(
-                JACOBI, PERIODS, save_path=save_file, show=False
-            )
+            plotter.plot_jacobi_period(JACOBI, PERIODS, save_path=save_file, show=False)
             assert os.path.exists(save_file)
             assert os.path.getsize(save_file) > 0
         finally:

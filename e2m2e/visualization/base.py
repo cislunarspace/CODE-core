@@ -169,7 +169,14 @@ class OrbitVisualizer:
 
         if show_start and len(x) > 0:
             ax.scatter(
-                x[0], y[0], z[0], color=color, marker="o", s=50, edgecolors="black", linewidth=1,
+                x[0],
+                y[0],
+                z[0],
+                color=color,
+                marker="o",
+                s=50,
+                edgecolors="black",
+                linewidth=1,
             )
 
         return ax
@@ -252,7 +259,9 @@ class OrbitVisualizer:
                 return ax
 
         if self.system.L_points is None:
-            raise ValueError("Libration points not computed on system. Call compute_libration_points() first.")
+            raise ValueError(
+                "Libration points not computed on system. Call compute_libration_points() first."
+            )
 
         if ax is None:
             if is_3d and self.axes_3d is not None:
@@ -272,10 +281,12 @@ class OrbitVisualizer:
 
             if is_3d:
                 ax.plot(
-                    [coord[0]], [coord[1]], [coord[2]],
+                    [coord[0]],
+                    [coord[1]],
+                    [coord[2]],
                     marker=marker,
                     color=color,
-                    markersize=(size ** 0.5),
+                    markersize=(size**0.5),
                     linestyle="None",
                 )
                 if show_labels:
@@ -326,20 +337,24 @@ class OrbitVisualizer:
 
         if is_3d:
             ax.plot(
-                [-self.mu], [0], [0],
+                [-self.mu],
+                [0],
+                [0],
                 marker="o",
                 color=self.primary_body_color,
-                markersize=(self.primary_body_size ** 0.5),
+                markersize=(self.primary_body_size**0.5),
                 markeredgecolor="black",
                 markeredgewidth=1,
                 linestyle="None",
                 label=primary_name,
             )
             ax.plot(
-                [1 - self.mu], [0], [0],
+                [1 - self.mu],
+                [0],
+                [0],
                 marker="o",
                 color=self.secondary_body_color,
-                markersize=(self.secondary_body_size ** 0.5),
+                markersize=(self.secondary_body_size**0.5),
                 markeredgecolor="black",
                 markeredgewidth=1,
                 linestyle="None",

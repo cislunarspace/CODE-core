@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.transfer.cost import TransferCost, compute_transfer_cost
+from e2m2e.transfer.cost import compute_transfer_cost
 
 
 def test_transfer_cost_zero_when_velocities_match():

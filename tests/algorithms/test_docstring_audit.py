@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import ast
-import importlib
 import inspect
 from pathlib import Path
 
@@ -85,7 +84,12 @@ class TestTwoLevelMultipleShooting:
 
     @pytest.mark.parametrize(
         "name",
-        ["_build_level1_constraint", "_build_level1_jacobian", "_build_level2_constraint", "_build_level2_patch_jacobian"],
+        [
+            "_build_level1_constraint",
+            "_build_level1_jacobian",
+            "_build_level2_constraint",
+            "_build_level2_patch_jacobian",
+        ],
     )
     def test_helper_function_has_docstring(self, name):
         tree = _parse_module(self.FILE)
@@ -175,13 +179,24 @@ class TestContinuation:
         growth_line = None
         increase_line = None
         for i, line in enumerate(lines):
-            if "step_growth_factor" in line and "=" in line and "1.2" in line and growth_line is None:
+            if (
+                "step_growth_factor" in line
+                and "=" in line
+                and "1.2" in line
+                and growth_line is None
+            ):
                 growth_line = i
-            if "step_increase_factor" in line and "=" in line and "1.2" in line and increase_line is None:
+            if (
+                "step_increase_factor" in line
+                and "=" in line
+                and "1.2" in line
+                and increase_line is None
+            ):
                 increase_line = i
         if growth_line is not None and increase_line is not None:
             # 两套因子都存在，应至少有一处 why-注释解释为何需要两套
-            context = "\n".join(lines[min(growth_line, increase_line) : max(growth_line, increase_line) + 2])
+            span = lines[min(growth_line, increase_line) : max(growth_line, increase_line) + 2]
+            context = "\n".join(span)
             assert "#" in context, (
                 "step_growth_factor 和 step_increase_factor 两套因子混用，缺 why-注释"
             )

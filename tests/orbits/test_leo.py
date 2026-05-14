@@ -5,7 +5,6 @@
 """
 
 import numpy as np
-import pytest
 
 from e2m2e.orbits.leo import (
     DU,
@@ -23,9 +22,9 @@ class TestLeoConstants:
         assert abs(R_LEO * DU - 6771.0) < 1.0
 
     def test_v_circular_leo(self):
-        from e2m2e.orbits.leo import MU
         # VU not re-exported from leo, compute manually
         from e2m2e.orbits.geo import VU
+
         v_ms = V_CIRCULAR_LEO * VU
         assert 7500 < v_ms < 8000
 

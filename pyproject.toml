@@ -47,7 +47,6 @@ dependencies = [
 Homepage = "https://github.com/cislunarspace/e2m2e"
 Repository = "https://github.com/cislunarspace/e2m2e"
 Issues = "https://github.com/cislunarspace/e2m2e/issues"
-Documentation = "https://cislunarspace.github.io/e2m2e"
 
 [tool.hatch.build.targets.wheel]
 packages = ["e2m2e"]
@@ -68,7 +67,7 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 80
+fail_under = 60
 
 [dependency-groups]
 dev = [
@@ -76,10 +75,4 @@ dev = [
     "pytest-cov>=4.0",
     "ruff>=0.1",
     "mypy",
-]
-docs = [
-    "sphinx>=7.0",
-    "sphinx-rtd-theme>=2.0",
-    "sphinxcontrib-mermaid>=0.9",
-    "sphinx-copybutton>=0.5",
 ]

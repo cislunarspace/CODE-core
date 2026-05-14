@@ -12,10 +12,10 @@ from typing import Any
 
 import numpy as np
 
-logger = logging.getLogger(__name__)
-
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
+
+logger = logging.getLogger(__name__)
 
 
 class StabilityType(Enum):

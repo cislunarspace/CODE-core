@@ -5,7 +5,6 @@
 """
 
 import numpy as np
-import pytest
 
 from e2m2e.orbits.geo import (
     DU,

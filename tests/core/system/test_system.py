@@ -316,15 +316,15 @@ class TestCR3BPSystemDUTUVUProperties:
 
     def test_DU_returns_kilometers(self, earth_moon_system):
         """DU returns characteristic length in km."""
-        assert earth_moon_system.DU == pytest.approx(384405.0, abs=1e-6)
+        assert pytest.approx(384405.0, abs=1e-6) == earth_moon_system.DU
 
     def test_TU_returns_days(self, earth_moon_system):
         """TU returns characteristic time in days (TOD convention)."""
-        assert earth_moon_system.TU == pytest.approx(4.34811305, abs=1e-8)
+        assert pytest.approx(4.34811305, abs=1e-8) == earth_moon_system.TU
 
     def test_VU_returns_meters_per_second(self, earth_moon_system):
         """VU returns characteristic velocity in m/s (TOD convention)."""
-        assert earth_moon_system.VU == pytest.approx(1023.23281, abs=0.01)
+        assert pytest.approx(1023.23281, abs=0.01) == earth_moon_system.VU
 
 
 class TestCR3BPSystemPhysicalConstants:

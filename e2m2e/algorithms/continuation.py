@@ -11,14 +11,14 @@ import logging
 
 import numpy as np
 
-logger = logging.getLogger(__name__)
-
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit, OrbitFamily
 from .differential_correction import (
     DifferentialCorrection,
     compute_halo_initial_guess,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def compute_F_and_dF_symmetric_xz_plane(
@@ -143,7 +143,7 @@ class Continuation:
             step: 初始延拓步长（默认 0.01）
         """
         self.correction = corrector
-        self.dynamics = corrector.dynamics
+        self.dynamics: CR3BP_Dynamics = corrector.dynamics  # type: ignore[assignment]
 
         self.continuation_parameter: str | None = None
         if corrector.fixed_parameters:
@@ -213,7 +213,9 @@ class Continuation:
             if verbose:
                 logger.warning(
                     "输入步长 %.6f 超过最大限制 %.6f，限制为 %.6f",
-                    step_size, self.max_step_size, self.max_step_size,
+                    step_size,
+                    self.max_step_size,
+                    self.max_step_size,
                 )
             step_size = self.max_step_size
 
@@ -221,7 +223,9 @@ class Continuation:
             if verbose:
                 logger.warning(
                     "输入步长 %.6f 小于最小限制 %.6f，限制为 %.6f",
-                    step_size, self.min_step_size, self.min_step_size,
+                    step_size,
+                    self.min_step_size,
+                    self.min_step_size,
                 )
             step_size = self.min_step_size
 
@@ -294,7 +298,9 @@ class Continuation:
                             )
                             logger.info(
                                 "  第 %d 条轨道，参数值=%.6f，周期=%.4f",
-                                i + 1, param_val, orbit.period,
+                                i + 1,
+                                param_val,
+                                orbit.period,
                             )
                         else:
                             logger.info("  正向延拓进度：已完成 %d 条轨道", i + 1)
@@ -367,7 +373,9 @@ class Continuation:
                             )
                             logger.info(
                                 "  第 %d 条轨道，参数值=%.6f，周期=%.4f",
-                                i + 1, param_val, orbit.period,
+                                i + 1,
+                                param_val,
+                                orbit.period,
                             )
                         else:
                             logger.info("  反向延拓进度：已完成 %d 条轨道", i + 1)
@@ -454,7 +462,7 @@ class Continuation:
         Returns:
             OrbitFamily: 仅含种子 + 本支新轨道（不重复添加种子）
         """
-        dynamics = self.correction.dynamics
+        dynamics = self.dynamics
 
         if direction not in ("positive", "negative"):
             raise ValueError(
@@ -487,7 +495,13 @@ class Continuation:
 
         if verbose:
             logger.debug("初始自由变量 X = [%.6f, %.6f, %.6f, %.6f]", X[0], X[1], X[2], X[3])
-            logger.debug("初始切向量 Xdot = [%.6f, %.6f, %.6f, %.6f]", Xdot[0], Xdot[1], Xdot[2], Xdot[3])
+            logger.debug(
+                "初始切向量 Xdot = [%.6f, %.6f, %.6f, %.6f]",
+                Xdot[0],
+                Xdot[1],
+                Xdot[2],
+                Xdot[3],
+            )
 
         ds = float(step_sign * step_size)
         tv = target_vector
@@ -504,7 +518,13 @@ class Continuation:
                 Xnew = X + ds * Xdot
 
             if verbose:
-                logger.debug("  预测 Xnew = [%.6f, %.6f, %.6f, %.6f]", Xnew[0], Xnew[1], Xnew[2], Xnew[3])
+                logger.debug(
+                    "  预测 Xnew = [%.6f, %.6f, %.6f, %.6f]",
+                    Xnew[0],
+                    Xnew[1],
+                    Xnew[2],
+                    Xnew[3],
+                )
 
             # 仅欧拉预测时的自由变量（PAL 若跳入 F=0 的非物理根则回退到此）
             X_predictor_only = Xnew.copy()
@@ -530,7 +550,11 @@ class Continuation:
                 # 与 MATLAB continuation_PAL_CR3BP 一致：先判收敛，再更新 Xnew
                 if np.linalg.norm(F) < TolPAL:
                     if verbose:
-                        logger.debug("  PAL迭代 %d: 收敛, ||F|| = %.2e", iter_pal + 1, np.linalg.norm(F))
+                        logger.debug(
+                            "  PAL迭代 %d: 收敛, ||F|| = %.2e",
+                            iter_pal + 1,
+                            np.linalg.norm(F),
+                        )
                     break
 
                 try:
@@ -562,7 +586,9 @@ class Continuation:
                 if verbose:
                     logger.warning(
                         "  PAL 结果偏离物理 Halo 支 (x=%.4f, z=%.4f, T/2=%.4f)，回退为欧拉预测初值",
-                        _x, _z, _tf2,
+                        _x,
+                        _z,
+                        _tf2,
                     )
                 X = X_predictor_only.copy()
 
@@ -627,7 +653,10 @@ class Continuation:
                 if verbose and (n + 1) % 5 == 0:
                     logger.info(
                         "  轨道 %d: x0=%.4f, z0=%.4f, T=%.4f",
-                        n + 1, orbit.states[0, 0], orbit.states[0, 2], orbit.period,
+                        n + 1,
+                        orbit.states[0, 0],
+                        orbit.states[0, 2],
+                        orbit.period,
                     )
             else:
                 if verbose:
@@ -694,7 +723,8 @@ class Continuation:
             raise ValueError(f"halo_class必须是0或1，当前为{halo_class}")
 
         if verbose:
-            logger.info("生成Halo轨道: L%d %s Halo", libration_point, "北" if halo_class == 0 else "南")
+            halo_label = "北" if halo_class == 0 else "南"
+            logger.info("生成Halo轨道: L%d %s Halo", libration_point, halo_label)
             logger.info("  Z振幅: %s", amplitude_z)
 
         mu = self.correction.dynamics.system.mu
@@ -964,7 +994,11 @@ class Continuation:
             logger.info("  z_amplitude(参数): %.4f", seed_z_amplitude)
             logger.info("  每支新轨道数 N = %d", n_orbits)
             logger.info("  正向 |DeltaS| = %s, 负向 |DeltaS| = %s", step_size, step_size_negative)
-            logger.info("  dc_scheme = %s, DirectionalIncrement = %s", dc_scheme, directional_increment)
+            logger.info(
+                "  dc_scheme = %s, DirectionalIncrement = %s",
+                dc_scheme,
+                directional_increment,
+            )
             logger.info("=" * 30)
 
         orbit_family = OrbitFamily([seed_orbit])

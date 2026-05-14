@@ -8,7 +8,6 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-
 _MIN_DISTANCE = 1e-10
 
 
@@ -43,11 +42,7 @@ def pseudo_potential_hessian(
         - (1 - mu) * (1 / r1**3 - 3 * (x + mu) ** 2 / r1**5)
         - mu * (1 / r2**3 - 3 * (x - 1 + mu) ** 2 / r2**5)
     )
-    U_yy = (
-        1
-        - (1 - mu) * (1 / r1**3 - 3 * y**2 / r1**5)
-        - mu * (1 / r2**3 - 3 * y**2 / r2**5)
-    )
+    U_yy = 1 - (1 - mu) * (1 / r1**3 - 3 * y**2 / r1**5) - mu * (1 / r2**3 - 3 * y**2 / r2**5)
     U_zz = -(1 - mu) * (1 / r1**3 - 3 * z**2 / r1**5) - mu * (1 / r2**3 - 3 * z**2 / r2**5)
     # 混合偏导 ∂²Ω/∂x∂y：离心力项 ∂²/∂x∂y[(x²+y²)/2] = 0，仅保留引力交叉项
     U_xy = 3 * (1 - mu) * (x + mu) * y / r1**5 + 3 * mu * (x - 1 + mu) * y / r2**5

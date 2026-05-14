@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-import e2m2e
 from e2m2e.algorithms import DifferentialCorrection
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
 from e2m2e.core.dynamics import Dynamics
@@ -47,7 +46,9 @@ class TestFiniteDiffJacobianConsistency:
         stm = result["stm"][-1]
         deriv = dynamics.equations_of_motion(t_half, result["states"][-1])
 
-        stm_jac = np.zeros((len(corrector.constraint_indices), len(corrector.free_variable_indices)))
+        n_constraints = len(corrector.constraint_indices)
+        n_free = len(corrector.free_variable_indices)
+        stm_jac = np.zeros((n_constraints, n_free))
         for j, var_idx in enumerate(corrector.free_variable_indices):
             if var_idx < 6:
                 for i, c_idx in enumerate(corrector.constraint_indices):

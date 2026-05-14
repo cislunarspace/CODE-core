@@ -460,8 +460,6 @@ class Orbit:
         times = np.array(orbit_data["times"])
         orbit = cls(states, times, system)
 
-        orbit.metadata = orbit_data.get("metadata", data.get("metadata", {}))
-
         properties = orbit_data.get("properties", {})
         orbit.period = properties.get("period", orbit_data.get("period"))
         orbit.amplitudes = properties.get("amplitudes", orbit_data.get("amplitudes", {}))
@@ -471,6 +469,12 @@ class Orbit:
         orbit.family_type = properties.get("family_type", orbit_data.get("family_type"))
         # 重新检查周期性（使用正确的 period），不再从 JSON 恢复 is_periodic
         orbit._check_periodicity()
+        # 若 JSON 中保存了周期性误差，优先使用保存值（可能来自差分修正，比数值重算更准确）
+        saved_error = properties.get("periodicity_error")
+        if saved_error is not None:
+            orbit._periodicity_error = saved_error
+        # 在 _check_periodicity() 之后恢复 metadata（前者会覆写 description）
+        orbit.metadata = orbit_data.get("metadata", data.get("metadata", {}))
 
         return orbit
 

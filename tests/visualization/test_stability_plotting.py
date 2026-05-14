@@ -14,7 +14,6 @@ from e2m2e.algorithms.stability import StabilityAnalysis
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit, OrbitFamily
 from e2m2e.visualization import FamilyPlotter
 
-
 MU = 1.21506683e-2
 
 
@@ -30,9 +29,7 @@ def _make_orbit(x0: float, period: float, system: CR3BP_System) -> Orbit:
     return orbit
 
 
-def _compute_stability_values(
-    family: OrbitFamily, dynamics: CR3BP_Dynamics
-) -> list[float]:
+def _compute_stability_values(family: OrbitFamily, dynamics: CR3BP_Dynamics) -> list[float]:
     values = []
     for orbit in family:
         if orbit.period is None:
@@ -68,9 +65,7 @@ def family(system):
 class TestStabilityToFamilyPlotter:
     """StabilityAnalysis output feeds into FamilyPlotter without errors."""
 
-    def test_plot_jacobi_period_stability_accepts_stability_values(
-        self, system, dynamics, family
-    ):
+    def test_plot_jacobi_period_stability_accepts_stability_values(self, system, dynamics, family):
         stability_values = _compute_stability_values(family, dynamics)
         jacobi_values = [3.17 - i * 0.001 for i in range(len(family))]
         periods = [o.period for o in family]
@@ -86,9 +81,7 @@ class TestStabilityToFamilyPlotter:
         assert fig is not None
         assert len(stability_values) == len(family)
 
-    def test_plot_family_overview_accepts_stability_values(
-        self, system, dynamics, family
-    ):
+    def test_plot_family_overview_accepts_stability_values(self, system, dynamics, family):
         stability_values = _compute_stability_values(family, dynamics)
         jacobi_values = [3.17 - i * 0.001 for i in range(len(family))]
         periods = [o.period for o in family]
@@ -105,9 +98,7 @@ class TestStabilityToFamilyPlotter:
         assert fig is not None
         assert len(stability_values) == len(family)
 
-    def test_orbit_without_period_yields_default_stability(
-        self, system, dynamics
-    ):
+    def test_orbit_without_period_yields_default_stability(self, system, dynamics):
         fam = OrbitFamily(family_type="no_period")
         orbit = _make_orbit(0.8, 3.0, system)
         orbit.period = None
@@ -125,9 +116,7 @@ class TestStabilityToFamilyPlotter:
 
         assert values == []
 
-    def test_stability_values_are_nonnegative_floats(
-        self, system, dynamics, family
-    ):
+    def test_stability_values_are_nonnegative_floats(self, system, dynamics, family):
         values = _compute_stability_values(family, dynamics)
 
         for v in values:

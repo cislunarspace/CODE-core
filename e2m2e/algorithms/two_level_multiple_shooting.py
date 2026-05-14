@@ -122,7 +122,8 @@ def _build_level2_patch_jacobian(
     Returns:
         六个雅可比子块，顺序为 (prev_pos, prev_time, curr_pos, curr_time, next_pos, next_time)
     """
-    left_inverse_stm = np.linalg.pinv(left_stm)  # 用伪逆而非逆矩阵，STM 子块在周期轨道分岔点附近可能奇异
+    # 用伪逆而非逆矩阵，STM 子块在周期轨道分岔点附近可能奇异
+    left_inverse_stm = np.linalg.pinv(left_stm)
     left_b_inverse = np.linalg.pinv(left_inverse_stm[0:3, 3:6])
     left_a = left_inverse_stm[0:3, 0:3]
     right_b_inverse = np.linalg.pinv(right_stm[0:3, 3:6])
@@ -133,9 +134,7 @@ def _build_level2_patch_jacobian(
     current_position_block = left_b_inverse @ left_a - right_b_inverse @ right_a
     current_time_block = -(
         left_arrival_acceleration + (left_b_inverse @ left_a) @ left_arrival_velocity
-    ) + (
-        right_departure_acceleration + (right_b_inverse @ right_a) @ right_departure_velocity
-    )
+    ) + (right_departure_acceleration + (right_b_inverse @ right_a) @ right_departure_velocity)
     next_position_block = right_b_inverse
     next_time_block = -right_b_inverse @ right_arrival_velocity
 
@@ -245,7 +244,8 @@ class TwoLevelMultipleShooting:
                 position_tolerance,
             )
             level1_iterations.extend(segment_iterations)
-            had_level1_failure = had_level1_failure or had_failure  # Level 1 单段不收敛不中止，留给 Level 2 修复
+            # Level 1 单段不收敛不中止，留给 Level 2 修复
+            had_level1_failure = had_level1_failure or had_failure
             final_position, final_velocity = self._compute_residuals(t_work, state_work)
             position_residual = float(np.sum(final_position))
             velocity_residual = float(np.sum(final_velocity))
@@ -480,13 +480,13 @@ class TwoLevelMultipleShooting:
             for internal_index in range(1, n_points - 1):
                 column = 4 * (internal_index - 1)
                 candidate_states[internal_index, :3] = (
-                    candidate_states[internal_index, :3]
-                    + damping * delta[column : column + 3]
+                    candidate_states[internal_index, :3] + damping * delta[column : column + 3]
                 )
                 candidate_t[internal_index] = (
                     candidate_t[internal_index] + damping * delta[column + 3]
                 )
-            if np.any(np.diff(candidate_t) <= 0):  # 修正后时间节点可能逆序，导致积分失败，需拒绝该步
+            # 修正后时间节点可能逆序，导致积分失败，需拒绝该步
+            if np.any(np.diff(candidate_t) <= 0):
                 continue
             position_residuals, velocity_residuals = self._compute_residuals(
                 candidate_t,
