@@ -128,6 +128,10 @@ class Orbit:
 
     @property
     def period(self) -> float | None:
+        """轨道周期（无量纲时间）
+
+        由 x 方向零交叉检测估计，或由外部算法设置。
+        """
         return self._period
 
     @period.setter
@@ -136,6 +140,10 @@ class Orbit:
 
     @property
     def amplitudes(self) -> dict:
+        """各方向振幅字典
+
+        键为 ``"x"``/``"y"``/``"z"``，值为半极差 ``(max - min) / 2``。
+        """
         return self._amplitudes
 
     @amplitudes.setter
@@ -144,6 +152,10 @@ class Orbit:
 
     @property
     def extrema(self) -> dict:
+        """位置极值字典
+
+        键为 ``"x_max"``/``"x_min"``/``"y_max"`` … 等格式。
+        """
         return self._extrema
 
     @extrema.setter
@@ -152,6 +164,7 @@ class Orbit:
 
     @property
     def mean_state(self) -> np.ndarray | None:
+        """状态向量均值，形状 ``(6,)``"""
         return self._mean_state
 
     @mean_state.setter
@@ -160,6 +173,7 @@ class Orbit:
 
     @property
     def center(self) -> np.ndarray | None:
+        """轨道几何中心（位置均值），形状 ``(3,)``"""
         return self._center
 
     @center.setter
@@ -168,6 +182,7 @@ class Orbit:
 
     @property
     def is_periodic(self) -> bool:
+        """轨道是否被判定为周期轨道"""
         return self._is_periodic
 
     @is_periodic.setter
@@ -176,6 +191,7 @@ class Orbit:
 
     @property
     def periodicity_error(self) -> float | None:
+        """周期性闭合误差范数（首尾状态差的无穷范数）"""
         return self._periodicity_error
 
     @periodicity_error.setter
@@ -184,6 +200,10 @@ class Orbit:
 
     @property
     def monodromy_matrix(self) -> np.ndarray | None:
+        """单值矩阵（Monodromy Matrix），形状 ``(6, 6)``
+
+        通过 ``compute_monodromy_matrix`` 计算并缓存。
+        """
         return self._monodromy_matrix
 
     @monodromy_matrix.setter
@@ -192,6 +212,10 @@ class Orbit:
 
     @property
     def eigenvalues(self) -> np.ndarray | None:
+        """单值矩阵的特征值，形状 ``(6,)``
+
+        特征值在单位圆上 → 稳定；|λ| > 1 → 不稳定方向。
+        """
         return self._eigenvalues
 
     @eigenvalues.setter
@@ -200,6 +224,7 @@ class Orbit:
 
     @property
     def stability(self) -> str | None:
+        """稳定性标签：``"stable"`` / ``"unstable"`` / ``"marginally_stable"``"""
         return self._stability
 
     @stability.setter
@@ -208,6 +233,10 @@ class Orbit:
 
     @property
     def lyapunov_exponents(self) -> np.ndarray | None:
+        """Lyapunov 指数，形状 ``(6,)``
+
+        由 ``ln|λ_i| / T`` 计算，其中 T 为轨道周期。
+        """
         return self._lyapunov_exponents
 
     @lyapunov_exponents.setter
@@ -274,6 +303,10 @@ class Orbit:
 
         # 若轨迹闭合误差 < 1e-4，认为轨迹是一个完整周期的积分结果
         # 直接用闭合误差作为周期性误差
+        # 阈值说明：1e-4 用于判断「轨迹大致闭合」（来自差分修正的典型残差量级），
+        # 而非严格周期性判定；严格判定使用 1e-5（见下方赋值）。
+        # 两级阈值的设计：粗阈值允许将 DC 残差级别的近周期轨道纳入「可分析」范畴，
+        # 细阈值则用于最终标记 is_periodic 供后续稳定性分析使用。
         if closure_error < 1e-4:
             self._periodicity_error = closure_error
             self._is_periodic = closure_error < 1e-5
@@ -357,6 +390,11 @@ class Orbit:
         }
 
     def get_period(self) -> float | None:
+        """获取轨道周期
+
+        Returns:
+            无量纲周期；若未估计到则返回 None
+        """
         return self._period
 
     def get_amplitude(self, direction: str) -> float:
@@ -517,6 +555,16 @@ class OrbitFamily:
         family_type: str | None = None,
         system: CR3BP_System | None = None,
     ) -> None:
+        """初始化轨道族
+
+        Args:
+            orbits: 初始轨道列表，也可传入单条 Orbit 对象
+            family_type: 轨道族类型（如 ``"halo"``、``"lyapunov"``）
+            system: 关联的 CR3BP_System 对象（用于计算 Jacobi 常数等）
+
+        Raises:
+            TypeError: orbits 列表中包含非 Orbit 对象
+        """
         self.orbits: list[Orbit] = []
         if orbits is not None:
             if isinstance(orbits, Orbit):
@@ -552,20 +600,47 @@ class OrbitFamily:
         return iter(self.orbits)
 
     def add_orbit(self, orbit: Orbit) -> None:
+        """向轨道族添加一条轨道
+
+        Args:
+            orbit: 要添加的 Orbit 对象
+        """
         self.orbits.append(orbit)
 
     def get_states(self) -> npt.NDArray[np.floating]:
+        """获取所有轨道的初始状态
+
+        Returns:
+            初始状态数组，形状 ``(n_orbits, 6)``
+        """
         return np.array([orbit.states[0] for orbit in self.orbits])
 
     def get_periods(self) -> npt.NDArray[np.floating]:
+        """获取所有已知周期
+
+        Returns:
+            周期数组，仅包含 period 不为 None 的轨道
+        """
         return np.array([orbit.period for orbit in self.orbits if orbit.period is not None])
 
     def get_jacobi_constants(self) -> npt.NDArray[np.floating]:
+        """计算所有轨道初始状态的 Jacobi 常数
+
+        需要关联 CR3BP_System；若 system 为 None 则返回空数组。
+
+        Returns:
+            Jacobi 常数数组，形状 ``(n_orbits,)``
+        """
         if self.system is None:
             return np.array([])
         return np.array([self.system.get_jacobi_constant(orbit.states[0]) for orbit in self.orbits])
 
     def save_to_file(self, filename: str | Path) -> None:
+        """将轨道族序列化保存到 JSON 文件
+
+        Args:
+            filename: 输出文件路径，父目录不存在时自动创建
+        """
         filepath = Path(filename)
         dirpath = filepath.parent
         if not dirpath.exists():
@@ -601,6 +676,15 @@ class OrbitFamily:
     def load_from_file(
         cls, filename: str | Path, system: CR3BP_System | None = None
     ) -> OrbitFamily:
+        """从 JSON 文件反序列化加载轨道族
+
+        Args:
+            filename: 输入文件路径
+            system: 关联的 CR3BP_System 对象（可选）
+
+        Returns:
+            加载的 OrbitFamily 实例
+        """
         filepath = Path(filename)
         with open(filepath) as f:
             data = json.load(f)

@@ -179,7 +179,12 @@ class CR3BP_SRP_Dynamics(CR3BP_Dynamics):
         r_xy = np.sqrt((x + mu) ** 2 + y**2)
         ut = np.array([-y, x + mu, 0.0]) / r_xy if r_xy > 1e-15 else np.array([0.0, 0.0, 0.0])
 
-        # 径向和切向 SRP 力分量（来自 EXOSIMS）
+        # 径向和切向 SRP 力分量（来自 EXOSIMS 光学系数模型）
+        # F_radial = b1 + b2·cos²(α_avg) + b3·cos(α_avg)
+        #   其中 α_avg = 60°（假设航天器面法线与太阳方向的平均入射角），
+        #   cos²(60°) = 0.25，cos(60°) = 0.5
+        # F_tangential = b2·cos(α_avg)·sin(α_avg) + b3·sin(α_avg)
+        #   sin(60°) = √3/2，故 sin(60°)·cos(60°) = √3/4
         F_radial = self.b1 + 0.25 * self.b2 + 0.5 * self.b3
         F_tangential = (np.sqrt(3) * 0.25) * (self.b2 + 2.0 * self.b3)
 
