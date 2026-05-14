@@ -14,7 +14,8 @@ from pydantic import BaseModel, ConfigDict, field_validator
 class NumpyArray(np.ndarray):
     """Pydantic 兼容的 numpy 数组类型标记
 
-    实际使用中通过 validator 确保 numpy 数组的正确处理。
+    作为字段类型注解使用，实际的形状校验由各字段上的
+    @field_validator 完成，本类本身不包含 validator。
     """
 
     pass
@@ -23,6 +24,7 @@ class NumpyArray(np.ndarray):
 class _NumpyModel(BaseModel):
     """支持 numpy 数组的 Pydantic 基类"""
 
+    # numpy.ndarray 不是标准 Pydantic 类型，必须允许任意类型才能通过校验
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -53,6 +55,17 @@ class PropagationResult(_NumpyModel):
     @field_validator("states")
     @classmethod
     def validate_states_shape(cls, v: np.ndarray) -> np.ndarray:
+        """校验状态数组形状为 (n, 6)，保证六维状态向量完整性
+
+        Args:
+            v: 待校验的状态数组
+
+        Returns:
+            通过校验的状态数组
+
+        Raises:
+            ValueError: 形状不符合 (n, 6) 时抛出
+        """
         if v.ndim != 2 or v.shape[1] != 6:
             raise ValueError(f"states 形状必须为 (n, 6)，实际为 {v.shape}")
         return v
@@ -60,6 +73,17 @@ class PropagationResult(_NumpyModel):
     @field_validator("stm")
     @classmethod
     def validate_stm_shape(cls, v: np.ndarray | None) -> np.ndarray | None:
+        """校验状态转移矩阵形状为 (n, 6, 6)
+
+        Args:
+            v: 待校验的 STM 数组，可为 None
+
+        Returns:
+            通过校验的 STM 数组或 None
+
+        Raises:
+            ValueError: 形状不符合 (n, 6, 6) 时抛出
+        """
         if v is not None and (v.ndim != 3 or v.shape[1] != 6 or v.shape[2] != 6):
             raise ValueError(f"stm 形状必须为 (n, 6, 6)，实际为 {v.shape}")
         return v
@@ -111,6 +135,17 @@ class OrbitStability(_NumpyModel):
     @field_validator("monodromy_matrix")
     @classmethod
     def validate_monodromy(cls, v: np.ndarray | None) -> np.ndarray | None:
+        """校验单值矩阵形状为 (6, 6)
+
+        Args:
+            v: 待校验的单值矩阵，可为 None
+
+        Returns:
+            通过校验的矩阵或 None
+
+        Raises:
+            ValueError: 形状不符合 (6, 6) 时抛出
+        """
         if v is not None and v.shape != (6, 6):
             raise ValueError(f"monodromy_matrix 形状必须为 (6, 6)，实际为 {v.shape}")
         return v

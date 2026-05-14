@@ -30,6 +30,12 @@ class DiagramGenerator:
         requirements: RequirementRegistry | None = None,
         components: ComponentRegistry | None = None,
     ):
+        """初始化图表生成器
+
+        Args:
+            requirements: 需求注册表实例，默认使用全局单例
+            components: 组件注册表实例，默认使用全局单例
+        """
         self.requirements = requirements or RequirementRegistry()
         self.components = components or ComponentRegistry()
 
@@ -72,6 +78,8 @@ class DiagramGenerator:
         lines = ["requirementDiagram"]
 
         for req in self.requirements:
+            # 将 SysML 需求分类映射为 Mermaid requirementDiagram 的 type 字段
+            # 默认 "functional" 兜底未匹配的分类
             type_label = {
                 RequirementCategory.FUNCTIONAL: "functional",
                 RequirementCategory.PERFORMANCE: "performance",
@@ -118,7 +126,7 @@ class DiagramGenerator:
         for from_state, to_state, trigger in transitions:
             lines.append(f"    {from_state} --> {to_state} : {trigger}")
 
-        # 终止状态：如果存在终止状态（如 "complete", "failed"）
+        # 终止状态集合：覆盖数值求解的典型终态（收敛/发散）和通用终态
         terminal_states = {"complete", "converged", "failed", "diverged"}
         for state in states:
             if state.lower() in terminal_states:
@@ -242,7 +250,7 @@ class DiagramGenerator:
         """
         generated = []
 
-        # BDD for each layer
+        # BDD for each layer（不含 "mbse"，因为 MBSE 层是架构元数据，不生成独立 BDD）
         for layer in ["core", "algorithms", "transfer", "visualization"]:
             bdd_content = self.generate_bdd(layer)
             if bdd_content != "classDiagram":  # 非空

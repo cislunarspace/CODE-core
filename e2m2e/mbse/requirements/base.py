@@ -68,6 +68,7 @@ class RequirementRegistry:
     _requirements: dict[str, Requirement]
 
     def __new__(cls) -> RequirementRegistry:
+        """单例模式：全局共享同一个注册表实例，确保需求注册全局一致"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._requirements = {}
@@ -128,7 +129,11 @@ class RequirementRegistry:
         return matrix
 
     def coverage_report(self) -> dict:
-        """生成需求覆盖率报告"""
+        """生成需求覆盖率报告
+
+        Returns:
+            包含 total/covered/uncovered/coverage_rate/uncovered_ids 的字典
+        """
         all_reqs = self.all()
         total = len(all_reqs)
         if total == 0:
@@ -149,10 +154,13 @@ class RequirementRegistry:
         self._requirements.clear()
 
     def __len__(self) -> int:
+        """返回已注册需求数量"""
         return len(self._requirements)
 
     def __contains__(self, req_id: str) -> bool:
+        """检查需求是否已注册"""
         return req_id in self._requirements
 
     def __iter__(self):
+        """遍历所有已注册需求"""
         return iter(self._requirements.values())

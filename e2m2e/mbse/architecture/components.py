@@ -33,6 +33,8 @@ class Component:
     description: str = ""
 
     def __post_init__(self):
+        """校验架构层合法性"""
+        # mbse 层用于 MBSE 自身的架构组件（ComponentRegistry 等），不属于运行时四层架构
         valid_layers = {"core", "algorithms", "transfer", "visualization", "mbse"}
         if self.layer not in valid_layers:
             raise ValueError(f"无效的架构层: {self.layer}，应为 {valid_layers}")
@@ -48,6 +50,7 @@ class ComponentRegistry:
     _components: dict[str, Component]
 
     def __new__(cls) -> ComponentRegistry:
+        """单例模式：全局共享同一个注册表实例，避免多次注册丢失"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._components = {}
@@ -95,10 +98,13 @@ class ComponentRegistry:
         self._components.clear()
 
     def __len__(self) -> int:
+        """返回已注册组件数量"""
         return len(self._components)
 
     def __contains__(self, name: str) -> bool:
+        """检查组件是否已注册"""
         return name in self._components
 
     def __iter__(self):
+        """遍历所有已注册组件"""
         return iter(self._components.values())
