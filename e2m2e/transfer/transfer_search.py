@@ -960,13 +960,21 @@ class TransferSearch:
                         "dv_departure": dv_departure,
                         "dv_insertion": None,
                         "min_distance_orbit_idx": None,
+                        "first_intersection_idx": None,
+                        "first_intersection_time": None,
+                        "first_min_distance_idx": None,
+                        "first_min_distance_time": None,
                     }
                     results.append(result)
                 else:
                     collision, body, col_idx = self._check_collision(traj_states)
-                    min_dist, min_idx, orbit_idx = self._compute_min_distance(
+                    # 一次性算出每步距离序列，下面所有"最近点/相交/首次穿越"判定共用同一份数据
+                    d_per_step, orbit_idx_per_step = self._compute_distance_series(
                         traj_states, arrival_orbit
                     )
+                    min_idx = int(np.argmin(d_per_step))
+                    min_dist = float(d_per_step[min_idx])
+                    orbit_idx = int(orbit_idx_per_step[min_idx])
                     v_tr = traj_states[min_idx][3:6]
                     v_ro = arrival_orbit.states[orbit_idx][3:6]
                     dv_insertion = float(np.linalg.norm(v_tr - v_ro))  # 粗估：最近几何点处速度差
@@ -976,6 +984,29 @@ class TransferSearch:
                     local_min, local_min_dist, local_min_idx = self._detect_local_minimum(
                         traj_states, arrival_orbit
                     )
+
+                    # 首次进入两类阈值内的索引/时间（C1: 两对独立字段）。
+                    # None 表示从未进入；保留 D1 语义（即使 idx=0 也忠实记录，绘图端做 fallback）。
+                    first_int_idx: int | None
+                    first_int_time: float | None
+                    first_md_idx: int | None
+                    first_md_time: float | None
+
+                    _int_hits = np.where(d_per_step <= ith)[0]
+                    if _int_hits.size > 0:
+                        first_int_idx = int(_int_hits[0])
+                        first_int_time = float(traj_times[first_int_idx])
+                    else:
+                        first_int_idx = None
+                        first_int_time = None
+
+                    _md_hits = np.where(d_per_step <= mdt)[0]
+                    if _md_hits.size > 0:
+                        first_md_idx = int(_md_hits[0])
+                        first_md_time = float(traj_times[first_md_idx])
+                    else:
+                        first_md_idx = None
+                        first_md_time = None
 
                     result = {
                         "success": True,
@@ -993,6 +1024,10 @@ class TransferSearch:
                         "intersection_found": intersection,
                         "intersection_point": int_point,
                         "intersection_idx": int_idx,
+                        "first_intersection_idx": first_int_idx,
+                        "first_intersection_time": first_int_time,
+                        "first_min_distance_idx": first_md_idx,
+                        "first_min_distance_time": first_md_time,
                         "local_minimum_found": local_min,
                         "local_minimum_distance": local_min_dist,
                         "local_minimum_idx": local_min_idx,
@@ -1073,10 +1108,19 @@ class TransferSearch:
 
         return result["states"], result["time"]
 
-    def _compute_min_distance(
+    def _compute_distance_series(
         self, trajectory_states: np.ndarray, arrival_orbit: Orbit
-    ) -> tuple[float, int, int]:
-        """计算轨迹到目标轨道的最小距离及最近点（轨迹步、目标轨道采样下标）。"""
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """逐步计算轨迹各点到目标轨道的最小距离。
+
+        返回与轨迹同长度的两个一维数组:
+            d_per_step[i]          : 轨迹第 i 步到 arrival_orbit 最近点的距离
+            orbit_idx_per_step[i]  : 该最近点在 arrival_orbit 上的采样下标
+
+        ``_compute_min_distance``、``search()`` 的首次穿越扫描共用同一份距离序列，
+        从而保证 ``min_distance``、``intersection_found``、``first_*_idx``
+        三类衍生量在数值上严格自洽。
+        """
         traj_positions = trajectory_states[:, :3]
         orbit_positions = arrival_orbit.states[:, :3]
 
@@ -1087,50 +1131,57 @@ class TransferSearch:
         max_pairs = 10_000_000
 
         if n_traj * n_orbit > max_pairs:
-            return self._compute_min_distance_chunked(traj_positions, orbit_positions)
+            return self._compute_distance_series_chunked(
+                traj_positions, orbit_positions
+            )
 
         diff = traj_positions[:, np.newaxis, :] - orbit_positions[np.newaxis, :, :]
-        distances = np.sqrt(np.sum(diff**2, axis=2))
+        distances = np.sqrt(np.sum(diff**2, axis=2))  # (n_traj, n_orbit)
 
-        flat_distances = distances.flatten()
-        min_flat_idx = np.argmin(flat_distances)
-        min_distance = flat_distances[min_flat_idx]
+        orbit_idx_per_step = np.argmin(distances, axis=1)
+        d_per_step = distances[np.arange(n_traj), orbit_idx_per_step]
 
-        step_idx = int(min_flat_idx // n_orbit)
-        orbit_idx = int(min_flat_idx % n_orbit)
+        return d_per_step, orbit_idx_per_step.astype(np.int64)
 
-        return min_distance, step_idx, orbit_idx
-
-    def _compute_min_distance_chunked(
+    def _compute_distance_series_chunked(
         self, traj_positions: np.ndarray, orbit_positions: np.ndarray
-    ) -> tuple[float, int, int]:
-        """分块计算最小距离，避免内存溢出。"""
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """分块计算每步最近距离序列，避免大轨迹/大轨道时内存溢出。"""
         n_traj = len(traj_positions)
         n_orbit = len(orbit_positions)
         chunk_size = max(1, 10_000_000 // n_orbit)
 
-        global_min_dist = float("inf")
-        global_step_idx = 0
-        global_orbit_idx = 0
+        d_per_step = np.empty(n_traj, dtype=np.float64)
+        orbit_idx_per_step = np.empty(n_traj, dtype=np.int64)
 
         for start in range(0, n_traj, chunk_size):
             end = min(start + chunk_size, n_traj)
             chunk = traj_positions[start:end]
 
             diff = chunk[:, np.newaxis, :] - orbit_positions[np.newaxis, :, :]
-            distances = np.sqrt(np.sum(diff**2, axis=2))
+            distances = np.sqrt(np.sum(diff**2, axis=2))  # (chunk_len, n_orbit)
 
-            flat_distances = distances.flatten()
-            min_flat_idx = np.argmin(flat_distances)
-            min_distance = flat_distances[min_flat_idx]
+            chunk_orbit_idx = np.argmin(distances, axis=1)
+            chunk_d = distances[np.arange(end - start), chunk_orbit_idx]
 
-            if min_distance < global_min_dist:
-                global_min_dist = min_distance
-                local_step = int(min_flat_idx // n_orbit)
-                global_step_idx = start + local_step
-                global_orbit_idx = int(min_flat_idx % n_orbit)
+            d_per_step[start:end] = chunk_d
+            orbit_idx_per_step[start:end] = chunk_orbit_idx
 
-        return global_min_dist, global_step_idx, global_orbit_idx
+        return d_per_step, orbit_idx_per_step
+
+    def _compute_min_distance(
+        self, trajectory_states: np.ndarray, arrival_orbit: Orbit
+    ) -> tuple[float, int, int]:
+        """计算轨迹到目标轨道的最小距离及最近点（轨迹步、目标轨道采样下标）。
+
+        薄包装：复用 :meth:`_compute_distance_series` 的完整距离序列，
+        保留旧的 3 元组签名，所有现有调用方零改动。
+        """
+        d_per_step, orbit_idx_per_step = self._compute_distance_series(
+            trajectory_states, arrival_orbit
+        )
+        step_idx = int(np.argmin(d_per_step))
+        return float(d_per_step[step_idx]), step_idx, int(orbit_idx_per_step[step_idx])
 
     def compute_min_distance_to_orbit(
         self, trajectory_states: np.ndarray, arrival_orbit: Orbit
