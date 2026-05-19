@@ -6,11 +6,12 @@
 """
 
 from .base import OrbitVisualizer, ProjectionPlane
-from .config import PlotConfig
+from .config import BODY_ICON_SCALE_ENV, PlotConfig
 from .family import FamilyPlotter
 from .transfer import TransferPlotter
 
 __all__ = [
+    "BODY_ICON_SCALE_ENV",
     "PlotConfig",
     "OrbitVisualizer",
     "ProjectionPlane",

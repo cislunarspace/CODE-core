@@ -12,12 +12,17 @@ import contextlib
 import logging
 import os
 import subprocess
+from collections.abc import Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
 _STANDARD_DPI = 96.0  # 标准 DPI，作为缩放计算的基准
+
+# 环境变量名：天体图标缩放系数（地球、月球同步缩放）。
+# 调用方通过设置此环境变量影响 PlotConfig.from_env() 构造的实例。
+BODY_ICON_SCALE_ENV = "E2M2E_BODY_ICON_SCALE"
 
 
 def _detect_system_scale() -> float:
@@ -282,6 +287,53 @@ class PlotConfig(BaseModel):
     # 缩放参数
     auto_scale: bool = True
     scale_factor: float = Field(default_factory=lambda: _detected_scale)
+
+    @classmethod
+    def from_env(
+        cls,
+        env: Mapping[str, str] | None = None,
+        **overrides,
+    ) -> "PlotConfig":
+        """从环境变量构造 PlotConfig，overrides 优先级最高。
+
+        当前支持的环境变量：
+        - ``BODY_ICON_SCALE_ENV`` (``E2M2E_BODY_ICON_SCALE``)：浮点数，同时
+          应用于 ``primary_body_icon_scale`` 和 ``secondary_body_icon_scale``。
+          解析失败（非数字、≤ 0）时静默回退到字段默认值，不抛异常。
+
+        Args:
+            env: 环境变量映射，``None`` 时使用 ``os.environ``。便于测试注入。
+            **overrides: 显式字段覆盖，优先级高于环境变量。
+
+        Returns:
+            构造好的 PlotConfig 实例。
+        """
+        source = os.environ if env is None else env
+
+        env_kwargs: dict[str, float] = {}
+
+        raw = source.get(BODY_ICON_SCALE_ENV)
+        if raw is not None:
+            try:
+                value = float(raw)
+            except ValueError:
+                logger.debug(
+                    "Invalid %s value: %r (expected float)", BODY_ICON_SCALE_ENV, raw
+                )
+            else:
+                if value > 0:
+                    env_kwargs["primary_body_icon_scale"] = value
+                    env_kwargs["secondary_body_icon_scale"] = value
+                else:
+                    logger.debug(
+                        "Non-positive %s value: %r (expected > 0)",
+                        BODY_ICON_SCALE_ENV,
+                        raw,
+                    )
+
+        # overrides 覆盖 env 值
+        merged = {**env_kwargs, **overrides}
+        return cls(**merged)
 
     def apply_rcparams(self) -> None:
         """将配置应用到 matplotlib 全局参数。

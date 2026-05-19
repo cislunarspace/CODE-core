@@ -162,6 +162,59 @@ class OrbitVisualizer:
         offset_img = OffsetImage(image, zoom=zoom, dpi_cor=False)
         return offset_img, True
 
+    def _add_3d_billboard_icon(
+        self,
+        ax: Any,
+        offset_img: Any,
+        position: tuple[float, float, float],
+        label: str,
+    ) -> None:
+        """在 3D Axes 上以 Billboard 方式渲染 PNG 图标。
+
+        matplotlib 3D 的 AnnotationBbox 默认会被 axes 裁剪掉、且需要先获取投影
+        矩阵才能定位。这里：
+        1. 用 ``proj3d.proj_transform`` 把 (x,y,z) 投影到 axes data 坐标系下
+           的 2D 平面坐标（3D Axes 的 transData 接受的是已投影的 2D 点）。
+        2. 显式 ``annotation_clip=False`` + ``set_clip_on(False)``，否则图标
+           会被静默裁掉。
+        3. 注册 ``draw_event`` 回调：每次重绘（含 savefig）都重新投影，确保
+           ``view_init`` 改变后图标仍贴在正确的天体位置。
+
+        Args:
+            ax: 3D axes 对象。
+            offset_img: 已经构造好的 ``OffsetImage``。
+            position: 天体的 (x, y, z) 旋转系坐标。
+            label: 图例标签。
+        """
+        from matplotlib.offsetbox import AnnotationBbox
+        from mpl_toolkits.mplot3d import proj3d
+
+        x3, y3, z3 = position
+
+        # 用初始投影占位；draw_event 回调会在每次重绘前更新位置
+        x2, y2, _ = proj3d.proj_transform(x3, y3, z3, ax.get_proj())
+        ab = AnnotationBbox(
+            offset_img,
+            (x2, y2),
+            xycoords="data",
+            frameon=False,
+            pad=0.0,
+            annotation_clip=False,
+            zorder=10,
+        )
+        ab.set_clip_on(False)
+        ax.add_artist(ab)
+
+        def _update_icon_position(_event, ab=ab, x3=x3, y3=y3, z3=z3, ax=ax):
+            x2, y2, _ = proj3d.proj_transform(x3, y3, z3, ax.get_proj())
+            ab.xy = (x2, y2)
+            ab.xybox = (x2, y2)
+
+        ax.figure.canvas.mpl_connect("draw_event", _update_icon_position)
+
+        # 图例占位（invisible scatter），与 2D 路径一致
+        ax.scatter([], [], [], color="white", label=label)
+
     def _get_next_color(self) -> str:
         """从颜色循环中获取下一个颜色。"""
         color = self.color_cycle[self.color_index % len(self.color_cycle)]
@@ -391,7 +444,9 @@ class OrbitVisualizer:
         """绘制主天体和次天体标记。
 
         天体位置：主天体在 (-μ, 0, 0)，次天体在 (1-μ, 0, 0)（旋转系坐标）。
-        2D 图表优先使用 PNG 图标，3D 图表使用圆形 marker。
+        2D 图表优先使用 PNG 图标。3D 图表也优先使用 PNG 图标，通过 Billboard
+        技术将图标"贴"在 3D 空间中的固定位置（不随视角旋转），图标加载失败时
+        回退到圆形 marker。
 
         Args:
             ax: 目标 axes 对象。
@@ -414,31 +469,50 @@ class OrbitVisualizer:
         secondary_name = getattr(self.system, "secondary_body", None) or "Moon"
 
         if is_3d:
-            # 3D 图表不支持 AnnotationBbox，使用圆形 marker
-            ax.plot(
-                [-self.mu],
-                [0],
-                [0],
-                marker="o",
-                color=self.primary_body_color,
-                markersize=(self.primary_body_size**0.5),
-                markeredgecolor="black",
-                markeredgewidth=1,
-                linestyle="None",
-                label=primary_name,
+            # 3D 图表：尝试用 PNG 图标（Billboard：通过 draw_event 回调
+            # 把 3D 数据点投影到 2D 屏幕坐标，每次重绘都同步图标位置）。
+            primary_icon, primary_ok = self._get_body_icon(
+                is_primary=True,
+                size=int(self.primary_body_size * self.config.primary_body_icon_scale),
             )
-            ax.plot(
-                [1 - self.mu],
-                [0],
-                [0],
-                marker="o",
-                color=self.secondary_body_color,
-                markersize=(self.secondary_body_size**0.5),
-                markeredgecolor="black",
-                markeredgewidth=1,
-                linestyle="None",
-                label=secondary_name,
+            secondary_icon, secondary_ok = self._get_body_icon(
+                is_primary=False,
+                size=int(self.secondary_body_size * self.config.secondary_body_icon_scale),
             )
+
+            if primary_ok and secondary_ok:
+                self._add_3d_billboard_icon(
+                    ax, primary_icon, (-self.mu, 0.0, 0.0), primary_name
+                )
+                self._add_3d_billboard_icon(
+                    ax, secondary_icon, (1 - self.mu, 0.0, 0.0), secondary_name
+                )
+            else:
+                # 图标加载失败，回退到圆形 marker
+                ax.plot(
+                    [-self.mu],
+                    [0],
+                    [0],
+                    marker="o",
+                    color=self.primary_body_color,
+                    markersize=(self.primary_body_size**0.5),
+                    markeredgecolor="black",
+                    markeredgewidth=1,
+                    linestyle="None",
+                    label=primary_name,
+                )
+                ax.plot(
+                    [1 - self.mu],
+                    [0],
+                    [0],
+                    marker="o",
+                    color=self.secondary_body_color,
+                    markersize=(self.secondary_body_size**0.5),
+                    markeredgecolor="black",
+                    markeredgewidth=1,
+                    linestyle="None",
+                    label=secondary_name,
+                )
         else:
             # 2D 图表优先使用 PNG 图标
             primary_pos = np.array([-self.mu, 0])
