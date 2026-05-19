@@ -14,50 +14,39 @@ Classes:
 
 Functions:
     propagate_state_at_orbit_time: 沿轨道周期外推状态
+
+Note:
+    星历相关模块 (spice, ephemeris_system, ephemeris_dynamics) 不在顶层导出，
+    如需使用请直接从子模块导入：
+        from e2m2e.core.spice import SPICEManager
+        from e2m2e.core.ephemeris_system import EphemerisSystem
+        from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
 """
 
-from . import (
-    coordinate,
-    dynamics,
-    ephemeris_dynamics,
-    ephemeris_system,
-    orbit,
-    potential,
-    spice,
-    system,
-)
+from __future__ import annotations
+
+from . import coordinate, dynamics, orbit, potential, system
 from .coordinate import CoordinateTransformation, ReferenceFrame, SynodicJ2000Transformation
 from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
-from .ephemeris_dynamics import EphemerisDynamics
-from .ephemeris_system import EphemerisSystem
 from .orbit import Orbit, OrbitFamily
 from .potential import pseudo_potential_hessian
-from .spice import SPICEManager
-from .srp_dynamics import CR3BP_SRP_Dynamics
 from .system import CR3BP_System, LibrationPoint
 
 __all__ = [
     "coordinate",
     "dynamics",
     "potential",
-    "ephemeris_dynamics",
-    "ephemeris_system",
     "orbit",
-    "spice",
     "system",
     "CR3BP_System",
     "LibrationPoint",
     "Dynamics",
     "CR3BP_Dynamics",
-    "CR3BP_SRP_Dynamics",
     "Orbit",
     "OrbitFamily",
     "propagate_state_at_orbit_time",
     "CoordinateTransformation",
     "SynodicJ2000Transformation",
     "ReferenceFrame",
-    "SPICEManager",
-    "EphemerisSystem",
-    "EphemerisDynamics",
     "pseudo_potential_hessian",
 ]

@@ -120,7 +120,9 @@ pytestmark_spice = pytest.mark.spice
 
 
 def _make_eph_dynamics(spice_kernel_path):
-    from e2m2e.core import EphemerisDynamics, EphemerisSystem, SPICEManager
+    from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
+    from e2m2e.core.ephemeris_system import EphemerisSystem
+    from e2m2e.core.spice import SPICEManager
 
     mgr = SPICEManager()
     mgr.load_kernel(spice_kernel_path)

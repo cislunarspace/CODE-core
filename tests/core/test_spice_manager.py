@@ -28,7 +28,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.core import SPICEManager
+from e2m2e.core.spice import SPICEManager
 
 pytestmark = pytest.mark.spice
 

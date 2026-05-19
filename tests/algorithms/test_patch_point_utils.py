@@ -28,13 +28,8 @@ import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.algorithms import convert_to_j2000, sample_patch_points
-from e2m2e.core import (
-    CR3BP_Dynamics,
-    CR3BP_System,
-    Orbit,
-    SPICEManager,
-    SynodicJ2000Transformation,
-)
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit, SynodicJ2000Transformation
+from e2m2e.core.spice import SPICEManager
 
 pytestmark = pytest.mark.spice
 

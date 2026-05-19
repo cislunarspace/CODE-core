@@ -41,12 +41,12 @@ from numpy.testing import assert_allclose
 from e2m2e.core import (
     CR3BP_Dynamics,
     CR3BP_System,
-    EphemerisDynamics,
-    EphemerisSystem,
     Orbit,
-    SPICEManager,
     SynodicJ2000Transformation,
 )
+from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
+from e2m2e.core.ephemeris_system import EphemerisSystem
+from e2m2e.core.spice import SPICEManager
 
 pytestmark = pytest.mark.spice
 from e2m2e.algorithms import (  # noqa: E402
