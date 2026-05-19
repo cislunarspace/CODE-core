@@ -257,6 +257,9 @@ class PlotConfig(BaseModel):
     primary_body_size: int = 200
     secondary_body_color: str = "silver"
     secondary_body_size: int = 100
+    # 天体图标缩放系数（用于 PNG 图标显示大小微调，不影响散点回退）
+    primary_body_icon_scale: float = 1.0
+    secondary_body_icon_scale: float = 1.0
     lp_colors: list[str] = Field(default_factory=lambda: ["gray"] * 5)
     lp_markers: list[str] = Field(default_factory=lambda: ["^"] * 5)
     lp_sizes: list[int] = Field(default_factory=lambda: [60] * 5)

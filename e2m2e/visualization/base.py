@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import logging
 from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
@@ -18,8 +20,7 @@ if TYPE_CHECKING:
 from ..core.system import CR3BP_System, LibrationPoint
 from .config import PlotConfig
 
-if TYPE_CHECKING:
-    pass
+logger = logging.getLogger(__name__)
 
 
 class ProjectionPlane(Enum):
@@ -84,6 +85,82 @@ class OrbitVisualizer:
         self.libration_point_sizes = list(self.config.lp_sizes)
         self.libration_point_labels = ["L1", "L2", "L3", "L4", "L5"]
         self.libration_point_fontsize = self.config.lp_label
+
+        # 天体图标（PNG 图片缓存，懒加载）
+        self._primary_body_image: Any | None = None  # 主天体（地球）图片
+        self._secondary_body_image: Any | None = None  # 次天体（月球）图片
+        self._icon_loaded: bool = False
+
+    def _load_body_icons(self) -> None:
+        """懒加载天体图标 PNG 图片。
+
+        从 ~/Downloads 目录加载地球和月球 PNG 文件。
+        加载失败时静默回退，不影响绘图流程。
+
+        Note:
+            PIL Image 会转换为 numpy array 以便 matplotlib OffsetImage 使用。
+        """
+        if self._icon_loaded:
+            return
+
+        try:
+            from PIL import Image
+            import numpy as np
+
+            downloads = Path.home() / "Downloads"
+            earth_path = downloads / "地球.png"
+            moon_path = downloads / "月球.png"
+
+            if earth_path.exists():
+                img = Image.open(earth_path).convert("RGBA")
+                self._primary_body_image = np.array(img)
+                logger.debug("已加载地球图标: %s", earth_path)
+            else:
+                logger.debug("地球图标不存在: %s", earth_path)
+
+            if moon_path.exists():
+                img = Image.open(moon_path).convert("RGBA")
+                self._secondary_body_image = np.array(img)
+                logger.debug("已加载月球图标: %s", moon_path)
+            else:
+                logger.debug("月球图标不存在: %s", moon_path)
+
+        except ImportError:
+            logger.debug("PIL 未安装，无法加载天体图标")
+        except Exception as e:
+            logger.debug("加载天体图标失败: %s", e)
+        finally:
+            self._icon_loaded = True
+
+    def _get_body_icon(
+        self, is_primary: bool, size: int
+    ) -> tuple[Any | None, bool]:
+        """获取天体图标和是否可用的元组。
+
+        Args:
+            is_primary: True 表示主天体（地球），False 表示次天体（月球）
+            size: 目标像素大小（用于计算缩放比例）
+
+        Returns:
+            (OffsetImage 或 PIL Image, 是否可用) 元组
+        """
+        self._load_body_icons()
+
+        from matplotlib.offsetbox import OffsetImage
+
+        image = self._primary_body_image if is_primary else self._secondary_body_image
+        if image is None:
+            return None, False
+
+        # 计算缩放比例
+        # 使图标在显示时占约 size 像素
+        # 公式：zoom = 目标像素 / 原始像素尺寸
+        # dpi_cor=False 避免保存时根据 dpi 自动放大
+        orig_size = max(image.shape[0], image.shape[1])  # 700
+        zoom = size / orig_size if orig_size > 0 else 1.0
+
+        offset_img = OffsetImage(image, zoom=zoom, dpi_cor=False)
+        return offset_img, True
 
     def _get_next_color(self) -> str:
         """从颜色循环中获取下一个颜色。"""
@@ -314,6 +391,7 @@ class OrbitVisualizer:
         """绘制主天体和次天体标记。
 
         天体位置：主天体在 (-μ, 0, 0)，次天体在 (1-μ, 0, 0)（旋转系坐标）。
+        2D 图表优先使用 PNG 图标，3D 图表使用圆形 marker。
 
         Args:
             ax: 目标 axes 对象。
@@ -336,6 +414,7 @@ class OrbitVisualizer:
         secondary_name = getattr(self.system, "secondary_body", None) or "Moon"
 
         if is_3d:
+            # 3D 图表不支持 AnnotationBbox，使用圆形 marker
             ax.plot(
                 [-self.mu],
                 [0],
@@ -361,26 +440,75 @@ class OrbitVisualizer:
                 label=secondary_name,
             )
         else:
+            # 2D 图表优先使用 PNG 图标
             primary_pos = np.array([-self.mu, 0])
             secondary_pos = np.array([1 - self.mu, 0])
-            ax.scatter(
-                *primary_pos,
-                color="#2E86AB",
-                s=self.primary_body_size,  # type: ignore[misc]
-                edgecolors="#1A5276",
-                linewidth=1.5,
-                zorder=10,
-                label=primary_name,
+
+            # 尝试加载并使用图标（应用图标缩放系数）
+            primary_icon, primary_ok = self._get_body_icon(
+                is_primary=True,
+                size=int(self.primary_body_size * self.config.primary_body_icon_scale),
             )
-            ax.scatter(
-                *secondary_pos,
-                color="#95A5A6",
-                s=self.secondary_body_size,  # type: ignore[misc]
-                edgecolors="#566573",
-                linewidth=1.5,
-                zorder=10,
-                label=secondary_name,
+            secondary_icon, secondary_ok = self._get_body_icon(
+                is_primary=False,
+                size=int(self.secondary_body_size * self.config.secondary_body_icon_scale),
             )
+
+            if primary_ok and secondary_ok:
+                # 成功加载图标，使用 AnnotationBbox
+                from matplotlib.offsetbox import AnnotationBbox
+
+                # 先添加图例条目（用 invisible scatter）
+                ax.scatter(
+                    [],
+                    [],
+                    color="white",
+                    label=primary_name,
+                )
+                ax.scatter(
+                    [],
+                    [],
+                    color="white",
+                    label=secondary_name,
+                )
+
+                # 绘制主天体（地球）图标
+                ab_primary = AnnotationBbox(
+                    primary_icon,
+                    primary_pos,
+                    frameon=False,
+                    zorder=10,
+                )
+                ax.add_artist(ab_primary)
+
+                # 绘制次天体（月球）图标
+                ab_secondary = AnnotationBbox(
+                    secondary_icon,
+                    secondary_pos,
+                    frameon=False,
+                    zorder=10,
+                )
+                ax.add_artist(ab_secondary)
+            else:
+                # 图标加载失败，回退到圆形散点
+                ax.scatter(
+                    *primary_pos,
+                    color="#2E86AB",
+                    s=self.primary_body_size,  # type: ignore[misc]
+                    edgecolors="#1A5276",
+                    linewidth=1.5,
+                    zorder=10,
+                    label=primary_name,
+                )
+                ax.scatter(
+                    *secondary_pos,
+                    color="#95A5A6",
+                    s=self.secondary_body_size,  # type: ignore[misc]
+                    edgecolors="#566573",
+                    linewidth=1.5,
+                    zorder=10,
+                    label=secondary_name,
+                )
         return ax
 
     def show(self) -> None:
