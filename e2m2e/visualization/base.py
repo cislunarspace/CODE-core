@@ -10,6 +10,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -21,6 +22,88 @@ from ..core.system import CR3BP_System, LibrationPoint
 from .config import PlotConfig
 
 logger = logging.getLogger(__name__)
+
+
+class _DepthDriverPatch(mpatches.Patch):
+    """利用 Axes3D 的 do_3d_projection 钩子驱动 Billboard 图标的深度排序。
+
+    Axes3D.draw() 在渲染前会对所有可见 Collection 和 Patch 调用
+    do_3d_projection()，这是唯一能在每帧渲染前获取到正确投影矩阵 M 的时机。
+    本 Patch 利用这个钩子来：
+
+    1. 更新 AnnotationBbox 的投影位置（跟随视角变化）。
+    2. 根据图标与场景中 Line3D 的深度比较动态调整 AnnotationBbox 的 zorder。
+
+    这比 draw_event 方案更可靠——后者在渲染之后才触发，导致 zorder 更新延迟一帧，
+    旋转时出现遮挡关系闪烁。本方案在渲染前同步更新，消除延迟。
+    """
+
+    def __init__(self, annotation_box: Any, position_3d: tuple[float, float, float]) -> None:
+        super().__init__(
+            visible=True,
+            fill=False,
+            facecolor="none",
+            edgecolor="none",
+            linewidth=0,
+        )
+        self._ab = annotation_box
+        self._pos = position_3d
+        self._last_zorder: float = 10
+
+    def get_path(self) -> Any:
+        from matplotlib.path import Path
+        return Path(np.empty((0, 2)))
+
+    def draw(self, renderer: Any) -> None:
+        pass
+
+    def do_3d_projection(self) -> float:
+        from mpl_toolkits.mplot3d import proj3d
+
+        M = getattr(self.axes, "M", None)
+        if M is None:
+            return 0.0
+
+        x3, y3, z3 = self._pos
+        x2, y2, z2 = proj3d.proj_transform(x3, y3, z3, M)
+        self._ab.xy = (x2, y2)
+        self._ab.xybox = (x2, y2)
+
+        line_zs = []
+        for line in self.axes.lines:
+            verts = getattr(line, "_verts3d", None)
+            if verts is None or not line.get_visible():
+                continue
+            xs3d, ys3d, zs3d = verts
+            if len(xs3d) == 0:
+                continue
+            _, _, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, M)
+            line_zs.append(zs)
+
+        if not line_zs:
+            self._ab.set_zorder(10)
+            return z2
+
+        all_zs = np.concatenate(line_zs)
+        if all_zs.size == 0:
+            self._ab.set_zorder(10)
+            return z2
+
+        # proj_z 越小越靠近相机；与中位数比较决定遮挡关系
+        median_z = np.median(all_zs)
+        z_range = all_zs.max() - all_zs.min()
+        margin = z_range * 0.1
+
+        if z2 < median_z - margin:
+            new_zorder = 10
+        elif z2 > median_z + margin:
+            new_zorder = 1
+        else:
+            new_zorder = self._last_zorder
+
+        self._last_zorder = new_zorder
+        self._ab.set_zorder(new_zorder)
+        return z2
 
 
 class ProjectionPlane(Enum):
@@ -169,16 +252,12 @@ class OrbitVisualizer:
         position: tuple[float, float, float],
         label: str,
     ) -> None:
-        """在 3D Axes 上以 Billboard 方式渲染 PNG 图标。
+        """在 3D Axes 上以 Billboard 方式渲染 PNG 图标，支持动态深度遮挡。
 
-        matplotlib 3D 的 AnnotationBbox 默认会被 axes 裁剪掉、且需要先获取投影
-        矩阵才能定位。这里：
-        1. 用 ``proj3d.proj_transform`` 把 (x,y,z) 投影到 axes data 坐标系下
-           的 2D 平面坐标（3D Axes 的 transData 接受的是已投影的 2D 点）。
-        2. 显式 ``annotation_clip=False`` + ``set_clip_on(False)``，否则图标
-           会被静默裁掉。
-        3. 注册 ``draw_event`` 回调：每次重绘（含 savefig）都重新投影，确保
-           ``view_init`` 改变后图标仍贴在正确的天体位置。
+        matplotlib 3D 的 AnnotationBbox 是 2D 元素，不参与自动深度排序。
+        通过 :class:`_DepthDriverPatch` 挂接到 Axes3D.draw() 的
+        do_3d_projection 钩子，在每帧渲染**之前**同步更新图标位置和 zorder，
+        确保旋转交互时遮挡关系无延迟地反映空间深度。
 
         Args:
             ax: 3D axes 对象。
@@ -191,7 +270,6 @@ class OrbitVisualizer:
 
         x3, y3, z3 = position
 
-        # 用初始投影占位；draw_event 回调会在每次重绘前更新位置
         x2, y2, _ = proj3d.proj_transform(x3, y3, z3, ax.get_proj())
         ab = AnnotationBbox(
             offset_img,
@@ -205,12 +283,10 @@ class OrbitVisualizer:
         ab.set_clip_on(False)
         ax.add_artist(ab)
 
-        def _update_icon_position(_event, ab=ab, x3=x3, y3=y3, z3=z3, ax=ax):
-            x2, y2, _ = proj3d.proj_transform(x3, y3, z3, ax.get_proj())
-            ab.xy = (x2, y2)
-            ab.xybox = (x2, y2)
-
-        ax.figure.canvas.mpl_connect("draw_event", _update_icon_position)
+        # 深度驱动：不可见 Patch，通过 do_3d_projection 钩子
+        # 在每帧渲染前同步更新 AnnotationBbox 的位置和 zorder
+        driver = _DepthDriverPatch(ab, position)
+        ax.add_patch(driver)
 
         # 图例占位（invisible scatter），与 2D 路径一致
         ax.scatter([], [], [], color="white", label=label)
