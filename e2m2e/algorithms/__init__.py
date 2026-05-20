@@ -7,6 +7,7 @@ e2m2e算法模块
 from . import (
     continuation,
     differential_correction,
+    ephemeris_correction,
     multiple_shooting,
     stability,
     strategies,
@@ -18,6 +19,10 @@ from .differential_correction import (
     compute_halo_coefficients,
     compute_halo_initial_guess,
     halo_third_order_approximation,
+)
+from .ephemeris_correction import (
+    EphemerisCorrectionResult,
+    correct_ephemeris_patch_points,
 )
 from .multiple_shooting import MultipleShooting, convert_to_j2000, sample_patch_points
 from .stability import BifurcationType, StabilityAnalysis, StabilityType
@@ -31,6 +36,7 @@ __all__ = [
     "differential_correction",
     "continuation",
     "stability",
+    "ephemeris_correction",
     "multiple_shooting",
     "two_level_multiple_shooting",
     "strategies",
@@ -43,6 +49,8 @@ __all__ = [
     "StabilityType",
     "BifurcationType",
     "MultipleShooting",
+    "EphemerisCorrectionResult",
+    "correct_ephemeris_patch_points",
     "TwoLevelMultipleShooting",
     "TwoLevelMultipleShootingResult",
     "sample_patch_points",
