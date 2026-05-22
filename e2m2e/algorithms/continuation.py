@@ -795,6 +795,7 @@ class Continuation:
         n_orbits: int = 50,
         direction: str = "positive",
         step_size: float = 0.001,
+        z_range: tuple[float, float] | None = None,
         verbose: bool = False,
     ) -> list[Orbit]:
         """生成Halo轨道族
@@ -807,6 +808,8 @@ class Continuation:
             n_orbits: 目标轨道数量（含种子；每支各生成n_orbits-1条新轨道）
             direction: 延拓方向 ("positive", "negative", "both")
             step_size: z方向步长（正数；方向由direction控制）
+            z_range: 延拓z振幅范围 (z_min, z_max)；提供时优先使用，
+                代替硬编码边界，并自动推断延拓方向
             verbose: 是否打印详细信息
 
         Returns:
@@ -820,14 +823,42 @@ class Continuation:
         family = [seed_orbit]
         libration_point = int(seed_orbit.parameters.get("libration_point", 1))
         halo_class = int(seed_orbit.parameters.get("halo_class", 0))
-        directions = ["positive", "negative"] if direction == "both" else [direction]
+        seed_z = float(seed_orbit.states[0, 2])
 
-        logger.info("开始生成Halo轨道族: 目标数量=%d, 方向=%s", n_orbits, direction)
+        # z边界: 北Halo z>0, 南Halo z<0
+        default_z_limit = 0.5 if halo_class == 0 else -0.5
+        z_threshold = 1e-4 if halo_class == 0 else -1e-4
+
+        # 处理 z_range
+        if z_range is not None:
+            z_min, z_max = z_range
+            if z_min >= z_max:
+                raise ValueError(f"z_range必须满足z_min < z_max，当前为({z_min}, {z_max})")
+            # 自动推断方向：正向 = 往更大的 z 值走，反向 = 往更小的 z 值走
+            forward = z_max > seed_z
+            backward = z_min < seed_z
+            dirs = []
+            if forward:
+                dirs.append("positive")
+            if backward:
+                dirs.append("negative")
+            if not dirs:
+                logger.warning("z_range不包含种子轨道z0，不延拓")
+                return family
+            directions = dirs
+            logger.info(
+                "开始生成Halo轨道族: z范围=[%.4f, %.4f], 方向=%s, 最大数量=%d",
+                z_min, z_max, "/".join(directions), n_orbits,
+            )
+        else:
+            directions = ["positive", "negative"] if direction == "both" else [direction]
+            logger.info("开始生成Halo轨道族: 目标数量=%d, 方向=%s", n_orbits, direction)
+
         logger.info(
             "  种子轨道: L%d %s Halo, z0=%.6f",
             libration_point,
             "北" if halo_class == 0 else "南",
-            float(seed_orbit.states[0, 2]),
+            seed_z,
         )
 
         # 自适应步长参数
@@ -841,14 +872,23 @@ class Continuation:
             current_step = float(step_size)
             current_z = float(current_orbit.states[0, 2])
 
-            # z边界: 北Halo z>0, 南Halo z<0
-            z_limit = 0.5 if halo_class == 0 else -0.5
-            z_threshold = 1e-4 if halo_class == 0 else -1e-4
+            # z边界: z_range模式使用用户指定边界，否则使用默认值
+            if z_range is not None:
+                z_min_val, z_max_val = z_range
+                z_limit = z_max_val if dir_name == "positive" else z_min_val
+            else:
+                z_limit = default_z_limit
 
             if verbose:
-                logger.info("--- %s延拓 ---", "正向" if dir_name == "positive" else "反向")
+                logger.info("--- %s延拓 (边界=%.4f) ---", "正向" if dir_name == "positive" else "反向", z_limit)
 
             for i in range(n_orbits - 1):
+                # 全局轨道数上限：n_orbits 是总轨道数（含种子），不是每方向上限
+                if len(family) >= n_orbits:
+                    if verbose:
+                        logger.info("  达到全局轨道数上限 %d, 终止", n_orbits)
+                    break
+
                 # 计算目标z
                 dz = current_step if dir_name == "positive" else -current_step
                 target_z = current_z + dz
@@ -857,12 +897,12 @@ class Continuation:
                 if halo_class == 0:
                     if target_z <= z_threshold or target_z >= z_limit:
                         if verbose:
-                            logger.info("  达到z边界, 终止")
+                            logger.info("  达到z边界 %.4f, 终止", z_limit)
                         break
                 else:
                     if target_z >= z_threshold or target_z <= z_limit:
                         if verbose:
-                            logger.info("  达到z边界, 终止")
+                            logger.info("  达到z边界 %.4f, 终止", z_limit)
                         break
 
                 # 配置微分修正器
