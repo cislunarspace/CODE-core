@@ -118,7 +118,7 @@ class TestAnalyzeBifurcation:
         analysis = StabilityAnalysis(orbit)
         eigs = [2.0, 0.5, 1.0, 1.0, np.exp(0.3j), np.exp(-0.3j)]
         _inject_eigenvalues(analysis, eigs)
-        result = analysis.analyze_bifurcation()
+        analysis.analyze_bifurcation()
         assert analysis.bifurcation_type == BifurcationType.SADDLE_NODE
         assert analysis.bifurcation_detected
 
@@ -127,7 +127,7 @@ class TestAnalyzeBifurcation:
         analysis = StabilityAnalysis(orbit)
         eigs = [2.0, 0.5, -1.0 + 0j, -1.0 + 0j, np.exp(0.3j), np.exp(-0.3j)]
         _inject_eigenvalues(analysis, eigs)
-        result = analysis.analyze_bifurcation()
+        analysis.analyze_bifurcation()
         assert analysis.bifurcation_type == BifurcationType.PERIOD_DOUBLING
         assert analysis.bifurcation_detected
 
@@ -136,7 +136,7 @@ class TestAnalyzeBifurcation:
         analysis = StabilityAnalysis(orbit)
         eigs = [2.0, 0.5, np.exp(0.5j), np.exp(-0.5j), np.exp(0.7j), np.exp(-0.7j)]
         _inject_eigenvalues(analysis, eigs)
-        result = analysis.analyze_bifurcation()
+        analysis.analyze_bifurcation()
         assert analysis.bifurcation_type == BifurcationType.TORUS
 
     def test_no_bifurcation(self):

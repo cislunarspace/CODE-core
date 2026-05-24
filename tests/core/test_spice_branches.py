@@ -1,11 +1,10 @@
 """Cover uncovered branches in SPICEManager without requiring real kernels."""
 
-import os
 from unittest.mock import patch
 
 import pytest
 
-from e2m2e.core.spice import SPICEManager, _GM_VALUES
+from e2m2e.core.spice import _GM_VALUES, SPICEManager
 
 
 class TestLoadKernelFileNotFound:
