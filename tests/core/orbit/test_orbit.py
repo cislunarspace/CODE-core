@@ -66,7 +66,6 @@ class TestOrbitInit:
         assert orbit.jacobi_constants is None
         assert orbit.stability_indices is None
         assert orbit.family_type is None
-        assert orbit.monodromy_matrix is None
         assert not orbit.is_periodic
 
 
@@ -136,35 +135,35 @@ class TestPropagateStateAtOrbitTime:
 
 
 class TestOrbitPeriod:
-    """Tests for get_period method"""
+    """Tests for period property"""
 
-    def test_get_period_returns_value(self):
-        """Test get_period returns period value (auto-computed or None)"""
+    def test_period_returns_value(self):
+        """Test period property returns value (auto-computed or None)"""
         states = np.random.rand(10, 6)
         times = np.linspace(0, 1, 10)
         orbit = Orbit(states=states, times=times)
 
-        result = orbit.get_period()
+        result = orbit.period
         assert result is None or isinstance(result, (float, np.floating))
 
-    def test_get_period_with_estimate(self, sample_orbit):
-        """Test get_period returns period when estimated"""
-        sample_orbit.get_period()
+    def test_period_with_estimate(self, sample_orbit):
+        """Test period property returns period when estimated"""
+        assert sample_orbit.period is None or isinstance(sample_orbit.period, (float, np.floating))
 
 
 class TestOrbitAmplitude:
-    """Tests for get_amplitude method"""
+    """Tests for amplitudes property"""
 
-    def test_get_amplitude_valid_direction(self, sample_orbit):
-        """Test get_amplitude with valid direction"""
-        amp = sample_orbit.get_amplitude(direction="x")
+    def test_amplitudes_valid_direction(self, sample_orbit):
+        """Test amplitudes dict contains valid direction"""
+        amp = sample_orbit.amplitudes["x"]
         assert isinstance(amp, float)
         assert amp >= 0
 
-    def test_get_amplitude_invalid_direction(self, sample_orbit):
-        """Test get_amplitude raises error for invalid direction"""
-        with pytest.raises(ValueError, match="无效的方向"):
-            sample_orbit.get_amplitude(direction="invalid")
+    def test_amplitudes_missing_direction(self, sample_orbit):
+        """Test amplitudes dict raises KeyError for missing direction"""
+        with pytest.raises(KeyError):
+            _ = sample_orbit.amplitudes["invalid"]
 
 
 class TestOrbitSaveLoad:
@@ -198,43 +197,6 @@ class TestOrbitSaveLoad:
         finally:
             if filename.exists():
                 os.remove(filename)
-
-
-class TestOrbitMonodromy:
-    """Tests for compute_monodromy_matrix method"""
-
-    def test_monodromy_requires_period(self, sample_orbit, earth_moon_dynamics):
-        """Test compute_monodromy_matrix raises error without period"""
-        sample_orbit.period = None
-
-        with pytest.raises(ValueError, match="轨道周期未知"):
-            sample_orbit.compute_monodromy_matrix(dynamics=earth_moon_dynamics)
-
-
-class TestOrbitStability:
-    """Tests for compute_stability method"""
-
-    def test_stability_requires_monodromy(self, sample_orbit, earth_moon_dynamics):
-        """Test compute_stability requires monodromy matrix"""
-        sample_orbit.monodromy_matrix = None
-        sample_orbit.period = 1.0
-
-        result = sample_orbit.compute_stability(dynamics=earth_moon_dynamics)
-
-        assert "stability" in result
-        assert "eigenvalues" in result
-
-    def test_compute_stability_with_zero_period(self, earth_moon_dynamics, earth_moon_system):
-        """compute_stability should handle zero period gracefully."""
-        orbit = Orbit(
-            states=np.array([[0.8, 0.0, 0.0, 0.0, 0.1, 0.0]]),
-            times=np.array([0.0]),
-            system=earth_moon_system,
-        )
-        orbit.period = 0.0
-        result = orbit.compute_stability(earth_moon_dynamics)
-        assert result["stability"] == "unknown"
-        assert result["eigenvalues"] is None
 
 
 class TestOrbitMetadata:

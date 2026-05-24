@@ -8,9 +8,7 @@
 采用组合模式重构 Orbit 类：
 - 核心数据（states, times, system）直接持有
 - 计算属性（period, amplitudes, extrema, center 等）通过 property 代理
-- 稳定性属性（monodromy_matrix, eigenvalues, stability 等）通过 property 代理
-- 删除所有未使用的保留字段
-  （radius, shape, orientation, is_quasi_periodic, is_chaotic, segments, segment_indices）
+- 稳定性分析由 e2m2e.algorithms.stability 模块独立负责
 - 保持 v3 JSON 格式向后兼容
 
 主要类：
@@ -23,12 +21,9 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
-
 import numpy as np
 import numpy.typing as npt
 
-from .dynamics import CR3BP_Dynamics
 from .system import CR3BP_System
 
 
@@ -51,15 +46,6 @@ class Orbit:
         stability_indices: 稳定性指标（由外部算法填充）
     """
 
-    # 支持的轨道族类型
-    VALID_FAMILY_TYPES = [
-        "halo",
-        "lyapunov",
-        "vertical",
-        "axial",
-        "butterfly",
-        "dragonfly",
-    ]
     # 状态向量分量名称
     VALID_COMPONENTS = ["x", "y", "z", "vx", "vy", "vz"]
 
@@ -106,12 +92,6 @@ class Orbit:
         self._center: np.ndarray | None = None
         self._is_periodic: bool = False
         self._periodicity_error: float | None = None
-
-        # 稳定性属性
-        self._monodromy_matrix: np.ndarray | None = None
-        self._eigenvalues: np.ndarray | None = None
-        self._stability: str | None = None
-        self._lyapunov_exponents: np.ndarray | None = None
 
         # 元数据
         self.metadata: dict = {
@@ -198,51 +178,6 @@ class Orbit:
     def periodicity_error(self, value: float | None) -> None:
         self._periodicity_error = value
 
-    @property
-    def monodromy_matrix(self) -> np.ndarray | None:
-        """单值矩阵（Monodromy Matrix），形状 ``(6, 6)``
-
-        通过 ``compute_monodromy_matrix`` 计算并缓存。
-        """
-        return self._monodromy_matrix
-
-    @monodromy_matrix.setter
-    def monodromy_matrix(self, value: np.ndarray | None) -> None:
-        self._monodromy_matrix = value
-
-    @property
-    def eigenvalues(self) -> np.ndarray | None:
-        """单值矩阵的特征值，形状 ``(6,)``
-
-        特征值在单位圆上 → 稳定；|λ| > 1 → 不稳定方向。
-        """
-        return self._eigenvalues
-
-    @eigenvalues.setter
-    def eigenvalues(self, value: np.ndarray | None) -> None:
-        self._eigenvalues = value
-
-    @property
-    def stability(self) -> str | None:
-        """稳定性标签：``"stable"`` / ``"unstable"`` / ``"marginally_stable"``"""
-        return self._stability
-
-    @stability.setter
-    def stability(self, value: str | None) -> None:
-        self._stability = value
-
-    @property
-    def lyapunov_exponents(self) -> np.ndarray | None:
-        """Lyapunov 指数，形状 ``(6,)``
-
-        由 ``ln|λ_i| / T`` 计算，其中 T 为轨道周期。
-        """
-        return self._lyapunov_exponents
-
-    @lyapunov_exponents.setter
-    def lyapunov_exponents(self, value: np.ndarray | None) -> None:
-        self._lyapunov_exponents = value
-
     # ---- 核心方法 ----
 
     def compute_basic_properties(self) -> None:
@@ -325,83 +260,6 @@ class Orbit:
             self.metadata["description"] = "Periodic orbit"
         else:
             self.metadata["description"] = "Non-periodic trajectory"
-
-    def compute_monodromy_matrix(self, dynamics: CR3BP_Dynamics) -> npt.NDArray[np.floating]:
-        """计算轨道的单值矩阵（Monodromy Matrix）
-
-        Args:
-            dynamics: CR3BP_Dynamics 对象
-
-        Returns:
-            单值矩阵 (6, 6)
-
-        Raises:
-            ValueError: 轨道周期未知
-        """
-        if self._period is None:
-            raise ValueError("无法计算单值矩阵：轨道周期未知")
-
-        initial_state = self.states[0]
-        self._monodromy_matrix = dynamics.compute_state_transition_matrix(
-            initial_state, self._period
-        )
-        self._eigenvalues = np.linalg.eigvals(self._monodromy_matrix)
-        return self._monodromy_matrix
-
-    def compute_stability(self, dynamics: CR3BP_Dynamics) -> dict[str, Any]:
-        """计算轨道的稳定性指标
-
-        Args:
-            dynamics: CR3BP_Dynamics 对象
-
-        Returns:
-            稳定性分析结果字典
-        """
-        if self._period is None or self._period <= 0:
-            return {
-                "stability": "unknown",
-                "eigenvalues": None,
-                "max_deviation": None,
-                "lyapunov_exponents": None,
-            }
-        if self._monodromy_matrix is None:
-            self.compute_monodromy_matrix(dynamics)
-
-        if self._eigenvalues is None:
-            raise ValueError("Eigenvalues not computed. Call compute_monodromy_matrix first.")
-        eigenvalues = self._eigenvalues
-        magnitudes = np.abs(eigenvalues)
-        max_deviation = np.max(np.abs(magnitudes - 1.0))
-
-        if max_deviation < 1e-6:
-            self._stability = "stable"
-        elif np.any(magnitudes > 1.0 + 1e-6):
-            self._stability = "unstable"
-        else:
-            self._stability = "marginally_stable"
-
-        self._lyapunov_exponents = np.log(magnitudes) / self._period
-
-        return {
-            "stability": self._stability,
-            "eigenvalues": eigenvalues,
-            "max_deviation": max_deviation,
-            "lyapunov_exponents": self._lyapunov_exponents,
-        }
-
-    def get_period(self) -> float | None:
-        """获取轨道周期
-
-        Returns:
-            无量纲周期；若未估计到则返回 None
-        """
-        return self._period
-
-    def get_amplitude(self, direction: str) -> float:
-        """获取指定方向的轨道振幅"""
-        if direction not in self._amplitudes:
-            raise ValueError(f"无效的方向: {direction}。可用方向: {list(self._amplitudes.keys())}")
-        return self._amplitudes[direction]
 
     def save_to_file(self, filename: str | Path) -> None:
         """将轨道数据序列化保存到 JSON 文件（v3 格式兼容）"""
@@ -512,15 +370,6 @@ class Orbit:
         new_orbit.extrema = self._extrema.copy()
         new_orbit.mean_state = self._mean_state.copy() if self._mean_state is not None else None
         new_orbit.center = self._center.copy() if self._center is not None else None
-
-        new_orbit.monodromy_matrix = (
-            self._monodromy_matrix.copy() if self._monodromy_matrix is not None else None
-        )
-        new_orbit.eigenvalues = self._eigenvalues.copy() if self._eigenvalues is not None else None
-        new_orbit.stability = self._stability
-        new_orbit.lyapunov_exponents = (
-            self._lyapunov_exponents.copy() if self._lyapunov_exponents is not None else None
-        )
 
         new_orbit.is_periodic = self._is_periodic
         new_orbit.periodicity_error = self._periodicity_error
