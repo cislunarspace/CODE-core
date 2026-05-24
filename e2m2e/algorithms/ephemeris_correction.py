@@ -60,29 +60,27 @@ def correct_ephemeris_patch_points(
             state_patch=result.state_patch,
         )
     if method == "two_level":
-        solver = TwoLevelMultipleShooting(dynamics)
-        result = solver.correct(
+        two_level_solver = TwoLevelMultipleShooting(dynamics)
+        two_level_result = two_level_solver.correct(
             t_patch=t_patch,
             state_patch=state_patch,
             max_outer_iterations=max_iter,
             position_tolerance=tolerance,
-            velocity_tolerance=(
-                velocity_tolerance if velocity_tolerance is not None else 1e-6
-            ),
+            velocity_tolerance=(velocity_tolerance if velocity_tolerance is not None else 1e-6),
             boundary="fixed_endpoints",
             verbose=verbose,
         )
         position_history, velocity_history = _split_residual_history(
-            result.residual_history
+            two_level_result.residual_history
         )
         return EphemerisCorrectionResult(
-            converged=result.converged,
-            iterations=result.outer_iterations,
-            max_residual=float(result.final_position_residual),
+            converged=two_level_result.converged,
+            iterations=two_level_result.outer_iterations,
+            max_residual=float(two_level_result.final_position_residual),
             residual_history=position_history,
-            t_patch=result.t_patch,
-            state_patch=result.state_patch,
-            velocity_residual=float(result.final_velocity_residual),
+            t_patch=two_level_result.t_patch,
+            state_patch=two_level_result.state_patch,
+            velocity_residual=float(two_level_result.final_velocity_residual),
             velocity_residual_history=velocity_history,
         )
     raise ValueError(f"unsupported correction method: {method}")

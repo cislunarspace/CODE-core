@@ -848,7 +848,10 @@ class Continuation:
             directions = dirs
             logger.info(
                 "开始生成Halo轨道族: z范围=[%.4f, %.4f], 方向=%s, 最大数量=%d",
-                z_min, z_max, "/".join(directions), n_orbits,
+                z_min,
+                z_max,
+                "/".join(directions),
+                n_orbits,
             )
         else:
             directions = ["positive", "negative"] if direction == "both" else [direction]
@@ -880,7 +883,8 @@ class Continuation:
                 z_limit = default_z_limit
 
             if verbose:
-                logger.info("--- %s延拓 (边界=%.4f) ---", "正向" if dir_name == "positive" else "反向", z_limit)
+                dir_label = "正向" if dir_name == "positive" else "反向"
+                logger.info("--- %s延拓 (边界=%.4f) ---", dir_label, z_limit)
 
             for i in range(n_orbits - 1):
                 # 全局轨道数上限：n_orbits 是总轨道数（含种子），不是每方向上限

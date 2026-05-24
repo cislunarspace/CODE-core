@@ -54,7 +54,9 @@ def _worker_init(
 
     import spiceypy
 
-    from e2m2e.core import EphemerisDynamics, EphemerisSystem, SPICEManager
+    from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
+    from e2m2e.core.ephemeris_system import EphemerisSystem
+    from e2m2e.core.spice import SPICEManager
 
     global _worker_dynamics
 

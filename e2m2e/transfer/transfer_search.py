@@ -1131,9 +1131,7 @@ class TransferSearch:
         max_pairs = 10_000_000
 
         if n_traj * n_orbit > max_pairs:
-            return self._compute_distance_series_chunked(
-                traj_positions, orbit_positions
-            )
+            return self._compute_distance_series_chunked(traj_positions, orbit_positions)
 
         diff = traj_positions[:, np.newaxis, :] - orbit_positions[np.newaxis, :, :]
         distances = np.sqrt(np.sum(diff**2, axis=2))  # (n_traj, n_orbit)

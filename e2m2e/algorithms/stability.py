@@ -67,8 +67,9 @@ class StabilityAnalysis:
             dynamics: CR3BP_Dynamics对象（可选，如果orbit关联了system则自动创建）
         """
         self.orbit = orbit
-        if dynamics is None and getattr(orbit, "system", None) is not None:
-            dynamics = CR3BP_Dynamics(orbit.system)
+        system = getattr(orbit, "system", None)
+        if dynamics is None and system is not None:
+            dynamics = CR3BP_Dynamics(system)
         self.dynamics = dynamics
 
         self.monodromy_matrix = None

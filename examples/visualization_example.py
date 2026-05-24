@@ -5,10 +5,12 @@
 这个示例展示了如何使用 e2m2e 的可视化功能。
 """
 
+from __future__ import annotations
+
 import numpy as np
+from e2m2e.visualization.plotting import OrbitVisualizer
 
 from e2m2e.core.system import CR3BP_System
-from e2m2e.visualization.plotting import OrbitVisualizer
 
 
 def basic_visualization():

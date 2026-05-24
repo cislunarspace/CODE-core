@@ -19,10 +19,10 @@ import pytest
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
 from e2m2e.transfer import DROTransferSearch
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def system() -> CR3BP_System:
@@ -84,6 +84,7 @@ def _trajectory_with_distances(d_sequence: np.ndarray, target: np.ndarray) -> np
 # _compute_distance_series
 # =============================================================================
 
+
 class TestComputeDistanceSeries:
     def test_returns_full_per_step_series_with_correct_shapes(self, searcher):
         target = np.array([1.0, 0.0, 0.0])
@@ -120,6 +121,7 @@ class TestComputeMinDistanceBackwardCompat:
 # search() 的 4 个新字段（通过 mock _forward_integrate 注入合成轨迹）
 # =============================================================================
 
+
 class TestSearchFirstFeasibilityFields:
     """通过 mock _forward_integrate 注入已知距离序列的轨迹，
     断言 search_single_departure_point 写入的 4 个字段语义正确。"""
@@ -147,15 +149,9 @@ class TestSearchFirstFeasibilityFields:
         def _no_local_min(self, traj_states, arrival_orbit):
             return False, float("inf"), -1
 
-        monkeypatch.setattr(
-            DROTransferSearch, "_forward_integrate", _fake_integrate, raising=True
-        )
-        monkeypatch.setattr(
-            DROTransferSearch, "_check_collision", _no_collision, raising=True
-        )
-        monkeypatch.setattr(
-            DROTransferSearch, "_detect_local_minimum", _no_local_min, raising=True
-        )
+        monkeypatch.setattr(DROTransferSearch, "_forward_integrate", _fake_integrate, raising=True)
+        monkeypatch.setattr(DROTransferSearch, "_check_collision", _no_collision, raising=True)
+        monkeypatch.setattr(DROTransferSearch, "_detect_local_minimum", _no_local_min, raising=True)
 
         departure_state = np.array([1.5, 0.0, 0.0, 0.0, 0.5, 0.0])
         results = searcher._search_single_departure(

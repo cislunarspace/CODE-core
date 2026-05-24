@@ -293,7 +293,7 @@ class PlotConfig(BaseModel):
         cls,
         env: Mapping[str, str] | None = None,
         **overrides,
-    ) -> "PlotConfig":
+    ) -> PlotConfig:
         """从环境变量构造 PlotConfig，overrides 优先级最高。
 
         当前支持的环境变量：
@@ -317,9 +317,7 @@ class PlotConfig(BaseModel):
             try:
                 value = float(raw)
             except ValueError:
-                logger.debug(
-                    "Invalid %s value: %r (expected float)", BODY_ICON_SCALE_ENV, raw
-                )
+                logger.debug("Invalid %s value: %r (expected float)", BODY_ICON_SCALE_ENV, raw)
             else:
                 if value > 0:
                     env_kwargs["primary_body_icon_scale"] = value

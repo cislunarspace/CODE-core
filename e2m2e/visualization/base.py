@@ -48,10 +48,11 @@ class _DepthDriverPatch(mpatches.Patch):
         )
         self._ab = annotation_box
         self._pos = position_3d
-        self._last_zorder: float = 10
+        self._last_zorder: int = 10
 
     def get_path(self) -> Any:
         from matplotlib.path import Path
+
         return Path(np.empty((0, 2)))
 
     def draw(self, renderer: Any) -> None:
@@ -60,7 +61,10 @@ class _DepthDriverPatch(mpatches.Patch):
     def do_3d_projection(self) -> float:
         from mpl_toolkits.mplot3d import proj3d
 
-        M = getattr(self.axes, "M", None)
+        axes = self.axes
+        if axes is None:
+            return 0.0
+        M = getattr(axes, "M", None)
         if M is None:
             return 0.0
 
@@ -70,7 +74,7 @@ class _DepthDriverPatch(mpatches.Patch):
         self._ab.xybox = (x2, y2)
 
         line_zs = []
-        for line in self.axes.lines:
+        for line in axes.lines:
             verts = getattr(line, "_verts3d", None)
             if verts is None or not line.get_visible():
                 continue
@@ -187,8 +191,8 @@ class OrbitVisualizer:
             return
 
         try:
-            from PIL import Image
             import numpy as np
+            from PIL import Image
 
             downloads = Path.home() / "Downloads"
             earth_path = downloads / "地球.png"
@@ -215,9 +219,7 @@ class OrbitVisualizer:
         finally:
             self._icon_loaded = True
 
-    def _get_body_icon(
-        self, is_primary: bool, size: int
-    ) -> tuple[Any | None, bool]:
+    def _get_body_icon(self, is_primary: bool, size: int) -> tuple[Any | None, bool]:
         """获取天体图标和是否可用的元组。
 
         Args:
@@ -557,9 +559,7 @@ class OrbitVisualizer:
             )
 
             if primary_ok and secondary_ok:
-                self._add_3d_billboard_icon(
-                    ax, primary_icon, (-self.mu, 0.0, 0.0), primary_name
-                )
+                self._add_3d_billboard_icon(ax, primary_icon, (-self.mu, 0.0, 0.0), primary_name)
                 self._add_3d_billboard_icon(
                     ax, secondary_icon, (1 - self.mu, 0.0, 0.0), secondary_name
                 )
@@ -608,6 +608,10 @@ class OrbitVisualizer:
                 # 成功加载图标，使用 AnnotationBbox
                 from matplotlib.offsetbox import AnnotationBbox
 
+                # 确保图标不为 None（类型断言）
+                assert primary_icon is not None
+                assert secondary_icon is not None
+
                 # 先添加图例条目（用 invisible scatter）
                 ax.scatter(
                     [],
@@ -625,7 +629,7 @@ class OrbitVisualizer:
                 # 绘制主天体（地球）图标
                 ab_primary = AnnotationBbox(
                     primary_icon,
-                    primary_pos,
+                    (float(primary_pos[0]), float(primary_pos[1])),
                     frameon=False,
                     zorder=10,
                 )
@@ -634,7 +638,7 @@ class OrbitVisualizer:
                 # 绘制次天体（月球）图标
                 ab_secondary = AnnotationBbox(
                     secondary_icon,
-                    secondary_pos,
+                    (float(secondary_pos[0]), float(secondary_pos[1])),
                     frameon=False,
                     zorder=10,
                 )
