@@ -213,6 +213,27 @@ uv run ruff format .         # 格式化
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 开启 Pull Request
 
+## 更新日志
+
+### v4.2.0
+
+- **两级多重打靶法** — `TwoLevelMultipleShooting` 求解器，支持分层约束结构
+- **Halo 轨道族生成** — `generate_halo_family` 新增 `z_range` 参数，支持按 z 轴范围筛选
+- **星历修正分发** — `ephemeris_correction_dispatch` 自动选择修正策略
+- **3D 天体图标** — 地球/月球 PNG Billboard 渲染，动态深度排序
+- **环境变量配置** — `PlotConfig.from_env()` 从环境变量加载绘图配置
+- **迭代回调** — `iterate_correction` 支持 `callback` 参数，实时监控收敛过程
+- **统一 delta-v 计算** — `compute_transfer_cost` 提取为独立接口
+- **搜索首次可行解计时** — `TransferSearch` 结果记录首次可行解时间
+- **完整 docstring 审计** — 覆盖 algorithms、core、transfer、visualization 模块
+
+### v4.1.0
+
+- 转移轨道搜索与 NLP 优化两步法
+- SRP 动力学建模
+- 稳定性分析模块
+- MBSE 需求追踪
+
 ## 引用
 
 ```bibtex
@@ -221,7 +242,7 @@ uv run ruff format .         # 格式化
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {4.1.0},
+  version = {4.2.0},
   year = {2026},
 }
 ```
