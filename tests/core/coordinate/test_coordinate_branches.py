@@ -128,16 +128,12 @@ class TestStringRepr:
 class TestTransformSecondaryFrames:
     def test_barycentric_to_secondary_via_transform(self, coord):
         state = np.array([0.5, 0.1, 0.0, 0.01, 0.02, 0.0])
-        result = coord.transform(
-            state, from_frame="barycentric", to_frame="secondary_centered"
-        )
+        result = coord.transform(state, from_frame="barycentric", to_frame="secondary_centered")
         direct = coord.barycentric_to_secondary(state)
         assert np.allclose(result, direct)
 
     def test_secondary_to_barycentric_via_transform(self, coord):
         state = np.array([0.5, 0.1, 0.0, 0.01, 0.02, 0.0])
-        result = coord.transform(
-            state, from_frame="secondary_centered", to_frame="barycentric"
-        )
+        result = coord.transform(state, from_frame="secondary_centered", to_frame="barycentric")
         direct = coord.secondary_to_barycentric(state)
         assert np.allclose(result, direct)

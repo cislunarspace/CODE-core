@@ -31,9 +31,7 @@ def _inject_eigenvalues(analysis, eigenvalues):
     analysis.eigenvectors = np.eye(len(eigenvalues), dtype=complex)
     analysis.eigenvalue_magnitudes = np.abs(analysis.eigenvalues)
     analysis.eigenvalue_arguments = np.angle(analysis.eigenvalues)
-    analysis.sorted_eigenvalues = analysis.eigenvalues[
-        np.argsort(-analysis.eigenvalue_magnitudes)
-    ]
+    analysis.sorted_eigenvalues = analysis.eigenvalues[np.argsort(-analysis.eigenvalue_magnitudes)]
     analysis.floquet_multipliers = analysis.eigenvalues.copy()
     analysis.floquet_exponents = None
     analysis.has_eigenvalues = True
@@ -201,9 +199,7 @@ class TestDetectBifurcationInFamily:
         dynamics = CR3BP_Dynamics(system)
         orbit = _make_orbit(n=5, period=2.0, system=system)
 
-        results = StabilityAnalysis.detect_bifurcation_in_family(
-            [orbit], dynamics, tolerance=1e-8
-        )
+        results = StabilityAnalysis.detect_bifurcation_in_family([orbit], dynamics, tolerance=1e-8)
         assert isinstance(results, list)
 
     def test_handles_exception_gracefully(self):
@@ -211,9 +207,7 @@ class TestDetectBifurcationInFamily:
         dynamics = CR3BP_Dynamics(system)
         orbit = _make_orbit(n=5, period=None, system=system)
 
-        results = StabilityAnalysis.detect_bifurcation_in_family(
-            [orbit], dynamics, tolerance=1e-8
-        )
+        results = StabilityAnalysis.detect_bifurcation_in_family([orbit], dynamics, tolerance=1e-8)
         assert isinstance(results, list)
 
 
@@ -223,7 +217,5 @@ class TestFindNearestBifurcation:
         dynamics = CR3BP_Dynamics(system)
         orbit = _make_orbit(n=5, period=2.0, system=system)
 
-        result = StabilityAnalysis.find_nearest_bifurcation(
-            [orbit], dynamics, tolerance=1e-8
-        )
+        result = StabilityAnalysis.find_nearest_bifurcation([orbit], dynamics, tolerance=1e-8)
         assert result is None
