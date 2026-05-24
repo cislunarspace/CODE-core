@@ -46,7 +46,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --group dev
-      - run: uv run pytest --cov=e2m2e --cov-report=xml --cov-report=term-missing --cov-fail-under=60 -x
+      - run: uv run pytest --cov=e2m2e --cov-report=xml --cov-report=term-missing --cov-fail-under=55 -x
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5

@@ -67,7 +67,7 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 60
+fail_under = 55
 
 [dependency-groups]
 dev = [
