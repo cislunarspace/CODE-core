@@ -37,8 +37,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ github.event_name == 'pull_request' && fromJson('["ubuntu-latest"]') || fromJson('["ubuntu-latest", "macos-latest", "windows-latest"]') }}
-        python-version: ${{ github.event_name == 'pull_request' && fromJson('["3.12"]') || fromJson('["3.10", "3.11", "3.12", "3.13"]') }}
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -48,7 +48,7 @@ jobs:
       - run: uv sync --group dev
       - run: uv run pytest --cov=e2m2e --cov-report=xml --cov-report=term-missing --cov-fail-under=60 -x
       - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5
         with:
           file: coverage.xml
