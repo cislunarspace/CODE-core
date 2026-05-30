@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -24,6 +25,8 @@ from .halo_initial_guess import (  # noqa: F401
 
 if TYPE_CHECKING:
     from .strategies.base import CorrectionConfig
+
+logger = logging.getLogger(__name__)
 
 
 class DifferentialCorrection:
@@ -300,9 +303,9 @@ class DifferentialCorrection:
 
         self._reset_history()
 
-        print(
-            f"Halo 轨道配置完成（固定 Z0）：z0={z0}，平动点=L{libration_point}，"
-            f"自由变量={self.free_variables}，目标约束={list(self.target_conditions.keys())}"
+        logger.debug(
+            "Halo 轨道配置完成（固定 Z0）：z0=%s，平动点=L%s，自由变量=%s，目标约束=%s",
+            z0, libration_point, self.free_variables, list(self.target_conditions.keys()),
         )
 
         return self
@@ -332,9 +335,9 @@ class DifferentialCorrection:
 
         self._reset_history()
 
-        print(
-            f"Halo 轨道配置完成（固定 X0）：x0={x0}，平动点=L{libration_point}，"
-            f"自由变量={self.free_variables}，目标约束={list(self.target_conditions.keys())}"
+        logger.debug(
+            "Halo 轨道配置完成（固定 X0）：x0=%s，平动点=L%s，自由变量=%s，目标约束=%s",
+            x0, libration_point, self.free_variables, list(self.target_conditions.keys()),
         )
 
         return self

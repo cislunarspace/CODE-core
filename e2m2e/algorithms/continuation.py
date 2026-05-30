@@ -440,6 +440,7 @@ class Continuation:
         directional_increment: bool = False,
         target_vector: int = 0,
         target_direction: int = 1,
+        progress_callback=None,
     ):
         """伪弧长延拓（对应 MATLAB ``continuation_PAL_CR3BP``，plane=13 / XZ 对称）
 
@@ -647,6 +648,9 @@ class Continuation:
                 _, dF = compute_F_and_dF_symmetric_xz_plane(X, orbit.states[0].copy(), dynamics)
                 Xdot = compute_tangent_vector(dF)
 
+                if progress_callback is not None:
+                    progress_callback(n + 1, n_orbits, orbit, direction)
+
                 if verbose and (n + 1) % 5 == 0:
                     logger.info(
                         "  轨道 %d: x0=%.4f, z0=%.4f, T=%.4f",
@@ -794,6 +798,7 @@ class Continuation:
         step_size: float = 0.001,
         z_range: tuple[float, float] | None = None,
         verbose: bool = False,
+        progress_callback=None,
     ) -> list[Orbit]:
         """生成Halo轨道族
 
@@ -942,6 +947,9 @@ class Continuation:
                         elif orbit.correction_iterations > 20:
                             current_step = max(current_step * shrink, min_step)
 
+                    if progress_callback is not None:
+                        progress_callback(i + 1, n_orbits - 1, orbit, dir_name)
+
                     if verbose and (i + 1) % 5 == 0:
                         logger.info(
                             "  第%d条: z=%.5f, x=%.6f, T=%.4f",
@@ -986,6 +994,7 @@ class Continuation:
         IterMax: int = 100,
         dc_scheme: str = "adaptive",
         directional_increment: bool = True,
+        progress_callback=None,
     ) -> OrbitFamily:
         """Halo 轨道族伪弧长延拓（对齐 ``CR3BP_MATLAB_Library``）
 
@@ -1075,6 +1084,7 @@ class Continuation:
                 directional_increment=directional_increment,
                 target_vector=tv,
                 target_direction=td,
+                progress_callback=progress_callback,
             )
             for o in sub.orbits[1:]:
                 _tag_halo_family(o)
