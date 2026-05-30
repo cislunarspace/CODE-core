@@ -8,14 +8,15 @@ from . import (
     continuation,
     differential_correction,
     ephemeris_correction,
+    halo_initial_guess,
     multiple_shooting,
     stability,
     strategies,
     two_level_multiple_shooting,
 )
 from .continuation import Continuation
-from .differential_correction import (
-    DifferentialCorrection,
+from .differential_correction import DifferentialCorrection
+from .halo_initial_guess import (
     compute_halo_coefficients,
     compute_halo_initial_guess,
     halo_third_order_approximation,
@@ -40,6 +41,7 @@ __all__ = [
     "multiple_shooting",
     "two_level_multiple_shooting",
     "strategies",
+    "halo_initial_guess",
     "compute_halo_coefficients",
     "halo_third_order_approximation",
     "compute_halo_initial_guess",

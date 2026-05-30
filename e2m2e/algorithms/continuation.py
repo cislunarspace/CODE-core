@@ -13,10 +13,7 @@ import numpy as np
 
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit, OrbitFamily
-from .differential_correction import (
-    DifferentialCorrection,
-    compute_halo_initial_guess,
-)
+from .halo_initial_guess import compute_halo_initial_guess
 
 logger = logging.getLogger(__name__)
 
