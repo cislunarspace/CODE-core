@@ -293,11 +293,12 @@ class TestNorthSouthHalo:
         assert guess_north["z0"] == 0.0
         assert guess_south["z0"] == 0.0
 
-    def test_north_south_x_positions_differ(self):
-        """北和南 Halo x0 位置应略有不同"""
+    def test_north_south_x_positions_identical(self):
+        """北和南 Halo x0 位置相同（CR3BP z→-z 对称性：仅 z0 符号不同）"""
         guess_north = compute_halo_initial_guess(mu=MU, z_amplitude=0.1, L=1, halo_class=0)
         guess_south = compute_halo_initial_guess(mu=MU, z_amplitude=0.1, L=1, halo_class=1)
-        assert guess_north["x0"] != guess_south["x0"]
+        assert guess_north["x0"] == guess_south["x0"]
+        assert guess_north["vy0"] == guess_south["vy0"]
 
     def test_north_south_third_order_z_opposite_phase(self):
         """北和南 Halo z 坐标相位应相差 π"""

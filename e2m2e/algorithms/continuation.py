@@ -1026,7 +1026,7 @@ class Continuation:
             OrbitFamily: 种子 + 各支新轨道（无重复种子）
         """
         libration_point = int(seed_orbit.parameters.get("libration_point", 1))
-        halo_class = seed_orbit.parameters.get("halo_class", 0)
+        halo_class = int(seed_orbit.parameters.get("halo_class", 0))
         seed_z_amplitude = seed_orbit.parameters.get("amplitude_z", 0.1)
 
         if direction not in ("positive", "negative", "both"):
@@ -1062,7 +1062,10 @@ class Continuation:
 
         branches: list[tuple[str, float, int, int]] = []
         if direction in ("positive", "both"):
-            branches.append(("positive", step_size, 1, 1))
+            # 北族 z0>0：增大振幅 = 增大 z0 → td=+1
+            # 南族 z0<0：增大振幅 = 减小 z0 → td=-1
+            td_pos = -1 if halo_class == 1 else 1
+            branches.append(("positive", step_size, 1, td_pos))
         if direction in ("negative", "both"):
             branches.append(("negative", step_size_negative, 0, -1))
 

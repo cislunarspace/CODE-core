@@ -784,7 +784,7 @@ class DifferentialCorrection:
 
     def _infer_family_type(self):
         """根据配置推断轨道族类型"""
-        if self.setup_type and "3D" in self.setup_type:
+        if self.setup_type and ("3D" in self.setup_type or "halo" in self.setup_type):
             return "halo"
         elif self.setup_type and "2D" in self.setup_type:
             return "lyapunov"

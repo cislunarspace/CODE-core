@@ -300,7 +300,7 @@ def halo_third_order_approximation(
     kappa2 = coeffs["kappa2"]
 
     if halo_class == 1:
-        delta = -delta
+        delta = -delta  # 轨道轨迹的 z 分量需要翻转 delta 以生成南族轨道
 
     omega_p = coeffs["omega_p"]
 
@@ -366,7 +366,7 @@ def compute_halo_initial_guess(
         mu: 质量比
         z_amplitude: Z方向振幅
         L: 拉格朗日点 (1=L1, 2=L2)
-        halo_class: 0=北Halo, 1=南Halo
+        halo_class: 0=北Halo, 1=南Halo（当前不影响返回值，z 方向由调用方处理）
 
     Returns:
         包含初始猜测参数的字典:
@@ -389,9 +389,6 @@ def compute_halo_initial_guess(
     k = coeffs["k"]
     delta = coeffs["delta"]
 
-    if halo_class == 1:
-        delta = -delta
-
     # 平动点位置
     L_position = 1 - mu - gamma  # L1: gamma>0, L2: gamma<0
 
@@ -399,7 +396,8 @@ def compute_halo_initial_guess(
     Au = np.sqrt(z_amplitude) * 0.5
     Aw = z_amplitude
 
-    # 初始 x 坐标：基于平动点位置，叠加与振幅相关的小修正
+    # CR3BP z→-z 对称性：北族 (x0,0,+z0,0,vy0,0) 与南族 (x0,0,-z0,0,vy0,0)
+    # 共享相同的 x0 和 vy0。不翻转 delta，z 方向由调用方通过 initial_z 处理。
     x0 = L_position + delta * z_amplitude * 0.05
 
     # vy0：基于频率和振幅的速度估计
