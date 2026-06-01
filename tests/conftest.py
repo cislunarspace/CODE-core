@@ -13,7 +13,6 @@ from e2m2e.core import CoordinateTransformation, CR3BP_Dynamics, CR3BP_System, O
 def pytest_configure(config):
     config.addinivalue_line("markers", "spice: marks tests requiring SPICE kernel files")
 
-
 @pytest.fixture
 def earth_moon_system():
     """Create an Earth-Moon CR3BP system"""
@@ -129,3 +128,69 @@ def dro_31_state():
 def dro_31_period():
     """3:1 DRO周期（无量纲TU）"""
     return 2.095
+
+
+# =============================================================================
+# SPICE ephemeris fixtures
+#
+# Six test files previously rebuilt this chain locally:
+#   tests/algorithms/test_multiple_shooting.py
+#   tests/algorithms/test_dro_ephemeris_correction.py
+#   tests/algorithms/test_dc_via_propagate.py
+#   tests/algorithms/test_patch_point_utils.py
+#   tests/core/coordinate/test_synodic_j2000.py
+#   tests/core/dynamics/test_ephemeris_dynamics.py
+#
+# The previous test_dc_via_propagate._make_eph_dynamics helper had a kernel
+# leak (mgr.unload_kernel never called). These fixtures fix that by going
+# through proper yield-teardown.
+# =============================================================================
+
+
+@pytest.fixture
+def spice_manager(spice_kernel_path):
+    """SPICEManager with DE440/DE438/DE435 kernel loaded; auto-unload after test."""
+    from e2m2e.core.spice import SPICEManager
+
+    mgr = SPICEManager()
+    mgr.load_kernel(spice_kernel_path)
+    yield mgr
+    mgr.unload_kernel(spice_kernel_path)
+
+
+@pytest.fixture
+def spice_eph_system(spice_manager):
+    """Earth-Moon-Sun ephemeris system in J2000, with origin at Earth."""
+    from e2m2e.core.ephemeris_system import EphemerisSystem
+
+    return EphemerisSystem(
+        bodies=["EARTH", "MOON", "SUN"],
+        spice=spice_manager,
+        origin="EARTH",
+        frame="J2000",
+    )
+
+
+@pytest.fixture
+def spice_eph_dynamics(spice_eph_system):
+    """Ephemeris N-body dynamics with relaxed rtol/atol/max_step for fast tests."""
+    from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
+
+    d = EphemerisDynamics(system=spice_eph_system)
+    # 这些宽松参数让测试中的星历传播比生产快 ~10×
+    # 生产代码（_run_propagate 等）使用更严格的 1e-12。
+    d.rtol = 1e-10
+    d.atol = 1e-10
+    d.max_step = 600.0
+    return d
+
+
+@pytest.fixture
+def spice_syn_j2000(earth_moon_system, spice_manager):
+    """Synodic ↔ J2000 coordinate transformer wired to the standard CR3BP system."""
+    from e2m2e.core import SynodicJ2000Transformation
+
+    return SynodicJ2000Transformation(
+        cr3bp_system=earth_moon_system,
+        spice=spice_manager,
+    )

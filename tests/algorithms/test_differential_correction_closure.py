@@ -11,58 +11,14 @@
   correction_termination_reason, closure_error 等属性
 """
 
-import pytest
 
-import e2m2e
 from e2m2e.algorithms import DifferentialCorrection
-from e2m2e.core import CR3BP_Dynamics, Orbit
+from e2m2e.core import Orbit
 
-# 地月系统质量比
-MU = 1.21506683e-2
-
-
-# ============================================================
-# Fixtures
-# ============================================================
-@pytest.fixture
-def earth_moon_system():
-    """创建地月CR3BP系统"""
-    system = e2m2e.core.system.CR3BP_System(mu=MU, primary="earth", secondary="moon")
-    system.compute_libration_points()
-    return system
-
-
-@pytest.fixture
-def dynamics(earth_moon_system):
-    """创建动力学对象"""
-    return CR3BP_Dynamics(earth_moon_system)
-
-
-@pytest.fixture
-def corrector_2d_fixed_x0(dynamics):
-    """创建2D对称x轴、固定x0的微分修正器"""
-    corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(x0=0.79188556619742)
-    return corrector
-
-
-@pytest.fixture
-def dro_initial_guess():
-    """DRO初始猜测轨道"""
-    x0 = 0.79188556619742
-    vy0 = 0.53682
-    guess = Orbit(
-        states=[[x0, 0.0, 0.0, 0.0, vy0, 0.0]],
-        times=[0],
-    )
-    guess.period = 3.420385
-    return guess
-
-
-@pytest.fixture
-def corrected_dro(corrector_2d_fixed_x0, dro_initial_guess):
-    """执行微分修正后的DRO轨道"""
-    return corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+# 公共 fixtures 从 tests/algorithms/conftest.py 导入：
+#   dro_dynamics, dro_corrector, dro_seed_orbit, corrected_dro
+# 种子 x0=0.79188556619742, vy0=0.573665890385585, period=6.307498 来自 conftest。
+# 注：corrected_dro 每次返回深拷贝，可安全 mutate。
 
 
 # ============================================================
@@ -119,10 +75,10 @@ class TestPeriodicFlag:
                 "Orbit with small closure_error should be periodic"
             )
 
-    def test_large_closure_error_not_periodic(self, dynamics):
+    def test_large_closure_error_not_periodic(self, dro_dynamics):
         """closure_error 较大时，轨道不应被标记为周期轨道"""
         # 创建一个 closure_error 会很大的情况
-        corrector = DifferentialCorrection(dynamics)
+        corrector = DifferentialCorrection(dro_dynamics)
         corrector.setup_2D_symmetric_x_fixed_x0(x0=0.5)
         corrector.max_iterations = 1  # 限制迭代次数
 
@@ -223,17 +179,17 @@ class TestOrbitStateIndependence:
 class TestFamilyTypeInference:
     """测试轨道家族类型推断"""
 
-    def test_2d_orbit_family_type_lyapunov(self, corrector_2d_fixed_x0, dro_initial_guess):
+    def test_2d_orbit_family_type_lyapunov(self, dro_corrector, dro_seed_orbit):
         """2D 对称轨道应该被识别为 lyapunov 类型"""
-        orbit = corrector_2d_fixed_x0.iterate_correction(dro_initial_guess)
+        orbit = dro_corrector.iterate_correction(dro_seed_orbit)
         if orbit is not None:
             assert orbit.family_type == "lyapunov", (
                 f"2D orbit should have family_type='lyapunov', got {orbit.family_type}"
             )
 
-    def test_3d_orbit_family_type_halo(self, dynamics):
+    def test_3d_orbit_family_type_halo(self, dro_dynamics):
         """3D 对称轨道应该被识别为 halo 类型"""
-        corrector = DifferentialCorrection(dynamics)
+        corrector = DifferentialCorrection(dro_dynamics)
         corrector.setup_3D_symmetric_x_fixed_x0(x0=0.8)
 
         # 创建 3D 初始猜测
@@ -286,16 +242,16 @@ class TestOrbitStateShape:
 class TestBoundaryCases:
     """测试边界情况"""
 
-    def test_very_small_step_correction(self, corrector_2d_fixed_x0, dro_initial_guess):
+    def test_very_small_step_correction(self, dro_corrector, dro_seed_orbit):
         """测试修正器处理极小步长的能力"""
-        corrector_2d_fixed_x0.max_iterations = 10
-        orbit = corrector_2d_fixed_x0.iterate_correction(dro_initial_guess, verbose=False)
+        dro_corrector.max_iterations = 10
+        orbit = dro_corrector.iterate_correction(dro_seed_orbit, verbose=False)
         # 应该成功或返回 None，不应崩溃
         assert orbit is None or isinstance(orbit, Orbit)
 
-    def test_none_result_handling(self, dynamics):
+    def test_none_result_handling(self, dro_dynamics):
         """测试修正失败返回 None 的情况"""
-        corrector = DifferentialCorrection(dynamics)
+        corrector = DifferentialCorrection(dro_dynamics)
         corrector.setup_2D_symmetric_x_fixed_x0(x0=0.3)
         corrector.max_iterations = 1
 

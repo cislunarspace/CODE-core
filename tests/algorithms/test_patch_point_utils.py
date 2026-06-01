@@ -11,7 +11,7 @@
    - 输入: Orbit 对象（需有 period 属性）、采样点数
    - 输出: (t_patch, states) 元组
 
-2. convert_to_j2000(t_patch_syn, states_syn, syn_j2000, reference_et, tu_seconds)
+2. convert_to_j2000(t_patch_syn, states_syn, spice_syn_j2000, reference_et, tu_seconds)
    - 位置: e2m2e.core.coordinate (CoordinateTransformation 的静态方法或模块级函数)
    - 功能: 将 synodic 归一化坐标批量转换为 J2000
    - 输入: synodic 时间数组、synodic 状态数组、SynodicJ2000Transformation 实例、
@@ -28,8 +28,7 @@ import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.algorithms import convert_to_j2000, sample_patch_points
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit, SynodicJ2000Transformation
-from e2m2e.core.spice import SPICEManager
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
 
 pytestmark = pytest.mark.spice
 
@@ -50,6 +49,11 @@ DRO_31_PERIOD = 2.095
 # =============================================================================
 # Fixtures
 # =============================================================================
+# 公共 SPICE fixtures 来自 tests/conftest.py:
+#   spice_manager, spice_eph_system, spice_eph_dynamics, spice_syn_j2000,
+#   reference_epoch, spice_kernel_path
+
+
 @pytest.fixture
 def cr3bp_system():
     return CR3BP_System(mu=MU, primary="earth", secondary="moon")
@@ -78,24 +82,8 @@ def dro_orbit(cr3bp_dynamics):
 
 
 @pytest.fixture
-def spice_manager(spice_kernel_path):
-    mgr = SPICEManager()
-    mgr.load_kernel(spice_kernel_path)
-    yield mgr
-    mgr.unload_kernel(spice_kernel_path)
-
-
-@pytest.fixture
 def reference_et(spice_manager, reference_epoch):
     return spice_manager.utc_to_et(reference_epoch)
-
-
-@pytest.fixture
-def syn_j2000(cr3bp_system, spice_manager):
-    return SynodicJ2000Transformation(
-        cr3bp_system=cr3bp_system,
-        spice=spice_manager,
-    )
 
 
 # =============================================================================
@@ -180,68 +168,68 @@ class TestSamplePatchPoints:
 class TestConvertToJ2000:
     """测试 convert_to_j2000 库函数"""
 
-    def test_returns_correct_shapes(self, dro_orbit, syn_j2000, reference_et):
+    def test_returns_correct_shapes(self, dro_orbit, spice_syn_j2000, reference_et):
         """返回值形状应正确"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 8)
         t_j2000, states_j2000 = convert_to_j2000(
-            t_syn, states_syn, syn_j2000, reference_et, TU_DAYS
+            t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS
         )
 
         assert t_j2000.shape == (8,)
         assert states_j2000.shape == (8, 6)
 
-    def test_time_starts_at_reference_et(self, dro_orbit, syn_j2000, reference_et):
+    def test_time_starts_at_reference_et(self, dro_orbit, spice_syn_j2000, reference_et):
         """J2000 时间起点应等于 reference_et"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
-        t_j2000, _ = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
+        t_j2000, _ = convert_to_j2000(t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS)
         assert_allclose(t_j2000[0], reference_et)
 
-    def test_time_is_monotonically_increasing(self, dro_orbit, syn_j2000, reference_et):
+    def test_time_is_monotonically_increasing(self, dro_orbit, spice_syn_j2000, reference_et):
         """J2000 时间应单调递增"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 8)
-        t_j2000, _ = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
+        t_j2000, _ = convert_to_j2000(t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS)
         assert np.all(np.diff(t_j2000) > 0)
 
-    def test_time_span_matches_period(self, dro_orbit, syn_j2000, reference_et):
+    def test_time_span_matches_period(self, dro_orbit, spice_syn_j2000, reference_et):
         """J2000 时间跨度应等于 orbit period * TU_SECONDS"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
-        t_j2000, _ = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
+        t_j2000, _ = convert_to_j2000(t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS)
         expected_span = dro_orbit.period * TU_SECONDS
         actual_span = t_j2000[-1] - t_j2000[0]
         # endpoint=False so last point is not a full period
         assert actual_span < expected_span
 
-    def test_states_are_finite(self, dro_orbit, syn_j2000, reference_et):
+    def test_states_are_finite(self, dro_orbit, spice_syn_j2000, reference_et):
         """所有 J2000 状态值应为有限数"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 8)
-        _, states_j2000 = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
+        _, states_j2000 = convert_to_j2000(t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS)
         assert np.all(np.isfinite(states_j2000))
 
-    def test_position_near_moon_distance(self, dro_orbit, syn_j2000, reference_et):
+    def test_position_near_moon_distance(self, dro_orbit, spice_syn_j2000, reference_et):
         """J2000 下的 DRO 位置应在月球距离附近 (300000-500000 km)"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
-        _, states_j2000 = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
+        _, states_j2000 = convert_to_j2000(t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS)
         for i in range(len(states_j2000)):
             r = np.linalg.norm(states_j2000[i, :3])
             assert 300000 < r < 500000, f"Patch {i} 距地球 {r:.0f} km，超出合理范围"
 
-    def test_velocity_is_reasonable(self, dro_orbit, syn_j2000, reference_et):
+    def test_velocity_is_reasonable(self, dro_orbit, spice_syn_j2000, reference_et):
         """J2000 下的速度应在合理范围 (< 5 km/s)"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
-        _, states_j2000 = convert_to_j2000(t_syn, states_syn, syn_j2000, reference_et, TU_DAYS)
+        _, states_j2000 = convert_to_j2000(t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS)
         for i in range(len(states_j2000)):
             v = np.linalg.norm(states_j2000[i, 3:])
             assert v < 5.0, f"Patch {i} 速度 {v:.2f} km/s 过大"
 
-    def test_consistency_with_direct_call(self, dro_orbit, syn_j2000, reference_et):
-        """应与直接调用 syn_j2000.batch_synodic_to_j2000 结果一致"""
+    def test_consistency_with_direct_call(self, dro_orbit, spice_syn_j2000, reference_et):
+        """应与直接调用 spice_syn_j2000.batch_synodic_to_j2000 结果一致"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
 
         t_j2000, states_j2000 = convert_to_j2000(
-            t_syn, states_syn, syn_j2000, reference_et, TU_DAYS
+            t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS
         )
 
-        expected_states = syn_j2000.batch_synodic_to_j2000(
+        expected_states = spice_syn_j2000.batch_synodic_to_j2000(
             states_syn=states_syn,
             t_syn_arr=t_syn,
             et0=reference_et,
@@ -251,13 +239,13 @@ class TestConvertToJ2000:
         assert_allclose(states_j2000, expected_states, rtol=1e-12)
         assert_allclose(t_j2000, expected_times, rtol=1e-12)
 
-    def test_single_point(self, dro_orbit, syn_j2000, reference_et):
+    def test_single_point(self, dro_orbit, spice_syn_j2000, reference_et):
         """单点输入应正常工作"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 1)
         assert len(t_syn) == 1
 
         t_j2000, states_j2000 = convert_to_j2000(
-            t_syn, states_syn, syn_j2000, reference_et, TU_DAYS
+            t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS
         )
         assert t_j2000.shape == (1,)
         assert states_j2000.shape == (1, 6)

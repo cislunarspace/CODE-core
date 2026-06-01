@@ -43,9 +43,6 @@ import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.algorithms import MultipleShooting
-from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
-from e2m2e.core.ephemeris_system import EphemerisSystem
-from e2m2e.core.spice import SPICEManager
 
 pytestmark = pytest.mark.spice
 
@@ -53,33 +50,15 @@ pytestmark = pytest.mark.spice
 # =============================================================================
 # Fixtures
 # =============================================================================
-@pytest.fixture
-def spice_manager(spice_kernel_path):
-    mgr = SPICEManager()
-    mgr.load_kernel(spice_kernel_path)
-    yield mgr
-    mgr.unload_kernel(spice_kernel_path)
+# 公共 SPICE fixtures 来自 tests/conftest.py:
+#   spice_manager, spice_eph_system, spice_eph_dynamics, spice_syn_j2000,
+#   reference_epoch, spice_kernel_path
 
 
 @pytest.fixture
-def eph_system(spice_manager):
-    return EphemerisSystem(
-        bodies=["EARTH", "MOON", "SUN"],
-        spice=spice_manager,
-        origin="EARTH",
-        frame="J2000",
-    )
-
-
-@pytest.fixture
-def eph_dynamics(eph_system):
-    return EphemerisDynamics(system=eph_system)
-
-
-@pytest.fixture
-def ms_corrector(eph_dynamics):
+def ms_corrector(spice_eph_dynamics):
     """创建 MultipleShooting 实例"""
-    return MultipleShooting(dynamics=eph_dynamics)
+    return MultipleShooting(dynamics=spice_eph_dynamics)
 
 
 @pytest.fixture
@@ -120,9 +99,9 @@ def simple_patch_points(reference_et):
 class TestMultipleShootingInit:
     """测试 MultipleShooting 的创建和配置"""
 
-    def test_create_instance(self, eph_dynamics):
+    def test_create_instance(self, spice_eph_dynamics):
         """应能创建 MultipleShooting 实例"""
-        ms = MultipleShooting(dynamics=eph_dynamics)
+        ms = MultipleShooting(dynamics=spice_eph_dynamics)
         assert ms is not None
 
     def test_requires_dynamics(self):
@@ -135,9 +114,9 @@ class TestMultipleShootingInit:
         assert hasattr(ms_corrector, "correct")
         assert callable(ms_corrector.correct)
 
-    def test_dynamics_reference(self, ms_corrector, eph_dynamics):
+    def test_dynamics_reference(self, ms_corrector, spice_eph_dynamics):
         """应持有 Dynamics 引用"""
-        assert ms_corrector.dynamics is eph_dynamics
+        assert ms_corrector.dynamics is spice_eph_dynamics
 
     def test_default_parameters(self, ms_corrector):
         """应有合理的默认参数"""

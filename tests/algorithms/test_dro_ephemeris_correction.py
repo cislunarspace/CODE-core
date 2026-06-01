@@ -38,21 +38,17 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.core import (
-    CR3BP_Dynamics,
-    CR3BP_System,
-    Orbit,
-    SynodicJ2000Transformation,
-)
-from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
-from e2m2e.core.ephemeris_system import EphemerisSystem
-from e2m2e.core.spice import SPICEManager
-
-pytestmark = pytest.mark.spice
 from e2m2e.algorithms import (  # noqa: E402
     DifferentialCorrection,
     MultipleShooting,
 )
+from e2m2e.core import (
+    CR3BP_Dynamics,
+    CR3BP_System,
+    Orbit,
+)
+
+pytestmark = pytest.mark.spice
 
 # =============================================================================
 # 物理参数
@@ -71,6 +67,13 @@ POSITION_CONTINUITY_TOL = 1e-6  # km
 # =============================================================================
 # Fixtures
 # =============================================================================
+# 公共 SPICE fixtures 来自 tests/conftest.py:
+#   spice_manager, spice_eph_system, spice_eph_dynamics, spice_syn_j2000,
+#   reference_epoch, spice_kernel_path
+#
+# 本地 fixtures 仅保留算法特有的部分（DRO 种子、缓存结果等）。
+
+
 @pytest.fixture
 def cr3bp_system():
     """地月 CR3BP 系统"""
@@ -103,48 +106,9 @@ def dro_orbit(cr3bp_dynamics, cr3bp_system):
 
 
 @pytest.fixture
-def spice_manager(spice_kernel_path):
-    """加载了 DE440 的 SPICEManager"""
-    mgr = SPICEManager()
-    mgr.load_kernel(spice_kernel_path)
-    yield mgr
-    mgr.unload_kernel(spice_kernel_path)
-
-
-@pytest.fixture
 def reference_et(spice_manager, reference_epoch):
     """参考历元 ET"""
     return spice_manager.utc_to_et(reference_epoch)
-
-
-@pytest.fixture
-def eph_system(spice_manager):
-    """Earth-Moon-Sun 星历系统"""
-    return EphemerisSystem(
-        bodies=["EARTH", "MOON", "SUN"],
-        spice=spice_manager,
-        origin="EARTH",
-        frame="J2000",
-    )
-
-
-@pytest.fixture
-def eph_dynamics(eph_system):
-    """星历 N-body 动力学（使用较宽松的积分参数以加速测试）"""
-    d = EphemerisDynamics(system=eph_system)
-    d.rtol = 1e-10
-    d.atol = 1e-10
-    d.max_step = 600.0
-    return d
-
-
-@pytest.fixture
-def syn_j2000(cr3bp_system, spice_manager):
-    """synodic ↔ J2000 坐标转换器"""
-    return SynodicJ2000Transformation(
-        cr3bp_system=cr3bp_system,
-        spice=spice_manager,
-    )
 
 
 @pytest.fixture(scope="module")
@@ -156,8 +120,8 @@ def _correction_cache():
 def correction_result(
     dro_orbit,
     cr3bp_dynamics,
-    syn_j2000,
-    eph_dynamics,
+    spice_syn_j2000,
+    spice_eph_dynamics,
     reference_et,
     _correction_cache,
 ):
@@ -175,14 +139,14 @@ def correction_result(
     for i in range(1, N_PATCH_POINTS):
         state_patch_syn[i] = cr3bp_dynamics.propagate_orbit_state_at_time(dro_orbit, t_patch_syn[i])
 
-    state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
+    state_patch_j2000 = spice_syn_j2000.batch_synodic_to_j2000(
         states_syn=state_patch_syn,
         t_syn_arr=t_patch_syn,
         et0=reference_et,
     )
     t_patch_j2000 = reference_et + t_patch_syn * tc
 
-    ms = MultipleShooting(dynamics=eph_dynamics)
+    ms = MultipleShooting(dynamics=spice_eph_dynamics)
     result = ms.correct(
         t_patch=t_patch_j2000,
         state_patch=state_patch_j2000,
@@ -278,7 +242,7 @@ class TestStep2SamplePatchPoints:
 class TestStep3SynodicToJ2000:
     """测试将 DRO patch points 从 synodic 转换到 J2000"""
 
-    def test_convert_patch_points(self, dro_orbit, cr3bp_dynamics, syn_j2000, reference_et):
+    def test_convert_patch_points(self, dro_orbit, cr3bp_dynamics, spice_syn_j2000, reference_et):
         """应能将所有 patch points 转换到 J2000"""
         period = dro_orbit.period
         t_patch = np.linspace(0, period, N_PATCH_POINTS, endpoint=False)
@@ -288,7 +252,7 @@ class TestStep3SynodicToJ2000:
         for i in range(1, N_PATCH_POINTS):
             state_patch_syn[i] = cr3bp_dynamics.propagate_orbit_state_at_time(dro_orbit, t_patch[i])
 
-        state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
+        state_patch_j2000 = spice_syn_j2000.batch_synodic_to_j2000(
             states_syn=state_patch_syn,
             t_syn_arr=t_patch,
             et0=reference_et,
@@ -297,9 +261,9 @@ class TestStep3SynodicToJ2000:
         assert state_patch_j2000.shape == (N_PATCH_POINTS, 6)
         assert np.all(np.isfinite(state_patch_j2000))
 
-    def test_j2000_positions_near_moon(self, dro_orbit, cr3bp_dynamics, syn_j2000, reference_et):
+    def test_j2000_positions_near_moon(self, dro_orbit, cr3bp_dynamics, spice_syn_j2000, reference_et):
         """J2000 下的 DRO 位置应在月球距离附近"""
-        state0_j2000 = syn_j2000.synodic_to_j2000(
+        state0_j2000 = spice_syn_j2000.synodic_to_j2000(
             state_syn=dro_orbit.states[0],
             t_syn=0.0,
             et0=reference_et,
@@ -307,7 +271,7 @@ class TestStep3SynodicToJ2000:
         r = np.linalg.norm(state0_j2000[:3])
         assert 300000 < r < 500000, f"DRO距地球 {r:.0f} km，超出合理范围"
 
-    def test_j2000_time_is_et(self, syn_j2000, reference_et, dro_orbit):
+    def test_j2000_time_is_et(self, spice_syn_j2000, reference_et, dro_orbit):
         """J2000 时间应为 ET 秒"""
         tc = TU_SECONDS
         period = dro_orbit.period
@@ -328,8 +292,8 @@ class TestStep4MultipleShootingCorrection:
         self,
         dro_orbit,
         cr3bp_dynamics,
-        syn_j2000,
-        eph_dynamics,
+        spice_syn_j2000,
+        spice_eph_dynamics,
         reference_et,
     ):
         """Multiple Shooting 修正应收敛"""
@@ -344,14 +308,14 @@ class TestStep4MultipleShootingCorrection:
                 dro_orbit, t_patch_syn[i]
             )
 
-        state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
+        state_patch_j2000 = spice_syn_j2000.batch_synodic_to_j2000(
             states_syn=state_patch_syn,
             t_syn_arr=t_patch_syn,
             et0=reference_et,
         )
         t_patch_j2000 = reference_et + t_patch_syn * tc
 
-        ms = MultipleShooting(dynamics=eph_dynamics)
+        ms = MultipleShooting(dynamics=spice_eph_dynamics)
         result = ms.correct(
             t_patch=t_patch_j2000,
             state_patch=state_patch_j2000,
@@ -411,8 +375,8 @@ class TestDROEphemerisPipeline:
         self,
         cr3bp_dynamics,
         dro_orbit,
-        eph_dynamics,
-        syn_j2000,
+        spice_eph_dynamics,
+        spice_syn_j2000,
         reference_et,
         _correction_cache,
     ):
@@ -433,14 +397,14 @@ class TestDROEphemerisPipeline:
                         dro_orbit, t_patch_syn[i]
                     )
 
-                state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
+                state_patch_j2000 = spice_syn_j2000.batch_synodic_to_j2000(
                     states_syn=state_patch_syn,
                     t_syn_arr=t_patch_syn,
                     et0=reference_et,
                 )
                 t_patch_j2000 = reference_et + t_patch_syn * tc
 
-                ms = MultipleShooting(dynamics=eph_dynamics)
+                ms = MultipleShooting(dynamics=spice_eph_dynamics)
                 result = ms.correct(
                     t_patch=t_patch_j2000,
                     state_patch=state_patch_j2000,
