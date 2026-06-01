@@ -1,133 +1,111 @@
-"""测试DRO到RO转移NLP优化模块"""
+"""Tests for the DROTRONLPOptimizer module.
 
-import json
-import sys
-from pathlib import Path
+Converted from script-style (sys.path.insert, print, main()) to pytest.
+All tests in this file are pure construction / data-class tests — no
+propagation or optimization is performed, so they run without
+fixtures for the dynamics.
+"""
 
 import numpy as np
+import pytest
 
-# 添加项目根目录到路径
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from e2m2e.core.dynamics import CR3BP_Dynamics  # noqa: E402
-from e2m2e.core.orbit import Orbit  # noqa: E402
-from e2m2e.core.system import CR3BP_System  # noqa: E402
-from e2m2e.transfer.transfer_optimization import (  # noqa: E402
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System
+from e2m2e.core.orbit import Orbit
+from e2m2e.transfer.transfer_optimization import (
     DROTRONLPOptimizer,
     NLPOptimizationResult,
     NLPOptimizationVariables,
     TransferType,
 )
 
-
-def load_orbit_data(json_path: str) -> dict:
-    """加载轨道数据"""
-    with open(json_path) as f:
-        return json.load(f)
+# =============================================================================
+# Fixtures
+# =============================================================================
 
 
-def create_orbit_from_data(data: dict, system: CR3BP_System) -> Orbit:
-    """从数据创建Orbit对象"""
-    states = np.array(data["states"])
-    times = np.array(data["times"])
-    period = data.get("period", times[-1] - times[0])
-
-    return Orbit(states=states, times=times, period=period, system=system)
+@pytest.fixture
+def earth_moon_system():
+    return CR3BP_System(mu=0.012150585, primary="earth", secondary="moon")
 
 
-def test_nlp_optimizer_initialization():
-    """测试NLP优化器初始化"""
-    print("\n=== 测试NLP优化器初始化 ===")
+@pytest.fixture
+def dynamics(earth_moon_system):
+    return CR3BP_Dynamics(system=earth_moon_system)
 
-    # 创建系统
-    system = CR3BP_System(mu=0.012150585, primary="earth", secondary="moon")
-    dynamics = CR3BP_Dynamics(system=system)
 
-    # 创建虚拟轨道
-    dummy_orbit = Orbit(states=np.zeros((10, 6)), times=np.linspace(0, 10, 10), system=system)
-    dummy_orbit.period = 10.0
+@pytest.fixture
+def dummy_orbit(earth_moon_system):
+    orbit = Orbit(
+        states=np.zeros((10, 6)),
+        times=np.linspace(0, 10, 10),
+        system=earth_moon_system,
+    )
+    orbit.period = 10.0
+    return orbit
 
-    # 出发点状态
+
+@pytest.fixture
+def optimizer(dynamics, dummy_orbit):
     departure_state = np.array([0.8, 0.0, 0.0, 0.0, 0.5, 0.0])
-
-    # 创建优化器
-    optimizer = DROTRONLPOptimizer(
-        system=system,
+    return DROTRONLPOptimizer(
+        system=dynamics.system,
         dynamics=dynamics,
         departure_orbit=dummy_orbit,
         arrival_orbit=dummy_orbit,
         departure_state=departure_state,
     )
 
+
+# =============================================================================
+# Tests
+# =============================================================================
+
+
+def test_nlp_optimizer_initialization(optimizer):
     assert optimizer is not None
     assert optimizer.mu == 0.012150585
     assert optimizer.departure_state is not None
 
-    print("✓ NLP优化器初始化成功")
 
+def test_optimization_variables_roundtrip():
+    """NLPOptimizationVariables should round-trip through to_array/from_array."""
+    variables = NLPOptimizationVariables(alpha=1.2, transfer_time=15.0, t_ins=3.0)
 
-def test_optimization_variables():
-    """测试优化变量类"""
-    print("\n=== 测试优化变量类 ===")
-
-    vars = NLPOptimizationVariables(alpha=1.2, transfer_time=15.0, t_ins=3.0)
-
-    # 测试to_array
-    arr = vars.to_array()
+    arr = variables.to_array()
     assert arr.shape == (3,)
     assert np.allclose(arr, [1.2, 15.0, 3.0])
 
-    # 测试from_array
-    vars2 = NLPOptimizationVariables.from_array(arr)
-    assert np.isclose(vars2.alpha, vars.alpha)
-    assert np.isclose(vars2.transfer_time, vars.transfer_time)
-    assert np.isclose(vars2.t_ins, vars.t_ins)
-
-    print("✓ 优化变量类测试通过")
+    rebuilt = NLPOptimizationVariables.from_array(arr)
+    assert np.isclose(rebuilt.alpha, variables.alpha)
+    assert np.isclose(rebuilt.transfer_time, variables.transfer_time)
+    assert np.isclose(rebuilt.t_ins, variables.t_ins)
 
 
-def test_departure_velocity_computation():
-    """测试出发速度计算"""
-    print("\n=== 测试出发速度计算 ===")
-
-    system = CR3BP_System(mu=0.012150585, primary="earth", secondary="moon")
-    dynamics = CR3BP_Dynamics(system=system)
-
-    # 创建虚拟轨道
-    dummy_orbit = Orbit(states=np.zeros((10, 6)), times=np.linspace(0, 10, 10), system=system)
-    dummy_orbit.period = 10.0
-
+def test_departure_velocity_direction_preserved(dynamics, dummy_orbit):
+    """departure_state 沿任意方向时，出发速度应与原速度方向相同。"""
     departure_state = np.array([0.8, 0.0, 0.0, 0.0, 0.8, 0.0])
-
     optimizer = DROTRONLPOptimizer(
-        system=system,
+        system=dynamics.system,
         dynamics=dynamics,
         departure_orbit=dummy_orbit,
         arrival_orbit=dummy_orbit,
         departure_state=departure_state,
     )
 
-    # 计算不同alpha的出发速度
     for alpha in [0.8, 1.0, 1.2, 1.5]:
         v_injection = optimizer.compute_departure_velocity(departure_state, alpha)
 
-        # 验证速度方向与原始速度方向一致
         original_vel = departure_state[3:]
         original_dir = original_vel / np.linalg.norm(original_vel)
         new_dir = v_injection / np.linalg.norm(v_injection)
 
-        # 方向应该相同(可能符号相反取决于轨道类型)
         dot = np.dot(original_dir, new_dir)
+        # 方向应相同（符号可能相反，取决于轨道类型）
         assert abs(abs(dot) - 1.0) < 1e-6, f"速度方向不一致: dot={dot}"
-
-    print("✓ 出发速度计算测试通过")
 
 
 def test_nlp_result_structure():
-    """测试NLP结果结构"""
-    print("\n=== 测试NLP结果结构 ===")
-
+    """NLPOptimizationResult 应保留所有构造字段。"""
     result = NLPOptimizationResult(
         alpha=1.2,
         transfer_time=15.0,
@@ -147,25 +125,15 @@ def test_nlp_result_structure():
     assert result.delta_v2 == 0.3
     assert result.success
 
-    print("✓ NLP结果结构测试通过")
 
-
-def test_transfer_type_enum():
-    """测试转移类型枚举"""
-    print("\n=== 测试转移类型枚举 ===")
-
+def test_transfer_type_enum_values():
     assert TransferType.DIRECT.value == "direct"
     assert TransferType.LGA.value == "lga"
     assert TransferType.EXTERNAL.value == "external"
 
-    print("✓ 转移类型枚举测试通过")
 
-
-def test_module_import():
-    """测试模块导入"""
-    print("\n=== 测试模块导入 ===")
-
-    # 从主模块导入
+def test_module_exports():
+    """Top-level transfer 子包应重新导出 NLP 类。"""
     from e2m2e.transfer import (
         DROTRONLPOptimizer,
         NLPOptimizationResult,
@@ -179,22 +147,3 @@ def test_module_import():
     assert NLPOptimizationResult is not None
     assert TransferType is not None
     assert optimize_transfer is not None
-
-    print("✓ 模块导入测试通过")
-
-
-if __name__ == "__main__":
-    print("=" * 50)
-    print("DRO-RO NLP模块测试")
-    print("=" * 50)
-
-    test_nlp_optimizer_initialization()
-    test_optimization_variables()
-    test_departure_velocity_computation()
-    test_nlp_result_structure()
-    test_transfer_type_enum()
-    test_module_import()
-
-    print("\n" + "=" * 50)
-    print("所有测试通过!")
-    print("=" * 50)
