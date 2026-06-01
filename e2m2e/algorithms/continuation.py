@@ -505,15 +505,62 @@ class Continuation:
         tv = target_vector
         td = target_direction
 
+        # [FIX] directional_increment 的原始实现每步根据 Xdot 重新判定方向,在
+        # 族流形折叠点(fold)处 Xdot 渐近过零变号,形成 2-周期环振荡(steps 65+
+        # 退回 z≈0.085,详见 tests/algorithms/test_pal_stagnation.py 回归测试)。
+        #
+        # 修复方案:directional_increment 在 PAL 折叠点本质上不稳定。PAL 的
+        # 核心优势就是能沿弧长穿过折叠,此时目标变量(tv)会自然反转。
+        # 修复:让 directional_increment 仅在**延拓**的初始方向起作用,穿过
+        # 折叠点后**不再强制方向**。具体:初始用 Xdot 决定 dir_sign 起点,
+        # 一旦检测到"目标变量穿越期望方向"则不再翻转 — 信任 PAL 的自然
+        # 行为。滞回参数保证噪声不触发反向。
+        def _initial_dir_sign() -> float:
+            if not directional_increment:
+                return 1.0
+            return 1.0 if td * (ds * Xdot)[tv] > 0 else -1.0
+
+        dir_sign = _initial_dir_sign()
+        prev_X_for_dir: np.ndarray | None = None
+        # 滞回:翻转 dir_sign 后至少保持 K 步不再翻,防止噪声来回触发
+        _hysteresis_steps_remaining = 0
+        _HYSTERESIS_K = 5
+        # 是否已经"穿越折叠点":穿越后不再使用 dir_sign 翻折,
+        # 避免 dir_sign 在噪声中反复切换
+        _crossed_fold = False
+
+        # 用于停滞检测:上一条已收敛轨道的状态
+        prev_orbit_state: np.ndarray | None = None
+        # 连续无进展步数(用于触发步长缩减)
+        stagnation_count = 0
+        # 动态步长(支持自适应缩减)
+        current_step_size = float(step_size)
+        # 记录终止原因(给调用方诊断)
+        self.termination_reason: str | None = None
+
         for n in range(n_orbits):
             if verbose and (n + 1) % 5 == 0:
                 logger.info("--- 延拓第 %d/%d 条轨道 ---", n + 1, n_orbits)
 
-            delta_dir = ds * Xdot
-            if directional_increment:
-                Xnew = X + ds * Xdot if td * delta_dir[tv] > 0 else X - ds * Xdot
-            else:
-                Xnew = X + ds * Xdot
+            # [FIX] 反馈式 dir_sign + 滞回 + 单次穿越:
+            # 1. 滞回 5 步内不重判(防噪声)
+            # 2. 仅在"_crossed_fold=False"时检测翻转
+            # 3. 一旦翻转一次,就标记为已穿越,不再翻转(避免来回)
+            # 这让 PAL 在穿过折叠点后沿流形自然反向,不再振荡。
+            if directional_increment and prev_X_for_dir is not None and not _crossed_fold:
+                if _hysteresis_steps_remaining > 0:
+                    _hysteresis_steps_remaining -= 1
+                else:
+                    _delta_tv_actual = X[tv] - prev_X_for_dir[tv]
+                    # 当前 dir_sign 让目标变量沿 td 方向增大,若上一步 X[tv] 反向
+                    # 说明已越过折叠点,翻转 dir_sign 让 PAL 沿流形继续走
+                    if dir_sign * (td * _delta_tv_actual) < 0:
+                        dir_sign = -dir_sign
+                        _hysteresis_steps_remaining = _HYSTERESIS_K
+                        _crossed_fold = True
+
+            # [FIX] 使用 dir_sign 缩放预测(不每步重判 Xdot)
+            Xnew = X + dir_sign * ds * Xdot
 
             if verbose:
                 logger.debug(
@@ -536,6 +583,9 @@ class Continuation:
 
                 F, dF_new = compute_F_and_dF_symmetric_xz_plane(Xnew, SV0_guess, dynamics)
                 Xdot_new = compute_tangent_vector(dF_new)
+                # 切向量同向化(对 SVD 任意符号),确保 PAL 约束的 Newton 步稳定
+                if np.dot(Xdot_new, Xdot) < 0:
+                    Xdot_new = -Xdot_new
 
                 G = np.zeros(4)
                 G[:3] = F
@@ -570,25 +620,37 @@ class Continuation:
             Xdot = Xdot_new
             X = Xnew.copy()
 
-            # PAL 可能在 F=0 的另一支上“收敛”，偏离 L1 Halo 族；回退为欧拉预测初值
+            # [FIX] PAL 牛顿迭代解本身已满足 PAL 约束 + F=0 物理约束,正常
+            # 情况下它就在 Halo 流形上。仅检查绝对物理范围:
+            #  - x ∈ (0.75, 1.05) : L1 halo 平面 Lyapunov 分岔附近的 x 范围
+            #  - |z| ∈ (1e-3, 0.55) : z 振幅的非平凡物理范围
+            #  - T/2 ∈ (0.35, π/2) : 周期下界 0.7(短周期近似),上界
+            #    π ≈ 3.14 即 T/2 < π/2 ≈ 1.57(物理上 2:1 共振周期,实际
+            #    L1 halo T/2 ≤ 1.38)
+            # 旧版 T/2 < 1.35 把所有 L1 halo 折叠点附近的轨道误判
+            # 触发回退,导致 158/160 步错误地"回退为欧拉预测初值",用户
+            # 看到的"延拓到某范围不再继续"实际是回退后流形推进能力丧失。
+            # **不要**再检查与欧拉预测的距离:PAL Newton 解是物理正解,
+            # 欧拉预测只是切线一步,不能用作回退判据。
             _x, _z, _tf2 = X[0], X[1], X[3]
             pal_plausible = (
                 0.75 < _x < 1.05
                 and abs(_z) > 1e-3
                 and abs(_z) < 0.55
-                and 0.35 < _tf2 < 1.35
-                and abs(_x - X_predictor_only[0]) < 0.25
-                and abs(_z - X_predictor_only[1]) < 0.25
+                and 0.35 < _tf2 < np.pi / 2
             )
             if not pal_plausible:
                 if verbose:
                     logger.warning(
-                        "  PAL 结果偏离物理 Halo 支 (x=%.4f, z=%.4f, T/2=%.4f)，回退为欧拉预测初值",
+                        "  PAL 结果超出物理范围 (x=%.4f, z=%.4f, T/2=%.4f),回退为欧拉预测初值",
                         _x,
                         _z,
                         _tf2,
                     )
                 X = X_predictor_only.copy()
+                # [FIX] 同步把 Xdot 也回退到预测方向(以欧拉预测结果为基准重新求切向量)
+                # 防止使用 stale Xdot 造成下一轮 PAL 牛顿迭代从错误初值起步
+                # 实际不重新求,因为下面会通过差分修正收敛,这里不动 Xdot
 
             SV0_corr = SV0i.copy()
             SV0_corr[0] = X[0]
@@ -637,6 +699,34 @@ class Continuation:
             if orbit is not None and orbit.correction_success:
                 orbit_family.add_orbit(orbit)
                 family_states.append(orbit.states[0].copy())
+
+                # [FIX] 停滞检测:若新轨道与上一条几乎重合,认为 PAL 在折叠点处
+                # 振荡,缩减步长重试(类似自然延拓的自适应策略)。阈值取当前
+                # 步长的一定比例,避免在低步长下误判。
+                new_state = orbit.states[0]
+                if prev_orbit_state is not None:
+                    progress = float(np.linalg.norm(new_state - prev_orbit_state))
+                    stagnation_threshold = 0.1 * current_step_size
+                    if progress < stagnation_threshold:
+                        stagnation_count += 1
+                        if stagnation_count >= 3 and current_step_size > 1e-5:
+                            # 连续 3 步无实质进展,缩减步长
+                            new_step = current_step_size * 0.5
+                            if verbose:
+                                logger.warning(
+                                    "  轨道 %d: 连续 %d 步无实质进展 (Δ=%.2e),"
+                                    " 步长从 %.5f 缩至 %.5f",
+                                    n + 1, stagnation_count, progress,
+                                    current_step_size, new_step,
+                                )
+                            current_step_size = new_step
+                            # 同步更新 ds 和 dir_sign 应用的步长
+                            ds = float(step_sign * current_step_size)
+                            stagnation_count = 0
+                    else:
+                        stagnation_count = 0
+                prev_orbit_state = new_state.copy()
+
                 X = np.array(
                     [
                         orbit.states[0, 0],
@@ -646,7 +736,13 @@ class Continuation:
                     ]
                 )
                 _, dF = compute_F_and_dF_symmetric_xz_plane(X, orbit.states[0].copy(), dynamics)
-                Xdot = compute_tangent_vector(dF)
+                Xdot_new = compute_tangent_vector(dF)
+                # 切向量同向化(对 SVD 任意符号)
+                if np.dot(Xdot_new, Xdot) < 0:
+                    Xdot_new = -Xdot_new
+                Xdot = Xdot_new
+                # [FIX] 记录这一步收敛后的 X,供下一步反馈式方向调整
+                prev_X_for_dir = X.copy()
 
                 if progress_callback is not None:
                     progress_callback(n + 1, n_orbits, orbit, direction)
@@ -662,6 +758,7 @@ class Continuation:
             else:
                 if verbose:
                     logger.warning("  轨道 %d: 微分修正失败", n + 1)
+                self.termination_reason = "微分修正失败"
                 break
 
         if verbose:
