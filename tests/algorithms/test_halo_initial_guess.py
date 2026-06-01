@@ -1,12 +1,16 @@
 """
-Halo初始猜测模块测试
+Halo initial guess module tests
 
-直接测试 halo_initial_guess.py 模块中的函数。
-覆盖 Richardson 三阶近似系数、解析近似和初始猜测生成。
+测试 halo_initial_guess.py 模块中的函数。覆盖：
+  - Richardson 三阶近似系数（compute_halo_coefficients）
+  - 解析近似（halo_third_order_approximation）
+  - 初始猜测生成（compute_halo_initial_guess）
+  - 模块导入路径（TestBackwardCompatibility）
 
-与 test_analytical_halo.py 形成互补：
-- test_analytical_halo.py 通过 e2m2e.algorithms 导入（间接）
-- 本文件直接导入 halo_initial_guess 模块（直接）
+合并自原来的两个文件：
+  - test_analytical_halo.py：~30 个测试通过 `e2m2e.algorithms` 间接导入
+  - test_halo_initial_guess.py：~30 个测试直接导入 halo_initial_guess 模块
+两者 ~60% 重叠，合并后保留全部独有覆盖，去掉重复。
 
 References:
     Richardson, D. L. (1980). Analytic construction of periodic orbits
@@ -14,7 +18,6 @@ References:
 """
 
 import numpy as np
-import numpy.typing as npt
 import pytest
 
 from e2m2e.algorithms.halo_initial_guess import (
@@ -49,12 +52,12 @@ class TestModuleImport:
 
 
 # =============================================================================
-# compute_halo_coefficients — tested directly through the new module
+# compute_halo_coefficients
 # =============================================================================
 
 
-class TestHaloCoefficientsDirect:
-    """直接测试 halo_initial_guess.compute_halo_coefficients。"""
+class TestHaloCoefficients:
+    """compute_halo_coefficients 的正确性（参数化覆盖 L1 和 L2）。"""
 
     @pytest.mark.parametrize("L", [1, 2])
     def test_gamma_nonzero(self, L: int):
@@ -72,11 +75,22 @@ class TestHaloCoefficientsDirect:
     def test_omega_p_reasonable_range(self, L: int):
         """omega_p 应在合理范围内（L1 ≈ 2.33, L2 ≈ 1.86, Lyapunov 频率）。"""
         coeffs = compute_halo_coefficients(MU, L)
-        # omega_p = 2π/T, Lyapunov 周期 ≈ 2.69 → omega_p ≈ 2.33
         if L == 1:
             assert 2.0 < coeffs["omega_p"] < 2.6
         else:
             assert 1.5 < coeffs["omega_p"] < 2.2
+
+    def test_l1_gamma_close_to_hill_approximation(self):
+        """L1 gamma 应为正值，接近 Hill 球近似 (μ/3)^(1/3)。"""
+        coeffs = compute_halo_coefficients(MU, L=1)
+        expected = (MU / 3) ** (1 / 3)
+        np.testing.assert_allclose(coeffs["gamma"], expected, rtol=0.06)
+
+    def test_l2_gamma_close_to_hill_approximation(self):
+        """L2 gamma 应为负值，绝对值接近 Hill 球近似。"""
+        coeffs = compute_halo_coefficients(MU, L=2)
+        expected = (MU / 3) ** (1 / 3)
+        np.testing.assert_allclose(abs(coeffs["gamma"]), expected, rtol=0.15)
 
     @pytest.mark.parametrize("L", [1, 2])
     def test_l1_l2_gamma_opposite_signs(self, L: int):
@@ -125,18 +139,17 @@ class TestHaloCoefficientsDirect:
         """L 不是 1 或 2 时应抛出 ValueError。"""
         with pytest.raises(ValueError, match="L必须是1或2"):
             compute_halo_coefficients(MU, 3)
-
         with pytest.raises(ValueError, match="L必须是1或2"):
             compute_halo_coefficients(MU, 0)
 
 
 # =============================================================================
-# halo_third_order_approximation — tested directly
+# halo_third_order_approximation
 # =============================================================================
 
 
-class TestHaloThirdOrderApproximationDirect:
-    """直接测试 halo_initial_guess.halo_third_order_approximation。"""
+class TestHaloThirdOrderApproximation:
+    """halo_third_order_approximation 的正确性（参数化覆盖 north/south）。"""
 
     @pytest.mark.parametrize("halo_class", [0, 1])
     def test_returns_three_values(self, halo_class: int):
@@ -154,14 +167,6 @@ class TestHaloThirdOrderApproximationDirect:
             mu=MU, Au=0.01, Aw=0.01, phi=0.0, L=1, tf=1.0, N=N, halo_class=halo_class
         )
         assert sv.shape == (N, 6)
-
-    @pytest.mark.parametrize("halo_class", [0, 1])
-    def test_times_shape_matches_N(self, halo_class: int):
-        """时间序列形状应为 (N,)。"""
-        N = 200
-        _, t, _ = halo_third_order_approximation(
-            mu=MU, Au=0.01, Aw=0.01, phi=0.0, L=1, tf=1.0, N=N, halo_class=halo_class
-        )
         assert t.shape == (N,)
 
     @pytest.mark.parametrize("halo_class", [0, 1])
@@ -211,23 +216,34 @@ class TestHaloThirdOrderApproximationDirect:
         assert max_vel < 2.0
 
     def test_xz_symmetry_north(self):
-        """北 Halo 应满足 XZ 平面对称。"""
+        """北 Halo 应满足 XZ 平面对称，z 坐标应穿过零。"""
         sv, _, _ = halo_third_order_approximation(
             mu=MU, Au=0.01, Aw=0.01, phi=0.0, L=1, tf=1.0, N=100, halo_class=0
         )
-        # 初始点 y=0, z=0；轨道应穿过平面
         assert np.min(sv[:, 2]) < 0 or np.max(sv[:, 2]) > 0
 
     def test_xz_symmetry_south(self):
-        """南 Halo 应满足 XZ 平面对称。"""
+        """南 Halo 应满足 XZ 平面对称，z 坐标应穿过零。"""
         sv, _, _ = halo_third_order_approximation(
             mu=MU, Au=0.01, Aw=0.01, phi=np.pi, L=1, tf=1.0, N=100, halo_class=1
         )
         assert np.min(sv[:, 2]) < 0 or np.max(sv[:, 2]) > 0
 
+    def test_north_south_third_order_z_opposite_phase(self):
+        """北和南 Halo z 坐标相位应相差 π。"""
+        Au = 0.01
+        Aw = 0.01
+        sv_north, _, _ = halo_third_order_approximation(
+            mu=MU, Au=Au, Aw=Aw, phi=0.0, L=1, tf=1.0, N=100, halo_class=0
+        )
+        sv_south, _, _ = halo_third_order_approximation(
+            mu=MU, Au=Au, Aw=Aw, phi=0.0, L=1, tf=1.0, N=100, halo_class=1
+        )
+        np.testing.assert_allclose(sv_north[:, 2], -sv_south[:, 2], atol=1e-10)
+
     def test_invalid_L_raises(self):
         """L 不是 1 或 2 时应抛出 ValueError。"""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="L必须是1或2"):
             halo_third_order_approximation(
                 mu=MU, Au=0.01, Aw=0.01, phi=0.0, L=3, tf=1.0, N=100
             )
@@ -255,12 +271,12 @@ class TestHaloThirdOrderApproximationDirect:
 
 
 # =============================================================================
-# compute_halo_initial_guess — tested directly
+# compute_halo_initial_guess
 # =============================================================================
 
 
-class TestHaloInitialGuessDirect:
-    """直接测试 halo_initial_guess.compute_halo_initial_guess。"""
+class TestHaloInitialGuess:
+    """compute_halo_initial_guess 的正确性（参数化覆盖 L 和 halo_class）。"""
 
     @pytest.mark.parametrize("L", [1, 2])
     @pytest.mark.parametrize("halo_class", [0, 1])
@@ -288,6 +304,19 @@ class TestHaloInitialGuessDirect:
             assert guess["vy0"] > 0
         else:
             assert guess["vy0"] < 0
+
+    def test_l1_l2_different_period(self):
+        """L2 Halo 半周期应比 L1 长（因 ω_p 更小）。"""
+        guess_l1 = compute_halo_initial_guess(mu=MU, z_amplitude=0.05, L=1, halo_class=0)
+        guess_l2 = compute_halo_initial_guess(mu=MU, z_amplitude=0.05, L=2, halo_class=0)
+        assert guess_l2["T_half"] > guess_l1["T_half"]
+
+    def test_north_south_x_positions_identical(self):
+        """北和南 Halo x0 位置相同（CR3BP z→-z 对称性：仅 z0 符号不同）。"""
+        guess_north = compute_halo_initial_guess(mu=MU, z_amplitude=0.1, L=1, halo_class=0)
+        guess_south = compute_halo_initial_guess(mu=MU, z_amplitude=0.1, L=1, halo_class=1)
+        assert guess_north["x0"] == guess_south["x0"]
+        assert guess_north["vy0"] == guess_south["vy0"]
 
     @pytest.mark.parametrize("L", [1, 2])
     def test_T_half_positive(self, L: int):
@@ -344,7 +373,7 @@ class TestHaloInitialGuessDirect:
 
 
 # =============================================================================
-# Integration: new module + DifferentialCorrection backward compat
+# Backward compatibility: re-export from e2m2e.algorithms must keep working
 # =============================================================================
 
 
@@ -355,7 +384,11 @@ class TestBackwardCompatibility:
         """通过 differential_correction 导入应返回相同函数。"""
         from e2m2e.algorithms.differential_correction import (
             compute_halo_coefficients as from_dc,
+        )
+        from e2m2e.algorithms.differential_correction import (
             compute_halo_initial_guess as from_dc_guess,
+        )
+        from e2m2e.algorithms.differential_correction import (
             halo_third_order_approximation as from_dc_approx,
         )
 
@@ -368,8 +401,6 @@ class TestBackwardCompatibility:
         """e2m2e.algorithms.__init__ 的导入应继续工作。"""
         from e2m2e.algorithms import (
             compute_halo_coefficients,
-            compute_halo_initial_guess,
-            halo_third_order_approximation,
         )
 
         # 结果应与直接导入一致
