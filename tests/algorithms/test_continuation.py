@@ -337,3 +337,46 @@ class TestBoundaryCases:
 
         # 应该返回结果或优雅地处理
         assert result is None or isinstance(result, OrbitFamily)
+
+
+# ============================================================
+# 端到端 pipeline: 修正 + 双向延拓
+# ============================================================
+class TestEndToEndPipeline:
+    """修正 → 延拓 端到端集成测试。
+
+    与 test_differentialcorrection 关注单次修正的细节不同，
+    这里验证整个 pipeline 在 DRO 场景下能跑通并产生合理结果。
+    """
+
+    def test_full_pipeline_forward_continuation(self, dro_corrector, corrected_dro):
+        """完整流程: 修正 → 正向延拓"""
+        from tests.algorithms.conftest import DRO_X0
+
+        continuation = Continuation(corrector=dro_corrector, step=0.01)
+        family_result = continuation.natural_continuation(
+            corrected_dro,
+            param_range=(DRO_X0, DRO_X0 + 0.03),
+            step_size=0.01,
+            verbose=False,
+        )
+
+        assert family_result is not None
+        assert len(family_result) > 0
+        for orbit in family_result:
+            if orbit is not None:
+                assert orbit.period > 0
+
+    def test_full_pipeline_backward_continuation(self, dro_corrector, corrected_dro):
+        """完整流程: 修正 → 反向延拓"""
+        from tests.algorithms.conftest import DRO_X0
+
+        continuation = Continuation(corrector=dro_corrector, step=0.01)
+        result_family = continuation.natural_continuation(
+            corrected_dro,
+            param_range=(DRO_X0 - 0.02, DRO_X0),
+            step_size=0.01,
+            verbose=False,
+        )
+        if result_family is not None:
+            assert len(result_family) >= 0

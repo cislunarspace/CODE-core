@@ -245,6 +245,28 @@ class TestCorrectedOrbit:
         state_end = corrected_dro.states[-1]
         np.testing.assert_allclose(state_start, state_end, atol=1e-6)
 
+    def test_dro_period_reasonable(self, corrected_dro):
+        """DRO 修正后周期应在合理范围内"""
+        period = corrected_dro.period
+        # DRO 周期通常在 1–15 个无量纲时间单位之间；
+        # 上限 15 留出余量以容纳不同初值收敛到不同周期轨道的场景。
+        assert 1.0 < period < 15.0, f"周期应该在合理范围内: {period}"
+
+    def test_dro_jacobi_constant(self, corrected_dro, dro_dynamics):
+        """DRO 修正后初始状态的 Jacobi 常数应在 2.5–4.0 之间"""
+        C = dro_dynamics.system.get_jacobi_constant(corrected_dro.states[0])
+        assert 2.5 < C < 4.0, f"Jacobi常数应该在合理范围内: {C}"
+
+    def test_dro_orbit_save_load(self, corrected_dro, dro_dynamics, tmp_path):
+        """DRO 轨道应能保存到 JSON 并正确加载回来（period 保持）"""
+        filepath = tmp_path / "test_dro.json"
+        corrected_dro.save_to_file(str(filepath))
+        assert filepath.exists(), "文件应该被创建"
+
+        loaded_orbit = Orbit.load_from_file(str(filepath), system=dro_dynamics.system)
+        assert loaded_orbit is not None
+        assert loaded_orbit.period == corrected_dro.period
+
 
 # ============================================================
 # 收敛历史 API 测试
