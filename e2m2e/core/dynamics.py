@@ -36,7 +36,8 @@ import numpy.typing as npt
 from scipy.integrate import solve_ivp
 
 from .potential import pseudo_potential_hessian
-from .system import CR3BP_System
+from .cr3bp_system import CR3BP_System
+from .system import System
 
 if TYPE_CHECKING:
     from .orbit import Orbit
@@ -72,7 +73,7 @@ class Dynamics:
     STM_DIMENSION = STATE_DIM + STATE_DIM * STATE_DIM  # 42 = 6 + 36
     MIN_DISTANCE = 1e-10  # km (dimensionless), prevents division by zero at singularities
 
-    def __init__(self, system: Any) -> None:
+    def __init__(self, system: System) -> None:
         """初始化动力学
 
         Args:
