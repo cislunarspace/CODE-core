@@ -9,10 +9,12 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
+from ..mbse.data.enums import ReferenceFrame, UnitSystem
 from .spice import SPICEManager
+from .system import System
 
 
-class EphemerisSystem:
+class EphemerisSystem(System):
     """星历系统，管理一组天体的星历查询。
 
     封装 SPICE 工具包，为轨道设计流程提供统一的天体数据访问层。
@@ -30,7 +32,7 @@ class EphemerisSystem:
         bodies: list[str],
         spice: SPICEManager,
         origin: str = "EARTH",
-        frame: str = "J2000",
+        frame: ReferenceFrame = ReferenceFrame.J2000,
     ) -> None:
         """初始化星历系统。
 
@@ -43,7 +45,28 @@ class EphemerisSystem:
         self.bodies = list(bodies)
         self.spice = spice
         self.origin = origin
-        self.frame = frame
+        self._frame = frame
+
+    @property
+    def frame(self) -> ReferenceFrame:
+        """星历系统的坐标框架。"""
+        return self._frame
+
+    @property
+    def unit_system(self) -> UnitSystem:
+        """星历系统使用物理单位。"""
+        return UnitSystem.SI
+
+    def gravitational_parameter(self, body: str) -> float:
+        """获取天体的引力参数 GM。
+
+        Args:
+            body: 天体名称。
+
+        Returns:
+            GM 值，单位 km³/s²。
+        """
+        return self.spice.get_gm(body)
 
     def get_body_position(self, body: str, et: float) -> npt.NDArray[np.floating]:
         """获取天体相对于原点的位置向量。
@@ -57,7 +80,7 @@ class EphemerisSystem:
         Returns:
             位置向量，形状 (3,)，单位 km。
         """
-        return self.spice.get_body_position(body, et, self.frame, self.origin)
+        return self.spice.get_body_position(body, et, self.frame.value, self.origin)
 
     def get_body_state(self, body: str, et: float) -> npt.NDArray[np.floating]:
         """获取天体相对于原点的状态向量。
@@ -71,7 +94,7 @@ class EphemerisSystem:
         Returns:
             状态向量，形状 (6,)，前 3 元素为位置 [km]，后 3 元素为速度 [km/s]。
         """
-        return self.spice.get_body_state(body, et, self.frame, self.origin)
+        return self.spice.get_body_state(body, et, self.frame.value, self.origin)
 
     def get_gm(self, body: str) -> float:
         """获取天体的引力参数 GM。
