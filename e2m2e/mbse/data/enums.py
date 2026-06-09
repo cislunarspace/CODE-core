@@ -92,3 +92,10 @@ class TransferType(enum.Enum):
     DIRECT = "direct"
     LGA = "lga"  # Lunar Gravity Assist
     EXTERNAL = "external"
+
+
+class UnitSystem(enum.Enum):
+    """单位系统"""
+
+    DIMENSIONLESS = "dimensionless"  # 无量纲单位（如 CR3BP）
+    SI = "si"  # 国际单位制（km, s, km/s）
