@@ -34,9 +34,28 @@ def correct_ephemeris_patch_points(
     n_workers: int,
     kernel_dir: str,
     velocity_tolerance: float | None = None,
+    base_bodies: list[str] | None = None,
+    lambda_steps: list[float] | None = None,
+    inner_method: str = "standard",
 ) -> EphemerisCorrectionResult:
     if method == "homotopy":
-        raise NotImplementedError("homotopy correction is not fully implemented")
+        # 延迟 import 避免与 homotopy_correction 的循环依赖
+        # （后者从本模块导入 EphemerisCorrectionResult）
+        from .homotopy_correction import correct_with_homotopy
+
+        kwargs: dict = {
+            "tolerance": tolerance,
+            "max_iter": max_iter,
+            "n_workers": n_workers,
+            "kernel_dir": kernel_dir,
+            "verbose": verbose,
+            "inner_method": inner_method,
+        }
+        if base_bodies is not None:
+            kwargs["base_bodies"] = list(base_bodies)
+        if lambda_steps is not None:
+            kwargs["lambda_steps"] = list(lambda_steps)
+        return correct_with_homotopy(dynamics, t_patch, state_patch, **kwargs)
     if method == "standard":
         solver = MultipleShooting(
             dynamics=dynamics,
