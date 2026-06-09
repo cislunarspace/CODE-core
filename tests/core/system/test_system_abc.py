@@ -107,3 +107,41 @@ class TestCR3BPSystemPreserved:
         state = [0.8, 0.0, 0.0, 0.0, 0.3, 0.0]
         c = earth_moon.get_jacobi_constant(state)
         assert isinstance(c, float)
+
+
+class TestEphemerisSystemInterface:
+    """EphemerisSystem 对 System 接口的实现。"""
+
+    def test_frame_is_j2000(self, ephemeris_system):
+        """默认 frame 应为 J2000。"""
+        assert ephemeris_system.frame == ReferenceFrame.J2000
+
+    def test_unit_system_is_si(self, ephemeris_system):
+        """星历单位系统应为 SI。"""
+        assert ephemeris_system.unit_system == UnitSystem.SI
+
+    def test_gravitational_parameter_earth(self, ephemeris_system):
+        """EARTH 引力参数应来自 SPICE。"""
+        assert ephemeris_system.gravitational_parameter("EARTH") == pytest.approx(398600.435436)
+
+    def test_gravitational_parameter_moon(self, ephemeris_system):
+        """MOON 引力参数应来自 SPICE。"""
+        assert ephemeris_system.gravitational_parameter("MOON") == pytest.approx(4902.800066)
+
+
+class TestSystemInterfaceContract:
+    """System 子类通用契约。"""
+
+    def test_cr3bp_and_ephemeris_share_interface(self, earth_moon, ephemeris_system):
+        """两个子类都应实现 frame / unit_system / gravitational_parameter。"""
+        for system in (earth_moon, ephemeris_system):
+            assert isinstance(system.frame, ReferenceFrame)
+            assert isinstance(system.unit_system, UnitSystem)
+        # CR3BP 接受 "primary"/"secondary"
+        assert isinstance(earth_moon.gravitational_parameter("primary"), float)
+        # 星历接受 SPICE 天体名
+        assert isinstance(ephemeris_system.gravitational_parameter("EARTH"), float)
+
+    def test_ephemeris_frame_value_used_by_spice(self, ephemeris_system):
+        """SPICE 字符串应来自 frame.value。"""
+        assert ephemeris_system.frame.value == "J2000"
