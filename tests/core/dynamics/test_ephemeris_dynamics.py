@@ -38,6 +38,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
+from e2m2e.mbse.data.enums import ReferenceFrame, UnitSystem
+
 from e2m2e.core import Dynamics
 from e2m2e.core.ephemeris_system import EphemerisSystem
 
@@ -95,7 +97,9 @@ class TestEphemerisSystemInit:
     def test_frame_attribute(self, spice_eph_system):
         """应有 frame 属性"""
         assert hasattr(spice_eph_system, "frame")
-        assert spice_eph_system.frame == "J2000"
+        from e2m2e.mbse.data.enums import ReferenceFrame
+
+        assert spice_eph_system.frame == ReferenceFrame.J2000
 
     def test_spice_reference(self, spice_eph_system, spice_manager):
         """应持有 SPICEManager 引用"""

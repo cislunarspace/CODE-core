@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 
-from ..core.system import CR3BP_System
+from ..core.cr3bp_system import CR3BP_System
 from .base import OrbitVisualizer
 from .config import PlotConfig
 

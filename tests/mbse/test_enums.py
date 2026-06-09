@@ -47,7 +47,7 @@ class TestReferenceFrame:
 
     def test_reference_frame_has_j2000(self):
         """ReferenceFrame 应有 J2000 成员。"""
-        assert ReferenceFrame.J2000.value == "j2000"
+        assert ReferenceFrame.J2000.value == "J2000"
 
     def test_reference_frame_has_synodic(self):
         """ReferenceFrame 应有 SYNODIC 成员。"""

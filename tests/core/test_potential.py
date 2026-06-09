@@ -101,7 +101,7 @@ class TestRegressionStabilityIndex:
 
     @pytest.fixture
     def system(self):
-        sys = CR3BP_System.from_known_system("earth_moon")
+        sys = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
         sys.compute_libration_points()
         return sys
 
@@ -155,7 +155,7 @@ class TestRegressionJacobianA:
     def dynamics(self):
         from e2m2e.core import CR3BP_System
 
-        sys = CR3BP_System.from_known_system("earth_moon")
+        sys = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
         return CR3BP_Dynamics(system=sys)
 
     def test_jacobian_shape(self, dynamics):

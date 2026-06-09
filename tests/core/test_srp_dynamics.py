@@ -12,13 +12,13 @@ import pytest
 
 from e2m2e.core.dynamics import CR3BP_Dynamics
 from e2m2e.core.srp_dynamics import CR3BP_SRP_Dynamics
-from e2m2e.core.system import CR3BP_System
+from e2m2e.core.cr3bp_system import CR3BP_System
 
 
 @pytest.fixture
 def earth_moon_system():
     """创建地月系统"""
-    return CR3BP_System.from_known_system("earth_moon")
+    return CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
 
 
 @pytest.fixture

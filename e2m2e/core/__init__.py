@@ -27,10 +27,11 @@ from __future__ import annotations
 
 from . import coordinate, dynamics, orbit, potential, system
 from .coordinate import CoordinateTransformation, ReferenceFrame, SynodicJ2000Transformation
+from .cr3bp_system import CR3BP_System, LibrationPoint
 from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
 from .orbit import Orbit, OrbitFamily
 from .potential import pseudo_potential_hessian
-from .system import CR3BP_System, LibrationPoint
+from .system import System
 
 __all__ = [
     "coordinate",
@@ -38,6 +39,7 @@ __all__ = [
     "potential",
     "orbit",
     "system",
+    "System",
     "CR3BP_System",
     "LibrationPoint",
     "Dynamics",

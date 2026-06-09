@@ -106,6 +106,6 @@ def _make_earth_moon_system():
     mutate it freely). Session-scoped fixtures here need a fresh system they
     own; this helper is the single place that decision lives.
     """
-    from e2m2e.core.system import CR3BP_System
+    from e2m2e.core.cr3bp_system import CR3BP_System
 
     return CR3BP_System(mu=1.21506683e-2, primary="earth", secondary="moon")

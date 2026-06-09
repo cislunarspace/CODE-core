@@ -122,9 +122,9 @@ class TestStrategyIntegration:
     def test_setup_delegates_to_strategy(self):
         from e2m2e.algorithms.differential_correction import DifferentialCorrection
         from e2m2e.core.dynamics import CR3BP_Dynamics
-        from e2m2e.core.system import CR3BP_System
+        from e2m2e.core.cr3bp_system import CR3BP_System
 
-        system = CR3BP_System.from_known_system("earth_moon")
+        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
         dynamics = CR3BP_Dynamics(system)
         dc = DifferentialCorrection(dynamics)
 
@@ -137,9 +137,9 @@ class TestStrategyIntegration:
     def test_setup_halo_delegates(self):
         from e2m2e.algorithms.differential_correction import DifferentialCorrection
         from e2m2e.core.dynamics import CR3BP_Dynamics
-        from e2m2e.core.system import CR3BP_System
+        from e2m2e.core.cr3bp_system import CR3BP_System
 
-        system = CR3BP_System.from_known_system("earth_moon")
+        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
         dynamics = CR3BP_Dynamics(system)
         dc = DifferentialCorrection(dynamics)
 

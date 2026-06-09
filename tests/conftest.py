@@ -16,19 +16,19 @@ def pytest_configure(config):
 @pytest.fixture
 def earth_moon_system():
     """Create an Earth-Moon CR3BP system"""
-    return CR3BP_System.from_known_system("earth_moon")
+    return CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
 
 
 @pytest.fixture
 def sun_earth_system():
     """Create a Sun-Earth CR3BP system"""
-    return CR3BP_System.from_known_system("sun_earth")
+    return CR3BP_System(mu=3.0039e-06, primary="Sun", secondary="Earth")._with_default_scales()
 
 
 @pytest.fixture
 def sun_jupiter_system():
     """Create a Sun-Jupiter CR3BP system"""
-    return CR3BP_System.from_known_system("sun_jupiter")
+    return CR3BP_System(mu=0.0009535, primary="Sun", secondary="Jupiter")._with_default_scales()
 
 
 @pytest.fixture
@@ -163,11 +163,13 @@ def spice_eph_system(spice_manager):
     """Earth-Moon-Sun ephemeris system in J2000, with origin at Earth."""
     from e2m2e.core.ephemeris_system import EphemerisSystem
 
+    from e2m2e.mbse.data.enums import ReferenceFrame
+
     return EphemerisSystem(
         bodies=["EARTH", "MOON", "SUN"],
         spice=spice_manager,
         origin="EARTH",
-        frame="J2000",
+        frame=ReferenceFrame.J2000,
     )
 
 

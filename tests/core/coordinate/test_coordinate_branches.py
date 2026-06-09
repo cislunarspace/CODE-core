@@ -4,12 +4,12 @@ import numpy as np
 import pytest
 
 from e2m2e.core.coordinate import CoordinateTransformation, ReferenceFrame
-from e2m2e.core.system import CR3BP_System
+from e2m2e.core.cr3bp_system import CR3BP_System
 
 
 @pytest.fixture
 def system():
-    return CR3BP_System.from_known_system("earth_moon")
+    return CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
 
 
 @pytest.fixture

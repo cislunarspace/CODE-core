@@ -75,7 +75,7 @@ class ReferenceFrame(enum.Enum):
     PRIMARY_CENTERED = "primary_centered"  # 主天体中心坐标系
     SECONDARY_CENTERED = "secondary_centered"  # 次天体中心坐标系
     SYNODIC = "synodic"  # 会合坐标系
-    J2000 = "j2000"  # J2000 惯性系
+    J2000 = "J2000"  # J2000 惯性系
 
 
 class ProjectionPlane(enum.Enum):

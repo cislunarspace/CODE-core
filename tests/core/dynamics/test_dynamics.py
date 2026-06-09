@@ -17,7 +17,7 @@ from e2m2e.core import CR3BP_Dynamics, CR3BP_System
 @pytest.fixture
 def earth_moon_system():
     """Create Earth-Moon CR3BP system."""
-    return CR3BP_System.from_known_system("earth_moon")
+    return CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
 
 
 @pytest.fixture

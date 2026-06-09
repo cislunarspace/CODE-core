@@ -58,7 +58,7 @@ class _AggregatePbarWithSlot:
 
 from ..core.dynamics import CR3BP_Dynamics  # noqa: E402
 from ..core.orbit import Orbit  # noqa: E402
-from ..core.system import CR3BP_System  # noqa: E402
+from ..core.cr3bp_system import CR3BP_System  # noqa: E402
 from .search_config import SearchConfig  # noqa: E402
 from .transfer_optimization import (  # noqa: E402
     DROTRONLPOptimizer,

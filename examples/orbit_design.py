@@ -20,7 +20,7 @@ def design_lyapunov_orbit():
 
     # 1. 创建系统
     print("\n1. 初始化地月系统")
-    system = CR3BP_System.from_known_system("earth_moon")
+    system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
     system.set_characteristic_scales(384400, 27.32 * 86400)
     system.compute_libration_points()
 

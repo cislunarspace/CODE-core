@@ -8,7 +8,7 @@ from io import StringIO
 import numpy as np
 import pytest
 
-from e2m2e.core.system import CR3BP_System, LibrationPoint
+from e2m2e.core.cr3bp_system import CR3BP_System, LibrationPoint
 
 
 class TestLibrationPointEnum:
@@ -79,7 +79,7 @@ class TestCR3BPMuValidation:
 
 
 class TestCR3BPSystemKnownSystems:
-    """Tests for from_known_system class method"""
+    """Tests for CR3BP_System direct constructor + _with_default_scales helper."""
 
     def test_earth_moon_system(self, earth_moon_system):
         """Test Earth-Moon system creation"""
@@ -89,12 +89,12 @@ class TestCR3BPSystemKnownSystems:
 
     def test_earth_moon_mu_full_precision(self):
         """Earth-Moon mu must match Cui et al. 2025 Table 1 to 10 digits."""
-        system = CR3BP_System.from_known_system("earth_moon")
+        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
         assert system.mu == pytest.approx(1.21506683e-2, rel=0, abs=1e-12)
 
-    def test_from_known_system_auto_sets_scales(self):
-        """from_known_system should auto-initialize characteristic scales."""
-        system = CR3BP_System.from_known_system("earth_moon")
+    def test_with_default_scales_auto_sets_scales(self):
+        """_with_default_scales should auto-initialize characteristic scales."""
+        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
         assert system.is_initialized is True
         assert system.characteristic_length is not None
         assert system.characteristic_time is not None
@@ -102,12 +102,12 @@ class TestCR3BPSystemKnownSystems:
 
     def test_earth_moon_distance_matches_paper(self):
         """Earth-Moon characteristic length must be 384405 km (Cui et al. 2025)."""
-        system = CR3BP_System.from_known_system("earth_moon")
+        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
         assert system.characteristic_length == pytest.approx(384405.0, abs=1e-6)
 
     def test_earth_moon_TU_days(self):
         """Earth-Moon characteristic time must match 4.34811305 days."""
-        system = CR3BP_System.from_known_system("earth_moon")
+        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
         assert system.characteristic_time / 86400 == pytest.approx(4.34811305, abs=1e-8)
 
     def test_sun_earth_system(self, sun_earth_system):
@@ -123,15 +123,20 @@ class TestCR3BPSystemKnownSystems:
         assert sun_jupiter_system.secondary_body == "Jupiter"
 
     def test_invalid_system_name(self):
-        """Test ValueError for unknown system name"""
-        with pytest.raises(ValueError, match="未知系统"):
-            CR3BP_System.from_known_system("invalid_system")
+        """Test ValueError for unsupported body pair in _with_default_scales."""
+        with pytest.raises(ValueError, match="_with_default_scales 不支持"):
+            CR3BP_System(mu=0.01, primary="A", secondary="B")._with_default_scales()
 
     def test_known_systems_keys(self):
-        """Test KNOWN_SYSTEMS contains expected systems"""
-        assert "earth_moon" in CR3BP_System.KNOWN_SYSTEMS
-        assert "sun_earth" in CR3BP_System.KNOWN_SYSTEMS
-        assert "sun_jupiter" in CR3BP_System.KNOWN_SYSTEMS
+        """Test _with_default_scales supports expected primary/secondary pairs."""
+        for primary, secondary in [("Earth", "Moon"), ("Sun", "Earth"), ("Sun", "Jupiter")]:
+            mu = {
+                ("Earth", "Moon"): 1.21506683e-2,
+                ("Sun", "Earth"): 3.0039e-6,
+                ("Sun", "Jupiter"): 0.0009535,
+            }[(primary, secondary)]
+            sys = CR3BP_System(mu=mu, primary=primary, secondary=secondary)._with_default_scales()
+            assert sys.is_initialized is True
 
 
 class TestCR3BPSystemLibrationPoints:
@@ -468,12 +473,12 @@ class TestInfoDifferentSystems:
     """Tests for info() output across different systems"""
 
     def test_sun_earth_system(self):
-        system = CR3BP_System.from_known_system("sun_earth")
+        system = CR3BP_System(mu=3.0039e-06, primary="Sun", secondary="Earth")._with_default_scales()
         output = _capture_info(system)
         assert "Sun-Earth" in output
 
     def test_sun_jupiter_system(self):
-        system = CR3BP_System.from_known_system("sun_jupiter")
+        system = CR3BP_System(mu=0.0009535, primary="Sun", secondary="Jupiter")._with_default_scales()
         output = _capture_info(system)
         assert "Sun-Jupiter" in output
 

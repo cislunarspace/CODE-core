@@ -20,7 +20,7 @@ from scipy.optimize import Bounds, minimize
 
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
-from ..core.system import CR3BP_System
+from ..core.cr3bp_system import CR3BP_System
 from .cost import compute_transfer_cost
 
 try:

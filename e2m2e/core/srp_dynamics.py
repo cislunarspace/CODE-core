@@ -33,7 +33,7 @@ import numpy as np
 import numpy.typing as npt
 
 from .dynamics import CR3BP_Dynamics
-from .system import CR3BP_System
+from .cr3bp_system import CR3BP_System
 
 NUMERICAL_JACOBIAN_EPS = 1e-8
 
@@ -55,9 +55,9 @@ class CR3BP_SRP_Dynamics(CR3BP_Dynamics):
         P_srp: 太阳辐射压常数 (N/m² at 1 AU)
 
     Example:
-        >>> from e2m2e.core.system import CR3BP_System
+        >>> from e2m2e.core.cr3bp_system import CR3BP_System
         >>> from e2m2e.core.srp_dynamics import CR3BP_SRP_Dynamics
-        >>> system = CR3BP_System.from_known_system("earth_moon")
+        >>> system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
         >>> dynamics = CR3BP_SRP_Dynamics(system, area=100.0, mass=1000.0)
         >>> result = dynamics.propagate([0.8, 0, 0, 0, 0.6, 0], (0, 1))
     """

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
-from ..core.system import CR3BP_System, LibrationPoint
+from ..core.cr3bp_system import CR3BP_System, LibrationPoint
 from .config import PlotConfig
 
 logger = logging.getLogger(__name__)

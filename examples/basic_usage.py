@@ -22,7 +22,7 @@ def main():
     print("-" * 40)
 
     # 方法 1: 从已知系统创建
-    system = CR3BP_System.from_known_system("earth_moon")
+    system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
 
     # 设置特征尺度
     system.set_characteristic_scales(

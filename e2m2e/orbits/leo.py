@@ -12,7 +12,7 @@ import numpy.typing as npt
 
 from e2m2e.core import CR3BP_System
 
-_em = CR3BP_System.from_known_system("earth_moon")
+_em = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
 MU: float = _em.mu
 DU: float = _em.DU
 

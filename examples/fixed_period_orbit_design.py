@@ -29,7 +29,7 @@ def design_fixed_period_dro(target_period):
         orbit: 修正后的轨道对象，如果失败则返回 None
     """
     # 1. 创建系统
-    system = CR3BP_System.from_known_system("earth_moon")
+    system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
     system.set_characteristic_scales(384400, 27.32 * 86400)
 
     # 2. 创建动力学对象
@@ -75,7 +75,7 @@ def example_workflow():
     print("=" * 60)
 
     # 1. 系统设置
-    system = CR3BP_System.from_known_system("earth_moon")
+    system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
     system.set_characteristic_scales(384400, 27.32 * 86400)
     dynamics = CR3BP_Dynamics(system=system)
 

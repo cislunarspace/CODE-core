@@ -25,7 +25,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
-from .system import CR3BP_System
+from .cr3bp_system import CR3BP_System
 
 
 class Orbit:

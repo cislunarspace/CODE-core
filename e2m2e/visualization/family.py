@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 
-from ..core.system import CR3BP_System
+from ..core.cr3bp_system import CR3BP_System
 from .base import OrbitVisualizer
 from .config import PlotConfig
 
