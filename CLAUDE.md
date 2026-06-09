@@ -1,3 +1,7 @@
+## Communication language
+
+Use Chinese for all interactions with the user.
+
 ## Agent skills
 
 ### Issue tracker
