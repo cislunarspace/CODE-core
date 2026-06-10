@@ -18,6 +18,12 @@ class OrbitFamilyType(enum.Enum):
     BUTTERFLY = "butterfly"
     DRAGONFLY = "dragonfly"
     DRO = "dro"  # Distant Retrograde Orbit
+    DPO = "dpo"  # Direct Prograde Orbit (待实现)
+    SPO = "spo"  # Short Period Orbit (待实现)
+    LPO = "lpo"  # Long Period Orbit (待实现)
+    TADPOLE = "tadpole"  # 待实现
+    HORSESHOE = "horseshoe"  # 待实现
+    RO = "ro"  # Resonant Orbit
     NRHO = "nrho"  # Near Rectilinear Halo Orbit
     LYO = "lyo"  # Lissajous Orbit
 
