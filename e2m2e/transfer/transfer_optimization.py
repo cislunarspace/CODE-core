@@ -21,6 +21,7 @@ from scipy.optimize import Bounds, minimize
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
 from ..core.cr3bp_system import CR3BP_System
+from ..mbse.data.enums import TransferType
 from .cost import compute_transfer_cost
 
 try:
@@ -34,14 +35,6 @@ except ImportError:
     COPT = None
     coptpy = None
     NlpCallbackBase = None
-
-
-class TransferType(Enum):
-    """转移轨道类型分类。"""
-
-    DIRECT = "direct"  # 直接转移：短时间，近地点变化小
-    LGA = "lga"  # 月球引力助推：中等时间，轨迹经过月球附近
-    EXTERNAL = "external"  # 外部转移：长时间，远地点超出地月系统
 
 
 @dataclass

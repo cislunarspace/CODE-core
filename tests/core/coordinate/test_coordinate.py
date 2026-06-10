@@ -18,10 +18,11 @@ class TestReferenceFrameEnum:
         assert ReferenceFrame.PRIMARY_CENTERED.value == "primary_centered"
         assert ReferenceFrame.SECONDARY_CENTERED.value == "secondary_centered"
         assert ReferenceFrame.SYNODIC.value == "synodic"
+        assert ReferenceFrame.J2000.value == "J2000"
 
     def test_reference_frame_count(self):
-        """Test there are 6 reference frames"""
-        assert len(ReferenceFrame) == 6
+        """Test there are 7 reference frames (6 CR3BP + J2000)"""
+        assert len(ReferenceFrame) == 7
 
 
 class TestCoordinateTransformationInit:

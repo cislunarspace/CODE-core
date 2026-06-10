@@ -110,20 +110,7 @@ class _DepthDriverPatch(mpatches.Patch):
         return z2
 
 
-class ProjectionPlane(Enum):
-    """轨道投影视图平面枚举。
-
-    指定绘制 2D 投影时保留哪两个坐标轴。
-
-    Attributes:
-        XY: X-Y 平面，轨道面内投影，最常用的标准视图。
-        XZ: X-Z 平面，侧视图，观察轨道的面外偏移。
-        YZ: Y-Z 平面，正视图，沿 X 轴方向观察。
-    """
-
-    XY = "xy"  # X-Y 平面（轨道面内投影）
-    XZ = "xz"  # X-Z 平面（侧视图）
-    YZ = "yz"  # Y-Z 平面（正视图）
+from ..mbse.data.enums import ProjectionPlane
 
 
 class OrbitVisualizer:

@@ -6,34 +6,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
-
 import numpy as np
 import numpy.typing as npt
 
+from ..mbse.data.enums import ReferenceFrame
 from .cr3bp_system import CR3BP_System
 
 _TU_SECONDS_DEFAULT = 4.34811305 * 86400
-
-
-class ReferenceFrame(Enum):
-    """参考系枚举
-
-    Attributes:
-        ROTATING: 旋转系
-        INERTIAL: 惯性系
-        BARYCENTRIC: 质心系
-        PRIMARY_CENTERED: 主天体中心系
-        SECONDARY_CENTERED: 次天体中心系
-        SYNODIC: 会合系（同旋转系）
-    """
-
-    ROTATING = "rotating"
-    INERTIAL = "inertial"
-    BARYCENTRIC = "barycentric"
-    PRIMARY_CENTERED = "primary_centered"
-    SECONDARY_CENTERED = "secondary_centered"
-    SYNODIC = "synodic"
 
 
 class CoordinateTransformation:
