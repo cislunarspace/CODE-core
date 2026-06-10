@@ -190,7 +190,8 @@ class TestMultipleShootingCorrection:
             max_iter=20,
         )
         assert hasattr(result, "converged")
-        assert hasattr(result, "iterations")
+        assert hasattr(result, "outer_iterations")
+        assert hasattr(result, "status")
         assert hasattr(result, "max_residual")
 
     def test_position_continuity_improved(self, ms_corrector, simple_patch_points):
@@ -304,7 +305,7 @@ class TestMultipleShootingConvergence:
             state_patch=state_patch,
             max_iter=5,
         )
-        assert result.iterations <= 5
+        assert result.outer_iterations <= 5
 
 
 # =============================================================================
@@ -352,7 +353,7 @@ class TestMultipleShootingVerbose:
         )
         assert result is not None
         assert hasattr(result, "converged")
-        assert hasattr(result, "iterations")
+        assert hasattr(result, "outer_iterations")
 
     def test_verbose_false_no_tqdm_output(self, ms_corrector, simple_patch_points, capsys):
         """verbose=False 时 stderr 不包含 tqdm 进度条输出"""
@@ -383,7 +384,7 @@ class TestMultipleShootingVerbose:
             verbose=False,
         )
         assert result.converged == result_ref.converged
-        assert result.iterations == result_ref.iterations
+        assert result.outer_iterations == result_ref.outer_iterations
         np.testing.assert_allclose(result.max_residual, result_ref.max_residual, rtol=1e-12)
         if result.residual_history and result_ref.residual_history:
             np.testing.assert_allclose(
@@ -423,7 +424,7 @@ class TestMultipleShootingVerbose:
                 verbose=True,
             )
 
-            n_calls = result.iterations if result.converged else 5
+            n_calls = result.outer_iterations if result.converged else 5
             assert (
                 mock_bar.set_postfix.call_count >= n_calls or mock_bar.update.call_count >= n_calls
             )

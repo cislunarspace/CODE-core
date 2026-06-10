@@ -29,6 +29,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithms import ephemeris_correction, homotopy_correction
+from e2m2e.mbse.data.enums import BoundaryMode
 
 
 def _fake_dynamics():
@@ -56,8 +57,8 @@ def test_two_level_inner_method_is_dispatched_to_two_level_solver():
         def correct(self, **kwargs):
             captured.append(kwargs)
             return SimpleNamespace(
-                converged=True, status="converged",
-                outer_iterations=2, level1_iterations=[1, 1],
+                converged=True,
+                outer_iterations=2, level1_iterations=[[1, 1]],
                 final_position_residual=1.0e-3,
                 final_velocity_residual=1.0e-6,
                 per_patch_position_residual=np.array([0.5e-3, 0.5e-3]),
@@ -83,7 +84,7 @@ def test_two_level_inner_method_is_dispatched_to_two_level_solver():
     # All kwargs forwarded (we use the default velocity_tolerance; just check shape)
     assert "position_tolerance" in captured[0]
     assert "velocity_tolerance" in captured[0]
-    assert captured[0]["boundary"] == "fixed_endpoints"
+    assert captured[0]["boundary"] == BoundaryMode.FIXED_ENDPOINTS
 
     # Aggregated result follows the two-level aggregation spec
     assert result.converged is True
@@ -199,7 +200,7 @@ def test_two_level_failed_final_step_aggregates_correctly():
         def correct(self, **kwargs):
             return SimpleNamespace(
                 converged=False, status="max_iterations", outer_iterations=5,
-                level1_iterations=[5, 5], final_position_residual=2.0e-3,
+                level1_iterations=[[5, 5]], final_position_residual=2.0e-3,
                 final_velocity_residual=2.0e-6,
                 per_patch_position_residual=np.array([1.0e-3, 1.0e-3]),
                 per_patch_velocity_residual=np.array([1.0e-6, 1.0e-6]),

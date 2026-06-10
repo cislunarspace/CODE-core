@@ -38,7 +38,7 @@ def test_correct_with_homotopy_returns_ephemeris_correction_result():
             captured["correct"] = kwargs
             return SimpleNamespace(
                 converged=True,
-                iterations=2,
+                outer_iterations=2,
                 max_residual=1.0e-9,
                 residual_history=[1.0e-6, 1.0e-9],
                 t_patch=t_patch + 0.1,

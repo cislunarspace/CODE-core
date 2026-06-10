@@ -103,7 +103,7 @@ def test_intermediate_steps_use_loose_tolerance_final_uses_strict():
             captured_tols.append(kwargs["tolerance"])
             self.dynamics.lambda_weight  # ensure attribute is readable
             return SimpleNamespace(
-                converged=True, iterations=1, max_residual=1e-12,
+                converged=True, outer_iterations=1, max_residual=1e-12,
                 residual_history=[1e-12],
                 t_patch=kwargs["t_patch"] + 0.1,
                 state_patch=kwargs["state_patch"] + 0.01,
@@ -135,7 +135,7 @@ def test_each_step_seeded_with_previous_step_output():
             seeded.append((np.array(kwargs["t_patch"]), np.array(kwargs["state_patch"])))
             # Return a slightly perturbed result so we can check seeding
             return SimpleNamespace(
-                converged=True, iterations=1, max_residual=1e-12,
+                converged=True, outer_iterations=1, max_residual=1e-12,
                 residual_history=[1e-12],
                 t_patch=kwargs["t_patch"] + 0.5,
                 state_patch=kwargs["state_patch"] + 0.1,
@@ -173,7 +173,7 @@ def test_failed_intermediate_step_still_seeds_next_step():
             seeded.append((np.array(kwargs["t_patch"]), np.array(kwargs["state_patch"])))
             return SimpleNamespace(
                 converged=False,  # intermediate failure
-                iterations=5,
+                outer_iterations=5,
                 max_residual=1.0e-3,
                 residual_history=[1e-2, 1e-3],
                 t_patch=kwargs["t_patch"] + 1.0,
@@ -208,7 +208,7 @@ def test_aggregated_fields_follow_spec():
 
         def correct(self, **kwargs):
             return SimpleNamespace(
-                converged=True, iterations=2, max_residual=2.0e-9,
+                converged=True, outer_iterations=2, max_residual=2.0e-9,
                 residual_history=[1.0e-7, 2.0e-9],
                 t_patch=kwargs["t_patch"] + 0.1,
                 state_patch=kwargs["state_patch"] + 0.01,
@@ -254,7 +254,7 @@ def test_final_step_nonconvergence_aggregates_to_converged_false():
 
         def correct(self, **kwargs):
             return SimpleNamespace(
-                converged=False, iterations=10, max_residual=1.0e-5,
+                converged=False, outer_iterations=10, max_residual=1.0e-5,
                 residual_history=[1.0e-3, 1.0e-5],
                 t_patch=kwargs["t_patch"] + 0.1,
                 state_patch=kwargs["state_patch"] + 0.01,
@@ -291,7 +291,7 @@ def test_inner_step_exception_raises_with_context():
             if abs(self.dynamics.lambda_weight - 0.75) < 1e-12:
                 raise RuntimeError("upstream solver failure")
             return SimpleNamespace(
-                converged=True, iterations=1, max_residual=1.0e-9,
+                converged=True, outer_iterations=1, max_residual=1.0e-9,
                 residual_history=[1.0e-9],
                 t_patch=kwargs["t_patch"] + 0.1,
                 state_patch=kwargs["state_patch"] + 0.01,
@@ -320,19 +320,19 @@ def test_residual_history_not_dropped_when_intermediate_step_fails():
     per_step_results = iter([
         # step 0: converges
         SimpleNamespace(
-            converged=True, iterations=3, max_residual=1.0e-9,
+            converged=True, outer_iterations=3, max_residual=1.0e-9,
             residual_history=[1.0e-7, 1.0e-8, 1.0e-9],
             t_patch=t_patch + 0.1, state_patch=state_patch + 0.01,
         ),
         # step 1: does NOT converge, but reports a residual history
         SimpleNamespace(
-            converged=False, iterations=5, max_residual=1.0e-4,
+            converged=False, outer_iterations=5, max_residual=1.0e-4,
             residual_history=[1.0e-3, 1.0e-4],
             t_patch=t_patch + 0.2, state_patch=state_patch + 0.02,
         ),
         # step 2: final step
         SimpleNamespace(
-            converged=True, iterations=2, max_residual=1.0e-9,
+            converged=True, outer_iterations=2, max_residual=1.0e-9,
             residual_history=[1.0e-8, 1.0e-9],
             t_patch=t_patch + 0.3, state_patch=state_patch + 0.03,
         ),

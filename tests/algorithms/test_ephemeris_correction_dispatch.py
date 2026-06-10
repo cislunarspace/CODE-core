@@ -23,7 +23,7 @@ def test_standard_method_uses_multiple_shooting_and_normalizes_result(monkeypatc
             calls["correct"] = kwargs
             return SimpleNamespace(
                 converged=True,
-                iterations=3,
+                outer_iterations=3,
                 max_residual=1.2,
                 residual_history=[3, 2, 1.2],
                 t_patch=t_patch + 1,

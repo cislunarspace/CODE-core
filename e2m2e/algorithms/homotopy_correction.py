@@ -32,6 +32,7 @@ from ..core.ephemeris_system import EphemerisSystem
 from .ephemeris_correction import EphemerisCorrectionResult
 from .multiple_shooting import MultipleShooting
 from .two_level_multiple_shooting import TwoLevelMultipleShooting
+from e2m2e.mbse.data.enums import BoundaryMode
 
 DEFAULT_LAMBDA_STEPS: tuple[float, ...] = (0.25, 0.50, 0.75, 1.00)
 
@@ -218,7 +219,7 @@ def correct_with_homotopy(
                     verbose=verbose,
                 )
                 position_histories.extend(float(v) for v in step_result.residual_history)
-                iterations_total += int(step_result.iterations)
+                iterations_total += int(step_result.outer_iterations)
                 final_converged = bool(step_result.converged)
                 final_max_residual = float(step_result.max_residual)
                 last_t = step_result.t_patch
@@ -232,7 +233,7 @@ def correct_with_homotopy(
                     max_outer_iterations=max_iter,
                     position_tolerance=step_tol,
                     velocity_tolerance=vel_tol,
-                    boundary="fixed_endpoints",
+                    boundary=BoundaryMode.FIXED_ENDPOINTS,
                     verbose=verbose,
                 )
                 pos_hist, vel_hist = _split_residual_history(step_result.residual_history)

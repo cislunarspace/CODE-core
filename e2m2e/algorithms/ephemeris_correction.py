@@ -73,7 +73,7 @@ def correct_ephemeris_patch_points(
         )
         return EphemerisCorrectionResult(
             converged=result.converged,
-            iterations=result.iterations,
+            iterations=result.outer_iterations,
             max_residual=float(result.max_residual),
             residual_history=[float(value) for value in result.residual_history],
             t_patch=result.t_patch,

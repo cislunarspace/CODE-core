@@ -324,7 +324,7 @@ class TestStep4MultipleShootingCorrection:
             tolerance=POSITION_CONTINUITY_TOL,
         )
 
-        assert result.converged, f"Multiple Shooting 未收敛，迭代 {result.iterations} 次"
+        assert result.converged, f"Multiple Shooting 未收敛，迭代 {result.outer_iterations} 次"
 
 
 # =============================================================================
@@ -366,7 +366,7 @@ class TestDROEphemerisPipeline:
         """完整流程: DRO生成 → 采样 → 坐标转换 → 星历修正 → 验证"""
         result = correction_result
 
-        assert result.converged, f"修正未收敛，迭代 {result.iterations} 次"
+        assert result.converged, f"修正未收敛，迭代 {result.outer_iterations} 次"
         assert result.max_residual < POSITION_CONTINUITY_TOL, (
             f"最大位置连续性误差 {result.max_residual:.2e} km > {POSITION_CONTINUITY_TOL} km"
         )

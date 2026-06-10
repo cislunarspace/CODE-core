@@ -10,10 +10,13 @@
 from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
 from tqdm.auto import tqdm
+
+from e2m2e.mbse.data.enums import ConvergenceState
 
 # Unicode sparkline 字符，用于在终端内渲染残差收敛曲线
 _SPARK_CHARS = " ▁▂▃▄▅▆▇█"
@@ -118,6 +121,7 @@ def _sparkline(values: list[float]) -> str:
     return "".join(_SPARK_CHARS[max(0, min(n, int((x - lo) / span * n)))] for x in logs)
 
 
+@dataclass(frozen=True)
 class MultipleShootingResult:
     """多重打靶法迭代修正的结果。
 
@@ -125,18 +129,19 @@ class MultipleShootingResult:
         t_patch: 修正后的时间节点数组，形状 (N,)
         state_patch: 修正后的状态量数组，形状 (N, 6)，每行依次为 [x, y, z, vx, vy, vz]
         converged: 是否在最大迭代次数内收敛
-        iterations: 实际迭代次数
+        status: 终止原因枚举
+        outer_iterations: 实际迭代次数
         max_residual: 最终迭代的最大残差
         residual_history: 每次迭代最大残差的历史记录
     """
 
-    def __init__(self, t_patch, state_patch, converged, iterations, max_residual, residual_history):
-        self.t_patch = t_patch
-        self.state_patch = state_patch
-        self.converged = converged
-        self.iterations = iterations
-        self.max_residual = max_residual
-        self.residual_history = residual_history
+    t_patch: np.ndarray
+    state_patch: np.ndarray
+    converged: bool
+    status: ConvergenceState
+    outer_iterations: int
+    max_residual: float
+    residual_history: list[float]
 
 
 class MultipleShooting:
@@ -422,12 +427,13 @@ class MultipleShooting:
                         seg_pbar.close()
                     pbar.close()
                     return MultipleShootingResult(
-                        t_patch=t_work,
-                        state_patch=state_work,
+                        t_patch=t_work.copy(),
+                        state_patch=state_work.copy(),
                         converged=True,
-                        iterations=iteration + 1,
+                        status=ConvergenceState.CONVERGED,
+                        outer_iterations=iteration + 1,
                         max_residual=max_res,
-                        residual_history=residual_history,
+                        residual_history=list(residual_history),
                     )
 
                 # === 第三步：构建雅可比矩阵 DF ===
@@ -496,12 +502,13 @@ class MultipleShooting:
             pbar.close()
 
         return MultipleShootingResult(
-            t_patch=t_work,
-            state_patch=state_work,
+            t_patch=t_work.copy(),
+            state_patch=state_work.copy(),
             converged=False,
-            iterations=_max_iter,
+            status=ConvergenceState.MAX_ITERATIONS,
+            outer_iterations=_max_iter,
             max_residual=residual_history[-1] if residual_history else float("inf"),
-            residual_history=residual_history,
+            residual_history=list(residual_history),
         )
 
 
