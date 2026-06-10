@@ -12,6 +12,7 @@ from .core_models import (
 )
 from .enums import (
     BifurcationLabel,
+    BoundaryMode,
     ConvergenceState,
     OrbitFamilyType,
     ProjectionPlane,
@@ -19,11 +20,13 @@ from .enums import (
     StabilityLabel,
     TransferPhase,
     TransferType,
+    TwoLevelMultipleShootingStatus,
     UnitSystem,
 )
 
 __all__ = [
     "BifurcationLabel",
+    "BoundaryMode",
     "ConvergenceState",
     "OrbitFamilyType",
     "ProjectionPlane",
@@ -31,6 +34,7 @@ __all__ = [
     "StabilityLabel",
     "TransferPhase",
     "TransferType",
+    "TwoLevelMultipleShootingStatus",
     "UnitSystem",
     "JacobiResult",
     "OrbitProperties",

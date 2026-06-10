@@ -8,6 +8,20 @@ from __future__ import annotations
 import enum
 
 
+class BoundaryMode(enum.Enum):
+    """两层多重打靶的边界条件。"""
+
+    FIXED_ENDPOINTS = "fixed_endpoints"
+
+
+class TwoLevelMultipleShootingStatus(enum.Enum):
+    """两层多重打靶的结果状态。"""
+
+    CONVERGED = "converged"
+    MAX_ITERATIONS = "max_iterations"
+    LEVEL1_FAILED = "level1_failed"
+
+
 class OrbitFamilyType(enum.Enum):
     """轨道族类型"""
 
