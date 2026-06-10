@@ -279,7 +279,6 @@ class TwoLevelMultipleShooting:
             t_candidate, state_candidate = self._run_level2(
                 t_work,
                 state_work,
-                position_residual + velocity_residual,
             )
             t_work = t_candidate
             state_work = state_candidate
@@ -433,17 +432,16 @@ class TwoLevelMultipleShooting:
         self,
         t_patch: np.ndarray,
         state_patch: np.ndarray,
-        current_residual: float,
     ) -> tuple[np.ndarray, np.ndarray]:
         """执行 Level 2：联合修正内部节点的位置和时间使速度连续。
 
         对每个内部节点构建速度连续性约束和雅可比矩阵，通过最小二乘
-        求解修正量，并使用几何衰减回溯线搜索保证残差单调下降。
+        求解修正量，并应用全步长修正。若全步长导致时间节点逆序，
+        则使用几何衰减回溯保证时间单调递增。
 
         Args:
             t_patch: 时间节点数组 (N,)
             state_patch: 当前状态量数组 (N, 6)
-            current_residual: 当前总残差（位置 + 速度），用于线搜索判定
 
         Returns:
             (修正后的时间数组, 修正后的状态数组)
@@ -507,8 +505,7 @@ class TwoLevelMultipleShooting:
                     jacobian[row : row + 3, column + 3] = time_block
 
         delta, _, _, _ = np.linalg.lstsq(jacobian, -residuals, rcond=None)
-        # 几何衰减回溯线搜索：优先取全步长，若残差不降或时间节点逆序则逐步折半，
-        # 直到找到同时满足单调时间序和残差下降的步长。
+        # 应用最小二乘修正量；优先全步长，若时间节点逆序则逐步折半。
         for damping in (1.0, 0.5, 0.25, 0.125, 0.0625):
             candidate_t = t_next.copy()
             candidate_states = states.copy()
@@ -520,16 +517,10 @@ class TwoLevelMultipleShooting:
                 candidate_t[internal_index] = (
                     candidate_t[internal_index] + damping * delta[column + 3]
                 )
-            # 修正后时间节点可能逆序，导致积分失败，需拒绝该步
+            # 时间节点必须严格递增，否则继续折半
             if np.any(np.diff(candidate_t) <= 0):
                 continue
-            position_residuals, velocity_residuals = self._compute_residuals(
-                candidate_t,
-                candidate_states,
-            )
-            candidate_residual = float(np.max(position_residuals) + np.max(velocity_residuals))
-            if candidate_residual <= current_residual:
-                return candidate_t, candidate_states
+            return candidate_t, candidate_states
         return t_next, states
 
     def _compute_residuals(
