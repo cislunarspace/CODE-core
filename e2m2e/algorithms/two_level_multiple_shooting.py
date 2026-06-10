@@ -15,6 +15,8 @@ from dataclasses import dataclass
 import numpy as np
 from tqdm.auto import tqdm
 
+from e2m2e.mbse.data.enums import BoundaryMode, TwoLevelMultipleShootingStatus
+
 
 @dataclass(frozen=True)
 class TwoLevelMultipleShootingResult:
@@ -24,22 +26,23 @@ class TwoLevelMultipleShootingResult:
         t_patch: 修正后的时间节点数组
         state_patch: 修正后的状态量数组
         converged: 是否收敛
-        status: 终止原因（converged / max_iterations / level1_failed）
+        status: 终止原因
         outer_iterations: 外层迭代次数
-        level1_iterations: 每段 Level 1 迭代次数列表
-        final_position_residual: 最终位置残差总和
-        final_velocity_residual: 最终速度残差总和
+        level1_iterations: 每段 Level 1 迭代次数列表，
+            形状为 ``list[list[int]]``（外层迭代 × 弧段）
+        final_position_residual: 最终最大位置残差
+        final_velocity_residual: 最终最大速度残差
         per_patch_position_residual: 各段位置残差
         per_patch_velocity_residual: 各段速度残差
-        residual_history: 每次外层迭代的 (位置, 速度) 残差记录
+        residual_history: 每次外层迭代的 (最大位置残差, 最大速度残差) 记录
     """
 
     t_patch: np.ndarray
     state_patch: np.ndarray
     converged: bool
-    status: str
+    status: TwoLevelMultipleShootingStatus
     outer_iterations: int
-    level1_iterations: list[int]
+    level1_iterations: list[list[int]]
     final_position_residual: float
     final_velocity_residual: float
     per_patch_position_residual: np.ndarray
@@ -186,7 +189,8 @@ class TwoLevelMultipleShooting:
         max_level1_iterations: int = 20,
         position_tolerance: float = 1e-3,
         velocity_tolerance: float = 1e-6,
-        boundary: str = "fixed_endpoints",
+        level1_position_tolerance: float | None = None,
+        boundary: BoundaryMode = BoundaryMode.FIXED_ENDPOINTS,
         verbose: bool = False,
     ) -> TwoLevelMultipleShootingResult:
         """执行两层多重打靶修正。
@@ -201,7 +205,9 @@ class TwoLevelMultipleShooting:
             max_level1_iterations: Level 1 每段最大迭代次数
             position_tolerance: 位置残差收敛容差
             velocity_tolerance: 速度残差收敛容差
-            boundary: 边界条件，目前仅支持 "fixed_endpoints"（首尾节点固定）
+            level1_position_tolerance: Level 1 内部容差。
+                若为 ``None``，则使用 ``position_tolerance``。
+            boundary: 边界条件，目前仅支持 ``BoundaryMode.FIXED_ENDPOINTS``
             verbose: 是否显示进度条
 
         Returns:
@@ -222,10 +228,12 @@ class TwoLevelMultipleShooting:
             boundary,
         )
 
+        l1_tol = position_tolerance if level1_position_tolerance is None else level1_position_tolerance
+
         t_work = t_values.copy()
         state_work = states.copy()
         residual_history: list[tuple[float, float]] = []
-        level1_iterations: list[int] = []
+        level1_iterations: list[list[int]] = []
         had_level1_failure = False
         final_position = np.full(len(t_work) - 1, np.inf)
         final_velocity = np.full(len(t_work) - 1, np.inf)
@@ -241,14 +249,14 @@ class TwoLevelMultipleShooting:
                 t_work,
                 state_work,
                 max_level1_iterations,
-                position_tolerance,
+                l1_tol,
             )
-            level1_iterations.extend(segment_iterations)
+            level1_iterations.append(segment_iterations)
             # Level 1 单段不收敛不中止，留给 Level 2 修复
             had_level1_failure = had_level1_failure or had_failure
             final_position, final_velocity = self._compute_residuals(t_work, state_work)
-            position_residual = float(np.sum(final_position))
-            velocity_residual = float(np.sum(final_velocity))
+            position_residual = float(np.max(final_position))
+            velocity_residual = float(np.max(final_velocity))
             residual_history.append((position_residual, velocity_residual))
             if self._is_converged(
                 position_residual,
@@ -260,7 +268,7 @@ class TwoLevelMultipleShooting:
                     t_work,
                     state_work,
                     True,
-                    "converged",
+                    TwoLevelMultipleShootingStatus.CONVERGED,
                     outer_index + 1,
                     level1_iterations,
                     final_position,
@@ -276,12 +284,34 @@ class TwoLevelMultipleShooting:
             t_work = t_candidate
             state_work = state_candidate
             final_position, final_velocity = self._compute_residuals(t_work, state_work)
-            residual_history[-1] = (
-                float(np.sum(final_position)),
-                float(np.sum(final_velocity)),
-            )
+            position_residual = float(np.max(final_position))
+            velocity_residual = float(np.max(final_velocity))
+            residual_history[-1] = (position_residual, velocity_residual)
 
-        status = "level1_failed" if had_level1_failure else "max_iterations"
+            # Level 2 后也检查收敛——符合 legacy early-success 语义
+            if self._is_converged(
+                position_residual,
+                velocity_residual,
+                position_tolerance,
+                velocity_tolerance,
+            ):
+                return self._result(
+                    t_work,
+                    state_work,
+                    True,
+                    TwoLevelMultipleShootingStatus.CONVERGED,
+                    outer_index + 1,
+                    level1_iterations,
+                    final_position,
+                    final_velocity,
+                    residual_history,
+                )
+
+        status = (
+            TwoLevelMultipleShootingStatus.LEVEL1_FAILED
+            if had_level1_failure
+            else TwoLevelMultipleShootingStatus.MAX_ITERATIONS
+        )
         return self._result(
             t_work,
             state_work,
@@ -302,7 +332,7 @@ class TwoLevelMultipleShooting:
         max_level1_iterations: int,
         position_tolerance: float,
         velocity_tolerance: float,
-        boundary: str,
+        boundary: BoundaryMode,
     ) -> None:
         """校验 correct 方法的所有输入参数。
 
@@ -316,8 +346,13 @@ class TwoLevelMultipleShooting:
             boundary: 边界条件类型
 
         Raises:
+            TypeError: boundary 类型错误时
             ValueError: 任何参数不合法时
         """
+        if not isinstance(boundary, BoundaryMode):
+            raise TypeError(
+                f"boundary must be a BoundaryMode enum, got {type(boundary).__name__}"
+            )
         if t_values.ndim != 1:
             raise ValueError("t_patch must be one-dimensional")
         if states.ndim != 2 or states.shape[1] != 6:
@@ -336,8 +371,8 @@ class TwoLevelMultipleShooting:
             raise ValueError("position_tolerance must be positive")
         if velocity_tolerance <= 0:
             raise ValueError("velocity_tolerance must be positive")
-        if boundary != "fixed_endpoints":
-            raise ValueError(f"unsupported boundary: {boundary}")
+        if boundary != BoundaryMode.FIXED_ENDPOINTS:
+            raise ValueError(f"unsupported boundary: {boundary.value}")
 
     def _run_level1(
         self,
@@ -492,7 +527,7 @@ class TwoLevelMultipleShooting:
                 candidate_t,
                 candidate_states,
             )
-            candidate_residual = float(np.sum(position_residuals) + np.sum(velocity_residuals))
+            candidate_residual = float(np.max(position_residuals) + np.max(velocity_residuals))
             if candidate_residual <= current_residual:
                 return candidate_t, candidate_states
         return t_next, states
@@ -535,8 +570,8 @@ class TwoLevelMultipleShooting:
         """判断两层修正是否同时收敛。
 
         Args:
-            position_residual: 总位置残差
-            velocity_residual: 总速度残差
+            position_residual: 最大位置残差
+            velocity_residual: 最大速度残差
             position_tolerance: 位置容差
             velocity_tolerance: 速度容差
 
@@ -550,9 +585,9 @@ class TwoLevelMultipleShooting:
         t_patch: np.ndarray,
         state_patch: np.ndarray,
         converged: bool,
-        status: str,
+        status: TwoLevelMultipleShootingStatus,
         outer_iterations: int,
-        level1_iterations: list[int],
+        level1_iterations: list[list[int]],
         per_patch_position_residual: np.ndarray,
         per_patch_velocity_residual: np.ndarray,
         residual_history: list[tuple[float, float]],
@@ -563,7 +598,7 @@ class TwoLevelMultipleShooting:
             t_patch: 最终时间节点数组
             state_patch: 最终状态量数组
             converged: 是否收敛
-            status: 终止原因字符串
+            status: 终止原因枚举
             outer_iterations: 外层迭代次数
             level1_iterations: 各段 Level 1 迭代次数
             per_patch_position_residual: 各段位置残差
@@ -579,9 +614,9 @@ class TwoLevelMultipleShooting:
             converged=converged,
             status=status,
             outer_iterations=outer_iterations,
-            level1_iterations=list(level1_iterations),
-            final_position_residual=float(np.sum(per_patch_position_residual)),
-            final_velocity_residual=float(np.sum(per_patch_velocity_residual)),
+            level1_iterations=[list(seg) for seg in level1_iterations],
+            final_position_residual=float(np.max(per_patch_position_residual)),
+            final_velocity_residual=float(np.max(per_patch_velocity_residual)),
             per_patch_position_residual=per_patch_position_residual.copy(),
             per_patch_velocity_residual=per_patch_velocity_residual.copy(),
             residual_history=list(residual_history),

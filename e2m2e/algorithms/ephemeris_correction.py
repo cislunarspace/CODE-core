@@ -8,6 +8,7 @@ import numpy as np
 
 from .multiple_shooting import MultipleShooting
 from .two_level_multiple_shooting import TwoLevelMultipleShooting
+from e2m2e.mbse.data.enums import BoundaryMode
 
 
 @dataclass(frozen=True)
@@ -86,7 +87,7 @@ def correct_ephemeris_patch_points(
             max_outer_iterations=max_iter,
             position_tolerance=tolerance,
             velocity_tolerance=(velocity_tolerance if velocity_tolerance is not None else 1e-6),
-            boundary="fixed_endpoints",
+            boundary=BoundaryMode.FIXED_ENDPOINTS,
             verbose=verbose,
         )
         position_history, velocity_history = _split_residual_history(

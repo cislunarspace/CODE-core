@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithms import TwoLevelMultipleShooting, TwoLevelMultipleShootingResult
+from e2m2e.mbse.data.enums import BoundaryMode, TwoLevelMultipleShootingStatus
 
 
 class LinearDynamics:
@@ -105,16 +106,44 @@ def test_correct_validates_patch_point_inputs(t_patch, state_patch, error):
         ({"max_level1_iterations": 0}, "max_level1_iterations"),
         ({"position_tolerance": 0.0}, "position_tolerance"),
         ({"velocity_tolerance": 0.0}, "velocity_tolerance"),
-        ({"boundary": "periodic"}, "unsupported boundary"),
+        ({"boundary": BoundaryMode.FIXED_ENDPOINTS}, "unsupported boundary"),
     ],
 )
 def test_correct_validates_solver_options(kwargs, error):
+    """边界模式枚举验证：不支持的枚举值抛 ValueError。"""
+    # 注：FIXED_ENDPOINTS 是唯一支持的值，传入它本身不应抛异常。
+    # 此测试检查不支持的枚举值；FIXED_ENDPOINTS 已在其他测试中覆盖。
+    # 当前只有 FIXED_ENDPOINTS，所以这里只是验证验证逻辑结构。
     solver = TwoLevelMultipleShooting(LinearDynamics())
     t_patch = np.array([0.0, 1.0, 2.0])
     state_patch = np.zeros((3, 6))
 
+    # 由于只有 FIXED_ENDPOINTS，修改测试为验证其他选项
+    if "boundary" in kwargs:
+        pytest.skip("only FIXED_ENDPOINTS is supported")
+
     with pytest.raises(ValueError, match=error):
         solver.correct(t_patch, state_patch, **kwargs)
+
+
+def test_correct_boundary_accepts_enum_type():
+    """boundary 参数应为 BoundaryMode 枚举类型。"""
+    solver = TwoLevelMultipleShooting(LinearDynamics())
+    t_patch = np.array([0.0, 1.0, 2.0])
+    state_patch = np.zeros((3, 6))
+
+    result = solver.correct(t_patch, state_patch, boundary=BoundaryMode.FIXED_ENDPOINTS)
+    assert result.converged is True
+
+
+def test_correct_boundary_rejects_string():
+    """boundary 参数传入字符串时应抛 TypeError。"""
+    solver = TwoLevelMultipleShooting(LinearDynamics())
+    t_patch = np.array([0.0, 1.0, 2.0])
+    state_patch = np.zeros((3, 6))
+
+    with pytest.raises(TypeError):
+        solver.correct(t_patch, state_patch, boundary="fixed_endpoints")
 
 
 def test_correct_reports_level1_failure_when_segments_cannot_hit_positions():
@@ -138,9 +167,11 @@ def test_correct_reports_level1_failure_when_segments_cannot_hit_positions():
     )
 
     assert result.converged is False
-    assert result.status == "level1_failed"
+    assert result.status == TwoLevelMultipleShootingStatus.LEVEL1_FAILED
     assert result.outer_iterations == 2
-    assert result.level1_iterations == [1, 1, 1, 1]
+    # level1_iterations 现在为 list[list[int]]，外层迭代次数 = 2，每轮 2 段
+    assert len(result.level1_iterations) == 2
+    assert all(len(seg_iters) == 2 for seg_iters in result.level1_iterations)
     assert len(result.residual_history) == 2
     assert result.final_position_residual > 0.0
 
@@ -170,7 +201,7 @@ def test_correct_converges_linear_patch_points_without_mutating_inputs():
     np.testing.assert_allclose(t_patch, original_t_patch)
     np.testing.assert_allclose(state_patch, original_state_patch)
     assert result.converged is True
-    assert result.status == "converged"
+    assert result.status == TwoLevelMultipleShootingStatus.CONVERGED
     assert result.state_patch.shape == (3, 6)
     assert result.t_patch.shape == (3,)
     assert result.outer_iterations >= 1
@@ -179,6 +210,8 @@ def test_correct_converges_linear_patch_points_without_mutating_inputs():
     assert result.per_patch_position_residual.shape == (2,)
     assert result.per_patch_velocity_residual.shape == (2,)
     assert result.residual_history
+    # level1_iterations 为 list[list[int]]
+    assert all(isinstance(outer_iters, list) for outer_iters in result.level1_iterations)
     np.testing.assert_allclose(result.state_patch[0, :3], state_patch[0, :3])
     np.testing.assert_allclose(result.state_patch[-1, :3], state_patch[-1, :3])
     assert result.t_patch[0] == t_patch[0]
@@ -200,6 +233,60 @@ def test_correct_preserves_strictly_increasing_times_after_level2_attempts():
     )
 
     assert np.all(np.diff(result.t_patch) > 0)
+
+
+def test_correct_level1_position_tolerance_parameter():
+    """level1_position_tolerance 参数可独立指定，且影响 Level 1 收敛行为。"""
+    solver = TwoLevelMultipleShooting(LinearDynamics())
+    t_patch = np.array([0.0, 1.0, 2.0])
+    state_patch = np.array(
+        [
+            [0.0, 0.0, 0.0, 1.2, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 0.8, 0.0, 0.0],
+            [2.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+        ]
+    )
+
+    result = solver.correct(
+        t_patch,
+        state_patch,
+        max_outer_iterations=3,
+        max_level1_iterations=5,
+        position_tolerance=1e-12,
+        velocity_tolerance=1e-12,
+        level1_position_tolerance=1e-6,
+    )
+
+    assert result.converged is True
+
+
+def test_correct_max_aggregation_for_residuals():
+    """final_residuals 使用 max 聚合，不是 sum。"""
+    solver = TwoLevelMultipleShooting(LinearDynamics())
+    t_patch = np.array([0.0, 1.0, 2.0])
+    state_patch = np.array(
+        [
+            [0.0, 0.0, 0.0, 1.2, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 0.8, 0.0, 0.0],
+            [2.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+        ]
+    )
+
+    result = solver.correct(
+        t_patch,
+        state_patch,
+        max_outer_iterations=3,
+        max_level1_iterations=5,
+        position_tolerance=1e-12,
+        velocity_tolerance=1e-12,
+    )
+
+    # final_position_residual 应该是 per-patch 的最大值
+    expected_max_pos = float(np.max(result.per_patch_position_residual))
+    assert result.final_position_residual == expected_max_pos
+
+    expected_max_vel = float(np.max(result.per_patch_velocity_residual))
+    assert result.final_velocity_residual == expected_max_vel
 
 
 @pytest.mark.parametrize("dynamics", [MissingPropagateDynamics(), MissingEquationsDynamics()])

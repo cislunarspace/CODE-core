@@ -7,6 +7,7 @@ import pytest
 
 from e2m2e.algorithms import ephemeris_correction
 from e2m2e.algorithms.ephemeris_correction import correct_ephemeris_patch_points
+from e2m2e.mbse.data.enums import BoundaryMode
 
 
 def test_standard_method_uses_multiple_shooting_and_normalizes_result(monkeypatch):
@@ -106,7 +107,7 @@ def test_two_level_method_uses_two_level_solver_and_preserves_velocity_diagnosti
         "max_outer_iterations": 6,
         "position_tolerance": 1e-3,
         "velocity_tolerance": 1e-6,
-        "boundary": "fixed_endpoints",
+        "boundary": BoundaryMode.FIXED_ENDPOINTS,
         "verbose": True,
     }
     assert result.converged is False
