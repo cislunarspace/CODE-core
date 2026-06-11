@@ -1,0 +1,11 @@
+[package]
+name = "e2m2e-integrators"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "e2m2e_integrators"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.24", features = ["extension-module"] }

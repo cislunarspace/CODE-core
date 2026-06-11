@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.0"]
+build-backend = "maturin"
 
 [project]
 name = "e2m2e"
@@ -48,8 +48,10 @@ Homepage = "https://github.com/cislunarspace/e2m2e"
 Repository = "https://github.com/cislunarspace/e2m2e"
 Issues = "https://github.com/cislunarspace/e2m2e/issues"
 
-[tool.hatch.build.targets.wheel]
-packages = ["e2m2e"]
+[tool.maturin]
+manifest-path = "crates/e2m2e-integrators/Cargo.toml"
+module-name = "e2m2e._integrators"
+python-source = "."
 
 [tool.ruff]
 line-length = 100
@@ -75,4 +77,5 @@ dev = [
     "pytest-cov>=4.0",
     "ruff>=0.1",
     "mypy",
+    "maturin>=1.0",
 ]

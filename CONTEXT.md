@@ -102,7 +102,10 @@ _Avoid_: 推力、燃料消耗
 ### 算法
 
 **动力学（Dynamics）** — 在给定 `System` 上积分运动方程的能力。`Dynamics` 是基类，`CR3BP_Dynamics` 与 `EphemerisDynamics` 为其实现。负责 `propagate(state, time_range)` 并返回状态历史。
-_Avoid_: 积分器、求解器
+_Avoid_: 求解器
+
+**积分器（Integrator）** — `Dynamics` 内部的底层数值单步推进引擎（如 RK 步进器）。负责从 `(t, y)` 计算一步到 `(t + h, y_new)`，并返回步长建议与误差估计。积分器不持有 System 上下文、不做事件检测、不控制传播全程；这些职责由 `Dynamics` 承担。
+_Avoid_: 步进器（overloaded，中文中可接受"步进器"作为实现层面的同义词）
 
 **状态转移矩阵（STM / State Transition Matrix）** — 状态扰动的线性传播矩阵，形状 `(n_points, 6, 6)`。由 `Dynamics.propagate(..., with_stm=True)` 返回。
 _Avoid_: 雅可比矩阵（STM 是状态空间的雅可比，但与约束雅可比不同）
