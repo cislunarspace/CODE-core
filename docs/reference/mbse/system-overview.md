@@ -6,38 +6,45 @@ title: e2m2e MBSE 系统模型总览
 
 ## 系统描述
 
-e2m2e (Earth to Moon, Moon to Earth) 是基于 CR3BP (Circular Restricted Three-Body Problem) 的地月转移轨道设计 Python 库。提供系统建模、数值算法、转移轨迹设计和可视化功能。
+e2m2e (Earth to Moon, Moon to Earth) 是用于地月空间轨道与转移轨道设计的 Python 库。它以 CR3BP 系统和星历系统为计算上下文，提供动力学传播、周期轨道生成、轨道转移设计和可视化能力。
 
 ## 架构层次
 
 ```mermaid
 graph TD
-    Core["Core 层<br/>物理模型、数据结构"]
-    Algorithms["Algorithms 层<br/>数值求解器"]
+    Core["Core 层<br/>系统、动力学、轨道数据"]
+    Algorithms["Algorithms 层<br/>微分修正、延拓、稳定性、多重打靶"]
     Transfer["Transfer 层<br/>转移轨迹设计"]
-    Visualization["Visualization 层<br/>绘图可视化"]
+    Visualization["Visualization 层<br/>绘图与可视化"]
+    MBSE["MBSE 层<br/>组件登记、需求追溯、图表生成"]
     Core --> Algorithms
+    Core --> Transfer
     Algorithms --> Transfer
+    Core --> Visualization
     Transfer --> Visualization
+    Core --> MBSE
+    Algorithms --> MBSE
+    Transfer --> MBSE
 ```
 
 | 层 | 模块 | 职责 |
 |----|------|------|
-| Core | system, dynamics, orbit, coordinate, spice | 物理模型、数据结构 |
-| Algorithms | differential_correction, continuation, stability, multiple_shooting, strategies | 数值求解器 |
-| Transfer | transfer_search, transfer_optimization, transfer | 转移轨迹设计 |
-| Visualization | config, base, family, transfer, stability | 绘图可视化 |
+| Core | system, dynamics, orbit, coordinate, spice | 物理模型、传播能力、轨道数据结构 |
+| Algorithms | differential_correction, continuation, stability, multiple_shooting, strategies | 数值求解与轨道族生成 |
+| Transfer | transfer_search, transfer_optimization, transfer | 转移轨迹搜索与优化 |
+| Visualization | config, base, family, transfer, stability | 绘图与可视化输出 |
+| MBSE | architecture, requirements, data, diagrams | 组件登记、需求追溯、数据模型、Mermaid 图表生成 |
 
-## Protocol 接口
+## 当前接缝
 
-| Protocol | 方法 | 实现者 |
-|----------|------|--------|
-| SystemModel | `mu`, `get_jacobi_constant` | `CR3BP_System`, `EphemerisSystem` |
-| Propagator | `propagate()` | `CR3BP_Dynamics`, `EphemerisDynamics` |
-| EOMProvider | `equations_of_motion()`, `equations_with_stm()` | `CR3BP_Dynamics`, `EphemerisDynamics` |
-| OrbitContainer | `states`, `times`, `period` | `Orbit`, `OrbitFamily` |
-| CorrectorStrategy | `CorrectionConfig` | `symmetric_2d_*`, `symmetric_3d_*`, `halo_*` |
-| Visualizer | `plot()` | `OrbitVisualizer`, `FamilyPlotter`, `TransferPlotter` |
+ADR-0001 撤销了装饰性的 Protocol 接缝。当前 MBSE 文档只描述真实存在的接口与实现关系：
+
+| 接缝 | 接口 | 适配器 / 实现 | 用途 |
+|------|------|---------------|------|
+| 动力学传播 | `Dynamics` 基类 | `CR3BP_Dynamics`, `EphemerisDynamics` | 统一 `propagate()` 调用和方程钩子 |
+| 组件登记 | `ComponentRegistry` | core / algorithms 组件定义 | 汇总模块职责与依赖关系 |
+| 需求追溯 | `RequirementRegistry` | core / algorithms 需求定义 | 将需求连接到代码与测试 |
+| 图表生成 | `DiagramGenerator` | BDD、需求图、活动图、序列图、状态机图 | 从 MBSE 模型生成 Mermaid 文档 |
 
 ## 数据模型
 

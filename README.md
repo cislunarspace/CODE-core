@@ -191,6 +191,12 @@ e2m2e/
 └── visualization/        # 2D/3D 绘图
 ```
 
+## 文档
+
+- [快速开始与安装](docs/getting-started/quickstart.rst)
+- [API 参考](docs/api/e2m2e.rst)
+- [MBSE 模型](docs/reference/mbse/index.md) — 组件登记、需求追溯与图表生成；多态接缝以 `Dynamics` 基类为准，见 [ADR-0001](docs/adr/0001-protocol-seams.md)
+
 ## 测试
 
 ```bash
