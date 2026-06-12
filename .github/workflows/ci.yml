@@ -44,9 +44,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - uses: dtolnay/rust-toolchain@stable
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --group dev
-      - run: uv run pytest --cov=e2m2e --cov-report=xml --cov-report=term-missing --cov-fail-under=55 -x
+      - run: cargo test --package e2m2e-integrators
+      - run: uv run maturin develop
+      - run: |
+          uv run pytest \
+            --cov=e2m2e \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=55 \
+            -x
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5

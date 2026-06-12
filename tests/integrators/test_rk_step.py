@@ -78,3 +78,79 @@ def test_rk_step_callback_dimension_mismatch_raises():
 
     with pytest.raises(ValueError):
         rk_step(RkMethod.PD45, 0.0, y0, 1e-3, 1e-12, f)
+
+
+def test_public_shim_imports():
+    """The recommended public entry point re-exports the stepper symbols."""
+    from e2m2e.integrators import RkMethod, rk_step
+
+    assert callable(rk_step)
+    assert RkMethod.PD45 is not None
+
+
+def test_two_body_circular_orbit_matches_scipy():
+    """PD45 follows a circular two-body orbit as closely as scipy RK45."""
+    from scipy.integrate import solve_ivp
+
+    from e2m2e.integrators import RkMethod, rk_step
+
+    def two_body(t, y):
+        r = y[:3]
+        v = y[3:]
+        r_norm = np.linalg.norm(r)
+        a = -r / r_norm**3
+        return np.concatenate([v, a])
+
+    # Unit circle in xy-plane, circular velocity for mu=1
+    y0 = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=float)
+    period = 2.0 * np.pi
+    tol = 1e-12
+
+    # Propagate with Rust PD45 using adaptive step acceptance
+    t = 0.0
+    y = y0.copy()
+    h = 0.01
+    while t < period:
+        h = min(h, period - t)
+        result = rk_step(RkMethod.PD45, t, y, h, tol, two_body)
+        y = np.asarray(result.y_new)
+        t += h
+        h = result.h_next
+
+    # Propagate with scipy RK45
+    sol = solve_ivp(two_body, (0.0, period), y0, method="RK45", rtol=tol, atol=tol)
+    y_scipy = sol.y[:, -1]
+
+    assert np.linalg.norm(y - y_scipy) < 1e-9
+
+
+def test_two_body_circular_orbit_matches_analytic():
+    """PD45 follows a circular two-body orbit to high analytic precision."""
+    from e2m2e.integrators import RkMethod, rk_step
+    from tests.integrators.conftest import kepler_analytic_state
+
+    def two_body(t, y):
+        r = y[:3]
+        v = y[3:]
+        r_norm = np.linalg.norm(r)
+        a = -r / r_norm**3
+        return np.concatenate([v, a])
+
+    y0 = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=float)
+    r0 = y0[:3]
+    v0 = y0[3:]
+    period = 2.0 * np.pi
+    tol = 1e-12
+
+    t = 0.0
+    y = y0.copy()
+    h = 0.01
+    while t < period:
+        h = min(h, period - t)
+        result = rk_step(RkMethod.PD45, t, y, h, tol, two_body)
+        y = np.asarray(result.y_new)
+        t += h
+        h = result.h_next
+
+    y_exact = kepler_analytic_state(r0, v0, period)
+    assert np.linalg.norm(y - y_exact) < 1e-9
