@@ -10,6 +10,7 @@ import numpy as np
 import numpy.typing as npt
 
 from ..mbse.data.enums import ReferenceFrame, UnitSystem
+from .coordinate_system import CoordinateSystem
 from .spice import SPICEManager
 from .system import System
 
@@ -33,6 +34,7 @@ class EphemerisSystem(System):
         spice: SPICEManager,
         origin: str = "EARTH",
         frame: ReferenceFrame = ReferenceFrame.J2000,
+        coordinate_system: CoordinateSystem | None = None,
     ) -> None:
         """初始化星历系统。
 
@@ -41,11 +43,13 @@ class EphemerisSystem(System):
             spice: 已完成内核加载的 SPICE 管理器实例。
             origin: 参考原点天体，所有位置矢量将相对于此天体计算。
             frame: 参考坐标系名称，用于确定位置矢量的坐标框架。
+            coordinate_system: 可选的默认坐标系；用于 ForceModel 传播。
         """
         self.bodies = list(bodies)
         self.spice = spice
         self.origin = origin
         self._frame = frame
+        self._coordinate_system = coordinate_system
 
     @property
     def frame(self) -> ReferenceFrame:
@@ -56,6 +60,15 @@ class EphemerisSystem(System):
     def unit_system(self) -> UnitSystem:
         """星历系统使用物理单位。"""
         return UnitSystem.SI
+
+    @property
+    def coordinate_system(self) -> CoordinateSystem | None:
+        """星历系统的默认坐标系。"""
+        return self._coordinate_system
+
+    @coordinate_system.setter
+    def coordinate_system(self, value: CoordinateSystem | None) -> None:
+        self._coordinate_system = value
 
     def gravitational_parameter(self, body: str) -> float:
         """获取天体的引力参数 GM。
