@@ -8,6 +8,9 @@
 from __future__ import annotations
 
 import abc
+from typing import Any
+
+import numpy.typing as npt
 
 from ..mbse.data.enums import ReferenceFrame, UnitSystem
 
@@ -37,6 +40,25 @@ class System(abc.ABC):
     def unit_system(self) -> UnitSystem:
         """系统的单位系统。"""
         raise NotImplementedError
+
+    @property
+    def coordinate_system(self) -> Any:
+        """系统默认坐标系；具体系统可覆盖。"""
+        return None
+
+    def transform(
+        self,
+        state: npt.ArrayLike,
+        *,
+        to_coordinate_system: Any,
+        et: float,
+        from_coordinate_system: Any | None = None,
+    ) -> npt.NDArray:
+        """通过 ``CoordinateSystem`` 薄委托转换状态。"""
+        source = from_coordinate_system or self.coordinate_system
+        if source is None:
+            raise ValueError("System.coordinate_system is required for transform()")
+        return source.transform_state(state, from_cs=source, to_cs=to_coordinate_system, et=et)
 
     @abc.abstractmethod
     def gravitational_parameter(self, body: str) -> float:

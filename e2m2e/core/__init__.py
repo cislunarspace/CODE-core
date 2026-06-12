@@ -26,11 +26,25 @@ Note:
 from __future__ import annotations
 
 from . import coordinate, dynamics, orbit, potential, system
+from .axes import Axes
 from .coordinate import CoordinateTransformation, ReferenceFrame, SynodicJ2000Transformation
+from .coordinate_system import CoordinateSystem
 from .cr3bp_system import CR3BP_System, LibrationPoint
 from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
 from .orbit import Orbit, OrbitFamily
+from .origin import Origin
 from .potential import pseudo_potential_hessian
+from .spice import SPICEManager
+from .standard_axes import (
+    GMATITRFAxes,
+    IAU2000EqAxes,
+    ICRSAxes,
+    ITRFApproxAxes,
+    ITRFAxes,
+    ITRFSpiceAxes,
+    standard_itrf,
+)
+from .standard_origins import CelestialBodyOrigin, InertialOrigin
 from .system import System
 
 __all__ = [
@@ -40,6 +54,19 @@ __all__ = [
     "orbit",
     "system",
     "System",
+    "Axes",
+    "Origin",
+    "CoordinateSystem",
+    "ICRSAxes",
+    "IAU2000EqAxes",
+    "ITRFSpiceAxes",
+    "ITRFAxes",
+    "GMATITRFAxes",
+    "ITRFApproxAxes",
+    "standard_itrf",
+    "CelestialBodyOrigin",
+    "InertialOrigin",
+    "SPICEManager",
     "CR3BP_System",
     "LibrationPoint",
     "Dynamics",

@@ -93,9 +93,9 @@ class TestSynodicJ2000Init:
         assert hasattr(spice_syn_j2000, "j2000_to_synodic")
         assert callable(spice_syn_j2000.j2000_to_synodic)
 
-    def test_system_reference(self, spice_syn_j2000, cr3bp_system):
-        """应持有 CR3BP 系统引用"""
-        assert spice_syn_j2000.cr3bp_system is cr3bp_system
+    def test_system_reference(self, spice_syn_j2000, earth_moon_system):
+        """应持有标准 CR3BP 系统引用"""
+        assert spice_syn_j2000.cr3bp_system is earth_moon_system
 
     def test_spice_reference(self, spice_syn_j2000, spice_manager):
         """应持有 SPICEManager 引用"""
