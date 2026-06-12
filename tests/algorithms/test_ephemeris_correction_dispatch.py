@@ -141,27 +141,17 @@ def test_homotopy_method_delegates_to_correct_with_homotopy(monkeypatch):
         homotopy_correction, "correct_with_homotopy", fake,
     )
 
-    # Inject patched module so the dispatch's lazy import resolves to it
-    import sys
-    saved = sys.modules.get("e2m2e.algorithms.homotopy_correction")
-    sys.modules["e2m2e.algorithms.homotopy_correction"] = homotopy_correction
-    try:
-        result = correct_ephemeris_patch_points(
-            "homotopy",
-            dynamics="dynamics",
-            t_patch=t_patch,
-            state_patch=state_patch,
-            tolerance=1e-8,
-            max_iter=5,
-            verbose=False,
-            n_workers=1,
-            kernel_dir="kernels",
-        )
-    finally:
-        if saved is None:
-            sys.modules.pop("e2m2e.algorithms.homotopy_correction", None)
-        else:
-            sys.modules["e2m2e.algorithms.homotopy_correction"] = saved
+    result = correct_ephemeris_patch_points(
+        "homotopy",
+        dynamics="dynamics",
+        t_patch=t_patch,
+        state_patch=state_patch,
+        tolerance=1e-8,
+        max_iter=5,
+        verbose=False,
+        n_workers=1,
+        kernel_dir="kernels",
+    )
 
     assert captured["dynamics"] == "dynamics"
     assert captured["tolerance"] == 1e-8

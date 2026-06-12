@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+import pytest
+
+from e2m2e.mbse.requirements.base import (
+    Requirement,
+    RequirementCategory,
+    RequirementRegistry,
+)
+
+
+def make_requirement(
+    req_id: str,
+    *,
+    category: RequirementCategory = RequirementCategory.FUNCTIONAL,
+    parent: str | None = None,
+    linked_tests: list[str] | None = None,
+) -> Requirement:
+    return Requirement(
+        id=req_id,
+        title=f"Requirement {req_id}",
+        category=category,
+        description="Synthetic requirement for registry behavior tests.",
+        parent=parent,
+        linked_code=["e2m2e/example.py"],
+        linked_tests=[] if linked_tests is None else linked_tests,
+    )
+
+
+@pytest.fixture
+def registry():
+    reg = RequirementRegistry()
+    reg.clear()
+    yield reg
+    reg.clear()
+
+
+def test_register_rejects_duplicate_ids_and_supports_lookup(registry):
+    requirement = make_requirement("REQ-001")
+
+    registry.register(requirement)
+
+    assert registry.get("REQ-001") is requirement
+    assert "REQ-001" in registry
+    assert list(registry) == [requirement]
+    with pytest.raises(ValueError, match="REQ-001"):
+        registry.register(requirement)
+    with pytest.raises(KeyError, match="REQ-999"):
+        registry.get("REQ-999")
+
+
+def test_filters_by_category_and_recursive_children(registry):
+    parent = make_requirement("REQ-001", category=RequirementCategory.FUNCTIONAL)
+    child = make_requirement(
+        "REQ-002",
+        category=RequirementCategory.INTERFACE,
+        parent="REQ-001",
+    )
+    grandchild = make_requirement(
+        "REQ-003",
+        category=RequirementCategory.INTERFACE,
+        parent="REQ-002",
+    )
+    registry.register_many([parent, child, grandchild])
+
+    assert registry.by_category(RequirementCategory.INTERFACE) == [child, grandchild]
+    assert registry.by_parent("REQ-001") == [child]
+    assert registry.children_of("REQ-001") == [child, grandchild]
+
+
+def test_traceability_matrix_marks_requirements_with_linked_tests(registry):
+    covered = make_requirement("REQ-001", linked_tests=["tests/example_test.py"])
+    uncovered = make_requirement("REQ-002")
+    registry.register_many([covered, uncovered])
+
+    matrix = registry.traceability_matrix()
+
+    assert matrix["REQ-001"]["requirement"] is covered
+    assert matrix["REQ-001"]["code"] == ["e2m2e/example.py"]
+    assert matrix["REQ-001"]["tests"] == ["tests/example_test.py"]
+    assert matrix["REQ-001"]["has_coverage"] is True
+    assert matrix["REQ-002"]["has_coverage"] is False
+
+
+def test_coverage_report_handles_empty_and_partially_covered_registry(registry):
+    assert registry.coverage_report() == {
+        "total": 0,
+        "covered": 0,
+        "uncovered": 0,
+        "coverage_rate": 0.0,
+    }
+
+    registry.register_many([
+        make_requirement("REQ-001", linked_tests=["tests/example_test.py"]),
+        make_requirement("REQ-002"),
+    ])
+
+    assert registry.coverage_report() == {
+        "total": 2,
+        "covered": 1,
+        "uncovered": 1,
+        "coverage_rate": 0.5,
+        "uncovered_ids": ["REQ-002"],
+    }
