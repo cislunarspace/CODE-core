@@ -62,9 +62,9 @@ from ..core.cr3bp_system import CR3BP_System  # noqa: E402
 from .search_config import SearchConfig  # noqa: E402
 from .transfer_optimization import (  # noqa: E402
     DROTRONLPOptimizer,
-    NLPOptimizationResult,
     NLPOptimizationVariables,
 )
+from .config import TransferOptimizationResult  # noqa: E402
 
 # 100 km 换算为 CR3BP 无量纲单位：用于判断轨迹-轨道最近距离是否"足够近"
 DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / CR3BP_System.EARTH_MOON_DISTANCE_KM
@@ -306,7 +306,7 @@ class TransferSearch:
 
         return results
 
-    def optimize(self, initial_guess: dict[str, Any] | None = None) -> NLPOptimizationResult:
+    def optimize(self, initial_guess: dict[str, Any] | None = None) -> TransferOptimizationResult:
         """执行优化
 
         Args:

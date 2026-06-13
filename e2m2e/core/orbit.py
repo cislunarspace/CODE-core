@@ -43,8 +43,6 @@ class Orbit:
         family_type: 轨道族类型
         parameters: 轨道参数字典
         metadata: 轨道元数据
-        jacobi_constants: Jacobi 常数序列
-        stability_indices: 稳定性指标（由外部算法填充）
     """
 
     # 状态向量分量名称
@@ -80,8 +78,6 @@ class Orbit:
             raise ValueError("时间序列长度必须与状态序列长度一致")
 
         # 外部填充属性
-        self.jacobi_constants: np.ndarray | None = None
-        self.stability_indices: dict | None = None
         self.family_type: str | None = None
         self.parameters: dict = {}
 
@@ -182,20 +178,14 @@ class Orbit:
     # ---- 核心方法 ----
 
     def compute_basic_properties(self) -> None:
-        """计算轨道的基本几何与物理属性
+        """计算轨道的基本几何属性
 
         自动计算：
-        1. Jacobi 常数序列（当 system 不为 None）
-        2. 平均状态向量
-        3. 位置极值与振幅
-        4. 轨道中心
-        5. 周期估计（零交叉检测）
+        1. 平均状态向量
+        2. 位置极值与振幅
+        3. 轨道中心
+        4. 周期估计（零交叉检测）
         """
-        if self.system is not None and hasattr(self.system, "get_jacobi_constant"):
-            self.jacobi_constants = np.array(
-                [self.system.get_jacobi_constant(state) for state in self.states]
-            )
-
         self._mean_state = np.mean(self.states, axis=0)
 
         for i, component in enumerate(self.VALID_COMPONENTS[:3]):
@@ -357,12 +347,6 @@ class Orbit:
             system=self.system,
         )
 
-        new_orbit.jacobi_constants = (
-            self.jacobi_constants.copy() if self.jacobi_constants is not None else None
-        )
-        new_orbit.stability_indices = (
-            self.stability_indices.copy() if self.stability_indices is not None else None
-        )
         new_orbit.family_type = self.family_type
         new_orbit.parameters = self.parameters.copy()
 

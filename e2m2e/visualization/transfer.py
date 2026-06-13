@@ -34,7 +34,7 @@ class TransferPlotter(OrbitVisualizer):
 
     def plot(self, data: Any, config: object = None, **kwargs) -> Any:
         """统一绘图入口，委托到 plot_solution_plane。
-        data 应为搜索结果列表（NLPOptimizationResult 列表或 dict 列表）。
+        data 应为搜索结果列表（TransferOptimizationResult 列表或 dict 列表）。
 
         Args:
             data: 搜索结果列表。
@@ -56,7 +56,7 @@ class TransferPlotter(OrbitVisualizer):
         """绘制搜索结果散点图（转移时间 vs 总 Δv）。
 
         Args:
-            results: 搜索结果列表（dict 或 NLPOptimizationResult）。
+            results: 搜索结果列表（dict 或 TransferOptimizationResult）。
             color_by: 着色依据，如 "transfer_type"。
             ax: 目标 axes 对象。
             show_colorbar: 是否显示颜色条。
@@ -219,10 +219,10 @@ class TransferPlotter(OrbitVisualizer):
     def _parse_solution_results(self, results) -> list:
         """将搜索结果解析为统一的 dict 格式。
 
-        支持两种输入：原始 dict 直接透传，NLPOptimizationResult 对象提取字段。
+        支持两种输入：原始 dict 直接透传，TransferOptimizationResult 对象提取字段。
 
         Args:
-            results: 搜索结果列表，元素为 dict 或 NLPOptimizationResult。
+            results: 搜索结果列表，元素为 dict 或 TransferOptimizationResult。
 
         Returns:
             统一的 dict 列表，每个 dict 包含 transfer_time/delta_v1/delta_v2/
@@ -240,13 +240,13 @@ class TransferPlotter(OrbitVisualizer):
                         "transfer_time": r.transfer_time,
                         "delta_v1": r.delta_v1,
                         "delta_v2": r.delta_v2,
-                        "objective_value": r.objective_value,
+                        "objective_value": getattr(r, "total_delta_v", r.delta_v1 + r.delta_v2),
                         "success": r.success,
                         # transfer_type 可能是枚举值（.value 取字符串）
                         # 也可能已经是字符串（来自反序列化结果），两种情况统一处理
                         "transfer_type": r.transfer_type.value
-                        if hasattr(r.transfer_type, "value")
-                        else str(r.transfer_type),
+                        if hasattr(getattr(r, "transfer_type", None), "value")
+                        else str(getattr(r, "transfer_type", "")),
                     }
                 )
         return parsed

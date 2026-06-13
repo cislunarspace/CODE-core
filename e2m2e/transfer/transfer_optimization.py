@@ -592,6 +592,8 @@ class DROTRONLPOptimizer:
 
         max_violation = max(violation.values()) if violation else 0.0
 
+        transfer_type = self._classify_transfer(transfer_time, times, states, insertion_state)
+
         return TransferOptimizationResult(
             success=success,
             message=message,
@@ -608,6 +610,7 @@ class DROTRONLPOptimizer:
             transfer_trajectory=states,
             transfer_trajectory_times=times,
             constraints_violation=max_violation,
+            transfer_type=transfer_type,
         )
 
     def _classify_transfer(

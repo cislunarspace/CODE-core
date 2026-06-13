@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -39,6 +40,30 @@ class BifurcationType(Enum):
     PITCHFORK = "pitchfork"
     TRANSCRITICAL = "transcritical"
     SECONDARY_HOPF = "secondary_hopf"
+
+
+@dataclass(frozen=True)
+class OrbitStability:
+    """轨道稳定性分析结果。
+
+    由 ``StabilityAnalysis.analyze()`` 返回的结果容器，包含单值矩阵、
+    Floquet 乘子、稳定性指数、分类与分岔信息。
+
+    Attributes:
+        monodromy_matrix: 单值矩阵，形状 (6, 6)
+        eigenvalues: 单值矩阵特征值数组
+        stability_indices: 稳定性指数字典
+        classification: 稳定性分类结果
+        bifurcation: 分岔分析结果
+        numerical_errors: 数值误差估计
+    """
+
+    monodromy_matrix: np.ndarray
+    eigenvalues: np.ndarray
+    stability_indices: dict[str, float | None]
+    classification: dict[str, Any]
+    bifurcation: dict[str, Any]
+    numerical_errors: dict[str, float | None]
 
 
 class StabilityAnalysis:
@@ -341,11 +366,12 @@ class StabilityAnalysis:
             "eigenvalues": self.eigenvalues,
         }
 
-    def full_analysis(self):
-        """执行完整的稳定性分析
+    def analyze(self) -> OrbitStability:
+        """执行完整稳定性分析并返回不可变结果对象。
 
         Returns:
-            dict: 完整分析结果
+            OrbitStability: 包含单值矩阵、特征值、稳定性指数、
+            分类、分岔与数值误差的独立结果对象。
         """
         self.compute_monodromy()
         self.compute_floquet_multipliers()
@@ -353,13 +379,29 @@ class StabilityAnalysis:
         classification = self.classify_orbit()
         bifurcation = self.analyze_bifurcation()
 
+        return OrbitStability(
+            monodromy_matrix=self.monodromy_matrix,
+            eigenvalues=self.eigenvalues,
+            stability_indices=self.stability_indices.copy(),
+            classification=classification,
+            bifurcation=bifurcation,
+            numerical_errors=self.numerical_errors.copy(),
+        )
+
+    def full_analysis(self):
+        """执行完整的稳定性分析
+
+        Returns:
+            dict: 完整分析结果
+        """
+        result = self.analyze()
         return {
-            "monodromy_matrix": self.monodromy_matrix,
-            "eigenvalues": self.eigenvalues,
-            "stability_indices": self.stability_indices,
-            "classification": classification,
-            "bifurcation": bifurcation,
-            "numerical_errors": self.numerical_errors,
+            "monodromy_matrix": result.monodromy_matrix,
+            "eigenvalues": result.eigenvalues,
+            "stability_indices": result.stability_indices,
+            "classification": result.classification,
+            "bifurcation": result.bifurcation,
+            "numerical_errors": result.numerical_errors,
         }
 
     def __str__(self):

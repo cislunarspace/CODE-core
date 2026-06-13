@@ -122,14 +122,12 @@ class OrbitStability(_NumpyModel):
         monodromy_matrix: 单值矩阵 (6x6)
         eigenvalues: 单值矩阵特征值（复数数组）
         stability: 稳定性标签
-        stability_indices: 稳定性指标字典
         lyapunov_exponents: Lyapunov 指数数组
     """
 
     monodromy_matrix: np.ndarray | None = None
     eigenvalues: np.ndarray | None = None
     stability: str | None = None
-    stability_indices: dict | None = None
     lyapunov_exponents: np.ndarray | None = None
 
     @field_validator("monodromy_matrix")

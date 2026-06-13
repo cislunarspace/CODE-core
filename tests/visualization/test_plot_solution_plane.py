@@ -6,7 +6,7 @@
 
 验收标准:
   1. TransferPlotter 新增 plot_solution_plane() 方法
-  2. 输入: results（NLPOptimizationResult 列表或等价 dict 列表）,
+  2. 输入: results（TransferOptimizationResult 列表或等价 dict 列表）,
          color_by（可选，按 transfer_type 着色）,
          ax（可选，复用已有 Axes）,
          show_colorbar（可选）
@@ -27,7 +27,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from e2m2e.core import CR3BP_System
-from e2m2e.transfer import NLPOptimizationResult, TransferType
+from e2m2e.mbse.data.enums import TransferType
+from e2m2e.transfer import TransferOptimizationResult
 from e2m2e.visualization.transfer import TransferPlotter
 
 
@@ -44,17 +45,15 @@ def _make_result(
     delta_v2: float,
     transfer_type: TransferType = TransferType.DIRECT,
     success: bool = True,
-) -> NLPOptimizationResult:
-    return NLPOptimizationResult(
-        alpha=1.0,
+) -> TransferOptimizationResult:
+    return TransferOptimizationResult(
         transfer_time=transfer_time,
-        t_ins=3.0,
-        objective_value=delta_v1 + delta_v2,
         delta_v1=delta_v1,
         delta_v2=delta_v2,
+        total_delta_v=delta_v1 + delta_v2,
+        transfer_type=transfer_type,
         success=success,
         message="",
-        transfer_type=transfer_type,
     )
 
 

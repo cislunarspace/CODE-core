@@ -10,6 +10,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..mbse.data.enums import TransferType
+
 
 DU = 3.84405000e5
 
@@ -69,6 +71,7 @@ class TransferOptimizationResult:
         transfer_trajectory: 完整转移轨迹 [n_steps, 6]
         transfer_trajectory_times: 轨迹时间序列 [n_steps]
         constraints_violation: 最大约束违反量
+        transfer_type: 转移类型
     """
 
     success: bool = False
@@ -86,3 +89,4 @@ class TransferOptimizationResult:
     transfer_trajectory: np.ndarray | None = None
     transfer_trajectory_times: np.ndarray | None = None
     constraints_violation: float = 0.0
+    transfer_type: TransferType = TransferType.DIRECT

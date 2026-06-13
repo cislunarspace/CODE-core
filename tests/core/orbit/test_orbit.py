@@ -63,23 +63,17 @@ class TestOrbitInit:
         times = np.linspace(0, 1, 10)
         orbit = Orbit(states=states, times=times)
 
-        assert orbit.jacobi_constants is None
-        assert orbit.stability_indices is None
+        assert not hasattr(orbit, "jacobi_constants")
+        assert not hasattr(orbit, "stability_indices")
         assert orbit.family_type is None
         assert not orbit.is_periodic
 
-
-class TestOrbitBasicProperties:
-    """Tests for compute_basic_properties method"""
-
-    def test_compute_properties_with_system(self, earth_moon_system):
-        """Test compute_basic_properties with associated system"""
+    def test_jacobi_computed_via_system(self, earth_moon_system):
+        """Jacobi 常数应由 system 直接计算，不再由 Orbit 持有"""
         states = np.random.rand(10, 6)
-        times = np.linspace(0, 1, 10)
-        orbit = Orbit(states=states, times=times, system=earth_moon_system)
-
-        assert orbit.jacobi_constants is not None
-        assert len(orbit.jacobi_constants) == 10
+        for state in states:
+            c = earth_moon_system.get_jacobi_constant(state)
+            assert isinstance(c, (float, np.floating))
 
     def test_compute_properties_mean_state(self, earth_moon_system):
         """Test mean state computation"""
