@@ -1,9 +1,6 @@
 """Tests for the DROTRONLPOptimizer module.
 
 Converted from script-style (sys.path.insert, print, main()) to pytest.
-All tests in this file are pure construction / data-class tests — no
-propagation or optimization is performed, so they run without
-fixtures for the dynamics.
 """
 
 import numpy as np
@@ -11,9 +8,9 @@ import pytest
 
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System
 from e2m2e.core.orbit import Orbit
+from e2m2e.transfer import TransferConfig, TransferOptimizationResult
 from e2m2e.transfer.transfer_optimization import (
     DROTRONLPOptimizer,
-    NLPOptimizationResult,
     NLPOptimizationVariables,
     TransferType,
 )
@@ -104,26 +101,37 @@ def test_departure_velocity_direction_preserved(dynamics, dummy_orbit):
         assert abs(abs(dot) - 1.0) < 1e-6, f"速度方向不一致: dot={dot}"
 
 
-def test_nlp_result_structure():
-    """NLPOptimizationResult 应保留所有构造字段。"""
-    result = NLPOptimizationResult(
-        alpha=1.2,
-        transfer_time=15.0,
-        t_ins=3.0,
-        objective_value=0.5,
-        delta_v1=0.2,
-        delta_v2=0.3,
-        success=True,
-        message="Test",
+def test_scipy_optimizer_returns_transfer_result(optimizer):
+    """SciPy 路径应直接返回 TransferOptimizationResult。"""
+    config = TransferConfig(
+        alpha_min=0.5,
+        alpha_max=2.5,
+        earth_radius=200.0 / 3.84405000e5,
+        moon_radius=100.0 / 3.84405000e5,
+        use_relaxed_velocity=True,
+        velocity_angle_tol=0.05,
+    )
+    optimizer_with_config = DROTRONLPOptimizer(
+        system=optimizer.system,
+        dynamics=optimizer.dynamics,
+        departure_orbit=optimizer.departure_orbit,
+        arrival_orbit=optimizer.arrival_orbit,
+        departure_state=optimizer.departure_state,
+        config=config,
     )
 
-    assert result.alpha == 1.2
-    assert result.transfer_time == 15.0
-    assert result.t_ins == 3.0
-    assert result.objective_value == 0.5
-    assert result.delta_v1 == 0.2
-    assert result.delta_v2 == 0.3
+    result = optimizer_with_config._build_result(
+        NLPOptimizationVariables(alpha=1.0, transfer_time=10.0, t_ins=5.0),
+        success=True,
+        message="test",
+    )
+
+    assert isinstance(result, TransferOptimizationResult)
     assert result.success
+    assert result.total_delta_v >= 0.0
+    assert result.transfer_time == pytest.approx(10.0)
+    assert result.departure_alpha == pytest.approx(1.0)
+    assert result.t_ins == pytest.approx(5.0)
 
 
 def test_transfer_type_enum_values():
@@ -136,7 +144,6 @@ def test_module_exports():
     """Top-level transfer 子包应重新导出 NLP 类。"""
     from e2m2e.transfer import (
         DROTRONLPOptimizer,
-        NLPOptimizationResult,
         NLPOptimizationVariables,
         TransferType,
         optimize_transfer,
@@ -144,6 +151,5 @@ def test_module_exports():
 
     assert DROTRONLPOptimizer is not None
     assert NLPOptimizationVariables is not None
-    assert NLPOptimizationResult is not None
     assert TransferType is not None
     assert optimize_transfer is not None

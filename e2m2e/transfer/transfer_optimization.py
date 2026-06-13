@@ -23,6 +23,7 @@ from ..core.orbit import Orbit
 from ..core.cr3bp_system import CR3BP_System
 from ..mbse.data.enums import TransferType
 from .cost import compute_transfer_cost
+from .config import TransferConfig, TransferOptimizationResult
 
 try:
     import coptpy as cp
@@ -149,6 +150,7 @@ class DROTRONLPOptimizer:
         departure_orbit: Orbit,
         arrival_orbit: Orbit,
         departure_state: np.ndarray,
+        config: TransferConfig | None = None,
     ):
         """初始化NLP优化器
 
@@ -158,6 +160,7 @@ class DROTRONLPOptimizer:
             departure_orbit: 出发点轨道
             arrival_orbit: 目标轨道
             departure_state: 出发点状态 [x, y, z, vx, vy, vz]
+            config: 转移优化配置；None 时使用内部默认值
         """
         self.system = system
         self.dynamics = dynamics
@@ -167,14 +170,23 @@ class DROTRONLPOptimizer:
         self.arrival_orbit = arrival_orbit
         self.departure_state = departure_state
 
-        self.alpha_range = self.DEFAULT_ALPHA_RANGE
+        self.alpha_range = config.alpha_range if config is not None else self.DEFAULT_ALPHA_RANGE
         self.transfer_time_range = self.DEFAULT_TRANSFER_TIME_RANGE
-        self.t_ins_range = self.DEFAULT_T_INS_RANGE
+        self.t_ins_range = (
+            config.t_ins_range
+            if config is not None and config.t_ins_range is not None
+            else self.DEFAULT_T_INS_RANGE
+        )
 
-        self.velocity_angle_tol = self.DEFAULT_VELOCITY_ANGLE_TOL
+        self.velocity_angle_tol = (
+            config.velocity_angle_tol if config is not None else self.DEFAULT_VELOCITY_ANGLE_TOL
+        )
 
-        self.earth_radius = self.EARTH_RADIUS_ND
-        self.moon_radius = self.MOON_RADIUS_ND
+        self.earth_radius = config.earth_radius if config is not None else self.EARTH_RADIUS_ND
+        self.moon_radius = config.moon_radius if config is not None else self.MOON_RADIUS_ND
+
+        self._use_relaxed_velocity = config.use_relaxed_velocity if config is not None else False
+        self._verbose = config.verbose if config is not None else True
 
         self._last_trajectory: tuple[np.ndarray, np.ndarray] | None = None
         self._progress_callback: Callable | None = None
@@ -453,23 +465,25 @@ class DROTRONLPOptimizer:
         alpha_range: tuple[float, float] | None = None,
         transfer_time_range: tuple[float, float] | None = None,
         t_ins_range: tuple[float, float] | None = None,
-        use_relaxed_velocity_constraint: bool = False,
-        velocity_angle_constraint: float = 0.0,
-        verbose: bool = True,
-    ) -> NLPOptimizationResult:
+        use_relaxed_velocity_constraint: bool | None = None,
+        velocity_angle_constraint: float | None = None,
+        verbose: bool | None = None,
+    ) -> TransferOptimizationResult:
         """执行NLP优化
 
         Args:
             initial_guess: 初始猜测
-            alpha_range: α范围
+            alpha_range: α范围；None 时使用构造配置
             transfer_time_range: 转移时间范围
-            t_ins_range: 插入时间范围
-            use_relaxed_velocity_constraint: 是否使用松弛速度约束
-            velocity_angle_constraint: 松弛速度约束角度(弧度)
-            verbose: 是否打印信息
+            t_ins_range: 插入时间范围；None 时使用构造配置
+            use_relaxed_velocity_constraint: 是否使用松弛速度约束；
+                None 时使用构造配置
+            velocity_angle_constraint: 松弛速度约束角度(弧度)；
+                None 时使用构造配置
+            verbose: 是否打印信息；None 时使用构造配置
 
         Returns:
-            优化结果
+            TransferOptimizationResult，包含优化详情
         """
         if alpha_range is not None:
             self.alpha_range = alpha_range
@@ -477,6 +491,13 @@ class DROTRONLPOptimizer:
             self.transfer_time_range = transfer_time_range
         if t_ins_range is not None:
             self.t_ins_range = t_ins_range
+
+        if use_relaxed_velocity_constraint is None:
+            use_relaxed_velocity_constraint = self._use_relaxed_velocity
+        if velocity_angle_constraint is None:
+            velocity_angle_constraint = self.velocity_angle_tol
+        if verbose is None:
+            verbose = self._verbose
 
         if initial_guess is None:
             alpha0 = 1.0
@@ -553,12 +574,12 @@ class DROTRONLPOptimizer:
             print("\n优化结果:")
             print(f"  成功: {opt_result.success}")
             print(f"  消息: {opt_result.message}")
-            print(f"  α={opt_result.alpha:.6f}")
+            print(f"  α={opt_result.departure_alpha:.6f}")
             print(f"  T={opt_result.transfer_time:.6f}")
             print(f"  t_ins={opt_result.t_ins:.6f}")
             print(f"  ΔV1={opt_result.delta_v1:.6f}")
             print(f"  ΔV2={opt_result.delta_v2:.6f}")
-            print(f"  总ΔV={opt_result.objective_value:.6f}")
+            print(f"  总ΔV={opt_result.total_delta_v:.6f}")
 
         return opt_result
 
@@ -574,7 +595,7 @@ class DROTRONLPOptimizer:
         message: str,
         use_relaxed_constraint: bool = False,
         velocity_angle_constraint: float = 0.0,
-    ) -> NLPOptimizationResult:
+    ) -> TransferOptimizationResult:
         """构建优化结果对象"""
         alpha = variables.alpha
         transfer_time = variables.transfer_time
@@ -598,10 +619,6 @@ class DROTRONLPOptimizer:
             insertion_state[3:],
         )
 
-        earth_col, moon_col = self.check_collision(variables.to_array())
-
-        transfer_type = self._classify_transfer(transfer_time, times, states, insertion_state)
-
         violation = {}
         if success:
             violation["position"] = self.constraint_position(variables.to_array())
@@ -614,22 +631,24 @@ class DROTRONLPOptimizer:
             else:
                 violation["velocity"] = abs(self.constraint_velocity_parallel(variables.to_array()))
 
-        return NLPOptimizationResult(
-            alpha=alpha,
-            transfer_time=transfer_time,
-            t_ins=t_ins,
-            objective_value=cost.total,
-            delta_v1=cost.dv1,
-            delta_v2=cost.dv2,
-            transfer_trajectory=states,
-            transfer_times=times,
-            departure_state=self.departure_state.copy(),
-            insertion_state=insertion_state,
-            final_state=final_state,
+        max_violation = max(violation.values()) if violation else 0.0
+
+        return TransferOptimizationResult(
             success=success,
             message=message,
-            transfer_type=transfer_type,
-            constraints_violation=violation,
+            departure_state=self.departure_state.copy(),
+            departure_alpha=alpha,
+            departure_beta=0.0,
+            insertion_state=insertion_state,
+            final_state=final_state,
+            delta_v1=cost.dv1,
+            delta_v2=cost.dv2,
+            total_delta_v=cost.total,
+            transfer_time=transfer_time,
+            t_ins=t_ins,
+            transfer_trajectory=states,
+            transfer_trajectory_times=times,
+            constraints_violation=max_violation,
         )
 
     def _classify_transfer(
