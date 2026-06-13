@@ -11,8 +11,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from enum import Enum
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -21,7 +20,6 @@ from scipy.optimize import Bounds, minimize
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
 from ..core.cr3bp_system import CR3BP_System
-from ..mbse.data.enums import TransferType
 from .cost import compute_transfer_cost
 from .config import TransferConfig, TransferOptimizationResult
 
@@ -73,45 +71,6 @@ class NLPOptimizationVariables:
             对应的 ``NLPOptimizationVariables`` 实例。
         """
         return cls(alpha=arr[0], transfer_time=arr[1], t_ins=arr[2])
-
-
-@dataclass
-class NLPOptimizationResult:
-    """NLP优化结果
-
-    Attributes:
-        alpha: 切向速度比
-        transfer_time: 转移时间
-        t_ins: 插入时间
-        objective_value: 目标函数值(总ΔV)
-        delta_v1: 出发脉冲
-        delta_v2: 插入脉冲
-        transfer_trajectory: 转移轨迹状态序列
-        transfer_times: 转移轨迹时间序列
-        departure_state: 出发点状态
-        insertion_state: 插入点状态
-        final_state: 转移轨迹末端状态
-        success: 优化是否成功
-        message: 结果消息
-        transfer_type: 转移类型
-        constraints_violation: 约束违反量字典
-    """
-
-    alpha: float = 0.0
-    transfer_time: float = 0.0
-    t_ins: float = 0.0
-    objective_value: float = 0.0
-    delta_v1: float = 0.0
-    delta_v2: float = 0.0
-    transfer_trajectory: np.ndarray | None = None
-    transfer_times: np.ndarray | None = None
-    departure_state: np.ndarray | None = None
-    insertion_state: np.ndarray | None = None
-    final_state: np.ndarray | None = None
-    success: bool = False
-    message: str = ""
-    transfer_type: TransferType = TransferType.DIRECT
-    constraints_violation: dict[str, float] = field(default_factory=dict)
 
 
 class DROTRONLPOptimizer:
@@ -657,14 +616,10 @@ class DROTRONLPOptimizer:
         times: np.ndarray,
         states: np.ndarray,
         insertion_state: np.ndarray,
-    ) -> TransferType:
-        """分类转移类型
+    ):
+        """分类转移类型（已废弃，保留方法签名仅用于兼容旧调用）。"""
+        from ..mbse.data.enums import TransferType
 
-        基于轨迹特征分类:
-        - 直接转移: 短时间(<20天), 近地点变化小
-        - LGA转移: 中等时间,有近月点
-        - 外部转移: 长时间,远地点很大
-        """
         if len(states) == 0:
             return TransferType.DIRECT
 
@@ -690,7 +645,7 @@ def optimize_transfer(
     departure_state: np.ndarray,
     initial_guess: NLPOptimizationVariables | None = None,
     **kwargs,
-) -> NLPOptimizationResult:
+) -> TransferOptimizationResult:
     """便捷函数: 优化DRO到RO转移
 
     Args:
@@ -971,8 +926,8 @@ if NlpCallbackBase is not None:
                     "message": str(e),
                 }
 
-        def get_result(self) -> NLPOptimizationResult:
-            """从 COPT 求解结果构建 ``NLPOptimizationResult``。
+        def get_result(self) -> TransferOptimizationResult:
+            """从 COPT 求解结果构建 ``TransferOptimizationResult``。
 
             Raises:
                 RuntimeError: 尚未调用 ``solve()`` 时。
@@ -1009,7 +964,7 @@ def optimize_with_copt(
     bar_threads: int = 1,
     time_limit: float | None = None,
     scipy_fallback_kwargs: dict[str, Any] | None = None,
-) -> NLPOptimizationResult:
+) -> TransferOptimizationResult:
     """使用 COPT 求解 NLP（与 ``data_processing_module`` 中用法一致：
     ``cp.Envr`` / ``createModel`` / ``COPT.Param`` / ``solve``）。
 
@@ -1026,12 +981,12 @@ def optimize_with_copt(
         scipy_fallback_kwargs: 回退时传给 ``optimizer.optimize`` 的额外参数
 
     Returns:
-        ``NLPOptimizationResult``
+        ``TransferOptimizationResult``
     """
     if scipy_fallback_kwargs is None:
         scipy_fallback_kwargs = {}
 
-    def _run_scipy() -> NLPOptimizationResult:
+    def _run_scipy() -> TransferOptimizationResult:
         return optimizer.optimize(initial_guess=initial_guess, **scipy_fallback_kwargs)
 
     if cp is None or COPT is None or NlpCallbackBase is None:

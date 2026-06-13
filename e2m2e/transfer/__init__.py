@@ -6,8 +6,10 @@ Classes:
     SearchConfig: 搜索/优化参数配置 dataclass
     TransferSearch: 通用轨道转移网格搜索
     Transfer: 简化的转移轨道优化接口
+    TransferConfig: 转移优化配置
+    TransferOptimizationResult: 转移优化结果
     DROTRONLPOptimizer: DRO-RO 转移轨道 NLP 优化器
-    COPTNLPSolver: 基于 COPT 的 NLP 求解器封装
+    NLPOptimizationVariables: NLP 优化变量
 
 Functions:
     load_orbit_from_json: 从 JSON 文件加载轨道数据
@@ -15,18 +17,13 @@ Functions:
     optimize_with_copt: 使用 COPT 求解 NLP
 """
 
-from . import transfer, transfer_optimization, transfer_search  # noqa: F401
+from . import optimizers, transfer, transfer_optimization, transfer_search  # noqa: F401
+from .config import TransferConfig, TransferOptimizationResult
 from .search_config import SearchConfig
-from .transfer import (
-    Transfer,
-    TransferConfig,
-    TransferOptimizationResult,
-)
+from .transfer import Transfer
 from .transfer_optimization import (
     DROTRONLPOptimizer,
-    NLPOptimizationResult,
     NLPOptimizationVariables,
-    TransferType,
     optimize_transfer,
     optimize_with_copt,
 )
@@ -49,9 +46,7 @@ __all__ = [
     "TransferConfig",
     "TransferOptimizationResult",
     "DROTRONLPOptimizer",
-    "NLPOptimizationResult",
     "NLPOptimizationVariables",
-    "TransferType",
     "DEFAULT_MIN_DISTANCE_THRESHOLD_DU",
     "load_orbit_from_json",
     "optimize_transfer",

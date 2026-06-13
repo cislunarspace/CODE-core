@@ -11,11 +11,8 @@ from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
 from . import transfer_optimization
 from .config import TransferConfig, TransferOptimizationResult
-from .transfer_optimization import (
-    DROTRONLPOptimizer,
-    NLPOptimizationVariables,
-    optimize_with_copt,
-)
+from .optimizers import COPTTransferOptimizer, SciPyTransferOptimizer
+from .transfer_optimization import DROTRONLPOptimizer, NLPOptimizationVariables
 
 _HAVE_COPT = transfer_optimization.coptpy is not None
 
@@ -167,17 +164,20 @@ class Transfer:
             config=config,
         )
 
-        if self._config.use_copt and _HAVE_COPT:
-            nlp_result = optimize_with_copt(
-                optimizer,
-                initial_guess=ig,
-                fallback_to_scipy=self._config.fallback_to_scipy,
-            )
-        else:
-            nlp_result = optimizer.optimize(initial_guess=ig)
+        adapter = self._build_optimizer_adapter(optimizer)
+        nlp_result = adapter.optimize(initial_guess=ig)
 
         self._result = nlp_result
         return self._result
+
+    def _build_optimizer_adapter(self, optimizer: DROTRONLPOptimizer):
+        """根据配置构造 SciPy 或 COPT adapter。"""
+        if self._config.use_copt and _HAVE_COPT:
+            return COPTTransferOptimizer(
+                optimizer,
+                fallback_to_scipy=self._config.fallback_to_scipy,
+            )
+        return SciPyTransferOptimizer(optimizer)
 
     def _sample_departure_state_from_dro(self) -> np.ndarray:
         """从 DRO 采样出发点状态，返回 DRO 轨道的第一个状态点。"""

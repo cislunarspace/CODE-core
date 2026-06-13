@@ -12,8 +12,8 @@ from e2m2e.transfer import TransferConfig, TransferOptimizationResult
 from e2m2e.transfer.transfer_optimization import (
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
-    TransferType,
 )
+from e2m2e.mbse.data.enums import TransferType
 
 # =============================================================================
 # Fixtures
@@ -145,11 +145,9 @@ def test_module_exports():
     from e2m2e.transfer import (
         DROTRONLPOptimizer,
         NLPOptimizationVariables,
-        TransferType,
         optimize_transfer,
     )
 
     assert DROTRONLPOptimizer is not None
     assert NLPOptimizationVariables is not None
-    assert TransferType is not None
     assert optimize_transfer is not None

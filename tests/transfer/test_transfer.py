@@ -34,6 +34,33 @@ def dummy_orbit(earth_moon_system):
     return orbit
 
 
+def test_transfer_uses_optimizer_adapter(dynamics, dummy_orbit):
+    """Transfer.optimize 应通过 adapter 调用，不再直接调用 optimizer.optimize。"""
+    from e2m2e.transfer.optimizers import SciPyTransferOptimizer
+
+    transfer = Transfer(dynamics).set_orbit(dummy_orbit, dummy_orbit)
+    expected_result = TransferOptimizationResult(
+        success=True,
+        total_delta_v=1.23,
+        transfer_time=12.0,
+    )
+
+    with patch("e2m2e.transfer.transfer.DROTRONLPOptimizer") as MockOptimizer:
+        instance = MockOptimizer.return_value
+        with patch.object(
+            SciPyTransferOptimizer, "optimize", return_value=expected_result
+        ) as mock_adapter_optimize:
+            result = transfer.optimize(
+                initial_guess={"alpha": 1.0, "transfer_time": 10.0, "t_ins": 5.0},
+                alpha_range=(0.5, 2.5),
+                t_ins_range=(0.0, 10.0),
+            )
+
+    assert result is expected_result
+    mock_adapter_optimize.assert_called_once()
+    instance.optimize.assert_not_called()
+
+
 def test_transfer_uses_config_to_initialize_optimizer(dynamics, dummy_orbit):
     """Transfer.optimize 应通过 config 构造优化器，不再 poke 属性。"""
     transfer = Transfer(dynamics).set_orbit(dummy_orbit, dummy_orbit)
