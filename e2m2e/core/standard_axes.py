@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
-import spiceypy
+
+from ._spice_loader import get_spiceypy
+
+if TYPE_CHECKING:
+    import spiceypy
 
 from .axes import Axes
 from .gmat_data import CoordinateDataError, gmat_fixture_path
@@ -55,7 +60,7 @@ class ITRFSpiceAxes(Axes):
 
     def rotation_matrix(self, et: float) -> npt.NDArray[np.floating]:
         try:
-            return np.array(spiceypy.pxform(self._frame, "J2000", et))
+            return np.array(get_spiceypy().pxform(self._frame, "J2000", et))
         except Exception as exc:  # pragma: no cover
             raise CoordinateDataError(
                 "SPICE ITRF transform unavailable. Load an LSK, text PCK, and Earth binary PCK "
@@ -66,7 +71,7 @@ class ITRFSpiceAxes(Axes):
         self, et: float
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         try:
-            transform = np.array(spiceypy.sxform(self._frame, "J2000", et))
+            transform = np.array(get_spiceypy().sxform(self._frame, "J2000", et))
         except Exception as exc:  # pragma: no cover
             raise CoordinateDataError(
                 "SPICE ITRF state transform unavailable. Load an LSK, text PCK, and Earth binary "

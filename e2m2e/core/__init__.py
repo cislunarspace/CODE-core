@@ -25,6 +25,16 @@ Note:
 
 from __future__ import annotations
 
+import importlib
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .ephemeris_dynamics import EphemerisDynamics as EphemerisDynamics
+    from .ephemeris_system import EphemerisSystem as EphemerisSystem
+    from .spice import SPICEManager as SPICEManager
+    from .standard_axes import ITRFSpiceAxes as ITRFSpiceAxes
+    from .standard_origins import CelestialBodyOrigin as CelestialBodyOrigin
+
 from . import coordinate, dynamics, orbit, potential, system
 from .axes import Axes
 from .coordinate import CoordinateTransformation, ReferenceFrame, SynodicJ2000Transformation
@@ -34,18 +44,44 @@ from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
 from .orbit import Orbit, OrbitFamily
 from .origin import Origin
 from .potential import pseudo_potential_hessian
-from .spice import SPICEManager
 from .standard_axes import (
     GMATITRFAxes,
     IAU2000EqAxes,
     ICRSAxes,
     ITRFApproxAxes,
     ITRFAxes,
-    ITRFSpiceAxes,
     standard_itrf,
 )
-from .standard_origins import CelestialBodyOrigin, InertialOrigin
+from .standard_origins import InertialOrigin
 from .system import System
+
+# 星历/SPICE 相关符号通过 __getattr__ 按需延迟导入，避免用户只使用 CR3BP
+# 基础类时强制加载 spiceypy。参见 issue #44。
+_LAZY_SPICE_EXPORTS: dict[str, str] = {
+    "SPICEManager": "e2m2e.core.spice",
+    "EphemerisSystem": "e2m2e.core.ephemeris_system",
+    "EphemerisDynamics": "e2m2e.core.ephemeris_dynamics",
+    "ITRFSpiceAxes": "e2m2e.core.standard_axes",
+    "CelestialBodyOrigin": "e2m2e.core.standard_origins",
+}
+
+
+def __getattr__(name: str) -> object:
+    """按需延迟导入 SPICE/星历相关符号。"""
+    module_name = _LAZY_SPICE_EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module 'e2m2e.core' has no attribute '{name}'")
+
+    module = importlib.import_module(module_name)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """确保 dir(e2m2e.core) 包含延迟导出的公开符号。"""
+    return sorted(set(__all__) | set(globals().keys()) | set(_LAZY_SPICE_EXPORTS.keys()))
+
 
 __all__ = [
     "coordinate",
