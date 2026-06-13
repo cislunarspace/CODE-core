@@ -82,7 +82,7 @@ _Avoid_: 采样点数、任意传播时长、周期倍数
 ### 推进与转移
 
 **推进模型（Propulsion Model）** — 描述航天器如何改变速度的策略。`Transfer` 持有推进模型以支持不同转移类型。
-- `ImpulsivePropulsion`：脉冲机动，速度瞬时变化。
+- `ImpulsivePropulsion`：脉冲机动，速度瞬时变化。将出发速度分解为切向与法向分量：``v = alpha * |v| * t_hat + beta * |v| * n_hat``，其中 `alpha` 为切向速度比，`beta` 为法向速度比（默认 `0.0`，即纯切向）。
 - `LowThrustPropulsion`：连续小推力（待实现）。
 _Avoid_: 推进方式、动力模型
 
@@ -90,8 +90,8 @@ _Avoid_: 推进方式、动力模型
 _Avoid_: 轨道族转换、星历转换
 
 **端点条件（Terminal Condition）** — 转移出发或到达必须满足的条件。
-- `OrbitTerminal`：位于某条 `Orbit` 上。
-- `StateTerminal`：固定状态与时间。
+- `OrbitTerminal`：位于某条 `Orbit` 上，出发状态取轨道首点，到达状态通过动力学传播获取。
+- `StateTerminal`：固定状态与时间，出发与到达状态均为固定值，不依赖动力学传播。已实现，但尚未接入 DRO→RO 优化器。
 - `LEOTerminal`、`GEOTerminal`：近地/地球同步停泊轨道端点（待实现）。
 - `BodySurfaceTerminal`：位于天体表面某点（待实现）。
 _Avoid_: 出发轨道、到达点（过于笼统）

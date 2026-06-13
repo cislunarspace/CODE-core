@@ -12,6 +12,8 @@ from ..core.orbit import Orbit
 from . import transfer_optimization
 from .config import TransferConfig, TransferOptimizationResult
 from .optimizers import COPTTransferOptimizer, SciPyTransferOptimizer
+from .propulsion import ImpulsivePropulsion, PropulsionModel
+from .terminal import OrbitTerminal, TerminalCondition
 from .transfer_optimization import DROTRONLPOptimizer, NLPOptimizationVariables
 
 _HAVE_COPT = transfer_optimization.coptpy is not None
@@ -42,16 +44,24 @@ class Transfer:
         ... )
     """
 
-    def __init__(self, dynamics: CR3BP_Dynamics):
+    def __init__(
+        self,
+        dynamics: CR3BP_Dynamics,
+        propulsion: PropulsionModel | None = None,
+    ):
         """初始化转移优化器
 
         Args:
             dynamics: CR3BP 动力学实例，用于轨道传播
+            propulsion: 推进模型；None 时默认使用 ``ImpulsivePropulsion()``
         """
         self.dynamics = dynamics
         self.system = dynamics.system
         self.mu = self.system.mu
+        self.propulsion = propulsion if propulsion is not None else ImpulsivePropulsion()
 
+        self._departure: TerminalCondition | None = None
+        self._arrival: TerminalCondition | None = None
         self._departure_orbit: Orbit | None = None
         self._arrival_orbit: Orbit | None = None
         self._config = TransferConfig()
@@ -68,6 +78,16 @@ class Transfer:
         return self._arrival_orbit
 
     @property
+    def departure(self) -> TerminalCondition | None:
+        """出发终端条件。"""
+        return self._departure
+
+    @property
+    def arrival(self) -> TerminalCondition | None:
+        """到达终端条件。"""
+        return self._arrival
+
+    @property
     def config(self) -> TransferConfig:
         """转移优化配置。"""
         return self._config
@@ -77,8 +97,39 @@ class Transfer:
         """最新优化结果。"""
         return self._result
 
+    def set_departure(self, terminal: TerminalCondition) -> Transfer:
+        """设置出发终端条件
+
+        Args:
+            terminal: 出发终端条件
+
+        Returns:
+            self，支持链式调用
+        """
+        self._departure = terminal
+        if isinstance(terminal, OrbitTerminal):
+            self._departure_orbit = terminal.orbit
+        return self
+
+    def set_arrival(self, terminal: TerminalCondition) -> Transfer:
+        """设置到达终端条件
+
+        Args:
+            terminal: 到达终端条件
+
+        Returns:
+            self，支持链式调用
+        """
+        self._arrival = terminal
+        if isinstance(terminal, OrbitTerminal):
+            self._arrival_orbit = terminal.orbit
+        return self
+
     def set_orbit(self, start: Orbit, end: Orbit) -> Transfer:
-        """设置出发轨道和到达轨道
+        """设置出发轨道和到达轨道（兼容旧接口）
+
+        内部调用 ``set_departure(OrbitTerminal(start))`` 和
+        ``set_arrival(OrbitTerminal(end))``。
 
         Args:
             start: 出发轨道（DRO）
@@ -87,9 +138,7 @@ class Transfer:
         Returns:
             self，支持链式调用
         """
-        self._departure_orbit = start
-        self._arrival_orbit = end
-        return self
+        return self.set_departure(OrbitTerminal(start)).set_arrival(OrbitTerminal(end))
 
     def optimize(
         self,
@@ -113,8 +162,14 @@ class Transfer:
         Returns:
             TransferOptimizationResult，包含优化详情
         """
-        if self._departure_orbit is None or self._arrival_orbit is None:
-            raise ValueError("Must call set_orbit() before optimize()")
+        if self._departure is None or self._arrival is None:
+            raise ValueError("Must call set_departure() / set_arrival() or set_orbit() before optimize()")
+
+        # 当前仅支持 OrbitTerminal 类型的终端条件
+        if not isinstance(self._departure, OrbitTerminal) or not isinstance(self._arrival, OrbitTerminal):
+            raise NotImplementedError(
+                "Only OrbitTerminal is supported for departure and arrival at this time"
+            )
 
         # 若用户未指定覆盖值，使用配置中的默认值
         if use_relaxed_velocity is None:
@@ -130,7 +185,7 @@ class Transfer:
 
         # 插入时间范围：未指定时默认为一个完整 RO 周期
         if t_ins_range is None:
-            t0 = self._arrival_orbit.times[0]
+            t0 = self._arrival_orbit.times[0] if self._arrival_orbit is not None else 0.0
             period = self._get_ro_period()
             t_ins_range = (t0, t0 + period)
 
@@ -162,6 +217,7 @@ class Transfer:
             arrival_orbit=self._arrival_orbit,
             departure_state=departure_state,
             config=config,
+            propulsion=self.propulsion,
         )
 
         adapter = self._build_optimizer_adapter(optimizer)

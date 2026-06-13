@@ -9,7 +9,6 @@ DRO到RO转移轨道NLP优化模块
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -20,8 +19,8 @@ from scipy.optimize import Bounds, minimize
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
 from ..core.cr3bp_system import CR3BP_System
-from .cost import compute_transfer_cost
 from .config import TransferConfig, TransferOptimizationResult
+from .propulsion import ImpulsivePropulsion, PropulsionModel
 
 try:
     import coptpy as cp
@@ -110,6 +109,7 @@ class DROTRONLPOptimizer:
         arrival_orbit: Orbit,
         departure_state: np.ndarray,
         config: TransferConfig | None = None,
+        propulsion: PropulsionModel | None = None,
     ):
         """初始化NLP优化器
 
@@ -120,6 +120,7 @@ class DROTRONLPOptimizer:
             arrival_orbit: 目标轨道
             departure_state: 出发点状态 [x, y, z, vx, vy, vz]
             config: 转移优化配置；None 时使用内部默认值
+            propulsion: 推进模型；None 时使用 ``ImpulsivePropulsion()``
         """
         self.system = system
         self.dynamics = dynamics
@@ -128,6 +129,7 @@ class DROTRONLPOptimizer:
         self.departure_orbit = departure_orbit
         self.arrival_orbit = arrival_orbit
         self.departure_state = departure_state
+        self.propulsion = propulsion if propulsion is not None else ImpulsivePropulsion()
 
         self.alpha_range = config.alpha_range if config is not None else self.DEFAULT_ALPHA_RANGE
         self.transfer_time_range = self.DEFAULT_TRANSFER_TIME_RANGE
@@ -207,7 +209,7 @@ class DROTRONLPOptimizer:
         )
 
         if not empty:
-            cost = compute_transfer_cost(
+            cost = self.propulsion.compute_cost(
                 self.departure_state, v_injection, final_state[3:], insertion_state[3:]
             )
             dv1 = cost.dv1
@@ -258,8 +260,7 @@ class DROTRONLPOptimizer:
     ) -> np.ndarray:
         """根据α和β计算出发注入速度。
 
-        速度分解为切向和法向分量：v = α·|v|·t̂ + β·|v|·n̂，
-        其中 t̂ 为原始速度方向，n̂ 为轨道面法向。
+        委托给 ``self.propulsion.compute_departure_velocity``，保留方法签名以兼容外部调用。
 
         Args:
             state: 出发点状态 [x, y, z, vx, vy, vz]
@@ -269,25 +270,7 @@ class DROTRONLPOptimizer:
         Returns:
             注入速度向量 [vx, vy, vz]
         """
-        state[:3]
-        vel = state[3:]
-
-        normal = np.array([0.0, 0.0, 1.0])
-
-        v_mag = np.linalg.norm(vel)
-        if v_mag < 1e-10:
-            warnings.warn("出发点速度接近零", stacklevel=2)
-            return vel
-
-        tangential = vel / v_mag
-
-        normal_dir = np.cross(tangential, normal)
-        norm_nd = np.linalg.norm(normal_dir)
-        normal_dir = np.array([1.0, 0.0, 0.0]) if norm_nd < 1e-10 else normal_dir / norm_nd
-
-        v_injection = alpha * v_mag * tangential + beta * v_mag * normal_dir
-
-        return v_injection
+        return self.propulsion.compute_departure_velocity(state, alpha=alpha, beta=beta)
 
     def forward_integrate(
         self,
@@ -571,7 +554,7 @@ class DROTRONLPOptimizer:
         )
         final_state = states[-1] if len(states) > 0 else None
 
-        cost = compute_transfer_cost(
+        cost = self.propulsion.compute_cost(
             self.departure_state,
             v_injection,
             final_state[3:] if final_state is not None else np.zeros(3),
@@ -647,6 +630,7 @@ def optimize_transfer(
     arrival_orbit: Orbit,
     departure_state: np.ndarray,
     initial_guess: NLPOptimizationVariables | None = None,
+    propulsion: PropulsionModel | None = None,
     **kwargs,
 ) -> TransferOptimizationResult:
     """便捷函数: 优化DRO到RO转移
@@ -658,6 +642,7 @@ def optimize_transfer(
         arrival_orbit: 目标轨道
         departure_state: 出发点状态
         initial_guess: 初始猜测
+        propulsion: 推进模型；None 时使用 ``ImpulsivePropulsion()``
         **kwargs: 其他优化参数
 
     Returns:
@@ -669,6 +654,7 @@ def optimize_transfer(
         departure_orbit=departure_orbit,
         arrival_orbit=arrival_orbit,
         departure_state=departure_state,
+        propulsion=propulsion,
     )
 
     return optimizer.optimize(initial_guess=initial_guess, **kwargs)

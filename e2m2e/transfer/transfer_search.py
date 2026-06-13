@@ -22,7 +22,6 @@ import os
 import queue
 import sys
 import threading
-import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -65,6 +64,7 @@ from .transfer_optimization import (  # noqa: E402
     NLPOptimizationVariables,
 )
 from .config import TransferOptimizationResult  # noqa: E402
+from .propulsion import ImpulsivePropulsion  # noqa: E402
 
 # 100 km 换算为 CR3BP 无量纲单位：用于判断轨迹-轨道最近距离是否"足够近"
 DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / CR3BP_System.EARTH_MOON_DISTANCE_KM
@@ -139,6 +139,8 @@ class TransferSearch:
         self._n_workers: int | None = None
         # "processes" 多进程，利于 CPU 密集积分绕过 GIL；"threads" 保留线程内 tqdm 细粒度进度
         self._parallel_backend: str = "processes"
+        # 内部推进模型，用于计算出发注入速度（不暴露为公共参数）
+        self._propulsion = ImpulsivePropulsion()
 
         # 搜索 + 优化配置（集中管理）
         self._config: SearchConfig = config if config is not None else SearchConfig()
@@ -331,6 +333,7 @@ class TransferSearch:
             departure_orbit=self._departure_orbit,
             arrival_orbit=self._arrival_orbit,
             departure_state=initial_guess["departure_state"],
+            propulsion=self._propulsion,
         )
 
         transfer_time = self.transfer_time_range[1] / 2 if self.transfer_time_range else 15.0
@@ -1055,23 +1058,8 @@ class TransferSearch:
         return results
 
     def _compute_departure_velocity(self, orbit_state: np.ndarray, alpha: float) -> np.ndarray:
-        """计算出发点速度扰动 (平面)"""
-        pos = orbit_state[:3]
-        vel = orbit_state[3:]
-
-        r_xy = np.sqrt(pos[0] ** 2 + pos[1] ** 2)
-        if r_xy < 1e-10:
-            warnings.warn("位置靠近原点，使用原始速度", stacklevel=2)
-            return vel.copy()
-
-        tangential = np.array([-pos[1], pos[0], 0.0]) / r_xy
-        radial = pos / np.linalg.norm(pos)
-
-        v_radial_comp = np.dot(vel, radial)
-        v_tangential_comp = np.dot(vel, tangential)
-
-        new_vel = v_radial_comp * radial + alpha * v_tangential_comp * tangential
-        return new_vel
+        """计算出发点速度扰动，委托给内部脉冲推进模型。"""
+        return self._propulsion.compute_departure_velocity(orbit_state, alpha=alpha)
 
     def _forward_integrate(
         self,

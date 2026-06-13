@@ -17,7 +17,8 @@ Functions:
     optimize_with_copt: 使用 COPT 求解 NLP
 """
 
-from . import optimizers, transfer, transfer_optimization, transfer_search  # noqa: F401
+from .propulsion import ImpulsivePropulsion, PropulsionModel
+from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 from .config import TransferConfig, TransferOptimizationResult
 from .search_config import SearchConfig
 from .transfer import Transfer
@@ -51,5 +52,10 @@ __all__ = [
     "load_orbit_from_json",
     "optimize_transfer",
     "optimize_with_copt",
+    "PropulsionModel",
+    "ImpulsivePropulsion",
+    "TerminalCondition",
+    "OrbitTerminal",
+    "StateTerminal",
     "_HAVE_COPT",
 ]
