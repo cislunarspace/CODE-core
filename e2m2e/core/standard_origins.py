@@ -29,6 +29,11 @@ class CelestialBodyOrigin(Origin):
         self._body = body.upper()
         self._spice = spice
 
+    @property
+    def body(self) -> str:
+        """天体名称（大写）。"""
+        return self._body
+
     def state(self, et: float) -> npt.NDArray[np.floating]:
         """返回该天体中心在 ICRF 中的绝对状态。
 
