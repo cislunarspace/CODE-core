@@ -137,7 +137,7 @@ class ITRFApproxAxes(Axes):
     def rotation_matrix(self, et: float) -> npt.NDArray[np.floating]:
         precession = self._iau2000eq.rotation_matrix(et)
         gast = _greenwich_apparent_sidereal_time(et)
-        return precession @ _rotation3(-gast)
+        return precession @ _rotation3(gast)
 
 
 def standard_itrf() -> ITRFSpiceAxes:

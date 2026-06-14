@@ -193,6 +193,20 @@ class TestITRFApproxAxes:
 
         np.testing.assert_allclose(rotation @ rotation.T, np.eye(3), atol=1e-12)
 
+    def test_angular_velocity_z_is_positive_earth_rotation(self, spice_manager):
+        """角速度 z 分量应为正（地球东向自转，ω_z ≈ +7.292e-5 rad/s）。
+
+        回归测试：GAST 旋转方向曾经符号错误（_rotation3(-gast)），导致
+        角速度为负、大气阻力相对速度计算错误。此测试防止该 bug 再现。
+        """
+        axes = ITRFApproxAxes()
+        et = spice_manager.utc_to_et("2024-01-01T00:00:00")
+
+        omega = axes.angular_velocity(et)
+
+        assert omega[2] > 0.0, f"地球东向自转要求 ω_z > 0，实际 {omega[2]:.4e}"
+        np.testing.assert_allclose(omega[2], 7.2921150e-5, rtol=1e-3)
+
 
 class TestStandardCoordinateSystems:
     def test_icrf_to_explicit_gmat_itrf_vector_round_trip(self):
