@@ -1,8 +1,9 @@
 """e2m2e 力模型子包。"""
 
+from .drag import DragModel
 from .exceptions import CoordinateTransformError
 from .force_model import ForceModel
 from .gravity_field import GravityField
 from .physical_model import PhysicalModel
 
-__all__ = ["PhysicalModel", "ForceModel", "GravityField", "CoordinateTransformError"]
+__all__ = ["PhysicalModel", "ForceModel", "GravityField", "DragModel", "CoordinateTransformError"]
