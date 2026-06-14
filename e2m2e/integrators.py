@@ -5,11 +5,10 @@ from collections.abc import Callable
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e._integrators import MultistepMethod
-from e2m2e._integrators import MultistepResult
-from e2m2e._integrators import RkMethod
-from e2m2e._integrators import rk_step as _rk_step
+from e2m2e._integrators import CowellResult, MultistepMethod, MultistepResult, RkMethod
+from e2m2e._integrators import cowell_step as _cowell_step
 from e2m2e._integrators import multistep_step as _multistep_step
+from e2m2e._integrators import rk_step as _rk_step
 
 __all__ = [
     "rk_step",
@@ -18,6 +17,9 @@ __all__ = [
     "MultistepMethod",
     "MultistepResult",
     "initialize_abm_history",
+    "cowell_step",
+    "CowellResult",
+    "initialize_cowell_history",
 ]
 
 
@@ -97,3 +99,75 @@ def initialize_abm_history(
         t += h
         history.append(np.asarray(f(t, y), dtype=float).tolist())
     return t, y, history
+
+
+def cowell_step(
+    t: float,
+    h: float,
+    tol: float,
+    accel: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
+    history: list[npt.ArrayLike],
+):
+    """Take a single Cowell (Störmer-Cowell) 8th-order step for ``x'' = a(t, x)``.
+
+    ``history`` = ``[x_{n-1}, x_n, a_{n-7}, ..., a_n]`` (10 vectors: 2 position
+    samples + 8 acceleration samples, oldest first). ``accel(t, x)`` returns the
+    acceleration depending on position only (gravity, J2). Output is position
+    only. Fixed step.
+
+    Returns a ``CowellResult`` with ``x_new``, ``error``, ``h_next``, ``history``.
+    """
+    hist_lists = [np.asarray(hi, dtype=float).tolist() for hi in history]
+
+    def _adapt(t_i: float, x_i: list[float]) -> list[float]:
+        x_arr = np.asarray(x_i, dtype=float)
+        result = accel(t_i, x_arr)
+        return np.asarray(result, dtype=float).tolist()
+
+    return _cowell_step(t, h, tol, _adapt, hist_lists)
+
+
+def initialize_cowell_history(
+    t0: float,
+    x0: npt.ArrayLike,
+    v0: npt.ArrayLike,
+    h: float,
+    accel: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
+    n_startup: int = 7,
+    tol: float = 1e-12,
+) -> tuple[float, np.ndarray, np.ndarray, list[list[float]]]:
+    """Bootstrap the 8th-order Cowell history via ``n_startup`` RK89 steps.
+
+    Returns ``(t, x, v, history)`` with
+    ``history = [x_{n-1}, x_n, a_{n-7}, ..., a_n]`` (2 positions + 8
+    accelerations, ready for :func:`cowell_step`). ``n_startup`` must be ≥ 7 so
+    the 8 most recent acceleration samples are available; with the default
+    ``n_startup=7`` the state advances to ``t0 + 7h``.
+    """
+    if n_startup < 7:
+        raise ValueError(
+            f"8th-order Cowell needs n_startup >= 7 (8 acceleration samples), got {n_startup}"
+        )
+    x = np.asarray(x0, dtype=float).copy()
+    v = np.asarray(v0, dtype=float).copy()
+    t = float(t0)
+    d = len(x)
+    xs = [x.copy()]
+    accels = [np.asarray(accel(t, x), dtype=float)]
+
+    def _first_order(t_i: float, state: np.ndarray) -> np.ndarray:
+        return np.concatenate([state[d:], np.asarray(accel(t_i, state[:d]), dtype=float)])
+
+    for _ in range(n_startup):
+        result = rk_step(RkMethod.RK89, t, np.concatenate([x, v]), h, tol, _first_order)
+        y = np.asarray(result.y_new, dtype=float)
+        x, v = y[:d], y[d:]
+        t += h
+        xs.append(x.copy())
+        accels.append(np.asarray(accel(t, x), dtype=float))
+
+    history = (
+        [xs[-2].tolist(), xs[-1].tolist()]
+        + [a.tolist() for a in accels[-8:]]
+    )
+    return t, x, v, history

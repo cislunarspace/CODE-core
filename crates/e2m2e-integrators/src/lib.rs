@@ -3,6 +3,7 @@ use pyo3::types::PyList;
 
 pub(crate) mod abm;
 pub(crate) mod butcher;
+pub(crate) mod cowell;
 pub(crate) mod multistep_methods;
 pub(crate) mod pd45;
 pub(crate) mod pd78;
@@ -55,6 +56,28 @@ impl MultistepResult {
     }
 }
 
+/// Result of a single Cowell (Störmer-Cowell) step. `x_new` is the position
+/// only; the history mixes positions and accelerations (see `cowell_step`).
+#[pyclass(frozen, get_all)]
+#[derive(Clone, Debug)]
+pub struct CowellResult {
+    pub x_new: Vec<f64>,
+    pub error: f64,
+    pub h_next: f64,
+    pub history: Vec<Vec<f64>>,
+}
+
+#[pymethods]
+impl CowellResult {
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        let x_new = PyList::new(py, &self.x_new)?;
+        Ok(format!(
+            "CowellResult(x_new={x_new:?}, error={:.3e}, h_next={:.3e})",
+            self.error, self.h_next
+        ))
+    }
+}
+
 fn call_python_rhs(f: &Bound<PyAny>, n: usize, t: f64, y: &[f64]) -> PyResult<Vec<f64>> {
     let py = f.py();
     let yi_list = PyList::new(py, y)?;
@@ -73,10 +96,6 @@ fn call_python_rhs(f: &Bound<PyAny>, n: usize, t: f64, y: &[f64]) -> PyResult<Ve
 }
 
 /// Take a single explicit Runge-Kutta step.
-///
-/// The callback `f` receives a Python list of floats and must return an iterable
-/// of floats of the same length. A thin Python shim can adapt NumPy arrays to
-/// this signature for callers that prefer ndarray-based callbacks.
 #[pyfunction]
 fn rk_step(
     method: RkMethod,
@@ -120,14 +139,6 @@ fn rk_step(
 }
 
 /// Take a single multistep predictor-corrector step.
-///
-/// `history` must hold exactly `method.steps()` derivative samples (oldest
-/// first), each of the same length as `y`, at equal spacing `h`. The callback
-/// `f` has the same signature as for [`rk_step`]. The returned
-/// [`MultistepResult`] carries the rolled history for the next step.
-///
-/// The step size is assumed fixed; if the caller changes `h`, it must
-/// re-initialise the history (history samples are equally spaced).
 #[pyfunction]
 fn multistep_step(
     method: MultistepMethod,
@@ -192,6 +203,73 @@ fn multistep_step(
     })
 }
 
+/// Take a single Cowell (Störmer-Cowell) 8th-order step for x'' = a(t, x).
+///
+/// `history` = `[x_{n-1}, x_n, a_{n-7}, ..., a_n]` (10 vectors: 2 position
+/// samples + 8 acceleration samples, oldest first). `accel` evaluates a(t, x).
+/// Output is position only. Fixed step; changing `h` requires re-initialising
+/// the history.
+#[pyfunction]
+fn cowell_step(
+    t: f64,
+    h: f64,
+    tol: f64,
+    accel: &Bound<PyAny>,
+    history: Vec<Vec<f64>>,
+) -> PyResult<CowellResult> {
+    if h <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "step size h must be positive",
+        ));
+    }
+    if tol <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "tolerance tol must be positive",
+        ));
+    }
+    if history.len() != cowell::COWELL_HISTORY_LEN {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "cowell needs {} history samples [x_(n-1), x_n, a_(n-7), ..., a_n] \
+             (2 positions + 8 accelerations), got {}",
+            cowell::COWELL_HISTORY_LEN,
+            history.len()
+        )));
+    }
+    let n = history[0].len();
+    if n == 0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "position dimension must be positive",
+        ));
+    }
+    for hist in &history {
+        if hist.len() != n {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "history sample has length {} but position dimension is {n}",
+                hist.len()
+            )));
+        }
+    }
+
+    let callback = |ti: f64, xi: &[f64]| -> PyResult<Vec<f64>> { call_python_rhs(accel, n, ti, xi) };
+
+    let (x_new, error, new_history) = cowell::cowell_step(t, h, &history, callback)?;
+
+    if x_new.iter().any(|v| v.is_nan() || v.is_infinite()) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "step produced non-finite values",
+        ));
+    }
+
+    let h_next = suggest_next_step(h, error, tol, cowell::COWELL_EMBEDDED_ORDER);
+
+    Ok(CowellResult {
+        x_new,
+        error,
+        h_next,
+        history: new_history,
+    })
+}
+
 /// A placeholder function to verify the FFI path works end-to-end.
 #[pyfunction]
 fn hello_integrators() -> PyResult<String> {
@@ -203,9 +281,11 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
     m.add_function(wrap_pyfunction!(multistep_step, m)?)?;
+    m.add_function(wrap_pyfunction!(cowell_step, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;
     m.add_class::<MultistepResult>()?;
+    m.add_class::<CowellResult>()?;
     Ok(())
 }
