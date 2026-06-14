@@ -18,7 +18,7 @@ References:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
@@ -107,10 +107,28 @@ class SolarRadiationPressure(PhysicalModel):
         self,
         t: float,
         state: npt.ArrayLike,
-        system: object,
+        system: Any,
     ) -> npt.NDArray[np.floating]:
-        """系统感知路径（待 Phase F 实现）。"""
-        raise NotImplementedError(
-            "SolarRadiationPressure.compute_acceleration (system-aware) "
-            "is implemented in a later phase."
-        )
+        """系统感知光压加速度。
+
+        从 ``system`` 读取传播原点与 SPICE，查询太阳相对原点的 J2000 位置，
+        取阴影模型的光照份额（无阴影时为全光照），调用纯函数
+        ``_compute_srp_acceleration``。要求传播坐标系为惯性系。
+        """
+        cs = getattr(system, "coordinate_system", None)
+        if cs is None:
+            raise ValueError("system.coordinate_system is required for SRP")
+        rotation = np.asarray(cs.axes.rotation_matrix(t), dtype=float)
+        if not np.allclose(rotation, np.eye(3), atol=1e-9):
+            raise NotImplementedError(
+                "SolarRadiationPressure requires an inertial propagation frame (ICRF); "
+                f"got non-identity axes {type(cs.axes).__name__}."
+            )
+
+        spice = system.spice
+        origin = cs.origin.body
+        sc_pos = np.asarray(state, dtype=float)[:3]
+        sun_pos = spice.get_body_state("SUN", t, "J2000", origin)[:3]
+
+        flux = self._shadow.flux_factor(t, state, system) if self._shadow is not None else 1.0
+        return self._compute_srp_acceleration(sc_pos - sun_pos, flux)

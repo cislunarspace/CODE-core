@@ -13,6 +13,7 @@ References:
 from __future__ import annotations
 
 import abc
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -38,7 +39,7 @@ class ShadowModel(abc.ABC):
         self,
         t: float,
         state: npt.ArrayLike,
-        system: object,
+        system: Any,
     ) -> float:
         """返回航天器在当前状态下的光照份额 ∈ [0, 1]。
 
@@ -180,9 +181,42 @@ class ConicalShadowModel(ShadowModel):
         self,
         t: float,
         state: npt.ArrayLike,
-        system: object,
+        system: Any,
     ) -> float:
-        """系统感知路径（待 Phase D 实现）。"""
-        raise NotImplementedError(
-            "ConicalShadowModel.flux_factor (system-aware) is implemented in a later phase."
-        )
+        """系统感知光照份额。
+
+        从 ``system`` 读取传播原点与 SPICE，查询太阳及各遮挡体相对原点的 J2000
+        位置，调用纯几何 ``_body_flux_factor`` 与 ``_combine_body_fluxes``。
+        要求传播坐标系为惯性系（轴旋转矩阵为单位阵）。
+        """
+        cs = getattr(system, "coordinate_system", None)
+        if cs is None:
+            raise ValueError("system.coordinate_system is required for shadow")
+        rotation = np.asarray(cs.axes.rotation_matrix(t), dtype=float)
+        if not np.allclose(rotation, np.eye(3), atol=1e-9):
+            raise NotImplementedError(
+                "ConicalShadowModel requires an inertial propagation frame (ICRF); "
+                f"got non-identity axes {type(cs.axes).__name__}."
+            )
+
+        spice = system.spice
+        origin = cs.origin.body
+        sc_pos = np.asarray(state, dtype=float)[:3]
+        sun_pos = spice.get_body_state("SUN", t, "J2000", origin)[:3]
+        sun_radius = self._radii["SUN"]
+
+        factors: list[float] = []
+        angular_radii: list[float] = []
+        directions: list[npt.NDArray[np.floating]] = []
+        for body in self._bodies:
+            body_pos = spice.get_body_state(body, t, "J2000", origin)[:3]
+            r_body = self._radii[body]
+            factors.append(
+                self._body_flux_factor(sc_pos, body_pos, sun_pos, r_body, sun_radius)
+            )
+            sc_to_body = body_pos - sc_pos
+            d_body = float(np.linalg.norm(sc_to_body))
+            angular_radii.append(np.arcsin(min(1.0, r_body / d_body)))
+            directions.append(sc_to_body / d_body)
+
+        return self._combine_body_fluxes(factors, angular_radii, directions)
