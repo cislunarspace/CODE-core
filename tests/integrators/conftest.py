@@ -174,11 +174,13 @@ def propagate_rk(method, rhs, y0, t_span, tol: float = 1e-12, h0: float = 1.0):
         h_step = min(h, tf - t)
         result = rk_step(method, t, y, h_step, abs_tol, rhs)
         if result.error <= abs_tol:
-            # Accept the step and advance.
+            # Accept; cap step growth at 2x to avoid error-overshoot on accept.
             y = np.asarray(result.y_new, dtype=float)
             t += h_step
-        # On reject, leave y/t unchanged and retry with the smaller h_next.
-        h = result.h_next
+            h = min(result.h_next, h_step * 2.0)
+        else:
+            # Reject: leave y/t unchanged, retry with the smaller suggested step.
+            h = result.h_next
         n_steps += 1
     return t, y, n_steps
 
