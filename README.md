@@ -15,7 +15,7 @@ e2m2e 是一个用于设计地月空间运行轨道和转移轨道的 Python 库
 
 - **CR3BP 系统建模**：地月、日地、日木等天体系统，拉格朗日点计算，Jacobi 常数
 - **星历动力学**：基于 SPICE 内核的 N 体引力计算，支持多天体摄动
-- **太阳辐射压 (SRP)**：CR3BP_SRP_Dynamics 子类，支持光学系数参数化
+- **太阳辐射压 (SRP)**：SolarRadiationPressure 力模型（cannonball Cr + 圆锥地影/月影）
 - **周期轨道**：DRO、ARO、RO、Halo、Lyapunov、Lissajous、Butterfly、Dragonfly
 - **设计算法**：微分修正、多重打靶法、自然延拓、伪弧长延拓、稳定性分析
 - **转移轨道**：DRO-RO 转移搜索 (网格搜索 + NLP 优化)
@@ -179,7 +179,6 @@ e2m2e/
 ├── core/                 # 系统、动力学、轨道、坐标系、星历
 │   ├── system.py         # CR3BP_System - 系统定义、平动点
 │   ├── dynamics.py       # CR3BP_Dynamics - 运动方程、STM
-│   ├── srp_dynamics.py   # CR3BP_SRP_Dynamics - 太阳辐射压扰动
 │   ├── orbit.py          # Orbit, OrbitFamily - 轨道数据结构
 │   ├── coordinate.py     # 坐标变换
 │   ├── ephemeris_system.py      # EphemerisSystem - 星历系统

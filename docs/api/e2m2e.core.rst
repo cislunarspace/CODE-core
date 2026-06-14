@@ -25,14 +25,6 @@ e2m2e.core.dynamics module
    :undoc-members:
    :show-inheritance:
 
-e2m2e.core.srp_dynamics module
--------------------------------
-
-.. automodule:: e2m2e.core.srp_dynamics
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 e2m2e.core.orbit module
 ------------------------
 

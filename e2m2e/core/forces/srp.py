@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 
-from .physical_model import PhysicalModel
+from .physical_model import PhysicalModel, require_inertial_frame
 
 if TYPE_CHECKING:
     from .shadow import ShadowModel
@@ -115,18 +115,7 @@ class SolarRadiationPressure(PhysicalModel):
         取阴影模型的光照份额（无阴影时为全光照），调用纯函数
         ``_compute_srp_acceleration``。要求传播坐标系为惯性系。
         """
-        cs = getattr(system, "coordinate_system", None)
-        if cs is None:
-            raise ValueError("system.coordinate_system is required for SRP")
-        rotation = np.asarray(cs.axes.rotation_matrix(t), dtype=float)
-        if not np.allclose(rotation, np.eye(3), atol=1e-9):
-            raise NotImplementedError(
-                "SolarRadiationPressure requires an inertial propagation frame (ICRF); "
-                f"got non-identity axes {type(cs.axes).__name__}."
-            )
-
-        spice = system.spice
-        origin = cs.origin.body
+        _cs, spice, origin = require_inertial_frame(system, t)
         sc_pos = np.asarray(state, dtype=float)[:3]
         sun_pos = spice.get_body_state("SUN", t, "J2000", origin)[:3]
 

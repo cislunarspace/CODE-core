@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import abc
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -36,3 +37,23 @@ class PhysicalModel(abc.ABC):
             加速度向量，形状 ``(3,)``，单位与 ``system.unit_system`` 一致。
         """
         raise NotImplementedError
+
+
+def require_inertial_frame(
+    system: Any, t: float
+) -> tuple[Any, Any, str]:
+    """校验传播系为惯性系，返回 (coordinate_system, spice, origin_body)。
+
+    供在传播惯性系（ICRF，轴旋转矩阵为单位阵）中直接计算的力模型调用。
+    非惯性系（如 ITRFApproxAxes）抛 ``NotImplementedError``。
+    """
+    cs = getattr(system, "coordinate_system", None)
+    if cs is None:
+        raise ValueError("system.coordinate_system is required")
+    rotation = np.asarray(cs.axes.rotation_matrix(t), dtype=float)
+    if not np.allclose(rotation, np.eye(3), atol=1e-9):
+        raise NotImplementedError(
+            "force model requires an inertial propagation frame (ICRF); "
+            f"got non-identity axes {type(cs.axes).__name__}."
+        )
+    return cs, system.spice, cs.origin.body

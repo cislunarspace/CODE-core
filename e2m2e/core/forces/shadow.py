@@ -18,6 +18,8 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from .physical_model import require_inertial_frame
+
 # 默认遮挡体赤道半径（km），取 GMAT PCK 值。可通过 radii 覆盖参数扩展。
 _BODY_RADII_KM: dict[str, float] = {
     "EARTH": 6378.1363,
@@ -189,18 +191,7 @@ class ConicalShadowModel(ShadowModel):
         位置，调用纯几何 ``_body_flux_factor`` 与 ``_combine_body_fluxes``。
         要求传播坐标系为惯性系（轴旋转矩阵为单位阵）。
         """
-        cs = getattr(system, "coordinate_system", None)
-        if cs is None:
-            raise ValueError("system.coordinate_system is required for shadow")
-        rotation = np.asarray(cs.axes.rotation_matrix(t), dtype=float)
-        if not np.allclose(rotation, np.eye(3), atol=1e-9):
-            raise NotImplementedError(
-                "ConicalShadowModel requires an inertial propagation frame (ICRF); "
-                f"got non-identity axes {type(cs.axes).__name__}."
-            )
-
-        spice = system.spice
-        origin = cs.origin.body
+        _cs, spice, origin = require_inertial_frame(system, t)
         sc_pos = np.asarray(state, dtype=float)[:3]
         sun_pos = spice.get_body_state("SUN", t, "J2000", origin)[:3]
         sun_radius = self._radii["SUN"]
