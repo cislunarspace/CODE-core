@@ -107,3 +107,96 @@ def solve_kepler(M: float, e: float, tol: float = 1e-14, max_iter: int = 100) ->
         if abs(dE) < tol:
             break
     return E
+
+
+# ---------------------------------------------------------------------------
+# LEO J2 problem + adaptive propagation helper (shared by RK method tests).
+# ---------------------------------------------------------------------------
+
+# Earth gravitational constants (km, s).
+EARTH_MU = 398600.4418  # km^3 / s^2
+EARTH_RE = 6378.137  # km, equatorial radius
+EARTH_J2 = 1.0826261e-3
+
+
+def j2_rhs(
+    mu: float = EARTH_MU, re: float = EARTH_RE, j2: float = EARTH_J2
+):
+    """Two-body + J2 acceleration, state vector [x, y, z, vx, vy, vz] in km/s."""
+
+    def f(t: float, state: np.ndarray) -> np.ndarray:  # noqa: ARG001
+        r = state[:3]
+        v = state[3:]
+        r_norm = np.linalg.norm(r)
+        r2 = r_norm**2
+        a_2body = -mu * r / r_norm**3
+        k = 1.5 * j2 * mu * re**2 / r_norm**5
+        z2_over_r2 = r[2] ** 2 / r2
+        a_j2 = -k * np.array(
+            [
+                r[0] * (1.0 - 5.0 * z2_over_r2),
+                r[1] * (1.0 - 5.0 * z2_over_r2),
+                r[2] * (3.0 - 5.0 * z2_over_r2),
+            ]
+        )
+        return np.concatenate([v, a_2body + a_j2])
+
+    return f
+
+
+def leo_initial_state(altitude_km: float = 400.0, mu: float = EARTH_MU, re: float = EARTH_RE):
+    """Circular LEO initial state in the xy-plane: [r, 0, 0, 0, v, 0] (km/s)."""
+    r = re + altitude_km
+    v = np.sqrt(mu / r)
+    return np.array([r, 0.0, 0.0, 0.0, v, 0.0])
+
+
+def propagate_rk(method, rhs, y0, t_span, tol: float = 1e-12, h0: float = 1.0):
+    """Adaptive propagation via ``rk_step`` from t_span[0] to t_span[1].
+
+    ``tol`` is a *relative* tolerance: the per-step acceptance threshold is
+    ``tol * max(1, ||y||)`` so the controller behaves sensibly across state
+    scales (e.g. normalised two-body vs LEO in km). Steps whose local error
+    estimate exceeds the threshold are rejected and retried at the smaller
+    step size suggested by ``rk_step``.
+
+    Returns ``(t_final, y_final, n_steps)``.
+    """
+    from e2m2e.integrators import rk_step
+
+    t0, tf = t_span
+    t = float(t0)
+    y = np.asarray(y0, dtype=float).copy()
+    h = float(h0)
+    n_steps = 0
+    while t < tf:
+        abs_tol = tol * max(1.0, float(np.linalg.norm(y)))
+        h_step = min(h, tf - t)
+        result = rk_step(method, t, y, h_step, abs_tol, rhs)
+        if result.error <= abs_tol:
+            # Accept the step and advance.
+            y = np.asarray(result.y_new, dtype=float)
+            t += h_step
+        # On reject, leave y/t unchanged and retry with the smaller h_next.
+        h = result.h_next
+        n_steps += 1
+    return t, y, n_steps
+
+
+def normalized_leo_j2(altitude_du: float = 400.0 / EARTH_RE, days: float = 1.0):
+    """Normalised LEO + J2 problem (length unit = Earth radius, time unit set so mu = 1).
+
+    Normalisation makes ||y|| ~ O(1) so that the relative tolerance in
+    :func:`propagate_rk` controls the error directly rather than being scaled
+    up by the ~7000 km state magnitude of a km/s formulation.
+
+    Returns ``(rhs, y0, t_span)`` with ``t_span`` in normalised time units
+    (1 day ≈ 107.2 TU).
+    """
+    tu_per_second = np.sqrt(EARTH_MU / EARTH_RE**3)  # TU per second
+    t_span = (0.0, days * 86400.0 * tu_per_second)
+    rhs = j2_rhs(mu=1.0, re=1.0, j2=EARTH_J2)
+    r = 1.0 + altitude_du
+    v = np.sqrt(1.0 / r)
+    y0 = np.array([r, 0.0, 0.0, 0.0, v, 0.0])
+    return rhs, y0, t_span

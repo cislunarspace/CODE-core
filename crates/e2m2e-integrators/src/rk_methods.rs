@@ -1,11 +1,13 @@
 use crate::butcher::ButcherTable;
 use crate::pd45::PD45_TABLE;
+use crate::pd78::PD78_TABLE;
 use pyo3::prelude::*;
 
 #[pyclass(eq, eq_int, rename_all = "SCREAMING_SNAKE_CASE")]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RkMethod {
     Pd45,
+    Pd78,
 }
 
 impl RkMethod {
@@ -13,6 +15,7 @@ impl RkMethod {
     pub fn table(self) -> &'static ButcherTable {
         match self {
             RkMethod::Pd45 => &PD45_TABLE,
+            RkMethod::Pd78 => &PD78_TABLE,
         }
     }
 

@@ -3,6 +3,7 @@ use pyo3::types::PyList;
 
 pub(crate) mod butcher;
 pub(crate) mod pd45;
+pub(crate) mod pd78;
 pub mod rk_methods;
 
 use butcher::{explicit_rk_step, suggest_next_step};
