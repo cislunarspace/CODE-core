@@ -24,21 +24,28 @@ e2m2e **不处理**：
 ### 系统与环境
 
 **动力学系统（System）** — 天体的几何、引力与运动学模型，是后续一切计算的上下文。System 抽象基类（`abc.ABC`）定义最小接口：
-- `frame`（`ReferenceFrame`）— 坐标框架。
+- `frame`（`ReferenceFrame`）— 坐标系标识枚举（如 `SYNODIC`、`INERTIAL`），仅作标签、不做变换。
+- `coordinate_system`（`CoordinateSystem | None`，可选）— 变换对象（`坐标轴`+`原点`）；`EphemerisSystem` 有，`CR3BP_System` 无（走 `CoordinateTransformation`），`System.transform()` 薄委托给它。
 - `unit_system`（`UnitSystem`）— 单位系统。
 - `gravitational_parameter(body)` — 天体引力参数；CR3BP 返回无量纲，星历返回 km³/s²。
 _Avoid_: 系统模型、动力学模型
 
-**CR3BP 系统（CR3BP System）** — `System` 的实现，描述圆型限制性三体问题：两个主天体绕公共质心作圆周运动，第三体质量可忽略。采用以质心为原点的旋转坐标系，所有量无量纲化（DU, TU, VU）。特有概念：`LibrationPoint`（平动点）。
+**CR3BP 系统（CR3BP System）** — `System` 的实现，描述圆型限制性三体问题：两个主天体绕公共质心作圆周运动，第三体质量可忽略。采用以质心为原点的旋转坐标系，所有量无量纲化（DU, TU, VU）。在该会合旋转系中运动按**相位**演化——**自治系统**，与历元无关（给定初始相位，后续状态唯一确定）。特有概念：`LibrationPoint`（平动点）。
 _Avoid_: 三体系统、无量纲系统
 
-**星历系统（Ephemeris System）** — `System` 的实现，基于 SPICE 内核查询天体星历。采用 J2000 等惯性坐标框架，单位为物理单位（km, s, km/s）。不定义平动点。
+**星历系统（Ephemeris System）** — `System` 的实现，基于 SPICE 内核查询天体星历。采用 J2000 等惯性坐标系，单位为物理单位（km, s, km/s）。运动按**历元**演化——**非自治**，天体位置随历元变化（由 SPICE 查询确定）。不定义平动点。
 _Avoid_: 星历数据源、目标天体历表
 
-**坐标框架（Coordinate Frame）** — 描述向量指向的参考方向和原点，如 J2000、CR3BP 旋转系。与单位系统正交。
-_Avoid_: 坐标系（中文中过于宽泛）
+**坐标轴（`Axes`）** — 坐标系的**朝向**部分。`rotation_matrix(et)` 给出到 ICRF/J2000 的旋转矩阵 R（约定 `r_icrf = R @ r_axes`），`rotation_and_rate` 给出 (R, Rdot)（`v_icrf = R @ v_axes + Rdot @ r_axes`）。实现按精度分档：`ITRFSpiceAxes`（SPICE ITRF93，高精度）、`GMATITRFAxes`（GMAT 兼容原生）、`ITRFApproxAxes`（低精度教学）、`ICRSAxes`（单位阵）、`IAU2000EqAxes`。
+_Avoid_: 坐标系（指 `CoordinateSystem` 整体，非朝向部分）
 
-**单位系统（Unit System）** — 描述数值的量纲，如 CR3BP 无量纲单位、SI 单位。同一坐标框架中的状态可用不同单位系统表示。
+**原点（`Origin`）** — 坐标系的**平移**部分。`state(et)` 返回该原点在 ICRF 中的绝对状态 [r, v]。子类 `CelestialBodyOrigin`（天体中心）、`InertialOrigin`（质心等无平移点）。
+_Avoid_: 物理天体本身（原点是参考点）
+
+**坐标系（`CoordinateSystem`）** — `坐标轴`（朝向）+ `原点`（平移）的组合体，是向量/状态变换的单位（`transform_vector`/`transform_state`）。与 `单位系统` 正交；`System.coordinate_system` 持有一个供力模型变换。注：`CR3BP_System` **不**经 `CoordinateSystem` 变换——会合旋转系/惯性系/天体中心系转换走独立的 `CoordinateTransformation`（`e2m2e/core/coordinate.py`，绑 `CR3BP_System`），故其 `coordinate_system` 为 `None`；会合系原则上可表达为（会合 `Axes`+质心 `Origin`），但代码走 legacy 路径。
+_Avoid_: 坐标框架（口语同义词，规范用"坐标系"）；把 `frame` 枚举当坐标系（仅标签，不做变换）
+
+**单位系统（Unit System）** — 描述数值的量纲，如 CR3BP 无量纲单位、SI 单位。同一坐标系中的状态可用不同单位系统表示。
 _Avoid_: 单位、量纲
 
 **平动点（Libration Point）** — CR3BP 中旋转坐标系下的五个平衡解：L1、L2、L3 共线，L4、L5 三角。仅属于 CR3BP System 的概念。
@@ -79,6 +86,14 @@ _Avoid_: 采样轨道、代表性轨道集
 **周期** — 一条 **单条轨道** 在 CR3BP 模型中完成一次重复运动所需的时间。周期可以来自用户输入、参考初值、轨道修正结果或输出诊断。周期不同于采样点数、传播时长。
 _Avoid_: 采样点数、任意传播时长、周期倍数
 
+### 力模型与传播
+
+**力模型（`PhysicalModel`）** — 对航天器加速度的一项物理贡献（`PhysicalModel` 子类：引力场、大气阻力、太阳光压、有限推力等）。每个力模型接收 `(t, state, system)`，返回在 `system.coordinate_system`（传播坐标系）下的加速度 `(3,)`。需要中间坐标系（如 ITRF 算阻力、ICRF 算光压）的力模型**自行**经由 `system.transform` 完成变换并转回传播系。
+_Avoid_: 力（单独使用含混）、force（同上）
+
+**力模型聚合（`ForceModel`）** — 多个 **力模型** 加速度的合成，由 `ForceModel`（`Dynamics` 子类）承担。聚合时容器对各力模型返回的加速度做矢量求和；**坐标变换的职责属于每个力模型，不属于容器**。容器不代劳变换、不感知各力模型的中间坐标系。
+_Avoid_: 容器协调坐标转换（误导：暗示容器代劳变换）、力叠加（口语化）
+
 ### 推进与转移
 
 **推进模型（Propulsion Model）** — 描述航天器如何改变速度的策略。`Transfer` 持有推进模型以支持不同转移类型。_仅用于 `Transfer` 的出发/到达代价建模（`alpha/beta` 速度分解），与传播中的推力事件不同；参见 推力/机动模型_。
@@ -108,11 +123,20 @@ _Avoid_: 推力、燃料消耗
 
 ### 算法
 
-**动力学（Dynamics）** — 在给定 `System` 上积分运动方程的能力。`Dynamics` 是基类，`CR3BP_Dynamics` 与 `EphemerisDynamics` 为其实现。负责 `propagate(state, time_range)` 并返回状态历史。
-_Avoid_: 求解器
+**动力学（Dynamics）** — 在给定 `System` 上积分运动方程、返回状态历史的多态锚点（ADR 0001）。**坐标系是主轴**：`System` 决定坐标系与基底引力——`CR3BP 系统`（地月会合旋转系，运动按**相位**演化、自治、与历元无关）或 `星历系统`（高精度惯性系，运动按**历元**演化、天体位置由 SPICE 查询）。**力在坐标系之上声明、与之正交**：统一模式下每个 `Dynamics` = `System` + 可选声明 `力模型` 列表；力影响外推计算量与保真度，不决定模型身份。已实现：`CR3BP_Dynamics`（会合系、解析伪势+科氏基底）、`EphemerisDynamics`（惯性系、解析 N 体引力基底）、`ForceModel`（`力模型聚合`，惯性系全力分解——引力亦作 `力模型`、无解析基底）。**会合系 + 声明力**（受摄 CR3BP `中间模型`）待建。因 `力模型` 接口不提供 ∂a/∂r，携带声明力的 `动力学` 暂不支持解析 STM；加入时变力（如太阳引力）会使会合系模型失去相位自治（→ bicellular 类时间周期系统）。
+_Avoid_: 求解器；把"解析 vs 力分解"当作主轴（主轴是坐标系）；把 `ForceModel` 视作"坐标系+力"模式之外的特例（它是惯性系下的一种实现）
 
-**积分器（Integrator）** — `Dynamics` 内部的底层数值单步推进引擎（如 RK 步进器）。负责从 `(t, y)` 计算一步到 `(t + h, y_new)`，并返回步长建议与误差估计。积分器不持有 System 上下文、不做事件检测、不控制传播全程；这些职责由 `Dynamics` 承担。
-_Avoid_: 步进器（overloaded，中文中可接受"步进器"作为实现层面的同义词）
+**中间模型（Intermediate Model）** — 在基础模型（`CR3BP 系统` 或 `星历系统`）之上声明摄动 `力模型` 构成的模型，**不是第三种基础 `System`**。如会合旋转系 + 太阳引力 + SRP。加入时变力（太阳在会合系中运动）后，会合系中间模型失去相位自治（→ bicellular 类时间周期系统）。当前未实现（待按 `动力学` 统一模式给解析类加可选力列表，并解决旋转系下 `力模型` 的 `require_inertial_frame` 约束）。
+_Avoid_: 把中间模型当作独立的第三种 System；把"CR3BP + 力"仍当作自治 CR3BP
+
+**积分器（Integrator）** — `动力学` 调用的底层数值推进引擎，实现在 Rust crate（`crates/e2m2e-integrators`）并经 `e2m2e.integrators` 公开。共性：不持有 `System` 上下文、不做事件检测、不控制传播全程（那些是 `动力学` 的职责）；每次调用推进一步并返回误差估计与步长建议。分三族：
+- **单步积分器（Single-step / Runge-Kutta 族）**：无状态、自适应步长、积一阶 `y'=f(t,y)`、输出全状态。`rk_step`，方法 `Pd45`/`Pd78`/`Rk89`。
+- **多步积分器（Multistep / Adams 族）**：携带**历史缓冲**（纯导数采样）、固定步长、积一阶 `y'=f`、输出全状态。`multistep_step`，方法 `Abm`。
+- **二阶积分器（Second-order / Cowell 族）**：携带**历史缓冲**（位置+加速度采样，wire 与 Adams 不兼容）、固定步长、积二阶 `x''=a(t,x)`、输出**仅位置**（速度需有限差分恢复）。`cowell_step`。
+_Avoid_: 步进器（overloaded；中文中可接受"步进器"作为实现层面同义词）；把多步/二阶排除在"积分器"外（与 GMAT 分类、crate 目录相悖）
+
+**历史缓冲（history）** — 多步与二阶积分器跨步保留的既往采样（单步积分器无此物）。固定步长；改步长须重建。两种**不兼容**的 wire 格式：**Adams 族**为纯导数采样 `[f_{n-k}, …, f_n]`；**Cowell 族**为位置+加速度混合采样（如 `[x_{n-1}, x_n, a_{n-7}, …, a_n]`），故两者不能共用同一缓冲。Cowell 的混合 wire 偏离 #107 grilling 共识（当时设想统一纯导数 wire），记录于 issue 与 `cowell.rs` 注释。
+_Avoid_: 把 Adams 与 Cowell 的 history 视为同一种 wire
 
 **状态转移矩阵（STM / State Transition Matrix）** — 状态扰动的线性传播矩阵，形状 `(n_points, 6, 6)`。由 `Dynamics.propagate(..., with_stm=True)` 返回。
 _Avoid_: 雅可比矩阵（STM 是状态空间的雅可比，但与约束雅可比不同）
@@ -193,7 +217,7 @@ _Avoid_: 只说绘图（无法覆盖未来交互式查看）、只说可视化�
 **检查与分析** — 用于验证 **输入文件** 或 **输出文件**、查看数值诊断、比较结果或理解轨道数据特征的工具类别。检查强调是否符合预期；分析强调解释数据特征。
 _Avoid_: 只说检查（无法覆盖数据解释）、只说分析（容易弱化验证语义）
 
-**坐标系** — 用于解释轨道状态、转换结果或绘图位置的参考框架。坐标系影响数据含义和显示方式。
+**坐标系** — **绘图与可视化** 中解释轨道状态/转换结果/绘图位置所用的参考框架（即 `系统与环境` 节定义的 **坐标系**）。仅影响数据含义与显示方式，不改变数值。
 _Avoid_: 绘图样式、显示单位、主题
 
 **图层** — **绘图与可视化** 中可独立显示、隐藏或调整样式的一类视觉元素，例如轨道曲线、天体图标、平动点、坐标轴或标注。图层只影响展示，不改变轨道数据、计算结果或输出文件中的数值内容。
@@ -219,7 +243,7 @@ _Avoid_: 工具链（容易强调实现组合）、处理流程（过于泛化�
 | 状态序列形状 | `(n_points, 6)` — 不是 `(6, n_points)` |
 | STM 形状 | `(n_points, 6, 6)` |
 | 数值积分容差 | `rtol=atol=1e-12`（默认） |
-| 坐标框架与单位 | 每个 `Orbit` 必须能通过绑定的 `System` 解释其 `frame` 与 `unit_system` |
+| 坐标系与单位 | `Orbit` 状态由绑定的 `System` 解释（`frame` 标识 / `coordinate_system` 变换 / `unit_system` 量纲） |
 | 参考历元 | `"2025-06-21T11:00:06"`（SPICE 操作默认） |
 
 ## 领域关系

@@ -66,3 +66,15 @@ The goal of #61 is to introduce a Rust-based single-step Runge-Kutta engine (sta
 
 - A later slice may re-implement `Dynamics.propagate()` to orchestrate Rust `rk_step` calls from Python, adding dense output and event detection as needed.
 - Additional RK methods (e.g., DOP853) can be added to `crates/e2m2e-integrators/src/` without changing the build system.
+
+## Amendment (2026-06-14, issue #67)
+
+Decision 2 ("Rust crate owns only single-step integration") described the **first slice's** scope, not a permanent constraint. The integrator-family epic (#67) expanded the Rust crate to three method families:
+
+- **Single-step RK** (`rk_step`): `Pd45`, `Pd78`, `Rk89` — unchanged from the original slice.
+- **Multistep predictor-corrector** (`multistep_step`): Adams-Bashforth-Moulton (`Abm`), fixed step, carries a derivative-sample **history** buffer.
+- **Second-order double-integration** (`cowell_step`): Störmer-Cowell, fixed step, integrates `x'' = a(t, x)` directly from a mixed position+acceleration history buffer; outputs position only.
+
+Decisions 1 (workspace + maturin), 3 (Python keeps trajectory-level control — adaptive stepping, event detection, dense output stay out of the crate), and 4 (public `e2m2e.integrators` shim) still hold. The new multistep/second-order families obey the same boundary: they advance one step and return an error estimate + step suggestion; they do not perform event detection, dense output, or full propagation control.
+
+Note on decision 3: `CR3BP_Dynamics` and `EphemerisDynamics` (system-typed axis) still use `scipy.solve_ivp`; only `ForceModel` (force-decomposed axis) drives the Rust steppers from Python. See `CONTEXT.md` → 动力学 for the two-axis model. The original "Future work" items above are now realized: `ForceModel` orchestrates `rk_step` from Python (adaptive stepping + simple event detection), and the crate gained multistep + second-order families.
