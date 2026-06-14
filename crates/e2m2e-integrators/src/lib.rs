@@ -1,10 +1,11 @@
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-mod pd45;
+pub(crate) mod butcher;
+pub(crate) mod pd45;
 pub mod rk_methods;
 
-use pd45::{pd45_step, suggest_next_step};
+use butcher::{explicit_rk_step, suggest_next_step};
 use rk_methods::RkMethod;
 
 /// Result of a single Runge-Kutta step.
@@ -75,13 +76,10 @@ fn rk_step(
     }
 
     let n = y.len();
-    let callback = |ti: f64, yi: &[f64]| -> PyResult<Vec<f64>> {
-        call_python_rhs(f, n, ti, yi)
-    };
+    let callback = |ti: f64, yi: &[f64]| -> PyResult<Vec<f64>> { call_python_rhs(f, n, ti, yi) };
 
-    let (y_new, error) = match method {
-        RkMethod::Pd45 => pd45_step(t, &y, h, callback)?,
-    };
+    let table = method.table();
+    let (y_new, error) = explicit_rk_step(table, t, &y, h, callback)?;
 
     if y_new.iter().any(|v| v.is_nan() || v.is_infinite()) {
         return Err(pyo3::exceptions::PyValueError::new_err(
@@ -89,13 +87,9 @@ fn rk_step(
         ));
     }
 
-    let h_next = suggest_next_step(h, error, tol);
+    let h_next = suggest_next_step(h, error, tol, method.embedded_order());
 
-    Ok(StepResult {
-        y_new,
-        error,
-        h_next,
-    })
+    Ok(StepResult { y_new, error, h_next })
 }
 
 /// A placeholder function to verify the FFI path works end-to-end.
