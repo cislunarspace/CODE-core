@@ -81,10 +81,17 @@ _Avoid_: 采样点数、任意传播时长、周期倍数
 
 ### 推进与转移
 
-**推进模型（Propulsion Model）** — 描述航天器如何改变速度的策略。`Transfer` 持有推进模型以支持不同转移类型。
+**推进模型（Propulsion Model）** — 描述航天器如何改变速度的策略。`Transfer` 持有推进模型以支持不同转移类型。_仅用于 `Transfer` 的出发/到达代价建模（`alpha/beta` 速度分解），与传播中的推力事件不同；参见 推力/机动模型_。
 - `ImpulsivePropulsion`：脉冲机动，速度瞬时变化。将出发速度分解为切向与法向分量：``v = alpha * |v| * t_hat + beta * |v| * n_hat``，其中 `alpha` 为切向速度比，`beta` 为法向速度比（默认 `0.0`，即纯切向）。
 - `LowThrustPropulsion`：连续小推力（待实现）。
 _Avoid_: 推进方式、动力模型
+
+**推力/机动模型（Thrust / Maneuver Model）** — 航天器在传播中改变速度的两种事件，定义在 `e2m2e.core.forces.thrust`。与 **推进模型**（转移代价建模）正交。
+- `FiniteBurn(PhysicalModel)`：连续推力加速度。`thrust_profile(t)` 返回推力大小（N，标量，`0` 表示关机）；`direction` 接受固定向量 `(3,)` 或 `(t, state) -> (3,)` 可调用（传播坐标系内，内部归一化）；`mass` 常量（kg）。返回 `thrust/mass · d̂ / 1000`（km/s²）。合并了 GMAT R2026a 的 `FiniteBurn`（配置）与 `FiniteThrust`（力模型），未引入 `Thruster` 硬件层。
+- `ImpulsiveBurn`：瞬时 Δv 机动事件 `(epoch, delta_v)`（frozen dataclass），**不继承 `PhysicalModel`**；由 `ForceModel.propagate_maneuvers` 在 `epoch` 处中断传播、在传播坐标系内施加 `state[3:6] += delta_v`、续传。输出在 burn epoch 处为 post-burn 单行（无重复 epoch），`BurnApplication` 记录 `velocity_before/after`。
+- 第一阶段：Δv 与方向均在传播（惯性）坐标系内解释，不做坐标变换；VNB/LVLH burn 坐标系推迟到 Slice 12（届时加 `frame` 字段，转换走 `CoordinateSystem.transform_vector`，对应 GMAT `Burn::ConvertDeltaVToInertial` 的 `coincident=true` 纯旋转）。
+- 质量变化：不支持（`mass` 常量）。GMAT 通过把质量作为增广状态通道实现（脉冲用齐奥尔科夫斯基方程离散扣、有限推力写 `dm/dt`），e2m2e 状态（REQ-002）为 6 维无质量通道，故推迟到独立切片。
+_Avoid_: 推进方式（与 Propulsion Model 混淆）、burn（单独使用含混，须带限定：脉冲/有限）
 
 **转移（Transfer）** — 从出发条件到到达条件的轨迹。出发与到达由 `TerminalCondition` 定义，不由 `Orbit` 强制限定。
 _Avoid_: 轨道族转换、星历转换

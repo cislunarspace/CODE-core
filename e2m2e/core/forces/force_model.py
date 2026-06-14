@@ -11,8 +11,8 @@ import numpy.typing as npt
 from e2m2e.core.dynamics import Dynamics
 from e2m2e.integrators import RkMethod, rk_step
 
-from .exceptions import CoordinateTransformError
 from .physical_model import PhysicalModel
+from .thrust import BurnApplication, ImpulsiveBurn
 
 
 class ForceModel(Dynamics):
@@ -238,6 +238,95 @@ class ForceModel(Dynamics):
             "time": time_array,
             "states": state_array,
             "terminal_event_index": terminal_event_index,
+        }
+
+    def propagate_maneuvers(
+        self,
+        initial_state: npt.ArrayLike,
+        t_span: tuple[float, float],
+        burns: list[ImpulsiveBurn],
+        *,
+        initial_step: float | None = None,
+        max_steps: int = 100_000,
+    ) -> dict[str, Any]:
+        """带脉冲机动的传播：coast 段之间在 burn epoch 处施加 Δv。
+
+        按 epoch 排序 burns，依次 coast → 施加 Δv → 续传。burn epoch 处
+        输出行携带 post-burn 速度（丢 pre-burn 行，无重复 epoch）。
+        """
+        t0, tf = float(t_span[0]), float(t_span[1])
+        y = np.asarray(initial_state, dtype=float)
+
+        _eps = 1e-12
+        for burn in burns:
+            if burn.epoch < t0 - _eps or burn.epoch > tf + _eps:
+                raise ValueError(
+                    f"burn epoch {burn.epoch} outside t_span ({t0}, {tf})"
+                )
+
+        sorted_burns = sorted(burns, key=lambda b: b.epoch)
+
+        segments: list[
+            tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]
+        ] = []
+        burn_meta: list[
+            tuple[
+                float,
+                npt.NDArray[np.floating],
+                npt.NDArray[np.floating],
+                npt.NDArray[np.floating],
+            ]
+        ] = []
+        current_t = t0
+        for burn in sorted_burns:
+            seg = self.propagate(
+                y,
+                (current_t, burn.epoch),
+                initial_step=initial_step,
+                max_steps=max_steps,
+            )
+            segments.append((seg["time"], seg["states"]))
+            y = np.asarray(seg["states"][-1], dtype=float).copy()
+            current_t = burn.epoch
+            velocity_before = y[3:6].copy()
+            delta_v = np.asarray(burn.delta_v, dtype=float)
+            y[3:6] = y[3:6] + delta_v
+            velocity_after = y[3:6].copy()
+            burn_meta.append((burn.epoch, delta_v, velocity_before, velocity_after))
+
+        seg = self.propagate(
+            y,
+            (current_t, tf),
+            initial_step=initial_step,
+            max_steps=max_steps,
+        )
+        segments.append((seg["time"], seg["states"]))
+
+        # 拼接：首段全留；后续段替换运行结果的末行（pre-burn）为本段首行（post-burn）
+        time = segments[0][0]
+        states = segments[0][1]
+        applied: list[BurnApplication] = []
+        for i, (seg_time, seg_states) in enumerate(segments[1:]):
+            post_burn_index = len(states) - 1
+            epoch_i, dv_i, vb_i, va_i = burn_meta[i]
+            applied.append(
+                BurnApplication(
+                    index=post_burn_index,
+                    epoch=epoch_i,
+                    delta_v=dv_i,
+                    velocity_before=vb_i,
+                    velocity_after=va_i,
+                )
+            )
+            time = np.concatenate([time[:-1], seg_time])
+            states = np.concatenate([states[:-1], seg_states], axis=0)
+
+        self.last_trajectory = (time, states)
+        return {
+            "time": time,
+            "states": states,
+            "burns": applied,
+            "terminal_event_index": None,
         }
 
     def _prepare_t_eval(
