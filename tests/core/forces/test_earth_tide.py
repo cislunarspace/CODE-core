@@ -7,7 +7,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.forces.earth_tide import solid_tide_step1, solid_tide_step2
+from e2m2e.core.forces.earth_tide import pole_tide, solid_tide_step1, solid_tide_step2
 
 
 # 物理常量(量级参考用)
@@ -117,5 +117,43 @@ class TestSolidTideStep2:
 
     def test_returns_5x5_arrays(self):
         deltaC, deltaS = solid_tide_step2(et=0.0)
+        assert deltaC.shape == (5, 5)
+        assert deltaS.shape == (5, 5)
+
+
+class TestPoleTide:
+    """极潮(固体极潮 IERS p.65 + Desai 海洋极潮 TN32 §6.3)。
+
+    迁移 GMAT IncrementEarthTide 的极潮段:只影响 (2,1)。
+    m1 = xp - xp_bar;m2 = -(yp - yp_bar);xp_bar/yp_bar 是 IERS p.84 长期漂移模型。
+    量级 ~1e-9(GMAT 系数 1.333e-9 / 2.2344e-10)。
+    xp/yp 单位 arcsec。
+    """
+
+    def test_only_21_nonzero(self):
+        """极潮只影响 (2,1)。"""
+        deltaC, deltaS = pole_tide(et=0.0, xp=0.1, yp=0.3)
+
+        for n in range(5):
+            for m in range(n + 1):
+                if (n, m) != (2, 1):
+                    assert deltaC[n, m] == 0.0
+                    assert deltaS[n, m] == 0.0
+
+    def test_delta_21_reasonable_magnitude(self):
+        """ΔC21/ΔS21 量级在 1e-11 到 1e-8。"""
+        deltaC, deltaS = pole_tide(et=0.0, xp=0.1, yp=0.3)
+
+        assert 1e-12 < abs(deltaC[2, 1]) < 1e-8
+        assert 1e-12 < abs(deltaS[2, 1]) < 1e-8
+
+    def test_nonzero_even_when_xp_yp_zero(self):
+        """xp=yp=0 时仍有长期漂移贡献(xp_bar≈0.054, yp_bar≈0.357 非零)。"""
+        deltaC, deltaS = pole_tide(et=0.0, xp=0.0, yp=0.0)
+
+        assert deltaS[2, 1] != 0.0
+
+    def test_returns_5x5_arrays(self):
+        deltaC, deltaS = pole_tide(et=0.0, xp=0.0, yp=0.0)
         assert deltaC.shape == (5, 5)
         assert deltaS.shape == (5, 5)

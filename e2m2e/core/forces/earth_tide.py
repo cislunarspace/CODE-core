@@ -41,6 +41,7 @@ _K_PLUS_EARTH: npt.NDArray[np.floating] = np.array(
 
 _JD_J2000 = 2451545.0
 _DAYS_PER_JULIAN_CENTURY = 36525.0
+_DAYS_PER_YEAR = 365.25
 _RAD_PER_DEG = np.pi / 180.0
 
 # ----------------------------------------------------------------------------
@@ -317,5 +318,53 @@ def solid_tide_step1(
                 kplus = _K_PLUS_EARTH[m] / (2 * n + 1)  # (2n+1)=5
                 deltaC[4, m] += kplus * f * cm
                 deltaS[4, m] += kplus * f * sm
+
+    return deltaC, deltaS
+
+
+def pole_tide(
+    et: float,
+    xp: float,
+    yp: float,
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    """极潮(固体极潮 IERS p.65 + Desai 海洋极潮 TN32 §6.3)。
+
+    迁移 GMAT IncrementEarthTide 的极潮段。只影响 (2,1)。对齐 GMAT
+    ``ETide::SolidAndPole`` 档(固体极潮 + 海洋极潮都做);``Solid`` 档不做极潮。
+
+    公式:
+        ym2000 = (JD - JD_J2000) / 365.25
+        xp_bar = 0.054 + ym2000·0.00083  (IERS p.84 mean pole)
+        yp_bar = 0.357 + ym2000·0.00395
+        m1 = xp - xp_bar;m2 = -(yp - yp_bar)
+        固体极潮:ΔC21 -= 1.333e-9·(m1+0.0115·m2);ΔS21 -= 1.333e-9·(m2-0.0115·m1)
+        海洋极潮:ΔC21 -= 2.2344e-10·(m1-0.01737·m2);ΔS21 -= 1.7680e-10·(m2-0.03351·m1)
+
+    Args:
+        et: SPICE et 秒(past J2000)。
+        xp: 极移 x 分量(arcsec,IERS EOP C04)。
+        yp: 极移 y 分量(arcsec)。
+
+    Returns:
+        (DeltaC, DeltaS),各为 5×5 数组;仅 (2,1) 非零。
+    """
+    jd = _JD_J2000 + et / 86400.0
+    ym2000 = (jd - _JD_J2000) / _DAYS_PER_YEAR
+    xp_bar = 0.054 + ym2000 * 0.00083
+    yp_bar = 0.357 + ym2000 * 0.00395
+
+    m1 = xp - xp_bar
+    m2 = -(yp - yp_bar)
+
+    deltaC = np.zeros((5, 5), dtype=float)
+    deltaS = np.zeros((5, 5), dtype=float)
+
+    # 固体极潮(IERS p.65)
+    deltaC[2, 1] -= 1.333e-09 * (m1 + 0.0115 * m2)
+    deltaS[2, 1] -= 1.333e-09 * (m2 - 0.0115 * m1)
+
+    # 海洋极潮(Desai,TN32 §6.3)
+    deltaC[2, 1] -= 2.2344e-10 * (m1 - 0.01737 * m2)
+    deltaS[2, 1] -= 1.7680e-10 * (m2 - 0.03351 * m1)
 
     return deltaC, deltaS
