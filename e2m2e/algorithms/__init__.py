@@ -11,6 +11,10 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .ephemeris_correction import EphemerisCorrectionResult as EphemerisCorrectionResult
+    from .ephemeris_correction_types import (
+        PatchPointCorrector as PatchPointCorrector,
+        UnsupportedCorrectorMethodError as UnsupportedCorrectorMethodError,
+    )
     from .multiple_shooting import MultipleShooting as MultipleShooting
     from .two_level_multiple_shooting import (
         TwoLevelMultipleShooting as TwoLevelMultipleShooting,
@@ -38,6 +42,8 @@ _LAZY_MODULE_EXPORTS: dict[str, str] = {
 
 _LAZY_SYMBOL_EXPORTS: dict[str, str] = {
     "EphemerisCorrectionResult": "e2m2e.algorithms.ephemeris_correction",
+    "PatchPointCorrector": "e2m2e.algorithms.ephemeris_correction_types",
+    "UnsupportedCorrectorMethodError": "e2m2e.algorithms.ephemeris_correction_types",
     "correct_ephemeris_patch_points": "e2m2e.algorithms.ephemeris_correction",
     "MultipleShooting": "e2m2e.algorithms.multiple_shooting",
     "convert_to_j2000": "e2m2e.algorithms.multiple_shooting",
@@ -94,6 +100,8 @@ __all__ = [
     "BifurcationType",
     "MultipleShooting",
     "EphemerisCorrectionResult",
+    "PatchPointCorrector",
+    "UnsupportedCorrectorMethodError",
     "correct_ephemeris_patch_points",
     "TwoLevelMultipleShooting",
     "TwoLevelMultipleShootingResult",

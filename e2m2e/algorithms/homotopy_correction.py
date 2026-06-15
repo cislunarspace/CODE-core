@@ -29,7 +29,7 @@ import numpy.typing as npt
 
 from ..core.ephemeris_dynamics import EphemerisDynamics
 from ..core.ephemeris_system import EphemerisSystem
-from .ephemeris_correction import EphemerisCorrectionResult
+from .ephemeris_correction_types import EphemerisCorrectionResult
 from .multiple_shooting import MultipleShooting
 from .two_level_multiple_shooting import TwoLevelMultipleShooting
 from e2m2e.mbse.data.enums import BoundaryMode
