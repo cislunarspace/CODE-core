@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import numpy.typing as npt
 
@@ -111,7 +113,7 @@ class RelativisticCorrection(PhysicalModel):
         self,
         t: float,
         state: npt.ArrayLike,
-        system: object,
+        system: Any,
     ) -> npt.NDArray[np.floating]:
         """返回相对论修正加速度，km/s²。"""
         state_arr = np.asarray(state, dtype=float)
@@ -149,12 +151,16 @@ class RelativisticCorrection(PhysicalModel):
 
         return acc
 
-    def _compute_de_sitter_omega(self, t: float, system: object) -> npt.NDArray[np.floating]:
+    def _compute_de_sitter_omega(self, t: float, system: Any) -> npt.NDArray[np.floating]:
         """计算 de Sitter（geodesic）项的 omega 矢量。"""
         spice = system.spice
         primary = self._primary_body
-        central_state = spice.get_body_state(self._central_body, t, "J2000", "SOLAR SYSTEM BARYCENTER")
-        primary_state = spice.get_body_state(primary, t, "J2000", "SOLAR SYSTEM BARYCENTER")
+        central_state = spice.get_body_state(
+            self._central_body, t, "J2000", "SOLAR SYSTEM BARYCENTER"
+        )
+        primary_state = spice.get_body_state(
+            primary, t, "J2000", "SOLAR SYSTEM BARYCENTER"
+        )
         rel_state = central_state - primary_state
         r_vec = rel_state[:3]
         v_vec = rel_state[3:6]
@@ -167,12 +173,14 @@ class RelativisticCorrection(PhysicalModel):
         return np.cross(vel, pos)
 
     def _compute_angular_momentum(
-        self, t: float, system: object
+        self, t: float, system: Any
     ) -> npt.NDArray[np.floating]:
         """通过 bodyFixed -> inertial 旋转矩阵实时计算角动量矢量 J。"""
         try:
             spice = system.spice
-            body_inertial = CoordinateSystem(
+            # body_inertial 备用：GMAT 同时构造 fixed/inertial 两个
+            # 坐标系；这里只使用 fixed 系，如需反算惯系轴可参考展开。
+            body_inertial = CoordinateSystem(  # noqa: F841
                 axes=ICRSAxes(),
                 origin=CelestialBodyOrigin(body=self._central_body, spice=spice),
             )
