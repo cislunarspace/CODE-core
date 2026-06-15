@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import numpy.typing as npt
@@ -12,12 +12,21 @@ from e2m2e.core.coordinate_system import CoordinateSystem
 from e2m2e.core.standard_axes import ITRFApproxAxes
 from e2m2e.core.standard_origins import CelestialBodyOrigin
 
+from .earth_tide import (
+    permanent_tide_correction,
+    pole_tide,
+    solid_tide_step1,
+    solid_tide_step2,
+)
 from .exceptions import CoordinateTransformError
-from .gravity_file import load_gfc_file
+from .gravity_file import extrapolate_coefficients, load_gfc_file
 from .physical_model import PhysicalModel
 
 
 _DEFAULT_SPICE_FRAME = "ITRF93"
+# Sun/Moon 平均半长轴(永久潮汐修正用,近似)
+_A_SUN_KM = 1.495978707e8
+_A_MOON_KM = 384400.0
 
 
 class GravityField(PhysicalModel):
@@ -35,20 +44,45 @@ class GravityField(PhysicalModel):
         order: int | None = None,
         gravity_file: str | Path | None = None,
         input_frame: str = _DEFAULT_SPICE_FRAME,
+        tide_mode: str = "none",
+        tide_convention: str = "tide_free",
+        epoch: float | None = None,
+        polar_motion_provider: Callable[[float], tuple[float, float]] | None = None,
     ) -> None:
         """初始化 GravityField。
 
         Args:
-            body: 中心天体名称，如 ``'EARTH'``。
-            degree: 最大 degree，默认 2。
-            order: 最大 order，默认等于 degree。
-            gravity_file: 自定义 .gfc 文件路径，默认使用包内 EGM96-to10。
-            input_frame: 球谐展开坐标系的 SPICE frame 名，默认 ITRF93。
+            body: 中心天体名称,如 ``'EARTH'``。
+            degree: 最大 degree,默认 2。
+            order: 最大 order,默认等于 degree。
+            gravity_file: 自定义 .gfc 文件路径,默认使用包内 EGM96-to10。
+            input_frame: 球谐展开坐标系的 SPICE frame 名,默认 ITRF93。
+            tide_mode: 潮汐档位,对齐 GMAT ``ETide`` 三档:
+                ``"none"``(无潮汐)、``"solid"``(固体潮 Step1+Step2)、
+                ``"solid_and_pole"``(固体潮 + 极潮)。
+            tide_convention: 系数约定,``"tide_free"`` 或 ``"zero_tide"``。
+                zero_tide 模式减去永久潮汐(系数已含永久分量)。
+            epoch: dot 项(系数长期变化率)外推的参考历元(SPICE et 秒)。
+                与 .gfc 的 dot 行配合;``None`` 表示不外推。
+            polar_motion_provider: 极潮 xp/yp 提供者,签名 ``(et) -> (xp, yp)``
+                (arcsec)。solid_and_pole 档必需;由调用方从 ``gmat_eop`` 注入。
         """
         self._body = body.upper()
         self._input_frame = input_frame
         self._gravity_file_arg = gravity_file
         self._degree = int(degree)
+        tide_mode_normalized = tide_mode.lower()
+        if tide_mode_normalized not in ("none", "solid", "solid_and_pole"):
+            raise ValueError(f"tide_mode must be none/solid/solid_and_pole, got {tide_mode!r}")
+        self._tide_mode = tide_mode_normalized
+        tide_convention_normalized = tide_convention.lower()
+        if tide_convention_normalized not in ("tide_free", "zero_tide"):
+            raise ValueError(
+                f"tide_convention must be tide_free/zero_tide, got {tide_convention!r}"
+            )
+        self._tide_convention = tide_convention_normalized
+        self._epoch = epoch
+        self._polar_motion_provider = polar_motion_provider
         if self._degree < 0:
             raise ValueError("degree must be non-negative")
 
@@ -130,6 +164,92 @@ class GravityField(PhysicalModel):
         """正规化系数副本。"""
         return {"C": self._data.C.copy(), "S": self._data.S.copy()}
 
+    @property
+    def tide_mode(self) -> str:
+        """潮汐档位。"""
+        return self._tide_mode
+
+    @property
+    def tide_convention(self) -> str:
+        """系数约定。"""
+        return self._tide_convention
+
+    def _effective_coefficients(
+        self, t: float, system: Any
+    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        """返回 t 时刻的有效 C/S(含 dot 外推 + 潮汐修正)。
+
+        Args:
+            t: SPICE et 秒。
+            system: 动力学系统;tide_mode 非 none 时需暴露 ``spice`` 属性以查
+                Sun/Moon 位置与 GM。
+
+        Returns:
+            (C_eff, S_eff),形状与 ``self._data.C`` 一致。
+        """
+        C = self._data.C.copy()
+        S = self._data.S.copy()
+
+        # dot 项历元外推
+        if self._epoch is not None and np.any(self._data.dotC):
+            C, S = extrapolate_coefficients(
+                C, S, self._data.dotC, self._data.dotS, t, self._epoch
+            )
+
+        if self._tide_mode == "none":
+            return C, S
+
+        spice = getattr(system, "spice", None) if system is not None else None
+        if spice is None:
+            raise CoordinateTransformError(
+                "tide_mode != 'none' requires system.spice for Sun/Moon ephemeris"
+            )
+
+        sun_pos = spice.get_body_position("SUN", t, self._input_frame, "EARTH")
+        moon_pos = spice.get_body_position("MOON", t, self._input_frame, "EARTH")
+        mu_sun = spice.get_gm("SUN")
+        mu_moon = spice.get_gm("MOON")
+        mu_earth = self._data.mu
+        r_earth = self._data.radius
+
+        # 固体潮 Step 1(Sun + Moon)
+        dC, dS = solid_tide_step1(sun_pos, mu_sun, mu_earth, r_earth)
+        dC_moon, dS_moon = solid_tide_step1(moon_pos, mu_moon, mu_earth, r_earth)
+        dC = dC + dC_moon
+        dS = dS + dS_moon
+
+        # 固体潮 Step 2(频率相关)
+        dC2, dS2 = solid_tide_step2(t)
+        dC = dC + dC2
+        dS = dS + dS2
+
+        # zero-tide:减去永久潮汐(系数已含永久分量)
+        if self._tide_convention == "zero_tide":
+            dC_perm, dS_perm = permanent_tide_correction(
+                mu_sun, mu_moon, mu_earth, r_earth, _A_SUN_KM, _A_MOON_KM
+            )
+            dC = dC - dC_perm
+            dS = dS - dS_perm
+
+        # 极档:叠加极潮
+        if self._tide_mode == "solid_and_pole":
+            if self._polar_motion_provider is None:
+                raise ValueError(
+                    "tide_mode='solid_and_pole' requires polar_motion_provider"
+                )
+            xp, yp = self._polar_motion_provider(t)
+            dC_pole, dS_pole = pole_tide(t, xp, yp)
+            dC = dC + dC_pole
+            dS = dS + dS_pole
+
+        # pad ΔC/ΔS(5×5)到 C/S 形状(degree 可能 > 4)
+        n = min(5, C.shape[0])
+        dC_padded = np.zeros_like(C)
+        dS_padded = np.zeros_like(S)
+        dC_padded[:n, :n] = dC[:n, :n]
+        dS_padded[:n, :n] = dS[:n, :n]
+        return C + dC_padded, S + dS_padded
+
     def compute_acceleration(
         self,
         t: float,
@@ -140,12 +260,12 @@ class GravityField(PhysicalModel):
 
         Args:
             t: SPICE et 时间。
-            state: 状态向量，在 system.coordinate_system 下。
-            system: 动力学系统；若传入 None，则假设状态已在 input_frame 下
-                （仅用于隔离测试）。
+            state: 状态向量,在 system.coordinate_system 下。
+            system: 动力学系统;若传入 None,则假设状态已在 input_frame 下
+                (仅用于隔离测试,tide_mode 必须为 none)。
 
         Returns:
-            加速度向量，在 system.coordinate_system 下。
+            加速度向量,在 system.coordinate_system 下。
         """
         state_arr = np.asarray(state, dtype=float)
         if state_arr.shape[0] < 3:
@@ -156,7 +276,16 @@ class GravityField(PhysicalModel):
         else:
             r_input = self._transform_position_to_input_frame(t, state_arr, system)
 
-        acc_input = self._compute_acceleration_in_input_frame(r_input)
+        # 潮汐/dot 外推是时变的,每步重算有效系数
+        needs_effective = self._tide_mode != "none" or (
+            self._epoch is not None and np.any(self._data.dotC)
+        )
+        if needs_effective:
+            C_eff, S_eff = self._effective_coefficients(t, system)
+        else:
+            C_eff, S_eff = None, None
+
+        acc_input = self._compute_acceleration_in_input_frame(r_input, C_eff, S_eff)
 
         if system is None:
             return acc_input
@@ -164,9 +293,21 @@ class GravityField(PhysicalModel):
         return self._transform_vector_from_input_frame(t, acc_input, system)
 
     def _compute_acceleration_in_input_frame(
-        self, r: npt.NDArray[np.floating]
+        self,
+        r: npt.NDArray[np.floating],
+        C: npt.NDArray[np.floating] | None = None,
+        S: npt.NDArray[np.floating] | None = None,
     ) -> npt.NDArray[np.floating]:
-        """在输入坐标系（固连系）中计算引力加速度。"""
+        """在输入坐标系(固连系)中计算引力加速度。
+
+        Args:
+            r: 位置,在 input_frame 下。
+            C, S: 可选的有效球谐系数(含潮汐/dot);``None`` 用文件原始系数。
+        """
+        if C is None:
+            C = self._data.C
+        if S is None:
+            S = self._data.S
         x, y, z = r
         r_norm = np.linalg.norm(r)
         if r_norm == 0:
@@ -238,8 +379,8 @@ class GravityField(PhysicalModel):
         for n in range(0, n_max + 1):
             rho_n = rho**n
             for m in range(0, min(n, m_max) + 1):
-                c_val = self._data.C[n, m]
-                s_val = self._data.S[n, m]
+                c_val = C[n, m]
+                s_val = S[n, m]
                 if c_val == 0.0 and s_val == 0.0:
                     continue
                 cm = np.cos(m * lon)
