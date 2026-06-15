@@ -1,0 +1,6 @@
+# ADR 0005：TwoLevelMultipleShooting 作为独立算法
+
+**状态**：已采纳
+**日期**：2026-05-13
+
+把 `TwoLevelMultipleShooting` 作为 `e2m2e.algorithms` 中的一个独立算法加入，而不是扩展或继承现有的 `MultipleShooting`。两层修正与现有的全状态多重打靶求解器在自由变量、残差、雅可比结构和结果诊断上都不同；把它分开，既保住了通用求解器更简单的 API，又给转移设计代码提供了一组稳定的 API，用来承载原有的两层星历修正语义。

@@ -1,80 +1,80 @@
-# ADR 0002: Rust Integrator Core with Python Dynamics Control
+# ADR 0002：Rust 积分器内核，由 Python 控制动力学
 
-**Status**: Accepted  
-**Date**: 2026-06-11  
-**Issue**: #61
+**状态**：已采纳
+**日期**：2026-06-11
+**关联 Issue**：#61
 
-## Context
+## 背景
 
-Issue #60 plans to migrate propagation and force-model capabilities from GMAT to e2m2e using a Rust integrator core with Python force models and full coordinate support. Issue #61 is the first vertical slice of that migration.
+Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust 积分器内核 + Python 力模型 + 完整坐标支持。Issue #61 是这次迁移的第一个纵向切片。
 
-The existing `Dynamics` class in `e2m2e/core/dynamics.py` already provides a stable Template Method API: `propagate()` orchestrates the full trajectory integration, while subclasses override `_get_eom_func()` and `_get_max_step()`. It currently delegates the entire integration to `scipy.integrate.solve_ivp`.
+`e2m2e/core/dynamics.py` 中现有的 `Dynamics` 类已经提供稳定的模板方法 API：`propagate()` 编排整条轨迹的积分，子类覆写 `_get_eom_func()` 与 `_get_max_step()`。它目前把全部积分委托给 `scipy.integrate.solve_ivp`。
 
-The goal of #61 is to introduce a Rust-based single-step Runge-Kutta engine (starting with Prince-Dormand 5(4), "PD45") and expose it to Python, without breaking the existing `Dynamics` API or forcing an immediate rewrite of trajectory-level control logic.
+#61 的目标是引入一个基于 Rust 的单步 Runge-Kutta 引擎（从 Prince-Dormand 5(4)，即 "PD45" 起步），并暴露给 Python，同时不破坏现有 `Dynamics` API、也不强迫立刻重写轨迹级控制逻辑。
 
-## Decision
+## 决策
 
-1. **Introduce a Rust workspace under `crates/` with maturin as the sole build backend.**
-   - The root `Cargo.toml` defines a workspace.
-   - The first crate is `crates/e2m2e-integrators/`, built with PyO3 + maturin.
-   - `pyproject.toml` switches its `build-system` from `hatchling` to `maturin`.
+1. **在 `crates/` 下引入 Rust 工作空间，构建后端只用 maturin。**
+   - 根 `Cargo.toml` 定义一个工作空间。
+   - 第一个 crate 是 `crates/e2m2e-integrators/`，用 PyO3 + maturin 构建。
+   - `pyproject.toml` 的 `build-system` 从 `hatchling` 切换到 `maturin`。
 
-2. **Rust crate owns only single-step integration.**
-   - It exposes `rk_step(method, t, y, h, tol, f)` where `f` is a Python callback.
-   - It returns a `StepResult` with `y_new`, `error`, and `h_next`.
-   - It does **not** perform event detection, dense output, or full propagation control.
+2. **Rust crate 只负责单步积分。**
+   - 暴露 `rk_step(method, t, y, h, tol, f)`，其中 `f` 是 Python 回调。
+   - 返回一个 `StepResult`，含 `y_new`、`error`、`h_next`。
+   - **不**做事件检测、稠密输出或完整传播控制。
 
-3. **Python `Dynamics` keeps responsibility for trajectory-level control.**
-   - In this first slice, `Dynamics.propagate()` continues to use `scipy.integrate.solve_ivp`.
-   - The Rust `rk_step` is used only by dedicated tests and as a low-level building block for future slices.
+3. **Python 侧的 `Dynamics` 继续负责轨迹级控制。**
+   - 在这第一个切片里，`Dynamics.propagate()` 继续用 `scipy.integrate.solve_ivp`。
+   - Rust 的 `rk_step` 只被专用测试使用，并作为后续切片的底层构件。
 
-4. **Public API shim at `e2m2e.integrators`.**
-   - Rust extension module installs as `e2m2e._integrators`.
-   - A thin Python module `e2m2e.integrators` re-exports `rk_step` and `RkMethod` so callers do not need to import an underscore-prefixed internal module.
+4. **在 `e2m2e.integrators` 提供公开薄封装。**
+   - Rust 扩展模块安装为 `e2m2e._integrators`。
+   - 一个薄薄的 Python 模块 `e2m2e.integrators` 重新导出 `rk_step` 与 `RkMethod`，调用者不必导入带下划线前缀的内部模块。
 
-## Rationale
+## 理由
 
-1. **Incremental migration risk.** Replacing `solve_ivp` inside `Dynamics.propagate()` in one step would require re-implementing adaptive step acceptance, dense output, event detection, and stiffness handling in Python. Doing that correctly is larger than one slice and adds failure modes that the current `solve_ivp` path does not have.
+1. **迁移风险需逐步控制。** 一步到位地在 `Dynamics.propagate()` 里替换 `solve_ivp`，就要用 Python 重新实现自适应步长接受、稠密输出、事件检测与刚性处理。正确做完这些远超一个切片，还会引入当前 `solve_ivp` 路径没有的失败模式。
 
-2. **Algorithm validation before integration.** We want to verify that the Rust PD45 implementation is correct before it becomes the default path for all propagation. Isolating it behind tests lets us compare against `scipy` and analytic solutions without affecting production callers.
+2. **在接入默认路径之前先验证算法。** 我们希望先确认 Rust PD45 实现正确，再让它成为所有传播的默认路径。把它隔离在测试之后，可以与 `scipy` 及解析解对比，而不影响生产调用方。
 
-3. **Build-backend switch is hard to reverse.** Moving from `hatchling` to `maturin` changes how wheels are produced and how contributors set up the project. This is a meaningful, surprising trade-off that should be documented rather than hidden in `pyproject.toml` alone.
+3. **构建后端的切换难以逆转。** 从 `hatchling` 换到 `maturin` 改变了 wheel 的产出方式和贡献者搭建项目的方式。这是一个有分量、会让人意外的权衡，应当记在文档里，而不是只藏在 `pyproject.toml` 中。
 
-4. **Workspace prepares future crates without forcing them now.** Issue #60 mentions Rust force models and coordinate transformations. A workspace lets future crates live under `crates/` without reorganizing the repository later.
+4. **工作空间为未来的 crate 预留位置，但不现在强加。** Issue #60 提到 Rust 力模型与坐标变换。工作空间让未来的 crate 可以放在 `crates/` 下，不必日后重组仓库。
 
-## Consequences
+## 结果
 
-### Added
+### 新增
 
-- `Cargo.toml` at repository root defining a Cargo workspace.
-- `crates/e2m2e-integrators/` with `Cargo.toml`, PyO3 bindings, PD45 coefficients, and inline Rust unit tests.
-- `[tool.maturin]` configuration in `pyproject.toml`.
-- `e2m2e/integrators.py` public shim re-exporting `rk_step` and `RkMethod`.
-- `tests/integrators/test_rk_step.py` for Python-level correctness and consistency tests.
+- 仓库根的 `Cargo.toml`，定义 Cargo 工作空间。
+- `crates/e2m2e-integrators/`，含 `Cargo.toml`、PyO3 绑定、PD45 系数与内联 Rust 单元测试。
+- `pyproject.toml` 中的 `[tool.maturin]` 配置。
+- `e2m2e/integrators.py` 公开薄封装，重新导出 `rk_step` 与 `RkMethod`。
+- `tests/integrators/test_rk_step.py`，Python 层正确性与一致性测试。
 
-### Modified
+### 变更
 
-- `pyproject.toml` `build-system` changes from `hatchling` to `maturin`.
-- CI workflow installs Rust toolchain and runs `maturin develop` before Python tests.
+- `pyproject.toml` 的 `build-system` 从 `hatchling` 改为 `maturin`。
+- CI 工作流安装 Rust 工具链，并在 Python 测试前运行 `maturin develop`。
 
-### Unchanged
+### 不变
 
-- `Dynamics.propagate()` implementation and behavior in this slice.
-- Public `Dynamics`, `CR3BP_Dynamics`, and `EphemerisDynamics` APIs.
+- 本切片中 `Dynamics.propagate()` 的实现与行为。
+- 公开的 `Dynamics`、`CR3BP_Dynamics`、`EphemerisDynamics` API。
 
-### Future work
+### 后续工作
 
-- A later slice may re-implement `Dynamics.propagate()` to orchestrate Rust `rk_step` calls from Python, adding dense output and event detection as needed.
-- Additional RK methods (e.g., DOP853) can be added to `crates/e2m2e-integrators/src/` without changing the build system.
+- 后续切片可重写 `Dynamics.propagate()`，从 Python 编排 Rust 的 `rk_step` 调用，按需加入稠密输出与事件检测。
+- 可向 `crates/e2m2e-integrators/src/` 增加更多 RK 方法（如 DOP853），无需改构建系统。
 
-## Amendment (2026-06-14, issue #67)
+## 修订（2026-06-14，issue #67）
 
-Decision 2 ("Rust crate owns only single-step integration") described the **first slice's** scope, not a permanent constraint. The integrator-family epic (#67) expanded the Rust crate to three method families:
+决策 2（"Rust crate 只负责单步积分"）描述的是**第一个切片**的范围，不是永久约束。积分器族 epic（#67）把 Rust crate 扩展为三个方法族：
 
-- **Single-step RK** (`rk_step`): `Pd45`, `Pd78`, `Rk89` — unchanged from the original slice.
-- **Multistep predictor-corrector** (`multistep_step`): Adams-Bashforth-Moulton (`Abm`), fixed step, carries a derivative-sample **history** buffer.
-- **Second-order double-integration** (`cowell_step`): Störmer-Cowell, fixed step, integrates `x'' = a(t, x)` directly from a mixed position+acceleration history buffer; outputs position only.
+- **单步 RK**（`rk_step`）：`Pd45`、`Pd78`、`Rk89`——与原切片一致。
+- **多步预测-校正**（`multistep_step`）：Adams-Bashforth-Moulton（`Abm`），定步长，携带一个导数采样的**历史缓冲**。
+- **二阶双积分**（`cowell_step`）：Störmer-Cowell，定步长，直接积 `x'' = a(t, x)`，从一个位置+加速度混合的历史缓冲出发；只输出位置。
 
-Decisions 1 (workspace + maturin), 3 (Python keeps trajectory-level control — adaptive stepping, event detection, dense output stay out of the crate), and 4 (public `e2m2e.integrators` shim) still hold. The new multistep/second-order families obey the same boundary: they advance one step and return an error estimate + step suggestion; they do not perform event detection, dense output, or full propagation control.
+决策 1（工作空间 + maturin）、3（Python 继续负责轨迹级控制——自适应步长、事件检测、稠密输出都不进 crate）、4（公开的 `e2m2e.integrators` 薄封装）仍然成立。新增的多步/二阶族遵守同样的边界：推进一步、返回误差估计与步长建议；不做事件检测、稠密输出或完整传播控制。
 
-Note on decision 3: `CR3BP_Dynamics` and `EphemerisDynamics` (system-typed axis) still use `scipy.solve_ivp`; only `ForceModel` (force-decomposed axis) drives the Rust steppers from Python. See `CONTEXT.md` → 动力学 for the two-axis model. The original "Future work" items above are now realized: `ForceModel` orchestrates `rk_step` from Python (adaptive stepping + simple event detection), and the crate gained multistep + second-order families.
+关于决策 3 的说明：`CR3BP_Dynamics` 与 `EphemerisDynamics`（系统类）仍用 `scipy.solve_ivp`；只有 `ForceModel`（力分解类）从 Python 驱动 Rust 步进器。坐标系与力两个维度的划分见 `CONTEXT.md` → 动力学。原先的"后续工作"各项现已落实：`ForceModel` 从 Python 编排 `rk_step`（自适应步长 + 简单事件检测），crate 也增加了多步与二阶族。
