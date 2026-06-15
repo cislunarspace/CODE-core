@@ -13,6 +13,7 @@ from e2m2e.core.standard_axes import (
     ITRFApproxAxes,
     ITRFAxes,
     ITRFSpiceAxes,
+    standard_icrf,
     standard_itrf,
 )
 from e2m2e.core.standard_origins import CelestialBodyOrigin, InertialOrigin
@@ -208,6 +209,77 @@ class TestITRFApproxAxes:
         np.testing.assert_allclose(omega[2], 7.2921150e-5, rtol=1e-3)
 
 
+class TestICRFITRFIntegrationWithSpice:
+    """ICRF↔ITRF 端到端集成测试,SPICE pxform 作参考源。
+
+    issue #78 验收第 5 条"ICRF↔ITRF 旋转矩阵元素误差 < 1e-12"与
+    第 6 条"所有矩阵满足正交性 < 1e-14"。把 standard_icrf() 与
+    ITRFSpiceAxes + CelestialBodyOrigin('EARTH') 组合,验证 CoordinateSystem
+    走出的转换与 SPICE pxform 直接对比。
+    """
+
+    def test_icrf_itrf_rotation_matches_pxform(self, spice_manager, requires_itrf93):
+        """ICRF→ITRF 向量变换与 spiceypy.pxform('J2000','ITRF93',et) 元素差 < 1e-12。"""
+        import spiceypy
+
+        from e2m2e.core.coordinate_system import CoordinateSystem
+
+        icrf = standard_icrf()
+        itrf = CoordinateSystem(
+            axes=ITRFSpiceAxes(),
+            origin=CelestialBodyOrigin("EARTH", spice_manager),
+        )
+        et = spice_manager.utc_to_et("2024-01-01T00:00:00")
+
+        # 非零向量,从 ICRF 转 ITRF
+        vec = np.array([1.0, 0.0, 0.0])
+        result = icrf.transform_vector(vec, from_cs=icrf, to_cs=itrf, et=et)
+
+        # SPICE 参考:pxform('J2000', 'ITRF93', et) 把 ICRF/J2000 向量转 ITRF93
+        expected_R = spiceypy.pxform("J2000", "ITRF93", et)
+        expected = expected_R @ vec
+
+        np.testing.assert_allclose(result, expected, atol=1e-12)
+
+    def test_icrf_itrf_rotation_matrix_is_orthogonal(self, spice_manager, requires_itrf93):
+        """ICRF↔ITRF 链路两端 Axes 旋转矩阵 R @ R.T = I,误差 < 1e-14。"""
+        from e2m2e.core.coordinate_system import CoordinateSystem
+
+        icrf = standard_icrf()
+        itrf = CoordinateSystem(
+            axes=ITRFSpiceAxes(),
+            origin=CelestialBodyOrigin("EARTH", spice_manager),
+        )
+        et = spice_manager.utc_to_et("2024-01-01T00:00:00")
+
+        R_icrf = icrf.axes.rotation_matrix(et)
+        R_itrf = itrf.axes.rotation_matrix(et)
+
+        np.testing.assert_allclose(R_icrf @ R_icrf.T, np.eye(3), atol=1e-14)
+        np.testing.assert_allclose(R_itrf @ R_itrf.T, np.eye(3), atol=1e-14)
+
+
+class TestITRFApproxAxesConsistencyWithITRF93:
+    """ITRFApproxAxes 与 SPICE-backed ITRF93 的一致性验证。
+
+    issue #78 验收第 2 条"ITRFApproxAxes 实现并通过一致性测试"——
+    近似实现(忽略极移 + 简化章动 + GMST 公式)应在亚角秒到几十角秒
+    量级与精确版吻合,验证"近似实现工作正常、方向没反"。容差 1e-4 rad
+    (约 20 角秒)留 10× 余量。
+    """
+
+    def test_rotation_matrix_approximately_matches_itrf93(self, spice_manager, requires_itrf93):
+        """ITRFApproxAxes 与 ITRFSpiceAxes 在同一 et 上矩阵元素差 < 1e-4。"""
+        approx = ITRFApproxAxes()
+        precise = ITRFSpiceAxes()
+        et = spice_manager.utc_to_et("2024-01-01T00:00:00")
+
+        R_approx = approx.rotation_matrix(et)
+        R_precise = precise.rotation_matrix(et)
+
+        np.testing.assert_allclose(R_approx, R_precise, atol=1e-4)
+
+
 class TestStandardCoordinateSystems:
     def test_icrf_to_explicit_gmat_itrf_vector_round_trip(self):
         from e2m2e.core.coordinate_system import CoordinateSystem
@@ -220,3 +292,26 @@ class TestStandardCoordinateSystems:
         back = itrf.transform_vector(itrf_vec, from_cs=itrf, to_cs=icrf, et=0.0)
 
         np.testing.assert_allclose(back, vec, atol=1e-12)
+
+
+class TestStandardIcrfPreset:
+    """standard_icrf() 工厂:返回 ICRF 标准坐标系预设(CoordinateSystem)。
+
+    issue #78 验收第 4 条"ICRF 与 ITRF 标准坐标系预设可用"——ICRF 侧的
+    字面落实。ICRF = ICRSAxes(恒等旋转)+ InertialOrigin(SSB 无平移)。
+    """
+
+    def test_standard_icrf_returns_coordinate_system(self):
+        """standard_icrf() 返回 CoordinateSystem,axes 为 ICRSAxes,origin 为 InertialOrigin。"""
+        from e2m2e.core.coordinate_system import CoordinateSystem
+
+        cs = standard_icrf()
+        assert isinstance(cs, CoordinateSystem)
+        assert isinstance(cs.axes, ICRSAxes)
+        assert isinstance(cs.origin, InertialOrigin)
+
+    def test_standard_icrf_importable_from_core_top_level(self):
+        """standard_icrf 可从 e2m2e.core 顶层导入(与 standard_itrf 对齐)。"""
+        from e2m2e.core import standard_icrf as imported
+
+        assert imported is standard_icrf

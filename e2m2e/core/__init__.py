@@ -40,17 +40,18 @@ from .axes import Axes
 from .coordinate import CoordinateTransformation, ReferenceFrame, SynodicJ2000Transformation
 from .coordinate_system import CoordinateSystem
 from .cr3bp_system import CR3BP_System, LibrationPoint
+from .dynamic_axes import DynamicAxes
 from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
 from .orbit import Orbit, OrbitFamily
 from .origin import Origin
 from .potential import pseudo_potential_hessian
-from .dynamic_axes import DynamicAxes
 from .standard_axes import (
     GMATITRFAxes,
     IAU2000EqAxes,
     ICRSAxes,
     ITRFApproxAxes,
     ITRFAxes,
+    standard_icrf,
     standard_itrf,
 )
 from .standard_dynamic_axes import LVLHAxes, VNBAxes
@@ -101,6 +102,7 @@ __all__ = [
     "ITRFAxes",
     "GMATITRFAxes",
     "ITRFApproxAxes",
+    "standard_icrf",
     "standard_itrf",
     "DynamicAxes",
     "LVLHAxes",

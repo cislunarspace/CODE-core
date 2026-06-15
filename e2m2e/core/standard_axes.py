@@ -3,22 +3,19 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 
 from ._spice_loader import get_spiceypy
-
-if TYPE_CHECKING:
-    import spiceypy
-
 from .axes import Axes
+from .coordinate_system import CoordinateSystem
 from .gmat_data import CoordinateDataError, gmat_fixture_path
 from .gmat_eop import EopFile, TaiUtcTable
 from .gmat_itrf import GmatItrfReduction
 from .gmat_time import TimeSystemConverter
 from .iau_2006 import iau2000eq_matrix
+from .standard_origins import InertialOrigin
 from .xys import ErfaXysProvider, XysProvider
 
 
@@ -143,6 +140,19 @@ class ITRFApproxAxes(Axes):
 def standard_itrf() -> ITRFSpiceAxes:
     """返回公共默认 ITRF：SPICE-backed ``ITRF93``。"""
     return ITRFSpiceAxes()
+
+
+def standard_icrf() -> CoordinateSystem:
+    """返回 ICRF 标准坐标系预设。
+
+    ICRF = ICRSAxes(恒等旋转,与 ICRF/J2000 同向)+ InertialOrigin(太阳系
+    质心,无平移)。这是地心 ITRF 转换的惯性别,常作为 ``CoordinateSystem``
+    组合的一端。
+
+    与 ``standard_itrf`` 不同,这里直接返回完整 ``CoordinateSystem``——
+    ICRF 预设在调用方通常直接用作转换源/目标,不需再自行拼 Axes + Origin。
+    """
+    return CoordinateSystem(axes=ICRSAxes(), origin=InertialOrigin())
 
 
 def _greenwich_apparent_sidereal_time(et: float) -> float:
