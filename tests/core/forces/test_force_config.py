@@ -270,3 +270,91 @@ def test_drag_model_round_trip():
         "params": {"f107": 120.0, "ap": 10.0},
     }
     assert ForceModel.to_config(fm2) == config
+
+
+def test_finite_burn_vnb_direction_frame_round_trip():
+    """FiniteBurn 带 VNB direction_frame 的 from_config → to_config round-trip。"""
+    system = _FakeSystem()
+    config_dict = {
+        "version": 1,
+        "forces": [
+            {
+                "name": "engine",
+                "type": "FiniteBurn",
+                "enabled": True,
+                "params": {
+                    "mass": 1000.0,
+                    "thrust_profile": {"kind": "constant", "thrust": 10.0},
+                    "direction": {"kind": "fixed", "vector": [1.0, 0.0, 0.0]},
+                    "direction_frame": "VNB",
+                },
+            }
+        ],
+    }
+
+    fm = ForceModel.from_config(config_dict, system)
+
+    assert ForceModel.to_config(fm) == config_dict
+
+    # 物理行为验证：VNB 下 [1,0,0] = V 方向 = 速度方向
+    engine = fm.get_force("engine")
+    acc = engine.compute_acceleration(
+        0.0, np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), system
+    )
+    np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0], atol=1e-12)
+
+
+def test_finite_burn_lvlh_direction_frame_round_trip():
+    """FiniteBurn 带 LVLH direction_frame 的 from_config → to_config round-trip。"""
+    system = _FakeSystem()
+    config_dict = {
+        "version": 1,
+        "forces": [
+            {
+                "name": "engine",
+                "type": "FiniteBurn",
+                "enabled": True,
+                "params": {
+                    "mass": 1000.0,
+                    "thrust_profile": {"kind": "constant", "thrust": 10.0},
+                    "direction": {"kind": "fixed", "vector": [0.0, 0.0, 1.0]},
+                    "direction_frame": "LVLH",
+                },
+            }
+        ],
+    }
+
+    fm = ForceModel.from_config(config_dict, system)
+
+    assert ForceModel.to_config(fm) == config_dict
+
+    # 物理行为验证：LVLH 下 [0,0,1] = N 方向 = R × V
+    engine = fm.get_force("engine")
+    acc = engine.compute_acceleration(
+        0.0, np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), system
+    )
+    np.testing.assert_allclose(acc, [0.0, 0.0, 1e-5], atol=1e-12)
+
+
+def test_finite_burn_invalid_direction_frame_from_config_raises():
+    """from_config 遇非法 direction_frame 抛 ValueError。"""
+    system = _FakeSystem()
+    config_dict = {
+        "version": 1,
+        "forces": [
+            {
+                "name": "engine",
+                "type": "FiniteBurn",
+                "enabled": True,
+                "params": {
+                    "mass": 1000.0,
+                    "thrust_profile": {"kind": "constant", "thrust": 10.0},
+                    "direction": {"kind": "fixed", "vector": [1.0, 0.0, 0.0]},
+                    "direction_frame": "INVALID",
+                },
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="direction_frame"):
+        ForceModel.from_config(config_dict, system)

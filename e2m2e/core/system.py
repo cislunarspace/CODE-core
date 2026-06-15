@@ -10,6 +10,7 @@ from __future__ import annotations
 import abc
 from typing import Any
 
+import numpy as np
 import numpy.typing as npt
 
 from ..mbse.data.enums import ReferenceFrame, UnitSystem
@@ -45,6 +46,22 @@ class System(abc.ABC):
     def coordinate_system(self) -> Any:
         """系统默认坐标系；具体系统可覆盖。"""
         return None
+
+    def update_coordinate_systems(self, t: float, state: npt.ArrayLike) -> None:
+        """更新动态坐标系。
+
+        若 ``coordinate_system.axes`` 为 ``DynamicAxes`` 实例，
+        调用 ``axes.update(t, state)``。默认 no-op。
+        """
+        cs = self.coordinate_system
+        if cs is None:
+            return
+        axes = getattr(cs, "axes", None)
+        if axes is None:
+            return
+        from .dynamic_axes import DynamicAxes
+        if isinstance(axes, DynamicAxes):
+            axes.update(t, np.asarray(state, dtype=float))
 
     def transform(
         self,

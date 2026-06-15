@@ -304,6 +304,10 @@ class ForceModel(Dynamics):
         event_funcs = list(events) if events is not None else []
         event_values_prev = [func(t0, y) for func in event_funcs]
 
+        # 循环开始前更新动态坐标系
+        if hasattr(self.system, "update_coordinate_systems"):
+            self.system.update_coordinate_systems(t0, y)
+
         times: list[float] = [t0]
         states: list[npt.NDArray[np.floating]] = [y.copy()]
         terminal_event_index: int | None = None
@@ -323,6 +327,10 @@ class ForceModel(Dynamics):
             if eval_index < len(t_eval):
                 h = min(h, t_eval[eval_index] - t)
             h = max(h, min_step)
+
+            # 每个 rk_step 前更新动态坐标系
+            if hasattr(self.system, "update_coordinate_systems"):
+                self.system.update_coordinate_systems(t, y)
 
             result = rk_step(RkMethod.PD45, t, y, h, tol, eom)
 

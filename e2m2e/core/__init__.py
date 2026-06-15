@@ -44,6 +44,7 @@ from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
 from .orbit import Orbit, OrbitFamily
 from .origin import Origin
 from .potential import pseudo_potential_hessian
+from .dynamic_axes import DynamicAxes
 from .standard_axes import (
     GMATITRFAxes,
     IAU2000EqAxes,
@@ -52,6 +53,7 @@ from .standard_axes import (
     ITRFAxes,
     standard_itrf,
 )
+from .standard_dynamic_axes import LVLHAxes, VNBAxes
 from .standard_origins import InertialOrigin
 from .system import System
 
@@ -100,6 +102,9 @@ __all__ = [
     "GMATITRFAxes",
     "ITRFApproxAxes",
     "standard_itrf",
+    "DynamicAxes",
+    "LVLHAxes",
+    "VNBAxes",
     "CelestialBodyOrigin",
     "InertialOrigin",
     "SPICEManager",
