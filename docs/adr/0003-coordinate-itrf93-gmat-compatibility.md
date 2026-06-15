@@ -48,9 +48,12 @@ GMAT R2026a 用 `ITRF93` 作为高精度地球 SPICE 帧，把 `IAU_EARTH` 当�
    - EOP 越界默认抛错。
    - GMAT 风格的钳位只在显式兼容选项下可用。
 
-8. **系统集成是薄委托。**
-   - `System.coordinate_system` 存放一个可选的坐标系。
-   - `System.transform()` 委托给 `CoordinateSystem.transform_state()`，不重复坐标数学。
+8. **系统集成不提供坐标转换快捷方式。**
+   - `System.coordinate_system` 存放一个可选的坐标系，供力模型查询"输入状态在哪个坐标系下"。
+   - 坐标转换入口在 `CoordinateSystem` 层：调用方直接用 `system.coordinate_system.transform_state()` / `transform_vector()`，或自行构造 `CoordinateSystem` 实例调用。
+   - `System` **不**提供 `transform()` 快捷方式。
+
+   > **修订记录（2026-06-15，issue #79）**：原决策第 8 条写"`System.transform()` 薄委托给 `CoordinateSystem.transform_state()`"。落地后实际生产代码（阻力、重力、推力、光压模型）全部绕过 `System.transform()`，直接用 `system.coordinate_system.transform_*`。经重新讨论判定：薄委托层只是多余间接，快捷方式不必要。#79 移除 `System.transform()` 方法，本条同步修订。原 `System.transform()` 落地于 #90，未经深思熟虑的设计判断现已反转。
 
 ## 结果
 

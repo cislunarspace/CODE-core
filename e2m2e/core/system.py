@@ -63,20 +63,6 @@ class System(abc.ABC):
         if isinstance(axes, DynamicAxes):
             axes.update(t, np.asarray(state, dtype=float))
 
-    def transform(
-        self,
-        state: npt.ArrayLike,
-        *,
-        to_coordinate_system: Any,
-        et: float,
-        from_coordinate_system: Any | None = None,
-    ) -> npt.NDArray:
-        """通过 ``CoordinateSystem`` 薄委托转换状态。"""
-        source = from_coordinate_system or self.coordinate_system
-        if source is None:
-            raise ValueError("System.coordinate_system is required for transform()")
-        return source.transform_state(state, from_cs=source, to_cs=to_coordinate_system, et=et)
-
     @abc.abstractmethod
     def gravitational_parameter(self, body: str) -> float:
         """获取指定天体的引力参数。

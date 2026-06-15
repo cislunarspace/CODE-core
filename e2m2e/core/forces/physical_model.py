@@ -16,7 +16,8 @@ class PhysicalModel(abc.ABC):
 
     力模型以纯函数接口提供加速度。所有坐标约定都在
     ``system.coordinate_system`` 下完成；需要非默认坐标系计算的子类
-    应自行调用 ``system.transform()``。
+    应通过 ``system.coordinate_system.transform_state()`` /
+    ``transform_vector()`` 自行完成转换。
     """
 
     @abc.abstractmethod

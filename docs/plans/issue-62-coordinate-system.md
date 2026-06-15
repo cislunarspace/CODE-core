@@ -17,7 +17,7 @@ Deliver the coordinate-system vertical slice for `Axes + Origin + CoordinateSyst
 - Public coordinate APIs accept SPICE ET seconds.
 - A1MJD behavior is low-level/test-only for GMAT parity checks.
 - EOP out-of-range raises by default; GMAT clamp behavior is explicit opt-in.
-- `System.transform()` is a thin delegate to `CoordinateSystem.transform_state()`.
+- `System` 不提供坐标转换快捷方式（2026-06-15 #79 修订：原"薄委托"判断反转，生产代码已直接用 `system.coordinate_system.transform_*`）。
 
 ## Vertical Slices
 
