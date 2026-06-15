@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -13,6 +14,15 @@ from e2m2e.integrators import RkMethod, rk_step
 
 from .physical_model import PhysicalModel
 from .thrust import BurnApplication, ImpulsiveBurn
+
+
+@dataclass(frozen=True)
+class ForceEntry:
+    """容器内单个力模型的注册记录。"""
+
+    name: str
+    force: PhysicalModel
+    enabled: bool = True
 
 
 class ForceModel(Dynamics):
@@ -40,45 +50,161 @@ class ForceModel(Dynamics):
             raise ValueError(
                 "ForceModel requires system.coordinate_system to be set."
             )
-        self._forces: tuple[PhysicalModel, ...] = tuple()
+        self._entries: tuple[ForceEntry, ...] = ()
         if forces is not None:
             for force in forces:
                 self.add_force(force)
 
     @property
     def forces(self) -> tuple[PhysicalModel, ...]:
-        """当前聚合的力模型，只读。"""
-        return self._forces
+        """当前聚合的力模型，只读（含已 disable 的项）。"""
+        return tuple(entry.force for entry in self._entries)
 
-    def add_force(self, force: PhysicalModel) -> None:
-        """添加一个力模型。"""
+    def add_force(self, force: PhysicalModel, name: str | None = None) -> None:
+        """添加一个力模型。
+
+        Args:
+            force: 待添加的力模型。
+            name: 力模型的名字。缺省时按类名自动生成，遇同类自动消歧
+                （``Foo``、``Foo_2``、``Foo_3``…）。显式给出且与已有名字
+                冲突时抛 ``ValueError``。
+        """
         if not isinstance(force, PhysicalModel):
             raise TypeError(
                 f"force must be a PhysicalModel, got {type(force).__name__}"
             )
-        self._forces = self._forces + (force,)
+        if name is None:
+            name = self._auto_name(force)
+        elif any(entry.name == name for entry in self._entries):
+            raise ValueError(f"force name {name!r} already exists in ForceModel")
+        self._entries = self._entries + (ForceEntry(name, force, True),)
 
-    def remove_force(self, index: int | PhysicalModel) -> None:
-        """移除一个力模型（按索引或对象 identity）。"""
-        forces = list(self._forces)
+    def _auto_name(self, force: PhysicalModel) -> str:
+        """按类名生成唯一名字，遇同类自动加序号后缀。"""
+        base = type(force).__name__
+        if not any(entry.name == base for entry in self._entries):
+            return base
+        suffix = 2
+        while any(entry.name == f"{base}_{suffix}" for entry in self._entries):
+            suffix += 1
+        return f"{base}_{suffix}"
+
+    def get_force(self, name: str) -> PhysicalModel:
+        """按名取力模型；不存在抛 ``KeyError``。"""
+        for entry in self._entries:
+            if entry.name == name:
+                return entry.force
+        raise KeyError(name)
+
+    def list_forces(self) -> list[ForceEntry]:
+        """返回所有力模型的注册记录（含已 disable 的项）。
+
+        与 ``forces`` 属性的区别：本方法暴露 ``name`` 与 ``enabled`` 两个维度。
+        """
+        return list(self._entries)
+
+    def enable(self, name: str) -> None:
+        """按名启用一个力模型；不存在抛 ``KeyError``。"""
+        self._set_enabled(name, True)
+
+    def disable(self, name: str) -> None:
+        """按名禁用一个力模型（跳过加速度计算，但保留在容器内）。
+
+        不存在抛 ``KeyError``。
+        """
+        self._set_enabled(name, False)
+
+    def _set_enabled(self, name: str, enabled: bool) -> None:
+        """翻转指定名字力模型的 enabled 标志（不可变替换）。"""
+        if not any(entry.name == name for entry in self._entries):
+            raise KeyError(name)
+        self._entries = tuple(
+            ForceEntry(entry.name, entry.force, enabled) if entry.name == name else entry
+            for entry in self._entries
+        )
+
+    # --- 配置驱动（ADR 0004）---
+
+    _CONFIG_VERSION = 1
+
+    def to_config(self) -> dict[str, Any]:
+        """序列化为配置字典 ``{version, forces: [...]}``。
+
+        每条力经 ``force_config.serialize_force`` 转 ``{type, params}``，
+        容器补 ``name`` 与 ``enabled``。round-trip 契约见 ADR 0004。
+        """
+        from .force_config import serialize_force
+
+        forces_config: list[dict[str, Any]] = []
+        for entry in self._entries:
+            single = serialize_force(entry.force)
+            forces_config.append(
+                {
+                    "name": entry.name,
+                    "type": single["type"],
+                    "enabled": entry.enabled,
+                    "params": single["params"],
+                }
+            )
+        return {"version": self._CONFIG_VERSION, "forces": forces_config}
+
+    @classmethod
+    def from_config(
+        cls, config: dict[str, Any], system: Any
+    ) -> ForceModel:
+        """从配置字典构建 ``ForceModel``。
+
+        校验 ``version``，逐条 ``force_config.build_force`` 构造并按 ``name``
+        注册；``enabled: false`` 的条目构造后立即 disable。
+        """
+        from .force_config import build_force
+
+        version = config.get("version")
+        if version != cls._CONFIG_VERSION:
+            raise ValueError(
+                f"unsupported config version {version!r}; "
+                f"expected {cls._CONFIG_VERSION}"
+            )
+        fm = cls(system)
+        for entry in config.get("forces", []):
+            force = build_force(entry["type"], entry.get("params", {}))
+            fm.add_force(force, name=entry["name"])
+            if not entry.get("enabled", True):
+                fm.disable(entry["name"])
+        return fm
+
+    def remove_force(self, index: int | PhysicalModel | str) -> None:
+        """移除一个力模型（按索引、实例 identity 或名字）。"""
+        entries = list(self._entries)
         if isinstance(index, int):
-            del forces[index]
+            del entries[index]
+        elif isinstance(index, str):
+            for i, entry in enumerate(entries):
+                if entry.name == index:
+                    del entries[i]
+                    break
+            else:
+                raise ValueError(f"force name {index!r} not found in ForceModel")
         else:
-            try:
-                forces.remove(index)
-            except ValueError as exc:
-                raise ValueError("force not found in ForceModel") from exc
-        self._forces = tuple(forces)
+            for i, entry in enumerate(entries):
+                if entry.force is index:
+                    del entries[i]
+                    break
+            else:
+                raise ValueError("force not found in ForceModel")
+        self._entries = tuple(entries)
 
     def _compute_total_acceleration(
         self,
         t: float,
         state: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
-        """计算所有力模型在当前状态下的总加速度。"""
+        """计算所有启用力模型在当前状态下的总加速度。"""
         total = np.zeros(3, dtype=float)
-        for force in self._forces:
-            total = total + force.compute_acceleration(t, state, self.system)
+        for entry in self._entries:
+            if not entry.enabled:
+                continue
+            total = total + entry.force.compute_acceleration(t, state, self.system)
         return total
 
     def equations_of_motion(

@@ -69,6 +69,21 @@ class DragModel(PhysicalModel):
         return self._body
 
     @property
+    def cd(self) -> float:
+        """阻力系数 Cd。"""
+        return self._cd
+
+    @property
+    def area(self) -> float:
+        """迎风截面积，单位 m²。"""
+        return self._area
+
+    @property
+    def mass(self) -> float:
+        """航天器质量，单位 kg。"""
+        return self._mass
+
+    @property
     def ballistic_coefficient(self) -> float:
         """弹道系数 ``Cd·A/m``，单位 m²/kg。"""
         return self._cd * self._area / self._mass

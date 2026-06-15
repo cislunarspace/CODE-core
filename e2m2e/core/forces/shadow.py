@@ -68,6 +68,9 @@ class ConicalShadowModel(ShadowModel):
         radii: dict[str, float] | None = None,
     ) -> None:
         self._bodies: tuple[str, ...] = tuple(b.upper() for b in bodies)
+        self._radii_arg: dict[str, float] | None = (
+            {k.upper(): float(v) for k, v in radii.items()} if radii else None
+        )
         self._radii: dict[str, float] = dict(_BODY_RADII_KM)
         if radii:
             self._radii.update({k.upper(): float(v) for k, v in radii.items()})
@@ -81,6 +84,11 @@ class ConicalShadowModel(ShadowModel):
     def bodies(self) -> tuple[str, ...]:
         """遮挡体列表（大写）。"""
         return self._bodies
+
+    @property
+    def radii(self) -> dict[str, float] | None:
+        """用户传入的天体半径覆盖（大写键）；``None`` 表示全用默认值。"""
+        return dict(self._radii_arg) if self._radii_arg is not None else None
 
     def body_radius(self, body: str) -> float:
         """返回天体半径（km）。"""

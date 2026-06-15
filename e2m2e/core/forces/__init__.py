@@ -2,7 +2,8 @@
 
 from .drag import DragModel
 from .exceptions import CoordinateTransformError
-from .force_model import ForceModel
+from .force_config import NotSerializableError, dump_force_config, load_force_config
+from .force_model import ForceEntry, ForceModel
 from .gravity_field import GravityField
 from .physical_model import PhysicalModel
 from .shadow import ConicalShadowModel, ShadowModel
@@ -12,6 +13,7 @@ from .thrust import BurnApplication, FiniteBurn, ImpulsiveBurn
 __all__ = [
     "PhysicalModel",
     "ForceModel",
+    "ForceEntry",
     "GravityField",
     "DragModel",
     "SolarRadiationPressure",
@@ -21,4 +23,7 @@ __all__ = [
     "FiniteBurn",
     "BurnApplication",
     "CoordinateTransformError",
+    "NotSerializableError",
+    "load_force_config",
+    "dump_force_config",
 ]

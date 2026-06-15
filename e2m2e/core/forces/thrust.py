@@ -82,6 +82,23 @@ class FiniteBurn(PhysicalModel):
             if np.linalg.norm(direction_arr) < 1e-15:
                 raise ValueError("direction must be a non-zero vector")
 
+    @property
+    def thrust_profile(self) -> Callable[[float], float]:
+        """推力大小随时间变化的可调用（N）。"""
+        return self._thrust_profile
+
+    @property
+    def direction(
+        self,
+    ) -> npt.ArrayLike | Callable[[float, npt.NDArray[np.floating]], npt.ArrayLike]:
+        """推力方向：固定向量或 ``(t, state) -> (3,)`` 可调用。"""
+        return self._direction
+
+    @property
+    def mass(self) -> float:
+        """航天器质量（kg，常量）。"""
+        return self._mass
+
     def compute_acceleration(
         self,
         t: float,

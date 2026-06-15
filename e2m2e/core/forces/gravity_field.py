@@ -47,6 +47,7 @@ class GravityField(PhysicalModel):
         """
         self._body = body.upper()
         self._input_frame = input_frame
+        self._gravity_file_arg = gravity_file
         self._degree = int(degree)
         if self._degree < 0:
             raise ValueError("degree must be non-negative")
@@ -103,6 +104,16 @@ class GravityField(PhysicalModel):
     def order(self) -> int:
         """最大 order。"""
         return self._order
+
+    @property
+    def input_frame(self) -> str:
+        """球谐展开坐标系的 SPICE frame 名。"""
+        return self._input_frame
+
+    @property
+    def gravity_file(self) -> str | Path | None:
+        """用户传入的自定义 .gfc 路径；``None`` 表示用包内默认 EGM96。"""
+        return self._gravity_file_arg
 
     @property
     def gravitational_parameter(self) -> float:
