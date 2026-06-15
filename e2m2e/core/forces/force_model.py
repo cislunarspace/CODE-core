@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -80,14 +81,22 @@ class ForceModel(Dynamics):
         self._entries = self._entries + (ForceEntry(name, force, True),)
 
     def _auto_name(self, force: PhysicalModel) -> str:
-        """按类名生成唯一名字，遇同类自动加序号后缀。"""
+        """按类名生成唯一名字，遇同类自动加序号后缀。
+
+        若已存在 ``Foo`` 或 ``Foo_N`` 中的任意一个，新名字取该系列最大
+        序号加 1，保证整个 ``Foo`` 系列名字连续且唯一。
+        """
         base = type(force).__name__
-        if not any(entry.name == base for entry in self._entries):
+        pattern = re.compile(rf"^{re.escape(base)}(_(\d+))?$")
+        max_suffix = 0
+        for entry in self._entries:
+            match = pattern.match(entry.name)
+            if match:
+                suffix = int(match.group(2)) if match.group(2) else 1
+                max_suffix = max(max_suffix, suffix)
+        if max_suffix == 0:
             return base
-        suffix = 2
-        while any(entry.name == f"{base}_{suffix}" for entry in self._entries):
-            suffix += 1
-        return f"{base}_{suffix}"
+        return f"{base}_{max_suffix + 1}"
 
     def get_force(self, name: str) -> PhysicalModel:
         """按名取力模型；不存在抛 ``KeyError``。"""
@@ -173,25 +182,26 @@ class ForceModel(Dynamics):
                 fm.disable(entry["name"])
         return fm
 
-    def remove_force(self, index: int | PhysicalModel | str) -> None:
-        """移除一个力模型（按索引、实例 identity 或名字）。"""
+    def remove_force(self, index: int | str) -> None:
+        """移除一个力模型（按索引或名字）。
+
+        Args:
+            index: 整数索引，或力模型注册名。
+
+        Raises:
+            ValueError: 名字不存在时。
+            IndexError: 索引越界时。
+        """
         entries = list(self._entries)
         if isinstance(index, int):
             del entries[index]
-        elif isinstance(index, str):
+        else:
             for i, entry in enumerate(entries):
                 if entry.name == index:
                     del entries[i]
                     break
             else:
                 raise ValueError(f"force name {index!r} not found in ForceModel")
-        else:
-            for i, entry in enumerate(entries):
-                if entry.force is index:
-                    del entries[i]
-                    break
-            else:
-                raise ValueError("force not found in ForceModel")
         self._entries = tuple(entries)
 
     def _compute_total_acceleration(

@@ -146,7 +146,7 @@ _Avoid_: 力模型聚合、容器协调坐标转换（误导：暗示容器代�
 _Avoid_: 把配置当作运行规格（它只列力，不驱动传播）；把字段名、版本号这类序列化细节当作领域概念来记（那是实现，归代码与 ADR）
 
 **传播中的推力/机动** — 航天器在传播过程中改变速度的事件。与转移设计中的推进模型不同，这里的推力/机动直接参与运动方程或传播流程。
-- `FiniteBurn`：连续推力，作为力模型参与加速度计算。
+- `FiniteBurn`：连续推力，作为力模型参与加速度计算。运行时 `thrust_profile` 与 `direction` 均可接受可调用对象；但配置往返（`to_config` / `from_config`）目前只支持固定推力剖面（`constant`、`pulse`）和固定方向向量（`fixed`），任意 Python callable 会导致 `NotSerializableError`。
 - `ImpulsiveBurn`：瞬时 Δv 事件，在指定 epoch 处直接修改状态速度，不由力模型表达。
 
 限制：当前 Δv 与方向只在传播（惯性）坐标系内解释，不做坐标变换；VNB/LVLH burn 坐标系推迟到 Slice 12。质量变化也不支持（`mass` 常量）。

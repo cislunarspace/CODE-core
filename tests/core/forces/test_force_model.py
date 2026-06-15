@@ -140,6 +140,17 @@ def test_auto_name_disambiguates_same_type():
     assert names == ["ConstantForce", "ConstantForce_2"]
 
 
+def test_auto_name_skips_occupied_suffix():
+    """显式占用 Foo_2 后，自动命名不再回退到 Foo，而是取 Foo_3。"""
+    system = _FakeSystem()
+    fm = ForceModel(system)
+    fm.add_force(ConstantForce([1.0, 0.0, 0.0]), name="ConstantForce_2")
+    fm.add_force(ConstantForce([0.0, 2.0, 0.0]))
+
+    names = [e.name for e in fm.list_forces()]
+    assert names == ["ConstantForce_2", "ConstantForce_3"]
+
+
 def test_explicit_duplicate_name_raises():
     """显式给出重名时抛 ValueError。"""
     system = _FakeSystem()
@@ -158,6 +169,19 @@ def test_remove_force_by_name():
     fm.add_force(ConstantForce([0.0, 2.0, 0.0]), name="secondary")
 
     fm.remove_force("primary")
+
+    assert len(fm.forces) == 1
+    assert fm.forces[0] is fm.get_force("secondary")
+
+
+def test_remove_force_by_index():
+    """可按索引移除力模型。"""
+    system = _FakeSystem()
+    fm = ForceModel(system)
+    fm.add_force(ConstantForce([1.0, 0.0, 0.0]), name="primary")
+    fm.add_force(ConstantForce([0.0, 2.0, 0.0]), name="secondary")
+
+    fm.remove_force(0)
 
     assert len(fm.forces) == 1
     assert fm.forces[0] is fm.get_force("secondary")
