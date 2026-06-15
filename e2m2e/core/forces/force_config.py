@@ -19,6 +19,7 @@ from e2m2e.core.atmosphere import AtmosphereModel, ExponentialAtmosphere
 from .drag import DragModel
 from .gravity_field import GravityField
 from .physical_model import PhysicalModel
+from .relativistic_correction import RelativisticCorrection
 from .shadow import ConicalShadowModel, ShadowModel
 from .srp import SolarRadiationPressure
 from .thrust import FiniteBurn
@@ -223,11 +224,30 @@ def _serialize_finite_burn(force: FiniteBurn) -> dict[str, Any]:
     return params
 
 
+def _serialize_relativistic_correction(force: RelativisticCorrection) -> dict[str, Any]:
+    return {
+        "central_body": force.central_body,
+        "primary_body": force.primary_body,
+        "enable_schwarzschild": force.enable_schwarzschild,
+        "enable_lense_thirring": force.enable_lense_thirring,
+        "enable_de_sitter": force.enable_de_sitter,
+        "angular_momentum_vector": (
+            force.angular_momentum_vector.tolist()
+            if force.angular_momentum_vector is not None
+            else None
+        ),
+        "body_radius": force.body_radius,
+        "c": force.c,
+        "gamma": force.gamma,
+    }
+
+
 _SERIALIZERS: dict[type, Any] = {
     GravityField: _serialize_gravity_field,
     DragModel: _serialize_drag_model,
     SolarRadiationPressure: _serialize_srp,
     FiniteBurn: _serialize_finite_burn,
+    RelativisticCorrection: _serialize_relativistic_correction,
 }
 
 
@@ -267,11 +287,16 @@ def _build_finite_burn(params: dict[str, Any]) -> FiniteBurn:
     return FiniteBurn(**built)
 
 
+def _build_relativistic_correction(params: dict[str, Any]) -> RelativisticCorrection:
+    return RelativisticCorrection(**params)
+
+
 _BUILDERS: dict[str, Any] = {
     "GravityField": _build_gravity_field,
     "DragModel": _build_drag_model,
     "SolarRadiationPressure": _build_srp,
     "FiniteBurn": _build_finite_burn,
+    "RelativisticCorrection": _build_relativistic_correction,
 }
 
 
