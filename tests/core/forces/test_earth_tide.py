@@ -7,7 +7,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.forces.earth_tide import solid_tide_step1
+from e2m2e.core.forces.earth_tide import solid_tide_step1, solid_tide_step2
 
 
 # 物理常量(量级参考用)
@@ -82,3 +82,40 @@ class TestSolidTideStep1:
         )
 
         np.testing.assert_allclose(deltaC_double[2, 0], 2.0 * deltaC_moon[2, 0], rtol=1e-12)
+
+
+class TestSolidTideStep2:
+    """固体潮 Step 2(频率相关,迁移 GMAT IncrementEarthTide 的 Delaunay 幅角段)。
+
+    5 个 Delaunay 幅角 F[0..4] + GMST + Table6.3a/b/c,只影响 (2,0)/(2,1)/(2,2)。
+    量级 ~1e-10(GMAT freq_dep * 1e-12 缩放)。
+    """
+
+    def test_delta_c20_nonzero_and_reasonable_at_j2000(self):
+        """J2000 时刻 ΔC20(频率相关)非零,量级在 1e-12 到 1e-9。"""
+        deltaC, _ = solid_tide_step2(et=0.0)
+
+        assert deltaC[2, 0] != 0.0
+        assert 1e-13 < abs(deltaC[2, 0]) < 1e-9
+
+    def test_only_degree2_terms_nonzero(self):
+        """Step 2 只写 (2,0)/(2,1)/(2,2),其余为零。"""
+        deltaC, deltaS = solid_tide_step2(et=0.0)
+
+        # degree 0,1,3,4 的 (n,0) 为零
+        assert deltaC[0, 0] == 0.0
+        assert deltaC[1, 0] == 0.0
+        assert deltaC[3, 0] == 0.0
+        assert deltaC[4, 0] == 0.0  # Step2 不写 (4,m);Step1 才写
+
+    def test_delta_varies_with_time(self):
+        """潮汐频率相关项随时间变化(Delaunay 幅角时变)。"""
+        d1, _ = solid_tide_step2(et=0.0)
+        d2, _ = solid_tide_step2(et=6 * 86400.0)  # 6 天后
+
+        assert not np.allclose(d1[2, 0], d2[2, 0], atol=1e-15)
+
+    def test_returns_5x5_arrays(self):
+        deltaC, deltaS = solid_tide_step2(et=0.0)
+        assert deltaC.shape == (5, 5)
+        assert deltaS.shape == (5, 5)
