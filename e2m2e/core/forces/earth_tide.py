@@ -368,3 +368,37 @@ def pole_tide(
     deltaS[2, 1] -= 1.7680e-10 * (m2 - 0.03351 * m1)
 
     return deltaC, deltaS
+
+
+def permanent_tide_correction(
+    mu_sun: float,
+    mu_moon: float,
+    mu_earth: float,
+    r_earth: float,
+    a_sun: float,
+    a_moon: float,
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    """永久潮汐修正(IERS TN32 Step 3,时间平均,AC3)。
+
+    zero-tide 系数约定下,``GravityField`` 在叠加固体潮后减去此值——因为
+    zero-tide 系数已含永久潮汐,运行时若再加完整固体潮(含永久分量)会重复。
+
+    用 ``solid_tide_step1`` 在 Sun/Moon 半长轴距离 + 赤道(零纬度,时间平均
+    近似)计算。GMAT 把永久潮汐处理放在系数加载 setup;e2m2e 用运行时减除,
+    公式等价(GMAT 注释 "moved to model setup, correction to TideFree
+    coefficients" 的本意)。
+
+    Args:
+        mu_sun, mu_moon: Sun/Moon GM,km³/s²。
+        mu_earth: 地球 GM,km³/s²。
+        r_earth: 地球参考半径,km。
+        a_sun, a_moon: Sun/Moon 轨道半长轴,km(时间平均距离近似)。
+
+    Returns:
+        (DeltaC, DeltaS),各为 5×5 数组。
+    """
+    sun_pos = np.array([a_sun, 0.0, 0.0])
+    moon_pos = np.array([a_moon, 0.0, 0.0])
+    dC_sun, dS_sun = solid_tide_step1(sun_pos, mu_sun, mu_earth, r_earth)
+    dC_moon, dS_moon = solid_tide_step1(moon_pos, mu_moon, mu_earth, r_earth)
+    return dC_sun + dC_moon, dS_sun + dS_moon

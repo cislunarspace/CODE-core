@@ -7,7 +7,12 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.forces.earth_tide import pole_tide, solid_tide_step1, solid_tide_step2
+from e2m2e.core.forces.earth_tide import (
+    permanent_tide_correction,
+    pole_tide,
+    solid_tide_step1,
+    solid_tide_step2,
+)
 
 
 # 物理常量(量级参考用)
@@ -157,3 +162,54 @@ class TestPoleTide:
         deltaC, deltaS = pole_tide(et=0.0, xp=0.0, yp=0.0)
         assert deltaC.shape == (5, 5)
         assert deltaS.shape == (5, 5)
+
+
+# 永久潮汐修正用物理常量(Sun/Moon 半长轴)
+_SUN_MU = 1.32712440018e11  # km³/s²
+_A_SUN = 1.495978707e8  # km
+_A_MOON = _MOON_DIST  # km
+
+
+class TestPermanentTideCorrection:
+    """永久潮汐修正(IERS TN32 Step 3,时间平均,AC3)。
+
+    zero-tide 系数约定下,GravityField 减去此值(系数已含永久潮汐)。
+    用 solid_tide_step1 在 Sun/Moon 半长轴 + 赤道(零纬度,时间平均近似)计算。
+    """
+
+    def test_returns_5x5_nonzero_c20(self):
+        dC, dS = permanent_tide_correction(
+            mu_sun=_SUN_MU,
+            mu_moon=_MOON_MU,
+            mu_earth=_EARTH_MU,
+            r_earth=_EARTH_R,
+            a_sun=_A_SUN,
+            a_moon=_A_MOON,
+        )
+
+        assert dC.shape == (5, 5)
+        assert dC[2, 0] != 0.0
+
+    def test_c20_magnitude_reasonable(self):
+        """永久潮汐 ΔC20 量级 ~1e-9(Sun+Moon 在平均位置)。"""
+        dC, _ = permanent_tide_correction(
+            mu_sun=_SUN_MU,
+            mu_moon=_MOON_MU,
+            mu_earth=_EARTH_MU,
+            r_earth=_EARTH_R,
+            a_sun=_A_SUN,
+            a_moon=_A_MOON,
+        )
+
+        assert 1e-10 < abs(dC[2, 0]) < 1e-7
+
+    def test_moon_dominates_over_sun(self):
+        """Moon 近,永久潮汐贡献大于 Sun。"""
+        dC_sun_only, _ = permanent_tide_correction(
+            _SUN_MU, 0.0, _EARTH_MU, _EARTH_R, _A_SUN, _A_MOON
+        )
+        dC_moon_only, _ = permanent_tide_correction(
+            0.0, _MOON_MU, _EARTH_MU, _EARTH_R, _A_SUN, _A_MOON
+        )
+
+        assert abs(dC_moon_only[2, 0]) > abs(dC_sun_only[2, 0])
