@@ -3,6 +3,8 @@ Unit tests for the new Axes + Origin + CoordinateSystem framework.
 """
 
 
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -195,3 +197,77 @@ class TestCoordinateSystemState:
         result = cs_a.transform_vector(vec, from_cs=cs_a, to_cs=cs_b, et=0.0)
 
         np.testing.assert_allclose(result, np.array([0.0, -1.0, 0.0]), atol=1e-14)
+
+
+class TestCoordinateSystemFrozen:
+    """CoordinateSystem 冻结契约:运行时不可换组件、不可加属性。
+
+    issue #76 验收第 5 条"代码遵循 immutability 与类型注解规范"的字面落实——
+    CoordinateSystem 是坐标变换的源头,冻结后任何运行时偷换都会让变换结果
+    在不同时刻给出不一致的输出,锁住该契约。
+    """
+
+    def test_axes_cannot_be_replaced(self):
+        """cs.axes = ... 抛 FrozenInstanceError。"""
+        cs = CoordinateSystem(
+            axes=FixedAxes(angle=0.0), origin=FixedOrigin(state=np.zeros(6))
+        )
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            cs.axes = FixedAxes(angle=np.pi / 2)
+
+    def test_origin_cannot_be_replaced(self):
+        """cs.origin = ... 抛 FrozenInstanceError。"""
+        cs = CoordinateSystem(
+            axes=FixedAxes(angle=0.0), origin=FixedOrigin(state=np.zeros(6))
+        )
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            cs.origin = FixedOrigin(state=np.ones(6))
+
+    def test_new_attribute_cannot_be_added(self):
+        """cs.weird_attr = ... 抛 FrozenInstanceError(锁住"无任意属性添加"契约)。"""
+        cs = CoordinateSystem(
+            axes=FixedAxes(angle=0.0), origin=FixedOrigin(state=np.zeros(6))
+        )
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            cs.weird_attr = 1
+
+
+class TestCoordinateSystemOrthogonality:
+    """CoordinateSystem 中使用的 Axes 旋转矩阵满足正交性。
+
+    issue #76 验收第 4 条"所有转换矩阵满足正交性(R @ R.T = I 误差 < 1e-14)"
+    的字面落实——在新框架的 test_coordinate_system.py 里显式覆盖,因
+    test_standard_axes.py 覆盖的是具体类,本文件覆盖"框架内的任何 Axes
+    子类"契约。
+    """
+
+    @pytest.mark.parametrize("et", [0.0, 1.0, 100.0, 86400.0, -86400.0])
+    def test_fixed_axes_rotation_matrix_orthogonal(self, et):
+        """FixedAxes 在多个 et 上 R @ R.T = I,Frobenius 误差 < 1e-14。"""
+        axes = FixedAxes(angle=np.pi / 3)
+        R = axes.rotation_matrix(et)
+        np.testing.assert_allclose(R @ R.T, np.eye(3), atol=1e-14)
+        np.testing.assert_allclose(np.linalg.det(R), 1.0, atol=1e-14)
+
+    @pytest.mark.parametrize("et", [0.0, 1.0, 100.0, 86400.0])
+    def test_rotating_axes_rotation_matrix_orthogonal(self, et):
+        """RotatingAxes 在多个 et 上正交。"""
+        axes = RotatingAxes(omega=0.5)
+        R = axes.rotation_matrix(et)
+        np.testing.assert_allclose(R @ R.T, np.eye(3), atol=1e-14)
+
+
+class TestCoordinateSystemTransformVector:
+    """transform_vector 边界用例:零向量经任意坐标变换后仍为零。"""
+
+    def test_transform_vector_zero_vector_is_zero(self):
+        """零向量经过任意坐标变换后仍是零向量(无信息被捏造)。"""
+        axes_a = FixedAxes(angle=0.0)
+        axes_b = FixedAxes(angle=np.pi / 4)
+        origin = FixedOrigin(state=np.zeros(6))
+        cs_a = CoordinateSystem(axes=axes_a, origin=origin)
+        cs_b = CoordinateSystem(axes=axes_b, origin=origin)
+
+        zero = np.zeros(3)
+        result = cs_a.transform_vector(zero, from_cs=cs_a, to_cs=cs_b, et=0.0)
+        np.testing.assert_array_equal(result, zero)

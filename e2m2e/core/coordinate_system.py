@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import numpy.typing as npt
 
@@ -9,12 +11,16 @@ from .axes import Axes
 from .origin import Origin
 
 
+@dataclass(frozen=True)
 class CoordinateSystem:
-    """由坐标轴和原点组成的参考系。"""
+    """由坐标轴和原点组成的参考系(不可变组合)。
 
-    def __init__(self, axes: Axes, origin: Origin) -> None:
-        self.axes = axes
-        self.origin = origin
+    运行时不可换组件:任何对 ``axes`` / ``origin`` 的赋值或新属性添加都会抛
+    ``FrozenInstanceError``。意图:防止变换源头在不同时刻给出不一致结果。
+    """
+
+    axes: Axes
+    origin: Origin
 
     def transform_vector(
         self,
