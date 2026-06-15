@@ -128,3 +128,45 @@ def test_leo_j2_one_day_raan_drift(leo_system):
         / omega_dot_analytical_deg_per_day
     )
     assert relative_error < 0.05, f"relative_error={relative_error:.3f}"
+
+
+@pytest.mark.spice
+def test_leo_solid_tide_orbit_difference(leo_system):
+    """AC6: LEO 1 天传播,固体潮 ON vs OFF 产生非零轨道差异(自洽性)。
+
+    精度要求低:只验证潮汐改变轨道(非零差异),不设硬门槛。需要 ITRF93
+    BPC 内核以查 Sun/Moon 在地固系的位置。
+    """
+    system = leo_system
+    spice = system.spice
+    et0 = spice.utc_to_et("2025-06-21T11:00:06")
+
+    # ITRF93 帧 Sun/Moon 查询需要 BPC 内核,不可用则 skip
+    try:
+        spice.get_body_position("SUN", et0, "ITRF93", "EARTH")
+    except Exception:
+        pytest.skip("ITRF93 frame (BPC kernel) not available for tide test")
+
+    mu = system.gravitational_parameter("EARTH")
+    a = 6778.0  # km
+    e = 0.001
+    y0 = _keplerian_to_cartesian(a, e, 51.6, 0.0, 0.0, 0.0, mu)
+    t_span = (et0, et0 + 86400.0)
+    t_eval = np.linspace(et0, et0 + 86400.0, 50)
+
+    gf_off = GravityField(body="EARTH", degree=2, order=0)
+    gf_on = GravityField(body="EARTH", degree=2, order=0, tide_mode="solid")
+
+    res_off = ForceModel(system, forces=[gf_off]).propagate(
+        y0, t_span, t_eval=t_eval, max_steps=200_000
+    )
+    res_on = ForceModel(system, forces=[gf_on]).propagate(
+        y0, t_span, t_eval=t_eval, max_steps=200_000
+    )
+
+    pos_off = res_off["states"][-1][:3]
+    pos_on = res_on["states"][-1][:3]
+    diff_km = np.linalg.norm(pos_on - pos_off)
+
+    # 自洽性:潮汐 ON 改变轨道,差异非零
+    assert diff_km > 0.0
