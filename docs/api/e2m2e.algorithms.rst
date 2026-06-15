@@ -66,7 +66,7 @@ e2m2e.algorithms.strategies.halo module
    :show-inheritance:
 
 e2m2e.algorithms.strategies.symmetric_2d module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.algorithms.strategies.symmetric_2d
    :members:
@@ -74,9 +74,17 @@ e2m2e.algorithms.strategies.symmetric_2d module
    :show-inheritance:
 
 e2m2e.algorithms.strategies.symmetric_3d module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.algorithms.strategies.symmetric_3d
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.algorithms.halo_initial_guess module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.algorithms.halo_initial_guess
    :members:
    :undoc-members:
    :show-inheritance:

@@ -19,11 +19,14 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
    core/ephemeris
    core/orbit
    core/coordinate
+   core/forces
+   core/integrators
+   core/atmosphere
 
    algorithms/differential-correction
    algorithms/continuation
-   algorithms/halo
    algorithms/stability
+   algorithms/halo
    algorithms/multiple-shooting
    algorithms/homotopy-correction
 

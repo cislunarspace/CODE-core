@@ -15,3 +15,14 @@ Subpackages
    e2m2e.core
    e2m2e.algorithms
    e2m2e.transfer
+
+Submodules
+----------
+
+e2m2e.integrators module
+------------------------
+
+.. automodule:: e2m2e.integrators
+   :members:
+   :undoc-members:
+   :show-inheritance:

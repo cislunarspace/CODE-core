@@ -5,10 +5,21 @@ from collections.abc import Callable
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e._integrators import CowellResult, MultistepMethod, MultistepResult, RkMethod
-from e2m2e._integrators import cowell_step as _cowell_step
-from e2m2e._integrators import multistep_step as _multistep_step
-from e2m2e._integrators import rk_step as _rk_step
+try:
+    from e2m2e._integrators import CowellResult, MultistepMethod, MultistepResult, RkMethod
+    from e2m2e._integrators import cowell_step as _cowell_step
+    from e2m2e._integrators import multistep_step as _multistep_step
+    from e2m2e._integrators import rk_step as _rk_step
+except ModuleNotFoundError:
+    # _integrators is a compiled Rust extension; allow import for doc builds
+    # where the extension is not built.
+    CowellResult = None  # type: ignore[misc,assignment]
+    MultistepMethod = None  # type: ignore[misc,assignment]
+    MultistepResult = None  # type: ignore[misc,assignment]
+    RkMethod = None  # type: ignore[misc,assignment]
+    _cowell_step = None  # type: ignore[misc,assignment]
+    _multistep_step = None  # type: ignore[misc,assignment]
+    _rk_step = None  # type: ignore[misc,assignment]
 
 __all__ = [
     "rk_step",

@@ -40,3 +40,43 @@ e2m2e.transfer.search_config module
    :members:
    :undoc-members:
    :show-inheritance:
+
+e2m2e.transfer.config module
+----------------------------
+
+.. automodule:: e2m2e.transfer.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.transfer.propulsion module
+---------------------------------
+
+.. automodule:: e2m2e.transfer.propulsion
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.transfer.terminal module
+-------------------------------
+
+.. automodule:: e2m2e.transfer.terminal
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.transfer.cost module
+--------------------------
+
+.. automodule:: e2m2e.transfer.cost
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.transfer.optimizers module
+---------------------------------
+
+.. automodule:: e2m2e.transfer.optimizers
+   :members:
+   :undoc-members:
+   :show-inheritance:
