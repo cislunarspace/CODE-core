@@ -213,11 +213,14 @@ def _serialize_direction(direction: Any) -> dict[str, Any]:
 
 
 def _serialize_finite_burn(force: FiniteBurn) -> dict[str, Any]:
-    return {
+    params: dict[str, Any] = {
         "mass": force.mass,
         "thrust_profile": _serialize_thrust_profile(force.thrust_profile),
         "direction": _serialize_direction(force.direction),
     }
+    if force.direction_frame is not None:
+        params["direction_frame"] = force.direction_frame
+    return params
 
 
 _SERIALIZERS: dict[type, Any] = {

@@ -122,6 +122,15 @@ _Avoid_: 把中间模型当作独立的第三种 System；把"CR3BP + 力"仍当
 **坐标轴（`Axes`）** — 坐标系的"朝向"部分。它规定：同一个空间方向，在我的坐标系里如何表示，在 ICRF/J2000 里又如何表示。精确定义：给定历元 `et`，返回旋转矩阵 `R`，使得 `r_icrf = R @ r_axes`；以及（如果需要）旋转矩阵的变化率 `Rdot`，使得 `v_icrf = R @ v_axes + Rdot @ r_axes`。实现时按精度分档：SPICE ITRF93、GMAT 兼容原生、低精度教学、惯性 ICRF 系（单位阵）、IAU2000 春分赤道系等。
 _Avoid_: 坐标系（指 `CoordinateSystem` 整体，非朝向部分）
 
+**动态坐标轴（Dynamic Axes）** — 旋转矩阵不仅依赖历元，还依赖航天器瞬时状态的坐标轴。与静态坐标轴（ICRS、ITRF 等）不同，动态坐标轴的方向随航天器运动实时变化。实现上继承 `Axes` 但增加 `update(et, state)` 方法：先以状态刷新内部方向缓存，再调用 `rotation_matrix(et)` 取矩阵。状态注入由 `System.update_coordinate_systems` 或 `ForceModel.propagate` 在系统层面统一完成，避免多个力模型重复计算或状态不一致。
+_Avoid_: 把动态坐标轴当作普通 `Axes` 使用（必须先 `update`）、在力模型内部各自更新
+
+**VNB（Velocity-Normal-Binormal）** — 一种动态坐标轴，x 轴沿速度方向，z 轴沿轨道角动量方向，y 轴由叉积补全。用于推力方向、机动分解等需要"沿速度/垂直轨道面"表达的场合。轴向定义与 GMAT 一致。
+_Avoid_: 与文献中其他 VNB 定义混用（如把 Normal 当作速度垂直于轨道面内的分量）
+
+**LVLH（Local Vertical Local Horizontal）** — 一种动态坐标轴，z 轴沿位置反方向（从航天器指向地心，即 Local Vertical），y 轴沿负角动量方向，x 轴由叉积补全（即 Local Horizontal）。用于轨道保持、相对导航等场合。注意不同文献对 LVLH 的 x/y 命名有分歧，e2m2e 采用 GMAT 约定。
+_Avoid_: 与文献中 z 轴为 `+r` 的 LVLH 定义混用
+
 **原点（`Origin`）** — 坐标系的"位置"部分。`state(et)` 返回该原点在 ICRF/J2000 中的绝对状态 `[r, v]`。例如天体中心、质心等无平移点。
 _Avoid_: 物理天体本身（原点是参考点）
 
