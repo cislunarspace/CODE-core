@@ -1,5 +1,7 @@
-"""
-Unit tests for CoordinateTransformation class
+"""CoordinateTransformation 单元测试。
+
+覆盖参考系枚举、初始化、旋转矩阵、
+旋转/惯性互转、质心/原点变换与往返一致性。
 """
 
 import numpy as np

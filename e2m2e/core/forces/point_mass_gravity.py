@@ -54,7 +54,7 @@ class PointMassGravity(PhysicalModel):
                 )
             mu = system.gravitational_parameter(self._body)
 
-        r = np.asarray(state[:3], dtype=float)
+        r = np.asarray(state, dtype=float)[:3]
         r_norm = np.linalg.norm(r)
         if r_norm < 1e-15:
             return np.zeros(3)

@@ -1,4 +1,7 @@
-"""ForceModel.propagate_maneuvers 编排测试。"""
+"""ForceModel.propagate_maneuvers 编排测试。
+
+验证单脉冲速度/能量变化、多脉冲顺序与边界。
+"""
 
 import numpy as np
 import pytest

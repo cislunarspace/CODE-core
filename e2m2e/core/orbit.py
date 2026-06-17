@@ -3,14 +3,6 @@
 本模块定义了圆型限制性三体问题（CR3BP）中轨道数据的表示与处理逻辑，
 是 e2m2e 四层架构中 core 层的核心组件之一。
 
-重构说明 (v4.0 MBSE)
---------------------
-采用组合模式重构 Orbit 类：
-- 核心数据（states, times, system）直接持有
-- 计算属性（period, amplitudes, extrema, center 等）通过 property 代理
-- 稳定性分析由 e2m2e.algorithms.stability 模块独立负责
-- 保持 v3 JSON 格式向后兼容
-
 主要类：
     Orbit: 单条轨道的数据容器，支持属性计算、序列化/反序列化和稳定性分析。
     OrbitFamily: 轨道族容器，用于存储和管理多条同族轨道。

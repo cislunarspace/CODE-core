@@ -1,4 +1,7 @@
-"""ForceModel propagate 边界行为测试。"""
+"""ForceModel 传播边界行为测试。
+
+覆盖零时间跨度、终止事件与 t_eval 精确输出。
+"""
 
 import numpy as np
 import pytest

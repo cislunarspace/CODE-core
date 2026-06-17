@@ -1,41 +1,7 @@
-"""
-需求: Multiple Shooting 多段打靶法差分修正 (Layer 2)
+"""Multiple Shooting 多段打靶法测试（Layer 2）。
 
-e2m2e 需要实现 Multiple Shooting 算法，在星历 N-body 模型下修正轨道使 patch
-points 之间位置和速度连续。这是将 CR3BP 轨道转换到高精度星历模型的核心算法。
-
-功能要求:
-  1. 将轨道分割为多个 patch points
-  2. 分别传播每段轨迹（带 STM）
-  3. 组装约束向量 F(X)（位置/速度不连续量）
-  4. 组装 Jacobian DF(X)（基于 STM）
-  5. Newton 迭代: X_{k+1} = X_k - DF^{-1} @ F(X_k)
-  6. 支持可变时间 / 固定时间修正
-  7. 支持部分自由变量（只修正位置、只修正速度等）
-
-约束条件:
-  - 位置连续: r_i(t_i_end) = r_{i+1}(t_{i+1_start})
-  - 速度连续: v_i(t_i_end) = v_{i+1}(t_{i+1_start})  (可选)
-  - 历元连续: 时间节点不跳变
-
-自由变量:
-  - 每个 patch point 的 6 维状态 [x, y, z, vx, vy, vz]
-  - 时间节点 t_i (可选, var_time=True 时)
-
-算法:
-  F_i = [r_{i+1} - r_prop_i(t_{i+1}), v_{i+1} - v_prop_i(t_{i+1})]
-  DF_ij = STM_i * I_j - delta_{i+1,j} * I  (简化表示)
-  dX = -DF^{-1} @ F  (或最小范数解)
-
-参考实现:
-  SEMpy multiple_shooting.py 中的 MultipleShooting.correct()
-  SEMpy 支持并行传播 patch segments
-
-参考论文:
-  陈昱桔 (2024) "面向地月空间态势感知的DRO轨道设计与控制研究"
-
-依赖:
-  Layer 1b (EphemerisDynamics)
+覆盖初始化、patch points 校验、修正过程、Jacobian 计算、
+固定/可变时间选项与 verbose 进度条。
 """
 
 import numpy as np

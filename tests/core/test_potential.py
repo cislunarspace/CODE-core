@@ -1,4 +1,8 @@
-"""Tests for pseudo_potential_hessian and its integration."""
+"""pseudo_potential_hessian 及其集成测试。
+
+验证 Hessian 形状、对称性、有限差分一致性，
+以及 L1/L2/L3 稳定性指数回归值。
+"""
 
 import numpy as np
 import pytest
@@ -101,7 +105,9 @@ class TestRegressionStabilityIndex:
 
     @pytest.fixture
     def system(self):
-        sys = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+        sys = CR3BP_System(
+            mu=0.0121506683, primary="Earth", secondary="Moon"
+        )._with_default_scales()
         sys.compute_libration_points()
         return sys
 
@@ -155,7 +161,9 @@ class TestRegressionJacobianA:
     def dynamics(self):
         from e2m2e.core import CR3BP_System
 
-        sys = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+        sys = CR3BP_System(
+            mu=0.0121506683, primary="Earth", secondary="Moon"
+        )._with_default_scales()
         return CR3BP_Dynamics(system=sys)
 
     def test_jacobian_shape(self, dynamics):

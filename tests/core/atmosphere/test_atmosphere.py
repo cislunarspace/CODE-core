@@ -1,4 +1,7 @@
-"""ExponentialAtmosphere 大气密度模型测试。"""
+"""ExponentialAtmosphere 大气密度模型测试。
+
+覆盖 USSA76 参考值、高度单调性、F10.7/Ap 修正与边界钳制。
+"""
 
 import numpy as np
 import pytest

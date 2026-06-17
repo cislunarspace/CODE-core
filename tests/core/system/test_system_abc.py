@@ -1,4 +1,7 @@
-"""Test System ABC and CR3BP_System System-interface implementation."""
+"""System ABC 与 CR3BP_System/EphemerisSystem 接口实现测试。
+
+验证抽象基类契约、子类关系与接口一致性。
+"""
 
 import pytest
 

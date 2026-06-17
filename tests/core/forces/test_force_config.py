@@ -1,4 +1,7 @@
-"""ForceModel 配置驱动测试：from_config / to_config / JSON IO。"""
+"""ForceModel 配置驱动测试：from_config / to_config / JSON IO。
+
+验证 GravityField、SRP+阴影、FiniteBurn 的 round-trip 一致性。
+"""
 
 import numpy as np
 import pytest

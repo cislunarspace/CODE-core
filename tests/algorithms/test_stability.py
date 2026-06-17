@@ -1,7 +1,6 @@
-"""
-StabilityAnalysis 类测试
+"""StabilityAnalysis 稳定性分析测试。
 
-测试稳定性分析功能，包括单值矩阵计算、Floquet乘子分析、稳定性分类等。
+覆盖单值矩阵、Floquet 乘子、稳定性分类、分岔分析与枚举值。
 """
 
 import numpy as np

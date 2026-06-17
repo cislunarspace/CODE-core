@@ -1,3 +1,7 @@
+"""RequirementRegistry 需求登记与追溯测试。
+
+覆盖注册、查重、分类过滤、追溯矩阵与覆盖率报告。
+"""
 from __future__ import annotations
 
 import pytest
@@ -16,6 +20,7 @@ def make_requirement(
     parent: str | None = None,
     linked_tests: list[str] | None = None,
 ) -> Requirement:
+    """构造合成需求对象，用于注册表行为测试。"""
     return Requirement(
         id=req_id,
         title=f"Requirement {req_id}",
@@ -29,6 +34,7 @@ def make_requirement(
 
 @pytest.fixture
 def registry():
+    """提供已清空的 RequirementRegistry 实例。"""
     reg = RequirementRegistry()
     reg.clear()
     yield reg
@@ -36,6 +42,7 @@ def registry():
 
 
 def test_register_rejects_duplicate_ids_and_supports_lookup(registry):
+    """注册拒绝重复 ID，并支持按 ID 查找。"""
     requirement = make_requirement("REQ-001")
 
     registry.register(requirement)
@@ -50,6 +57,7 @@ def test_register_rejects_duplicate_ids_and_supports_lookup(registry):
 
 
 def test_filters_by_category_and_recursive_children(registry):
+    """按分类过滤与递归获取子需求。"""
     parent = make_requirement("REQ-001", category=RequirementCategory.FUNCTIONAL)
     child = make_requirement(
         "REQ-002",
@@ -69,6 +77,7 @@ def test_filters_by_category_and_recursive_children(registry):
 
 
 def test_traceability_matrix_marks_requirements_with_linked_tests(registry):
+    """追溯矩阵标记已关联测试的需求。"""
     covered = make_requirement("REQ-001", linked_tests=["tests/example_test.py"])
     uncovered = make_requirement("REQ-002")
     registry.register_many([covered, uncovered])
@@ -83,6 +92,7 @@ def test_traceability_matrix_marks_requirements_with_linked_tests(registry):
 
 
 def test_coverage_report_handles_empty_and_partially_covered_registry(registry):
+    """覆盖率报告处理空注册表与部分覆盖场景。"""
     assert registry.coverage_report() == {
         "total": 0,
         "covered": 0,

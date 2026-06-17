@@ -1,12 +1,12 @@
-"""TDD：PatchPointCorrector 接缝测试
+"""PatchPointCorrector 接缝类型与注册表测试。
 
-验证注册表分发、统一接口、错误处理。
+验证 Protocol 运行时检查、EphemerisCorrectionResult 不可变性、
+错误类型与分发行为。
 """
 
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -18,7 +18,6 @@ from e2m2e.algorithms.ephemeris_correction_types import (
     PatchPointCorrector,
     UnsupportedCorrectorMethodError,
 )
-
 
 # ---------------------------------------------------------------------------
 # 接缝类型测试

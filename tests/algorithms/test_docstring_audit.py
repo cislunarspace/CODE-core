@@ -1,7 +1,6 @@
-"""注释完备性审计测试
+"""注释完备性审计测试。
 
 使用 AST 检查 e2m2e/algorithms/ 下各模块的 docstring 完备性。
-每个测试对应 issue #37 中的一个审计项。
 """
 
 from __future__ import annotations

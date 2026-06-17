@@ -1,15 +1,11 @@
-"""
-SPICE 模块延迟加载测试
+"""SPICE 模块延迟加载测试。
 
-验证 e2m2e.core.spice 模块本身不强制加载 spiceypy，
-直到真正调用需要 SPICE 功能的方法。
+验证 e2m2e.core.spice 不强制加载 spiceypy 直到首次调用需要 SPICE 的方法。
 """
 
 import subprocess
 import sys
 from pathlib import Path
-
-import pytest
 
 
 class TestSpiceLazyImport:

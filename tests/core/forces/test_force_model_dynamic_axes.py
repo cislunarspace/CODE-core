@@ -1,9 +1,11 @@
-"""ForceModel propagate 过程中动态坐标系更新测试。"""
+"""ForceModel propagate 过程中动态坐标系更新测试。
+
+验证 DynamicAxes.update 在传播循环中被正确调用。
+"""
 
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from e2m2e.core.axes import Axes
 from e2m2e.core.coordinate_system import CoordinateSystem

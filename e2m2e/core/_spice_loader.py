@@ -11,7 +11,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import spiceypy
+    pass
 
 
 _spiceypy: ModuleType | None = None

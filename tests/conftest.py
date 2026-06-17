@@ -1,5 +1,7 @@
-"""
-pytest configuration and shared fixtures for e2m2e tests
+"""pytest 配置与共享 fixture。
+
+提供地月/日地/木日 CR3BP 系统、
+SPICE 内核 fixture 与参考历元。
 """
 
 import os
@@ -162,7 +164,6 @@ def spice_manager(spice_kernel_path):
 def spice_eph_system(spice_manager):
     """Earth-Moon-Sun ephemeris system in J2000, with origin at Earth."""
     from e2m2e.core.ephemeris_system import EphemerisSystem
-
     from e2m2e.mbse.data.enums import ReferenceFrame
 
     return EphemerisSystem(

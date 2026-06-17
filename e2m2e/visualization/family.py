@@ -29,6 +29,12 @@ class FamilyPlotter(OrbitVisualizer):
     """
 
     def __init__(self, system: CR3BP_System, config: PlotConfig | None = None) -> None:
+        """初始化轨道族可视化器。
+
+        Args:
+            system: CR3BP 系统对象。
+            config: 绘图配置。
+        """
         super().__init__(system, config)
 
     def plot(self, data: Any, config: object = None, **kwargs) -> Any:

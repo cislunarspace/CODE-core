@@ -1,4 +1,7 @@
-"""Tests for the RK89 (Verner 9(8)) integrator."""
+"""RK89（Verner 9(8)）积分器测试。
+
+覆盖谐振子、圆轨道二体解析精度。
+"""
 
 import math
 

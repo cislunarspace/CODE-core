@@ -1,4 +1,5 @@
-"""LEO 配置构建 vs 手动构建的传播一致性测试（需要 SPICE 内核）。"""
+"""LEO 配置构建 vs 手动构建传播一致性测试（需 SPICE 内核）。
+"""
 
 import numpy as np
 import pytest

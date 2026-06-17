@@ -1,5 +1,6 @@
-"""
-Unit tests for standard axes implementations.
+"""标准坐标轴实现单元测试。
+
+覆盖 ICRSAxes 恒等旋转与 IAU2000EqAxes 正交性。
 """
 
 import numpy as np

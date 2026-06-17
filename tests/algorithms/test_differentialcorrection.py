@@ -1,15 +1,7 @@
-"""
-DifferentialCorrection 微分修正算法测试模块
+"""DifferentialCorrection 微分修正算法测试。
 
-测试基于STM牛顿法的微分修正算法在不同对称性配置下的正确性。
-
-参考论文：
-  Cui et al. (2025) "Two-Impulse Transfers from Lunar Distant Retrograde Orbits
-  to Resonant Orbits", JGCD, Vol.48, No.6
-
-地月系统参数：
-  μ = 1.21506683 × 10⁻² (地月系统质量比)
-  DU = 3.84405 × 10⁵ km, TU = 4.34811305 天
+覆盖多种对称性配置、收敛性、修正轨道物理性质、
+历史 API 与失败场景。
 """
 
 import numpy as np

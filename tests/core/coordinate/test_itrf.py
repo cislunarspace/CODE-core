@@ -1,4 +1,7 @@
-"""ITRF axes, celestial origins, and standard coordinate-system tests."""
+"""ITRF 坐标轴、天体原点与标准坐标系测试。
+
+覆盖 ITRF93/GMAT 近似/ICRF 集成与标准预设工厂。
+"""
 
 import os
 

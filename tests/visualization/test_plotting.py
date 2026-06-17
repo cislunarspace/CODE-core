@@ -1,7 +1,6 @@
-"""
-OrbitVisualizer 和 FamilyPlotter 类测试
+"""OrbitVisualizer 与 FamilyPlotter 类测试。
 
-测试轨道可视化器的核心功能，包括3D轨道族绘图功能。
+覆盖可视化器创建、3D 轨道族绘图与配置。
 """
 
 import os

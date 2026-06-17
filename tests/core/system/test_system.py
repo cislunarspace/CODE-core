@@ -1,5 +1,7 @@
-"""
-Unit tests for CR3BP_System class
+"""CR3BP_System 单元测试。
+
+覆盖平动点枚举、初始化、mu 校验、已知系统、
+平动点计算、Jacobi 常数、特征尺度与单位转换。
 """
 
 from contextlib import redirect_stdout
@@ -89,12 +91,16 @@ class TestCR3BPSystemKnownSystems:
 
     def test_earth_moon_mu_full_precision(self):
         """Earth-Moon mu must match Cui et al. 2025 Table 1 to 10 digits."""
-        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+        system = CR3BP_System(
+            mu=0.0121506683, primary="Earth", secondary="Moon"
+        )._with_default_scales()
         assert system.mu == pytest.approx(1.21506683e-2, rel=0, abs=1e-12)
 
     def test_with_default_scales_auto_sets_scales(self):
         """_with_default_scales should auto-initialize characteristic scales."""
-        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+        system = CR3BP_System(
+            mu=0.0121506683, primary="Earth", secondary="Moon"
+        )._with_default_scales()
         assert system.is_initialized is True
         assert system.characteristic_length is not None
         assert system.characteristic_time is not None
@@ -102,12 +108,16 @@ class TestCR3BPSystemKnownSystems:
 
     def test_earth_moon_distance_matches_paper(self):
         """Earth-Moon characteristic length must be 384405 km (Cui et al. 2025)."""
-        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+        system = CR3BP_System(
+            mu=0.0121506683, primary="Earth", secondary="Moon"
+        )._with_default_scales()
         assert system.characteristic_length == pytest.approx(384405.0, abs=1e-6)
 
     def test_earth_moon_TU_days(self):
         """Earth-Moon characteristic time must match 4.34811305 days."""
-        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+        system = CR3BP_System(
+            mu=0.0121506683, primary="Earth", secondary="Moon"
+        )._with_default_scales()
         assert system.characteristic_time / 86400 == pytest.approx(4.34811305, abs=1e-8)
 
     def test_sun_earth_system(self, sun_earth_system):
@@ -473,12 +483,16 @@ class TestInfoDifferentSystems:
     """Tests for info() output across different systems"""
 
     def test_sun_earth_system(self):
-        system = CR3BP_System(mu=3.0039e-06, primary="Sun", secondary="Earth")._with_default_scales()
+        system = CR3BP_System(
+            mu=3.0039e-06, primary="Sun", secondary="Earth"
+        )._with_default_scales()
         output = _capture_info(system)
         assert "Sun-Earth" in output
 
     def test_sun_jupiter_system(self):
-        system = CR3BP_System(mu=0.0009535, primary="Sun", secondary="Jupiter")._with_default_scales()
+        system = CR3BP_System(
+            mu=0.0009535, primary="Sun", secondary="Jupiter"
+        )._with_default_scales()
         output = _capture_info(system)
         assert "Sun-Jupiter" in output
 

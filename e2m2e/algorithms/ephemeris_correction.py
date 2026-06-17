@@ -15,6 +15,8 @@ from typing import Any
 
 import numpy as np
 
+from e2m2e.mbse.data.enums import BoundaryMode
+
 from .ephemeris_correction_types import (
     EphemerisCorrectionResult,
     PatchPointCorrector,
@@ -22,8 +24,6 @@ from .ephemeris_correction_types import (
 )
 from .multiple_shooting import MultipleShooting
 from .two_level_multiple_shooting import TwoLevelMultipleShooting
-from e2m2e.mbse.data.enums import BoundaryMode
-
 
 # ---------------------------------------------------------------------------
 # 修正器实现（私有）
@@ -57,6 +57,7 @@ class _StandardPatchPointCorrector:
         velocity_tolerance: float | None,
         verbose: bool,
     ) -> EphemerisCorrectionResult:
+        """调用 ``MultipleShooting`` 修正 patch points 并返回统一结果。"""
         result = self._solver.correct(
             t_patch=t_patch,
             state_patch=state_patch,
@@ -91,6 +92,7 @@ class _TwoLevelPatchPointCorrector:
         velocity_tolerance: float | None,
         verbose: bool,
     ) -> EphemerisCorrectionResult:
+        """调用 ``TwoLevelMultipleShooting`` 修正 patch points 并返回统一结果。"""
         result = self._solver.correct(
             t_patch=t_patch,
             state_patch=state_patch,
@@ -152,6 +154,11 @@ class _HomotopyPatchPointCorrector:
         velocity_tolerance: float | None,
         verbose: bool,
     ) -> EphemerisCorrectionResult:
+        """调用 ``correct_with_homotopy`` 修正 patch points 并返回统一结果。
+
+        构造参数（``base_bodies``、``lambda_steps`` 等）已在构造器注入；
+        ``correct`` 仅接收统一的求解参数。
+        """
         # 延迟 import 避免循环依赖（homotopy_correction 从本模块导入类型）
         from .homotopy_correction import correct_with_homotopy
 

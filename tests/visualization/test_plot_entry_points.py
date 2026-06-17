@@ -1,8 +1,6 @@
-"""
-OrbitVisualizer / FamilyPlotter / TransferPlotter .plot() 入口点测试
+"""OrbitVisualizer / FamilyPlotter / TransferPlotter .plot() 入口点测试。
 
-验证三个可视化器的 plot() 公共入口方法行为正确，
-作为 issue #33 重构（删除 plotting.py、清理 Protocol 注释）的回归基线。
+验证三个可视化器的 plot() 公共入口方法行为正确。
 """
 
 import matplotlib

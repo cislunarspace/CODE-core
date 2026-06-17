@@ -2,9 +2,7 @@ e2m2e.transfer package
 =======================
 
 .. automodule:: e2m2e.transfer
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :no-index:
 
 Submodules
 ----------

@@ -1,4 +1,7 @@
-"""GMAT fixture parser/time/reduction tests."""
+"""GMAT fixture 解析器、时间转换与约化测试。
+
+覆盖 TAI-UTC 表、EOP 文件、时间转换器与 ITRF 矩阵黄金值。
+"""
 
 import numpy as np
 import pytest

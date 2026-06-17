@@ -1,6 +1,6 @@
-"""测试微分修正策略模式
+"""微分修正策略模式测试。
 
-验证 CorrectionConfig 数据类和各策略函数的正确性。
+验证 CorrectionConfig 数据类与各类策略函数的正确性。
 """
 
 import pytest
@@ -121,10 +121,12 @@ class TestStrategyIntegration:
 
     def test_setup_delegates_to_strategy(self):
         from e2m2e.algorithms.differential_correction import DifferentialCorrection
-        from e2m2e.core.dynamics import CR3BP_Dynamics
         from e2m2e.core.cr3bp_system import CR3BP_System
+        from e2m2e.core.dynamics import CR3BP_Dynamics
 
-        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+        system = CR3BP_System(
+            mu=0.0121506683, primary="Earth", secondary="Moon"
+        )._with_default_scales()
         dynamics = CR3BP_Dynamics(system)
         dc = DifferentialCorrection(dynamics)
 
@@ -136,10 +138,12 @@ class TestStrategyIntegration:
 
     def test_setup_halo_delegates(self):
         from e2m2e.algorithms.differential_correction import DifferentialCorrection
-        from e2m2e.core.dynamics import CR3BP_Dynamics
         from e2m2e.core.cr3bp_system import CR3BP_System
+        from e2m2e.core.dynamics import CR3BP_Dynamics
 
-        system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+        system = CR3BP_System(
+            mu=0.0121506683, primary="Earth", secondary="Moon"
+        )._with_default_scales()
         dynamics = CR3BP_Dynamics(system)
         dc = DifferentialCorrection(dynamics)
 

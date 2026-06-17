@@ -1,25 +1,7 @@
-"""
-需求: SPICE 星历内核集成 (Layer 1a)
+"""SPICE 星历内核集成测试（Layer 1a）。
 
-e2m2e 需要封装 SPICE Toolkit (spiceypy) 的核心功能，以支持高精度星历模型。
-SPICEManager 负责:
-  1. 加载 JPL DE440/DE438 星历内核 (.bsp)
-  2. UTC ↔ ET (历书时) 时间转换
-  3. 查询天体在指定参考系下的位置和速度
-  4. 查询天体间距离
-
-参考实现:
-  SEMpy 使用 spiceypy 库封装 CSPICE 函数。
-  SEMpy 中 Primary 类定义了各天体的 NAIF ID (Earth=399, Moon=301, Sun=10)。
-  SEMpy 中 Ephemeris 类管理天体列表和 GM 值。
-
-天体 NAIF ID:
-  Sun = 10, Earth = 399, Moon = 301
-  Earth-Moon Barycenter = 3
-
-依赖:
-  pip install spiceypy
-  需要下载 JPL DE440 或 DE438 内核文件 (.bsp)
+覆盖 SPICEManager 初始化、内核加载/卸载、时间转换、
+天体状态查询与物理参数。
 """
 
 import os

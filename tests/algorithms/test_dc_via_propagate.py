@@ -1,10 +1,7 @@
-"""Issue #31: DifferentialCorrection 全程走 dynamics.propagate() 集成测试
+"""DifferentialCorrection 全程走 dynamics.propagate() 集成测试。
 
-验证:
-- _compute_jacobian_finite_diff 通过 propagate() 完成，结果与 STM 雅可比一致
-- _create_corrected_orbit 通过 propagate() 构建轨道，返回 Orbit 对象
-- DifferentialCorrection 可接受 Dynamics 基类（非 CR3BP_Dynamics 硬编码）
-- (SPICE) EphemerisDynamics 跑通微分修正代码路径
+验证有限差分 Jacobian 与 STM 一致、修正轨道构建、
+以及 EphemerisDynamics 代码路径。
 """
 
 import numpy as np

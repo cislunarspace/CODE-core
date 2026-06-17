@@ -1,4 +1,7 @@
-"""ForceModel 容器测试。"""
+"""ForceModel 容器测试。
+
+覆盖坐标系要求、力聚合、增删、启用禁用、自动命名与重复名检测。
+"""
 
 import numpy as np
 import pytest

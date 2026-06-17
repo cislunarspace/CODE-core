@@ -1,15 +1,8 @@
-"""TDD: HomotopyEphemerisDynamics lambda-weighted acc/Jacobian semantics.
+"""HomotopyEphemerisDynamics lambda 加权加速度与 Jacobian 语义测试。
 
-Issue #240 acceptance criteria:
-- FakeSpice implements ``get_gm(body)`` and
-  ``get_body_position(target, et, frame, observer)``.
-- Use ``EphemerisSystem(spice=fake_spice, ...)`` to build the system.
-- Verify lambda=0 → acc/Jacobian == base EphemerisDynamics.
-- Verify lambda=1 → acc/Jacobian == full EphemerisDynamics.
-- Verify intermediate lambda → linear interpolation
-    a_lambda = a_base + lambda * (a_full - a_base)
-    J_lambda = J_base + lambda * (J_full - J_base)
-- No real SPICE kernel or network access.
+验证 lambda=0 时退化为基础 EphemerisDynamics，
+lambda=1 时为完整 EphemerisDynamics，
+中间值按线性插值。
 """
 
 from __future__ import annotations

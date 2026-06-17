@@ -1,7 +1,9 @@
-"""测试用点质量力模型 fixture。"""
+"""力模型测试共享 fixture。
+
+提供点质量测试力模型。
+"""
 
 import numpy as np
-
 import pytest
 
 from e2m2e.core.forces import PhysicalModel

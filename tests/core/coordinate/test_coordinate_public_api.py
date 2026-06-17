@@ -1,4 +1,7 @@
-"""Public coordinate API and smoke tests."""
+"""坐标模块公开 API 与冒烟测试。
+
+验证顶层导出符号可用性与标准工厂函数。
+"""
 
 import numpy as np
 

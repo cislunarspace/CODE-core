@@ -58,8 +58,8 @@ class OrbitStability:
         numerical_errors: 数值误差估计
     """
 
-    monodromy_matrix: np.ndarray
-    eigenvalues: np.ndarray
+    monodromy_matrix: np.ndarray | None
+    eigenvalues: np.ndarray | None
     stability_indices: dict[str, float | None]
     classification: dict[str, Any]
     bifurcation: dict[str, Any]
@@ -97,17 +97,17 @@ class StabilityAnalysis:
             dynamics = CR3BP_Dynamics(system)
         self.dynamics = dynamics
 
-        self.monodromy_matrix = None
+        self.monodromy_matrix: np.ndarray | None = None
         self.stm_history: list[np.ndarray] = []
 
-        self.eigenvalues = None
+        self.eigenvalues: np.ndarray | None = None
         self.eigenvectors = None
         self.eigenvalue_magnitudes = None
         self.eigenvalue_arguments = None
         self.sorted_eigenvalues = None
         self.eigenvalue_pairs: list[tuple[complex, complex]] = []
 
-        self.stability_indices = {
+        self.stability_indices: dict[str, float | None] = {
             "nu1": None,
             "nu2": None,
             "nu3": None,
@@ -129,7 +129,7 @@ class StabilityAnalysis:
         self.bifurcation_type = BifurcationType.NONE
         self.bifurcation_detected = False
 
-        self.numerical_errors = {
+        self.numerical_errors: dict[str, float | None] = {
             "determinant_error": None,
             "symplectic_error": None,
         }
@@ -426,17 +426,14 @@ class StabilityAnalysis:
         检测是否有特征值接近 +1（切分岔/saddle-node bifurcation）。
 
         Args:
-            orbits: Orbit对象列表（轨道族）
-            dynamics: CR3BP_Dynamics对象
-            tolerance: 特征值接近 +1 的容差，默认 1e-8
+            orbits: Orbit 对象列表（轨道族）。
+            dynamics: CR3BP_Dynamics 对象。
+            tolerance: 特征值接近 +1 的容差，默认 1e-8。
 
         Returns:
-            List[Dict[str, Any]]: 分岔点列表，每个元素包含：
-                - orbit_index: 轨道在族中的索引
-                - orbit: Orbit对象
-                - eigenvalues: 特征值数组
-                - eigenvalue_diff: |λ - 1| 的最小值
-                - bifurcation_type: 分岔类型
+            分岔点列表，每个元素为字典，包含键 orbit_index（族内索引）、
+            orbit、eigenvalues、eigenvalue_diff（特征值 λ 与 1 之差的绝对值）、
+            bifurcation_type。
         """
         bifurcation_points: list[dict[str, Any]] = []
         n_failed = 0

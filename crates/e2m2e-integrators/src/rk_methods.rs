@@ -4,6 +4,9 @@ use crate::pd78::PD78_TABLE;
 use crate::rk89::RK89_TABLE;
 use pyo3::prelude::*;
 
+/// 单步 Runge-Kutta 方法枚举，暴露给 Python。
+///
+/// 每种方法对应一张 Butcher 表（见 [`crate::butcher::ButcherTable`]）。
 #[pyclass(eq, eq_int, rename_all = "SCREAMING_SNAKE_CASE")]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RkMethod {
@@ -13,7 +16,7 @@ pub enum RkMethod {
 }
 
 impl RkMethod {
-    /// The Butcher tableau for this method.
+    /// 该方法的 Butcher 表。
     pub fn table(self) -> &'static ButcherTable {
         match self {
             RkMethod::Pd45 => &PD45_TABLE,
@@ -22,16 +25,17 @@ impl RkMethod {
         }
     }
 
+    /// 级数（ stages ）。
     pub fn stages(self) -> usize {
         self.table().stages
     }
 
-    /// Order of the primary (higher-order) solution.
+    /// 主解（高阶解）的阶数。
     pub fn order(self) -> usize {
         self.table().order
     }
 
-    /// Order of the embedded (lower-order) solution used for error control.
+    /// 嵌入（低阶）解的阶数，用于误差控制。
     pub fn embedded_order(self) -> usize {
         self.table().embedded_order
     }

@@ -1,4 +1,7 @@
-"""PhysicalModel ABC 子类化契约测试。"""
+"""PhysicalModel ABC 子类化契约测试。
+
+验证抽象基类不能直接实例化、子类可提供恒定力。
+"""
 
 import numpy as np
 import pytest

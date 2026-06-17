@@ -10,9 +10,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import numpy.typing as npt
 
-from ..core.dynamics import Dynamics
+from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
 
 # Re-export Richardson approximation functions for backward compatibility.
@@ -67,7 +66,7 @@ class DifferentialCorrection:
 
     def __init__(
         self,
-        dynamic: Dynamics,
+        dynamic: CR3BP_Dynamics,
         target: dict[str, Any] | None = None,
         free_vars: list[str] | None = None,
     ) -> None:
@@ -78,7 +77,7 @@ class DifferentialCorrection:
             target: 目标约束条件字典（可选）
             free_vars: 自由变量列表（可选）
         """
-        self.dynamics = dynamic
+        self.dynamics: CR3BP_Dynamics = dynamic
         self.target_conditions = target or {}
         self.free_variables = free_vars or []
 
@@ -343,10 +342,10 @@ class DifferentialCorrection:
         return self
 
     def _apply_config(self, config: CorrectionConfig) -> None:
-        """Apply an immutable CorrectionConfig to this corrector instance.
+        """将不可变的 CorrectionConfig 应用到当前修正器实例。
 
         Args:
-            config: A CorrectionConfig produced by a strategy function.
+            config: 策略函数生成的 CorrectionConfig 对象。
         """
         self.setup_type = config.setup_type
         self.symmetry_condition = config.symmetry_condition

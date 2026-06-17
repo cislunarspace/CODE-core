@@ -16,9 +16,9 @@ from typing import Any
 import numpy as np
 from scipy.optimize import Bounds, minimize
 
+from ..core.cr3bp_system import CR3BP_System
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
-from ..core.cr3bp_system import CR3BP_System
 from .config import TransferConfig, TransferOptimizationResult
 from .propulsion import ImpulsivePropulsion, PropulsionModel
 
@@ -964,9 +964,9 @@ def optimize_with_copt(
             ``DROTRONLPOptimizer``
         initial_guess: 初始猜测 ``(α, T, t_ins)``；默认 ``(1, 10, 5)``
         fallback_to_scipy: 未安装 COPT 或求解失败时是否回退 SciPy SLSQP
-        max_iter: ``COPT.Param.NLPIterLimit``
-        threads / bar_threads: ``COPT.Param.Threads`` / ``BarThreads``（Python 回调建议为 1）
-        time_limit: 若给定，则设置 ``COPT.Param.TimeLimit``（秒），与参考脚本中 MILP 用法一致
+        max_iter: ``COPT.Param.NLPIterLimit`` （最大迭代数）
+        threads / bar_threads: ``COPT.Param.Threads`` / ``BarThreads`` （Python 回调建议为 1）
+        time_limit: 若给定，则设置 ``COPT.Param.TimeLimit`` （秒），与参考脚本中 MILP 用法一致
         scipy_fallback_kwargs: 回退时传给 ``optimizer.optimize`` 的额外参数
 
     Returns:

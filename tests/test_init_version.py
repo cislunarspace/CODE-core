@@ -1,4 +1,7 @@
-"""Cover __init__.py metadata and subpackage imports."""
+"""e2m2e 包元数据与子包导入测试。
+
+验证版本号、作者、导出列表与可导入性。
+"""
 
 import e2m2e
 

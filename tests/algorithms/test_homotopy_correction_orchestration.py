@@ -1,12 +1,7 @@
-"""TDD: correct_with_homotopy parameter validation and orchestration.
+"""correct_with_homotopy 参数校验与编排测试。
 
-Issue #239 acceptance criteria:
-- base_bodies is a subset of system.bodies and contains origin
-- lambda_steps: non-empty, strictly increasing, all in [0, 1], last == 1.0
-- inner_method="homotopy" rejected (no recursion)
-- intermediate lambda steps use tolerance*10; final uses strict tolerance
-- each step is seeded with the previous step's t_patch/state_patch
-- aggregated EphemerisCorrectionResult semantics
+验证 lambda_steps 约束、中间步容差策略、
+上一步输出作为下一步种子、以及聚合结果语义。
 """
 
 from __future__ import annotations
@@ -18,7 +13,6 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithms import homotopy_correction
-from e2m2e.algorithms.ephemeris_correction import EphemerisCorrectionResult
 
 
 def _fake_dynamics():
@@ -101,7 +95,7 @@ def test_intermediate_steps_use_loose_tolerance_final_uses_strict():
 
         def correct(self, **kwargs):
             captured_tols.append(kwargs["tolerance"])
-            self.dynamics.lambda_weight  # ensure attribute is readable
+            _ = self.dynamics.lambda_weight  # ensure attribute is readable
             return SimpleNamespace(
                 converged=True, outer_iterations=1, max_residual=1e-12,
                 residual_history=[1e-12],
@@ -297,9 +291,10 @@ def test_inner_step_exception_raises_with_context():
                 state_patch=kwargs["state_patch"] + 0.01,
             )
 
-    with patch.object(homotopy_correction, "MultipleShooting", ExplodingMS):
-        with pytest.raises(RuntimeError, match=r"lambda step 1.*lambda=0\.75.*inner_method=standard"):
-            homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy_correction, "MultipleShooting", ExplodingMS), pytest.raises(
+        RuntimeError, match=r"lambda step 1.*lambda=0\.75.*inner_method=standard"
+    ):
+        homotopy_correction.correct_with_homotopy(
                 dynamics=_fake_dynamics(),
                 t_patch=np.array([0.0, 100.0]),
                 state_patch=np.ones((2, 6)),

@@ -1,5 +1,7 @@
-"""
-Unit tests for Orbit class
+"""Orbit 类单元测试。
+
+覆盖初始化、属性计算、周期/振幅、
+保存加载、元数据与轨道族交互。
 """
 
 import os

@@ -1,37 +1,7 @@
-"""
-需求: DRO 轨道 CR3BP → 星历模型修正 (Layer 3)
+"""DRO 轨道 CR3BP → 星历模型修正测试（Layer 3）。
 
-这是整个需求的最终目标：将 CR3BP 中计算的 3:1 DRO 轨道转换到高精度星历
-(Ephemeris N-body) 模型下，使用 Multiple Shooting 差分修正。
-
-工作流:
-  Step 1: 加载 CR3BP 中的 3:1 DRO 轨道
-  Step 2: 对 DRO 轨道均匀采样生成 patch points
-  Step 3: synodic → J2000 坐标转换（含速度）
-  Step 4: Multiple Shooting 差分修正（星历模型）
-  Step 5: 验证修正后位置连续性 < 1e-6 km
-
-输入:
-  DRO 初始状态: [1.1202109158830986, 0, 0, 0, -0.46178983697629084, 0]
-  DRO 周期: 2.095 TU (无量纲)
-  地月系统: mu = 1.21506683e-2
-  DU = 3.84405e5 km, TU = 4.34811305 * 86400 s
-  参考历元: 2025-06-21T11:00:06 UTC
-  天体: Earth + Moon + Sun
-
-验证标准:
-  修正后相邻 patch points 的位置连续性误差 < 1e-6 km
-  修正后轨道保持 DRO 形状（距地球约 384,400 km）
-
-参考:
-  陈昱桔 (2024) "面向地月空间态势感知的DRO轨道设计与控制研究"
-  SEMpy: halo_orbit_correction_2.py (类似工作流)
-
-依赖:
-  Layer 1a (SPICEManager)
-  Layer 1b (EphemerisDynamics)
-  Layer 1c (SynodicJ2000Transformation)
-  Layer 2 (MultipleShooting)
+覆盖 DRO 生成、patch points 采样、synodic→J2000 转换、
+Multiple Shooting 修正与结果验证。
 """
 
 import numpy as np
@@ -261,7 +231,9 @@ class TestStep3SynodicToJ2000:
         assert state_patch_j2000.shape == (N_PATCH_POINTS, 6)
         assert np.all(np.isfinite(state_patch_j2000))
 
-    def test_j2000_positions_near_moon(self, dro_orbit, cr3bp_dynamics, spice_syn_j2000, reference_et):
+    def test_j2000_positions_near_moon(
+        self, dro_orbit, cr3bp_dynamics, spice_syn_j2000, reference_et
+    ):
         """J2000 下的 DRO 位置应在月球距离附近"""
         state0_j2000 = spice_syn_j2000.synodic_to_j2000(
             state_syn=dro_orbit.states[0],

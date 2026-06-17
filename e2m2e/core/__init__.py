@@ -17,10 +17,8 @@ Functions:
 
 Note:
     星历相关模块 (spice, ephemeris_system, ephemeris_dynamics) 不在顶层导出，
-    如需使用请直接从子模块导入：
-        from e2m2e.core.spice import SPICEManager
-        from e2m2e.core.ephemeris_system import EphemerisSystem
-        from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
+    如需使用请直接从子模块导入，例如
+    ``from e2m2e.core.spice import SPICEManager``。
 """
 
 from __future__ import annotations

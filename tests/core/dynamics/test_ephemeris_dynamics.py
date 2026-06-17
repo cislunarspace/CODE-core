@@ -1,47 +1,16 @@
-"""
-需求: 星历 N-body 动力学模型 (Layer 1b)
+"""星历 N-body 动力学模型测试（Layer 1b）。
 
-e2m2e 需要在 J2000 惯性系下实现包含 Earth + Moon + Sun 引力的 N-body 轨道传播。
-这构成了高精度星历模型的动力学基础。
-
-功能要求:
-  1. EphemerisSystem - 管理天体列表、GM 值、特征尺度
-  2. EphemerisDynamics - 继承 Dynamics 基类，实现 N-body 运动方程
-  3. 运动方程: a = Σ(-GM_body * (r_sc_body/|r_sc_body|^3 + r_body_origin/|r_body_origin|^3))
-  4. 支持 STM 传播 (42 维增广状态)
-  5. 时间变量为 ET 秒，状态变量为 km, km/s（有量纲）
-
-运动方程 (J2000 惯性系):
-  对于每个天体 b:
-    r_ob = body_b 在 J2000 下的位置 (相对于原点)
-    r_bsc = r_sc - r_ob (航天器相对于天体 b 的位置)
-    a += -GM_b * (r_bsc / |r_bsc|^3 + r_ob / |r_ob|^3)
-
-  原点天体 (默认为地球):
-    a += -GM_origin * r_sc / |r_sc|^3
-
-参考实现:
-  SEMpy ephemeris_dynamics.py 中的 eqm_6_ephemeris 和 eqm_42_ephemeris
-  SEMpy 使用 numba JIT 加速 + CSPICE 调用获取天体位置
-
-与 CR3BP_Dynamics 的区别:
-  - CR3BP 在旋转系中使用无量纲变量
-  - EphemerisDynamics 在 J2000 惯性系中使用有量纲变量 (km, km/s, s)
-  - CR3BP 只有两体引力; EphemerisDynamics 包含多体引力
-  - EphemerisDynamics 需要通过 SPICE 获取天体实时位置
-
-依赖:
-  Layer 1a (SPICEManager)
+覆盖 EphemerisSystem/EphemerisDynamics 初始化、运动方程、
+轨道传播与边界处理。
 """
 
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.mbse.data.enums import ReferenceFrame, UnitSystem
-
 from e2m2e.core import Dynamics
 from e2m2e.core.ephemeris_system import EphemerisSystem
+from e2m2e.mbse.data.enums import ReferenceFrame
 
 pytestmark = pytest.mark.spice
 
@@ -97,7 +66,6 @@ class TestEphemerisSystemInit:
     def test_frame_attribute(self, spice_eph_system):
         """应有 frame 属性"""
         assert hasattr(spice_eph_system, "frame")
-        from e2m2e.mbse.data.enums import ReferenceFrame
 
         assert spice_eph_system.frame == ReferenceFrame.J2000
 

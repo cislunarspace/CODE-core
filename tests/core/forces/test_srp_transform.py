@@ -1,7 +1,6 @@
-"""SRP / Shadow 系统感知路径集成测试（需要 SPICE 内核）。
+"""SRP / Shadow 系统感知路径集成测试（需 SPICE 内核）。
 
-验证 ``compute_acceleration`` / ``flux_factor`` 通过 ``system`` 取太阳与遮挡体
-位置后，与手动（SPICE 取位 + 纯函数）计算一致。范式同 ``test_drag_transform.py``。
+验证 compute_acceleration / flux_factor 通过 system 取太阳位置后与手动计算一致。
 """
 
 from __future__ import annotations

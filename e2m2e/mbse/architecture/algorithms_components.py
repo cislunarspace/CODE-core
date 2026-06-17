@@ -1,6 +1,7 @@
 """Algorithms 层组件注册
 
-将 algorithms/ 层的所有组件注册到 MBSE 组件注册表中。
+将 algorithms/ 层的所有组件登记到 MBSE 组件注册表，
+供生成 BDD 与依赖图使用。
 """
 
 from .components import Component

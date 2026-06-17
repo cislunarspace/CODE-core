@@ -64,7 +64,7 @@ class ImpulsivePropulsion(PropulsionModel):
     其中 ``t_hat`` 为原始速度方向，``n_hat`` 为轨道面法向。
 
     Attributes:
-        normal: 轨道面法向量，默认 ``[0, 0, 1]``（z轴）。
+        normal: 轨道面法向量，默认 ``[0, 0, 1]`` （z轴）。
     """
 
     def __init__(self, normal: np.ndarray | None = None):
@@ -90,7 +90,7 @@ class ImpulsivePropulsion(PropulsionModel):
         Args:
             state: 出发点状态 ``[x, y, z, vx, vy, vz]``。
             alpha: 切向速度比（缩放切向分量）。
-            beta: 法向速度比（缩放法向分量），默认 ``0.0``（纯切向）。
+            beta: 法向速度比（缩放法向分量），默认 ``0.0`` （纯切向）。
             **_: 忽略其他关键字参数。
 
         Returns:
@@ -107,10 +107,9 @@ class ImpulsivePropulsion(PropulsionModel):
 
         normal_dir = np.cross(tangential, self.normal)
         norm_nd = np.linalg.norm(normal_dir)
-        if norm_nd < 1e-10:
-            normal_dir = np.array([1.0, 0.0, 0.0])
-        else:
-            normal_dir = normal_dir / norm_nd
+        normal_dir = (
+            np.array([1.0, 0.0, 0.0]) if norm_nd < 1e-10 else normal_dir / norm_nd
+        )
 
         v_injection = alpha * v_mag * tangential + beta * v_mag * normal_dir
 

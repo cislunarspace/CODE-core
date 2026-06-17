@@ -1,34 +1,34 @@
-# Context Map
+# 上下文地图
 
-This is a single-context repository. All domain knowledge lives at the root level.
+本仓库是单上下文仓库，所有领域知识放在根目录。
 
-| Context | Location | Covers |
+| 上下文 | 位置 | 覆盖 |
 |---------|----------|--------|
-| `e2m2e` | `./CONTEXT.md` | The entire e2m2e library |
+| `e2m2e` | `./CONTEXT.md` | 整个 e2m2e 库 |
 
-## Architecture layers
+## 架构层次
 
+```text
+core/           → 基础层 — CR3BP 系统、轨道数据结构、物理模型
+    ↓
+algorithms/     → 数值求解 — 微分修正、延拓、稳定性、多重打靶
+    ↓
+transfer/       → 转移设计 — 网格搜索、NLP 优化
+    ↓
+visualization/  → 绘图 — 轨道族、转移轨迹
+
+横切：           mbse/ — 组件登记、需求追溯、数据模型、图表生成
 ```
-core/           → Foundation — CR3BP system, orbit data structures, physics models
-    ↓
-algorithms/     → Numerical solvers — differential correction, continuation, stability, multiple shooting
-    ↓
-transfer/       → Transfer design — grid search, NLP optimization
-    ↓
-visualization/  → Plotting — orbit families, transfer trajectories
 
-Cross-cutting:   mbse/ — Protocol interfaces, Pydantic models, requirement tracking, diagram generation
-```
+## 消费领域文档的 skills
 
-## Skills consuming domain docs
-
-These skills read `CONTEXT.md` before exploring:
+下列 skills 在探索前先读 `CONTEXT.md`：
 
 - `/improve-codebase-architecture`
 - `/diagnose`
 - `/tdd`
 
-These skills read `docs/adr/` for architectural decisions:
+下列 skills 读 `docs/adr/` 了解架构决策：
 
-- `/grill-with-docs` — writes ADRs
-- All skills above consult existing ADRs before proposing changes
+- `/grill-with-docs` — 撰写 ADR
+- 上述 skills 在提出变更前都会先查阅现有 ADR

@@ -1,16 +1,10 @@
-"""
-algorithms/__init__.py 延迟按需导入测试
+"""e2m2e.algorithms 延迟按需导入测试。
 
-验证 import e2m2e.algorithms 时不应强制加载所有算法子模块，
-特别是不应加载依赖 spiceypy 的星历修正/多重打靶模块；
-按需导入的符号（如 Continuation）仍可正常使用。
+验证导入包时不强制加载 spiceypy、按需符号仍可用。
 """
 
 import subprocess
 import sys
-from pathlib import Path
-
-import pytest
 
 
 class TestAlgorithmsLazyImports:

@@ -113,7 +113,7 @@ class SolarRadiationPressure(PhysicalModel):
 
         从 ``system`` 读取传播原点与 SPICE，查询太阳相对原点的 J2000 位置，
         取阴影模型的光照份额（无阴影时为全光照），调用纯函数
-        ``_compute_srp_acceleration``。要求传播坐标系为惯性系。
+        ``_compute_srp_acceleration``。要求参考系为惯性系。
         """
         _cs, spice, origin = require_inertial_frame(system, t)
         sc_pos = np.asarray(state, dtype=float)[:3]

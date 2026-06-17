@@ -1,4 +1,7 @@
-"""PointMassGravity 测试（TDD）。"""
+"""PointMassGravity 测试（TDD）。
+
+验证显式 mu、system 回退与月球体切换。
+"""
 
 import numpy as np
 import pytest

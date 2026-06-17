@@ -1,12 +1,6 @@
-"""
-需求: DROTRONLPOptimizer 进度回调
+"""DROTRONLPOptimizer 进度回调测试。
 
-验收标准:
-  1. DROTRONLPOptimizer 新增 set_progress_callback(callback) 方法
-  2. callback 签名: callback(iteration: int, objective: float,
-                             alpha: float, transfer_time: float, t_ins: float) -> None
-  3. 不设置 callback 时行为与当前完全一致（不报错、无副作用）
-  4. callback 为 None 时等价于未设置
+验证 set_progress_callback 签名与无副作用回退。
 """
 
 import numpy as np

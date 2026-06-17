@@ -1,9 +1,8 @@
-"""Differential correction strategy functions.
+"""微分修正策略函数。
 
-Each strategy function returns an immutable CorrectionConfig that fully
-describes the correction setup (symmetry, free variables, constraints, etc.).
-The DifferentialCorrection class delegates to these functions so that
-configuration logic is separated from the iterative solver.
+每个策略函数返回一个不可变的 CorrectionConfig，完整描述修正配置
+（对称性、自由变量、约束等）。DifferentialCorrection 类委托给这些函数，
+使配置逻辑与迭代求解器分离。
 """
 
 from .base import CorrectionConfig

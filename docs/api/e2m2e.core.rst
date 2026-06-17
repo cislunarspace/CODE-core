@@ -2,9 +2,7 @@ e2m2e.core package
 ===================
 
 .. automodule:: e2m2e.core
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :no-index:
 
 Submodules
 ----------
@@ -16,6 +14,7 @@ e2m2e.core.atmosphere module
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. automodule:: e2m2e.core.atmosphere.base
    :members:
@@ -107,14 +106,11 @@ e2m2e.core.spice module
    :undoc-members:
    :show-inheritance:
 
-<<<<<<< ours
 e2m2e.core.forces package
 --------------------------
 
 .. automodule:: e2m2e.core.forces
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :no-index:
 
 e2m2e.core.forces.force_model module
 -------------------------------------
@@ -156,8 +152,6 @@ e2m2e.core.forces.drag module
    :undoc-members:
    :show-inheritance:
 
-=======
->>>>>>> theirs
 e2m2e.core.forces.srp module
 -----------------------------
 
@@ -166,7 +160,6 @@ e2m2e.core.forces.srp module
    :undoc-members:
    :show-inheritance:
 
-<<<<<<< ours
 e2m2e.core.forces.thrust module
 --------------------------------
 
@@ -175,8 +168,6 @@ e2m2e.core.forces.thrust module
    :undoc-members:
    :show-inheritance:
 
-=======
->>>>>>> theirs
 e2m2e.core.forces.shadow module
 --------------------------------
 
@@ -184,30 +175,3 @@ e2m2e.core.forces.shadow module
    :members:
    :undoc-members:
    :show-inheritance:
-<<<<<<< ours
-
-e2m2e.core.atmosphere package
-------------------------------
-
-.. automodule:: e2m2e.core.atmosphere
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-e2m2e.core.atmosphere.base module
-----------------------------------
-
-.. automodule:: e2m2e.core.atmosphere.base
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-e2m2e.core.atmosphere.exponential module
------------------------------------------
-
-.. automodule:: e2m2e.core.atmosphere.exponential
-   :members:
-   :undoc-members:
-   :show-inheritance:
-=======
->>>>>>> theirs

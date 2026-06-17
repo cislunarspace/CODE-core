@@ -1,4 +1,8 @@
-"""End-to-end comparison across the integrator family (Slice 9 closure)."""
+"""积分器族端到端对比测试（Slice 9 闭包）。
+
+验证 PD45/PD78/RK89 与 DOP853 一致性，
+以及高阶方法步数更少。
+"""
 
 import numpy as np
 from scipy.integrate import solve_ivp

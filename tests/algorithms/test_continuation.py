@@ -1,15 +1,6 @@
-"""
-Continuation 延拓算法测试模块
+"""Continuation 延拓算法测试。
 
-测试 Continuation 类的功能，特别关注：
-1. 移除 param 参数后的行为 - 延拓参数自动从修正器获取
-2. 改进的进度显示逻辑（verbose 和非 verbose 模式）
-3. 双向延拓功能
-4. 步长自适应调整
-
-参考最近 commits:
-- "refactor(continuation)：移除 param 参数"
-- "feat(continuation): 改进延拓算法进度显示"
+验证参数自动推断、进度显示、双向延拓、步长控制与边界情况。
 """
 
 import contextlib

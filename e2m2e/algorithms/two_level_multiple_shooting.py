@@ -28,8 +28,7 @@ class TwoLevelMultipleShootingResult:
         converged: 是否收敛
         status: 终止原因
         outer_iterations: 外层迭代次数
-        level1_iterations: 每段 Level 1 迭代次数列表，
-            形状为 ``list[list[int]]``（外层迭代 × 弧段）
+        level1_iterations: 每段 Level 1 迭代次数列表，形状为 ``list[list[int]]`` （外层迭代 × 弧段）
         final_position_residual: 最终最大位置残差
         final_velocity_residual: 最终最大速度残差
         per_patch_position_residual: 各段位置残差
@@ -228,7 +227,11 @@ class TwoLevelMultipleShooting:
             boundary,
         )
 
-        l1_tol = position_tolerance if level1_position_tolerance is None else level1_position_tolerance
+        l1_tol = (
+            position_tolerance
+            if level1_position_tolerance is None
+            else level1_position_tolerance
+        )
 
         t_work = t_values.copy()
         state_work = states.copy()

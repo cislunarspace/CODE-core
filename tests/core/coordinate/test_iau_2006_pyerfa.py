@@ -1,15 +1,6 @@
-"""IAU 2006 简化岁差/章动矩阵与 pyerfa（SOFA 官方）黄金参考对比测试。
+"""IAU 2006 简化岁差/章动矩阵与 pyerfa 黄金参考对比测试。
 
-issue #77 验收第 3、4 条的字面落实——把已存在的纯 Python 实现
-(e2m2e/core/iau_2006.py 与 standard_axes.py)钉死在 IAU 2006 官方参考值上。
-
-设计原则:
-- 参考矩阵的 N / P 拼装全部用 pyerfa 函数 + 本地 _rz/_ry/_rx,不复用项目
-  mean_obliquity 或 _rotation1/2/3(避免循环污染)
-- T 单一取值 0.5(框架先立,后续要更严再加 T 扫描)
-- 角度 / 矩阵元素容差 5e-5 rad(约 10 角秒,留 TDB→TT 桥接 + IAU 2006A 与
-  简化模型章动主项差异余量);正交性容差 1e-14(双精度舍入下界)
-- 不动 iau_2006.py / standard_axes.py 的数学逻辑
+验证项目实现与 SOFA 官方参考值在 5e-5 rad 内一致。
 """
 
 from __future__ import annotations

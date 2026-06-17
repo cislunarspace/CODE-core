@@ -1,14 +1,11 @@
 """GMAT LEO 对比脚本生成与基本行为测试。
 
-这些测试不依赖可运行的 GMAT 二进制，只验证脚本生成格式、
-文件存在性和 compare 脚本在缺少 GMAT 输出时的友好提示。
+验证脚本格式、力模型配置与报告解析。
 """
 
 from pathlib import Path
 
 import pytest
-
-from e2m2e.core.forces import ForceModel, GravityField
 
 
 @pytest.fixture

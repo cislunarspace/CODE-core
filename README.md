@@ -11,21 +11,35 @@ e2m2e 是一个用于设计地月空间运行轨道和转移轨道的 Python 库
 
 > **[PyPI](https://pypi.org/project/e2m2e/)**
 
-## 功能
+e2m2e 围绕“建模—生成—转移—检查”组织工作流。你可以先建立地月空间的动力学模型，再生成或修正一条轨道，必要时把它转换到更精确的星历模型，最后通过可视化检查设计结果。
 
-- **CR3BP 系统建模**：地月、日地、日木等天体系统，拉格朗日点计算，Jacobi 常数
-- **星历动力学**：基于 SPICE 内核的 N 体引力计算，支持多天体摄动与可配置力模型
-- **积分器族**：RK（PD45/PD78/RK89）、Adams-Bashforth-Moulton、Cowell 8 阶，支持自适应与固定步长
-- **力模型容器**：配置驱动 ForceModel，按名注册、启用/禁用、序列化到 JSON
-- **大气阻力**：指数大气模型 + 阻力系数模型，适用于 LEO 轨道衰减分析
-- **太阳辐射压 (SRP)**：cannonball SRP + 圆锥地影/月影，支持多遮挡体光照份额合成
-- **推力模型**：脉冲推力与有限推力，固定/速度/轨道根数方向配置
-- **坐标系与 GMAT 兼容**：J2000/ICRS/ITRF 层级转换、GAST/极移、标准轴/原点定义
-- **LEO/GEO 参考轨道**：快速创建近地/地球同步轨道，支持与 GMAT 参考轨道对比
-- **周期轨道**：DRO、ARO、RO、Halo、Lyapunov、Lissajous、Butterfly、Dragonfly
-- **设计算法**：微分修正（对称 2D/3D/Halo 策略）、多重打靶法、自然延拓、伪弧长延拓、稳定性分析
-- **转移轨道**：DRO-RO 转移搜索 (网格搜索 + NLP 优化)
-- **可视化**：2D/3D 轨道绘图、Jacobi 常数图、稳定性分析图
+核心能力覆盖：
+- **建模**：CR3BP 系统、星历系统、力模型组合、坐标系与积分器族
+- **生成**：周期轨道族、微分修正、多重打靶、延拓、稳定性分析
+- **转移**：网格搜索 + NLP 优化的转移轨道设计
+- **检查**：2D/3D 轨道绘图、Jacobi 常数图、稳定性分析图
+
+更详细的能力按模块列出：
+
+**动力学建模**
+- CR3BP 系统（地月、日地、日木等）、平动点与 Jacobi 常数
+- 星历系统：基于 SPICE 内核的 N 体引力，可配置力模型
+- 力模型组合：重力场、大气阻力、太阳光压（cannonball + 圆锥地影/月影）、脉冲/有限推力；按名注册、启用/禁用、序列化到 JSON
+- 积分器族：RK（PD45/PD78/RK89）、Adams-Bashforth-Moulton、Cowell 8 阶，自适应与固定步长
+
+**坐标系**
+- J2000/ICRS/ITRF 层级转换、GAST/极移，标准轴/原点定义，与 GMAT 兼容
+
+**轨道生成与分析**
+- 周期轨道族：DRO、ARO、RO、Halo、Lyapunov、Lissajous、Butterfly、Dragonfly
+- 微分修正（对称 2D/3D/Halo）、多重打靶（含两级）、自然/伪弧长延拓、稳定性分析
+- LEO/GEO 参考轨道快速创建
+
+**转移设计**
+- 转移轨道搜索与优化（网格搜索 + NLP），如 DRO-RO
+
+**可视化**
+- 2D/3D 轨道绘图、Jacobi 常数图、稳定性分析图
 
 ## 安装
 
@@ -62,7 +76,7 @@ uv sync --group dev
 ```python
 from e2m2e.core import CR3BP_System
 
-system = CR3BP_System.from_known_system("earth_moon")
+system = CR3BP_System(mu=0.01215, primary="earth", secondary="moon")
 system.compute_libration_points()
 system.info()
 ```
@@ -73,11 +87,14 @@ system.info()
 from e2m2e.core import EphemerisSystem, EphemerisDynamics, SPICEManager
 
 spice = SPICEManager()
-spice.load_kernels_from_directory("./kernels/")
+kernel = spice.find_ephemeris_kernel("./kernels/")
+spice.load_kernel(kernel)
 
 ephemeris_system = EphemerisSystem(
     bodies=["EARTH", "MOON", "SUN"],
-    reference_epoch="2025-06-21T11:00:06"
+    spice=spice,
+    origin="EARTH",
+    frame="J2000",
 )
 dynamics = EphemerisDynamics(system=ephemeris_system)
 ```
@@ -112,21 +129,21 @@ family = continuation.natural_continuation(
 ### 多重打靶法
 
 ```python
-from e2m2e.algorithms import MultipleShooting, sample_patch_points, convert_to_j2000
+from e2m2e.algorithms import MultipleShooting, sample_patch_points
 
 ms = MultipleShooting(dynamics=dynamics)
-t_patch, state_patch = sample_patch_points(orbit=seed_dro, n_segments=5)
+t_patch, state_patch = sample_patch_points(seed_dro, n_points=5)
 
 result = ms.correct(
     t_patch=t_patch,
     state_patch=state_patch,
     max_iter=50,
-    tol=1e-10,
-    var_time=True
+    tolerance=1e-10,
+    var_time=True,
 )
 
 if result.converged:
-    state_j2000 = convert_to_j2000(result.state_patch, system)
+    print(f"收敛，最大残差 {result.max_residual:.2e}")
 ```
 
 ### 转移轨道设计
@@ -152,6 +169,11 @@ results = searcher.search(
     alpha_min=0.5, alpha_max=2.5,
     n_alpha=101, n_departure=200,
     max_transfer_time=200.0,
+    intersection_threshold=0.05,
+    min_distance_threshold=0.02,
+    collision_earth_radius=6378.0 / 384400.0,
+    collision_moon_radius=1737.0 / 384400.0,
+    integration_dt=0.01,
     departure_orbit=dro_orbit, arrival_orbit=ro_orbit,
 )
 
@@ -183,13 +205,15 @@ plotter.plot_family_2d(family, jacobi_values, title="DRO Family")
 ```text
 e2m2e/
 ├── core/                 # 系统、动力学、轨道、坐标系、星历
-│   ├── system.py         # CR3BP_System - 系统定义、平动点
+│   ├── system.py         # System 抽象基类
+│   ├── cr3bp_system.py   # CR3BP_System - 系统定义、平动点
 │   ├── dynamics.py       # CR3BP_Dynamics - 运动方程、STM
 │   ├── orbit.py          # Orbit, OrbitFamily - 轨道数据结构
-│   ├── coordinate.py     # 坐标变换
-│   ├── ephemeris_system.py      # EphemerisSystem - 星历系统
-│   ├── ephemeris_dynamics.py    # EphemerisDynamics - N 体动力学
-│   └── spice.py                 # SPICE 内核管理
+│   ├── coordinate.py     # CoordinateTransformation - 坐标变换
+│   ├── coordinate_system.py  # CoordinateSystem - 坐标系定义
+│   ├── ephemeris_system.py  # EphemerisSystem - 星历系统
+│   ├── ephemeris_dynamics.py # EphemerisDynamics - N 体动力学
+│   └── spice.py          # SPICE 内核管理
 ├── algorithms/           # 微分修正、延拓、打靶、稳定性分析
 ├── transfer/             # 转移轨道搜索与优化
 ├── mbse/                 # 基于模型的系统工程
@@ -226,24 +250,7 @@ uv run ruff format .         # 格式化
 
 ## 更新日志
 
-### v4.2.0
-
-- **两级多重打靶法** — `TwoLevelMultipleShooting` 求解器，支持分层约束结构
-- **Halo 轨道族生成** — `generate_halo_family` 新增 `z_range` 参数，支持按 z 轴范围筛选
-- **星历修正分发** — `ephemeris_correction_dispatch` 自动选择修正策略
-- **3D 天体图标** — 地球/月球 PNG Billboard 渲染，动态深度排序
-- **环境变量配置** — `PlotConfig.from_env()` 从环境变量加载绘图配置
-- **迭代回调** — `iterate_correction` 支持 `callback` 参数，实时监控收敛过程
-- **统一 delta-v 计算** — `compute_transfer_cost` 提取为独立接口
-- **搜索首次可行解计时** — `TransferSearch` 结果记录首次可行解时间
-- **完整 docstring 审计** — 覆盖 algorithms、core、transfer、visualization 模块
-
-### v4.1.0
-
-- 转移轨道搜索与 NLP 优化两步法
-- SRP 动力学建模
-- 稳定性分析模块
-- MBSE 需求追踪
+见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 引用
 
@@ -253,7 +260,7 @@ uv run ruff format .         # 格式化
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {4.2.0},
+  version = {4.2.1},
   year = {2026},
 }
 ```

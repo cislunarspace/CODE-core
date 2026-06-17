@@ -1,4 +1,8 @@
-"""GravityField 测试。"""
+"""GravityField 测试。
+
+覆盖 degree=0 点质量退化、degree=2 J2 解析一致性、
+潮汐集成与 dot 历元外推。
+"""
 
 import numpy as np
 import pytest

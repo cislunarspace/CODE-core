@@ -1,10 +1,7 @@
 """动态坐标系推力传播集成测试（Slice 12 验收）。
 
-验证：
-1. VNB 沿速度方向推力：惯性系中推力加速度方向与速度方向点积 ≈ 1，
-   轨道能量/半长轴增加；
-2. LVLH 径向推力：偏心率随时间增加；
-3. 动态坐标系转换矩阵正交性：传播过程中采样 R @ R.T 与 I 的偏差 < 1e-14。
+验证 VNB 沿速度方向推力提升半长轴、LVLH 径向推力增加偏心率、
+转换矩阵正交性与混合方向。
 """
 
 from __future__ import annotations
@@ -18,7 +15,6 @@ from e2m2e.core.forces import FiniteBurn, ForceModel, PointMassGravity
 from e2m2e.core.spice import SPICEManager
 from e2m2e.core.standard_axes import ICRSAxes
 from e2m2e.core.standard_origins import CelestialBodyOrigin
-
 
 _EARTH_R_KM = 6378.137
 _MU_EARTH = 398600.4415  # km³/s²

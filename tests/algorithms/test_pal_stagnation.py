@@ -1,29 +1,7 @@
 """Halo PAL 延拓折叠点停滞回归测试。
 
-背景
-----
-当 L1 北 Halo 族用 ``pseudo_arclength_continuation`` 延拓到 z_amplitude ≈ 0.085
-附近时,族流形存在折叠点(fold):Xdot 的 rz 分量渐近过零并换号。
-``directional_increment=True`` 的逻辑在每一步根据当前 Xdot 重新判断方向,
-导致在折叠点形成 2-周期环:
-- 偶数步:预测方向 = +ds*Xdot,落到 A 点
-- 奇数步:预测方向 = -ds*Xdot,落到 B 点
-A 和 B 几乎相同(距离 ≪ step_size),延拓实际停滞。
-
-本测试的修复目标
------------------
-PAL 延拓在 30 步内不应该停滞;轨道 z 振幅应单调增长超过 0.10。
-
-测试设计
---------
-1. 复用 e2m2e/algorithms/continuation.py 中的 PAL 实现
-2. 用 L1 北 Halo 小振幅种子(振幅 0.001)启动
-3. 请求 30 步延拓
-4. 断言:首尾连续若干轨道间的状态距离应 ≥ 步长
-5. 断言:最终 z 振幅 > 0.10(超过 0.085 折叠点)
-
-若 fix 缺失:测试会失败,因为 OrbitFamily 的最后 5 条轨道互相靠得很近,
-且最终 z 振幅停滞在 ~0.085。
+验证 L1/L2 北/南 Halo 在折叠点处不形成 2-周期环，
+延拓能平稳穿过折叠点。
 """
 
 from __future__ import annotations
@@ -33,7 +11,6 @@ import pytest
 
 from e2m2e.algorithms import Continuation, DifferentialCorrection
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
-
 
 # 测试运行较慢(约 30-60 秒),只在不在 fast 模式时跑
 pytestmark = pytest.mark.slow
@@ -60,8 +37,12 @@ def _build_l_halo_seed(libration_point: int, halo_class: int, amplitude_z: float
         halo_class=halo_class,
         verbose=False,
     )
-    assert seed is not None, f"L{libration_point} {'北' if halo_class == 0 else '南'} 种子生成失败"
-    assert seed.correction_success, f"L{libration_point} {'北' if halo_class == 0 else '南'} 种子修正失败"
+    assert seed is not None, (
+        f"L{libration_point} {'北' if halo_class == 0 else '南'} 种子生成失败"
+    )
+    assert seed.correction_success, (
+        f"L{libration_point} {'北' if halo_class == 0 else '南'} 种子修正失败"
+    )
 
     # 标记族类型与参数,符合 halo_pseudo_arclength_continuation 的预期
     seed.family_type = "halo"
@@ -137,14 +118,12 @@ class TestHaloPALStagnation:
         z_amps = [abs(float(o.states[0, 2])) for o in family]
         max_z_amp = max(z_amps)
 
-        if libration_point == 1:
-            expected_min = 0.08  # L1 折叠点 z ≈ 0.085
-        else:
-            expected_min = 0.10  # L2 折叠点 z ≈ 0.30,80 步内应超过 0.10
+        # L1 折叠点 z ≈ 0.085；L2 折叠点 z ≈ 0.30,80 步内应超过 0.10
+        expected_min = 0.08 if libration_point == 1 else 0.10
 
         assert max_z_amp >= expected_min, (
-            f"L{libration_point} {'北' if halo_class == 0 else '南'} {direction} 延拓在 z={max_z_amp:.4f} 处即停,"
-            f"未达到预期折叠点位置 z≥{expected_min}"
+            f"L{libration_point} {'北' if halo_class == 0 else '南'} {direction} "
+            f"延拓在 z={max_z_amp:.4f} 处即停,未达到预期折叠点位置 z≥{expected_min}"
         )
 
     @pytest.mark.parametrize("libration_point,halo_class,direction", _ALL_PAL_CONFIGS)
@@ -226,10 +205,7 @@ class TestHaloPALStagnation:
         x_values = [float(o.states[0, 0]) for o in continuation_orbits]
 
         # L1 折叠点后 x 应 > 0.94, L2 折叠点后 x 应 > 1.16
-        if libration_point == 1:
-            threshold = 0.94
-        else:
-            threshold = 1.16
+        threshold = 0.94 if libration_point == 1 else 1.16
 
         max_x = max(x_values)
         assert max_x > threshold, (

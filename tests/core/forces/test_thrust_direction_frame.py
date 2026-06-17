@@ -1,10 +1,13 @@
-"""FiniteBurn direction_frame 测试（TDD）。"""
+"""FiniteBurn direction_frame 测试（TDD）。
+
+验证 VNB/LVLH 坐标系转换、非法帧拒绝、
+callable 方向与零速度/零位置边界。
+"""
 
 import numpy as np
 import pytest
 
 from e2m2e.core.forces import FiniteBurn
-
 
 # --- 构造辅助 ---
 

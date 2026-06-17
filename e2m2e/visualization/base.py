@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import logging
-from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -14,12 +13,13 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 
+from ..core.cr3bp_system import CR3BP_System, LibrationPoint
+from ..mbse.data.enums import ProjectionPlane
+from .config import PlotConfig
+
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
-
-from ..core.cr3bp_system import CR3BP_System, LibrationPoint
-from .config import PlotConfig
 
 logger = logging.getLogger(__name__)
 
@@ -110,9 +110,6 @@ class _DepthDriverPatch(mpatches.Patch):
         return z2
 
 
-from ..mbse.data.enums import ProjectionPlane
-
-
 class OrbitVisualizer:
     """轨道可视化器，支持 2D 投影和 3D 轨道绑定绘图。
 
@@ -125,6 +122,12 @@ class OrbitVisualizer:
     """
 
     def __init__(self, system: CR3BP_System, config: PlotConfig | None = None) -> None:
+        """初始化可视化器。
+
+        Args:
+            system: CR3BP 系统对象，用于获取天体位置和平动点坐标。
+            config: 绘图配置，未指定时使用默认 PlotConfig。
+        """
         self.system = system
         self.mu = system.mu  # 质量参数，用于天体位置计算
         self.config = config or PlotConfig()

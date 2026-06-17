@@ -1,3 +1,8 @@
+"""TwoLevelMultipleShooting 单元测试。
+
+覆盖输入校验、线性动力学收敛、停滞动力学失败、
+边界模式枚举与残差聚合语义。
+"""
 import numpy as np
 import pytest
 
@@ -6,6 +11,7 @@ from e2m2e.mbse.data.enums import BoundaryMode, TwoLevelMultipleShootingStatus
 
 
 class LinearDynamics:
+    """线性动力学桩：位置随速度线性增长。"""
     def propagate(self, state, time_span, with_stm=True):
         dt = time_span[1] - time_span[0]
         final_state = np.asarray(state, dtype=float).copy()
@@ -25,6 +31,7 @@ class LinearDynamics:
 
 
 class StagnantDynamics:
+    """停滞动力学桩：位置不随时间变化。"""
     def propagate(self, state, time_span, with_stm=True):
         final_state = np.asarray(state, dtype=float).copy()
         stm = np.eye(6)
@@ -40,6 +47,7 @@ class StagnantDynamics:
 
 
 class TimeBendingDynamics:
+    """时间弯折动力学桩：速度被强制偏移。"""
     def propagate(self, state, time_span, with_stm=True):
         final_state = np.asarray(state, dtype=float).copy()
         final_state[3:6] = final_state[3:6] + np.array([10.0, 0.0, 0.0])
@@ -58,16 +66,19 @@ class TimeBendingDynamics:
 
 
 class MissingPropagateDynamics:
+    """缺少 propagate 方法的动力学桩，用于协议校验。"""
     def equations_of_motion(self, _time, state):
         return np.zeros_like(state)
 
 
 class MissingEquationsDynamics:
+    """缺少 equations_of_motion 方法的动力学桩，用于协议校验。"""
     def propagate(self, state, time_span, with_stm=True):
         return {"states": np.array([state, state]), "stm": np.array([np.eye(6), np.eye(6)])}
 
 
 def test_two_level_multiple_shooting_is_public_algorithm():
+    """TwoLevelMultipleShooting 与 TwoLevelMultipleShootingResult 可从公开 API 导入。"""
     solver = TwoLevelMultipleShooting(LinearDynamics())
 
     assert solver.dynamics is not None
@@ -75,6 +86,7 @@ def test_two_level_multiple_shooting_is_public_algorithm():
 
 
 def test_correct_rejects_patch_states_not_shaped_as_n_points_by_6():
+    """state_patch 形状不是 (n_points, 6) 时应抛 ValueError。"""
     solver = TwoLevelMultipleShooting(LinearDynamics())
     t_patch = np.array([0.0, 1.0, 2.0])
     transposed_states = np.zeros((6, 3))
@@ -93,6 +105,7 @@ def test_correct_rejects_patch_states_not_shaped_as_n_points_by_6():
     ],
 )
 def test_correct_validates_patch_point_inputs(t_patch, state_patch, error):
+    """patch points 输入校验：形状、长度、单调性。"""
     solver = TwoLevelMultipleShooting(LinearDynamics())
 
     with pytest.raises(ValueError, match=error):
@@ -147,6 +160,7 @@ def test_correct_boundary_rejects_string():
 
 
 def test_correct_reports_level1_failure_when_segments_cannot_hit_positions():
+    """段无法命中目标位置时，Level 1 失败状态应正确报告。"""
     solver = TwoLevelMultipleShooting(StagnantDynamics())
     t_patch = np.array([0.0, 1.0, 2.0])
     state_patch = np.array(
@@ -177,6 +191,7 @@ def test_correct_reports_level1_failure_when_segments_cannot_hit_positions():
 
 
 def test_correct_converges_linear_patch_points_without_mutating_inputs():
+    """线性动力学下应收敛，且不修改输入的 t_patch / state_patch。"""
     solver = TwoLevelMultipleShooting(LinearDynamics())
     t_patch = np.array([0.0, 1.0, 2.0])
     state_patch = np.array(
@@ -219,6 +234,7 @@ def test_correct_converges_linear_patch_points_without_mutating_inputs():
 
 
 def test_correct_preserves_strictly_increasing_times_after_level2_attempts():
+    """Level 2 尝试后，返回的 t_patch 仍应严格递增。"""
     solver = TwoLevelMultipleShooting(TimeBendingDynamics())
     t_patch = np.array([0.0, 1.0, 2.0])
     state_patch = np.zeros((3, 6))
@@ -291,5 +307,6 @@ def test_correct_max_aggregation_for_residuals():
 
 @pytest.mark.parametrize("dynamics", [MissingPropagateDynamics(), MissingEquationsDynamics()])
 def test_constructor_requires_dynamics_protocol(dynamics):
+    """构造函数要求 dynamics 同时实现 propagate 与 equations_of_motion。"""
     with pytest.raises(TypeError, match="dynamics"):
         TwoLevelMultipleShooting(dynamics)

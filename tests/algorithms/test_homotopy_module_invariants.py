@@ -1,10 +1,7 @@
-"""TDD: import-time invariants for the homotopy module.
+"""homotopy_correction 模块导入时不变量测试。
 
-Issue #239 acceptance criteria:
-- correct_ephemeris_patch_points(method='homotopy') uses deferred import
-  to avoid a circular import between ephemeris_correction and
-  homotopy_correction.
-- The two-level and standard methods are unaffected by the new module.
+验证延迟导入避免循环依赖、默认 lambda 步长、
+以及标准/两层方法不受新模块影响。
 """
 
 from __future__ import annotations
@@ -34,6 +31,15 @@ def test_homotopy_correction_importable_independently():
             sys.modules["e2m2e.algorithms.ephemeris_correction"] = saved_eph
         if saved_hc is not None:
             sys.modules["e2m2e.algorithms.homotopy_correction"] = saved_hc
+        # importlib.import_module 会把新模块注册为包属性；
+        # 必须恢复包命名空间，否则后续 monkeypatch 与延迟 import
+        # 指向不同模块对象（sys.modules vs 包属性），导致补丁失效。
+        import e2m2e.algorithms as _algo_pkg
+
+        if saved_eph is not None:
+            _algo_pkg.ephemeris_correction = saved_eph
+        if saved_hc is not None:
+            _algo_pkg.homotopy_correction = saved_hc
 
 
 def test_standard_and_two_level_methods_unaffected_by_homotopy_module():

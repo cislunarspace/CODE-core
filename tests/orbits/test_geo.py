@@ -1,7 +1,6 @@
-"""
-测试 e2m2e.orbits.geo 模块
+"""e2m2e.orbits.geo 模块测试。
 
-从 transfer-orbit-design/tests/test_inbound_transfer.py::TestGeoUtils 移植。
+覆盖 GEO 常数、圆速度、出发速度计算与碰撞检测。
 """
 
 import numpy as np

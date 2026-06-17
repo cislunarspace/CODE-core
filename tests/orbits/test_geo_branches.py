@@ -1,4 +1,7 @@
-"""Cover uncovered branches in e2m2e.orbits.geo."""
+"""e2m2e.orbits.geo 未覆盖分支测试。
+
+覆盖原点圆速度回退、无穿越检测与最近接近搜索。
+"""
 
 import numpy as np
 import pytest

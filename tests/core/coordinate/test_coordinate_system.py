@@ -1,5 +1,7 @@
-"""
-Unit tests for the new Axes + Origin + CoordinateSystem framework.
+"""Axes + Origin + CoordinateSystem 框架单元测试。
+
+验证抽象基类、固定/旋转轴状态变换、
+原点偏移、正交性与向量变换。
 """
 
 

@@ -1,1 +1,2 @@
-"""Conftest for MBSE tests."""
+"""MBSE 测试共享 fixture。
+"""

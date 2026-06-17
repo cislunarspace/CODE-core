@@ -1,13 +1,12 @@
-//! Prince-Dormand 5(4) tableau (Dormand & Prince, 1980).
+//! Prince-Dormand 5(4) 表（Dormand & Prince, 1980）。
 //!
-//! Only the coefficient table lives here — the shared step logic is in
-//! [`crate::butcher::explicit_rk_step`].
+//! 仅系数表存放于此 —— 共享步进逻辑在 [`crate::butcher::explicit_rk_step`]。
 
 use crate::butcher::ButcherTable;
 
-/// Prince-Dormand 5(4): 7 stages, order 5, embedded order 4.
+/// Prince-Dormand 5(4)：7 级，主阶 5，嵌入阶 4。
 ///
-/// Coefficients match the prior hand-rolled implementation bit-for-bit.
+/// 系数与先前手写的逐位实现一致。
 pub const PD45_TABLE: ButcherTable = ButcherTable::new(
     7,
     5,

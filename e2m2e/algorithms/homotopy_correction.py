@@ -1,50 +1,49 @@
-"""Fixed-step homotopy ephemeris correction.
+"""同伦星历修正模块。
 
-Implements `correct_with_homotopy`, which transitions a patched-point
-trajectory from a base body set (e.g. ``["EARTH", "MOON"]``) to a full
-ephemeris body set (e.g. ``["EARTH", "MOON", "SUN"]``) by a fixed sequence
-of lambda weights. At each lambda step the inner corrector (standard
-multiple shooting, or two-level multiple shooting) is invoked with the
-previous step's `(t_patch, state_patch)` as initial guess, regardless of
-whether that step converged.
+通过固定步长的 lambda 权重序列，将 patch points 轨迹从基础天体集
+（如 ``["EARTH", "MOON"]``）逐步过渡到完整天体集
+（如 ``["EARTH", "MOON", "SUN"]``）。
 
-The dynamics weighting itself is performed by `HomotopyEphemerisDynamics`,
-a subclass of `EphemerisDynamics` whose `_compute_acc_and_jacobian`
-linearly interpolates the per-body acceleration/Jacobian between the
-base set and the full set:
+每一步调用内部修正器（标准多重打靶或两层多重打靶），
+以上一步的 ``(t_patch, state_patch)`` 作为初值猜测，
+无论上一步是否收敛。
+
+动力学加权由 ``HomotopyEphemerisDynamics`` 完成，
+它在基础集与完整集之间线性插值加速度与雅可比矩阵：
 
     a_lambda = a_base + lambda * (a_full - a_base)
     J_lambda = J_base + lambda * (J_full - J_base)
 
-The interpolation is purely in the ephemeris body-grouping dimension; no
-coordinate transformation or CR3BP dynamics is involved.
-
-Issue: #239 (MVP), extended in #240/#241.
+插值仅发生在天体分组维度，不涉及坐标变换或 CR3BP 动力学。
 """
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import numpy.typing as npt
+
+from e2m2e.mbse.data.enums import BoundaryMode
 
 from ..core.ephemeris_dynamics import EphemerisDynamics
 from ..core.ephemeris_system import EphemerisSystem
 from .ephemeris_correction_types import EphemerisCorrectionResult
-from .multiple_shooting import MultipleShooting
-from .two_level_multiple_shooting import TwoLevelMultipleShooting
-from e2m2e.mbse.data.enums import BoundaryMode
+from .multiple_shooting import MultipleShooting, MultipleShootingResult
+from .two_level_multiple_shooting import (
+    TwoLevelMultipleShooting,
+    TwoLevelMultipleShootingResult,
+)
 
 DEFAULT_LAMBDA_STEPS: tuple[float, ...] = (0.25, 0.50, 0.75, 1.00)
 
 
 class HomotopyEphemerisDynamics(EphemerisDynamics):
-    """Ephemeris dynamics with a single linear mixing weight ``lambda``.
+    """带单一 lambda 线性混合权重的星历动力学。
 
-    The acceleration and Jacobian are computed as
-    ``a_base + lambda * (a_full - a_base)``. The base set is the subset
-    `base_bodies` of the full body list; the full set is the dynamics'
-    normal body list. Both share the same spice/origin/frame, so the
-    call structure of `_compute_acc_and_jacobian` is reused.
+    加速度与雅可比矩阵按 ``a_base + lambda * (a_full - a_base)`` 计算。
+    基础集是完整天体列表的子集 ``base_bodies``；完整集即动力学对象的正常天体列表。
+    两者共享相同的 SPICE 原点与坐标框架，因此 ``_compute_acc_and_jacobian`` 的调用结构可直接复用。
     """
 
     def __init__(
@@ -86,7 +85,7 @@ class HomotopyEphemerisDynamics(EphemerisDynamics):
         r_sc: npt.NDArray[np.floating],
         need_jacobian: bool = False,
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
-        """Linear interpolation of acc/Jacobian between base and full sets."""
+        """在基础集与完整集之间线性插值加速度与雅可比矩阵。"""
         acc_base, jac_base = self.base_dynamics._compute_acc_and_jacobian(
             t, r_sc, need_jacobian
         )
@@ -103,7 +102,7 @@ class HomotopyEphemerisDynamics(EphemerisDynamics):
 
 
 def _validate_base_bodies(dynamics: EphemerisDynamics, base_bodies: list[str]) -> None:
-    """Ensure base_bodies is a subset of full bodies and contains origin."""
+    """校验 base_bodies 是完整天体列表的子集且包含原点。"""
     full_bodies = list(dynamics.system.bodies)
     full_set = set(full_bodies)
     base_set = set(base_bodies)
@@ -121,13 +120,14 @@ def _validate_base_bodies(dynamics: EphemerisDynamics, base_bodies: list[str]) -
 
 
 def _validate_lambda_steps(lambda_steps: list[float]) -> None:
+    """校验 lambda 步长序列非空、严格递增、在 [0, 1] 范围内且终值为 1.0。"""
     if not lambda_steps:
         raise ValueError("lambda_steps must not be empty")
     for value in lambda_steps:
         if not 0.0 <= value <= 1.0:
             raise ValueError(f"lambda_steps values must be in [0, 1], got {value}")
-    for prev, curr in zip(lambda_steps, lambda_steps[1:]):
-        if curr <= prev:
+    for i in range(len(lambda_steps) - 1):
+        if lambda_steps[i + 1] <= lambda_steps[i]:
             raise ValueError(
                 f"lambda_steps must be strictly increasing, got {lambda_steps}"
             )
@@ -153,19 +153,18 @@ def correct_with_homotopy(
     velocity_tolerance: float | None = None,
     verbose: bool = False,
 ) -> EphemerisCorrectionResult:
-    """Drive a base->full body-set transition via fixed lambda steps.
+    """按固定 lambda 步长序列驱动基础集到完整集的过渡修正。
 
-    Each step invokes the inner corrector (MultipleShooting by default,
-    or TwoLevelMultipleShooting when ``inner_method="two_level"``) with
-    ``(t_patch, state_patch)`` seeded from the previous step's output.
-    Intermediate steps use ``tolerance * 10``; the final ``lambda=1.0``
-    step uses the strict tolerance.
+    每一步调用内部修正器（默认 ``MultipleShooting``，
+    ``inner_method="two_level"`` 时为 ``TwoLevelMultipleShooting``），
+    以上一步输出的 ``(t_patch, state_patch)`` 作为初值猜测。
+    中间步使用 ``tolerance * 10`` 的宽松容差；最终 ``lambda=1.0`` 步使用严格容差。
 
-    Aggregated ``EphemerisCorrectionResult`` semantics:
-      - standard: ``converged`` from last step, ``iterations`` summed,
-        ``max_residual`` from last step, ``residual_history`` flattened.
-      - two_level: same plus ``velocity_residual`` and
-        ``velocity_residual_history`` from the two-level history pairs.
+    ``EphemerisCorrectionResult`` 汇总语义：
+      - standard：``converged`` 取最后一步结果，``iterations`` 累加，
+        ``max_residual`` 取最后一步，``residual_history`` 扁平化。
+      - two_level：同上，另含 ``velocity_residual`` 与
+        ``velocity_residual_history``（来自两层历史对）。
     """
     if inner_method == "homotopy":
         raise ValueError("inner_method='homotopy' is not allowed (would recurse)")
@@ -204,6 +203,8 @@ def correct_with_homotopy(
         step_dynamics.integrator = dynamics.integrator
 
         try:
+            solver: MultipleShooting | TwoLevelMultipleShooting
+            step_result: MultipleShootingResult | TwoLevelMultipleShootingResult
             if inner_method == "standard":
                 solver = MultipleShooting(
                     dynamics=step_dynamics,
@@ -236,15 +237,20 @@ def correct_with_homotopy(
                     boundary=BoundaryMode.FIXED_ENDPOINTS,
                     verbose=verbose,
                 )
-                pos_hist, vel_hist = _split_residual_history(step_result.residual_history)
+                # 两层求解器的运行时契约：residual_history 为 (位置, 速度) 元组列表，
+                # final_position_residual / final_velocity_residual 为末次外层迭代残差。
+                # 此处 step_result 在测试中可能被 mock 成 SimpleNamespace，
+                # 因此不在运行时做 isinstance 校验，只用 cast 告诉 mypy 期望类型。
+                two_level_result = cast(TwoLevelMultipleShootingResult, step_result)
+                pos_hist, vel_hist = _split_residual_history(two_level_result.residual_history)
                 position_histories.extend(pos_hist)
                 velocity_histories.extend(vel_hist)
-                iterations_total += int(step_result.outer_iterations)
-                final_converged = bool(step_result.converged)
-                final_max_residual = float(step_result.final_position_residual)
-                final_velocity_residual = float(step_result.final_velocity_residual)
-                last_t = step_result.t_patch
-                last_state = step_result.state_patch
+                iterations_total += int(two_level_result.outer_iterations)
+                final_converged = bool(two_level_result.converged)
+                final_max_residual = float(two_level_result.final_position_residual)
+                final_velocity_residual = float(two_level_result.final_velocity_residual)
+                last_t = two_level_result.t_patch
+                last_state = two_level_result.state_patch
         except Exception as exc:
             raise RuntimeError(
                 f"homotopy lambda step {step_index} (lambda={lam}, "
@@ -272,7 +278,7 @@ def correct_with_homotopy(
 def _split_residual_history(
     residual_history: list[tuple[float, float]],
 ) -> tuple[list[float], list[float]]:
-    """Split a two-level ``residual_history`` (pos, vel) into two flat lists."""
+    """将两层修正的 ``(位置残差, 速度残差)`` 历史拆分为两个列表。"""
     pos: list[float] = []
     vel: list[float] = []
     for pair in residual_history:

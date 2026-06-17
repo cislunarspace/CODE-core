@@ -43,7 +43,7 @@ class PhysicalModel(abc.ABC):
 def require_inertial_frame(
     system: Any, t: float
 ) -> tuple[Any, Any, str]:
-    """校验传播系为惯性系，返回 (coordinate_system, spice, origin_body)。
+    """校验参考系为惯性系，返回 (coordinate_system, spice, origin_body)。
 
     供在传播惯性系（ICRF，轴旋转矩阵为单位阵）中直接计算的力模型调用。
     非惯性系（如 ITRFApproxAxes）抛 ``NotImplementedError``。

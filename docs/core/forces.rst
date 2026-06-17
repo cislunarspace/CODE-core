@@ -6,9 +6,11 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
 核心概念
 --------
 
+这三个概念构成力模型子包的核心接口：
+
 - **PhysicalModel**：所有力模型的抽象基类，定义 ``compute_acceleration(t, state, system)`` 接口。
-- **ForceModel**：容器类，聚合多个 ``PhysicalModel``，按名注册、启用/禁用，并通过 Rust ``rk_step`` 步进器完成传播。
-- **ForceEntry**：容器内单个力模型的注册记录，包含 ``name``、``force`` 和 ``enabled`` 三个字段。
+- **ForceModel**：力模型组合，把多个 ``PhysicalModel`` 组合成一次传播所需的运动方程；按名登记、启用/禁用，并通过 Rust 积分器完成传播。
+- **ForceEntry**：力模型组合内单个力模型的登记记录，包含 ``name``、``force`` 和 ``enabled`` 三个字段。
 
 支持力模型类型
 --------------
@@ -129,10 +131,13 @@ name-based 注册机制
    for entry in fm.list_forces():
        print(f"{entry.name}: {type(entry.force).__name__}, enabled={entry.enabled}")
 
-配置驱动构建完整流程
---------------------
+配置驱动构建流程
+------------------
 
 以下示例展示从配置字典构建 ``ForceModel``，接入 ``EphemerisDynamics`` 完成一次 LEO 轨道传播。
+
+.. code-block:: python
+
    from e2m2e.core.standard_axes import ICRSAxes
    from e2m2e.core.standard_origins import CelestialBodyOrigin
    from e2m2e.core.forces import ForceModel
@@ -250,39 +255,47 @@ JSON 文件 IO
 **不可序列化的推力剖面**
 
 ``FiniteBurn`` 若使用用户手写的 ``lambda`` 作为 ``thrust_profile``，仍可正常传播，但 ``to_config()`` 会抛出 ``NotSerializableError``。解决方式：改用 ``force_config`` 提供的 DSL（``{"kind": "constant"}`` 或 ``{"kind": "pulse"}``）构造推力剖面。
+
 .. automodule:: e2m2e.core.forces.force_model
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. automodule:: e2m2e.core.forces.force_config
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. automodule:: e2m2e.core.forces.physical_model
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. automodule:: e2m2e.core.forces.gravity_field
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. automodule:: e2m2e.core.forces.drag
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. automodule:: e2m2e.core.forces.thrust
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 太阳辐射压与阴影模型
+====================
 
-e2m2e 提供基于 cannonball 模型的太阳辐射压（SRP）力模型，以及圆锥阴影模型用于计算地影/月影对光照的遮挡效应。两者均通过 ``PhysicalModel`` 接口与 ``ForceModel`` 容器集成，支持配置驱动的序列化与反序列化。
+e2m2e 提供基于 cannonball 模型的太阳辐射压（SRP）力模型，以及圆锥阴影模型用于计算地影/月影对光照的遮挡效应。两者均通过 ``PhysicalModel`` 接口与力模型组合集成，支持配置驱动的序列化与反序列化。
 
 太阳辐射压模型
 --------------
@@ -312,7 +325,7 @@ e2m2e 提供基于 cannonball 模型的太阳辐射压（SRP）力模型，以�
      - 1.5
    * - ``shadow``
      - 阴影模型实例（注入）
-     - ``None``（全光照）
+     - ``None`` （全光照）
 
 阴影模型
 --------
@@ -346,7 +359,7 @@ e2m2e 提供基于 cannonball 模型的太阳辐射压（SRP）力模型，以�
      - ``("EARTH",)``
    * - ``radii``
      - 天体半径覆盖字典（km）
-     - ``None``（使用内置默认值）
+     - ``None`` （使用内置默认值）
 
 内置默认半径：
 
@@ -387,10 +400,13 @@ SRP 与阴影模型支持通过 :mod:`~e2m2e.core.forces.force_config` 进行配
        }
    }
 
-完整工作流示例
+SRP 工作流示例
 --------------
 
-以下示例展示 SRP + 地影/月影 + ``EphemerisDynamics`` 的完整传播流程：
+以下示例展示 SRP + 地影/月影 + ``EphemerisDynamics`` 的传播流程：
+
+.. code-block:: python
+
    from e2m2e.core.standard_axes import J2000Axes
    from e2m2e.core.standard_origins import CelestialBodyOrigin
    from e2m2e.core.forces import (

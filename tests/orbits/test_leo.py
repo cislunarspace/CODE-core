@@ -1,7 +1,6 @@
-"""
-测试 e2m2e.orbits.leo 模块
+"""e2m2e.orbits.leo 模块测试。
 
-从 transfer-orbit-design/tests/test_inbound_transfer.py::TestLeoUtils 移植。
+覆盖 LEO 常数、圆速度、轨道状态生成。
 """
 
 import numpy as np

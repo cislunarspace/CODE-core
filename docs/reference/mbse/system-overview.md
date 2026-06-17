@@ -1,8 +1,21 @@
 ---
-title: e2m2e MBSE 系统模型总览
+title: e2m2e MBSE 模型总览
 ---
 
-# e2m2e MBSE 系统模型总览
+# e2m2e MBSE 模型总览
+
+## 什么是 MBSE
+
+**MBSE（基于模型的系统工程，Model-Based Systems Engineering）** 是一种以形式化模型为核心、贯穿需求、设计、分析、验证与确认全生命周期的系统工程方法。与传统以文档为中心的系统工程不同，MBSE 把系统要素之间的关系做成模型元素间的显式关联，可自动检查、可追溯；建模语言通常用 SysML（需求、行为、结构、参数四个维度）。
+
+e2m2e 不是面向完整系统工程流程的 MBSE 工具，而是**借鉴 MBSE 思路**，在仓库内用轻量方式做四件事：
+
+- **组件登记**（`ComponentRegistry`）——汇总各模块的职责与依赖；
+- **需求追溯**（`RequirementRegistry`）——把需求连到代码与测试；
+- **数据模型**（Pydantic）——统一传播结果、轨道属性等数据结构；
+- **图表生成**（`DiagramGenerator`）——从上述模型生成 BDD、需求图、活动图、序列图、状态机的 Mermaid 文档。
+
+本页及 `docs/reference/mbse/` 下的各图，就是这套轻量 MBSE 模型的产物。
 
 ## 系统描述
 

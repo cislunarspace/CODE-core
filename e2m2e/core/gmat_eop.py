@@ -1,4 +1,4 @@
-"""GMAT leap-second and Earth-orientation data readers."""
+"""GMAT 闰秒与地球定向参数数据读取模块。"""
 
 from __future__ import annotations
 

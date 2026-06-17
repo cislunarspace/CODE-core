@@ -1,7 +1,6 @@
 """SolarRadiationPressure 力模型测试。
 
-纯函数路径（``_compute_srp_acceleration``）免 SPICE，与 ``test_drag.py`` 范式一致。
-系统感知路径（``compute_acceleration``）由 ``test_srp_transform.py`` 覆盖。
+覆盖 1 AU 量级、方向、反平方缩放、Cr 线性缩放与 flux 调制。
 """
 
 from __future__ import annotations

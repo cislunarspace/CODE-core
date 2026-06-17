@@ -14,7 +14,7 @@ def main() -> None:
     args = parser.parse_args()
 
     output_lines: list[str] = []
-    with open(args.input, "r", encoding="utf-8") as f:
+    with open(args.input, encoding="utf-8") as f:
         for line in f:
             stripped = line.strip()
             if not stripped or stripped.startswith("/*"):

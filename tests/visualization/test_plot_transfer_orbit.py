@@ -1,33 +1,6 @@
-"""
-需求: 转移轨道 3D 可视化
+"""转移轨道 3D 可视化测试。
 
-复现论文 Fig.8-10：在旋转系下绘制 DRO 出发轨道 + 转移轨迹 + RO 到达轨道的 3D 示意图。
-支持单条和多条转移轨迹叠加绘制，标注出发/到达点，绘制天体（地球、月球）和拉格朗日点。
-
-验收标准:
-  1. TransferPlotter 新增 plot_transfer_orbit() 方法
-  2. 输入:
-     - departure_orbit: Orbit (DRO)
-     - arrival_orbit: Orbit (RO)
-     - transfer_trajectory: np.ndarray (n, 6) 转移轨迹状态序列
-     - departure_state: np.ndarray (6,) 出发点状态（标注用）
-     - insertion_state: np.ndarray (6,) 到达点状态（标注用）
-     - ax: 可选，复用已有 3D Axes
-     - label: 可选，轨迹标签
-     - color: 可选，轨迹颜色
-  3. 输出: matplotlib Axes (projection='3d')
-  4. 图中应包含:
-     - DRO 轨道线（出发轨道）
-     - RO 轨道线（到达轨道）
-     - 转移轨迹线（突出显示）
-     - 出发点标记
-     - 到达点标记
-     - 地球、月球天体标记
-     - 拉格朗日点（可选）
-  5. 支持在同一 ax 上叠加绘制多条转移轨迹
-  6. 坐标轴标签使用无量纲单位
-
-参考论文: Cui et al. (2025), Fig. 8a-d, Fig. 9a-d, Fig. 10a-d
+复现论文 Fig.8-10：DRO 出发轨道 + 转移轨迹 + RO 到达轨道 3D 示意图。
 """
 
 import matplotlib

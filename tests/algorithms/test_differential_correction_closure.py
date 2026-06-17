@@ -1,14 +1,7 @@
-"""
-微分修正轨道闭合性测试模块
+"""微分修正轨道闭合性测试。
 
-测试 _create_corrected_orbit 方法中的闭合误差计算和轨道闭合验证功能。
-
-这些测试覆盖最近 commit "Enhance orbit closure verification in differential correction" 的功能：
-- closure_error 计算
-- orbit.is_periodic 标记
-- 轨道闭合性修正尝试
-- correction_success, correction_iterations, correction_error,
-  correction_termination_reason, closure_error 等属性
+覆盖 closure_error、is_periodic、修正结果属性、
+状态数组独立性与边界情况。
 """
 
 

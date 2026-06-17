@@ -1,4 +1,7 @@
-"""Test Pydantic data model validation."""
+"""Pydantic 数据模型校验测试。
+
+验证 PropagationResult 状态形状与 STM 维度。
+"""
 
 import numpy as np
 import pytest

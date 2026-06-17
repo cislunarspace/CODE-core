@@ -1,7 +1,9 @@
-"""ForceModel 传播循环测试。"""
+"""ForceModel 传播循环测试。
+
+覆盖恒力抛物线轨迹、t_eval 精确输出与终止事件。
+"""
 
 import numpy as np
-import pytest
 
 from e2m2e.core.forces import ForceModel, PhysicalModel
 

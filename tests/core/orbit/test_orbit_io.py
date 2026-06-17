@@ -1,8 +1,6 @@
-"""
-Orbit 文件读写测试模块
+"""Orbit 文件读写测试。
 
-测试 Orbit.save_to_file() 和 Orbit.load_from_file() 的基本行为，
-重点覆盖 numpy 布尔值序列化问题以及保存后的属性恢复。
+覆盖 numpy 布尔序列化、属性恢复与元数据时间戳。
 """
 
 import json

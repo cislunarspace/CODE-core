@@ -1,9 +1,12 @@
+"""ephemeris_correction 分发路径测试。
+
+验证标准/两层/同伦三种修正方法的注册表分发与结果聚合。
+"""
 from __future__ import annotations
 
 from types import SimpleNamespace
 
 import numpy as np
-import pytest
 
 from e2m2e.algorithms import ephemeris_correction
 from e2m2e.algorithms.ephemeris_correction import correct_ephemeris_patch_points
@@ -11,6 +14,7 @@ from e2m2e.mbse.data.enums import BoundaryMode
 
 
 def test_standard_method_uses_multiple_shooting_and_normalizes_result(monkeypatch):
+    """standard 方法应使用 MultipleShooting 并归一化结果字段。"""
     calls: dict[str, object] = {}
     t_patch = np.array([0.0, 1.0])
     state_patch = np.ones((2, 6))
@@ -61,6 +65,7 @@ def test_standard_method_uses_multiple_shooting_and_normalizes_result(monkeypatc
 
 
 def test_two_level_method_uses_two_level_solver_and_preserves_velocity_diagnostics(monkeypatch):
+    """two_level 方法应使用 TwoLevelMultipleShooting 并保留速度诊断字段。"""
     calls: dict[str, object] = {}
     t_patch = np.array([0.0, 1.0])
     state_patch = np.ones((2, 6))
@@ -119,7 +124,7 @@ def test_two_level_method_uses_two_level_solver_and_preserves_velocity_diagnosti
 
 
 def test_homotopy_method_delegates_to_correct_with_homotopy(monkeypatch):
-    """method='homotopy' routes to correct_with_homotopy (Issue #239)."""
+    """method='homotopy' 应路由到 correct_with_homotopy (Issue #239)。"""
     from e2m2e.algorithms import homotopy_correction
 
     captured: dict = {}

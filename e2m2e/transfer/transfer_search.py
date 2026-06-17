@@ -30,11 +30,22 @@ from tqdm.auto import tqdm
 
 
 class _AggregatePbarWithSlot:
-    """共享总进度：转发 update/postfix，加锁并加槽位前缀。"""
+    """共享总进度条代理：把多 worker 的更新转发到同一个 tqdm 进度条，加锁并加槽位前缀。
+
+    用于多线程并行搜索时，将各 worker 的进度汇总到单行总进度条，
+    避免多行 tqdm 在终端中刷屏。
+    """
 
     __slots__ = ("_inner", "_lock", "_slot")
 
     def __init__(self, inner: Any, lock: threading.Lock | None, slot: int) -> None:
+        """初始化代理。
+
+        Args:
+            inner: 底层 tqdm 进度条对象。
+            lock: 线程锁；``None`` 时不加锁（单线程场景）。
+            slot: worker 槽位编号，用于前缀标识。
+        """
         self._inner = inner
         self._lock = lock
         self._slot = slot
@@ -55,16 +66,16 @@ class _AggregatePbarWithSlot:
             self._inner.set_postfix_str(merged, refresh=refresh)
 
 
+from ..core.cr3bp_system import CR3BP_System  # noqa: E402
 from ..core.dynamics import CR3BP_Dynamics  # noqa: E402
 from ..core.orbit import Orbit  # noqa: E402
-from ..core.cr3bp_system import CR3BP_System  # noqa: E402
+from .config import TransferOptimizationResult  # noqa: E402
+from .propulsion import ImpulsivePropulsion  # noqa: E402
 from .search_config import SearchConfig  # noqa: E402
 from .transfer_optimization import (  # noqa: E402
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
 )
-from .config import TransferOptimizationResult  # noqa: E402
-from .propulsion import ImpulsivePropulsion  # noqa: E402
 
 # 100 km 换算为 CR3BP 无量纲单位：用于判断轨迹-轨道最近距离是否"足够近"
 DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / CR3BP_System.EARTH_MOON_DISTANCE_KM
@@ -181,7 +192,7 @@ class TransferSearch:
         return self
 
     def set_parallel_backend(self, backend: str) -> TransferSearch:
-        """设置并行后端：``processes``（默认，多进程）或 ``threads``（多线程）。"""
+        """设置并行后端：``processes`` （默认，多进程）或 ``threads`` （多线程）。"""
         b = backend.strip().lower()
         if b not in ("processes", "threads"):
             raise ValueError("parallel_backend 须为 'processes' 或 'threads'")

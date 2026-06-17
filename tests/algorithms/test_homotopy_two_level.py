@@ -1,23 +1,7 @@
-"""TDD: two-level inner method in correct_with_homotopy.
+"""correct_with_homotopy 两层内方法测试。
 
-Issue #241 acceptance criteria:
-- inner_method="two_level" is supported and reuses
-  HomotopyEphemerisDynamics + base_bodies/lambda_steps validation +
-  inner_method="homotopy" guard + lambda-step orchestration.
-- Per lambda step, TwoLevelMultipleShooting.correct(...) replaces
-  MultipleShooting.correct(...).
-- The two-level inner dynamics is still pure ephemeris (J2000, ET sec,
-  km, km/s) — no CR3BP, no coordinate transformation.
-- Aggregated result for the two-level path:
-    converged = final step's converged
-    iterations = sum of (outer_iterations) per step
-    max_residual = final step's final_position_residual
-    residual_history = flattened position residual history
-    velocity_residual = final step's final_velocity_residual
-    velocity_residual_history = flattened velocity residual history
-    t_patch/state_patch = final step's t_patch/state_patch
-- Standard, two_level, and standard-homotopy paths coexist without
-  interference.
+验证 TwoLevelMultipleShooting 替代、聚合结果语义、
+以及失败路径处理。
 """
 
 from __future__ import annotations

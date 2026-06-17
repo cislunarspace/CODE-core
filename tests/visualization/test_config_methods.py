@@ -1,4 +1,7 @@
-"""Cover apply_rcparams and get_cmap on PlotConfig."""
+"""PlotConfig.apply_rcparams 与 get_cmap 测试。
+
+验证字体参数设置与色表获取。
+"""
 
 import matplotlib
 

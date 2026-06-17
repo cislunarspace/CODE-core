@@ -1,4 +1,7 @@
-"""ImpulsiveBurn / FiniteBurn 单元测试。"""
+"""ImpulsiveBurn / FiniteBurn 单元测试。
+
+覆盖冻结拷贝、零推力、常值推力、固定/可调用方向与归一化。
+"""
 
 import dataclasses
 

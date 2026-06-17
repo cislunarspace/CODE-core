@@ -1,10 +1,6 @@
-"""
-Period Validation Tests for Differential Correction
+"""微分修正周期合理性验证测试。
 
-Tests for the period validation feature that rejects converged solutions
-with invalid periods (T < 1e-6) to prevent convergence to invalid solutions.
-
-Reference: Commit 584c44d - fix: 添加周期合理性验证防止收敛到无效解
+验证无效周期被拒绝、终止原因记录与修正量历史追踪。
 """
 
 

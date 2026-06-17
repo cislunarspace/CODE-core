@@ -12,7 +12,6 @@ import numpy as np
 
 from ..mbse.data.enums import TransferType
 
-
 DU = 3.84405000e5
 
 

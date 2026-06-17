@@ -1,10 +1,6 @@
-"""
-Continuation Step Tracking and Sorting Tests
+"""Continuation 步数跟踪与排序测试。
 
-Tests for the continuation_step metadata tracking and sorting feature that ensures
-orbits are ordered by step number from the seed orbit (0, 1, -1, 2, -2, ...).
-
-Reference: Commit 071cd09 - feat(continuation): 添加轨道延拓步数跟踪与排序功能
+验证延拓步数元数据、按绝对值排序与统计信息。
 """
 
 

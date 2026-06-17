@@ -197,7 +197,7 @@ class ConicalShadowModel(ShadowModel):
 
         从 ``system`` 读取传播原点与 SPICE，查询太阳及各遮挡体相对原点的 J2000
         位置，调用纯几何 ``_body_flux_factor`` 与 ``_combine_body_fluxes``。
-        要求传播坐标系为惯性系（轴旋转矩阵为单位阵）。
+        要求参考系为惯性系（轴旋转矩阵为单位阵）。
         """
         _cs, spice, origin = require_inertial_frame(system, t)
         sc_pos = np.asarray(state, dtype=float)[:3]

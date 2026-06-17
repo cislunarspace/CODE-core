@@ -1,4 +1,7 @@
-"""Tests for the Rust integrator extension."""
+"""Rust 扩展积分器模块测试。
+
+覆盖模块导入、RK 步进符号与步长非正校验。
+"""
 
 import math
 

@@ -1,8 +1,6 @@
-"""SolarRadiationPressure × ConicalShadowModel 纯集成测试（免 SPICE）。
+"""SolarRadiationPressure × ConicalShadowModel 纯集成测试。
 
-验证阴影模型输出 ∈ [0, 1] 正确调制 SRP 加速度。两个纯函数的合成契约。
-系统感知路径（``compute_acceleration`` 内部调用 ``shadow.flux_factor``）
-由 ``test_srp_transform.py`` 覆盖。
+验证阴影输出正确调制 SRP 加速度。
 """
 
 from __future__ import annotations

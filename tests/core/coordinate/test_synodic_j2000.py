@@ -1,35 +1,6 @@
-"""
-需求: CR3BP 旋转系 ↔ J2000 惯性系 坐标转换 (Layer 1c)
+"""CR3BP 旋转系 ↔ J2000 惯性系坐标转换测试（Layer 1c）。
 
-e2m2e 需要实现 CR3BP 旋转系 (synodic frame) 与 J2000 惯性系之间的坐标转换，
-以支持将 CR3BP 中计算的轨道转换到高精度星历模型。
-
-功能要求:
-  1. synodic → J2000: 将 CR3BP 旋转系状态转换到 J2000 惯性系
-  2. J2000 → synodic: 将 J2000 惯性系状态转换到 CR3BP 旋转系
-  3. 使用 SPICE 获取瞬时旋转矩阵（基于天体实际位置）
-  4. 速度转换包含 Coriolis 项
-  5. 支持批量转换（多个时间点）
-
-转换算法 (synodic → J2000):
-  1. 将无量纲 CR3BP 时间转换为 ET: t_et = et0 + t_syn * t_c
-  2. 用 SPICE 获取月球在 J2000 下的位置 r_m2 和速度 v_m2
-  3. 计算瞬时特征长度 l_c = |r_m2|
-  4. 构造旋转矩阵:
-     e1 = r_m2 / |r_m2|  (x 轴指向月球)
-     e3 = (r_m2 × v_m2) / |r_m2 × v_m2|  (z 轴为轨道法线)
-     e2 = e3 × e1  (y 轴完成右手系)
-  5. 有量纲化: r_dim = r_syn * l_c, v_dim = v_syn * l_c / t_c
-  6. 原点平移（如果 CR3BP 以某天体为中心）
-  7. 旋转: state_j2000 = R @ state_dim
-
-参考实现:
-  SEMpy synodic_j2000.py 中的 synodic_to_j2000 和 j2000_to_synodic
-  注意: SEMpy 的 CR3BP 以质心为原点, Moon 在 (1-mu, 0, 0) 处
-
-依赖:
-  Layer 1a (SPICEManager)
-  CR3BP_System (已有)
+覆盖初始化、单向/双向转换、批量转换与往返一致性。
 """
 
 import numpy as np
@@ -162,7 +133,9 @@ class TestSynodicToJ2000:
         r_spice = np.linalg.norm(spice_moon[:3])
         assert_allclose(r_transform, r_spice, rtol=0.01)
 
-    def test_different_times_different_positions(self, spice_syn_j2000, reference_et, dro_synodic_state):
+    def test_different_times_different_positions(
+        self, spice_syn_j2000, reference_et, dro_synodic_state
+    ):
         """不同 CR3BP 时刻转换到 J2000 应给出不同位置"""
         state_t0 = spice_syn_j2000.synodic_to_j2000(
             state_syn=dro_synodic_state, t_syn=0.0, et0=reference_et
@@ -240,8 +213,12 @@ class TestSynodicJ2000RoundTrip:
         spice_state = spice_syn_j2000.spice.get_body_state(
             target="MOON", et=reference_et, frame="J2000", observer="EARTH"
         )
-        state_syn = spice_syn_j2000.j2000_to_synodic(state_j2000=spice_state, t_syn=0.0, et0=reference_et)
-        state_back = spice_syn_j2000.synodic_to_j2000(state_syn=state_syn, t_syn=0.0, et0=reference_et)
+        state_syn = spice_syn_j2000.j2000_to_synodic(
+            state_j2000=spice_state, t_syn=0.0, et0=reference_et
+        )
+        state_back = spice_syn_j2000.synodic_to_j2000(
+            state_syn=state_syn, t_syn=0.0, et0=reference_et
+        )
         assert_allclose(state_back, spice_state, atol=1e-3)
 
 

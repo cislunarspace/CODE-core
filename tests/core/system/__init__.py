@@ -1,1 +1,2 @@
-"""Tests for e2m2e.core.system module"""
+"""e2m2e.core.system 模块测试包。
+"""

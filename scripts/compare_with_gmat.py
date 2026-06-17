@@ -74,10 +74,7 @@ def _parse_gmat_report(path: Path) -> dict[str, npt.NDArray[Any]]:
 
     # 检测表头行：GMAT WriteHeaders=true 时第一行是列名
     header = lines[0].strip()
-    if "UTCGregorian" in header:
-        data_lines = lines[1:]
-    else:
-        data_lines = lines
+    data_lines = lines[1:] if "UTCGregorian" in header else lines
 
     utc_list: list[str] = []
     states: list[list[float]] = []
@@ -103,7 +100,9 @@ def _utc_to_et(utc_strings: npt.NDArray[Any], spice: Any) -> npt.NDArray[np.floa
     return np.array([spice.utc_to_et(str(s)) for s in utc_strings], dtype=float)
 
 
-def _state_to_elements(state: npt.NDArray[np.floating], et: float, mu: float) -> npt.NDArray[np.floating]:
+def _state_to_elements(
+    state: npt.NDArray[np.floating], et: float, mu: float
+) -> npt.NDArray[np.floating]:
     """用 spiceypy.oscltx 提取经典轨道根数。"""
     import spiceypy
 
@@ -149,7 +148,9 @@ def _propagate_e2m2e(
     while project_root.name != "" and not (project_root / "kernels").is_dir():
         project_root = project_root.parent
     if not (project_root / "kernels").is_dir():
-        raise FileNotFoundError(f"Could not find kernels directory from {output_dir} or {Path.cwd()}")
+        raise FileNotFoundError(
+            f"Could not find kernels directory from {output_dir} or {Path.cwd()}"
+        )
     kernel_dir = project_root / "kernels"
 
     spice = SPICEManager()

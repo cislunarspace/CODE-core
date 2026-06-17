@@ -1,4 +1,7 @@
-"""Cover uncovered branches in SPICEManager without requiring real kernels."""
+"""SPICEManager 未覆盖分支测试（无需真实内核）。
+
+覆盖内核文件缺失、GM 缓存、闰秒内核搜索。
+"""
 
 from unittest.mock import patch
 

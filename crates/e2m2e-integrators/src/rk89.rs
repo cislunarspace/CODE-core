@@ -1,25 +1,22 @@
-//! RungeKutta89 tableau (Verner 9(8), 16 stages).
+//! RungeKutta89 表（Verner 9(8)，16 级）。
 //!
-//! Only the coefficient table lives here — the shared step logic is in
-//! [`crate::butcher::explicit_rk_step`].
+//! 仅系数表存放于此 —— 共享步进逻辑在 [`crate::butcher::explicit_rk_step`]。
 //!
-//! # Source
-//! Coefficients transcribed verbatim from GMAT R2026a
-//! `src/base/propagator/RungeKutta89.cpp::SetCoefficients()` (line 152), which
-//! declares `RungeKutta(16, 9)` — 16 stages, 9th-order solution with 8th-order
-//! embedded error control. GMAT stores the time nodes `ai`, the RK matrix
-//! `bij`, the 9th-order weights `cj`, and the error-estimate coefficients `ee`
-//! (where `ee = cj - cj_hat`). The 8th-order embedded weights `cj_hat` are
-//! reconstructed here as `b_star = cj - ee` and verified by the `ee_consistency`
-//! test against GMAT's `ee` literal. The √6 terms are characteristic of
-//! Verner's family of methods.
+//! # 来源
+//! 系数逐字转录自 GMAT R2026a
+//! `src/base/propagator/RungeKutta89.cpp::SetCoefficients()`（第 152 行），
+//! 其中声明 `RungeKutta(16, 9)` —— 16 级，9 阶主解，8 阶嵌入误差控制。
+//! GMAT 存储时间节点 `ai`、RK 矩阵 `bij`、9 阶权重 `cj` 以及误差估计系数 `ee`
+//!（`ee = cj - cj_hat`）。本文的 8 阶嵌入权重 `cj_hat` 由 `b_star = cj - ee`
+//! 重建，并通过 `ee_consistency` 测试与 GMAT 的 `ee` 字面量核对。
+//! √6 项为 Verner 方法族特征。
 
 use crate::butcher::ButcherTable;
 
-/// sqrt(6.0), matching GMAT's `Real rt6 = sqrt(6.0)`.
+/// sqrt(6.0)，与 GMAT `Real rt6 = sqrt(6.0)` 一致。
 const RT6: f64 = 2.449489742783178; // sqrt(6.0), matches GMAT `Real rt6 = sqrt(6.0)`
 
-/// RungeKutta89 (Verner 9(8)): 16 stages, order 9, embedded order 8.
+/// RungeKutta89 (Verner 9(8))：16 级，主阶 9，嵌入阶 8。
 pub const RK89_TABLE: ButcherTable = ButcherTable::new(
     16,
     9,

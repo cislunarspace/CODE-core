@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -33,16 +33,19 @@ class NotSerializableError(TypeError):
 
 # --- 嵌套依赖：大气模型 ---
 
+_ATMOS_SERIALIZERS: dict[type, Any] = {}
+
+
 def _serialize_exponential_atmosphere(atm: ExponentialAtmosphere) -> dict[str, Any]:
+    """把指数大气模型序列化为参数字典。"""
     return {"f107": atm.f107, "ap": atm.ap}
 
 
-_ATMOS_SERIALIZERS: dict[type, Any] = {
-    ExponentialAtmosphere: _serialize_exponential_atmosphere,
-}
+_ATMOS_SERIALIZERS[ExponentialAtmosphere] = _serialize_exponential_atmosphere
 
 
 def _serialize_atmosphere(atm: AtmosphereModel) -> dict[str, Any]:
+    """把大气模型序列化为 ``{type, params}`` 字典。"""
     serializer = _ATMOS_SERIALIZERS.get(type(atm))
     if serializer is None:
         raise NotSerializableError(
@@ -52,6 +55,7 @@ def _serialize_atmosphere(atm: AtmosphereModel) -> dict[str, Any]:
 
 
 def _build_atmosphere(config: dict[str, Any]) -> AtmosphereModel:
+    """按配置字典构造大气模型。"""
     builder = _ATMOS_BUILDERS.get(config["type"])
     if builder is None:
         raise ValueError(
@@ -62,6 +66,7 @@ def _build_atmosphere(config: dict[str, Any]) -> AtmosphereModel:
 
 
 def _build_exponential_atmosphere(params: dict[str, Any]) -> ExponentialAtmosphere:
+    """从参数字典构造指数大气模型。"""
     return ExponentialAtmosphere(**params)
 
 
@@ -73,6 +78,7 @@ _ATMOS_BUILDERS: dict[str, Any] = {
 # --- 嵌套依赖：阴影模型 ---
 
 def _serialize_conical_shadow(shadow: ConicalShadowModel) -> dict[str, Any]:
+    """把圆锥阴影模型序列化为参数字典。"""
     return {
         "bodies": list(shadow.bodies),
         "radii": shadow.radii,
@@ -85,6 +91,7 @@ _SHADOW_SERIALIZERS: dict[type, Any] = {
 
 
 def _serialize_shadow(shadow: ShadowModel) -> dict[str, Any]:
+    """把阴影模型序列化为 ``{type, params}`` 字典。"""
     serializer = _SHADOW_SERIALIZERS.get(type(shadow))
     if serializer is None:
         raise NotSerializableError(
@@ -94,6 +101,7 @@ def _serialize_shadow(shadow: ShadowModel) -> dict[str, Any]:
 
 
 def _build_conical_shadow(params: dict[str, Any]) -> ConicalShadowModel:
+    """从参数字典构造圆锥阴影模型。"""
     return ConicalShadowModel(**params)
 
 
@@ -103,6 +111,7 @@ _SHADOW_BUILDERS: dict[str, Any] = {
 
 
 def _build_shadow(config: dict[str, Any]) -> ShadowModel:
+    """按配置字典构造阴影模型。"""
     builder = _SHADOW_BUILDERS.get(config["type"])
     if builder is None:
         raise ValueError(
@@ -115,6 +124,7 @@ def _build_shadow(config: dict[str, Any]) -> ShadowModel:
 # --- 单力模型序列化器：type(实例) -> params dict ---
 
 def _serialize_gravity_field(force: GravityField) -> dict[str, Any]:
+    """把球谐重力场力模型序列化为参数字典。"""
     return {
         "body": force.body,
         "degree": force.degree,
@@ -125,6 +135,7 @@ def _serialize_gravity_field(force: GravityField) -> dict[str, Any]:
 
 
 def _serialize_drag_model(force: DragModel) -> dict[str, Any]:
+    """把大气阻力力模型序列化为参数字典。"""
     return {
         "body": force.body,
         "cd": force.cd,
@@ -135,6 +146,7 @@ def _serialize_drag_model(force: DragModel) -> dict[str, Any]:
 
 
 def _serialize_srp(force: SolarRadiationPressure) -> dict[str, Any]:
+    """把太阳光压力模型序列化为参数字典。"""
     return {
         "area": force.area,
         "mass": force.mass,
@@ -150,21 +162,25 @@ def _serialize_srp(force: SolarRadiationPressure) -> dict[str, Any]:
 # to_config 据此反向。用户手写 lambda 无标记 → NotSerializableError。
 
 def _build_thrust_profile(config: dict[str, Any]) -> Callable[[float], float]:
+    """按配置字典构造推力剖面可调用对象。"""
     kind = config["kind"]
     if kind == "constant":
         thrust = float(config["thrust"])
 
-        def profile(t: float, _thrust: float = thrust) -> float:
+        def constant_profile(t: float, _thrust: float = thrust) -> float:
             return _thrust
 
-        profile._e2m2e_config_kind = ("constant", {"kind": "constant", "thrust": thrust})
-        return profile
+        cast(Any, constant_profile)._e2m2e_config_kind = (
+            "constant",
+            {"kind": "constant", "thrust": thrust},
+        )
+        return constant_profile
     if kind == "pulse":
         t_start = float(config["t_start"])
         t_end = float(config["t_end"])
         thrust = float(config["thrust"])
 
-        def profile(
+        def pulse_profile(
             t: float,
             _t_start: float = t_start,
             _t_end: float = t_end,
@@ -172,15 +188,16 @@ def _build_thrust_profile(config: dict[str, Any]) -> Callable[[float], float]:
         ) -> float:
             return _thrust if _t_start <= t <= _t_end else 0.0
 
-        profile._e2m2e_config_kind = (
+        cast(Any, pulse_profile)._e2m2e_config_kind = (
             "pulse",
             {"kind": "pulse", "t_start": t_start, "t_end": t_end, "thrust": thrust},
         )
-        return profile
+        return pulse_profile
     raise ValueError(f"unknown thrust_profile kind {kind!r}")
 
 
 def _serialize_thrust_profile(profile: Callable[[float], float]) -> dict[str, Any]:
+    """把推力剖面可调用对象序列化为配置字典。"""
     kind_info = getattr(profile, "_e2m2e_config_kind", None)
     if kind_info is None:
         raise NotSerializableError(
@@ -192,6 +209,7 @@ def _serialize_thrust_profile(profile: Callable[[float], float]) -> dict[str, An
 
 
 def _build_direction(config: dict[str, Any]) -> Any:
+    """按配置字典构造推力方向。"""
     kind = config["kind"]
     if kind == "fixed":
         return [float(v) for v in config["vector"]]
@@ -199,6 +217,7 @@ def _build_direction(config: dict[str, Any]) -> Any:
 
 
 def _serialize_direction(direction: Any) -> dict[str, Any]:
+    """把推力方向序列化为配置字典。"""
     # 固定向量：按类型识别（FiniteBurn 把固定向量存成 ndarray 或 list）。
     if callable(direction):
         kind_info = getattr(direction, "_e2m2e_config_kind", None)
@@ -214,6 +233,7 @@ def _serialize_direction(direction: Any) -> dict[str, Any]:
 
 
 def _serialize_finite_burn(force: FiniteBurn) -> dict[str, Any]:
+    """把连续推力力模型序列化为参数字典。"""
     params: dict[str, Any] = {
         "mass": force.mass,
         "thrust_profile": _serialize_thrust_profile(force.thrust_profile),
@@ -225,6 +245,7 @@ def _serialize_finite_burn(force: FiniteBurn) -> dict[str, Any]:
 
 
 def _serialize_relativistic_correction(force: RelativisticCorrection) -> dict[str, Any]:
+    """把相对论修正力模型序列化为参数字典。"""
     return {
         "central_body": force.central_body,
         "primary_body": force.primary_body,
@@ -264,16 +285,19 @@ def serialize_force(force: PhysicalModel) -> dict[str, Any]:
 # --- 单力模型构造器：type 名 -> PhysicalModel ---
 
 def _build_gravity_field(params: dict[str, Any]) -> GravityField:
+    """从参数字典构造球谐重力场力模型。"""
     return GravityField(**params)
 
 
 def _build_drag_model(params: dict[str, Any]) -> DragModel:
+    """从参数字典构造大气阻力力模型。"""
     built = dict(params)
     built["atmosphere"] = _build_atmosphere(built["atmosphere"])
     return DragModel(**built)
 
 
 def _build_srp(params: dict[str, Any]) -> SolarRadiationPressure:
+    """从参数字典构造太阳光压力模型。"""
     built = dict(params)
     if built.get("shadow") is not None:
         built["shadow"] = _build_shadow(built["shadow"])
@@ -281,6 +305,7 @@ def _build_srp(params: dict[str, Any]) -> SolarRadiationPressure:
 
 
 def _build_finite_burn(params: dict[str, Any]) -> FiniteBurn:
+    """从参数字典构造连续推力力模型。"""
     built = dict(params)
     built["thrust_profile"] = _build_thrust_profile(built["thrust_profile"])
     built["direction"] = _build_direction(built["direction"])
@@ -288,6 +313,7 @@ def _build_finite_burn(params: dict[str, Any]) -> FiniteBurn:
 
 
 def _build_relativistic_correction(params: dict[str, Any]) -> RelativisticCorrection:
+    """从参数字典构造相对论修正力模型。"""
     return RelativisticCorrection(**params)
 
 

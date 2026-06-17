@@ -1,14 +1,6 @@
-"""
-首次可行性字段（first_intersection_*, first_min_distance_*）单元测试。
+"""首次可行性字段单元测试。
 
-覆盖 #71 引入的改动：
-- ``_compute_distance_series`` 返回完整的每步距离序列与最近 orbit 索引序列。
-- ``_compute_min_distance`` 保持旧 3 元组签名（薄包装）。
-- ``search()`` 主循环写入 4 个新字段。
-
-测试均不跑积分，直接构造合成轨迹/轨道数据 + 直接调用 `_compute_distance_series`
-或 mock `_forward_integrate` 后调 `search_single_departure_point`，以保证测试
-与具体动力学解耦。
+覆盖 _compute_distance_series 完整距离序列与 search 新字段写入。
 """
 
 from __future__ import annotations

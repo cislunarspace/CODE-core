@@ -1,7 +1,6 @@
-"""地球潮汐修正测试(Slice 10' / issue #108)。
+"""地球潮汐修正测试（Slice 10 / issue #108）。
 
-迁移 GMAT HarmonicGravity 的固体潮 + 极潮 + tide-free/zero-tide 约定。
-精度要求低,测试目标是覆盖迁移路径 + sanity check 量级。
+覆盖固体潮 Step1/Step2、极潮与 tide-free/zero-tide 约定。
 """
 
 import numpy as np
@@ -13,7 +12,6 @@ from e2m2e.core.forces.earth_tide import (
     solid_tide_step1,
     solid_tide_step2,
 )
-
 
 # 物理常量(量级参考用)
 _MOON_MU = 4902.8001  # km³/s²

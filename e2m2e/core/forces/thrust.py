@@ -1,13 +1,29 @@
-"""推力与机动模型。
+r"""推力与机动模型。
 
-Slice 6 实现：
-- ``ImpulsiveBurn``：瞬时 Δv 机动事件（不继承 ``PhysicalModel``），
-  由 :meth:`ForceModel.propagate_maneuvers` 在 epoch 处中断传播并施加。
-- ``FiniteBurn``：连续推力加速度（``PhysicalModel``），后续测试加入。
+提供两种推力/机动表示：
 
-演进路径（对应 GMAT R2026a 三层架构）：本模块合并了 GMAT 的
-``FiniteBurn``（配置）与 ``FiniteThrust``（力模型），未引入 ``Thruster``
-硬件层；VNB/LVLH burn 坐标系推迟到 Slice 12。
+- ``ImpulsiveBurn``：瞬时 Δv 机动事件，由 ``ForceModel.propagate_maneuvers``
+  在指定 epoch 处中断传播并施加速度增量。
+- ``FiniteBurn``：连续推力加速度力模型，继承 ``PhysicalModel``，
+  在传播过程中实时参与加速度计算。
+
+``FiniteBurn`` 合并了 GMAT R2026a 的 ``FiniteBurn``（配置）与
+``FiniteThrust``（力模型）两层，未引入 ``Thruster`` 硬件层。
+推力大小与方向解耦：``thrust_profile(t)`` 返回标量推力（N），
+``direction`` 给出方向向量（固定向量或随状态更新的可调用），
+内部归一化为单位向量。质量为常量（不支持推进剂消耗）。
+
+``direction_frame`` 支持 ``"VNB"``、``"LVLH"`` 与 ``None``：
+
+- ``None``：``direction`` 直接在传播（惯性）坐标系内解释。
+- ``"VNB"``：``direction`` 在 VNB 坐标系下解释，其中
+  :math:`V = v/\\|v\\|` (速度方向)，
+  :math:`N = (r \\times v)/\\|r \\times v\\|` (角动量方向)，
+  :math:`B = V \\times N` (副法向)。
+- ``"LVLH"``：``direction`` 在 LVLH 坐标系下解释，其中
+  :math:`R = r/\\|r\\|` (径向)，
+  :math:`V = v/\\|v\\|` (沿迹方向)，
+  :math:`N = R \\times V` (轨道面法向)。
 """
 
 from __future__ import annotations
@@ -29,14 +45,14 @@ class ImpulsiveBurn:
     :meth:`e2m2e.core.forces.force_model.ForceModel.propagate_maneuvers`
     在 ``epoch`` 处施加 ``state[3:6] += delta_v``。
 
-    VNB/LVLH burn frame 推迟到 Slice 12（届时加 ``frame`` 字段，转换走
+    VNB/LVLH burn 坐标系暂不支持（届时加 ``frame`` 字段，转换走
     :meth:`CoordinateSystem.transform_vector`，对应 GMAT
     ``Burn::ConvertDeltaVToInertial`` 的 ``coincident=true`` 纯旋转）。
 
     Args:
         epoch: 施加时刻，SPICE et 秒，与 ``ForceModel.propagate`` 的
             ``t_span`` 一致。
-        delta_v: 速度增量，传播坐标系，形状 ``(3,)``。
+        delta_v: 速度增量，参考系，形状 ``(3,)``。
     """
 
     epoch: float
@@ -52,20 +68,21 @@ class ImpulsiveBurn:
 class FiniteBurn(PhysicalModel):
     """连续推力加速度力模型。
 
-    合并了 GMAT R2026a 的 ``FiniteBurn``（配置）与 ``FiniteThrust``（力模型），
-    未引入 ``Thruster`` 硬件层（见模块 docstring 的演进路径）。
-
     推力大小与方向解耦：``thrust_profile(t)`` 返回标量推力（牛顿），
     ``direction`` 给出方向向量（固定向量或随状态更新的可调用），
-    内部归一化为单位向量。质量为常量（Slice 6 不支持推进剂消耗）。
+    内部归一化为单位向量。质量为常量（不支持推进剂消耗）。
 
     ``direction_frame`` 支持 ``"VNB"``、``"LVLH"`` 与 ``None``：
+
     - ``None``：``direction`` 直接在传播（惯性）坐标系内解释。
     - ``"VNB"``：``direction`` 在 VNB 坐标系下解释，其中
-      V = v/|v|（速度方向），N = (r x v)/|r x v|（角动量方向），
-      B = V x N（副法向）。
+      :math:`V = v/\\|v\\|` (速度方向)，
+      :math:`N = (r \\times v)/\\|r \\times v\\|` (角动量方向)，
+      :math:`B = V \\times N` (副法向)。
     - ``"LVLH"``：``direction`` 在 LVLH 坐标系下解释，其中
-      R = r/|r|（径向），V = v/|v|（沿迹方向），N = R x V（轨道面法向）。
+      :math:`R = r/\\|r\\|` (径向)，
+      :math:`V = v/\\|v\\|` (沿迹方向)，
+      :math:`N = R \\times V` (轨道面法向)。
 
     Args:
         thrust_profile: ``t -> thrust``（N，标量；``0`` 表示关机）。

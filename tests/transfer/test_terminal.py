@@ -1,6 +1,6 @@
 """终端条件模块测试。
 
-覆盖 TerminalCondition 抽象基类及 OrbitTerminal、StateTerminal 具体实现。
+覆盖 TerminalCondition 抽象基类与 OrbitTerminal、StateTerminal 具体实现。
 """
 
 from __future__ import annotations
@@ -8,10 +8,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.transfer.terminal import OrbitTerminal, StateTerminal, TerminalCondition
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System
 from e2m2e.core.orbit import Orbit
-
+from e2m2e.transfer.terminal import OrbitTerminal, StateTerminal, TerminalCondition
 
 # =============================================================================
 # TerminalCondition 抽象基类

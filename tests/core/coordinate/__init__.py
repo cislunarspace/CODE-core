@@ -1,1 +1,2 @@
-"""Tests for e2m2e.core.coordinate module"""
+"""e2m2e.core.coordinate 模块测试包。
+"""

@@ -1,4 +1,7 @@
-"""ForceModel 二体传播测试。"""
+"""ForceModel 二体传播测试。
+
+验证点质量圆轨道一个周期闭合与能量守恒。
+"""
 
 import numpy as np
 

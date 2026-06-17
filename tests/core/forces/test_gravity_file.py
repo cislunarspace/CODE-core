@@ -1,11 +1,13 @@
-"""重力场文件解析测试。"""
+"""重力场文件解析测试。
 
-import io
+覆盖 .gfc 头/系数读取、dot 行、默认 GM/R 与异常处理。
+"""
+
 
 import numpy as np
 import pytest
 
-from e2m2e.core.forces.gravity_file import GravityFileData, load_gfc_file
+from e2m2e.core.forces.gravity_file import load_gfc_file
 
 
 def _minimal_gfc_content():

@@ -2,9 +2,7 @@ e2m2e.algorithms package
 =========================
 
 .. automodule:: e2m2e.algorithms
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :no-index:
 
 Submodules
 ----------
@@ -45,9 +43,7 @@ e2m2e.algorithms.strategies package
 -------------------------------------
 
 .. automodule:: e2m2e.algorithms.strategies
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :no-index:
 
 e2m2e.algorithms.strategies.base module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

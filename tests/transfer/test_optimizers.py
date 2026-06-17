@@ -1,9 +1,7 @@
-def test_module_does_not_export_nlp_result():
-    """NLPOptimizationResult 不应再从 e2m2e.transfer 公共导出。"""
-    import e2m2e.transfer
+"""Transfer 优化器适配与导出测试。
 
-    assert not hasattr(e2m2e.transfer, "NLPOptimizationResult")
-
+验证 optimizer adapter 调用与 NLPOptimizationResult 不再公开导出。
+"""
 import numpy as np
 import pytest
 
@@ -16,18 +14,28 @@ from e2m2e.transfer.transfer_optimization import (
 )
 
 
+def test_module_does_not_export_nlp_result():
+    """NLPOptimizationResult 不应再从 e2m2e.transfer 公共导出。"""
+    import e2m2e.transfer
+
+    assert not hasattr(e2m2e.transfer, "NLPOptimizationResult")
+
+
 @pytest.fixture
 def earth_moon_system():
+    """地月 CR3BP 系统 fixture。"""
     return CR3BP_System(mu=0.012150585, primary="earth", secondary="moon")
 
 
 @pytest.fixture
 def dynamics(earth_moon_system):
+    """CR3BP 动力学 fixture。"""
     return CR3BP_Dynamics(system=earth_moon_system)
 
 
 @pytest.fixture
 def dummy_orbit(earth_moon_system):
+    """占位轨道 fixture，用于优化器构造。"""
     orbit = Orbit(
         states=np.zeros((10, 6)),
         times=np.linspace(0, 10, 10),
@@ -39,6 +47,7 @@ def dummy_orbit(earth_moon_system):
 
 @pytest.fixture
 def optimizer(dynamics, dummy_orbit):
+    """预配置的 DROTRONLPOptimizer fixture。"""
     departure_state = np.array([0.8, 0.0, 0.0, 0.0, 0.5, 0.0])
     return DROTRONLPOptimizer(
         system=dynamics.system,

@@ -1,4 +1,7 @@
-"""标准原点（CelestialBodyOrigin / InertialOrigin）测试。"""
+"""标准原点（CelestialBodyOrigin / InertialOrigin）测试。
+
+验证 body 属性大写规范化。
+"""
 
 from __future__ import annotations
 

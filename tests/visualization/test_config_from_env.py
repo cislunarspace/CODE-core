@@ -1,10 +1,6 @@
 """PlotConfig.from_env 类方法测试。
 
-测试环境变量驱动的 PlotConfig 构造行为：
-- 环境变量缺失 → 字段默认值
-- 环境变量有效 → 应用到 primary/secondary_body_icon_scale
-- 环境变量无效（非数字、≤ 0）→ 静默回退到默认值，不抛异常
-- overrides 优先级高于环境变量
+验证环境变量缺失、有效值、非数字/非正回退与 overrides 优先级。
 """
 
 from __future__ import annotations

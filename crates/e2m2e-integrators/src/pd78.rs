@@ -1,21 +1,20 @@
-//! Prince-Dormand 8(7)13M tableau (Dormand & Prince, 1981; Hairner-Wanner
-//! *Solving Ordinary Differential Equations I*, 2nd ed., p.195-196).
+//! Prince-Dormand 8(7)13M 表（Dormand & Prince, 1981；Hairner-Wanner
+//! *Solving Ordinary Differential Equations I*, 2nd ed., p.195-196）。
 //!
-//! Only the coefficient table lives here — the shared step logic is in
-//! [`crate::butcher::explicit_rk_step`].
+//! 仅系数表存放于此 —— 共享步进逻辑在 [`crate::butcher::explicit_rk_step`]。
 //!
-//! # Source
-//! Coefficients transcribed verbatim from GMAT R2026a
-//! `src/base/propagator/PrinceDormand78.cpp::SetCoefficients()` (line 141),
-//! which declares `RungeKutta(13, 8)` — 13 stages, 8th-order solution with
-//! 7th-order embedded error control. Cross-checked against Hairner-Wanner.
+//! # 来源
+//! 系数逐字转录自 GMAT R2026a
+//! `src/base/propagator/PrinceDormand78.cpp::SetCoefficients()`（第 141 行），
+//! 其中声明 `RungeKutta(13, 8)` —— 13 级，8 阶主解，7 阶嵌入误差控制。
+//! 与 Hairner-Wanner 交叉核对。
 
 use crate::butcher::ButcherTable;
 
-/// Prince-Dormand 8(7)13M: 13 stages, order 8, embedded order 7.
+/// Prince-Dormand 8(7)13M：13 级，主阶 8，嵌入阶 7。
 ///
-/// Field mapping from GMAT: `ai`→`c`, `bij`→`a` (strictly lower triangular),
-/// `cj`→`b` (8th-order weights), `cjhat`→`b_star` (7th-order embedded weights).
+/// 字段映射自 GMAT：`ai`→`c`，`bij`→`a`（严格下三角），
+/// `cj`→`b`（8 阶权重），`cjhat`→`b_star`（7 阶嵌入权重）。
 pub const PD78_TABLE: ButcherTable = ButcherTable::new(
     13,
     8,

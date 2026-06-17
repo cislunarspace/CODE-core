@@ -1,4 +1,8 @@
-"""Cover uncovered branches in CoordinateTransformation."""
+"""CoordinateTransformation 未覆盖分支测试。
+
+覆盖缓存淘汰、无科氏力分支、mu 为 None 路径、
+未实现变换对与字符串表示。
+"""
 
 import numpy as np
 import pytest

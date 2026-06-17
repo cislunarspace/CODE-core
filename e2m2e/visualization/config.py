@@ -2,8 +2,6 @@
 
 定义 PlotConfig 配置类，统一管理 matplotlib 的字体、颜色、尺寸等绘图参数。
 包含自动检测系统 DPI 缩放的逻辑，确保高分辨率屏幕上的正确显示。
-
-v4.0 MBSE 重构：从 dataclass 迁移到 Pydantic BaseModel，获得运行时验证。
 """
 
 from __future__ import annotations

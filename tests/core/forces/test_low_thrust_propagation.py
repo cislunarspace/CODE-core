@@ -1,4 +1,8 @@
-"""低推力传播端到端验证。"""
+"""低推力传播端到端验证。
+
+验证半长轴变化率与解析公式误差 < 5%、30 天螺旋轨道演化、
+以及 FiniteBurn 配置 round-trip。
+"""
 
 import numpy as np
 import pytest
@@ -213,7 +217,14 @@ def test_low_thrust_config_round_trip(earth_ephemeris_system):
     from e2m2e.core.forces.force_config import build_force
 
     burn_original = FiniteBurn(
-        thrust_profile=build_force("FiniteBurn", {"thrust_profile": {"kind": "constant", "thrust": thrust}, "direction": {"kind": "fixed", "vector": [0.0, 1.0, 0.0]}, "mass": mass}).thrust_profile,
+        thrust_profile=build_force(
+            "FiniteBurn",
+            {
+                "thrust_profile": {"kind": "constant", "thrust": thrust},
+                "direction": {"kind": "fixed", "vector": [0.0, 1.0, 0.0]},
+                "mass": mass,
+            },
+        ).thrust_profile,
         direction=[0.0, 1.0, 0.0],
         mass=mass,
     )

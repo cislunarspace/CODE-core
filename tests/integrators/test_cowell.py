@@ -1,4 +1,7 @@
-"""Tests for the Cowell (Störmer-Cowell) 8th-order double-integration integrator."""
+"""Cowell（Störmer-Cowell）八阶二重积分器测试。
+
+覆盖 J2 归一化加速度、启动历史与位置传播。
+"""
 
 import numpy as np
 import pytest

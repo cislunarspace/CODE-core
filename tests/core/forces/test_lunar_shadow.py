@@ -1,12 +1,6 @@
 """月影测试 —— 验收 #5：圆锥阴影模型支持地球 + 月球双遮挡体。
 
-用真实 SPICE 星历（de440s）构造 cislunar 场景：SC 置于月球反日侧低轨，月球
-应投下本影。三联断言锁定"阴影源是月球而非地球"，从而用真实几何（非合成
-factor）验证多遮挡体路径端到端可运行。
-
-References:
-    - GMAT R2026a ``ShadowState`` / ``SolarRadiationPressure::GetShadowStateFromAllBodies``
-    - GMAT GMT-6543 多遮挡体合成规范
+用真实 SPICE 星历验证多遮挡体路径端到端可运行。
 """
 
 from __future__ import annotations

@@ -1,4 +1,7 @@
-"""Tests for the PD78 (Dormand-Prince 8(7)13M) integrator."""
+"""PD78（Dormand-Prince 8(7)13M）积分器测试。
+
+覆盖谐振子、圆轨道二体解析精度。
+"""
 
 import math
 

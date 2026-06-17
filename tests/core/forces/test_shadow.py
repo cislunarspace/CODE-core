@@ -1,8 +1,6 @@
 """ConicalShadowModel 圆锥阴影模型测试。
 
-纯几何路径（``_body_flux_factor`` / ``_combine_body_fluxes``）免 SPICE，与
-``test_drag.py`` 范式一致。系统感知路径（``flux_factor(t, state, system)``）
-由 ``test_srp_transform.py`` 同级覆盖。
+覆盖纯几何路径：全光照、深本影与半影中间值。
 """
 
 from __future__ import annotations

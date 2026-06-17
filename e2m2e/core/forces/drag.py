@@ -25,7 +25,7 @@ class DragModel(PhysicalModel):
     """大气阻力力模型。
 
     在 ITRF（地固系）中计算大气密度与相对速度，求得阻力加速度后转换回
-    传播坐标系。大气在 ITRF 中静止，因此相对速度等于航天器 ITRF 速度。
+    参考系。大气在 ITRF 中静止，因此相对速度等于航天器 ITRF 速度。
 
     力模型接口约定：输入状态与输出加速度均在 ``system.coordinate_system``
     下；本类内部负责转换到 ITRF 并转回。
@@ -165,7 +165,7 @@ class DragModel(PhysicalModel):
         vector: npt.NDArray[np.floating],
         system: Any,
     ) -> npt.NDArray[np.floating]:
-        """把 ITRF 中的加速度矢量转换回传播坐标系。"""
+        """把 ITRF 中的加速度矢量转换回参考系。"""
         input_cs = self._get_itrf_coordinate_system(system)
         try:
             return system.coordinate_system.transform_vector(

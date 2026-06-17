@@ -1,12 +1,11 @@
-"""地球潮汐修正(迁移 GMAT HarmonicGravity)。
+"""地球潮汐修正。
 
-迁移 GMAT R2026a ``src/base/forcemodel/harmonic/HarmonicGravity.cpp`` 的潮汐
-修正能力,基于 IERS Technical Note 32(Conventions 2003)。本模块只做纯计算,
-返回 ΔC/ΔS 系数修正,由 ``GravityField`` 在球谐展开前叠加(AC1-AC4)。
+对地球球谐系数做潮汐修正，返回 ΔC/ΔS 系数，由 ``GravityField`` 在球谐展开前叠加。
+包含固体潮（Step 1 频率无关 + Step 2 频率相关）、极潮（固体极潮 + Desai 海洋极潮）
+与永久潮汐修正（tide-free / zero-tide 约定）。
 
-单位约定:位置 km、GM km³/s²、参考半径 km,与 ``gravity_field.py`` 一致。
-GMAT 源码用混单位(pos=meters、FieldRadius=km)凑量级,本实现用一致单位
-重写,物理公式等价。
+公式与系数取自 IERS Technical Note 32 (Conventions 2003)，与 GMAT R2026a
+``HarmonicGravity`` 对齐。单位一致：位置 km、GM km³/s²、参考半径 km。
 """
 
 from __future__ import annotations
@@ -150,9 +149,9 @@ _TABLE_63C: npt.NDArray[np.floating] = np.array(
 def _delaunay_args_and_gmst(jd: float) -> tuple[npt.NDArray[np.floating], float]:
     """计算 5 个 Delaunay 幅角(度)与 GMST(度)。
 
-    迁移 GMAT IncrementEarthTide 的幅角段(IERS TN32 p.48/60)。GMAT 注释
-    "ignore difference between TDB and TDT",本实现用 et→JD(TDB)近似,
-    框架层面可接受(潮汐是日级振荡)。
+    公式取自 IERS TN32 p.48/60，与 GMAT IncrementEarthTide 幅角段对齐。
+    用 et→JD(TDB) 近似，忽略 TDB 与 TDT 的秒级差异（潮汐是日级振荡，
+    该近似在框架层面可接受）。
 
     Args:
         jd: 儒略日(TDB 近似)。
@@ -167,11 +166,41 @@ def _delaunay_args_and_gmst(jd: float) -> tuple[npt.NDArray[np.floating], float]
 
     # 5 个 Delaunay 幅角(度)
     F = np.zeros(5, dtype=float)
-    F[0] = (134.96340251e3 + 1717915923.2178 * t + 31.8792 * t2 + 0.051635 * t3 - 0.00024470 * t4) / 3600.0
-    F[1] = (357.52910918e3 + 129596581.0481 * t - 0.5532 * t2 + 0.000136 * t3 - 0.00001149 * t4) / 3600.0
-    F[2] = (93.27209062e3 + 1739527262.8478 * t - 12.7512 * t2 - 0.001037 * t3 + 0.00000417 * t4) / 3600.0
-    F[3] = (297.85019547e3 + 1602961601.2090 * t - 6.3706 * t2 + 0.006593 * t3 - 0.00003169 * t4) / 3600.0
-    F[4] = (125.04455501e3 - 6962890.5431 * t + 7.4722 * t2 + 0.007702 * t3 - 0.00005939 * t4) / 3600.0
+    F[0] = (
+        134.96340251e3
+        + 1717915923.2178 * t
+        + 31.8792 * t2
+        + 0.051635 * t3
+        - 0.00024470 * t4
+    ) / 3600.0
+    F[1] = (
+        357.52910918e3
+        + 129596581.0481 * t
+        - 0.5532 * t2
+        + 0.000136 * t3
+        - 0.00001149 * t4
+    ) / 3600.0
+    F[2] = (
+        93.27209062e3
+        + 1739527262.8478 * t
+        - 12.7512 * t2
+        - 0.001037 * t3
+        + 0.00000417 * t4
+    ) / 3600.0
+    F[3] = (
+        297.85019547e3
+        + 1602961601.2090 * t
+        - 6.3706 * t2
+        + 0.006593 * t3
+        - 0.00003169 * t4
+    ) / 3600.0
+    F[4] = (
+        125.04455501e3
+        - 6962890.5431 * t
+        + 7.4722 * t2
+        + 0.007702 * t3
+        - 0.00005939 * t4
+    ) / 3600.0
 
     # GMST(IERS p.60):先算秒,再 /240 转度
     gmst_sec = 67310.54841 + 3164400184.812866 * t + 0.093104 * t2 - 6.2e-06 * t3
@@ -181,10 +210,10 @@ def _delaunay_args_and_gmst(jd: float) -> tuple[npt.NDArray[np.floating], float]
 
 
 def solid_tide_step2(et: float) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-    """固体潮 Step 2(频率相关,迁移 GMAT IncrementEarthTide 的 Delaunay 幅角段)。
+    """固体潮 Step 2（频率相关）。
 
-    只影响 (2,0)/(2,1)/(2,2)。用 5 个 Delaunay 幅角 + GMST + Table6.3a/b/c。
-    量级 ~1e-10(GMAT ``freq_dep * 1e-12`` 缩放)。
+    只影响 (2,0)/(2,1)/(2,2)。用 5 个 Delaunay 幅角 + GMST + Table 6.3a/b/c。
+    量级 ~1e-10（GMAT ``freq_dep * 1e-12`` 缩放）。
 
     Args:
         et: SPICE et 秒(past J2000)。
@@ -266,25 +295,25 @@ def solid_tide_step1(
     mu_earth: float,
     r_earth: float,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-    """固体潮 Step 1(频率无关,迁移 GMAT IncrementSolidTide)。
+    """固体潮 Step 1（频率无关）。
 
-    对单个扰动天体(Sun 或 Moon)计算 ΔC/ΔS。调用方需对 Sun、Moon 各调一次
-    并累加(GMAT IncrementEarthTide 内部调 IncrementSolidTide 两次)。
+    对单个扰动天体（Sun 或 Moon）计算 ΔC/ΔS。调用方需对 Sun、Moon 各调一次
+    并累加（GMAT IncrementEarthTide 内部调 IncrementSolidTide 两次）。
 
-    公式(IERS TN32 eqn 1, p.59;eqn 4, p.60):
+    公式（IERS TN32 eqn 1, p.59；eqn 4, p.60）：
         ΔC[n][m] += K[n][m]/(2n+1) · (μ_p/μ_e) · (R_e/r)^(n+1) · P_nm(sinφ) · cos(mλ)
         ΔS[n][m] += K[n][m]/(2n+1) · (μ_p/μ_e) · (R_e/r)^(n+1) · P_nm(sinφ) · sin(mλ)
-    n=2 时额外(弹性 Love 数,3 阶位移):
+    n=2 时额外（弹性 Love 数，3 阶位移）：
         ΔC[4][m] += KPlus[m]/5 · ... ; ΔS[4][m] += KPlus[m]/5 · ...
 
     Args:
-        pos_perturber: 扰动天体在 ITRF 下的位置,形状 (3,),单位 km。
-        mu_perturber: 扰动天体 GM,km³/s²。
-        mu_earth: 地球 GM,km³/s²。
-        r_earth: 地球参考半径,km。
+        pos_perturber: 扰动天体在 ITRF 下的位置，形状 (3,)，单位 km。
+        mu_perturber: 扰动天体 GM，km³/s²。
+        mu_earth: 地球 GM，km³/s²。
+        r_earth: 地球参考半径，km。
 
     Returns:
-        (DeltaC, DeltaS),各为 5×5 数组。
+        (DeltaC, DeltaS)，各为 5×5 数组。
     """
     pos = np.asarray(pos_perturber, dtype=float)
     r = np.linalg.norm(pos)
@@ -327,10 +356,10 @@ def pole_tide(
     xp: float,
     yp: float,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-    """极潮(固体极潮 IERS p.65 + Desai 海洋极潮 TN32 §6.3)。
+    """极潮（固体极潮 IERS p.65 + Desai 海洋极潮 TN32 §6.3）。
 
-    迁移 GMAT IncrementEarthTide 的极潮段。只影响 (2,1)。对齐 GMAT
-    ``ETide::SolidAndPole`` 档(固体极潮 + 海洋极潮都做);``Solid`` 档不做极潮。
+    只影响 (2,1)。对齐 GMAT ``ETide::SolidAndPole`` 档（固体极潮 + 海洋极潮都做）；
+    ``Solid`` 档不做极潮。
 
     公式:
         ym2000 = (JD - JD_J2000) / 365.25
@@ -378,24 +407,23 @@ def permanent_tide_correction(
     a_sun: float,
     a_moon: float,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-    """永久潮汐修正(IERS TN32 Step 3,时间平均,AC3)。
+    """永久潮汐修正（IERS TN32 Step 3，时间平均）。
 
-    zero-tide 系数约定下,``GravityField`` 在叠加固体潮后减去此值——因为
-    zero-tide 系数已含永久潮汐,运行时若再加完整固体潮(含永久分量)会重复。
+    zero-tide 系数约定下，``GravityField`` 在叠加固体潮后减去此值——因为
+    zero-tide 系数已含永久潮汐，运行时若再加完整固体潮（含永久分量）会重复。
 
-    用 ``solid_tide_step1`` 在 Sun/Moon 半长轴距离 + 赤道(零纬度,时间平均
-    近似)计算。GMAT 把永久潮汐处理放在系数加载 setup;e2m2e 用运行时减除,
-    公式等价(GMAT 注释 "moved to model setup, correction to TideFree
-    coefficients" 的本意)。
+    用 ``solid_tide_step1`` 在 Sun/Moon 半长轴距离 + 赤道（零纬度，时间平均
+    近似）计算。GMAT 把永久潮汐处理放在系数加载 setup；e2m2e 用运行时减除，
+    公式等价。
 
     Args:
-        mu_sun, mu_moon: Sun/Moon GM,km³/s²。
-        mu_earth: 地球 GM,km³/s²。
-        r_earth: 地球参考半径,km。
-        a_sun, a_moon: Sun/Moon 轨道半长轴,km(时间平均距离近似)。
+        mu_sun, mu_moon: Sun/Moon GM，km³/s²。
+        mu_earth: 地球 GM，km³/s²。
+        r_earth: 地球参考半径，km。
+        a_sun, a_moon: Sun/Moon 轨道半长轴，km（时间平均距离近似）。
 
     Returns:
-        (DeltaC, DeltaS),各为 5×5 数组。
+        (DeltaC, DeltaS)，各为 5×5 数组。
     """
     sun_pos = np.array([a_sun, 0.0, 0.0])
     moon_pos = np.array([a_moon, 0.0, 0.0])

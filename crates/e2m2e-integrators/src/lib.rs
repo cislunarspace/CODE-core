@@ -1,3 +1,10 @@
+//! e2m2e 积分器 crate：单步 Runge-Kutta、多步 Adams 与二阶 Cowell 的 Rust 实现，
+//! 通过 PyO3 暴露给 Python。
+//!
+//! 三种积分族共享同一入口风格：给定当前状态与右端项，推进一步并返回
+//! 误差估计与步长建议。具体族的区别见 [`crate::butcher`]、[`crate::abm`]、
+//! [`crate::cowell`] 的模块文档。
+
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
@@ -14,7 +21,7 @@ use butcher::{explicit_rk_step, suggest_next_step};
 use multistep_methods::MultistepMethod;
 use rk_methods::RkMethod;
 
-/// Result of a single Runge-Kutta step.
+/// 单步 Runge-Kutta 的结果。
 #[pyclass(frozen, get_all)]
 #[derive(Clone, Debug)]
 pub struct StepResult {
@@ -34,8 +41,7 @@ impl StepResult {
     }
 }
 
-/// Result of a single multistep step. Carries the rolled history so the Python
-/// propagation loop can thread it into the next call.
+/// 单步多步的结果。携带滚动后的历史缓冲，供 Python 传播循环传入下一步调用。
 #[pyclass(frozen, get_all)]
 #[derive(Clone, Debug)]
 pub struct MultistepResult {
@@ -56,8 +62,8 @@ impl MultistepResult {
     }
 }
 
-/// Result of a single Cowell (Störmer-Cowell) step. `x_new` is the position
-/// only; the history mixes positions and accelerations (see `cowell_step`).
+/// 单步 Cowell (Störmer-Cowell) 的结果。`x_new` 仅含位置；
+/// 历史缓冲混合位置与加速度采样（见 `cowell_step`）。
 #[pyclass(frozen, get_all)]
 #[derive(Clone, Debug)]
 pub struct CowellResult {
@@ -78,6 +84,7 @@ impl CowellResult {
     }
 }
 
+/// 调用 Python 右端项回调，校验返回值长度。
 fn call_python_rhs(f: &Bound<PyAny>, n: usize, t: f64, y: &[f64]) -> PyResult<Vec<f64>> {
     let py = f.py();
     let yi_list = PyList::new(py, y)?;
@@ -95,7 +102,7 @@ fn call_python_rhs(f: &Bound<PyAny>, n: usize, t: f64, y: &[f64]) -> PyResult<Ve
     Ok(vals)
 }
 
-/// Take a single explicit Runge-Kutta step.
+/// 执行一次显式 Runge-Kutta 单步。
 #[pyfunction]
 fn rk_step(
     method: RkMethod,
@@ -138,7 +145,7 @@ fn rk_step(
     Ok(StepResult { y_new, error, h_next })
 }
 
-/// Take a single multistep predictor-corrector step.
+/// 执行一次多步预测-校正单步。
 #[pyfunction]
 fn multistep_step(
     method: MultistepMethod,
@@ -203,12 +210,11 @@ fn multistep_step(
     })
 }
 
-/// Take a single Cowell (Störmer-Cowell) 8th-order step for x'' = a(t, x).
+/// 执行一次 Cowell (Störmer-Cowell) 8 阶单步，用于 x'' = a(t, x)。
 ///
-/// `history` = `[x_{n-1}, x_n, a_{n-7}, ..., a_n]` (10 vectors: 2 position
-/// samples + 8 acceleration samples, oldest first). `accel` evaluates a(t, x).
-/// Output is position only. Fixed step; changing `h` requires re-initialising
-/// the history.
+/// `history` = `[x_{n−1}, x_n, a_{n−7}, ..., a_n]`（10 个向量：2 个位置采样
+/// + 8 个加速度采样，由旧到新）。`accel` 计算 a(t, x)。
+/// 输出仅含位置。固定步长；改变 `h` 需重新初始化历史缓冲。
 #[pyfunction]
 fn cowell_step(
     t: f64,
@@ -270,12 +276,13 @@ fn cowell_step(
     })
 }
 
-/// A placeholder function to verify the FFI path works end-to-end.
+/// 占位函数，用于验证 FFI 路径端到端通畅。
 #[pyfunction]
 fn hello_integrators() -> PyResult<String> {
     Ok("hello from e2m2e-integrators".to_string())
 }
 
+/// PyO3 模块初始化函数，将 Rust 函数与类注册到 Python 模块。
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;

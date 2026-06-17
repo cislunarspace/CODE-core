@@ -1,39 +1,38 @@
-//! Adams-Bashforth-Moulton 4-step predictor-corrector (PECE).
+//! Adams-Bashforth-Moulton 4 步预测-校正（PECE）。
 //!
-//! 4th-order method: Adams-Bashforth predictor + Adams-Moulton corrector,
-//! with Milne error estimate `|19/270·(c−p)|`. Fixed-step — the history stores
-//! derivative samples at equal spacing `h`; changing `h` requires
-//! re-initialising the history (see `initialize_abm_history` on the Python side).
+//! 4 阶方法：Adams-Bashforth 预测器 + Adams-Moulton 校正器，
+//! 附带 Milne 误差估计 `|19/270·(c−p)|`。固定步长 —— 历史缓冲存储等间距 `h` 的导数采样；
+//! 改变 `h` 需要重新初始化历史缓冲（Python 侧见 `initialize_abm_history`）。
 //!
-//! # Source
-//! Weights transcribed verbatim from GMAT R2026a
-//! `src/base/propagator/AdamsBashforthMoulton.cpp::SetWeights()` (line 146),
-//! Milne factor `eeFactor = 19/270` from line 70.
+//! # 来源
+//! 权重逐字转录自 GMAT R2026a
+//! `src/base/propagator/AdamsBashforthMoulton.cpp::SetWeights()`（第 146 行），
+//! Milne 因子 `eeFactor = 19/270` 来自第 70 行。
 
-/// Adams-Bashforth 4-step predictor weights, oldest→newest
-/// (`history[0]·(−9/24) + … + history[3]·(55/24)`).
+/// Adams-Bashforth 4 步预测器权重，由旧到新
+/// (`history[0]·(−9/24) + … + history[3]·(55/24)`)。
 const PWEIGHTS: [f64; 4] = [-9.0 / 24.0, 37.0 / 24.0, -59.0 / 24.0, 55.0 / 24.0];
 
-/// Adams-Moulton 4-step corrector weights. `CWEIGHTS[0..2]` multiply
-/// `history[1..3]`; `CWEIGHTS[3]` multiplies the newly-evaluated `f(predictor)`.
+/// Adams-Moulton 4 步校正器权重。`CWEIGHTS[0..2]` 乘 `history[1..3]`；
+/// `CWEIGHTS[3]` 乘新求得的 `f(predictor)`。
 const CWEIGHTS: [f64; 4] = [1.0 / 24.0, -5.0 / 24.0, 19.0 / 24.0, 9.0 / 24.0];
 
-/// Milne error factor for 4th-order ABM (GMAT `eeFactor`).
+/// 4 阶 ABM 的 Milne 误差因子（GMAT `eeFactor`）。
 pub const EE_FACTOR: f64 = 19.0 / 270.0;
 
-/// Step count of the method (4-step → history holds 4 derivative samples).
+/// 方法步数（4 步 → 历史缓冲保存 4 个导数采样）。
 pub const ABM_STEPS: usize = 4;
 
-/// Embedded order used for step-size suggestion (Milne estimate is O(h⁵)).
+/// 用于步长建议的嵌入阶数（Milne 估计按此阶数缩放）。
 pub const ABM_EMBEDDED_ORDER: usize = 4;
 
-/// One ABM 4th-order predictor-corrector step (PECE).
+/// 一次 ABM 4 阶预测-校正步（PECE）。
 ///
-/// `history` must hold exactly [`ABM_STEPS`] derivative samples
-/// `[f_{n-3}, f_{n-2}, f_{n-1}, f_n]` (oldest first), each of length `y.len()`,
-/// at equal spacing `h`. Returns `(corrector, milne_error, rolled_history)`
-/// where `rolled_history = [f_{n-2}, f_{n-1}, f_n, f_{n+1}]` and
-/// `f_{n+1} = f(t+h, corrector)`.
+/// `history` 必须恰好保存 [`ABM_STEPS`] 个导数采样
+/// `[f_{n-3}, f_{n-2}, f_{n-1}, f_n]`（由旧到新），每个长度与 `y.len()` 相同，
+/// 等间距 `h`。返回 `(corrector, milne_error, rolled_history)`，
+/// 其中 `rolled_history = [f_{n-2}, f_{n-1}, f_n, f_{n+1}]`，
+/// `f_{n+1} = f(t+h, corrector)`。
 pub fn abm_step<F, E>(
     t: f64,
     y: &[f64],

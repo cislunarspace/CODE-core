@@ -17,13 +17,6 @@
   - z 轴与 x-y 平面正交
 
 所有量均采用无量纲化单位（距离单位 DU = 主天体间距，时间单位 TU 使主天体角速度为 1）。
-
-重构说明 (v4.0 MBSE)
---------------------
-采用 Template Method 模式统一传播逻辑：
-- 基类 ``Dynamics`` 拥有 ``propagate()`` 模板方法
-- 子类覆写 ``_get_eom_func()`` 和 ``_get_max_step()`` 钩子方法
-- 结果提取逻辑统一在基类中，保证 states 形状始终为 ``(n_points, 6)``
 """
 
 from __future__ import annotations
@@ -35,8 +28,8 @@ import numpy as np
 import numpy.typing as npt
 from scipy.integrate import solve_ivp
 
-from .potential import pseudo_potential_hessian
 from .cr3bp_system import CR3BP_System
+from .potential import pseudo_potential_hessian
 from .system import System
 
 if TYPE_CHECKING:
@@ -337,7 +330,11 @@ class CR3BP_Dynamics(Dynamics):
     等号左侧的 2ẏ、-2ẋ 项为科里奥利力（Coriolis），伪势能中
     已包含离心力项 x²/2 + y²/2。
 
+    Attributes:
+        system: CR3BP 系统对象，提供 mu 等系统常数与 Jacobi 常数计算。
     """
+
+    system: CR3BP_System
 
     def __init__(self, system: CR3BP_System) -> None:
         """初始化CR3BP动力学
@@ -410,7 +407,8 @@ class CR3BP_Dynamics(Dynamics):
         """计算 CR3BP 状态方程的雅可比矩阵 A(t)
 
         A(t) 是 6x6 矩阵，满足 dΦ/dt = A(t)·Φ。
-        结构为：
+        结构如下::
+
             | 0₃ₓ₃  I₃ₓ₃ |    位置方程的雅可比：∂(v)/∂(r,v) = [0, I]
             | U_ij   Ω   |    速度方程的雅可比：∂(a)/∂(r,v) = [U, Ω]
 

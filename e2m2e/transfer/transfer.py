@@ -1,6 +1,7 @@
-"""DRO-RO 转移轨迹优化模块
+"""DRO-RO 转移轨迹优化接口
 
-提供基于 NLP 方法（Cui et al. 2025）的简化转移轨迹优化接口。
+把网格搜索得到的初值交由 NLP 优化器（Cui et al. 2025）求解，得到一条满足位置连续性
+和速度平行性约束的转移轨迹。
 """
 
 from __future__ import annotations
@@ -25,23 +26,8 @@ DU = 3.84405000e5
 class Transfer:
     """DRO-RO 转移轨迹优化器
 
-    提供基于 NLP 方法的 DRO（远距逆行轨道）到 RO（直线轨道）转移轨迹优化简化接口。
-
-    Example:
-        >>> from e2m2e.transfer import Transfer, TransferConfig
-        >>> from e2m2e.core import CR3BP_System, CR3BP_Dynamics
-        >>> from scripts.utils.common import MU
-        >>>
-        >>> system = CR3BP_System(mu=MU, primary="earth", secondary="moon")
-        >>> dynamics = CR3BP_Dynamics(system=system)
-        >>> transfer = Transfer(dynamics)
-        >>> transfer.set_orbit(start=dro_orbit, end=ro_orbit)
-        >>> result = transfer.optimize(
-        ...     initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
-        ...     alpha_range=(0.5, 2.5),
-        ...     use_relaxed_velocity=True,
-        ...     velocity_angle_tol=0.05,
-        ... )
+    在端点条件（出发/到达）给定后，调用 NLP 优化器求解从 DRO（远距逆行轨道）
+    到 RO（共振轨道）的转移轨迹。
     """
 
     def __init__(
@@ -163,13 +149,22 @@ class Transfer:
             TransferOptimizationResult，包含优化详情
         """
         if self._departure is None or self._arrival is None:
-            raise ValueError("Must call set_departure() / set_arrival() or set_orbit() before optimize()")
+            raise ValueError(
+                "Must call set_departure() / set_arrival() "
+                "or set_orbit() before optimize()"
+            )
 
         # 当前仅支持 OrbitTerminal 类型的终端条件
-        if not isinstance(self._departure, OrbitTerminal) or not isinstance(self._arrival, OrbitTerminal):
+        if not isinstance(self._departure, OrbitTerminal) or not isinstance(
+            self._arrival, OrbitTerminal
+        ):
             raise NotImplementedError(
                 "Only OrbitTerminal is supported for departure and arrival at this time"
             )
+
+        # 此处 departure/arrival 终端已确认为 OrbitTerminal，对应轨道必非 None
+        assert self._departure_orbit is not None
+        assert self._arrival_orbit is not None
 
         # 若用户未指定覆盖值，使用配置中的默认值
         if use_relaxed_velocity is None:
@@ -227,7 +222,14 @@ class Transfer:
         return self._result
 
     def _build_optimizer_adapter(self, optimizer: DROTRONLPOptimizer):
-        """根据配置构造 SciPy 或 COPT adapter。"""
+        """按配置选择 SciPy 或 COPT adapter 包装底层优化器。
+
+        Args:
+            optimizer: NLP 优化器实例。
+
+        Returns:
+            ``TransferOptimizer`` 子类实例。
+        """
         if self._config.use_copt and _HAVE_COPT:
             return COPTTransferOptimizer(
                 optimizer,
@@ -236,17 +238,27 @@ class Transfer:
         return SciPyTransferOptimizer(optimizer)
 
     def _sample_departure_state_from_dro(self) -> np.ndarray:
-        """从 DRO 采样出发点状态，返回 DRO 轨道的第一个状态点。"""
+        """取出发轨道的首个状态点作为出发点状态。
+
+        Returns:
+            形状 ``(6,)`` 的状态副本。
+
+        Raises:
+            ValueError: 出发轨道尚未设置时。
+        """
         if self._departure_orbit is None:
             raise ValueError("Departure orbit not set")
 
         return self._departure_orbit.states[0].copy()
 
     def _get_ro_period(self) -> float:
-        """获取 RO 轨道周期
+        """获取到达轨道的周期。
+
+        若到达轨道的 ``period`` 属性可用则直接取，否则回退为 ``times[-1] - times[0]``；
+        均不可用时返回默认值 10.0。
 
         Returns:
-            RO 周期；不可用时返回默认值 10.0
+            到达轨道周期（无量纲时间）。
         """
         if self._arrival_orbit is None:
             return 10.0

@@ -1,4 +1,8 @@
-"""Shared helpers for integrator tests."""
+"""积分器测试共享辅助函数。
+
+提供解析开普勒传播、J2 右端项、
+LEO 初始状态与 RK 自适应传播封装。
+"""
 
 import numpy as np
 

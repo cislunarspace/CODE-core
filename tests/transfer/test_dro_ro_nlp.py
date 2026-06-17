@@ -1,6 +1,6 @@
-"""Tests for the DROTRONLPOptimizer module.
+"""DROTRONLPOptimizer 模块测试。
 
-Converted from script-style (sys.path.insert, print, main()) to pytest.
+覆盖优化器初始化、变量边界与约束构建。
 """
 
 import numpy as np
@@ -8,12 +8,12 @@ import pytest
 
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System
 from e2m2e.core.orbit import Orbit
+from e2m2e.mbse.data.enums import TransferType
 from e2m2e.transfer import TransferConfig, TransferOptimizationResult
 from e2m2e.transfer.transfer_optimization import (
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
 )
-from e2m2e.mbse.data.enums import TransferType
 
 # =============================================================================
 # Fixtures

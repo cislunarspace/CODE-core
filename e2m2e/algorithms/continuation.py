@@ -1,8 +1,6 @@
-"""
-轨道族延拓算法模块
+"""轨道族延拓算法模块
 
-提供自然参数延拓和伪弧长延拓方法，用于生成轨道族。
-包括Halo轨道、Lyapunov轨道等的生成功能。
+提供自然参数延拓和伪弧长延拓方法，用于沿轨道族参数方向逐步生成相邻轨道。
 """
 
 from __future__ import annotations
@@ -13,6 +11,7 @@ import numpy as np
 
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit, OrbitFamily
+from .differential_correction import DifferentialCorrection
 from .halo_initial_guess import compute_halo_initial_guess
 
 logger = logging.getLogger(__name__)
@@ -181,7 +180,7 @@ class Continuation:
 
         # 终止条件
         self.max_orbits = 100
-        self.termination_reason = None
+        self.termination_reason: str | None = None
 
     def natural_continuation(
         self,
@@ -445,20 +444,21 @@ class Continuation:
         """伪弧长延拓（对应 MATLAB ``continuation_PAL_CR3BP``，plane=13 / XZ 对称）
 
         自由变量 ``X = [rx, rz, vy, T/2]``，``Xdot = null(dF)``，PAL 约束
-        ``G = [F; (Xnew-X)·Xdot - DeltaS]``；内层用 ``Xnew`` 计算 ``F``（与 MATLAB 中
-        仅用固定 ``X`` 相比更一致）。每步后用微分修正闭合。
+        ``G = [F; (Xnew-X)·Xdot - ΔS]``；内层用 ``Xnew`` 计算 ``F``（与 MATLAB
+        中仅用固定 ``X`` 相比更一致）。每步后用微分修正闭合。
 
         Args:
-            seed_orbit: 种子轨道（Orbit对象）
-            n_orbits: 本支要生成的新轨道条数（与 MATLAB 中 ``N`` 一致）
-            step_size: 伪弧长步长 ``|DeltaS|``（正数；``direction`` 决定符号）
-            direction: ``positive`` 或 ``negative``（双侧延拓请调用两次或使用
-                ``halo_pseudo_arclength_continuation(..., direction='both')``）
-            dc_scheme: 见 ``Continuation`` 文档字符串
-            target_vector: 与 MATLAB ``TargetVector`` 对应的 0 基下标：``0=rx,1=rz,2=vy,3=T/2``
+            seed_orbit: 种子轨道（Orbit 对象）。
+            n_orbits: 本支要生成的新轨道条数（与 MATLAB 中 N 一致）。
+            step_size: 伪弧长步长 ΔS 的模长（正数；direction 决定符号）。
+            direction: 延拓方向，取 positive 或 negative；双侧延拓请调用两次，
+                或改用 halo_pseudo_arclength_continuation(direction='both')。
+            dc_scheme: 微分修正方案，见 Continuation 类文档字符串。
+            target_vector: 与 MATLAB TargetVector 对应的 0 基下标
+                （0=rx, 1=rz, 2=vy, 3=T/2）。
 
         Returns:
-            OrbitFamily: 仅含种子 + 本支新轨道（不重复添加种子）
+            OrbitFamily: 仅含种子与本支新轨道（不重复添加种子）。
         """
         dynamics = self.dynamics
 
@@ -536,7 +536,7 @@ class Continuation:
         # 动态步长(支持自适应缩减)
         current_step_size = float(step_size)
         # 记录终止原因(给调用方诊断)
-        self.termination_reason: str | None = None
+        self.termination_reason = None
 
         for n in range(n_orbits):
             if verbose and (n + 1) % 5 == 0:
@@ -1098,29 +1098,30 @@ class Continuation:
         对应 ``continuation_PAL_CR3BP`` + XZ 对称（``X = [rx,rz,vy,T/2]``），与
         ``examples/FAMILY_L1Halo_North.m`` 的 PAL 步一致。
 
-        微分修正：MATLAB 脚本在 PAL 后使用 ``type=1``（固定 ``x0``）。当前 Python 在 PAL
-        初值下 ``setup_halo_orbit_fixed_x0`` 易与 STM 牛顿耦合到非物理解，故默认
-        ``dc_scheme='adaptive'``（按 Δx/Δz 在 fixed x / fixed z 间切换，与原
-        ``pseudo_arclength_continuation`` 一致）。若需对齐 MATLAB 的 fixedX，可设
-        ``matlab_halo_type1``（失败时会自动再试 ``fixed_z0``）。
-        - ``DirectionalIncrement``、``TargetVector``、``TargetDirection`` 与脚本一致：
-          正向支 ``TargetVector=2``（``rz``）、``TargetDirection=+1``；负向支
-          ``TargetVector=1``（``rx``）、``TargetDirection=-1``（0 基下标见
-          ``pseudo_arclength_continuation``）。
+        微分修正：MATLAB 脚本在 PAL 后使用 ``type=1`` （固定 ``x0`` ）。当前 Python
+        在 PAL 初值下 ``setup_halo_orbit_fixed_x0`` 易与 STM 牛顿耦合到非物理解，
+        故默认 ``dc_scheme='adaptive'`` （按 Δx/Δz 在 fixed x / fixed z 间切换，
+        与原 ``pseudo_arclength_continuation`` 一致）。若需对齐 MATLAB 的 fixedX，
+        可设 ``matlab_halo_type1`` （失败时会自动再试 ``fixed_z0`` ）。
 
-        ``FAMILY_L1Halo_North.m`` 中正负支 ``DeltaS`` 不同（0.0045 与 0.009），可用
+        DirectionalIncrement、TargetVector、TargetDirection 与脚本一致：正向支
+        TargetVector=2 （rz）、TargetDirection=+1；负向支 TargetVector=1 （rx）、
+        TargetDirection=-1 （0 基下标见 ``pseudo_arclength_continuation`` ）。
+
+        ``FAMILY_L1Halo_North.m`` 中正负支 ΔS 不同（0.0045 与 0.009），可用
         ``step_size_negative`` 单独指定负向步长模长。
 
         Args:
-            seed_orbit: 已收敛的 Halo 种子轨道
-            n_orbits: 每一支的新轨道条数 ``N``（与 MATLAB 一致；``direction=both`` 时
-                正向、负向各生成 ``n_orbits`` 条）
-            step_size: 正向伪弧长步长 ``|DeltaS|``（默认 0.0045）
-            step_size_negative: 负向步长模长，默认与 ``step_size`` 相同
-            dc_scheme: ``matlab_halo_type1`` / ``matlab_halo_type2`` / ``adaptive``
+            seed_orbit: 已收敛的 Halo 种子轨道。
+            n_orbits: 每一支生成的新轨道条数 N；direction 为 both 时正向、负向
+                各生成 n_orbits 条。
+            step_size: 正向伪弧长步长 ΔS（默认 0.0045）。
+            step_size_negative: 负向步长模长，默认与 step_size 相同。
+            dc_scheme: 微分修正方案，取 matlab_halo_type1 / matlab_halo_type2 /
+                adaptive。
 
         Returns:
-            OrbitFamily: 种子 + 各支新轨道（无重复种子）
+            OrbitFamily: 种子与各支新轨道（不重复种子）。
         """
         libration_point = int(seed_orbit.parameters.get("libration_point", 1))
         halo_class = int(seed_orbit.parameters.get("halo_class", 0))

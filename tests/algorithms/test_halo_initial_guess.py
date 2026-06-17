@@ -1,20 +1,6 @@
-"""
-Halo initial guess module tests
+"""Halo 初始猜测模块测试。
 
-测试 halo_initial_guess.py 模块中的函数。覆盖：
-  - Richardson 三阶近似系数（compute_halo_coefficients）
-  - 解析近似（halo_third_order_approximation）
-  - 初始猜测生成（compute_halo_initial_guess）
-  - 模块导入路径（TestBackwardCompatibility）
-
-合并自原来的两个文件：
-  - test_analytical_halo.py：~30 个测试通过 `e2m2e.algorithms` 间接导入
-  - test_halo_initial_guess.py：~30 个测试直接导入 halo_initial_guess 模块
-两者 ~60% 重叠，合并后保留全部独有覆盖，去掉重复。
-
-References:
-    Richardson, D. L. (1980). Analytic construction of periodic orbits
-    about the collinear points. Celestial Mechanics, 22(3), 303-320.
+覆盖 Richardson 三阶近似系数、解析近似、初始猜测生成与向后兼容。
 """
 
 import numpy as np

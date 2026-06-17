@@ -498,19 +498,19 @@ class ForceModel(Dynamics):
         t_eval = np.unique(np.round(combined / 1e-14) * 1e-14)
         # Ensure monotonic and within bounds after rounding
         t_eval = np.clip(t_eval, t0, tf)
-        return t_eval
+        return np.asarray(t_eval, dtype=float)
 
     def _estimate_initial_step(
         self, y: npt.NDArray[np.floating], t0: float, tf: float
     ) -> float:
         """从初始状态估算初始步长。"""
-        r = np.linalg.norm(y[:3])
-        v = np.linalg.norm(y[3:])
+        r = float(np.linalg.norm(y[:3]))
+        v = float(np.linalg.norm(y[3:]))
         if r == 0 or v == 0:
             return 1e-6 * abs(tf - t0)
         # Rough orbital period estimate for central motion: 2*pi*r/v
         period = 2.0 * np.pi * r / v
-        return period / 100.0
+        return float(period / 100.0)
 
     def _raise_for_unsupported(
         self, with_stm: bool, with_jacobi: bool

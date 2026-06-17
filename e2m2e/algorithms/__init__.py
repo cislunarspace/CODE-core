@@ -13,11 +13,15 @@ if TYPE_CHECKING:
     from .ephemeris_correction import EphemerisCorrectionResult as EphemerisCorrectionResult
     from .ephemeris_correction_types import (
         PatchPointCorrector as PatchPointCorrector,
+    )
+    from .ephemeris_correction_types import (
         UnsupportedCorrectorMethodError as UnsupportedCorrectorMethodError,
     )
     from .multiple_shooting import MultipleShooting as MultipleShooting
     from .two_level_multiple_shooting import (
         TwoLevelMultipleShooting as TwoLevelMultipleShooting,
+    )
+    from .two_level_multiple_shooting import (
         TwoLevelMultipleShootingResult as TwoLevelMultipleShootingResult,
     )
 

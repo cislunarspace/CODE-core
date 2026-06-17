@@ -1,14 +1,7 @@
-"""TDD: integration test with real SPICE kernels.
+"""同伦修正真实 SPICE 内核集成测试。
 
-Issue #242 acceptance criteria:
-- Uses existing project SPICE fixtures (spice_kernel_path / spice_eph_dynamics).
-- Skips (does not fail) if no SPICE kernels are locally available.
-- Inputs are J2000 / ET seconds / km / km/s.
-- MVP scenario: full=Earth+Moon+Sun, base=Earth+Moon, lambda_steps=default.
-- Covers standard path (inner_method="standard") and (cost-permitting)
-  two-level path. Both via shared fixtures, no network downloads.
-- Validates aggregated result fields for the returned EphemerisCorrectionResult.
-- Final residual does not regress compared to the initial value.
+使用项目 SPICE fixture 验证 correct_with_homotopy 端到端运行，
+确认返回结果字段与残差不退化。
 """
 
 from __future__ import annotations
@@ -139,6 +132,7 @@ def test_homotopy_j2000_et_km_units_are_preserved(
     # Snapshot the input ranges
     pos_mag_in = float(np.max(np.linalg.norm(state_patch[:, :3], axis=1)))
     vel_mag_in = float(np.max(np.linalg.norm(state_patch[:, 3:], axis=1)))
+    del vel_mag_in  # 当前测试未直接断言速度幅值，但保留计算以备扩展
 
     result = correct_with_homotopy(
         dynamics=spice_eph_dynamics,

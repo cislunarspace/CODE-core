@@ -1,7 +1,6 @@
-"""Integration tests: StabilityAnalysis → FamilyPlotter.
+"""StabilityAnalysis → FamilyPlotter 集成测试。
 
-Verifies that stability values computed by algorithms.stability.StabilityAnalysis
-can be passed directly to FamilyPlotter plotting methods without errors.
+验证稳定性计算结果可直接传入绘图方法。
 """
 
 import matplotlib

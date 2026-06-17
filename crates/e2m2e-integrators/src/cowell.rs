@@ -1,56 +1,46 @@
-//! Cowell (Störmer-Cowell) 8th-order PECE for the second-order ODE x'' = a(t, x).
+//! Cowell (Störmer-Cowell) 8 阶 PECE，用于二阶 ODE x'' = a(t, x)。
 //!
-//! Double-integration multistep: integrates position directly from acceleration
-//! samples via the Störmer (explicit) predictor + Cowell (implicit) corrector,
-//! avoiding the first-order velocity equation. This is the form that pays off
-//! for orbital mechanics (high-order on position).
+//! 双重积分多步：通过 Störmer（显式）预测器 + Cowell（隐式）校正器，
+//! 直接由加速度采样积分位置，避免一阶速度方程。这种形式在轨道力学中收益明显
+//!（位置上的高阶精度）。
 //!
-//! # Order and back-difference form
-//! 8th-order non-summed Störmer-Cowell in backward-difference (BD) form:
-//! - predictor: `x_{n+1} = 2 x_n − x_{n-1} + h²·Σ_{j=0}^{7} λ_j·∇ʲa_n`
-//! - corrector: `x_{n+1} = 2 x_n − x_{n-1} + h²·Σ_{j=0}^{7} q_j·∇ʲa_{n+1}`
+//! # 阶数与后向差分形式
+//! 8 阶非求和 Störmer-Cowell，后向差分（BD）形式：
+//! - 预测器：`x_{n+1} = 2 x_n − x_{n-1} + h²·Σ_{j=0}^{7} λ_j·∇ʲa_n`
+//! - 校正器：`x_{n+1} = 2 x_n − x_{n-1} + h²·Σ_{j=0}^{7} q_j·∇ʲa_{n+1}`
 //!
-//! **Why 8 terms, not 7?** The corrector's global order is fixed by its leading
-//! truncation term `q_{k+1}·∇^{k+1}a` (LTE `O(h^{k+3})` → global order `k+1`).
-//! For a method truncating at index `k`, order = `k+1` *unless* the next
-//! coefficient is zero. The classic 4th-order Störmer-Cowell truncates at k=2
-//! (3 terms) yet reaches order 4 because **q_3 = 0** gives a free skip — the
-//! leading residual becomes q_4·∇⁴a. That lucky zero does **not** recur: q_7 =
-//! −19/6048 ≠ 0, so a 7-term method (k=6) is only order 7. Reaching order 8
-//! requires truncating at k=7 (8 terms), making the leading residual q_8·∇⁸a
-//! (LTE O(h¹⁰), global order 8). Verified empirically by the convergence test
-//! below (and by a term-sweep: 5→5, 6→6, 7→7, 8→8).
+//! **为何 8 项而非 7 项？** 校正器的全局阶数由其首项截断项 `q_{k+1}·∇^{k+1}a` 决定
+//!（局部截断误差 LTE `O(h^{k+3})` → 全局阶 `k+1`）。经典 4 阶 Störmer-Cowell
+//! 截断于 k=2（3 项），但因 **q_3 = 0** 而免费跳一级，首项残差变为 q_4·∇⁴a。
+//! 这一幸运零值不再复现：q_7 = −19/6048 ≠ 0，因此 7 项方法（k=6）只有 7 阶。
+//! 达到 8 阶需要截断于 k=7（8 项），使首项残差为 q_8·∇⁸a（LTE O(h¹⁰)，全局 8 阶）。
+//! 下方收敛测试（以及项数扫描：5→5、6→6、7→7、8→8）已实证验证。
 //!
-//! # History
-//! `history` = `[x_{n-1}, x_n, a_{n-7}, a_{n-6}, ..., a_n]` — 2 position samples
-//! followed by 8 acceleration samples (oldest first), 10 vectors of the position
-//! dimension. This mixed layout is why Cowell cannot share `multistep_step`'s
-//! history wire (pure derivative samples): a deviation from #107's original
-//! "reuse multistep_step" note, recorded in the issue.
+//! # 历史缓冲
+//! `history` = `[x_{n-1}, x_n, a_{n-7}, a_{n-6}, ..., a_n]` —— 2 个位置采样
+//! 后接 8 个加速度采样（由旧到新），共 10 个位置维度的向量。这种混合布局
+//! 是 Cowell 无法复用 `multistep_step` 历史缓冲（纯导数采样）的原因。
 //!
-//! # Limitations
-//! - RHS is `a(t, x)` (acceleration depending on position). Velocity-dependent
-//!   forces (atmospheric drag) need a different formulation.
-//! - Output is position only (`x_new`); recover velocity by finite differences.
-//! - Fixed step; changing `h` requires re-initialising the history.
+//! # 限制
+//! - 右端项为 `a(t, x)`（仅位置相关的加速度）。速度相关力（如大气阻力）需另作处理。
+//! - 输出仅含位置（`x_new`）；速度需由有限差分恢复。
+//! - 固定步长；改变 `h` 需重新初始化历史缓冲。
 //!
-//! # Source
-//! Coefficients transcribed from Berry, *A Variable-Step Double-Integration
-//! Multi-Step Integrator*, Virginia Tech PhD thesis, 2004, §2.3.5:
-//! - corrector `q_i` — eq 2.56 (`L²` expansion, `q_i = Σ_k c_k c_{i-k}` where
-//!   `c` are the Adams-Moulton coefficients of eq 2.39);
-//! - predictor `λ_i` — eq 2.60 (`EL²` expansion), satisfying `λ_i = Σ_{k≤i} q_k`.
-//! Cross-checked against Montenbruck & Gill, *Satellite Orbits* §3.3, and
-//! Henrici, *Discrete Variable Methods in ODEs*. The 4th-order truncation
-//! (λ_0..λ_2 / q_0..q_2) expands to the textbook ordinate weights
-//! predictor [13/12, −2/12, 1/12] and corrector [1/12, 10/12, 1/12].
+//! # 来源
+//! 系数转录自 Berry, *A Variable-Step Double-Integration Multi-Step Integrator*,
+//! Virginia Tech PhD thesis, 2004, §2.3.5：
+//! - 校正器 `q_i` —— 式 2.56（`L²` 展开，`q_i = Σ_k c_k c_{i-k}`，其中 `c`
+//!   为式 2.39 的 Adams-Moulton 系数）；
+//! - 预测器 `λ_i` —— 式 2.60（`EL²` 展开），满足 `λ_i = Σ_{k≤i} q_k`。
+//! 与 Montenbruck & Gill, *Satellite Orbits* §3.3 及 Henrici,
+//! *Discrete Variable Methods in ODEs* 交叉核对。4 阶截断（λ_0..λ_2 / q_0..q_2）
+//! 展开后即为教科书坐标权重：预测器 [13/12, −2/12, 1/12]、校正器 [1/12, 10/12, 1/12]。
 //!
-//! ⚠️ Berry's PDF (web extraction) misreads several `q_i` as 0 — q_5 (actually
-//! −1/240) and q_7 (actually −19/6048). All q_i here were recomputed via the
-//! convolution `q_i = Σ_k c_k c_{i-k}` and cross-locked against the λ table by
-//! the consistency test `λ_i = Σ_{k≤i} q_k` below.
+//! ⚠️ Berry 的 PDF（网页提取）将若干 `q_i` 误读为 0 —— q_5（实际 −1/240）
+//! 与 q_7（实际 −19/6048）。本文所有 q_i 均通过卷积 `q_i = Σ_k c_k c_{i-k}`
+//! 重新计算，并通过一致性测试 `λ_i = Σ_{k≤i} q_k` 与 λ 表交叉锁定。
 
-/// Störmer (explicit) predictor backward-difference coefficients λ_0..λ_7.
+/// Störmer（显式）预测器后向差分系数 λ_0..λ_7。
 const PRED_LAMBDA: [f64; 8] = [
     1.0,
     0.0,
@@ -62,7 +52,7 @@ const PRED_LAMBDA: [f64; 8] = [
     275.0 / 4032.0,
 ];
 
-/// Cowell (implicit) corrector backward-difference coefficients q_0..q_7.
+/// Cowell（隐式）校正器后向差分系数 q_0..q_7。
 const CORR_Q: [f64; 8] = [
     1.0,
     -1.0,
@@ -74,18 +64,18 @@ const CORR_Q: [f64; 8] = [
     -19.0 / 6048.0,
 ];
 
-/// Number of acceleration backpoints the method consumes per step.
+/// 方法每步消耗的加速度回溯点数。
 pub const COWELL_N_ACCEL: usize = 8;
-/// Total history length: 2 position samples + 8 acceleration samples.
+/// 历史缓冲总长度：2 个位置采样 + 8 个加速度采样。
 pub const COWELL_HISTORY_LEN: usize = 10;
-/// Order used for step-size suggestion (Milne estimate scales at this order).
+/// 用于步长建议的阶数（Milne 估计按此阶数缩放）。
 pub const COWELL_EMBEDDED_ORDER: usize = 8;
 
-/// `j`-th backward difference `∇ʲ` at the newest sample.
+/// 最新采样处的 `j` 阶后向差分 `∇ʲ`。
 ///
-/// `samples` are oldest-first; returns `Σ_{m=0}^{j} C(j,m)·(−1)^m·samples[k-m]`
-/// where `k = samples.len() − 1` is the newest index. The running binomial
-/// `C(j,m+1) = C(j,m)·(j−m)/(m+1)` avoids recomputing factorials.
+/// `samples` 由旧到新；返回 `Σ_{m=0}^{j} C(j,m)·(−1)^m·samples[k−m]`，
+/// 其中 `k = samples.len() − 1` 为最新索引。递推二项式
+/// `C(j,m+1) = C(j,m)·(j−m)/(m+1)` 避免重复计算阶乘。
 fn backward_diff(samples: &[Vec<f64>], j: usize) -> Vec<f64> {
     let k = samples.len() - 1;
     let n = samples[0].len();
@@ -101,12 +91,12 @@ fn backward_diff(samples: &[Vec<f64>], j: usize) -> Vec<f64> {
     result
 }
 
-/// One Störmer-Cowell 8th-order PECE step.
+/// 一次 Störmer-Cowell 8 阶 PECE 步。
 ///
-/// `history` = `[x_{n-1}, x_n, a_{n-7}, ..., a_n]` (10 vectors of the position
-/// dimension). `accel` evaluates `a(t, x)`. Returns `(x_{n+1}, milne_error,
-/// new_history)` where `new_history = [x_n, x_{n+1}, a_{n-6}, ..., a_n, a_{n+1}]`
-/// and the error is `‖x_corrector − x_predictor‖` (Milne-style local estimate).
+/// `history` = `[x_{n−1}, x_n, a_{n−7}, ..., a_n]`（10 个位置维度的向量）。
+/// `accel` 计算 `a(t, x)`。返回 `(x_{n+1}, milne_error, new_history)`，
+/// 其中 `new_history = [x_n, x_{n+1}, a_{n−6}, ..., a_n, a_{n+1}]`，
+/// 误差为 `‖x_corrector − x_predictor‖`（Milne 风格局部估计）。
 pub fn cowell_step<F, E>(
     t: f64,
     h: f64,

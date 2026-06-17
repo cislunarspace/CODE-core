@@ -1,7 +1,7 @@
-"""Cover uncovered branches in StabilityAnalysis.
+"""StabilityAnalysis 未覆盖分支测试。
 
-Tests classification, bifurcation, stability index, str/repr,
-and static helper methods using mocked monodromy matrices.
+使用模拟单值矩阵覆盖分类、分岔、稳定性指数、
+字符串表示与静态辅助方法。
 """
 
 import numpy as np

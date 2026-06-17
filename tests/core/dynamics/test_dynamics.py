@@ -1,7 +1,7 @@
-"""
-CR3BP_Dynamics 类测试
+"""CR3BP_Dynamics 动力学测试。
 
-测试动力学模型的核心功能，包括运动方程、轨迹传播、状态转移矩阵等。
+覆盖运动方程、STM 方程、轨迹传播、截面检测、
+Jacobi 常数与奇点保护。
 """
 
 import numpy as np

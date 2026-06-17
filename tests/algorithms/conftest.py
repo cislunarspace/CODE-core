@@ -1,29 +1,6 @@
-"""
-Shared fixtures for algorithm tests.
+"""算法测试共享 fixtures。
 
-This conftest provides deep, pre-configured fixtures for the DRO seed orbit
-correction scenario. Seven algorithm test files previously rebuilt this
-chain locally (earth_moon_system → dynamics → corrector → seed orbit →
-corrected orbit), duplicating ~800 lines of fixture code.
-
-Design notes
-------------
-- `dro_seed_state`, `dro_seed_orbit` are session-scoped: cheap to create,
-  used as a "standard" reference orbit across the suite.
-- `_corrected_dro_cached` is session-scoped: the correction itself
-  propagates with STM and converges in 5–15 iterations — expensive.
-  Computing it once per session is the whole point.
-- `corrected_dro` (function-scoped) returns a fresh deepcopy of the cached
-  orbit. Several tests in test_differential_correction_closure.py mutate
-  the returned orbit's states array to verify independence — a session-
-  shared object would leak mutations across tests.
-- `dro_corrector` is function-scoped: cheap to create, but stateful
-  (converged, error_history, termination_reason are all mutated by
-  iterate_correction). Tests that call iterate_correction need a fresh
-  corrector each time.
-
-Reference: Cui et al. (2025) "Two-Impulse Transfers from Lunar DROs to
-Resonant Orbits", JGCD, Vol.48, No.6.
+为 DRO 种子轨道修正场景提供预配置 fixture。
 """
 
 from __future__ import annotations

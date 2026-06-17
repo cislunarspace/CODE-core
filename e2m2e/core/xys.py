@@ -1,4 +1,4 @@
-"""IAU X,Y,s provider implementations."""
+"""IAU X, Y, s 参数提供器实现。"""
 
 from __future__ import annotations
 

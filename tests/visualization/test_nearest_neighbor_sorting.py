@@ -1,10 +1,6 @@
-"""
-Nearest Neighbor Sorting Methods Tests
+"""最近邻排序方法测试。
 
-Tests for the _sort_points_by_nearest_neighbor and _sort_3d_points_by_nearest_neighbor
-methods in OrbitVisualizer that solve orbit plot crossing issues.
-
-Reference: Commit cf9337a - 添加最近邻排序方法解决轨道绘图交叉线问题
+验证 _sort_points_by_nearest_neighbor 解决轨道绘图交叉线问题。
 """
 
 import matplotlib

@@ -1,4 +1,7 @@
-"""FamilyPlotter.plot_jacobi_period 测试"""
+"""FamilyPlotter.plot_jacobi_period 测试。
+
+验证返回 fig/ax、数据排序与标签。
+"""
 
 import os
 

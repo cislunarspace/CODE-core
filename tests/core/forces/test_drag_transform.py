@@ -1,4 +1,7 @@
-"""DragModel ITRF↔传播系转换集成测试（需要 SPICE 内核）。"""
+"""DragModel ITRF↔传播系转换集成测试（需 SPICE 内核）。
+
+验证内部转换与手动转换结果一致、旋转保模。
+"""
 
 import numpy as np
 import pytest

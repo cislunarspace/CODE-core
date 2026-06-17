@@ -1,11 +1,6 @@
 """终端条件模块
 
 定义转移优化中出发/到达终端条件的抽象接口与具体实现。
-
-主要类：
-    TerminalCondition: 抽象基类，定义 get_initial_state / get_arrival_state 契约
-    OrbitTerminal: 基于周期轨道的终端条件，通过动力学传播获取相位状态
-    StateTerminal: 基于固定状态与时刻的终端条件，直接返回给定状态
 """
 
 from __future__ import annotations
@@ -17,7 +12,7 @@ import numpy as np
 import numpy.typing as npt
 
 if TYPE_CHECKING:
-    from ..core.dynamics import Dynamics
+    from ..core.dynamics import CR3BP_Dynamics
     from ..core.orbit import Orbit
 
 
@@ -35,7 +30,7 @@ class TerminalCondition(ABC):
 
     @abstractmethod
     def get_arrival_state(
-        self, t_ins: float, dynamics: Dynamics
+        self, t_ins: float, dynamics: CR3BP_Dynamics
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """返回到达时刻的位置与速度
 
@@ -68,7 +63,7 @@ class OrbitTerminal(TerminalCondition):
         return np.array(self.orbit.states[0], copy=True)
 
     def get_arrival_state(
-        self, t_ins: float, dynamics: Dynamics
+        self, t_ins: float, dynamics: CR3BP_Dynamics
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """通过动力学传播获取到达相位状态"""
         state = dynamics.propagate_orbit_state_at_time(self.orbit, float(t_ins))
@@ -100,7 +95,7 @@ class StateTerminal(TerminalCondition):
         return np.array(self.state, copy=True)
 
     def get_arrival_state(
-        self, t_ins: float, dynamics: Dynamics
+        self, t_ins: float, dynamics: CR3BP_Dynamics
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """返回固定状态的位置与速度（忽略 t_ins）"""
         return self.state[:3], self.state[3:6]

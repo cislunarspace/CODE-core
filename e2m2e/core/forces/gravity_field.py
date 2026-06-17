@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -21,7 +22,6 @@ from .earth_tide import (
 from .exceptions import CoordinateTransformError
 from .gravity_file import extrapolate_coefficients, load_gfc_file
 from .physical_model import PhysicalModel
-
 
 _DEFAULT_SPICE_FRAME = "ITRF93"
 # Sun/Moon 平均半长轴(永久潮汐修正用,近似)
@@ -57,15 +57,15 @@ class GravityField(PhysicalModel):
             order: 最大 order,默认等于 degree。
             gravity_file: 自定义 .gfc 文件路径,默认使用包内 EGM96-to10。
             input_frame: 球谐展开坐标系的 SPICE frame 名,默认 ITRF93。
-            tide_mode: 潮汐档位,对齐 GMAT ``ETide`` 三档:
-                ``"none"``(无潮汐)、``"solid"``(固体潮 Step1+Step2)、
-                ``"solid_and_pole"``(固体潮 + 极潮)。
-            tide_convention: 系数约定,``"tide_free"`` 或 ``"zero_tide"``。
-                zero_tide 模式减去永久潮汐(系数已含永久分量)。
-            epoch: dot 项(系数长期变化率)外推的参考历元(SPICE et 秒)。
-                与 .gfc 的 dot 行配合;``None`` 表示不外推。
-            polar_motion_provider: 极潮 xp/yp 提供者,签名 ``(et) -> (xp, yp)``
-                (arcsec)。solid_and_pole 档必需;由调用方从 ``gmat_eop`` 注入。
+            tide_mode: 潮汐档位，对齐 GMAT ``ETide`` 三档：
+                ``"none"`` （无潮汐）、``"solid"`` （固体潮 Step1+Step2）、
+                ``"solid_and_pole"`` （固体潮 + 极潮）。
+            tide_convention: 系数约定，``"tide_free"`` 或 ``"zero_tide"`` 。
+                zero_tide 模式减去永久潮汐（系数已含永久分量）。
+            epoch: dot 项（系数长期变化率）外推的参考历元（SPICE et 秒）。
+                与 .gfc 的 dot 行配合；``None`` 表示不外推。
+            polar_motion_provider: 极潮 xp/yp 提供者，签名 ``(et) -> (xp, yp)``
+                （arcsec）。solid_and_pole 档必需；由调用方从 ``gmat_eop`` 注入。
         """
         self._body = body.upper()
         self._input_frame = input_frame
@@ -391,9 +391,9 @@ class GravityField(PhysicalModel):
                 dUdlambda += rho_n * m * P[n, m] * (-c_val * sm + s_val * cm)
 
         mu = self._data.mu
-        dUdr = -mu / (r_norm * r_norm) * dUdr
-        dUdphi = mu / r_norm * dUdphi
-        dUdlambda = mu / r_norm * dUdlambda
+        dUdr = float(-mu / (r_norm * r_norm) * dUdr)
+        dUdphi = float(mu / r_norm * dUdphi)
+        dUdlambda = float(mu / r_norm * dUdlambda)
 
         # Convert to Cartesian (ITRF)
         cos_lon = np.cos(lon)
@@ -432,7 +432,7 @@ class GravityField(PhysicalModel):
         vector: npt.NDArray[np.floating],
         system: Any,
     ) -> npt.NDArray[np.floating]:
-        """把输入坐标系中的矢量转换回传播坐标系。"""
+        """把输入坐标系中的矢量转换回参考系。"""
         input_cs = self._get_input_coordinate_system(system)
         try:
             return system.coordinate_system.transform_vector(

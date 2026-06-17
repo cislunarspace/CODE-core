@@ -1,4 +1,7 @@
-"""Tests for the ABM (Adams-Bashforth-Moulton) multistep integrator."""
+"""ABM（Adams-Bashforth-Moulton）多步积分器测试。
+
+覆盖历史长度校验、启动填充、谐振子精度与四阶收敛。
+"""
 
 import numpy as np
 import pytest

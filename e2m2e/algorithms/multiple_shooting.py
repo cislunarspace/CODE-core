@@ -16,7 +16,7 @@ import numpy as np
 import numpy.typing as npt
 from tqdm.auto import tqdm
 
-from e2m2e.mbse.data.enums import ConvergenceState
+from e2m2e.mbse.data.enums import ConvergenceState, ReferenceFrame
 
 # Unicode sparkline 字符，用于在终端内渲染残差收敛曲线
 _SPARK_CHARS = " ▁▂▃▄▅▆▇█"
@@ -34,7 +34,7 @@ def _worker_init(
     kernel_dir: str,
     bodies: list[str],
     origin: str,
-    frame: str,
+    frame: ReferenceFrame,
     rtol: float,
     atol: float,
     max_step: float,
@@ -153,14 +153,21 @@ class MultipleShooting:
 
     当 var_time=True 时，时间节点也作为自由变量参与修正（适用于自由时间问题）。
 
+    动力学对象需提供以下接口：
+
+    - ``propagate(state, time_span, with_stm=True)`` ——积分传播，
+      返回含 ``"states"`` 和 ``"stm"`` 的字典。
+    - ``equations_of_motion(t, state)`` ——计算状态导数（右端函数值）。
+
     并行策略
-    ---------
-    - ``n_workers=1``：串行（默认）。
-    - ``n_workers>1, kernel_dir=None``：多线程（``ThreadPoolExecutor``）。
-      适合 CR3BP 等纯 Python/NumPy 动力学，但受 GIL 限制，并发收益有限。
-    - ``n_workers>1, kernel_dir=<路径>``：**多进程**（``ProcessPoolExecutor``）。
-      每个子进程重载 SPICE 内核，绕过 GIL，可充分利用多核 CPU。
-      仅适用于 ``EphemerisDynamics``（需 SPICE 内核）。
+    --------
+    - ``n_workers=1`` ：串行（默认）。
+    - ``n_workers>1`` 且 ``kernel_dir=None`` ：多线程
+      （``ThreadPoolExecutor`` ），适合 CR3BP 等纯 Python/NumPy 动力学，
+      但受 GIL 限制，并发收益有限。
+    - ``n_workers>1`` 且 ``kernel_dir`` 已设置：多进程
+      （``ProcessPoolExecutor`` ），每个子进程重载 SPICE 内核，绕过 GIL，
+      可充分利用多核 CPU，仅适用于 ``EphemerisDynamics`` （需 SPICE 内核）。
     """
 
     def __init__(
@@ -169,23 +176,16 @@ class MultipleShooting:
         n_workers: int = 1,
         kernel_dir: str | None = None,
     ) -> None:
-        """
+        """初始化多重打靶修正器。
+
+        动力学对象接口与并行策略详见类文档字符串。
+
         Args:
-            dynamics: 动力学模型对象，需提供以下接口：
-                - propagate(state, time_span, with_stm=True):
-                  积分传播，返回含 "states" 和 "stm" 的字典
-                - equations_of_motion(t, state):
-                  计算状态导数（右端函数值）
-            n_workers: 并行工作进程/线程数，默认 1（串行）。
-                - ``n_workers>1`` 且 ``kernel_dir`` 已设置：
-                  使用 ProcessPoolExecutor（多进程，推荐）。
-                - ``n_workers>1`` 且 ``kernel_dir=None``：
-                  使用 ThreadPoolExecutor（多线程，受 GIL 限制）。
-            kernel_dir: SPICE 内核目录路径
-                （含 ``de440.bsp`` 和 ``naif0012.tls``）。
-                仅在 ``n_workers>1`` 时需要。设置后自动启用多进程模式。
-                例：``kernel_dir=os.environ.get("SPICE_KERNEL_DIR",
-                "../e2m2e/kernels")``
+            dynamics: 动力学模型对象，需提供 ``propagate`` 与
+                ``equations_of_motion`` 接口。
+            n_workers: 并行工作进程/线程数，默认 1 （串行）。
+            kernel_dir: SPICE 内核目录路径（含 ``de440.bsp`` 和
+                ``naif0012.tls`` ），仅在 ``n_workers>1`` 时需要。
         """
         if dynamics is None:
             raise TypeError("dynamics must not be None")

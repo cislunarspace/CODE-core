@@ -1,42 +1,39 @@
-//! Generic explicit Runge-Kutta driver, parameterised over a Butcher tableau.
+//! 显式 Runge-Kutta 通用驱动器，由 Butcher 表参数化。
 //!
-//! All explicit embedded RK methods (PD45, PD78, RK89, ...) share the same
-//! single-step structure; only the Butcher coefficients differ. This module
-//! hosts the shared [`explicit_rk_step`] driver and the order-aware
-//! [`suggest_next_step`] heuristic, so each concrete method only contributes a
-//! [`ButcherTable`] constant.
+//! 所有显式嵌入 RK 方法（PD45、PD78、RK89 等）共享同样的单步结构；
+//! 仅 Butcher 系数不同。本模块存放共享的 [`explicit_rk_step`] 驱动器
+//! 与阶数感知的 [`suggest_next_step`] 启发式，各具体方法只需贡献一个
+//! [`ButcherTable`] 常量。
 
-/// A Butcher tableau for an explicit embedded Runge-Kutta method.
+/// 显式嵌入 Runge-Kutta 方法的 Butcher 表。
 ///
-/// All coefficient slices are `&'static` — tables are compile-time constants
-/// sourced from GMAT / literature. Overall dimensions are validated by
-/// [`ButcherTable::new`] at construction time (at compile time when the table
-/// is a `const`); per-row lower-triangular shape is covered by each method's
-/// own unit tests.
+/// 所有系数切片均为 `&'static` —— 表为编译期常量，来源为 GMAT / 文献。
+/// 整体维度由 [`ButcherTable::new`] 在构造时校验（`const` 情形下在编译期校验）；
+/// 每行下三角形状由各方法自身的单元测试覆盖。
 pub struct ButcherTable {
-    /// Number of stages `s`.
+    /// 级数 `s`。
     pub stages: usize,
-    /// Order `p` of the primary (higher-order) solution.
+    /// 主解（高阶解）的阶数 `p`。
     pub order: usize,
-    /// Order of the embedded (lower-order) solution used for error estimate.
+    /// 用于误差估计的嵌入（低阶）解的阶数。
     pub embedded_order: usize,
-    /// Time nodes `c[i]` (length `stages`); `c[0]` is conventionally 0.
+    /// 时间节点 `c[i]`（长度 `stages`）；`c[0]` 惯例为 0。
     pub c: &'static [f64],
-    /// Runge-Kutta matrix rows `a[i]`; row `i` has length `i` (lower triangular).
+    /// Runge-Kutta 矩阵行 `a[i]`；第 `i` 行长度为 `i`（严格下三角）。
     pub a: &'static [&'static [f64]],
-    /// Weights `b` for the primary (higher-order) solution (length `stages`).
+    /// 主解（高阶）权重 `b`（长度 `stages`）。
     pub b: &'static [f64],
-    /// Weights `b_star` for the embedded (lower-order) solution (length `stages`).
+    /// 嵌入（低阶）解的权重 `b_star`（长度 `stages`）。
     pub b_star: &'static [f64],
 }
 
 impl ButcherTable {
-    /// Construct a tableau, validating overall dimension consistency.
+    /// 构造一张表，校验整体维度一致性。
     ///
-    /// Intended for `const` initialisers so that a malformed table fails to
-    /// compile. Asserts `c`, `b`, `b_star`, and `a` each have `stages` entries.
-    /// Per-row length (`a[i].len() == i`) is enforced by each method's tests,
-    /// since per-element slice indexing is not yet allowed in `const fn`.
+    /// 供 `const` 初始化器使用，使格式错误的表在编译期失败。
+    /// 断言 `c`、`b`、`b_star`、`a` 各有 `stages` 个元素。
+    /// 逐行长度（`a[i].len() == i`）因 `const fn` 中尚不允许逐元素切片索引，
+    /// 由各方法的测试强制执行。
     pub const fn new(
         stages: usize,
         order: usize,
@@ -62,11 +59,9 @@ impl ButcherTable {
     }
 }
 
-/// Take a single explicit Runge-Kutta step using `table`.
+/// 使用 `table` 执行一次显式 Runge-Kutta 单步。
 ///
-/// Returns the primary (higher-order) solution and the L2 norm of the
-/// difference between the primary and embedded solutions (the local error
-/// estimate used for step-size control).
+/// 返回主解（高阶解）与主解和嵌入解之差的 L2 范数（用于步长控制的局部误差估计）。
 pub fn explicit_rk_step<F, E>(
     table: &ButcherTable,
     t: f64,
@@ -121,11 +116,10 @@ where
     Ok((y_high, error))
 }
 
-/// Suggest the next step size from the local error estimate.
+/// 由局部误差估计建议下一步步长。
 ///
-/// Standard controller: `h_next = h · clamp(0.9 · (tol/error)^(1/(p+1)), 0.1, 5)`
-/// where `p = embedded_order`. The exponent matches the order of the embedded
-/// error estimate.
+/// 标准控制器：`h_next = h · clamp(0.9 · (tol/error)^(1/(p+1)), 0.1, 5)`，
+/// 其中 `p = embedded_order`。指数与嵌入误差估计的阶数一致。
 pub fn suggest_next_step(h: f64, error: f64, tol: f64, embedded_order: usize) -> f64 {
     if error == 0.0 {
         return h * 5.0;

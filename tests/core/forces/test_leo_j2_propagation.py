@@ -1,14 +1,15 @@
-"""LEO 一天 J2 端到端传播测试。"""
+"""LEO 一天 J2 端到端传播测试。
+"""
 
 import numpy as np
 import pytest
 
+from e2m2e.core.coordinate_system import CoordinateSystem
 from e2m2e.core.ephemeris_system import EphemerisSystem
 from e2m2e.core.forces import ForceModel, GravityField
 from e2m2e.core.spice import SPICEManager
 from e2m2e.core.standard_axes import ICRSAxes
 from e2m2e.core.standard_origins import CelestialBodyOrigin
-from e2m2e.core.coordinate_system import CoordinateSystem
 
 
 @pytest.fixture
@@ -105,15 +106,15 @@ def test_leo_j2_one_day_raan_drift(leo_system):
 
     result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
-    raans = np.array([_extract_raan(s, t, mu) for s, t in zip(result["states"], result["time"])])
+    raans = np.array(
+        [_extract_raan(s, t, mu) for s, t in zip(result["states"], result["time"], strict=True)]
+    )
     times_day = (result["time"] - et0) / 86400.0
 
     # Fit linear drift; unwrap RAAN to handle 2pi crossing
     raans_unwrapped = np.unwrap(raans)
     coeffs = np.polyfit(times_day, raans_unwrapped, 1)
-    omega_dot_rad_per_sec = coeffs[0] / 86400.0
 
-    omega_dot_rad_per_sec = coeffs[0] / 86400.0
     omega_dot_deg_per_day = np.degrees(coeffs[0])
 
     # Analytical J2 RAAN drift rate

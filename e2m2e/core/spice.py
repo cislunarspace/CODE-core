@@ -10,11 +10,11 @@ SPICE 内核文件说明
 SPICE 内核是 NASA NAIF 提供的数据文件，包含天体星历、姿态、时间转换等信息。
 本模块使用两类内核：
 
-1. **闰秒内核**（``.tls``）：提供 UTC ↔ ET 时间转换所需的闰秒表。
+1. **闰秒内核** （``.tls``）：提供 UTC ↔ ET 时间转换所需的闰秒表。
    模块会自动在 ``kernels/`` 目录和 ``SPICE_KERNEL_DIR`` 环境变量指定的路径中
    搜索并加载 ``.tls`` 文件，无需手动操作。
 
-2. **星历内核**（``.bsp``）：包含天体位置/速度数据（如 JPL DE440）。
+2. **星历内核** （``.bsp``）：包含天体位置/速度数据（如 JPL DE440）。
    需要手动加载，可通过 ``find_ephemeris_kernel()`` 搜索或 ``load_kernel()`` 加载。
 
 支持的星历内核（按推荐优先级）：
@@ -69,7 +69,7 @@ import numpy.typing as npt
 from ._spice_loader import get_spiceypy
 
 if TYPE_CHECKING:
-    import spiceypy
+    pass
 
 # 常用天体的引力参数 GM（km³/s²）。
 # 键名为 NAIF 标准天体名称的大写形式。

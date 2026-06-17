@@ -134,7 +134,10 @@ CORE_REQUIREMENTS = [
         id="REQ-022",
         title="OrbitFamily 聚合",
         category=RequirementCategory.FUNCTIONAL,
-        description="OrbitFamily 提供统一的聚合接口：states、periods 属性与 get_jacobi_constants() 方法。",
+        description=(
+            "OrbitFamily 提供统一的聚合接口：states、periods 属性与 "
+            "get_jacobi_constants() 方法。"
+        ),
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.orbit"],

@@ -38,7 +38,8 @@ class DynamicAxes(Axes, abc.ABC):
     def _require_updated(self) -> None:
         if not self._updated:
             raise RuntimeError(
-                "DynamicAxes: 必须先调用 update(t, state) 后方能使用 rotation_matrix/rotation_and_rate。"
+                "DynamicAxes: 必须先调用 update(t, state) 后方能使用 "
+                "rotation_matrix/rotation_and_rate。"
             )
 
     def rotation_matrix(self, et: float) -> npt.NDArray[np.floating]:

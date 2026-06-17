@@ -1,15 +1,14 @@
-"""测试 Continuation 物理去重
+"""Continuation 物理去重测试。
 
-验证 compute_F_and_dF_symmetric_xz_plane 使用 CR3BP_Dynamics 实例
-而非本地复制的物理公式。
+验证 compute_F_and_dF_symmetric_xz_plane 使用 CR3BP_Dynamics 实例而非本地复制公式。
 """
 
 import numpy as np
 import pytest
 
 from e2m2e.algorithms.continuation import compute_F_and_dF_symmetric_xz_plane
-from e2m2e.core.dynamics import CR3BP_Dynamics
 from e2m2e.core.cr3bp_system import CR3BP_System
+from e2m2e.core.dynamics import CR3BP_Dynamics
 
 
 @pytest.fixture

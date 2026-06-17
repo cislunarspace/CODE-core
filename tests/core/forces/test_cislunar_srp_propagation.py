@@ -1,8 +1,6 @@
-"""cislunar SRP + 地影 端到端传播测试（需要 SPICE 内核）。
+"""cislunar SRP + 地影端到端传播测试。
 
-春秋分历元、赤道圆轨：太阳在赤道面内，轨道每圈穿越反日点地影。
-验证 SRP 加速度进出地影时的明显跳变（本影≈0 / 全光照=满 / 半影窄过渡）。
-范式同 ``test_leo_drag_propagation.py``。
+验证赤道圆轨进出地影时 SRP 加速度跳变。
 """
 
 from __future__ import annotations

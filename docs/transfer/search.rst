@@ -55,7 +55,7 @@
 执行搜索
 --------
 
-``search()`` 方法一次性传入所有搜索参数，执行完整的网格搜索：
+``search()`` 方法一次性传入所有搜索参数，执行网格搜索：
 
 .. code-block:: python
 
@@ -128,7 +128,7 @@
 - ``departure_state`` (ndarray): 出发点六维状态
 - ``departure_time`` (float): 出发点时间
 - ``transfer_time`` (float): 转移时间
-- ``transfer_trajectory`` (ndarray): 完整转移轨迹 ``(n_steps, 6)``
+- ``transfer_trajectory`` (ndarray): 转移轨迹 ``(n_steps, 6)``
 - ``transfer_times`` (ndarray): 轨迹时间序列
 - ``min_distance`` (float): 到目标轨道的最小距离
 - ``min_distance_idx`` (int): 最小距离对应的轨迹步索引
@@ -160,10 +160,10 @@
    if nlp_result.success:
        print(f"优化后总脉冲: {nlp_result.total_delta_v:.6f}")
 
-完整示例
---------
+示例
+----
 
-以下示例展示从轨道加载到搜索完成的完整流程：
+以下示例展示从轨道加载到搜索完成的流程：
 
 .. code-block:: python
 

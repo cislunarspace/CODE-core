@@ -1,4 +1,7 @@
-"""DragModel 大气阻力力模型测试。"""
+"""DragModel 大气阻力力模型测试。
+
+覆盖 PhysicalModel 子类关系、加速度方向、量级公式与边界。
+"""
 
 import numpy as np
 import pytest

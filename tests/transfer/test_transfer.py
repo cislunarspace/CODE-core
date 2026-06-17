@@ -1,8 +1,7 @@
-def test_transfer_has_no_convert_nlp_result_method(dynamics):
-    """Transfer 不应再包含 _convert_nlp_result 转换函数。"""
-    transfer = Transfer(dynamics)
-    assert not hasattr(transfer, "_convert_nlp_result")
+"""Transfer 类编排与接口测试。
 
+验证 _convert_nlp_result 已移除、optimize 通过 adapter 调用。
+"""
 from unittest.mock import patch
 
 import numpy as np
@@ -13,18 +12,27 @@ from e2m2e.core.orbit import Orbit
 from e2m2e.transfer import Transfer, TransferConfig, TransferOptimizationResult
 
 
+def test_transfer_has_no_convert_nlp_result_method(dynamics):
+    """Transfer 不应再包含 _convert_nlp_result 转换函数。"""
+    transfer = Transfer(dynamics)
+    assert not hasattr(transfer, "_convert_nlp_result")
+
+
 @pytest.fixture
 def earth_moon_system():
+    """地月 CR3BP 系统 fixture。"""
     return CR3BP_System(mu=0.012150585, primary="earth", secondary="moon")
 
 
 @pytest.fixture
 def dynamics(earth_moon_system):
+    """CR3BP 动力学 fixture。"""
     return CR3BP_Dynamics(system=earth_moon_system)
 
 
 @pytest.fixture
 def dummy_orbit(earth_moon_system):
+    """占位轨道 fixture，用于 Transfer 构造。"""
     orbit = Orbit(
         states=np.zeros((10, 6)),
         times=np.linspace(0, 10, 10),

@@ -1,21 +1,6 @@
-"""
-需求: Solution Plane 可视化（transfer_time vs total_delta_v 散点图）
+"""Solution Plane 可视化测试（transfer_time vs total_delta_v 散点图）。
 
-复现论文 Fig.6：对搜索/优化结果绘制 solution plane（转移时间 T vs 总 Δv 散点图）。
-支持按 transfer_type（DIRECT/LGA/EXTERNAL）着色，对应论文中不同的转移路径。
-
-验收标准:
-  1. TransferPlotter 新增 plot_solution_plane() 方法
-  2. 输入: results（TransferOptimizationResult 列表或等价 dict 列表）,
-         color_by（可选，按 transfer_type 着色）,
-         ax（可选，复用已有 Axes）,
-         show_colorbar（可选）
-  3. 输出: matplotlib Axes 对象
-  4. x 轴为 transfer_time, y 轴为 total_delta_v (delta_v1 + delta_v2)
-  5. 无有效数据时不报错，显示 "no data" 提示文字
-  6. 返回的 ax 可被调用方进一步定制（标题、保存等）
-
-参考论文: Cui et al. (2025), Fig. 6a-d
+复现论文 Fig.6，支持按 transfer_type 着色。
 """
 
 import matplotlib

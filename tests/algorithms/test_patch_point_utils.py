@@ -1,26 +1,6 @@
-"""
-需求: 将 sample_patch_points 和 convert_to_j2000 纳入 e2m2e 库
+"""sample_patch_points 与 convert_to_j2000 库函数测试。
 
-来源: transfer-orbit-design/scripts/ephemeris/correct_dro_to_ephemeris.py
-
-这两个函数目前作为脚本中的辅助函数存在，需要纳入 e2m2e 库：
-
-1. sample_patch_points(orbit, n_points)
-   - 位置: e2m2e.algorithms.multiple_shooting (模块级函数)
-   - 功能: 沿 Orbit 对象等间距采样 n_points 个 patch points
-   - 输入: Orbit 对象（需有 period 属性）、采样点数
-   - 输出: (t_patch, states) 元组
-
-2. convert_to_j2000(t_patch_syn, states_syn, spice_syn_j2000, reference_et, tu_seconds)
-   - 位置: e2m2e.core.coordinate (CoordinateTransformation 的静态方法或模块级函数)
-   - 功能: 将 synodic 归一化坐标批量转换为 J2000
-   - 输入: synodic 时间数组、synodic 状态数组、SynodicJ2000Transformation 实例、
-           参考历元 ET（秒）、TU 对应秒数
-   - 输出: (t_patch_j2000, states_j2000) 元组
-
-依赖:
-  - e2m2e.core.Orbit (states, times, period 属性)
-  - e2m2e.core.SynodicJ2000Transformation.batch_synodic_to_j2000
+覆盖采样形状、时间对齐、J2000 转换与一致性。
 """
 
 import numpy as np
@@ -202,13 +182,17 @@ class TestConvertToJ2000:
     def test_states_are_finite(self, dro_orbit, spice_syn_j2000, reference_et):
         """所有 J2000 状态值应为有限数"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 8)
-        _, states_j2000 = convert_to_j2000(t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS)
+        _, states_j2000 = convert_to_j2000(
+            t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS
+        )
         assert np.all(np.isfinite(states_j2000))
 
     def test_position_near_moon_distance(self, dro_orbit, spice_syn_j2000, reference_et):
         """J2000 下的 DRO 位置应在月球距离附近 (300000-500000 km)"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
-        _, states_j2000 = convert_to_j2000(t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS)
+        _, states_j2000 = convert_to_j2000(
+            t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS
+        )
         for i in range(len(states_j2000)):
             r = np.linalg.norm(states_j2000[i, :3])
             assert 300000 < r < 500000, f"Patch {i} 距地球 {r:.0f} km，超出合理范围"
@@ -216,7 +200,9 @@ class TestConvertToJ2000:
     def test_velocity_is_reasonable(self, dro_orbit, spice_syn_j2000, reference_et):
         """J2000 下的速度应在合理范围 (< 5 km/s)"""
         t_syn, states_syn = sample_patch_points(dro_orbit, 4)
-        _, states_j2000 = convert_to_j2000(t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS)
+        _, states_j2000 = convert_to_j2000(
+            t_syn, states_syn, spice_syn_j2000, reference_et, TU_DAYS
+        )
         for i in range(len(states_j2000)):
             v = np.linalg.norm(states_j2000[i, 3:])
             assert v < 5.0, f"Patch {i} 速度 {v:.2f} km/s 过大"

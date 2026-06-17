@@ -1,8 +1,6 @@
-"""
-core/__init__.py 延迟导出测试
+"""e2m2e.core 延迟导出测试。
 
-验证 e2m2e.core 子包本身对 SPICE 相关符号使用 __getattr__ 按需延迟导出，
-使用户只导入非星历符号时不会强制加载 spiceypy。
+验证非星历符号导入不加载 spiceypy、SPICE 符号按需可用。
 """
 
 import importlib.util
@@ -10,8 +8,6 @@ import subprocess
 import sys
 import types
 from pathlib import Path
-
-import pytest
 
 
 class TestCoreLazyExports:
@@ -26,7 +22,13 @@ class TestCoreLazyExports:
         """绕过 e2m2e/__init__.py，直接加载 e2m2e.core 子包。
 
         父包会在 slice 3 中处理，此处只验证 core 子包自身的延迟导出行为。
+        返回 ``(module, saved_modules)``，调用方须用 ``_restore_modules``
+        恢复 ``sys.modules``，避免污染后续测试。
         """
+        saved_modules = {
+            name: sys.modules.get(name)
+            for name in ("e2m2e", "e2m2e.core")
+        }
         module_path = TestCoreLazyExports._core_package_path()
         spec = importlib.util.spec_from_file_location(
             "e2m2e.core", module_path, submodule_search_locations=[str(module_path.parent)]
@@ -40,17 +42,26 @@ class TestCoreLazyExports:
         sys.modules["e2m2e"] = e2m2e_pkg
         sys.modules["e2m2e.core"] = module
         spec.loader.exec_module(module)
-        return module
+        return module, saved_modules
+
+    @staticmethod
+    def _restore_modules(saved_modules: dict[str, object | None]) -> None:
+        """恢复 ``_load_core_directly`` 替换的 ``sys.modules`` 条目。"""
+        for name, original in saved_modules.items():
+            if original is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = original
 
     def test_import_non_spice_symbols_does_not_load_spiceypy(self):
         """从 e2m2e.core 导入非星历符号时不应加载 spiceypy。"""
-        code = """
+        code = f"""
 import sys
 import types
 from pathlib import Path
 import importlib.util
 
-module_path = Path(r"%s")
+module_path = Path(r"{self._core_package_path()}")
 spec = importlib.util.spec_from_file_location(
     "e2m2e.core", module_path, submodule_search_locations=[str(module_path.parent)]
 )
@@ -66,7 +77,7 @@ CR3BP_System = module.CR3BP_System
 print("spiceypy_loaded:", "spiceypy" in sys.modules)
 print("orbit_family:", OrbitFamily)
 print("cr3bp_system:", CR3BP_System)
-""" % self._core_package_path()
+"""
         result = subprocess.run(
             [sys.executable, "-c", code],
             capture_output=True,
@@ -81,13 +92,13 @@ print("cr3bp_system:", CR3BP_System)
 
     def test_spice_symbols_are_accessible_through_lazy_export(self):
         """SPICE 相关符号仍可通过 e2m2e.core 访问并正常工作。"""
-        code = """
+        code = f"""
 import sys
 import types
 from pathlib import Path
 import importlib.util
 
-module_path = Path(r"%s")
+module_path = Path(r"{self._core_package_path()}")
 spec = importlib.util.spec_from_file_location(
     "e2m2e.core", module_path, submodule_search_locations=[str(module_path.parent)]
 )
@@ -104,7 +115,7 @@ print("manager:", SPICEManager)
 mgr = SPICEManager()
 gm = mgr.get_gm("EARTH")
 print("gm:", gm)
-""" % self._core_package_path()
+"""
         result = subprocess.run(
             [sys.executable, "-c", code],
             capture_output=True,
@@ -120,15 +131,18 @@ print("gm:", gm)
 
     def test_all_public_api_exports_preserved(self):
         """core/__init__.__all__ 中导出的公开 API 仍然可用。"""
-        module = self._load_core_directly()
-        expected = [
-            "SPICEManager",
-            "CR3BP_System",
-            "OrbitFamily",
-            "CoordinateTransformation",
-            "ITRFSpiceAxes",
-            "CelestialBodyOrigin",
-            "standard_itrf",
-        ]
-        for name in expected:
-            assert hasattr(module, name), f"core 缺少导出: {name}"
+        module, saved = self._load_core_directly()
+        try:
+            expected = [
+                "SPICEManager",
+                "CR3BP_System",
+                "OrbitFamily",
+                "CoordinateTransformation",
+                "ITRFSpiceAxes",
+                "CelestialBodyOrigin",
+                "standard_itrf",
+            ]
+            for name in expected:
+                assert hasattr(module, name), f"core 缺少导出: {name}"
+        finally:
+            self._restore_modules(saved)
