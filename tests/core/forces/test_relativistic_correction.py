@@ -1,4 +1,7 @@
-"""相对论修正力模型测试。"""
+"""相对论修正力模型测试。
+
+覆盖有限加速度、Schwarzschild 开关、配置 round-trip 与三项独立启用。
+"""
 
 import types
 
@@ -209,7 +212,7 @@ def test_automatic_angular_momentum_raises_without_kernels():
         enable_de_sitter=False,
     )
 
-    with pytest.raises(Exception):  # 当前为 RelativisticCorrectionError
+    with pytest.raises(Exception, match="."):  # 当前为 RelativisticCorrectionError
         force.compute_acceleration(0.0, state, system)
 
 
@@ -243,8 +246,10 @@ def test_gps_relativistic_position_difference_magnitude(earth_ephemeris_system):
     pos_diff = np.linalg.norm(
         result_with["states"][-1, :3] - result_without["states"][-1, :3]
     )
-    # 实测 GPS 纯轨道力学修正约 0.3 mm/天；断言其为正且不超过 1 cm/天。
-    assert 1e-4 <= pos_diff <= 0.01, f"GPS 1-day position diff = {pos_diff:.6f} km"
+    # 物理量级：GPS 轨道 Schwarzschild 修正约 0.3 mm/天（3e-7 km）。
+    # 下界收到 1/10 物理量级以防回归把数量级改坏（远低于物理 3 个数量级 → 收紧到 0.1×）。
+    # 上界 0.01 km（10 cm/天）覆盖 Lense-Thirring / de Sitter 等次级项贡献。
+    assert 3e-8 <= pos_diff <= 0.01, f"GPS 1-day position diff = {pos_diff:.6e} km"
 
 
 @pytest.mark.spice
@@ -277,5 +282,7 @@ def test_leo_relativistic_position_difference_magnitude(earth_ephemeris_system):
     pos_diff = np.linalg.norm(
         result_with["states"][-1, :3] - result_without["states"][-1, :3]
     )
-    # 实测 LEO 纯轨道力学修正约 2.5 mm/天；断言其为正且不超过 1 cm/天。
-    assert 1e-3 <= pos_diff <= 0.01, f"LEO 1-day position diff = {pos_diff:.6f} km"
+    # 物理量级：LEO Schwarzschild 修正约 2.5 mm/天（2.5e-6 km）。
+    # 下界收到 1/10 物理量级以防回归把数量级改坏（原 1e-3 km 比物理宽 2.7 个数量级 → 收紧到 0.1×）。
+    # 上界 0.01 km（10 cm/天）覆盖 Lense-Thirring / de Sitter 等次级项贡献。
+    assert 2.5e-7 <= pos_diff <= 0.01, f"LEO 1-day position diff = {pos_diff:.6e} km"
