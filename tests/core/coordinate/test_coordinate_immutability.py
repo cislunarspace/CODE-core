@@ -35,7 +35,7 @@ def test_no_axes_or_origin_attribute_mutation_in_core():
 
     offenders: list[tuple[str, int, str]] = []
     for py in sorted(core_root.rglob("*.py")):
-        for lineno, line in enumerate(py.read_text().splitlines(), start=1):
+        for lineno, line in enumerate(py.read_text(encoding="utf-8").splitlines(), start=1):
             stripped = line.lstrip()
             if stripped.startswith("#"):
                 continue

@@ -85,7 +85,7 @@ def test_compare_script_warns_when_gmat_report_missing(
 
 
 @pytest.mark.spice
-def test_propagate_e2m2e_runs_with_full_force_model(output_dir: Path) -> None:
+def test_propagate_e2m2e_runs_with_full_force_model(output_dir: Path, spice_kernel_path: str) -> None:
     """e2m2e 传播函数应能用完整力模型跑完 1 天。"""
     import sys
 
