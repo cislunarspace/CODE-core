@@ -50,7 +50,8 @@ jobs:
       - run: uv sync --group dev
       - run: cargo test --package e2m2e-integrators
       - run: uv run maturin develop
-      - run: |
+      - shell: bash
+        run: |
           uv run pytest \
             -m "not slow" \
             --cov=e2m2e \
