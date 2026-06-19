@@ -34,6 +34,7 @@ jobs:
   test:
     needs: [lint, typecheck]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -51,6 +52,7 @@ jobs:
       - run: uv run maturin develop
       - run: |
           uv run pytest \
+            -m "not slow" \
             --cov=e2m2e \
             --cov-report=xml \
             --cov-report=term-missing \

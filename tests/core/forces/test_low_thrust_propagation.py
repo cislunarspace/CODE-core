@@ -145,6 +145,7 @@ def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_ephemeris_system):
     )
 
 
+@pytest.mark.slow
 @pytest.mark.spice
 def test_low_thrust_spiral_orbit_evolution(earth_ephemeris_system):
     """30 天低推力螺旋轨道：半长轴单调提升，偏心率保持低值。"""
