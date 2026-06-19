@@ -23,26 +23,53 @@ jobs:
 
   build:
     needs: lint
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
       - name: Verify version matches tag
+        shell: bash
         run: |
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
-          PY_VERSION="$(uv run python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          PY_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
           if [ "$TAG_VERSION" != "$PY_VERSION" ]; then
             echo "ERROR: Tag version ($TAG_VERSION) != pyproject.toml version ($PY_VERSION)"
             exit 1
           fi
           echo "Version verified: $TAG_VERSION"
-      - run: uv build
-      - run: uvx twine check dist/*
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          command: build
+          args: --release --out dist
+          manylinux: 2014
+      - name: Build sdist
+        if: matrix.os == 'ubuntu-latest'
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - shell: bash
+        run: pipx run twine check dist/*
       - uses: actions/upload-artifact@v7
         with:
-          name: dist
+          name: dist-${{ matrix.os }}
           path: dist/
 
   github-release:
@@ -53,8 +80,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: dist
           path: dist/
+          merge-multiple: true
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -70,6 +97,6 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: dist
           path: dist/
+          merge-multiple: true
       - uses: pypa/gh-action-pypi-publish@release/v1
