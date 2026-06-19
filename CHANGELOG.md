@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [5.0.0] - 2026-06-19
+
+### Added
+- 力模型体系：球谐重力场（J2）、指数大气阻力、太阳光压与圆锥阴影、脉冲/有限推力、相对论修正
+- 潮汐模型：固体潮 Step1/Step2 修正、极潮（含 Desai 海洋极潮）、永久潮汐 tide-free/zero-tide 约定、`GravityField` 潮汐集成
+- 积分器族：Rust 工作空间 + maturin 绑定，新增 PD45、RK89、PD78、Cowell 8 阶、ABM 4 阶步进器
+- 坐标系：ITRF 框架、`standard_icrf()` 工厂、ICRF↔ITRF 端到端测试、IAU 2006 简化模型 pyerfa 黄金参考对比
+- 转移轨道：推进模型与终端条件抽象、SciPy/COPT adapter 化、二层/标准多重打靶固定步长同伦星历转换
+- System 抽象：`CR3BP_System` 与 `EphemerisSystem` 实现 `System` ABC，`UnitSystem` 与 `ReferenceFrame.J2000`
+- 数据模型：`BoundaryMode`、`TwoLevelMultipleShootingStatus`、`OrbitFamilyType`（15 个轨道族）
+- 动态坐标轴 VNB/LVLH 与 `FiniteBurn` 方向帧
+- Sphinx 文档补齐：力模型、积分器、大气、SRP、策略、转移工作流
+- 真实 SPICE 小样例验证、月影真实几何测试、LEO 潮汐端到端自洽验证、GMAT LEO 参考轨道对比工具链
+
+### Changed
+- **BREAKING**: `Dynamics` 签名改为接收 `system: System`
+- **BREAKING**: `ForceModel` 改为配置驱动，容器按名管理；命名与移除接口对齐 #69 关闭共识
+- **BREAKING**: 星历修正从字符串分发改为 `PatchPointCorrector` 接缝与注册表
+- **BREAKING**: 统一枚举定义中心到 `mbse/data/enums.py`
+- **BREAKING**: 二层多重打靶接口与收敛语义重构，Level 2 修正接口与回溯逻辑简化
+- `MultipleShootingResult` 升级为 frozen dataclass
+- 回退 `CoordinateSystem` 冻结（#76 决策反转）
+- `CONTEXT.md` 重写术语表，ADR 全量译为中文，传播/坐标术语对齐
+- CLAUDE.md 增补写作要求段
+- CI 依赖升级
+
+### Fixed
+- 修正 `ITRFApproxAxes` GAST 旋转符号
+- 延迟加载 `spiceypy`，避免顶层导入强制加载
+- 修正 Halo PAL 延拓折叠振荡与南 Halo 分支方向
+- 清理 `Orbit` 派生属性边界
+- Sphinx 构建零警告收口（#123-#129）
+- 同伦动力学权重、失败路径与残差可观测性补强
+- 统一结果类型验证与收尾
+
+### Removed
+- **BREAKING**: 删除 `from_known_system` 及迁移调用点
+- **BREAKING**: 移除 `System.transform()` 快捷方式
+- 删除冗余 `test_basic.py`
+- 删除浅层 MBSE 元数据测试
+- 移除 `AGENTS.md` 与 `CONTRIBUTING.md`
+
 ## [4.2.1] - 2026-05-25
 
 ### Fixed
