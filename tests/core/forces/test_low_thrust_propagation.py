@@ -136,9 +136,7 @@ def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_ephemeris_system):
     a_final = a_history[-1]
 
     # 解析解：a(t) = (a0^(3/2) + 3/2 * sqrt(mu) * (F/m) * t)^(2/3)
-    a_theory = (
-        a0**1.5 + 1.5 * np.sqrt(mu) * (thrust / mass) * duration_s
-    ) ** (2.0 / 3.0)
+    a_theory = (a0**1.5 + 1.5 * np.sqrt(mu) * (thrust / mass) * duration_s) ** (2.0 / 3.0)
 
     relative_error = abs((a_final - a_theory) / a_theory)
     assert relative_error < 0.05, (
@@ -186,18 +184,14 @@ def test_low_thrust_spiral_orbit_evolution(earth_ephemeris_system):
     e_history = np.array([_eccentricity(s, mu) for s in result["states"]])
 
     # 半长轴显著提升（>5 km）且线性拟合斜率为正
-    assert a_history[-1] > a0 + 5.0, (
-        f"半长轴应提升超过 5 km, got {a_history[-1] - a0:.3f} km"
-    )
+    assert a_history[-1] > a0 + 5.0, f"半长轴应提升超过 5 km, got {a_history[-1] - a0:.3f} km"
     times_day = (result["time"] - result["time"][0]) / 86400.0
     slope = np.polyfit(times_day, a_history, 1)[0]
     assert slope > 0.0, f"半长轴 secular 斜率应为正, got {slope:.3f} km/day"
 
     # 偏心率保持低值
     assert e_history[-1] < 0.05, f"最终偏心率应 < 0.05, got {e_history[-1]:.6f}"
-    assert np.max(e_history) < 0.05, (
-        f"最大偏心率应 < 0.05, got {np.max(e_history):.6f}"
-    )
+    assert np.max(e_history) < 0.05, f"最大偏心率应 < 0.05, got {np.max(e_history):.6f}"
 
 
 @pytest.mark.spice

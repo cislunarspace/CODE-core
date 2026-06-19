@@ -3,7 +3,6 @@
 覆盖 .gfc 头/系数读取、dot 行、默认 GM/R 与异常处理。
 """
 
-
 import numpy as np
 import pytest
 
@@ -151,9 +150,7 @@ def test_extrapolate_coefficients_linear_drift():
     dotS = np.zeros((3, 2))
 
     # t - t0 = 1 年
-    C_out, _ = extrapolate_coefficients(
-        C, S, dotC, dotS, t=_SECONDS_PER_YEAR, t0=0.0
-    )
+    C_out, _ = extrapolate_coefficients(C, S, dotC, dotS, t=_SECONDS_PER_YEAR, t0=0.0)
 
     np.testing.assert_allclose(C_out[2, 0], -4.84e-4 + 1.0e-11, rtol=1e-12)
     # 未给 dot 的项不变
@@ -198,9 +195,7 @@ def test_extrapolate_c20_dot_sign_and_magnitude_from_j2_dot():
     dotC[2, 0] = C20_dot
     dotS = np.zeros((3, 3))
 
-    C_out, _ = extrapolate_coefficients(
-        C, S, dotC, dotS, t=_SECONDS_PER_YEAR, t0=0.0
-    )
+    C_out, _ = extrapolate_coefficients(C, S, dotC, dotS, t=_SECONDS_PER_YEAR, t0=0.0)
 
     # 1 年后 C20 增加 C20_dot
     np.testing.assert_allclose(C_out[2, 0], C20 + C20_dot, rtol=1e-12)

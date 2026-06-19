@@ -103,9 +103,7 @@ def test_lambda_one_matches_full_dynamics(full_dynamics, base_dynamics):
 
 
 @pytest.mark.parametrize("lam", [0.25, 0.5, 0.75])
-def test_intermediate_lambda_is_linear_interpolation(
-    full_dynamics, base_dynamics, lam
-):
+def test_intermediate_lambda_is_linear_interpolation(full_dynamics, base_dynamics, lam):
     hom = HomotopyEphemerisDynamics(
         system=full_dynamics.system,
         base_bodies=["EARTH", "MOON"],
@@ -145,9 +143,7 @@ def test_homotopy_dynamics_keeps_propagate_working(fake_spice):
         origin="EARTH",
         frame=ReferenceFrame.J2000,
     )
-    hom = HomotopyEphemerisDynamics(
-        system=system, base_bodies=["EARTH", "MOON"], lambda_weight=0.5
-    )
+    hom = HomotopyEphemerisDynamics(system=system, base_bodies=["EARTH", "MOON"], lambda_weight=0.5)
     initial_state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
     result = hom.propagate(
         initial_state=initial_state,

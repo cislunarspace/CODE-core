@@ -165,9 +165,7 @@ class EopFile:
                 f"between {left.mjd} and {right.mjd}"
             )
 
-        ratio = (
-            0.0 if left.mjd == right.mjd else (utc_mjd - left.mjd) / (right.mjd - left.mjd)
-        )
+        ratio = 0.0 if left.mjd == right.mjd else (utc_mjd - left.mjd) / (right.mjd - left.mjd)
 
         x_arcsec = left.x_arcsec + ratio * (right.x_arcsec - left.x_arcsec)
         y_arcsec = left.y_arcsec + ratio * (right.y_arcsec - left.y_arcsec)

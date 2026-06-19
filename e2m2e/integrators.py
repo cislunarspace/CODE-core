@@ -177,8 +177,5 @@ def initialize_cowell_history(
         xs.append(x.copy())
         accels.append(np.asarray(accel(t, x), dtype=float))
 
-    history = (
-        [xs[-2].tolist(), xs[-1].tolist()]
-        + [a.tolist() for a in accels[-8:]]
-    )
+    history = [xs[-2].tolist(), xs[-1].tolist()] + [a.tolist() for a in accels[-8:]]
     return t, x, v, history

@@ -107,9 +107,7 @@ class ImpulsivePropulsion(PropulsionModel):
 
         normal_dir = np.cross(tangential, self.normal)
         norm_nd = np.linalg.norm(normal_dir)
-        normal_dir = (
-            np.array([1.0, 0.0, 0.0]) if norm_nd < 1e-10 else normal_dir / norm_nd
-        )
+        normal_dir = np.array([1.0, 0.0, 0.0]) if norm_nd < 1e-10 else normal_dir / norm_nd
 
         v_injection = alpha * v_mag * tangential + beta * v_mag * normal_dir
 

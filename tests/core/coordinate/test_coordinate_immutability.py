@@ -40,9 +40,7 @@ def test_no_axes_or_origin_attribute_mutation_in_core():
             if stripped.startswith("#"):
                 continue
             if pattern.search(line):
-                offenders.append(
-                    (str(py.relative_to(core_root)), lineno, line.strip())
-                )
+                offenders.append((str(py.relative_to(core_root)), lineno, line.strip()))
 
     assert not offenders, (
         "e2m2e/core/ 检测到 Axes/Origin 属性的运行时 mutate,违反 immutability 规范:\n"

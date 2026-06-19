@@ -1,2 +1,1 @@
-"""MBSE 测试共享 fixture。
-"""
+"""MBSE 测试共享 fixture。"""

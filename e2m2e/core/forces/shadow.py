@@ -76,9 +76,7 @@ class ConicalShadowModel(ShadowModel):
             self._radii.update({k.upper(): float(v) for k, v in radii.items()})
         for body in self._bodies:
             if body not in self._radii:
-                raise ValueError(
-                    f"unknown shadow body {body!r}; provide a radii override"
-                )
+                raise ValueError(f"unknown shadow body {body!r}; provide a radii override")
 
     @property
     def bodies(self) -> tuple[str, ...]:
@@ -210,9 +208,7 @@ class ConicalShadowModel(ShadowModel):
         for body in self._bodies:
             body_pos = spice.get_body_state(body, t, "J2000", origin)[:3]
             r_body = self._radii[body]
-            factors.append(
-                self._body_flux_factor(sc_pos, body_pos, sun_pos, r_body, sun_radius)
-            )
+            factors.append(self._body_flux_factor(sc_pos, body_pos, sun_pos, r_body, sun_radius))
             sc_to_body = body_pos - sc_pos
             d_body = float(np.linalg.norm(sc_to_body))
             angular_radii.append(np.arcsin(min(1.0, r_body / d_body)))

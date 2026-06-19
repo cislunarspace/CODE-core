@@ -4,7 +4,6 @@
 原点偏移、正交性与向量变换。
 """
 
-
 import numpy as np
 import pytest
 
@@ -133,9 +132,7 @@ class TestCoordinateSystemState:
 
         et = 0.0
         state = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        result = cs_inertial.transform_state(
-            state, from_cs=cs_inertial, to_cs=cs_rotating, et=et
-        )
+        result = cs_inertial.transform_state(state, from_cs=cs_inertial, to_cs=cs_rotating, et=et)
 
         # At et=0, rotating frame coincides with inertial frame, so r is unchanged.
         # v_rotating = v_inertial - omega x r = [0, 0, 0] - [0, 0, 1] x [1, 0, 0]

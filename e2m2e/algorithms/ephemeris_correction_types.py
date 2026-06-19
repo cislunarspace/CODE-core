@@ -83,6 +83,5 @@ class UnsupportedCorrectorMethodError(ValueError):
         self.method = method
         self.available = list(available)
         super().__init__(
-            f"unsupported correction method: {method!r}; "
-            f"available: {', '.join(sorted(available))}"
+            f"unsupported correction method: {method!r}; available: {', '.join(sorted(available))}"
         )

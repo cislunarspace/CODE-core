@@ -78,9 +78,7 @@ def test_propagate_maneuvers_records_burn_application():
 
     # index 指向 post-burn 行：该行时刻 == burn epoch、速度 == velocity_after
     assert result["time"][rec.index] == pytest.approx(0.5)
-    np.testing.assert_allclose(
-        result["states"][rec.index][3:6], rec.velocity_after, rtol=1e-12
-    )
+    np.testing.assert_allclose(result["states"][rec.index][3:6], rec.velocity_after, rtol=1e-12)
 
 
 def test_propagate_maneuvers_no_duplicate_epoch_at_burn():

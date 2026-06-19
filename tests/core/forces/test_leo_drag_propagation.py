@@ -1,5 +1,4 @@
-"""LEO 阻力传播端到端测试（需 SPICE 内核）。
-"""
+"""LEO 阻力传播端到端测试（需 SPICE 内核）。"""
 
 import numpy as np
 import pytest

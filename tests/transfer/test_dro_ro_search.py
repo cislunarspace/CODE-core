@@ -1,5 +1,4 @@
-"""DRO-RO 转移搜索模块测试：最小距离、可行解判定。
-"""
+"""DRO-RO 转移搜索模块测试：最小距离、可行解判定。"""
 
 import numpy as np
 import pytest

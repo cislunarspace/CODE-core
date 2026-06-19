@@ -112,7 +112,5 @@ def test_srp_acceleration_points_away_from_sun(earth_icrf_system) -> None:
 
     sun_pos = _sun_pos_rel_earth(system, et)
     sun_to_sc = state[:3] - sun_pos
-    cos_angle = np.dot(acc, sun_to_sc) / (
-        np.linalg.norm(acc) * np.linalg.norm(sun_to_sc)
-    )
+    cos_angle = np.dot(acc, sun_to_sc) / (np.linalg.norm(acc) * np.linalg.norm(sun_to_sc))
     assert cos_angle == pytest.approx(1.0, abs=1e-9)

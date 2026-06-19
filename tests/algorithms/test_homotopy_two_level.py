@@ -24,7 +24,10 @@ def _fake_dynamics():
             frame="J2000",
             spice=object(),
         ),
-        rtol=1e-9, atol=1e-9, max_step=60.0, integrator="DOP853",
+        rtol=1e-9,
+        atol=1e-9,
+        max_step=60.0,
+        integrator="DOP853",
     )
 
 
@@ -42,7 +45,8 @@ def test_two_level_inner_method_is_dispatched_to_two_level_solver():
             captured.append(kwargs)
             return SimpleNamespace(
                 converged=True,
-                outer_iterations=2, level1_iterations=[[1, 1]],
+                outer_iterations=2,
+                level1_iterations=[[1, 1]],
                 final_position_residual=1.0e-3,
                 final_velocity_residual=1.0e-6,
                 per_patch_position_residual=np.array([0.5e-3, 0.5e-3]),
@@ -55,9 +59,12 @@ def test_two_level_inner_method_is_dispatched_to_two_level_solver():
     with patch.object(homotopy_correction, "TwoLevelMultipleShooting", FakeTwoLevelMS):
         result = homotopy_correction.correct_with_homotopy(
             dynamics=_fake_dynamics(),
-            t_patch=t_patch, state_patch=state_patch,
+            t_patch=t_patch,
+            state_patch=state_patch,
             tolerance=1e-3,  # 1e-3 is the two-level default position tolerance
-            max_iter=5, n_workers=1, kernel_dir="k",
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             lambda_steps=[0.5, 1.0],
             inner_method="two_level",
@@ -94,14 +101,19 @@ def test_two_level_dispatches_via_caller_with_inner_method_kwarg():
     def fake_correct_with_homotopy(dynamics_arg, t_patch_arg, state_patch_arg, **kwargs):
         captured.update(kwargs)
         return ephemeris_correction.EphemerisCorrectionResult(
-            converged=True, iterations=1, max_residual=1.0e-3,
-            residual_history=[1.0e-3], velocity_residual=1.0e-6,
+            converged=True,
+            iterations=1,
+            max_residual=1.0e-3,
+            residual_history=[1.0e-3],
+            velocity_residual=1.0e-6,
             velocity_residual_history=[1.0e-6],
-            t_patch=t_patch_arg, state_patch=state_patch_arg,
+            t_patch=t_patch_arg,
+            state_patch=state_patch_arg,
         )
 
     with patch.object(homotopy_correction, "correct_with_homotopy", fake_correct_with_homotopy):
         import sys
+
         saved = sys.modules.get("e2m2e.algorithms.homotopy_correction")
         sys.modules["e2m2e.algorithms.homotopy_correction"] = homotopy_correction
         try:
@@ -110,8 +122,11 @@ def test_two_level_dispatches_via_caller_with_inner_method_kwarg():
                 dynamics=fake_dynamics,
                 t_patch=np.array([0.0, 1.0, 2.0]),
                 state_patch=np.zeros((3, 6)),
-                tolerance=1e-3, max_iter=5, verbose=False,
-                n_workers=1, kernel_dir="k",
+                tolerance=1e-3,
+                max_iter=5,
+                verbose=False,
+                n_workers=1,
+                kernel_dir="k",
                 inner_method="two_level",
             )
         finally:
@@ -130,7 +145,10 @@ def test_two_level_rejects_recursive_homotopy_inner_method():
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0, 200.0]),
             state_patch=np.ones((3, 6)),
-            tolerance=1e-3, max_iter=5, n_workers=1, kernel_dir="k",
+            tolerance=1e-3,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             inner_method="homotopy",
             lambda_steps=[0.5, 1.0],
@@ -150,20 +168,28 @@ def test_two_level_uses_velocity_tolerance_default():
         def correct(self, **kwargs):
             velocity_tolerances.append(kwargs["velocity_tolerance"])
             return SimpleNamespace(
-                converged=True, status="converged", outer_iterations=1,
-                level1_iterations=[1], final_position_residual=1.0e-3,
+                converged=True,
+                status="converged",
+                outer_iterations=1,
+                level1_iterations=[1],
+                final_position_residual=1.0e-3,
                 final_velocity_residual=1.0e-6,
                 per_patch_position_residual=np.array([0.5e-3, 0.5e-3]),
                 per_patch_velocity_residual=np.array([0.5e-6, 0.5e-6]),
                 residual_history=[(1.0e-3, 1.0e-6)],
-                t_patch=kwargs["t_patch"], state_patch=kwargs["state_patch"],
+                t_patch=kwargs["t_patch"],
+                state_patch=kwargs["state_patch"],
             )
 
     with patch.object(homotopy_correction, "TwoLevelMultipleShooting", FakeTwoLevelMS):
         homotopy_correction.correct_with_homotopy(
             dynamics=_fake_dynamics(),
-            t_patch=t_patch, state_patch=state_patch,
-            tolerance=1e-3, max_iter=5, n_workers=1, kernel_dir="k",
+            t_patch=t_patch,
+            state_patch=state_patch,
+            tolerance=1e-3,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             lambda_steps=[1.0],
             inner_method="two_level",
@@ -183,8 +209,11 @@ def test_two_level_failed_final_step_aggregates_correctly():
 
         def correct(self, **kwargs):
             return SimpleNamespace(
-                converged=False, status="max_iterations", outer_iterations=5,
-                level1_iterations=[[5, 5]], final_position_residual=2.0e-3,
+                converged=False,
+                status="max_iterations",
+                outer_iterations=5,
+                level1_iterations=[[5, 5]],
+                final_position_residual=2.0e-3,
                 final_velocity_residual=2.0e-6,
                 per_patch_position_residual=np.array([1.0e-3, 1.0e-3]),
                 per_patch_velocity_residual=np.array([1.0e-6, 1.0e-6]),
@@ -196,8 +225,12 @@ def test_two_level_failed_final_step_aggregates_correctly():
     with patch.object(homotopy_correction, "TwoLevelMultipleShooting", FakeTwoLevelMS):
         result = homotopy_correction.correct_with_homotopy(
             dynamics=_fake_dynamics(),
-            t_patch=t_patch, state_patch=state_patch,
-            tolerance=1e-3, max_iter=5, n_workers=1, kernel_dir="k",
+            t_patch=t_patch,
+            state_patch=state_patch,
+            tolerance=1e-3,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             lambda_steps=[0.5, 1.0],
             inner_method="two_level",

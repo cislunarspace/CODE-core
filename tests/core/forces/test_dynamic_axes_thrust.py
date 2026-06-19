@@ -115,6 +115,7 @@ def earth_ephemeris_system(spice_kernel_path):
 
 # --- 测试 1：VNB 沿速度方向推力 ---
 
+
 @pytest.mark.spice
 def test_vnb_velocity_direction_thrust_increases_semi_major_axis(earth_ephemeris_system):
     """VNB 下 direction=[1,0,0] 沿速度方向推力，验证半长轴与轨道能量增加。"""
@@ -148,16 +149,13 @@ def test_vnb_velocity_direction_thrust_increases_semi_major_axis(earth_ephemeris
     # Assert：半长轴增加
     a_initial = _semi_major_axis(result["states"][0], mu)
     a_final = _semi_major_axis(result["states"][-1], mu)
-    assert a_final > a_initial, (
-        f"半长轴应增加: initial={a_initial:.3f} km, final={a_final:.3f} km"
-    )
+    assert a_final > a_initial, f"半长轴应增加: initial={a_initial:.3f} km, final={a_final:.3f} km"
 
     # Assert：轨道能量增加
     energy_initial = _orbital_energy(result["states"][0], mu)
     energy_final = _orbital_energy(result["states"][-1], mu)
     assert energy_final > energy_initial, (
-        f"轨道能量应增加: initial={energy_initial:.6f} km²/s², "
-        f"final={energy_final:.6f} km²/s²"
+        f"轨道能量应增加: initial={energy_initial:.6f} km²/s², final={energy_final:.6f} km²/s²"
     )
 
 
@@ -216,6 +214,7 @@ def test_vnb_velocity_direction_thrust_acceleration_aligns_with_velocity(
 
 # --- 测试 2：LVLH 径向推力 ---
 
+
 @pytest.mark.spice
 def test_lvlh_radial_direction_thrust_increases_eccentricity(earth_ephemeris_system):
     """LVLH 下 direction=[1,0,0] 径向推力，验证偏心率随时间增加。"""
@@ -249,9 +248,7 @@ def test_lvlh_radial_direction_thrust_increases_eccentricity(earth_ephemeris_sys
     # Assert：偏心率增加
     e_initial = _eccentricity(result["states"][0], mu)
     e_final = _eccentricity(result["states"][-1], mu)
-    assert e_final > e_initial, (
-        f"偏心率应增加: initial={e_initial:.6f}, final={e_final:.6f}"
-    )
+    assert e_final > e_initial, f"偏心率应增加: initial={e_initial:.6f}, final={e_final:.6f}"
 
     # 进一步验证：偏心率序列单调递增（或至少总体趋势上升）
     e_history = np.array([_eccentricity(s, mu) for s in result["states"]])
@@ -311,6 +308,7 @@ def test_lvlh_radial_direction_thrust_acceleration_aligns_with_position(
 
 # --- 测试 3：动态坐标系转换矩阵正交性 ---
 
+
 @pytest.mark.spice
 def test_vnb_rotation_matrix_orthogonality_during_propagation(earth_ephemeris_system):
     """VNB 推力传播过程中，动态坐标系转换矩阵保持正交（R @ R.T ≈ I）。"""
@@ -362,15 +360,11 @@ def test_vnb_rotation_matrix_orthogonality_during_propagation(earth_ephemeris_sy
         # 验证正交性：R @ R.T ≈ I
         identity_check = R @ R.T
         deviation = np.max(np.abs(identity_check - np.eye(3)))
-        assert deviation < 1e-14, (
-            f"VNB 转换矩阵正交性偏差应 < 1e-14, got {deviation:.2e}"
-        )
+        assert deviation < 1e-14, f"VNB 转换矩阵正交性偏差应 < 1e-14, got {deviation:.2e}"
 
         # 验证行列式 = 1（右手系）
         det = np.linalg.det(R)
-        assert abs(det - 1.0) < 1e-14, (
-            f"VNB 转换矩阵行列式应 ≈ 1, got {det:.6f}"
-        )
+        assert abs(det - 1.0) < 1e-14, f"VNB 转换矩阵行列式应 ≈ 1, got {det:.6f}"
 
 
 @pytest.mark.spice
@@ -422,12 +416,8 @@ def test_lvlh_rotation_matrix_orthogonality_during_propagation(earth_ephemeris_s
 
         # LVLH 基的关键几何性质：
         # 1. N 同时垂直于 R 和 V（叉积性质）
-        assert abs(np.dot(N, R)) < 1e-14, (
-            f"N 应垂直于 R: dot={np.dot(N, R):.2e}"
-        )
-        assert abs(np.dot(N, V)) < 1e-14, (
-            f"N 应垂直于 V: dot={np.dot(N, V):.2e}"
-        )
+        assert abs(np.dot(N, R)) < 1e-14, f"N 应垂直于 R: dot={np.dot(N, R):.2e}"
+        assert abs(np.dot(N, V)) < 1e-14, f"N 应垂直于 V: dot={np.dot(N, V):.2e}"
 
         # 2. R 和 V 的点积 = r·v / (|r||v|)，在椭圆轨道中不为零
         rv_dot = np.dot(R, V)
@@ -442,18 +432,15 @@ def test_lvlh_rotation_matrix_orthogonality_during_propagation(earth_ephemeris_s
             ortho_matrix = np.array([R, V_perp, N])
             identity_check = ortho_matrix @ ortho_matrix.T
             deviation = np.max(np.abs(identity_check - np.eye(3)))
-            assert deviation < 1e-14, (
-                f"Gram-Schmidt 正交基偏差应 < 1e-14, got {deviation:.2e}"
-            )
+            assert deviation < 1e-14, f"Gram-Schmidt 正交基偏差应 < 1e-14, got {deviation:.2e}"
 
             # 行列式 = 1（右手系）
             det = np.linalg.det(ortho_matrix)
-            assert abs(det - 1.0) < 1e-14, (
-                f"正交基行列式应 ≈ 1, got {det:.6f}"
-            )
+            assert abs(det - 1.0) < 1e-14, f"正交基行列式应 ≈ 1, got {det:.6f}"
 
 
 # --- 测试 4：VNB/LVLH 混合方向推力验证 ---
+
 
 @pytest.mark.spice
 def test_vnb_combined_direction_thrust_produces_expected_components(
@@ -497,7 +484,7 @@ def test_vnb_combined_direction_thrust_produces_expected_components(
     h_norm = np.linalg.norm(h)
     N = h / h_norm
 
-    gravity_acc = -mu / (np.linalg.norm(r)**3) * r
+    gravity_acc = -mu / (np.linalg.norm(r) ** 3) * r
     total_acc = fm._compute_total_acceleration(et0, state)
     thrust_acc = total_acc - gravity_acc
 
@@ -562,6 +549,7 @@ def test_lvlh_combined_direction_thrust_produces_expected_components(
 
 # --- 测试 5：零推力边界 ---
 
+
 @pytest.mark.spice
 def test_vnb_zero_thrust_no_orbit_change(earth_ephemeris_system):
     """VNB 方向但推力为零时，轨道应与纯引力传播一致。"""
@@ -587,12 +575,8 @@ def test_vnb_zero_thrust_no_orbit_change(earth_ephemeris_system):
     t_eval = np.linspace(et0, et0 + 600.0, 20)
 
     # Act
-    result_with_zero = fm_with_zero_thrust.propagate(
-        y0, t_span, t_eval=t_eval, max_steps=200_000
-    )
-    result_gravity_only = fm_gravity_only.propagate(
-        y0, t_span, t_eval=t_eval, max_steps=200_000
-    )
+    result_with_zero = fm_with_zero_thrust.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
+    result_gravity_only = fm_gravity_only.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
     # Assert
     np.testing.assert_allclose(

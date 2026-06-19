@@ -23,7 +23,10 @@ def _fake_dynamics():
             frame="J2000",
             spice=object(),
         ),
-        rtol=1e-9, atol=1e-9, max_step=60.0, integrator="DOP853",
+        rtol=1e-9,
+        atol=1e-9,
+        max_step=60.0,
+        integrator="DOP853",
     )
 
 
@@ -33,7 +36,10 @@ def test_inner_method_homotopy_is_rejected():
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0]),
             state_patch=np.ones((2, 6)),
-            tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             inner_method="homotopy",
         )
@@ -45,7 +51,10 @@ def test_invalid_base_bodies_not_subset_raises():
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0]),
             state_patch=np.ones((2, 6)),
-            tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "JUPITER"],  # JUPITER not in bodies
         )
 
@@ -56,7 +65,10 @@ def test_invalid_base_bodies_missing_origin_raises():
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0]),
             state_patch=np.ones((2, 6)),
-            tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["MOON"],  # missing EARTH (origin)
         )
 
@@ -64,11 +76,11 @@ def test_invalid_base_bodies_missing_origin_raises():
 @pytest.mark.parametrize(
     "lambda_steps",
     [
-        [],                              # empty
-        [0.5],                           # missing terminal 1.0
-        [0.5, 0.3],                      # not strictly increasing
-        [0.5, 0.75, 1.1],                # > 1.0
-        [-0.1, 0.5, 1.0],                # < 0.0
+        [],  # empty
+        [0.5],  # missing terminal 1.0
+        [0.5, 0.3],  # not strictly increasing
+        [0.5, 0.75, 1.1],  # > 1.0
+        [-0.1, 0.5, 1.0],  # < 0.0
     ],
 )
 def test_invalid_lambda_steps_raises(lambda_steps):
@@ -77,7 +89,10 @@ def test_invalid_lambda_steps_raises(lambda_steps):
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0]),
             state_patch=np.ones((2, 6)),
-            tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             lambda_steps=lambda_steps,
         )
@@ -97,7 +112,9 @@ def test_intermediate_steps_use_loose_tolerance_final_uses_strict():
             captured_tols.append(kwargs["tolerance"])
             _ = self.dynamics.lambda_weight  # ensure attribute is readable
             return SimpleNamespace(
-                converged=True, outer_iterations=1, max_residual=1e-12,
+                converged=True,
+                outer_iterations=1,
+                max_residual=1e-12,
                 residual_history=[1e-12],
                 t_patch=kwargs["t_patch"] + 0.1,
                 state_patch=kwargs["state_patch"] + 0.01,
@@ -106,8 +123,12 @@ def test_intermediate_steps_use_loose_tolerance_final_uses_strict():
     with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
         homotopy_correction.correct_with_homotopy(
             dynamics=_fake_dynamics(),
-            t_patch=t_patch, state_patch=state_patch,
-            tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
+            t_patch=t_patch,
+            state_patch=state_patch,
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             lambda_steps=[0.25, 0.5, 1.0],
         )
@@ -129,7 +150,9 @@ def test_each_step_seeded_with_previous_step_output():
             seeded.append((np.array(kwargs["t_patch"]), np.array(kwargs["state_patch"])))
             # Return a slightly perturbed result so we can check seeding
             return SimpleNamespace(
-                converged=True, outer_iterations=1, max_residual=1e-12,
+                converged=True,
+                outer_iterations=1,
+                max_residual=1e-12,
                 residual_history=[1e-12],
                 t_patch=kwargs["t_patch"] + 0.5,
                 state_patch=kwargs["state_patch"] + 0.1,
@@ -138,8 +161,12 @@ def test_each_step_seeded_with_previous_step_output():
     with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
         homotopy_correction.correct_with_homotopy(
             dynamics=_fake_dynamics(),
-            t_patch=t_patch, state_patch=state_patch,
-            tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
+            t_patch=t_patch,
+            state_patch=state_patch,
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             lambda_steps=[0.5, 1.0],
         )
@@ -177,8 +204,12 @@ def test_failed_intermediate_step_still_seeds_next_step():
     with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
         result = homotopy_correction.correct_with_homotopy(
             dynamics=_fake_dynamics(),
-            t_patch=t_patch, state_patch=state_patch,
-            tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
+            t_patch=t_patch,
+            state_patch=state_patch,
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             lambda_steps=[0.5, 1.0],
         )
@@ -202,7 +233,9 @@ def test_aggregated_fields_follow_spec():
 
         def correct(self, **kwargs):
             return SimpleNamespace(
-                converged=True, outer_iterations=2, max_residual=2.0e-9,
+                converged=True,
+                outer_iterations=2,
+                max_residual=2.0e-9,
                 residual_history=[1.0e-7, 2.0e-9],
                 t_patch=kwargs["t_patch"] + 0.1,
                 state_patch=kwargs["state_patch"] + 0.01,
@@ -211,8 +244,12 @@ def test_aggregated_fields_follow_spec():
     with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
         result = homotopy_correction.correct_with_homotopy(
             dynamics=_fake_dynamics(),
-            t_patch=t_patch, state_patch=state_patch,
-            tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
+            t_patch=t_patch,
+            state_patch=state_patch,
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             lambda_steps=[0.25, 0.5, 0.75, 1.0],
         )
@@ -233,6 +270,7 @@ def test_aggregated_fields_follow_spec():
 # Failure-path coverage (Issue #240)
 # ---------------------------------------------------------------------------
 
+
 def test_final_step_nonconvergence_aggregates_to_converged_false():
     """If the final step returns converged=False, the aggregated result is converged=False.
 
@@ -248,7 +286,9 @@ def test_final_step_nonconvergence_aggregates_to_converged_false():
 
         def correct(self, **kwargs):
             return SimpleNamespace(
-                converged=False, outer_iterations=10, max_residual=1.0e-5,
+                converged=False,
+                outer_iterations=10,
+                max_residual=1.0e-5,
                 residual_history=[1.0e-3, 1.0e-5],
                 t_patch=kwargs["t_patch"] + 0.1,
                 state_patch=kwargs["state_patch"] + 0.01,
@@ -257,8 +297,12 @@ def test_final_step_nonconvergence_aggregates_to_converged_false():
     with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
         result = homotopy_correction.correct_with_homotopy(
             dynamics=_fake_dynamics(),
-            t_patch=t_patch, state_patch=state_patch,
-            tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
+            t_patch=t_patch,
+            state_patch=state_patch,
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             lambda_steps=[0.5, 1.0],
         )
@@ -276,6 +320,7 @@ def test_inner_step_exception_raises_with_context():
     The context string should include the step index, the lambda value, and
     the inner method so that the failure is debuggable in isolation.
     """
+
     class ExplodingMS:
         def __init__(self, dynamics, n_workers, kernel_dir):
             self.dynamics = dynamics
@@ -285,24 +330,31 @@ def test_inner_step_exception_raises_with_context():
             if abs(self.dynamics.lambda_weight - 0.75) < 1e-12:
                 raise RuntimeError("upstream solver failure")
             return SimpleNamespace(
-                converged=True, outer_iterations=1, max_residual=1.0e-9,
+                converged=True,
+                outer_iterations=1,
+                max_residual=1.0e-9,
                 residual_history=[1.0e-9],
                 t_patch=kwargs["t_patch"] + 0.1,
                 state_patch=kwargs["state_patch"] + 0.01,
             )
 
-    with patch.object(homotopy_correction, "MultipleShooting", ExplodingMS), pytest.raises(
-        RuntimeError, match=r"lambda step 1.*lambda=0\.75.*inner_method=standard"
+    with (
+        patch.object(homotopy_correction, "MultipleShooting", ExplodingMS),
+        pytest.raises(RuntimeError, match=r"lambda step 1.*lambda=0\.75.*inner_method=standard"),
     ):
         homotopy_correction.correct_with_homotopy(
-                dynamics=_fake_dynamics(),
-                t_patch=np.array([0.0, 100.0]),
-                state_patch=np.ones((2, 6)),
-                tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
-                base_bodies=["EARTH", "MOON"],
-                lambda_steps=[0.5, 0.75, 1.0],
-                inner_method="standard",
-            )
+            dynamics=_fake_dynamics(),
+            t_patch=np.array([0.0, 100.0]),
+            state_patch=np.ones((2, 6)),
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
+            base_bodies=["EARTH", "MOON"],
+            lambda_steps=[0.5, 0.75, 1.0],
+            inner_method="standard",
+        )
+
 
 def test_residual_history_not_dropped_when_intermediate_step_fails():
     """residual_history accumulates all per-step histories, even if some steps are nonconverged.
@@ -312,26 +364,37 @@ def test_residual_history_not_dropped_when_intermediate_step_fails():
     """
     t_patch = np.array([0.0, 100.0])
     state_patch = np.ones((2, 6))
-    per_step_results = iter([
-        # step 0: converges
-        SimpleNamespace(
-            converged=True, outer_iterations=3, max_residual=1.0e-9,
-            residual_history=[1.0e-7, 1.0e-8, 1.0e-9],
-            t_patch=t_patch + 0.1, state_patch=state_patch + 0.01,
-        ),
-        # step 1: does NOT converge, but reports a residual history
-        SimpleNamespace(
-            converged=False, outer_iterations=5, max_residual=1.0e-4,
-            residual_history=[1.0e-3, 1.0e-4],
-            t_patch=t_patch + 0.2, state_patch=state_patch + 0.02,
-        ),
-        # step 2: final step
-        SimpleNamespace(
-            converged=True, outer_iterations=2, max_residual=1.0e-9,
-            residual_history=[1.0e-8, 1.0e-9],
-            t_patch=t_patch + 0.3, state_patch=state_patch + 0.03,
-        ),
-    ])
+    per_step_results = iter(
+        [
+            # step 0: converges
+            SimpleNamespace(
+                converged=True,
+                outer_iterations=3,
+                max_residual=1.0e-9,
+                residual_history=[1.0e-7, 1.0e-8, 1.0e-9],
+                t_patch=t_patch + 0.1,
+                state_patch=state_patch + 0.01,
+            ),
+            # step 1: does NOT converge, but reports a residual history
+            SimpleNamespace(
+                converged=False,
+                outer_iterations=5,
+                max_residual=1.0e-4,
+                residual_history=[1.0e-3, 1.0e-4],
+                t_patch=t_patch + 0.2,
+                state_patch=state_patch + 0.02,
+            ),
+            # step 2: final step
+            SimpleNamespace(
+                converged=True,
+                outer_iterations=2,
+                max_residual=1.0e-9,
+                residual_history=[1.0e-8, 1.0e-9],
+                t_patch=t_patch + 0.3,
+                state_patch=state_patch + 0.03,
+            ),
+        ]
+    )
 
     class FakeMS:
         def __init__(self, dynamics, n_workers, kernel_dir):
@@ -343,8 +406,12 @@ def test_residual_history_not_dropped_when_intermediate_step_fails():
     with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
         result = homotopy_correction.correct_with_homotopy(
             dynamics=_fake_dynamics(),
-            t_patch=t_patch, state_patch=state_patch,
-            tolerance=1e-8, max_iter=5, n_workers=1, kernel_dir="k",
+            t_patch=t_patch,
+            state_patch=state_patch,
+            tolerance=1e-8,
+            max_iter=5,
+            n_workers=1,
+            kernel_dir="k",
             base_bodies=["EARTH", "MOON"],
             lambda_steps=[0.5, 0.75, 1.0],
         )
@@ -353,9 +420,13 @@ def test_residual_history_not_dropped_when_intermediate_step_fails():
     assert result.converged is True
     # No history entries lost: 3 + 2 + 2 = 7 entries in order
     assert result.residual_history == [
-        1.0e-7, 1.0e-8, 1.0e-9,    # step 0
-        1.0e-3, 1.0e-4,            # step 1
-        1.0e-8, 1.0e-9,            # step 2
+        1.0e-7,
+        1.0e-8,
+        1.0e-9,  # step 0
+        1.0e-3,
+        1.0e-4,  # step 1
+        1.0e-8,
+        1.0e-9,  # step 2
     ]
     # final max_residual is from step 2
     assert result.max_residual == 1.0e-9

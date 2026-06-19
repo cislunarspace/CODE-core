@@ -2,6 +2,7 @@
 
 验证标准/两层/同伦三种修正方法的注册表分发与结果聚合。
 """
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -137,13 +138,18 @@ def test_homotopy_method_delegates_to_correct_with_homotopy(monkeypatch):
         captured["state_patch"] = state_patch_arg
         captured.update(kwargs)
         return ephemeris_correction.EphemerisCorrectionResult(
-            converged=True, iterations=2, max_residual=1.0e-9,
+            converged=True,
+            iterations=2,
+            max_residual=1.0e-9,
             residual_history=[1.0e-6, 1.0e-9],
-            t_patch=t_patch_arg, state_patch=state_patch_arg,
+            t_patch=t_patch_arg,
+            state_patch=state_patch_arg,
         )
 
     monkeypatch.setattr(
-        homotopy_correction, "correct_with_homotopy", fake,
+        homotopy_correction,
+        "correct_with_homotopy",
+        fake,
     )
 
     result = correct_ephemeris_patch_points(

@@ -123,9 +123,7 @@ EARTH_RE = 6378.137  # km, equatorial radius
 EARTH_J2 = 1.0826261e-3
 
 
-def j2_rhs(
-    mu: float = EARTH_MU, re: float = EARTH_RE, j2: float = EARTH_J2
-):
+def j2_rhs(mu: float = EARTH_MU, re: float = EARTH_RE, j2: float = EARTH_J2):
     """Two-body + J2 acceleration, state vector [x, y, z, vx, vy, vz] in km/s."""
 
     def f(t: float, state: np.ndarray) -> np.ndarray:  # noqa: ARG001

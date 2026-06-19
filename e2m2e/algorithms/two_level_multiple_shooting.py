@@ -228,9 +228,7 @@ class TwoLevelMultipleShooting:
         )
 
         l1_tol = (
-            position_tolerance
-            if level1_position_tolerance is None
-            else level1_position_tolerance
+            position_tolerance if level1_position_tolerance is None else level1_position_tolerance
         )
 
         t_work = t_values.copy()
@@ -352,9 +350,7 @@ class TwoLevelMultipleShooting:
             ValueError: 任何参数不合法时
         """
         if not isinstance(boundary, BoundaryMode):
-            raise TypeError(
-                f"boundary must be a BoundaryMode enum, got {type(boundary).__name__}"
-            )
+            raise TypeError(f"boundary must be a BoundaryMode enum, got {type(boundary).__name__}")
         if t_values.ndim != 1:
             raise ValueError("t_patch must be one-dimensional")
         if states.ndim != 2 or states.shape[1] != 6:

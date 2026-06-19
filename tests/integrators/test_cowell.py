@@ -113,9 +113,7 @@ def test_cowell_leo_j2_matches_dop853():
     h = 0.04  # normalised time units (~32 s for a 400 km LEO)
     t_cw, x_cw = _propagate_cowell(accel, x0, v0, h, t_span[1])
 
-    sol = solve_ivp(
-        rhs, t_span, y0, method="DOP853", rtol=1e-12, atol=1e-12, dense_output=True
-    )
+    sol = solve_ivp(rhs, t_span, y0, method="DOP853", rtol=1e-12, atol=1e-12, dense_output=True)
     assert sol.success
     x_ref = np.asarray(sol.sol(t_cw))[:3]
     assert np.linalg.norm(x_cw - x_ref) < 1e-9

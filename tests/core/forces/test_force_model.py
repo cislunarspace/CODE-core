@@ -224,4 +224,3 @@ def test_multi_force_acceleration_equals_vector_sum():
         + f3.compute_acceleration(0.0, state, system)
     )
     np.testing.assert_allclose(total, manual_sum, atol=1e-14)
-

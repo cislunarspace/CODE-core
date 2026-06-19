@@ -37,9 +37,7 @@ def _build_l_halo_seed(libration_point: int, halo_class: int, amplitude_z: float
         halo_class=halo_class,
         verbose=False,
     )
-    assert seed is not None, (
-        f"L{libration_point} {'北' if halo_class == 0 else '南'} 种子生成失败"
-    )
+    assert seed is not None, f"L{libration_point} {'北' if halo_class == 0 else '南'} 种子生成失败"
     assert seed.correction_success, (
         f"L{libration_point} {'北' if halo_class == 0 else '南'} 种子修正失败"
     )

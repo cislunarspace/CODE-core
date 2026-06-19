@@ -30,9 +30,7 @@ def _trivial_pseudo_dro(spice_eph_dynamics, n_points: int = 5):
     return t_patch, state_patch
 
 
-def test_standard_homotopy_against_real_spice_kernels(
-    spice_eph_dynamics, spice_kernel_path
-):
+def test_standard_homotopy_against_real_spice_kernels(spice_eph_dynamics, spice_kernel_path):
     """Run the standard-MS homotopy on a real SPICE-backed dynamics.
 
     Skips if no SPICE kernel is available. The test verifies that
@@ -91,9 +89,7 @@ def test_standard_homotopy_via_dispatch(spice_eph_dynamics, spice_kernel_path):
 
 
 @pytest.mark.slow
-def test_two_level_homotopy_against_real_spice_kernels(
-    spice_eph_dynamics, spice_kernel_path
-):
+def test_two_level_homotopy_against_real_spice_kernels(spice_eph_dynamics, spice_kernel_path):
     """Two-level homotopy is more expensive; mark as slow and skip if not requested.
 
     The two-level path uses a different default velocity_tolerance (1e-6)
@@ -120,9 +116,7 @@ def test_two_level_homotopy_against_real_spice_kernels(
     assert np.isfinite(result.velocity_residual)
 
 
-def test_homotopy_j2000_et_km_units_are_preserved(
-    spice_eph_dynamics, spice_kernel_path
-):
+def test_homotopy_j2000_et_km_units_are_preserved(spice_eph_dynamics, spice_kernel_path):
     """The t_patch / state_patch units are J2000 / ET seconds / km / km/s.
 
     The trajectory state_patch should stay in the same numerical regime as

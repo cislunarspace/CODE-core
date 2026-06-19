@@ -230,23 +230,17 @@ class TestHaloThirdOrderApproximation:
     def test_invalid_L_raises(self):
         """L 不是 1 或 2 时应抛出 ValueError。"""
         with pytest.raises(ValueError, match="L必须是1或2"):
-            halo_third_order_approximation(
-                mu=MU, Au=0.01, Aw=0.01, phi=0.0, L=3, tf=1.0, N=100
-            )
+            halo_third_order_approximation(mu=MU, Au=0.01, Aw=0.01, phi=0.0, L=3, tf=1.0, N=100)
 
     def test_invalid_N_raises(self):
         """N < 2 时应抛出 ValueError。"""
         with pytest.raises(ValueError, match="N必须大于等于2"):
-            halo_third_order_approximation(
-                mu=MU, Au=0.01, Aw=0.01, phi=0.0, L=1, tf=1.0, N=1
-            )
+            halo_third_order_approximation(mu=MU, Au=0.01, Aw=0.01, phi=0.0, L=1, tf=1.0, N=1)
 
     def test_invalid_tf_raises(self):
         """tf <= 0 时应抛出 ValueError。"""
         with pytest.raises(ValueError, match="tf必须为正数"):
-            halo_third_order_approximation(
-                mu=MU, Au=0.01, Aw=0.01, phi=0.0, L=1, tf=0.0, N=100
-            )
+            halo_third_order_approximation(mu=MU, Au=0.01, Aw=0.01, phi=0.0, L=1, tf=0.0, N=100)
 
     def test_invalid_halo_class_raises(self):
         """halo_class 不是 0 或 1 时应抛出 ValueError。"""

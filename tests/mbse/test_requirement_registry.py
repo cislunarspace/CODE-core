@@ -2,6 +2,7 @@
 
 覆盖注册、查重、分类过滤、追溯矩阵与覆盖率报告。
 """
+
 from __future__ import annotations
 
 import pytest
@@ -100,10 +101,12 @@ def test_coverage_report_handles_empty_and_partially_covered_registry(registry):
         "coverage_rate": 0.0,
     }
 
-    registry.register_many([
-        make_requirement("REQ-001", linked_tests=["tests/example_test.py"]),
-        make_requirement("REQ-002"),
-    ])
+    registry.register_many(
+        [
+            make_requirement("REQ-001", linked_tests=["tests/example_test.py"]),
+            make_requirement("REQ-002"),
+        ]
+    )
 
     assert registry.coverage_report() == {
         "total": 2,

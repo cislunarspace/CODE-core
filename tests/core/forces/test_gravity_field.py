@@ -72,9 +72,7 @@ def test_gravity_field_degree_two_matches_j2_formula(minimal_gravity_file):
     acc = gf.compute_acceleration(0.0, state, None)
 
     point_mass = -gf.gravitational_parameter / np.linalg.norm(r) ** 3 * r
-    j2_acc = j2_analytical_acceleration(
-        r, gf.gravitational_parameter, gf.reference_radius, j2
-    )
+    j2_acc = j2_analytical_acceleration(r, gf.gravitational_parameter, gf.reference_radius, j2)
     expected = point_mass + j2_acc
     np.testing.assert_allclose(acc, expected, rtol=1e-12)
 

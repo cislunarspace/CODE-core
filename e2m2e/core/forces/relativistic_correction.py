@@ -158,9 +158,7 @@ class RelativisticCorrection(PhysicalModel):
         central_state = spice.get_body_state(
             self._central_body, t, "J2000", "SOLAR SYSTEM BARYCENTER"
         )
-        primary_state = spice.get_body_state(
-            primary, t, "J2000", "SOLAR SYSTEM BARYCENTER"
-        )
+        primary_state = spice.get_body_state(primary, t, "J2000", "SOLAR SYSTEM BARYCENTER")
         rel_state = central_state - primary_state
         r_vec = rel_state[:3]
         v_vec = rel_state[3:6]
@@ -172,9 +170,7 @@ class RelativisticCorrection(PhysicalModel):
         vel = 1.5 * v_vec
         return np.cross(vel, pos)
 
-    def _compute_angular_momentum(
-        self, t: float, system: Any
-    ) -> npt.NDArray[np.floating]:
+    def _compute_angular_momentum(self, t: float, system: Any) -> npt.NDArray[np.floating]:
         """通过 bodyFixed -> inertial 旋转矩阵实时计算角动量矢量 J。"""
         try:
             spice = system.spice

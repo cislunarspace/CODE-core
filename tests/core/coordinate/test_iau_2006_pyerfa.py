@@ -26,7 +26,7 @@ T_TEST = 0.5
 _SECONDS_PER_JULIAN_CENTURY = 36525.0 * 86400.0
 
 # 容差(详见模块 docstring)
-ANGLE_TOL = 5e-5      # 弧度,约 10 角秒
+ANGLE_TOL = 5e-5  # 弧度,约 10 角秒
 MATRIX_TOL = 5e-5
 ORTHO_TOL = 1e-14
 
@@ -174,9 +174,7 @@ class TestIau2000EqMatrix:
     def test_iau2000eq_matrix_equivalent_to_precession_matrix(self):
         """iau2000eq_matrix(T_TEST * 36525 * 86400) ≡ precession_matrix(T_TEST)(1e-14)。"""
         et = T_TEST * _SECONDS_PER_JULIAN_CENTURY
-        np.testing.assert_allclose(
-            iau2000eq_matrix(et), precession_matrix(T_TEST), atol=1e-14
-        )
+        np.testing.assert_allclose(iau2000eq_matrix(et), precession_matrix(T_TEST), atol=1e-14)
 
 
 class TestIau2000EqTrueMatrix:
@@ -218,4 +216,3 @@ class TestOrthogonality:
 
         np.testing.assert_allclose(R @ R.T, np.eye(3), atol=ORTHO_TOL)
         np.testing.assert_allclose(np.linalg.det(R), 1.0, atol=ORTHO_TOL)
-

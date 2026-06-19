@@ -101,9 +101,8 @@ def nutation_angles(t: float) -> tuple[float, float, float]:
     """
     # 黄经章动主项系数（角秒）
     # 基于 IAU 2000A 最大项近似
-    dpsi_arcsec = (
-        -17.206424 * np.sin(_mean_moon_node(t))
-        + 0.003386 * np.sin(2 * _mean_moon_node(t))
+    dpsi_arcsec = -17.206424 * np.sin(_mean_moon_node(t)) + 0.003386 * np.sin(
+        2 * _mean_moon_node(t)
     )
     deps_arcsec = 9.205233 * np.cos(_mean_moon_node(t))
 

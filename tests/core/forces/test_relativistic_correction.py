@@ -169,9 +169,7 @@ def test_config_round_trip():
     assert restored.enable_schwarzschild is True
     assert restored.enable_lense_thirring is False
     assert restored.enable_de_sitter is True
-    np.testing.assert_array_equal(
-        restored.angular_momentum_vector, np.array([0.0, 0.0, 7.5e33])
-    )
+    np.testing.assert_array_equal(restored.angular_momentum_vector, np.array([0.0, 0.0, 7.5e33]))
     assert restored.body_radius == pytest.approx(6378.137)
     assert restored.c == pytest.approx(299792.458)
     assert restored.gamma == pytest.approx(1.0)
@@ -232,9 +230,7 @@ def test_gps_relativistic_position_difference_magnitude(earth_ephemeris_system):
 
     gravity = GravityField(body="EARTH", degree=2, order=0)
     fm_without = ForceModel(system, forces=[gravity])
-    result_without = fm_without.propagate(
-        y0, t_span, t_eval=t_eval, max_steps=200_000
-    )
+    result_without = fm_without.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
     relcorr = RelativisticCorrection(
         central_body="EARTH",
@@ -243,9 +239,7 @@ def test_gps_relativistic_position_difference_magnitude(earth_ephemeris_system):
     fm_with = ForceModel(system, forces=[gravity, relcorr])
     result_with = fm_with.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
-    pos_diff = np.linalg.norm(
-        result_with["states"][-1, :3] - result_without["states"][-1, :3]
-    )
+    pos_diff = np.linalg.norm(result_with["states"][-1, :3] - result_without["states"][-1, :3])
     # 物理量级：GPS 轨道 Schwarzschild 修正约 0.3 mm/天（3e-7 km）。
     # 下界收到 1/10 物理量级以防回归把数量级改坏（远低于物理 3 个数量级 → 收紧到 0.1×）。
     # 上界 0.01 km（10 cm/天）覆盖 Lense-Thirring / de Sitter 等次级项贡献。
@@ -268,9 +262,7 @@ def test_leo_relativistic_position_difference_magnitude(earth_ephemeris_system):
 
     gravity = GravityField(body="EARTH", degree=2, order=0)
     fm_without = ForceModel(system, forces=[gravity])
-    result_without = fm_without.propagate(
-        y0, t_span, t_eval=t_eval, max_steps=200_000
-    )
+    result_without = fm_without.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
     relcorr = RelativisticCorrection(
         central_body="EARTH",
@@ -279,9 +271,7 @@ def test_leo_relativistic_position_difference_magnitude(earth_ephemeris_system):
     fm_with = ForceModel(system, forces=[gravity, relcorr])
     result_with = fm_with.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
-    pos_diff = np.linalg.norm(
-        result_with["states"][-1, :3] - result_without["states"][-1, :3]
-    )
+    pos_diff = np.linalg.norm(result_with["states"][-1, :3] - result_without["states"][-1, :3])
     # 物理量级：LEO Schwarzschild 修正约 2.5 mm/天（2.5e-6 km）。
     # 下界收到 1/10 物理量级以防回归把数量级改坏（原 1e-3 km 比物理宽 2.7 个数量级 → 收紧到 0.1×）。
     # 上界 0.01 km（10 cm/天）覆盖 Lense-Thirring / de Sitter 等次级项贡献。

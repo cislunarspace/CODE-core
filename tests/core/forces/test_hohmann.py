@@ -74,9 +74,7 @@ def test_hohmann_transfer_two_burns(point_mass_force):
     # 第二段：施加 Δv2 @ 远地点，再传 1/4 GEO 周期，验证末态圆轨道
     burn2 = ImpulsiveBurn(epoch=half_period, delta_v=dv2_needed)
     geo_quarter = 0.5 * np.pi * np.sqrt(r2**3 / mu)
-    leg2 = fm.propagate_maneuvers(
-        y0, (0.0, half_period + geo_quarter), burns=[burn1, burn2]
-    )
+    leg2 = fm.propagate_maneuvers(y0, (0.0, half_period + geo_quarter), burns=[burn1, burn2])
     final = leg2["states"][-1]
     r_final = np.linalg.norm(final[:3])
     v_final = np.linalg.norm(final[3:6])

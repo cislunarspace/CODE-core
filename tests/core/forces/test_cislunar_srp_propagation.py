@@ -103,7 +103,9 @@ def test_equatorial_leo_crosses_earth_shadow(earth_icrf_system) -> None:
     sun_mask = flux > 0.99
     assert srp_mag[umbra_mask].max() < full_mag_km * 1e-6, "本影段 SRP 加速度应≈0"
     np.testing.assert_allclose(
-        srp_mag[sun_mask].max(), full_mag_km, rtol=0.05,
+        srp_mag[sun_mask].max(),
+        full_mag_km,
+        rtol=0.05,
         err_msg="全光照段 SRP 加速度应≈满量级",
     )
 

@@ -234,10 +234,7 @@ def _compute_errors(
     vel_err = np.linalg.norm(gmat_states[:, 3:6] - e2m2e_at_gmat[:, 3:6], axis=1)
 
     rtn = np.array(
-        [
-            _rtn_error(gmat_states[i], e2m2e_at_gmat[i])
-            for i in range(gmat_states.shape[0])
-        ]
+        [_rtn_error(gmat_states[i], e2m2e_at_gmat[i]) for i in range(gmat_states.shape[0])]
     )
 
     return {
@@ -395,9 +392,7 @@ def main() -> None:
 
     print("Computing errors...")
     gmat_et = _utc_to_et(gmat_data["utc"], e2m2e_data["spice"])
-    errors = _compute_errors(
-        gmat_et, gmat_data["states"], e2m2e_data["time"], e2m2e_data["states"]
-    )
+    errors = _compute_errors(gmat_et, gmat_data["states"], e2m2e_data["time"], e2m2e_data["states"])
 
     print("Generating plots...")
     figures = _plot_errors(errors, output_dir)

@@ -1,5 +1,4 @@
-"""LEO 配置构建 vs 手动构建传播一致性测试（需 SPICE 内核）。
-"""
+"""LEO 配置构建 vs 手动构建传播一致性测试（需 SPICE 内核）。"""
 
 import numpy as np
 import pytest
@@ -51,9 +50,7 @@ def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
     R3_raan = np.array(
         [[np.cos(raan), -np.sin(raan), 0.0], [np.sin(raan), np.cos(raan), 0.0], [0.0, 0.0, 1.0]]
     )
-    R1_i = np.array(
-        [[1.0, 0.0, 0.0], [0.0, np.cos(i), -np.sin(i)], [0.0, np.sin(i), np.cos(i)]]
-    )
+    R1_i = np.array([[1.0, 0.0, 0.0], [0.0, np.cos(i), -np.sin(i)], [0.0, np.sin(i), np.cos(i)]])
     R3_argp = np.array(
         [[np.cos(argp), -np.sin(argp), 0.0], [np.sin(argp), np.cos(argp), 0.0], [0.0, 0.0, 1.0]]
     )
@@ -89,6 +86,4 @@ def test_leo_config_vs_manual_propagation_match(leo_system):
     result_manual = fm_manual.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
     result_config = fm_config.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
-    np.testing.assert_allclose(
-        result_manual["states"], result_config["states"], atol=1e-12
-    )
+    np.testing.assert_allclose(result_manual["states"], result_config["states"], atol=1e-12)

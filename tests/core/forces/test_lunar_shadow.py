@@ -75,14 +75,10 @@ def test_lunar_umbra_shadow_comes_from_moon_not_earth(earth_icrf_system) -> None
 
     flux_moon = ConicalShadowModel(bodies=["MOON"]).flux_factor(et, state, system)
     flux_earth = ConicalShadowModel(bodies=["EARTH"]).flux_factor(et, state, system)
-    flux_both = ConicalShadowModel(bodies=["EARTH", "MOON"]).flux_factor(
-        et, state, system
-    )
+    flux_both = ConicalShadowModel(bodies=["EARTH", "MOON"]).flux_factor(et, state, system)
 
     assert flux_moon < 1e-6, f"月球应投本影 flux≈0，实际 {flux_moon:.3e}"
-    assert flux_earth > 0.99, (
-        f"该处地球不应遮挡 flux≈1（证明阴影源是月球），实际 {flux_earth:.4f}"
-    )
+    assert flux_earth > 0.99, f"该处地球不应遮挡 flux≈1（证明阴影源是月球），实际 {flux_earth:.4f}"
     assert flux_both < 1e-6, (
         f"地+月合成应为本影 flux≈0（GMT-6543 任一本影→0），实际 {flux_both:.3e}"
     )

@@ -98,15 +98,11 @@ class _TwoLevelPatchPointCorrector:
             state_patch=state_patch,
             max_outer_iterations=max_iter,
             position_tolerance=tolerance,
-            velocity_tolerance=(
-                velocity_tolerance if velocity_tolerance is not None else 1e-6
-            ),
+            velocity_tolerance=(velocity_tolerance if velocity_tolerance is not None else 1e-6),
             boundary=BoundaryMode.FIXED_ENDPOINTS,
             verbose=verbose,
         )
-        position_history, velocity_history = _split_residual_history(
-            result.residual_history
-        )
+        position_history, velocity_history = _split_residual_history(result.residual_history)
         return EphemerisCorrectionResult(
             converged=result.converged,
             iterations=result.outer_iterations,

@@ -2,6 +2,7 @@
 
 验证 optimizer adapter 调用与 NLPOptimizationResult 不再公开导出。
 """
+
 import numpy as np
 import pytest
 

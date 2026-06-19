@@ -103,9 +103,7 @@ def test_abm_leo_j2_matches_dop853():
     h = 0.002
     t_abm, y_abm = _propagate_abm(rhs, y0, h, t_span[1])
 
-    sol = solve_ivp(
-        rhs, t_span, y0, method="DOP853", rtol=1e-12, atol=1e-12, dense_output=True
-    )
+    sol = solve_ivp(rhs, t_span, y0, method="DOP853", rtol=1e-12, atol=1e-12, dense_output=True)
     assert sol.success
     y_ref = np.asarray(sol.sol(t_abm))
     assert np.linalg.norm(y_abm - y_ref) < 1e-6

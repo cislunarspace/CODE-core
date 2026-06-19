@@ -150,8 +150,7 @@ class Transfer:
         """
         if self._departure is None or self._arrival is None:
             raise ValueError(
-                "Must call set_departure() / set_arrival() "
-                "or set_orbit() before optimize()"
+                "Must call set_departure() / set_arrival() or set_orbit() before optimize()"
             )
 
         # 当前仅支持 OrbitTerminal 类型的终端条件

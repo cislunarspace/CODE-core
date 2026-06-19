@@ -77,15 +77,11 @@ class TestCR3BPSystemInterface:
 
     def test_gravitational_parameter_primary(self, earth_moon):
         """primary 引力参数应为 1 - mu。"""
-        assert earth_moon.gravitational_parameter("primary") == pytest.approx(
-            1 - earth_moon.mu
-        )
+        assert earth_moon.gravitational_parameter("primary") == pytest.approx(1 - earth_moon.mu)
 
     def test_gravitational_parameter_secondary(self, earth_moon):
         """secondary 引力参数应为 mu。"""
-        assert earth_moon.gravitational_parameter("secondary") == pytest.approx(
-            earth_moon.mu
-        )
+        assert earth_moon.gravitational_parameter("secondary") == pytest.approx(earth_moon.mu)
 
     def test_gravitational_parameter_invalid_body(self, earth_moon):
         """无效天体名应抛出 ValueError。"""

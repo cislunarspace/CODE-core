@@ -11,6 +11,7 @@ from e2m2e.core.forces import FiniteBurn
 
 # --- 构造辅助 ---
 
+
 def _make_state(r, v):
     """构造 6 维状态向量。"""
     return np.array([*r, *v], dtype=float)
@@ -26,6 +27,7 @@ class _FakeSystem:
 
 
 # --- direction_frame 参数校验 ---
+
 
 def test_finite_burn_invalid_direction_frame_raises():
     """非法 direction_frame 在构造时抛 ValueError。"""
@@ -72,6 +74,7 @@ def test_finite_burn_none_direction_frame_default():
 
 # --- direction_frame=None 时保持原有行为 ---
 
+
 def test_finite_burn_none_frame_fixed_direction():
     """direction_frame=None 时，固定方向直接归一化使用。"""
     burn = FiniteBurn(
@@ -100,6 +103,7 @@ def test_finite_burn_none_frame_callable_direction():
 
 
 # --- VNB 坐标系转换 ---
+
 
 def test_finite_burn_vnb_velocity_direction():
     """VNB 下 direction=[1,0,0] 对应速度方向（V）。"""
@@ -168,6 +172,7 @@ def test_finite_burn_vnb_combined_direction():
 
 # --- LVLH 坐标系转换 ---
 
+
 def test_finite_burn_lvlh_radial_direction():
     """LVLH 下 direction=[1,0,0] 对应径向（R = r/|r|）。"""
     burn = FiniteBurn(
@@ -233,6 +238,7 @@ def test_finite_burn_lvlh_3d_position():
 
 # --- callable direction + direction_frame ---
 
+
 def test_finite_burn_vnb_with_callable_direction():
     """direction 为 callable 时，返回值在 direction_frame 下解释。"""
     burn = FiniteBurn(
@@ -265,6 +271,7 @@ def test_finite_burn_lvlh_with_callable_direction():
 
 # --- 零速度/零位置边界 ---
 
+
 def test_finite_burn_vnb_zero_velocity_raises():
     """VNB 下 |v|=0 时无法构造 V 方向，抛 ValueError。"""
     burn = FiniteBurn(
@@ -292,6 +299,7 @@ def test_finite_burn_lvlh_zero_position_raises():
 
 
 # --- 关机时 direction_frame 不触发计算 ---
+
 
 def test_finite_burn_zero_thrust_skips_direction_frame():
     """thrust=0 时直接返回零，不解析 direction_frame。"""

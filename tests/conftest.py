@@ -15,6 +15,7 @@ from e2m2e.core import CoordinateTransformation, CR3BP_Dynamics, CR3BP_System, O
 def pytest_configure(config):
     config.addinivalue_line("markers", "spice: marks tests requiring SPICE kernel files")
 
+
 @pytest.fixture
 def earth_moon_system():
     """Create an Earth-Moon CR3BP system"""

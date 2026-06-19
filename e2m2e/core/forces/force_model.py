@@ -48,9 +48,7 @@ class ForceModel(Dynamics):
         """
         super().__init__(system)
         if getattr(system, "coordinate_system", None) is None:
-            raise ValueError(
-                "ForceModel requires system.coordinate_system to be set."
-            )
+            raise ValueError("ForceModel requires system.coordinate_system to be set.")
         self._entries: tuple[ForceEntry, ...] = ()
         if forces is not None:
             for force in forces:
@@ -71,9 +69,7 @@ class ForceModel(Dynamics):
                 冲突时抛 ``ValueError``。
         """
         if not isinstance(force, PhysicalModel):
-            raise TypeError(
-                f"force must be a PhysicalModel, got {type(force).__name__}"
-            )
+            raise TypeError(f"force must be a PhysicalModel, got {type(force).__name__}")
         if name is None:
             name = self._auto_name(force)
         elif any(entry.name == name for entry in self._entries):
@@ -158,9 +154,7 @@ class ForceModel(Dynamics):
         return {"version": self._CONFIG_VERSION, "forces": forces_config}
 
     @classmethod
-    def from_config(
-        cls, config: dict[str, Any], system: Any
-    ) -> ForceModel:
+    def from_config(cls, config: dict[str, Any], system: Any) -> ForceModel:
         """从配置字典构建 ``ForceModel``。
 
         校验 ``version``，逐条 ``force_config.build_force`` 构造并按 ``name``
@@ -171,8 +165,7 @@ class ForceModel(Dynamics):
         version = config.get("version")
         if version != cls._CONFIG_VERSION:
             raise ValueError(
-                f"unsupported config version {version!r}; "
-                f"expected {cls._CONFIG_VERSION}"
+                f"unsupported config version {version!r}; expected {cls._CONFIG_VERSION}"
             )
         fm = cls(system)
         for entry in config.get("forces", []):
@@ -226,14 +219,10 @@ class ForceModel(Dynamics):
     def _get_eom_func(self, with_stm: bool) -> Callable:
         """返回运动方程函数（兼容 Dynamics 接口）。"""
         if with_stm:
-            raise NotImplementedError(
-                "ForceModel does not support state transition matrices."
-            )
+            raise NotImplementedError("ForceModel does not support state transition matrices.")
         return self._eom_func
 
-    def _eom_func(
-        self, t: float, state: npt.NDArray[np.floating]
-    ) -> npt.NDArray[np.floating]:
+    def _eom_func(self, t: float, state: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
         """运动方程闭包。"""
         acceleration = self._compute_total_acceleration(t, state)
         return np.concatenate([state[3:6], acceleration])
@@ -319,9 +308,7 @@ class ForceModel(Dynamics):
         while t < tf:
             step_count += 1
             if step_count > max_steps:
-                raise RuntimeError(
-                    f"ForceModel propagation exceeded maximum steps ({max_steps})."
-                )
+                raise RuntimeError(f"ForceModel propagation exceeded maximum steps ({max_steps}).")
 
             h = min(h, max_step)
             if eval_index < len(t_eval):
@@ -369,9 +356,7 @@ class ForceModel(Dynamics):
             else:
                 # Reject step
                 if result.h_next < min_step:
-                    raise RuntimeError(
-                        "Step size below minimum; integration failed."
-                    )
+                    raise RuntimeError("Step size below minimum; integration failed.")
                 h = result.h_next
 
         time_array = np.asarray(times, dtype=float)
@@ -404,15 +389,11 @@ class ForceModel(Dynamics):
         _eps = 1e-12
         for burn in burns:
             if burn.epoch < t0 - _eps or burn.epoch > tf + _eps:
-                raise ValueError(
-                    f"burn epoch {burn.epoch} outside t_span ({t0}, {tf})"
-                )
+                raise ValueError(f"burn epoch {burn.epoch} outside t_span ({t0}, {tf})")
 
         sorted_burns = sorted(burns, key=lambda b: b.epoch)
 
-        segments: list[
-            tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]
-        ] = []
+        segments: list[tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]] = []
         burn_meta: list[
             tuple[
                 float,
@@ -500,9 +481,7 @@ class ForceModel(Dynamics):
         t_eval = np.clip(t_eval, t0, tf)
         return np.asarray(t_eval, dtype=float)
 
-    def _estimate_initial_step(
-        self, y: npt.NDArray[np.floating], t0: float, tf: float
-    ) -> float:
+    def _estimate_initial_step(self, y: npt.NDArray[np.floating], t0: float, tf: float) -> float:
         """从初始状态估算初始步长。"""
         r = float(np.linalg.norm(y[:3]))
         v = float(np.linalg.norm(y[3:]))
@@ -512,14 +491,10 @@ class ForceModel(Dynamics):
         period = 2.0 * np.pi * r / v
         return float(period / 100.0)
 
-    def _raise_for_unsupported(
-        self, with_stm: bool, with_jacobi: bool
-    ) -> None:
+    def _raise_for_unsupported(self, with_stm: bool, with_jacobi: bool) -> None:
         if with_stm:
             raise NotImplementedError(
                 "ForceModel does not support state transition matrices in this slice."
             )
         if with_jacobi:
-            raise NotImplementedError(
-                "ForceModel does not support Jacobi constant computation."
-            )
+            raise NotImplementedError("ForceModel does not support Jacobi constant computation.")

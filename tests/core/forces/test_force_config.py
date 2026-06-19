@@ -251,7 +251,6 @@ def test_json_io_round_trip(tmp_path):
     assert ForceModel.to_config(fm2) == ForceModel.to_config(fm)
 
 
-
 def test_drag_model_round_trip():
     """DragModel 含嵌套 atmosphere 的 round-trip。"""
     system = _FakeSystem()
@@ -301,9 +300,7 @@ def test_finite_burn_vnb_direction_frame_round_trip():
 
     # 物理行为验证：VNB 下 [1,0,0] = V 方向 = 速度方向
     engine = fm.get_force("engine")
-    acc = engine.compute_acceleration(
-        0.0, np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), system
-    )
+    acc = engine.compute_acceleration(0.0, np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), system)
     np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0], atol=1e-12)
 
 
@@ -333,9 +330,7 @@ def test_finite_burn_lvlh_direction_frame_round_trip():
 
     # 物理行为验证：LVLH 下 [0,0,1] = N 方向 = R × V
     engine = fm.get_force("engine")
-    acc = engine.compute_acceleration(
-        0.0, np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), system
-    )
+    acc = engine.compute_acceleration(0.0, np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), system)
     np.testing.assert_allclose(acc, [0.0, 0.0, 1e-5], atol=1e-12)
 
 

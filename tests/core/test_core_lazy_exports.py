@@ -25,10 +25,7 @@ class TestCoreLazyExports:
         返回 ``(module, saved_modules)``，调用方须用 ``_restore_modules``
         恢复 ``sys.modules``，避免污染后续测试。
         """
-        saved_modules = {
-            name: sys.modules.get(name)
-            for name in ("e2m2e", "e2m2e.core")
-        }
+        saved_modules = {name: sys.modules.get(name) for name in ("e2m2e", "e2m2e.core")}
         module_path = TestCoreLazyExports._core_package_path()
         spec = importlib.util.spec_from_file_location(
             "e2m2e.core", module_path, submodule_search_locations=[str(module_path.parent)]

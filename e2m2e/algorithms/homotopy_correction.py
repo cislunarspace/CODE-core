@@ -86,12 +86,8 @@ class HomotopyEphemerisDynamics(EphemerisDynamics):
         need_jacobian: bool = False,
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
         """在基础集与完整集之间线性插值加速度与雅可比矩阵。"""
-        acc_base, jac_base = self.base_dynamics._compute_acc_and_jacobian(
-            t, r_sc, need_jacobian
-        )
-        acc_full, jac_full = super()._compute_acc_and_jacobian(
-            t, r_sc, need_jacobian
-        )
+        acc_base, jac_base = self.base_dynamics._compute_acc_and_jacobian(t, r_sc, need_jacobian)
+        acc_full, jac_full = super()._compute_acc_and_jacobian(t, r_sc, need_jacobian)
         lam = self.lambda_weight
         acc = acc_base + lam * (acc_full - acc_base)
         jac: np.ndarray | None = None
@@ -114,8 +110,7 @@ def _validate_base_bodies(dynamics: EphemerisDynamics, base_bodies: list[str]) -
         )
     if dynamics.system.origin not in base_set:
         raise ValueError(
-            f"base_bodies {base_bodies} must include origin "
-            f"{dynamics.system.origin!r}"
+            f"base_bodies {base_bodies} must include origin {dynamics.system.origin!r}"
         )
 
 
@@ -128,9 +123,7 @@ def _validate_lambda_steps(lambda_steps: list[float]) -> None:
             raise ValueError(f"lambda_steps values must be in [0, 1], got {value}")
     for i in range(len(lambda_steps) - 1):
         if lambda_steps[i + 1] <= lambda_steps[i]:
-            raise ValueError(
-                f"lambda_steps must be strictly increasing, got {lambda_steps}"
-            )
+            raise ValueError(f"lambda_steps must be strictly increasing, got {lambda_steps}")
     if lambda_steps[-1] != 1.0:
         raise ValueError(
             f"lambda_steps must end at 1.0 (final step is the full dynamics), "
@@ -170,8 +163,7 @@ def correct_with_homotopy(
         raise ValueError("inner_method='homotopy' is not allowed (would recurse)")
     if inner_method not in ("standard", "two_level"):
         raise ValueError(
-            f"unsupported inner_method: {inner_method!r}; "
-            "expected 'standard' or 'two_level'"
+            f"unsupported inner_method: {inner_method!r}; expected 'standard' or 'two_level'"
         )
 
     steps = list(lambda_steps) if lambda_steps is not None else list(DEFAULT_LAMBDA_STEPS)

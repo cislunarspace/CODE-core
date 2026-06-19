@@ -165,9 +165,7 @@ class TestIterateCorrection:
         final_error = history["errors"][-1]
         assert final_error < dro_corrector.tolerance
 
-    def test_error_monotonically_decreasing_near_convergence(
-        self, dro_corrector, dro_seed_orbit
-    ):
+    def test_error_monotonically_decreasing_near_convergence(self, dro_corrector, dro_seed_orbit):
         """收敛阶段误差应大致递减"""
         dro_corrector.iterate_correction(dro_seed_orbit)
 

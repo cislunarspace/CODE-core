@@ -96,9 +96,7 @@ class GravityField(PhysicalModel):
         if gravity_file is None:
             self._load_default_file(requested_degree=self._degree)
         else:
-            self._data = load_gfc_file(
-                gravity_file, requested_degree=self._degree
-            )
+            self._data = load_gfc_file(gravity_file, requested_degree=self._degree)
 
         # Trim to requested order
         for n in range(self._degree + 1):
@@ -192,9 +190,7 @@ class GravityField(PhysicalModel):
 
         # dot 项历元外推
         if self._epoch is not None and np.any(self._data.dotC):
-            C, S = extrapolate_coefficients(
-                C, S, self._data.dotC, self._data.dotS, t, self._epoch
-            )
+            C, S = extrapolate_coefficients(C, S, self._data.dotC, self._data.dotS, t, self._epoch)
 
         if self._tide_mode == "none":
             return C, S
@@ -234,9 +230,7 @@ class GravityField(PhysicalModel):
         # 极档:叠加极潮
         if self._tide_mode == "solid_and_pole":
             if self._polar_motion_provider is None:
-                raise ValueError(
-                    "tide_mode='solid_and_pole' requires polar_motion_provider"
-                )
+                raise ValueError("tide_mode='solid_and_pole' requires polar_motion_provider")
             xp, yp = self._polar_motion_provider(t)
             dC_pole, dS_pole = pole_tide(t, xp, yp)
             dC = dC + dC_pole
@@ -330,13 +324,8 @@ class GravityField(PhysicalModel):
             P[1, 1] = -np.sqrt(3.0) * u
         for n in range(2, n_max + 1):
             # Vertical recurrence for m = 0
-            alpha = np.sqrt(
-                (2.0 * n + 1.0) * (2.0 * n - 1.0) / (n * n)
-            )
-            beta = np.sqrt(
-                (2.0 * n + 1.0) * (n - 1.0) * (n - 1.0)
-                / (n * n * (2.0 * n - 3.0))
-            )
+            alpha = np.sqrt((2.0 * n + 1.0) * (2.0 * n - 1.0) / (n * n))
+            beta = np.sqrt((2.0 * n + 1.0) * (n - 1.0) * (n - 1.0) / (n * n * (2.0 * n - 3.0)))
             P[n, 0] = alpha * s * P[n - 1, 0] - beta * P[n - 2, 0]
         for m in range(1, n_max + 1):
             # Diagonal recurrence (n == m, n >= 2)
@@ -344,22 +333,17 @@ class GravityField(PhysicalModel):
                 # Sub-diagonal
                 P[m + 1, m] = s * np.sqrt(2.0 * m + 3.0) * P[m, m]
             for n in range(m + 2, n_max + 1):
-                alpha = np.sqrt(
-                    (2.0 * n + 1.0) * (2.0 * n - 1.0)
-                    / ((n + m) * (n - m))
-                )
+                alpha = np.sqrt((2.0 * n + 1.0) * (2.0 * n - 1.0) / ((n + m) * (n - m)))
                 beta = np.sqrt(
-                    (2.0 * n + 1.0) * (n + m - 1.0) * (n - m - 1.0)
+                    (2.0 * n + 1.0)
+                    * (n + m - 1.0)
+                    * (n - m - 1.0)
                     / ((n + m) * (n - m) * (2.0 * n - 3.0))
                 )
                 P[n, m] = alpha * s * P[n - 1, m] - beta * P[n - 2, m]
             # Next diagonal
             if m + 1 <= n_max:
-                P[m + 1, m + 1] = (
-                    -u
-                    * np.sqrt((2.0 * m + 3.0) / (2.0 * m + 2.0))
-                    * P[m, m]
-                )
+                P[m + 1, m + 1] = -u * np.sqrt((2.0 * m + 3.0) / (2.0 * m + 2.0)) * P[m, m]
 
         # Derivatives with respect to latitude phi
         dP = np.zeros((n_max + 1, n_max + 1))

@@ -58,8 +58,11 @@ def test_standard_and_two_level_methods_unaffected_by_homotopy_module():
             dynamics=object(),
             t_patch=np.array([0.0, 1.0]),
             state_patch=np.zeros((2, 6)),
-            tolerance=1e-3, max_iter=5, verbose=False,
-            n_workers=1, kernel_dir="k",
+            tolerance=1e-3,
+            max_iter=5,
+            verbose=False,
+            n_workers=1,
+            kernel_dir="k",
         )
     except ValueError:
         pass

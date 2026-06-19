@@ -3,6 +3,7 @@
 覆盖输入校验、线性动力学收敛、停滞动力学失败、
 边界模式枚举与残差聚合语义。
 """
+
 import numpy as np
 import pytest
 
@@ -12,6 +13,7 @@ from e2m2e.mbse.data.enums import BoundaryMode, TwoLevelMultipleShootingStatus
 
 class LinearDynamics:
     """线性动力学桩：位置随速度线性增长。"""
+
     def propagate(self, state, time_span, with_stm=True):
         dt = time_span[1] - time_span[0]
         final_state = np.asarray(state, dtype=float).copy()
@@ -32,6 +34,7 @@ class LinearDynamics:
 
 class StagnantDynamics:
     """停滞动力学桩：位置不随时间变化。"""
+
     def propagate(self, state, time_span, with_stm=True):
         final_state = np.asarray(state, dtype=float).copy()
         stm = np.eye(6)
@@ -48,6 +51,7 @@ class StagnantDynamics:
 
 class TimeBendingDynamics:
     """时间弯折动力学桩：速度被强制偏移。"""
+
     def propagate(self, state, time_span, with_stm=True):
         final_state = np.asarray(state, dtype=float).copy()
         final_state[3:6] = final_state[3:6] + np.array([10.0, 0.0, 0.0])
@@ -67,12 +71,14 @@ class TimeBendingDynamics:
 
 class MissingPropagateDynamics:
     """缺少 propagate 方法的动力学桩，用于协议校验。"""
+
     def equations_of_motion(self, _time, state):
         return np.zeros_like(state)
 
 
 class MissingEquationsDynamics:
     """缺少 equations_of_motion 方法的动力学桩，用于协议校验。"""
+
     def propagate(self, state, time_span, with_stm=True):
         return {"states": np.array([state, state]), "stm": np.array([np.eye(6), np.eye(6)])}
 

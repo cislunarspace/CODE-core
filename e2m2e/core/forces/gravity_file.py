@@ -28,9 +28,7 @@ class GravityFileData:
     dotS: npt.NDArray[np.floating]
 
 
-def _normalize_coefficient(
-    c: float, n: int, m: int
-) -> float:
+def _normalize_coefficient(c: float, n: int, m: int) -> float:
     """把非正规化系数转换为完全正规化系数。"""
     # C_nm^norm = C_nm * sqrt((2 - delta_m0) * (2n+1) * (n-m)! / (n+m)!)
     delta_m0 = 1.0 if m == 0 else 0.0

@@ -634,10 +634,7 @@ class Continuation:
             # 欧拉预测只是切线一步,不能用作回退判据。
             _x, _z, _tf2 = X[0], X[1], X[3]
             pal_plausible = (
-                0.75 < _x < 1.05
-                and abs(_z) > 1e-3
-                and abs(_z) < 0.55
-                and 0.35 < _tf2 < np.pi / 2
+                0.75 < _x < 1.05 and abs(_z) > 1e-3 and abs(_z) < 0.55 and 0.35 < _tf2 < np.pi / 2
             )
             if not pal_plausible:
                 if verbose:
@@ -716,8 +713,11 @@ class Continuation:
                                 logger.warning(
                                     "  轨道 %d: 连续 %d 步无实质进展 (Δ=%.2e),"
                                     " 步长从 %.5f 缩至 %.5f",
-                                    n + 1, stagnation_count, progress,
-                                    current_step_size, new_step,
+                                    n + 1,
+                                    stagnation_count,
+                                    progress,
+                                    current_step_size,
+                                    new_step,
                                 )
                             current_step_size = new_step
                             # 同步更新 ds 和 dir_sign 应用的步长

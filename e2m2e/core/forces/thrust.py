@@ -60,9 +60,7 @@ class ImpulsiveBurn:
 
     def __post_init__(self) -> None:
         """以拷贝方式存储 delta_v，避免外部数组变更影响 burn。"""
-        object.__setattr__(
-            self, "delta_v", np.asarray(self.delta_v, dtype=float).copy()
-        )
+        object.__setattr__(self, "delta_v", np.asarray(self.delta_v, dtype=float).copy())
 
 
 class FiniteBurn(PhysicalModel):
@@ -169,11 +167,7 @@ class FiniteBurn(PhysicalModel):
             N = h / h_norm
             B = np.cross(V, N)
             # direction_local = [a_V, a_N, a_B] -> a_V * V + a_N * N + a_B * B
-            return (
-                direction_local[0] * V
-                + direction_local[1] * N
-                + direction_local[2] * B
-            )
+            return direction_local[0] * V + direction_local[1] * N + direction_local[2] * B
 
         if frame == "LVLH":
             if r_norm < 1e-15:
@@ -184,11 +178,7 @@ class FiniteBurn(PhysicalModel):
             V = v / v_norm
             N = np.cross(R, V)
             # direction_local = [a_R, a_V, a_N] -> a_R * R + a_V * V + a_N * N
-            return (
-                direction_local[0] * R
-                + direction_local[1] * V
-                + direction_local[2] * N
-            )
+            return direction_local[0] * R + direction_local[1] * V + direction_local[2] * N
 
         # unreachable: validated in __init__
         return direction_local
@@ -205,9 +195,7 @@ class FiniteBurn(PhysicalModel):
         """
         magnitude = float(self._thrust_profile(t))
         if magnitude < 0.0:
-            raise ValueError(
-                f"thrust_profile returned negative value {magnitude}"
-            )
+            raise ValueError(f"thrust_profile returned negative value {magnitude}")
         if magnitude == 0.0:
             return np.zeros(3)
         direction = self._direction

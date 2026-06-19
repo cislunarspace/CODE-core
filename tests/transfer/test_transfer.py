@@ -2,6 +2,7 @@
 
 验证 _convert_nlp_result 已移除、optimize 通过 adapter 调用。
 """
+
 from unittest.mock import patch
 
 import numpy as np

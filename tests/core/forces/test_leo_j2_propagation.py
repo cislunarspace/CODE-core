@@ -1,5 +1,4 @@
-"""LEO 一天 J2 端到端传播测试。
-"""
+"""LEO 一天 J2 端到端传播测试。"""
 
 import numpy as np
 import pytest
@@ -43,27 +42,35 @@ def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
     nu = np.radians(nu)
 
     r_pqw = np.array([r * np.cos(nu), r * np.sin(nu), 0.0])
-    v_pqw = np.array([
-        -np.sqrt(mu / p) * np.sin(nu),
-        np.sqrt(mu / p) * (e + np.cos(nu)),
-        0.0,
-    ])
+    v_pqw = np.array(
+        [
+            -np.sqrt(mu / p) * np.sin(nu),
+            np.sqrt(mu / p) * (e + np.cos(nu)),
+            0.0,
+        ]
+    )
 
-    R3_raan = np.array([
-        [np.cos(raan), -np.sin(raan), 0.0],
-        [np.sin(raan), np.cos(raan), 0.0],
-        [0.0, 0.0, 1.0],
-    ])
-    R1_i = np.array([
-        [1.0, 0.0, 0.0],
-        [0.0, np.cos(i), -np.sin(i)],
-        [0.0, np.sin(i), np.cos(i)],
-    ])
-    R3_argp = np.array([
-        [np.cos(argp), -np.sin(argp), 0.0],
-        [np.sin(argp), np.cos(argp), 0.0],
-        [0.0, 0.0, 1.0],
-    ])
+    R3_raan = np.array(
+        [
+            [np.cos(raan), -np.sin(raan), 0.0],
+            [np.sin(raan), np.cos(raan), 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+    R1_i = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, np.cos(i), -np.sin(i)],
+            [0.0, np.sin(i), np.cos(i)],
+        ]
+    )
+    R3_argp = np.array(
+        [
+            [np.cos(argp), -np.sin(argp), 0.0],
+            [np.sin(argp), np.cos(argp), 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+    )
     R = R3_raan @ R1_i @ R3_argp
 
     r_eci = R @ r_pqw
@@ -119,9 +126,7 @@ def test_leo_j2_one_day_raan_drift(leo_system):
 
     # Analytical J2 RAAN drift rate
     n = np.sqrt(mu / a**3)
-    omega_dot_analytical = (
-        -1.5 * j2 * (R_e / a) ** 2 * n * np.cos(np.radians(i)) / (1 - e**2) ** 2
-    )
+    omega_dot_analytical = -1.5 * j2 * (R_e / a) ** 2 * n * np.cos(np.radians(i)) / (1 - e**2) ** 2
     omega_dot_analytical_deg_per_day = np.degrees(omega_dot_analytical) * 86400.0
 
     relative_error = abs(

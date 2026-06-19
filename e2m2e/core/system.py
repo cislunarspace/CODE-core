@@ -60,6 +60,7 @@ class System(abc.ABC):
         if axes is None:
             return
         from .dynamic_axes import DynamicAxes
+
         if isinstance(axes, DynamicAxes):
             axes.update(t, np.asarray(state, dtype=float))
 

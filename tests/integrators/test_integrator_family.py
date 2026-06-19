@@ -14,9 +14,7 @@ from tests.integrators.conftest import normalized_leo_j2, propagate_rk
 def test_rk_family_matches_dop853():
     """PD45/PD78/RK89 each match scipy DOP853 on LEO + J2 over 1 day (< 1e-9)."""
     rhs, y0, t_span = normalized_leo_j2(days=1.0)
-    sol = solve_ivp(
-        rhs, t_span, y0, method="DOP853", rtol=1e-13, atol=1e-13, dense_output=True
-    )
+    sol = solve_ivp(rhs, t_span, y0, method="DOP853", rtol=1e-13, atol=1e-13, dense_output=True)
     assert sol.success
 
     for method in (RkMethod.PD45, RkMethod.PD78, RkMethod.RK89):

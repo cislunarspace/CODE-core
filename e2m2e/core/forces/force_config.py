@@ -48,9 +48,7 @@ def _serialize_atmosphere(atm: AtmosphereModel) -> dict[str, Any]:
     """把大气模型序列化为 ``{type, params}`` 字典。"""
     serializer = _ATMOS_SERIALIZERS.get(type(atm))
     if serializer is None:
-        raise NotSerializableError(
-            f"atmosphere type {type(atm).__name__} has no config serializer"
-        )
+        raise NotSerializableError(f"atmosphere type {type(atm).__name__} has no config serializer")
     return {"type": type(atm).__name__, "params": serializer(atm)}
 
 
@@ -59,8 +57,7 @@ def _build_atmosphere(config: dict[str, Any]) -> AtmosphereModel:
     builder = _ATMOS_BUILDERS.get(config["type"])
     if builder is None:
         raise ValueError(
-            f"unknown atmosphere type {config['type']!r}; "
-            f"known types: {sorted(_ATMOS_BUILDERS)}"
+            f"unknown atmosphere type {config['type']!r}; known types: {sorted(_ATMOS_BUILDERS)}"
         )
     return builder(config.get("params", {}))
 
@@ -76,6 +73,7 @@ _ATMOS_BUILDERS: dict[str, Any] = {
 
 
 # --- 嵌套依赖：阴影模型 ---
+
 
 def _serialize_conical_shadow(shadow: ConicalShadowModel) -> dict[str, Any]:
     """把圆锥阴影模型序列化为参数字典。"""
@@ -94,9 +92,7 @@ def _serialize_shadow(shadow: ShadowModel) -> dict[str, Any]:
     """把阴影模型序列化为 ``{type, params}`` 字典。"""
     serializer = _SHADOW_SERIALIZERS.get(type(shadow))
     if serializer is None:
-        raise NotSerializableError(
-            f"shadow type {type(shadow).__name__} has no config serializer"
-        )
+        raise NotSerializableError(f"shadow type {type(shadow).__name__} has no config serializer")
     return {"type": type(shadow).__name__, "params": serializer(shadow)}
 
 
@@ -115,13 +111,13 @@ def _build_shadow(config: dict[str, Any]) -> ShadowModel:
     builder = _SHADOW_BUILDERS.get(config["type"])
     if builder is None:
         raise ValueError(
-            f"unknown shadow type {config['type']!r}; "
-            f"known types: {sorted(_SHADOW_BUILDERS)}"
+            f"unknown shadow type {config['type']!r}; known types: {sorted(_SHADOW_BUILDERS)}"
         )
     return builder(config.get("params", {}))
 
 
 # --- 单力模型序列化器：type(实例) -> params dict ---
+
 
 def _serialize_gravity_field(force: GravityField) -> dict[str, Any]:
     """把球谐重力场力模型序列化为参数字典。"""
@@ -160,6 +156,7 @@ def _serialize_srp(force: SolarRadiationPressure) -> dict[str, Any]:
 # thrust_profile / direction 可能是任意 Python callable，无法通用序列化。
 # DSL 只支持几种固定写法；from_config 构造的闭包打 _e2m2e_config_kind 标记，
 # to_config 据此反向。用户手写 lambda 无标记 → NotSerializableError。
+
 
 def _build_thrust_profile(config: dict[str, Any]) -> Callable[[float], float]:
     """按配置字典构造推力剖面可调用对象。"""
@@ -276,13 +273,12 @@ def serialize_force(force: PhysicalModel) -> dict[str, Any]:
     """把单条力序列化为 ``{type, params}``；未知类型抛 ``NotSerializableError``。"""
     serializer = _SERIALIZERS.get(type(force))
     if serializer is None:
-        raise NotSerializableError(
-            f"force type {type(force).__name__} has no config serializer"
-        )
+        raise NotSerializableError(f"force type {type(force).__name__} has no config serializer")
     return {"type": type(force).__name__, "params": serializer(force)}
 
 
 # --- 单力模型构造器：type 名 -> PhysicalModel ---
+
 
 def _build_gravity_field(params: dict[str, Any]) -> GravityField:
     """从参数字典构造球谐重力场力模型。"""
@@ -330,13 +326,12 @@ def build_force(type_name: str, params: dict[str, Any]) -> PhysicalModel:
     """按 type 名与 params 构造单条力；未知 type 抛 ``ValueError``。"""
     builder = _BUILDERS.get(type_name)
     if builder is None:
-        raise ValueError(
-            f"unknown force type {type_name!r}; known types: {sorted(_BUILDERS)}"
-        )
+        raise ValueError(f"unknown force type {type_name!r}; known types: {sorted(_BUILDERS)}")
     return builder(params)
 
 
 # --- JSON 文件 IO ---
+
 
 def dump_force_config(fm: Any, path: str | Path) -> None:
     """把 ``ForceModel.to_config()`` 的结果写入 JSON 文件。"""

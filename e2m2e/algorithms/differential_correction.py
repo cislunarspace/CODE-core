@@ -304,7 +304,10 @@ class DifferentialCorrection:
 
         logger.debug(
             "Halo 轨道配置完成（固定 Z0）：z0=%s，平动点=L%s，自由变量=%s，目标约束=%s",
-            z0, libration_point, self.free_variables, list(self.target_conditions.keys()),
+            z0,
+            libration_point,
+            self.free_variables,
+            list(self.target_conditions.keys()),
         )
 
         return self
@@ -336,7 +339,10 @@ class DifferentialCorrection:
 
         logger.debug(
             "Halo 轨道配置完成（固定 X0）：x0=%s，平动点=L%s，自由变量=%s，目标约束=%s",
-            x0, libration_point, self.free_variables, list(self.target_conditions.keys()),
+            x0,
+            libration_point,
+            self.free_variables,
+            list(self.target_conditions.keys()),
         )
 
         return self

@@ -49,8 +49,7 @@ class PointMassGravity(PhysicalModel):
         if mu is None:
             if system is None:
                 raise ValueError(
-                    "mu is None and system is None; cannot resolve "
-                    "gravitational_parameter"
+                    "mu is None and system is None; cannot resolve gravitational_parameter"
                 )
             mu = system.gravitational_parameter(self._body)
 

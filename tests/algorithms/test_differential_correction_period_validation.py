@@ -3,7 +3,6 @@
 验证无效周期被拒绝、终止原因记录与修正量历史追踪。
 """
 
-
 from e2m2e.core import Orbit
 
 # 公共 fixtures 从 tests/algorithms/conftest.py 导入：
