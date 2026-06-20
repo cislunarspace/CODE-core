@@ -61,6 +61,19 @@ jobs:
         with:
           command: sdist
           args: --out dist
+      - name: Ensure license files in sdist
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          # maturin sdist 不含仓库根目录的 LICENSE/AUTHORS.md（cargo package 只打包
+          # crate 目录内的文件），但 PKG-INFO 自动声明了 License-File，PyPI 会拒绝。
+          SDIST=$(ls dist/e2m2e-*.tar.gz)
+          mkdir -p /tmp/sdist-fix
+          tar xzf "$SDIST" -C /tmp/sdist-fix
+          SDIST_DIR=$(ls -d /tmp/sdist-fix/e2m2e-*/)
+          cp LICENSE AUTHORS.md "$SDIST_DIR"
+          tar czf "$SDIST" -C /tmp/sdist-fix "$(basename "$SDIST_DIR")"
+          rm -rf /tmp/sdist-fix
       - shell: bash
         run: pipx run twine check dist/*
       - uses: actions/upload-artifact@v7
