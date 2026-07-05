@@ -10,6 +10,7 @@ from e2m2e.core import CR3BP_Dynamics, CR3BP_System
 from e2m2e.core.orbit import Orbit
 from e2m2e.mbse.data.enums import TransferType
 from e2m2e.transfer import TransferConfig, TransferOptimizationResult
+from e2m2e.transfer.terminal import OrbitTerminal, StateTerminal
 from e2m2e.transfer.transfer_optimization import (
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
@@ -151,3 +152,110 @@ def test_module_exports():
     assert DROTRONLPOptimizer is not None
     assert NLPOptimizationVariables is not None
     assert optimize_transfer is not None
+
+
+# =============================================================================
+# issue #161 — TerminalCondition 接口接入
+# =============================================================================
+
+
+class TestTerminalConditionInterface:
+    """验证 ``DROTRONLPOptimizer`` 真正走 ``TerminalCondition`` 接口。"""
+
+    def test_accepts_terminal_pair(self, optimizer):
+        """``DROTRONLPOptimizer`` 应通过 ``departure_terminal``/``arrival_terminal`` 接受终端。"""
+        opt = DROTRONLPOptimizer(
+            system=optimizer.system,
+            dynamics=optimizer.dynamics,
+            departure_terminal=optimizer.departure_terminal,
+            arrival_terminal=optimizer.arrival_terminal,
+        )
+        assert isinstance(opt.departure_terminal, OrbitTerminal)
+        assert isinstance(opt.arrival_terminal, OrbitTerminal)
+        # 旧接口仍兼容
+        assert opt.departure_orbit is optimizer.departure_orbit
+        assert opt.arrival_orbit is optimizer.arrival_orbit
+
+    def test_state_terminal_at_arrival(self, dynamics, dummy_orbit):
+        """``StateTerminal`` 应能作为到达端接入（issue #161 验收点）。"""
+        fixed_state = np.array([0.95, 0.05, 0.0, 0.0, 0.3, 0.0])
+        opt = DROTRONLPOptimizer(
+            system=dynamics.system,
+            dynamics=dynamics,
+            departure_terminal=OrbitTerminal(dummy_orbit),
+            arrival_terminal=StateTerminal(fixed_state, time=2.0),
+        )
+        assert isinstance(opt.arrival_terminal, StateTerminal)
+        # StateTerminal 没有 ``orbit`` 属性，``arrival_orbit`` 应为 None
+        assert opt.arrival_orbit is None
+        # ``get_arrival_state_at_t_ins`` 忽略 ``t_ins``，返回固定状态
+        for t_ins in (0.0, 5.0, 100.0):
+            pos, vel = opt.get_arrival_state_at_t_ins(t_ins)
+            np.testing.assert_array_equal(pos, fixed_state[:3])
+            np.testing.assert_array_equal(vel, fixed_state[3:6])
+
+    def test_from_orbits_classmethod(self, dynamics, dummy_orbit):
+        """``from_orbits`` 类方法应与旧接口等价（包成 ``OrbitTerminal``）。"""
+        departure_state = np.array([0.8, 0.0, 0.0, 0.0, 0.5, 0.0])
+        opt_from = DROTRONLPOptimizer.from_orbits(
+            system=dynamics.system,
+            dynamics=dynamics,
+            departure_orbit=dummy_orbit,
+            arrival_orbit=dummy_orbit,
+            departure_state=departure_state,
+        )
+        opt_legacy = DROTRONLPOptimizer(
+            system=dynamics.system,
+            dynamics=dynamics,
+            departure_orbit=dummy_orbit,
+            arrival_orbit=dummy_orbit,
+            departure_state=departure_state,
+        )
+        np.testing.assert_array_equal(
+            opt_from.departure_state, opt_legacy.departure_state
+        )
+        assert isinstance(opt_from.departure_terminal, OrbitTerminal)
+        assert isinstance(opt_from.arrival_terminal, OrbitTerminal)
+
+    def test_from_orbits_without_state(self, dynamics, dummy_orbit):
+        """``from_orbits`` 不显式传 ``departure_state`` 时取轨道首点。"""
+        opt = DROTRONLPOptimizer.from_orbits(
+            system=dynamics.system,
+            dynamics=dynamics,
+            departure_orbit=dummy_orbit,
+            arrival_orbit=dummy_orbit,
+        )
+        np.testing.assert_array_equal(opt.departure_state, dummy_orbit.states[0])
+
+    def test_mixing_new_and_legacy_raises(self, dynamics, dummy_orbit):
+        """同时传新旧接口参数应报错。"""
+        with pytest.raises(ValueError, match="cannot mix"):
+            DROTRONLPOptimizer(
+                system=dynamics.system,
+                dynamics=dynamics,
+                departure_terminal=OrbitTerminal(dummy_orbit),
+                arrival_terminal=OrbitTerminal(dummy_orbit),
+                departure_orbit=dummy_orbit,
+            )
+
+    def test_neither_interface_raises(self, dynamics):
+        """既不提供终端也不提供 orbit 应报错。"""
+        with pytest.raises(ValueError, match="must provide"):
+            DROTRONLPOptimizer(
+                system=dynamics.system,
+                dynamics=dynamics,
+            )
+
+    def test_legacy_interface_still_works(self, dynamics, dummy_orbit):
+        """旧接口应继续被支持以保持向后兼容。"""
+        departure_state = np.array([0.8, 0.0, 0.0, 0.0, 0.5, 0.0])
+        opt = DROTRONLPOptimizer(
+            system=dynamics.system,
+            dynamics=dynamics,
+            departure_orbit=dummy_orbit,
+            arrival_orbit=dummy_orbit,
+            departure_state=departure_state,
+        )
+        assert isinstance(opt.departure_terminal, OrbitTerminal)
+        assert isinstance(opt.arrival_terminal, OrbitTerminal)
+        np.testing.assert_array_equal(opt.departure_state, departure_state)

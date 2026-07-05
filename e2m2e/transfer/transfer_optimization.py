@@ -1,93 +1,55 @@
-"""
-DRO到RO转移轨道NLP优化模块
+"""DRO→RO 转移轨道 NLP 优化的高层编排。
 
-实现论文Cui et al. (2025)中的"搜索-优化"两步法的优化阶段。
-优化变量: y = {α, T, t_ins}
-目标函数: J(y) = Δv1 + Δv2
-约束: 位置连续性、速度平行性、撞星约束
+实现论文 Cui et al. (2025) "搜索-优化"两步法中的优化阶段：
+
+- 优化变量：``y = (α, T, t_ins)``
+- 目标函数：``J(y) = Δv1 + Δv2``
+- 约束：位置连续性、速度平行性（或松弛形式）、撞星规避
+
+本模块只承载高层编排：构造优化器、计算目标/约束、组装结果。
+SciPy SLSQP 与 COPT 两种求解后端分别封装在
+:mod:`e2m2e.transfer.nlp_scipy` 与 :mod:`e2m2e.transfer.nlp_copt`，
+由 :class:`DROTRONLPOptimizer` 调度。
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from scipy.optimize import Bounds, minimize
 
 from ..core.cr3bp_system import CR3BP_System
 from ..core.dynamics import CR3BP_Dynamics
+from ..core.enums import TransferType
 from ..core.orbit import Orbit
 from .config import TransferConfig, TransferOptimizationResult
+
+# 后端以模块级 re-export 形式暴露，保持 ``e2m2e.transfer.transfer_optimization.coptpy``
+# 等既有 API 兼容（外部模块通过 ``_HAVE_COPT = transfer_optimization.coptpy is not None`` 判定）。
+from .nlp_copt import coptpy, optimize_with_copt  # noqa: F401
+from .nlp_core import NLPOptimizationVariables
 from .propulsion import ImpulsivePropulsion, PropulsionModel
-
-try:
-    import coptpy as cp
-    from coptpy import COPT
-
-    NlpCallbackBase = cp.NlpCallbackBase
-    coptpy = cp  # 与既有 ``_HAVE_COPT`` 等检查兼容
-except ImportError:
-    cp = None
-    COPT = None
-    coptpy = None
-    NlpCallbackBase = None
-
-
-@dataclass
-class NLPOptimizationVariables:
-    """NLP优化变量
-
-    优化变量: y = {α, T, t_ins}
-
-    Attributes:
-        alpha: 切向速度比
-        transfer_time: 转移时间T
-        t_ins: 从轨道远地点到插入点的时间
-    """
-
-    alpha: float = 0.0
-    transfer_time: float = 0.0
-    t_ins: float = 0.0
-
-    def to_array(self) -> np.ndarray:
-        """转换为numpy数组。
-
-        Returns:
-            ``[alpha, transfer_time, t_ins]`` 一维数组。
-        """
-        return np.array([self.alpha, self.transfer_time, self.t_ins])
-
-    @classmethod
-    def from_array(cls, arr: np.ndarray) -> NLPOptimizationVariables:
-        """从numpy数组创建实例。
-
-        Args:
-            arr: ``[alpha, transfer_time, t_ins]`` 一维数组。
-
-        Returns:
-            对应的 ``NLPOptimizationVariables`` 实例。
-        """
-        return cls(alpha=arr[0], transfer_time=arr[1], t_ins=arr[2])
+from .terminal import OrbitTerminal, TerminalCondition
 
 
 class DROTRONLPOptimizer:
-    """DRO到RO转移轨道NLP优化器
+    """DRO→RO 转移轨道 NLP 优化器
 
-    实现论文Section III.B的优化阶段算法。
-    使用SQP(序贯二次规划)方法求解NLP问题。
+    实现论文 Section III.B 的优化阶段算法。
+    默认通过 SciPy SLSQP 求解；调用方可改走 COPT 后端
+    （见 :func:`~e2m2e.transfer.nlp_copt.optimize_with_copt`）。
 
     Attributes:
-        system: CR3BP系统对象
-        dynamics: CR3BP动力学对象
+        system: CR3BP 系统对象
+        dynamics: CR3BP 动力学对象
         departure_orbit: 出发点轨道
         arrival_orbit: 目标轨道
         departure_state: 出发点状态
-        alpha_range: α搜索范围
-        velocity_angle_tolerance: 速度平行性容差(弧度)
-        earth_radius: 地球半径(无量纲)
-        moon_radius: 月球半径(无量纲)
+        alpha_range: α 搜索范围
+        velocity_angle_tolerance: 速度平行性容差（弧度）
+        earth_radius: 地球半径（无量纲）
+        moon_radius: 月球半径（无量纲）
     """
 
     # 优化变量的默认搜索范围
@@ -105,31 +67,70 @@ class DROTRONLPOptimizer:
         self,
         system: CR3BP_System,
         dynamics: CR3BP_Dynamics,
-        departure_orbit: Orbit,
-        arrival_orbit: Orbit,
-        departure_state: np.ndarray,
+        *,
+        departure_terminal: TerminalCondition | None = None,
+        arrival_terminal: TerminalCondition | None = None,
+        departure_orbit: Orbit | None = None,
+        arrival_orbit: Orbit | None = None,
+        departure_state: np.ndarray | None = None,
         config: TransferConfig | None = None,
         propulsion: PropulsionModel | None = None,
     ):
-        """初始化NLP优化器
+        """初始化 NLP 优化器（issue #161）。
 
-        Args:
-            system: CR3BP系统对象
-            dynamics: CR3BP动力学对象
-            departure_orbit: 出发点轨道
-            arrival_orbit: 目标轨道
-            departure_state: 出发点状态 [x, y, z, vx, vy, vz]
-            config: 转移优化配置；None 时使用内部默认值
-            propulsion: 推进模型；None 时使用 ``ImpulsivePropulsion()``
+        支持两种构造路径（不可混用）：
+
+        * **新接口（推荐）** — ``(departure_terminal, arrival_terminal)``，
+          内部走 :class:`TerminalCondition` 接口；这是 :class:`StateTerminal`
+          等非轨道型终端接入的唯一方式。
+        * **旧接口（向后兼容）** — ``(departure_orbit, arrival_orbit,
+          departure_state)``，内部等价于把两条轨道包成 :class:`OrbitTerminal`。
         """
         self.system = system
         self.dynamics = dynamics
         self.mu = system.mu
-
-        self.departure_orbit = departure_orbit
-        self.arrival_orbit = arrival_orbit
-        self.departure_state = departure_state
         self.propulsion = propulsion if propulsion is not None else ImpulsivePropulsion()
+
+        # ``departure_state`` 在两种接口下都允许（新接口下作覆盖），
+        # 因此混用判定只看 ``departure_orbit``/``arrival_orbit``。
+        has_terminals = (
+            departure_terminal is not None or arrival_terminal is not None
+        )
+        has_legacy = departure_orbit is not None or arrival_orbit is not None
+        if has_terminals and has_legacy:
+            raise ValueError(
+                "DROTRONLPOptimizer: cannot mix new and legacy interfaces"
+            )
+        if has_terminals:
+            if departure_terminal is None or arrival_terminal is None:
+                raise ValueError(
+                    "DROTRONLPOptimizer: both terminals required"
+                )
+            self.departure_terminal: TerminalCondition = departure_terminal
+            self.arrival_terminal: TerminalCondition = arrival_terminal
+        elif has_legacy:
+            if departure_orbit is None or arrival_orbit is None:
+                raise ValueError(
+                    "DROTRONLPOptimizer: legacy interface requires both orbits"
+                )
+            self.departure_terminal = OrbitTerminal(departure_orbit)
+            self.arrival_terminal = OrbitTerminal(arrival_orbit)
+        else:
+            raise ValueError(
+                "DROTRONLPOptimizer: must provide terminal pair or orbit pair"
+            )
+
+        # 实际出发点状态：显式覆盖 > 终端默认首点
+        self._departure_state = (
+            np.asarray(departure_state, dtype=float)
+            if departure_state is not None
+            else self.departure_terminal.get_initial_state()
+        )
+
+        # 兼容历史读取（仅 OrbitTerminal 提供 .orbit）
+        self.departure_state = self._departure_state
+        self.departure_orbit = getattr(self.departure_terminal, "orbit", None)
+        self.arrival_orbit = getattr(self.arrival_terminal, "orbit", None)
 
         self.alpha_range = (
             config.nlp_alpha_range if config is not None else self.DEFAULT_ALPHA_RANGE
@@ -142,11 +143,17 @@ class DROTRONLPOptimizer:
         )
 
         self.velocity_angle_tol = (
-            config.nlp_velocity_angle_tol if config is not None else self.DEFAULT_VELOCITY_ANGLE_TOL
+            config.nlp_velocity_angle_tol
+            if config is not None
+            else self.DEFAULT_VELOCITY_ANGLE_TOL
         )
 
-        self.earth_radius = config.nlp_earth_radius if config is not None else self.EARTH_RADIUS_ND
-        self.moon_radius = config.nlp_moon_radius if config is not None else self.MOON_RADIUS_ND
+        self.earth_radius = (
+            config.nlp_earth_radius if config is not None else self.EARTH_RADIUS_ND
+        )
+        self.moon_radius = (
+            config.nlp_moon_radius if config is not None else self.MOON_RADIUS_ND
+        )
 
         self._use_relaxed_velocity = (
             config.nlp_use_relaxed_velocity if config is not None else False
@@ -158,6 +165,55 @@ class DROTRONLPOptimizer:
         self._eval_cache: dict[str, Any] | None = None
         self._eval_cache_key: bytes | None = None
         self._cache_enabled: bool = False
+
+    @classmethod
+    def from_orbits(
+        cls,
+        system: CR3BP_System,
+        dynamics: CR3BP_Dynamics,
+        departure_orbit: Orbit,
+        arrival_orbit: Orbit,
+        departure_state: np.ndarray | None = None,
+        config: TransferConfig | None = None,
+        propulsion: PropulsionModel | None = None,
+    ) -> DROTRONLPOptimizer:
+        """通过 ``Orbit`` 直接构造（向后兼容的便捷类方法）。
+
+        内部等价于把两条轨道包成 :class:`OrbitTerminal` 再走新接口。
+
+        Args:
+            system: CR3BP 系统对象
+            dynamics: CR3BP 动力学对象
+            departure_orbit: 出发轨道
+            arrival_orbit: 到达轨道
+            departure_state: 出发点状态；``None`` 时取轨道首点
+            config: 优化配置
+            propulsion: 推进模型
+
+        Returns:
+            ``DROTRONLPOptimizer`` 实例
+        """
+        # ``departure_state`` 在显式传入时通过关键字传给 ``__init__``，
+        # 否则让 ``__init__`` 用 ``OrbitTerminal.get_initial_state()``，
+        # 这样 ``__init__`` 不会因 ``has_legacy=...departure_state...`` 误判接口。
+        if departure_state is not None:
+            return cls(
+                system=system,
+                dynamics=dynamics,
+                departure_terminal=OrbitTerminal(departure_orbit),
+                arrival_terminal=OrbitTerminal(arrival_orbit),
+                departure_state=departure_state,
+                config=config,
+                propulsion=propulsion,
+            )
+        return cls(
+            system=system,
+            dynamics=dynamics,
+            departure_terminal=OrbitTerminal(departure_orbit),
+            arrival_terminal=OrbitTerminal(arrival_orbit),
+            config=config,
+            propulsion=propulsion,
+        )
 
     def set_progress_callback(self, callback: Callable | None) -> None:
         """设置迭代进度回调函数。
@@ -190,13 +246,18 @@ class DROTRONLPOptimizer:
             包含 ``objective``、``pos_violation``、``cos_angle`` 等键的字典。
         """
         key = self._y_key(y)
-        if self._cache_enabled and self._eval_cache_key == key and self._eval_cache is not None:
+        if (
+            self._cache_enabled
+            and self._eval_cache_key == key
+            and self._eval_cache is not None
+        ):
             return self._eval_cache
 
         alpha, transfer_time, t_ins = y
+        dep_state = self._departure_state
 
-        v_injection = self.compute_departure_velocity(self.departure_state, alpha)
-        initial_state = np.concatenate([self.departure_state[:3], v_injection])
+        v_injection = self.compute_departure_velocity(dep_state, alpha)
+        initial_state = np.concatenate([dep_state[:3], v_injection])
 
         times, states = self.forward_integrate(
             initial_state=initial_state, t_span=(0.0, transfer_time)
@@ -206,15 +267,21 @@ class DROTRONLPOptimizer:
 
         final_state = states[-1] if not empty else np.zeros(6)
 
-        insertion_state = (
-            self.dynamics.propagate_orbit_state_at_time(self.arrival_orbit, float(t_ins))
-            if not empty
-            else np.zeros(6)
-        )
+        # 到达状态走 TerminalCondition 接口
+        if not empty:
+            ins_pos, ins_vel = self.arrival_terminal.get_arrival_state(
+                float(t_ins), self.dynamics
+            )
+            insertion_state = np.concatenate([ins_pos, ins_vel])
+        else:
+            insertion_state = np.zeros(6)
 
         if not empty:
             cost = self.propulsion.compute_cost(
-                self.departure_state, v_injection, final_state[3:], insertion_state[3:]
+                dep_state,
+                v_injection,
+                final_state[3:],
+                insertion_state[3:],
             )
             dv1 = cost.dv1
             dv2 = cost.dv2
@@ -262,17 +329,17 @@ class DROTRONLPOptimizer:
     def compute_departure_velocity(
         self, state: np.ndarray, alpha: float, beta: float = 0.0
     ) -> np.ndarray:
-        """根据α和β计算出发注入速度。
+        """根据 α 和 β 计算出发注入速度。
 
         委托给 ``self.propulsion.compute_departure_velocity``，保留方法签名以兼容外部调用。
 
         Args:
-            state: 出发点状态 [x, y, z, vx, vy, vz]
+            state: 出发点状态 ``[x, y, z, vx, vy, vz]``
             alpha: 切向速度比（缩放切向分量）
             beta: 法向速度比（缩放法向分量），默认 0.0（纯切向）
 
         Returns:
-            注入速度向量 [vx, vy, vz]
+            注入速度向量 ``[vx, vy, vz]``
         """
         return self.propulsion.compute_departure_velocity(state, alpha=alpha, beta=beta)
 
@@ -285,12 +352,12 @@ class DROTRONLPOptimizer:
         """前向积分转移弧
 
         Args:
-            initial_state: 初始状态 [x, y, z, vx, vy, vz]
-            t_span: 积分时间范围 (t0, tf)
+            initial_state: 初始状态 ``[x, y, z, vx, vy, vz]``
+            t_span: 积分时间范围 ``(t0, tf)``
             t_eval: 评估时间点
 
         Returns:
-            (times, states): 时间序列和状态序列
+            ``(times, states)``：时间序列和状态序列
         """
         if t_eval is None:
             step = max(0.01, self.dynamics.max_step)
@@ -313,24 +380,21 @@ class DROTRONLPOptimizer:
         return times, states
 
     def get_arrival_state_at_t_ins(self, t_ins: float) -> tuple[np.ndarray, np.ndarray]:
-        """获取目标轨道上 t_ins（绝对时间）对应的状态
+        """获取目标轨道上 ``t_ins``（绝对时间）对应的状态
 
         Args:
-            t_ins: 绝对时间（与 orbit.times 同一坐标系）
+            t_ins: 绝对时间（与 ``orbit.times`` 同一坐标系）
 
         Returns:
-            (position, velocity): 位置和速度
+            ``(position, velocity)``：位置和速度
         """
-        arrival_state = self.dynamics.propagate_orbit_state_at_time(
-            self.arrival_orbit, float(t_ins)
-        )
-        return arrival_state[:3], arrival_state[3:]
+        return self.arrival_terminal.get_arrival_state(float(t_ins), self.dynamics)
 
     def objective_function(self, y: np.ndarray) -> float:
-        """目标函数 J(y) = Δv1 + Δv2
+        """目标函数 ``J(y) = Δv1 + Δv2``
 
         Args:
-            y: 优化变量 [alpha, T, t_ins]
+            y: 优化变量 ``[alpha, T, t_ins]``
 
         Returns:
             总脉冲代价
@@ -343,10 +407,10 @@ class DROTRONLPOptimizer:
     def constraint_position(self, y: np.ndarray) -> float:
         """位置连续性约束 Eq.(13)
 
-        (x_f - x_ins)^2 + (y_f - y_ins)^2 + (z_f - z_ins)^2 = 0
+        ``(x_f - x_ins)^2 + (y_f - y_ins)^2 + (z_f - z_ins)^2 = 0``
 
         Args:
-            y: 优化变量 [alpha, T, t_ins]
+            y: 优化变量 ``[alpha, T, t_ins]``
 
         Returns:
             约束违反量
@@ -355,12 +419,12 @@ class DROTRONLPOptimizer:
         return cache["pos_violation"]
 
     def constraint_velocity_parallel(self, y: np.ndarray) -> float:
-        """速度平行性约束 Eq.(14) 或relaxed Eq.(17)
+        """速度平行性约束 Eq.(14) 或松弛 Eq.(17)
 
-        v_f · v_ins / (||v_f|| ||v_ins||) - 1 = 0
+        ``v_f · v_ins / (||v_f|| ||v_ins||) - 1 = 0``
 
         Args:
-            y: 优化变量 [alpha, T, t_ins]
+            y: 优化变量 ``[alpha, T, t_ins]``
 
         Returns:
             约束违反量
@@ -372,15 +436,16 @@ class DROTRONLPOptimizer:
         """检查是否撞击地球或月球
 
         Args:
-            y: 优化变量 [alpha, T, t_ins]
+            y: 优化变量 ``[alpha, T, t_ins]``
 
         Returns:
-            (earth_collision, moon_collision): 是否撞击地球、月球
+            ``(earth_collision, moon_collision)``：是否撞击地球、月球
         """
         alpha, transfer_time, t_ins = y
+        dep_state = self._departure_state
 
-        v_injection = self.compute_departure_velocity(self.departure_state, alpha)
-        initial_state = np.concatenate([self.departure_state[:3], v_injection])
+        v_injection = self.compute_departure_velocity(dep_state, alpha)
+        initial_state = np.concatenate([dep_state[:3], v_injection])
 
         times, states = self.forward_integrate(
             initial_state=initial_state, t_span=(0.0, transfer_time)
@@ -415,119 +480,22 @@ class DROTRONLPOptimizer:
         velocity_angle_constraint: float | None = None,
         verbose: bool | None = None,
     ) -> TransferOptimizationResult:
-        """执行NLP优化
+        """执行 SciPy 后端的 NLP 优化。
 
-        Args:
-            initial_guess: 初始猜测
-            alpha_range: α范围；None 时使用构造配置
-            transfer_time_range: 转移时间范围
-            t_ins_range: 插入时间范围；None 时使用构造配置
-            use_relaxed_velocity_constraint: 是否使用松弛速度约束；
-                None 时使用构造配置
-            velocity_angle_constraint: 松弛速度约束角度(弧度)；
-                None 时使用构造配置
-            verbose: 是否打印信息；None 时使用构造配置
-
-        Returns:
-            TransferOptimizationResult，包含优化详情
+        委托给 :func:`e2m2e.transfer.nlp_scipy.solve_with_scipy`。完整参数说明见该函数。
         """
-        if alpha_range is not None:
-            self.alpha_range = alpha_range
-        if transfer_time_range is not None:
-            self.transfer_time_range = transfer_time_range
-        if t_ins_range is not None:
-            self.t_ins_range = t_ins_range
+        from .nlp_scipy import solve_with_scipy
 
-        if use_relaxed_velocity_constraint is None:
-            use_relaxed_velocity_constraint = self._use_relaxed_velocity
-        if velocity_angle_constraint is None:
-            velocity_angle_constraint = self.velocity_angle_tol
-        if verbose is None:
-            verbose = self._verbose
-
-        if initial_guess is None:
-            alpha0 = 1.0
-            T0 = 10.0
-            t_ins0 = 5.0
-        else:
-            alpha0 = initial_guess.alpha
-            T0 = initial_guess.transfer_time
-            t_ins0 = initial_guess.t_ins
-
-        y0 = np.array([alpha0, T0, t_ins0])
-
-        self.enable_cache(True)
-
-        if verbose:
-            print("\n开始NLP优化:")
-            print(f"  初始猜测: α={alpha0:.4f}, T={T0:.4f}, t_ins={t_ins0:.4f}")
-            print(f"  α范围: [{self.alpha_range[0]}, {self.alpha_range[1]}]")
-            print(f"  T范围: [{self.transfer_time_range[0]}, {self.transfer_time_range[1]}]")
-            print(f"  t_ins范围: [{self.t_ins_range[0]}, {self.t_ins_range[1]}]")
-
-        constraints = []
-
-        constraints.append({"type": "eq", "fun": self.constraint_position})
-
-        if use_relaxed_velocity_constraint:
-            cos_theta_max = np.cos(velocity_angle_constraint)
-            constraints.append(
-                {"type": "ineq", "fun": lambda y: cos_theta_max - self._compute_cos_angle(y)}
-            )
-        else:
-            constraints.append({"type": "eq", "fun": self.constraint_velocity_parallel})
-
-        bounds = Bounds(
-            lb=[self.alpha_range[0], self.transfer_time_range[0], self.t_ins_range[0]],
-            ub=[self.alpha_range[1], self.transfer_time_range[1], self.t_ins_range[1]],
+        return solve_with_scipy(
+            self,
+            initial_guess=initial_guess,
+            alpha_range=alpha_range,
+            transfer_time_range=transfer_time_range,
+            t_ins_range=t_ins_range,
+            use_relaxed_velocity_constraint=use_relaxed_velocity_constraint,
+            velocity_angle_constraint=velocity_angle_constraint,
+            verbose=verbose,
         )
-
-        iteration_counter = [0]
-
-        def _scipy_callback(xk):
-            iteration_counter[0] += 1
-            if self._progress_callback is not None:
-                alpha_k, T_k, tins_k = float(xk[0]), float(xk[1]), float(xk[2])
-                obj_k = float(self.objective_function(xk))
-                self._progress_callback(iteration_counter[0], obj_k, alpha_k, T_k, tins_k)
-
-        try:
-            result = minimize(
-                self.objective_function,
-                y0,
-                method="SLSQP",
-                bounds=bounds,
-                constraints=constraints,
-                options={"ftol": 1e-10, "maxiter": 1000, "disp": verbose},
-                callback=_scipy_callback,
-            )
-
-            success = result.success
-            message = result.message
-            final_y = result.x
-
-        except Exception as e:
-            success = False
-            message = f"优化失败: {str(e)}"
-            final_y = y0
-
-        opt_vars = NLPOptimizationVariables.from_array(final_y)
-        opt_result = self._build_result(
-            opt_vars, success, message, use_relaxed_velocity_constraint, velocity_angle_constraint
-        )
-
-        if verbose:
-            print("\n优化结果:")
-            print(f"  成功: {opt_result.success}")
-            print(f"  消息: {opt_result.message}")
-            print(f"  α={opt_result.departure_alpha:.6f}")
-            print(f"  T={opt_result.transfer_time:.6f}")
-            print(f"  t_ins={opt_result.t_ins:.6f}")
-            print(f"  ΔV1={opt_result.delta_v1:.6f}")
-            print(f"  ΔV2={opt_result.delta_v2:.6f}")
-            print(f"  总ΔV={opt_result.total_delta_v:.6f}")
-
-        return opt_result
 
     def _compute_cos_angle(self, y: np.ndarray) -> float:
         """计算速度夹角余弦"""
@@ -546,20 +514,23 @@ class DROTRONLPOptimizer:
         alpha = variables.alpha
         transfer_time = variables.transfer_time
         t_ins = variables.t_ins
+        dep_state = self._departure_state
 
-        v_injection = self.compute_departure_velocity(self.departure_state, alpha)
-        initial_state = np.concatenate([self.departure_state[:3], v_injection])
+        v_injection = self.compute_departure_velocity(dep_state, alpha)
+        initial_state = np.concatenate([dep_state[:3], v_injection])
         times, states = self.forward_integrate(
             initial_state=initial_state, t_span=(0.0, transfer_time)
         )
 
-        insertion_state = self.dynamics.propagate_orbit_state_at_time(
-            self.arrival_orbit, float(t_ins)
+        # 到达状态走 TerminalCondition 接口
+        ins_pos, ins_vel = self.arrival_terminal.get_arrival_state(
+            float(t_ins), self.dynamics
         )
+        insertion_state = np.concatenate([ins_pos, ins_vel])
         final_state = states[-1] if len(states) > 0 else None
 
         cost = self.propulsion.compute_cost(
-            self.departure_state,
+            dep_state,
             v_injection,
             final_state[3:] if final_state is not None else np.zeros(3),
             insertion_state[3:],
@@ -575,16 +546,20 @@ class DROTRONLPOptimizer:
                     - self._compute_cos_angle(variables.to_array()),
                 )
             else:
-                violation["velocity"] = abs(self.constraint_velocity_parallel(variables.to_array()))
+                violation["velocity"] = abs(
+                    self.constraint_velocity_parallel(variables.to_array())
+                )
 
         max_violation = max(violation.values()) if violation else 0.0
 
-        transfer_type = self._classify_transfer(transfer_time, times, states, insertion_state)
+        transfer_type = self._classify_transfer(
+            transfer_time, times, states, insertion_state
+        )
 
         return TransferOptimizationResult(
             success=success,
             message=message,
-            departure_state=self.departure_state.copy(),
+            departure_state=dep_state.copy(),
             departure_alpha=alpha,
             departure_beta=0.0,
             insertion_state=insertion_state,
@@ -606,10 +581,30 @@ class DROTRONLPOptimizer:
         times: np.ndarray,
         states: np.ndarray,
         insertion_state: np.ndarray,
-    ):
-        """分类转移类型（已废弃，保留方法签名仅用于兼容旧调用）。"""
-        from ..core.enums import TransferType
+    ) -> TransferType:
+        """根据转移时间与轨迹几何范围分类转移类型。
 
+        分类规则（启发式阈值，单位均为无量纲）：
+
+        - ``transfer_time < 20.0`` 且 ``max(x) < 1.5``：直达转移 ``TransferType.DIRECT``
+        - ``max(x) > 3.0``：轨迹绕到地月系统外侧，外部转移 ``TransferType.EXTERNAL``
+        - 其余情况：含月球引力辅助的转移 ``TransferType.LGA``
+
+        积分失败或轨迹为空时按 :class:`TransferType.DIRECT` 返回。
+
+        该结果会写入 :class:`TransferOptimizationResult.transfer_type`，
+        可视化层（``plot_solution_plane(..., color_by="transfer_type")``）
+        据此按类型着色，因此本方法属于活跃路径，并非已废弃。
+
+        Args:
+            transfer_time: 转移时间（无量纲时间）
+            times: 轨迹时间序列
+            states: 轨迹状态序列，形状 ``(n_steps, 6)``
+            insertion_state: 插入点状态
+
+        Returns:
+            转移类型枚举。
+        """
         if len(states) == 0:
             return TransferType.DIRECT
 
@@ -637,17 +632,17 @@ def optimize_transfer(
     propulsion: PropulsionModel | None = None,
     **kwargs,
 ) -> TransferOptimizationResult:
-    """便捷函数: 优化DRO到RO转移
+    """便捷函数: 优化 DRO→RO 转移（SciPy SLSQP 后端）
 
     Args:
-        system: CR3BP系统
-        dynamics: CR3BP动力学
+        system: CR3BP 系统
+        dynamics: CR3BP 动力学
         departure_orbit: 出发点轨道
         arrival_orbit: 目标轨道
         departure_state: 出发点状态
         initial_guess: 初始猜测
-        propulsion: 推进模型；None 时使用 ``ImpulsivePropulsion()``
-        **kwargs: 其他优化参数
+        propulsion: 推进模型；``None`` 时使用 ``ImpulsivePropulsion()``
+        **kwargs: 其他优化参数（透传给 ``optimizer.optimize``）
 
     Returns:
         优化结果
@@ -662,367 +657,3 @@ def optimize_transfer(
     )
 
     return optimizer.optimize(initial_guess=initial_guess, **kwargs)
-
-
-if NlpCallbackBase is not None:
-
-    class COPTNLPCallback(NlpCallbackBase):  # type: ignore[misc, valid-type]
-        """COPT NLP回调类
-
-        用于COPT非线性优化问题的目标函数和约束计算。
-        继承自 cp.NlpCallbackBase 以正确处理 SWIG 绑定。
-
-        Attributes:
-            optimizer: DROTRONLPOptimizer实例
-            x: 当前变量值 [alpha, transfer_time, t_ins]
-        """
-
-        def __init__(self, optimizer: DROTRONLPOptimizer):
-            """初始化回调。
-
-            Args:
-                optimizer: 关联的 NLP 优化器实例。
-            """
-            super().__init__()
-            self.optimizer = optimizer
-            self.x = None
-
-        def EvalObj(self, xdata, outdata):
-            """计算目标函数值 J(y) = Δv1 + Δv2"""
-            x = np.array(xdata)
-            self.x = x
-            obj = self.optimizer.objective_function(x)
-            outdata[0] = obj
-            return 0
-
-        def EvalGrad(self, xdata, outdata):
-            """计算目标函数梯度 (数值差分)"""
-            x = np.array(xdata)
-            self.x = x
-            h = 1e-8
-            grad = np.zeros(3)
-            f0 = self.optimizer.objective_function(x)
-            for i in range(3):
-                x_pert = x.copy()
-                x_pert[i] += h
-                grad[i] = (self.optimizer.objective_function(x_pert) - f0) / h
-            for i in range(3):
-                outdata[i] = grad[i]
-            return 0
-
-        def EvalCon(self, xdata, outdata):
-            """计算约束函数值"""
-            x = np.array(xdata)
-            self.x = x
-
-            pos_con = self.optimizer.constraint_position(x)
-            vel_con = self.optimizer.constraint_velocity_parallel(x)
-
-            outdata[0] = pos_con
-            outdata[1] = vel_con
-            return 0
-
-        def EvalJac(self, xdata, outdata):
-            """计算约束函数Jacobian矩阵 (数值差分)"""
-            x = np.array(xdata)
-            self.x = x
-            h = 1e-8
-
-            pos_con = self.optimizer.constraint_position(x)
-            grad_pos = np.zeros(3)
-            for i in range(3):
-                x_pert = x.copy()
-                x_pert[i] += h
-                grad_pos[i] = (self.optimizer.constraint_position(x_pert) - pos_con) / h
-
-            vel_con = self.optimizer.constraint_velocity_parallel(x)
-            grad_vel = np.zeros(3)
-            for i in range(3):
-                x_pert = x.copy()
-                x_pert[i] += h
-                grad_vel[i] = (self.optimizer.constraint_velocity_parallel(x_pert) - vel_con) / h
-
-            outdata[0] = grad_pos[0]
-            outdata[1] = grad_pos[1]
-            outdata[2] = grad_pos[2]
-            outdata[3] = grad_vel[0]
-            outdata[4] = grad_vel[1]
-            outdata[5] = grad_vel[2]
-            return 0
-
-        def EvalHess(self, xdata, sigma, lam, outdata):
-            """拉格朗日函数 Hessian 下三角（与 COPT 文档一致）。
-
-            L(x) = σ·f(x) + λᵀc(x)，须返回 ∇²L 在 idxHess 指定位置的值；
-            仅 σ·∇²f 而忽略约束曲率会导致错误步长/收敛行为。
-            """
-            x = np.asarray(xdata, dtype=np.float64).ravel()
-            lam_v = np.asarray(lam, dtype=np.float64).ravel()
-            if lam_v.size < 2:
-                lam_v = np.pad(lam_v, (0, max(0, 2 - lam_v.size)))
-            sigma = float(sigma)
-            l0, l1 = float(lam_v[0]), float(lam_v[1])
-            self.x = x
-            h = 1e-6
-
-            def lagrangian(xv: np.ndarray) -> float:
-                fv = self.optimizer.objective_function(xv)
-                c1 = self.optimizer.constraint_position(xv)
-                c2 = self.optimizer.constraint_velocity_parallel(xv)
-                return sigma * fv + l0 * c1 + l1 * c2
-
-            L0 = lagrangian(x)
-            hess_L = np.zeros((3, 3))
-            for i in range(3):
-                for j in range(i + 1):
-                    x_ij = x.copy()
-                    x_ij[i] += h
-                    x_ij[j] += h
-                    L_ij = lagrangian(x_ij)
-
-                    x_i = x.copy()
-                    x_i[i] += h
-                    L_i = lagrangian(x_i)
-
-                    x_j = x.copy()
-                    x_j[j] += h
-                    L_j = lagrangian(x_j)
-
-                    hess_L[i, j] = (L_ij - L_i - L_j + L0) / (h * h)
-                    hess_L[j, i] = hess_L[i, j]
-
-            idx = 0
-            for i in range(3):
-                for j in range(i + 1):
-                    outdata[idx] = hess_L[i, j]
-                    idx += 1
-            return 0
-
-    def _apply_copt_nlp_params(model: Any, options: dict[str, Any]) -> None:
-        """与参考脚本一致：``model.setParam(COPT.Param.*, ...)``（NLP 项 + 可选 TimeLimit）。"""
-        assert COPT is not None
-        model.setParam(COPT.Param.NLPTol, 1e-10)
-        model.setParam(COPT.Param.NLPIterLimit, int(options.get("max_iter", 1000)))
-        model.setParam(COPT.Param.Threads, int(options.get("threads", 1)))
-        model.setParam(COPT.Param.BarThreads, int(options.get("bar_threads", 1)))
-        tl = options.get("time_limit")
-        if tl is not None:
-            model.setParam(COPT.Param.TimeLimit, float(tl))
-
-    class COPTNLPSolver:
-        """基于 COPT 的 NLP 封装：``cp.Envr()`` → ``createModel`` → ``loadNlData`` → ``solve``。
-
-        Args:
-            optimizer: DROTRONLPOptimizer 实例。
-            options: COPT 求解参数（max_iter、threads 等）。
-        """
-
-        def __init__(self, optimizer: DROTRONLPOptimizer, options: dict[str, Any] | None = None):
-            self.optimizer = optimizer
-            self.options = options or {}
-            self.model: Any = None
-            self.callback: COPTNLPCallback | None = None
-
-        def _setup_model(self, x0: np.ndarray) -> bool:
-            """构建 COPT NLP 模型（变量、约束、Jacobian/Hessian 结构）。
-
-            Args:
-                x0: 初始变量 ``[alpha, T, t_ins]``。
-
-            Returns:
-                ``True`` 表示模型构建成功。
-            """
-            if cp is None or COPT is None:
-                raise RuntimeError("COPT not installed. Install with: pip install coptpy")
-
-            env = cp.Envr()
-            self.model = env.createModel("DRO_RO_Transfer_NLP")
-            _apply_copt_nlp_params(self.model, self.options)
-
-            alpha_lb, alpha_ub = self.optimizer.alpha_range
-            t_lb, t_ub = self.optimizer.transfer_time_range
-            tins_lb, tins_ub = self.optimizer.t_ins_range
-
-            col_lower = [alpha_lb, t_lb, tins_lb]
-            col_upper = [alpha_ub, t_ub, tins_ub]
-
-            row_lower = [0.0, 0.0]
-            row_upper = [0.0, 0.0]
-
-            self.callback = COPTNLPCallback(self.optimizer)
-
-            n_jac = 6
-            idx_jac_row = [0, 0, 0, 1, 1, 1]
-            idx_jac_col = [0, 1, 2, 0, 1, 2]
-
-            n_hess = 6
-            idx_hess_row = [0, 1, 1, 2, 2, 2]
-            idx_hess_col = [0, 0, 1, 0, 1, 2]
-
-            self.model.loadNlData(
-                nCols=3,
-                nRows=2,
-                sense=COPT.MINIMIZE,
-                nGrad=3,
-                idxGrad=[0, 1, 2],
-                nJac=n_jac,
-                idxJacRow=idx_jac_row,
-                idxJacCol=idx_jac_col,
-                nHess=n_hess,
-                idxHessRow=idx_hess_row,
-                idxHessCol=idx_hess_col,
-                colLower=col_lower,
-                colUpper=col_upper,
-                rowLower=row_lower,
-                rowUpper=row_upper,
-                initX=list(x0),
-                evalType=-1,
-                cb=self.callback,
-            )
-
-            _apply_copt_nlp_params(self.model, self.options)
-
-            return True
-
-        def solve(self, x0: np.ndarray) -> dict:
-            """求解 NLP 模型。
-
-            Args:
-                x0: 初始变量 ``[alpha, T, t_ins]``。
-
-            Returns:
-                含 ``status``、``objective``、``solution``、``success`` 的字典。
-            """
-            if self.model is None:
-                self._setup_model(x0)
-
-            try:
-                self.model.solve()
-
-                status = self.model.status
-                assert COPT is not None
-                obj_val = self.model.objval if status == COPT.OPTIMAL else float("inf")
-                solution = self.model.x if hasattr(self.model, "x") else x0
-
-                return {
-                    "status": status,
-                    "objective": obj_val,
-                    "solution": solution,
-                    "success": status == COPT.OPTIMAL,
-                }
-            except Exception as e:
-                return {
-                    "status": -1,
-                    "objective": float("inf"),
-                    "solution": x0,
-                    "success": False,
-                    "message": str(e),
-                }
-
-        def get_result(self) -> TransferOptimizationResult:
-            """从 COPT 求解结果构建 ``TransferOptimizationResult``。
-
-            Raises:
-                RuntimeError: 尚未调用 ``solve()`` 时。
-            """
-            if self.model is None or self.callback is None or self.callback.x is None:
-                raise RuntimeError("Must call solve() first")
-
-            assert COPT is not None
-            assert self.callback is not None
-            opt_vars = NLPOptimizationVariables.from_array(self.callback.x)
-            success = self.model.status == COPT.OPTIMAL
-
-            return self.optimizer._build_result(
-                opt_vars,
-                success,
-                "COPT solution" if success else f"COPT status: {self.model.status}",
-            )
-
-
-else:
-    COPTNLPSolver = None  # type: ignore[misc, assignment]
-
-    def _apply_copt_nlp_params(model: Any, options: dict[str, Any]) -> None:
-        pass
-
-
-def optimize_with_copt(
-    optimizer: DROTRONLPOptimizer,
-    initial_guess: NLPOptimizationVariables | None = None,
-    *,
-    fallback_to_scipy: bool = True,
-    max_iter: int = 1000,
-    threads: int = 1,
-    bar_threads: int = 1,
-    time_limit: float | None = None,
-    scipy_fallback_kwargs: dict[str, Any] | None = None,
-) -> TransferOptimizationResult:
-    """使用 COPT 求解 NLP（与 ``data_processing_module`` 中用法一致：
-    ``cp.Envr`` / ``createModel`` / ``COPT.Param`` / ``solve``）。
-
-    数学形式与 ``DROTRONLPOptimizer.optimize`` 相同（等式约束 + 最小化 Δv）。
-
-    Args:
-        optimizer: 已设置 ``alpha_range`` / ``transfer_time_range`` / ``t_ins_range`` 的
-            ``DROTRONLPOptimizer``
-        initial_guess: 初始猜测 ``(α, T, t_ins)``；默认 ``(1, 10, 5)``
-        fallback_to_scipy: 未安装 COPT 或求解失败时是否回退 SciPy SLSQP
-        max_iter: ``COPT.Param.NLPIterLimit`` （最大迭代数）
-        threads / bar_threads: ``COPT.Param.Threads`` / ``BarThreads`` （Python 回调建议为 1）
-        time_limit: 若给定，则设置 ``COPT.Param.TimeLimit`` （秒），与参考脚本中 MILP 用法一致
-        scipy_fallback_kwargs: 回退时传给 ``optimizer.optimize`` 的额外参数
-
-    Returns:
-        ``TransferOptimizationResult``
-    """
-    if scipy_fallback_kwargs is None:
-        scipy_fallback_kwargs = {}
-
-    def _run_scipy() -> TransferOptimizationResult:
-        return optimizer.optimize(initial_guess=initial_guess, **scipy_fallback_kwargs)
-
-    if cp is None or COPT is None or NlpCallbackBase is None:
-        if fallback_to_scipy:
-            return _run_scipy()
-        raise RuntimeError(
-            "coptpy 未安装，无法使用 COPT；请安装 coptpy 或设置 fallback_to_scipy=True"
-        )
-
-    if initial_guess is None:
-        alpha0, T0, tins0 = 1.0, 10.0, 5.0
-    else:
-        alpha0 = initial_guess.alpha
-        T0 = initial_guess.transfer_time
-        tins0 = initial_guess.t_ins
-
-    x0 = np.array([alpha0, T0, tins0], dtype=float)
-
-    copt_options: dict[str, Any] = {
-        "max_iter": max_iter,
-        "threads": threads,
-        "bar_threads": bar_threads,
-    }
-    if time_limit is not None:
-        copt_options["time_limit"] = time_limit
-
-    try:
-        solver = COPTNLPSolver(optimizer, copt_options)
-        result = solver.solve(x0)
-
-        if result["success"]:
-            return solver.get_result()
-        if fallback_to_scipy:
-            return _run_scipy()
-        try:
-            return solver.get_result()
-        except RuntimeError:
-            return optimizer._build_result(
-                NLPOptimizationVariables.from_array(np.asarray(x0, dtype=float)),
-                False,
-                "COPT 未收敛且无可用解向量",
-            )
-    except Exception:
-        if fallback_to_scipy:
-            return _run_scipy()
-        raise
