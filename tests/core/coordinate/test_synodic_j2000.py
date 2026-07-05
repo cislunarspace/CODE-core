@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.core import CR3BP_System, SynodicJ2000Transformation
+from e2m2e.core import CR3BP_System, SynodicJ2000System
 
 pytestmark = pytest.mark.spice
 
@@ -41,14 +41,14 @@ def dro_synodic_state():
 
 
 # =============================================================================
-# Test SynodicJ2000Transformation 初始化
+# Test SynodicJ2000System 初始化
 # =============================================================================
 class TestSynodicJ2000Init:
     """测试坐标转换器的创建"""
 
     def test_create_instance(self, cr3bp_system, spice_manager):
-        """应能创建 SynodicJ2000Transformation"""
-        transform = SynodicJ2000Transformation(
+        """应能创建 SynodicJ2000System"""
+        transform = SynodicJ2000System(
             cr3bp_system=cr3bp_system,
             spice=spice_manager,
         )

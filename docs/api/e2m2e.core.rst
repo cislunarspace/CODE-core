@@ -50,14 +50,6 @@ e2m2e.core.orbit module
    :undoc-members:
    :show-inheritance:
 
-e2m2e.core.coordinate module
------------------------------
-
-.. automodule:: e2m2e.core.coordinate
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 e2m2e.core.coordinate_system module
 ------------------------------------
 

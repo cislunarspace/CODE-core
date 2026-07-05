@@ -56,14 +56,6 @@ CORE_COMPONENTS = [
         description="轨道族容器",
     ),
     Component(
-        name="CoordinateTransformation",
-        module_path="e2m2e.core.coordinate",
-        protocols=[],
-        dependencies=["CR3BP_System"],
-        layer="core",
-        description="旋转/惯性坐标系变换",
-    ),
-    Component(
         name="SPICEManager",
         module_path="e2m2e.core.spice",
         protocols=[],

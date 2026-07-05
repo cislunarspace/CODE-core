@@ -75,8 +75,8 @@ CORE_REQUIREMENTS = [
         description="坐标变换与其逆变换的组合必须恢复原始坐标（在数值精度范围内）。",
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.core.coordinate"],
-        linked_tests=["tests/core/test_coordinate.py", "tests/core/coordinate/test_coordinate.py"],
+        linked_code=["e2m2e.core.coordinate_system", "e2m2e.core.synodic_j2000"],
+        linked_tests=["tests/core/coordinate/test_synodic_j2000.py"],
     ),
     # ---- 物理模型精度 ----
     Requirement(

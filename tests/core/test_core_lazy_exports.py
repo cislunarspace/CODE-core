@@ -134,7 +134,7 @@ print("gm:", gm)
                 "SPICEManager",
                 "CR3BP_System",
                 "OrbitFamily",
-                "CoordinateTransformation",
+                "SynodicJ2000System",
                 "ITRFSpiceAxes",
                 "CelestialBodyOrigin",
                 "standard_itrf",

@@ -571,7 +571,7 @@ def convert_to_j2000(
         t_patch_syn: synodic 坐标系下的时间节点数组，归一化时间单位（TU）
         states_syn: synodic 坐标系下的状态数组，形状 (N, 6)，
                    每行 [x, y, z, vx, vy, vz]，归一化单位（DU, DU/TU）
-        syn_j2000: SynodicJ2000Transformation 对象，提供坐标转换功能
+        syn_j2000: SynodicJ2000System 对象，提供坐标转换功能
         reference_et: 参考历元的 SPICE ephemeris time（ET），单位秒
         tu_days: 归一化时间单位（TU）对应的天数，默认值为 4.34811305 天
 
@@ -583,7 +583,7 @@ def convert_to_j2000(
 
     Notes:
         - 时间转换公式：t_j2000 = reference_et + t_syn * (tu_days * 86400)
-        - 状态转换使用 SynodicJ2000Transformation.batch_synodic_to_j2000() 方法
+        - 状态转换使用 SynodicJ2000System.batch_synodic_to_j2000() 方法
         - 适用于将 CR3BP 轨道转换到星历模型进行高精度修正的场景
         - 转换后的状态可用于 EphemerisDynamics 进行轨道传播
     """

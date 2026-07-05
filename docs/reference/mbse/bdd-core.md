@@ -45,11 +45,6 @@ classDiagram
         轨道族容器
     }
     OrbitFamily --> Orbit : aggregates
-    class CoordinateTransformation {
-        <<core>>
-        旋转/惯性坐标框架变换
-    }
-    CoordinateTransformation --> System : uses
     class SPICEManager {
         <<core>>
         SPICE 内核管理

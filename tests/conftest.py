@@ -9,7 +9,7 @@ import os
 import numpy as np
 import pytest
 
-from e2m2e.core import CoordinateTransformation, CR3BP_Dynamics, CR3BP_System, Orbit
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
 
 
 def pytest_configure(config):
@@ -38,12 +38,6 @@ def sun_jupiter_system():
 def earth_moon_dynamics(earth_moon_system):
     """Create Earth-Moon CR3BP dynamics"""
     return CR3BP_Dynamics(system=earth_moon_system)
-
-
-@pytest.fixture
-def earth_moon_coordinate(earth_moon_system):
-    """Create Earth-Moon coordinate transformation"""
-    return CoordinateTransformation(system=earth_moon_system)
 
 
 @pytest.fixture
@@ -191,10 +185,15 @@ def spice_eph_dynamics(spice_eph_system):
 
 @pytest.fixture
 def spice_syn_j2000(earth_moon_system, spice_manager):
-    """Synodic ↔ J2000 coordinate transformer wired to the standard CR3BP system."""
-    from e2m2e.core import SynodicJ2000Transformation
+    """Synodic ↔ J2000 coordinate transformer wired to the standard CR3BP system.
 
-    return SynodicJ2000Transformation(
+    基于 ``CoordinateSystem`` 的 ``SynodicJ2000System`` 实现，接口包括
+    ``synodic_to_j2000``、``j2000_to_synodic``、``batch_synodic_to_j2000``、
+    ``batch_j2000_to_synodic``，以及 ``cr3bp_system``、``spice`` 属性。
+    """
+    from e2m2e.core.synodic_j2000 import SynodicJ2000System
+
+    return SynodicJ2000System(
         cr3bp_system=earth_moon_system,
         spice=spice_manager,
     )

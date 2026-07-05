@@ -209,8 +209,8 @@ e2m2e/
 │   ├── cr3bp_system.py   # CR3BP_System - 系统定义、平动点
 │   ├── dynamics.py       # CR3BP_Dynamics - 运动方程、STM
 │   ├── orbit.py          # Orbit, OrbitFamily - 轨道数据结构
-│   ├── coordinate.py     # CoordinateTransformation - 坐标变换
 │   ├── coordinate_system.py  # CoordinateSystem - 坐标系定义
+│   ├── synodic_j2000.py  # SynodicJ2000System - synodic ↔ J2000 转换器
 │   ├── ephemeris_system.py  # EphemerisSystem - 星历系统
 │   ├── ephemeris_dynamics.py # EphemerisDynamics - N 体动力学
 │   └── spice.py          # SPICE 内核管理
