@@ -9,7 +9,7 @@ from .components import Component
 CORE_COMPONENTS = [
     Component(
         name="CR3BP_System",
-        module_path="e2m2e.core.system",
+        module_path="e2m2e.core.cr3bp_system",
         protocols=[],
         dependencies=[],
         layer="core",
