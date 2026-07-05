@@ -12,6 +12,7 @@ import logging
 import os
 import subprocess
 from collections.abc import Mapping
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -22,6 +23,10 @@ _STANDARD_DPI = 96.0  # 标准 DPI，作为缩放计算的基准
 # 环境变量名：天体图标缩放系数（地球、月球同步缩放）。
 # 调用方通过设置此环境变量影响 PlotConfig.from_env() 构造的实例。
 BODY_ICON_SCALE_ENV = "E2M2E_BODY_ICON_SCALE"
+
+# 环境变量名：天体图标目录。允许用户在不修改代码的情况下切换图标位置。
+# 调用方通过设置此环境变量影响 PlotConfig.from_env() 构造的实例。
+BODY_ICON_PATH_ENV = "E2M2E_BODY_ICON_PATH"
 
 
 def _detect_system_scale() -> float:
@@ -260,6 +265,9 @@ class PlotConfig(BaseModel):
         primary_body_size: 主天体标记大小。
         secondary_body_color: 次天体标记颜色。
         secondary_body_size: 次天体标记大小。
+        icon_path: 天体图标目录，None 时由 ``icons.resolve_icon_dir`` 回退。
+        primary_body_icon: 主天体图标文件名。
+        secondary_body_icon: 次天体图标文件名。
         lp_colors: 平动点标记颜色列表（5个元素）。
         lp_markers: 平动点标记形状列表（5个元素）。
         lp_sizes: 平动点标记大小列表（5个元素）。
@@ -298,6 +306,13 @@ class PlotConfig(BaseModel):
     # 天体图标缩放系数（用于 PNG 图标显示大小微调，不影响散点回退）
     primary_body_icon_scale: float = 1.0
     secondary_body_icon_scale: float = 1.0
+    # 天体图标目录：None 时由 icons.resolve_icon_dir() 按以下优先级回退——
+    # 环境变量 E2M2E_BODY_ICON_PATH → ~/Downloads（向后兼容默认）。
+    # 支持 ~、${VAR}/$VAR 占位符、相对/绝对路径。
+    icon_path: str | None = None
+    # 主天体/次天体图标文件名（相对于 icon_path）
+    primary_body_icon: str = "地球.png"
+    secondary_body_icon: str = "月球.png"
     lp_colors: list[str] = Field(default_factory=lambda: ["gray"] * 5)
     lp_markers: list[str] = Field(default_factory=lambda: ["^"] * 5)
     lp_sizes: list[int] = Field(default_factory=lambda: [60] * 5)
@@ -333,6 +348,8 @@ class PlotConfig(BaseModel):
         - ``BODY_ICON_SCALE_ENV`` (``E2M2E_BODY_ICON_SCALE``)：浮点数，同时
           应用于 ``primary_body_icon_scale`` 和 ``secondary_body_icon_scale``。
           解析失败（非数字、≤ 0）时静默回退到字段默认值，不抛异常。
+        - ``BODY_ICON_PATH_ENV`` (``E2M2E_BODY_ICON_PATH``)：天体图标目录，
+          写入 ``icon_path`` 字段。空字符串或缺失时静默忽略。
 
         Args:
             env: 环境变量映射，``None`` 时使用 ``os.environ``。便于测试注入。
@@ -343,7 +360,11 @@ class PlotConfig(BaseModel):
         """
         source = os.environ if env is None else env
 
-        env_kwargs: dict[str, float] = {}
+        env_kwargs: dict[str, Any] = {}
+
+        raw_path = source.get(BODY_ICON_PATH_ENV)
+        if raw_path:
+            env_kwargs["icon_path"] = raw_path
 
         raw = source.get(BODY_ICON_SCALE_ENV)
         if raw is not None:

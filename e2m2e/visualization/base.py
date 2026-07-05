@@ -6,15 +6,14 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 
 from ..core.cr3bp_system import CR3BP_System, LibrationPoint
 from ..core.enums import ProjectionPlane
+from . import icons
 from .config import PlotConfig
 
 if TYPE_CHECKING:
@@ -22,92 +21,6 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 logger = logging.getLogger(__name__)
-
-
-class _DepthDriverPatch(mpatches.Patch):
-    """利用 Axes3D 的 do_3d_projection 钩子驱动 Billboard 图标的深度排序。
-
-    Axes3D.draw() 在渲染前会对所有可见 Collection 和 Patch 调用
-    do_3d_projection()，这是唯一能在每帧渲染前获取到正确投影矩阵 M 的时机。
-    本 Patch 利用这个钩子来：
-
-    1. 更新 AnnotationBbox 的投影位置（跟随视角变化）。
-    2. 根据图标与场景中 Line3D 的深度比较动态调整 AnnotationBbox 的 zorder。
-
-    这比 draw_event 方案更可靠——后者在渲染之后才触发，导致 zorder 更新延迟一帧，
-    旋转时出现遮挡关系闪烁。本方案在渲染前同步更新，消除延迟。
-    """
-
-    def __init__(self, annotation_box: Any, position_3d: tuple[float, float, float]) -> None:
-        super().__init__(
-            visible=True,
-            fill=False,
-            facecolor="none",
-            edgecolor="none",
-            linewidth=0,
-        )
-        self._ab = annotation_box
-        self._pos = position_3d
-        self._last_zorder: int = 10
-
-    def get_path(self) -> Any:
-        from matplotlib.path import Path
-
-        return Path(np.empty((0, 2)))
-
-    def draw(self, renderer: Any) -> None:
-        pass
-
-    def do_3d_projection(self) -> float:
-        from mpl_toolkits.mplot3d import proj3d
-
-        axes = self.axes
-        if axes is None:
-            return 0.0
-        M = getattr(axes, "M", None)
-        if M is None:
-            return 0.0
-
-        x3, y3, z3 = self._pos
-        x2, y2, z2 = proj3d.proj_transform(x3, y3, z3, M)
-        self._ab.xy = (x2, y2)
-        self._ab.xybox = (x2, y2)
-
-        line_zs = []
-        for line in axes.lines:
-            verts = getattr(line, "_verts3d", None)
-            if verts is None or not line.get_visible():
-                continue
-            xs3d, ys3d, zs3d = verts
-            if len(xs3d) == 0:
-                continue
-            _, _, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, M)
-            line_zs.append(zs)
-
-        if not line_zs:
-            self._ab.set_zorder(10)
-            return z2
-
-        all_zs = np.concatenate(line_zs)
-        if all_zs.size == 0:
-            self._ab.set_zorder(10)
-            return z2
-
-        # proj_z 越小越靠近相机；与中位数比较决定遮挡关系
-        median_z = np.median(all_zs)
-        z_range = all_zs.max() - all_zs.min()
-        margin = z_range * 0.1
-
-        if z2 < median_z - margin:
-            new_zorder = 10
-        elif z2 > median_z + margin:
-            new_zorder = 1
-        else:
-            new_zorder = self._last_zorder
-
-        self._last_zorder = new_zorder
-        self._ab.set_zorder(new_zorder)
-        return z2
 
 
 class OrbitVisualizer:
@@ -168,11 +81,11 @@ class OrbitVisualizer:
         self._secondary_body_image: Any | None = None  # 次天体（月球）图片
         self._icon_loaded: bool = False
 
-    def _load_body_icons(self) -> None:
-        """懒加载天体图标 PNG 图片。
+    def _ensure_icons_loaded(self) -> None:
+        """懒加载天体图标 PNG 图片到 ``self._primary_body_image/_secondary_body_image``。
 
-        从 ~/Downloads 目录加载地球和月球 PNG 文件。
-        加载失败时静默回退，不影响绘图流程。
+        路径解析委托给 :func:`icons.resolve_icon_dir`，避免硬编码
+        ``~/Downloads``。加载失败时静默回退，不影响绘图流程。
 
         Note:
             PIL Image 会转换为 numpy array 以便 matplotlib OffsetImage 使用。
@@ -180,34 +93,15 @@ class OrbitVisualizer:
         if self._icon_loaded:
             return
 
-        try:
-            import numpy as np
-            from PIL import Image
-
-            downloads = Path.home() / "Downloads"
-            earth_path = downloads / "地球.png"
-            moon_path = downloads / "月球.png"
-
-            if earth_path.exists():
-                img = Image.open(earth_path).convert("RGBA")
-                self._primary_body_image = np.array(img)
-                logger.debug("已加载地球图标: %s", earth_path)
-            else:
-                logger.debug("地球图标不存在: %s", earth_path)
-
-            if moon_path.exists():
-                img = Image.open(moon_path).convert("RGBA")
-                self._secondary_body_image = np.array(img)
-                logger.debug("已加载月球图标: %s", moon_path)
-            else:
-                logger.debug("月球图标不存在: %s", moon_path)
-
-        except ImportError:
-            logger.debug("PIL 未安装，无法加载天体图标")
-        except Exception as e:
-            logger.debug("加载天体图标失败: %s", e)
-        finally:
-            self._icon_loaded = True
+        icon_dir = icons.resolve_icon_dir(self.config.icon_path)
+        primary, secondary = icons.load_body_icons(
+            icon_dir,
+            self.config.primary_body_icon,
+            self.config.secondary_body_icon,
+        )
+        self._primary_body_image = primary
+        self._secondary_body_image = secondary
+        self._icon_loaded = True
 
     def _get_body_icon(self, is_primary: bool, size: int) -> tuple[Any | None, bool]:
         """获取天体图标和是否可用的元组。
@@ -219,69 +113,44 @@ class OrbitVisualizer:
         Returns:
             (OffsetImage 或 PIL Image, 是否可用) 元组
         """
-        self._load_body_icons()
-
-        from matplotlib.offsetbox import OffsetImage
+        self._ensure_icons_loaded()
 
         image = self._primary_body_image if is_primary else self._secondary_body_image
         if image is None:
             return None, False
 
-        # 计算缩放比例
-        # 使图标在显示时占约 size 像素
-        # 公式：zoom = 目标像素 / 原始像素尺寸
-        # dpi_cor=False 避免保存时根据 dpi 自动放大
-        orig_size = max(image.shape[0], image.shape[1])  # 700
-        zoom = size / orig_size if orig_size > 0 else 1.0
+        return icons.make_offset_image(image, size), True
 
-        offset_img = OffsetImage(image, zoom=zoom, dpi_cor=False)
-        return offset_img, True
-
-    def _add_3d_billboard_icon(
-        self,
-        ax: Any,
-        offset_img: Any,
-        position: tuple[float, float, float],
-        label: str,
+    def _plot_body_marker_3d(
+        self, ax: Any, x: float, color: str, size: int, label: str
     ) -> None:
-        """在 3D Axes 上以 Billboard 方式渲染 PNG 图标，支持动态深度遮挡。
-
-        matplotlib 3D 的 AnnotationBbox 是 2D 元素，不参与自动深度排序。
-        通过 :class:`_DepthDriverPatch` 挂接到 Axes3D.draw() 的
-        do_3d_projection 钩子，在每帧渲染**之前**同步更新图标位置和 zorder，
-        确保旋转交互时遮挡关系无延迟地反映空间深度。
-
-        Args:
-            ax: 3D axes 对象。
-            offset_img: 已经构造好的 ``OffsetImage``。
-            position: 天体的 (x, y, z) 旋转系坐标。
-            label: 图例标签。
-        """
-        from matplotlib.offsetbox import AnnotationBbox
-        from mpl_toolkits.mplot3d import proj3d
-
-        x3, y3, z3 = position
-
-        x2, y2, _ = proj3d.proj_transform(x3, y3, z3, ax.get_proj())
-        ab = AnnotationBbox(
-            offset_img,
-            (x2, y2),
-            xycoords="data",
-            frameon=False,
-            pad=0.0,
-            annotation_clip=False,
-            zorder=10,
+        """在 3D axes 上画一个天体的圆形 marker（图标加载失败时的回退）。"""
+        ax.plot(
+            [x],
+            [0],
+            [0],
+            marker="o",
+            color=color,
+            markersize=(size**0.5),
+            markeredgecolor="black",
+            markeredgewidth=1,
+            linestyle="None",
+            label=label,
         )
-        ab.set_clip_on(False)
-        ax.add_artist(ab)
 
-        # 深度驱动：不可见 Patch，通过 do_3d_projection 钩子
-        # 在每帧渲染前同步更新 AnnotationBbox 的位置和 zorder
-        driver = _DepthDriverPatch(ab, position)
-        ax.add_patch(driver)
-
-        # 图例占位（invisible scatter），与 2D 路径一致
-        ax.scatter([], [], [], color="white", label=label)
+    def _plot_body_marker_2d(
+        self, ax: Any, pos: np.ndarray, color: str, edge: str, size: int, label: str
+    ) -> None:
+        """在 2D axes 上画一个天体的散点 marker（图标加载失败时的回退）。"""
+        ax.scatter(
+            *pos,
+            color=color,
+            s=size,  # type: ignore[misc]
+            edgecolors=edge,
+            linewidth=1.5,
+            zorder=10,
+            label=label,
+        )
 
     def _get_next_color(self) -> str:
         """从颜色循环中获取下一个颜色。"""
@@ -549,35 +418,23 @@ class OrbitVisualizer:
             )
 
             if primary_ok and secondary_ok:
-                self._add_3d_billboard_icon(ax, primary_icon, (-self.mu, 0.0, 0.0), primary_name)
-                self._add_3d_billboard_icon(
+                icons.add_3d_billboard_icon(
+                    ax, primary_icon, (-self.mu, 0.0, 0.0), primary_name
+                )
+                icons.add_3d_billboard_icon(
                     ax, secondary_icon, (1 - self.mu, 0.0, 0.0), secondary_name
                 )
             else:
                 # 图标加载失败，回退到圆形 marker
-                ax.plot(
-                    [-self.mu],
-                    [0],
-                    [0],
-                    marker="o",
-                    color=self.primary_body_color,
-                    markersize=(self.primary_body_size**0.5),
-                    markeredgecolor="black",
-                    markeredgewidth=1,
-                    linestyle="None",
-                    label=primary_name,
+                self._plot_body_marker_3d(
+                    ax, -self.mu, self.primary_body_color, self.primary_body_size, primary_name
                 )
-                ax.plot(
-                    [1 - self.mu],
-                    [0],
-                    [0],
-                    marker="o",
-                    color=self.secondary_body_color,
-                    markersize=(self.secondary_body_size**0.5),
-                    markeredgecolor="black",
-                    markeredgewidth=1,
-                    linestyle="None",
-                    label=secondary_name,
+                self._plot_body_marker_3d(
+                    ax,
+                    1 - self.mu,
+                    self.secondary_body_color,
+                    self.secondary_body_size,
+                    secondary_name,
                 )
         else:
             # 2D 图表优先使用 PNG 图标
@@ -596,62 +453,31 @@ class OrbitVisualizer:
 
             if primary_ok and secondary_ok:
                 # 成功加载图标，使用 AnnotationBbox
-                from matplotlib.offsetbox import AnnotationBbox
-
                 # 确保图标不为 None（类型断言）
                 assert primary_icon is not None
                 assert secondary_icon is not None
 
-                # 先添加图例条目（用 invisible scatter）
-                ax.scatter(
-                    [],
-                    [],
-                    color="white",
-                    label=primary_name,
+                icons.add_2d_icon(
+                    ax, primary_icon, (float(primary_pos[0]), float(primary_pos[1])), primary_name
                 )
-                ax.scatter(
-                    [],
-                    [],
-                    color="white",
-                    label=secondary_name,
-                )
-
-                # 绘制主天体（地球）图标
-                ab_primary = AnnotationBbox(
-                    primary_icon,
-                    (float(primary_pos[0]), float(primary_pos[1])),
-                    frameon=False,
-                    zorder=10,
-                )
-                ax.add_artist(ab_primary)
-
-                # 绘制次天体（月球）图标
-                ab_secondary = AnnotationBbox(
+                icons.add_2d_icon(
+                    ax,
                     secondary_icon,
                     (float(secondary_pos[0]), float(secondary_pos[1])),
-                    frameon=False,
-                    zorder=10,
+                    secondary_name,
                 )
-                ax.add_artist(ab_secondary)
             else:
                 # 图标加载失败，回退到圆形散点
-                ax.scatter(
-                    *primary_pos,
-                    color="#2E86AB",
-                    s=self.primary_body_size,  # type: ignore[misc]
-                    edgecolors="#1A5276",
-                    linewidth=1.5,
-                    zorder=10,
-                    label=primary_name,
+                self._plot_body_marker_2d(
+                    ax, primary_pos, "#2E86AB", "#1A5276", self.primary_body_size, primary_name
                 )
-                ax.scatter(
-                    *secondary_pos,
-                    color="#95A5A6",
-                    s=self.secondary_body_size,  # type: ignore[misc]
-                    edgecolors="#566573",
-                    linewidth=1.5,
-                    zorder=10,
-                    label=secondary_name,
+                self._plot_body_marker_2d(
+                    ax,
+                    secondary_pos,
+                    "#95A5A6",
+                    "#566573",
+                    self.secondary_body_size,
+                    secondary_name,
                 )
         return ax
 
@@ -685,38 +511,15 @@ class OrbitVisualizer:
             (sorted_x, sorted_y) 排序后的坐标元组。
         """
         points = np.column_stack((x, y))
-        n = len(points)
-        if n <= 2:
+        if len(points) <= 2:
             return x, y
-        # 选择离原点最远的点作为起点，确保排序从轨道外侧开始
-        distances_from_origin = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2)
-        start_idx = np.argmax(distances_from_origin)
-        visited = np.zeros(n, dtype=bool)
-        sorted_indices = np.zeros(n, dtype=int)
-        current_idx = start_idx
-        for i in range(n):
-            visited[current_idx] = True
-            sorted_indices[i] = current_idx
-            if i == n - 1:
-                break
-            min_dist = np.inf
-            nearest_idx = -1
-            for j in range(n):
-                if not visited[j]:
-                    dist = np.sqrt(
-                        (points[current_idx, 0] - points[j, 0]) ** 2
-                        + (points[current_idx, 1] - points[j, 1]) ** 2
-                    )
-                    if dist < min_dist:
-                        min_dist = dist
-                        nearest_idx = j
-            current_idx = nearest_idx
-        return points[sorted_indices, 0], points[sorted_indices, 1]
+        order = self._greedy_nearest_neighbor_order(points)
+        return points[order, 0], points[order, 1]
 
     def _sort_3d_points_by_nearest_neighbor(self, x, y, z):
         """使用最近邻算法排序 3D 散点，使绘制的连线不交叉。
 
-        三维版本，逻辑与 _sort_points_by_nearest_neighbor 相同，
+        三维版本，逻辑与 :meth:`_sort_points_by_nearest_neighbor` 相同，
         但距离计算包含 z 分量。
 
         Args:
@@ -728,31 +531,36 @@ class OrbitVisualizer:
             (sorted_x, sorted_y, sorted_z) 排序后的坐标元组。
         """
         points = np.column_stack((x, y, z))
-        n = len(points)
-        if n <= 2:
+        if len(points) <= 2:
             return x, y, z
-        # 选择离原点最远的点作为起点，确保排序从轨道外侧开始
-        distances_from_origin = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2 + points[:, 2] ** 2)
-        start_idx = np.argmax(distances_from_origin)
+        order = self._greedy_nearest_neighbor_order(points)
+        return points[order, 0], points[order, 1], points[order, 2]
+
+    @staticmethod
+    def _greedy_nearest_neighbor_order(points: np.ndarray) -> np.ndarray:
+        """贪心最近邻遍历，返回点的访问顺序索引数组。
+
+        从离原点最远的点出发，每步选最近的未访问点。维数由 ``points.shape[1]`` 决定。
+
+        Args:
+            points: ``(n, d)`` 的坐标数组，``d >= 1``。
+
+        Returns:
+            ``(n,)`` 的整数索引数组，按访问顺序排列。
+        """
+        n = len(points)
         visited = np.zeros(n, dtype=bool)
-        sorted_indices = np.zeros(n, dtype=int)
-        current_idx = start_idx
+        order = np.empty(n, dtype=int)
+        start_idx = int(np.argmax(np.sum(points * points, axis=1)))
+        current = start_idx
         for i in range(n):
-            visited[current_idx] = True
-            sorted_indices[i] = current_idx
+            visited[current] = True
+            order[i] = current
             if i == n - 1:
                 break
-            min_dist = np.inf
-            nearest_idx = -1
-            for j in range(n):
-                if not visited[j]:
-                    dist = np.sqrt(
-                        (points[current_idx, 0] - points[j, 0]) ** 2
-                        + (points[current_idx, 1] - points[j, 1]) ** 2
-                        + (points[current_idx, 2] - points[j, 2]) ** 2
-                    )
-                    if dist < min_dist:
-                        min_dist = dist
-                        nearest_idx = j
-            current_idx = nearest_idx
-        return points[sorted_indices, 0], points[sorted_indices, 1], points[sorted_indices, 2]
+            # 计算到所有未访问点的平方距离，已访问置 inf
+            diff = points - points[current]
+            dists = np.einsum("ij,ij->i", diff, diff)
+            dists[visited] = np.inf
+            current = int(np.argmin(dists))
+        return order
