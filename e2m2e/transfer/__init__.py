@@ -6,7 +6,7 @@
 from . import transfer_optimization
 from .config import TransferConfig, TransferOptimizationResult
 from .propulsion import ImpulsivePropulsion, PropulsionModel
-from .search_config import SearchConfig
+from .search_config import SearchConfig  # 向后兼容别名（= TransferConfig）
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 from .transfer import Transfer
 from .transfer_optimization import (
@@ -17,8 +17,6 @@ from .transfer_optimization import (
 )
 from .transfer_search import (
     DEFAULT_MIN_DISTANCE_THRESHOLD_DU,
-    DROROTransferSearch,
-    DROTransferSearch,
     TransferSearch,
     load_orbit_from_json,
 )
@@ -28,8 +26,6 @@ _HAVE_COPT = transfer_optimization.coptpy is not None
 __all__ = [
     "SearchConfig",
     "TransferSearch",
-    "DROTransferSearch",
-    "DROROTransferSearch",
     "Transfer",
     "TransferConfig",
     "TransferOptimizationResult",

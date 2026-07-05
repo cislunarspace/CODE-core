@@ -12,10 +12,13 @@ from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
 from . import transfer_optimization
 from .config import TransferConfig, TransferOptimizationResult
-from .optimizers import COPTTransferOptimizer, SciPyTransferOptimizer
 from .propulsion import ImpulsivePropulsion, PropulsionModel
 from .terminal import OrbitTerminal, TerminalCondition
-from .transfer_optimization import DROTRONLPOptimizer, NLPOptimizationVariables
+from .transfer_optimization import (
+    DROTRONLPOptimizer,
+    NLPOptimizationVariables,
+    optimize_with_copt,
+)
 
 _HAVE_COPT = transfer_optimization.coptpy is not None
 
@@ -167,9 +170,9 @@ class Transfer:
 
         # 若用户未指定覆盖值，使用配置中的默认值
         if use_relaxed_velocity is None:
-            use_relaxed_velocity = self._config.use_relaxed_velocity
+            use_relaxed_velocity = self._config.nlp_use_relaxed_velocity
         if velocity_angle_tol is None:
-            velocity_angle_tol = self._config.velocity_angle_tol
+            velocity_angle_tol = self._config.nlp_velocity_angle_tol
 
         # 出发点状态：用户手动指定或从 DRO 轨道采样
         if departure_state is None:
@@ -192,16 +195,16 @@ class Transfer:
 
         # 通过 config 一次性传入所有优化参数，避免 poke optimizer 属性
         config = TransferConfig(
-            alpha_min=alpha_range[0],
-            alpha_max=alpha_range[1],
-            t_ins_range=t_ins_range,
-            earth_radius=self._config.earth_radius,
-            moon_radius=self._config.moon_radius,
-            use_relaxed_velocity=use_relaxed_velocity,
-            velocity_angle_tol=velocity_angle_tol,
-            use_copt=self._config.use_copt,
-            fallback_to_scipy=self._config.fallback_to_scipy,
-            verbose=False,
+            nlp_alpha_min=alpha_range[0],
+            nlp_alpha_max=alpha_range[1],
+            nlp_t_ins_range=t_ins_range,
+            nlp_earth_radius=self._config.nlp_earth_radius,
+            nlp_moon_radius=self._config.nlp_moon_radius,
+            nlp_use_relaxed_velocity=use_relaxed_velocity,
+            nlp_velocity_angle_tol=velocity_angle_tol,
+            nlp_use_copt=self._config.nlp_use_copt,
+            nlp_fallback_to_scipy=self._config.nlp_fallback_to_scipy,
+            nlp_verbose=False,
         )
 
         optimizer = DROTRONLPOptimizer(
@@ -214,27 +217,32 @@ class Transfer:
             propulsion=self.propulsion,
         )
 
-        adapter = self._build_optimizer_adapter(optimizer)
-        nlp_result = adapter.optimize(initial_guess=ig)
+        nlp_result = self._optimize_nlp(optimizer, ig)
 
         self._result = nlp_result
         return self._result
 
-    def _build_optimizer_adapter(self, optimizer: DROTRONLPOptimizer):
-        """按配置选择 SciPy 或 COPT adapter 包装底层优化器。
+    def _optimize_nlp(
+        self,
+        optimizer: DROTRONLPOptimizer,
+        initial_guess: NLPOptimizationVariables,
+    ) -> TransferOptimizationResult:
+        """按配置选择 SciPy 或 COPT 路径求解 NLP。
 
         Args:
             optimizer: NLP 优化器实例。
+            initial_guess: NLP 优化变量初值。
 
         Returns:
-            ``TransferOptimizer`` 子类实例。
+            ``TransferOptimizationResult``。
         """
-        if self._config.use_copt and _HAVE_COPT:
-            return COPTTransferOptimizer(
+        if self._config.nlp_use_copt and _HAVE_COPT:
+            return optimize_with_copt(
                 optimizer,
-                fallback_to_scipy=self._config.fallback_to_scipy,
+                initial_guess=initial_guess,
+                fallback_to_scipy=self._config.nlp_fallback_to_scipy,
             )
-        return SciPyTransferOptimizer(optimizer)
+        return optimizer.optimize(initial_guess=initial_guess)
 
     def _sample_departure_state_from_dro(self) -> np.ndarray:
         """取出发轨道的首个状态点作为出发点状态。

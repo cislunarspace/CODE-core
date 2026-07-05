@@ -14,7 +14,8 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import fsolve
 
-from ..mbse.data.enums import ReferenceFrame, UnitSystem
+from .constants import AU as _AU_KM
+from .enums import ReferenceFrame, UnitSystem
 from .potential import pseudo_potential_hessian
 from .system import System
 
@@ -57,7 +58,7 @@ class CR3BP_System(System):
     # 天文常量
     EARTH_MOON_DISTANCE_KM = 384400.0  # 地月平均距离 (km) — 旧值，保留以兼容
     EARTH_MOON_DISTANCE_KM_PRECISE = 384405.0  # 地月距离精确值 (km), Cui et al. 2025
-    AU = 149597870.7  # 天文单位 (km)
+    AU = _AU_KM  # 天文单位 (km)
     G = 6.67430e-20  # 万有引力常数 (km^3 / (kg * s^2))
     DAY = 86400  # 一天的秒数
     YEAR = 365.25 * 86400  # 一年的秒数（儒略年）

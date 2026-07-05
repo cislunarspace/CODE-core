@@ -10,7 +10,12 @@ from types import SimpleNamespace
 import numpy as np
 
 from e2m2e.algorithms import ephemeris_correction
-from e2m2e.algorithms.ephemeris_correction import correct_ephemeris_patch_points
+from e2m2e.algorithms.ephemeris_correction import (
+    correct_ephemeris_patch_points,
+    homotopy,
+    standard,
+    two_level,
+)
 from e2m2e.mbse.data.enums import BoundaryMode
 
 
@@ -35,7 +40,7 @@ def test_standard_method_uses_multiple_shooting_and_normalizes_result(monkeypatc
                 state_patch=state_patch + 2,
             )
 
-    monkeypatch.setattr(ephemeris_correction, "MultipleShooting", FakeMultipleShooting)
+    monkeypatch.setattr(standard, "MultipleShooting", FakeMultipleShooting)
 
     result = correct_ephemeris_patch_points(
         "standard",
@@ -88,7 +93,7 @@ def test_two_level_method_uses_two_level_solver_and_preserves_velocity_diagnosti
             )
 
     monkeypatch.setattr(
-        ephemeris_correction,
+        two_level,
         "TwoLevelMultipleShooting",
         FakeTwoLevelMultipleShooting,
     )
@@ -126,8 +131,6 @@ def test_two_level_method_uses_two_level_solver_and_preserves_velocity_diagnosti
 
 def test_homotopy_method_delegates_to_correct_with_homotopy(monkeypatch):
     """method='homotopy' 应路由到 correct_with_homotopy (Issue #239)。"""
-    from e2m2e.algorithms import homotopy_correction
-
     captured: dict = {}
     t_patch = np.array([0.0, 1.0])
     state_patch = np.ones((2, 6))
@@ -147,7 +150,7 @@ def test_homotopy_method_delegates_to_correct_with_homotopy(monkeypatch):
         )
 
     monkeypatch.setattr(
-        homotopy_correction,
+        homotopy,
         "correct_with_homotopy",
         fake,
     )

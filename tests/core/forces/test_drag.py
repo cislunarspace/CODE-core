@@ -7,11 +7,10 @@ import numpy as np
 import pytest
 
 from e2m2e.core.atmosphere import ExponentialAtmosphere
+from e2m2e.core.constants import KM_TO_M as _KM_TO_M
+from e2m2e.core.constants import R_EARTH as _EARTH_R_KM
 from e2m2e.core.forces import PhysicalModel
 from e2m2e.core.forces.drag import DragModel
-
-_EARTH_R_KM = 6378.137
-_KM_TO_M = 1000.0
 
 
 def test_drag_model_is_physical_model():

@@ -1,25 +1,42 @@
-"""共享枚举定义
+"""mbse 数据枚举
 
-统一管理 e2m2e 系统中所有枚举类型，替代分散在各个模块中的局部枚举。
+基础领域枚举（``ReferenceFrame``、``UnitSystem``、``ProjectionPlane``、
+``TransferType``、``BoundaryMode``、``TwoLevelMultipleShootingStatus``、
+``ConvergenceState``）已下沉到 ``e2m2e.core.enums``，此处仅作重导出以保持向后兼容。
+
+仅 mbse 内部使用的追溯性枚举（``OrbitFamilyType``、``StabilityLabel``、
+``BifurcationLabel``、``TransferPhase``）仍定义在本模块。
 """
 
 from __future__ import annotations
 
 import enum
 
+from e2m2e.core.enums import (
+    BoundaryMode,
+    ConvergenceState,
+    ProjectionPlane,
+    ReferenceFrame,
+    TransferType,
+    TwoLevelMultipleShootingStatus,
+    UnitSystem,
+)
 
-class BoundaryMode(enum.Enum):
-    """两层多重打靶的边界条件。"""
-
-    FIXED_ENDPOINTS = "fixed_endpoints"
-
-
-class TwoLevelMultipleShootingStatus(enum.Enum):
-    """两层多重打靶的结果状态。"""
-
-    CONVERGED = "converged"
-    MAX_ITERATIONS = "max_iterations"
-    LEVEL1_FAILED = "level1_failed"
+__all__ = [
+    # 自 core 重导出的基础领域枚举
+    "BoundaryMode",
+    "ConvergenceState",
+    "ProjectionPlane",
+    "ReferenceFrame",
+    "TransferType",
+    "TwoLevelMultipleShootingStatus",
+    "UnitSystem",
+    # mbse 内部追溯性枚举
+    "OrbitFamilyType",
+    "StabilityLabel",
+    "BifurcationLabel",
+    "TransferPhase",
+]
 
 
 class OrbitFamilyType(enum.Enum):
@@ -65,16 +82,6 @@ class BifurcationLabel(enum.Enum):
     SECONDARY_HOPF = "secondary_hopf"
 
 
-class ConvergenceState(enum.Enum):
-    """算法收敛状态（用于状态机图）"""
-
-    ITERATING = "iterating"
-    CONVERGED = "converged"
-    DIVERGED = "diverged"
-    STAGNATED = "stagnated"
-    MAX_ITERATIONS = "max_iterations"
-
-
 class TransferPhase(enum.Enum):
     """转移设计阶段（用于状态机图）"""
 
@@ -84,38 +91,3 @@ class TransferPhase(enum.Enum):
     OPTIMIZING = "optimizing"
     COMPLETE = "complete"
     FAILED = "failed"
-
-
-class ReferenceFrame(enum.Enum):
-    """参考坐标系"""
-
-    ROTATING = "rotating"  # CR3BP 旋转坐标系
-    INERTIAL = "inertial"  # 惯性坐标系
-    BARYCENTRIC = "barycentric"  # 质心坐标系
-    PRIMARY_CENTERED = "primary_centered"  # 主天体中心坐标系
-    SECONDARY_CENTERED = "secondary_centered"  # 次天体中心坐标系
-    SYNODIC = "synodic"  # 会合坐标系
-    J2000 = "J2000"  # J2000 惯性系
-
-
-class ProjectionPlane(enum.Enum):
-    """投影平面"""
-
-    XY = "xy"
-    XZ = "xz"
-    YZ = "yz"
-
-
-class TransferType(enum.Enum):
-    """转移类型"""
-
-    DIRECT = "direct"
-    LGA = "lga"  # Lunar Gravity Assist
-    EXTERNAL = "external"
-
-
-class UnitSystem(enum.Enum):
-    """单位系统"""
-
-    DIMENSIONLESS = "dimensionless"  # 无量纲单位（如 CR3BP）
-    SI = "si"  # 国际单位制（km, s, km/s）

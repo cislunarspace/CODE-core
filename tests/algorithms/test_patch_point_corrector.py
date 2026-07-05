@@ -12,7 +12,12 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithms import ephemeris_correction
-from e2m2e.algorithms.ephemeris_correction import correct_ephemeris_patch_points
+from e2m2e.algorithms.ephemeris_correction import (
+    correct_ephemeris_patch_points,
+    homotopy,
+    standard,
+    two_level,
+)
 from e2m2e.algorithms.ephemeris_correction_types import (
     EphemerisCorrectionResult,
     PatchPointCorrector,
@@ -163,7 +168,7 @@ class TestDispatch:
                     state_patch=state_patch + 0.01,
                 )
 
-        monkeypatch.setattr(ephemeris_correction, "MultipleShooting", FakeMS)
+        monkeypatch.setattr(standard, "MultipleShooting", FakeMS)
         result = correct_ephemeris_patch_points(
             "standard",
             dynamics="dynamics",
@@ -201,7 +206,7 @@ class TestDispatch:
                     state_patch=kwargs["state_patch"] + 0.01,
                 )
 
-        monkeypatch.setattr(ephemeris_correction, "TwoLevelMultipleShooting", FakeTwoLevelMS)
+        monkeypatch.setattr(two_level, "TwoLevelMultipleShooting", FakeTwoLevelMS)
         result = correct_ephemeris_patch_points(
             "two_level",
             dynamics="dynamics",
@@ -235,9 +240,7 @@ class TestDispatch:
                 state_patch=state_patch,
             )
 
-        from e2m2e.algorithms import homotopy_correction
-
-        monkeypatch.setattr(homotopy_correction, "correct_with_homotopy", fake_homotopy)
+        monkeypatch.setattr(homotopy, "correct_with_homotopy", fake_homotopy)
         result = correct_ephemeris_patch_points(
             "homotopy",
             dynamics="dynamics",
@@ -271,7 +274,7 @@ class TestDispatch:
                     state_patch=np.zeros((1, 6)),
                 )
 
-        monkeypatch.setattr(ephemeris_correction, "MultipleShooting", FakeMS)
+        monkeypatch.setattr(standard, "MultipleShooting", FakeMS)
         corrector = ephemeris_correction._StandardPatchPointCorrector(
             "dynamics", n_workers=1, kernel_dir="k"
         )
@@ -295,7 +298,7 @@ class TestDispatch:
                     state_patch=np.zeros((1, 6)),
                 )
 
-        monkeypatch.setattr(ephemeris_correction, "TwoLevelMultipleShooting", FakeTwoLevelMS)
+        monkeypatch.setattr(two_level, "TwoLevelMultipleShooting", FakeTwoLevelMS)
         corrector = ephemeris_correction._TwoLevelPatchPointCorrector("dynamics")
         assert isinstance(corrector, PatchPointCorrector)
 

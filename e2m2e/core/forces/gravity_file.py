@@ -8,8 +8,10 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
+from e2m2e.core.constants import R_EARTH
+
 _DEFAULT_MU = 398600.4415  # km^3/s^2
-_DEFAULT_RADIUS = 6378.1363  # km
+_DEFAULT_RADIUS = R_EARTH  # km
 _SECONDS_PER_YEAR = 365.25 * 86400.0  # 儒略年,与 GMAT DAYS_PER_YEAR 一致
 
 

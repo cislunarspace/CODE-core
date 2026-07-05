@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
-from e2m2e.transfer import DROTransferSearch
+from e2m2e.transfer import TransferSearch
 
 # =============================================================================
 # Fixtures
@@ -31,8 +31,8 @@ def dynamics(system: CR3BP_System) -> CR3BP_Dynamics:
 
 
 @pytest.fixture
-def searcher(system: CR3BP_System, dynamics: CR3BP_Dynamics) -> DROTransferSearch:
-    s = DROTransferSearch(dynamics)
+def searcher(system: CR3BP_System, dynamics: CR3BP_Dynamics) -> TransferSearch:
+    s = TransferSearch(dynamics)
     s.alpha_min = 1.0
     s.alpha_max = 1.0
     s.n_alpha = 1
@@ -120,7 +120,7 @@ class TestSearchFirstFeasibilityFields:
 
     def _run_search_with_distances(
         self,
-        searcher: DROTransferSearch,
+        searcher: TransferSearch,
         d_sequence: np.ndarray,
         monkeypatch: pytest.MonkeyPatch,
     ) -> dict:
@@ -141,9 +141,9 @@ class TestSearchFirstFeasibilityFields:
         def _no_local_min(self, traj_states, arrival_orbit):
             return False, float("inf"), -1
 
-        monkeypatch.setattr(DROTransferSearch, "_forward_integrate", _fake_integrate, raising=True)
-        monkeypatch.setattr(DROTransferSearch, "_check_collision", _no_collision, raising=True)
-        monkeypatch.setattr(DROTransferSearch, "_detect_local_minimum", _no_local_min, raising=True)
+        monkeypatch.setattr(TransferSearch, "_forward_integrate", _fake_integrate, raising=True)
+        monkeypatch.setattr(TransferSearch, "_check_collision", _no_collision, raising=True)
+        monkeypatch.setattr(TransferSearch, "_detect_local_minimum", _no_local_min, raising=True)
 
         departure_state = np.array([1.5, 0.0, 0.0, 0.0, 0.5, 0.0])
         results = searcher._search_single_departure(

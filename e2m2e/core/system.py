@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from ..mbse.data.enums import ReferenceFrame, UnitSystem
+from .enums import ReferenceFrame, UnitSystem
 
 
 class System(abc.ABC):

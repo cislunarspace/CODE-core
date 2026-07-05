@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithms.ephemeris_correction import correct_ephemeris_patch_points
-from e2m2e.algorithms.homotopy_correction import (
+from e2m2e.algorithms.ephemeris_correction.homotopy import (
     DEFAULT_LAMBDA_STEPS,
     correct_with_homotopy,
 )

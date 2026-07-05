@@ -12,7 +12,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from e2m2e.algorithms import homotopy_correction
+from e2m2e.algorithms.ephemeris_correction import homotopy
 
 
 def _fake_dynamics():
@@ -32,7 +32,7 @@ def _fake_dynamics():
 
 def test_inner_method_homotopy_is_rejected():
     with pytest.raises(ValueError, match="inner_method='homotopy' is not allowed"):
-        homotopy_correction.correct_with_homotopy(
+        homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0]),
             state_patch=np.ones((2, 6)),
@@ -47,7 +47,7 @@ def test_inner_method_homotopy_is_rejected():
 
 def test_invalid_base_bodies_not_subset_raises():
     with pytest.raises(ValueError, match="subset of system.bodies"):
-        homotopy_correction.correct_with_homotopy(
+        homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0]),
             state_patch=np.ones((2, 6)),
@@ -61,7 +61,7 @@ def test_invalid_base_bodies_not_subset_raises():
 
 def test_invalid_base_bodies_missing_origin_raises():
     with pytest.raises(ValueError, match="must include origin"):
-        homotopy_correction.correct_with_homotopy(
+        homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0]),
             state_patch=np.ones((2, 6)),
@@ -85,7 +85,7 @@ def test_invalid_base_bodies_missing_origin_raises():
 )
 def test_invalid_lambda_steps_raises(lambda_steps):
     with pytest.raises(ValueError, match="lambda_steps"):
-        homotopy_correction.correct_with_homotopy(
+        homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0]),
             state_patch=np.ones((2, 6)),
@@ -120,8 +120,8 @@ def test_intermediate_steps_use_loose_tolerance_final_uses_strict():
                 state_patch=kwargs["state_patch"] + 0.01,
             )
 
-    with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
-        homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy, "MultipleShooting", FakeMS):
+        homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=t_patch,
             state_patch=state_patch,
@@ -158,8 +158,8 @@ def test_each_step_seeded_with_previous_step_output():
                 state_patch=kwargs["state_patch"] + 0.1,
             )
 
-    with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
-        homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy, "MultipleShooting", FakeMS):
+        homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=t_patch,
             state_patch=state_patch,
@@ -201,8 +201,8 @@ def test_failed_intermediate_step_still_seeds_next_step():
                 state_patch=kwargs["state_patch"] + 0.2,
             )
 
-    with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
-        result = homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy, "MultipleShooting", FakeMS):
+        result = homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=t_patch,
             state_patch=state_patch,
@@ -241,8 +241,8 @@ def test_aggregated_fields_follow_spec():
                 state_patch=kwargs["state_patch"] + 0.01,
             )
 
-    with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
-        result = homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy, "MultipleShooting", FakeMS):
+        result = homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=t_patch,
             state_patch=state_patch,
@@ -294,8 +294,8 @@ def test_final_step_nonconvergence_aggregates_to_converged_false():
                 state_patch=kwargs["state_patch"] + 0.01,
             )
 
-    with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
-        result = homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy, "MultipleShooting", FakeMS):
+        result = homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=t_patch,
             state_patch=state_patch,
@@ -339,10 +339,10 @@ def test_inner_step_exception_raises_with_context():
             )
 
     with (
-        patch.object(homotopy_correction, "MultipleShooting", ExplodingMS),
+        patch.object(homotopy, "MultipleShooting", ExplodingMS),
         pytest.raises(RuntimeError, match=r"lambda step 1.*lambda=0\.75.*inner_method=standard"),
     ):
-        homotopy_correction.correct_with_homotopy(
+        homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0]),
             state_patch=np.ones((2, 6)),
@@ -403,8 +403,8 @@ def test_residual_history_not_dropped_when_intermediate_step_fails():
         def correct(self, **kwargs):
             return next(per_step_results)
 
-    with patch.object(homotopy_correction, "MultipleShooting", FakeMS):
-        result = homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy, "MultipleShooting", FakeMS):
+        result = homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=t_patch,
             state_patch=state_patch,

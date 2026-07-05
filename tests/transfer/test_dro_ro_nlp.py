@@ -104,12 +104,12 @@ def test_departure_velocity_direction_preserved(dynamics, dummy_orbit):
 def test_scipy_optimizer_returns_transfer_result(optimizer):
     """SciPy 路径应直接返回 TransferOptimizationResult。"""
     config = TransferConfig(
-        alpha_min=0.5,
-        alpha_max=2.5,
-        earth_radius=200.0 / 3.84405000e5,
-        moon_radius=100.0 / 3.84405000e5,
-        use_relaxed_velocity=True,
-        velocity_angle_tol=0.05,
+        nlp_alpha_min=0.5,
+        nlp_alpha_max=2.5,
+        nlp_earth_radius=200.0 / 3.84405000e5,
+        nlp_moon_radius=100.0 / 3.84405000e5,
+        nlp_use_relaxed_velocity=True,
+        nlp_velocity_angle_tol=0.05,
     )
     optimizer_with_config = DROTRONLPOptimizer(
         system=optimizer.system,

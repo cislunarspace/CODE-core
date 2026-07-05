@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.homotopy_correction import HomotopyEphemerisDynamics
+from e2m2e.algorithms.ephemeris_correction.homotopy import HomotopyEphemerisDynamics
 from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
 from e2m2e.core.ephemeris_system import EphemerisSystem
 from e2m2e.mbse.data.enums import ReferenceFrame

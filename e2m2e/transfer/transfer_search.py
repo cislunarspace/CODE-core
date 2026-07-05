@@ -69,9 +69,8 @@ class _AggregatePbarWithSlot:
 from ..core.cr3bp_system import CR3BP_System  # noqa: E402
 from ..core.dynamics import CR3BP_Dynamics  # noqa: E402
 from ..core.orbit import Orbit  # noqa: E402
-from .config import TransferOptimizationResult  # noqa: E402
+from .config import TransferConfig, TransferOptimizationResult  # noqa: E402
 from .propulsion import ImpulsivePropulsion  # noqa: E402
-from .search_config import SearchConfig  # noqa: E402
 from .transfer_optimization import (  # noqa: E402
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
@@ -90,50 +89,51 @@ class TransferSearch:
     3. 前向积分获取转移轨迹
     4. 筛选与目标轨道相交或距离局部最小的候选解
 
-    搜索参数集中存储在 ``self.config``（:class:`SearchConfig` dataclass）中，
-    同时通过属性代理提供向后兼容的直接读写访问（``self.alpha_min`` 等）。
+    搜索参数集中存储在 ``self.config``（:class:`TransferConfig` dataclass）的
+    ``search_*`` 字段中，同时通过属性代理提供向后兼容的直接读写访问
+    （``self.alpha_min`` 等裸名映射到 ``search_alpha_min`` 等前缀字段）。
 
     使用方式:
         transfer = TransferSearch(dynamics)
         transfer.configure_search(alpha_min=0.5, alpha_max=2.5, n_alpha=101)
         results = transfer.search(...)
 
-    或通过 SearchConfig:
-        from e2m2e.transfer import SearchConfig
-        cfg = SearchConfig(alpha_min=0.5, alpha_max=2.5, n_alpha=101)
+    或通过 TransferConfig:
+        from e2m2e.transfer import TransferConfig
+        cfg = TransferConfig(search_alpha_min=0.5, search_alpha_max=2.5, search_n_alpha=101)
         transfer = TransferSearch(dynamics, config=cfg)
     """
 
-    # --- 搜索配置属性名（与 SearchConfig 字段一一对应） ---
-    _CONFIG_FIELDS: tuple[str, ...] = (
-        "alpha_min",
-        "alpha_max",
-        "n_alpha",
-        "n_departure",
-        "max_transfer_time",
-        "intersection_threshold",
-        "min_distance_threshold",
-        "collision_earth_radius",
-        "collision_moon_radius",
-        "integration_dt",
-        "alpha_range",
-        "transfer_time_range",
-        "t_ins_range",
-        "velocity_angle_tolerance",
-    )
+    # --- 裸名 → TransferConfig 前缀字段的映射（向后兼容属性代理） ---
+    # 搜索阶段字段（search_*）支持读写；优化阶段字段（nlp_*）中 alpha_range 为只读属性。
+    _CONFIG_FIELD_MAP: dict[str, str] = {
+        "alpha_min": "search_alpha_min",
+        "alpha_max": "search_alpha_max",
+        "n_alpha": "search_n_alpha",
+        "n_departure": "search_n_departure",
+        "max_transfer_time": "search_max_transfer_time",
+        "intersection_threshold": "search_intersection_threshold",
+        "min_distance_threshold": "search_min_distance_threshold",
+        "collision_earth_radius": "search_collision_earth_radius",
+        "collision_moon_radius": "search_collision_moon_radius",
+        "integration_dt": "search_integration_dt",
+        "alpha_range": "nlp_alpha_range",
+        "transfer_time_range": "nlp_transfer_time_range",
+        "t_ins_range": "nlp_t_ins_range",
+    }
 
     def __init__(
         self,
         dynamics: CR3BP_Dynamics,
         name: str = "TransferSearch",
-        config: SearchConfig | None = None,
+        config: TransferConfig | None = None,
     ):
         """初始化转移搜索器。
 
         Args:
             dynamics: CR3BP 动力学对象（需提供 ``system``、``propagate`` 等）。
             name: 搜索器实例名称，用于日志输出。
-            config: 搜索/优化配置；为 ``None`` 时使用默认 ``SearchConfig()``。
+            config: 搜索/优化配置（:class:`TransferConfig`）；为 ``None`` 时使用默认值。
         """
         self.system = dynamics.system
         # dynamics 类型说明：
@@ -154,30 +154,32 @@ class TransferSearch:
         self._propulsion = ImpulsivePropulsion()
 
         # 搜索 + 优化配置（集中管理）
-        self._config: SearchConfig = config if config is not None else SearchConfig()
+        self._config: TransferConfig = config if config is not None else TransferConfig()
 
-    # --- 向后兼容属性代理：读/写直接转发到 _config ---
+    # --- 向后兼容属性代理：读/写直接转发到 _config 的前缀字段 ---
 
     @property
-    def config(self) -> SearchConfig:
+    def config(self) -> TransferConfig:
         """搜索/优化配置对象。"""
         return self._config
 
     @config.setter
-    def config(self, value: SearchConfig) -> None:
+    def config(self, value: TransferConfig) -> None:
         self._config = value
 
     def __getattr__(self, name: str) -> Any:
-        """属性代理：读取 ``_CONFIG_FIELDS`` 中的字段时转发到 ``self._config``。"""
-        # 仅代理 _CONFIG_FIELDS 中的字段，避免干扰其他属性查找
-        if name in TransferSearch._CONFIG_FIELDS:
-            return getattr(self._config, name)
+        """属性代理：读取 ``_CONFIG_FIELD_MAP`` 中的裸名时转发到 ``self._config`` 的前缀字段。"""
+        # 仅代理映射表中的裸名，避免干扰其他属性查找
+        field = TransferSearch._CONFIG_FIELD_MAP.get(name)
+        if field is not None:
+            return getattr(self._config, field)
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     def __setattr__(self, name: str, value: Any) -> None:
-        """属性代理：写入 ``_CONFIG_FIELDS`` 中的字段时转发到 ``self._config``。"""
-        if name in TransferSearch._CONFIG_FIELDS:
-            setattr(self._config, name, value)
+        """属性代理：写入 ``_CONFIG_FIELD_MAP`` 中的裸名时转发到 ``self._config`` 的前缀字段。"""
+        field = TransferSearch._CONFIG_FIELD_MAP.get(name)
+        if field is not None:
+            setattr(self._config, field, value)
         else:
             super().__setattr__(name, value)
 
@@ -230,17 +232,18 @@ class TransferSearch:
 
     def search(
         self,
+        config: TransferConfig | None = None,
         *,
-        alpha_min: float,
-        alpha_max: float,
-        n_alpha: int,
-        n_departure: int,
-        max_transfer_time: float,
-        intersection_threshold: float,
-        min_distance_threshold: float,
-        collision_earth_radius: float,
-        collision_moon_radius: float,
-        integration_dt: float,
+        alpha_min: float | None = None,
+        alpha_max: float | None = None,
+        n_alpha: int | None = None,
+        n_departure: int | None = None,
+        max_transfer_time: float | None = None,
+        intersection_threshold: float | None = None,
+        min_distance_threshold: float | None = None,
+        collision_earth_radius: float | None = None,
+        collision_moon_radius: float | None = None,
+        integration_dt: float | None = None,
         departure_orbit: Orbit | None = None,
         arrival_orbit: Orbit | None = None,
         verbose: bool = True,
@@ -249,7 +252,12 @@ class TransferSearch:
     ) -> list[dict[str, Any]]:
         """执行网格搜索
 
+        可通过 ``config`` 传入一份 :class:`TransferConfig`，或以散装 kwargs 提供
+        搜索参数（散装 kwargs 会覆盖 ``config`` 中的对应 ``search_*`` 字段）。
+        二者均未提供的 ``search_*`` 字段保持原值，下游会在缺失时报错。
+
         Args:
+            config: 搜索/优化配置；非 ``None`` 时替换当前 ``self.config``。
             alpha_min: α 下界
             alpha_max: α 上界
             n_alpha: α 方向网格点数
@@ -275,16 +283,30 @@ class TransferSearch:
         if dep_orbit is None or arr_orbit is None:
             raise ValueError("必须提供 departure_orbit 和 arrival_orbit")
 
-        self.alpha_min = alpha_min
-        self.alpha_max = alpha_max
-        self.n_alpha = n_alpha
-        self.n_departure = n_departure
-        self.max_transfer_time = max_transfer_time
-        self.intersection_threshold = intersection_threshold
-        self.min_distance_threshold = min_distance_threshold
-        self.collision_earth_radius = collision_earth_radius
-        self.collision_moon_radius = collision_moon_radius
-        self.integration_dt = integration_dt
+        if config is not None:
+            self._config = config
+
+        # 散装 kwargs（非 None）覆盖对应 search_* 字段，保持向后兼容
+        if alpha_min is not None:
+            self.alpha_min = alpha_min
+        if alpha_max is not None:
+            self.alpha_max = alpha_max
+        if n_alpha is not None:
+            self.n_alpha = n_alpha
+        if n_departure is not None:
+            self.n_departure = n_departure
+        if max_transfer_time is not None:
+            self.max_transfer_time = max_transfer_time
+        if intersection_threshold is not None:
+            self.intersection_threshold = intersection_threshold
+        if min_distance_threshold is not None:
+            self.min_distance_threshold = min_distance_threshold
+        if collision_earth_radius is not None:
+            self.collision_earth_radius = collision_earth_radius
+        if collision_moon_radius is not None:
+            self.collision_moon_radius = collision_moon_radius
+        if integration_dt is not None:
+            self.integration_dt = integration_dt
 
         self._departure_orbit = dep_orbit
         self._arrival_orbit = arr_orbit
@@ -295,8 +317,8 @@ class TransferSearch:
             print(f"{'=' * 60}")
             print(f"出发点: {dep_orbit}")
             print(f"目标: {arr_orbit}")
-            print(f"α范围: [{alpha_min}, {alpha_max}], n={n_alpha}")
-            print(f"出发点数量: {n_departure}")
+            print(f"α范围: [{self.alpha_min}, {self.alpha_max}], n={self.n_alpha}")
+            print(f"出发点数量: {self.n_departure}")
             print(f"{'=' * 60}\n")
 
         results = self._grid_search(
@@ -1263,10 +1285,6 @@ class TransferSearch:
             return True, "moon", int(moon_collision_idx[0])
 
         return False, None, -1
-
-
-DROTransferSearch = TransferSearch
-DROROTransferSearch = TransferSearch
 
 
 def _process_departure_worker(

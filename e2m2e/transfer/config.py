@@ -1,7 +1,11 @@
-"""转移优化公共类型定义。
+"""转移轨道统一配置类型定义。
 
-把 TransferConfig 与 TransferOptimizationResult 放在独立模块，
-避免 transfer.py 与 transfer_optimization.py 之间的循环导入。
+把原先分散在 ``config.py``（优化阶段）与 ``search_config.py``（搜索阶段）的
+两个 dataclass 合并为单一 :class:`TransferConfig`，用 ``search_*`` / ``nlp_*``
+前缀区分子域字段，消除"两个 dataclass 描述同一件事"的碎片化。
+
+同时保留 :class:`TransferOptimizationResult` 于本模块，避免 ``transfer.py`` 与
+``transfer_optimization.py`` 之间的循环导入。
 """
 
 from __future__ import annotations
@@ -10,44 +14,77 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..mbse.data.enums import TransferType
+from ..core.enums import TransferType
 
 DU = 3.84405000e5
 
 
 @dataclass
 class TransferConfig:
-    """转移优化配置
+    """转移轨道统一配置。
 
-    Attributes:
-        alpha_min: 切向速度比下界
-        alpha_max: 切向速度比上界
-        alpha_range: (alpha_min, alpha_max) 元组，与 alpha_min/alpha_max 保持一致
-        earth_radius: 地球碰撞检测半径（无量纲）
-        moon_radius: 月球碰撞检测半径（无量纲）
-        use_relaxed_velocity: 是否使用松弛速度约束
-        velocity_angle_tol: 松弛速度约束角度容差（弧度）
-        t_ins_range: RO 上插入时间范围；None 时由调用方推导
-        use_copt: 是否优先使用 COPT 优化器
-        fallback_to_scipy: COPT 失败时是否回退到 SciPy
-        verbose: 优化器是否打印迭代信息
+    同时承载网格搜索阶段（``search_*`` 前缀，供
+    :class:`~e2m2e.transfer.transfer_search.TransferSearch` 使用）与 NLP 优化阶段
+    （``nlp_*`` 前缀，供 :class:`~e2m2e.transfer.transfer.Transfer` 与
+    :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer` 使用）的参数。
+
+    搜索阶段字段默认为 ``None``，运行 ``search()`` 前须显式赋值（或通过散装 kwargs /
+    ``configure_search()`` 设置）；优化阶段字段提供工程默认值。
+
+    Search-stage fields (default ``None``):
+
+        search_alpha_min / search_alpha_max: α 网格上下界
+        search_n_alpha: α 方向网格点数
+        search_n_departure: 出发点采样数量
+        search_max_transfer_time: 最大转移时间（CR3BP 无量纲时间）
+        search_intersection_threshold: 相交判定距离阈值（无量纲距离）
+        search_min_distance_threshold: 候选解最小距离阈值（无量纲距离）
+        search_collision_earth_radius: 地球碰撞检测半径（无量纲距离）
+        search_collision_moon_radius: 月球碰撞检测半径（无量纲距离）
+        search_integration_dt: 积分时间步长（无量纲时间）
+
+    NLP-stage fields (with engineering defaults):
+
+        nlp_alpha_min / nlp_alpha_max: 优化阶段 α 范围
+        nlp_earth_radius / nlp_moon_radius: 优化阶段碰撞检测半径（无量纲距离）
+        nlp_use_relaxed_velocity: 是否使用松弛速度约束
+        nlp_velocity_angle_tol: 松弛速度约束角度容差（弧度）
+        nlp_t_ins_range: RO 上的插入时间范围；None 时由调用方推导
+        nlp_transfer_time_range: 优化阶段转移时间范围
+        nlp_use_copt: 是否优先使用 COPT 优化器
+        nlp_fallback_to_scipy: COPT 失败时是否回退到 SciPy
+        nlp_verbose: 优化器是否打印迭代信息
     """
 
-    alpha_min: float = 0.5
-    alpha_max: float = 2.5
-    earth_radius: float = 200.0 / DU
-    moon_radius: float = 100.0 / DU
-    use_relaxed_velocity: bool = True
-    velocity_angle_tol: float = 0.05
-    t_ins_range: tuple[float, float] | None = None
-    use_copt: bool = False
-    fallback_to_scipy: bool = True
-    verbose: bool = False
+    # --- 搜索阶段参数（search_*）---
+    search_alpha_min: float | None = None
+    search_alpha_max: float | None = None
+    search_n_alpha: int | None = None
+    search_n_departure: int | None = None
+    search_max_transfer_time: float | None = None
+    search_intersection_threshold: float | None = None
+    search_min_distance_threshold: float | None = None
+    search_collision_earth_radius: float | None = None
+    search_collision_moon_radius: float | None = None
+    search_integration_dt: float | None = None
+
+    # --- 优化阶段参数（nlp_*）---
+    nlp_alpha_min: float = 0.5
+    nlp_alpha_max: float = 2.5
+    nlp_earth_radius: float = 200.0 / DU
+    nlp_moon_radius: float = 100.0 / DU
+    nlp_use_relaxed_velocity: bool = True
+    nlp_velocity_angle_tol: float = 0.05
+    nlp_t_ins_range: tuple[float, float] | None = None
+    nlp_transfer_time_range: tuple[float, float] | None = None
+    nlp_use_copt: bool = False
+    nlp_fallback_to_scipy: bool = True
+    nlp_verbose: bool = False
 
     @property
-    def alpha_range(self) -> tuple[float, float]:
-        """由 alpha_min / alpha_max 导出的范围。"""
-        return (self.alpha_min, self.alpha_max)
+    def nlp_alpha_range(self) -> tuple[float, float]:
+        """由 nlp_alpha_min / nlp_alpha_max 导出的优化阶段 α 范围。"""
+        return (self.nlp_alpha_min, self.nlp_alpha_max)
 
 
 @dataclass

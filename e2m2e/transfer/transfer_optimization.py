@@ -131,23 +131,27 @@ class DROTRONLPOptimizer:
         self.departure_state = departure_state
         self.propulsion = propulsion if propulsion is not None else ImpulsivePropulsion()
 
-        self.alpha_range = config.alpha_range if config is not None else self.DEFAULT_ALPHA_RANGE
+        self.alpha_range = (
+            config.nlp_alpha_range if config is not None else self.DEFAULT_ALPHA_RANGE
+        )
         self.transfer_time_range = self.DEFAULT_TRANSFER_TIME_RANGE
         self.t_ins_range = (
-            config.t_ins_range
-            if config is not None and config.t_ins_range is not None
+            config.nlp_t_ins_range
+            if config is not None and config.nlp_t_ins_range is not None
             else self.DEFAULT_T_INS_RANGE
         )
 
         self.velocity_angle_tol = (
-            config.velocity_angle_tol if config is not None else self.DEFAULT_VELOCITY_ANGLE_TOL
+            config.nlp_velocity_angle_tol if config is not None else self.DEFAULT_VELOCITY_ANGLE_TOL
         )
 
-        self.earth_radius = config.earth_radius if config is not None else self.EARTH_RADIUS_ND
-        self.moon_radius = config.moon_radius if config is not None else self.MOON_RADIUS_ND
+        self.earth_radius = config.nlp_earth_radius if config is not None else self.EARTH_RADIUS_ND
+        self.moon_radius = config.nlp_moon_radius if config is not None else self.MOON_RADIUS_ND
 
-        self._use_relaxed_velocity = config.use_relaxed_velocity if config is not None else False
-        self._verbose = config.verbose if config is not None else True
+        self._use_relaxed_velocity = (
+            config.nlp_use_relaxed_velocity if config is not None else False
+        )
+        self._verbose = config.nlp_verbose if config is not None else True
 
         self._last_trajectory: tuple[np.ndarray, np.ndarray] | None = None
         self._progress_callback: Callable | None = None
@@ -604,7 +608,7 @@ class DROTRONLPOptimizer:
         insertion_state: np.ndarray,
     ):
         """分类转移类型（已废弃，保留方法签名仅用于兼容旧调用）。"""
-        from ..mbse.data.enums import TransferType
+        from ..core.enums import TransferType
 
         if len(states) == 0:
             return TransferType.DIRECT

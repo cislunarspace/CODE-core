@@ -9,8 +9,8 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from ..mbse.data.enums import ReferenceFrame, UnitSystem
 from .coordinate_system import CoordinateSystem
+from .enums import ReferenceFrame, UnitSystem
 from .spice import SPICEManager
 from .system import System
 

@@ -18,11 +18,12 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from ..constants import R_EARTH
 from .physical_model import require_inertial_frame
 
 # 默认遮挡体赤道半径（km），取 GMAT PCK 值。可通过 radii 覆盖参数扩展。
 _BODY_RADII_KM: dict[str, float] = {
-    "EARTH": 6378.1363,
+    "EARTH": R_EARTH,
     "MOON": 1737.4,
     "SUN": 695700.0,
 }

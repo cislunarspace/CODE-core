@@ -9,8 +9,8 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from ..mbse.data.enums import ReferenceFrame
 from .cr3bp_system import CR3BP_System
+from .enums import ReferenceFrame
 
 _TU_SECONDS_DEFAULT = 4.34811305 * 86400
 

@@ -1,7 +1,8 @@
 """绘图配置模块
 
 定义 PlotConfig 配置类，统一管理 matplotlib 的字体、颜色、尺寸等绘图参数。
-包含自动检测系统 DPI 缩放的逻辑，确保高分辨率屏幕上的正确显示。
+高 DPI 缩放适配逻辑封装在 :func:`configure_dpi_scaling` 中，import 本模块
+时不执行任何副作用；交互式绘图场景下需由调用方显式调用以适配高分辨率屏幕。
 """
 
 from __future__ import annotations
@@ -111,96 +112,130 @@ def _detect_system_scale() -> float:
     return 1.0
 
 
-_detected_scale = _detect_system_scale()
-# 检测系统缩放，若大于标准值则自动补丁 tkinter 以适配高 DPI
-if _detected_scale > 1.01:
-    os.environ.setdefault("TK_SCALE", str(_detected_scale))
-    import shutil as _shutil
-    import tkinter as _tk
+# import 时不执行任何副作用：_detected_scale 默认为 1.0（标准 DPI），
+# 由 configure_dpi_scaling() 在需要高 DPI 适配时显式检测并更新。
+_detected_scale = 1.0
+_dpi_configured = False
 
-    # tkinter scaling 使用 point 为单位（1 point = 1/72 inch），
-    # 而系统 DPI 基于每英寸像素数（1 inch = 96 px 在标准 DPI 下），
-    # 因此缩放倍数需乘以 96/72 将 DPI 比率转换为 point 缩放比率
-    _tk_scaling_val = _detected_scale * 96.0 / 72.0
-    _orig_tk_init = _tk.Tk.__init__
-    _orig_toplevel_init = _tk.Toplevel.__init__
 
-    def _patched_tk_init(self, *args, **kwargs):
-        _orig_tk_init(self, *args, **kwargs)
-        with contextlib.suppress(Exception):
-            self.tk.call("tk", "scaling", _tk_scaling_val)
+def configure_dpi_scaling() -> float:
+    """显式启用高 DPI 缩放适配（opt-in）。
 
-    def _patched_toplevel_init(self, *args, **kwargs):
-        _orig_toplevel_init(self, *args, **kwargs)
-        with contextlib.suppress(Exception):
-            self.tk.call("tk", "scaling", _tk_scaling_val)
+    本模块 import 时不执行任何副作用（不 fork xrandr、不修改环境变量、
+    不打补丁）。需要在交互式绘图场景下适配高分辨率屏幕时，由调用方
+    显式调用本函数。本函数会：
 
-    _tk.Tk.__init__ = _patched_tk_init  # type: ignore[method-assign]
-    _tk.Toplevel.__init__ = _patched_toplevel_init  # type: ignore[method-assign]
+    1. 调用 :func:`_detect_system_scale` 检测系统显示缩放（可能 fork
+       ``xrandr`` 子进程）。
+    2. 若缩放大于 1.01：设置 ``TK_SCALE`` 环境变量，对
+       ``tkinter.Tk``/``tkinter.Toplevel`` 的 ``__init__`` 打补丁以应用
+       tk scaling，并在 ``zenity`` 可用时用它替换
+       ``tkinter.filedialog`` 的 ``askopenfilename``/``asksaveasfilename``。
 
-    # 在高 DPI 环境下，tkinter 原生文件对话框无法跟随缩放，
-    # 会出现极小的窗口。用 zenity（Linux 桌面原生对话框）替代，
-    # zenity 由 GTK 渲染，自动适配系统缩放设置
-    if _shutil.which("zenity"):
-        import tkinter.filedialog as _fd
+    本函数幂等：重复调用直接返回已检测的缩放值，不会重复打补丁。
 
-        _orig_askopen = _fd.askopenfilename
-        _orig_asksave = _fd.asksaveasfilename
+    Returns:
+        检测到的系统缩放倍数（1.0 表示标准 DPI）。返回值同时写入
+        模块级 ``_detected_scale``，供 :class:`PlotConfig` 的
+        ``scale_factor`` 字段默认值使用。
+    """
+    global _detected_scale, _dpi_configured
+    if _dpi_configured:
+        return _detected_scale
+    _dpi_configured = True
 
-        def _zenity_save(
-            title="Save file",
-            initialdir=None,
-            initialfile=None,
-            filetypes=None,
-            defaultextension=None,
-            **kwargs,
-        ):
-            cmd = ["zenity", "--file-selection", "--save", "--confirm-overwrite"]
-            if title:
-                cmd.extend(["--title", title])
-            if initialfile:
-                import pathlib as _p
+    scale = _detect_system_scale()
+    _detected_scale = scale
 
-                d = _p.Path(initialdir) / initialfile if initialdir else _p.Path(initialfile)
-                cmd.extend(["--filename", str(d)])
-            elif initialdir:
-                import pathlib as _p
+    # 检测系统缩放，若大于标准值则自动补丁 tkinter 以适配高 DPI
+    if scale > 1.01:
+        os.environ.setdefault("TK_SCALE", str(scale))
+        import shutil as _shutil
+        import tkinter as _tk
 
-                cmd.extend(["--filename", str(_p.Path(initialdir) / "")])
-            if filetypes:
-                for name, patterns in filetypes:
-                    for pat in patterns.split():
-                        cmd.extend(["--file-filter", f"{name} | {pat}"])
-            try:
-                r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-                if r.returncode == 0:
-                    return r.stdout.strip()
-            except Exception:
-                logger.debug("zenity file dialog failed", exc_info=True)
-            return ""
+        # tkinter scaling 使用 point 为单位（1 point = 1/72 inch），
+        # 而系统 DPI 基于每英寸像素数（1 inch = 96 px 在标准 DPI 下），
+        # 因此缩放倍数需乘以 96/72 将 DPI 比率转换为 point 缩放比率
+        _tk_scaling_val = scale * 96.0 / 72.0
+        _orig_tk_init = _tk.Tk.__init__
+        _orig_toplevel_init = _tk.Toplevel.__init__
 
-        def _zenity_open(title="Open file", initialdir=None, filetypes=None, **kwargs):
-            cmd = ["zenity", "--file-selection"]
-            if title:
-                cmd.extend(["--title", title])
-            if initialdir:
-                import pathlib as _p
+        def _patched_tk_init(self, *args, **kwargs):
+            _orig_tk_init(self, *args, **kwargs)
+            with contextlib.suppress(Exception):
+                self.tk.call("tk", "scaling", _tk_scaling_val)
 
-                cmd.extend(["--filename", str(_p.Path(initialdir) / "")])
-            if filetypes:
-                for name, patterns in filetypes:
-                    for pat in patterns.split():
-                        cmd.extend(["--file-filter", f"{name} | {pat}"])
-            try:
-                r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-                if r.returncode == 0:
-                    return r.stdout.strip()
-            except Exception:
-                logger.debug("zenity file dialog failed", exc_info=True)
-            return ""
+        def _patched_toplevel_init(self, *args, **kwargs):
+            _orig_toplevel_init(self, *args, **kwargs)
+            with contextlib.suppress(Exception):
+                self.tk.call("tk", "scaling", _tk_scaling_val)
 
-        _fd.asksaveasfilename = _zenity_save
-        _fd.askopenfilename = _zenity_open
+        _tk.Tk.__init__ = _patched_tk_init  # type: ignore[method-assign]
+        _tk.Toplevel.__init__ = _patched_toplevel_init  # type: ignore[method-assign]
+
+        # 在高 DPI 环境下，tkinter 原生文件对话框无法跟随缩放，
+        # 会出现极小的窗口。用 zenity（Linux 桌面原生对话框）替代，
+        # zenity 由 GTK 渲染，自动适配系统缩放设置
+        if _shutil.which("zenity"):
+            import tkinter.filedialog as _fd
+
+            def _zenity_save(
+                title="Save file",
+                initialdir=None,
+                initialfile=None,
+                filetypes=None,
+                defaultextension=None,
+                **kwargs,
+            ):
+                cmd = ["zenity", "--file-selection", "--save", "--confirm-overwrite"]
+                if title:
+                    cmd.extend(["--title", title])
+                if initialfile:
+                    import pathlib as _p
+
+                    d = _p.Path(initialdir) / initialfile if initialdir else _p.Path(initialfile)
+                    cmd.extend(["--filename", str(d)])
+                elif initialdir:
+                    import pathlib as _p
+
+                    cmd.extend(["--filename", str(_p.Path(initialdir) / "")])
+                if filetypes:
+                    for name, patterns in filetypes:
+                        for pat in patterns.split():
+                            cmd.extend(["--file-filter", f"{name} | {pat}"])
+                try:
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                    if r.returncode == 0:
+                        return r.stdout.strip()
+                except Exception:
+                    logger.debug("zenity file dialog failed", exc_info=True)
+                return ""
+
+            def _zenity_open(title="Open file", initialdir=None, filetypes=None, **kwargs):
+                cmd = ["zenity", "--file-selection"]
+                if title:
+                    cmd.extend(["--title", title])
+                if initialdir:
+                    import pathlib as _p
+
+                    cmd.extend(["--filename", str(_p.Path(initialdir) / "")])
+                if filetypes:
+                    for name, patterns in filetypes:
+                        for pat in patterns.split():
+                            cmd.extend(["--file-filter", f"{name} | {pat}"])
+                try:
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                    if r.returncode == 0:
+                        return r.stdout.strip()
+                except Exception:
+                    logger.debug("zenity file dialog failed", exc_info=True)
+                return ""
+
+            _fd.asksaveasfilename = _zenity_save
+            _fd.askopenfilename = _zenity_open
+
+    return scale
+
 
 import matplotlib  # noqa: E402
 

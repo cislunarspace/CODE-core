@@ -5,11 +5,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from .exceptions import E2M2EError
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _COMMITTED_GMAT_FIXTURE_DIR = _REPO_ROOT / "tests" / "core" / "coordinate" / "fixtures" / "gmat"
 
 
-class CoordinateDataError(RuntimeError):
+class CoordinateDataError(E2M2EError, RuntimeError):
     """坐标数据缺失、越界或格式错误。"""
 
 

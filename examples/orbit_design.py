@@ -83,6 +83,11 @@ def visualize_orbit(orbit, system):
     try:
         from e2m2e.visualization.plotting import OrbitVisualizer
 
+        from e2m2e.visualization.config import configure_dpi_scaling
+
+        # 交互式绘图场景下显式启用高 DPI 缩放适配（import 时无副作用，需 opt-in）
+        configure_dpi_scaling()
+
         print("创建可视化对象...")
         viz = OrbitVisualizer(system)
 

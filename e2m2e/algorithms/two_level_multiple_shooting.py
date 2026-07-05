@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import numpy as np
 from tqdm.auto import tqdm
 
-from e2m2e.mbse.data.enums import BoundaryMode, TwoLevelMultipleShootingStatus
+from e2m2e.core.enums import BoundaryMode, TwoLevelMultipleShootingStatus
 
 
 @dataclass(frozen=True)

@@ -4,11 +4,7 @@
 """
 
 from .core_models import (
-    JacobiResult,
     OrbitProperties,
-    OrbitStability,
-    PropagationResult,
-    SystemConfig,
 )
 from .enums import (
     BifurcationLabel,
@@ -36,9 +32,5 @@ __all__ = [
     "TransferType",
     "TwoLevelMultipleShootingStatus",
     "UnitSystem",
-    "JacobiResult",
     "OrbitProperties",
-    "OrbitStability",
-    "PropagationResult",
-    "SystemConfig",
 ]

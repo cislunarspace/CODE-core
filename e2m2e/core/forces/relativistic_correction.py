@@ -7,14 +7,12 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from ..constants import R_EARTH
 from ..coordinate_system import CoordinateSystem
 from ..standard_axes import ICRSAxes, ITRFSpiceAxes
 from ..standard_origins import CelestialBodyOrigin
+from .exceptions import RelativisticCorrectionError
 from .physical_model import PhysicalModel
-
-
-class RelativisticCorrectionError(Exception):
-    """相对论修正力模型专用异常。"""
 
 
 class RelativisticCorrection(PhysicalModel):
@@ -26,7 +24,7 @@ class RelativisticCorrection(PhysicalModel):
 
     # 常用天体赤道半径 (km)，与 GMAT 默认值/IAU 标准一致。
     _DEFAULT_BODY_RADII_KM: dict[str, float] = {
-        "EARTH": 6378.1363,
+        "EARTH": R_EARTH,
         "MOON": 1737.4,
         "SUN": 696000.0,
         "MARS": 3396.19,

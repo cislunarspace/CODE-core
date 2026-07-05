@@ -10,11 +10,16 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .ephemeris_correction import EphemerisCorrectionResult as EphemerisCorrectionResult
-    from .ephemeris_correction_types import (
+    # ephemeris_correction is now a subpackage (dispatcher + _REGISTRY live in
+    # ``ephemeris_correction/__init__.py``); the seam types are re-exported
+    # from it but physically remain in ``ephemeris_correction_types``.
+    from .ephemeris_correction import (
+        EphemerisCorrectionResult as EphemerisCorrectionResult,
+    )
+    from .ephemeris_correction import (
         PatchPointCorrector as PatchPointCorrector,
     )
-    from .ephemeris_correction_types import (
+    from .ephemeris_correction import (
         UnsupportedCorrectorMethodError as UnsupportedCorrectorMethodError,
     )
     from .multiple_shooting import MultipleShooting as MultipleShooting
@@ -46,8 +51,8 @@ _LAZY_MODULE_EXPORTS: dict[str, str] = {
 
 _LAZY_SYMBOL_EXPORTS: dict[str, str] = {
     "EphemerisCorrectionResult": "e2m2e.algorithms.ephemeris_correction",
-    "PatchPointCorrector": "e2m2e.algorithms.ephemeris_correction_types",
-    "UnsupportedCorrectorMethodError": "e2m2e.algorithms.ephemeris_correction_types",
+    "PatchPointCorrector": "e2m2e.algorithms.ephemeris_correction",
+    "UnsupportedCorrectorMethodError": "e2m2e.algorithms.ephemeris_correction",
     "correct_ephemeris_patch_points": "e2m2e.algorithms.ephemeris_correction",
     "MultipleShooting": "e2m2e.algorithms.multiple_shooting",
     "convert_to_j2000": "e2m2e.algorithms.multiple_shooting",

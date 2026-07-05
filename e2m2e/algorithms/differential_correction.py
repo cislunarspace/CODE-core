@@ -84,9 +84,6 @@ class DifferentialCorrection:
         self.tolerance = self.DEFAULT_TOLERANCE
         self.max_iterations = self.DEFAULT_MAX_ITERATIONS
         self.damping_factor = self.DEFAULT_DAMPING_FACTOR
-        self.use_adaptive_damping = True
-        self.min_damping = 0.1
-        self.max_damping = 2.0
 
         self.convergence_history: list[float] = []
         self.error_history: list[float] = []
@@ -104,8 +101,6 @@ class DifferentialCorrection:
         self.solution_time = None
 
         self.jacobian_matrix = None
-        self.correction_matrix = None
-        self.pseudoinverse_matrix = None
 
         self.constraint_indices: list[int] = []
         self.constraint_weights: dict[str, float] = {}
@@ -116,13 +111,10 @@ class DifferentialCorrection:
         self.symmetry_condition: str | None = None
         self.fixed_parameters: dict[str, float] = {}
 
-        self.use_analytic_stm = True
         self.finite_difference_step = 1e-7
-        self.finite_difference_method = "central"
 
         self.stagnation_limit = 1e-14
         self.divergence_limit = 1e10
-        self.step_size_limit = 1.0
 
         self.performance_stats = {
             "total_time": 0.0,
@@ -516,6 +508,7 @@ class DifferentialCorrection:
             self.iteration_count = iteration + 1
 
             # 1. 带STM传播到半周期时间（使用修正后的当前状态）
+            final_state = None
             try:
                 result = self.dynamics.propagate(
                     current_state,
@@ -534,6 +527,7 @@ class DifferentialCorrection:
                 if verbose:
                     print(f"  积分失败: {e}")
                 self.termination_reason = f"积分失败: {e}"
+                break
 
             # 2. 计算约束残差
             constraint = np.array([final_state[idx] for idx in self.constraint_indices])

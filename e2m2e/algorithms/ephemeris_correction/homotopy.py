@@ -19,18 +19,18 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e.mbse.data.enums import BoundaryMode
+from e2m2e.core.enums import BoundaryMode
 
-from ..core.ephemeris_dynamics import EphemerisDynamics
-from ..core.ephemeris_system import EphemerisSystem
-from .ephemeris_correction_types import EphemerisCorrectionResult
-from .multiple_shooting import MultipleShooting, MultipleShootingResult
-from .two_level_multiple_shooting import (
+from ...core.ephemeris_dynamics import EphemerisDynamics
+from ...core.ephemeris_system import EphemerisSystem
+from ..ephemeris_correction_types import EphemerisCorrectionResult
+from ..multiple_shooting import MultipleShooting, MultipleShootingResult
+from ..two_level_multiple_shooting import (
     TwoLevelMultipleShooting,
     TwoLevelMultipleShootingResult,
 )
@@ -265,6 +265,61 @@ def correct_with_homotopy(
         velocity_residual=final_velocity_residual,
         velocity_residual_history=velocity_histories if velocity_histories else None,
     )
+
+
+class _HomotopyPatchPointCorrector:
+    """包装 ``correct_with_homotopy``，实现 ``PatchPointCorrector`` 接缝。
+
+    同伦修正器的构造参数（``base_bodies``、``lambda_steps`` 等）
+    通过构造器注入；``correct`` 只接收统一的求解参数。
+    """
+
+    def __init__(
+        self,
+        dynamics: Any,
+        *,
+        base_bodies: list[str] | None = None,
+        lambda_steps: list[float] | None = None,
+        n_workers: int = 1,
+        kernel_dir: str | None = None,
+        inner_method: str = "standard",
+        **_kwargs: Any,
+    ) -> None:
+        self._dynamics = dynamics
+        self._base_bodies = base_bodies
+        self._lambda_steps = lambda_steps
+        self._n_workers = n_workers
+        self._kernel_dir = kernel_dir
+        self._inner_method = inner_method
+
+    def correct(
+        self,
+        t_patch: np.ndarray,
+        state_patch: np.ndarray,
+        *,
+        max_iter: int,
+        tolerance: float,
+        velocity_tolerance: float | None,
+        verbose: bool,
+    ) -> EphemerisCorrectionResult:
+        """调用 ``correct_with_homotopy`` 修正 patch points 并返回统一结果。
+
+        构造参数（``base_bodies``、``lambda_steps`` 等）已在构造器注入；
+        ``correct`` 仅接收统一的求解参数。
+        """
+        kwargs: dict = {
+            "tolerance": tolerance,
+            "max_iter": max_iter,
+            "n_workers": self._n_workers,
+            "kernel_dir": self._kernel_dir,
+            "verbose": verbose,
+            "inner_method": self._inner_method,
+        }
+        if self._base_bodies is not None:
+            kwargs["base_bodies"] = list(self._base_bodies)
+        if self._lambda_steps is not None:
+            kwargs["lambda_steps"] = list(self._lambda_steps)
+        return correct_with_homotopy(self._dynamics, t_patch, state_patch, **kwargs)
 
 
 def _split_residual_history(

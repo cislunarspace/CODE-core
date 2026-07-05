@@ -11,6 +11,10 @@ import numpy as np
 from e2m2e.visualization.plotting import OrbitVisualizer
 
 from e2m2e.core.system import CR3BP_System
+from e2m2e.visualization.config import configure_dpi_scaling
+
+# 交互式绘图场景下显式启用高 DPI 缩放适配（import 时无副作用，需 opt-in）
+configure_dpi_scaling()
 
 
 def basic_visualization():

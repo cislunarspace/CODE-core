@@ -8,11 +8,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from e2m2e.core.constants import AU as _AU_KM
 from e2m2e.core.forces import PhysicalModel
 from e2m2e.core.forces.srp import SolarRadiationPressure
 
-# 1 AU（km），与 srp 模块内部常量一致。
-_AU_KM = 149597870.691
 # 太阳光压常数（N/m² @ 1 AU）。
 _P_SRP_1AU = 4.56e-6
 

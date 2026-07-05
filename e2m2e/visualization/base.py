@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ..core.cr3bp_system import CR3BP_System, LibrationPoint
-from ..mbse.data.enums import ProjectionPlane
+from ..core.enums import ProjectionPlane
 from .config import PlotConfig
 
 if TYPE_CHECKING:

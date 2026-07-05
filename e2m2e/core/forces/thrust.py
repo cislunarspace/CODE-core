@@ -34,6 +34,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
+from ..standard_dynamic_axes import LVLHAxes, VNBAxes
 from .physical_model import PhysicalModel
 
 
@@ -106,6 +107,12 @@ class FiniteBurn(PhysicalModel):
                 f"direction_frame must be 'VNB', 'LVLH', or None, got {direction_frame!r}"
             )
         self._direction_frame = direction_frame
+        if direction_frame == "VNB":
+            self._axes: VNBAxes | LVLHAxes | None = VNBAxes()
+        elif direction_frame == "LVLH":
+            self._axes = LVLHAxes()
+        else:
+            self._axes = None
         if not callable(direction):
             direction_arr = np.asarray(direction, dtype=float)
             if np.linalg.norm(direction_arr) < 1e-15:
@@ -135,12 +142,23 @@ class FiniteBurn(PhysicalModel):
 
     def _resolve_direction_in_frame(
         self,
+        t: float,
         direction_local: npt.NDArray[np.floating],
         state: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
         """把 direction_local 从 burn 坐标系转换到传播坐标系。
 
+        复用 :class:`~e2m2e.core.standard_dynamic_axes.VNBAxes` /
+        :class:`~e2m2e.core.standard_dynamic_axes.LVLHAxes` 构造旋转矩阵，
+        再用 ``rotation @ direction_local`` 完成变换。轴向定义沿用
+        ``standard_dynamic_axes``（VNB/LVLH 按 GMAT 约定，见 CONTEXT.md）。
+
+        动态坐标轴类本身不校验状态退化情形，这里保留原手搓逻辑的边界
+        检查（零速度/零位置/共线 r-v），以抛出含义清晰的 ``ValueError``
+        并避免 ``LVLHAxes`` 在角动量为零时产生 NaN。
+
         Args:
+            t: 当前历元（秒），透传给 ``axes.update``/``rotation_matrix``。
             direction_local: 在 direction_frame 下的方向向量（未归一化）。
             state: 完整状态向量 (6,)，在传播坐标系下。
 
@@ -155,33 +173,30 @@ class FiniteBurn(PhysicalModel):
         v = state[3:6]
         r_norm = np.linalg.norm(r)
         v_norm = np.linalg.norm(v)
+        h_norm = np.linalg.norm(np.cross(r, v))
 
         if frame == "VNB":
             if v_norm < 1e-15:
                 raise ValueError("VNB frame requires non-zero velocity")
-            V = v / v_norm
-            h = np.cross(r, v)
-            h_norm = np.linalg.norm(h)
             if h_norm < 1e-15:
                 raise ValueError("VNB frame requires non-zero angular momentum")
-            N = h / h_norm
-            B = np.cross(V, N)
-            # direction_local = [a_V, a_N, a_B] -> a_V * V + a_N * N + a_B * B
-            return direction_local[0] * V + direction_local[1] * N + direction_local[2] * B
-
-        if frame == "LVLH":
+        else:  # LVLH
             if r_norm < 1e-15:
                 raise ValueError("LVLH frame requires non-zero position")
-            R = r / r_norm
             if v_norm < 1e-15:
                 raise ValueError("LVLH frame requires non-zero velocity")
-            V = v / v_norm
-            N = np.cross(R, V)
-            # direction_local = [a_R, a_V, a_N] -> a_R * R + a_V * V + a_N * N
-            return direction_local[0] * R + direction_local[1] * V + direction_local[2] * N
+            if h_norm < 1e-15:
+                # 退化的径向（直线）轨道：r 与 v 共线，LVLHAxes 的 h_hat 未定义
+                # (h/|h| → NaN)。沿用原手搓逻辑在此情形下的稳健行为：
+                # N = R × V = 0，仅径向/沿迹分量有意义。
+                R = r / r_norm
+                V = v / v_norm
+                return direction_local[0] * R + direction_local[1] * V
 
-        # unreachable: validated in __init__
-        return direction_local
+        assert self._axes is not None  # direction_frame validated in __init__
+        self._axes.update(t, state)
+        rotation = self._axes.rotation_matrix(t)
+        return rotation @ direction_local
 
     def compute_acceleration(
         self,
@@ -209,7 +224,7 @@ class FiniteBurn(PhysicalModel):
 
         if self._direction_frame is not None:
             state_arr = np.asarray(state, dtype=float)
-            direction_hat = self._resolve_direction_in_frame(direction_hat, state_arr)
+            direction_hat = self._resolve_direction_in_frame(t, direction_hat, state_arr)
             # 重新归一化（坐标转换可能改变长度）
             new_norm = np.linalg.norm(direction_hat)
             if new_norm < 1e-15:

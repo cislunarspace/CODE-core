@@ -13,11 +13,13 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 
-from .cr3bp_system import CR3BP_System
+if TYPE_CHECKING:
+    from .system import System
 
 
 class Orbit:
@@ -31,7 +33,7 @@ class Orbit:
     Attributes:
         states: 状态序列 ``[x, y, z, vx, vy, vz]``，形状为 ``(n, 6)``
         times: 时间序列，形状为 ``(n,)``
-        system: 关联的 CR3BP_System 对象
+        system: 关联的 System 对象
         family_type: 轨道族类型
         parameters: 轨道参数字典
         metadata: 轨道元数据
@@ -44,14 +46,14 @@ class Orbit:
         self,
         states: npt.ArrayLike,
         times: npt.ArrayLike,
-        system: CR3BP_System | None = None,
+        system: System | None = None,
     ) -> None:
         """初始化轨道对象
 
         Args:
             states: 状态序列，形状 ``(n, 6)`` 或 ``(6,)``
             times: 时间序列，形状 ``(n,)``
-            system: CR3BP_System 对象（可选）
+            system: System 对象（可选）
 
         Raises:
             ValueError: 状态分量数不等于 6 或时间序列长度不一致
@@ -277,7 +279,7 @@ class Orbit:
     def load_from_file(
         cls,
         filename: str | Path,
-        system: CR3BP_System | None = None,
+        system: System | None = None,
         orbit_index: int | None = None,
     ) -> Orbit:
         """从 JSON 文件反序列化加载轨道数据（v3 格式兼容）"""
@@ -375,7 +377,7 @@ class OrbitFamily:
     Attributes:
         orbits: Orbit 对象列表
         family_type: 轨道族类型
-        system: 关联的 CR3BP_System 对象
+        system: 关联的 System 对象
         metadata: 轨道族元数据
     """
 
@@ -383,14 +385,14 @@ class OrbitFamily:
         self,
         orbits: list[Orbit] | None = None,
         family_type: str | None = None,
-        system: CR3BP_System | None = None,
+        system: System | None = None,
     ) -> None:
         """初始化轨道族
 
         Args:
             orbits: 初始轨道列表，也可传入单条 Orbit 对象
             family_type: 轨道族类型（如 ``"halo"``、``"lyapunov"``）
-            system: 关联的 CR3BP_System 对象（用于计算 Jacobi 常数等）
+            system: 关联的 System 对象（用于计算 Jacobi 常数等）
 
         Raises:
             TypeError: orbits 列表中包含非 Orbit 对象
@@ -463,6 +465,11 @@ class OrbitFamily:
         """
         if self.system is None:
             return np.array([])
+        # Jacobi 常数是 CR3BP 专有概念；非 CR3BP 系统无法计算。
+        from .cr3bp_system import CR3BP_System
+
+        if not isinstance(self.system, CR3BP_System):
+            return np.array([])
         return np.array([self.system.get_jacobi_constant(orbit.states[0]) for orbit in self.orbits])
 
     def save_to_file(self, filename: str | Path) -> None:
@@ -503,14 +510,12 @@ class OrbitFamily:
             json.dump(data, f, indent=2)
 
     @classmethod
-    def load_from_file(
-        cls, filename: str | Path, system: CR3BP_System | None = None
-    ) -> OrbitFamily:
+    def load_from_file(cls, filename: str | Path, system: System | None = None) -> OrbitFamily:
         """从 JSON 文件反序列化加载轨道族
 
         Args:
             filename: 输入文件路径
-            system: 关联的 CR3BP_System 对象（可选）
+            system: 关联的 System 对象（可选）
 
         Returns:
             加载的 OrbitFamily 实例

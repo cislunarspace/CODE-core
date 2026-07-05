@@ -1,6 +1,6 @@
 """Transfer 类编排与接口测试。
 
-验证 _convert_nlp_result 已移除、optimize 通过 adapter 调用。
+验证 _convert_nlp_result 已移除、optimize 直接按配置分支调度 SciPy / COPT。
 """
 
 from unittest.mock import patch
@@ -43,11 +43,10 @@ def dummy_orbit(earth_moon_system):
     return orbit
 
 
-def test_transfer_uses_optimizer_adapter(dynamics, dummy_orbit):
-    """Transfer.optimize 应通过 adapter 调用，不再直接调用 optimizer.optimize。"""
-    from e2m2e.transfer.optimizers import SciPyTransferOptimizer
-
+def test_transfer_dispatches_to_copt_when_enabled(dynamics, dummy_orbit):
+    """use_copt 且 COPT 可用时，Transfer 应走 optimize_with_copt 而非 optimizer.optimize。"""
     transfer = Transfer(dynamics).set_orbit(dummy_orbit, dummy_orbit)
+    transfer.config.nlp_use_copt = True
     expected_result = TransferOptimizationResult(
         success=True,
         total_delta_v=1.23,
@@ -56,9 +55,16 @@ def test_transfer_uses_optimizer_adapter(dynamics, dummy_orbit):
 
     with patch("e2m2e.transfer.transfer.DROTRONLPOptimizer") as MockOptimizer:
         instance = MockOptimizer.return_value
-        with patch.object(
-            SciPyTransferOptimizer, "optimize", return_value=expected_result
-        ) as mock_adapter_optimize:
+        instance.optimize.return_value = TransferOptimizationResult(
+            success=False, total_delta_v=99.0
+        )
+        with (
+            patch(
+                "e2m2e.transfer.transfer.optimize_with_copt",
+                return_value=expected_result,
+            ) as mock_copt,
+            patch("e2m2e.transfer.transfer._HAVE_COPT", True),
+        ):
             result = transfer.optimize(
                 initial_guess={"alpha": 1.0, "transfer_time": 10.0, "t_ins": 5.0},
                 alpha_range=(0.5, 2.5),
@@ -66,7 +72,8 @@ def test_transfer_uses_optimizer_adapter(dynamics, dummy_orbit):
             )
 
     assert result is expected_result
-    mock_adapter_optimize.assert_called_once()
+    mock_copt.assert_called_once()
+    assert mock_copt.call_args.kwargs["fallback_to_scipy"] is True
     instance.optimize.assert_not_called()
 
 
@@ -97,11 +104,11 @@ def test_transfer_uses_config_to_initialize_optimizer(dynamics, dummy_orbit):
     assert "config" in kwargs
     config = kwargs["config"]
     assert isinstance(config, TransferConfig)
-    assert config.alpha_range == (0.5, 2.5)
-    assert config.t_ins_range == (0.0, 10.0)
-    assert config.use_relaxed_velocity is True
-    assert config.velocity_angle_tol == pytest.approx(0.05)
-    assert config.verbose is False
+    assert config.nlp_alpha_range == (0.5, 2.5)
+    assert config.nlp_t_ins_range == (0.0, 10.0)
+    assert config.nlp_use_relaxed_velocity is True
+    assert config.nlp_velocity_angle_tol == pytest.approx(0.05)
+    assert config.nlp_verbose is False
 
     # 确认 optimize() 只被调用一次，且没有通过额外参数覆盖范围
     instance.optimize.assert_called_once()

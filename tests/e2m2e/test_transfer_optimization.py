@@ -42,8 +42,8 @@ class TestTransferCreation:
 
         assert hasattr(transfer, "config")
         assert isinstance(transfer.config, TransferConfig)
-        assert transfer.config.alpha_min == 0.5
-        assert transfer.config.alpha_max == 2.5
+        assert transfer.config.nlp_alpha_min == 0.5
+        assert transfer.config.nlp_alpha_max == 2.5
 
 
 class TestTransferOptimization:

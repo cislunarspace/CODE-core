@@ -12,7 +12,8 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from e2m2e.algorithms import ephemeris_correction, homotopy_correction
+from e2m2e.algorithms import ephemeris_correction
+from e2m2e.algorithms.ephemeris_correction import homotopy
 from e2m2e.mbse.data.enums import BoundaryMode
 
 
@@ -56,8 +57,8 @@ def test_two_level_inner_method_is_dispatched_to_two_level_solver():
                 state_patch=kwargs["state_patch"] + 0.01,
             )
 
-    with patch.object(homotopy_correction, "TwoLevelMultipleShooting", FakeTwoLevelMS):
-        result = homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy, "TwoLevelMultipleShooting", FakeTwoLevelMS):
+        result = homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=t_patch,
             state_patch=state_patch,
@@ -111,29 +112,22 @@ def test_two_level_dispatches_via_caller_with_inner_method_kwarg():
             state_patch=state_patch_arg,
         )
 
-    with patch.object(homotopy_correction, "correct_with_homotopy", fake_correct_with_homotopy):
-        import sys
-
-        saved = sys.modules.get("e2m2e.algorithms.homotopy_correction")
-        sys.modules["e2m2e.algorithms.homotopy_correction"] = homotopy_correction
-        try:
-            ephemeris_correction.correct_ephemeris_patch_points(
-                "homotopy",
-                dynamics=fake_dynamics,
-                t_patch=np.array([0.0, 1.0, 2.0]),
-                state_patch=np.zeros((3, 6)),
-                tolerance=1e-3,
-                max_iter=5,
-                verbose=False,
-                n_workers=1,
-                kernel_dir="k",
-                inner_method="two_level",
-            )
-        finally:
-            if saved is None:
-                sys.modules.pop("e2m2e.algorithms.homotopy_correction", None)
-            else:
-                sys.modules["e2m2e.algorithms.homotopy_correction"] = saved
+    # The dispatcher calls ``correct_with_homotopy`` as a module-global of the
+    # ``ephemeris_correction.homotopy`` submodule, so patching it there is
+    # picked up directly — no sys.modules indirection needed.
+    with patch.object(homotopy, "correct_with_homotopy", fake_correct_with_homotopy):
+        ephemeris_correction.correct_ephemeris_patch_points(
+            "homotopy",
+            dynamics=fake_dynamics,
+            t_patch=np.array([0.0, 1.0, 2.0]),
+            state_patch=np.zeros((3, 6)),
+            tolerance=1e-3,
+            max_iter=5,
+            verbose=False,
+            n_workers=1,
+            kernel_dir="k",
+            inner_method="two_level",
+        )
 
     assert captured["inner_method"] == "two_level"
 
@@ -141,7 +135,7 @@ def test_two_level_dispatches_via_caller_with_inner_method_kwarg():
 def test_two_level_rejects_recursive_homotopy_inner_method():
     """inner_method='homotopy' is still rejected (no recursion) on the two-level path."""
     with pytest.raises(ValueError, match="inner_method='homotopy' is not allowed"):
-        homotopy_correction.correct_with_homotopy(
+        homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=np.array([0.0, 100.0, 200.0]),
             state_patch=np.ones((3, 6)),
@@ -181,8 +175,8 @@ def test_two_level_uses_velocity_tolerance_default():
                 state_patch=kwargs["state_patch"],
             )
 
-    with patch.object(homotopy_correction, "TwoLevelMultipleShooting", FakeTwoLevelMS):
-        homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy, "TwoLevelMultipleShooting", FakeTwoLevelMS):
+        homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=t_patch,
             state_patch=state_patch,
@@ -222,8 +216,8 @@ def test_two_level_failed_final_step_aggregates_correctly():
                 state_patch=kwargs["state_patch"] + 0.01,
             )
 
-    with patch.object(homotopy_correction, "TwoLevelMultipleShooting", FakeTwoLevelMS):
-        result = homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy, "TwoLevelMultipleShooting", FakeTwoLevelMS):
+        result = homotopy.correct_with_homotopy(
             dynamics=_fake_dynamics(),
             t_patch=t_patch,
             state_patch=state_patch,

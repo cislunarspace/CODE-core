@@ -1,6 +1,6 @@
 """TDD: minimal smoke test for correct_with_homotopy.
 
-Verifies the function exists in algorithms.homotopy_correction, accepts the
+Verifies the function exists in algorithms.homotopy, accepts the
 MVP parameter set, and returns a (placeholder) EphemerisCorrectionResult
 object with the documented fields.
 
@@ -14,8 +14,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from e2m2e.algorithms import homotopy_correction
-from e2m2e.algorithms.ephemeris_correction import EphemerisCorrectionResult
+from e2m2e.algorithms.ephemeris_correction import EphemerisCorrectionResult, homotopy
 
 
 def test_correct_with_homotopy_returns_ephemeris_correction_result():
@@ -59,8 +58,8 @@ def test_correct_with_homotopy_returns_ephemeris_correction_result():
         integrator="DOP853",
     )
 
-    with patch.object(homotopy_correction, "MultipleShooting", FakeMultipleShooting):
-        result = homotopy_correction.correct_with_homotopy(
+    with patch.object(homotopy, "MultipleShooting", FakeMultipleShooting):
+        result = homotopy.correct_with_homotopy(
             dynamics=fake_dynamics,
             t_patch=t_patch,
             state_patch=state_patch,

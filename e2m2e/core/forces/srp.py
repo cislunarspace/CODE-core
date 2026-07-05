@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 
+from ..constants import AU, KM_TO_M
 from .physical_model import PhysicalModel, require_inertial_frame
 
 if TYPE_CHECKING:
@@ -30,9 +31,6 @@ if TYPE_CHECKING:
 
 # 1 AU 处太阳光压常数（N/m²）。等价于 GMAT flux/c = 1367 / 2.998e8。
 _P_SRP_1AU = 4.56e-6
-# 1 天文单位（km），GMAT nominalSun。
-_AU_KM = 149597870.691
-_KM_TO_M = 1000.0
 
 
 class SolarRadiationPressure(PhysicalModel):
@@ -98,9 +96,9 @@ class SolarRadiationPressure(PhysicalModel):
         vec = np.asarray(sun_to_sc_vec, dtype=float)
         r = float(np.linalg.norm(vec))
         # 1/r² 标度（相对 1 AU）。
-        pressure = _P_SRP_1AU * (_AU_KM / r) ** 2  # N/m²
+        pressure = _P_SRP_1AU * (AU / r) ** 2  # N/m²
         mag_si = flux_factor * pressure * self._cr * self._area / self._mass  # m/s²
-        mag_km = mag_si / _KM_TO_M  # km/s²
+        mag_km = mag_si / KM_TO_M  # km/s²
         return mag_km * (vec / r)
 
     def compute_acceleration(

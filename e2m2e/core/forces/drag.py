@@ -8,17 +8,13 @@ import numpy as np
 import numpy.typing as npt
 
 from e2m2e.core.atmosphere import AtmosphereModel
+from e2m2e.core.constants import KM_TO_M, R_EARTH
 from e2m2e.core.coordinate_system import CoordinateSystem
 from e2m2e.core.standard_axes import ITRFApproxAxes
 from e2m2e.core.standard_origins import CelestialBodyOrigin
 
 from .exceptions import CoordinateTransformError
 from .physical_model import PhysicalModel
-
-# WGS84 地球赤道半径（km），用于地心高度计算。
-_EARTH_EQUATORIAL_RADIUS_KM = 6378.137
-
-_KM_TO_M = 1000.0
 
 
 class DragModel(PhysicalModel):
@@ -127,11 +123,11 @@ class DragModel(PhysicalModel):
         v_itrf: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
         """在 ITRF 中计算阻力加速度，返回 km/s²。"""
-        altitude_km = float(np.linalg.norm(r_itrf)) - _EARTH_EQUATORIAL_RADIUS_KM
+        altitude_km = float(np.linalg.norm(r_itrf)) - R_EARTH
         rho = self._atmosphere.density(altitude_km)  # kg/m³
 
         # 大气在 ITRF 中静止，相对速度 = ITRF 速度；转 SI（m/s）
-        v_rel = v_itrf * _KM_TO_M  # m/s
+        v_rel = v_itrf * KM_TO_M  # m/s
         v_rel_mag = float(np.linalg.norm(v_rel))
 
         if rho == 0.0 or v_rel_mag == 0.0:
@@ -142,7 +138,7 @@ class DragModel(PhysicalModel):
         # a_drag [m/s²] = -0.5 · ρ · BC · |v_rel|² · v̂_rel
         # 等价于 -0.5 · ρ · BC · |v_rel| · v_rel
         a_drag_si = -0.5 * rho * bc * v_rel_mag * v_rel
-        return a_drag_si / _KM_TO_M  # 转回 km/s²
+        return a_drag_si / KM_TO_M  # 转回 km/s²
 
     def _transform_state_to_itrf(
         self, t: float, state: npt.NDArray[np.floating], system: Any

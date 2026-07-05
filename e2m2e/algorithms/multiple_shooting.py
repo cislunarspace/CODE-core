@@ -16,7 +16,7 @@ import numpy as np
 import numpy.typing as npt
 from tqdm.auto import tqdm
 
-from e2m2e.mbse.data.enums import ConvergenceState, ReferenceFrame
+from e2m2e.core.enums import ConvergenceState, ReferenceFrame
 
 # Unicode sparkline 字符，用于在终端内渲染残差收敛曲线
 _SPARK_CHARS = " ▁▂▃▄▅▆▇█"

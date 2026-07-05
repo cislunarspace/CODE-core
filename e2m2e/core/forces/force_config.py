@@ -17,19 +17,13 @@ import numpy as np
 from e2m2e.core.atmosphere import AtmosphereModel, ExponentialAtmosphere
 
 from .drag import DragModel
+from .exceptions import NotSerializableError
 from .gravity_field import GravityField
 from .physical_model import PhysicalModel
 from .relativistic_correction import RelativisticCorrection
 from .shadow import ConicalShadowModel, ShadowModel
 from .srp import SolarRadiationPressure
 from .thrust import FiniteBurn
-
-
-class NotSerializableError(TypeError):
-    """力模型无法序列化为配置（如含任意 Python callable）时抛出。"""
-
-    pass
-
 
 # --- 嵌套依赖：大气模型 ---
 
