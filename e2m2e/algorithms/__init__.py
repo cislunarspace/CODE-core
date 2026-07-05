@@ -30,7 +30,14 @@ if TYPE_CHECKING:
         TwoLevelMultipleShootingResult as TwoLevelMultipleShootingResult,
     )
 
-from . import continuation, differential_correction, halo_initial_guess, stability, strategies
+from . import (
+    continuation,
+    differential_correction,
+    halo_family,  # noqa: F401  # 显式预加载以保证 ``continuation`` 内的方法重绑定可用
+    halo_initial_guess,
+    stability,
+    strategies,
+)
 from .continuation import Continuation
 from .differential_correction import DifferentialCorrection
 from .halo_initial_guess import (

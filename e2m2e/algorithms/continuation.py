@@ -12,7 +12,11 @@ import numpy as np
 from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit, OrbitFamily
 from .differential_correction import DifferentialCorrection
-from .halo_initial_guess import compute_halo_initial_guess
+from .halo_family import (
+    generate_halo_family,
+    generate_halo_seed_orbit,
+    halo_pseudo_arclength_continuation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -247,161 +251,37 @@ class Continuation:
         logger.info("步长: %s", step_size)
         logger.info("=" * 30)
 
-        corrector = self.correction
-
-        current_orbit = seed_orbit.copy()
-
-        temp_orbits_with_steps = []
-
-        step_size_history = []
+        temp_orbits_with_steps: list[tuple[Orbit, int]] = []
 
         if forward:
             if verbose:
                 logger.info("--- 正向延拓 (参数增大方向) ---")
-
-            target_forward = param_max
-            i = 0
-            while True:
-                if param_index < 6:
-                    current_param_value = current_orbit.states[0, param_index]
-                else:
-                    current_param_value = current_orbit.period
-
-                if current_param_value >= target_forward:
-                    break
-
-                if param_index < 6:
-                    guess_orbit = current_orbit.copy()
-                    guess_orbit.states[0, param_index] += step_size
-                    orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
-                else:
-                    guess_orbit = current_orbit.copy()
-                    guess_orbit.period = current_orbit.period + step_size * 2
-                    orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
-
-                if orbit is not None and orbit.correction_success:
-                    orbit.metadata["continuation_step"] = i + 1
-                    temp_orbits_with_steps.append((orbit, i + 1))
-
-                    current_orbit = orbit
-
-                    self.continuation_stats["successful_steps"] += 1
-
-                    if (i + 1) % 10 == 0:
-                        if verbose:
-                            param_val = (
-                                orbit.states[0, param_index] if param_index < 6 else orbit.period
-                            )
-                            logger.info(
-                                "  第 %d 条轨道，参数值=%.6f，周期=%.4f",
-                                i + 1,
-                                param_val,
-                                orbit.period,
-                            )
-                        else:
-                            logger.info("  正向延拓进度：已完成 %d 条轨道", i + 1)
-
-                    if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
-                        if orbit.correction_iterations < 3:
-                            step_size = min(step_size * self.step_growth_factor, self.max_step_size)
-                        elif orbit.correction_iterations > 8:
-                            step_size = max(
-                                step_size * self.step_reduction_factor, self.min_step_size
-                            )
-                else:
-                    self.continuation_stats["failed_steps"] += 1
-
-                    step_size *= self.step_reduction_factor
-                    if step_size < self.min_step_size:
-                        self.termination_reason = "步长过小，延拓终止"
-                        if verbose:
-                            logger.info("正向步长过小，延拓终止于第 %d 条轨道", len(orbit_family))
-                        break
-
-                    if verbose:
-                        logger.info("  第 %d 步修正失败，减小步长至 %.6f", i + 1, step_size)
-
-                step_size_history.append(step_size)
-                i += 1
-
-                if len(orbit_family) >= self.max_orbits:
-                    self.termination_reason = "达到最大轨道数限制"
-                    break
+            temp_orbits_with_steps.extend(
+                self._sweep(
+                    seed_orbit=seed_orbit,
+                    target=param_max,
+                    direction_sign=+1,
+                    direction_label="正向",
+                    step_size=step_size,
+                    param_index=param_index,
+                    verbose=verbose,
+                )
+            )
 
         if backward:
-            current_orbit = seed_orbit.copy()
-
             if verbose:
                 logger.info("--- 反向延拓 (参数减小方向) ---")
-
-            target_backward = param_min
-            i = 0
-            while True:
-                if param_index < 6:
-                    current_param_value = current_orbit.states[0, param_index]
-                else:
-                    current_param_value = current_orbit.period
-
-                if current_param_value <= target_backward:
-                    break
-
-                if param_index < 6:
-                    guess_orbit = current_orbit.copy()
-                    guess_orbit.states[0, param_index] -= step_size
-                    orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
-                else:
-                    guess_orbit = current_orbit.copy()
-                    guess_orbit.period = current_orbit.period - step_size * 2
-                    orbit = corrector.iterate_correction(guess_orbit, verbose=verbose)
-
-                if orbit is not None and orbit.correction_success:
-                    orbit.metadata["continuation_step"] = -(i + 1)
-                    temp_orbits_with_steps.append((orbit, -(i + 1)))
-
-                    current_orbit = orbit
-
-                    self.continuation_stats["successful_steps"] += 1
-
-                    if (i + 1) % 10 == 0:
-                        if verbose:
-                            param_val = (
-                                orbit.states[0, param_index] if param_index < 6 else orbit.period
-                            )
-                            logger.info(
-                                "  第 %d 条轨道，参数值=%.6f，周期=%.4f",
-                                i + 1,
-                                param_val,
-                                orbit.period,
-                            )
-                        else:
-                            logger.info("  反向延拓进度：已完成 %d 条轨道", i + 1)
-
-                    if hasattr(self, "step_size_adaptation") and self.step_size_adaptation:
-                        if orbit.correction_iterations < 3:
-                            step_size = min(step_size * self.step_growth_factor, self.max_step_size)
-                        elif orbit.correction_iterations > 8:
-                            step_size = max(
-                                step_size * self.step_reduction_factor, self.min_step_size
-                            )
-                else:
-                    self.continuation_stats["failed_steps"] += 1
-
-                    step_size *= self.step_reduction_factor
-                    if step_size < self.min_step_size:
-                        self.termination_reason = "步长过小，延拓终止"
-                        if verbose:
-                            logger.info("反向步长过小，延拓终止于第 %d 条轨道", len(orbit_family))
-                        break
-
-                    if verbose:
-                        logger.info("  第 %d 步修正失败，减小步长至 %.6f", i + 1, step_size)
-
-                step_size_history.append(step_size)
-                i += 1
-
-                if len(orbit_family) >= self.max_orbits:
-                    self.termination_reason = "达到最大轨道数限制"
-                    break
+            temp_orbits_with_steps.extend(
+                self._sweep(
+                    seed_orbit=seed_orbit,
+                    target=param_min,
+                    direction_sign=-1,
+                    direction_label="反向",
+                    step_size=step_size,
+                    param_index=param_index,
+                    verbose=verbose,
+                )
+            )
 
         seed_orbit.metadata["continuation_step"] = 0
         all_orbits_with_steps = [(seed_orbit, 0)] + temp_orbits_with_steps
@@ -423,6 +303,124 @@ class Continuation:
             logger.info("  轨道已按距离种子轨道的步数排序: 0, 1, -1, 2, -2, ...")
 
         return orbit_family
+
+    def _sweep(
+        self,
+        seed_orbit: Orbit,
+        target: float,
+        direction_sign: int,
+        *,
+        direction_label: str,
+        step_size: float,
+        param_index: int,
+        verbose: bool,
+    ) -> list[tuple[Orbit, int]]:
+        """沿参数方向单向延拓（``natural_continuation`` 内部使用）
+
+        ``direction_sign=+1`` 表示正向（参数增大），``-1`` 表示反向（参数减小）。
+        由 ``natural_continuation`` 在正向、反向各调用一次，消除原先两块几乎
+        完全重复的 forward/backward 代码。
+
+        Args:
+            seed_orbit: 起始轨道（不会被原地修改；内部 ``.copy()``）。
+            target: 参数目标值；正向时延拓至 ``current >= target`` 终止，
+                反向时延拓至 ``current <= target`` 终止。
+            direction_sign: ``+1`` 或 ``-1``。
+            direction_label: 仅用于日志（"正向"/"反向"）。
+            step_size: 初始步长（函数内部按 ``step_size_adaptation`` 策略调整）。
+            param_index: 0–5 对应 ``states[0, i]``，6 对应 ``orbit.period``。
+            verbose: 是否打印详细进度日志。
+
+        Returns:
+            ``(orbit, signed_step_index)`` 列表，``signed_step_index =
+            direction_sign * (i + 1)``。触底或达 ``max_orbits`` 上限后提前返回。
+        """
+        results: list[tuple[Orbit, int]] = []
+        current_orbit = seed_orbit.copy()
+        i = 0
+
+        while True:
+            if param_index < 6:
+                current_param_value = current_orbit.states[0, param_index]
+            else:
+                current_param_value = current_orbit.period
+
+            if direction_sign > 0:
+                if current_param_value >= target:
+                    break
+            else:
+                if current_param_value <= target:
+                    break
+
+            if param_index < 6:
+                guess_orbit = current_orbit.copy()
+                guess_orbit.states[0, param_index] += direction_sign * step_size
+            else:
+                # 延拓参数为周期时，period 必有值（微分修正后赋值）。
+                assert current_orbit.period is not None
+                guess_orbit = current_orbit.copy()
+                guess_orbit.period = current_orbit.period + direction_sign * step_size * 2
+
+            orbit = self.correction.iterate_correction(guess_orbit, verbose=verbose)
+
+            if orbit is not None and orbit.correction_success:
+                signed_step = direction_sign * (i + 1)
+                orbit.metadata["continuation_step"] = signed_step
+                results.append((orbit, signed_step))
+
+                current_orbit = orbit
+
+                self.continuation_stats["successful_steps"] += 1
+
+                if (i + 1) % 10 == 0:
+                    if verbose:
+                        param_val = (
+                            orbit.states[0, param_index] if param_index < 6 else orbit.period
+                        )
+                        logger.info(
+                            "  第 %d 条轨道，参数值=%.6f，周期=%.4f",
+                            i + 1,
+                            param_val,
+                            orbit.period,
+                        )
+                    else:
+                        logger.info(
+                            "  %s延拓进度：已完成 %d 条轨道", direction_label, i + 1
+                        )
+
+                if self.step_size_adaptation:
+                    if orbit.correction_iterations < 3:
+                        step_size = min(
+                            step_size * self.step_growth_factor, self.max_step_size
+                        )
+                    elif orbit.correction_iterations > 8:
+                        step_size = max(
+                            step_size * self.step_reduction_factor, self.min_step_size
+                        )
+            else:
+                self.continuation_stats["failed_steps"] += 1
+
+                step_size *= self.step_reduction_factor
+                if step_size < self.min_step_size:
+                    self.termination_reason = "步长过小，延拓终止"
+                    if verbose:
+                        logger.info(
+                            "%s步长过小，延拓终止于第 %d 条轨道",
+                            direction_label,
+                            1 + len(results),  # +1 to align with len(orbit_family)
+                        )
+                    break
+
+                if verbose:
+                    logger.info("  第 %d 步修正失败，减小步长至 %.6f", i + 1, step_size)
+
+            i += 1
+
+            if 1 + len(results) >= self.max_orbits:
+                self.termination_reason = "达到最大轨道数限制"
+                break
+
+        return results
 
     def pseudo_arclength_continuation(
         self,
@@ -792,420 +790,22 @@ class Continuation:
             "termination_reason": self.termination_reason,
         }
 
-    def generate_halo_seed_orbit(
-        self,
-        libration_point: int,
-        amplitude_z: float,
-        halo_class: int = 0,
-        verbose: bool = False,
-    ) -> Orbit:
-        """生成Halo轨道初始猜测并修正
+    # Halo 专用编排（generate_halo_seed_orbit / generate_halo_family /
+    # halo_pseudo_arclength_continuation）已迁出到 ``halo_family`` 模块；
+    # 本文件末尾以方法重绑定的形式对外保留同名 API。
 
-        使用Richardson三阶近似生成初始猜测，然后通过微分修正
-        得到精确的周期轨道。
 
-        Args:
-            libration_point: 拉格朗日点 (1=L1, 2=L2)
-            amplitude_z: Z方向振幅
-            halo_class: 0=北Halo, 1=南Halo
-            verbose: 是否打印详细信息
-
-        Returns:
-            Orbit: Halo周期轨道
-        """
-        if libration_point not in [1, 2]:
-            raise ValueError(f"libration_point必须是1或2，当前为{libration_point}")
-        if amplitude_z <= 0:
-            raise ValueError(f"amplitude_z必须为正数，当前为{amplitude_z}")
-        if halo_class not in [0, 1]:
-            raise ValueError(f"halo_class必须是0或1，当前为{halo_class}")
-
-        if verbose:
-            halo_label = "北" if halo_class == 0 else "南"
-            logger.info("生成Halo轨道: L%d %s Halo", libration_point, halo_label)
-            logger.info("  Z振幅: %s", amplitude_z)
-
-        mu = self.correction.dynamics.system.mu
-
-        guess = compute_halo_initial_guess(
-            mu=mu,
-            z_amplitude=amplitude_z,
-            L=libration_point,
-            halo_class=halo_class,
-        )
-
-        initial_z = amplitude_z if halo_class == 0 else -amplitude_z
-
-        initial_state = np.array(
-            [
-                guess["x0"],
-                0.0,
-                initial_z,
-                guess["vx0"],
-                guess["vy0"],
-                guess["vz0"],
-            ]
-        )
-
-        if halo_class == 0:
-            self.correction.setup_halo_orbit_fixed_z0(
-                z0=amplitude_z,
-                libration_point=libration_point,
-            )
-        else:
-            self.correction.setup_halo_orbit_fixed_z0(
-                z0=-amplitude_z,
-                libration_point=libration_point,
-            )
-
-        initial_orbit = Orbit(
-            states=initial_state.reshape(1, -1),
-            times=np.array([0.0]),
-            system=self.correction.dynamics.system,
-        )
-        initial_orbit.period = 2.0 * guess["T_half"]
-
-        self.correction.max_iterations = 150
-        self.correction.tolerance = 1e-5
-
-        if verbose:
-            logger.info("  初始猜测: x0=%.6f, vy0=%.6f", guess["x0"], guess["vy0"])
-            logger.info("  预估周期: %.4f TU", initial_orbit.period)
-
-        orbit = self.correction.iterate_correction(
-            initial_guess=initial_orbit,
-            verbose=verbose,
-        )
-
-        if orbit is not None:
-            orbit.family_type = "halo"
-            orbit.parameters["libration_point"] = libration_point
-            orbit.parameters["amplitude_z"] = amplitude_z
-            orbit.parameters["halo_class"] = halo_class
-            if verbose:
-                logger.info("[ok] Halo轨道生成成功: 周期=%.6f TU", orbit.period)
-
-        return orbit
-
-    def generate_halo_family(
-        self,
-        seed_orbit: Orbit,
-        n_orbits: int = 50,
-        direction: str = "positive",
-        step_size: float = 0.001,
-        z_range: tuple[float, float] | None = None,
-        verbose: bool = False,
-        progress_callback=None,
-    ) -> list[Orbit]:
-        """生成Halo轨道族
-
-        使用自然参数延拓法生成Halo轨道族。每步以前一收敛轨道为初值，
-        沿z方向推进，比每次都从Richardson近似重新开始更稳定。
-
-        Args:
-            seed_orbit: 种子轨道
-            n_orbits: 目标轨道数量（含种子；每支各生成n_orbits-1条新轨道）
-            direction: 延拓方向 ("positive", "negative", "both")
-            step_size: z方向步长（正数；方向由direction控制）
-            z_range: 延拓z振幅范围 (z_min, z_max)；提供时优先使用，
-                代替硬编码边界，并自动推断延拓方向
-            verbose: 是否打印详细信息
-
-        Returns:
-            List[Orbit]: Halo轨道族
-        """
-        if n_orbits < 1:
-            raise ValueError(f"n_orbits必须大于0，当前为{n_orbits}")
-        if direction not in ["positive", "negative", "both"]:
-            raise ValueError(f"direction必须是positive/negative/both，当前为{direction}")
-
-        family = [seed_orbit]
-        libration_point = int(seed_orbit.parameters.get("libration_point", 1))
-        halo_class = int(seed_orbit.parameters.get("halo_class", 0))
-        seed_z = float(seed_orbit.states[0, 2])
-
-        # z边界: 北Halo z>0, 南Halo z<0
-        default_z_limit = 0.5 if halo_class == 0 else -0.5
-        z_threshold = 1e-4 if halo_class == 0 else -1e-4
-
-        # 处理 z_range
-        if z_range is not None:
-            z_min, z_max = z_range
-            if z_min >= z_max:
-                raise ValueError(f"z_range必须满足z_min < z_max，当前为({z_min}, {z_max})")
-            # 自动推断方向：正向 = 往更大的 z 值走，反向 = 往更小的 z 值走
-            forward = z_max > seed_z
-            backward = z_min < seed_z
-            dirs = []
-            if forward:
-                dirs.append("positive")
-            if backward:
-                dirs.append("negative")
-            if not dirs:
-                logger.warning("z_range不包含种子轨道z0，不延拓")
-                return family
-            directions = dirs
-            logger.info(
-                "开始生成Halo轨道族: z范围=[%.4f, %.4f], 方向=%s, 最大数量=%d",
-                z_min,
-                z_max,
-                "/".join(directions),
-                n_orbits,
-            )
-        else:
-            directions = ["positive", "negative"] if direction == "both" else [direction]
-            logger.info("开始生成Halo轨道族: 目标数量=%d, 方向=%s", n_orbits, direction)
-
-        logger.info(
-            "  种子轨道: L%d %s Halo, z0=%.6f",
-            libration_point,
-            "北" if halo_class == 0 else "南",
-            seed_z,
-        )
-
-        # 自适应步长参数
-        min_step = 1e-4
-        max_step = 0.05
-        growth = 1.2
-        shrink = 0.5
-
-        for dir_name in directions:
-            current_orbit = seed_orbit
-            current_step = float(step_size)
-            current_z = float(current_orbit.states[0, 2])
-
-            # z边界: z_range模式使用用户指定边界，否则使用默认值
-            if z_range is not None:
-                z_min_val, z_max_val = z_range
-                z_limit = z_max_val if dir_name == "positive" else z_min_val
-            else:
-                z_limit = default_z_limit
-
-            if verbose:
-                dir_label = "正向" if dir_name == "positive" else "反向"
-                logger.info("--- %s延拓 (边界=%.4f) ---", dir_label, z_limit)
-
-            for i in range(n_orbits - 1):
-                # 全局轨道数上限：n_orbits 是总轨道数（含种子），不是每方向上限
-                if len(family) >= n_orbits:
-                    if verbose:
-                        logger.info("  达到全局轨道数上限 %d, 终止", n_orbits)
-                    break
-
-                # 计算目标z
-                dz = current_step if dir_name == "positive" else -current_step
-                target_z = current_z + dz
-
-                # 边界检查
-                if halo_class == 0:
-                    if target_z <= z_threshold or target_z >= z_limit:
-                        if verbose:
-                            logger.info("  达到z边界 %.4f, 终止", z_limit)
-                        break
-                else:
-                    if target_z >= z_threshold or target_z <= z_limit:
-                        if verbose:
-                            logger.info("  达到z边界 %.4f, 终止", z_limit)
-                        break
-
-                # 配置微分修正器
-                self.correction.setup_halo_orbit_fixed_z0(
-                    z0=target_z,
-                    libration_point=libration_point,
-                )
-                self.correction.max_iterations = 150
-                self.correction.tolerance = 1e-6
-
-                # 用前一轨道构造初值猜测
-                guess_state = current_orbit.states[0].copy()
-                guess_state[2] = target_z
-                guess = Orbit(
-                    states=guess_state.reshape(1, -1),
-                    times=np.array([0.0]),
-                    system=self.correction.dynamics.system,
-                )
-                guess.period = current_orbit.period
-
-                orbit = self.correction.iterate_correction(guess, verbose=False)
-
-                if orbit is not None and orbit.correction_success:
-                    orbit.family_type = "halo"
-                    orbit.parameters["libration_point"] = libration_point
-                    orbit.parameters["halo_class"] = halo_class
-                    orbit.parameters["amplitude_z"] = abs(target_z)
-                    family.append(orbit)
-                    current_orbit = orbit
-                    current_z = target_z
-
-                    # 自适应步长
-                    if self.step_size_adaptation:
-                        if orbit.correction_iterations < 5:
-                            current_step = min(current_step * growth, max_step)
-                        elif orbit.correction_iterations > 20:
-                            current_step = max(current_step * shrink, min_step)
-
-                    if progress_callback is not None:
-                        progress_callback(i + 1, n_orbits - 1, orbit, dir_name)
-
-                    if verbose and (i + 1) % 5 == 0:
-                        logger.info(
-                            "  第%d条: z=%.5f, x=%.6f, T=%.4f",
-                            i + 1,
-                            target_z,
-                            orbit.states[0, 0],
-                            orbit.period,
-                        )
-                else:
-                    # 修正失败，缩小步长重试一次
-                    current_step = max(current_step * shrink, min_step)
-                    if current_step <= min_step:
-                        if verbose:
-                            logger.warning(
-                                "  第%d步修正失败且步长已达最小, 终止",
-                                i + 1,
-                            )
-                        break
-                    if verbose:
-                        logger.info(
-                            "  第%d步修正失败, 缩小步长至%.6f后重试",
-                            i + 1,
-                            current_step,
-                        )
-                    # 保持current_orbit不变，用更小的步长重新循环
-                    # 不增加i，相当于重试
-                    continue
-
-        logger.info("[ok] 轨道族生成完成: 共%d条轨道", len(family))
-        return family
-
-    def halo_pseudo_arclength_continuation(
-        self,
-        seed_orbit: Orbit,
-        n_orbits: int = 50,
-        direction: str = "both",
-        step_size: float = 0.0045,
-        step_size_negative: float | None = None,
-        verbose: bool = True,
-        TolPAL: float = 1e-6,
-        TolDiffCorr: float = 1e-6,
-        IterMax: int = 100,
-        dc_scheme: str = "adaptive",
-        directional_increment: bool = True,
-        progress_callback=None,
-    ) -> OrbitFamily:
-        """Halo 轨道族伪弧长延拓（对齐 ``CR3BP_MATLAB_Library``）
-
-        对应 ``continuation_PAL_CR3BP`` + XZ 对称（``X = [rx,rz,vy,T/2]``），与
-        ``examples/FAMILY_L1Halo_North.m`` 的 PAL 步一致。
-
-        微分修正：MATLAB 脚本在 PAL 后使用 ``type=1`` （固定 ``x0`` ）。当前 Python
-        在 PAL 初值下 ``setup_halo_orbit_fixed_x0`` 易与 STM 牛顿耦合到非物理解，
-        故默认 ``dc_scheme='adaptive'`` （按 Δx/Δz 在 fixed x / fixed z 间切换，
-        与原 ``pseudo_arclength_continuation`` 一致）。若需对齐 MATLAB 的 fixedX，
-        可设 ``matlab_halo_type1`` （失败时会自动再试 ``fixed_z0`` ）。
-
-        DirectionalIncrement、TargetVector、TargetDirection 与脚本一致：正向支
-        TargetVector=2 （rz）、TargetDirection=+1；负向支 TargetVector=1 （rx）、
-        TargetDirection=-1 （0 基下标见 ``pseudo_arclength_continuation`` ）。
-
-        ``FAMILY_L1Halo_North.m`` 中正负支 ΔS 不同（0.0045 与 0.009），可用
-        ``step_size_negative`` 单独指定负向步长模长。
-
-        Args:
-            seed_orbit: 已收敛的 Halo 种子轨道。
-            n_orbits: 每一支生成的新轨道条数 N；direction 为 both 时正向、负向
-                各生成 n_orbits 条。
-            step_size: 正向伪弧长步长 ΔS（默认 0.0045）。
-            step_size_negative: 负向步长模长，默认与 step_size 相同。
-            dc_scheme: 微分修正方案，取 matlab_halo_type1 / matlab_halo_type2 /
-                adaptive。
-
-        Returns:
-            OrbitFamily: 种子与各支新轨道（不重复种子）。
-        """
-        libration_point = int(seed_orbit.parameters.get("libration_point", 1))
-        halo_class = int(seed_orbit.parameters.get("halo_class", 0))
-        seed_z_amplitude = seed_orbit.parameters.get("amplitude_z", 0.1)
-
-        if direction not in ("positive", "negative", "both"):
-            raise ValueError("direction 须为 positive / negative / both")
-
-        if step_size_negative is None:
-            step_size_negative = step_size
-
-        self.correction.max_iterations = 150
-
-        if verbose:
-            logger.info("=" * 30)
-            logger.info("Halo 伪弧长延拓（对齐 continuation_PAL_CR3BP + FAMILY_L1Halo_North）")
-            logger.info("  种子: L%d %s Halo", libration_point, "北" if halo_class == 0 else "南")
-            logger.info("  z_amplitude(参数): %.4f", seed_z_amplitude)
-            logger.info("  每支新轨道数 N = %d", n_orbits)
-            logger.info("  正向 |DeltaS| = %s, 负向 |DeltaS| = %s", step_size, step_size_negative)
-            logger.info(
-                "  dc_scheme = %s, DirectionalIncrement = %s",
-                dc_scheme,
-                directional_increment,
-            )
-            logger.info("=" * 30)
-
-        orbit_family = OrbitFamily([seed_orbit])
-
-        def _tag_halo_family(orb: Orbit) -> None:
-            orb.family_type = "halo"
-            orb.parameters["libration_point"] = libration_point
-            orb.parameters["halo_class"] = halo_class
-            z0 = float(orb.states[0, 2])
-            orb.parameters["amplitude_z"] = abs(z0)
-
-        branches: list[tuple[str, float, int, int]] = []
-        if direction in ("positive", "both"):
-            # 北族 z0>0：增大振幅 = 增大 z0 → td=+1
-            # 南族 z0<0：增大振幅 = 减小 z0 → td=-1
-            td_pos = -1 if halo_class == 1 else 1
-            branches.append(("positive", step_size, 1, td_pos))
-        if direction in ("negative", "both"):
-            branches.append(("negative", step_size_negative, 0, -1))
-
-        for br_name, ds_mag, tv, td in branches:
-            if verbose:
-                logger.info("--- Halo 延拓支: %s (|DeltaS|=%s) ---", br_name, ds_mag)
-
-            sub = self.pseudo_arclength_continuation(
-                seed_orbit,
-                n_orbits=n_orbits,
-                step_size=ds_mag,
-                direction="positive" if br_name == "positive" else "negative",
-                verbose=verbose,
-                TolPAL=TolPAL,
-                TolDiffCorr=TolDiffCorr,
-                IterMax=IterMax,
-                dc_scheme=dc_scheme,
-                libration_point=libration_point,
-                directional_increment=directional_increment,
-                target_vector=tv,
-                target_direction=td,
-                progress_callback=progress_callback,
-            )
-            for o in sub.orbits[1:]:
-                _tag_halo_family(o)
-                orbit_family.add_orbit(o)
-
-        if verbose:
-            logger.info("延拓完成：共 %d 条轨道", len(orbit_family))
-            z_values = [o.parameters.get("amplitude_z", 0) for o in orbit_family]
-            if z_values:
-                logger.info("  z_amplitude 范围: [%.4f, %.4f]", min(z_values), max(z_values))
-
-        return orbit_family
-
-    def __str__(self):
-        return (
-            f"Continuation(param={self.continuation_parameter}, n_orbits={len(self.family_orbits)})"
-        )
 
     def __repr__(self):
         return (
             f"Continuation(corrector={self.correction}, "
             f"param={self.continuation_parameter}, step={self.step_size})"
         )
+
+
+# Halo 专用方法在 ``halo_family`` 中以 ``(continuation, ...)`` 函数定义。
+# 把它们以方法形式重绑到 ``Continuation`` 类，等价于调用方写
+# ``continuation.halo_xxx(...)``（第一个参数由 Python 自动注入 ``self``）。
+Continuation.generate_halo_seed_orbit = generate_halo_seed_orbit  # type: ignore[attr-defined]
+Continuation.generate_halo_family = generate_halo_family  # type: ignore[attr-defined]
+Continuation.halo_pseudo_arclength_continuation = halo_pseudo_arclength_continuation  # type: ignore[attr-defined]
