@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 ## 交流语言
 
@@ -16,26 +16,6 @@
 - **通俗、亲切，由小讲到大，由近讲到远，引人入胜**：先讲读者已知／当前的事物，再推到陌生／抽象的；忌一上来就宏大叙事或先搬死人、外国人。
 - **与读者完全平等**：靠分析说服，不要装腔作势来吓人；老老实实办事。
 - **动笔前想受众**：这篇东西给谁看？谁受益？怎样让更多人受益？
-
-## 文档语言政策
-
-- 面向人读的文档与注释一律用中文（CONTEXT.md、ADR、issue/PR 正文、README、Sphinx 文档、代码注释与 docstring）。代码标识符与不可避免的外文术语（CR3BP、SPICE、SysML 等）保留原文。
-- `CHANGELOG.md`：保留 Keep a Changelog 的英文小节头（Added / Changed / Fixed / Removed），条目内容用中文。
-- `CODE_OF_CONDUCT.md`、`SECURITY.md` 等 GitHub 标准模板保留英文，不翻译。
-
-## Agent skills
-
-### Issue tracker
-
-Issues live as GitHub issues. Use the `gh` CLI for all operations. Pull requests are not treated as request channels. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Five canonical triage roles mapped 1:1 to GitHub labels (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context repo. One `CONTEXT.md` at the root, ADRs under `docs/adr/`. See `docs/agents/domain.md`.
 
 ## 编码准则
 
