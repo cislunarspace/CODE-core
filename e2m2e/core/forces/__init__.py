@@ -14,11 +14,13 @@ from .point_mass_gravity import PointMassGravity
 from .relativistic_correction import RelativisticCorrection
 from .shadow import ConicalShadowModel, ShadowModel
 from .srp import SolarRadiationPressure
+from .third_body_gravity import ThirdBodyGravity
 from .thrust import BurnApplication, FiniteBurn, ImpulsiveBurn
 
 __all__ = [
     "PhysicalModel",
     "PointMassGravity",
+    "ThirdBodyGravity",
     "ForceModel",
     "ForceEntry",
     "GravityField",
