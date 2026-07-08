@@ -130,4 +130,4 @@ website/node_modules/
 **/__pycache__/
 **/*.pyc
 **/*.pyo
-**/*.pyd
+**/*.pydscripts/*.png
