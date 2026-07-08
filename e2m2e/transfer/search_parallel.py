@@ -53,9 +53,7 @@ def sample_departure_points(
     if n == 1:
         idx = np.array([0], dtype=int)
     else:
-        idx = (
-            (np.arange(n, dtype=float) * (n_pts - 1) / (n - 1)).round().astype(int)
-        )
+        idx = (np.arange(n, dtype=float) * (n_pts - 1) / (n - 1)).round().astype(int)
     return states[idx].copy(), times[idx].copy()
 
 
@@ -98,8 +96,13 @@ def search_single_departure(
     ith = searcher.intersection_threshold
     mdt = searcher.min_distance_threshold
     if (
-        a0 is None or a1 is None or na is None or mtt is None
-        or idt is None or ith is None or mdt is None
+        a0 is None
+        or a1 is None
+        or na is None
+        or mtt is None
+        or idt is None
+        or ith is None
+        or mdt is None
     ):
         raise ValueError(
             "请先设置 alpha_min, alpha_max, n_alpha, max_transfer_time, integration_dt, "
@@ -121,14 +124,22 @@ def search_single_departure(
             try:
                 traj_states, traj_times = searcher._forward_integrate(initial_state, mtt, idt)
             except Exception:
-                results.append({
-                    "success": False, "departure_state": departure_state,
-                    "departure_time": departure_time, "alpha": alpha,
-                    "status": "integration_failed", "dv_departure": dv_departure,
-                    "dv_insertion": None, "min_distance_orbit_idx": None,
-                    "first_intersection_idx": None, "first_intersection_time": None,
-                    "first_min_distance_idx": None, "first_min_distance_time": None,
-                })
+                results.append(
+                    {
+                        "success": False,
+                        "departure_state": departure_state,
+                        "departure_time": departure_time,
+                        "alpha": alpha,
+                        "status": "integration_failed",
+                        "dv_departure": dv_departure,
+                        "dv_insertion": None,
+                        "min_distance_orbit_idx": None,
+                        "first_intersection_idx": None,
+                        "first_intersection_time": None,
+                        "first_min_distance_idx": None,
+                        "first_min_distance_time": None,
+                    }
+                )
                 continue
 
             collision, body, col_idx = searcher._check_collision(traj_states)
@@ -168,14 +179,20 @@ def search_single_departure(
                 first_md_time = None
 
             result = {
-                "success": True, "departure_state": departure_state,
-                "departure_time": departure_time, "alpha": alpha,
-                "transfer_trajectory": traj_states, "transfer_times": traj_times,
+                "success": True,
+                "departure_state": departure_state,
+                "departure_time": departure_time,
+                "alpha": alpha,
+                "transfer_trajectory": traj_states,
+                "transfer_times": traj_times,
                 "transfer_time": traj_times[-1],
-                "min_distance": min_dist, "min_distance_idx": min_idx,
+                "min_distance": min_dist,
+                "min_distance_idx": min_idx,
                 "min_distance_orbit_idx": int(orbit_idx),
-                "dv_departure": dv_departure, "dv_insertion": dv_insertion,
-                "intersection_found": intersection, "intersection_point": int_point,
+                "dv_departure": dv_departure,
+                "dv_insertion": dv_insertion,
+                "intersection_found": intersection,
+                "intersection_point": int_point,
                 "intersection_idx": int_idx,
                 "first_intersection_idx": first_int_idx,
                 "first_intersection_time": first_int_time,
@@ -184,7 +201,8 @@ def search_single_departure(
                 "local_minimum_found": local_min,
                 "local_minimum_distance": local_min_dist,
                 "local_minimum_idx": local_min_idx,
-                "collision_found": collision, "collision_body": body,
+                "collision_found": collision,
+                "collision_body": body,
                 "collision_idx": col_idx,
             }
             if collision:
@@ -225,17 +243,34 @@ def dispatch_grid_search(
         raise ValueError("parallel_backend 须为 'processes' 或 'threads'")
     if n_workers == 1:
         return grid_search_sequential(
-            searcher, departure_states, departure_times,
-            arrival_orbit, dep_name, arr_name, verbose,
+            searcher,
+            departure_states,
+            departure_times,
+            arrival_orbit,
+            dep_name,
+            arr_name,
+            verbose,
         )
     if pb == "processes":
         return grid_search_parallel_processes(
-            searcher, departure_states, departure_times,
-            arrival_orbit, dep_name, arr_name, verbose, n_workers,
+            searcher,
+            departure_states,
+            departure_times,
+            arrival_orbit,
+            dep_name,
+            arr_name,
+            verbose,
+            n_workers,
         )
     return grid_search_parallel_threads(
-        searcher, departure_states, departure_times,
-        arrival_orbit, dep_name, arr_name, verbose, n_workers,
+        searcher,
+        departure_states,
+        departure_times,
+        arrival_orbit,
+        dep_name,
+        arr_name,
+        verbose,
+        n_workers,
     )
 
 
@@ -244,7 +279,8 @@ def grid_search_sequential(
     departure_states: np.ndarray,
     departure_times: np.ndarray,
     arrival_orbit: Orbit,
-    dep_name: str, arr_name: str,
+    dep_name: str,
+    arr_name: str,
     verbose: bool,
 ) -> list[dict[str, Any]]:
     """串行网格搜索。"""
@@ -289,13 +325,20 @@ def _process_pack_base(searcher):
     dyn = searcher.dynamics
     return (
         searcher.mu,
-        float(searcher.alpha_min), float(searcher.alpha_max),
-        int(searcher.n_alpha), int(searcher.n_departure),
+        float(searcher.alpha_min),
+        float(searcher.alpha_max),
+        int(searcher.n_alpha),
+        int(searcher.n_departure),
         float(searcher.max_transfer_time),
-        float(searcher.intersection_threshold), float(searcher.min_distance_threshold),
-        float(searcher.collision_earth_radius), float(searcher.collision_moon_radius),
+        float(searcher.intersection_threshold),
+        float(searcher.min_distance_threshold),
+        float(searcher.collision_earth_radius),
+        float(searcher.collision_moon_radius),
         float(searcher.integration_dt),
-        str(dyn.integrator), float(dyn.rtol), float(dyn.atol), float(dyn.max_step),
+        str(dyn.integrator),
+        float(dyn.rtol),
+        float(dyn.atol),
+        float(dyn.max_step),
     )
 
 
@@ -304,7 +347,8 @@ def grid_search_parallel_processes(
     departure_states: np.ndarray,
     departure_times: np.ndarray,
     arrival_orbit: Orbit,
-    dep_name: str, arr_name: str,
+    dep_name: str,
+    arr_name: str,
     verbose: bool,
     n_workers: int,
 ) -> list[dict[str, Any]]:
@@ -330,8 +374,7 @@ def grid_search_parallel_processes(
 
     if verbose and total_steps > 0:
         tqdm.write(
-            f"  并行搜索(进程): {total_departures}×{n_alpha}={total_steps} 步"
-            f" | {n_workers} 进程"
+            f"  并行搜索(进程): {total_departures}×{n_alpha}={total_steps} 步 | {n_workers} 进程"
         )
         pbar = open_search_progress_bar(total_steps, "并行网格搜索(进程)")
         # 多进程下 tqdm 无法跨进程；用 Manager().Queue() 中转。
@@ -361,8 +404,10 @@ def grid_search_parallel_processes(
 
     pack_base = _process_pack_base(searcher) + (dep_name, arr_name)
     if (
-        searcher.alpha_min is None or searcher.alpha_max is None
-        or searcher.n_alpha is None or searcher.n_departure is None
+        searcher.alpha_min is None
+        or searcher.alpha_max is None
+        or searcher.n_alpha is None
+        or searcher.n_departure is None
         or searcher.max_transfer_time is None
         or searcher.intersection_threshold is None
         or searcher.min_distance_threshold is None
@@ -383,11 +428,16 @@ def grid_search_parallel_processes(
                 zip(departure_states, departure_times, strict=False)
             ):
                 packed = (
-                    (i,
-                     np.asarray(dep_state, dtype=float),
-                     float(dep_time),
-                     arrival_states, arrival_times_a, arrival_period)
-                    + pack_base + (progress_queue,)
+                    (
+                        i,
+                        np.asarray(dep_state, dtype=float),
+                        float(dep_time),
+                        arrival_states,
+                        arrival_times_a,
+                        arrival_period,
+                    )
+                    + pack_base
+                    + (progress_queue,)
                 )
                 fut = executor.submit(process_departure_worker_packed, packed)
                 futures[fut] = i
@@ -459,7 +509,8 @@ def grid_search_parallel_threads(
     departure_states: np.ndarray,
     departure_times: np.ndarray,
     arrival_orbit: Orbit,
-    dep_name: str, arr_name: str,
+    dep_name: str,
+    arr_name: str,
     verbose: bool,
     n_workers: int,
 ) -> list[dict[str, Any]]:
@@ -502,9 +553,16 @@ def grid_search_parallel_threads(
                 futures = {
                     executor.submit(
                         _run_departure_with_worker_slot,
-                        searcher, slot_queue, n_alpha, i,
-                        dep_state, dep_time, arrival_orbit,
-                        worker_bars, None, None,
+                        searcher,
+                        slot_queue,
+                        n_alpha,
+                        i,
+                        dep_state,
+                        dep_time,
+                        arrival_orbit,
+                        worker_bars,
+                        None,
+                        None,
                     ): i
                     for i, (dep_state, dep_time) in enumerate(
                         zip(departure_states, departure_times, strict=False)
@@ -514,9 +572,16 @@ def grid_search_parallel_threads(
                 futures = {
                     executor.submit(
                         _run_departure_with_worker_slot,
-                        searcher, slot_queue, n_alpha, i,
-                        dep_state, dep_time, arrival_orbit,
-                        None, aggregate_pbar, aggregate_lock,
+                        searcher,
+                        slot_queue,
+                        n_alpha,
+                        i,
+                        dep_state,
+                        dep_time,
+                        arrival_orbit,
+                        None,
+                        aggregate_pbar,
+                        aggregate_lock,
                     ): i
                     for i, (dep_state, dep_time) in enumerate(
                         zip(departure_states, departure_times, strict=False)
@@ -526,7 +591,12 @@ def grid_search_parallel_threads(
                 futures = {
                     executor.submit(
                         searcher._search_single_departure,
-                        dep_state, dep_time, arrival_orbit, False, None, i,
+                        dep_state,
+                        dep_time,
+                        arrival_orbit,
+                        False,
+                        None,
+                        i,
                     ): i
                     for i, (dep_state, dep_time) in enumerate(
                         zip(departure_states, departure_times, strict=False)
@@ -560,15 +630,22 @@ def process_departure_worker(
     arrival_times: np.ndarray,
     arrival_period: float | None,
     mu: float,
-    alpha_min: float, alpha_max: float,
-    n_alpha: int, n_departure: int,
+    alpha_min: float,
+    alpha_max: float,
+    n_alpha: int,
+    n_departure: int,
     max_transfer_time: float,
-    intersection_threshold: float, min_distance_threshold: float,
-    collision_earth_radius: float, collision_moon_radius: float,
+    intersection_threshold: float,
+    min_distance_threshold: float,
+    collision_earth_radius: float,
+    collision_moon_radius: float,
     integration_dt: float,
     integrator: str,
-    rtol: float, atol: float, max_step: float,
-    dep_name: str, arr_name: str,
+    rtol: float,
+    atol: float,
+    max_step: float,
+    dep_name: str,
+    arr_name: str,
     progress_queue: Any | None = None,
 ) -> list[dict[str, Any]]:
     """子进程入口（模块级，便于 Windows spawn 下 pickle）。"""
@@ -587,8 +664,10 @@ def process_departure_worker(
 
     searcher = TransferSearch(dynamics=dynamics)
     searcher.configure_search(
-        alpha_min=alpha_min, alpha_max=alpha_max,
-        n_alpha=n_alpha, n_departure=n_departure,
+        alpha_min=alpha_min,
+        alpha_max=alpha_max,
+        n_alpha=n_alpha,
+        n_departure=n_departure,
         max_transfer_time=max_transfer_time,
         intersection_threshold=intersection_threshold,
         min_distance_threshold=min_distance_threshold,

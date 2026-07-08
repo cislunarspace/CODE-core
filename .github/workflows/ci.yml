@@ -47,7 +47,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: astral-sh/setup-uv@v7
-      - run: uv sync --group dev
+      - run: uv sync --group dev --extra normal-form
       - run: cargo test --package e2m2e-integrators
       - run: uv run maturin develop
       - shell: bash

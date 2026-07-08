@@ -16,6 +16,7 @@ e2m2e 围绕“建模—生成—转移—检查”组织工作流。你可以�
 核心能力覆盖：
 - **建模**：CR3BP 系统、星历系统、力模型组合、坐标系与积分器族
 - **生成**：周期轨道族、微分修正、多重打靶、延拓、稳定性分析
+- **正规化**：Hamiltonian 正规化流水线，把平动点附近轨道化简为少数表征参数
 - **转移**：网格搜索 + NLP 优化的转移轨道设计
 - **检查**：2D/3D 轨道绘图、Jacobi 常数图、稳定性分析图
 
@@ -37,6 +38,10 @@ e2m2e 围绕“建模—生成—转移—检查”组织工作流。你可以�
 
 **转移设计**
 - 转移轨道搜索与优化（网格搜索 + NLP），如 DRO-RO
+
+**Hamiltonian 正规化**
+- 一键式流水线 `NormalFormPipeline`：动力学替代 → quasi-Floquet 变换 → 中心流形化简 → 表征参数 `(q1, p1, I2, θ2, I3, θ3)`
+- 把 CR3BP 平动点附近的复杂非线性动力学化简为少数几乎不变的参数，用于轨道识别与高保真外推。可选依赖 `pip install e2m2e[normal-form]`，示例见 `examples/normal_form_example.py`
 
 **可视化**
 - 2D/3D 轨道绘图、Jacobi 常数图、稳定性分析图
@@ -214,7 +219,7 @@ e2m2e/
 │   ├── ephemeris_system.py  # EphemerisSystem - 星历系统
 │   ├── ephemeris_dynamics.py # EphemerisDynamics - N 体动力学
 │   └── spice.py          # SPICE 内核管理
-├── algorithms/           # 微分修正、延拓、打靶、稳定性分析
+├── algorithms/           # 微分修正、延拓、打靶、稳定性分析、Hamiltonian 正规化
 ├── transfer/             # 转移轨道搜索与优化
 ├── mbse/                 # 基于模型的系统工程
 └── visualization/        # 2D/3D 绘图
@@ -260,7 +265,7 @@ uv run ruff format .         # 格式化
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {4.2.1},
+  version = {5.1.0},
   year = {2026},
 }
 ```

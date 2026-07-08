@@ -3,6 +3,7 @@
 提供 :class:`NLPOptimizationVariables` 数据结构与后端无关的辅助类型，
 作为 SciPy / COPT 后端之间共享的"问题描述"层。
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

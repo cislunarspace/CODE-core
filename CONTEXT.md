@@ -78,6 +78,32 @@ _Avoid_: 轨道族本身、批量运行
 **稳定性分析（Stability Analysis）** — 计算单周期轨道单值矩阵的特征值谱，以分类轨道稳定性。属于外部算法，结果不写入 `Orbit`。
 _Avoid_: 特征值计算、稳定性判断
 
+### Hamiltonian 正规化
+
+平动点附近的轨道作周期或拟周期运动，但运动方程里的非线性项会让一条本该重复的轨道逐渐漂移、失稳。**Hamiltonian 正规化（Normal Form）** 的做法是：通过一连串坐标变换，把这些非线性耦合项逐层消去，直到轨道的动力学可以用少数几个几乎不变的参数来描述。它属于对已有轨道的分析方法，不生成新轨道。
+
+e2m2e 把这件事做成一条流水线 `NormalFormPipeline`：输入一条 rho 坐标初值，依次经过动力学替代、quasi-Floquet 变换、中心流形化简，最终得到一组表征参数。上下文（平动点、历元、归一化单位、频率、特征指数）集中在 `NormalFormContext`，结果聚合在 `NormalFormResult`。
+
+> 命名注：e2m2e 代码 docstring 与早期文档也称这套方法为"法型化"（Normal Form 的另一译法），两者同义；CONTEXT.md 统一用"Hamiltonian 正规化"。
+
+**rho 坐标系（平动点相对坐标系）** — 以某个平动点为原点的相对坐标系，状态为 6 维无量纲数组 `[ρ, ρ̇]`。正规化的所有后续步骤都在 rho 系里进行。它与"坐标系与单位"节的会合旋转系同源，只是原点平移到了平动点。
+_Avoid_: 平动点坐标系（含混）、惯性系状态
+
+**动力学替代轨道（dynamical substitute orbit）** — 严格的周期轨道只存在于理想 CR3BP；一旦加入太阳引力等摄动（星历模型），平动点附近不再有精确的周期解。动力学替代轨道是受摄系统里"最接近周期"的那条轨线，由多重打靶在一个时间窗口里修正到首尾连续闭合。它是流水线的第一站，由 `DynamicalSubstituteCorrector` 产出，挂在 `DynamicalSubstituteResult.substitute_orbit`。（该结果里的 `Kamiltonian` 字段是 qiao 的历史遗留命名，指变换后的 Hamiltonian，并非新概念。）
+_Avoid_: 周期轨道（受摄系统里不再精确）、参考轨道
+
+**生成函数 W（generating function W）** — 动力学替代步同时算出的、连接 rho 坐标与下一层（quasi-Floquet）坐标的近恒等变换的母函数，挂在 `DynamicalSubstituteResult.W_poly`。
+_Avoid_: 把 W 当作轨道本身
+
+**quasi-Floquet 变换矩阵 B(t)（quasi-Floquet transformation）** — 平衡点附近的线性化是常系数的，可以直接做 Floquet 分解；但替代轨道本身随时间运动，邻域的线性化是时变的。quasi-Floquet 变换用一个时变、保辛的矩阵 B(t)，把这条时变线性化系统化成常系数的实标准形（一个双曲方向加两个中心振荡方向），辛约束 `BᵀJB = J` 保证变换不破坏系统的哈密顿结构。由 `QuasiFloquetReducer` 求解，结果在 `QuasiFloquetResult`（`B_samples`、实标准形 `D`）。
+_Avoid_: 普通 Floquet 变换（那是常系数情形）、状态转移矩阵
+
+**中心流形（center manifold）** — 平动点附近有一个双曲（不稳定）方向和两个中心（振荡）方向。双曲方向让扰动指数增长，是轨道失稳的根源；中心方向上的运动有界。消去双曲方向与中心方向的耦合之后、只剩中心运动的不变流形就是中心流形——其上轨道不沿双曲方向逃逸，适合用作用量-角变量描述。`CenterManifoldReducer` 用高阶 Lie 变换做这步消去，各阶生成函数系数在 `CenterManifoldResult.W_series`。
+_Avoid_: 把中心流形等同于整条轨道、稳定流形/不稳定流形（那是双曲方向的伴生流形）
+
+**表征参数（representation parameters / param）** — 正规化的终点产物：一组作用量-角变量形式的 6 维坐标 `(q1, p1, I2, θ2, I3, θ3)`。理想情况下它们是运动积分（不随时间变化），于是可以用几个常数描述一条本需六个状态量随时间演化的轨道。rho 坐标与表征参数互为正逆变换，变换链为 `rho → EM → DS → QF → CM → param`，由 `LibrationCatalogTransformer` 的 `rho_to_param` / `param_to_rho` 提供。
+_Avoid_: 把表征参数当作状态向量（它是化简后的约化坐标）、轨道初值
+
 ### 动力学模型
 
 **动力学系统（System）** — 描述天体几何、引力与运动学模型，是后续计算的上下文。一个系统要回答四件事：

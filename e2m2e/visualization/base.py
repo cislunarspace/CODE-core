@@ -121,9 +121,7 @@ class OrbitVisualizer:
 
         return icons.make_offset_image(image, size), True
 
-    def _plot_body_marker_3d(
-        self, ax: Any, x: float, color: str, size: int, label: str
-    ) -> None:
+    def _plot_body_marker_3d(self, ax: Any, x: float, color: str, size: int, label: str) -> None:
         """在 3D axes 上画一个天体的圆形 marker（图标加载失败时的回退）。"""
         ax.plot(
             [x],
@@ -418,9 +416,7 @@ class OrbitVisualizer:
             )
 
             if primary_ok and secondary_ok:
-                icons.add_3d_billboard_icon(
-                    ax, primary_icon, (-self.mu, 0.0, 0.0), primary_name
-                )
+                icons.add_3d_billboard_icon(ax, primary_icon, (-self.mu, 0.0, 0.0), primary_name)
                 icons.add_3d_billboard_icon(
                     ax, secondary_icon, (1 - self.mu, 0.0, 0.0), secondary_name
                 )

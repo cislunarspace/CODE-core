@@ -5,6 +5,7 @@
 ``DROTRONLPOptimizer.optimize`` 调用。SLSQP 是 DRO→RO 转移优化的默认求解器，
 无需额外依赖，仅依赖 ``scipy>=1.10``。
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -83,9 +84,7 @@ def solve_with_scipy(
         print("\n开始NLP优化:")
         print(f"  初始猜测: α={alpha0:.4f}, T={T0:.4f}, t_ins={t_ins0:.4f}")
         print(f"  α范围: [{optimizer.alpha_range[0]}, {optimizer.alpha_range[1]}]")
-        print(
-            f"  T范围: [{optimizer.transfer_time_range[0]}, {optimizer.transfer_time_range[1]}]"
-        )
+        print(f"  T范围: [{optimizer.transfer_time_range[0]}, {optimizer.transfer_time_range[1]}]")
         print(f"  t_ins范围: [{optimizer.t_ins_range[0]}, {optimizer.t_ins_range[1]}]")
 
     # 6. 构造约束
@@ -122,9 +121,7 @@ def solve_with_scipy(
         if optimizer._progress_callback is not None:
             alpha_k, T_k, tins_k = float(xk[0]), float(xk[1]), float(xk[2])
             obj_k = float(optimizer.objective_function(xk))
-            optimizer._progress_callback(
-                iteration_counter[0], obj_k, alpha_k, T_k, tins_k
-            )
+            optimizer._progress_callback(iteration_counter[0], obj_k, alpha_k, T_k, tins_k)
 
     # 8. 求解
     try:

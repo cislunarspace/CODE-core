@@ -38,8 +38,12 @@ def open_search_progress_bar(total: int, desc: str) -> Any | None:
     if total <= 0:
         return None
     return tqdm(
-        total=total, desc=desc, unit="it",
-        file=sys.stderr, dynamic_ncols=True, mininterval=0.2,
+        total=total,
+        desc=desc,
+        unit="it",
+        file=sys.stderr,
+        dynamic_ncols=True,
+        mininterval=0.2,
     )
 
 
@@ -65,8 +69,14 @@ def reset_tqdm_bar(bar: Any, total: int) -> None:
 def open_parallel_worker_progress_bars(n_workers: int, n_alpha: int) -> list[Any]:
     return [
         tqdm(
-            total=n_alpha, position=i, desc=f"W{i}", leave=True, unit="α",
-            file=sys.stderr, dynamic_ncols=True, mininterval=0.1,
+            total=n_alpha,
+            position=i,
+            desc=f"W{i}",
+            leave=True,
+            unit="α",
+            file=sys.stderr,
+            dynamic_ncols=True,
+            mininterval=0.1,
         )
         for i in range(n_workers)
     ]

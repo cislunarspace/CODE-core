@@ -71,11 +71,13 @@ def generate_halo_seed_orbit(
 
     if halo_class == 0:
         continuation.correction.setup_halo_orbit_fixed_z0(
-            z0=amplitude_z, libration_point=libration_point,
+            z0=amplitude_z,
+            libration_point=libration_point,
         )
     else:
         continuation.correction.setup_halo_orbit_fixed_z0(
-            z0=-amplitude_z, libration_point=libration_point,
+            z0=-amplitude_z,
+            libration_point=libration_point,
         )
 
     initial_orbit = Orbit(
@@ -93,7 +95,8 @@ def generate_halo_seed_orbit(
         logger.info("  预估周期: %.4f TU", initial_orbit.period)
 
     orbit = continuation.correction.iterate_correction(
-        initial_guess=initial_orbit, verbose=verbose,
+        initial_guess=initial_orbit,
+        verbose=verbose,
     )
 
     if orbit is not None:
@@ -145,7 +148,10 @@ def generate_halo_family(
         directions = dirs
         logger.info(
             "开始生成Halo轨道族: z范围=[%.4f, %.4f], 方向=%s, 最大数量=%d",
-            z_min, z_max, "/".join(directions), n_orbits,
+            z_min,
+            z_max,
+            "/".join(directions),
+            n_orbits,
         )
     else:
         directions = ["positive", "negative"] if direction == "both" else [direction]
@@ -153,7 +159,9 @@ def generate_halo_family(
 
     logger.info(
         "  种子轨道: L%d %s Halo, z0=%.6f",
-        libration_point, "北" if halo_class == 0 else "南", seed_z,
+        libration_point,
+        "北" if halo_class == 0 else "南",
+        seed_z,
     )
 
     min_step = 1e-4
@@ -197,7 +205,8 @@ def generate_halo_family(
                     break
 
             continuation.correction.setup_halo_orbit_fixed_z0(
-                z0=target_z, libration_point=libration_point,
+                z0=target_z,
+                libration_point=libration_point,
             )
             continuation.correction.max_iterations = 150
             continuation.correction.tolerance = 1e-6
@@ -231,7 +240,10 @@ def generate_halo_family(
                 if verbose and (i + 1) % 5 == 0:
                     logger.info(
                         "  第%d条: z=%.5f, x=%.6f, T=%.4f",
-                        i + 1, target_z, orbit.states[0, 0], orbit.period,
+                        i + 1,
+                        target_z,
+                        orbit.states[0, 0],
+                        orbit.period,
                     )
             else:
                 current_step = max(current_step * shrink, min_step)
@@ -241,7 +253,9 @@ def generate_halo_family(
                     break
                 if verbose:
                     logger.info(
-                        "  第%d步修正失败, 缩小步长至%.6f后重试", i + 1, current_step,
+                        "  第%d步修正失败, 缩小步长至%.6f后重试",
+                        i + 1,
+                        current_step,
                     )
                 continue
 
@@ -284,10 +298,14 @@ def halo_pseudo_arclength_continuation(
         logger.info("  z_amplitude(参数): %.4f", seed_z_amplitude)
         logger.info("  每支新轨道数 N = %d", n_orbits)
         logger.info(
-            "  正向 |DeltaS| = %s, 负向 |DeltaS| = %s", step_size, step_size_negative,
+            "  正向 |DeltaS| = %s, 负向 |DeltaS| = %s",
+            step_size,
+            step_size_negative,
         )
         logger.info(
-            "  dc_scheme = %s, DirectionalIncrement = %s", dc_scheme, directional_increment,
+            "  dc_scheme = %s, DirectionalIncrement = %s",
+            dc_scheme,
+            directional_increment,
         )
         logger.info("=" * 30)
 

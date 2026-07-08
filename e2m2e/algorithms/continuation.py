@@ -384,19 +384,13 @@ class Continuation:
                             orbit.period,
                         )
                     else:
-                        logger.info(
-                            "  %s延拓进度：已完成 %d 条轨道", direction_label, i + 1
-                        )
+                        logger.info("  %s延拓进度：已完成 %d 条轨道", direction_label, i + 1)
 
                 if self.step_size_adaptation:
                     if orbit.correction_iterations < 3:
-                        step_size = min(
-                            step_size * self.step_growth_factor, self.max_step_size
-                        )
+                        step_size = min(step_size * self.step_growth_factor, self.max_step_size)
                     elif orbit.correction_iterations > 8:
-                        step_size = max(
-                            step_size * self.step_reduction_factor, self.min_step_size
-                        )
+                        step_size = max(step_size * self.step_reduction_factor, self.min_step_size)
             else:
                 self.continuation_stats["failed_steps"] += 1
 
@@ -793,8 +787,6 @@ class Continuation:
     # Halo 专用编排（generate_halo_seed_orbit / generate_halo_family /
     # halo_pseudo_arclength_continuation）已迁出到 ``halo_family`` 模块；
     # 本文件末尾以方法重绑定的形式对外保留同名 API。
-
-
 
     def __repr__(self):
         return (

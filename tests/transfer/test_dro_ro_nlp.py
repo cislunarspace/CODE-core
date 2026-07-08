@@ -211,9 +211,7 @@ class TestTerminalConditionInterface:
             arrival_orbit=dummy_orbit,
             departure_state=departure_state,
         )
-        np.testing.assert_array_equal(
-            opt_from.departure_state, opt_legacy.departure_state
-        )
+        np.testing.assert_array_equal(opt_from.departure_state, opt_legacy.departure_state)
         assert isinstance(opt_from.departure_terminal, OrbitTerminal)
         assert isinstance(opt_from.arrival_terminal, OrbitTerminal)
 

@@ -165,8 +165,10 @@ class TransferSearch:
             self._config = config
 
         for name, value in (
-            ("alpha_min", alpha_min), ("alpha_max", alpha_max),
-            ("n_alpha", n_alpha), ("n_departure", n_departure),
+            ("alpha_min", alpha_min),
+            ("alpha_max", alpha_max),
+            ("n_alpha", n_alpha),
+            ("n_departure", n_departure),
             ("max_transfer_time", max_transfer_time),
             ("intersection_threshold", intersection_threshold),
             ("min_distance_threshold", min_distance_threshold),
@@ -191,7 +193,12 @@ class TransferSearch:
             print(f"{'=' * 60}\n")
 
         results = search_parallel.dispatch_grid_search(
-            self, dep_orbit, arr_orbit, verbose, n_workers, parallel_backend,
+            self,
+            dep_orbit,
+            arr_orbit,
+            verbose,
+            n_workers,
+            parallel_backend,
         )
         self._search_results = results
 
@@ -224,9 +231,7 @@ class TransferSearch:
             departure_state=initial_guess["departure_state"],
             propulsion=self._propulsion,
         )
-        transfer_time = (
-            self.transfer_time_range[1] / 2 if self.transfer_time_range else 15.0
-        )
+        transfer_time = self.transfer_time_range[1] / 2 if self.transfer_time_range else 15.0
         nlp_vars = NLPOptimizationVariables(
             alpha=initial_guess.get("alpha", 1.0),
             transfer_time=initial_guess.get("transfer_time") or transfer_time,
@@ -272,7 +277,9 @@ class TransferSearch:
 
     def _is_feasible(self, result: dict[str, Any]) -> bool:
         return search_geometry.is_feasible_result(
-            result, self.min_distance_threshold, DEFAULT_MIN_DISTANCE_THRESHOLD_DU,
+            result,
+            self.min_distance_threshold,
+            DEFAULT_MIN_DISTANCE_THRESHOLD_DU,
         )
 
     def _compute_distance_series(self, trajectory_states, arrival_orbit):
@@ -292,8 +299,10 @@ class TransferSearch:
 
     def _check_collision(self, trajectory_states):
         return search_geometry.check_collision(
-            trajectory_states, self.mu,
-            self.collision_earth_radius, self.collision_moon_radius,
+            trajectory_states,
+            self.mu,
+            self.collision_earth_radius,
+            self.collision_moon_radius,
         )
 
     def _compute_departure_velocity(self, orbit_state, alpha):

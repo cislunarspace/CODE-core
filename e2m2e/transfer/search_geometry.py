@@ -75,10 +75,7 @@ def detect_local_minimum(
     min_distances = np.min(distances, axis=1)
     local_mins = []
     for i in range(1, len(min_distances) - 1):
-        if (
-            min_distances[i + 1] > min_distances[i]
-            and min_distances[i - 1] > min_distances[i]
-        ):
+        if min_distances[i + 1] > min_distances[i] and min_distances[i - 1] > min_distances[i]:
             local_mins.append((i, min_distances[i]))
     if local_mins:
         best = min(local_mins, key=lambda x: x[1])

@@ -93,32 +93,22 @@ class DROTRONLPOptimizer:
 
         # ``departure_state`` 在两种接口下都允许（新接口下作覆盖），
         # 因此混用判定只看 ``departure_orbit``/``arrival_orbit``。
-        has_terminals = (
-            departure_terminal is not None or arrival_terminal is not None
-        )
+        has_terminals = departure_terminal is not None or arrival_terminal is not None
         has_legacy = departure_orbit is not None or arrival_orbit is not None
         if has_terminals and has_legacy:
-            raise ValueError(
-                "DROTRONLPOptimizer: cannot mix new and legacy interfaces"
-            )
+            raise ValueError("DROTRONLPOptimizer: cannot mix new and legacy interfaces")
         if has_terminals:
             if departure_terminal is None or arrival_terminal is None:
-                raise ValueError(
-                    "DROTRONLPOptimizer: both terminals required"
-                )
+                raise ValueError("DROTRONLPOptimizer: both terminals required")
             self.departure_terminal: TerminalCondition = departure_terminal
             self.arrival_terminal: TerminalCondition = arrival_terminal
         elif has_legacy:
             if departure_orbit is None or arrival_orbit is None:
-                raise ValueError(
-                    "DROTRONLPOptimizer: legacy interface requires both orbits"
-                )
+                raise ValueError("DROTRONLPOptimizer: legacy interface requires both orbits")
             self.departure_terminal = OrbitTerminal(departure_orbit)
             self.arrival_terminal = OrbitTerminal(arrival_orbit)
         else:
-            raise ValueError(
-                "DROTRONLPOptimizer: must provide terminal pair or orbit pair"
-            )
+            raise ValueError("DROTRONLPOptimizer: must provide terminal pair or orbit pair")
 
         # 实际出发点状态：显式覆盖 > 终端默认首点
         self._departure_state = (
@@ -143,17 +133,11 @@ class DROTRONLPOptimizer:
         )
 
         self.velocity_angle_tol = (
-            config.nlp_velocity_angle_tol
-            if config is not None
-            else self.DEFAULT_VELOCITY_ANGLE_TOL
+            config.nlp_velocity_angle_tol if config is not None else self.DEFAULT_VELOCITY_ANGLE_TOL
         )
 
-        self.earth_radius = (
-            config.nlp_earth_radius if config is not None else self.EARTH_RADIUS_ND
-        )
-        self.moon_radius = (
-            config.nlp_moon_radius if config is not None else self.MOON_RADIUS_ND
-        )
+        self.earth_radius = config.nlp_earth_radius if config is not None else self.EARTH_RADIUS_ND
+        self.moon_radius = config.nlp_moon_radius if config is not None else self.MOON_RADIUS_ND
 
         self._use_relaxed_velocity = (
             config.nlp_use_relaxed_velocity if config is not None else False
@@ -246,11 +230,7 @@ class DROTRONLPOptimizer:
             包含 ``objective``、``pos_violation``、``cos_angle`` 等键的字典。
         """
         key = self._y_key(y)
-        if (
-            self._cache_enabled
-            and self._eval_cache_key == key
-            and self._eval_cache is not None
-        ):
+        if self._cache_enabled and self._eval_cache_key == key and self._eval_cache is not None:
             return self._eval_cache
 
         alpha, transfer_time, t_ins = y
@@ -269,9 +249,7 @@ class DROTRONLPOptimizer:
 
         # 到达状态走 TerminalCondition 接口
         if not empty:
-            ins_pos, ins_vel = self.arrival_terminal.get_arrival_state(
-                float(t_ins), self.dynamics
-            )
+            ins_pos, ins_vel = self.arrival_terminal.get_arrival_state(float(t_ins), self.dynamics)
             insertion_state = np.concatenate([ins_pos, ins_vel])
         else:
             insertion_state = np.zeros(6)
@@ -523,9 +501,7 @@ class DROTRONLPOptimizer:
         )
 
         # 到达状态走 TerminalCondition 接口
-        ins_pos, ins_vel = self.arrival_terminal.get_arrival_state(
-            float(t_ins), self.dynamics
-        )
+        ins_pos, ins_vel = self.arrival_terminal.get_arrival_state(float(t_ins), self.dynamics)
         insertion_state = np.concatenate([ins_pos, ins_vel])
         final_state = states[-1] if len(states) > 0 else None
 
@@ -546,15 +522,11 @@ class DROTRONLPOptimizer:
                     - self._compute_cos_angle(variables.to_array()),
                 )
             else:
-                violation["velocity"] = abs(
-                    self.constraint_velocity_parallel(variables.to_array())
-                )
+                violation["velocity"] = abs(self.constraint_velocity_parallel(variables.to_array()))
 
         max_violation = max(violation.values()) if violation else 0.0
 
-        transfer_type = self._classify_transfer(
-            transfer_time, times, states, insertion_state
-        )
+        transfer_type = self._classify_transfer(transfer_time, times, states, insertion_state)
 
         return TransferOptimizationResult(
             success=success,

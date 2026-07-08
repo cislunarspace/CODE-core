@@ -72,6 +72,32 @@ CR3BP 相关术语
    动力学方程
       描述运动学参数与力关系的方程，一般为微分式（如 dv/dt = F/m）。完整的运动方程组 = 运动方程 + 动力学方程；``Dynamics`` 积分二者合成的状态导数 ODE。
 
+Hamiltonian 正规化
+------------------
+
+.. glossary::
+
+   Hamiltonian 正规化
+      通过逐层坐标变换消去 CR3BP 平动点附近运动方程中的非线性耦合项，把轨道动力学化简为少数几个几乎不变的参数。e2m2e 用 ``NormalFormPipeline`` 一行调用完成，上下文在 ``NormalFormContext``、结果在 ``NormalFormResult``。代码 docstring 也称"法型化"，同义。
+
+   rho 坐标系
+      以平动点为原点的 6 维无量纲相对坐标系，状态 ``[ρ, ρ̇]``；正规化各步在此系内进行。
+
+   动力学替代轨道
+      受摄（星历）系统里"最接近周期"的轨线，由多重打靶在时间窗口内修正到首尾闭合。``DynamicalSubstituteCorrector`` 产出，见 ``DynamicalSubstituteResult.substitute_orbit``。
+
+   生成函数 W
+      连接 rho 坐标与 quasi-Floquet 坐标的近恒等变换的母函数，见 ``DynamicalSubstituteResult.W_poly``。
+
+   quasi-Floquet 变换矩阵
+      时变、保辛的矩阵 ``B(t)``，把替代轨道邻域的时变线性化化为常系数实标准形（一双曲方向 + 两中心方向），满足 ``BᵀJB = J``。``QuasiFloquetReducer`` 求解，见 ``QuasiFloquetResult``。
+
+   中心流形
+      消去双曲-中心耦合后、只剩中心运动的不变流形，其上轨道不沿双曲方向逃逸。``CenterManifoldReducer`` 经高阶 Lie 变换消耦，生成函数在 ``CenterManifoldResult.W_series``。
+
+   表征参数
+      正规化终点产物，作用量-角变量形式的 6 维约化坐标 ``(q1, p1, I2, θ2, I3, θ3)``，理想下为运动积分。与 rho 坐标互为正逆变换（``rho ↔ EM ↔ DS ↔ QF ↔ CM ↔ param``），由 ``LibrationCatalogTransformer`` 提供。
+
 MBSE
 ----
 

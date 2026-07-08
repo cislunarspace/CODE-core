@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [5.1.0] - 2026-07-08
+
+### Added
+- Hamiltonian 正规化流水线 `e2m2e.algorithms.normal_form`（#168–#176）：把 CR3BP 平动点附近的非线性动力学逐层化简为少数表征参数
+  - `NormalFormPipeline` 一键式流水线：动力学替代 → quasi-Floquet 变换 → 中心流形化简 → rho↔param 坐标变换
+  - `NormalFormContext`/`NormalFormResult`、`DynamicalSubstituteCorrector`、`QuasiFloquetReducer`、`CenterManifoldReducer`、`LibrationCatalogTransformer`
+  - NAFF 频率分析（不可用时降级 FFT）、块三对角多重打靶、函数式坐标变换链 `coord_trans`
+  - `[normal-form]` 可选依赖（sympy、joblib），惰性导入不阻塞基础包加载
+  - 文档 `docs/algorithms/normal-form.rst`、示例 `examples/normal_form_example.py`
+  - `CONTEXT.md` 与 `docs/reference/glossary.rst` 新增「Hamiltonian 正规化」术语小节
+
+### Fixed
+- 修正 quasi-Floquet Lie 代数法的 dexp 公式误差：原实现假设 `d/dt exp(ξ)=exp(ξ)·ξ̇`（仅 [ξ,ξ̇]=0 成立），改为 commutator-free 4 阶 Lie group RK4
+- 修正中心流形 Step 2（center）的 W 归零 bug：MAD 离群抑制在常系数输入下把 W 缩到 0，且 `reduce()` 取实部丢弃了纯虚 W
+- 修正 rho↔param 坐标变换的插值时间网格缺陷：原用 `dt=0.1` 兜底网格，改为取 `qf_result.tlist` 的真实采样点
+
 ## [5.0.0] - 2026-06-19
 
 ### Added

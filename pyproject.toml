@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "e2m2e"
-version = "5.0.0"
+version = "5.1.0"
 description = "Earth to Moon, Moon to Earth — 地月空间转移轨道设计库"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -42,6 +42,14 @@ dependencies = [
     "spiceypy>=8.1.0",
     "pydantic>=2.0",
     "pyerfa>=2.0.1.5",
+]
+
+[project.optional-dependencies]
+# 法型化流水线（normal-form 切片）所需的符号计算与并行工具，
+# 在化简器内部惰性导入，不阻塞基础 ``e2m2e.algorithms`` 加载。
+normal-form = [
+    "sympy>=1.12",
+    "joblib>=1.3",
 ]
 
 [project.urls]

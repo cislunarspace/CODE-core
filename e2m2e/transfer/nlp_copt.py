@@ -7,6 +7,7 @@
 但 :class:`COPTNLPSolver` 退化为占位实现，:func:`optimize_with_copt`
 应通过 ``fallback_to_scipy`` 回退 SciPy 求解。
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -107,18 +108,14 @@ if NlpCallbackBase is not None:
             for i in range(3):
                 x_pert = x.copy()
                 x_pert[i] += h
-                grad_pos[i] = (
-                    self.optimizer.constraint_position(x_pert) - pos_con
-                ) / h
+                grad_pos[i] = (self.optimizer.constraint_position(x_pert) - pos_con) / h
 
             vel_con = self.optimizer.constraint_velocity_parallel(x)
             grad_vel = np.zeros(3)
             for i in range(3):
                 x_pert = x.copy()
                 x_pert[i] += h
-                grad_vel[i] = (
-                    self.optimizer.constraint_velocity_parallel(x_pert) - vel_con
-                ) / h
+                grad_vel[i] = (self.optimizer.constraint_velocity_parallel(x_pert) - vel_con) / h
 
             outdata[0] = grad_pos[0]
             outdata[1] = grad_pos[1]
@@ -195,9 +192,7 @@ if NlpCallbackBase is not None:
             options: COPT 求解参数（``max_iter``、``threads`` 等）。
         """
 
-        def __init__(
-            self, optimizer: DROTRONLPOptimizer, options: dict[str, Any] | None = None
-        ):
+        def __init__(self, optimizer: DROTRONLPOptimizer, options: dict[str, Any] | None = None):
             self.optimizer = optimizer
             self.options = options or {}
             self.model: Any = None
