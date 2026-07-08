@@ -10,23 +10,51 @@ import numpy as np
 import numpy.typing as npt
 
 from e2m2e.core.coordinate_system import CoordinateSystem
-from e2m2e.core.standard_axes import ITRFApproxAxes
+from e2m2e.core.standard_axes import ITRFSpiceAxes
 from e2m2e.core.standard_origins import CelestialBodyOrigin
 
 from .earth_tide import (
+    _K_EARTH,
+    _K_PLUS_EARTH,
+    load_love_number_file,
     permanent_tide_correction,
     pole_tide,
     solid_tide_step1,
     solid_tide_step2,
 )
 from .exceptions import CoordinateTransformError
-from .gravity_file import extrapolate_coefficients, load_gfc_file
+from .gravity_file import extrapolate_coefficients, load_gravity_file
 from .physical_model import PhysicalModel
 
-_DEFAULT_SPICE_FRAME = "ITRF93"
+# 按中心天体的默认 body-fixed SPICE frame。
+# 地球用 ITRF93(由 earth_*.bpc 定义),月球用 MOON_PA(DE421 principal axes,
+# 由 SPICELunaFrameKernel.tf + SPICELunaCurrentKernel.bpc 定义)。
+_DEFAULT_FRAME_BY_BODY: dict[str, str] = {
+    "EARTH": "ITRF93",
+    "MOON": "MOON_PA",
+}
+# 按中心天体的默认重力场文件名(相对于 e2m2e.core.forces.data)。
+_DEFAULT_FILE_BY_BODY: dict[str, str] = {
+    "EARTH": "egm96_to10.gfc",
+    "MOON": "grgm900c.cof",
+}
+# 按中心天体的默认 Love 数文件名(None 表示用硬编码常量,如地球)。
+_DEFAULT_TIDE_FILE_BY_BODY: dict[str, str | None] = {
+    "EARTH": None,
+    "MOON": "grgm900c.tide",
+}
 # Sun/Moon 平均半长轴(永久潮汐修正用,近似)
 _A_SUN_KM = 1.495978707e8
 _A_MOON_KM = 384400.0
+
+# 每个中心天体做固体潮时的扰动体列表(body 名)。地球受 Sun+Moon 扰动,
+# 月球受 Earth 扰动(GMAT 行为)。
+_PERTURBERS_BY_BODY: dict[str, list[str]] = {
+    "EARTH": ["SUN", "MOON"],
+    "MOON": ["EARTH"],
+}
+# 查扰动体位置时用到的观察者(中心天体)映射,与 _PERTURBERS_BY_BODY 对齐。
+# get_body_position(target, et, frame, observer) 的 observer 即中心天体。
 
 
 class GravityField(PhysicalModel):
@@ -43,7 +71,7 @@ class GravityField(PhysicalModel):
         degree: int = 2,
         order: int | None = None,
         gravity_file: str | Path | None = None,
-        input_frame: str = _DEFAULT_SPICE_FRAME,
+        input_frame: str | None = None,
         tide_mode: str = "none",
         tide_convention: str = "tide_free",
         epoch: float | None = None,
@@ -52,11 +80,13 @@ class GravityField(PhysicalModel):
         """初始化 GravityField。
 
         Args:
-            body: 中心天体名称,如 ``'EARTH'``。
+            body: 中心天体名称,如 ``'EARTH'``、``'MOON'``。
             degree: 最大 degree,默认 2。
             order: 最大 order,默认等于 degree。
-            gravity_file: 自定义 .gfc 文件路径,默认使用包内 EGM96-to10。
-            input_frame: 球谐展开坐标系的 SPICE frame 名,默认 ITRF93。
+            gravity_file: 自定义重力场文件路径（.gfc 或 .cof）；``None`` 时按
+                ``body`` 取包内默认文件（地球 EGM96-to10，月球 GRGM900C）。
+            input_frame: 球谐展开坐标系的 SPICE frame 名。``None`` 时按 ``body``
+                推导：地球 ``ITRF93``、月球 ``MOON_PA``；其它天体需显式提供。
             tide_mode: 潮汐档位，对齐 GMAT ``ETide`` 三档：
                 ``"none"`` （无潮汐）、``"solid"`` （固体潮 Step1+Step2）、
                 ``"solid_and_pole"`` （固体潮 + 极潮）。
@@ -68,7 +98,7 @@ class GravityField(PhysicalModel):
                 （arcsec）。solid_and_pole 档必需；由调用方从 ``gmat_eop`` 注入。
         """
         self._body = body.upper()
-        self._input_frame = input_frame
+        self._input_frame = self._resolve_input_frame(self._body, input_frame)
         self._gravity_file_arg = gravity_file
         self._degree = int(degree)
         tide_mode_normalized = tide_mode.lower()
@@ -96,7 +126,7 @@ class GravityField(PhysicalModel):
         if gravity_file is None:
             self._load_default_file(requested_degree=self._degree)
         else:
-            self._data = load_gfc_file(gravity_file, requested_degree=self._degree)
+            self._data = load_gravity_file(gravity_file, requested_degree=self._degree)
 
         # Trim to requested order
         for n in range(self._degree + 1):
@@ -104,21 +134,39 @@ class GravityField(PhysicalModel):
             self._data.C[n, max_m + 1 :] = 0.0
             self._data.S[n, max_m + 1 :] = 0.0
 
+    @staticmethod
+    def _resolve_input_frame(body: str, input_frame: str | None) -> str:
+        """按 body 推导默认 input_frame,显式传入则覆盖。"""
+        if input_frame is not None:
+            return input_frame
+        if body in _DEFAULT_FRAME_BY_BODY:
+            return _DEFAULT_FRAME_BY_BODY[body]
+        raise ValueError(
+            f"No default body-fixed frame for body={body!r}; pass input_frame explicitly"
+        )
+
     def _load_default_file(self, requested_degree: int) -> None:
-        """加载包内默认 EGM96-to10 .gfc 文件。"""
+        """按 ``body`` 加载包内默认重力场文件(地球 EGM96-to10，月球 GRGM900C)。"""
+        filename = _DEFAULT_FILE_BY_BODY.get(self._body)
+        if filename is None:
+            raise ValueError(
+                f"No default gravity file for body={self._body!r}; "
+                "pass gravity_file explicitly"
+            )
         from importlib import resources
 
-        ref = resources.files("e2m2e.core.forces.data").joinpath("egm96_to10.gfc")
+        ref = resources.files("e2m2e.core.forces.data").joinpath(filename)
+        suffix = Path(filename).suffix
         with ref.open("r", encoding="utf-8") as f:
-            # load_gfc_file expects a path; write to a temporary file
+            # load_gravity_file expects a path; write to a temporary file
             from tempfile import NamedTemporaryFile
 
             content = f.read()
-        with NamedTemporaryFile(mode="w", suffix=".gfc", delete=False) as tmp:
+        with NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as tmp:
             tmp.write(content)
             tmp_path = tmp.name
         try:
-            self._data = load_gfc_file(tmp_path, requested_degree=requested_degree)
+            self._data = load_gravity_file(tmp_path, requested_degree=requested_degree)
         finally:
             Path(tmp_path).unlink()
 
@@ -177,10 +225,17 @@ class GravityField(PhysicalModel):
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """返回 t 时刻的有效 C/S(含 dot 外推 + 潮汐修正)。
 
+        潮汐路径按中心天体分流:
+        - ``EARTH``:扰动体 [Sun, Moon],Love 数取硬编码 ``_K_EARTH``/
+          ``_K_PLUS_EARTH``;Step1 后追加地球专用 Step2/极潮/永久潮。与重构前
+          行为逐字一致(回归验证 atol=1e-12)。
+        - ``MOON``:扰动体 [Earth](地球相对月球的位置),Love 数从
+          ``grgm900c.tide`` 读(k₂=0.024116);只做 Step1,不做 Step2/极潮。
+
         Args:
             t: SPICE et 秒。
             system: 动力学系统;tide_mode 非 none 时需暴露 ``spice`` 属性以查
-                Sun/Moon 位置与 GM。
+                扰动体位置与 GM。
 
         Returns:
             (C_eff, S_eff),形状与 ``self._data.C`` 一致。
@@ -198,43 +253,63 @@ class GravityField(PhysicalModel):
         spice = getattr(system, "spice", None) if system is not None else None
         if spice is None:
             raise CoordinateTransformError(
-                "tide_mode != 'none' requires system.spice for Sun/Moon ephemeris"
+                "tide_mode != 'none' requires system.spice for perturber ephemeris"
             )
 
-        sun_pos = spice.get_body_position("SUN", t, self._input_frame, "EARTH")
-        moon_pos = spice.get_body_position("MOON", t, self._input_frame, "EARTH")
-        mu_sun = spice.get_gm("SUN")
-        mu_moon = spice.get_gm("MOON")
-        mu_earth = self._data.mu
-        r_earth = self._data.radius
-
-        # 固体潮 Step 1(Sun + Moon)
-        dC, dS = solid_tide_step1(sun_pos, mu_sun, mu_earth, r_earth)
-        dC_moon, dS_moon = solid_tide_step1(moon_pos, mu_moon, mu_earth, r_earth)
-        dC = dC + dC_moon
-        dS = dS + dS_moon
-
-        # 固体潮 Step 2(频率相关)
-        dC2, dS2 = solid_tide_step2(t)
-        dC = dC + dC2
-        dS = dS + dS2
-
-        # zero-tide:减去永久潮汐(系数已含永久分量)
-        if self._tide_convention == "zero_tide":
-            dC_perm, dS_perm = permanent_tide_correction(
-                mu_sun, mu_moon, mu_earth, r_earth, _A_SUN_KM, _A_MOON_KM
+        # 查扰动体位置/GM(observer 为中心天体)。位置在中心天体 body-fixed 系下。
+        perturber_names = _PERTURBERS_BY_BODY.get(self._body)
+        if perturber_names is None:
+            raise CoordinateTransformError(
+                f"solid tide not configured for body={self._body!r}"
             )
-            dC = dC - dC_perm
-            dS = dS - dS_perm
+        perturbers = [
+            (
+                spice.get_body_position(name, t, self._input_frame, self._body),
+                spice.get_gm(name),
+            )
+            for name in perturber_names
+        ]
 
-        # 极档:叠加极潮
-        if self._tide_mode == "solid_and_pole":
-            if self._polar_motion_provider is None:
-                raise ValueError("tide_mode='solid_and_pole' requires polar_motion_provider")
-            xp, yp = self._polar_motion_provider(t)
-            dC_pole, dS_pole = pole_tide(t, xp, yp)
-            dC = dC + dC_pole
-            dS = dS + dS_pole
+        mu_central = self._data.mu
+        r_central = self._data.radius
+
+        # 固体潮 Step 1(天体无关:扰动体列表 + 该天体的 Love 数表)
+        k_love, k_plus = self._resolve_love_numbers()
+        dC, dS = solid_tide_step1(
+            perturbers,
+            k_love=k_love,
+            k_plus=k_plus,
+            mu_central=mu_central,
+            r_central=r_central,
+        )
+
+        # 地球专用:Step2(频率相关)+ 极潮 + 永久潮汐修正
+        if self._body == "EARTH":
+            # 固体潮 Step 2(频率相关,Delaunay 幅角)
+            dC2, dS2 = solid_tide_step2(t)
+            dC = dC + dC2
+            dS = dS + dS2
+
+            # zero-tide:减去永久潮汐(系数已含永久分量)
+            if self._tide_convention == "zero_tide":
+                mu_sun = spice.get_gm("SUN")
+                mu_moon = spice.get_gm("MOON")
+                dC_perm, dS_perm = permanent_tide_correction(
+                    mu_sun, mu_moon, mu_central, r_central, _A_SUN_KM, _A_MOON_KM
+                )
+                dC = dC - dC_perm
+                dS = dS - dS_perm
+
+            # 极档:叠加极潮
+            if self._tide_mode == "solid_and_pole":
+                if self._polar_motion_provider is None:
+                    raise ValueError(
+                        "tide_mode='solid_and_pole' requires polar_motion_provider"
+                    )
+                xp, yp = self._polar_motion_provider(t)
+                dC_pole, dS_pole = pole_tide(t, xp, yp)
+                dC = dC + dC_pole
+                dS = dS + dS_pole
 
         # pad ΔC/ΔS(5×5)到 C/S 形状(degree 可能 > 4)
         n = min(5, C.shape[0])
@@ -243,6 +318,38 @@ class GravityField(PhysicalModel):
         dC_padded[:n, :n] = dC[:n, :n]
         dS_padded[:n, :n] = dS[:n, :n]
         return C + dC_padded, S + dS_padded
+
+    def _resolve_love_numbers(
+        self,
+    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
+        """按 ``body`` 解析固体潮 Love 数表 (k_love, k_plus)。
+
+        地球用硬编码常量(``_K_EARTH`` / ``_K_PLUS_EARTH``);月球从包内
+        ``grgm900c.tide`` 读取(仅 k₂=0.024116,无弹性 3 阶位移 → k_plus=None)。
+        """
+        if self._body == "EARTH":
+            return _K_EARTH, _K_PLUS_EARTH
+        tide_file = _DEFAULT_TIDE_FILE_BY_BODY.get(self._body)
+        if tide_file is None:
+            raise CoordinateTransformError(
+                f"no Love number source for body={self._body!r}"
+            )
+        from importlib import resources
+
+        ref = resources.files("e2m2e.core.forces.data").joinpath(tide_file)
+        with ref.open("r", encoding="utf-8") as f:
+            content = f.read()
+        from tempfile import NamedTemporaryFile
+
+        with NamedTemporaryFile(mode="w", suffix=".tide", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        try:
+            k_love = load_love_number_file(tmp_path)
+        finally:
+            Path(tmp_path).unlink()
+        # 月球等无弹性 3 阶位移贡献。
+        return k_love, None
 
     def compute_acceleration(
         self,
@@ -428,12 +535,16 @@ class GravityField(PhysicalModel):
             ) from exc
 
     def _get_input_coordinate_system(self, system: Any) -> CoordinateSystem:
-        """构造输入坐标系（固连系）。"""
+        """构造输入坐标系（固连系）。
+
+        按 ``self._input_frame``（默认按 ``body`` 推导）构造 SPICE-backed 坐标轴:
+        地球 ``ITRF93``、月球 ``MOON_PA``。
+        """
         spice = getattr(system, "spice", None)
         if spice is None:
             raise CoordinateTransformError(
-                "system must expose a 'spice' attribute for ITRF transforms"
+                "system must expose a 'spice' attribute for body-fixed transforms"
             )
-        axes = ITRFApproxAxes()
+        axes = ITRFSpiceAxes(frame=self._input_frame)
         origin = CelestialBodyOrigin(body=self._body, spice=spice)
         return CoordinateSystem(axes=axes, origin=origin)

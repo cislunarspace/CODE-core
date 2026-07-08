@@ -156,9 +156,15 @@ def _propagate_e2m2e(
     spice = SPICEManager()
     ephem_kernel = spice.find_ephemeris_kernel(str(kernel_dir))
     pck_kernel = next((p for p in kernel_dir.glob("*.tpc") if p.is_file()), None)
+    # body-fixed 帧(ITRF93)需要 binary PCK;加载所有 .bpc 内核。
+    bpc_kernels = sorted(p for p in kernel_dir.glob("*.bpc") if p.is_file())
     spice.load_kernel(ephem_kernel)
     if pck_kernel is not None:
         spice.load_kernel(str(pck_kernel))
+    bpc_loaded = []
+    for bpc in bpc_kernels:
+        spice.load_kernel(str(bpc))
+        bpc_loaded.append(str(bpc))
 
     try:
         system = EphemerisSystem(bodies=["EARTH"], spice=spice, origin="EARTH")
@@ -204,6 +210,8 @@ def _propagate_e2m2e(
             "spice": spice,
         }
     finally:
+        for bpc in reversed(bpc_loaded):
+            spice.unload_kernel(bpc)
         spice.unload_kernel(ephem_kernel)
         if pck_kernel is not None:
             spice.unload_kernel(str(pck_kernel))
