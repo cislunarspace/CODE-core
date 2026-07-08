@@ -199,6 +199,15 @@ _Avoid_: 把 `PointMassGravity` 当作任意天体引力的通用工具（它只
 **第三体引力（`ThirdBodyGravity`）** — 参考系原点之外的天体对航天器的引力摄动。一个实例对应一个摄动天体：`ThirdBodyGravity("MOON")`、`ThirdBodyGravity("SUN")`。加速度由直接项与间接项合成：`a = -μᵢ [(r - rᵢ)/|r - rᵢ|³ + rᵢ/|rᵢ|³]`，其中 `rᵢ` 是摄动天体相对 **参考系原点** 的位置（由 `system.get_body_position` 查 SPICE），`r` 是航天器相对原点的位置。间接项 `-μᵢ rᵢ/|rᵢ|³` 扣除摄动天体对原点的引力，以保持坐标原点固定在原点天体而非质心。原点取自 `system.origin`，不作为参数暴露——间接项只在"力原点 = 系统原点"时物理正确。在 `ForceModel` 里把 `PointMassGravity(原点天体)` 与若干个 `ThirdBodyGravity(摄动天体)` 组合，物理上等价于 `EphemerisDynamics` 的解析 N 体公式，应给出同一条轨迹。
 _Avoid_: 第三体力（规范用"第三体引力"，与中心引力/球谐引力同属引力类）、点质量力（与 `PointMassGravity` 名近职异，易混）
 
+**球谐引力场（`GravityField`）** — 把一个天体的引力场展开为完全正规化球谐系数（Cnm/Snm），用 Pines 递推计算非球形引力加速度。它 **天体无关**：地球（EGM96）、月球（GRGM900C）等任意天体共用同一个类，差别只在系数文件、GM、参考半径和 **body-fixed 轴**。一个实例绑定一个中心天体：`GravityField("EARTH", degree=10)`、`GravityField("MOON", degree=50, gravity_file="grgm900c.cof")`。它在天体固连系中展开球谐（地球 ITRF93、月球 MOON_PA），自行完成参考系↔固连系的坐标变换。`body` 参数驱动 body-fixed 轴的切换——这是天体无关的关键：不按 body 选对轴，球谐系数就会在错误的坐标系里展开。GM 和参考半径从引力场文件头读取（与天体无关的解析器同时支持 ICGEM `.gfc` 和 GMAT `.cof` 格式）。
+_Avoid_: 把 `GravityField` 当作地球专用（它天体无关，按 body 切换轴）；把 body-fixed 轴选择当作用户职责（库按 body 自动选择）
+
+**天体固连系（body-fixed frame）** — 固结在天体上、随天体自转的坐标系。球谐引力场在天体固连系中展开，因为球谐系数（Cnm/Snm）定义在天体固连框架下。不同天体的固连系实现不同：地球用 ITRF93（IAU 2000 CIO 方法，需 binary PCK），月球用 MOON_PA（DE421 principal axes 系，需月球 binary PCK + frame kernel）。`GravityField` 按 `body` 自动选择对应的固连系轴，用户不需手动指定。
+_Avoid_: 把天体固连系当作惯性系（它是旋转系）；把不同天体的固连系混用（月球系数必须在 MOON_PA 展开，不能用 ITRF）
+
+**固体潮（solid tide）** — 外部天体引力使中心天体弹性形变，进而改变其引力场系数（ΔC/ΔS）的效应。固体潮修正的 Step1 公式（IERS TN32 eqn.1）**天体无关**——对任意中心天体，传入扰动体列表（位置 + GM）+ Love number 即可累加。地球还有额外的频率相关项（Step2，IERS Table 6.3）、极潮和永久潮汐修正，这些是地球 IERS 规范专用的。月球固体潮用 Love number k₂=0.024116，扰动体是地球。
+_Avoid_: 把固体潮等同于海洋潮汐（e2m2e 只做固体潮）；把地球专用的 Step2/极潮当作天体无关
+
 **力模型组合（`ForceModel`）** — 把多个力模型组合成一次传播所需运动方程的对象。它决定哪些力模型启用，把它们产生的加速度合成总加速度，再写成状态导数形式。为了支持不同任务对力的不同选择，它也负责按名登记、启用/禁用和配置序列化。每个力模型自己处理所需的坐标变换；组合只汇总它们返回的加速度。由于它继承 `Dynamics`，也可以作为动力学实现直接使用。
 _Avoid_: 力模型聚合、容器协调坐标转换（误导：暗示容器代劳变换）
 
