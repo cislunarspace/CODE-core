@@ -1,4 +1,12 @@
-"""ICGEM .gfc 重力场文件解析。"""
+"""重力场文件解析。
+
+支持两种格式:
+- ICGEM ``.gfc``（``load_gfc_file``）。
+- GMAT ``.cof``（``load_cof_file``），移植 GMAT ``HarmonicGravity.cpp`` 的
+  ``LM_LoadCof`` 逻辑。
+
+统一入口 ``load_gravity_file`` 按文件扩展名分发。
+"""
 
 from __future__ import annotations
 
@@ -178,6 +186,225 @@ def load_gfc_file(
         S=S,
         dotC=dotC,
         dotS=dotS,
+    )
+
+
+# ----------------------------------------------------------------------------
+# GMAT .cof 格式（移植自 GMAT HarmonicGravity.cpp 的 LM_LoadCof）
+# ----------------------------------------------------------------------------
+
+
+def load_cof_file(
+    path: str | Path,
+    *,
+    requested_degree: int | None = None,
+    default_mu: float = _DEFAULT_MU,
+    default_radius: float = _DEFAULT_RADIUS,
+) -> GravityFileData:
+    """加载 GMAT ``.cof`` 格式重力场文件。
+
+    解析逻辑移植自 GMAT ``HarmonicGravity.cpp`` 的 ``LM_LoadCof``。文件结构:
+
+    - 头行 ``POTFIELD<NNN><MMM> <flag> <Mu> <RefRadius> <Normalized>``
+      - ``NNN``/``MMM`` 各 3 字符，分别为文件中包含的最大 degree 与 order
+        （如 ``POTFIELD360360``）。
+      - ``Mu`` 单位 m³/s²×1e9，解析时除以 1e9 得到 km³/s²。
+      - ``RefRadius`` 单位 m×1e3，解析时除以 1e3 得到 km。
+      - ``Normalized`` 为 1.0 表示系数已完全正规化。
+    - 系数行 ``RECOEF <n:3> <m:3> <Cnm:21> <Snm:21>``，按固定列宽解析
+      （n=substr(8,3), m=substr(11,3), Cnm=substr(17,21), Snm=substr(38,21)）。
+      m=0 时无 Snm 列。
+    - 以 ``COMMENT`` 或 ``C `` 开头的行为注释，跳过。
+
+    返回结构与 :func:`load_gfc_file` 完全一致。COF 文件不含 dot 项,
+    故 ``dotC``/``dotS`` 全零;COF 通常省略 C₀₀,此处补 1.0。
+
+    Args:
+        path: 文件路径。
+        requested_degree: 请求的最大 degree,用于截断读取。
+        default_mu: 头行缺失 GM 时的默认值,单位 km^3/s^2。
+        default_radius: 头行缺失参考半径时的默认值,单位 km。
+
+    Returns:
+        解析后的重力场数据。
+    """
+    path = Path(path)
+    text = path.read_text(encoding="utf-8")
+
+    model_name = path.stem
+    mu = float(default_mu)
+    radius = float(default_radius)
+    max_degree: int | None = None
+    normalized = True
+
+    coefficients: dict[tuple[int, int], tuple[float, float]] = {}
+
+    header_seen = False
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip("\n")
+        if not line.strip():
+            continue
+        if line.upper() == "END":
+            continue
+
+        upper = line.upper()
+        # 注释行:以 "COMMENT" 或 "C "（C 后紧跟空格）开头。
+        if upper.startswith("COMMENT") or upper.startswith("C "):
+            continue
+
+        if not header_seen:
+            # 头行:前 8 字符为 "POTFIELD"，紧接 3 字符 degree 与 3 字符 order。
+            if not upper.startswith("POTFIELD"):
+                raise ValueError(
+                    f"Expected POTFIELD header in .cof file, got: {raw_line!r}"
+                )
+            if len(line) < 14:
+                raise ValueError(f"POTFIELD header too short: {raw_line!r}")
+            # GMAT: NN=substr(8,3), MM=substr(11,3), 其余 substr(14) 按空格分隔。
+            try:
+                header_degree = int(line[8:11])
+            except ValueError as exc:
+                raise ValueError(
+                    f"Cannot parse degree from POTFIELD header: {raw_line!r}"
+                ) from exc
+            parts = line[14:].split()
+            if len(parts) < 4:
+                raise ValueError(f"POTFIELD header missing fields: {raw_line!r}")
+            # parts = [flag, Mu, RefRadius, Normalized, ...]
+            # 单位:Mu 为 m^3/s^2 × 1e9 -> 除以 1e9 得 km^3/s^2;
+            #       RefRadius 为 m × 1e3 -> 除以 1e3 得 km。
+            mu = float(parts[1]) / 1e9
+            radius = float(parts[2]) / 1e3
+            normalized = float(parts[3]) > 0.0
+            max_degree = header_degree
+            header_seen = True
+            continue
+
+        if not upper.startswith("RECOEF"):
+            # 未知行类型,跳过(与 GMAT 宽容策略一致)。
+            continue
+
+        # 固定列:n=substr(8,3), m=substr(11,3)。
+        if len(line) < 14:
+            raise ValueError(f"RECOEF line too short: {raw_line!r}")
+        try:
+            n = int(line[8:11])
+            m = int(line[11:14])
+        except ValueError as exc:
+            raise ValueError(f"Cannot parse n/m in RECOEF line: {raw_line!r}") from exc
+
+        # Cnm=substr(17,21)（固定列,C++ substr 越界会返回较短子串,
+        # Python 切片同样安全）。字段不足时为错误。
+        c_field = line[17:38].strip()
+        if not c_field:
+            raise ValueError(f"RECOEF line missing Cnm field: {raw_line!r}")
+        try:
+            c_val = float(c_field)
+        except ValueError as exc:
+            raise ValueError(f"Cannot parse Cnm {c_field!r}: {raw_line!r}") from exc
+
+        # Snm=substr(38,21),m=0 时通常无此列;按 GMAT 仅在行足够长时读取。
+        s_field = line[38:59].strip()
+        if s_field:
+            try:
+                s_val = float(s_field)
+            except ValueError as exc:
+                raise ValueError(f"Cannot parse Snm {s_field!r}: {raw_line!r}") from exc
+        else:
+            s_val = 0.0
+
+        if n < 0 or m < 0 or m > n:
+            raise ValueError(f"Invalid degree/order: n={n}, m={m}")
+        if (n, m) in coefficients:
+            raise ValueError(f"Duplicate coefficient for degree={n}, order={m}")
+        coefficients[(n, m)] = (c_val, s_val)
+
+    if not header_seen:
+        raise ValueError(f"No POTFIELD header found in .cof file: {path}")
+    if mu <= 0 or radius <= 0:
+        raise ValueError("GM and radius must be positive")
+
+    # C00 约定为 1.0(COF 通常省略 n=0 行)。
+    if (0, 0) not in coefficients:
+        coefficients[(0, 0)] = (1.0, 0.0)
+
+    actual_max_degree = max(n for n, _ in coefficients)
+    if max_degree is None:
+        max_degree = actual_max_degree
+    elif actual_max_degree < max_degree:
+        # 允许声明的 max_degree 超过实际系数(缺项按零处理)。
+        pass
+
+    if requested_degree is not None and requested_degree > max_degree:
+        raise ValueError(
+            f"Requested degree {requested_degree} exceeds file max_degree {max_degree}"
+        )
+
+    degree = requested_degree if requested_degree is not None else max_degree
+    size = degree + 1
+    C = np.zeros((size, size), dtype=float)
+    S = np.zeros((size, size), dtype=float)
+    dotC = np.zeros((size, size), dtype=float)
+    dotS = np.zeros((size, size), dtype=float)
+    for (n, m), (c_val, s_val) in coefficients.items():
+        if n <= degree:
+            C[n, m] = c_val
+            S[n, m] = s_val
+
+    return GravityFileData(
+        model_name=model_name,
+        mu=mu,
+        radius=radius,
+        max_degree=max_degree,
+        normalized=normalized,
+        C=C,
+        S=S,
+        dotC=dotC,
+        dotS=dotS,
+    )
+
+
+def load_gravity_file(
+    path: str | Path,
+    *,
+    requested_degree: int | None = None,
+    default_mu: float = _DEFAULT_MU,
+    default_radius: float = _DEFAULT_RADIUS,
+) -> GravityFileData:
+    """按文件扩展名分发到对应格式的解析器。
+
+    - ``.gfc`` -> :func:`load_gfc_file`
+    - ``.cof`` -> :func:`load_cof_file`
+
+    其它扩展名抛 :class:`ValueError`。
+
+    Args:
+        path: 重力场文件路径。
+        requested_degree: 请求的最大 degree。
+        default_mu: 头部缺失 GM 时的默认值,单位 km^3/s^2。
+        default_radius: 头部缺失参考半径时的默认值,单位 km。
+
+    Returns:
+        解析后的重力场数据。
+    """
+    path = Path(path)
+    suffix = path.suffix.lower()
+    if suffix == ".gfc":
+        return load_gfc_file(
+            path,
+            requested_degree=requested_degree,
+            default_mu=default_mu,
+            default_radius=default_radius,
+        )
+    if suffix == ".cof":
+        return load_cof_file(
+            path,
+            requested_degree=requested_degree,
+            default_mu=default_mu,
+            default_radius=default_radius,
+        )
+    raise ValueError(
+        f"Unsupported gravity file extension {suffix!r} (expected .gfc or .cof): {path}"
     )
 
 
