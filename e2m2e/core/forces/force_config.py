@@ -20,9 +20,11 @@ from .drag import DragModel
 from .exceptions import NotSerializableError
 from .gravity_field import GravityField
 from .physical_model import PhysicalModel
+from .point_mass_gravity import PointMassGravity
 from .relativistic_correction import RelativisticCorrection
 from .shadow import ConicalShadowModel, ShadowModel
 from .srp import SolarRadiationPressure
+from .third_body_gravity import ThirdBodyGravity
 from .thrust import FiniteBurn
 
 # --- 嵌套依赖：大气模型 ---
@@ -254,12 +256,24 @@ def _serialize_relativistic_correction(force: RelativisticCorrection) -> dict[st
     }
 
 
+def _serialize_point_mass_gravity(force: PointMassGravity) -> dict[str, Any]:
+    """把点质量引力力模型序列化为参数字典。"""
+    return {"body": force.body, "mu": force.mu}
+
+
+def _serialize_third_body_gravity(force: ThirdBodyGravity) -> dict[str, Any]:
+    """把第三体引力力模型序列化为参数字典。"""
+    return {"body": force.body, "mu": force.mu}
+
+
 _SERIALIZERS: dict[type, Any] = {
     GravityField: _serialize_gravity_field,
     DragModel: _serialize_drag_model,
     SolarRadiationPressure: _serialize_srp,
     FiniteBurn: _serialize_finite_burn,
     RelativisticCorrection: _serialize_relativistic_correction,
+    PointMassGravity: _serialize_point_mass_gravity,
+    ThirdBodyGravity: _serialize_third_body_gravity,
 }
 
 
@@ -307,12 +321,24 @@ def _build_relativistic_correction(params: dict[str, Any]) -> RelativisticCorrec
     return RelativisticCorrection(**params)
 
 
+def _build_point_mass_gravity(params: dict[str, Any]) -> PointMassGravity:
+    """从参数字典构造点质量引力力模型。"""
+    return PointMassGravity(**params)
+
+
+def _build_third_body_gravity(params: dict[str, Any]) -> ThirdBodyGravity:
+    """从参数字典构造第三体引力力模型。"""
+    return ThirdBodyGravity(**params)
+
+
 _BUILDERS: dict[str, Any] = {
     "GravityField": _build_gravity_field,
     "DragModel": _build_drag_model,
     "SolarRadiationPressure": _build_srp,
     "FiniteBurn": _build_finite_burn,
     "RelativisticCorrection": _build_relativistic_correction,
+    "PointMassGravity": _build_point_mass_gravity,
+    "ThirdBodyGravity": _build_third_body_gravity,
 }
 
 
