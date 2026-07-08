@@ -1,14 +1,16 @@
-"""地球潮汐修正。
+"""固体潮修正（天体无关 Step1 + 地球专用 Step2/极潮/永久潮）。
 
-对地球球谐系数做潮汐修正，返回 ΔC/ΔS 系数，由 ``GravityField`` 在球谐展开前叠加。
-包含固体潮（Step 1 频率无关 + Step 2 频率相关）、极潮（固体极潮 + Desai 海洋极潮）
-与永久潮汐修正（tide-free / zero-tide 约定）。
+``solid_tide_step1`` 天体无关:对任意中心天体,把扰动体位置 + 该天体的 Love
+数表喂进去即可算 ΔC/ΔS(对齐 GMAT ``HarmonicGravity::IncrementSolidTide``)。
+Step2(频率相关)、极潮、永久潮修正均为地球专用,保留原样。
 
 公式与系数取自 IERS Technical Note 32 (Conventions 2003)，与 GMAT R2026a
 ``HarmonicGravity`` 对齐。单位一致：位置 km、GM km³/s²、参考半径 km。
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
@@ -33,6 +35,45 @@ _K_EARTH: npt.NDArray[np.floating] = np.array(
 _K_PLUS_EARTH: npt.NDArray[np.floating] = np.array(
     [-0.00087, -0.00079, -0.00057, 0.0, 0.0], dtype=float
 )
+
+# ----------------------------------------------------------------------------
+# 月球 Love 数:从 grgm900c.tide 读取(k 2 m value 格式)。月球只有 k₂=0.024116
+# 三项(m=0,1,2),没有弹性 3 阶位移(k_plus=None)。k₂≈0.024 比地球 0.30 小一阶,
+# 潮汐效应是二阶小量。
+# ----------------------------------------------------------------------------
+
+# Love 数表的阶数固定为 5(n=0..4),与地球 _K_EARTH 对齐,便于共用 solid_tide_step1。
+_LOVE_TABLE_SIZE = 5
+
+
+def load_love_number_file(path: str | Path) -> npt.NDArray[np.floating]:
+    """读取 GMAT 风格 Love 数文件(如 ``grgm900c.tide``)。
+
+    文件格式:每行 ``k <n> <m> <value>``(可带 ``%`` 注释行与空行)。返回
+    ``_LOVE_TABLE_SIZE``×``_LOVE_TABLE_SIZE`` 的 ``K[n][m]`` 表,n=0,1,4 行
+    默认为零;文件中未给出的项也为零。
+
+    Args:
+        path: Love 数文件路径。
+
+    Returns:
+        ``K[n][m]`` 表,形状 (5,5)。
+    """
+    path = Path(path)
+    k = np.zeros((_LOVE_TABLE_SIZE, _LOVE_TABLE_SIZE), dtype=float)
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("%") or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 4 or parts[0].lower() != "k":
+            continue
+        n = int(parts[1])
+        m = int(parts[2])
+        val = float(parts[3])
+        if 0 <= n < _LOVE_TABLE_SIZE and 0 <= m < _LOVE_TABLE_SIZE:
+            k[n, m] = val
+    return k
 
 # ----------------------------------------------------------------------------
 # 时间与角度常量
@@ -270,63 +311,79 @@ def _legendre_23(s: float, c: float) -> npt.NDArray[np.floating]:
 
 
 def solid_tide_step1(
-    pos_perturber: npt.ArrayLike,
-    mu_perturber: float,
-    mu_earth: float,
-    r_earth: float,
+    perturbers: list[tuple[npt.ArrayLike, float]] | tuple[npt.ArrayLike, float],
+    k_love: npt.NDArray[np.floating],
+    k_plus: npt.NDArray[np.floating] | None,
+    mu_central: float,
+    r_central: float,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-    """固体潮 Step 1（频率无关）。
+    """固体潮 Step 1（频率无关，天体无关）。
 
-    对单个扰动天体（Sun 或 Moon）计算 ΔC/ΔS。调用方需对 Sun、Moon 各调一次
-    并累加（GMAT IncrementEarthTide 内部调 IncrementSolidTide 两次）。
+    对一组扰动天体累加 ΔC/ΔS。公式本身天体无关（IERS TN32 eqn 1, p.59；
+    eqn 4, p.60），Love 数由调用方按中心天体传入。
 
-    公式（IERS TN32 eqn 1, p.59；eqn 4, p.60）：
-        ΔC[n][m] += K[n][m]/(2n+1) · (μ_p/μ_e) · (R_e/r)^(n+1) · P_nm(sinφ) · cos(mλ)
-        ΔS[n][m] += K[n][m]/(2n+1) · (μ_p/μ_e) · (R_e/r)^(n+1) · P_nm(sinφ) · sin(mλ)
-    n=2 时额外（弹性 Love 数，3 阶位移）：
+    对每个扰动天体:
+        ΔC[n][m] += K[n][m]/(2n+1) · (μ_p/μ_c) · (R_c/r)^(n+1) · P_nm(sinφ) · cos(mλ)
+        ΔS[n][m] += K[n][m]/(2n+1) · (μ_p/μ_c) · (R_c/r)^(n+1) · P_nm(sinφ) · sin(mλ)
+    n=2 且 ``k_plus`` 非空时额外（弹性 Love 数，3 阶位移，IERS eqn 4）:
         ΔC[4][m] += KPlus[m]/5 · ... ; ΔS[4][m] += KPlus[m]/5 · ...
 
+    与 GMAT ``HarmonicGravity::IncrementEarthTide`` 对齐:其内部对 Sun、Moon
+    各调一次 ``IncrementSolidTide`` 并累加;本函数把"逐体累加"内化,调用方
+    一次性传完整扰动体列表。
+
     Args:
-        pos_perturber: 扰动天体在 ITRF 下的位置，形状 (3,)，单位 km。
-        mu_perturber: 扰动天体 GM，km³/s²。
-        mu_earth: 地球 GM，km³/s²。
-        r_earth: 地球参考半径，km。
+        perturbers: 扰动天体列表 ``[(position, gm), ...]``,``position`` 为扰动
+            体相对中心天体的位置(中心天体 body-fixed 系,如 ITRF93/MOON_PA),
+            形状 (3,)、单位 km;``gm`` 为扰动体 GM(km³/s²)。也接受单个
+            ``(position, gm)`` 元组以兼容旧调用方。
+        k_love: n=2,3 阶位移 Love 数表 ``K[n][m]``,形状 (5,5)(n=0,1,4 行用零
+            填充,与 GMAT LoveMax+1=5 对齐)。地球用 ``_K_EARTH``。
+        k_plus: n=2 时的弹性 3 阶位移 ``KPlus[m]``,形状 (5,)(m>2 处为零)。
+            地球用 ``_K_PLUS_EARTH``;月球等无此贡献时传 ``None``。
+        mu_central: 中心天体 GM,km³/s²。
+        r_central: 中心天体参考半径,km。
 
     Returns:
-        (DeltaC, DeltaS)，各为 5×5 数组。
+        (DeltaC, DeltaS),各为 5×5 数组。
     """
-    pos = np.asarray(pos_perturber, dtype=float)
-    r = np.linalg.norm(pos)
-    if r == 0.0:
-        raise ValueError("perturber position must be non-zero")
-
-    # 地心纬度 φ、经度 λ
-    xy = np.hypot(pos[0], pos[1])
-    lat = np.arctan2(pos[2], xy)
-    lon = np.arctan2(pos[1], pos[0])
-    s = np.sin(lat)
-    c = np.cos(lat)
-
-    P = _legendre_23(s, c)
-    massratio = mu_perturber / mu_earth
-    rho = r_earth / r  # 无量纲
+    # 兼容单个 (position, gm) 元组:不期望第一个元素本身是 (3,) ndarray。
+    if isinstance(perturbers, tuple) and len(perturbers) == 2 and np.isscalar(perturbers[1]):
+        perturbers = [perturbers]
 
     deltaC = np.zeros((5, 5), dtype=float)
     deltaS = np.zeros((5, 5), dtype=float)
 
-    for n in (2, 3):
-        rho_n = rho ** (n + 1)
-        for m in range(0, n + 1):
-            f = massratio * rho_n * P[n, m]
-            cm = np.cos(m * lon)
-            sm = np.sin(m * lon)
-            kn = _K_EARTH[n, m] / (2 * n + 1)
-            deltaC[n, m] += kn * f * cm
-            deltaS[n, m] += kn * f * sm
-            if n == 2:
-                kplus = _K_PLUS_EARTH[m] / (2 * n + 1)  # (2n+1)=5
-                deltaC[4, m] += kplus * f * cm
-                deltaS[4, m] += kplus * f * sm
+    for pos_perturber, mu_perturber in perturbers:
+        pos = np.asarray(pos_perturber, dtype=float)
+        r = np.linalg.norm(pos)
+        if r == 0.0:
+            raise ValueError("perturber position must be non-zero")
+
+        # 中心纬度 φ、经度 λ
+        xy = np.hypot(pos[0], pos[1])
+        lat = np.arctan2(pos[2], xy)
+        lon = np.arctan2(pos[1], pos[0])
+        s = np.sin(lat)
+        c = np.cos(lat)
+
+        P = _legendre_23(s, c)
+        massratio = mu_perturber / mu_central
+        rho = r_central / r  # 无量纲
+
+        for n in (2, 3):
+            rho_n = rho ** (n + 1)
+            for m in range(0, n + 1):
+                f = massratio * rho_n * P[n, m]
+                cm = np.cos(m * lon)
+                sm = np.sin(m * lon)
+                kn = k_love[n, m] / (2 * n + 1)
+                deltaC[n, m] += kn * f * cm
+                deltaS[n, m] += kn * f * sm
+                if n == 2 and k_plus is not None:
+                    kplus = k_plus[m] / (2 * n + 1)  # (2n+1)=5
+                    deltaC[4, m] += kplus * f * cm
+                    deltaS[4, m] += kplus * f * sm
 
     return deltaC, deltaS
 
@@ -407,6 +464,10 @@ def permanent_tide_correction(
     """
     sun_pos = np.array([a_sun, 0.0, 0.0])
     moon_pos = np.array([a_moon, 0.0, 0.0])
-    dC_sun, dS_sun = solid_tide_step1(sun_pos, mu_sun, mu_earth, r_earth)
-    dC_moon, dS_moon = solid_tide_step1(moon_pos, mu_moon, mu_earth, r_earth)
-    return dC_sun + dC_moon, dS_sun + dS_moon
+    return solid_tide_step1(
+        [(sun_pos, mu_sun), (moon_pos, mu_moon)],
+        k_love=_K_EARTH,
+        k_plus=_K_PLUS_EARTH,
+        mu_central=mu_earth,
+        r_central=r_earth,
+    )
