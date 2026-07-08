@@ -1,6 +1,6 @@
-"""法型化上下文对象 ``NormalFormContext``。
+"""标准形化简上下文对象 ``NormalFormContext``。
 
-集中存放一条法型化流水线所需的全部静态/派生数据：
+集中存放一条标准形化简流水线所需的全部静态/派生数据：
 归一化常量、平动点几何、基础频率、中心流形频率、特征指数、用户传入的
 历元与展开阶数。本切片只交付构造与读取；后续切片在该对象上调用具体
 化简器（DynamicalSubstituteCorrector、QuasiFloquetReducer 等）。
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 
 class NormalFormContext:
-    """法型化流水线上下文。
+    """标准形化简流水线上下文。
 
     构造时由 ``System`` 提供质量比与归一化尺度（若有），并由 ``LibrationPoint``
     选择平动点；其余 qiao 归一化常量（LU、TU、mu_e/m/s、JD0、基础频率等）

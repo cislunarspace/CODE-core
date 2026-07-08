@@ -1,6 +1,6 @@
-"""法型化（Normal Form）算法包。
+"""标准形（Normal Form）算法包。
 
-为圆型限制性三体问题（CR3BP）平动点附近的轨道设计提供法型化流水线
+为圆型限制性三体问题（CR3BP）平动点附近的轨道设计提供标准形化简流水线
 的基础脚手架：
 
 - 切片 0 交付 ``NormalFormContext``、``NormalFormResult`` 与 SI ↔ qiao

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class NormalFormResult:
-    """法型化流水线统一结果容器。
+    """标准形化简流水线统一结果容器。
 
     不可变：所有字段在构造后只读，确保下游消费方按值传递。
 

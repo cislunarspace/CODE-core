@@ -1,4 +1,4 @@
-"""法型化一键式流水线（issue #175）。
+"""标准形化简一键式流水线（issue #175）。
 
 把前面四个切片的 reducer 串成一条完整路径：
 
@@ -59,7 +59,7 @@ __all__ = ["NormalFormPipeline"]
 
 @dataclass(frozen=True)
 class NormalFormPipeline:
-    """法型化一键式流水线（上下文绑定）。
+    """标准形化简一键式流水线（上下文绑定）。
 
     通过 :meth:`reduce` 把一条 ``(6,)`` rho 坐标初值依次送进动力学替代
     corrector、quasi-Floquet reducer、中心流形 reducer，最后绑定成表征
@@ -89,7 +89,7 @@ class NormalFormPipeline:
     dynamical_kwargs: dict[str, object] = field(default_factory=dict)
 
     def reduce(self, orbit: npt.ArrayLike) -> NormalFormResult:
-        """对 rho 坐标初值跑完整法型化流水线。
+        """对 rho 坐标初值跑完整标准形化简流水线。
 
         Args:
             orbit: ``(6,)`` rho 坐标初始状态 ``[ρ, ρ̇]``（无量纲），作为

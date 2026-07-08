@@ -1,4 +1,4 @@
-"""构建与数值化法型化 Hamilton 量。
+"""构建与数值化标准形 Hamilton 量。
 
 对应 qiao ``Code03_Hamilton_expr.py``（符号构造）与
 ``Code04_Hamilton_num.py``（在指定历元窗口上求数值时间序列）。

@@ -45,7 +45,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 法型化流水线（normal-form 切片）所需的符号计算与并行工具，
+# 标准形化简流水线（normal-form 切片）所需的符号计算与并行工具，
 # 在化简器内部惰性导入，不阻塞基础 ``e2m2e.algorithms`` 加载。
 normal-form = [
     "sympy>=1.12",
