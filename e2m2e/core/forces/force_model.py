@@ -238,6 +238,7 @@ class ForceModel(Dynamics):
         initial_step: float | None = None,
         events: list[Callable[[float, npt.NDArray[np.floating]], float]] | None = None,
         max_steps: int = 100_000,
+        method: RkMethod = RkMethod.PD45,
     ) -> dict[str, Any]:
         """使用 Rust rk_step 传播轨迹。
 
@@ -250,6 +251,7 @@ class ForceModel(Dynamics):
             initial_step: 初始步长，默认从初始状态估算。
             events: 简单终止事件列表，每个事件返回标量，符号变化时停止。
             max_steps: 最大积分步数，默认 100_000。
+            method: Runge-Kutta 积分器方法，默认 PD45。
 
         Returns:
             包含 ``time``、``states`` 和 ``terminal_event_index`` 的字典。
@@ -319,7 +321,7 @@ class ForceModel(Dynamics):
             if hasattr(self.system, "update_coordinate_systems"):
                 self.system.update_coordinate_systems(t, y)
 
-            result = rk_step(RkMethod.PD45, t, y, h, tol, eom)
+            result = rk_step(method, t, y, h, tol, eom)
 
             if result.error <= tol:
                 # Accept step
@@ -377,6 +379,7 @@ class ForceModel(Dynamics):
         *,
         initial_step: float | None = None,
         max_steps: int = 100_000,
+        method: RkMethod = RkMethod.PD45,
     ) -> dict[str, Any]:
         """带脉冲机动的传播：coast 段之间在 burn epoch 处施加 Δv。
 
@@ -409,6 +412,7 @@ class ForceModel(Dynamics):
                 (current_t, burn.epoch),
                 initial_step=initial_step,
                 max_steps=max_steps,
+                method=method,
             )
             segments.append((seg["time"], seg["states"]))
             y = np.asarray(seg["states"][-1], dtype=float).copy()
@@ -424,6 +428,7 @@ class ForceModel(Dynamics):
             (current_t, tf),
             initial_step=initial_step,
             max_steps=max_steps,
+            method=method,
         )
         segments.append((seg["time"], seg["states"]))
 
