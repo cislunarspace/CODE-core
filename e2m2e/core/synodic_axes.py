@@ -20,7 +20,9 @@ from .axes import Axes
 class SynodicAxes(Axes):
     """SPICE 驱动的会合旋转坐标轴。"""
 
-    _DEFAULT_RATE_STEP = 1.0e-5  # 数值微分默认步长 (秒)
+    # 数值微分步长 (秒)。1e-5 会严重吃有效数字并放大 SPICE 星历插值噪声
+    # （Cdot 相对误差 ~1e-3）；1.0s 处于舍入-截断平衡平台，误差降到 ~1e-7。
+    _DEFAULT_RATE_STEP = 1.0
     _CACHE_CAPACITY = 256  # R / Rdot 缓存容量
 
     def __init__(self, spice) -> None:
