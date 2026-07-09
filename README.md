@@ -265,7 +265,7 @@ uv run ruff format .         # 格式化
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {5.1.0},
+  version = {5.2.0},
   year = {2026},
 }
 ```

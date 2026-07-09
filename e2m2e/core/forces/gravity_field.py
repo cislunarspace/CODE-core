@@ -150,8 +150,7 @@ class GravityField(PhysicalModel):
         filename = _DEFAULT_FILE_BY_BODY.get(self._body)
         if filename is None:
             raise ValueError(
-                f"No default gravity file for body={self._body!r}; "
-                "pass gravity_file explicitly"
+                f"No default gravity file for body={self._body!r}; pass gravity_file explicitly"
             )
         from importlib import resources
 
@@ -259,9 +258,7 @@ class GravityField(PhysicalModel):
         # 查扰动体位置/GM(observer 为中心天体)。位置在中心天体 body-fixed 系下。
         perturber_names = _PERTURBERS_BY_BODY.get(self._body)
         if perturber_names is None:
-            raise CoordinateTransformError(
-                f"solid tide not configured for body={self._body!r}"
-            )
+            raise CoordinateTransformError(f"solid tide not configured for body={self._body!r}")
         perturbers = [
             (
                 spice.get_body_position(name, t, self._input_frame, self._body),
@@ -303,9 +300,7 @@ class GravityField(PhysicalModel):
             # 极档:叠加极潮
             if self._tide_mode == "solid_and_pole":
                 if self._polar_motion_provider is None:
-                    raise ValueError(
-                        "tide_mode='solid_and_pole' requires polar_motion_provider"
-                    )
+                    raise ValueError("tide_mode='solid_and_pole' requires polar_motion_provider")
                 xp, yp = self._polar_motion_provider(t)
                 dC_pole, dS_pole = pole_tide(t, xp, yp)
                 dC = dC + dC_pole
@@ -331,9 +326,7 @@ class GravityField(PhysicalModel):
             return _K_EARTH, _K_PLUS_EARTH
         tide_file = _DEFAULT_TIDE_FILE_BY_BODY.get(self._body)
         if tide_file is None:
-            raise CoordinateTransformError(
-                f"no Love number source for body={self._body!r}"
-            )
+            raise CoordinateTransformError(f"no Love number source for body={self._body!r}")
         from importlib import resources
 
         ref = resources.files("e2m2e.core.forces.data").joinpath(tide_file)

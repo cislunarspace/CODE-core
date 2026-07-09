@@ -256,18 +256,14 @@ def load_cof_file(
         if not header_seen:
             # 头行:前 8 字符为 "POTFIELD"，紧接 3 字符 degree 与 3 字符 order。
             if not upper.startswith("POTFIELD"):
-                raise ValueError(
-                    f"Expected POTFIELD header in .cof file, got: {raw_line!r}"
-                )
+                raise ValueError(f"Expected POTFIELD header in .cof file, got: {raw_line!r}")
             if len(line) < 14:
                 raise ValueError(f"POTFIELD header too short: {raw_line!r}")
             # GMAT: NN=substr(8,3), MM=substr(11,3), 其余 substr(14) 按空格分隔。
             try:
                 header_degree = int(line[8:11])
             except ValueError as exc:
-                raise ValueError(
-                    f"Cannot parse degree from POTFIELD header: {raw_line!r}"
-                ) from exc
+                raise ValueError(f"Cannot parse degree from POTFIELD header: {raw_line!r}") from exc
             parts = line[14:].split()
             if len(parts) < 4:
                 raise ValueError(f"POTFIELD header missing fields: {raw_line!r}")

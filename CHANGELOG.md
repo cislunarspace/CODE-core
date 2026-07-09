@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [5.2.0] - 2026-07-09
+
+### Added
+- 第三体引力 `ThirdBodyGravity`（#181–#183）：力分解路径补上缺失的第三体点质量引力，使 `ForceModel` 能外推 cislunar 轨道。每个摄动天体一个实例，含直接项与间接项，与 `EphemerisDynamics` 的解析 N 体公式物理等价（自洽性测试 < 1 mm）
+- 月球非球形引力（#185–#189）：`GravityField` 改造为天体无关，支持任意天体的球谐引力场
+  - 按 `body` 自动切换 body-fixed 轴：地球 ITRF93、月球 MOON_PA（DE421 principal axes）
+  - COF 格式引力场文件解析（移植 GMAT `LM_LoadCof`），引入月球 GRGM900C（360×360，GRAIL）
+  - 固体潮 Step1 重构为天体无关（扰动体列表 + Love number），地球 Step2/极潮保留专用；月球固体潮（k₂=0.024116）
+  - 引入完整 EGM96（360×360），替换此前只有 n≤2 的截断文件，地球引力场真正支持 10×10
+  - DFH "非球形-大天体耦合项"即固体潮，`tide_mode="solid"` 启用
+- `PointMassGravity` 配置序列化（补历史欠账，#183）
+- SPICE 内核：地球 ITRF93（`earth_latest_high_prec.bpc` + `SPICEEarthPredictedKernel.bpc`）、月球 MOON_PA（`SPICELunaCurrentKernel.bpc` + `SPICELunaFrameKernel.tf`）
+
+### Changed
+- 地球 body-fixed 从低精度 `ITRFApproxAxes`（岁差+GAST）升级到 SPICE ITRF93（IAU 2000 CIO 方法）
+- `solid_tide_step1` 签名重构为接收扰动体列表 + Love number 表（天体无关），地球潮汐回归逐字一致（误差 < 1e-19）
+
+### Fixed
+- COF 解析器注释跳过：GMAT EGM96.cof 用 `CCCCC` 边框注释，原逻辑只跳 `COMMENT`/`C ` 开头
+
+### 验证
+- e2m2e vs DFH 满配（无 SRP）力模型对齐：Halo 7 天 88 米、Lissajous 7 天 201 米
+- SRP 诊断结论：残余差异 97% 来自 ECOM vs cannonball 光压模型差异，力模型基线已对齐到亚百米级
+
 ## [5.1.0] - 2026-07-08
 
 ### Added

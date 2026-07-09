@@ -46,18 +46,15 @@ from e2m2e.core.ephemeris_system import EphemerisSystem
 from e2m2e.core.forces import (
     ForceModel,
     GravityField,
-    PointMassGravity,
+    PhysicalModel,
     SolarRadiationPressure,
     ThirdBodyGravity,
-    PhysicalModel,
 )
 from e2m2e.core.spice import SPICEManager
 from e2m2e.core.standard_axes import ICRSAxes
 from e2m2e.core.standard_origins import CelestialBodyOrigin
 
-DFH_FILE = Path(
-    "/home/ouyangjiahong/codes/qiao/OrbitDesign/EPHEMERIDES_DAC.TXT"
-)
+DFH_FILE = Path("/home/ouyangjiahong/codes/qiao/OrbitDesign/EPHEMERIDES_DAC.TXT")
 
 
 class IndirectTerm(PhysicalModel):
@@ -117,7 +114,7 @@ def main() -> None:
         "naif0012.tls",
         "pck00010.tpc",
         "earth_latest_high_prec.bpc",
-        "SPICEEarthPredictedKernel.bpc",  # 预测内核，覆盖到 2125 年（补 earth_latest 到 2026-06-12 的缺口）
+        "SPICEEarthPredictedKernel.bpc",  # 覆盖到 2125 年，补 earth_latest 缺口
         "SPICELunaFrameKernel.tf",
         "SPICELunaCurrentKernel.bpc",
     ]
@@ -128,10 +125,18 @@ def main() -> None:
             loaded_kernels.append(str(kpath))
     # DE430 内含全部行星数据，但缺少名称-ID映射，需手动注册（行星用 SSB ID）
     from spiceypy import boddef
+
     for name, naif_id in [
-        ("MERCURY", 1), ("VENUS", 2), ("EARTH", 399), ("MARS", 4),
-        ("JUPITER", 5), ("SATURN", 6), ("URANUS", 7), ("NEPTUNE", 8),
-        ("MOON", 301), ("SUN", 10),
+        ("MERCURY", 1),
+        ("VENUS", 2),
+        ("EARTH", 399),
+        ("MARS", 4),
+        ("JUPITER", 5),
+        ("SATURN", 6),
+        ("URANUS", 7),
+        ("NEPTUNE", 8),
+        ("MOON", 301),
+        ("SUN", 10),
     ]:
         boddef(name, naif_id)
     print(f"星历内核: {Path(ephem_kernel).name}")
@@ -152,21 +157,27 @@ def main() -> None:
                 m = pat.match(line.strip())
                 if not m:
                     continue
-                y, mo, d, h, mi, s = (int(m.group(1)), int(m.group(2)),
-                                      int(m.group(3)), int(m.group(4)),
-                                      int(m.group(5)), float(m.group(6)))
+                y, mo, d, h, mi, s = (
+                    int(m.group(1)),
+                    int(m.group(2)),
+                    int(m.group(3)),
+                    int(m.group(4)),
+                    int(m.group(5)),
+                    float(m.group(6)),
+                )
                 iso = f"{y:04d}-{mo:02d}-{d:02d}T{h:02d}:{mi:02d}:{s:06.3f}"
                 utc_list.append(iso)
                 pos = [float(m.group(7)), float(m.group(8)), float(m.group(9))]
-                vel = [float(m.group(10)) / 1000.0,
-                       float(m.group(11)) / 1000.0,
-                       float(m.group(12)) / 1000.0]  # m/s→km/s
+                vel = [
+                    float(m.group(10)) / 1000.0,
+                    float(m.group(11)) / 1000.0,
+                    float(m.group(12)) / 1000.0,
+                ]  # m/s→km/s
                 dfh_states.append(pos + vel)
 
         dfh_et = np.array([spice.utc_to_et(u) for u in utc_list])
         dfh_states = np.array(dfh_states)
-        print(f"DFH 轨道: {len(dfh_et)} 点, "
-              f"{utc_list[0]} → {utc_list[-1]}")
+        print(f"DFH 轨道: {len(dfh_et)} 点, {utc_list[0]} → {utc_list[-1]}")
         print(f"  弧段长度: {(dfh_et[-1] - dfh_et[0]) / 86400:.2f} 天")
 
         # --- e2m2e 外推（issue #189：对齐 DFH 满配）---
@@ -176,12 +187,21 @@ def main() -> None:
         # 加速系，每个摄动天体需补间接项 -μ_i·r_i/|r_i|³。GravityField 只算
         # 球谐直接引力（含中心项 degree=0），不带间接项；故：
         #   - 地球用 GravityField（真 EGM96 10×10 + 固体潮）
-        #   - 月球用 GravityField（含中心 + 非球形 GRGM900C 10×10 + 固体潮）+ IndirectTerm（补间接项）
-        #   - 不用 ThirdBodyGravity("MOON")（会与 GravityField MOON 的 degree=0 重复）
+        #   - 月球用 GravityField（GRGM900C 10×10 + 固体潮）+ IndirectTerm（补间接项）
+        #   - 不用 ThirdBodyGravity("MOON")（会与 GravityField MOON degree=0 重复）
         #   - 太阳/行星用 ThirdBodyGravity（自带直接项+间接项，点质量）
-        all_bodies = ["EARTH", "MOON", "SUN",
-                      "MERCURY", "VENUS", "MARS",
-                      "JUPITER", "SATURN", "URANUS", "NEPTUNE"]
+        all_bodies = [
+            "EARTH",
+            "MOON",
+            "SUN",
+            "MERCURY",
+            "VENUS",
+            "MARS",
+            "JUPITER",
+            "SATURN",
+            "URANUS",
+            "NEPTUNE",
+        ]
         system = EphemerisSystem(bodies=all_bodies, spice=spice, origin="EARTH")
         system.coordinate_system = CoordinateSystem(
             axes=ICRSAxes(),
@@ -190,43 +210,43 @@ def main() -> None:
         fm = ForceModel(system)
         fm.max_step = 600.0
         # 地球引力场（真 EGM96 10×10 + 固体潮）
-        earth_cof = str(project_root / "e2m2e" / "core" / "forces" / "data"
-                        / "EGM96.cof")
+        earth_cof = str(project_root / "e2m2e" / "core" / "forces" / "data" / "EGM96.cof")
         fm.add_force(
-            GravityField("EARTH", degree=10, order=10, gravity_file=earth_cof,
-                         tide_mode="solid"),
+            GravityField("EARTH", degree=10, order=10, gravity_file=earth_cof, tide_mode="solid"),
             name="earth_gravity",
         )
         # 月球引力场（中心 + 非球形 GRGM900C 10×10 + 固体潮）
-        moon_cof = str(project_root / "e2m2e" / "core" / "forces" / "data"
-                       / "grgm900c.cof")
+        moon_cof = str(project_root / "e2m2e" / "core" / "forces" / "data" / "grgm900c.cof")
         fm.add_force(
-            GravityField("MOON", degree=10, order=10, gravity_file=moon_cof,
-                         tide_mode="solid"),
+            GravityField("MOON", degree=10, order=10, gravity_file=moon_cof, tide_mode="solid"),
             name="moon_gravity",
         )
         # 月球间接项（地心加速系必需；不能省，也不能用 ThirdBodyGravity 替代）
         fm.add_force(IndirectTerm("MOON"), name="moon_indirect")
         # 太阳和七大行星第三体（点质量，自带直接项 + 间接项）
-        for body in ["SUN", "MERCURY", "VENUS", "MARS",
-                     "JUPITER", "SATURN", "URANUS", "NEPTUNE"]:
+        for body in ["SUN", "MERCURY", "VENUS", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE"]:
             fm.add_force(ThirdBodyGravity(body), name=f"third_{body.lower()}")
         # 太阳光压（cannonball，最接近 ECOM 的简化替代）
-        fm.add_force(SolarRadiationPressure(area=10.0, mass=1000.0, cr=1.4),
-                     name="srp")
+        fm.add_force(SolarRadiationPressure(area=10.0, mass=1000.0, cr=1.4), name="srp")
 
         et0 = dfh_et[0]
         # 采样间隔：取若干个时间点用于画误差曲线（每小时太密，每 6 小时）
         sample_idx = np.arange(0, len(dfh_et), 6)
         t_eval = dfh_et[sample_idx]
 
-        print(f"e2m2e 外推中...")
-        print(f"  力模型: PointMass(EARTH) + GravityField(MOON 10x10 solid)"
-              f" + IndirectTerm(MOON) + ThirdBody(Sun+七大行星) + SRP(cannonball)")
-        print(f"  DFH 满配: 太阳+大行星+地球非球形10x10(EGM2008)+月球非球形10x10"
-              f"+ECOM光压+潮汐+耦合(大气/相对论关)")
-        print(f"  e2m2e 缺(相对DFH): ECOM光压(用cannonball代替)、"
-              f"地球非球形(用点质量代替)、非球形-大天体耦合")
+        print("e2m2e 外推中...")
+        print(
+            "  力模型: PointMass(EARTH) + GravityField(MOON 10x10 solid)"
+            " + IndirectTerm(MOON) + ThirdBody(Sun+七大行星) + SRP(cannonball)"
+        )
+        print(
+            "  DFH 满配: 太阳+大行星+地球非球形10x10(EGM2008)+月球非球形10x10"
+            "+ECOM光压+潮汐+耦合(大气/相对论关)"
+        )
+        print(
+            "  e2m2e 缺(相对DFH): ECOM光压(用cannonball代替)、"
+            "地球非球形(用点质量代替)、非球形-大天体耦合"
+        )
         result = fm.propagate(
             dfh_states[0],
             (et0, dfh_et[-1]),
@@ -239,14 +259,10 @@ def main() -> None:
         # --- 对比：把 DFH 状态插值到 e2m2e 输出时刻 ---
         dfh_pos_interp = np.empty_like(e2m2e_states[:, :3])
         for k in range(3):
-            dfh_pos_interp[:, k] = np.interp(
-                e2m2e_time, dfh_et, dfh_states[:, k]
-            )
+            dfh_pos_interp[:, k] = np.interp(e2m2e_time, dfh_et, dfh_states[:, k])
         dfh_vel_interp = np.empty_like(e2m2e_states[:, 3:])
         for k in range(3):
-            dfh_vel_interp[:, k] = np.interp(
-                e2m2e_time, dfh_et, dfh_states[:, 3 + k]
-            )
+            dfh_vel_interp[:, k] = np.interp(e2m2e_time, dfh_et, dfh_states[:, 3 + k])
 
         pos_err = np.linalg.norm(e2m2e_states[:, :3] - dfh_pos_interp, axis=1)
         vel_err = np.linalg.norm(e2m2e_states[:, 3:] - dfh_vel_interp, axis=1)
@@ -254,24 +270,28 @@ def main() -> None:
 
         # --- 汇总 ---
         print("\n===== e2m2e vs DFH 差异 =====")
-        print(f"最大位置差: {pos_err.max():.3f} km  "
-              f"@ t={days[np.argmax(pos_err)]:.2f} 天")
-        print(f"最大速度差: {vel_err.max():.6f} km/s  "
-              f"@ t={days[np.argmax(vel_err)]:.2f} 天")
+        print(f"最大位置差: {pos_err.max():.3f} km  @ t={days[np.argmax(pos_err)]:.2f} 天")
+        print(f"最大速度差: {vel_err.max():.6f} km/s  @ t={days[np.argmax(vel_err)]:.2f} 天")
         print(f"末态位置差: {pos_err[-1]:.3f} km")
+
         # 关键时刻采样：1/3/7/15/30 天 + 末态
         # 采样间隔 = 6 小时 → 每天 4 点；用最近索引
         def idx_for_day(d: float) -> int:
             return int(round(d * 4))
+
         key_marks = [1.0, 3.0, 7.0, 15.0, 30.0]
         print("  关键时刻：")
         for d in key_marks:
             i = idx_for_day(d)
             if i < len(days):
-                print(f"  t={days[i]:6.1f} 天: 位置差 {pos_err[i]:10.3f} km, "
-                      f"速度差 {vel_err[i]:.6f} km/s")
-        print(f"  t={days[-1]:6.1f} 天(末态): 位置差 {pos_err[-1]:10.3f} km, "
-              f"速度差 {vel_err[-1]:.6f} km/s")
+                print(
+                    f"  t={days[i]:6.1f} 天: 位置差 {pos_err[i]:10.3f} km, "
+                    f"速度差 {vel_err[i]:.6f} km/s"
+                )
+        print(
+            f"  t={days[-1]:6.1f} 天(末态): 位置差 {pos_err[-1]:10.3f} km, "
+            f"速度差 {vel_err[-1]:.6f} km/s"
+        )
 
         # --- 画图 ---
         fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
@@ -279,7 +299,7 @@ def main() -> None:
         ax1 = axes[0]
         ax1.semilogy(days, pos_err, "r-", label="Position error")
         ax1.set_ylabel("Position error [km]")
-        ax1.set_title("e2m2e vs DFH: PointMass(Earth) + Moon gravity field 10x10 + Sun/planets + SRP")
+        ax1.set_title("e2m2e vs DFH: Earth+Moon gravity 10x10 + Sun/planets + SRP")
         ax1.grid(True, which="both", alpha=0.3)
         ax1.legend()
 
@@ -298,10 +318,15 @@ def main() -> None:
         # 三维轨迹图
         fig2 = plt.figure(figsize=(10, 8))
         ax = fig2.add_subplot(111, projection="3d")
-        ax.plot(dfh_states[:, 0], dfh_states[:, 1], dfh_states[:, 2],
-                "k-", alpha=0.5, label="DFH")
-        ax.plot(e2m2e_states[:, 0], e2m2e_states[:, 1], e2m2e_states[:, 2],
-                "r--", alpha=0.7, label="e2m2e")
+        ax.plot(dfh_states[:, 0], dfh_states[:, 1], dfh_states[:, 2], "k-", alpha=0.5, label="DFH")
+        ax.plot(
+            e2m2e_states[:, 0],
+            e2m2e_states[:, 1],
+            e2m2e_states[:, 2],
+            "r--",
+            alpha=0.7,
+            label="e2m2e",
+        )
         ax.plot(0, 0, 0, "ko", markersize=5)
         ax.set_xlabel("x [km]")
         ax.set_ylabel("y [km]")
