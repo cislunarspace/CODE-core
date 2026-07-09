@@ -143,11 +143,16 @@ CORE_REQUIREMENTS = [
         linked_tests=["tests/core/orbit/test_orbit_family.py"],
     ),
     # ---- 星历动力学 ----
+    # 注：EphemerisDynamics 已降级为遗留内部实现（仅供 multiple_shooting/homotopy
+    # 内部使用，新代码用 ForceModel）。下列需求保留以维持遗留消费者的测试覆盖。
     Requirement(
         id="REQ-025",
-        title="EphemerisDynamics 统一接口",
+        title="EphemerisDynamics 统一接口（遗留）",
         category=RequirementCategory.INTERFACE,
-        description="EphemerisDynamics 必须与 CR3BP_Dynamics 共享 Dynamics 基类接口。",
+        description=(
+            "EphemerisDynamics 必须与 CR3BP_Dynamics 共享 Dynamics 基类接口。"
+            "（遗留实现，仅供 multiple_shooting/homotopy 内部使用；新代码用 ForceModel。）"
+        ),
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.ephemeris_dynamics"],
@@ -155,10 +160,11 @@ CORE_REQUIREMENTS = [
     ),
     Requirement(
         id="REQ-026",
-        title="EphemerisDynamics 自适应步长",
+        title="EphemerisDynamics 自适应步长（遗留）",
         category=RequirementCategory.FUNCTIONAL,
         description=(
             "EphemerisDynamics 根据传播时长自适应调整最大步长（max_step = min(60s, duration/10)）。"
+            "（遗留实现，新代码用 ForceModel。）"
         ),
         priority=RequirementPriority.SHOULD,
         verification_method="test",

@@ -37,7 +37,9 @@ CORE_COMPONENTS = [
         protocols=[],
         dependencies=["Dynamics", "EphemerisSystem"],
         layer="core",
-        description="星历 N 体动力学",
+        description=(
+            "星历 N 体动力学（遗留，仅供 multiple_shooting/homotopy 内部使用；新代码用 ForceModel）"
+        ),
     ),
     Component(
         name="Orbit",

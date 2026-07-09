@@ -27,7 +27,6 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .ephemeris_dynamics import EphemerisDynamics as EphemerisDynamics
     from .ephemeris_system import EphemerisSystem as EphemerisSystem
     from .spice import SPICEManager as SPICEManager
     from .standard_axes import ITRFSpiceAxes as ITRFSpiceAxes
@@ -62,7 +61,6 @@ from .system import System
 _LAZY_SPICE_EXPORTS: dict[str, str] = {
     "SPICEManager": "e2m2e.core.spice",
     "EphemerisSystem": "e2m2e.core.ephemeris_system",
-    "EphemerisDynamics": "e2m2e.core.ephemeris_dynamics",
     "ITRFSpiceAxes": "e2m2e.core.standard_axes",
     "CelestialBodyOrigin": "e2m2e.core.standard_origins",
 }
