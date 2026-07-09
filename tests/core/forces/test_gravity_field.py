@@ -302,7 +302,8 @@ class TestMoonTideIntegration:
 
         C_t0, S_t0 = gf_solid._effective_coefficients(t=0.0, system=sys_stub)
         C_t1, S_t1 = gf_solid._effective_coefficients(
-            t=86400.0 * 30, system=sys_stub  # 30 天后
+            t=86400.0 * 30,
+            system=sys_stub,  # 30 天后
         )
         # Stub 返回固定扰动体位置 → Δ 恒定(无 Step2 时变性)
         np.testing.assert_allclose(C_t0, C_t1, atol=1e-15)
@@ -313,9 +314,7 @@ class TestMoonTideIntegration:
 # 天体无关改造(issue #187):按 body 切换 body-fixed frame 与默认重力文件
 # ----------------------------------------------------------------------------
 
-_KERNELS_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "kernels"
-)
+_KERNELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "kernels")
 
 
 class _SystemStub:
@@ -511,4 +510,3 @@ class TestBodyAgnosticGravityField:
         acc = gf.compute_acceleration(0.0, state, None)
         expected = -gf.gravitational_parameter / np.linalg.norm(r) ** 3 * r
         np.testing.assert_allclose(acc, expected, rtol=1e-12)
-

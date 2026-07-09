@@ -82,9 +82,7 @@ class TestThirdBodyGravityInterface:
         force = ThirdBodyGravity(body="moon")
         assert force.body == "MOON"
 
-    def test_compute_acceleration_shape(
-        self, spice_eph_system, reference_et, dro_state
-    ):
+    def test_compute_acceleration_shape(self, spice_eph_system, reference_et, dro_state):
         """加速度输出应为 (3,)。"""
         force = ThirdBodyGravity("MOON")
         acc = force.compute_acceleration(reference_et, dro_state, spice_eph_system)
@@ -109,9 +107,7 @@ class TestThirdBodyAccelMatchesEphemeris:
         self, spice_eph_dynamics, spice_eph_system, reference_et, dro_state
     ):
         """ThirdBodyGravity("MOON") 的单点加速度 == EphemerisDynamics 月球第三体增量。"""
-        expected = _third_body_contribution(
-            spice_eph_dynamics, reference_et, dro_state[:3], "MOON"
-        )
+        expected = _third_body_contribution(spice_eph_dynamics, reference_et, dro_state[:3], "MOON")
 
         force = ThirdBodyGravity("MOON")
         acc = force.compute_acceleration(reference_et, dro_state, spice_eph_system)
@@ -122,9 +118,7 @@ class TestThirdBodyAccelMatchesEphemeris:
         self, spice_eph_dynamics, spice_eph_system, reference_et, dro_state
     ):
         """ThirdBodyGravity("SUN") 的单点加速度 == EphemerisDynamics 太阳第三体增量。"""
-        expected = _third_body_contribution(
-            spice_eph_dynamics, reference_et, dro_state[:3], "SUN"
-        )
+        expected = _third_body_contribution(spice_eph_dynamics, reference_et, dro_state[:3], "SUN")
 
         force = ThirdBodyGravity("SUN")
         acc = force.compute_acceleration(reference_et, dro_state, spice_eph_system)

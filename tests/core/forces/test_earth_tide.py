@@ -93,12 +93,18 @@ class TestSolidTideStep1:
         """单个 (position, gm) 元组也应被接受(兼容旧调用方)。"""
         pos = np.array([_MOON_DIST, 0.0, 0.0])
         dC_list, _ = solid_tide_step1(
-            [(pos, _MOON_MU)], k_love=_K_EARTH, k_plus=_K_PLUS_EARTH,
-            mu_central=_EARTH_MU, r_central=_EARTH_R,
+            [(pos, _MOON_MU)],
+            k_love=_K_EARTH,
+            k_plus=_K_PLUS_EARTH,
+            mu_central=_EARTH_MU,
+            r_central=_EARTH_R,
         )
         dC_tuple, _ = solid_tide_step1(
-            (pos, _MOON_MU), k_love=_K_EARTH, k_plus=_K_PLUS_EARTH,
-            mu_central=_EARTH_MU, r_central=_EARTH_R,
+            (pos, _MOON_MU),
+            k_love=_K_EARTH,
+            k_plus=_K_PLUS_EARTH,
+            mu_central=_EARTH_MU,
+            r_central=_EARTH_R,
         )
         np.testing.assert_allclose(dC_list, dC_tuple, atol=0.0)
 
@@ -109,8 +115,10 @@ class TestSolidTideStep1:
         moon_pos = np.array([_MOON_DIST, 0.0, 0.0])
         dC_both, dS_both = solid_tide_step1(
             [(sun_pos, sun_mu), (moon_pos, _MOON_MU)],
-            k_love=_K_EARTH, k_plus=_K_PLUS_EARTH,
-            mu_central=_EARTH_MU, r_central=_EARTH_R,
+            k_love=_K_EARTH,
+            k_plus=_K_PLUS_EARTH,
+            mu_central=_EARTH_MU,
+            r_central=_EARTH_R,
         )
         dC_sun, dS_sun = _earth_step1_single(sun_pos, sun_mu)
         dC_moon, dS_moon = _earth_step1_single(moon_pos, _MOON_MU)
@@ -122,8 +130,10 @@ class TestSolidTideStep1:
         pos = np.array([_MOON_DIST, 0.0, 0.0])
         dC, dS = solid_tide_step1(
             [(pos, _MOON_MU)],
-            k_love=_K_EARTH, k_plus=None,
-            mu_central=_EARTH_MU, r_central=_EARTH_R,
+            k_love=_K_EARTH,
+            k_plus=None,
+            mu_central=_EARTH_MU,
+            r_central=_EARTH_R,
         )
         # n=4 全零
         assert np.all(dC[4, :] == 0.0)
@@ -193,8 +203,10 @@ class TestMoonSolidTideStep1:
         earth_pos = np.array([_MOON_DIST, 0.0, 0.0])
         dC, dS = solid_tide_step1(
             [(earth_pos, _EARTH_MU)],
-            k_love=_moon_k_love(), k_plus=None,
-            mu_central=_MOON_MU, r_central=_MOON_R,
+            k_love=_moon_k_love(),
+            k_plus=None,
+            mu_central=_MOON_MU,
+            r_central=_MOON_R,
         )
         # ΔC20 应非零且 < 0(P20(0)<0)
         assert dC[2, 0] != 0.0
@@ -208,12 +220,18 @@ class TestMoonSolidTideStep1:
         pos = np.array([_MOON_DIST, 0.0, 0.0])
         # 同样扰动体/中心天体,仅 Love 数不同
         dC_earth, _ = solid_tide_step1(
-            [(pos, _MOON_MU)], k_love=_K_EARTH, k_plus=_K_PLUS_EARTH,
-            mu_central=_EARTH_MU, r_central=_EARTH_R,
+            [(pos, _MOON_MU)],
+            k_love=_K_EARTH,
+            k_plus=_K_PLUS_EARTH,
+            mu_central=_EARTH_MU,
+            r_central=_EARTH_R,
         )
         dC_moon_love, _ = solid_tide_step1(
-            [(pos, _MOON_MU)], k_love=_moon_k_love(), k_plus=None,
-            mu_central=_EARTH_MU, r_central=_EARTH_R,
+            [(pos, _MOON_MU)],
+            k_love=_moon_k_love(),
+            k_plus=None,
+            mu_central=_EARTH_MU,
+            r_central=_EARTH_R,
         )
         ratio = abs(dC_moon_love[2, 0]) / abs(dC_earth[2, 0])
         # k₂比例 ≈ 0.024116/0.30190 ≈ 0.0799
@@ -225,8 +243,10 @@ class TestMoonSolidTideStep1:
         earth_pos = np.array([_MOON_DIST, 0.0, 0.0])
         dC, dS = solid_tide_step1(
             [(earth_pos, _EARTH_MU)],
-            k_love=_moon_k_love(), k_plus=None,
-            mu_central=_MOON_MU, r_central=_MOON_R,
+            k_love=_moon_k_love(),
+            k_plus=None,
+            mu_central=_MOON_MU,
+            r_central=_MOON_R,
         )
         assert np.all(dC[4, :] == 0.0)
         assert np.all(dS[4, :] == 0.0)
@@ -243,8 +263,10 @@ class TestMoonSolidTideStep1:
 
         dC, _ = solid_tide_step1(
             [(earth_pos, _EARTH_MU)],
-            k_love=_moon_k_love(), k_plus=None,
-            mu_central=_MOON_MU, r_central=_MOON_R,
+            k_love=_moon_k_love(),
+            k_plus=None,
+            mu_central=_MOON_MU,
+            r_central=_MOON_R,
         )
         np.testing.assert_allclose(dC[2, 0], expected_C20, rtol=1e-12)
 
