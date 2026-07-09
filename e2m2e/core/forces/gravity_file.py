@@ -248,8 +248,9 @@ def load_cof_file(
             continue
 
         upper = line.upper()
-        # 注释行:以 "COMMENT" 或 "C "（C 后紧跟空格）开头。
-        if upper.startswith("COMMENT") or upper.startswith("C "):
+        # 注释行：以 "COMMENT" 或 "C" 开头（含 GMAT 的 CCCCC 边框注释）。
+        # 数据行以 POTFIELD/RECOEF 开头，不会误判。
+        if upper.startswith("C"):
             continue
 
         if not header_seen:

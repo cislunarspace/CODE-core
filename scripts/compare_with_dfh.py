@@ -117,6 +117,7 @@ def main() -> None:
         "naif0012.tls",
         "pck00010.tpc",
         "earth_latest_high_prec.bpc",
+        "SPICEEarthPredictedKernel.bpc",  # 预测内核，覆盖到 2125 年（补 earth_latest 到 2026-06-12 的缺口）
         "SPICELunaFrameKernel.tf",
         "SPICELunaCurrentKernel.bpc",
     ]
@@ -174,9 +175,8 @@ def main() -> None:
         # 坐标系约定（与 EphemerisDynamics 的 N 体闭式一致）：以地球为原点的
         # 加速系，每个摄动天体需补间接项 -μ_i·r_i/|r_i|³。GravityField 只算
         # 球谐直接引力（含中心项 degree=0），不带间接项；故：
-        #   - 地球用 PointMassGravity（L1 处非球形可忽略；且 earth_latest_high_prec.bpc
-        #     只覆盖到 2026-06-12，用 GravityField EARTH 会因 ITRF93 变换超覆盖而失败）
-        #   - 月球用 GravityField（含中心 + 非球形 + 固体潮）+ IndirectTerm（补间接项）
+        #   - 地球用 GravityField（真 EGM96 10×10 + 固体潮）
+        #   - 月球用 GravityField（含中心 + 非球形 GRGM900C 10×10 + 固体潮）+ IndirectTerm（补间接项）
         #   - 不用 ThirdBodyGravity("MOON")（会与 GravityField MOON 的 degree=0 重复）
         #   - 太阳/行星用 ThirdBodyGravity（自带直接项+间接项，点质量）
         all_bodies = ["EARTH", "MOON", "SUN",
@@ -189,8 +189,14 @@ def main() -> None:
         )
         fm = ForceModel(system)
         fm.max_step = 600.0
-        # 地球中心引力（点质量；L1 处非球形可忽略）
-        fm.add_force(PointMassGravity("EARTH"), name="earth")
+        # 地球引力场（真 EGM96 10×10 + 固体潮）
+        earth_cof = str(project_root / "e2m2e" / "core" / "forces" / "data"
+                        / "EGM96.cof")
+        fm.add_force(
+            GravityField("EARTH", degree=10, order=10, gravity_file=earth_cof,
+                         tide_mode="solid"),
+            name="earth_gravity",
+        )
         # 月球引力场（中心 + 非球形 GRGM900C 10×10 + 固体潮）
         moon_cof = str(project_root / "e2m2e" / "core" / "forces" / "data"
                        / "grgm900c.cof")
