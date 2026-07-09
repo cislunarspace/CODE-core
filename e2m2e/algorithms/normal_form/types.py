@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -72,6 +73,44 @@ class NormalFormResult:
     qf_result: QuasiFloquetResult | None = None
     cm_result: CenterManifoldResult | None = None
     catalog_transformer: LibrationCatalogTransformer | None = None
+
+    # ------------------------------------------------------------------
+    # 序列化：save / load
+    # ------------------------------------------------------------------
+
+    def save(self, path: str | Path) -> None:
+        """把结果存为 ``.npz`` 文件。
+
+        所有子结果（DS / QF / CM）及 context 参数一并序列化；
+        ``catalog_transformer`` 反序列化时由三个子结果重建，不单独存储。
+
+        Args:
+            path: 输出 ``.npz`` 文件路径；父目录自动创建。
+        """
+        from ._serial import result_to_npz_dict
+
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez(path, **result_to_npz_dict(self))
+
+    @classmethod
+    def load(cls, path: str | Path) -> NormalFormResult:
+        """从 ``.npz`` 文件重建 :class:`NormalFormResult`。
+
+        反序列化后 ``catalog_transformer`` 自动由三个子结果重建，
+        与原始对象在 ``rho_to_param`` / ``param_to_rho`` 上数值等价。
+
+        Args:
+            path: ``.npz`` 文件路径。
+
+        Returns:
+            重建的 :class:`NormalFormResult`。
+        """
+        from ._serial import result_from_npz_dict
+
+        data = np.load(path, allow_pickle=False)
+        d = {k: data[k] for k in data.files}
+        return result_from_npz_dict(d)
 
 
 __all__ = ["NormalFormResult"]
