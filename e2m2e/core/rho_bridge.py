@@ -49,8 +49,12 @@ def compute_emr_rotation(
 
 
 def _jd_to_et(jd: float, system: EphemerisSystem) -> float:
-    """儒略日 → SPICE 历书时（秒）。"""
-    return system.spice.utc_to_et(f"JD {jd:.15f}")
+    """儒略日 → SPICE 历书时（秒）。
+
+    输入 jd 为 TDB 儒略日（与 qiao JD0 约定一致），使用 JDTDB 格式
+    避免 UTC/TDB 的 ~64 秒偏差。
+    """
+    return system.spice.utc_to_et(f"{jd:.20f} JDTDB")
 
 
 def _compute_lp_state_j2000(
