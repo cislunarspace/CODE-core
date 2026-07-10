@@ -86,7 +86,7 @@ class DynamicalSubstituteResult:
     Attributes:
         context: 关联 :class:`NormalFormContext`。
         order: 展开阶数（与 ``context.order`` 一致）。
-        substitute_orbit: 替代轨道 ``e2m2e.Orbit`` 或等价的 ``(n, 6)`` 数组。
+        substitute_orbit: 替代轨道稠密输出，``(n, 6)`` 状态数组。
         tlist: 稠密输出时间数组，形状 ``(n,)``，归一化 TU。
         Xlist: 稠密输出状态数组，形状 ``(n, 6)``。
         W_poly: ``(pow, coef_array)`` 形式的生成函数 ``W(t)``；6 个
@@ -104,7 +104,7 @@ class DynamicalSubstituteResult:
 
     context: NormalFormContext
     order: int
-    substitute_orbit: object  # e2m2e.Orbit or ndarray
+    substitute_orbit: npt.NDArray[np.floating]
     tlist: npt.NDArray[np.floating]
     Xlist: npt.NDArray[np.floating]
     W_poly: dict[tuple[int, ...], npt.NDArray[np.floating]]
@@ -213,7 +213,7 @@ class DynamicalSubstituteCorrector:
         W_poly, Wdot_poly = self._build_W(tlist, Xlist)
 
         # ---- 包装成 Orbit ----
-        substitute_orbit = self._wrap_orbit(tlist, Xlist)
+        substitute_orbit = Xlist
 
         return DynamicalSubstituteResult(
             context=self.context,
@@ -394,17 +394,6 @@ class DynamicalSubstituteCorrector:
                 W_poly[pow_tuple] = B[:, k - 3]
                 Wdot_poly[pow_tuple] = Bdot[:, k - 3]
         return W_poly, Wdot_poly
-
-    def _wrap_orbit(
-        self, tlist: npt.NDArray[np.floating], Xlist: npt.NDArray[np.floating]
-    ) -> object:
-        """把稠密输出包装为 ``e2m2e.Orbit``（失败则退到 ``ndarray``）。"""
-        try:
-            from e2m2e.core.orbit import Orbit
-
-            return Orbit(states=Xlist, times=tlist, system=self.context.system)
-        except Exception:
-            return Xlist
 
 
 # ---------------------------------------------------------------------------
