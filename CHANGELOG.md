@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [5.3.0] - 2026-07-10
+
+### Added
+- rho↔ECI 坐标桥接（#193）：`rho_to_eci`/`eci_to_rho` 把 qiao 的 rho 无量纲状态接入 `ForceModel`（ECI 积分），往返误差 < 1e-9
+- `NormalFormResult.save/load`（#192）：npz 序列化，含 W_series 三层嵌套复值 dict，正规化结果可预计算反复用
+- `ForceModel.propagate` 开放积分器选择（#191）：`method` 参数支持 PD45/PD78/RK89，PD78 与 qiao Rust / GMAT 逐字一致
+
+### Fixed
+- **rho↔ECI 速度变换 bug**：`v_eci` 公式末项误旋转已是 J2000 速度的 `v_LP`（多乘 `C`），致 ECI 积分 72h 轨迹发散 120,065 km。修正后 python-e2m2e 星历链 vs qiao Rust 72h 差异 0.035 km
+- `rho_bridge._jd_to_et` 时间格式：`spice.str2et(f"JD {jd}")` 把 TDB 当 UTC，差 ~68 秒；改用 `f"{jd:.20f} JDTDB"`
+- `SynodicAxes` 数值微分步长 1e-5s→1.0s：原步长严重吃有效数字，Cdot 相对误差 1.36e-3；1.0s 处于舍入-截断平衡，误差降到 ~1e-7
+
+### Changed
+- **坐标系族提为 `core/coordinate/` 子目录**（#197）：12 文件从 core 根层收入子包，与 tests/core/coordinate/ 对齐；`sys.modules` 别名保持 `from e2m2e.core.axes import` 等旧路径零破坏
+- **ForceModel 移除对 Dynamics 的假继承**（#140）：原继承只为复用几个数据属性却全部重写 propagate、对 STM/Jacobi 抛 NotImplementedError（LSP 违反）；改为独立类自持属性
+- 折叠单实现 ABC（#196/#203）：删 PropulsionModel、AtmosphereModel、ShadowModel（各仅一个实现，死灵活性）；XysProvider 按 ADR 0003 保留（GMATXysProvider 是真实需求）
+- `rho_bridge` 用 Protocol 消除 core→algorithms 反向依赖（#198）
+- `MultipleShooting` 三并行后端的段收集逻辑统一（#143），消除 ~30 行重复
+- `DifferentialCorrection` 清理死代码（#141）：`_compute_error_vector` + 3 个从不读取的实例属性
+- `NormalFormResult` 删两个从不填充的幽灵字段（#201）；`_wrap_orbit` 移除过宽 `except Exception`（#204）
+- `propagate` 的 `_prepare_t_eval`/`_estimate_initial_step` 标为 staticmethod（#147）
+- 删废弃 `SearchConfig` 别名与死常量（#202）；修正示例失效导入（#199）；`.gitignore` 修 `*.pyd`/`scripts/*.png` 粘连 bug（#200）
+
+### Removed
+- `EphemerisDynamics` 从 `e2m2e.core` 公开导出移除（降级为内部实现，子模块路径 `e2m2e.core.ephemeris_dynamics` 仍可用）
+- `PropulsionModel`/`AtmosphereModel`/`ShadowModel` ABC、`SearchConfig` 别名（见 Changed）
+
 ## [5.2.0] - 2026-07-09
 
 ### Added
