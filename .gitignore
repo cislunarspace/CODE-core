@@ -134,3 +134,7 @@ website/node_modules/
 
 # scripts 下的产物图（临时对比输出，不入库）
 scripts/*.png
+
+# agent/工具会话产物
+.mimocode/
+.zcode/

@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 import numpy as np
 import numpy.typing as npt
 
-from .cr3bp_system import LibrationPoint
+from ..cr3bp_system import LibrationPoint
 from .synodic_axes import SynodicAxes
 
 if TYPE_CHECKING:

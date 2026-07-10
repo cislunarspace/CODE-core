@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from .coordinate_system import CoordinateSystem
+from .coordinate.coordinate_system import CoordinateSystem
 from .enums import ReferenceFrame, UnitSystem
 from .spice import SPICEManager
 from .system import System

@@ -27,42 +27,69 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from .coordinate.standard_axes import ITRFSpiceAxes as ITRFSpiceAxes
+    from .coordinate.standard_origins import CelestialBodyOrigin as CelestialBodyOrigin
     from .ephemeris_system import EphemerisSystem as EphemerisSystem
     from .spice import SPICEManager as SPICEManager
-    from .standard_axes import ITRFSpiceAxes as ITRFSpiceAxes
-    from .standard_origins import CelestialBodyOrigin as CelestialBodyOrigin
 
 from . import dynamics, orbit, potential, system
-from .axes import Axes
-from .coordinate_system import CoordinateSystem
-from .cr3bp_system import CR3BP_System, LibrationPoint
-from .dynamic_axes import DynamicAxes
-from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
-from .enums import ReferenceFrame
-from .orbit import Orbit, OrbitFamily
-from .origin import Origin
-from .potential import pseudo_potential_hessian
-from .standard_axes import (
-    GMATITRFAxes,
+from .coordinate import (
+    Axes,
+    CoordinateSystem,
+    DynamicAxes,
     IAU2000EqAxes,
+    GMATITRFAxes,
     ICRSAxes,
     ITRFApproxAxes,
     ITRFAxes,
+    InertialOrigin,
+    LVLHAxes,
+    Origin,
+    VNBAxes,
     standard_icrf,
     standard_itrf,
 )
-from .standard_dynamic_axes import LVLHAxes, VNBAxes
-from .standard_origins import InertialOrigin
-from .synodic_j2000 import SynodicJ2000System
+from .coordinate import SynodicJ2000System
+from .cr3bp_system import CR3BP_System, LibrationPoint
+from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
+from .enums import ReferenceFrame
+from .orbit import Orbit, OrbitFamily
+from .potential import pseudo_potential_hessian
 from .system import System
+
+# 坐标系族已收入 .coordinate 子包（issue #197）。为保持对外导入路径零破坏，
+# 把旧路径 e2m2e.core.<mod> 注册为指向 e2m2e.core.coordinate.<mod> 的别名，
+# 使 `from e2m2e.core.axes import Axes` 等既有写法继续可用。
+import sys as _sys
+
+from . import coordinate as _coordinate
+
+for _mod in (
+    "axes",
+    "origin",
+    "coordinate_system",
+    "dynamic_axes",
+    "standard_axes",
+    "standard_origins",
+    "standard_dynamic_axes",
+    "synodic_axes",
+    "synodic_j2000",
+    "rho_bridge",
+    "xys",
+    "iau_2006",
+):
+    _full = f"{__name__}.{_mod}"
+    if _full not in _sys.modules:
+        _sys.modules[_full] = importlib.import_module(f"{__name__}.coordinate.{_mod}")
+del _sys, _coordinate, _mod, _full
 
 # 星历/SPICE 相关符号通过 __getattr__ 按需延迟导入，避免用户只使用 CR3BP
 # 基础类时强制加载 spiceypy。参见 issue #44。
 _LAZY_SPICE_EXPORTS: dict[str, str] = {
     "SPICEManager": "e2m2e.core.spice",
     "EphemerisSystem": "e2m2e.core.ephemeris_system",
-    "ITRFSpiceAxes": "e2m2e.core.standard_axes",
-    "CelestialBodyOrigin": "e2m2e.core.standard_origins",
+    "ITRFSpiceAxes": "e2m2e.core.coordinate.standard_axes",
+    "CelestialBodyOrigin": "e2m2e.core.coordinate.standard_origins",
 }
 
 

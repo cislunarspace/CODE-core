@@ -9,7 +9,7 @@ import numpy as np
 import numpy.typing as npt
 
 from .origin import Origin
-from .spice import SPICEManager
+from ..spice import SPICEManager
 
 
 class CelestialBodyOrigin(Origin):

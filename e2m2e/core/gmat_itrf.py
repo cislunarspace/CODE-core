@@ -7,7 +7,7 @@ import numpy.typing as npt
 
 from .gmat_eop import EopFile, EopSample
 from .gmat_time import TimeSystemConverter
-from .xys import XysProvider
+from .coordinate.xys import XysProvider
 
 SECONDS_PER_DAY = 86400.0
 J2000_JD = 2451545.0
