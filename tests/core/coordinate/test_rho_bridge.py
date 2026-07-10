@@ -180,6 +180,23 @@ class TestPhysicalPlausibility:
         v_mag = np.linalg.norm(v_eci)
         assert 0.1 < v_mag < 5.0, f"速度 {v_mag:.3f} km/s 超出合理范围"
 
+    def test_stationary_at_libration_point_has_v_lp_velocity(self, system, context):
+        """rho=0、rhodot=0（航天器"停在"平动点）时，ECI 速度应等于平动点的
+        J2000 速度 v_LP，而非 v_LP 经旋转后的 C@v_LP。
+
+        防回归：v_eci 公式末项曾误写 C@v_LP（v_LP 已是 J2000，不该再旋转），
+        导致 72h 跨验证发散 12 万 km。
+        """
+        from e2m2e.core.rho_bridge import _compute_lp_state_j2000, _jd_to_et, rho_to_eci
+
+        t_nd = 0.0
+        jd = context.jd0 + t_nd * context.TU / 86400.0
+        et = _jd_to_et(jd, system)
+        _, v_lp = _compute_lp_state_j2000(et, context, system)
+
+        _, v_eci = rho_to_eci(np.zeros(3), np.zeros(3), t_nd, context, system)
+        assert_allclose(v_eci, v_lp, atol=1e-9)
+
     def test_zero_rho_near_moon_distance(self, system, context):
         """rho=0 时，ECI 位置应接近地月距离（L1 距地 ~83% 地月距离）。"""
         from e2m2e.core.rho_bridge import rho_to_eci

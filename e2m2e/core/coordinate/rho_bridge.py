@@ -153,9 +153,9 @@ def rho_to_eci(
     rho_km = rho_nd * LU
     rhodot_km = rhodot_nd * LU / TU
 
-    # EMR → J2000（C 从 EMR→J2000）
+    # EMR → J2000（C 从 EMR→J2000）。v_LP 已是 J2000 速度，不再旋转。
     r_eci = C @ rho_km + r_LP
-    v_eci = C @ rhodot_km + Cdot @ rho_km + C @ v_LP
+    v_eci = C @ rhodot_km + Cdot @ rho_km + v_LP
 
     return r_eci, v_eci
 
@@ -191,12 +191,13 @@ def eci_to_rho(
     C, Cdot = compute_emr_rotation(et, system)
     r_LP, v_LP = _compute_lp_state_j2000(et, context, system)
 
-    # J2000 → EMR（C.T 从 J2000→EMR）
-    # rho_km = C.T @ (r_eci - r_LP), rhodot_km = C.T @ v_eci - C.T @ Cdot @ rho_km - v_LP
+    # J2000 → EMR（C.T 从 J2000→EMR）。v_LP 已是 J2000 速度，逆变换时需转回 EMR。
+    # rho_km = C.T @ (r_eci - r_LP)
+    # rhodot_km = C.T @ v_eci - C.T @ Cdot @ rho_km - C.T @ v_LP
     rho_km = C.T @ (r_eci - r_LP)
     rho_nd = rho_km / LU
 
-    rhodot_km = C.T @ v_eci - C.T @ Cdot @ rho_km - v_LP
+    rhodot_km = C.T @ v_eci - C.T @ Cdot @ rho_km - C.T @ v_LP
     rhodot_nd = rhodot_km * TU / LU
 
     return rho_nd, rhodot_nd
