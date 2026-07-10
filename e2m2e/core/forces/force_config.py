@@ -14,7 +14,7 @@ from typing import Any, cast
 
 import numpy as np
 
-from e2m2e.core.atmosphere import AtmosphereModel, ExponentialAtmosphere
+from e2m2e.core.atmosphere import ExponentialAtmosphere
 
 from .drag import DragModel
 from .exceptions import NotSerializableError
@@ -22,7 +22,7 @@ from .gravity_field import GravityField
 from .physical_model import PhysicalModel
 from .point_mass_gravity import PointMassGravity
 from .relativistic_correction import RelativisticCorrection
-from .shadow import ConicalShadowModel, ShadowModel
+from .shadow import ConicalShadowModel
 from .srp import SolarRadiationPressure
 from .third_body_gravity import ThirdBodyGravity
 from .thrust import FiniteBurn
@@ -40,7 +40,7 @@ def _serialize_exponential_atmosphere(atm: ExponentialAtmosphere) -> dict[str, A
 _ATMOS_SERIALIZERS[ExponentialAtmosphere] = _serialize_exponential_atmosphere
 
 
-def _serialize_atmosphere(atm: AtmosphereModel) -> dict[str, Any]:
+def _serialize_atmosphere(atm: ExponentialAtmosphere) -> dict[str, Any]:
     """把大气模型序列化为 ``{type, params}`` 字典。"""
     serializer = _ATMOS_SERIALIZERS.get(type(atm))
     if serializer is None:
@@ -48,7 +48,7 @@ def _serialize_atmosphere(atm: AtmosphereModel) -> dict[str, Any]:
     return {"type": type(atm).__name__, "params": serializer(atm)}
 
 
-def _build_atmosphere(config: dict[str, Any]) -> AtmosphereModel:
+def _build_atmosphere(config: dict[str, Any]) -> ExponentialAtmosphere:
     """按配置字典构造大气模型。"""
     builder = _ATMOS_BUILDERS.get(config["type"])
     if builder is None:
@@ -84,7 +84,7 @@ _SHADOW_SERIALIZERS: dict[type, Any] = {
 }
 
 
-def _serialize_shadow(shadow: ShadowModel) -> dict[str, Any]:
+def _serialize_shadow(shadow: ConicalShadowModel) -> dict[str, Any]:
     """把阴影模型序列化为 ``{type, params}`` 字典。"""
     serializer = _SHADOW_SERIALIZERS.get(type(shadow))
     if serializer is None:
@@ -102,7 +102,7 @@ _SHADOW_BUILDERS: dict[str, Any] = {
 }
 
 
-def _build_shadow(config: dict[str, Any]) -> ShadowModel:
+def _build_shadow(config: dict[str, Any]) -> ConicalShadowModel:
     """按配置字典构造阴影模型。"""
     builder = _SHADOW_BUILDERS.get(config["type"])
     if builder is None:

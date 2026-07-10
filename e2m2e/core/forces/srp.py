@@ -27,7 +27,7 @@ from ..constants import AU, KM_TO_M
 from .physical_model import PhysicalModel, require_inertial_frame
 
 if TYPE_CHECKING:
-    from .shadow import ShadowModel
+    from .shadow import ConicalShadowModel
 
 # 1 AU 处太阳光压常数（N/m²）。等价于 GMAT flux/c = 1367 / 2.998e8。
 _P_SRP_1AU = 4.56e-6
@@ -48,7 +48,7 @@ class SolarRadiationPressure(PhysicalModel):
         area: float,
         mass: float,
         cr: float = 1.5,
-        shadow: ShadowModel | None = None,
+        shadow: ConicalShadowModel | None = None,
     ) -> None:
         self._area = float(area)
         self._mass = float(mass)
@@ -75,7 +75,7 @@ class SolarRadiationPressure(PhysicalModel):
         return self._cr
 
     @property
-    def shadow(self) -> ShadowModel | None:
+    def shadow(self) -> ConicalShadowModel | None:
         """注入的阴影模型，``None`` 表示全光照。"""
         return self._shadow
 

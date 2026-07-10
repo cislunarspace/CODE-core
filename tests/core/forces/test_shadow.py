@@ -8,16 +8,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.core.forces.shadow import ConicalShadowModel, ShadowModel
+from e2m2e.core.forces.shadow import ConicalShadowModel
 
 _AU_KM = 149597870.691
 _R_EARTH = 6378.1363
 _R_SUN = 695700.0
-
-
-def test_conical_shadow_model_is_shadow_model() -> None:
-    """ConicalShadowModel 是 ShadowModel 的具体子类。"""
-    assert isinstance(ConicalShadowModel(), ShadowModel)
 
 
 def test_body_flux_factor_full_sun_returns_one() -> None:

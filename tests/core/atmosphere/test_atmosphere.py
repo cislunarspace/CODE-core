@@ -6,7 +6,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.atmosphere import AtmosphereModel, ExponentialAtmosphere
+from e2m2e.core.atmosphere import ExponentialAtmosphere
 
 # USSA76 指数模型基准密度（kg/m³），用于验证误差 < 20%。
 # 这些是 US Standard Atmosphere 1976 分段指数拟合的标准断点值。
@@ -19,12 +19,6 @@ USS76_REFERENCE_DENSITY = {
     500: 5.215e-13,
     700: 3.381e-14,
 }
-
-
-def test_exponential_atmosphere_is_atmosphere_model():
-    """ExponentialAtmosphere 是 AtmosphereModel 的具体子类。"""
-    atm = ExponentialAtmosphere()
-    assert isinstance(atm, AtmosphereModel)
 
 
 def test_density_returns_positive_float():

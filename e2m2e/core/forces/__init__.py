@@ -12,7 +12,7 @@ from .gravity_field import GravityField
 from .physical_model import PhysicalModel
 from .point_mass_gravity import PointMassGravity
 from .relativistic_correction import RelativisticCorrection
-from .shadow import ConicalShadowModel, ShadowModel
+from .shadow import ConicalShadowModel
 from .srp import SolarRadiationPressure
 from .third_body_gravity import ThirdBodyGravity
 from .thrust import BurnApplication, FiniteBurn, ImpulsiveBurn
@@ -26,7 +26,6 @@ __all__ = [
     "GravityField",
     "DragModel",
     "SolarRadiationPressure",
-    "ShadowModel",
     "ConicalShadowModel",
     "ImpulsiveBurn",
     "FiniteBurn",

@@ -12,7 +12,6 @@ References:
 
 from __future__ import annotations
 
-import abc
 from typing import Any
 
 import numpy as np
@@ -29,32 +28,7 @@ _BODY_RADII_KM: dict[str, float] = {
 }
 
 
-class ShadowModel(abc.ABC):
-    """阴影模型抽象基类。
-
-    力模型（如 ``SolarRadiationPressure``）通过 ``flux_factor`` 获取光照份额，
-    不关心具体实现（圆锥、圆柱等）。``flux_factor`` 返回 ∈ [0, 1]：1=全光照，
-    0=本影。
-    """
-
-    @abc.abstractmethod
-    def flux_factor(
-        self,
-        t: float,
-        state: npt.ArrayLike,
-        system: Any,
-    ) -> float:
-        """返回航天器在当前状态下的光照份额 ∈ [0, 1]。
-
-        Args:
-            t: SPICE et 时间（秒）。
-            state: 状态向量，在 ``system.coordinate_system`` 下。
-            system: 动力学系统，提供坐标系与天体星历。
-        """
-        raise NotImplementedError
-
-
-class ConicalShadowModel(ShadowModel):
+class ConicalShadowModel:
     """圆锥阴影模型（本影 + 半影 + 环形食）。
 
     Args:

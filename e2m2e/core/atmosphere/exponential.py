@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from .base import AtmosphereModel
-
 # US Standard Atmosphere 1976 断点密度（kg/m³）。
 # 数据来源：USSA76 标准大气表，覆盖 0-1000 km。
 _USS76_BREAKPOINTS: tuple[tuple[float, float], ...] = (
@@ -53,7 +51,7 @@ _F107_SENSITIVITY = 0.5
 _AP_SENSITIVITY = 0.1
 
 
-class ExponentialAtmosphere(AtmosphereModel):
+class ExponentialAtmosphere:
     """US Standard Atmosphere 1976 分段指数大气密度模型。
 
     在每个高度层内使用 ``ρ(h) = ρ₀ · exp(-(h - h₀) / H)`` 计算密度。

@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e.core.atmosphere import AtmosphereModel
+from e2m2e.core.atmosphere import ExponentialAtmosphere
 from e2m2e.core.constants import KM_TO_M, R_EARTH
 from e2m2e.core.coordinate_system import CoordinateSystem
 from e2m2e.core.standard_axes import ITRFApproxAxes
@@ -36,7 +36,7 @@ class DragModel(PhysicalModel):
 
     def __init__(
         self,
-        atmosphere: AtmosphereModel,
+        atmosphere: ExponentialAtmosphere,
         area: float,
         mass: float,
         body: str = "EARTH",
@@ -55,7 +55,7 @@ class DragModel(PhysicalModel):
             raise ValueError("cd must be positive")
 
     @property
-    def atmosphere(self) -> AtmosphereModel:
+    def atmosphere(self) -> ExponentialAtmosphere:
         """大气密度模型。"""
         return self._atmosphere
 
