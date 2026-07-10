@@ -81,7 +81,7 @@ def visualize_orbit(orbit, system):
     print("-" * 40)
 
     try:
-        from e2m2e.visualization.plotting import OrbitVisualizer
+        from e2m2e.visualization import OrbitVisualizer
 
         from e2m2e.visualization.config import configure_dpi_scaling
 

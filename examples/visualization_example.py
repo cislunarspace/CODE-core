@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import numpy as np
-from e2m2e.visualization.plotting import OrbitVisualizer
+from e2m2e.visualization import OrbitVisualizer
 
 from e2m2e.core.system import CR3BP_System
 from e2m2e.visualization.config import configure_dpi_scaling
