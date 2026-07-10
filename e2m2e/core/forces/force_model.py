@@ -10,7 +10,6 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e.core.dynamics import Dynamics
 from e2m2e.integrators import RkMethod, rk_step
 
 from .physical_model import PhysicalModel
@@ -26,14 +25,19 @@ class ForceEntry:
     enabled: bool = True
 
 
-class ForceModel(Dynamics):
+class ForceModel:
     """聚合多个 PhysicalModel 并完成传播的动力学容器。
 
-    形式上继承 ``Dynamics``，但 ``propagate()`` 使用 Rust ``rk_step``
-    单步步进器实现自适应传播，不依赖 ``scipy.solve_ivp``。
+    不继承 ``Dynamics``：``Dynamics`` 是 CR3BP/Ephemeris 的基类，其
+    ``propagate()`` 基于 ``scipy.solve_ivp`` 与 STM 模板方法；ForceModel 用
+    Rust ``rk_step`` 单步步进器实现自适应传播，且不支持 STM / Jacobi。
+    此前形式上继承 ``Dynamics`` 只为复用几个数据属性，却全部重写 ``propagate``
+    并对 STM/Jacobi 抛 ``NotImplementedError``——是 LSP 违反（假继承）。
     """
 
+    DEFAULT_TOLERANCE = 1e-12
     DEFAULT_MAX_STEP = 60.0  # 秒，用于物理单位传播
+    STATE_DIM = 6  # 状态向量维度 [x, y, z, vx, vy, vz]
 
     def __init__(
         self,
@@ -46,9 +50,14 @@ class ForceModel(Dynamics):
             system: 动力学系统，必须提供 ``coordinate_system``。
             forces: 初始力模型列表，默认空列表。
         """
-        super().__init__(system)
+        self.system = system
         if getattr(system, "coordinate_system", None) is None:
             raise ValueError("ForceModel requires system.coordinate_system to be set.")
+        # 积分器配置（与 Dynamics 同名属性，供 propagate 与外部配置使用）
+        self.rtol: float = self.DEFAULT_TOLERANCE
+        self.atol: float = self.DEFAULT_TOLERANCE
+        self.max_step: float = self.DEFAULT_MAX_STEP
+        self.last_trajectory: tuple[np.ndarray, np.ndarray] | None = None
         self._entries: tuple[ForceEntry, ...] = ()
         if forces is not None:
             for force in forces:
