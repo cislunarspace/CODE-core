@@ -23,9 +23,6 @@ from .transfer_optimization import (
 _HAVE_COPT = transfer_optimization.coptpy is not None
 
 
-DU = 3.84405000e5
-
-
 class Transfer:
     """DRO-RO 转移轨迹优化器
 
