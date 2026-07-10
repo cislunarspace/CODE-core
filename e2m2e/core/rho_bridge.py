@@ -15,17 +15,32 @@ r_LP/v_LP 是平动点在 J2000 中的位置/速度。
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
 
+from .cr3bp_system import LibrationPoint
 from .synodic_axes import SynodicAxes
 
 if TYPE_CHECKING:
-    from e2m2e.algorithms.normal_form.context import NormalFormContext
-
     from .ephemeris_system import EphemerisSystem
+
+
+@runtime_checkable
+class RhoContext(Protocol):
+    """rho↔ECI 桥接所需的最小上下文契约。
+
+    core 层不应认识 algorithms 的类型；本 Protocol 描述 rho_bridge 实际用到的
+    几个属性（归一化参数、平动点选择），让 :class:`NormalFormContext` 等上层
+    类型按结构匹配，消除 core → algorithms 的反向依赖。
+    """
+
+    LU: float
+    TU: float
+    jd0: float
+    gamma: float
+    libration_point: LibrationPoint
 
 
 def compute_emr_rotation(
@@ -59,7 +74,7 @@ def _jd_to_et(jd: float, system: EphemerisSystem) -> float:
 
 def _compute_lp_state_j2000(
     et: float,
-    context: NormalFormContext,
+    context: RhoContext,
     system: EphemerisSystem,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """计算平动点在 J2000 中的位置和速度。
@@ -75,8 +90,6 @@ def _compute_lp_state_j2000(
     Returns:
         ``(r_LP, v_LP)`` 各为 ``(3,)`` 数组，J2000 下 km / km/s。
     """
-    from e2m2e.core.cr3bp_system import LibrationPoint
-
     moon_state = system.get_body_state("MOON", et)
     R_EM = moon_state[:3]
     V_EM = moon_state[3:]
@@ -110,7 +123,7 @@ def rho_to_eci(
     rho_nd: npt.ArrayLike,
     rhodot_nd: npt.ArrayLike,
     t_nd: float,
-    context: NormalFormContext,
+    context: RhoContext,
     system: EphemerisSystem,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """rho 无量纲坐标 → ECI（J2000, km, km/s）。
@@ -151,7 +164,7 @@ def eci_to_rho(
     r_eci: npt.ArrayLike,
     v_eci: npt.ArrayLike,
     t_nd: float,
-    context: NormalFormContext,
+    context: RhoContext,
     system: EphemerisSystem,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """ECI（J2000, km, km/s）→ rho 无量纲坐标。
