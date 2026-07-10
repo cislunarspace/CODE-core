@@ -91,9 +91,6 @@ class DifferentialCorrection:
         self.iteration_count = 0
         self.converged = False
 
-        self.current_state = None
-        self.current_time = None
-        self.current_constraints = None
         self.current_error = None
 
         self.initial_guess = None
@@ -103,8 +100,6 @@ class DifferentialCorrection:
         self.jacobian_matrix = None
 
         self.constraint_indices: list[int] = []
-        self.constraint_weights: dict[str, float] = {}
-        self.constraint_types: dict[str, str] = {}
         self.free_variable_indices: list[int] = []
 
         self.setup_type: str | None = None
@@ -352,8 +347,6 @@ class DifferentialCorrection:
         self.free_variable_indices = list(config.free_variable_indices)
         self.target_conditions = dict(config.target_conditions)
         self.constraint_indices = list(config.constraint_indices)
-        self.constraint_weights = dict(config.constraint_weights)
-        self.constraint_types = dict(config.constraint_types)
 
     def _reset_history(self):
         """重置收敛历史"""
@@ -364,24 +357,6 @@ class DifferentialCorrection:
         self.converged = False
         self.termination_reason = None
         self.success = False
-
-    def _compute_error_vector(self, final_state):
-        """计算约束误差向量
-
-        Args:
-            final_state: 终点状态向量
-
-        Returns:
-            error_vector: 误差向量
-        """
-        constraints = np.array([final_state[idx] for idx in self.constraint_indices])
-        targets = np.zeros(len(self.constraint_indices))
-
-        keys = list(self.target_conditions.keys())
-        for i, key in enumerate(keys):
-            targets[i] = self.target_conditions[key]
-
-        return constraints - targets
 
     def _compute_jacobian_finite_diff(self, current_state, current_time):
         """使用有限差分法计算雅可比矩阵
