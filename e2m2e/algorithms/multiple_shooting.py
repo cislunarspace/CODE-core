@@ -311,11 +311,14 @@ class MultipleShooting:
                 f_starts = []  # 各段起始点处的状态导数 f(t_i, x_i)
                 f_ends = []  # 各段终止点处的状态导数 f(t_{i+1}, x_{i+1})
 
+                # 逐段积分，收集每段的 (终端状态, 终端 STM)。三路后端差异仅在
+                # "如何提交/收集任务"，统一产出 segment_pairs，公共的 4 列表
+                # append 在下面只写一次。
+                segment_pairs: list[tuple[np.ndarray, np.ndarray]] = []
+
                 if use_multiprocess and n_seg > 1:
-                    # ---- 多进程模式 ----
-                    # 只传纯数据（ndarray + tuple），结果仅返回终端切片，减少 IPC 开销
-                    seg_results_mp: dict[int, dict] = {}
-                    future_to_idx_mp = {
+                    # 多进程：_worker_propagate 仅返回终端切片，减少 IPC 开销
+                    future_to_idx = {
                         process_pool.submit(  # type: ignore[union-attr]
                             _worker_propagate,
                             state_work[i].copy(),
@@ -323,27 +326,22 @@ class MultipleShooting:
                         ): i
                         for i in range(n_seg)
                     }
-                    done_count = 0
-                    for done_count, future in enumerate(as_completed(future_to_idx_mp)):
-                        idx = future_to_idx_mp[future]
-                        seg_results_mp[idx] = future.result()
+                    results: dict[int, dict] = {}
+                    for done_count, future in enumerate(as_completed(future_to_idx)):
+                        idx = future_to_idx[future]
+                        results[idx] = future.result()
                         pbar.set_postfix_str(
                             f"propagating {done_count + 1}/{n_seg} segs [mp]",
                             refresh=True,
                         )
-
-                    for i in range(n_seg):
-                        r = seg_results_mp[i]
-                        final_state = r["final_state"]
-                        final_stm = r["final_stm"]
-                        final_states.append(final_state)
-                        stms.append(final_stm)
-                        f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
-                        f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
+                    segment_pairs = [
+                        (results[i]["final_state"], results[i]["final_stm"])
+                        for i in range(n_seg)
+                    ]
 
                 elif use_multithread and n_seg > 1:
-                    # ---- 多线程模式 ----
-                    seg_results: dict[int, object] = {}
+                    # 多线程：_propagate_segment 返回完整 result dict
+                    seg_results: dict[int, dict] = {}
                     with ThreadPoolExecutor(max_workers=self.n_workers) as executor:
                         future_to_idx = {
                             executor.submit(
@@ -354,26 +352,20 @@ class MultipleShooting:
                             ): i
                             for i in range(n_seg)
                         }
-                        done_count = 0
                         for done_count, future in enumerate(as_completed(future_to_idx)):
                             idx = future_to_idx[future]
-                            seg_results[idx] = future.result()
+                            seg_results[idx] = future.result()  # type: ignore[index]
                             pbar.set_postfix_str(
                                 f"propagating {done_count + 1}/{n_seg} segs",
                                 refresh=True,
                             )
-
-                    for i in range(n_seg):
-                        result = seg_results[i]  # type: ignore[index]
-                        final_state = result["states"][-1]  # type: ignore[index]
-                        final_stm = result["stm"][-1]  # type: ignore[index]
-                        final_states.append(final_state)
-                        stms.append(final_stm)
-                        f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
-                        f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
+                    segment_pairs = [
+                        (seg_results[i]["states"][-1], seg_results[i]["stm"][-1])  # type: ignore[index]
+                        for i in range(n_seg)
+                    ]
 
                 else:
-                    # ---- 串行模式 ----
+                    # 串行
                     if seg_pbar is not None:
                         seg_pbar.reset()
                     for i in range(n_seg):
@@ -382,14 +374,16 @@ class MultipleShooting:
                             (t_work[i], t_work[i + 1]),
                             with_stm=True,
                         )
-                        final_state = result["states"][-1]
-                        final_stm = result["stm"][-1]
-                        final_states.append(final_state)
-                        stms.append(final_stm)
-                        f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
-                        f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
+                        segment_pairs.append((result["states"][-1], result["stm"][-1]))
                         if seg_pbar is not None:
                             seg_pbar.update(1)
+
+                # 公共收集：每段的终端状态/STM + 两端点的状态导数
+                for i, (final_state, final_stm) in enumerate(segment_pairs):
+                    final_states.append(final_state)
+                    stms.append(final_stm)
+                    f_starts.append(self.dynamics.equations_of_motion(t_work[i], state_work[i]))
+                    f_ends.append(self.dynamics.equations_of_motion(t_work[i + 1], final_state))
 
                 # === 第二步：构建残差向量 F ===
                 # 残差定义：F_i = φ(t_{i+1}; t_i, x_i) - x_{i+1}
