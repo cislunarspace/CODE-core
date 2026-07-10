@@ -368,8 +368,6 @@ def result_to_npz_dict(result: NormalFormResult) -> dict[str, Any]:
     d["_nfr_residual"] = np.array(result.residual)
     d["_nfr_success"] = np.array(int(result.success))
     d["_nfr_message"] = _encode_str(result.message)
-    for i, arr in enumerate(result.hamiltonian_coefficients):
-        d[f"_nfr_hc_{i}"] = np.asarray(arr, dtype=float)
 
     # 子结果
     if result.ds_result is not None:
@@ -415,14 +413,6 @@ def result_from_npz_dict(d: dict[str, Any]) -> NormalFormResult:
     success = bool(int(d["_nfr_success"]))
     message = str(d["_nfr_message"])
 
-    # hamiltonian_coefficients
-    hc_list = []
-    i = 0
-    while f"_nfr_hc_{i}" in d:
-        hc_list.append(d[f"_nfr_hc_{i}"])
-        i += 1
-    hamiltonian_coefficients = tuple(hc_list)
-
     # 子结果
     ds_result = None
     if "_has_ds" in d:
@@ -450,7 +440,6 @@ def result_from_npz_dict(d: dict[str, Any]) -> NormalFormResult:
     return NormalFormResult(
         context=ctx,
         order=order,
-        hamiltonian_coefficients=hamiltonian_coefficients,
         residual=residual,
         success=success,
         message=message,

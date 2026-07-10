@@ -288,8 +288,6 @@ def test_normal_form_result_is_constructible(earth_moon_system):
     assert res.context is ctx
     assert res.order == 2
     assert res.success is False
-    assert res.hamiltonian_coefficients == ()
-    assert res.transformation_matrices == ()
     assert res.metadata == {}
 
 

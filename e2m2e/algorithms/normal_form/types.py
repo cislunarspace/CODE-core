@@ -32,9 +32,9 @@ class NormalFormResult:
 
     字段分两组：
 
-    - **通用化简诊断**（``hamiltonian_coefficients``、``transformation_matrices``、
-      ``residual``、``success``、``message``、``metadata``）：跨切片稳定，描述
-      整条流水线的收敛情况。保留给仅关心"是否收敛、残差多大"的诊断调用方。
+    - **通用化简诊断**（``residual``、``success``、``message``、``metadata``）：
+      跨切片稳定，描述整条流水线的收敛情况。保留给仅关心"是否收敛、残差多大"
+      的诊断调用方。
     - **子结果句柄**（``ds_result`` / ``qf_result`` / ``cm_result`` /
       ``catalog_transformer``）：issue #175 新增。指向四个子 reducer 的产物；
       ``catalog_transformer`` 一等公民字段使外部用户能直接
@@ -47,8 +47,6 @@ class NormalFormResult:
     Attributes:
         context: 关联的 ``NormalFormContext``。
         order: 实际展开阶数（一般等于 ``context.order``）。
-        hamiltonian_coefficients: 截断 Hamilton 量各阶系数。
-        transformation_matrices: 各阶近恒等变换矩阵 ``T_k``（如 Quasi-Floquet 矩阵）。
         residual: 截断后剩余项的范数估计。
         success: 流水线是否在容差内收敛。
         message: 人类可读的终止原因。
@@ -63,8 +61,6 @@ class NormalFormResult:
 
     context: NormalFormContext
     order: int
-    hamiltonian_coefficients: tuple[npt.NDArray[np.floating], ...] = ()
-    transformation_matrices: tuple[npt.NDArray[np.floating], ...] = ()
     residual: float = 0.0
     success: bool = False
     message: str = ""
