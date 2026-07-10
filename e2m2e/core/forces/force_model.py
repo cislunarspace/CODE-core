@@ -468,8 +468,9 @@ class ForceModel:
             "terminal_event_index": None,
         }
 
+    @staticmethod
     def _prepare_t_eval(
-        self, t0: float, tf: float, t_eval: npt.ArrayLike | None
+        t0: float, tf: float, t_eval: npt.ArrayLike | None
     ) -> npt.NDArray[np.floating]:
         """准备并校验 t_eval 数组。"""
         if t_eval is None:
@@ -495,7 +496,8 @@ class ForceModel:
         t_eval = np.clip(t_eval, t0, tf)
         return np.asarray(t_eval, dtype=float)
 
-    def _estimate_initial_step(self, y: npt.NDArray[np.floating], t0: float, tf: float) -> float:
+    @staticmethod
+    def _estimate_initial_step(y: npt.NDArray[np.floating], t0: float, tf: float) -> float:
         """从初始状态估算初始步长。"""
         r = float(np.linalg.norm(y[:3]))
         v = float(np.linalg.norm(y[3:]))
