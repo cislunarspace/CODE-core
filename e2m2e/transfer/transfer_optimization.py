@@ -29,7 +29,7 @@ from .config import TransferConfig, TransferOptimizationResult
 # 等既有 API 兼容（外部模块通过 ``_HAVE_COPT = transfer_optimization.coptpy is not None`` 判定）。
 from .nlp_copt import coptpy, optimize_with_copt  # noqa: F401
 from .nlp_core import NLPOptimizationVariables
-from .propulsion import ImpulsivePropulsion, PropulsionModel
+from .propulsion import ImpulsivePropulsion
 from .terminal import OrbitTerminal, TerminalCondition
 
 
@@ -74,7 +74,7 @@ class DROTRONLPOptimizer:
         arrival_orbit: Orbit | None = None,
         departure_state: np.ndarray | None = None,
         config: TransferConfig | None = None,
-        propulsion: PropulsionModel | None = None,
+        propulsion: ImpulsivePropulsion | None = None,
     ):
         """初始化 NLP 优化器（issue #161）。
 
@@ -159,7 +159,7 @@ class DROTRONLPOptimizer:
         arrival_orbit: Orbit,
         departure_state: np.ndarray | None = None,
         config: TransferConfig | None = None,
-        propulsion: PropulsionModel | None = None,
+        propulsion: ImpulsivePropulsion | None = None,
     ) -> DROTRONLPOptimizer:
         """通过 ``Orbit`` 直接构造（向后兼容的便捷类方法）。
 
@@ -601,7 +601,7 @@ def optimize_transfer(
     arrival_orbit: Orbit,
     departure_state: np.ndarray,
     initial_guess: NLPOptimizationVariables | None = None,
-    propulsion: PropulsionModel | None = None,
+    propulsion: ImpulsivePropulsion | None = None,
     **kwargs,
 ) -> TransferOptimizationResult:
     """便捷函数: 优化 DRO→RO 转移（SciPy SLSQP 后端）

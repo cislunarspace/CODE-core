@@ -1,6 +1,6 @@
 """推进模型模块测试。
 
-覆盖 PropulsionModel 抽象基类与 ImpulsivePropulsion 具体实现。
+覆盖 ImpulsivePropulsion 具体实现。
 """
 
 from __future__ import annotations
@@ -9,18 +9,7 @@ import numpy as np
 import pytest
 
 from e2m2e.transfer.cost import TransferCost
-from e2m2e.transfer.propulsion import ImpulsivePropulsion, PropulsionModel
-
-# =============================================================================
-# PropulsionModel 抽象基类
-# =============================================================================
-
-
-def test_propulsion_model_is_abstract():
-    """PropulsionModel 不能直接实例化。"""
-    with pytest.raises(TypeError):
-        PropulsionModel()
-
+from e2m2e.transfer.propulsion import ImpulsivePropulsion
 
 # =============================================================================
 # ImpulsivePropulsion 初始化

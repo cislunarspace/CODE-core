@@ -5,7 +5,7 @@
 
 from . import transfer_optimization
 from .config import TransferConfig, TransferOptimizationResult
-from .propulsion import ImpulsivePropulsion, PropulsionModel
+from .propulsion import ImpulsivePropulsion
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 from .transfer import Transfer
 from .transfer_optimization import (
@@ -33,7 +33,6 @@ __all__ = [
     "load_orbit_from_json",
     "optimize_transfer",
     "optimize_with_copt",
-    "PropulsionModel",
     "ImpulsivePropulsion",
     "TerminalCondition",
     "OrbitTerminal",

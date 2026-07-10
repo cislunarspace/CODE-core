@@ -12,7 +12,7 @@ from ..core.dynamics import CR3BP_Dynamics
 from ..core.orbit import Orbit
 from . import transfer_optimization
 from .config import TransferConfig, TransferOptimizationResult
-from .propulsion import ImpulsivePropulsion, PropulsionModel
+from .propulsion import ImpulsivePropulsion
 from .terminal import OrbitTerminal, TerminalCondition
 from .transfer_optimization import (
     DROTRONLPOptimizer,
@@ -33,7 +33,7 @@ class Transfer:
     def __init__(
         self,
         dynamics: CR3BP_Dynamics,
-        propulsion: PropulsionModel | None = None,
+        propulsion: ImpulsivePropulsion | None = None,
     ):
         """初始化转移优化器
 

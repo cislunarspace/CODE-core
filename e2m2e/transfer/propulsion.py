@@ -1,13 +1,11 @@
-"""推进模型抽象与脉冲推进实现。
+"""脉冲推进模型。
 
-提供 ``PropulsionModel`` 抽象基类及 ``ImpulsivePropulsion`` 具体实现，
-用于计算转移轨道的出发注入速度与代价。
+提供 :class:`ImpulsivePropulsion`，用于计算转移轨道的出发注入速度与代价。
 """
 
 from __future__ import annotations
 
 import warnings
-from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
@@ -15,48 +13,7 @@ import numpy as np
 from .cost import TransferCost, compute_transfer_cost
 
 
-class PropulsionModel(ABC):
-    """推进模型抽象基类。
-
-    定义转移轨道出发注入速度计算与代价评估的接口。
-    """
-
-    @abstractmethod
-    def compute_departure_velocity(self, state: np.ndarray, **params: Any) -> np.ndarray:
-        """根据出发点状态与参数计算出发注入速度。
-
-        Args:
-            state: 出发点六维状态 ``[x, y, z, vx, vy, vz]``。
-            **params: 模型特定参数（如 ``alpha``、``beta`` 等）。
-
-        Returns:
-            注入速度向量 ``[vx, vy, vz]``。
-        """
-        ...
-
-    @abstractmethod
-    def compute_cost(
-        self,
-        departure_state: np.ndarray,
-        initial_velocity: np.ndarray,
-        final_velocity: np.ndarray,
-        insertion_velocity: np.ndarray,
-    ) -> TransferCost:
-        """计算转移代价。
-
-        Args:
-            departure_state: 出发点六维状态 ``[x, y, z, vx, vy, vz]``。
-            initial_velocity: 出发注入速度（调整后） ``[vx, vy, vz]``。
-            final_velocity: 转移轨迹末端速度 ``[vx, vy, vz]``。
-            insertion_velocity: 目标轨道插入点速度 ``[vx, vy, vz]``。
-
-        Returns:
-            ``TransferCost`` 含 ``dv1``、``dv2`` 及 ``total``。
-        """
-        ...
-
-
-class ImpulsivePropulsion(PropulsionModel):
+class ImpulsivePropulsion:
     """脉冲推进模型。
 
     将出发速度分解为切向与法向分量：
@@ -122,7 +79,7 @@ class ImpulsivePropulsion(PropulsionModel):
     ) -> TransferCost:
         """计算转移代价。
 
-        委托给 ``e2m2e.transfer.cost.compute_transfer_cost``。
+        委托给 :func:`e2m2e.transfer.cost.compute_transfer_cost`。
 
         Args:
             departure_state: 出发点六维状态 ``[x, y, z, vx, vy, vz]``。
