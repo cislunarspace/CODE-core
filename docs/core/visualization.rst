@@ -80,3 +80,5 @@ TransferPlotter
 - ``XY`` — x-y 平面（默认）
 - ``XZ`` — x-z 平面
 - ``YZ`` — y-z 平面
+
+可运行示例见 ``examples/visualization_example.py``。

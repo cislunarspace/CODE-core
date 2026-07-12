@@ -336,3 +336,5 @@ Cowell 直接积分二阶 ODE :math:`\ddot{x} = a(t, x)`，避免将位置和速
 .. code-block:: python
 
    import numpy as np
+
+可运行示例见 ``examples/integrator_comparison.py``。

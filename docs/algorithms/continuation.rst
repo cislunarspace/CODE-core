@@ -82,3 +82,5 @@ Halo 轨道有专用的延拓编排，结合 Richardson 三阶解析近似和延
    for orbit in family:
        if hasattr(orbit, 'converged') and not orbit.converged:
            print(f"步 {i} 未收敛")
+
+可运行示例见 ``examples/continuation_example.py``。

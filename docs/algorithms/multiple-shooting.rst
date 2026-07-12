@@ -113,3 +113,5 @@
 
 - Montenbruck O, Gill E. *Satellite Orbits*, Chapter 7.
 - 轨道力学中的多重打靶法：将长弧段分解为短弧段序列，降低对初始猜测的敏感性。
+
+可运行示例见 ``examples/multiple_shooting_example.py``。
