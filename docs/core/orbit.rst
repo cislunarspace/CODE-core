@@ -1,90 +1,95 @@
 轨道
 ====
 
-e2m2e 的轨道数据结构与操作。
+e2m2e 的轨道数据结构。
 
 Orbit 类
 --------
 
-:class:`~e2m2e.core.orbit.Orbit` 是最基本的轨道数据容器，用于存储、计算和持久化一条 CR3BP 轨道的全部信息。
+:class:`~e2m2e.core.orbit.Orbit` 是轨道数据容器，存储状态序列与时间序列。
 
 **核心属性：**
 
-- ``states``: 状态序列 ``[x, y, z, vx, vy, vz]``，形状 ``(n, 6)``
-- ``times``: 时间序列，形状 ``(n,)``
-- ``system``: 关联的 CR3BP_System 对象
-
-**计算属性（property）：**
-
-- ``period``: 轨道周期
-- ``amplitudes``: x/y/z 方向振幅
-- ``extrema``: 各分量极值
-- ``center``: 轨道中心
-- ``monodromy_matrix``: 单周期转移矩阵
-- ``eigenvalues``: 特征值
-- ``stability_index``: 稳定性指标
+- ``states`` — 状态序列 ``[x, y, z, vx, vy, vz]``，形状 ``(n_points, 6)``
+- ``times`` — 时间序列，形状 ``(n_points,)``
+- ``system`` — 关联的系统对象（``CR3BP_System`` 或 ``EphemerisSystem``）
 
 .. code-block:: python
 
-   from e2m2e.core.orbit import Orbit
-   from e2m2e.core.system import CR3BP_System
+   from e2m2e.core import Orbit
    import numpy as np
 
-   system = CR3BP_System.from_known_system("earth_moon")
+   # 从状态序列创建
+   orbit = Orbit(
+       states=np.array([[0.8, 0, 0, 0, 0.6, 0]]),
+       times=np.array([0.0]),
+       system=system,
+   )
 
-   # 从状态序列创建轨道
-   states = np.array([...])  # (n, 6)
-   times = np.linspace(0, 2 * np.pi, 100)
-   orbit = Orbit(states, times, system)
+**周期属性：**
 
-   # 访问计算属性
-   print(f"周期: {orbit.period}")
-   print(f"x 振幅: {orbit.amplitudes['x']}")
+``Orbit`` 不自带周期、Jacobi 常数、稳定性等派生属性——这些由外部算法按需计算。
+微分修正后，周期会作为属性附加到 ``Orbit`` 上。
 
-轨道族类型
-----------
-
-支持的轨道族：
-
-- ``halo``: Halo 轨道
-- ``lyapunov``: Lyapunov 轨道
-- ``vertical``: 垂直轨道
-- ``axial``: 轴向轨道
-- ``butterfly``: 蝴蝶轨道
-- ``dragonfly``: 蜻蜓轨道
+**序列化：**
 
 .. code-block:: python
 
-   # 设置轨道族类型
-   orbit.family_type = "halo"
-   orbit.parameters = {"L": 1, "amplitude_z": 0.01}
-
-序列化
--------
-
-Orbit 支持 JSON 序列化/反序列化：
-
-.. code-block:: python
-
-   # 保存轨道
+   # 保存到 JSON
    orbit.save("my_orbit.json")
 
-   # 加载轨道
+   # 从 JSON 加载
    orbit2 = Orbit.load("my_orbit.json")
 
-OrbitFamily 类
---------------
+轨道族 (OrbitFamily)
+---------------------
 
-:class:`~e2m2e.core.orbit.OrbitFamily` 是轨道族容器，用于存储和管理多条同族轨道。
+同类型、由连续参数（如 Jacobi 常数、振幅）索引的一组 ``Orbit`` 集合。
+轨道族是延拓的结果，不是生成它的方法。
 
 .. code-block:: python
 
-   from e2m2e.core.orbit import OrbitFamily
+   # 延拓返回轨道族
+   from e2m2e.algorithms import Continuation
 
-   family = OrbitFamily("halo_L1", system)
-   family.append(orbit1)
-   family.append(orbit2)
+   continuation = Continuation(corrector=corrector)
+   family = continuation.natural_continuation(
+       seed_orbit=seed_dro,
+       param_range=(0.14, 0.9),
+       step_size=0.005,
+   )
 
-   # 访问族内所有轨道
+   # 遍历族内轨道
    for orbit in family:
-       print(orbit.period)
+       print(f"周期: {orbit.period:.6f}")
+
+CR3BP 周期轨道族类型
+--------------------
+
+.. list-table::
+   :header-rows: 1
+
+   * - 族名
+     - 相关平动点
+     - 物理特征
+   * - Lyapunov
+     - L1, L2, L3
+     - 平面周期轨道
+   * - Halo
+     - L1, L2
+     - 三维周期轨道
+   * - Vertical
+     - L1–L5
+     - 垂直方向振荡
+   * - Butterfly
+     - L1, L2
+     - 连接两个共线平动点的对称轨道
+   * - Dragonfly
+     - L1, L2
+     - 连接两个共线平动点的非对称轨道
+   * - DRO
+     - secondary
+     - 远程逆行轨道
+   * - RO
+     - 全系统
+     - 满足 m:n 共振比例的周期轨道

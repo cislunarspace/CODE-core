@@ -64,7 +64,10 @@ e2m2e 实现了基于 Cui et al. (2025) 的"搜索-优化"两步法，用于 DRO
    )
 
    # 1. 建立动力学
-   system = CR3BP_System.from_known_system("earth_moon")
+   system = CR3BP_System(
+       mu=0.0121506683, primary="Earth", secondary="Moon"
+   )._with_default_scales()
+   system.compute_libration_points()
    dynamics = CR3BP_Dynamics(system)
 
    # 2. 加载出发轨道（DRO）和目标轨道（RO）

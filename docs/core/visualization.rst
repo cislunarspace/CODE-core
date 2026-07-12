@@ -1,24 +1,24 @@
 可视化
 ======
 
-e2m2e 提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
+e2m2e 的可视化模块提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
 
 核心类
 ------
 
-- **PlotConfig** — 统一的绘图配置（字体、颜色、尺寸、DPI 缩放）
+- **PlotConfig** — 统一的绘图配置（字体、颜色、尺寸、DPI 缩放、天体图标）
+- **OrbitVisualizer** — 可视化基类，定义 ``plot()`` 接口
 - **FamilyPlotter** — 轨道族可视化：2D/3D 绘图、Jacobi-周期-稳定性分析图
 - **TransferPlotter** — 转移轨迹可视化
-- **OrbitVisualizer** — 可视化基类
 
-配置绘图参数
-------------
+PlotConfig
+----------
 
 .. code-block:: python
 
    from e2m2e.visualization import PlotConfig
 
-   # 使用默认配置
+   # 默认配置
    config = PlotConfig()
    config.apply_rcparams()
 
@@ -29,12 +29,17 @@ e2m2e 提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
    # 从环境变量读取（支持高 DPI 缩放）
    config = PlotConfig.from_env()
 
-绘制轨道族
-----------
+环境变量：
+
+- ``E2M2E_BODY_ICON_PATH`` — 天体图标目录
+- ``E2M2E_BODY_ICON_SCALE`` — 天体图标缩放系数
+
+FamilyPlotter
+-------------
 
 .. code-block:: python
 
-   from e2m2e.visualization import PlotConfig, FamilyPlotter
+   from e2m2e.visualization import FamilyPlotter, PlotConfig
 
    config = PlotConfig(title=32, label=28)
    config.apply_rcparams()
@@ -47,11 +52,11 @@ e2m2e 提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
    # 3D 轨道族
    plotter.plot_family_3d(family, jacobi_values, title="DRO Family 3D")
 
-   # Jacobi-周期-稳定性组合图
+   # Jacobi-周期-稳定性组合分析图
    plotter.plot_analysis(family)
 
-绘制转移轨迹
-------------
+TransferPlotter
+---------------
 
 .. code-block:: python
 
@@ -67,8 +72,11 @@ e2m2e 提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
        title="DRO-RO Transfer",
    )
 
-天体图标
+投影平面
 --------
 
-可视化支持在轨道图上绘制天体图标（地球、月球）。图标路径通过环境变量
-``E2M2E_BODY_ICON_PATH`` 配置，缩放系数通过 ``E2M2E_BODY_ICON_SCALE`` 配置。
+``ProjectionPlane`` 枚举指定 2D 绘图的投影平面：
+
+- ``XY`` — x-y 平面（默认）
+- ``XZ`` — x-z 平面
+- ``YZ`` — y-z 平面

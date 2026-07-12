@@ -16,11 +16,6 @@ e2m2e.core.atmosphere module
    :show-inheritance:
    :no-index:
 
-.. automodule:: e2m2e.core.atmosphere.base
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 .. automodule:: e2m2e.core.atmosphere.exponential
    :members:
    :undoc-members:

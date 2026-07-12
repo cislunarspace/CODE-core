@@ -35,9 +35,9 @@
 1. **SciPy SLSQP** (默认): 使用 ``scipy.optimize.minimize`` 的 SLSQP 方法
 2. **COPT**: 杉数科技商业优化器，性能更优（需单独安装 ``coptpy``）
 
-求解器通过 :class:`~e2m2e.transfer.transfer.TransferConfig` 的 ``use_copt`` 字段控制，
-底层由 :class:`~e2m2e.transfer.optimizers.SciPyTransferOptimizer` 和
-:class:`~e2m2e.transfer.optimizers.COPTTransferOptimizer` 统一适配。
+求解器通过 :class:`~e2m2e.transfer.config.TransferConfig` 的 ``use_copt`` 字段控制，
+底层由 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer` 统一适配
+（SciPy 和 COPT 两种后端）。
 
 .. code-block:: python
 
@@ -117,7 +117,10 @@
    from e2m2e.core.system import CR3BP_System
    from e2m2e.core.dynamics import CR3BP_Dynamics
 
-   system = CR3BP_System.from_known_system("earth_moon")
+   system = CR3BP_System(
+       mu=0.0121506683, primary="Earth", secondary="Moon"
+   )._with_default_scales()
+   system.compute_libration_points()
    dynamics = CR3BP_Dynamics(system)
 
    transfer = Transfer(dynamics)
@@ -275,7 +278,10 @@ COPT 求解
    )
 
    # 建立系统
-   system = CR3BP_System.from_known_system("earth_moon")
+   system = CR3BP_System(
+       mu=0.0121506683, primary="Earth", secondary="Moon"
+   )._with_default_scales()
+   system.compute_libration_points()
    dynamics = CR3BP_Dynamics(system)
 
    # 加载轨道

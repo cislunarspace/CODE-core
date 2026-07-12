@@ -1,12 +1,28 @@
+动力学
+======
+
+e2m2e 的动力学层负责在指定系统上积分运动方程、得到状态历史。
+
+Dynamics 基类
+-------------
+
+:class:`~e2m2e.core.dynamics.Dynamics` 采用模板方法模式：
+
+- ``propagate()`` — 编排整条轨迹的积分（算法骨架）
+- ``_get_eom_func()`` — 钩子方法，子类提供具体的 ODE 右端函数
+- ``_get_max_step()`` — 钩子方法，子类提供最大步长
+
+**传播结果：**
+
+- ``states`` — 状态序列，形状 ``(n_points, 6)``
+- ``stm``（可选）— 状态转移矩阵，形状 ``(n_points, 6, 6)``
+
 CR3BP 动力学
-============
+-------------
 
-圆型限制性三体问题的运动方程与太阳辐射压力 (SRP) 摄动。
+:class:`~e2m2e.core.dynamics.CR3BP_Dynamics` 在旋转坐标系中积分 CR3BP 运动方程。
 
-运动方程
---------
-
-CR3BP 在旋转坐标系下的运动方程：
+**运动方程：**
 
 .. math::
 
@@ -16,85 +32,77 @@ CR3BP 在旋转坐标系下的运动方程：
 
    \ddot{z} = \frac{\partial \Omega}{\partial z}
 
-其中 Ω 为伪势能函数。
-
-伪势能 Ω
----------
-
-伪势能由引力势与离心势组成：
+其中伪势能 Ω 由引力势与离心势组成：
 
 .. math::
 
    \Omega = \frac{1}{2}(x^2 + y^2) + \frac{1-\mu}{r_1} + \frac{\mu}{r_2}
 
-   r_1 = \sqrt{(x+\mu)^2 + y^2 + z^2}
+   r_1 = \sqrt{(x+\mu)^2 + y^2 + z^2}, \quad r_2 = \sqrt{(x-1+\mu)^2 + y^2 + z^2}
 
-   r_2 = \sqrt{(x-1+\mu)^2 + y^2 + z^2}
+**使用示例：**
 
-其中 r₁、r₂ 分别为第三体到两个主天体的距离。
+.. code-block:: python
 
-科里奥利力与离心力
-------------------
+   from e2m2e.core import CR3BP_System, CR3BP_Dynamics, Orbit
+   import numpy as np
 
-旋转坐标系中的惯性力：
+   system = CR3BP_System(
+       mu=0.0121506683, primary="Earth", secondary="Moon"
+   )._with_default_scales()
+   system.compute_libration_points()
 
-- **科里奥利力**: 与速度方向垂直，不改变能量
-- **离心力**: 沿径向向外，与伪势能中的离心势对应
+   dynamics = CR3BP_Dynamics(system)
+
+   # 传播一条轨道
+   initial_state = np.array([0.8, 0, 0, 0, 0.6, 0])
+   orbit = Orbit(
+       states=initial_state.reshape(1, -1),
+       times=np.array([0.0]),
+       system=system,
+   )
+   orbit.period = 3.0
+
+   result = dynamics.propagate(
+       initial_state, t_span=(0, orbit.period), max_steps=10000
+   )
+
+   print(f"状态形状: {result.states.shape}")
+   print(f"末状态: {result.states[-1]}")
 
 状态转移矩阵 (STM)
 -------------------
 
-状态转移矩阵描述初始状态微小偏差的线性演化：
+STM 描述初始状态微小偏差的线性演化：
 
 .. math::
 
    \delta \mathbf{x}(t) = \boldsymbol{\Phi}(t, t_0) \, \delta \mathbf{x}(t_0)
 
-其中 :math:`\boldsymbol{\Phi}` 为 6×6 状态转移矩阵，满足：
+.. code-block:: python
 
-.. math::
+   result = dynamics.propagate(
+       initial_state, t_span=(0, 3.0), with_stm=True
+   )
+   print(f"STM 形状: {result.stm.shape}")  # (n_points, 6, 6)
 
-   \dot{\boldsymbol{\Phi}} = \mathbf{A}(t) \, \boldsymbol{\Phi}, \quad \boldsymbol{\Phi}(t_0, t_0) = \mathbf{I}
+星历动力学
+----------
 
-:math:`\mathbf{A}(t)` 为运动方程的雅可比矩阵。
+:class:`~e2m2e.core.ephemeris_dynamics.EphemerisDynamics` 基于 SPICE 星历计算 N 体引力。
+详见 :doc:`ephemeris`。
 
-太阳辐射压力 (SRP)
--------------------
+力模型传播
+----------
 
-SRP 对第三体的摄动加速度：
-
-.. math::
-
-   \mathbf{a}_{SRP} = -\frac{P_{SR} \, C_R \, A}{m} \hat{\mathbf{r}}_s
-
-其中：
-
-- :math:`P_{SR}` — 太阳辐射压强
-- :math:`C_R` — 反射系数
-- :math:`A/m` — 面质比
-- :math:`\hat{\mathbf{r}}_s` — 朝向太阳方向的单位向量
-
-使用示例
---------
+:class:`~e2m2e.core.forces.force_model.ForceModel` 用 Rust 积分器实现自适应传播，
+不继承 ``Dynamics``。详见 :doc:`forces`。
 
 .. code-block:: python
 
-   from e2m2e.core.system import CR3BP_System
-   from e2m2e.core.dynamics import CR3BP_Dynamics, SRP_Perturbation
+   from e2m2e.core.forces import ForceModel, GravityField
 
-   # 创建系统与动力学对象
-   system = CR3BP_System.from_known_system("earth_moon")
-   dynamics = CR3BP_Dynamics(system)
+   fm = ForceModel(eph_system)
+   fm.add_force(GravityField("EARTH", degree=2, order=0))
 
-   # 计算加速度
-   state = [0.8, 0, 0, 0, 0.6, 0]
-   accel = dynamics.compute_acceleration(state)
-   print(f"accel = {accel}")
-
-   # 计算状态转移矩阵
-   stm = dynamics.compute_stm(state)
-   print(f"STM shape = {stm.shape}")
-
-   # 添加 SRP 摄动
-   srp = SRP_Perturbation(CR=1.2, Am=0.01)
-   dynamics_with_srp = dynamics.with_perturbation(srp)
+   result = fm.propagate(state0, t_span, t_eval=t_eval)

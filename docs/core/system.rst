@@ -1,62 +1,130 @@
+系统
+====
+
+e2m2e 的系统层定义天体几何、引力与运动学模型，是后续所有计算的上下文。
+
+System 基类
+-----------
+
+:class:`~e2m2e.core.system.System` 是抽象基类，定义系统要回答的四个问题：
+
+1. 用什么坐标框架？由 ``frame`` 标识。
+2. 状态怎么在坐标系间转换？由 ``coordinate_system`` 负责。
+3. 数值用什么单位？由 ``unit_system`` 决定。
+4. 各天体的引力参数？通过 ``gravitational_parameter(body)`` 查询。
+
 CR3BP 系统
-==========
-
-圆型限制性三体问题 (CR3BP) 系统定义。
-
-概述
-----
-
-CR3BP 描述一个质量可忽略的第三体在两个主天体引力场中的运动。
-两个主天体绕其公共质心做圆周运动，采用旋转坐标系使主天体固定。
-
-质量参数
---------
-
-质量参数 μ = m₂/(m₁+m₂)，其中 m₂ 为较小天体质量。
-
-- 地月系统: μ ≈ 0.01215
-- 日地系统: μ ≈ 3.0039e-6
-- 日木系统: μ ≈ 0.0009535
-
-拉格朗日点
 ----------
 
-系统有 5 个拉格朗日点 (L1-L5)，是旋转坐标系中的平衡点。
+:class:`~e2m2e.core.cr3bp_system.CR3BP_System` 描述圆型限制性三体问题：
+两个主天体绕公共质心作圆周运动，第三体质量可忽略。
+
+**创建系统：**
+
+.. code-block:: python
+
+   from e2m2e.core import CR3BP_System
+
+   system = CR3BP_System(
+       mu=0.0121506683,
+       primary="Earth",
+       secondary="Moon",
+   )._with_default_scales()
+
+``_with_default_scales()`` 自动设置地月特征尺度（384405 km、27.32 天）。
+
+**质量参数 μ：**
 
 .. math::
 
-   L1, L2, L3: 共线平衡点（x 轴上）
-   L4, L5: 三角平衡点（等边三角形顶点）
+   \mu = \frac{m_2}{m_1 + m_2}
 
-Jacobi 常数
------------
+- 地月系统: μ ≈ 0.01215
+- 日地系统: μ ≈ 3.0039×10⁻⁶
+- 日木系统: μ ≈ 9.535×10⁻⁴
 
-Jacobi 常数是 CR3BP 中唯一的运动积分：
+**平动点：**
+
+.. code-block:: python
+
+   system.compute_libration_points()
+
+   print(system.L1)  # L1 坐标 [x, 0, 0]
+   print(system.L2)
+   print(system.L3)
+   print(system.L4)  # 三角平动点
+   print(system.L5)
+
+五个平动点中，L1、L2、L3 为共线平衡点（在 x 轴上），L4、L5 为三角平衡点。
+
+**Jacobi 常数：**
 
 .. math::
 
    C_J = 2\Omega - v^2
 
-其中 Ω 为伪势能，v 为速度大小。
-
-使用示例
---------
+其中 Ω 为伪势能，v 为速度大小。Jacobi 常数是 CR3BP 中唯一的运动积分。
 
 .. code-block:: python
 
-   from e2m2e.core.system import CR3BP_System
-
-   # 创建地月系统
-   system = CR3BP_System.from_known_system("earth_moon")
-
-   # 获取质量参数
-   print(f"μ = {system.mu}")
-
-   # 计算拉格朗日点
-   L1 = system.libration_points[0]
-   print(f"L1 = {L1}")
-
-   # 计算 Jacobi 常数
    state = [0.8, 0, 0, 0, 0.6, 0]
    CJ = system.get_jacobi_constant(state)
    print(f"C_J = {CJ}")
+
+**单位转换：**
+
+.. code-block:: python
+
+   # 无量纲 → 物理
+   phys = system.dimensionless_to_physical(dimensionless_state)
+
+   # 物理 → 无量纲
+   dim = system.physical_to_dimensionless(physical_state)
+
+星历系统
+--------
+
+:class:`~e2m2e.core.ephemeris_system.EphemerisSystem` 基于 SPICE 内核查询天体星历，
+采用 J2000 惯性坐标系，物理单位（km, s, km/s）。详见 :doc:`ephemeris`。
+
+.. code-block:: python
+
+   from e2m2e.core import EphemerisSystem, SPICEManager
+
+   spice = SPICEManager()
+   spice.load_kernel("kernels/de440.bsp")
+
+   system = EphemerisSystem(
+       bodies=["EARTH", "MOON", "SUN"],
+       spice=spice,
+       origin="EARTH",
+       frame="J2000",
+   )
+
+CR3BP 与星历系统的区别
+-----------------------
+
+.. list-table::
+   :header-rows: 1
+
+   * - 特性
+     - CR3BP_System
+     - EphemerisSystem
+   * - 坐标系
+     - 旋转坐标系（无量纲）
+     - 惯性坐标系（J2000，有量纲）
+   * - 单位
+     - 无量纲（DU, TU）
+     - 物理单位（km, s）
+   * - 天体数量
+     - 2 个主天体
+     - N 个天体（可配置）
+   * - 平动点
+     - 有（L1–L5）
+     - 无
+   * - 自治性
+     - 自治（不依赖时间）
+     - 非自治（依赖历元）
+   * - 适用场景
+     - 概念设计、周期轨道族
+     - 高精度任务设计

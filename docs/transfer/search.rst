@@ -23,12 +23,12 @@
 参数配置
 --------
 
-搜索参数通过 :class:`~e2m2e.transfer.search_config.SearchConfig` dataclass 集中管理，
+搜索参数通过 :class:`~e2m2e.transfer.config.TransferConfig` 的 ``search_*`` 字段集中管理，
 同时 ``TransferSearch`` 提供向后兼容的属性代理访问。
 
 .. code-block:: python
 
-   from e2m2e.transfer import TransferSearch, SearchConfig
+   from e2m2e.transfer import TransferSearch, TransferConfig
    from e2m2e.core.dynamics import CR3BP_Dynamics
 
    # 方式一：通过 SearchConfig 配置
@@ -172,7 +172,10 @@
    from e2m2e.transfer import TransferSearch, SearchConfig, load_orbit_from_json
 
    # 建立系统
-   system = CR3BP_System.from_known_system("earth_moon")
+   system = CR3BP_System(
+       mu=0.0121506683, primary="Earth", secondary="Moon"
+   )._with_default_scales()
+   system.compute_libration_points()
    dynamics = CR3BP_Dynamics(system)
 
    # 加载轨道

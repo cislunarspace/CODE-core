@@ -49,12 +49,10 @@
 
 构造 ``NormalFormPipeline`` 时可覆盖默认行为：
 
-- ``quasi_floquet_method``：``"matrix"``（默认，36 维直接积分）或
-  ``"lie_algebra"``（21 维 sp(6) 参数化，自动保辛）
-- ``center_max_order``：中心流形 Lie 变换截断阶数，默认 ``10``
-- ``center_steps``：化简步骤元组，默认 ``("invariant", "center")``
-- ``dynamical_kwargs``：透传给动力学替代 corrector 的覆盖项
-  （如 ``{"t_total": 8.0}``）
+- ``quasi_floquet_method``：matrix（默认，36 维直接积分）或 lie_algebra（21 维 sp(6) 参数化，自动保辛）
+- ``center_max_order``：中心流形 Lie 变换截断阶数，默认 10
+- ``center_steps``：化简步骤元组，默认 ("invariant", "center")
+- ``dynamical_kwargs``：透传给动力学替代 corrector 的覆盖项（如 {"t_total": 8.0}）
 
 子模块
 ------

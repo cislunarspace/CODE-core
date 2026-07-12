@@ -31,14 +31,6 @@ e2m2e.transfer.transfer_search module
    :undoc-members:
    :show-inheritance:
 
-e2m2e.transfer.search_config module
--------------------------------------
-
-.. automodule:: e2m2e.transfer.search_config
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 e2m2e.transfer.config module
 ----------------------------
 
@@ -67,14 +59,6 @@ e2m2e.transfer.cost module
 --------------------------
 
 .. automodule:: e2m2e.transfer.cost
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-e2m2e.transfer.optimizers module
----------------------------------
-
-.. automodule:: e2m2e.transfer.optimizers
    :members:
    :undoc-members:
    :show-inheritance:
