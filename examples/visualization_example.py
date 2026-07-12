@@ -79,11 +79,12 @@ def main():
     plotter.save("dro_family_2d.png", dpi=150)
     print("   已保存 dro_family_2d.png")
 
-    # 4. 绘制分析图
-    print("\n4. 绘制 Jacobi-周期-稳定性分析图")
-    plotter.plot_jacobi_period_stability(family)
-    plotter.save("dro_analysis.png", dpi=150)
-    print("   已保存 dro_analysis.png")
+    # 4. 绘制轨道族概览图
+    print("\n4. 绘制轨道族概览图")
+    periods = [orb.period for orb in family]
+    plotter.plot_jacobi_period(jacobi_values, periods, title="DRO Jacobi vs Period")
+    plotter.save("dro_jacobi_period.png", dpi=150)
+    print("   已保存 dro_jacobi_period.png")
 
     print("\n" + "=" * 60)
     print("示例完成！")
