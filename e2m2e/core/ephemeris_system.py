@@ -70,6 +70,23 @@ class EphemerisSystem(System):
     def coordinate_system(self, value: CoordinateSystem | None) -> None:
         self._coordinate_system = value
 
+    def update_coordinate_systems(self, t: float, state: npt.ArrayLike) -> None:
+        """更新动态坐标系。
+
+        若 ``coordinate_system.axes`` 为 ``DynamicAxes`` 实例，
+        调用 ``axes.update(t, state)``。
+        """
+        cs = self.coordinate_system
+        if cs is None:
+            return
+        axes = getattr(cs, "axes", None)
+        if axes is None:
+            return
+        from .coordinate.dynamic_axes import DynamicAxes
+
+        if isinstance(axes, DynamicAxes):
+            axes.update(t, np.asarray(state, dtype=float))
+
     def gravitational_parameter(self, body: str) -> float:
         """获取天体的引力参数 GM。
 

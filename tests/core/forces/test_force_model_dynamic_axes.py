@@ -169,6 +169,16 @@ def test_system_update_coordinate_systems_updates_dynamic_axes():
         def coordinate_system(self):
             return self._cs
 
+        def update_coordinate_systems(self, t, state):
+            from e2m2e.core.coordinate.dynamic_axes import DynamicAxes
+
+            cs = self.coordinate_system
+            if cs is None:
+                return
+            a = getattr(cs, "axes", None)
+            if a is not None and isinstance(a, DynamicAxes):
+                a.update(t, np.asarray(state, dtype=float))
+
         def gravitational_parameter(self, body):
             return 398600.4415
 
@@ -182,7 +192,7 @@ def test_system_update_coordinate_systems_updates_dynamic_axes():
 
 
 def test_system_update_coordinate_systems_no_op_for_static_axes():
-    """System.update_coordinate_systems 对静态 Axes 为 no-op。"""
+    """update_coordinate_systems 对静态 Axes 为 no-op。"""
     from e2m2e.core.system import System
 
     origin = _FixedOrigin()
@@ -208,6 +218,9 @@ def test_system_update_coordinate_systems_no_op_for_static_axes():
         def coordinate_system(self):
             return self._cs
 
+        def update_coordinate_systems(self, t, state):
+            pass
+
         def gravitational_parameter(self, body):
             return 398600.4415
 
@@ -218,7 +231,7 @@ def test_system_update_coordinate_systems_no_op_for_static_axes():
 
 
 def test_system_update_coordinate_systems_no_op_when_no_coordinate_system():
-    """System.coordinate_system 为 None 时 update_coordinate_systems 为 no-op。"""
+    """coordinate_system 为 None 时 update_coordinate_systems 为 no-op。"""
     from e2m2e.core.system import System
 
     class _MinimalSystem(System):
@@ -233,6 +246,9 @@ def test_system_update_coordinate_systems_no_op_when_no_coordinate_system():
             from e2m2e.mbse.data.enums import UnitSystem
 
             return UnitSystem.SI
+
+        def update_coordinate_systems(self, t, state):
+            pass
 
         def gravitational_parameter(self, body):
             return 398600.4415
