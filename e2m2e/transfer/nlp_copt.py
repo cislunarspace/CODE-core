@@ -10,7 +10,10 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
+
+logger = logging.getLogger(__name__)
 
 import numpy as np
 
@@ -404,5 +407,6 @@ def optimize_with_copt(
             )
     except Exception:
         if fallback_to_scipy:
+            logger.warning("COPT 求解失败，回退到 SciPy", exc_info=True)
             return _run_scipy()
         raise

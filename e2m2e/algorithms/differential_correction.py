@@ -467,19 +467,19 @@ class DifferentialCorrection:
         current_time = half_period_time
 
         if verbose:
-            print(f"\n{'=' * 60}")
-            print("开始微分修正迭代（STM牛顿法）...")
-            print(f"{'=' * 60}")
-            print(
-                f"初始状态: x={self.initial_guess[0]:.6f},"
-                f" y={self.initial_guess[1]:.6f}, z={self.initial_guess[2]:.6f}"
+            logger.info("=" * 60)
+            logger.info("开始微分修正迭代（STM牛顿法）...")
+            logger.info("=" * 60)
+            logger.info(
+                "初始状态: x=%.6f, y=%.6f, z=%.6f",
+                self.initial_guess[0], self.initial_guess[1], self.initial_guess[2],
             )
-            print(
-                f"         x_dot={self.initial_guess[3]:.6f},"
-                f" y_dot={self.initial_guess[4]:.6f}, z_dot={self.initial_guess[5]:.6f}"
+            logger.info(
+                "         x_dot=%.6f, y_dot=%.6f, z_dot=%.6f",
+                self.initial_guess[3], self.initial_guess[4], self.initial_guess[5],
             )
-            print(f"初始半周期: T/2={half_period_time:.6f}")
-            print(f"{'=' * 60}")
+            logger.info("初始半周期: T/2=%.6f", half_period_time)
+            logger.info("=" * 60)
 
         for iteration in range(self.max_iterations):
             self.iteration_count = iteration + 1
@@ -502,7 +502,7 @@ class DifferentialCorrection:
 
             except Exception as e:
                 if verbose:
-                    print(f"  积分失败: {e}")
+                    logger.info("  积分失败: %s", e)
                 self.termination_reason = f"积分失败: {e}"
                 break
 
@@ -530,14 +530,14 @@ class DifferentialCorrection:
             )
 
             if verbose:
-                print(f"\n迭代 {iteration + 1}: 约束残差范数 = {current_error:.2e}")
+                logger.info("迭代 %d: 约束残差范数 = %.2e", iteration + 1, current_error)
 
             if current_error < self.tolerance:
                 self.converged = True
                 self.termination_reason = "收敛成功：误差小于容差"
                 self.current_error = current_error  # 保存误差值
                 if verbose:
-                    print(f"[OK] 收敛成功！最终误差: {current_error:.2e}")
+                    logger.info("[OK] 收敛成功！最终误差: %.2e", current_error)
                 if callback:
                     callback(iteration + 1, current_error, True)
                 break
@@ -546,7 +546,7 @@ class DifferentialCorrection:
             if current_error > self.divergence_limit:
                 self.termination_reason = "发散：误差超过限制"
                 if verbose:
-                    print(f"[WARN] 警告：迭代发散，误差 = {current_error:.2e}")
+                    logger.warning("[WARN] 迭代发散，误差 = %.2e", current_error)
                 if callback:
                     callback(iteration + 1, current_error, False)
                 break
@@ -577,7 +577,7 @@ class DifferentialCorrection:
                     delta = np.linalg.lstsq(self.jacobian_matrix, error_vector, rcond=None)[0]
             except np.linalg.LinAlgError:
                 if verbose:
-                    print("  雅可比矩阵奇异，无法求解修正量。")
+                    logger.warning("  雅可比矩阵奇异，无法求解修正量。")
                 self.termination_reason = "雅可比矩阵奇异"
                 if callback:
                     callback(iteration + 1, current_error, False)
@@ -600,12 +600,12 @@ class DifferentialCorrection:
             elif current_time <= 0:
                 current_time = 1e-6
                 if verbose:
-                    print("  警告：时间调整为正值")
+                    logger.warning("  时间调整为正值")
 
             if verbose:
-                print(f"  修正量范数: {correction_norm:.2e}")
-                print(f"  新状态: x={current_state[0]:.6f}, y_dot={current_state[4]:.6f}")
-                print(f"  新半周期: T/2={current_time:.6f}")
+                logger.info("  修正量范数: %.2e", correction_norm)
+                logger.info("  新状态: x=%.6f, y_dot=%.6f", current_state[0], current_state[4])
+                logger.info("  新半周期: T/2=%.6f", current_time)
 
             # 检查停滞（仅在未收敛的情况下检查）
             if not self.converged and correction_norm < self.stagnation_limit:
@@ -615,9 +615,9 @@ class DifferentialCorrection:
                     self.termination_reason = "收敛成功：修正量过小但误差足够小"
                     self.current_error = current_error
                     if verbose:
-                        print(
-                            f"  收敛成功：修正量过小({correction_norm:.2e})"
-                            f"但误差已足够小({current_error:.2e})"
+                        logger.info(
+                            "  收敛成功：修正量过小(%.2e)但误差已足够小(%.2e)",
+                            correction_norm, current_error,
                         )
                     if callback:
                         callback(iteration + 1, current_error, True)
@@ -625,7 +625,7 @@ class DifferentialCorrection:
                 else:
                     self.termination_reason = "停滞：修正量过小"
                     if verbose:
-                        print(f"  停滞：修正量 = {correction_norm:.2e}")
+                        logger.info("  停滞：修正量 = %.2e", correction_norm)
                     if callback:
                         callback(iteration + 1, current_error, False)
                     break
@@ -646,7 +646,7 @@ class DifferentialCorrection:
                     f"收敛但周期无效: T={2 * current_time:.6e} < {min_valid_period}"
                 )
                 if verbose:
-                    print(f"\n微分修正失败: {self.termination_reason}")
+                    logger.info("微分修正失败: %s", self.termination_reason)
                 return None
 
             self.success = True
@@ -654,19 +654,19 @@ class DifferentialCorrection:
             self.solution_time = current_time
 
             if verbose:
-                print(f"\n{'=' * 60}")
-                print("微分修正成功完成")
-                print(f"{'=' * 60}")
-                print(f"  最终周期: T = {2 * current_time:.6f}")
-                print(f"  最终误差: {current_error:.2e}")
-                print(f"  迭代次数: {self.iteration_count}")
-                print(f"{'=' * 60}")
+                logger.info("=" * 60)
+                logger.info("微分修正成功完成")
+                logger.info("=" * 60)
+                logger.info("  最终周期: T = %.6f", 2 * current_time)
+                logger.info("  最终误差: %.2e", current_error)
+                logger.info("  迭代次数: %d", self.iteration_count)
+                logger.info("=" * 60)
 
             result_dict = self._build_result(current_state, current_time)
             return self._create_corrected_orbit(result_dict)
         else:
             if verbose:
-                print(f"\n微分修正失败: {self.termination_reason}")
+                logger.info("微分修正失败: %s", self.termination_reason)
 
     def _build_result(self, final_state, half_period):
         """构建修正结果字典

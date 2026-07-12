@@ -7,6 +7,7 @@ per-α 积分内核 :func:`search_single_departure` 通过 ``searcher`` 上的�
 
 from __future__ import annotations
 
+import logging
 import multiprocessing
 import queue
 import threading
@@ -29,6 +30,8 @@ from .search_progress import (
 
 if TYPE_CHECKING:
     from .transfer_search import TransferSearch
+
+logger = logging.getLogger(__name__)
 
 
 def sample_departure_points(
@@ -124,6 +127,7 @@ def search_single_departure(
             try:
                 traj_states, traj_times = searcher._forward_integrate(initial_state, mtt, idt)
             except Exception:
+                logger.debug("积分失败: alpha=%.4f, departure_time=%.4f", alpha, departure_time, exc_info=True)
                 results.append(
                     {
                         "success": False,

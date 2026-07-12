@@ -33,10 +33,13 @@ Hamilton 系的共轭动量 ``p``，**不做物理量换算**——``q``、``p``
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..context import NormalFormContext
@@ -83,6 +86,7 @@ def _resolve_C_Cdot(
         cdot_dim = np.asarray(cdot, dtype=float) * float(context.TU)
         return np.asarray(C, dtype=float), cdot_dim
     except Exception:
+        logger.warning("EM 参数计算失败，退化到纯 CR3BP（C=常值, Cdot=0）", exc_info=True)
         return _CR3BP_C.copy(), np.zeros((3, 3), dtype=float)
 
 
