@@ -77,6 +77,10 @@ for _mod in (
     "rho_bridge",
     "xys",
     "iau_2006",
+    "gmat_data",
+    "gmat_eop",
+    "gmat_itrf",
+    "gmat_time",
 ):
     _full = f"{__name__}.{_mod}"
     if _full not in _sys.modules:

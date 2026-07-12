@@ -10,10 +10,10 @@ import numpy.typing as npt
 from .._spice_loader import get_spiceypy
 from .axes import Axes
 from .coordinate_system import CoordinateSystem
-from ..gmat_data import CoordinateDataError, gmat_fixture_path
-from ..gmat_eop import EopFile, TaiUtcTable
-from ..gmat_itrf import GmatItrfReduction
-from ..gmat_time import TimeSystemConverter
+from .gmat_data import CoordinateDataError, gmat_fixture_path
+from .gmat_eop import EopFile, TaiUtcTable
+from .gmat_itrf import GmatItrfReduction
+from .gmat_time import TimeSystemConverter
 from .iau_2006 import iau2000eq_matrix
 from .standard_origins import InertialOrigin
 from .xys import ErfaXysProvider, XysProvider

@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .exceptions import E2M2EError
+from ..exceptions import E2M2EError
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _COMMITTED_GMAT_FIXTURE_DIR = _REPO_ROOT / "tests" / "core" / "coordinate" / "fixtures" / "gmat"
 
 

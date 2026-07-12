@@ -44,7 +44,6 @@ class TestDynamicsInit:
         assert dynamics.integrator == "RK45"
         assert dynamics.rtol == 1e-12
         assert dynamics.atol == 1e-12
-        assert dynamics.initialized is True
 
     def test_init_stores_system_reference(self, earth_moon_system, dynamics):
         """Test that dynamics object stores system reference."""

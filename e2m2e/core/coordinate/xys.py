@@ -7,8 +7,8 @@ import math
 
 import erfa
 
-from ..gmat_data import CoordinateDataError
-from ..gmat_eop import JD_MJD_OFFSET
+from .gmat_data import CoordinateDataError
+from .gmat_eop import JD_MJD_OFFSET
 
 
 class XysProvider(abc.ABC):
