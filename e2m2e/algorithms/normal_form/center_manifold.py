@@ -518,7 +518,7 @@ def _lie_transform_step(
             k = _characteristic_freq(pow_tuple, lam, wp, wv)
             # Step 1：Ẇ = -k·W - coef（qiao Code10 同调方程闭合形式）。
             # Step 2：先用复值+MAD 求 W；若 MAD 抑制触发则 Ẇ 走数值微分，
-            #         否则 Ẇ = k·W + coef（再取负，见下）。
+            #         否则 Ẇ = k·W + coef（再取负，见下方 if-else 实现）。
             if not use_imag_solver:
                 W_func = _solve_wfunc_fft(tlist, coef_c.real, k)
                 Wd_func = -k * W_func - coef_c

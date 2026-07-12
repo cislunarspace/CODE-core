@@ -163,7 +163,7 @@ def _apply_lie_series(
     Args:
         X0: ``(6,)`` 复初值。
         W_series_at_t: ``{order: {pow_tuple: complex_scalar}}``，已插值。
-        forward: 方向标志（见上）。
+        forward: 方向标志（``True`` 为 QF→CM，``False`` 为 CM→QF，见上方 docstring）。
         rtol, atol: ODE 容差。
 
     Returns:

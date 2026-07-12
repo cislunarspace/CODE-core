@@ -54,7 +54,7 @@ class NormalFormResult:
         ds_result: 动力学替代结果（切片 #171）；流水线未跑到该步时为 ``None``。
         qf_result: quasi-Floquet 结果（切片 #172）；同上。
         cm_result: 中心流形化简结果（切片 #173）；同上。
-        catalog_transformer: 表征参数目录变换器（切片 #174），绑定上述三个子
+        catalog_transformer: 表征参数目录变换器（切片 #174），绑定 ds_result、qf_result、cm_result 三个子
             结果与 context；流水线跑完四步后非 ``None``，是外部用户做
             ``rho ↔ param`` 坐标变换的入口。
     """
