@@ -92,6 +92,13 @@ class Orbit:
             "tags": [],
         }
 
+        # 微分修正结果属性（由 DifferentialCorrection 填充）
+        self.correction_success: bool | None = None
+        self.correction_iterations: int | None = None
+        self.correction_error: float | None = None
+        self.correction_termination_reason: str | None = None
+        self.closure_error: float | None = None
+
         # 计算基本属性
         self.compute_basic_properties()
 
@@ -355,16 +362,12 @@ class Orbit:
 
         new_orbit.metadata = self.metadata.copy()
 
-        # 复制动态添加的属性
-        for attr in (
-            "correction_success",
-            "correction_iterations",
-            "correction_error",
-            "correction_termination_reason",
-            "closure_error",
-        ):
-            if hasattr(self, attr):
-                setattr(new_orbit, attr, getattr(self, attr))
+        # 复制微分修正结果
+        new_orbit.correction_success = self.correction_success
+        new_orbit.correction_iterations = self.correction_iterations
+        new_orbit.correction_error = self.correction_error
+        new_orbit.correction_termination_reason = self.correction_termination_reason
+        new_orbit.closure_error = self.closure_error
 
         return new_orbit
 
