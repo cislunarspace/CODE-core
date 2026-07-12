@@ -2,183 +2,92 @@
 """
 可视化模块使用示例
 
-这个示例展示了如何使用 e2m2e 的可视化功能。
+展示如何使用 e2m2e 的 FamilyPlotter 和 TransferPlotter 绘制轨道。
 """
 
 from __future__ import annotations
 
+import matplotlib
+matplotlib.use("Agg")  # 非交互后端，CI 环境下使用
+
 import numpy as np
-from e2m2e.visualization import OrbitVisualizer
 
-from e2m2e.core.system import CR3BP_System
-from e2m2e.visualization.config import configure_dpi_scaling
-
-# 交互式绘图场景下显式启用高 DPI 缩放适配（import 时无副作用，需 opt-in）
-configure_dpi_scaling()
+from e2m2e.algorithms import Continuation, DifferentialCorrection
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
+from e2m2e.visualization import FamilyPlotter, PlotConfig
 
 
-def basic_visualization():
-    """基本可视化示例"""
-    print("=" * 60)
-    print("e2m2e 可视化模块使用示例")
-    print("=" * 60)
-
-    # 1. 创建地月系统
-    print("\n1. 创建地月系统")
-    print("-" * 40)
+def generate_dro_family():
+    """生成 DRO 轨道族作为可视化数据"""
     system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
     system.set_characteristic_scales(384400, 27.32 * 86400)
     system.compute_libration_points()
+    dynamics = CR3BP_Dynamics(system)
 
-    print("系统创建完成")
-    print(f"质量参数 μ = {system.mu:.6f}")
-    print(f"L1点位置: {system.L1}")
+    # DRO 种子轨道
+    initial_state = [0.79188556619742, 0.0, 0.0, 0.0, 0.53682, 0.0]
+    seed_orbit = Orbit(states=[initial_state], times=[0], system=system)
+    seed_orbit.period = 3.0
 
-    # 2. 创建可视化器
-    print("\n2. 创建可视化器")
-    print("-" * 40)
-    viz = OrbitVisualizer(system)
-    print("可视化器创建成功")
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_2D_symmetric_x_fixed_x0(x0=initial_state[0])
+    seed_dro = corrector.iterate_correction(initial_guess=seed_orbit, verbose=False)
 
-    # 3. 生成示例轨道数据
-    print("\n3. 生成示例轨道数据")
-    print("-" * 40)
-    n_points = 200
-    t = np.linspace(0, 2 * np.pi, n_points)
+    if seed_dro is None:
+        return None, None, system
 
-    # 创建一个简单的圆形轨道（围绕L1点）
-    amplitude = 0.02
-    x0 = system.L1[0]  # L1点的x坐标
+    # 延拓生成轨道族
+    continuation = Continuation(corrector=corrector)
+    family = continuation.natural_continuation(
+        seed_orbit=seed_dro,
+        param_range=(0.14, 0.9),
+        step_size=0.005,
+        verbose=False,
+    )
 
-    x = x0 + amplitude * np.cos(t)
-    y = amplitude * np.sin(t)
-    z = np.zeros_like(t)
-    vx = -amplitude * np.sin(t)
-    vy = amplitude * np.cos(t)
-    vz = np.zeros_like(t)
+    # 计算每条轨道的 Jacobi 常数
+    jacobi_values = [system.get_jacobi_constant(orb.states[0]) for orb in family]
 
-    orbit_states = np.column_stack([x, y, z, vx, vy, vz])
-    print(f"轨道数据生成完成，包含 {len(orbit_states)} 个点")
-
-    return system, viz, orbit_states
-
-
-def demo_2d_projection(system, viz, orbit_states):
-    """演示2D投影功能"""
-    print("\n4. 2D投影演示")
-    print("-" * 40)
-
-    # XY平面投影
-    print("绘制XY平面投影...")
-    viz.plot_2d_projection(orbit_states, plane="xy", color="blue", label="Lyapunov Orbit")
-    viz.plot_primary_bodies()
-    viz.plot_libration_points()
-    viz.axes.legend()
-    viz.axes.set_title("XY Projection - Lyapunov Orbit around L1")
-    viz.show()
-
-    # XZ平面投影
-    print("绘制XZ平面投影...")
-    viz.plot_2d_projection(orbit_states, plane="xz", color="green", label="XZ View")
-    viz.axes.set_title("XZ Projection")
-    viz.show()
-
-    # YZ平面投影
-    print("绘制YZ平面投影...")
-    viz.plot_2d_projection(orbit_states, plane="yz", color="purple", label="YZ View")
-    viz.axes.set_title("YZ Projection")
-    viz.show()
-
-
-def demo_3d_orbit(viz, orbit_states):
-    """演示3D轨道功能"""
-    print("\n5. 3D轨道演示")
-    print("-" * 40)
-
-    print("绘制3D轨道...")
-    viz.plot_3d_orbit(orbit_states, color="red", label="3D Orbit")
-    viz.plot_primary_bodies(ax=viz.axes_3d, is_3d=True)
-    viz.plot_libration_points(ax=viz.axes_3d, is_3d=True)
-    viz.axes_3d.legend()
-    viz.axes_3d.set_title("3D View - Lyapunov Orbit")
-    viz.show()
-
-
-def demo_overview_plot(viz, orbit_states):
-    """演示概览图功能"""
-    print("\n6. 概览图演示")
-    print("-" * 40)
-
-    print("创建综合概览图...")
-    fig = viz.create_overview_plot(orbit_states)
-    fig.suptitle("Orbit Overview - All Projections", fontsize=16)
-    viz.show()
-
-    # 保存图形
-    print("保存概览图为PNG文件...")
-    viz.save("orbit_overview_demo.png", dpi=200)
-    print("图形已保存为 'orbit_overview_demo.png'")
-
-
-def demo_customization(viz, orbit_states):
-    """演示自定义设置"""
-    print("\n7. 自定义设置演示")
-    print("-" * 40)
-
-    # 修改可视化器设置
-    viz.figsize = (10, 6)
-    viz.orbit_linewidth = 2.0
-    viz.orbit_alpha = 0.9
-    viz.primary_body_color = "orange"
-    viz.secondary_body_color = "gray"
-
-    print("自定义设置应用完成:")
-    print(f"  图形大小: {viz.figsize}")
-    print(f"  轨道线宽: {viz.orbit_linewidth}")
-    print(f"  轨道透明度: {viz.orbit_alpha}")
-    print(f"  主天体颜色: {viz.primary_body_color}")
-    print(f"  次天体颜色: {viz.secondary_body_color}")
-
-    # 使用新设置绘制图形
-    viz.plot_2d_projection(orbit_states, plane="xy", color="darkblue", label="Custom Orbit")
-    viz.plot_primary_bodies()
-    viz.plot_libration_points()
-    viz.axes.legend()
-    viz.axes.set_title("Customized Visualization")
-    viz.show()
+    return family, jacobi_values, system
 
 
 def main():
     """主函数"""
-    try:
-        # 基本设置
-        system, viz, orbit_states = basic_visualization()
+    print("=" * 60)
+    print("e2m2e 可视化模块示例")
+    print("=" * 60)
 
-        # 演示各种功能
-        demo_2d_projection(system, viz, orbit_states)
-        demo_3d_orbit(viz, orbit_states)
-        demo_overview_plot(viz, orbit_states)
-        demo_customization(viz, orbit_states)
+    # 1. 配置绘图风格
+    print("\n1. 配置绘图风格")
+    config = PlotConfig(title=32, label=28)
+    config.apply_rcparams()
 
-        print("\n" + "=" * 60)
-        print("示例完成！")
-        print("=" * 60)
-        print("\n总结:")
-        print("- 成功演示了2D投影（XY, XZ, YZ平面）")
-        print("- 成功演示了3D轨道可视化")
-        print("- 成功创建了综合概览图")
-        print("- 成功演示了自定义设置")
-        print("- 图形已保存为 'orbit_overview_demo.png'")
+    # 2. 生成轨道族数据
+    print("\n2. 生成 DRO 轨道族")
+    family, jacobi_values, system = generate_dro_family()
 
-    except ImportError as e:
-        print(f"\n导入错误: {e}")
-        print("请确保已安装所有依赖:")
-        print("  pip install numpy matplotlib")
-    except Exception as e:
-        print(f"\n错误: {e}")
-        import traceback
+    if family is None:
+        print("   轨道族生成失败")
+        return
 
-        traceback.print_exc()
+    print(f"   轨道族包含 {len(family)} 条轨道")
+
+    # 3. 使用 FamilyPlotter 绘制轨道族
+    print("\n3. 绘制轨道族 2D 图")
+    plotter = FamilyPlotter(system, config)
+    plotter.plot_family_2d(family, jacobi_values, title="DRO Family")
+    plotter.save("dro_family_2d.png", dpi=150)
+    print("   已保存 dro_family_2d.png")
+
+    # 4. 绘制分析图
+    print("\n4. 绘制 Jacobi-周期-稳定性分析图")
+    plotter.plot_jacobi_period_stability(family)
+    plotter.save("dro_analysis.png", dpi=150)
+    print("   已保存 dro_analysis.png")
+
+    print("\n" + "=" * 60)
+    print("示例完成！")
+    print("=" * 60)
 
 
 if __name__ == "__main__":

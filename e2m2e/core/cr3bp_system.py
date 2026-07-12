@@ -56,8 +56,7 @@ class CR3BP_System(System):
     """
 
     # 天文常量
-    EARTH_MOON_DISTANCE_KM = 384400.0  # 地月平均距离 (km) — 旧值，保留以兼容
-    EARTH_MOON_DISTANCE_KM_PRECISE = 384405.0  # 地月距离精确值 (km), Cui et al. 2025
+    EARTH_MOON_DISTANCE_KM = 384405.0  # 地月平均距离 (km), Cui et al. 2025
     AU = _AU_KM  # 天文单位 (km)
     G = 6.67430e-20  # 万有引力常数 (km^3 / (kg * s^2))
     DAY = 86400  # 一天的秒数
@@ -110,7 +109,7 @@ class CR3BP_System(System):
         """
         if self.primary_body == "Earth" and self.secondary_body == "Moon":
             self.set_characteristic_scales(
-                distance=CR3BP_System.EARTH_MOON_DISTANCE_KM_PRECISE,
+                distance=CR3BP_System.EARTH_MOON_DISTANCE_KM,
                 period=27.32 * 86400,
             )
         elif self.primary_body == "Sun" and self.secondary_body == "Earth":

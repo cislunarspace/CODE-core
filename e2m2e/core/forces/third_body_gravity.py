@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import warnings
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 
 from .physical_model import PhysicalModel
+
+if TYPE_CHECKING:
+    from ..system import System
 
 
 class ThirdBodyGravity(PhysicalModel):
@@ -55,7 +58,7 @@ class ThirdBodyGravity(PhysicalModel):
         self,
         t: float,
         state: npt.ArrayLike,
-        system: Any,
+        system: System,
     ) -> npt.NDArray[np.floating]:
         """返回第三体摄动加速度，km/s²。
 

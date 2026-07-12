@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 
 from .physical_model import PhysicalModel
+
+if TYPE_CHECKING:
+    from ..system import System
 
 
 class PointMassGravity(PhysicalModel):
@@ -39,7 +42,7 @@ class PointMassGravity(PhysicalModel):
         self,
         t: float,
         state: npt.ArrayLike,
-        system: Any,
+        system: System,
     ) -> npt.NDArray[np.floating]:
         """返回引力加速度，km/s²。
 

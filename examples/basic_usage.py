@@ -7,8 +7,7 @@ e2m2e 基础使用示例
 
 import numpy as np
 
-from e2m2e.core.dynamics import CR3BP_Dynamics
-from e2m2e.core.system import CR3BP_System
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System, LibrationPoint
 
 
 def main():
@@ -76,7 +75,7 @@ def main():
     print("\n5. 平动点稳定性分析")
     print("-" * 40)
 
-    from e2m2e.core.system import LibrationPoint
+    # LibrationPoint 已在顶部导入
 
     # 分析 L1 点的稳定性
     stability_info = system.compute_stability_index(LibrationPoint.L1)

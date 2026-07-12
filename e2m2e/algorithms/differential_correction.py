@@ -157,8 +157,9 @@ class DifferentialCorrection:
 
         self._reset_history()
 
-        print(
-            f"2D对称x轴配置完成：固定x0={x0}，自由变量={self.free_variables}，目标约束={list(self.target_conditions.keys())}"
+        logger.debug(
+            "2D对称x轴配置完成：固定x0=%s，自由变量=%s，目标约束=%s",
+            x0, self.free_variables, list(self.target_conditions.keys()),
         )
 
         return self
@@ -206,8 +207,9 @@ class DifferentialCorrection:
 
         self._reset_history()
 
-        print(
-            f"2D对称y轴配置完成：固定y0={y0}，自由变量={self.free_variables}，目标约束={list(self.target_conditions.keys())}"
+        logger.debug(
+            "2D对称y轴配置完成：固定y0=%s，自由变量=%s，目标约束=%s",
+            y0, self.free_variables, list(self.target_conditions.keys()),
         )
 
         return self

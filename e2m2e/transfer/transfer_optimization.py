@@ -358,7 +358,7 @@ class DROTRONLPOptimizer:
         return times, states
 
     def get_arrival_state_at_t_ins(self, t_ins: float) -> tuple[np.ndarray, np.ndarray]:
-        """获取目标轨道上 ``t_ins``（绝对时间）对应的状态
+        """获取目标轨道上 t_ins（绝对时间）对应的状态
 
         Args:
             t_ins: 绝对时间（与 ``orbit.times`` 同一坐标系）

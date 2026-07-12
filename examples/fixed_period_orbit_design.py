@@ -13,10 +13,8 @@
 
 import numpy as np
 
-from e2m2e.algorithms.differential_correction import DifferentialCorrection
-from e2m2e.core.dynamics import CR3BP_Dynamics
-from e2m2e.core.orbit import Orbit
-from e2m2e.core.system import CR3BP_System
+from e2m2e.algorithms import DifferentialCorrection
+from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
 
 
 def design_fixed_period_dro(target_period):
@@ -37,7 +35,7 @@ def design_fixed_period_dro(target_period):
 
     # 3. 配置固定周期微分修正器
     t_half = target_period / 2  # 半周期
-    corrector = DifferentialCorrection(dynamic=dynamics)
+    corrector = DifferentialCorrection(dynamics)
     corrector.setup_2D_symmetric_x_fixed_t(t_half=t_half)
 
     print(f"目标周期: {target_period:.4f} (半周期: {t_half:.4f})")
@@ -51,10 +49,12 @@ def design_fixed_period_dro(target_period):
     print(f"初始猜测: x0={x0_guess}, y_dot0={y_dot0_guess}")
 
     # 5. 执行迭代修正
+    seed = Orbit(
+        states=initial_state.reshape(1, -1), times=np.array([0.0]), system=system
+    )
+    seed.period = target_period
     orbit = corrector.iterate_correction(
-        initial_guess=Orbit(
-            states=initial_state.reshape(1, -1), times=np.array([0.0]), system=system
-        ),
+        initial_guess=seed,
         verbose=True,
     )
 
@@ -88,7 +88,7 @@ def example_workflow():
     # 3. 配置修正器
     print("\n步骤 2: 配置固定周期微分修正器")
     target_T = 3.0  # 目标周期
-    corrector = DifferentialCorrection(dynamic=dynamics)
+    corrector = DifferentialCorrection(dynamics)
     corrector.setup_2D_symmetric_x_fixed_t(t_half=target_T / 2)
 
     print(f"  - 目标半周期: {target_T / 2:.4f}")
@@ -99,6 +99,7 @@ def example_workflow():
     print("\n步骤 3: 提供初始猜测")
     initial_state = np.array([0.6, 0.0, 0.0, 0.0, 0.5, 0.0])
     orbit_init = Orbit(states=initial_state.reshape(1, -1), times=np.array([0.0]), system=system)
+    orbit_init.period = target_T
     print(f"  - 初始状态: {initial_state}")
 
     # 5. 执行修正

@@ -56,7 +56,6 @@ class Dynamics:
         last_stm: 最近一次积分的状态转移矩阵
         cross_section_tolerance: 截面检测容差
         last_crossing: 上次穿过截面的点和时间
-        initialized: 初始化完成标志
     """
 
     DEFAULT_TOLERANCE = 1e-12  # 默认积分容差，双精度机器精度量级，确保数值解精度
@@ -87,8 +86,6 @@ class Dynamics:
         # 截面检测参数
         self.cross_section_tolerance = 1e-8
         self.last_crossing = None
-
-        self.initialized = True
 
     def _get_eom_func(self, with_stm: bool) -> Callable:
         """获取运动方程函数（钩子方法，子类可覆写）

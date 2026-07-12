@@ -18,7 +18,7 @@ References:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
@@ -27,6 +27,7 @@ from ..constants import AU, KM_TO_M
 from .physical_model import PhysicalModel, require_inertial_frame
 
 if TYPE_CHECKING:
+    from ..system import System
     from .shadow import ConicalShadowModel
 
 # 1 AU 处太阳光压常数（N/m²）。等价于 GMAT flux/c = 1367 / 2.998e8。
@@ -105,7 +106,7 @@ class SolarRadiationPressure(PhysicalModel):
         self,
         t: float,
         state: npt.ArrayLike,
-        system: Any,
+        system: System,
     ) -> npt.NDArray[np.floating]:
         """系统感知光压加速度。
 

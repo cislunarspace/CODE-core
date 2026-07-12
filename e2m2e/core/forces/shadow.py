@@ -12,13 +12,16 @@ References:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 
 from ..constants import R_EARTH
 from .physical_model import require_inertial_frame
+
+if TYPE_CHECKING:
+    from ..system import System
 
 # 默认遮挡体赤道半径（km），取 GMAT PCK 值。可通过 radii 覆盖参数扩展。
 _BODY_RADII_KM: dict[str, float] = {
@@ -164,7 +167,7 @@ class ConicalShadowModel:
         self,
         t: float,
         state: npt.ArrayLike,
-        system: Any,
+        system: System,
     ) -> float:
         """系统感知光照份额。
 
