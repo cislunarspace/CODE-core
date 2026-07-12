@@ -292,3 +292,5 @@ Halo 轨道（固定 z 振幅）
 - Broucke R A. Periodic orbits in the restricted three body problem with Earth-moon masses[R]. 1968.
 - Richardson D L. Analytical construction of a periodic solution about the collinear points[J]. Celestial Mechanics, 1980.
 - Howell K C. Three-dimensional, periodic, 'halo' orbits in the restricted three-body problem[D]. Stanford University, 1983.
+
+可运行示例见 ``examples/fixed_period_orbit_design.py``。

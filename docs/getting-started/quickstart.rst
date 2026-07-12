@@ -185,3 +185,5 @@
 - :doc:`../core/forces` — 力模型组合
 - :doc:`../algorithms/differential-correction` — 微分修正策略
 - :doc:`../transfer/overview` — 转移轨道设计
+
+可运行示例见 ``examples/basic_usage.py``。
