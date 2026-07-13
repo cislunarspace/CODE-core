@@ -336,7 +336,7 @@ class TestBoundaryCases:
 class TestEndToEndPipeline:
     """修正 → 延拓 端到端集成测试。
 
-    与 test_differentialcorrection 关注单次修正的细节不同，
+    与 test_differential_correction 关注单次修正的细节不同，
     这里验证整个 pipeline 在 DRO 场景下能跑通并产生合理结果。
     """
 

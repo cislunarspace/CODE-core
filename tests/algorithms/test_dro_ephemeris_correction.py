@@ -12,11 +12,7 @@ from e2m2e.algorithms import (  # noqa: E402
     DifferentialCorrection,
     MultipleShooting,
 )
-from e2m2e.core import (
-    CR3BP_Dynamics,
-    CR3BP_System,
-    Orbit,
-)
+from e2m2e.core import Orbit
 
 pytestmark = pytest.mark.spice
 
@@ -45,18 +41,6 @@ POSITION_CONTINUITY_TOL = 1e-6  # km
 
 
 @pytest.fixture
-def cr3bp_system():
-    """地月 CR3BP 系统"""
-    return CR3BP_System(mu=MU, primary="earth", secondary="moon")
-
-
-@pytest.fixture
-def cr3bp_dynamics(cr3bp_system):
-    """CR3BP 动力学"""
-    return CR3BP_Dynamics(system=cr3bp_system)
-
-
-@pytest.fixture
 def dro_orbit(cr3bp_dynamics, cr3bp_system):
     """
     生成 3:1 DRO 轨道。
@@ -70,15 +54,10 @@ def dro_orbit(cr3bp_dynamics, cr3bp_system):
     corrector.setup_2D_symmetric_x_fixed_x0(DRO_31_X0)
     result = corrector.iterate_correction(seed_orbit, verbose=False)
 
-    if result is None or not corrector.success:
-        pytest.skip("DRO 微分修正未收敛，跳过依赖测试")
+    # DRO 微分修正在此标准 seed 下应收敛（与 tests/algorithms/conftest.py 的
+    # corrected_dro fixture 一致）；不收敛是回归，直接失败而非 skip（issue #218）
+    assert result is not None and corrector.success, "DRO 微分修正未收敛"
     return result
-
-
-@pytest.fixture
-def reference_et(spice_manager, reference_epoch):
-    """参考历元 ET"""
-    return spice_manager.utc_to_et(reference_epoch)
 
 
 @pytest.fixture(scope="module")

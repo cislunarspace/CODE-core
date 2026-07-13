@@ -174,12 +174,12 @@ def dro_31_period():
 # Six test files previously rebuilt this chain locally:
 #   tests/algorithms/test_multiple_shooting.py
 #   tests/algorithms/test_dro_ephemeris_correction.py
-#   tests/algorithms/test_dc_via_propagate.py
+#   tests/algorithms/test_differential_correction_via_propagate.py
 #   tests/algorithms/test_patch_point_utils.py
 #   tests/core/coordinate/test_synodic_j2000.py
 #   tests/core/dynamics/test_ephemeris_dynamics.py
 #
-# The previous test_dc_via_propagate._make_eph_dynamics helper had a kernel
+# The previous test_differential_correction_via_propagate._make_eph_dynamics helper had a kernel
 # leak (mgr.unload_kernel never called). These fixtures fix that by going
 # through proper yield-teardown.
 # =============================================================================

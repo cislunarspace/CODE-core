@@ -8,7 +8,7 @@ import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.algorithms import convert_to_j2000, sample_patch_points
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
+from e2m2e.core import Orbit
 
 pytestmark = pytest.mark.spice
 
@@ -35,16 +35,6 @@ DRO_31_PERIOD = 2.095
 
 
 @pytest.fixture
-def cr3bp_system():
-    return CR3BP_System(mu=MU, primary="earth", secondary="moon")
-
-
-@pytest.fixture
-def cr3bp_dynamics(cr3bp_system):
-    return CR3BP_Dynamics(system=cr3bp_system)
-
-
-@pytest.fixture
 def dro_orbit(cr3bp_dynamics):
     from e2m2e.algorithms import DifferentialCorrection
 
@@ -59,11 +49,6 @@ def dro_orbit(cr3bp_dynamics):
     assert result is not None
     assert corrector.success
     return result
-
-
-@pytest.fixture
-def reference_et(spice_manager, reference_epoch):
-    return spice_manager.utc_to_et(reference_epoch)
 
 
 # =============================================================================

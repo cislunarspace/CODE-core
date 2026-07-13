@@ -1,6 +1,7 @@
 """算法测试共享 fixtures。
 
-为 DRO 种子轨道修正场景提供预配置 fixture。
+包含跨文件共享的通用 fixture（reference_et、cr3bp_system、cr3bp_dynamics）
+以及 DRO 种子轨道修正场景的预配置 fixture。
 """
 
 from __future__ import annotations
@@ -17,6 +18,27 @@ from e2m2e.core import CR3BP_Dynamics, Orbit
 DRO_X0 = 0.79188556619742
 DRO_VY0 = 0.573665890385585
 DRO_PERIOD_GUESS = 6.307498
+
+
+# =============================================================================
+# 跨文件共享 fixtures（DRO / NRHO / multiple shooting / patch point 通用）
+# =============================================================================
+@pytest.fixture
+def reference_et(spice_manager, reference_epoch):
+    """参考历元 ET"""
+    return spice_manager.utc_to_et(reference_epoch)
+
+
+@pytest.fixture
+def cr3bp_system():
+    """地月 CR3BP 系统"""
+    return _make_earth_moon_system()
+
+
+@pytest.fixture
+def cr3bp_dynamics(cr3bp_system):
+    """CR3BP 动力学"""
+    return CR3BP_Dynamics(system=cr3bp_system)
 
 
 @pytest.fixture(scope="session")

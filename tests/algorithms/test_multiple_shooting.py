@@ -28,11 +28,6 @@ def ms_corrector(spice_eph_dynamics):
 
 
 @pytest.fixture
-def reference_et(spice_manager, reference_epoch):
-    return spice_manager.utc_to_et(reference_epoch)
-
-
-@pytest.fixture
 def simple_patch_points(reference_et):
     """
     创建简单的 patch points 用于测试修正。
@@ -170,8 +165,8 @@ class TestMultipleShootingCorrection:
             tolerance=1e-6,
         )
 
-        if not result.converged:
-            pytest.skip(f"多重打靶未收敛 (residual={result.max_residual:.2e})")
+        # 不收敛应直接失败而非 skip，否则算法回归会被绿色报告掩盖（issue #218）
+        assert result.converged, f"多重打靶未收敛 (residual={result.max_residual:.2e})"
         corrected_states = result.state_patch
         for i in range(len(corrected_states) - 1):
             (
@@ -223,8 +218,8 @@ class TestMultipleShootingTimeOptions:
             var_time=False,
             max_iter=20,
         )
-        if not result.converged:
-            pytest.skip(f"多重打靶未收敛 (residual={result.max_residual:.2e})")
+        # 固定时间修正在 simple_patch_points 上应能收敛；不收敛是回归（issue #218）
+        assert result.converged, f"多重打靶未收敛 (residual={result.max_residual:.2e})"
         assert_allclose(result.t_patch, t_patch, atol=1e-10)
 
     def test_variable_time_correction(self, ms_corrector, simple_patch_points):
@@ -236,8 +231,8 @@ class TestMultipleShootingTimeOptions:
             var_time=True,
             max_iter=20,
         )
-        if not result.converged:
-            pytest.skip(f"多重打靶未收敛 (residual={result.max_residual:.2e})")
+        # 可变时间修正在 simple_patch_points 上应能收敛；不收敛是回归（issue #218）
+        assert result.converged, f"多重打靶未收敛 (residual={result.max_residual:.2e})"
         assert result.t_patch is not None
         assert len(result.t_patch) == len(t_patch)
 

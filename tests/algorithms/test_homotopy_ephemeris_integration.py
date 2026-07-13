@@ -15,6 +15,8 @@ from e2m2e.algorithms.ephemeris_correction.homotopy import (
     correct_with_homotopy,
 )
 
+pytestmark = pytest.mark.spice
+
 
 def _trivial_pseudo_dro(spice_eph_dynamics, n_points: int = 5):
     """Build a near-trivial patched state vector: short arc near LEO.
