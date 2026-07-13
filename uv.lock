@@ -350,7 +350,7 @@ wheels = [
 
 [[package]]
 name = "e2m2e"
-version = "5.0.0"
+version = "5.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
