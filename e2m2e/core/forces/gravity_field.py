@@ -134,6 +134,12 @@ class GravityField(PhysicalModel):
             self._data.C[n, max_m + 1 :] = 0.0
             self._data.S[n, max_m + 1 :] = 0.0
 
+        # Love 数是常数，构造时一次性解析缓存。先前 _resolve_love_numbers 每步
+        # 重读文件 + 写临时文件 + 解析，是满配直推 22% 耗时的根源（profile 定位）。
+        self._love_cache: tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None] | None = None
+        if self._tide_mode != "none":
+            self._love_cache = self._load_love_numbers()
+
     @staticmethod
     def _resolve_input_frame(body: str, input_frame: str | None) -> str:
         """按 body 推导默认 input_frame,显式传入则覆盖。"""
@@ -314,10 +320,10 @@ class GravityField(PhysicalModel):
         dS_padded[:n, :n] = dS[:n, :n]
         return C + dC_padded, S + dS_padded
 
-    def _resolve_love_numbers(
+    def _load_love_numbers(
         self,
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
-        """按 ``body`` 解析固体潮 Love 数表 (k_love, k_plus)。
+        """按 ``body`` 解析固体潮 Love 数表 (k_love, k_plus)。构造时调用一次。
 
         地球用硬编码常量(``_K_EARTH`` / ``_K_PLUS_EARTH``);月球从包内
         ``grgm900c.tide`` 读取(仅 k₂=0.024116,无弹性 3 阶位移 → k_plus=None)。
@@ -343,6 +349,14 @@ class GravityField(PhysicalModel):
             Path(tmp_path).unlink()
         # 月球等无弹性 3 阶位移贡献。
         return k_love, None
+
+    def _resolve_love_numbers(
+        self,
+    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
+        """返回缓存的 Love 数表（构造时一次性解析，避免每步重读文件）。"""
+        if self._love_cache is None:
+            self._love_cache = self._load_love_numbers()
+        return self._love_cache
 
     def compute_acceleration(
         self,
