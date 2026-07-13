@@ -15,6 +15,7 @@ pub(crate) mod multistep_methods;
 pub(crate) mod pd45;
 pub(crate) mod pd78;
 pub(crate) mod rk89;
+pub(crate) mod spherical_harmonic;
 pub mod rk_methods;
 
 use butcher::{explicit_rk_step, suggest_next_step};
@@ -282,6 +283,47 @@ fn hello_integrators() -> PyResult<String> {
     Ok("hello from e2m2e-integrators".to_string())
 }
 
+/// 球谐引力加速度（body-fixed 系）。
+///
+/// Python 侧 `GravityField._compute_acceleration_in_input_frame` 的 Rust 加速版。
+/// 输入位置 `r` 与输出加速度均在 body-fixed 系（坐标变换仍由 Python 完成）。
+/// `c_flat`/`s_flat` 是 C/S 系数矩阵的行优先扁平化（shape=(degree+1)**2）。
+#[pyfunction]
+fn spherical_harmonic_accel(
+    r: Vec<f64>,
+    c_flat: Vec<f64>,
+    s_flat: Vec<f64>,
+    mu: f64,
+    radius: f64,
+    degree: usize,
+    order: usize,
+) -> PyResult<Vec<f64>> {
+    if r.len() != 3 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "r must have length 3, got {}",
+            r.len()
+        )));
+    }
+    let nn = degree + 1;
+    if c_flat.len() != nn * nn || s_flat.len() != nn * nn {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "C/S flattened length must be (degree+1)^2 = {}, got C={} S={}",
+            nn * nn,
+            c_flat.len(),
+            s_flat.len()
+        )));
+    }
+    if order > degree {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "order ({}) must be <= degree ({})",
+            order, degree
+        )));
+    }
+    Ok(spherical_harmonic::spherical_harmonic_accel(
+        &r, &c_flat, &s_flat, mu, radius, degree, order,
+    ))
+}
+
 /// PyO3 模块初始化函数，将 Rust 函数与类注册到 Python 模块。
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
@@ -289,6 +331,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
     m.add_function(wrap_pyfunction!(multistep_step, m)?)?;
     m.add_function(wrap_pyfunction!(cowell_step, m)?)?;
+    m.add_function(wrap_pyfunction!(spherical_harmonic_accel, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;
