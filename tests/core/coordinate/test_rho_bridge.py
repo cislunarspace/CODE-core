@@ -213,3 +213,46 @@ class TestPhysicalPlausibility:
         r_l1, _ = rho_to_eci(np.zeros(3), np.zeros(3), 0.0, context, system)
         r_l2, _ = rho_to_eci(np.zeros(3), np.zeros(3), 0.0, context_l2, system)
         assert np.linalg.norm(r_l2) > np.linalg.norm(r_l1)
+
+
+# =============================================================================
+# Test tu_to_et
+# =============================================================================
+
+
+class TestTimeConversion:
+    """归一化 TU → SPICE ET 转换。"""
+
+    def test_tu_to_et_at_epoch(self, system, context):
+        """t_nd=0（历元）时，ET 应接近 J2000 起算的值。"""
+        from e2m2e.core.rho_bridge import tu_to_et
+
+        et = tu_to_et(0.0, context, system)
+        # epoch=J2000.0 (2451545.0 JD)，对应 ET 应在 0 附近（64s TDB-UTC 偏差内）
+        assert abs(et) < 100.0, f"t_nd=0 时 ET={et:.1f}s，偏离 J2000"
+
+    def test_tu_to_et_monotonic(self, system, context):
+        """ET 应随 t_nd 单调递增（TU>0）。"""
+        from e2m2e.core.rho_bridge import tu_to_et
+
+        et0 = tu_to_et(0.0, context, system)
+        et1 = tu_to_et(1.0, context, system)
+        et2 = tu_to_et(2.0, context, system)
+        assert et0 < et1 < et2
+
+    def test_tu_to_et_matches_jd_path(self, system, context):
+        """tu_to_et 与手动 jd0 + t_nd*TU/86400 → _jd_to_et 路径一致。"""
+        from e2m2e.core.rho_bridge import _jd_to_et, tu_to_et
+
+        t_nd = 1.5
+        jd = context.jd0 + t_nd * context.TU / 86400.0
+        et_expected = _jd_to_et(jd, system)
+        et = tu_to_et(t_nd, context, system)
+        assert_allclose(et, et_expected)
+
+    def test_tu_to_et_step_matches_tu_seconds(self, system, context):
+        """Δt_nd=1 的 ET 差应接近 context.TU（TU 秒 = 一归一化时间单位）。"""
+        from e2m2e.core.rho_bridge import tu_to_et
+
+        dt_et = tu_to_et(1.0, context, system) - tu_to_et(0.0, context, system)
+        assert_allclose(dt_et, context.TU, rtol=1e-9)

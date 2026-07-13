@@ -9,6 +9,7 @@ from .exceptions import (
 from .force_config import dump_force_config, load_force_config
 from .force_model import ForceEntry, ForceModel
 from .gravity_field import GravityField
+from .indirect_term import IndirectTerm
 from .physical_model import PhysicalModel
 from .point_mass_gravity import PointMassGravity
 from .relativistic_correction import RelativisticCorrection
@@ -24,6 +25,7 @@ __all__ = [
     "ForceModel",
     "ForceEntry",
     "GravityField",
+    "IndirectTerm",
     "DragModel",
     "SolarRadiationPressure",
     "ConicalShadowModel",

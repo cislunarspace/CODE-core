@@ -19,6 +19,7 @@ from e2m2e.core.atmosphere import ExponentialAtmosphere
 from .drag import DragModel
 from .exceptions import NotSerializableError
 from .gravity_field import GravityField
+from .indirect_term import IndirectTerm
 from .physical_model import PhysicalModel
 from .point_mass_gravity import PointMassGravity
 from .relativistic_correction import RelativisticCorrection
@@ -266,6 +267,11 @@ def _serialize_third_body_gravity(force: ThirdBodyGravity) -> dict[str, Any]:
     return {"body": force.body, "mu": force.mu}
 
 
+def _serialize_indirect_term(force: IndirectTerm) -> dict[str, Any]:
+    """把第三体间接项力模型序列化为参数字典。"""
+    return {"body": force.body, "mu": force.mu}
+
+
 _SERIALIZERS: dict[type, Any] = {
     GravityField: _serialize_gravity_field,
     DragModel: _serialize_drag_model,
@@ -274,6 +280,7 @@ _SERIALIZERS: dict[type, Any] = {
     RelativisticCorrection: _serialize_relativistic_correction,
     PointMassGravity: _serialize_point_mass_gravity,
     ThirdBodyGravity: _serialize_third_body_gravity,
+    IndirectTerm: _serialize_indirect_term,
 }
 
 
@@ -331,6 +338,11 @@ def _build_third_body_gravity(params: dict[str, Any]) -> ThirdBodyGravity:
     return ThirdBodyGravity(**params)
 
 
+def _build_indirect_term(params: dict[str, Any]) -> IndirectTerm:
+    """从参数字典构造第三体间接项力模型。"""
+    return IndirectTerm(**params)
+
+
 _BUILDERS: dict[str, Any] = {
     "GravityField": _build_gravity_field,
     "DragModel": _build_drag_model,
@@ -339,6 +351,7 @@ _BUILDERS: dict[str, Any] = {
     "RelativisticCorrection": _build_relativistic_correction,
     "PointMassGravity": _build_point_mass_gravity,
     "ThirdBodyGravity": _build_third_body_gravity,
+    "IndirectTerm": _build_indirect_term,
 }
 
 

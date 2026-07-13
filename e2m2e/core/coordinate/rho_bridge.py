@@ -72,6 +72,22 @@ def _jd_to_et(jd: float, system: EphemerisSystem) -> float:
     return system.spice.utc_to_et(f"{jd:.20f} JDTDB")
 
 
+def tu_to_et(t_nd: float, context: RhoContext, system: EphemerisSystem) -> float:
+    """归一化时间 TU → SPICE 历书时（秒）。
+
+    与 :meth:`NormalFormContext.tu_to_seconds` 命名族对称：后者停在 SI 秒，
+    本函数进一步经 SPICE ``str2et("... JDTDB")`` 转到历书时，供
+    ``ForceModel`` 等 ET 驱动的力模型使用。
+
+    Args:
+        t_nd: 归一化时间（TU）。
+        context: 标准形上下文，提供 ``jd0`` 与 ``TU``。
+        system: 星历系统，提供 SPICE 访问。
+    """
+    jd = context.jd0 + t_nd * context.TU / 86400.0
+    return _jd_to_et(jd, system)
+
+
 def _compute_lp_state_j2000(
     et: float,
     context: RhoContext,
