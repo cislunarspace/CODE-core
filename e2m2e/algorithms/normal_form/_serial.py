@@ -365,7 +365,7 @@ def result_to_npz_dict(result: NormalFormResult) -> dict[str, Any]:
 
     # 顶层字段
     d["_nfr_order"] = np.array(result.order)
-    d["_nfr_residual"] = np.array(result.residual)
+    d["_nfr_residual"] = np.array(result.substitute_residual)
     d["_nfr_success"] = np.array(int(result.success))
     d["_nfr_message"] = _encode_str(result.message)
 
@@ -440,7 +440,7 @@ def result_from_npz_dict(d: dict[str, Any]) -> NormalFormResult:
     return NormalFormResult(
         context=ctx,
         order=order,
-        residual=residual,
+        substitute_residual=residual,
         success=success,
         message=message,
         ds_result=ds_result,

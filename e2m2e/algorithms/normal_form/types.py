@@ -32,9 +32,9 @@ class NormalFormResult:
 
     字段分两组：
 
-    - **通用化简诊断**（``residual``、``success``、``message``、``metadata``）：
-      跨切片稳定，描述整条流水线的收敛情况。保留给仅关心"是否收敛、残差多大"
-      的诊断调用方。
+    - **通用化简诊断**（``substitute_residual``、``success``、``message``、
+      ``metadata``）：跨切片稳定，描述整条流水线的收敛情况。保留给仅关心
+      "是否收敛、残差多大"的诊断调用方。
     - **子结果句柄**（``ds_result`` / ``qf_result`` / ``cm_result`` /
       ``catalog_transformer``）：issue #175 新增。指向四个子 reducer 的产物；
       ``catalog_transformer`` 一等公民字段使外部用户能直接
@@ -47,7 +47,10 @@ class NormalFormResult:
     Attributes:
         context: 关联的 ``NormalFormContext``。
         order: 实际展开阶数（一般等于 ``context.order``）。
-        residual: 截断后剩余项的范数估计。
+        substitute_residual: 动力学替代步（多重打靶）的段间连续性残差
+            （来自 ``ds_result.residual_norm``）。注意它不是 Lie 变换的
+            截断残差——后者当前写入 ``metadata["cm_hyperbolic_coupling"]``。
+            ``residual`` 是其向后兼容别名。
         success: 流水线是否在容差内收敛。
         message: 人类可读的终止原因。
         metadata: 自由扩展字段；保留供后续切片写入诊断数据。
@@ -61,7 +64,7 @@ class NormalFormResult:
 
     context: NormalFormContext
     order: int
-    residual: float = 0.0
+    substitute_residual: float = 0.0
     success: bool = False
     message: str = ""
     metadata: dict[str, object] = field(default_factory=dict)
@@ -69,6 +72,16 @@ class NormalFormResult:
     qf_result: QuasiFloquetResult | None = None
     cm_result: CenterManifoldResult | None = None
     catalog_transformer: LibrationCatalogTransformer | None = None
+
+    @property
+    def residual(self) -> float:
+        """``substitute_residual`` 的向后兼容别名。
+
+        早期版本该字段名 ``residual``，但 docstring 描述的"截断残差"与实际
+        写入的"动力学替代连续性残差"语义不符（见 #224）。新代码应用
+        ``substitute_residual``；本 property 仅为不破坏既有消费者保留。
+        """
+        return self.substitute_residual
 
     # ------------------------------------------------------------------
     # 序列化：save / load

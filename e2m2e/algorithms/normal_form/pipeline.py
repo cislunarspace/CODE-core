@@ -162,7 +162,7 @@ class NormalFormPipeline:
         return NormalFormResult(
             context=self.context,
             order=int(self.context.order),
-            residual=float(ds_result.residual_norm),
+            substitute_residual=float(ds_result.residual_norm),
             success=True,
             message="流水线四步全部完成",
             metadata={
