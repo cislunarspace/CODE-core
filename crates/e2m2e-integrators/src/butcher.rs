@@ -61,13 +61,19 @@ impl ButcherTable {
 
 /// 使用 `table` 执行一次显式 Runge-Kutta 单步。
 ///
-/// 返回主解（高阶解）与主解和嵌入解之差的 L2 范数（用于步长控制的局部误差估计）。
+/// 返回主解（高阶解）与局部误差估计。误差为主解与嵌入解之差的 L2 范数，
+/// 仅统计前 ``error_dim`` 个分量（``error_dim`` 为 ``None`` 时统计全部）。
+///
+/// STM 增广传播时，物理状态占前 6 维、状态转移矩阵展平占后 36 维。后者不
+/// 参与步长误差控制（与 GMAT 一致：STM 元素禁用误差控制），否则 STM 分量
+/// 会主导 L2 范数、导致步长过小。
 pub fn explicit_rk_step<F, E>(
     table: &ButcherTable,
     t: f64,
     y: &[f64],
     h: f64,
     f: F,
+    error_dim: Option<usize>,
 ) -> Result<(Vec<f64>, f64), E>
 where
     F: Fn(f64, &[f64]) -> Result<Vec<f64>, E>,
@@ -106,9 +112,11 @@ where
         y_low[l] = y[l] + h * y_low[l];
     }
 
-    let error = y_high
+    // 误差只统计前 error_dim 维（默认全部），让 STM 分量不主导步长控制。
+    let dim = error_dim.unwrap_or(n).min(n);
+    let error = y_high[..dim]
         .iter()
-        .zip(y_low.iter())
+        .zip(y_low[..dim].iter())
         .map(|(hi, lo)| (hi - lo).powi(2))
         .sum::<f64>()
         .sqrt();

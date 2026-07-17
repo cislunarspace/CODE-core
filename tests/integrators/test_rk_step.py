@@ -157,3 +157,75 @@ def test_two_body_circular_orbit_matches_analytic():
 
     y_exact = kepler_analytic_state(r0, v0, period)
     assert np.linalg.norm(y - y_exact) < 1e-9
+
+
+def test_rk_step_state_error_dim_default_matches_full():
+    """state_error_dim=None 时误差与旧行为一致（全状态 L2）。"""
+    from e2m2e._integrators import RkMethod, rk_step
+
+    def f(t, y):
+        y = np.asarray(y, dtype=float)
+        r = y[:3]
+        v = y[3:]
+        r_norm = np.linalg.norm(r)
+        return np.concatenate([v, -r / r_norm**3])
+
+    y0 = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=float)
+    r_default = rk_step(RkMethod.PD45, 0.0, y0, 0.01, 1e-10, f)
+    r_dim6 = rk_step(RkMethod.PD45, 0.0, y0, 0.01, 1e-10, f, state_error_dim=6)
+    assert abs(r_default.error - r_dim6.error) < 1e-15
+
+
+def test_rk_step_state_error_dim_excludes_stm_components():
+    """42 维增广状态传 state_error_dim=6 时，误差只反映前 6 维物理状态。
+
+    构造一个 42 维系统：前 6 维是二体轨道，后 36 维是 STM（初始单位阵）。
+    全状态误差会被 STM 分量主导；分段误差只看前 6 维，与纯 6 维一致。
+    """
+    from e2m2e._integrators import RkMethod, rk_step
+
+    def eom_6(t, y):
+        y = np.asarray(y, dtype=float)
+        r = y[:3]
+        v = y[3:]
+        rn = np.linalg.norm(r)
+        return np.concatenate([v, -r / rn**3])
+
+    def eom_42(t, y):
+        y = np.asarray(y, dtype=float)
+        state = y[:6]
+        stm = y[6:].reshape(6, 6)
+        r = state[:3]
+        v = state[3:]
+        rn = np.linalg.norm(r)
+        acc = -r / rn**3
+        A = np.zeros((6, 6))
+        A[:3, 3:] = np.eye(3)
+        A[3:, :3] = -np.eye(3) / rn**3 + 3.0 * np.outer(r, r) / rn**5
+        return np.concatenate([v, acc, (A @ stm).flatten()])
+
+    y6 = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=float)
+    y42 = np.concatenate([y6, np.eye(6).flatten()])
+
+    r_6 = rk_step(RkMethod.PD45, 0.0, y6, 0.01, 1e-10, eom_6)
+    r_42_dim6 = rk_step(RkMethod.PD45, 0.0, y42, 0.01, 1e-10, eom_42, state_error_dim=6)
+    r_42_full = rk_step(RkMethod.PD45, 0.0, y42, 0.01, 1e-10, eom_42)
+
+    # 分段误差 ≈ 纯 6 维误差
+    assert abs(r_42_dim6.error - r_6.error) < 1e-12
+    # 全状态误差明显更大（STM 分量贡献）
+    assert r_42_full.error > r_42_dim6.error
+
+
+def test_rk_step_state_error_dim_rejects_invalid():
+    """state_error_dim=0 或超过状态长度时抛 ValueError。"""
+    from e2m2e._integrators import RkMethod, rk_step
+
+    def f(t, y):
+        return np.zeros_like(y)
+
+    y0 = np.zeros(6)
+    with pytest.raises(ValueError, match="state_error_dim"):
+        rk_step(RkMethod.PD45, 0.0, y0, 0.01, 1e-10, f, state_error_dim=0)
+    with pytest.raises(ValueError, match="state_error_dim"):
+        rk_step(RkMethod.PD45, 0.0, y0, 0.01, 1e-10, f, state_error_dim=10)

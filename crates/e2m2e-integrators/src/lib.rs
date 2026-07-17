@@ -104,7 +104,12 @@ fn call_python_rhs(f: &Bound<PyAny>, n: usize, t: f64, y: &[f64]) -> PyResult<Ve
 }
 
 /// 执行一次显式 Runge-Kutta 单步。
+///
+/// ``state_error_dim``：步长误差控制只统计前 N 维（``None`` 时统计全部）。
+/// 用于 STM 增广传播——物理状态占前 6 维，STM 展平占后 36 维，后者不应
+/// 主导步长控制。
 #[pyfunction]
+#[pyo3(signature = (method, t, y, h, tol, f, state_error_dim=None))]
 fn rk_step(
     method: RkMethod,
     t: f64,
@@ -112,6 +117,7 @@ fn rk_step(
     h: f64,
     tol: f64,
     f: &Bound<PyAny>,
+    state_error_dim: Option<usize>,
 ) -> PyResult<StepResult> {
     if h <= 0.0 {
         return Err(pyo3::exceptions::PyValueError::new_err(
@@ -128,12 +134,21 @@ fn rk_step(
             "state vector y must not be empty",
         ));
     }
+    if let Some(dim) = state_error_dim {
+        if dim == 0 || dim > y.len() {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "state_error_dim must be in 1..={}, got {}",
+                y.len(),
+                dim
+            )));
+        }
+    }
 
     let n = y.len();
     let callback = |ti: f64, yi: &[f64]| -> PyResult<Vec<f64>> { call_python_rhs(f, n, ti, yi) };
 
     let table = method.table();
-    let (y_new, error) = explicit_rk_step(table, t, &y, h, callback)?;
+    let (y_new, error) = explicit_rk_step(table, t, &y, h, callback, state_error_dim)?;
 
     if y_new.iter().any(|v| v.is_nan() || v.is_infinite()) {
         return Err(pyo3::exceptions::PyValueError::new_err(

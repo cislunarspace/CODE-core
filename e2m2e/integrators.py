@@ -41,11 +41,15 @@ def rk_step(
     h: float,
     tol: float,
     f: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
+    state_error_dim: int | None = None,
 ):
     """Take a single Runge-Kutta step using the Rust integrator core.
 
     The callback ``f`` receives a NumPy ndarray and must return one of the same
     length. Returns a ``StepResult`` with ``y_new``, ``error``, ``h_next``.
+
+    ``state_error_dim``：步长误差控制只统计前 N 维（``None`` 时统计全部）。
+    STM 增广传播时传 6，让状态转移矩阵的 36 个分量不主导步长控制。
     """
     y = np.asarray(y, dtype=float)
 
@@ -54,7 +58,7 @@ def rk_step(
         result = f(t_i, y_arr)
         return np.asarray(result, dtype=float).tolist()
 
-    return _rk_step(method, t, y.tolist(), h, tol, _adapt)
+    return _rk_step(method, t, y.tolist(), h, tol, _adapt, state_error_dim)
 
 
 def multistep_step(
