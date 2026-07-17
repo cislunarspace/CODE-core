@@ -73,13 +73,7 @@ class ThirdBodyGravity(PhysicalModel):
 
         距离低于 ``MIN_DISTANCE`` 时钳位，避免除零（发出 ``UserWarning``）。
         """
-        mu = self._mu
-        if mu is None:
-            if system is None:
-                raise ValueError(
-                    "mu is None and system is None; cannot resolve gravitational_parameter"
-                )
-            mu = system.gravitational_parameter(self._body)
+        mu = self._resolve_mu(system)
 
         r_sc = np.asarray(state, dtype=float)[:3]
         # 摄动天体相对原点（get_body_position 自动用 system.origin 作 observer）
@@ -115,13 +109,7 @@ class ThirdBodyGravity(PhysicalModel):
         第三体分支逐字一致。间接项 ``-μ rᵢ/|rᵢ|³`` 不依赖航天器位置，
         故 ∂/∂r = 0。
         """
-        mu = self._mu
-        if mu is None:
-            if system is None:
-                raise ValueError(
-                    "mu is None and system is None; cannot resolve gravitational_parameter"
-                )
-            mu = system.gravitational_parameter(self._body)
+        mu = self._resolve_mu(system)
 
         r_sc = np.asarray(state, dtype=float)[:3]
         r_ob = np.asarray(system.get_body_position(self._body, t), dtype=float)

@@ -48,13 +48,7 @@ class PointMassGravity(PhysicalModel):
 
         ``r=0`` 时返回零向量，避免除零。
         """
-        mu = self._mu
-        if mu is None:
-            if system is None:
-                raise ValueError(
-                    "mu is None and system is None; cannot resolve gravitational_parameter"
-                )
-            mu = system.gravitational_parameter(self._body)
+        mu = self._resolve_mu(system)
 
         r = np.asarray(state, dtype=float)[:3]
         r_norm = np.linalg.norm(r)
@@ -73,13 +67,7 @@ class PointMassGravity(PhysicalModel):
         公式：``-μ(I/r³ - 3 r rᵀ/r⁵)``，与 ``EphemerisDynamics`` 中心天体
         分支逐字一致。``r=0`` 时返回零矩阵。
         """
-        mu = self._mu
-        if mu is None:
-            if system is None:
-                raise ValueError(
-                    "mu is None and system is None; cannot resolve gravitational_parameter"
-                )
-            mu = system.gravitational_parameter(self._body)
+        mu = self._resolve_mu(system)
 
         r = np.asarray(state, dtype=float)[:3]
         r_norm = float(np.linalg.norm(r))

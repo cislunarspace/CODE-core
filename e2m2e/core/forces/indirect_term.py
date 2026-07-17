@@ -60,13 +60,7 @@ class IndirectTerm(PhysicalModel):
 
         ``r_body=0`` 时返回零向量，避免除零。
         """
-        mu = self._mu
-        if mu is None:
-            if system is None:
-                raise ValueError(
-                    "mu is None and system is None; cannot resolve gravitational_parameter"
-                )
-            mu = system.gravitational_parameter(self._body)
+        mu = self._resolve_mu(system)
 
         r_ob = np.asarray(system.get_body_position(self._body, t), dtype=float)
         n = float(np.linalg.norm(r_ob))
