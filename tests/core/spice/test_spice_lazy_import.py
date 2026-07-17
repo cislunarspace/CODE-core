@@ -34,7 +34,7 @@ spec = importlib.util.spec_from_file_location("e2m2e.core.spice", module_path)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 print("spiceypy_loaded:", "spiceypy" in sys.modules)
-""" % (Path(__file__).parent.parent.parent / "e2m2e" / "core" / "spice.py")
+""" % (Path(__file__).parent.parent.parent.parent / "e2m2e" / "core" / "spice.py")
         returncode, stdout, stderr = self._run_in_subprocess(code)
 
         assert returncode == 0, f"子进程退出码非零: stderr={stderr}"
@@ -55,7 +55,7 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 manager_class = module.SPICEManager
 print("spiceypy_loaded:", "spiceypy" in sys.modules)
-""" % (Path(__file__).parent.parent.parent / "e2m2e" / "core" / "spice.py")
+""" % (Path(__file__).parent.parent.parent.parent / "e2m2e" / "core" / "spice.py")
         returncode, stdout, stderr = self._run_in_subprocess(code)
 
         assert returncode == 0, f"子进程退出码非零: stderr={stderr}"
@@ -87,7 +87,7 @@ try:
 except Exception:
     pass
 print("after_get_gm_uncached:", "spiceypy" in sys.modules)
-""" % (Path(__file__).parent.parent.parent / "e2m2e" / "core" / "spice.py")
+""" % (Path(__file__).parent.parent.parent.parent / "e2m2e" / "core" / "spice.py")
         returncode, stdout, stderr = self._run_in_subprocess(code)
 
         assert returncode == 0, f"子进程退出码非零: stderr={stderr}"
