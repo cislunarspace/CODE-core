@@ -13,8 +13,8 @@ import numpy as np
 
 from e2m2e.core.enums import BoundaryMode
 
-from ..ephemeris_correction_types import EphemerisCorrectionResult
 from ..two_level_multiple_shooting import TwoLevelMultipleShooting
+from .types import EphemerisCorrectionResult
 
 
 class _TwoLevelPatchPointCorrector:

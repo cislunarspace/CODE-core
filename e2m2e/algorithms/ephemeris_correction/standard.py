@@ -11,8 +11,8 @@ from typing import Any
 
 import numpy as np
 
-from ..ephemeris_correction_types import EphemerisCorrectionResult
 from ..multiple_shooting import MultipleShooting
+from .types import EphemerisCorrectionResult
 
 
 class _StandardPatchPointCorrector:

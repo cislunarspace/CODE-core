@@ -18,7 +18,7 @@ from e2m2e.algorithms.ephemeris_correction import (
     standard,
     two_level,
 )
-from e2m2e.algorithms.ephemeris_correction_types import (
+from e2m2e.algorithms.ephemeris_correction import (
     EphemerisCorrectionResult,
     PatchPointCorrector,
     UnsupportedCorrectorMethodError,

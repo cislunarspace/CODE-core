@@ -15,8 +15,8 @@
 
 同伦修正与分发器同置于本子包内，因此分发器可正常 import
 ``correct_with_homotopy``，不再需要延迟导入的循环依赖 workaround。
-接缝类型（``EphemerisCorrectionResult`` 等）保留在
-``e2m2e.algorithms.ephemeris_correction_types`` 作为叶子模块破环。
+接缝类型（``EphemerisCorrectionResult`` 等）定义在 ``types`` 子模块，
+作为子包内的叶子模块破环。
 """
 
 from __future__ import annotations
@@ -26,14 +26,14 @@ from typing import Any
 
 import numpy as np
 
-from ..ephemeris_correction_types import (
+from .homotopy import _HomotopyPatchPointCorrector
+from .standard import _StandardPatchPointCorrector
+from .two_level import _TwoLevelPatchPointCorrector
+from .types import (
     EphemerisCorrectionResult,
     PatchPointCorrector,
     UnsupportedCorrectorMethodError,
 )
-from .homotopy import _HomotopyPatchPointCorrector
-from .standard import _StandardPatchPointCorrector
-from .two_level import _TwoLevelPatchPointCorrector
 
 # ---------------------------------------------------------------------------
 # 注册表

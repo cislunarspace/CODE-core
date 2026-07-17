@@ -28,12 +28,12 @@ from e2m2e.core.enums import BoundaryMode
 
 from ...core.ephemeris_dynamics import EphemerisDynamics
 from ...core.ephemeris_system import EphemerisSystem
-from ..ephemeris_correction_types import EphemerisCorrectionResult
 from ..multiple_shooting import MultipleShooting, MultipleShootingResult
 from ..two_level_multiple_shooting import (
     TwoLevelMultipleShooting,
     TwoLevelMultipleShootingResult,
 )
+from .types import EphemerisCorrectionResult
 
 DEFAULT_LAMBDA_STEPS: tuple[float, ...] = (0.25, 0.50, 0.75, 1.00)
 

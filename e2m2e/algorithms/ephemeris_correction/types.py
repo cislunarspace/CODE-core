@@ -1,7 +1,10 @@
 """星历修正接缝类型
 
 定义 ``PatchPointCorrector`` 接缝与 ``EphemerisCorrectionResult`` 结果类型，
-供 ``ephemeris_correction.py`` 的注册表与各修正实现共用。
+供 ``ephemeris_correction`` 子包的注册表与各修正实现共用。
+
+作为子包内的叶子模块破环：分发器与各修正实现从 ``.types`` import，
+避免分发器与实现之间的循环依赖。
 """
 
 from __future__ import annotations

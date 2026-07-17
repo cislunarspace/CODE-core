@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # ephemeris_correction is now a subpackage (dispatcher + _REGISTRY live in
-    # ``ephemeris_correction/__init__.py``); the seam types are re-exported
-    # from it but physically remain in ``ephemeris_correction_types``.
+    # ``ephemeris_correction/__init__.py``); the seam types are defined in
+    # ``ephemeris_correction/types.py`` and re-exported by the subpackage.
     from .ephemeris_correction import (
         EphemerisCorrectionResult as EphemerisCorrectionResult,
     )
