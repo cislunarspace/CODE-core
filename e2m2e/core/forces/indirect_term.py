@@ -73,3 +73,12 @@ class IndirectTerm(PhysicalModel):
         if n < 1e-6:
             return np.zeros(3)
         return -mu * r_ob / n**3
+
+    def compute_jacobian(
+        self,
+        t: float,
+        state: npt.ArrayLike,
+        system: System,
+    ) -> npt.NDArray[np.floating] | None:
+        """间接项不依赖航天器位置，∂a/∂r 恒为零矩阵。"""
+        return np.zeros((3, 3))

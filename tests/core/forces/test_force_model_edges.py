@@ -61,12 +61,24 @@ def test_propagate_rejects_backward_integration():
         fm.propagate(np.zeros(6), (1.0, 0.0))
 
 
-def test_propagate_rejects_with_stm():
-    """with_stm=True 抛 NotImplementedError。"""
+def test_propagate_with_stm_returns_kinematic_stm():
+    """with_stm=True 返回 STM；恒力下 STM 为纯运动学 [[I, tI],[0, I]]。
+
+    ConstantForce 加速度不依赖位置，∂a/∂r = 0（经有限差分兜底得到），
+    故 STM 退化为自由质点的运动学转移矩阵。
+    """
     system = _FakeSystem()
-    fm = ForceModel(system)
-    with pytest.raises(NotImplementedError, match="state transition matrices"):
-        fm.propagate(np.zeros(6), (0.0, 1.0), with_stm=True)
+    fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, 0.0])])
+    y0 = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+    dt = 2.0
+
+    result = fm.propagate(y0, (0.0, dt), with_stm=True)
+
+    assert "stm" in result
+    stm = result["stm"][-1]
+    expected = np.eye(6)
+    expected[:3, 3:] = dt * np.eye(3)  # ∂r_f/∂v_0 = t·I
+    np.testing.assert_allclose(stm, expected, atol=1e-6)
 
 
 def test_propagate_rejects_with_jacobi():

@@ -61,3 +61,29 @@ class PointMassGravity(PhysicalModel):
         if r_norm < 1e-15:
             return np.zeros(3)
         return -mu / (r_norm**3) * r
+
+    def compute_jacobian(
+        self,
+        t: float,
+        state: npt.ArrayLike,
+        system: System,
+    ) -> npt.NDArray[np.floating] | None:
+        """返回中心引力加速度对位置的偏导 ∂a/∂r（3×3）。
+
+        公式：``-μ(I/r³ - 3 r rᵀ/r⁵)``，与 ``EphemerisDynamics`` 中心天体
+        分支逐字一致。``r=0`` 时返回零矩阵。
+        """
+        mu = self._mu
+        if mu is None:
+            if system is None:
+                raise ValueError(
+                    "mu is None and system is None; cannot resolve gravitational_parameter"
+                )
+            mu = system.gravitational_parameter(self._body)
+
+        r = np.asarray(state, dtype=float)[:3]
+        r_norm = float(np.linalg.norm(r))
+        if r_norm < 1e-15:
+            return np.zeros((3, 3))
+        mu_r3 = mu / r_norm**3
+        return -mu_r3 * (np.eye(3) - 3.0 * np.outer(r, r) / (r_norm**2))

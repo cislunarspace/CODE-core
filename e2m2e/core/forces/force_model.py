@@ -38,6 +38,7 @@ class ForceModel:
     DEFAULT_TOLERANCE = 1e-12
     DEFAULT_MAX_STEP = 60.0  # 秒，用于物理单位传播
     STATE_DIM = 6  # 状态向量维度 [x, y, z, vx, vy, vz]
+    STM_DIM = STATE_DIM + STATE_DIM * STATE_DIM  # 42 = 6 状态 + 36 STM 展平
 
     def __init__(
         self,
@@ -219,22 +220,89 @@ class ForceModel:
             total = total + entry.force.compute_acceleration(t, state, self.system)
         return total
 
+    def _compute_total_jacobian(
+        self,
+        t: float,
+        state: npt.NDArray[np.floating],
+    ) -> npt.NDArray[np.floating]:
+        """计算所有启用力模型的叠加雅可比 ∂a/∂r（3×3）。
+
+        对齐 GMAT ``ODEModel::GetDerivatives``：组合模型的雅可比是各力雅可比
+        之和（``∂(a₁+a₂)/∂r = ∂a₁/∂r + ∂a₂/∂r``，无交叉耦合）。返回 ``None``
+        雅可比的力用三点中心差分兜底（调 ``compute_acceleration``）。
+        """
+        total = np.zeros((3, 3), dtype=float)
+        r_norm = float(np.linalg.norm(state[:3]))
+        # 有限差分步长：sqrt(eps) * r_norm，保证相对扰动在机器精度量级
+        delta = max(np.sqrt(np.finfo(float).eps) * r_norm, 1e-6)
+        for entry in self._entries:
+            if not entry.enabled:
+                continue
+            jac = entry.force.compute_jacobian(t, state, self.system)
+            if jac is None:
+                jac = self._finite_diff_jacobian(entry.force, t, state, delta)
+            total = total + jac
+        return total
+
+    def _finite_diff_jacobian(
+        self,
+        force: PhysicalModel,
+        t: float,
+        state: npt.NDArray[np.floating],
+        delta: float,
+    ) -> npt.NDArray[np.floating]:
+        """三点中心差分估算单个力的 ∂a/∂r（3×3）。
+
+        对位置三分量各扰动 ±delta，调 ``compute_acceleration`` 取差分。
+        """
+        jac = np.zeros((3, 3), dtype=float)
+        for i in range(3):
+            state_plus = state.copy()
+            state_minus = state.copy()
+            state_plus[i] += delta
+            state_minus[i] -= delta
+            a_plus = force.compute_acceleration(t, state_plus, self.system)
+            a_minus = force.compute_acceleration(t, state_minus, self.system)
+            jac[:, i] = (a_plus - a_minus) / (2.0 * delta)
+        return jac
+
     def equations_of_motion(
         self, t: float, state: npt.NDArray[np.floating]
     ) -> npt.NDArray[np.floating]:
-        """运动方程（兼容 Dynamics 接口）。"""
+        """运动方程（兼容 Dynamics 接口，6 维）。"""
         return self._eom_func(t, state)
 
     def _get_eom_func(self, with_stm: bool) -> Callable:
         """返回运动方程函数（兼容 Dynamics 接口）。"""
         if with_stm:
-            raise NotImplementedError("ForceModel does not support state transition matrices.")
+            return self._eom_func_with_stm
         return self._eom_func
 
     def _eom_func(self, t: float, state: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
-        """运动方程闭包。"""
+        """运动方程闭包（6 维 [v, a]）。"""
         acceleration = self._compute_total_acceleration(t, state)
         return np.concatenate([state[3:6], acceleration])
+
+    def _eom_func_with_stm(
+        self, t: float, augmented_state: npt.NDArray[np.floating]
+    ) -> npt.NDArray[np.floating]:
+        """增广运动方程闭包（42 维 [v, a, Φ̇]）。
+
+        拆出状态与 STM，算加速度和雅可比，组装
+        ``A = [[0, I], [∂a/∂r, 0]]``，返回 ``[v, a, (A@Φ).flatten()]``。
+        对齐 GMAT ``CompleteDerivativeCalculations``：力模型只供 Ã 的左下块，
+        变分方程 Φ̇ = AΦ 在此集中求解。
+        """
+        state = augmented_state[:6]
+        stm = augmented_state[6:].reshape((6, 6))
+        acceleration = self._compute_total_acceleration(t, state)
+        dacc_dr = self._compute_total_jacobian(t, state)
+
+        A = np.zeros((6, 6))
+        A[:3, 3:] = np.eye(3)
+        A[3:, :3] = dacc_dr
+        stm_dot = A @ stm
+        return np.concatenate([state[3:6], acceleration, stm_dot.flatten()])
 
     def propagate(
         self,
@@ -255,15 +323,19 @@ class ForceModel:
             initial_state: 初始状态向量，形状 (6,)。
             t_span: 时间区间 [t0, tf]，单位为 SPICE et 秒。
             t_eval: 评估时间点数组，默认 linspace(t0, tf, 100)。
-            with_stm: 不支持，传 True 抛 NotImplementedError。
+            with_stm: 是否同时积分状态转移矩阵。返回字典额外含 ``stm`` 键，
+                形状 (n_points, 6, 6)。STM 不参与步长误差控制（对齐 GMAT），
+                仅前 6 维物理状态决定接受/拒绝步长。
             with_jacobi: 不支持，传 True 抛 NotImplementedError。
             initial_step: 初始步长，默认从初始状态估算。
             events: 简单终止事件列表，每个事件返回标量，符号变化时停止。
+                ``with_stm=True`` 时事件函数接收 6 维状态（非增广状态）。
             max_steps: 最大积分步数，默认 100_000。
             method: Runge-Kutta 积分器方法，默认 PD45。
 
         Returns:
-            包含 ``time``、``states`` 和 ``terminal_event_index`` 的字典。
+            包含 ``time``、``states`` 和 ``terminal_event_index`` 的字典；
+            ``with_stm=True`` 时额外含 ``stm`` 键。
         """
         self._raise_for_unsupported(with_stm, with_jacobi)
 
@@ -275,8 +347,21 @@ class ForceModel:
             raise NotImplementedError(
                 "ForceModel propagation only supports forward integration (tf >= t0)."
             )
+
+        y0 = np.asarray(initial_state, dtype=float)
+        if y0.shape != (self.STATE_DIM,):
+            raise ValueError(f"initial_state must have shape ({self.STATE_DIM},)")
+
         if tf == t0:
-            y0 = np.asarray(initial_state, dtype=float)
+            if with_stm:
+                aug = np.concatenate([y0, np.eye(self.STATE_DIM).flatten()])
+                self.last_trajectory = (np.array([t0]), y0.reshape(1, -1))
+                return {
+                    "time": np.array([t0]),
+                    "states": y0.reshape(1, -1),
+                    "stm": np.eye(self.STATE_DIM).reshape(1, self.STATE_DIM, self.STATE_DIM),
+                    "terminal_event_index": None,
+                }
             self.last_trajectory = (np.array([t0]), y0.reshape(1, -1))
             return {
                 "time": np.array([t0]),
@@ -284,9 +369,11 @@ class ForceModel:
                 "terminal_event_index": None,
             }
 
-        y = np.asarray(initial_state, dtype=float)
-        if y.shape != (self.STATE_DIM,):
-            raise ValueError(f"initial_state must have shape ({self.STATE_DIM},)")
+        # with_stm 时拼单位阵成 42 维增广状态 [r, v, Φ_flat]
+        if with_stm:
+            y = np.concatenate([y0, np.eye(self.STATE_DIM).flatten()])
+        else:
+            y = y0
 
         t_eval = self._prepare_t_eval(t0, tf, t_eval)
         max_step = float(self.max_step)
@@ -298,18 +385,24 @@ class ForceModel:
                 raise ValueError("initial_step must be positive")
             h = float(initial_step)
         else:
-            h = self._estimate_initial_step(y, t0, tf)
+            h = self._estimate_initial_step(y0, t0, tf)
 
-        eom = self._eom_func
+        eom = self._eom_func_with_stm if with_stm else self._eom_func
+        # STM 分量不参与步长误差控制，只看前 6 维物理状态
+        error_dim = self.STATE_DIM if with_stm else None
         event_funcs = list(events) if events is not None else []
-        event_values_prev = [func(t0, y) for func in event_funcs]
+        # 事件函数接收 6 维状态，with_stm 时从增广状态取前 6 维
+        event_values_prev = [func(t0, y0) for func in event_funcs]
 
-        # 循环开始前更新动态坐标系
+        # 循环开始前更新动态坐标系（用 6 维物理状态）
         if hasattr(self.system, "update_coordinate_systems"):
-            self.system.update_coordinate_systems(t0, y)
+            self.system.update_coordinate_systems(t0, y0)
 
         times: list[float] = [t0]
-        states: list[npt.NDArray[np.floating]] = [y.copy()]
+        states: list[npt.NDArray[np.floating]] = [y0.copy()]
+        stm_list: list[npt.NDArray[np.floating]] | None = (
+            [np.eye(self.STATE_DIM)] if with_stm else None
+        )
         terminal_event_index: int | None = None
 
         t = t0
@@ -326,21 +419,22 @@ class ForceModel:
                 h = min(h, t_eval[eval_index] - t)
             h = max(h, min_step)
 
-            # 每个 rk_step 前更新动态坐标系
+            # 每个 rk_step 前更新动态坐标系（用 6 维物理状态）
             if hasattr(self.system, "update_coordinate_systems"):
-                self.system.update_coordinate_systems(t, y)
+                self.system.update_coordinate_systems(t, y[: self.STATE_DIM])
 
-            result = rk_step(method, t, y, h, tol, eom)
+            result = rk_step(method, t, y, h, tol, eom, state_error_dim=error_dim)
 
             if result.error <= tol:
                 # Accept step
                 t_new = t + h
                 y_new = np.asarray(result.y_new, dtype=float)
+                state_new = y_new[: self.STATE_DIM] if with_stm else y_new
 
-                # Event detection
+                # Event detection（事件函数接收 6 维状态）
                 for idx, func in enumerate(event_funcs):
                     g_prev = event_values_prev[idx]
-                    g_curr = func(t_new, y_new)
+                    g_curr = func(t_new, state_new)
                     if g_prev * g_curr < 0:
                         terminal_event_index = idx
                         break
@@ -348,7 +442,9 @@ class ForceModel:
 
                 if terminal_event_index is not None:
                     times.append(t_new)
-                    states.append(y_new)
+                    states.append(state_new)
+                    if with_stm:
+                        stm_list.append(y_new[self.STATE_DIM :].reshape(self.STATE_DIM, self.STATE_DIM))  # type: ignore[union-attr]
                     break
 
                 t = t_new
@@ -357,7 +453,9 @@ class ForceModel:
                 # Record t_eval points
                 while eval_index < len(t_eval) and abs(t - t_eval[eval_index]) < 1e-14:
                     times.append(t)
-                    states.append(y.copy())
+                    states.append(state_new.copy())
+                    if with_stm:
+                        stm_list.append(y[self.STATE_DIM :].reshape(self.STATE_DIM, self.STATE_DIM))  # type: ignore[union-attr]
                     eval_index += 1
 
                 if t >= tf:
@@ -374,11 +472,14 @@ class ForceModel:
         state_array = np.asarray(states, dtype=float)
         self.last_trajectory = (time_array, state_array)
 
-        return {
+        out: dict[str, Any] = {
             "time": time_array,
             "states": state_array,
             "terminal_event_index": terminal_event_index,
         }
+        if with_stm:
+            out["stm"] = np.asarray(stm_list, dtype=float)  # type: ignore[arg-type]
+        return out
 
     def propagate_maneuvers(
         self,
@@ -508,9 +609,5 @@ class ForceModel:
         return float(period / 100.0)
 
     def _raise_for_unsupported(self, with_stm: bool, with_jacobi: bool) -> None:
-        if with_stm:
-            raise NotImplementedError(
-                "ForceModel does not support state transition matrices in this slice."
-            )
         if with_jacobi:
             raise NotImplementedError("ForceModel does not support Jacobi constant computation.")

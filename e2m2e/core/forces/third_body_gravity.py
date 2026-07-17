@@ -101,3 +101,33 @@ class ThirdBodyGravity(PhysicalModel):
             r_ob_norm = float(self.MIN_DISTANCE)
 
         return -mu * (r_bsc / r_bsc_norm**3 + r_ob / r_ob_norm**3)
+
+    def compute_jacobian(
+        self,
+        t: float,
+        state: npt.ArrayLike,
+        system: System,
+    ) -> npt.NDArray[np.floating] | None:
+        """返回第三体摄动加速度对位置的偏导 ∂a/∂r（3×3）。
+
+        直接项 ``-μ(r-rᵢ)/|r-rᵢ|³`` 的雅可比为
+        ``-μ(I/|r-rᵢ|³ - 3(r-rᵢ)(r-rᵢ)ᵀ/|r-rᵢ|⁵)``，与 ``EphemerisDynamics``
+        第三体分支逐字一致。间接项 ``-μ rᵢ/|rᵢ|³`` 不依赖航天器位置，
+        故 ∂/∂r = 0。
+        """
+        mu = self._mu
+        if mu is None:
+            if system is None:
+                raise ValueError(
+                    "mu is None and system is None; cannot resolve gravitational_parameter"
+                )
+            mu = system.gravitational_parameter(self._body)
+
+        r_sc = np.asarray(state, dtype=float)[:3]
+        r_ob = np.asarray(system.get_body_position(self._body, t), dtype=float)
+        r_bsc = r_sc - r_ob
+        r_bsc_norm = float(np.linalg.norm(r_bsc))
+        if r_bsc_norm < self.MIN_DISTANCE:
+            r_bsc_norm = float(self.MIN_DISTANCE)
+        mu_r3 = mu / r_bsc_norm**3
+        return -mu_r3 * (np.eye(3) - 3.0 * np.outer(r_bsc, r_bsc) / (r_bsc_norm**2))
