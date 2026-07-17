@@ -76,7 +76,6 @@ def _make_ds_result(l1_context, *, n=96, T=3.0):
         Xlist=Xlist,
         W_poly=W_poly,
         Wdot_poly=Wdot_poly,
-        Kamiltonian=None,
     )
 
 
@@ -382,7 +381,6 @@ def test_fft_components_roundtrip(l1_context, tmp_path):
         Xlist=ds.Xlist,
         W_poly=ds.W_poly,
         Wdot_poly=ds.Wdot_poly,
-        Kamiltonian=None,
         fft_components=fft_comps,
     )
     qf = _make_qf_result(l1_context)

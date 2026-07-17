@@ -237,7 +237,6 @@ def _ds_from_dict(d: dict[str, Any], ctx: Any) -> Any:
         Xlist=Xlist,
         W_poly=W_poly,
         Wdot_poly=Wdot_poly,
-        Kamiltonian=None,
         fft_components=fft_components,
         shooting_result=shooting_result,
         backend=backend,

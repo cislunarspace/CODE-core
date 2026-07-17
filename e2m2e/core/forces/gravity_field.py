@@ -353,9 +353,12 @@ class GravityField(PhysicalModel):
     def _resolve_love_numbers(
         self,
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
-        """返回缓存的 Love 数表（构造时一次性解析，避免每步重读文件）。"""
-        if self._love_cache is None:
-            self._love_cache = self._load_love_numbers()
+        """返回缓存的 Love 数表（构造时一次性解析，避免每步重读文件）。
+
+        仅在 ``tide_mode != "none"`` 时被调（由 ``_effective_coefficients``
+        把守），故 ``_love_cache`` 此时必非 ``None``。
+        """
+        assert self._love_cache is not None  # tide_mode != "none" 不变量
         return self._love_cache
 
     def compute_acceleration(

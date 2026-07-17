@@ -79,7 +79,7 @@ def _make_ds_result(l1_context, *, n: int = 96, T: float = 3.0):
 
     用一条围绕原点的小正弦轨道作为 ``Xlist``，由其数值微分得 ``W_poly``
     （6 个线性项系数时间序列）。本切片变换链只读 ``W_poly`` 与 ``tlist``，
-    故 ``Kamiltonian``/``fft_components`` 等字段留默认/空。
+    故 ``fft_components`` 等字段留默认/空。
     """
     tlist = np.linspace(0.0, T, n)
     amp = 1e-3
@@ -114,7 +114,6 @@ def _make_ds_result(l1_context, *, n: int = 96, T: float = 3.0):
         Xlist=Xlist,
         W_poly=W_poly,
         Wdot_poly=Wdot_poly,
-        Kamiltonian=None,
     )
 
 

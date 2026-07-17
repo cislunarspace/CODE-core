@@ -272,12 +272,6 @@ class ForceModel:
         """运动方程（兼容 Dynamics 接口，6 维）。"""
         return self._eom_func(t, state)
 
-    def _get_eom_func(self, with_stm: bool) -> Callable:
-        """返回运动方程函数（兼容 Dynamics 接口）。"""
-        if with_stm:
-            return self._eom_func_with_stm
-        return self._eom_func
-
     def _eom_func(self, t: float, state: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
         """运动方程闭包（6 维 [v, a]）。"""
         acceleration = self._compute_total_acceleration(t, state)

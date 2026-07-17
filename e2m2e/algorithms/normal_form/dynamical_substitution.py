@@ -8,10 +8,7 @@
 2. **频域分解**：对 ``b(t)`` 做频率分析（NAFF/FFT），把受迫分量与
    中心流形分量分离；
 3. **生成函数 ``W(t)``**：对动量分量数值微分得 ``B̈``，由 ``Bdot2A``
-   公式把 ``B`` 与 ``A`` 拼起来，组装 ``W_poly`` / ``Wdot_poly``；
-4. **动力学替代 Hamilton 量**：在 slice 3 才真正展开 Lie 级数消除
-   ``H`` 的一阶项；本切片只交付 :class:`DynamicalSubstituteResult`
-   的 ``Kamiltonian`` 字段为 ``None`` 的占位壳，留待 slice 3 填充。
+   公式把 ``B`` 与 ``A`` 拼起来，组装 ``W_poly`` / ``Wdot_poly``。
 
 Public API：
 
@@ -92,8 +89,6 @@ class DynamicalSubstituteResult:
         W_poly: ``(pow, coef_array)`` 形式的生成函数 ``W(t)``；6 个
             线性项各对应一个幂次 ``(1,0,0,0,0,0)``/.../``(0,0,0,0,0,1)``。
         Wdot_poly: 与 ``W_poly`` 同结构的 ``Wdot(t)``。
-        Kamiltonian: 动力学替代 Hamilton 量。本切片仅占位 ``None``；
-            slice 3 将通过 Lie 级数填充。
         fft_components: ``x/y/z`` 三个方向的 :class:`FFTComponent` 列表；
             供后续 slice 引用。
         shooting_result: 多重打靶迭代结果（节点、残差历史、收敛标志）。
@@ -109,7 +104,6 @@ class DynamicalSubstituteResult:
     Xlist: npt.NDArray[np.floating]
     W_poly: dict[tuple[int, ...], npt.NDArray[np.floating]]
     Wdot_poly: dict[tuple[int, ...], npt.NDArray[np.floating]]
-    Kamiltonian: object = None
     fft_components: dict[str, list[FFTComponent]] = field(default_factory=dict)
     shooting_result: MultipleShootingResult | None = None
     backend: str = "fft"
@@ -223,7 +217,6 @@ class DynamicalSubstituteCorrector:
             Xlist=Xlist,
             W_poly=W_poly,
             Wdot_poly=Wdot_poly,
-            Kamiltonian=None,
             fft_components=fft_components,
             shooting_result=shooting,
             backend=backend,
