@@ -30,87 +30,43 @@ from .thrust import FiniteBurn
 
 # --- 嵌套依赖：大气模型 ---
 
-_ATMOS_SERIALIZERS: dict[type, Any] = {}
-
-
-def _serialize_exponential_atmosphere(atm: ExponentialAtmosphere) -> dict[str, Any]:
-    """把指数大气模型序列化为参数字典。"""
-    return {"f107": atm.f107, "ap": atm.ap}
-
-
-_ATMOS_SERIALIZERS[ExponentialAtmosphere] = _serialize_exponential_atmosphere
-
 
 def _serialize_atmosphere(atm: ExponentialAtmosphere) -> dict[str, Any]:
     """把大气模型序列化为 ``{type, params}`` 字典。"""
-    serializer = _ATMOS_SERIALIZERS.get(type(atm))
-    if serializer is None:
-        raise NotSerializableError(f"atmosphere type {type(atm).__name__} has no config serializer")
-    return {"type": type(atm).__name__, "params": serializer(atm)}
+    if not isinstance(atm, ExponentialAtmosphere):
+        raise NotSerializableError(
+            f"atmosphere type {type(atm).__name__} has no config serializer"
+        )
+    return {"type": "ExponentialAtmosphere", "params": {"f107": atm.f107, "ap": atm.ap}}
 
 
 def _build_atmosphere(config: dict[str, Any]) -> ExponentialAtmosphere:
     """按配置字典构造大气模型。"""
-    builder = _ATMOS_BUILDERS.get(config["type"])
-    if builder is None:
-        raise ValueError(
-            f"unknown atmosphere type {config['type']!r}; known types: {sorted(_ATMOS_BUILDERS)}"
-        )
-    return builder(config.get("params", {}))
-
-
-def _build_exponential_atmosphere(params: dict[str, Any]) -> ExponentialAtmosphere:
-    """从参数字典构造指数大气模型。"""
-    return ExponentialAtmosphere(**params)
-
-
-_ATMOS_BUILDERS: dict[str, Any] = {
-    "ExponentialAtmosphere": _build_exponential_atmosphere,
-}
+    if config["type"] != "ExponentialAtmosphere":
+        raise ValueError(f"unknown atmosphere type {config['type']!r}")
+    return ExponentialAtmosphere(**config.get("params", {}))
 
 
 # --- 嵌套依赖：阴影模型 ---
 
 
-def _serialize_conical_shadow(shadow: ConicalShadowModel) -> dict[str, Any]:
-    """把圆锥阴影模型序列化为参数字典。"""
-    return {
-        "bodies": list(shadow.bodies),
-        "radii": shadow.radii,
-    }
-
-
-_SHADOW_SERIALIZERS: dict[type, Any] = {
-    ConicalShadowModel: _serialize_conical_shadow,
-}
-
-
 def _serialize_shadow(shadow: ConicalShadowModel) -> dict[str, Any]:
     """把阴影模型序列化为 ``{type, params}`` 字典。"""
-    serializer = _SHADOW_SERIALIZERS.get(type(shadow))
-    if serializer is None:
-        raise NotSerializableError(f"shadow type {type(shadow).__name__} has no config serializer")
-    return {"type": type(shadow).__name__, "params": serializer(shadow)}
-
-
-def _build_conical_shadow(params: dict[str, Any]) -> ConicalShadowModel:
-    """从参数字典构造圆锥阴影模型。"""
-    return ConicalShadowModel(**params)
-
-
-_SHADOW_BUILDERS: dict[str, Any] = {
-    "ConicalShadowModel": _build_conical_shadow,
-}
+    if not isinstance(shadow, ConicalShadowModel):
+        raise NotSerializableError(
+            f"shadow type {type(shadow).__name__} has no config serializer"
+        )
+    return {
+        "type": "ConicalShadowModel",
+        "params": {"bodies": list(shadow.bodies), "radii": shadow.radii},
+    }
 
 
 def _build_shadow(config: dict[str, Any]) -> ConicalShadowModel:
     """按配置字典构造阴影模型。"""
-    builder = _SHADOW_BUILDERS.get(config["type"])
-    if builder is None:
-        raise ValueError(
-            f"unknown shadow type {config['type']!r}; known types: {sorted(_SHADOW_BUILDERS)}"
-        )
-    return builder(config.get("params", {}))
+    if config["type"] != "ConicalShadowModel":
+        raise ValueError(f"unknown shadow type {config['type']!r}")
+    return ConicalShadowModel(**config.get("params", {}))
 
 
 # --- 单力模型序列化器：type(实例) -> params dict ---
