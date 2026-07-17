@@ -549,6 +549,81 @@ def sample_patch_points(
     return t_patch, states
 
 
+def sample_patch_points_perilune_clustered(
+    orbit,
+    dynamics,
+    n_base: int = 8,
+    n_perilune: int = 5,
+    perilune_window: float = 0.15,
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    """在近月点附近加密采样 patch points。
+
+    NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月点落在节点
+    之间而欠约束，导致多重打靶残差停滞。本函数先积分一圈定位近月点
+    （离次天体最近的点），在其两侧 ``perilune_window·period`` 窗口内
+    加密 ``n_perilune`` 个节点，其余 ``n_base`` 个节点等时间间隔分布在
+    窗口外。
+
+    Args:
+        orbit: 周期轨道，需含 ``period``、``times``、``states``。
+        dynamics: 动力学对象，用于积分定位近月点（需提供
+            ``propagate_orbit_state_at_time``）。
+        n_base: 窗口外的等时间间隔节点数。
+        n_perilune: 近月点窗口内的加密节点数（含近月点本身）。
+        perilune_window: 加密窗口半宽，占周期比例（如 0.15 表示近月点
+            前后各 15% 周期）。
+
+    Returns:
+        (t_patch, states)：时间节点与对应状态，按时间升序排列。
+    """
+    if orbit.period is None or orbit.period <= 0:
+        raise ValueError("orbit must have a positive period")
+    period = float(orbit.period)
+
+    # 积分一圈，密集采样定位近月点（离原点最远的次天体方向上最近）
+    # NRHO 近月点 = 离月球最近的点。月球在 synodic 系 x = 1-mu 处。
+    mu = getattr(dynamics.system, "mu", None)
+    if mu is None:
+        # 非 CR3BP：退化为等时间间隔
+        return sample_patch_points(orbit, n_base + n_perilune - 1)
+    moon_x = 1.0 - mu
+
+    # 一次连续积分一圈（比逐点 propagate_orbit_state_at_time 快两个量级）
+    n_probe = 200
+    t_probe = np.linspace(0, period, n_probe, endpoint=False)
+    probe_result = dynamics.propagate(orbit.states[0], (0, period), t_eval=t_probe)
+    states_probe = probe_result["states"]
+    dists = np.sqrt(
+        (states_probe[:, 0] - moon_x) ** 2
+        + states_probe[:, 1] ** 2
+        + states_probe[:, 2] ** 2
+    )
+    i_perilune = int(np.argmin(dists))
+    t_perilune = float(t_probe[i_perilune])
+
+    # 近月点窗口 [t_p - w, t_p + w]，映射到 [0, period) 内
+    half_w = perilune_window * period
+    t_lo = (t_perilune - half_w) % period
+    t_hi = (t_perilune + half_w) % period
+
+    # 窗口内加密点（含近月点）
+    t_dense = np.linspace(t_perilune - half_w, t_perilune + half_w, n_perilune)
+
+    # 窗口外等分点：在 [t_hi, t_lo + period] 上等分 n_base 份
+    # （绕开窗口，覆盖剩余弧段）
+    t_outside = np.linspace(t_hi, t_lo + period, n_base + 1)[:-1] % period
+
+    t_all = np.concatenate([t_dense, t_outside])
+    t_all = np.sort(np.unique(np.round(t_all, 12)))  # 去重排序
+
+    # 线性插值获取各节点状态
+    states = np.empty((len(t_all), 6))
+    for i in range(6):
+        states[:, i] = np.interp(t_all, orbit.times, orbit.states[:, i])
+
+    return t_all, states
+
+
 def convert_to_j2000(
     t_patch_syn: npt.ArrayLike,
     states_syn: npt.ArrayLike,
