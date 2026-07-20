@@ -19,11 +19,35 @@
 //! 主循环是单线程 Python，OK）。
 
 use cspice_sys::{
-    bodvrd_c, failed_c, pxform_c, reset_c, spkezr_c, sxform_c, ConstSpiceChar, SpiceBoolean,
-    SpiceDouble, SpiceInt,
+    bodvrd_c, failed_c, getmsg_c, pxform_c, reset_c, spkezr_c, sxform_c, ConstSpiceChar,
+    SpiceBoolean, SpiceDouble, SpiceInt,
 };
 use std::ffi::CString;
 use std::os::raw::c_char;
+
+/// 取 CSPICE 短错误消息（调用前必须 failed_c() == true）。
+fn get_short_error_message() -> String {
+    let mut msg_buf = vec![0i8; 256];
+    let short_c = CString::new("SHORT").unwrap();
+    unsafe {
+        getmsg_c(
+            short_c.as_ptr() as *mut ConstSpiceChar,
+            256,
+            msg_buf.as_mut_ptr() as *mut c_char,
+        );
+    }
+    c_chars_to_string(&msg_buf)
+}
+
+/// 把 CSPICE 返回的 C char 数组转成 Rust String（在首个 null 处截断）。
+fn c_chars_to_string(buf: &[i8]) -> String {
+    let bytes: Vec<u8> = buf
+        .iter()
+        .take_while(|&&c| c != 0)
+        .map(|&c| c as u8)
+        .collect();
+    String::from_utf8_lossy(&bytes).to_string()
+}
 
 /// CSPICE FFI 调用错误。
 #[derive(Debug)]
@@ -49,12 +73,9 @@ fn check_spice_error() -> Result<(), SpiceFfiError> {
     unsafe {
         let failed: bool = failed_c() != 0;
         if failed {
-            // 简化：取不到详细错误信息（需要 errdev_c/getmsg_c），先 reset
-            // 后续可加 getmsg_c 取 short message
+            let msg = get_short_error_message();
             reset_c();
-            return Err(SpiceFfiError::Failed(
-                "CSPICE call failed (use reset + retry or check inputs)".to_string(),
-            ));
+            return Err(SpiceFfiError::Failed(msg));
         }
     }
     Ok(())

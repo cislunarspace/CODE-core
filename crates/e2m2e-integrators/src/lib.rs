@@ -21,6 +21,8 @@ pub(crate) mod spherical_harmonic;
 pub(crate) mod spice_ffi;
 #[cfg(feature = "spice")]
 pub(crate) mod spk_accel;
+#[cfg(feature = "spice")]
+pub(crate) mod forces;
 pub mod rk_methods;
 
 use butcher::{explicit_rk_step, suggest_next_step};
@@ -513,6 +515,88 @@ fn indirect_term_acceleration(
     Ok(vec![a[0], a[1], a[2]])
 }
 
+/// GravityField 完整加速度（含坐标变换 + 球谐 + 潮汐）。
+///
+/// 移植自 Python `GravityField.compute_acceleration`。
+///
+/// # 参数
+/// - `et`：SPICE et 秒
+/// - `r_sc`: 航天器位置 [x, y, z] km（propagation frame 下，通常 J2000 地心）
+/// - `c_flat`/`s_flat`：球谐系数 (degree+1)² 长度
+/// - `mu`/`radius`/`degree`/`order`：球谐参数
+/// - `input_frame`：body-fixed frame 名（"ITRF93"/"MOON_PA"）
+/// - `propagation_frame`：传播 frame 名（通常 "J2000"）
+/// - `body`：中心天体名（"EARTH"/"MOON"）
+/// - `tide_mode`：0=None, 1=Solid, 2=SolidAndPole（Pole 档暂不支持，回退 Python）
+/// - `k_love_flat`：Love 数表 5×5 行优先
+/// - `k_plus_flat`：弹性 Love 数 5 元素或空
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn gravity_field_acceleration(
+    et: f64,
+    r_sc: Vec<f64>,
+    c_flat: Vec<f64>,
+    s_flat: Vec<f64>,
+    mu: f64,
+    radius: f64,
+    degree: usize,
+    order: usize,
+    input_frame: &str,
+    propagation_frame: &str,
+    body: &str,
+    propagation_origin: &str,
+    tide_mode: usize,
+    k_love_flat: Vec<f64>,
+    k_plus_flat: Option<Vec<f64>>,
+) -> PyResult<Vec<f64>> {
+    if r_sc.len() != 3 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "r_sc must have length 3, got {}",
+            r_sc.len()
+        )));
+    }
+    let mode = match tide_mode {
+        0 => forces::gravity_field::TideMode::None,
+        1 => forces::gravity_field::TideMode::Solid,
+        2 => forces::gravity_field::TideMode::SolidAndPole,
+        _ => {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "tide_mode must be 0/1/2, got {}",
+                tide_mode
+            )))
+        }
+    };
+    let tide = forces::gravity_field::TideConfig {
+        mode,
+        k_love_flat,
+        k_plus_flat,
+    };
+    let r_arr = [r_sc[0], r_sc[1], r_sc[2]];
+    let a = forces::gravity_field::gravity_field_acceleration(
+        et,
+        &r_arr,
+        &c_flat,
+        &s_flat,
+        mu,
+        radius,
+        degree,
+        order,
+        input_frame,
+        propagation_frame,
+        body,
+        propagation_origin,
+        &tide,
+    )
+    .map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "gravity_field_acceleration failed: {:?}",
+            e
+        ))
+    })?;
+    Ok(vec![a[0], a[1], a[2]])
+}
+
 /// PyO3 模块初始化函数，将 Rust 函数与类注册到 Python 模块。
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
@@ -532,6 +616,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(third_body_acceleration, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(indirect_term_acceleration, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(gravity_field_acceleration, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;
