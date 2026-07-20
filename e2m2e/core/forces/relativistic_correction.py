@@ -107,6 +107,41 @@ class RelativisticCorrection(PhysicalModel):
         """后牛顿参数 gamma。"""
         return self._gamma
 
+    def to_rust_spec(self, system) -> tuple | None:
+        """序列化为 ``("relativistic", ...)`` 元组。
+
+        - LT 项需要 sxform + body-fixed frame；本仓库已实测 NRHO 上 LT 量级 < 1m
+          （#343 排查），但完整移植已实现（含 sxform via cspice-sys FFI）。
+        - 如果 LT 启用但 angular_momentum_vector 未传，Rust 侧会每步 sxform
+          自动算（与 Python 一致）；如需避免 sxform 开销，可在 Python 侧
+          预先算好 J 向量并传入 angular_momentum_vector。
+        """
+        mu_central = float(system.gravitational_parameter(self._central_body))
+        mu_primary = (
+            float(system.gravitational_parameter(self._primary_body))
+            if self._primary_body is not None
+            else None
+        )
+        # angular_momentum_vector：None 时 Rust 自动 sxform
+        j_vec = (
+            list(self._angular_momentum_vector)
+            if self._angular_momentum_vector is not None
+            else None
+        )
+        return (
+            "relativistic",
+            self._central_body,
+            self._primary_body,
+            mu_central,
+            mu_primary,
+            self._enable_schwarzschild,
+            self._enable_lense_thirring,
+            self._enable_de_sitter,
+            j_vec,
+            self._body_radius,
+            self._gamma,
+        )
+
     def compute_acceleration(
         self,
         t: float,

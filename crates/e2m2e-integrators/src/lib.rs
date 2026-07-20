@@ -727,6 +727,61 @@ fn parse_force_tuple(item: &Bound<'_, PyAny>) -> PyResult<forces::compiled::Comp
                 shadow_bodies,
             })
         }
+        "relativistic" => {
+            // 元组格式：
+            // ("relativistic", central_body, primary_body_or_none,
+            //  mu_central, mu_primary_or_none,
+            //  enable_schwarzschild, enable_lt, enable_de_sitter,
+            //  angular_momentum_vector_or_none, body_radius_override_or_none, gamma)
+            let central_body: String = tuple.get_item(1)?.extract()?;
+            let primary_obj = tuple.get_item(2)?;
+            let primary_body: Option<String> = if primary_obj.is_none() {
+                None
+            } else {
+                Some(primary_obj.extract()?)
+            };
+            let mu_central: f64 = tuple.get_item(3)?.extract()?;
+            let mu_primary_obj = tuple.get_item(4)?;
+            let mu_primary: Option<f64> = if mu_primary_obj.is_none() {
+                None
+            } else {
+                Some(mu_primary_obj.extract()?)
+            };
+            let enable_schwarzschild: bool = tuple.get_item(5)?.extract()?;
+            let enable_lense_thirring: bool = tuple.get_item(6)?.extract()?;
+            let enable_de_sitter: bool = tuple.get_item(7)?.extract()?;
+            // angular_momentum_vector 可选（None 时自动 sxform 算）
+            let j_obj = tuple.get_item(8)?;
+            let angular_momentum_vector: Option<[f64; 3]> = if j_obj.is_none() {
+                None
+            } else {
+                let v: Vec<f64> = j_obj.extract()?;
+                if v.len() == 3 {
+                    Some([v[0], v[1], v[2]])
+                } else {
+                    None
+                }
+            };
+            let radius_obj = tuple.get_item(9)?;
+            let body_radius_override: Option<f64> = if radius_obj.is_none() {
+                None
+            } else {
+                Some(radius_obj.extract()?)
+            };
+            let gamma: f64 = tuple.get_item(10)?.extract()?;
+            Ok(CompiledForce::Relativistic {
+                central_body,
+                primary_body,
+                mu_central,
+                mu_primary,
+                enable_schwarzschild,
+                enable_lense_thirring,
+                enable_de_sitter,
+                angular_momentum_vector,
+                body_radius_override,
+                gamma,
+            })
+        }
         _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
             "unknown force tag {:?}",
             tag

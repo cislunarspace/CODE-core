@@ -71,6 +71,12 @@ class ThirdBodyGravity(PhysicalModel):
         """显式设置的引力参数；``None`` 表示从 system 获取。"""
         return self._mu
 
+    def to_rust_spec(self, system) -> tuple | None:
+        """序列化为 ``("third_body", naif_id_str, mu)``。"""
+        mu = self._mu if self._mu is not None else system.gravitational_parameter(self._body)
+        naif_id = self._name_or_id(self._body)
+        return ("third_body", naif_id, float(mu))
+
     def compute_acceleration(
         self,
         t: float,

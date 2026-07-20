@@ -6,6 +6,7 @@
 //! 与 `rk_step + Python callback` 模式相比，本模块消除 30 万次 GIL 跨界。
 
 use crate::forces::gravity_field::{self, TideConfig, TideMode};
+use crate::forces::relativistic;
 use crate::forces::srp;
 use crate::spk_accel;
 
@@ -42,6 +43,18 @@ pub enum CompiledForce {
         mass: f64,
         cr: f64,
         shadow_bodies: Vec<String>,
+    },
+    Relativistic {
+        central_body: String,
+        primary_body: Option<String>,
+        mu_central: f64,
+        mu_primary: Option<f64>,
+        enable_schwarzschild: bool,
+        enable_lense_thirring: bool,
+        enable_de_sitter: bool,
+        angular_momentum_vector: Option<[f64; 3]>,
+        body_radius_override: Option<f64>,
+        gamma: f64,
     },
 }
 
@@ -113,6 +126,35 @@ impl CompiledForce {
                 let sc_pos = [state[0], state[1], state[2]];
                 srp::srp_acceleration(et, &sc_pos, *area, *mass, *cr, shadow_bodies, observer)
                     .map_err(|e| format!("{:?}", e))
+            }
+            Self::Relativistic {
+                central_body,
+                primary_body,
+                mu_central,
+                mu_primary,
+                enable_schwarzschild,
+                enable_lense_thirring,
+                enable_de_sitter,
+                angular_momentum_vector,
+                body_radius_override,
+                gamma,
+            } => {
+                let state6 = [state[0], state[1], state[2], state[3], state[4], state[5]];
+                relativistic::relativistic_acceleration(
+                    et,
+                    &state6,
+                    central_body,
+                    primary_body.as_deref(),
+                    *mu_central,
+                    *mu_primary,
+                    *enable_schwarzschild,
+                    *enable_lense_thirring,
+                    *enable_de_sitter,
+                    angular_momentum_vector.as_ref(),
+                    *body_radius_override,
+                    *gamma,
+                )
+                .map_err(|e| format!("{:?}", e))
             }
         }
     }

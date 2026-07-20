@@ -4,4 +4,5 @@
 
 pub mod compiled;
 pub mod gravity_field;
+pub mod relativistic;
 pub mod srp;

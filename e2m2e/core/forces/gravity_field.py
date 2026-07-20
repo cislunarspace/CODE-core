@@ -220,6 +220,43 @@ class GravityField(PhysicalModel):
         """潮汐档位。"""
         return self._tide_mode
 
+    def to_rust_spec(self, system: Any) -> tuple | None:
+        """序列化为 Rust propagate_compiled 的 ``("gravity", ...)`` 元组。
+
+        SolidAndPole 档暂不支持（需外部 xp/yp provider），返回 ``None``
+        让 ForceModel 回退 Python 路径。
+        """
+        if self._tide_mode == "solid_and_pole":
+            return None
+        # tide_mode → 整数（与 Rust TideMode enum 一致）
+        tide_int = {"none": 0, "solid": 1}[self._tide_mode]
+        # Love 数（tide_mode=none 时仍传占位 zeros）
+        if self._love_cache is not None:
+            k_love, k_plus = self._love_cache
+            k_love_flat = k_love.ravel().tolist()
+            k_plus_flat = k_plus.ravel().tolist() if k_plus is not None else None
+        else:
+            k_love_flat = [0.0] * 25
+            k_plus_flat = None
+        # 传播系 origin（通常 "EARTH"）
+        propagation_origin = getattr(system, "origin", "EARTH")
+        return (
+            "gravity",
+            self._data.C.ravel(order="C").tolist(),
+            self._data.S.ravel(order="C").tolist(),
+            float(self._data.mu),
+            float(self._data.radius),
+            int(self._degree),
+            int(self._order),
+            self._input_frame,
+            "J2000",
+            self._body,
+            propagation_origin,
+            tide_int,
+            k_love_flat,
+            k_plus_flat,
+        )
+
     @property
     def tide_convention(self) -> str:
         """系数约定。"""

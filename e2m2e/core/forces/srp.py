@@ -80,6 +80,11 @@ class SolarRadiationPressure(PhysicalModel):
         """注入的阴影模型，``None`` 表示全光照。"""
         return self._shadow
 
+    def to_rust_spec(self, system) -> tuple | None:
+        """序列化为 ``("srp", area, mass, cr, shadow_bodies)``。"""
+        shadow_bodies = list(self._shadow.bodies) if self._shadow is not None else []
+        return ("srp", self._area, self._mass, self._cr, shadow_bodies)
+
     def _compute_srp_acceleration(
         self,
         sun_to_sc_vec: npt.ArrayLike,
