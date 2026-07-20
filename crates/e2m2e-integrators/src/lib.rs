@@ -404,6 +404,50 @@ fn pole_tide(et: f64, xp: f64, yp: f64) -> PyResult<Vec<f64>> {
     Ok(solid_tide::pole_tide(et, xp, yp))
 }
 
+/// PoC：通过 cspice 查询 `target` 相对 `observer` 在 J2000 系下的位置（km）。
+///
+/// 用于验证：
+/// 1. maturin + cspice 链路是否正常
+/// 2. Python spiceypy 已 furnsh 的内核池是否对 Rust cspice 可见（共享内核池）
+///
+/// 仅在 `spice` feature 下编译。返回长度 3 的 `Vec<f64>`。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Vec<f64>> {
+    use cspice::common::AberrationCorrection;
+    use cspice::spk::easier_reader;
+    use cspice::time::Et;
+
+    let et_tdb = Et::from(et);
+    let (state, _lt) = easier_reader(
+        target,
+        et_tdb,
+        "J2000",
+        AberrationCorrection::NONE,
+        observer,
+    )
+    .map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!("cspice spkezr failed: {:?}", e))
+    })?;
+    Ok(vec![
+        state.position.x,
+        state.position.y,
+        state.position.z,
+    ])
+}
+
+/// PoC：在 Rust cspice 内核池加载一个内核文件。
+///
+/// Rust cspice 与 Python spiceypy 是**独立的 CSPICE 实例**（静态链接，全局状态
+/// 不共享）。Python 侧 furnsh 的内核，Rust 看不见；反之亦然。要让 Rust 查询
+/// 可用，必须用本函数在 Rust 侧再 furnsh 一次（同一份文件，两边独立加载）。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn spice_poc_furnsh(path: &str) -> PyResult<()> {
+    cspice::data::furnish(path)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {:?}", e)))
+}
+
 /// PyO3 模块初始化函数，将 Rust 函数与类注册到 Python 模块。
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
@@ -415,6 +459,10 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solid_tide_step1, m)?)?;
     m.add_function(wrap_pyfunction!(solid_tide_step2, m)?)?;
     m.add_function(wrap_pyfunction!(pole_tide, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(spice_poc_body_position, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(spice_poc_furnsh, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;
