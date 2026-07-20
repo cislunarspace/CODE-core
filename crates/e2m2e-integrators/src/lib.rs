@@ -18,6 +18,8 @@ pub(crate) mod rk89;
 pub(crate) mod solid_tide;
 pub(crate) mod spherical_harmonic;
 #[cfg(feature = "spice")]
+pub(crate) mod spice_ffi;
+#[cfg(feature = "spice")]
 pub(crate) mod spk_accel;
 pub mod rk_methods;
 

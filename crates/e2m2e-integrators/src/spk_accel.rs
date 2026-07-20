@@ -129,8 +129,10 @@ mod tests {
     use super::*;
 
     fn load_kernels() {
+        // crates/e2m2e-integrators → crates → e2m2e 根
         let kernel_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
+            .and_then(|p| p.parent())
             .unwrap()
             .join("kernels");
         for name in [
