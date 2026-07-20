@@ -15,6 +15,7 @@ pub(crate) mod multistep_methods;
 pub(crate) mod pd45;
 pub(crate) mod pd78;
 pub(crate) mod rk89;
+pub(crate) mod solid_tide;
 pub(crate) mod spherical_harmonic;
 pub mod rk_methods;
 
@@ -339,6 +340,70 @@ fn spherical_harmonic_accel(
     ))
 }
 
+/// 固体潮 Step 1（频率无关，天体无关）。
+///
+/// Python 侧 `earth_tide.solid_tide_step1` 的 Rust 加速版。输入扰动体位置由
+/// Python 完成坐标变换后传入（本函数不查 SPICE）。
+///
+/// # 参数
+/// - `perturbers_flat`：扁平化扰动体列表，每 4 个一组 `[px, py, pz, gm]`（位置 km、
+///   gm km³/s²）。长度必须是 4 的倍数。
+/// - `k_love_flat`：Love 数表 5×5 行优先扁平化，长度 25。
+/// - `k_plus_flat`：弹性 Love 数 5 元素，或 `None`（无贡献）。
+/// - `mu_central`、`r_central`：中心天体 GM 与参考半径。
+///
+/// # 返回
+/// 长度 50 的 `Vec<f64>`：`C(25) ++ S(25)`，各为 5×5 行优先扁平化。
+#[pyfunction]
+fn solid_tide_step1(
+    perturbers_flat: Vec<f64>,
+    k_love_flat: Vec<f64>,
+    k_plus_flat: Option<Vec<f64>>,
+    mu_central: f64,
+    r_central: f64,
+) -> PyResult<Vec<f64>> {
+    if k_love_flat.len() != 25 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "k_love_flat must be length 25, got {}",
+            k_love_flat.len()
+        )));
+    }
+    if let Some(kp) = &k_plus_flat {
+        if kp.len() != 5 {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "k_plus_flat must be length 5, got {}",
+                kp.len()
+            )));
+        }
+    }
+    if perturbers_flat.len() % 4 != 0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "perturbers_flat length must be multiple of 4, got {}",
+            perturbers_flat.len()
+        )));
+    }
+    let k_plus_ref = k_plus_flat.as_deref();
+    Ok(solid_tide::solid_tide_step1(
+        &perturbers_flat,
+        &k_love_flat,
+        k_plus_ref,
+        mu_central,
+        r_central,
+    ))
+}
+
+/// 固体潮 Step 2（频率相关，地球专用）。返回长度 50 的 `Vec<f64>`（C25 + S25）。
+#[pyfunction]
+fn solid_tide_step2(et: f64) -> PyResult<Vec<f64>> {
+    Ok(solid_tide::solid_tide_step2(et))
+}
+
+/// 极潮（固体极潮 + 海洋极潮，IERS TN32）。返回长度 50 的 `Vec<f64>`（C25 + S25）。
+#[pyfunction]
+fn pole_tide(et: f64, xp: f64, yp: f64) -> PyResult<Vec<f64>> {
+    Ok(solid_tide::pole_tide(et, xp, yp))
+}
+
 /// PyO3 模块初始化函数，将 Rust 函数与类注册到 Python 模块。
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
@@ -347,6 +412,9 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(multistep_step, m)?)?;
     m.add_function(wrap_pyfunction!(cowell_step, m)?)?;
     m.add_function(wrap_pyfunction!(spherical_harmonic_accel, m)?)?;
+    m.add_function(wrap_pyfunction!(solid_tide_step1, m)?)?;
+    m.add_function(wrap_pyfunction!(solid_tide_step2, m)?)?;
+    m.add_function(wrap_pyfunction!(pole_tide, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;

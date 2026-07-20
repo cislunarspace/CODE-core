@@ -237,48 +237,20 @@ def solid_tide_step2(et: float) -> tuple[npt.NDArray[np.floating], npt.NDArray[n
     只影响 (2,0)/(2,1)/(2,2)。用 5 个 Delaunay 幅角 + GMST + Table 6.3a/b/c。
     量级 ~1e-10（GMAT ``freq_dep * 1e-12`` 缩放）。
 
+    实现：1:1 移植到 Rust（``crates/e2m2e-integrators/src/solid_tide.rs``），
+    Python 侧仅做一次 FFI 调用与 reshape。精度回归：< 1e-15（机器精度）。
+
     Args:
         et: SPICE et 秒(past J2000)。
 
     Returns:
         (DeltaC, DeltaS),各为 5×5 数组;仅 (2,0)/(2,1)/(2,2) 非零。
     """
-    jd = _JD_J2000 + et / 86400.0
-    F, gmst = _delaunay_args_and_gmst(jd)
+    from e2m2e._integrators import solid_tide_step2 as _rust_step2
 
-    deltaC = np.zeros((5, 5), dtype=float)
-    deltaS = np.zeros((5, 5), dtype=float)
-
-    # (2,0) 频率相关:IERS eqn 5a
-    freq_c20 = 0.0
-    for row in _TABLE_63B:
-        theta = -np.dot(row[:5], F) * _RAD_PER_DEG  # 弧度
-        freq_c20 += row[5] * np.cos(theta) - row[6] * np.sin(theta)
-    deltaC[2, 0] += freq_c20 * 1e-12
-
-    # (2,1) 频率相关:IERS eqn 5b,m=1
-    freq_c21 = 0.0
-    freq_s21 = 0.0
-    m = 1
-    for row in _TABLE_63A:
-        theta = (m * (gmst + 180.0) - np.dot(row[:5], F)) * _RAD_PER_DEG
-        freq_c21 += row[5] * np.sin(theta) + row[6] * np.cos(theta)
-        freq_s21 += row[5] * np.cos(theta) - row[6] * np.sin(theta)
-    deltaC[2, 1] += freq_c21 * 1e-12
-    deltaS[2, 1] += freq_s21 * 1e-12
-
-    # (2,2) 频率相关:m=2,Table63c 只有 amp
-    freq_c22 = 0.0
-    freq_s22 = 0.0
-    m = 2
-    for row in _TABLE_63C:
-        theta = (m * (gmst + 180.0) - np.dot(row[:5], F)) * _RAD_PER_DEG
-        freq_c22 += row[5] * np.cos(theta)
-        freq_s22 += -row[5] * np.sin(theta)
-    deltaC[2, 2] += freq_c22 * 1e-12
-    deltaS[2, 2] += freq_s22 * 1e-12
-
-    return deltaC, deltaS
+    out = _rust_step2(float(et))
+    arr = np.asarray(out, dtype=float)
+    return arr[:25].reshape(5, 5), arr[25:].reshape(5, 5)
 
 
 def _legendre_23(s: float, c: float) -> npt.NDArray[np.floating]:
@@ -347,46 +319,37 @@ def solid_tide_step1(
 
     Returns:
         (DeltaC, DeltaS),各为 5×5 数组。
+
+    实现：1:1 移植到 Rust（``crates/e2m2e-integrators/src/solid_tide.rs``）。
+    Python 侧仅做参数打包（perturbers → [px,py,pz,gm,...] 扁平化）+ reshape。
     """
+    from e2m2e._integrators import solid_tide_step1 as _rust_step1
+
     # 兼容单个 (position, gm) 元组:不期望第一个元素本身是 (3,) ndarray。
     if isinstance(perturbers, tuple) and len(perturbers) == 2 and np.isscalar(perturbers[1]):
         perturbers = [perturbers]
 
-    deltaC = np.zeros((5, 5), dtype=float)
-    deltaS = np.zeros((5, 5), dtype=float)
-
+    # 扁平化 perturbers: [px, py, pz, gm, px, py, pz, gm, ...]
+    flat = []
     for pos_perturber, mu_perturber in perturbers:
-        pos = np.asarray(pos_perturber, dtype=float)
-        r = np.linalg.norm(pos)
-        if r == 0.0:
-            raise ValueError("perturber position must be non-zero")
+        pos = np.asarray(pos_perturber, dtype=float).ravel()
+        if pos.size != 3:
+            raise ValueError(f"perturber position must have 3 elements, got {pos.size}")
+        flat.extend(pos.tolist())
+        flat.append(float(mu_perturber))
 
-        # 中心纬度 φ、经度 λ
-        xy = np.hypot(pos[0], pos[1])
-        lat = np.arctan2(pos[2], xy)
-        lon = np.arctan2(pos[1], pos[0])
-        s = np.sin(lat)
-        c = np.cos(lat)
+    k_love_flat = np.asarray(k_love, dtype=float).ravel().tolist()
+    k_plus_flat = None if k_plus is None else np.asarray(k_plus, dtype=float).ravel().tolist()
 
-        P = _legendre_23(s, c)
-        massratio = mu_perturber / mu_central
-        rho = r_central / r  # 无量纲
-
-        for n in (2, 3):
-            rho_n = rho ** (n + 1)
-            for m in range(0, n + 1):
-                f = massratio * rho_n * P[n, m]
-                cm = np.cos(m * lon)
-                sm = np.sin(m * lon)
-                kn = k_love[n, m] / (2 * n + 1)
-                deltaC[n, m] += kn * f * cm
-                deltaS[n, m] += kn * f * sm
-                if n == 2 and k_plus is not None:
-                    kplus = k_plus[m] / (2 * n + 1)  # (2n+1)=5
-                    deltaC[4, m] += kplus * f * cm
-                    deltaS[4, m] += kplus * f * sm
-
-    return deltaC, deltaS
+    out = _rust_step1(
+        flat,
+        k_love_flat,
+        k_plus_flat,
+        float(mu_central),
+        float(r_central),
+    )
+    arr = np.asarray(out, dtype=float)
+    return arr[:25].reshape(5, 5), arr[25:].reshape(5, 5)
 
 
 def pole_tide(
@@ -414,27 +377,14 @@ def pole_tide(
 
     Returns:
         (DeltaC, DeltaS),各为 5×5 数组;仅 (2,1) 非零。
+
+    实现：1:1 移植到 Rust（``crates/e2m2e-integrators/src/solid_tide.rs``）。
     """
-    jd = _JD_J2000 + et / 86400.0
-    ym2000 = (jd - _JD_J2000) / _DAYS_PER_YEAR
-    xp_bar = 0.054 + ym2000 * 0.00083
-    yp_bar = 0.357 + ym2000 * 0.00395
+    from e2m2e._integrators import pole_tide as _rust_pole_tide
 
-    m1 = xp - xp_bar
-    m2 = -(yp - yp_bar)
-
-    deltaC = np.zeros((5, 5), dtype=float)
-    deltaS = np.zeros((5, 5), dtype=float)
-
-    # 固体极潮(IERS p.65)
-    deltaC[2, 1] -= 1.333e-09 * (m1 + 0.0115 * m2)
-    deltaS[2, 1] -= 1.333e-09 * (m2 - 0.0115 * m1)
-
-    # 海洋极潮(Desai,TN32 §6.3)
-    deltaC[2, 1] -= 2.2344e-10 * (m1 - 0.01737 * m2)
-    deltaS[2, 1] -= 1.7680e-10 * (m2 - 0.03351 * m1)
-
-    return deltaC, deltaS
+    out = _rust_pole_tide(float(et), float(xp), float(yp))
+    arr = np.asarray(out, dtype=float)
+    return arr[:25].reshape(5, 5), arr[25:].reshape(5, 5)
 
 
 def permanent_tide_correction(
