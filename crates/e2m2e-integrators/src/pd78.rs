@@ -197,7 +197,7 @@ mod tests {
         let y0 = vec![1.0, 0.0];
         let h = 1e-4;
 
-        let (y1, error) = explicit_rk_step(&PD78_TABLE, 0.0, &y0, h, f).unwrap();
+        let (y1, error) = explicit_rk_step(&PD78_TABLE, 0.0, &y0, h, f, None).unwrap();
 
         let y_exact = vec![h.cos(), -h.sin()];
         let num_err = y1
