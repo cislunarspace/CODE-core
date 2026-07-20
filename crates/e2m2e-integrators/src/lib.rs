@@ -6,7 +6,7 @@
 //! [`crate::cowell`] 的模块文档。
 
 use pyo3::prelude::*;
-use pyo3::types::PyList;
+use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 
 pub(crate) mod abm;
 pub(crate) mod butcher;
@@ -597,7 +597,276 @@ fn gravity_field_acceleration(
     Ok(vec![a[0], a[1], a[2]])
 }
 
-/// PyO3 模块初始化函数，将 Rust 函数与类注册到 Python 模块。
+/// SRP 加速度（含阴影）。
+///
+/// 移植自 Python `SolarRadiationPressure.compute_acceleration`。
+///
+/// # 参数
+/// - `et`：SPICE et 秒
+/// - `sc_pos`：航天器位置 [x, y, z] km（observer 系下）
+/// - `area`/`mass`/`cr`：SRP cannonball 参数（area m²、mass kg、cr 无量纲）
+/// - `shadow_bodies`：遮挡体名称列表（如 ["EARTH", "MOON"]），空 = 无阴影
+/// - `observer`：观察者天体（通常 "EARTH"）
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn srp_acceleration(
+    et: f64,
+    sc_pos: Vec<f64>,
+    area: f64,
+    mass: f64,
+    cr: f64,
+    shadow_bodies: Vec<String>,
+    observer: &str,
+) -> PyResult<Vec<f64>> {
+    if sc_pos.len() != 3 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "sc_pos must have length 3, got {}",
+            sc_pos.len()
+        )));
+    }
+    let pos_arr = [sc_pos[0], sc_pos[1], sc_pos[2]];
+    let a = forces::srp::srp_acceleration(et, &pos_arr, area, mass, cr, &shadow_bodies, observer)
+        .map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!(
+                "srp_acceleration failed: {:?}",
+                e
+            ))
+        })?;
+    Ok(vec![a[0], a[1], a[2]])
+}
+
+/// 解析单个 Python force 元组为 CompiledForce。
+///
+/// 元组格式（首元素是 type 标签）：
+/// - `("gravity", c_flat, s_flat, mu, radius, degree, order, input_frame,
+///     propagation_frame, body, propagation_origin, tide_mode, k_love_flat,
+///     k_plus_flat_or_none)`
+/// - `("third_body", body, mu)`
+/// - `("indirect", body, mu)`
+/// - `("srp", area, mass, cr, shadow_bodies_list)`
+#[cfg(feature = "spice")]
+fn parse_force_tuple(item: &Bound<'_, PyAny>) -> PyResult<forces::compiled::CompiledForce> {
+    use forces::compiled::CompiledForce;
+    use forces::gravity_field::TideMode;
+
+    let tuple = item
+        .downcast::<PyTuple>()
+        .map_err(|_| pyo3::exceptions::PyTypeError::new_err("force must be a tuple"))?;
+    let tag: String = tuple
+        .get_item(0)?
+        .extract()
+        .map_err(|_| pyo3::exceptions::PyTypeError::new_err("force tag must be a string"))?;
+
+    match tag.as_str() {
+        "gravity" => {
+            // 14 个元素
+            let c_flat: Vec<f64> = tuple.get_item(1)?.extract()?;
+            let s_flat: Vec<f64> = tuple.get_item(2)?.extract()?;
+            let mu: f64 = tuple.get_item(3)?.extract()?;
+            let radius: f64 = tuple.get_item(4)?.extract()?;
+            let degree: usize = tuple.get_item(5)?.extract()?;
+            let order: usize = tuple.get_item(6)?.extract()?;
+            let input_frame: String = tuple.get_item(7)?.extract()?;
+            let propagation_frame: String = tuple.get_item(8)?.extract()?;
+            let body: String = tuple.get_item(9)?.extract()?;
+            let propagation_origin: String = tuple.get_item(10)?.extract()?;
+            let tide_mode_int: usize = tuple.get_item(11)?.extract()?;
+            let k_love_flat: Vec<f64> = tuple.get_item(12)?.extract()?;
+            let k_plus_flat_obj = tuple.get_item(13)?;
+            let k_plus_flat: Option<Vec<f64>> = if k_plus_flat_obj.is_none() {
+                None
+            } else {
+                Some(k_plus_flat_obj.extract()?)
+            };
+            let tide_mode = match tide_mode_int {
+                0 => TideMode::None,
+                1 => TideMode::Solid,
+                2 => TideMode::SolidAndPole,
+                _ => {
+                    return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                        "tide_mode must be 0/1/2, got {}",
+                        tide_mode_int
+                    )))
+                }
+            };
+            Ok(CompiledForce::GravityField {
+                c_flat,
+                s_flat,
+                mu,
+                radius,
+                degree,
+                order,
+                input_frame,
+                propagation_frame,
+                body,
+                propagation_origin,
+                tide_mode,
+                k_love_flat,
+                k_plus_flat,
+            })
+        }
+        "third_body" => {
+            let body: String = tuple.get_item(1)?.extract()?;
+            let mu: f64 = tuple.get_item(2)?.extract()?;
+            Ok(CompiledForce::ThirdBody { body, mu })
+        }
+        "indirect" => {
+            let body: String = tuple.get_item(1)?.extract()?;
+            let mu: f64 = tuple.get_item(2)?.extract()?;
+            Ok(CompiledForce::IndirectTerm { body, mu })
+        }
+        "srp" => {
+            let area: f64 = tuple.get_item(1)?.extract()?;
+            let mass: f64 = tuple.get_item(2)?.extract()?;
+            let cr: f64 = tuple.get_item(3)?.extract()?;
+            let shadow_bodies: Vec<String> = tuple.get_item(4)?.extract()?;
+            Ok(CompiledForce::SRP {
+                area,
+                mass,
+                cr,
+                shadow_bodies,
+            })
+        }
+        _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "unknown force tag {:?}",
+            tag
+        ))),
+    }
+}
+
+/// 全 Rust 力模型传播器（消除 Python↔Rust 跨界）。
+///
+/// Python 侧把所有 force 序列化为元组列表，Rust 在内部循环里直接调
+/// `compute_total_acceleration`，每个 RK 子阶段不再跨界回 Python。
+///
+/// # 参数
+/// - `method`: RkMethod
+/// - `t0`/`y0`: 初始时刻与状态
+/// - `h_init`: 初始步长
+/// - `tol`: 容差
+/// - `t_eval`: 评估时刻数组
+/// - `observer`: 传播系 origin（如 "EARTH"）
+/// - `forces_py`: force 元组列表
+/// - `max_steps`: 最大步数
+///
+/// # 返回
+/// Python dict：`{"time": [...], "states": [[...]], "n_steps": int, "n_rejected": int}`
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn propagate_compiled(
+    method: RkMethod,
+    t0: f64,
+    y0: Vec<f64>,
+    h_init: f64,
+    tol: f64,
+    t_eval: Vec<f64>,
+    observer: &str,
+    forces_py: &Bound<'_, PyList>,
+    max_steps: usize,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use forces::compiled::{compute_total_acceleration, CompiledForce};
+
+    if y0.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "y0 must have length 6, got {}",
+            y0.len()
+        )));
+    }
+    if tol <= 0.0 || h_init <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "tol and h_init must be positive",
+        ));
+    }
+
+    // 解析 forces
+    let mut forces: Vec<CompiledForce> = Vec::with_capacity(forces_py.len());
+    for item in forces_py.iter() {
+        forces.push(parse_force_tuple(&item)?);
+    }
+
+    let table = method.table();
+    let n = y0.len();
+    let mut y = y0;
+    let mut t = t0;
+    let mut h = h_init;
+    let mut times: Vec<f64> = vec![t0];
+    let mut states: Vec<Vec<f64>> = vec![y.clone()];
+    let mut eval_idx = 1usize; // t_eval[0] == t0 已经记录
+    let mut n_steps = 0usize;
+    let mut n_rejected = 0usize;
+
+    // 用 RefCell 包装 cspice 错误状态（不能直接通过 explicit_rk_step 的 E 传）
+    use std::cell::RefCell;
+    let last_error: RefCell<Option<String>> = RefCell::new(None);
+
+    while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
+        n_steps += 1;
+        // 限制步长不超过下一个评估点（提高 t_eval 命中率）
+        if eval_idx < t_eval.len() {
+            let t_next_eval = t_eval[eval_idx];
+            if t + h > t_next_eval {
+                h = t_next_eval - t;
+            }
+        }
+
+        // RK 单步：用 Rust 闭包调 compute_total_acceleration
+        let forces_ref = &forces;
+        let observer_ref = observer;
+        let err_cell = &last_error;
+        let callback = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
+            let state6 = [yi[0], yi[1], yi[2], yi[3], yi[4], yi[5]];
+            compute_total_acceleration(forces_ref, ti, &state6, observer_ref)
+                .map(|a| vec![yi[3], yi[4], yi[5], a[0], a[1], a[2]])
+                .map_err(|e| {
+                    *err_cell.borrow_mut() = Some(e.clone());
+                    e
+                })
+        };
+
+        let (y_new, error) = match explicit_rk_step(table, t, &y, h, callback, None) {
+            Ok(r) => r,
+            Err(msg) => {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "RK step force error: {}",
+                    msg
+                )));
+            }
+        };
+        let _ = n;
+
+        if error <= tol {
+            t += h;
+            y = y_new;
+            // 输出落在 t_eval 的点
+            while eval_idx < t_eval.len() && t >= t_eval[eval_idx] - 1e-9 {
+                times.push(t_eval[eval_idx]);
+                states.push(y.clone());
+                eval_idx += 1;
+            }
+            let h_next = suggest_next_step(h, error, tol, method.embedded_order());
+            h = h_next;
+        } else {
+            n_rejected += 1;
+            let h_next = suggest_next_step(h, error, tol, method.embedded_order());
+            h = h_next;
+            if h < 1e-12 * (t_eval[t_eval.len() - 1] - t0).abs() {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                    "step size collapsed below minimum",
+                ));
+            }
+        }
+    }
+
+    // 返回 dict
+    let dict = PyDict::new(py);
+    dict.set_item("time", times)?;
+    dict.set_item("states", states)?;
+    dict.set_item("n_steps", n_steps)?;
+    dict.set_item("n_rejected", n_rejected)?;
+    Ok(dict.into())
+}
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
@@ -618,6 +887,10 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(indirect_term_acceleration, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(gravity_field_acceleration, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(srp_acceleration, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(propagate_compiled, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;
