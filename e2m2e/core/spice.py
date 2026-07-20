@@ -198,6 +198,14 @@ class SPICEManager:
             raise FileNotFoundError(f"Kernel file not found: {path}")
         self._ensure_leapseconds()
         get_spiceypy().furnsh(path)
+        # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（静态链接，
+        # 内核池不共享）。spice feature 启用时双 furnsh，让下沉到 Rust
+        # 的力（ThirdBody/Indirect/...）也能查到。
+        try:
+            from e2m2e._integrators import spice_poc_furnsh  # noqa: F401
+            spice_poc_furnsh(path)
+        except ImportError:
+            pass
 
     def unload_kernel(self, path: str) -> None:
         """卸载一个已加载的 SPICE 内核文件，释放相关资源。
@@ -206,6 +214,8 @@ class SPICEManager:
             path: 之前通过 load_kernel 加载的内核文件路径。
         """
         get_spiceypy().unload(path)
+        # Rust cspice 侧没有 unload 包装，依赖进程退出释放（cspice 0.1 限制）。
+        # unload 不影响 Python spiceypy 一致性，下次 load_kernel 时重新 furnsh。
 
     def enable_ephem_cache(
         self,

@@ -62,6 +62,22 @@ class IndirectTerm(PhysicalModel):
         """
         mu = self._resolve_mu(system)
 
+        # 走 Rust cspice 路径（spice feature 启用时）；否则走 Python spiceypy。
+        # 两路数值一致（机器精度），Rust 版避免跨界 + numpy 数组分配。
+        # 只在 system 暴露 spice 属性（真实 EphemerisSystem）时走 Rust，
+        # 桩 system（如单元测试 mock）回退到 Python 路径。
+        if getattr(system, "spice", None) is not None:
+            try:
+                from e2m2e._integrators import indirect_term_acceleration  # noqa: F401
+                from .third_body_gravity import ThirdBodyGravity
+                observer = getattr(system, "origin", "EARTH")
+                observer_id = ThirdBodyGravity._name_or_id(observer)
+                target_id = ThirdBodyGravity._name_or_id(self._body)
+                a = indirect_term_acceleration(float(t), target_id, observer_id, float(mu))
+                return np.asarray(a, dtype=float)
+            except ImportError:
+                pass
+
         r_ob = np.asarray(system.get_body_position(self._body, t), dtype=float)
         n = float(np.linalg.norm(r_ob))
         if n < 1e-6:

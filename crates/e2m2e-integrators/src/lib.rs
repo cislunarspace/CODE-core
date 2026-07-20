@@ -17,6 +17,8 @@ pub(crate) mod pd78;
 pub(crate) mod rk89;
 pub(crate) mod solid_tide;
 pub(crate) mod spherical_harmonic;
+#[cfg(feature = "spice")]
+pub(crate) mod spk_accel;
 pub mod rk_methods;
 
 use butcher::{explicit_rk_step, suggest_next_step};
@@ -448,6 +450,67 @@ fn spice_poc_furnsh(path: &str) -> PyResult<()> {
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {:?}", e)))
 }
 
+/// 第三体摄动加速度（含直接项 + 间接项）。
+///
+/// 移植自 Python `ThirdBodyGravity.compute_acceleration`。一次调用完成
+/// "cspice 查扰动体位置 + 加速度公式"，消除 Python↔cspice 跨界 + numpy
+/// 数组分配开销。
+///
+/// # 参数
+/// - `et`：SPICE et 秒（past J2000 TDB）
+/// - `target`：摄动天体名（"MOON"/"SUN"/"5"=JUPITER 等）
+/// - `observer`：原点天体名（通常 "EARTH"）
+/// - `sc_pos`：航天器位置 [x, y, z] km（相对 observer），长度 3
+/// - `mu`：摄动天体 GM（km³/s²）
+///
+/// # 返回
+/// 长度 3 的加速度 `Vec<f64>`，单位 km/s²。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn third_body_acceleration(
+    et: f64,
+    target: &str,
+    observer: &str,
+    sc_pos: Vec<f64>,
+    mu: f64,
+) -> PyResult<Vec<f64>> {
+    if sc_pos.len() != 3 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "sc_pos must have length 3, got {}",
+            sc_pos.len()
+        )));
+    }
+    let a = spk_accel::third_body_acceleration(et, target, observer, &sc_pos, mu, 1e-6)
+        .map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!(
+                "third_body_acceleration cspice failed: {:?}",
+                e
+            ))
+        })?;
+    Ok(vec![a[0], a[1], a[2]])
+}
+
+/// 第三体间接项加速度：`a = -μ · r_ob / |r_ob|³`。
+///
+/// 移植自 Python `IndirectTerm.compute_acceleration`。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn indirect_term_acceleration(
+    et: f64,
+    target: &str,
+    observer: &str,
+    mu: f64,
+) -> PyResult<Vec<f64>> {
+    let a = spk_accel::indirect_term_acceleration(et, target, observer, mu, 1e-6)
+        .map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!(
+                "indirect_term_acceleration cspice failed: {:?}",
+                e
+            ))
+        })?;
+    Ok(vec![a[0], a[1], a[2]])
+}
+
 /// PyO3 模块初始化函数，将 Rust 函数与类注册到 Python 模块。
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
@@ -463,6 +526,10 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(spice_poc_body_position, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(spice_poc_furnsh, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(third_body_acceleration, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(indirect_term_acceleration, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;
