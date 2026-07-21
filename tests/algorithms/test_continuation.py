@@ -4,6 +4,7 @@
 """
 
 import contextlib
+import logging
 
 from e2m2e.algorithms import Continuation
 from e2m2e.core import OrbitFamily
@@ -55,20 +56,22 @@ class TestContinuationParameterRemoval:
 class TestProgressDisplay:
     """测试进度显示逻辑"""
 
-    def test_verbose_mode_output(self, dro_continuation, corrected_dro, capsys):
-        """verbose 模式应该输出详细信息"""
-        # 只延拓很少的步数来加快测试
-        with contextlib.suppress(Exception):
-            dro_continuation.natural_continuation(
-                seed_orbit=corrected_dro,
-                param_range=(0.791, 0.792),
-                step_size=0.0001,
-                verbose=True,
-            )
+    def test_verbose_mode_output(self, dro_continuation, corrected_dro, caplog):
+        """verbose 模式应该输出详细信息
 
-        captured = capsys.readouterr()
-        # verbose 模式应该输出标题和详细信息
-        assert "自然参数延拓" in captured.out or "延拓" in captured.out or captured.out != ""
+        生产代码用 logging（非 print），故用 caplog 而非 capsys 捕获。
+        """
+        with caplog.at_level(logging.INFO, logger="e2m2e.algorithms.continuation"):
+            with contextlib.suppress(Exception):
+                dro_continuation.natural_continuation(
+                    seed_orbit=corrected_dro,
+                    param_range=(0.791, 0.792),
+                    step_size=0.0001,
+                    verbose=True,
+                )
+
+        # verbose 模式应产出延拓相关日志
+        assert "延拓" in caplog.text
 
     def test_non_verbose_mode_minimal_output(self, dro_continuation, corrected_dro, capsys):
         """非 verbose 模式应该只有最小输出"""
