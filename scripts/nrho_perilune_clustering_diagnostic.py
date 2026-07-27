@@ -17,8 +17,8 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 
 import numpy as np
 
@@ -38,10 +38,7 @@ def _resolve_xlsx_path() -> str:
     """从 NRHO_REFERENCE_DATA 环境变量解析 xlsx 路径，缺失则报错退出。"""
     path = os.environ.get("NRHO_REFERENCE_DATA")
     if not path:
-        sys.exit(
-            "未设置 NRHO_REFERENCE_DATA 环境变量（需指向 "
-            "earth-moon_halo_L2_S.xlsx）。"
-        )
+        sys.exit("未设置 NRHO_REFERENCE_DATA 环境变量（需指向 earth-moon_halo_L2_S.xlsx）。")
     if not os.path.exists(path):
         sys.exit(f"NRHO_REFERENCE_DATA 指向的文件不存在：{path}")
     return path
@@ -54,16 +51,16 @@ def _resolve_kernel_path() -> str:
         candidate = os.path.join(kernel_dir, name) if kernel_dir else name
         if os.path.exists(candidate):
             return candidate
-    sys.exit(
-        "未找到 DE440/DE438/DE435 SPICE 内核，请设置 SPICE_KERNEL_DIR。"
-    )
+    sys.exit("未找到 DE440/DE438/DE435 SPICE 内核，请设置 SPICE_KERNEL_DIR。")
 
 
 def load_nrho(xlsx_path: str, index: int = 0):
     """加载 NRHO 并构造带密集时间序列的 Orbit 供采样。"""
     with zipfile.ZipFile(xlsx_path) as z:
-        rows = ET.parse(z.open("xl/worksheets/sheet1.xml")).getroot().findall(
-            ".//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}row"
+        rows = (
+            ET.parse(z.open("xl/worksheets/sheet1.xml"))
+            .getroot()
+            .findall(".//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}row")
         )
         cells = []
         for c in rows[index + 1].findall(
@@ -100,10 +97,11 @@ def main(strict: bool = False) -> int:
     kernel_path = _resolve_kernel_path()
 
     # 构造星历动力学（与 tests/conftest.py 的 spice_eph_dynamics fixture 对齐）
-    from e2m2e.core.ephemeris_system import EphemerisSystem
-    from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
-    from e2m2e.core.spice import SPICEManager
     from e2m2e.core.synodic_j2000 import SynodicJ2000System
+
+    from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
+    from e2m2e.core.ephemeris_system import EphemerisSystem
+    from e2m2e.core.spice import SPICEManager
     from e2m2e.mbse.data.enums import ReferenceFrame
 
     spice = SPICEManager()
@@ -145,11 +143,11 @@ def main(strict: bool = False) -> int:
         )
         t_cl_j2000 = reference_et + t_cl * tc
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("NRHO 打靶收敛诊断（EphemerisDynamics 点质量）")
-        print(f"{'='*70}")
-        print(f"等时间: {len(t_eq)} 点, t/T = {np.round(t_eq/orbit.period, 3)}")
-        print(f"近月点加密: {len(t_cl)} 点, t/T = {np.round(t_cl/orbit.period, 3)}")
+        print(f"{'=' * 70}")
+        print(f"等时间: {len(t_eq)} 点, t/T = {np.round(t_eq / orbit.period, 3)}")
+        print(f"近月点加密: {len(t_cl)} 点, t/T = {np.round(t_cl / orbit.period, 3)}")
 
         res_eq = run_correction(eph_dyn, t_eq_j2000, state_eq_j2000)
         res_cl = run_correction(eph_dyn, t_cl_j2000, state_cl_j2000)
@@ -166,7 +164,7 @@ def main(strict: bool = False) -> int:
 
         improvement = res_eq.max_residual / max(res_cl.max_residual, 1e-30)
         print(f"\n残差改善倍数: {improvement:.1f}x")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         if strict and res_cl.max_residual > res_eq.max_residual * 2:
             print(

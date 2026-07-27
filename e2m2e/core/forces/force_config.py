@@ -34,9 +34,7 @@ from .thrust import FiniteBurn
 def _serialize_atmosphere(atm: ExponentialAtmosphere) -> dict[str, Any]:
     """把大气模型序列化为 ``{type, params}`` 字典。"""
     if not isinstance(atm, ExponentialAtmosphere):
-        raise NotSerializableError(
-            f"atmosphere type {type(atm).__name__} has no config serializer"
-        )
+        raise NotSerializableError(f"atmosphere type {type(atm).__name__} has no config serializer")
     return {"type": "ExponentialAtmosphere", "params": {"f107": atm.f107, "ap": atm.ap}}
 
 
@@ -53,9 +51,7 @@ def _build_atmosphere(config: dict[str, Any]) -> ExponentialAtmosphere:
 def _serialize_shadow(shadow: ConicalShadowModel) -> dict[str, Any]:
     """把阴影模型序列化为 ``{type, params}`` 字典。"""
     if not isinstance(shadow, ConicalShadowModel):
-        raise NotSerializableError(
-            f"shadow type {type(shadow).__name__} has no config serializer"
-        )
+        raise NotSerializableError(f"shadow type {type(shadow).__name__} has no config serializer")
     return {
         "type": "ConicalShadowModel",
         "params": {"bodies": list(shadow.bodies), "radii": shadow.radii},

@@ -53,6 +53,7 @@ class IndirectTerm(PhysicalModel):
     def to_rust_spec(self, system) -> tuple | None:
         """序列化为 ``("indirect", naif_id_str, mu)``。"""
         from .third_body_gravity import ThirdBodyGravity
+
         mu = self._mu if self._mu is not None else system.gravitational_parameter(self._body)
         naif_id = ThirdBodyGravity._name_or_id(self._body)
         return ("indirect", naif_id, float(mu))
@@ -76,7 +77,9 @@ class IndirectTerm(PhysicalModel):
         if getattr(system, "spice", None) is not None:
             try:
                 from e2m2e._integrators import indirect_term_acceleration  # noqa: F401
+
                 from .third_body_gravity import ThirdBodyGravity
+
                 observer = getattr(system, "origin", "EARTH")
                 observer_id = ThirdBodyGravity._name_or_id(observer)
                 target_id = ThirdBodyGravity._name_or_id(self._body)

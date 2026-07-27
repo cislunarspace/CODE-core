@@ -83,12 +83,18 @@ def design_halo():
     z0 = 0.001  # z 方向振幅
     guess = compute_halo_initial_guess(system.mu, z0, L=1, halo_class=0)
 
-    initial_state = np.array([
-        guess["x0"], 0.0, z0,
-        0.0, guess["vy0"], 0.0,
-    ])
+    initial_state = np.array(
+        [
+            guess["x0"],
+            0.0,
+            z0,
+            0.0,
+            guess["vy0"],
+            0.0,
+        ]
+    )
 
-    print(f"\n1. Richardson 解析近似初始猜测")
+    print("\n1. Richardson 解析近似初始猜测")
     print(f"   x0 = {guess['x0']:.6f}")
     print(f"   vy0 = {guess['vy0']:.6f}")
     print(f"   T/2 = {guess['T_half']:.6f}")
@@ -129,6 +135,7 @@ def main():
     except Exception as e:
         print(f"\n错误: {e}")
         import traceback
+
         traceback.print_exc()
 
     print("\n" + "=" * 60)

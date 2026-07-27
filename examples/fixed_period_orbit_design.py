@@ -49,9 +49,7 @@ def design_fixed_period_dro(target_period):
     print(f"初始猜测: x0={x0_guess}, y_dot0={y_dot0_guess}")
 
     # 5. 执行迭代修正
-    seed = Orbit(
-        states=initial_state.reshape(1, -1), times=np.array([0.0]), system=system
-    )
+    seed = Orbit(states=initial_state.reshape(1, -1), times=np.array([0.0]), system=system)
     seed.period = target_period
     orbit = corrector.iterate_correction(
         initial_guess=seed,

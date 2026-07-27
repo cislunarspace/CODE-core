@@ -12,8 +12,8 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from .coordinate_system import CoordinateSystem
 from ..cr3bp_system import CR3BP_System
+from .coordinate_system import CoordinateSystem
 from .standard_axes import ICRSAxes
 from .standard_origins import CelestialBodyOrigin
 from .synodic_axes import SynodicAxes

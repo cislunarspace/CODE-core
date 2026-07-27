@@ -118,8 +118,9 @@ def nrho_orbit(cr3bp_dynamics, cr3bp_system, request):
     index = request.param
     data = load_nrho_from_xlsx(XLSX_PATH, index)
 
-    seed_state = np.array([data["x0"], data["y0"], data["z0"],
-                           data["vx0"], data["vy0"], data["vz0"]])
+    seed_state = np.array(
+        [data["x0"], data["y0"], data["z0"], data["vx0"], data["vy0"], data["vz0"]]
+    )
     orbit = Orbit([seed_state], [0])
     orbit.period = data["period"]
     return orbit
@@ -190,8 +191,9 @@ class TestStep2SamplePatchPoints:
         for t in t_patch[1:]:
             state = cr3bp_dynamics.propagate_orbit_state_at_time(nrho_orbit, t)
             # 至少有一个 z 或 vz 分量不为零
-            assert abs(state[2]) > 1e-10 or abs(state[5]) > 1e-10, \
+            assert abs(state[2]) > 1e-10 or abs(state[5]) > 1e-10, (
                 "采样点 z 和 vz 均为零，不是三维轨道"
+            )
 
 
 # =============================================================================

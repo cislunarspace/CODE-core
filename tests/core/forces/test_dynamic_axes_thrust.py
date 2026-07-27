@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from e2m2e.core.coordinate_system import CoordinateSystem
+from e2m2e.core.standard_axes import ICRSAxes
+from e2m2e.core.standard_origins import CelestialBodyOrigin
+
 from e2m2e.core.ephemeris_system import EphemerisSystem
 from e2m2e.core.forces import FiniteBurn, ForceModel, PointMassGravity
 from e2m2e.core.spice import SPICEManager
-from e2m2e.core.standard_axes import ICRSAxes
-from e2m2e.core.standard_origins import CelestialBodyOrigin
 
 _EARTH_R_KM = 6378.137
 _MU_EARTH = 398600.4415  # km³/s²

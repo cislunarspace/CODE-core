@@ -7,9 +7,7 @@ import os
 
 import numpy as np
 import pytest
-
 from e2m2e.core.gmat_data import CoordinateDataError, gmat_data_dir
-from e2m2e.core.spice import SPICEManager
 from e2m2e.core.standard_axes import (
     GMATITRFAxes,
     ICRSAxes,
@@ -20,6 +18,8 @@ from e2m2e.core.standard_axes import (
     standard_itrf,
 )
 from e2m2e.core.standard_origins import CelestialBodyOrigin, InertialOrigin
+
+from e2m2e.core.spice import SPICEManager
 
 
 @pytest.fixture
@@ -224,7 +224,6 @@ class TestICRFITRFIntegrationWithSpice:
     def test_icrf_itrf_rotation_matches_pxform(self, spice_manager, requires_itrf93):
         """ICRF→ITRF 向量变换与 spiceypy.pxform('J2000','ITRF93',et) 元素差 < 1e-12。"""
         import spiceypy
-
         from e2m2e.core.coordinate_system import CoordinateSystem
 
         icrf = standard_icrf()

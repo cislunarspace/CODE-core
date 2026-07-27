@@ -5,7 +5,6 @@
 
 import numpy as np
 import pytest
-
 from e2m2e.core.gmat_data import CoordinateDataError, gmat_fixture_path
 from e2m2e.core.gmat_eop import ARCSEC_TO_RAD, EopFile, TaiUtcTable
 from e2m2e.core.gmat_itrf import GmatItrfReduction

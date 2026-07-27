@@ -8,8 +8,8 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from .origin import Origin
 from ..spice import SPICEManager
+from .origin import Origin
 
 
 class CelestialBodyOrigin(Origin):

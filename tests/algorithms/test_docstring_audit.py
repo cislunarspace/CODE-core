@@ -155,9 +155,7 @@ class TestContinuation:
         """__init__ docstring 中不应包含不存在的 param 参数"""
         mod = _import(self.MODULE)
         ds = _assert_doc(mod.Continuation.__init__, "Continuation.__init__")
-        assert "- param:" not in ds, (
-            "docstring 不应包含 param 参数（签名中实际参数名为 step）"
-        )
+        assert "- param:" not in ds, "docstring 不应包含 param 参数（签名中实际参数名为 step）"
         assert "step" in ds, "docstring 中应包含 step 参数说明"
 
     def test_infer_param_index_has_docstring(self):

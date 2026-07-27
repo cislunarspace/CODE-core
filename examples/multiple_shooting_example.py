@@ -5,8 +5,6 @@
 展示如何使用 MultipleShooting 和 sample_patch_points 对轨道进行修正。
 """
 
-import numpy as np
-
 from e2m2e.algorithms import DifferentialCorrection, MultipleShooting, sample_patch_points
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
 
@@ -58,7 +56,7 @@ def main():
     if result.converged:
         print(f"  收敛！最大残差 = {result.max_residual:.2e}")
     else:
-        print(f"  未收敛")
+        print("  未收敛")
 
     # 4. 对比不同 patch points 数量
     print("\n不同 patch points 数量的收敛性:")

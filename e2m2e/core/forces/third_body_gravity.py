@@ -50,6 +50,7 @@ class ThirdBodyGravity(PhysicalModel):
         """
         try:
             import spiceypy as _spiceypy
+
             naif_id = _spiceypy.bods2c(name)
             if naif_id > 0:
                 return str(naif_id)
@@ -105,6 +106,7 @@ class ThirdBodyGravity(PhysicalModel):
         if getattr(system, "spice", None) is not None:
             try:
                 from e2m2e._integrators import third_body_acceleration  # noqa: F401
+
                 observer = getattr(system, "origin", "EARTH")
                 observer_id = self._name_or_id(observer)
                 target_id = self._name_or_id(self._body)

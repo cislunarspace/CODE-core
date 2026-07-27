@@ -159,7 +159,9 @@ class DifferentialCorrection:
 
         logger.debug(
             "2D对称x轴配置完成：固定x0=%s，自由变量=%s，目标约束=%s",
-            x0, self.free_variables, list(self.target_conditions.keys()),
+            x0,
+            self.free_variables,
+            list(self.target_conditions.keys()),
         )
 
         return self
@@ -209,7 +211,9 @@ class DifferentialCorrection:
 
         logger.debug(
             "2D对称y轴配置完成：固定y0=%s，自由变量=%s，目标约束=%s",
-            y0, self.free_variables, list(self.target_conditions.keys()),
+            y0,
+            self.free_variables,
+            list(self.target_conditions.keys()),
         )
 
         return self
@@ -472,11 +476,15 @@ class DifferentialCorrection:
             logger.info("=" * 60)
             logger.info(
                 "初始状态: x=%.6f, y=%.6f, z=%.6f",
-                self.initial_guess[0], self.initial_guess[1], self.initial_guess[2],
+                self.initial_guess[0],
+                self.initial_guess[1],
+                self.initial_guess[2],
             )
             logger.info(
                 "         x_dot=%.6f, y_dot=%.6f, z_dot=%.6f",
-                self.initial_guess[3], self.initial_guess[4], self.initial_guess[5],
+                self.initial_guess[3],
+                self.initial_guess[4],
+                self.initial_guess[5],
             )
             logger.info("初始半周期: T/2=%.6f", half_period_time)
             logger.info("=" * 60)
@@ -617,7 +625,8 @@ class DifferentialCorrection:
                     if verbose:
                         logger.info(
                             "  收敛成功：修正量过小(%.2e)但误差已足够小(%.2e)",
-                            correction_norm, current_error,
+                            correction_norm,
+                            current_error,
                         )
                     if callback:
                         callback(iteration + 1, current_error, True)

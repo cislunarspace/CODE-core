@@ -7,13 +7,13 @@ import types
 
 import numpy as np
 import pytest
-
 from e2m2e.core.coordinate_system import CoordinateSystem
+from e2m2e.core.standard_axes import ICRSAxes
+from e2m2e.core.standard_origins import CelestialBodyOrigin
+
 from e2m2e.core.ephemeris_system import EphemerisSystem
 from e2m2e.core.forces import ForceModel, GravityField, RelativisticCorrection
 from e2m2e.core.spice import SPICEManager
-from e2m2e.core.standard_axes import ICRSAxes
-from e2m2e.core.standard_origins import CelestialBodyOrigin
 
 
 def _make_system(mu: float = 398600.435507):

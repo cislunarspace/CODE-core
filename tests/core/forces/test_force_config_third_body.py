@@ -8,17 +8,17 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from e2m2e.core.coordinate_system import CoordinateSystem
+from e2m2e.core.standard_axes import ICRSAxes
+from e2m2e.core.standard_origins import CelestialBodyOrigin
 from numpy.testing import assert_allclose
 
-from e2m2e.core.coordinate_system import CoordinateSystem
 from e2m2e.core.forces import (
     ForceModel,
     PointMassGravity,
     ThirdBodyGravity,
 )
 from e2m2e.core.forces.force_config import build_force, serialize_force
-from e2m2e.core.standard_axes import ICRSAxes
-from e2m2e.core.standard_origins import CelestialBodyOrigin
 
 # mu=1.327e11 km^3/s^2（约太阳引力参数量级），用于 mu 往返测试。
 MU_SUN_LIKE = 1.327e11
