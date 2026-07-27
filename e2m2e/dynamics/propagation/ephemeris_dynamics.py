@@ -33,12 +33,20 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
 
 from .dynamics import Dynamics
 from .ephemeris_system import EphemerisSystem
+
+try:
+    from e2m2e._integrators import propagate_with_stm_py
+
+    _HAS_RUST_STM = True
+except ImportError:
+    _HAS_RUST_STM = False
 
 
 class EphemerisDynamics(Dynamics):
@@ -78,6 +86,69 @@ class EphemerisDynamics(Dynamics):
         if span_duration > 0:
             return min(self.max_step, span_duration / 10.0)
         return self.max_step
+
+    def _propagate_with_stm(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+        with_jacobi: bool,
+    ) -> dict[str, Any]:
+        """增广状态积分（含 STM），优先走 Rust 快速路径。"""
+        if _HAS_RUST_STM:
+            return self._propagate_with_stm_rust(
+                initial_state,
+                t_span,
+                t_eval,
+                max_step,
+            )
+        return super()._propagate_with_stm(
+            initial_state,
+            t_span,
+            t_eval,
+            max_step,
+            with_jacobi,
+        )
+
+    def _propagate_with_stm_rust(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+    ) -> dict[str, Any]:
+        """Rust 快速路径：调用 propagate_with_stm_py 完成 STM 传播。"""
+        system: EphemerisSystem = self.system
+        bodies = list(system.bodies)
+        origin = system.origin
+        gm_values = [float(gm) for gm in system.get_gm_values()]
+
+        if t_eval is not None:
+            t_eval_list = [float(t) for t in np.asarray(t_eval, dtype=float).ravel()]
+        else:
+            t_eval_list = [float(t_span[0]), float(t_span[1])]
+
+        result = propagate_with_stm_py(
+            bodies=bodies,
+            origin=origin,
+            gm_values=gm_values,
+            t_span=(float(t_span[0]), float(t_span[1])),
+            t_eval=t_eval_list,
+            initial_state=[float(x) for x in initial_state[:6]],
+            rtol=self.rtol,
+            atol=self.atol,
+            max_step=float(max_step),
+        )
+
+        states = np.array(result["states"])
+        stm = np.array(result["stm"]).reshape(-1, 6, 6)
+        time = np.array(result["time"])
+
+        self.last_trajectory = (time, states)
+        self.last_stm = stm
+
+        return {"time": time, "states": states, "stm": stm}
 
     def _compute_acc_and_jacobian(
         self,

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import abc
 
-from .enums import ReferenceFrame, UnitSystem
+from e2m2e.enums import ReferenceFrame, UnitSystem
 
 
 class System(abc.ABC):

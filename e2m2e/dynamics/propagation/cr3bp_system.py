@@ -14,8 +14,9 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import fsolve
 
-from .constants import AU as _AU_KM
-from .enums import ReferenceFrame, UnitSystem
+from e2m2e.constants import AU as _AU_KM
+from e2m2e.enums import ReferenceFrame, UnitSystem
+
 from .potential import pseudo_potential_hessian
 from .system import System
 

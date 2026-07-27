@@ -23,7 +23,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from ..constants import AU, KM_TO_M
+from e2m2e.constants import AU, KM_TO_M
+
 from .physical_model import PhysicalModel, require_inertial_frame
 
 if TYPE_CHECKING:
