@@ -335,8 +335,7 @@ class MultipleShooting:
                             refresh=True,
                         )
                     segment_pairs = [
-                        (results[i]["final_state"], results[i]["final_stm"])
-                        for i in range(n_seg)
+                        (results[i]["final_state"], results[i]["final_stm"]) for i in range(n_seg)
                     ]
 
                 elif use_multithread and n_seg > 1:
@@ -594,9 +593,7 @@ def sample_patch_points_perilune_clustered(
     probe_result = dynamics.propagate(orbit.states[0], (0, period), t_eval=t_probe)
     states_probe = probe_result["states"]
     dists = np.sqrt(
-        (states_probe[:, 0] - moon_x) ** 2
-        + states_probe[:, 1] ** 2
-        + states_probe[:, 2] ** 2
+        (states_probe[:, 0] - moon_x) ** 2 + states_probe[:, 1] ** 2 + states_probe[:, 2] ** 2
     )
     i_perilune = int(np.argmin(dists))
     t_perilune = float(t_probe[i_perilune])

@@ -32,37 +32,36 @@ if TYPE_CHECKING:
     from .ephemeris_system import EphemerisSystem as EphemerisSystem
     from .spice import SPICEManager as SPICEManager
 
-from . import dynamics, orbit, potential, system
-from .coordinate import (
-    Axes,
-    CoordinateSystem,
-    DynamicAxes,
-    IAU2000EqAxes,
-    GMATITRFAxes,
-    ICRSAxes,
-    ITRFApproxAxes,
-    ITRFAxes,
-    InertialOrigin,
-    LVLHAxes,
-    Origin,
-    VNBAxes,
-    standard_icrf,
-    standard_itrf,
-)
-from .coordinate import SynodicJ2000System
-from .cr3bp_system import CR3BP_System, LibrationPoint
-from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
-from .enums import ReferenceFrame
-from .orbit import Orbit, OrbitFamily
-from .potential import pseudo_potential_hessian
-from .system import System
-
 # 坐标系族已收入 .coordinate 子包（issue #197）。为保持对外导入路径零破坏，
 # 把旧路径 e2m2e.core.<mod> 注册为指向 e2m2e.core.coordinate.<mod> 的别名，
 # 使 `from e2m2e.core.axes import Axes` 等既有写法继续可用。
 import sys as _sys
 
 from . import coordinate as _coordinate
+from . import dynamics, orbit, potential, system
+from .coordinate import (
+    Axes,
+    CoordinateSystem,
+    DynamicAxes,
+    GMATITRFAxes,
+    IAU2000EqAxes,
+    ICRSAxes,
+    InertialOrigin,
+    ITRFApproxAxes,
+    ITRFAxes,
+    LVLHAxes,
+    Origin,
+    SynodicJ2000System,
+    VNBAxes,
+    standard_icrf,
+    standard_itrf,
+)
+from .cr3bp_system import CR3BP_System, LibrationPoint
+from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
+from .enums import ReferenceFrame
+from .orbit import Orbit, OrbitFamily
+from .potential import pseudo_potential_hessian
+from .system import System
 
 for _mod in (
     "axes",

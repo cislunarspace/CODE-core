@@ -127,7 +127,12 @@ def search_single_departure(
             try:
                 traj_states, traj_times = searcher._forward_integrate(initial_state, mtt, idt)
             except Exception:
-                logger.debug("积分失败: alpha=%.4f, departure_time=%.4f", alpha, departure_time, exc_info=True)
+                logger.debug(
+                    "积分失败: alpha=%.4f, departure_time=%.4f",
+                    alpha,
+                    departure_time,
+                    exc_info=True,
+                )
                 results.append(
                     {
                         "success": False,

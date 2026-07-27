@@ -13,12 +13,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-logger = logging.getLogger(__name__)
-
 import numpy as np
 
 from .config import TransferOptimizationResult
 from .nlp_core import NLPOptimizationVariables
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .transfer_optimization import DROTRONLPOptimizer
