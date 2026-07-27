@@ -81,7 +81,7 @@ class Dynamics:
 
         # 缓存最近一次积分结果
         self.last_trajectory: tuple[np.ndarray, np.ndarray] | None = None
-        self.last_stm = None  # STM 矩阵数组
+        self.last_stm: np.ndarray | None = None  # STM 矩阵数组
 
         # 截面检测参数
         self.cross_section_tolerance = 1e-8
