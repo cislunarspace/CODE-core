@@ -6,24 +6,27 @@
 //! [`crate::cowell`] 的模块文档。
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyString, PyTuple};
+#[cfg(feature = "spice")]
+use pyo3::types::PyDict;
+use pyo3::types::PyList;
 
 pub(crate) mod abm;
 pub(crate) mod butcher;
 pub(crate) mod cowell;
+#[cfg(feature = "spice")]
+pub(crate) mod forces;
 pub(crate) mod multistep_methods;
 pub(crate) mod pd45;
 pub(crate) mod pd78;
 pub(crate) mod rk89;
+pub mod rk_methods;
 pub(crate) mod solid_tide;
+pub mod solve_ivp;
 pub(crate) mod spherical_harmonic;
 #[cfg(feature = "spice")]
 pub(crate) mod spice_ffi;
 #[cfg(feature = "spice")]
 pub(crate) mod spk_accel;
-#[cfg(feature = "spice")]
-pub(crate) mod forces;
-pub mod rk_methods;
 
 use butcher::{explicit_rk_step, suggest_next_step};
 use multistep_methods::MultistepMethod;
@@ -165,7 +168,11 @@ fn rk_step(
 
     let h_next = suggest_next_step(h, error, tol, method.embedded_order());
 
-    Ok(StepResult { y_new, error, h_next })
+    Ok(StepResult {
+        y_new,
+        error,
+        h_next,
+    })
 }
 
 /// 执行一次多步预测-校正单步。
@@ -279,7 +286,8 @@ fn cowell_step(
         }
     }
 
-    let callback = |ti: f64, xi: &[f64]| -> PyResult<Vec<f64>> { call_python_rhs(accel, n, ti, xi) };
+    let callback =
+        |ti: f64, xi: &[f64]| -> PyResult<Vec<f64>> { call_python_rhs(accel, n, ti, xi) };
 
     let (x_new, error, new_history) = cowell::cowell_step(t, h, &history, callback)?;
 
@@ -382,7 +390,7 @@ fn solid_tide_step1(
             )));
         }
     }
-    if perturbers_flat.len() % 4 != 0 {
+    if !perturbers_flat.len().is_multiple_of(4) {
         return Err(pyo3::exceptions::PyValueError::new_err(format!(
             "perturbers_flat length must be multiple of 4, got {}",
             perturbers_flat.len()
@@ -435,11 +443,7 @@ fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Ve
     .map_err(|e| {
         pyo3::exceptions::PyRuntimeError::new_err(format!("cspice spkezr failed: {:?}", e))
     })?;
-    Ok(vec![
-        state.position.x,
-        state.position.y,
-        state.position.z,
-    ])
+    Ok(vec![state.position.x, state.position.y, state.position.z])
 }
 
 /// PoC：在 Rust cspice 内核池加载一个内核文件。
@@ -484,13 +488,14 @@ fn third_body_acceleration(
             sc_pos.len()
         )));
     }
-    let a = spk_accel::third_body_acceleration(et, target, observer, &sc_pos, mu, 1e-6)
-        .map_err(|e| {
+    let a = spk_accel::third_body_acceleration(et, target, observer, &sc_pos, mu, 1e-6).map_err(
+        |e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!(
                 "third_body_acceleration cspice failed: {:?}",
                 e
             ))
-        })?;
+        },
+    )?;
     Ok(vec![a[0], a[1], a[2]])
 }
 
@@ -505,13 +510,12 @@ fn indirect_term_acceleration(
     observer: &str,
     mu: f64,
 ) -> PyResult<Vec<f64>> {
-    let a = spk_accel::indirect_term_acceleration(et, target, observer, mu, 1e-6)
-        .map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!(
-                "indirect_term_acceleration cspice failed: {:?}",
-                e
-            ))
-        })?;
+    let a = spk_accel::indirect_term_acceleration(et, target, observer, mu, 1e-6).map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "indirect_term_acceleration cspice failed: {:?}",
+            e
+        ))
+    })?;
     Ok(vec![a[0], a[1], a[2]])
 }
 
@@ -627,11 +631,8 @@ fn srp_acceleration(
     let pos_arr = [sc_pos[0], sc_pos[1], sc_pos[2]];
     let a = forces::srp::srp_acceleration(et, &pos_arr, area, mass, cr, &shadow_bodies, observer)
         .map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!(
-                "srp_acceleration failed: {:?}",
-                e
-            ))
-        })?;
+        pyo3::exceptions::PyRuntimeError::new_err(format!("srp_acceleration failed: {:?}", e))
+    })?;
     Ok(vec![a[0], a[1], a[2]])
 }
 
@@ -922,10 +923,92 @@ fn propagate_compiled(
     dict.set_item("n_rejected", n_rejected)?;
     Ok(dict.into())
 }
+
+/// Python 接口：42 维增广状态传播（状态 + STM）。
+///
+/// 纯 N 体模型（EARTH/MOON/SUN 等），用于星历修正的逐段积分。
+/// 调用 `e2m2e-forces` 的 `propagate_with_stm`（DOP853 + STM 变分方程）。
+///
+/// # 参数
+/// - `bodies`: 天体名称列表（如 `["EARTH", "MOON", "SUN"]`）
+/// - `origin`: 原点天体名称（如 `"EARTH"`）
+/// - `gm_values`: 各天体的 GM（km³/s²），与 `bodies` 一一对应
+/// - `t_span`: `(t_start, t_end)` 积分区间（SPICE et 秒）
+/// - `t_eval`: 输出时间点数组
+/// - `initial_state`: 初始状态 `[x, y, z, vx, vy, vz]`（km, km/s）
+/// - `rtol`, `atol`: 积分容差
+/// - `max_step`: 最大步长（秒），`None` 则不限制
+/// - `max_steps`: 最大步数，`None` 则用默认上限
+///
+/// # 返回
+/// Python dict：`{"states": [[6], ...], "stm": [[36], ...], "time": [...]}`
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[pyo3(signature = (bodies, origin, gm_values, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None))]
+#[allow(clippy::too_many_arguments)]
+fn propagate_with_stm_py(
+    bodies: Vec<String>,
+    origin: String,
+    gm_values: Vec<f64>,
+    t_span: (f64, f64),
+    t_eval: Vec<f64>,
+    initial_state: Vec<f64>,
+    rtol: f64,
+    atol: f64,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::forces::nbody_stm::{propagate_with_stm, NBodyConfig};
+
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    if gm_values.len() != bodies.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "gm_values length ({}) must match bodies length ({})",
+            gm_values.len(),
+            bodies.len()
+        )));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+
+    let config = NBodyConfig {
+        bodies,
+        origin,
+        gm_values,
+    };
+
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    let result = propagate_with_stm(
+        &config, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
+    );
+
+    // 转为 Python 对象
+    let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
+    let stm_list: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();
+
+    let dict = PyDict::new(py);
+    dict.set_item("states", states_list)?;
+    dict.set_item("stm", stm_list)?;
+    dict.set_item("time", result.times)?;
+    Ok(dict.into())
+}
+
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
+    m.add_function(wrap_pyfunction!(solve_ivp::solve_ivp_py, m)?)?;
     m.add_function(wrap_pyfunction!(multistep_step, m)?)?;
     m.add_function(wrap_pyfunction!(cowell_step, m)?)?;
     m.add_function(wrap_pyfunction!(spherical_harmonic_accel, m)?)?;
@@ -946,6 +1029,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(srp_acceleration, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(propagate_with_stm_py, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;

@@ -26,7 +26,7 @@ pub const ABM_STEPS: usize = 4;
 /// 用于步长建议的嵌入阶数（Milne 估计按此阶数缩放）。
 pub const ABM_EMBEDDED_ORDER: usize = 4;
 
-/// 多步法单步返回类型：`(新状态, 误差估计, 滚动后的历史缓冲)`。
+/// ABM 单步返回类型：`(corrector, milne_error, rolled_history)`。
 pub type StepResult<T> = Result<(Vec<f64>, f64, Vec<Vec<f64>>), T>;
 
 /// 一次 ABM 4 阶预测-校正步（PECE）。

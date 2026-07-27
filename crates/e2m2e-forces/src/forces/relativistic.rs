@@ -5,7 +5,7 @@
 //! - Lense-Thirring（自转角动量 LT，需要 sxform + 旋转矩阵导数）
 //! - de Sitter（geodesic precession）
 
-use crate::spice_ffi::{spkezr, sxform, SpiceFfiError};
+use e2m2e_spice::spice_ffi::{spkezr, sxform, SpiceFfiError};
 
 /// 默认光速（km/s）。
 const C_DEFAULT: f64 = 299792.458;

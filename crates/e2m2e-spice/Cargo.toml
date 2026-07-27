@@ -1,0 +1,18 @@
+[package]
+name = "e2m2e-spice"
+version = "0.1.0"
+edition = "2021"
+description = "SPICE FFI bindings for e2m2e"
+
+[lib]
+name = "e2m2e_spice"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+spice = ["dep:cspice", "dep:cspice-sys"]
+
+[dependencies]
+pyo3 = { workspace = true }
+cspice = { workspace = true, optional = true }
+cspice-sys = { workspace = true, optional = true }

@@ -72,6 +72,9 @@ pub const COWELL_HISTORY_LEN: usize = 10;
 /// 用于步长建议的阶数（Milne 估计按此阶数缩放）。
 pub const COWELL_EMBEDDED_ORDER: usize = 8;
 
+/// Cowell 单步返回类型：`(x_{n+1}, milne_error, new_history)`。
+pub type StepResult<T> = Result<(Vec<f64>, f64, Vec<Vec<f64>>), T>;
+
 /// 最新采样处的 `j` 阶后向差分 `∇ʲ`。
 ///
 /// `samples` 由旧到新；返回 `Σ_{m=0}^{j} C(j,m)·(−1)^m·samples[k−m]`，
@@ -91,9 +94,6 @@ fn backward_diff(samples: &[Vec<f64>], j: usize) -> Vec<f64> {
     }
     result
 }
-
-/// 多步法单步返回类型：`(新状态, 误差估计, 滚动后的历史缓冲)`。
-pub type StepResult<T> = Result<(Vec<f64>, f64, Vec<Vec<f64>>), T>;
 
 /// 一次 Störmer-Cowell 8 阶 PECE 步。
 ///
