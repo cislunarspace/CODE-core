@@ -82,11 +82,7 @@ fn body_flux_factor(
 ///
 /// `factors[i]` 是第 i 个遮挡体的光照份额（0..1）；
 /// `angular_radii[i]` 是遮挡体视角径；`directions[i]` 是 sc→遮挡体 单位向量。
-fn combine_body_fluxes(
-    factors: &[f64],
-    angular_radii: &[f64],
-    directions: &[[f64; 3]],
-) -> f64 {
+fn combine_body_fluxes(factors: &[f64], angular_radii: &[f64], directions: &[[f64; 3]]) -> f64 {
     let n = factors.len();
     if n == 0 {
         return 1.0;
@@ -159,11 +155,7 @@ pub fn flux_factor(
         ];
         let d = norm(&sc_to_body);
         angular_radii.push((body_radius / d).min(1.0).asin());
-        directions.push([
-            sc_to_body[0] / d,
-            sc_to_body[1] / d,
-            sc_to_body[2] / d,
-        ]);
+        directions.push([sc_to_body[0] / d, sc_to_body[1] / d, sc_to_body[2] / d]);
     }
     Ok(combine_body_fluxes(&factors, &angular_radii, &directions))
 }
@@ -234,15 +226,7 @@ mod tests {
     #[test]
     fn srp_basic_finite() {
         // 跑通即可（不加载内核会失败，跳过具体断言）
-        let result = srp_acceleration(
-            0.0,
-            &[100000.0, 0.0, 0.0],
-            10.0,
-            1000.0,
-            1.0,
-            &[],
-            "EARTH",
-        );
+        let result = srp_acceleration(0.0, &[100000.0, 0.0, 0.0], 10.0, 1000.0, 1.0, &[], "EARTH");
         // 不加载内核会失败，但函数应该正确处理
         assert!(result.is_ok() || result.is_err());
     }

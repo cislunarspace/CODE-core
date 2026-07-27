@@ -6,7 +6,6 @@
 
 import numpy as np
 import pytest
-
 from e2m2e.core.axes import Axes
 from e2m2e.core.coordinate_system import CoordinateSystem
 from e2m2e.core.origin import Origin

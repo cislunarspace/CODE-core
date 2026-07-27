@@ -69,7 +69,7 @@ def test_indirect_term_no_system_no_mu_raises():
 
 def test_indirect_term_3d_position():
     """三维天体位置下的加速度方向与大小正确。"""
-    system = _FakeSystem()
+    _FakeSystem()
 
     class _OffsetSystem(_FakeSystem):
         def get_body_position(self, body, t):

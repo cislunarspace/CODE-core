@@ -128,25 +128,31 @@ fn compute_angular_momentum(
 ) -> Result<[f64; 3], SpiceFfiError> {
     let radius = body_radius_override
         .or_else(|| default_body_radius(central_body))
-        .ok_or_else(|| SpiceFfiError::Failed(format!(
-            "no default body radius for {:?}; provide override",
-            central_body
-        )))?;
+        .ok_or_else(|| {
+            SpiceFfiError::Failed(format!(
+                "no default body radius for {:?}; provide override",
+                central_body
+            ))
+        })?;
     let frame = body_fixed_frame(central_body);
 
     let xform = sxform(frame, "J2000", et)?;
     // xform 是 [[f64;6];6]，前 3×3 是 R，后 3×3 是 Rdot
-    let r = [[xform[0][0], xform[0][1], xform[0][2]],
-             [xform[1][0], xform[1][1], xform[1][2]],
-             [xform[2][0], xform[2][1], xform[2][2]]];
-    let rdot = [[xform[3][0], xform[3][1], xform[3][2]],
-                [xform[4][0], xform[4][1], xform[4][2]],
-                [xform[5][0], xform[5][1], xform[5][2]]];
+    let r = [
+        [xform[0][0], xform[0][1], xform[0][2]],
+        [xform[1][0], xform[1][1], xform[1][2]],
+        [xform[2][0], xform[2][1], xform[2][2]],
+    ];
+    let rdot = [
+        [xform[3][0], xform[3][1], xform[3][2]],
+        [xform[4][0], xform[4][1], xform[4][2]],
+        [xform[5][0], xform[5][1], xform[5][2]],
+    ];
 
     // body_spin_vector（与 Python 公式逐字一致）
     let spin = [
         -r[0][2] * rdot[0][1] - r[1][2] * rdot[1][1] - r[2][2] * rdot[2][1],
-         r[0][2] * rdot[0][0] + r[1][2] * rdot[1][0] + r[2][2] * rdot[2][0],
+        r[0][2] * rdot[0][0] + r[1][2] * rdot[1][0] + r[2][2] * rdot[2][0],
         -r[0][1] * rdot[0][0] - r[1][1] * rdot[1][0] - r[2][1] * rdot[2][0],
     ];
     let spin_rate = norm(&spin);
@@ -167,12 +173,8 @@ fn compute_de_sitter_omega(
     mu_primary: f64,
 ) -> Result<[f64; 3], SpiceFfiError> {
     // 查 central 和 primary 相对 SSB 的状态
-    let (central_state, _) = spkezr(
-        central_body, et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER",
-    )?;
-    let (primary_state, _) = spkezr(
-        primary_body, et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER",
-    )?;
+    let (central_state, _) = spkezr(central_body, et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER")?;
+    let (primary_state, _) = spkezr(primary_body, et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER")?;
     let r_vec = [
         central_state[0] - primary_state[0],
         central_state[1] - primary_state[1],

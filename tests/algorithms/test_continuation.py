@@ -61,14 +61,16 @@ class TestProgressDisplay:
 
         生产代码用 logging（非 print），故用 caplog 而非 capsys 捕获。
         """
-        with caplog.at_level(logging.INFO, logger="e2m2e.algorithms.continuation"):
-            with contextlib.suppress(Exception):
-                dro_continuation.natural_continuation(
-                    seed_orbit=corrected_dro,
-                    param_range=(0.791, 0.792),
-                    step_size=0.0001,
-                    verbose=True,
-                )
+        with (
+            caplog.at_level(logging.INFO, logger="e2m2e.algorithms.continuation"),
+            contextlib.suppress(Exception),
+        ):
+            dro_continuation.natural_continuation(
+                seed_orbit=corrected_dro,
+                param_range=(0.791, 0.792),
+                step_size=0.0001,
+                verbose=True,
+            )
 
         # verbose 模式应产出延拓相关日志
         assert "延拓" in caplog.text

@@ -10,9 +10,9 @@
 //! （即 origin 平移为零）。NRHO 场景成立（两者 origin 都是 EARTH/MOON）。
 //! 对于 origin 不同的场景（如 Barycenter origin），需另加 spkezr 平移。
 
-use crate::spice_ffi::{mat3_mul_vec, mat3_t_mul_vec, pxform, SpiceFfiError};
 use crate::solid_tide;
 use crate::spherical_harmonic;
+use crate::spice_ffi::{mat3_mul_vec, mat3_t_mul_vec, pxform, SpiceFfiError};
 
 /// 潮汐配置（与 Python ``tide_mode`` 三档对应）。
 #[derive(Clone, Debug)]
@@ -107,7 +107,11 @@ pub fn gravity_field_acceleration(
     // Step 1: 坐标变换 propagation → input_frame
     // 查两个 origin 在 SSB 的位置
     let (prop_origin_state_ssb, _) = crate::spice_ffi::spkezr(
-        propagation_origin, et, propagation_frame, "NONE", "SOLAR SYSTEM BARYCENTER",
+        propagation_origin,
+        et,
+        propagation_frame,
+        "NONE",
+        "SOLAR SYSTEM BARYCENTER",
     )?;
     let r_ssb = [
         r_sc[0] + prop_origin_state_ssb[0],
@@ -120,7 +124,11 @@ pub fn gravity_field_acceleration(
         [r_sc[0], r_sc[1], r_sc[2]]
     } else {
         let (body_state_ssb, _) = crate::spice_ffi::spkezr(
-            body, et, propagation_frame, "NONE", "SOLAR SYSTEM BARYCENTER",
+            body,
+            et,
+            propagation_frame,
+            "NONE",
+            "SOLAR SYSTEM BARYCENTER",
         )?;
         [
             r_ssb[0] - body_state_ssb[0],
@@ -182,14 +190,11 @@ fn effective_coefficients(
     let mut perturbers_flat: Vec<f64> = Vec::with_capacity(perturbers_names.len() * 4);
     for &name in perturbers_names {
         // SPICE 查扰动体相对中心天体在 input_frame 系下的位置
-        let (state, _lt) = crate::spice_ffi::spkezr(
-            name, et, input_frame, "NONE", body,
-        )?;
+        let (state, _lt) = crate::spice_ffi::spkezr(name, et, input_frame, "NONE", body)?;
         perturbers_flat.extend_from_slice(&[state[0], state[1], state[2]]);
         // GM 用硬编码表（与 Python spice.get_gm 一致；DE430 bsp 不带 GM）
-        let gm = gm_for_body(name).ok_or_else(|| {
-            SpiceFfiError::Failed(format!("GM not known for body {:?}", name))
-        })?;
+        let gm = gm_for_body(name)
+            .ok_or_else(|| SpiceFfiError::Failed(format!("GM not known for body {:?}", name)))?;
         perturbers_flat.push(gm);
     }
 

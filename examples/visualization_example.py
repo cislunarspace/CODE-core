@@ -8,9 +8,9 @@
 from __future__ import annotations
 
 import matplotlib
+
 matplotlib.use("Agg")  # 非交互后端，CI 环境下使用
 
-import numpy as np
 
 from e2m2e.algorithms import Continuation, DifferentialCorrection
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit

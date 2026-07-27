@@ -5,8 +5,6 @@
 展示如何使用 StabilityAnalysis 分析周期轨道的 Floquet 稳定性。
 """
 
-import numpy as np
-
 from e2m2e.algorithms import Continuation, DifferentialCorrection
 from e2m2e.algorithms.stability import StabilityAnalysis
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
@@ -42,11 +40,11 @@ def analyze_single_orbit():
     result = analyzer.analyze()
 
     # 3. 输出结果
-    print(f"\n特征值:")
+    print("\n特征值:")
     for i, ev in enumerate(result.eigenvalues):
-        print(f"  λ{i+1} = {ev:.4f}  |λ| = {abs(ev):.6f}")
+        print(f"  λ{i + 1} = {ev:.4f}  |λ| = {abs(ev):.6f}")
 
-    print(f"\n稳定性指数:")
+    print("\n稳定性指数:")
     for key, val in result.stability_indices.items():
         if val is not None:
             print(f"  {key} = {val:.6f}")
@@ -115,6 +113,7 @@ def main():
     except Exception as e:
         print(f"\n错误: {e}")
         import traceback
+
         traceback.print_exc()
 
     print("\n" + "=" * 60)

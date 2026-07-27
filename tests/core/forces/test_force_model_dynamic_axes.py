@@ -6,12 +6,12 @@
 from __future__ import annotations
 
 import numpy as np
-
 from e2m2e.core.axes import Axes
 from e2m2e.core.coordinate_system import CoordinateSystem
 from e2m2e.core.dynamic_axes import DynamicAxes
-from e2m2e.core.forces import ForceModel, PhysicalModel
 from e2m2e.core.origin import Origin
+
+from e2m2e.core.forces import ForceModel, PhysicalModel
 
 
 class _FixedOrigin(Origin):

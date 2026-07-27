@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from e2m2e.core.coordinate_system import CoordinateSystem
+from e2m2e.core.standard_axes import ICRSAxes
+from e2m2e.core.standard_origins import CelestialBodyOrigin
 from numpy.testing import assert_allclose
 
-from e2m2e.core.coordinate_system import CoordinateSystem
 from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
 from e2m2e.core.ephemeris_system import EphemerisSystem
 from e2m2e.core.forces import (
@@ -24,8 +26,6 @@ from e2m2e.core.forces import (
     ThirdBodyGravity,
 )
 from e2m2e.core.forces.physical_model import PhysicalModel
-from e2m2e.core.standard_axes import ICRSAxes
-from e2m2e.core.standard_origins import CelestialBodyOrigin
 
 pytestmark = pytest.mark.spice
 
@@ -52,9 +52,7 @@ class TestForceModelSTMConsistency:
     任何雅可比叠加错误都会在 STM 上放大显现。
     """
 
-    def test_stm_matches_ephemeris_dynamics(
-        self, spice_eph_system, spice_manager, reference_epoch
-    ):
+    def test_stm_matches_ephemeris_dynamics(self, spice_eph_system, spice_manager, reference_epoch):
         """同弧段传播，ForceModel 与 EphemerisDynamics 的 STM 一致。"""
         system = _make_force_model_system(spice_eph_system, spice_manager)
         reference_et = spice_manager.utc_to_et(reference_epoch)
@@ -85,18 +83,18 @@ class TestForceModelSTMConsistency:
         # 末端状态一致（验证加速度等价）
         fm_final = fm_result["states"][-1]
         eph_final = eph_result["states"][-1]
-        assert_allclose(fm_final, eph_final, atol=1e-6, rtol=1e-9,
-                        err_msg="末端状态不一致，加速度可能有误")
+        assert_allclose(
+            fm_final, eph_final, atol=1e-6, rtol=1e-9, err_msg="末端状态不一致，加速度可能有误"
+        )
 
         # 末端 STM 一致（验证雅可比叠加正确）
         fm_stm = fm_result["stm"][-1]
         eph_stm = eph_result["stm"][-1]
-        assert_allclose(fm_stm, eph_stm, atol=1e-7, rtol=1e-7,
-                        err_msg="STM 不一致，雅可比叠加可能有误")
+        assert_allclose(
+            fm_stm, eph_stm, atol=1e-7, rtol=1e-7, err_msg="STM 不一致，雅可比叠加可能有误"
+        )
 
-    def test_stm_shape_and_identity_at_t0(
-        self, spice_eph_system, spice_manager, reference_epoch
-    ):
+    def test_stm_shape_and_identity_at_t0(self, spice_eph_system, spice_manager, reference_epoch):
         """STM 形状为 (n, 6, 6)，首点为单位阵。"""
         system = _make_force_model_system(spice_eph_system, spice_manager)
         reference_et = spice_manager.utc_to_et(reference_epoch)
@@ -111,9 +109,7 @@ class TestForceModelSTMConsistency:
         assert result["stm"].shape == (len(result["time"]), 6, 6)
         assert_allclose(result["stm"][0], np.eye(6), atol=1e-12)
 
-    def test_stm_recovers_perturbation(
-        self, spice_eph_system, spice_manager, reference_epoch
-    ):
+    def test_stm_recovers_perturbation(self, spice_eph_system, spice_manager, reference_epoch):
         """STM 乘小扰动应近似实际传播的偏差。
 
         δx(tf) ≈ Φ(tf, t0) · δx(t0)。这是 STM 的定义，直接验证。
@@ -123,9 +119,7 @@ class TestForceModelSTMConsistency:
 
         state0 = np.array([300000.0, 0.0, 0.0, 0.0, 1.0, 0.0])
         t_span = (reference_et, reference_et + 1800.0)
-        fm = ForceModel(
-            system, forces=[PointMassGravity("EARTH"), ThirdBodyGravity("MOON")]
-        )
+        fm = ForceModel(system, forces=[PointMassGravity("EARTH"), ThirdBodyGravity("MOON")])
 
         # 基准传播
         base = fm.propagate(state0, t_span, with_stm=True)
@@ -169,6 +163,7 @@ class _NoJacobianTestForce(PhysicalModel):
     def compute_acceleration(self, t, state, system):
         r = np.asarray(state, dtype=float)[:3]
         return -self._k * r
+
     # compute_jacobian 继承基类默认返回 None
 
 
@@ -190,8 +185,13 @@ class TestFiniteDiffJacobianFallback:
         fm_fd = ForceModel(system, forces=[_NoJacobianTestForce(k=1.0)])
         res_f = fm_fd.propagate(state0, t_span, with_stm=True)
 
-        assert_allclose(res_a["stm"][-1], res_f["stm"][-1], atol=1e-6, rtol=1e-6,
-                        err_msg="有限差分雅可比与解析雅可比的 STM 偏差过大")
+        assert_allclose(
+            res_a["stm"][-1],
+            res_f["stm"][-1],
+            atol=1e-6,
+            rtol=1e-6,
+            err_msg="有限差分雅可比与解析雅可比的 STM 偏差过大",
+        )
 
 
 # =============================================================================
@@ -208,9 +208,7 @@ def body_fixed_system(spice_kernel_path):
     spice.load_kernel(spice_kernel_path)
     bf_kernels = load_body_fixed_kernels(spice)
     try:
-        system = EphemerisSystem(
-            bodies=["EARTH", "MOON", "SUN"], spice=spice, origin="EARTH"
-        )
+        system = EphemerisSystem(bodies=["EARTH", "MOON", "SUN"], spice=spice, origin="EARTH")
         system.coordinate_system = CoordinateSystem(
             axes=ICRSAxes(),
             origin=CelestialBodyOrigin(body="EARTH", spice=spice),
@@ -271,9 +269,7 @@ class TestGravityFieldSTM:
         rel_err = np.linalg.norm(predicted - actual) / np.linalg.norm(actual)
         assert rel_err < 1e-3, f"球谐 STM 预测偏差过大: rel_err={rel_err:.2e}"
 
-    def test_j2_stm_matches_point_mass_plus_perturbation(
-        self, body_fixed_system, reference_epoch
-    ):
+    def test_j2_stm_matches_point_mass_plus_perturbation(self, body_fixed_system, reference_epoch):
         """地球 J2 的 STM 应接近纯点质量 STM（J2 是小摄动）。
 
         两者 STM 应在 1e-3 量级一致（J2 对 1 小时弧段的 STM 贡献很小）。

@@ -8,7 +8,6 @@ from __future__ import annotations
 import erfa
 import numpy as np
 import pytest
-
 from e2m2e.core.gmat_time import J2000_MJD
 from e2m2e.core.iau_2006 import (
     iau2000eq_matrix,

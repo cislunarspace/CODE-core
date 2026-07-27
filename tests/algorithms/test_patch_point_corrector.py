@@ -13,15 +13,13 @@ import pytest
 
 from e2m2e.algorithms import ephemeris_correction
 from e2m2e.algorithms.ephemeris_correction import (
+    EphemerisCorrectionResult,
+    PatchPointCorrector,
+    UnsupportedCorrectorMethodError,
     correct_ephemeris_patch_points,
     homotopy,
     standard,
     two_level,
-)
-from e2m2e.algorithms.ephemeris_correction import (
-    EphemerisCorrectionResult,
-    PatchPointCorrector,
-    UnsupportedCorrectorMethodError,
 )
 
 # ---------------------------------------------------------------------------

@@ -32,9 +32,10 @@
 //! - 校正器 `q_i` —— 式 2.56（`L²` 展开，`q_i = Σ_k c_k c_{i-k}`，其中 `c`
 //!   为式 2.39 的 Adams-Moulton 系数）；
 //! - 预测器 `λ_i` —— 式 2.60（`EL²` 展开），满足 `λ_i = Σ_{k≤i} q_k`。
+//!
 //! 与 Montenbruck & Gill, *Satellite Orbits* §3.3 及 Henrici,
 //! *Discrete Variable Methods in ODEs* 交叉核对。4 阶截断（λ_0..λ_2 / q_0..q_2）
-//! 展开后即为教科书坐标权重：预测器 [13/12, −2/12, 1/12]、校正器 [1/12, 10/12, 1/12]。
+//! 展开后即为教科书坐标权重：预测器 `[13/12, −2/12, 1/12]`、校正器 `[1/12, 10/12, 1/12]`。
 //!
 //! ⚠️ Berry 的 PDF（网页提取）将若干 `q_i` 误读为 0 —— q_5（实际 −1/240）
 //! 与 q_7（实际 −19/6048）。本文所有 q_i 均通过卷积 `q_i = Σ_k c_k c_{i-k}`
@@ -91,18 +92,16 @@ fn backward_diff(samples: &[Vec<f64>], j: usize) -> Vec<f64> {
     result
 }
 
+/// 多步法单步返回类型：`(新状态, 误差估计, 滚动后的历史缓冲)`。
+pub type StepResult<T> = Result<(Vec<f64>, f64, Vec<Vec<f64>>), T>;
+
 /// 一次 Störmer-Cowell 8 阶 PECE 步。
 ///
 /// `history` = `[x_{n−1}, x_n, a_{n−7}, ..., a_n]`（10 个位置维度的向量）。
 /// `accel` 计算 `a(t, x)`。返回 `(x_{n+1}, milne_error, new_history)`，
 /// 其中 `new_history = [x_n, x_{n+1}, a_{n−6}, ..., a_n, a_{n+1}]`，
 /// 误差为 `‖x_corrector − x_predictor‖`（Milne 风格局部估计）。
-pub fn cowell_step<F, E>(
-    t: f64,
-    h: f64,
-    history: &[Vec<f64>],
-    accel: F,
-) -> Result<(Vec<f64>, f64, Vec<Vec<f64>>), E>
+pub fn cowell_step<F, E>(t: f64, h: f64, history: &[Vec<f64>], accel: F) -> StepResult<E>
 where
     F: Fn(f64, &[f64]) -> Result<Vec<f64>, E>,
 {
@@ -119,13 +118,13 @@ where
     for l in 0..n {
         x_pred[l] = 2.0 * x_n[l] - x_prev[l];
     }
-    for j in 0..COWELL_N_ACCEL {
-        if PRED_LAMBDA[j] == 0.0 {
+    for (j, &lambda_j) in PRED_LAMBDA.iter().enumerate().take(COWELL_N_ACCEL) {
+        if lambda_j == 0.0 {
             continue;
         }
         let dj = backward_diff(a_stored, j);
         for l in 0..n {
-            x_pred[l] += h2 * PRED_LAMBDA[j] * dj[l];
+            x_pred[l] += h2 * lambda_j * dj[l];
         }
     }
 
@@ -140,13 +139,13 @@ where
     for l in 0..n {
         x_corr[l] = 2.0 * x_n[l] - x_prev[l];
     }
-    for j in 0..COWELL_N_ACCEL {
-        if CORR_Q[j] == 0.0 {
+    for (j, &q_j) in CORR_Q.iter().enumerate().take(COWELL_N_ACCEL) {
+        if q_j == 0.0 {
             continue;
         }
         let dj = backward_diff(&corr_samples, j);
         for l in 0..n {
-            x_corr[l] += h2 * CORR_Q[j] * dj[l];
+            x_corr[l] += h2 * q_j * dj[l];
         }
     }
 
@@ -201,9 +200,8 @@ mod tests {
     #[test]
     fn harmonic_oscillator_one_step_is_eighth_order_accurate() {
         // x'' = -x, x(0)=1, x'(0)=0 → x(t)=cos t, a(t) = -cos t.
-        let accel = |_t: f64, x: &[f64]| -> Result<Vec<f64>, std::convert::Infallible> {
-            Ok(vec![-x[0]])
-        };
+        let accel =
+            |_t: f64, x: &[f64]| -> Result<Vec<f64>, std::convert::Infallible> { Ok(vec![-x[0]]) };
 
         let h: f64 = 1e-3;
         // History at t = 0: [x(-h), x(0), a(-7h), ..., a(-h), a(0)].

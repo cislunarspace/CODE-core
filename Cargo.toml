@@ -1,3 +1,17 @@
 [workspace]
-members = ["crates/e2m2e-integrators"]
 resolver = "2"
+members = [
+    "crates/e2m2e-integrators",
+    "crates/e2m2e-propagation",
+    "crates/e2m2e-forces",
+    "crates/e2m2e-spice",
+]
+
+[workspace.package]
+version = "5.3.0"
+edition = "2021"
+
+[workspace.dependencies]
+pyo3 = { version = "0.24", features = ["extension-module", "abi3-py310"] }
+cspice = "0.1"
+cspice-sys = "1.0"

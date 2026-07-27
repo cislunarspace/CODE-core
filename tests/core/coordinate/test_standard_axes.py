@@ -4,7 +4,6 @@
 """
 
 import numpy as np
-
 from e2m2e.core.standard_axes import IAU2000EqAxes, ICRSAxes
 
 

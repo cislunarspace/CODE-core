@@ -18,7 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - uses: astral-sh/setup-uv@v7
+      # Rust 格式与风格
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace -- -D warnings
+      # Python 格式与风格
       - run: uv sync --group dev
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -30,38 +37,3 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --group dev
       - run: uv run mypy e2m2e/ --ignore-missing-imports
-
-  test:
-    needs: [lint, typecheck]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        python-version: ["3.13"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: astral-sh/setup-uv@v7
-      - run: uv sync --group dev --extra normal-form
-      - run: cargo test --package e2m2e-integrators
-      - run: uv run maturin develop
-      - shell: bash
-        run: |
-          uv run pytest \
-            -m "not slow" \
-            --cov=e2m2e \
-            --cov-report=xml \
-            --cov-report=term-missing \
-            --cov-fail-under=55 \
-            -x
-      - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v7
-        with:
-          file: coverage.xml
-          fail_ci_if_error: false

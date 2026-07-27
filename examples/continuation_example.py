@@ -5,8 +5,6 @@
 展示如何使用自然延拓和伪弧长延拓生成 DRO 轨道族。
 """
 
-import numpy as np
-
 from e2m2e.algorithms import Continuation, DifferentialCorrection
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
 
@@ -70,6 +68,7 @@ def main():
     except Exception as e:
         print(f"\n错误: {e}")
         import traceback
+
         traceback.print_exc()
 
     print("\n" + "=" * 60)

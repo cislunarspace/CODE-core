@@ -37,10 +37,11 @@ __author__ = "天疆说"
 __email__ = "ouyangjiahong22@nudt.edu.cn"
 
 # 导入子包
-from . import algorithms, core, mbse, transfer, visualization
+from . import algorithms, core, dynamics, mbse, transfer, visualization
 
 __all__ = [
     "core",
+    "dynamics",
     "algorithms",
     "visualization",
     "transfer",
