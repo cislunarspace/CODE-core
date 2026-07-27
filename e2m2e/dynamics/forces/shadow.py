@@ -17,7 +17,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from ..constants import R_EARTH
+from e2m2e.constants import R_EARTH
+
 from .physical_model import require_inertial_frame
 
 if TYPE_CHECKING:

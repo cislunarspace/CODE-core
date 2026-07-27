@@ -7,7 +7,8 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from ..constants import R_EARTH
+from e2m2e.constants import R_EARTH
+
 from ..coordinate_system import CoordinateSystem
 from ..standard_axes import ICRSAxes, ITRFSpiceAxes
 from ..standard_origins import CelestialBodyOrigin
