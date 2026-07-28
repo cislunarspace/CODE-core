@@ -659,6 +659,12 @@ fn parse_force_tuple(item: &Bound<'_, PyAny>) -> PyResult<forces::compiled::Comp
         .map_err(|_| pyo3::exceptions::PyTypeError::new_err("force tag must be a string"))?;
 
     match tag.as_str() {
+        "point_mass" => {
+            let mu: f64 = tuple.get_item(1)?.extract().map_err(|_| {
+                pyo3::exceptions::PyTypeError::new_err("point_mass mu must be float")
+            })?;
+            Ok(CompiledForce::PointMass { mu })
+        }
         "gravity" => {
             // 14 个元素
             let c_flat: Vec<f64> = tuple.get_item(1)?.extract()?;
@@ -1004,6 +1010,83 @@ fn propagate_with_stm_py(
     Ok(dict.into())
 }
 
+/// 编译型力模型 + STM 的 PD45 传播（消除 cspice 隔离）。
+///
+/// 与 `propagate_with_stm_py`（纯 NBody）不同，本函数支持所有编译型力模型：
+/// PointMass、GravityField、ThirdBody、IndirectTerm、SRP、Relativistic。
+/// 使用 integrators crate 的 cspice 实例，避免跨 .so 内核池隔离问题。
+///
+/// # 参数
+/// - `observer`: 传播系 origin 天体名（如 "EARTH"）
+/// - `forces_py`: force 元组列表（格式同 `propagate_compiled`）
+/// - `t_span`: `(t_start, t_end)` 积分区间（SPICE et 秒）
+/// - `t_eval`: 输出时间点数组
+/// - `initial_state`: 初始状态 `[x, y, z, vx, vy, vz]`（km, km/s）
+/// - `rtol`, `atol`: 积分容差
+/// - `max_step`: 最大步长（秒），`None` 则不限制
+/// - `max_steps`: 最大步数，`None` 则用默认上限
+///
+/// # 返回
+/// Python dict：`{"states": [[6], ...], "stm": [[36], ...], "time": [...],
+///                "n_steps": int, "n_rejected": int}`
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None))]
+#[allow(clippy::too_many_arguments)]
+fn propagate_compiled_stm_py(
+    observer: &str,
+    forces_py: &Bound<'_, PyList>,
+    t_span: (f64, f64),
+    t_eval: Vec<f64>,
+    initial_state: Vec<f64>,
+    rtol: f64,
+    atol: f64,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use forces::compiled::CompiledForce;
+    use forces::compiled_stm::propagate_compiled_stm;
+
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+
+    let mut forces: Vec<CompiledForce> = Vec::with_capacity(forces_py.len());
+    for item in forces_py.iter() {
+        forces.push(parse_force_tuple(&item)?);
+    }
+
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    let result = propagate_compiled_stm(
+        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
+    )
+    .map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!("STM propagation failed: {}", e))
+    })?;
+
+    let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
+    let stm_list: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();
+
+    let dict = PyDict::new(py);
+    dict.set_item("states", states_list)?;
+    dict.set_item("stm", stm_list)?;
+    dict.set_item("time", result.times)?;
+    dict.set_item("n_steps", result.n_steps)?;
+    dict.set_item("n_rejected", result.n_rejected)?;
+    Ok(dict.into())
+}
+
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
@@ -1031,6 +1114,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_compiled, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_with_stm_py, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;

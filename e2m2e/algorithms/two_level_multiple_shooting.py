@@ -307,6 +307,11 @@ class TwoLevelMultipleShooting:
                     residual_history,
                 )
 
+            if verbose:
+                iterator.set_postfix_str(
+                    f"maxP={position_residual:.2e} maxV={velocity_residual:.3e}"
+                )
+
         status = (
             TwoLevelMultipleShootingStatus.LEVEL1_FAILED
             if had_level1_failure
@@ -435,8 +440,9 @@ class TwoLevelMultipleShooting:
         """执行 Level 2：联合修正内部节点的位置和时间使速度连续。
 
         对每个内部节点构建速度连续性约束和雅可比矩阵，通过最小二乘
-        求解修正量，并应用全步长修正。若全步长导致时间节点逆序，
-        则使用几何衰减回溯保证时间单调递增。
+        求解修正量。回溯线搜索同时要求时间节点单调递增且最大速度残差
+        不增大：在长弧段转移上，裸全步长可能落到二次模型失效区，反而
+        放大速度不连续，故按几何衰减折半直到速度真正下降。
 
         Args:
             t_patch: 时间节点数组 (N,)
@@ -451,6 +457,10 @@ class TwoLevelMultipleShooting:
         n_internal = n_points - 2
         if n_internal <= 0:
             return t_next, states
+
+        # 回溯接受准则的基线：当前最大速度残差（仅内部节点）
+        _, velocity_baseline = self._compute_residuals(t_next, states)
+        max_vel_before = float(velocity_baseline.max()) if velocity_baseline.size else 0.0
 
         jacobian = np.zeros((3 * n_internal, 4 * n_internal))
         residuals = np.zeros(3 * n_internal)
@@ -504,8 +514,11 @@ class TwoLevelMultipleShooting:
                     jacobian[row : row + 3, column + 3] = time_block
 
         delta, _, _, _ = np.linalg.lstsq(jacobian, -residuals, rcond=None)
-        # 应用最小二乘修正量；优先全步长，若时间节点逆序则逐步折半。
-        for damping in (1.0, 0.5, 0.25, 0.125, 0.0625):
+        # 回溯线搜索：从全步长起不断折半，直到时间节点严格递增且最大速度
+        # 残差真正下降才接受。长弧段转移上裸全步长会越过最优点放大速度不连续，
+        # 必须折半到线性化有效的小步长；下降即返回，避免无效的全量残差重算。
+        damping = 1.0
+        for _ in range(12):
             candidate_t = t_next.copy()
             candidate_states = states.copy()
             for internal_index in range(1, n_points - 1):
@@ -516,10 +529,14 @@ class TwoLevelMultipleShooting:
                 candidate_t[internal_index] = (
                     candidate_t[internal_index] + damping * delta[column + 3]
                 )
-            # 时间节点必须严格递增，否则继续折半
             if np.any(np.diff(candidate_t) <= 0):
+                damping *= 0.5
                 continue
-            return candidate_t, candidate_states
+            _, velocity_after = self._compute_residuals(candidate_t, candidate_states)
+            max_vel_after = float(velocity_after.max()) if velocity_after.size else 0.0
+            if max_vel_after < max_vel_before:
+                return candidate_t, candidate_states
+            damping *= 0.5
         return t_next, states
 
     def _compute_residuals(

@@ -15,6 +15,9 @@ use e2m2e_spice::spk_accel;
 /// 每个 variant 持有该 force 的全部配置。Python 侧用元组序列化（见
 /// `force_from_tuple`）。
 pub enum CompiledForce {
+    PointMass {
+        mu: f64,
+    },
     GravityField {
         c_flat: Vec<f64>,
         s_flat: Vec<f64>,
@@ -70,6 +73,17 @@ impl CompiledForce {
         observer: &str,
     ) -> Result<[f64; 3], String> {
         match self {
+            Self::PointMass { mu } => {
+                let r = [state[0], state[1], state[2]];
+                let r_norm_sq = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
+                let r_norm = r_norm_sq.sqrt().max(1e-6);
+                let inv_r3 = 1.0 / (r_norm * r_norm * r_norm);
+                Ok([
+                    -mu * r[0] * inv_r3,
+                    -mu * r[1] * inv_r3,
+                    -mu * r[2] * inv_r3,
+                ])
+            }
             Self::GravityField {
                 c_flat,
                 s_flat,
@@ -175,4 +189,126 @@ pub fn compute_total_acceleration(
         total[2] += a[2];
     }
     Ok(total)
+}
+
+/// 单个 force 是否支持解析/Rust FD 雅可比。
+pub fn supports_jacobian(force: &CompiledForce) -> bool {
+    matches!(
+        force,
+        CompiledForce::PointMass { .. }
+            | CompiledForce::GravityField { .. }
+            | CompiledForce::ThirdBody { .. }
+            | CompiledForce::IndirectTerm { .. }
+    )
+}
+
+/// 计算单个 force 的加速度 + 雅可比（3×3）。
+///
+/// - PointMass：解析 `-μ(I/r³ − 3rrᵀ/r⁵)`
+/// - GravityField：body-fixed 系 FD + R·J·Rᵀ（需 SPICE）
+/// - ThirdBody：spk_accel 解析
+/// - IndirectTerm：零矩阵（不依赖航天器位置）
+/// - SRP/Relativistic：返回 Err
+pub fn acceleration_and_jacobian(
+    force: &CompiledForce,
+    et: f64,
+    state: &[f64; 6],
+    observer: &str,
+) -> Result<([f64; 3], [[f64; 3]; 3]), String> {
+    match force {
+        CompiledForce::PointMass { mu } => {
+            let r = [state[0], state[1], state[2]];
+            let r_norm_sq = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
+            let r_norm = r_norm_sq.sqrt().max(1e-6);
+            let inv_r3 = 1.0 / (r_norm * r_norm * r_norm);
+            let inv_r5 = inv_r3 / (r_norm * r_norm);
+            let acc = [
+                -mu * r[0] * inv_r3,
+                -mu * r[1] * inv_r3,
+                -mu * r[2] * inv_r3,
+            ];
+            let mut jac = [[0.0_f64; 3]; 3];
+            for i in 0..3 {
+                for j in 0..3 {
+                    let delta = if i == j { 1.0 } else { 0.0 };
+                    jac[i][j] = -mu * (delta * inv_r3 - 3.0 * r[i] * r[j] * inv_r5);
+                }
+            }
+            Ok((acc, jac))
+        }
+        CompiledForce::GravityField {
+            c_flat,
+            s_flat,
+            mu,
+            radius,
+            degree,
+            order,
+            input_frame,
+            propagation_frame,
+            body,
+            propagation_origin,
+            tide_mode,
+            k_love_flat,
+            k_plus_flat,
+        } => {
+            let r_sc = [state[0], state[1], state[2]];
+            let tide = TideConfig {
+                mode: tide_mode.clone(),
+                k_love_flat: k_love_flat.clone(),
+                k_plus_flat: k_plus_flat.clone(),
+            };
+            let ctx = gravity_field::GravityFieldContext::build(
+                et,
+                c_flat,
+                s_flat,
+                *mu,
+                *radius,
+                *degree,
+                *order,
+                input_frame,
+                propagation_frame,
+                body,
+                propagation_origin,
+                &tide,
+            )
+            .map_err(|e| format!("{:?}", e))?;
+            let acc = ctx.accel(&r_sc).map_err(|e| format!("{:?}", e))?;
+            let jac = ctx.jacobian_fd(&r_sc).map_err(|e| format!("{:?}", e))?;
+            Ok((acc, jac))
+        }
+        CompiledForce::ThirdBody { body, mu } => {
+            let sc_pos = [state[0], state[1], state[2]];
+            let (acc, jac) = spk_accel::third_body_acceleration_and_jacobian(
+                et, body, observer, &sc_pos, *mu, 1e-6,
+            )
+            .map_err(|e| format!("{:?}", e))?;
+            Ok((acc, jac))
+        }
+        CompiledForce::IndirectTerm { .. } => {
+            let acc = force.acceleration(et, state, observer)?;
+            Ok((acc, [[0.0; 3]; 3]))
+        }
+        _ => Err(format!("Jacobian not supported for this force type")),
+    }
+}
+
+/// 计算所有 force 的总加速度 + 总雅可比（逐力叠加）。
+pub fn compute_total_acceleration_and_jacobian(
+    forces: &[CompiledForce],
+    et: f64,
+    state: &[f64; 6],
+    observer: &str,
+) -> Result<([f64; 3], [[f64; 3]; 3]), String> {
+    let mut total_acc = [0.0_f64; 3];
+    let mut total_jac = [[0.0_f64; 3]; 3];
+    for force in forces {
+        let (acc, jac) = acceleration_and_jacobian(force, et, state, observer)?;
+        for i in 0..3 {
+            total_acc[i] += acc[i];
+            for j in 0..3 {
+                total_jac[i][j] += jac[i][j];
+            }
+        }
+    }
+    Ok((total_acc, total_jac))
 }

@@ -125,7 +125,7 @@ pub fn compute_jacobian_A(jac_da_dr: &[[f64; 3]; 3]) -> [[f64; 6]; 6] {
 ///
 /// # 返回
 /// dΦ/dt（展平为 36 维）
-fn stm_derivative(stm: &[f64; 36], jac_da_dr: &[[f64; 3]; 3]) -> [f64; 36] {
+pub fn stm_derivative(stm: &[f64; 36], jac_da_dr: &[[f64; 3]; 3]) -> [f64; 36] {
     let mut dstm = [0.0_f64; 36];
     // dΦ/dt = A · Φ
     // A = [0, I; U, 0]，其中 U = ∂a/∂r

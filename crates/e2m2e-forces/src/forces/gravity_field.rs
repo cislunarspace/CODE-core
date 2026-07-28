@@ -247,3 +247,197 @@ fn input_frame_for_body(body: &str) -> &'static str {
         _ => "IAU_EARTH", // fallback，一般不会走到
     }
 }
+
+// ── 3x3 矩阵乘法辅助 ──────────────────────────────────────────────────────
+
+/// 3x3 矩阵乘法：C = A @ B。
+fn mat3_mul(a: &[[f64; 3]; 3], b: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
+    let mut c = [[0.0_f64; 3]; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            c[i][j] = a[i][0] * b[0][j] + a[i][1] * b[1][j] + a[i][2] * b[2][j];
+        }
+    }
+    c
+}
+
+/// 3x3 矩阵转置。
+fn mat3_transpose(a: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
+    let mut t = [[0.0_f64; 3]; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            t[i][j] = a[j][i];
+        }
+    }
+    t
+}
+
+// ── GravityFieldContext：SPICE 预提取 + 状态无关缓存 ─────────────────────
+
+/// 重力场计算上下文：积分前一次性提取 SPICE 数据，积分循环内零 FFI 调用。
+///
+/// 与 `gravity_field_acceleration` 物理等价，但把与航天器状态无关的量
+/// （坐标旋转、天体位置、潮汐有效系数）缓存到结构体中。积分步内只做
+/// 内存查表 + `spherical_harmonic_accel`，不碰 SPICE，Rayon 并行安全。
+pub struct GravityFieldContext {
+    /// 旋转矩阵 R = pxform(input_frame, propagation_frame)
+    rotation: [[f64; 3]; 3],
+    /// propagation origin 在 SSB 的位置偏移（r_body_icrf = r_sc + offset）
+    origin_offset: [f64; 3],
+    /// 有效球谐系数 C（含潮汐修正）
+    c_eff: Vec<f64>,
+    /// 有效球谐系数 S（含潮汐修正）
+    s_eff: Vec<f64>,
+    mu: f64,
+    radius: f64,
+    degree: usize,
+    order: usize,
+}
+
+impl GravityFieldContext {
+    /// 一次性查询 SPICE，构建上下文。
+    ///
+    /// 在积分循环外调用一次，返回的 context 可在积分循环内反复使用。
+    pub fn build(
+        et: f64,
+        c_flat: &[f64],
+        s_flat: &[f64],
+        mu: f64,
+        radius: f64,
+        degree: usize,
+        order: usize,
+        input_frame: &str,
+        propagation_frame: &str,
+        body: &str,
+        propagation_origin: &str,
+        tide: &TideConfig,
+    ) -> Result<Self, SpiceFfiError> {
+        // 1. 查天体位置（平移偏移）
+        let (prop_origin_state_ssb, _) = e2m2e_spice::spice_ffi::spkezr(
+            propagation_origin,
+            et,
+            propagation_frame,
+            "NONE",
+            "SOLAR SYSTEM BARYCENTER",
+        )?;
+        let origin_offset = if body == propagation_origin {
+            [0.0; 3]
+        } else {
+            let (body_state_ssb, _) = e2m2e_spice::spice_ffi::spkezr(
+                body,
+                et,
+                propagation_frame,
+                "NONE",
+                "SOLAR SYSTEM BARYCENTER",
+            )?;
+            [
+                prop_origin_state_ssb[0] - body_state_ssb[0],
+                prop_origin_state_ssb[1] - body_state_ssb[1],
+                prop_origin_state_ssb[2] - body_state_ssb[2],
+            ]
+        };
+
+        // 2. 查旋转矩阵
+        let rotation = e2m2e_spice::spice_ffi::pxform(input_frame, propagation_frame, et)?;
+
+        // 3. 有效系数（含潮汐）
+        let (c_eff, s_eff) = if tide.mode == TideMode::None {
+            (c_flat.to_vec(), s_flat.to_vec())
+        } else {
+            effective_coefficients(et, body, c_flat, s_flat, mu, radius, tide)?
+        };
+
+        Ok(Self {
+            rotation,
+            origin_offset,
+            c_eff,
+            s_eff,
+            mu,
+            radius,
+            degree,
+            order,
+        })
+    }
+
+    /// 计算加速度（propagation frame），与 `gravity_field_acceleration` 逐位等价。
+    pub fn accel(&self, r_sc: &[f64; 3]) -> Result<[f64; 3], SpiceFfiError> {
+        // 平移：propagation origin -> gravity body
+        let r_body_icrf = [
+            r_sc[0] + self.origin_offset[0],
+            r_sc[1] + self.origin_offset[1],
+            r_sc[2] + self.origin_offset[2],
+        ];
+        // 旋转：propagation frame -> input frame（body-fixed）
+        let r_input = e2m2e_spice::spice_ffi::mat3_t_mul_vec(&self.rotation, &r_body_icrf);
+
+        // 球谐加速度（body-fixed 系）
+        let a_input = spherical_harmonic::spherical_harmonic_accel(
+            &r_input,
+            &self.c_eff,
+            &self.s_eff,
+            self.mu,
+            self.radius,
+            self.degree,
+            self.order,
+        );
+        let a_input_arr = [a_input[0], a_input[1], a_input[2]];
+
+        // 反向旋转：input frame -> propagation frame
+        let a_prop = e2m2e_spice::spice_ffi::mat3_mul_vec(&self.rotation, &a_input_arr);
+        Ok(a_prop)
+    }
+
+    /// 有限差分雅可比 ∂a_prop/∂r_sc（3×3），body-fixed 系差分 + 旋转 sandwich。
+    ///
+    /// 步长与 Python `_finite_diff_jacobian`（`sqrt(eps) * |r|`）一致。
+    /// 潮汐系数随 et 变化但不依赖 r_sc，FD 自动包含其对雅可比的全部贡献。
+    pub fn jacobian_fd(&self, r_sc: &[f64; 3]) -> Result<[[f64; 3]; 3], SpiceFfiError> {
+        // 变换到 body-fixed 系（与 accel 一致）
+        let r_body_icrf = [
+            r_sc[0] + self.origin_offset[0],
+            r_sc[1] + self.origin_offset[1],
+            r_sc[2] + self.origin_offset[2],
+        ];
+        let r_input = e2m2e_spice::spice_ffi::mat3_t_mul_vec(&self.rotation, &r_body_icrf);
+
+        let r_norm =
+            (r_input[0] * r_input[0] + r_input[1] * r_input[1] + r_input[2] * r_input[2]).sqrt();
+        let h = (f64::EPSILON.sqrt() * r_norm).max(1e-6);
+
+        // body-fixed 系下 6 次扰动差分
+        let mut j_input = [[0.0_f64; 3]; 3];
+        for dim in 0..3 {
+            let mut r_plus = r_input;
+            let mut r_minus = r_input;
+            r_plus[dim] += h;
+            r_minus[dim] -= h;
+            let a_plus = spherical_harmonic::spherical_harmonic_accel(
+                &r_plus,
+                &self.c_eff,
+                &self.s_eff,
+                self.mu,
+                self.radius,
+                self.degree,
+                self.order,
+            );
+            let a_minus = spherical_harmonic::spherical_harmonic_accel(
+                &r_minus,
+                &self.c_eff,
+                &self.s_eff,
+                self.mu,
+                self.radius,
+                self.degree,
+                self.order,
+            );
+            for i in 0..3 {
+                j_input[i][dim] = (a_plus[i] - a_minus[i]) / (2.0 * h);
+            }
+        }
+
+        // 链式法则：J_prop = R @ J_input @ R^T
+        let rt = mat3_transpose(&self.rotation);
+        let j_mid = mat3_mul(&j_input, &rt);
+        let j_prop = mat3_mul(&self.rotation, &j_mid);
+        Ok(j_prop)
+    }
+}

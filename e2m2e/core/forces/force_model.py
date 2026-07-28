@@ -300,6 +300,9 @@ class ForceModel:
 
     # ── Rust propagate_compiled 快速路径（spice feature 启用时） ──
 
+    # 不支持雅可比的力模型类型（SRP、相对论修正），STM 路径需排除。
+    _STM_UNSUPPORTED_TYPES = ("SolarRadiationPressure", "RelativisticCorrection")
+
     def _can_use_rust_path(self) -> bool:
         """检测所有 force 是否支持 Rust 编译 + spice feature 是否启用。
 
@@ -314,6 +317,28 @@ class ForceModel:
             if not entry.enabled:
                 continue
             if entry.force.to_rust_spec(self.system) is None:
+                return False
+        return True
+
+    def _can_use_rust_stm_path(self) -> bool:
+        """检测是否可用 Rust compiled STM 路径。
+
+        条件：
+        1. ``propagate_compiled_stm_py`` 可 import（spice feature 启用）
+        2. 所有启用的 force 都有 ``to_rust_spec``
+        3. 无 SRP / Relativistic 等不支持雅可比的力模型
+        """
+        try:
+            from e2m2e._integrators import propagate_compiled_stm_py  # noqa: F401
+        except ImportError:
+            return False
+        for entry in self._entries:
+            if not entry.enabled:
+                continue
+            if entry.force.to_rust_spec(self.system) is None:
+                return False
+            type_name = type(entry.force).__name__
+            if type_name in self._STM_UNSUPPORTED_TYPES:
                 return False
         return True
 
@@ -365,6 +390,61 @@ class ForceModel:
         return {
             "time": np.asarray(result["time"]),
             "states": np.asarray(result["states"]),
+            "terminal_event_index": None,
+            "n_steps": result["n_steps"],
+            "n_rejected": result["n_rejected"],
+        }
+
+    def _propagate_via_rust_stm(
+        self,
+        y0: npt.NDArray[np.floating],
+        t0: float,
+        tf: float,
+        t_eval: npt.ArrayLike,
+        tol: float,
+        max_steps: int,
+    ) -> dict[str, Any]:
+        """走 Rust propagate_compiled_stm_py（含 STM，消除 cspice 隔离）。
+
+        自动序列化所有 force，调 Rust STM 入口。返回格式与 Python propagate 一致。
+        """
+        from e2m2e._integrators import propagate_compiled_stm_py
+
+        forces_py = []
+        for entry in self._entries:
+            if not entry.enabled:
+                continue
+            spec = entry.force.to_rust_spec(self.system)
+            if spec is None:
+                raise RuntimeError(
+                    f"force {entry.force.__class__.__name__} lacks to_rust_spec; "
+                    "should be filtered by _can_use_rust_stm_path"
+                )
+            forces_py.append(spec)
+
+        observer = getattr(self.system, "origin", "EARTH")
+        t_eval_list = [float(x) for x in np.asarray(t_eval).flat]
+
+        result = propagate_compiled_stm_py(
+            observer,
+            forces_py,
+            (float(t0), float(tf)),
+            t_eval_list,
+            [float(x) for x in y0],
+            float(tol),
+            float(tol),
+            float(self.max_step),
+            int(max_steps),
+        )
+
+        states = np.asarray(result["states"])
+        stm_flat = np.asarray(result["stm"])
+        stm = stm_flat.reshape(-1, 6, 6)
+        self.last_trajectory = (np.asarray(result["time"]), states)
+        return {
+            "time": np.asarray(result["time"]),
+            "states": states,
+            "stm": stm,
             "terminal_event_index": None,
             "n_steps": result["n_steps"],
             "n_rejected": result["n_rejected"],
@@ -462,6 +542,12 @@ class ForceModel:
         # 满足时走零跨界 Rust 内循环（30 天 NRHO 9.6s vs Python 95s），否则回退。
         if not with_stm and not event_funcs and self._can_use_rust_path():
             return self._propagate_via_rust(y0, t0, tf, t_eval, tol, h, max_steps)
+
+        # ── Rust compiled STM 快速路径 ──
+        # 条件：with_stm、无 events、所有 force 支持 Jacobian。
+        # 消除 cspice 隔离：STM 传播在 integrators .so 内完成，共享内核池。
+        if with_stm and not event_funcs and self._can_use_rust_stm_path():
+            return self._propagate_via_rust_stm(y0, t0, tf, t_eval, tol, max_steps)
 
         # 循环开始前更新动态坐标系（用 6 维物理状态）
         if hasattr(self.system, "update_coordinate_systems"):
