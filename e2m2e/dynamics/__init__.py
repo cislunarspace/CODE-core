@@ -4,7 +4,6 @@
 
 子模块:
     propagation: 传播相关（动力学系统、轨道、积分）
-    forces: 力模型（引力场、第三体、SRP、STM）
     coord_trans: 坐标变换（Synodic↔J2000、ITRF、IAU）
     spice: SPICE 绑定（星历查询、内核管理）
 """
@@ -41,7 +40,6 @@ def __dir__() -> list[str]:
 __all__ = [
     # 子模块
     "propagation",
-    "forces",
     "coord_trans",
     "spice",
     # 延迟导入的符号
