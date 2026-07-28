@@ -9,6 +9,9 @@ use crate::forces::gravity_field::{self, TideConfig, TideMode};
 use crate::forces::relativistic;
 use crate::forces::srp;
 use crate::spk_accel;
+use e2m2e_forces::forces::gravity_field::{
+    GravityFieldContext, TideConfig as ForcesTideConfig, TideMode as ForcesTideMode,
+};
 
 /// 编译后的 force（enum，dispatch 用 match）。
 ///
@@ -253,23 +256,37 @@ pub fn acceleration_and_jacobian(
             k_love_flat,
             k_plus_flat,
         } => {
-            // 用有限差分计算雅可比（在传播系下做 FD，与 forces crate 的 body-fixed FD
-            // 精度相当，因为坐标变换是光滑旋转）
-            let acc = force.acceleration(et, state, observer)?;
-            let r_norm = (state[0] * state[0] + state[1] * state[1] + state[2] * state[2]).sqrt();
-            let h = (f64::EPSILON.sqrt() * r_norm).max(1e-6);
-            let mut jac = [[0.0_f64; 3]; 3];
-            for dim in 0..3 {
-                let mut state_p = *state;
-                let mut state_m = *state;
-                state_p[dim] += h;
-                state_m[dim] -= h;
-                let a_p = force.acceleration(et, &state_p, observer)?;
-                let a_m = force.acceleration(et, &state_m, observer)?;
-                for i in 0..3 {
-                    jac[i][dim] = (a_p[i] - a_m[i]) / (2.0 * h);
-                }
-            }
+            // 用 GravityFieldContext 做 body-fixed FD（与 forces crate 一致）。
+            // build() 时一次性查 SPICE（旋转矩阵 + 原点偏移 + 潮汐系数），
+            // jacobian_fd() 在 body-fixed 系做 FD，零额外 SPICE 调用。
+            let forces_tide_mode = match tide_mode {
+                TideMode::None => ForcesTideMode::None,
+                TideMode::Solid => ForcesTideMode::Solid,
+                TideMode::SolidAndPole => ForcesTideMode::SolidAndPole,
+            };
+            let tide = ForcesTideConfig {
+                mode: forces_tide_mode,
+                k_love_flat: k_love_flat.clone(),
+                k_plus_flat: k_plus_flat.clone(),
+            };
+            let ctx = GravityFieldContext::build(
+                et,
+                c_flat,
+                s_flat,
+                *mu,
+                *radius,
+                *degree,
+                *order,
+                input_frame,
+                propagation_frame,
+                body,
+                propagation_origin,
+                &tide,
+            )
+            .map_err(|e| format!("{:?}", e))?;
+            let r_sc = [state[0], state[1], state[2]];
+            let acc = ctx.accel(&r_sc).map_err(|e| format!("{:?}", e))?;
+            let jac = ctx.jacobian_fd(&r_sc).map_err(|e| format!("{:?}", e))?;
             Ok((acc, jac))
         }
         CompiledForce::ThirdBody { body, mu } => {
