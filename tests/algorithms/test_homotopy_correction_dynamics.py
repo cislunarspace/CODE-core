@@ -135,8 +135,13 @@ def test_lambda_weight_outside_unit_interval_raises(full_dynamics):
         )
 
 
-def test_homotopy_dynamics_keeps_propagate_working(fake_spice):
+def test_homotopy_dynamics_keeps_propagate_working(fake_spice, monkeypatch):
     """End-to-end: a short propagation through HomotopyEphemerisDynamics succeeds."""
+    # FakeSpice 的解析位置模型只有纯 Python 积分路径可见；Rust 快速路径
+    # （propagate_with_stm_py）直接查询进程内真实 SPICE 内核池，绕开 FakeSpice，
+    # 且在内核缺失时静默返回截断结果。本测试验证的是 lambda 插值语义，
+    # 固定走 Python 路径，与进程内是否加载过真实内核解耦。
+    monkeypatch.setattr("e2m2e.core.ephemeris_dynamics._HAS_RUST_STM", False)
     system = EphemerisSystem(
         bodies=["EARTH", "MOON", "SUN"],
         spice=fake_spice,

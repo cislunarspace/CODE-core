@@ -84,7 +84,7 @@ def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
 @pytest.fixture
 def earth_ephemeris_system(spice_kernel_path):
     """Earth-centered J2000 ephemeris system for relativistic tests."""
-    from conftest import load_body_fixed_kernels, unload_kernels
+    from kernel_helpers import load_body_fixed_kernels, unload_kernels
 
     spice = SPICEManager()
     spice.load_kernel(spice_kernel_path)

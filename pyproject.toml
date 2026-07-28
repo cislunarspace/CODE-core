@@ -71,6 +71,8 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# 让 tests/kernel_helpers.py 在 xdist worker 中可导入
+pythonpath = ["tests"]
 
 [tool.coverage.run]
 source = ["e2m2e"]
@@ -84,6 +86,7 @@ fail_under = 55
 dev = [
     "pytest>=9.0.3",
     "pytest-cov>=4.0",
+    "pytest-xdist>=3.0",
     "ruff>=0.1",
     "mypy",
     "maturin>=1.0",

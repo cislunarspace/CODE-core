@@ -19,7 +19,7 @@ _MU_EARTH = 398600.4415  # km³/s²
 @pytest.fixture
 def leo_system(spice_kernel_path):
     """LEO 传播用的 EphemerisSystem（ICRF + 地球中心）。"""
-    from conftest import load_body_fixed_kernels, unload_kernels
+    from kernel_helpers import load_body_fixed_kernels, unload_kernels
 
     spice = SPICEManager()
     spice.load_kernel(spice_kernel_path)

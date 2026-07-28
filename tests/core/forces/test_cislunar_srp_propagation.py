@@ -26,7 +26,7 @@ _EARTH_R_KM = 6378.137
 @pytest.fixture
 def earth_icrf_system(spice_kernel_path):
     """地球中心 ICRF 传播系统。"""
-    from conftest import load_body_fixed_kernels, unload_kernels
+    from kernel_helpers import load_body_fixed_kernels, unload_kernels
 
     spice = SPICEManager()
     spice.load_kernel(spice_kernel_path)

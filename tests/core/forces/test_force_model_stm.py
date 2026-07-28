@@ -200,7 +200,7 @@ class TestFiniteDiffJacobianFallback:
 @pytest.fixture
 def body_fixed_system(spice_kernel_path):
     """加载 body-fixed 内核的 ICRS 系统（GravityField 需要 ITRF93/MOON_PA）。"""
-    from conftest import load_body_fixed_kernels, unload_kernels
+    from kernel_helpers import load_body_fixed_kernels, unload_kernels
 
     from e2m2e.core.spice import SPICEManager
 
