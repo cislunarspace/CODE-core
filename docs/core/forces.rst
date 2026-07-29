@@ -14,11 +14,24 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
 
 支持力模型类型
 --------------
+
+.. list-table::
+   :header-rows: 1
+
    * - 类型
      - 说明
      - 配置 type 名
+   * - PointMassGravity
+     - 中心天体点质量引力
+     - ``PointMassGravity``
+   * - ThirdBodyGravity
+     - 第三体引力摄动（含间接项）
+     - ``ThirdBodyGravity``
+   * - IndirectTerm
+     - 单独的间接项修正
+     - ``IndirectTerm``
    * - GravityField
-     - 球谐重力场（支持 EGM96 及自定义 .gfc）
+     - 球谐重力场（天体无关，支持 EGM96/GRGM900C 及自定义 .gfc/.cof）
      - ``GravityField``
    * - DragModel
      - 大气阻力（依赖注入大气密度模型）
@@ -29,6 +42,92 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
    * - FiniteBurn
      - 连续推力（封闭 DSL：constant/pulse 推力 + fixed 方向）
      - ``FiniteBurn``
+   * - RelativisticCorrection
+     - 后牛顿相对论修正（Schwarzschild / Lense-Thirring / de Sitter）
+     - ``RelativisticCorrection``
+
+另有机动事件 ``ImpulsiveBurn``（瞬时 Δv，在指定 epoch 直接修改状态速度），
+它不是 ``PhysicalModel``，不参与加速度叠加，也不进配置注册表。
+
+内置力模型公式
+--------------
+
+**PointMassGravity** — 中心天体点质量引力。适用于参考系原点天体自身的二体引力：
+
+.. math::
+
+   \mathbf{a} = -\frac{\mu}{|\mathbf{r}|^3} \, \mathbf{r}
+
+其中 ``μ`` 为引力参数（km³/s²），``r`` 为航天器相对中心天体的位置。
+它不查任何第三体的位置，只能表达参考系原点天体自身的引力；其他天体的
+引力贡献用 ThirdBodyGravity。
+
+**ThirdBodyGravity** — 参考系原点之外的天体引力摄动。一个实例对应一个摄动
+天体（如 ``ThirdBodyGravity("MOON")``）。加速度由直接项与间接项合成：
+
+.. math::
+
+   \mathbf{a} = -\mu_i \left[ \frac{\mathbf{r} - \mathbf{r}_i}{|\mathbf{r} - \mathbf{r}_i|^3} + \frac{\mathbf{r}_i}{|\mathbf{r}_i|^3} \right]
+
+其中 ``r`` 为航天器相对原点的位置，``r_i`` 为摄动天体相对原点的位置（由
+SPICE 查询）。间接项扣除摄动天体对原点的引力，保持坐标原点固定。
+
+**GravityField** — 完全正规化球谐重力场（Cnm/Snm），用 Pines 递推计算非球形
+引力加速度。天体无关：地球（EGM96）、月球（GRGM900C）等共用同一个类，按
+``body`` 参数自动切换 body-fixed 轴与系数文件。位势展开为：
+
+.. math::
+
+   U = \frac{\mu}{r} \sum_{n=0}^{N} \left(\frac{R}{r}\right)^n \sum_{m=0}^{n} \left(C_{nm}\cos m\lambda + S_{nm}\sin m\lambda\right) \bar{P}_{nm}(\sin\phi)
+
+加速度由 Pines 方法直接递推位势梯度得到，不经过球谐系数的解析微分。内置
+固体潮修正：地球支持 Step1（天体无关）+ Step2（频率相关）+ 极潮 + 永久潮；
+月球支持 k₂ = 0.024116 Love 数的固体潮。
+
+**DragModel** — 大气阻力。在 ITRF（地固系）中计算密度与相对速度，自动完成
+参考系↔ITRF 坐标变换。大气在 ITRF 中静止，相对速度等于航天器 ITRF 速度：
+
+.. math::
+
+   \mathbf{a}_{\text{drag}} = -\frac{1}{2} \, \rho \, \frac{C_d A}{m} \, |\mathbf{v}_{\text{rel}}| \, \mathbf{v}_{\text{rel}}
+
+其中 ``ρ`` 为大气密度（由 ``ExponentialAtmosphere`` 提供，US Standard
+Atmosphere 1976 分段指数模型），``C_d`` 为阻力系数（默认 2.2），``A/m`` 为
+面积质量比。
+
+**FiniteBurn** — 连续推力加速度力模型。推力大小（``thrust_profile(t)`` →
+标量 N）与方向（``direction``）解耦，方向支持传播惯性系、VNB、LVLH 三种
+坐标系：
+
+.. math::
+
+   \mathbf{a}_{\text{thrust}} = \frac{T(t)}{m} \, \hat{\mathbf{d}}
+
+其中 ``T(t)`` 为标量推力函数，``d̂`` 为归一化方向向量。配置往返支持固定
+推力/脉冲剖面与固定方向的封闭 DSL；任意 Python callable 可传播但无法序列化。
+
+**RelativisticCorrection** — 后牛顿相对论修正，含三项，公式与 GMAT 对齐：
+
+- Schwarzschild 项（质量引起的时空弯曲）：
+
+  .. math::
+
+     \mathbf{a}_S = \frac{\gamma \mu}{c^2 r^3} \left[ \left(\frac{4\mu}{r} - v^2\right) \mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v} \right]
+
+- Lense-Thirring 项（参考系拖曳）：
+
+  .. math::
+
+     \mathbf{a}_{LT} = \frac{2\mu}{c^2 r^3} \left[ \frac{3}{r^2}(\mathbf{r} \cdot \mathbf{J})(\mathbf{r} \times \mathbf{v}) + \mathbf{v} \times \mathbf{J} \right]
+
+- de Sitter 项（测地进动）：
+
+  .. math::
+
+     \mathbf{a}_{dS} = 2 \, \boldsymbol{\omega} \times \mathbf{v}
+
+其中 ``γ = 1.0`` 为后牛顿参数，``c`` 为光速，``J`` 为天体角动量参数，
+``ω`` 为 de Sitter 进动角速度。
 
 配置 Schema
 -----------
@@ -250,7 +349,7 @@ JSON 文件 IO
 .. code-block:: python
 
    build_force("UnknownType", {})
-   # ValueError: unknown force type 'UnknownType'; known types: ['DragModel', 'FiniteBurn', 'GravityField', 'SolarRadiationPressure']
+   # ValueError: unknown force type 'UnknownType'; known types: ['DragModel', 'FiniteBurn', 'GravityField', 'IndirectTerm', 'PointMassGravity', 'RelativisticCorrection', 'SolarRadiationPressure', 'ThirdBodyGravity']
 
 **不可序列化的推力剖面**
 

@@ -91,3 +91,9 @@ dev = [
     "mypy",
     "maturin>=1.0",
 ]
+docs = [
+    "sphinx>=7",
+    "sphinx-rtd-theme>=2",
+    "sphinxcontrib-mermaid>=0.9",
+    "sphinx-copybutton>=0.5",
+]

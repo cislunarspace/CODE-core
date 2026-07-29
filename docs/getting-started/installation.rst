@@ -1,7 +1,7 @@
 安装
 ====
 
-e2m2e 支持 pip 安装和从源码安装。
+e2m2e 支持 uv（推荐）、conda、pip 三种安装方式。
 
 依赖要求
 --------
@@ -9,6 +9,33 @@ e2m2e 支持 pip 安装和从源码安装。
 - Python >= 3.10
 - Rust 工具链（从源码安装时需要，用于构建积分器内核）
 - [uv](https://docs.astral.sh/uv/)（推荐的包管理器）
+
+uv（推荐）
+----------
+
+`uv <https://docs.astral.sh/uv/>`_ 是本项目推荐的包管理器，速度快、依赖解析可靠。
+
+.. code-block:: bash
+
+   uv pip install e2m2e
+
+在自己的项目中使用：
+
+.. code-block:: bash
+
+   uv init my-project && cd my-project
+   uv add e2m2e
+
+conda
+-----
+
+e2m2e 没有 conda-forge 包，conda 用来创建和管理 Python 环境，环境内仍用 pip 安装：
+
+.. code-block:: bash
+
+   conda create -n e2m2e python=3.12
+   conda activate e2m2e
+   pip install e2m2e
 
 pip 安装
 --------
