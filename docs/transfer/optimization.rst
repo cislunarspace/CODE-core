@@ -35,7 +35,7 @@
 1. **SciPy SLSQP** (默认): 使用 ``scipy.optimize.minimize`` 的 SLSQP 方法
 2. **COPT**: 杉数科技商业优化器，性能更优（需单独安装 ``coptpy``）
 
-求解器通过 :class:`~e2m2e.transfer.config.TransferConfig` 的 ``use_copt`` 字段控制，
+求解器通过 :class:`~e2m2e.transfer.config.TransferConfig` 的 ``nlp_use_copt`` 字段控制，
 底层由 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer` 统一适配
 （SciPy 和 COPT 两种后端）。
 
@@ -44,15 +44,15 @@
    from e2m2e.transfer import TransferConfig
 
    # 使用 SciPy（默认）
-   config = TransferConfig(use_copt=False)
+   config = TransferConfig(nlp_use_copt=False)
 
    # 使用 COPT（需安装 coptpy），失败时回退 SciPy
-   config = TransferConfig(use_copt=True, fallback_to_scipy=True)
+   config = TransferConfig(nlp_use_copt=True, nlp_fallback_to_scipy=True)
 
 配置参数
 --------
 
-:class:`~e2m2e.transfer.transfer.TransferConfig` 控制优化行为：
+:class:`~e2m2e.transfer.config.TransferConfig` 控制优化行为：
 
 .. code-block:: python
 
@@ -61,15 +61,15 @@
    DU = 3.84405000e5  # 地月距离 (km)
 
    config = TransferConfig(
-       alpha_min=0.5,              # α 下界
-       alpha_max=2.5,              # α 上界
-       earth_radius=200.0 / DU,    # 地球碰撞半径（无量纲）
-       moon_radius=100.0 / DU,     # 月球碰撞半径（无量纲）
-       use_relaxed_velocity=True,  # 使用松弛速度约束
-       velocity_angle_tol=0.05,    # 速度角度容差（弧度）
-       use_copt=False,             # 求解器选择
-       fallback_to_scipy=True,   # COPT 失败时回退 SciPy
-       verbose=False,              # 是否打印迭代信息
+       nlp_alpha_min=0.5,              # α 下界
+       nlp_alpha_max=2.5,              # α 上界
+       nlp_earth_radius=200.0 / DU,    # 地球碰撞半径（无量纲）
+       nlp_moon_radius=100.0 / DU,     # 月球碰撞半径（无量纲）
+       nlp_use_relaxed_velocity=True,  # 使用松弛速度约束
+       nlp_velocity_angle_tol=0.05,    # 速度角度容差（弧度）
+       nlp_use_copt=False,             # 求解器选择
+       nlp_fallback_to_scipy=True,   # COPT 失败时回退 SciPy
+       nlp_verbose=False,              # 是否打印迭代信息
    )
 
 优化变量与约束详解
@@ -89,21 +89,25 @@
 
       c_{\text{pos}}(y) = (x_f - x_{\text{ins}})^2 + (y_f - y_{\text{ins}})^2 + (z_f - z_{\text{ins}})^2 = 0
 
-2. **速度平行性（等式约束，默认）**
+2. **速度平行性（等式约束）**
 
    .. math::
 
       c_{\text{vel}}(y) = \frac{\mathbf{v}_f \cdot \mathbf{v}_{\text{ins}}}{\|\mathbf{v}_f\| \|\mathbf{v}_{\text{ins}}\|} - 1 = 0
 
+   是否默认启用取决于调用路径：直接使用 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer`
+   （不传 ``config``）时默认采用等式约束；经 :class:`~e2m2e.transfer.transfer.Transfer` 走
+   ``TransferConfig`` 时，``nlp_use_relaxed_velocity`` 默认 ``True``，即默认松弛为不等式约束。
+
 3. **松弛速度约束（不等式约束，可选）**
 
-   当 ``use_relaxed_velocity=True`` 时，将等式约束松弛为不等式：
+   当 ``nlp_use_relaxed_velocity=True`` 时，将等式约束松弛为不等式：
 
    .. math::
 
       \cos(\theta_{\text{max}}) - \frac{\mathbf{v}_f \cdot \mathbf{v}_{\text{ins}}}{\|\mathbf{v}_f\| \|\mathbf{v}_{\text{ins}}\|} \geq 0
 
-   其中 :math:`\theta_{\text{max}} = \text{velocity_angle_tol}`。
+   其中 :math:`\theta_{\text{max}} = \text{nlp_velocity_angle_tol}`。
 
 高层接口：Transfer
 ------------------
@@ -159,10 +163,10 @@
        arrival_orbit=ro_orbit,
        departure_state=dro_orbit.states[0],
        config=TransferConfig(
-           alpha_min=0.5,
-           alpha_max=2.5,
-           use_relaxed_velocity=True,
-           velocity_angle_tol=0.05,
+           nlp_alpha_min=0.5,
+           nlp_alpha_max=2.5,
+           nlp_use_relaxed_velocity=True,
+           nlp_velocity_angle_tol=0.05,
        ),
    )
 
@@ -230,7 +234,7 @@ COPT 求解
 结果分析
 --------
 
-:class:`~e2m2e.transfer.transfer.TransferOptimizationResult` 包含优化结果：
+:class:`~e2m2e.transfer.config.TransferOptimizationResult` 包含优化结果：
 
 .. code-block:: python
 
@@ -273,9 +277,9 @@ COPT 求解
        DROTRONLPOptimizer,
        NLPOptimizationVariables,
        TransferConfig,
-       compute_transfer_cost,
        load_orbit_from_json,
    )
+   from e2m2e.transfer.cost import compute_transfer_cost
 
    # 建立系统
    system = CR3BP_System(
@@ -310,8 +314,8 @@ COPT 求解
        departure_orbit=dro_orbit, arrival_orbit=ro_orbit,
        departure_state=best["departure_state"],
        config=TransferConfig(
-           alpha_min=0.5, alpha_max=2.5,
-           use_relaxed_velocity=True, velocity_angle_tol=0.05,
+           nlp_alpha_min=0.5, nlp_alpha_max=2.5,
+           nlp_use_relaxed_velocity=True, nlp_velocity_angle_tol=0.05,
        ),
    )
 

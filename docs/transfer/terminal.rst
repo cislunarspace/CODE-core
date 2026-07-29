@@ -17,8 +17,10 @@ TerminalCondition
            """返回出发状态 [x, y, z, vx, vy, vz]"""
            ...
 
-       def get_arrival_state(self, t_transfer: float) -> np.ndarray:
-           """返回到达状态（可能依赖传播）"""
+       def get_arrival_state(
+           self, t_ins: float, dynamics: CR3BP_Dynamics
+       ) -> tuple[np.ndarray, np.ndarray]:
+           """返回到达时刻的位置与速度，两个 (3,) 数组"""
            ...
 
 OrbitTerminal
@@ -27,14 +29,16 @@ OrbitTerminal
 :class:`~e2m2e.transfer.terminal.OrbitTerminal` 位于某条 ``Orbit`` 上：
 
 - 出发状态取轨道首点
-- 到达状态通过动力学传播获取
+- 到达状态通过动力学传播获取（``dynamics`` 在调用 ``get_arrival_state`` 时传入）
+
+构造函数只接收轨道对象；终端充当出发端还是到达端，由优化器装配时的位置决定。
 
 .. code-block:: python
 
    from e2m2e.transfer.terminal import OrbitTerminal
 
-   departure = OrbitTerminal(orbit=dro_orbit, dynamics=dynamics, is_departure=True)
-   arrival = OrbitTerminal(orbit=ro_orbit, dynamics=dynamics, is_departure=False)
+   departure = OrbitTerminal(dro_orbit)
+   arrival = OrbitTerminal(ro_orbit)
 
 StateTerminal
 -------------

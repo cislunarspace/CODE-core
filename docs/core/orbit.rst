@@ -13,6 +13,8 @@ Orbit 类
 - ``states`` — 状态序列 ``[x, y, z, vx, vy, vz]``，形状 ``(n_points, 6)``
 - ``times`` — 时间序列，形状 ``(n_points,)``
 - ``system`` — 关联的系统对象（``CR3BP_System`` 或 ``EphemerisSystem``）
+- ``family_type`` / ``parameters`` — 轨道族类型与连续参数（由延拓等外部算法填充）
+- ``metadata`` — 元数据字典（创建时间、来源、描述、标签）
 
 .. code-block:: python
 
@@ -26,20 +28,23 @@ Orbit 类
        system=system,
    )
 
-**周期属性：**
+**基本属性：**
 
-``Orbit`` 不自带周期、Jacobi 常数、稳定性等派生属性——这些由外部算法按需计算。
-微分修正后，周期会作为属性附加到 ``Orbit`` 上。
+``Orbit.__init__`` 末尾调用 ``compute_basic_properties()``，构造时即自动估计
+``period``（x 方向零交叉检测），并计算 ``amplitudes``、``extrema``、
+``mean_state``、``center``、``is_periodic``、``periodicity_error``——这些字段
+在 ``__init__`` 中显式声明，经 property 代理访问。微分修正的结果写入预声明的
+``correction_*`` 字段（默认 ``None``）。Jacobi 常数、稳定性仍由外部算法按需计算。
 
 **序列化：**
 
 .. code-block:: python
 
    # 保存到 JSON
-   orbit.save("my_orbit.json")
+   orbit.save_to_file("my_orbit.json")
 
    # 从 JSON 加载
-   orbit2 = Orbit.load("my_orbit.json")
+   orbit2 = Orbit.load_from_file("my_orbit.json", system=system)
 
 轨道族 (OrbitFamily)
 ---------------------

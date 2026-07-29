@@ -1,7 +1,7 @@
 转移轨道设计概述
 ================
 
-e2m2e 实现了基于 Cui et al. (2025) 的"搜索-优化"两步法，用于 DRO（Distant Retrograde Orbit）到 RO（Regular Orbit）的转移轨道设计。
+e2m2e 实现了基于 Cui et al. (2025) 的"搜索-优化"两步法，用于 DRO（Distant Retrograde Orbit）到 RO（共振轨道）的转移轨道设计。
 
 设计方法
 --------

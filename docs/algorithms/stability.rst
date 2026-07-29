@@ -30,27 +30,40 @@ Floquet 理论
 
    from e2m2e.algorithms.stability import StabilityAnalysis
 
-   analyzer = StabilityAnalysis(dynamics)
+   # 构造时传入轨道；orbit 关联了 system 时 dynamics 可省略
+   analyzer = StabilityAnalysis(orbit, dynamics)
 
-   # 分析单条轨道
-   result = analyzer.analyze(orbit)
+   # analyze() 不接受参数，返回不可变的 OrbitStability 结果对象
+   result = analyzer.analyze()
 
    print(f"特征值: {result.eigenvalues}")
-   print(f"稳定性指标: {result.stability_index}")
-   print(f"不稳定方向数: {result.n_unstable}")
+   print(f"稳定性指数: {result.stability_indices}")
+   print(f"分类: {result.classification['stability_type']}")
+
+``analyze()`` 返回 frozen 数据类 ``OrbitStability``，字段包括：
+
+- ``monodromy_matrix`` — 单值矩阵，形状 (6, 6)
+- ``eigenvalues`` — 单值矩阵特征值（Floquet 乘子）
+- ``stability_indices`` — 稳定性指数字典，键为 ``nu1``/``nu2``/``nu3``/``broucke``
+- ``classification`` — 稳定性分类结果（含 ``stability_type``、``is_stable`` 等）
+- ``bifurcation`` — 分岔分析结果
+- ``numerical_errors`` — 数值误差估计
 
 稳定性指标
 ----------
 
-稳定性指标定义为：
+稳定性指数采用 Broucke 定义：对每对倒数特征值 (λ, 1/λ) 求和取实部，
 
 .. math::
 
-   \nu = \max_i |\lambda_i|
+   \nu = \lambda + \frac{1}{\lambda}
 
-- ν = 1：中性稳定
-- ν > 1：不稳定（ν 越大越不稳定）
-- ν < 1：渐近稳定（Hamiltonian 系统中不会出现）
+- \|ν\| < 2：该模态稳定（特征值位于单位圆上）
+- \|ν\| > 2：该模态不稳定（ν 越大越不稳定）
+
+``stability_indices`` 字典给出各模态的 ``nu1``/``nu2``/``nu3``，以及
+``broucke`` = \|ν1\| + \|ν2\|。特征值的最大模可从
+``classification["max_eigenvalue_magnitude"]`` 读取。
 
 批量分析
 --------
@@ -61,13 +74,51 @@ Floquet 理论
 
    from e2m2e.algorithms.stability import StabilityAnalysis
 
-   analyzer = StabilityAnalysis(dynamics)
-
    results = []
    for orbit in family:
-       result = analyzer.analyze(orbit)
+       result = StabilityAnalysis(orbit, dynamics).analyze()
        results.append(result)
-       print(f"周期={orbit.period:.4f}, 稳定性指标={result.stability_index:.6f}")
+       nu_max = max(v for v in result.stability_indices.values() if v is not None)
+       print(f"周期={orbit.period:.4f}, 稳定性指数={nu_max:.6f}")
+
+分岔检测
+--------
+
+``analyze()`` 返回的 ``bifurcation`` 字段由 ``analyze_bifurcation()`` 生成，
+根据特征值与 +1、-1 及单位圆的关系识别分岔类型（``BifurcationType`` 枚举）：
+
+- 特征值穿过 +1 → 鞍结分岔（``SADDLE_NODE``）
+- 特征值穿过 -1 → 倍周期分岔（``PERIOD_DOUBLING``）
+- 复特征值穿过单位圆 → 环面分岔（``TORUS``）
+
+对整个轨道族检测分岔点，使用静态方法：
+
+.. code-block:: python
+
+   # 遍历轨道族，返回特征值接近 +1 的分岔点列表
+   bifurcations = StabilityAnalysis.detect_bifurcation_in_family(
+       orbits=family,
+       dynamics=dynamics,
+       tolerance=1e-8,
+   )
+
+   # 或直接定位最接近目标 x0 的分岔点，未找到时返回 None
+   bp = StabilityAnalysis.find_nearest_bifurcation(
+       orbits=family,
+       dynamics=dynamics,
+       target_x0=0.85,
+   )
+
+数值误差校验
+------------
+
+单值矩阵由数值积分得到，``numerical_errors`` 字段给出两项残差，
+用于校验积分精度是否足够：
+
+- ``determinant_error`` — \|det(M) − 1\|，辛矩阵行列式应恒为 1
+- ``symplectic_error`` — ‖MᵀJM − J‖ 的范数，辛性质残差
+
+残差显著偏大时，应收紧积分容差后重新分析。
 
 参考
 ----

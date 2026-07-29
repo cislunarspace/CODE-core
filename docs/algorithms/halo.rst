@@ -13,7 +13,7 @@ Richardson 三阶解析近似为 Halo 轨道提供初始猜测：
    from e2m2e.algorithms.halo_initial_guess import compute_halo_initial_guess
 
    # L1 Halo，z 方向振幅 0.01
-   guess = compute_halo_initial_guess(mu=system.mu, z_A=0.01, L=1, halo_class=0)
+   guess = compute_halo_initial_guess(mu=system.mu, z_amplitude=0.01, L=1, halo_class=0)
 
    print(f"x0 = {guess['x0']}")
    print(f"vy0 = {guess['vy0']}")
@@ -21,8 +21,8 @@ Richardson 三阶解析近似为 Halo 轨道提供初始猜测：
 
 ``halo_class`` 区分 Halo 族的分支：
 
-- ``0``：南族 Halo（z0 < 0）
-- ``1``：北族 Halo（z0 > 0）
+- ``0``：北族 Halo（z0 > 0）
+- ``1``：南族 Halo（z0 < 0）
 
 ``L`` 选择平动点：``1`` 为 L1，``2`` 为 L2。
 
@@ -66,14 +66,18 @@ Richardson 三阶解析近似为 Halo 轨道提供初始猜测：
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_family import generate_halo_family
-
-   family = generate_halo_family(
-       system=system,
-       dynamics=dynamics,
+   # 1. 先生成种子轨道（种子宜取小振幅，Richardson 近似精度高，由延拓放大）
+   seed_orbit = continuation.generate_halo_seed_orbit(
        libration_point=1,
-       amplitude_z_range=(0.001, 0.15),
+       amplitude_z=0.001,
+       halo_class=0,        # 0=北族，1=南族
+   )
+
+   # 2. 从种子出发做自然参数延拓，返回 Orbit 列表
+   family = continuation.generate_halo_family(
+       seed_orbit,
        n_orbits=50,
+       z_range=(0.001, 0.15),   # z 振幅范围
    )
 
    print(f"生成 {len(family)} 条 Halo 轨道")

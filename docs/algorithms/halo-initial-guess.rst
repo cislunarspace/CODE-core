@@ -1,7 +1,7 @@
 Halo 初始猜测
 =============
 
-:e2m2e.algorithms.halo_initial_guess` 模块提供 Richardson 三阶解析近似，
+:mod:`e2m2e.algorithms.halo_initial_guess` 模块提供 Richardson 三阶解析近似，
 用于生成 Halo 轨道的初始猜测参数。
 
 Richardson 三阶近似
@@ -13,7 +13,7 @@ Richardson (1980) 给出共线平动点附近 Halo 轨道的三阶解析解：
 
    from e2m2e.algorithms.halo_initial_guess import compute_halo_initial_guess
 
-   guess = compute_halo_initial_guess(mu=0.01215, z_A=0.01, L=1, halo_class=0)
+   guess = compute_halo_initial_guess(mu=0.01215, z_amplitude=0.01, L=1, halo_class=0)
 
    print(f"x0 = {guess['x0']}")      # x 方向初始位置
    print(f"vy0 = {guess['vy0']}")    # y 方向初始速度
@@ -22,9 +22,9 @@ Richardson (1980) 给出共线平动点附近 Halo 轨道的三阶解析解：
 参数说明：
 
 - ``mu`` — CR3BP 质量参数
-- ``z_A`` — z 方向振幅（无量纲）
+- ``z_amplitude`` — z 方向振幅（无量纲）
 - ``L`` — 平动点编号（1=L1，2=L2）
-- ``halo_class`` — Halo 族分支（0=南族，1=北族）
+- ``halo_class`` — Halo 族分支（0=北族，1=南族）
 
 内部求解过程
 ------------
@@ -47,7 +47,7 @@ Richardson (1980) 给出共线平动点附近 Halo 轨道的三阶解析解：
    import numpy as np
 
    # 1. 解析近似
-   guess = compute_halo_initial_guess(mu=system.mu, z_A=0.01, L=1, halo_class=0)
+   guess = compute_halo_initial_guess(mu=system.mu, z_amplitude=0.01, L=1, halo_class=0)
 
    # 2. 组装初始状态
    initial_state = np.array([

@@ -21,9 +21,16 @@ SPICE 管理器
 de440.bsp     JPL DE440（推荐，覆盖 1550–2650 年）
 de440s.bsp    JPL DE440 精简版（1849–2150 年）
 de435.bsp     JPL DE435（1550–2650 年）
+de438.bsp     JPL DE438（长期星历）
 ============  ====================================
 
-内核文件从 `NASA NAIF <https://naif.jpl.nasa.gov/naif/data.html>`_ 下载。
+项目的 ``kernels-v1`` 发布包（见 :doc:`../getting-started/installation`）提供
+de430.bsp 与 de440s.bsp。注意 ``find_ephemeris_kernel`` 的优先级列表不含
+de430.bsp，使用 de430 需手动 ``load_kernel``。
+
+内核文件推荐从项目的 `GitHub Release <https://github.com/cislunarspace/e2m2e/releases>`_
+下载（``kernels-v1`` 含 de430.bsp、de440s.bsp 等全部必需内核）；
+官方来源（网络可达时）为 `NASA NAIF <https://naif.jpl.nasa.gov/naif/data.html>`_。
 
 .. code-block:: python
 
@@ -40,6 +47,30 @@ de435.bsp     JPL DE435（1550–2650 年）
 
    mgr.unload_kernel("path/to/de440.bsp")
 
+星历缓存
+^^^^^^^^
+
+积分前调用一次 ``enable_ephem_cache``，在均匀网格上批量预采样指定天体的
+（位置、速度）并构建 CubicSpline；之后 ``get_body_position`` / ``get_body_state``
+对覆盖范围内的查询走插值，不再跨 SPICE 边界。典型场景下 ForceModel 满配直推
+加速 10× 以上。
+
+缓存依赖当前已加载的星历内核；``unload_kernel`` 后缓存自动失效。
+
+.. code-block:: python
+
+   mgr.enable_ephem_cache(
+       ["MOON", "SUN"], et_start, et_end, dt=3600.0
+   )
+
+   # ... ForceModel 传播 ...
+
+   mgr.disable_ephem_cache()  # 关闭缓存，回退到逐步 SPICE 查询
+
+完整签名为 ``enable_ephem_cache(bodies, et_start, et_end, *, dt=3600.0, frame="J2000", observer="EARTH")``：
+``bodies`` 为要缓存的天体名列表，``et_start`` / ``et_end`` 为积分区间起止
+ET 秒，``dt`` 为网格步长（秒）。
+
 星历系统
 --------
 
@@ -47,6 +78,7 @@ de435.bsp     JPL DE435（1550–2650 年）
 
 .. code-block:: python
 
+   from e2m2e.core import ReferenceFrame
    from e2m2e.core.spice import SPICEManager
    from e2m2e.core.ephemeris_system import EphemerisSystem
 
@@ -57,7 +89,7 @@ de435.bsp     JPL DE435（1550–2650 年）
        bodies=["EARTH", "MOON", "SUN"],
        spice=mgr,
        origin="EARTH",
-       frame="J2000"
+       frame=ReferenceFrame.J2000
    )
 
    # 查询月球位置
@@ -73,6 +105,11 @@ de435.bsp     JPL DE435（1550–2650 年）
 ----------
 
 :class:`~e2m2e.core.ephemeris_dynamics.EphemerisDynamics` 实现受限 N 体问题，利用 SPICE 星历数据计算多体引力加速度。
+
+.. note::
+
+   ``EphemerisDynamics`` 已降级为内部实现（``e2m2e.core.ephemeris_dynamics``
+   路径仍可用）。新代码推荐 :doc:`forces` 的 ForceModel 力分解路径。
 
 **物理模型：**
 
@@ -98,11 +135,15 @@ de435.bsp     JPL DE435（1550–2650 年）
    import numpy as np
    state0 = np.array([r1, r2, r3, v1, v2, v3])  # km, km/s
    t_span = (0, 86400)  # 秒
-   result = dynamics.propagate(state0, t_span)
+   result = dynamics.propagate(state0, t_span, with_stm=True)
 
    # 结果
-   print(result.states.shape)  # (n_points, 6)
-   print(result.stm.shape)     # (n_points, 6, 6)
+   print(result["states"].shape)  # (n_points, 6)
+   print(result["stm"].shape)     # (n_points, 6, 6)
+
+``with_stm=True`` 时，若 Rust 绑定可用，传播走 ``propagate_with_stm_py``
+快速路径，否则回退到 Python 增广积分。行为契约：星历内核缺失或轨迹被截断
+（如 Rust 侧提前退出）时抛 ``RuntimeError``，不会静默返回截断结果。
 
 **积分器配置：**
 

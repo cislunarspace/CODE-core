@@ -64,11 +64,11 @@ CR3BP 动力学
    orbit.period = 3.0
 
    result = dynamics.propagate(
-       initial_state, t_span=(0, orbit.period), max_steps=10000
-   )
+       initial_state, t_span=(0, orbit.period)
+   )  # 需要控制步长时设置 dynamics.max_step 属性
 
-   print(f"状态形状: {result.states.shape}")
-   print(f"末状态: {result.states[-1]}")
+   print(f"状态形状: {result['states'].shape}")
+   print(f"末状态: {result['states'][-1]}")
 
 状态转移矩阵 (STM)
 -------------------
@@ -84,7 +84,7 @@ STM 描述初始状态微小偏差的线性演化：
    result = dynamics.propagate(
        initial_state, t_span=(0, 3.0), with_stm=True
    )
-   print(f"STM 形状: {result.stm.shape}")  # (n_points, 6, 6)
+   print(f"STM 形状: {result['stm'].shape}")  # (n_points, 6, 6)
 
 星历动力学
 ----------
@@ -100,9 +100,18 @@ STM 描述初始状态微小偏差的线性演化：
 
 .. code-block:: python
 
+   from e2m2e.core import CelestialBodyOrigin, CoordinateSystem, ICRSAxes
    from e2m2e.core.forces import ForceModel, GravityField
+
+   # ForceModel 要求系统持有坐标系（球谐引力等力需要坐标变换）
+   eph_system.coordinate_system = CoordinateSystem(
+       axes=ICRSAxes(),
+       origin=CelestialBodyOrigin(body="EARTH", spice=spice),
+   )
 
    fm = ForceModel(eph_system)
    fm.add_force(GravityField("EARTH", degree=2, order=0))
 
    result = fm.propagate(state0, t_span, t_eval=t_eval)
+
+``propagate`` 支持 ``with_stm=True`` 同时传播状态转移矩阵，详见 :doc:`forces`。

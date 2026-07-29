@@ -49,6 +49,30 @@
 - ``tolerance`` — 位置残差收敛容差
 - ``var_time`` — 是否允许调整时间节点（``True`` 时自由度更大）
 
+近月点加密采样
+--------------
+
+NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月点落在节点之间
+而欠约束，导致多重打靶残差停滞。
+:func:`~e2m2e.algorithms.multiple_shooting.sample_patch_points_perilune_clustered`
+先积分一圈定位近月点（离次天体最近的点），在其两侧窗口内加密节点：
+
+.. code-block:: python
+
+   from e2m2e.algorithms import sample_patch_points_perilune_clustered
+
+   t_patch, state_patch = sample_patch_points_perilune_clustered(
+       orbit,
+       dynamics,
+       n_base=8,              # 窗口外等时间间隔节点数
+       n_perilune=5,          # 近月点窗口内加密节点数（含近月点本身）
+       perilune_window=0.15,  # 加密窗口半宽，占周期比例
+   )
+
+返回按时间升序排列的 ``(t_patch, states)``，可直接传给
+``MultipleShooting.correct``。非 CR3BP 动力学（无 ``mu`` 属性）时
+退化为等时间间隔采样。
+
 两层多重打靶
 ------------
 
@@ -70,15 +94,15 @@
    result = tms.correct(
        t_patch=t_patch,
        state_patch=state_patch,
-       max_iter=20,
-       tolerance=1e-8,
+       max_outer_iterations=20,
+       position_tolerance=1e-8,
        velocity_tolerance=1e-6,
    )
 
    if result.converged:
        print(f"外层迭代: {result.outer_iterations}")
-       print(f"位置残差: {result.max_residual:.2e}")
-       print(f"速度残差: {result.velocity_residual:.2e}")
+       print(f"位置残差: {result.final_position_residual:.2e}")
+       print(f"速度残差: {result.final_velocity_residual:.2e}")
 
 星历修正
 --------

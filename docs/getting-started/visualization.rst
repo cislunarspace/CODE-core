@@ -47,8 +47,17 @@ e2m2e 提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
    # 3D 轨道族
    plotter.plot_family_3d(family, jacobi_values, title="DRO Family 3D")
 
-   # Jacobi-周期-稳定性组合图
-   plotter.plot_analysis(family)
+   # Jacobi-周期-稳定性组合图（三个序列与 family 中轨道一一对应）
+   from e2m2e.algorithms import StabilityAnalysis
+
+   periods = [orb.period for orb in family]
+   stability_values = [
+       StabilityAnalysis(orb, dynamics).classify_orbit()["max_eigenvalue_magnitude"]
+       for orb in family
+   ]
+   plotter.plot_jacobi_period_stability(
+       jacobi_values, periods, stability_values, title="DRO Family Analysis"
+   )
 
 绘制转移轨迹
 ------------
@@ -59,12 +68,14 @@ e2m2e 提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
 
    plotter = TransferPlotter(system, config)
 
-   # 绘制转移轨迹与出发/到达轨道
-   plotter.plot_transfer(
-       transfer_trajectory=result.transfer_trajectory,
+   # 绘制转移轨迹与出发/到达轨道（3D 视图）
+   plotter.plot_transfer_orbit(
        departure_orbit=dro_orbit,
        arrival_orbit=ro_orbit,
-       title="DRO-RO Transfer",
+       transfer_trajectory=result.transfer_trajectory,
+       departure_state=result.departure_state,
+       insertion_state=result.insertion_state,
+       label="DRO-RO Transfer",
    )
 
 天体图标

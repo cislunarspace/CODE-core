@@ -44,11 +44,11 @@
 
 .. code-block:: python
 
-   family = continuation.pseudo_arc_length_continuation(
+   family = continuation.pseudo_arclength_continuation(
        seed_orbit=seed_orbit,
-       param_range=(0.005, 0.15),
-       step_size=0.002,
-       max_arc_length=1.0,
+       n_orbits=50,              # 本支生成的新轨道条数
+       step_size=0.005,          # 伪弧长步长 ΔS
+       direction="positive",     # 延拓方向；双侧延拓调用两次
    )
 
 Halo 轨道延拓
@@ -58,29 +58,31 @@ Halo 轨道有专用的延拓编排，结合 Richardson 三阶解析近似和延
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_family import generate_halo_family
-
-   family = generate_halo_family(
-       system=system,
-       dynamics=dynamics,
+   # 1. 先生成种子轨道（Richardson 近似在小振幅下精度高，种子宜取小振幅，
+   #    再由延拓逐步放大）
+   seed_orbit = continuation.generate_halo_seed_orbit(
        libration_point=1,
-       amplitude_z_range=(0.001, 0.15),
+       amplitude_z=0.001,
+       halo_class=0,        # 0=北族，1=南族
+   )
+
+   # 2. 从种子出发做自然参数延拓，返回 Orbit 列表
+   family = continuation.generate_halo_family(
+       seed_orbit,
        n_orbits=50,
+       z_range=(0.001, 0.15),   # z 振幅范围
    )
 
 延拓失败处理
 ------------
 
-延拓过程中，某些步可能因微分修正不收敛而失败。默认行为是记录失败并继续：
+延拓过程中，某一步微分修正不收敛时，延拓器会缩减步长重试；
+步长缩减到下限（``min_step_size``）仍不收敛时，终止该方向的延拓。
+轨道族中只追加收敛的轨道，失败步不会进入结果。
 
-.. code-block:: python
+延拓结束后，可通过 ``Continuation`` 实例上的两个属性诊断：
 
-   # 延拓结果包含成功与失败的轨道
-   family = continuation.natural_continuation(...)
-
-   # 检查每条轨道的状态
-   for orbit in family:
-       if hasattr(orbit, 'converged') and not orbit.converged:
-           print(f"步 {i} 未收敛")
+- ``continuation.termination_reason`` — 终止原因（如“步长过小，延拓终止”）
+- ``continuation.continuation_stats`` — 成功/失败步数等统计信息
 
 可运行示例见 ``examples/continuation_example.py``。

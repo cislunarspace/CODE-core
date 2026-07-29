@@ -111,7 +111,8 @@ API
        # inner_method="standard",                # 默认值；可改为 "two_level"
    )
 
-低层入口：``correct_with_homotopy`` （同模块 ``homotopy_correction`` ），
+低层入口：``correct_with_homotopy`` （模块
+``e2m2e.algorithms.ephemeris_correction.homotopy`` ），
 用于需要更细粒度控制的研究场景。
 
 参数
@@ -135,7 +136,7 @@ API
 
 - ``converged`` ：最后一步的 ``converged`` 标志。
 - ``iterations`` ：所有 lambda 步的迭代次数之和（standard 是
-  ``MultipleShootingResult.iterations`` ，two_level 是
+  ``MultipleShootingResult.outer_iterations`` ，two_level 是
   ``TwoLevelMultipleShootingResult.outer_iterations`` ）。
 - ``max_residual`` ：最后一步的最终位置残差。
 - ``residual_history`` ：所有 lambda 步位置残差历史的扁平拼接。
@@ -156,7 +157,7 @@ API
    from e2m2e.algorithms.ephemeris_correction import (
        correct_ephemeris_patch_points,
    )
-   from e2m2e.algorithms.homotopy_correction import correct_with_homotopy
+   from e2m2e.algorithms.ephemeris_correction.homotopy import correct_with_homotopy
    from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
    from e2m2e.core.ephemeris_system import EphemerisSystem
    from e2m2e.core.spice import SPICEManager
@@ -235,7 +236,6 @@ API
 - :mod:`tests.algorithms.test_ephemeris_correction_dispatch`：
   dispatch delegation。
 - :mod:`tests.algorithms.test_homotopy_correction_smoke` /
-  :mod:`tests.algorithms.test_homotopy_dispatch_delegation` /
   :mod:`tests.algorithms.test_homotopy_module_invariants`：
   公共 API、参数透传、模块不循环导入。
 - :mod:`tests.algorithms.test_homotopy_correction_orchestration`：

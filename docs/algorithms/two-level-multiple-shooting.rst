@@ -29,24 +29,26 @@
    result = tms.correct(
        t_patch=t_patch,
        state_patch=state_patch,
-       max_iter=20,
-       tolerance=1e-8,
+       max_outer_iterations=20,
+       position_tolerance=1e-8,
        velocity_tolerance=1e-6,
    )
 
    if result.converged:
        print(f"外层迭代: {result.outer_iterations}")
-       print(f"位置残差: {result.max_residual:.2e}")
-       print(f"速度残差: {result.velocity_residual:.2e}")
+       print(f"位置残差: {result.final_position_residual:.2e}")
+       print(f"速度残差: {result.final_velocity_residual:.2e}")
 
 参数说明
 --------
 
 - ``t_patch`` — 时间节点数组，形状 ``(N,)``
 - ``state_patch`` — 状态量数组，形状 ``(N, 6)``
-- ``max_iter`` — 外层最大迭代次数
-- ``tolerance`` — Level 1 位置残差收敛容差
-- ``velocity_tolerance`` — Level 2 速度残差收敛容差
+- ``max_outer_iterations`` — 外层（Level 1 + Level 2）最大迭代次数（默认 10）
+- ``max_level1_iterations`` — Level 1 每段最大迭代次数（默认 20）
+- ``position_tolerance`` — 位置残差收敛容差
+- ``velocity_tolerance`` — 速度残差收敛容差
+- ``level1_position_tolerance`` — Level 1 内部容差（默认 ``None``，即取 ``position_tolerance``）
 
 结果字段
 --------
@@ -57,8 +59,12 @@
 - ``converged`` — 是否收敛
 - ``status`` — 终止原因
 - ``outer_iterations`` — 外层迭代次数
-- ``max_residual`` — 最终位置残差
-- ``velocity_residual`` — 最终速度残差
+- ``level1_iterations`` — 每段 Level 1 迭代次数（外层迭代 × 弧段）
+- ``final_position_residual`` — 最终最大位置残差
+- ``final_velocity_residual`` — 最终最大速度残差
+- ``per_patch_position_residual`` — 各段位置残差
+- ``per_patch_velocity_residual`` — 各段速度残差
+- ``residual_history`` — 每次外层迭代的（最大位置残差, 最大速度残差）记录
 
 与标准多重打靶的区别
 --------------------
