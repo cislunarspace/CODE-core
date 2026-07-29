@@ -6,7 +6,7 @@
 
 ## 背景
 
-Issue #69 想让用户写一份配置（JSON 或 dict）就能建出一套力模型（J2 + 阻力 + 光压 + 有限推力），还能存盘再读回，读回再建出的力与原先一样。现有容器已经能聚合多个 `PhysicalModel` 并通过 Rust `rk_step` 步进器传播（ADR 0002），每个力模型也已经各自完成坐标变换（CONTEXT.md `力模型聚合`；ADR 0003）。还差两件事：一是按名字找到单个力——`get_force`/`remove_force`/`enable`/`disable` 与配置往返都要用它；二是把每种力的参数写成数据，包括那些本身持有别的实例、或持有 Python 函数的力。
+Issue #69 想让用户写一份配置（JSON 或 dict）就能建出一套力模型（J2 + 阻力 + 光压 + 有限推力），还能存盘再读回，读回再建出的力与原先一样。现有容器已经能聚合多个 `PhysicalModel` 并通过 Rust `rk_step` 步进器传播（ADR 0002），每个力模型也已经各自完成坐标变换（ADR 0003）。还差两件事：一是按名字找到单个力——`get_force`/`remove_force`/`enable`/`disable` 与配置往返都要用它；二是把每种力的参数写成数据，包括那些本身持有别的实例、或持有 Python 函数的力。
 
 有两处比较难办。`DragModel` 收一个 `AtmosphereModel`，`SolarRadiationPressure` 收一个 `ShadowModel`——这俩都是实例，不是几个数。`FiniteBurn` 收一个 `thrust_profile` 函数，它的 `direction` 也可能是个函数——一般情况下这俩都没法存进 JSON 再原样读回来。
 
@@ -51,7 +51,7 @@ Issue #69 想让用户写一份配置（JSON 或 dict）就能建出一套力模
 
 - 四个 `PhysicalModel` 子类的物理与 `compute_acceleration` 签名（除 `GravityField` 存原始 `gravity_file` 参数外）。
 - `propagate`/`propagate_maneuvers` 行为（它们调用 `_compute_total_acceleration`，故禁用的力自然被排除）。
-- 坐标变换职责——每个力模型自行变换；见 ADR 0003、CONTEXT.md `力模型聚合`。
+- 坐标变换职责——每个力模型自行变换；见 ADR 0003。
 
 ### 后续工作
 

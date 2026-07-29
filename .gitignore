@@ -141,3 +141,7 @@ scripts/*.png
 *.pdb
 AGENTS.md
 CLAUDE.md
+CONTEXT.md
+CONTEXT-MAP.md
+docs/agents/
+docs/plans/

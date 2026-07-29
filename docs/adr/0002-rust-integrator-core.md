@@ -77,7 +77,7 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 
 决策 1（工作空间 + maturin）、4（公开的 `e2m2e.integrators` 薄封装）仍然成立。新增的多步/二阶族遵守同样的边界：推进一步、返回误差估计与步长建议；不做事件检测、稠密输出或完整传播控制。
 
-关于决策 3 的说明：`CR3BP_Dynamics` 与 `EphemerisDynamics`（系统类）仍用 `scipy.solve_ivp`；只有 `ForceModel`（力分解类）从 Python 驱动 Rust 步进器。坐标系与力两个维度的划分见 `CONTEXT.md` → 动力学。原先的"后续工作"各项现已落实：`ForceModel` 从 Python 编排 `rk_step`（自适应步长 + 简单事件检测），crate 也增加了多步与二阶族。
+关于决策 3 的说明：`CR3BP_Dynamics` 与 `EphemerisDynamics`（系统类）仍用 `scipy.solve_ivp`；只有 `ForceModel`（力分解类）从 Python 驱动 Rust 步进器。原先的"后续工作"各项现已落实：`ForceModel` 从 Python 编排 `rk_step`（自适应步长 + 简单事件检测），crate 也增加了多步与二阶族。
 
 ## 修订（2026-07，crate 拆分与 spice 构建约定）
 

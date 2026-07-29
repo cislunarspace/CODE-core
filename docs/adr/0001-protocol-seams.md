@@ -36,7 +36,6 @@
 - `tests/mbse/test_protocol_conformance.py`
 - `mbse/architecture/__init__.py` 中的 `Protocol` 导出
 - MBSE 组件元数据中的 `Protocol` 引用
-- `CONTEXT.md` 中的 `Protocol` 词条
 
 ### 保留
 

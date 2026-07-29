@@ -151,7 +151,7 @@ class FiniteBurn(PhysicalModel):
         复用 :class:`~e2m2e.core.standard_dynamic_axes.VNBAxes` /
         :class:`~e2m2e.core.standard_dynamic_axes.LVLHAxes` 构造旋转矩阵，
         再用 ``rotation @ direction_local`` 完成变换。轴向定义沿用
-        ``standard_dynamic_axes``（VNB/LVLH 按 GMAT 约定，见 CONTEXT.md）。
+        ``standard_dynamic_axes``（VNB/LVLH 按 GMAT 约定）。
 
         动态坐标轴类本身不校验状态退化情形，这里保留原手搓逻辑的边界
         检查（零速度/零位置/共线 r-v），以抛出含义清晰的 ``ValueError``
