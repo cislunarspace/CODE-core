@@ -1,7 +1,7 @@
 """构建与数值化标准形 Hamilton 量。
 
-对应 qiao ``Code03_Hamilton_expr.py``（符号构造）与
-``Code04_Hamilton_num.py``（在指定历元窗口上求数值时间序列）。
+对应 qiao ``Code03_Hamilton_expr.py`` （符号构造）与
+``Code04_Hamilton_num.py`` （在指定历元窗口上求数值时间序列）。
 
 公开接口：
 
@@ -131,10 +131,10 @@ def build_hamiltonian(
     max_degree: int | None = None,
     store_sources: bool = True,
 ) -> Hamiltonian:
-    """组装符号 Hamilton 量。
+    r"""组装符号 Hamilton 量。
 
     Hamilton = f·q + ½‖p‖² + pᵀ C_pq q + ½ qᵀ C_qq q
-              − μ_e / |r_e − q_LP − q| − μ_m / |r_m − q_LP − q| − μ_s / |r_s − q_LP − q|
+              − μ_e / \|r_e − q_LP − q\| − μ_m / \|r_m − q_LP − q\| − μ_s / \|r_s − q_LP − q\|
 
     三个引力势分别用 Legendre 标量场乘 ``-μ`` 替换 ``(rx, ry, rz, r0)``
     成对应天体的观测向量后加入。

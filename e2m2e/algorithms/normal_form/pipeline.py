@@ -2,6 +2,8 @@
 
 把前面四个切片的 reducer 串成一条完整路径：
 
+.. code-block:: text
+
     星历轨道初值
         │  DynamicalSubstituteCorrector  （切片 #171）
         ▼
@@ -71,10 +73,10 @@ class NormalFormPipeline:
 
     Args:
         context: 归一化上下文（提供平动点、频率、历元等）。
-        quasi_floquet_method: quasi-Floquet 求解法，``"matrix"``（默认，
-            36 维直接积分 + 辛投影）或 ``"lie_algebra"``（21 维 sp(6)
+        quasi_floquet_method: quasi-Floquet 求解法，``"matrix"`` （默认，
+            36 维直接积分 + 辛投影）或 ``"lie_algebra"`` （21 维 sp(6)
             参数化，自动保辛）。
-        center_max_order: 中心流形 Lie 变换截断阶数，默认 ``10``（与 qiao
+        center_max_order: 中心流形 Lie 变换截断阶数，默认 ``10`` （与 qiao
             ``Code10``/``Code11`` 一致）。
         center_steps: 中心流形化简步骤元组，默认 ``("invariant", "center")``。
         dynamical_kwargs: 透传给 :class:`DynamicalSubstituteCorrector` 的
@@ -92,7 +94,7 @@ class NormalFormPipeline:
         """对 rho 坐标初值跑完整标准形化简流水线。
 
         Args:
-            orbit: ``(6,)`` rho 坐标初始状态 ``[ρ, ρ̇]``（无量纲），作为
+            orbit: ``(6,)`` rho 坐标初始状态 ``[ρ, ρ̇]`` （无量纲），作为
                 动力学替代 corrector 的种子。SPICE 内核不可用时底层自动
                 降级到纯 CR3BP（仅供烟雾测试）。
 

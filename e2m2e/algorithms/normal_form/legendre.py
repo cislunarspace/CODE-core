@@ -63,7 +63,7 @@ class LegendreExpansionResult:
 def expand_legendre_1_over_r(
     max_degree: int = DEFAULT_COLLINEAR_ORDER,
 ) -> LegendreExpansionResult:
-    """对 1/|(rx, ry, rz) − (q1, q2, q3)| 做 Legendre 多项式展开。
+    r"""对 1/\|(rx, ry, rz) − (q1, q2, q3)\| 做 Legendre 多项式展开。
 
     返回 sympy 系数多项式 dict：键为 ``(n1, n2, n3, n4, n5, n6)``，
     值为 sympy 系数（标量场不带 ``μ`` 乘子；乘子由调用方在

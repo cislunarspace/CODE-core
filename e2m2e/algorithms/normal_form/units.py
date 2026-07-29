@@ -1,9 +1,10 @@
 """SI ↔ qiao 归一化单位转换。
 
 约定：
-- SI 状态 ``[x, y, z, vx, vy, vz]`` 单位为 ``km`` + ``km/s``（与
+
+- SI 状态 ``[x, y, z, vx, vy, vz]`` 单位为 ``km`` + ``km/s`` （与
   ``CR3BP_System.physical_to_dimensionless`` 物理接口一致）；
-- qiao 归一化状态使用 ``LU``（位置）与 ``VU = LU/TU``（速度），与
+- qiao 归一化状态使用 ``LU`` （位置）与 ``VU = LU/TU`` （速度），与
   ``Global_File.py`` 中无量纲状态保持一致；
 - 时间方向上 SI 秒 ↔ 归一化 TU 通过 ``NormalFormContext.seconds_to_tu``
   / ``tu_to_seconds`` 完成。

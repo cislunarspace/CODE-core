@@ -88,10 +88,11 @@ class PhysicalModel(abc.ABC):
         返回 ``None`` 表示该 force 不支持 Rust 编译，``ForceModel.propagate``
         检测到任一 force 返回 ``None`` 时回退到 Python eom 路径。
 
-        子类按需覆盖。元组协议见 ``parse_force_tuple``（Rust lib.rs）：
+        子类按需覆盖。元组协议见 ``parse_force_tuple`` （Rust lib.rs）：
+
         - GravityField: ``("gravity", c_flat, s_flat, mu, radius, degree, order,
-            input_frame, propagation_frame, body, propagation_origin, tide_mode,
-            k_love_flat, k_plus_flat_or_none)``
+          input_frame, propagation_frame, body, propagation_origin, tide_mode,
+          k_love_flat, k_plus_flat_or_none)``
         - ThirdBody: ``("third_body", naif_id_str, mu)``
         - Indirect: ``("indirect", naif_id_str, mu)``
         - SRP: ``("srp", area, mass, cr, shadow_bodies_list)``

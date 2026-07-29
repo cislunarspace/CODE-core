@@ -31,10 +31,10 @@ class NormalFormResult:
 
     字段分两组：
 
-    - **通用化简诊断**（``substitute_residual``、``success``、``message``、
+    - **通用化简诊断** （``substitute_residual``、``success``、``message``、
       ``metadata``）：跨切片稳定，描述整条流水线的收敛情况。保留给仅关心
       "是否收敛、残差多大"的诊断调用方。
-    - **子结果句柄**（``ds_result`` / ``qf_result`` / ``cm_result`` /
+    - **子结果句柄** （``ds_result`` / ``qf_result`` / ``cm_result`` /
       ``catalog_transformer``）：issue #175 新增。指向四个子 reducer 的产物；
       ``catalog_transformer`` 一等公民字段使外部用户能直接
       ``result.catalog_transformer.rho_to_param(X_rho, t)`` 完成完整坐标变换，

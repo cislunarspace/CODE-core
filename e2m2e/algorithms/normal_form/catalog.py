@@ -18,7 +18,7 @@
 
 与 #175（``pipeline.py`` 最终 ``NormalFormResult``）的衔接取舍：
 
-- :mod:`.types.NormalFormResult`（切片 0）是一个**通用流水线结果容器**
+- :mod:`.types.NormalFormResult` （切片 0）是一个**通用流水线结果容器**
   （Hamiltonian 系数、变换矩阵、残差等），字段语义偏"化简结果"，不适合
   直接当坐标变换的系数聚合器；
 - 本切片定义独立的 :class:`LibrationCatalogData` 作为**坐标变换专用聚合
