@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [5.3.1] - 2026-07-29
+
+### Added
+- `e2m2e.algorithms` 导出 `sample_patch_points_perilune_clustered`（multiple_shooting.py:551），与 `sample_patch_points` 并列，面向 NRHO 近月点欠约束场景；此前需从 `e2m2e.algorithms.multiple_shooting` 模块路径导入
+
+### Fixed
+- `ForceModel` 类 docstring 仍自述「不支持 STM」，与 `propagate(with_stm=True)` 现状矛盾；改为以代码实际为准（支持 STM，不支持 Jacobi）
+
+### Changed
+- 发版前 GitHub Pages 文档全面审查与更新（PR #250）：50+ 处问题修复
+  - 硬错误：quickstart 力模型组合三连错、stability 整节旧 API 重写、TransferConfig 9 个旧字段改 `nlp_*`、terminal/propulsion 虚构签名、visualization 两个不存在的绘图方法、orbit 的 `save/load`、dynamics/ephemeris 的 dict 属性访问、coordinate transform 参数序与 `UnitSystem.CR3BP`、halo 族编排四文件签名、两层打靶参数/字段名
+  - 过时描述：Orbit 显式字段、System 基类三问题、halo_class 南北族（3 文件写反）、EphemerisDynamics 内部实现地位、ITRFSpiceAxes 标注、ReferenceFrame 枚举成员、内核下载指向 GitHub Release（kernels-v1）等
+  - 新功能文档：ForceModel STM 与 propagate_compiled 快速路径、`rk_step` `state_error_dim`、SPICEManager 星历缓存、STM 截断抛错契约、`NormalFormResult.save/load`、近月点加密采样；API 页补 `indirect_term`/`relativistic_correction`/`ephemeris_correction`/`normal_form`/`two_level_multiple_shooting` 等模块
+  - 审查中追加：halo 种子示例 `amplitude_z` 由 0.01 改 0.001（Richardson 近似在 0.01 不收敛、与 `examples/halo_orbit_design.py` 一致）；stability 分岔判据措辞由「穿过」改为「接近」（与代码 `abs(lam±1.0) < tol` 一致）
+- 源码 docstring RST 排版修复以支撑 Sphinx 构建零警告：normal_form 11 个模块、ephemeris_correction、physical_model、visualization/config、force_model 等 docstring 解析干净；`api/e2m2e.mbse.rst` 与 `api/e2m2e.visualization.rst` 用 `:exclude-members:` 消解 ProjectionPlane/PlotConfig 的重复对象描述与交叉引用歧义
+
 ## [5.3.0] - 2026-07-10
 
 ### Added
