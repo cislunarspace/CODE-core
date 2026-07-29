@@ -314,11 +314,13 @@ mod tests {
         ] {
             let path = kernel_dir.join(name);
             if path.exists() {
-                if cspice::data::furnish(path.to_string_lossy().to_string()).is_ok()
-                    && name.ends_with(".bsp")
-                {
+                // 按文件存在判断跳过；furnish 失败保持原有的容忍（let _），
+                // 但 has_spk 仍置真——星历损坏时测试会照常运行并大声失败，
+                // 不会被守卫掩盖。
+                if name.ends_with(".bsp") {
                     has_spk = true;
                 }
+                let _ = cspice::data::furnish(path.to_string_lossy().to_string());
             }
         }
         has_spk
