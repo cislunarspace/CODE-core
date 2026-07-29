@@ -29,6 +29,9 @@ jobs:
       # cspice-sys 经 downloadcspice 从 NAIF 下载 CSPICE 源码。
       - run: cargo clippy --workspace --features spice -- -D warnings
       - run: cargo test --workspace
+      # spice 下的 forces 测试；--test-threads=1 因 cspice 有全局线程锁。
+      # 依赖 de430/de440s.bsp 的测试在无星历时自动跳过（.bsp 未被 git 跟踪）。
+      - run: cargo test -p e2m2e-forces --features spice -- --test-threads=1
       # Python 格式与风格
       - run: uv sync --group dev
       - run: uv run ruff check .
