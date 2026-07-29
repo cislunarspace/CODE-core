@@ -64,6 +64,7 @@ _LAZY_SYMBOL_EXPORTS: dict[str, str] = {
     "MultipleShooting": "e2m2e.algorithms.multiple_shooting",
     "convert_to_j2000": "e2m2e.algorithms.multiple_shooting",
     "sample_patch_points": "e2m2e.algorithms.multiple_shooting",
+    "sample_patch_points_perilune_clustered": "e2m2e.algorithms.multiple_shooting",
     "TwoLevelMultipleShooting": "e2m2e.algorithms.two_level_multiple_shooting",
     "TwoLevelMultipleShootingResult": "e2m2e.algorithms.two_level_multiple_shooting",
 }
@@ -122,6 +123,7 @@ __all__ = [
     "TwoLevelMultipleShooting",
     "TwoLevelMultipleShootingResult",
     "sample_patch_points",
+    "sample_patch_points_perilune_clustered",
     "convert_to_j2000",
     "CorrectionConfig",
 ]
