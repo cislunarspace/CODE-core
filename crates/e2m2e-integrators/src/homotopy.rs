@@ -11,6 +11,7 @@
 //! 4. **Sigmoid 平滑**：`u = 1/2 [1 + tanh(S/ε)]`，ε → 0
 
 use crate::multiple_shooting::{multiple_shooting_correct, MultipleShootingRustResult};
+use e2m2e_forces::forces::augmented_state::ThrustParams;
 use e2m2e_forces::forces::compiled::CompiledForce;
 
 /// 同伦法求解器配置。
@@ -63,6 +64,18 @@ pub struct HomotopyResult {
     pub residual_history: Vec<f64>,
 }
 
+/// 同伦法问题定义：打包在多个函数间重复出现的参数。
+pub struct HomotopyProblem<'a> {
+    /// 力模型列表
+    pub forces: &'a [CompiledForce],
+    /// 传播系 origin
+    pub observer: &'a str,
+    /// patch points 时间
+    pub t_patch: &'a [f64],
+    /// patch points 状态（7D）
+    pub state_patch: &'a [[f64; 7]],
+}
+
 /// 同伦法求解器。
 ///
 /// 使用 L2-L1 同伦从能量最优过渡到燃料最优。
@@ -79,24 +92,16 @@ impl HomotopySolver {
     /// 求解燃料最优控制。
     ///
     /// # 参数
-    /// - `forces`: 力模型列表（重力等）
-    /// - `observer`: 传播系 origin
-    /// - `t_patch`: 初始 patch points（时间）
-    /// - `state_patch`: 初始 patch points（状态，7D）
-    /// - `t_max`: 最大推力（N）
-    /// - `isp`: 比冲（s）
+    /// - `ctx`: 问题定义（力模型、传播系、patch points）
+    /// - `thrust`: 推力配置
     /// - `verbose`: 是否输出进度
     ///
     /// # 返回
     /// 同伦法求解结果
     pub fn solve(
         &self,
-        forces: &[CompiledForce],
-        observer: &str,
-        t_patch: &[f64],
-        state_patch: &[[f64; 7]],
-        t_max: f64,
-        isp: f64,
+        ctx: &HomotopyProblem<'_>,
+        thrust: &ThrustParams,
         verbose: bool,
     ) -> Result<HomotopyResult, String> {
         let mut lambda = self.config.lambda_init;
@@ -109,16 +114,7 @@ impl HomotopySolver {
             eprintln!("同伦法求解：λ = {:.2}（能量最优）", lambda);
         }
 
-        let mut current_result = self.solve_with_lambda(
-            forces,
-            observer,
-            t_patch,
-            state_patch,
-            t_max,
-            isp,
-            lambda,
-            verbose,
-        )?;
+        let mut current_result = self.solve_with_lambda(ctx, thrust, lambda, verbose)?;
 
         total_iterations += current_result.iterations;
         residual_history.push(current_result.max_residual);
@@ -146,16 +142,13 @@ impl HomotopySolver {
                 })
                 .collect();
 
-            current_result = self.solve_with_lambda(
-                forces,
-                observer,
-                &current_result.t_patch,
-                &prev_state_patch,
-                t_max,
-                isp,
-                lambda,
-                verbose,
-            )?;
+            let ctx_next = HomotopyProblem {
+                forces: ctx.forces,
+                observer: ctx.observer,
+                t_patch: &current_result.t_patch,
+                state_patch: &prev_state_patch,
+            };
+            current_result = self.solve_with_lambda(&ctx_next, thrust, lambda, verbose)?;
 
             total_iterations += current_result.iterations;
             residual_history.push(current_result.max_residual);
@@ -198,13 +191,9 @@ impl HomotopySolver {
     /// 这里使用多重打靶法求解，控制律使用 Sigmoid 平滑。
     fn solve_with_lambda(
         &self,
-        forces: &[CompiledForce],
-        observer: &str,
-        t_patch: &[f64],
-        state_patch: &[[f64; 7]],
-        t_max: f64,
-        isp: f64,
-        lambda: f64,
+        ctx: &HomotopyProblem<'_>,
+        _thrust: &ThrustParams,
+        _lambda: f64,
         verbose: bool,
     ) -> Result<MultipleShootingRustResult, String> {
         // TODO: 实现带同伦参数的多重打靶求解
@@ -215,15 +204,16 @@ impl HomotopySolver {
         // 3. 计算协态变量（costate）
 
         // 占位：使用 6D 状态向量（忽略质量）
-        let state_patch_6d: Vec<[f64; 6]> = state_patch
+        let state_patch_6d: Vec<[f64; 6]> = ctx
+            .state_patch
             .iter()
             .map(|s| [s[0], s[1], s[2], s[3], s[4], s[5]])
             .collect();
 
         multiple_shooting_correct(
-            forces,
-            observer,
-            t_patch,
+            ctx.forces,
+            ctx.observer,
+            ctx.t_patch,
             &state_patch_6d,
             false, // 固定时间
             self.config.max_iter,
