@@ -10,8 +10,8 @@
 //! 3. 逐步合并相邻段，继续修正
 //! 4. 重复直到所有段合并为一条完整轨迹
 
-use crate::forces::compiled::CompiledForce;
 use crate::multiple_shooting::{multiple_shooting_correct, MultipleShootingRustResult};
+use e2m2e_forces::forces::compiled::CompiledForce;
 use pyo3::prelude::*;
 
 /// 分段打靶拼接结果。
@@ -140,6 +140,7 @@ fn merge_segments(
 }
 
 /// 对单段进行多重打靶修正。
+#[allow(clippy::too_many_arguments)]
 fn correct_segment(
     forces: &[CompiledForce],
     observer: &str,
@@ -165,6 +166,7 @@ fn correct_segment(
 }
 
 /// 分段打靶拼接法主函数。
+#[allow(clippy::too_many_arguments)]
 pub fn segmented_shooting_correct(
     forces: &[CompiledForce],
     observer: &str,
@@ -245,7 +247,7 @@ pub fn segmented_shooting_correct(
                     "合并阶段 {}: {} 段 -> {} 段",
                     stage,
                     current_segments.len(),
-                    (current_segments.len() + 1) / 2
+                    current_segments.len().div_ceil(2)
                 );
             }
 
@@ -257,7 +259,7 @@ pub fn segmented_shooting_correct(
             let merged = merge_segments(current_segments, &merge_indices);
 
             let mut corrected = Vec::new();
-            for (i, (seg_t, seg_s)) in merged.into_iter().enumerate() {
+            for (seg_t, seg_s) in merged {
                 let result = correct_segment(
                     forces,
                     observer,
@@ -387,7 +389,7 @@ pub fn segmented_shooting_correct_py(
         rtol,
         verbose,
     )
-    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))
+    .map_err(pyo3::exceptions::PyRuntimeError::new_err)
 }
 
 #[cfg(test)]

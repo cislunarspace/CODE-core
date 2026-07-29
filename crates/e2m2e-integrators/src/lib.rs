@@ -1,42 +1,24 @@
 //! e2m2e 积分器 crate：单步 Runge-Kutta、多步 Adams 与二阶 Cowell 的 Rust 实现，
 //! 通过 PyO3 暴露给 Python。
 //!
-//! 三种积分族共享同一入口风格：给定当前状态与右端项，推进一步并返回
-//! 误差估计与步长建议。具体族的区别见 [`crate::butcher`]、[`crate::abm`]、
-//! [`crate::cowell`] 的模块文档。
+//! 纯数学积分器（Butcher 表、RK/ABM/Cowell、solve_ivp）在
+//! `e2m2e-propagation` crate，力模型在 `e2m2e-forces`，SPICE FFI 在
+//! `e2m2e-spice`；本 crate 只做 PyO3 绑定与 shooting 算法。
 
 use pyo3::prelude::*;
-use pyo3::types::PyList;
 #[cfg(feature = "spice")]
-use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::PyTuple;
+use pyo3::types::{PyDict, PyList};
 
-pub(crate) mod abm;
-pub(crate) mod butcher;
-pub(crate) mod cowell;
-#[cfg(feature = "spice")]
-pub(crate) mod forces;
 #[cfg(feature = "spice")]
 pub mod multiple_shooting;
-pub(crate) mod multistep_methods;
-pub(crate) mod pd45;
-pub(crate) mod pd78;
-pub(crate) mod rk89;
-pub mod rk_methods;
 #[cfg(feature = "spice")]
 pub mod segmented_shooting;
-#[cfg(feature = "spice")]
-pub mod single_shooting;
-pub(crate) mod solid_tide;
-pub mod solve_ivp;
-pub(crate) mod spherical_harmonic;
-#[cfg(feature = "spice")]
-pub(crate) mod spice_ffi;
-#[cfg(feature = "spice")]
-pub(crate) mod spk_accel;
 
-use butcher::{explicit_rk_step, suggest_next_step};
-use multistep_methods::MultistepMethod;
-use rk_methods::RkMethod;
+use e2m2e_propagation::butcher::{explicit_rk_step, suggest_next_step};
+use e2m2e_propagation::multistep_methods::MultistepMethod;
+use e2m2e_propagation::rk_methods::RkMethod;
+use e2m2e_propagation::{abm, cowell};
 
 /// 单步 Runge-Kutta 的结果。
 #[pyclass(frozen, get_all)]
@@ -319,6 +301,91 @@ fn hello_integrators() -> PyResult<String> {
     Ok("hello from e2m2e-integrators".to_string())
 }
 
+/// Python 接口：完整自适应步长 ODE 积分器（scipy `solve_ivp` 等价物）。
+///
+/// 使用 DOP853 (Prince-Dormand 8(7)13M) 方法。纯 Rust 积分循环在
+/// `e2m2e_propagation::solve_ivp`，本函数只做 Python 回调适配与结果封装。
+///
+/// # 参数
+/// - `t_span`: `(t_start, t_end)` 积分区间
+/// - `y0`: 初始状态向量
+/// - `t_eval`: 输出时间点数组
+/// - `rtol`: 相对容差
+/// - `atol`: 绝对容差
+/// - `f`: Python callable `f(t, y) -> dy/dt`
+/// - `max_step`: 最大步长（默认 `f64::INFINITY`）
+/// - `max_steps`: 最大步数（默认 `MAX_ADAPTIVE_STEPS`）
+/// - `state_error_dim`: 步长误差控制只统计前 N 维（用于 STM 增广传播）
+///
+/// # 返回
+/// Python dict：`{"states": [[...]], "time": [...], "n_steps": int}`
+#[pyfunction]
+#[pyo3(signature = (t_span, y0, t_eval, rtol, atol, f, max_step=None, max_steps=None, state_error_dim=None))]
+#[allow(clippy::too_many_arguments)]
+pub fn solve_ivp_py(
+    t_span: (f64, f64),
+    y0: Vec<f64>,
+    t_eval: Vec<f64>,
+    rtol: f64,
+    atol: f64,
+    f: &Bound<PyAny>,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    state_error_dim: Option<usize>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_propagation::pd78::PD78_TABLE as DOP853;
+    use e2m2e_propagation::solve_ivp::{solve_ivp_impl, MAX_ADAPTIVE_STEPS};
+
+    if y0.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "y0 must not be empty",
+        ));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+    if rtol <= 0.0 || atol <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "rtol and atol must be positive",
+        ));
+    }
+
+    let n = y0.len();
+    let callback = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
+        call_python_rhs(f, n, ti, yi).map_err(|e| e.to_string())
+    };
+
+    let h_max = max_step.unwrap_or(f64::INFINITY);
+    let s_max = max_steps.unwrap_or(MAX_ADAPTIVE_STEPS);
+
+    let states = solve_ivp_impl(
+        &DOP853,
+        callback,
+        t_span,
+        &y0,
+        &t_eval,
+        rtol,
+        atol,
+        h_max,
+        s_max,
+        state_error_dim,
+    );
+
+    let n_steps = states.len(); // 近似：实际步数 ≥ 输出点数
+
+    // 构造输出时间戳
+    let out_times: Vec<f64> = t_eval[..states.len()].to_vec();
+
+    let dict = PyDict::new(py);
+    dict.set_item("states", states)?;
+    dict.set_item("time", out_times)?;
+    dict.set_item("n_steps", n_steps)?;
+    Ok(dict.into())
+}
+
 /// 球谐引力加速度（body-fixed 系）。
 ///
 /// Python 侧 `GravityField._compute_acceleration_in_input_frame` 的 Rust 加速版。
@@ -355,7 +422,7 @@ fn spherical_harmonic_accel(
             order, degree
         )));
     }
-    Ok(spherical_harmonic::spherical_harmonic_accel(
+    Ok(e2m2e_forces::spherical_harmonic::spherical_harmonic_accel(
         &r, &c_flat, &s_flat, mu, radius, degree, order,
     ))
 }
@@ -403,7 +470,7 @@ fn solid_tide_step1(
         )));
     }
     let k_plus_ref = k_plus_flat.as_deref();
-    Ok(solid_tide::solid_tide_step1(
+    Ok(e2m2e_forces::solid_tide::solid_tide_step1(
         &perturbers_flat,
         &k_love_flat,
         k_plus_ref,
@@ -415,13 +482,13 @@ fn solid_tide_step1(
 /// 固体潮 Step 2（频率相关，地球专用）。返回长度 50 的 `Vec<f64>`（C25 + S25）。
 #[pyfunction]
 fn solid_tide_step2(et: f64) -> PyResult<Vec<f64>> {
-    Ok(solid_tide::solid_tide_step2(et))
+    Ok(e2m2e_forces::solid_tide::solid_tide_step2(et))
 }
 
 /// 极潮（固体极潮 + 海洋极潮，IERS TN32）。返回长度 50 的 `Vec<f64>`（C25 + S25）。
 #[pyfunction]
 fn pole_tide(et: f64, xp: f64, yp: f64) -> PyResult<Vec<f64>> {
-    Ok(solid_tide::pole_tide(et, xp, yp))
+    Ok(e2m2e_forces::solid_tide::pole_tide(et, xp, yp))
 }
 
 /// PoC：通过 cspice 查询 `target` 相对 `observer` 在 J2000 系下的位置（km）。
@@ -494,14 +561,14 @@ fn third_body_acceleration(
             sc_pos.len()
         )));
     }
-    let a = spk_accel::third_body_acceleration(et, target, observer, &sc_pos, mu, 1e-6).map_err(
-        |e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!(
-                "third_body_acceleration cspice failed: {:?}",
-                e
-            ))
-        },
-    )?;
+    let a =
+        e2m2e_spice::spk_accel::third_body_acceleration(et, target, observer, &sc_pos, mu, 1e-6)
+            .map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "third_body_acceleration cspice failed: {:?}",
+                    e
+                ))
+            })?;
     Ok(vec![a[0], a[1], a[2]])
 }
 
@@ -516,12 +583,13 @@ fn indirect_term_acceleration(
     observer: &str,
     mu: f64,
 ) -> PyResult<Vec<f64>> {
-    let a = spk_accel::indirect_term_acceleration(et, target, observer, mu, 1e-6).map_err(|e| {
-        pyo3::exceptions::PyRuntimeError::new_err(format!(
-            "indirect_term_acceleration cspice failed: {:?}",
-            e
-        ))
-    })?;
+    let a = e2m2e_spice::spk_accel::indirect_term_acceleration(et, target, observer, mu, 1e-6)
+        .map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!(
+                "indirect_term_acceleration cspice failed: {:?}",
+                e
+            ))
+        })?;
     Ok(vec![a[0], a[1], a[2]])
 }
 
@@ -567,9 +635,9 @@ fn gravity_field_acceleration(
         )));
     }
     let mode = match tide_mode {
-        0 => forces::gravity_field::TideMode::None,
-        1 => forces::gravity_field::TideMode::Solid,
-        2 => forces::gravity_field::TideMode::SolidAndPole,
+        0 => e2m2e_forces::forces::gravity_field::TideMode::None,
+        1 => e2m2e_forces::forces::gravity_field::TideMode::Solid,
+        2 => e2m2e_forces::forces::gravity_field::TideMode::SolidAndPole,
         _ => {
             return Err(pyo3::exceptions::PyValueError::new_err(format!(
                 "tide_mode must be 0/1/2, got {}",
@@ -577,13 +645,13 @@ fn gravity_field_acceleration(
             )))
         }
     };
-    let tide = forces::gravity_field::TideConfig {
+    let tide = e2m2e_forces::forces::gravity_field::TideConfig {
         mode,
         k_love_flat,
         k_plus_flat,
     };
     let r_arr = [r_sc[0], r_sc[1], r_sc[2]];
-    let a = forces::gravity_field::gravity_field_acceleration(
+    let a = e2m2e_forces::forces::gravity_field::gravity_field_acceleration(
         et,
         &r_arr,
         &c_flat,
@@ -635,8 +703,16 @@ fn srp_acceleration(
         )));
     }
     let pos_arr = [sc_pos[0], sc_pos[1], sc_pos[2]];
-    let a = forces::srp::srp_acceleration(et, &pos_arr, area, mass, cr, &shadow_bodies, observer)
-        .map_err(|e| {
+    let a = e2m2e_forces::forces::srp::srp_acceleration(
+        et,
+        &pos_arr,
+        area,
+        mass,
+        cr,
+        &shadow_bodies,
+        observer,
+    )
+    .map_err(|e| {
         pyo3::exceptions::PyRuntimeError::new_err(format!("srp_acceleration failed: {:?}", e))
     })?;
     Ok(vec![a[0], a[1], a[2]])
@@ -654,9 +730,9 @@ fn srp_acceleration(
 #[cfg(feature = "spice")]
 pub(crate) fn parse_force_tuple(
     item: &Bound<'_, PyAny>,
-) -> PyResult<forces::compiled::CompiledForce> {
-    use forces::compiled::CompiledForce;
-    use forces::gravity_field::TideMode;
+) -> PyResult<e2m2e_forces::forces::compiled::CompiledForce> {
+    use e2m2e_forces::forces::compiled::CompiledForce;
+    use e2m2e_forces::forces::gravity_field::TideMode;
 
     let tuple = item
         .downcast::<PyTuple>()
@@ -836,7 +912,7 @@ fn propagate_compiled(
     max_steps: usize,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
-    use forces::compiled::{compute_total_acceleration, CompiledForce};
+    use e2m2e_forces::forces::compiled::{compute_total_acceleration, CompiledForce};
 
     if y0.len() != 6 {
         return Err(pyo3::exceptions::PyValueError::new_err(format!(
@@ -889,9 +965,8 @@ fn propagate_compiled(
             let state6 = [yi[0], yi[1], yi[2], yi[3], yi[4], yi[5]];
             compute_total_acceleration(forces_ref, ti, &state6, observer_ref)
                 .map(|a| vec![yi[3], yi[4], yi[5], a[0], a[1], a[2]])
-                .map_err(|e| {
+                .inspect_err(|e| {
                     *err_cell.borrow_mut() = Some(e.clone());
-                    e
                 })
         };
 
@@ -1056,8 +1131,8 @@ fn propagate_compiled_stm_py(
     max_steps: Option<usize>,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
-    use forces::compiled::CompiledForce;
-    use forces::compiled_stm::propagate_compiled_stm;
+    use e2m2e_forces::forces::compiled::CompiledForce;
+    use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm;
 
     if initial_state.len() != 6 {
         return Err(pyo3::exceptions::PyValueError::new_err(format!(
@@ -1102,7 +1177,7 @@ fn propagate_compiled_stm_py(
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
-    m.add_function(wrap_pyfunction!(solve_ivp::solve_ivp_py, m)?)?;
+    m.add_function(wrap_pyfunction!(solve_ivp_py, m)?)?;
     m.add_function(wrap_pyfunction!(multistep_step, m)?)?;
     m.add_function(wrap_pyfunction!(cowell_step, m)?)?;
     m.add_function(wrap_pyfunction!(spherical_harmonic_accel, m)?)?;
@@ -1134,13 +1209,6 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     )?)?;
     #[cfg(feature = "spice")]
     m.add_class::<multiple_shooting::MultipleShootingRustResult>()?;
-    #[cfg(feature = "spice")]
-    m.add_function(wrap_pyfunction!(
-        segmented_shooting::segmented_shooting_correct_py,
-        m
-    )?)?;
-    #[cfg(feature = "spice")]
-    m.add_class::<segmented_shooting::SegmentedShootingResult>()?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(
         segmented_shooting::segmented_shooting_correct_py,

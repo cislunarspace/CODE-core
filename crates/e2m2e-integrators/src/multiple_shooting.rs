@@ -10,15 +10,13 @@
 //! 3. 最小二乘求解：dX = -(DF^T DF)^{-1} DF^T F
 //! 4. 更新：x_new = x_old + α * dX
 
-use crate::forces::compiled::CompiledForce;
-use crate::forces::compiled_stm::{propagate_compiled_stm, CompiledStmResult};
+use e2m2e_forces::forces::compiled::CompiledForce;
+use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 /// 最小二乘求解结果。
 struct LeastSquaresResult {
     dx: Vec<f64>,
-    residual_norm: f64,
 }
 
 /// 多重打靶迭代结果。
@@ -176,9 +174,7 @@ fn least_squares_solve(
         // 交换行
         if max_row != i {
             for j in 0..=n_vars {
-                let tmp = augmented[i * (n_vars + 1) + j];
-                augmented[i * (n_vars + 1) + j] = augmented[max_row * (n_vars + 1) + j];
-                augmented[max_row * (n_vars + 1) + j] = tmp;
+                augmented.swap(i * (n_vars + 1) + j, max_row * (n_vars + 1) + j);
             }
         }
 
@@ -208,10 +204,7 @@ fn least_squares_solve(
         }
     }
 
-    // 计算残差范数
-    let residual_norm = f.iter().map(|x| x * x).sum::<f64>().sqrt();
-
-    LeastSquaresResult { dx, residual_norm }
+    LeastSquaresResult { dx }
 }
 
 /// 多重打靶迭代修正（Rust 实现）。
@@ -331,8 +324,8 @@ pub fn multiple_shooting_correct(
         // 第五步：更新变量
         // 更新状态
         let mut x_flat: Vec<f64> = state_work.iter().flat_map(|s| s.iter().copied()).collect();
-        for i in 0..(n_nodes * 6) {
-            x_flat[i] += ls_result.dx[i];
+        for (i, x) in x_flat.iter_mut().enumerate() {
+            *x += ls_result.dx[i];
         }
         state_work = x_flat
             .chunks_exact(6)
@@ -345,8 +338,8 @@ pub fn multiple_shooting_correct(
 
         // 更新时间（仅自由时间模式）
         if var_time {
-            for i in 0..n_nodes {
-                t_work[i] += ls_result.dx[n_nodes * 6 + i];
+            for (i, t) in t_work.iter_mut().enumerate() {
+                *t += ls_result.dx[n_nodes * 6 + i];
             }
         }
     }
@@ -419,7 +412,7 @@ pub fn multiple_shooting_correct_py(
         max_step,
         verbose,
     )
-    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))
+    .map_err(pyo3::exceptions::PyRuntimeError::new_err)
 }
 
 #[cfg(test)]

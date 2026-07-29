@@ -8,8 +8,8 @@
 
 use super::compiled::{compute_total_acceleration_and_jacobian, CompiledForce};
 use super::nbody_stm;
-use crate::butcher::{explicit_rk_step, suggest_next_step};
-use crate::pd45::PD45_TABLE;
+use e2m2e_propagation::butcher::{explicit_rk_step, suggest_next_step};
+use e2m2e_propagation::pd45::PD45_TABLE;
 
 /// PD45 嵌入误差估计的阶数（p=4 嵌入, 误差 ~ O(h^5)）。
 const PD45_EMBEDDED_ORDER: usize = 4;
@@ -74,6 +74,7 @@ pub fn precheck(
 /// 与 `nbody_stm::propagate_with_stm` 物理等价，但用 PD45 循环
 /// （与 `propagate_compiled` 同一 RK 表/控制器），
 /// 保证 with_stm=True/False 的 states 逐位一致。
+#[allow(clippy::too_many_arguments)]
 pub fn propagate_compiled_stm(
     forces: &[CompiledForce],
     observer: &str,

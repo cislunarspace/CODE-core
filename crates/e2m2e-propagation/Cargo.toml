@@ -8,4 +8,9 @@ description = "ODE integrators for e2m2e (RK, ABM, Cowell)"
 name = "e2m2e_propagation"
 crate-type = ["rlib"]
 
+[features]
+default = []
+pyo3 = ["dep:pyo3"]
+
 [dependencies]
+pyo3 = { workspace = true, optional = true }
