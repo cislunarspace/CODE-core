@@ -77,7 +77,9 @@ jobs:
           manylinux: 2_28
           before-script-linux: |
             set -eux
-            yum install -y openssl-devel
+            # cspice-sys 1.0.4 的 downloadcspice：reqwest→native-tls→openssl-sys 需 openssl.pc；
+            # 编译 cspice C 头用 bindgen，需 libclang.so（AlmaLinux 8 包名 clang-libs）
+            yum install -y openssl-devel clang-libs clang
       - name: Build sdist
         if: matrix.os == 'ubuntu-latest'
         uses: PyO3/maturin-action@v1
