@@ -19,8 +19,7 @@
 //! 主循环是单线程 Python，OK）。
 
 use cspice_sys::{
-    bodvrd_c, failed_c, getmsg_c, pxform_c, reset_c, spkezr_c, sxform_c, ConstSpiceChar,
-    SpiceDouble, SpiceInt,
+    bodvrd_c, failed_c, getmsg_c, pxform_c, reset_c, spkezr_c, sxform_c, ConstSpiceChar, SpiceInt,
 };
 use std::ffi::CString;
 use std::os::raw::c_char;

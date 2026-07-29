@@ -14,4 +14,6 @@ edition = "2021"
 [workspace.dependencies]
 pyo3 = { version = "0.24", features = ["extension-module", "abi3-py310"] }
 cspice = "0.1"
-cspice-sys = "1.0"
+# downloadcspice：构建时从 NAIF 下载 CSPICE 源码，免去手工安装与 CSPICE_DIR 配置。
+# 仅在启用 spice feature 时生效。
+cspice-sys = { version = "1.0", features = ["downloadcspice"] }

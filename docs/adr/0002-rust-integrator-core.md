@@ -75,6 +75,12 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 - **多步预测-校正**（`multistep_step`）：Adams-Bashforth-Moulton（`Abm`），定步长，携带一个导数采样的**历史缓冲**。
 - **二阶双积分**（`cowell_step`）：Störmer-Cowell，定步长，直接积 `x'' = a(t, x)`，从一个位置+加速度混合的历史缓冲出发；只输出位置。
 
-决策 1（工作空间 + maturin）、3（Python 继续负责轨迹级控制——自适应步长、事件检测、稠密输出都不进 crate）、4（公开的 `e2m2e.integrators` 薄封装）仍然成立。新增的多步/二阶族遵守同样的边界：推进一步、返回误差估计与步长建议；不做事件检测、稠密输出或完整传播控制。
+决策 1（工作空间 + maturin）、4（公开的 `e2m2e.integrators` 薄封装）仍然成立。新增的多步/二阶族遵守同样的边界：推进一步、返回误差估计与步长建议；不做事件检测、稠密输出或完整传播控制。
 
 关于决策 3 的说明：`CR3BP_Dynamics` 与 `EphemerisDynamics`（系统类）仍用 `scipy.solve_ivp`；只有 `ForceModel`（力分解类）从 Python 驱动 Rust 步进器。坐标系与力两个维度的划分见 `CONTEXT.md` → 动力学。原先的"后续工作"各项现已落实：`ForceModel` 从 Python 编排 `rk_step`（自适应步长 + 简单事件检测），crate 也增加了多步与二阶族。
+
+## 修订（2026-07，crate 拆分与 spice 构建约定）
+
+单 crate 拆为四个：`e2m2e-integrators`（pyo3 绑定与编译入口，maturin 唯一打包目标）、`e2m2e-propagation`（纯数学积分器）、`e2m2e-forces`（N 体 STM、重力场）、`e2m2e-spice`（CSPICE FFI）。决策 3 随之部分失效：传播已进入 Rust（`propagate_compiled`、`propagate_with_stm_py`），原因是 cspice 内核池是进程级单例，SPICE 相关的传播与 STM 必须和力模型编进同一个扩展，无法留在 Python 编排层。
+
+spice feature 的构建约定：`cspice-sys` 经 `downloadcspice` 在构建时从 NAIF 官网下载 CSPICE 源码，无需手工安装（也可用 `CSPICE_DIR` 指向本机安装）。`maturin develop` 默认不带 spice，`maturin develop --features spice` 才包含 STM 传播、打靶、第三体等 Rust 快速路径；无 spice 时 Python 侧全部静默降级到慢路径，对应测试以 `importorskip` 跳过。**release wheel 暂不带 spice**：带上意味着 wheel 内嵌 CSPICE 且构建依赖 NAIF 官网可达性，许可与发布稳定性需单独评估后再开。CI 以 `cargo clippy --workspace --features spice` 兜底 spice-gated 代码的编译。

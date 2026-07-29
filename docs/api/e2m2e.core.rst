@@ -45,26 +45,26 @@ e2m2e.core.orbit module
    :undoc-members:
    :show-inheritance:
 
-e2m2e.core.coordinate_system module
-------------------------------------
+e2m2e.core.coordinate.coordinate_system module
+----------------------------------------------
 
-.. automodule:: e2m2e.core.coordinate_system
+.. automodule:: e2m2e.core.coordinate.coordinate_system
    :members:
    :undoc-members:
    :show-inheritance:
 
-e2m2e.core.standard_axes module
---------------------------------
+e2m2e.core.coordinate.standard_axes module
+------------------------------------------
 
-.. automodule:: e2m2e.core.standard_axes
+.. automodule:: e2m2e.core.coordinate.standard_axes
    :members:
    :undoc-members:
    :show-inheritance:
 
-e2m2e.core.standard_origins module
------------------------------------
+e2m2e.core.coordinate.standard_origins module
+---------------------------------------------
 
-.. automodule:: e2m2e.core.standard_origins
+.. automodule:: e2m2e.core.coordinate.standard_origins
    :members:
    :undoc-members:
    :show-inheritance:

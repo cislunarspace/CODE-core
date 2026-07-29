@@ -37,6 +37,13 @@ Five canonical triage roles mapped 1:1 to GitHub labels (needs-triage, needs-inf
 
 Single-context repo. One `CONTEXT.md` at the root, ADRs under `docs/adr/`. See `docs/agents/domain.md`.
 
+## 构建与测试
+
+- Rust 扩展：`maturin develop` 构建 `e2m2e._integrators`。默认不带 spice feature，第三体/compiled STM/打靶等 Rust 快速路径缺席，Python 侧静默降级。
+- `maturin develop --features spice` 才包含快速路径。spice 构建由 `cspice-sys` 的 `downloadcspice` 自动从 NAIF 官网下载 CSPICE 源码（需网络可达 naif.jpl.nasa.gov），也可用 `CSPICE_DIR` 指向本机 CSPICE 安装。
+- 测试：`uv run pytest -n auto`。依赖 spice 快速路径的测试在无 spice 构建下以 `importorskip` 跳过，属预期。
+- 提交前检查：`uv run ruff check .`、`uv run ruff format --check .`、`uv run mypy e2m2e/ --ignore-missing-imports`、`cargo fmt --all -- --check`、`cargo clippy --workspace -- -D warnings`。
+
 ## 编码准则
 
 LLM 写代码时会犯一些可以预见的错误，同样几个，一遍又一遍。以下是规则，不是建议。

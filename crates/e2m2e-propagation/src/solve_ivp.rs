@@ -3,14 +3,11 @@
 //! 从 qiao 仓库的 `qiao-propagation` crate 迁移，改造为：
 //! - 去掉 `Complex<f64>` 泛化，只保留 `f64`
 //! - 复用 e2m2e 已有的 `explicit_rk_step`（返回标量误差）
-//! - 暴露 PyO3 Python 接口（接受 Python callable 作为力模型回调）
 //!
 //! 使用 Prince-Dormand 8(7)13M (DOP853) 方法。
 
 use crate::butcher::{explicit_rk_step, suggest_next_step, ButcherTable};
 use crate::pd78::PD78_TABLE as DOP853;
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
 
 /// 自适应积分步数上限（防止发散/塌缩轨迹死循环的兜底值）。
 pub const MAX_ADAPTIVE_STEPS: usize = 500_000;
@@ -189,109 +186,6 @@ where
     solve_ivp_impl(
         &DOP853, f, t_span, y0, t_eval, rtol, atol, max_step, max_steps, error_dim,
     )
-}
-
-// =========================================================================
-// PyO3 接口：暴露给 Python
-// =========================================================================
-
-/// 调用 Python 右端项回调，校验返回值长度。
-fn call_python_rhs(f: &Bound<PyAny>, n: usize, t: f64, y: &[f64]) -> PyResult<Vec<f64>> {
-    let py = f.py();
-    let yi_list = PyList::new(py, y)?;
-    let result = f.call1((t, yi_list))?;
-    let vals: Vec<f64> = result.extract()?;
-
-    if vals.len() != n {
-        return Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "callback returned {} values but state vector has {} elements",
-            vals.len(),
-            n
-        )));
-    }
-
-    Ok(vals)
-}
-
-/// Python 接口：完整自适应步长 ODE 积分器（scipy `solve_ivp` 等价物）。
-///
-/// 使用 DOP853 (Prince-Dormand 8(7)13M) 方法。
-///
-/// # 参数
-/// - `t_span`: `(t_start, t_end)` 积分区间
-/// - `y0`: 初始状态向量
-/// - `t_eval`: 输出时间点数组
-/// - `rtol`: 相对容差
-/// - `atol`: 绝对容差
-/// - `f`: Python callable `f(t, y) -> dy/dt`
-/// - `max_step`: 最大步长（默认 `f64::INFINITY`）
-/// - `max_steps`: 最大步数（默认 `usize::MAX`）
-/// - `state_error_dim`: 步长误差控制只统计前 N 维（用于 STM 增广传播）
-///
-/// # 返回
-/// Python dict：`{"states": [[...]], "time": [...], "n_steps": int}`
-#[pyfunction]
-#[pyo3(signature = (t_span, y0, t_eval, rtol, atol, f, max_step=None, max_steps=None, state_error_dim=None))]
-#[allow(clippy::too_many_arguments)]
-pub fn solve_ivp_py(
-    t_span: (f64, f64),
-    y0: Vec<f64>,
-    t_eval: Vec<f64>,
-    rtol: f64,
-    atol: f64,
-    f: &Bound<PyAny>,
-    max_step: Option<f64>,
-    max_steps: Option<usize>,
-    state_error_dim: Option<usize>,
-    py: Python<'_>,
-) -> PyResult<PyObject> {
-    if y0.is_empty() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "y0 must not be empty",
-        ));
-    }
-    if t_eval.is_empty() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "t_eval must not be empty",
-        ));
-    }
-    if rtol <= 0.0 || atol <= 0.0 {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "rtol and atol must be positive",
-        ));
-    }
-
-    let n = y0.len();
-    let callback = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
-        call_python_rhs(f, n, ti, yi).map_err(|e| e.to_string())
-    };
-
-    let h_max = max_step.unwrap_or(f64::INFINITY);
-    let s_max = max_steps.unwrap_or(MAX_ADAPTIVE_STEPS);
-
-    let states = solve_ivp_impl(
-        &DOP853,
-        callback,
-        t_span,
-        &y0,
-        &t_eval,
-        rtol,
-        atol,
-        h_max,
-        s_max,
-        state_error_dim,
-    );
-
-    let n_steps = states.len(); // 近似：实际步数 ≥ 输出点数
-
-    // 构造输出时间戳
-    let out_times: Vec<f64> = t_eval[..states.len()].to_vec();
-
-    let dict = PyDict::new(py);
-    dict.set_item("states", states)?;
-    dict.set_item("time", out_times)?;
-    dict.set_item("n_steps", n_steps)?;
-    Ok(dict.into())
 }
 
 #[cfg(test)]

@@ -330,7 +330,7 @@ e2m2e 提供基于 cannonball 模型的太阳辐射压（SRP）力模型，以�
 阴影模型
 --------
 
-:class:`~e2m2e.core.forces.shadow.ShadowModel` 是抽象基类，定义 ``flux_factor(t, state, system) -> float`` 接口。当前实现为圆锥阴影模型 :class:`~e2m2e.core.forces.shadow.ConicalShadowModel`。
+:class:`~e2m2e.core.forces.shadow.ConicalShadowModel` 定义 ``flux_factor(t, state, system) -> float`` 接口，是当前唯一的阴影模型实现。
 
 圆锥阴影模型
 ^^^^^^^^^^^^

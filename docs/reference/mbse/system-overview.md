@@ -70,8 +70,7 @@ ADR-0001 撤销了装饰性的 Protocol 接缝。当前 MBSE 文档只描述真�
 | `OrbitStability` | 稳定性分析结果（单值矩阵、特征值） |
 | `JacobiResult` | Jacobi 常数计算结果 |
 | `SystemConfig` | 系统配置参数 |
-| `SearchConfig` | 搜索配置参数 |
-| `TransferConfig` | 转移配置参数 |
+| `TransferConfig` | 转移配置参数（含搜索阶段 ``search_*`` 字段） |
 
 ## 需求统计
 

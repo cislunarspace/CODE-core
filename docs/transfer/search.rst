@@ -31,18 +31,18 @@
    from e2m2e.transfer import TransferSearch, TransferConfig
    from e2m2e.core.dynamics import CR3BP_Dynamics
 
-   # 方式一：通过 SearchConfig 配置
-   cfg = SearchConfig(
-       alpha_min=0.5,
-       alpha_max=2.5,
-       n_alpha=101,
-       n_departure=200,
-       max_transfer_time=30.0,
-       intersection_threshold=1e-3,
-       min_distance_threshold=1e-3,
-       collision_earth_radius=200.0 / 384405.0,
-       collision_moon_radius=100.0 / 384405.0,
-       integration_dt=0.01,
+   # 方式一：通过 TransferConfig 的 search_* 字段配置
+   cfg = TransferConfig(
+       search_alpha_min=0.5,
+       search_alpha_max=2.5,
+       search_n_alpha=101,
+       search_n_departure=200,
+       search_max_transfer_time=30.0,
+       search_intersection_threshold=1e-3,
+       search_min_distance_threshold=1e-3,
+       search_collision_earth_radius=200.0 / 384405.0,
+       search_collision_moon_radius=100.0 / 384405.0,
+       search_integration_dt=0.01,
    )
    searcher = TransferSearch(dynamics, config=cfg)
 
@@ -169,7 +169,7 @@
 
    from e2m2e.core.system import CR3BP_System
    from e2m2e.core.dynamics import CR3BP_Dynamics
-   from e2m2e.transfer import TransferSearch, SearchConfig, load_orbit_from_json
+   from e2m2e.transfer import TransferSearch, TransferConfig, load_orbit_from_json
 
    # 建立系统
    system = CR3BP_System(
@@ -183,32 +183,22 @@
    ro_orbit = load_orbit_from_json("data/ro_orbit.json")
 
    # 配置搜索
-   cfg = SearchConfig(
-       alpha_min=0.5,
-       alpha_max=2.5,
-       n_alpha=101,
-       n_departure=200,
-       max_transfer_time=30.0,
-       intersection_threshold=1e-3,
-       min_distance_threshold=1e-3,
-       collision_earth_radius=200.0 / 384405.0,
-       collision_moon_radius=100.0 / 384405.0,
-       integration_dt=0.01,
+   cfg = TransferConfig(
+       search_alpha_min=0.5,
+       search_alpha_max=2.5,
+       search_n_alpha=101,
+       search_n_departure=200,
+       search_max_transfer_time=30.0,
+       search_intersection_threshold=1e-3,
+       search_min_distance_threshold=1e-3,
+       search_collision_earth_radius=200.0 / 384405.0,
+       search_collision_moon_radius=100.0 / 384405.0,
+       search_integration_dt=0.01,
    )
    searcher = TransferSearch(dynamics, config=cfg)
 
-   # 执行搜索（多进程并行）
+   # 执行搜索（多进程并行）；搜索参数已随 config 挂在 searcher 上
    results = searcher.search(
-       alpha_min=cfg.alpha_min,
-       alpha_max=cfg.alpha_max,
-       n_alpha=cfg.n_alpha,
-       n_departure=cfg.n_departure,
-       max_transfer_time=cfg.max_transfer_time,
-       intersection_threshold=cfg.intersection_threshold,
-       min_distance_threshold=cfg.min_distance_threshold,
-       collision_earth_radius=cfg.collision_earth_radius,
-       collision_moon_radius=cfg.collision_moon_radius,
-       integration_dt=cfg.integration_dt,
        departure_orbit=dro_orbit,
        arrival_orbit=ro_orbit,
        verbose=True,

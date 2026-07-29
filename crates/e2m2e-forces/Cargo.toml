@@ -1,19 +1,23 @@
 [package]
 name = "e2m2e-forces"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
-description = "Force models for e2m2e (N-body, gravity field, SRP, STM)"
+description = "Force models for e2m2e (N-body, gravity field, STM)"
 
 [lib]
 name = "e2m2e_forces"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [features]
 default = []
-spice = ["dep:cspice", "e2m2e-spice/spice"]
+spice = [
+    "dep:cspice",
+    "dep:e2m2e-spice",
+    "dep:e2m2e-propagation",
+    "e2m2e-spice/spice",
+]
 
 [dependencies]
-pyo3 = { workspace = true }
-e2m2e-spice = { path = "../e2m2e-spice" }
-e2m2e-propagation = { path = "../e2m2e-propagation" }
+e2m2e-spice = { path = "../e2m2e-spice", optional = true }
+e2m2e-propagation = { path = "../e2m2e-propagation", optional = true }
 cspice = { workspace = true, optional = true }

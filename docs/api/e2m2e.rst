@@ -15,6 +15,8 @@ Subpackages
    e2m2e.core
    e2m2e.algorithms
    e2m2e.transfer
+   e2m2e.mbse
+   e2m2e.visualization
 
 Submodules
 ----------
