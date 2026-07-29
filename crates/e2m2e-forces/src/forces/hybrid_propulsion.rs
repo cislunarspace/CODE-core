@@ -55,21 +55,12 @@ impl Default for ElectricPropulsion {
 /// 支持两种推进方式的组合使用：
 /// - 化学推进：瞬时速度改变（impulsive Δv）
 /// - 电推进：连续小推力（continuous low-thrust）
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct HybridPropulsion {
     /// 化学推进参数
     pub chemical: ChemicalPropulsion,
     /// 电推进参数
     pub electric: ElectricPropulsion,
-}
-
-impl Default for HybridPropulsion {
-    fn default() -> Self {
-        Self {
-            chemical: ChemicalPropulsion::default(),
-            electric: ElectricPropulsion::default(),
-        }
-    }
 }
 
 impl HybridPropulsion {
