@@ -4,8 +4,8 @@
 
 #[cfg(feature = "spice")]
 pub mod forces;
-// gravity_field 的内部依赖；integrators 使用自己的本地副本，不经过本 crate。
-#[cfg(feature = "spice")]
-pub(crate) mod solid_tide;
-#[cfg(feature = "spice")]
-pub(crate) mod spherical_harmonic;
+// 纯数学模块，无 spice 依赖；保持无条件 pub，其 #[cfg(test)] 测试在
+// 默认 feature 的 cargo test 下照常执行（integrators 使用自己的本地副本，
+// 不经过本 crate）。
+pub mod solid_tide;
+pub mod spherical_harmonic;
