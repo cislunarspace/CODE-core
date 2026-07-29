@@ -139,3 +139,5 @@ scripts/*.png
 .mimocode/
 .zcode/
 *.pdb
+AGENTS.md
+CLAUDE.md
