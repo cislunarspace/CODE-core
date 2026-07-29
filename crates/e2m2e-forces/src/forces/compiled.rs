@@ -5,13 +5,10 @@
 //!
 //! 与 `rk_step + Python callback` 模式相比，本模块消除 30 万次 GIL 跨界。
 
-use crate::forces::gravity_field::{self, TideConfig, TideMode};
+use crate::forces::gravity_field::{self, GravityFieldContext, TideConfig, TideMode};
 use crate::forces::relativistic;
 use crate::forces::srp;
-use crate::spk_accel;
-use e2m2e_forces::forces::gravity_field::{
-    GravityFieldContext, TideConfig as ForcesTideConfig, TideMode as ForcesTideMode,
-};
+use e2m2e_spice::spk_accel;
 
 /// 编译后的 force（enum，dispatch 用 match）。
 ///
@@ -208,9 +205,7 @@ pub fn supports_jacobian(force: &CompiledForce) -> bool {
 /// 计算单个 force 的加速度 + 雅可比（3×3）。
 ///
 /// - PointMass：解析 `-μ(I/r³ − 3rrᵀ/r⁵)`
-/// - GravityField：传播系下有限差分（不含 body-fixed 旋转 sandwich，
-///   精度略低于 forces crate 的 `GravityFieldContext::jacobian_fd`，
-///   但避免了构建 context 的复杂度）
+/// - GravityField：用 `GravityFieldContext` 做 body-fixed 有限差分
 /// - ThirdBody：spk_accel 解析
 /// - IndirectTerm：零矩阵（不依赖航天器位置）
 /// - SRP/Relativistic：返回 Err
@@ -256,16 +251,11 @@ pub fn acceleration_and_jacobian(
             k_love_flat,
             k_plus_flat,
         } => {
-            // 用 GravityFieldContext 做 body-fixed FD（与 forces crate 一致）。
+            // 用 GravityFieldContext 做 body-fixed FD。
             // build() 时一次性查 SPICE（旋转矩阵 + 原点偏移 + 潮汐系数），
             // jacobian_fd() 在 body-fixed 系做 FD，零额外 SPICE 调用。
-            let forces_tide_mode = match tide_mode {
-                TideMode::None => ForcesTideMode::None,
-                TideMode::Solid => ForcesTideMode::Solid,
-                TideMode::SolidAndPole => ForcesTideMode::SolidAndPole,
-            };
-            let tide = ForcesTideConfig {
-                mode: forces_tide_mode,
+            let tide = TideConfig {
+                mode: tide_mode.clone(),
                 k_love_flat: k_love_flat.clone(),
                 k_plus_flat: k_plus_flat.clone(),
             };

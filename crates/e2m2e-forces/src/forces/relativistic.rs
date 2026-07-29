@@ -5,7 +5,7 @@
 //! - Lense-Thirring（自转角动量 LT，需要 sxform + 旋转矩阵导数）
 //! - de Sitter（geodesic precession）
 
-use crate::spice_ffi::{spkezr, sxform, SpiceFfiError};
+use e2m2e_spice::spice_ffi::{spkezr, sxform, SpiceFfiError};
 
 /// 默认光速（km/s）。
 const C_DEFAULT: f64 = 299792.458;
@@ -43,6 +43,7 @@ fn body_fixed_frame(body: &str) -> &str {
 /// - `enable_schwarzschild` / `enable_lt` / `enable_de_sitter`: 三项开关
 /// - `angular_momentum_vector`: 用户显式传入的 J 向量，或 None 自动算（LT 用）
 /// - `body_radius_override`: 用户传入的天体半径，或 None 用默认表
+#[allow(clippy::too_many_arguments)]
 pub fn relativistic_acceleration(
     et: f64,
     state: &[f64; 6],

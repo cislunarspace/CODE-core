@@ -5,7 +5,7 @@
 //! - 阴影用 M&G §3.4.2 圆锥几何（视角径 a/b、角距 c、四分支判定 + 精确圆面
 //!   重叠面积），多遮挡体按 GMAT GMT-6543 合成
 
-use crate::spice_ffi::{spkezr, SpiceFfiError};
+use e2m2e_spice::spice_ffi::{spkezr, SpiceFfiError};
 
 /// SRP 常量（与 Python srp.py 一致）。
 const P_SRP_1AU: f64 = 4.56e-6; // N/m²
@@ -91,7 +91,7 @@ fn combine_body_fluxes(factors: &[f64], angular_radii: &[f64], directions: &[[f6
         return factors[0];
     }
     // 任一本影（factor=0）→ 0
-    if factors.iter().any(|&f| f == 0.0) {
+    if factors.contains(&0.0) {
         return 0.0;
     }
     if n == 2 {

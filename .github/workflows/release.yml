@@ -53,7 +53,9 @@ jobs:
         with:
           target: ${{ matrix.target }}
           command: build
-          args: --release --out dist
+          # spice feature：内含 CSPICE（经 cspice-sys downloadcspice 从 NAIF
+          # 下载源码编译），提供 STM 传播/打靶等 Rust 快速路径，署名见 NOTICE
+          args: --release --out dist --features spice
           manylinux: 2014
       - name: Build sdist
         if: matrix.os == 'ubuntu-latest'
@@ -71,7 +73,7 @@ jobs:
           mkdir -p /tmp/sdist-fix
           tar xzf "$SDIST" -C /tmp/sdist-fix
           SDIST_DIR=$(ls -d /tmp/sdist-fix/e2m2e-*/)
-          cp LICENSE AUTHORS.md "$SDIST_DIR"
+          cp LICENSE AUTHORS.md NOTICE "$SDIST_DIR"
           tar czf "$SDIST" -C /tmp/sdist-fix "$(basename "$SDIST_DIR")"
           rm -rf /tmp/sdist-fix
       - shell: bash

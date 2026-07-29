@@ -3,9 +3,13 @@ use crate::pd45::PD45_TABLE;
 use crate::pd78::PD78_TABLE;
 use crate::rk89::RK89_TABLE;
 
-/// 单步 Runge-Kutta 方法枚举。
+/// 单步 Runge-Kutta 方法枚举。启用 `pyo3` feature 时暴露给 Python。
 ///
 /// 每种方法对应一张 Butcher 表（见 [`crate::butcher::ButcherTable`]）。
+#[cfg_attr(
+    feature = "pyo3",
+    pyo3::pyclass(eq, eq_int, rename_all = "SCREAMING_SNAKE_CASE")
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RkMethod {
     Pd45,

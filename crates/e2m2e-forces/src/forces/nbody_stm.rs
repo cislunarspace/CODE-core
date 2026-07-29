@@ -291,12 +291,17 @@ pub fn propagate_with_stm(
 mod tests {
     use super::*;
 
-    fn load_kernels() {
+    /// 加载仓库 kernels/ 下可用的内核。返回是否加载到了 SPK 星历（.bsp）。
+    ///
+    /// de430/de440s.bsp 被 .gitignore 排除，干净 clone（如 CI runner）上没有；
+    /// 依赖 MOON/SUN 星历的测试须据此跳过。
+    fn load_kernels() -> bool {
         let kernel_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .and_then(|p| p.parent())
             .unwrap()
             .join("kernels");
+        let mut has_spk = false;
         for name in [
             "naif0012.tls",
             "pck00010.tpc",
@@ -309,9 +314,16 @@ mod tests {
         ] {
             let path = kernel_dir.join(name);
             if path.exists() {
+                // 按文件存在判断跳过；furnish 失败保持原有的容忍（let _），
+                // 但 has_spk 仍置真——星历损坏时测试会照常运行并大声失败，
+                // 不会被守卫掩盖。
+                if name.ends_with(".bsp") {
+                    has_spk = true;
+                }
                 let _ = cspice::data::furnish(path.to_string_lossy().to_string());
             }
         }
+        has_spk
     }
 
     /// 地月系配置：EARTH 为中心，MOON 为摄动体。
@@ -396,7 +408,10 @@ mod tests {
     /// 第三体摄动雅可比数值验证（含 EARTH+MOON+SUN）。
     #[test]
     fn third_body_jacobian_numerical() {
-        load_kernels();
+        if !load_kernels() {
+            eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
+            return;
+        }
         let config = earth_moon_sun_config();
         let et = 0.0; // J2000
         let r = [7000.0, 0.0, 0.0]; // LEO
@@ -498,7 +513,10 @@ mod tests {
 
     #[test]
     fn augmented_eom_basic() {
-        load_kernels();
+        if !load_kernels() {
+            eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
+            return;
+        }
         let config = earth_moon_sun_config();
         let et = 0.0;
 
@@ -537,7 +555,10 @@ mod tests {
     /// 然后用有限差分验证 STM 的 ∂r(T)/∂r(0) 和 ∂r(T)/∂v(0)。
     #[test]
     fn stm_propagation_vs_finite_difference() {
-        load_kernels();
+        if !load_kernels() {
+            eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
+            return;
+        }
         let config = earth_moon_sun_config();
 
         let et0 = 0.0;
@@ -646,7 +667,10 @@ mod tests {
     /// propagate_with_stm 端到端测试：传播 LEO 一个周期，验证 STM 与有限差分一致。
     #[test]
     fn propagate_with_stm_leo_one_period() {
-        load_kernels();
+        if !load_kernels() {
+            eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
+            return;
+        }
         let config = earth_moon_sun_config();
 
         let et0 = 0.0;
