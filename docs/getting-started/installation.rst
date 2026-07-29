@@ -23,6 +23,9 @@ pip 安装
 
    pip install e2m2e[normal-form]
 
+发布的 wheel 内嵌 CSPICE（静态链接，署名见仓库 NOTICE），STM 传播、打靶、
+第三体引力等 Rust 快速路径开箱即用。
+
 从源码安装
 ----------
 
@@ -40,6 +43,18 @@ pip 安装
 
 从源码安装需要 `Rust 工具链 <https://www.rust-lang.org/tools/install>`_，因为积分器核心
 由 Rust 实现（PyO3 绑定），通过 `maturin <https://www.maturin.rs/>`_ 构建。
+
+.. code-block:: bash
+
+   # 默认构建（不含 spice 快速路径）
+   uv run maturin develop
+
+   # 含 spice 快速路径（构建时自动从 NAIF 下载 CSPICE 源码编译，
+   # 需网络可达 naif.jpl.nasa.gov；也可设 CSPICE_DIR 指向本机 CSPICE 安装）
+   uv run maturin develop --features spice
+
+无 spice 的构建下，第三体引力、STM 传播、打靶等绑定缺席，Python 侧自动
+降级到纯 Python 路径，功能正确但更慢。
 
 SPICE 内核
 ----------

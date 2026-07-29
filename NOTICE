@@ -1,0 +1,11 @@
+NOTICE
+======
+
+e2m2e 的二进制发行版（wheel）静态链接了 CSPICE Toolkit。
+
+CSPICE Toolkit 由 NASA Jet Propulsion Laboratory (JPL) 的
+Navigation and Ancillary Information Facility (NAIF) 开发并提供。
+按照 NAIF 的再分发条款，SPICE Toolkit 库模块可以作为支持自建
+SPICE 工具的软件包的一部分随包发布。
+
+CSPICE Toolkit source: https://naif.jpl.nasa.gov/naif/toolkit.html
