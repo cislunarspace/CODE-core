@@ -40,10 +40,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from e2m2e.core.coordinate_system import CoordinateSystem
-from e2m2e.core.standard_axes import ICRSAxes
-from e2m2e.core.standard_origins import CelestialBodyOrigin
 
+from e2m2e.core.coordinate.coordinate_system import CoordinateSystem
+from e2m2e.core.coordinate.standard_axes import ICRSAxes
+from e2m2e.core.coordinate.standard_origins import CelestialBodyOrigin
 from e2m2e.core.ephemeris_system import EphemerisSystem
 from e2m2e.core.forces import (
     ForceModel,

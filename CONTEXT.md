@@ -142,7 +142,7 @@ _Avoid_: 把积分等同于传播全程（积分是单步，传播是全程）
 **状态转移矩阵（STM / State Transition Matrix）** — 状态扰动的线性传播矩阵，形状 `(n_points, 6, 6)`。由 `Dynamics.propagate(..., with_stm=True)` 返回。
 _Avoid_: 雅可比矩阵（STM 是状态空间的雅可比，但与约束雅可比不同）
 
-**积分器（Integrator）** — `动力学` 调用的底层数值推进引擎，实现在 Rust crate（`crates/e2m2e-integrators`）并经 `e2m2e.integrators` 公开。共性：不持有 `System` 上下文、不做事件检测、不控制传播全程（那些是 `动力学` 的职责）；每次调用推进一步并返回误差估计与步长建议。分三族：
+**积分器（Integrator）** — `动力学` 调用的底层数值推进引擎，实现在 Rust workspace（`crates/`）并经 `e2m2e.integrators` 公开。四个 crate 的分工：`e2m2e-integrators` 是 pyo3 绑定与编译入口（maturin 打包为 `e2m2e._integrators`，含力模型的编译型实现）；`e2m2e-propagation` 是纯数学积分器（RK/ABM/Cowell、solve_ivp）；`e2m2e-forces` 是 N 体 STM 变分方程与重力场（spice feature）；`e2m2e-spice` 是 CSPICE FFI 与 SPK 加速度（spice feature）。共性：不持有 `System` 上下文、不做事件检测、不控制传播全程（那些是 `动力学` 的职责）；每次调用推进一步并返回误差估计与步长建议。分三族：
 - **单步积分器（Single-step / Runge-Kutta 族）**：无状态、自适应步长、积一阶 `y'=f(t,y)`、输出全状态。`rk_step`，方法 `Pd45`/`Pd78`/`Rk89`。
 - **多步积分器（Multistep / Adams 族）**：携带**历史缓冲**（纯导数采样）、固定步长、积一阶 `y'=f`、输出全状态。`multistep_step`，方法 `Abm`。
 - **二阶积分器（Second-order / Cowell 族）**：携带**历史缓冲**（位置+加速度采样，采样格式与 Adams 不兼容）、固定步长、积二阶 `x''=a(t,x)`、输出**仅位置**（速度需有限差分恢复）。`cowell_step`。

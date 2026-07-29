@@ -285,7 +285,11 @@ e2m2e/
 ├── mbse/                       # 基于模型的系统工程（文档产物，非运行时）
 ├── visualization/              # 2D/3D 绘图
 └── integrators.py              # Rust 积分器 Python 薄封装
-crates/e2m2e-integrators/       # Rust 积分器内核（PD45/PD78/RK89/ABM/Cowell）
+crates/
+├── e2m2e-integrators/          # pyo3 绑定与编译入口（打包为 e2m2e._integrators）
+├── e2m2e-propagation/          # 纯数学积分器（PD45/PD78/RK89/ABM/Cowell、solve_ivp）
+├── e2m2e-forces/               # 力模型与 N 体 STM 变分方程（spice feature）
+└── e2m2e-spice/                # CSPICE FFI 与 SPK 加速度（spice feature）
 ```
 
 ## 文档

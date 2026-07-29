@@ -1,12 +1,11 @@
 [package]
 name = "e2m2e-propagation"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 description = "ODE integrators for e2m2e (RK, ABM, Cowell)"
 
 [lib]
 name = "e2m2e_propagation"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
-pyo3 = { workspace = true }

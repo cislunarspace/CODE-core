@@ -7,8 +7,7 @@ e2m2e 提供可插拔的大气密度模型，供阻力力模型 ``DragModel`` �
 核心概念
 --------
 
-- **AtmosphereModel**：大气密度模型抽象基类，定义 ``density(altitude)`` 接口。
-- **ExponentialAtmosphere**：USSA76 分段指数大气密度模型，支持 F10.7 / Ap 一阶修正。
+- **ExponentialAtmosphere**：USSA76 分段指数大气密度模型，提供 ``density(altitude)`` 接口，支持 F10.7 / Ap 一阶修正。
 
 ExponentialAtmosphere
 ---------------------

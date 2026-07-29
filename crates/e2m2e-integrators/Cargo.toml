@@ -1,6 +1,6 @@
 [package]
 name = "e2m2e-integrators"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 
 [lib]
@@ -13,7 +13,6 @@ spice = ["dep:cspice", "dep:cspice-sys", "e2m2e-forces/spice", "e2m2e-spice/spic
 
 [dependencies]
 pyo3 = { workspace = true }
-e2m2e-propagation = { path = "../e2m2e-propagation" }
 e2m2e-forces = { path = "../e2m2e-forces" }
 e2m2e-spice = { path = "../e2m2e-spice" }
 cspice = { workspace = true, optional = true }

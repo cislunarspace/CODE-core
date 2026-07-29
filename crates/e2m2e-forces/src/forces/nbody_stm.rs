@@ -96,27 +96,6 @@ pub fn compute_nbody_acceleration_and_jacobian(
     Ok((acc, jac))
 }
 
-/// 计算状态方程的雅可比矩阵 A(t)。
-///
-/// A = | 0₃ₓ₃  I₃ₓ₃ |
-///     | U₃ₓ₃  0₃ₓ₃ |
-///
-/// 其中 U = ∂a/∂r。
-pub fn compute_jacobian_A(jac_da_dr: &[[f64; 3]; 3]) -> [[f64; 6]; 6] {
-    let mut a = [[0.0_f64; 6]; 6];
-    // A[0:3, 3:6] = I
-    for i in 0..3 {
-        a[i][i + 3] = 1.0;
-    }
-    // A[3:6, 0:3] = ∂a/∂r
-    for i in 0..3 {
-        for j in 0..3 {
-            a[i + 3][j] = jac_da_dr[i][j];
-        }
-    }
-    a
-}
-
 /// STM 变分方程的右端项：dΦ/dt = A · Φ。
 ///
 /// # 参数
@@ -224,6 +203,7 @@ pub struct PropagationResult {
 /// # 错误
 /// - 初值处右端项求值失败（如 SPICE 内核缺失导致第三体位置查询失败）；
 /// - 积分提前退出导致输出点数少于 `t_eval.len()`（如步长塌缩、中途力模型失败）。
+#[allow(clippy::too_many_arguments)]
 pub fn propagate_with_stm(
     config: &NBodyConfig,
     t_span: (f64, f64),

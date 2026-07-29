@@ -89,6 +89,7 @@ fn perturbers_for_body(body: &str) -> &'static [&'static str] {
 ///   3. `r_input = R_j2000_to_input^T @ r_body_icrf` —— 旋转到 input_frame 轴
 ///      其中 `R_j2000_to_input = pxform(J2000, input_frame)`，T 反转方向
 ///      等价于 `R_input_to_j2000 = pxform(input_frame, J2000)` 的转置 × r_body_icrf
+#[allow(clippy::too_many_arguments)]
 pub fn gravity_field_acceleration(
     et: f64,
     r_sc: &[f64; 3],
@@ -298,6 +299,7 @@ impl GravityFieldContext {
     /// 一次性查询 SPICE，构建上下文。
     ///
     /// 在积分循环外调用一次，返回的 context 可在积分循环内反复使用。
+    #[allow(clippy::too_many_arguments)]
     pub fn build(
         et: f64,
         c_flat: &[f64],

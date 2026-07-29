@@ -18,7 +18,6 @@
 
 const JD_J2000: f64 = 2451545.0;
 const DAYS_PER_JULIAN_CENTURY: f64 = 36525.0;
-const DAYS_PER_YEAR: f64 = 365.25;
 const RAD_PER_DEG: f64 = std::f64::consts::PI / 180.0;
 
 // ----------------------------------------------------------------------------
@@ -329,36 +328,6 @@ pub fn solid_tide_step1(
     pack_cs(&dc, &ds)
 }
 
-// ----------------------------------------------------------------------------
-// 极潮
-// ----------------------------------------------------------------------------
-
-/// 极潮（固体极潮 IERS p.65 + Desai 海洋极潮 TN32 §6.3）。返回长度 50 的 Vec<f64>。
-///
-/// 只影响 (2,1)。对齐 GMAT `ETide::SolidAndPole`。
-pub fn pole_tide(et: f64, xp: f64, yp: f64) -> Vec<f64> {
-    let jd = JD_J2000 + et / 86400.0;
-    let ym2000 = (jd - JD_J2000) / DAYS_PER_YEAR;
-    let xp_bar = 0.054 + ym2000 * 0.00083;
-    let yp_bar = 0.357 + ym2000 * 0.00395;
-
-    let m1 = xp - xp_bar;
-    let m2 = -(yp - yp_bar);
-
-    let mut dc = [[0.0_f64; 5]; 5];
-    let mut ds = [[0.0_f64; 5]; 5];
-
-    // 固体极潮（IERS p.65）
-    dc[2][1] -= 1.333e-09 * (m1 + 0.0115 * m2);
-    ds[2][1] -= 1.333e-09 * (m2 - 0.0115 * m1);
-
-    // 海洋极潮（Desai, TN32 §6.3）
-    dc[2][1] -= 2.2344e-10 * (m1 - 0.01737 * m2);
-    ds[2][1] -= 1.7680e-10 * (m2 - 0.03351 * m1);
-
-    pack_cs(&dc, &ds)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417,14 +386,5 @@ mod tests {
         assert!(out[2 * 5 + 0].abs() > 1e-9);
         // 所有项有限
         assert!(out.iter().all(|v| v.is_finite()));
-    }
-
-    /// pole_tide 在中等极移下应该非零。
-    #[test]
-    fn test_pole_tide_basic() {
-        let out = pole_tide(0.0, 0.1, 0.3);
-        assert_eq!(out.len(), 50);
-        // (2,1) 非零：index [2,1] = 11
-        assert!(out[11].abs() > 1e-12 || out[25 + 11].abs() > 1e-12);
     }
 }

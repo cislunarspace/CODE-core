@@ -57,7 +57,6 @@ e2m2e 实现了基于 Cui et al. (2025) 的"搜索-优化"两步法，用于 DRO
        Transfer,
        TransferSearch,
        TransferConfig,
-       SearchConfig,
        DROTRONLPOptimizer,
        NLPOptimizationVariables,
        load_orbit_from_json,

@@ -2,12 +2,10 @@ use crate::butcher::ButcherTable;
 use crate::pd45::PD45_TABLE;
 use crate::pd78::PD78_TABLE;
 use crate::rk89::RK89_TABLE;
-use pyo3::prelude::*;
 
-/// 单步 Runge-Kutta 方法枚举，暴露给 Python。
+/// 单步 Runge-Kutta 方法枚举。
 ///
 /// 每种方法对应一张 Butcher 表（见 [`crate::butcher::ButcherTable`]）。
-#[pyclass(eq, eq_int, rename_all = "SCREAMING_SNAKE_CASE")]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RkMethod {
     Pd45,
