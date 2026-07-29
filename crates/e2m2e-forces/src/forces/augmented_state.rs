@@ -22,6 +22,21 @@ use super::compiled::{compute_total_acceleration, CompiledForce};
 /// 7D 增广状态：[r(3), v(3), m(1)]
 pub type AugmentedState7 = [f64; 7];
 
+/// 推力配置参数。
+///
+/// 将推力相关的 4 个独立参数打包，避免函数签名参数过多。
+#[derive(Debug, Clone, Copy)]
+pub struct ThrustParams {
+    /// 最大推力（N）
+    pub t_max: f64,
+    /// 比冲（s）
+    pub isp: f64,
+    /// 推力幅值 u0 ∈ [0, 1]
+    pub throttle: f64,
+    /// 推力方向单位向量（惯性系）
+    pub direction: [f64; 3],
+}
+
 /// 7D 增广动力学方程。
 ///
 /// # 参数
@@ -29,10 +44,7 @@ pub type AugmentedState7 = [f64; 7];
 /// - `observer`: 传播系 origin 天体名（如 "EARTH"）
 /// - `et`: 历元时刻（SPICE et 秒）
 /// - `state`: 7D 状态 [x, y, z, vx, vy, vz, m]
-/// - `t_max`: 最大推力（N）
-/// - `isp`: 比冲（s）
-/// - `throttle`: 推力幅值 u0 ∈ [0, 1]
-/// - `direction`: 推力方向单位向量（惯性系）
+/// - `thrust`: 推力配置
 ///
 /// # 返回
 /// 7D 导数 [vx, vy, vz, ax, ay, az, mdot]
@@ -41,10 +53,7 @@ pub fn augmented_eom_7d(
     observer: &str,
     et: f64,
     state: &AugmentedState7,
-    t_max: f64,
-    isp: f64,
-    throttle: f64,
-    direction: &[f64; 3],
+    thrust: &ThrustParams,
 ) -> Result<AugmentedState7, String> {
     // 提取状态分量
     let r = [state[0], state[1], state[2]];
@@ -58,19 +67,19 @@ pub fn augmented_eom_7d(
     // 2. 计算推力加速度
     // T_max 单位为 N (kg·m/s²)，质量单位为 kg，加速度单位为 m/s²
     // 需要转换为 km/s²（除以 1000）
-    let a_thrust_mag_m_s2 = (t_max / m) * throttle;
+    let a_thrust_mag_m_s2 = (thrust.t_max / m) * thrust.throttle;
     let a_thrust_mag_km_s2 = a_thrust_mag_m_s2 / 1000.0;
     let a_thrust = [
-        a_thrust_mag_km_s2 * direction[0],
-        a_thrust_mag_km_s2 * direction[1],
-        a_thrust_mag_km_s2 * direction[2],
+        a_thrust_mag_km_s2 * thrust.direction[0],
+        a_thrust_mag_km_s2 * thrust.direction[1],
+        a_thrust_mag_km_s2 * thrust.direction[2],
     ];
 
     // 3. 计算质量流率
     // mdot = -u0 * T_max / (Isp * g0)
     // 单位：kg/s
     let g0 = 9.81; // m/s²
-    let mdot = -throttle * t_max / (isp * g0);
+    let mdot = -thrust.throttle * thrust.t_max / (thrust.isp * g0);
 
     // 4. 组装 7D 导数
     Ok([
@@ -100,10 +109,7 @@ pub type AugmentedState42 = [f64; 43];
 /// - `observer`: 传播系 origin
 /// - `et`: 历元时刻
 /// - `state`: 43D 状态 [x, y, z, vx, vy, vz, m, Φ(36)]
-/// - `t_max`: 最大推力（N）
-/// - `isp`: 比冲（s）
-/// - `throttle`: 推力幅值
-/// - `direction`: 推力方向
+/// - `thrust`: 推力配置
 ///
 /// # 返回
 /// 43D 导数
@@ -112,10 +118,7 @@ pub fn augmented_eom_7d_with_stm(
     observer: &str,
     et: f64,
     state: &AugmentedState42,
-    t_max: f64,
-    isp: f64,
-    throttle: f64,
-    direction: &[f64; 3],
+    thrust: &ThrustParams,
 ) -> Result<AugmentedState42, String> {
     // 提取状态分量
     let r = [state[0], state[1], state[2]];
@@ -130,17 +133,17 @@ pub fn augmented_eom_7d_with_stm(
         super::compiled::compute_total_acceleration_and_jacobian(forces, et, &state6, observer)?;
 
     // 2. 计算推力加速度
-    let a_thrust_mag_m_s2 = (t_max / m) * throttle;
+    let a_thrust_mag_m_s2 = (thrust.t_max / m) * thrust.throttle;
     let a_thrust_mag_km_s2 = a_thrust_mag_m_s2 / 1000.0;
     let a_thrust = [
-        a_thrust_mag_km_s2 * direction[0],
-        a_thrust_mag_km_s2 * direction[1],
-        a_thrust_mag_km_s2 * direction[2],
+        a_thrust_mag_km_s2 * thrust.direction[0],
+        a_thrust_mag_km_s2 * thrust.direction[1],
+        a_thrust_mag_km_s2 * thrust.direction[2],
     ];
 
     // 3. 计算质量流率
     let g0 = 9.81;
-    let mdot = -throttle * t_max / (isp * g0);
+    let mdot = -thrust.throttle * thrust.t_max / (thrust.isp * g0);
 
     // 4. 计算 STM 导数
     // dΦ/dt = A * Φ，其中 A 是雅可比矩阵
@@ -173,18 +176,17 @@ mod tests {
         let state = [
             7000.0, 0.0, 0.0, // position (km)
             0.0, 7.5, 0.0,    // velocity (km/s)
-            1500.0,           // mass (kg)
+            1500.0, // mass (kg)
         ];
 
-        let t_max = 1.0; // N
-        let isp = 3000.0; // s
-        let throttle = 0.8;
-        let direction = [1.0, 0.0, 0.0];
+        let thrust = ThrustParams {
+            t_max: 1.0,  // N
+            isp: 3000.0, // s
+            throttle: 0.8,
+            direction: [1.0, 0.0, 0.0],
+        };
 
-        let result = augmented_eom_7d(
-            &forces, "EARTH", 0.0, &state, t_max, isp, throttle, &direction,
-        )
-        .unwrap();
+        let result = augmented_eom_7d(&forces, "EARTH", 0.0, &state, &thrust).unwrap();
 
         // 验证位置导数 = 速度
         assert!((result[0] - 0.0).abs() < 1e-10);
@@ -202,19 +204,18 @@ mod tests {
         let forces = vec![]; // 无重力
 
         let state = [
-            7000.0, 0.0, 0.0, 0.0, 0.0, 0.0, // 静止
+            7000.0, 0.0, 0.0, 0.0, 0.0, 0.0,    // 静止
             1000.0, // kg
         ];
 
-        let t_max = 0.5; // N
-        let isp = 3000.0;
-        let throttle = 1.0;
-        let direction = [1.0, 0.0, 0.0];
+        let thrust = ThrustParams {
+            t_max: 0.5, // N
+            isp: 3000.0,
+            throttle: 1.0,
+            direction: [1.0, 0.0, 0.0],
+        };
 
-        let result = augmented_eom_7d(
-            &forces, "EARTH", 0.0, &state, t_max, isp, throttle, &direction,
-        )
-        .unwrap();
+        let result = augmented_eom_7d(&forces, "EARTH", 0.0, &state, &thrust).unwrap();
 
         // 验证推力加速度：a = T/m = 0.5 N / 1000 kg = 5e-4 m/s² = 5e-7 km/s²
         let expected_a = 0.5 / 1000.0 / 1000.0; // km/s²
