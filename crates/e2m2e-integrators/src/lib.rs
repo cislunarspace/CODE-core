@@ -18,14 +18,14 @@ pub(crate) mod forces;
 #[cfg(feature = "spice")]
 pub mod multiple_shooting;
 pub(crate) mod multistep_methods;
-#[cfg(feature = "spice")]
-pub mod segmented_shooting;
-#[cfg(feature = "spice")]
-pub mod single_shooting;
 pub(crate) mod pd45;
 pub(crate) mod pd78;
 pub(crate) mod rk89;
 pub mod rk_methods;
+#[cfg(feature = "spice")]
+pub mod segmented_shooting;
+#[cfg(feature = "spice")]
+pub mod single_shooting;
 pub(crate) mod solid_tide;
 pub mod solve_ivp;
 pub(crate) mod spherical_harmonic;
@@ -652,7 +652,9 @@ fn srp_acceleration(
 /// - `("indirect", body, mu)`
 /// - `("srp", area, mass, cr, shadow_bodies_list)`
 #[cfg(feature = "spice")]
-pub(crate) fn parse_force_tuple(item: &Bound<'_, PyAny>) -> PyResult<forces::compiled::CompiledForce> {
+pub(crate) fn parse_force_tuple(
+    item: &Bound<'_, PyAny>,
+) -> PyResult<forces::compiled::CompiledForce> {
     use forces::compiled::CompiledForce;
     use forces::gravity_field::TideMode;
 
@@ -1003,7 +1005,10 @@ fn propagate_with_stm_py(
 
     let result = propagate_with_stm(
         &config, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
-    );
+    )
+    .map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!("STM propagation failed: {}", e))
+    })?;
 
     // 转为 Python 对象
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
@@ -1123,15 +1128,24 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
     #[cfg(feature = "spice")]
-    m.add_function(wrap_pyfunction!(multiple_shooting::multiple_shooting_correct_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        multiple_shooting::multiple_shooting_correct_py,
+        m
+    )?)?;
     #[cfg(feature = "spice")]
     m.add_class::<multiple_shooting::MultipleShootingRustResult>()?;
     #[cfg(feature = "spice")]
-    m.add_function(wrap_pyfunction!(segmented_shooting::segmented_shooting_correct_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        segmented_shooting::segmented_shooting_correct_py,
+        m
+    )?)?;
     #[cfg(feature = "spice")]
     m.add_class::<segmented_shooting::SegmentedShootingResult>()?;
     #[cfg(feature = "spice")]
-    m.add_function(wrap_pyfunction!(segmented_shooting::segmented_shooting_correct_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        segmented_shooting::segmented_shooting_correct_py,
+        m
+    )?)?;
     #[cfg(feature = "spice")]
     m.add_class::<segmented_shooting::SegmentedShootingResult>()?;
     m.add_class::<RkMethod>()?;

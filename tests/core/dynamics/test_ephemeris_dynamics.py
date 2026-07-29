@@ -259,5 +259,49 @@ class TestEphemerisDynamicsEdgeCases:
         assert np.all(np.isfinite(result["states"]))
 
 
+# =============================================================================
+# Test Rust STM 快速路径的错误处理（issue #246）
+# =============================================================================
+class TestRustStmErrorHandling:
+    """Rust 快速路径不允许静默返回截断结果"""
+
+    def test_propagate_with_stm_py_unknown_body_raises(self, reference_et, leo_state):
+        """无星历天体的第三体查询必须抛 RuntimeError，而非返回截断结果"""
+        propagate_with_stm_py = pytest.importorskip(
+            "e2m2e._integrators", reason="Rust 扩展不可用"
+        ).propagate_with_stm_py
+        with pytest.raises(RuntimeError, match="STM propagation failed"):
+            propagate_with_stm_py(
+                bodies=["EARTH", "FAKEBODY"],
+                origin="EARTH",
+                gm_values=[398600.435507, 1.0],
+                t_span=(reference_et, reference_et + 100.0),
+                t_eval=[reference_et, reference_et + 100.0],
+                initial_state=[float(x) for x in leo_state],
+                rtol=1e-12,
+                atol=1e-12,
+                max_step=10.0,
+            )
+
+    def test_rust_path_rejects_truncated_result(self, spice_eph_dynamics, leo_state, monkeypatch):
+        """_propagate_with_stm_rust 对点数不足的截断结果必须抛 RuntimeError"""
+        import e2m2e.core.ephemeris_dynamics as ephem_dyn
+
+        def fake_propagate(**kwargs):
+            t0 = kwargs["t_eval"][0]
+            return {
+                "states": [list(kwargs["initial_state"])],
+                "stm": [[1.0 if i == j else 0.0 for i in range(6) for j in range(6)]],
+                "time": [t0],
+            }
+
+        monkeypatch.setattr(ephem_dyn, "propagate_with_stm_py", fake_propagate)
+        monkeypatch.setattr(ephem_dyn, "_HAS_RUST_STM", True)
+
+        t_eval = np.linspace(0.0, 100.0, 101)
+        with pytest.raises(RuntimeError, match="truncated"):
+            spice_eph_dynamics.propagate(leo_state, (0.0, 100.0), t_eval=t_eval, with_stm=True)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -220,6 +220,10 @@ pub struct PropagationResult {
 ///
 /// # 返回
 /// `PropagationResult`：每个 `t_eval` 对应的状态和 STM。
+///
+/// # 错误
+/// - 初值处右端项求值失败（如 SPICE 内核缺失导致第三体位置查询失败）；
+/// - 积分提前退出导致输出点数少于 `t_eval.len()`（如步长塌缩、中途力模型失败）。
 pub fn propagate_with_stm(
     config: &NBodyConfig,
     t_span: (f64, f64),
@@ -229,7 +233,7 @@ pub fn propagate_with_stm(
     atol: f64,
     max_step: Option<f64>,
     max_steps: Option<usize>,
-) -> PropagationResult {
+) -> Result<PropagationResult, String> {
     use e2m2e_propagation::solve_ivp::solve_ivp_capped;
 
     // 构造 42 维增广状态：[r(3), v(3), Φ(36)]
@@ -239,6 +243,11 @@ pub fn propagate_with_stm(
     for i in 0..6 {
         augmented0[6 + i * 6 + i] = 1.0;
     }
+
+    // 预检：初值处右端项必须可求值。SPICE 内核缺失时第三体位置查询
+    // 在此处确定性失败，避免积分静默返回截断结果（issue #246）。
+    augmented_eom(config, t_span.0, &augmented0)
+        .map_err(|e| format!("initial RHS evaluation failed at t={}: {}", t_span.0, e))?;
 
     let h_max = max_step.unwrap_or(f64::INFINITY);
     let s_max = max_steps.unwrap_or(500_000);
@@ -261,6 +270,19 @@ pub fn propagate_with_stm(
         Some(6), // 只统计前 6 维误差
     );
 
+    // 完整性校验：solve_ivp_capped 在力模型失败/步长塌缩时会提前退出，
+    // 输出点数不足即视为传播失败，不允许静默截断（issue #246）。
+    if sol.len() != t_eval.len() {
+        return Err(format!(
+            "propagation truncated: got {} of {} time points (t_span=({:.3}, {:.3})); \
+             likely cause: SPICE kernels not loaded or step size collapsed",
+            sol.len(),
+            t_eval.len(),
+            t_span.0,
+            t_span.1,
+        ));
+    }
+
     // 分离状态和 STM
     let mut states = Vec::with_capacity(sol.len());
     let mut stms = Vec::with_capacity(sol.len());
@@ -278,11 +300,11 @@ pub fn propagate_with_stm(
         times.push(t_eval[i]);
     }
 
-    PropagationResult {
+    Ok(PropagationResult {
         states,
         stms,
         times,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -556,7 +578,8 @@ mod tests {
             1e-12,
             None,
             None,
-        );
+        )
+        .unwrap();
         assert_eq!(result.states.len(), 2, "应输出 2 个时间点");
         let r1 = result.states[1];
         let stm_flat = &result.stms[1];
@@ -579,7 +602,8 @@ mod tests {
                 1e-12,
                 None,
                 None,
-            );
+            )
+            .unwrap();
             let r1_pert = result_pert.states[1];
 
             for row in 0..2 {
@@ -613,7 +637,8 @@ mod tests {
                 1e-12,
                 None,
                 None,
-            );
+            )
+            .unwrap();
             let r1_pert = result_pert.states[1];
 
             for row in 0..2 {
@@ -662,7 +687,8 @@ mod tests {
             1e-12,
             None,
             None,
-        );
+        )
+        .unwrap();
 
         assert_eq!(result.states.len(), 2, "应输出 2 个时间点");
         assert_eq!(result.stms.len(), 2);
@@ -719,7 +745,8 @@ mod tests {
                 1e-12,
                 None,
                 None,
-            );
+            )
+            .unwrap();
 
             let r1_pert = result_pert.states[1];
 
@@ -739,5 +766,45 @@ mod tests {
                 );
             }
         }
+    }
+
+    // =========================================================
+    // 测试 7：无星历天体必须返回 Err，不允许静默截断（issue #246）
+    // =========================================================
+
+    /// 第三体无星历数据时，propagate_with_stm 必须返回带上下文的 Err，
+    /// 而不是静默返回只有 t0 的截断结果。
+    #[test]
+    fn propagate_with_stm_unknown_body_returns_err() {
+        load_kernels();
+        let config = NBodyConfig {
+            bodies: vec!["EARTH".to_string(), "FAKEBODY".to_string()],
+            origin: "EARTH".to_string(),
+            gm_values: vec![398600.435436, 1.0],
+        };
+
+        let state0 = [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0];
+        let t_eval = vec![0.0, 100.0];
+
+        let result = propagate_with_stm(
+            &config,
+            (0.0, 100.0),
+            &t_eval,
+            &state0,
+            1e-12,
+            1e-12,
+            None,
+            None,
+        );
+
+        let err = match result {
+            Ok(_) => panic!("无星历天体必须返回 Err"),
+            Err(e) => e,
+        };
+        assert!(
+            err.contains("FAKEBODY") || err.contains("SPICE"),
+            "错误信息应指名失败的天体或 SPICE 查询，实际: {}",
+            err
+        );
     }
 }

@@ -8,9 +8,9 @@ import os
 
 import numpy as np
 import pytest
+from kernel_helpers import SPICE_KERNEL_DIR
 
 from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
-from kernel_helpers import SPICE_KERNEL_DIR
 
 
 def pytest_configure(config):
