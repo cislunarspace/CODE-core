@@ -10,6 +10,8 @@ use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyList};
 
 #[cfg(feature = "spice")]
+pub mod homotopy;
+#[cfg(feature = "spice")]
 pub mod multiple_shooting;
 #[cfg(feature = "spice")]
 pub mod segmented_shooting;

@@ -2,9 +2,11 @@
 //!
 //! 每个 force 一个子模块，1:1 移植自 Python 实现。
 
+pub mod augmented_state;
 pub mod compiled;
 pub mod compiled_stm;
 pub mod gravity_field;
+pub mod hybrid_propulsion;
 pub mod nbody_stm;
 pub mod relativistic;
 pub mod srp;
