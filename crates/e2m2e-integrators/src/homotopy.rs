@@ -110,7 +110,14 @@ impl HomotopySolver {
         }
 
         let mut current_result = self.solve_with_lambda(
-            forces, observer, t_patch, state_patch, t_max, isp, lambda, verbose,
+            forces,
+            observer,
+            t_patch,
+            state_patch,
+            t_max,
+            isp,
+            lambda,
+            verbose,
         )?;
 
         total_iterations += current_result.iterations;
@@ -156,7 +163,10 @@ impl HomotopySolver {
             // 检查收敛
             if current_result.max_residual < self.config.tolerance {
                 if verbose {
-                    eprintln!("同伦法收敛：λ = {:.2}, 残差 = {:.2e}", lambda, current_result.max_residual);
+                    eprintln!(
+                        "同伦法收敛：λ = {:.2}, 残差 = {:.2e}",
+                        lambda, current_result.max_residual
+                    );
                 }
                 break;
             }
@@ -260,15 +270,9 @@ pub fn sigmoid_control(s: f64, epsilon: f64) -> f64 {
 ///
 /// # 返回
 /// 切换函数值 S
-pub fn switching_function(
-    lambda_v: &[f64; 3],
-    u_hat: &[f64; 3],
-    lambda_m: f64,
-    isp: f64,
-) -> f64 {
+pub fn switching_function(lambda_v: &[f64; 3], u_hat: &[f64; 3], lambda_m: f64, isp: f64) -> f64 {
     let g0 = 9.81; // m/s²
-    lambda_v[0] * u_hat[0] + lambda_v[1] * u_hat[1] + lambda_v[2] * u_hat[2]
-        - lambda_m / (isp * g0)
+    lambda_v[0] * u_hat[0] + lambda_v[1] * u_hat[1] + lambda_v[2] * u_hat[2] - lambda_m / (isp * g0)
 }
 
 #[cfg(test)]

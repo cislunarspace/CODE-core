@@ -44,8 +44,8 @@ pub struct ElectricPropulsion {
 impl Default for ElectricPropulsion {
     fn default() -> Self {
         Self {
-            t_max: 1.0,   // N（潘迅 1 N，Caillau 0.3-10 N）
-            isp: 3000.0,  // s（NSTAR 3100 s，SMART-1 1500 s）
+            t_max: 1.0,  // N（潘迅 1 N，Caillau 0.3-10 N）
+            isp: 3000.0, // s（NSTAR 3100 s，SMART-1 1500 s）
         }
     }
 }
@@ -139,11 +139,7 @@ impl HybridPropulsion {
     ///
     /// # 返回
     /// 质量流率（kg/s）
-    pub fn mass_flow_rate(
-        &self,
-        chemical_throttle: f64,
-        electric_throttle: f64,
-    ) -> f64 {
+    pub fn mass_flow_rate(&self, chemical_throttle: f64, electric_throttle: f64) -> f64 {
         let g0 = 9.81; // m/s²
 
         // 化学推进质量流率
