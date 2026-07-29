@@ -87,9 +87,9 @@ Floquet 理论
 ``analyze()`` 返回的 ``bifurcation`` 字段由 ``analyze_bifurcation()`` 生成，
 根据特征值与 +1、-1 及单位圆的关系识别分岔类型（``BifurcationType`` 枚举）：
 
-- 特征值穿过 +1 → 鞍结分岔（``SADDLE_NODE``）
-- 特征值穿过 -1 → 倍周期分岔（``PERIOD_DOUBLING``）
-- 复特征值穿过单位圆 → 环面分岔（``TORUS``）
+- 特征值接近 +1 → 鞍结分岔（``SADDLE_NODE``）
+- 特征值接近 -1 → 倍周期分岔（``PERIOD_DOUBLING``）
+- 复特征值接近单位圆 → 环面分岔（``TORUS``）
 
 对整个轨道族检测分岔点，使用静态方法：
 
