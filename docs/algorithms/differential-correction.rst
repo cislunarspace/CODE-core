@@ -91,7 +91,7 @@ CR3BP 动力学在旋转坐标系中具有以下对称性：
 
 .. code-block:: python
 
-   from e2m2e.core.system import CR3BP_System
+   from e2m2e.core import CR3BP_System
    from e2m2e.core.dynamics import CR3BP_Dynamics
    from e2m2e.core.orbit import Orbit
    from e2m2e.algorithms.differential_correction import DifferentialCorrection
@@ -209,7 +209,7 @@ Halo 轨道（固定 z 振幅）
    orbit = corrector.iterate_correction(initial_guess=initial_guess)
    if orbit is not None:
        print(f"Halo 轨道周期: {orbit.period:.4f}")
-       print(f"Jacobi 常数: {orbit.jacobi_constant:.6f}")
+       print(f"Jacobi 常数: {system.get_jacobi_constant(orbit.states[0]):.6f}")
 
 策略与修正器的协作关系
 ----------------------

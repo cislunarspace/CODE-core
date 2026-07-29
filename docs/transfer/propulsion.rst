@@ -28,13 +28,14 @@
 
    propulsion = ImpulsivePropulsion()
 
-   # 计算出发脉冲
-   cost = propulsion.compute_departure_cost(
-       departure_state=dro_orbit.states[0],
+   # 计算出发注入速度
+   v_inj = propulsion.compute_departure_velocity(
+       dro_orbit.states[0],
        alpha=1.2,
        beta=0.0,
    )
-   print(f"出发脉冲: {cost.dv1:.6f} DU")
+
+   # 转移代价（Δv 分解）由 compute_cost 计算，见下文示例
 
 参数说明
 --------

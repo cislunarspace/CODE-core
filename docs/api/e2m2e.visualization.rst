@@ -5,6 +5,7 @@ e2m2e.visualization package
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: PlotConfig
 
 Submodules
 ----------

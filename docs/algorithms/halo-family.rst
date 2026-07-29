@@ -16,41 +16,34 @@ Halo 专用逻辑：种子生成、自然参数族延拓、伪弧长延拓。
    seed = generate_halo_seed_orbit(
        continuation=continuation,
        libration_point=1,
+       amplitude_z=0.001,   # 种子宜取小振幅（Richardson 近似精度高），由延拓放大
        halo_class=0,
-       z_amplitude=0.01,
    )
 
 参数说明：
 
 - ``continuation`` — ``Continuation`` 实例
 - ``libration_point`` — 平动点编号（1 或 2）
-- ``halo_class`` — Halo 族分支（0=南族，1=北族）
-- ``z_amplitude`` — z 方向振幅
+- ``amplitude_z`` — z 方向振幅
+- ``halo_class`` — Halo 族分支（0=北族，1=南族）
 
 轨道族生成
 ----------
 
-``generate_halo_family()`` 是一站式入口，从种子到完整轨道族：
+``generate_halo_family()`` 从种子轨道出发，沿 z 振幅方向自然延拓生成轨道族：
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_family import generate_halo_family
-
-   family = generate_halo_family(
-       system=system,
-       dynamics=dynamics,
-       libration_point=1,
-       amplitude_z_range=(0.001, 0.15),
+   family = continuation.generate_halo_family(
+       seed_orbit=seed,
        n_orbits=50,
+       z_range=(0.001, 0.15),   # z 振幅范围
    )
 
    print(f"生成 {len(family)} 条 Halo 轨道")
 
-内部流程：
-
-1. 用 Richardson 三阶近似生成初始猜测
-2. 微分修正得到种子轨道
-3. 自然延拓生成轨道族
+内部流程：以上一条收敛轨道为初值，固定目标 z0 逐点微分修正，
+逐步推进到 ``z_range`` 边界；修正失败时缩减步长重试，触底即终止。
 
 伪弧长延拓
 ----------
@@ -59,13 +52,14 @@ Halo 专用逻辑：种子生成、自然参数族延拓、伪弧长延拓。
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_family import generate_halo_family_pal
+   from e2m2e.algorithms.halo_family import halo_pseudo_arclength_continuation
 
-   family = generate_halo_family_pal(
-       system=system,
-       dynamics=dynamics,
-       libration_point=1,
-       amplitude_z_range=(0.001, 0.15),
-       n_orbits=50,
-       step_size=0.002,
+   family = halo_pseudo_arclength_continuation(
+       continuation=continuation,
+       seed_orbit=seed,
+       n_orbits=50,               # 每支生成的新轨道条数
+       direction="both",          # 双侧延拓
+       step_size=0.0045,          # 伪弧长步长 ΔS
    )
+
+返回 ``OrbitFamily`` 对象，包含种子轨道与各延拓支的新轨道。

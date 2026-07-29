@@ -41,8 +41,28 @@
    param = result.catalog_transformer.rho_to_param(x0, t=0.0)
 
 ``result`` 是一个不可变容器，既给出整条流水线的收敛诊断
-（``success``、``residual``、``metadata``），也把四个子结果作为一等公民
-字段暴露，供需要深入到某一层的调用方使用。
+（``success``、``substitute_residual``、``message``、``metadata``），也把四个子结果作为一等公民
+字段暴露，供需要深入到某一层的调用方使用。``residual`` 是
+``substitute_residual`` 的向后兼容别名，新代码应使用后者。
+
+结果保存与加载
+--------------
+
+``NormalFormResult`` 可序列化到磁盘，便于把化简结果存档复用：
+
+.. code-block:: python
+
+   from e2m2e.algorithms.normal_form import NormalFormResult
+
+   # 保存为 .npz（全部子结果与 context 参数一并序列化）
+   result.save("result.npz")
+
+   # 重建；catalog_transformer 由三个子结果自动复原
+   result = NormalFormResult.load("result.npz")
+
+``catalog_transformer`` 不单独存储，加载时由动力学替代、quasi-Floquet、
+中心流形三个子结果重建，与原始对象在 ``rho_to_param`` / ``param_to_rho``
+上数值等价。
 
 可配置旋钮
 ----------

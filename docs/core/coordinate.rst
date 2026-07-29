@@ -13,15 +13,16 @@ e2m2e 的坐标系层负责位置、速度等矢量在不同参考框架之间�
 
 .. code-block:: python
 
-   from e2m2e.core.coordinate_system import CoordinateSystem
-   from e2m2e.core.standard_axes import ICRSAxes, ITRFSpiceAxes
-   from e2m2e.core.standard_origins import CelestialBodyOrigin
+   from e2m2e.core import CoordinateSystem, ICRSAxes, ITRFSpiceAxes, CelestialBodyOrigin
 
    # ICRF 惯性系（地球中心）
    icrf = CoordinateSystem(
        axes=ICRSAxes(),
        origin=CelestialBodyOrigin(body="EARTH", spice=spice),
    )
+
+坐标系族位于 ``e2m2e.core.coordinate`` 子包，上述类在 ``e2m2e.core`` 顶层
+重导出；旧的 ``e2m2e.core.<mod>`` 模块路径保留兼容别名。
 
 坐标轴类型
 ----------
@@ -38,7 +39,7 @@ e2m2e 提供多种坐标轴实现：
      - 惯性 ICRF 系（单位阵）
      - 星历传播默认
    * - ``ITRFSpiceAxes``
-     - ITRF93 地固系（IAU 2000 CIO）
+     - SPICE-backed 高精度 ITRF93（需加载 LSK/PCK 内核）
      - 球谐引力场展开
    * - ``ITRFApproxAxes``
      - 低精度 ITRF 近似
@@ -63,12 +64,12 @@ VNBAxes 和 LVLHAxes 是动态坐标轴——旋转矩阵不仅依赖历元，�
 
    # 在不同坐标系间转换状态
    state_itrf = icrf.transform_state(
-       et, state_j2000, from_cs=j2000_cs, to_cs=itrf_cs
+       state_j2000, from_cs=j2000_cs, to_cs=itrf_cs, et=et
    )
 
    # 转换向量（不含原点平移）
    accel_j2000 = icrf.transform_vector(
-       et, accel_itrf, from_cs=itrf_cs, to_cs=j2000_cs
+       accel_itrf, from_cs=itrf_cs, to_cs=j2000_cs, et=et
    )
 
 坐标系与单位
@@ -76,8 +77,9 @@ VNBAxes 和 LVLHAxes 是动态坐标轴——旋转矩阵不仅依赖历元，�
 
 同一坐标系中的状态可用不同单位系统表示。``UnitSystem`` 枚举标识数值的量纲：
 
-- ``CR3BP`` — 无量纲单位（DU, TU, VU）
+- ``DIMENSIONLESS`` — 无量纲单位（DU, TU, VU）
 - ``SI`` — 国际单位制（km, s, km/s）
 
-``Orbit`` 状态由绑定的 ``System`` 解释：``frame`` 标识参考系名称，
-``coordinate_system`` 负责变换，``unit_system`` 决定量纲。
+``Orbit`` 状态由绑定的 ``System`` 解释：``frame`` 与 ``unit_system`` 由
+``System`` 基类定义，分别标识参考系与量纲；坐标变换由 ``CoordinateSystem``
+对象完成（星历系统可持有一个默认 ``coordinate_system``）。

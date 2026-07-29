@@ -1,7 +1,7 @@
 积分器族选择与配置
 ========================
 
-e2m2e 的积分器分三族：自适应单步 Runge-Kutta（RK）、固定步长多步 Adams、固定步长二阶 Cowell，分别对应一阶化方程 :math:`\dot{y}=f(t,y)`、一阶化方程 :math:`\dot{y}=f(t,y)` 和双积分方程 :math:`\ddot{x}=a(t,x)`。所有积分器核心由 Rust 实现（PyO3 绑定），Python 层仅做类型转换与初始化辅助。
+e2m2e 的积分器分三族：自适应单步 Runge-Kutta（RK）、固定步长多步 Adams、固定步长二阶 Cowell，分别对应一阶化方程 :math:`\dot{y}=f(t,y)`、一阶化方程 :math:`\dot{y}=f(t,y)` 和双积分方程 :math:`\ddot{x}=a(t,x)`。Rust 侧是一个 workspace，含四个 crate：``e2m2e-propagation``（纯数学积分器：Butcher 表、RK/ABM/Cowell、solve_ivp）、``e2m2e-forces``（N 体与 STM 变分方程、编译型力模型）、``e2m2e-spice``（CSPICE FFI，spice feature 构建时内嵌 CSPICE）与 ``e2m2e-integrators``（PyO3 绑定，maturin 唯一打包目标，生成 ``e2m2e._integrators`` 扩展）。Python 层仅做类型转换与初始化辅助。
 
 
 积分器概览
@@ -125,12 +125,13 @@ PD45 是低阶、低开销的默认选择；PD78 和 RK89 在相同容差下步�
 - ``h0`` — 初始试探步长。自适应控制器会在几步内收敛到合适步长，``h0`` 只需大致量级正确即可。
 - ``result.error`` — 高阶解与嵌入解的 L2 范数差，即局部截断误差估计。
 - ``result.h_next`` — 控制器建议的下一步长：``h_next = h * clamp(0.9 * (tol/error)^(1/(p+1)), 0.1, 5)``，其中 ``p`` 为嵌入阶数。
+- ``state_error_dim`` — 可选参数，``rk_step`` 与 ``solve_ivp_py`` 均支持。步长误差控制只统计前 N 维状态（``None`` 时统计全部）；STM 增广传播时传 6，让 36 个 STM 分量不主导步长。
 
 
 Adams-Bashforth-Moulton（固定步长多步）
 ---------------------------------------
 
-ABM 是 4 步 4 阶 PECE（Predict-Evaluate-Correct-Evaluate）预测-校正器。与 RK 不同，它每一步只调用一次右端函数（预测后一次、校正后一次），但依赖前 4 步的导数样本（history）。
+ABM 是 4 步 4 阶 PECE（Predict-Evaluate-Correct-Evaluate）预测-校正器。它每一步做两次右端求值（预测后一次、校正后一次），但依赖前 4 步的导数样本（history）。
 
 特点
 ^^^^
@@ -326,6 +327,18 @@ Cowell 直接积分二阶 ODE :math:`\ddot{x} = a(t, x)`，避免将位置和速
    * - ``CowellResult``
      - ``x_new``, ``error``, ``h_next``, ``history``
      - Cowell 单步结果（位置-only，含滚动 history）
+
+
+编译型传播快速路径
+------------------
+
+spice feature 启用时，扩展模块还提供 ``propagate_compiled`` 与
+``propagate_compiled_stm_py`` 两个入口：力模型在 Python 侧一次序列化为元组，
+之后整个积分循环（含 SPICE 查询与 STM 变分方程）在 Rust 内完成，消除逐步
+Python↔Rust 跨界。这两个入口不直接面向用户，由
+:class:`~e2m2e.core.forces.force_model.ForceModel` 的 ``propagate`` 按条件
+自动分流，30 天直推约 9.7× 加速；触发条件与回退行为见 :doc:`forces` 的
+「Rust 编译快速路径」小节。
 
 
 轨道传播示例

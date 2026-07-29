@@ -15,9 +15,10 @@
   也是单线程串行）；
 - 暴露 :class:`SubstituteSolver` 协议，把"如何积分一段弧并给出
   ``(Xf, Φ)``"留给调用方注入，便于：
-    1. 单元测试注入假动力学；
-    2. 未来把现有 :class:`MultipleShooting` 适配到本接口
-       （多进程并行路径）。
+
+  1. 单元测试注入假动力学；
+  2. 未来把现有 :class:`MultipleShooting` 适配到本接口
+     （多进程并行路径）。
 
 Public API：
 
@@ -36,7 +37,7 @@ from typing import Protocol, runtime_checkable
 import numpy as np
 import numpy.typing as npt
 
-#: ``(N, 6)`` 节点状态数组；每行 ``[q1, q2, q3, p1, p2, p3]``（rho 坐标）。
+#: ``(N, 6)`` 节点状态数组；每行 ``[q1, q2, q3, p1, p2, p3]`` （rho 坐标）。
 PatchStates = npt.NDArray[np.floating]
 #: ``(N-1, 6, 6)`` 状态转移矩阵 ``Φ_i = Φ(t_{i+1}; t_i, X_i)``。
 STMStack = npt.NDArray[np.floating]

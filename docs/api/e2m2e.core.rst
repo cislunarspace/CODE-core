@@ -162,3 +162,19 @@ e2m2e.core.forces.shadow module
    :members:
    :undoc-members:
    :show-inheritance:
+
+e2m2e.core.forces.indirect_term module
+---------------------------------------
+
+.. automodule:: e2m2e.core.forces.indirect_term
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.core.forces.relativistic_correction module
+-------------------------------------------------
+
+.. automodule:: e2m2e.core.forces.relativistic_correction
+   :members:
+   :undoc-members:
+   :show-inheritance:

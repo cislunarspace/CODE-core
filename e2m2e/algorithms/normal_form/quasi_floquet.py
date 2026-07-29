@@ -1,7 +1,7 @@
-"""quasi-Floquet 变换矩阵 ``B(t)``（Code7–Code9）。
+"""quasi-Floquet 变换矩阵 ``B(t)`` （Code7–Code9）。
 
-对应 qiao ``Code08_QuasiFloquet.py``（矩阵法）与
-``Code08_QuasiFloquet_LA.py``（李代数法）：从动力学替代轨道出发，求解
+对应 qiao ``Code08_QuasiFloquet.py`` （矩阵法）与
+``Code08_QuasiFloquet_LA.py`` （李代数法）：从动力学替代轨道出发，求解
 
 .. math::
 
@@ -13,16 +13,16 @@
 
 两种实现：
 
-- **矩阵法**（``method="matrix"``）：把 ``B`` 展平为 36 维状态直接积分
+- **矩阵法** （``method="matrix"``）：把 ``B`` 展平为 36 维状态直接积分
   ``Ḃ = M·B − B·D``，事后用 Newton 迭代把每个采样点的 ``B`` 投影到
   最近的辛矩阵（qiao ``Code08_QuasiFloquet``）；
-- **李代数法**（``method="lie_algebra"``）：参数化 ``B = B₀·exp(ξ)``，
+- **李代数法** （``method="lie_algebra"``）：参数化 ``B = B₀·exp(ξ)``，
   ``ξ ∈ sp(6, R)``（21 维），在李代数里做修正，``B`` 自动保辛（qiao
   ``Code08_QuasiFloquet_LA``）。
 
 辛保持性的数值保证：当 ``M(t)`` 与 ``D`` 都是 Hamilton 矩阵
 （``MᵀJ + JM = 0``）时，``BᵀJB`` 是 ``Ḃ`` 方程的精确首次积分，因此
-本模块刻意构造 ``M(t) = J·S(t)``（``S`` 对称）以保证辛约束在
+本模块刻意构造 ``M(t) = J·S(t)`` （``S`` 对称）以保证辛约束在
 ``<1e-12`` 量级成立；矩阵法仍在末尾做一次辛投影兜底。
 
 Public API：
@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 # 辛结构与实标准形
 # ---------------------------------------------------------------------------
 
-#: 6 维辛矩阵 ``J = [[0, I₃], [-I₃, 0]]``（位置在前、动量在后）。
+#: 6 维辛矩阵 ``J = [[0, I₃], [-I₃, 0]]`` （位置在前、动量在后）。
 J6: npt.NDArray[np.floating] = np.block(
     [[np.zeros((3, 3)), np.eye(3)], [-np.eye(3), np.zeros((3, 3))]]
 )
@@ -92,7 +92,7 @@ def real_normal_form_matrix(lam: float, wp: float, wv: float) -> npt.NDArray[np.
 
 
 def build_sp6_basis() -> list[npt.NDArray[np.floating]]:
-    """构造 sp(6, R) 的 21 维正交基 ``{E_k}``（Frobenius 归一）。
+    """构造 sp(6, R) 的 21 维正交基 ``{E_k}`` （Frobenius 归一）。
 
     三块结构：``A`` 块 ``n²=9``（``E_ij = e_i e_jᵀ − e_{n+j} e_{n+i}ᵀ``）、
     ``B`` 块 ``n(n+1)/2=6``（右上对称）、``C`` 块 ``n(n+1)/2=6``
@@ -455,8 +455,8 @@ class QuasiFloquetReducer:
 
     Args:
         context: 归一化上下文（提供频率 ``ω_p``/``ω_v``、特征指数 λ）。
-        method: ``"matrix"``（默认，36 维直接积分 + 辛投影）或
-            ``"lie_algebra"``（21 维 sp(6) 参数化，自动保辛）。
+        method: ``"matrix"`` （默认，36 维直接积分 + 辛投影）或
+            ``"lie_algebra"`` （21 维 sp(6) 参数化，自动保辛）。
         project: 矩阵法是否在末尾做辛投影兜底（默认 ``True``）。
         rtol: ODE 相对容差。
         atol: ODE 绝对容差。

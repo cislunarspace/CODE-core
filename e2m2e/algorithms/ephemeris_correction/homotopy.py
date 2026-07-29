@@ -157,7 +157,7 @@ def correct_with_homotopy(
       - standard：``converged`` 取最后一步结果，``iterations`` 累加，
         ``max_residual`` 取最后一步，``residual_history`` 扁平化。
       - two_level：同上，另含 ``velocity_residual`` 与
-        ``velocity_residual_history``（来自两层历史对）。
+        ``velocity_residual_history`` （来自两层历史对）。
     """
     if inner_method == "homotopy":
         raise ValueError("inner_method='homotopy' is not allowed (would recurse)")

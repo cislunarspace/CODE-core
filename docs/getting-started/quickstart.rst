@@ -98,6 +98,9 @@
 多重打靶
 --------
 
+沿用上一节微分修正得到的 ``seed_dro`` 作为打靶初值，因此以下示例
+以 ``seed_dro`` 修正成功（不为 ``None``）为前提：
+
 .. code-block:: python
 
    from e2m2e.algorithms import MultipleShooting, sample_patch_points
@@ -134,18 +137,29 @@
 
 .. code-block:: python
 
-   from e2m2e.core import EphemerisSystem, SPICEManager
+   from e2m2e.core import (
+       CelestialBodyOrigin,
+       CoordinateSystem,
+       EphemerisSystem,
+       ICRSAxes,
+       SPICEManager,
+   )
    from e2m2e.core.forces import ForceModel, GravityField, DragModel
    from e2m2e.core.atmosphere import ExponentialAtmosphere
 
    # 加载 SPICE 内核
    spice = SPICEManager()
-   spice.load_kernel("kernels/de440.bsp")
+   spice.load_kernel("kernels/de440s.bsp")
 
-   # 创建星历系统
+   # 创建星历系统（frame 默认为 J2000）
    eph_system = EphemerisSystem(
        bodies=["EARTH", "MOON", "SUN"],
-       spice=spice, origin="EARTH", frame="J2000",
+       spice=spice, origin="EARTH",
+   )
+
+   # ForceModel 要求系统已设置坐标系
+   eph_system.coordinate_system = CoordinateSystem(
+       axes=ICRSAxes(), origin=CelestialBodyOrigin(body="EARTH", spice=spice)
    )
 
    # 组合力模型

@@ -4,11 +4,11 @@
 Hamiltonian 的双曲-中心耦合项，把非线性 Hamiltonian 化简为仅依赖
 作用量的函数：
 
-- **Step 1 ``"invariant"``**（qiao ``Code10_DepartInvarManifold``）：
+- **Step 1 ``"invariant"``** （qiao ``Code10_DepartInvarManifold``）：
   消去 ``q_1^k·p_1^l``（``k ≠ l``）的双曲交叉项，判别条件
   ``pow(1)==pow(4)`` 保留双曲"循环坐标" ``I_1 = q_1·p_1``。经此步后
   双曲方向与中心方向解耦，中心部分可独立分析；
-- **Step 2 ``"center"``**（qiao ``Code11_DepartCenterManifold``）：
+- **Step 2 ``"center"``** （qiao ``Code11_DepartCenterManifold``）：
   在 Step 1 结果上，消去两个中心方向 ``(q_2,p_2)``/``(q_3,p_3)`` 之间
   的非共振耦合，更严判别条件
   ``pow(1)==pow(4) && pow(2)==pow(5) && pow(3)==pow(6)``，结果只剩
@@ -626,7 +626,7 @@ class CenterManifoldReducer:
 
     Args:
         context: 归一化上下文（提供频率 ``ω_p``/``ω_v``、特征指数 λ）。
-        max_order: Lie 变换截断阶数，默认 ``10``（与 qiao 一致）。
+        max_order: Lie 变换截断阶数，默认 ``10`` （与 qiao 一致）。
     """
 
     context: NormalFormContext

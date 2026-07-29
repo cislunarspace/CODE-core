@@ -26,13 +26,15 @@ PlotConfig
    config = PlotConfig(title=32, label=28, tick=20)
    config.apply_rcparams()
 
-   # 从环境变量读取（支持高 DPI 缩放）
+   # 从环境变量读取（仅图标路径与缩放两个变量）
    config = PlotConfig.from_env()
 
 环境变量：
 
 - ``E2M2E_BODY_ICON_PATH`` — 天体图标目录
 - ``E2M2E_BODY_ICON_SCALE`` — 天体图标缩放系数
+
+高 DPI 屏幕的缩放独立于环境变量，调用 ``configure_dpi_scaling()`` 自动检测并调整。
 
 FamilyPlotter
 -------------
@@ -53,7 +55,10 @@ FamilyPlotter
    plotter.plot_family_3d(family, jacobi_values, title="DRO Family 3D")
 
    # Jacobi-周期-稳定性组合分析图
-   plotter.plot_analysis(family)
+   plotter.plot_jacobi_period_stability(
+       jacobi_values, periods, stability_values,
+       title="DRO Family 分析",
+   )
 
 TransferPlotter
 ---------------
@@ -65,11 +70,13 @@ TransferPlotter
    plotter = TransferPlotter(system, config)
 
    # 绘制转移轨迹与出发/到达轨道
-   plotter.plot_transfer(
-       transfer_trajectory=result.transfer_trajectory,
+   plotter.plot_transfer_orbit(
        departure_orbit=dro_orbit,
        arrival_orbit=ro_orbit,
-       title="DRO-RO Transfer",
+       transfer_trajectory=result.transfer_trajectory,
+       departure_state=result.departure_state,
+       insertion_state=result.insertion_state,
+       label="DRO-RO Transfer",
    )
 
 投影平面

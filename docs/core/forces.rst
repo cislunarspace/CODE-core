@@ -8,7 +8,7 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
 
 这三个概念构成力模型子包的核心接口：
 
-- **PhysicalModel**：所有力模型的抽象基类，定义 ``compute_acceleration(t, state, system)`` 接口。
+- **PhysicalModel**：所有力模型的抽象基类，定义 ``compute_acceleration(t, state, system)`` 接口。另有两个可选钩子：``compute_jacobian(t, state, system)`` 返回解析雅可比 ∂a/∂r（默认返回 ``None``，由 ``ForceModel`` 有限差分兜底）；``to_rust_spec(system)`` 把力序列化为 Rust 编译路径接受的元组（默认返回 ``None``，表示该力不支持 Rust 编译）。
 - **ForceModel**：力模型组合，把多个 ``PhysicalModel`` 组合成一次传播所需的运动方程；按名登记、启用/禁用，并通过 Rust 积分器完成传播。
 - **ForceEntry**：力模型组合内单个力模型的登记记录，包含 ``name``、``force`` 和 ``enabled`` 三个字段。
 
@@ -47,7 +47,14 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
      - ``RelativisticCorrection``
 
 另有机动事件 ``ImpulsiveBurn``（瞬时 Δv，在指定 epoch 直接修改状态速度），
-它不是 ``PhysicalModel``，不参与加速度叠加，也不进配置注册表。
+它不是 ``PhysicalModel``，不参与加速度叠加，也不进配置注册表；施加方式见
+下文「传播接口」小节的 ``propagate_maneuvers``。
+
+.. warning::
+
+   用 ``GravityField`` 模拟月球（含 degree=0 中心项）时，必须单独补月球间接项
+   ``IndirectTerm("MOON")``，且不能再加 ``ThirdBodyGravity("MOON")``——后者会与
+   ``GravityField`` 的中心项重复计算月球点质量。
 
 内置力模型公式
 --------------
@@ -230,6 +237,61 @@ name-based 注册机制
    for entry in fm.list_forces():
        print(f"{entry.name}: {type(entry.force).__name__}, enabled={entry.enabled}")
 
+传播接口
+--------
+
+``ForceModel.propagate`` 用 Rust ``rk_step`` 单步步进器做自适应传播：
+
+.. code-block:: python
+
+   from e2m2e.integrators import RkMethod
+
+   result = fm.propagate(
+       state0,
+       (t0, tf),
+       t_eval=t_eval,             # 输出采样点，默认 linspace(t0, tf, 100)
+       with_stm=True,             # 同时积分状态转移矩阵
+       initial_step=1.0,          # 初始步长，默认从初始状态估算
+       events=[...],              # 终止事件列表，见下
+       max_steps=200_000,
+       method=RkMethod.PD45,      # RK 方法，默认 PD45
+   )
+
+``with_stm=True`` 时把 6 维状态与 6×6 STM 展平拼成 42 维增广状态一起积分：
+各力的解析雅可比 ``compute_jacobian`` 直接叠加，不提供解析雅可比的力由
+``ForceModel`` 用三点中心差分兜底；STM 分量不参与步长误差控制，接受/拒绝
+只看前 6 维物理状态（对齐 GMAT）。返回字典在 ``time``、``states``、
+``terminal_event_index`` 之外多一个 ``stm`` 键，形状 ``(n_points, 6, 6)``。
+
+``events`` 是终止事件列表，每个事件是 ``f(t, state) -> float`` 的可调用，
+函数值符号变化即在该步停止，``terminal_event_index`` 记录触发的事件下标；
+``with_stm=True`` 时事件函数接收 6 维物理状态（非增广状态）。
+
+带脉冲机动时用 ``propagate_maneuvers(initial_state, t_span, burns)``：按
+``epoch`` 排序 ``ImpulsiveBurn`` 列表，逐段 coast 传播，在每个 burn epoch
+处施加 ``state[3:6] += delta_v`` 后续传；返回字典额外含 ``burns`` 键，
+记录每次机动的施加位置与前后速度。
+
+.. code-block:: python
+
+   from e2m2e.core.forces import ImpulsiveBurn
+
+   burns = [ImpulsiveBurn(epoch=et0 + 1800.0, delta_v=np.array([0.0, 0.01, 0.0]))]
+   result = fm.propagate_maneuvers(state0, (et0, et0 + 7200.0), burns)
+
+Rust 编译快速路径
+^^^^^^^^^^^^^^^^^
+
+spice feature 启用、无 ``events``、不带 STM，且所有启用力模型的
+``to_rust_spec()`` 都非 ``None`` 时，``propagate`` 自动分流到 Rust
+``propagate_compiled``：力模型一次序列化后整个积分循环在 Rust 内完成，
+消除逐步 Python↔Rust 跨界；30 天 NRHO 传播约 9.6 s，Python 路径约 95 s。
+任一条件不满足时自动回退 Python 路径，返回格式一致，无需用户干预。
+
+带 STM 时有对应的 Rust compiled STM 快速路径（``propagate_compiled_stm_py``），
+但 ``SolarRadiationPressure`` 与 ``RelativisticCorrection`` 无解析雅可比，
+含这两个力的 STM 传播不走该路径，回退 Python 增广积分。
+
 配置驱动构建流程
 ------------------
 
@@ -237,7 +299,14 @@ name-based 注册机制
 
 .. code-block:: python
 
-   from e2m2e.core.standard_axes import ICRSAxes
+   import numpy as np
+
+   from e2m2e.core import (
+       CoordinateSystem,
+       EphemerisSystem,
+       ICRSAxes,
+       SPICEManager,
+   )
    from e2m2e.core.standard_origins import CelestialBodyOrigin
    from e2m2e.core.forces import ForceModel
 
@@ -297,9 +366,12 @@ name-based 注册机制
    print(f"states shape: {result['states'].shape}")   # (50, 6)
    print(f"time span: {result['time'][0]} -> {result['time'][-1]}")
 
-   # 6. 序列化回配置（验证 round-trip）
+   # 6. 序列化回配置，再构建一次（验证 round-trip 契约）
+   # 注意：to_config 输出是规范形式（如 GravityField 恒带 input_frame/gravity_file
+   # 两键），与手写 config 不一定逐键相等；契约是“再序列化一次字典相等”。
    config_roundtrip = fm.to_config()
-   assert config_roundtrip == config   # 字典完全相等
+   fm2 = ForceModel.from_config(config_roundtrip, system)
+   assert fm2.to_config() == config_roundtrip
 
    # 7. 存盘 / 读回
    from e2m2e.core.forces import dump_force_config, load_force_config
@@ -348,6 +420,8 @@ JSON 文件 IO
 
 .. code-block:: python
 
+   from e2m2e.core.forces.force_config import build_force
+
    build_force("UnknownType", {})
    # ValueError: unknown force type 'UnknownType'; known types: ['DragModel', 'FiniteBurn', 'GravityField', 'IndirectTerm', 'PointMassGravity', 'RelativisticCorrection', 'SolarRadiationPressure', 'ThirdBodyGravity']
 
@@ -386,6 +460,18 @@ JSON 文件 IO
    :no-index:
 
 .. automodule:: e2m2e.core.forces.thrust
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
+
+.. automodule:: e2m2e.core.forces.indirect_term
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
+
+.. automodule:: e2m2e.core.forces.relativistic_correction
    :members:
    :undoc-members:
    :show-inheritance:
@@ -506,8 +592,15 @@ SRP 工作流示例
 
 .. code-block:: python
 
-   from e2m2e.core.standard_axes import J2000Axes
-   from e2m2e.core.standard_origins import CelestialBodyOrigin
+   import numpy as np
+
+   from e2m2e.core import (
+       CelestialBodyOrigin,
+       CoordinateSystem,
+       EphemerisSystem,
+       ICRSAxes,
+       SPICEManager,
+   )
    from e2m2e.core.forces import (
        SolarRadiationPressure,
        ConicalShadowModel,
@@ -518,16 +611,15 @@ SRP 工作流示例
    mgr = SPICEManager()
    mgr.load_kernel("path/to/de440.bsp")
 
-   # 2. 构建星历系统（含地球、月球、太阳）
+   # 2. 构建星历系统（含地球、月球、太阳；frame 默认 J2000）
    system = EphemerisSystem(
        bodies=["EARTH", "MOON", "SUN"],
        spice=mgr,
        origin="EARTH",
-       frame="J2000",
    )
 
-   # 3. 设置坐标系（J2000 惯性系，力模型要求惯性系）
-   axes = J2000Axes()
+   # 3. 设置坐标系（ICRF 惯性系，力模型要求惯性系）
+   axes = ICRSAxes()
    origin = CelestialBodyOrigin(body="EARTH", spice=mgr)
    system.coordinate_system = CoordinateSystem(axes=axes, origin=origin)
 
@@ -552,7 +644,6 @@ SRP 工作流示例
    state0 = np.array([r0, 0.0, 0.0, 0.0, v0, 0.0])
 
    # 8. 传播（1 个轨道周期，约 90 分钟）
-   from e2m2e.core.spice import SPICEManager
    et0 = mgr.utc_to_et("2024-06-21T00:00:00")
    period = 2 * np.pi * r0 / v0  # ~5400 s
    result = fm.propagate(state0, (et0, et0 + period))

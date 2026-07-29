@@ -345,6 +345,7 @@ class PlotConfig(BaseModel):
         """从环境变量构造 PlotConfig，overrides 优先级最高。
 
         当前支持的环境变量：
+
         - ``BODY_ICON_SCALE_ENV`` (``E2M2E_BODY_ICON_SCALE``)：浮点数，同时
           应用于 ``primary_body_icon_scale`` 和 ``secondary_body_icon_scale``。
           解析失败（非数字、≤ 0）时静默回退到字段默认值，不抛异常。

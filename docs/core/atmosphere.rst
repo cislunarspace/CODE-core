@@ -173,6 +173,11 @@ F10.7 和 Ap 越高，大气热膨胀越显著，同高度密度越大。
 
    fm = ForceModel.from_config(config, system)
 
-   # round-trip 验证
-   assert fm.to_config() == config
+   # round-trip 契约：序列化后的配置可原样重建，且重建结果再序列化不变
+   fm2 = ForceModel.from_config(fm.to_config(), system)
+   assert fm2.to_config() == fm.to_config()
+
+注意 ``to_config()`` 输出的是规范化配置，会补出手写配置省略的默认值键
+（如 ``GravityField`` 的 ``input_frame``、``gravity_file``），
+因此不能直接断言 ``fm.to_config() == config``。
 

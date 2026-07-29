@@ -144,6 +144,13 @@
 - ``collision_body`` (str | None): 碰撞天体（"earth" 或 "moon"）
 - ``status`` (str): 状态描述（"success" / "collision" / "no_intersection" / "integration_failed"）
 
+注意：``status="integration_failed"`` 的结果是稀疏字典，不含 ``transfer_trajectory``、
+``transfer_time``、``min_distance``、``collision_found`` 等键，且 ``dv_insertion=None``。
+消费结果前应先检查 ``success`` 或 ``status``，避免对缺失键取值。
+
+另外，``TransferSearch.configure_search(**kwargs)`` 提供批量设置搜索属性的便捷方法，
+与逐个赋值属性等价。
+
 搜索后自动优化
 --------------
 

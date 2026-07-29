@@ -8,7 +8,9 @@ e2m2e 支持 uv（推荐）、conda、pip 三种安装方式。
 
 - Python >= 3.10
 - Rust 工具链（从源码安装时需要，用于构建积分器内核）
-- [uv](https://docs.astral.sh/uv/)（推荐的包管理器）
+
+推荐工具：`uv <https://docs.astral.sh/uv/>`__ 是推荐的包管理器，仅 uv 安装
+路径需要；走 conda/pip 路径则不必安装。
 
 uv（推荐）
 ----------

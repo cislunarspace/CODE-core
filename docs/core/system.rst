@@ -6,12 +6,14 @@ e2m2e 的系统层定义天体几何、引力与运动学模型，是后续所�
 System 基类
 -----------
 
-:class:`~e2m2e.core.system.System` 是抽象基类，定义系统要回答的四个问题：
+:class:`~e2m2e.core.system.System` 是抽象基类，定义系统要回答的三个问题：
 
 1. 用什么坐标框架？由 ``frame`` 标识。
-2. 状态怎么在坐标系间转换？由 ``coordinate_system`` 负责。
-3. 数值用什么单位？由 ``unit_system`` 决定。
-4. 各天体的引力参数？通过 ``gravitational_parameter(body)`` 查询。
+2. 数值用什么单位？由 ``unit_system`` 决定。
+3. 各天体的引力参数？通过 ``gravitational_parameter(body)`` 查询。
+
+``coordinate_system`` 不在基类接口中，仅 ``EphemerisSystem`` 可选持有
+（供坐标变换与 ForceModel 传播使用）。
 
 CR3BP 系统
 ----------
@@ -32,6 +34,8 @@ CR3BP 系统
    )._with_default_scales()
 
 ``_with_default_scales()`` 自动设置地月特征尺度（384405 km、27.32 天）。
+内置 Earth-Moon、Sun-Earth、Sun-Jupiter 三组默认尺度；其他组合抛
+``ValueError``，需用 ``set_characteristic_scales()`` 显式设置。
 
 **质量参数 μ：**
 
@@ -89,16 +93,16 @@ CR3BP 系统
 
 .. code-block:: python
 
-   from e2m2e.core import EphemerisSystem, SPICEManager
+   from e2m2e.core import EphemerisSystem, ReferenceFrame, SPICEManager
 
    spice = SPICEManager()
-   spice.load_kernel("kernels/de440.bsp")
+   spice.load_kernel("kernels/de440s.bsp")
 
    system = EphemerisSystem(
        bodies=["EARTH", "MOON", "SUN"],
        spice=spice,
        origin="EARTH",
-       frame="J2000",
+       frame=ReferenceFrame.J2000,
    )
 
 CR3BP 与星历系统的区别

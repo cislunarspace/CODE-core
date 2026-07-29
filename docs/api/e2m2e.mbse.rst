@@ -16,3 +16,4 @@ e2m2e.mbse.data module
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: ProjectionPlane

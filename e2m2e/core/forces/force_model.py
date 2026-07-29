@@ -30,7 +30,8 @@ class ForceModel:
 
     不继承 ``Dynamics``：``Dynamics`` 是 CR3BP/Ephemeris 的基类，其
     ``propagate()`` 基于 ``scipy.solve_ivp`` 与 STM 模板方法；ForceModel 用
-    Rust ``rk_step`` 单步步进器实现自适应传播，且不支持 STM / Jacobi。
+    Rust ``rk_step`` 单步步进器实现自适应传播，支持 ``with_stm=True``
+    （各力解析雅可比叠加、无雅可比的力用有限差分兜底），不支持 Jacobi。
     此前形式上继承 ``Dynamics`` 只为复用几个数据属性，却全部重写 ``propagate``
     并对 STM/Jacobi 抛 ``NotImplementedError``——是 LSP 违反（假继承）。
     """
