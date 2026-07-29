@@ -56,7 +56,9 @@ pip install e2m2e[normal-form]
 
 ### SPICE 内核
 
-星历动力学需要 NASA SPICE 内核文件，放置在 `kernels/` 目录或 `$SPICE_KERNEL_DIR` 指定的路径。常用内核：`de440.bsp`（行星星历）、`moon_pa_de440_200625.bsp`（月球姿态）、`pck00011.tpc`（行星常数），从 [NASA NAIF](https://naif.jpl.nasa.gov/naif/data.html) 下载。
+星历动力学需要 NASA SPICE 内核文件，放置在 `kernels/` 目录或 `$SPICE_KERNEL_DIR` 指定的路径。
+
+国内用户推荐从项目的 [GitHub Release](https://github.com/cislunarspace/e2m2e/releases) 下载：`kernels-v1` 中打包了全部必需内核（行星星历、地球自转、月球姿态、闰秒与行星常数），下载后放入 `kernels/` 目录即可。官方来源（网络可达时）：[NASA NAIF](https://naif.jpl.nasa.gov/naif/data.html)。
 
 ## 快速开始
 

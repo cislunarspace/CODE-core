@@ -89,13 +89,16 @@ SPICE 内核
 星历动力学需要 NASA SPICE 内核文件，放置在 ``kernels/`` 目录或 ``$SPICE_KERNEL_DIR``
 指定的路径。
 
-常用内核：
+国内用户推荐从项目的 `GitHub Release <https://github.com/cislunarspace/e2m2e/releases>`_
+下载：``kernels-v1`` 中打包了全部必需内核，下载后放入 ``kernels/`` 目录即可：
 
-- `de440.bsp <https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/>`_ — JPL DE440 行星星历（推荐，覆盖 1550–2650 年）
-- ``moon_pa_de440_200625.bsp`` — 月球姿态
-- `pck00011.tpc <https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/>`_ — 行星常数
+- ``de430.bsp``、``de440s.bsp`` — JPL 行星星历
+- ``earth_latest_high_prec.bpc``、``SPICEEarthPredictedKernel.bpc`` — 地球自转（ITRF93 高精度）
+- ``SPICELunaCurrentKernel.bpc``、``SPICELunaFrameKernel.tf`` — 月球姿态与坐标架（MOON_PA）
+- ``naif0011.tls``、``naif0012.tls`` — 闰秒
+- ``pck00010.tpc`` — 行星常数
 
-内核下载：`NASA NAIF <https://naif.jpl.nasa.gov/naif/data.html>`_
+官方来源（网络可达时）：`NASA NAIF <https://naif.jpl.nasa.gov/naif/data.html>`_
 
 验证安装
 --------
