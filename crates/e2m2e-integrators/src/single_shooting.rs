@@ -273,7 +273,11 @@ pub fn single_shooting_correct(
         residual_history.push(max_res);
 
         if verbose {
-            eprintln!("Iteration {}: max_residual = {:.2e}", iteration + 1, max_res);
+            eprintln!(
+                "Iteration {}: max_residual = {:.2e}",
+                iteration + 1,
+                max_res
+            );
         }
 
         // 判断收敛
@@ -295,8 +299,12 @@ pub fn single_shooting_correct(
 
         // 求解修正量 Δx = -J^{-1} * residual
         let neg_residual: [f64; 6] = [
-            -residual[0], -residual[1], -residual[2],
-            -residual[3], -residual[4], -residual[5],
+            -residual[0],
+            -residual[1],
+            -residual[2],
+            -residual[3],
+            -residual[4],
+            -residual[5],
         ];
         let delta = solve_linear_system(&jacobian, &neg_residual)?;
 
@@ -330,7 +338,11 @@ pub fn single_shooting_correct(
         None,
         None,
     )?;
-    let final_state = final_result.states.last().ok_or("empty propagation")?.to_vec();
+    let final_state = final_result
+        .states
+        .last()
+        .ok_or("empty propagation")?
+        .to_vec();
 
     Ok(SingleShootingResult {
         initial_state: state.to_vec(),

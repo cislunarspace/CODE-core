@@ -193,7 +193,10 @@ pub fn segmented_shooting_correct(
     let mut converged = true;
 
     if verbose {
-        eprintln!("分段打靶拼接：{} 段，每段 {} 点", n_segments, config.points_per_segment);
+        eprintln!(
+            "分段打靶拼接：{} 段，每段 {} 点",
+            n_segments, config.points_per_segment
+        );
     }
 
     // 第1步：对每小段独立进行多重打靶修正
@@ -219,7 +222,11 @@ pub fn segmented_shooting_correct(
         if !result.converged {
             converged = false;
             if verbose {
-                eprintln!("    段 {} 未收敛，残差 = {:.2e}", i + 1, result.max_residual);
+                eprintln!(
+                    "    段 {} 未收敛，残差 = {:.2e}",
+                    i + 1,
+                    result.max_residual
+                );
             }
         }
 
@@ -234,7 +241,12 @@ pub fn segmented_shooting_correct(
 
         while current_segments.len() > 1 {
             if verbose {
-                eprintln!("合并阶段 {}: {} 段 -> {} 段", stage, current_segments.len(), (current_segments.len() + 1) / 2);
+                eprintln!(
+                    "合并阶段 {}: {} 段 -> {} 段",
+                    stage,
+                    current_segments.len(),
+                    (current_segments.len() + 1) / 2
+                );
             }
 
             let merge_indices: Vec<(usize, usize)> = (0..current_segments.len() - 1)

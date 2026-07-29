@@ -49,11 +49,7 @@ pub struct MultipleShootingRustResult {
 ///
 /// 残差定义：F_i = φ(t_{i+1}; t_i, x_i) - x_{i+1}
 /// 即第 i 段积分终端状态与第 i+1 个节点状态的差值。
-fn build_residual(
-    final_states: &[[f64; 6]],
-    state_work: &[[f64; 6]],
-    n_seg: usize,
-) -> Vec<f64> {
+fn build_residual(final_states: &[[f64; 6]], state_work: &[[f64; 6]], n_seg: usize) -> Vec<f64> {
     let mut f = vec![0.0_f64; n_seg * 6];
     for i in 0..n_seg {
         for j in 0..6 {
@@ -67,11 +63,7 @@ fn build_residual(
 ///
 /// DF[i*6:(i+1)*6, i*6:(i+1)*6] = Φ_i（状态转移矩阵）
 /// DF[i*6:(i+1)*6, (i+1)*6:(i+2)*6] = -I_6
-fn build_jacobian_fixed_time(
-    stms: &[[f64; 36]],
-    n_seg: usize,
-    n_vars: usize,
-) -> Vec<f64> {
+fn build_jacobian_fixed_time(stms: &[[f64; 36]], n_seg: usize, n_vars: usize) -> Vec<f64> {
     let n_constraints = n_seg * 6;
     let mut df = vec![0.0_f64; n_constraints * n_vars];
 
@@ -146,7 +138,7 @@ fn least_squares_solve(
     let mut dtf = vec![0.0_f64; n_vars];
     for i in 0..n_vars {
         for j in 0..n_constraints {
-            dtf[i] += df[j * n_vars + i] * (-f[j]);  // 注意负号
+            dtf[i] += df[j * n_vars + i] * (-f[j]); // 注意负号
         }
     }
 
@@ -167,7 +159,7 @@ fn least_squares_solve(
         for j in 0..n_vars {
             augmented[i * (n_vars + 1) + j] = dtd[i * n_vars + j];
         }
-        augmented[i * (n_vars + 1) + n_vars] = dtf[i];  // 注意：这里已经是 -DF^T F
+        augmented[i * (n_vars + 1) + n_vars] = dtf[i]; // 注意：这里已经是 -DF^T F
     }
 
     // 前向消元
@@ -313,7 +305,11 @@ pub fn multiple_shooting_correct(
         residual_history.push(max_res);
 
         if verbose {
-            eprintln!("Iteration {}: max_residual = {:.2e}", iteration + 1, max_res);
+            eprintln!(
+                "Iteration {}: max_residual = {:.2e}",
+                iteration + 1,
+                max_res
+            );
         }
 
         // 判断收敛
