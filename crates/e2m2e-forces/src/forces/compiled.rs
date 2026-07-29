@@ -59,6 +59,21 @@ pub enum CompiledForce {
         body_radius_override: Option<f64>,
         gamma: f64,
     },
+    /// 小推力（电推进）模型。
+    ///
+    /// 推力加速度 = (T_max / m) * u * α
+    /// 其中 T_max 为最大推力（N），m 为航天器质量（kg），u ∈ [0, 1] 为推力幅值，
+    /// α 为单位推力方向向量。
+    LowThrust {
+        /// 最大推力（N）
+        t_max: f64,
+        /// 比冲（s）
+        isp: f64,
+        /// 推力幅值 u ∈ [0, 1]（同伦参数）
+        throttle: f64,
+        /// 推力方向单位向量（惯性系）
+        direction: [f64; 3],
+    },
 }
 
 impl CompiledForce {
@@ -169,6 +184,25 @@ impl CompiledForce {
                     *gamma,
                 )
                 .map_err(|e| format!("{:?}", e))
+            }
+            Self::LowThrust {
+                t_max,
+                isp: _,
+                throttle,
+                direction,
+            } => {
+                // 小推力加速度 = (T_max / m) * u * α
+                // 注意：当前实现假设质量恒定，实际应用中需要扩展状态向量包含质量
+                let mass = 1000.0; // kg，默认质量，实际应从状态或参数获取
+                // T_max 单位为 N (kg·m/s²)，质量单位为 kg，加速度单位为 m/s²
+                // 需要转换为 km/s²（除以 1000）
+                let accel_mag_m_s2 = (*t_max / mass) * throttle;
+                let accel_mag_km_s2 = accel_mag_m_s2 / 1000.0;
+                Ok([
+                    accel_mag_km_s2 * direction[0],
+                    accel_mag_km_s2 * direction[1],
+                    accel_mag_km_s2 * direction[2],
+                ])
             }
         }
     }

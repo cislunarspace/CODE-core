@@ -872,6 +872,24 @@ pub(crate) fn parse_force_tuple(
                 gamma,
             })
         }
+        "low_thrust" => {
+            // 元组格式：("low_thrust", t_max, isp, throttle, direction)
+            let t_max: f64 = tuple.get_item(1)?.extract()?;
+            let isp: f64 = tuple.get_item(2)?.extract()?;
+            let throttle: f64 = tuple.get_item(3)?.extract()?;
+            let direction: Vec<f64> = tuple.get_item(4)?.extract()?;
+            if direction.len() != 3 {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "low_thrust direction must have 3 elements",
+                ));
+            }
+            Ok(CompiledForce::LowThrust {
+                t_max,
+                isp,
+                throttle,
+                direction: [direction[0], direction[1], direction[2]],
+            })
+        }
         _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
             "unknown force tag {:?}",
             tag
