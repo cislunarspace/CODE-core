@@ -1003,7 +1003,10 @@ fn propagate_with_stm_py(
 
     let result = propagate_with_stm(
         &config, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
-    );
+    )
+    .map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!("STM propagation failed: {}", e))
+    })?;
 
     // 转为 Python 对象
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();

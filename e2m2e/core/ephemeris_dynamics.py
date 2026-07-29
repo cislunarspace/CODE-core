@@ -145,6 +145,14 @@ class EphemerisDynamics(Dynamics):
         stm = np.array(result["stm"]).reshape(-1, 6, 6)
         time = np.array(result["time"])
 
+        # 防御性校验：Rust 侧任何提前退出都必须在这里暴露，
+        # 不允许把截断结果当完整轨迹返回（issue #246）。
+        if len(time) != len(t_eval_list):
+            raise RuntimeError(
+                f"Rust STM propagation returned {len(time)} of {len(t_eval_list)} "
+                f"requested time points; the trajectory is truncated"
+            )
+
         self.last_trajectory = (time, states)
         self.last_stm = stm
 
