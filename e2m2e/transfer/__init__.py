@@ -12,6 +12,12 @@ from .config import (
 )
 from .lambert import LambertSolution, solve_lambert, solve_lambert_batch
 from .low_energy import PatchCandidate, design_low_energy_transfer, patch_manifolds
+from .lowthrust_shooting import (
+    EngineConfig,
+    LowThrustSegment,
+    LowThrustShooting,
+    LowThrustShootingSolution,
+)
 from .multi_impulse import (
     CoastArc,
     Impulse,
@@ -67,5 +73,9 @@ __all__ = [
     "PatchCandidate",
     "patch_manifolds",
     "design_low_energy_transfer",
+    "EngineConfig",
+    "LowThrustSegment",
+    "LowThrustShooting",
+    "LowThrustShootingSolution",
     "_HAVE_COPT",
 ]

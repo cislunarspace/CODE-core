@@ -40,15 +40,23 @@ pub fn third_body_acceleration(
 ) -> Result<[f64; 3], cspice::Error> {
     debug_assert_eq!(sc_pos.len(), 3, "sc_pos must have length 3");
 
-    let et_tdb = Et::from(et);
-    let (state, _lt) = easier_reader(
-        target,
-        et_tdb,
-        "J2000",
-        AberrationCorrection::NONE,
-        observer,
-    )?;
-    let r_ob = [state.position.x, state.position.y, state.position.z];
+    // 优先查星历缓存（未激活或未覆盖时回退 cspice），消除每步 FFI 跨界。
+    let r_ob = match crate::ephem_cache::with_cache(|c| {
+        c.and_then(|cache| cache.body_position(target, observer, et))
+    }) {
+        Some(pos) => pos,
+        None => {
+            let et_tdb = Et::from(et);
+            let (state, _lt) = easier_reader(
+                target,
+                et_tdb,
+                "J2000",
+                AberrationCorrection::NONE,
+                observer,
+            )?;
+            [state.position.x, state.position.y, state.position.z]
+        }
+    };
 
     // r_bsc = r_sc - r_ob
     let r_bsc = [
@@ -98,15 +106,22 @@ pub fn third_body_acceleration_and_jacobian(
     mu: f64,
     min_distance: f64,
 ) -> Result<([f64; 3], [[f64; 3]; 3]), cspice::Error> {
-    let et_tdb = Et::from(et);
-    let (state, _lt) = easier_reader(
-        target,
-        et_tdb,
-        "J2000",
-        AberrationCorrection::NONE,
-        observer,
-    )?;
-    let r_ob = [state.position.x, state.position.y, state.position.z];
+    let r_ob = match crate::ephem_cache::with_cache(|c| {
+        c.and_then(|cache| cache.body_position(target, observer, et))
+    }) {
+        Some(pos) => pos,
+        None => {
+            let et_tdb = Et::from(et);
+            let (state, _lt) = easier_reader(
+                target,
+                et_tdb,
+                "J2000",
+                AberrationCorrection::NONE,
+                observer,
+            )?;
+            [state.position.x, state.position.y, state.position.z]
+        }
+    };
 
     let r_bsc = [
         sc_pos[0] - r_ob[0],
@@ -163,15 +178,22 @@ pub fn indirect_term_acceleration(
     mu: f64,
     min_distance: f64,
 ) -> Result<[f64; 3], cspice::Error> {
-    let et_tdb = Et::from(et);
-    let (state, _lt) = easier_reader(
-        target,
-        et_tdb,
-        "J2000",
-        AberrationCorrection::NONE,
-        observer,
-    )?;
-    let r_ob = [state.position.x, state.position.y, state.position.z];
+    let r_ob = match crate::ephem_cache::with_cache(|c| {
+        c.and_then(|cache| cache.body_position(target, observer, et))
+    }) {
+        Some(pos) => pos,
+        None => {
+            let et_tdb = Et::from(et);
+            let (state, _lt) = easier_reader(
+                target,
+                et_tdb,
+                "J2000",
+                AberrationCorrection::NONE,
+                observer,
+            )?;
+            [state.position.x, state.position.y, state.position.z]
+        }
+    };
     let r_ob_norm = (r_ob[0] * r_ob[0] + r_ob[1] * r_ob[1] + r_ob[2] * r_ob[2]).sqrt();
     let r_ob_safe = if r_ob_norm < min_distance {
         min_distance

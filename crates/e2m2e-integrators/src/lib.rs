@@ -623,9 +623,16 @@ fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Ve
 /// Rust cspice 与 Python spiceypy 是**独立的 CSPICE 实例**（静态链接，全局状态
 /// 不共享）。Python 侧 furnsh 的内核，Rust 看不见；反之亦然。要让 Rust 查询
 /// 可用，必须用本函数在 Rust 侧再 furnsh 一次（同一份文件，两边独立加载）。
+///
+/// 同时在首次加载时把行星名注册到质心/本体 ID（`register_bodies`），使本
+/// 实例对 "MARS"/"JUPITER" 等的解析与 Python spiceypy 实例（那边在
+/// `design_orbit` 里 boddef）以及 DFH 一致——否则 CSPICE 默认表会把
+/// "MARS" 解析成不存在的本体 499。
 #[cfg(feature = "spice")]
 #[pyfunction]
 fn spice_poc_furnsh(path: &str) -> PyResult<()> {
+    static REGISTERED: std::sync::Once = std::sync::Once::new();
+    REGISTERED.call_once(|| e2m2e_spice::spice_ffi::register_bodies());
     cspice::data::furnish(path)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {:?}", e)))
 }
@@ -1567,6 +1574,52 @@ fn lambert_batch_py(
     Ok(list.into())
 }
 
+/// 激活 Rust 星历预采样缓存。
+///
+/// 在积分前把要用到的天体状态与帧旋转矩阵在均匀网格上预采样、建三次样条，
+/// 装入进程级缓存。此后 Rust 力模型（ThirdBody/IndirectTerm/GravityField）
+/// 每步查表，不再调 cspice FFI。需在 SPICE 内核已加载后调用。
+///
+/// # 参数
+/// - `targets`: 要缓存的天体对 ``[(target, observer), ...]``，如
+///   ``[("MOON", "EARTH"), ("SUN", "EARTH"), ("EARTH", "SOLAR SYSTEM BARYCENTER")]``
+/// - `frame_pairs`: 要缓存的帧旋转对 ``[(from, to), ...]``，如
+///   ``[("ITRF93", "J2000"), ("MOON_PA", "J2000")]``
+/// - `et_start`, `et_end`: 积分时间范围（SPICE et 秒）
+/// - `dt`: 网格步长（秒），默认 3600
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[pyo3(signature = (targets, frame_pairs, et_start, et_end, dt=3600.0))]
+fn enable_ephem_cache(
+    targets: &Bound<'_, PyList>,
+    frame_pairs: &Bound<'_, PyList>,
+    et_start: f64,
+    et_end: f64,
+    dt: f64,
+) -> PyResult<()> {
+    let mut bodies: Vec<(String, String)> = Vec::new();
+    for item in targets.iter() {
+        let tup: (String, String) = item.extract()?;
+        bodies.push(tup);
+    }
+    let mut frames: Vec<(String, String)> = Vec::new();
+    for item in frame_pairs.iter() {
+        let tup: (String, String) = item.extract()?;
+        frames.push(tup);
+    }
+    let cache = e2m2e_spice::ephem_cache::EphemCache::build(&bodies, &frames, et_start, et_end, dt)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("ephem cache build: {e:?}")))?;
+    e2m2e_spice::ephem_cache::enable(cache);
+    Ok(())
+}
+
+/// 关闭 Rust 星历缓存（回到逐次 cspice 查询）。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn disable_ephem_cache() {
+    e2m2e_spice::ephem_cache::disable();
+}
+
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
@@ -1597,6 +1650,10 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_compiled, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_lowthrust, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(enable_ephem_cache, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(disable_ephem_cache, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_with_stm_py, m)?)?;
     #[cfg(feature = "spice")]

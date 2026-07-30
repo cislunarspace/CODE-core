@@ -327,6 +327,38 @@ spice feature 启用、无 ``events``、不带 STM，且所有启用力模型的
 但 ``SolarRadiationPressure`` 与 ``RelativisticCorrection`` 无解析雅可比，
 含这两个力的 STM 传播不走该路径，回退 Python 增广积分。
 
+Rust 星历预采样缓存
+^^^^^^^^^^^^^^^^^^^
+
+Rust 积分内循环里，``GravityField``/``ThirdBodyGravity``/``IndirectTerm``
+每个 RK 子步都跨界调 cspice FFI（``spkezr``/``pxform``），即便
+``GravityField(degree=0)`` 也不例外。Python 侧的 ``EphemCache`` 只拦 Python
+层查询，对 Rust 积分内循环无效——Rust 直接走 ``spk_accel``/``gravity_field``
+→ ``spice_ffi``，不回 Python。
+
+``enable_ephem_cache`` 在积分前把要用到的天体状态与帧旋转矩阵在均匀网格上
+预采样、建三次样条存内存表，此后上述力模型每步查表替代 FFI：
+
+.. code-block:: python
+
+   from e2m2e._integrators import enable_ephem_cache, disable_ephem_cache
+
+   enable_ephem_cache(
+       targets=[("MOON", "EARTH"), ("SUN", "EARTH"), ("EARTH", "SOLAR SYSTEM BARYCENTER")],
+       frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
+       et_start=et0, et_end=et0 + duration, dt=600.0,
+   )
+   try:
+       result = fm.propagate(...)
+   finally:
+       disable_ephem_cache()
+
+三次样条保 C² 连续，避免线性插值网格点导数跳变导致自适应积分器缩步长。
+精度与网格步长相关（pxform 600s 网格下末态精度 ~1e-3 km）；未激活时所有
+路径走原 FFI，逐字一致。附带的零误差优化：``GravityField`` 在
+``body == propagation_origin``（地心系地球重力场等常见场景）时跳过
+origin→SSB 查询（该量在 ``r_body_icrf`` 短路分支未被使用）。
+
 配置驱动构建流程
 ------------------
 

@@ -106,44 +106,72 @@ pub fn gravity_field_acceleration(
     tide: &TideConfig,
 ) -> Result<[f64; 3], SpiceFfiError> {
     // Step 1: 坐标变换 propagation → input_frame
-    // 查两个 origin 在 SSB 的位置
-    let (prop_origin_state_ssb, _) = e2m2e_spice::spice_ffi::spkezr(
-        propagation_origin,
-        et,
-        propagation_frame,
-        "NONE",
-        "SOLAR SYSTEM BARYCENTER",
-    )?;
-    let r_ssb = [
-        r_sc[0] + prop_origin_state_ssb[0],
-        r_sc[1] + prop_origin_state_ssb[1],
-        r_sc[2] + prop_origin_state_ssb[2],
-    ];
-
-    // 若 body == propagation_origin，省一次 spkezr（origin 重合，r_body_icrf = r_sc）
+    //
+    // body == propagation_origin（地心系地球重力场等常见场景）时，origin 与
+    // body 重合，r_body_icrf = r_sc，无需查 origin/body 在 SSB 的位置——
+    // 既省两次 spkezr FFI，又避免对 SSB 大级坐标（~1.5e8 km）做插值引入误差。
+    // 仅 body != origin 时才需要查 SSB 位置做平移。
     let r_body_icrf: [f64; 3] = if body == propagation_origin {
         [r_sc[0], r_sc[1], r_sc[2]]
     } else {
-        let (body_state_ssb, _) = e2m2e_spice::spice_ffi::spkezr(
-            body,
-            et,
-            propagation_frame,
-            "NONE",
-            "SOLAR SYSTEM BARYCENTER",
-        )?;
+        // 查两个 origin 在 SSB 的位置（优先走星历缓存，未覆盖回退 spkezr）
+        let prop_origin_pos_ssb: [f64; 3] =
+            match e2m2e_spice::ephem_cache::with_cache(|c| {
+                c.and_then(|cache| {
+                    cache.body_position(propagation_origin, "SOLAR SYSTEM BARYCENTER", et)
+                })
+            }) {
+                Some(p) => p,
+                None => {
+                    let (st, _) = e2m2e_spice::spice_ffi::spkezr(
+                        propagation_origin,
+                        et,
+                        propagation_frame,
+                        "NONE",
+                        "SOLAR SYSTEM BARYCENTER",
+                    )?;
+                    [st[0], st[1], st[2]]
+                }
+            };
+        let r_ssb = [
+            r_sc[0] + prop_origin_pos_ssb[0],
+            r_sc[1] + prop_origin_pos_ssb[1],
+            r_sc[2] + prop_origin_pos_ssb[2],
+        ];
+        let body_pos_ssb: [f64; 3] = match e2m2e_spice::ephem_cache::with_cache(|c| {
+            c.and_then(|cache| cache.body_position(body, "SOLAR SYSTEM BARYCENTER", et))
+        }) {
+            Some(p) => p,
+            None => {
+                let (st, _) = e2m2e_spice::spice_ffi::spkezr(
+                    body,
+                    et,
+                    propagation_frame,
+                    "NONE",
+                    "SOLAR SYSTEM BARYCENTER",
+                )?;
+                [st[0], st[1], st[2]]
+            }
+        };
         [
-            r_ssb[0] - body_state_ssb[0],
-            r_ssb[1] - body_state_ssb[1],
-            r_ssb[2] - body_state_ssb[2],
+            r_ssb[0] - body_pos_ssb[0],
+            r_ssb[1] - body_pos_ssb[1],
+            r_ssb[2] - body_pos_ssb[2],
         ]
     };
 
-    // 旋转 propagation_frame → input_frame
+    // 旋转 propagation_frame → input_frame（优先走缓存）
     // Python: position_out = to_rotation.T @ r_body_icrf，
     // 其中 to_rotation = pxform(input_frame, J2000)（input → j2000）。
     // 所以 position_out = pxform(input_frame, J2000).T @ r_body_icrf
     //                   = pxform(J2000, input_frame) @ r_body_icrf
-    let r_input_to_j2000 = pxform(input_frame, propagation_frame, et)?;
+    let r_input_to_j2000: [[f64; 3]; 3] =
+        match e2m2e_spice::ephem_cache::with_cache(|c| {
+            c.and_then(|cache| cache.frame_matrix(input_frame, propagation_frame, et))
+        }) {
+            Some(m) => m,
+            None => pxform(input_frame, propagation_frame, et)?,
+        };
     let r_input = mat3_t_mul_vec(&r_input_to_j2000, &r_body_icrf);
 
     // Step 2: 有效系数（含潮汐修正）

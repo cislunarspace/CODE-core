@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - BCR4BP 双圆限制性四体模型（`e2m2e.core.bcr4bp_system`/`bcr4bp_dynamics`）：`BCR4BPSystem` 在 CR3BP 会合系上叠加太阳解析圆轨道摄动（m_s=328900.56、a_s=389.17、ω_s=−0.9252，DE440/GMAT 来源），`BCR4BP_Dynamics` 含太阳直接/间接项与 STM；无 Jacobi 积分，与星历 1 天外推误差约 1e3 km（主误差来自月球圆轨道近似）
 - 多脉冲转移与主矢量检验（`e2m2e.transfer.multi_impulse`）：`MultiImpulseTransfer` 以中途节点 `[t_i, r_i]` 为决策变量、弧段 Lambert 封闭、scipy SLSQP 最小化总 ΔV；`check_primer_vector` 实现 Lawden 必要条件检验与 Lion & Handelsman 中途脉冲插入准则
 - 可变质量低推力受控动力学基座（`e2m2e.core.forces.VariableMassFiniteBurn`）：质量作为状态量 `state[6]` 随推力消耗（`ṁ = −T/(Isp·g₀)`），`ForceModel.propagate` 自动把状态扩展为 7D `[r,v,m]` 并分流到 Rust `propagate_compiled_lowthrust`（复用 `augmented_state::augmented_eom_7d`）。本期支持常量推力与固定方向；半长轴变化率对标解析解误差 < 5%、质量消耗对标 < 1e-6。为后续最优控制求解层（直接法配点、间接法协态、月面动力下降）的共同基座
+- 低推力多段直接打靶求解器（`e2m2e.transfer.lowthrust_shooting`）：`LowThrustShooting` 以各段常量控制（throttle + 方向）为决策变量、接龙传播复用 7D 地基、SLSQP 最小化燃料、归一化末端等式约束匹配目标。`LowThrustShootingSolution` 含控制历史与质量剖面。文献参数（Zhang 2025: T=20mN, Isp=3000s, m0=500kg）短弧 min-fuel 闭环验证
+- Rust 侧星历预采样缓存（`e2m2e._integrators.enable_ephem_cache`/`disable_ephem_cache`）：积分前把天体状态与帧旋转矩阵在均匀网格上预采样、建三次样条存内存表，`GravityField`/`ThirdBody`/`IndirectTerm` 每步查表替代 cspice FFI。Python 侧 `EphemCache` 对 Rust 积分内循环无效（Rust 直接走 spice_ffi），故缓存做在 `e2m2e-spice` crate。三次样条保 C² 连续避免自适应积分器缩步长。附优化：`GravityField` 在 `body==origin`（地心系地球重力场等）时跳过 origin→SSB 查询（该量在 r_body_icrf 短路分支未被使用），零误差省 FFI
 
 ## [5.3.1] - 2026-07-29
 
