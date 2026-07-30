@@ -396,6 +396,108 @@ class ForceModel:
             "n_rejected": result["n_rejected"],
         }
 
+    def _has_variable_mass_thrust(self) -> bool:
+        """是否含启用的 :class:`VariableMassFiniteBurn`。"""
+        from .thrust import VariableMassFiniteBurn
+
+        return any(
+            isinstance(entry.force, VariableMassFiniteBurn)
+            for entry in self._entries
+            if entry.enabled
+        )
+
+    def _propagate_lowthrust(
+        self,
+        initial_state: npt.ArrayLike,
+        t0: float,
+        tf: float,
+        t_eval: npt.ArrayLike | None,
+        with_stm: bool,
+        max_steps: int,
+    ) -> dict[str, Any]:
+        """可变质量低推力 7D 传播 ``[r, v, m]``。
+
+        从 force 列表拆出 :class:`VariableMassFiniteBurn` 的推力规格（throttle/
+        方向，本期仅常量），其余 force 收集成非推力 force 列表，调 Rust
+        ``propagate_compiled_lowthrust``。``with_stm=True`` 暂不支持（43D 含
+        STM 的受控动力学版本已存在于 Rust 侧，留待求解器期次接线）。
+        """
+        from .thrust import VariableMassFiniteBurn
+
+        if with_stm:
+            raise NotImplementedError(
+                "VariableMassFiniteBurn propagation does not support with_stm yet"
+            )
+
+        y0 = np.asarray(initial_state, dtype=float)
+        if y0.shape != (self.STATE_DIM + 1,):
+            raise ValueError(
+                f"VariableMassFiniteBurn requires a 7D initial_state "
+                f"[r, v, m], got shape {y0.shape}"
+            )
+
+        # 拆推力 force 与其余 force
+        thrust_spec: tuple | None = None
+        forces_py: list[tuple] = []
+        for entry in self._entries:
+            if not entry.enabled:
+                continue
+            if isinstance(entry.force, VariableMassFiniteBurn):
+                spec = entry.force.to_rust_spec(self.system)
+                if spec is None:
+                    raise NotImplementedError(
+                        "VariableMassFiniteBurn with a callable direction cannot use "
+                        "the Rust path; use a fixed direction."
+                    )
+                if thrust_spec is not None:
+                    raise ValueError("only one VariableMassFiniteBurn is supported per propagation")
+                thrust_spec = spec
+            else:
+                spec = entry.force.to_rust_spec(self.system)
+                if spec is None:
+                    raise NotImplementedError(
+                        f"force {entry.force.__class__.__name__} lacks to_rust_spec; "
+                        "cannot mix with VariableMassFiniteBurn on the Rust path"
+                    )
+                forces_py.append(spec)
+
+        if thrust_spec is None:
+            raise RuntimeError("VariableMassFiniteBurn not found (should not happen)")
+
+        # thrust_spec = ("low_thrust_variable", t_max, isp, throttle, dx, dy, dz)
+        t_max = float(thrust_spec[1])
+        isp = float(thrust_spec[2])
+        throttle = float(thrust_spec[3])
+        direction = (float(thrust_spec[4]), float(thrust_spec[5]), float(thrust_spec[6]))
+
+        from e2m2e._integrators import RkMethod, propagate_compiled_lowthrust
+
+        t_eval_arr = self._prepare_t_eval(t0, tf, t_eval)
+        observer = getattr(self.system, "origin", "EARTH")
+        tol = float(self.rtol)
+        h = self._estimate_initial_step(y0[: self.STATE_DIM], t0, tf)
+
+        result = propagate_compiled_lowthrust(
+            RkMethod.PD45,
+            float(t0),
+            [float(x) for x in y0],
+            float(h),
+            tol,
+            [float(x) for x in np.asarray(t_eval_arr).flat],
+            observer,
+            forces_py,
+            (t_max, isp, throttle, direction[0], direction[1], direction[2]),
+            int(max_steps),
+        )
+        self.last_trajectory = (np.asarray(result["time"]), np.asarray(result["states"]))
+        return {
+            "time": np.asarray(result["time"]),
+            "states": np.asarray(result["states"]),
+            "terminal_event_index": None,
+            "n_steps": result["n_steps"],
+            "n_rejected": result["n_rejected"],
+        }
+
     def _propagate_via_rust_stm(
         self,
         y0: npt.NDArray[np.floating],
@@ -544,6 +646,13 @@ class ForceModel:
             raise NotImplementedError(
                 "ForceModel propagation only supports forward integration (tf >= t0)."
             )
+
+        # ── 可变质量低推力 7D 路径 ──
+        # 当 force 列表含 VariableMassFiniteBurn 时，状态为 7D [r, v, m]，质量
+        # 随推力消耗，走 Rust propagate_compiled_lowthrust。与 6D 主路径隔离，
+        # 不参与 STM/事件分派。详见 docs/plans/lowthrust-foundation-prd.md。
+        if self._has_variable_mass_thrust():
+            return self._propagate_lowthrust(initial_state, t0, tf, t_eval, with_stm, max_steps)
 
         y0 = np.asarray(initial_state, dtype=float)
         if y0.shape != (self.STATE_DIM,):

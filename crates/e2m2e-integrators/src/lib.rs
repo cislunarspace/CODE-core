@@ -1130,6 +1130,180 @@ fn propagate_compiled(
     Ok(dict.into())
 }
 
+/// 7D 可变质量低推力传播：状态 `[x, y, z, vx, vy, vz, m]`。
+///
+/// 受控动力学复用 `e2m2e-forces` 的 `augmented_eom_7d`：重力走
+/// `compute_total_acceleration`，推力与质量流走 `ThrustParams`。控制律为
+/// 常量 throttle 与常量方向（与 `ThrustParams` 的常量语义对齐）；时变控制
+/// 留待求解器期次。
+///
+/// # 参数
+/// - `method`: RK 方法
+/// - `t0`: 起始时刻（SPICE et 秒）
+/// - `y0`: 初始状态，长度 7
+/// - `h_init`: 初始步长
+/// - `tol`: 步长误差容差
+/// - `t_eval`: 评估时刻数组
+/// - `observer`: 传播系 origin（如 "EARTH"）
+/// - `forces_py`: 非推力 force 元组列表（格式同 `propagate_compiled`）
+/// - `thrust_spec`: `(t_max, isp, throttle, dir_x, dir_y, dir_z)`
+/// - `max_steps`: 最大步数
+///
+/// # 返回
+/// Python dict：`{"time": [...], "states": [[7], ...], "n_steps": int, "n_rejected": int}`
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn propagate_compiled_lowthrust(
+    method: RkMethod,
+    t0: f64,
+    y0: Vec<f64>,
+    h_init: f64,
+    tol: f64,
+    t_eval: Vec<f64>,
+    observer: &str,
+    forces_py: &Bound<'_, PyList>,
+    thrust_spec: (f64, f64, f64, f64, f64, f64),
+    max_steps: usize,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::forces::augmented_state::{augmented_eom_7d, ThrustParams};
+    use e2m2e_forces::forces::compiled::CompiledForce;
+
+    if y0.len() != 7 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "y0 must have length 7 (low-thrust augmented state), got {}",
+            y0.len()
+        )));
+    }
+    if y0[6] <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial mass (y0[6]) must be positive, got {}",
+            y0[6]
+        )));
+    }
+    if tol <= 0.0 || h_init <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "tol and h_init must be positive",
+        ));
+    }
+
+    let (t_max, isp, throttle, dir_x, dir_y, dir_z) = thrust_spec;
+    if !(0.0..=1.0).contains(&throttle) {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "throttle must be in [0, 1], got {throttle}"
+        )));
+    }
+    let dir_norm = (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
+    if throttle > 0.0 && dir_norm < 1e-15 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "thrust direction must be non-zero when throttle > 0",
+        ));
+    }
+    // 归一化方向（throttle=0 时方向不影响结果，给个占位单位向量避免 NaN）
+    let direction: [f64; 3] = if dir_norm > 1e-15 {
+        [dir_x / dir_norm, dir_y / dir_norm, dir_z / dir_norm]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
+    let thrust = ThrustParams {
+        t_max,
+        isp,
+        throttle,
+        direction,
+    };
+
+    // 解析非推力 force（重力等），格式同 propagate_compiled
+    let mut forces: Vec<CompiledForce> = Vec::with_capacity(forces_py.len());
+    for item in forces_py.iter() {
+        forces.push(parse_force_tuple(&item)?);
+    }
+
+    let table = method.table();
+    let mut y = y0;
+    let mut t = t0;
+    let mut h = h_init;
+    let mut times: Vec<f64> = vec![t0];
+    let mut states: Vec<Vec<f64>> = vec![y.clone()];
+    let mut eval_idx = 1usize; // t_eval[0] == t0 已经记录
+    let mut n_steps = 0usize;
+    let mut n_rejected = 0usize;
+
+    // cspice 错误状态经 RefCell 透传（不能通过 explicit_rk_step 的 E 传）
+    use std::cell::RefCell;
+    let last_error: RefCell<Option<String>> = RefCell::new(None);
+
+    while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
+        n_steps += 1;
+        // 限制步长不超过下一个评估点（提高 t_eval 命中率）
+        if eval_idx < t_eval.len() {
+            let t_next_eval = t_eval[eval_idx];
+            if t + h > t_next_eval {
+                h = t_next_eval - t;
+            }
+        }
+
+        // RK 单步：用 Rust 闭包调 augmented_eom_7d，返回 7D 导数
+        let forces_ref = &forces;
+        let observer_ref = observer;
+        let err_cell = &last_error;
+        let thrust_ref = &thrust;
+        let callback = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
+            let state7 = [yi[0], yi[1], yi[2], yi[3], yi[4], yi[5], yi[6]];
+            augmented_eom_7d(forces_ref, observer_ref, ti, &state7, thrust_ref)
+                .map(|d| vec![d[0], d[1], d[2], d[3], d[4], d[5], d[6]])
+                .inspect_err(|e| {
+                    *err_cell.borrow_mut() = Some(e.clone());
+                })
+        };
+
+        let (y_new, error) = match explicit_rk_step(table, t, &y, h, callback, None) {
+            Ok(r) => r,
+            Err(msg) => {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "RK step force error: {msg}"
+                )));
+            }
+        };
+
+        if error <= tol {
+            t += h;
+            y = y_new;
+            // 输出落在 t_eval 的点
+            while eval_idx < t_eval.len() && t >= t_eval[eval_idx] - 1e-9 {
+                times.push(t_eval[eval_idx]);
+                states.push(y.clone());
+                eval_idx += 1;
+            }
+            let h_next = suggest_next_step(h, error, tol, method.embedded_order());
+            h = h_next;
+        } else {
+            n_rejected += 1;
+            let h_next = suggest_next_step(h, error, tol, method.embedded_order());
+            h = h_next;
+            if h < 1e-12 * (t_eval[t_eval.len() - 1] - t0).abs() {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                    "step size collapsed below minimum",
+                ));
+            }
+        }
+    }
+
+    if n_steps >= max_steps && t < t_eval[t_eval.len() - 1] {
+        return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "propagation reached max_steps ({max_steps}) before t_final"
+        )));
+    }
+
+    // 返回 dict
+    let dict = PyDict::new(py);
+    dict.set_item("time", times)?;
+    dict.set_item("states", states)?;
+    dict.set_item("n_steps", n_steps)?;
+    dict.set_item("n_rejected", n_rejected)?;
+    Ok(dict.into())
+}
+
 /// Python 接口：42 维增广状态传播（状态 + STM）。
 ///
 /// 纯 N 体模型（EARTH/MOON/SUN 等），用于星历修正的逐段积分。
@@ -1421,6 +1595,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(srp_acceleration, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(propagate_compiled_lowthrust, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_with_stm_py, m)?)?;
     #[cfg(feature = "spice")]

@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - 事件检测：`Dynamics.propagate(events=...)` 透传 scipy 事件语义（terminal/direction），`PoincareSection.event(direction, terminal)` 生成截面穿越事件函数；Rust `solve_ivp_events_py`（薄封装 `e2m2e.integrators.solve_ivp_events`）在积分内循环完成事件检测与二分求精，`ForceModel.propagate` 事件走此快速路径
 - BCR4BP 双圆限制性四体模型（`e2m2e.core.bcr4bp_system`/`bcr4bp_dynamics`）：`BCR4BPSystem` 在 CR3BP 会合系上叠加太阳解析圆轨道摄动（m_s=328900.56、a_s=389.17、ω_s=−0.9252，DE440/GMAT 来源），`BCR4BP_Dynamics` 含太阳直接/间接项与 STM；无 Jacobi 积分，与星历 1 天外推误差约 1e3 km（主误差来自月球圆轨道近似）
 - 多脉冲转移与主矢量检验（`e2m2e.transfer.multi_impulse`）：`MultiImpulseTransfer` 以中途节点 `[t_i, r_i]` 为决策变量、弧段 Lambert 封闭、scipy SLSQP 最小化总 ΔV；`check_primer_vector` 实现 Lawden 必要条件检验与 Lion & Handelsman 中途脉冲插入准则
+- 可变质量低推力受控动力学基座（`e2m2e.core.forces.VariableMassFiniteBurn`）：质量作为状态量 `state[6]` 随推力消耗（`ṁ = −T/(Isp·g₀)`），`ForceModel.propagate` 自动把状态扩展为 7D `[r,v,m]` 并分流到 Rust `propagate_compiled_lowthrust`（复用 `augmented_state::augmented_eom_7d`）。本期支持常量推力与固定方向；半长轴变化率对标解析解误差 < 5%、质量消耗对标 < 1e-6。为后续最优控制求解层（直接法配点、间接法协态、月面动力下降）的共同基座
 
 ## [5.3.1] - 2026-07-29
 

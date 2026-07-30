@@ -42,6 +42,9 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
    * - FiniteBurn
      - 连续推力（封闭 DSL：constant/pulse 推力 + fixed 方向）
      - ``FiniteBurn``
+   * - VariableMassFiniteBurn
+     - 可变质量连续推力（质量作为状态量随推力消耗，7D 受控动力学）
+     - —（不走配置注册表，直接构造）
    * - RelativisticCorrection
      - 后牛顿相对论修正（Schwarzschild / Lense-Thirring / de Sitter）
      - ``RelativisticCorrection``
@@ -112,6 +115,38 @@ Atmosphere 1976 分段指数模型），``C_d`` 为阻力系数（默认 2.2）�
 
 其中 ``T(t)`` 为标量推力函数，``d̂`` 为归一化方向向量。配置往返支持固定
 推力/脉冲剖面与固定方向的封闭 DSL；任意 Python callable 可传播但无法序列化。
+
+**VariableMassFiniteBurn** — 可变质量连续推力，是低推力转移与月面动力下降等
+最优控制问题的受控动力学基座。与 ``FiniteBurn`` 的唯一区别：质量不是常量，
+而是状态量 ``state[6]``，随推力按 ``ṁ = −T/(Isp·g₀)`` 消耗：
+
+.. math::
+
+   \mathbf{a}_{\text{thrust}} = \frac{T}{m} \, \hat{\mathbf{d}}, \qquad \dot{m} = -\frac{T}{I_{\text{sp}} \, g_0}
+
+含它的 ``ForceModel.propagate`` 把状态扩展为 7D ``[r, v, m]``，自动分流到
+Rust ``propagate_compiled_lowthrust``（受控 EOM 复用
+``augmented_state::augmented_eom_7d``）。本期仅支持常量推力与固定方向
+（``to_rust_spec`` 非 ``None`` 才走 Rust 路径）；可调用方向暂返回
+``NotImplementedError``。详见 ``docs/plans/lowthrust-foundation-prd.md``。
+
+.. code-block:: python
+
+   import numpy as np
+   from e2m2e.core.forces import ForceModel, GravityField, VariableMassFiniteBurn
+
+   burn = VariableMassFiniteBurn(
+       thrust=0.1,            # N
+       isp=3000.0,            # s
+       initial_mass=1000.0,   # kg，写入状态第 7 维
+       direction=np.array([0.0, 1.0, 0.0]),  # 固定方向（圆轨道初速方向）
+   )
+   fm = ForceModel(system, forces=[GravityField("EARTH", degree=0, order=0), burn])
+
+   # 7D 初值：[r, v, m]
+   state0 = np.array([6678.137, 0.0, 0.0, 0.0, 7.726, 0.0, 1000.0])
+   result = fm.propagate(state0, (et0, et0 + 86400.0))
+   # result["states"] 形状 (n, 7)，最后一列为质量剖面
 
 **RelativisticCorrection** — 后牛顿相对论修正，含三项，公式与 GMAT 对齐：
 
