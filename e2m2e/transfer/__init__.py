@@ -26,6 +26,7 @@ from .multi_impulse import (
 )
 from .porkchop import PorkchopData, porkchop
 from .propulsion import ImpulsivePropulsion
+from .qlaw import qlaw_guess, rv_to_keplerian
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 from .three_body_lambert import ThreeBodyLambert
 from .transfer import Transfer
@@ -77,5 +78,7 @@ __all__ = [
     "LowThrustSegment",
     "LowThrustShooting",
     "LowThrustShootingSolution",
+    "qlaw_guess",
+    "rv_to_keplerian",
     "_HAVE_COPT",
 ]

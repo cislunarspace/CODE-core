@@ -156,6 +156,51 @@ class LowThrustShooting:
 
     # ---- 求解 ----
 
+    def solve_from_qlaw(
+        self,
+        n_segments: int,
+        target_oe: tuple[float, float, float],
+        forces: Sequence[PhysicalModel],
+        *,
+        step: float = 120.0,
+        use_analytic_jac: bool = True,
+        maxiter: int = 100,
+        verbose: bool = False,
+    ) -> LowThrustShootingSolution:
+        """用 Q-law 生成初猜，再解析雅可比打磨。
+
+         两级流程（gap-analysis）：Q-law 前向反馈积分产出次优控制历史
+        （:func:`~e2m2e.transfer.qlaw.qlaw_guess`），喂 :meth:`solve` 做
+         min-fuel 最优控制打磨。Q-law 解决「满推力初猜推过头」的发散问题。
+
+         Args:
+             n_segments: 段数 N（Q-law 重采样 + 求解器决策变量数 = 3N）。
+             target_oe: Q-law 目标 ``(a_T, e_T, i_T)``（只控 a,e,i）。
+             forces: 非推力力模型（与构造时一致，Q-law 用于查 μ）。
+             step: Q-law 前向积分步长（秒）。
+             use_analytic_jac: 打磨阶段用解析雅可比。
+             maxiter: SLSQP 最大迭代。
+             verbose: 打印进度。
+        """
+        from .qlaw import qlaw_guess
+
+        y0, _segments, _qh, _final = qlaw_guess(
+            self._system,  # type: ignore[arg-type]
+            forces,
+            self._engine,
+            self._initial_state,
+            self._initial_mass,
+            target_oe,
+            self._t0,
+            self._tf,
+            n_segments,
+            step=step,
+            verbose=verbose,
+        )
+        return self.solve(
+            n_segments, x0=y0, use_analytic_jac=use_analytic_jac, maxiter=maxiter, verbose=verbose
+        )
+
     def solve(
         self,
         n_segments: int,
