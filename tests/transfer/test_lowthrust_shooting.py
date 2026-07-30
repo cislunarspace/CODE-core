@@ -79,8 +79,8 @@ def test_lowthrust_shooting_segment_continuity(earth_ephemeris_system):
     init = np.array([r0, 0.0, 0.0, 0.0, v0, 0.0])
     shooter = _make_shooter(system, init, init, 5400.0)  # 约 1.5 圈
 
-    # 零推力接龙
-    y = np.tile(np.array([0.0, 1.0, 0.0, 0.0]), 4)
+    # 零推力接龙（throttle=0, θ₁=0, θ₂=0）
+    y = np.tile(np.array([0.0, 0.0, 0.0]), 4)
     _, states = shooter._propagate_chain(y)
 
     # 段边界（每段 2 个采样点，合并后边界在 index 2, 4, 6 处）
@@ -92,7 +92,7 @@ def test_lowthrust_shooting_segment_continuity(earth_ephemeris_system):
 
 @pytest.mark.spice
 def test_lowthrust_shooting_decision_variable_size(earth_ephemeris_system):
-    """决策变量数 = 4N，等式约束数 = 6。"""
+    """决策变量数 = 3N（throttle+θ₁+θ₂），等式约束数 = 6。"""
     system = earth_ephemeris_system
     mu = system.gravitational_parameter("EARTH")
     r0 = 6378.137 + 300.0
@@ -102,7 +102,7 @@ def test_lowthrust_shooting_decision_variable_size(earth_ephemeris_system):
 
     for n in (1, 4, 8):
         x0 = shooter._default_x0(n)
-        assert x0.shape == (4 * n,), f"N={n}: 决策变量应为 {4 * n}, got {x0.shape}"
+        assert x0.shape == (3 * n,), f"N={n}: 决策变量应为 {3 * n}, got {x0.shape}"
 
 
 @pytest.mark.spice
@@ -120,7 +120,7 @@ def test_lowthrust_shooting_zero_thrust_constraint_violation(earth_ephemeris_sys
     target = np.array([r0, 0.0, 0.0, 0.0, -v0, 0.0])
     shooter = _make_shooter(system, init, target, 2 * np.pi * r0 / v0)
 
-    y_zero = np.tile(np.array([0.0, 1.0, 0.0, 0.0]), 4)
+    y_zero = np.tile(np.array([0.0, 0.0, 0.0]), 4)
     residual = shooter._terminal_constraint(y_zero)
     # 约束已归一化（速度残差 / v_ref）。逆行目标与顺行末态速度差 ~2*v0，
     # 归一化后 ≈ 2.0
@@ -162,7 +162,8 @@ def test_lowthrust_shooting_known_control_reproduction(earth_ephemeris_system):
         t0=et0,
         tf=et0 + duration,
     )
-    known_y = np.tile(np.array([0.7, 0.0, 1.0, 0.0]), 4)  # throttle=0.7 沿 y
+    # throttle=0.7 沿 y 方向（θ₁=π/2, θ₂=0）
+    known_y = np.tile(np.array([0.7, np.pi / 2, 0.0]), 4)
     _, known_states = known_shooter._propagate_chain(known_y)
     target_state = known_states[-1][:6].copy()
 
@@ -224,7 +225,7 @@ def test_lowthrust_shooting_min_fuel_throttle_reduction(earth_ephemeris_system):
         t0=et0,
         tf=et0 + duration,
     )
-    full_y = np.tile(np.array([1.0, 0.0, 1.0, 0.0]), 3)
+    full_y = np.tile(np.array([1.0, np.pi / 2, 0.0]), 3)  # 满推力沿速度方向(y)
     _, full_states = probe._propagate_chain(full_y)
     target_state = full_states[-1][:6].copy()
 

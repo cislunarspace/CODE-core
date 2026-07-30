@@ -162,7 +162,7 @@ class LowThrustShooting:
         *,
         x0: npt.ArrayLike | None = None,
         throttle_bounds: tuple[float, float] = (0.0, 1.0),
-        direction_box: float = 1.0,
+        use_analytic_jac: bool = True,
         ftol: float = 1e-9,
         maxiter: int = 200,
         verbose: bool = False,
@@ -170,10 +170,12 @@ class LowThrustShooting:
         """求解 min-fuel 低推力打靶。
 
         Args:
-            n_segments: 段数 N，``≥ 1``。决策变量总数 = ``4N``。
-            x0: 初猜决策向量 ``(4N,)``；None 时 throttle 全满、方向沿初速方向。
+            n_segments: 段数 N，``≥ 1``。决策变量每段 ``(throttle, θ₁, θ₂)``，
+                总数 ``3N``（角度参数化方向，Du 2024 式 5）。
+            x0: 初猜决策向量 ``(3N,)``；None 时 throttle 全满、方向角对齐初速。
             throttle_bounds: throttle 上下界，默认 ``(0, 1)``。
-            direction_box: 方向分量盒约束半宽，默认 1.0（即 ``[-1, 1]``）。
+            use_analytic_jac: True 时用解析雅可比（灵敏度方程，每迭代 1 次传播）；
+                False 回退 SLSQP 数值差分（每迭代 3N+1 次传播）。
             ftol: SLSQP 目标容差。
             maxiter: SLSQP 最大迭代次数。
             verbose: 是否打印 SLSQP 迭代信息。
@@ -184,19 +186,24 @@ class LowThrustShooting:
         if n_segments < 1:
             raise ValueError(f"n_segments must be >= 1, got {n_segments}")
 
-        n_var = 4 * n_segments
+        n_var = 3 * n_segments
         y0 = self._default_x0(n_segments) if x0 is None else np.asarray(x0, dtype=float)
         if y0.shape != (n_var,):
             raise ValueError(f"x0 must have shape ({n_var},), got {y0.shape}")
 
-        lb, ub = self._bounds(n_segments, throttle_bounds, direction_box)
+        lb, ub = self._bounds(n_segments, throttle_bounds)
+
+        constraints: dict[str, object] = {"type": "eq", "fun": self._terminal_constraint}
+        if use_analytic_jac:
+            constraints["jac"] = self._terminal_jacobian
 
         result = minimize(
             self._fuel_objective,
             y0,
             method="SLSQP",
+            jac=self._fuel_jacobian if use_analytic_jac else None,
             bounds=Bounds(lb, ub),
-            constraints=[{"type": "eq", "fun": self._terminal_constraint}],
+            constraints=[constraints],
             options={"ftol": ftol, "maxiter": maxiter, "disp": verbose},
         )
 
@@ -209,50 +216,50 @@ class LowThrustShooting:
 
     # ---- 内部：决策向量解码与传播接龙 ----
 
+    @staticmethod
+    def _angles_to_direction(theta1: float, theta2: float) -> np.ndarray:
+        """角度参数化方向向量（Du 2024 式 5）。"""
+        return np.array(
+            [
+                np.cos(theta1) * np.cos(theta2),
+                np.sin(theta1) * np.cos(theta2),
+                np.sin(theta2),
+            ]
+        )
+
     def _default_x0(self, n_segments: int) -> np.ndarray:
-        """默认初猜：throttle 全满，方向沿初速方向。"""
+        """默认初猜：throttle 全满，方向角对齐初速方向。"""
         v0 = self._initial_state[3:6]
         v_hat = v0 / np.linalg.norm(v0)
-        seg = np.concatenate([[1.0], v_hat])
+        # 反推初速方向的 (θ₁, θ₂)：θ₁=atan2(vy,vx)，θ₂=asin(vz)
+        theta1 = float(np.arctan2(v_hat[1], v_hat[0]))
+        theta2 = float(np.arcsin(v_hat[2]))
+        seg = np.array([1.0, theta1, theta2])
         return np.tile(seg, n_segments)
 
     def _bounds(
         self,
         n_segments: int,
         throttle_bounds: tuple[float, float],
-        direction_box: float,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """组装决策变量上下界：[throttle_i, ux_i, uy_i, uz_i] × N。"""
+        """组装决策变量上下界：[throttle_i, θ₁_i, θ₂_i] × N。"""
         t_lo, t_hi = throttle_bounds
-        d = float(direction_box)
-        seg_lb = np.array([t_lo, -d, -d, -d])
-        seg_ub = np.array([t_hi, d, d, d])
+        seg_lb = np.array([t_lo, -np.pi, -np.pi / 2])
+        seg_ub = np.array([t_hi, np.pi, np.pi / 2])
         return np.tile(seg_lb, n_segments), np.tile(seg_ub, n_segments)
 
-    def _decode_segments(
-        self, y: npt.NDArray[np.floating]
-    ) -> list[tuple[float, float, float, float]]:
-        """决策向量 -> 各段 (throttle, 归一化方向) 列表。
-
-        方向向量归一化；零方向（throttle=0 时允许）给占位单位向量。
-        """
-        flat = np.asarray(y, dtype=float).reshape(-1, 4)
-        segs: list[tuple[float, float, float, float]] = []
-        for row in flat:
-            throttle = float(np.clip(row[0], 0.0, 1.0))
-            d = row[1:4]
-            norm = np.linalg.norm(d)
-            if norm < 1e-15:
-                ux, uy, uz = 1.0, 0.0, 0.0  # 占位；throttle=0 时方向不影响
-            else:
-                ux, uy, uz = d / norm
-            segs.append((throttle, ux, uy, uz))
-        return segs
+    def _decode_segments(self, y: npt.NDArray[np.floating]) -> list[tuple[float, float, float]]:
+        """决策向量 -> 各段 (throttle, θ₁, θ₂) 列表。"""
+        flat = np.asarray(y, dtype=float).reshape(-1, 3)
+        return [(float(np.clip(row[0], 0.0, 1.0)), float(row[1]), float(row[2])) for row in flat]
 
     def _propagate_chain(
         self, y: npt.NDArray[np.floating]
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-        """接龙传播：返回合并时间序列 (M,) 与 7D 状态序列 (M, 7)。"""
+        """接龙传播：返回合并时间序列 (M,) 与 7D 状态序列 (M, 7)。
+
+        用无灵敏度的 ``propagate_compiled_lowthrust``（重建轨迹用）。
+        """
         from e2m2e._integrators import RkMethod, propagate_compiled_lowthrust
 
         segs = self._decode_segments(y)
@@ -269,8 +276,9 @@ class LowThrustShooting:
         t_max = self._engine.t_max
         isp = self._engine.isp
 
-        for i, (throttle, ux, uy, uz) in enumerate(segs):
+        for i, (throttle, theta1, theta2) in enumerate(segs):
             ti, tip1 = float(node_times[i]), float(node_times[i + 1])
+            alpha = self._angles_to_direction(theta1, theta2)
             res = propagate_compiled_lowthrust(
                 RkMethod.PD45,
                 ti,
@@ -280,42 +288,119 @@ class LowThrustShooting:
                 [ti, tip1],
                 self._observer,
                 self._forces_py,
-                (t_max, isp, throttle, ux, uy, uz),
+                (t_max, isp, throttle, float(alpha[0]), float(alpha[1]), float(alpha[2])),
                 500_000,
             )
             seg_states = np.asarray(res["states"], dtype=float)
-            # 取段末状态作为下一段初态
             state = seg_states[-1].copy()
-            # 合并：跳过段首（与上段段末重复）
             for k in range(1, len(seg_states)):
                 times_list.append(float(res["time"][k]))
                 states_list.append(seg_states[k])
 
         return np.asarray(times_list), np.asarray(states_list)
 
+    def _propagate_chain_with_jacobian(
+        self, y: npt.NDArray[np.floating]
+    ) -> tuple[float, npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        """带灵敏度的接龙传播，返回 (末态质量, 末态[r,v] 6D, 全雅可比 6×3N)。
+
+        每段调 ``propagate_compiled_lowthrust_sensitivity``，收末端灵敏度 S(7×3)
+        与 STM Φ(6×6)。全局末端对段 i 控制的雅可比 = 复合 STM(段 i+1..N) · S_i
+        的前 6 行。复合 STM 从后往前累积。
+        """
+        from e2m2e._integrators import RkMethod, propagate_compiled_lowthrust_sensitivity
+
+        segs = self._decode_segments(y)
+        n_segments = len(segs)
+        dt = (self._tf - self._t0) / n_segments
+        node_times = self._t0 + np.arange(n_segments + 1) * dt
+        t_max = self._engine.t_max
+        isp = self._engine.isp
+
+        # 先正向接龙，收集每段末端 state7、Φ(6×6)、S(7×3)
+        seg_ends: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []
+        state = np.concatenate([self._initial_state, [self._initial_mass]])
+        for i, (throttle, theta1, theta2) in enumerate(segs):
+            ti, tip1 = float(node_times[i]), float(node_times[i + 1])
+            res = propagate_compiled_lowthrust_sensitivity(
+                RkMethod.PD45,
+                ti,
+                state.tolist(),
+                self._estimate_h(state, dt),
+                1e-10,
+                [ti, tip1],
+                self._observer,
+                self._forces_py,
+                (t_max, isp, throttle, theta1, theta2),
+                500_000,
+            )
+            end_state = np.asarray(res["states"][-1])
+            end_stm = np.asarray(res["stm"][-1]).reshape(6, 6)
+            end_sens = np.asarray(res["sensitivity"][-1]).reshape(7, 3)
+            seg_ends.append((end_state, end_stm, end_sens))
+            state = end_state  # 下段初态
+
+        final_state7 = seg_ends[-1][0]
+        # 链式雅可比：从后往前累积复合 STM，J_i = Φ_{i+1..N} · S_i（前 6 行）
+        jac = np.zeros((6, 3 * n_segments))
+        composite_phi = np.eye(6)  # 末端到末端
+        for i in range(n_segments - 1, -1, -1):
+            end_state_i, end_stm_i, end_sens_i = seg_ends[i]
+            # J_i（段 i 控制对全局末端的灵敏度）= composite_phi · S_i[:6, :]
+            jac[:, i * 3 : (i + 1) * 3] = composite_phi @ end_sens_i[:6, :]
+            # 更新复合 STM：composite_phi = Φ_{i+1..N} → Φ_{i..N} = composite_phi · Φ_i
+            composite_phi = composite_phi @ end_stm_i
+
+        final_mass = float(final_state7[6])
+        return final_mass, final_state7[:6], jac
+
     def _estimate_h(self, state: npt.NDArray[np.floating], dt: float) -> float:
         """段内初始步长估计：取段长的 1/10，并夹到合理区间。"""
         h = dt / 10.0
         return float(np.clip(h, 1.0, dt))
+
+    # ---- 目标、约束及其解析雅可比 ----
 
     def _fuel_objective(self, y: npt.NDArray[np.floating]) -> float:
         """目标：最小化 -m_f（最大化末态质量 = min-fuel）。"""
         _, states = self._propagate_chain(y)
         return -float(states[-1][6])
 
-    def _terminal_constraint(self, y: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
-        """等式约束：末态 [r, v] - target_state，归一化到 O(1) 量级。
+    def _fuel_jacobian(self, y: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+        """目标解析雅可比：∂(-m_f)/∂y。
 
-        位置残差除以参考长度、速度残差除以参考速度，使约束与决策变量
-        （throttle/方向 ~O(1)）、目标（−mf）尺度匹配，改善 SLSQP 数值差分
-        雅可比的性态。SLSQP 默认差分步长 ~1e-8 对未归一化的 km 级位置残差
-        过小，雅可比被数值噪声淹没导致不收敛。
+        ∂m_f/∂(段 i 控制) = 末态质量对段 i 控制的灵敏度 = 复合 STM 的质量行
+        与 S_i 质量行的复合。质量不进 6×6 STM（ṁ 只依赖 throttle），故段 i 之后
+        的质量变化只来自段 i 自身的 ∂m_f/∂(段 i throttle) = S_i[6, 0]·dt... 但
+        实际上质量是单调累积：末态质量 = 初态 - Σ 燃料消耗，燃料消耗只依赖各段
+        throttle 与段长。因此 ∂m_f/∂(段 i throttle) = -T_max·dt/(Isp·g0)，
+        ∂m_f/∂θ = 0。
         """
-        _, states = self._propagate_chain(y)
+        from e2m2e._integrators import propagate_compiled_lowthrust_sensitivity  # noqa: F401
+
+        g0 = 9.81
+        dt = (self._tf - self._t0) / (len(self._decode_segments(y)))
+        dm_dthr = -self._engine.t_max * dt / (self._engine.isp * g0)
+        jac = np.zeros(len(y))
+        for i in range(len(y) // 3):
+            jac[i * 3] = -dm_dthr  # ∂(-m_f)/∂throttle = -∂m_f/∂thr = +(T dt/Isp g0)
+        return jac
+
+    def _terminal_constraint(self, y: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+        """等式约束：归一化末态 [r, v] - target_state。"""
+        _, final_rv, _ = self._propagate_chain_with_jacobian(y)
         r_ref = float(np.linalg.norm(self._initial_state[:3]))
         v_ref = float(np.linalg.norm(self._initial_state[3:6]))
-        residual = states[-1][:6] - self._target_state
+        residual = final_rv - self._target_state
         return np.concatenate([residual[:3] / r_ref, residual[3:6] / v_ref])
+
+    def _terminal_jacobian(self, y: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+        """约束解析雅可比：归一化的 jac = 链式雅可比各行除以参考量。"""
+        _, _, jac = self._propagate_chain_with_jacobian(y)
+        r_ref = float(np.linalg.norm(self._initial_state[:3]))
+        v_ref = float(np.linalg.norm(self._initial_state[3:6]))
+        scale = np.array([r_ref, r_ref, r_ref, v_ref, v_ref, v_ref])
+        return jac / scale[:, None]
 
     def _build_solution(
         self,
@@ -329,8 +414,8 @@ class LowThrustShooting:
         times, states = self._propagate_chain(y)
         segs_decoded = self._decode_segments(y)
         segments = tuple(
-            LowThrustSegment(throttle=t, direction=np.array([ux, uy, uz]))
-            for (t, ux, uy, uz) in segs_decoded
+            LowThrustSegment(throttle=t, direction=self._angles_to_direction(t1, t2))
+            for (t, t1, t2) in segs_decoded
         )
         final_mass = float(states[-1][6])
         return LowThrustShootingSolution(

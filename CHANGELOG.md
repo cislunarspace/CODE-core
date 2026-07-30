@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - 可变质量低推力受控动力学基座（`e2m2e.core.forces.VariableMassFiniteBurn`）：质量作为状态量 `state[6]` 随推力消耗（`ṁ = −T/(Isp·g₀)`），`ForceModel.propagate` 自动把状态扩展为 7D `[r,v,m]` 并分流到 Rust `propagate_compiled_lowthrust`（复用 `augmented_state::augmented_eom_7d`）。本期支持常量推力与固定方向；半长轴变化率对标解析解误差 < 5%、质量消耗对标 < 1e-6。为后续最优控制求解层（直接法配点、间接法协态、月面动力下降）的共同基座
 - 低推力多段直接打靶求解器（`e2m2e.transfer.lowthrust_shooting`）：`LowThrustShooting` 以各段常量控制（throttle + 方向）为决策变量、接龙传播复用 7D 地基、SLSQP 最小化燃料、归一化末端等式约束匹配目标。`LowThrustShootingSolution` 含控制历史与质量剖面。文献参数（Zhang 2025: T=20mN, Isp=3000s, m0=500kg）短弧 min-fuel 闭环验证
 - Rust 侧星历预采样缓存（`e2m2e._integrators.enable_ephem_cache`/`disable_ephem_cache`）：积分前把天体状态与帧旋转矩阵在均匀网格上预采样、建三次样条存内存表，`GravityField`/`ThirdBody`/`IndirectTerm` 每步查表替代 cspice FFI。Python 侧 `EphemCache` 对 Rust 积分内循环无效（Rust 直接走 spice_ffi），故缓存做在 `e2m2e-spice` crate。三次样条保 C² 连续避免自适应积分器缩步长。附优化：`GravityField` 在 `body==origin`（地心系地球重力场等）时跳过 origin→SSB 查询（该量在 r_body_icrf 短路分支未被使用），零误差省 FFI
+- 低推力解析雅可比（灵敏度方程法）：`augmented_eom_7d_with_sensitivity`（Rust，64D 增广 `[x₇, Φ₆ₓ₆, S₇ₓ₃]`）一次传播同时产出末端状态、STM、状态对控制 (throttle,θ₁,θ₂) 的灵敏度；`propagate_compiled_lowthrust_sensitivity` PyO3 出口。`LowThrustShooting` 改角度参数化方向（Du 2024 式 5，决策变量 4N→3N），目标/约束提供解析雅可比喂 SLSQP。文献调研（Zhang 2015 式 21-24）。每迭代传播次数从 3N+1（数值差分）降到 1（增广积分），实测 24x 加速。有限差分对标（throttle/θ₁/θ₂ 单段 + 全链式雅可比）逐元素一致
+- `PointMassGravity.to_rust_spec`：补齐 `("point_mass", mu)` 序列化，让点质量引力走 Rust 编译路径（与 GravityField degree=0 对齐但更轻量，不查星历）
 
 ## [5.3.1] - 2026-07-29
 

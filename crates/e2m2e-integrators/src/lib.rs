@@ -1311,6 +1311,193 @@ fn propagate_compiled_lowthrust(
     Ok(dict.into())
 }
 
+/// 7D 可变质量低推力 + 灵敏度传播（64D 增广状态）。
+///
+/// 在 `propagate_compiled_lowthrust`（7D 受控）基础上，同时积分：
+/// - Φ（6×6 状态对初值 STM，链式接龙用）
+/// - S（7×3 状态对控制参数 (throttle, θ₁, θ₂) 的灵敏度）
+///
+/// 一次传播同时产出末端状态、STM、灵敏度，供低推力求解器组装解析雅可比
+/// （替代 SLSQP 数值差分）。详见 `docs/plans/lowthrust-analytic-jacobian-prd.md`。
+///
+/// # 参数
+/// - `method`: RK 方法
+/// - `t0`: 起始时刻（SPICE et 秒）
+/// - `y0`: 初始状态，长度 7
+/// - `h_init`, `tol`: 步长控制
+/// - `t_eval`: 评估时刻数组（取首末两点即可）
+/// - `observer`: 传播系 origin
+/// - `forces_py`: 非推力 force 元组列表
+/// - `thrust_spec`: `(t_max, isp, throttle, θ₁, θ₂)`
+/// - `max_steps`: 最大步数
+///
+/// # 返回
+/// Python dict：`{"time": [...], "states": [[7]], "stm": [[36]], "sensitivity": [[21]],
+///               "n_steps": int, "n_rejected": int}`（均为末端时刻的值序列）
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn propagate_compiled_lowthrust_sensitivity(
+    method: RkMethod,
+    t0: f64,
+    y0: Vec<f64>,
+    h_init: f64,
+    tol: f64,
+    t_eval: Vec<f64>,
+    observer: &str,
+    forces_py: &Bound<'_, PyList>,
+    thrust_spec: (f64, f64, f64, f64, f64),
+    max_steps: usize,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::forces::augmented_state::{
+        augmented_eom_7d_with_sensitivity, ThrustParams,
+    };
+    use e2m2e_forces::forces::compiled::CompiledForce;
+
+    if y0.len() != 7 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "y0 must have length 7, got {}",
+            y0.len()
+        )));
+    }
+    if y0[6] <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial mass (y0[6]) must be positive, got {}",
+            y0[6]
+        )));
+    }
+    if tol <= 0.0 || h_init <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "tol and h_init must be positive",
+        ));
+    }
+
+    let (t_max, isp, throttle, theta1, theta2) = thrust_spec;
+    if !(0.0..=1.0).contains(&throttle) {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "throttle must be in [0, 1], got {throttle}"
+        )));
+    }
+    let thrust = ThrustParams {
+        t_max,
+        isp,
+        throttle,
+        // 方向由 (θ₁,θ₂) 在 EOM 内部参数化，这里给占位单位向量
+        direction: [1.0, 0.0, 0.0],
+    };
+
+    let mut forces: Vec<CompiledForce> = Vec::with_capacity(forces_py.len());
+    for item in forces_py.iter() {
+        forces.push(parse_force_tuple(&item)?);
+    }
+
+    // 初始 64D 增广状态：[x₇, Φ=I₆, S=0]
+    let mut y = vec![0.0_f64; 64];
+    y[..7].copy_from_slice(&y0);
+    for i in 0..6 {
+        y[7 + i * 6 + i] = 1.0; // Φ(0) = I₆
+    }
+    // S(0) = 0（已是默认）
+
+    let table = method.table();
+    let mut t = t0;
+    let mut h = h_init;
+    let mut eval_idx = 1usize;
+    let mut n_steps = 0usize;
+    let mut n_rejected = 0usize;
+
+    use std::cell::RefCell;
+    let last_error: RefCell<Option<String>> = RefCell::new(None);
+
+    // 记录落在 t_eval 的点（首点已含初值）
+    let mut times: Vec<f64> = vec![t0];
+    let mut states: Vec<Vec<f64>> = vec![y[..7].to_vec()];
+    let mut stms: Vec<Vec<f64>> = vec![y[7..43].to_vec()];
+    let mut sens: Vec<Vec<f64>> = vec![y[43..64].to_vec()];
+
+    while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
+        n_steps += 1;
+        if eval_idx < t_eval.len() {
+            let t_next_eval = t_eval[eval_idx];
+            if t + h > t_next_eval {
+                h = t_next_eval - t;
+            }
+        }
+
+        let forces_ref = &forces;
+        let observer_ref = observer;
+        let err_cell = &last_error;
+        let thrust_ref = &thrust;
+        let theta1_c = theta1;
+        let theta2_c = theta2;
+        let callback = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
+            let mut state64 = [0.0_f64; 64];
+            state64.copy_from_slice(&yi[..64]);
+            augmented_eom_7d_with_sensitivity(
+                forces_ref,
+                observer_ref,
+                ti,
+                &state64,
+                thrust_ref,
+                theta1_c,
+                theta2_c,
+            )
+            .map(|d| d.to_vec())
+            .inspect_err(|e| {
+                *err_cell.borrow_mut() = Some(e.clone());
+            })
+        };
+
+        let (y_new, error) = match explicit_rk_step(table, t, &y, h, callback, None) {
+            Ok(r) => r,
+            Err(msg) => {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "RK step force error: {msg}"
+                )));
+            }
+        };
+
+        if error <= tol {
+            t += h;
+            y = y_new;
+            while eval_idx < t_eval.len() && t >= t_eval[eval_idx] - 1e-9 {
+                times.push(t_eval[eval_idx]);
+                states.push(y[..7].to_vec());
+                stms.push(y[7..43].to_vec());
+                sens.push(y[43..64].to_vec());
+                eval_idx += 1;
+            }
+            let h_next = suggest_next_step(h, error, tol, method.embedded_order());
+            h = h_next;
+        } else {
+            n_rejected += 1;
+            let h_next = suggest_next_step(h, error, tol, method.embedded_order());
+            h = h_next;
+            if h < 1e-12 * (t_eval[t_eval.len() - 1] - t0).abs() {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                    "step size collapsed below minimum",
+                ));
+            }
+        }
+    }
+
+    if n_steps >= max_steps && t < t_eval[t_eval.len() - 1] {
+        return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "propagation reached max_steps ({max_steps}) before t_final"
+        )));
+    }
+
+    let dict = PyDict::new(py);
+    dict.set_item("time", times)?;
+    dict.set_item("states", states)?;
+    dict.set_item("stm", stms)?;
+    dict.set_item("sensitivity", sens)?;
+    dict.set_item("n_steps", n_steps)?;
+    dict.set_item("n_rejected", n_rejected)?;
+    Ok(dict.into())
+}
+
 /// Python 接口：42 维增广状态传播（状态 + STM）。
 ///
 /// 纯 N 体模型（EARTH/MOON/SUN 等），用于星历修正的逐段积分。
@@ -1650,6 +1837,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_compiled, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_lowthrust, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(propagate_compiled_lowthrust_sensitivity, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(enable_ephem_cache, m)?)?;
     #[cfg(feature = "spice")]
