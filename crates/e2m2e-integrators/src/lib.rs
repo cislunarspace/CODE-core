@@ -387,6 +387,104 @@ pub fn solve_ivp_py(
     Ok(dict.into())
 }
 
+/// Python 接口：带事件检测的自适应步长 ODE 积分器。
+///
+/// 事件检测在 Rust 积分内循环完成：每个接受步的端点评估事件函数，
+/// 符号变化（经 direction 过滤）时在步内对线性插值态二分求精（无稠密输出）。
+///
+/// # 参数
+/// - `events`: `[(callable, terminal, direction), ...]`，callable 为
+///   `g(t, y) -> float`；`terminal=True` 触发即停；`direction` > 0 只记
+///   上行穿越、< 0 只记下行、0 双向（scipy `solve_ivp` 语义）
+/// - `method`: RK 方法（默认 `Pd78`，即 DOP853）
+/// - 其余参数同 `solve_ivp_py`
+///
+/// # 返回
+/// Python dict：`{"states", "time", "n_steps", "t_events", "y_events",
+/// "terminal_event"}`；terminal 截断时 `time`/`states` 末点为求精后的
+/// 事件点，`terminal_event` 为触发终止的事件索引（未终止为 None）。
+#[pyfunction]
+#[pyo3(signature = (t_span, y0, t_eval, rtol, atol, f, events, method=None, max_step=None, max_steps=None, state_error_dim=None))]
+#[allow(clippy::too_many_arguments)]
+pub fn solve_ivp_events_py<'py>(
+    t_span: (f64, f64),
+    y0: Vec<f64>,
+    t_eval: Vec<f64>,
+    rtol: f64,
+    atol: f64,
+    f: &Bound<'py, PyAny>,
+    events: Vec<(Bound<'py, PyAny>, bool, f64)>,
+    method: Option<RkMethod>,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    state_error_dim: Option<usize>,
+    py: Python<'py>,
+) -> PyResult<PyObject> {
+    use e2m2e_propagation::solve_ivp::{solve_ivp_events_impl, EventSpec, MAX_ADAPTIVE_STEPS};
+
+    if y0.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "y0 must not be empty",
+        ));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+    if rtol <= 0.0 || atol <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "rtol and atol must be positive",
+        ));
+    }
+
+    let n = y0.len();
+    let rhs = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
+        call_python_rhs(f, n, ti, yi).map_err(|e| e.to_string())
+    };
+
+    type PyEvent<'a> = Box<dyn Fn(f64, &[f64]) -> Result<f64, String> + 'a>;
+    let specs: Vec<EventSpec<PyEvent<'py>>> = events
+        .into_iter()
+        .map(|(g, terminal, direction)| {
+            let closure: PyEvent<'py> =
+                Box::new(move |ti: f64, yi: &[f64]| -> Result<f64, String> {
+                    let yi_list = PyList::new(g.py(), yi).map_err(|e| e.to_string())?;
+                    let value = g.call1((ti, yi_list)).map_err(|e| e.to_string())?;
+                    value.extract::<f64>().map_err(|e| e.to_string())
+                });
+            EventSpec::new(closure, terminal, direction)
+        })
+        .collect();
+
+    let table = method.unwrap_or(RkMethod::Pd78).table();
+    let h_max = max_step.unwrap_or(f64::INFINITY);
+    let s_max = max_steps.unwrap_or(MAX_ADAPTIVE_STEPS);
+
+    let result = solve_ivp_events_impl(
+        table,
+        rhs,
+        t_span,
+        &y0,
+        &t_eval,
+        rtol,
+        atol,
+        h_max,
+        s_max,
+        state_error_dim,
+        &specs,
+    );
+
+    let dict = PyDict::new(py);
+    dict.set_item("states", result.states)?;
+    dict.set_item("time", result.t)?;
+    dict.set_item("n_steps", result.n_steps)?;
+    dict.set_item("t_events", result.t_events)?;
+    dict.set_item("y_events", result.y_events)?;
+    dict.set_item("terminal_event", result.terminal_event)?;
+    Ok(dict.into())
+}
+
 /// 球谐引力加速度（body-fixed 系）。
 ///
 /// Python 侧 `GravityField._compute_acceleration_in_input_frame` 的 Rust 加速版。
@@ -1300,6 +1398,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_py, m)?)?;
+    m.add_function(wrap_pyfunction!(solve_ivp_events_py, m)?)?;
     m.add_function(wrap_pyfunction!(multistep_step, m)?)?;
     m.add_function(wrap_pyfunction!(cowell_step, m)?)?;
     m.add_function(wrap_pyfunction!(lambert_izzo_py, m)?)?;

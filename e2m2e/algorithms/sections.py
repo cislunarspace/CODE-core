@@ -1,12 +1,15 @@
 """
 庞加莱截面工具模块
 
-提供平面截面与近拱点截面的定义，以及沿流形管（或任意轨迹弧）的
-事后截面穿越检测。
+提供平面截面与近拱点截面的定义，以及两类截面穿越检测：
 
-检测方案（事后）：传播时密采样 t_eval → 逐采样点求截面函数 s(t)
-（平面：state[axis]-value；近拱点：r·v，r 为相对中心天体的位置）
-→ 符号变化区间内对线性插值态用 Brent 法求精，穿越态残差可达 1e-10 以下。
+- **积分中检测**：``PoincareSection.event()`` 生成 scipy ``solve_ivp``
+  语义的事件函数，传给 ``Dynamics.propagate(events=...)``，由积分器在
+  步内定位穿越（scipy 侧用稠密输出求精），无需密采样。
+- **事后检测**：``crossings``/``detect_crossings``，传播时密采样
+  t_eval → 逐采样点求截面函数 s(t)（平面：state[axis]-value；近拱点：
+  r·v，r 为相对中心天体的位置）→ 符号变化区间内对线性插值态用 Brent
+  法求精，穿越态残差可达 1e-10 以下。
 """
 
 from __future__ import annotations
@@ -112,6 +115,32 @@ class PoincareSection:
     def __call__(self, state: np.ndarray) -> float:
         """求截面函数在给定状态处的值"""
         return float(self._section_fn(np.asarray(state, dtype=float)))
+
+    def event(
+        self, direction: int = 0, terminal: bool = False
+    ) -> Callable[[float, np.ndarray], float]:
+        """生成 scipy ``solve_ivp`` 语义的事件函数，供积分中检测使用
+
+        返回的 callable ``g(t, state) -> float`` 可直接传给
+        ``Dynamics.propagate(events=...)``；函数对象携带 scipy 约定的
+        ``direction``/``terminal`` 属性。截面函数只依赖前 6 维物理状态，
+        STM 增广传播（42 维状态）时自动截取前 6 维。
+
+        Args:
+            direction: 穿越方向过滤。> 0 只记上行穿越（s 由负到正），
+                < 0 只记下行，0 双向
+            terminal: True 时首次触发即终止积分
+
+        Returns:
+            事件函数，零点即截面
+        """
+
+        def g(t: float, state: np.ndarray) -> float:
+            return self(np.asarray(state, dtype=float)[:6])
+
+        g.direction = direction  # type: ignore[attr-defined]
+        g.terminal = terminal  # type: ignore[attr-defined]
+        return g
 
     @classmethod
     def plane(cls, axis: int, value: float) -> PoincareSection:

@@ -39,6 +39,8 @@ import sys as _sys
 
 from . import coordinate as _coordinate
 from . import dynamics, orbit, potential, system
+from .bcr4bp_dynamics import BCR4BP_Dynamics
+from .bcr4bp_system import BCR4BPSystem
 from .coordinate import (
     Axes,
     CoordinateSystem,
@@ -140,6 +142,8 @@ __all__ = [
     "LibrationPoint",
     "Dynamics",
     "CR3BP_Dynamics",
+    "BCR4BPSystem",
+    "BCR4BP_Dynamics",
     "Orbit",
     "OrbitFamily",
     "propagate_state_at_orbit_time",

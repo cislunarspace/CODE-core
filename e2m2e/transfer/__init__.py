@@ -12,6 +12,12 @@ from .config import (
 )
 from .lambert import LambertSolution, solve_lambert, solve_lambert_batch
 from .low_energy import PatchCandidate, design_low_energy_transfer, patch_manifolds
+from .multi_impulse import (
+    CoastArc,
+    Impulse,
+    MultiImpulseTransfer,
+    PrimerVectorReport,
+)
 from .porkchop import PorkchopData, porkchop
 from .propulsion import ImpulsivePropulsion
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
@@ -54,6 +60,10 @@ __all__ = [
     "ThreeBodyLambert",
     "TransferArc",
     "TransferSolution",
+    "CoastArc",
+    "Impulse",
+    "MultiImpulseTransfer",
+    "PrimerVectorReport",
     "PatchCandidate",
     "patch_manifolds",
     "design_low_energy_transfer",

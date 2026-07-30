@@ -87,6 +87,14 @@ e2m2e.transfer.three_body_lambert module
    :undoc-members:
    :show-inheritance:
 
+e2m2e.transfer.multi_impulse module
+------------------------------------
+
+.. automodule:: e2m2e.transfer.multi_impulse
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 e2m2e.transfer.low_energy module
 ---------------------------------
 

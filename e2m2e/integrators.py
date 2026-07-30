@@ -1,6 +1,7 @@
 """Public Python shim for the Rust integrator extension."""
 
 from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -13,6 +14,7 @@ try:
         RkMethod,
         lambert_batch_py,
         lambert_izzo_py,
+        solve_ivp_events_py,
     )
     from e2m2e._integrators import cowell_step as _cowell_step
     from e2m2e._integrators import multistep_step as _multistep_step
@@ -26,6 +28,7 @@ except ModuleNotFoundError:
     RkMethod = None  # type: ignore[misc,assignment]
     lambert_batch_py = None  # type: ignore[misc,assignment]
     lambert_izzo_py = None  # type: ignore[misc,assignment]
+    solve_ivp_events_py = None  # type: ignore[misc,assignment]
     _cowell_step = None  # type: ignore[misc,assignment]
     _multistep_step = None  # type: ignore[misc,assignment]
     _rk_step = None  # type: ignore[misc,assignment]
@@ -42,6 +45,7 @@ __all__ = [
     "initialize_cowell_history",
     "lambert_izzo_py",
     "lambert_batch_py",
+    "solve_ivp_events",
 ]
 
 
@@ -194,3 +198,73 @@ def initialize_cowell_history(
 
     history = [xs[-2].tolist(), xs[-1].tolist()] + [a.tolist() for a in accels[-8:]]
     return t, x, v, history
+
+
+def solve_ivp_events(
+    t_span: tuple[float, float],
+    y0: npt.ArrayLike,
+    t_eval: npt.ArrayLike,
+    rtol: float,
+    atol: float,
+    f: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
+    events: list[tuple[Callable[[float, npt.NDArray[np.floating]], float], bool, float]],
+    method: RkMethod | None = None,
+    max_step: float | None = None,
+    max_steps: int | None = None,
+    state_error_dim: int | None = None,
+) -> dict[str, Any]:
+    """带事件检测的 Rust solve_ivp 封装（scipy 事件语义）。
+
+    事件检测在 Rust 积分内循环完成：每个接受步的端点评估事件函数，
+    符号变化（经 direction 过滤）时在步内对线性插值态二分求精（无稠密输出）。
+
+    Args:
+        t_span: 积分区间 ``(t0, tf)``。
+        y0: 初始状态向量。
+        t_eval: 输出时间点数组。
+        rtol: 相对容差。
+        atol: 绝对容差。
+        f: ODE 右端函数 ``f(t, y) -> dy/dt``。
+        events: ``[(g, terminal, direction), ...]``，``g(t, y) -> float``，
+            零点即事件面；``terminal=True`` 触发即停；``direction`` > 0 只记
+            上行穿越（g 由负到正）、< 0 只记下行、0 双向。
+        method: RK 方法，默认 PD78（DOP853）。
+        max_step: 最大步长。求精精度受步内线性插值误差（``~h²/8·|ÿ|``）限制，
+            需要更紧的事件时刻时请设小 max_step。
+        max_steps: 最大积分步数。
+        state_error_dim: 步长误差控制只统计前 N 维（用于 STM 增广传播）。
+
+    Returns:
+        dict：``states``/``time``（t_eval 前缀，terminal 截断时末点为求精后的
+        事件点）、``t_events``/``y_events``（逐事件的触发时刻与状态列表）、
+        ``terminal_event``（触发终止的事件索引或 None）、``n_steps``。
+    """
+    y0_arr = np.asarray(y0, dtype=float)
+
+    def _adapt_rhs(t_i: float, y_i: list[float]) -> list[float]:
+        return np.asarray(f(t_i, np.asarray(y_i, dtype=float)), dtype=float).tolist()
+
+    def _adapt_event(
+        g: Callable[[float, npt.NDArray[np.floating]], float],
+    ) -> Callable[[float, list[float]], float]:
+        def _g(t_i: float, y_i: list[float]) -> float:
+            return float(g(t_i, np.asarray(y_i, dtype=float)))
+
+        return _g
+
+    event_specs = [
+        (_adapt_event(g), terminal, float(direction)) for g, terminal, direction in events
+    ]
+    return solve_ivp_events_py(
+        (float(t_span[0]), float(t_span[1])),
+        y0_arr.tolist(),
+        [float(t) for t in np.asarray(t_eval, dtype=float).flat],
+        float(rtol),
+        float(atol),
+        _adapt_rhs,
+        event_specs,
+        method,
+        max_step,
+        max_steps,
+        state_error_dim,
+    )

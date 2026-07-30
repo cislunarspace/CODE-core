@@ -138,6 +138,9 @@ class Dynamics:
         t_eval: npt.ArrayLike | None = None,
         with_stm: bool = False,
         with_jacobi: bool = False,
+        events: Callable[[float, np.ndarray], float]
+        | list[Callable[[float, np.ndarray], float]]
+        | None = None,
     ) -> dict[str, Any]:
         """传播轨迹（Template Method）
 
@@ -152,19 +155,33 @@ class Dynamics:
             t_eval: 评估时间点数组（可选）
             with_stm: 是否计算状态转移矩阵
             with_jacobi: 是否沿轨迹逐点计算 Jacobi 常数
+            events: 事件函数（单个 callable 或列表），scipy ``solve_ivp``
+                语义：``g(t, state) -> float``，零点即事件面；可给函数对象
+                设 ``terminal = True``（触发即停）与 ``direction``（> 0 只记
+                上行穿越，< 0 只记下行，0 双向）属性。
+                ``with_stm=True`` 时事件函数接收 42 维增广状态。
 
         Returns:
             轨迹结果字典，包含 ``time`` 和 ``states`` 键；
             当 ``with_stm=True`` 时额外包含 ``stm`` 键；
-            当 ``with_jacobi=True`` 时额外包含 ``jacobi`` 与 ``jacobi_error`` 键
+            当 ``with_jacobi=True`` 时额外包含 ``jacobi`` 与 ``jacobi_error`` 键；
+            当传入 ``events`` 时额外包含 ``t_events`` 与 ``y_events`` 键
+            （逐事件的触发时刻与状态数组，scipy 语义）
         """
         initial_state = np.asarray(initial_state, dtype=float)
         max_step = self._get_max_step(t_span)
 
+        if events is not None and callable(events):
+            events = [events]
+
         if with_stm:
-            return self._propagate_with_stm(initial_state, t_span, t_eval, max_step, with_jacobi)
+            return self._propagate_with_stm(
+                initial_state, t_span, t_eval, max_step, with_jacobi, events
+            )
         else:
-            return self._propagate_state_only(initial_state, t_span, t_eval, max_step, with_jacobi)
+            return self._propagate_state_only(
+                initial_state, t_span, t_eval, max_step, with_jacobi, events
+            )
 
     def _propagate_with_stm(
         self,
@@ -173,6 +190,7 @@ class Dynamics:
         t_eval: npt.ArrayLike | None,
         max_step: float,
         with_jacobi: bool,
+        events: list[Callable[[float, np.ndarray], float]] | None = None,
     ) -> dict[str, Any]:
         """增广状态积分（含 STM）
 
@@ -191,6 +209,7 @@ class Dynamics:
             rtol=self.rtol,
             atol=self.atol,
             max_step=max_step,
+            events=events,
         )
 
         # 从增广结果中分离状态和 STM
@@ -207,6 +226,10 @@ class Dynamics:
             "stm": stm_matrices,
         }
 
+        if events is not None:
+            out["t_events"] = result.t_events
+            out["y_events"] = result.y_events
+
         if with_jacobi:
             out = self._handle_jacobi(states, out)
 
@@ -219,6 +242,7 @@ class Dynamics:
         t_eval: npt.ArrayLike | None,
         max_step: float,
         with_jacobi: bool,
+        events: list[Callable[[float, np.ndarray], float]] | None = None,
     ) -> dict[str, Any]:
         """纯状态积分（不含 STM）"""
         eom_func = self._get_eom_func(with_stm=False)
@@ -231,6 +255,7 @@ class Dynamics:
             rtol=self.rtol,
             atol=self.atol,
             max_step=max_step,
+            events=events,
         )
 
         # result.y 形状为 (6, n_points)，转置为 (n_points, 6) — REQ-002
@@ -242,6 +267,10 @@ class Dynamics:
             "time": result.t,
             "states": states,
         }
+
+        if events is not None:
+            out["t_events"] = result.t_events
+            out["y_events"] = result.y_events
 
         if with_jacobi:
             out = self._handle_jacobi(states, out)

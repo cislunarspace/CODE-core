@@ -451,6 +451,56 @@ class ForceModel:
             "n_rejected": result["n_rejected"],
         }
 
+    def _propagate_via_solve_ivp_events(
+        self,
+        y0: npt.NDArray[np.floating],
+        t0: float,
+        tf: float,
+        t_eval: npt.ArrayLike,
+        max_steps: int,
+        event_funcs: list[Callable[[float, npt.NDArray[np.floating]], float]],
+        method: RkMethod,
+    ) -> dict[str, Any]:
+        """走 Rust solve_ivp_events（事件检测在 Rust 积分内循环完成）。
+
+        每个接受步端点评估事件函数，符号变化时步内二分求精；触发即停
+        （ForceModel 事件语义：全部 terminal、双向）。与下方 Python 积分
+        循环的区别：末点是求精后的事件点而非触发步终点，且单步不再受
+        t_eval 钳制。
+        """
+        from e2m2e.integrators import solve_ivp_events
+
+        def eom(t: float, state: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+            # 动态坐标系按回调时刻/状态逐次更新（比按步更新更细，语义一致）
+            if hasattr(self.system, "update_coordinate_systems"):
+                self.system.update_coordinate_systems(t, state[: self.STATE_DIM])
+            return self._eom_func(t, state)
+
+        result = solve_ivp_events(
+            (t0, tf),
+            y0,
+            t_eval,
+            float(self.rtol),
+            float(self.atol),
+            eom,
+            [(func, True, 0.0) for func in event_funcs],
+            method=method,
+            max_step=float(self.max_step),
+            max_steps=int(max_steps),
+        )
+
+        times = np.asarray(result["time"], dtype=float)
+        states = np.asarray(result["states"], dtype=float)
+        self.last_trajectory = (times, states)
+        return {
+            "time": times,
+            "states": states,
+            "terminal_event_index": result["terminal_event"],
+            "t_events": [np.asarray(ts, dtype=float) for ts in result["t_events"]],
+            "y_events": [np.asarray(ys, dtype=float) for ys in result["y_events"]],
+            "n_steps": result["n_steps"],
+        }
+
     def propagate(
         self,
         initial_state: npt.ArrayLike,
@@ -549,6 +599,20 @@ class ForceModel:
         # 消除 cspice 隔离：STM 传播在 integrators .so 内完成，共享内核池。
         if with_stm and not event_funcs and self._can_use_rust_stm_path():
             return self._propagate_via_rust_stm(y0, t0, tf, t_eval, tol, max_steps)
+
+        # ── Rust solve_ivp_events 事件路径 ──
+        # 条件：有 events、无 STM、扩展已构建。事件检测与步内求精在 Rust 积分
+        # 内循环完成，替代下方手搓 Python 循环。with_stm + events 仍走 Python
+        # 循环（solve_ivp_events 不支持事件函数只收 6 维状态的增广传播）。
+        if event_funcs and not with_stm:
+            try:
+                from e2m2e._integrators import solve_ivp_events_py  # noqa: F401
+            except ImportError:
+                pass  # 扩展未构建：回退下方 Python 积分循环
+            else:
+                return self._propagate_via_solve_ivp_events(
+                    y0, t0, tf, t_eval, max_steps, event_funcs, method
+                )
 
         # 循环开始前更新动态坐标系（用 6 维物理状态）
         if hasattr(self.system, "update_coordinate_systems"):

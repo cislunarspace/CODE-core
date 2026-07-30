@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - porkchop 扫描（`e2m2e.transfer.porkchop`）：出发时间 × 飞行时间网格的双脉冲 ΔV 扫描，终端状态经 `TerminalCondition` 接口提取
 - 不变流形与庞加莱截面（`e2m2e.algorithms.manifolds`/`sections`）：`InvariantManifold` 种子生成与批量传播；`PoincareSection` 平面/近拱点截面，事后检测 + Brent 插值求精
 - 三体打靶与低能转移（`e2m2e.transfer.three_body_lambert`/`low_energy`）：`ThreeBodyLambert` 以二体解为初猜在 CR3BP 下 Newton 打靶；`patch_manifolds` 截面拼接、`design_low_energy_transfer` 低能转移流水线
+- 事件检测：`Dynamics.propagate(events=...)` 透传 scipy 事件语义（terminal/direction），`PoincareSection.event(direction, terminal)` 生成截面穿越事件函数；Rust `solve_ivp_events_py`（薄封装 `e2m2e.integrators.solve_ivp_events`）在积分内循环完成事件检测与二分求精，`ForceModel.propagate` 事件走此快速路径
+- BCR4BP 双圆限制性四体模型（`e2m2e.core.bcr4bp_system`/`bcr4bp_dynamics`）：`BCR4BPSystem` 在 CR3BP 会合系上叠加太阳解析圆轨道摄动（m_s=328900.56、a_s=389.17、ω_s=−0.9252，DE440/GMAT 来源），`BCR4BP_Dynamics` 含太阳直接/间接项与 STM；无 Jacobi 积分，与星历 1 天外推误差约 1e3 km（主误差来自月球圆轨道近似）
+- 多脉冲转移与主矢量检验（`e2m2e.transfer.multi_impulse`）：`MultiImpulseTransfer` 以中途节点 `[t_i, r_i]` 为决策变量、弧段 Lambert 封闭、scipy SLSQP 最小化总 ΔV；`check_primer_vector` 实现 Lawden 必要条件检验与 Lion & Handelsman 中途脉冲插入准则
 
 ## [5.3.1] - 2026-07-29
 

@@ -72,6 +72,18 @@
    print(crossings.times.shape)           # (k,)，穿越时刻
    print(crossings.trajectory_index)      # (k,)，每个穿越点所属弧的索引
 
+``crossings()`` 是事后检测（先传播、再在采样点上找穿越）。若要在积分
+过程中检测穿越（例如首次到达截面即停），用
+:meth:`~e2m2e.algorithms.sections.PoincareSection.event` 生成 scipy 语义的
+事件函数传给 ``Dynamics.propagate(events=...)``：
+
+.. code-block:: python
+
+   event = section.event(direction=-1, terminal=True)
+   result = dynamics.propagate(y0, (0.0, 10.0), events=[event])
+
+详见 :doc:`../core/dynamics` 的「事件检测」一节。
+
 流形拼接与低能转移
 ------------------
 

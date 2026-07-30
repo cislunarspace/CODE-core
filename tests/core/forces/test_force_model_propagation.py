@@ -4,6 +4,7 @@
 """
 
 import numpy as np
+import pytest
 
 from e2m2e.core.forces import ForceModel, PhysicalModel
 
@@ -93,3 +94,34 @@ def test_propagate_termination_event():
     # 事件在 t=sqrt(2) 附近触发；由于 t_eval 钳制，最后输出点可能到 2.0
     assert result["time"][-1] <= 2.0
     assert result["time"][-1] > 1.3
+
+
+def test_propagate_termination_event_refined_by_rust():
+    """Rust solve_ivp_events 路径：事件时刻步内求精，末点落在事件面上。"""
+    integrators = pytest.importorskip("e2m2e._integrators")
+    if not hasattr(integrators, "solve_ivp_events_py"):
+        pytest.skip("需要带 solve_ivp_events_py 的 Rust 扩展")
+
+    system = _FakeSystem()
+    fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, -1.0])])
+    # 步内求精基于线性插值，误差 ~h²/8；max_step=0.01 时约 1e-5
+    fm.max_step = 0.01
+
+    y0 = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+
+    def hit_ground(t, y):
+        return y[2]
+
+    result = fm.propagate(
+        y0,
+        (0.0, 5.0),
+        t_eval=np.linspace(0.0, 5.0, 6),
+        events=[hit_ground],
+    )
+
+    assert result["terminal_event_index"] == 0
+    # z(t) = 1 - t²/2，零点在 t = √2
+    assert result["time"][-1] == pytest.approx(np.sqrt(2.0), abs=1e-3)
+    assert abs(result["states"][-1][2]) < 1e-3
+    assert len(result["t_events"][0]) == 1
+    assert result["t_events"][0][0] == pytest.approx(np.sqrt(2.0), abs=1e-3)

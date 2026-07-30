@@ -126,6 +126,71 @@ Lambert 问题，得到双脉冲 ΔV 网格，即 porkchop 图的数据层。出
 轨道上两相位点间转移、Lyapunov → Halo 交会）的收敛行为见
 ``tests/transfer/test_three_body_lambert.py``。
 
+多脉冲转移与主矢量检验
+----------------------
+
+双脉冲解只在特定几何下最优。
+:class:`~e2m2e.transfer.multi_impulse.MultiImpulseTransfer` 在固定端点
+（:class:`~e2m2e.transfer.terminal.StateTerminal`，位置、速度、时刻均固定）
+之间规划 n 脉冲转移：决策变量为各中途脉冲节点的时刻与位置 ``[t_i, r_i]``，
+相邻节点间的弧段由 Lambert 封闭（默认二体 ``solve_lambert``，可切
+``ThreeBodyLambert`` 打靶精修），脉冲是封闭结果的进出弧速度差，由 scipy
+SLSQP 最小化总 ΔV。
+
+.. code-block:: python
+
+   import numpy as np
+   from e2m2e.transfer import MultiImpulseTransfer, StateTerminal
+
+   MU_EARTH = 398600.4418  # km³/s²
+   R1, R2 = 7000.0, 42164.0  # LEO → GEO，km
+   TOF_HOHMANN = np.pi * np.sqrt(((R1 + R2) / 2) ** 3 / MU_EARTH)
+
+   def circular(r, angle=0.0):
+       """半径 r、相位角 angle 的圆轨道状态（逆时针）。"""
+       v = np.sqrt(MU_EARTH / r)
+       return np.array(
+           [r * np.cos(angle), r * np.sin(angle), 0.0,
+            -v * np.sin(angle), v * np.cos(angle), 0.0]
+       )
+
+   transfer = MultiImpulseTransfer(
+       StateTerminal(circular(R1), 0.0),
+       StateTerminal(circular(R2, np.pi), TOF_HOHMANN),
+       mu=MU_EARTH,
+   )
+   sol = transfer.optimize(2)
+   print(f"总脉冲: {sol.total_delta_v:.4f} km/s")   # 霍曼基准 3.7708
+
+``optimize(n_impulses, x0=...)`` 的决策变量只含中途节点（m = n − 2 个），
+n=2 时无自由变量、直接封闭单弧；``x0`` 给出中途节点的初猜
+``[t_1, r_1, ...]``。优化后 ``transfer.legs`` 刷新为
+:class:`~e2m2e.transfer.multi_impulse.Impulse` 与
+:class:`~e2m2e.transfer.multi_impulse.CoastArc` 交替的序列。
+
+:meth:`~e2m2e.transfer.multi_impulse.MultiImpulseTransfer.check_primer_vector`
+对给定解做 Lawden 主矢量检验：由端点横截条件
+p(t0) = Δv̂₀、p(tf) = Δv̂_f 确定主矢量初值，协态经 STM 携载得到 p(t) 曲线
+（公式出处为 Prussing《Optimal Spacecraft Trajectories》第 3–4 章）。
+最优性的必要条件是全程 ``|p(t)| ≤ 1`` 且脉冲点 ``|p| = 1``、方向与 p 共线；
+弧内 ``|p| > 1`` 时在峰值处插入中途脉冲可降低总 ΔV（Lion & Handelsman 1968）。
+霍曼转移满足 Lawden 条件；同一端点但飞行时间取 0.5 倍霍曼时间的双脉冲解
+弧内 ``|p| > 1``，检验会给出插入建议，以建议点为零脉冲初猜做三脉冲优化，
+总 ΔV 随之下降：
+
+.. code-block:: python
+
+   report = transfer.check_primer_vector(sol, n_samples=300)
+   print(f"Lawden 条件满足: {report.lawden_satisfied}")
+   if not report.lawden_satisfied:
+       x0 = np.concatenate(
+           [[report.suggested_insertion_time],
+            report.suggested_insertion_position]
+       )
+       sol3 = transfer.optimize(3, x0=x0)   # 三脉冲总 ΔV 低于双脉冲
+
+完整算例见 ``tests/transfer/test_multi_impulse.py``。
+
 .. automodule:: e2m2e.transfer.lambert
    :members:
    :undoc-members:
@@ -139,6 +204,12 @@ Lambert 问题，得到双脉冲 ΔV 网格，即 porkchop 图的数据层。出
    :no-index:
 
 .. automodule:: e2m2e.transfer.three_body_lambert
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
+
+.. automodule:: e2m2e.transfer.multi_impulse
    :members:
    :undoc-members:
    :show-inheritance:

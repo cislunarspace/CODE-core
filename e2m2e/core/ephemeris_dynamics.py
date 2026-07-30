@@ -94,9 +94,13 @@ class EphemerisDynamics(Dynamics):
         t_eval: npt.ArrayLike | None,
         max_step: float,
         with_jacobi: bool,
+        events: list[Callable[[float, np.ndarray], float]] | None = None,
     ) -> dict[str, Any]:
-        """增广状态积分（含 STM），优先走 Rust 快速路径。"""
-        if _HAS_RUST_STM:
+        """增广状态积分（含 STM），优先走 Rust 快速路径。
+
+        Rust STM 路径不支持事件检测；传入 events 时回退 scipy 路径。
+        """
+        if _HAS_RUST_STM and events is None:
             return self._propagate_with_stm_rust(
                 initial_state,
                 t_span,
@@ -109,6 +113,7 @@ class EphemerisDynamics(Dynamics):
             t_eval,
             max_step,
             with_jacobi,
+            events,
         )
 
     def _propagate_with_stm_rust(
