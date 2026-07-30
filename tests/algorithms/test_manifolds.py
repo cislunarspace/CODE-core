@@ -43,9 +43,7 @@ def _make_l1_lyapunov_orbit() -> Orbit:
     # L1 处雅可比的面内中心模态（纯虚特征值）给出 x 轴穿越点的 (x0, vy0) 关系
     jacobian = dynamics.compute_jacobian_A([x_l1, 0, 0, 0, 0, 0])
     eigenvalues, eigenvectors = np.linalg.eig(jacobian)
-    idx = next(
-        k for k, lam in enumerate(eigenvalues) if abs(lam.real) < 1e-8 and lam.imag > 1e-8
-    )
+    idx = next(k for k, lam in enumerate(eigenvalues) if abs(lam.real) < 1e-8 and lam.imag > 1e-8)
     mode = np.real(eigenvectors[:, idx] * np.exp(-1j * np.angle(eigenvectors[0, idx])))
     mode /= mode[0]
 

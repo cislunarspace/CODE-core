@@ -39,9 +39,7 @@ def _make_l1_lyapunov_orbit(system) -> Orbit:
 
     jacobian = dynamics.compute_jacobian_A([x_l1, 0, 0, 0, 0, 0])
     eigenvalues, eigenvectors = np.linalg.eig(jacobian)
-    idx = next(
-        k for k, lam in enumerate(eigenvalues) if abs(lam.real) < 1e-8 and lam.imag > 1e-8
-    )
+    idx = next(k for k, lam in enumerate(eigenvalues) if abs(lam.real) < 1e-8 and lam.imag > 1e-8)
     mode = np.real(eigenvectors[:, idx] * np.exp(-1j * np.angle(eigenvectors[0, idx])))
     mode /= mode[0]
 

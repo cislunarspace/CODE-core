@@ -153,9 +153,9 @@ def design_low_energy_transfer(
             departure.orbit, ManifoldKind.UNSTABLE, branch_a, epsilon
         ).propagate(t_span, section=section)
         for branch_b in ("+", "-"):
-            tube_b = InvariantManifold(
-                target, ManifoldKind.STABLE, branch_b, epsilon
-            ).propagate(t_span, section=section)
+            tube_b = InvariantManifold(target, ManifoldKind.STABLE, branch_b, epsilon).propagate(
+                t_span, section=section
+            )
             candidates = patch_manifolds(tube_a, tube_b, section)
             if candidates and (best is None or candidates[0].cost < best.cost):
                 best = candidates[0]

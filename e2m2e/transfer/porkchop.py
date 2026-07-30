@@ -111,9 +111,7 @@ def porkchop(
         v_arr_col = np.empty((n, 3))
         for i, td in enumerate(t_dep):
             rf_col[i], v_arr_col[i] = arr.get_arrival_state(float(td + t), dynamics)
-        velocities = solve_lambert_batch(
-            r0_grid, rf_col, [t], mu, direction=direction, revs=revs
-        )
+        velocities = solve_lambert_batch(r0_grid, rf_col, [t], mu, direction=direction, revs=revs)
         col = velocities[:, 0, :, :]  # (n, 2, 3)
         valid = ~np.isnan(col[:, 0, 0])
         dv1[valid, j] = np.linalg.norm(col[valid, 0, :] - v_dep_grid[valid], axis=1)

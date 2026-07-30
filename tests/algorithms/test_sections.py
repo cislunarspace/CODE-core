@@ -81,9 +81,7 @@ class TestPlaneCrossings:
     def test_no_crossing_returns_empty(self, cr3bp_system, cr3bp_dynamics):
         """无穿越时返回空结果（形状保持 (0, 6)）"""
         x0 = np.array([DRO_X0, 0, 0, 0, DRO_VY0, 0])
-        result = cr3bp_dynamics.propagate(
-            x0, (0, 0.5), t_eval=np.linspace(0, 0.5, 500)
-        )
+        result = cr3bp_dynamics.propagate(x0, (0, 0.5), t_eval=np.linspace(0, 0.5, 500))
 
         section = PoincareSection.plane(axis=2, value=1.0)  # DRO 在平面内，z 恒为 0
         tube = _make_tube(result["states"], result["time"], cr3bp_system)
@@ -111,9 +109,7 @@ class TestPeriapsisCrossings:
 
         assert len(crossings.times) >= 2
         moon_pos = np.array([1.0 - cr3bp_system.mu, 0.0, 0.0])
-        rv = np.array(
-            [np.dot(state[:3] - moon_pos, state[3:]) for state in crossings.states]
-        )
+        rv = np.array([np.dot(state[:3] - moon_pos, state[3:]) for state in crossings.states])
         assert np.all(np.abs(rv) < 1e-8)
 
     def test_periapsis_detects_perilune_and_apolune(self, cr3bp_system, cr3bp_dynamics):

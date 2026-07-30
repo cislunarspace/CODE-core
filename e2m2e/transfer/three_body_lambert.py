@@ -95,9 +95,7 @@ class ThreeBodyLambert:
         result = self.dynamics.propagate(
             np.concatenate([r0, v0]), (0.0, tof_dim), t_eval=np.linspace(0.0, tof_dim, 200)
         )
-        states_phys = np.array(
-            [self.system.dimensionless_to_physical(s) for s in result["states"]]
-        )
+        states_phys = np.array([self.system.dimensionless_to_physical(s) for s in result["states"]])
         times_phys = np.asarray(result["time"], dtype=float) * self.system.characteristic_time
 
         v_char = self.system.characteristic_velocity
@@ -152,9 +150,7 @@ class ThreeBodyLambert:
             alpha = 1.0
             for _ in range(self._LINE_SEARCH_STEPS):
                 trial = v0 - alpha * delta
-                result_trial = self.dynamics.propagate(
-                    np.concatenate([r0, trial]), (0.0, tof_dim)
-                )
+                result_trial = self.dynamics.propagate(np.concatenate([r0, trial]), (0.0, tof_dim))
                 error_trial = float(np.linalg.norm(result_trial["states"][-1][:3] - rf))
                 if np.isfinite(error_trial) and error_trial < error:
                     v0 = trial

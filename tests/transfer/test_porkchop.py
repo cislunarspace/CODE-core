@@ -85,7 +85,5 @@ class TestPorkchopGrid:
         # 相位对齐的出发时刻：让到达端在 tof 后位于出发端对面
         phase_arr0 = np.pi - dep.n * 0.0 - arr.n * t_h
         arr_aligned = CircularOrbitTerminal(r2, phase0=phase_arr0)
-        data = porkchop(
-            dep, arr_aligned, [0.0], [t_h], mu=MU_EARTH, dynamics=None
-        )
+        data = porkchop(dep, arr_aligned, [0.0], [t_h], mu=MU_EARTH, dynamics=None)
         assert data.total[0, 0] == pytest.approx(dv_h, rel=1e-3)

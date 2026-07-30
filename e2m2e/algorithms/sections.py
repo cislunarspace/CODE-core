@@ -186,9 +186,7 @@ class PoincareSection:
                 all_times.append(t_cross)
                 all_indices.append(k)
 
-        states = (
-            np.array(all_states).reshape(-1, 6) if all_states else np.empty((0, 6))
-        )
+        states = np.array(all_states).reshape(-1, 6) if all_states else np.empty((0, 6))
         return SectionCrossings(
             section=self,
             states=states,

@@ -22,9 +22,7 @@ def _propagate(r0, v0, tof, mu=MU):
     def rhs(_t, y):
         return np.concatenate([y[3:], -mu * y[:3] / np.linalg.norm(y[:3]) ** 3])
 
-    sol = solve_ivp(
-        rhs, (0.0, tof), np.concatenate([r0, v0]), rtol=1e-11, atol=1e-11
-    )
+    sol = solve_ivp(rhs, (0.0, tof), np.concatenate([r0, v0]), rtol=1e-11, atol=1e-11)
     return sol.y[:3, -1]
 
 

@@ -42,9 +42,7 @@ def _make_l1_lyapunov_orbit(system, dynamics) -> tuple[Orbit, DifferentialCorrec
 
     jacobian = dynamics.compute_jacobian_A([x_l1, 0, 0, 0, 0, 0])
     eigenvalues, eigenvectors = np.linalg.eig(jacobian)
-    idx = next(
-        k for k, lam in enumerate(eigenvalues) if abs(lam.real) < 1e-8 and lam.imag > 1e-8
-    )
+    idx = next(k for k, lam in enumerate(eigenvalues) if abs(lam.real) < 1e-8 and lam.imag > 1e-8)
     mode = np.real(eigenvectors[:, idx] * np.exp(-1j * np.angle(eigenvectors[0, idx])))
     mode /= mode[0]
 
@@ -93,9 +91,9 @@ class TestPatchManifolds:
         system, orbits = lyapunov_family
         section = PoincareSection.periapsis("earth", system)
 
-        tube_big = InvariantManifold(
-            orbits[-1], ManifoldKind.STABLE, "-", _EPS
-        ).propagate(6.0, section=section)
+        tube_big = InvariantManifold(orbits[-1], ManifoldKind.STABLE, "-", _EPS).propagate(
+            6.0, section=section
+        )
         tube_mid = InvariantManifold(
             orbits[_MID_INDEX], ManifoldKind.UNSTABLE, "+", _EPS
         ).propagate(6.0, section=section)
@@ -115,9 +113,9 @@ class TestPatchManifolds:
         system, orbits = lyapunov_family
         section = PoincareSection.periapsis("earth", system)
 
-        tube_big = InvariantManifold(
-            orbits[-1], ManifoldKind.STABLE, "-", _EPS
-        ).propagate(6.0, section=section)
+        tube_big = InvariantManifold(orbits[-1], ManifoldKind.STABLE, "-", _EPS).propagate(
+            6.0, section=section
+        )
         tube_mid = InvariantManifold(
             orbits[_MID_INDEX], ManifoldKind.UNSTABLE, "+", _EPS
         ).propagate(6.0, section=section)
@@ -147,9 +145,7 @@ class TestDesignLowEnergyTransfer:
     def test_pipeline_converges(self, lyapunov_family):
         """中间轨道 → 大幅值轨道：流水线收敛，两段弧，总脉冲为各脉冲之和"""
         system, orbits = lyapunov_family
-        sol = design_low_energy_transfer(
-            OrbitTerminal(orbits[_MID_INDEX]), orbits[-1]
-        )
+        sol = design_low_energy_transfer(OrbitTerminal(orbits[_MID_INDEX]), orbits[-1])
 
         assert sol.converged, sol.message
         assert len(sol.arcs) == 2
@@ -168,6 +164,4 @@ class TestDesignLowEnergyTransfer:
         """不支持的 model 报错"""
         _, orbits = lyapunov_family
         with pytest.raises(ValueError, match="cr3bp"):
-            design_low_energy_transfer(
-                OrbitTerminal(orbits[0]), orbits[1], model="bcr4bp"
-            )
+            design_low_energy_transfer(OrbitTerminal(orbits[0]), orbits[1], model="bcr4bp")
