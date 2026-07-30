@@ -91,8 +91,7 @@ fn compute_tof(g: &Geometry, x: f64, n: u32) -> f64 {
             let eta = z - g.lambda * x;
             let s1 = (1.0 - g.lambda - x * eta) / 2.0;
             let q = 4.0 / 3.0 * hypergeo(s1);
-            (eta * eta * eta * q + 4.0 * g.lambda * eta) / 2.0
-                + n as f64 * PI / rho.powf(1.5)
+            (eta * eta * eta * q + 4.0 * g.lambda * eta) / 2.0 + n as f64 * PI / rho.powf(1.5)
         } else {
             // Lancaster-Blanchard 表达式
             let y = rho.sqrt();
@@ -451,12 +450,13 @@ mod tests {
     fn batch_matches_single() {
         let r0 = [5000.0, 10000.0, 2100.0];
         let rf = [-14600.0, 2500.0, 7000.0];
-        let geoms = [ (r0, rf), (r0, r0) ]; // 第二组弦长为零，必失败
+        let geoms = [(r0, rf), (r0, r0)]; // 第二组弦长为零，必失败
         let tofs = [3600.0, 7200.0];
         let results = lambert_batch(&geoms, &tofs, MU, TransferDirection::ShortWay, 0);
         assert_eq!(results.len(), 4);
         for (j, &tof) in tofs.iter().enumerate() {
-            let (v0, vf, _) = lambert_izzo(&r0, &rf, tof, MU, TransferDirection::ShortWay, 0).unwrap();
+            let (v0, vf, _) =
+                lambert_izzo(&r0, &rf, tof, MU, TransferDirection::ShortWay, 0).unwrap();
             let (b0, bf, _) = results[j].as_ref().unwrap();
             assert_vec_close(b0, &v0, 0.0 + 1e-12);
             assert_vec_close(bf, &vf, 1e-12);
