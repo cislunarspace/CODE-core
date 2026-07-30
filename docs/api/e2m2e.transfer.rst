@@ -62,3 +62,35 @@ e2m2e.transfer.cost module
    :members:
    :undoc-members:
    :show-inheritance:
+
+e2m2e.transfer.lambert module
+------------------------------
+
+.. automodule:: e2m2e.transfer.lambert
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.transfer.porkchop module
+-------------------------------
+
+.. automodule:: e2m2e.transfer.porkchop
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.transfer.three_body_lambert module
+-----------------------------------------
+
+.. automodule:: e2m2e.transfer.three_body_lambert
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.transfer.low_energy module
+---------------------------------
+
+.. automodule:: e2m2e.transfer.low_energy
+   :members:
+   :undoc-members:
+   :show-inheritance:

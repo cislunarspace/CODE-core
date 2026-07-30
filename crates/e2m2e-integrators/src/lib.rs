@@ -1192,6 +1192,109 @@ fn propagate_compiled_stm_py(
     Ok(dict.into())
 }
 
+/// 二体 Lambert 求解（Izzo 算法）的 Python 接口。
+///
+/// # 参数
+/// - `r0`/`rf`：出发/到达位置 [x, y, z]（km）
+/// - `tof`：飞行时间（s）
+/// - `mu`：中心天体 GM（km³/s²）
+/// - `long_way`：True 取长程解（转移角 > π）
+/// - `revs`：完整圈数（≥ 1 时返回右分支低能解）
+///
+/// # 返回
+/// Python dict：`{"v0": [3], "vf": [3], "n_iter": int}`；无解/不收敛抛 ValueError。
+#[pyfunction]
+#[pyo3(signature = (r0, rf, tof, mu, long_way, revs))]
+fn lambert_izzo_py(
+    r0: Vec<f64>,
+    rf: Vec<f64>,
+    tof: f64,
+    mu: f64,
+    long_way: bool,
+    revs: u32,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_propagation::lambert::{lambert_izzo, TransferDirection};
+
+    if r0.len() != 3 || rf.len() != 3 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "r0/rf must have length 3, got {} and {}",
+            r0.len(),
+            rf.len()
+        )));
+    }
+    let direction = if long_way {
+        TransferDirection::LongWay
+    } else {
+        TransferDirection::ShortWay
+    };
+    let r0_arr = [r0[0], r0[1], r0[2]];
+    let rf_arr = [rf[0], rf[1], rf[2]];
+    let (v0, vf, n_iter) = lambert_izzo(&r0_arr, &rf_arr, tof, mu, direction, revs)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+
+    let dict = PyDict::new(py);
+    dict.set_item("v0", v0.to_vec())?;
+    dict.set_item("vf", vf.to_vec())?;
+    dict.set_item("n_iter", n_iter)?;
+    Ok(dict.into())
+}
+
+/// N×M 网格批量 Lambert 求解（porkchop 用）的 Python 接口。
+///
+/// # 参数
+/// - `geometries`：几何列表，每项 `[r0x, r0y, r0z, rfx, rfy, rfz]`（km）
+/// - `tofs`：飞行时间列表（s），对每个几何都求解一遍
+/// - `mu`/`long_way`/`revs`：同 `lambert_izzo_py`
+///
+/// # 返回
+/// 长度 `len(geometries) * len(tofs)` 的 list（几何在外，tof 在内），
+/// 每项为 dict 或 None（该组合无解）。
+#[pyfunction]
+#[pyo3(signature = (geometries, tofs, mu, long_way, revs))]
+fn lambert_batch_py(
+    geometries: Vec<Vec<f64>>,
+    tofs: Vec<f64>,
+    mu: f64,
+    long_way: bool,
+    revs: u32,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_propagation::lambert::{lambert_batch, TransferDirection};
+
+    let mut geoms: Vec<([f64; 3], [f64; 3])> = Vec::with_capacity(geometries.len());
+    for g in &geometries {
+        if g.len() != 6 {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "each geometry must have length 6 [r0, rf], got {}",
+                g.len()
+            )));
+        }
+        geoms.push(([g[0], g[1], g[2]], [g[3], g[4], g[5]]));
+    }
+    let direction = if long_way {
+        TransferDirection::LongWay
+    } else {
+        TransferDirection::ShortWay
+    };
+    let results = lambert_batch(&geoms, &tofs, mu, direction, revs);
+
+    let list = PyList::empty(py);
+    for res in results {
+        match res {
+            Ok((v0, vf, n_iter)) => {
+                let dict = PyDict::new(py);
+                dict.set_item("v0", v0.to_vec())?;
+                dict.set_item("vf", vf.to_vec())?;
+                dict.set_item("n_iter", n_iter)?;
+                list.append(dict)?;
+            }
+            Err(_) => list.append(py.None())?,
+        }
+    }
+    Ok(list.into())
+}
+
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
@@ -1199,6 +1302,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solve_ivp_py, m)?)?;
     m.add_function(wrap_pyfunction!(multistep_step, m)?)?;
     m.add_function(wrap_pyfunction!(cowell_step, m)?)?;
+    m.add_function(wrap_pyfunction!(lambert_izzo_py, m)?)?;
+    m.add_function(wrap_pyfunction!(lambert_batch_py, m)?)?;
     m.add_function(wrap_pyfunction!(spherical_harmonic_accel, m)?)?;
     m.add_function(wrap_pyfunction!(solid_tide_step1, m)?)?;
     m.add_function(wrap_pyfunction!(solid_tide_step2, m)?)?;

@@ -35,6 +35,8 @@ from . import (
     differential_correction,
     halo_family,  # noqa: F401  # 显式预加载以保证 ``continuation`` 内的方法重绑定可用
     halo_initial_guess,
+    manifolds,
+    sections,
     stability,
     strategies,
 )
@@ -45,6 +47,8 @@ from .halo_initial_guess import (
     compute_halo_initial_guess,
     halo_third_order_approximation,
 )
+from .manifolds import InvariantManifold, ManifoldKind, ManifoldTube
+from .sections import PoincareSection, SectionCrossings
 from .stability import BifurcationType, StabilityAnalysis, StabilityType
 from .strategies import CorrectionConfig
 
@@ -102,6 +106,8 @@ __all__ = [
     "differential_correction",
     "continuation",
     "stability",
+    "manifolds",
+    "sections",
     "ephemeris_correction",
     "multiple_shooting",
     "two_level_multiple_shooting",
@@ -115,6 +121,11 @@ __all__ = [
     "StabilityAnalysis",
     "StabilityType",
     "BifurcationType",
+    "InvariantManifold",
+    "ManifoldKind",
+    "ManifoldTube",
+    "PoincareSection",
+    "SectionCrossings",
     "MultipleShooting",
     "EphemerisCorrectionResult",
     "PatchPointCorrector",

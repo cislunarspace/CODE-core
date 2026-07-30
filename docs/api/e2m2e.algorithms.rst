@@ -47,6 +47,22 @@ e2m2e.algorithms.stability module
    :undoc-members:
    :show-inheritance:
 
+e2m2e.algorithms.manifolds module
+----------------------------------
+
+.. automodule:: e2m2e.algorithms.manifolds
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.algorithms.sections module
+---------------------------------
+
+.. automodule:: e2m2e.algorithms.sections
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 e2m2e.algorithms.strategies package
 -------------------------------------
 

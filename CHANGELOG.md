@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- 二体 Lambert 求解器（`e2m2e.transfer.lambert`）：Izzo 算法 Rust 内核（`e2m2e-propagation` crate），`solve_lambert`/`solve_lambert_batch` 支持短程/长程与多圈解，基准对齐 Vallado 文献值
+- porkchop 扫描（`e2m2e.transfer.porkchop`）：出发时间 × 飞行时间网格的双脉冲 ΔV 扫描，终端状态经 `TerminalCondition` 接口提取
+- 不变流形与庞加莱截面（`e2m2e.algorithms.manifolds`/`sections`）：`InvariantManifold` 种子生成与批量传播；`PoincareSection` 平面/近拱点截面，事后检测 + Brent 插值求精
+- 三体打靶与低能转移（`e2m2e.transfer.three_body_lambert`/`low_energy`）：`ThreeBodyLambert` 以二体解为初猜在 CR3BP 下 Newton 打靶；`patch_manifolds` 截面拼接、`design_low_energy_transfer` 低能转移流水线
+
 ## [5.3.1] - 2026-07-29
 
 ### Added

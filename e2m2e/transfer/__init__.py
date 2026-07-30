@@ -4,9 +4,18 @@
 """
 
 from . import transfer_optimization
-from .config import TransferConfig, TransferOptimizationResult
+from .config import (
+    TransferArc,
+    TransferConfig,
+    TransferOptimizationResult,
+    TransferSolution,
+)
+from .lambert import LambertSolution, solve_lambert, solve_lambert_batch
+from .low_energy import PatchCandidate, design_low_energy_transfer, patch_manifolds
+from .porkchop import PorkchopData, porkchop
 from .propulsion import ImpulsivePropulsion
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
+from .three_body_lambert import ThreeBodyLambert
 from .transfer import Transfer
 from .transfer_optimization import (
     DROTRONLPOptimizer,
@@ -37,5 +46,16 @@ __all__ = [
     "TerminalCondition",
     "OrbitTerminal",
     "StateTerminal",
+    "LambertSolution",
+    "solve_lambert",
+    "solve_lambert_batch",
+    "PorkchopData",
+    "porkchop",
+    "ThreeBodyLambert",
+    "TransferArc",
+    "TransferSolution",
+    "PatchCandidate",
+    "patch_manifolds",
+    "design_low_energy_transfer",
     "_HAVE_COPT",
 ]

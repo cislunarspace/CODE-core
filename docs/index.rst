@@ -33,10 +33,12 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
    algorithms/multiple-shooting
    algorithms/two-level-multiple-shooting
    algorithms/stability
+   algorithms/manifolds
    algorithms/normal-form
    algorithms/homotopy-correction
 
    transfer/overview
+   transfer/lambert
    transfer/search
    transfer/optimization
    transfer/terminal

@@ -126,3 +126,44 @@ class TransferOptimizationResult:
     transfer_trajectory_times: np.ndarray | None = None
     constraints_violation: float = 0.0
     transfer_type: TransferType = TransferType.DIRECT
+
+
+@dataclass(frozen=True)
+class TransferArc:
+    """一段无动力飞行弧（脉冲之间的轨迹段）。
+
+    Attributes:
+        states: 弧上状态序列 ``[x, y, z, vx, vy, vz]``，形状 ``(n, 6)``，物理单位 (km, km/s)
+        times: 对应时刻序列，形状 ``(n,)``，s
+        delta_v: 进入该弧所需的脉冲大小，km/s（首段弧即出发脉冲）
+    """
+
+    states: np.ndarray
+    times: np.ndarray
+    delta_v: float = 0.0
+
+
+@dataclass(frozen=True)
+class TransferSolution:
+    """三体打靶 / 低能转移的轻量结果类型。
+
+    与 :class:`TransferOptimizationResult` 风格对齐，但按 frozen dataclass 保持最小：
+    多段弧各自携带进入脉冲，到达脉冲单列，总脉冲为各脉冲之和。
+
+    Attributes:
+        arcs: 转移弧序列（物理单位 km, km/s, s）
+        arrival_delta_v: 到达脉冲（末段弧之后的交会/入轨脉冲），km/s
+        total_delta_v: 全部脉冲之和，km/s
+        transfer_time: 总飞行时间，s
+        converged: 打靶/修正是否收敛
+        n_iter: Newton 迭代次数（流水线取末次修正的迭代数）
+        message: 附加说明（未收敛原因、流水线备注等）
+    """
+
+    arcs: tuple[TransferArc, ...]
+    arrival_delta_v: float
+    total_delta_v: float
+    transfer_time: float
+    converged: bool
+    n_iter: int
+    message: str = ""
