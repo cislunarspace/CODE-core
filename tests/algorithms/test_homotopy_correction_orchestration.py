@@ -12,7 +12,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.ephemeris_correction import homotopy
+from e2m2e.algorithm.ephemeris_correction import homotopy
 
 
 def _fake_dynamics():

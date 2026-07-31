@@ -62,7 +62,7 @@ class TestProgressDisplay:
         生产代码用 logging（非 print），故用 caplog 而非 capsys 捕获。
         """
         with (
-            caplog.at_level(logging.INFO, logger="e2m2e.algorithms.continuation"),
+            caplog.at_level(logging.INFO, logger="e2m2e.algorithm.solver.continuation"),
             contextlib.suppress(Exception),
         ):
             dro_continuation.natural_continuation(

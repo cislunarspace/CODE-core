@@ -1,59 +1,27 @@
-"""DFH SK_STATISTIC.TXT 蒙特卡洛统计文件解析与写入。
+"""DFH SK_STATISTIC.TXT 蒙特卡洛统计文件解析与写入（临时脚本，ADR 0011）。
 
-文件为以下两种形态之一（不含角动量管理 / 含角动量管理）::
+``SKStatistic`` 通用容器已迁至 ``e2m2e.data.types.sk_statistic``；本模块
+保留 DFH 专属格式的 parse/read/write，作为开发期临时脚本。
 
-    <仿真次数> <总delta-V> <最大delta-V>
-    <仿真次数> <总delta-V> <最大delta-V> <姿态delta-V> <姿态delta-V(不影响轨道)>
-
-末尾附一行文字 ``The number of failed Monte Carlo tests is N``（失败次数，
-列数与数据行不同，必须单独识别）。照 MATLAB ``parse_sk_statistic.m``：
-数据行取每行全部数值词元（>=3 个），按最大列数对齐、缺列补 NaN。
+文件形态：数据行 ``<仿真次数> <总delta-V> <最大delta-V>``（含角动量管理时
+追加姿态列），末尾一行 ``The number of failed Monte Carlo tests is N``。
+照 MATLAB ``parse_sk_statistic.m``：数据行取每行全部数值词元（>=3 个），
+按最大列数对齐、缺列补 NaN。
 """
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
-__all__ = ["SKStatistic", "parse_sk_statistic", "read_sk_statistic", "write_sk_statistic"]
+from e2m2e.data.types.sk_statistic import COLUMNS, SKStatistic
+
+__all__ = ["SKStatistic", "COLUMNS", "parse_sk_statistic", "read_sk_statistic", "write_sk_statistic"]
 
 _NUM_RE = re.compile(r"[+-]?\d*\.?\d+(?:[eE][+-]?\d+)?")
 _FAILED_RE = re.compile(r"is\s+(\d+)")
-
-#: 数据行各列含义（列数随是否含角动量管理而取舍）
-COLUMNS = (
-    "run_index",
-    "total_delta_v",
-    "max_delta_v",
-    "attitude_delta_v",
-    "attitude_delta_v_independent",
-)
-
-
-@dataclass
-class SKStatistic:
-    """SK_STATISTIC 统计表容器。
-
-    Attributes:
-        rows: 数据行矩阵，形状 ``(n, k)``，k 为 3（无角动量）或 4/5
-            （含角动量）；列含义见 :data:`COLUMNS` 前 k 项，单位 m/s
-        num_failed: 蒙特卡洛失败次数；文件无末行文字时为 ``None``
-    """
-
-    rows: np.ndarray
-    num_failed: int | None
-    raw_text: str = field(default="", repr=False)
-
-    def __len__(self) -> int:
-        return self.rows.shape[0]
-
-    @property
-    def has_attitude(self) -> bool:
-        """是否含角动量管理（姿态 delta-V 列）。"""
-        return self.rows.shape[1] >= 4
 
 
 def parse_sk_statistic(raw: str) -> SKStatistic:
@@ -87,11 +55,7 @@ def read_sk_statistic(path: str | Path) -> SKStatistic:
 
 
 def write_sk_statistic(stats: SKStatistic, path: str | Path) -> None:
-    """把统计表写入 SK_STATISTIC.TXT。
-
-    数据行按 DFH 输出风格：运行序号（12 宽整数）+ 各统计列（15 位小数
-    定点），末尾一行 ``The number of failed Monte Carlo tests is N``。
-    """
+    """把统计表写入 SK_STATISTIC.TXT。"""
     lines = []
     for i, row in enumerate(stats.rows, start=1):
         cols = "".join(f"{v:>20.15f}" for v in row)

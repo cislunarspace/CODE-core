@@ -14,8 +14,8 @@ import importlib
 
 import numpy as np
 
-from e2m2e.algorithms import ephemeris_correction
-from e2m2e.algorithms.ephemeris_correction import homotopy
+from e2m2e.algorithm import ephemeris_correction
+from e2m2e.algorithm.ephemeris_correction import homotopy
 
 
 def test_homotopy_submodule_exposes_public_api():

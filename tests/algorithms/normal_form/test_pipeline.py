@@ -154,13 +154,13 @@ def test_catalog_transformer_roundtrip(fast_pipeline):
 
 def test_reduce_works_without_spice_kernels(fast_pipeline, monkeypatch):
     """SPICE 内核不可用时（CI 环境）流水线降级到纯 CR3BP 仍跑通。"""
-    import e2m2e.algorithms.normal_form.dynamical_substitution as ds
+    import e2m2e.algorithm.normal_form.dynamical_substitution as ds
 
     def _broken(*args, **kwargs):
         raise RuntimeError("simulated SPICE missing")
 
     monkeypatch.setattr(
-        "e2m2e.algorithms.normal_form._ephemeris.eval_params",
+        "e2m2e.algorithm.normal_form._ephemeris.eval_params",
         _broken,
         raising=False,
     )

@@ -357,7 +357,7 @@ class TestMultipleShootingVerbose:
         from unittest.mock import MagicMock, patch
 
         t_patch, state_patch = simple_patch_points
-        with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
+        with patch("e2m2e.algorithm.solver.multiple_shooting.tqdm") as mock_tqdm:
             mock_bar = MagicMock()
             mock_tqdm.return_value = mock_bar
 
@@ -374,7 +374,7 @@ class TestMultipleShootingVerbose:
         from unittest.mock import MagicMock, patch
 
         t_patch, state_patch = simple_patch_points
-        with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
+        with patch("e2m2e.algorithm.solver.multiple_shooting.tqdm") as mock_tqdm:
             mock_bar = MagicMock()
             mock_tqdm.return_value = mock_bar
 
@@ -395,7 +395,7 @@ class TestMultipleShootingVerbose:
         from unittest.mock import MagicMock, patch
 
         t_patch, state_patch = simple_patch_points
-        with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
+        with patch("e2m2e.algorithm.solver.multiple_shooting.tqdm") as mock_tqdm:
             mock_bar = MagicMock()
             mock_tqdm.return_value = mock_bar
 
@@ -413,7 +413,7 @@ class TestMultipleShootingVerbose:
         from unittest.mock import MagicMock, patch
 
         t_patch, state_patch = simple_patch_points
-        with patch("e2m2e.algorithms.multiple_shooting.tqdm") as mock_tqdm:
+        with patch("e2m2e.algorithm.solver.multiple_shooting.tqdm") as mock_tqdm:
             mock_bar = MagicMock()
             mock_tqdm.return_value = mock_bar
 

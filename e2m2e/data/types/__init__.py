@@ -9,7 +9,9 @@ State/Epoch 是类型别名（单值 → 别名）；Orbit/EphemerisTable/Nomina
 """
 
 from .epoch import Epoch, EpochUtc, EtSec, JdTdb
+from .maneuver import ManeuverTable
 from .orbit import Orbit
+from .sk_statistic import SKStatistic
 from .state import OrbitState, State
 from .trajectory import EphemerisTable, NominalOrbit
 
@@ -18,8 +20,10 @@ __all__ = [
     "EpochUtc",
     "EtSec",
     "JdTdb",
+    "ManeuverTable",
     "Orbit",
     "OrbitState",
+    "SKStatistic",
     "State",
     "EphemerisTable",
     "NominalOrbit",

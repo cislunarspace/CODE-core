@@ -285,7 +285,7 @@ class TestRustStmErrorHandling:
 
     def test_rust_path_rejects_truncated_result(self, spice_eph_dynamics, leo_state, monkeypatch):
         """_propagate_with_stm_rust 对点数不足的截断结果必须抛 RuntimeError"""
-        import e2m2e.core.ephemeris_dynamics as ephem_dyn
+        import e2m2e.algorithm.dynamics.ephemeris_dynamics as ephem_dyn
 
         def fake_propagate(**kwargs):
             t0 = kwargs["t_eval"][0]

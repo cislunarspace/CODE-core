@@ -1,17 +1,22 @@
-"""e2m2e 交会对接与相对运动模块（主题 3）。
+"""交会对接与相对运动模块 shim（ADR 0011 迁移）。
 
-提供 CR3BP/星历相对运动动力学（RLM 线性化 + 非线性 Encke 式）、
-目标轨道包装、相对状态数据结构、LVLH 转换、调相设计、保持点安全分析。
+实现已迁至 ``e2m2e.algorithm.proximity``，旧路径保持可用。
 """
 
-from .phasing import PhasingManeuver, PhasingSolution, phasing_search
-from .relative_dynamics import RelativeDynamics, RelativeState, TargetOrbit
-from .safety import (
+from __future__ import annotations
+
+from e2m2e.algorithm.proximity import (
     KeepingPoint,
+    PhasingManeuver,
+    PhasingSolution,
+    RelativeDynamics,
+    RelativeState,
     SafetyRegion,
     SafetyReport,
+    TargetOrbit,
     check_passive_safety,
     max_collision_probability,
+    phasing_search,
 )
 
 __all__ = [

@@ -1,12 +1,12 @@
 """转移轨道设计。
 
-按数学类型组织（ADR 0011）：脉冲路径（lambert/three_body_lambert/multi_impulse）、
-自然动力学路径（low_energy/manifold，覆盖引力辅助数学内核）、低推力路径
-（low_thrust/）、任务层（search/optimize/porkchop）。``transfer_orbit.py`` 是
-编排器：接收 transfer_type（HMN/LGA/WSB/小推力），按枚举选路径组合底层数学模块。
+按数学类型组织（ADR 0011 迁移，源：``transfer/``）：脉冲路径（lambert/
+three_body_lambert/multi_impulse）、自然动力学路径（low_energy/manifold，
+覆盖引力辅助数学内核）、低推力路径（low_thrust/）、任务层（search/
+optimize/porkchop）。``transfer_orbit.py`` 是编排器：接收 transfer_type
+（HMN/LGA/WSB/小推力），按枚举选路径组合底层数学模块（新类型，当前占位）。
 
-实现状态：骨架。数学模块待从 ``transfer/`` 迁入；transfer_orbit.py 编排器为
-新类型。未实现（对外承诺能力）：LGA/WSB 引力辅助弹道搜索，占位抛
+未实现（对外承诺能力）：LGA/WSB 引力辅助弹道搜索，占位抛
 ``NotImplementedError``。
 """
 
@@ -15,7 +15,92 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-__all__ = ["TransferDesignResult", "transfer_orbit"]
+from .config import (
+    TransferArc,
+    TransferConfig,
+    TransferOptimizationResult,
+    TransferSolution,
+)
+from .lambert import LambertSolution, solve_lambert, solve_lambert_batch
+from .low_energy import PatchCandidate, design_low_energy_transfer, patch_manifolds
+from .lowthrust_collocation import LowThrustCollocation
+from .lowthrust_shooting import (
+    EngineConfig,
+    LowThrustSegment,
+    LowThrustShooting,
+    LowThrustShootingSolution,
+)
+from .mission_assessment import MissionAssessment
+from .multi_impulse import (
+    CoastArc,
+    Impulse,
+    MultiImpulseTransfer,
+    PrimerVectorReport,
+)
+from .nsga2 import NSGA2Result, nsga2
+from .porkchop import ParetoFront, PorkchopData, pareto_front, porkchop
+from .propulsion import ImpulsivePropulsion
+from .qlaw import qlaw_guess, rv_to_keplerian
+from .solution_database import SolutionDatabase
+from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
+from .three_body_lambert import ThreeBodyLambert
+from .transfer import Transfer
+from .transfer_optimization import (
+    DROTRONLPOptimizer,
+    NLPOptimizationVariables,
+    optimize_transfer,
+    optimize_with_copt,
+)
+from .transfer_search import (
+    DEFAULT_MIN_DISTANCE_THRESHOLD_DU,
+    TransferSearch,
+    load_orbit_from_json,
+)
+
+__all__ = [
+    "TransferSearch",
+    "Transfer",
+    "TransferConfig",
+    "TransferOptimizationResult",
+    "DROTRONLPOptimizer",
+    "NLPOptimizationVariables",
+    "DEFAULT_MIN_DISTANCE_THRESHOLD_DU",
+    "load_orbit_from_json",
+    "optimize_transfer",
+    "optimize_with_copt",
+    "ImpulsivePropulsion",
+    "TerminalCondition",
+    "OrbitTerminal",
+    "StateTerminal",
+    "LambertSolution",
+    "solve_lambert",
+    "solve_lambert_batch",
+    "PorkchopData",
+    "porkchop",
+    "ParetoFront",
+    "pareto_front",
+    "NSGA2Result",
+    "nsga2",
+    "MissionAssessment",
+    "SolutionDatabase",
+    "ThreeBodyLambert",
+    "TransferArc",
+    "TransferSolution",
+    "CoastArc",
+    "Impulse",
+    "MultiImpulseTransfer",
+    "PrimerVectorReport",
+    "PatchCandidate",
+    "patch_manifolds",
+    "design_low_energy_transfer",
+    "EngineConfig",
+    "LowThrustSegment",
+    "LowThrustShooting",
+    "LowThrustShootingSolution",
+    "LowThrustCollocation",
+    "qlaw_guess",
+    "rv_to_keplerian",
+]
 
 
 @dataclass
@@ -43,7 +128,7 @@ def transfer_orbit(
     tof_range: tuple[float, float] | None = None,
     **kwargs,
 ) -> TransferDesignResult:
-    """端到端转移轨道设计。
+    """端到端转移轨道设计（编排器）。
 
     Args:
         transfer_type: "HMN"（直接）/ "LGA"（月球引力辅助）/ "WSB"（太阳引力辅助）/
@@ -53,7 +138,7 @@ def transfer_orbit(
         tof_range: 飞行时间范围（天）。
 
     Raises:
-        NotImplementedError: 实现未完成（骨架）；或 transfer_type 对应能力未实现。
+        NotImplementedError: 编排器实现未完成（当前为占位，能力在规划中）。
     """
     raise NotImplementedError(
         f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）"

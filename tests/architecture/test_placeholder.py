@@ -1,7 +1,8 @@
-"""架构骨架占位测试：未实现能力断言抛 NotImplementedError。
+"""架构骨架占位/行为测试。
 
-按模块一个占位测试文件（ADR 0011/设计共识）：只断言"调用抛 NotImplementedError
-+ 错误信息含能力名"。实现完成后改成正常行为测试。
+未实现能力（角动量管理、ECOM 光压、LGA/WSB、Facade/MCP/tools/logging）
+断言抛 NotImplementedError 且错误信息含能力名；已实现能力（design_orbit/
+control_orbit/propagate_orbit/family 初猜）改行为冒烟测试。
 """
 
 from __future__ import annotations
@@ -9,20 +10,20 @@ from __future__ import annotations
 import pytest
 
 
-def test_design_orbit_placeholder():
-    """design_orbit 占位：抛 NotImplementedError 且信息含能力名。"""
+def test_design_orbit_implemented():
+    """design_orbit 已实现：形状参数校验先于占位抛错。"""
     from e2m2e.algorithm.design import design_orbit
 
-    with pytest.raises(NotImplementedError, match="design_orbit"):
-        design_orbit("DRO")
+    with pytest.raises(ValueError, match="duration"):
+        design_orbit("DRO", duration=0.0)
 
 
-def test_control_orbit_placeholder():
-    """control_orbit 占位。"""
+def test_control_orbit_implemented():
+    """control_orbit 已实现：参数校验先于占位抛错。"""
     from e2m2e.algorithm.station_keeping import control_orbit
 
-    with pytest.raises(NotImplementedError, match="control_orbit"):
-        control_orbit(None)
+    with pytest.raises(ValueError, match="control_mode"):
+        control_orbit(None, control_mode=9)
 
 
 def test_momentum_management_placeholder():
@@ -41,24 +42,30 @@ def test_transfer_orbit_placeholder():
         transfer_orbit("HMN")
 
 
-def test_propagate_orbit_placeholder():
-    """propagate_orbit 占位。"""
+def test_propagate_orbit_implemented():
+    """propagate_orbit 已实现：形状校验先于占位抛错。"""
     from e2m2e.algorithm.propagation import propagate_orbit
 
-    with pytest.raises(NotImplementedError, match="propagate_orbit"):
+    with pytest.raises(ValueError, match="initial_state"):
         propagate_orbit(None, None, 1.0)
 
 
-def test_family_design_placeholder():
-    """六类初猜占位。"""
-    from e2m2e.algorithm.family import design_dro, design_halo, design_nrho
+def test_family_design_implemented():
+    """六类初猜已实现：真实数值族行走，非 NotImplementedError 占位。"""
+    from e2m2e.algorithm.family import Cr3bpOrbitError, design_dro
 
-    with pytest.raises(NotImplementedError, match="design_dro"):
-        design_dro(10000.0)
-    with pytest.raises(NotImplementedError, match="design_halo"):
-        design_halo(2, 30000.0)
-    with pytest.raises(NotImplementedError, match="design_nrho"):
-        design_nrho(2, 1, 5000.0)
+    # 极小振幅在族行走内报收敛失败（Cr3bpOrbitError），证明已接入真实实现。
+    with pytest.raises(Cr3bpOrbitError):
+        design_dro(1.0)
+
+    import inspect
+
+    from e2m2e.algorithm import family
+
+    for name in ("design_halo", "design_nrho", "design_lissajous", "design_triangular"):
+        fn = getattr(family, name)
+        assert callable(fn)
+        assert "NotImplementedError" not in (inspect.getsource(fn) or "")
 
 
 def test_ecom_srp_placeholder():

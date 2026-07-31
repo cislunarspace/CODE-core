@@ -11,6 +11,7 @@ Frame 抽象，见 ADR 0015）。
 """
 
 from .eop import ARCSEC_TO_RAD, JD_MJD_OFFSET, CoordinateDataError, EopFile, EopRecord, EopSample
+from .gmat_fixture import committed_gmat_fixture_dir, gmat_data_dir, gmat_fixture_path
 from .leap_seconds import SECONDS_PER_DAY, LeapSecondRecord, TaiUtcTable
 from .r2s2 import R2S2Adapter
 from .spice_frames import frame_rotation
@@ -19,6 +20,9 @@ __all__ = [
     "ARCSEC_TO_RAD",
     "JD_MJD_OFFSET",
     "CoordinateDataError",
+    "committed_gmat_fixture_dir",
+    "gmat_data_dir",
+    "gmat_fixture_path",
     "EopFile",
     "EopRecord",
     "EopSample",

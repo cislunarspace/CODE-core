@@ -1,7 +1,6 @@
 """station_keeping 误差模型单测（纯 numpy，不依赖 SPICE/pyd）。"""
 
 import numpy as np
-import pytest
 
 from e2m2e.algorithms.station_keeping.error_models import (
     BoxMullerSampler,

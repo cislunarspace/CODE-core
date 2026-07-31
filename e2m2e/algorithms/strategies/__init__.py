@@ -1,18 +1,17 @@
-"""微分修正策略函数。
+"""微分修正策略函数 shim（ADR 0011 迁移）。
 
-每个策略函数返回一个不可变的 CorrectionConfig，完整描述修正配置
-（对称性、自由变量、约束等）。DifferentialCorrection 类委托给这些函数，
-使配置逻辑与迭代求解器分离。
+实现已迁至 ``e2m2e.algorithm.family.strategies``，旧路径保持可用。
 """
 
-from .base import CorrectionConfig
-from .halo import halo_fixed_x0, halo_fixed_z0
-from .symmetric_2d import (
+from __future__ import annotations
+
+from e2m2e.algorithm.family.strategies import (
+    CorrectionConfig,
+    halo_fixed_x0,
+    halo_fixed_z0,
     symmetric_2d_fixed_t,
     symmetric_2d_fixed_x0,
     symmetric_2d_fixed_y0,
-)
-from .symmetric_3d import (
     symmetric_3d_fixed_x0,
     symmetric_xz_fixed_x0,
     symmetric_xz_fixed_z0,

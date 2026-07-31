@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
 pytest.importorskip("sympy")
@@ -15,8 +14,6 @@ pytest.importorskip("sympy")
 import sympy as sp
 
 from e2m2e.algorithms.normal_form.polynomial import (
-    expr2poly,
-    poly2expr,
     poly_subs,
 )
 

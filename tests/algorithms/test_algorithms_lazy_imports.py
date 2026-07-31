@@ -49,7 +49,7 @@ print("multiple_shooting_loaded:", "e2m2e.algorithms.multiple_shooting" in sys.m
 
         assert returncode == 0, f"子进程退出码非零: stderr={stderr}"
         assert "spiceypy_loaded: False" in stdout
-        assert "continuation: <class 'e2m2e.algorithms.continuation.Continuation'>" in stdout
+        assert "continuation: <class 'e2m2e.algorithm.solver.continuation.Continuation'>" in stdout
         assert "ephemeris_correction_loaded: False" in stdout
         assert "multiple_shooting_loaded: False" in stdout
 

@@ -53,17 +53,17 @@ def test_transfer_dispatches_to_copt_when_enabled(dynamics, dummy_orbit):
         transfer_time=12.0,
     )
 
-    with patch("e2m2e.transfer.transfer.DROTRONLPOptimizer") as MockOptimizer:
+    with patch("e2m2e.algorithm.transfer.transfer.DROTRONLPOptimizer") as MockOptimizer:
         instance = MockOptimizer.return_value
         instance.optimize.return_value = TransferOptimizationResult(
             success=False, total_delta_v=99.0
         )
         with (
             patch(
-                "e2m2e.transfer.transfer.optimize_with_copt",
+                "e2m2e.algorithm.transfer.transfer.optimize_with_copt",
                 return_value=expected_result,
             ) as mock_copt,
-            patch("e2m2e.transfer.transfer._HAVE_COPT", True),
+            patch("e2m2e.algorithm.transfer.transfer._HAVE_COPT", True),
         ):
             result = transfer.optimize(
                 initial_guess={"alpha": 1.0, "transfer_time": 10.0, "t_ins": 5.0},
@@ -86,7 +86,7 @@ def test_transfer_uses_config_to_initialize_optimizer(dynamics, dummy_orbit):
         transfer_time=12.0,
     )
 
-    with patch("e2m2e.transfer.transfer.DROTRONLPOptimizer") as MockOptimizer:
+    with patch("e2m2e.algorithm.transfer.transfer.DROTRONLPOptimizer") as MockOptimizer:
         instance = MockOptimizer.return_value
         instance.optimize.return_value = expected_result
 

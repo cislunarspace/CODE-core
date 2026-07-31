@@ -14,8 +14,7 @@ pytest.importorskip("sympy")
 
 from e2m2e.algorithms.normal_form import NormalFormContext
 from e2m2e.algorithms.normal_form.hamiltonian import build_cr3bp_hamiltonian
-from e2m2e.algorithms.normal_form.quasi_floquet import _cr3bp_hessian_symmetric
-from e2m2e.core import CR3BP_System, LibrationPoint
+from e2m2e.core import LibrationPoint
 
 
 @pytest.fixture

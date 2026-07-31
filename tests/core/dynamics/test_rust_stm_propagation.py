@@ -30,7 +30,7 @@ class TestRustStmAvailability:
 
     def test_rust_stm_import_flag(self):
         """应能检测到 propagate_with_stm_py 是否可用"""
-        from e2m2e.core.ephemeris_dynamics import _HAS_RUST_STM
+        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
 
         # 无论是否安装了 spice wheel，flag 都应该是 bool
         assert isinstance(_HAS_RUST_STM, bool)
@@ -41,7 +41,7 @@ class TestRustStmPropagation:
 
     def test_rust_propagate_with_stm_shape(self, spice_eph_dynamics, reference_et, leo_state):
         """Rust 路径应返回正确形状的 states/stm/time"""
-        from e2m2e.core.ephemeris_dynamics import _HAS_RUST_STM
+        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
 
         if not _HAS_RUST_STM:
             pytest.skip("propagate_with_stm_py 不可用（未安装 spice wheel）")
@@ -58,7 +58,7 @@ class TestRustStmPropagation:
 
     def test_rust_stm_initial_is_identity(self, spice_eph_dynamics, reference_et, leo_state):
         """Rust 路径的初始 STM 应为单位矩阵"""
-        from e2m2e.core.ephemeris_dynamics import _HAS_RUST_STM
+        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
 
         if not _HAS_RUST_STM:
             pytest.skip("propagate_with_stm_py 不可用（未安装 spice wheel）")
@@ -73,7 +73,7 @@ class TestRustStmPropagation:
 
     def test_rust_vs_python_stm_leo_one_period(self, spice_eph_dynamics, reference_et, leo_state):
         """Rust 与 Python STM 在 LEO 一个周期内一致性"""
-        from e2m2e.core.ephemeris_dynamics import _HAS_RUST_STM
+        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
 
         if not _HAS_RUST_STM:
             pytest.skip("propagate_with_stm_py 不可用（未安装 spice wheel）")
@@ -119,7 +119,7 @@ class TestRustStmPropagation:
 
     def test_rust_propagate_api_entry(self, spice_eph_dynamics, reference_et, leo_state):
         """通过 propagate(with_stm=True) 入口应自动走 Rust 路径"""
-        from e2m2e.core.ephemeris_dynamics import _HAS_RUST_STM
+        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
 
         if not _HAS_RUST_STM:
             pytest.skip("propagate_with_stm_py 不可用（未安装 spice wheel）")

@@ -12,7 +12,6 @@ exe 定位：``DFH_ORBIT_ROOT`` 环境变量优先，其次 MATLAB 封装库的 
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 from pathlib import Path
 

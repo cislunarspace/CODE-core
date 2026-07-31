@@ -9,8 +9,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.ephemeris_correction import correct_ephemeris_patch_points
-from e2m2e.algorithms.ephemeris_correction.homotopy import (
+from e2m2e.algorithm.ephemeris_correction import correct_ephemeris_patch_points
+from e2m2e.algorithm.ephemeris_correction.homotopy import (
     DEFAULT_LAMBDA_STEPS,
     correct_with_homotopy,
 )
