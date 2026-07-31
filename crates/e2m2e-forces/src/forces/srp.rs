@@ -117,6 +117,24 @@ fn combine_body_fluxes(factors: &[f64], angular_radii: &[f64], directions: &[[f6
     min_f
 }
 
+/// 查 target 相对 observer 的 J2000 位置（km），优先走星历预采样缓存。
+///
+/// SRP 是 STM 传播内循环的热点：数值差分雅可比每步要 6 次加速度评估，
+/// 每次都查太阳/遮挡体位置。缓存命中时全走内存三次样条，免 cspice FFI。
+fn body_position_cached(
+    target: &str,
+    observer: &str,
+    et: f64,
+) -> Result<[f64; 3], SpiceFfiError> {
+    if let Some(p) = e2m2e_spice::ephem_cache::with_cache(|c| {
+        c.and_then(|c| c.body_position(target, observer, et))
+    }) {
+        return Ok(p);
+    }
+    let (state, _) = spkezr(target, et, "J2000", "NONE", observer)?;
+    Ok([state[0], state[1], state[2]])
+}
+
 /// ConicalShadowModel 完整光照份额（系统感知）。
 ///
 /// 与 Python ConicalShadowModel.flux_factor 一致。返回 [0, 1]。
@@ -130,8 +148,7 @@ pub fn flux_factor(
         return Ok(1.0);
     }
     // 查太阳 + 各遮挡体相对 observer 的 J2000 位置
-    let (sun_state, _) = spkezr("SUN", et, "J2000", "NONE", observer)?;
-    let sun_pos = [sun_state[0], sun_state[1], sun_state[2]];
+    let sun_pos = body_position_cached("SUN", observer, et)?;
     let sun_radius = body_radius("SUN").unwrap();
 
     let mut factors: Vec<f64> = Vec::with_capacity(shadow_bodies.len());
@@ -143,8 +160,7 @@ pub fn flux_factor(
             Some(r) => r,
             None => continue,
         };
-        let (body_state, _) = spkezr(body, et, "J2000", "NONE", observer)?;
-        let body_pos = [body_state[0], body_state[1], body_state[2]];
+        let body_pos = body_position_cached(body, observer, et)?;
         let f = body_flux_factor(sc_pos, &body_pos, &sun_pos, body_radius, sun_radius);
         factors.push(f);
 
@@ -173,8 +189,7 @@ pub fn srp_acceleration(
     shadow_bodies: &[String],
     observer: &str,
 ) -> Result<[f64; 3], SpiceFfiError> {
-    let (sun_state, _) = spkezr("SUN", et, "J2000", "NONE", observer)?;
-    let sun_pos = [sun_state[0], sun_state[1], sun_state[2]];
+    let sun_pos = body_position_cached("SUN", observer, et)?;
 
     // sun → sc 向量
     let sun_to_sc = [

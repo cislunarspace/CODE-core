@@ -42,8 +42,12 @@ class SynodicAxes(Axes):
         return np.column_stack([e1, e2, e3])
 
     def _evict_oldest(self) -> None:
-        if len(self._rotation_cache) >= self._CACHE_CAPACITY:
+        # 两个缓存的 key 集合并不同步（rotation_matrix 塞 et，rotation_and_rate
+        # 还塞 et±step），需各自独立判容量与判空，否则对空 rate_cache 取
+        # next(iter(...)) 会抛 StopIteration（step4 长期预报 876 点远超 256 容量）。
+        if len(self._rotation_cache) >= self._CACHE_CAPACITY and self._rotation_cache:
             self._rotation_cache.pop(next(iter(self._rotation_cache)))
+        if len(self._rate_cache) >= self._CACHE_CAPACITY and self._rate_cache:
             self._rate_cache.pop(next(iter(self._rate_cache)))
 
     def rotation_matrix(self, et: float) -> npt.NDArray[np.floating]:
@@ -61,7 +65,8 @@ class SynodicAxes(Axes):
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         cached_rate = self._rate_cache.get(et)
         if cached_rate is not None:
-            rotation = self._rotation_cache[et]
+            # rotation 可能已被 evict（容量 256），不能直接索引
+            rotation = self.rotation_matrix(et)
             return rotation, cached_rate
         rotation = self.rotation_matrix(et)
         step = self._DEFAULT_RATE_STEP

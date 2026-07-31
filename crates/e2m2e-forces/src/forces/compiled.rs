@@ -233,6 +233,7 @@ pub fn supports_jacobian(force: &CompiledForce) -> bool {
             | CompiledForce::GravityField { .. }
             | CompiledForce::ThirdBody { .. }
             | CompiledForce::IndirectTerm { .. }
+            | CompiledForce::SRP { .. }
     )
 }
 
@@ -324,6 +325,28 @@ pub fn acceleration_and_jacobian(
         CompiledForce::IndirectTerm { .. } => {
             let acc = force.acceleration(et, state, observer)?;
             Ok((acc, [[0.0; 3]; 3]))
+        }
+        CompiledForce::SRP { .. } => {
+            // 数值差分（与 GravityField::jacobian_fd 同模式，步长 sqrt(eps)*|r|）。
+            // SRP 加速度含阴影几何（太阳/遮挡体位置随 et 变化但本步内固定），
+            // 差分自动包含光照份额对位置的贡献；阴影边界处不连续引入的
+            // 差分误差只影响边界点，对 STM 积分可接受。
+            let r_norm = (state[0] * state[0] + state[1] * state[1] + state[2] * state[2]).sqrt();
+            let h = (f64::EPSILON.sqrt() * r_norm).max(1e-6);
+            let acc0 = force.acceleration(et, state, observer)?;
+            let mut jac = [[0.0_f64; 3]; 3];
+            for dim in 0..3 {
+                let mut state_plus = *state;
+                let mut state_minus = *state;
+                state_plus[dim] += h;
+                state_minus[dim] -= h;
+                let a_plus = force.acceleration(et, &state_plus, observer)?;
+                let a_minus = force.acceleration(et, &state_minus, observer)?;
+                for i in 0..3 {
+                    jac[i][dim] = (a_plus[i] - a_minus[i]) / (2.0 * h);
+                }
+            }
+            Ok((acc0, jac))
         }
         _ => Err("Jacobian not supported for this force type".to_string()),
     }
