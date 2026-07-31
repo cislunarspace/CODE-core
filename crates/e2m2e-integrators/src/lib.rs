@@ -1662,94 +1662,6 @@ fn propagate_compiled_stm_py(
     Ok(dict.into())
 }
 
-/// 编译型力模型 + STM 的批量传播（蒙特卡洛站保仿真用）。
-///
-/// 对 N 个初始状态分别做 `propagate_compiled_stm`（同一力模型、同一时间网格）。
-/// 单次调用提交样本矩阵，省去 Python 侧逐样本的组装与 GIL 往返。
-///
-/// 说明：CSPICE 全局状态非线程安全（见 `spice_ffi.rs` 模块注释），本函数内部
-/// 串行循环，不做 rayon 并行；蒙特卡洛的并行在 Python 侧用进程池（进程隔离
-/// 天然满足 CSPICE 线程安全约束）。
-///
-/// # 参数
-/// - `observer`: 传播系 origin 天体名（如 "EARTH"）
-/// - `forces_py`: force 元组列表（格式同 `propagate_compiled`）
-/// - `t_span`: `(t_start, t_end)` 积分区间（SPICE et 秒）
-/// - `t_eval`: 输出时间点数组
-/// - `initial_states`: 初始状态矩阵 `[[x, y, z, vx, vy, vz], ...]`（km, km/s）
-/// - `rtol`, `atol`: 积分容差
-/// - `max_step`: 最大步长（秒），`None` 则不限制
-/// - `max_steps`: 最大步数，`None` 则用默认上限
-///
-/// # 返回
-/// Python dict：`{"states": [[[6], ...], ...], "stm": [[[36], ...], ...],
-///                "time": [...]}`
-#[cfg(feature = "spice")]
-#[pyfunction]
-#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_states, rtol, atol, max_step=None, max_steps=None))]
-#[allow(clippy::too_many_arguments)]
-fn propagate_compiled_stm_batch_py(
-    observer: &str,
-    forces_py: &Bound<'_, PyList>,
-    t_span: (f64, f64),
-    t_eval: Vec<f64>,
-    initial_states: Vec<Vec<f64>>,
-    rtol: f64,
-    atol: f64,
-    max_step: Option<f64>,
-    max_steps: Option<usize>,
-    py: Python<'_>,
-) -> PyResult<PyObject> {
-    use e2m2e_forces::forces::compiled::CompiledForce;
-    use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm;
-
-    if t_eval.is_empty() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "t_eval must not be empty",
-        ));
-    }
-    if initial_states.is_empty() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "initial_states must not be empty",
-        ));
-    }
-
-    let mut forces: Vec<CompiledForce> = Vec::with_capacity(forces_py.len());
-    for item in forces_py.iter() {
-        forces.push(parse_force_tuple(&item)?);
-    }
-
-    let mut states_batch: Vec<Vec<Vec<f64>>> = Vec::with_capacity(initial_states.len());
-    let mut stm_batch: Vec<Vec<Vec<f64>>> = Vec::with_capacity(initial_states.len());
-    for (idx, initial_state) in initial_states.iter().enumerate() {
-        if initial_state.len() != 6 {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "initial_states[{idx}] must have length 6, got {}",
-                initial_state.len()
-            )));
-        }
-        let mut state0 = [0.0_f64; 6];
-        state0.copy_from_slice(initial_state);
-
-        let result = propagate_compiled_stm(
-            &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
-        )
-        .map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!(
-                "STM propagation failed for sample {idx}: {e}"
-            ))
-        })?;
-
-        states_batch.push(result.states.iter().map(|s| s.to_vec()).collect());
-        stm_batch.push(result.stms.iter().map(|s| s.to_vec()).collect());
-    }
-
-    let dict = PyDict::new(py);
-    dict.set_item("states", states_batch)?;
-    dict.set_item("stm", stm_batch)?;
-    dict.set_item("time", t_eval)?;
-    Ok(dict.into())
-}
 
 /// 二体 Lambert 求解（Izzo 算法）的 Python 接口。
 ///
@@ -2010,7 +1922,6 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
     #[cfg(feature = "spice")]
-    m.add_function(wrap_pyfunction!(propagate_compiled_stm_batch_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(
         multiple_shooting::multiple_shooting_correct_py,

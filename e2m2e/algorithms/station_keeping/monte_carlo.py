@@ -15,8 +15,7 @@
 统计总 Δv、最大 Δv 与失败次数。
 
 传播全部走 Rust 编译力模型（``propagate_compiled*``），控制律的 STM 由
-42 维增广传播给出。批量传播接口用于真实轨道弧段的多样本同时推进；
-蒙特卡洛的样本并行在 Python 进程池（CSPICE 全局状态非线程安全，rayon
+42 维增广传播给出。蒙特卡洛的样本并行在 Python 进程池（CSPICE 全局状态非线程安全，rayon
 不可用，见 ``spice_ffi.rs`` 模块注释）。
 """
 
@@ -209,49 +208,6 @@ class RustPropagator:
         )
         states = np.asarray(result["states"])
         return states[1:] if prepended else states
-
-
-class BatchRustPropagator:
-    """Rust 批量 STM 传播器（蒙特卡洛弧段多样本同时推进）。"""
-
-    def __init__(
-        self,
-        observer: str,
-        forces_py: list[tuple[Any, ...]],
-        rtol: float = 1e-10,
-        atol: float = 1e-10,
-        max_step: float = 3600.0,
-        max_steps: int = 500_000,
-    ) -> None:
-        from e2m2e._integrators import propagate_compiled_stm_batch_py
-
-        self._observer = observer
-        self._forces_py = forces_py
-        self._rtol = rtol
-        self._atol = atol
-        self._max_step = max_step
-        self._max_steps = max_steps
-        self._batch = propagate_compiled_stm_batch_py
-
-    def propagate_with_stm_batch(
-        self,
-        states0: Sequence[npt.ArrayLike],
-        t0: float,
-        t_eval: npt.ArrayLike,
-    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-        """批量传播，返回 ``(states (n,m,6), stm (n,m,6,6))``。"""
-        result = self._batch(
-            self._observer,
-            self._forces_py,
-            (float(t0), float(np.asarray(t_eval)[-1])),
-            [float(x) for x in np.asarray(t_eval)],
-            [[float(x) for x in np.asarray(s)] for s in states0],
-            self._rtol,
-            self._atol,
-            self._max_step,
-            self._max_steps,
-        )
-        return np.asarray(result["states"]), np.asarray(result["stm"]).reshape(-1, -1, 6, 6)
 
 
 class PropagatorFactory:
@@ -483,44 +439,6 @@ class SingleSampleSimulation:
 _CTX: dict[str, Any] = {}
 
 
-def _ensure_new_integrators() -> None:
-    """把新构建的 ``_integrators`` 注入当前进程（开发期辅助）。
-
-    Windows spawn 的子进程不继承父进程的 ``sys.modules`` 注入；而旧 pyd
-    缺 ``propagate_compiled_stm_py``（spice feature 未启用时构建）。worker
-    从 ``target/wheels`` 提取新构建注入。持久安装（``maturin develop
-    --features spice``）后旧 pyd 不存在此问题，本函数为无操作。
-    """
-    import importlib.util
-    import shutil
-    import tempfile
-    import zipfile
-
-    try:
-        import e2m2e._integrators as m
-
-        if hasattr(m, "propagate_compiled_stm_py"):
-            return
-    except ImportError:
-        pass
-    repo = Path(__file__).resolve().parents[3]
-    wheels = sorted((repo / "target" / "wheels").glob("e2m2e-*.whl"))
-    if not wheels:
-        raise RuntimeError(
-            "已安装的 _integrators 缺 STM 传播且未找到新构建 wheel（先运行 maturin build）"
-        )
-    tmp = Path(tempfile.mkdtemp()) / "e2m2e_integrators.pyd"
-    with zipfile.ZipFile(wheels[-1]) as zf:
-        with zf.open("e2m2e/_integrators.pyd") as src_f, open(tmp, "wb") as dst_f:
-            shutil.copyfileobj(src_f, dst_f)
-    spec = importlib.util.spec_from_file_location("e2m2e._integrators", tmp)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["e2m2e._integrators"] = mod
-    spec.loader.exec_module(mod)
-    # 内核加载到新 DLL 的 cspice 域（每个 pyd 静态链接的 cspice 内核池独立）
-    for path in _kernel_paths():
-        mod.spice_poc_furnsh(path)
-
 
 def _kernel_paths(kernel_dir: str | None = None) -> list[str]:
     """Rust cspice 域的内核清单（对齐 dfh/design_orbit 的 _BODY_FIXED_KERNELS）。"""
@@ -547,8 +465,7 @@ def _kernel_paths(kernel_dir: str | None = None) -> list[str]:
 
 
 def _init_worker(params: dict[str, Any]) -> None:
-    """worker 初始化：注入新 pyd（开发期）+ 重建 SPICE 上下文。"""
-    _ensure_new_integrators()
+    """worker ?????? SPICE ????"""
     from ...core.spice import SPICEManager
     from ...dfh.design_orbit import load_design_kernels
 
