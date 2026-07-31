@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - NSGA-II 多目标优化器（`e2m2e.transfer.nsga2`，主题 8）：`nsga2(objectives, bounds, ...)` 经典 NSGA-II（Deb 2002），非支配排序 + 拥挤度选择 + 精英保留，SBX 交叉 + 多项式变异。约束用 Deb 可行支配规则（可行解支配不可行解，都不可行按违反量排序），无需罚因子。`ObjectiveFn` 签名 `fn(x) -> (objectives, violation)`，全部目标最小化。并行评估用 ProcessPoolExecutor（Windows spawn 安全，fn 须模块级可 pickle）。ZDT1 收敛验证（100 代平均误差 0.0013）、Schaffer N.1 收敛、约束问题前沿全可行、串行/并行一致性。11 测试全过
 - 任务综合评估与解数据库（`e2m2e.transfer.mission_assessment`/`solution_database`，主题 8 收尾）：`MissionAssessment` 多指标静态加权（`evaluate`/`rank`/`best`，指标名自动推断或显式指定），在 Pareto 前沿上标量化辅助决策；`SolutionDatabase` 封装多 scan 聚合查询（`add_scan`/`get_scan`/`query`/`pareto_front`/`list_scans`/`filter`），`filter` 预留 Grossi 式主矢量筛选钩子。12 测试全过
 - CR3BP 相对运动动力学（`e2m2e.proximity`，主题 3 第一版）：`TargetOrbit` 目标轨道包装（线性插值 `state_at(t)`）；`RelativeDynamics` RLM 时变线性化（`linear_model(t)` 返回 A(t) 矩阵，`propagate(rho0, t_span)` 传播 6 维相对状态，`propagate_with_stm` 复用绝对 STM 传播相对状态+相对 STM）。复用 `CR3BP_Dynamics.compute_jacobian_A` 在目标状态处求值。9 测试全过（TargetOrbit 插值、A(t) 与绝对雅可比一致、小扰动传播、STM 一致性）
+- 相对运动扩展（`e2m2e.proximity`，主题 3 后续）：**Encke 式非线性相对方程**（`encke_eom`/`nonlinear_eom`/`propagate_nonlinear`），Encke 改写引力差分项避免近距离两式相减截断误差（Battin 标准形式，f(q)·q·r + g(q)·δr），与牛顿式机器精度一致；**LVLH 系相对状态转换**（`to_lvlh`/`from_lvlh`），含 Ṙ 中心差分修正，往返转换零误差；**调相设计**（`phasing.py::phasing_search`），基于相对 STM 的两脉冲调相（Fossa 2022 NRHO 范式），在 tof 网格上解两点边值。8 测试全过（Encke/牛顿式一致性、LVLH 往返、调相两脉冲结构）
 
 ## [5.3.1] - 2026-07-29
 

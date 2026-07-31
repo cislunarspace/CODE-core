@@ -193,3 +193,248 @@ class RelativeDynamics:
             rhos[i] = stms[i] @ rho0
 
         return times, rhos, stms
+
+    # ------------------------------------------------------------------
+    # 非线性相对运动方程（牛顿式）与 Encke 改写
+    # ------------------------------------------------------------------
+
+    def _absolute_eom(self, state: np.ndarray) -> np.ndarray:
+        """CR3BP 绝对动力学右端（会合系）。"""
+        return self.dynamics.equations_of_motion(0.0, state)
+
+    def nonlinear_eom(self, t: float, rho: np.ndarray) -> np.ndarray:
+        """非线性相对运动方程右端（牛顿式，两式相减）。
+
+        δẍ = f(x_target + δx) − f(x_target)
+
+        近距离时两式相减产生截断误差（Cuevas del Valle 2022）。
+        供对比验证用；实际传播建议用 :meth:`encke_eom`。
+
+        Args:
+            t: 时间
+            rho: 相对状态 ``[δr, δv]``，形状 ``(6,)``
+
+        Returns:
+            相对状态导数 ``[δv, δa]``
+        """
+        target_state = self.target.state_at(t)
+        chaser_state = target_state + rho
+        f_target = self._absolute_eom(target_state)
+        f_chaser = self._absolute_eom(chaser_state)
+        return f_chaser - f_target
+
+    def encke_eom(self, t: float, rho: np.ndarray) -> np.ndarray:
+        """Encke 改写的非线性相对运动方程右端。
+
+        把引力加速度差分项改写为 Encke 形式，避免近距离 ``1/r³``
+        两式相减的截断误差。精度比牛顿式提升一个量级（Cuevas del Valle 2022）。
+
+        对每个引力中心，Encke 公式（Battin 标准形式）：
+
+            a_grav(r + δr) − a_grav(r) = −μ/|r|³ [f(q)·q·r + g(q)·δr]
+
+        其中 ``q = (2r·δr + |δr|²)/|r|²``，
+        ``f(q) = ((1+q)^(−3/2) − 1)/q``（q→0 时 f→−3/2，用级数展开），
+        ``g(q) = (1+q)^(−3/2)``。
+
+        Args:
+            t: 时间
+            rho: 相对状态 ``[δr, δv]``，形状 ``(6,)``
+
+        Returns:
+            相对状态导数 ``[δv, δa]``
+        """
+        mu = self.dynamics.system.mu
+        target_state = self.target.state_at(t)
+        dr = rho[:3]
+        dv = rho[3:]
+
+        # 伪势能梯度差（离心力 + 科里奥利力，线性项直接相减）
+        x, y, z = target_state[0], target_state[1], target_state[2]
+        dx, dy, _ = dr[0], dr[1], dr[2]
+
+        # 离心力差（伪势能二次项）：∂Ω/∂x 中的 x 项
+        da_centrifugal = np.array([dx, dy, 0.0])
+
+        # 科里奥利力差：2ω×δv（CR3BP 旋转系角速度 ω = 1，z 轴）
+        da_coriolis = np.array([2.0 * dv[1], -2.0 * dv[0], 0.0])
+
+        # 引力差（Encke 改写）：两个引力中心
+        # 主天体 1（质量 1−μ，位于 (−μ, 0, 0)）
+        r1 = np.array([x + mu, y, z])
+        r1_norm = np.linalg.norm(r1)
+        q1 = (2.0 * np.dot(r1, dr) + np.dot(dr, dr)) / (r1_norm * r1_norm)
+        f1 = _encke_f(q1)
+        g1 = (1.0 + q1) ** (-1.5)
+        da_grav1 = -(1.0 - mu) / (r1_norm**3) * (f1 * q1 * r1 + g1 * dr)
+
+        # 主天体 2（质量 μ，位于 (1−μ, 0, 0)）
+        r2 = np.array([x - 1.0 + mu, y, z])
+        r2_norm = np.linalg.norm(r2)
+        q2 = (2.0 * np.dot(r2, dr) + np.dot(dr, dr)) / (r2_norm * r2_norm)
+        f2 = _encke_f(q2)
+        g2 = (1.0 + q2) ** (-1.5)
+        da_grav2 = -mu / (r2_norm**3) * (f2 * q2 * r2 + g2 * dr)
+
+        da = da_centrifugal + da_coriolis + da_grav1 + da_grav2
+        return np.concatenate([dv, da])
+
+    def propagate_nonlinear(
+        self,
+        rho0: npt.ArrayLike,
+        t_span: tuple[float, float],
+        *,
+        method: str = "encke",
+        rtol: float = 1e-10,
+        atol: float = 1e-12,
+        max_step: float | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """传播相对状态（非线性方程）。
+
+        Args:
+            rho0: 初始相对状态 ``[δr, δv]``，形状 ``(6,)``
+            t_span: 传播区间
+            method: ``"encke"``（推荐）或 ``"newton"``（两式相减，精度低）
+            rtol, atol: 积分容差
+            max_step: 最大步长
+
+        Returns:
+            ``(times, rhos)``
+        """
+        rho0 = np.asarray(rho0, dtype=float)
+        if rho0.shape != (6,):
+            raise ValueError(f"rho0 形状须为 (6,)，得到 {rho0.shape}")
+
+        eom = self.encke_eom if method == "encke" else self.nonlinear_eom
+        result = solve_ivp(
+            eom,
+            t_span,
+            rho0,
+            method="RK45",
+            rtol=rtol,
+            atol=atol,
+            max_step=max_step if max_step is not None else np.inf,
+            dense_output=True,
+        )
+        if not result.success:
+            raise RuntimeError(f"非线性相对传播失败: {result.message}")
+
+        n = max(int((t_span[1] - t_span[0]) / (max_step or 0.01)) + 1, 2)
+        times = np.linspace(t_span[0], t_span[1], n)
+        rhos = result.sol(times).T
+        return times, rhos
+
+    # ------------------------------------------------------------------
+    # LVLH 系相对状态转换
+    # ------------------------------------------------------------------
+
+    def to_lvlh(self, rho_syn: npt.ArrayLike, t: float) -> tuple[np.ndarray, np.ndarray]:
+        """把会合系相对状态转换到 LVLH 系。
+
+        LVLH 系定义（`LVLHAxes`）：R = 径向，H = 角动量，V = H × R。
+        转换公式：
+
+            ρ_lvlh = Rᵀ δr_syn
+            ρ̇_lvlh = Rᵀ δv_syn + Ṙᵀ δr_syn
+
+        其中 R 为目标轨道的 LVLH 旋转矩阵，Ṙ 用中心差分近似
+        （步长 1e-5，与 `Axes.rotation_and_rate` 一致）。
+
+        Args:
+            rho_syn: 会合系相对状态 ``[δr, δv]``，形状 ``(6,)``
+            t: 参考历元
+
+        Returns:
+            ``(rho_lvlh, rho_dot_lvlh)``：LVLH 系相对位置与速度，
+            各形状 ``(3,)``
+        """
+        rho_syn = np.asarray(rho_syn, dtype=float)
+        dr_syn = rho_syn[:3]
+        dv_syn = rho_syn[3:]
+
+        # 目标轨道在 t 时刻的状态
+        target_state = self.target.state_at(t)
+        r_target = target_state[:3]
+        v_target = target_state[3:]
+
+        # LVLH 旋转矩阵（目标轨道）
+        R = _lvlh_rotation(r_target, v_target)
+
+        # R 的时间导数（中心差分）
+        dt = 1e-5
+        state_plus = self.target.state_at(t + dt)
+        state_minus = self.target.state_at(t - dt)
+        R_plus = _lvlh_rotation(state_plus[:3], state_plus[3:])
+        R_minus = _lvlh_rotation(state_minus[:3], state_minus[3:])
+        R_dot = (R_plus - R_minus) / (2.0 * dt)
+
+        # 位置转换
+        rho_lvlh = R.T @ dr_syn
+
+        # 速度转换：ρ̇_lvlh = Rᵀ δv_syn + Ṙᵀ δr_syn
+        rho_dot_lvlh = R.T @ dv_syn + R_dot.T @ dr_syn
+
+        return rho_lvlh, rho_dot_lvlh
+
+    def from_lvlh(
+        self, rho_lvlh: npt.ArrayLike, rho_dot_lvlh: npt.ArrayLike, t: float
+    ) -> np.ndarray:
+        """把 LVLH 系相对状态转换回会合系。
+
+        逆转换：
+
+            δr_syn = R ρ_lvlh
+            δv_syn = R ρ̇_lvlh + Ṙ ρ_lvlh
+
+        Args:
+            rho_lvlh: LVLH 系相对位置，形状 ``(3,)``
+            rho_dot_lvlh: LVLH 系相对速度，形状 ``(3,)``
+            t: 参考历元
+
+        Returns:
+            会合系相对状态 ``[δr, δv]``，形状 ``(6,)``
+        """
+        rho_lvlh = np.asarray(rho_lvlh, dtype=float)
+        rho_dot_lvlh = np.asarray(rho_dot_lvlh, dtype=float)
+
+        target_state = self.target.state_at(t)
+        r_target = target_state[:3]
+        v_target = target_state[3:]
+        R = _lvlh_rotation(r_target, v_target)
+
+        dt = 1e-5
+        state_plus = self.target.state_at(t + dt)
+        state_minus = self.target.state_at(t - dt)
+        R_plus = _lvlh_rotation(state_plus[:3], state_plus[3:])
+        R_minus = _lvlh_rotation(state_minus[:3], state_minus[3:])
+        R_dot = (R_plus - R_minus) / (2.0 * dt)
+
+        dr_syn = R @ rho_lvlh
+        dv_syn = R @ rho_dot_lvlh + R_dot @ rho_lvlh
+
+        return np.concatenate([dr_syn, dv_syn])
+
+
+def _lvlh_rotation(r: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """构造 LVLH 旋转矩阵 R = [r_hat, v_hat, h_hat]。
+
+    R = 径向，H = 角动量方向，V = H × R。
+    返回 (3, 3)，列为单位向量。
+    """
+    h = np.cross(r, v)
+    r_hat = r / np.linalg.norm(r)
+    h_hat = h / np.linalg.norm(h)
+    v_hat = np.cross(h_hat, r_hat)
+    return np.column_stack([r_hat, v_hat, h_hat])
+
+
+def _encke_f(q: float) -> float:
+    """Encke 函数 f(q) = ((1+q)^(−3/2) − 1) / q。
+
+    q→0 时极限为 −3/2。用泰勒展开避免 0/0：
+    f(q) ≈ −3/2 + 15/8 q − 35/16 q² + ...
+    """
+    if abs(q) < 1e-6:
+        # 泰勒展开（q 很小时）
+        return -1.5 + 1.875 * q - 2.1875 * q * q
+    return ((1.0 + q) ** (-1.5) - 1.0) / q
