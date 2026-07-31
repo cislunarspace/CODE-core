@@ -24,6 +24,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from ..data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
+
 __all__ = [
     "DEFAULT_DYB",
     "DEFAULT_PERTURBATION",
@@ -34,22 +36,6 @@ __all__ = [
 ]
 
 _GOLDEN_PATH = Path(__file__).resolve().parent / "data" / "inputs-dac.golden"
-
-#: 摄动开关默认值（与 MATLAB fmt_perturb_block.m 一致）
-DEFAULT_PERTURBATION: dict[str, int] = {
-    "sun_body": 1,
-    "planets": 1,
-    "earth_nonspherical": 1,
-    "moon_nonspherical": 1,
-    "solar_radiation": 2,
-    "atmosphere": 0,
-    "relativity": 0,
-    "tide": 1,
-    "coupling": 1,
-}
-
-#: DYB 系数默认值：DYB(1)=等效面质比 0.01 (m2/kg)，其余为相对 DYB(1) 的比值
-DEFAULT_DYB: list[float] = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 _PERTURB_LABELS = [
     "太阳的第三体引力摄动开关（=0，关闭；=1，打开）",

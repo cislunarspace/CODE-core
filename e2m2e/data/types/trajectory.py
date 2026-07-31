@@ -1,12 +1,11 @@
 """轨迹数据容器：EphemerisTable（通用星历容器）与 NominalOrbit（名义轨道契约）。
 
 - ``EphemerisTable``：UTC + GCRS 位置 km/速度 m/s + 会合系位置，通用容器，非 DFH
-  专属（ADR 0011）。待从 ``io/ephemeris.py`` 迁入。
+  专属（ADR 0011 迁移，源：``io/ephemeris.py``）。DFH 格式读写（parse/write）
+  保留在 ``io/`` 作临时脚本。
 - ``NominalOrbit``：FR1↔FR2 数据契约（ADR 0015，Gómez vol I §8.2.3）：等间距历元
   状态表 + Floquet 基 + 投影因子表 + 高次插值器。Floquet 基 + 投影因子由 FR1
   预计算，控制全程插值不复算。
-
-实现状态：骨架。``EphemerisTable`` 待迁入；``NominalOrbit`` 为新类型，接口待定稿。
 """
 
 from __future__ import annotations
@@ -24,11 +23,12 @@ class EphemerisTable:
     """通用星历表容器。
 
     Attributes:
-        year/month/day/hour/minute: 整型数组（形状 (n,)）。
-        second: 秒（含小数，形状 (n,)）。
-        position_km: GCRS 位置（km，形状 (n, 3)）。
-        velocity_mps: GCRS 速度（m/s，形状 (n, 3)）。
-        synodic_position: 地月会合系位置（无量纲，形状 (n, 3)），可选。
+        year, month, day, hour, minute: 整型数组，形状 ``(n,)``
+        second: 秒（含小数），形状 ``(n,)``
+        position_km: GCRS 位置（km），形状 ``(n, 3)``
+        velocity_mps: GCRS 速度（m/s），形状 ``(n, 3)``
+        synodic_position: 地月会合系位置（无量纲），形状 ``(n, 3)``
+        raw_text: 原始文件文本；程序生成（非读入）时为空串。
     """
 
     year: np.ndarray
@@ -39,7 +39,8 @@ class EphemerisTable:
     second: np.ndarray
     position_km: np.ndarray
     velocity_mps: np.ndarray
-    synodic_position: np.ndarray | None = None
+    synodic_position: np.ndarray
+    raw_text: str = field(default="", repr=False)
 
     def __len__(self) -> int:
         return len(self.year)
@@ -69,4 +70,4 @@ class NominalOrbit:
         """任意时刻（秒）的标称状态（6 维），经插值器。"""
         if self.interpolator is None:
             raise NotImplementedError("NominalOrbit 插值器待实现")
-        raise NotImplementedError  # pragma: no cover - 骨架
+        raise NotImplementedError  # pragma: no cover - 插值器契约待 FR1 落地

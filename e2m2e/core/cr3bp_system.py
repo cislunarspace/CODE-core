@@ -14,7 +14,21 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import fsolve
 
-from .constants import AU as _AU_KM
+from ..data.templates.systems import (
+    AU as _AU_KM,
+)
+from ..data.templates.systems import (
+    DAY as _SYSTEM_DAY,
+)
+from ..data.templates.systems import (
+    EARTH_MOON_DISTANCE_KM as _SYSTEM_EM_DISTANCE,
+)
+from ..data.templates.systems import (
+    YEAR as _SYSTEM_YEAR,
+)
+from ..data.templates.systems import (
+    G as _SYSTEM_G,
+)
 from .enums import ReferenceFrame, UnitSystem
 from .potential import pseudo_potential_hessian
 from .system import System
@@ -55,12 +69,12 @@ class CR3BP_System(System):
         has_L_points: 是否已计算平动点
     """
 
-    # 天文常量
-    EARTH_MOON_DISTANCE_KM = 384405.0  # 地月平均距离 (km), Cui et al. 2025
-    AU = _AU_KM  # 天文单位 (km)
-    G = 6.67430e-20  # 万有引力常数 (km^3 / (kg * s^2))
-    DAY = 86400  # 一天的秒数
-    YEAR = 365.25 * 86400  # 一年的秒数（儒略年）
+    # 天文常量（标准参数数据在 data/templates/systems.py，ADR 0011）
+    EARTH_MOON_DISTANCE_KM = _SYSTEM_EM_DISTANCE
+    AU = _AU_KM
+    G = _SYSTEM_G
+    DAY = _SYSTEM_DAY
+    YEAR = _SYSTEM_YEAR
 
     def __init__(self, mu: float, primary: str, secondary: str) -> None:
         """初始化系统参数

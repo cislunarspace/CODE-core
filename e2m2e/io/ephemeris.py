@@ -1,59 +1,32 @@
-"""DFH EPHEMERIDES_*.TXT 星历文件读写。
+"""DFH EPHEMERIDES_*.TXT 星历文件读写（临时脚本，ADR 0011）。
+
+``EphemerisTable`` 通用容器已迁至 ``e2m2e.data.types.trajectory``；本模块
+保留 DFH 专属格式的 parse/read/write，作为开发期临时脚本（io/ 最终不进
+e2m2e）。
 
 文件行格式（空白分隔，每行 10 列或更多）::
 
     YYYY-MM-DD-HH-MM-SS.SS  pX pY pZ  vX vY vZ  sX sY sZ
 
 - 时间戳：UTC，年-月-日-时-分-秒以 ``-`` 分隔（秒含两位小数）；
-- pX/pY/pZ：GCRS 位置（km）；
-- vX/vY/vZ：GCRS 速度（m/s）；
-- sX/sY/sZ：地月会合系位置（无量纲）。
+- pX/pY/pZ：GCRS 位置（km）；vX/vY/vZ：GCRS 速度（m/s）；
+  sX/sY/sZ：地月会合系位置（无量纲）。
 
 解析陷阱：时间戳自身以 ``-`` 分隔，不能对整行 ``split('-')``——数值列的
 负号会被拆碎。照 MATLAB ``parse_ephemeris.m`` 的做法：先按空白分列取首列
 作时间戳再拆 ``-``，其余列按浮点解析；WSB 等文件时间戳后多于 9 列时只取
-前 9 列。解析不了时间戳或数值不足 9 列的行静默跳过（与 MATLAB 一致）。
-
-写出格式照 MATLAB ``write_ephemeris_table.m``：时间戳后 9 个 25 字符宽、
-12 位小数的定点数，CRLF 行尾。
+前 9 列。解析不了时间戳或数值不足 9 列的行静默跳过。
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
+from e2m2e.data.types.trajectory import EphemerisTable
+
 __all__ = ["EphemerisTable", "parse_ephemeris", "read_ephemeris", "write_ephemeris"]
-
-
-@dataclass
-class EphemerisTable:
-    """DFH 星历表容器。
-
-    Attributes:
-        year, month, day, hour, minute: 整型数组，形状 ``(n,)``
-        second: 秒（含小数），形状 ``(n,)``
-        position_km: GCRS 位置（km），形状 ``(n, 3)``
-        velocity_mps: GCRS 速度（m/s），形状 ``(n, 3)``
-        synodic_position: 地月会合系位置（无量纲），形状 ``(n, 3)``
-    """
-
-    year: np.ndarray
-    month: np.ndarray
-    day: np.ndarray
-    hour: np.ndarray
-    minute: np.ndarray
-    second: np.ndarray
-    position_km: np.ndarray
-    velocity_mps: np.ndarray
-    synodic_position: np.ndarray
-    raw_text: str = field(default="", repr=False)
-    """原始文件文本；程序生成（非读入）时为空串。"""
-
-    def __len__(self) -> int:
-        return len(self.year)
 
 
 def parse_ephemeris(raw: str) -> EphemerisTable:
@@ -106,11 +79,7 @@ def read_ephemeris(path: str | Path) -> EphemerisTable:
 
 
 def write_ephemeris(table: EphemerisTable, path: str | Path) -> None:
-    """按 DFH 格式写出星历文件（CRLF 行尾，UTF-8 无 BOM）。
-
-    每行：``YYYY-MM-DD-HH-MM-SS.SS`` 后接 9 个 25 字符宽、12 位小数的
-    定点数，与 MATLAB ``write_ephemeris_table.m`` 一致。
-    """
+    """按 DFH 格式写出星历文件（CRLF 行尾，UTF-8 无 BOM）。"""
     lines = []
     for k in range(len(table)):
         head = (

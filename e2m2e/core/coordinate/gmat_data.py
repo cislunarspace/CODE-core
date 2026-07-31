@@ -1,18 +1,19 @@
-"""GMAT 裁剪 fixture 发现工具。"""
+"""GMAT 裁剪 fixture 发现工具（含 CoordinateDataError shim）。
+
+``CoordinateDataError`` 已迁至 ``e2m2e.data.frames.eop``（ADR 0011 迁移），
+此处 re-export 保持旧路径可用；fixture 路径发现工具是开发期测试辅助，
+暂留本模块。
+"""
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
-from ..exceptions import E2M2EError
+from e2m2e.data.frames.eop import CoordinateDataError
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _COMMITTED_GMAT_FIXTURE_DIR = _REPO_ROOT / "tests" / "core" / "coordinate" / "fixtures" / "gmat"
-
-
-class CoordinateDataError(E2M2EError, RuntimeError):
-    """坐标数据缺失、越界或格式错误。"""
 
 
 def committed_gmat_fixture_dir() -> Path:

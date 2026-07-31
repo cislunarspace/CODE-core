@@ -1,15 +1,9 @@
-"""e2m2e 统一异常层次。
+"""异常基类 shim：``E2M2EError`` 已迁至顶层 ``e2m2e.exceptions``。
 
-所有 e2m2e 抛出的异常都以 :class:`E2M2EError` 为共同基类，
-便于调用方用 ``except E2M2EError`` 统一捕获库内部错误。
-
-各子包仍可把自身异常多重继承自 Python 内置异常（如 ``ValueError``、
-``RuntimeError``、``TypeError``），以保留原有的语义与既有 ``except``
-子句的兼容性。
+旧路径 ``e2m2e.core.exceptions.E2M2EError`` 在迁移期继续可用（ADR 0011
+过渡策略：旧包位置 re-export 新模块）。
 """
 
+from ..exceptions import E2M2EError
 
-class E2M2EError(Exception):
-    """所有 e2m2e 异常的共同基类。"""
-
-    pass
+__all__ = ["E2M2EError"]
