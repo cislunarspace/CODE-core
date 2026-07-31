@@ -13,6 +13,7 @@ from __future__ import annotations
 from .axes import Axes
 from .coordinate_system import CoordinateSystem
 from .dynamic_axes import DynamicAxes
+from .gcrs_ebcrs import GCRSEBCRSSystem
 from .iau_2006 import iau2000eq_matrix, precession_angles
 from .origin import Origin
 from .rho_bridge import eci_to_rho, rho_to_eci
@@ -51,6 +52,7 @@ __all__ = [
     "InertialOrigin",
     "SynodicAxes",
     "SynodicJ2000System",
+    "GCRSEBCRSSystem",
     "ErfaXysProvider",
     "XysProvider",
     "iau2000eq_matrix",

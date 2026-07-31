@@ -45,6 +45,7 @@ from .coordinate import (
     Axes,
     CoordinateSystem,
     DynamicAxes,
+    GCRSEBCRSSystem,
     GMATITRFAxes,
     IAU2000EqAxes,
     ICRSAxes,
@@ -149,5 +150,6 @@ __all__ = [
     "propagate_state_at_orbit_time",
     "ReferenceFrame",
     "SynodicJ2000System",
+    "GCRSEBCRSSystem",
     "pseudo_potential_hessian",
 ]
