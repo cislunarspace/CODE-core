@@ -19,6 +19,7 @@ from .lowthrust_shooting import (
     LowThrustShooting,
     LowThrustShootingSolution,
 )
+from .mission_assessment import MissionAssessment
 from .multi_impulse import (
     CoastArc,
     Impulse,
@@ -29,6 +30,7 @@ from .nsga2 import NSGA2Result, nsga2
 from .porkchop import ParetoFront, PorkchopData, pareto_front, porkchop
 from .propulsion import ImpulsivePropulsion
 from .qlaw import qlaw_guess, rv_to_keplerian
+from .solution_database import SolutionDatabase
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 from .three_body_lambert import ThreeBodyLambert
 from .transfer import Transfer
@@ -70,6 +72,8 @@ __all__ = [
     "pareto_front",
     "NSGA2Result",
     "nsga2",
+    "MissionAssessment",
+    "SolutionDatabase",
     "ThreeBodyLambert",
     "TransferArc",
     "TransferSolution",
