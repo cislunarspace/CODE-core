@@ -24,16 +24,16 @@ import warnings
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.normal_form import (
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form import (
     NormalFormPipeline,
     NormalFormResult,
 )
-from e2m2e.algorithms.normal_form.center_manifold import CenterManifoldResult
-from e2m2e.algorithms.normal_form.dynamical_substitution import (
+from e2m2e.algorithm.normal_form.center_manifold import CenterManifoldResult
+from e2m2e.algorithm.normal_form.dynamical_substitution import (
     DynamicalSubstituteResult,
 )
-from e2m2e.algorithms.normal_form.quasi_floquet import QuasiFloquetResult
-from e2m2e.core import LibrationPoint
+from e2m2e.algorithm.normal_form.quasi_floquet import QuasiFloquetResult
 
 # ---------------------------------------------------------------------------
 # 公共 fixture
@@ -43,8 +43,8 @@ from e2m2e.core import LibrationPoint
 @pytest.fixture
 def l1_context(earth_moon_system):
     """L1 共线点上下文（与 test_catalog / test_dynamical_substitution 一致）。"""
-    from e2m2e.algorithms.normal_form import NormalFormContext
-    from e2m2e.algorithms.normal_form.constants import JD0_J2000
+    from e2m2e.algorithm.normal_form import NormalFormContext
+    from e2m2e.algorithm.normal_form.constants import JD0_J2000
 
     return NormalFormContext(
         system=earth_moon_system,
@@ -94,7 +94,7 @@ def test_pipeline_is_constructible(l1_context):
 
 def test_pipeline_importable_via_package_root():
     """切片 #175 验收：能从包根直接 import。"""
-    from e2m2e.algorithms.normal_form import NormalFormPipeline as P
+    from e2m2e.algorithm.normal_form import NormalFormPipeline as P
 
     assert P is NormalFormPipeline
 
@@ -189,7 +189,7 @@ def test_reduce_rejects_bad_orbit_shape(fast_pipeline):
 
 def test_reduce_accepts_orbit_like_object(fast_pipeline, l1_context):
     """带 ``.states`` 的 Orbit-like 对象取首帧作为初值。"""
-    from e2m2e.core.orbit import Orbit
+    from e2m2e.data.types.orbit import Orbit
 
     x0 = np.array([1e-3, -1e-3, 0.0, 0.0, 1e-4, -1e-4])
     orbit = Orbit(
@@ -211,7 +211,7 @@ def test_failure_records_completed_subresults(l1_context, monkeypatch):
         raise RuntimeError("synthetic QF failure")
 
     monkeypatch.setattr(
-        "e2m2e.algorithms.normal_form.quasi_floquet.QuasiFloquetReducer.reduce",
+        "e2m2e.algorithm.normal_form.quasi_floquet.QuasiFloquetReducer.reduce",
         _boom,
     )
 

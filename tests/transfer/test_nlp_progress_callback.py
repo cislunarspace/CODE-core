@@ -6,8 +6,9 @@
 import numpy as np
 import pytest
 
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
-from e2m2e.transfer import DROTRONLPOptimizer
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.transfer import DROTRONLPOptimizer
+from e2m2e.data.types.orbit import Orbit
 
 
 def _simple_orbit(n: int = 80) -> Orbit:

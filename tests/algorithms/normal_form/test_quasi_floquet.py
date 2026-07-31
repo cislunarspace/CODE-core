@@ -25,11 +25,12 @@ import pytest
 from scipy.integrate import solve_ivp
 from scipy.linalg import expm
 
-from e2m2e.algorithms.normal_form.constants import JD0_J2000
-from e2m2e.algorithms.normal_form.dynamical_substitution import (
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form.constants import JD0_J2000
+from e2m2e.algorithm.normal_form.dynamical_substitution import (
     DynamicalSubstituteResult,
 )
-from e2m2e.algorithms.normal_form.quasi_floquet import (
+from e2m2e.algorithm.normal_form.quasi_floquet import (
     J6,
     QuasiFloquetReducer,
     QuasiFloquetResult,
@@ -39,7 +40,6 @@ from e2m2e.algorithms.normal_form.quasi_floquet import (
     symplectic_project,
     vector_to_sp6,
 )
-from e2m2e.core import LibrationPoint
 
 # ---------------------------------------------------------------------------
 # 公共 fixture（复用 test_dynamical_substitution 的范式）
@@ -49,7 +49,7 @@ from e2m2e.core import LibrationPoint
 @pytest.fixture
 def l1_context(earth_moon_system):
     """L1 共线点上下文（与 slice 2 测试一致）。"""
-    from e2m2e.algorithms.normal_form import NormalFormContext
+    from e2m2e.algorithm.normal_form import NormalFormContext
 
     return NormalFormContext(
         system=earth_moon_system,
@@ -327,7 +327,7 @@ def test_cr3bp_hamiltonian_linearization_is_hamiltonian(l1_context):
     无法构造同时辛归一化与对角化的实标准形变换）；动量框架
     ``[[C,I],[S_grav,C]]`` 满足且特征值等于物理频率。
     """
-    from e2m2e.algorithms.normal_form.quasi_floquet import (
+    from e2m2e.algorithm.normal_form.quasi_floquet import (
         _cr3bp_hamiltonian_linearization,
     )
 
@@ -344,7 +344,7 @@ def test_cr3bp_hamiltonian_linearization_is_hamiltonian(l1_context):
 
 def test_real_normal_form_transform_is_symplectic_diagonalizing(l1_context):
     """``V`` 辛归一化且 ``V⁻¹MV = D``（实标准形结构、频率正确）。"""
-    from e2m2e.algorithms.normal_form.quasi_floquet import (
+    from e2m2e.algorithm.normal_form.quasi_floquet import (
         _cr3bp_hamiltonian_linearization,
         real_normal_form_transform,
     )

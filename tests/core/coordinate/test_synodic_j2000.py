@@ -7,7 +7,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.core import CR3BP_System, SynodicJ2000System
+from e2m2e.algorithm.coordinate import SynodicJ2000System
+from e2m2e.algorithm.dynamics import CR3BP_System
 
 pytestmark = pytest.mark.spice
 

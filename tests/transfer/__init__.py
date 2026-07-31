@@ -1,1 +1,1 @@
-"""e2m2e.transfer 模块测试包。"""
+"""e2m2e.algorithm.transfer 模块测试包。"""

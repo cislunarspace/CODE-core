@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.core import Dynamics
-from e2m2e.core.ephemeris_system import EphemerisSystem
+from e2m2e.algorithm.dynamics import Dynamics
+from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.mbse.data.enums import ReferenceFrame
 
 pytestmark = pytest.mark.spice

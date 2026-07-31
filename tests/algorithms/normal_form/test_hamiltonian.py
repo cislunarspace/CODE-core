@@ -11,17 +11,17 @@ import pytest
 # sympy 是 normal-form optional dep；未安装时整个文件 skip（不 error）。
 pytest.importorskip("sympy")
 
-from e2m2e.algorithms.normal_form import NormalFormContext
-from e2m2e.algorithms.normal_form.constants import JD0_J2000
-from e2m2e.algorithms.normal_form.hamiltonian import (
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form import NormalFormContext
+from e2m2e.algorithm.normal_form.constants import JD0_J2000
+from e2m2e.algorithm.normal_form.hamiltonian import (
     DYNAMIC_PARAM_NAMES,
     Hamiltonian,
     build_hamiltonian,
     evaluate_hamiltonian,
     hamiltonian_constant_term,
 )
-from e2m2e.algorithms.normal_form.legendre import expand_legendre_1_over_r
-from e2m2e.core import LibrationPoint
+from e2m2e.algorithm.normal_form.legendre import expand_legendre_1_over_r
 
 # ---------------------------------------------------------------------------
 # 公共 fixture：可复用的上下文与 Legendre 展开
@@ -309,7 +309,7 @@ def test_evaluate_hamiltonian_over_invalid_times_fails(l1_hamiltonian):
 
 def test_polylist_simplify_zero_epsilon_drops_only_zero_columns():
     """``polylist_simplify`` 在 ``eps=0`` 仍保留所有非零列。"""
-    from e2m2e.algorithms.normal_form.polynomial import polylist_simplify
+    from e2m2e.algorithm.normal_form.polynomial import polylist_simplify
 
     powers = {
         (0, 0, 0, 0, 0, 0): np.array([1.0]),
@@ -325,7 +325,7 @@ def test_polylist_simplify_zero_epsilon_drops_only_zero_columns():
 
 def test_evaluate_hamiltonian_requires_sympy_coefficients():
     """无 sympy 系数的 :class:`Hamiltonian` 报 :class:`ValueError`。"""
-    from e2m2e.algorithms.normal_form.hamiltonian import Hamiltonian
+    from e2m2e.algorithm.normal_form.hamiltonian import Hamiltonian
 
     powers = np.zeros((1, 6), dtype=np.int64)
     h = Hamiltonian(

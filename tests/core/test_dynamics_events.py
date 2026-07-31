@@ -7,8 +7,8 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.sections import PoincareSection, detect_crossings
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.manifold.sections import PoincareSection, detect_crossings
 
 
 @pytest.fixture

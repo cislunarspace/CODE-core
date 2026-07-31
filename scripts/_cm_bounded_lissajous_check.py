@@ -12,11 +12,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from e2m2e.algorithms.lissajous_initial_guess import compute_lissajous_initial_guess
-from e2m2e.algorithms.normal_form import NormalFormContext, NormalFormPipeline
-from e2m2e.algorithms.normal_form.constants import JD0_J2000
-from e2m2e.algorithms.normal_form.propagation import propagate_parametric
-from e2m2e.core import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.family.lissajous_initial_guess import compute_lissajous_initial_guess
+from e2m2e.algorithm.normal_form import NormalFormContext, NormalFormPipeline
+from e2m2e.algorithm.normal_form.constants import JD0_J2000
+from e2m2e.algorithm.normal_form.propagation import propagate_parametric
 
 
 def main() -> None:

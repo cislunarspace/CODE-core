@@ -6,7 +6,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.forces import PhysicalModel
+from e2m2e.algorithm.forces import PhysicalModel
 
 
 class PointMassTestForce(PhysicalModel):

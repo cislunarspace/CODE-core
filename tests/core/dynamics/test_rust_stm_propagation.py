@@ -90,7 +90,7 @@ class TestRustStmPropagation:
         )
 
         # Python 路径（基类 SciPy）
-        from e2m2e.core.dynamics import Dynamics
+        from e2m2e.algorithm.dynamics.dynamics import Dynamics
 
         python_result = Dynamics._propagate_with_stm(
             spice_eph_dynamics,

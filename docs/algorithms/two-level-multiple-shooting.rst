@@ -1,7 +1,7 @@
 两层多重打靶
 ============
 
-:class:`~e2m2e.algorithms.two_level_multiple_shooting.TwoLevelMultipleShooting`
+:class:`~e2m2e.algorithm.solver.two_level_multiple_shooting.TwoLevelMultipleShooting`
 将多重打靶问题分解为两层交替求解，适用于自由时间多段轨道设计。
 
 基本原理
@@ -22,7 +22,7 @@
 
 .. code-block:: python
 
-   from e2m2e.algorithms.two_level_multiple_shooting import TwoLevelMultipleShooting
+   from e2m2e.algorithm.solver.two_level_multiple_shooting import TwoLevelMultipleShooting
 
    tms = TwoLevelMultipleShooting(dynamics=dynamics)
 

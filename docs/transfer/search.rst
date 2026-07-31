@@ -1,7 +1,7 @@
 转移窗口搜索
 ============
 
-:class:`~e2m2e.transfer.transfer_search.TransferSearch` 实现转移轨道的参数空间搜索，是"搜索-优化"两步法中的第一步。
+:class:`~e2m2e.algorithm.transfer.transfer_search.TransferSearch` 实现转移轨道的参数空间搜索，是"搜索-优化"两步法中的第一步。
 
 搜索算法
 --------
@@ -23,13 +23,13 @@
 参数配置
 --------
 
-搜索参数通过 :class:`~e2m2e.transfer.config.TransferConfig` 的 ``search_*`` 字段集中管理，
+搜索参数通过 :class:`~e2m2e.algorithm.transfer.config.TransferConfig` 的 ``search_*`` 字段集中管理，
 同时 ``TransferSearch`` 提供向后兼容的属性代理访问。
 
 .. code-block:: python
 
-   from e2m2e.transfer import TransferSearch, TransferConfig
-   from e2m2e.core.dynamics import CR3BP_Dynamics
+   from e2m2e.algorithm.transfer import TransferSearch, TransferConfig
+   from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
 
    # 方式一：通过 TransferConfig 的 search_* 字段配置
    cfg = TransferConfig(
@@ -174,9 +174,9 @@
 
 .. code-block:: python
 
-   from e2m2e.core.system import CR3BP_System
-   from e2m2e.core.dynamics import CR3BP_Dynamics
-   from e2m2e.transfer import TransferSearch, TransferConfig, load_orbit_from_json
+   from e2m2e.algorithm.dynamics.system import CR3BP_System
+   from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+   from e2m2e.algorithm.transfer import TransferSearch, TransferConfig, load_orbit_from_json
 
    # 建立系统
    system = CR3BP_System(

@@ -12,10 +12,11 @@ import copy
 import numpy as np
 import pytest
 
-from e2m2e.algorithms import DifferentialCorrection
-from e2m2e.algorithms.halo_initial_guess import _compute_gamma, compute_halo_initial_guess
-from e2m2e.core import CR3BP_Dynamics, Orbit
-from e2m2e.transfer import StateTerminal, ThreeBodyLambert, TransferSolution
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics
+from e2m2e.algorithm.family.halo_initial_guess import _compute_gamma, compute_halo_initial_guess
+from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.algorithm.transfer import StateTerminal, ThreeBodyLambert, TransferSolution
+from e2m2e.data.types.orbit import Orbit
 
 # 地月系统质量参数（与 tests/algorithms/conftest.py 一致）
 MU = 1.21506683e-2
@@ -26,7 +27,7 @@ _HALO_Z0 = 0.001  # L1 Halo z 振幅（无量纲；Richardson 初猜直接修正
 
 
 def _make_system():
-    from e2m2e.core.cr3bp_system import CR3BP_System
+    from e2m2e.algorithm.dynamics import CR3BP_System
 
     return CR3BP_System(mu=MU, primary="Earth", secondary="Moon")._with_default_scales()
 

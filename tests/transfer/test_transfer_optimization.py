@@ -15,7 +15,7 @@ class TestTransferCreation:
 
     def test_transfer_creation_with_dynamics(self, dynamics):
         """Transfer should be created with a dynamics instance."""
-        from e2m2e.transfer import Transfer
+        from e2m2e.algorithm.transfer import Transfer
 
         transfer = Transfer(dynamics)
 
@@ -26,7 +26,7 @@ class TestTransferCreation:
 
     def test_transfer_set_orbits(self, dynamics, dro_orbit, ro_orbit):
         """Transfer.set_orbit() should accept start (departure) and end (arrival) orbits."""
-        from e2m2e.transfer import Transfer
+        from e2m2e.algorithm.transfer import Transfer
 
         transfer = Transfer(dynamics)
         transfer.set_orbit(start=dro_orbit, end=ro_orbit)
@@ -36,7 +36,7 @@ class TestTransferCreation:
 
     def test_transfer_config_fields(self, dynamics):
         """Transfer.config should expose optimization configuration."""
-        from e2m2e.transfer import Transfer, TransferConfig
+        from e2m2e.algorithm.transfer import Transfer, TransferConfig
 
         transfer = Transfer(dynamics)
 
@@ -51,7 +51,7 @@ class TestTransferOptimization:
 
     def test_optimize_with_auto_departure_sampling(self, dynamics, dro_orbit, ro_orbit):
         """optimize() should work without explicit departure_state (auto-sample)."""
-        from e2m2e.transfer import Transfer
+        from e2m2e.algorithm.transfer import Transfer
 
         transfer = Transfer(dynamics)
         transfer.set_orbit(start=dro_orbit, end=ro_orbit)
@@ -73,7 +73,7 @@ class TestTransferOptimization:
         self, dynamics, dro_orbit, ro_orbit, dro_departure_state
     ):
         """optimize() should accept manual departure_state parameter."""
-        from e2m2e.transfer import Transfer
+        from e2m2e.algorithm.transfer import Transfer
 
         transfer = Transfer(dynamics)
         transfer.set_orbit(start=dro_orbit, end=ro_orbit)
@@ -91,7 +91,7 @@ class TestTransferOptimization:
 
     def test_optimize_with_t_ins_range(self, dynamics, dro_orbit, ro_orbit, dro_departure_state):
         """optimize() should accept t_ins_range parameter."""
-        from e2m2e.transfer import Transfer
+        from e2m2e.algorithm.transfer import Transfer
 
         transfer = Transfer(dynamics)
         transfer.set_orbit(start=dro_orbit, end=ro_orbit)
@@ -115,7 +115,7 @@ class TestTransferOptimization:
         self, dynamics, dro_orbit, ro_orbit, dro_departure_state
     ):
         """When t_ins_range is not specified, default to full RO period."""
-        from e2m2e.transfer import Transfer
+        from e2m2e.algorithm.transfer import Transfer
 
         transfer = Transfer(dynamics)
         transfer.set_orbit(start=dro_orbit, end=ro_orbit)
@@ -140,7 +140,7 @@ class TestTransferOptimizationResult:
         self, dynamics, dro_orbit, ro_orbit, dro_departure_state
     ):
         """Result should contain departure position and velocity information."""
-        from e2m2e.transfer import Transfer
+        from e2m2e.algorithm.transfer import Transfer
 
         transfer = Transfer(dynamics)
         transfer.set_orbit(start=dro_orbit, end=ro_orbit)
@@ -163,7 +163,7 @@ class TestTransferOptimizationResult:
         self, dynamics, dro_orbit, ro_orbit, dro_departure_state
     ):
         """Result should contain arrival/insertion position and velocity change."""
-        from e2m2e.transfer import Transfer
+        from e2m2e.algorithm.transfer import Transfer
 
         transfer = Transfer(dynamics)
         transfer.set_orbit(start=dro_orbit, end=ro_orbit)
@@ -186,7 +186,7 @@ class TestTransferOptimizationResult:
         self, dynamics, dro_orbit, ro_orbit, dro_departure_state
     ):
         """Result should contain full transfer trajectory."""
-        from e2m2e.transfer import Transfer
+        from e2m2e.algorithm.transfer import Transfer
 
         transfer = Transfer(dynamics)
         transfer.set_orbit(start=dro_orbit, end=ro_orbit)
@@ -209,7 +209,7 @@ class TestTransferOptimizationResult:
         self, dynamics, dro_orbit, ro_orbit, dro_departure_state
     ):
         """total_delta_v should equal delta_v1 + delta_v2."""
-        from e2m2e.transfer import Transfer
+        from e2m2e.algorithm.transfer import Transfer
 
         transfer = Transfer(dynamics)
         transfer.set_orbit(start=dro_orbit, end=ro_orbit)
@@ -250,7 +250,7 @@ def dro_orbit(dro_file):
     pytest.importorskip("_dro_data", reason="DRO data file not available")
     if not dro_file.exists():
         pytest.skip("DRO orbit data file not found")
-    from e2m2e.transfer import load_orbit_from_json
+    from e2m2e.algorithm.transfer import load_orbit_from_json
 
     return load_orbit_from_json(str(dro_file))
 
@@ -259,7 +259,7 @@ def dro_orbit(dro_file):
 def ro_orbit(ro_file):
     if not ro_file.exists():
         pytest.skip("RO orbit data file not found")
-    from e2m2e.transfer import load_orbit_from_json
+    from e2m2e.algorithm.transfer import load_orbit_from_json
 
     with open(ro_file, encoding="utf-8") as f:
         ro_json = json.load(f)
@@ -274,7 +274,7 @@ def ro_orbit(ro_file):
 def dynamics():
     MU = 1.21506683e-2
 
-    from e2m2e.core import CR3BP_Dynamics, CR3BP_System
+    from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 
     system = CR3BP_System(mu=MU, primary="earth", secondary="moon")
     dyn = CR3BP_Dynamics(system=system)

@@ -22,22 +22,22 @@ import warnings
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.normal_form.constants import JD0_J2000
-from e2m2e.algorithms.normal_form.dynamical_substitution import (
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form.constants import JD0_J2000
+from e2m2e.algorithm.normal_form.dynamical_substitution import (
     DEFAULT_DENSE_STEP,
     DEFAULT_NODE_STEP,
     DEFAULT_TOTAL_TU,
     DynamicalSubstituteCorrector,
     DynamicalSubstituteResult,
 )
-from e2m2e.algorithms.normal_form.multiple_shooting import (
+from e2m2e.algorithm.normal_form.multiple_shooting import (
     MultipleShootingResult,
     ODESubstituteSolver,
     ShootingPatch,
     multiple_shooting_newton,
     solve_block_tridiagonal,
 )
-from e2m2e.core import LibrationPoint
 
 # ---------------------------------------------------------------------------
 # 公共 fixture
@@ -47,7 +47,7 @@ from e2m2e.core import LibrationPoint
 @pytest.fixture
 def l1_context(earth_moon_system):
     """L1 共线点上下文（与现有 slice 1 测试一致）。"""
-    from e2m2e.algorithms.normal_form import NormalFormContext
+    from e2m2e.algorithm.normal_form import NormalFormContext
 
     return NormalFormContext(
         system=earth_moon_system,
@@ -171,11 +171,11 @@ def test_reduce_falls_back_to_fft_when_naff_missing(
 ):
     """``reduce`` 在 NAFF 不可用时降级到 FFT，并把后端记录到结果。"""
     monkeypatch.setattr(
-        "e2m2e.algorithms.normal_form.fft._resolve_naff_binary",
+        "e2m2e.algorithm.normal_form.fft._resolve_naff_binary",
         lambda: None,
     )
     monkeypatch.setattr(
-        "e2m2e.algorithms.normal_form.fft.naff_available",
+        "e2m2e.algorithm.normal_form.fft.naff_available",
         lambda: False,
     )
     with warnings.catch_warnings(record=True) as caught:
@@ -363,13 +363,13 @@ def test_default_constants_match_qiao():
 def test_reduce_works_without_spice_kernels(tiny_corrector, monkeypatch):
     """``spice_optional=True`` 时即使 SPICE 不可用也应跑出合理结果。"""
     # 强行让 _ephemeris.eval_params 抛 RuntimeError 模拟 SPICE 缺失
-    import e2m2e.algorithms.normal_form.dynamical_substitution as ds
+    import e2m2e.algorithm.normal_form.dynamical_substitution as ds
 
     def _broken(*args, **kwargs):
         raise RuntimeError("simulated SPICE missing")
 
     monkeypatch.setattr(
-        "e2m2e.algorithms.normal_form._ephemeris.eval_params",
+        "e2m2e.algorithm.normal_form._ephemeris.eval_params",
         _broken,
         raising=False,
     )
@@ -433,7 +433,7 @@ def test_substitute_orbit_suppresses_center_manifold_frequencies(l1_context, mon
 
     解锁条件：加载 SPICE ``.tls`` + ``.bsp`` 内核后即可启用本测试。
     """
-    import e2m2e.algorithms.normal_form._ephemeris as _eph
+    import e2m2e.algorithm.normal_form._ephemeris as _eph
 
     # 探测 SPICE leapseconds 内核是否就绪：str2et 需要已加载 .tls
     spice_ready = True
@@ -483,7 +483,7 @@ def test_substitute_orbit_suppresses_center_manifold_frequencies(l1_context, mon
 
 def test_dynamical_substitution_importable_via_package_root():
     """切片 #171 验收：能从包根直接 ``import``。"""
-    from e2m2e.algorithms.normal_form import (  # noqa: F401
+    from e2m2e.algorithm.normal_form import (  # noqa: F401
         DynamicalSubstituteCorrector,
         DynamicalSubstituteResult,
     )

@@ -12,9 +12,11 @@ import matplotlib
 matplotlib.use("Agg")  # 非交互后端，CI 环境下使用
 
 
-from e2m2e.algorithms import Continuation, DifferentialCorrection
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
-from e2m2e.visualization import FamilyPlotter, PlotConfig
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.solver.continuation import Continuation
+from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.data.types.orbit import Orbit
+from e2m2e.tools.viz import FamilyPlotter, PlotConfig
 
 
 def generate_dro_family():

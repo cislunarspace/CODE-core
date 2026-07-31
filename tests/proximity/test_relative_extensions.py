@@ -3,11 +3,11 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.cr3bp_system import CR3BP_System
-from e2m2e.core.dynamics import CR3BP_Dynamics
-from e2m2e.core.orbit import Orbit
-from e2m2e.proximity.phasing import phasing_search
-from e2m2e.proximity.relative_dynamics import RelativeDynamics, TargetOrbit
+from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+from e2m2e.algorithm.proximity.phasing import phasing_search
+from e2m2e.algorithm.proximity.relative_dynamics import RelativeDynamics, TargetOrbit
+from e2m2e.data.types.orbit import Orbit
 
 MU_EARTH_MOON = 0.0121505856
 

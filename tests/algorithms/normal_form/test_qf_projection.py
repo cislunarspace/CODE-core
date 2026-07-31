@@ -14,7 +14,7 @@ import pytest
 
 pytest.importorskip("sympy")
 
-from e2m2e.algorithms.normal_form.qf_projection import project_hamiltonian_to_qf
+from e2m2e.algorithm.normal_form.qf_projection import project_hamiltonian_to_qf
 
 
 def _make_qf_result(B_samples: np.ndarray, tlist: np.ndarray) -> MagicMock:

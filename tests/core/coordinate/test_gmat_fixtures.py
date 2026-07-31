@@ -5,11 +5,13 @@
 
 import numpy as np
 import pytest
-from e2m2e.core.gmat_data import CoordinateDataError, gmat_fixture_path
-from e2m2e.core.gmat_eop import ARCSEC_TO_RAD, EopFile, TaiUtcTable
-from e2m2e.core.gmat_itrf import GmatItrfReduction
-from e2m2e.core.gmat_time import TimeSystemConverter
-from e2m2e.core.xys import ErfaXysProvider
+
+from e2m2e.algorithm.coordinate.gmat_itrf import GmatItrfReduction
+from e2m2e.algorithm.coordinate.gmat_time import TimeSystemConverter
+from e2m2e.algorithm.coordinate.xys import ErfaXysProvider
+from e2m2e.data.frames.eop import ARCSEC_TO_RAD, EopFile
+from e2m2e.data.frames.gmat_fixture import CoordinateDataError, gmat_fixture_path
+from e2m2e.data.frames.leap_seconds import TaiUtcTable
 
 
 def test_tai_utc_table_preserves_post_2017_leap_seconds():

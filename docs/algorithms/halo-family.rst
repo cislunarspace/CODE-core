@@ -1,7 +1,7 @@
 Halo 轨道族编排
 ===============
 
-Halo 轨道族编排模块（``e2m2e.algorithms.halo_family``）从 ``continuation.py`` 拆出
+Halo 轨道族编排模块（``e2m2e.algorithm.family.halo_family``）从 ``continuation.py`` 拆出
 Halo 专用逻辑：种子生成、自然参数族延拓、伪弧长延拓。
 
 种子生成
@@ -11,7 +11,7 @@ Halo 专用逻辑：种子生成、自然参数族延拓、伪弧长延拓。
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_family import generate_halo_seed_orbit
+   from e2m2e.algorithm.family.halo_family import generate_halo_seed_orbit
 
    seed = generate_halo_seed_orbit(
        continuation=continuation,
@@ -52,7 +52,7 @@ Halo 专用逻辑：种子生成、自然参数族延拓、伪弧长延拓。
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_family import halo_pseudo_arclength_continuation
+   from e2m2e.algorithm.family.halo_family import halo_pseudo_arclength_continuation
 
    family = halo_pseudo_arclength_continuation(
        continuation=continuation,

@@ -12,9 +12,9 @@ import pytest
 
 pytest.importorskip("sympy")
 
-from e2m2e.algorithms.normal_form import NormalFormContext
-from e2m2e.algorithms.normal_form.hamiltonian import build_cr3bp_hamiltonian
-from e2m2e.core import LibrationPoint
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form import NormalFormContext
+from e2m2e.algorithm.normal_form.hamiltonian import build_cr3bp_hamiltonian
 
 
 @pytest.fixture

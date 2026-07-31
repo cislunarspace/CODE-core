@@ -5,8 +5,10 @@
 展示如何使用 MultipleShooting 和 sample_patch_points 对轨道进行修正。
 """
 
-from e2m2e.algorithms import DifferentialCorrection, MultipleShooting, sample_patch_points
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.algorithm.solver.multiple_shooting import MultipleShooting, sample_patch_points
+from e2m2e.data.types.orbit import Orbit
 
 
 def main():

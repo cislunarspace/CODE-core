@@ -6,7 +6,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.forces.gravity_file import load_gfc_file
+from e2m2e.algorithm.forces.gravity_file import load_gfc_file
 
 
 def _minimal_gfc_content():
@@ -142,7 +142,7 @@ _SECONDS_PER_YEAR = 365.25 * 86400.0
 
 def test_extrapolate_coefficients_linear_drift():
     """dot 历元外推:C_nm(t) = C_nm(t0) + dotC_nm * (t-t0),时间单位转年。"""
-    from e2m2e.core.forces.gravity_file import extrapolate_coefficients
+    from e2m2e.algorithm.forces.gravity_file import extrapolate_coefficients
 
     C = np.array([[1.0, 0.0], [0.0, 0.0], [-4.84e-4, 0.0]])
     S = np.zeros((3, 2))
@@ -159,7 +159,7 @@ def test_extrapolate_coefficients_linear_drift():
 
 def test_extrapolate_coefficients_no_change_at_reference_epoch():
     """t == t0 时系数不变(外推回到参考历元)。"""
-    from e2m2e.core.forces.gravity_file import extrapolate_coefficients
+    from e2m2e.algorithm.forces.gravity_file import extrapolate_coefficients
 
     C = np.array([[1.0, 0.0], [0.0, 0.0], [-4.84e-4, 0.0]])
     S = np.zeros((3, 2))
@@ -179,7 +179,7 @@ def test_extrapolate_c20_dot_sign_and_magnitude_from_j2_dot():
     J2_dot ≈ -1.6e-11/yr(下降)→ C20_dot ≈ +7.2e-12/yr(上升,符号反转)。
     测试验证符号与量级,不混用 J2_dot 与 C20_dot。
     """
-    from e2m2e.core.forces.gravity_file import extrapolate_coefficients
+    from e2m2e.algorithm.forces.gravity_file import extrapolate_coefficients
 
     sqrt5 = np.sqrt(5.0)
     J2 = 1.0826e-3

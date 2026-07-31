@@ -25,8 +25,8 @@ import pytest
 from calcephpy import Constants, NaifId
 from kernel_helpers import SPICE_KERNEL_DIR
 
-from e2m2e.core import GCRSEBCRSSystem
-from e2m2e.core.coordinate.gmat_data import CoordinateDataError
+from e2m2e.algorithm.coordinate import GCRSEBCRSSystem
+from e2m2e.data.frames.gmat_fixture import CoordinateDataError
 
 pytestmark = pytest.mark.spice
 

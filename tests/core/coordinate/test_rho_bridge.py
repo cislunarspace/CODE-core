@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.algorithms.normal_form.context import NormalFormContext
-from e2m2e.core import LibrationPoint
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form.context import NormalFormContext
 
 pytestmark = pytest.mark.spice
 
@@ -43,7 +43,7 @@ def context_l2(earth_moon_system):
 @pytest.fixture
 def system(spice_manager):
     """地球-月球 EphemerisSystem。"""
-    from e2m2e.core.ephemeris_system import EphemerisSystem
+    from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 
     return EphemerisSystem(
         bodies=["MOON", "SUN"],
@@ -62,7 +62,7 @@ class TestEMRRotation:
 
     def test_rotation_is_orthogonal(self, system):
         """C(t) 应正交：det=1, C@C.T=I。"""
-        from e2m2e.core.rho_bridge import compute_emr_rotation
+        from e2m2e.algorithm.coordinate.rho_bridge import compute_emr_rotation
 
         et = system.spice.utc_to_et("2025-06-21T11:00:06")
         C, _ = compute_emr_rotation(et, system)
@@ -71,7 +71,7 @@ class TestEMRRotation:
 
     def test_rotation_varies_with_time(self, system):
         """不同时间的旋转矩阵应不同。"""
-        from e2m2e.core.rho_bridge import compute_emr_rotation
+        from e2m2e.algorithm.coordinate.rho_bridge import compute_emr_rotation
 
         et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
         et1 = et0 + 86400.0  # 一天后
@@ -81,7 +81,7 @@ class TestEMRRotation:
 
     def test_cdot_finite(self, system):
         """Cdot 应为有限值。"""
-        from e2m2e.core.rho_bridge import compute_emr_rotation
+        from e2m2e.algorithm.coordinate.rho_bridge import compute_emr_rotation
 
         et = system.spice.utc_to_et("2025-06-21T11:00:06")
         _, Cdot = compute_emr_rotation(et, system)
@@ -98,7 +98,7 @@ class TestRoundTrip:
 
     def test_round_trip_zero_state(self, system, context):
         """零状态往返应精确恢复。"""
-        from e2m2e.core.rho_bridge import eci_to_rho, rho_to_eci
+        from e2m2e.algorithm.coordinate.rho_bridge import eci_to_rho, rho_to_eci
 
         rho = np.zeros(3)
         rhodot = np.zeros(3)
@@ -112,7 +112,7 @@ class TestRoundTrip:
 
     def test_round_trip_nonzero_state(self, system, context):
         """非零状态往返误差 < 1e-9。"""
-        from e2m2e.core.rho_bridge import eci_to_rho, rho_to_eci
+        from e2m2e.algorithm.coordinate.rho_bridge import eci_to_rho, rho_to_eci
 
         rho = np.array([0.01, -0.005, 0.002])
         rhodot = np.array([0.001, 0.002, -0.0005])
@@ -126,7 +126,7 @@ class TestRoundTrip:
 
     def test_round_trip_l2(self, system, context_l2):
         """L2 平动点往返误差 < 1e-9。"""
-        from e2m2e.core.rho_bridge import eci_to_rho, rho_to_eci
+        from e2m2e.algorithm.coordinate.rho_bridge import eci_to_rho, rho_to_eci
 
         rho = np.array([0.01, 0.005, -0.001])
         rhodot = np.array([-0.001, 0.003, 0.0002])
@@ -140,7 +140,7 @@ class TestRoundTrip:
 
     def test_round_trip_different_times(self, system, context):
         """多个时间点往返一致性。"""
-        from e2m2e.core.rho_bridge import eci_to_rho, rho_to_eci
+        from e2m2e.algorithm.coordinate.rho_bridge import eci_to_rho, rho_to_eci
 
         rho = np.array([0.005, -0.003, 0.001])
         rhodot = np.array([0.0005, 0.001, -0.0003])
@@ -162,7 +162,7 @@ class TestPhysicalPlausibility:
 
     def test_position_distance_range(self, system, context):
         """ECI 位置距地心 ~300000-400000 km。"""
-        from e2m2e.core.rho_bridge import rho_to_eci
+        from e2m2e.algorithm.coordinate.rho_bridge import rho_to_eci
 
         rho = np.array([0.01, 0.0, 0.0])
         rhodot = np.zeros(3)
@@ -172,7 +172,7 @@ class TestPhysicalPlausibility:
 
     def test_velocity_magnitude(self, system, context):
         """ECI 速度应 ~1 km/s 量级。"""
-        from e2m2e.core.rho_bridge import rho_to_eci
+        from e2m2e.algorithm.coordinate.rho_bridge import rho_to_eci
 
         rho = np.array([0.01, 0.0, 0.0])
         rhodot = np.array([0.001, 0.001, 0.0])
@@ -187,7 +187,11 @@ class TestPhysicalPlausibility:
         防回归：v_eci 公式末项曾误写 C@v_LP（v_LP 已是 J2000，不该再旋转），
         导致 72h 跨验证发散 12 万 km。
         """
-        from e2m2e.core.rho_bridge import _compute_lp_state_j2000, _jd_to_et, rho_to_eci
+        from e2m2e.algorithm.coordinate.rho_bridge import (
+            _compute_lp_state_j2000,
+            _jd_to_et,
+            rho_to_eci,
+        )
 
         t_nd = 0.0
         jd = context.jd0 + t_nd * context.TU / 86400.0
@@ -199,7 +203,7 @@ class TestPhysicalPlausibility:
 
     def test_zero_rho_near_moon_distance(self, system, context):
         """rho=0 时，ECI 位置应接近地月距离（L1 距地 ~83% 地月距离）。"""
-        from e2m2e.core.rho_bridge import rho_to_eci
+        from e2m2e.algorithm.coordinate.rho_bridge import rho_to_eci
 
         r_eci, _ = rho_to_eci(np.zeros(3), np.zeros(3), 0.0, context, system)
         dist = np.linalg.norm(r_eci)
@@ -208,7 +212,7 @@ class TestPhysicalPlausibility:
 
     def test_l2_farther_than_l1(self, system, context, context_l2):
         """L2 距地应远于 L1。"""
-        from e2m2e.core.rho_bridge import rho_to_eci
+        from e2m2e.algorithm.coordinate.rho_bridge import rho_to_eci
 
         r_l1, _ = rho_to_eci(np.zeros(3), np.zeros(3), 0.0, context, system)
         r_l2, _ = rho_to_eci(np.zeros(3), np.zeros(3), 0.0, context_l2, system)
@@ -225,7 +229,7 @@ class TestTimeConversion:
 
     def test_tu_to_et_at_epoch(self, system, context):
         """t_nd=0（历元）时，ET 应接近 J2000 起算的值。"""
-        from e2m2e.core.rho_bridge import tu_to_et
+        from e2m2e.algorithm.coordinate.rho_bridge import tu_to_et
 
         et = tu_to_et(0.0, context, system)
         # epoch=J2000.0 (2451545.0 JD)，对应 ET 应在 0 附近（64s TDB-UTC 偏差内）
@@ -233,7 +237,7 @@ class TestTimeConversion:
 
     def test_tu_to_et_monotonic(self, system, context):
         """ET 应随 t_nd 单调递增（TU>0）。"""
-        from e2m2e.core.rho_bridge import tu_to_et
+        from e2m2e.algorithm.coordinate.rho_bridge import tu_to_et
 
         et0 = tu_to_et(0.0, context, system)
         et1 = tu_to_et(1.0, context, system)
@@ -242,7 +246,7 @@ class TestTimeConversion:
 
     def test_tu_to_et_matches_jd_path(self, system, context):
         """tu_to_et 与手动 jd0 + t_nd*TU/86400 → _jd_to_et 路径一致。"""
-        from e2m2e.core.rho_bridge import _jd_to_et, tu_to_et
+        from e2m2e.algorithm.coordinate.rho_bridge import _jd_to_et, tu_to_et
 
         t_nd = 1.5
         jd = context.jd0 + t_nd * context.TU / 86400.0
@@ -252,7 +256,7 @@ class TestTimeConversion:
 
     def test_tu_to_et_step_matches_tu_seconds(self, system, context):
         """Δt_nd=1 的 ET 差应接近 context.TU（TU 秒 = 一归一化时间单位）。"""
-        from e2m2e.core.rho_bridge import tu_to_et
+        from e2m2e.algorithm.coordinate.rho_bridge import tu_to_et
 
         dt_et = tu_to_et(1.0, context, system) - tu_to_et(0.0, context, system)
         assert_allclose(dt_et, context.TU, rtol=1e-9)

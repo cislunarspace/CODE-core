@@ -6,9 +6,9 @@
 
 import numpy as np
 
-from e2m2e.core.forces import PointMassGravity
-from e2m2e.transfer import EngineConfig, LowThrustShooting
-from e2m2e.transfer.qlaw import qlaw_guess, rv_to_keplerian
+from e2m2e.algorithm.forces import PointMassGravity
+from e2m2e.algorithm.transfer import EngineConfig, LowThrustShooting
+from e2m2e.algorithm.transfer.qlaw import qlaw_guess, rv_to_keplerian
 
 MU = 398600.435507  # km³/s²，地球
 

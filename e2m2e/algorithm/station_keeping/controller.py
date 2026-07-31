@@ -20,7 +20,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from e2m2e.io.ephemeris import read_ephemeris
-from e2m2e.io.force_mapping import dfh_perturbation_to_force_config
 from e2m2e.io.inputs_dac import DEFAULT_DYB, DEFAULT_PERTURBATION
 
 from ...data.kernels.manager import SPICEManager
@@ -30,6 +29,7 @@ from ..coordinate.standard_axes import ICRSAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
 from ..design.design_orbit import default_kernel_dir, load_design_kernels
 from ..dynamics import EphemerisSystem
+from ..forces.force_mapping import dfh_perturbation_to_force_config
 from .monte_carlo import MonteCarloResult, run_monte_carlo
 
 __all__ = ["ControlOrbitResult", "control_orbit"]

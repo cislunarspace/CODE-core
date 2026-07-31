@@ -51,9 +51,9 @@ e2m2e 实现了基于 Cui et al. (2025) 的"搜索-优化"两步法，用于 DRO
 
 .. code-block:: python
 
-   from e2m2e.core.system import CR3BP_System
-   from e2m2e.core.dynamics import CR3BP_Dynamics
-   from e2m2e.transfer import (
+   from e2m2e.algorithm.dynamics.system import CR3BP_System
+   from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+   from e2m2e.algorithm.transfer import (
        Transfer,
        TransferSearch,
        TransferConfig,
@@ -141,7 +141,7 @@ e2m2e 实现了基于 Cui et al. (2025) 的"搜索-优化"两步法，用于 DRO
        print(f"优化后转移时间: {nlp_result.transfer_time:.2f} TU")
 
    # 2.3 成本分析
-   from e2m2e.transfer.cost import compute_transfer_cost
+   from e2m2e.algorithm.transfer.cost import compute_transfer_cost
 
    cost = compute_transfer_cost(
        departure_state=nlp_result.departure_state,

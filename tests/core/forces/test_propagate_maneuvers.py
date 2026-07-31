@@ -6,8 +6,8 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.forces import ForceModel
-from e2m2e.core.forces.thrust import BurnApplication, ImpulsiveBurn
+from e2m2e.algorithm.forces import ForceModel
+from e2m2e.algorithm.forces.thrust import BurnApplication, ImpulsiveBurn
 
 
 class _FakeSystem:

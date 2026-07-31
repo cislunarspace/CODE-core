@@ -13,7 +13,7 @@ pytest.importorskip("sympy")
 
 import sympy as sp
 
-from e2m2e.algorithms.normal_form.polynomial import (
+from e2m2e.algorithm.normal_form.polynomial import (
     poly_subs,
 )
 

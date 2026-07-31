@@ -6,15 +6,15 @@
 import numpy as np
 import pytest
 
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System
-from e2m2e.core.orbit import Orbit
-from e2m2e.mbse.data.enums import TransferType
-from e2m2e.transfer import TransferConfig, TransferOptimizationResult
-from e2m2e.transfer.terminal import OrbitTerminal, StateTerminal
-from e2m2e.transfer.transfer_optimization import (
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.transfer import TransferConfig, TransferOptimizationResult
+from e2m2e.algorithm.transfer.terminal import OrbitTerminal, StateTerminal
+from e2m2e.algorithm.transfer.transfer_optimization import (
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
 )
+from e2m2e.data.types.orbit import Orbit
+from e2m2e.mbse.data.enums import TransferType
 
 # =============================================================================
 # Fixtures
@@ -143,7 +143,7 @@ def test_transfer_type_enum_values():
 
 def test_module_exports():
     """Top-level transfer 子包应重新导出 NLP 类。"""
-    from e2m2e.transfer import (
+    from e2m2e.algorithm.transfer import (
         DROTRONLPOptimizer,
         NLPOptimizationVariables,
         optimize_transfer,

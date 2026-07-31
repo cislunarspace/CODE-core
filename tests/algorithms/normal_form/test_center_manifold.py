@@ -27,17 +27,17 @@ import pytest
 # sympy 是 normal-form optional dep；未安装时整个文件 skip（不 error）。
 pytest.importorskip("sympy")
 
-from e2m2e.algorithms.normal_form.center_manifold import (
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form.center_manifold import (
     DEFAULT_MAX_ORDER,
     CenterManifoldReducer,
     CenterManifoldResult,
     list_deriv,
 )
-from e2m2e.algorithms.normal_form.quasi_floquet import (
+from e2m2e.algorithm.normal_form.quasi_floquet import (
     QuasiFloquetResult,
     real_normal_form_matrix,
 )
-from e2m2e.core import LibrationPoint
 
 # ---------------------------------------------------------------------------
 # 公共 fixture（沿用 test_quasi_floquet 的范式）
@@ -47,8 +47,8 @@ from e2m2e.core import LibrationPoint
 @pytest.fixture
 def l1_context(earth_moon_system):
     """L1 共线点上下文。"""
-    from e2m2e.algorithms.normal_form import NormalFormContext
-    from e2m2e.algorithms.normal_form.constants import JD0_J2000
+    from e2m2e.algorithm.normal_form import NormalFormContext
+    from e2m2e.algorithm.normal_form.constants import JD0_J2000
 
     return NormalFormContext(
         system=earth_moon_system,
@@ -227,7 +227,7 @@ def test_center_step_leaves_only_action_terms(l1_context):
 
 def _assert_action_form(hamiltonian_terms):
     """断言 Hamiltonian 只依赖作用量：虚变换回复坐标后三对全平衡。"""
-    from e2m2e.algorithms.normal_form.center_manifold import _D, _linear_basis_change
+    from e2m2e.algorithm.normal_form.center_manifold import _D, _linear_basis_change
 
     H_by_order: dict[int, dict[tuple[int, ...], np.ndarray]] = {}
     for k, v in hamiltonian_terms.items():
@@ -395,7 +395,7 @@ def test_solve_wfunc_fft_recovers_exponential_forcing():
     ``ẏ = -α·y + e^{αt}`` 的一个特解是 ``y = e^{αt}/(2α)``；此处只验证
     求解器返回有限复值数组、且与解析特解量级一致。
     """
-    from e2m2e.algorithms.normal_form.center_manifold import _solve_wfunc_fft
+    from e2m2e.algorithm.normal_form.center_manifold import _solve_wfunc_fft
 
     tlist = np.linspace(0, 2.0, 128)
     alpha = 1.7
@@ -413,7 +413,7 @@ def test_solve_wfunc_fft_recovers_exponential_forcing():
 
 def test_virtual_real_transform_roundtrip():
     """虚变换 + 实变换 roundtrip：实多项式还原（含双曲/中心混合项）。"""
-    from e2m2e.algorithms.normal_form.center_manifold import (
+    from e2m2e.algorithm.normal_form.center_manifold import (
         _D,
         _D_INV,
         _linear_basis_change,
@@ -441,7 +441,7 @@ def test_virtual_transform_makes_complex_diagonal(l1_context):
     ``i·ω_p·y2·y5``、``i·ω_v·y3·y6``；双曲项 ``λ·q1·p1`` 不变。这是
     Gómez vol III §2.7.1 "put in complex form" 一步（qiao Code10 虚变换）。
     """
-    from e2m2e.algorithms.normal_form.center_manifold import _D, _linear_basis_change
+    from e2m2e.algorithm.normal_form.center_manifold import _D, _linear_basis_change
 
     lam = float(l1_context.characteristic_exponent)
     nu1, nu2 = l1_context.central_frequencies
@@ -476,11 +476,11 @@ def test_homological_equation_residual(l1_context):
     ``H_elim``。此前在实正规形下用复值 ``k`` 求解，残差高达 O(h)（残留
     耦合 max=48 的根因）。
     """
-    from e2m2e.algorithms.normal_form.center_manifold import (
+    from e2m2e.algorithm.normal_form.center_manifold import (
         _characteristic_freq,
         _solve_wfunc_fft,
     )
-    from e2m2e.algorithms.normal_form.polynomial import poly_poisson
+    from e2m2e.algorithm.normal_form.polynomial import poly_poisson
 
     lam = float(l1_context.characteristic_exponent)
     nu1, nu2 = l1_context.central_frequencies
@@ -532,7 +532,7 @@ def test_list_deriv_handles_complex():
 
 def test_keep_criteria_predicates():
     """判别条件忠实迁移 qiao Code10/Code11。"""
-    from e2m2e.algorithms.normal_form.center_manifold import (
+    from e2m2e.algorithm.normal_form.center_manifold import (
         _is_center_term,
         _is_invariant_term,
     )

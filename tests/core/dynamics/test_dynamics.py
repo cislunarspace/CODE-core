@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 
 
 # =============================================================================

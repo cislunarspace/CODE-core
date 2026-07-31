@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from e2m2e.algorithms.station_keeping.error_models import (
+from e2m2e.algorithm.station_keeping.error_models import (
     BoxMullerSampler,
     NavigationErrorModel,
     SrpErrorModel,

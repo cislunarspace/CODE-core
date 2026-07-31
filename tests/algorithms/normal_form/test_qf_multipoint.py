@@ -10,15 +10,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.normal_form import NormalFormContext
-from e2m2e.algorithms.normal_form.quasi_floquet import (
+from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.normal_form import NormalFormContext
+from e2m2e.algorithm.normal_form.quasi_floquet import (
     J6,
     _cr3bp_hessian_symmetric,
     _qf_rhs_factory,
     _solve_qf_multipoint,
     real_normal_form_matrix,
 )
-from e2m2e.core import CR3BP_System, LibrationPoint
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ class TestSolveQfMultipoint:
         M_at, D, lam = l2_M_D
         tlist = np.linspace(0, 1.6, 40)
         # 单次积分（B(0)=I）
-        from e2m2e.algorithms.normal_form.quasi_floquet import _solve_qf_matrix
+        from e2m2e.algorithm.normal_form.quasi_floquet import _solve_qf_matrix
         B_single = _solve_qf_matrix(M_at, D, tlist, segment=None)
         # 多点打靶（B(T)=I 末值）——不同边界条件，但短窗口两者量级应可比
         B_mp = _solve_qf_multipoint(M_at, D, tlist, node_step=0.4)

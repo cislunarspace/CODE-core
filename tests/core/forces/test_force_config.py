@@ -6,8 +6,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.atmosphere import ExponentialAtmosphere
-from e2m2e.core.forces import (
+from e2m2e.algorithm.forces import (
     ConicalShadowModel,
     DragModel,
     FiniteBurn,
@@ -15,7 +14,8 @@ from e2m2e.core.forces import (
     GravityField,
     SolarRadiationPressure,
 )
-from e2m2e.core.forces.force_config import (
+from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
+from e2m2e.algorithm.forces.force_config import (
     NotSerializableError,
     dump_force_config,
     load_force_config,

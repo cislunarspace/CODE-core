@@ -14,15 +14,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.normal_form import NormalFormContext
-from e2m2e.algorithms.normal_form.quasi_floquet import (
+from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.normal_form import NormalFormContext
+from e2m2e.algorithm.normal_form.quasi_floquet import (
     J6,
     _cr3bp_hessian_symmetric,
     _qf_rhs_factory,
     _solve_qf_matrix,
     real_normal_form_matrix,
 )
-from e2m2e.core import CR3BP_System, LibrationPoint
 
 
 @pytest.fixture

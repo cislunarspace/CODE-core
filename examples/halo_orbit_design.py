@@ -8,9 +8,10 @@ Halo 轨道设计示例
 
 import numpy as np
 
-from e2m2e.algorithms import DifferentialCorrection
-from e2m2e.algorithms.halo_initial_guess import compute_halo_initial_guess
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
+from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.data.types.orbit import Orbit
 
 
 def design_single_halo():

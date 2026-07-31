@@ -7,8 +7,8 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.station_keeping.special_point import SpecialPointLaw
-from e2m2e.algorithms.station_keeping.target_point import (
+from e2m2e.algorithm.station_keeping.special_point import SpecialPointLaw
+from e2m2e.algorithm.station_keeping.target_point import (
     LooseTargetPointLaw,
     StrictTargetPointLaw,
 )

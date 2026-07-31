@@ -8,9 +8,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.core.constants import AU as _AU_KM
-from e2m2e.core.forces import PhysicalModel
-from e2m2e.core.forces.srp import SolarRadiationPressure
+from e2m2e.algorithm.forces import PhysicalModel
+from e2m2e.algorithm.forces.srp import SolarRadiationPressure
+from e2m2e.data.templates.systems import AU as _AU_KM
 
 # 太阳光压常数（N/m² @ 1 AU）。
 _P_SRP_1AU = 4.56e-6

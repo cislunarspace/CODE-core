@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from e2m2e.transfer.porkchop import PorkchopData, porkchop
-from e2m2e.transfer.terminal import TerminalCondition
+from e2m2e.algorithm.transfer.porkchop import PorkchopData, porkchop
+from e2m2e.algorithm.transfer.terminal import TerminalCondition
 
 MU_EARTH = 398600.4418  # km³/s²
 

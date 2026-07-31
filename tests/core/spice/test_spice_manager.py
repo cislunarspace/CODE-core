@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.core.spice import SPICEManager
+from e2m2e.data.kernels.manager import SPICEManager
 
 pytestmark = pytest.mark.spice
 

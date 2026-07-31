@@ -10,14 +10,11 @@ import copy
 import numpy as np
 import pytest
 
-from e2m2e.algorithms import (
-    DifferentialCorrection,
-    InvariantManifold,
-    ManifoldKind,
-    PoincareSection,
-)
-from e2m2e.algorithms.halo_initial_guess import _compute_gamma
-from e2m2e.core import CR3BP_Dynamics, Orbit
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics
+from e2m2e.algorithm.family.halo_initial_guess import _compute_gamma
+from e2m2e.algorithm.manifold import InvariantManifold, ManifoldKind, PoincareSection
+from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.data.types.orbit import Orbit
 
 # 地月系统质量参数（与 tests/algorithms/conftest.py 一致）
 MU = 1.21506683e-2
@@ -32,7 +29,7 @@ def _make_l1_lyapunov_orbit() -> Orbit:
 
     初猜来自 L1 处线性化中心模态特征向量，再由微分修正闭合为精确周期轨道。
     """
-    from e2m2e.core.cr3bp_system import CR3BP_System
+    from e2m2e.algorithm.dynamics import CR3BP_System
 
     system = CR3BP_System(mu=MU, primary="earth", secondary="moon")
     dynamics = CR3BP_Dynamics(system)

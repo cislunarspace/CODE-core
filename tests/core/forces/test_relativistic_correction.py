@@ -7,13 +7,13 @@ import types
 
 import numpy as np
 import pytest
-from e2m2e.core.coordinate_system import CoordinateSystem
-from e2m2e.core.standard_axes import ICRSAxes
-from e2m2e.core.standard_origins import CelestialBodyOrigin
 
-from e2m2e.core.ephemeris_system import EphemerisSystem
-from e2m2e.core.forces import ForceModel, GravityField, RelativisticCorrection
-from e2m2e.core.spice import SPICEManager
+from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
+from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+from e2m2e.algorithm.forces import ForceModel, GravityField, RelativisticCorrection
+from e2m2e.data.kernels.manager import SPICEManager
 
 
 def _make_system(mu: float = 398600.435507):
@@ -150,7 +150,7 @@ def test_schwarzschild_switch_controls_acceleration():
 
 def test_config_round_trip():
     """RelativisticCorrection 支持 ForceModel 配置往返。"""
-    from e2m2e.core.forces.force_config import build_force, serialize_force
+    from e2m2e.algorithm.forces.force_config import build_force, serialize_force
 
     original = RelativisticCorrection(
         central_body="Earth",

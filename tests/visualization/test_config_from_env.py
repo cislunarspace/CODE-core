@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from e2m2e.visualization.config import BODY_ICON_SCALE_ENV, PlotConfig
+from e2m2e.tools.viz.config import BODY_ICON_SCALE_ENV, PlotConfig
 
 
 class TestFromEnvBodyIconScale:

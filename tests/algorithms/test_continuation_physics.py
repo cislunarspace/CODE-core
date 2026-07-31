@@ -6,9 +6,9 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.continuation import compute_F_and_dF_symmetric_xz_plane
-from e2m2e.core.cr3bp_system import CR3BP_System
-from e2m2e.core.dynamics import CR3BP_Dynamics
+from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+from e2m2e.algorithm.solver.continuation import compute_F_and_dF_symmetric_xz_plane
 
 
 @pytest.fixture

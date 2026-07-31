@@ -179,8 +179,8 @@ def _make_shooter_two_body():
     """构造纯二体低推力求解器（无需 SPICE，PointMassGravity 不查 system）。"""
     from types import SimpleNamespace
 
-    from e2m2e.core.forces import PointMassGravity
-    from e2m2e.transfer import EngineConfig, LowThrustShooting
+    from e2m2e.algorithm.forces import PointMassGravity
+    from e2m2e.algorithm.transfer import EngineConfig, LowThrustShooting
 
     mu = 398600.435507
     system = SimpleNamespace(origin="EARTH")

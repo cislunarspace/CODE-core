@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.transfer.nsga2 import NSGA2Result, nsga2
+from e2m2e.algorithm.transfer.nsga2 import NSGA2Result, nsga2
 
 # ----------------------------------------------------------------------
 # 模块级目标函数（ProcessPoolExecutor 可 pickle）

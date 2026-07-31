@@ -4,7 +4,7 @@ import time
 
 import numpy as np
 
-from e2m2e.dfh import design_orbit
+from e2m2e.algorithm.design import design_orbit
 from e2m2e.io import read_ephemeris
 
 t0 = time.time()

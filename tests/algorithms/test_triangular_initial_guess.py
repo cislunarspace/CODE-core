@@ -3,11 +3,11 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.triangular_initial_guess import (
+from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.family.triangular_initial_guess import (
     _triangular_modes,
     compute_triangular_initial_guess,
 )
-from e2m2e.core import CR3BP_System, LibrationPoint
 
 
 def _earth_moon_system():

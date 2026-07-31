@@ -7,7 +7,10 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithms import TwoLevelMultipleShooting, TwoLevelMultipleShootingResult
+from e2m2e.algorithm.solver.two_level_multiple_shooting import (
+    TwoLevelMultipleShooting,
+    TwoLevelMultipleShootingResult,
+)
 from e2m2e.mbse.data.enums import BoundaryMode, TwoLevelMultipleShootingStatus
 
 

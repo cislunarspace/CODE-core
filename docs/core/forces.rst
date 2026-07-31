@@ -133,7 +133,7 @@ Rust ``propagate_compiled_lowthrust``（受控 EOM 复用
 .. code-block:: python
 
    import numpy as np
-   from e2m2e.core.forces import ForceModel, GravityField, VariableMassFiniteBurn
+   from e2m2e.algorithm.forces import ForceModel, GravityField, VariableMassFiniteBurn
 
    burn = VariableMassFiniteBurn(
        thrust=0.1,            # N
@@ -250,8 +250,8 @@ name-based 注册机制
 
 .. code-block:: python
 
-   from e2m2e.core.forces import ForceModel, GravityField, DragModel
-   from e2m2e.core.atmosphere import ExponentialAtmosphere
+   from e2m2e.algorithm.forces import ForceModel, GravityField, DragModel
+   from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 
    fm = ForceModel(system)
 
@@ -309,7 +309,7 @@ name-based 注册机制
 
 .. code-block:: python
 
-   from e2m2e.core.forces import ImpulsiveBurn
+   from e2m2e.algorithm.forces import ImpulsiveBurn
 
    burns = [ImpulsiveBurn(epoch=et0 + 1800.0, delta_v=np.array([0.0, 0.01, 0.0]))]
    result = fm.propagate_maneuvers(state0, (et0, et0 + 7200.0), burns)
@@ -368,14 +368,14 @@ origin→SSB 查询（该量在 ``r_body_icrf`` 短路分支未被使用）。
 
    import numpy as np
 
-   from e2m2e.core import (
+   from e2m2e.algorithm.dynamics import (
        CoordinateSystem,
        EphemerisSystem,
        ICRSAxes,
        SPICEManager,
    )
-   from e2m2e.core.standard_origins import CelestialBodyOrigin
-   from e2m2e.core.forces import ForceModel
+   from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+   from e2m2e.algorithm.forces import ForceModel
 
    # 1. 准备星历系统（ICRF + 地球中心）
    spice = SPICEManager()
@@ -441,7 +441,7 @@ origin→SSB 查询（该量在 ``r_body_icrf`` 短路分支未被使用）。
    assert fm2.to_config() == config_roundtrip
 
    # 7. 存盘 / 读回
-   from e2m2e.core.forces import dump_force_config, load_force_config
+   from e2m2e.algorithm.forces import dump_force_config, load_force_config
 
    dump_force_config(fm, "leo_forces.json")
    fm_loaded = load_force_config("leo_forces.json", system)
@@ -451,7 +451,7 @@ JSON 文件 IO
 
 .. code-block:: python
 
-   from e2m2e.core.forces import dump_force_config, load_force_config
+   from e2m2e.algorithm.forces import dump_force_config, load_force_config
 
    # 写入 JSON
    dump_force_config(fm, "forces.json")
@@ -487,7 +487,7 @@ JSON 文件 IO
 
 .. code-block:: python
 
-   from e2m2e.core.forces.force_config import build_force
+   from e2m2e.algorithm.forces.force_config import build_force
 
    build_force("UnknownType", {})
    # ValueError: unknown force type 'UnknownType'; known types: ['DragModel', 'FiniteBurn', 'GravityField', 'IndirectTerm', 'PointMassGravity', 'RelativisticCorrection', 'SolarRadiationPressure', 'ThirdBodyGravity']
@@ -496,49 +496,49 @@ JSON 文件 IO
 
 ``FiniteBurn`` 若使用用户手写的 ``lambda`` 作为 ``thrust_profile``，仍可正常传播，但 ``to_config()`` 会抛出 ``NotSerializableError``。解决方式：改用 ``force_config`` 提供的 DSL（``{"kind": "constant"}`` 或 ``{"kind": "pulse"}``）构造推力剖面。
 
-.. automodule:: e2m2e.core.forces.force_model
+.. automodule:: e2m2e.algorithm.forces.force_model
    :members:
    :undoc-members:
    :show-inheritance:
    :no-index:
 
-.. automodule:: e2m2e.core.forces.force_config
+.. automodule:: e2m2e.algorithm.forces.force_config
    :members:
    :undoc-members:
    :show-inheritance:
    :no-index:
 
-.. automodule:: e2m2e.core.forces.physical_model
+.. automodule:: e2m2e.algorithm.forces.physical_model
    :members:
    :undoc-members:
    :show-inheritance:
    :no-index:
 
-.. automodule:: e2m2e.core.forces.gravity_field
+.. automodule:: e2m2e.algorithm.forces.gravity_field
    :members:
    :undoc-members:
    :show-inheritance:
    :no-index:
 
-.. automodule:: e2m2e.core.forces.drag
+.. automodule:: e2m2e.algorithm.forces.drag
    :members:
    :undoc-members:
    :show-inheritance:
    :no-index:
 
-.. automodule:: e2m2e.core.forces.thrust
+.. automodule:: e2m2e.algorithm.forces.thrust
    :members:
    :undoc-members:
    :show-inheritance:
    :no-index:
 
-.. automodule:: e2m2e.core.forces.indirect_term
+.. automodule:: e2m2e.algorithm.forces.indirect_term
    :members:
    :undoc-members:
    :show-inheritance:
    :no-index:
 
-.. automodule:: e2m2e.core.forces.relativistic_correction
+.. automodule:: e2m2e.algorithm.forces.relativistic_correction
    :members:
    :undoc-members:
    :show-inheritance:
@@ -552,7 +552,7 @@ e2m2e 提供基于 cannonball 模型的太阳辐射压（SRP）力模型，以�
 太阳辐射压模型
 --------------
 
-:class:`~e2m2e.core.forces.srp.SolarRadiationPressure` 实现 Montenbruck & Gill 的 cannonball SRP 模型：
+:class:`~e2m2e.algorithm.forces.srp.SolarRadiationPressure` 实现 Montenbruck & Gill 的 cannonball SRP 模型：
 
 .. math::
 
@@ -582,7 +582,7 @@ e2m2e 提供基于 cannonball 模型的太阳辐射压（SRP）力模型，以�
 阴影模型
 --------
 
-:class:`~e2m2e.core.forces.shadow.ConicalShadowModel` 定义 ``flux_factor(t, state, system) -> float`` 接口，是当前唯一的阴影模型实现。
+:class:`~e2m2e.algorithm.forces.shadow.ConicalShadowModel` 定义 ``flux_factor(t, state, system) -> float`` 接口，是当前唯一的阴影模型实现。
 
 圆锥阴影模型
 ^^^^^^^^^^^^
@@ -630,7 +630,7 @@ e2m2e 提供基于 cannonball 模型的太阳辐射压（SRP）力模型，以�
 配置与序列化
 ------------
 
-SRP 与阴影模型支持通过 :mod:`~e2m2e.core.forces.force_config` 进行配置驱动的序列化。
+SRP 与阴影模型支持通过 :mod:`~e2m2e.algorithm.forces.force_config` 进行配置驱动的序列化。
 
 **配置字典格式：**
 
@@ -661,14 +661,14 @@ SRP 工作流示例
 
    import numpy as np
 
-   from e2m2e.core import (
+   from e2m2e.algorithm.dynamics import (
        CelestialBodyOrigin,
        CoordinateSystem,
        EphemerisSystem,
        ICRSAxes,
        SPICEManager,
    )
-   from e2m2e.core.forces import (
+   from e2m2e.algorithm.forces import (
        SolarRadiationPressure,
        ConicalShadowModel,
        ForceModel,
@@ -719,11 +719,11 @@ SRP 工作流示例
    print(f"末状态: {result['states'][-1]}")
 
    # 9. 序列化配置到 JSON
-   from e2m2e.core.forces import dump_force_config
+   from e2m2e.algorithm.forces import dump_force_config
    dump_force_config(fm, "srp_config.json")
 
    # 10. 从 JSON 恢复
-   from e2m2e.core.forces import load_force_config
+   from e2m2e.algorithm.forces import load_force_config
    fm2 = load_force_config("srp_config.json", system)
 
    # 验证 round-trip
@@ -749,8 +749,8 @@ SRP 和阴影模型均提供纯函数接口，可在无 SPICE 环境下直接测
 .. code-block:: python
 
    import numpy as np
-   from e2m2e.core.forces.srp import SolarRadiationPressure
-   from e2m2e.core.forces.shadow import ConicalShadowModel
+   from e2m2e.algorithm.forces.srp import SolarRadiationPressure
+   from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 
    # SRP 纯函数测试
    srp = SolarRadiationPressure(area=2.0, mass=1000.0, cr=1.5)

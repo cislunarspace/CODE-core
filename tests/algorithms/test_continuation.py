@@ -6,8 +6,8 @@
 import contextlib
 import logging
 
-from e2m2e.algorithms import Continuation
-from e2m2e.core import OrbitFamily
+from e2m2e.algorithm.solver.continuation import Continuation
+from e2m2e.data.types.orbit import OrbitFamily
 
 # 公共 fixtures 从 tests/algorithms/conftest.py 导入：
 #   dro_dynamics, dro_corrector, dro_seed_orbit, corrected_dro, dro_continuation

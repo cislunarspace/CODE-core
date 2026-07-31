@@ -6,7 +6,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.forces import ForceModel, PhysicalModel
+from e2m2e.algorithm.forces import ForceModel, PhysicalModel
 
 
 class ConstantForce(PhysicalModel):

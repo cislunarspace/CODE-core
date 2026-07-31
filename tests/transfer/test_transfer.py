@@ -8,9 +8,9 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System
-from e2m2e.core.orbit import Orbit
-from e2m2e.transfer import Transfer, TransferConfig, TransferOptimizationResult
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.transfer import Transfer, TransferConfig, TransferOptimizationResult
+from e2m2e.data.types.orbit import Orbit
 
 
 def test_transfer_has_no_convert_nlp_result_method(dynamics):

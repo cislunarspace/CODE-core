@@ -5,7 +5,7 @@
 
 import numpy as np
 
-from e2m2e.core import (
+from e2m2e.algorithm.coordinate import (
     Axes,
     CoordinateSystem,
     GMATITRFAxes,

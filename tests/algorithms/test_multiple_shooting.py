@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.algorithms import MultipleShooting
+from e2m2e.algorithm.solver.multiple_shooting import MultipleShooting
 
 pytestmark = pytest.mark.spice
 
@@ -284,7 +284,7 @@ class TestMultipleShootingVerbose:
       5. 提前收敛时进度条正确关闭
 
     参考:
-      e2m2e.transfer.TransferSearch 中 tqdm 的使用方式
+      e2m2e.algorithm.transfer.TransferSearch 中 tqdm 的使用方式
 
     依赖:
       tqdm>=4.66 (已在 pyproject.toml 中声明)

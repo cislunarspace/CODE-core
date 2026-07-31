@@ -22,12 +22,13 @@ import zipfile
 
 import numpy as np
 
-from e2m2e.algorithms import MultipleShooting
-from e2m2e.algorithms.multiple_shooting import (
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.solver.multiple_shooting import (
+    MultipleShooting,
     sample_patch_points,
     sample_patch_points_perilune_clustered,
 )
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
+from e2m2e.data.types.orbit import Orbit
 
 MU = 1.21506683e-2
 TU_SECONDS = 4.34811305 * 86400  # 秒
@@ -97,11 +98,10 @@ def main(strict: bool = False) -> int:
     kernel_path = _resolve_kernel_path()
 
     # 构造星历动力学（与 tests/conftest.py 的 spice_eph_dynamics fixture 对齐）
-    from e2m2e.core.synodic_j2000 import SynodicJ2000System
-
-    from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
-    from e2m2e.core.ephemeris_system import EphemerisSystem
-    from e2m2e.core.spice import SPICEManager
+    from e2m2e.algorithm.coordinate import SynodicJ2000System
+    from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
+    from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+    from e2m2e.data.kernels.manager import SPICEManager
     from e2m2e.mbse.data.enums import ReferenceFrame
 
     spice = SPICEManager()

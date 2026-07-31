@@ -8,8 +8,9 @@ from __future__ import annotations
 import erfa
 import numpy as np
 import pytest
-from e2m2e.core.gmat_time import J2000_MJD
-from e2m2e.core.iau_2006 import (
+
+from e2m2e.algorithm.coordinate.gmat_time import J2000_MJD
+from e2m2e.algorithm.coordinate.iau_2006 import (
     iau2000eq_matrix,
     iau2000eq_true_matrix,
     nutation_angles,
@@ -17,7 +18,7 @@ from e2m2e.core.iau_2006 import (
     precession_angles,
     precession_matrix,
 )
-from e2m2e.core.standard_axes import ICRSAxes
+from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
 
 # 单一 T 值:框架先立,后续要更严再加 T 扫描
 T_TEST = 0.5

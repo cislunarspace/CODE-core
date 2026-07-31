@@ -6,7 +6,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.forces import PointMassGravity
+from e2m2e.algorithm.forces import PointMassGravity
 
 
 class _FakeSystem:
@@ -85,6 +85,6 @@ def test_point_mass_gravity_3d_position():
 
 def test_point_mass_gravity_is_physical_model():
     """PointMassGravity 是 PhysicalModel 子类。"""
-    from e2m2e.core.forces import PhysicalModel
+    from e2m2e.algorithm.forces import PhysicalModel
 
     assert issubclass(PointMassGravity, PhysicalModel)

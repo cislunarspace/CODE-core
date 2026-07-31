@@ -7,7 +7,7 @@ e2m2e 基础使用示例
 
 import numpy as np
 
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, LibrationPoint
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System, LibrationPoint
 
 
 def main():

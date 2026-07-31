@@ -16,7 +16,7 @@ PlotConfig
 
 .. code-block:: python
 
-   from e2m2e.visualization import PlotConfig
+   from e2m2e.tools.viz import PlotConfig
 
    # 默认配置
    config = PlotConfig()
@@ -41,7 +41,7 @@ FamilyPlotter
 
 .. code-block:: python
 
-   from e2m2e.visualization import FamilyPlotter, PlotConfig
+   from e2m2e.tools.viz import FamilyPlotter, PlotConfig
 
    config = PlotConfig(title=32, label=28)
    config.apply_rcparams()
@@ -65,7 +65,7 @@ TransferPlotter
 
 .. code-block:: python
 
-   from e2m2e.visualization import TransferPlotter
+   from e2m2e.tools.viz import TransferPlotter
 
    plotter = TransferPlotter(system, config)
 

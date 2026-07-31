@@ -5,7 +5,8 @@
 
 import numpy as np
 import pytest
-from e2m2e.core.standard_dynamic_axes import LVLHAxes, VNBAxes
+
+from e2m2e.algorithm.coordinate.standard_dynamic_axes import LVLHAxes, VNBAxes
 
 # ---------------------------------------------------------------------------
 # 公共状态

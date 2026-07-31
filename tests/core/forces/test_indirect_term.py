@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.forces import IndirectTerm
+from e2m2e.algorithm.forces import IndirectTerm
 
 
 class _FakeSystem:
@@ -86,7 +86,7 @@ def test_indirect_term_3d_position():
 
 def test_indirect_term_is_physical_model():
     """IndirectTerm 是 PhysicalModel 子类。"""
-    from e2m2e.core.forces import PhysicalModel
+    from e2m2e.algorithm.forces import PhysicalModel
 
     assert issubclass(IndirectTerm, PhysicalModel)
 

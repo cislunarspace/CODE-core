@@ -20,7 +20,7 @@ F10.7 太阳射电通量和 Ap 地磁指数通过线性乘法因子对基准密�
 
 .. code-block:: python
 
-   from e2m2e.core.atmosphere import ExponentialAtmosphere
+   from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 
    # 默认参数：F10.7=150 sfu（中等太阳活动），Ap=15（中等地磁活动）
    atm = ExponentialAtmosphere()
@@ -75,13 +75,13 @@ F10.7 和 Ap 越高，大气热膨胀越显著，同高度密度越大。
 .. code-block:: python
 
    import numpy as np
-   from e2m2e.core.spice import SPICEManager
-   from e2m2e.core.ephemeris_system import EphemerisSystem
-   from e2m2e.core.coordinate_system import CoordinateSystem
-   from e2m2e.core.standard_axes import ICRSAxes
-   from e2m2e.core.standard_origins import CelestialBodyOrigin
-   from e2m2e.core.atmosphere import ExponentialAtmosphere
-   from e2m2e.core.forces import ForceModel, GravityField, DragModel
+   from e2m2e.data.kernels.manager import SPICEManager
+   from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+   from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+   from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
+   from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+   from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
+   from e2m2e.algorithm.forces import ForceModel, GravityField, DragModel
 
    # 1. 准备星历系统（ICRF + 地球中心）
    spice = SPICEManager()

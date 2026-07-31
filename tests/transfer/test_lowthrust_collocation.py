@@ -9,8 +9,8 @@ from types import SimpleNamespace
 import numpy as np
 from e2m2e._integrators import RkMethod, propagate_compiled_lowthrust
 
-from e2m2e.core.forces import PointMassGravity
-from e2m2e.transfer import EngineConfig, LowThrustCollocation, LowThrustShooting
+from e2m2e.algorithm.forces import PointMassGravity
+from e2m2e.algorithm.transfer import EngineConfig, LowThrustCollocation, LowThrustShooting
 
 MU = 398600.435507
 

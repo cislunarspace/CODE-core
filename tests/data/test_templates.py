@@ -36,8 +36,8 @@ class TestSystemsConstants:
 
     def test_single_source_with_core_constants(self):
         """core/constants.py 是 shim，值与数据层一致。"""
-        from e2m2e.core.constants import AU as core_au
-        from e2m2e.core.constants import R_EARTH as core_rearth
+        from e2m2e.data.templates.systems import AU as core_au
+        from e2m2e.data.templates.systems import R_EARTH as core_rearth
 
         assert core_au == AU
         assert core_rearth == R_EARTH
@@ -53,11 +53,11 @@ class TestSeedConstants:
         assert seed._HALO_SEED_Z0 == 0.001
         assert seed._HALO_FOLD_Z0 == {1: 0.07, 2: 0.15}
 
-    def test_dfh_uses_data_layer_constants(self):
-        """dfh/cr3bp_orbits.py 的常量来自数据层（单一来源）。"""
-        from e2m2e.dfh.cr3bp_orbits import CHAR_LENGTH_KM as dfh_char_length
+    def test_family_uses_data_layer_constants(self):
+        """algorithm/family/cr3bp_orbits.py 的常量来自数据层（单一来源）。"""
+        from e2m2e.algorithm.family.cr3bp_orbits import CHAR_LENGTH_KM as family_char_length
 
-        assert dfh_char_length == CHAR_LENGTH_KM
+        assert family_char_length == CHAR_LENGTH_KM
 
 
 class TestPerturbationDefaults:
@@ -87,7 +87,7 @@ class TestEnums:
         assert OrbitFamilyType.NRHO.value == "nrho"
 
     def test_old_paths_shim(self):
-        from e2m2e.core.enums import ReferenceFrame as CoreReferenceFrame
+        from e2m2e.data.templates.enums import ReferenceFrame as CoreReferenceFrame
         from e2m2e.mbse.data.enums import OrbitFamilyType as MbseOrbitFamilyType
 
         assert CoreReferenceFrame is ReferenceFrame

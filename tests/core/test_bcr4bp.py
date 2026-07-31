@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.core import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 
 MU = 0.0121506683
 
@@ -185,7 +185,7 @@ class TestJacobianFiniteDiff:
         t = 1.1
         cr3bp_hessian_state = sample_state.copy()
         # 太阳项雅可比 = BCR4BP 左下块 - CR3BP 伪势能 Hessian
-        from e2m2e.core import pseudo_potential_hessian
+        from e2m2e.algorithm.dynamics.potential import pseudo_potential_hessian
 
         A = bcr4bp_dynamics.compute_jacobian_A(t, sample_state)
         H = pseudo_potential_hessian(MU, *cr3bp_hessian_state[:3])
@@ -296,11 +296,10 @@ class TestEphemerisComparison:
         reference_epoch,
         sample_state,
     ):
-        from e2m2e.core.coordinate_system import CoordinateSystem
-        from e2m2e.core.standard_axes import ICRSAxes
-        from e2m2e.core.standard_origins import CelestialBodyOrigin
-
-        from e2m2e.core.forces import ForceModel, PointMassGravity, ThirdBodyGravity
+        from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+        from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
+        from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+        from e2m2e.algorithm.forces import ForceModel, PointMassGravity, ThirdBodyGravity
 
         et0 = spice_manager.utc_to_et(reference_epoch)
 

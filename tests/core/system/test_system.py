@@ -10,7 +10,7 @@ from io import StringIO
 import numpy as np
 import pytest
 
-from e2m2e.core.cr3bp_system import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
 
 
 class TestLibrationPointEnum:

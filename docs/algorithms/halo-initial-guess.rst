@@ -1,7 +1,7 @@
 Halo 初始猜测
 =============
 
-:mod:`e2m2e.algorithms.halo_initial_guess` 模块提供 Richardson 三阶解析近似，
+:mod:`e2m2e.algorithm.family.halo_initial_guess` 模块提供 Richardson 三阶解析近似，
 用于生成 Halo 轨道的初始猜测参数。
 
 Richardson 三阶近似
@@ -11,7 +11,7 @@ Richardson (1980) 给出共线平动点附近 Halo 轨道的三阶解析解：
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_initial_guess import compute_halo_initial_guess
+   from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
 
    guess = compute_halo_initial_guess(mu=0.01215, z_amplitude=0.01, L=1, halo_class=0)
 
@@ -41,9 +41,9 @@ Richardson (1980) 给出共线平动点附近 Halo 轨道的三阶解析解：
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_initial_guess import compute_halo_initial_guess
-   from e2m2e.algorithms import DifferentialCorrection
-   from e2m2e.core import Orbit
+   from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
+   from e2m2e.algorithm.solver import DifferentialCorrection
+   from e2m2e.data.types.orbit import Orbit
    import numpy as np
 
    # 1. 解析近似

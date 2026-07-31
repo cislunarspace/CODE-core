@@ -8,11 +8,9 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.algorithms import (  # noqa: E402
-    DifferentialCorrection,
-    MultipleShooting,
-)
-from e2m2e.core import Orbit
+from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.algorithm.solver.multiple_shooting import MultipleShooting
+from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.spice
 

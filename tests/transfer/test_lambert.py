@@ -1,10 +1,10 @@
-"""二体 Lambert 求解器（``e2m2e.transfer.lambert``）测试。"""
+"""二体 Lambert 求解器（``e2m2e.algorithm.transfer.lambert``）测试。"""
 
 import numpy as np
 import pytest
 from scipy.integrate import solve_ivp
 
-from e2m2e.transfer import LambertSolution, solve_lambert, solve_lambert_batch
+from e2m2e.algorithm.transfer import LambertSolution, solve_lambert, solve_lambert_batch
 
 MU = 398600.4418
 

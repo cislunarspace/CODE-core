@@ -9,8 +9,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithms import Continuation, DifferentialCorrection
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.solver.continuation import Continuation
+from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.data.types.orbit import Orbit
 
 # 测试运行较慢(约 30-60 秒),只在不在 fast 模式时跑
 pytestmark = pytest.mark.slow

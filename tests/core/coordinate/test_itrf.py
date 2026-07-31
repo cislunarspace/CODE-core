@@ -7,8 +7,8 @@ import os
 
 import numpy as np
 import pytest
-from e2m2e.core.gmat_data import CoordinateDataError, gmat_data_dir
-from e2m2e.core.standard_axes import (
+
+from e2m2e.algorithm.coordinate.standard_axes import (
     GMATITRFAxes,
     ICRSAxes,
     ITRFApproxAxes,
@@ -17,9 +17,9 @@ from e2m2e.core.standard_axes import (
     standard_icrf,
     standard_itrf,
 )
-from e2m2e.core.standard_origins import CelestialBodyOrigin, InertialOrigin
-
-from e2m2e.core.spice import SPICEManager
+from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin, InertialOrigin
+from e2m2e.data.frames.gmat_fixture import CoordinateDataError, gmat_data_dir
+from e2m2e.data.kernels.manager import SPICEManager
 
 
 @pytest.fixture
@@ -224,7 +224,8 @@ class TestICRFITRFIntegrationWithSpice:
     def test_icrf_itrf_rotation_matches_pxform(self, spice_manager, requires_itrf93):
         """ICRF→ITRF 向量变换与 spiceypy.pxform('J2000','ITRF93',et) 元素差 < 1e-12。"""
         import spiceypy
-        from e2m2e.core.coordinate_system import CoordinateSystem
+
+        from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 
         icrf = standard_icrf()
         itrf = CoordinateSystem(
@@ -245,7 +246,7 @@ class TestICRFITRFIntegrationWithSpice:
 
     def test_icrf_itrf_rotation_matrix_is_orthogonal(self, spice_manager, requires_itrf93):
         """ICRF↔ITRF 链路两端 Axes 旋转矩阵 R @ R.T = I,误差 < 1e-14。"""
-        from e2m2e.core.coordinate_system import CoordinateSystem
+        from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 
         icrf = standard_icrf()
         itrf = CoordinateSystem(
@@ -290,7 +291,7 @@ class TestITRFApproxAxesConsistencyWithITRF93:
 
 class TestStandardCoordinateSystems:
     def test_icrf_to_explicit_gmat_itrf_vector_round_trip(self):
-        from e2m2e.core.coordinate_system import CoordinateSystem
+        from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 
         icrf = CoordinateSystem(axes=ICRSAxes(), origin=InertialOrigin())
         itrf = CoordinateSystem(axes=GMATITRFAxes(compatibility="gmat"), origin=InertialOrigin())
@@ -311,7 +312,7 @@ class TestStandardIcrfPreset:
 
     def test_standard_icrf_returns_coordinate_system(self):
         """standard_icrf() 返回 CoordinateSystem,axes 为 ICRSAxes,origin 为 InertialOrigin。"""
-        from e2m2e.core.coordinate_system import CoordinateSystem
+        from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 
         cs = standard_icrf()
         assert isinstance(cs, CoordinateSystem)
@@ -320,6 +321,6 @@ class TestStandardIcrfPreset:
 
     def test_standard_icrf_importable_from_core_top_level(self):
         """standard_icrf 可从 e2m2e.core 顶层导入(与 standard_itrf 对齐)。"""
-        from e2m2e.core import standard_icrf as imported
+        from e2m2e.algorithm.coordinate import standard_icrf as imported
 
         assert imported is standard_icrf

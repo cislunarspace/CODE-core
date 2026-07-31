@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.proximity.safety import (
+from e2m2e.algorithm.proximity.safety import (
     SafetyRegion,
     check_passive_safety,
     max_collision_probability,

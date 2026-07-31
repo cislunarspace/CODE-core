@@ -19,15 +19,17 @@ class TestPackageMetadata:
         assert e2m2e.__email__ == "ouyangjiahong22@nudt.edu.cn"
 
     def test_all_exports(self):
-        assert "core" in e2m2e.__all__
-        assert "algorithms" in e2m2e.__all__
-        assert "visualization" in e2m2e.__all__
-        assert "transfer" in e2m2e.__all__
+        assert "data" in e2m2e.__all__
+        assert "algorithm" in e2m2e.__all__
+        assert "api" in e2m2e.__all__
+        assert "tools" in e2m2e.__all__
         assert "mbse" in e2m2e.__all__
+        assert "integrators" in e2m2e.__all__
 
     def test_subpackages_importable(self):
-        assert hasattr(e2m2e, "core")
-        assert hasattr(e2m2e, "algorithms")
-        assert hasattr(e2m2e, "visualization")
-        assert hasattr(e2m2e, "transfer")
+        assert hasattr(e2m2e, "data")
+        assert hasattr(e2m2e, "algorithm")
+        assert hasattr(e2m2e, "api")
+        assert hasattr(e2m2e, "tools")
         assert hasattr(e2m2e, "mbse")
+        assert hasattr(e2m2e, "integrators")

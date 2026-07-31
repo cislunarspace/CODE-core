@@ -6,8 +6,8 @@ PD45 与 PD78 传播同一轨道结果量级一致。
 
 import numpy as np
 
-from e2m2e.core.forces import ForceModel, PhysicalModel
-from e2m2e.core.forces.thrust import ImpulsiveBurn
+from e2m2e.algorithm.forces import ForceModel, PhysicalModel
+from e2m2e.algorithm.forces.thrust import ImpulsiveBurn
 from e2m2e.integrators import RkMethod
 
 

@@ -6,7 +6,7 @@ e2m2e 提供基于 SPICE 的星历系统和 N 体动力学模型，用于高精�
 SPICE 管理器
 ------------
 
-:class:`~e2m2e.core.spice.SPICEManager` 封装 NASA SPICE 工具包，提供天体星历查询、时间转换和内核管理。
+:class:`~e2m2e.data.kernels.manager.SPICEManager` 封装 NASA SPICE 工具包，提供天体星历查询、时间转换和内核管理。
 
 **内核类型：**
 
@@ -34,7 +34,7 @@ de430.bsp，使用 de430 需手动 ``load_kernel``。
 
 .. code-block:: python
 
-   from e2m2e.core.spice import SPICEManager
+   from e2m2e.data.kernels.manager import SPICEManager
 
    mgr = SPICEManager()
    mgr.load_kernel("path/to/de440.bsp")
@@ -74,13 +74,13 @@ ET 秒，``dt`` 为网格步长（秒）。
 星历系统
 --------
 
-:class:`~e2m2e.core.ephemeris_system.EphemerisSystem` 管理一组天体的星历查询，提供统一的数据访问层。
+:class:`~e2m2e.algorithm.dynamics.ephemeris_system.EphemerisSystem` 管理一组天体的星历查询，提供统一的数据访问层。
 
 .. code-block:: python
 
-   from e2m2e.core import ReferenceFrame
-   from e2m2e.core.spice import SPICEManager
-   from e2m2e.core.ephemeris_system import EphemerisSystem
+   from e2m2e.algorithm.dynamics import ReferenceFrame
+   from e2m2e.data.kernels.manager import SPICEManager
+   from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 
    mgr = SPICEManager()
    mgr.load_kernel("path/to/de440.bsp")
@@ -104,11 +104,11 @@ ET 秒，``dt`` 为网格步长（秒）。
 星历动力学
 ----------
 
-:class:`~e2m2e.core.ephemeris_dynamics.EphemerisDynamics` 实现受限 N 体问题，利用 SPICE 星历数据计算多体引力加速度。
+:class:`~e2m2e.algorithm.dynamics.ephemeris_dynamics.EphemerisDynamics` 实现受限 N 体问题，利用 SPICE 星历数据计算多体引力加速度。
 
 .. note::
 
-   ``EphemerisDynamics`` 已降级为内部实现（``e2m2e.core.ephemeris_dynamics``
+   ``EphemerisDynamics`` 已降级为内部实现（``e2m2e.algorithm.dynamics.ephemeris_dynamics``
    路径仍可用）。新代码推荐 :doc:`forces` 的 ForceModel 力分解路径。
 
 **物理模型：**
@@ -127,7 +127,7 @@ ET 秒，``dt`` 为网格步长（秒）。
 
 .. code-block:: python
 
-   from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
+   from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
 
    dynamics = EphemerisDynamics(system)
 

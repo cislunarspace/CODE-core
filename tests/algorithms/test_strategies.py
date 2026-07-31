@@ -5,7 +5,7 @@
 
 import pytest
 
-from e2m2e.algorithms.strategies import (
+from e2m2e.algorithm.family.strategies import (
     CorrectionConfig,
     halo_fixed_x0,
     halo_fixed_z0,
@@ -120,9 +120,9 @@ class TestStrategyIntegration:
     """策略与 DifferentialCorrection 集成"""
 
     def test_setup_delegates_to_strategy(self):
-        from e2m2e.algorithms.differential_correction import DifferentialCorrection
-        from e2m2e.core.cr3bp_system import CR3BP_System
-        from e2m2e.core.dynamics import CR3BP_Dynamics
+        from e2m2e.algorithm.dynamics import CR3BP_System
+        from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+        from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 
         system = CR3BP_System(
             mu=0.0121506683, primary="Earth", secondary="Moon"
@@ -137,9 +137,9 @@ class TestStrategyIntegration:
         assert dc.fixed_parameters.get("x0") == 0.5
 
     def test_setup_halo_delegates(self):
-        from e2m2e.algorithms.differential_correction import DifferentialCorrection
-        from e2m2e.core.cr3bp_system import CR3BP_System
-        from e2m2e.core.dynamics import CR3BP_Dynamics
+        from e2m2e.algorithm.dynamics import CR3BP_System
+        from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+        from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 
         system = CR3BP_System(
             mu=0.0121506683, primary="Earth", secondary="Moon"

@@ -6,7 +6,7 @@ e2m2e 的动力学层负责在指定系统上积分运动方程、得到状态�
 Dynamics 基类
 -------------
 
-:class:`~e2m2e.core.dynamics.Dynamics` 采用模板方法模式：
+:class:`~e2m2e.algorithm.dynamics.dynamics.Dynamics` 采用模板方法模式：
 
 - ``propagate()`` — 编排整条轨迹的积分（算法骨架）
 - ``_get_eom_func()`` — 钩子方法，子类提供具体的 ODE 右端函数
@@ -20,7 +20,7 @@ Dynamics 基类
 CR3BP 动力学
 -------------
 
-:class:`~e2m2e.core.dynamics.CR3BP_Dynamics` 在旋转坐标系中积分 CR3BP 运动方程。
+:class:`~e2m2e.algorithm.dynamics.dynamics.CR3BP_Dynamics` 在旋转坐标系中积分 CR3BP 运动方程。
 
 **运动方程：**
 
@@ -44,7 +44,7 @@ CR3BP 动力学
 
 .. code-block:: python
 
-   from e2m2e.core import CR3BP_System, CR3BP_Dynamics, Orbit
+   from e2m2e.algorithm.dynamics import CR3BP_System, CR3BP_Dynamics, Orbit
    import numpy as np
 
    system = CR3BP_System(
@@ -89,15 +89,15 @@ STM 描述初始状态微小偏差的线性演化：
 BCR4BP 动力学
 -------------
 
-:class:`~e2m2e.core.bcr4bp_dynamics.BCR4BP_Dynamics` 在 CR3BP 运动方程上叠加
+:class:`~e2m2e.algorithm.dynamics.BCR4BP_Dynamics` 在 CR3BP 运动方程上叠加
 太阳质点摄动（直接项与间接项），太阳位置由
-:class:`~e2m2e.core.bcr4bp_system.BCR4BPSystem` 解析给出，方程显式含时
+:class:`~e2m2e.algorithm.dynamics.BCR4BPSystem` 解析给出，方程显式含时
 （时间周期系统，周期约一个会合月）。``propagate`` 接口语义与
 ``CR3BP_Dynamics`` 一致，支持 ``with_stm=True``。
 
 .. code-block:: python
 
-   from e2m2e.core import BCR4BP_Dynamics, BCR4BPSystem
+   from e2m2e.algorithm.dynamics import BCR4BP_Dynamics, BCR4BPSystem
 
    system = BCR4BPSystem.earth_moon(sun_phase0=0.0)
    dynamics = BCR4BP_Dynamics(system)
@@ -113,19 +113,19 @@ BCR4BP 无 Jacobi 积分（太阳项显式含时），``with_jacobi=True`` 抛
 星历动力学
 ----------
 
-:class:`~e2m2e.core.ephemeris_dynamics.EphemerisDynamics` 基于 SPICE 星历计算 N 体引力。
+:class:`~e2m2e.algorithm.dynamics.ephemeris_dynamics.EphemerisDynamics` 基于 SPICE 星历计算 N 体引力。
 详见 :doc:`ephemeris`。
 
 力模型传播
 ----------
 
-:class:`~e2m2e.core.forces.force_model.ForceModel` 用 Rust 积分器实现自适应传播，
+:class:`~e2m2e.algorithm.forces.force_model.ForceModel` 用 Rust 积分器实现自适应传播，
 不继承 ``Dynamics``。详见 :doc:`forces`。
 
 .. code-block:: python
 
-   from e2m2e.core import CelestialBodyOrigin, CoordinateSystem, ICRSAxes
-   from e2m2e.core.forces import ForceModel, GravityField
+   from e2m2e.algorithm.dynamics import CelestialBodyOrigin, CoordinateSystem, ICRSAxes
+   from e2m2e.algorithm.forces import ForceModel, GravityField
 
    # ForceModel 要求系统持有坐标系（球谐引力等力需要坐标变换）
    eph_system.coordinate_system = CoordinateSystem(
@@ -149,13 +149,13 @@ BCR4BP 无 Jacobi 积分（太阳项显式含时），``with_jacobi=True`` 抛
 ``direction``（> 0 只记上行穿越、< 0 只记下行、0 双向）属性。
 ``with_stm=True`` 时事件函数接收 42 维增广状态。
 
-:class:`~e2m2e.algorithms.sections.PoincareSection` 的
-:meth:`~e2m2e.algorithms.sections.PoincareSection.event` 方法直接生成
+:class:`~e2m2e.algorithm.manifold.sections.PoincareSection` 的
+:meth:`~e2m2e.algorithm.manifold.sections.PoincareSection.event` 方法直接生成
 scipy 语义的事件函数（截面函数只依赖前 6 维，增广传播时自动截取）：
 
 .. code-block:: python
 
-   from e2m2e.algorithms import PoincareSection
+   from e2m2e.algorithm.manifold import PoincareSection
 
    section = PoincareSection.plane(axis=1, value=0.0)   # xz 平面 y=0
    event = section.event(direction=-1, terminal=True)   # 首次下行穿越即停

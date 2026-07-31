@@ -40,7 +40,7 @@ e2m2e/
 
 **激进式全量迁移 + sys.modules 别名过渡**：
 
-- 每个新模块实现完整后，在旧包位置建立 **shim**（re-export 新模块），使旧路径 `e2m2e.core`、`e2m2e.algorithms`、`e2m2e.transfer`、`e2m2e.dfh` 等在迁移期间保持可用（169 个测试引用旧路径，不能一次断掉）。
+- 每个新模块实现完整后，在旧包位置建立 **shim**（re-export 新模块），使旧路径 `e2m2e.core`、`e2m2e.algorithms`、`e2m2e.algorithm.transfer`、`e2m2e.dfh` 等在迁移期间保持可用（169 个测试引用旧路径，不能一次断掉）。
 - 具体机制：迁移一个子模块后，旧包同名文件改为 `from <new_path> import *`（或明确的 re-export），旧路径仍能 import。
 - 全部迁移完成、测试全绿后，**删除旧包**（core/algorithms/transfer/dfh/io/visualization/proximity），顶层只留新结构。
 - 分批次迁移，每批一个 commit、跑通测试再动下一批。

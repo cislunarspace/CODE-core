@@ -65,8 +65,8 @@ pip install e2m2e[normal-form]
 创建地月 CR3BP 系统，生成一个 DRO 轨道族：
 
 ```python
-from e2m2e.core import CR3BP_System, Orbit, CR3BP_Dynamics
-from e2m2e.algorithms import DifferentialCorrection, Continuation
+from e2m2e.algorithm.dynamics import CR3BP_System, CR3BP_Dynamics, Orbit
+from e2m2e.algorithm.solver import DifferentialCorrection, Continuation
 
 system = CR3BP_System(mu=0.01215, primary="earth", secondary="moon")
 dynamics = CR3BP_Dynamics(system=system)
@@ -140,7 +140,7 @@ family = continuation.natural_continuation(
 | 地球非球形×大天体耦合项 | 未实现 | 见 issue #253 |
 | 不变流形与低能量转移 | 已实现 | 流形 + 庞加莱截面 + 拼接 |
 | 正规化（normal form） | 已实现 | 可选依赖 `[normal-form]` |
-| MCP 服务 | 未实现 | 接口层规划中（`e2m2e.api`），依赖 `[mcp]` extra |
+| MCP ?? | ???? | Facade ??????`e2m2e.api`??????? `[mcp]` extra |
 
 详细的能力清单与 API 文档见[在线文档](https://cislunarspace.github.io/e2m2e/)；逐版本变更见 [CHANGELOG.md](CHANGELOG.md)。
 

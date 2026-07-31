@@ -17,15 +17,15 @@ import pytest
 
 pytest.importorskip("sympy")
 
-from e2m2e.algorithms.normal_form.catalog import (
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form.catalog import (
     LibrationCatalogData,
     LibrationCatalogTransformer,
 )
-from e2m2e.algorithms.normal_form.center_manifold import CenterManifoldReducer
-from e2m2e.algorithms.normal_form.dynamical_substitution import DynamicalSubstituteResult
-from e2m2e.algorithms.normal_form.quasi_floquet import QuasiFloquetResult, real_normal_form_matrix
-from e2m2e.algorithms.normal_form.types import NormalFormResult
-from e2m2e.core import LibrationPoint
+from e2m2e.algorithm.normal_form.center_manifold import CenterManifoldReducer
+from e2m2e.algorithm.normal_form.dynamical_substitution import DynamicalSubstituteResult
+from e2m2e.algorithm.normal_form.quasi_floquet import QuasiFloquetResult, real_normal_form_matrix
+from e2m2e.algorithm.normal_form.types import NormalFormResult
 
 # ---------------------------------------------------------------------------
 # 公共 fixture（沿用 test_catalog.py 的范式）
@@ -34,8 +34,8 @@ from e2m2e.core import LibrationPoint
 
 @pytest.fixture
 def l1_context(earth_moon_system):
-    from e2m2e.algorithms.normal_form import NormalFormContext
-    from e2m2e.algorithms.normal_form.constants import JD0_J2000
+    from e2m2e.algorithm.normal_form import NormalFormContext
+    from e2m2e.algorithm.normal_form.constants import JD0_J2000
 
     return NormalFormContext(
         system=earth_moon_system,
@@ -361,7 +361,7 @@ def test_save_load_without_sub_results(l1_context, tmp_path):
 
 def test_fft_components_roundtrip(l1_context, tmp_path):
     """fft_components 正确往返（含 tuple coef 字段）。"""
-    from e2m2e.algorithms.normal_form.fft import FFTComponent
+    from e2m2e.algorithm.normal_form.fft import FFTComponent
 
     ds = _make_ds_result(l1_context)
     # 注入 fft_components

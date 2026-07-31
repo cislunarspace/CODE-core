@@ -6,7 +6,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.halo_initial_guess import (
+from e2m2e.algorithm.family.halo_initial_guess import (
     compute_halo_coefficients,
     compute_halo_initial_guess,
     halo_third_order_approximation,
@@ -362,13 +362,13 @@ class TestBackwardCompatibility:
 
     def test_reexport_preserves_public_api(self):
         """通过 differential_correction 导入应返回相同函数。"""
-        from e2m2e.algorithms.differential_correction import (
+        from e2m2e.algorithm.solver.differential_correction import (
             compute_halo_coefficients as from_dc,
         )
-        from e2m2e.algorithms.differential_correction import (
+        from e2m2e.algorithm.solver.differential_correction import (
             compute_halo_initial_guess as from_dc_guess,
         )
-        from e2m2e.algorithms.differential_correction import (
+        from e2m2e.algorithm.solver.differential_correction import (
             halo_third_order_approximation as from_dc_approx,
         )
 
@@ -379,9 +379,7 @@ class TestBackwardCompatibility:
 
     def test_algorithms_init_reexport(self):
         """e2m2e.algorithms.__init__ 的导入应继续工作。"""
-        from e2m2e.algorithms import (
-            compute_halo_coefficients,
-        )
+        from e2m2e.algorithm.family import compute_halo_coefficients
 
         # 结果应与直接导入一致
         coeffs1 = compute_halo_coefficients(MU, 1)

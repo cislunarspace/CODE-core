@@ -41,18 +41,18 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from e2m2e.core.coordinate.coordinate_system import CoordinateSystem
-from e2m2e.core.coordinate.standard_axes import ICRSAxes
-from e2m2e.core.coordinate.standard_origins import CelestialBodyOrigin
-from e2m2e.core.ephemeris_system import EphemerisSystem
-from e2m2e.core.forces import (
+from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
+from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+from e2m2e.algorithm.forces import (
     ForceModel,
     GravityField,
     IndirectTerm,
     SolarRadiationPressure,
     ThirdBodyGravity,
 )
-from e2m2e.core.spice import SPICEManager
+from e2m2e.data.kernels.manager import SPICEManager
 
 DFH_FILE = Path("/home/ouyangjiahong/codes/qiao/OrbitDesign/EPHEMERIDES_DAC.TXT")
 

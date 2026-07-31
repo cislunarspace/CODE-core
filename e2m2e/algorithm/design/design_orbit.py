@@ -40,7 +40,6 @@ import numpy as np
 from e2m2e.io import (
     DEFAULT_PERTURBATION,
     EphemerisTable,
-    dfh_perturbation_to_force_config,
 )
 
 from ...data.kernels._spice_loader import get_spiceypy
@@ -64,6 +63,7 @@ from ..family.cr3bp_orbits import (
     earth_moon_system,
 )
 from ..forces import ForceModel
+from ..forces.force_mapping import dfh_perturbation_to_force_config
 from ..solver.multiple_shooting import sample_patch_points_perilune_clustered
 
 __all__ = [
@@ -665,4 +665,3 @@ def design_orbit(
         correction=correction,
         force_config=force_config,
     )
-

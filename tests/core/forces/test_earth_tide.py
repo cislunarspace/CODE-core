@@ -7,7 +7,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.core.forces.earth_tide import (
+from e2m2e.algorithm.forces.earth_tide import (
     _K_EARTH,
     _K_PLUS_EARTH,
     load_love_number_file,

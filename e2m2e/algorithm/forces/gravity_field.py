@@ -32,7 +32,7 @@ _DEFAULT_FRAME_BY_BODY: dict[str, str] = {
     "EARTH": "ITRF93",
     "MOON": "MOON_PA",
 }
-# 按中心天体的默认重力场文件名(相对于 e2m2e.core.forces.data)。
+# 按中心天体的默认重力场文件名(相对于 e2m2e.algorithm.forces.data)。
 _DEFAULT_FILE_BY_BODY: dict[str, str] = {
     "EARTH": "egm96_to10.gfc",
     "MOON": "grgm900c.cof",
@@ -161,7 +161,7 @@ class GravityField(PhysicalModel):
             )
         from importlib import resources
 
-        ref = resources.files("e2m2e.core.forces.data").joinpath(filename)
+        ref = resources.files("e2m2e.algorithm.forces.data").joinpath(filename)
         suffix = Path(filename).suffix
         with ref.open("r", encoding="utf-8") as f:
             # load_gravity_file expects a path; write to a temporary file
@@ -373,7 +373,7 @@ class GravityField(PhysicalModel):
             raise CoordinateTransformError(f"no Love number source for body={self._body!r}")
         from importlib import resources
 
-        ref = resources.files("e2m2e.core.forces.data").joinpath(tide_file)
+        ref = resources.files("e2m2e.algorithm.forces.data").joinpath(tide_file)
         with ref.open("r", encoding="utf-8") as f:
             content = f.read()
         from tempfile import NamedTemporaryFile
@@ -522,4 +522,3 @@ class GravityField(PhysicalModel):
         axes = ITRFSpiceAxes(frame=self._input_frame)
         origin = CelestialBodyOrigin(body=self._body, spice=spice)
         return CoordinateSystem(axes=axes, origin=origin)
-

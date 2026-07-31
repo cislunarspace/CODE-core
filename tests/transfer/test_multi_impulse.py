@@ -12,7 +12,7 @@
 import numpy as np
 import pytest
 
-from e2m2e.transfer import (
+from e2m2e.algorithm.transfer import (
     CoastArc,
     Impulse,
     MultiImpulseTransfer,
@@ -158,7 +158,7 @@ class TestValidation:
     def test_zero_arrival_impulse_primer_raises(self):
         """到达脉冲为零时无法确定主矢量端点方向"""
         # 到达终端取霍曼弧的自然到达状态：到达脉冲为零、出发脉冲非零
-        from e2m2e.transfer import solve_lambert
+        from e2m2e.algorithm.transfer import solve_lambert
 
         r0 = _circular(R1)[:3]
         rf = _circular(R2, np.pi)[:3]

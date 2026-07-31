@@ -73,13 +73,13 @@ API
 
 .. code-block:: python
 
-   from e2m2e.algorithms.ephemeris_correction import (
+   from e2m2e.algorithm.ephemeris_correction import (
        correct_ephemeris_patch_points,
    )
-   from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
-   from e2m2e.core.ephemeris_system import EphemerisSystem
+   from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
+   from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
    from e2m2e.mbse.data.enums import ReferenceFrame
-   from e2m2e.core.spice import SPICEManager
+   from e2m2e.data.kernels.manager import SPICEManager
 
    spice = SPICEManager()
    spice.load_kernel("/path/to/de440.bsp")
@@ -112,7 +112,7 @@ API
    )
 
 低层入口：``correct_with_homotopy`` （模块
-``e2m2e.algorithms.ephemeris_correction.homotopy`` ），
+``e2m2e.algorithm.ephemeris_correction.homotopy`` ），
 用于需要更细粒度控制的研究场景。
 
 参数
@@ -154,13 +154,13 @@ API
 .. code-block:: python
 
    import numpy as np
-   from e2m2e.algorithms.ephemeris_correction import (
+   from e2m2e.algorithm.ephemeris_correction import (
        correct_ephemeris_patch_points,
    )
-   from e2m2e.algorithms.ephemeris_correction.homotopy import correct_with_homotopy
-   from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
-   from e2m2e.core.ephemeris_system import EphemerisSystem
-   from e2m2e.core.spice import SPICEManager
+   from e2m2e.algorithm.ephemeris_correction.homotopy import correct_with_homotopy
+   from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
+   from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+   from e2m2e.data.kernels.manager import SPICEManager
    from e2m2e.mbse.data.enums import ReferenceFrame
 
    KERNEL_DIR = "/path/to/kernels"

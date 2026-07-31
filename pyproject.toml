@@ -37,7 +37,6 @@ classifiers = [
 dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
-    "matplotlib>=3.7",
     "tqdm>=4.66",
     "spiceypy>=8.1.0",
     "pydantic>=2.0",
@@ -51,6 +50,15 @@ dependencies = [
 normal-form = [
     "sympy>=1.12",
     "joblib>=1.3",
+]
+# 可视化（tools/viz）：核心库不依赖 matplotlib（ADR 0011，MCP 无头部署
+# 不需要）。
+viz = [
+    "matplotlib>=3.7",
+]
+# MCP 协议层（api/mcp）：部署 MCP 服务器时装。
+mcp = [
+    "mcp>=1.0",
 ]
 
 [project.urls]

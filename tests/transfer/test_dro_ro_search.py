@@ -3,8 +3,9 @@
 import numpy as np
 import pytest
 
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
-from e2m2e.transfer import DEFAULT_MIN_DISTANCE_THRESHOLD_DU, TransferSearch
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.transfer import DEFAULT_MIN_DISTANCE_THRESHOLD_DU, TransferSearch
+from e2m2e.data.types.orbit import Orbit
 
 
 @pytest.fixture

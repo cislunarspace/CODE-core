@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from e2m2e.transfer.mission_assessment import MissionAssessment
-from e2m2e.transfer.porkchop import PorkchopData
-from e2m2e.transfer.solution_database import SolutionDatabase
+from e2m2e.algorithm.transfer.mission_assessment import MissionAssessment
+from e2m2e.algorithm.transfer.porkchop import PorkchopData
+from e2m2e.algorithm.transfer.solution_database import SolutionDatabase
 
 
 class TestMissionAssessment:

@@ -1,2 +1,2 @@
-"""e2m2e.visualization 模块测试包。"""
+"""e2m2e.tools.viz 模块测试包。"""
 # visualization tests

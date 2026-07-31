@@ -11,8 +11,8 @@ import pytest
 
 matplotlib.use("Agg")
 
-from e2m2e.core import CR3BP_System
-from e2m2e.visualization.family import FamilyPlotter
+from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.tools.viz.family import FamilyPlotter
 
 MU = 1.21506683e-2
 

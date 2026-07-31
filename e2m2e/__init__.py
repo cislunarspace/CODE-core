@@ -1,15 +1,11 @@
 """
 e2m2e - Earth to Moon, Moon to Earth Transfer Orbit Design Library
 
-一个用于设计和分析地月空间转移轨道的Python库，专注于圆型限制性三体问题（CR3BP）中的轨道动力学。
+一个用于设计和分析地月空间转移轨道的Python库，专注于圆型限制性三体问题
+（CR3BP）中的轨道动力学。五层架构（ADR 0011）：data/（数据层）、crates/
+（数值层）、algorithm/（算法层）、api/（接口层）、tools/（工具层）。
 
-主要功能：
-1. 地月系统三体动力学建模
-2. 平动点轨道（Halo, Lyapunov等）设计
-3. 微分修正算法
-4. 轨道延拓算法
-5. 转移轨道设计
-6. 可视化工具
+主要能力：任务轨道设计、轨道保持、转移轨道设计、轨道预报、时空坐标转换。
 
 作者: 天疆说
 """
@@ -36,13 +32,14 @@ except PackageNotFoundError:
 __author__ = "天疆说"
 __email__ = "ouyangjiahong22@nudt.edu.cn"
 
-# 导入子包
-from . import algorithms, core, mbse, transfer, visualization
+# 导入子包（五层 + mbse 独立顶层 + integrators 数值层门面）
+from . import algorithm, api, data, integrators, mbse, tools
 
 __all__ = [
-    "core",
-    "algorithms",
-    "visualization",
-    "transfer",
+    "data",
+    "algorithm",
+    "api",
+    "tools",
     "mbse",
+    "integrators",
 ]

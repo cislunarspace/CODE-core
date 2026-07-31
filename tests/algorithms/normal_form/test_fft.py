@@ -18,7 +18,7 @@ import warnings
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.normal_form.fft import (
+from e2m2e.algorithm.normal_form.fft import (
     FFTComponent,
     extract_frequencies,
     fft_extract,
@@ -59,11 +59,11 @@ def test_extract_frequencies_falls_back_to_fft_when_naff_missing(
 ):
     """``extract_frequencies(prefer="auto")`` 在 NAFF 不可用时降级到 FFT 并警告。"""
     monkeypatch.setattr(
-        "e2m2e.algorithms.normal_form.fft._resolve_naff_binary",
+        "e2m2e.algorithm.normal_form.fft._resolve_naff_binary",
         lambda: None,
     )
     monkeypatch.setattr(
-        "e2m2e.algorithms.normal_form.fft.naff_available",
+        "e2m2e.algorithm.normal_form.fft.naff_available",
         lambda: False,
     )
 
@@ -89,15 +89,15 @@ def test_extract_frequencies_prefer_naff_falls_back_on_runtime_error(
         raise RuntimeError("simulated NAFF crash")
 
     monkeypatch.setattr(
-        "e2m2e.algorithms.normal_form.fft._resolve_naff_binary",
+        "e2m2e.algorithm.normal_form.fft._resolve_naff_binary",
         lambda: "/bin/true",
     )
     monkeypatch.setattr(
-        "e2m2e.algorithms.normal_form.fft.naff_available",
+        "e2m2e.algorithm.normal_form.fft.naff_available",
         lambda: True,
     )
     monkeypatch.setattr(
-        "e2m2e.algorithms.normal_form.fft.detect_naff",
+        "e2m2e.algorithm.normal_form.fft.detect_naff",
         _boom,
     )
 
