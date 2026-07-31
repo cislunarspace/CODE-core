@@ -1,8 +1,8 @@
 """架构骨架占位/行为测试。
 
-未实现能力（角动量管理、ECOM 光压、LGA/WSB、Facade/MCP/tools/logging）
+未实现能力（角动量管理、ECOM 光压、LGA/WSB、transfer_orbit、MCP/tools/logging）
 断言抛 NotImplementedError 且错误信息含能力名；已实现能力（design_orbit/
-control_orbit/propagate_orbit/family 初猜）改行为冒烟测试。
+control_orbit/propagate_orbit/family 初猜、Facade 一档接入）改行为冒烟测试。
 """
 
 from __future__ import annotations
@@ -77,14 +77,22 @@ def test_ecom_srp_placeholder():
 
 
 def test_facade_placeholder():
-    """Facade 方法占位。"""
+    """Facade：已实现方法接入真实编排，未实现方法保持占位。"""
     from e2m2e.api.facade import Facade
 
     facade = Facade()
-    with pytest.raises(NotImplementedError, match="design_orbit"):
-        facade.design_orbit(orbit_type="DRO")
-    with pytest.raises(NotImplementedError, match="control_orbit"):
-        facade.control_orbit()
+    # 已实现：参数校验先于占位抛错（OrbitError 包装 INVALID_PARAMS）
+    from e2m2e.api.models import OrbitError
+
+    with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+        facade.design_orbit(orbit_type="DRO", duration=0.0)
+    with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+        facade.control_orbit(control_mode=9)
+    # 未实现：保持占位
+    with pytest.raises(NotImplementedError, match="transfer_design"):
+        facade.transfer_design(transfer_type="HMN")
+    with pytest.raises(NotImplementedError, match="orbit_propagation"):
+        facade.orbit_propagation()
 
 
 def test_mcp_server_placeholder():

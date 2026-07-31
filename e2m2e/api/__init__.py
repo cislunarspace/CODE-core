@@ -9,7 +9,26 @@
 - ``mcp/``：MCP 服务（create_server(facade) 进程内 + CLI mcp-serve 薄包装）。
 - ``cli/``：命令行（子命令 = Facade 方法）。
 
-实现状态：骨架。Facade 方法待接入 algorithm/ 各编排器后逐能力实现。
+实现状态：一档任务（design/control）与二档子任务（family/stability/proximity）
+已接入 algorithm/；transfer_design/orbit_propagation/spacetime_transform 及
+MCP/CLI 依赖 [mcp] extra，保持占位。
 """
 
-__all__: list[str] = []
+from .facade import Facade, mcp_tools
+from .models import (
+    ControlOrbitRequest,
+    ControlOrbitResponse,
+    DesignOrbitRequest,
+    DesignOrbitResponse,
+    OrbitError,
+)
+
+__all__ = [
+    "Facade",
+    "mcp_tools",
+    "OrbitError",
+    "DesignOrbitRequest",
+    "DesignOrbitResponse",
+    "ControlOrbitRequest",
+    "ControlOrbitResponse",
+]
