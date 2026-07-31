@@ -438,6 +438,181 @@ def hamiltonian_constant_term(
     return np.zeros(arr.shape[0], dtype=float)
 
 
+def build_cr3bp_hamiltonian(
+    context: NormalFormContext,
+    max_degree: int | None = None,
+) -> dict[tuple[int, ...], float]:
+    r"""构造纯 CR3BP Hamiltonian（数值系数 dict，不依赖 SPICE）。
+
+    CR3BP 是自治系统，平动点是不动点，故 Hamiltonian 系数为常数。本函数
+    复用 :func:`build_hamiltonian` 的符号构造，再把全部动态参数替换为
+    CR3BP 常数值，得到 ``{pow_tuple: float}`` 的纯数值 dict。
+
+    对应 Gómez vol III 2.7 的 LISWCH ``GENHAM`` 步（CR3BP 原路）：在平动点
+    偏移坐标 ``q = (q1,q2,q3)`` 下展开
+
+    .. math::
+        H = \tfrac12\|p\|^2 + p^T C_{pq} q + \tfrac12 q^T C_{qq} q
+            - \mu_e/\|r_e - q\| - \mu_m/\|r_m - q\|
+
+    其中 ``C_pq`` 为科里奥利、``C_qq`` 为离心，``r_e=(-\mu-x_{LP},0,0)``、
+    ``r_m=(1-\mu-x_{LP},0,0)`` 为两主天体相对平动点的位置。太阳项置零
+    （CR3BP 只含两个主天体）。一阶项 ``f·q`` 在平动点处为零（平衡点）。
+
+    Args:
+        context: 归一化上下文（提供 ``mu``、``libration_position`` 等）。
+            本函数内部以 ``mu_s=0`` 重新构造上下文以消去太阳项。
+        max_degree: 截断阶数；``None`` 时用 ``context.order``。
+
+    Returns:
+        幂次向量 → 纯数值 ``float`` 系数的 dict。系数为常数（不随时间），
+        可直接广播成时间序列供 :class:`CenterManifoldReducer` 注入。
+
+    Notes:
+        与 :func:`evaluate_hamiltonian` 不同，本函数**不**产出时间序列——
+        CR3BP 自治，系数恒定。调用方（如 pipeline）若需与 ``qf_result.tlist``
+        对齐的时间序列，自行 ``np.full(N, coef)`` 广播即可。
+    """
+    import sympy as sp
+
+    from .context import NormalFormContext
+    from .legendre import expand_legendre_1_over_r
+
+    deg = int(max_degree) if max_degree is not None else int(context.order)
+    if deg < 1:
+        raise ValueError(f"max_degree 必须 ≥ 1，得到 {deg}")
+
+    # 以 mu_s=0 重新构造上下文，消去太阳项（_add_body 已把 -mu_s 乘进系数）。
+    ctx_cr3bp = NormalFormContext(
+        system=context.system,
+        libration_point=context.libration_point,
+        epoch=context.epoch,
+        order=context.order,
+        LU=context.LU,
+        TU=context.TU,
+        mu=context.mu,
+        mu_e=context.mu_e,
+        mu_m=context.mu_m,
+        mu_s=0.0,
+        frequency_scale=context.frequency_scale,
+    )
+
+    legendre = expand_legendre_1_over_r(max_degree=deg)
+    H_sym = build_hamiltonian(ctx_cr3bp, legendre, max_degree=deg, store_sources=False)
+
+    # CR3BP 常数参数（会合系，角速度 ω=ẑ 无量纲化为 1）。
+    mu = float(ctx_cr3bp.mu)
+    x_lp = float(np.asarray(ctx_cr3bp.libration_position, dtype=float).ravel()[0])
+
+    # 科里奥利 C_pq = [[0,1,0],[-1,0,0],[0,0,0]]（对应 yp_x − xp_y，论文 3 式 4-5）。
+    # 离心 C_qq = 零矩阵：H = ½‖p‖² + yp_x − xp_y − Σc_nρⁿP_n（Jorba-Masdemont /
+    # Gómez vol I 标准形）。离心效应已通过 H = ½‖ṙ‖² − Ω 的 Legendre 变换
+    # 被吸收进 ½‖p‖² + yp_x − xp_y，不作为独立项出现。引力势的完整 Legendre
+    # 展开（build_hamiltonian 的 -μ/|r-q|）已包含全部二阶信息。
+    # （此前误加 ±½(x²+y²) 离心项，导致 H 的 q-q 块符号错、与 QF 的 S 不自洽。）
+    cpq = np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+    cqq = np.zeros((3, 3))
+
+    # 两主天体相对平动点的位置（地心会合系：地球在 0、月球在 1）
+    re = np.array([-x_lp, 0.0, 0.0])
+    rm = np.array([1.0 - x_lp, 0.0, 0.0])
+
+    # 力项 f：星历模型里 f 是「受迫频率」（使平动点保持拟周期运动的额外力）。
+    # CR3BP 自治、平动点是真实平衡点，故 f 应令 q=0 处 Hamilton 方程的 ṗ=0，
+    # 即 f 恰好抵消引力势在原点的一阶梯度。这里先置 0，数值化后删一阶项
+    # （等价于令 f = -∂(引力势)/∂q|₀，强制平衡条件）。
+    params: dict[str, float] = {}
+    for i in range(3):
+        for j in range(3):
+            params[f"Cpq{i * 3 + j + 1}"] = float(cpq[i, j])
+            params[f"Cqq{i * 3 + j + 1}"] = float(cqq[i, j])
+    params["f1"] = params["f2"] = params["f3"] = 0.0
+    params["rex"], params["rey"], params["rez"] = float(re[0]), float(re[1]), float(re[2])
+    params["re0"] = float(np.linalg.norm(re))
+    params["rmx"], params["rmy"], params["rmz"] = float(rm[0]), float(rm[1]), float(rm[2])
+    params["rm0"] = float(np.linalg.norm(rm))
+    # 太阳项已被 mu_s=0 消去，rs* 任取非零避免 0/0（系数恒为 0）
+    params["rsx"] = params["rsy"] = params["rsz"] = 1.0
+    params["rs0"] = 1.0
+
+    # 逐项数值化：对 sympy 系数做 subs 再求 float
+    numeric: dict[tuple[int, ...], float] = {}
+    for pow_tuple, coef in H_sym.coefficients.items():
+        val = _eval_coef(coef, params)
+        if val != 0.0:
+            numeric[tuple(int(p) for p in pow_tuple)] = val
+
+    # 强制平动点平衡：删除一阶项（CR3BP 下 q=0 是平衡点，ṗ=0 要求一阶项为零）。
+    # 这等价于令 f 等于引力势在原点的负梯度，与 DS 的 _build_dynamics_rhs_circular
+    # 把平动点当原点的约定一致。
+    numeric = {k: v for k, v in numeric.items() if sum(k) != 1}
+
+    # —— γ 缩放坐标下的引力势（Jorba-Masdemont c_n 形式）——
+    # 标准 expand_legendre 展开的 -μ/|r-q| 在月球附近 (r=γ) 使 (q/r)^n 急剧放大
+    # （阶6 达 3.6e4）。改用 JM 的 c_n·ρ^n·P_n(x/ρ) 形式：c_n 含 (γ/r)^{n+1}
+    # 因子，月球 r=γ 使其=1，系数降到 O(1)~O(10)。
+    # 动能 ½‖p‖² 与科里奥利 yp_x-xp_y 保持原值（系数 1）。
+    if ctx_cr3bp.gamma is not None:
+        gamma = float(ctx_cr3bp.gamma)
+        mu_val = float(ctx_cr3bp.mu)
+        rho_e_ratio = gamma / (1.0 + gamma)  # 地球项 γ/(1+γ)
+
+        # 保留动能 + 科里奥利（含 p 项），删原引力势（纯 q 项）用 c_n 重构
+        kinetic_coriolis = {k: v for k, v in numeric.items() if sum(k[3:]) > 0}
+        grav = _legendre_sum_cn(mu_val, gamma, rho_e_ratio, deg)
+        numeric = {**kinetic_coriolis, **grav}
+
+    if not numeric:
+        numeric[(0, 0, 0, 0, 0, 0)] = 0.0
+    return numeric
+
+
+def _legendre_sum_cn(
+    mu: float, gamma: float, rho_e_ratio: float, max_degree: int
+) -> dict[tuple[int, ...], float]:
+    """用 Jorba-Masdemont c_n·ρ^n·P_n(x/ρ) 构造 γ 缩放引力势。
+
+    ``H_grav = -Σ_{n≥2} c_n·ρ^n·P_n(x/ρ)``，其中 ``ρ²=x²+y²+z²``、
+    ``P_n`` 是 Legendre 多项式。``c_n = (-1)^n/γ³·[μ+(1-μ)(γ/(1+γ))^{n+1}]``
+    （L2，JM 式1）。返回 ``{pow_tuple: coef}`` 的多项式 dict。
+    """
+    # c_n（L2）
+    cn = {}
+    for n in range(2, max_degree + 1):
+        cn[n] = ((-1) ** n / gamma**3) * (mu + (1 - mu) * rho_e_ratio ** (n + 1))
+
+    # ρ^n·P_n(x/ρ) = ρ^n·P_n(x/ρ)。用 P_n 递推展开为 x,y,z 多项式。
+    # P_0=1, P_1=u, P_{n} = ((2n-1)/n)·u·P_{n-1} - ((n-1)/n)·P_{n-2}, u=x/ρ
+    # ρ^n·P_n(x/ρ): 用 Q_n = ρ^n·P_n(x/ρ) 递推（避免 ρ 分母）
+    # Q_0=1, Q_1=x, Q_n = ((2n-1)/n)·x·Q_{n-1} - ((n-1)/n)·ρ²·Q_{n-2}
+    # Q_n 是 x,y,z 的 n 次齐次多项式，存为 {(i,j,k): coef}
+    Q: dict[int, dict[tuple[int, int, int], float]] = {0: {(0, 0, 0): 1.0}, 1: {(1, 0, 0): 1.0}}
+    rho_sq_terms = {(2, 0, 0): 1.0, (0, 2, 0): 1.0, (0, 0, 2): 1.0}  # x²+y²+z²
+    for n in range(2, max_degree + 1):
+        # Q_n = ((2n-1)/n)·x·Q_{n-1} - ((n-1)/n)·(x²+y²+z²)·Q_{n-2}
+        a = (2 * n - 1) / n
+        b = (n - 1) / n
+        qn: dict[tuple[int, int, int], float] = {}
+        for pow_t, coef in Q[n - 1].items():
+            new_pow = (pow_t[0] + 1, pow_t[1], pow_t[2])
+            qn[new_pow] = qn.get(new_pow, 0.0) + a * coef
+        for pow_t, coef in Q[n - 2].items():
+            for rs_pow, rs_coef in rho_sq_terms.items():
+                new_pow = (pow_t[0] + rs_pow[0], pow_t[1] + rs_pow[1], pow_t[2] + rs_pow[2])
+                qn[new_pow] = qn.get(new_pow, 0.0) - b * rs_coef * coef
+        Q[n] = {k: v for k, v in qn.items() if abs(v) > 1e-15}
+
+    # H_grav = -Σ c_n·Q_n
+    result: dict[tuple[int, ...], float] = {}
+    for n in range(2, max_degree + 1):
+        c = cn[n]
+        for pow_t, coef in Q[n].items():
+            full_pow = (pow_t[0], pow_t[1], pow_t[2], 0, 0, 0)
+            val = -c * coef
+            result[full_pow] = result.get(full_pow, 0.0) + val
+    return {k: v for k, v in result.items() if abs(v) > 1e-15}
+
+
 # ---------------------------------------------------------------------------
 # 内部辅助
 # ---------------------------------------------------------------------------
@@ -453,6 +628,7 @@ __all__ = [
     "DYNAMIC_PARAM_NAMES",
     "Hamiltonian",
     "build_hamiltonian",
+    "build_cr3bp_hamiltonian",
     "evaluate_hamiltonian",
     "hamiltonian_constant_term",
 ]

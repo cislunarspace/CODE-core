@@ -195,6 +195,55 @@ def poly2expr(
 # ---------------------------------------------------------------------------
 
 
+def poly_subs(
+    poly: Mapping[tuple[int, ...], object],
+    subs_map: Mapping[object, object],
+) -> dict[tuple[int, ...], object]:
+    """多项式变量替换：把每个旧变量替换为 ``subs_map`` 给出的表达式。
+
+    用于 H→QF 映射（Code09）：``subs_map`` 把旧坐标 ``(x1..x6)`` 映到
+    新坐标 ``(q1..p3)`` 的线性组合 ``X = B·Y``，即
+    ``subs_map[x_i] = Σ_j B[i,j]·y_j``，其中 ``y_j`` **必须命名为**
+    ``q1, q2, q3, p1, p2, p3``。替换后展开、按这套新变量的幂次重排系数。
+
+    系数可以是 sympy 表达式（含 B 元素符号）或数值/ndarray（此时
+    ``subs_map`` 的值也应是同形数值/符号，sympy 会广播）。
+
+    Args:
+        poly: 幂次向量 → 系数 dict（变量为 ``subs_map`` 的键，即旧变量）。
+        subs_map: 旧变量符号 → 新变量表达式的映射。新变量必须命名为
+            ``q1, q2, q3, p1, p2, p3``——否则会被 :func:`expr2poly`
+            误当常数，本函数会对此做校验并抛 :class:`ValueError`。
+
+    Returns:
+        替换后的幂次向量 → 系数 dict（变量为新变量 ``q1..p3``）。
+
+    Raises:
+        ValueError: ``subs_map`` 值中出现了非 ``q1..p3`` 命名的自由符号。
+    """
+    import sympy as sp
+
+    # 校验：替换后表达式的自由符号只能含 q1..p3（其余符号当作系数，
+    # 如 B 矩阵元素 b_ij）。若出现其他「坐标名」（如 y1），说明调用方
+    # 用错了命名——expr2poly 会把它误当常数，静默返回错误结果。
+    allowed_coord_names = {"q1", "q2", "q3", "p1", "p2", "p3"}
+    for replacement in subs_map.values():
+        for sym in getattr(replacement, "free_symbols", set()):
+            if (
+                getattr(sym, "name", None)
+                and sym.name in {"y1", "y2", "y3", "y4", "y5", "y6", "x1", "x2", "x3", "x4", "x5", "x6"}
+            ):
+                raise ValueError(
+                    f"新变量 {sym.name!r} 命名非法：替换后的变量必须命名为 "
+                    f"{sorted(allowed_coord_names)}，否则 expr2poly 会误当常数。"
+                )
+
+    expr = poly2expr(poly, variables=tuple(subs_map.keys()))
+    substituted = expr.subs(subs_map)
+    expanded = sp.expand(substituted)
+    return expr2poly(expanded)
+
+
 def poly_poisson(
     poly1: Mapping[tuple[int, ...], object],
     poly2: Mapping[tuple[int, ...], object],
@@ -323,6 +372,7 @@ __all__ = [
     "trim_degree",
     "expr2poly",
     "poly2expr",
+    "poly_subs",
     "poly_poisson",
     "poly_simplify",
     "polylist_simplify",

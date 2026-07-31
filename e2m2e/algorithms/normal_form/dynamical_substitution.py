@@ -504,34 +504,46 @@ def _bdot2a(
 def _build_dynamics_rhs_circular(
     context: NormalFormContext,
 ) -> Callable[[float, npt.ArrayLike], npt.NDArray[np.floating]]:
-    """纯 CR3BP 旋转系下的 rho 坐标右端项（用作无 SPICE 退路）。
+    """纯 CR3BP 地心会合系下的 rho 坐标右端项（无 SPICE 退路）。
 
-    对应 qiao ``Subfunction/dynfunc/dynfunc_circ_rho`` 的简化版：忽略
-    太阳与三体摄动，只保留两个主天体的引力。
+    对应 qiao ``Dynfunc_rho.m`` 的 CR3BP 降级（忽略太阳与三体摄动）。
+    坐标系与 qiao 一致：地心会合系（地球在原点、月球在 ``(1,0,0)``），
+    rho 为平动点相对坐标（原点在平动点 ``r0``）。
+
+    运动方程（平动点平衡项已消去，使 ``rho=0`` 是平衡点）::
+
+        ρ̈ = −μ_e·[(r0+ρ)/|r0+ρ|³ − r0/|r0|³]
+            −μ_m·[(r0+ρ−r_m)/|r0+ρ−r_m|³ − (r0−r_m)/|r0−r_m|³]
+            −2ω×ρ̇
+
+    其中 ``r0`` 是平动点在地心会合系的位置（如 L2 = 1+γ）、``r_m=(1,0,0)``
+    是月球位置、``ω=ẑ``。此形式由 qiao ``Dynfunc_rho`` 第 69 行的
+    ``−μ_m·rm/|rm|³ − r0dotdot``（平动点平衡条件）消去常数项得到。
     """
     mu = float(context.mu)
-    # 平动点位置（无量纲）：与 rho = 0 对应的就是平动点
-    r_lp = np.asarray(context.libration_position, dtype=float)
-    omega = np.array([0.0, 0.0, 1.0])  # 旋转系角速度（无量纲 = 1）
+    mu_e = float(context.mu_e)  # 归一化地球引力常数（≈1−μ）
+    mu_m = float(context.mu_m)  # 归一化月球引力常数（≈μ）
+    r0 = np.asarray(context.libration_position, dtype=float).ravel()
+    rm = np.array([1.0, 0.0, 0.0])  # 月球在地心会合系
+    omega = np.array([0.0, 0.0, 1.0])
+    # 平动点处的引力加速度（平衡条件，用于消去常数项）
+    d_e_0 = r0
+    d_m_0 = r0 - rm
+    grav0 = -mu_e * d_e_0 / np.linalg.norm(d_e_0) ** 3 - mu_m * d_m_0 / np.linalg.norm(d_m_0) ** 3
 
     def rhs(t: float, X: npt.ArrayLike) -> npt.NDArray[np.floating]:
         X_arr = np.asarray(X, dtype=float).ravel()
         rho = X_arr[:3]
         rhodot = X_arr[3:6]
-        # rho 在会合系下的实际位置：q1=earth, q2=moon 固定
-        # 这里以平动点为原点，取 earth=( -mu, 0, 0 ), moon=(1-mu, 0, 0)
-        earth = np.array([-mu, 0.0, 0.0])
-        moon = np.array([1.0 - mu, 0.0, 0.0])
-        d1 = rho + r_lp - earth
-        d2 = rho + r_lp - moon
-        d1n = d1 / np.linalg.norm(d1) ** 3
-        d2n = d2 / np.linalg.norm(d2) ** 3
-        # CR3BP 运动方程：忽略太阳；ρ̈ = -∇U - 2 ω×ρ̇ - ω×(ω×ρ)
-        # U = ½(x²+y²) + (1-μ)/r1 + μ/r2  (围绕原点展开)
-        U_rho = -((1.0 - mu) * d1n + mu * d2n)
+        d_e = r0 + rho
+        d_m = r0 + rho - rm
+        grav = (
+            -mu_e * d_e / np.linalg.norm(d_e) ** 3
+            - mu_m * d_m / np.linalg.norm(d_m) ** 3
+        )
         coriolis = -2.0 * np.cross(omega, rhodot)
         centrifugal = -np.cross(omega, np.cross(omega, rho))
-        rhodotdot = U_rho + coriolis + centrifugal
+        rhodotdot = (grav - grav0) + coriolis + centrifugal
         return np.concatenate([rhodot, rhodotdot])
 
     return rhs

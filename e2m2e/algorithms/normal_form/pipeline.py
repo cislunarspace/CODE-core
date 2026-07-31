@@ -32,6 +32,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -46,6 +47,8 @@ from .dynamical_substitution import (
     DEFAULT_TOTAL_TU,
     DynamicalSubstituteCorrector,
 )
+from .hamiltonian import build_cr3bp_hamiltonian
+from .qf_projection import project_hamiltonian_to_qf
 from .quasi_floquet import QuasiFloquetReducer
 from .types import NormalFormResult
 
@@ -82,6 +85,8 @@ class NormalFormPipeline:
         dynamical_kwargs: 透传给 :class:`DynamicalSubstituteCorrector` 的
             覆盖项（如 ``{"t_total": 8.0, "node_step": 0.8}``）。``None``
             时用该 corrector 的全部默认值。
+        qf_segment: quasi-Floquet 矩阵法分段辛重投影的段长（TU）。``None``
+            单次积分（小窗口）；``0.4`` 等短段值用于长窗口抑制双曲 overflow。
     """
 
     context: NormalFormContext
@@ -89,6 +94,7 @@ class NormalFormPipeline:
     center_max_order: int = 10
     center_steps: tuple[str, ...] = ("invariant", "center")
     dynamical_kwargs: dict[str, object] = field(default_factory=dict)
+    qf_segment: float | None = None
 
     def reduce(self, orbit: npt.ArrayLike) -> NormalFormResult:
         """对 rho 坐标初值跑完整标准形化简流水线。
@@ -133,17 +139,32 @@ class NormalFormPipeline:
 
         # —— 步骤 2：quasi-Floquet ——
         try:
-            qf_reducer = QuasiFloquetReducer(context=self.context, method=self.quasi_floquet_method)
+            qf_reducer = QuasiFloquetReducer(
+                context=self.context, method=self.quasi_floquet_method, segment=self.qf_segment
+            )
             qf_result = qf_reducer.reduce(ds_result)
         except Exception as exc:
             return self._failure("quasi_floquet", exc, ds_result, qf_result, cm_result)
 
         # —— 步骤 3：中心流形化简 ——
+        # CR3BP 路径（DS 降级、spice 不可用）：注入高阶 Hamiltonian。
+        # CR3BP 自治、平动点是不动点，直接展开 H 即可（无需 Code06 Kamiltonian）。
+        # 星历路径（spice 可用）：暂不注入（Code06 Kamiltonian + QF 多点打靶待后续主题）。
+        hamiltonian_terms: Mapping[tuple[int, ...], npt.NDArray[np.floating]] | None = None
+        if not ds_result.spice_available:
+            try:
+                H_terms = build_cr3bp_hamiltonian(self.context, max_degree=self.center_max_order)
+                hamiltonian_terms = project_hamiltonian_to_qf(H_terms, qf_result)
+            except Exception as exc:
+                return self._failure("hamiltonian_projection", exc, ds_result, qf_result, cm_result)
+
         try:
             cm_reducer = CenterManifoldReducer(
                 context=self.context, max_order=self.center_max_order
             )
-            cm_result = cm_reducer.reduce(qf_result, steps=self.center_steps)
+            cm_result = cm_reducer.reduce(
+                qf_result, hamiltonian_terms=hamiltonian_terms, steps=self.center_steps
+            )
         except Exception as exc:
             return self._failure("center_manifold", exc, ds_result, qf_result, cm_result)
 

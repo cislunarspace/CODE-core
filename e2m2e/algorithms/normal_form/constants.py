@@ -162,7 +162,7 @@ def compute_libration_position(
         return np.array([1.0 - gamma, 0.0, 0.0], dtype=float)
     if point is LibrationPoint.L2:
         return np.array([1.0 + gamma, 0.0, 0.0], dtype=float)
-    # L3
+    # L3（地球外侧，距地球 γ；地心会合系地球在原点）
     return np.array([-gamma, 0.0, 0.0], dtype=float)
 
 

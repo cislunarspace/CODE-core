@@ -210,16 +210,18 @@ class QuasiFloquetResult:
 
 
 def _cr3bp_hessian_symmetric(r: npt.NDArray[np.floating], mu: float) -> npt.NDArray[np.floating]:
-    """纯 CR3BP 会合系下二阶导 ``Ω`` 的对称 Hessian（无量纲）。
+    """地心会合系下有效势 ``Ω`` 的对称 Hessian（无量纲）。
 
-    返回对称矩阵 ``S = ∂²Ω/∂x_i ∂x_j``，对应
-    ``ρ̈ = −∂Ω/∂ρ`` 在会合系下的二阶导。后续用 ``M = J·S_block`` 拼
-    Hamilton 矩阵（``J`` 的位置/动量顺序与 qiao 一致）。这里只关心围绕
-    替代轨道的线性化，因此位置取 ``r = ρ + 平动点位置``。
+    坐标系与 qiao ``Dynfunc_rho`` 一致：地心会合系（地球在原点、月球在
+    ``(1,0,0)``）。``r`` 为该系下的位置（如 ``ρ + 平动点位置``）。
+
+    有效势 ``Ω = ½(x²+y²) + (1−μ)/r₁ + μ/r₂``（离心绕地心，仅 x-y 平面），
+    其 Hessian 对角为 ``(1+2c₂, 1−c₂, −c₂)``，其中
+    ``c₂ = (1−μ)/r₁³ + μ/r₂³``，``r₁=|r|``（到地球）、``r₂=|r−(1,0,0)|``（到月球）。
     """
     mu1 = 1.0 - mu
-    r1 = r - np.array([-mu, 0.0, 0.0])  # 到地球
-    r2 = r - np.array([1.0 - mu, 0.0, 0.0])  # 到月球
+    r1 = r  # 到地球（地心会合系地球在原点）
+    r2 = r - np.array([1.0, 0.0, 0.0])  # 到月球（月球在 (1,0,0)）
     d1 = float(np.linalg.norm(r1))
     d2 = float(np.linalg.norm(r2))
     d1i3 = 1.0 / d1**3
@@ -227,8 +229,10 @@ def _cr3bp_hessian_symmetric(r: npt.NDArray[np.floating], mu: float) -> npt.NDAr
     d1i5 = 1.0 / d1**5
     d2i5 = 1.0 / d2**5
 
-    # 二阶导矩阵：(3/r^5) r⊗r − (1/r^3) I，对每个主天体加权求和
-    S = np.eye(3) * (1.0 - mu1 * d1i3 - mu * d2i3)
+    # 离心仅 x-y 平面（z 方向无离心）+ 引力 Hessian。
+    # 此前用质心系（地球 −μ）并把离心误加到 z，导致与 constants 频率不自洽。
+    c2 = mu1 * d1i3 + mu * d2i3
+    S = np.diag([1.0 - c2, 1.0 - c2, -c2]).astype(float)
     S += mu1 * 3.0 * d1i5 * np.outer(r1, r1)
     S += mu * 3.0 * d2i5 * np.outer(r2, r2)
     return S
@@ -346,6 +350,7 @@ def _solve_qf_matrix(
     *,
     rtol: float = 1e-11,
     atol: float = 1e-13,
+    segment: float | None = None,
 ) -> npt.NDArray[np.floating]:
     """矩阵法：从 ``B(t_0)=I`` 出发 DOP853 积分 ``Ḃ = M·B − B·D``。
 
@@ -353,6 +358,20 @@ def _solve_qf_matrix(
     单次初值积分 + 末尾辛投影即可：``M``、``D`` 都是 Hamilton 矩阵，
     ``BᵀJB=J`` 是精确首次积分，前向积分的辛误差仅由 ODE 容差累积，
     ``symplectic_project`` 把残余误差拉回 ``<1e-13``。
+
+    Args:
+        segment: 分段辛重投影的段长（归一化 TU）。``None`` 时单次积分到底
+            （仅适合 ``λT < 10`` 的小窗口）。非 ``None`` 时把积分区间按
+            ``segment`` 分短段，每段末用 :func:`symplectic_project` 把 ``B``
+            拉回辛群——抑制双曲方向 ``e^(λt)`` 增长导致的辛误差累积。
+            段长取 ``0.4``–``0.8``（与 qiao ``node_step`` 一致，使单段
+            ``e^(λ·segment)`` 有限）。这避免长窗口的 overflow，但 ``B`` 的
+            双曲分量仍按 ``e^(λt)`` 物理增长（中心流形约化本就如此）。
+
+            .. note::
+               分段 + 投影是 ``qiao`` 完整多点打靶（块三对角 Newton）的最小
+               替代。对 ``λT ≳ 40``（如 L2 的 30 天窗口）仍可能精度不足，
+               需完整多点打靶（见 issue #328）。
     """
     from scipy.integrate import solve_ivp
 
@@ -360,18 +379,323 @@ def _solve_qf_matrix(
     B0 = np.eye(6, dtype=float).ravel()
 
     t_arr = np.asarray(tlist, dtype=float).ravel()
-    sol = solve_ivp(
-        rhs,
-        (float(t_arr[0]), float(t_arr[-1])),
-        B0,
-        t_eval=t_arr,
-        method="DOP853",
-        rtol=rtol,
-        atol=atol,
+
+    if segment is None or segment <= 0:
+        sol = solve_ivp(
+            rhs,
+            (float(t_arr[0]), float(t_arr[-1])),
+            B0,
+            t_eval=t_arr,
+            method="DOP853",
+            rtol=rtol,
+            atol=atol,
+        )
+        if not sol.success:
+            raise RuntimeError(f"QF 矩阵法积分失败：{sol.message}")
+        return sol.y.T.reshape(-1, 6, 6)
+
+    # 分段积分 + 每段末辛投影。段边界取 segment 的整数倍，落在 [t0, tf] 内。
+    return _solve_qf_segmented(rhs, B0, t_arr, float(segment), rtol, atol)
+
+
+def _solve_qf_segmented(
+    rhs: Callable[[float, npt.ArrayLike], npt.NDArray[np.floating]],
+    B0: npt.NDArray[np.floating],
+    t_arr: npt.NDArray[np.floating],
+    segment: float,
+    rtol: float,
+    atol: float,
+) -> npt.NDArray[np.floating]:
+    """分段积分 ``Ḃ = M·B − B·D``，每段末辛投影。
+
+    段边界为 ``segment`` 的整数倍（夹在 ``[t_arr[0], t_arr[-1]]`` 之间）。
+    每段独立 DOP853 积分，段末用 :func:`symplectic_project` 把 ``B`` 拉回
+    辛群，抑制 ``e^(λt)`` 增长导致的辛误差累积。段内对 ``t_arr`` 的采样点
+    用 ``dense_output`` 取值，保持采样点不偏移。
+    """
+    from scipy.integrate import solve_ivp
+
+    t0 = float(t_arr[0])
+    tf = float(t_arr[-1])
+    seg_ends = np.arange(t0 + segment, tf + 0.5 * segment, segment)
+    seg_ends = seg_ends[seg_ends < tf - 1e-12]  # 不含末点（末点单独处理）
+
+    N = t_arr.size
+    B_out = np.zeros((N, 6, 6), dtype=float)
+    B_out[0] = B0.reshape(6, 6)
+
+    cur_B = B0.copy()
+    cur_t = t0
+    seg_idx = 0
+
+    def _take_samples(sol, t_lo: float, t_hi: float, start_i: int) -> int:
+        """从 dense_output 取 (t_lo, t_hi] 内的 t_arr 采样点，返回下一个下标。"""
+        j = start_i
+        while j < N and t_arr[j] <= t_hi + 1e-12:
+            if t_arr[j] > t_lo + 1e-12:  # 跳过段首（已由上段末填）
+                B_out[j] = sol.sol(float(t_arr[j])).reshape(6, 6)
+            j += 1
+        return j
+
+    next_i = 1  # t_arr[0] 已填
+    for t_end in seg_ends:
+        sol = solve_ivp(
+            rhs, (cur_t, float(t_end)), cur_B,
+            method="DOP853", rtol=rtol, atol=atol, dense_output=True,
+        )
+        if not sol.success:
+            raise RuntimeError(f"QF 分段积分失败（段 [{cur_t}, {t_end}]）：{sol.message}")
+        next_i = _take_samples(sol, cur_t, float(t_end), next_i)
+        # 段末投影，作为下段初值
+        cur_B = symplectic_project(sol.y[:, -1].reshape(6, 6)).ravel()
+        cur_t = float(t_end)
+        seg_idx += 1
+
+    # 末段：积分到 tf
+    if cur_t < tf - 1e-12:
+        sol = solve_ivp(
+            rhs, (cur_t, tf), cur_B,
+            t_eval=t_arr[next_i:], method="DOP853", rtol=rtol, atol=atol,
+        )
+        if not sol.success:
+            raise RuntimeError(f"QF 末段积分失败：{sol.message}")
+        for k, t in enumerate(sol.t):
+            B_out[next_i + k] = sol.y[:, k].reshape(6, 6)
+
+    return B_out
+
+
+# ---------------------------------------------------------------------------
+# 多点打靶法：短弧 STM + 块三对角求解（qiao Code08）
+# ---------------------------------------------------------------------------
+
+
+def _solve_qf_multipoint(
+    M_at: Callable[[float], npt.NDArray[np.floating]],
+    D: npt.NDArray[np.floating],
+    tlist: npt.NDArray[np.floating],
+    *,
+    node_step: float = 0.8,
+    rtol: float = 1e-11,
+    atol: float = 1e-13,
+) -> npt.NDArray[np.floating]:
+    """多点打靶法求 quasi-Floquet 变换 ``B(t)``（qiao Code08 路径）。
+
+    把区间 ``[t0, tf]`` 按 ``node_step`` 分短段，每段用 36 维向量化 STM
+    ``Φ_i = expm((I⊗M − D^T⊗I)·node_step)``（短弧 ``e^(λ·node_step)`` 有限，
+    不 overflow），再解节点连续性方程 ``Φ_i·B_i = B_{i+1}``（边界 ``B_N=I``）
+    得各节点 ``B_i``，节点间用段 STM 单步稠密化。
+
+    与单次积分 (:func:`_solve_qf_matrix`) 的根本区别：长窗口下 ``B(t)`` 的
+    双曲分量 ``e^(λt)`` 物理增长不可避免，但单次积分在 ``e^(λt)`` 大时浮点
+    精度累积丢失（辛性破坏）；多点打靶把长积分换成短弧 STM 的代数连锁，
+    每段 STM 精度保持，连锁求解是纯线性代数——辛误差不随窗口增长。
+
+    对 CR3BP（``M`` 常数），所有段 STM 相同，连续性方程有显式解
+    ``B_i = Φ^{-(N-i)}·B_N``（反向递推）；对时变 ``M``，逐段算 STM 后用
+    块三对角 Thomas 算法求解。
+
+    Args:
+        node_step: 节点间距（TU），默认 ``0.8``（与 qiao ``Code08`` 一致，
+            使 ``e^(λ·node_step)`` 有限）。L2 ``λ≈2.16`` 时 ``0.8`` 给
+            ``e^1.73≈5.6``。
+        rtol/atol: 段 STM 数值积分容差（时变 ``M`` 用；常数 ``M`` 用
+            ``expm`` 解析）。
+
+    Returns:
+        ``(N, 6, 6)`` 采样点 ``B(t)``。``B(tlist[-1]) = I``（末节点边界）。
+    """
+    from scipy.linalg import expm
+
+    t_arr = np.asarray(tlist, dtype=float).ravel()
+    t0, tf = float(t_arr[0]), float(t_arr[-1])
+
+    # 节点时刻（含端点）
+    t_nodes = np.arange(t0, tf + 0.5 * node_step, node_step)
+    if t_nodes[-1] > tf - 1e-12:
+        t_nodes[-1] = tf
+    elif abs(t_nodes[-1] - tf) > 1e-12:
+        t_nodes = np.append(t_nodes, tf)
+    n_nodes = t_nodes.size
+
+    # 检测 M 是否常数（解析 CR3BP 线性化）：多点采样比较。
+    # 注意 DS 替代轨道让 M(t)=J·S(ρ(t)) 随轨道位置变化，即使底层是 CR3BP，
+    # 此时 M 非常数，须走时变分支（块三对角 Thomas）。
+    M0 = np.asarray(M_at(t0), dtype=float)
+    M_const = all(
+        np.allclose(M0, np.asarray(M_at(tt), dtype=float), atol=1e-12)
+        for tt in [t0 + 0.1 * (tf - t0), 0.5 * (t0 + tf), t0 + 0.9 * (tf - t0)]
     )
-    if not sol.success:
-        raise RuntimeError(f"QF 矩阵法积分失败：{sol.message}")
-    return sol.y.T.reshape(-1, 6, 6)
+
+    I6 = np.eye(6)
+
+    if M_const:
+        # CR3BP：段 STM 解析，反向递推求节点 B。
+        # 用 expm(-A36·dt) 作段逆（比 inv(expm(A36·dt)) 精确，避免大条件数求逆）。
+        # A36 是 vec(Ḃ)=vec(MB−BD) 的矩阵形式；numpy ravel 行优先，故
+        # vec(MB)=(M⊗I)vec(B)、vec(BD)=(I⊗D^T)vec(B)，A36 = M⊗I − I⊗D^T。
+        A36 = np.kron(M0, I6) - np.kron(I6, D.T)
+        Phi_inv_equal = expm(-A36 * node_step)
+
+        B_nodes = [np.zeros((6, 6)) for _ in range(n_nodes)]
+        B_nodes[-1] = I6.copy()  # B_N = I
+        for i in range(n_nodes - 2, -1, -1):
+            dt = t_nodes[i + 1] - t_nodes[i]
+            phi_inv_i = Phi_inv_equal if abs(dt - node_step) < 1e-12 else expm(-A36 * dt)
+            B_nodes[i] = (phi_inv_i @ B_nodes[i + 1].ravel()).reshape(6, 6)
+    else:
+        # 时变 M：逐段积分 STM，块三对角 Thomas 求解
+        B_nodes = _multipoint_thomas(M_at, D, t_nodes, rtol, atol)
+
+    # 节点间稠密化：对 t_arr 每个点，找到所在段 [t_nodes[k], t_nodes[k+1]]，
+    # 用段 STM 单步传播 B_nodes[k] 到该点。
+    return _densify_b_multipoint(M_at, D, M_const, M0, t_arr, t_nodes, B_nodes, rtol, atol)
+
+
+def _multipoint_thomas(
+    M_at: Callable[[float], npt.NDArray[np.floating]],
+    D: npt.NDArray[np.floating],
+    t_nodes: npt.NDArray[np.floating],
+    rtol: float,
+    atol: float,
+) -> list[npt.NDArray[np.floating]]:
+    """时变 M 的块三对角多点打靶（qiao Code08:251-329 路径）。
+
+    高斯-牛顿迭代解连续性 ``Φ_i·B_i − B_{i+1} = 0``（边界 ``B_N=I``），
+    正则化 ``D_i = I + Φ_i·Φ_i^T`` 保证可逆（Levenberg-Marquardt 式）。
+    """
+    from scipy.integrate import solve_ivp
+
+    I6 = np.eye(6)
+    n_nodes = t_nodes.size
+    I36 = np.eye(36)
+    rhs36 = _qf_rhs_factory(M_at, D)
+
+    # 逐段算 36×36 STM Φ_i：积分 vec(Φ) 的 1296 维流，Φ̇ = A36(t)·Φ，Φ(t0)=I36。
+    # 对应 qiao Calc_Phi_QF 的 Dynfunc_Phi_QF（reshape X 为 36×36 再乘 A）。
+    Phi_list: list[npt.NDArray[np.floating]] = []
+    for k in range(n_nodes - 1):
+        def rhs_phi(t: float, X1296: npt.ArrayLike) -> npt.NDArray[np.floating]:
+            Phi = np.asarray(X1296, dtype=float).reshape(36, 36)
+            # A36(t) = M(t)⊗I − I⊗D^T（行优先 vec(B)）；Ḃ 各列 = A36·Φ 各列
+            Mt = M_at(t)
+            A36_t = np.kron(Mt, I6) - np.kron(I6, D.T)
+            return (A36_t @ Phi).ravel()
+
+        sol = solve_ivp(
+            rhs_phi,
+            (float(t_nodes[k]), float(t_nodes[k + 1])),
+            I36.ravel(),
+            method="DOP853", rtol=rtol, atol=atol,
+        )
+        if not sol.success:
+            raise RuntimeError(f"多点打靶段 STM 积分失败（段 {k}）：{sol.message}")
+        Phi_list.append(sol.y[:, -1].reshape(36, 36))
+
+    # 节点 B 初猜（随机小矩阵，末节点 I）
+    rng = np.random.default_rng(0)
+    B = [rng.standard_normal((6, 6)) * 0.1 for _ in range(n_nodes)]
+    B[-1] = np.eye(6)
+
+    # 高斯-牛顿迭代
+    for _ in range(30):
+        # 前向消元
+        D_blk: list = [None] * (n_nodes - 1)
+        L_blk: list = [None] * (n_nodes - 1)
+        X_res: list = [None] * (n_nodes - 1)
+        max_err = 0.0
+        for i in range(n_nodes - 1):
+            Phi = Phi_list[i]
+            Ai = Phi
+            Xf = Phi @ B[i].ravel()
+            X_res[i] = Xf - B[i + 1].ravel()
+            max_err = max(max_err, np.max(np.abs(X_res[i])))
+            if i == 0:
+                D_blk[i] = I36 + Ai @ Ai.T
+            else:
+                L_blk[i] = -Ai @ np.linalg.inv(D_blk[i - 1])
+                D_blk[i] = I36 + Ai @ Ai.T - L_blk[i] @ D_blk[i - 1] @ L_blk[i].T
+                X_res[i] = X_res[i] - L_blk[i] @ X_res[i - 1]
+        if max_err < 1e-13:
+            break
+        # 后向回代
+        Y: list = [None] * (n_nodes - 1)
+        for i in range(n_nodes - 2, -1, -1):
+            sol_i = np.linalg.solve(D_blk[i], X_res[i])
+            if i < n_nodes - 2:
+                sol_i = sol_i - L_blk[i + 1].T @ Y[i + 1]
+            Y[i] = sol_i
+        # 修正
+        for i in range(n_nodes):
+            if i == 0:
+                dB = -Phi_list[0].T @ Y[0]
+            elif i == n_nodes - 1:
+                dB = Y[i - 1]
+            else:
+                dB = Y[i - 1] - Phi_list[i].T @ Y[i]
+            B[i] = B[i] + dB.reshape(6, 6)
+        B[-1] = np.eye(6)  # 固定末节点
+    return B
+
+
+def _densify_b_multipoint(
+    M_at: Callable[[float], npt.NDArray[np.floating]],
+    D: npt.NDArray[np.floating],
+    M_const: bool,
+    M0: npt.NDArray[np.floating],
+    t_arr: npt.NDArray[np.floating],
+    t_nodes: npt.NDArray[np.floating],
+    B_nodes: list[npt.NDArray[np.floating]],
+    rtol: float,
+    atol: float,
+) -> npt.NDArray[np.floating]:
+    """节点间稠密化：对每个采样点，用段 STM 单步传播节点 ``B`` 到该点。"""
+    from scipy.integrate import solve_ivp
+    from scipy.linalg import expm
+
+    I6 = np.eye(6)
+    n = t_arr.size
+    n_nodes = t_nodes.size
+    B_out = np.zeros((n, 6, 6), dtype=float)
+    rhs36 = _qf_rhs_factory(M_at, D)
+
+    # 预计算常数 M 的 36×36 矩阵（CR3BP 加速）。行优先：A36 = M⊗I − I⊗D^T。
+    A36_const = np.kron(M0, I6) - np.kron(I6, D.T) if M_const else None
+
+    for i, t in enumerate(t_arr):
+        # 找 t 所在段 [t_nodes[k], t_nodes[k+1]]
+        if t <= t_nodes[0]:
+            B_out[i] = B_nodes[0]
+            continue
+        if t >= t_nodes[-1]:
+            B_out[i] = B_nodes[-1]
+            continue
+        k = int(np.searchsorted(t_nodes, t)) - 1
+        k = max(0, min(k, n_nodes - 2))
+        t_lo = float(t_nodes[k])
+        dt = float(t) - t_lo
+        if dt <= 0:
+            B_out[i] = B_nodes[k]
+            continue
+
+        if M_const:
+            # 解析段 STM
+            phi_t = expm(A36_const * dt)
+            B_out[i] = (phi_t @ B_nodes[k].ravel()).reshape(6, 6)
+        else:
+            # 时变 M：从节点 B_nodes[k] 积分 36 维 vec(B) 到 t。
+            # rhs36(t, B_6x6) 返回 Ḃ 的 6×6，这里对 vec(B)（36 维）操作。
+            def rhs_vec(tt: float, X36: npt.ArrayLike) -> npt.NDArray[np.floating]:
+                return rhs36(tt, np.asarray(X36).ravel().reshape(6, 6)).ravel()
+
+            sol = solve_ivp(
+                rhs_vec,
+                (t_lo, float(t)),
+                B_nodes[k].ravel(),
+                method="DOP853", rtol=rtol, atol=atol,
+            )
+            B_out[i] = sol.y[:, -1].reshape(6, 6)
+    return B_out
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +784,10 @@ class QuasiFloquetReducer:
         project: 矩阵法是否在末尾做辛投影兜底（默认 ``True``）。
         rtol: ODE 相对容差。
         atol: ODE 绝对容差。
+        segment: 矩阵法分段辛重投影的段长（TU）。``None``（默认）单次积分，
+            适合 ``λT < 10`` 的小窗口；非 ``None`` 时分短段 + 每段辛投影，
+            抑制双曲方向 ``e^(λt)`` 增长导致的 overflow（详见
+            :func:`_solve_qf_matrix`）。
     """
 
     context: NormalFormContext
@@ -467,6 +795,7 @@ class QuasiFloquetReducer:
     project: bool = True
     rtol: float = 1e-11
     atol: float = 1e-13
+    segment: float | None = None
 
     def reduce(self, ds_result: DynamicalSubstituteResult) -> QuasiFloquetResult:
         """对 ``ds_result`` 执行 quasi-Floquet 变换。
@@ -481,8 +810,10 @@ class QuasiFloquetReducer:
         Raises:
             ValueError: ``method`` 非法，或 ``ds_result`` 数据不足。
         """
-        if self.method not in ("matrix", "lie_algebra"):
-            raise ValueError(f"method 必须是 'matrix' 或 'lie_algebra'，得到 {self.method!r}")
+        if self.method not in ("matrix", "lie_algebra", "multipoint"):
+            raise ValueError(
+                f"method 必须是 'matrix' / 'lie_algebra' / 'multipoint'，得到 {self.method!r}"
+            )
         if ds_result.Xlist.shape[0] < 2:
             raise ValueError(f"ds_result 至少需要 2 个采样点，得到 {ds_result.Xlist.shape[0]}")
 
@@ -496,7 +827,17 @@ class QuasiFloquetReducer:
 
         # —— 求解 B(t) ——
         if self.method == "matrix":
-            B_samples = _solve_qf_matrix(M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol)
+            B_samples = _solve_qf_matrix(
+                M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol, segment=self.segment
+            )
+            if self.project:
+                B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
+        elif self.method == "multipoint":
+            # 多点打靶（qiao Code08）：segment 作 node_step，默认 0.8。
+            node_step = 0.8 if self.segment is None else float(self.segment)
+            B_samples = _solve_qf_multipoint(
+                M_at, D, ds_result.tlist, node_step=node_step, rtol=self.rtol, atol=self.atol
+            )
             if self.project:
                 B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
         else:

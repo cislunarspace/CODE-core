@@ -74,6 +74,7 @@ class NormalFormContext:
         mu_e: float | None = None,
         mu_m: float | None = None,
         mu_s: float | None = None,
+        frequency_scale: float = 1.0,
     ) -> None:
         """构造上下文。
 
@@ -132,11 +133,20 @@ class NormalFormContext:
             self.libration_point, self.mu, gamma=self.gamma
         )
 
-        # 频率体系
-        self.base_frequencies: npt.NDArray[np.floating] = np.array(BASE_FREQUENCIES, dtype=float)
+        # 频率体系（可选 frequency_scale 缩放，用于 γ 缩放坐标：t'=t/γ^{3/2}
+        # 使频率变为 ω·γ^{3/2}，让 Hamiltonian 高阶系数 c_n=O(1)）
+        self.frequency_scale: float = float(frequency_scale)
+        self.base_frequencies: npt.NDArray[np.floating] = (
+            np.array(BASE_FREQUENCIES, dtype=float) * self.frequency_scale
+        )
         nu1, nu2 = central_frequencies(self.libration_point)
-        self.central_frequencies: tuple[float, float] = (nu1, nu2)
-        self.characteristic_exponent: float = characteristic_exponent(self.libration_point)
+        self.central_frequencies: tuple[float, float] = (
+            nu1 * self.frequency_scale,
+            nu2 * self.frequency_scale,
+        )
+        self.characteristic_exponent: float = (
+            characteristic_exponent(self.libration_point) * self.frequency_scale
+        )
 
     # ------------------------------------------------------------------
     # 时间转换
