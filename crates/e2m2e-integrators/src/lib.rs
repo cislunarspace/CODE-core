@@ -1807,6 +1807,66 @@ fn disable_ephem_cache() {
     e2m2e_spice::ephem_cache::disable();
 }
 
+/// 7D 受控动力学单点求值（配点法用）。
+///
+/// 包装 `augmented_eom_7d`：给定状态 `[r,v,m]` 与控制参数
+/// `(t_max, isp, throttle, θ₁, θ₂)`，返回 7D 导数。方向由角度参数化还原。
+///
+/// # 参数
+/// - `forces_py`: 非推力 force 元组列表（格式同 `propagate_compiled`）
+/// - `observer`: 传播系 origin
+/// - `et`: 历元时刻（SPICE et 秒）
+/// - `state7`: 状态 `[x,y,z,vx,vy,vz,m]`
+/// - `thrust_spec`: `(t_max, isp, throttle, θ₁, θ₂)`
+///
+/// # 返回
+/// 7D 导数 `[vx,vy,vz, ax,ay,az, ṁ]`
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn augmented_eom_7d_py(
+    forces_py: &Bound<'_, PyList>,
+    observer: &str,
+    et: f64,
+    state7: Vec<f64>,
+    thrust_spec: (f64, f64, f64, f64, f64),
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::forces::augmented_state::{augmented_eom_7d, ThrustParams};
+    use e2m2e_forces::forces::compiled::CompiledForce;
+
+    if state7.len() != 7 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "state7 must have length 7, got {}",
+            state7.len()
+        )));
+    }
+    let (t_max, isp, throttle, theta1, theta2) = thrust_spec;
+    // 角度参数化方向（与 sensitivity 出口一致）
+    let direction = [
+        theta1.cos() * theta2.cos(),
+        theta1.sin() * theta2.cos(),
+        theta2.sin(),
+    ];
+    let thrust = ThrustParams {
+        t_max,
+        isp,
+        throttle,
+        direction,
+    };
+
+    let mut forces: Vec<CompiledForce> = Vec::with_capacity(forces_py.len());
+    for item in forces_py.iter() {
+        forces.push(parse_force_tuple(&item)?);
+    }
+
+    let mut s = [0.0_f64; 7];
+    s.copy_from_slice(&state7);
+    let d = augmented_eom_7d(&forces, observer, et, &s, &thrust)
+        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
+    Ok(PyList::new(py, d.iter())?.into())
+}
+
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
@@ -1843,6 +1903,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(enable_ephem_cache, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(disable_ephem_cache, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(augmented_eom_7d_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_with_stm_py, m)?)?;
     #[cfg(feature = "spice")]
