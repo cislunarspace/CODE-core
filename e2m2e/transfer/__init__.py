@@ -25,7 +25,7 @@ from .multi_impulse import (
     MultiImpulseTransfer,
     PrimerVectorReport,
 )
-from .porkchop import PorkchopData, porkchop
+from .porkchop import ParetoFront, PorkchopData, pareto_front, porkchop
 from .propulsion import ImpulsivePropulsion
 from .qlaw import qlaw_guess, rv_to_keplerian
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
@@ -65,6 +65,8 @@ __all__ = [
     "solve_lambert_batch",
     "PorkchopData",
     "porkchop",
+    "ParetoFront",
+    "pareto_front",
     "ThreeBodyLambert",
     "TransferArc",
     "TransferSolution",
