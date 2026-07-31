@@ -76,6 +76,8 @@ def _serialize_gravity_field(force: GravityField) -> dict[str, Any]:
         "order": force.order,
         "input_frame": force.input_frame,
         "gravity_file": str(force.gravity_file) if force.gravity_file is not None else None,
+        "tide_mode": force.tide_mode,
+        "tide_convention": force.tide_convention,
     }
 
 
