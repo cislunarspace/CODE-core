@@ -21,7 +21,6 @@ import numpy.typing as npt
 from scipy.integrate import solve_ivp
 
 if TYPE_CHECKING:
-    from ..core.dynamics import CR3BP_Dynamics
     from ..core.orbit import Orbit
 
 
@@ -84,27 +83,35 @@ class TargetOrbit:
 
 
 class RelativeDynamics:
-    """CR3BP 相对运动动力学（RLM 时变线性化）。
+    """相对运动动力学（RLM 时变线性化）。
 
-    在目标轨道邻域内把 CR3BP 动力学线性化，得到时变相对运动方程：
+    在目标轨道邻域内把动力学线性化，得到时变相对运动方程：
 
         δẋ = A(t) δx
 
-    其中 A(t) = :meth:`CR3BP_Dynamics.compute_jacobian_A` 在目标状态处求值。
+    其中 A(t) 由 ``dynamics.compute_jacobian_A(t, state)`` 在目标状态处求值。
+    支持 CR3BP（`CR3BP_Dynamics`）和星历（`EphemerisDynamics`）两套动力学，
+    鸭子类型适配：只要对象有 ``compute_jacobian_A(t, state)`` 和
+    ``propagate(..., with_stm=True)`` 即可。
     """
 
-    def __init__(self, target: TargetOrbit, dynamics: CR3BP_Dynamics) -> None:
+    def __init__(self, target: TargetOrbit, dynamics: object) -> None:
         self.target = target
         self.dynamics = dynamics
 
     def linear_model(self, t: float) -> np.ndarray:
         """返回 t 时刻 RLM 的 A(t) 矩阵，形状 ``(6, 6)``。
 
-        A = [[0, I], [U, Ω]]，U 为伪势能 Hessian 在目标状态处求值，
-        Ω 为科里奥利项。
+        CR3BP：A = [[0, I], [U, Ω]]，U 为伪势能 Hessian，Ω 为科里奥利项。
+        星历：A = [[0, I], [∂a/∂r, 0]]，∂a/∂r 为 N 体引力雅可比。
         """
         state = self.target.state_at(t)
-        return self.dynamics.compute_jacobian_A(state)
+        # 鸭子类型适配：CR3BP 是 compute_jacobian_A(state)，
+        # 星历是 compute_jacobian_A(t, state)
+        try:
+            return self.dynamics.compute_jacobian_A(t, state)
+        except TypeError:
+            return self.dynamics.compute_jacobian_A(state)
 
     def propagate(
         self,
@@ -323,6 +330,31 @@ class RelativeDynamics:
         times = np.linspace(t_span[0], t_span[1], n)
         rhos = result.sol(times).T
         return times, rhos
+
+    # ------------------------------------------------------------------
+    # 星历相对运动（EphemerisDynamics）
+    # ------------------------------------------------------------------
+
+    def ephemeris_linear_model(self, t: float) -> np.ndarray:
+        """星历 RLM 的 A(t) 矩阵（同 :meth:`linear_model`，显式命名）。"""
+        return self.linear_model(t)
+
+    def ephemeris_encke_eom(self, t: float, rho: np.ndarray) -> np.ndarray:
+        """星历 Encke 改写的非线性相对运动方程右端（预留）。
+
+        星历惯性系无科里奥利/离心项，Encke 公式需按 N 体逐项改写
+        （每个天体的直接项差 Encke 化，间接项与位置无关直接相消）。
+        当前版本暂用牛顿式两式相减，后续实现。
+
+        Args:
+            t: 时间
+            rho: 相对状态 ``[δr, δv]``，形状 ``(6,)``
+
+        Returns:
+            相对状态导数 ``[δv, δa]``
+        """
+        # 当前用牛顿式；Encke 星历版留后续（需访问 ForceModel 各力分量）
+        return self.nonlinear_eom(t, rho)
 
     # ------------------------------------------------------------------
     # LVLH 系相对状态转换
