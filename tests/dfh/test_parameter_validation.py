@@ -48,6 +48,31 @@ class TestDesignOrbitValidation:
         with pytest.raises(ValueError, match="1737~110000"):
             design_orbit("DRO", amplitude=1000.0)
 
+    def test_lissajous_amplitude_too_large_rejected(self):
+        """Lissajous L2 面内/外振幅超 7600 km 应拒绝。"""
+        with pytest.raises(ValueError, match="7600"):
+            design_orbit("Lissajous", collinear_point=2, amplitude_in=10000.0)
+        with pytest.raises(ValueError, match="7600"):
+            design_orbit("Lissajous", collinear_point=2, amplitude_out=10000.0)
+
+    def test_l4_amplitude_in_too_large_rejected(self):
+        with pytest.raises(ValueError, match="10000"):
+            design_orbit("L4", amplitude_in=20000.0)
+
+    def test_l4_amplitude_out_too_large_rejected(self):
+        with pytest.raises(ValueError, match="76000"):
+            design_orbit("L4", amplitude_out=80000.0)
+
+    def test_l5_amplitude_out_too_large_rejected(self):
+        with pytest.raises(ValueError, match="76000"):
+            design_orbit("L5", amplitude_out=80000.0)
+
+    def test_lissajous_phase_out_of_range(self):
+        with pytest.raises(ValueError, match="phase_in"):
+            design_orbit("Lissajous", phase_in=1.5)
+        with pytest.raises(ValueError, match="phase_out"):
+            design_orbit("L4", phase_out=-0.5)
+
     def test_unknown_perturbation_key_rejected(self):
         """摄动字典含未知开关时立即拒绝（未知 key 在序列化层校验）。"""
         with pytest.raises(ValueError, match="未知摄动开关"):

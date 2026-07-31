@@ -21,6 +21,8 @@ import numpy as np
 
 from ..algorithms import DifferentialCorrection
 from ..algorithms.halo_initial_guess import compute_halo_initial_guess
+from ..algorithms.lissajous_initial_guess import compute_lissajous_initial_guess
+from ..algorithms.triangular_initial_guess import compute_triangular_initial_guess
 from ..core import CR3BP_Dynamics, CR3BP_System, Orbit
 
 #: 地月 CR3BP 参数（与 examples/、tests/conftest.py 的标准系统一致）
@@ -465,3 +467,83 @@ def design_nrho(
         tol=tol_km / du,
         seed_orbit=seed,
     )
+
+
+def design_lissajous(
+    collinear_point: int,
+    amplitude_in_km: float,
+    amplitude_out_km: float,
+    phase_in: float,
+    phase_out: float,
+    *,
+    dynamics: CR3BP_Dynamics | None = None,
+) -> Orbit:
+    """生成指定共线点（L1/L2/L3）的 Lissajous 拟周期轨道初猜。
+
+    Lissajous 面内/面外频率不可约，是准周期轨道，不做周期闭合；初猜
+    状态作为星历修正 patch points 的采样基准，由 ``design_orbit`` 的
+    下游多重打靶精化。``period`` 取面内名义周期 2π/ω_xy。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    state0, nominal_period = compute_lissajous_initial_guess(
+        dynamics.system,
+        collinear_point,
+        amplitude_in_km,
+        amplitude_out_km,
+        phase_in,
+        phase_out,
+    )
+    orbit = Orbit(
+        states=state0.reshape(1, -1),
+        times=np.array([0.0]),
+        system=dynamics.system,
+    )
+    orbit.period = nominal_period
+    orbit.family_type = "lissajous"
+    orbit.parameters = {
+        "collinear_point": collinear_point,
+        "amplitude_in_km": amplitude_in_km,
+        "amplitude_out_km": amplitude_out_km,
+    }
+    return orbit
+
+
+def design_triangular(
+    point: int,
+    amplitude_in_km: float,
+    amplitude_out_km: float,
+    phase_in: float,
+    phase_out: float,
+    *,
+    dynamics: CR3BP_Dynamics | None = None,
+) -> Orbit:
+    """生成 L4/L5 邻域拟周期轨道初猜（等边三角形平动点）。
+
+    面内振幅默认均分给短/长两模态（拆分比例待 golden 标定）。不做微分
+    修正：现有 ``algorithms/strategies/`` 全基于 x 轴/y 轴镜面对称，L4/L5
+    无适用对称性。初猜状态直接作星历修正 patch points 的采样基准。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    state0, nominal_period = compute_triangular_initial_guess(
+        dynamics.system,
+        point,
+        amplitude_in_km,
+        amplitude_out_km,
+        phase_in,
+        phase_out,
+    )
+    orbit = Orbit(
+        states=state0.reshape(1, -1),
+        times=np.array([0.0]),
+        system=dynamics.system,
+    )
+    orbit.period = nominal_period
+    orbit.family_type = f"L{point}"
+    orbit.parameters = {
+        "point": point,
+        "amplitude_in_km": amplitude_in_km,
+        "amplitude_out_km": amplitude_out_km,
+    }
+    return orbit

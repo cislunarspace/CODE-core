@@ -60,7 +60,9 @@ from ..io import (
 from .cr3bp_orbits import (
     design_dro,
     design_halo,
+    design_lissajous,
     design_nrho,
+    design_triangular,
     earth_moon_system,
 )
 
@@ -210,6 +212,10 @@ def _validate_params(
     collinear_point: int | None,
     north_south: int | None,
     perilune_height: float | None,
+    amplitude_in: float | None,
+    amplitude_out: float | None,
+    phase_in: float | None,
+    phase_out: float | None,
 ) -> dict[str, float | int]:
     """按类型校验形状参数并填默认值（对齐 MATLAB ``design_orbit.m`` 的
     类型依赖默认值与取值范围），返回规范化参数。"""
@@ -262,7 +268,64 @@ def _validate_params(
             "phase": phase,
         }
 
-    raise ValueError(f"orbit_type 必须为 DRO/NRHO/Halo，当前 {sel!r}")
+    if sel == "LISSAJOUS":
+        collinear_point = 2 if collinear_point is None else int(collinear_point)
+        amplitude_in = 2500.0 if amplitude_in is None else float(amplitude_in)
+        amplitude_out = 7500.0 if amplitude_out is None else float(amplitude_out)
+        phase_in = 0.01 if phase_in is None else float(phase_in)
+        phase_out = 0.55 if phase_out is None else float(phase_out)
+        if collinear_point not in (1, 2, 3):
+            raise ValueError(f"Lissajous collinear_point 必须为 1/2/3，当前 {collinear_point}")
+        limit = 100000.0 if collinear_point == 3 else 7600.0
+        if not 0.0 < amplitude_in <= limit:
+            raise ValueError(
+                f"Lissajous L{collinear_point} amplitude_in 应在 (0, {limit:.0f}] km，"
+                f"实际为 {amplitude_in:.0f} km"
+            )
+        if not 0.0 < amplitude_out <= limit:
+            raise ValueError(
+                f"Lissajous L{collinear_point} amplitude_out 应在 (0, {limit:.0f}] km，"
+                f"实际为 {amplitude_out:.0f} km"
+            )
+        if not 0.0 <= phase_in <= 1.0:
+            raise ValueError(f"Lissajous phase_in 应在 0~1 之间，实际为 {phase_in}")
+        if not 0.0 <= phase_out <= 1.0:
+            raise ValueError(f"Lissajous phase_out 应在 0~1 之间，实际为 {phase_out}")
+        return {
+            "collinear_point": collinear_point,
+            "amplitude_in": amplitude_in,
+            "amplitude_out": amplitude_out,
+            "phase_in": phase_in,
+            "phase_out": phase_out,
+        }
+
+    if sel in ("L4", "L5"):
+        amplitude_in = 8000.0 if amplitude_in is None else float(amplitude_in)
+        amplitude_out = 6000.0 if amplitude_out is None else float(amplitude_out)
+        phase_in = 0.0 if phase_in is None else float(phase_in)
+        phase_out = 0.0 if phase_out is None else float(phase_out)
+        if not 0.0 < amplitude_in <= 10000.0:
+            raise ValueError(
+                f"{sel} amplitude_in 应在 (0, 10000] km 之间，实际为 {amplitude_in:.0f} km"
+            )
+        if not 0.0 < amplitude_out <= 76000.0:
+            raise ValueError(
+                f"{sel} amplitude_out 应在 (0, 76000] km 之间，实际为 {amplitude_out:.0f} km"
+            )
+        if not 0.0 <= phase_in <= 1.0:
+            raise ValueError(f"{sel} phase_in 应在 0~1 之间，实际为 {phase_in}")
+        if not 0.0 <= phase_out <= 1.0:
+            raise ValueError(f"{sel} phase_out 应在 0~1 之间，实际为 {phase_out}")
+        return {
+            "amplitude_in": amplitude_in,
+            "amplitude_out": amplitude_out,
+            "phase_in": phase_in,
+            "phase_out": phase_out,
+        }
+
+    raise ValueError(
+        f"orbit_type 必须为 DRO/NRHO/Halo/Lissajous/L4/L5，当前 {sel!r}"
+    )
 
 
 def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_Dynamics) -> Orbit:
@@ -271,10 +334,28 @@ def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_D
         return design_dro(params["amplitude"], dynamics=dynamics)
     if sel == "HALO":
         return design_halo(int(params["collinear_point"]), params["amplitude"], dynamics=dynamics)
-    return design_nrho(
-        int(params["collinear_point"]),
-        int(params["north_south"]),
-        params["perilune_height"],
+    if sel == "NRHO":
+        return design_nrho(
+            int(params["collinear_point"]),
+            int(params["north_south"]),
+            params["perilune_height"],
+            dynamics=dynamics,
+        )
+    if sel == "LISSAJOUS":
+        return design_lissajous(
+            int(params["collinear_point"]),
+            params["amplitude_in"],
+            params["amplitude_out"],
+            params["phase_in"],
+            params["phase_out"],
+            dynamics=dynamics,
+        )
+    return design_triangular(
+        4 if sel == "L4" else 5,
+        params["amplitude_in"],
+        params["amplitude_out"],
+        params["phase_in"],
+        params["phase_out"],
         dynamics=dynamics,
     )
 
@@ -370,6 +451,10 @@ def design_orbit(
     collinear_point: int | None = None,
     north_south: int | None = None,
     perilune_height: float | None = None,
+    amplitude_in: float | None = None,
+    amplitude_out: float | None = None,
+    phase_in: float | None = None,
+    phase_out: float | None = None,
     epoch: Sequence[float] | str = (2024, 1, 1, 0, 0, 0.0),
     duration: float = 1.0,
     output_step: float = 3600.0,
@@ -384,17 +469,24 @@ def design_orbit(
     correction_velocity_tolerance: float = 0.1,
     verbose: bool = False,
 ) -> OrbitDesignResult:
-    """端到端设计 DRO/NRHO/Halo 标称轨道。
+    """端到端设计六类标称轨道（DRO/NRHO/Halo/Lissajous/L4/L5）。
 
     Args:
-        orbit_type: ``"DRO"`` / ``"NRHO"`` / ``"Halo"``。
+        orbit_type: ``"DRO"`` / ``"NRHO"`` / ``"Halo"`` / ``"Lissajous"`` /
+            ``"L4"`` / ``"L5"``。
         amplitude: 振幅（km）。DRO 1737~110000，默认 10000；Halo 面外振幅
             ±73000（正北负南），默认 30000；NRHO 不用。
         phase: 初始相位（周期份额）。DRO/Halo 取值 0~1，默认 0.5001/0；
             NRHO 取值 0.01~0.99，默认 0.5。
         collinear_point: 共线平动点编号 1/2（Halo/NRHO，默认 2）。
+            Lissajous 取 1/2/3（默认 2）。
         north_south: 1=北 / 2=南（NRHO，默认 2）。
         perilune_height: 近月点高度（km，100~10000，NRHO，默认 5000）。
+        amplitude_in / amplitude_out: 面内/面外振幅（km）。Lissajous
+            L1/L2 各 ≤ 7600、L3 各 ≤ 100000（默认 2500/7500）；L4/L5 面内
+            ≤ 10000、面外 ≤ 76000（默认 8000/6000）。
+        phase_in / phase_out: 面内/面外初始相位（0~1）。Lissajous 默认
+            0.01/0.55；L4/L5 默认 0/0。
         epoch: 起始历元 UTC，``[年, 月, 日, 时, 分, 秒]`` 或 ISO 字符串。
         duration: 维持时间（年，0 < d ≤ 20）。
         output_step: 星历输出间隔（秒）。
@@ -445,6 +537,10 @@ def design_orbit(
         collinear_point=collinear_point,
         north_south=north_south,
         perilune_height=perilune_height,
+        amplitude_in=amplitude_in,
+        amplitude_out=amplitude_out,
+        phase_in=phase_in,
+        phase_out=phase_out,
     )
 
     if spice is None:
@@ -455,7 +551,7 @@ def design_orbit(
     system = earth_moon_system()
     dynamics = CR3BP_Dynamics(system)
     cr3bp_orbit = _cr3bp_orbit_for(sel, params, dynamics)
-    phase = float(params["phase"])
+    phase = float(params.get("phase", 0.0))
     jacobi = float(system.get_jacobi_constant(cr3bp_orbit.states[0]))
 
     # --- 2. 相位 → 历元状态，采样 patch points，转 J2000 ---
@@ -464,8 +560,12 @@ def design_orbit(
     # phase=0 起点一致；DRO 的参考状态是近侧穿越点，而 DFH 相位零点在远侧
     # 穿越点（黄金样本标定：DFH phase=0.5001 的 DRO 首行恰在近侧穿越点，
     # 距月取最小值），差半个周期
-    phase_offset = 0.5 if sel == "DRO" else 0.0
-    t0_syn = ((phase + phase_offset) % 1.0) * period
+    if sel in ("LISSAJOUS", "L4", "L5"):
+        # 面内/面外相位已体现在初猜状态（t=0 即历元状态）
+        t0_syn = 0.0
+    else:
+        phase_offset = 0.5 if sel == "DRO" else 0.0
+        t0_syn = ((phase + phase_offset) % 1.0) * period
     if t0_syn > 0.0:
         state0_syn = np.asarray(
             dynamics.propagate_orbit_state_at_time(cr3bp_orbit, t0_syn), dtype=float
