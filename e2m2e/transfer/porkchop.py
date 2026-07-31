@@ -202,6 +202,61 @@ class PorkchopData:
             conn.close()
         return cls(t_dep=t_dep, tof=tof, dv1=dv1, dv2=dv2, total=total)
 
+    # ------------------------------------------------------------------
+    # 插值代价查询
+    # ------------------------------------------------------------------
+
+    def query(self, t_dep: float, tof: float) -> float:
+        """双线性插值查询转移代价（总 ΔV）。
+
+        在规则网格上定位 ``(t_dep, tof)`` 所在的单元格，用四角点双线性
+        插值估计 ``total``。若四角点含 NaN（无解组合），返回 NaN——调用方
+        应检查返回值或先用 :func:`pareto_front` 筛选有效区域。
+
+        对应规划文档「宋亮俊数据库的在线查询」（主题 8）：预计算网格 +
+        双线性插值，替代逐点重算 Lambert。
+
+        Args:
+            t_dep: 出发时间（须在本网格 ``t_dep`` 范围内）
+            tof: 飞行时间（须在本网格 ``tof`` 范围内）
+
+        Returns:
+            插值得到的总 ΔV（km/s），或 NaN（格点含无解组合）。
+
+        Raises:
+            ValueError: 查询点超出网格范围。
+        """
+        i, di = _grid_locate(self.t_dep, t_dep)
+        j, dj = _grid_locate(self.tof, tof)
+
+        # 双线性插值：f(i+di, j+dj) = (1-di)(1-dj)f(i,j) + di(1-dj)f(i+1,j)
+        #                              + (1-di)dj f(i,j+1) + di·dj f(i+1,j+1)
+        c00 = self.total[i, j]
+        c10 = self.total[i + 1, j]
+        c01 = self.total[i, j + 1]
+        c11 = self.total[i + 1, j + 1]
+        if np.isnan(c00) or np.isnan(c10) or np.isnan(c01) or np.isnan(c11):
+            return float("nan")
+        return float(
+            (1 - di) * (1 - dj) * c00 + di * (1 - dj) * c10 + (1 - di) * dj * c01 + di * dj * c11
+        )
+
+    @classmethod
+    def query_scan(cls, path: str | Path, scan_id: int, t_dep: float, tof: float) -> float:
+        """从 SQLite 解数据库读网格并插值查询。
+
+        等价于 ``cls.from_sqlite(path, scan_id).query(t_dep, tof)``。
+
+        Args:
+            path: SQLite 文件路径。
+            scan_id: 扫描编号。
+            t_dep, tof: 查询点（同 :meth:`query`）。
+
+        Returns:
+            插值得到的总 ΔV（km/s），或 NaN。
+        """
+        return cls.from_sqlite(path, scan_id).query(t_dep, tof)
+
 
 _SCHEMA_SQL = """\
 CREATE TABLE IF NOT EXISTS scans (
@@ -223,7 +278,25 @@ CREATE TABLE IF NOT EXISTS design_points (
     total   REAL
 );
 CREATE INDEX IF NOT EXISTS idx_points_scan ON design_points(scan_id);
+CREATE INDEX IF NOT EXISTS idx_points_grid ON design_points(scan_id, t_dep, tof);
 """
+
+
+def _grid_locate(axis: np.ndarray, x: float) -> tuple[int, float]:
+    """在单调递增坐标轴上定位 x，返回 (i, dx) 使 x ∈ [axis[i], axis[i+1]]。
+
+    dx ∈ [0, 1] 为归一化偏移。x 恰好等于末端点时返回 (n-2, 1.0)。
+    """
+    n = axis.shape[0]
+    if n < 2:
+        raise ValueError(f"坐标轴长度 {n} < 2，无法插值")
+    x = float(x)
+    if x < axis[0] or x > axis[-1]:
+        raise ValueError(f"查询点 {x} 超出网格范围 [{axis[0]}, {axis[-1]}]")
+    i = int(np.searchsorted(axis, x, side="right")) - 1
+    i = min(i, n - 2)  # x == axis[-1] 时 i = n-1 → 钳到 n-2
+    dx = (x - axis[i]) / (axis[i + 1] - axis[i])
+    return i, dx
 
 
 def _nan_to_none(x: float) -> float | None:

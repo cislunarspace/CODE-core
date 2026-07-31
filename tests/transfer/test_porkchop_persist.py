@@ -182,3 +182,88 @@ class TestParetoFront:
         front = pareto_front(data, objectives=("dv1", "tof"))
         # (tof=1, dv1=1.0) tof 最小；(tof=2, dv1=0.5) dv1 最小 → 都在前沿
         assert front.total.shape[0] == 2
+
+
+class TestQuery:
+    """插值代价查询：网格点精确值、双线性、NaN、越界、SQLite 路径。"""
+
+    def test_grid_point_exact(self):
+        """网格点上查询返回精确值。"""
+        t_dep = np.array([0.0, 1.0, 2.0])
+        tof = np.array([10.0, 20.0, 30.0])
+        total = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+        data = PorkchopData(t_dep=t_dep, tof=tof, dv1=total * 0.5, dv2=total * 0.5, total=total)
+        assert data.query(1.0, 20.0) == pytest.approx(5.0)
+        assert data.query(0.0, 10.0) == pytest.approx(1.0)
+        assert data.query(2.0, 30.0) == pytest.approx(9.0)
+
+    def test_bilinear_interpolation(self):
+        """非网格点双线性插值。"""
+        t_dep = np.array([0.0, 1.0, 2.0])
+        tof = np.array([10.0, 20.0, 30.0])
+        total = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+        data = PorkchopData(t_dep=t_dep, tof=tof, dv1=total * 0.5, dv2=total * 0.5, total=total)
+        # 中心点：(1+2+4+5)/4 = 3.0
+        assert data.query(0.5, 15.0) == pytest.approx(3.0)
+        # 1/4 处：加权平均
+        assert data.query(0.25, 12.5) == pytest.approx(
+            0.75 * 0.75 * 1.0 + 0.25 * 0.75 * 4.0 + 0.75 * 0.25 * 2.0 + 0.25 * 0.25 * 5.0
+        )
+
+    def test_nan_propagation(self):
+        """格点含 NaN 时返回 NaN。"""
+        t_dep = np.array([0.0, 1.0])
+        tof = np.array([1.0, 2.0])
+        total = np.array([[1.0, np.nan], [2.0, 3.0]])
+        data = PorkchopData(t_dep=t_dep, tof=tof, dv1=total * 0.5, dv2=total * 0.5, total=total)
+        assert np.isnan(data.query(0.5, 1.5))
+
+    def test_out_of_bounds_raises(self):
+        """越界查询报错。"""
+        t_dep = np.array([0.0, 1.0])
+        tof = np.array([1.0, 2.0])
+        total = np.array([[1.0, 2.0], [3.0, 4.0]])
+        data = PorkchopData(t_dep=t_dep, tof=tof, dv1=total * 0.5, dv2=total * 0.5, total=total)
+        with pytest.raises(ValueError, match="超出网格范围"):
+            data.query(3.0, 1.5)
+        with pytest.raises(ValueError, match="超出网格范围"):
+            data.query(0.5, 5.0)
+
+    def test_query_scan_from_sqlite(self, leo_geo, tmp_path):
+        """SQLite 路径：写入→query_scan→与内存 query 一致。"""
+        data = _small_grid(leo_geo)
+        db = tmp_path / "porkchop.db"
+        scan_id = data.to_sqlite(db, orbit_pair="LEO->GEO")
+
+        # 网格点精确值
+        td, tf = float(data.t_dep[2]), float(data.tof[3])
+        expected = data.query(td, tf)
+        actual = PorkchopData.query_scan(db, scan_id, td, tf)
+        assert actual == pytest.approx(expected)
+
+    def test_leo_geo_query_smooth(self, leo_geo):
+        """LEO→GEO 真实网格：霍曼谷区附近插值平滑。"""
+        dep, arr = leo_geo
+        r1, r2 = 7000.0, 42164.0
+        a_t = (r1 + r2) / 2
+        t_h = np.pi * np.sqrt(a_t**3 / MU_EARTH)
+        phase_arr0 = np.pi - dep.n * 0.0 - arr.n * t_h
+        arr_aligned = CircularOrbitTerminal(r2, phase0=phase_arr0)
+        t_dep = np.linspace(0.0, 3600.0, 20)
+        tof = np.linspace(t_h * 0.9, t_h * 1.1, 20)
+        data = porkchop(dep, arr_aligned, t_dep, tof, mu=MU_EARTH, dynamics=None)
+
+        # 谷区中心附近插值应与邻近网格点接近
+        td_mid = float(data.t_dep[10])
+        tf_mid = float(data.tof[10])
+        q = data.query(td_mid, tf_mid)
+        assert not np.isnan(q)
+        # 插值点在邻近四点值域内
+        neighbors = [
+            data.total[10, 10],
+            data.total[11, 10],
+            data.total[10, 11],
+            data.total[11, 11],
+        ]
+        valid = [v for v in neighbors if not np.isnan(v)]
+        assert min(valid) <= q <= max(valid)
