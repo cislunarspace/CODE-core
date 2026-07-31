@@ -25,6 +25,7 @@ from .multi_impulse import (
     MultiImpulseTransfer,
     PrimerVectorReport,
 )
+from .nsga2 import NSGA2Result, nsga2
 from .porkchop import ParetoFront, PorkchopData, pareto_front, porkchop
 from .propulsion import ImpulsivePropulsion
 from .qlaw import qlaw_guess, rv_to_keplerian
@@ -67,6 +68,8 @@ __all__ = [
     "porkchop",
     "ParetoFront",
     "pareto_front",
+    "NSGA2Result",
+    "nsga2",
     "ThreeBodyLambert",
     "TransferArc",
     "TransferSolution",

@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Hermite-Simpson 配点求解器（`e2m2e.transfer.lowthrust_collocation`）：`LowThrustCollocation` 并列于直接打靶（`LowThrustShooting`），把节点状态+控制都作决策变量、HS 缺陷约束保证段间动力学连续，比单弧打靶更鲁棒。复用地基 Rust `augmented_eom_7d`（新增 `augmented_eom_7d_py` 单点 EOM PyO3 出口供配点频繁求值），Q-law 初猜可用（`solve_from_qlaw`）。决策变量 10(N+1)（节点状态7D+控制3D），Simpson 缺陷约束。验证：HS 缺陷在真实轨迹上随弧长 O(dt⁴) 下降（转录正确）、min-fuel 闭环收敛、对标直接打靶末态一致；3 测试全过。解析缺陷雅可比（块三对角）留后续性能优化
 - porkchop 持久化与 Pareto 前沿（`e2m2e.transfer.porkchop`，主题 8）：`PorkchopData.to_sqlite`/`from_sqlite` 把 ΔV 网格落盘为 SQLite 解数据库（scans 元数据表 + design_points 展平表，NaN→NULL，stdlib sqlite3 零新增依赖，多 scan 自增累积）；`pareto_front` 用经典非支配排序（Deb 2002 O(MN²)）从网格提取 ΔV–TOF Pareto 前沿（Topputo 2013 双目标范式），支持自定义目标字段组合，产出 `ParetoFront` 带绘图。10 测试全过（SQLite 往返等价、多 scan 累积、已知支配关系、LEO→GEO 前沿形态）
 - porkchop 插值代价查询（`e2m2e.transfer.porkchop`，主题 8）：`PorkchopData.query(t_dep, tof)` 规则网格双线性插值查总 ΔV，NaN 格点传播 NaN；`PorkchopData.query_scan(path, scan_id, t_dep, tof)` 从 SQLite 解数据库读网格后插值（等价于 from_sqlite + query）。补 `(scan_id, t_dep, tof)` 索引。对应规划文档「宋亮俊数据库的在线查询」——预计算网格 + 双线性插值替代逐点重算 Lambert。6 测试全过（网格点精确值、双线性权重、NaN 传播、越界报错、SQLite 路径一致性、LEO→GEO 谷区平滑性）
+- NSGA-II 多目标优化器（`e2m2e.transfer.nsga2`，主题 8）：`nsga2(objectives, bounds, ...)` 经典 NSGA-II（Deb 2002），非支配排序 + 拥挤度选择 + 精英保留，SBX 交叉 + 多项式变异。约束用 Deb 可行支配规则（可行解支配不可行解，都不可行按违反量排序），无需罚因子。`ObjectiveFn` 签名 `fn(x) -> (objectives, violation)`，全部目标最小化。并行评估用 ProcessPoolExecutor（Windows spawn 安全，fn 须模块级可 pickle）。ZDT1 收敛验证（100 代平均误差 0.0013）、Schaffer N.1 收敛、约束问题前沿全可行、串行/并行一致性。11 测试全过
 
 ## [5.3.1] - 2026-07-29
 
