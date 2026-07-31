@@ -1,21 +1,18 @@
-"""e2m2e 可视化模块
+"""????? shim?ADR 0011 ????
 
-提供轨道族、转移轨迹的绘图工具。
-使用统一的 PlotConfig 配置类管理字体、颜色、尺寸等绘图参数。
-稳定性分析请使用 e2m2e.algorithms.stability 模块。
+????? ``e2m2e.tools.viz``?????????
 """
 
-from .base import OrbitVisualizer, ProjectionPlane
-from .config import BODY_ICON_PATH_ENV, BODY_ICON_SCALE_ENV, PlotConfig
-from .family import FamilyPlotter
-from .transfer import TransferPlotter
+from __future__ import annotations
 
-__all__ = [
-    "BODY_ICON_PATH_ENV",
-    "BODY_ICON_SCALE_ENV",
-    "PlotConfig",
-    "OrbitVisualizer",
-    "ProjectionPlane",
-    "FamilyPlotter",
-    "TransferPlotter",
-]
+import importlib
+
+_impl = importlib.import_module("e2m2e.tools.viz")
+
+
+def __getattr__(name: str):
+    return getattr(_impl, name)
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(dir(_impl)))

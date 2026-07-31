@@ -103,9 +103,8 @@ def test_mcp_server_placeholder():
         create_server(None)
 
 
-def test_tools_logging_placeholder():
-    """tools/logging 配置工厂占位。"""
+def test_tools_logging_implemented():
+    """tools/logging 配置工厂已实现。"""
     from e2m2e.tools.logging import configure_logging
 
-    with pytest.raises(NotImplementedError, match="tools/logging"):
-        configure_logging()
+    configure_logging(level="ERROR")
