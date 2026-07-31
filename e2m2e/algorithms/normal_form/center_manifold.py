@@ -25,9 +25,13 @@ Hamiltonian 的双曲-中心耦合项，把非线性 Hamiltonian 化简为仅依
    ``ad_{W_i}^n / n!``（Lie 级数）累加，再加上 ``Ẇ_i`` 项更新各阶；
 3. 第 ``i`` 阶按判别条件删去被 ``W_i`` 消去的项。
 
-数学上每步都应在末尾用实变换 ``D⁻¹`` 映回实坐标——但由于虚变换 ``D``
-是常值辛矩阵且同调方程已显式消去耦合，本模块直接在实 ``QF`` 坐标上
-操作（``D`` 只用于推导 ``k`` 的形式），与 qiao 数值实现等价。
+与 qiao 数值实现一致，每个化简步骤前后做复基底变换（
+:func:`_linear_basis_change`）：先虚变换 ``X = D·Y``（实坐标 → 复坐标，
+二阶部分成复对角形 ``λ·y1·y4 + i·ω_p·y2·y5 + i·ω_v·y3·y6``，同调方程
+的复值特征频率 ``k`` 只有在此坐标系下才与 ``H_2`` 的泊松谱匹配），
+Lie 变换完成后实变换 ``Y = D⁻¹·X`` 映回实坐标并取实部（吸收数值虚部
+噪声）。生成函数 ``W`` 保持复坐标——:mod:`.coord_trans.qf_cm` 的
+QF↔CM Lie 流在复域消费它（先 ``Re2Im`` 再应用 ``W`` 再 ``Im2Re``）。
 
 单位约定：内部 Hamiltonian 系数全部在 qiao 归一化单位（TU）下运算；
 与 SI 之间换算只能经 :class:`NormalFormContext` 与 :mod:`.units`。
@@ -52,7 +56,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from math import factorial
+from math import comb, factorial
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -113,26 +117,26 @@ class CenterManifoldResult:
 
     @property
     def max_hyperbolic_coupling(self) -> float:
-        """化简后剩余双曲-中心交叉项系数的最大绝对值。
+        """化简后剩余双曲-中心**耦合**项系数的最大绝对值。
 
-        "双曲-中心交叉项"指同时涉及双曲方向 ``q_1``/``p_1``（指数位
-        0/3）与中心方向（指数位 1/4 或 2/5）的 Hamiltonian 项；理想
-        化简后这类项应被消去（系数 ≈ 0）。本属性是步骤 ``"invariant"``
-        化简效果的核心诊断量：值越小，化简越彻底。
+        耦合指双曲方向不平衡（``pow[0] != pow[3]``）且涉及中心方向的
+        项——Step 1（``invariant``）的消去对象。双曲平衡的作用量项
+        （如 ``I₁³·I₂²``）在中心流形上（``q₁=p₁=0``）自动为零，不是
+        耦合，不统计。本属性是步骤 ``"invariant"`` 化简效果的核心
+        诊断量：值越小，化简越彻底。
 
         Returns:
-            ``max_{k∈terms} |coef_k|``，其中 ``k`` 遍历
-            ``(pow[0]+pow[3] > 0) and (pow[1]+pow[4]+pow[2]+pow[5] > 0)``
-            的项；无此类项时返回 ``0.0``。
+            ``max_{k∈terms} |coef_k|``，其中 ``k`` 遍历双曲不平衡且
+            含中心方向的项；无此类项时返回 ``0.0``。
         """
         mx = 0.0
         for pow_tuple, coef in self.hamiltonian_terms.items():
-            hyper = pow_tuple[0] + pow_tuple[3]
-            center = pow_tuple[1] + pow_tuple[4] + pow_tuple[2] + pow_tuple[5]
-            if hyper > 0 and center > 0:
-                m = float(np.max(np.abs(coef))) if np.ndim(coef) else abs(float(coef))
-                if m > mx:
-                    mx = m
+            if pow_tuple[0] != pow_tuple[3]:
+                center = pow_tuple[1] + pow_tuple[4] + pow_tuple[2] + pow_tuple[5]
+                if center > 0:
+                    m = float(np.max(np.abs(coef))) if np.ndim(coef) else abs(float(coef))
+                    if m > mx:
+                        mx = m
         return mx
 
     def W_for(self, step: str, order: int) -> dict[tuple[int, ...], npt.NDArray[np.complex128]]:
@@ -151,6 +155,107 @@ class CenterManifoldResult:
         if step not in self.W_series:
             raise KeyError(f"步骤 {step!r} 未执行；已执行：{self.steps_performed}")
         return dict(self.W_series[step].get(order, {}))
+
+
+# ---------------------------------------------------------------------------
+# 复基底变换（虚变换 / 实变换，迁移自 qiao Code10/Code11 的
+# virtual_transform_symbolic）
+# ---------------------------------------------------------------------------
+
+#: 6×6 复对角化矩阵 D（与 coord_trans/qf_cm.py 的 ``_D`` 逐元素一致，
+#: 亦与 qiao Code10/Code11 的虚变换矩阵一致）。双曲方向 q1/p1（位 0/3）
+#: 保持实；平面中心对 q2/p2（位 1/4）、垂直中心对 q3/p3（位 2/5）通过
+#: ``(1/√2, ±i/√2)`` 组合拆成 ±i 模式。实变换 ``X = D·Y`` 把实正规形
+#: ``(ω/2)(q²+p²)`` 化为复对角形 ``i·ω·q·p``（Gómez vol III §2.7.1）。
+_D: npt.NDArray[np.complex128] = np.zeros((6, 6), dtype=complex)
+_D[0, 0] = 1.0
+_D[1, 1] = 1.0 / np.sqrt(2.0)
+_D[1, 4] = 1j / np.sqrt(2.0)
+_D[2, 2] = 1.0 / np.sqrt(2.0)
+_D[2, 5] = 1j / np.sqrt(2.0)
+_D[3, 3] = 1.0
+_D[4, 4] = 1.0 / np.sqrt(2.0)
+_D[4, 1] = 1j / np.sqrt(2.0)
+_D[5, 5] = 1.0 / np.sqrt(2.0)
+_D[5, 2] = 1j / np.sqrt(2.0)
+
+#: ``D`` 的逆（预计算，供实变换复用）。
+_D_INV: npt.NDArray[np.complex128] = np.linalg.inv(_D)
+
+
+def _add_exp(pow_tuple: tuple[int, ...], idx: int, delta: int) -> tuple[int, ...]:
+    """幂次向量的单分量加法（``pow[idx] += delta``）。"""
+    lst = list(pow_tuple)
+    lst[idx] += delta
+    return tuple(lst)
+
+
+def _sub_exp(pow_tuple: tuple[int, ...], idx: int, delta: int) -> tuple[int, ...]:
+    """幂次向量的单分量减法（``pow[idx] -= delta``）。"""
+    lst = list(pow_tuple)
+    lst[idx] -= delta
+    return tuple(lst)
+
+
+def _linear_basis_change(
+    H_by_order: Mapping[int, Mapping[tuple[int, ...], npt.ArrayLike]],
+    M: npt.NDArray[np.complex128],
+) -> dict[int, dict[tuple[int, ...], npt.NDArray[np.complex128]]]:
+    """线性基底变换：对每个单项式做 ``v_i → Σ_j M[i,j]·w_j`` 替换展开。
+
+    用于中心流形化简的虚变换（``M = _D``，实坐标 → 复坐标）与实变换
+    （``M = _D_INV``，复坐标 → 实坐标），对应 qiao ``Code10``/``Code11``
+    的符号替换 ``subs(expr, X_coord, M * Y_coord)``：逐项展开成新变量的
+    多项式。系数保持为时间序列（复值）。
+
+    ``M`` 每行至多 2 个非零元素（``D`` 的结构），每个因子
+    ``(m0·w_j0 + m1·w_j1)^n`` 用二项式展开
+    ``Σ_s C(n,s)·m0^{n-s}·m1^s·w_j0^{n-s}·w_j1^s``，纯数组实现、不依赖
+    sympy。
+
+    Args:
+        H_by_order: ``{order: {pow: coef}}`` 系数表（变量为 ``v``）。
+        M: 6×6 复变换矩阵（``v → M·w``）。
+
+    Returns:
+        ``{order: {new_pow: coef}}``，系数为复值时间序列（变量为 ``w``）。
+    """
+    out: dict[int, dict[tuple[int, ...], npt.NDArray[np.complex128]]] = {}
+    for order, poly in H_by_order.items():
+        acc: dict[tuple[int, ...], npt.NDArray[np.complex128]] = {}
+        for pow_tuple, coef in poly.items():
+            # 当前单项式的展开表 {new_pow: 复标量系数}
+            terms: dict[tuple[int, ...], complex] = {
+                tuple(int(p) for p in pow_tuple): 1.0
+            }
+            for i, ni in enumerate(int(p) for p in pow_tuple):
+                if ni == 0:
+                    continue
+                row = [(j, M[i, j]) for j in range(6) if abs(M[i, j]) > 1e-12]
+                if not row:
+                    continue
+                # 先移除被展开变量的原幂次 ni（展开式从 ni·e_i 分解而来）
+                if len(row) == 1:
+                    j0, m0 = row[0]
+                    terms = {
+                        _add_exp(_sub_exp(pow_old, i, ni), j0, ni): c * (m0**ni)
+                        for pow_old, c in terms.items()
+                    }
+                else:
+                    (j0, m0), (j1, m1) = row
+                    new_terms: dict[tuple[int, ...], complex] = {}
+                    for pow_old, c in terms.items():
+                        reduced = _sub_exp(pow_old, i, ni)
+                        for s in range(ni + 1):
+                            npow = _add_exp(_add_exp(reduced, j0, ni - s), j1, s)
+                            cnew = c * comb(ni, s) * (m0 ** (ni - s)) * (m1**s)
+                            new_terms[npow] = new_terms.get(npow, 0.0) + cnew
+                    terms = new_terms
+            for new_pow, c in terms.items():
+                arr = acc.get(new_pow, 0) + np.asarray(coef, dtype=complex) * c
+                acc[new_pow] = arr
+        out[order] = acc
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -203,6 +308,11 @@ def _solve_wfunc_fft(
     N = t_arr.size
     if N < 2:
         return np.zeros(N, dtype=complex)
+    # 常数（自治系统）输入：同调方程退化为代数除法 ``W = -f/k``
+    # （Gómez vol III §2.7.1 / Ross (9.7.3)）。CR3BP 路径的系数是常数
+    # 时间序列，走此路径避免 FFT 的离散频率误差。
+    if np.max(np.abs(f_vals - f_vals[0])) <= 1e-2 * max(1.0, np.max(np.abs(f_vals))):
+        return np.full(N, -f_vals[0] / k, dtype=complex)
     dt = float(t_arr[1] - t_arr[0])
     M = int(np.ceil(extension_ratio * N))
     # mirror 边界延拓
@@ -210,16 +320,16 @@ def _solve_wfunc_fft(
     N_ext = f_ext.size
 
     F = np.fft.fft(f_ext)
-    if N_ext % 2 == 0:
-        freq = np.arange(-N_ext // 2, N_ext // 2, dtype=float)
-    else:
-        freq = np.arange(-(N_ext - 1) // 2, (N_ext - 1) // 2 + 1, dtype=float)
-    freq = freq * (1.0 / (N_ext * dt))
+    # 频率轴用 fftfreq（与 fft 输出顺序一致：DC 在 index 0，正频在前、
+    # 负频在后）。不要用「-N/2..N/2-1 + fftshift」构造——N_ext 为奇数时
+    # fftshift 的 DC 位置（ceil(N/2)）与 arange 的 DC 位置（(N-1)/2）
+    # 错位 1 个频率 bin，使常数输入的解产生 O(Δω/k) 的系统偏差
+    # （161 点窗口实测残差 4.8%）。
+    freq = np.fft.fftfreq(N_ext, dt)
     omega = 2.0 * np.pi * freq
     omega[np.abs(omega) < 1e-12] = 1e-12  # 避免零频奇异
 
     H = 1.0 / (1j * omega - k)
-    H = np.fft.fftshift(H)
     y_ext = np.fft.ifft(F * H)
     return y_ext[M : M + N]
 
@@ -278,22 +388,22 @@ def _solve_wfunc_fft_imag(
     N = t_arr.size
     if N < 2:
         return np.zeros(N, dtype=complex), False
+    # 常数输入：代数特解 W = -f/k（同 _solve_wfunc_fft）。同时避开 MAD
+    # 抑制把唯一非零 DC 尖峰当离群点缩回（常数输入下 MAD 判定无意义）。
+    if np.max(np.abs(f_vals - f_vals[0])) <= 1e-2 * max(1.0, np.max(np.abs(f_vals))):
+        return -np.full(N, f_vals[0], dtype=complex) / k, False
     dt = float(t_arr[1] - t_arr[0])
     M = int(np.ceil(extension_ratio * N))
     f_ext = np.concatenate([f_vals[:M][::-1], f_vals, f_vals[-M:][::-1]])
     N_ext = f_ext.size
 
     F = np.fft.fft(f_ext)
-    if N_ext % 2 == 0:
-        freq = np.arange(-N_ext // 2, N_ext // 2, dtype=float)
-    else:
-        freq = np.arange(-(N_ext - 1) // 2, (N_ext - 1) // 2 + 1, dtype=float)
-    freq = freq * (1.0 / (N_ext * dt))
+    # 频率轴用 fftfreq（与 fft 输出顺序一致）；见 _solve_wfunc_fft 注释。
+    freq = np.fft.fftfreq(N_ext, dt)
     omega = 2.0 * np.pi * freq
     omega[np.abs(omega) < 1e-12] = 1e-12
 
     H = 1.0 / (1j * omega - k)
-    H = np.fft.fftshift(H)
     Y_freq = F * H
     y_ext = np.fft.ifft(Y_freq)
     y = y_ext[M : M + N]
@@ -453,7 +563,7 @@ def _polylist_to_complex(
 
 
 def _lie_transform_step(
-    H_by_order: dict[int, dict[tuple[int, ...], npt.NDArray[np.floating]]],
+    H_by_order: dict[int, dict[tuple[int, ...], npt.NDArray[np.complex128]]],
     *,
     max_order: int,
     tlist: npt.NDArray[np.floating],
@@ -464,13 +574,15 @@ def _lie_transform_step(
     delete_criterion,
     use_imag_solver: bool,
 ) -> tuple[
-    dict[int, dict[tuple[int, ...], npt.NDArray[np.floating]]],
+    dict[int, dict[tuple[int, ...], npt.NDArray[np.complex128]]],
     dict[int, dict[tuple[int, ...], npt.NDArray[np.complex128]]],
 ]:
     """执行一步中心流形化简的 Lie 变换（Code10/Code11 通用骨架）。
 
     Args:
-        H_by_order: ``{order: {pow: coef}}``，被原地更新。
+        H_by_order: ``{order: {pow: coef}}``，被原地更新。系数为**复坐标**
+            （调用方已做虚变换），同调方程的复值特征频率
+            ``k`` 与复对角形 ``H_2`` 的泊松谱匹配。
         max_order: 截断阶数。
         tlist: 时间序列。
         lam, wp, wv: 频率（双曲/平面/垂直）。
@@ -478,8 +590,9 @@ def _lie_transform_step(
             （W 记零）。Code10 用 ``_is_invariant_term``（``pow1==pow4``），
             Code11 用 ``_is_center_term``（三对全平衡）。
         delete_criterion: 该阶处理完后**删除**不满足此判据的项。
-            Code10 与 Code11 不同：Code10 删所有非作用量项（三对全平衡），
-            Code11 只删真正求过 W 的项（``list_iseliminate``）。
+            Code10 与 Code11 不同：Code10 删双曲不平衡项
+            （``pow1≠pow4``），Code11 只删真正求过 W 的项
+            （``list_iseliminate``）。
         use_imag_solver: ``True`` 用复值 + MAD 求解器（Step 2），
             ``False`` 用实值求解器（Step 1）。
 
@@ -585,20 +698,14 @@ def _lie_transform_step(
 
 
 def _delete_invariant(pow_tuple, eliminated: list[tuple[int, ...]]) -> bool:
-    """Code10 删除判据：保留三对全平衡项（即作用量项）。
+    """Code10 删除判据：保留双曲平衡项（``pow(1)==pow(4)``）。
 
-    qiao ``Code10`` 第 131–134 行：``k[0]==k[3] and k[1]==k[4] and
-    k[2]==k[5]``。注意 Code10 用 ``keep_criterion=_is_invariant_term``
-    决定**求 W**（只对 ``pow1≠pow4`` 求解），但删除时更严，连中心非共振
-    项一并清掉。这是 qiao 的实际行为：Step 1 把 Hamiltonian 直接化到
-    作用量形式（Step 2 在此基础上再做精修，结构相同但 ``keep`` 更严、
-    无项可删时退化为恒等）。
+    qiao ``Code10`` 第 280–287 行：``if pow(1) == pow(4) continue``
+    （``pow(2)==pow(5) && pow(3)==pow(6)`` 在 qiao 源码中被注释掉）——
+    只删双曲方向不平衡的项，中心方向不平衡项**保留**给 Step 2
+    （``center``）处理。
     """
-    return (
-        int(pow_tuple[0]) == int(pow_tuple[3])
-        and int(pow_tuple[1]) == int(pow_tuple[4])
-        and int(pow_tuple[2]) == int(pow_tuple[5])
-    )
+    return int(pow_tuple[0]) == int(pow_tuple[3])
 
 
 def _delete_center(pow_tuple, eliminated: list[tuple[int, ...]]) -> bool:
@@ -667,10 +774,14 @@ class CenterManifoldReducer:
         if self.max_order < 1:
             raise ValueError(f"max_order 必须为正，得到 {self.max_order}")
 
-        # 频率（实标准形 D 同源）
-        lam = float(self.context.characteristic_exponent)
-        nu1, nu2 = self.context.central_frequencies
-        wp, wv = float(nu1), float(nu2)
+        # 频率：从 qf_result 的实标准形 D 提取（与 QF 变换 B 严格自洽）。
+        # constant 方法（CR3BP）的 D 是 V⁻¹MV 的数值（M 特征值），与
+        # context 固化频率可有 0.3% 失谐；用 D 提取保证同调方程的谱
+        # k 与 H₂ 精确匹配。
+        D_qf = np.asarray(qf_result.D, dtype=float).reshape(6, 6)
+        lam = float(D_qf[0, 0])
+        wp = float(abs(D_qf[1, 4]))
+        wv = float(abs(D_qf[2, 5]))
 
         tlist = np.asarray(qf_result.tlist, dtype=float).ravel()
         N = tlist.size
@@ -681,6 +792,12 @@ class CenterManifoldReducer:
         W_all: dict[str, dict[int, dict[tuple[int, ...], npt.NDArray[np.complex128]]]] = {}
         steps_done: list[str] = []
         for step in steps_resolved:
+            # 虚变换：实坐标 → 复坐标。二阶部分化为复对角形
+            # λ·y1·y4 + i·ω_p·y2·y5 + i·ω_v·y3·y6 后，同调方程的特征
+            # 频率 k（_characteristic_freq 的复值公式）才与泊松谱匹配。
+            # 对应 qiao Code10/Code11 的 ``X = D·Y`` 虚变换。
+            H_by_order = _linear_basis_change(H_by_order, _D)
+
             if step == "invariant":
                 H_by_order, W_step = _lie_transform_step(
                     H_by_order,
@@ -705,7 +822,14 @@ class CenterManifoldReducer:
                     delete_criterion=_delete_center,
                     use_imag_solver=True,
                 )
-            # W 保留复值：Step 1（invariant）的双曲特征频率 λ 为实数，W
+            # 实变换：复坐标 → 实坐标，取实部吸收数值虚部噪声。
+            # 对应 qiao Code10/Code11 末尾的 ``Y = D⁻¹·X`` 实变换。
+            H_by_order = _linear_basis_change(H_by_order, _D_INV)
+            H_by_order = {
+                o: {k: np.real(np.asarray(v, dtype=complex)) for k, v in poly.items()}
+                for o, poly in H_by_order.items()
+            }
+            # W 保留复坐标：Step 1（invariant）的双曲特征频率 λ 为实数，W
             # 天然实值；Step 2（center）的中心频率为纯虚 iω，同调方程特解
             # W 为纯虚（实部≈0）。coord_trans 的 QF↔CM Lie 流在复域操作，
             # 必须拿到完整复值 W，故此处不取实部。对应 qiao Code10/Code11
@@ -816,16 +940,19 @@ class CenterManifoldReducer:
 def _max_hyperbolic_center_coupling(
     terms: Mapping[tuple[int, ...], npt.ArrayLike],
 ) -> float:
-    """计算 Hamiltonian 表中双曲-中心交叉项系数的最大绝对值。
+    """计算 Hamiltonian 表中双曲-中心**耦合**项系数的最大绝对值。
 
-    双曲方向指数位 0/3（``q_1``/``p_1``），中心方向指数位 1/4/2/5
-    （``q_2``/``p_2``/``q_3``/``p_3``）。同时涉及时即为交叉项。
+    耦合指**双曲方向不平衡**（``pow[0] != pow[3]``）且涉及中心方向的
+    项——Step 1（``invariant``）的消去对象。双曲方向平衡的项（如
+    ``I₁³·I₂²``）只是作用量组合：在中心流形上 ``q₁=p₁=0`` 时自动为零，
+    不是耦合，不统计在内。
     """
     mx = 0.0
     for pow_tuple, coef in terms.items():
-        hyper = int(pow_tuple[0]) + int(pow_tuple[3])
+        if int(pow_tuple[0]) == int(pow_tuple[3]):
+            continue  # 双曲平衡：作用量项，非耦合
         center = int(pow_tuple[1]) + int(pow_tuple[4]) + int(pow_tuple[2]) + int(pow_tuple[5])
-        if hyper > 0 and center > 0:
+        if center > 0:
             arr = np.asarray(coef, dtype=float).ravel()
             m = float(np.max(np.abs(arr))) if arr.size else 0.0
             if m > mx:

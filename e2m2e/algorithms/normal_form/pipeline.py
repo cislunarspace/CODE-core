@@ -139,8 +139,15 @@ class NormalFormPipeline:
 
         # —— 步骤 2：quasi-Floquet ——
         try:
+            # CR3BP 降级路径：M(t) 常数，QF 变换退化为常数实标准形变换
+            # （method="constant"），B=V 不随 e^{λt} 增长；用户显式指定
+            # 的 multipoint/matrix 在长窗口下系数随窗口变化，短窗口 FFT
+            # 求解器有系统偏差（见 quasi_floquet 模块 docstring）。
+            qf_method = self.quasi_floquet_method
+            if not ds_result.spice_available and qf_method not in ("constant",):
+                qf_method = "constant"
             qf_reducer = QuasiFloquetReducer(
-                context=self.context, method=self.quasi_floquet_method, segment=self.qf_segment
+                context=self.context, method=qf_method, segment=self.qf_segment
             )
             qf_result = qf_reducer.reduce(ds_result)
         except Exception as exc:

@@ -316,6 +316,60 @@ def test_M_samples_are_hamiltonian(matrix_reducer, small_orbit_ds_result):
 
 
 # ---------------------------------------------------------------------------
+# 常数 QF 变换（CR3BP：B = 实标准形变换 V）
+# ---------------------------------------------------------------------------
+
+
+def test_cr3bp_hamiltonian_linearization_is_hamiltonian(l1_context):
+    """动量框架线性化 ``M_H`` 应为 Hamilton 矩阵（``MᵀJ + JM = 0``）。
+
+    速度框架 ``[[0,I],[S,−2Ω×]]`` 不满足此性质（特征向量无 J 正交性，
+    无法构造同时辛归一化与对角化的实标准形变换）；动量框架
+    ``[[C,I],[S_grav,C]]`` 满足且特征值等于物理频率。
+    """
+    from e2m2e.algorithms.normal_form.quasi_floquet import (
+        _cr3bp_hamiltonian_linearization,
+    )
+
+    M_H = _cr3bp_hamiltonian_linearization(l1_context.libration_position, l1_context.mu)
+    assert np.linalg.norm(M_H.T @ J6 + J6 @ M_H) < 1e-10
+    # 特征值与 qiao 权威频率一致（1% 内；γ/μ 数值舍入引起的小偏差）
+    ev = np.linalg.eigvals(M_H)
+    lam_num = max(abs(e.real) for e in ev)
+    om_num = sorted(abs(e.imag) for e in ev if abs(e.real) < 1e-8)
+    assert abs(lam_num - l1_context.characteristic_exponent) < 0.01 * l1_context.characteristic_exponent
+    assert abs(om_num[0] - l1_context.central_frequencies[1]) < 0.01 * l1_context.central_frequencies[1]
+    assert abs(om_num[-1] - l1_context.central_frequencies[0]) < 0.01 * l1_context.central_frequencies[0]
+
+
+def test_real_normal_form_transform_is_symplectic_diagonalizing(l1_context):
+    """``V`` 辛归一化且 ``V⁻¹MV = D``（实标准形结构、频率正确）。"""
+    from e2m2e.algorithms.normal_form.quasi_floquet import (
+        _cr3bp_hamiltonian_linearization,
+        real_normal_form_transform,
+    )
+
+    M_H = _cr3bp_hamiltonian_linearization(l1_context.libration_position, l1_context.mu)
+    V, D = real_normal_form_transform(M_H)
+    # 辛性
+    assert np.linalg.norm(V.T @ J6 @ V - J6) < 1e-10
+    # 对角化：V⁻¹MV = D（实标准形结构，非对角块仅 ±ω 位置）
+    D_check = np.linalg.solve(V, M_H @ V)
+    mask = np.zeros((6, 6), dtype=bool)
+    mask[0, 0] = mask[3, 3] = True
+    mask[1, 4] = mask[4, 1] = True
+    mask[2, 5] = mask[5, 2] = True
+    assert np.abs(D_check[~mask]).max() < 1e-10
+    # 频率：λ > 0、ωp > ωv > 0（L1/L2 面内频率更大）
+    assert D_check[0, 0] > 0
+    assert D_check[1, 4] > D_check[2, 5] > 0
+    # 还原的 D 与 qiao 权威频率一致（1% 内）
+    assert abs(D_check[0, 0] - l1_context.characteristic_exponent) < 0.01 * l1_context.characteristic_exponent
+    assert abs(D_check[1, 4] - l1_context.central_frequencies[0]) < 0.01 * l1_context.central_frequencies[0]
+    assert abs(D_check[2, 5] - l1_context.central_frequencies[1]) < 0.01 * l1_context.central_frequencies[1]
+
+
+# ---------------------------------------------------------------------------
 # sp(6) 基与代数工具
 # ---------------------------------------------------------------------------
 

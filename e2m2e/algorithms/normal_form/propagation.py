@@ -147,6 +147,11 @@ def propagate_parametric(
     在中心流形上积分 Hamilton 正则方程（钳制双曲方向 ``q1/p1=0``），逐时刻
     转回 rho。这是约化 Hamilton ``H⁰`` 的流——Lissajous 轨道。
 
+    **坐标约定**：积分在 **CM 笛卡尔坐标** ``[q1,q2,q3,p1,p2,p3]`` 上进行
+    （:func:`_eval_hamiltonian_rhs` 的正则方程），输入输出端经
+    ``param_to_cm``/``cm_to_param`` 与表征参数 ``(q1,p1,I2,θ2,I3,θ3)``
+    互转。不要直接把 param 当笛卡尔积分——作用量-角变量不是正则坐标。
+
     Args:
         rho_state: ``(6,)`` 初始 rho 状态（无量纲）。
         t_span: ``(K,)`` 时间序列（无量纲 TU），单调递增。
@@ -161,6 +166,8 @@ def propagate_parametric(
         - ``pos_err_km``: ``(M,)`` 位置误差（km），无真值时为 ``None``。
     """
     from scipy.integrate import solve_ivp
+
+    from .coord_trans.cm_param import cm_to_param, param_to_cm
 
     if nf_result.catalog_transformer is None:
         raise ValueError(
@@ -178,18 +185,19 @@ def propagate_parametric(
     hamiltonian_terms = nf_result.cm_result.hamiltonian_terms
     tlist = np.asarray(nf_result.qf_result.tlist, dtype=float).ravel()
 
-    # rho → param 初值
+    # rho → param → CM 笛卡尔（作用量-角变量 → 正则坐标）初值
     X0_param = transformer.rho_to_param(rho_state, t_arr[0])
     if np.any(np.isnan(X0_param)):
         return np.array([]), np.empty((0, 6)), None
+    X0_cm = param_to_cm(X0_param)
 
-    # 积分 Hamilton 正则方程
+    # 积分 Hamilton 正则方程（CM 笛卡尔坐标）
     span = t_arr[-1] - t_arr[0]
     max_step = 0.1 * abs(span)
     sol = solve_ivp(
         fun=lambda t, X: _eval_hamiltonian_rhs(t, X, hamiltonian_terms, tlist),
         t_span=[t_arr[0], t_arr[-1]],
-        y0=X0_param,
+        y0=X0_cm,
         method="DOP853",
         t_eval=t_arr,
         rtol=1e-12,
@@ -199,15 +207,16 @@ def propagate_parametric(
     if not sol.success:
         return np.array([]), np.empty((0, 6)), None
 
-    X_param_list = sol.y.T
+    X_cm_list = sol.y.T
     t_out = sol.t
 
-    # 逐时刻 param → rho
+    # 逐时刻 CM 笛卡尔 → param → rho
     rho_list = []
     t_valid = []
     for i in range(len(t_out)):
-        if np.all(np.isfinite(X_param_list[i])):
-            rho_i = transformer.param_to_rho(X_param_list[i], t_out[i])
+        if np.all(np.isfinite(X_cm_list[i])):
+            X_param_i = cm_to_param(X_cm_list[i])
+            rho_i = transformer.param_to_rho(X_param_i, t_out[i])
             if np.all(np.isfinite(rho_i)):
                 rho_list.append(rho_i)
                 t_valid.append(t_out[i])

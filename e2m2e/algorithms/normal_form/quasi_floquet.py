@@ -18,7 +18,14 @@
   最近的辛矩阵（qiao ``Code08_QuasiFloquet``）；
 - **李代数法** （``method="lie_algebra"``）：参数化 ``B = B₀·exp(ξ)``，
   ``ξ ∈ sp(6, R)``（21 维），在李代数里做修正，``B`` 自动保辛（qiao
-  ``Code08_QuasiFloquet_LA``）。
+  ``Code08_QuasiFloquet_LA``）；
+- **常数法** （``method="constant"``）：CR3BP 下 ``M`` 是常数矩阵，
+  方程 ``Ḃ = M·B − B·D`` 有常数解 ``B = V``（把 ``M`` 化到实标准形
+  ``D`` 的变换矩阵）。``V`` 的元素 O(1)、不随 ``e^{λt}`` 增长，投影到
+  QF 坐标的 Hamiltonian 系数保持常数——中心流形化简的同调方程退化为
+  代数除法（Gómez vol III §2.7.1），无需 FFT 频域求解。矩阵法/多点
+  打靶在 CR3BP 下解出的时变解（``B(0)=I`` 前向或 ``B(T)=I`` 末端）使
+  系数随窗口变化，短窗口下 FFT 求解器因频率分辨率不足产生系统偏差。
 
 辛保持性的数值保证：当 ``M(t)`` 与 ``D`` 都是 Hamilton 矩阵
 （``MᵀJ + JM = 0``）时，``BᵀJB`` 是 ``Ḃ`` 方程的精确首次积分，因此
@@ -84,6 +91,129 @@ def real_normal_form_matrix(lam: float, wp: float, wv: float) -> npt.NDArray[np.
     D[2, 5] = wv
     D[5, 2] = -wv
     return D
+
+
+def real_normal_form_transform(
+    M: npt.NDArray[np.floating],
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    """CR3BP 常数 QF 变换矩阵 ``V``：``X = V·Y`` 把常数 ``M`` 化为实标准形。
+
+    ``M`` 必须是**常数 Hamilton 矩阵**（``MᵀJ + JM = 0``，如
+    :func:`_cr3bp_hamiltonian_linearization` 的输出）——Hamilton 矩阵的
+    特征向量满足 J 正交性，实标准形基 ``V`` 才能同时辛归一化与对角化
+    （速度框架 ``[[0,I],[S,−2Ω×]]`` 不是 Hamilton 矩阵，其基无法辛
+    归一化，``symplectic_project`` 会破坏对角化）。特征值为一对实
+    ``±λ`` 与两对纯虚 ``±i·ω_p``、``±i·ω_v``。``V`` 的列按
+    :func:`real_normal_form_matrix` 的基底顺序取实标准形基：
+
+    .. math::
+
+        V = [v_λ,\\ \\mathrm{Re}(v_{ω_p}),\\ \\mathrm{Re}(v_{ω_v}),
+             v_{-λ},\\ \\mathrm{Im}(v_{ω_p}),\\ \\mathrm{Im}(v_{ω_v})]
+
+    并做辛归一化（``v_iᵀJv_{i+3} = 1`` 的列缩放 + 符号）与
+    :func:`symplectic_project` 精修，使 ``VᵀJV = J``、``V⁻¹MV = D``。
+    注：``ω_p`` 与 ``ω_v`` 按频率升序无法区分面内/面外（L1/L2 面内
+    频率更大），本函数按**特征向量的 z 分量占优**区分：z 占优为
+    ``ω_v``（垂直）、x/y 占优为 ``ω_p``（平面）。
+
+    Args:
+        M: ``(6, 6)`` 常数 Hamilton 线性化矩阵。
+
+    Returns:
+        ``(V, D)``：实标准形变换矩阵与实标准形（后者即
+        :func:`real_normal_form_matrix` 输出，从 ``V`` 还原）。
+    """
+    M = np.asarray(M, dtype=float)
+    eigvals, eigvecs = np.linalg.eig(M)
+    tol = 1e-8 * max(1.0, float(np.max(np.abs(eigvals))))
+
+    v_pos: npt.NDArray[np.complexfloating] | None = None  # +λ
+    v_neg: npt.NDArray[np.complexfloating] | None = None  # -λ
+    v_imag: list[tuple[float, npt.NDArray[np.complexfloating]]] = []  # +iω 族
+    for ev, vec in zip(eigvals, eigvecs.T):
+        if abs(ev.imag) <= tol:  # 实特征值 ±λ
+            if ev.real > 0 and v_pos is None:
+                v_pos = vec
+            elif ev.real < 0 and v_neg is None:
+                v_neg = vec
+        elif abs(ev.real) <= tol and ev.imag > 0:  # 正虚特征值 +iω
+            v_imag.append((float(ev.imag), vec))
+    if v_pos is None or v_neg is None or len(v_imag) < 2:
+        raise ValueError(
+            f"M 的特征值结构不符合共线平动点（需要 ±λ、±iω_p、±iω_v），"
+            f"实际谱：{sorted(round(abs(ev), 6) for ev in eigvals)}"
+        )
+    # 面内/面外按特征向量方向区分：z 占优 = 垂直（ω_v），x/y 占优 = 平面（ω_p）
+    def _z_dominance(v: npt.NDArray[np.complexfloating]) -> float:
+        return float(np.abs(v[2]) / (np.abs(v).max() + 1e-300))
+
+    if _z_dominance(v_imag[0][1]) > _z_dominance(v_imag[1][1]):
+        v_wp, v_wv = v_imag[1][1], v_imag[0][1]
+    else:
+        v_wp, v_wv = v_imag[0][1], v_imag[1][1]
+
+    # 列顺序：[q1, q2, q3, p1, p2, p3] = [v_λ, Re(v_ωp), Re(v_ωv), v_-λ, Im(v_ωp), Im(v_ωv)]
+    V = np.zeros((6, 6), dtype=float)
+    V[:, 0] = np.real(v_pos)
+    V[:, 3] = np.real(v_neg)
+    V[:, 1] = np.real(v_wp)
+    V[:, 4] = np.imag(v_wp)
+    V[:, 2] = np.real(v_wv)
+    V[:, 5] = np.imag(v_wv)
+
+    # 辛归一化：每对 (q_i, p_i) 的 J 内积 s_i = v_qiᵀ J v_pi 应非零；
+    # 缩放 v_qi·a、v_pi·a（a = 1/√|s_i|），符号取正。
+    for i in range(3):
+        s = float(V[:, i] @ J6 @ V[:, i + 3])
+        if abs(s) < 1e-14:
+            raise ValueError(f"V 的第 {i} 对列 J 内积为零，无法辛归一化")
+        a = 1.0 / np.sqrt(abs(s))
+        V[:, i] *= a
+        V[:, i + 3] *= a
+        if s < 0:
+            V[:, i + 3] *= -1.0
+
+    V = symplectic_project(V)
+    D = np.linalg.solve(V, M @ V)  # V⁻¹MV
+    return V, D
+
+
+def _cr3bp_hamiltonian_linearization(
+    r_lp: npt.NDArray[np.floating],
+    mu: float,
+) -> npt.NDArray[np.floating]:
+    """CR3BP 共线平动点处的 Hamiltonian 框架线性化矩阵（Hamilton 矩阵）。
+
+    动量坐标 ``(q, p)`` 下 ``H₂ = ½‖p‖² + pᵀ·C·q − ½qᵀ·S_grav·q``
+    （``C = Ω×`` 为旋转耦合、``S_grav`` 为纯引力势 Hessian，无离心），
+    正则方程线性化：
+
+    .. math::
+
+        M_H = \\begin{pmatrix} C & I \\\\ S_{grav} & C \\end{pmatrix}
+
+    满足 ``M_HᵀJ + J·M_H = 0``（Hamilton 矩阵），其特征向量具有
+    J 正交性，可构造同时辛归一化与对角化的实标准形变换
+    （:func:`real_normal_form_transform`）。速度框架
+    ``[[0, I], [S_eff, −2Ω×]]`` 不是 Hamilton 矩阵，不可用于此。
+
+    Args:
+        r_lp: 平动点位置（地心会合系，如 ``(1+γ, 0, 0)``）。
+        mu: 系统质量比。
+
+    Returns:
+        ``(6, 6)`` Hamilton 线性化矩阵 ``M_H``。
+    """
+    C = np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])  # Ω×
+    S = _cr3bp_hessian_symmetric(np.asarray(r_lp, dtype=float).ravel(), mu)
+    S_grav = S - np.diag([1.0, 1.0, 0.0])  # 去掉有效势离心（动量框架不含离心）
+    M = np.zeros((6, 6), dtype=float)
+    M[:3, :3] = C
+    M[:3, 3:] = np.eye(3)
+    M[3:, :3] = S_grav
+    M[3:, 3:] = C
+    return M
 
 
 # ---------------------------------------------------------------------------
@@ -246,15 +376,22 @@ def _build_M_at(
 ]:
     """从替代轨道构造 ``M(t)`` 的**连续**求值器与采样点栈。
 
-    会合系 CR3BP 线性化方程为
-    ``δρ̈ = S(ρ)·δρ − 2 Ω×δρ̇``（``S`` 对称、``Ω=ẑ``），写成 Hamilton
-    形 ``[δρ̇; δρ̈] = M·[δρ; δρ̇]`` 即
-    ``M = [[−Ω×, I₃], [S, −Ω×]]``，等价于 ``M = J·[[S, Ω×], [−Ω×, 0]]``
-    仍为 Hamilton 矩阵。
+    ``M(t)`` 是**动量框架**（Hamiltonian 正则坐标 ``(q, p)``）的线性化
+    （:func:`_cr3bp_hamiltonian_linearization` 同款，Hamilton 矩阵，
+    ``MᵀJ + JM = 0``）：
+
+    ``M = [[C, I₃], [S_grav, C]]``，``C = Ω×``（旋转耦合）、
+    ``S_grav`` 为纯引力势 Hessian（无离心）。
+
+    选动量框架而非速度框架 ``[[0, I], [S_eff, −2Ω×]]`` 的原因：
+    (1) QF 变换 ``B`` 的消费方是 Hamiltonian（:func:`build_cr3bp_hamiltonian`
+    的 ``(q,p)`` 坐标），``B`` 必须与 H 同框架；(2) 动量框架是 Hamilton
+    矩阵，特征向量具有 J 正交性，实标准形变换 ``V`` 可同时辛归一化与
+    对角化，且 ``BᵀJB`` 是 ``Ḃ`` 方程的首次积分（速度框架两者皆不成立）。
 
     关键：返回的求值器 ``M_at(t)`` 在任意 ``t`` 上**重新解析地**计算
-    ``S``（先对轨道位置线性插值，再算对称 Hessian），因此在 ODE 的每个
-    自适应步上 ``M(t)`` 都是精确的 Hamilton 矩阵。这避免了「预计算
+    ``S_grav``（先对轨道位置线性插值，再算对称 Hessian），因此在 ODE 的
+    每个自适应步上 ``M(t)`` 都是精确的 Hamilton 矩阵。这避免了「预计算
     ``M`` 再线性插值」会让 ``MᵀJ+JM=0`` 在节点之间失效、从而破坏辛
     守恒的问题。
 
@@ -269,16 +406,17 @@ def _build_M_at(
     r_lp = np.asarray(ds_result.context.libration_position, dtype=float).ravel()
     t_arr = np.asarray(ds_result.tlist, dtype=float).ravel()
 
-    # 旋转系角速度张量 [[0,-1,0],[1,0,0],[0,0,0]]（对应 Ω×v = Omega_x @ v）
+    # 旋转耦合张量 C = Ω×（[[0,-1,0],[1,0,0],[0,0,0]]）
     omega_x = np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
     def assemble(rho: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
-        S = _cr3bp_hessian_symmetric(rho + r_lp, mu)
+        S_eff = _cr3bp_hessian_symmetric(rho + r_lp, mu)
+        S_grav = S_eff - np.diag([1.0, 1.0, 0.0])  # 去掉有效势离心（动量框架不含）
         M = np.zeros((6, 6), dtype=float)
-        M[:3, :3] = -omega_x  # −Ω×（Coriolis 位置块）
+        M[:3, :3] = omega_x  # C
         M[:3, 3:] = np.eye(3)
-        M[3:, :3] = S
-        M[3:, 3:] = -omega_x
+        M[3:, :3] = S_grav
+        M[3:, 3:] = omega_x  # C
         return M
 
     def M_at(t: float) -> npt.NDArray[np.floating]:
@@ -810,14 +948,17 @@ class QuasiFloquetReducer:
         Raises:
             ValueError: ``method`` 非法，或 ``ds_result`` 数据不足。
         """
-        if self.method not in ("matrix", "lie_algebra", "multipoint"):
+        if self.method not in ("matrix", "lie_algebra", "multipoint", "constant"):
             raise ValueError(
-                f"method 必须是 'matrix' / 'lie_algebra' / 'multipoint'，得到 {self.method!r}"
+                f"method 必须是 'matrix' / 'lie_algebra' / 'multipoint' / 'constant'，"
+                f"得到 {self.method!r}"
             )
         if ds_result.Xlist.shape[0] < 2:
             raise ValueError(f"ds_result 至少需要 2 个采样点，得到 {ds_result.Xlist.shape[0]}")
 
-        # —— 实标准形 D（qiao Global_File 频率）——
+        # —— 实标准形 D ——
+        # 非 constant 方法用 qiao Global_File 固化频率；constant 方法（CR3BP）
+        # 在下方用 V 还原的 V⁻¹MV（M 特征值），保证 D 与 B 严格自洽。
         nu1, nu2 = self.context.central_frequencies
         lam = float(self.context.characteristic_exponent)
         D = real_normal_form_matrix(lam, float(nu1), float(nu2))
@@ -826,7 +967,18 @@ class QuasiFloquetReducer:
         M_at, M_stack = _build_M_at(ds_result)
 
         # —— 求解 B(t) ——
-        if self.method == "matrix":
+        if self.method == "constant":
+            # CR3BP：M(t) 常数，QF 变换退化为常数实标准形变换 V
+            # （X = V·Y 使 Ẏ = D·Y）。B 不随 e^{λt} 增长，QF 坐标下的
+            # Hamiltonian 系数保持常数，同调方程退化为代数除法。
+            # D 用 V 还原的 V⁻¹MV（M 特征值），与 context 固化频率的
+            # 0.3% 级失谐不再进入同调方程。V 必须从 Hamiltonian 框架
+            # 的线性化构造（Hamilton 矩阵，基可同时辛归一化与对角化）。
+            r_lp = np.asarray(ds_result.context.libration_position, dtype=float).ravel()
+            M_H = _cr3bp_hamiltonian_linearization(r_lp, float(ds_result.context.mu))
+            V, D = real_normal_form_transform(M_H)
+            B_samples = np.stack([V for _ in range(len(ds_result.tlist))])
+        elif self.method == "matrix":
             B_samples = _solve_qf_matrix(
                 M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol, segment=self.segment
             )

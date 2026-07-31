@@ -100,3 +100,20 @@ class TestBuildCr3bpHamiltonian:
         # （直接断言：3 阶项数有限且稳定）
         n3 = sum(1 for k in H_base if sum(k) == 3)
         assert n3 > 0
+
+
+class TestRustPathConsistency:
+    """Rust 数值路径（e2m2e._integrators）与 sympy 符号路径一致。"""
+
+    def test_rust_matches_sympy(self, l2_context, monkeypatch):
+        """两条路径输出完全相同的系数表（浮点噪声内）。"""
+        import sys
+
+        # 屏蔽 Rust 扩展强制走 sympy 符号路径
+        monkeypatch.setitem(sys.modules, "e2m2e._integrators", None)
+        H_sym = build_cr3bp_hamiltonian(l2_context, max_degree=6)
+        monkeypatch.undo()
+        H_rust = build_cr3bp_hamiltonian(l2_context, max_degree=6)
+        assert set(H_rust) == set(H_sym)
+        for k in H_rust:
+            assert abs(H_rust[k] - H_sym[k]) < 1e-10, f"{k}: {H_rust[k]} vs {H_sym[k]}"

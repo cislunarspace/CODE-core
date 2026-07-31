@@ -13,6 +13,7 @@ use pyo3::types::{PyDict, PyList};
 pub mod homotopy;
 #[cfg(feature = "spice")]
 pub mod multiple_shooting;
+pub mod normal_form;
 #[cfg(feature = "spice")]
 pub mod segmented_shooting;
 
@@ -1870,6 +1871,8 @@ fn augmented_eom_7d_py(
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::project_hamiltonian_qf_py, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::build_cr3bp_hamiltonian_py, m)?)?;
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_py, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_events_py, m)?)?;

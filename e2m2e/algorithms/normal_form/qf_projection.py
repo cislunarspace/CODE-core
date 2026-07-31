@@ -9,12 +9,14 @@ Hamiltonian 高阶项（阶 ≥ 3），经 quasi-Floquet 变换矩阵 ``B(t)`` �
 自加实标准形二阶项（``λ q₁p₁ + ω/2(q²+p²)``）；本函数只提供 ≥3 阶非线性
 项，供 Lie 变换消去双曲-中心耦合。
 
-算法（与 Code09 一致）：
+两条实现路径：
 
-1. 对每个 ≥3 阶单项式 ``C·x^n``，符号替换 ``x_i → Σ_j B[i,j]·y_j``，
-   展开为 ``y`` 的多项式（系数为 ``b_ij`` 的符号表达式）；
-2. 逐时刻 ``t``，把 ``B(t)`` 的 36 个元素代入符号系数，得到数值；
-3. 合并同幂次的时间序列，输出 ``{pow_tuple: coef_array}``。
+1. **Rust 数值展开**（默认）：``e2m2e._integrators.project_hamiltonian_qf_py``
+   对每个采样时刻做 ``X = B·Y`` 的数值多项式展开（multinomial 组合枚举），
+   不依赖符号运算。CR3BP 标量系数路径下毫秒级完成。
+2. **sympy 符号展开**（回退）：扩展未编译、或系数为时间序列（星历路径）
+   时回退到 :func:`_project_hamiltonian_to_qf_sympy`（原实现，符号替换
+   ``x_i → Σ_j B[i,j]·y_j`` + 逐时刻求值，较慢）。
 """
 
 from __future__ import annotations
@@ -49,6 +51,48 @@ def project_hamiltonian_to_qf(
         ``{pow_tuple: coef_array}``，``coef_array`` 长度与
         ``qf_result.tlist`` 一致。变量为 QF 坐标（命名为 q1..p3）。
     """
+    tlist = np.asarray(qf_result.tlist, dtype=float).ravel()
+    N = tlist.size
+
+    # 收集标量系数的 ≥3 阶项；含时间序列系数时走符号回退
+    pows: list[list[int]] = []
+    coefs: list[float] = []
+    scalar_only = True
+    for pow_tuple, coef in hamiltonian_terms.items():
+        if sum(pow_tuple) < 3:
+            continue
+        arr = np.asarray(coef, dtype=float).ravel()
+        if arr.size != 1:
+            scalar_only = False
+            break
+        pows.append([int(p) for p in pow_tuple])
+        coefs.append(float(arr[0]))
+
+    try:
+        from e2m2e._integrators import project_hamiltonian_qf_py
+    except ImportError:
+        project_hamiltonian_qf_py = None
+
+    if scalar_only and pows and project_hamiltonian_qf_py is not None:
+        b_seq = [np.asarray(qf_result.B(t), dtype=float).ravel().tolist() for t in tlist]
+        out_pows, out_coefs = project_hamiltonian_qf_py(pows, coefs, b_seq)
+        coef_matrix = np.asarray(out_coefs, dtype=float)  # (M, K)
+        result: dict[tuple[int, ...], npt.NDArray[np.floating]] = {
+            tuple(p): coef_matrix[:, k] for k, p in enumerate(out_pows)
+        }
+        cleaned = {k: v for k, v in result.items() if np.any(np.abs(v) > 1e-14)}
+        if not cleaned:
+            cleaned = {(0, 0, 0, 0, 0, 0): np.zeros(N)}
+        return cleaned
+
+    return _project_hamiltonian_to_qf_sympy(hamiltonian_terms, qf_result)
+
+
+def _project_hamiltonian_to_qf_sympy(
+    hamiltonian_terms: dict[tuple[int, ...], float],
+    qf_result: "QuasiFloquetResult",
+) -> dict[tuple[int, ...], npt.NDArray[np.floating]]:
+    """符号路径（原实现）：sympy 替换展开 + lambdify 逐时刻求值。"""
     import sympy as sp
 
     tlist = np.asarray(qf_result.tlist, dtype=float).ravel()
@@ -81,18 +125,16 @@ def project_hamiltonian_to_qf(
     if not symbolic:
         return {(0, 0, 0, 0, 0, 0): np.zeros(N)}
 
-    # 把每个符号系数编译成 lambda(b11,b12,...,b66)，逐时刻代入 B(t)
+    # 把每个符号系数编译成 lambda(b11,b12,...,b66)，一次性向量化求值
+    # 整条时间序列（B(t) 的 36 个元素逐时刻作为数组参数，numpy 广播）。
     b_list = list(b_syms)
     lambdas = {pow_tuple: sp.lambdify(b_list, expr, "numpy") for pow_tuple, expr in symbolic.items()}
+    B_all = np.stack([np.asarray(qf_result.B(t), dtype=float).ravel() for t in tlist])  # (N, 36)
 
     result: dict[tuple[int, ...], npt.NDArray[np.floating]] = {}
     for pow_tuple, fn in lambdas.items():
-        arr = np.zeros(N, dtype=float)
-        for k in range(N):
-            Bk = np.asarray(qf_result.B(tlist[k]), dtype=float).ravel()
-            val = fn(*Bk)
-            arr[k] = float(np.asarray(val).ravel()[0]) if np.ndim(val) else float(val)
-        result[pow_tuple] = arr
+        val = fn(*[B_all[:, j] for j in range(36)])
+        result[pow_tuple] = np.asarray(val, dtype=float).ravel()
 
     # 剔除全零序列（数值噪声或抵消）
     cleaned = {k: v for k, v in result.items() if np.any(np.abs(v) > 1e-14)}
