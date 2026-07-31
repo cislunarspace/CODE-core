@@ -124,6 +124,24 @@ family = continuation.natural_continuation(
 
 ![基于 MCP 的异构模型交互框架（李胤慷等，2026）](docs/_static/paper/mcp-interaction-framework.jpg)
 
+### 能力与实现状态
+
+| 能力 | 实现状态 | 说明 |
+|------|---------|------|
+| 任务轨道设计（DRO/NRHO/Halo/Lissajous/L4/L5） | 已实现 | CR3BP 初猜 → 星历修正 → 高精度预报全链路 |
+| 轨道保持（特征点/目标点严格/目标点宽松 + 蒙特卡洛） | 已实现 | 三控制律 + 三轨道误差仿真 |
+| 角动量管理 | 未实现 | 姿态发动机联合控制（见 issue #261） |
+| 转移轨道设计（HMN） | 已实现 | Lambert + 打靶组装 |
+| 转移轨道设计（LGA/WSB） | 未实现 | 引力辅助弹道搜索 |
+| 低推力转移 | 已实现 | Q-law 初猜 + 打靶/配点/解析雅可比 |
+| 轨道预报 | 已实现 | ForceModel 高精度外推 |
+| 时空坐标转换（TDT+GCRS↔TDB+EBCRS） | 已实现 | r2s2 后端 |
+| ECOM 光压模型 | 未实现 | 现有仅炮弹模型（见 issue #253） |
+| 地球非球形×大天体耦合项 | 未实现 | 见 issue #253 |
+| 不变流形与低能量转移 | 已实现 | 流形 + 庞加莱截面 + 拼接 |
+| 正规化（normal form） | 已实现 | 可选依赖 `[normal-form]` |
+| MCP 服务 | 未实现 | 接口层规划中（`e2m2e.api`），依赖 `[mcp]` extra |
+
 详细的能力清单与 API 文档见[在线文档](https://cislunarspace.github.io/e2m2e/)；逐版本变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 文档
