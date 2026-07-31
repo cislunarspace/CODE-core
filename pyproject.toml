@@ -74,6 +74,11 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 testpaths = ["tests"]
 # 让 tests/kernel_helpers.py 在 xdist worker 中可导入
 pythonpath = ["tests"]
+markers = [
+    "slow: 运行时间较长的数值测试",
+    "spice: 依赖 SPICE 内核的测试，内核缺失时跳过",
+    "e2e: 依赖 DFH_DAC.exe 的端到端测试，exe 缺失时跳过",
+]
 
 [tool.coverage.run]
 source = ["e2m2e"]

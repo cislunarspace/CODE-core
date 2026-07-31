@@ -487,8 +487,9 @@ class MultipleShooting:
             # 未收敛时在最终状态更新描述
             if not converged:
                 pbar.set_description_str("Multiple Shooting [max_iter]")
+                res_last = residual_history[-1] if residual_history else float("inf")
                 pbar.set_postfix_str(
-                    f"res={residual_history[-1]:.2e} tol={_tolerance:.0e}"
+                    f"res={res_last:.2e} tol={_tolerance:.0e}"
                     f"  spark={_sparkline(residual_history)}",
                     refresh=True,
                 )
