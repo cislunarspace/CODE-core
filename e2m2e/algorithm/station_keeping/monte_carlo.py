@@ -64,7 +64,7 @@ _CHAR_PERIOD_SEC = 27.32 * 86400.0
 
 def _earth_moon_system():
     """构造标准地月 CR3BP 系统（仅特征尺度，供会合系转换用）。"""
-    from ...core.cr3bp_system import CR3BP_System
+    from ..dynamics.cr3bp_system import CR3BP_System
 
     sys_ = CR3BP_System(mu=EARTH_MOON_MU, primary="Earth", secondary="Moon")
     sys_.set_characteristic_scales(_CHAR_LENGTH_KM, _CHAR_PERIOD_SEC)
@@ -462,8 +462,8 @@ def _kernel_paths(kernel_dir: str | None = None) -> list[str]:
 
 def _init_worker(params: dict[str, Any]) -> None:
     """worker ?????? SPICE ????"""
-    from ...core.spice import SPICEManager
-    from ...dfh.design_orbit import load_design_kernels
+    from ...data.kernels.manager import SPICEManager
+    from ..design.design_orbit import load_design_kernels
 
     mgr = SPICEManager()
     # 完整内核（行星历 + body-fixed 帧 + 行星名注册），与 design 链路一致
@@ -522,7 +522,7 @@ def _make_law(
     if control_mode == 2:
         return StrictTargetPointLaw(feedback_arc_days=feedback_arc_days)
     if control_mode == 3:
-        from ...core.coordinate.synodic_j2000 import SynodicJ2000System
+        from ..coordinate.synodic_j2000 import SynodicJ2000System
 
         cr3 = _earth_moon_system()
         synodic = SynodicJ2000Adapter(SynodicJ2000System(cr3bp_system=cr3, spice=spice), et0)
@@ -711,7 +711,7 @@ def _build_controlled_ephemeris(
         return None
     from datetime import datetime
 
-    from ...core.coordinate.synodic_j2000 import SynodicJ2000System
+    from ..coordinate.synodic_j2000 import SynodicJ2000System
 
     cr3 = _earth_moon_system()
     syn_j2000 = SynodicJ2000System(cr3bp_system=cr3, spice=spice)

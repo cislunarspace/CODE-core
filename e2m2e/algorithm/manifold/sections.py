@@ -22,7 +22,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 if TYPE_CHECKING:
-    from ..core.cr3bp_system import CR3BP_System
+    from ..dynamics.cr3bp_system import CR3BP_System
     from .manifolds import ManifoldTube
 
 

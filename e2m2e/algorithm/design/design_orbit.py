@@ -165,7 +165,7 @@ class OrbitDesignResult:
 
 def default_kernel_dir() -> str:
     """仓库自带 SPICE 内核目录（``kernels/``）。"""
-    return str(Path(__file__).resolve().parent.parent.parent / "kernels")
+    return str(Path(__file__).resolve().parent.parent.parent.parent / "kernels")
 
 
 def load_design_kernels(spice: SPICEManager, kernel_dir: str | None = None) -> list[str]:

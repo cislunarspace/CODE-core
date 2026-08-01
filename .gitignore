@@ -135,6 +135,9 @@ website/node_modules/
 # scripts 下的产物图（临时对比输出，不入库）
 scripts/*.png
 
+# examples 下的示例产物图（运行时 --save 生成，不入库）
+examples/main_*.png
+
 # agent/工具会话产物
 .mimocode/
 .zcode/

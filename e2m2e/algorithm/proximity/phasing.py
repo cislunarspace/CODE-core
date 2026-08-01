@@ -22,8 +22,8 @@ import numpy.typing as npt
 from ..proximity.relative_dynamics import RelativeDynamics, TargetOrbit
 
 if TYPE_CHECKING:
-    from ..core.dynamics import CR3BP_Dynamics
-    from ..core.orbit import Orbit
+    from ...data.types.orbit import Orbit
+    from ..dynamics import CR3BP_Dynamics
 
 
 @dataclass
