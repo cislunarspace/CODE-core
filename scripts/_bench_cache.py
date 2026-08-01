@@ -4,6 +4,7 @@
 单圈打靶（24 次积分 × 多迭代），有缓存应显著快于无缓存（否则缓存没生效）。
 运行：``uv run python scripts/_bench_cache.py``
 """
+
 from __future__ import annotations
 
 import time
@@ -69,9 +70,7 @@ def main() -> None:
         state0_syn = np.asarray(cr3bp_orbit.states[0], dtype=float)
         syn_j2000 = SynodicJ2000System(cr3bp_system=system, spice=spice)
 
-        full_system = EphemerisSystem(
-            bodies=["EARTH", "MOON", "SUN"], spice=spice, origin="EARTH"
-        )
+        full_system = EphemerisSystem(bodies=["EARTH", "MOON", "SUN"], spice=spice, origin="EARTH")
         full_system.coordinate_system = CoordinateSystem(
             axes=ICRSAxes(),
             origin=CelestialBodyOrigin(body="EARTH", spice=spice),
@@ -102,20 +101,32 @@ def main() -> None:
         def run(label: str) -> None:
             t0 = time.perf_counter()
             r = multiple_shooting_correct_py(
-                forces_py, "EARTH", list(seg_t), [list(map(float, x)) for x in seg_s],
-                var_time=True, fix_first_node=False, fixed_node_mask=None,
-                max_iter=50, tolerance=1e-4, rtol=1e-10,
+                forces_py,
+                "EARTH",
+                list(seg_t),
+                [list(map(float, x)) for x in seg_s],
+                var_time=True,
+                fix_first_node=False,
+                fixed_node_mask=None,
+                max_iter=50,
+                tolerance=1e-4,
+                rtol=1e-10,
             )
             dt = time.perf_counter() - t0
-            print(f"{label}: {dt:.1f}s, conv={r.converged} iter={r.iterations} "
-                  f"res={r.max_residual:.1e}")
+            print(
+                f"{label}: {dt:.1f}s, conv={r.converged} iter={r.iterations} "
+                f"res={r.max_residual:.1e}"
+            )
 
         # 无缓存
         run("无缓存")
         # 有缓存
         spice.enable_ephem_cache(
-            ["EARTH", "MOON", "SUN"], et0, et0 + 86400 * 400,
-            dt=3600.0, observer="EARTH",
+            ["EARTH", "MOON", "SUN"],
+            et0,
+            et0 + 86400 * 400,
+            dt=3600.0,
+            observer="EARTH",
             frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
         )
         run("有缓存")

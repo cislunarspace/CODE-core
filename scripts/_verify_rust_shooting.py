@@ -6,6 +6,7 @@ Python 语义等价、可直接用于 segmented 分支。
 
 运行：``uv run python scripts/_verify_rust_shooting.py``
 """
+
 from __future__ import annotations
 
 import time
@@ -90,9 +91,7 @@ def main() -> None:
         from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
         from e2m2e.algorithm.dynamics import EphemerisSystem
 
-        full_system = EphemerisSystem(
-            bodies=["EARTH", "MOON", "SUN"], spice=spice, origin="EARTH"
-        )
+        full_system = EphemerisSystem(bodies=["EARTH", "MOON", "SUN"], spice=spice, origin="EARTH")
         full_system.coordinate_system = CoordinateSystem(
             axes=ICRSAxes(),
             origin=CelestialBodyOrigin(body="EARTH", spice=spice),
@@ -109,16 +108,25 @@ def main() -> None:
         )
         t0 = time.perf_counter()
         r = multiple_shooting_correct_py(
-            forces_py, "EARTH", list(seg_t), [list(map(float, x)) for x in seg_s],
-            var_time=True, fix_first_node=False, fixed_node_mask=None,
-            max_iter=50, tolerance=1e-4, rtol=1e-10,
+            forces_py,
+            "EARTH",
+            list(seg_t),
+            [list(map(float, x)) for x in seg_s],
+            var_time=True,
+            fix_first_node=False,
+            fixed_node_mask=None,
+            max_iter=50,
+            tolerance=1e-4,
+            rtol=1e-10,
         )
         dt = time.perf_counter() - t0
         sp = np.asarray(r.state_patch)
         rr = np.linalg.norm(sp[:, :3], axis=1) / du
         spread = (rr.max() - rr.min()) / rr.mean()
-        print(f"Rust 单圈 var_time 全自由: conv={r.converged} iter={r.iterations} "
-              f"res={r.max_residual:.1e} km ({dt:.1f}s)")
+        print(
+            f"Rust 单圈 var_time 全自由: conv={r.converged} iter={r.iterations} "
+            f"res={r.max_residual:.1e} km ({dt:.1f}s)"
+        )
         print(f"  残差历史: {[f'{x:.1e}' for x in r.residual_history[:6]]}")
         print(f"  |r|/du 极差/均值 = {spread:.3f}（保形 < 0.3）")
         t_syn = (np.asarray(r.t_patch) - et0) / t_c
@@ -139,9 +147,16 @@ def main() -> None:
                 et0=et0,
             )
             r1 = multiple_shooting_correct_py(
-                forces_py, "EARTH", list(seg_t2), [list(map(float, x)) for x in seg_s2],
-                var_time=True, fix_first_node=False, fixed_node_mask=None,
-                max_iter=50, tolerance=1e-4, rtol=1e-10,
+                forces_py,
+                "EARTH",
+                list(seg_t2),
+                [list(map(float, x)) for x in seg_s2],
+                var_time=True,
+                fix_first_node=False,
+                fixed_node_mask=None,
+                max_iter=50,
+                tolerance=1e-4,
+                rtol=1e-10,
             )
             segs.append((np.asarray(r1.t_patch), np.asarray(r1.state_patch)))
             print(f"第 1 步段 {k + 1}: conv={r1.converged} res={r1.max_residual:.1e} km")
@@ -157,16 +172,25 @@ def main() -> None:
         mask[-1] = True
         t0 = time.perf_counter()
         rm = multiple_shooting_correct_py(
-            forces_py, "EARTH", list(merged_t), [list(map(float, x)) for x in merged_s],
-            var_time=True, fix_first_node=False, fixed_node_mask=mask,
-            max_iter=50, tolerance=1e-4, rtol=1e-10,
+            forces_py,
+            "EARTH",
+            list(merged_t),
+            [list(map(float, x)) for x in merged_s],
+            var_time=True,
+            fix_first_node=False,
+            fixed_node_mask=mask,
+            max_iter=50,
+            tolerance=1e-4,
+            rtol=1e-10,
         )
         dt = time.perf_counter() - t0
         spm = np.asarray(rm.state_patch)
         rm_ = np.linalg.norm(spm[:, :3], axis=1) / du
         spread_m = (rm_.max() - rm_.min()) / rm_.mean()
-        print(f"\n合并段（{n} 节点，固定两端）: conv={rm.converged} iter={rm.iterations} "
-              f"res={rm.max_residual:.1e} km ({dt:.1f}s)")
+        print(
+            f"\n合并段（{n} 节点，固定两端）: conv={rm.converged} iter={rm.iterations} "
+            f"res={rm.max_residual:.1e} km ({dt:.1f}s)"
+        )
         print(f"  残差历史: {[f'{x:.1e}' for x in rm.residual_history[:8]]}")
         print(f"  |r|/du 极差/均值 = {spread_m:.3f}（保形 < 0.3）")
         t_syn2 = (np.asarray(rm.t_patch) - et0) / t_c
@@ -189,9 +213,7 @@ def _build_force_model(spice: SPICEManager) -> ForceModel:
         axes=ICRSAxes(),
         origin=CelestialBodyOrigin(body="EARTH", spice=spice),
     )
-    force_config = dfh_perturbation_to_force_config(
-        PERTURBATION, earth_degree=10, moon_degree=10
-    )
+    force_config = dfh_perturbation_to_force_config(PERTURBATION, earth_degree=10, moon_degree=10)
     fm = ForceModel.from_config(force_config, full_system)
     fm.rtol = 1e-12
     fm.atol = 1e-12

@@ -7,6 +7,7 @@ CR3BP 远月点在星历模型下偏离小（<1e3 km），"钉 CR3BP 远月点"�
 
 运行：``uv run python scripts/_apolune_drift_quantify.py``
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -53,9 +54,7 @@ def _build_force_model(spice: SPICEManager) -> ForceModel:
         axes=ICRSAxes(),
         origin=CelestialBodyOrigin(body="EARTH", spice=spice),
     )
-    force_config = dfh_perturbation_to_force_config(
-        PERTURBATION, earth_degree=10, moon_degree=10
-    )
+    force_config = dfh_perturbation_to_force_config(PERTURBATION, earth_degree=10, moon_degree=10)
     fm = ForceModel.from_config(force_config, full_system)
     fm.rtol = 1e-12
     fm.atol = 1e-12
@@ -104,8 +103,10 @@ def main() -> None:
         t_apo_rel = float(t_dense[i_apo])  # 远月点在圈内的相对时刻
         apo_dist = dist_moon[i_apo]
         apo_geod = np.linalg.norm(states_syn[i_apo, :3])
-        print(f"CR3BP 远月点: t/T = {t_apo_rel / period:.4f}, "
-              f"距月 {apo_dist:.3f} du, 距地 {apo_geod:.4f} du")
+        print(
+            f"CR3BP 远月点: t/T = {t_apo_rel / period:.4f}, "
+            f"距月 {apo_dist:.3f} du, 距地 {apo_geod:.4f} du"
+        )
         print(f"  synodic 坐标 = {states_syn[i_apo, :3]}")
 
         # 各圈远月点（CR3BP tile，转 J2000）
@@ -138,9 +139,7 @@ def main() -> None:
         print("\n全摄动自由积分（从首圈 CR3BP 远月点出发）vs 各圈 CR3BP 远月点:")
         print(f"  {'圈':>3} {'|Δr| (km)':>14} {'|Δr|/du':>10} {'|Δv| (km/s)':>14}")
         for k in range(N_REV):
-            dv = np.linalg.norm(
-                states_eph[k, 3:] - apo_states_j2000[k, 3:]
-            ) * (du / t_c)
+            dv = np.linalg.norm(states_eph[k, 3:] - apo_states_j2000[k, 3:]) * (du / t_c)
             print(f"  {k:>3} {drift[k]:>14.3e} {drift[k] / du:>10.3f} {dv:>14.3e}")
 
         # 结论

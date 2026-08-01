@@ -14,6 +14,7 @@
 运行：``uv run python scripts/_halo_initial_guess_diagnostic.py``
 依赖：SPICE 内核在 ``kernels/``（design_orbit 的默认目录）。
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -63,9 +64,7 @@ def _build_force_model(spice: SPICEManager):
         axes=ICRSAxes(),
         origin=CelestialBodyOrigin(body="EARTH", spice=spice),
     )
-    force_config = dfh_perturbation_to_force_config(
-        PERTURBATION, earth_degree=10, moon_degree=10
-    )
+    force_config = dfh_perturbation_to_force_config(PERTURBATION, earth_degree=10, moon_degree=10)
     fm = ForceModel.from_config(force_config, full_system)
     fm.rtol = 1e-12
     fm.atol = 1e-12
@@ -100,19 +99,18 @@ def main() -> None:
         # 相位 0 → 历元状态 = CR3BP 参考状态（y=0 穿越点）
         state0_syn = np.asarray(cr3bp_orbit.states[0], dtype=float)
         print(f"Halo L2: period = {period:.4f} TU = {period * t_c / 86400:.2f} 天")
-        print(f"特征长度 = {system.characteristic_length:.0f} km，"
-              f"特征时间 = {t_c / 86400:.2f} 天")
+        print(f"特征长度 = {system.characteristic_length:.0f} km，特征时间 = {t_c / 86400:.2f} 天")
 
         # --- (a) CR3BP 单圈闭合误差 ---
         dense = _dense_orbit(dynamics, state0_syn, period)
-        r_close = np.linalg.norm(
-            dense.states[-1, :3] - dense.states[0, :3]
-        ) * system.characteristic_length
-        v_close = np.linalg.norm(
-            dense.states[-1, 3:] - dense.states[0, 3:]
-        ) * (system.characteristic_length / t_c)
-        print(f"\n(a) CR3BP 单圈闭合误差: |Δr| = {r_close:.3e} km, "
-              f"|Δv| = {v_close:.3e} km/s")
+        r_close = (
+            np.linalg.norm(dense.states[-1, :3] - dense.states[0, :3])
+            * system.characteristic_length
+        )
+        v_close = np.linalg.norm(dense.states[-1, 3:] - dense.states[0, 3:]) * (
+            system.characteristic_length / t_c
+        )
+        print(f"\n(a) CR3BP 单圈闭合误差: |Δr| = {r_close:.3e} km, |Δv| = {v_close:.3e} km/s")
 
         # --- (b) 逐圈星历偏离：全摄动自由积分 vs CR3BP tile ---
         t_patch_syn, state_patch_syn = _sample_patch_points(
@@ -143,9 +141,7 @@ def main() -> None:
             i = (k + 1) * 8 - 1  # 每圈 8 点，取圈末
             if i >= len(drift):
                 break
-            dv = np.linalg.norm(
-                states_eph[i, 3:] - state_patch_j2000[i, 3:]
-            ) * (du / t_c)
+            dv = np.linalg.norm(states_eph[i, 3:] - state_patch_j2000[i, 3:]) * (du / t_c)
             print(f"    {k + 1:>3} {drift[i]:>14.3e} {dv:>14.3e}")
 
         # --- (c) 一圈 STM 增长（Lyapunov 倍率）---
@@ -161,8 +157,10 @@ def main() -> None:
         # 星历偏离 > 1e4 km 的圈数即段长安全上限（打靶需吸收的残差）
         exceed = np.where(drift > 1e4)[0]
         safe = int(exceed[0] // 8) + 1 if len(exceed) else N_REV
-        print(f"\n结论: 星历偏离 > 1e4 km 出现于第 {safe} 圈 → "
-              f"revs_per_group 建议 ≤ {max(1, safe - 1)}")
+        print(
+            f"\n结论: 星历偏离 > 1e4 km 出现于第 {safe} 圈 → "
+            f"revs_per_group 建议 ≤ {max(1, safe - 1)}"
+        )
     finally:
         spice.unload_kernel(default_kernel_dir())
 
