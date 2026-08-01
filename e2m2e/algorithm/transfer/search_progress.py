@@ -1,4 +1,4 @@
-﻿"""轨道搜索的 tqdm 进度条封装。"""
+"""轨道搜索的 tqdm 进度条封装。"""
 
 from __future__ import annotations
 
@@ -80,4 +80,3 @@ def open_parallel_worker_progress_bars(n_workers: int, n_alpha: int) -> list[Any
         )
         for i in range(n_workers)
     ]
-

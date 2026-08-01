@@ -1,4 +1,4 @@
-﻿"""标准多重打靶 patch point 修正器。
+"""标准多重打靶 patch point 修正器。
 
 包装 ``MultipleShooting``，实现 ``PatchPointCorrector`` 接缝，
 将统一参数翻译为求解器特定参数，并将求解器结果重包为
@@ -59,4 +59,3 @@ class _StandardPatchPointCorrector:
             t_patch=result.t_patch,
             state_patch=result.state_patch,
         )
-

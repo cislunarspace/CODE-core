@@ -1,4 +1,4 @@
-﻿"""任务综合评估：多指标加权（主题 8）。
+"""任务综合评估：多指标加权（主题 8）。
 
 在 Pareto 前沿上按用户权重把多目标标量化，辅助决策。对应规划文档
 「丁百慧式多指标加权」——但文档未展开「动态权值」语义，本实现为
@@ -123,4 +123,3 @@ class MissionAssessment:
         if hasattr(front, "total") and hasattr(front, "tof"):
             return cls(metric_names=["dv", "tof"])
         return cls()
-

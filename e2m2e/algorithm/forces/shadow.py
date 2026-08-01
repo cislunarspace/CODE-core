@@ -1,4 +1,4 @@
-﻿"""圆锥阴影模型（地影/月影）。
+"""圆锥阴影模型（地影/月影）。
 
 实现 GMAT ``ShadowState`` 的圆锥阴影算法（Montenbruck & Gill §3.4.2 的
 "Shadow Function"）：从航天器看太阳与遮挡体的视角径 (a, b) 与角距 c，分四
@@ -193,4 +193,3 @@ class ConicalShadowModel:
             directions.append(sc_to_body / d_body)
 
         return self._combine_body_fluxes(factors, angular_radii, directions)
-

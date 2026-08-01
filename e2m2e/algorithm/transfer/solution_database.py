@@ -1,4 +1,4 @@
-﻿"""解数据库：多 scan 聚合查询与筛选（主题 8）。
+"""解数据库：多 scan 聚合查询与筛选（主题 8）。
 
 在 porkchop SQLite 存档基础上提供统一查询接口：
 - 多 scan 聚合（跨扫描合并查询）
@@ -123,4 +123,3 @@ class SolutionDatabase:
                         float(data.total[i, j]),
                     )
         return mask
-

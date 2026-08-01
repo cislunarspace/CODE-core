@@ -1,4 +1,4 @@
-﻿"""
+"""
 庞加莱截面工具模块
 
 提供平面截面与近拱点截面的定义，以及两类截面穿越检测：
@@ -228,4 +228,3 @@ class PoincareSection:
 
     def __repr__(self):
         return f"PoincareSection(description={self.description!r})"
-

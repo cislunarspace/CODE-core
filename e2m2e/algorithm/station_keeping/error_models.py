@@ -73,9 +73,7 @@ class NavigationErrorModel:
     position_sigma_m: float = 1500.0
     velocity_sigma_mps: float = 0.002
 
-    def perturb(
-        self, state: npt.ArrayLike, sampler: BoxMullerSampler
-    ) -> npt.NDArray[np.floating]:
+    def perturb(self, state: npt.ArrayLike, sampler: BoxMullerSampler) -> npt.NDArray[np.floating]:
         """叠加一次测定轨高斯扰动（式 5.37/5.38/5.39）。
 
         Args:

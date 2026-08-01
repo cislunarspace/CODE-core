@@ -1,4 +1,4 @@
-﻿"""IAU X, Y, s 参数提供器实现。"""
+"""IAU X, Y, s 参数提供器实现。"""
 
 from __future__ import annotations
 
@@ -33,4 +33,3 @@ class ErfaXysProvider(XysProvider):
         jd_tt = tt_mjd + JD_MJD_OFFSET
         x, y, s = erfa.xys06a(jd_tt, 0.0)
         return float(x), float(y), float(s)
-

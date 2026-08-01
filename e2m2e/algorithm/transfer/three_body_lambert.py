@@ -1,4 +1,4 @@
-﻿"""三体 Lambert 打靶模块。
+"""三体 Lambert 打靶模块。
 
 以二体 Lambert 解为初猜，在 CR3BP 动力学下用 Newton 打靶修正出发速度，
 使给定飞行时间后的末端位置命中目标。流程（孙俞等 2017、Fossa 等 2022）：
@@ -161,4 +161,3 @@ class ThreeBodyLambert:
                 return v0, error, n_iter, False
 
         return v0, error, self.max_iterations, False
-

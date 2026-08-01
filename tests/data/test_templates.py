@@ -1,6 +1,5 @@
 """data/templates/：常量、种子、枚举、schema 数据测试。"""
 
-
 from e2m2e.data.templates import (
     AU,
     CHAR_LENGTH_KM,

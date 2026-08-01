@@ -1,4 +1,4 @@
-﻿"""两层多重打靶 patch point 修正器。
+"""两层多重打靶 patch point 修正器。
 
 包装 ``TwoLevelMultipleShooting``，实现 ``PatchPointCorrector`` 接缝，
 保留两层修正特有的位置/速度残差诊断字段。
@@ -65,4 +65,3 @@ def _split_residual_history(
         position_history.append(float(position))
         velocity_history.append(float(velocity))
     return position_history, velocity_history
-

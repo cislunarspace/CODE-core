@@ -1,4 +1,4 @@
-﻿"""NLP 优化公共抽象。
+"""NLP 优化公共抽象。
 
 提供 :class:`NLPOptimizationVariables` 数据结构与后端无关的辅助类型，
 作为 SciPy / COPT 后端之间共享的"问题描述"层。
@@ -47,4 +47,3 @@ class NLPOptimizationVariables:
             对应的 :class:`NLPOptimizationVariables` 实例。
         """
         return cls(alpha=arr[0], transfer_time=arr[1], t_ins=arr[2])
-

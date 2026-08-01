@@ -1,4 +1,4 @@
-﻿"""IAU 2006 简化地球定向参数计算。
+"""IAU 2006 简化地球定向参数计算。
 
 提供岁差矩阵与章动矩阵的纯 Python 实现，不依赖外部 EOP 文件。
 本模块使用 IAU 2006 简化理论，适合教学、快速验证以及无 SPICE 内核
@@ -180,4 +180,3 @@ def _rotation3(angle: float) -> npt.NDArray[np.floating]:
     c = np.cos(angle)
     s = np.sin(angle)
     return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
-

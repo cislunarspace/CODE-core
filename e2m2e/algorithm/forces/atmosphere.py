@@ -1,4 +1,4 @@
-﻿"""标准指数大气密度模型。"""
+"""标准指数大气密度模型。"""
 
 from __future__ import annotations
 
@@ -115,4 +115,3 @@ def _solar_activity_factor(f107: float, ap: float) -> float:
     f_factor = 1.0 + _F107_SENSITIVITY * (f107 - _DEFAULT_F107) / _DEFAULT_F107
     a_factor = 1.0 + _AP_SENSITIVITY * (ap - _DEFAULT_AP) / _DEFAULT_AP
     return f_factor * a_factor
-

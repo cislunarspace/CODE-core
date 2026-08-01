@@ -510,8 +510,7 @@ def build_cr3bp_hamiltonian(
             rho_e_ratio = gamma / (1.0 + gamma)  # 地球项 γ/(1+γ)
             pows, coefs = build_cr3bp_hamiltonian_py(mu_val, gamma, rho_e_ratio, deg)
             numeric_rust: dict[tuple[int, ...], float] = {
-                tuple(int(p) for p in pow_t): float(c)
-                for pow_t, c in zip(pows, coefs, strict=True)
+                tuple(int(p) for p in pow_t): float(c) for pow_t, c in zip(pows, coefs, strict=True)
             }
             # 与符号路径一致：强制平动点平衡（删一阶项）
             numeric_rust = {k: v for k, v in numeric_rust.items() if sum(k) != 1}

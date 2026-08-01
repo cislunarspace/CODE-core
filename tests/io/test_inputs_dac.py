@@ -175,9 +175,9 @@ class TestControl:
         for i in range(168, 216):
             if i == 168:  # L169 为 #### 分隔行
                 continue
-            assert _value_tokens(lines[i]) == pytest.approx(
-                _value_tokens(golden[i])
-            ), f"L{i + 1} 数值不一致"
+            assert _value_tokens(lines[i]) == pytest.approx(_value_tokens(golden[i])), (
+                f"L{i + 1} 数值不一致"
+            )
 
     def test_parameter_override(self):
         lines = e2m2e.io.format_inputs_control(

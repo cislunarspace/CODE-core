@@ -1,4 +1,4 @@
-﻿"""力模型抽象基类。"""
+"""力模型抽象基类。"""
 
 from __future__ import annotations
 
@@ -122,4 +122,3 @@ def require_inertial_frame(system: Any, t: float) -> tuple[Any, Any, str]:
             f"got non-identity axes {type(cs.axes).__name__}."
         )
     return cs, system.spice, cs.origin.body
-

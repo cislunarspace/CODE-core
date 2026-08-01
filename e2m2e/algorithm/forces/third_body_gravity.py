@@ -1,4 +1,4 @@
-﻿"""第三体引力摄动模型。"""
+"""第三体引力摄动模型。"""
 
 from __future__ import annotations
 
@@ -160,4 +160,3 @@ class ThirdBodyGravity(PhysicalModel):
             r_bsc_norm = float(self.MIN_DISTANCE)
         mu_r3 = mu / r_bsc_norm**3
         return -mu_r3 * (np.eye(3) - 3.0 * np.outer(r_bsc, r_bsc) / (r_bsc_norm**2))
-

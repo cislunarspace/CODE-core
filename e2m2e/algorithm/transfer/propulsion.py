@@ -1,4 +1,4 @@
-﻿"""脉冲推进模型。
+"""脉冲推进模型。
 
 提供 :class:`ImpulsivePropulsion`，用于计算转移轨道的出发注入速度与代价。
 """
@@ -93,4 +93,3 @@ class ImpulsivePropulsion:
         return compute_transfer_cost(
             departure_state, initial_velocity, final_velocity, insertion_velocity
         )
-

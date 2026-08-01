@@ -1,4 +1,4 @@
-﻿"""球谐重力场力模型。"""
+"""球谐重力场力模型。"""
 
 from __future__ import annotations
 

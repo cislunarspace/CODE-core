@@ -67,8 +67,7 @@ class TestBuildCr3bpHamiltonian:
         """
         H = build_cr3bp_hamiltonian(l2_context, max_degree=2)
         qq_terms = [
-            float(H.get(k, 0))
-            for k in [(2, 0, 0, 0, 0, 0), (0, 2, 0, 0, 0, 0), (0, 0, 2, 0, 0, 0)]
+            float(H.get(k, 0)) for k in [(2, 0, 0, 0, 0, 0), (0, 2, 0, 0, 0, 0), (0, 0, 2, 0, 0, 0)]
         ]
         assert all(np.isfinite(qq_terms))
         assert all(abs(v) > 0.1 for v in qq_terms), f"q-q 对角项过小：{qq_terms}"

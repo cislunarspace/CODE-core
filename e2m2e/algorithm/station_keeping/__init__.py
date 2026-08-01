@@ -53,6 +53,4 @@ def momentum_management(
     Raises:
         NotImplementedError: 角动量管理未实现。
     """
-    raise NotImplementedError(
-        "角动量管理未实现（原 #261）：姿态发动机 E/E_r 矩阵 + 联合控制待补"
-    )
+    raise NotImplementedError("角动量管理未实现（原 #261）：姿态发动机 E/E_r 矩阵 + 联合控制待补")

@@ -93,40 +93,88 @@ def _eval_hamiltonian_rhs(
                 return 1.0
             if base == 0.0:
                 return 0.0  # 0^n (n>0) = 0
-            return base ** exp
+            return base**exp
 
         # q̇_i = ∂H/∂p_i：p_i 指数降 1，乘 n_{p_i}
         if n4 > 0:  # ∂/∂p1
-            dX[0] += val * n4 * (
-                _pow(q1, n1) * _pow(q2, n2) * _pow(q3, n3)
-                * _pow(p1, n4 - 1) * _pow(p2, n5) * _pow(p3, n6)
+            dX[0] += (
+                val
+                * n4
+                * (
+                    _pow(q1, n1)
+                    * _pow(q2, n2)
+                    * _pow(q3, n3)
+                    * _pow(p1, n4 - 1)
+                    * _pow(p2, n5)
+                    * _pow(p3, n6)
+                )
             )
         if n5 > 0:  # ∂/∂p2
-            dX[1] += val * n5 * (
-                _pow(q1, n1) * _pow(q2, n2) * _pow(q3, n3)
-                * _pow(p1, n4) * _pow(p2, n5 - 1) * _pow(p3, n6)
+            dX[1] += (
+                val
+                * n5
+                * (
+                    _pow(q1, n1)
+                    * _pow(q2, n2)
+                    * _pow(q3, n3)
+                    * _pow(p1, n4)
+                    * _pow(p2, n5 - 1)
+                    * _pow(p3, n6)
+                )
             )
         if n6 > 0:  # ∂/∂p3
-            dX[2] += val * n6 * (
-                _pow(q1, n1) * _pow(q2, n2) * _pow(q3, n3)
-                * _pow(p1, n4) * _pow(p2, n5) * _pow(p3, n6 - 1)
+            dX[2] += (
+                val
+                * n6
+                * (
+                    _pow(q1, n1)
+                    * _pow(q2, n2)
+                    * _pow(q3, n3)
+                    * _pow(p1, n4)
+                    * _pow(p2, n5)
+                    * _pow(p3, n6 - 1)
+                )
             )
 
         # ṗ_i = -∂H/∂q_i：q_i 指数降 1，乘 -n_{q_i}
         if n1 > 0:  # -∂/∂q1
-            dX[3] -= val * n1 * (
-                _pow(q1, n1 - 1) * _pow(q2, n2) * _pow(q3, n3)
-                * _pow(p1, n4) * _pow(p2, n5) * _pow(p3, n6)
+            dX[3] -= (
+                val
+                * n1
+                * (
+                    _pow(q1, n1 - 1)
+                    * _pow(q2, n2)
+                    * _pow(q3, n3)
+                    * _pow(p1, n4)
+                    * _pow(p2, n5)
+                    * _pow(p3, n6)
+                )
             )
         if n2 > 0:  # -∂/∂q2
-            dX[4] -= val * n2 * (
-                _pow(q1, n1) * _pow(q2, n2 - 1) * _pow(q3, n3)
-                * _pow(p1, n4) * _pow(p2, n5) * _pow(p3, n6)
+            dX[4] -= (
+                val
+                * n2
+                * (
+                    _pow(q1, n1)
+                    * _pow(q2, n2 - 1)
+                    * _pow(q3, n3)
+                    * _pow(p1, n4)
+                    * _pow(p2, n5)
+                    * _pow(p3, n6)
+                )
             )
         if n3 > 0:  # -∂/∂q3
-            dX[5] -= val * n3 * (
-                _pow(q1, n1) * _pow(q2, n2) * _pow(q3, n3 - 1)
-                * _pow(p1, n4) * _pow(p2, n5) * _pow(p3, n6)
+            dX[5] -= (
+                val
+                * n3
+                * (
+                    _pow(q1, n1)
+                    * _pow(q2, n2)
+                    * _pow(q3, n3 - 1)
+                    * _pow(p1, n4)
+                    * _pow(p2, n5)
+                    * _pow(p3, n6)
+                )
             )
 
     # 钳制双曲方向（q1/p1），留中心流形。对应 Gómez 2.7 的 q1=p1=0 约化。
@@ -171,9 +219,7 @@ def propagate_parametric(
     from .coord_trans.cm_param import cm_to_param, param_to_cm
 
     if nf_result.catalog_transformer is None:
-        raise ValueError(
-            "nf_result.catalog_transformer 为 None，无法做 rho↔param 变换。"
-        )
+        raise ValueError("nf_result.catalog_transformer 为 None，无法做 rho↔param 变换。")
     if nf_result.cm_result is None:
         raise ValueError("nf_result.cm_result 为 None，缺少 Hamiltonian 系数。")
     if nf_result.qf_result is None:
@@ -234,8 +280,6 @@ def propagate_parametric(
     if truth_rho is not None:
         truth = np.asarray(truth_rho, dtype=float)
         if truth.shape[0] == rho_out.shape[0]:
-            pos_err_km = (
-                np.linalg.norm(rho_out[:, :3] - truth[:, :3], axis=1) * context.LU
-            )
+            pos_err_km = np.linalg.norm(rho_out[:, :3] - truth[:, :3], axis=1) * context.LU
 
     return t_out, rho_out, pos_err_km

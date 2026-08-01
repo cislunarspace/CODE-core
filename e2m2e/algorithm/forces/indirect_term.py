@@ -1,4 +1,4 @@
-﻿"""第三体引力间接项。"""
+"""第三体引力间接项。"""
 
 from __future__ import annotations
 
@@ -102,4 +102,3 @@ class IndirectTerm(PhysicalModel):
     ) -> npt.NDArray[np.floating] | None:
         """间接项不依赖航天器位置，∂a/∂r 恒为零矩阵。"""
         return np.zeros((3, 3))
-

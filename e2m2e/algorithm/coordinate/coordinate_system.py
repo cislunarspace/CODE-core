@@ -1,4 +1,4 @@
-﻿"""坐标系组合与转换。"""
+"""坐标系组合与转换。"""
 
 from __future__ import annotations
 
@@ -63,4 +63,3 @@ class CoordinateSystem:
         velocity_out = to_rotation.T @ (velocity_icrf - to_origin[3:] - to_rate @ position_out)
 
         return np.concatenate([position_out, velocity_out])
-

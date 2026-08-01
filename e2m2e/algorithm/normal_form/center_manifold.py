@@ -225,9 +225,7 @@ def _linear_basis_change(
         acc: dict[tuple[int, ...], npt.NDArray[np.complex128]] = {}
         for pow_tuple, coef in poly.items():
             # 当前单项式的展开表 {new_pow: 复标量系数}
-            terms: dict[tuple[int, ...], complex] = {
-                tuple(int(p) for p in pow_tuple): 1.0
-            }
+            terms: dict[tuple[int, ...], complex] = {tuple(int(p) for p in pow_tuple): 1.0}
             for i, ni in enumerate(int(p) for p in pow_tuple):
                 if ni == 0:
                     continue

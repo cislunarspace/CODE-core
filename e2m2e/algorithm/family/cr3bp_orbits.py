@@ -1,4 +1,4 @@
-﻿"""CR3BP 周期轨道生成：``design_orbit`` 链路的初猜段。
+"""CR3BP 周期轨道生成：``design_orbit`` 链路的初猜段。
 
 把 DFH 形状参数翻译成地月 CR3BP 周期轨道：
 
@@ -559,4 +559,3 @@ def design_triangular(
         "amplitude_out_km": amplitude_out_km,
     }
     return orbit
-

@@ -1,4 +1,4 @@
-﻿"""终端条件模块
+"""终端条件模块
 
 定义转移优化中出发/到达终端条件的抽象接口与具体实现。
 """
@@ -99,4 +99,3 @@ class StateTerminal(TerminalCondition):
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """返回固定状态的位置与速度（忽略 t_ins）"""
         return self.state[:3], self.state[3:6]
-

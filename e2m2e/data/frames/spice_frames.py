@@ -14,8 +14,6 @@ import numpy.typing as npt
 from ..kernels._spice_loader import get_spiceypy
 
 
-def frame_rotation(
-    frame_from: str, frame_to: str, et: float
-) -> npt.NDArray[np.floating]:
+def frame_rotation(frame_from: str, frame_to: str, et: float) -> npt.NDArray[np.floating]:
     """SPICE 帧旋转矩阵（3×3）：``frame_from`` → ``frame_to`` 在 ET 时刻。"""
     return np.array(get_spiceypy().pxform(frame_from, frame_to, et))

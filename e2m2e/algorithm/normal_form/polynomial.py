@@ -227,8 +227,18 @@ def poly_subs(
     # 用错了命名——expr2poly 会把它误当常数，静默返回错误结果。
     allowed_coord_names = {"q1", "q2", "q3", "p1", "p2", "p3"}
     disallowed_coord_names = {
-        "y1", "y2", "y3", "y4", "y5", "y6",
-        "x1", "x2", "x3", "x4", "x5", "x6",
+        "y1",
+        "y2",
+        "y3",
+        "y4",
+        "y5",
+        "y6",
+        "x1",
+        "x2",
+        "x3",
+        "x4",
+        "x5",
+        "x6",
     }
     for replacement in subs_map.values():
         for sym in getattr(replacement, "free_symbols", set()):

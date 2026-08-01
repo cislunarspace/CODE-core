@@ -1,4 +1,4 @@
-﻿"""
+"""
 微分修正算法模块
 
 提供用于求解周期轨道的微分修正算法，支持多种对称性配置。
@@ -805,4 +805,3 @@ class DifferentialCorrection:
             f"DifferentialCorrection(dynamic={self.dynamics}, "
             f"setup={self.setup_type}, tol={self.tolerance})"
         )
-

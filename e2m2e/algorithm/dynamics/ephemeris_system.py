@@ -1,4 +1,4 @@
-﻿"""星历系统模块。
+"""星历系统模块。
 
 提供天体位置、引力常数等星历信息的统一查询接口，
 底层通过 SPICE 工具包获取数据。
@@ -148,4 +148,3 @@ class EphemerisSystem(System):
             与 self.bodies 顺序对应的 GM 值数组，单位通常为 km³/s²。
         """
         return np.array([self.spice.get_gm(body) for body in self.bodies])
-

@@ -1,4 +1,4 @@
-﻿"""GMAT 风格 ITRF reduction stages。"""
+"""GMAT 风格 ITRF reduction stages。"""
 
 from __future__ import annotations
 
@@ -98,4 +98,3 @@ class GmatItrfReduction:
         omega_earth = EARTH_ROTATION_RATE * (1.0 - eop_sample.lod / SECONDS_PER_DAY)
         rate = celestial @ rotation3(-theta) @ skew([0.0, 0.0, omega_earth]) @ polar_motion
         return rotation, rate
-

@@ -150,7 +150,11 @@ class TestDesignSerialization:
     def test_perturbation_override(self):
         """摄动覆盖：L14 大气改为 1（golden 为 0）。"""
         lines = format_inputs_design(
-            "DRO", amplitude=10000.0, phase=0.5, epoch=EPOCH, duration=0.1,
+            "DRO",
+            amplitude=10000.0,
+            phase=0.5,
+            epoch=EPOCH,
+            duration=0.1,
             perturbation={**PERTURBATION, "atmosphere": 1},
         )
         assert _value(lines[13]) == [1.0]
@@ -177,9 +181,7 @@ class TestFmtInputsPropagate:
         assert _value(lines[0]) == [4.0], "L1 功能码应为 4"
 
     def test_epoch_line(self):
-        lines = format_inputs_propagate(
-            **{**self.PROP_PARAMS, "epoch": [2025, 6, 15, 12, 30, 0.0]}
-        )
+        lines = format_inputs_propagate(**{**self.PROP_PARAMS, "epoch": [2025, 6, 15, 12, 30, 0.0]})
         assert _value(lines[265]) == [2025.0, 6.0, 15.0, 12.0, 30.0, 0.0]
         assert "//" in lines[265], "L266 历元行应含 // 分隔符"
 

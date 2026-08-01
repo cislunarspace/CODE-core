@@ -19,8 +19,11 @@ import numpy as np
 from e2m2e.data.types.sk_statistic import COLUMNS, SKStatistic
 
 __all__ = [
-    "SKStatistic", "COLUMNS", "parse_sk_statistic",
-    "read_sk_statistic", "write_sk_statistic",
+    "SKStatistic",
+    "COLUMNS",
+    "parse_sk_statistic",
+    "read_sk_statistic",
+    "write_sk_statistic",
 ]
 
 _NUM_RE = re.compile(r"[+-]?\d*\.?\d+(?:[eE][+-]?\d+)?")

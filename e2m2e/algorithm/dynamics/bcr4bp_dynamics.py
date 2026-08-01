@@ -1,4 +1,4 @@
-﻿"""双圆限制性四体问题（BCR4BP）动力学模块。
+"""双圆限制性四体问题（BCR4BP）动力学模块。
 
 包含 ``BCR4BP_Dynamics`` 类：在 CR3BP 运动方程上叠加太阳直接项与间接项
 摄动。太阳位置由 ``BCR4BPSystem.sun_position(t)`` 解析给出，系统显式含
@@ -210,4 +210,3 @@ class BCR4BP_Dynamics(Dynamics):
             f"BCR4BP_Dynamics(system={self.system}, integrator='{self.integrator}', "
             f"rtol={self.rtol}, atol={self.atol}, max_step={self.max_step})"
         )
-

@@ -1,4 +1,4 @@
-﻿"""点质量引力模型。"""
+"""点质量引力模型。"""
 
 from __future__ import annotations
 
@@ -83,4 +83,3 @@ class PointMassGravity(PhysicalModel):
         （不查 body-fixed 轴、不查星历）。``mu`` 为 ``None`` 时从 system 解析。
         """
         return ("point_mass", self._resolve_mu(system))
-

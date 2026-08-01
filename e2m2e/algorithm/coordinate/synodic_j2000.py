@@ -1,4 +1,4 @@
-﻿"""基于 ``CoordinateSystem`` 的 synodic ↔ J2000 转换器。
+"""基于 ``CoordinateSystem`` 的 synodic ↔ J2000 转换器。
 
 synodic 坐标系 = (SynodicAxes, CelestialBodyOrigin("EARTH"))
 J2000 坐标系   = (ICRSAxes,      CelestialBodyOrigin("EARTH"))
@@ -102,4 +102,3 @@ class SynodicJ2000System:
         for i in range(n):
             results[i] = self.j2000_to_synodic(states_j2000[i], t_syn_arr[i], et0)
         return results
-

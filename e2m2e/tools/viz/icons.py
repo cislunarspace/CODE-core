@@ -1,4 +1,4 @@
-﻿"""天体图标加载与渲染辅助模块
+"""天体图标加载与渲染辅助模块
 
 封装 PNG 图标加载、2D AnnotationBbox 包装、3D Billboard 深度驱动 Patch 等
 可视化辅助逻辑。原位于 ``base.py``，独立为模块便于复用与单元测试。
@@ -283,4 +283,3 @@ def add_2d_icon(
         zorder=10,
     )
     ax.add_artist(ab)
-

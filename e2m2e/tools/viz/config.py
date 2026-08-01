@@ -1,4 +1,4 @@
-﻿"""绘图配置模块
+"""绘图配置模块
 
 定义 PlotConfig 配置类，统一管理 matplotlib 的字体、颜色、尺寸等绘图参数。
 高 DPI 缩放适配逻辑封装在 :func:`configure_dpi_scaling` 中，import 本模块
@@ -433,4 +433,3 @@ class PlotConfig(BaseModel):
             matplotlib.colors.Colormap 颜色映射实例。
         """
         return matplotlib.colormaps[self.colormap]
-

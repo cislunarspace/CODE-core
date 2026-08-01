@@ -1,4 +1,4 @@
-﻿"""双圆限制性四体问题（BCR4BP）系统模块。
+"""双圆限制性四体问题（BCR4BP）系统模块。
 
 包含 ``BCR4BPSystem`` 类：在 ``CR3BP_System`` （地月会合旋转系）之上叠加
 太阳质点摄动。双圆近似下，地月绕公共质心作圆周运动（CR3BP 假设），太阳
@@ -195,4 +195,3 @@ class BCR4BPSystem(CR3BP_System):
             f"sun_angular_rate={self._sun_angular_rate}, "
             f"sun_phase0={self.sun_phase0}, initialized={self.is_initialized})"
         )
-

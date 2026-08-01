@@ -1,4 +1,4 @@
-﻿"""L4/L5 三角平动点邻域的一阶解析初猜。
+"""L4/L5 三角平动点邻域的一阶解析初猜。
 
 L4/L5 在纯 CR3BP 下是椭圆型平衡点（地月 μ=0.0122 < μ_Routh≈0.0385），
 线性化矩阵只有纯虚特征值，没有双曲方向。邻域运动是三模态拟周期叠加：
@@ -84,9 +84,7 @@ def _triangular_modes(
             omega_l = im
 
     if v_s is None or v_l is None or v_z is None:
-        raise RuntimeError(
-            f"L{point} 未找到三个纯虚模态（短/长周期 + 垂直），特征值 {eigvals}"
-        )
+        raise RuntimeError(f"L{point} 未找到三个纯虚模态（短/长周期 + 垂直），特征值 {eigvals}")
     return omega_s, v_s, omega_l, v_l, omega_v, v_z, x_L
 
 
@@ -147,4 +145,3 @@ def compute_triangular_initial_guess(
 
     nominal_period = 2.0 * np.pi / omega_s
     return state0, nominal_period
-

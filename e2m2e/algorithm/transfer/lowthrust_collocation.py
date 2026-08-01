@@ -1,4 +1,4 @@
-﻿"""低推力 Hermite-Simpson 配点求解器。
+"""低推力 Hermite-Simpson 配点求解器。
 
 与 :class:`~e2m2e.transfer.lowthrust_shooting.LowThrustShooting`（直接打靶）
 并列的直接法求解器。把节点状态与控制都作为决策变量，用 Hermite-Simpson 缺陷
@@ -324,4 +324,3 @@ class LowThrustCollocation:
             n_iter=n_iter,
             message=message,
         )
-

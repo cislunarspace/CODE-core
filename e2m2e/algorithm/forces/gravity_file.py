@@ -1,4 +1,4 @@
-﻿"""重力场文件解析。
+"""重力场文件解析。
 
 支持两种格式:
 - ICGEM ``.gfc``（``load_gfc_file``）。
@@ -429,4 +429,3 @@ def extrapolate_coefficients(
     """
     dt_years = (t - t0) / _SECONDS_PER_YEAR
     return C + dotC * dt_years, S + dotS * dt_years
-

@@ -144,6 +144,7 @@ def real_normal_form_transform(
             f"M 的特征值结构不符合共线平动点（需要 ±λ、±iω_p、±iω_v），"
             f"实际谱：{sorted(round(abs(ev), 6) for ev in eigvals)}"
         )
+
     # 面内/面外按特征向量方向区分：z 占优 = 垂直（ω_v），x/y 占优 = 平面（ω_p）
     def _z_dominance(v: npt.NDArray[np.complexfloating]) -> float:
         return float(np.abs(v[2]) / (np.abs(v).max() + 1e-300))
@@ -577,8 +578,13 @@ def _solve_qf_segmented(
     next_i = 1  # t_arr[0] 已填
     for t_end in seg_ends:
         sol = solve_ivp(
-            rhs, (cur_t, float(t_end)), cur_B,
-            method="DOP853", rtol=rtol, atol=atol, dense_output=True,
+            rhs,
+            (cur_t, float(t_end)),
+            cur_B,
+            method="DOP853",
+            rtol=rtol,
+            atol=atol,
+            dense_output=True,
         )
         if not sol.success:
             raise RuntimeError(f"QF 分段积分失败（段 [{cur_t}, {t_end}]）：{sol.message}")
@@ -590,8 +596,13 @@ def _solve_qf_segmented(
     # 末段：积分到 tf
     if cur_t < tf - 1e-12:
         sol = solve_ivp(
-            rhs, (cur_t, tf), cur_B,
-            t_eval=t_arr[next_i:], method="DOP853", rtol=rtol, atol=atol,
+            rhs,
+            (cur_t, tf),
+            cur_B,
+            t_eval=t_arr[next_i:],
+            method="DOP853",
+            rtol=rtol,
+            atol=atol,
         )
         if not sol.success:
             raise RuntimeError(f"QF 末段积分失败：{sol.message}")
@@ -710,6 +721,7 @@ def _multipoint_thomas(
     # 对应 qiao Calc_Phi_QF 的 Dynfunc_Phi_QF（reshape X 为 36×36 再乘 A）。
     Phi_list: list[npt.NDArray[np.floating]] = []
     for k in range(n_nodes - 1):
+
         def rhs_phi(t: float, X1296: npt.ArrayLike) -> npt.NDArray[np.floating]:
             Phi = np.asarray(X1296, dtype=float).reshape(36, 36)
             # A36(t) = M(t)⊗I − I⊗D^T（行优先 vec(B)）；Ḃ 各列 = A36·Φ 各列
@@ -721,7 +733,9 @@ def _multipoint_thomas(
             rhs_phi,
             (float(t_nodes[k]), float(t_nodes[k + 1])),
             I36.ravel(),
-            method="DOP853", rtol=rtol, atol=atol,
+            method="DOP853",
+            rtol=rtol,
+            atol=atol,
         )
         if not sol.success:
             raise RuntimeError(f"多点打靶段 STM 积分失败（段 {k}）：{sol.message}")
@@ -828,7 +842,9 @@ def _densify_b_multipoint(
                 rhs_vec,
                 (t_lo, float(t)),
                 B_nodes[k].ravel(),
-                method="DOP853", rtol=rtol, atol=atol,
+                method="DOP853",
+                rtol=rtol,
+                atol=atol,
             )
             B_out[i] = sol.y[:, -1].reshape(6, 6)
     return B_out

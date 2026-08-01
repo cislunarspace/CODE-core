@@ -1,4 +1,4 @@
-﻿"""``normal_form`` 包内部：从 SPICE 求 ``Eval_expr`` 所需星历参数。
+"""``normal_form`` 包内部：从 SPICE 求 ``Eval_expr`` 所需星历参数。
 
 实现相当于 qiao ``Eval_expr.py`` 的功能，但通过 e2m2e 自带的
 ``SPICEManager`` 获取天体状态，避免上层 ``Hamilton`` 模块直接依赖
@@ -291,4 +291,3 @@ def eval_params(jd_tdb: float, context: NormalFormContext) -> dict[str, float]:
 
 
 __all__ = ["eval_params"]
-

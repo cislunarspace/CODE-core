@@ -1,4 +1,4 @@
-﻿"""力模型容器与 Rust 积分器传播实现。"""
+"""力模型容器与 Rust 积分器传播实现。"""
 
 from __future__ import annotations
 
@@ -942,4 +942,3 @@ class ForceModel:
     def _raise_for_unsupported(self, with_stm: bool, with_jacobi: bool) -> None:
         if with_jacobi:
             raise NotImplementedError("ForceModel does not support Jacobi constant computation.")
-

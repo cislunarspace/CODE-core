@@ -1,4 +1,4 @@
-﻿"""DRO-RO 转移轨迹优化接口
+"""DRO-RO 转移轨迹优化接口
 
 把网格搜索得到的初值交由 NLP 优化器（Cui et al. 2025）求解，得到一条满足位置连续性
 和速度平行性约束的转移轨迹。
@@ -275,4 +275,3 @@ class Transfer:
             return float(self._arrival_orbit.times[-1] - self._arrival_orbit.times[0])
 
         return 10.0
-

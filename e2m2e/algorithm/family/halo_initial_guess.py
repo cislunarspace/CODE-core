@@ -1,4 +1,4 @@
-﻿"""
+"""
 Halo轨道初始猜测模块
 
 提供 Richardson 三阶近似方法，用于生成 Halo 轨道的初始猜测参数。
@@ -417,4 +417,3 @@ def compute_halo_initial_guess(
         "Au": Au,
         "Aw": Aw,
     }
-

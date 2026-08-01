@@ -1,4 +1,4 @@
-﻿"""基础可视化模块
+"""基础可视化模块
 
 提供轨道可视化的核心类 OrbitVisualizer，支持 2D 投影和 3D 轨道绘图。
 """
@@ -560,4 +560,3 @@ class OrbitVisualizer:
             dists[visited] = np.inf
             current = int(np.argmin(dists))
         return order
-

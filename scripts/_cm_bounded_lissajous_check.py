@@ -46,9 +46,7 @@ def main() -> None:
     if not result.success:
         print(f"  message: {result.message}")
         return
-    print(
-        f"  cm_hyperbolic_coupling: {result.metadata['cm_hyperbolic_coupling']:.3e}"
-    )
+    print(f"  cm_hyperbolic_coupling: {result.metadata['cm_hyperbolic_coupling']:.3e}")
     print(
         f"  pre_hyperbolic_center_coupling: "
         f"{result.cm_result.metadata['pre_hyperbolic_center_coupling']:.3e}"

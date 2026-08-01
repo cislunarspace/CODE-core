@@ -1,4 +1,4 @@
-﻿"""低推力多段直接打靶求解器。
+"""低推力多段直接打靶求解器。
 
 在地基 ``VariableMassFiniteBurn`` / ``propagate_compiled_lowthrust``（7D 可变
 质量受控传播，commit ``b66fa88``）之上，建第一个低推力最优控制闭环求解器：
@@ -473,4 +473,3 @@ class LowThrustShooting:
             n_iter=n_iter,
             message=message,
         )
-

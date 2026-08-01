@@ -1,4 +1,4 @@
-﻿"""坐标轴抽象基类。"""
+"""坐标轴抽象基类。"""
 
 from __future__ import annotations
 
@@ -67,4 +67,3 @@ class Axes(abc.ABC):
         rotation, rate = self.rotation_and_rate(et)
         omega_skew = rate @ rotation.T
         return np.array([omega_skew[2, 1], omega_skew[0, 2], omega_skew[1, 0]])
-

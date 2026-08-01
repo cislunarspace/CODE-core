@@ -1,4 +1,4 @@
-﻿"""porkchop 图扫描：二体 Lambert 双脉冲 ΔV 网格。
+"""porkchop 图扫描：二体 Lambert 双脉冲 ΔV 网格。
 
 对出发时间 × 飞行时间网格逐点解 Lambert 问题，得到出发/到达脉冲
 及其总和的网格数据（porkchop 图的数据层）。终端（出发/到达天体或
@@ -515,4 +515,3 @@ def porkchop(
         dv2[valid, j] = np.linalg.norm(v_arr_col[valid] - col[valid, 1, :], axis=1)
 
     return PorkchopData(t_dep=t_dep, tof=tof, dv1=dv1, dv2=dv2, total=dv1 + dv2)
-

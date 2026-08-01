@@ -1,4 +1,4 @@
-﻿"""Lissajous 轨道一阶解析初猜（共线平动点 L1/L2/L3）。
+"""Lissajous 轨道一阶解析初猜（共线平动点 L1/L2/L3）。
 
 Lissajous 是围绕共线点的**准周期**轨道：面内运动（x-y）以频率 ω_xy、
 面外运动（z）以频率 ω_z 独立振荡，两频率不可约（不共振）。Halo 轨道是
@@ -139,4 +139,3 @@ def compute_lissajous_initial_guess(
 
     nominal_period = 2.0 * np.pi / omega_xy  # 面内周期（TU）
     return state0, nominal_period
-

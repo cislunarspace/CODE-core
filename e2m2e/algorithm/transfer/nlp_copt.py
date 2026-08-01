@@ -1,4 +1,4 @@
-﻿"""COPT NLP 后端。
+"""COPT NLP 后端。
 
 封装杉数科技商业优化求解器 COPT（Cardinal Optimizer）的非线性规划调用，
 供 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer` 选用。
@@ -410,4 +410,3 @@ def optimize_with_copt(
             logger.warning("COPT 求解失败，回退到 SciPy", exc_info=True)
             return _run_scipy()
         raise
-

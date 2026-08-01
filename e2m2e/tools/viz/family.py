@@ -1,4 +1,4 @@
-﻿"""轨道族可视化模块
+"""轨道族可视化模块
 
 提供轨道族的 2D/3D 绘图、Jacobi-周期-稳定性分析图和概览图。
 """
@@ -587,4 +587,3 @@ class FamilyPlotter(OrbitVisualizer):
         if show:
             plt.show()
         return fig
-

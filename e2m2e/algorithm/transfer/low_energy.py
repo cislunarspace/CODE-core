@@ -1,4 +1,4 @@
-﻿"""流形拼接与低能转移流水线模块。
+"""流形拼接与低能转移流水线模块。
 
 低能转移初猜生成（郑越、赵敏 2023 流程的产品化）：
 
@@ -224,4 +224,3 @@ def design_low_energy_transfer(
         n_iter=leg2.n_iter,
         message=message,
     )
-

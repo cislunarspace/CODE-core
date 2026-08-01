@@ -1,4 +1,4 @@
-﻿"""二体 Lambert 求解器（Izzo 算法）的 Python 薄封装。
+"""二体 Lambert 求解器（Izzo 算法）的 Python 薄封装。
 
 Rust 内核在 ``e2m2e-propagation`` crate（``crates/e2m2e-propagation/src/lambert.rs``），
 经 ``e2m2e._integrators`` 暴露；本模块只做类型转换与结果封装。
@@ -135,4 +135,3 @@ def solve_lambert_batch(
                 out[i, j, 0, :] = res["v0"]
                 out[i, j, 1, :] = res["vf"]
     return out
-

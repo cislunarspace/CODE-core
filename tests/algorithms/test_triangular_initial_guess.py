@@ -44,12 +44,8 @@ class TestInitialGuess:
     def test_l4_l5_are_mirror_images(self):
         """L4/L5 初猜关于 x 轴对称（y 分量反号）。"""
         system = _earth_moon_system()
-        state4, period4 = compute_triangular_initial_guess(
-            system, 4, 8000.0, 6000.0, 0.0, 0.0
-        )
-        state5, period5 = compute_triangular_initial_guess(
-            system, 5, 8000.0, 6000.0, 0.0, 0.0
-        )
+        state4, period4 = compute_triangular_initial_guess(system, 4, 8000.0, 6000.0, 0.0, 0.0)
+        state5, period5 = compute_triangular_initial_guess(system, 5, 8000.0, 6000.0, 0.0, 0.0)
         assert period4 == period5
         np.testing.assert_allclose(state4[0], state5[0])
         np.testing.assert_allclose(state4[1], -state5[1])

@@ -1,4 +1,4 @@
-﻿"""两层多重打靶法求解器
+"""两层多重打靶法求解器
 
 将多重打靶问题分解为两层交替求解：
 - Level 1（局部问题）：逐段调整出发速度使位置连续；
@@ -628,4 +628,3 @@ class TwoLevelMultipleShooting:
             per_patch_velocity_residual=per_patch_velocity_residual.copy(),
             residual_history=list(residual_history),
         )
-

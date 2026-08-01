@@ -1,4 +1,4 @@
-﻿"""星历修正子包。
+"""星历修正子包。
 
 通过 ``PatchPointCorrector`` 注册表分发修正方法，
 取代原先的 ``if/elif`` 字符串分发。
@@ -121,4 +121,3 @@ __all__ = [
     "_TwoLevelPatchPointCorrector",
     "_HomotopyPatchPointCorrector",
 ]
-

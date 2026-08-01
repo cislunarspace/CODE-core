@@ -1,4 +1,4 @@
-﻿r"""星历动力学模型 —— 在多体 N 体引力场中传播航天器轨道。
+r"""星历动力学模型 —— 在多体 N 体引力场中传播航天器轨道。
 
 本模块实现 ``EphemerisDynamics``，它继承自 ``Dynamics``，利用
 SPICE 星历数据提供的高精度天体位置与引力参数，计算多体引力加速度、
@@ -313,4 +313,3 @@ class EphemerisDynamics(Dynamics):
             f"EphemerisDynamics(system={self.system}, integrator='{self.integrator}', "
             f"rtol={self.rtol}, atol={self.atol}, max_step={self.max_step})"
         )
-

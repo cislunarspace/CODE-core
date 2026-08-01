@@ -1,4 +1,4 @@
-﻿"""轨道搜索的几何核。
+"""轨道搜索的几何核。
 
 纯函数：仅 np.ndarray / Orbit 输入，不引入进度条与并行。
 """
@@ -122,4 +122,3 @@ def is_feasible_result(
     if md < mdt:
         return True
     return bool(result.get("local_minimum_found", False) and lmd < mdt)
-

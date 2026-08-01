@@ -1,4 +1,4 @@
-﻿"""相对论修正力模型。"""
+"""相对论修正力模型。"""
 
 from __future__ import annotations
 
@@ -250,4 +250,3 @@ class RelativisticCorrection(PhysicalModel):
                 f"No default body radius for {self._central_body!r}. "
                 "Provide body_radius explicitly."
             ) from exc
-

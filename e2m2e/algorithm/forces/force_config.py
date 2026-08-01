@@ -1,4 +1,4 @@
-﻿"""ForceModel 配置驱动：力模型 ↔ dict 序列化与 JSON IO。
+"""ForceModel 配置驱动：力模型 ↔ dict 序列化与 JSON IO。
 
 设计见 ADR 0004。容器级编排（信封、version、entry 拼装）在
 ``ForceModel.to_config`` / ``from_config``；本模块只负责"单条力"的
@@ -334,4 +334,3 @@ def load_force_config(path: str | Path, system: Any) -> Any:
     from .force_model import ForceModel
 
     return ForceModel.from_config(config, system)
-

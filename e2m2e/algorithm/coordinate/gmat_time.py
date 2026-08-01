@@ -1,4 +1,4 @@
-﻿"""GMAT 兼容时间转换。"""
+"""GMAT 兼容时间转换。"""
 
 from __future__ import annotations
 
@@ -58,4 +58,3 @@ class TimeSystemConverter:
         tt_mjd = self.et_to_tt_mjd(et)
         tai_mjd = tt_mjd - TT_TAI_OFFSET / SECONDS_PER_DAY
         return self.tai_mjd_to_a1_mjd(tai_mjd)
-

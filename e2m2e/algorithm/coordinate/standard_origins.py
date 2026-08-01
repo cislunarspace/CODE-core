@@ -1,4 +1,4 @@
-﻿"""常用坐标原点实现。
+"""常用坐标原点实现。
 
 提供基于 SPICE 的天体中心原点等标准原点实现。
 """
@@ -55,4 +55,3 @@ class InertialOrigin(Origin):
     def state(self, et: float) -> npt.NDArray[np.floating]:
         """返回零状态。"""
         return np.zeros(6)
-

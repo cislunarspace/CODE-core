@@ -1,4 +1,4 @@
-﻿"""rho 无量纲坐标 ↔ ECI（J2000, km）坐标桥接。
+"""rho 无量纲坐标 ↔ ECI（J2000, km）坐标桥接。
 
 将 qiao ``rho_to_eci`` / ``eci_to_rho`` 的功能用 e2m2e 的 ``EphemerisSystem``
 + ``SynodicAxes`` 重写。rho 坐标系以选定平动点为原点，使用 CR3BP 归一化单位，
@@ -217,4 +217,3 @@ def eci_to_rho(
     rhodot_nd = rhodot_km * TU / LU
 
     return rho_nd, rhodot_nd
-

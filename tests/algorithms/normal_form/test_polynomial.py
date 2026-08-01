@@ -54,8 +54,8 @@ class TestPolySubs:
         x1, x2, x3, x4, x5, x6 = sp.symbols("x1 x2 x3 x4 x5 x6", real=True)
         H = {(2, 1, 0, 0, 0, 0): 1}  # x1^2·x2
         subs_map = {
-            x1: Q2,   # 旧 x1 → 新 q2
-            x2: Q1,   # 旧 x2 → 新 q1
+            x1: Q2,  # 旧 x1 → 新 q2
+            x2: Q1,  # 旧 x2 → 新 q1
             x3: Q3,
             x4: P1,
             x5: P2,
@@ -101,8 +101,8 @@ class TestPolySubs:
         c = sp.symbols("c", real=True)
         H = {(1, 1, 0, 0, 0, 0): 5}  # 5·x1·x2
         subs_map = {
-            x1: 2 * Q1,        # 数值缩放
-            x2: c * Q2,        # 符号缩放
+            x1: 2 * Q1,  # 数值缩放
+            x2: c * Q2,  # 符号缩放
             x3: Q3,
             x4: P1,
             x5: P2,
@@ -116,9 +116,7 @@ class TestPolySubs:
         """4 阶项 ``x1^4`` 经单位 B 替换不变。"""
         x1, x2, x3, x4, x5, x6 = sp.symbols("x1 x2 x3 x4 x5 x6", real=True)
         H = {(4, 0, 0, 0, 0, 0): 7}
-        subs_map = {x: v for x, v in zip(
-            [x1, x2, x3, x4, x5, x6], NEW_VARS, strict=True
-        )}
+        subs_map = {x: v for x, v in zip([x1, x2, x3, x4, x5, x6], NEW_VARS, strict=True)}
         result = poly_subs(H, subs_map)
         assert result == {(4, 0, 0, 0, 0, 0): 7}
 

@@ -1,4 +1,4 @@
-﻿r"""推力与机动模型。
+r"""推力与机动模型。
 
 提供两种推力/机动表示：
 
@@ -421,4 +421,3 @@ class BurnApplication:
     delta_v: npt.NDArray[np.floating]
     velocity_before: npt.NDArray[np.floating]
     velocity_after: npt.NDArray[np.floating]
-

@@ -140,6 +140,4 @@ def transfer_orbit(
     Raises:
         NotImplementedError: 编排器实现未完成（当前为占位，能力在规划中）。
     """
-    raise NotImplementedError(
-        f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）"
-    )
+    raise NotImplementedError(f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）")

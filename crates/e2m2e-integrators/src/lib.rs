@@ -633,7 +633,7 @@ fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Ve
 #[pyfunction]
 fn spice_poc_furnsh(path: &str) -> PyResult<()> {
     static REGISTERED: std::sync::Once = std::sync::Once::new();
-    REGISTERED.call_once(|| e2m2e_spice::spice_ffi::register_bodies());
+    REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
     cspice::data::furnish(path)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {:?}", e)))
 }

@@ -1,4 +1,4 @@
-﻿"""多脉冲转移框架与 Lawden 主矢量检验。
+"""多脉冲转移框架与 Lawden 主矢量检验。
 
 多脉冲 NLP 采用节点参数化：两端为固定 :class:`StateTerminal`（位置、速度、时刻
 均固定），中途脉冲节点以 ``(t_i, r_i)`` 为决策变量，相邻节点间的弧段由 Lambert
@@ -581,4 +581,3 @@ class MultiImpulseTransfer:
         if with_stm:
             out["stm"] = res["stm"]
         return out
-

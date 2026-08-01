@@ -1,4 +1,4 @@
-﻿"""常用动态坐标轴实现。
+"""常用动态坐标轴实现。
 
 - VNBAxes: 速度-法向-副法向（VNB）坐标轴
 - LVLHAxes: 本地垂直本地水平（LVLH）坐标轴
@@ -54,4 +54,3 @@ class LVLHAxes(DynamicAxes):
 
     def _compute_rotation_matrix(self, et: float) -> npt.NDArray[np.floating]:
         return self._rotation
-

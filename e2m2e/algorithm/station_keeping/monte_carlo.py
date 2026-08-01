@@ -395,9 +395,7 @@ class SingleSampleSimulation:
 
             # 控制量基于测量状态、控制力模型计算，施加于真实轨道
             # （控制律输出 km/s；误差模型与输出统计按 DFH 惯例用 m/s）
-            dv_c = self.law.compute_maneuver(
-                x_meas, t_k, propagator=prop_ctrl, nominal=nominal
-            )
+            dv_c = self.law.compute_maneuver(x_meas, t_k, propagator=prop_ctrl, nominal=nominal)
             if dv_c is None:
                 # 特征点模式找不到目标穿越：本控制时刻不开机
                 dv_r = None
@@ -436,7 +434,6 @@ class SingleSampleSimulation:
 # ── 进程池：CSPICE 全局状态非线程安全，样本并行用进程隔离 ──
 
 _CTX: dict[str, Any] = {}
-
 
 
 def _kernel_paths(kernel_dir: str | None = None) -> list[str]:

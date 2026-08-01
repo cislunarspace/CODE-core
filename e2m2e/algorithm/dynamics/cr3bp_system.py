@@ -1,4 +1,4 @@
-﻿"""圆型限制性三体问题系统模块。
+"""圆型限制性三体问题系统模块。
 
 包含 ``CR3BP_System`` 类与 ``LibrationPoint`` 枚举，用于定义和操作
 圆型限制性三体问题系统。``CR3BP_System`` 继承自 ``System`` 抽象基类。
@@ -495,4 +495,3 @@ class CR3BP_System(System):
 
         # 3. 尾部分隔线
         print("=" * 60)
-

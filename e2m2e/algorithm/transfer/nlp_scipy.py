@@ -1,4 +1,4 @@
-﻿"""SciPy SLSQP 后端。
+"""SciPy SLSQP 后端。
 
 把原先嵌入 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer`
 的 SciPy SLSQP 求解循环抽出为顶层函数 :func:`solve_with_scipy`，由
@@ -163,4 +163,3 @@ def solve_with_scipy(
         print(f"  总ΔV={opt_result.total_delta_v:.6f}")
 
     return opt_result
-

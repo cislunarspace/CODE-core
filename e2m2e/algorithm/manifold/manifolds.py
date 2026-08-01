@@ -1,4 +1,4 @@
-﻿"""
+"""
 不变流形计算模块
 
 提供 CR3BP 周期轨道不变流形（稳定/不稳定）的种子生成与批量传播功能。
@@ -265,4 +265,3 @@ class InvariantManifold:
         new_times = np.append(times[: seg_idx + 1], t_cross)
         new_states = np.vstack([states[: seg_idx + 1], state_cross])
         return new_times, new_states
-

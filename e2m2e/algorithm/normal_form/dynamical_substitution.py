@@ -536,10 +536,7 @@ def _build_dynamics_rhs_circular(
         rhodot = X_arr[3:6]
         d_e = r0 + rho
         d_m = r0 + rho - rm
-        grav = (
-            -mu_e * d_e / np.linalg.norm(d_e) ** 3
-            - mu_m * d_m / np.linalg.norm(d_m) ** 3
-        )
+        grav = -mu_e * d_e / np.linalg.norm(d_e) ** 3 - mu_m * d_m / np.linalg.norm(d_m) ** 3
         coriolis = -2.0 * np.cross(omega, rhodot)
         centrifugal = -np.cross(omega, np.cross(omega, rho))
         rhodotdot = (grav - grav0) + coriolis + centrifugal

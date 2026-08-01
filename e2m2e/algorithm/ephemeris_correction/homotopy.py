@@ -1,4 +1,4 @@
-﻿"""同伦星历修正模块。
+"""同伦星历修正模块。
 
 通过固定步长的 lambda 权重序列，将 patch points 轨迹从基础天体集
 （如 ``["EARTH", "MOON"]``）逐步过渡到完整天体集
@@ -331,4 +331,3 @@ def _split_residual_history(
         pos.append(float(p))
         vel.append(float(v))
     return pos, vel
-

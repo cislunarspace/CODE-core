@@ -1,4 +1,4 @@
-﻿"""星历修正接缝类型
+"""星历修正接缝类型
 
 定义 ``PatchPointCorrector`` 接缝与 ``EphemerisCorrectionResult`` 结果类型，
 供 ``ephemeris_correction`` 子包的注册表与各修正实现共用。
@@ -88,4 +88,3 @@ class UnsupportedCorrectorMethodError(ValueError):
         super().__init__(
             f"unsupported correction method: {method!r}; available: {', '.join(sorted(available))}"
         )
-

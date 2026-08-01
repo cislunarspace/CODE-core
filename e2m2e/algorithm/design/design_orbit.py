@@ -1,4 +1,4 @@
-﻿"""任务轨道设计入口（DFH 功能码 1 对齐层）。
+"""任务轨道设计入口（DFH 功能码 1 对齐层）。
 
 链路（对齐 ``docs/plans/dfh-parity-prd.md`` FR1）：
 
@@ -323,9 +323,7 @@ def _validate_params(
             "phase_out": phase_out,
         }
 
-    raise ValueError(
-        f"orbit_type 必须为 DRO/NRHO/Halo/Lissajous/L4/L5，当前 {sel!r}"
-    )
+    raise ValueError(f"orbit_type 必须为 DRO/NRHO/Halo/Lissajous/L4/L5，当前 {sel!r}")
 
 
 def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_Dynamics) -> Orbit:

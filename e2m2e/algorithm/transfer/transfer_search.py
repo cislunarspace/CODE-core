@@ -1,4 +1,4 @@
-﻿"""轨道转移搜索编排类。
+"""轨道转移搜索编排类。
 
 实现论文 Cui et al. (2025) 中"搜索-优化"两步法的搜索阶段：
 平面转移轨道设计，搜索变量: 出发点位置、α（切向速度比）。
@@ -347,4 +347,3 @@ def load_orbit_from_json(filepath: str) -> Orbit:
     if "period_ratio" in data:
         orbit.metadata["period_ratio"] = data["period_ratio"]
     return orbit
-

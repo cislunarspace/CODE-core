@@ -100,9 +100,7 @@ class DynamicsLike(Protocol):
     def compute_jacobian_A(self, state: npt.NDArray[np.floating]) -> np.ndarray: ...
 
     @overload
-    def compute_jacobian_A(
-        self, t: float, state: npt.NDArray[np.floating]
-    ) -> np.ndarray: ...
+    def compute_jacobian_A(self, t: float, state: npt.NDArray[np.floating]) -> np.ndarray: ...
 
     def propagate(
         self,

@@ -1,4 +1,4 @@
-﻿"""固体潮修正（天体无关 Step1 + 地球专用 Step2/极潮/永久潮）。
+"""固体潮修正（天体无关 Step1 + 地球专用 Step2/极潮/永久潮）。
 
 ``solid_tide_step1`` 天体无关:对任意中心天体,把扰动体位置 + 该天体的 Love
 数表喂进去即可算 ΔC/ΔS(对齐 GMAT ``HarmonicGravity::IncrementSolidTide``)。
@@ -425,4 +425,3 @@ def permanent_tide_correction(
         mu_central=mu_earth,
         r_central=r_earth,
     )
-

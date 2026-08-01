@@ -1,4 +1,4 @@
-﻿"""由 SPICE 月球瞬时状态驱动的会合（synodic）坐标轴。
+"""由 SPICE 月球瞬时状态驱动的会合（synodic）坐标轴。
 
 该轴在 ICRF/J2000 下的基向量由 ``spice.get_body_state("MOON", et, "J2000", "EARTH")``
 实时确定：
@@ -81,4 +81,3 @@ class SynodicAxes(Axes):
         """返回当前时刻的地月距离 (km)。"""
         moon_state = self._spice.get_body_state("MOON", et, "J2000", "EARTH")
         return float(np.linalg.norm(moon_state[:3]))
-

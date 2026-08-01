@@ -1,4 +1,4 @@
-﻿"""NormalFormResult 序列化辅助（save/load 内部实现）。
+"""NormalFormResult 序列化辅助（save/load 内部实现）。
 
 把 ``NormalFormResult`` 及其四个子结果扁平化为 ``dict[str, ndarray | str]``,
 供 ``np.savez`` 写入单个 ``.npz`` 文件；反向从 ``.npz`` 重建等价对象。
@@ -446,4 +446,3 @@ def result_from_npz_dict(d: dict[str, Any]) -> NormalFormResult:
         cm_result=cm_result,
         catalog_transformer=catalog_transformer,
     )
-

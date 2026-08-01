@@ -1,4 +1,4 @@
-﻿"""太阳光压力模型（cannonball / 基础 Cr 系数）。
+"""太阳光压力模型（cannonball / 基础 Cr 系数）。
 
 实现 Montenbruck & Gill eq. 3.75 的 cannonball SRP 模型：
 
@@ -125,4 +125,3 @@ class SolarRadiationPressure(PhysicalModel):
 
         flux = self._shadow.flux_factor(t, state, system) if self._shadow is not None else 1.0
         return self._compute_srp_acceleration(sc_pos - sun_pos, flux)
-

@@ -1,4 +1,4 @@
-﻿"""动力学系统抽象基类模块。
+"""动力学系统抽象基类模块。
 
 定义 ``System`` 抽象基类，统一 CR3BP 系统与星历系统的公共接口。
 具体实现见 ``cr3bp_system.py``（``CR3BP_System``）和 ``ephemeris_system.py``
@@ -64,4 +64,3 @@ class System(abc.ABC):
             天体位置向量。
         """
         raise NotImplementedError(f"{type(self).__name__} does not support get_body_position")
-

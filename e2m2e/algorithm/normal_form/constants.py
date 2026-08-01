@@ -1,4 +1,4 @@
-﻿"""Normal-form 归一化常数与平动点几何工具。
+"""Normal-form 归一化常数与平动点几何工具。
 
 集中存放 qiao ``Global_File.py`` / ``Calc_LPstate.py`` 中固化下来的物理
 与几何常量，以及从给定质量比反解平动点无量纲坐标、共线点 γ 值的辅助函数。
@@ -201,4 +201,3 @@ def characteristic_exponent(point: LibrationPoint) -> float:
     """
     _, _, lam = _CENTRAL_PARAMS[point]
     return lam
-

@@ -1,4 +1,4 @@
-﻿"""力模型子包异常。
+"""力模型子包异常。
 
 所有异常均继承 :class:`e2m2e.core.exceptions.E2M2EError`，并同时保留
 对原有 Python 内置异常的多重继承，使既有 ``except ValueError`` /
@@ -24,4 +24,3 @@ class NotSerializableError(E2M2EError, TypeError):
     """力模型无法序列化为配置（如含任意 Python callable）时抛出。"""
 
     pass
-

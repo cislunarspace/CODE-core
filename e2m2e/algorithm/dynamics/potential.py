@@ -1,4 +1,4 @@
-﻿"""CR3BP 伪势能函数
+"""CR3BP 伪势能函数
 
 包含伪势能 Ω 的 Hessian 矩阵计算，供动力学方程和稳定性分析共用。
 """
@@ -56,4 +56,3 @@ def pseudo_potential_hessian(
             [U_xz, U_yz, U_zz],
         ]
     )
-

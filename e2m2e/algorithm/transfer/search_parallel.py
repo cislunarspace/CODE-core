@@ -1,4 +1,4 @@
-﻿"""轨道搜索的并行/串行后端与 per-α 积分内核。
+"""轨道搜索的并行/串行后端与 per-α 积分内核。
 
 per-α 积分内核 :func:`search_single_departure` 通过 ``searcher`` 上的几何方法
 分发（``searcher._forward_integrate`` / ``_check_collision`` / ``_compute_distance_series`` 等），
@@ -700,4 +700,3 @@ def process_departure_worker(
 def process_departure_worker_packed(packed: tuple[Any, ...]) -> list[dict[str, Any]]:
     """单元组打包，供 ``ProcessPoolExecutor`` 提交。"""
     return process_departure_worker(*packed)
-

@@ -78,7 +78,7 @@ class TestSolveQfMultipoint:
         B_mp = _solve_qf_multipoint(M_at, D, tlist, node_step=0.4)
         maxB = np.max(np.abs(B_mp))
         err_abs = _max_symplectic_error(B_mp)
-        err_rel = err_abs / (maxB ** 2 + 1e-30)
+        err_rel = err_abs / (maxB**2 + 1e-30)
         assert err_rel < 1e-13, f"相对辛误差过大：{err_rel}（绝对 {err_abs}, max|B| {maxB}）"
 
     def test_satisfies_ode(self, l2_M_D):

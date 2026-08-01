@@ -49,7 +49,9 @@ def _default_orbit_root() -> Path | None:
     """MATLAB 封装库的 orbit 目录（含 DFH_DAC.exe 与数据文件）。"""
     candidates = [
         Path.home() / "Downloads/Compressed/orbit-design-module/CislunarOrbitPack/orbit",
-        Path(r"C:\Users\ouyangjiahong\Downloads\Compressed\orbit-design-module\CislunarOrbitPack\orbit"),
+        Path(
+            r"C:\Users\ouyangjiahong\Downloads\Compressed\orbit-design-module\CislunarOrbitPack\orbit"
+        ),
     ]
     for c in candidates:
         if (c / "DFH_DAC.exe").is_file():

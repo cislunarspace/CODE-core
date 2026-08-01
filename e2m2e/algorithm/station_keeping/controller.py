@@ -40,7 +40,9 @@ _EPHEMERIS_NAMES = {1: "EPHEMERIDES_LOOSE", 2: "EPHEMERIDES_TIGHT", 3: "EPHEMERI
 #: e2m2e 能力边界内的默认摄动开关：球模型光压、关耦合项（MATLAB 默认
 #: 分别为 ECOM 与开，e2m2e 未实现，#253）
 _DEFAULT_CTRL_PERTURBATION: dict[str, int] = {
-    **DEFAULT_PERTURBATION, "solar_radiation": 1, "coupling": 0
+    **DEFAULT_PERTURBATION,
+    "solar_radiation": 1,
+    "coupling": 0,
 }
 
 
@@ -185,8 +187,16 @@ def control_orbit(
 
     system = EphemerisSystem(
         bodies=[
-            "SUN", "EARTH", "MOON", "MARS", "JUPITER",
-            "SATURN", "VENUS", "MERCURY", "URANUS", "NEPTUNE",
+            "SUN",
+            "EARTH",
+            "MOON",
+            "MARS",
+            "JUPITER",
+            "SATURN",
+            "VENUS",
+            "MERCURY",
+            "URANUS",
+            "NEPTUNE",
         ],
         spice=spice,
         origin="EARTH",

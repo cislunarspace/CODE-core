@@ -1,4 +1,4 @@
-﻿"""转移轨道脉冲代价计算模块。
+"""转移轨道脉冲代价计算模块。
 
 提供 ΔV 出发/插入脉冲及总代价的计算。
 """
@@ -44,4 +44,3 @@ def compute_transfer_cost(
     # 转移末端速度与目标轨道插入速度之差给出插入脉冲
     dv2 = float(np.linalg.norm(final_velocity - insertion_velocity))
     return TransferCost(dv1=dv1, dv2=dv2, total=dv1 + dv2)
-

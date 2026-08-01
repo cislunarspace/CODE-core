@@ -1,4 +1,4 @@
-﻿"""DRO→RO 转移轨道 NLP 优化的高层编排。
+"""DRO→RO 转移轨道 NLP 优化的高层编排。
 
 实现论文 Cui et al. (2025) "搜索-优化"两步法中的优化阶段：
 
@@ -628,4 +628,3 @@ def optimize_transfer(
     )
 
     return optimizer.optimize(initial_guess=initial_guess, **kwargs)
-

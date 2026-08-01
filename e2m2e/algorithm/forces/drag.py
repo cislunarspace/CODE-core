@@ -1,4 +1,4 @@
-﻿"""大气阻力力模型。"""
+"""大气阻力力模型。"""
 
 from __future__ import annotations
 
@@ -181,4 +181,3 @@ class DragModel(PhysicalModel):
         axes = ITRFApproxAxes()
         origin = CelestialBodyOrigin(body=self._body, spice=spice)
         return CoordinateSystem(axes=axes, origin=origin)
-

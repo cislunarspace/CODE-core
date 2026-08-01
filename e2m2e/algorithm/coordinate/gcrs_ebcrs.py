@@ -1,4 +1,4 @@
-﻿"""TDT+GCRS ↔ TDB+EBCRS 时空坐标转换（r2s2 后端）。
+"""TDT+GCRS ↔ TDB+EBCRS 时空坐标转换（r2s2 后端）。
 
 TDT 是 TT（地球时）的旧称；EBCRS 是地月质心天球参考系，轴向与 BCRS/ICRS
 一致，原点在地月质心。
@@ -110,4 +110,3 @@ class GCRSEBCRSSystem:
         xs = position + self._emb_position(jd1, jd2)
         tt1, tt2, Xs = R2S2.TDB2TT(jd1, jd2, xs)
         return tt1 + tt2, Xs
-

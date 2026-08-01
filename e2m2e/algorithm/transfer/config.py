@@ -1,4 +1,4 @@
-﻿"""转移轨道统一配置类型定义。
+"""转移轨道统一配置类型定义。
 
 把原先分散在 ``config.py``（优化阶段）与 ``search_config.py``（搜索阶段）的
 两个 dataclass 合并为单一 :class:`TransferConfig`，用 ``search_*`` / ``nlp_*``
@@ -167,4 +167,3 @@ class TransferSolution:
     converged: bool
     n_iter: int
     message: str = ""
-

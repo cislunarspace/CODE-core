@@ -1,4 +1,4 @@
-﻿"""NSGA-II 多目标优化器（主题 8）。
+"""NSGA-II 多目标优化器（主题 8）。
 
 经典 NSGA-II（Deb et al. 2002）：非支配排序 + 拥挤度选择 + 精英保留。
 纯 Python 编排，适应度评估可选 ProcessPoolExecutor 并行（Windows spawn
@@ -412,4 +412,3 @@ def _polynomial_mutation(
                 y = y + deltaq * (hi[j] - lo[j])
                 pop[i, j] = np.clip(y, lo[j], hi[j])
     return pop
-

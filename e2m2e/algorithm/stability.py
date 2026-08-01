@@ -1,4 +1,4 @@
-﻿"""
+"""
 稳定性分析模块
 
 提供轨道稳定性分析功能，包括单值矩阵计算、Floquet乘子分析、分岔检测等。
@@ -515,4 +515,3 @@ class StabilityAnalysis:
                 best_bp = bp
 
         return best_bp
-

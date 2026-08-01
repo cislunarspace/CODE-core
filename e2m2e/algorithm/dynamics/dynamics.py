@@ -1,4 +1,4 @@
-﻿"""
+"""
 三体问题动力学模块
 
 包含通用 Dynamics 基类和 CR3BP_Dynamics 类，用于计算和积分圆型限制性三体问题的动力学方程。
@@ -596,4 +596,3 @@ def propagate_state_at_orbit_time(
         积分末端状态
     """
     return dynamics.propagate_orbit_state_at_time(orbit, t, integration_dt)
-

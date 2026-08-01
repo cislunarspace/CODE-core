@@ -1,4 +1,4 @@
-﻿"""Halo 轨道族编排模块
+"""Halo 轨道族编排模块
 
 从 ``continuation.py`` 拆出的 Halo 专用编排：种子生成、自然参数族延拓、
 伪弧长（PAL）延拓。``Continuation`` 实例上同名方法仍可用 — 在
@@ -352,4 +352,3 @@ def halo_pseudo_arclength_continuation(
             logger.info("  z_amplitude 范围: [%.4f, %.4f]", min(z_values), max(z_values))
 
     return orbit_family
-

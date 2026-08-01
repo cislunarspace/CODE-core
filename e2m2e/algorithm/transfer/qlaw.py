@@ -1,4 +1,4 @@
-﻿"""Q-law 低推力初猜生成器（Lyapunov 反馈律）。
+"""Q-law 低推力初猜生成器（Lyapunov 反馈律）。
 
 用 Q-law（Petropoulos；Holt 2024 式 6-10）做低推力转移的初猜生成：前向反馈
 积分产出次优控制历史，喂 :class:`~e2m2e.transfer.lowthrust_shooting.LowThrustShooting`
@@ -458,4 +458,3 @@ __all__ = [
     "qlaw_guess",
     "make_shooter_for_qlaw",
 ]
-

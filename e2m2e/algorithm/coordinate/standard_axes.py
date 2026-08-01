@@ -1,4 +1,4 @@
-﻿"""常用坐标轴实现。"""
+"""常用坐标轴实现。"""
 
 from __future__ import annotations
 
@@ -171,4 +171,3 @@ def _rotation3(angle: float) -> npt.NDArray[np.floating]:
     cos_angle = np.cos(angle)
     sin_angle = np.sin(angle)
     return np.array([[cos_angle, -sin_angle, 0.0], [sin_angle, cos_angle, 0.0], [0.0, 0.0, 1.0]])
-

@@ -1,4 +1,4 @@
-﻿"""标准形化简上下文对象 ``NormalFormContext``。
+"""标准形化简上下文对象 ``NormalFormContext``。
 
 集中存放一条标准形化简流水线所需的全部静态/派生数据：
 归一化常量、平动点几何、基础频率、中心流形频率、特征指数、用户传入的
@@ -220,4 +220,3 @@ def librationPoint_normalize(point: LibrationPoint | int | str) -> LibrationPoin
 
 
 __all__ = ["NormalFormContext"]
-

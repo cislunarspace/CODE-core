@@ -1,4 +1,4 @@
-﻿"""轨道族延拓算法模块
+"""轨道族延拓算法模块
 
 提供自然参数延拓和伪弧长延拓方法，用于沿轨道族参数方向逐步生成相邻轨道。
 """
@@ -801,4 +801,3 @@ class Continuation:
 Continuation.generate_halo_seed_orbit = generate_halo_seed_orbit  # type: ignore[attr-defined]
 Continuation.generate_halo_family = generate_halo_family  # type: ignore[attr-defined]
 Continuation.halo_pseudo_arclength_continuation = halo_pseudo_arclength_continuation  # type: ignore[attr-defined]
-

@@ -1,4 +1,4 @@
-﻿"""动态坐标轴抽象基类。"""
+"""动态坐标轴抽象基类。"""
 
 from __future__ import annotations
 
@@ -56,4 +56,3 @@ class DynamicAxes(Axes, abc.ABC):
     def _compute_rotation_matrix(self, et: float) -> npt.NDArray[np.floating]:
         """子类实现：在已 update 的前提下计算旋转矩阵。"""
         raise NotImplementedError
-
