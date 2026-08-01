@@ -69,6 +69,10 @@ def main() -> None:
         duration=2.0,
         output_step=3600.0,
         perturbation=perturbation,
+        # 论文式分段打靶拼接（朱彦伟 2026）：逐段独立打靶转星历 + 远月点
+        # 分层合并，对 Halo 等不稳定轨道长期保形。默认 two_level 适合
+        # 单圈修正 + 短期预报；segmented 显式用于长期设计。
+        correction_method="segmented",
     )
     elapsed = time.perf_counter() - t0
     print(f"   耗时 {elapsed:.1f} s")

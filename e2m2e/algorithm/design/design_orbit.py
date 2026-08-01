@@ -89,13 +89,19 @@ DAYS_PER_YEAR = 365.25
 
 #: 星历修正的默认收敛容差（km，6 维状态 max 范数：位置 km + 速度 km/s）。
 #:
-#: 取 1e-4 而非 1e-6 的依据：紧凑近月 DRO（如 amplitude=10000，周期~1 天、
-#: 月距~1 万 km）因月球引力梯度强，CR3BP 几何与真实星历 N 体动力学存在
-#: ~5.7e-5 km 的物理收敛底线，多重打靶无论收紧积分器或增加节点都突破不了
-#: （实测见 design_orbit 调研）；远月 3:1 DRO 无此底线可达 1e-6（见
-#: tests/algorithms/test_dro_ephemeris_correction.py 的多点用例亦用 1e-4）。
-#: 1e-4 相对底线留约 1.7 倍裕度，兼顾紧凑与宽松两类轨道。
-CORRECTION_TOL_KM = 1e-4
+#: 取 2e-2（20 m）。地月尺度（特征长度 3.84e5 km）下 10 m 已属高精度、
+#: 1 km 都不错，0.1 m（原 1e-4）对轨道保形无实质增益，却超出星历模型与
+#: CR3BP 初猜的物理可收敛底线（紧凑近月轨道 ~5.7e-5 km，见下），导致
+#: 求解器停在 ~1.2e-2 km 永远报 not converged。容差 2e-2 给 solver 留裕度
+#: （实测单圈收敛残差 1.7e-2、3 圈段 1.5e-2，均 < 2e-2 明确收敛），迭代数
+#: 大减（10→4），保形不受影响（实测 30 天 |r| 首 480967→末 476884 km，
+#: 会合系 x∈[1.08,1.19] 紧邻 L2）。
+#:
+#: 历史依据：原 1e-4 的注释——紧凑近月 DRO（amplitude=10000，月距~1 万 km）
+#: 因月球引力梯度强，CR3BP 几何与真实星历 N 体动力学存在 ~5.7e-5 km 的
+#: 物理收敛底线；1e-4 相对底线留约 1.7 倍裕度。该底线说明 0.1 m 级收敛对
+#: 部分轨道本就不可达，进一步佐证 2e-2 是更贴合物理的默认。
+CORRECTION_TOL_KM = 2e-2
 
 #: 每圈 patch 节点数（均匀采样）；NRHO 用近月点加密采样替代
 _POINTS_PER_REV = 8
@@ -454,7 +460,7 @@ def _design_apolune_segmented(
     max_iter: int = 50,
     tolerance: float = CORRECTION_TOL_KM,
     verbose: bool = False,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, float]:
     """论文式分段打靶拼接（朱彦伟 2026）：逐段独立转星历 + 远月点分层合并。
 
     Halo/NRHO 在星历模型下极不稳定（STM 谱半径 ~1e7/圈），CR3BP 初猜
@@ -481,12 +487,15 @@ def _design_apolune_segmented(
             不是 8 的倍数——不能硬编码）。
 
     Returns:
-        ``(t_patch, state_patch)``（J2000），整条连续星历轨迹。
+        ``(t_patch, state_patch, max_residual)``（J2000），整条连续星历轨迹
+        与全程各段/合并段的最大打靶残差（km，供结果对象填充）。
     """
     from e2m2e._integrators import multiple_shooting_correct_py
 
     n_total = len(t_patch_j2000)
     n_rev = n_total // points_per_rev
+    # 全程最大残差（各段 + 各合并段打靶的最大值）
+    max_residual = 0.0
 
     # --- 第 1 步：切段，每段独立打靶转星历 ---
     seg_t: list[np.ndarray] = []
@@ -521,9 +530,15 @@ def _design_apolune_segmented(
             )
         except RuntimeError as e:
             raise DesignNotConvergedError(f"分段打靶段 {len(seg_t) + 1} 积分失败: {e}") from e
+        if not result.converged:
+            raise DesignNotConvergedError(
+                f"分段打靶段 {len(seg_t) + 1} 未收敛"
+                f"（残差 {result.max_residual:.3e} km > 容差 {tolerance:.3e} km）"
+            )
         sp = np.asarray(result.state_patch)
         seg_t.append(np.asarray(result.t_patch, dtype=float))
         seg_s.append(sp)
+        max_residual = max(max_residual, float(result.max_residual))
         if verbose:
             print(f"    残差 {result.max_residual:.2e} km, {result.iterations} 次迭代")
         k = end
@@ -567,17 +582,18 @@ def _design_apolune_segmented(
                     rtol=1e-10,
                 )
             except RuntimeError as e:
-                # 合并段打靶失败：回退为不合并，两段各自保留（整条仍连续
-                # 由段内保证，seam 处 gap 留在后续层处理）
-                if verbose:
-                    print(f"    合并失败: {e}，保留两段")
-                merged_t.extend([seg_t[i], seg_t[i + 1]])
-                merged_s.extend([seg_s[i], seg_s[i + 1]])
-                i += 2
-                continue
+                # 合并段打靶失败：整条轨道在此无法拼接连续，明确报错而非
+                # 静默回退（回退保留两段会让 seam 处轨道不连续，产出错误结果）
+                raise DesignNotConvergedError(f"分层合并第 {layer} 层段打靶积分失败: {e}") from e
+            if not result.converged:
+                raise DesignNotConvergedError(
+                    f"分层合并第 {layer} 层段未收敛"
+                    f"（残差 {result.max_residual:.3e} km > 容差 {tolerance:.3e} km）"
+                )
             spm = np.asarray(result.state_patch)
             merged_t.append(np.asarray(result.t_patch, dtype=float))
             merged_s.append(spm)
+            max_residual = max(max_residual, float(result.max_residual))
             if verbose:
                 print(
                     f"    合并段 {n} 节点: 残差 {result.max_residual:.2e} km, "
@@ -589,7 +605,7 @@ def _design_apolune_segmented(
 
     all_t = seg_t[0]
     all_s = seg_s[0]
-    return np.asarray(all_t, dtype=float), np.asarray(all_s, dtype=float)
+    return np.asarray(all_t, dtype=float), np.asarray(all_s, dtype=float), max_residual
 
 
 def design_orbit(
@@ -613,7 +629,7 @@ def design_orbit(
     moon_degree: int = 10,
     spice: SPICEManager | None = None,
     kernel_dir: str | None = None,
-    correction_method: str = "segmented",
+    correction_method: str = "two_level",
     correction_revolutions: int = 1,
     correction_velocity_tolerance: float = 0.1,
     verbose: bool = False,
@@ -650,11 +666,13 @@ def design_orbit(
         spice: 已加载内核的 ``SPICEManager``；缺省自动创建并加载
             ``kernel_dir``（默认仓库 ``kernels/``）下的内核。
         kernel_dir: SPICE 内核目录。
-        correction_method: 星历修正方法。默认 ``"segmented"``——逐段滚动多重
-            打靶（每圈一小段，用上一圈修正 shape 滚动 tile），拼接整条长期
-            轨迹，对 Halo/NRHO 等不稳定轨道在星历模型下能长期保形（朱彦伟
-            2026 分段打靶拼接法）；``"two_level"`` 端点固定 + 回溯线搜索
-            （Marchand-Howell-Wilson 两层法），适合单圈修正 + 短期预报；
+        correction_method: 星历修正方法。默认 ``"two_level"``——端点固定 +
+            回溯线搜索（Marchand-Howell-Wilson 两层法），对全部六类轨道
+            （DRO/Halo/NRHO/Lissajous/L4/L5）可靠；``"segmented"`` 论文式
+            分段打靶拼接（逐段独立 var_time 打靶转星历 + 远月点分层合并，
+            朱彦伟 2026），对 Halo/NRHO 等不稳定轨道在星历模型下长期保形，
+            但近月紧凑轨道（如 amplitude=10000 的 DRO）段打靶残差
+            ~7e-2 km 超出 2e-2 容差，需显式开启时注意；
             ``"standard"`` 全自由变量无步长控制，仅对稳定 DRO 可靠；
             ``"homotopy"`` 同伦过渡（质点 N 体语义）。
         correction_revolutions: 星历修正弧长（圈数）。
@@ -839,7 +857,7 @@ def design_orbit(
                 # 控制在单圈量级（Halo 初猜在星历下第 1 圈就偏，段越短
                 # 初猜越贴真实动力学）。默认组内 3 圈，段多时自动增。
                 revs_per_group = max(1, min(3, n_rev))
-                t_patch_long, s_patch_long = _design_apolune_segmented(
+                t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
                     forces_py,
                     "EARTH",
                     t_patch_j2000_n,
@@ -884,7 +902,7 @@ def design_orbit(
         correction = EphemerisCorrectionResult(
             converged=True,
             iterations=0,
-            max_residual=0.0,
+            max_residual=max_residual,
             residual_history=[],
             t_patch=t_patch_long,
             state_patch=s_patch_long,
