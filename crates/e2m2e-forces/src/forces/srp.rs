@@ -121,11 +121,7 @@ fn combine_body_fluxes(factors: &[f64], angular_radii: &[f64], directions: &[[f6
 ///
 /// SRP 是 STM 传播内循环的热点：数值差分雅可比每步要 6 次加速度评估，
 /// 每次都查太阳/遮挡体位置。缓存命中时全走内存三次样条，免 cspice FFI。
-fn body_position_cached(
-    target: &str,
-    observer: &str,
-    et: f64,
-) -> Result<[f64; 3], SpiceFfiError> {
+fn body_position_cached(target: &str, observer: &str, et: f64) -> Result<[f64; 3], SpiceFfiError> {
     if let Some(p) = e2m2e_spice::ephem_cache::with_cache(|c| {
         c.and_then(|c| c.body_position(target, observer, et))
     }) {

@@ -118,7 +118,8 @@ impl CubicSpline {
         let a = (self.xs[i + 1] - t) / h;
         let b = (t - self.xs[i]) / h;
         // 三次样条求值（二阶导数形式）
-        a * self.ys[i] + b * self.ys[i + 1]
+        a * self.ys[i]
+            + b * self.ys[i + 1]
             + ((a * a * a - a) * self.m[i] + (b * b * b - b) * self.m[i + 1]) * (h * h) / 6.0
     }
 }
@@ -315,7 +316,12 @@ mod tests {
             let expected = x.sin();
             let err = (sp.eval(x) - expected).abs();
             max_err = max_err.max(err);
-            assert!(err < 5e-3, "at {x}: got {} exp {}, err {err}", sp.eval(x), expected);
+            assert!(
+                err < 5e-3,
+                "at {x}: got {} exp {}, err {err}",
+                sp.eval(x),
+                expected
+            );
         }
         // 内部点（远离边界）应明显更精确
         assert!((sp.eval(2.0) - 2.0_f64.sin()).abs() < 1e-4);

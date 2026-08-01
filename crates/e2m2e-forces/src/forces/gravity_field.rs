@@ -115,24 +115,23 @@ pub fn gravity_field_acceleration(
         [r_sc[0], r_sc[1], r_sc[2]]
     } else {
         // 查两个 origin 在 SSB 的位置（优先走星历缓存，未覆盖回退 spkezr）
-        let prop_origin_pos_ssb: [f64; 3] =
-            match e2m2e_spice::ephem_cache::with_cache(|c| {
-                c.and_then(|cache| {
-                    cache.body_position(propagation_origin, "SOLAR SYSTEM BARYCENTER", et)
-                })
-            }) {
-                Some(p) => p,
-                None => {
-                    let (st, _) = e2m2e_spice::spice_ffi::spkezr(
-                        propagation_origin,
-                        et,
-                        propagation_frame,
-                        "NONE",
-                        "SOLAR SYSTEM BARYCENTER",
-                    )?;
-                    [st[0], st[1], st[2]]
-                }
-            };
+        let prop_origin_pos_ssb: [f64; 3] = match e2m2e_spice::ephem_cache::with_cache(|c| {
+            c.and_then(|cache| {
+                cache.body_position(propagation_origin, "SOLAR SYSTEM BARYCENTER", et)
+            })
+        }) {
+            Some(p) => p,
+            None => {
+                let (st, _) = e2m2e_spice::spice_ffi::spkezr(
+                    propagation_origin,
+                    et,
+                    propagation_frame,
+                    "NONE",
+                    "SOLAR SYSTEM BARYCENTER",
+                )?;
+                [st[0], st[1], st[2]]
+            }
+        };
         let r_ssb = [
             r_sc[0] + prop_origin_pos_ssb[0],
             r_sc[1] + prop_origin_pos_ssb[1],
@@ -165,13 +164,12 @@ pub fn gravity_field_acceleration(
     // 其中 to_rotation = pxform(input_frame, J2000)（input → j2000）。
     // 所以 position_out = pxform(input_frame, J2000).T @ r_body_icrf
     //                   = pxform(J2000, input_frame) @ r_body_icrf
-    let r_input_to_j2000: [[f64; 3]; 3] =
-        match e2m2e_spice::ephem_cache::with_cache(|c| {
-            c.and_then(|cache| cache.frame_matrix(input_frame, propagation_frame, et))
-        }) {
-            Some(m) => m,
-            None => pxform(input_frame, propagation_frame, et)?,
-        };
+    let r_input_to_j2000: [[f64; 3]; 3] = match e2m2e_spice::ephem_cache::with_cache(|c| {
+        c.and_then(|cache| cache.frame_matrix(input_frame, propagation_frame, et))
+    }) {
+        Some(m) => m,
+        None => pxform(input_frame, propagation_frame, et)?,
+    };
     let r_input = mat3_t_mul_vec(&r_input_to_j2000, &r_body_icrf);
 
     // Step 2: 有效系数（含潮汐修正）

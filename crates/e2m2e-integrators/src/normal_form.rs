@@ -204,10 +204,7 @@ pub fn project_hamiltonian_qf_py(
                 .collect(),
         );
     }
-    Ok((
-        out_pows.iter().map(|p| p.to_vec()).collect(),
-        out_coefs,
-    ))
+    Ok((out_pows.iter().map(|p| p.to_vec()).collect(), out_coefs))
 }
 
 /// CR3BP Hamiltonian 构造（Jorba-Masdemont ``c_n·ρⁿ·P_n(x/ρ)`` 形式）。

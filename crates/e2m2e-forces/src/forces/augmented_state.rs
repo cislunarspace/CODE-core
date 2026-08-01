@@ -235,9 +235,11 @@ pub fn augmented_eom_7d_with_sensitivity(
     //    v̇=a → A[v,r]=∂a/∂r, A[v,v]=0, A[v,m]=∂a/∂m
     //    ṁ → A[m,*]=0（ṁ 只依赖 throttle）
     // ∂a_thrust/∂m = -u·T_max·α/m²（km/s²，注意 T_max 是 N→m/s²，/1000 转 km）
-    let da_dm = [-(u * t_max / (m * m)) / 1000.0 * alpha[0],
-                 -(u * t_max / (m * m)) / 1000.0 * alpha[1],
-                 -(u * t_max / (m * m)) / 1000.0 * alpha[2]];
+    let da_dm = [
+        -(u * t_max / (m * m)) / 1000.0 * alpha[0],
+        -(u * t_max / (m * m)) / 1000.0 * alpha[1],
+        -(u * t_max / (m * m)) / 1000.0 * alpha[2],
+    ];
     let mut a_mat = [[0.0_f64; 7]; 7];
     for i in 0..3 {
         a_mat[i][3 + i] = 1.0; // A[r_i, v_i] = 1
@@ -249,20 +251,34 @@ pub fn augmented_eom_7d_with_sensitivity(
 
     // 4. 组装 7×3 控制雅可比 B（行优先），列序 [throttle, θ₁, θ₂]
     // ∂v̇/∂throttle = T_max·α/m（/1000 转 km/s²）
-    let dv_dthr = [(t_max / m) / 1000.0 * alpha[0],
-                   (t_max / m) / 1000.0 * alpha[1],
-                   (t_max / m) / 1000.0 * alpha[2]];
+    let dv_dthr = [
+        (t_max / m) / 1000.0 * alpha[0],
+        (t_max / m) / 1000.0 * alpha[1],
+        (t_max / m) / 1000.0 * alpha[2],
+    ];
     // ∂α/∂θ₁ = [-sinθ₁cosθ₂, cosθ₁cosθ₂, 0]
-    let dalpha_dt1 = [-theta1.sin() * theta2.cos(),
-                      theta1.cos() * theta2.cos(),
-                      0.0];
+    let dalpha_dt1 = [
+        -theta1.sin() * theta2.cos(),
+        theta1.cos() * theta2.cos(),
+        0.0,
+    ];
     // ∂α/∂θ₂ = [-cosθ₁sinθ₂, -sinθ₁sinθ₂, cosθ₂]
-    let dalpha_dt2 = [-theta1.cos() * theta2.sin(),
-                      -theta1.sin() * theta2.sin(),
-                      theta2.cos()];
+    let dalpha_dt2 = [
+        -theta1.cos() * theta2.sin(),
+        -theta1.sin() * theta2.sin(),
+        theta2.cos(),
+    ];
     let coeff = (t_max * u / m) / 1000.0; // km/s²
-    let dv_dt1 = [coeff * dalpha_dt1[0], coeff * dalpha_dt1[1], coeff * dalpha_dt1[2]];
-    let dv_dt2 = [coeff * dalpha_dt2[0], coeff * dalpha_dt2[1], coeff * dalpha_dt2[2]];
+    let dv_dt1 = [
+        coeff * dalpha_dt1[0],
+        coeff * dalpha_dt1[1],
+        coeff * dalpha_dt1[2],
+    ];
+    let dv_dt2 = [
+        coeff * dalpha_dt2[0],
+        coeff * dalpha_dt2[1],
+        coeff * dalpha_dt2[2],
+    ];
     // ∂ṁ/∂throttle = -T_max/(Isp·g₀)；∂ṁ/∂θ₁=∂ṁ/∂θ₂=0
     let dmdot_dthr = -t_max / (isp * g0);
 
