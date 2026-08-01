@@ -217,6 +217,7 @@ impl HomotopySolver {
             &state_patch_6d,
             false, // 固定时间
             false, // 不固定首节点（homotopy 占位实现，保持原有语义）
+            None,  // fixed_node_mask：不额外固定
             self.config.max_iter,
             self.config.tolerance,
             self.config.rtol,

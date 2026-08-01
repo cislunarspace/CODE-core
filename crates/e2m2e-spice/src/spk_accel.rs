@@ -40,12 +40,11 @@ pub fn third_body_acceleration(
 ) -> Result<[f64; 3], cspice::Error> {
     debug_assert_eq!(sc_pos.len(), 3, "sc_pos must have length 3");
 
-    // 优先查星历缓存（未激活或未覆盖时回退 cspice），消除每步 FFI 跨界。
-    let r_ob = match crate::ephem_cache::with_cache(|c| {
-        c.and_then(|cache| cache.body_position(target, observer, et))
-    }) {
-        Some(pos) => pos,
-        None => {
+    // 优先查星历缓存（strict 模式下 miss 即硬 Err，杜绝回退 cspice；
+    // 非 strict 时 miss 软回退 easier_reader），消除每步 FFI 跨界。
+    let r_ob = match crate::ephem_cache::lookup_body_position(target, observer, et) {
+        Ok(Some(pos)) => pos,
+        Ok(None) => {
             let et_tdb = Et::from(et);
             let (state, _lt) = easier_reader(
                 target,
@@ -56,6 +55,7 @@ pub fn third_body_acceleration(
             )?;
             [state.position.x, state.position.y, state.position.z]
         }
+        Err(e) => return Err(e.into()),
     };
 
     // r_bsc = r_sc - r_ob
@@ -106,11 +106,9 @@ pub fn third_body_acceleration_and_jacobian(
     mu: f64,
     min_distance: f64,
 ) -> Result<([f64; 3], [[f64; 3]; 3]), cspice::Error> {
-    let r_ob = match crate::ephem_cache::with_cache(|c| {
-        c.and_then(|cache| cache.body_position(target, observer, et))
-    }) {
-        Some(pos) => pos,
-        None => {
+    let r_ob = match crate::ephem_cache::lookup_body_position(target, observer, et) {
+        Ok(Some(pos)) => pos,
+        Ok(None) => {
             let et_tdb = Et::from(et);
             let (state, _lt) = easier_reader(
                 target,
@@ -121,6 +119,7 @@ pub fn third_body_acceleration_and_jacobian(
             )?;
             [state.position.x, state.position.y, state.position.z]
         }
+        Err(e) => return Err(e.into()),
     };
 
     let r_bsc = [
@@ -178,11 +177,9 @@ pub fn indirect_term_acceleration(
     mu: f64,
     min_distance: f64,
 ) -> Result<[f64; 3], cspice::Error> {
-    let r_ob = match crate::ephem_cache::with_cache(|c| {
-        c.and_then(|cache| cache.body_position(target, observer, et))
-    }) {
-        Some(pos) => pos,
-        None => {
+    let r_ob = match crate::ephem_cache::lookup_body_position(target, observer, et) {
+        Ok(Some(pos)) => pos,
+        Ok(None) => {
             let et_tdb = Et::from(et);
             let (state, _lt) = easier_reader(
                 target,
@@ -193,6 +190,7 @@ pub fn indirect_term_acceleration(
             )?;
             [state.position.x, state.position.y, state.position.z]
         }
+        Err(e) => return Err(e.into()),
     };
     let r_ob_norm = (r_ob[0] * r_ob[0] + r_ob[1] * r_ob[1] + r_ob[2] * r_ob[2]).sqrt();
     let r_ob_safe = if r_ob_norm < min_distance {

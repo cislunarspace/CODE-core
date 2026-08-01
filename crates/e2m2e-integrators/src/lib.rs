@@ -1813,6 +1813,20 @@ fn disable_ephem_cache() {
     e2m2e_spice::ephem_cache::disable();
 }
 
+/// 返回 cspice FFI 调用计数（验证"零 cspice"用）。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn ephem_ffi_call_count() -> u64 {
+    e2m2e_spice::spice_ffi::ffi_call_count()
+}
+
+/// 清零 cspice FFI 调用计数。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn reset_ephem_ffi_call_count() {
+    e2m2e_spice::spice_ffi::reset_ffi_call_count();
+}
+
 /// 7D 受控动力学单点求值（配点法用）。
 ///
 /// 包装 `augmented_eom_7d`：给定状态 `[r,v,m]` 与控制参数
@@ -1917,6 +1931,10 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(enable_ephem_cache, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(disable_ephem_cache, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(ephem_ffi_call_count, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(reset_ephem_ffi_call_count, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(augmented_eom_7d_py, m)?)?;
     #[cfg(feature = "spice")]
