@@ -8,13 +8,13 @@
 
 import numpy as np
 import pytest
-from e2m2e.core.coordinate_system import CoordinateSystem
-from e2m2e.core.standard_axes import ICRSAxes
-from e2m2e.core.standard_origins import CelestialBodyOrigin
 
-from e2m2e.core.ephemeris_system import EphemerisSystem
-from e2m2e.core.forces import ForceModel, GravityField, VariableMassFiniteBurn
-from e2m2e.core.spice import SPICEManager
+from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
+from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+from e2m2e.algorithm.forces import ForceModel, GravityField, VariableMassFiniteBurn
+from e2m2e.data.kernels.manager import SPICEManager
 
 
 def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):

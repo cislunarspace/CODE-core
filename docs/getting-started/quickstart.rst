@@ -8,7 +8,7 @@
 
 .. code-block:: python
 
-   from e2m2e.core import CR3BP_System
+   from e2m2e.algorithm.dynamics import CR3BP_System
 
    # 创建地月 CR3BP 系统
    system = CR3BP_System(
@@ -32,8 +32,8 @@
 
 .. code-block:: python
 
-   from e2m2e.core import CR3BP_System, Orbit, CR3BP_Dynamics
-   from e2m2e.algorithms import DifferentialCorrection, Continuation
+   from e2m2e.algorithm.dynamics import CR3BP_System, Orbit, CR3BP_Dynamics
+   from e2m2e.algorithm.solver import DifferentialCorrection, Continuation
    import numpy as np
 
    # 1. 创建系统与动力学
@@ -69,7 +69,7 @@
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_initial_guess import compute_halo_initial_guess
+   from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
 
    # Richardson 三阶解析近似生成初始猜测
    z0 = 0.01  # z 方向振幅
@@ -103,7 +103,7 @@
 
 .. code-block:: python
 
-   from e2m2e.algorithms import MultipleShooting, sample_patch_points
+   from e2m2e.algorithm.solver import MultipleShooting, sample_patch_points
 
    ms = MultipleShooting(dynamics=dynamics)
    t_patch, state_patch = sample_patch_points(seed_dro, n_points=5)
@@ -124,7 +124,7 @@
 
 .. code-block:: python
 
-   from e2m2e.transfer import Transfer
+   from e2m2e.algorithm.transfer import Transfer
 
    transfer = Transfer(dynamics)
    result = transfer.set_orbit(start=dro_orbit, end=ro_orbit).optimize(
@@ -137,15 +137,15 @@
 
 .. code-block:: python
 
-   from e2m2e.core import (
+   from e2m2e.algorithm.dynamics import (
        CelestialBodyOrigin,
        CoordinateSystem,
        EphemerisSystem,
        ICRSAxes,
        SPICEManager,
    )
-   from e2m2e.core.forces import ForceModel, GravityField, DragModel
-   from e2m2e.core.atmosphere import ExponentialAtmosphere
+   from e2m2e.algorithm.forces import ForceModel, GravityField, DragModel
+   from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 
    # 加载 SPICE 内核
    spice = SPICEManager()
@@ -183,7 +183,7 @@
 
 .. code-block:: python
 
-   from e2m2e.visualization import PlotConfig, FamilyPlotter
+   from e2m2e.tools.viz import PlotConfig, FamilyPlotter
 
    config = PlotConfig(title=32, label=28)
    config.apply_rcparams()

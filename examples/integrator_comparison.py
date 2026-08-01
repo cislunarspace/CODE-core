@@ -7,7 +7,8 @@
 
 import numpy as np
 
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.data.types.orbit import Orbit
 from e2m2e.integrators import RkMethod, rk_step
 
 
@@ -45,7 +46,7 @@ def main():
     dynamics = CR3BP_Dynamics(system)
 
     # DRO 轨道
-    from e2m2e.algorithms import DifferentialCorrection
+    from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 
     initial_state = [0.79188556619742, 0.0, 0.0, 0.0, 0.53682, 0.0]
     seed_orbit = Orbit(states=[initial_state], times=[0], system=system)

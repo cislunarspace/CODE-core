@@ -42,6 +42,8 @@ jobs:
       - run: uv sync --group dev
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      # 五层依赖方向检查（ADR 0012）：data/algorithm/api 无越层 import
+      - run: uv run python scripts/check_layer_imports.py
 
   typecheck:
     runs-on: ubuntu-latest

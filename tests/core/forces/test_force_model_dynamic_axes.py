@@ -6,12 +6,12 @@
 from __future__ import annotations
 
 import numpy as np
-from e2m2e.core.axes import Axes
-from e2m2e.core.coordinate_system import CoordinateSystem
-from e2m2e.core.dynamic_axes import DynamicAxes
-from e2m2e.core.origin import Origin
 
-from e2m2e.core.forces import ForceModel, PhysicalModel
+from e2m2e.algorithm.coordinate.axes import Axes
+from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+from e2m2e.algorithm.coordinate.dynamic_axes import DynamicAxes
+from e2m2e.algorithm.coordinate.origin import Origin
+from e2m2e.algorithm.forces import ForceModel, PhysicalModel
 
 
 class _FixedOrigin(Origin):
@@ -143,7 +143,7 @@ def test_propagate_compatible_with_old_system_without_update():
 
 def test_system_update_coordinate_systems_updates_dynamic_axes():
     """System.update_coordinate_systems 正确识别 DynamicAxes 并调用 update。"""
-    from e2m2e.core.system import System
+    from e2m2e.algorithm.dynamics.system import System
 
     axes = _MockDynamicAxes()
     origin = _FixedOrigin()
@@ -170,7 +170,7 @@ def test_system_update_coordinate_systems_updates_dynamic_axes():
             return self._cs
 
         def update_coordinate_systems(self, t, state):
-            from e2m2e.core.coordinate.dynamic_axes import DynamicAxes
+            from e2m2e.algorithm.coordinate.dynamic_axes import DynamicAxes
 
             cs = self.coordinate_system
             if cs is None:
@@ -193,7 +193,7 @@ def test_system_update_coordinate_systems_updates_dynamic_axes():
 
 def test_system_update_coordinate_systems_no_op_for_static_axes():
     """update_coordinate_systems 对静态 Axes 为 no-op。"""
-    from e2m2e.core.system import System
+    from e2m2e.algorithm.dynamics.system import System
 
     origin = _FixedOrigin()
     cs = CoordinateSystem(_FixedAxes(), origin)
@@ -232,7 +232,7 @@ def test_system_update_coordinate_systems_no_op_for_static_axes():
 
 def test_system_update_coordinate_systems_no_op_when_no_coordinate_system():
     """coordinate_system 为 None 时 update_coordinate_systems 为 no-op。"""
-    from e2m2e.core.system import System
+    from e2m2e.algorithm.dynamics.system import System
 
     class _MinimalSystem(System):
         @property

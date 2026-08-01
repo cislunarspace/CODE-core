@@ -1,7 +1,7 @@
-e2m2e.visualization package
+e2m2e.tools.viz package
 ===========================
 
-.. automodule:: e2m2e.visualization
+.. automodule:: e2m2e.tools.viz
    :members:
    :undoc-members:
    :show-inheritance:
@@ -10,26 +10,26 @@ e2m2e.visualization package
 Submodules
 ----------
 
-e2m2e.visualization.config module
+e2m2e.tools.viz.config module
 ---------------------------------
 
-.. automodule:: e2m2e.visualization.config
+.. automodule:: e2m2e.tools.viz.config
    :members:
    :undoc-members:
    :show-inheritance:
 
-e2m2e.visualization.family module
+e2m2e.tools.viz.family module
 ---------------------------------
 
-.. automodule:: e2m2e.visualization.family
+.. automodule:: e2m2e.tools.viz.family
    :members:
    :undoc-members:
    :show-inheritance:
 
-e2m2e.visualization.transfer module
+e2m2e.tools.viz.transfer module
 -----------------------------------
 
-.. automodule:: e2m2e.visualization.transfer
+.. automodule:: e2m2e.tools.viz.transfer
    :members:
    :undoc-members:
    :show-inheritance:

@@ -10,7 +10,7 @@ Richardson 三阶解析近似为 Halo 轨道提供初始猜测：
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_initial_guess import compute_halo_initial_guess
+   from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
 
    # L1 Halo，z 方向振幅 0.01
    guess = compute_halo_initial_guess(mu=system.mu, z_amplitude=0.01, L=1, halo_class=0)
@@ -33,8 +33,8 @@ Richardson 三阶解析近似为 Halo 轨道提供初始猜测：
 
 .. code-block:: python
 
-   from e2m2e.algorithms import DifferentialCorrection
-   from e2m2e.core import Orbit
+   from e2m2e.algorithm.solver import DifferentialCorrection
+   from e2m2e.data.types.orbit import Orbit
    import numpy as np
 
    # 1. 组装初始状态

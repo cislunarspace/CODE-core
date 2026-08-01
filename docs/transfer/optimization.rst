@@ -7,7 +7,7 @@
 优化器
 ------
 
-:class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer` 实现 DRO 到 RO 的转移轨道优化。
+:class:`~e2m2e.algorithm.transfer.transfer_optimization.DROTRONLPOptimizer` 实现 DRO 到 RO 的转移轨道优化。
 
 **优化变量：** y = {α, T, t_ins}
 
@@ -35,13 +35,13 @@
 1. **SciPy SLSQP** (默认): 使用 ``scipy.optimize.minimize`` 的 SLSQP 方法
 2. **COPT**: 杉数科技商业优化器，性能更优（需单独安装 ``coptpy``）
 
-求解器通过 :class:`~e2m2e.transfer.config.TransferConfig` 的 ``nlp_use_copt`` 字段控制，
-底层由 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer` 统一适配
+求解器通过 :class:`~e2m2e.algorithm.transfer.config.TransferConfig` 的 ``nlp_use_copt`` 字段控制，
+底层由 :class:`~e2m2e.algorithm.transfer.transfer_optimization.DROTRONLPOptimizer` 统一适配
 （SciPy 和 COPT 两种后端）。
 
 .. code-block:: python
 
-   from e2m2e.transfer import TransferConfig
+   from e2m2e.algorithm.transfer import TransferConfig
 
    # 使用 SciPy（默认）
    config = TransferConfig(nlp_use_copt=False)
@@ -52,11 +52,11 @@
 配置参数
 --------
 
-:class:`~e2m2e.transfer.config.TransferConfig` 控制优化行为：
+:class:`~e2m2e.algorithm.transfer.config.TransferConfig` 控制优化行为：
 
 .. code-block:: python
 
-   from e2m2e.transfer import TransferConfig
+   from e2m2e.algorithm.transfer import TransferConfig
 
    DU = 3.84405000e5  # 地月距离 (km)
 
@@ -95,8 +95,8 @@
 
       c_{\text{vel}}(y) = \frac{\mathbf{v}_f \cdot \mathbf{v}_{\text{ins}}}{\|\mathbf{v}_f\| \|\mathbf{v}_{\text{ins}}\|} - 1 = 0
 
-   是否默认启用取决于调用路径：直接使用 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer`
-   （不传 ``config``）时默认采用等式约束；经 :class:`~e2m2e.transfer.transfer.Transfer` 走
+   是否默认启用取决于调用路径：直接使用 :class:`~e2m2e.algorithm.transfer.transfer_optimization.DROTRONLPOptimizer`
+   （不传 ``config``）时默认采用等式约束；经 :class:`~e2m2e.algorithm.transfer.transfer.Transfer` 走
    ``TransferConfig`` 时，``nlp_use_relaxed_velocity`` 默认 ``True``，即默认松弛为不等式约束。
 
 3. **松弛速度约束（不等式约束，可选）**
@@ -112,14 +112,14 @@
 高层接口：Transfer
 ------------------
 
-:class:`~e2m2e.transfer.transfer.Transfer` 提供简化的链式调用接口，封装了
+:class:`~e2m2e.algorithm.transfer.transfer.Transfer` 提供简化的链式调用接口，封装了
 优化器构造、配置管理和结果提取的细节。
 
 .. code-block:: python
 
-   from e2m2e.transfer import Transfer, TransferConfig
-   from e2m2e.core.system import CR3BP_System
-   from e2m2e.core.dynamics import CR3BP_Dynamics
+   from e2m2e.algorithm.transfer import Transfer, TransferConfig
+   from e2m2e.algorithm.dynamics.system import CR3BP_System
+   from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
 
    system = CR3BP_System(
        mu=0.0121506683, primary="Earth", secondary="Moon"
@@ -144,12 +144,12 @@
 底层接口：DROTRONLPOptimizer
 -----------------------------
 
-直接使用 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer`
+直接使用 :class:`~e2m2e.algorithm.transfer.transfer_optimization.DROTRONLPOptimizer`
 可获得更精细的控制，包括缓存、进度回调和约束定制。
 
 .. code-block:: python
 
-   from e2m2e.transfer import (
+   from e2m2e.algorithm.transfer import (
        DROTRONLPOptimizer,
        NLPOptimizationVariables,
        TransferConfig,
@@ -197,11 +197,11 @@
 便捷函数
 --------
 
-:func:`~e2m2e.transfer.transfer_optimization.optimize_transfer` 提供一步到位的优化：
+:func:`~e2m2e.algorithm.transfer.transfer_optimization.optimize_transfer` 提供一步到位的优化：
 
 .. code-block:: python
 
-   from e2m2e.transfer.transfer_optimization import optimize_transfer, NLPOptimizationVariables
+   from e2m2e.algorithm.transfer.transfer_optimization import optimize_transfer, NLPOptimizationVariables
 
    result = optimize_transfer(
        system=system,
@@ -215,12 +215,12 @@
 COPT 求解
 ---------
 
-:func:`~e2m2e.transfer.transfer_optimization.optimize_with_copt` 使用 COPT 求解 NLP，
+:func:`~e2m2e.algorithm.transfer.transfer_optimization.optimize_with_copt` 使用 COPT 求解 NLP，
 失败时自动回退 SciPy：
 
 .. code-block:: python
 
-   from e2m2e.transfer.transfer_optimization import optimize_with_copt
+   from e2m2e.algorithm.transfer.transfer_optimization import optimize_with_copt
 
    result = optimize_with_copt(
        optimizer,
@@ -234,7 +234,7 @@ COPT 求解
 结果分析
 --------
 
-:class:`~e2m2e.transfer.config.TransferOptimizationResult` 包含优化结果：
+:class:`~e2m2e.algorithm.transfer.config.TransferOptimizationResult` 包含优化结果：
 
 .. code-block:: python
 
@@ -270,16 +270,16 @@ COPT 求解
 
 .. code-block:: python
 
-   from e2m2e.core.system import CR3BP_System
-   from e2m2e.core.dynamics import CR3BP_Dynamics
-   from e2m2e.transfer import (
+   from e2m2e.algorithm.dynamics.system import CR3BP_System
+   from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+   from e2m2e.algorithm.transfer import (
        TransferSearch,
        DROTRONLPOptimizer,
        NLPOptimizationVariables,
        TransferConfig,
        load_orbit_from_json,
    )
-   from e2m2e.transfer.cost import compute_transfer_cost
+   from e2m2e.algorithm.transfer.cost import compute_transfer_cost
 
    # 建立系统
    system = CR3BP_System(

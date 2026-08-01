@@ -12,8 +12,8 @@ import warnings
 
 import numpy as np
 
-from e2m2e.algorithms.normal_form import NormalFormContext, NormalFormPipeline
-from e2m2e.core import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.normal_form import NormalFormContext, NormalFormPipeline
 
 
 def main():

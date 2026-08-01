@@ -25,14 +25,15 @@ import pytest
 # sympy 是 normal-form optional dep；未安装时整个文件 skip（不 error）。
 pytest.importorskip("sympy")
 
-from e2m2e.algorithms.normal_form.catalog import (
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form.catalog import (
     LibrationCatalogData,
     LibrationCatalogTransformer,
 )
-from e2m2e.algorithms.normal_form.center_manifold import (
+from e2m2e.algorithm.normal_form.center_manifold import (
     CenterManifoldReducer,
 )
-from e2m2e.algorithms.normal_form.coord_trans import (
+from e2m2e.algorithm.normal_form.coord_trans import (
     cm_to_param,
     cm_to_qf,
     ds_to_em,
@@ -46,14 +47,13 @@ from e2m2e.algorithms.normal_form.coord_trans import (
     rho_to_em,
     rho_to_param,
 )
-from e2m2e.algorithms.normal_form.dynamical_substitution import (
+from e2m2e.algorithm.normal_form.dynamical_substitution import (
     DynamicalSubstituteResult,
 )
-from e2m2e.algorithms.normal_form.quasi_floquet import (
+from e2m2e.algorithm.normal_form.quasi_floquet import (
     QuasiFloquetResult,
     real_normal_form_matrix,
 )
-from e2m2e.core import LibrationPoint
 
 # ---------------------------------------------------------------------------
 # 公共 fixture（沿用 test_center_manifold / test_quasi_floquet 的范式）
@@ -63,8 +63,8 @@ from e2m2e.core import LibrationPoint
 @pytest.fixture
 def l1_context(earth_moon_system):
     """L1 共线点上下文。"""
-    from e2m2e.algorithms.normal_form import NormalFormContext
-    from e2m2e.algorithms.normal_form.constants import JD0_J2000
+    from e2m2e.algorithm.normal_form import NormalFormContext
+    from e2m2e.algorithm.normal_form.constants import JD0_J2000
 
     return NormalFormContext(
         system=earth_moon_system,
@@ -225,7 +225,7 @@ def test_em_ds_roundtrip_machine_precision(l1_context):
     X_em = 1e-3 * rng.standard_normal(6)
     t = 1.5
     # 内联插值 W(t) 以便单元隔离
-    from e2m2e.algorithms.normal_form.coord_trans.em_ds import _interp_W_at
+    from e2m2e.algorithm.normal_form.coord_trans.em_ds import _interp_W_at
 
     W_at_t = _interp_W_at(ds.W_poly, np.asarray(ds.tlist).ravel(), t)
     X_ds = em_to_ds(X_em, W_at_t)
@@ -321,7 +321,7 @@ def test_qf_cm_roundtrip_with_high_order(l1_context):
 
 def test_qf_cm_re_basis_change_is_involution():
     """实/复基底变换 D 是对合：D⁻¹·D = I（逐元素验证）。"""
-    from e2m2e.algorithms.normal_form.coord_trans.qf_cm import _D, _D_INV
+    from e2m2e.algorithm.normal_form.coord_trans.qf_cm import _D, _D_INV
 
     np.testing.assert_allclose(_D @ _D_INV, np.eye(6), atol=1e-14)
     np.testing.assert_allclose(_D_INV @ _D, np.eye(6), atol=1e-14)
@@ -332,7 +332,7 @@ def test_hamilton_flow_rhs_matches_termwise():
 
     对应 qiao ``qpQF2qpCM.__main__`` 的自检逻辑。
     """
-    from e2m2e.algorithms.normal_form.coord_trans.qf_cm import (
+    from e2m2e.algorithm.normal_form.coord_trans.qf_cm import (
         _hamilton_flow_rhs,
         _pack_wpoly,
     )
@@ -392,8 +392,8 @@ def test_w_series_interp_uses_real_tlist(l1_context):
     的解析值，且与 ``dt=0.1`` 兜底值明显不同。这是 issue #174 "rho_to_param
     与 qiao fixture 一致" 的前提保障。
     """
-    from e2m2e.algorithms.normal_form.center_manifold import CenterManifoldReducer
-    from e2m2e.algorithms.normal_form.coord_trans import _interp_W_series_at_t
+    from e2m2e.algorithm.normal_form.center_manifold import CenterManifoldReducer
+    from e2m2e.algorithm.normal_form.coord_trans import _interp_W_series_at_t
 
     qf = _make_qf_result(l1_context, n=96, T=3.0)
     # 注入一项随时间线性变化的 Hamiltonian 项，使 W_series 非常值
@@ -638,7 +638,7 @@ def test_catalog_data_is_frozen(catalog_data, l1_context):
 
 def test_lazy_export_via_package(l1_context):
     """``LibrationCatalogTransformer`` 经包顶层 lazy export 可导入。"""
-    from e2m2e.algorithms.normal_form import (
+    from e2m2e.algorithm.normal_form import (
         LibrationCatalogData,
         LibrationCatalogTransformer,
     )

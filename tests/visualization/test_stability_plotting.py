@@ -9,9 +9,10 @@ import pytest
 
 matplotlib.use("Agg")
 
-from e2m2e.algorithms.stability import StabilityAnalysis
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit, OrbitFamily
-from e2m2e.visualization import FamilyPlotter
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.stability import StabilityAnalysis
+from e2m2e.data.types.orbit import Orbit, OrbitFamily
+from e2m2e.tools.viz import FamilyPlotter
 
 MU = 1.21506683e-2
 

@@ -6,7 +6,7 @@ e2m2e 的轨道数据结构。
 Orbit 类
 --------
 
-:class:`~e2m2e.core.orbit.Orbit` 是轨道数据容器，存储状态序列与时间序列。
+:class:`~e2m2e.data.types.orbit.Orbit` 是轨道数据容器，存储状态序列与时间序列。
 
 **核心属性：**
 
@@ -18,7 +18,7 @@ Orbit 类
 
 .. code-block:: python
 
-   from e2m2e.core import Orbit
+   from e2m2e.data.types.orbit import Orbit
    import numpy as np
 
    # 从状态序列创建
@@ -55,7 +55,7 @@ Orbit 类
 .. code-block:: python
 
    # 延拓返回轨道族
-   from e2m2e.algorithms import Continuation
+   from e2m2e.algorithm.solver import Continuation
 
    continuation = Continuation(corrector=corrector)
    family = continuation.natural_continuation(

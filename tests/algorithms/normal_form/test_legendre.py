@@ -9,7 +9,7 @@ import pytest
 # sympy 是 normal-form optional dep；未安装时整个文件 skip（不 error）。
 pytest.importorskip("sympy")
 
-from e2m2e.algorithms.normal_form.legendre import (
+from e2m2e.algorithm.normal_form.legendre import (
     DEFAULT_COLLINEAR_ORDER,
     DEFAULT_TRIANGULAR_ORDER,
     LegendreExpansionResult,

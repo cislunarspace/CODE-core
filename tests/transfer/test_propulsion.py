@@ -8,8 +8,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.transfer.cost import TransferCost
-from e2m2e.transfer.propulsion import ImpulsivePropulsion
+from e2m2e.algorithm.transfer.cost import TransferCost
+from e2m2e.algorithm.transfer.propulsion import ImpulsivePropulsion
 
 # =============================================================================
 # ImpulsivePropulsion 初始化

@@ -5,9 +5,9 @@
 
 import pytest
 
-from e2m2e.core.cr3bp_system import CR3BP_System, LibrationPoint
-from e2m2e.core.ephemeris_system import EphemerisSystem
-from e2m2e.core.system import System
+from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+from e2m2e.algorithm.dynamics.system import System
 from e2m2e.mbse.data.enums import ReferenceFrame, UnitSystem
 
 

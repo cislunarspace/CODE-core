@@ -6,9 +6,10 @@
 
 import numpy as np
 import pytest
-from e2m2e.core.axes import Axes
-from e2m2e.core.coordinate_system import CoordinateSystem
-from e2m2e.core.origin import Origin
+
+from e2m2e.algorithm.coordinate.axes import Axes
+from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+from e2m2e.algorithm.coordinate.origin import Origin
 
 
 class FixedAxes(Axes):

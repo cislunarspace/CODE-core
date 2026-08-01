@@ -5,7 +5,7 @@
 
 import numpy as np
 
-from e2m2e.core.forces import ForceModel
+from e2m2e.algorithm.forces import ForceModel
 
 
 class _FakeSystem:

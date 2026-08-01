@@ -91,10 +91,10 @@ CR3BP 动力学在旋转坐标系中具有以下对称性：
 
 .. code-block:: python
 
-   from e2m2e.core import CR3BP_System
-   from e2m2e.core.dynamics import CR3BP_Dynamics
-   from e2m2e.core.orbit import Orbit
-   from e2m2e.algorithms.differential_correction import DifferentialCorrection
+   from e2m2e.algorithm.dynamics import CR3BP_System
+   from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+   from e2m2e.data.types.orbit import Orbit
+   from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
    import numpy as np
 
    # 1. 创建地月系统
@@ -181,7 +181,7 @@ Halo 轨道（固定 z 振幅）
 
 .. code-block:: python
 
-   from e2m2e.algorithms.halo_initial_guess import compute_halo_initial_guess
+   from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
 
    # 1. 使用 Richardson 三阶近似生成初始猜测
    mu = system.mu
@@ -243,7 +243,7 @@ Halo 轨道（固定 z 振幅）
 
 .. code-block:: python
 
-   from e2m2e.algorithms.strategies import (
+   from e2m2e.algorithm.family.strategies import (
        symmetric_2d_fixed_x0,
        symmetric_3d_fixed_x0,
        halo_fixed_z0,

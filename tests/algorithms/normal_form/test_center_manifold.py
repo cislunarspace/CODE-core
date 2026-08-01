@@ -27,17 +27,17 @@ import pytest
 # sympy 是 normal-form optional dep；未安装时整个文件 skip（不 error）。
 pytest.importorskip("sympy")
 
-from e2m2e.algorithms.normal_form.center_manifold import (
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form.center_manifold import (
     DEFAULT_MAX_ORDER,
     CenterManifoldReducer,
     CenterManifoldResult,
     list_deriv,
 )
-from e2m2e.algorithms.normal_form.quasi_floquet import (
+from e2m2e.algorithm.normal_form.quasi_floquet import (
     QuasiFloquetResult,
     real_normal_form_matrix,
 )
-from e2m2e.core import LibrationPoint
 
 # ---------------------------------------------------------------------------
 # 公共 fixture（沿用 test_quasi_floquet 的范式）
@@ -47,8 +47,8 @@ from e2m2e.core import LibrationPoint
 @pytest.fixture
 def l1_context(earth_moon_system):
     """L1 共线点上下文。"""
-    from e2m2e.algorithms.normal_form import NormalFormContext
-    from e2m2e.algorithms.normal_form.constants import JD0_J2000
+    from e2m2e.algorithm.normal_form import NormalFormContext
+    from e2m2e.algorithm.normal_form.constants import JD0_J2000
 
     return NormalFormContext(
         system=earth_moon_system,
@@ -183,10 +183,12 @@ def test_smoke_end_to_end_runs(l1_context):
 
 
 def test_invariant_step_reduces_hyperbolic_center_coupling(l1_context):
-    """Step 1（invariant）消去双曲-中心交叉项。
+    """Step 1（invariant）消去双曲方向不平衡的交叉项。
 
-    注入 ``q_1``/``p_1`` 与中心方向耦合的项后，化简后
-    ``max_hyperbolic_coupling`` 应远小于化简前 ``pre_coupling``。
+    注入 ``q_1``/``p_1`` 与中心方向耦合的项后，化简结果中 3+ 阶不得含
+    双曲方向不平衡项（``pow(1)!=pow(4)``）——这是 qiao ``Code10`` 的
+    删除判据（只消双曲不平衡项）。双曲平衡但中心不平衡的项（如
+    ``q1²·q2·q3·p1²``）是 Step 2（``center``）的目标，Step 1 保留。
     """
     reducer = CenterManifoldReducer(context=l1_context, max_order=6)
     qf = _make_qf_result(l1_context)
@@ -194,22 +196,24 @@ def test_invariant_step_reduces_hyperbolic_center_coupling(l1_context):
     pre = 0.1  # _hyper_center_terms 最大幅值
 
     result = reducer.reduce(qf, hamiltonian_terms=terms, steps=("invariant",))
-    post = result.max_hyperbolic_coupling
-    assert post < 1e-3 * pre, f"Step 1 化简后双曲-中心耦合 {post:.2e} 未显著低于化简前 {pre:.2e}"
-    # 化简后保留的项（3 阶以上）要么是纯双曲（pow1==pow4）要么纯中心；
-    # 二阶实标准形项不参与断言。
+    # 注入项全部是双曲不平衡型（pow(1)!=pow(4)），Step 1 后必须消失
     for pow_tuple in result.hamiltonian_terms:
         if sum(pow_tuple) < 3:
             continue
         assert pow_tuple[0] == pow_tuple[3], f"Step 1 后 3+ 阶仍含双曲不平衡项 {pow_tuple}"
+    # 残余耦合（含 Step 2 目标项）应远小于注入幅值
+    post = result.max_hyperbolic_coupling
+    assert post < 0.05 * pre, f"Step 1 化简后残余耦合 {post:.2e} 未显著低于注入幅值 {pre:.2e}"
 
 
 def test_center_step_leaves_only_action_terms(l1_context):
     """Step 1 + Step 2 后 Hamiltonian 只剩作用量项。
 
-    两步完成后，保留的项必须满足三对共轭全部平衡
-    （``pow1==pow4 && pow2==pow5 && pow3==pow6``）——即仅依赖作用量
-    ``I_1``、``I_2``、``I_3``。
+    两步完成后，把化简后的实坐标 Hamiltonian 虚变换回复坐标，所有
+    ≥3 阶项必须满足三对共轭全部平衡（``pow1==pow4 && pow2==pow5 &&
+    pow3==pow6``）——即仅依赖作用量 ``I_1``、``I_2``、``I_3``。注意
+    必须在**复坐标**断言：实坐标下作用量 ``I_2=(q2²+p2²)/2`` 的展开项
+    （如 ``q2⁶``）本身不满足幂次平衡。
     """
     reducer = CenterManifoldReducer(context=l1_context, max_order=6)
     qf = _make_qf_result(l1_context)
@@ -218,17 +222,30 @@ def test_center_step_leaves_only_action_terms(l1_context):
     terms.update(_center_cross_terms(qf.tlist, scale=0.08))
 
     result = reducer.reduce(qf, hamiltonian_terms=terms)  # 两步都跑
-    # 二阶实标准形项（如 q2²）是 H₂ 的分量，Lie 变换不处理；只对 ≥3 阶
-    # 项断言三对全平衡（作用量形式）。
-    for pow_tuple in result.hamiltonian_terms:
-        if sum(pow_tuple) < 3:
+    _assert_action_form(result.hamiltonian_terms)
+
+
+def _assert_action_form(hamiltonian_terms):
+    """断言 Hamiltonian 只依赖作用量：虚变换回复坐标后三对全平衡。"""
+    from e2m2e.algorithm.normal_form.center_manifold import _D, _linear_basis_change
+
+    H_by_order: dict[int, dict[tuple[int, ...], np.ndarray]] = {}
+    for k, v in hamiltonian_terms.items():
+        deg = sum(k)
+        H_by_order.setdefault(deg, {})[k] = np.asarray(v)
+    H_c = _linear_basis_change(H_by_order, _D)
+    for o, poly in H_c.items():
+        if o < 3:
             continue
-        is_action = (
-            pow_tuple[0] == pow_tuple[3]
-            and pow_tuple[1] == pow_tuple[4]
-            and pow_tuple[2] == pow_tuple[5]
-        )
-        assert is_action, f"两步化简后 3+ 阶仍含非作用量项 {pow_tuple}"
+        for pow_tuple, v in poly.items():
+            if np.max(np.abs(v)) <= 1e-12:
+                continue
+            is_action = (
+                pow_tuple[0] == pow_tuple[3]
+                and pow_tuple[1] == pow_tuple[4]
+                and pow_tuple[2] == pow_tuple[5]
+            )
+            assert is_action, f"两步化简后 {o} 阶仍含非作用量项 {pow_tuple}"
 
 
 def test_max_hyperbolic_coupling_decreases_after_full_reduction(l1_context):
@@ -310,10 +327,11 @@ def test_center_step_produces_nonzero_complex_W(l1_context):
 def test_center_step_reduces_center_coupling(l1_context):
     """Step 2 消去中心方向间非共振耦合，使 Hamiltonian 只剩作用量项。
 
-    回归守卫：注入纯中心非共振项后，Step 2 化简结果中 ≥3 阶项必须全部
-    满足三对共轭平衡（``pow1==pow4 && pow2==pow5 && pow3==pow6``），即
-    仅依赖作用量 ``I_2``/``I_3``。此前 Step 2 因 W 归零退化而是 no-op，
-    本测试直接断言化简效果，不依赖正逆相消。
+    回归守卫：注入纯中心非共振项后，Step 2 化简结果（虚变换回复坐标
+    后）中 ≥3 阶项必须全部满足三对共轭平衡（``pow1==pow4 &&
+    pow2==pow5 && pow3==pow6``），即仅依赖作用量 ``I_2``/``I_3``。
+    此前 Step 2 因 W 归零退化而是 no-op，本测试直接断言化简效果，
+    不依赖正逆相消。
     """
     reducer = CenterManifoldReducer(context=l1_context, max_order=6)
     qf = _make_qf_result(l1_context)
@@ -323,15 +341,7 @@ def test_center_step_reduces_center_coupling(l1_context):
         (0, 2, 1, 0, 1, 1): 0.05 * ones,
     }
     result = reducer.reduce(qf, hamiltonian_terms=center_terms, steps=("center",))
-    for pow_tuple in result.hamiltonian_terms:
-        if sum(pow_tuple) < 3:
-            continue
-        is_action = (
-            pow_tuple[0] == pow_tuple[3]
-            and pow_tuple[1] == pow_tuple[4]
-            and pow_tuple[2] == pow_tuple[5]
-        )
-        assert is_action, f"Step 2 后 3+ 阶仍含中心非作用量项 {pow_tuple}"
+    _assert_action_form(result.hamiltonian_terms)
 
 
 def test_W_for_accessor_and_keyerror(l1_context):
@@ -385,7 +395,7 @@ def test_solve_wfunc_fft_recovers_exponential_forcing():
     ``ẏ = -α·y + e^{αt}`` 的一个特解是 ``y = e^{αt}/(2α)``；此处只验证
     求解器返回有限复值数组、且与解析特解量级一致。
     """
-    from e2m2e.algorithms.normal_form.center_manifold import _solve_wfunc_fft
+    from e2m2e.algorithm.normal_form.center_manifold import _solve_wfunc_fft
 
     tlist = np.linspace(0, 2.0, 128)
     alpha = 1.7
@@ -394,6 +404,109 @@ def test_solve_wfunc_fft_recovers_exponential_forcing():
     y = _solve_wfunc_fft(tlist, forcing, k)
     assert y.shape == tlist.shape
     assert np.all(np.isfinite(y))
+
+
+# ---------------------------------------------------------------------------
+# 虚变换 / 实变换（复基底变换）
+# ---------------------------------------------------------------------------
+
+
+def test_virtual_real_transform_roundtrip():
+    """虚变换 + 实变换 roundtrip：实多项式还原（含双曲/中心混合项）。"""
+    from e2m2e.algorithm.normal_form.center_manifold import (
+        _D,
+        _D_INV,
+        _linear_basis_change,
+    )
+
+    ones = np.ones(4)
+    H = {
+        3: {
+            (0, 3, 0, 0, 0, 0): ones,  # q2³
+            (1, 1, 0, 1, 0, 0): 0.5 * ones,  # q1·q2·p1
+            (0, 1, 1, 0, 1, 1): 0.3 * ones,  # q2·q3·p2·p3
+        }
+    }
+    Hc = _linear_basis_change(H, _D)
+    Hr = _linear_basis_change(Hc, _D_INV)
+    for k, v in H[3].items():
+        got = np.real(Hr[3][k])
+        np.testing.assert_allclose(got, v, atol=1e-12)
+
+
+def test_virtual_transform_makes_complex_diagonal(l1_context):
+    """H₂ 实正规形虚变换后成复对角形。
+
+    ``(ω_p/2)(q2²+p2²)`` 与 ``(ω_v/2)(q3²+p3²)`` 各自合成单项
+    ``i·ω_p·y2·y5``、``i·ω_v·y3·y6``；双曲项 ``λ·q1·p1`` 不变。这是
+    Gómez vol III §2.7.1 "put in complex form" 一步（qiao Code10 虚变换）。
+    """
+    from e2m2e.algorithm.normal_form.center_manifold import _D, _linear_basis_change
+
+    lam = float(l1_context.characteristic_exponent)
+    nu1, nu2 = l1_context.central_frequencies
+    wp, wv = float(nu1), float(nu2)
+    ones = np.ones(4)
+    H2 = {
+        2: {
+            (1, 0, 0, 1, 0, 0): lam * ones,
+            (0, 2, 0, 0, 0, 0): (wp / 2) * ones,
+            (0, 0, 0, 0, 2, 0): (wp / 2) * ones,
+            (0, 0, 2, 0, 0, 0): (wv / 2) * ones,
+            (0, 0, 0, 0, 0, 2): (wv / 2) * ones,
+        }
+    }
+    H2c = _linear_basis_change(H2, _D)
+    kept = {k: v for k, v in H2c[2].items() if np.max(np.abs(v)) > 1e-12}
+    assert set(kept.keys()) == {
+        (1, 0, 0, 1, 0, 0),
+        (0, 1, 0, 0, 1, 0),
+        (0, 0, 1, 0, 0, 1),
+    }, kept.keys()
+    np.testing.assert_allclose(kept[(1, 0, 0, 1, 0, 0)][0], lam, atol=1e-12)
+    np.testing.assert_allclose(kept[(0, 1, 0, 0, 1, 0)][0], 1j * wp, atol=1e-12)
+    np.testing.assert_allclose(kept[(0, 0, 1, 0, 0, 1)][0], 1j * wv, atol=1e-12)
+
+
+def test_homological_equation_residual(l1_context):
+    """同调方程残差：``{H₂c, W} + H_elim ≈ 0``（复坐标下谱公式匹配）。
+
+    在复对角形 ``H₂c = λ·y1·y4 + i·ω_p·y2·y5 + i·ω_v·y3·y6`` 下，
+    对常数系数 ``H_elim`` 用频域求解器解 ``W``，泊松括号必须精确抵消
+    ``H_elim``。此前在实正规形下用复值 ``k`` 求解，残差高达 O(h)（残留
+    耦合 max=48 的根因）。
+    """
+    from e2m2e.algorithm.normal_form.center_manifold import (
+        _characteristic_freq,
+        _solve_wfunc_fft,
+    )
+    from e2m2e.algorithm.normal_form.polynomial import poly_poisson
+
+    lam = float(l1_context.characteristic_exponent)
+    nu1, nu2 = l1_context.central_frequencies
+    wp, wv = float(nu1), float(nu2)
+    tlist = np.linspace(0.0, 3.0, 96)
+    ones = np.ones_like(tlist)
+
+    H2c = {
+        (1, 0, 0, 1, 0, 0): lam * ones,
+        (0, 1, 0, 0, 1, 0): 1j * wp * ones,
+        (0, 0, 1, 0, 0, 1): 1j * wv * ones,
+    }
+    elim_terms = {
+        (1, 2, 0, 0, 0, 0): 0.1 * ones,  # y1·y2²，k = -λ + 2i·ω_p
+        (0, 1, 0, 2, 0, 0): 0.05 * ones,  # y2·y4²，k = 2λ - i·ω_p
+        (1, 0, 1, 0, 0, 1): 0.03 * ones,  # y1·y3·y6，k = -λ + i·ω_v - i·ω_v
+    }
+    for pow_t, h in elim_terms.items():
+        k = _characteristic_freq(pow_t, lam, wp, wv)
+        assert abs(k) > 1e-9, f"{pow_t} 的 k 为零（共振项不应在此消去）"
+        W = {pow_t: _solve_wfunc_fft(tlist, np.real(h), k)}
+        pb = poly_poisson(H2c, W)
+        residual = pb.get(pow_t, np.zeros_like(ones)) + h
+        assert np.max(np.abs(residual)) < 1e-6, (
+            f"{pow_t}: 同调方程残差 {np.max(np.abs(residual)):.2e}（k={k}）"
+        )
 
 
 def test_list_deriv_recovers_linear_function():
@@ -419,7 +532,7 @@ def test_list_deriv_handles_complex():
 
 def test_keep_criteria_predicates():
     """判别条件忠实迁移 qiao Code10/Code11。"""
-    from e2m2e.algorithms.normal_form.center_manifold import (
+    from e2m2e.algorithm.normal_form.center_manifold import (
         _is_center_term,
         _is_invariant_term,
     )

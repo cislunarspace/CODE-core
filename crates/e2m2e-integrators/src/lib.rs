@@ -13,6 +13,7 @@ use pyo3::types::{PyDict, PyList};
 pub mod homotopy;
 #[cfg(feature = "spice")]
 pub mod multiple_shooting;
+pub mod normal_form;
 #[cfg(feature = "spice")]
 pub mod segmented_shooting;
 
@@ -632,7 +633,7 @@ fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Ve
 #[pyfunction]
 fn spice_poc_furnsh(path: &str) -> PyResult<()> {
     static REGISTERED: std::sync::Once = std::sync::Once::new();
-    REGISTERED.call_once(|| e2m2e_spice::spice_ffi::register_bodies());
+    REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
     cspice::data::furnish(path)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {:?}", e)))
 }
@@ -1073,12 +1074,17 @@ fn propagate_compiled(
 
     while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
         n_steps += 1;
-        // 限制步长不超过下一个评估点（提高 t_eval 命中率）
+        // 限制步长不超过下一个评估点（提高 t_eval 命中率），且不超过
+        // h_init（作为最大步长：稀疏 t_eval 下自适应步长失控，实测
+        // 2 点 vs 31 点网格的 30 天结果差 22 万 km）
         if eval_idx < t_eval.len() {
             let t_next_eval = t_eval[eval_idx];
             if t + h > t_next_eval {
                 h = t_next_eval - t;
             }
+        }
+        if h > h_init {
+            h = h_init;
         }
 
         // RK 单步：用 Rust 闭包调 compute_total_acceleration
@@ -1350,9 +1356,7 @@ fn propagate_compiled_lowthrust_sensitivity(
     max_steps: usize,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
-    use e2m2e_forces::forces::augmented_state::{
-        augmented_eom_7d_with_sensitivity, ThrustParams,
-    };
+    use e2m2e_forces::forces::augmented_state::{augmented_eom_7d_with_sensitivity, ThrustParams};
     use e2m2e_forces::forces::compiled::CompiledForce;
 
     if y0.len() != 7 {
@@ -1795,7 +1799,9 @@ fn enable_ephem_cache(
         frames.push(tup);
     }
     let cache = e2m2e_spice::ephem_cache::EphemCache::build(&bodies, &frames, et_start, et_end, dt)
-        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("ephem cache build: {e:?}")))?;
+        .map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("ephem cache build: {e:?}"))
+        })?;
     e2m2e_spice::ephem_cache::enable(cache);
     Ok(())
 }
@@ -1870,6 +1876,11 @@ fn augmented_eom_7d_py(
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::project_hamiltonian_qf_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        normal_form::build_cr3bp_hamiltonian_py,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_py, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_events_py, m)?)?;
@@ -1898,7 +1909,10 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_lowthrust, m)?)?;
     #[cfg(feature = "spice")]
-    m.add_function(wrap_pyfunction!(propagate_compiled_lowthrust_sensitivity, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        propagate_compiled_lowthrust_sensitivity,
+        m
+    )?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(enable_ephem_cache, m)?)?;
     #[cfg(feature = "spice")]
@@ -1909,6 +1923,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_with_stm_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
+    #[cfg(feature = "spice")]
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(
         multiple_shooting::multiple_shooting_correct_py,

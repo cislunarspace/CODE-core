@@ -6,13 +6,13 @@
 
 import numpy as np
 import pytest
-from e2m2e.core.coordinate_system import CoordinateSystem
-from e2m2e.core.standard_axes import ICRSAxes
-from e2m2e.core.standard_origins import CelestialBodyOrigin
 
-from e2m2e.core.ephemeris_system import EphemerisSystem
-from e2m2e.core.forces import FiniteBurn, ForceModel, GravityField
-from e2m2e.core.spice import SPICEManager
+from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
+from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+from e2m2e.algorithm.forces import FiniteBurn, ForceModel, GravityField
+from e2m2e.data.kernels.manager import SPICEManager
 
 
 def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
@@ -213,7 +213,7 @@ def test_low_thrust_config_round_trip(earth_ephemeris_system):
     mass = 1000.0
     duration_s = 1.0 * 86400.0
 
-    from e2m2e.core.forces.force_config import build_force
+    from e2m2e.algorithm.forces.force_config import build_force
 
     burn_original = FiniteBurn(
         thrust_profile=build_force(

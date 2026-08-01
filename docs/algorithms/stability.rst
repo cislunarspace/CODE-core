@@ -24,11 +24,11 @@ Floquet 理论
 使用方法
 --------
 
-:class:`~e2m2e.algorithms.stability.StabilityAnalysis` 分析单条周期轨道的稳定性：
+:class:`~e2m2e.algorithm.stability.StabilityAnalysis` 分析单条周期轨道的稳定性：
 
 .. code-block:: python
 
-   from e2m2e.algorithms.stability import StabilityAnalysis
+   from e2m2e.algorithm.stability import StabilityAnalysis
 
    # 构造时传入轨道；orbit 关联了 system 时 dynamics 可省略
    analyzer = StabilityAnalysis(orbit, dynamics)
@@ -72,7 +72,7 @@ Floquet 理论
 
 .. code-block:: python
 
-   from e2m2e.algorithms.stability import StabilityAnalysis
+   from e2m2e.algorithm.stability import StabilityAnalysis
 
    results = []
    for orbit in family:

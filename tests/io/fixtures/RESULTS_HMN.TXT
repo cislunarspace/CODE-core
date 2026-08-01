@@ -1,0 +1,37 @@
+ Results of direct transfer orbit design.
+ ----------------------------------------------------
+ TLI point epoch is (TDB in MJD form)
+   51569.1007428704     
+ 
+ NOI point epoch is (TDB in MJD form)
+   51574.5007428704     
+ 
+ TOF is (in days).
+   5.40000000000000     
+ 
+ Position (km) and speed (m/s) at the TLI point.
+  -6150.16833338456        2736.21211807013        794.798350110074     
+  -6159.27369443213       -7338.48459156835       -4891.93023333589     
+ Keplerian elements at the TLI point.
+ a(km), e, i(deg), O(deg), w(deg), M(deg)
+   210611.162112202       0.969007300251942        30.0000000000000     
+  -12.1835052364851        144.080343965411       8.915882209543727E-002
+ 
+ Position (km) and speed (m/s) at the NOI point.
+   278240.964623737       -268583.277575811       -117733.473116215     
+   125.180068419443        106.665063157511        74.7702040039726     
+ Keplerian elements at the NOI point.
+ a(km), e, i(deg), O(deg), w(deg), M(deg)
+   205525.330006955       0.966942894218805        29.8527965500714     
+  -11.9526238604548        144.120483530875       -178.932634934910     
+ 
+ Position (km) and speed (m/s) at the nominal orbit.
+   278241.509601575       -268583.803637638       -117733.473116235     
+   703.715155914130        653.239640888732        176.500712965195     
+ Keplerian elements at the nominal orbit.
+ a(km), e, i(deg), O(deg), w(deg), M(deg)
+  6.692064029961836E-003   385284699441.636        20.0369850638349     
+   12.6025795336804       -58.1521619229361       -23876851215.7168     
+ 
+ Delta-V cost at the NOI point is (m/s)
+   802.368813537801     

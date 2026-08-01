@@ -12,9 +12,10 @@ import pytest
 
 matplotlib.use("Agg")  # 使用非交互式后端
 
-from e2m2e.core import CR3BP_System, Orbit, OrbitFamily
-from e2m2e.visualization.base import OrbitVisualizer
-from e2m2e.visualization.family import FamilyPlotter
+from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.data.types.orbit import Orbit, OrbitFamily
+from e2m2e.tools.viz.base import OrbitVisualizer
+from e2m2e.tools.viz.family import FamilyPlotter
 
 
 class TestOrbitVisualizerCreation:

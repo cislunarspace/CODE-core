@@ -16,7 +16,7 @@ e2m2e 提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
 
 .. code-block:: python
 
-   from e2m2e.visualization import PlotConfig
+   from e2m2e.tools.viz import PlotConfig
 
    # 使用默认配置
    config = PlotConfig()
@@ -34,7 +34,7 @@ e2m2e 提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
 
 .. code-block:: python
 
-   from e2m2e.visualization import PlotConfig, FamilyPlotter
+   from e2m2e.tools.viz import PlotConfig, FamilyPlotter
 
    config = PlotConfig(title=32, label=28)
    config.apply_rcparams()
@@ -48,7 +48,7 @@ e2m2e 提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
    plotter.plot_family_3d(family, jacobi_values, title="DRO Family 3D")
 
    # Jacobi-周期-稳定性组合图（三个序列与 family 中轨道一一对应）
-   from e2m2e.algorithms import StabilityAnalysis
+   from e2m2e.algorithm.stability import StabilityAnalysis
 
    periods = [orb.period for orb in family]
    stability_values = [
@@ -64,7 +64,7 @@ e2m2e 提供轨道族和转移轨迹的绘图工具，基于 matplotlib。
 
 .. code-block:: python
 
-   from e2m2e.visualization import TransferPlotter
+   from e2m2e.tools.viz import TransferPlotter
 
    plotter = TransferPlotter(system, config)
 

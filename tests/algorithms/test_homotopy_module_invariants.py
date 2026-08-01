@@ -14,8 +14,8 @@ import importlib
 
 import numpy as np
 
-from e2m2e.algorithms import ephemeris_correction
-from e2m2e.algorithms.ephemeris_correction import homotopy
+from e2m2e.algorithm import ephemeris_correction
+from e2m2e.algorithm.ephemeris_correction import homotopy
 
 
 def test_homotopy_submodule_exposes_public_api():
@@ -25,7 +25,7 @@ def test_homotopy_submodule_exposes_public_api():
     ``homotopy`` 子模块内定义，分发器的 ``_HomotopyPatchPointCorrector``
     通过模块级正常 import / 同模块调用使用它——不再需要延迟导入。
     """
-    mod = importlib.import_module("e2m2e.algorithms.ephemeris_correction.homotopy")
+    mod = importlib.import_module("e2m2e.algorithm.ephemeris_correction.homotopy")
     assert callable(getattr(mod, "correct_with_homotopy", None))
     assert callable(getattr(mod, "HomotopyEphemerisDynamics", None))
     assert hasattr(mod, "DEFAULT_LAMBDA_STEPS")

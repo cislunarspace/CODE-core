@@ -11,8 +11,10 @@ import copy
 import numpy as np
 import pytest
 
-from e2m2e.algorithms import Continuation, DifferentialCorrection
-from e2m2e.core import CR3BP_Dynamics, Orbit
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics
+from e2m2e.algorithm.solver.continuation import Continuation
+from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.data.types.orbit import Orbit
 
 # DRO seed parameters (Cui et al. 2025) — standardise the suite on this seed.
 DRO_X0 = 0.79188556619742
@@ -105,6 +107,6 @@ def _make_earth_moon_system():
     mutate it freely). Session-scoped fixtures here need a fresh system they
     own; this helper is the single place that decision lives.
     """
-    from e2m2e.core.cr3bp_system import CR3BP_System
+    from e2m2e.algorithm.dynamics import CR3BP_System
 
     return CR3BP_System(mu=1.21506683e-2, primary="earth", secondary="moon")

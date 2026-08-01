@@ -7,7 +7,7 @@ callable 方向与零速度/零位置边界。
 import numpy as np
 import pytest
 
-from e2m2e.core.forces import FiniteBurn
+from e2m2e.algorithm.forces import FiniteBurn
 
 # --- 构造辅助 ---
 

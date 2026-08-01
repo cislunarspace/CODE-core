@@ -8,7 +8,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.core.forces.shadow import ConicalShadowModel
+from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 
 _AU_KM = 149597870.691
 _R_EARTH = 6378.1363

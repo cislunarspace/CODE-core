@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from e2m2e.core.standard_origins import CelestialBodyOrigin
+from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
 
 
 class TestCelestialBodyOriginBodyProperty:

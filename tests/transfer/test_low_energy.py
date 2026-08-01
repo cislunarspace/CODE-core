@@ -9,21 +9,18 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithms import (
-    Continuation,
-    DifferentialCorrection,
-    InvariantManifold,
-    ManifoldKind,
-    PoincareSection,
-)
-from e2m2e.algorithms.halo_initial_guess import _compute_gamma
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
-from e2m2e.transfer import (
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.family.halo_initial_guess import _compute_gamma
+from e2m2e.algorithm.manifold import InvariantManifold, ManifoldKind, PoincareSection
+from e2m2e.algorithm.solver.continuation import Continuation
+from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.algorithm.transfer import (
     OrbitTerminal,
     PatchCandidate,
     design_low_energy_transfer,
     patch_manifolds,
 )
+from e2m2e.data.types.orbit import Orbit
 
 MU = 1.21506683e-2
 DU = 384405.0  # km

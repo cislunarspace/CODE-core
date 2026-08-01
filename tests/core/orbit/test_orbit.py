@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from e2m2e.core.orbit import Orbit, OrbitFamily
+from e2m2e.data.types.orbit import Orbit, OrbitFamily
 
 
 class TestOrbitInit:

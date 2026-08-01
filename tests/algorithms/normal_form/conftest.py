@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from e2m2e.core import CR3BP_System
+from e2m2e.algorithm.dynamics import CR3BP_System
 
 
 @pytest.fixture

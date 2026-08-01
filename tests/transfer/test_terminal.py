@@ -8,9 +8,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System
-from e2m2e.core.orbit import Orbit
-from e2m2e.transfer.terminal import OrbitTerminal, StateTerminal, TerminalCondition
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.transfer.terminal import OrbitTerminal, StateTerminal, TerminalCondition
+from e2m2e.data.types.orbit import Orbit
 
 # =============================================================================
 # TerminalCondition 抽象基类

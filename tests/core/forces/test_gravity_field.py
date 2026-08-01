@@ -10,7 +10,7 @@ import os
 import numpy as np
 import pytest
 
-from e2m2e.core.forces import GravityField
+from e2m2e.algorithm.forces import GravityField
 
 
 @pytest.fixture
@@ -253,7 +253,7 @@ class TestMoonTideIntegration:
     def test_moon_solid_delta_matches_direct_step1(self):
         """body='MOON' 走 _effective_coefficients 的 ΔC/ΔS 与直接调
         solid_tide_step1(扰动体=地球,Love=月球 k₂)逐字一致。"""
-        from e2m2e.core.forces.earth_tide import solid_tide_step1
+        from e2m2e.algorithm.forces.earth_tide import solid_tide_step1
 
         gf_solid = GravityField("MOON", degree=4, tide_mode="solid")
         gf_none = GravityField("MOON", degree=4)
@@ -339,7 +339,7 @@ def body_frame_spice():
     """
     import spiceypy
 
-    from e2m2e.core.spice import SPICEManager
+    from e2m2e.data.kernels.manager import SPICEManager
 
     if not os.path.isdir(_KERNELS_DIR):
         pytest.skip("kernels directory not found")
@@ -426,7 +426,7 @@ class TestBodyAgnosticGravityField:
         """``GravityField('MOON', degree=10, gravity_file=...)`` 可构造。"""
         from importlib import resources
 
-        ref = resources.files("e2m2e.core.forces.data").joinpath("grgm900c.cof")
+        ref = resources.files("e2m2e.algorithm.forces.data").joinpath("grgm900c.cof")
         with ref.open("rb") as f:
             content = f.read()
         import tempfile
@@ -446,7 +446,7 @@ class TestBodyAgnosticGravityField:
 
     def test_earth_axes_use_itrf93(self, body_frame_spice):
         """EARTH 的 _get_input_coordinate_system 用 ITRFSpiceAxes(frame=ITRF93)。"""
-        from e2m2e.core.standard_axes import ITRFSpiceAxes
+        from e2m2e.algorithm.coordinate.standard_axes import ITRFSpiceAxes
 
         gf = GravityField("EARTH", degree=2)
         cs = gf._get_input_coordinate_system(_SystemStub(body_frame_spice))
@@ -455,7 +455,7 @@ class TestBodyAgnosticGravityField:
 
     def test_moon_axes_use_moon_pa(self, body_frame_spice):
         """MOON 的 _get_input_coordinate_system 用 ITRFSpiceAxes(frame=MOON_PA)。"""
-        from e2m2e.core.standard_axes import ITRFSpiceAxes
+        from e2m2e.algorithm.coordinate.standard_axes import ITRFSpiceAxes
 
         gf = GravityField("MOON", degree=2)
         cs = gf._get_input_coordinate_system(_SystemStub(body_frame_spice))

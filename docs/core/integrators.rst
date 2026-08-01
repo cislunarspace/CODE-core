@@ -336,7 +336,7 @@ spice feature 启用时，扩展模块还提供 ``propagate_compiled`` 与
 ``propagate_compiled_stm_py`` 两个入口：力模型在 Python 侧一次序列化为元组，
 之后整个积分循环（含 SPICE 查询与 STM 变分方程）在 Rust 内完成，消除逐步
 Python↔Rust 跨界。这两个入口不直接面向用户，由
-:class:`~e2m2e.core.forces.force_model.ForceModel` 的 ``propagate`` 按条件
+:class:`~e2m2e.algorithm.forces.force_model.ForceModel` 的 ``propagate`` 按条件
 自动分流，30 天直推约 9.7× 加速；触发条件与回退行为见 :doc:`forces` 的
 「Rust 编译快速路径」小节。
 

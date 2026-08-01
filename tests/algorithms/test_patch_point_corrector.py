@@ -11,8 +11,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from e2m2e.algorithms import ephemeris_correction
-from e2m2e.algorithms.ephemeris_correction import (
+from e2m2e.algorithm import ephemeris_correction
+from e2m2e.algorithm.ephemeris_correction import (
     EphemerisCorrectionResult,
     PatchPointCorrector,
     UnsupportedCorrectorMethodError,

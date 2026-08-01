@@ -11,8 +11,9 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 
-from e2m2e.core import CR3BP_System, Orbit
-from e2m2e.visualization.transfer import TransferPlotter
+from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.data.types.orbit import Orbit
+from e2m2e.tools.viz.transfer import TransferPlotter
 
 
 @pytest.fixture

@@ -8,8 +8,8 @@ import dataclasses
 import numpy as np
 import pytest
 
-from e2m2e.core.forces import ForceModel
-from e2m2e.core.forces.thrust import FiniteBurn, ImpulsiveBurn
+from e2m2e.algorithm.forces import ForceModel
+from e2m2e.algorithm.forces.thrust import FiniteBurn, ImpulsiveBurn
 
 
 class _FakeSystem:

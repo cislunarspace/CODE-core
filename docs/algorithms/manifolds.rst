@@ -16,11 +16,11 @@
 该相位，位置部分归一化后施加 ±ε 的无量纲扰动得到种子；稳定流形反向积分、
 不稳定流形正向积分得到流形管。
 
-:class:`~e2m2e.algorithms.manifolds.InvariantManifold` 的用法：
+:class:`~e2m2e.algorithm.manifold.manifolds.InvariantManifold` 的用法：
 
 .. code-block:: python
 
-   from e2m2e.algorithms import InvariantManifold, ManifoldKind
+   from e2m2e.algorithm.manifold import InvariantManifold, ManifoldKind
 
    # orbit 为周期轨道：须关联 system 且 period 已知（可只存首点）
    epsilon = 50.0 / 384405.0   # 无量纲扰动幅度，典型取 50 km / DU
@@ -34,7 +34,7 @@
    print(f"流形弧数: {len(tube.trajectories)}")
 
 ``branch`` 取 ``"+"`` 或 ``"-"``，对应扰动的两个方向，分别走向轨道两侧。
-返回的 :class:`~e2m2e.algorithms.manifolds.ManifoldTube` 携带轨道引用、
+返回的 :class:`~e2m2e.algorithm.manifold.manifolds.ManifoldTube` 携带轨道引用、
 流形类型、分支与 ε，``trajectories`` 为流形弧列表（无量纲 CR3BP 态）。
 
 给 ``propagate`` 传入 ``section`` 参数时，每条弧在首次穿越截面处截断，
@@ -42,7 +42,7 @@
 
 .. code-block:: python
 
-   from e2m2e.algorithms import PoincareSection
+   from e2m2e.algorithm.manifold import PoincareSection
 
    section = PoincareSection.periapsis("earth", orbit.system)
    tube = manifold.propagate(4.0, section=section)
@@ -50,7 +50,7 @@
 庞加莱截面
 ----------
 
-:class:`~e2m2e.algorithms.sections.PoincareSection` 由标量函数 s(state) 的
+:class:`~e2m2e.algorithm.manifold.sections.PoincareSection` 由标量函数 s(state) 的
 零等值面定义，提供两类构造：
 
 - ``PoincareSection.plane(axis, value)``：平面截面 s = state[axis] − value，
@@ -63,7 +63,7 @@
 平面截面穿越残差可达 1e-10 以下。
 
 ``crossings()`` 检测流形管中所有弧的穿越，返回
-:class:`~e2m2e.algorithms.sections.SectionCrossings`：
+:class:`~e2m2e.algorithm.manifold.sections.SectionCrossings`：
 
 .. code-block:: python
 
@@ -74,7 +74,7 @@
 
 ``crossings()`` 是事后检测（先传播、再在采样点上找穿越）。若要在积分
 过程中检测穿越（例如首次到达截面即停），用
-:meth:`~e2m2e.algorithms.sections.PoincareSection.event` 生成 scipy 语义的
+:meth:`~e2m2e.algorithm.manifold.sections.PoincareSection.event` 生成 scipy 语义的
 事件函数传给 ``Dynamics.propagate(events=...)``：
 
 .. code-block:: python
@@ -88,28 +88,28 @@
 ------------------
 
 两条流形管在同一截面上的穿越点两两配对，可拼接成转移初猜。
-:func:`~e2m2e.transfer.low_energy.patch_manifolds` 按加权拼接代价
-``w_r·|Δr| + w_v·|Δv|`` 升序输出候选（:class:`~e2m2e.transfer.low_energy.PatchCandidate`）：
+:func:`~e2m2e.algorithm.transfer.low_energy.patch_manifolds` 按加权拼接代价
+``w_r·|Δr| + w_v·|Δv|`` 升序输出候选（:class:`~e2m2e.algorithm.transfer.low_energy.PatchCandidate`）：
 
 .. code-block:: python
 
-   from e2m2e.transfer import patch_manifolds
+   from e2m2e.algorithm.transfer import patch_manifolds
 
    # 出发轨道不稳定流形 + 目标轨道稳定流形，同一截面
    candidates = patch_manifolds(tube_a, tube_b, section, weights=(1.0, 1.0))
    best = candidates[0]
    print(f"|Δr|={best.delta_r:.4e}, |Δv|={best.delta_v:.4e}")
 
-:func:`~e2m2e.transfer.low_energy.design_low_energy_transfer` 把上述步骤
+:func:`~e2m2e.algorithm.transfer.low_energy.design_low_energy_transfer` 把上述步骤
 串成流水线：出发轨道不稳定流形与目标轨道稳定流形（± 分支四种组合全局
 取最优）传播到次天体近拱点截面，取最优拼接候选，出发弧直接用流形弧，
-拼接点之后由 :class:`~e2m2e.transfer.three_body_lambert.ThreeBodyLambert`
+拼接点之后由 :class:`~e2m2e.algorithm.transfer.three_body_lambert.ThreeBodyLambert`
 打靶闭合到目标轨道。脉冲由三段构成：出发脉冲（上出发流形）、拼接脉冲
 （截面处）、到达脉冲（入目标流形）。
 
 .. code-block:: python
 
-   from e2m2e.transfer import OrbitTerminal, design_low_energy_transfer
+   from e2m2e.algorithm.transfer import OrbitTerminal, design_low_energy_transfer
 
    sol = design_low_energy_transfer(OrbitTerminal(departure_orbit), target_orbit)
 
@@ -121,24 +121,24 @@
        print(f"总脉冲: {sol.total_delta_v:.6f} km/s")
        print(f"转移时间: {sol.transfer_time:.1f} s")
 
-返回两段弧的 :class:`~e2m2e.transfer.config.TransferSolution`，物理单位。
+返回两段弧的 :class:`~e2m2e.algorithm.transfer.config.TransferSolution`，物理单位。
 当前仅支持 CR3BP 模型；星历转换（CR3BP 闭合解 → 星历模型）尚未接入，
 ``epoch`` 参数为其预留入口。端到端基准见 ``tests/transfer/test_low_energy.py``：
 L1 Lyapunov 族内中间轨道到大幅值轨道，拼接脉冲在几十 m/s 量级。
 
-.. automodule:: e2m2e.algorithms.manifolds
+.. automodule:: e2m2e.algorithm.manifold.manifolds
    :members:
    :undoc-members:
    :show-inheritance:
    :no-index:
 
-.. automodule:: e2m2e.algorithms.sections
+.. automodule:: e2m2e.algorithm.manifold.sections
    :members:
    :undoc-members:
    :show-inheritance:
    :no-index:
 
-.. automodule:: e2m2e.transfer.low_energy
+.. automodule:: e2m2e.algorithm.transfer.low_energy
    :members:
    :undoc-members:
    :show-inheritance:

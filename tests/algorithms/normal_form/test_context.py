@@ -12,8 +12,9 @@ import math
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.normal_form import NormalFormContext, NormalFormResult
-from e2m2e.algorithms.normal_form.constants import (
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form import NormalFormContext, NormalFormResult
+from e2m2e.algorithm.normal_form.constants import (
     BASE_FREQUENCIES,
     JD0_J2000,
     LU_KM,
@@ -23,7 +24,6 @@ from e2m2e.algorithms.normal_form.constants import (
     MU_S,
     TU_S,
 )
-from e2m2e.core import LibrationPoint
 
 # ---------------------------------------------------------------------------
 # 构造烟测：L1–L5

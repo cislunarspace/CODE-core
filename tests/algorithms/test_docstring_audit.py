@@ -78,7 +78,7 @@ def _public_classes(module: Any) -> list[tuple[str, type]]:
 
 
 class TestTwoLevelMultipleShooting:
-    MODULE = "e2m2e.algorithms.two_level_multiple_shooting"
+    MODULE = "e2m2e.algorithm.solver.two_level_multiple_shooting"
 
     def test_module_docstring_exists(self):
         mod = _import(self.MODULE)
@@ -135,7 +135,7 @@ class TestTwoLevelMultipleShooting:
 
 
 class TestMultipleShooting:
-    MODULE = "e2m2e.algorithms.multiple_shooting"
+    MODULE = "e2m2e.algorithm.solver.multiple_shooting"
 
     def test_module_docstring_exists(self):
         mod = _import(self.MODULE)
@@ -149,7 +149,7 @@ class TestMultipleShooting:
 
 
 class TestContinuation:
-    MODULE = "e2m2e.algorithms.continuation"
+    MODULE = "e2m2e.algorithm.solver.continuation"
 
     def test_init_docstring_param_matches_signature(self):
         """__init__ docstring 中不应包含不存在的 param 参数"""
@@ -179,7 +179,7 @@ class TestContinuation:
 
 
 class TestStability:
-    MODULE = "e2m2e.algorithms.stability"
+    MODULE = "e2m2e.algorithm.stability"
 
     def test_pair_eigenvalues_has_args_returns(self):
         mod = _import(self.MODULE)
@@ -196,7 +196,7 @@ class TestStability:
 
 
 class TestDifferentialCorrection:
-    MODULE = "e2m2e.algorithms.differential_correction"
+    MODULE = "e2m2e.algorithm.solver.differential_correction"
 
     def test_iterate_correction_documents_callback(self):
         mod = _import(self.MODULE)
@@ -222,10 +222,10 @@ class TestDifferentialCorrection:
 
 class TestStrategiesChinese:
     STRATEGY_MODULES = [
-        "e2m2e.algorithms.strategies.base",
-        "e2m2e.algorithms.strategies.halo",
-        "e2m2e.algorithms.strategies.symmetric_2d",
-        "e2m2e.algorithms.strategies.symmetric_3d",
+        "e2m2e.algorithm.family.strategies.base",
+        "e2m2e.algorithm.family.strategies.halo",
+        "e2m2e.algorithm.family.strategies.symmetric_2d",
+        "e2m2e.algorithm.family.strategies.symmetric_3d",
     ]
 
     @pytest.mark.parametrize("dotted", STRATEGY_MODULES, ids=lambda d: d.rsplit(".", 1)[1])

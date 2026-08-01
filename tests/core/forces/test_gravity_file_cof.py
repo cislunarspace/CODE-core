@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from e2m2e.core.forces.gravity_file import (
+from e2m2e.algorithm.forces.gravity_file import (
     load_cof_file,
     load_gravity_file,
 )
@@ -28,7 +28,7 @@ from e2m2e.core.forces.gravity_file import (
 
 
 def _grgm900c_path() -> Path:
-    ref = resources.files("e2m2e.core.forces.data").joinpath("grgm900c.cof")
+    ref = resources.files("e2m2e.algorithm.forces.data").joinpath("grgm900c.cof")
     return Path(ref)
 
 

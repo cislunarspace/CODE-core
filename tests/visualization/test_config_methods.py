@@ -5,7 +5,7 @@
 
 import matplotlib
 
-from e2m2e.visualization.config import PlotConfig
+from e2m2e.tools.viz.config import PlotConfig
 
 
 class TestApplyRcParams:

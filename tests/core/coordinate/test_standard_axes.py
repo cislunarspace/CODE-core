@@ -4,7 +4,8 @@
 """
 
 import numpy as np
-from e2m2e.core.standard_axes import IAU2000EqAxes, ICRSAxes
+
+from e2m2e.algorithm.coordinate.standard_axes import IAU2000EqAxes, ICRSAxes
 
 
 class TestICRSAxes:
@@ -50,7 +51,7 @@ class TestIAU2000EqAxes:
 
     def test_precession_angle_reasonable(self):
         """Precession angle at 10 years is in the expected arcsecond range."""
-        from e2m2e.core.iau_2006 import precession_angles
+        from e2m2e.algorithm.coordinate.iau_2006 import precession_angles
 
         t = 10.0 / 100.0  # 10 years in Julian centuries
         zeta, theta, z = precession_angles(t)

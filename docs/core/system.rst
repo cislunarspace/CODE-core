@@ -6,7 +6,7 @@ e2m2e 的系统层定义天体几何、引力与运动学模型，是后续所�
 System 基类
 -----------
 
-:class:`~e2m2e.core.system.System` 是抽象基类，定义系统要回答的三个问题：
+:class:`~e2m2e.algorithm.dynamics.system.System` 是抽象基类，定义系统要回答的三个问题：
 
 1. 用什么坐标框架？由 ``frame`` 标识。
 2. 数值用什么单位？由 ``unit_system`` 决定。
@@ -18,14 +18,14 @@ System 基类
 CR3BP 系统
 ----------
 
-:class:`~e2m2e.core.cr3bp_system.CR3BP_System` 描述圆型限制性三体问题：
+:class:`~e2m2e.algorithm.dynamics.CR3BP_System` 描述圆型限制性三体问题：
 两个主天体绕公共质心作圆周运动，第三体质量可忽略。
 
 **创建系统：**
 
 .. code-block:: python
 
-   from e2m2e.core import CR3BP_System
+   from e2m2e.algorithm.dynamics import CR3BP_System
 
    system = CR3BP_System(
        mu=0.0121506683,
@@ -88,7 +88,7 @@ CR3BP 系统
 BCR4BP 系统
 -----------
 
-:class:`~e2m2e.core.bcr4bp_system.BCR4BPSystem` 描述双圆限制性四体问题
+:class:`~e2m2e.algorithm.dynamics.BCR4BPSystem` 描述双圆限制性四体问题
 （Bicircular Restricted Four-Body Problem）：在 CR3BP 的地月会合旋转系
 之上叠加太阳质点摄动。双圆近似下，地月绕公共质心作圆周运动（CR3BP
 假设），太阳也在会合系中绕质心作共面圆周运动，其位置是时间的解析函数，
@@ -107,7 +107,7 @@ BCR4BP 系统
 
 .. code-block:: python
 
-   from e2m2e.core import BCR4BPSystem
+   from e2m2e.algorithm.dynamics import BCR4BPSystem
 
    system = BCR4BPSystem.earth_moon(sun_phase0=0.0)
 
@@ -123,7 +123,7 @@ BCR4BP 系统
 
 **与 CR3BP 的区别：** BCR4BP 无 Jacobi 积分（太阳项显式含时）；
 ``compute_libration_points`` 给出的是对应 CR3BP 的平动点，仅作参考
-位置。配套动力学为 :class:`~e2m2e.core.bcr4bp_dynamics.BCR4BP_Dynamics`，
+位置。配套动力学为 :class:`~e2m2e.algorithm.dynamics.BCR4BP_Dynamics`，
 见 :doc:`dynamics` 的「BCR4BP 动力学」一节。精度上，双圆近似与星历
 （地+月+日点质量）对比 1 天外推位置误差在 1e3 km 量级，主误差来自
 月球圆轨道近似。
@@ -131,12 +131,12 @@ BCR4BP 系统
 星历系统
 --------
 
-:class:`~e2m2e.core.ephemeris_system.EphemerisSystem` 基于 SPICE 内核查询天体星历，
+:class:`~e2m2e.algorithm.dynamics.ephemeris_system.EphemerisSystem` 基于 SPICE 内核查询天体星历，
 采用 J2000 惯性坐标系，物理单位（km, s, km/s）。详见 :doc:`ephemeris`。
 
 .. code-block:: python
 
-   from e2m2e.core import EphemerisSystem, ReferenceFrame, SPICEManager
+   from e2m2e.algorithm.dynamics import EphemerisSystem, ReferenceFrame, SPICEManager
 
    spice = SPICEManager()
    spice.load_kernel("kernels/de440s.bsp")

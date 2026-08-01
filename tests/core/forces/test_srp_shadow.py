@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from e2m2e.core.constants import AU as _AU_KM
-from e2m2e.core.constants import R_EARTH as _R_EARTH
-from e2m2e.core.forces.shadow import ConicalShadowModel
-from e2m2e.core.forces.srp import SolarRadiationPressure
+from e2m2e.algorithm.forces.shadow import ConicalShadowModel
+from e2m2e.algorithm.forces.srp import SolarRadiationPressure
+from e2m2e.data.templates.systems import AU as _AU_KM
+from e2m2e.data.templates.systems import R_EARTH as _R_EARTH
 
 _R_SUN = 695700.0
 _P_SRP_1AU = 4.56e-6

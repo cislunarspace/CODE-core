@@ -1,7 +1,7 @@
 脉冲推进模型
 ============
 
-:class:`~e2m2e.transfer.propulsion.ImpulsivePropulsion` 用于计算转移轨道的出发注入速度与代价。
+:class:`~e2m2e.algorithm.transfer.propulsion.ImpulsivePropulsion` 用于计算转移轨道的出发注入速度与代价。
 
 基本原理
 --------
@@ -24,7 +24,7 @@
 
 .. code-block:: python
 
-   from e2m2e.transfer.propulsion import ImpulsivePropulsion
+   from e2m2e.algorithm.transfer.propulsion import ImpulsivePropulsion
 
    propulsion = ImpulsivePropulsion()
 
@@ -45,12 +45,12 @@
 与转移代价的配合
 ----------------
 
-``ImpulsivePropulsion`` 内部调用 :func:`~e2m2e.transfer.cost.compute_transfer_cost`
+``ImpulsivePropulsion`` 内部调用 :func:`~e2m2e.algorithm.transfer.cost.compute_transfer_cost`
 计算 Δv 分解：
 
 .. code-block:: python
 
-   from e2m2e.transfer.cost import compute_transfer_cost
+   from e2m2e.algorithm.transfer.cost import compute_transfer_cost
 
    cost = compute_transfer_cost(
        departure_state=departure_state,

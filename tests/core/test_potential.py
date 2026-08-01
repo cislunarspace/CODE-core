@@ -7,8 +7,8 @@
 import numpy as np
 import pytest
 
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, LibrationPoint
-from e2m2e.core.potential import pseudo_potential_hessian
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System, LibrationPoint
+from e2m2e.algorithm.dynamics.potential import pseudo_potential_hessian
 
 
 class TestPseudoPotentialHessian:
@@ -159,7 +159,7 @@ class TestRegressionJacobianA:
 
     @pytest.fixture
     def dynamics(self):
-        from e2m2e.core import CR3BP_System
+        from e2m2e.algorithm.dynamics import CR3BP_System
 
         sys = CR3BP_System(
             mu=0.0121506683, primary="Earth", secondary="Moon"

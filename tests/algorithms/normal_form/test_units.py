@@ -12,10 +12,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.normal_form import NormalFormContext
-from e2m2e.algorithms.normal_form.constants import LU_KM, MU, TU_S, VU_KMS
-from e2m2e.algorithms.normal_form.units import from_normalized, to_normalized
-from e2m2e.core import LibrationPoint
+from e2m2e.algorithm.dynamics import LibrationPoint
+from e2m2e.algorithm.normal_form import NormalFormContext
+from e2m2e.algorithm.normal_form.constants import LU_KM, MU, TU_S, VU_KMS
+from e2m2e.algorithm.normal_form.units import from_normalized, to_normalized
 
 
 @pytest.fixture

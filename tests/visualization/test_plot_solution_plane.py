@@ -11,10 +11,10 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 
-from e2m2e.core import CR3BP_System
+from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.algorithm.transfer import TransferOptimizationResult
 from e2m2e.mbse.data.enums import TransferType
-from e2m2e.transfer import TransferOptimizationResult
-from e2m2e.visualization.transfer import TransferPlotter
+from e2m2e.tools.viz.transfer import TransferPlotter
 
 
 @pytest.fixture

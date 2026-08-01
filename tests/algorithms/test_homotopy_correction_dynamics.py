@@ -10,9 +10,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithms.ephemeris_correction.homotopy import HomotopyEphemerisDynamics
-from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
-from e2m2e.core.ephemeris_system import EphemerisSystem
+from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
+from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+from e2m2e.algorithm.ephemeris_correction.homotopy import HomotopyEphemerisDynamics
 from e2m2e.mbse.data.enums import ReferenceFrame
 
 
@@ -141,7 +141,7 @@ def test_homotopy_dynamics_keeps_propagate_working(fake_spice, monkeypatch):
     # （propagate_with_stm_py）直接查询进程内真实 SPICE 内核池，绕开 FakeSpice，
     # 且在内核缺失时静默返回截断结果。本测试验证的是 lambda 插值语义，
     # 固定走 Python 路径，与进程内是否加载过真实内核解耦。
-    monkeypatch.setattr("e2m2e.core.ephemeris_dynamics._HAS_RUST_STM", False)
+    monkeypatch.setattr("e2m2e.algorithm.dynamics.ephemeris_dynamics._HAS_RUST_STM", False)
     system = EphemerisSystem(
         bodies=["EARTH", "MOON", "SUN"],
         spice=fake_spice,

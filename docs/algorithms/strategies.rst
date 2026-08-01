@@ -33,7 +33,7 @@ CorrectionConfig
 
 .. code-block:: python
 
-   from e2m2e.algorithms.strategies import halo_fixed_z0
+   from e2m2e.algorithm.family.strategies import halo_fixed_z0
 
    config = halo_fixed_z0(z0=0.01, libration_point=1)
    print(config.setup_type)          # "halo_orbit_fixed_z0"

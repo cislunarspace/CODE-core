@@ -65,8 +65,8 @@ pip install e2m2e[normal-form]
 创建地月 CR3BP 系统，生成一个 DRO 轨道族：
 
 ```python
-from e2m2e.core import CR3BP_System, Orbit, CR3BP_Dynamics
-from e2m2e.algorithms import DifferentialCorrection, Continuation
+from e2m2e.algorithm.dynamics import CR3BP_System, CR3BP_Dynamics, Orbit
+from e2m2e.algorithm.solver import DifferentialCorrection, Continuation
 
 system = CR3BP_System(mu=0.01215, primary="earth", secondary="moon")
 dynamics = CR3BP_Dynamics(system=system)
@@ -123,6 +123,24 @@ family = continuation.natural_continuation(
 - 面向上层规划系统的服务化封装。下一步把 e2m2e 封装为 MCP 服务器，接入下图所示的异构模型交互框架，让大模型可以像调用 Lambert、C-W 工具一样调用地月轨道算法
 
 ![基于 MCP 的异构模型交互框架（李胤慷等，2026）](docs/_static/paper/mcp-interaction-framework.jpg)
+
+### 能力与实现状态
+
+| 能力 | 实现状态 | 说明 |
+|------|---------|------|
+| 任务轨道设计（DRO/NRHO/Halo/Lissajous/L4/L5） | 已实现 | CR3BP 初猜 → 星历修正 → 高精度预报全链路 |
+| 轨道保持（特征点/目标点严格/目标点宽松 + 蒙特卡洛） | 已实现 | 三控制律 + 三轨道误差仿真 |
+| 角动量管理 | 未实现 | 姿态发动机联合控制（见 issue #261） |
+| 转移轨道设计（HMN） | 已实现 | Lambert + 打靶组装 |
+| 转移轨道设计（LGA/WSB） | 未实现 | 引力辅助弹道搜索 |
+| 低推力转移 | 已实现 | Q-law 初猜 + 打靶/配点/解析雅可比 |
+| 轨道预报 | 已实现 | ForceModel 高精度外推 |
+| 时空坐标转换（TDT+GCRS↔TDB+EBCRS） | 已实现 | r2s2 后端 |
+| ECOM 光压模型 | 未实现 | 现有仅炮弹模型（见 issue #253） |
+| 地球非球形×大天体耦合项 | 未实现 | 见 issue #253 |
+| 不变流形与低能量转移 | 已实现 | 流形 + 庞加莱截面 + 拼接 |
+| 正规化（normal form） | 已实现 | 可选依赖 `[normal-form]` |
+| MCP ?? | ???? | Facade ??????`e2m2e.api`??????? `[mcp]` extra |
 
 详细的能力清单与 API 文档见[在线文档](https://cislunarspace.github.io/e2m2e/)；逐版本变更见 [CHANGELOG.md](CHANGELOG.md)。
 

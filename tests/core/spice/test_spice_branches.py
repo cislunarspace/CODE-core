@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from e2m2e.core.spice import _GM_VALUES, SPICEManager
+from e2m2e.data.kernels.manager import _GM_VALUES, SPICEManager
 
 
 class TestLoadKernelFileNotFound:
@@ -47,8 +47,8 @@ class TestFindEphemerisKernelNonexistent:
 
 class TestFindLeapsecondsKernel:
     def test_returns_none_for_empty_paths(self):
-        from e2m2e.core.spice import _find_leapseconds_kernel
+        from e2m2e.data.kernels.manager import _find_leapseconds_kernel
 
-        with patch("e2m2e.core.spice._LEAPSECOND_SEARCH_PATHS", ["", "/nonexistent"]):
+        with patch("e2m2e.data.kernels.manager._LEAPSECOND_SEARCH_PATHS", ["", "/nonexistent"]):
             result = _find_leapseconds_kernel()
             assert result is None

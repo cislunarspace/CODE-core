@@ -11,21 +11,21 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from e2m2e.core.coordinate_system import CoordinateSystem
-from e2m2e.core.standard_axes import ICRSAxes
-from e2m2e.core.standard_origins import CelestialBodyOrigin
 from numpy.testing import assert_allclose
 
-from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
-from e2m2e.core.ephemeris_system import EphemerisSystem
-from e2m2e.core.forces import (
+from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
+from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
+from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+from e2m2e.algorithm.forces import (
     ForceModel,
     GravityField,
     IndirectTerm,
     PointMassGravity,
     ThirdBodyGravity,
 )
-from e2m2e.core.forces.physical_model import PhysicalModel
+from e2m2e.algorithm.forces.physical_model import PhysicalModel
 
 pytestmark = pytest.mark.spice
 
@@ -202,7 +202,7 @@ def body_fixed_system(spice_kernel_path):
     """加载 body-fixed 内核的 ICRS 系统（GravityField 需要 ITRF93/MOON_PA）。"""
     from kernel_helpers import load_body_fixed_kernels, unload_kernels
 
-    from e2m2e.core.spice import SPICEManager
+    from e2m2e.data.kernels.manager import SPICEManager
 
     spice = SPICEManager()
     spice.load_kernel(spice_kernel_path)

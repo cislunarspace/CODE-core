@@ -33,7 +33,7 @@ def load_body_fixed_kernels(spice) -> list[str]:
     (ITRFSpiceAxes)能解析 SPICE 旋转。文件不存在时静默跳过该项。
 
     Args:
-        spice: 已初始化的 :class:`~e2m2e.core.spice.SPICEManager`。
+        spice: 已初始化的 :class:`~e2m2e.data.kernels.manager.SPICEManager`。
 
     Returns:
         实际 furnsh 的内核绝对路径列表;调用方应在 teardown 时对其逆序 unload。

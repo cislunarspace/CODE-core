@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from e2m2e.algorithms.ephemeris_correction import EphemerisCorrectionResult, homotopy
+from e2m2e.algorithm.ephemeris_correction import EphemerisCorrectionResult, homotopy
 
 
 def test_correct_with_homotopy_returns_ephemeris_correction_result():

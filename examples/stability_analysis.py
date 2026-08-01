@@ -5,9 +5,11 @@
 展示如何使用 StabilityAnalysis 分析周期轨道的 Floquet 稳定性。
 """
 
-from e2m2e.algorithms import Continuation, DifferentialCorrection
-from e2m2e.algorithms.stability import StabilityAnalysis
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.solver.continuation import Continuation
+from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.algorithm.stability import StabilityAnalysis
+from e2m2e.data.types.orbit import Orbit
 
 
 def analyze_single_orbit():

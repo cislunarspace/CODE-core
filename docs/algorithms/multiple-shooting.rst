@@ -17,11 +17,11 @@
 标准多重打靶
 ------------
 
-:class:`~e2m2e.algorithms.multiple_shooting.MultipleShooting` 是标准实现。
+:class:`~e2m2e.algorithm.solver.multiple_shooting.MultipleShooting` 是标准实现。
 
 .. code-block:: python
 
-   from e2m2e.algorithms import MultipleShooting, sample_patch_points
+   from e2m2e.algorithm.solver import MultipleShooting, sample_patch_points
 
    ms = MultipleShooting(dynamics=dynamics)
 
@@ -54,12 +54,12 @@
 
 NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月点落在节点之间
 而欠约束，导致多重打靶残差停滞。
-:func:`~e2m2e.algorithms.multiple_shooting.sample_patch_points_perilune_clustered`
+:func:`~e2m2e.algorithm.solver.multiple_shooting.sample_patch_points_perilune_clustered`
 先积分一圈定位近月点（离次天体最近的点），在其两侧窗口内加密节点：
 
 .. code-block:: python
 
-   from e2m2e.algorithms import sample_patch_points_perilune_clustered
+   from e2m2e.algorithm.solver import sample_patch_points_perilune_clustered
 
    t_patch, state_patch = sample_patch_points_perilune_clustered(
        orbit,
@@ -76,7 +76,7 @@ NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月�
 两层多重打靶
 ------------
 
-:class:`~e2m2e.algorithms.two_level_multiple_shooting.TwoLevelMultipleShooting`
+:class:`~e2m2e.algorithm.solver.two_level_multiple_shooting.TwoLevelMultipleShooting`
 将问题分解为两层交替求解：
 
 - **Level 1（局部问题）**：逐段调整出发速度使位置连续
@@ -87,7 +87,7 @@ NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月�
 
 .. code-block:: python
 
-   from e2m2e.algorithms.two_level_multiple_shooting import TwoLevelMultipleShooting
+   from e2m2e.algorithm.solver.two_level_multiple_shooting import TwoLevelMultipleShooting
 
    tms = TwoLevelMultipleShooting(dynamics=dynamics)
 
@@ -107,12 +107,12 @@ NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月�
 星历修正
 --------
 
-多重打靶在星历模型中的应用，通过 :func:`~e2m2e.algorithms.ephemeris_correction.correct_ephemeris_patch_points`
+多重打靶在星历模型中的应用，通过 :func:`~e2m2e.algorithm.ephemeris_correction.correct_ephemeris_patch_points`
 统一调度：
 
 .. code-block:: python
 
-   from e2m2e.algorithms.ephemeris_correction import correct_ephemeris_patch_points
+   from e2m2e.algorithm.ephemeris_correction import correct_ephemeris_patch_points
 
    result = correct_ephemeris_patch_points(
        method="standard",      # 或 "two_level"、"homotopy"

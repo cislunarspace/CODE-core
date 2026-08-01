@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.algorithms import convert_to_j2000, sample_patch_points
-from e2m2e.core import Orbit
+from e2m2e.algorithm.solver.multiple_shooting import convert_to_j2000, sample_patch_points
+from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.spice
 
@@ -36,7 +36,7 @@ DRO_31_PERIOD = 2.095
 
 @pytest.fixture
 def dro_orbit(cr3bp_dynamics):
-    from e2m2e.algorithms import DifferentialCorrection
+    from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 
     seed_state = np.array([DRO_31_X0, 0.0, 0.0, 0.0, DRO_31_VY0, 0.0])
     seed_orbit = Orbit([seed_state], [0])

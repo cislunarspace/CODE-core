@@ -132,14 +132,13 @@ def _propagate_e2m2e(
     order: int = 10,
 ) -> dict[str, Any]:
     """用 e2m2e 传播与 GMAT 脚本对应的 LEO 场景。"""
-    from e2m2e.core.coordinate_system import CoordinateSystem
-    from e2m2e.core.standard_axes import ICRSAxes
-    from e2m2e.core.standard_origins import CelestialBodyOrigin
-
-    from e2m2e.core.atmosphere import ExponentialAtmosphere
-    from e2m2e.core.ephemeris_system import EphemerisSystem
-    from e2m2e.core.forces import DragModel, ForceModel, GravityField, SolarRadiationPressure
-    from e2m2e.core.spice import SPICEManager
+    from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+    from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
+    from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+    from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+    from e2m2e.algorithm.forces import DragModel, ForceModel, GravityField, SolarRadiationPressure
+    from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
+    from e2m2e.data.kernels.manager import SPICEManager
 
     project_root = output_dir
     while project_root.name != "" and not (project_root / "kernels").is_dir():

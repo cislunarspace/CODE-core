@@ -10,7 +10,8 @@ import numpy as np
 import pytest
 from kernel_helpers import SPICE_KERNEL_DIR
 
-from e2m2e.core import CR3BP_Dynamics, CR3BP_System, Orbit
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.data.types.orbit import Orbit
 
 
 def pytest_configure(config):
@@ -146,7 +147,7 @@ def dro_31_period():
 @pytest.fixture
 def spice_manager(spice_kernel_path):
     """SPICEManager with DE440/DE438/DE435 kernel loaded; auto-unload after test."""
-    from e2m2e.core.spice import SPICEManager
+    from e2m2e.data.kernels.manager import SPICEManager
 
     mgr = SPICEManager()
     mgr.load_kernel(spice_kernel_path)
@@ -157,7 +158,7 @@ def spice_manager(spice_kernel_path):
 @pytest.fixture
 def spice_eph_system(spice_manager):
     """Earth-Moon-Sun ephemeris system in J2000, with origin at Earth."""
-    from e2m2e.core.ephemeris_system import EphemerisSystem
+    from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
     from e2m2e.mbse.data.enums import ReferenceFrame
 
     return EphemerisSystem(
@@ -171,7 +172,7 @@ def spice_eph_system(spice_manager):
 @pytest.fixture
 def spice_eph_dynamics(spice_eph_system):
     """Ephemeris N-body dynamics with relaxed rtol/atol/max_step for fast tests."""
-    from e2m2e.core.ephemeris_dynamics import EphemerisDynamics
+    from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
 
     d = EphemerisDynamics(system=spice_eph_system)
     # 这些宽松参数让测试中的星历传播比生产快 ~10×
@@ -190,7 +191,7 @@ def spice_syn_j2000(earth_moon_system, spice_manager):
     ``synodic_to_j2000``、``j2000_to_synodic``、``batch_synodic_to_j2000``、
     ``batch_j2000_to_synodic``，以及 ``cr3bp_system``、``spice`` 属性。
     """
-    from e2m2e.core.synodic_j2000 import SynodicJ2000System
+    from e2m2e.algorithm.coordinate import SynodicJ2000System
 
     return SynodicJ2000System(
         cr3bp_system=earth_moon_system,

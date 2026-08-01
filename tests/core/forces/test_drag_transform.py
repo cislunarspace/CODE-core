@@ -5,14 +5,14 @@
 
 import numpy as np
 import pytest
-from e2m2e.core.coordinate_system import CoordinateSystem
-from e2m2e.core.standard_axes import ICRSAxes, ITRFApproxAxes
-from e2m2e.core.standard_origins import CelestialBodyOrigin
 
-from e2m2e.core.atmosphere import ExponentialAtmosphere
-from e2m2e.core.ephemeris_system import EphemerisSystem
-from e2m2e.core.forces.drag import DragModel
-from e2m2e.core.spice import SPICEManager
+from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
+from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes, ITRFApproxAxes
+from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
+from e2m2e.algorithm.forces.drag import DragModel
+from e2m2e.data.kernels.manager import SPICEManager
 
 _EARTH_R_KM = 6378.137
 _KM_TO_M = 1000.0

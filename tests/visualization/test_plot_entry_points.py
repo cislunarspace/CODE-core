@@ -11,10 +11,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from e2m2e.core import CR3BP_System, Orbit, OrbitFamily
-from e2m2e.visualization.base import OrbitVisualizer
-from e2m2e.visualization.family import FamilyPlotter
-from e2m2e.visualization.transfer import TransferPlotter
+from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.data.types.orbit import Orbit, OrbitFamily
+from e2m2e.tools.viz.base import OrbitVisualizer
+from e2m2e.tools.viz.family import FamilyPlotter
+from e2m2e.tools.viz.transfer import TransferPlotter
 
 
 @pytest.fixture
@@ -89,7 +90,7 @@ class TestVisualizationPackageImport:
     """visualization 包在无 plotting.py 的情况下可正常导入"""
 
     def test_public_api_imports(self):
-        from e2m2e.visualization import (
+        from e2m2e.tools.viz import (
             FamilyPlotter,
             OrbitVisualizer,
             PlotConfig,
@@ -107,6 +108,6 @@ class TestVisualizationPackageImport:
         assert all(cls is not None for cls in classes)
 
     def test_plotting_module_not_in_public_api(self):
-        import e2m2e.visualization
+        import e2m2e.tools.viz
 
-        assert not hasattr(e2m2e.visualization, "configure_academic_fonts")
+        assert not hasattr(e2m2e.tools.viz, "configure_academic_fonts")

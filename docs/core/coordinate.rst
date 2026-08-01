@@ -13,7 +13,7 @@ e2m2e 的坐标系层负责位置、速度等矢量在不同参考框架之间�
 
 .. code-block:: python
 
-   from e2m2e.core import CoordinateSystem, ICRSAxes, ITRFSpiceAxes, CelestialBodyOrigin
+   from e2m2e.algorithm.dynamics import CoordinateSystem, ICRSAxes, ITRFSpiceAxes, CelestialBodyOrigin
 
    # ICRF 惯性系（地球中心）
    icrf = CoordinateSystem(
@@ -21,7 +21,7 @@ e2m2e 的坐标系层负责位置、速度等矢量在不同参考框架之间�
        origin=CelestialBodyOrigin(body="EARTH", spice=spice),
    )
 
-坐标系族位于 ``e2m2e.core.coordinate`` 子包，上述类在 ``e2m2e.core`` 顶层
+坐标系族位于 ``e2m2e.algorithm.coordinate`` 子包，上述类在 ``e2m2e.core`` 顶层
 重导出；旧的 ``e2m2e.core.<mod>`` 模块路径保留兼容别名。
 
 坐标轴类型

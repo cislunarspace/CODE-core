@@ -16,7 +16,7 @@
 
 .. code-block:: python
 
-   from e2m2e.algorithms import DifferentialCorrection, Continuation
+   from e2m2e.algorithm.solver import DifferentialCorrection, Continuation
 
    corrector = DifferentialCorrection(dynamics)
    corrector.setup_2D_symmetric_x_fixed_x0(x0=initial_state[0])
