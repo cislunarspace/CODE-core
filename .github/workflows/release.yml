@@ -66,19 +66,27 @@ jobs:
       # cspice-sys 1.0.4 的 downloadcspice 走 reqwest→native-tls→openssl-sys，
       # 找不到 pkg-config 文件而失败。manylinux_2_28 镜像自带 openssl 1.1.1
       # 与 openssl-devel（含 openssl.pc），加上 before-script 兜底安装。
+      # SPICE 编译包来自 cspice-v1 release（scripts/download_cspice.py），
+      # 设好 CSPICE_DIR 后 cspice-sys 跳过 NAIF 下载（国内网络常不可达）。
+      - name: 下载 SPICE 编译包（cspice-v1 release）
+        shell: bash
+        run: python scripts/download_cspice.py >> "$GITHUB_ENV"
       - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           command: build
-          # spice feature：内含 CSPICE（经 cspice-sys downloadcspice 从 NAIF
-          # 下载源码编译），提供 STM 传播/打靶等 Rust 快速路径，署名见 NOTICE
+          # spice feature：内含 CSPICE（经 CSPICE_DIR 指向 cspice-v1 release
+          # 预编译包，见上方下载步骤），提供 STM 传播/打靶等 Rust 快速路径，署名见 NOTICE
           args: --release --out dist --features spice
           manylinux: 2_28
           before-script-linux: |
             set -eux
-            # cspice-sys 1.0.4 的 downloadcspice：reqwest→native-tls→openssl-sys 需 openssl.pc；
-            # 编译 cspice C 头用 bindgen，需 libclang.so（AlmaLinux 8 包名 clang-libs）
+            # cspice-sys 的 CSPICE_DIR 指向预编译包后跳过 NAIF 下载；无需
+            # openssl.pc（bindgen 在容器内编译 cspice C 头仍需 libclang.so，
+            # AlmaLinux 8 包名 clang-libs）。export 对同一容器内的 maturin
+            # 构建生效。
+            export CSPICE_DIR="$(python3 scripts/download_cspice.py --print-cspice-dir)"
             yum install -y openssl-devel clang-libs clang
       - name: Build sdist
         if: matrix.os == 'ubuntu-latest'
