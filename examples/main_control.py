@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""main_control —— 轨道保持示例（对标 orbit-design-module 的 main_control.m）
+"""main_control —— 轨道保持示例
 
 先用 ``design_orbit`` 设计一条 Halo 标称轨道，再用 ``control_orbit``
 做轨道保持蒙特卡洛仿真，绘制受控轨迹与标称轨迹对比。

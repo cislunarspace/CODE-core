@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""main_propagate —— 轨道预报示例（对标 orbit-design-module 的 main_propagate.m）
+"""main_propagate —— 轨道预报示例
 
 用高精度力模型（``ForceModel.from_config`` + ``propagate``）从一条 Halo
 轨道的初始状态外推 60 天，绘制预报轨迹。
@@ -67,7 +67,7 @@ def main() -> None:
     from e2m2e.data.kernels.manager import SPICEManager
 
     # design_orbit 自动加载了 SPICE 内核并构造系统；这里重建独立系统。
-    # 直接构造星历系统 + 力模型（与 design 第 4 段同款）
+    # 直接构造星历系统 + 力模型
     _spice = SPICEManager()
     load_design_kernels(_spice, default_kernel_dir())
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""main_design —— 轨道设计示例（对标 orbit-design-module 的 main_design.m）
+"""main_design —— 轨道设计示例
 
 用 ``e2m2e.algorithm.design.design_orbit`` 设计一条地月 L2 Halo 轨道，
 在会合系（synodic）中绘制 x-z 与 x-y 投影。

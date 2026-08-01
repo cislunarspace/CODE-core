@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""main_transfer —— 转移轨道设计示例（对标 orbit-design-module 的 main_transfer.m）
+"""main_transfer —— 转移轨道设计示例
 
 用二体 Lambert 求解器（``e2m2e.algorithm.transfer.solve_lambert``，Izzo 算法）
 设计一条地月转移轨道，沿转移弧插值得到轨迹并绘制 3D 图。
