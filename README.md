@@ -62,34 +62,39 @@ pip install e2m2e[normal-form]
 
 ## 快速开始
 
-创建地月 CR3BP 系统，生成一个 DRO 轨道族：
+任务级一行接口：设计一条地月 L2 Halo 轨道。内部走完整链路：CR3BP 初猜 → 星历 N 体多重打靶修正 → 高精度长期预报。
+
+> 本示例走星历动力学，运行前请先完成上方「SPICE 内核」一节——仓库根目录 `kernels/` 已含全部必需内核，或设置 `$SPICE_KERNEL_DIR` 指向自备内核目录。
 
 ```python
-from e2m2e.algorithm.dynamics import CR3BP_System, CR3BP_Dynamics, Orbit
-from e2m2e.algorithm.solver import DifferentialCorrection, Continuation
+from e2m2e.api import Facade
 
-system = CR3BP_System(mu=0.01215, primary="earth", secondary="moon")
-dynamics = CR3BP_Dynamics(system=system)
+facade = Facade()  # 默认从仓库 kernels/（或 $SPICE_KERNEL_DIR）加载 SPICE 内核
 
-# 种子轨道
-initial_state = [0.79188556619742, 0.0, 0.0, 0.0, 0.53682, 0.0]
-seed_orbit = Orbit(states=[initial_state], times=[0])
-
-# 微分修正收敛到周期轨道
-corrector = DifferentialCorrection(dynamic=dynamics)
-corrector.setup_2D_symmetric_x_fixed_x0(x0=initial_state[0])
-seed_dro = corrector.iterate_correction(initial_guess=seed_orbit)
-
-# 延拓生成轨道族
-continuation = Continuation(corrector=corrector)
-family = continuation.natural_continuation(
-    seed_orbit=seed_dro,
-    param_range=(0.14, 0.9),
-    step_size=0.005,
+# 设计一条地月 L2 近直线 Halo 轨道
+result = facade.design_orbit(
+    orbit_type="Halo",
+    collinear_point=2,     # 共线平动点：1 = L1（地月之间），2 = L2（月球背地侧，默认）
+    amplitude=30000.0,     # 面外振幅（km，取值 ±73000，正北负南）
+    phase=0.0,             # 初始相位（周期份额 0~1）
+    epoch=[2024, 1, 1, 0, 0, 0.0],   # 起始历元 UTC：[年,月,日,时,分,秒]
+    duration=1.0,          # 维持时间（年）
+    output_step=3600.0,    # 星历输出间隔（秒）
 )
+
+print("轨道类型        :", result.orbit_type)
+print("起始历元 (UTC)  :", result.epoch_utc)
+print("维持时间 (天)   :", result.duration_day)
+print("CR3BP Jacobi 常数:", f"{result.cr3bp_jacobi:.6f}")
+print("星历修正收敛    :", result.correction_converged)
+print("星历修正迭代数  :", result.correction_iterations)
+print("初始状态 (J2000) :", [f"{v:.6f}" for v in result.initial_state])  # 位置 km + 速度 km/s
+print("力模型配置      :", result.force_config)
 ```
 
-更多示例（星历动力学、多重打靶、转移设计、可视化）见[在线文档](https://cislunarspace.github.io/e2m2e/)和 [`examples/`](examples/) 目录。
+`Facade.design_orbit` 是任务级一档接口（ADR 0014）：把 CR3BP 初猜、星历修正、长期预报串成一条调用。同属 Facade 的能力还有轨道保持 `control_orbit`，以及 DRO/NRHO/Lissajous/L4/L5 等其他轨道类型（改 `orbit_type` 与对应形状参数即可）。
+
+更多示例（星历动力学、多重打靶、转移设计、可视化）见[在线文档](https://cislunarspace.github.io/e2m2e/)和 [`examples/`](examples/) 目录；其中 `orbit_design.py` 等仍为低层 CR3BP API（微分修正 + 延拓生成轨道族），适合需要细粒度控制算法的场景。需要 DFH 格式标称星历文件时，可用 `e2m2e.algorithm.design.design_orbit`（其返回结果含 `ephemeris` 与 `write_ephemeris`）。
 
 ## 使命与进度
 
@@ -140,7 +145,7 @@ family = continuation.natural_continuation(
 | 地球非球形×大天体耦合项 | 未实现 | 见 issue #253 |
 | 不变流形与低能量转移 | 已实现 | 流形 + 庞加莱截面 + 拼接 |
 | 正规化（normal form） | 已实现 | 可选依赖 `[normal-form]` |
-| MCP ?? | ???? | Facade ??????`e2m2e.api`??????? `[mcp]` extra |
+| MCP 服务 | 部分实现 | Facade 方法全集（`mcp_exposed`）可派生；`create_server`/`e2m2e mcp-serve` 占位，部署依赖 `[mcp]` extra |
 
 详细的能力清单与 API 文档见[在线文档](https://cislunarspace.github.io/e2m2e/)；逐版本变更见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -178,7 +183,7 @@ uv run ruff check .
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {5.3.0},
+  version = {5.4.0},
   year = {2026},
 }
 ```
