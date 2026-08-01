@@ -17,3 +17,5 @@ cspice = "0.1"
 # downloadcspice：构建时从 NAIF 下载 CSPICE 源码，免去手工安装与 CSPICE_DIR 配置。
 # 仅在启用 spice feature 时生效。
 cspice-sys = { version = "1.0", features = ["downloadcspice"] }
+# 多重打靶段积分并行（段间相互独立，rayon par_iter 线性加速）
+rayon = "1.10"

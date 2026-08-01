@@ -10,9 +10,12 @@
 //! 3. 最小二乘求解：dX = -(DF^T DF)^{-1} DF^T F
 //! 4. 更新：x_new = x_old + α * dX
 
-use e2m2e_forces::forces::compiled::CompiledForce;
+use e2m2e_forces::forces::compiled::{
+    compute_total_acceleration_and_jacobian, CompiledForce,
+};
 use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm;
 use pyo3::prelude::*;
+use rayon::prelude::*;
 
 /// 最小二乘求解结果。
 struct LeastSquaresResult {
@@ -59,23 +62,36 @@ fn build_residual(final_states: &[[f64; 6]], state_work: &[[f64; 6]], n_seg: usi
 
 /// 构建雅可比矩阵 DF（固定时间模式）。
 ///
-/// DF[i*6:(i+1)*6, i*6:(i+1)*6] = Φ_i（状态转移矩阵）
-/// DF[i*6:(i+1)*6, (i+1)*6:(i+2)*6] = -I_6
-fn build_jacobian_fixed_time(stms: &[[f64; 36]], n_seg: usize, n_vars: usize) -> Vec<f64> {
+/// 自由变量列块 j 对应节点 x_{j+node_offset}。固定首点时 node_offset=1
+/// （x_0 不参与修正），否则 node_offset=0。
+/// 残差 F_i = φ(x_i) - x_{i+1}，故：
+///   ∂F_i/∂x_i     = Φ_i，列块 = i - node_offset（i >= node_offset 时存在）
+///   ∂F_i/∂x_{i+1} = -I_6，列块 = i + 1 - node_offset
+fn build_jacobian_fixed_time(
+    stms: &[[f64; 36]],
+    n_seg: usize,
+    n_vars: usize,
+    node_offset: usize,
+) -> Vec<f64> {
     let n_constraints = n_seg * 6;
     let mut df = vec![0.0_f64; n_constraints * n_vars];
 
     for i in 0..n_seg {
         let r_start = i * 6;
-        // ∂F_i/∂x_i = Φ_i
-        for row in 0..6 {
-            for col in 0..6 {
-                df[(r_start + row) * n_vars + i * 6 + col] = stms[i][row * 6 + col];
+        // ∂F_i/∂x_i = Φ_i（仅当 x_i 是自由变量，即 i >= node_offset）
+        if i >= node_offset {
+            let col_block = i - node_offset;
+            for row in 0..6 {
+                for col in 0..6 {
+                    df[(r_start + row) * n_vars + col_block * 6 + col] =
+                        stms[i][row * 6 + col];
+                }
             }
         }
         // ∂F_i/∂x_{i+1} = -I_6
+        let col_block = i + 1 - node_offset;
         for j in 0..6 {
-            df[(r_start + j) * n_vars + (i + 1) * 6 + j] = -1.0;
+            df[(r_start + j) * n_vars + col_block * 6 + j] = -1.0;
         }
     }
     df
@@ -83,40 +99,48 @@ fn build_jacobian_fixed_time(stms: &[[f64; 36]], n_seg: usize, n_vars: usize) ->
 
 /// 构建雅可比矩阵 DF（自由时间模式）。
 ///
-/// DF[i*6:(i+1)*6, i*6:(i+1)*6] = Φ_i
-/// DF[i*6:(i+1)*6, (i+1)*6:(i+2)*6] = -I_6
-/// DF[i*6:(i+1)*6, N*6 + i] = -f(t_i, x_i)
-/// DF[i*6:(i+1)*6, N*6 + i + 1] = f(t_{i+1}, φ_i)
+/// 自由变量列块 j 对应节点 x_{j+node_offset}；时间变量接在状态变量之后，
+/// 从 n_free_nodes*6 开始。
+///   ∂F_i/∂x_i     = Φ_i，列块 = i - node_offset（i >= node_offset 时存在）
+///   ∂F_i/∂x_{i+1} = -I_6，列块 = i + 1 - node_offset
+///   ∂F_i/∂t_i     = -f(t_i, x_i)
+///   ∂F_i/∂t_{i+1} = f(t_{i+1}, φ_i)
 fn build_jacobian_variable_time(
     stms: &[[f64; 36]],
     f_starts: &[[f64; 6]],
     f_ends: &[[f64; 6]],
     n_seg: usize,
     n_vars: usize,
-    n_nodes: usize,
+    n_free_nodes: usize,
+    node_offset: usize,
 ) -> Vec<f64> {
     let n_constraints = n_seg * 6;
     let mut df = vec![0.0_f64; n_constraints * n_vars];
 
     for i in 0..n_seg {
         let r_start = i * 6;
-        // ∂F_i/∂x_i = Φ_i
-        for row in 0..6 {
-            for col in 0..6 {
-                df[(r_start + row) * n_vars + i * 6 + col] = stms[i][row * 6 + col];
+        // ∂F_i/∂x_i = Φ_i（仅当 x_i 是自由变量，即 i >= node_offset）
+        if i >= node_offset {
+            let col_block = i - node_offset;
+            for row in 0..6 {
+                for col in 0..6 {
+                    df[(r_start + row) * n_vars + col_block * 6 + col] =
+                        stms[i][row * 6 + col];
+                }
             }
         }
         // ∂F_i/∂x_{i+1} = -I_6
+        let col_block = i + 1 - node_offset;
         for j in 0..6 {
-            df[(r_start + j) * n_vars + (i + 1) * 6 + j] = -1.0;
+            df[(r_start + j) * n_vars + col_block * 6 + j] = -1.0;
         }
         // ∂F_i/∂t_i = -f(t_i, x_i)
         for j in 0..6 {
-            df[(r_start + j) * n_vars + n_nodes * 6 + i] = -f_starts[i][j];
+            df[(r_start + j) * n_vars + n_free_nodes * 6 + i] = -f_starts[i][j];
         }
         // ∂F_i/∂t_{i+1} = f(t_{i+1}, φ_i)
         for j in 0..6 {
-            df[(r_start + j) * n_vars + n_nodes * 6 + i + 1] = f_ends[i][j];
+            df[(r_start + j) * n_vars + n_free_nodes * 6 + i + 1] = f_ends[i][j];
         }
     }
     df
@@ -215,6 +239,9 @@ fn least_squares_solve(
 /// * `t_patch` - 初始时间节点，形状 (N,)
 /// * `state_patch` - 初始状态量，形状 (N, 6)
 /// * `var_time` - 是否启用自由时间修正
+/// * `fix_first_node` - 固定首节点（不参与修正）。多重打靶的段首点代表段的
+///   初始条件，段内修正不应改变它；不固定时欠定系统（约束 N-1 段 < 变量 N
+///   节点）会让首点沿零空间漂移，导致结果发散。
 /// * `max_iter` - 最大迭代次数
 /// * `tolerance` - 收敛容差
 /// * `rtol` - 积分相对容差
@@ -227,6 +254,7 @@ pub fn multiple_shooting_correct(
     t_patch: &[f64],
     state_patch: &[[f64; 6]],
     var_time: bool,
+    fix_first_node: bool,
     max_iter: usize,
     tolerance: f64,
     rtol: f64,
@@ -252,44 +280,87 @@ pub fn multiple_shooting_correct(
     let mut residual_history = Vec::new();
     let mut converged = false;
 
+    // 自由变量：默认全部 N 个节点状态；固定首点时只含节点 1..N-1，
+    // 系统恰定（(N-1)*6 变量 = (N-1)*6 约束），消除欠定漂移
+    let n_free_nodes = if fix_first_node { n_nodes - 1 } else { n_nodes };
     let n_vars = if var_time {
-        n_nodes * 6 + n_nodes
+        n_free_nodes * 6 + n_nodes
     } else {
-        n_nodes * 6
+        n_free_nodes * 6
     };
 
     for iteration in 0..max_iter {
-        // 第一步：逐段积分，收集 STM、终端状态
+        // 第一步：逐段积分，收集 STM、终端状态。
+        // 段间相互独立（只依赖本段起始状态），用 rayon 并行积分；
+        // 顺带求段两端点的状态导数 [v, a]（自由时间模式雅可比需要，
+        // 不再用零占位）。
+        let seg_infos: Vec<Result<([f64; 36], [f64; 6], [f64; 6], [f64; 6]), String>> =
+            (0..n_seg)
+                .into_par_iter()
+                .map(|i| {
+                    let t_span = (t_work[i], t_work[i + 1]);
+                    let result = propagate_compiled_stm(
+                        forces,
+                        observer,
+                        t_span,
+                        &[t_work[i], t_work[i + 1]],
+                        &state_work[i],
+                        rtol,
+                        rtol * 0.1,
+                        max_step,
+                        Some(500_000),
+                    )?;
+
+                    let final_state = result
+                        .states
+                        .last()
+                        .ok_or("empty propagation result")?
+                        .clone();
+                    let final_stm = result.stms.last().ok_or("empty STM result")?.clone();
+
+                    let (a0, _) = compute_total_acceleration_and_jacobian(
+                        forces,
+                        t_work[i],
+                        &state_work[i],
+                        observer,
+                    )?;
+                    let (a1, _) = compute_total_acceleration_and_jacobian(
+                        forces,
+                        t_work[i + 1],
+                        &final_state,
+                        observer,
+                    )?;
+                    let f_start = [
+                        state_work[i][3],
+                        state_work[i][4],
+                        state_work[i][5],
+                        a0[0],
+                        a0[1],
+                        a0[2],
+                    ];
+                    let f_end = [
+                        final_state[3],
+                        final_state[4],
+                        final_state[5],
+                        a1[0],
+                        a1[1],
+                        a1[2],
+                    ];
+
+                    Ok((final_stm, final_state, f_start, f_end))
+                })
+                .collect();
+
         let mut stms = Vec::with_capacity(n_seg);
         let mut final_states = Vec::with_capacity(n_seg);
         let mut f_starts = Vec::with_capacity(n_seg);
         let mut f_ends = Vec::with_capacity(n_seg);
-
-        for i in 0..n_seg {
-            let t_span = (t_work[i], t_work[i + 1]);
-            let result = propagate_compiled_stm(
-                forces,
-                observer,
-                t_span,
-                &[t_work[i], t_work[i + 1]],
-                &state_work[i],
-                rtol,
-                rtol * 0.1,
-                max_step,
-                Some(500_000),
-            )?;
-
-            // 终端状态和 STM
-            let final_state = result.states.last().ok_or("empty propagation result")?;
-            let final_stm = result.stms.last().ok_or("empty STM result")?;
-
-            stms.push(*final_stm);
-            final_states.push(*final_state);
-
-            // 状态导数（简化：使用有限差分近似）
-            // 注意：完整的实现应该调用 equations_of_motion，但这里简化处理
-            f_starts.push([0.0_f64; 6]); // 占位
-            f_ends.push([0.0_f64; 6]); // 占位
+        for info in seg_infos {
+            let (final_stm, final_state, f_start, f_end) = info?;
+            stms.push(final_stm);
+            final_states.push(final_state);
+            f_starts.push(f_start);
+            f_ends.push(f_end);
         }
 
         // 第二步：构建残差向量
@@ -312,20 +383,36 @@ pub fn multiple_shooting_correct(
         }
 
         // 第三步：构建雅可比矩阵
+        let node_offset = if fix_first_node { 1 } else { 0 };
         let df = if var_time {
-            build_jacobian_variable_time(&stms, &f_starts, &f_ends, n_seg, n_vars, n_nodes)
+            build_jacobian_variable_time(
+                &stms,
+                &f_starts,
+                &f_ends,
+                n_seg,
+                n_vars,
+                n_free_nodes,
+                node_offset,
+            )
         } else {
-            build_jacobian_fixed_time(&stms, n_seg, n_vars)
+            build_jacobian_fixed_time(&stms, n_seg, n_vars, node_offset)
         };
 
         // 第四步：最小二乘求解
         let ls_result = least_squares_solve(&df, &f, n_seg * 6, n_vars);
 
         // 第五步：更新变量
-        // 更新状态
+        // 更新状态（跳过首点：固定首点时 dx 只含节点 1..N-1 的修正量）
         let mut x_flat: Vec<f64> = state_work.iter().flat_map(|s| s.iter().copied()).collect();
-        for (i, x) in x_flat.iter_mut().enumerate() {
-            *x += ls_result.dx[i];
+        if fix_first_node {
+            // 首点 6 个分量不更新，dx 从节点 1 开始对齐
+            for (i, x) in x_flat.iter_mut().enumerate().skip(6) {
+                *x += ls_result.dx[i - 6];
+            }
+        } else {
+            for (i, x) in x_flat.iter_mut().enumerate() {
+                *x += ls_result.dx[i];
+            }
         }
         state_work = x_flat
             .chunks_exact(6)
@@ -339,7 +426,7 @@ pub fn multiple_shooting_correct(
         // 更新时间（仅自由时间模式）
         if var_time {
             for (i, t) in t_work.iter_mut().enumerate() {
-                *t += ls_result.dx[n_nodes * 6 + i];
+                *t += ls_result.dx[n_free_nodes * 6 + i];
             }
         }
     }
@@ -360,7 +447,7 @@ pub fn multiple_shooting_correct(
 ///
 /// `forces` 是 Python 元组列表，每个元组描述一个力模型（格式同 `propagate_compiled`）。
 #[pyfunction]
-#[pyo3(signature = (forces, observer, t_patch, state_patch, var_time=false, max_iter=50, tolerance=1e-8, rtol=1e-10, max_step=None, verbose=false))]
+#[pyo3(signature = (forces, observer, t_patch, state_patch, var_time=false, fix_first_node=false, max_iter=50, tolerance=1e-8, rtol=1e-10, max_step=None, verbose=false))]
 #[allow(clippy::too_many_arguments)]
 pub fn multiple_shooting_correct_py(
     forces: Vec<PyObject>,
@@ -368,6 +455,7 @@ pub fn multiple_shooting_correct_py(
     t_patch: Vec<f64>,
     state_patch: Vec<Vec<f64>>,
     var_time: bool,
+    fix_first_node: bool,
     max_iter: usize,
     tolerance: f64,
     rtol: f64,
@@ -406,6 +494,7 @@ pub fn multiple_shooting_correct_py(
         &t_patch,
         &state_array,
         var_time,
+        fix_first_node,
         max_iter,
         tolerance,
         rtol,
@@ -445,12 +534,45 @@ mod tests {
     #[test]
     fn test_build_jacobian_fixed_time() {
         let stms = vec![[0.0_f64; 36]; 2];
-        let df = build_jacobian_fixed_time(&stms, 2, 18);
+        {
+            let df_dbg = build_jacobian_fixed_time(&stms, 2, 18, 0);
+            }
+        // node_offset=0：自由变量 = [x_0, x_1, x_2]，列块 j 对应 x_j
+        let df = build_jacobian_fixed_time(&stms, 2, 18, 0);
         assert_eq!(df.len(), 12 * 18);
-        // 验证结构：DF[0:6, 0:6] = Φ_0 = 0
-        // DF[0:6, 6:12] = -I_6
+        // 验证结构：DF[0:6, 0:6] = Φ_0 = 0（stms 全 0）
+        // DF[0:6, 6:12] = -I_6（∂F_0/∂x_1）
         for i in 0..6 {
             assert!((df[i * 18 + 6 + i] - (-1.0)).abs() < 1e-15);
+        }
+        // DF[6:12, 6:12] = Φ_1 = 0（∂F_1/∂x_1）
+        for i in 0..6 {
+            assert!((df[6 * 18 + 6 + i] - 0.0).abs() < 1e-15);
+        }
+        // DF[6:12, 12:18] = -I_6（∂F_1/∂x_2，对角线为 -1）
+        for i in 0..6 {
+            assert!((df[(6 + i) * 18 + 12 + i] - (-1.0)).abs() < 1e-15);
+        }
+    }
+
+    #[test]
+    fn test_build_jacobian_fixed_time_fix_first_node() {
+        let stms = vec![[0.0_f64; 36]; 2];
+        // node_offset=1、n_seg=2：3 个节点 x_0..x_2，固定 x_0，自由变量 = [x_1, x_2]，
+        // n_vars = 2*6 = 12。列块 0 对应 x_1，列块 1 对应 x_2。
+        let df = build_jacobian_fixed_time(&stms, 2, 12, 1);
+        assert_eq!(df.len(), 12 * 12);
+        // DF[0:6, 0:6] = -I_6（∂F_0/∂x_1，x_0 固定无列）
+        for i in 0..6 {
+            assert!((df[i * 12 + i] - (-1.0)).abs() < 1e-15);
+        }
+        // DF[6:12, 0:6] = Φ_1 = 0（∂F_1/∂x_1）
+        for i in 0..6 {
+            assert!((df[6 * 12 + i] - 0.0).abs() < 1e-15);
+        }
+        // DF[6:12, 6:12] = -I_6（∂F_1/∂x_2，对角线为 -1）
+        for i in 0..6 {
+            assert!((df[(6 + i) * 12 + 6 + i] - (-1.0)).abs() < 1e-15);
         }
     }
 

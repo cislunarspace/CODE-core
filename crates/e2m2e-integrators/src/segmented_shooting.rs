@@ -62,14 +62,20 @@ impl Default for SegmentationConfig {
 }
 
 /// 将轨迹分段。
+///
+/// 相邻段首尾相接（共享 1 个拼接点：段 i 末点 = 段 i+1 首点），这是分层合并
+/// 连续性的基础——合并后新段的末点与下一段首点时间戳相同，可无缝拼接。
+/// `overlap_points` 参数保留用于兼容，但内部强制为 1：重叠 >1 会让合并后的
+/// 段与段之间时间不连续，破坏拼接。
 fn segment_trajectory(
     t_patch: &[f64],
     state_patch: &[[f64; 6]],
     points_per_segment: usize,
-    overlap_points: usize,
+    _overlap_points: usize,
 ) -> Vec<(Vec<f64>, Vec<[f64; 6]>)> {
     let n = t_patch.len();
     let mut segments = Vec::new();
+    let overlap_points = 1; // 首尾相接，保证合并连续性
 
     let mut start = 0;
     while start < n {
@@ -87,59 +93,10 @@ fn segment_trajectory(
     segments
 }
 
-/// 合并相邻段。
-fn merge_segments(
-    segments: Vec<(Vec<f64>, Vec<[f64; 6]>)>,
-    merge_indices: &[(usize, usize)],
-) -> Vec<(Vec<f64>, Vec<[f64; 6]>)> {
-    let mut merged = Vec::new();
-    let mut skip = vec![false; segments.len()];
-
-    for &(i, j) in merge_indices {
-        if i >= segments.len() || j >= segments.len() {
-            continue;
-        }
-
-        let (ref t_i, ref s_i) = segments[i];
-        let (ref t_j, ref s_j) = segments[j];
-
-        let mut t_merged = t_i.clone();
-        let mut s_merged = s_i.clone();
-
-        // 找到重叠点（t_j 中第一个等于 t_i 最后一个的点）
-        let overlap_start = if !t_j.is_empty() && !t_i.is_empty() {
-            let last_t = t_i.last().unwrap();
-            t_j.iter().position(|&t| (t - last_t).abs() < 1e-10)
-        } else {
-            None
-        };
-
-        // 添加非重叠部分（跳过重叠点）
-        let start = match overlap_start {
-            Some(idx) => idx + 1, // 跳过重叠点
-            None => 0,
-        };
-        for k in start..t_j.len() {
-            t_merged.push(t_j[k]);
-            s_merged.push(s_j[k]);
-        }
-
-        merged.push((t_merged, s_merged));
-        skip[i] = true;
-        skip[j] = true;
-    }
-
-    // 添加未合并的段
-    for (i, segment) in segments.into_iter().enumerate() {
-        if !skip[i] {
-            merged.push(segment);
-        }
-    }
-
-    merged
-}
-
 /// 对单段进行多重打靶修正。
+///
+/// 固定首节点：段首点是拼接/合并时的锚点（来自上一段的末端或初始初猜），
+/// 段内修正不应改变它，否则段间连续性在合并时被破坏。
 #[allow(clippy::too_many_arguments)]
 fn correct_segment(
     forces: &[CompiledForce],
@@ -157,6 +114,7 @@ fn correct_segment(
         t_patch,
         state_patch,
         false, // 固定时间
+        true,  // 固定首节点：拼接锚点不可变
         max_iter,
         tolerance,
         rtol,
@@ -236,49 +194,66 @@ pub fn segmented_shooting_correct(
         *seg_s = result.state_patch;
     }
 
-    // 第2步：逐步合并相邻段
+    // 第2步：分层两两合并（文献式多重打靶拼接）
+    // 每层把当前段序列两两配对（(0,1),(2,3)...），合并出更长的段后各自独立
+    // 修正，再进入下一层，直到只剩 1 段。分段首尾相接（overlap=1）保证：
+    // 合并后新段的末点时间戳 = 下一段首点时间戳，层间拼接连续。
+    // 注：不能单次合并所有段——多重打靶对超长弧段不收敛（残差震荡、积分
+    // 器步长塌缩），分层让每层修正的段长翻倍但有界，逐层扩大连续弧长。
     if config.enable_merging && n_segments > 1 {
         let mut current_segments = segments;
         let mut stage = 1;
 
         while current_segments.len() > 1 {
+            let n_merge = current_segments.len() / 2;
             if verbose {
                 eprintln!(
                     "合并阶段 {}: {} 段 -> {} 段",
                     stage,
                     current_segments.len(),
-                    current_segments.len().div_ceil(2)
+                    current_segments.len() - n_merge,
                 );
             }
 
-            let merge_indices: Vec<(usize, usize)> = (0..current_segments.len() - 1)
-                .step_by(2)
-                .map(|i| (i, i + 1))
-                .collect();
+            let mut corrected = Vec::with_capacity(current_segments.len() - n_merge);
+            let mut i = 0;
+            while i < current_segments.len() {
+                let (t1, s1) = current_segments[i].clone();
+                if i + 1 < current_segments.len() {
+                    // 合并相邻两段：首尾相接（段1末点 = 段2首点），去重拼接
+                    let (t2, s2) = &current_segments[i + 1];
+                    let mut t_all = t1.clone();
+                    let mut s_all = s1.clone();
+                    let last_t = *t_all.last().unwrap();
+                    let skip = t2
+                        .iter()
+                        .position(|&t| (t - last_t).abs() < 1e-10)
+                        .map(|idx| idx + 1)
+                        .unwrap_or(0);
+                    t_all.extend_from_slice(&t2[skip..]);
+                    s_all.extend_from_slice(&s2[skip..]);
 
-            let merged = merge_segments(current_segments, &merge_indices);
-
-            let mut corrected = Vec::new();
-            for (seg_t, seg_s) in merged {
-                let result = correct_segment(
-                    forces,
-                    observer,
-                    &seg_t,
-                    &seg_s,
-                    max_iter_per_segment,
-                    tolerance,
-                    rtol,
-                    verbose,
-                )?;
-
-                total_iterations += result.iterations;
-                stage_residuals.push(result.max_residual);
-
-                if !result.converged {
-                    converged = false;
+                    let result = correct_segment(
+                        forces,
+                        observer,
+                        &t_all,
+                        &s_all,
+                        max_iter_per_segment,
+                        tolerance,
+                        rtol,
+                        verbose,
+                    )?;
+                    total_iterations += result.iterations;
+                    stage_residuals.push(result.max_residual);
+                    if !result.converged {
+                        converged = false;
+                    }
+                    corrected.push((result.t_patch, result.state_patch));
+                } else {
+                    // 奇数段：最后一段直接继承（本层不合并）
+                    corrected.push((t1, s1));
                 }
-
-                corrected.push((result.t_patch, result.state_patch));
+                i += 2;
             }
 
             current_segments = corrected;
@@ -403,33 +378,19 @@ mod tests {
 
         let segments = segment_trajectory(&t, &s, 10, 2);
 
-        // 20个点，每段10个，重叠2个：段1=[0..10], 段2=[8..18], 段3=[16..20]
+        // 20个点，每段10个，首尾相接（overlap=1 强制）：
+        // 段1=[0..10], 段2=[9..19], 段3=[18..20]
         assert_eq!(segments.len(), 3);
         assert_eq!(segments[0].0.len(), 10);
         assert_eq!(segments[0].0[0], 0.0);
         assert_eq!(segments[0].0[9], 9.0);
+        // 段 i 末点 = 段 i+1 首点（拼接点）
         assert_eq!(segments[1].0.len(), 10);
-        assert_eq!(segments[1].0[0], 8.0);
-        assert_eq!(segments[1].0[9], 17.0);
-        assert_eq!(segments[2].0.len(), 4);
-        assert_eq!(segments[2].0[0], 16.0);
-        assert_eq!(segments[2].0[3], 19.0);
+        assert_eq!(segments[1].0[0], 9.0);
+        assert_eq!(segments[1].0[9], 18.0);
+        assert_eq!(segments[2].0.len(), 2);
+        assert_eq!(segments[2].0[0], 18.0);
+        assert_eq!(segments[2].0[1], 19.0);
     }
 
-    #[test]
-    fn test_merge_segments() {
-        let t1 = vec![0.0, 1.0, 2.0, 3.0];
-        let s1 = vec![[0.0; 6], [1.0; 6], [2.0; 6], [3.0; 6]];
-        let t2 = vec![3.0, 4.0, 5.0];
-        let s2 = vec![[3.0; 6], [4.0; 6], [5.0; 6]];
-
-        let segments = vec![(t1, s1), (t2, s2)];
-        let merged = merge_segments(segments, &[(0, 1)]);
-
-        assert_eq!(merged.len(), 1);
-        // 合并后：[0,1,2,3] + [4,5] = 6个点（去掉重叠的3）
-        assert_eq!(merged[0].0.len(), 6);
-        assert_eq!(merged[0].0[0], 0.0);
-        assert_eq!(merged[0].0[5], 5.0);
-    }
 }

@@ -13,6 +13,7 @@ spice = ["dep:cspice", "dep:cspice-sys", "e2m2e-forces/spice", "e2m2e-spice/spic
 
 [dependencies]
 pyo3 = { workspace = true }
+rayon = { workspace = true }
 e2m2e-forces = { path = "../e2m2e-forces" }
 e2m2e-propagation = { path = "../e2m2e-propagation", features = ["pyo3"] }
 e2m2e-spice = { path = "../e2m2e-spice" }
