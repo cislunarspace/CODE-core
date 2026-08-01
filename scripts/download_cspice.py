@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import shutil
 import sys
 import urllib.request
 import zipfile
@@ -71,6 +72,15 @@ def _ensure_extracted(cache_dir: pathlib.Path) -> pathlib.Path:
         zf.extractall(cache_dir)
     if not target.is_dir():
         raise SystemExit(f"解压后未找到 {subdir}/（zip 结构异常）")
+    # 平台修补：cspice-sys 用 ``rustc-link-lib=static=cspice`` 链接，
+    # Linux 下 cargo 找 ``libcspice.a``，但 MICE 包 lib/ 只带 ``cspice.a``
+    # （官方 downloadcspice 分支会重命名，CSPICE_DIR 路径不会）。
+    if platform_name == "linux":
+        src = target / "lib" / "cspice.a"
+        dst = target / "lib" / "libcspice.a"
+        if src.is_file() and not dst.is_file():
+            shutil.copyfile(src, dst)
+            print(f"已生成 {dst}（cspice-sys 需要 libcspice.a）", file=sys.stderr)
     return target
 
 
