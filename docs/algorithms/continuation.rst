@@ -85,4 +85,3 @@ Halo 轨道有专用的延拓编排，结合 Richardson 三阶解析近似和延
 - ``continuation.termination_reason`` — 终止原因（如“步长过小，延拓终止”）
 - ``continuation.continuation_stats`` — 成功/失败步数等统计信息
 
-可运行示例见 ``examples/continuation_example.py``。

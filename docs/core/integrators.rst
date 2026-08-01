@@ -350,4 +350,3 @@ Python↔Rust 跨界。这两个入口不直接面向用户，由
 
    import numpy as np
 
-可运行示例见 ``examples/integrator_comparison.py``。

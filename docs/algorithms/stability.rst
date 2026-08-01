@@ -126,4 +126,3 @@ Floquet 理论
 - Hairer E, Nørsett S P, Wanner G. *Solving Ordinary Differential Equations I*, Chapter IV.8.
 - Howell K C. *Three-dimensional, periodic, 'halo' orbits*, 1983.
 
-可运行示例见 ``examples/stability_analysis.py``。

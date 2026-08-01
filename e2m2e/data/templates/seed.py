@@ -14,7 +14,7 @@ CHAR_PERIOD_SEC = 27.32 * 86400.0
 #: 月球平均半径（km），NRHO 近月点高度的起算面
 MOON_RADIUS_KM = 1737.4
 
-#: DRO 族标准种子（examples/orbit_design.py 验证过的初值）
+#: DRO 族标准种子（examples/main_design.py 等验证过的初值）
 _DRO_SEED_X0 = 0.79188556619742
 _DRO_SEED_VY0 = 0.53682
 _DRO_SEED_PERIOD = 3.0

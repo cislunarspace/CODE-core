@@ -94,7 +94,7 @@ print("力模型配置      :", result.force_config)
 
 `Facade.design_orbit` 是任务级一档接口（ADR 0014）：把 CR3BP 初猜、星历修正、长期预报串成一条调用。同属 Facade 的能力还有轨道保持 `control_orbit`，以及 DRO/NRHO/Lissajous/L4/L5 等其他轨道类型（改 `orbit_type` 与对应形状参数即可）。
 
-更多示例（星历动力学、多重打靶、转移设计、可视化）见[在线文档](https://cislunarspace.github.io/e2m2e/)和 [`examples/`](examples/) 目录；其中 `orbit_design.py` 等仍为低层 CR3BP API（微分修正 + 延拓生成轨道族），适合需要细粒度控制算法的场景。需要 DFH 格式标称星历文件时，可用 `e2m2e.algorithm.design.design_orbit`（其返回结果含 `ephemeris` 与 `write_ephemeris`）。
+可运行示例见 [`examples/`](examples/) 目录：`main_design.py`（轨道设计）、`main_control.py`（轨道保持）、`main_transfer.py`（转移轨道）、`main_propagate.py`（轨道预报），均支持 `--save` 存图为 PNG。更多示例（星历动力学、多重打靶、转移设计、可视化）见[在线文档](https://cislunarspace.github.io/e2m2e/)。需要 DFH 格式标称星历文件时，可用 `e2m2e.algorithm.design.design_orbit`（其返回结果含 `ephemeris` 与 `write_ephemeris`）。
 
 ## 使命与进度
 

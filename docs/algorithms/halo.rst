@@ -94,4 +94,3 @@ NRHO（近直线晕轨道）
 - Richardson D L. Analytical construction of a periodic solution about the collinear points[J]. *Celestial Mechanics*, 1980, 22(3): 303-320.
 - Howell K C. Three-dimensional, periodic, 'halo' orbits in the restricted three-body problem[D]. Stanford University, 1983.
 
-可运行示例见 ``examples/halo_orbit_design.py``。

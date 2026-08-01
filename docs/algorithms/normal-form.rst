@@ -85,4 +85,3 @@
 - 中心流形化简：``CenterManifoldReducer``
 - 表征参数目录：``LibrationCatalogTransformer``
 
-可运行示例见 ``examples/normal_form_example.py``。
