@@ -301,8 +301,10 @@ class ForceModel:
 
     # ── Rust propagate_compiled 快速路径（spice feature 启用时） ──
 
-    # 不支持雅可比的力模型类型（SRP、相对论修正），STM 路径需排除。
-    _STM_UNSUPPORTED_TYPES = ("SolarRadiationPressure", "RelativisticCorrection")
+    # Rust STM 路径不支持的力模型类型：`acceleration_and_jacobian` 对
+    # 其余力（含 SRP）都有解析或 Rust 内有限差分雅可比，仅相对论修正
+    # 返回 Err（compiled.rs `_ => Err`）。
+    _STM_UNSUPPORTED_TYPES = ("RelativisticCorrection",)
 
     def _can_use_rust_path(self) -> bool:
         """检测所有 force 是否支持 Rust 编译 + spice feature 是否启用。
@@ -327,7 +329,8 @@ class ForceModel:
         条件：
         1. ``propagate_compiled_stm_py`` 可 import（spice feature 启用）
         2. 所有启用的 force 都有 ``to_rust_spec``
-        3. 无 SRP / Relativistic 等不支持雅可比的力模型
+        3. 无 Relativistic 等 Rust 侧无雅可比的力模型（SRP 允许——
+           Rust 内有限差分雅可比，不跨语言边界，比 Python 侧差分快一个量级）
         """
         try:
             from e2m2e._integrators import propagate_compiled_stm_py  # noqa: F401
