@@ -337,9 +337,18 @@ def test_cr3bp_hamiltonian_linearization_is_hamiltonian(l1_context):
     ev = np.linalg.eigvals(M_H)
     lam_num = max(abs(e.real) for e in ev)
     om_num = sorted(abs(e.imag) for e in ev if abs(e.real) < 1e-8)
-    assert abs(lam_num - l1_context.characteristic_exponent) < 0.01 * l1_context.characteristic_exponent
-    assert abs(om_num[0] - l1_context.central_frequencies[1]) < 0.01 * l1_context.central_frequencies[1]
-    assert abs(om_num[-1] - l1_context.central_frequencies[0]) < 0.01 * l1_context.central_frequencies[0]
+    assert (
+        abs(lam_num - l1_context.characteristic_exponent)
+        < 0.01 * l1_context.characteristic_exponent
+    )
+    assert (
+        abs(om_num[0] - l1_context.central_frequencies[1])
+        < 0.01 * l1_context.central_frequencies[1]
+    )
+    assert (
+        abs(om_num[-1] - l1_context.central_frequencies[0])
+        < 0.01 * l1_context.central_frequencies[0]
+    )
 
 
 def test_real_normal_form_transform_is_symplectic_diagonalizing(l1_context):
@@ -364,9 +373,18 @@ def test_real_normal_form_transform_is_symplectic_diagonalizing(l1_context):
     assert D_check[0, 0] > 0
     assert D_check[1, 4] > D_check[2, 5] > 0
     # 还原的 D 与 qiao 权威频率一致（1% 内）
-    assert abs(D_check[0, 0] - l1_context.characteristic_exponent) < 0.01 * l1_context.characteristic_exponent
-    assert abs(D_check[1, 4] - l1_context.central_frequencies[0]) < 0.01 * l1_context.central_frequencies[0]
-    assert abs(D_check[2, 5] - l1_context.central_frequencies[1]) < 0.01 * l1_context.central_frequencies[1]
+    assert (
+        abs(D_check[0, 0] - l1_context.characteristic_exponent)
+        < 0.01 * l1_context.characteristic_exponent
+    )
+    assert (
+        abs(D_check[1, 4] - l1_context.central_frequencies[0])
+        < 0.01 * l1_context.central_frequencies[0]
+    )
+    assert (
+        abs(D_check[2, 5] - l1_context.central_frequencies[1])
+        < 0.01 * l1_context.central_frequencies[1]
+    )
 
 
 # ---------------------------------------------------------------------------

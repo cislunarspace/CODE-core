@@ -180,7 +180,7 @@ _D[5, 5] = 1.0 / np.sqrt(2.0)
 _D[5, 2] = 1j / np.sqrt(2.0)
 
 #: ``D`` 的逆（预计算，供实变换复用）。
-_D_INV: npt.NDArray[np.complex128] = np.linalg.inv(_D)
+_D_INV: npt.NDArray[np.complex128] = np.linalg.inv(_D).astype(np.complex128)
 
 
 def _add_exp(pow_tuple: tuple[int, ...], idx: int, delta: int) -> tuple[int, ...]:
@@ -690,7 +690,7 @@ def _lie_transform_step(
                 k: v for k, v in H_by_order[order].items() if delete_criterion(k, eliminated)
             }
             if not H_by_order[order]:
-                H_by_order[order] = {(0, 0, 0, 0, 0, 0): np.zeros(N)}
+                H_by_order[order] = {(0, 0, 0, 0, 0, 0): np.zeros(N, dtype=complex)}
 
     # 化简各阶
     H_by_order = {o: polylist_simplify(v) for o, v in H_by_order.items() if v}
@@ -787,7 +787,11 @@ class CenterManifoldReducer:
         N = tlist.size
 
         # 组装初始 Hamiltonian 多项式表 {order: {pow: coef}}
-        H_by_order = self._assemble_hamiltonian(qf_result, hamiltonian_terms, tlist, N, lam, wp, wv)
+        # 系数在化简循环中在实/复坐标间切换（虚变换 → 复，取实部 → 实），
+        # 故此处用 Any（numpy dtype 跨域，静态类型无法追踪）。
+        H_by_order: Any = self._assemble_hamiltonian(
+            qf_result, hamiltonian_terms, tlist, N, lam, wp, wv
+        )
 
         W_all: dict[str, dict[int, dict[tuple[int, ...], npt.NDArray[np.complex128]]]] = {}
         steps_done: list[str] = []

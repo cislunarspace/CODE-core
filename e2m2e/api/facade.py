@@ -215,14 +215,12 @@ class Facade:
 
     @mcp_exposed
     def relative_motion(self, **params) -> Any:
-        """相对运动（二档）：薄封装 algorithm/proximity。"""
-        from e2m2e.algorithm.proximity import RelativeDynamics
+        """相对运动（二档）。
 
-        chief = params.get("chief")
-        deputy = params.get("deputy")
-        if chief is None or deputy is None:
-            raise OrbitError("INVALID_PARAMS", "chief/deputy 参数必填")
-        return RelativeDynamics(chief=chief, deputy=deputy)
+        实现状态：占位。待接入 algorithm/proximity 的 RelativeDynamics。
+        chief/deputy 参数需映射为 TargetOrbit + dynamics 对象后接入。
+        """
+        raise NotImplementedError("Facade.relative_motion 待接入 algorithm/proximity/")
 
 
 def mcp_tools(facade: Facade) -> list[str]:

@@ -131,7 +131,7 @@ def real_normal_form_transform(
     v_pos: npt.NDArray[np.complexfloating] | None = None  # +λ
     v_neg: npt.NDArray[np.complexfloating] | None = None  # -λ
     v_imag: list[tuple[float, npt.NDArray[np.complexfloating]]] = []  # +iω 族
-    for ev, vec in zip(eigvals, eigvecs.T):
+    for ev, vec in zip(eigvals, eigvecs.T, strict=True):
         if abs(ev.imag) <= tol:  # 实特征值 ±λ
             if ev.real > 0 and v_pos is None:
                 v_pos = vec
@@ -564,7 +564,6 @@ def _solve_qf_segmented(
 
     cur_B = B0.copy()
     cur_t = t0
-    seg_idx = 0
 
     def _take_samples(sol, t_lo: float, t_hi: float, start_i: int) -> int:
         """从 dense_output 取 (t_lo, t_hi] 内的 t_arr 采样点，返回下一个下标。"""
@@ -587,7 +586,6 @@ def _solve_qf_segmented(
         # 段末投影，作为下段初值
         cur_B = symplectic_project(sol.y[:, -1].reshape(6, 6)).ravel()
         cur_t = float(t_end)
-        seg_idx += 1
 
     # 末段：积分到 tf
     if cur_t < tf - 1e-12:
@@ -597,7 +595,7 @@ def _solve_qf_segmented(
         )
         if not sol.success:
             raise RuntimeError(f"QF 末段积分失败：{sol.message}")
-        for k, t in enumerate(sol.t):
+        for k, _t in enumerate(sol.t):
             B_out[next_i + k] = sol.y[:, k].reshape(6, 6)
 
     return B_out
@@ -675,7 +673,7 @@ def _solve_qf_multipoint(
         A36 = np.kron(M0, I6) - np.kron(I6, D.T)
         Phi_inv_equal = expm(-A36 * node_step)
 
-        B_nodes = [np.zeros((6, 6)) for _ in range(n_nodes)]
+        B_nodes: list[npt.NDArray[np.floating]] = [np.zeros((6, 6)) for _ in range(n_nodes)]
         B_nodes[-1] = I6.copy()  # B_N = I
         for i in range(n_nodes - 2, -1, -1):
             dt = t_nodes[i + 1] - t_nodes[i]
@@ -707,7 +705,6 @@ def _multipoint_thomas(
     I6 = np.eye(6)
     n_nodes = t_nodes.size
     I36 = np.eye(36)
-    rhs36 = _qf_rhs_factory(M_at, D)
 
     # 逐段算 36×36 STM Φ_i：积分 vec(Φ) 的 1296 维流，Φ̇ = A36(t)·Φ，Φ(t0)=I36。
     # 对应 qiao Calc_Phi_QF 的 Dynfunc_Phi_QF（reshape X 为 36×36 再乘 A）。
@@ -732,7 +729,7 @@ def _multipoint_thomas(
 
     # 节点 B 初猜（随机小矩阵，末节点 I）
     rng = np.random.default_rng(0)
-    B = [rng.standard_normal((6, 6)) * 0.1 for _ in range(n_nodes)]
+    B: list[npt.NDArray[np.floating]] = [rng.standard_normal((6, 6)) * 0.1 for _ in range(n_nodes)]
     B[-1] = np.eye(6)
 
     # 高斯-牛顿迭代
@@ -818,6 +815,7 @@ def _densify_b_multipoint(
 
         if M_const:
             # 解析段 STM
+            assert A36_const is not None  # M_const 分支必然已初始化
             phi_t = expm(A36_const * dt)
             B_out[i] = (phi_t @ B_nodes[k].ravel()).reshape(6, 6)
         else:

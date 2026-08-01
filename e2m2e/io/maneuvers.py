@@ -53,10 +53,12 @@ def _format_delta_v(v: float) -> str:
     return f"{v:>22.15f}"
 
 
-def write_maneuvers(table: ManeuverTable, path: str | Path) -> None:
-    """把机动序列表写入 MANEUVERS.TXT。"""
+def write_maneuvers(table: ManeuverTable, path: str | Path) -> Path:
+    """把机动序列表写入 MANEUVERS.TXT，返回写入的文件路径。"""
     lines = [
         f"{mjd:>20.10f}{_format_delta_v(dv)}"
         for mjd, dv in zip(table.mjd_tdb, table.delta_v_mps, strict=True)
     ]
-    Path(path).write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+    out = Path(path)
+    out.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+    return out

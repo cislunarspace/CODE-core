@@ -281,7 +281,10 @@ CONTROL_CASES: dict[str, dict] = {
         "special_mode": 1,
         "interval_day": 15.0,
         "input_eph": "EPHEMERIDES_DESIGN_NRHO_L2_NORTH_1Y.TXT",
-        "input_design": ("NRHO", {"collinear_point": 2, "north_south": 1, "perilune_height": 3500.0, "phase": 0.5}),
+        "input_design": (
+            "NRHO",
+            {"collinear_point": 2, "north_south": 1, "perilune_height": 3500.0, "phase": 0.5},
+        ),
     },
     "tight": {
         "control_mode": 2,
@@ -289,7 +292,10 @@ CONTROL_CASES: dict[str, dict] = {
         "special_mode": 1,
         "interval_day": 15.0,
         "input_eph": "EPHEMERIDES_DESIGN_NRHO_L2_NORTH_1Y.TXT",
-        "input_design": ("NRHO", {"collinear_point": 2, "north_south": 1, "perilune_height": 3500.0, "phase": 0.5}),
+        "input_design": (
+            "NRHO",
+            {"collinear_point": 2, "north_south": 1, "perilune_height": 3500.0, "phase": 0.5},
+        ),
     },
     "special": {
         "control_mode": 3,
@@ -308,7 +314,9 @@ CONTROL_NUM_MONTE_CARLO = 5
 CONTROL_OUTPUT_STEP_SEC = 86400.0
 
 #: 受控星历输出文件名（按控制模式，对齐 DFH）
-_CONTROL_EPH_NAMES = {1: "EPHEMERIDES_LOOSE.TXT", 2: "EPHEMERIDES_TIGHT.TXT", 3: "EPHEMERIDES_SPECIAL.TXT"}
+_CONTROL_EPH_NAMES = {
+    1: "EPHEMERIDES_LOOSE.TXT", 2: "EPHEMERIDES_TIGHT.TXT", 3: "EPHEMERIDES_SPECIAL.TXT"
+}
 
 
 def _run_dfh_control(lines: list[str], prefix: str) -> tuple[Path, Path, Path]:
@@ -362,7 +370,8 @@ def _run_dfh_control(lines: list[str], prefix: str) -> tuple[Path, Path, Path]:
                 print(f"  {src.name} 未产出（跳过）")
                 continue
             shutil.copyfile(src, out)
-            print(f"  {out.name}（{sum(1 for ln in out.read_text().splitlines() if ln.strip())} 行）")
+            n_lines = sum(1 for ln in out.read_text().splitlines() if ln.strip())
+            print(f"  {out.name}（{n_lines} 行）")
         if not eph_src.is_file():
             raise RuntimeError(f"DFH 未产出受控星历 {eph_src.name}")
         eph_out = FIXTURE_DIR / f"EPHEMERIDES_{prefix}.TXT"

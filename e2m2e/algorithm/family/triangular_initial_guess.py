@@ -124,11 +124,13 @@ def compute_triangular_initial_guess(
     """
     omega_s, v_s, omega_l, v_l, _omega_v, v_z, x_L = _triangular_modes(system, point)
     l_c = system.characteristic_length
+    # 调用约定保证系统已初始化特征尺度（模块内只算平动点不设尺度）
+    assert l_c is not None
 
-    # 振幅归一化：位置偏移最大 km → 无量纲系数
-    alpha_s = (0.5 * amplitude_in_km / l_c) / np.linalg.norm(v_s[:3])
-    alpha_l = (0.5 * amplitude_in_km / l_c) / np.linalg.norm(v_l[:3])
-    beta = (amplitude_out_km / l_c) / np.linalg.norm(v_z[:3])
+    # 振幅归一化：位置偏移最大 km → 无量纲系数（np.linalg.norm 返回 numpy 标量，包 float）
+    alpha_s = float((0.5 * amplitude_in_km / l_c) / np.linalg.norm(v_s[:3]))
+    alpha_l = float((0.5 * amplitude_in_km / l_c) / np.linalg.norm(v_l[:3]))
+    beta = float((amplitude_out_km / l_c) / np.linalg.norm(v_z[:3]))
     phi = float(phase_in) * 2.0 * np.pi
     psi = float(phase_out) * 2.0 * np.pi
 

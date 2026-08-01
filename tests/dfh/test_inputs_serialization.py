@@ -222,7 +222,9 @@ class TestFmtInputsPropagate:
 
     def test_earth_moon_degree(self):
         """L263/L264 阶次数与输入一致。"""
-        lines = format_inputs_propagate(**{**self.PROP_PARAMS, "earth_degree": 20, "moon_degree": 15})
+        lines = format_inputs_propagate(
+            **{**self.PROP_PARAMS, "earth_degree": 20, "moon_degree": 15}
+        )
         assert _value(lines[262]) == [20.0]
         assert _value(lines[263]) == [15.0]
 

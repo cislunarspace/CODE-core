@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -82,6 +82,43 @@ class TargetOrbit:
         return (1 - w) * self._states[idx] + w * self._states[idx + 1]
 
 
+class _SystemLike(Protocol):
+    """动力学系统协议的最小接口（仅声明 `mu`）。"""
+
+    mu: float
+
+
+class DynamicsLike(Protocol):
+    """鸭子类型协议：描述 ``CR3BP_Dynamics`` / ``EphemerisDynamics`` 的公共接口。
+
+    相对运动动力学模块通过此协议访问底层绝对动力学对象，不依赖具体类。
+    """
+
+    system: _SystemLike
+
+    @overload
+    def compute_jacobian_A(self, state: npt.NDArray[np.floating]) -> np.ndarray: ...
+
+    @overload
+    def compute_jacobian_A(
+        self, t: float, state: npt.NDArray[np.floating]
+    ) -> np.ndarray: ...
+
+    def propagate(
+        self,
+        initial_state: npt.ArrayLike,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None = None,
+        with_stm: bool = False,
+        with_jacobi: bool = False,
+        events: None = None,
+    ) -> dict[str, Any]: ...
+
+    def equations_of_motion(
+        self, t: float, state: npt.NDArray[np.floating]
+    ) -> npt.NDArray[np.floating]: ...
+
+
 class RelativeDynamics:
     """相对运动动力学（RLM 时变线性化）。
 
@@ -95,7 +132,7 @@ class RelativeDynamics:
     ``propagate(..., with_stm=True)`` 即可。
     """
 
-    def __init__(self, target: TargetOrbit, dynamics: object) -> None:
+    def __init__(self, target: TargetOrbit, dynamics: DynamicsLike) -> None:
         self.target = target
         self.dynamics = dynamics
 

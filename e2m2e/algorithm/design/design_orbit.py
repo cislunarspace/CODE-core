@@ -413,6 +413,7 @@ def _build_ephemeris_table(
     质心归一（月球在 1-mu），x 分量加 mu 平移对齐。
     """
     t_c = syn_j2000.cr3bp_system.characteristic_time
+    assert t_c is not None
     t_syn = (et_grid - et0) / t_c
     synodic = syn_j2000.batch_j2000_to_synodic(states, t_syn, et0)[:, :3]
     synodic[:, 0] += syn_j2000.cr3bp_system.mu
@@ -555,6 +556,7 @@ def design_orbit(
     jacobi = float(system.get_jacobi_constant(cr3bp_orbit.states[0]))
 
     # --- 2. 相位 → 历元状态，采样 patch points，转 J2000 ---
+    assert cr3bp_orbit.period is not None
     period = float(cr3bp_orbit.period)
     # 相位零点约定：Halo/NRHO 的参考状态（y=0 穿越点）与 DFH 黄金样本的
     # phase=0 起点一致；DRO 的参考状态是近侧穿越点，而 DFH 相位零点在远侧
@@ -584,6 +586,7 @@ def design_orbit(
     epoch_iso = _epoch_to_iso(epoch)
     et0 = spice.utc_to_et(epoch_iso)
     t_c = system.characteristic_time
+    assert t_c is not None
     syn_j2000 = SynodicJ2000System(cr3bp_system=system, spice=spice)
     state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
         states_syn=state_patch_syn, t_syn_arr=t_patch_syn, et0=et0

@@ -116,11 +116,13 @@ def compute_lissajous_initial_guess(
 
     omega_xy, v_xy, omega_z, v_z, x_L = _linear_modes(system, collinear_point)
     l_c = system.characteristic_length
+    # 调用约定保证系统已初始化特征尺度（模块内只算平动点不设尺度）
+    assert l_c is not None
 
     # 振幅归一化：α、β 是位置振幅，但特征向量 v 的位置部分模长不一定是 1。
     # 把振幅解释为"面内/面外位置偏移的最大 km"，则 α = (km/l_c) / |v_pos|。
-    alpha = (amplitude_in_km / l_c) / np.linalg.norm(v_xy[:3])
-    beta = (amplitude_out_km / l_c) / np.linalg.norm(v_z[:3])
+    alpha = float((amplitude_in_km / l_c) / np.linalg.norm(v_xy[:3]))
+    beta = float((amplitude_out_km / l_c) / np.linalg.norm(v_z[:3]))
     phi = float(phase_in) * 2.0 * np.pi
     psi = float(phase_out) * 2.0 * np.pi
 

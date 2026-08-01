@@ -48,7 +48,7 @@ class SafetyRegion:
         d = point - self.center
         dist = np.linalg.norm(d)
         if self.shape == "sphere":
-            return dist <= self.radius
+            return bool(dist <= self.radius)
         # cone
         if self.cone_axis is None or self.cone_half_angle is None:
             raise ValueError("cone 安全域需 cone_axis 和 cone_half_angle")
@@ -58,13 +58,13 @@ class SafetyRegion:
         # 锥内：径向距离 <= 轴向距离 * tan(半顶角)，且轴向距离在 [0, 深度] 内
         if axial < 0:
             return False
-        return radial <= axial * np.tan(self.cone_half_angle)
+        return bool(radial <= axial * np.tan(self.cone_half_angle))
 
     def distance_to(self, point: npt.ArrayLike) -> float:
         """点到安全域边界的有向距离（正=外部，负=内部）。"""
         point = np.asarray(point, dtype=float)
         d = point - self.center
-        dist = np.linalg.norm(d)
+        dist = float(np.linalg.norm(d))
         if self.shape == "sphere":
             return dist - self.radius
         # cone：近似用球距离

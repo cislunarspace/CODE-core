@@ -128,7 +128,10 @@ def _project_hamiltonian_to_qf_sympy(
     # 把每个符号系数编译成 lambda(b11,b12,...,b66)，一次性向量化求值
     # 整条时间序列（B(t) 的 36 个元素逐时刻作为数组参数，numpy 广播）。
     b_list = list(b_syms)
-    lambdas = {pow_tuple: sp.lambdify(b_list, expr, "numpy") for pow_tuple, expr in symbolic.items()}
+    lambdas = {
+        pow_tuple: sp.lambdify(b_list, expr, "numpy")
+        for pow_tuple, expr in symbolic.items()
+    }
     B_all = np.stack([np.asarray(qf_result.B(t), dtype=float).ravel() for t in tlist])  # (N, 36)
 
     result: dict[tuple[int, ...], npt.NDArray[np.floating]] = {}

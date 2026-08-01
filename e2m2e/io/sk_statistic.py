@@ -18,7 +18,10 @@ import numpy as np
 
 from e2m2e.data.types.sk_statistic import COLUMNS, SKStatistic
 
-__all__ = ["SKStatistic", "COLUMNS", "parse_sk_statistic", "read_sk_statistic", "write_sk_statistic"]
+__all__ = [
+    "SKStatistic", "COLUMNS", "parse_sk_statistic",
+    "read_sk_statistic", "write_sk_statistic",
+]
 
 _NUM_RE = re.compile(r"[+-]?\d*\.?\d+(?:[eE][+-]?\d+)?")
 _FAILED_RE = re.compile(r"is\s+(\d+)")
@@ -54,12 +57,14 @@ def read_sk_statistic(path: str | Path) -> SKStatistic:
     return parse_sk_statistic(Path(path).read_text(encoding="utf-8"))
 
 
-def write_sk_statistic(stats: SKStatistic, path: str | Path) -> None:
-    """把统计表写入 SK_STATISTIC.TXT。"""
+def write_sk_statistic(stats: SKStatistic, path: str | Path) -> Path:
+    """把统计表写入 SK_STATISTIC.TXT，返回写入的文件路径。"""
     lines = []
     for i, row in enumerate(stats.rows, start=1):
         cols = "".join(f"{v:>20.15f}" for v in row)
         lines.append(f"{i:>12d}{cols}")
     if stats.num_failed is not None:
         lines.append(f"The number of failed Monte Carlo tests is {stats.num_failed}")
-    Path(path).write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+    out = Path(path)
+    out.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+    return out

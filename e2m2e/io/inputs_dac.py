@@ -519,7 +519,9 @@ def format_inputs_control(
         *theory_pert,  # L170-178
         *real_pert,  # L179-187
         *dyb_block,  # L188-196
-        _valrow(f"{ecom_error_level:.2f}", 30, "ECOM模型三个方向上各系数的误差量级（百分比/100）"),  # L197
+        _valrow(
+            f"{ecom_error_level:.2f}", 30, "ECOM模型三个方向上各系数的误差量级（百分比/100）"
+        ),  # L197
         _valrow(earth_degree, 30, "地球非球形引力位阶次数（控制计算理论模型）"),  # L198
         _valrow(moon_degree, 30, "月球非球形引力位阶次数（控制计算理论模型）"),  # L199
         _valrow(real_earth_degree, 30, "地球非球形引力位阶次数（模拟的实际力模型）"),  # L200

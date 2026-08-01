@@ -93,7 +93,9 @@ class SpecialPointLaw:
 
     def __post_init__(self) -> None:
         if self.special_mode not in (1, 2):
-            raise ValueError(f"special_mode 必须为 1（Lissajous）或 2（halo/NRHO），当前 {self.special_mode}")
+            raise ValueError(
+                f"special_mode 必须为 1（Lissajous）或 2（halo/NRHO），当前 {self.special_mode}"
+            )
         if self.crossings < 1:
             raise ValueError(f"crossings 必须 >= 1，当前 {self.crossings}")
 
@@ -153,7 +155,6 @@ class SpecialPointLaw:
         res = propagator.propagate_with_stm(state0, t0, t_eval)
         states = np.asarray(res["states"])
         times = np.asarray(res["time"])
-        stm = np.asarray(res["stm"])
 
         syn_states = synodic.to_synodic(states, times)
         y = syn_states[:, 1]

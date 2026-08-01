@@ -24,7 +24,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import numpy.typing as npt
 
 if TYPE_CHECKING:
     pass
@@ -227,18 +226,19 @@ def poly_subs(
     # 如 B 矩阵元素 b_ij）。若出现其他「坐标名」（如 y1），说明调用方
     # 用错了命名——expr2poly 会把它误当常数，静默返回错误结果。
     allowed_coord_names = {"q1", "q2", "q3", "p1", "p2", "p3"}
+    disallowed_coord_names = {
+        "y1", "y2", "y3", "y4", "y5", "y6",
+        "x1", "x2", "x3", "x4", "x5", "x6",
+    }
     for replacement in subs_map.values():
         for sym in getattr(replacement, "free_symbols", set()):
-            if (
-                getattr(sym, "name", None)
-                and sym.name in {"y1", "y2", "y3", "y4", "y5", "y6", "x1", "x2", "x3", "x4", "x5", "x6"}
-            ):
+            if getattr(sym, "name", None) and sym.name in disallowed_coord_names:
                 raise ValueError(
                     f"新变量 {sym.name!r} 命名非法：替换后的变量必须命名为 "
                     f"{sorted(allowed_coord_names)}，否则 expr2poly 会误当常数。"
                 )
 
-    expr = poly2expr(poly, variables=tuple(subs_map.keys()))
+    expr: Any = poly2expr(poly, variables=tuple(subs_map.keys()))
     substituted = expr.subs(subs_map)
     expanded = sp.expand(substituted)
     return expr2poly(expanded)
@@ -320,17 +320,18 @@ def poly_simplify(
 
 
 def polylist_simplify(
-    poly: Mapping[tuple[int, ...], npt.NDArray[np.floating]],
+    poly: Mapping[tuple[int, ...], Any],
     eps: float = 1e-15,
-) -> dict[tuple[int, ...], npt.NDArray[np.floating]]:
+) -> dict[tuple[int, ...], Any]:
     """数值版 ``poly_simplify``：合并同幂次项，剔除均幅值过小的时间序列。
 
     与 qiao ``polylist_simplify`` 等价，使用 ``mean abs`` 作为阈值。
+    系数为时间序列 ``ndarray``（实或复值皆可，仅做幅值阈值与逐项累加）。
     """
     if not poly:
         return {(0,) * N_VARIABLES: np.zeros(1)}
 
-    result: dict[tuple[int, ...], npt.NDArray[np.floating]] = {}
+    result: dict[tuple[int, ...], Any] = {}
     for pow_tuple, coef in poly.items():
         key = tuple(int(p) for p in pow_tuple)
         mean_abs = float(np.mean(np.abs(coef)))

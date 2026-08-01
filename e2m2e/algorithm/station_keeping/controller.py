@@ -39,7 +39,9 @@ _EPHEMERIS_NAMES = {1: "EPHEMERIDES_LOOSE", 2: "EPHEMERIDES_TIGHT", 3: "EPHEMERI
 
 #: e2m2e 能力边界内的默认摄动开关：球模型光压、关耦合项（MATLAB 默认
 #: 分别为 ECOM 与开，e2m2e 未实现，#253）
-_DEFAULT_CTRL_PERTURBATION: dict[str, int] = {**DEFAULT_PERTURBATION, "solar_radiation": 1, "coupling": 0}
+_DEFAULT_CTRL_PERTURBATION: dict[str, int] = {
+    **DEFAULT_PERTURBATION, "solar_radiation": 1, "coupling": 0
+}
 
 
 @dataclass
@@ -151,9 +153,13 @@ def control_orbit(
         NotImplementedError: 摄动开关含 ECOM 光压或耦合项（#253）
     """
     if control_mode not in (1, 2, 3):
-        raise ValueError(f"control_mode 必须为 1/2/3（角动量管理 4-6 归属 #261），当前 {control_mode}")
+        raise ValueError(
+            f"control_mode 必须为 1/2/3（角动量管理 4-6 归属 #261），当前 {control_mode}"
+        )
     if special_mode not in (1, 2):
-        raise ValueError(f"special_mode 必须为 1（Lissajous）或 2（Halo/NRHO），当前 {special_mode}")
+        raise ValueError(
+            f"special_mode 必须为 1（Lissajous）或 2（Halo/NRHO），当前 {special_mode}"
+        )
     if num_monte_carlo < 1:
         raise ValueError(f"num_monte_carlo 必须 >= 1，当前 {num_monte_carlo}")
     if num_controls < 1:
@@ -178,7 +184,10 @@ def control_orbit(
     kernel_dir = kernel_dir or default_kernel_dir()
 
     system = EphemerisSystem(
-        bodies=["SUN", "EARTH", "MOON", "MARS", "JUPITER", "SATURN", "VENUS", "MERCURY", "URANUS", "NEPTUNE"],
+        bodies=[
+            "SUN", "EARTH", "MOON", "MARS", "JUPITER",
+            "SATURN", "VENUS", "MERCURY", "URANUS", "NEPTUNE",
+        ],
         spice=spice,
         origin="EARTH",
     )

@@ -520,7 +520,6 @@ def _build_dynamics_rhs_circular(
     是月球位置、``ω=ẑ``。此形式由 qiao ``Dynfunc_rho`` 第 69 行的
     ``−μ_m·rm/|rm|³ − r0dotdot``（平动点平衡条件）消去常数项得到。
     """
-    mu = float(context.mu)
     mu_e = float(context.mu_e)  # 归一化地球引力常数（≈1−μ）
     mu_m = float(context.mu_m)  # 归一化月球引力常数（≈μ）
     r0 = np.asarray(context.libration_position, dtype=float).ravel()

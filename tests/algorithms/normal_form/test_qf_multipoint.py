@@ -57,14 +57,11 @@ def _max_symplectic_error(B_samples: np.ndarray) -> float:
 class TestSolveQfMultipoint:
     """多点打靶求解 B(t) 的正确性与稳定性。"""
 
-    def test_short_window_matches_single_integral(self, l2_M_D):
-        """短窗口（T=1.6 TU）：多点打靶结果应接近单次积分（B(0)=I 初值）。"""
+    def test_short_window_symplectic(self, l2_M_D):
+        """短窗口（T=1.6 TU）：多点打靶的辛性应接近机器精度。"""
         M_at, D, lam = l2_M_D
         tlist = np.linspace(0, 1.6, 40)
-        # 单次积分（B(0)=I）
-        from e2m2e.algorithm.normal_form.quasi_floquet import _solve_qf_matrix
-        B_single = _solve_qf_matrix(M_at, D, tlist, segment=None)
-        # 多点打靶（B(T)=I 末值）——不同边界条件，但短窗口两者量级应可比
+        # 多点打靶（B(T)=I 末值）
         B_mp = _solve_qf_multipoint(M_at, D, tlist, node_step=0.4)
         # 多点打靶辛性应好
         assert _max_symplectic_error(B_mp) < 1e-6

@@ -78,8 +78,8 @@ def read_ephemeris(path: str | Path) -> EphemerisTable:
     return parse_ephemeris(raw)
 
 
-def write_ephemeris(table: EphemerisTable, path: str | Path) -> None:
-    """按 DFH 格式写出星历文件（CRLF 行尾，UTF-8 无 BOM）。"""
+def write_ephemeris(table: EphemerisTable, path: str | Path) -> Path:
+    """按 DFH 格式写出星历文件（CRLF 行尾，UTF-8 无 BOM），返回写入的文件路径。"""
     lines = []
     for k in range(len(table)):
         head = (
@@ -92,4 +92,6 @@ def write_ephemeris(table: EphemerisTable, path: str | Path) -> None:
             + list(table.synodic_position[k])
         )
         lines.append(head + "".join(f"{v:25.12f}" for v in nums))
-    Path(path).write_bytes(("\r\n".join(lines) + "\r\n").encode("utf-8"))
+    out = Path(path)
+    out.write_bytes(("\r\n".join(lines) + "\r\n").encode("utf-8"))
+    return out

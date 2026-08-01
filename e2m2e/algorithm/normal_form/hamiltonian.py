@@ -509,21 +509,20 @@ def build_cr3bp_hamiltonian(
             mu_val = float(ctx_cr3bp.mu)
             rho_e_ratio = gamma / (1.0 + gamma)  # 地球项 γ/(1+γ)
             pows, coefs = build_cr3bp_hamiltonian_py(mu_val, gamma, rho_e_ratio, deg)
-            numeric: dict[tuple[int, ...], float] = {
+            numeric_rust: dict[tuple[int, ...], float] = {
                 tuple(int(p) for p in pow_t): float(c)
-                for pow_t, c in zip(pows, coefs)
+                for pow_t, c in zip(pows, coefs, strict=True)
             }
             # 与符号路径一致：强制平动点平衡（删一阶项）
-            numeric = {k: v for k, v in numeric.items() if sum(k) != 1}
-            if not numeric:
-                numeric[(0, 0, 0, 0, 0, 0)] = 0.0
-            return numeric
+            numeric_rust = {k: v for k, v in numeric_rust.items() if sum(k) != 1}
+            if not numeric_rust:
+                numeric_rust[(0, 0, 0, 0, 0, 0)] = 0.0
+            return numeric_rust
 
     legendre = expand_legendre_1_over_r(max_degree=deg)
     H_sym = build_hamiltonian(ctx_cr3bp, legendre, max_degree=deg, store_sources=False)
 
     # CR3BP 常数参数（会合系，角速度 ω=ẑ 无量纲化为 1）。
-    mu = float(ctx_cr3bp.mu)
     x_lp = float(np.asarray(ctx_cr3bp.libration_position, dtype=float).ravel()[0])
 
     # 科里奥利 C_pq = [[0,1,0],[-1,0,0],[0,0,0]]（对应 yp_x − xp_y，论文 3 式 4-5）。
@@ -558,8 +557,11 @@ def build_cr3bp_hamiltonian(
     params["rs0"] = 1.0
 
     # 逐项数值化：对 sympy 系数做 subs 再求 float
+    h_sym_coefs = H_sym.coefficients
+    if not isinstance(h_sym_coefs, dict):
+        raise TypeError("符号路径 build_hamiltonian 应返回 dict 系数")
     numeric: dict[tuple[int, ...], float] = {}
-    for pow_tuple, coef in H_sym.coefficients.items():
+    for pow_tuple, coef in h_sym_coefs.items():
         val = _eval_coef(coef, params)
         if val != 0.0:
             numeric[tuple(int(p) for p in pow_tuple)] = val

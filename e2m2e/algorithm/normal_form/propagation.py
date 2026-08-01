@@ -49,7 +49,8 @@ def _eval_hamiltonian_rhs(
     ``∂/∂x_k (c·x_k^{n_k}·...) = c·n_k·x_k^{n_k-1}·...``）。实现上先算
     ``m``，再乘 ``n_k / x_k`` 等价于乘 ``n_k`` 并把 ``x_k`` 的幂降一次——
     但直接 ``m / x_k`` 在 ``x_k=0`` 时除零。改用：先算不含 ``x_k`` 的部分
-    ``m_{\\bar k} = m / x_k^{n_k}``（解析地，不真的除），再 ``∂/∂x_k = c·n_k·x_k^{n_k-1}·m_{\\bar k}``。
+    ``m_{\\bar k} = m / x_k^{n_k}``（解析地，不真的除），再
+    ``∂/∂x_k = c·n_k·x_k^{n_k-1}·m_{\\bar k}``。
 
     本实现用「逐项累积 + 降幂」：对每项先算 ``m``（完整幂积），再对每个
     非零指数方向，贡献 ``n_k · m / x_k``——但为避免除零，改写成
@@ -175,6 +176,8 @@ def propagate_parametric(
         )
     if nf_result.cm_result is None:
         raise ValueError("nf_result.cm_result 为 None，缺少 Hamiltonian 系数。")
+    if nf_result.qf_result is None:
+        raise ValueError("nf_result.qf_result 为 None，缺少 quasi-Floquet 时间网格。")
 
     rho_state = np.asarray(rho_state, dtype=float)
     t_arr = np.asarray(t_span, dtype=float).ravel()

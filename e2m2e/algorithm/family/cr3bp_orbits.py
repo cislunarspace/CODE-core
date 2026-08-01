@@ -33,6 +33,7 @@ from ...data.templates.seed import (  # noqa: F401
 from ...data.types.orbit import Orbit
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from ..solver.differential_correction import DifferentialCorrection
+from .halo_family import halo_pseudo_arclength_continuation
 from .halo_initial_guess import compute_halo_initial_guess
 from .lissajous_initial_guess import compute_lissajous_initial_guess
 from .triangular_initial_guess import compute_triangular_initial_guess
@@ -62,6 +63,7 @@ def _moon_distance_minmax(
     约 0.3 km），族行走与测试断言用同一函数测量才一致。
     """
     mu = dynamics.system.mu
+    assert orbit.period is not None  # 周期轨道必有 period
     t_eval = np.linspace(0.0, orbit.period, n_points)
     result = dynamics.propagate(orbit.states[0], (0.0, orbit.period), t_eval=t_eval)
     states = result["states"]
@@ -74,6 +76,12 @@ def _correct_or_raise(corrector: DifferentialCorrection, guess: Orbit, label: st
     if orbit is None:
         raise Cr3bpOrbitError(f"{label} 微分修正未收敛: {corrector.termination_reason}")
     return orbit
+
+
+def _require_orbit(o: Orbit | None) -> Orbit:
+    """运行时守卫：seed_orbit 保证 guess 不为 None。"""
+    assert o is not None
+    return o
 
 
 def _walk_family(
@@ -179,12 +187,14 @@ def _correct_dro(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
     else:
         state = guess.states[0].copy()
         state[0] = x0
+        assert guess.period is not None
         period = guess.period
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_2D_symmetric_x_fixed_x0(x0=x0)
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = period
     orbit = _correct_or_raise(corrector, seed, f"DRO(x0={x0:.6f})")
+    assert orbit.period is not None
     if orbit.period > 1.2 * period:
         # 大步长行走时修正器会跳到长周期伪解（多圈对称周期轨道），周期
         # 相对初猜显著变长即判为伪解，交由族行走退半步重试
@@ -211,12 +221,14 @@ def _correct_halo(
     else:
         state = guess.states[0].copy()
         state[2] = z0
+        assert guess.period is not None
         period = guess.period
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_halo_orbit_fixed_z0(z0=z0, libration_point=libration_point)
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = period
     orbit = _correct_or_raise(corrector, seed, f"Halo(L{libration_point}, z0={z0:.6f})")
+    assert orbit.period is not None
     if guess is not None and orbit.period > 1.2 * period:
         # 近月 NRHO 段 STM 条件数高，牛顿步易 overshoot 跳到长周期伪解，
         # 判为失败交由族行走退半步重试（同 ``_correct_dro`` 的处理）
@@ -278,6 +290,7 @@ def design_dro(
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
     du = dynamics.system.characteristic_length
+    assert du is not None
     target_du = amplitude_km / du
 
     def measure(orbit: Orbit) -> float:
@@ -311,6 +324,7 @@ def design_halo(
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
     du = dynamics.system.characteristic_length
+    assert du is not None
     z_target = amplitude_km / du
 
     if abs(z_target) <= _HALO_FOLD_Z0[collinear_point]:
@@ -335,7 +349,9 @@ def design_halo(
 
     seed = _halo_seed_walk(dynamics, collinear_point, z_target)
     return _walk_family(
-        correct_at=lambda x0, guess: _correct_halo_x0(dynamics, x0, collinear_point, guess),
+        correct_at=lambda x0, guess: _correct_halo_x0(
+            dynamics, x0, collinear_point, _require_orbit(guess)
+        ),
         measure=lambda orbit: float(orbit.states[0, 2]),
         target=z_target,
         p_seed=float(seed.states[0, 0]),
@@ -375,7 +391,8 @@ def _walk_pal_to_perilune(
     continuation = Continuation(corrector=DifferentialCorrection(dynamics))
     direction = "positive" if z_sign > 0 else "negative"
 
-    family = continuation.halo_pseudo_arclength_continuation(
+    family = halo_pseudo_arclength_continuation(
+        continuation,
         seed_orbit=seed,
         n_orbits=max_orbits,
         direction=direction,
@@ -421,6 +438,7 @@ def design_nrho(
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
     du = dynamics.system.characteristic_length
+    assert du is not None
     target_du = (perilune_height_km + MOON_RADIUS_KM) / du
     z_sign = 1.0 if north_south == 1 else -1.0
 
@@ -430,6 +448,7 @@ def design_nrho(
             # L1 NRHO 分支上微分修正的参考状态可能落在远月侧 xz 穿越点
             # （z 与北/南约定反号）；同一周期轨道平移半周期即得近月侧
             # 穿越点，z 符号与北/南约定一致
+            assert orbit.period is not None
             state_half = np.asarray(
                 dynamics.propagate_orbit_state_at_time(orbit, orbit.period / 2.0),
                 dtype=float,
@@ -449,7 +468,9 @@ def design_nrho(
         return _moon_distance_minmax(dynamics, orbit)[0]
 
     return _walk_family(
-        correct_at=lambda x0, guess: _correct_halo_x0(dynamics, x0, collinear_point, guess),
+        correct_at=lambda x0, guess: _correct_halo_x0(
+            dynamics, x0, collinear_point, _require_orbit(guess)
+        ),
         measure=measure,
         target=target_du,
         p_seed=float(seed.states[0, 0]),

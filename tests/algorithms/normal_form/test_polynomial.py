@@ -117,7 +117,7 @@ class TestPolySubs:
         x1, x2, x3, x4, x5, x6 = sp.symbols("x1 x2 x3 x4 x5 x6", real=True)
         H = {(4, 0, 0, 0, 0, 0): 7}
         subs_map = {x: v for x, v in zip(
-            [x1, x2, x3, x4, x5, x6], NEW_VARS
+            [x1, x2, x3, x4, x5, x6], NEW_VARS, strict=True
         )}
         result = poly_subs(H, subs_map)
         assert result == {(4, 0, 0, 0, 0, 0): 7}

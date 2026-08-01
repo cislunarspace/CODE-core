@@ -231,11 +231,13 @@ class PropagatorFactory:
         self._max_step = max_step
         self._max_steps = max_steps
 
-    def _forces_py(self, force_config: dict[str, Any], srp_cr_scale: float = 1.0) -> list[tuple[Any, ...]]:
+    def _forces_py(
+        self, force_config: dict[str, Any], srp_cr_scale: float = 1.0
+    ) -> list[tuple[Any, ...]]:
         """力配置 → Rust 元组列表；srp 的 cr 乘上光压弧段误差乘子。"""
         fm = ForceModel.from_config(force_config, self._system)
         out: list[tuple[Any, ...]] = []
-        for entry in fm._entries:  # noqa: SLF001（与 force_model 内部一致）
+        for entry in fm._entries:  # noqa: SLF001  # 与 force_model 内部一致
             if not entry.enabled:
                 continue
             spec = entry.force.to_rust_spec(self._system)
@@ -668,7 +670,9 @@ def run_monte_carlo(
             "bodies": list(getattr(system, "bodies", [])),
             "nominal_ephemeris": nominal_ephemeris,
         }
-        with ProcessPoolExecutor(max_workers=n_workers, initializer=_init_worker, initargs=(worker_params,)) as ex:
+        with ProcessPoolExecutor(
+            max_workers=n_workers, initializer=_init_worker, initargs=(worker_params,)
+        ) as ex:
             results = list(ex.map(_run_sample, [dict(spec, seed=s) for s in seeds]))
     else:
         results = [

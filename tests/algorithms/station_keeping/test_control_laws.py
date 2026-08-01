@@ -117,7 +117,9 @@ class TestLooseTargetPointLaw:
         """测量状态与标称一致时控制量为零。"""
         x_nom = np.array([10.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         law = LooseTargetPointLaw()
-        dv = law.compute_maneuver(x_nom, 0.0, propagator=FreeMotionPropagator(), nominal=NominalState(x_nom))
+        dv = law.compute_maneuver(
+            x_nom, 0.0, propagator=FreeMotionPropagator(), nominal=NominalState(x_nom)
+        )
         np.testing.assert_allclose(dv, 0.0, atol=1e-12)
 
 
