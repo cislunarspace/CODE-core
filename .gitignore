@@ -151,3 +151,7 @@ docs/plans/
 
 # 本地 CSPICE 库（第三方二进制，构建依赖本地安装，不入库）
 cspice/
+# download_cspice.py 的解压缓存（构建时生成）
+.cspice/
+# cspice 运行产生的 Fortran 临时输出
+fort.*
