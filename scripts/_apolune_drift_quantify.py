@@ -102,8 +102,10 @@ def main() -> None:
         )
         i_apo = int(np.argmax(dist_moon))
         t_apo_rel = float(t_dense[i_apo])  # 远月点在圈内的相对时刻
+        apo_dist = dist_moon[i_apo]
+        apo_geod = np.linalg.norm(states_syn[i_apo, :3])
         print(f"CR3BP 远月点: t/T = {t_apo_rel / period:.4f}, "
-              f"距月 {dist_moon[i_apo]:.3f} du, 距地 {np.linalg.norm(states_syn[i_apo, :3]):.4f} du")
+              f"距月 {apo_dist:.3f} du, 距地 {apo_geod:.4f} du")
         print(f"  synodic 坐标 = {states_syn[i_apo, :3]}")
 
         # 各圈远月点（CR3BP tile，转 J2000）
@@ -133,7 +135,7 @@ def main() -> None:
         )
         states_eph = np.asarray(out["states"])
         drift = np.linalg.norm(states_eph[:, :3] - apo_states_j2000[:, :3], axis=1)
-        print(f"\n全摄动自由积分（从首圈 CR3BP 远月点出发）vs 各圈 CR3BP 远月点:")
+        print("\n全摄动自由积分（从首圈 CR3BP 远月点出发）vs 各圈 CR3BP 远月点:")
         print(f"  {'圈':>3} {'|Δr| (km)':>14} {'|Δr|/du':>10} {'|Δv| (km/s)':>14}")
         for k in range(N_REV):
             dv = np.linalg.norm(
@@ -143,8 +145,8 @@ def main() -> None:
 
         # 结论
         d0 = drift[1]  # 第 2 圈远月点偏离（第 1 圈积分终点）
-        print(f"\n结论: 第 1 圈后远月点偏离 = {d0:.3e} km"
-              f"（{'远小于相位敏感点 2e5 km，钉远月点锚定可行' if d0 < 1e4 else '同样大，锚定需谨慎'}）")
+        verdict = "远小于相位敏感点 2e5 km，钉远月点锚定可行" if d0 < 1e4 else "同样大，锚定需谨慎"
+        print(f"\n结论: 第 1 圈后远月点偏离 = {d0:.3e} km（{verdict}）")
     finally:
         spice.unload_kernel(default_kernel_dir())
 

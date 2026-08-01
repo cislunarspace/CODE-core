@@ -137,7 +137,7 @@ def main() -> None:
         states_eph = np.asarray(out["states"])
         drift = np.linalg.norm(states_eph[:, :3] - state_patch_j2000[:, :3], axis=1)
         du = system.characteristic_length
-        print(f"\n(b) 全摄动自由积分 vs CR3BP tile（每圈末点）:")
+        print("\n(b) 全摄动自由积分 vs CR3BP tile（每圈末点）:")
         print(f"    {'圈':>3} {'|Δr| (km)':>14} {'|Δv| (km/s)':>14}")
         for k in range(N_REV):
             i = (k + 1) * 8 - 1  # 每圈 8 点，取圈末
@@ -150,7 +150,7 @@ def main() -> None:
 
         # --- (c) 一圈 STM 增长（Lyapunov 倍率）---
         stm = np.asarray(out["stm"])
-        print(f"\n(c) 一圈 STM 谱半径（Lyapunov 倍率）:")
+        print("\n(c) 一圈 STM 谱半径（Lyapunov 倍率）:")
         for k in range(min(4, N_REV)):
             i = (k + 1) * 8 - 1
             M = stm[i]

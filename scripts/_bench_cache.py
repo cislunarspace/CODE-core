@@ -9,8 +9,8 @@ from __future__ import annotations
 import time
 
 import numpy as np
-
 from e2m2e._integrators import multiple_shooting_correct_py
+
 from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
 from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
