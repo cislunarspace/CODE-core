@@ -116,6 +116,7 @@ fn enumerate_combos(
 ///     并集（排序），``out_coefs`` 为 ``(M, K)`` 逐时刻系数矩阵。
 #[pyfunction]
 #[pyo3(signature = (pows, coefs, b_seq))]
+#[allow(clippy::type_complexity)]
 pub fn project_hamiltonian_qf_py(
     pows: Vec<Vec<i64>>,
     coefs: Vec<f64>,
