@@ -36,6 +36,10 @@ def main() -> None:
 
         matplotlib.use("Agg")
 
+    from _plot_setup import setup_cjk_font
+
+    setup_cjk_font()
+
     from e2m2e.algorithm.design import design_orbit
     from e2m2e.algorithm.station_keeping import control_orbit
     from e2m2e.tools.viz import OrbitVisualizer
@@ -82,7 +86,7 @@ def main() -> None:
     ax1 = viz.plot_2d_projection(
         np.column_stack([nominal, np.zeros((len(nominal), 3))]),
         plane="xz",
-        label="Nominal",
+        label="标称轨道",
     )
 
     # 受控：最后一次样本的受控星历（若可用）
@@ -92,16 +96,16 @@ def main() -> None:
             np.column_stack([controlled, np.zeros((len(controlled), 3))]),
             plane="xz",
             color="orange",
-            label="Controlled",
+            label="受控轨道",
             ax=ax1,
         )
 
     viz.plot_primary_bodies(ax=ax1)
     viz.plot_libration_points(ax=ax1)
-    ax1.set_xlabel("X (nondimensional)")
-    ax1.set_ylabel("Z (nondimensional)")
-    ax1.set_title("Halo 轨道保持：标称 vs 受控（x-z）")
-    ax1.legend()
+    ax1.set_xlabel("X（无量纲）")
+    ax1.set_ylabel("Z（无量纲）")
+    ax1.set_title("L2 Halo 轨道保持：标称 vs 受控（会合系 x-z）")
+    ax1.legend(loc="upper right")
 
     if args.save:
         viz.save(str(_OUT_DIR / "main_control_halo.png"), dpi=150)

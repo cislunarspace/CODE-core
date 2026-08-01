@@ -36,18 +36,22 @@ def main() -> None:
 
         matplotlib.use("Agg")
 
+    from _plot_setup import setup_cjk_font
+
+    setup_cjk_font()
+
     from e2m2e.algorithm.design import design_orbit
     from e2m2e.tools.viz import OrbitVisualizer
 
     # 1. 端到端设计一条 L2 Halo（CR3BP 初猜 → 星历修正 → 高精度预报）
-    print("\n1. 设计 L2 Halo 轨道（amplitude=30000 km，维持 0.2 年）")
+    print("\n1. 设计 L2 Halo 轨道（amplitude=30000 km，维持 2 年）")
     t0 = time.perf_counter()
     result = design_orbit(
         "Halo",
         collinear_point=2,
         amplitude=30000.0,
         phase=0.0,
-        duration=0.2,
+        duration=2.0,
         output_step=3600.0,
     )
     elapsed = time.perf_counter() - t0
@@ -70,19 +74,21 @@ def main() -> None:
 
     states = cr3bp.states  # (n,6) 无量纲会合系状态
 
-    ax1 = viz.plot_2d_projection(states, plane="xz", label="Halo x-z")
+    ax1 = viz.plot_2d_projection(states, plane="xz", label="Halo L2 轨道")
     viz.plot_primary_bodies(ax=ax1)
     viz.plot_libration_points(ax=ax1)
-    ax1.set_xlabel("X (nondimensional)")
-    ax1.set_ylabel("Z (nondimensional)")
-    ax1.set_title(f"Halo L2  Amplitude=30000 km  C={result.cr3bp_jacobi:.4f}")
+    ax1.set_xlabel("X（无量纲）")
+    ax1.set_ylabel("Z（无量纲）")
+    ax1.set_title("L2 Halo 轨道会合系 x-z 投影（振幅 30000 km）")
+    ax1.legend(loc="upper right")
 
-    ax2 = viz.plot_2d_projection(states, plane="xy", label="Halo x-y")
+    ax2 = viz.plot_2d_projection(states, plane="xy", label="Halo L2 轨道")
     viz.plot_primary_bodies(ax=ax2)
     viz.plot_libration_points(ax=ax2)
-    ax2.set_xlabel("X (nondimensional)")
-    ax2.set_ylabel("Y (nondimensional)")
-    ax2.set_title("Halo L2 x-y 投影")
+    ax2.set_xlabel("X（无量纲）")
+    ax2.set_ylabel("Y（无量纲）")
+    ax2.set_title("L2 Halo 轨道会合系 x-y 投影")
+    ax2.legend(loc="upper right")
 
     if args.save:
         viz.save(str(_OUT_DIR / "main_design_halo.png"), dpi=150)

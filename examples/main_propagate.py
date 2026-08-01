@@ -2,7 +2,7 @@
 """main_propagate —— 轨道预报示例（对标 orbit-design-module 的 main_propagate.m）
 
 用高精度力模型（``ForceModel.from_config`` + ``propagate``）从一条 Halo
-轨道的初始状态外推 10 天，绘制预报轨迹。
+轨道的初始状态外推 60 天，绘制预报轨迹。
 
 用法：
     python examples/main_propagate.py            # 交互式出图
@@ -36,6 +36,10 @@ def main() -> None:
 
         matplotlib.use("Agg")
 
+    from _plot_setup import setup_cjk_font
+
+    setup_cjk_font()
+
     from e2m2e.algorithm.design import design_orbit
     from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
     from e2m2e.tools.viz import OrbitVisualizer
@@ -52,8 +56,8 @@ def main() -> None:
     )
     print(f"   初始状态 = {np.round(result.initial_state, 3)}")
 
-    # 2. 复用设计链路的力模型，从初始状态外推 10 天
-    print("\n2. 高精度外推 10 天（日/月/行星引力 + 光压 + 地球/月球非球形）")
+    # 2. 复用设计链路的力模型，从初始状态外推 60 天
+    print("\n2. 高精度外推 60 天（日/月/行星引力 + 光压 + 地球/月球非球形）")
     from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
     from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
     from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
@@ -77,7 +81,7 @@ def main() -> None:
     fm.max_step = 600.0
 
     et0 = _spice.utc_to_et(result.epoch_utc)
-    duration_days = 10.0
+    duration_days = 60.0
     et_grid = et0 + np.arange(0.0, duration_days * 86400.0 + 3600.0, 3600.0)
 
     out = fm.propagate(
@@ -87,7 +91,7 @@ def main() -> None:
         max_steps=2_000_000,
     )
     states = np.asarray(out["states"], dtype=float)
-    print(f"   预报 {len(states)} 步（10 天）")
+    print(f"   预报 {len(states)} 步（60 天）")
 
     # 3. 绘制预报轨迹 3D（J2000，归一化到地月尺度）
     print("\n3. 绘制预报轨迹 3D")
@@ -97,16 +101,17 @@ def main() -> None:
     traj = states.copy()
     traj[:, :3] /= 384400.0  # 归一化以在会合系尺度下显示
 
-    ax3d = viz.plot_3d_orbit(traj, label="Propagated 10d")
+    ax3d = viz.plot_3d_orbit(traj, label="预报轨迹（60 天）")
     viz.plot_primary_bodies(ax=ax3d, is_3d=True)
-    ax3d.set_xlabel("X (normalized)")
-    ax3d.set_ylabel("Y (normalized)")
-    ax3d.set_zlabel("Z (normalized)")
-    ax3d.set_title(f"Halo 预报 10 天  步数={len(states)}")
+    ax3d.set_xlabel("X（归一化）")
+    ax3d.set_ylabel("Y（归一化）")
+    ax3d.set_zlabel("Z（归一化）")
+    ax3d.set_title(f"L2 Halo 高精度预报 60 天  步数={len(states)}")
+    ax3d.legend()
 
     if args.save:
-        viz.save(str(_OUT_DIR / "main_propagate_10d.png"), dpi=150)
-        print(f"   已保存 {_OUT_DIR / 'main_propagate_10d.png'}")
+        viz.save(str(_OUT_DIR / "main_propagate_60d.png"), dpi=150)
+        print(f"   已保存 {_OUT_DIR / 'main_propagate_60d.png'}")
     else:
         viz.show()
 

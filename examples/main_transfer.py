@@ -36,6 +36,10 @@ def main() -> None:
 
         matplotlib.use("Agg")
 
+    from _plot_setup import setup_cjk_font
+
+    setup_cjk_font()
+
     from e2m2e.algorithm.transfer import solve_lambert
     from e2m2e.tools.viz import OrbitVisualizer
 
@@ -71,12 +75,13 @@ def main() -> None:
     traj_syn[:, :3] /= 384400.0
     traj_syn[:, :3] += np.array([0.0, 0.0, 0.0])  # 保持原点对齐
 
-    ax3d = viz.plot_3d_orbit(traj_syn, label="Transfer arc")
+    ax3d = viz.plot_3d_orbit(traj_syn, label="转移弧段")
     viz.plot_primary_bodies(ax=ax3d, is_3d=True)
-    ax3d.set_xlabel("X")
-    ax3d.set_ylabel("Y")
-    ax3d.set_zlabel("Z")
-    ax3d.set_title(f"二体 Lambert 转移  TOF=5d  Δv≈{np.linalg.norm(sol.v0):.3f} km/s")
+    ax3d.set_xlabel("X（归一化）")
+    ax3d.set_ylabel("Y（归一化）")
+    ax3d.set_zlabel("Z（归一化）")
+    ax3d.set_title(f"二体 Lambert 转移  TOF=5 天  Δv≈{np.linalg.norm(sol.v0):.3f} km/s")
+    ax3d.legend()
 
     if args.save:
         viz.save(str(_OUT_DIR / "main_transfer_lambert.png"), dpi=150)
