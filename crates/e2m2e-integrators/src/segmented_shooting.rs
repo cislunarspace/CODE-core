@@ -115,6 +115,7 @@ fn correct_segment(
         state_patch,
         false, // 固定时间
         true,  // 固定首节点：拼接锚点不可变
+        None,  // fixed_node_mask：走 fix_first_node 兼容路径
         max_iter,
         tolerance,
         rtol,
@@ -392,5 +393,4 @@ mod tests {
         assert_eq!(segments[2].0[0], 18.0);
         assert_eq!(segments[2].0[1], 19.0);
     }
-
 }

@@ -16,13 +16,55 @@
 //! `ephem_cache.py:10-16` 与 qiao `ephem_table.py`）。
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::RwLock;
 
 use cspice::common::AberrationCorrection;
 use cspice::spk::easier_reader;
 use cspice::time::Et;
 
 use crate::spice_ffi::{pxform, SpiceFfiError};
+
+/// 缓存查询失败原因（strict 模式下的硬错误）。
+#[derive(Debug, Clone, PartialEq)]
+pub enum CacheMissError {
+    /// 缓存未启用（未调 `enable`）。
+    NotEnabled,
+    /// 键缺失：该 (target, observer) / (from, to) / (target, observer, frame)
+    /// 未被预采样注册。
+    KeyMiss(String),
+    /// 查询时刻越出缓存覆盖范围。
+    OutOfRange { et: f64, start: f64, end: f64 },
+}
+
+impl std::fmt::Display for CacheMissError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CacheMissError::NotEnabled => write!(f, "ephem cache not enabled"),
+            CacheMissError::KeyMiss(key) => write!(f, "ephem cache key not registered: {key}"),
+            CacheMissError::OutOfRange { et, start, end } => {
+                write!(f, "ephem cache et {et} out of range [{start}, {end}]")
+            }
+        }
+    }
+}
+
+impl From<CacheMissError> for SpiceFfiError {
+    fn from(e: CacheMissError) -> Self {
+        SpiceFfiError::Failed(e.to_string())
+    }
+}
+
+impl From<CacheMissError> for cspice::Error {
+    fn from(e: CacheMissError) -> Self {
+        cspice::Error {
+            short_message: "EPHEM_CACHE_MISS".to_string(),
+            explanation: e.to_string(),
+            long_message: String::new(),
+            traceback: String::new(),
+        }
+    }
+}
 
 /// 自然三次样条：预解二阶导数，查询 O(log N) 二分定位 + O(1) 求值。
 ///
@@ -265,17 +307,56 @@ impl EphemCache {
 
 // ---- 进程级单例 ----
 
-static CACHE: Mutex<Option<EphemCache>> = Mutex::new(None);
+/// 缓存实例。`RwLock` 而非 `Mutex`：并行段积分下多线程并发读三次样条
+/// （纯数值，无 cspice），读锁并行不互相阻塞；enable/disable 写锁与读锁互斥。
+static CACHE: RwLock<Option<EphemCache>> = RwLock::new(None);
+
+/// strict 模式标记：开启后缓存 miss 返回 `Err`（硬失败），而非软回退 cspice。
+/// 由 `StrictGuard` RAII 管理（打靶并行区开启，保证零 cspice）。
+static STRICT: AtomicBool = AtomicBool::new(false);
+
+/// RAII：作用域内开启 strict 缓存模式，Drop 时恢复原值。
+///
+/// 语义：strict 下任何 `lookup_*` 查询 miss（未启用/键缺失/越界）返回 `Err`，
+/// 由调用方 `?` 向上传播——杜绝力模型静默回退 cspice（并行区 cspice 是
+/// 内核池损坏/panic 的根源）。非 strict 下 `lookup_*` miss 返回 `Ok(None)`，
+/// 调用方按既有模式回退 cspice。
+pub struct StrictGuard {
+    prev: bool,
+}
+
+impl StrictGuard {
+    pub fn new() -> Self {
+        let prev = STRICT.swap(true, Ordering::SeqCst);
+        Self { prev }
+    }
+}
+
+impl Drop for StrictGuard {
+    fn drop(&mut self) {
+        STRICT.store(self.prev, Ordering::SeqCst);
+    }
+}
+
+impl Default for StrictGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn strict() -> bool {
+    STRICT.load(Ordering::SeqCst)
+}
 
 /// 安装缓存（替换已有的）。后续力模型查询优先走它。
 pub fn enable(cache: EphemCache) {
-    let mut g = CACHE.lock().expect("ephem cache mutex poisoned");
+    let mut g = CACHE.write().expect("ephem cache rwlock poisoned");
     *g = Some(cache);
 }
 
 /// 清除缓存（回到逐次 cspice 查询）。
 pub fn disable() {
-    let mut g = CACHE.lock().expect("ephem cache mutex poisoned");
+    let mut g = CACHE.write().expect("ephem cache rwlock poisoned");
     *g = None;
 }
 
@@ -284,8 +365,73 @@ pub fn with_cache<F, R>(f: F) -> R
 where
     F: FnOnce(Option<&EphemCache>) -> R,
 {
-    let g = CACHE.lock().expect("ephem cache mutex poisoned");
+    let g = CACHE.read().expect("ephem cache rwlock poisoned");
     f(g.as_ref())
+}
+
+/// strict-aware 查天体位置。miss 时非 strict 返回 `Ok(None)`（回退 cspice），
+/// strict 返回 `Err`。目标/原点/时刻与缓存匹配则返回样条插值位置。
+pub fn lookup_body_position(
+    target: &str,
+    observer: &str,
+    et: f64,
+) -> Result<Option<[f64; 3]>, CacheMissError> {
+    let g = CACHE.read().expect("ephem cache rwlock poisoned");
+    let Some(cache) = g.as_ref() else {
+        return if strict() {
+            Err(CacheMissError::NotEnabled)
+        } else {
+            Ok(None)
+        };
+    };
+    let pos = cache.body_position(target, observer, et);
+    if pos.is_some() {
+        return Ok(pos);
+    }
+    if strict() {
+        if !(cache.et_start..=cache.et_end).contains(&et) {
+            return Err(CacheMissError::OutOfRange {
+                et,
+                start: cache.et_start,
+                end: cache.et_end,
+            });
+        }
+        Err(CacheMissError::KeyMiss(format!("({target}, {observer})")))
+    } else {
+        Ok(None)
+    }
+}
+
+/// strict-aware 查帧旋转矩阵。语义同 `lookup_body_position`。
+pub fn lookup_frame_matrix(
+    from: &str,
+    to: &str,
+    et: f64,
+) -> Result<Option<[[f64; 3]; 3]>, CacheMissError> {
+    let g = CACHE.read().expect("ephem cache rwlock poisoned");
+    let Some(cache) = g.as_ref() else {
+        return if strict() {
+            Err(CacheMissError::NotEnabled)
+        } else {
+            Ok(None)
+        };
+    };
+    let m = cache.frame_matrix(from, to, et);
+    if m.is_some() {
+        return Ok(m);
+    }
+    if strict() {
+        if !(cache.et_start..=cache.et_end).contains(&et) {
+            return Err(CacheMissError::OutOfRange {
+                et,
+                start: cache.et_start,
+                end: cache.et_end,
+            });
+        }
+        Err(CacheMissError::KeyMiss(format!("frame ({from}, {to})")))
+    } else {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]

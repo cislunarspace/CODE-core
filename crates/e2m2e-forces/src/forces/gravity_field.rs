@@ -114,14 +114,15 @@ pub fn gravity_field_acceleration(
     let r_body_icrf: [f64; 3] = if body == propagation_origin {
         [r_sc[0], r_sc[1], r_sc[2]]
     } else {
-        // 查两个 origin 在 SSB 的位置（优先走星历缓存，未覆盖回退 spkezr）
-        let prop_origin_pos_ssb: [f64; 3] = match e2m2e_spice::ephem_cache::with_cache(|c| {
-            c.and_then(|cache| {
-                cache.body_position(propagation_origin, "SOLAR SYSTEM BARYCENTER", et)
-            })
-        }) {
-            Some(p) => p,
-            None => {
+        // 查两个 origin 在 SSB 的位置（优先走星历缓存；strict 模式 miss 即
+        // 硬 Err，杜绝并行区回退 cspice）
+        let prop_origin_pos_ssb: [f64; 3] = match e2m2e_spice::ephem_cache::lookup_body_position(
+            propagation_origin,
+            "SOLAR SYSTEM BARYCENTER",
+            et,
+        ) {
+            Ok(Some(p)) => p,
+            Ok(None) => {
                 let (st, _) = e2m2e_spice::spice_ffi::spkezr(
                     propagation_origin,
                     et,
@@ -131,17 +132,20 @@ pub fn gravity_field_acceleration(
                 )?;
                 [st[0], st[1], st[2]]
             }
+            Err(e) => return Err(e.into()),
         };
         let r_ssb = [
             r_sc[0] + prop_origin_pos_ssb[0],
             r_sc[1] + prop_origin_pos_ssb[1],
             r_sc[2] + prop_origin_pos_ssb[2],
         ];
-        let body_pos_ssb: [f64; 3] = match e2m2e_spice::ephem_cache::with_cache(|c| {
-            c.and_then(|cache| cache.body_position(body, "SOLAR SYSTEM BARYCENTER", et))
-        }) {
-            Some(p) => p,
-            None => {
+        let body_pos_ssb: [f64; 3] = match e2m2e_spice::ephem_cache::lookup_body_position(
+            body,
+            "SOLAR SYSTEM BARYCENTER",
+            et,
+        ) {
+            Ok(Some(p)) => p,
+            Ok(None) => {
                 let (st, _) = e2m2e_spice::spice_ffi::spkezr(
                     body,
                     et,
@@ -151,6 +155,7 @@ pub fn gravity_field_acceleration(
                 )?;
                 [st[0], st[1], st[2]]
             }
+            Err(e) => return Err(e.into()),
         };
         [
             r_ssb[0] - body_pos_ssb[0],
@@ -159,17 +164,17 @@ pub fn gravity_field_acceleration(
         ]
     };
 
-    // 旋转 propagation_frame → input_frame（优先走缓存）
+    // 旋转 propagation_frame → input_frame（优先走缓存；strict miss 硬 Err）
     // Python: position_out = to_rotation.T @ r_body_icrf，
     // 其中 to_rotation = pxform(input_frame, J2000)（input → j2000）。
     // 所以 position_out = pxform(input_frame, J2000).T @ r_body_icrf
     //                   = pxform(J2000, input_frame) @ r_body_icrf
-    let r_input_to_j2000: [[f64; 3]; 3] = match e2m2e_spice::ephem_cache::with_cache(|c| {
-        c.and_then(|cache| cache.frame_matrix(input_frame, propagation_frame, et))
-    }) {
-        Some(m) => m,
-        None => pxform(input_frame, propagation_frame, et)?,
-    };
+    let r_input_to_j2000: [[f64; 3]; 3] =
+        match e2m2e_spice::ephem_cache::lookup_frame_matrix(input_frame, propagation_frame, et) {
+            Ok(Some(m)) => m,
+            Ok(None) => pxform(input_frame, propagation_frame, et)?,
+            Err(e) => return Err(e.into()),
+        };
     let r_input = mat3_t_mul_vec(&r_input_to_j2000, &r_body_icrf);
 
     // Step 2: 有效系数（含潮汐修正）
@@ -340,33 +345,64 @@ impl GravityFieldContext {
         propagation_origin: &str,
         tide: &TideConfig,
     ) -> Result<Self, SpiceFfiError> {
-        // 1. 查天体位置（平移偏移）
-        let (prop_origin_state_ssb, _) = e2m2e_spice::spice_ffi::spkezr(
-            propagation_origin,
-            et,
-            propagation_frame,
-            "NONE",
-            "SOLAR SYSTEM BARYCENTER",
-        )?;
-        let origin_offset = if body == propagation_origin {
+        // 1. 查天体位置（平移偏移）。优先走星历缓存（三次样条查表），未覆盖
+        //    回退 spkezr——与 gravity_field_acceleration L118-171 同模式。
+        //    body == propagation_origin（地心系地球重力场常见场景）时 origin
+        //    与 body 重合，无需查 SSB 平移。
+        let origin_offset: [f64; 3] = if body == propagation_origin {
             [0.0; 3]
         } else {
-            let (body_state_ssb, _) = e2m2e_spice::spice_ffi::spkezr(
-                body,
-                et,
-                propagation_frame,
-                "NONE",
+            let prop_origin_pos_ssb = match e2m2e_spice::ephem_cache::lookup_body_position(
+                propagation_origin,
                 "SOLAR SYSTEM BARYCENTER",
-            )?;
+                et,
+            ) {
+                Ok(Some(p)) => p,
+                Ok(None) => {
+                    let (st, _) = e2m2e_spice::spice_ffi::spkezr(
+                        propagation_origin,
+                        et,
+                        propagation_frame,
+                        "NONE",
+                        "SOLAR SYSTEM BARYCENTER",
+                    )?;
+                    [st[0], st[1], st[2]]
+                }
+                Err(e) => return Err(e.into()),
+            };
+            let body_pos_ssb = match e2m2e_spice::ephem_cache::lookup_body_position(
+                body,
+                "SOLAR SYSTEM BARYCENTER",
+                et,
+            ) {
+                Ok(Some(p)) => p,
+                Ok(None) => {
+                    let (st, _) = e2m2e_spice::spice_ffi::spkezr(
+                        body,
+                        et,
+                        propagation_frame,
+                        "NONE",
+                        "SOLAR SYSTEM BARYCENTER",
+                    )?;
+                    [st[0], st[1], st[2]]
+                }
+                Err(e) => return Err(e.into()),
+            };
             [
-                prop_origin_state_ssb[0] - body_state_ssb[0],
-                prop_origin_state_ssb[1] - body_state_ssb[1],
-                prop_origin_state_ssb[2] - body_state_ssb[2],
+                prop_origin_pos_ssb[0] - body_pos_ssb[0],
+                prop_origin_pos_ssb[1] - body_pos_ssb[1],
+                prop_origin_pos_ssb[2] - body_pos_ssb[2],
             ]
         };
 
-        // 2. 查旋转矩阵
-        let rotation = e2m2e_spice::spice_ffi::pxform(input_frame, propagation_frame, et)?;
+        // 2. 查旋转矩阵（优先走缓存帧样条；strict miss 硬 Err）
+        let rotation =
+            match e2m2e_spice::ephem_cache::lookup_frame_matrix(input_frame, propagation_frame, et)
+            {
+                Ok(Some(m)) => m,
+                Ok(None) => e2m2e_spice::spice_ffi::pxform(input_frame, propagation_frame, et)?,
+                Err(e) => return Err(e.into()),
+            };
 
         // 3. 有效系数（含潮汐）
         let (c_eff, s_eff) = if tide.mode == TideMode::None {

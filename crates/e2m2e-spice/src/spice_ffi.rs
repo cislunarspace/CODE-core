@@ -26,6 +26,25 @@ use cspice_sys::{
 };
 use std::ffi::CString;
 use std::os::raw::c_char;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// cspice FFI 调用计数。验证"零 cspice"用：打靶前后读该计数，应为 0
+/// （前提：星历预采样缓存已启用 + strict 模式，力模型查内存样条）。
+pub static FFI_CALLS: AtomicU64 = AtomicU64::new(0);
+
+/// 返回累计 cspice FFI 调用次数（pxform/sxform/spkezr 入口）。
+pub fn ffi_call_count() -> u64 {
+    FFI_CALLS.load(Ordering::Relaxed)
+}
+
+/// 清零 cspice FFI 调用计数。
+pub fn reset_ffi_call_count() {
+    FFI_CALLS.store(0, Ordering::Relaxed);
+}
+
+fn bump_ffi_calls() {
+    FFI_CALLS.fetch_add(1, Ordering::Relaxed);
+}
 
 /// 取 CSPICE 短错误消息（调用前必须 failed_c() == true）。
 fn get_short_error_message() -> String {
@@ -147,6 +166,7 @@ fn bodn2c(name: &str) -> Option<SpiceInt> {
 ///
 /// 等价于 Python spiceypy.pxform(from, to, et)。
 pub fn pxform(from: &str, to: &str, et: f64) -> Result<[[f64; 3]; 3], SpiceFfiError> {
+    bump_ffi_calls();
     let from_c = to_cstring(from);
     let to_c = to_cstring(to);
     let mut rotate = [[0.0_f64; 3]; 3];
@@ -166,6 +186,7 @@ pub fn pxform(from: &str, to: &str, et: f64) -> Result<[[f64; 3]; 3], SpiceFfiEr
 ///
 /// 等价于 Python spiceypy.sxform(from, to, et)。返回 6×6 行优先矩阵。
 pub fn sxform(from: &str, to: &str, et: f64) -> Result<[[f64; 6]; 6], SpiceFfiError> {
+    bump_ffi_calls();
     let from_c = to_cstring(from);
     let to_c = to_cstring(to);
     let mut xform = [[0.0_f64; 6]; 6];
@@ -192,6 +213,7 @@ pub fn spkezr(
     abcorr: &str,
     observer: &str,
 ) -> Result<([f64; 6], f64), SpiceFfiError> {
+    bump_ffi_calls();
     let target_c = to_cstring(target);
     let frame_c = to_cstring(frame);
     let abcorr_c = to_cstring(abcorr);
