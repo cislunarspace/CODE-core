@@ -45,6 +45,21 @@ def main() -> None:
 
     # 1. 端到端设计一条 L2 Halo（CR3BP 初猜 → 星历修正 → 高精度预报）
     print("\n1. 设计 L2 Halo 轨道（amplitude=30000 km，维持 2 年）")
+    # 摄动开关：太阳第三体引力 + 地月非球形（10 阶）+ 炮弹模型光压
+    perturbation = {
+        "sun_body": 1,
+        "planets": 0,
+        "earth_nonspherical": 1,
+        "moon_nonspherical": 1,
+        "solar_radiation": 1,
+        "atmosphere": 0,
+        "relativity": 0,
+        "tide": 0,
+        "coupling": 0,
+    }
+    print("   摄动开关：")
+    for k, v in perturbation.items():
+        print(f"     {k} = {v}")
     t0 = time.perf_counter()
     result = design_orbit(
         "Halo",
@@ -53,6 +68,7 @@ def main() -> None:
         phase=0.0,
         duration=2.0,
         output_step=3600.0,
+        perturbation=perturbation,
     )
     elapsed = time.perf_counter() - t0
     print(f"   耗时 {elapsed:.1f} s")

@@ -46,6 +46,21 @@ def main() -> None:
 
     # 1. 设计一条短弧 Halo 标称轨道（供轨道保持）
     print("\n1. 设计 L2 Halo 标称轨道")
+    # 摄动开关：太阳第三体引力 + 地月非球形（10 阶）+ 炮弹模型光压
+    perturbation = {
+        "sun_body": 1,
+        "planets": 0,
+        "earth_nonspherical": 1,
+        "moon_nonspherical": 1,
+        "solar_radiation": 1,
+        "atmosphere": 0,
+        "relativity": 0,
+        "tide": 0,
+        "coupling": 0,
+    }
+    print("   摄动开关：")
+    for k, v in perturbation.items():
+        print(f"     {k} = {v}")
     result = design_orbit(
         "Halo",
         collinear_point=2,
@@ -53,6 +68,7 @@ def main() -> None:
         phase=0.0,
         duration=0.1,
         output_step=3600.0,
+        perturbation=perturbation,
     )
     print(f"   星历行数 = {len(result.ephemeris)}")
 
@@ -66,6 +82,7 @@ def main() -> None:
         num_monte_carlo=1,
         control_interval=10.0,
         output_step=3600.0,
+        perturbation=perturbation,
     )
     print(f"   失败样本数 = {ctl.num_failed}")
     rows = np.asarray(ctl.sk_statistic.rows)
