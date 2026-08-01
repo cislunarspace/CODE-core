@@ -167,8 +167,25 @@ class SPICEManager(EphemerisProvider):
         dt: float = 3600.0,
         frame: str = "J2000",
         observer: str = "EARTH",
+        frame_pairs: list[tuple[str, str]] | None = None,
     ) -> None:
-        """构建并启用预插值星历缓存。"""
+        """构建并启用预插值星历缓存（Python 层 + Rust 积分层）。
+
+        Python 侧 ``EphemCache`` 拦 ``get_body_position/state``；Rust 侧
+        （``_integrators.enable_ephem_cache``）给 ``compiled_stm``/多重打靶
+        积分内循环的三次样条查表。两套缓存独立构建但同源（同网格采样），
+        保证 Rust 积分不逐次调 cspice（消除 DAFFRNOTFOUND 与每步 FFI 开销）。
+
+        Args:
+            bodies: 需缓存的天体名列表（EARTH/MOON/SUN/行星）。
+            et_start/et_end: 缓存覆盖的 ET 秒范围。
+            dt: 预采样网格步长（秒），默认 3600。
+            frame: Python 层缓存采样坐标系（J2000）。
+            observer: Python 层缓存采样原点（EARTH）。
+            frame_pairs: Rust 层帧旋转对（(from, to)）。GravityField 需
+                body-fixed→J2000（如 ("ITRF93","J2000")、("MOON_PA","J2000")）。
+                缺省注册 (frame, "J2000")。
+        """
         from .ephem_cache import build_ephem_cache
 
         self._ephem_cache = build_ephem_cache(
@@ -180,10 +197,60 @@ class SPICEManager(EphemerisProvider):
             frame=frame,
             observer=observer,
         )
+        # 同步启用 Rust 侧缓存。Rust 力模型（compiled.rs）查天体用两种
+        # observer：第三体/间接项用传播系原点（EARTH），GravityField 用
+        # SSB（需把原点也换算到 SSB 平移）。故每个 body 同时注册
+        # (body, observer) 与 (body, "SOLAR SYSTEM BARYCENTER")；帧对注册
+        # 传入的 frame_pairs（缺省 (frame, "J2000")）。
+        #
+        # 关键：缓存键是**精确字符串**（ephem_cache.rs L233），而第三体力的
+        # to_rust_spec 把天体转成 NAIF-ID 字符串（如 "MOON"→"301"）。故每个
+        # body 同时注册名字与 NAIF-ID 两种键，保证 ThirdBody 查询（用 ID）
+        # 与 GravityField 查询（用名字）都命中。Rust 采样同样走 cspice，
+        # 之后积分查表。
+        try:
+            from e2m2e._integrators import enable_ephem_cache as _rust_enable
+
+            # 天体名 → NAIF-ID 字符串（与 third_body_gravity.py 的
+            # _name_or_id 一致；失败保留名字）
+            try:
+                import spiceypy as _sp
+
+                id_keys = [str(_sp.bods2c(b)) if _sp.bods2c(b) > 0 else b.upper() for b in bodies]
+            except Exception:
+                id_keys = [b.upper() for b in bodies]
+
+            frame_pairs = frame_pairs or [(frame, "J2000")]
+            _rust_enable(
+                [
+                    (k, observer.upper())
+                    for b, kid in zip(bodies, id_keys, strict=True)
+                    for k in (b.upper(), kid)
+                ]
+                + [
+                    (k, "SOLAR SYSTEM BARYCENTER")
+                    for b, kid in zip(bodies, id_keys, strict=True)
+                    if b.upper() != "SOLAR SYSTEM BARYCENTER"
+                    for k in (b.upper(), kid)
+                ],
+                frame_pairs,
+                et_start,
+                et_end,
+                dt=dt,
+            )
+        except ImportError:
+            # 非 spice 构建（_integrators 无该函数）：仅 Python 层缓存生效
+            pass
 
     def disable_ephem_cache(self) -> None:
-        """关闭预插值星历缓存，回退到逐步 SPICE 查询。"""
+        """关闭预插值星历缓存（Python 层 + Rust 层），回退到逐步 SPICE 查询。"""
         self._ephem_cache = None
+        try:
+            from e2m2e._integrators import disable_ephem_cache as _rust_disable
+
+            _rust_disable()
+        except ImportError:
+            pass
 
     # ---- EphemerisProvider 时间方法 ----
 

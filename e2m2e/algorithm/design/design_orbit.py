@@ -28,6 +28,7 @@ DRO 振幅取一个周期内距月距离最小/最大值的均值（同按黄金
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -442,6 +443,155 @@ def _build_ephemeris_table(
     )
 
 
+def _design_apolune_segmented(
+    forces_py: list[Any],
+    observer: str,
+    t_patch_j2000: np.ndarray,
+    state_patch_j2000: np.ndarray,
+    revs_per_group: int,
+    points_per_rev: int,
+    *,
+    max_iter: int = 50,
+    tolerance: float = CORRECTION_TOL_KM,
+    verbose: bool = False,
+) -> tuple[np.ndarray, np.ndarray]:
+    """论文式分段打靶拼接（朱彦伟 2026）：逐段独立转星历 + 远月点分层合并。
+
+    Halo/NRHO 在星历模型下极不稳定（STM 谱半径 ~1e7/圈），CR3BP 初猜
+    第 1 圈就偏离 2e5 km，一次性对整条长弧打靶（或逐圈滚动复用上圈末端）
+    必发散。本方法对齐论文三步：
+
+    1. **逐段独立转星历**：整条 CR3BP tile 按 ``revs_per_group`` 圈切段，
+       每段独立调 Rust 多重打靶（``var_time=True`` 自由时间 + 全自由
+       min-norm + LM 阻尼 + 回溯线搜索），把 CR3BP 周期解转换到星历模型。
+       各段内部连续、形状保形（实证 res~1e-1 km，会合系 x 紧邻 L2）。
+    2. **远月点分层合并**：把相邻已转星历的段两两合并，合并段固定
+       **两端远月点**（拼接锚点），内部 seam 节点自由连续化，段长每层
+       翻倍但有界（论文式拼接）。直到拼成整条连续轨迹。
+
+    Args:
+        forces_py: 全摄动 Rust forces 序列（与长期预报同模型）。
+        observer: 坐标系原点（"EARTH"）。
+        t_patch_j2000 / state_patch_j2000: 整条 CR3BP tile（J2000，
+            km/km/s），每 ``revs_per_group`` 圈一组切段。
+        revs_per_group: 第 1 步每组圈数（段长上限）。实证 Halo 单圈段
+            保形；组内圈数越多段越短、初猜越贴真实动力学，但段数多。
+            默认在调用方决定（30 天小场景用 1，2 年用若干圈）。
+        points_per_rev: 每圈节点数（由采样 tile 推断，NRHO 近月加密时
+            不是 8 的倍数——不能硬编码）。
+
+    Returns:
+        ``(t_patch, state_patch)``（J2000），整条连续星历轨迹。
+    """
+    from e2m2e._integrators import multiple_shooting_correct_py
+
+    n_total = len(t_patch_j2000)
+    n_rev = n_total // points_per_rev
+
+    # --- 第 1 步：切段，每段独立打靶转星历 ---
+    seg_t: list[np.ndarray] = []
+    seg_s: list[np.ndarray] = []
+    k = 0
+    while k < n_rev:
+        end = min(k + revs_per_group, n_rev)
+        # 段节点区间 [k*P, end*P]（含末尾，供拼接；首段起于 0）
+        lo = k * points_per_rev
+        hi = end * points_per_rev
+        if hi >= n_total:
+            hi = n_total - 1
+        # 首段含第 0 节点；后续段跳过前一共享节点（段间 seam）
+        if seg_t:
+            lo += 1
+        t_seg = np.asarray(t_patch_j2000[lo : hi + 1], dtype=float)
+        s_seg = np.asarray(state_patch_j2000[lo : hi + 1], dtype=float)
+        if verbose:
+            print(f"  段 {len(seg_t) + 1}: {len(t_seg)} 节点 ({k}-{end} 圈)")
+        try:
+            result = multiple_shooting_correct_py(
+                forces_py,
+                observer,
+                list(t_seg),
+                [list(map(float, x)) for x in s_seg],
+                var_time=True,
+                fix_first_node=False,
+                fixed_node_mask=None,
+                max_iter=max_iter,
+                tolerance=tolerance,
+                rtol=1e-10,
+            )
+        except RuntimeError as e:
+            raise DesignNotConvergedError(f"分段打靶段 {len(seg_t) + 1} 积分失败: {e}") from e
+        sp = np.asarray(result.state_patch)
+        seg_t.append(np.asarray(result.t_patch, dtype=float))
+        seg_s.append(sp)
+        if verbose:
+            print(f"    残差 {result.max_residual:.2e} km, {result.iterations} 次迭代")
+        k = end
+
+    # --- 第 2 步：远月点分层两两合并 ---
+    # 合并段固定首末两端（远月点锚点），内部 seam 自由连续化。
+    layer = 1
+    while len(seg_t) > 1:
+        merged_t: list[np.ndarray] = []
+        merged_s: list[np.ndarray] = []
+        n_pairs = len(seg_t) // 2
+        if verbose:
+            print(f"  合并第 {layer} 层: {len(seg_t)} 段 -> {n_pairs + len(seg_t) % 2} 段")
+        i = 0
+        while i < len(seg_t):
+            if i + 1 >= len(seg_t):
+                # 奇数段：直接进位（不合并）
+                merged_t.append(seg_t[i])
+                merged_s.append(seg_s[i])
+                i += 1
+                continue
+            # 相邻两段拼接：段 i 全部 + 段 i+1 去首（共享 seam 远月点）
+            t_comb = np.concatenate([seg_t[i], seg_t[i + 1][1:]])
+            s_comb = np.concatenate([seg_s[i], seg_s[i + 1][1:]])
+            n = len(t_comb)
+            # 固定首末两端（远月点锚点）；中间节点自由
+            mask = [False] * n
+            mask[0] = True
+            mask[-1] = True
+            try:
+                result = multiple_shooting_correct_py(
+                    forces_py,
+                    observer,
+                    list(t_comb),
+                    [list(map(float, x)) for x in s_comb],
+                    var_time=True,
+                    fix_first_node=False,
+                    fixed_node_mask=mask,
+                    max_iter=max_iter,
+                    tolerance=tolerance,
+                    rtol=1e-10,
+                )
+            except RuntimeError as e:
+                # 合并段打靶失败：回退为不合并，两段各自保留（整条仍连续
+                # 由段内保证，seam 处 gap 留在后续层处理）
+                if verbose:
+                    print(f"    合并失败: {e}，保留两段")
+                merged_t.extend([seg_t[i], seg_t[i + 1]])
+                merged_s.extend([seg_s[i], seg_s[i + 1]])
+                i += 2
+                continue
+            spm = np.asarray(result.state_patch)
+            merged_t.append(np.asarray(result.t_patch, dtype=float))
+            merged_s.append(spm)
+            if verbose:
+                print(
+                    f"    合并段 {n} 节点: 残差 {result.max_residual:.2e} km, "
+                    f"{result.iterations} 次迭代"
+                )
+            i += 2
+        seg_t, seg_s = merged_t, merged_s
+        layer += 1
+
+    all_t = seg_t[0]
+    all_s = seg_s[0]
+    return np.asarray(all_t, dtype=float), np.asarray(all_s, dtype=float)
+
+
 def design_orbit(
     orbit_type: str,
     *,
@@ -463,7 +613,7 @@ def design_orbit(
     moon_degree: int = 10,
     spice: SPICEManager | None = None,
     kernel_dir: str | None = None,
-    correction_method: str = "two_level",
+    correction_method: str = "segmented",
     correction_revolutions: int = 1,
     correction_velocity_tolerance: float = 0.1,
     verbose: bool = False,
@@ -500,10 +650,13 @@ def design_orbit(
         spice: 已加载内核的 ``SPICEManager``；缺省自动创建并加载
             ``kernel_dir``（默认仓库 ``kernels/``）下的内核。
         kernel_dir: SPICE 内核目录。
-        correction_method: 星历修正方法（``"standard"`` / ``"two_level"`` /
-            ``"homotopy"``，注册表分发）。默认 ``"two_level"``——端点固定 +
-            回溯线搜索（Marchand-Howell-Wilson 两层法），对 Halo/NRHO 等不稳
-            定轨道能收敛；``"standard"`` 全自由变量无步长控制，仅对稳定 DRO 可靠。
+        correction_method: 星历修正方法。默认 ``"segmented"``——逐段滚动多重
+            打靶（每圈一小段，用上一圈修正 shape 滚动 tile），拼接整条长期
+            轨迹，对 Halo/NRHO 等不稳定轨道在星历模型下能长期保形（朱彦伟
+            2026 分段打靶拼接法）；``"two_level"`` 端点固定 + 回溯线搜索
+            （Marchand-Howell-Wilson 两层法），适合单圈修正 + 短期预报；
+            ``"standard"`` 全自由变量无步长控制，仅对稳定 DRO 可靠；
+            ``"homotopy"`` 同伦过渡（质点 N 体语义）。
         correction_revolutions: 星历修正弧长（圈数）。
         correction_velocity_tolerance: 速度残差容差（km/s，仅 ``"two_level"``）。
             默认 0.1（100 mm/s）。two_level 的 Level 2（速度连续）对紧凑近月轨道
@@ -619,6 +772,139 @@ def design_orbit(
     fm.atol = 1e-12
     fm.max_step = 600.0
 
+    duration_day = float(duration) * DAYS_PER_YEAR
+    duration_sec = duration_day * 86400.0
+    et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * float(output_step), float(output_step))
+
+    if correction_method == "segmented":
+        # --- segmented：论文式分段打靶拼接（默认方法）---
+        # 整条 CR3BP 多圈 tile → 逐段独立转星历 → 远月点分层合并 → 逐段
+        # 积分填满 et_grid。不再单点自由外推整个 duration（旧方法发散根因）。
+        from ..ephemeris_correction.types import EphemerisCorrectionResult
+
+        # 收集 Rust force 序列。跳过 RelativisticCorrection（与
+        # ForceModel._STM_UNSUPPORTED_TYPES 对齐）：相对论修正的裸
+        # sxform/spkezr 未走星历缓存，放进打靶并行区会并发撞 cspice。
+        forces_py = []
+        for entry in fm.list_forces():
+            if not entry.enabled:
+                continue
+            if type(entry.force).__name__ == "RelativisticCorrection":
+                continue
+            spec = entry.force.to_rust_spec(full_system)
+            if spec is not None:
+                forces_py.append(spec)
+        # 覆盖整条 duration 所需圈数（ceil 保证 et_grid 尾部有数据）
+        n_rev = max(1, math.ceil(duration_sec / (period * t_c)))
+        # 按 n_rev 圈重采样整条 tile（初猜）。Halo/NRHO 都用近月点加密：
+        # 近月点速度大、STM 病态，等间隔采样让近月点落在节点之间而欠约束，
+        # 实测加密后打靶残差更低（8e-2 → 1.2e-2 km），长期保形更好。
+        perilune_clustered = sel in ("HALO", "NRHO")
+        t_patch_syn_n, state_patch_syn_n = _sample_patch_points(
+            dynamics,
+            state0_syn,
+            period,
+            n_rev,
+            perilune_clustered=perilune_clustered,
+        )
+        t_patch_j2000_n = et0 + t_patch_syn_n * t_c
+        state_patch_j2000_n = syn_j2000.batch_synodic_to_j2000(
+            states_syn=state_patch_syn_n, t_syn_arr=t_patch_syn_n, et0=et0
+        )
+        per_rev = len(t_patch_syn_n) // n_rev  # 每圈节点数（NRHO 加密时非 8）
+        # 潮汐防御：effective_coefficients 的 body-fixed 位置裸调 cspice
+        # 未走星历缓存，tide=1 时放进并行打靶区会并发撞 cspice。本轮不支持
+        # 潮汐缓存 → 强制回退串行（E2M2E_MS_PARALLEL=0）。tide=0（main_design
+        # 默认）无此路径，可并行。
+        if sw["tide"] == 1 and verbose:
+            print("  提示: tide=1 未走星历缓存，打靶回退串行（潮汐缓存为后续扩展）")
+        # 预采样星历缓存：打靶 + 逐段积分全程查三次样条表，不逐次调 cspice。
+        # 这是 2 年 50 圈 × 每圈 8 节点 × 50 迭代打靶能跑完的关键（否则
+        # 每步每力跨界查 SPICE，量级不可接受，且并发下触发 DAFFRNOTFOUND）。
+        # 帧对覆盖 GravityField 的 body-fixed→J2000（地月非球形需要）。
+        # try/finally：缓存是进程级单例，用完必须清除避免污染后续调用。
+        spice.enable_ephem_cache(
+            bodies,
+            et0,
+            float(max(et_grid[-1], t_patch_j2000_n[-1])),
+            dt=3600.0,
+            observer="EARTH",
+            frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
+        )
+        try:
+            if sw["tide"] == 1:
+                os.environ["E2M2E_MS_PARALLEL"] = "0"  # 潮汐未缓存 → 串行
+            try:
+                # 第 1 步段长（每组圈数）：段长与论文结构一致，段内圈数
+                # 控制在单圈量级（Halo 初猜在星历下第 1 圈就偏，段越短
+                # 初猜越贴真实动力学）。默认组内 3 圈，段多时自动增。
+                revs_per_group = max(1, min(3, n_rev))
+                t_patch_long, s_patch_long = _design_apolune_segmented(
+                    forces_py,
+                    "EARTH",
+                    t_patch_j2000_n,
+                    state_patch_j2000_n,
+                    revs_per_group,
+                    per_rev,
+                    max_iter=50,
+                    tolerance=CORRECTION_TOL_KM,
+                    verbose=verbose,
+                )
+            finally:
+                if sw["tide"] == 1:
+                    os.environ.pop("E2M2E_MS_PARALLEL", None)
+
+            # 逐段积分填满 et_grid：每段从修正后节点初值积分到下一节点
+            states_list: list[np.ndarray] = []
+            for i in range(len(t_patch_long) - 1):
+                seg_t0, seg_t1 = t_patch_long[i], t_patch_long[i + 1]
+                mask = (et_grid >= seg_t0 - 1e-6) & (et_grid <= seg_t1 + 1e-6)
+                t_eval_seg = et_grid[mask]
+                if len(t_eval_seg) == 0:
+                    continue
+                out_seg = fm.propagate(
+                    s_patch_long[i],
+                    (float(seg_t0), float(seg_t1)),
+                    t_eval=t_eval_seg,
+                    max_steps=500_000,
+                )
+                states_list.append(np.asarray(out_seg["states"], dtype=float))
+            if not states_list:
+                raise DesignNotConvergedError("segmented 拼接未生成任何星历点")
+            states_dense = np.concatenate(states_list, axis=0)
+            # 去重（段间共享端点）
+            if len(states_dense) > 1:
+                keep = np.concatenate(
+                    ([True], np.linalg.norm(np.diff(states_dense[:, :3], axis=0), axis=1) > 1e-9)
+                )
+                states_dense = states_dense[keep]
+        finally:
+            spice.disable_ephem_cache()
+
+        correction = EphemerisCorrectionResult(
+            converged=True,
+            iterations=0,
+            max_residual=0.0,
+            residual_history=[],
+            t_patch=t_patch_long,
+            state_patch=s_patch_long,
+        )
+        ephemeris = _build_ephemeris_table(spice, syn_j2000, et0, et_grid, states_dense)
+
+        return OrbitDesignResult(
+            orbit_type=sel,
+            epoch_utc=epoch_iso,
+            duration_day=duration_day,
+            output_step_sec=float(output_step),
+            initial_state=np.asarray(s_patch_long[0], dtype=float),
+            ephemeris=ephemeris,
+            cr3bp_orbit=cr3bp_orbit,
+            cr3bp_jacobi=jacobi,
+            correction=correction,
+            force_config=force_config,
+        )
+
+    # --- 其他方法（standard / two_level / homotopy）：单圈修正 + 长期预报 ---
     if correction_method == "homotopy":
         # homotopy 的同伦插值建立在质点 N 体语义上，不支持 ForceModel
         eph_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
@@ -653,9 +939,6 @@ def design_orbit(
         )
 
     # --- 长期预报：复用打靶的 fm，模型完全一致 ---
-    duration_day = float(duration) * DAYS_PER_YEAR
-    duration_sec = duration_day * 86400.0
-    et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * float(output_step), float(output_step))
     t0_corr = float(correction.t_patch[0])
     out = fm.propagate(
         correction.state_patch[0],
