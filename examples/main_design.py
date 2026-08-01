@@ -77,23 +77,27 @@ def main() -> None:
     print(f"   星历修正收敛 = {conv.converged}（{conv.iterations} 次迭代）")
     print(f"   星历行数 = {len(result.ephemeris)}")
 
-    # 2. 取 CR3BP 周期轨道（无量纲会合系坐标，可直接画）
+    # 2. 取 CR3BP 周期轨道周期（用作参考量）
     cr3bp = result.cr3bp_orbit
     print(f"\n2. CR3BP 周期轨道周期 = {cr3bp.period:.6f}（无量纲）")
 
-    # 3. 绘图：会合系 3D 轨道，观察点对准 L2
-    print("\n3. 绘制会合系 3D 轨道（观察点对准 L2）")
+    # 3. 绘图：会合系 3D 轨道（加摄动后的 2 年拟周期预报轨迹）
+    print("\n3. 绘制会合系 3D 轨道（加摄动后拟周期轨迹，观察点对准 L2）")
     from e2m2e.algorithm.dynamics import LibrationPoint
     from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
 
     system = earth_moon_system()
     viz = OrbitVisualizer(system)
 
-    states = cr3bp.states  # (n,6) 无量纲会合系状态
-    l2 = system.L_points[LibrationPoint.L2]  # L2 会合系坐标 (1.1557, 0, 0)
+    # 画加摄动后的高精度预报星历（result.ephemeris），而非 CR3BP 理想周期解：
+    # 摄动使轨道偏离闭合周期解，呈现拟周期。synodic_position 是地心归一（月球
+    # 在 x=1）；减 mu 平移到质心归一（月球在 1-mu），与 L2 点、地月标记同坐标系。
+    states = result.ephemeris.synodic_position.copy()
+    states[:, 0] -= system.mu
+    l2 = system.L_points[LibrationPoint.L2]  # L2 会合系坐标（质心归一）
 
     # 一次 3D 绘图：轨道 + 地月天体 + L2 平动点标注
-    ax3d = viz.plot_3d_orbit(states, label="L2 Halo 轨道")
+    ax3d = viz.plot_3d_orbit(states, label="L2 Halo 拟周期轨迹（2 年）")
     viz.plot_primary_bodies(ax=ax3d, is_3d=True)
     ax3d.scatter(l2[0], l2[1], l2[2], marker="x", color="red", s=80, zorder=6)
     ax3d.text(l2[0], l2[1], l2[2] + 0.03, "L2", color="red", fontsize=12, fontweight="bold")
@@ -105,7 +109,7 @@ def main() -> None:
     ax3d.set_xlabel("X（无量纲）")
     ax3d.set_ylabel("Y（无量纲）")
     ax3d.set_zlabel("Z（无量纲）")
-    ax3d.set_title("L2 Halo 轨道会合系 3D（振幅 30000 km）")
+    ax3d.set_title("L2 Halo 拟周期轨迹会合系 3D（振幅 30000 km，2 年）")
     ax3d.legend(loc="upper right")
 
     if args.save:
