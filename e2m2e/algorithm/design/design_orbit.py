@@ -602,36 +602,10 @@ def design_orbit(
     if sw["planets"]:
         bodies += ["MERCURY", "VENUS", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE"]
 
-    eph_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
-    eph_dynamics = EphemerisDynamics(system=eph_system)
-    eph_dynamics.rtol = 1e-12
-    eph_dynamics.atol = 1e-12
-    eph_dynamics.max_step = 600.0
-
-    correction = correct_ephemeris_patch_points(
-        method=correction_method,
-        dynamics=eph_dynamics,
-        t_patch=t_patch_j2000,
-        state_patch=state_patch_j2000,
-        tolerance=CORRECTION_TOL_KM,
-        max_iter=50,
-        verbose=verbose,
-        n_workers=1,
-        kernel_dir=kernel_dir,
-        velocity_tolerance=correction_velocity_tolerance,
-        base_bodies=["EARTH", "MOON"] if correction_method == "homotopy" else None,
-    )
-    if not correction.converged:
-        raise DesignNotConvergedError(
-            f"{sel} 星历修正（{correction_method}）未收敛：迭代 {correction.iterations} 次，"
-            f"最大残差 {correction.max_residual:.3e} km"
-        )
-
-    # --- 4. 高精度力模型长期预报 ---
-    duration_day = float(duration) * DAYS_PER_YEAR
-    duration_sec = duration_day * 86400.0
-    et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * float(output_step), float(output_step))
-
+    # --- 3. 星历修正（多重打靶）+ 4. 高精度长期预报：共用同一力模型 ---
+    # 关键：打靶修正与长期预报必须用同一套力模型，否则修正初值在预报模型下
+    # 不是平衡态，非线性放大后轨道发散。homotopy 方法内部硬绑 EphemerisDynamics
+    # （仅质点 N 体），无法挂全摄动，故单独走旧路径。
     full_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
     full_system.coordinate_system = CoordinateSystem(
         axes=ICRSAxes(),
@@ -641,7 +615,47 @@ def design_orbit(
         perturbation, earth_degree=earth_degree, moon_degree=moon_degree, dyb=dyb
     )
     fm = ForceModel.from_config(force_config, full_system)
+    fm.rtol = 1e-12
+    fm.atol = 1e-12
     fm.max_step = 600.0
+
+    if correction_method == "homotopy":
+        # homotopy 的同伦插值建立在质点 N 体语义上，不支持 ForceModel
+        eph_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
+        eph_dynamics = EphemerisDynamics(system=eph_system)
+        eph_dynamics.rtol = 1e-12
+        eph_dynamics.atol = 1e-12
+        eph_dynamics.max_step = 600.0
+        correction_dynamics: Any = eph_dynamics
+        homotopy_base_bodies = ["EARTH", "MOON"]
+    else:
+        # standard / two_level：用全摄动 ForceModel，与预报一致
+        correction_dynamics = fm
+        homotopy_base_bodies = None
+
+    correction = correct_ephemeris_patch_points(
+        method=correction_method,
+        dynamics=correction_dynamics,
+        t_patch=t_patch_j2000,
+        state_patch=state_patch_j2000,
+        tolerance=CORRECTION_TOL_KM,
+        max_iter=50,
+        verbose=verbose,
+        n_workers=1,
+        kernel_dir=kernel_dir,
+        velocity_tolerance=correction_velocity_tolerance,
+        base_bodies=homotopy_base_bodies,
+    )
+    if not correction.converged:
+        raise DesignNotConvergedError(
+            f"{sel} 星历修正（{correction_method}）未收敛：迭代 {correction.iterations} 次，"
+            f"最大残差 {correction.max_residual:.3e} km"
+        )
+
+    # --- 长期预报：复用打靶的 fm，模型完全一致 ---
+    duration_day = float(duration) * DAYS_PER_YEAR
+    duration_sec = duration_day * 86400.0
+    et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * float(output_step), float(output_step))
     t0_corr = float(correction.t_patch[0])
     out = fm.propagate(
         correction.state_patch[0],
