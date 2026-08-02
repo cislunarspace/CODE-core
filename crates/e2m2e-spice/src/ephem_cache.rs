@@ -360,15 +360,6 @@ pub fn disable() {
     *g = None;
 }
 
-/// 查询缓存（未激活返回 None）。力模型用它判断是否走插值路径。
-pub fn with_cache<F, R>(f: F) -> R
-where
-    F: FnOnce(Option<&EphemCache>) -> R,
-{
-    let g = CACHE.read().expect("ephem cache rwlock poisoned");
-    f(g.as_ref())
-}
-
 /// strict-aware 查天体位置。miss 时非 strict 返回 `Ok(None)`（回退 cspice），
 /// strict 返回 `Err`。目标/原点/时刻与缓存匹配则返回样条插值位置。
 pub fn lookup_body_position(
