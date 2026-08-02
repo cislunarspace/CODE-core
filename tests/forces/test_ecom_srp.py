@@ -152,9 +152,7 @@ class TestCannonballDegradation:
         """flux=0 时加速应为零。"""
         dyb = [0.01] + [0.0] * 8
         ecom = EcomSolarRadiationPressure(dyb=dyb)
-        a = ecom._compute_ecom_acceleration(
-            [42164.0, 0.0, 0.0], [1e8, 0.0, 0.0], 0.0
-        )
+        a = ecom._compute_ecom_acceleration([42164.0, 0.0, 0.0], [1e8, 0.0, 0.0], 0.0)
         np.testing.assert_array_equal(a, np.zeros(3))
 
 
