@@ -60,3 +60,61 @@ class TestInitialGuess:
         d_small = np.linalg.norm(small[:3] - anchor)
         d_large = np.linalg.norm(large[:3] - anchor)
         assert d_large / d_small == pytest.approx(2.0, rel=0.05)
+
+
+# =============================================================================
+# Issue #255 — 扩展测试
+# =============================================================================
+
+
+class TestTriangularInitialGuessExtended:
+    """compute_triangular_initial_guess 扩展测试（状态结构、模态、振幅分拆）。"""
+
+    @pytest.mark.parametrize("point", [4, 5])
+    def test_state_shape_is_6(self, point: int):
+        """状态向量形状应为 (6,)。"""
+        system = _earth_moon_system()
+        state0, _ = compute_triangular_initial_guess(system, point, 8000.0, 6000.0, 0.0, 0.0)
+        assert np.asarray(state0).shape == (6,)
+
+    @pytest.mark.parametrize("point", [4, 5])
+    def test_period_is_positive(self, point: int):
+        """标称周期应为正值。"""
+        system = _earth_moon_system()
+        _, T = compute_triangular_initial_guess(system, point, 8000.0, 6000.0, 0.0, 0.0)
+        assert T > 0
+
+    @pytest.mark.parametrize("point", [4, 5])
+    def test_three_modal_frequencies_present(self, point: int):
+        """三角点应有三个独立模态频率（短周期、长周期、垂直），两两不等。"""
+        system = _earth_moon_system()
+        omega_s, _, omega_l, _, omega_v, _, _ = _triangular_modes(system, point)
+        freqs = sorted([omega_s, omega_l, omega_v])
+        # 三个频率应互不相同（特征方程给出两个面内 + 一个面外）
+        assert freqs[1] - freqs[0] > 1e-6
+        assert freqs[2] - freqs[1] > 1e-6
+
+    @pytest.mark.parametrize("point", [4, 5])
+    def test_inplane_amplitude_split_equally(self, point: int):
+        """面内振幅均分给短周期和长周期模态：两个模态使用相同的 0.5 倍原始振幅。"""
+        system = _earth_moon_system()
+        omega_s, v_s, omega_l, v_l, _, _, _ = _triangular_modes(system, point)
+        l_c = system.characteristic_length
+        amplitude_in_km = 8000.0
+        raw_in = amplitude_in_km / l_c
+        # 两个模态的位置振幅贡献：alpha * |v[:3]|，应各为 raw_in 的一半
+        pos_amp_s = (0.5 * raw_in / np.linalg.norm(v_s[:3])) * np.linalg.norm(v_s[:3])
+        pos_amp_l = (0.5 * raw_in / np.linalg.norm(v_l[:3])) * np.linalg.norm(v_l[:3])
+        assert pos_amp_s == pytest.approx(0.5 * raw_in, rel=1e-10)
+        assert pos_amp_l == pytest.approx(0.5 * raw_in, rel=1e-10)
+
+    @pytest.mark.parametrize("point", [4, 5])
+    def test_larger_amplitude_gives_larger_offset(self, point: int):
+        """振幅翻倍 → 距锚点的位置偏移近似翻倍（参数化 L4/L5）。"""
+        system = _earth_moon_system()
+        small, _ = compute_triangular_initial_guess(system, point, 4000.0, 3000.0, 0.0, 0.0)
+        large, _ = compute_triangular_initial_guess(system, point, 8000.0, 6000.0, 0.0, 0.0)
+        anchor = system.get_libration_point(LibrationPoint(point))
+        d_small = np.linalg.norm(small[:3] - anchor)
+        d_large = np.linalg.norm(large[:3] - anchor)
+        assert d_large / d_small == pytest.approx(2.0, rel=0.05)

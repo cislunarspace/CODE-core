@@ -154,16 +154,15 @@ class NormalFormPipeline:
             return self._failure("quasi_floquet", exc, ds_result, qf_result, cm_result)
 
         # —— 步骤 3：中心流形化简 ——
-        # CR3BP 路径（DS 降级、spice 不可用）：注入高阶 Hamiltonian。
-        # CR3BP 自治、平动点是不动点，直接展开 H 即可（无需 Code06 Kamiltonian）。
-        # 星历路径（spice 可用）：暂不注入（Code06 Kamiltonian + QF 多点打靶待后续主题）。
+        # 注入 CR3BP Hamiltonian 高阶项。星历路径下，动力学替代步骤的 W(t)
+        # 已吸收星历摄动，残余动力学接近 CR3BP，故 CR3BP Hamiltonian 多项式
+        # 结构对中心流形 Lie 变换同样适用。
         hamiltonian_terms: Mapping[tuple[int, ...], npt.NDArray[np.floating]] | None = None
-        if not ds_result.spice_available:
-            try:
-                H_terms = build_cr3bp_hamiltonian(self.context, max_degree=self.center_max_order)
-                hamiltonian_terms = project_hamiltonian_to_qf(H_terms, qf_result)
-            except Exception as exc:
-                return self._failure("hamiltonian_projection", exc, ds_result, qf_result, cm_result)
+        try:
+            H_terms = build_cr3bp_hamiltonian(self.context, max_degree=self.center_max_order)
+            hamiltonian_terms = project_hamiltonian_to_qf(H_terms, qf_result)
+        except Exception as exc:
+            return self._failure("hamiltonian_projection", exc, ds_result, qf_result, cm_result)
 
         try:
             cm_reducer = CenterManifoldReducer(

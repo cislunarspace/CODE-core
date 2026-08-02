@@ -43,6 +43,8 @@ _LAZY_EXPORTS = {
     "CenterManifoldResult": "center_manifold",
     "LibrationCatalogData": "catalog",
     "LibrationCatalogTransformer": "catalog",
+    "QPITCorrector": "corrector",
+    "QPITCorrectorResult": "corrector",
     "NormalFormPipeline": "pipeline",
 }
 

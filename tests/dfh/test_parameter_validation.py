@@ -116,3 +116,81 @@ class TestPropagateValidation:
             format_inputs_propagate(
                 epoch=[2024, 1, 1, 0, 0, 0], duration=1.0, initial_state=[1, 2, 3]
             )
+
+
+# =============================================================================
+# Lissajous / L4 / L5 补充边界校验（Phase 2 #255）
+# =============================================================================
+class TestLissajousTriangularValidation:
+    """Lissajous 与 L4/L5 轨道额外边界条件校验。"""
+
+    # --- Lissajous L3（amplitude 限制 100000，远大于 L1/L2 的 7600） ---
+    def test_lissajous_l3_amplitude_in_too_large(self):
+        with pytest.raises(ValueError, match="100000"):
+            design_orbit("Lissajous", collinear_point=3, amplitude_in=150000.0)
+
+    def test_lissajous_l3_amplitude_out_too_large(self):
+        with pytest.raises(ValueError, match="100000"):
+            design_orbit("Lissajous", collinear_point=3, amplitude_out=150000.0)
+
+    # --- Lissajous amplitude 为零或负 ---
+    def test_lissajous_amplitude_in_zero_rejected(self):
+        with pytest.raises(ValueError, match="0"):
+            design_orbit("Lissajous", collinear_point=2, amplitude_in=0.0)
+
+    def test_lissajous_amplitude_in_negative_rejected(self):
+        with pytest.raises(ValueError, match="0"):
+            design_orbit("Lissajous", collinear_point=2, amplitude_in=-500.0)
+
+    def test_lissajous_amplitude_out_zero_rejected(self):
+        with pytest.raises(ValueError, match="0"):
+            design_orbit("Lissajous", collinear_point=2, amplitude_out=0.0)
+
+    def test_lissajous_amplitude_out_negative_rejected(self):
+        with pytest.raises(ValueError, match="0"):
+            design_orbit("Lissajous", collinear_point=2, amplitude_out=-1000.0)
+
+    # --- Lissajous 无效 collinear_point ---
+    def test_lissajous_invalid_collinear_point_rejected(self):
+        with pytest.raises(ValueError, match="1/2/3"):
+            design_orbit("Lissajous", collinear_point=4)
+
+    # --- Lissajous L1 amplitude 限制（同 L2：7600 km） ---
+    def test_lissajous_l1_amplitude_in_too_large(self):
+        with pytest.raises(ValueError, match="7600"):
+            design_orbit("Lissajous", collinear_point=1, amplitude_in=8000.0)
+
+    # --- L4/L5 amplitude 为零或负 ---
+    def test_l4_amplitude_in_zero_rejected(self):
+        with pytest.raises(ValueError, match="0"):
+            design_orbit("L4", amplitude_in=0.0)
+
+    def test_l4_amplitude_in_negative_rejected(self):
+        with pytest.raises(ValueError, match="0"):
+            design_orbit("L4", amplitude_in=-500.0)
+
+    def test_l4_amplitude_out_zero_rejected(self):
+        with pytest.raises(ValueError, match="0"):
+            design_orbit("L4", amplitude_out=0.0)
+
+    def test_l5_amplitude_in_zero_rejected(self):
+        with pytest.raises(ValueError, match="0"):
+            design_orbit("L5", amplitude_in=0.0)
+
+    def test_l5_amplitude_out_zero_rejected(self):
+        with pytest.raises(ValueError, match="0"):
+            design_orbit("L5", amplitude_out=0.0)
+
+    # --- L4/L5 amplitude 上界 ---
+    def test_l5_amplitude_in_too_large_rejected(self):
+        with pytest.raises(ValueError, match="10000"):
+            design_orbit("L5", amplitude_in=15000.0)
+
+    # --- L4/L5 phase 越界 ---
+    def test_l4_phase_in_out_of_range(self):
+        with pytest.raises(ValueError, match="phase_in"):
+            design_orbit("L4", phase_in=1.5)
+
+    def test_l5_phase_in_out_of_range(self):
+        with pytest.raises(ValueError, match="phase_in"):
+            design_orbit("L5", phase_in=-0.1)
