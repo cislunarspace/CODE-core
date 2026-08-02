@@ -21,8 +21,28 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v7
+      # 无 spice 的常规测试
+      - run: cargo test --workspace
+      # 下载 SPICE 编译包 + 内核，跑 spice-gated 测试（forces 等）
+      - name: 下载 SPICE 编译包（cspice-v1 release）
+        run: uv run python scripts/download_cspice.py >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 下载 SPICE 内核（kernels-v1 release）
+        run: gh release download kernels-v1 --pattern '*.bsp' --pattern '*.tls' --pattern '*.tpc' --pattern '*.bpc' --pattern '*.tf' --dir kernels/ --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # --test-threads=1 因 cspice 有全局线程锁
+      - run: cargo test -p e2m2e-forces --features spice -- --test-threads=1
+
   build:
-    needs: lint
+    needs: [lint, test]
     strategy:
       matrix:
         include:

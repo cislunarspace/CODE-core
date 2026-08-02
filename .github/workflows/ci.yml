@@ -22,33 +22,23 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: astral-sh/setup-uv@v7
-      # Rust 格式与风格
+      # Rust 格式与风格（无 spice）
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace -- -D warnings
-      # spice-gated 代码（STM 传播、打靶等 Rust 大头）的编译与 lint 兜底。
-      # 编译包来自 cspice-v1 release（scripts/download_cspice.py），设好
-      # CSPICE_DIR 后 cspice-sys 跳过 NAIF 下载（国内网络常不可达）。
+      # spice-gated 代码的编译与 lint：编译包来自 cspice-v1 release，
+      # 设好 CSPICE_DIR 后 cspice-sys 跳过 NAIF 下载（国内网络常不可达）。
       - name: 下载 SPICE 编译包（cspice-v1 release）
         run: uv run python scripts/download_cspice.py >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: cargo clippy --workspace --features spice -- -D warnings
-      - run: cargo test --workspace
-      # 下载 SPICE 内核到 kernels/，让 nbody_stm 里依赖 de430/de440s.bsp 的
-      # forces 测试在 CI 上真跑起来（此前因 .bsp 未入库被守卫跳过）。
-      # 内核来自 kernels-v1 release 资产，覆盖 nbody_stm.rs 列出的全部 8 个文件名。
-      - name: 下载 SPICE 内核（kernels-v1 release）
-        run: gh release download kernels-v1 --pattern '*.bsp' --pattern '*.tls' --pattern '*.tpc' --pattern '*.bpc' --pattern '*.tf' --dir kernels/ --clobber
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # spice 下的 forces 测试；--test-threads=1 因 cspice 有全局线程锁。
-      - run: cargo test -p e2m2e-forces --features spice -- --test-threads=1
       # Python 格式与风格
       - run: uv sync --group dev
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       # 五层依赖方向检查（ADR 0012）：data/algorithm/api 无越层 import
       - run: uv run python scripts/check_layer_imports.py
+
 
   typecheck:
     runs-on: ubuntu-latest
