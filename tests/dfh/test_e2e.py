@@ -1,8 +1,13 @@
-"""端到端测试（移植 MATLAB ``tests/e2e/TestE2EDesignOrbit`` 等）。
+"""DFH 交叉参考端到端测试（ADR 0013：开发期参考，不进 CI）。
 
 用 Python 生成器写出 inputs-dac.txt，在 DFH exe 所在目录调用
 ``DFH_DAC.exe``，再解析输出，验证：exe 正常退出、星历结构完整、首行历元
 匹配、位置量级合理、生成文件被清理。exe 不存在时整组跳过（CI 不跑）。
+
+**ADR 0013 对齐说明**：本测试是开发期交叉参考脚本（ADR 0013 §4），用于量级/
+系统性偏差诊断，不是 e2m2e 的验证基准。e2m2e 是独立库，正确性由物理定义裁决
+（解析解 + 不变量），不与其他软件强制对比。DFH_DAC.exe 仅作本地手动诊断，
+不进 CI、不进发布包。
 
 exe 定位：``DFH_ORBIT_ROOT`` 环境变量优先，其次 MATLAB 封装库的 orbit
 目录（``orbit-design-module/CislunarOrbitPack/orbit``，含 JPLEPH 等数据
