@@ -8,14 +8,18 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces.ecom_srp import (
     EcomSolarRadiationPressure,
     _build_dyb_frame,
+    _P_SRP_1AU,
 )
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
+from e2m2e.data.templates.systems import AU, KM_TO_M
 
 
 class TestEcomConstruction:
@@ -152,7 +156,9 @@ class TestCannonballDegradation:
         """flux=0 时加速应为零。"""
         dyb = [0.01] + [0.0] * 8
         ecom = EcomSolarRadiationPressure(dyb=dyb)
-        a = ecom._compute_ecom_acceleration([42164.0, 0.0, 0.0], [1e8, 0.0, 0.0], 0.0)
+        a = ecom._compute_ecom_acceleration(
+            [42164.0, 0.0, 0.0], [1e8, 0.0, 0.0], 0.0
+        )
         np.testing.assert_array_equal(a, np.zeros(3))
 
 

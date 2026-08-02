@@ -36,13 +36,11 @@ _P_SRP_1AU = 4.56e-6
 
 def _cross(a: npt.NDArray, b: npt.NDArray) -> npt.NDArray:
     """三维向量叉积。"""
-    return np.array(
-        [
-            a[1] * b[2] - a[2] * b[1],
-            a[2] * b[0] - a[0] * b[2],
-            a[0] * b[1] - a[1] * b[0],
-        ]
-    )
+    return np.array([
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ])
 
 
 def _build_dyb_frame(
@@ -184,6 +182,8 @@ class EcomSolarRadiationPressure(PhysicalModel):
 
     def to_config(self) -> dict:
         """序列化为配置字典。"""
+        from .shadow import ConicalShadowModel
+
         shadow_cfg = None
         if self._shadow is not None:
             shadow_cfg = {
