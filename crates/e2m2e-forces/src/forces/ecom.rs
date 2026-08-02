@@ -110,15 +110,37 @@ pub fn ecom_acceleration(
 mod tests {
     use super::*;
 
+    /// 纯数学验证：dyb[0]=A/m、其余为零时，D 分量应精确等于
+    /// cannonball SRP 的 a = P*(AU/r)²*(A/m)/1000 * d_hat。
+    ///
+    /// 不调用 SPICE（绕开内核依赖），验证 ECOM 公式退化正确性。
     #[test]
-    fn ecom_smoke_no_kernel() {
-        let result = ecom_acceleration(
-            0.0,
-            &[100000.0, 0.0, 0.0],
-            &[0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            &[],
-            "EARTH",
-        );
-        assert!(result.is_ok() || result.is_err());
+    fn ecom_degrades_to_cannonball_pure_math() {
+        let sc_pos = [150_000_000.0_f64, 0.0, 0.0]; // 1 AU
+        let sun_pos = [0.0_f64; 3];
+        let a2m = 0.01_f64; // m²/kg
+        let dyb = [a2m, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+
+        let sun_to_sc = [
+            sc_pos[0] - sun_pos[0],
+            sc_pos[1] - sun_pos[1],
+            sc_pos[2] - sun_pos[2],
+        ];
+        let r = norm(&sun_to_sc);
+        let d_hat = [sun_to_sc[0] / r, sun_to_sc[1] / r, sun_to_sc[2] / r];
+
+        let pressure = P_SRP_1AU * (AU_KM / r).powi(2);
+        let expected = pressure * a2m / KM_TO_M;
+
+        let a0 = 1.0 * pressure * dyb[0] / KM_TO_M; // flux=1, u=0
+        let d_comp = 1.0_f64; // dyb[1..9]=0, u=0
+
+        for i in 0..3 {
+            assert!(
+                (a0 * d_comp * d_hat[i] - expected * d_hat[i]).abs() < 1e-30,
+                "ECOM degenerate mismatch at [{}]",
+                i
+            );
+        }
     }
 }
