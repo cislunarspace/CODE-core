@@ -140,3 +140,41 @@ def test_ephem_cache_third_body_consistency(earth_system):
     # 1800s 网格下累积到 ~1 km 量级（月球 2 天走 ~7% 周期，插值误差较大）。
     # 这是三次样条插值的固有精度，非 bug；缩网格可降至任意精度。
     assert diff < 5.0, f"第三体缓存 vs 未缓存末态差异 {diff:.3e} km 超过 5.0"
+
+
+@pytest.mark.spice
+def test_ephem_cache_tide_solid_consistency(earth_system):
+    """tide=1(solid) 下缓存激活 vs 未激活，末态一致。
+
+    验证 effective_coefficients 的潮汐扰动体位置查询走 EphemCache 而非
+    裸调 cspice。注册扰动体对 (SUN, EARTH) + (MOON, EARTH) 后，
+    tide=1 的传播结果应与无缓存基线一致。
+    """
+    system = earth_system
+    gravity = GravityField("EARTH", degree=4, order=4, tide_mode="solid")
+    duration = 6 * 3600.0
+
+    # 未激活基线
+    state_baseline, et0 = _propagate_leo(system, [gravity], duration)
+
+    # 激活缓存：含扰动体 (SUN/MOON, EARTH) + 帧旋转 (ITRF93, J2000)
+    enable_ephem_cache(
+        [
+            ("EARTH", "SOLAR SYSTEM BARYCENTER"),
+            ("SUN", "EARTH"),
+            ("MOON", "EARTH"),
+            ("SUN", "SOLAR SYSTEM BARYCENTER"),
+            ("MOON", "SOLAR SYSTEM BARYCENTER"),
+        ],
+        [("ITRF93", "J2000")],
+        et0,
+        et0 + duration,
+        600.0,
+    )
+    try:
+        state_cached, _ = _propagate_leo(system, [gravity], duration)
+    finally:
+        disable_ephem_cache()
+
+    diff = np.linalg.norm(state_cached - state_baseline)
+    assert diff < 1e-2, f"tide=1 缓存 vs 未缓存末态差异 {diff:.3e} km 超过 1e-2"

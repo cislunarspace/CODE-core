@@ -830,19 +830,23 @@ def design_orbit(
             states_syn=state_patch_syn_n, t_syn_arr=t_patch_syn_n, et0=et0
         )
         per_rev = len(t_patch_syn_n) // n_rev  # 每圈节点数（NRHO 加密时非 8）
-        # 潮汐防御：effective_coefficients 的 body-fixed 位置裸调 cspice
-        # 未走星历缓存，tide=1 时放进并行打靶区会并发撞 cspice。本轮不支持
-        # 潮汐缓存 → 强制回退串行（E2M2E_MS_PARALLEL=0）。tide=0（main_design
-        # 默认）无此路径，可并行。
-        if sw["tide"] == 1 and verbose:
-            print("  提示: tide=1 未走星历缓存，打靶回退串行（潮汐缓存为后续扩展）")
         # 预采样星历缓存：打靶 + 逐段积分全程查三次样条表，不逐次调 cspice。
         # 这是 2 年 50 圈 × 每圈 8 节点 × 50 迭代打靶能跑完的关键（否则
         # 每步每力跨界查 SPICE，量级不可接受，且并发下触发 DAFFRNOTFOUND）。
         # 帧对覆盖 GravityField 的 body-fixed→J2000（地月非球形需要）。
+        # 潮汐扰动体对：effective_coefficients 查 (perturber, central_body)
+        # 在 J2000 的位置 + (input_frame, "J2000") 帧旋转，合成 body-fixed
+        # 位置。注册扰动体对确保 tide=1 下全程走缓存、零 cspice FFI。
         # try/finally：缓存是进程级单例，用完必须清除避免污染后续调用。
+        # 扰动体→中心天体对（与 Rust perturbers_for_body 一致）：
+        #   EARTH → [SUN, MOON]，MOON → [EARTH]。
+        _perturber_map = {"EARTH": ["SUN", "MOON"], "MOON": ["EARTH"]}
+        _perturber_names = {p for b in bodies for p in _perturber_map.get(b.upper(), [])}
+        # 合并：原 bodies + 扰动体中未包含的天体（如 SUN），
+        # enable_ephem_cache 自动注册 (name, observer) + (name, SSB) + NAIF-ID 变体。
+        _cache_bodies = list(dict.fromkeys([*bodies, *_perturber_names]))
         spice.enable_ephem_cache(
-            bodies,
+            _cache_bodies,
             et0,
             float(max(et_grid[-1], t_patch_j2000_n[-1])),
             dt=3600.0,
@@ -850,27 +854,21 @@ def design_orbit(
             frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
         )
         try:
-            if sw["tide"] == 1:
-                os.environ["E2M2E_MS_PARALLEL"] = "0"  # 潮汐未缓存 → 串行
-            try:
-                # 第 1 步段长（每组圈数）：段长与论文结构一致，段内圈数
-                # 控制在单圈量级（Halo 初猜在星历下第 1 圈就偏，段越短
-                # 初猜越贴真实动力学）。默认组内 3 圈，段多时自动增。
-                revs_per_group = max(1, min(3, n_rev))
-                t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
-                    forces_py,
-                    "EARTH",
-                    t_patch_j2000_n,
-                    state_patch_j2000_n,
-                    revs_per_group,
-                    per_rev,
-                    max_iter=50,
-                    tolerance=CORRECTION_TOL_KM,
-                    verbose=verbose,
-                )
-            finally:
-                if sw["tide"] == 1:
-                    os.environ.pop("E2M2E_MS_PARALLEL", None)
+            # 第 1 步段长（每组圈数）：段长与论文结构一致，段内圈数
+            # 控制在单圈量级（Halo 初猜在星历下第 1 圈就偏，段越短
+            # 初猜越贴真实动力学）。默认组内 3 圈，段多时自动增。
+            revs_per_group = max(1, min(3, n_rev))
+            t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
+                forces_py,
+                "EARTH",
+                t_patch_j2000_n,
+                state_patch_j2000_n,
+                revs_per_group,
+                per_rev,
+                max_iter=50,
+                tolerance=CORRECTION_TOL_KM,
+                verbose=verbose,
+            )
 
             # 逐段积分填满 et_grid：每段从修正后节点初值积分到下一节点
             states_list: list[np.ndarray] = []

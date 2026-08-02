@@ -216,14 +216,31 @@ fn effective_coefficients(
     let mut c = base_c.to_vec();
     let mut s = base_s.to_vec();
 
-    // 查扰动体位置（input_frame 系下，observer = 中心天体）
+    // 查扰动体位置（input_frame 系下，observer = 中心天体）。
+    // 走星历缓存：先查 (perturber, central_body) 在 J2000 的位置，再查
+    // (input_frame, "J2000") 帧旋转矩阵，合成 body-fixed 位置。
+    // strict 模式（并行打靶区）下 miss 硬 Err，杜绝并发 cspice。
     let perturbers_names = perturbers_for_body(body);
     let input_frame = input_frame_for_body(body);
+    let r_input_to_j2000: [[f64; 3]; 3] =
+        match e2m2e_spice::ephem_cache::lookup_frame_matrix(input_frame, "J2000", et) {
+            Ok(Some(m)) => m,
+            Ok(None) => pxform(input_frame, "J2000", et)?,
+            Err(e) => return Err(e.into()),
+        };
     let mut perturbers_flat: Vec<f64> = Vec::with_capacity(perturbers_names.len() * 4);
     for &name in perturbers_names {
-        // SPICE 查扰动体相对中心天体在 input_frame 系下的位置
-        let (state, _lt) = e2m2e_spice::spice_ffi::spkezr(name, et, input_frame, "NONE", body)?;
-        perturbers_flat.extend_from_slice(&[state[0], state[1], state[2]]);
+        let pos_j2000: [f64; 3] =
+            match e2m2e_spice::ephem_cache::lookup_body_position(name, body, et) {
+                Ok(Some(p)) => p,
+                Ok(None) => {
+                    let (st, _) = e2m2e_spice::spice_ffi::spkezr(name, et, "J2000", "NONE", body)?;
+                    [st[0], st[1], st[2]]
+                }
+                Err(e) => return Err(e.into()),
+            };
+        let pos_bf = mat3_t_mul_vec(&r_input_to_j2000, &pos_j2000);
+        perturbers_flat.extend_from_slice(&pos_bf);
         // GM 用硬编码表（与 Python spice.get_gm 一致；DE430 bsp 不带 GM）
         let gm = gm_for_body(name)
             .ok_or_else(|| SpiceFfiError::Failed(format!("GM not known for body {:?}", name)))?;
