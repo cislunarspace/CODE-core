@@ -19,11 +19,10 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from ..proximity.relative_dynamics import RelativeDynamics, TargetOrbit
+from ..proximity.relative_dynamics import DynamicsLike, RelativeDynamics, TargetOrbit
 
 if TYPE_CHECKING:
     from ...data.types.orbit import Orbit
-    from ..dynamics import CR3BP_Dynamics
 
 
 @dataclass
@@ -60,7 +59,7 @@ def phasing_search(
     orbit: Orbit,
     dphase: float,
     tof_grid: npt.ArrayLike,
-    dynamics: CR3BP_Dynamics,
+    dynamics: DynamicsLike,
     *,
     t0: float | None = None,
 ) -> list[PhasingSolution]:
