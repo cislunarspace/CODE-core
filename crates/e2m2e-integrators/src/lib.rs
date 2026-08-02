@@ -1768,7 +1768,7 @@ fn lambert_batch_py(
 /// 激活 Rust 星历预采样缓存。
 ///
 /// 在积分前把要用到的天体状态与帧旋转矩阵在均匀网格上预采样、建三次样条，
-/// 装入进程级缓存。此后 Rust 力模型（ThirdBody/IndirectTerm/GravityField）
+/// 装入进程级缓存。此后 Rust 力模型（ThirdBody/IndirectTerm/GravityField/Relativistic）
 /// 每步查表，不再调 cspice FFI。需在 SPICE 内核已加载后调用。
 ///
 /// # 参数
@@ -1776,17 +1776,20 @@ fn lambert_batch_py(
 ///   ``[("MOON", "EARTH"), ("SUN", "EARTH"), ("EARTH", "SOLAR SYSTEM BARYCENTER")]``
 /// - `frame_pairs`: 要缓存的帧旋转对 ``[(from, to), ...]``，如
 ///   ``[("ITRF93", "J2000"), ("MOON_PA", "J2000")]``
+/// - `sxform_pairs`: 要缓存的 6×6 状态变换对 ``[(from, to), ...]``，如
+///   ``[("ITRF93", "J2000")]``（Lense-Thirring 用）。关键字参数，默认 ``None``。
 /// - `et_start`, `et_end`: 积分时间范围（SPICE et 秒）
 /// - `dt`: 网格步长（秒），默认 3600
 #[cfg(feature = "spice")]
 #[pyfunction]
-#[pyo3(signature = (targets, frame_pairs, et_start, et_end, dt=3600.0))]
+#[pyo3(signature = (targets, frame_pairs, et_start, et_end, dt=3600.0, *, sxform_pairs=None))]
 fn enable_ephem_cache(
     targets: &Bound<'_, PyList>,
     frame_pairs: &Bound<'_, PyList>,
     et_start: f64,
     et_end: f64,
     dt: f64,
+    sxform_pairs: Option<&Bound<'_, PyList>>,
 ) -> PyResult<()> {
     let mut bodies: Vec<(String, String)> = Vec::new();
     for item in targets.iter() {
@@ -1798,10 +1801,17 @@ fn enable_ephem_cache(
         let tup: (String, String) = item.extract()?;
         frames.push(tup);
     }
-    let cache = e2m2e_spice::ephem_cache::EphemCache::build(&bodies, &frames, et_start, et_end, dt)
-        .map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!("ephem cache build: {e:?}"))
-        })?;
+    let mut sxforms: Vec<(String, String)> = Vec::new();
+    if let Some(pairs) = sxform_pairs {
+        for item in pairs.iter() {
+            let tup: (String, String) = item.extract()?;
+            sxforms.push(tup);
+        }
+    }
+    let cache = e2m2e_spice::ephem_cache::EphemCache::build(
+        &bodies, &frames, &sxforms, et_start, et_end, dt,
+    )
+    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("ephem cache build: {e:?}")))?;
     e2m2e_spice::ephem_cache::enable(cache);
     Ok(())
 }

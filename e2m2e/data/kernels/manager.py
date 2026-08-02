@@ -168,6 +168,7 @@ class SPICEManager(EphemerisProvider):
         frame: str = "J2000",
         observer: str = "EARTH",
         frame_pairs: list[tuple[str, str]] | None = None,
+        sxform_pairs: list[tuple[str, str]] | None = None,
     ) -> None:
         """构建并启用预插值星历缓存（Python 层 + Rust 积分层）。
 
@@ -185,6 +186,8 @@ class SPICEManager(EphemerisProvider):
             frame_pairs: Rust 层帧旋转对（(from, to)）。GravityField 需
                 body-fixed→J2000（如 ("ITRF93","J2000")、("MOON_PA","J2000")）。
                 缺省注册 (frame, "J2000")。
+            sxform_pairs: Rust 层 6×6 状态变换对（(from, to)）。Lense-Thirring
+                需 body-fixed→J2000（如 ("ITRF93","J2000")）。可为空列表。
         """
         from .ephem_cache import build_ephem_cache
 
@@ -221,6 +224,7 @@ class SPICEManager(EphemerisProvider):
                 id_keys = [b.upper() for b in bodies]
 
             frame_pairs = frame_pairs or [(frame, "J2000")]
+            sxform_pairs = sxform_pairs or []
             _rust_enable(
                 [
                     (k, observer.upper())
@@ -237,6 +241,7 @@ class SPICEManager(EphemerisProvider):
                 et_start,
                 et_end,
                 dt=dt,
+                sxform_pairs=sxform_pairs,
             )
         except ImportError:
             # 非 spice 构建（_integrators 无该函数）：仅 Python 层缓存生效

@@ -177,10 +177,20 @@ struct FrameSpline {
     comps: [CubicSpline; 9],
 }
 
+/// 单个 (from, to) 帧对的 6×6 状态变换矩阵 36 分量样条（行优先）。
+///
+/// SPICE `sxform` 返回的 6×6 矩阵分块为 ``[R 0; Rdot R]``——左上 3×3 是
+/// 旋转 R，左下 3×3 是 R·ω（R 对时间导数），右下仍为 R。缓存 36 个分量
+/// 可直接插值整个矩阵，供 Lense-Thirring 等需要 Rdot 的力模型使用。
+struct SxformSpline {
+    comps: [CubicSpline; 36],
+}
+
 /// 星历预采样缓存。
 pub struct EphemCache {
     bodies: HashMap<(String, String), BodySpline>,
     frames: HashMap<(String, String), FrameSpline>,
+    sxforms: HashMap<(String, String), SxformSpline>,
     et_start: f64,
     et_end: f64,
 }
@@ -189,10 +199,12 @@ impl EphemCache {
     /// 预采样构建缓存。
     ///
     /// 对每个 (target, observer) 在 [et_start, et_end] 上以 dt 步长采样位置/速度；
-    /// 对每个 (from, to) 帧对采样 pxform 的 9 个分量。各建自然三次样条。
+    /// 对每个 (from, to) 帧对采样 pxform 的 9 个分量；
+    /// 对每个 (from, to) sxform 对采样 sxform 的 36 个分量。各建自然三次样条。
     pub fn build(
         bodies: &[(String, String)],
         frames: &[(String, String)],
+        sxform_pairs: &[(String, String)],
         et_start: f64,
         et_end: f64,
         dt: f64,
@@ -262,9 +274,25 @@ impl EphemCache {
             frame_map.insert((from.clone(), to.clone()), FrameSpline { comps });
         }
 
+        let mut sxform_map = HashMap::new();
+        for (from, to) in sxform_pairs {
+            let mut comps_grids: [Vec<f64>; 36] = std::array::from_fn(|_| vec![0.0_f64; n]);
+            for i in 0..n {
+                let m = crate::spice_ffi::sxform(from, to, t_grid[i])?;
+                for r in 0..6 {
+                    for c in 0..6 {
+                        comps_grids[r * 6 + c][i] = m[r][c];
+                    }
+                }
+            }
+            let comps = comps_grids.map(|g| CubicSpline::new(t_grid.clone(), g));
+            sxform_map.insert((from.clone(), to.clone()), SxformSpline { comps });
+        }
+
         Ok(Self {
             bodies: body_map,
             frames: frame_map,
+            sxforms: sxform_map,
             et_start: t_grid[0],
             et_end: t_grid[n - 1],
         })
@@ -302,6 +330,22 @@ impl EphemCache {
             r[k / 3][k % 3] = fs.comps[k].eval(et);
         }
         Some(r)
+    }
+
+    /// 查 (from, to) 帧 6×6 状态变换矩阵。未缓存或越界返回 None。
+    pub fn state_transform_matrix(&self, from: &str, to: &str, et: f64) -> Option<[[f64; 6]; 6]> {
+        let key = (from.to_string(), to.to_string());
+        let ss = self.sxforms.get(&key)?;
+        if !(self.et_start..=self.et_end).contains(&et) {
+            return None;
+        }
+        let mut m = [[0.0_f64; 6]; 6];
+        for (k, row) in m.iter_mut().enumerate() {
+            for (j, val) in row.iter_mut().enumerate() {
+                *val = ss.comps[k * 6 + j].eval(et);
+            }
+        }
+        Some(m)
     }
 }
 
@@ -420,6 +464,70 @@ pub fn lookup_frame_matrix(
             });
         }
         Err(CacheMissError::KeyMiss(format!("frame ({from}, {to})")))
+    } else {
+        Ok(None)
+    }
+}
+
+/// strict-aware 查帧 6×6 状态变换矩阵。语义同 `lookup_body_position`。
+pub fn lookup_sxform(
+    from: &str,
+    to: &str,
+    et: f64,
+) -> Result<Option<[[f64; 6]; 6]>, CacheMissError> {
+    let g = CACHE.read().expect("ephem cache rwlock poisoned");
+    let Some(cache) = g.as_ref() else {
+        return if strict() {
+            Err(CacheMissError::NotEnabled)
+        } else {
+            Ok(None)
+        };
+    };
+    let m = cache.state_transform_matrix(from, to, et);
+    if m.is_some() {
+        return Ok(m);
+    }
+    if strict() {
+        if !(cache.et_start..=cache.et_end).contains(&et) {
+            return Err(CacheMissError::OutOfRange {
+                et,
+                start: cache.et_start,
+                end: cache.et_end,
+            });
+        }
+        Err(CacheMissError::KeyMiss(format!("sxform ({from}, {to})")))
+    } else {
+        Ok(None)
+    }
+}
+
+/// strict-aware 查天体速度。语义同 `lookup_body_position`。
+pub fn lookup_body_velocity(
+    target: &str,
+    observer: &str,
+    et: f64,
+) -> Result<Option<[f64; 3]>, CacheMissError> {
+    let g = CACHE.read().expect("ephem cache rwlock poisoned");
+    let Some(cache) = g.as_ref() else {
+        return if strict() {
+            Err(CacheMissError::NotEnabled)
+        } else {
+            Ok(None)
+        };
+    };
+    let vel = cache.body_velocity(target, observer, et);
+    if vel.is_some() {
+        return Ok(vel);
+    }
+    if strict() {
+        if !(cache.et_start..=cache.et_end).contains(&et) {
+            return Err(CacheMissError::OutOfRange {
+                et,
+                start: cache.et_start,
+                end: cache.et_end,
+            });
+        }
+        Err(CacheMissError::KeyMiss(format!("({target}, {observer})")))
     } else {
         Ok(None)
     }

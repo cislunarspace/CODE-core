@@ -347,6 +347,8 @@ Rust 积分内循环里，``GravityField``/``ThirdBodyGravity``/``IndirectTerm``
        targets=[("MOON", "EARTH"), ("SUN", "EARTH"), ("EARTH", "SOLAR SYSTEM BARYCENTER")],
        frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
        et_start=et0, et_end=et0 + duration, dt=600.0,
+       # 可选：6×6 状态变换对（Lense-Thirring 相对论力需要 body-fixed→J2000）
+       sxform_pairs=[("ITRF93", "J2000")],
    )
    try:
        result = fm.propagate(...)

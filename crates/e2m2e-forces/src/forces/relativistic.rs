@@ -137,7 +137,12 @@ fn compute_angular_momentum(
         })?;
     let frame = body_fixed_frame(central_body);
 
-    let xform = sxform(frame, "J2000", et)?;
+    // 优先走星历缓存（strict 模式 miss 即硬 Err，杜绝并行区回退 cspice）
+    let xform = match e2m2e_spice::ephem_cache::lookup_sxform(frame, "J2000", et) {
+        Ok(Some(m)) => m,
+        Ok(None) => sxform(frame, "J2000", et)?,
+        Err(e) => return Err(e.into()),
+    };
     // xform 是 [[f64;6];6]，前 3×3 是 R，后 3×3 是 Rdot
     let r = [
         [xform[0][0], xform[0][1], xform[0][2]],
@@ -174,17 +179,64 @@ fn compute_de_sitter_omega(
     mu_primary: f64,
 ) -> Result<[f64; 3], SpiceFfiError> {
     // 查 central 和 primary 相对 SSB 的状态
-    let (central_state, _) = spkezr(central_body, et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER")?;
-    let (primary_state, _) = spkezr(primary_body, et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER")?;
+    // 优先走星历缓存（strict 模式 miss 即硬 Err，杜绝并行区回退 cspice）
+    let central_pos = match e2m2e_spice::ephem_cache::lookup_body_position(
+        central_body,
+        "SOLAR SYSTEM BARYCENTER",
+        et,
+    ) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            let (st, _) = spkezr(central_body, et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER")?;
+            [st[0], st[1], st[2]]
+        }
+        Err(e) => return Err(e.into()),
+    };
+    let central_vel = match e2m2e_spice::ephem_cache::lookup_body_velocity(
+        central_body,
+        "SOLAR SYSTEM BARYCENTER",
+        et,
+    ) {
+        Ok(Some(v)) => v,
+        Ok(None) => {
+            let (st, _) = spkezr(central_body, et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER")?;
+            [st[3], st[4], st[5]]
+        }
+        Err(e) => return Err(e.into()),
+    };
+    let primary_pos = match e2m2e_spice::ephem_cache::lookup_body_position(
+        primary_body,
+        "SOLAR SYSTEM BARYCENTER",
+        et,
+    ) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            let (st, _) = spkezr(primary_body, et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER")?;
+            [st[0], st[1], st[2]]
+        }
+        Err(e) => return Err(e.into()),
+    };
+    let primary_vel = match e2m2e_spice::ephem_cache::lookup_body_velocity(
+        primary_body,
+        "SOLAR SYSTEM BARYCENTER",
+        et,
+    ) {
+        Ok(Some(v)) => v,
+        Ok(None) => {
+            let (st, _) = spkezr(primary_body, et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER")?;
+            [st[3], st[4], st[5]]
+        }
+        Err(e) => return Err(e.into()),
+    };
     let r_vec = [
-        central_state[0] - primary_state[0],
-        central_state[1] - primary_state[1],
-        central_state[2] - primary_state[2],
+        central_pos[0] - primary_pos[0],
+        central_pos[1] - primary_pos[1],
+        central_pos[2] - primary_pos[2],
     ];
     let v_vec = [
-        central_state[3] - primary_state[3],
-        central_state[4] - primary_state[4],
-        central_state[5] - primary_state[5],
+        central_vel[0] - primary_vel[0],
+        central_vel[1] - primary_vel[1],
+        central_vel[2] - primary_vel[2],
     ];
     let r = norm(&r_vec);
     let c2 = C_DEFAULT * C_DEFAULT;

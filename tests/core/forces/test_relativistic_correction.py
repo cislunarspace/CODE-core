@@ -280,3 +280,90 @@ def test_leo_relativistic_position_difference_magnitude(earth_ephemeris_system):
     # 下界收到 1/10 物理量级以防回归把数量级改坏（原 1e-3 km 比物理宽 2.7 个数量级 → 收紧到 0.1×）。
     # 上界 0.01 km（10 cm/天）覆盖 Lense-Thirring / de Sitter 等次级项贡献。
     assert 2.5e-7 <= pos_diff <= 0.01, f"LEO 1-day position diff = {pos_diff:.6e} km"
+
+
+@pytest.mark.spice
+def test_relativistic_cache_zero_ffi_and_consistency(earth_ephemeris_system):
+    """#268 验收 1+2（缓存路径）：relativity=1 传播全程零 cspice FFI，且与无缓存一致。
+
+    - 启用星历缓存（含 de Sitter 的 EARTH/SUN 相对 SSB + LT 的 ITRF93→J2000 sxform）
+    - ``propagate_compiled`` 走纯 Rust 相对论力，``ephem_ffi_call_count()`` 应为 0
+    - 缓存 vs 无缓存末态一致（< 1e-5 km）
+    """
+    from e2m2e._integrators import (
+        RkMethod,
+        disable_ephem_cache,
+        ephem_ffi_call_count,
+        propagate_compiled,
+        reset_ephem_ffi_call_count,
+    )
+
+    system = earth_ephemeris_system
+    mu_earth = system.gravitational_parameter("EARTH")
+    mu_sun = system.gravitational_parameter("SUN")
+
+    # LEO 轨道
+    r_earth = 6378.137
+    a0 = r_earth + 400.0
+    y0 = _keplerian_to_cartesian(a0, 0.0, 51.6, 0.0, 0.0, 0.0, mu_earth)
+
+    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
+    t_eval = np.array([et0, et0 + 3600.0])
+
+    # 相对论力：Schwarzschild + LT(自动角动量→sxform) + de Sitter(→SSB 状态)
+    rel_spec = (
+        "relativistic",
+        "EARTH",
+        "SUN",
+        mu_earth,
+        mu_sun,
+        True,
+        True,
+        True,
+        None,  # angular_momentum_vector=None → 每步自动 sxform
+        None,  # body_radius → 默认表
+        1.0,
+    )
+
+    def run():
+        return propagate_compiled(
+            RkMethod.PD45,
+            float(et0),
+            [float(x) for x in y0],
+            600.0,
+            1e-10,
+            [float(x) for x in t_eval],
+            "EARTH",
+            [rel_spec],
+            200_000,
+        )
+
+    # 基线（无缓存）
+    res_base = run()
+
+    # 启用缓存：manager 会注册 EARTH/SUN 相对 SSB（de Sitter 用）+ name/ID 双键；
+    # sxform_pairs 注册 ITRF93→J2000 6×6 变换（LT 自动角动量用）。
+    system.spice.enable_ephem_cache(
+        ["EARTH", "SUN"],
+        et0,
+        et0 + 3600.0,
+        dt=600.0,
+        observer="EARTH",
+        frame_pairs=[("ITRF93", "J2000")],
+        sxform_pairs=[("ITRF93", "J2000")],
+    )
+    try:
+        reset_ephem_ffi_call_count()
+        res_cached = run()
+        ffi_during_prop = ephem_ffi_call_count()
+        # #268 验收标准 1：relativity=1 下传播全程零 cspice FFI
+        assert ffi_during_prop == 0, (
+            f"传播期间 cspice FFI 调用 {ffi_during_prop} 次，应为 0（LT sxform / de Sitter "
+            "spkezr 均应走缓存）"
+        )
+    finally:
+        disable_ephem_cache()
+
+    # 缓存 vs 无缓存一致
+    diff = np.linalg.norm(np.asarray(res_cached["states"][-1]) - np.asarray(res_base["states"][-1]))
+    assert diff < 1e-5, f"缓存 vs 无缓存末态差异 {diff:.3e} km 超过 1e-5"

@@ -801,8 +801,10 @@ def design_orbit(
         from ..ephemeris_correction.types import EphemerisCorrectionResult
 
         # 收集 Rust force 序列。跳过 RelativisticCorrection（与
-        # ForceModel._STM_UNSUPPORTED_TYPES 对齐）：相对论修正的裸
-        # sxform/spkezr 未走星历缓存，放进打靶并行区会并发撞 cspice。
+        # ForceModel._STM_UNSUPPORTED_TYPES 对齐）：相对论修正的 STM
+        # 雅可比尚未实现（compiled.rs `_ => Err`），放进打靶并行区无法
+        # 积分 STM。注：sxform/spkezr 已走星历缓存（#268），若未来补
+        # 雅可比，需同步注册 body/sxform 缓存键方可并入打靶。
         forces_py = []
         for entry in fm.list_forces():
             if not entry.enabled:
