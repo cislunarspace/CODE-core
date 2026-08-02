@@ -8,18 +8,14 @@
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces.ecom_srp import (
     EcomSolarRadiationPressure,
     _build_dyb_frame,
-    _P_SRP_1AU,
 )
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
-from e2m2e.data.templates.systems import AU, KM_TO_M
 
 
 class TestEcomConstruction:

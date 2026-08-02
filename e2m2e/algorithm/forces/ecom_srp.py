@@ -182,8 +182,6 @@ class EcomSolarRadiationPressure(PhysicalModel):
 
     def to_config(self) -> dict:
         """序列化为配置字典。"""
-        from .shadow import ConicalShadowModel
-
         shadow_cfg = None
         if self._shadow is not None:
             shadow_cfg = {
