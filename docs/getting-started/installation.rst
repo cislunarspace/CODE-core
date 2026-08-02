@@ -75,12 +75,12 @@ pip 安装
 
 .. code-block:: bash
 
-   # 默认构建（不含 spice 快速路径）
-   uv run maturin develop
+   # 默认构建（不含 spice 快速路径；debug 较慢，日常用 --release）
+   uv run maturin develop --release
 
    # 含 spice 快速路径（构建时自动从 NAIF 下载 CSPICE 源码编译，
    # 需网络可达 naif.jpl.nasa.gov；也可设 CSPICE_DIR 指向本机 CSPICE 安装）
-   uv run maturin develop --features spice
+   uv run maturin develop --release --features spice
 
 无 spice 的构建下，第三体引力、STM 传播、打靶等绑定缺席，Python 侧自动
 降级到纯 Python 路径，功能正确但更慢。

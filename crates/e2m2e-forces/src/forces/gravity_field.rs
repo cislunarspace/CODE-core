@@ -204,7 +204,10 @@ pub fn gravity_field_acceleration(
 /// 1:1 移植自 Python ``gravity_field._effective_coefficients``。
 /// 仅支持 ``Solid`` 档（Step1 + Step2 + 永久潮汐），``SolidAndPole`` 档
 /// 需要外部 xp/yp provider，Rust 侧暂不支持（回退到 Python 路径）。
-fn effective_coefficients(
+///
+/// pub 供集成测试按定义验证（ADR 0013）：
+/// 扰动体位置走 EphemCache 的命中/回退一致性、Love 数 k₂=0 的解析边界条件。
+pub fn effective_coefficients(
     et: f64,
     body: &str,
     base_c: &[f64],
