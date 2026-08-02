@@ -925,6 +925,21 @@ pub(crate) fn parse_force_tuple(
                 shadow_bodies,
             })
         }
+        "ecom_srp" => {
+            let dyb_vec: Vec<f64> = tuple.get_item(1)?.extract().map_err(|_| {
+                pyo3::exceptions::PyTypeError::new_err("ecom_srp dyb must be a list of floats")
+            })?;
+            if dyb_vec.len() != 9 {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "ecom_srp dyb must have 9 elements, got {}",
+                    dyb_vec.len()
+                )));
+            }
+            let mut dyb = [0.0_f64; 9];
+            dyb.copy_from_slice(&dyb_vec);
+            let shadow_bodies: Vec<String> = tuple.get_item(2)?.extract()?;
+            Ok(CompiledForce::EcomSrp { dyb, shadow_bodies })
+        }
         "relativistic" => {
             // 元组格式：
             // ("relativistic", central_body, primary_body_or_none,

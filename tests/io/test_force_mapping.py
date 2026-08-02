@@ -50,7 +50,7 @@ class TestBaseModel:
         assert [f["name"] for f in cfg["forces"]] == ["PointMassGravity", "ThirdBodyGravity"]
 
     def test_default_perturbation_raises(self):
-        # DEFAULT_PERTURBATION 含 solar_radiation=2（ECOM，未实现）与 coupling=1
+        # DEFAULT_PERTURBATION 含 coupling=1（未实现）
         with pytest.raises(NotImplementedError, match="#253"):
             dfh_perturbation_to_force_config()
 
@@ -138,9 +138,19 @@ class TestSingleSwitches:
 
 
 class TestUnsupported:
-    def test_ecom_srp_not_implemented(self):
-        with pytest.raises(NotImplementedError, match="ECOM.*#253"):
-            dfh_perturbation_to_force_config(_on(solar_radiation=2))
+    def test_ecom_srp_produces_ecom_config(self):
+        """solar_radiation=2 应产出 EcomSolarRadiationPressure 配置。"""
+        dyb = [0.02] + [0.0] * 8
+        cfg = dfh_perturbation_to_force_config(_on(solar_radiation=2), dyb=dyb)
+        (ecom,) = _entries_by_type(cfg, "EcomSolarRadiationPressure")
+        assert ecom["params"]["dyb"] == dyb
+        assert ecom["params"]["shadow"] is None
+
+    def test_ecom_srp_default_dyb(self):
+        """dyb=None 时使用 DEFAULT_DYB。"""
+        cfg = dfh_perturbation_to_force_config(_on(solar_radiation=2))
+        (ecom,) = _entries_by_type(cfg, "EcomSolarRadiationPressure")
+        assert ecom["params"]["dyb"] == [0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
     def test_coupling_not_implemented(self):
         with pytest.raises(NotImplementedError, match="#253"):

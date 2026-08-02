@@ -5,6 +5,7 @@
 //!
 //! 与 `rk_step + Python callback` 模式相比，本模块消除 30 万次 GIL 跨界。
 
+use crate::forces::ecom;
 use crate::forces::gravity_field::{self, GravityFieldContext, TideConfig, TideMode};
 use crate::forces::relativistic;
 use crate::forces::srp;
@@ -45,6 +46,10 @@ pub enum CompiledForce {
         area: f64,
         mass: f64,
         cr: f64,
+        shadow_bodies: Vec<String>,
+    },
+    EcomSrp {
+        dyb: [f64; 9],
         shadow_bodies: Vec<String>,
     },
     Relativistic {
@@ -156,6 +161,11 @@ impl CompiledForce {
                 srp::srp_acceleration(et, &sc_pos, *area, *mass, *cr, shadow_bodies, observer)
                     .map_err(|e| format!("{:?}", e))
             }
+            Self::EcomSrp { dyb, shadow_bodies } => {
+                let sc_pos = [state[0], state[1], state[2]];
+                ecom::ecom_acceleration(et, &sc_pos, dyb, shadow_bodies, observer)
+                    .map_err(|e| format!("{:?}", e))
+            }
             Self::Relativistic {
                 central_body,
                 primary_body,
@@ -234,6 +244,7 @@ pub fn supports_jacobian(force: &CompiledForce) -> bool {
             | CompiledForce::ThirdBody { .. }
             | CompiledForce::IndirectTerm { .. }
             | CompiledForce::SRP { .. }
+            | CompiledForce::EcomSrp { .. }
     )
 }
 
@@ -331,6 +342,25 @@ pub fn acceleration_and_jacobian(
             // SRP 加速度含阴影几何（太阳/遮挡体位置随 et 变化但本步内固定），
             // 差分自动包含光照份额对位置的贡献；阴影边界处不连续引入的
             // 差分误差只影响边界点，对 STM 积分可接受。
+            let r_norm = (state[0] * state[0] + state[1] * state[1] + state[2] * state[2]).sqrt();
+            let h = (f64::EPSILON.sqrt() * r_norm).max(1e-6);
+            let acc0 = force.acceleration(et, state, observer)?;
+            let mut jac = [[0.0_f64; 3]; 3];
+            for dim in 0..3 {
+                let mut state_plus = *state;
+                let mut state_minus = *state;
+                state_plus[dim] += h;
+                state_minus[dim] -= h;
+                let a_plus = force.acceleration(et, &state_plus, observer)?;
+                let a_minus = force.acceleration(et, &state_minus, observer)?;
+                for i in 0..3 {
+                    jac[i][dim] = (a_plus[i] - a_minus[i]) / (2.0 * h);
+                }
+            }
+            Ok((acc0, jac))
+        }
+        CompiledForce::EcomSrp { .. } => {
+            // 数值差分（与 SRP 同模式）。
             let r_norm = (state[0] * state[0] + state[1] * state[1] + state[2] * state[2]).sqrt();
             let h = (f64::EPSILON.sqrt() * r_norm).max(1e-6);
             let acc0 = force.acceleration(et, state, observer)?;

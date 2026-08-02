@@ -16,6 +16,7 @@ import numpy as np
 
 from .atmosphere import ExponentialAtmosphere
 from .drag import DragModel
+from .ecom_srp import EcomSolarRadiationPressure
 from .exceptions import NotSerializableError
 from .gravity_field import GravityField
 from .indirect_term import IndirectTerm
@@ -225,10 +226,19 @@ def _serialize_indirect_term(force: IndirectTerm) -> dict[str, Any]:
     return {"body": force.body, "mu": force.mu}
 
 
+def _serialize_ecom(force: EcomSolarRadiationPressure) -> dict[str, Any]:
+    """把 ECOM 光压力模型序列化为参数字典。"""
+    return {
+        "dyb": force.dyb,
+        "shadow": _serialize_shadow(force.shadow) if force.shadow is not None else None,
+    }
+
+
 _SERIALIZERS: dict[type, Any] = {
     GravityField: _serialize_gravity_field,
     DragModel: _serialize_drag_model,
     SolarRadiationPressure: _serialize_srp,
+    EcomSolarRadiationPressure: _serialize_ecom,
     FiniteBurn: _serialize_finite_burn,
     RelativisticCorrection: _serialize_relativistic_correction,
     PointMassGravity: _serialize_point_mass_gravity,
@@ -296,10 +306,19 @@ def _build_indirect_term(params: dict[str, Any]) -> IndirectTerm:
     return IndirectTerm(**params)
 
 
+def _build_ecom(params: dict[str, Any]) -> EcomSolarRadiationPressure:
+    """从参数字典构造 ECOM 光压力模型。"""
+    built = dict(params)
+    if built.get("shadow") is not None:
+        built["shadow"] = _build_shadow(built["shadow"])
+    return EcomSolarRadiationPressure(**built)
+
+
 _BUILDERS: dict[str, Any] = {
     "GravityField": _build_gravity_field,
     "DragModel": _build_drag_model,
     "SolarRadiationPressure": _build_srp,
+    "EcomSolarRadiationPressure": _build_ecom,
     "FiniteBurn": _build_finite_burn,
     "RelativisticCorrection": _build_relativistic_correction,
     "PointMassGravity": _build_point_mass_gravity,

@@ -5,6 +5,7 @@
 pub mod augmented_state;
 pub mod compiled;
 pub mod compiled_stm;
+pub mod ecom;
 pub mod gravity_field;
 pub mod hybrid_propulsion;
 pub mod nbody_stm;

@@ -12,6 +12,7 @@ Python 类是"力模型定义"（参数验证 + to_rust_spec 序列化 + 无 Rus
 from __future__ import annotations
 
 from .drag import DragModel
+from .ecom_srp import EcomSolarRadiationPressure
 from .exceptions import (
     CoordinateTransformError,
     NotSerializableError,
@@ -39,6 +40,7 @@ __all__ = [
     "IndirectTerm",
     "DragModel",
     "SolarRadiationPressure",
+    "EcomSolarRadiationPressure",
     "ConicalShadowModel",
     "ImpulsiveBurn",
     "FiniteBurn",
@@ -51,15 +53,3 @@ __all__ = [
     "load_force_config",
     "dump_force_config",
 ]
-
-
-def ecom_solar_radiation_pressure(*args, **kwargs):
-    """ECOM 光压模型（原 #253）。
-
-    实现状态：未实现（对外承诺能力，占位）。DFH 有炮弹/ECOM 两档，现有仅炮弹
-    模型。ECOM 9 系数（首系数 = 等效面质比）。
-
-    Raises:
-        NotImplementedError: ECOM 光压未实现。
-    """
-    raise NotImplementedError("ECOM 光压模型未实现（原 #253）：9 系数模型待补")

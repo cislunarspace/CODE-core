@@ -68,12 +68,15 @@ def test_family_design_implemented():
         assert "NotImplementedError" not in (inspect.getsource(fn) or "")
 
 
-def test_ecom_srp_placeholder():
-    """ECOM 光压（原 #253）占位：对外承诺能力。"""
-    from e2m2e.algorithm.forces import ecom_solar_radiation_pressure
+def test_ecom_srp_implemented():
+    """ECOM 光压（原 #253）已实现：可正常构造并输出 to_rust_spec。"""
+    from e2m2e.algorithm.forces import EcomSolarRadiationPressure
 
-    with pytest.raises(NotImplementedError, match="ECOM"):
-        ecom_solar_radiation_pressure()
+    dyb = [0.01] + [0.0] * 8
+    ecom = EcomSolarRadiationPressure(dyb=dyb)
+    spec = ecom.to_rust_spec()
+    assert spec[0] == "ecom_srp"
+    assert spec[1] == dyb
 
 
 def test_facade_placeholder():

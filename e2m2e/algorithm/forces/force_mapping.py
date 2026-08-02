@@ -125,8 +125,6 @@ def dfh_perturbation_to_force_config(
 
     if sw["coupling"] == 1:
         raise NotImplementedError("地球非球形×大天体耦合项尚未实现，归属 issue #253")
-    if sw["solar_radiation"] == 2:
-        raise NotImplementedError("ECOM 光压模型尚未实现，归属 issue #253")
     if sw["tide"] == 1 and sw["earth_nonspherical"] == 0:
         raise ValueError("tide=1 需要 earth_nonspherical=1：e2m2e 的固体潮挂在地球 GravityField 上")
 
@@ -189,6 +187,12 @@ def dfh_perturbation_to_force_config(
         add(
             "SolarRadiationPressure",
             {"area": a2m, "mass": 1.0, "cr": 1.0, "shadow": None},
+        )
+    if sw["solar_radiation"] == 2:
+        dyb_full = list(dyb) if dyb is not None else list(DEFAULT_DYB)
+        add(
+            "EcomSolarRadiationPressure",
+            {"dyb": dyb_full, "shadow": None},
         )
     if sw["atmosphere"] == 1:
         add(
