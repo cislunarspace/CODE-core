@@ -31,8 +31,8 @@ DFH（inputs-dac.txt 第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月�
 - ``tide=1``：地球固体潮，挂在地球 ``GravityField`` 的
   ``tide_mode="solid"`` 上——因此要求 ``earth_nonspherical=1``，
   否则抛 ``ValueError``。月球引力场不带潮（DFH 开关写明"地球的潮汐"）。
-- ``coupling=1``（地球非球形×大天体耦合项）：未实现，
-  ``NotImplementedError``（#253）。
+- ``coupling=1``（地球非球形×大天体耦合项）：强制启用固体潮
+  ``tide_mode="solid"``（与 ``tide=1`` 共用 IERS TN32 固体潮公式）。
 
 ``output_step`` 不是力模型参数，不进配置；它是传播输出网格，由调用方
 （阶段 3 传播对齐）用于构造 ``t_eval``。
@@ -116,15 +116,18 @@ def dfh_perturbation_to_force_config(
         ``dump_force_config`` 链路。
 
     Raises:
-        NotImplementedError: ``solar_radiation=2``（ECOM，#253）或
-            ``coupling=1``（非球形×大天体耦合项，#253）。
-        ValueError: 开关取值非法；``tide=1`` 而 ``earth_nonspherical=0``
-            （固体潮挂在地球引力场上）；``dyb`` 非 9 分量。
+        NotImplementedError: ``solar_radiation=2``（ECOM，#253）。
+        ValueError: 开关取值非法；``tide=1`` 或 ``coupling=1`` 而
+            ``earth_nonspherical=0``；``dyb`` 非 9 分量。
     """
     sw = _resolve_switches(perturbation)
 
-    if sw["coupling"] == 1:
-        raise NotImplementedError("地球非球形×大天体耦合项尚未实现，归属 issue #253")
+    # coupling=1 强制启用固体潮（无论 tide 开关值）。
+    # 公式来源：IERS TN32 eqn 1 p.59 / Vallado 2022 Eq.8-48
+    # 物理含义：大天体引力使地球弹性形变 → 修正球谐系数 C/S → 额外加速度
+    if sw["coupling"] == 1 and sw["earth_nonspherical"] == 0:
+        raise ValueError("coupling=1 需要 earth_nonspherical=1：耦合项挂在地球 GravityField 上")
+    effective_tide = sw["tide"] == 1 or sw["coupling"] == 1
     if sw["tide"] == 1 and sw["earth_nonspherical"] == 0:
         raise ValueError("tide=1 需要 earth_nonspherical=1：e2m2e 的固体潮挂在地球 GravityField 上")
 
@@ -147,7 +150,7 @@ def dfh_perturbation_to_force_config(
                 "order": int(earth_degree),
                 "input_frame": _DEFAULT_FRAME_BY_BODY["EARTH"],
                 "gravity_file": None,
-                "tide_mode": "solid" if sw["tide"] == 1 else "none",
+                "tide_mode": "solid" if effective_tide else "none",
                 "tide_convention": "tide_free",
             },
         )

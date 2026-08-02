@@ -49,10 +49,11 @@ class TestBaseModel:
         assert "IndirectTerm" not in _types(cfg)
         assert [f["name"] for f in cfg["forces"]] == ["PointMassGravity", "ThirdBodyGravity"]
 
-    def test_default_perturbation_raises(self):
-        # DEFAULT_PERTURBATION 含 coupling=1（未实现）
-        with pytest.raises(NotImplementedError, match="#253"):
-            dfh_perturbation_to_force_config()
+    def test_default_perturbation_no_error(self):
+        """DEFAULT_PERTURBATION（coupling=1）不再抛 NotImplementedError。"""
+        cfg = dfh_perturbation_to_force_config()
+        assert "forces" in cfg
+        assert len(cfg["forces"]) > 0
 
 
 class TestSingleSwitches:
@@ -152,9 +153,44 @@ class TestUnsupported:
         (ecom,) = _entries_by_type(cfg, "EcomSolarRadiationPressure")
         assert ecom["params"]["dyb"] == [0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-    def test_coupling_not_implemented(self):
-        with pytest.raises(NotImplementedError, match="#253"):
-            dfh_perturbation_to_force_config(_on(coupling=1))
+    def test_coupling_enables_solid_tide(self):
+        """coupling=1 强制启用 tide_mode='solid'（IERS TN32 固体潮）。"""
+        cfg = dfh_perturbation_to_force_config(
+            _on(coupling=1, earth_nonspherical=1),
+            earth_degree=4,
+        )
+        gf = next(
+            f
+            for f in cfg["forces"]
+            if f["type"] == "GravityField" and f["params"]["body"] == "EARTH"
+        )
+        assert gf["params"]["tide_mode"] == "solid"
+
+    def test_coupling_off_preserves_tide_setting(self):
+        """coupling=0 时，tide_mode 由 tide 开关独立决定。"""
+        cfg = dfh_perturbation_to_force_config(
+            _on(coupling=0, tide=0, earth_nonspherical=1),
+            earth_degree=4,
+        )
+        gf = next(
+            f
+            for f in cfg["forces"]
+            if f["type"] == "GravityField" and f["params"]["body"] == "EARTH"
+        )
+        assert gf["params"]["tide_mode"] == "none"
+
+    def test_coupling_forces_solid_tide_even_when_tide_off(self):
+        """coupling=1 + tide=0 时仍启用固体潮。"""
+        cfg = dfh_perturbation_to_force_config(
+            _on(coupling=1, tide=0, earth_nonspherical=1),
+            earth_degree=4,
+        )
+        gf = next(
+            f
+            for f in cfg["forces"]
+            if f["type"] == "GravityField" and f["params"]["body"] == "EARTH"
+        )
+        assert gf["params"]["tide_mode"] == "solid"
 
     def test_invalid_switch_value(self):
         with pytest.raises(ValueError, match="solar_radiation"):
@@ -181,6 +217,7 @@ class TestBuildAndRoundTrip:
         atmosphere=1,
         relativity=1,
         tide=1,
+        coupling=1,
     )
 
     def test_build_force_model_from_config(self):
