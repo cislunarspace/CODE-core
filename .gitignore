@@ -147,7 +147,6 @@ CLAUDE.md
 CONTEXT.md
 CONTEXT-MAP.md
 docs/agents/
-docs/plans/
 
 # 本地 CSPICE 库（第三方二进制，构建依赖本地安装，不入库）
 cspice/

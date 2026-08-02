@@ -1,5 +1,7 @@
 """Public Python shim for the Rust integrator extension."""
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from typing import Any
 

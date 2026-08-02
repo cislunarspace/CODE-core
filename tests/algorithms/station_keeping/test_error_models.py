@@ -70,10 +70,10 @@ class TestThrustExecutionError:
         """小量段（min ≤ |Δv| < mid）：大小 = Δv + N(0, abs_sigma)。"""
         dv, failed = self._apply(1.0, dv_min=0.1, dv_mid=10.0, abs_sigma_mps=0.033)
         assert not failed
-        mag = np.linalg.norm(dv)
-        # 无角度误差的期望：大小 ≈ 1.0 + 0.033·z；方向 ≈ +x
-        # （默认角度误差 0.333° 的 3σ ≈ 0.017，方向分量容差取 0.02）
-        assert 0.9 < mag < 1.2
+        mag = np.linalg.norm(dv)  # m/s
+        # 期望：大小 ≈ 1.0 + 0.033·z m/s；3σ 范围 ≈ ±0.099 m/s
+        # 方向误差 0.333° 的 3σ ≈ 1°，横向分量 ≤ sin(1°)·1.0 ≈ 0.0175 m/s
+        assert 0.9 < mag < 1.1
         assert abs(dv[1]) < 0.02 and abs(dv[2]) < 0.02
         assert dv[0] > 0
 
@@ -99,7 +99,9 @@ class TestThrustExecutionError:
         dv, failed = self._apply(10.0, dv_mid=10.0, abs_sigma_mps=0.033, rel_sigma=0.003)
         assert not failed
         mag = np.linalg.norm(dv)
-        assert abs(mag - 10.0) < 0.2  # 绝对误差 0.033 量级，非相对 0.03
+        # 绝对误差 0.033 m/s（apply 返回 m/s）；若误用 rel 分支则偏差 ≈ 10×0.003 = 0.03
+        # 阈值 0.1 m/s 远大于 3σ(0.033) ≈ 0.1 m/s，远小于 rel 分支 0.03 m/s
+        assert abs(mag - 10.0) < 0.1
 
 
 class TestSrpErrorModel:

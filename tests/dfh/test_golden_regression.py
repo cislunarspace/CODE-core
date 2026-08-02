@@ -1,8 +1,12 @@
-"""golden 回归测试（移植 MATLAB ``tests/regression/TestGoldenSample.m``）。
+"""输入序列化格式规格回归（ADR 0013：验证策略——按定义完成任务）。
 
-``format_inputs_control`` 的输出与 ``data/inputs-dac.golden`` 逐行比对：值字段
-（``//`` 之前）与注释字段（``//`` 之后）均须一致。golden 模板的控制段本身是
+``format_inputs_control`` 的输出与 ``data/inputs-dac.golden`` 逐行比对，验证
+序列化格式规格（行数、字段布局、值精度）的正确性。golden 模板的控制段本身是
 ControlMode=1 的默认参数，因此用默认参数调用即可复现。
+
+**ADR 0013 对齐说明**：本测试验证的是"输入格式规格"（行结构、字段位置、注释
+格式），而非算法正确性。算法正确性由解析解 + 物理不变量裁决，不依赖外部软件
+输出。DFH 格式仅作开发期交叉参考（ADR 0013 §4）。
 """
 
 from pathlib import Path
