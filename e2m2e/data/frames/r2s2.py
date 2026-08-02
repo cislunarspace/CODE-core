@@ -3,7 +3,7 @@
 r2s2（中科院地月空间时空坐标系库）提供 TDT+GCRS ↔ TDB+EBCRS 相对论时空
 转换。本模块管**句柄管理**（历表打开/校验，进程级单例注意）与时间星历
 校验；转换接口由 ``EphemerisProvider`` 提供、转换算法在
-``algorithm/coordinate/``（源：``core/coordinate/gcrs_ebcrs.py`` 句柄管理
+``algorithm/coordinate/``（源：``algorithm/coordinate/gcrs_ebcrs.py`` 句柄管理
 部分，ADR 0011/0015 迁移）。
 
 已知限制：r2s2 的 ``R2S2.init_E`` 是进程级全局状态，多历表实例会互相

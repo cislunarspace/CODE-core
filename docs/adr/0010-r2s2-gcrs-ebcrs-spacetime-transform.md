@@ -45,7 +45,7 @@ LCRS 位置）的两两互转，转换含 IAU 决议要求的相对论项，API 
 
 ## 封装决策
 
-新模块 `e2m2e/core/coordinate/gcrs_ebcrs.py`，公开类 `GCRSEBCRSSystem`：
+新模块 `e2m2e/algorithm/coordinate/gcrs_ebcrs.py`，公开类 `GCRSEBCRSSystem`：
 
 ```python
 system = GCRSEBCRSSystem("kernels/de440t.bsp")
@@ -73,7 +73,7 @@ jd_tt,  r_gcrs  = system.ebcrs_to_gcrs(jd_tdb, r_ebcrs)
 
 ## 验证
 
-`tests/core/coordinate/test_gcrs_ebcrs.py`：
+`tests/algorithm/coordinate/test_gcrs_ebcrs.py`：
 
 - 双向往返一致性（GCRS→EBCRS→GCRS 与反向），位置容差 1 cm、时间容差
   1 ms（容差下界由 r2s2 的 1 ns/1 mm 迭代精度与单段儒略日 float 的
