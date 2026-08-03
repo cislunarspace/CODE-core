@@ -174,13 +174,9 @@ def control_orbit(
         NotImplementedError: 摄动开关含 ECOM 光压或耦合项（#253）
     """
     if control_mode not in (1, 2, 3, 4, 5, 6):
-        raise ValueError(
-            f"control_mode 必须为 1-6，当前 {control_mode}"
-        )
+        raise ValueError(f"control_mode 必须为 1-6，当前 {control_mode}")
     if control_mode >= 4 and engine_layout is None:
-        raise ValueError(
-            f"control_mode {control_mode}（角动量管理）需提供 engine_layout"
-        )
+        raise ValueError(f"control_mode {control_mode}（角动量管理）需提供 engine_layout")
     if special_mode not in (1, 2):
         raise ValueError(
             f"special_mode 必须为 1（Lissajous）或 2（Halo/NRHO），当前 {special_mode}"
@@ -201,6 +197,7 @@ def control_orbit(
     # 角动量管理时校验发动机布局
     if engine_layout is not None:
         from .momentum_management import validate_engine_layout
+
         validate_engine_layout(engine_layout)
 
     if isinstance(input_ephemeris, EphemerisTable):

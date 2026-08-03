@@ -26,26 +26,33 @@ def _full_rank_layout() -> EngineLayout:
     - ±y 位置装 z 方向发动机
     - ±z 位置装 x 方向发动机
     """
-    positions = np.array([
-        [ 1,  0,  0],   # +x 位置
-        [-1,  0,  0],   # -x 位置
-        [ 0,  1,  0],   # +y 位置
-        [ 0, -1,  0],   # -y 位置
-        [ 0,  0,  1],   # +z 位置
-        [ 0,  0, -1],   # -z 位置
-    ], dtype=float)
-    directions = np.array([
-        [ 0,  1,  0],   # +x 位置 → y 方向
-        [ 0, -1,  0],   # -x 位置 → -y 方向
-        [ 0,  0,  1],   # +y 位置 → z 方向
-        [ 0,  0, -1],   # -y 位置 → -z 方向
-        [ 1,  0,  0],   # +z 位置 → x 方向
-        [-1,  0,  0],   # -z 位置 → -x 方向
-    ], dtype=float)
+    positions = np.array(
+        [
+            [1, 0, 0],  # +x 位置
+            [-1, 0, 0],  # -x 位置
+            [0, 1, 0],  # +y 位置
+            [0, -1, 0],  # -y 位置
+            [0, 0, 1],  # +z 位置
+            [0, 0, -1],  # -z 位置
+        ],
+        dtype=float,
+    )
+    directions = np.array(
+        [
+            [0, 1, 0],  # +x 位置 → y 方向
+            [0, -1, 0],  # -x 位置 → -y 方向
+            [0, 0, 1],  # +y 位置 → z 方向
+            [0, 0, -1],  # -y 位置 → -z 方向
+            [1, 0, 0],  # +z 位置 → x 方向
+            [-1, 0, 0],  # -z 位置 → -x 方向
+        ],
+        dtype=float,
+    )
     return EngineLayout(positions_m=positions, directions=directions)
 
 
 # ── EngineLayout ──
+
 
 class TestEngineLayout:
     def test_full_rank_construction(self):
@@ -66,7 +73,7 @@ class TestEngineLayout:
         with pytest.raises(ValueError, match="不足 6"):
             EngineLayout(
                 positions_m=np.ones((5, 3)),
-                directions=np.array([[0,1,0],[0,-1,0],[0,0,1],[0,0,-1],[1,0,0]]),
+                directions=np.array([[0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1], [1, 0, 0]]),
             )
 
     def test_zero_direction_rejected(self):
@@ -74,10 +81,16 @@ class TestEngineLayout:
         with pytest.raises(ValueError, match="零矢量"):
             EngineLayout(
                 positions_m=np.tile(np.eye(3), (2, 1)),
-                directions=np.array([
-                    [1, 0, 0], [0, 1, 0], [0, 0, 1],
-                    [0, 0, 0], [1, 0, 0], [0, 1, 0],
-                ]),
+                directions=np.array(
+                    [
+                        [1, 0, 0],
+                        [0, 1, 0],
+                        [0, 0, 1],
+                        [0, 0, 0],
+                        [1, 0, 0],
+                        [0, 1, 0],
+                    ]
+                ),
             )
 
     def test_shape_mismatch_rejected(self):
@@ -90,16 +103,24 @@ class TestEngineLayout:
 
 # ── validate_engine_layout ──
 
+
 class TestValidateEngineLayout:
     def test_full_rank_passes(self):
         validate_engine_layout(_full_rank_layout())
 
     def test_rank_deficient_Er_rejected(self):
         """6 个发动机全沿 z 方向喷气 → E_r 秩 1。"""
-        positions = np.array([
-            [1,0,0], [-1,0,0], [0,1,0],
-            [0,-1,0], [1,1,0], [-1,-1,0],
-        ], dtype=float)
+        positions = np.array(
+            [
+                [1, 0, 0],
+                [-1, 0, 0],
+                [0, 1, 0],
+                [0, -1, 0],
+                [1, 1, 0],
+                [-1, -1, 0],
+            ],
+            dtype=float,
+        )
         directions = np.tile([0, 0, 1.0], (6, 1))
         layout = EngineLayout(positions_m=positions, directions=directions)
         with pytest.raises(ValueError, match="E_r 秩不足"):
@@ -111,10 +132,17 @@ class TestValidateEngineLayout:
         # E[:,i] = rᵢ × [0,0,1] = [r_y, -r_x, 0] → E 行秩最多 2
         # E_r = [[0]*6, [0]*6, [1]*6] → E_r 秩 1
         # 增广秩 < 6
-        positions = np.array([
-            [1,0,0], [-1,0,0], [0,1,0],
-            [0,-1,0], [1,1,0], [-1,-1,0],
-        ], dtype=float)
+        positions = np.array(
+            [
+                [1, 0, 0],
+                [-1, 0, 0],
+                [0, 1, 0],
+                [0, -1, 0],
+                [1, 1, 0],
+                [-1, -1, 0],
+            ],
+            dtype=float,
+        )
         directions = np.tile([0, 0, 1.0], (6, 1))
         layout = EngineLayout(positions_m=positions, directions=directions)
         with pytest.raises(ValueError, match="秩不足"):
@@ -122,6 +150,7 @@ class TestValidateEngineLayout:
 
 
 # ── compute_srp_torque ──
+
 
 class TestSrpTorque:
     def test_perpendicular(self):
@@ -136,6 +165,7 @@ class TestSrpTorque:
 
 # ── compute_delta_m ──
 
+
 class TestDeltaM:
     def test_basic(self):
         dm = compute_delta_m([100, 0, 0], dt_sec=3600)
@@ -143,6 +173,7 @@ class TestDeltaM:
 
 
 # ── solve_momentum_unload ──
+
 
 class TestSolveMomentumUnload:
     def test_single_axis_unload(self):
@@ -172,11 +203,12 @@ class TestSolveMomentumUnload:
         delta_m = np.array([0, 0, 100.0])
         V = solve_momentum_unload(layout.E_r, delta_m, mass_kg=1000.0)
         # 期望 V[2]=V[3]=0.05（各分担一半），‖V‖²=0.005
-        expected_norm_sq = 2 * 0.05 ** 2
+        expected_norm_sq = 2 * 0.05**2
         assert np.dot(V, V) == pytest.approx(expected_norm_sq, abs=1e-12)
 
 
 # ── solve_joint_control ──
+
 
 class TestSolveJointControl:
     def test_orbital_only(self):
