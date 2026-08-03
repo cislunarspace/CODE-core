@@ -25,8 +25,9 @@ class SynodicAxes(Axes):
     _DEFAULT_RATE_STEP = 1.0
     _CACHE_CAPACITY = 256  # R / Rdot 缓存容量
 
-    def __init__(self, spice) -> None:
+    def __init__(self, spice, cache_capacity: int = 256) -> None:
         self._spice = spice
+        self._CACHE_CAPACITY = max(1, cache_capacity)
         self._rotation_cache: dict[float, npt.NDArray[np.floating]] = {}
         self._rate_cache: dict[float, npt.NDArray[np.floating]] = {}
 

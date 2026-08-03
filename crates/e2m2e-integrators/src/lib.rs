@@ -1082,6 +1082,7 @@ fn propagate_compiled(
     let mut eval_idx = 1usize; // t_eval[0] == t0 已经记录
     let mut n_steps = 0usize;
     let mut n_rejected = 0usize;
+    let mut n_steps_capped = 0usize;
 
     // 用 RefCell 包装 cspice 错误状态（不能直接通过 explicit_rk_step 的 E 传）
     use std::cell::RefCell;
@@ -1099,6 +1100,7 @@ fn propagate_compiled(
             }
         }
         if h > h_init {
+            n_steps_capped += 1;
             h = h_init;
         }
 
@@ -1155,6 +1157,7 @@ fn propagate_compiled(
     dict.set_item("states", states)?;
     dict.set_item("n_steps", n_steps)?;
     dict.set_item("n_rejected", n_rejected)?;
+    dict.set_item("n_steps_capped", n_steps_capped)?;
     Ok(dict.into())
 }
 
@@ -1256,6 +1259,7 @@ fn propagate_compiled_lowthrust(
     let mut eval_idx = 1usize; // t_eval[0] == t0 已经记录
     let mut n_steps = 0usize;
     let mut n_rejected = 0usize;
+    let mut n_steps_capped = 0usize;
 
     // cspice 错误状态经 RefCell 透传（不能通过 explicit_rk_step 的 E 传）
     use std::cell::RefCell;
@@ -1269,6 +1273,11 @@ fn propagate_compiled_lowthrust(
             if t + h > t_next_eval {
                 h = t_next_eval - t;
             }
+        }
+        // 稀疏 t_eval 下自适应步长失控：限制不超过 h_init（与 propagate_compiled 一致）
+        if h > h_init {
+            n_steps_capped += 1;
+            h = h_init;
         }
 
         // RK 单步：用 Rust 闭包调 augmented_eom_7d，返回 7D 导数
@@ -1329,6 +1338,7 @@ fn propagate_compiled_lowthrust(
     dict.set_item("states", states)?;
     dict.set_item("n_steps", n_steps)?;
     dict.set_item("n_rejected", n_rejected)?;
+    dict.set_item("n_steps_capped", n_steps_capped)?;
     Ok(dict.into())
 }
 
@@ -1425,6 +1435,7 @@ fn propagate_compiled_lowthrust_sensitivity(
     let mut eval_idx = 1usize;
     let mut n_steps = 0usize;
     let mut n_rejected = 0usize;
+    let mut n_steps_capped = 0usize;
 
     use std::cell::RefCell;
     let last_error: RefCell<Option<String>> = RefCell::new(None);
@@ -1442,6 +1453,11 @@ fn propagate_compiled_lowthrust_sensitivity(
             if t + h > t_next_eval {
                 h = t_next_eval - t;
             }
+        }
+        // 稀疏 t_eval 下自适应步长失控：限制不超过 h_init（与 propagate_compiled 一致）
+        if h > h_init {
+            n_steps_capped += 1;
+            h = h_init;
         }
 
         let forces_ref = &forces;
@@ -1514,6 +1530,7 @@ fn propagate_compiled_lowthrust_sensitivity(
     dict.set_item("sensitivity", sens)?;
     dict.set_item("n_steps", n_steps)?;
     dict.set_item("n_rejected", n_rejected)?;
+    dict.set_item("n_steps_capped", n_steps_capped)?;
     Ok(dict.into())
 }
 
