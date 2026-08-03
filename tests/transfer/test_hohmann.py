@@ -118,6 +118,12 @@ class TestConstructDepartureState:
         expected_v = math.sqrt(MU_EARTH / r_park)
         assert abs(np.linalg.norm(v) - expected_v) / expected_v < 1e-10
 
+    def test_nonzero_flight_path_angle_raises(self):
+        """γ≠0 时应抛出 NotImplementedError。"""
+        params = TliParams(parking_alt_km=200.0, inclination_deg=0.0, flight_path_angle_deg=5.0)
+        with pytest.raises(NotImplementedError, match="非零航迹角"):
+            construct_departure_state(params)
+
 
 class TestHohmannDeltaV:
     """霍曼转移 Δv 验证。"""

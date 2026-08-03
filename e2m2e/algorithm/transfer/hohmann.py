@@ -15,12 +15,9 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from .lambert import solve_lambert_batch
+from e2m2e.data.templates.systems import MU_EARTH, R_EARTH
 
-# 地球引力参数 (km³/s²)，WGS-84
-MU_EARTH: float = 398600.4418
-# 地球赤道半径 (km)，WGS-84
-R_EARTH: float = 6378.137
+from .lambert import solve_lambert_batch
 
 
 @dataclass(frozen=True)
@@ -157,7 +154,6 @@ def construct_departure_state(
     Returns:
         (r0, v0) in (km, km/s)，shape 均为 (3,)
     """
-    gamma = math.radians(params.flight_path_angle_deg)
     r_park = r_earth + params.parking_alt_km
 
     if abs(params.flight_path_angle_deg) < 1e-10:
@@ -167,24 +163,7 @@ def construct_departure_state(
         v_pf = np.array([0.0, v_park, 0.0])
         rot = _rotation_matrix(params.inclination_deg, params.arg_perigee_deg, params.raan_deg)
         return rot @ r_pf, rot @ v_pf
-    # γ≠0：椭圆轨道，航迹角反推偏心率
-    # Curtis Eq. 2.132: tan γ = (e·sin ν) / (1 + e·cos ν)
-    # 在近地点 ν=0 时 γ=0，所以取 ν=90°（远地点附近）反解 e:
-    # tan γ = e / 1  =>  e = tan γ （仅在 ν=90° 时成立）
-    # 更通用：在任意 ν 处，e = tan γ · (1 + e·cos ν) / sin ν
-    # 简化：假设出发点为近地点 (ν=0)，γ 应为 0；否则需从给定 ν 反解
-    # 这里取 ν=90° 的简化假设（远地点出发）
-    e = math.tan(abs(gamma))  # γ 在 [0, π/2) 内
-    a = r_park / (1.0 - e)  # 近地点 = r_park 时，a = r_park / (1-e)
-    return keplerian_to_cartesian(
-        a,
-        e,
-        params.inclination_deg,
-        params.arg_perigee_deg,
-        params.raan_deg,
-        0.0,  # ν=0（近地点）
-        mu_earth,
-    )
+    raise NotImplementedError("非零航迹角路径尚未验证")
 
 
 def hohmann_delta_v(r1: float, r2: float, mu: float = MU_EARTH) -> tuple[float, float]:
@@ -251,12 +230,12 @@ def scan_lambert_delta_v(
     )  # (1, M, 2, 3)
 
     total_dv = np.full(tof_grid.shape[0], np.inf)
-    for j in range(tof_grid.shape[0]):
-        v0_lam = result[0, j, 0, :]
-        vf_lam = result[0, j, 1, :]
-        if np.any(np.isnan(v0_lam)) or np.any(np.isnan(vf_lam)):
-            continue
-        total_dv[j] = np.linalg.norm(v0_lam - v0_park) + np.linalg.norm(vf_lam - v_target)
+    v0_lam = result[0, :, 0, :]  # (M, 3)
+    vf_lam = result[0, :, 1, :]  # (M, 3)
+    nan_mask = np.any(np.isnan(v0_lam) | np.isnan(vf_lam), axis=1)
+    total_dv[~nan_mask] = np.linalg.norm(v0_lam[~nan_mask] - v0_park, axis=1) + np.linalg.norm(
+        vf_lam[~nan_mask] - v_target, axis=1
+    )
 
     best_idx = int(np.argmin(total_dv))
     if np.isinf(total_dv[best_idx]):

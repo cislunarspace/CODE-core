@@ -125,6 +125,9 @@ __all__ = [
 ]
 
 
+_DEFAULT_TOF_GRID_POINTS: int = 50
+
+
 @dataclass
 class TransferDesignResult:
     """转移轨道设计结果。
@@ -267,7 +270,7 @@ def _transfer_orbit_hmn(
     if tof_range is not None:
         tof_min_sec = tof_range[0] * 86400.0
         tof_max_sec = tof_range[1] * 86400.0
-        tof_grid = np.linspace(tof_min_sec, tof_max_sec, 50)
+        tof_grid = np.linspace(tof_min_sec, tof_max_sec, _DEFAULT_TOF_GRID_POINTS)
 
         # 优先从 target_ephemeris 提取目标状态（RED-2）
         if target_ephemeris is not None:
