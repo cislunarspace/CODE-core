@@ -265,13 +265,16 @@ class SampleResult:
     """单样本蒙特卡洛结果。
 
     Attributes:
-        total_delta_v_mps: 总 Δv（m/s）
+        total_delta_v_mps: 总 Δv（m/s），角动量管理模式含轨道+姿态联合 Δv
         max_delta_v_mps: 最大单次 Δv（m/s）
         failed: 是否控制失败（单次 > Δv_max 或累计 > 总上限）
         maneuver_times: 控制时刻（et 秒），形状 ``(n,)``
         maneuver_dv_mps: 各控制时刻施加的 Δv（m/s），形状 ``(n,)``
         controlled_times: 受控星历时间（et 秒），形状 ``(m,)``
         controlled_states: 受控真实轨道状态（GCRS，km, km/s），形状 ``(m, 6)``
+        attitude_delta_v_mps: 姿态总 Δv（m/s），仅角动量管理模式非零
+        attitude_delta_v_independent_mps: 姿态不影响轨道时的 Δv（m/s），即
+            纯角动量卸载（不含轨道控制贡献）的 Δv 累计量
     """
 
     total_delta_v_mps: float
@@ -281,6 +284,8 @@ class SampleResult:
     maneuver_dv_mps: npt.NDArray[np.floating]
     controlled_times: npt.NDArray[np.floating]
     controlled_states: npt.NDArray[np.floating]
+    attitude_delta_v_mps: float = 0.0
+    attitude_delta_v_independent_mps: float = 0.0
 
 
 @dataclass
@@ -294,6 +299,8 @@ class MonteCarloResult:
         num_failed: 失败样本数
         maneuvers: 第一个样本的机动序列（et 秒, m/s）
         controlled_ephemeris: 第一个样本的受控星历（可为 None）
+        attitude_delta_v: 每样本姿态总 Δv（m/s），形状 ``(n_samples,)``（角动量管理）
+        attitude_delta_v_independent: 每样本姿态独立 Δv（m/s），形状 ``(n_samples,)``
     """
 
     total_delta_v: npt.NDArray[np.floating]
@@ -302,14 +309,31 @@ class MonteCarloResult:
     num_failed: int
     maneuvers: npt.NDArray[np.floating] = field(default_factory=lambda: np.empty((0, 2)))
     controlled_ephemeris: EphemerisTable | None = None
+    attitude_delta_v: npt.NDArray[np.floating] = field(default_factory=lambda: np.empty(0))
+    attitude_delta_v_independent: npt.NDArray[np.floating] = field(
+        default_factory=lambda: np.empty(0)
+    )
 
     def sk_statistic(self) -> SKStatistic:
-        """组装 SK_STATISTIC 表（3 列版，不含角动量管理）。
+        """组装 SK_STATISTIC 表（3 列或 5 列版）。
+
+        无角动量管理时 3 列（仿真序号/总 Δv/最大 Δv，序号在写出时追加）；
+        含角动量管理时 5 列（追加姿态总 Δv、姿态独立 Δv）。
 
         对齐 DFH 口径：失败样本不写统计行（黄金样本中失败行缺失）。
         """
         keep = ~self.failed_mask
-        rows = np.column_stack([self.total_delta_v[keep], self.max_delta_v[keep]])
+        if self.attitude_delta_v.size > 0:
+            rows = np.column_stack(
+                [
+                    self.total_delta_v[keep],
+                    self.max_delta_v[keep],
+                    self.attitude_delta_v[keep],
+                    self.attitude_delta_v_independent[keep],
+                ]
+            )
+        else:
+            rows = np.column_stack([self.total_delta_v[keep], self.max_delta_v[keep]])
         return SKStatistic(rows=rows, num_failed=self.num_failed)
 
     def maneuver_table(self) -> ManeuverTable:
@@ -337,6 +361,11 @@ class SingleSampleSimulation:
         force_config_ctrl: 控制（理论）力模型配置
         force_config_true: 真实（实际）力模型配置
         sampler: 标准正态采样器
+        engine_layout: 姿态发动机布局（None 表示无角动量管理）
+        momentum_interval_sec: 角动量卸载间隔（秒），0 表示与轨道控制同步
+        srp_offset_m: SRP 压心相对质心偏移（m），None 表示无 SRP 力矩
+        spacecraft_mass_kg: 航天器质量（kg）
+        srp_torque_nm: 常值 SRP 力矩（N·m），None 时由 srp_offset_m 和 SRP 力模型计算
     """
 
     nominal: NominalOrbit
@@ -352,8 +381,23 @@ class SingleSampleSimulation:
     force_config_ctrl: dict[str, Any]
     force_config_true: dict[str, Any]
     sampler: BoxMullerSampler
+    engine_layout: Any = None  # EngineLayout | None
+    momentum_interval_sec: float = 0.0
+    srp_offset_m: npt.NDArray[np.floating] | None = None
+    spacecraft_mass_kg: float = 1000.0
+    srp_torque_nm: npt.NDArray[np.floating] | None = None
 
     def run(self) -> SampleResult:
+        from .momentum_management import (
+            compute_delta_m as _compute_dm,
+        )
+        from .momentum_management import (
+            solve_joint_control as _solve_joint,
+        )
+        from .momentum_management import (
+            solve_momentum_unload as _solve_unload,
+        )
+
         nominal = self.nominal
         t0 = nominal.t_start
 
@@ -374,12 +418,47 @@ class SingleSampleSimulation:
 
         total_dv = 0.0
         max_dv = 0.0
+        attitude_total_dv = 0.0
+        attitude_independent_dv = 0.0
         failed = False
         t_prev = t0
 
-        for k in range(1, self.num_controls - 1):
-            t_k = t0 + k * self.control_interval_sec
+        # 角动量管理：SRP 力矩常值（用户输入 srp_torque_nm）
+        has_mm = self.engine_layout is not None
+        srp_torque = (
+            np.asarray(self.srp_torque_nm, dtype=float) if self.srp_torque_nm is not None else None
+        )
+        layout = self.engine_layout
+        mass = self.spacecraft_mass_kg
+        delta_m_cum = np.zeros(3)  # 累积角动量（上次卸载以来）
 
+        # 构造合并事件时间表（轨道控制 + 角动量卸载）
+        # event_type[t] = "orbital" | "momentum" | "both"
+        orbital_times: set[float] = set()
+        momentum_times: set[float] = set()
+        if has_mm and self.momentum_interval_sec > 0:
+            t_end = t0 + (self.num_controls - 1) * self.control_interval_sec
+            orbital_times = {
+                t0 + k * self.control_interval_sec for k in range(1, self.num_controls - 1)
+            }
+            t_m = t0 + self.momentum_interval_sec
+            while t_m < t_end:
+                # 与最近轨道控制时刻对齐（相差 < 1 秒视为同时）
+                if any(abs(t_m - t_o) < 1.0 for t_o in orbital_times):
+                    # 合并到轨道事件（标记为 both）
+                    pass
+                else:
+                    momentum_times.add(t_m)
+                t_m += self.momentum_interval_sec
+            events = sorted(orbital_times | momentum_times)
+        elif has_mm:
+            # 卸载间隔=0：与轨道控制同步
+            events = [t0 + k * self.control_interval_sec for k in range(1, self.num_controls - 1)]
+        else:
+            # 无角动量管理
+            events = [t0 + k * self.control_interval_sec for k in range(1, self.num_controls - 1)]
+
+        for t_k in events:
             # 弧段 [t_prev, t_k] 真实轨道传播（实际力模型 + 本弧段光压误差，
             # 表 5-3 脚注：每控制弧段重新抽样、弧段内固定）
             cr_scale = self.srp_error.sample_cr_scale(self.sampler)
@@ -393,31 +472,118 @@ class SingleSampleSimulation:
             # 式 5.39：控制时刻的测量状态 = 真实 + 测定轨扰动
             x_meas = self.nav_error.perturb(x_true, self.sampler)
 
-            # 控制量基于测量状态、控制力模型计算，施加于真实轨道
-            # （控制律输出 km/s；误差模型与输出统计按 DFH 惯例用 m/s）
-            dv_c = self.law.compute_maneuver(x_meas, t_k, propagator=prop_ctrl, nominal=nominal)
-            if dv_c is None:
-                # 特征点模式找不到目标穿越：本控制时刻不开机
-                dv_r = None
+            # 角动量累积（SRP 力矩 × 弧段时间）
+            if has_mm and srp_torque is not None:
+                delta_m_cum += _compute_dm(srp_torque, t_k - t_prev)
+
+            # 判断事件类型
+            is_orbital = t_k in orbital_times or (has_mm and self.momentum_interval_sec <= 0)
+            is_momentum = has_mm and (t_k in momentum_times or self.momentum_interval_sec <= 0)
+
+            # 控制量计算
+            if has_mm and is_orbital and is_momentum:
+                # 联合控制：轨道 + 角动量一次开机
+                dv_c = self.law.compute_maneuver(x_meas, t_k, propagator=prop_ctrl, nominal=nominal)
+                if dv_c is not None:
+                    V = _solve_joint(layout.E, layout.E_r, dv_c * 1000.0, delta_m_cum, mass)
+                    dv_orbital = layout.E @ V
+                    # 姿态独立 Δv：纯卸载需要的 Δv（与联合控制对比用）
+                    dv_att_ind = _solve_unload(layout.E_r, delta_m_cum, mass)
+                    attitude_independent_dv += float(np.linalg.norm(layout.E @ dv_att_ind))
+                    dv_r_orbital, failed_k = self.thrust_error.apply(dv_orbital, self.sampler)
+                    # 联合控制姿态贡献：纯卸载所需的发动机输出投影到轨道面
+                    if failed_k:
+                        pass
+                    elif np.linalg.norm(delta_m_cum) > 0:
+                        att_contribution = float(np.linalg.norm(layout.E @ dv_att_ind))
+                        attitude_total_dv += att_contribution
+                else:
+                    dv_r_orbital = None
+                    failed_k = False
+                    if np.linalg.norm(delta_m_cum) > 0:
+                        V = _solve_unload(layout.E_r, delta_m_cum, mass)
+                        dv_att_ind = V
+                        attitude_independent_dv += float(np.linalg.norm(layout.E @ dv_att_ind))
+                    else:
+                        V = None
+                if failed_k:
+                    failed = True
+                    break
+            elif has_mm and not is_orbital:
+                # 纯角动量卸载
+                dv_r_orbital = None
                 failed_k = False
+                if np.linalg.norm(delta_m_cum) > 0:
+                    V = _solve_unload(layout.E_r, delta_m_cum, mass)
+                    dv_att_ind = V
+                    attitude_independent_dv += float(np.linalg.norm(layout.E @ dv_att_ind))
+                    dv_att, failed_k = self.thrust_error.apply(layout.E @ V, self.sampler)
+                    if failed_k:
+                        failed = True
+                        break
+                    if dv_att is not None:
+                        att_mag = float(np.linalg.norm(dv_att))
+                        attitude_total_dv += att_mag
+                        total_dv += att_mag
+                        max_dv = max(max_dv, att_mag)
+                        x_true = x_true.copy()
+                        x_true[3:] += dv_att / 1000.0
+                V = None
             else:
-                dv_r, failed_k = self.thrust_error.apply(dv_c * 1000.0, self.sampler)
-            if failed_k:
-                failed = True
-                break
+                # 纯轨道控制（无角动量管理 或 角动量卸载间隔=0 与轨道同步）
+                dv_c = self.law.compute_maneuver(x_meas, t_k, propagator=prop_ctrl, nominal=nominal)
+                if dv_c is None:
+                    dv_r_orbital = None
+                    failed_k = False
+                else:
+                    dv_r_orbital, failed_k = self.thrust_error.apply(dv_c * 1000.0, self.sampler)
+                if failed_k:
+                    failed = True
+                    break
+                # 同步模式下角动量卸载与轨道控制合并
+                V = None
+                if has_mm and np.linalg.norm(delta_m_cum) > 0 and self.momentum_interval_sec <= 0:
+                    if dv_c is not None:
+                        V = _solve_joint(layout.E, layout.E_r, dv_c * 1000.0, delta_m_cum, mass)
+                        dv_att_ind = _solve_unload(layout.E_r, delta_m_cum, mass)
+                        attitude_independent_dv += float(np.linalg.norm(layout.E @ dv_att_ind))
+                    else:
+                        V = _solve_unload(layout.E_r, delta_m_cum, mass)
+                        dv_att_ind = V
+                        attitude_independent_dv += float(np.linalg.norm(layout.E @ dv_att_ind))
+                        att_applied, att_failed = self.thrust_error.apply(
+                            layout.E @ V, self.sampler
+                        )
+                        if att_failed:
+                            failed = True
+                            break
+                        if att_applied is not None:
+                            att_mag = float(np.linalg.norm(att_applied))
+                            attitude_total_dv += att_mag
+                            total_dv += att_mag
+                            max_dv = max(max_dv, att_mag)
+                            x_true = x_true.copy()
+                            x_true[3:] += att_applied / 1000.0
 
-            mag = 0.0 if dv_r is None else float(np.linalg.norm(dv_r))
-            maneuver_times.append(t_k)
-            maneuver_dv.append(mag)
-            total_dv += mag
-            max_dv = max(max_dv, mag)
-            if total_dv > self.thrust_total_mps:
-                failed = True
-                break
+            # 累计轨道控制 Δv
+            mag = 0.0 if dv_r_orbital is None else float(np.linalg.norm(dv_r_orbital))
+            if is_orbital:
+                maneuver_times.append(t_k)
+                maneuver_dv.append(mag)
+                total_dv += mag
+                max_dv = max(max_dv, mag)
+                if total_dv > self.thrust_total_mps:
+                    failed = True
+                    break
 
-            if dv_r is not None:
-                x_true = x_true.copy()
-                x_true[3:] += dv_r / 1000.0  # 施加于真实轨道（m/s → km/s）
+                if dv_r_orbital is not None:
+                    x_true = x_true.copy()
+                    x_true[3:] += dv_r_orbital / 1000.0  # 施加于真实轨道（m/s → km/s）
+
+            # 清零累积角动量（卸载完成）
+            if has_mm:
+                delta_m_cum = np.zeros(3)
+
             t_prev = t_k
 
         return SampleResult(
@@ -428,6 +594,8 @@ class SingleSampleSimulation:
             maneuver_dv_mps=np.array(maneuver_dv),
             controlled_times=np.array(controlled_times),
             controlled_states=np.array(controlled_states),
+            attitude_delta_v_mps=attitude_total_dv,
+            attitude_delta_v_independent_mps=attitude_independent_dv,
         )
 
 
@@ -570,6 +738,11 @@ def _build_simulation(
         force_config_ctrl=spec["force_config_ctrl"],
         force_config_true=spec["force_config_true"],
         sampler=sampler,
+        engine_layout=spec.get("engine_layout"),
+        momentum_interval_sec=spec.get("momentum_interval_sec", 0.0),
+        srp_offset_m=spec.get("srp_offset_m"),
+        spacecraft_mass_kg=spec.get("spacecraft_mass_kg", 1000.0),
+        srp_torque_nm=spec.get("srp_torque_nm"),
     )
 
 
@@ -601,6 +774,11 @@ def run_monte_carlo(
     seed: int | None = None,
     n_workers: int = 1,
     kernel_dir: str | None = None,
+    engine_layout: Any = None,
+    momentum_interval_days: float = 0.0,
+    srp_offset_m: npt.ArrayLike | None = None,
+    spacecraft_mass_kg: float = 1000.0,
+    srp_torque_nm: npt.ArrayLike | None = None,
 ) -> MonteCarloResult:
     """运行蒙特卡洛站保仿真（DFH 功能码 2 的数值核心）。
 
@@ -625,6 +803,11 @@ def run_monte_carlo(
         n_workers: 进程池大小（>1 时样本并行；需 ``kernel_dir`` 供 worker
             重建 SPICE 上下文）
         kernel_dir: SPICE 内核目录（``n_workers>1`` 时必填）
+        engine_layout: ``EngineLayout`` 实例（None 表示无角动量管理）
+        momentum_interval_days: 角动量卸载间隔（天），0 表示与轨道控制同步
+        srp_offset_m: SRP 压心相对质心偏移（m）
+        spacecraft_mass_kg: 航天器质量（kg）
+        srp_torque_nm: 常值 SRP 力矩（N·m）
 
     Returns:
         :class:`MonteCarloResult`（含 SK_STATISTIC/MANEUVERS 组装方法）
@@ -653,6 +836,13 @@ def run_monte_carlo(
         "force_config_ctrl": force_config_ctrl,
         "force_config_true": force_config_true,
         "observer": observer,
+        "engine_layout": engine_layout,
+        "momentum_interval_sec": momentum_interval_days * _SECONDS_PER_DAY,
+        "srp_offset_m": np.asarray(srp_offset_m, dtype=float) if srp_offset_m is not None else None,
+        "spacecraft_mass_kg": spacecraft_mass_kg,
+        "srp_torque_nm": (
+            np.asarray(srp_torque_nm, dtype=float) if srp_torque_nm is not None else None
+        ),
     }
 
     rng = np.random.default_rng(seed)
@@ -682,6 +872,9 @@ def run_monte_carlo(
     failed_mask = np.array([r.failed for r in results], dtype=bool)
     num_failed = int(failed_mask.sum())
 
+    att_dv = np.array([r.attitude_delta_v_mps for r in results])
+    att_dv_ind = np.array([r.attitude_delta_v_independent_mps for r in results])
+
     first = results[0] if results else None
     maneuvers = (
         np.column_stack([first.maneuver_times, first.maneuver_dv_mps])
@@ -696,6 +889,8 @@ def run_monte_carlo(
         num_failed=num_failed,
         maneuvers=maneuvers,
         controlled_ephemeris=controlled,
+        attitude_delta_v=att_dv,
+        attitude_delta_v_independent=att_dv_ind,
     )
 
 

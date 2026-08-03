@@ -86,12 +86,19 @@ class ControlOrbitRequest(_ApiModel):
     """轨道保持输入（对齐 algorithm/station_keeping 的 control_orbit 参数）。"""
 
     input_ephemeris: Any = Field(description="标称轨道星历路径或 EphemerisTable")
-    control_mode: int = Field(default=1, ge=1, le=3)
+    control_mode: int = Field(default=1, ge=1, le=6)
     is_nrho: int = Field(default=0, ge=0, le=1)
     special_mode: int = Field(default=1, ge=1, le=2)
     num_controls: int = Field(default=120, ge=1)
     num_monte_carlo: int = Field(default=5, ge=1)
     output_step: float = Field(default=86400.0, gt=0.0)
+    engine_layout: Any = Field(default=None, description="EngineLayout（角动量管理 4-6 必填）")
+    momentum_interval: float = Field(default=5.0, gt=0.0, description="角动量卸载间隔（天）")
+    srp_offset_m: list[float] | None = Field(default=None, description="SRP 压心偏移 [x,y,z]（m）")
+    spacecraft_mass: float = Field(default=1000.0, gt=0.0, description="航天器质量（kg）")
+    srp_torque: list[float] | None = Field(
+        default=None, description="常值 SRP 力矩 [τx,τy,τz]（N·m）"
+    )
 
 
 class ControlOrbitResponse(_ApiModel):
