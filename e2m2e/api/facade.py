@@ -114,6 +114,11 @@ class Facade:
                 num_monte_carlo=request.num_monte_carlo,
                 output_step=request.output_step,
                 kernel_dir=self._config.kernel_dir,
+                engine_layout=request.engine_layout,
+                momentum_interval=request.momentum_interval,
+                srp_offset_m=request.srp_offset_m,
+                spacecraft_mass=request.spacecraft_mass,
+                srp_torque=request.srp_torque,
             )
             return ControlOrbitResponse(
                 num_failed=result.num_failed,

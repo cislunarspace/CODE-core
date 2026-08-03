@@ -1,16 +1,16 @@
 """DFH 功能码 2（任务轨道控制/轨道保持）对齐入口。
 
 端到端复现 DFH 轨道保持功能：输入标称轨道星历（FR1 ``design_orbit``
-产物），按控制模式（特征点/目标点严格/目标点宽松）施加脉冲控制，以
-三轨道结构（目标/真实/测量）仿真测定轨与控制误差，蒙特卡洛批量评估，
-输出 SK_STATISTIC / MANEUVERS / 受控星历。算法以《控制方案.md》
+产物），按控制模式（特征点/目标点严格/目标点宽松，可选角动量管理）施加
+脉冲控制，以三轨道结构（目标/真实/测量）仿真测定轨与控制误差，蒙特卡洛
+批量评估，输出 SK_STATISTIC / MANEUVERS / 受控星历。算法以《控制方案.md》
 （hybrid_auto 版）为准，规格见 ``docs/plans/dfh-parity-prd.md`` FR2。
 
 参数与 MATLAB ``control_orbit.m`` 对齐（关键字参数 + dataclass 结果）。
-两处能力边界差异（e2m2e 尚未实现，见 #253）：光压默认用炮弹模型
-（``solar_radiation=1``，MATLAB 默认 ECOM=2）；耦合项默认关闭
-（``coupling=0``，MATLAB 默认开）。角动量管理（MATLAB ControlMode
-4-6）不在本入口范围（#261）。
+角动量管理模式（control_mode 4-6）通过 ``engine_layout`` 参数激活，
+对应 MATLAB ControlMode 4-6。两处能力边界差异（e2m2e 尚未实现，见
+#253）：光压默认用炮弹模型（``solar_radiation=1``，MATLAB 默认 ECOM=2）；
+耦合项默认关闭（``coupling=0``，MATLAB 默认开）。
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import numpy as np
 
 from e2m2e.io.ephemeris import read_ephemeris
 from e2m2e.io.inputs_dac import DEFAULT_DYB, DEFAULT_PERTURBATION
@@ -34,7 +36,7 @@ from .monte_carlo import MonteCarloResult, run_monte_carlo
 
 __all__ = ["ControlOrbitResult", "control_orbit"]
 
-#: 受控星历输出文件名（按控制模式分文件，对齐 DFH）
+#: 受控星历输出文件名（按控制模式分文件，对齐 DFH；mode 4-6 沿用基础模式文件名）
 _EPHEMERIS_NAMES = {1: "EPHEMERIDES_LOOSE", 2: "EPHEMERIDES_TIGHT", 3: "EPHEMERIDES_SPECIAL"}
 
 #: e2m2e 能力边界内的默认摄动开关：球模型光压、关耦合项（MATLAB 默认
@@ -51,7 +53,7 @@ class ControlOrbitResult:
     """轨道保持仿真结果（对齐 MATLAB ``control_orbit`` 输出结构）。
 
     Attributes:
-        sk_statistic: SK_STATISTIC 表（3 列：运行序号/总 Δv/最大 Δv，m/s）
+        sk_statistic: SK_STATISTIC 表（3 列或 5 列，m/s；角动量管理时含姿态列）
         num_failed: 蒙特卡洛失败样本数
         maneuvers: MANEUVERS 机动序列（MJD(TDB) + Δv，m/s）
         controlled_ephemeris: 最后一次样本的受控真实轨道星历
@@ -77,7 +79,9 @@ class ControlOrbitResult:
             write_maneuvers(self.maneuvers, out_dir / "MANEUVERS.TXT"),
         ]
         if self.controlled_ephemeris is not None:
-            name = _EPHEMERIS_NAMES.get(mode, f"EPHEMERIDES_MODE{mode}")
+            # mode 4-6 沿用基础模式的文件名
+            base = mode if mode <= 3 else mode - 3
+            name = _EPHEMERIS_NAMES.get(base, f"EPHEMERIDES_MODE{base}")
             paths.append(write_ephemeris(self.controlled_ephemeris, out_dir / f"{name}.TXT"))
         return paths
 
@@ -116,12 +120,18 @@ def control_orbit(
     kernel_dir: str | None = None,
     n_workers: int = 1,
     seed: int | None = None,
+    engine_layout: object | None = None,
+    momentum_interval: float = 5.0,
+    srp_offset_m: Sequence[float] | None = None,
+    spacecraft_mass: float = 1000.0,
+    srp_torque: Sequence[float] | None = None,
 ) -> ControlOrbitResult:
     """端到端轨道保持仿真（DFH 功能码 2）。
 
     Args:
         input_ephemeris: 标称轨道星历文件路径或 ``EphemerisTable``
-        control_mode: 1=目标点宽松、2=目标点严格、3=特征点
+        control_mode: 1=目标点宽松、2=目标点严格、3=特征点、
+            4=目标点宽松+角动量管理、5=目标点严格+角动量管理、6=特征点+角动量管理
         is_nrho: 目标轨道是否 NRHO（1=是；特征点模式的约束随之取
             ẋ=0 且 ż=0 由 ``special_mode`` 决定，本参数保留作输入对齐）
         special_mode: 特征点模式 1=Lissajous（ẋ=0）、2=Halo/NRHO（ẋ=0 且 ż=0）
@@ -146,6 +156,11 @@ def control_orbit(
             时 worker 用它在子进程重建上下文）
         n_workers: 进程池大小（>1 时样本并行）
         seed: 随机种子（同种子同结果）
+        engine_layout: ``EngineLayout`` 实例（角动量管理模式 4-6 必填）
+        momentum_interval: 角动量卸载间隔（天），0 表示与轨道控制同步
+        srp_offset_m: SRP 压心相对质心偏移 ``[x,y,z]``（m），常值
+        spacecraft_mass: 航天器质量（kg）
+        srp_torque: 常值 SRP 力矩 ``[τx,τy,τz]``（N·m）
 
     Returns:
         :class:`ControlOrbitResult`（SK_STATISTIC/MANEUVERS/受控星历）
@@ -154,9 +169,13 @@ def control_orbit(
         ValueError: 参数超界（控制模式、误差参数等）
         NotImplementedError: 摄动开关含 ECOM 光压或耦合项（#253）
     """
-    if control_mode not in (1, 2, 3):
+    if control_mode not in (1, 2, 3, 4, 5, 6):
         raise ValueError(
-            f"control_mode 必须为 1/2/3（角动量管理 4-6 归属 #261），当前 {control_mode}"
+            f"control_mode 必须为 1-6，当前 {control_mode}"
+        )
+    if control_mode >= 4 and engine_layout is None:
+        raise ValueError(
+            f"control_mode {control_mode}（角动量管理）需提供 engine_layout"
         )
     if special_mode not in (1, 2):
         raise ValueError(
@@ -174,6 +193,11 @@ def control_orbit(
     ]:
         if v <= 0:
             raise ValueError(f"{name} 必须为正数，当前 {v}")
+
+    # 角动量管理时校验发动机布局
+    if engine_layout is not None:
+        from .momentum_management import validate_engine_layout
+        validate_engine_layout(engine_layout)
 
     if isinstance(input_ephemeris, EphemerisTable):
         eph = input_ephemeris
@@ -224,13 +248,16 @@ def control_orbit(
         dyb=real_dyb_vals,
     )
 
+    # mode 4-6：基础控制律用 mode-3（4→1, 5→2, 6→3）
+    base_mode = control_mode if control_mode <= 3 else control_mode - 3
+
     result = run_monte_carlo(
         eph,
         spice=spice,
         system=system,
         force_config_ctrl=cfg_ctrl,
         force_config_true=cfg_true,
-        control_mode=control_mode,
+        control_mode=base_mode,
         special_mode=special_mode,
         special_crossings=special_crossings,
         control_interval_days=control_interval,
@@ -251,6 +278,11 @@ def control_orbit(
         seed=seed,
         n_workers=n_workers,
         kernel_dir=kernel_dir,
+        engine_layout=engine_layout,
+        momentum_interval_days=momentum_interval,
+        srp_offset_m=np.asarray(srp_offset_m, dtype=float) if srp_offset_m is not None else None,
+        spacecraft_mass_kg=spacecraft_mass,
+        srp_torque_nm=np.asarray(srp_torque, dtype=float) if srp_torque is not None else None,
     )
     return ControlOrbitResult(
         sk_statistic=result.sk_statistic(),

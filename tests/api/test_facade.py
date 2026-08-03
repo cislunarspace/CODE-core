@@ -29,8 +29,12 @@ class TestDesignOrbitRequest:
 
 class TestControlOrbitRequest:
     def test_control_mode_bounds(self):
+        """mode 7 超出范围；mode 4 在 API 层允许（算法层校验 engine_layout）。"""
         with pytest.raises(ValidationError):
-            ControlOrbitRequest(input_ephemeris="x", control_mode=4)
+            ControlOrbitRequest(input_ephemeris="x", control_mode=7)
+        # mode 4 在 API 层不报错（engine_layout 校验在算法层）
+        req = ControlOrbitRequest(input_ephemeris="x", control_mode=4)
+        assert req.control_mode == 4
 
 
 class TestFacade:

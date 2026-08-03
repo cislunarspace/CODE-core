@@ -98,8 +98,13 @@ class TestControlOrbitValidation:
             control_orbit("dummy.txt", num_controls=0)
 
     def test_control_mode_out_of_range(self):
-        """角动量管理模式 4-6 本期未实现（#261），应明确拒绝。"""
+        """control_mode 超出 1-6 范围应拒绝。"""
         with pytest.raises(ValueError, match="control_mode"):
+            control_orbit("dummy.txt", control_mode=7)
+
+    def test_momentum_mode_requires_engine_layout(self):
+        """角动量管理模式（4-6）需提供 engine_layout。"""
+        with pytest.raises(ValueError, match="engine_layout"):
             control_orbit("dummy.txt", control_mode=4)
 
     def test_thrust_min_nonpositive_rejected(self):
