@@ -142,9 +142,7 @@ def construct_departure_state(
     4. R = R₃(-Ω)·R₁(-i)·R₃(-ω)
     5. r_eci = R·r_pf;  v_eci = R·v_pf
 
-    非零航迹角路径（γ≠0，椭圆停泊轨道）：
-    调用 keplerian_to_cartesian(a, e, i, ω, Ω, ν=0) 其中：
-    a = r_park / (1 - e), e 由航迹角推导（Curtis Eq. 2.132）。
+    非零航迹角路径（γ≠0）：尚未实现，抛出 NotImplementedError。
 
     Args:
         params: TLI 出发参数
