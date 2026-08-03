@@ -49,7 +49,7 @@
 - [x] 蒙特卡洛统计输出 SK_STATISTIC/MANEUVERS
 - [x] Rust 批量 STM 传播接口可用，蒙特卡洛 100 样本规模可接受耗时
 - [x] 误差模型参数可配且有默认值
-- [ ] TIGHT/SPECIAL 量级对齐（#280）
+- [x] TIGHT/SPECIAL 量级对齐（#280）——控制律参数修正 + 阻尼/v_c，物理定义验证
 
 **关联**：
 - issue #257（CLOSED）

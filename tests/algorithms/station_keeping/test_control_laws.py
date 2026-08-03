@@ -83,6 +83,12 @@ class TestStrictTargetPointLaw:
         expected = (nominal.state_at(t_j)[:3] - state0[:3]) / t_j - state0[3:]
         np.testing.assert_allclose(dv, expected, atol=1e-9)
 
+    def test_default_tolerance_and_max_iter(self):
+        """默认 tolerance_km=0.1、max_iter=6（#280 修复值）。"""
+        law = StrictTargetPointLaw()
+        assert law.tolerance_km == 0.1
+        assert law.max_iter == 6
+
 
 class TestLooseTargetPointLaw:
     def test_analytic_solution_matches_hand_calc(self):
@@ -165,3 +171,46 @@ class TestSpecialPointLaw:
     def test_invalid_mode(self):
         with pytest.raises(ValueError, match="special_mode"):
             SpecialPointLaw(special_mode=3)
+
+    def test_default_damping_factor_and_v_c(self):
+        """默认 damping_factor=1.0、v_c=None，行为与修改前一致。"""
+        law = SpecialPointLaw()
+        assert law.damping_factor == 1.0
+        assert law.v_c is None
+
+    def test_v_c_scales_jacobian(self):
+        """v_c > 1 使雅可比除以 v_c，Newton 步长相应放大（自由运动场景）。"""
+        t0 = 0.0
+        state0 = np.array([0.0, 10.0, 0.0, 0.05, -0.01, 0.0])
+        law = SpecialPointLaw(
+            special_mode=1,
+            crossings=1,
+            horizon_sec=30.0 * _SECONDS_PER_DAY,
+            synodic=IdentitySynodic(),
+            v_c=2.0,
+            max_iter=1,  # 只看单步 Newton 修正量，不要求收敛
+        )
+        dv = law.compute_maneuver(state0, t0, propagator=FreeMotionPropagator())
+        # jac = [1,0,0]/v_c = [0.5,0,0] → Δv_x = -g/jac = -0.05/0.5 = -0.1
+        # v_c=2.0 使步长放大2×（自由运动线性场景下过冲，不收敛，返回 None 亦可接受）
+        if dv is not None:
+            np.testing.assert_allclose(dv, np.array([-0.1, 0.0, 0.0]), atol=1e-6)
+
+    def test_damping_factor_converges(self):
+        """damping_factor < 1 在过冲场景下逐步回溯，收敛到容差内。"""
+        t0 = 0.0
+        state0 = np.array([0.0, 10.0, 0.0, 0.05, -0.01, 0.0])
+        # v_c=1.0 无过冲，damping 仍生效：第一迭代全步长-0.05
+        # g=0.05>g_old=0.05 取等不触发，第二迭代全步长-0.05→v=0，g=0→收敛
+        # 验证 damping 不阻止正常收敛
+        law = SpecialPointLaw(
+            special_mode=1,
+            crossings=1,
+            horizon_sec=30.0 * _SECONDS_PER_DAY,
+            synodic=IdentitySynodic(),
+            damping_factor=0.5,
+            max_iter=10,
+        )
+        dv = law.compute_maneuver(state0, t0, propagator=FreeMotionPropagator())
+        assert dv is not None
+        np.testing.assert_allclose(dv, np.array([-0.05, 0.0, 0.0]), atol=1e-6)

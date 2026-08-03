@@ -74,12 +74,12 @@ facade = Facade()  # 默认从仓库 kernels/（或 $SPICE_KERNEL_DIR）加载 S
 # 设计一条地月 L2 近直线 Halo 轨道
 result = facade.design_orbit(
     orbit_type="Halo",
-    collinear_point=2,     # 共线平动点：1 = L1（地月之间），2 = L2（月球背地侧，默认）
-    amplitude=30000.0,     # 面外振幅（km，取值 ±73000，正北负南）
-    phase=0.0,             # 初始相位（周期份额 0~1）
-    epoch=[2024, 1, 1, 0, 0, 0.0],   # 起始历元 UTC：[年,月,日,时,分,秒]
-    duration=1.0,          # 维持时间（年）
-    output_step=3600.0,    # 星历输出间隔（秒）
+    collinear_point=2,  # 共线平动点：1 = L1（地月之间），2 = L2（月球背地侧，默认）
+    amplitude=30000.0,  # 面外振幅（km，取值 ±73000，正北负南）
+    phase=0.0,  # 初始相位（周期份额 0~1）
+    epoch=[2024, 1, 1, 0, 0, 0.0],  # 起始历元 UTC：[年,月,日,时,分,秒]
+    duration=1.0,  # 维持时间（年）
+    output_step=3600.0,  # 星历输出间隔（秒）
 )
 
 print("轨道类型        :", result.orbit_type)

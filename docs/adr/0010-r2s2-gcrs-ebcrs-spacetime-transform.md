@@ -50,7 +50,7 @@ LCRS 位置）的两两互转，转换含 IAU 决议要求的相对论项，API 
 ```python
 system = GCRSEBCRSSystem("kernels/de440t.bsp")
 jd_tdb, r_ebcrs = system.gcrs_to_ebcrs(jd_tt, r_gcrs)
-jd_tt,  r_gcrs  = system.ebcrs_to_gcrs(jd_tdb, r_ebcrs)
+jd_tt, r_gcrs = system.ebcrs_to_gcrs(jd_tdb, r_ebcrs)
 ```
 
 决策要点：

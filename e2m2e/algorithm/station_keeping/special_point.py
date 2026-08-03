@@ -90,6 +90,8 @@ class SpecialPointLaw:
     window_days: float = 1.0
     horizon_sec: float | None = None
     synodic: SynodicView | None = None
+    damping_factor: float = 1.0  # #280: <1 时启用 Armijo 回溯防振荡（默认不阻尼）
+    v_c: float | None = None  # #280: 特征速度 l_c/t_c (km/s)，用于雅可比无量纲化
 
     def __post_init__(self) -> None:
         if self.special_mode not in (1, 2):
@@ -106,19 +108,23 @@ class SpecialPointLaw:
         return np.array([v_syn[0], v_syn[2]])
 
     def _jacobian(
-        self, stm_vv: npt.NDArray[np.floating], rotation: npt.NDArray[np.floating]
+        self,
+        stm_vv: npt.NDArray[np.floating],
+        rotation: npt.NDArray[np.floating],
+        v_c: float = 1.0,
     ) -> npt.NDArray[np.floating]:
         """约束雅可比 ∂g/∂v₀：e1ᵀ·Φ_vv（mode 1）或 [e1ᵀ; e3ᵀ]·Φ_vv（mode 2）。
 
         ``rotation`` 为会合系旋转矩阵 R（列 = e1/e2/e3），
-        ``stm_vv`` 为 Φ(t*,t₀) 的 3×3 速度块。
+        ``stm_vv`` 为 Φ(t*,t₀) 的 3×3 速度块，
+        ``v_c`` 为特征速度（km/s，l_c/t_c），用于无量纲化（默认 1.0）。
         """
         e1 = rotation[:, 0]
         rows = [e1]
         if self.special_mode == 2:
             rows.append(rotation[:, 2])
         jac = np.stack(rows)
-        return jac @ stm_vv
+        return jac @ stm_vv / v_c
 
     def _find_crossing(
         self,
@@ -174,11 +180,11 @@ class SpecialPointLaw:
         if not np.any(sign):
             # 粗网格区间在细网格上未变号（边界情形），取最接近零的点
             j = int(np.argmin(np.abs(y_fine)))
-            frac = 0.0
+            t_star = t_fine[j]
         else:
             j = int(np.argmax(sign))
             frac = -y_fine[j] / (y_fine[j + 1] - y_fine[j]) if y_fine[j + 1] != y_fine[j] else 0.5
-        t_star = t_fine[j] + frac * (t_fine[j + 1] - t_fine[j])
+            t_star = t_fine[j] + frac * (t_fine[j + 1] - t_fine[j])
 
         # 取细网格上与 t* 最近点的状态/STM
         k = int(np.argmin(np.abs(t_fine - t_star)))
@@ -213,6 +219,7 @@ class SpecialPointLaw:
 
         state0 = np.asarray(state0, dtype=float)
         v0 = state0[3:].copy()
+        v_c = self.v_c if self.v_c is not None else 1.0
         t_star: float | None = None
         window: tuple[float, float] | None = None
         g_norm = np.inf
@@ -235,10 +242,32 @@ class SpecialPointLaw:
                 break
 
             rotation = synodic.rotation_matrix(t_star)
-            jac = self._jacobian(stm_at[3:6, 3:6], rotation)
+            jac = self._jacobian(stm_at[3:6, 3:6], rotation, v_c)
             # 最小范数解（式 5.33/5.34 解不唯一时的本项目做法）
             dv, *_ = np.linalg.lstsq(jac, -g, rcond=None)
-            v0 = v0 + dv
+
+            # 阻尼：若全步长增大约束残差则减半步长（Armijo 回溯）
+            if self.damping_factor < 1.0:
+                v_trial = v0 + dv
+                state_trial = state0.copy()
+                state_trial[3:] = v_trial
+                found_trial = self._find_crossing(
+                    state_trial, t0, t_horizon, propagator, synodic, grid_sec, window=window
+                )
+                if found_trial is not None:
+                    _, state_at_trial, _ = found_trial
+                    v_syn_trial = synodic.to_synodic(
+                        state_at_trial[np.newaxis, :], np.array([found_trial[0]])
+                    )[0, 3:]
+                    g_trial = float(np.linalg.norm(self._constraint(v_syn_trial)))
+                    if g_trial > g_norm:  # noqa: SIM108
+                        v0 = v0 + dv * self.damping_factor
+                    else:
+                        v0 = v_trial
+                else:
+                    v0 = v0 + dv * self.damping_factor
+            else:
+                v0 = v0 + dv
 
             # 迭代后期只在上次穿越时刻附近搜索（穿越时刻随 v0 收敛而稳定）
             window = (

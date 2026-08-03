@@ -683,22 +683,32 @@ def _make_law(
     horizon_sec: float,
     spice: Any,
     et0: float,
+    tight_tolerance_km: float = 0.1,
+    tight_max_iter: int = 6,
+    special_damping_factor: float = 1.0,
 ) -> Any:
     """按 DFH 控制模式构造控制律（1=宽松、2=严格、3=特征点）。"""
     if control_mode == 1:
         return LooseTargetPointLaw(feedback_arc_days=feedback_arc_days)
     if control_mode == 2:
-        return StrictTargetPointLaw(feedback_arc_days=feedback_arc_days)
+        return StrictTargetPointLaw(
+            feedback_arc_days=feedback_arc_days,
+            tolerance_km=tight_tolerance_km,
+            max_iter=tight_max_iter,
+        )
     if control_mode == 3:
         from ..coordinate.synodic_j2000 import SynodicJ2000System
 
         cr3 = _earth_moon_system()
-        synodic = SynodicJ2000Adapter(SynodicJ2000System(cr3bp_system=cr3, spice=spice), et0)
+        syn_system = SynodicJ2000System(cr3bp_system=cr3, spice=spice)
+        synodic = SynodicJ2000Adapter(syn_system, et0)
         return SpecialPointLaw(
             special_mode=special_mode,
             crossings=special_crossings,
             horizon_sec=horizon_sec,
             synodic=synodic,
+            damping_factor=special_damping_factor,
+            v_c=syn_system.cr3bp_system.characteristic_velocity,
         )
     raise ValueError(f"control_mode 必须为 1/2/3（角动量管理 4-6 归属 #261），当前 {control_mode}")
 
@@ -716,6 +726,9 @@ def _build_simulation(
             spec["control_interval_days"] * _SECONDS_PER_DAY,
             spice,
             nominal.t_start,
+            tight_tolerance_km=spec.get("tight_tolerance_km", 0.1),
+            tight_max_iter=spec.get("tight_max_iter", 6),
+            special_damping_factor=spec.get("special_damping_factor", 1.0),
         ),
         control_interval_sec=spec["control_interval_days"] * _SECONDS_PER_DAY,
         num_controls=spec["num_controls"],
@@ -779,6 +792,9 @@ def run_monte_carlo(
     srp_offset_m: npt.ArrayLike | None = None,
     spacecraft_mass_kg: float = 1000.0,
     srp_torque_nm: npt.ArrayLike | None = None,
+    tight_tolerance_km: float = 0.1,
+    tight_max_iter: int = 6,
+    special_damping_factor: float = 1.0,
 ) -> MonteCarloResult:
     """运行蒙特卡洛站保仿真（DFH 功能码 2 的数值核心）。
 
@@ -843,6 +859,9 @@ def run_monte_carlo(
         "srp_torque_nm": (
             np.asarray(srp_torque_nm, dtype=float) if srp_torque_nm is not None else None
         ),
+        "tight_tolerance_km": tight_tolerance_km,
+        "tight_max_iter": tight_max_iter,
+        "special_damping_factor": special_damping_factor,
     }
 
     rng = np.random.default_rng(seed)

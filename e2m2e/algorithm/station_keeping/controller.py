@@ -129,6 +129,9 @@ def control_orbit(
     srp_offset_m: Sequence[float] | None = None,
     spacecraft_mass: float = 1000.0,
     srp_torque: Sequence[float] | None = None,
+    tight_tolerance_km: float = 0.1,
+    tight_max_iter: int = 6,
+    special_damping_factor: float = 1.0,
 ) -> ControlOrbitResult:
     """端到端轨道保持仿真（DFH 功能码 2）。
 
@@ -165,6 +168,9 @@ def control_orbit(
         srp_offset_m: SRP 压心相对质心偏移 ``[x,y,z]``（m），常值
         spacecraft_mass: 航天器质量（kg）
         srp_torque: 常值 SRP 力矩 ``[τx,τy,τz]``（N·m）
+        tight_tolerance_km: TIGHT 模式位置重合容差（km，默认 0.1）
+        tight_max_iter: TIGHT 模式微分修正迭代上限（默认 6）
+        special_damping_factor: SPECIAL 模式牛顿迭代阻尼因子（<1 时启用回溯，默认 1.0 不阻尼）
 
     Returns:
         :class:`ControlOrbitResult`（SK_STATISTIC/MANEUVERS/受控星历）
@@ -284,6 +290,9 @@ def control_orbit(
         srp_offset_m=np.asarray(srp_offset_m, dtype=float) if srp_offset_m is not None else None,
         spacecraft_mass_kg=spacecraft_mass,
         srp_torque_nm=np.asarray(srp_torque, dtype=float) if srp_torque is not None else None,
+        tight_tolerance_km=tight_tolerance_km,
+        tight_max_iter=tight_max_iter,
+        special_damping_factor=special_damping_factor,
     )
     return ControlOrbitResult(
         sk_statistic=result.sk_statistic(),

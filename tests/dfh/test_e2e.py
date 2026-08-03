@@ -23,6 +23,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from e2m2e.algorithm.design.design_orbit import DesignNotConvergedError, design_orbit
+from e2m2e.algorithm.station_keeping.controller import control_orbit
 from e2m2e.io import (
     format_inputs_control,
     format_inputs_design,
@@ -243,3 +245,139 @@ class TestE2EControlOrbit:
 
         controlled = read_ephemeris(outputs["EPHEMERIDES_LOOSE.TXT"])
         _assert_ephemeris_shape(controlled)
+
+
+class TestE2EControlOrbitE2M2E:
+    """e2m2e control_orbit 端到端（ADR 0013：物理定义验证，不依赖 DFH exe）。
+
+    用同一标称 NRHO 轨道，分别跑 LOOSE / TIGHT / SPECIAL 三种模式
+    （num_monte_carlo=1），验证输出结构完整、总 Δv 量级合理、TIGHT/SPECIAL
+    有非零修正量。不修改已有 DFH exe 测试。
+    """
+
+    @pytest.mark.slow
+    @pytest.mark.spice
+    def test_mode1_loose_e2m2e(self, spice_kernel_dir):
+        """LOOSE 模式端到端：输出结构正确，总 Δv 量级合理。"""
+        try:
+            orbit_result = design_orbit(
+                "NRHO",
+                collinear_point=2,
+                north_south=1,
+                perilune_height=3500.0,
+                epoch=EPOCH,
+                duration=0.05,
+                output_step=3600.0,
+                kernel_dir=spice_kernel_dir,
+            )
+        except DesignNotConvergedError:
+            pytest.skip("NRHO 星历修正未收敛（已知极限情形）")
+        nominal_eph = orbit_result.ephemeris
+
+        result = control_orbit(
+            nominal_eph,
+            control_mode=1,
+            control_interval=3.0,
+            feedback_arc=3.0,
+            num_controls=5,
+            num_monte_carlo=1,
+            output_step=3600.0,
+            position_accuracy=1500.0,
+            velocity_accuracy=0.002,
+            seed=42,
+            kernel_dir=spice_kernel_dir,
+        )
+
+        sk = result.sk_statistic
+        assert len(sk.rows) >= 1, "SK_STATISTIC 应有至少 1 行"
+        assert sk.rows.shape[1] >= 3, "SK_STATISTIC 应有至少 3 列"
+        assert sk.num_failed in (None, 0), f"不应有失败样本，实际 {sk.num_failed}"
+        total_dv = float(sk.rows[-1, 2])  # 最后一行累计值
+        assert total_dv < 100.0, f"LOOSE 总 Δv 应 < 100 m/s，实际 {total_dv:.4f}"
+
+    @pytest.mark.slow
+    @pytest.mark.spice
+    def test_mode2_tight_e2m2e(self, spice_kernel_dir):
+        """TIGHT 模式端到端：总 Δv 量级与 LOOSE 同阶，且 >0（存在偏差需校正）。"""
+        try:
+            orbit_result = design_orbit(
+                "NRHO",
+                collinear_point=2,
+                north_south=1,
+                perilune_height=3500.0,
+                epoch=EPOCH,
+                duration=0.05,
+                output_step=3600.0,
+                kernel_dir=spice_kernel_dir,
+            )
+        except DesignNotConvergedError:
+            pytest.skip("NRHO 星历修正未收敛（已知极限情形）")
+        nominal_eph = orbit_result.ephemeris
+
+        result = control_orbit(
+            nominal_eph,
+            control_mode=2,
+            is_nrho=1,
+            control_interval=3.0,
+            feedback_arc=3.0,
+            num_controls=5,
+            num_monte_carlo=1,
+            output_step=3600.0,
+            position_accuracy=1500.0,
+            velocity_accuracy=0.002,
+            tight_tolerance_km=0.1,
+            tight_max_iter=6,
+            seed=42,
+            kernel_dir=spice_kernel_dir,
+        )
+
+        sk = result.sk_statistic
+        assert len(sk.rows) >= 1, "SK_STATISTIC 应有至少 1 行"
+        assert sk.num_failed in (None, 0), f"不应有失败样本，实际 {sk.num_failed}"
+        total_dv = float(sk.rows[-1, 2])
+        assert total_dv < 100.0, f"TIGHT 总 Δv 应 < 100 m/s，实际 {total_dv:.4f}"
+        # #280：有导航误差时 TIGHT 应产生非零修正（原值 0.1 km/2 iter 导致 Δv≈0）
+        assert total_dv > 0.0, "TIGHT 总 Δv 应 > 0（存在测定轨偏差需校正）"
+
+    @pytest.mark.slow
+    @pytest.mark.spice
+    def test_mode3_special_e2m2e(self, spice_kernel_dir):
+        """SPECIAL 模式端到端：穿越约束满足，总 Δv 量级合理。"""
+        try:
+            orbit_result = design_orbit(
+                "NRHO",
+                collinear_point=2,
+                north_south=1,
+                perilune_height=3500.0,
+                epoch=EPOCH,
+                duration=0.05,
+                output_step=3600.0,
+                kernel_dir=spice_kernel_dir,
+            )
+        except DesignNotConvergedError:
+            pytest.skip("NRHO 星历修正未收敛（已知极限情形）")
+        nominal_eph = orbit_result.ephemeris
+
+        result = control_orbit(
+            nominal_eph,
+            control_mode=3,
+            is_nrho=1,
+            special_mode=2,  # NRHO → Halo 类型（ẋ=0 且 ż=0）
+            control_interval=3.0,
+            feedback_arc=3.0,
+            special_crossings=3,
+            num_controls=5,
+            num_monte_carlo=1,
+            output_step=3600.0,
+            position_accuracy=1500.0,
+            velocity_accuracy=0.002,
+            special_damping_factor=0.5,
+            seed=42,
+            kernel_dir=spice_kernel_dir,
+        )
+
+        sk = result.sk_statistic
+        assert len(sk.rows) >= 1, "SK_STATISTIC 应有至少 1 行"
+        assert sk.num_failed in (None, 0), f"不应有失败样本，实际 {sk.num_failed}"
+        total_dv = float(sk.rows[-1, 2])
+        assert total_dv < 100.0, f"SPECIAL 总 Δv 应 < 100 m/s，实际 {total_dv:.4f}"

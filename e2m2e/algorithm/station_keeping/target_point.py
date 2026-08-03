@@ -51,8 +51,8 @@ class StrictTargetPointLaw:
     """
 
     feedback_arc_days: float = 28.0
-    tolerance_km: float = 1.0
-    max_iter: int = 2
+    tolerance_km: float = 0.1  # #280: 比测定轨精度（1.5 km 1σ）小一个量级
+    max_iter: int = 6  # #280: NRHO 非线性效应需多次迭代（原值 2 不足）
 
     def compute_maneuver(
         self,
