@@ -476,9 +476,16 @@ class SingleSampleSimulation:
                     V = _solve_joint(layout.E, layout.E_r, dv_c * 1000.0,
                                      delta_m_cum, mass)
                     dv_orbital = layout.E @ V
+                    # 姿态独立 Δv：纯卸载需要的 Δv（与联合控制对比用）
                     dv_att_ind = _solve_unload(layout.E_r, delta_m_cum, mass)
                     attitude_independent_dv += float(np.linalg.norm(layout.E @ dv_att_ind))
                     dv_r_orbital, failed_k = self.thrust_error.apply(dv_orbital, self.sampler)
+                    # 联合控制姿态贡献：纯卸载所需的发动机输出投影到轨道面
+                    if failed_k:
+                        pass
+                    elif np.linalg.norm(delta_m_cum) > 0:
+                        att_contribution = float(np.linalg.norm(layout.E @ dv_att_ind))
+                        attitude_total_dv += att_contribution
                 else:
                     dv_r_orbital = None
                     failed_k = False
@@ -534,7 +541,6 @@ class SingleSampleSimulation:
                         V = _solve_unload(layout.E_r, delta_m_cum, mass)
                         dv_att_ind = V
                         attitude_independent_dv += float(np.linalg.norm(layout.E @ dv_att_ind))
-                        att_mag_mps = float(np.linalg.norm(layout.E @ V))
                         att_applied, att_failed = self.thrust_error.apply(
                             layout.E @ V, self.sampler)
                         if att_failed:
