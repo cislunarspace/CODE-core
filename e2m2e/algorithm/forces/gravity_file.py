@@ -68,7 +68,7 @@ def load_gfc_file(
         解析后的重力场数据。
     """
     path = Path(path)
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8", errors="replace")
 
     model_name = "unknown"
     mu = float(default_mu)
@@ -229,7 +229,7 @@ def load_cof_file(
         解析后的重力场数据。
     """
     path = Path(path)
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8", errors="replace")
 
     model_name = path.stem
     mu = float(default_mu)
