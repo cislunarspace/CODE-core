@@ -96,7 +96,9 @@ class ControlOrbitRequest(_ApiModel):
     momentum_interval: float = Field(default=5.0, gt=0.0, description="角动量卸载间隔（天）")
     srp_offset_m: list[float] | None = Field(default=None, description="SRP 压心偏移 [x,y,z]（m）")
     spacecraft_mass: float = Field(default=1000.0, gt=0.0, description="航天器质量（kg）")
-    srp_torque: list[float] | None = Field(default=None, description="常值 SRP 力矩 [τx,τy,τz]（N·m）")
+    srp_torque: list[float] | None = Field(
+        default=None, description="常值 SRP 力矩 [τx,τy,τz]（N·m）"
+    )
 
 
 class ControlOrbitResponse(_ApiModel):

@@ -309,8 +309,12 @@ class MonteCarloResult:
     num_failed: int
     maneuvers: npt.NDArray[np.floating] = field(default_factory=lambda: np.empty((0, 2)))
     controlled_ephemeris: EphemerisTable | None = None
-    attitude_delta_v: npt.NDArray[np.floating] = field(default_factory=lambda: np.empty(0))
-    attitude_delta_v_independent: npt.NDArray[np.floating] = field(default_factory=lambda: np.empty(0))
+    attitude_delta_v: npt.NDArray[np.floating] = field(
+        default_factory=lambda: np.empty(0)
+    )
+    attitude_delta_v_independent: npt.NDArray[np.floating] = field(
+        default_factory=lambda: np.empty(0)
+    )
 
     def sk_statistic(self) -> SKStatistic:
         """组装 SK_STATISTIC 表（3 列或 5 列版）。
@@ -386,7 +390,11 @@ class SingleSampleSimulation:
     def run(self) -> SampleResult:
         from .momentum_management import (
             compute_delta_m as _compute_dm,
+        )
+        from .momentum_management import (
             solve_joint_control as _solve_joint,
+        )
+        from .momentum_management import (
             solve_momentum_unload as _solve_unload,
         )
 
@@ -417,26 +425,39 @@ class SingleSampleSimulation:
 
         # 角动量管理：SRP 力矩常值（用户输入 srp_torque_nm）
         has_mm = self.engine_layout is not None
-        srp_torque = np.asarray(self.srp_torque_nm, dtype=float) if self.srp_torque_nm is not None else None
+        srp_torque = (
+            np.asarray(self.srp_torque_nm, dtype=float)
+            if self.srp_torque_nm is not None
+            else None
+        )
         layout = self.engine_layout
         mass = self.spacecraft_mass_kg
         delta_m_cum = np.zeros(3)  # 累积角动量（上次卸载以来）
 
         # 构造合并事件时间表（轨道控制 + 角动量卸载）
+        # event_type[t] = "orbital" | "momentum" | "both"
+        orbital_times: set[float] = set()
+        momentum_times: set[float] = set()
         if has_mm and self.momentum_interval_sec > 0:
             t_end = t0 + (self.num_controls - 1) * self.control_interval_sec
             orbital_times = {t0 + k * self.control_interval_sec
                             for k in range(1, self.num_controls - 1)}
-            mom_times = set()
             t_m = t0 + self.momentum_interval_sec
             while t_m < t_end:
                 # 与最近轨道控制时刻对齐（相差 < 1 秒视为同时）
-                if not any(abs(t_m - t_o) < 1.0 for t_o in orbital_times):
-                    mom_times.add(t_m)
+                if any(abs(t_m - t_o) < 1.0 for t_o in orbital_times):
+                    # 合并到轨道事件（标记为 both）
+                    pass
+                else:
+                    momentum_times.add(t_m)
                 t_m += self.momentum_interval_sec
-            events = sorted(orbital_times | mom_times)
+            events = sorted(orbital_times | momentum_times)
+        elif has_mm:
+            # 卸载间隔=0：与轨道控制同步
+            events = [t0 + k * self.control_interval_sec
+                      for k in range(1, self.num_controls - 1)]
         else:
-            # 无角动量管理 或 卸载间隔=0（与轨道控制同步）
+            # 无角动量管理
             events = [t0 + k * self.control_interval_sec
                       for k in range(1, self.num_controls - 1)]
 
@@ -459,14 +480,13 @@ class SingleSampleSimulation:
                 delta_m_cum += _compute_dm(srp_torque, t_k - t_prev)
 
             # 判断事件类型
-            is_orbital = t_k in (orbital_times if has_mm and self.momentum_interval_sec > 0
-                                 else set(events))
-            is_momentum = has_mm and (not is_orbital or self.momentum_interval_sec <= 0
-                                      or any(abs(t_k - t) < 1.0
-                                             for t in ({t0 + j * self.momentum_interval_sec
-                                                        for j in range(1, int((t_k - t0) / self.momentum_interval_sec) + 2)
-                                                        if t0 + j * self.momentum_interval_sec <= t_k + 0.5}
-                                                       if self.momentum_interval_sec > 0 else set())))
+            is_orbital = t_k in orbital_times or (
+                has_mm and self.momentum_interval_sec <= 0
+            )
+            is_momentum = has_mm and (
+                t_k in momentum_times
+                or self.momentum_interval_sec <= 0
+            )
 
             # 控制量计算
             if has_mm and is_orbital and is_momentum:
@@ -829,7 +849,11 @@ def run_monte_carlo(
         "momentum_interval_sec": momentum_interval_days * _SECONDS_PER_DAY,
         "srp_offset_m": np.asarray(srp_offset_m, dtype=float) if srp_offset_m is not None else None,
         "spacecraft_mass_kg": spacecraft_mass_kg,
-        "srp_torque_nm": np.asarray(srp_torque_nm, dtype=float) if srp_torque_nm is not None else None,
+        "srp_torque_nm": (
+            np.asarray(srp_torque_nm, dtype=float)
+            if srp_torque_nm is not None
+            else None
+        ),
     }
 
     rng = np.random.default_rng(seed)

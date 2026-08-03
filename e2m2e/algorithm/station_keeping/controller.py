@@ -18,6 +18,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -33,6 +34,9 @@ from ..design.design_orbit import default_kernel_dir, load_design_kernels
 from ..dynamics import EphemerisSystem
 from ..forces.force_mapping import dfh_perturbation_to_force_config
 from .monte_carlo import MonteCarloResult, run_monte_carlo
+
+if TYPE_CHECKING:
+    from .momentum_management import EngineLayout
 
 __all__ = ["ControlOrbitResult", "control_orbit"]
 
@@ -120,7 +124,7 @@ def control_orbit(
     kernel_dir: str | None = None,
     n_workers: int = 1,
     seed: int | None = None,
-    engine_layout: object | None = None,
+    engine_layout: EngineLayout | None = None,
     momentum_interval: float = 5.0,
     srp_offset_m: Sequence[float] | None = None,
     spacecraft_mass: float = 1000.0,
