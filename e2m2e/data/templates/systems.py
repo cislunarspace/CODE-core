@@ -11,6 +11,10 @@ srp 用 149597870.691 km 而 cr3bp_system 用 149597870.7 km，已统一）。
 
 from __future__ import annotations
 
+# 地球引力参数 (km³/s²)。
+# 取 GMAT/WGS-84 标准值 398600.4418 km³/s²。
+MU_EARTH: float = 398600.4418
+
 # 地球赤道半径（km）。
 # 取 GMAT PCK / IAU 2015 常用值 6378.1363 km，与 gravity_file、shadow、
 # relativistic_correction 等力模型一致。
