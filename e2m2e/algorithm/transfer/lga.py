@@ -65,6 +65,7 @@ class LgaCandidate:
     departure_state: np.ndarray
     perilune_state: np.ndarray
     perilune_alt_km: float
+    perilune_time_dim: float
     arrival_state: np.ndarray
     dv_departure: float
     dv_arrival: float
@@ -241,6 +242,7 @@ def search_lga_trajectories(
                     departure_state=x0.copy(),
                     perilune_state=state_peri.copy(),
                     perilune_alt_km=alt_km,
+                    perilune_time_dim=float(t_peri),
                     arrival_state=arrival_state.copy(),
                     dv_departure=dv_dep,
                     dv_arrival=dv_arr,
@@ -281,8 +283,13 @@ def _refine_lga_candidate(
         shooter = ThreeBodyLambert(dynamics)
 
         peri_phys = system.dimensionless_to_physical(candidate.perilune_state)
-        # 到达段的 tof：从传播结果计算实际到达时间
-        tof_arrival = candidate.arrival_time_dim * char_time
+        # 到达段的 tof：近月点 → 目标的剩余时间（非出发→到达的总时间）
+        tof_arrival = (candidate.arrival_time_dim - candidate.perilune_time_dim) * char_time
+        if tof_arrival <= 0.0:
+            raise ValueError(
+                f"到达段剩余时间非正：arrival_time_dim={candidate.arrival_time_dim}, "
+                f"perilune_time_dim={candidate.perilune_time_dim}, tof_arrival={tof_arrival}"
+            )
 
         target_phys = system.dimensionless_to_physical(target_state)
 
@@ -305,6 +312,7 @@ def _refine_lga_candidate(
                 departure_state=candidate.departure_state,
                 perilune_state=candidate.perilune_state,
                 perilune_alt_km=candidate.perilune_alt_km,
+                perilune_time_dim=candidate.perilune_time_dim,
                 arrival_state=candidate.arrival_state,
                 dv_departure=candidate.dv_departure,
                 dv_arrival=dv_arr,
@@ -324,6 +332,7 @@ def _refine_lga_candidate(
         departure_state=candidate.departure_state,
         perilune_state=candidate.perilune_state,
         perilune_alt_km=candidate.perilune_alt_km,
+        perilune_time_dim=candidate.perilune_time_dim,
         arrival_state=candidate.arrival_state,
         dv_departure=candidate.dv_departure,
         dv_arrival=candidate.dv_arrival,

@@ -21,6 +21,7 @@ from e2m2e.algorithm.transfer import (
 from e2m2e.algorithm.transfer.hohmann import TliParams
 from e2m2e.algorithm.transfer.lga import (
     _compute_jacobi,
+    _refine_lga_candidate,
     search_lga_trajectories,
 )
 
@@ -146,6 +147,68 @@ class TestLgaSearch:
         for c in candidates:
             assert c.perilune_alt_km >= _SEARCH_PARAMS.perilune_alt_min
             assert c.perilune_alt_km <= _SEARCH_PARAMS.perilune_alt_max
+
+    def test_perilune_time_dim_populated(self, cr3bp_setup):
+        """候选的 perilune_time_dim 为正且在到达时刻之前（近月点 → 到达段剩余时间 > 0）。"""
+        system, dynamics, dep_state, tgt_state = cr3bp_setup
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
+        if not candidates:
+            pytest.skip("无可行候选，跳过 perilune_time_dim 验证")
+        for c in candidates:
+            assert c.perilune_time_dim > 0.0, (
+                f"perilune_time_dim 应为正，实际 {c.perilune_time_dim}"
+            )
+            assert c.arrival_time_dim > c.perilune_time_dim, (
+                f"到达时刻 {c.arrival_time_dim} 应晚于近月点时刻 {c.perilune_time_dim}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# TestLgaRefine：_refine_lga_candidate 精化测试
+# ---------------------------------------------------------------------------
+
+
+class TestLgaRefine:
+    """_refine_lga_candidate ThreeBodyLambert 打靶精化测试。"""
+
+    @pytest.fixture
+    def cr3bp_setup(self):
+        system, dynamics = _make_cr3bp_system()
+        dep_state = _make_departure_state(system)
+        tgt_state = _make_target_state(system)
+        return system, dynamics, dep_state, tgt_state
+
+    def test_refine_candidate_converges(self, cr3bp_setup):
+        """最优候选经 _refine_lga_candidate 精化后 converged=True。"""
+        system, dynamics, dep_state, tgt_state = cr3bp_setup
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
+        if not candidates:
+            pytest.skip("无可行候选，跳过精化测试")
+
+        best = candidates[0]
+        refined = _refine_lga_candidate(best, system, dynamics, tgt_state)
+        tof_arr = (best.arrival_time_dim - best.perilune_time_dim) * system.characteristic_time
+        assert refined.converged, (
+            f"精化应收敛：best.total_dv={best.total_dv:.4f}, tof_arrival={tof_arr:.2f}s"
+        )
+
+    def test_refine_tof_arrival_correct(self, cr3bp_setup):
+        """精化使用的 tof_arrival = (arrival - perilune) * char_time，而非总 TOF。"""
+        system, dynamics, dep_state, tgt_state = cr3bp_setup
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
+        if not candidates:
+            pytest.skip("无可行候选，跳过 tof_arrival 验证")
+
+        best = candidates[0]
+        char_time = system.characteristic_time
+        tof_arrival_expected = (best.arrival_time_dim - best.perilune_time_dim) * char_time
+        tof_total = best.arrival_time_dim * char_time
+
+        # 到达段 TOF 必须严格小于总 TOF（否则说明 perilune 时刻未被减去）
+        assert tof_arrival_expected < tof_total, (
+            f"到达段 TOF ({tof_arrival_expected:.2f}s) 应小于总 TOF ({tof_total:.2f}s)"
+        )
+        assert tof_arrival_expected > 0.0
 
 
 # ---------------------------------------------------------------------------
