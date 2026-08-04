@@ -4,21 +4,23 @@
 three_body_lambert/multi_impulse）、自然动力学路径（low_energy/manifold，
 覆盖引力辅助数学内核）、低推力路径（low_thrust/）、任务层（search/
 optimize/porkchop）。``transfer_orbit.py`` 是编排器：接收 transfer_type
-（HMN/LGA/WSB/小推力），按枚举选路径组合底层数学模块（新类型，当前占位）。
+（HMN/LGA/WSB/low_thrust），按枚举选路径组合底层数学模块。
 
-未实现（对外承诺能力）：小推力转移，占位抛
-``NotImplementedError``。LGA/WSB 引力辅助弹道搜索已实现。
+已实现：HMN 霍曼转移、LGA 月球引力辅助、WSB 太阳引力辅助、小推力转移。
 """
 
 from __future__ import annotations
 
+import math
 import warnings
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
+from ..forces import PointMassGravity
 from .config import (
     TransferArc,
     TransferConfig,
@@ -129,11 +131,13 @@ __all__ = [
     "WsbTransferDetails",
     "WsbSearchParams",
     "WsbCandidate",
+    "LowThrustTransferDetails",
     "transfer_orbit",
 ]
 
 
 _DEFAULT_TOF_GRID_POINTS: int = 50
+_G0: float = 9.81  # m/s², standard gravity (Tsiolkovsky equation)
 
 
 @dataclass
@@ -150,9 +154,13 @@ class TransferDesignResult:
     transfer_type: str
     delta_v: float
     trajectory: Any
-    details: HmnTransferDetails | LgaTransferDetails | WsbTransferDetails | dict[str, Any] = field(
-        default_factory=dict
-    )
+    details: (
+        HmnTransferDetails
+        | LgaTransferDetails
+        | WsbTransferDetails
+        | LowThrustTransferDetails
+        | dict[str, Any]
+    ) = field(default_factory=dict)
 
 
 @dataclass
@@ -217,6 +225,61 @@ class WsbTransferDetails:
     search_params: WsbSearchParams
 
 
+def _equivalent_delta_v(m0: float, mf: float, isp: float) -> float:
+    """Tsiolkovsky 方程：Δv = Isp·g₀·ln(m0/mf)，单位 km/s。
+
+    Args:
+        m0: 初始质量 (kg)。
+        mf: 末态质量 (kg)。
+        isp: 比冲 (s)。
+
+    Returns:
+        等效 Δv (km/s)。
+    """
+    return isp * _G0 * math.log(m0 / mf) / 1000.0
+
+
+@dataclass
+class LowThrustTransferDetails:
+    """小推力转移设计细节。
+
+    Attributes:
+        engine: 推进配置。
+        initial_mass: 初始质量 (kg)。
+        final_mass: 末态质量 (kg)。
+        fuel_consumed: 燃料消耗 (kg)。
+        equivalent_delta_v: 等效 Δv (km/s)，Tsiolkovsky 方程反算。
+        n_segments: 求解器段数。
+        solver_method: 求解方法 ("shooting" / "collocation")。
+        converged: 是否收敛。
+        n_iter: 迭代次数。
+        solver_message: 求解器消息。
+        terminal_residual_r: 终端位置残差 (km)。
+        terminal_residual_v: 终端速度残差 (km/s)。
+        time: 采样时间序列 (M,)，SPICE et 秒。
+        states_7d: 7D 状态序列 (M, 7) [x,y,z,vx,vy,vz,m]。
+        segments: 各段常量控制。
+        qlaw_q_history: Q-law Q 值历史（仅 solve_from_qlaw 时非空）。
+    """
+
+    engine: EngineConfig
+    initial_mass: float
+    final_mass: float
+    fuel_consumed: float
+    equivalent_delta_v: float
+    n_segments: int
+    solver_method: str  # "shooting" | "collocation"
+    converged: bool
+    n_iter: int
+    solver_message: str
+    terminal_residual_r: float  # km
+    terminal_residual_v: float  # km/s
+    time: NDArray[np.float64]
+    states_7d: NDArray[np.float64]
+    segments: tuple[LowThrustSegment, ...]
+    qlaw_q_history: NDArray[np.float64] | None = None
+
+
 def transfer_orbit(
     transfer_type: str,
     *,
@@ -227,6 +290,16 @@ def transfer_orbit(
     dynamics: Any = None,
     lga_search_params: LgaSearchParams | None = None,
     wsb_search_params: WsbSearchParams | None = None,
+    engine_config: EngineConfig | None = None,
+    initial_mass: float | None = None,
+    n_segments: int = 10,
+    target_oe: tuple[float, float, float] | None = None,
+    solver_method: str = "shooting",
+    duration_days: float = 30.0,
+    departure_state: NDArray[np.float64] | None = None,
+    target_state: NDArray[np.float64] | None = None,
+    system: Any = None,
+    forces: Any = None,
     **kwargs,
 ) -> TransferDesignResult:
     """端到端转移轨道设计（编排器）。
@@ -241,13 +314,23 @@ def transfer_orbit(
         dynamics: 动力学对象（可选），用于 ephemeris 打靶修正。
         lga_search_params: LGA 搜索参数（可选）。
         wsb_search_params: WSB 搜索参数（可选）。
+        engine_config: 推进配置（小推力转移必需）。
+        initial_mass: 初始质量 kg（小推力转移必需）。
+        n_segments: 求解器段数（小推力，默认 10）。
+        target_oe: Q-law 目标 ``(a_T, e_T, i_T)``（小推力可选）。
+        solver_method: 求解方法 ``"shooting"`` / ``"collocation"``（小推力，默认 ``"shooting"``）。
+        duration_days: 飞行时间（天）（小推力，默认 30.0）。
+        departure_state: 小推力出发状态 ``[r, v]`` (6,)，km / km/s（小推力可选）。
+        target_state: 小推力目标末态 ``[r, v]`` (6,)，km / km/s（小推力可选）。
+        system: 动力学系统（小推力可选，默认纯二体）。
+        forces: 非推力力模型列表（小推力可选）。
 
     Returns:
         TransferDesignResult: 转移轨道设计结果。
 
     Raises:
-        NotImplementedError: 编排器实现未完成（当前仅 HMN/LGA/WSB 已实现）。
-        ValueError: HMN 转移缺少必要参数。
+        NotImplementedError: 编排器实现未完成（未知的 transfer_type）。
+        ValueError: 转移类型缺少必要参数。
     """
     if transfer_type == "HMN":
         return _transfer_orbit_hmn(
@@ -269,6 +352,25 @@ def transfer_orbit(
             tli_params=tli_params,
             target_ephemeris=target_ephemeris,
             search_params=wsb_search_params,
+        )
+    if transfer_type == "low_thrust":
+        if engine_config is None:
+            raise ValueError("low_thrust 转移需要 engine_config")
+        if initial_mass is None:
+            raise ValueError("low_thrust 转移需要 initial_mass")
+        return _transfer_orbit_low_thrust(
+            tli_params=tli_params,
+            target_ephemeris=target_ephemeris,
+            engine_config=engine_config,
+            initial_mass=initial_mass,
+            n_segments=n_segments,
+            target_oe=target_oe,
+            solver_method=solver_method,
+            duration_days=duration_days,
+            departure_state=departure_state,
+            target_state=target_state,
+            system=system,
+            forces=forces,
         )
     raise NotImplementedError(f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）")
 
@@ -512,6 +614,162 @@ def _transfer_orbit_wsb(
         transfer_type="WSB",
         delta_v=refined.total_dv,
         trajectory=None,
+        details=details,
+    )
+
+
+def _transfer_orbit_low_thrust(
+    tli_params: TliParams | None,
+    target_ephemeris: Any,
+    engine_config: EngineConfig,
+    initial_mass: float,
+    n_segments: int = 10,
+    *,
+    target_oe: tuple[float, float, float] | None = None,
+    solver_method: str = "shooting",
+    duration_days: float = 30.0,
+    departure_state: np.ndarray | None = None,
+    target_state: np.ndarray | None = None,
+    system: Any = None,
+    forces: Any = None,
+) -> TransferDesignResult:
+    """小推力转移编排。
+
+    流程：
+    1. 出发状态：优先 ``departure_state``，否则 ``construct_departure_state(tli_params)``。
+    2. 目标状态：优先 ``target_state``，否则 ``_extract_target_state(target_ephemeris)``。
+    3. 动力学系统/力模型：优先传入参数，否则构造纯二体。
+    4. 构造 ``LowThrustShooting`` 或 ``LowThrustCollocation`` 求解器。
+    5. ``solve_from_qlaw()`` Q-law 初猜 + 求解。
+    6. 计算终端残差、等效 Δv，返回 ``TransferDesignResult``。
+
+    Args:
+        tli_params: 地球停泊轨道参数（TLI 高度/倾角/航迹角）。当 ``departure_state``
+            未提供时用于构造出发状态。
+        target_ephemeris: 目标轨道星历。当 ``target_state`` 未提供时用于提取目标状态。
+        engine_config: 推进配置（最大推力、比冲）。
+        initial_mass: 初始质量 (kg)。
+        n_segments: 求解器段数。
+        target_oe: Q-law 目标 ``(a_T, e_T, i_T)``。默认从目标状态反推圆轨道。
+        solver_method: 求解方法 ``"shooting"`` 或 ``"collocation"``。
+        duration_days: 飞行时间 (天)。
+        departure_state: 出发状态 ``[r, v]`` (6,)，km / km/s。优先于 tli_params。
+        target_state: 目标末态 ``[r, v]`` (6,)，km / km/s。优先于 target_ephemeris。
+        system: 动力学系统。默认纯二体 ``SimpleNamespace(origin="EARTH")``。
+        forces: 非推力力模型列表。默认 ``[PointMassGravity("EARTH", mu=MU_EARTH)]``。
+
+    Returns:
+        TransferDesignResult: 转移轨道设计结果，携带 ``LowThrustTransferDetails``。
+    """
+    # 1. 出发状态
+    if departure_state is not None:
+        r0 = departure_state[:3]
+        v0 = departure_state[3:6]
+    else:
+        if tli_params is None:
+            raise ValueError("low_thrust 转移需要 tli_params 或 departure_state 之一")
+        r0, v0 = construct_departure_state(tli_params)
+
+    # 2. 目标状态
+    if target_state is not None:
+        r_target = target_state[:3]
+        v_target = target_state[3:6]
+    else:
+        if target_ephemeris is None:
+            raise ValueError("low_thrust 转移需要 target_ephemeris 或 target_state 之一")
+        r_target, v_target = _extract_target_state(target_ephemeris)
+
+    # 3. 动力学系统和力模型
+    if system is None:
+        system = SimpleNamespace(origin="EARTH")
+    if forces is None:
+        forces = [PointMassGravity("EARTH", mu=MU_EARTH)]
+
+    # 4. 时间基准
+    has_spice = hasattr(system, "spice") and system.spice is not None
+    t0 = system.spice.utc_to_et(tli_params.epoch) if has_spice and tli_params is not None else 0.0
+    tf = t0 + duration_days * 86400.0
+
+    # 5. 目标轨道根数（默认圆轨道，从目标状态反推半长轴）
+    if target_oe is None:
+        r_target_norm = float(np.linalg.norm(r_target))
+        v_target_norm = float(np.linalg.norm(v_target))
+        energy = v_target_norm**2 / 2.0 - MU_EARTH / r_target_norm
+        a_target = -MU_EARTH / (2.0 * energy)
+        target_oe = (a_target, 0.0, 0.0)
+
+    # 6. 构造求解器
+    initial_state_6 = np.concatenate([r0, v0])
+    target_state_6 = np.concatenate([r_target, v_target])
+
+    solver: LowThrustShooting | LowThrustCollocation
+    if solver_method == "shooting":
+        solver = LowThrustShooting(
+            system=system,
+            forces=forces,
+            engine=engine_config,
+            initial_state=initial_state_6,
+            initial_mass=initial_mass,
+            target_state=target_state_6,
+            t0=t0,
+            tf=tf,
+        )
+    elif solver_method == "collocation":
+        solver = LowThrustCollocation(
+            system=system,
+            forces=forces,
+            engine=engine_config,
+            initial_state=initial_state_6,
+            initial_mass=initial_mass,
+            target_state=target_state_6,
+            t0=t0,
+            tf=tf,
+        )
+    else:
+        raise ValueError(
+            f"不支持的 solver_method: {solver_method!r}，期望 'shooting' 或 'collocation'"
+        )
+
+    # 7. Q-law 初猜 + 求解
+    sol: LowThrustShootingSolution = solver.solve_from_qlaw(n_segments, target_oe, forces)
+
+    # 8. 终端残差
+    r_final = sol.states[-1, :3]
+    v_final = sol.states[-1, 3:6]
+    terminal_residual_r = float(np.linalg.norm(r_final - r_target))
+    terminal_residual_v = float(np.linalg.norm(v_final - v_target))
+
+    # 9. 等效 Δv
+    final_mass = sol.final_mass
+    equiv_dv = _equivalent_delta_v(initial_mass, final_mass, engine_config.isp)
+
+    # 10. Q-law Q 值历史（solve_from_qlaw 不返回 q_history，设为 None）
+    qlaw_q_history = None
+
+    # 11. 汇总
+    details = LowThrustTransferDetails(
+        engine=engine_config,
+        initial_mass=initial_mass,
+        final_mass=final_mass,
+        fuel_consumed=sol.fuel_consumed,
+        equivalent_delta_v=equiv_dv,
+        n_segments=n_segments,
+        solver_method=solver_method,
+        converged=sol.converged,
+        n_iter=sol.n_iter,
+        solver_message=sol.message,
+        terminal_residual_r=terminal_residual_r,
+        terminal_residual_v=terminal_residual_v,
+        time=sol.time.astype(np.float64),
+        states_7d=sol.states.astype(np.float64),
+        segments=sol.segments,
+        qlaw_q_history=qlaw_q_history,
+    )
+
+    return TransferDesignResult(
+        transfer_type="low_thrust",
+        delta_v=equiv_dv,
+        trajectory=sol.states,
         details=details,
     )
 

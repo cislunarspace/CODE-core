@@ -377,8 +377,8 @@ class TestLgaTransferOrbit:
         assert isinstance(details.search_params, LgaSearchParams)
 
     def test_unsupported_type_still_raises(self):
-        """transfer_orbit("low_thrust") 仍抛出 NotImplementedError。"""
-        with pytest.raises(NotImplementedError, match="low_thrust"):
+        """transfer_orbit("low_thrust") without engine_config 抛出 ValueError。"""
+        with pytest.raises(ValueError, match="low_thrust"):
             transfer_orbit("low_thrust")
 
     def test_lga_missing_params_raises(self):

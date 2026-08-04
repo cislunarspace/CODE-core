@@ -211,8 +211,8 @@ class TestTransferOrbitHmn:
         assert abs(result.details.tof_sec - expected_tof) < 1e-10
 
     def test_unsupported_type_raises(self):
-        """transfer_orbit("low_thrust") 抛出 NotImplementedError。"""
-        with pytest.raises(NotImplementedError, match="low_thrust"):
+        """transfer_orbit("low_thrust") without engine_config 抛出 ValueError。"""
+        with pytest.raises(ValueError, match="low_thrust"):
             transfer_orbit("low_thrust")
 
 
