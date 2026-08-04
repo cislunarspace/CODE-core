@@ -4,6 +4,8 @@
 
 - DRO：以近侧 x 轴穿越点 ``x0`` 为族参数，从标准种子出发沿族行走，
   选取振幅（一个周期内距月球的最大距离，km）命中目标的成员；
+- DPO：与 DRO 对称的顺行族，以 ``x0`` 为族参数，vy0 < 0（顺行），
+  振幅定义同 DRO（距月心距离 min/max 均值，km）；
 - Halo：Richardson 三阶近似种子 + 定 ``z0`` 微分修正，沿族把 ``z0``
   走到目标面外振幅（km，符号区分北/南）；
 - NRHO：Halo 族成员中按近月距（距月心 = 近月点高度 + 月球半径）选取，
@@ -23,6 +25,9 @@ import numpy as np
 
 from ...data.templates.seed import (  # noqa: F401
     _AXIAL_SEED_VZ0,
+    _DPO_SEED_PERIOD,
+    _DPO_SEED_VY0,
+    _DPO_SEED_X0,
     _DRO_SEED_PERIOD,
     _DRO_SEED_VY0,
     _DRO_SEED_X0,
@@ -208,6 +213,39 @@ def _correct_dro(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
     return orbit
 
 
+def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Orbit:
+    """在近侧 x 轴穿越点 ``x0`` 处修正 DPO（固定 x0，自由 vy0 与半周期）。
+
+    DPO 与 DRO 使用相同修正策略（``setup_2D_symmetric_x_fixed_x0``），
+    但 vy0 < 0（顺行）。种子从反转 DRO vy0 的微分修正收敛获得。
+
+    DPO 族不稳定，族行走时 vy0 与 x0 的映射关系比 DRO 更非线性。
+    首次调用（guess=None）使用种子常量；后续调用保留已收敛轨道的完整
+    状态作为初猜（不仅覆盖 x0），避免在不稳定族上跳支。
+    """
+    if guess is None:
+        state = np.array([x0, 0.0, 0.0, 0.0, _DPO_SEED_VY0, 0.0])
+        period = _DPO_SEED_PERIOD
+    else:
+        state = guess.states[0].copy()
+        state[0] = x0
+        assert guess.period is not None
+        period = guess.period
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_2D_symmetric_x_fixed_x0(x0=x0)
+    seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
+    seed.period = period
+    orbit = _correct_or_raise(corrector, seed, f"DPO(x0={x0:.6f})")
+    assert orbit.period is not None
+    # DPO 族不稳定，周期变化幅度比 DRO 大；放宽伪解阈值以避免误杀
+    # 正常族行走中周期跳变到 2 倍以上才是真伪解（多圈对称周期轨道）
+    if orbit.period > 2.0 * period:
+        raise Cr3bpOrbitError(
+            f"DPO(x0={x0:.6f}) 修正跳到长周期伪解（T={orbit.period:.3f}，初猜 {period:.3f}）"
+        )
+    return orbit
+
+
 def _correct_halo(
     dynamics: CR3BP_Dynamics, z0: float, libration_point: int, guess: Orbit | None
 ) -> Orbit:
@@ -341,6 +379,47 @@ def design_dro(
         measure=measure,
         target=target_du,
         p_seed=_DRO_SEED_X0,
+        dp_init=0.02,
+        max_step=0.05,
+        tol=tol_km / du,
+    )
+
+
+def design_dpo(
+    amplitude_km: float,
+    *,
+    dynamics: CR3BP_Dynamics | None = None,
+    tol_km: float = 20.0,
+) -> Orbit:
+    """生成指定振幅的 DPO（Direct Prograde Orbit）周期轨道。
+
+    DPO 是 xy 平面内围绕月球的顺行周期轨道（旋转坐标系下逆时针），
+    与 DRO（逆行）对称。振幅定义同 DRO：一个周期内距月心距离
+    最小/最大值的均值（km）。以近侧 x 轴穿越点 ``x0`` 为族参数行走，
+    命中 ``tol_km`` 内即停。
+
+    References:
+        Folta et al. (2015). An Earth–Moon system trajectory design
+        reference catalog. AIAA SciTech.
+        Guzzetti et al. (2016). Rapid trajectory design in the
+        Earth–Moon ephemeris system via an interactive catalog of
+        periodic orbits. JGCD.
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    du = dynamics.system.characteristic_length
+    assert du is not None
+    target_du = amplitude_km / du
+
+    def measure(orbit: Orbit) -> float:
+        d_min, d_max = _moon_distance_minmax(dynamics, orbit)
+        return 0.5 * (d_min + d_max)
+
+    return _walk_family(
+        correct_at=lambda x0, guess: _correct_dpo(dynamics, x0, guess),
+        measure=measure,
+        target=target_du,
+        p_seed=_DPO_SEED_X0,
         dp_init=0.02,
         max_step=0.05,
         tol=tol_km / du,

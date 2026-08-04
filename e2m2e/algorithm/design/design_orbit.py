@@ -57,6 +57,7 @@ from ..ephemeris_correction import (
 )
 from ..family.cr3bp_orbits import (
     design_axial,
+    design_dpo,
     design_dro,
     design_halo,
     design_lissajous,
@@ -236,6 +237,15 @@ def _validate_params(
             raise ValueError(f"DRO phase 应在 0~1 之间，实际为 {phase}")
         return {"amplitude": amplitude, "phase": phase}
 
+    if sel == "DPO":
+        amplitude = 20000.0 if amplitude is None else float(amplitude)
+        phase = 0.5001 if phase is None else float(phase)
+        if not 1737.0 <= amplitude <= 110000.0:
+            raise ValueError(f"DPO amplitude 应在 1737~110000 km 之间，实际为 {amplitude:.0f} km")
+        if not 0.0 <= phase <= 1.0:
+            raise ValueError(f"DPO phase 应在 0~1 之间，实际为 {phase}")
+        return {"amplitude": amplitude, "phase": phase}
+
     if sel == "HALO":
         collinear_point = 2 if collinear_point is None else int(collinear_point)
         amplitude = 30000.0 if amplitude is None else float(amplitude)
@@ -349,13 +359,15 @@ def _validate_params(
             "phase": phase,
         }
 
-    raise ValueError(f"orbit_type 必须为 DRO/NRHO/Halo/Lissajous/L4/L5/Axial，当前 {sel!r}")
+    raise ValueError(f"orbit_type 必须为 DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial，当前 {sel!r}")
 
 
 def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_Dynamics) -> Orbit:
     """按规范化形状参数生成 CR3BP 周期轨道。"""
     if sel == "DRO":
         return design_dro(params["amplitude"], dynamics=dynamics)
+    if sel == "DPO":
+        return design_dpo(params["amplitude"], dynamics=dynamics)
     if sel == "HALO":
         return design_halo(int(params["collinear_point"]), params["amplitude"], dynamics=dynamics)
     if sel == "NRHO":
@@ -659,15 +671,15 @@ def design_orbit(
     correction_velocity_tolerance: float = 0.1,
     verbose: bool = False,
 ) -> OrbitDesignResult:
-    """端到端设计七类标称轨道（DRO/NRHO/Halo/Lissajous/L4/L5/Axial）。
+    """端到端设计八类标称轨道（DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial）。
 
     Args:
-        orbit_type: ``"DRO"`` / ``"NRHO"`` / ``"Halo"`` / ``"Lissajous"`` /
-            ``"L4"`` / ``"L5"`` / ``"AXIAL"``。
-        amplitude: 振幅（km）。DRO 1737~110000，默认 10000；Halo 面外振幅
-            ±73000（正北负南），默认 30000；Axial z 振幅 ±60000（正上族
-            负下族），默认 5000；NRHO 不用。
-        phase: 初始相位（周期份额）。DRO/Halo/Axial 取值 0~1，默认
+        orbit_type: ``"DRO"`` / ``"DPO"`` / ``"NRHO"`` / ``"Halo"`` /
+            ``"Lissajous"`` / ``"L4"`` / ``"L5"`` / ``"AXIAL"``。
+        amplitude: 振幅（km）。DRO 1737~110000，默认 10000；DPO 1737~110000，
+            默认 20000；Halo 面外振幅 ±73000（正北负南），默认 30000；
+            Axial z 振幅 ±60000（正上下族），默认 5000；NRHO 不用。
+        phase: 初始相位（周期份额）。DRO/DPO/Halo/Axial 取值 0~1，默认
             0.5001/0/0；NRHO 取值 0.01~0.99，默认 0.5。
         collinear_point: 共线平动点编号 1/2（Halo/NRHO，默认 2）。
             Lissajous/Axial 取 1/2/3（默认 2）。
@@ -761,7 +773,7 @@ def design_orbit(
         # 面内/面外相位已体现在初猜状态（t=0 即历元状态）
         t0_syn = 0.0
     else:
-        phase_offset = 0.5 if sel == "DRO" else 0.0
+        phase_offset = 0.5 if sel in ("DRO", "DPO") else 0.0
         t0_syn = ((phase + phase_offset) % 1.0) * period
     if t0_syn > 0.0:
         state0_syn = np.asarray(

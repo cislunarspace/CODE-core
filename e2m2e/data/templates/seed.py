@@ -29,3 +29,10 @@ _HALO_FOLD_Z0 = {1: 0.07, 2: 0.15}
 
 #: Axial 族种子面外速度（无量纲 DU/TU，小振幅下线性化初猜精度高）
 _AXIAL_SEED_VZ0 = 0.001
+
+#: DPO 族标准种子（从 DRO seed 反转 vy0 微分修正收敛所得）
+#: DPO 为顺行（prograde），xy 平面内围绕月球的周期轨道，与 DRO 对称。
+#: 种子 x0=0.90 处：vy0 < 0（顺行），period≈2.50。
+_DPO_SEED_X0 = 0.90
+_DPO_SEED_VY0 = -0.247645
+_DPO_SEED_PERIOD = 2.5022

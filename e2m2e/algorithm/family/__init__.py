@@ -50,6 +50,7 @@ from .triangular_initial_guess import compute_triangular_initial_guess
 
 __all__ = [
     "design_axial",
+    "design_dpo",
     "design_dro",
     "design_halo",
     "design_nrho",
@@ -83,6 +84,7 @@ __all__ = [
 #: 依赖 ``algorithm/solver``，经 PEP 562 在首次访问时加载。
 _LAZY_EXPORTS = {
     "design_axial": "design_axial",
+    "design_dpo": "design_dpo",
     "design_dro": "design_dro",
     "design_halo": "design_halo",
     "design_nrho": "design_nrho",
@@ -112,6 +114,7 @@ def _build_registry() -> dict[str, Callable[..., Orbit]]:
     """构建轨道族注册表（函数形态）：orbit_type → design_xxx(params) -> Orbit。"""
     from .cr3bp_orbits import (
         design_axial,
+        design_dpo,
         design_dro,
         design_halo,
         design_lissajous,
@@ -121,6 +124,7 @@ def _build_registry() -> dict[str, Callable[..., Orbit]]:
 
     return {
         "DRO": design_dro,
+        "DPO": design_dpo,
         "HALO": design_halo,
         "NRHO": design_nrho,
         "LISSAJOUS": design_lissajous,
