@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-08-04
+
+### Added
+- **转移轨道设计（transfer/）扩展**：
+  - LGA 月球引力辅助间接转移模块（`e2m2e.transfer.lga`，#258）：`LGATransfer` 基于圆锥曲线拼接的月球引力辅助转移设计，支持出发段 → 引力辅助 → 到达段全链路，精化到达段 TOF 计算
+  - HMN 霍曼直接转移模块（`e2m2e.transfer.hmn`，#256）：`HohmannTransfer` 双脉冲霍曼转移设计，支持 LEO→GEO 等共面圆轨道转移
+- **轨道族扩展**：
+  - DPO 顺行轨道族（`e2m2e.algorithms.orbit_design`，#288）：DPO（Distant Prograde Orbit）顺行族设计与延拓
+  - Axial 轨道族（`e2m2e.algorithms.orbit_design`，#287）：Axial 轨道族实现（Gómez Type B 分岔），扩展平动点附近轨道族覆盖
+  - Lissajous + L4/L5 端到端验证（#255）：三类轨道的星历修正全链路验证，QPIT（Quasi-Periodic Invariant Torus）正确器实现
+- **力模型扩展**：
+  - ECOM 9 系数光压模型（`e2m2e.core.forces`，#253/#276）：ECOM（Empirical CODE Orbit Model）光压模型，9 参数经验力，替代简单炮弹模型
+  - 耦合项固体潮强制启用（#277）：力模型 `coupling=1` 配置映射为固体潮 `tide_mode="solid"` 强制启用
+- **角动量管理联合控制**（#261）：姿态发动机联合控制实现，扩展轨道保持控制律
+- **TIGHT/SPECIAL 控制律参数修正与收敛增强**（#280）：轨道保持控制律参数优化，改善收敛性
+- **Rust 二进制过期防护**（#300）：靶向守卫 + ABI 版本戳 + 统一网关，防止 Rust 积分器二进制与 Python 源码不一致
+- **EphemCache 扩展**：Relativistic 力缓存（sxform + de Sitter spkezr，#273）、tide 扰动体位置走 EphemCache 解锁 tide=1 并行打靶（#267）、EphemCache ADR（#272）
+- **星历并行打靶**（#265）：Rust 侧星历预采样缓存 strict 模式 + rayon 并行段积分 + LM 阻尼打靶
+- SRP 放行 Rust STM 快速路径，打靶提速 9.4x
+
+### Changed
+- 转移模块常量归一化 + Lambert 向量化（#293/#294/#295）
+- CI 拆分 lint 与 test，lint 只做静态分析（#278）
+- gcrs_ebcrs 测试随源码迁入 `tests/algorithm/coordinate/`（#252 收尾）
+
+### Fixed
+- LGA 精化到达段 TOF 计算修正（#258）
+- 低推力 h_init 步长上限 + #257 遗留回归测试（#279）
+- COF/GFC 文件读取增加 UTF-8 容错解码（#283）
+- phasing mypy 类型错误 — dynamics 参数类型从 CR3BP_Dynamics 改为 DynamicsLike（#266）
+- 打靶与长期预报共用同一全摄动 ForceModel
+- Rust 多重打靶治发散 + rayon 并行段积分
+- 收敛容差 2e-2 km（20m）+ 各段收敛检查 + 真实残差上报
+
 ## [5.4.0] - 2026-08-01
 
 ### Added

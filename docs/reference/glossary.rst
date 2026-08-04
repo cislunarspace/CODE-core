@@ -21,6 +21,12 @@ CR3BP 相关术语
    halo 轨道
       围绕平动点的周期轨道
 
+   DPO
+      Distant Prograde Orbit，月球 L2 附近的顺行远距离轨道族
+
+   Axial 轨道
+      基于 Gómez Type B 分岔的共线平动点周期轨道族，与 Halo（Type A）分岔机制不同
+
    状态转移矩阵
       描述轨道扰动传播的矩阵 (STM)
 
@@ -49,6 +55,23 @@ CR3BP 相关术语
 
    中间模型
       按保真度，模型分四级：二体模型 < CR3BP < 中间模型 < 高精度星历模型。中间模型是 CR3BP 加部分摄动改进，低于星历模型。
+
+   ECOM
+      Empirical CODE Orbit Model，9 系数经验光压模型，比简单炮弹模型更精确地描述太阳光压对航天器的作用
+
+转移设计
+--------
+
+.. glossary::
+
+   LGA
+      Lunar Gravity Assist，月球引力辅助转移，利用月球引力改变航天器速度矢量以节省燃料
+
+   HMN
+      Hohmann Transfer，霍曼转移，共面圆轨道间的最小能量双脉冲转移
+
+   Lambert 问题
+      给定两端位置和飞行时间，求解连接两点的开普勒轨道弧段
 
 传播与积分
 ----------
