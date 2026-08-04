@@ -303,13 +303,20 @@ class CR3BP_System(System):
         return self.L_points[point]
 
     def get_jacobi_constant(self, state: npt.ArrayLike) -> float:
-        """计算Jacobi常数
+        """计算Jacobi常数（Parker 约定）
+
+        C = 2U - V²，其中 U = ½(x²+y²) + (1-μ)/r₁ + μ/r₂（不含常数项 ½μ(1-μ)）。
+
+        注意：Belbruno/Gómez 文献使用含常数项的 Ω = U + ½μ(1-μ)，
+        对应 C_Belbruno = C_Parker + μ(1-μ) ≈ C_Parker + 0.012。
+        两种约定给出相同运动方程（常数项梯度为零），仅 Jacobi 绝对值不同。
+        参见 Gómez 2001 Vol. I §2.1.1 Convention A/B。
 
         Args:
             state: 状态向量 [x, y, z, vx, vy, vz]
 
         Returns:
-            Jacobi常数
+            Jacobi常数（Parker 约定，无常数项）
         """
         x, y, z, vx, vy, vz = np.asarray(state, dtype=float)
 

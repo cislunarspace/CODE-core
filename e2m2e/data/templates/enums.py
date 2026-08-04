@@ -42,6 +42,7 @@ class TransferType(enum.Enum):
 
     DIRECT = "direct"
     LGA = "lga"  # Lunar Gravity Assist
+    WSB = "wsb"  # Weak Stability Boundary (sun-perturbed indirect transfer)
     EXTERNAL = "external"
 
 

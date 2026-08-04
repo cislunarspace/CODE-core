@@ -6,8 +6,8 @@ three_body_lambert/multi_impulse）、自然动力学路径（low_energy/manifol
 optimize/porkchop）。``transfer_orbit.py`` 是编排器：接收 transfer_type
 （HMN/LGA/WSB/小推力），按枚举选路径组合底层数学模块（新类型，当前占位）。
 
-未实现（对外承诺能力）：LGA/WSB 引力辅助弹道搜索，占位抛
-``NotImplementedError``。
+未实现（对外承诺能力）：小推力转移，占位抛
+``NotImplementedError``。LGA/WSB 引力辅助弹道搜索已实现。
 """
 
 from __future__ import annotations
@@ -71,6 +71,7 @@ from .transfer_search import (
     TransferSearch,
     load_orbit_from_json,
 )
+from .wsb import WsbCandidate, WsbSearchParams, search_wsb_trajectories
 
 __all__ = [
     "TransferSearch",
@@ -125,6 +126,9 @@ __all__ = [
     "LgaTransferDetails",
     "LgaSearchParams",
     "LgaCandidate",
+    "WsbTransferDetails",
+    "WsbSearchParams",
+    "WsbCandidate",
     "transfer_orbit",
 ]
 
@@ -146,7 +150,9 @@ class TransferDesignResult:
     transfer_type: str
     delta_v: float
     trajectory: Any
-    details: HmnTransferDetails | LgaTransferDetails | dict[str, Any] = field(default_factory=dict)
+    details: HmnTransferDetails | LgaTransferDetails | WsbTransferDetails | dict[str, Any] = field(
+        default_factory=dict
+    )
 
 
 @dataclass
@@ -193,6 +199,24 @@ class LgaTransferDetails:
     search_params: LgaSearchParams
 
 
+@dataclass
+class WsbTransferDetails:
+    """WSB 太阳引力辅助转移设计细节。"""
+
+    tli_epoch: float | str
+    tof_sec: float
+    perilune_alt_km: float
+    perilune_vel_km_s: float
+    perilune_state: np.ndarray
+    h2_kepler: float
+    dv_departure_km_s: float
+    dv_arrival_km_s: float
+    n_candidates_searched: int
+    n_candidates_feasible: int
+    converged: bool
+    search_params: WsbSearchParams
+
+
 def transfer_orbit(
     transfer_type: str,
     *,
@@ -202,6 +226,7 @@ def transfer_orbit(
     target_orbit_radius_km: float | None = None,
     dynamics: Any = None,
     lga_search_params: LgaSearchParams | None = None,
+    wsb_search_params: WsbSearchParams | None = None,
     **kwargs,
 ) -> TransferDesignResult:
     """端到端转移轨道设计（编排器）。
@@ -215,12 +240,13 @@ def transfer_orbit(
         target_orbit_radius_km: 目标轨道半径 (km)，HMN 转移必需。
         dynamics: 动力学对象（可选），用于 ephemeris 打靶修正。
         lga_search_params: LGA 搜索参数（可选）。
+        wsb_search_params: WSB 搜索参数（可选）。
 
     Returns:
         TransferDesignResult: 转移轨道设计结果。
 
     Raises:
-        NotImplementedError: 编排器实现未完成（当前仅 HMN/LGA 已实现）。
+        NotImplementedError: 编排器实现未完成（当前仅 HMN/LGA/WSB 已实现）。
         ValueError: HMN 转移缺少必要参数。
     """
     if transfer_type == "HMN":
@@ -237,6 +263,12 @@ def transfer_orbit(
             target_ephemeris=target_ephemeris,
             search_params=lga_search_params,
             dynamics=dynamics,
+        )
+    if transfer_type == "WSB":
+        return _transfer_orbit_wsb(
+            tli_params=tli_params,
+            target_ephemeris=target_ephemeris,
+            search_params=wsb_search_params,
         )
     raise NotImplementedError(f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）")
 
@@ -374,6 +406,110 @@ def _transfer_orbit_lga(
 
     return TransferDesignResult(
         transfer_type="LGA",
+        delta_v=refined.total_dv,
+        trajectory=None,
+        details=details,
+    )
+
+
+def _transfer_orbit_wsb(
+    tli_params: TliParams | None,
+    target_ephemeris: Any,
+    search_params: WsbSearchParams | None,
+) -> TransferDesignResult:
+    """WSB 太阳引力辅助转移编排。
+
+    流程：
+    1. TliParams → ECI 出发态
+    2. 目标星历 → 目标态
+    3. ECI → BCR4BP 无量纲（特征尺度与 CR3BP 共用）
+    4. search_wsb_trajectories() 并行网格搜索
+    5. 取最优候选
+    6. _refine_wsb_candidate() ThreeBodyLambert 打靶精化
+    7. 物理单位换算 + 结果汇总
+    """
+    if tli_params is None:
+        raise ValueError("WSB 转移需要 tli_params")
+    if target_ephemeris is None:
+        raise ValueError("WSB 转移需要 target_ephemeris")
+
+    from ..dynamics import CR3BP_Dynamics, CR3BP_System
+    from ..dynamics.bcr4bp_system import BCR4BPSystem
+    from .wsb import _refine_wsb_candidate
+
+    # BCR4BP 系统（搜索用，sun_phase0 在 worker 中逐个构造）
+    MU_EM = 1.21506683e-2
+    bcr4bp_system = BCR4BPSystem.earth_moon()
+
+    # 1. ECI 出发态
+    r0, v0 = construct_departure_state(tli_params)
+    departure_phys = np.concatenate([r0, v0])
+    departure_dim = bcr4bp_system.physical_to_dimensionless(departure_phys)
+
+    # 2. 目标态
+    r_target, v_target = _extract_target_state(target_ephemeris)
+    target_phys = np.concatenate([r_target, v_target])
+    target_dim = bcr4bp_system.physical_to_dimensionless(target_phys)
+
+    # 3. WSB 搜索（并行）
+    candidates = search_wsb_trajectories(departure_dim, target_dim, bcr4bp_system, search_params)
+
+    params = search_params if search_params is not None else WsbSearchParams()
+    n_searched = params.n_sun_phase * params.n_departure_phase * params.n_tof
+    n_feasible = len(candidates)
+
+    if not candidates:
+        warnings.warn("WSB 搜索未找到可行候选，返回零结果", stacklevel=2)
+        details = WsbTransferDetails(
+            tli_epoch=tli_params.epoch,
+            tof_sec=0.0,
+            perilune_alt_km=0.0,
+            perilune_vel_km_s=0.0,
+            perilune_state=np.zeros(6),
+            h2_kepler=0.0,
+            dv_departure_km_s=0.0,
+            dv_arrival_km_s=float("inf"),
+            n_candidates_searched=n_searched,
+            n_candidates_feasible=0,
+            converged=False,
+            search_params=params,
+        )
+        return TransferDesignResult(
+            transfer_type="WSB",
+            delta_v=float("inf"),
+            trajectory=None,
+            details=details,
+        )
+
+    # 4. 取最优候选
+    best = candidates[0]
+
+    # 5. ThreeBodyLambert 打靶精化（CR3BP 到达段）
+    cr3bp_system = CR3BP_System(mu=MU_EM, primary="Earth", secondary="Moon")._with_default_scales()
+    cr3bp_dynamics = CR3BP_Dynamics(cr3bp_system)
+    refined = _refine_wsb_candidate(best, cr3bp_system, cr3bp_dynamics, target_dim)
+
+    # 6. 物理单位换算
+    perilune_phys = bcr4bp_system.dimensionless_to_physical(refined.perilune_state)
+    perilune_vel = float(np.linalg.norm(perilune_phys[3:]))
+
+    details = WsbTransferDetails(
+        tli_epoch=tli_params.epoch,
+        tof_sec=refined.tof_sec,
+        perilune_alt_km=refined.perilune_alt_km,
+        perilune_vel_km_s=perilune_vel,
+        perilune_state=perilune_phys,
+        h2_kepler=refined.h2_kepler,
+        dv_departure_km_s=refined.dv_departure,
+        dv_arrival_km_s=refined.dv_arrival,
+        n_candidates_searched=n_searched,
+        n_candidates_feasible=n_feasible,
+        converged=refined.converged,
+        search_params=params,
+    )
+
+    return TransferDesignResult(
+        transfer_type="WSB",
         delta_v=refined.total_dv,
         trajectory=None,
         details=details,
