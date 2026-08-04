@@ -36,3 +36,16 @@ _AXIAL_SEED_VZ0 = 0.001
 _DPO_SEED_X0 = 0.90
 _DPO_SEED_VY0 = -0.247645
 _DPO_SEED_PERIOD = 2.5022
+
+#: SPO（Short-Period Orbit）族标准种子
+#: 来源：Capdevila & Howell (2018), JGCD, Table 1
+#: L4/L5 三角平动点短周期族成员，xy 平面内周期轨道（z₀=ż₀=0）。
+#: 坐标为质心会合系无量纲值。L5 种子由 CR3BP 对称性得到
+#: （y₀→-y₀, ẋ₀→-ẋ₀）。
+_SPO_L4_SEED_X0 = -0.2255
+_SPO_L4_SEED_Y0 = 0.8660
+_SPO_L4_SEED_VX0 = -0.2384
+_SPO_L4_SEED_VY0 = 0.2494
+#: 周期 28.3488 天，无量纲：T_days / (CHAR_PERIOD_SEC / 86400) * 2π
+#: CHAR_PERIOD_SEC = 27.32 * 86400，T* ≈ 4.3423 天/TU
+_SPO_SEED_PERIOD = 6.529

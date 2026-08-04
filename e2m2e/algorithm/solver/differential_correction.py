@@ -63,6 +63,7 @@ class DifferentialCorrection:
         "axial_orbit_fixed_vz0",
         "halo_orbit_fixed_z0",
         "halo_orbit_fixed_x0",
+        "spo_fixed_x0",
     ]
 
     def __init__(
@@ -371,6 +372,43 @@ class DifferentialCorrection:
         logger.debug(
             "Axial 轨道配置完成（固定 vz0）：vz0=%s，平动点=L%s，自由变量=%s，目标约束=%s",
             vz0,
+            libration_point,
+            self.free_variables,
+            list(self.target_conditions.keys()),
+        )
+
+        return self
+
+    def setup_spo_fixed_x0(self, x0, libration_point=5):
+        """配置 SPO 通用平面周期修正，固定 x₀（无对称性假设）。
+
+        L4/L5 短周期族是 xy 平面内围绕三角平动点的周期轨道，
+        不具有 x 轴或 xz 平面对称性（y₀≠0）。直接求解全周期闭合
+        条件：state(T) - state(0) = 0。
+
+        Args:
+            x0 (float): 固定的初始 x 坐标（族参数）
+            libration_point (int): 平动点编号 (4=L4, 5=L5)，默认 5
+
+        Returns:
+            self: 配置好的微分修正器实例
+
+        Note:
+            - 自由变量: [y₀, ẋ₀, ẏ₀, T]（4 个）
+            - 目标约束: [Δy=0, Δẋ=0, Δẏ=0]（3 个，全周期闭合）
+            - Δx/Δz 约束省略：x₀ 已固定（Δx 自动满足），z 方向解耦（Δz 行恒零）
+            - 4 自由 vs 3 约束 → 欠定系统，用 lstsq 求最小范数修正
+            - 使用 iterate_full_period_correction 方法（非 iterate_correction）
+        """
+        from ..family.strategies import spo_fixed_x0
+
+        config = spo_fixed_x0(x0, libration_point)
+        self._apply_config(config)
+        self._reset_history()
+
+        logger.debug(
+            "SPO 配置完成（固定 x0）：x0=%s，平动点=L%s，自由变量=%s，目标约束=%s",
+            x0,
             libration_point,
             self.free_variables,
             list(self.target_conditions.keys()),
@@ -724,6 +762,211 @@ class DifferentialCorrection:
             if verbose:
                 logger.info("微分修正失败: %s", self.termination_reason)
 
+    def iterate_full_period_correction(self, initial_guess, verbose=False, callback=None):
+        """全周期闭合修正（适用于无对称性的周期轨道，如 SPO）。
+
+        与 iterate_correction 的区别：
+        - iterate_correction：传播 T/2，利用对称性检查半周期约束
+        - 本方法：传播完整周期 T，检查 state(T) - state(0) = 0
+
+        约束语义：target_conditions 的值为 0（闭合残差为零），
+        实际残差 = final_state[c_idx] - initial_state[c_idx]。
+
+        Args:
+            initial_guess: 初始猜测轨道（states[0] 为初始状态，period 为周期）
+            verbose: 是否打印迭代过程
+            callback: 每次迭代后的回调函数
+
+        Returns:
+            Orbit | None: 修正后的周期轨道；失败返回 None
+        """
+        self.initial_guess = initial_guess.states[0].copy()
+        self.iteration_count = 0
+        self.converged = False
+        self.success = False
+
+        current_state = self.initial_guess.copy()
+        current_period = initial_guess.period  # 全周期（非半周期）
+
+        if verbose:
+            logger.info("=" * 60)
+            logger.info("开始全周期闭合修正迭代...")
+            logger.info(
+                "初始状态: x=%.6f, y=%.6f, z=%.6f",
+                current_state[0],
+                current_state[1],
+                current_state[2],
+            )
+            logger.info(
+                "         ẋ=%.6f, ẏ=%.6f, ż=%.6f",
+                current_state[3],
+                current_state[4],
+                current_state[5],
+            )
+            logger.info("初始周期: T=%.6f", current_period)
+            logger.info("=" * 60)
+
+        for iteration in range(self.max_iterations):
+            self.iteration_count = iteration + 1
+
+            # 1. 带STM传播完整周期
+            try:
+                result = self.dynamics.propagate(
+                    current_state,
+                    (0, current_period),
+                    t_eval=np.linspace(0, current_period, 1000),
+                    with_stm=True,
+                    with_jacobi=False,
+                )
+                final_state = result["states"][-1]
+                final_stm = result["stm"][-1]
+                self.performance_stats["stm_evaluations"] += 1
+            except Exception as e:
+                if verbose:
+                    logger.info("  积分失败: %s", e)
+                self.termination_reason = f"积分失败: {e}"
+                break
+
+            # 2. 计算闭合残差：state(T) - state(0) 在约束分量上
+            error_vector = np.array(
+                [final_state[idx] - current_state[idx] for idx in self.constraint_indices]
+            )
+            current_error = np.linalg.norm(error_vector)
+
+            self.error_history.append(current_error)
+            self.convergence_history.append(
+                {
+                    "iteration": iteration + 1,
+                    "error": current_error,
+                    "state": current_state.copy(),
+                    "time": current_period,
+                    "final_state": final_state.copy(),
+                }
+            )
+
+            if verbose:
+                logger.info("迭代 %d: 闭合残差范数 = %.2e", iteration + 1, current_error)
+
+            if current_error < self.tolerance:
+                self.converged = True
+                self.termination_reason = "收敛成功：闭合残差小于容差"
+                self.current_error = current_error
+                if verbose:
+                    logger.info("[OK] 收敛成功！最终误差: %.2e", current_error)
+                if callback:
+                    callback(iteration + 1, current_error, True)
+                break
+
+            if current_error > self.divergence_limit:
+                self.termination_reason = "发散：误差超过限制"
+                if callback:
+                    callback(iteration + 1, current_error, False)
+                break
+
+            # 3. 构建雅可比矩阵
+            # 对于闭合约束：∂(final_state[i] - initial_state[i]) / ∂free_var[j]
+            #   状态变量 (var_idx < 6): ∂final/∂var = STM[c_idx, var_idx],
+            #     若 var_idx == c_idx 则还需 -1（∂(-initial)/∂var = -δ）
+            #   时间变量 (var_idx == 6): ∂final/∂T = dstate/dt(T)
+            state_derivative = self.dynamics.equations_of_motion(current_period, final_state)
+
+            n_constraints = len(self.constraint_indices)
+            n_variables = len(self.free_variable_indices)
+            jacobian = np.zeros((n_constraints, n_variables))
+
+            for j, var_idx in enumerate(self.free_variable_indices):
+                if var_idx < 6:
+                    for i, c_idx in enumerate(self.constraint_indices):
+                        jacobian[i, j] = final_stm[c_idx, var_idx]
+                        if var_idx == c_idx:
+                            jacobian[i, j] -= 1.0
+                elif var_idx == 6:
+                    for i, c_idx in enumerate(self.constraint_indices):
+                        jacobian[i, j] = state_derivative[c_idx]
+
+            self.performance_stats["jacobian_evaluations"] += 1
+
+            # 4. 求解牛顿修正量（方阵用 solve，欠定用最小二乘）
+            try:
+                if n_constraints == n_variables:
+                    delta = np.linalg.solve(jacobian, error_vector)
+                else:
+                    delta = np.linalg.lstsq(jacobian, error_vector, rcond=None)[0]
+            except np.linalg.LinAlgError:
+                if verbose:
+                    logger.warning("  雅可比矩阵奇异，无法求解修正量。")
+                self.termination_reason = "雅可比矩阵奇异"
+                if callback:
+                    callback(iteration + 1, current_error, False)
+                break
+
+            correction_norm = np.linalg.norm(delta)
+            self.correction_history.append(correction_norm)
+
+            # 5. 更新自由变量
+            for j, var_idx in enumerate(self.free_variable_indices):
+                if var_idx < 6:
+                    current_state[var_idx] -= delta[j]
+                elif var_idx == 6:
+                    current_period -= delta[j]
+
+            if current_period <= 0:
+                current_period = 0.1
+
+            if verbose:
+                logger.info("  修正量范数: %.2e", correction_norm)
+                logger.info("  新周期: T=%.6f", current_period)
+
+            # 6. 停滞检查
+            if correction_norm < self.stagnation_limit:
+                if current_error < 1e-8:
+                    self.converged = True
+                    self.termination_reason = "收敛成功：修正量过小但误差足够小"
+                    self.current_error = current_error
+                    if callback:
+                        callback(iteration + 1, current_error, True)
+                    break
+                self.termination_reason = "停滞：修正量过小"
+                if callback:
+                    callback(iteration + 1, current_error, False)
+                break
+
+            if callback:
+                callback(iteration + 1, current_error, False)
+
+        if self.converged:
+            if current_period < 1e-6:
+                self.converged = False
+                self.success = False
+                self.termination_reason = f"收敛但周期无效: T={current_period:.6e}"
+                return None
+
+            self.success = True
+            self.final_solution = current_state.copy()
+            self.solution_time = current_period
+
+            if verbose:
+                logger.info("=" * 60)
+                logger.info("全周期修正成功完成")
+                logger.info("  最终周期: T = %.6f", current_period)
+                logger.info("  最终误差: %.2e", current_error)
+                logger.info("  迭代次数: %d", self.iteration_count)
+                logger.info("=" * 60)
+
+            # 全周期模式：period 就是 current_period（非 2*half_period）
+            result_dict = {
+                "state": current_state,
+                "period": current_period,
+                "half_period": current_period / 2,
+                "setup_type": self.setup_type,
+                "converged": self.converged,
+                "error": self.current_error,
+            }
+            return self._create_corrected_orbit(result_dict)
+        else:
+            if verbose:
+                logger.info("微分修正失败: %s", self.termination_reason)
+
     def _build_result(self, final_state, half_period):
         """构建修正结果字典
 
@@ -764,12 +1007,13 @@ class DifferentialCorrection:
         final_state = prop_result["states"][-1]
         closure_error = np.linalg.norm(final_state - initial_state)
 
-        # 对于 Halo/Axial 轨道，半周期对称性已由微分修正精确保证；全周期闭合误差
-        # 通常来自积分截断（~2e-6），用速度调整反而破坏对称性。
+        # 对于 Halo/Axial/SPO 轨道，周期对称性或全周期闭合已由微分修正精确保证；
+        # 全周期闭合误差通常来自积分截断（~2e-6），用速度调整反而破坏修正结果。
         if closure_error > 1e-10 and self.setup_type not in (
             "halo_orbit_fixed_x0",
             "halo_orbit_fixed_z0",
             "axial_orbit_fixed_vz0",
+            "spo_fixed_x0",
         ):
             closure_error_vector = final_state - initial_state
             pos_error = np.linalg.norm(closure_error_vector[:3])

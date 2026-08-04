@@ -39,6 +39,7 @@ from .strategies import (
     axial_fixed_vz0,
     halo_fixed_x0,
     halo_fixed_z0,
+    spo_fixed_x0,
     symmetric_2d_fixed_t,
     symmetric_2d_fixed_x0,
     symmetric_2d_fixed_y0,
@@ -55,6 +56,7 @@ __all__ = [
     "design_halo",
     "design_nrho",
     "design_lissajous",
+    "design_spo",
     "design_triangular",
     "earth_moon_system",
     "Cr3bpOrbitError",
@@ -77,6 +79,7 @@ __all__ = [
     "halo_fixed_z0",
     "halo_fixed_x0",
     "axial_fixed_vz0",
+    "spo_fixed_x0",
     "registry",
 ]
 
@@ -89,6 +92,7 @@ _LAZY_EXPORTS = {
     "design_halo": "design_halo",
     "design_nrho": "design_nrho",
     "design_lissajous": "design_lissajous",
+    "design_spo": "design_spo",
     "design_triangular": "design_triangular",
     "earth_moon_system": "earth_moon_system",
     "Cr3bpOrbitError": "Cr3bpOrbitError",
@@ -119,6 +123,7 @@ def _build_registry() -> dict[str, Callable[..., Orbit]]:
         design_halo,
         design_lissajous,
         design_nrho,
+        design_spo,
         design_triangular,
     )
 
@@ -135,4 +140,6 @@ def _build_registry() -> dict[str, Callable[..., Orbit]]:
         "L5": lambda amplitude_in, amplitude_out, phase_in=0.0, phase_out=0.0, **kw: (
             design_triangular(5, amplitude_in, amplitude_out, phase_in, phase_out, **kw)
         ),
+        "L4_SPO": lambda amplitude, **kw: design_spo(4, amplitude, **kw),
+        "L5_SPO": lambda amplitude, **kw: design_spo(5, amplitude, **kw),
     }

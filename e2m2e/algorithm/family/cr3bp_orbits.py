@@ -33,6 +33,11 @@ from ...data.templates.seed import (  # noqa: F401
     _DRO_SEED_X0,
     _HALO_FOLD_Z0,
     _HALO_SEED_Z0,
+    _SPO_L4_SEED_VX0,
+    _SPO_L4_SEED_VY0,
+    _SPO_L4_SEED_X0,
+    _SPO_L4_SEED_Y0,
+    _SPO_SEED_PERIOD,
     CHAR_LENGTH_KM,
     CHAR_PERIOD_SEC,
     EARTH_MOON_MU,
@@ -45,6 +50,7 @@ from .axial_initial_guess import compute_axial_initial_guess
 from .halo_family import halo_pseudo_arclength_continuation
 from .halo_initial_guess import compute_halo_initial_guess
 from .lissajous_initial_guess import compute_lissajous_initial_guess
+from .spo_initial_guess import compute_spo_initial_guess
 from .triangular_initial_guess import compute_triangular_initial_guess
 
 
@@ -714,4 +720,185 @@ def design_axial(
         dp_init=float(np.copysign(0.002, sign)),
         max_step=0.004,
         tol=1e-6,
+    )
+
+
+def _correct_spo(
+    dynamics: CR3BP_Dynamics,
+    x0: float,
+    libration_point: int,
+    guess: Orbit | None,
+) -> Orbit:
+    """在 x₀ 处修正 SPO（通用平面周期修正，无对称性假设）。
+
+    SPO 是 L4/L5 短周期族成员，xy 平面内周期轨道，不具有 x 轴
+    对称性（y₀≠0）。使用 iterate_full_period_correction 做全周期闭合。
+
+    首次调用（guess=None）使用短周期模态线性化初猜（不含长/垂直模态）。
+    后续调用保留已收敛轨道状态作初猜。
+    """
+    if guess is None:
+        # 从线性化短周期模态构造初猜（小振幅初猜对 Newton 收敛足够近）
+        state, period = compute_spo_initial_guess(
+            dynamics.system,
+            libration_point,
+            amplitude_km=1000.0,
+        )
+        # 覆盖 x₀ 到族参数指定值
+        state[0] = x0
+    else:
+        state = guess.states[0].copy()
+        state[0] = x0
+        state[2] = 0.0
+        state[5] = 0.0
+        assert guess.period is not None
+        period = guess.period
+
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_spo_fixed_x0(x0=x0, libration_point=libration_point)
+    seed = Orbit(
+        states=state.reshape(1, -1),
+        times=np.array([0.0]),
+        system=dynamics.system,
+    )
+    seed.period = period
+
+    orbit = corrector.iterate_full_period_correction(seed, verbose=False)
+    if orbit is None:
+        raise Cr3bpOrbitError(
+            f"SPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {corrector.termination_reason}"
+        )
+    assert orbit.period is not None
+    if orbit.period < 1.0 or orbit.period > 15.0:
+        raise Cr3bpOrbitError(
+            f"SPO(L{libration_point}, x0={x0:.6f}) 周期异常（T={orbit.period:.3f}，预期 1.0-15.0）"
+        )
+    return orbit
+
+
+def _l45_distance(
+    dynamics: CR3BP_Dynamics,
+    orbit: Orbit,
+    point: int,
+    n_points: int = 2000,
+) -> tuple[float, float]:
+    """传播一个周期，返回距 L4/L5 径向距离的最小/最大值（无量纲）。"""
+    mu = dynamics.system.mu
+    lp_x = 0.5 - mu
+    lp_y = np.sqrt(3) / 2 if point == 4 else -np.sqrt(3) / 2
+
+    assert orbit.period is not None
+    t_eval = np.linspace(0.0, orbit.period, n_points)
+    result = dynamics.propagate(orbit.states[0], (0.0, orbit.period), t_eval=t_eval)
+    states = result["states"]
+    dist = np.sqrt((states[:, 0] - lp_x) ** 2 + (states[:, 1] - lp_y) ** 2)
+    return float(dist.min()), float(dist.max())
+
+
+def design_spo(
+    libration_point: int,
+    amplitude_km: float,
+    *,
+    dynamics: CR3BP_Dynamics | None = None,
+    tol_km: float = 20.0,
+) -> Orbit:
+    r"""生成指定振幅的 L4/L5 SPO 周期轨道。
+
+    SPO（Short-Period Orbit）是 CR3BP 中围绕三角平动点的短周期族
+    成员（Gómez vol II, $\mathcal{L}_s$），周期约 1 朔望月（~28 天），
+    近稳定（特征值模 ≈ 1.001）。
+
+    振幅定义：一个周期内距 L4/L5 径向距离最小/最大值的均值（km）。
+    以 x₀ 为族参数，在 L4/L5 附近做二分搜索逼近目标振幅。
+
+    实现策略（直接二分，非族行走）：
+    SPO 短周期族在 L4/L5 附近的振幅-×₀ 映射非单调（小振幅区间
+    步长敏感），_walk_family 假设单调性，不适合此族。改用 x₀
+    上的直接二分搜索 + 每步全周期修正，每步都从线性化初猜出发
+    （SPO 近稳定，牛顿收敛可靠）。
+
+    Args:
+        libration_point: 平动点编号（4=L4, 5=L5）。
+        amplitude_km: 目标振幅（km）。
+        dynamics: CR3BP 动力学对象；缺省构造标准地月系统。
+        tol_km: 振幅匹配容差（km），默认 20。
+
+    Returns:
+        修正后的 SPO 周期轨道。
+
+    References:
+        Gómez et al. (2001). Dynamics and mission design near libration
+        points, Vol. II. ESA Contract Report.
+        Capdevila & Howell (2018). A transfer network linking Earth,
+        Moon, and the triangular libration point regions. JGCD.
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    du = dynamics.system.characteristic_length
+    assert du is not None
+    mu = dynamics.system.mu
+    target_du = amplitude_km / du
+    tol_du = tol_km / du
+
+    def measure(orbit: Orbit) -> float:
+        d_min, d_max = _l45_distance(dynamics, orbit, libration_point)
+        return 0.5 * (d_min + d_max)
+
+    lp_x = 0.5 - mu
+
+    # 预计算一条种子轨道（L4/L5 附近），后续二分步复用作初猜
+    seed_orbit = _correct_spo(dynamics, lp_x, libration_point, None)
+
+    def _correct_with_seed(x0: float) -> Orbit:
+        """用种子轨道作初猜的修正（比从线性化初猜快很多）。"""
+        return _correct_spo(dynamics, x0, libration_point, seed_orbit)
+
+    # 二分搜索 x₀：x₀ 越远离 L4（向月侧减小），振幅越大
+    # 搜索范围：x₀ ∈ [lp_x - 0.05, lp_x + 0.02]
+    x_lo = lp_x - 0.05  # 大振幅端
+    x_hi = lp_x + 0.02  # 小振幅端
+
+    best_orbit = None
+    best_err = float("inf")
+
+    for _ in range(25):
+        x_mid = 0.5 * (x_lo + x_hi)
+        try:
+            orbit_mid = _correct_with_seed(x_mid)
+        except Cr3bpOrbitError:
+            x_hi = x_mid
+            continue
+        amp_mid = measure(orbit_mid)
+        err = abs(amp_mid - target_du)
+        if err < best_err:
+            best_err = err
+            best_orbit = orbit_mid
+        if err <= tol_du:
+            return orbit_mid
+        # 振幅随 x₀ 递减（x₀ 增大 → 更靠近 L4 → 振幅减小）
+        if amp_mid > target_du:
+            x_lo = x_mid
+        else:
+            x_hi = x_mid
+
+    if best_orbit is not None and best_err <= 5 * tol_du:
+        return best_orbit
+
+    # 回退：小振幅（< 种子振幅）直接从线性化初猜修正
+    # 种子轨道在 lp_x 处振幅约 1500 km；目标更小时直接用线性化
+    # 初猜（不含长/垂直模态）在合适 x₀ 处修正
+    seed_amp = measure(seed_orbit)
+    if target_du < seed_amp:
+        # 在 lp_x 和 lp_x+0.01 之间找合适 x₀
+        for dx in np.linspace(0.0, 0.010, 11):
+            try:
+                orbit_try = _correct_spo(dynamics, lp_x + dx, libration_point, None)
+                if abs(measure(orbit_try) - target_du) <= 5 * tol_du:
+                    return orbit_try
+            except Cr3bpOrbitError:
+                continue
+
+    raise Cr3bpOrbitError(
+        f"SPO(L{libration_point}, amp={amplitude_km:.0f} km) 未命中目标"
+        f"（最佳误差 {best_err * du:.0f} km）"
     )
