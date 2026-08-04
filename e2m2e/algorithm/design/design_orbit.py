@@ -38,13 +38,11 @@ from typing import Any
 
 import numpy as np
 
-from e2m2e.io import (
-    DEFAULT_PERTURBATION,
-    EphemerisTable,
-)
+from e2m2e.io import EphemerisTable
 
 from ...data.kernels._spice_loader import get_spiceypy
 from ...data.kernels.manager import SPICEManager
+from ...data.templates.perturbations import DEFAULT_PERTURBATION
 from ...data.types.orbit import Orbit
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes
@@ -65,8 +63,6 @@ from ..family.cr3bp_orbits import (
     design_triangular,
     earth_moon_system,
 )
-from ..forces import ForceModel
-from ..forces.force_mapping import dfh_perturbation_to_force_config
 from ..solver.multiple_shooting import sample_patch_points_perilune_clustered
 
 __all__ = [
@@ -802,6 +798,9 @@ def design_orbit(
 
     # --- 3. 星历修正（N 体模型多重打靶） ---
     # 默认光压用炮弹模型、关耦合项（ECOM/耦合属 #253，显式开启会报错）
+    from ..forces import ForceModel
+    from ..forces.force_mapping import dfh_perturbation_to_force_config
+
     if perturbation is None:
         perturbation = DEFAULT_DESIGN_PERTURBATION
     sw = dict(perturbation)

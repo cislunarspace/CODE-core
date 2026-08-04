@@ -623,7 +623,7 @@ class ForceModel:
         initial_step: float | None = None,
         events: list[Callable[[float, npt.NDArray[np.floating]], float]] | None = None,
         max_steps: int = 100_000,
-        method: RkMethod = RkMethod.PD45,
+        method: RkMethod | None = None,
     ) -> dict[str, Any]:
         """使用 Rust rk_step 传播轨迹。
 
@@ -645,6 +645,8 @@ class ForceModel:
             包含 ``time``、``states`` 和 ``terminal_event_index`` 的字典；
             ``with_stm=True`` 时额外含 ``stm`` 键。
         """
+        if method is None:
+            method = RkMethod.PD45
         self._raise_for_unsupported(with_stm, with_jacobi)
 
         if len(t_span) != 2:
@@ -832,13 +834,15 @@ class ForceModel:
         *,
         initial_step: float | None = None,
         max_steps: int = 100_000,
-        method: RkMethod = RkMethod.PD45,
+        method: RkMethod | None = None,
     ) -> dict[str, Any]:
         """带脉冲机动的传播：coast 段之间在 burn epoch 处施加 Δv。
 
         按 epoch 排序 burns，依次 coast → 施加 Δv → 续传。burn epoch 处
         输出行携带 post-burn 速度（丢 pre-burn 行，无重复 epoch）。
         """
+        if method is None:
+            method = RkMethod.PD45
         t0, tf = float(t_span[0]), float(t_span[1])
         y = np.asarray(initial_state, dtype=float)
 
