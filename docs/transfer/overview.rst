@@ -9,6 +9,8 @@ e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍�
 - :doc:`lambert` — Lambert 二体求解器，支持短程/长程与多圈解
 - :doc:`hmn` — 霍曼直接转移（HMN），适用于共面圆轨道间的最小能量转移
 - :doc:`lga` — 月球引力辅助间接转移（LGA），基于圆锥曲线拼接法
+- :doc:`wsb` — 太阳引力辅助低能间接转移（WSB），H₂<0 弹道捕获
+- :doc:`low_thrust` — 小推力转移，Q-law 初猜 + 打靶/配点
 - :doc:`search` — 网格搜索，参数空间扫描可行转移窗口
 - :doc:`optimization` — NLP 优化，以搜索结果为初值精化转移轨道
 - :doc:`terminal` — 终端条件抽象

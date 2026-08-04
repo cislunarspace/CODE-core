@@ -102,3 +102,27 @@ e2m2e.algorithm.transfer.low_energy module
    :members:
    :undoc-members:
    :show-inheritance:
+
+e2m2e.algorithm.transfer.hohmann module
+---------------------------------------
+
+.. automodule:: e2m2e.algorithm.transfer.hohmann
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.algorithm.transfer.lga module
+-----------------------------------
+
+.. automodule:: e2m2e.algorithm.transfer.lga
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.algorithm.transfer.wsb module
+-----------------------------------
+
+.. automodule:: e2m2e.algorithm.transfer.wsb
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -21,22 +21,23 @@ LGA 转移分为三段：
 
 .. code-block:: python
 
-   from e2m2e.transfer.lga import LGATransfer
+   from e2m2e.algorithm.transfer.lga import search_lga_trajectories, LgaSearchParams
 
-   transfer = LGATransfer(
-       departure_orbit=departure_orbit,
-       arrival_orbit=arrival_orbit,
+   # departure_state / target_state：CR3BP 无量纲状态；system / dynamics：CR3BP 系统
+   candidates = search_lga_trajectories(
+       departure_state=departure_state,
+       target_state=target_state,
        system=system,
+       dynamics=dynamics,
+       params=LgaSearchParams(
+           tof_range=(15.0, 45.0),   # 飞行时间范围（天）
+           max_total_dv=4.0,         # 总 Δv 上限（km/s）
+       ),
    )
 
-   result = transfer.solve(
-       departure_epoch=epoch,
-       tof_guess=5.0,  # 飞行时间初猜（天）
-   )
-
-   if result.success:
-       print(f"总 Δv: {result.total_delta_v:.4f} km/s")
-       print(f"飞行时间: {result.time_of_flight:.2f} 天")
+   for c in candidates:
+       print(f"总 Δv: {c.total_dv:.4f} km/s, 飞行时间: {c.tof_sec / 86400:.2f} 天, "
+             f"近月点高度: {c.perilune_alt_km:.1f} km")
 
 参考文献
 --------

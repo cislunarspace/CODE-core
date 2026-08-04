@@ -10,12 +10,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 - **转移轨道设计（transfer/）扩展**：
-  - LGA 月球引力辅助间接转移模块（`e2m2e.transfer.lga`，#258）：`LGATransfer` 基于圆锥曲线拼接的月球引力辅助转移设计，支持出发段 → 引力辅助 → 到达段全链路，精化到达段 TOF 计算
-  - HMN 霍曼直接转移模块（`e2m2e.transfer.hmn`，#256）：`HohmannTransfer` 双脉冲霍曼转移设计，支持 LEO→GEO 等共面圆轨道转移
+  - WSB 太阳引力辅助间接转移模块（`e2m2e.algorithm.transfer.wsb`，#259）：BCR4BP 弹道网格搜索 + ThreeBodyLambert 到达段精化，以 H₂ < 0 判定弹道捕获（Belbruno 约定），`transfer_orbit("WSB")` 编排器接入
+  - 小推力转移编排器接入（#260）：低推力直接打靶/配点求解器接入 transfer 编排层，提供端到端算例
+  - LGA 月球引力辅助间接转移模块（`e2m2e.algorithm.transfer.lga`，#258）：`search_lga_trajectories` 弹道网格搜索（出发相位角 × TOF），圆锥曲线拼接的出发段 → 引力辅助 → 到达段全链路，精化到达段 TOF 计算
+  - HMN 霍曼直接转移模块（`e2m2e.algorithm.transfer.hohmann`，#256）：`hohmann_delta_v`/`hohmann_tof`/`scan_lambert_delta_v`/`ephemeris_shoot_transfer`，支持 LEO→GEO 等共面圆轨道转移
 - **轨道族扩展**：
   - DPO 顺行轨道族（`e2m2e.algorithms.orbit_design`，#288）：DPO（Distant Prograde Orbit）顺行族设计与延拓
   - Axial 轨道族（`e2m2e.algorithms.orbit_design`，#287）：Axial 轨道族实现（Gómez Type B 分岔），扩展平动点附近轨道族覆盖
+  - L4/L5 SPO 周期轨道族（#289）：三角平动点附近短周期轨道族，短周期模态初猜 + 二分搜索 x₀ 逼近目标振幅，`design_orbit` 新增 L4_SPO/L5_SPO 分发
+  - L4/L5 LPO 长周期轨道族及 Horseshoe 马蹄轨道（#290）：长周期模态初猜 + 平面周期修正，三层网格搜索解决振幅-x₀ 非单调，`design_horseshoe` 马蹄族封装，`design_orbit` 新增 L4_LPO/L5_LPO/L4_HORSESHOE/L5_HORSESHOE 分发
   - Lissajous + L4/L5 端到端验证（#255）：三类轨道的星历修正全链路验证，QPIT（Quasi-Periodic Invariant Torus）正确器实现
+- **Facade 一档接口补齐**（#291）：`transfer_design`/`orbit_propagation`/`spacetime_transform` 三方法从占位升级为薄封装，Facade 五个一档方法（design_orbit/control_orbit/transfer_design/orbit_propagation/spacetime_transform）全部落地
 - **力模型扩展**：
   - ECOM 9 系数光压模型（`e2m2e.core.forces`，#253/#276）：ECOM（Empirical CODE Orbit Model）光压模型，9 参数经验力，替代简单炮弹模型
   - 耦合项固体潮强制启用（#277）：力模型 `coupling=1` 配置映射为固体潮 `tide_mode="solid"` 强制启用
@@ -39,6 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - 打靶与长期预报共用同一全摄动 ForceModel
 - Rust 多重打靶治发散 + rayon 并行段积分
 - 收敛容差 2e-2 km（20m）+ 各段收敛检查 + 真实残差上报
+- `design_orbit` 分发测试因 Rust binding 导入失败（#301）：模块顶层引用导致测试收集阶段触发 Rust binding 导入链，改延迟导入与运行时默认值
 
 ## [5.4.0] - 2026-08-01
 
@@ -54,22 +60,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **推进系统建模**：混合推进系统建模与同伦法求解器框架；小推力（电推进）动力学模型
 - **SPICE 编译包自动化**：预编译 MICE 工具包发布至 GitHub Release（`cspice-v1`，`cspice-windows.zip`/`cspice-linux.zip`）；新增 `scripts/download_cspice.py` 从 Release 下载解压并输出 `CSPICE_DIR`，CI 与本地构建绕开 NAIF 官网下载（国内网络常不可达）
 - **转移轨道设计（transfer/）**：
-  - 二体 Lambert 求解器（`e2m2e.transfer.lambert`）：Izzo 算法 Rust 内核（`e2m2e-propagation` crate），`solve_lambert`/`solve_lambert_batch` 支持短程/长程与多圈解，基准对齐 Vallado 文献值
-  - porkchop 扫描（`e2m2e.transfer.porkchop`）：出发时间 × 飞行时间网格的双脉冲 ΔV 扫描，终端状态经 `TerminalCondition` 接口提取
-  - 多脉冲转移与主矢量检验（`e2m2e.transfer.multi_impulse`）：`MultiImpulseTransfer` 以中途节点 `[t_i, r_i]` 为决策变量、弧段 Lambert 封闭、scipy SLSQP 最小化总 ΔV；`check_primer_vector` 实现 Lawden 必要条件检验与 Lion & Handelsman 中途脉冲插入准则
-  - porkchop 持久化与 Pareto 前沿（`e2m2e.transfer.porkchop`，主题 8）：`PorkchopData.to_sqlite`/`from_sqlite` 把 ΔV 网格落盘为 SQLite 解数据库（scans 元数据表 + design_points 展平表，NaN→NULL，stdlib sqlite3 零新增依赖，多 scan 自增累积）；`pareto_front` 用经典非支配排序（Deb 2002 O(MN²)）从网格提取 ΔV–TOF Pareto 前沿（Topputo 2013 双目标范式），支持自定义目标字段组合，产出 `ParetoFront` 带绘图。10 测试全过（SQLite 往返等价、多 scan 累积、已知支配关系、LEO→GEO 前沿形态）
-  - porkchop 插值代价查询（`e2m2e.transfer.porkchop`，主题 8）：`PorkchopData.query(t_dep, tof)` 规则网格双线性插值查总 ΔV，NaN 格点传播 NaN；`PorkchopData.query_scan(path, scan_id, t_dep, tof)` 从 SQLite 解数据库读网格后插值（等价于 from_sqlite + query）。补 `(scan_id, t_dep, tof)` 索引。对应规划文档「宋亮俊数据库的在线查询」——预计算网格 + 双线性插值替代逐点重算 Lambert。6 测试全过（网格点精确值、双线性权重、NaN 传播、越界报错、SQLite 路径一致性、LEO→GEO 谷区平滑性）
-  - NSGA-II 多目标优化器（`e2m2e.transfer.nsga2`，主题 8）：`nsga2(objectives, bounds, ...)` 经典 NSGA-II（Deb 2002），非支配排序 + 拥挤度选择 + 精英保留，SBX 交叉 + 多项式变异。约束用 Deb 可行支配规则（可行解支配不可行解，都不可行按违反量排序），无需罚因子。`ObjectiveFn` 签名 `fn(x) -> (objectives, violation)`，全部目标最小化。并行评估用 ProcessPoolExecutor（Windows spawn 安全，fn 须模块级可 pickle）。ZDT1 收敛验证（100 代平均误差 0.0013）、Schaffer N.1 收敛、约束问题前沿全可行、串行/并行一致性。11 测试全过
-  - 任务综合评估与解数据库（`e2m2e.transfer.mission_assessment`/`solution_database`，主题 8 收尾）：`MissionAssessment` 多指标静态加权（`evaluate`/`rank`/`best`，指标名自动推断或显式指定），在 Pareto 前沿上标量化辅助决策；`SolutionDatabase` 封装多 scan 聚合查询（`add_scan`/`get_scan`/`query`/`pareto_front`/`list_scans`/`filter`），`filter` 预留 Grossi 式主矢量筛选钩子。12 测试全过
+  - 二体 Lambert 求解器（`e2m2e.algorithm.transfer.lambert`）：Izzo 算法 Rust 内核（`e2m2e-propagation` crate），`solve_lambert`/`solve_lambert_batch` 支持短程/长程与多圈解，基准对齐 Vallado 文献值
+  - porkchop 扫描（`e2m2e.algorithm.transfer.porkchop`）：出发时间 × 飞行时间网格的双脉冲 ΔV 扫描，终端状态经 `TerminalCondition` 接口提取
+  - 多脉冲转移与主矢量检验（`e2m2e.algorithm.transfer.multi_impulse`）：`MultiImpulseTransfer` 以中途节点 `[t_i, r_i]` 为决策变量、弧段 Lambert 封闭、scipy SLSQP 最小化总 ΔV；`check_primer_vector` 实现 Lawden 必要条件检验与 Lion & Handelsman 中途脉冲插入准则
+  - porkchop 持久化与 Pareto 前沿（`e2m2e.algorithm.transfer.porkchop`，主题 8）：`PorkchopData.to_sqlite`/`from_sqlite` 把 ΔV 网格落盘为 SQLite 解数据库（scans 元数据表 + design_points 展平表，NaN→NULL，stdlib sqlite3 零新增依赖，多 scan 自增累积）；`pareto_front` 用经典非支配排序（Deb 2002 O(MN²)）从网格提取 ΔV–TOF Pareto 前沿（Topputo 2013 双目标范式），支持自定义目标字段组合，产出 `ParetoFront` 带绘图。10 测试全过（SQLite 往返等价、多 scan 累积、已知支配关系、LEO→GEO 前沿形态）
+  - porkchop 插值代价查询（`e2m2e.algorithm.transfer.porkchop`，主题 8）：`PorkchopData.query(t_dep, tof)` 规则网格双线性插值查总 ΔV，NaN 格点传播 NaN；`PorkchopData.query_scan(path, scan_id, t_dep, tof)` 从 SQLite 解数据库读网格后插值（等价于 from_sqlite + query）。补 `(scan_id, t_dep, tof)` 索引。对应规划文档「宋亮俊数据库的在线查询」——预计算网格 + 双线性插值替代逐点重算 Lambert。6 测试全过（网格点精确值、双线性权重、NaN 传播、越界报错、SQLite 路径一致性、LEO→GEO 谷区平滑性）
+  - NSGA-II 多目标优化器（`e2m2e.algorithm.transfer.nsga2`，主题 8）：`nsga2(objectives, bounds, ...)` 经典 NSGA-II（Deb 2002），非支配排序 + 拥挤度选择 + 精英保留，SBX 交叉 + 多项式变异。约束用 Deb 可行支配规则（可行解支配不可行解，都不可行按违反量排序），无需罚因子。`ObjectiveFn` 签名 `fn(x) -> (objectives, violation)`，全部目标最小化。并行评估用 ProcessPoolExecutor（Windows spawn 安全，fn 须模块级可 pickle）。ZDT1 收敛验证（100 代平均误差 0.0013）、Schaffer N.1 收敛、约束问题前沿全可行、串行/并行一致性。11 测试全过
+  - 任务综合评估与解数据库（`e2m2e.algorithm.transfer.mission_assessment`/`solution_database`，主题 8 收尾）：`MissionAssessment` 多指标静态加权（`evaluate`/`rank`/`best`，指标名自动推断或显式指定），在 Pareto 前沿上标量化辅助决策；`SolutionDatabase` 封装多 scan 聚合查询（`add_scan`/`get_scan`/`query`/`pareto_front`/`list_scans`/`filter`），`filter` 预留 Grossi 式主矢量筛选钩子。12 测试全过
 - **不变流形与低能转移**：
   - 不变流形与庞加莱截面（`e2m2e.algorithms.manifolds`/`sections`）：`InvariantManifold` 种子生成与批量传播；`PoincareSection` 平面/近拱点截面，事后检测 + Brent 插值求精
-  - 三体打靶与低能转移（`e2m2e.transfer.three_body_lambert`/`low_energy`）：`ThreeBodyLambert` 以二体解为初猜在 CR3BP 下 Newton 打靶；`patch_manifolds` 截面拼接、`design_low_energy_transfer` 低能转移流水线
+  - 三体打靶与低能转移（`e2m2e.algorithm.transfer.three_body_lambert`/`low_energy`）：`ThreeBodyLambert` 以二体解为初猜在 CR3BP 下 Newton 打靶；`patch_manifolds` 截面拼接、`design_low_energy_transfer` 低能转移流水线
 - **低推力转移（transfer/）**：
   - 可变质量低推力受控动力学基座（`e2m2e.core.forces.VariableMassFiniteBurn`）：质量作为状态量 `state[6]` 随推力消耗（`ṁ = −T/(Isp·g₀)`），`ForceModel.propagate` 自动把状态扩展为 7D `[r,v,m]` 并分流到 Rust `propagate_compiled_lowthrust`（复用 `augmented_state::augmented_eom_7d`）。本期支持常量推力与固定方向；半长轴变化率对标解析解误差 < 5%、质量消耗对标 < 1e-6。为后续最优控制求解层（直接法配点、间接法协态、月面动力下降）的共同基座
-  - 低推力多段直接打靶求解器（`e2m2e.transfer.lowthrust_shooting`）：`LowThrustShooting` 以各段常量控制（throttle + 方向）为决策变量、接龙传播复用 7D 地基、SLSQP 最小化燃料、归一化末端等式约束匹配目标。`LowThrustShootingSolution` 含控制历史与质量剖面。文献参数（Zhang 2025: T=20mN, Isp=3000s, m0=500kg）短弧 min-fuel 闭环验证
+  - 低推力多段直接打靶求解器（`e2m2e.algorithm.transfer.lowthrust_shooting`）：`LowThrustShooting` 以各段常量控制（throttle + 方向）为决策变量、接龙传播复用 7D 地基、SLSQP 最小化燃料、归一化末端等式约束匹配目标。`LowThrustShootingSolution` 含控制历史与质量剖面。文献参数（Zhang 2025: T=20mN, Isp=3000s, m0=500kg）短弧 min-fuel 闭环验证
   - 低推力解析雅可比（灵敏度方程法）：`augmented_eom_7d_with_sensitivity`（Rust，64D 增广 `[x₇, Φ₆ₓ₆, S₇ₓ₃]`）一次传播同时产出末端状态、STM、状态对控制 (throttle,θ₁,θ₂) 的灵敏度；`propagate_compiled_lowthrust_sensitivity` PyO3 出口。`LowThrustShooting` 改角度参数化方向（Du 2024 式 5，决策变量 4N→3N），目标/约束提供解析雅可比喂 SLSQP。文献调研（Zhang 2015 式 21-24）。每迭代传播次数从 3N+1（数值差分）降到 1（增广积分），实测 24x 加速。有限差分对标（throttle/θ₁/θ₂ 单段 + 全链式雅可比）逐元素一致
-  - Q-law 低推力初猜生成器（`e2m2e.transfer.qlaw`）：`qlaw_guess` 用 Lyapunov 反馈律（Holt 2024 式 6-10、Petropoulos Q-law）前向积分产出次优控制历史，治满推力初猜「推过头」的发散问题。`rv_to_keplerian` 自写 rv→经典根数（项目原无）。架构：rk_step 单步循环（每步重算 Q-law 方向跟随轨道）+ 重采样成分段常量控制喂求解器——不用 propagate_compiled_lowthrust（它段内固定惯性方向，长段不跟随速度）。`LowThrustShooting.solve_from_qlaw` 串联 Q-law 初猜 + 解析雅可比打磨，完成 gap-analysis「Q-law 作初猜→打靶优化」两级流程。最简版控 a,e,i；验证：Q 单调下降、a 朝目标收敛、初猜约束残差小于满推力
-  - Hermite-Simpson 配点求解器（`e2m2e.transfer.lowthrust_collocation`）：`LowThrustCollocation` 并列于直接打靶（`LowThrustShooting`），把节点状态+控制都作决策变量、HS 缺陷约束保证段间动力学连续，比单弧打靶更鲁棒。复用地基 Rust `augmented_eom_7d`（新增 `augmented_eom_7d_py` 单点 EOM PyO3 出口供配点频繁求值），Q-law 初猜可用（`solve_from_qlaw`）。决策变量 10(N+1)（节点状态7D+控制3D），Simpson 缺陷约束。验证：HS 缺陷在真实轨迹上随弧长 O(dt⁴) 下降（转录正确）、min-fuel 闭环收敛、对标直接打靶末态一致；3 测试全过。解析缺陷雅可比（块三对角）留后续性能优化
+  - Q-law 低推力初猜生成器（`e2m2e.algorithm.transfer.qlaw`）：`qlaw_guess` 用 Lyapunov 反馈律（Holt 2024 式 6-10、Petropoulos Q-law）前向积分产出次优控制历史，治满推力初猜「推过头」的发散问题。`rv_to_keplerian` 自写 rv→经典根数（项目原无）。架构：rk_step 单步循环（每步重算 Q-law 方向跟随轨道）+ 重采样成分段常量控制喂求解器——不用 propagate_compiled_lowthrust（它段内固定惯性方向，长段不跟随速度）。`LowThrustShooting.solve_from_qlaw` 串联 Q-law 初猜 + 解析雅可比打磨，完成 gap-analysis「Q-law 作初猜→打靶优化」两级流程。最简版控 a,e,i；验证：Q 单调下降、a 朝目标收敛、初猜约束残差小于满推力
+  - Hermite-Simpson 配点求解器（`e2m2e.algorithm.transfer.lowthrust_collocation`）：`LowThrustCollocation` 并列于直接打靶（`LowThrustShooting`），把节点状态+控制都作决策变量、HS 缺陷约束保证段间动力学连续，比单弧打靶更鲁棒。复用地基 Rust `augmented_eom_7d`（新增 `augmented_eom_7d_py` 单点 EOM PyO3 出口供配点频繁求值），Q-law 初猜可用（`solve_from_qlaw`）。决策变量 10(N+1)（节点状态7D+控制3D），Simpson 缺陷约束。验证：HS 缺陷在真实轨迹上随弧长 O(dt⁴) 下降（转录正确）、min-fuel 闭环收敛、对标直接打靶末态一致；3 测试全过。解析缺陷雅可比（块三对角）留后续性能优化
   - `PointMassGravity.to_rust_spec`：补齐 `("point_mass", mu)` 序列化，让点质量引力走 Rust 编译路径（与 GravityField degree=0 对齐但更轻量，不查星历）
 - **proximity 相对运动**：
   - CR3BP 相对运动动力学（`e2m2e.proximity`，主题 3 第一版）：`TargetOrbit` 目标轨道包装（线性插值 `state_at(t)`）；`RelativeDynamics` RLM 时变线性化（`linear_model(t)` 返回 A(t) 矩阵，`propagate(rho0, t_span)` 传播 6 维相对状态，`propagate_with_stm` 复用绝对 STM 传播相对状态+相对 STM）。复用 `CR3BP_Dynamics.compute_jacobian_A` 在目标状态处求值。9 测试全过（TargetOrbit 插值、A(t) 与绝对雅可比一致、小扰动传播、STM 一致性）

@@ -30,20 +30,18 @@ HMN（Hohmann Transfer）模块实现经典的霍曼双脉冲转移设计，
 
 .. code-block:: python
 
-   from e2m2e.transfer.hmn import HohmannTransfer
+   from e2m2e.algorithm.transfer.hohmann import hohmann_delta_v, hohmann_tof
 
-   transfer = HohmannTransfer(
-       r_departure=6778.0,   # 出发轨道半径（km，如 LEO）
-       r_arrival=42164.0,    # 目标轨道半径（km，如 GEO）
-       mu=398600.4418,       # 中心天体引力常数（km³/s²）
-   )
+   r_departure = 6778.0    # 出发轨道半径（km，如 LEO）
+   r_arrival = 42164.0     # 目标轨道半径（km，如 GEO）
 
-   result = transfer.solve()
+   dv1, dv2 = hohmann_delta_v(r_departure, r_arrival)
+   tof = hohmann_tof(r_departure, r_arrival)
 
-   print(f"Δv1: {result.delta_v1:.4f} km/s")
-   print(f"Δv2: {result.delta_v2:.4f} km/s")
-   print(f"总 Δv: {result.total_delta_v:.4f} km/s")
-   print(f"转移时间: {result.transfer_time / 3600:.2f} 小时")
+   print(f"Δv1: {dv1:.4f} km/s")
+   print(f"Δv2: {dv2:.4f} km/s")
+   print(f"总 Δv: {dv1 + dv2:.4f} km/s")
+   print(f"转移时间: {tof / 3600:.2f} 小时")
 
 应用场景
 --------

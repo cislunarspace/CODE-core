@@ -17,7 +17,6 @@ Subpackages
    e2m2e.api
    e2m2e.tools.viz
    e2m2e.mbse
-   e2m2e.tools.viz
 
 Submodules
 ----------
