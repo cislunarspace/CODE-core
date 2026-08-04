@@ -211,9 +211,9 @@ class TestTransferOrbitHmn:
         assert abs(result.details.tof_sec - expected_tof) < 1e-10
 
     def test_unsupported_type_raises(self):
-        """transfer_orbit("LGA") 抛出 NotImplementedError。"""
-        with pytest.raises(NotImplementedError, match="LGA"):
-            transfer_orbit("LGA")
+        """transfer_orbit("WSB") 抛出 NotImplementedError。"""
+        with pytest.raises(NotImplementedError, match="WSB"):
+            transfer_orbit("WSB")
 
 
 class TestHmnTransferPhysics:

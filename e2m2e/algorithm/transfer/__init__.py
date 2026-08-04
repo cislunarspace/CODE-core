@@ -36,6 +36,7 @@ from .hohmann import (
     scan_lambert_delta_v,
 )
 from .lambert import LambertSolution, solve_lambert, solve_lambert_batch
+from .lga import LgaCandidate, LgaSearchParams, search_lga_trajectories
 from .low_energy import PatchCandidate, design_low_energy_transfer, patch_manifolds
 from .lowthrust_collocation import LowThrustCollocation
 from .lowthrust_shooting import (
@@ -121,6 +122,9 @@ __all__ = [
     "scan_lambert_delta_v",
     "ephemeris_shoot_transfer",
     "HmnTransferDetails",
+    "LgaTransferDetails",
+    "LgaSearchParams",
+    "LgaCandidate",
     "transfer_orbit",
 ]
 
@@ -142,7 +146,7 @@ class TransferDesignResult:
     transfer_type: str
     delta_v: float
     trajectory: Any
-    details: HmnTransferDetails | dict[str, Any] = field(default_factory=dict)
+    details: HmnTransferDetails | LgaTransferDetails | dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -170,6 +174,25 @@ class HmnTransferDetails:
     delta_v_theory: tuple[float, float]
 
 
+@dataclass
+class LgaTransferDetails:
+    """LGA 月球引力辅助转移设计细节。"""
+
+    tli_epoch: float | str
+    tof_sec: float
+    perilune_alt_km: float
+    perilune_vel_km_s: float
+    perilune_state: np.ndarray
+    dv_departure_km_s: float
+    dv_arrival_km_s: float
+    jacobi_departure: float
+    jacobi_arrival: float
+    n_candidates_searched: int
+    n_candidates_feasible: int
+    converged: bool
+    search_params: LgaSearchParams
+
+
 def transfer_orbit(
     transfer_type: str,
     *,
@@ -178,6 +201,7 @@ def transfer_orbit(
     tof_range: tuple[float, float] | None = None,
     target_orbit_radius_km: float | None = None,
     dynamics: Any = None,
+    lga_search_params: LgaSearchParams | None = None,
     **kwargs,
 ) -> TransferDesignResult:
     """端到端转移轨道设计（编排器）。
@@ -190,12 +214,13 @@ def transfer_orbit(
         tof_range: 飞行时间范围（天）。
         target_orbit_radius_km: 目标轨道半径 (km)，HMN 转移必需。
         dynamics: 动力学对象（可选），用于 ephemeris 打靶修正。
+        lga_search_params: LGA 搜索参数（可选）。
 
     Returns:
         TransferDesignResult: 转移轨道设计结果。
 
     Raises:
-        NotImplementedError: 编排器实现未完成（当前仅 HMN 已实现）。
+        NotImplementedError: 编排器实现未完成（当前仅 HMN/LGA 已实现）。
         ValueError: HMN 转移缺少必要参数。
     """
     if transfer_type == "HMN":
@@ -205,6 +230,13 @@ def transfer_orbit(
             tof_range,
             dynamics=dynamics,
             target_ephemeris=target_ephemeris,
+        )
+    if transfer_type == "LGA":
+        return _transfer_orbit_lga(
+            tli_params=tli_params,
+            target_ephemeris=target_ephemeris,
+            search_params=lga_search_params,
+            dynamics=dynamics,
         )
     raise NotImplementedError(f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）")
 
@@ -236,6 +268,115 @@ def _extract_target_state(target_ephemeris: Any) -> tuple[NDArray[np.float64], N
     raise TypeError(
         f"不支持的 target_ephemeris 类型：{type(target_ephemeris).__name__}，"
         "期望 ndarray (n,6)、NominalOrbit 或 EphemerisTable"
+    )
+
+
+def _transfer_orbit_lga(
+    tli_params: TliParams | None,
+    target_ephemeris: Any,
+    search_params: LgaSearchParams | None,
+    dynamics: Any = None,
+) -> TransferDesignResult:
+    """LGA 月球引力辅助转移编排。
+
+    流程：
+    1. TliParams → ECI 出发态
+    2. 目标星历 → 目标态
+    3. ECI → CR3BP 无量纲
+    4. search_lga_trajectories() 网格搜索
+    5. 取最优候选
+    6. _refine_lga_candidate() ThreeBodyLambert 打靶精化
+    7. 物理单位换算 + 结果汇总
+    """
+    if tli_params is None:
+        raise ValueError("LGA 转移需要 tli_params")
+    if target_ephemeris is None:
+        raise ValueError("LGA 转移需要 target_ephemeris")
+
+    from ..dynamics import CR3BP_Dynamics, CR3BP_System
+
+    # 地月 CR3BP 系统
+    MU_EM = 1.21506683e-2
+    system = CR3BP_System(mu=MU_EM, primary="Earth", secondary="Moon")._with_default_scales()
+    cr3bp_dynamics = CR3BP_Dynamics(system)
+
+    # 1. ECI 出发态
+    r0, v0 = construct_departure_state(tli_params)
+    departure_phys = np.concatenate([r0, v0])
+    departure_dim = system.physical_to_dimensionless(departure_phys)
+
+    # 2. 目标态
+    r_target, v_target = _extract_target_state(target_ephemeris)
+    target_phys = np.concatenate([r_target, v_target])
+    target_dim = system.physical_to_dimensionless(target_phys)
+
+    # 3. LGA 搜索
+    candidates = search_lga_trajectories(
+        departure_dim, target_dim, system, cr3bp_dynamics, search_params
+    )
+
+    params = search_params if search_params is not None else LgaSearchParams()
+
+    n_searched = params.n_departure_phase * params.n_tof
+    n_feasible = len(candidates)
+
+    if not candidates:
+        warnings.warn("LGA 搜索未找到可行候选，返回零结果", stacklevel=2)
+        details = LgaTransferDetails(
+            tli_epoch=tli_params.epoch,
+            tof_sec=0.0,
+            perilune_alt_km=0.0,
+            perilune_vel_km_s=0.0,
+            perilune_state=np.zeros(6),
+            dv_departure_km_s=0.0,
+            dv_arrival_km_s=float("inf"),
+            jacobi_departure=0.0,
+            jacobi_arrival=0.0,
+            n_candidates_searched=n_searched,
+            n_candidates_feasible=0,
+            converged=False,
+            search_params=params,
+        )
+        return TransferDesignResult(
+            transfer_type="LGA",
+            delta_v=float("inf"),
+            trajectory=None,
+            details=details,
+        )
+
+    # 4. 取最优候选
+    best = candidates[0]
+
+    # 5. ThreeBodyLambert 打靶精化
+    from .lga import _refine_lga_candidate
+
+    refined = _refine_lga_candidate(best, system, cr3bp_dynamics, target_dim)
+
+    # 6. 物理单位换算
+    perilune_phys = system.dimensionless_to_physical(refined.perilune_state)
+    perilune_vel = float(np.linalg.norm(perilune_phys[3:]))
+
+    details = LgaTransferDetails(
+        tli_epoch=tli_params.epoch,
+        tof_sec=refined.tof_sec,
+        perilune_alt_km=refined.perilune_alt_km,
+        perilune_vel_km_s=perilune_vel,
+        perilune_state=perilune_phys,
+        dv_departure_km_s=refined.dv_departure,
+        dv_arrival_km_s=refined.dv_arrival,
+        jacobi_departure=refined.jacobi_departure,
+        jacobi_arrival=refined.jacobi_arrival,
+        n_candidates_searched=n_searched,
+        n_candidates_feasible=n_feasible,
+        converged=refined.converged,
+        search_params=params,
+    )
+
+    return TransferDesignResult(
+        transfer_type="LGA",
+        delta_v=refined.total_dv,
+        trajectory=None,
+        details=details,
     )
 
 
