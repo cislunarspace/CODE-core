@@ -76,8 +76,10 @@ class IndirectTerm(PhysicalModel):
         # 桩 system（如单元测试 mock）回退到 Python 路径。
         if getattr(system, "spice", None) is not None:
             try:
-                from e2m2e._integrators import indirect_term_acceleration  # noqa: F401
+                from e2m2e.integrators import indirect_term_acceleration  # noqa: F401
 
+                if indirect_term_acceleration is None:
+                    raise ImportError
                 from .third_body_gravity import ThirdBodyGravity
 
                 observer = getattr(system, "origin", "EARTH")

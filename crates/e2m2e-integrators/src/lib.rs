@@ -297,6 +297,30 @@ fn cowell_step(
     })
 }
 
+/// 解析 abi-version.txt 的纯数字内容为 u32（const fn，编译期求值）。
+const fn parse_abi_version(s: &str) -> u32 {
+    let bytes = s.as_bytes();
+    let mut result: u32 = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b >= b'0' && b <= b'9' {
+            result = result * 10 + (b - b'0') as u32;
+        }
+        i += 1;
+    }
+    result
+}
+
+/// 从 abi-version.txt 读取（单一来源），build.rs 同步生成 Python 侧 _rust_abi.py。
+const RUST_PY_ABI: u32 = parse_abi_version(include_str!("../abi-version.txt"));
+
+/// 返回 Rust↔Python ABI 版本号（编译期常量，反映此 .pyd/.so 真实状态）。
+#[pyfunction]
+fn _py_abi_version() -> u32 {
+    RUST_PY_ABI
+}
+
 /// 占位函数，用于验证 FFI 路径端到端通畅。
 #[pyfunction]
 fn hello_integrators() -> PyResult<String> {
@@ -1931,6 +1955,7 @@ fn augmented_eom_7d_py(
 
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(_py_abi_version, m)?)?;
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
     m.add_function(wrap_pyfunction!(normal_form::project_hamiltonian_qf_py, m)?)?;
     m.add_function(wrap_pyfunction!(

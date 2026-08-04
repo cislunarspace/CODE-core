@@ -231,7 +231,7 @@ class LowThrustCollocation:
         et: float,
     ) -> np.ndarray:
         """单点受控 EOM 求值（调 Rust）。"""
-        from e2m2e._integrators import augmented_eom_7d_py
+        from e2m2e.integrators import augmented_eom_7d_py
 
         return np.asarray(
             augmented_eom_7d_py(

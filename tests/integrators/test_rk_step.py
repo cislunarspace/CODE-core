@@ -11,14 +11,14 @@ import pytest
 
 def test_hello_integrators_smoke():
     """Smoke test: the Rust extension module imports and responds."""
-    from e2m2e._integrators import hello_integrators
+    from e2m2e.integrators import hello_integrators
 
     assert hello_integrators() == "hello from e2m2e-integrators"
 
 
 def test_rk_step_imports():
     """The RK stepper symbols are importable from the extension module."""
-    from e2m2e._integrators import RkMethod, rk_step
+    from e2m2e.integrators import RkMethod, rk_step
 
     assert RkMethod.PD45 is not None
     assert callable(rk_step)
@@ -26,7 +26,7 @@ def test_rk_step_imports():
 
 def test_rk_step_harmonic_oscillator():
     """PD45 approximates the harmonic oscillator on a small step."""
-    from e2m2e._integrators import RkMethod, rk_step
+    from e2m2e.integrators import RkMethod, rk_step
 
     def f(t, y):
         return np.array([y[1], -y[0]], dtype=float)
@@ -43,7 +43,7 @@ def test_rk_step_harmonic_oscillator():
 
 def test_rk_step_invalid_step_size_raises():
     """A non-positive step size is rejected before integration."""
-    from e2m2e._integrators import RkMethod, rk_step
+    from e2m2e.integrators import RkMethod, rk_step
 
     def f(t, y):
         return np.zeros_like(y)
@@ -59,7 +59,7 @@ def test_rk_step_invalid_step_size_raises():
 
 def test_rk_step_invalid_tolerance_raises():
     """A non-positive tolerance is rejected before integration."""
-    from e2m2e._integrators import RkMethod, rk_step
+    from e2m2e.integrators import RkMethod, rk_step
 
     def f(t, y):
         return np.zeros_like(y)
@@ -72,7 +72,7 @@ def test_rk_step_invalid_tolerance_raises():
 
 def test_rk_step_callback_dimension_mismatch_raises():
     """A callback returning the wrong dimension is rejected."""
-    from e2m2e._integrators import RkMethod, rk_step
+    from e2m2e.integrators import RkMethod, rk_step
 
     def f(t, y):
         return np.array([0.0], dtype=float)
@@ -161,7 +161,7 @@ def test_two_body_circular_orbit_matches_analytic():
 
 def test_rk_step_state_error_dim_default_matches_full():
     """state_error_dim=None 时误差与旧行为一致（全状态 L2）。"""
-    from e2m2e._integrators import RkMethod, rk_step
+    from e2m2e.integrators import RkMethod, rk_step
 
     def f(t, y):
         y = np.asarray(y, dtype=float)
@@ -182,7 +182,7 @@ def test_rk_step_state_error_dim_excludes_stm_components():
     构造一个 42 维系统：前 6 维是二体轨道，后 36 维是 STM（初始单位阵）。
     全状态误差会被 STM 分量主导；分段误差只看前 6 维，与纯 6 维一致。
     """
-    from e2m2e._integrators import RkMethod, rk_step
+    from e2m2e.integrators import RkMethod, rk_step
 
     def eom_6(t, y):
         y = np.asarray(y, dtype=float)
@@ -219,7 +219,7 @@ def test_rk_step_state_error_dim_excludes_stm_components():
 
 def test_rk_step_state_error_dim_rejects_invalid():
     """state_error_dim=0 或超过状态长度时抛 ValueError。"""
-    from e2m2e._integrators import RkMethod, rk_step
+    from e2m2e.integrators import RkMethod, rk_step
 
     def f(t, y):
         return np.zeros_like(y)

@@ -42,8 +42,10 @@ from .dynamics import Dynamics
 from .ephemeris_system import EphemerisSystem
 
 try:
-    from e2m2e._integrators import propagate_with_stm_py
+    from e2m2e.integrators import propagate_with_stm_py
 
+    if propagate_with_stm_py is None:
+        raise ImportError
     _HAS_RUST_STM = True
 except ImportError:
     _HAS_RUST_STM = False

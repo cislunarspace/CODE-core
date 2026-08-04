@@ -305,7 +305,7 @@ class LowThrustShooting:
 
         用无灵敏度的 ``propagate_compiled_lowthrust``（重建轨迹用）。
         """
-        from e2m2e._integrators import RkMethod, propagate_compiled_lowthrust
+        from e2m2e.integrators import RkMethod, propagate_compiled_lowthrust
 
         segs = self._decode_segments(y)
         n_segments = len(segs)
@@ -353,7 +353,7 @@ class LowThrustShooting:
         与 STM Φ(6×6)。全局末端对段 i 控制的雅可比 = 复合 STM(段 i+1..N) · S_i
         的前 6 行。复合 STM 从后往前累积。
         """
-        from e2m2e._integrators import RkMethod, propagate_compiled_lowthrust_sensitivity
+        from e2m2e.integrators import RkMethod, propagate_compiled_lowthrust_sensitivity
 
         segs = self._decode_segments(y)
         n_segments = len(segs)
@@ -421,7 +421,7 @@ class LowThrustShooting:
         throttle 与段长。因此 ∂m_f/∂(段 i throttle) = -T_max·dt/(Isp·g0)，
         ∂m_f/∂θ = 0。
         """
-        from e2m2e._integrators import propagate_compiled_lowthrust_sensitivity  # noqa: F401
+        from e2m2e.integrators import propagate_compiled_lowthrust_sensitivity  # noqa: F401
 
         g0 = 9.81
         dt = (self._tf - self._t0) / (len(self._decode_segments(y)))

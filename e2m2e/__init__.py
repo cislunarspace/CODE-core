@@ -43,3 +43,14 @@ __all__ = [
     "mbse",
     "integrators",
 ]
+
+# ---- Import-time Rust ABI 校验 ----
+# 若 Rust 扩展已在进程内加载（如用户直引 e2m2e._integrators），立即校验版本，
+# 避免过期二进制静默产生错误结果。扩展未加载时静默跳过（惰性，首次 Rust 使用
+# 时由 integrators._check_rust_abi() 接管）。
+import sys as _sys
+
+if "e2m2e._integrators" in _sys.modules:
+    from .integrators import _check_rust_abi as _check_abi
+
+    _check_abi()

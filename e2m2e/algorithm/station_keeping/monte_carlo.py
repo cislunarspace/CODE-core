@@ -128,7 +128,7 @@ class RustPropagator:
         max_step: float = 3600.0,
         max_steps: int = 500_000,
     ) -> None:
-        from e2m2e._integrators import propagate_compiled_stm_py
+        from e2m2e.integrators import propagate_compiled_stm_py
 
         self._observer = observer
         self._forces_py = forces_py

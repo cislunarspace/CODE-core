@@ -105,8 +105,10 @@ class ThirdBodyGravity(PhysicalModel):
         # 桩 system（如单元测试 mock）回退到 Python 路径。
         if getattr(system, "spice", None) is not None:
             try:
-                from e2m2e._integrators import third_body_acceleration  # noqa: F401
+                from e2m2e.integrators import third_body_acceleration  # noqa: F401
 
+                if third_body_acceleration is None:
+                    raise ImportError
                 observer = getattr(system, "origin", "EARTH")
                 observer_id = self._name_or_id(observer)
                 target_id = self._name_or_id(self._body)

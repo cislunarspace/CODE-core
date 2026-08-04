@@ -501,7 +501,7 @@ def build_cr3bp_hamiltonian(
     # 扩展未编译或三角点回退符号路径。
     if ctx_cr3bp.gamma is not None:
         try:
-            from e2m2e._integrators import build_cr3bp_hamiltonian_py
+            from e2m2e.integrators import build_cr3bp_hamiltonian_py
         except ImportError:
             build_cr3bp_hamiltonian_py = None
         if build_cr3bp_hamiltonian_py is not None:

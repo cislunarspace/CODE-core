@@ -69,7 +69,7 @@ def project_hamiltonian_to_qf(
         coefs.append(float(arr[0]))
 
     try:
-        from e2m2e._integrators import project_hamiltonian_qf_py
+        from e2m2e.integrators import project_hamiltonian_qf_py
     except ImportError:
         project_hamiltonian_qf_py = None
 

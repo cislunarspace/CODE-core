@@ -110,6 +110,8 @@ website/node_modules/
 *.so
 *.dylib
 *.dll
+# build.rs 生成的 Python ABI 版本文件（构建产物，不入库）
+e2m2e/_rust_abi.py
 
 # cibuildwheel
 .cibuildwheel/

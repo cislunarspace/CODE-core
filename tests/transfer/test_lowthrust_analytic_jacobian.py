@@ -7,7 +7,8 @@
 
 import numpy as np
 import pytest
-from e2m2e._integrators import (
+
+from e2m2e.integrators import (
     RkMethod,
     propagate_compiled_lowthrust,
     propagate_compiled_lowthrust_sensitivity,

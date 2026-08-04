@@ -246,7 +246,7 @@ def solid_tide_step2(et: float) -> tuple[npt.NDArray[np.floating], npt.NDArray[n
     Returns:
         (DeltaC, DeltaS),各为 5×5 数组;仅 (2,0)/(2,1)/(2,2) 非零。
     """
-    from e2m2e._integrators import solid_tide_step2 as _rust_step2
+    from e2m2e.integrators import solid_tide_step2 as _rust_step2
 
     out = _rust_step2(float(et))
     arr = np.asarray(out, dtype=float)
@@ -323,7 +323,7 @@ def solid_tide_step1(
     实现：1:1 移植到 Rust（``crates/e2m2e-integrators/src/solid_tide.rs``）。
     Python 侧仅做参数打包（perturbers → [px,py,pz,gm,...] 扁平化）+ reshape。
     """
-    from e2m2e._integrators import solid_tide_step1 as _rust_step1
+    from e2m2e.integrators import solid_tide_step1 as _rust_step1
 
     # 兼容单个 (position, gm) 元组:不期望第一个元素本身是 (3,) ndarray。
     if isinstance(perturbers, tuple) and len(perturbers) == 2 and np.isscalar(perturbers[1]):
@@ -383,7 +383,7 @@ def pole_tide(
 
     实现：1:1 移植到 Rust（``crates/e2m2e-integrators/src/solid_tide.rs``）。
     """
-    from e2m2e._integrators import pole_tide as _rust_pole_tide
+    from e2m2e.integrators import pole_tide as _rust_pole_tide
 
     out = _rust_pole_tide(float(et), float(xp), float(yp))
     arr = np.asarray(out, dtype=float)

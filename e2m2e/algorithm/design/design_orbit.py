@@ -515,7 +515,7 @@ def _design_apolune_segmented(
         ``(t_patch, state_patch, max_residual)``（J2000），整条连续星历轨迹
         与全程各段/合并段的最大打靶残差（km，供结果对象填充）。
     """
-    from e2m2e._integrators import multiple_shooting_correct_py
+    from e2m2e.integrators import multiple_shooting_correct_py
 
     n_total = len(t_patch_j2000)
     n_rev = n_total // points_per_rev

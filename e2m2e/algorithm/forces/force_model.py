@@ -313,7 +313,10 @@ class ForceModel:
         失败（spice feature 未编译），返回 ``False``，propagate 回退 Python eom。
         """
         try:
-            from e2m2e._integrators import propagate_compiled  # noqa: F401
+            from e2m2e.integrators import propagate_compiled  # noqa: F401
+
+            if propagate_compiled is None:
+                raise ImportError
         except ImportError:
             return False
         for entry in self._entries:
@@ -333,7 +336,10 @@ class ForceModel:
            Rust 内有限差分雅可比，不跨语言边界，比 Python 侧差分快一个量级）
         """
         try:
-            from e2m2e._integrators import propagate_compiled_stm_py  # noqa: F401
+            from e2m2e.integrators import propagate_compiled_stm_py  # noqa: F401
+
+            if propagate_compiled_stm_py is None:
+                raise ImportError
         except ImportError:
             return False
         for entry in self._entries:
@@ -360,7 +366,7 @@ class ForceModel:
 
         自动序列化所有 force，调 Rust 入口。返回格式与 Python propagate 一致。
         """
-        from e2m2e._integrators import RkMethod, propagate_compiled
+        from e2m2e.integrators import RkMethod, propagate_compiled
 
         forces_py = []
         for entry in self._entries:
@@ -473,7 +479,7 @@ class ForceModel:
         throttle = float(thrust_spec[3])
         direction = (float(thrust_spec[4]), float(thrust_spec[5]), float(thrust_spec[6]))
 
-        from e2m2e._integrators import RkMethod, propagate_compiled_lowthrust
+        from e2m2e.integrators import RkMethod, propagate_compiled_lowthrust
 
         t_eval_arr = self._prepare_t_eval(t0, tf, t_eval)
         observer = getattr(self.system, "origin", "EARTH")
@@ -514,7 +520,7 @@ class ForceModel:
 
         自动序列化所有 force，调 Rust STM 入口。返回格式与 Python propagate 一致。
         """
-        from e2m2e._integrators import propagate_compiled_stm_py
+        from e2m2e.integrators import propagate_compiled_stm_py
 
         forces_py = []
         for entry in self._entries:
@@ -718,7 +724,10 @@ class ForceModel:
         # 循环（solve_ivp_events 不支持事件函数只收 6 维状态的增广传播）。
         if event_funcs and not with_stm:
             try:
-                from e2m2e._integrators import solve_ivp_events_py  # noqa: F401
+                from e2m2e.integrators import solve_ivp_events_py  # noqa: F401
+
+                if solve_ivp_events_py is None:
+                    raise ImportError
             except ImportError:
                 pass  # 扩展未构建：回退下方 Python 积分循环
             else:

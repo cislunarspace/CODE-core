@@ -323,7 +323,7 @@ def qlaw_guess(
         积分的真实末态 7D（含质量），供测试验证根数收敛（注意：求解器用 y 重建
         会因段内固定方向而与 final_state 略有差异，final_state 是连续反馈的真实结果）。
     """
-    from e2m2e._integrators import RkMethod, rk_step
+    from e2m2e.integrators import RkMethod, rk_step
 
     mu = _resolve_mu(system, forces)
     t_max = engine.t_max
@@ -367,7 +367,7 @@ def qlaw_guess(
         # 不越过 tf
         if t + h > tf:
             h = tf - t
-        res = rk_step(RkMethod.PD45, t, state.tolist(), h, tol, eom, state_error_dim=6)
+        res = rk_step(RkMethod.PD45, t, state.tolist(), h, tol, eom, state_error_dim=6)  # type: ignore[arg-type]  # qlaw eom 签名 vs integrators wrapper 类型标注（预存）
         if res.error <= tol:
             t += h
             state = np.asarray(res.y_new, dtype=float)

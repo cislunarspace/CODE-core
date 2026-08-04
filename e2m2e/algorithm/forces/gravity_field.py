@@ -463,7 +463,7 @@ class GravityField(PhysicalModel):
             C = self._data.C
         if S is None:
             S = self._data.S
-        from e2m2e._integrators import spherical_harmonic_accel
+        from e2m2e.integrators import spherical_harmonic_accel
 
         a = spherical_harmonic_accel(
             np.asarray(r, dtype=float).ravel().tolist(),

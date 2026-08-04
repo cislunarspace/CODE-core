@@ -290,7 +290,7 @@ def test_relativistic_cache_zero_ffi_and_consistency(earth_ephemeris_system):
     - ``propagate_compiled`` 走纯 Rust 相对论力，``ephem_ffi_call_count()`` 应为 0
     - 缓存 vs 无缓存末态一致（< 1e-5 km）
     """
-    from e2m2e._integrators import (
+    from e2m2e.integrators import (
         RkMethod,
         disable_ephem_cache,
         ephem_ffi_call_count,
