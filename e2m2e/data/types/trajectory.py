@@ -29,6 +29,8 @@ class EphemerisTable:
         velocity_mps: GCRS 速度（m/s），形状 ``(n, 3)``
         synodic_position: 地月会合系位置（无量纲），形状 ``(n, 3)``
         raw_text: 原始文件文本；程序生成（非读入）时为空串。
+        times_jd_tdb: 历元 TDB 儒略日序列（形状 ``(n,)``），由预报/设计链路
+            填充；读入的 DFH 星历可能为 ``None``。JD_TDB = 2451545.0 + ET/86400。
     """
 
     year: np.ndarray
@@ -41,6 +43,7 @@ class EphemerisTable:
     velocity_mps: np.ndarray
     synodic_position: np.ndarray
     raw_text: str = field(default="", repr=False)
+    times_jd_tdb: np.ndarray | None = field(default=None, repr=False)
 
     def __len__(self) -> int:
         return len(self.year)

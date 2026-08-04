@@ -4,14 +4,17 @@
 保留细粒度 API（专家用）。MCP 工具 = Facade 方法全集（纯派生），方法带
 ``mcp_exposed`` 元数据控制是否对 MCP 暴露。
 
-实现状态：一档任务已接入 algorithm/ 编排器（design_orbit/control_orbit），
-二档子任务已接入已有算法（family/stability/proximity）；未实现能力
-（transfer_design/orbit_propagation/spacetime_transform 等）保持占位。
+实现状态：一档任务已接入 algorithm/ 编排器（design_orbit/control_orbit/
+transfer_design/orbit_propagation/spacetime_transform），二档子任务已接入
+已有算法（family/stability/proximity）。
 """
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
+
+import numpy as np
 
 from .config import Config
 from .models import (
@@ -20,6 +23,12 @@ from .models import (
     DesignOrbitRequest,
     DesignOrbitResponse,
     OrbitError,
+    PropagationRequest,
+    PropagationResponse,
+    SpacetimeTransformRequest,
+    SpacetimeTransformResponse,
+    TransferDesignRequest,
+    TransferDesignResponse,
 )
 
 __all__ = ["Facade", "mcp_tools"]
@@ -29,6 +38,30 @@ def mcp_exposed(func):
     """标记 Facade 方法对 MCP 暴露（纯派生 + 元数据标记，ADR 0014）。"""
     func.mcp_exposed = True  # type: ignore[attr-defined]
     return func
+
+
+def _details_to_dict(details: Any) -> dict[str, Any]:
+    """把 details dataclass 转为 JSON 兼容 dict（ndarray → list）。"""
+    if details is None:
+        return {}
+    if isinstance(details, dict):
+        return {k: _serialize_value(v) for k, v in details.items()}
+    if dataclasses.is_dataclass(details) and not isinstance(details, type):
+        return {
+            f.name: _serialize_value(getattr(details, f.name)) for f in dataclasses.fields(details)
+        }
+    return {"value": _serialize_value(details)}
+
+
+def _serialize_value(value: Any) -> Any:
+    """递归序列化 numpy 值为 JSON 兼容类型。"""
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, (list, tuple)):
+        return [_serialize_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _serialize_value(v) for k, v in value.items()}
+    return value
 
 
 class Facade:
@@ -139,28 +172,143 @@ class Facade:
             raise OrbitError("CONTROL_FAILED", str(exc)) from exc
 
     @mcp_exposed
-    def transfer_design(self, **params) -> Any:
+    def transfer_design(self, **params) -> TransferDesignResponse:
         """转移轨道设计（一档）。
 
-        实现状态：占位（编排器 transfer_orbit 能力在规划中）。
+        薄封装 ``algorithm/transfer/transfer_orbit``：Pydantic 校验 → 编排 →
+        结果翻译为 Response。
         """
-        raise NotImplementedError("Facade.transfer_design 待接入 algorithm/transfer/")
+        try:
+            request = TransferDesignRequest(**params)
+            from e2m2e.algorithm.transfer import TliParams, transfer_orbit
+
+            tli_params = TliParams(
+                epoch=request.tli_epoch,
+                parking_alt_km=request.parking_alt_km,
+                inclination_deg=request.incl_deg,
+                flight_path_angle_deg=request.flight_path_deg,
+            )
+            tof_range = (
+                (float(request.tof_range[0]), float(request.tof_range[1]))
+                if request.tof_range
+                else None
+            )
+            result = transfer_orbit(
+                request.transfer_type,
+                target_ephemeris=request.target_ephemeris,
+                tli_params=tli_params,
+                tof_range=tof_range,
+                target_orbit_radius_km=request.target_orbit_radius_km,
+                lga_search_params=request.lga_search_params,
+                wsb_search_params=request.wsb_search_params,
+            )
+            trajectory = (
+                result.trajectory.tolist()
+                if result.trajectory is not None and isinstance(result.trajectory, np.ndarray)
+                else result.trajectory
+            )
+            return TransferDesignResponse(
+                transfer_type=result.transfer_type,
+                delta_v=result.delta_v,
+                trajectory=trajectory,
+                details=_details_to_dict(result.details),
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except NotImplementedError as exc:
+            raise OrbitError("NOT_IMPLEMENTED", str(exc)) from exc
+        except Exception as exc:
+            raise OrbitError("TRANSFER_FAILED", str(exc)) from exc
 
     @mcp_exposed
-    def orbit_propagation(self, **params) -> Any:
+    def orbit_propagation(self, **params) -> PropagationResponse:
         """轨道预报（一档）。
 
-        实现状态：占位（propagate_orbit 能力在规划中）。
+        薄封装 ``algorithm/propagation/propagate_orbit``：Pydantic 校验 →
+        传播 → EphemerisTable 翻译为 Response。
         """
-        raise NotImplementedError("Facade.orbit_propagation 待接入 algorithm/propagation.py")
+        try:
+            request = PropagationRequest(**params)
+            from e2m2e.algorithm.propagation import propagate_orbit
+
+            result = propagate_orbit(
+                initial_state=request.initial_state,
+                epoch=request.epoch,
+                duration=request.duration,
+                force_config=request.force_config,
+                output_step=request.output_step,
+                kernel_dir=self._config.kernel_dir,
+            )
+            times_jd = result.times_jd_tdb
+            assert times_jd is not None  # propagate_orbit 始终填充
+            vel_km_s = result.velocity_mps / 1000.0
+            return PropagationResponse(
+                epoch_utc=str(request.epoch) if isinstance(request.epoch, str) else "",
+                duration_sec=float(request.duration),
+                output_step=float(request.output_step),
+                n_points=len(result.year),
+                time_sec=((times_jd - times_jd[0]) * 86400.0).tolist(),
+                times_jd_tdb=times_jd.tolist(),
+                position_km=result.position_km.tolist(),
+                velocity_km_s=vel_km_s.tolist(),
+                final_state=result.position_km[-1].tolist() + vel_km_s[-1].tolist(),
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except NotImplementedError as exc:
+            raise OrbitError("NOT_IMPLEMENTED", str(exc)) from exc
+        except Exception as exc:
+            raise OrbitError("PROPAGATION_FAILED", str(exc)) from exc
 
     @mcp_exposed
-    def spacetime_transform(self, **params) -> Any:
+    def spacetime_transform(self, **params) -> SpacetimeTransformResponse:
         """时空坐标转换（一档）。
 
-        实现状态：占位（统一转换入口待接入 algorithm/coordinate/）。
+        薄封装 ``algorithm/coordinate/spacetime_convert``：Pydantic 校验 →
+        逐条转换 → 结果翻译为 Response。
         """
-        raise NotImplementedError("Facade.spacetime_transform 待接入 algorithm/coordinate/")
+        try:
+            request = SpacetimeTransformRequest(**params)
+            from e2m2e.algorithm.coordinate import spacetime_convert
+
+            if len(request.states) != len(request.times):
+                raise ValueError("states 与 times 长度必须一致")
+
+            converted_states: list[list[float]] = []
+            converted_times: list[float] = []
+            for state, t in zip(request.states, request.times, strict=True):
+                result = spacetime_convert(
+                    request.transform_type,
+                    state,
+                    float(t),
+                    et0_jd=request.et0_jd,
+                    ephemeris_path=request.ephemeris_path,
+                    kernel_dir=self._config.kernel_dir,
+                )
+                converted_states.append(result["state"].tolist())
+                converted_times.append(float(result["time"]))
+
+            return SpacetimeTransformResponse(
+                states=converted_states,
+                times=converted_times,
+                transform_type=request.transform_type,
+                details={
+                    "n_states": len(converted_states),
+                    "et0_jd": request.et0_jd,
+                },
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except NotImplementedError as exc:
+            raise OrbitError("NOT_IMPLEMENTED", str(exc)) from exc
+        except Exception as exc:
+            raise OrbitError("TRANSFORM_FAILED", str(exc)) from exc
 
     # ---- 二档子任务（mcp_exposed=True）----
 

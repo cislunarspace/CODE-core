@@ -17,6 +17,12 @@ __all__ = [
     "DesignOrbitResponse",
     "ControlOrbitRequest",
     "ControlOrbitResponse",
+    "TransferDesignRequest",
+    "TransferDesignResponse",
+    "PropagationRequest",
+    "PropagationResponse",
+    "SpacetimeTransformRequest",
+    "SpacetimeTransformResponse",
 ]
 
 
@@ -107,3 +113,80 @@ class ControlOrbitResponse(_ApiModel):
     num_failed: int
     sk_statistic: dict[str, Any]
     maneuvers: dict[str, Any]
+
+
+class TransferDesignRequest(_ApiModel):
+    """转移轨道设计输入（对齐 algorithm/transfer 的 transfer_orbit 参数）。"""
+
+    transfer_type: str = Field(description="HMN/LGA/WSB/low_thrust")
+    tli_epoch: Any = Field(description="TLI 历元（UTC ISO 字符串或 JD_TDB 浮点数）")
+    parking_alt_km: float = Field(default=200.0, gt=0.0, description="地球停泊轨道高度 (km)")
+    incl_deg: float = Field(default=28.5, ge=0.0, le=180.0, description="轨道倾角 (度)")
+    flight_path_deg: float = Field(default=0.0, ge=0.0, le=0.0, description="航迹角 (度，仅支持 0)")
+    target_ephemeris: Any = Field(
+        default=None, description="目标星历（EphemerisTable/NominalOrbit/ndarray）"
+    )
+    target_orbit_radius_km: float | None = Field(
+        default=None, gt=0.0, description="目标轨道半径 (km)，HMN 必需"
+    )
+    tof_range: list[float] | None = Field(default=None, description="飞行时间范围 [min, max]（天）")
+    lga_search_params: Any = Field(default=None, description="LGA 搜索参数（LgaSearchParams 实例）")
+    wsb_search_params: Any = Field(default=None, description="WSB 搜索参数（WsbSearchParams 实例）")
+
+
+class TransferDesignResponse(_ApiModel):
+    """转移轨道设计输出。"""
+
+    transfer_type: str
+    delta_v: float
+    trajectory: list[list[float]] | None
+    details: dict[str, Any]
+
+
+class PropagationRequest(_ApiModel):
+    """轨道预报输入（对齐 algorithm/propagation 的 propagate_orbit 参数）。"""
+
+    initial_state: list[float] = Field(
+        min_length=6, max_length=6, description="初值（GCRS，km, km/s，长度 6）"
+    )
+    epoch: Any = Field(description="起始历元 UTC（ISO 字符串或 [年,月,日,时,分,秒]）")
+    duration: float = Field(gt=0.0, description="预报时长（秒）")
+    force_config: dict[str, Any] | None = Field(
+        default=None, description="力模型配置（缺省用默认三体力模型）"
+    )
+    output_step: float = Field(default=3600.0, gt=0.0, description="输出间隔（秒）")
+
+
+class PropagationResponse(_ApiModel):
+    """轨道预报输出。"""
+
+    epoch_utc: str
+    duration_sec: float
+    output_step: float
+    n_points: int
+    time_sec: list[float]
+    times_jd_tdb: list[float]
+    position_km: list[list[float]]
+    velocity_km_s: list[list[float]]
+    final_state: list[float]
+
+
+class SpacetimeTransformRequest(_ApiModel):
+    """时空坐标转换输入。"""
+
+    states: list[list[float]] = Field(description="状态列表，每项 [x,y,z,vx,vy,vz]")
+    times: list[float] = Field(description="每个状态的 JD_TDB 时间值")
+    transform_type: str = Field(
+        description="synodic_to_j2000/j2000_to_synodic/gcrs_to_ebcrs/ebcrs_to_gcrs"
+    )
+    et0_jd: float = Field(description="参考历元 JD_TDB")
+    ephemeris_path: str | None = Field(default=None, description="历表路径（GCRS↔EBCRS 必需）")
+
+
+class SpacetimeTransformResponse(_ApiModel):
+    """时空坐标转换输出。"""
+
+    states: list[list[float]]
+    times: list[float]
+    transform_type: str
+    details: dict[str, Any]

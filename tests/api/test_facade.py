@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
 from e2m2e.api.facade import Facade, mcp_tools
-from e2m2e.api.models import ControlOrbitRequest, DesignOrbitRequest, OrbitError
+from e2m2e.api.models import (
+    ControlOrbitRequest,
+    DesignOrbitRequest,
+    OrbitError,
+    PropagationRequest,
+    SpacetimeTransformRequest,
+    TransferDesignRequest,
+)
 
 
 class TestDesignOrbitRequest:
@@ -37,6 +45,66 @@ class TestControlOrbitRequest:
         assert req.control_mode == 4
 
 
+class TestTransferDesignRequest:
+    def test_defaults(self):
+        req = TransferDesignRequest(transfer_type="HMN", tli_epoch="2025-06-21T11:00:00")
+        assert req.parking_alt_km == 200.0
+        assert req.incl_deg == 28.5
+        assert req.flight_path_deg == 0.0
+
+    def test_invalid_transfer_type_type(self):
+        with pytest.raises(ValidationError):
+            TransferDesignRequest(transfer_type=123, tli_epoch="2025-06-21T11:00:00")
+
+
+class TestPropagationRequest:
+    def test_defaults(self):
+        req = PropagationRequest(
+            initial_state=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            epoch="2025-06-21T11:00:00",
+            duration=3600.0,
+        )
+        assert req.output_step == 3600.0
+        assert req.force_config is None
+
+    def test_duration_must_be_positive(self):
+        with pytest.raises(ValidationError):
+            PropagationRequest(
+                initial_state=[0.0] * 6,
+                epoch="2025-06-21T11:00:00",
+                duration=0.0,
+            )
+
+    def test_invalid_state_shape(self):
+        # Pydantic 在 API 边界强制长度为 6
+        with pytest.raises(ValidationError):
+            PropagationRequest(
+                initial_state=[0.0] * 5,
+                epoch="2025-06-21T11:00:00",
+                duration=3600.0,
+            )
+
+
+class TestSpacetimeTransformRequest:
+    def test_defaults(self):
+        req = SpacetimeTransformRequest(
+            states=[[1.0] * 6],
+            times=[0.0],
+            transform_type="j2000_to_synodic",
+            et0_jd=2459000.0,
+        )
+        assert req.ephemeris_path is None
+
+    def test_unknown_transform_type_type(self):
+        with pytest.raises(ValidationError):
+            SpacetimeTransformRequest(
+                states=[[1.0] * 6],
+                times=[0.0],
+                transform_type=123,
+                et0_jd=2459000.0,
+            )
+
+
 class TestFacade:
     def test_construct(self):
         facade = Facade()
@@ -57,11 +125,29 @@ class TestFacade:
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
             facade.control_orbit(control_mode=9)
 
-    def test_placeholder_methods(self):
+    def test_transfer_design_invalid_params(self):
         facade = Facade()
-        for name in ("transfer_design", "orbit_propagation", "spacetime_transform"):
-            with pytest.raises(NotImplementedError):
-                getattr(facade, name)()
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade.transfer_design(transfer_type="HMN")
+
+    def test_orbit_propagation_invalid_params(self):
+        facade = Facade()
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade.orbit_propagation(
+                initial_state=[0.0] * 6,
+                epoch="2025-06-21T11:00:00",
+                duration=0.0,
+            )
+
+    def test_spacetime_transform_invalid_params(self):
+        facade = Facade()
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade.spacetime_transform(
+                states=[[1.0] * 6],
+                times=[0.0],
+                transform_type="unknown",
+                et0_jd=2459000.0,
+            )
 
     def test_orbit_family_generation_unknown(self):
         facade = Facade()
@@ -75,4 +161,55 @@ class TestMcpTools:
         names = mcp_tools(facade)
         assert "design_orbit" in names
         assert "control_orbit" in names
+        assert "transfer_design" in names
+        assert "orbit_propagation" in names
+        assert "spacetime_transform" in names
         assert "orbit_family_generation" in names
+
+
+class TestFacadeCallChain:
+    """无需 SPICE 的轻量调用链：仅验证错误码与序列化路径。"""
+
+    def test_transfer_design_hmn_call_chain(self):
+        facade = Facade()
+        response = facade.transfer_design(
+            transfer_type="HMN",
+            tli_epoch="2025-06-21T11:00:00",
+            target_orbit_radius_km=42164.0,
+        )
+        assert response.transfer_type == "HMN"
+        assert response.delta_v > 0.0
+        assert "departure_state" in response.details or "delta_v_theory" in response.details
+
+    def test_transfer_design_invalid_type_call_chain(self):
+        facade = Facade()
+        with pytest.raises(OrbitError, match="NOT_IMPLEMENTED"):
+            facade.transfer_design(
+                transfer_type="UNKNOWN_TYPE",
+                tli_epoch="2025-06-21T11:00:00",
+                target_orbit_radius_km=42164.0,
+            )
+
+    def test_spacetime_transform_mismatched_lengths(self):
+        facade = Facade()
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade.spacetime_transform(
+                states=[[1.0] * 6, [2.0] * 6],
+                times=[0.0],
+                transform_type="j2000_to_synodic",
+                et0_jd=2459000.0,
+            )
+
+    def test_details_to_dict_with_ndarray(self):
+        from e2m2e.api.facade import _details_to_dict
+
+        class DummyDataclass:
+            pass
+
+        details = {
+            "array": np.array([1.0, 2.0]),
+            "nested": {"tuple": (np.array([3.0]), 4.0)},
+        }
+        result = _details_to_dict(details)
+        assert result["array"] == [1.0, 2.0]
+        assert result["nested"]["tuple"] == [[3.0], 4.0]

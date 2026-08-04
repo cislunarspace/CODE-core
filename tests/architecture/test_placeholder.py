@@ -1,8 +1,9 @@
 """架构骨架占位/行为测试。
 
-未实现能力（角动量管理、ECOM 光压、LGA/WSB、transfer_orbit、MCP/tools/logging）
+未实现能力（MCP/tools 服务器占位）
 断言抛 NotImplementedError 且错误信息含能力名；已实现能力（design_orbit/
-control_orbit/propagate_orbit/family 初猜、Facade 一档接入）改行为冒烟测试。
+control_orbit/propagate_orbit/family 初猜、transfer_orbit、momentum_management、
+Facade 一档接入）改行为冒烟测试。
 """
 
 from __future__ import annotations
@@ -26,19 +27,25 @@ def test_control_orbit_implemented():
         control_orbit(None, control_mode=9)
 
 
-def test_momentum_management_placeholder():
-    """角动量管理（原 #261）占位：对外承诺能力。"""
-    from e2m2e.algorithm.station_keeping import momentum_management
+def test_momentum_management_implemented():
+    """角动量管理（原 #261）已实现：发动机布局校验先于占位抛错。"""
+    import numpy as np
 
-    with pytest.raises(NotImplementedError, match="角动量管理"):
-        momentum_management(None)
+    from e2m2e.algorithm.station_keeping import EngineLayout
+
+    # N=3 发动机布局不足 6 约束，EngineLayout 构造抛 ValueError（非占位）。
+    with pytest.raises(ValueError, match="不足 6"):
+        EngineLayout(
+            positions_m=np.zeros((3, 3)),
+            directions=np.tile([1.0, 0.0, 0.0], (3, 1)),
+        )
 
 
-def test_transfer_orbit_placeholder():
-    """transfer_orbit 占位。"""
+def test_transfer_orbit_implemented():
+    """transfer_orbit 已实现：HMN 缺参校验先于占位抛错。"""
     from e2m2e.algorithm.transfer import transfer_orbit
 
-    with pytest.raises(NotImplementedError, match="transfer_orbit"):
+    with pytest.raises(ValueError, match="HMN 转移需要 tli_params"):
         transfer_orbit("HMN")
 
 
@@ -91,11 +98,23 @@ def test_facade_placeholder():
         facade.design_orbit(orbit_type="DRO", duration=0.0)
     with pytest.raises(OrbitError, match="INVALID_PARAMS"):
         facade.control_orbit(control_mode=9)
-    # 未实现：保持占位
-    with pytest.raises(NotImplementedError, match="transfer_design"):
+    with pytest.raises(OrbitError, match="INVALID_PARAMS"):
         facade.transfer_design(transfer_type="HMN")
-    with pytest.raises(NotImplementedError, match="orbit_propagation"):
+    with pytest.raises(OrbitError, match="INVALID_PARAMS"):
         facade.orbit_propagation()
+    with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+        facade.spacetime_transform()
+    # 未实现：保持占位
+    with pytest.raises(NotImplementedError, match="transfer_search"):
+        facade.transfer_search()
+    with pytest.raises(NotImplementedError, match="low_thrust_design"):
+        facade.low_thrust_design()
+    with pytest.raises(NotImplementedError, match="manifold_analysis"):
+        facade.manifold_analysis()
+    with pytest.raises(NotImplementedError, match="low_energy_transfer"):
+        facade.low_energy_transfer()
+    with pytest.raises(NotImplementedError, match="relative_motion"):
+        facade.relative_motion()
 
 
 def test_mcp_server_placeholder():
