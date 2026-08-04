@@ -113,17 +113,17 @@ print("力模型配置      :", result.force_config)
 **已经建成：**
 
 - 两套动力学模型：简化三体模型（CR3BP，用于快速设计）和高精度星历模型（基于 SPICE，用于精确外推），以及两者之间的转换；另有含太阳摄动的双圆四体模型（BCR4BP），太阳位置解析给出，无需星历
-- 周期轨道族生成：DRO、Halo、Lyapunov、Lissajous、Butterfly、Dragonfly、共振轨道（RO）等，配微分修正、多重打靶、延拓等数值算法
-- 高精度力模型：点质量与第三体引力、球谐重力场（含固体潮）、大气阻力、太阳光压、连续推力，传播精度已与 GMAT、DFH 对齐到亚百米级
-- 转移轨道设计：Lambert 求解与 porkchop 扫描，多脉冲转移优化与 Lawden 主矢量检验，网格搜索 + 非线性规划的两步法
+- 周期轨道族生成：DRO、Halo、Lyapunov、Lissajous、Butterfly、Dragonfly、共振轨道（RO）、DPO、Axial 等，配微分修正、多重打靶、延拓等数值算法
+- 高精度力模型：点质量与第三体引力、球谐重力场（含固体潮、ECOM 9 系数光压）、大气阻力、太阳光压、连续推力，传播精度已与 GMAT、DFH 对齐到亚百米级
+- 转移轨道设计：Lambert 求解与 porkchop 扫描，多脉冲转移优化与 Lawden 主矢量检验，霍曼直接转移（HMN），月球引力辅助间接转移（LGA），低推力转移（Q-law 初猜 + 打靶/配点），网格搜索 + 非线性规划的两步法
 - 事件检测：轨道传播中检测截面穿越等事件，支持 terminal/direction 语义，提供 scipy 接口与 Rust 快速路径
 - 不变流形与低能量转移：流形计算、庞加莱截面拼接、低能转移流水线
 - 坐标系转换（J2000/ITRF 等，与 GMAT 兼容）和 2D/3D 可视化
 
 **正在进行和计划中的：**
 
-- 更多轨道族：DPO、三角平动点附近的 SPO/LPO、Horseshoe 等
-- 小推力转移与 LEO/GEO 端点条件
+- 更多轨道族：三角平动点附近的 SPO/LPO、Horseshoe 等
+- 低能转移的进一步完善（WSB 弹道搜索等）
 - Hamiltonian 正规化流水线的进一步完善（把平动点附近轨道化简为少数表征参数）
 - 面向上层规划系统的服务化封装。下一步把 e2m2e 封装为 MCP 服务器，接入下图所示的异构模型交互框架，让大模型可以像调用 Lambert、C-W 工具一样调用地月轨道算法
 
@@ -133,16 +133,16 @@ print("力模型配置      :", result.force_config)
 
 | 能力 | 实现状态 | 说明 |
 |------|---------|------|
-| 任务轨道设计（DRO/NRHO/Halo/Lissajous/L4/L5） | 已实现 | CR3BP 初猜 → 星历修正 → 高精度预报全链路 |
+| 任务轨道设计（DRO/NRHO/Halo/Lissajous/L4/L5/DPO/Axial） | 已实现 | CR3BP 初猜 → 星历修正 → 高精度预报全链路 |
 | 轨道保持（特征点/目标点严格/目标点宽松 + 蒙特卡洛） | 已实现 | 三控制律 + 三轨道误差仿真 |
-| 角动量管理 | 未实现 | 姿态发动机联合控制（见 issue #261） |
+| 角动量管理 | 已实现 | 姿态发动机联合控制（#261） |
 | 转移轨道设计（HMN） | 已实现 | Lambert + 打靶组装 |
-| 转移轨道设计（LGA/WSB） | 未实现 | 引力辅助弹道搜索 |
+| 转移轨道设计（LGA） | 已实现 | 月球引力辅助间接转移（#258） |
 | 低推力转移 | 已实现 | Q-law 初猜 + 打靶/配点/解析雅可比 |
 | 轨道预报 | 已实现 | ForceModel 高精度外推 |
 | 时空坐标转换（TDT+GCRS↔TDB+EBCRS） | 已实现 | r2s2 后端 |
-| ECOM 光压模型 | 未实现 | 现有仅炮弹模型（见 issue #253） |
-| 地球非球形×大天体耦合项 | 未实现 | 见 issue #253 |
+| ECOM 光压模型 | 已实现 | 9 系数经验光压模型（#253） |
+| 耦合项固体潮 | 已实现 | coupling=1 映射为固体潮强制启用（#277） |
 | 不变流形与低能量转移 | 已实现 | 流形 + 庞加莱截面 + 拼接 |
 | 正规化（normal form） | 已实现 | 可选依赖 `[normal-form]` |
 | MCP 服务 | 部分实现 | Facade 方法全集（`mcp_exposed`）可派生；`create_server`/`e2m2e mcp-serve` 占位，部署依赖 `[mcp]` extra |
@@ -183,7 +183,7 @@ uv run ruff check .
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {5.4.0},
+  version = {5.5.0},
   year = {2026},
 }
 ```

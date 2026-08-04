@@ -30,6 +30,8 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
    algorithms/halo
    algorithms/halo-family
    algorithms/halo-initial-guess
+   algorithms/dpo
+   algorithms/axial
    algorithms/multiple-shooting
    algorithms/two-level-multiple-shooting
    algorithms/stability
@@ -39,6 +41,8 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
 
    transfer/overview
    transfer/lambert
+   transfer/hmn
+   transfer/lga
    transfer/search
    transfer/optimization
    transfer/terminal
