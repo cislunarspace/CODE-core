@@ -58,7 +58,9 @@ from ..family.cr3bp_orbits import (
     design_dpo,
     design_dro,
     design_halo,
+    design_horseshoe,
     design_lissajous,
+    design_lpo,
     design_nrho,
     design_spo,
     design_triangular,
@@ -365,8 +367,29 @@ def _validate_params(
             raise ValueError(f"{sel} phase 应在 0~1 之间，实际为 {phase}")
         return {"amplitude": amplitude, "phase": phase}
 
+    if sel in ("L4_LPO", "L5_LPO"):
+        amplitude = 50000.0 if amplitude is None else float(amplitude)
+        phase = 0.0 if phase is None else float(phase)
+        if not 1000.0 <= amplitude <= 200000.0:
+            raise ValueError(f"{sel} amplitude 应在 1000~200000 km 之间，实际为 {amplitude:.0f} km")
+        if not 0.0 <= phase <= 1.0:
+            raise ValueError(f"{sel} phase 应在 0~1 之间，实际为 {phase}")
+        return {"amplitude": amplitude, "phase": phase}
+
+    if sel in ("L4_HORSESHOE", "L5_HORSESHOE"):
+        amplitude = 150000.0 if amplitude is None else float(amplitude)
+        phase = 0.0 if phase is None else float(phase)
+        if not 50000.0 <= amplitude <= 200000.0:
+            raise ValueError(
+                f"{sel} amplitude 应在 50000~200000 km 之间，实际为 {amplitude:.0f} km"
+            )
+        if not 0.0 <= phase <= 1.0:
+            raise ValueError(f"{sel} phase 应在 0~1 之间，实际为 {phase}")
+        return {"amplitude": amplitude, "phase": phase}
+
     raise ValueError(
-        f"orbit_type 必须为 DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial/L4_SPO/L5_SPO，当前 {sel!r}"
+        f"orbit_type 必须为 DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial/L4_SPO/L5_SPO"
+        f"/L4_LPO/L5_LPO/L4_HORSESHOE/L5_HORSESHOE，当前 {sel!r}"
     )
 
 
@@ -403,6 +426,18 @@ def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_D
     if sel in ("L4_SPO", "L5_SPO"):
         return design_spo(
             4 if sel == "L4_SPO" else 5,
+            params["amplitude"],
+            dynamics=dynamics,
+        )
+    if sel in ("L4_LPO", "L5_LPO"):
+        return design_lpo(
+            4 if sel == "L4_LPO" else 5,
+            params["amplitude"],
+            dynamics=dynamics,
+        )
+    if sel in ("L4_HORSESHOE", "L5_HORSESHOE"):
+        return design_horseshoe(
+            4 if sel == "L4_HORSESHOE" else 5,
             params["amplitude"],
             dynamics=dynamics,
         )
@@ -685,12 +720,13 @@ def design_orbit(
     correction_velocity_tolerance: float = 0.1,
     verbose: bool = False,
 ) -> OrbitDesignResult:
-    """端到端设计标称轨道（DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial/L4_SPO/L5_SPO）。
+    """端到端设计标称轨道（DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial/L4_SPO/L5_SPO/L4_LPO/L5_LPO/L4_HORSESHOE/L5_HORSESHOE）。
 
     Args:
         orbit_type: ``"DRO"`` / ``"DPO"`` / ``"NRHO"`` / ``"Halo"`` /
             ``"Lissajous"`` / ``"L4"`` / ``"L5"`` / ``"AXIAL"`` /
-            ``"L4_SPO"`` / ``"L5_SPO"``。
+            ``"L4_SPO"`` / ``"L5_SPO"`` / ``"L4_LPO"`` / ``"L5_LPO"`` /
+            ``"L4_HORSESHOE"`` / ``"L5_HORSESHOE"``。
         amplitude: 振幅（km）。DRO 1737~110000，默认 10000；DPO 1737~110000，
             默认 20000；Halo 面外振幅 ±73000（正北负南），默认 30000；
             Axial z 振幅 ±60000（正上下族），默认 5000；NRHO 不用。

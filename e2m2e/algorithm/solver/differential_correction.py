@@ -64,6 +64,7 @@ class DifferentialCorrection:
         "halo_orbit_fixed_z0",
         "halo_orbit_fixed_x0",
         "spo_fixed_x0",
+        "lpo_fixed_x0",
     ]
 
     def __init__(
@@ -408,6 +409,35 @@ class DifferentialCorrection:
 
         logger.debug(
             "SPO 配置完成（固定 x0）：x0=%s，平动点=L%s，自由变量=%s，目标约束=%s",
+            x0,
+            libration_point,
+            self.free_variables,
+            list(self.target_conditions.keys()),
+        )
+
+        return self
+
+    def setup_lpo_fixed_x0(self, x0, libration_point=5):
+        """配置 LPO 通用平面周期修正，固定 x₀（无对称性假设）。
+
+        与 setup_spo_fixed_x0 同构。LPO 是 L4/L5 长周期族，大振幅成员
+        呈马蹄形（Horseshoe）。使用 iterate_full_period_correction 方法。
+
+        Args:
+            x0 (float): 固定的初始 x 坐标（族参数）
+            libration_point (int): 平动点编号 (4=L4, 5=L5)，默认 5
+
+        Returns:
+            self: 配置好的微分修正器实例
+        """
+        from ..family.strategies import lpo_fixed_x0
+
+        config = lpo_fixed_x0(x0, libration_point)
+        self._apply_config(config)
+        self._reset_history()
+
+        logger.debug(
+            "LPO 配置完成（固定 x0）：x0=%s，平动点=L%s，自由变量=%s，目标约束=%s",
             x0,
             libration_point,
             self.free_variables,

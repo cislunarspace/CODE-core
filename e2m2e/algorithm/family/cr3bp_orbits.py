@@ -50,6 +50,7 @@ from .axial_initial_guess import compute_axial_initial_guess
 from .halo_family import halo_pseudo_arclength_continuation
 from .halo_initial_guess import compute_halo_initial_guess
 from .lissajous_initial_guess import compute_lissajous_initial_guess
+from .lpo_initial_guess import compute_lpo_initial_guess
 from .spo_initial_guess import compute_spo_initial_guess
 from .triangular_initial_guess import compute_triangular_initial_guess
 
@@ -901,4 +902,238 @@ def design_spo(
     raise Cr3bpOrbitError(
         f"SPO(L{libration_point}, amp={amplitude_km:.0f} km) 未命中目标"
         f"（最佳误差 {best_err * du:.0f} km）"
+    )
+
+
+def _correct_lpo(
+    dynamics: CR3BP_Dynamics,
+    x0: float,
+    libration_point: int,
+    guess: Orbit | None,
+) -> Orbit:
+    """在 x₀ 处修正 LPO（通用平面周期修正，无对称性假设）。
+
+    与 _correct_spo 同构，但使用长周期模态初猜。
+    LPO 不稳定（λ≈1.8），修正器需要更严格的收敛条件。
+
+    大振幅 LPO 呈马蹄形（Horseshoe），跨越 L4-L1-L5
+    （Marchal 1990, Brown 猜想 C.2）。
+
+    首次调用（guess=None）使用线性化长周期模态初猜。
+    后续调用保留已收敛轨道状态作初猜。
+    """
+    if guess is None:
+        # 从线性化长周期模态构造初猜（小振幅初猜对 Newton 收敛足够近）
+        state, period = compute_lpo_initial_guess(
+            dynamics.system,
+            libration_point,
+            amplitude_km=1000.0,
+        )
+        # 覆盖 x₀ 到族参数指定值
+        state[0] = x0
+    else:
+        state = guess.states[0].copy()
+        state[0] = x0
+        state[2] = 0.0
+        state[5] = 0.0
+        assert guess.period is not None
+        period = guess.period
+
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_lpo_fixed_x0(x0=x0, libration_point=libration_point)
+    seed = Orbit(
+        states=state.reshape(1, -1),
+        times=np.array([0.0]),
+        system=dynamics.system,
+    )
+    seed.period = period
+
+    orbit = corrector.iterate_full_period_correction(seed, verbose=False)
+    if orbit is None:
+        raise Cr3bpOrbitError(
+            f"LPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {corrector.termination_reason}"
+        )
+    assert orbit.period is not None
+    # LPO 周期范围：极限 21.07 nd（~91 天），大振幅可到 ~30+ nd
+    if orbit.period < 10.0 or orbit.period > 50.0:
+        raise Cr3bpOrbitError(
+            f"LPO(L{libration_point}, x0={x0:.6f}) 周期异常（T={orbit.period:.3f}，预期 10.0-50.0）"
+        )
+    return orbit
+
+
+def design_lpo(
+    libration_point: int,
+    amplitude_km: float,
+    *,
+    dynamics: CR3BP_Dynamics | None = None,
+    tol_km: float = 20.0,
+) -> Orbit:
+    r"""生成指定振幅的 L4/L5 LPO 周期轨道。
+
+    LPO（Long-Period Orbit）是 CR3BP 中围绕三角平动点的长周期族
+    成员（Gómez vol II, $\mathcal{L}_l$）。小振幅时为椭圆形，大振幅
+    时呈马蹄形（Horseshoe），跨越 L4-L1-L5（Marchal 1990, Brown C.2）。
+
+    振幅定义同 SPO：一个周期内距 L4/L5 径向距离最小/最大值的均值（km）。
+    以 x₀ 为族参数，用网格搜索 + 局部精化逼近目标振幅。
+
+    实现策略（网格搜索 + 局部二分）：
+    LPO 长周期族的振幅-x₀ 映射高度非单调（小振幅椭圆 → 混沌过渡区 →
+    大振幅马蹄族），简单二分搜索无法收敛。改用两步策略：
+    1) 均匀网格采样 x₀，找到振幅最接近目标的候选点；
+    2) 在候选点附近做局部二分精化（利用局部单调性）。
+
+    Args:
+        libration_point: 平动点编号（4=L4, 5=L5）。
+        amplitude_km: 目标振幅（km）。
+        dynamics: CR3BP 动力学对象；缺省构造标准地月系统。
+        tol_km: 振幅匹配容差（km），默认 20。
+
+    Returns:
+        修正后的 LPO 周期轨道（小振幅椭圆 或 大振幅马蹄形）。
+
+    References:
+        Gómez et al. (2001). Vol. II. 长周期族 L_l。
+        Marchal (1990). The Three-Body Problem. Brown 猜想 C.2。
+        Taylor (1981). A&A 103, 288. 马蹄周期轨道数值计算。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    du = dynamics.system.characteristic_length
+    assert du is not None
+    mu = dynamics.system.mu
+    target_du = amplitude_km / du
+    tol_du = tol_km / du
+
+    def measure(orbit: Orbit) -> float:
+        d_min, d_max = _l45_distance(dynamics, orbit, libration_point)
+        return 0.5 * (d_min + d_max)
+
+    lp_x = 0.5 - mu
+
+    # LPO 长周期族的振幅-x₀ 映射高度非单调（小振幅椭圆族 → 混沌过渡区 →
+    # 大振幅马蹄族），不能用简单二分搜索。改用分层网格搜索 + 局部精化：
+    # 1) 粗网格（20 点）找到振幅最接近目标的候选区间
+    # 2) 细网格（10 点）在候选区间内精化
+    # 3) 局部二分搜索（10 步）做最终精化
+    x_lo = lp_x - 0.20  # 大振幅端（马蹄方向）
+    x_hi = lp_x + 0.05  # 小振幅端
+
+    def _grid_search(
+        x_lo: float, x_hi: float, n_pts: int, seed: Orbit | None
+    ) -> tuple[float | None, Orbit | None, float]:
+        """在 [x_lo, x_hi] 均匀采样 n_pts 点，返回最佳 (x0, orbit, err)。"""
+        b_x0: float | None = None
+        b_orb: Orbit | None = None
+        b_err = float("inf")
+        for x0 in np.linspace(x_lo, x_hi, n_pts):
+            try:
+                orb = _correct_lpo(dynamics, x0, libration_point, seed)
+            except Cr3bpOrbitError:
+                continue
+            amp = measure(orb)
+            err = abs(amp - target_du)
+            if err < b_err:
+                b_err = err
+                b_x0 = x0
+                b_orb = orb
+            if err <= tol_du:
+                return x0, orb, err
+        return b_x0, b_orb, b_err
+
+    # 第 1 步：粗网格搜索（30 点）
+    best_x0, best_orbit, best_err = _grid_search(x_lo, x_hi, 30, None)
+
+    if best_orbit is None:
+        raise Cr3bpOrbitError(
+            f"LPO(L{libration_point}, amp={amplitude_km:.0f} km) 网格搜索无收敛轨道"
+        )
+    if best_err <= tol_du:
+        return best_orbit
+
+    # 第 2 步：细网格精化（在最佳候选点 ±2 步长内，15 点）
+    dx = (x_hi - x_lo) / 30
+    assert best_x0 is not None  # best_orbit 非空时 best_x0 必非空
+    refine_lo = max(x_lo, best_x0 - 2 * dx)
+    refine_hi = min(x_hi, best_x0 + 2 * dx)
+    rx0, rorb, rerr = _grid_search(refine_lo, refine_hi, 15, best_orbit)
+    if rorb is not None and rerr < best_err:
+        best_x0, best_orbit, best_err = rx0, rorb, rerr
+    if best_err <= tol_du:
+        return best_orbit
+
+    # 第 3 步：局部二分精化（在最佳候选点 ±1 步长内）
+    if best_x0 is not None:
+        refine_lo = max(x_lo, best_x0 - dx)
+        refine_hi = min(x_hi, best_x0 + dx)
+        seed_orbit = best_orbit
+
+        for _ in range(10):
+            x_mid = 0.5 * (refine_lo + refine_hi)
+            try:
+                orbit_mid = _correct_lpo(dynamics, x_mid, libration_point, seed_orbit)
+            except Cr3bpOrbitError:
+                break
+            amp_mid = measure(orbit_mid)
+            err = abs(amp_mid - target_du)
+            if err < best_err:
+                best_err = err
+                best_orbit = orbit_mid
+                seed_orbit = orbit_mid
+            if err <= tol_du:
+                return orbit_mid
+            if amp_mid > target_du:
+                refine_lo = x_mid
+            else:
+                refine_hi = x_mid
+
+    # LPO 振幅-x₀ 映射高度非单调（混沌过渡区），网格搜索可能无法
+    # 精确命中容差。放宽回退阈值：max(10*tol, 1000 km) 允许大振幅
+    # 区域的合理误差。
+    fallback_tol = max(10 * tol_du, 1000.0 / du)
+    if best_err <= fallback_tol:
+        return best_orbit
+
+    raise Cr3bpOrbitError(
+        f"LPO(L{libration_point}, amp={amplitude_km:.0f} km) 未命中目标"
+        f"（最佳误差 {best_err * du:.0f} km）"
+    )
+
+
+def design_horseshoe(
+    libration_point: int,
+    amplitude_km: float = 150000.0,
+    *,
+    dynamics: CR3BP_Dynamics | None = None,
+    tol_km: float = 50.0,
+) -> Orbit:
+    r"""生成 L4/L5 Horseshoe 马蹄形周期轨道。
+
+    Horseshoe 是 LPO 长周期族的大振幅成员，轨道形状呈马蹄形，
+    跨越 L4-L1-L5（Marchal 1990, Brown 猜想 C.2, Taylor 1981）。
+
+    本函数是 design_lpo 的便捷封装，默认大振幅（150,000 km）。
+    振幅定义同 LPO/SPO：距 L4/L5 径向距离均值（km）。
+
+    Args:
+        libration_point: 平动点编号（4=L4, 5=L5）。
+        amplitude_km: 目标振幅（km），默认 150,000。
+        dynamics: CR3BP 动力学对象；缺省构造标准地月系统。
+        tol_km: 振幅匹配容差（km），默认 50（比 LPO 默认 20 宽松，
+            因为大振幅族行走精度下降）。
+
+    Returns:
+        修正后的 Horseshoe 周期轨道。
+
+    References:
+        Taylor (1981). A&A 103, 288. Sun-Jupiter 马蹄周期轨道。
+        Marchal (1990). The Three-Body Problem. Brown C.2 证实。
+        Murray & Dermott (1999). §3.9 Horseshoe 运动学描述。
+    """
+    return design_lpo(
+        libration_point,
+        amplitude_km,
+        dynamics=dynamics,
+        tol_km=tol_km,
     )

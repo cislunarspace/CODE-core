@@ -49,3 +49,13 @@ _SPO_L4_SEED_VY0 = 0.2494
 #: 周期 28.3488 天，无量纲：T_days / (CHAR_PERIOD_SEC / 86400) * 2π
 #: CHAR_PERIOD_SEC = 27.32 * 86400，T* ≈ 4.3423 天/TU
 _SPO_SEED_PERIOD = 6.529
+
+#: LPO（Long-Period Orbit）族标准种子
+#: 来源：Gómez et al. (2001) Vol. II, Orbit F
+#: 中间方程 Orbit F：大振幅 LPO，周期 3T_S ≈ 88 天
+#: 坐标以 L5 为中心的相对坐标（无量纲）
+_LPO_SEED_F_DX = 0.4100071795043306
+_LPO_SEED_F_DY = -0.1028862236602286
+_LPO_SEED_F_VX = 0.1137594676750601
+_LPO_SEED_F_VY = -0.3961422724835140
+_LPO_SEED_PERIOD = 20.374

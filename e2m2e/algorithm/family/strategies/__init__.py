@@ -8,6 +8,7 @@
 from .axial import axial_fixed_vz0
 from .base import CorrectionConfig
 from .halo import halo_fixed_x0, halo_fixed_z0
+from .lpo import lpo_fixed_x0
 from .spo import spo_fixed_x0
 from .symmetric_2d import (
     symmetric_2d_fixed_t,
@@ -23,6 +24,7 @@ from .symmetric_3d import (
 __all__ = [
     "axial_fixed_vz0",
     "CorrectionConfig",
+    "lpo_fixed_x0",
     "spo_fixed_x0",
     "symmetric_2d_fixed_x0",
     "symmetric_2d_fixed_t",
