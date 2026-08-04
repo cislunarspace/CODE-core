@@ -56,6 +56,7 @@ from ..ephemeris_correction import (
     correct_ephemeris_patch_points,
 )
 from ..family.cr3bp_orbits import (
+    design_axial,
     design_dro,
     design_halo,
     design_lissajous,
@@ -330,7 +331,25 @@ def _validate_params(
             "phase_out": phase_out,
         }
 
-    raise ValueError(f"orbit_type 必须为 DRO/NRHO/Halo/Lissajous/L4/L5，当前 {sel!r}")
+    if sel == "AXIAL":
+        collinear_point = 2 if collinear_point is None else int(collinear_point)
+        amplitude = 5000.0 if amplitude is None else float(amplitude)
+        phase = 0.0 if phase is None else float(phase)
+        if collinear_point not in (1, 2, 3):
+            raise ValueError(f"Axial collinear_point 必须为 1/2/3，当前 {collinear_point}")
+        if abs(amplitude) > 60000.0:
+            raise ValueError(
+                f"Axial amplitude 应在 -60000~60000 km 之间，实际为 {amplitude:.0f} km"
+            )
+        if not 0.0 <= phase <= 1.0:
+            raise ValueError(f"Axial phase 应在 0~1 之间，实际为 {phase}")
+        return {
+            "collinear_point": collinear_point,
+            "amplitude": amplitude,
+            "phase": phase,
+        }
+
+    raise ValueError(f"orbit_type 必须为 DRO/NRHO/Halo/Lissajous/L4/L5/Axial，当前 {sel!r}")
 
 
 def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_Dynamics) -> Orbit:
@@ -353,6 +372,12 @@ def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_D
             params["amplitude_out"],
             params["phase_in"],
             params["phase_out"],
+            dynamics=dynamics,
+        )
+    if sel == "AXIAL":
+        return design_axial(
+            int(params["collinear_point"]),
+            params["amplitude"],
             dynamics=dynamics,
         )
     return design_triangular(
@@ -634,17 +659,18 @@ def design_orbit(
     correction_velocity_tolerance: float = 0.1,
     verbose: bool = False,
 ) -> OrbitDesignResult:
-    """端到端设计六类标称轨道（DRO/NRHO/Halo/Lissajous/L4/L5）。
+    """端到端设计七类标称轨道（DRO/NRHO/Halo/Lissajous/L4/L5/Axial）。
 
     Args:
         orbit_type: ``"DRO"`` / ``"NRHO"`` / ``"Halo"`` / ``"Lissajous"`` /
-            ``"L4"`` / ``"L5"``。
+            ``"L4"`` / ``"L5"`` / ``"AXIAL"``。
         amplitude: 振幅（km）。DRO 1737~110000，默认 10000；Halo 面外振幅
-            ±73000（正北负南），默认 30000；NRHO 不用。
-        phase: 初始相位（周期份额）。DRO/Halo 取值 0~1，默认 0.5001/0；
-            NRHO 取值 0.01~0.99，默认 0.5。
+            ±73000（正北负南），默认 30000；Axial z 振幅 ±60000（正上族
+            负下族），默认 5000；NRHO 不用。
+        phase: 初始相位（周期份额）。DRO/Halo/Axial 取值 0~1，默认
+            0.5001/0/0；NRHO 取值 0.01~0.99，默认 0.5。
         collinear_point: 共线平动点编号 1/2（Halo/NRHO，默认 2）。
-            Lissajous 取 1/2/3（默认 2）。
+            Lissajous/Axial 取 1/2/3（默认 2）。
         north_south: 1=北 / 2=南（NRHO，默认 2）。
         perilune_height: 近月点高度（km，100~10000，NRHO，默认 5000）。
         amplitude_in / amplitude_out: 面内/面外振幅（km）。Lissajous

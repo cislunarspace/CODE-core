@@ -19,14 +19,15 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ...data.types import Orbit
+
+# 先加载 solver 依赖的叶子模块（halo_initial_guess 等），再经惰性导出
+# cr3bp_orbits（依赖 solver）。
+from .axial_initial_guess import compute_axial_initial_guess
 from .halo_family import (
     generate_halo_family,
     generate_halo_seed_orbit,
     halo_pseudo_arclength_continuation,
 )
-
-# 先加载 solver 依赖的叶子模块（halo_initial_guess 等），再经惰性导出
-# cr3bp_orbits（依赖 solver）。
 from .halo_initial_guess import (
     compute_halo_coefficients,
     compute_halo_initial_guess,
@@ -35,6 +36,7 @@ from .halo_initial_guess import (
 from .lissajous_initial_guess import compute_lissajous_initial_guess
 from .strategies import (
     CorrectionConfig,
+    axial_fixed_vz0,
     halo_fixed_x0,
     halo_fixed_z0,
     symmetric_2d_fixed_t,
@@ -47,6 +49,7 @@ from .strategies import (
 from .triangular_initial_guess import compute_triangular_initial_guess
 
 __all__ = [
+    "design_axial",
     "design_dro",
     "design_halo",
     "design_nrho",
@@ -54,6 +57,7 @@ __all__ = [
     "design_triangular",
     "earth_moon_system",
     "Cr3bpOrbitError",
+    "compute_axial_initial_guess",
     "compute_halo_initial_guess",
     "compute_halo_coefficients",
     "halo_third_order_approximation",
@@ -71,12 +75,14 @@ __all__ = [
     "symmetric_xz_fixed_z0",
     "halo_fixed_z0",
     "halo_fixed_x0",
+    "axial_fixed_vz0",
     "registry",
 ]
 
 #: 惰性导出：cr3bp_orbits（六类初猜 + earth_moon_system + Cr3bpOrbitError）
 #: 依赖 ``algorithm/solver``，经 PEP 562 在首次访问时加载。
 _LAZY_EXPORTS = {
+    "design_axial": "design_axial",
     "design_dro": "design_dro",
     "design_halo": "design_halo",
     "design_nrho": "design_nrho",
@@ -105,6 +111,7 @@ def __getattr__(name: str):  # PEP 562
 def _build_registry() -> dict[str, Callable[..., Orbit]]:
     """构建轨道族注册表（函数形态）：orbit_type → design_xxx(params) -> Orbit。"""
     from .cr3bp_orbits import (
+        design_axial,
         design_dro,
         design_halo,
         design_lissajous,
@@ -117,6 +124,7 @@ def _build_registry() -> dict[str, Callable[..., Orbit]]:
         "HALO": design_halo,
         "NRHO": design_nrho,
         "LISSAJOUS": design_lissajous,
+        "AXIAL": design_axial,
         "L4": lambda amplitude_in, amplitude_out, phase_in=0.0, phase_out=0.0, **kw: (
             design_triangular(4, amplitude_in, amplitude_out, phase_in, phase_out, **kw)
         ),

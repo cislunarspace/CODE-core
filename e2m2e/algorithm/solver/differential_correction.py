@@ -60,6 +60,7 @@ class DifferentialCorrection:
         "3D_symmetric_x_fixed_x0",
         "3D_symmetric_xz_fixed_x0",
         "3D_symmetric_xz_fixed_z0",
+        "axial_orbit_fixed_vz0",
         "halo_orbit_fixed_z0",
         "halo_orbit_fixed_x0",
     ]
@@ -340,6 +341,43 @@ class DifferentialCorrection:
 
         return self
 
+    def setup_axial_orbit_fixed_vz0(self, vz0, libration_point=1):
+        """配置 Axial 轨道微分修正，固定初始 vz0（x 轴对称，Type B）。
+
+        Axial 轨道关于 x 轴对称，初始状态 (x0, 0, 0, 0, y_dot0, vz0)，
+        半周期处回到 x 轴 (y=0, z=0, x_dot=0)。
+
+        与 Halo（Type A, z0≠0, vz0=0）的区别：Axial 从 xy 平面出发，
+        获得面外速度后在半周期返回 xy 平面。
+
+        Args:
+            vz0 (float): 固定的初始 z 方向速度
+            libration_point (int): 平动点编号 (1=L1, 2=L2)，默认 L1
+
+        Returns:
+            self: 配置好的微分修正器实例
+
+        Note:
+            - 自由变量: [x0, y_dot0, T_half]
+            - 目标约束: [y(T/2)=0, z(T/2)=0, x_dot(T/2)=0]
+        """
+        from ..family.strategies import axial_fixed_vz0
+
+        config = axial_fixed_vz0(vz0, libration_point)
+        self._apply_config(config)
+
+        self._reset_history()
+
+        logger.debug(
+            "Axial 轨道配置完成（固定 vz0）：vz0=%s，平动点=L%s，自由变量=%s，目标约束=%s",
+            vz0,
+            libration_point,
+            self.free_variables,
+            list(self.target_conditions.keys()),
+        )
+
+        return self
+
     def _apply_config(self, config: CorrectionConfig) -> None:
         """将不可变的 CorrectionConfig 应用到当前修正器实例。
 
@@ -601,8 +639,13 @@ class DifferentialCorrection:
                 elif var_idx == 6:  # 更新时间变量
                     current_time -= delta[j]
 
-            # Halo：仅当 T/2 已崩溃到极小（寄生根）时拉回，避免一律钳位导致无法收敛到真实 ~0.92 TU
-            if self.setup_type in ("halo_orbit_fixed_x0", "halo_orbit_fixed_z0"):
+            # Halo/Axial：仅当 T/2 已崩溃到极小（寄生根）时拉回，
+            # 避免一律钳位导致无法收敛到真实 ~0.92 TU
+            if self.setup_type in (
+                "halo_orbit_fixed_x0",
+                "halo_orbit_fixed_z0",
+                "axial_orbit_fixed_vz0",
+            ):
                 if current_time < 0.02:
                     current_time = 0.25
             elif current_time <= 0:
@@ -644,7 +687,11 @@ class DifferentialCorrection:
 
         if self.converged:
             # 验证周期合理性（防止收敛到无效解如周期接近0的轨道）
-            if self.setup_type in ("halo_orbit_fixed_z0", "halo_orbit_fixed_x0"):
+            if self.setup_type in (
+                "halo_orbit_fixed_z0",
+                "halo_orbit_fixed_x0",
+                "axial_orbit_fixed_vz0",
+            ):
                 min_valid_period = 0.5
             else:
                 min_valid_period = 1e-6
@@ -717,11 +764,12 @@ class DifferentialCorrection:
         final_state = prop_result["states"][-1]
         closure_error = np.linalg.norm(final_state - initial_state)
 
-        # 对于 Halo 轨道，半周期对称性已由微分修正精确保证；全周期闭合误差
+        # 对于 Halo/Axial 轨道，半周期对称性已由微分修正精确保证；全周期闭合误差
         # 通常来自积分截断（~2e-6），用速度调整反而破坏对称性。
         if closure_error > 1e-10 and self.setup_type not in (
             "halo_orbit_fixed_x0",
             "halo_orbit_fixed_z0",
+            "axial_orbit_fixed_vz0",
         ):
             closure_error_vector = final_state - initial_state
             pos_error = np.linalg.norm(closure_error_vector[:3])
@@ -769,7 +817,9 @@ class DifferentialCorrection:
 
     def _infer_family_type(self):
         """根据配置推断轨道族类型"""
-        if self.setup_type and ("3D" in self.setup_type or "halo" in self.setup_type):
+        if self.setup_type and "axial" in self.setup_type:
+            return "axial"
+        elif self.setup_type and ("3D" in self.setup_type or "halo" in self.setup_type):
             return "halo"
         elif self.setup_type and "2D" in self.setup_type:
             return "lyapunov"

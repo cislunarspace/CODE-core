@@ -5,6 +5,7 @@
 使配置逻辑与迭代求解器分离。
 """
 
+from .axial import axial_fixed_vz0
 from .base import CorrectionConfig
 from .halo import halo_fixed_x0, halo_fixed_z0
 from .symmetric_2d import (
@@ -19,6 +20,7 @@ from .symmetric_3d import (
 )
 
 __all__ = [
+    "axial_fixed_vz0",
     "CorrectionConfig",
     "symmetric_2d_fixed_x0",
     "symmetric_2d_fixed_t",

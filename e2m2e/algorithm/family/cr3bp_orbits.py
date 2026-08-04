@@ -7,7 +7,9 @@
 - Halo：Richardson 三阶近似种子 + 定 ``z0`` 微分修正，沿族把 ``z0``
   走到目标面外振幅（km，符号区分北/南）；
 - NRHO：Halo 族成员中按近月距（距月心 = 近月点高度 + 月球半径）选取，
-  北/南对应 ``halo_class`` 0/1。
+  北/南对应 ``halo_class`` 0/1；
+- Axial：Gómez Type B 分岔族，以面外速度 ``vz0`` 为族参数，
+  从 xy 平面出发的 3D 周期轨道（x 轴对称），振幅 = max|z|（km）。
 
 族行走统一用割线法（``_walk_family``）：前一条轨道的修正结果作为下
 一条的初猜，天然延拓，避免大步长下微分修正发散。
@@ -20,6 +22,7 @@ from collections.abc import Callable
 import numpy as np
 
 from ...data.templates.seed import (  # noqa: F401
+    _AXIAL_SEED_VZ0,
     _DRO_SEED_PERIOD,
     _DRO_SEED_VY0,
     _DRO_SEED_X0,
@@ -33,6 +36,7 @@ from ...data.templates.seed import (  # noqa: F401
 from ...data.types.orbit import Orbit
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from ..solver.differential_correction import DifferentialCorrection
+from .axial_initial_guess import compute_axial_initial_guess
 from .halo_family import halo_pseudo_arclength_continuation
 from .halo_initial_guess import compute_halo_initial_guess
 from .lissajous_initial_guess import compute_lissajous_initial_guess
@@ -254,6 +258,41 @@ def _correct_halo_x0(
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = guess.period
     return _correct_or_raise(corrector, seed, f"Halo(L{libration_point}, x0={x0:.6f})")
+
+
+def _correct_axial(
+    dynamics: CR3BP_Dynamics, vz0: float, libration_point: int, guess: Orbit | None
+) -> Orbit:
+    """在面外速度 ``vz0``（带符号，无量纲）处修正 Axial 轨道（Type B）。
+
+    Axial 轨道的初始状态为 (x0, 0, 0, 0, y_dot0, vz0)，利用 x 轴
+    对称性做半周期修正（约束 y=0, z=0, x_dot=0 at T/2）。
+    """
+    if guess is None:
+        state0, period = compute_axial_initial_guess(
+            dynamics,
+            collinear_point=libration_point,
+            vz0=vz0,
+        )
+        state = state0
+    else:
+        state = guess.states[0].copy()
+        state[2] = 0.0  # z0 = 0（x 轴上）
+        state[5] = vz0
+        assert guess.period is not None
+        period = guess.period
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_axial_orbit_fixed_vz0(vz0=vz0, libration_point=libration_point)
+    seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
+    seed.period = period
+    orbit = _correct_or_raise(corrector, seed, f"Axial(L{libration_point}, vz0={vz0:.6f})")
+    assert orbit.period is not None
+    if guess is not None and orbit.period > 1.2 * period:
+        raise Cr3bpOrbitError(
+            f"Axial(L{libration_point}, vz0={vz0:.6f}) 修正跳到长周期伪解"
+            f"（T={orbit.period:.3f}，初猜 {period:.3f}）"
+        )
+    return orbit
 
 
 def _halo_seed_walk(
@@ -559,3 +598,41 @@ def design_triangular(
         "amplitude_out_km": amplitude_out_km,
     }
     return orbit
+
+
+def _z_amplitude_max(dynamics: CR3BP_Dynamics, orbit: Orbit, n_points: int = 1000) -> float:
+    """传播一个周期，返回 |z| 的最大值（无量纲 DU）。"""
+    assert orbit.period is not None
+    t_eval = np.linspace(0.0, orbit.period, n_points)
+    result = dynamics.propagate(orbit.states[0], (0.0, orbit.period), t_eval=t_eval)
+    return float(np.max(np.abs(result["states"][:, 2])))
+
+
+def design_axial(
+    collinear_point: int,
+    amplitude_km: float,
+    *,
+    dynamics: CR3BP_Dynamics | None = None,
+) -> Orbit:
+    """生成指定面外振幅的 Axial 周期轨道（Gómez Type B 分岔族）。
+
+    ``amplitude_km`` 带符号：正为上族、负为下族。振幅 = 一个周期内
+    |z| 的最大值（km）。以面外速度 ``vz0`` 为族参数沿 Type B 分支行
+    走，从 Lyapunov 分岔邻域的小振幅种子出发逼近目标。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    du = dynamics.system.characteristic_length
+    assert du is not None
+    z_target = abs(amplitude_km) / du
+    sign = 1.0 if amplitude_km >= 0 else -1.0
+
+    return _walk_family(
+        correct_at=lambda vz0, guess: _correct_axial(dynamics, vz0, collinear_point, guess),
+        measure=lambda orbit: _z_amplitude_max(dynamics, orbit),
+        target=z_target,
+        p_seed=float(np.copysign(_AXIAL_SEED_VZ0, sign)),
+        dp_init=float(np.copysign(0.002, sign)),
+        max_step=0.004,
+        tol=1e-6,
+    )

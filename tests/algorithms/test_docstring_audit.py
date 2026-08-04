@@ -222,6 +222,7 @@ class TestDifferentialCorrection:
 
 class TestStrategiesChinese:
     STRATEGY_MODULES = [
+        "e2m2e.algorithm.family.strategies.axial",
         "e2m2e.algorithm.family.strategies.base",
         "e2m2e.algorithm.family.strategies.halo",
         "e2m2e.algorithm.family.strategies.symmetric_2d",
