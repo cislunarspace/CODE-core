@@ -69,19 +69,20 @@ def test_no_j2000_stall_points(segmented_result):
     )
 
 
-def test_patch_points_self_consistent(segmented_result):
-    """打靶修正后的 patch points 段末与重积分吻合（亚百米级）。
+def test_patch_point_spacing_sane(segmented_result):
+    """烟雾测试：相邻 patch point 间距落在 Halo 振幅量级，防塌缩/爆炸。
 
-    从 patch point i 积分到 t_{i+1}，末端位置应与 patch point i+1 吻合，
-    证明打靶解在预报力模型下自洽（非伪收敛）。
+    本测试只校验打靶修正后相邻 patch point 的位置差落在合理量级（数千到
+    数十万 km，对应一个 Halo 振幅量级），作为退化/发散烟雾测试；它**不**
+    做重积分、也**不**校验"段末与重积分亚百米级自洽"。真正的重积分自洽
+    验证由 ``test_no_j2000_stall_points``（星历相邻点 J2000 漂移）承担。
     """
     conv = segmented_result.correction
-    t_patch = np.asarray(conv.t_patch)
     state_patch = np.asarray(conv.state_patch)
     # 检查前若干段（避免全段重积分耗时过长）
     max_diff = 0.0
-    for i in range(min(6, len(t_patch) - 1)):
+    for i in range(min(6, len(state_patch) - 1)):
         seg = state_patch[i + 1] - state_patch[i]
         max_diff = max(max_diff, float(np.linalg.norm(seg[:3])))
-    # 段间位置差应在一个 Halo 振幅量级（~1e4-1e5 km），非异常塌缩或爆炸
+    # 段间位置差应在一个 Halo 振幅量级（~1e3-1e6 km），非异常塌缩或爆炸
     assert 1e3 < max_diff < 1e6, f"段间位置差异常: {max_diff:.1f} km"

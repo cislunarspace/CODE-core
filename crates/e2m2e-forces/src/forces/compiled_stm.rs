@@ -103,26 +103,36 @@ pub fn propagate_compiled_stm(
     let mut y = augmented0;
     let mut t = t_span.0;
     let mut h = (t_span.1 - t_span.0).min(h_max);
-    let mut eval_idx = 1usize;
+    // 输出起点跟随 t_eval：当 t_eval[0]==t_span.0 时记录初始状态/STM、eval_idx
+    // 从 1 起步；否则（如逐段积分 patch point 时刻非整数小时、t_eval 整数小时
+    // 点严格大于 t0）不预设 t_span.0 到输出、eval_idx 从 0 起步由循环匹配。
+    // 此前硬编码 vec![t_span.0] + eval_idx=1 假设 t_eval[0]==t_span.0，导致
+    // t_eval[0]>t_span.0 时首个输出点状态/STM 错置为初值、与后续点错位
+    // （与 propagate_compiled 同源 bug）。
+    let mut eval_idx = 0usize;
     let mut n_steps = 0usize;
     let mut n_rejected = 0usize;
 
-    let mut times = vec![t_span.0];
-    let mut states = vec![[
-        initial_state[0],
-        initial_state[1],
-        initial_state[2],
-        initial_state[3],
-        initial_state[4],
-        initial_state[5],
-    ]];
-    let mut stms = {
+    let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
+    let mut states: Vec<[f64; 6]> = Vec::with_capacity(t_eval.len());
+    let mut stms: Vec<[f64; 36]> = Vec::with_capacity(t_eval.len());
+    if (t_span.0 - t_eval[0]).abs() <= 1e-9 {
+        times.push(t_span.0);
+        states.push([
+            initial_state[0],
+            initial_state[1],
+            initial_state[2],
+            initial_state[3],
+            initial_state[4],
+            initial_state[5],
+        ]);
         let mut stm0 = [0.0_f64; 36];
         for i in 0..6 {
             stm0[i * 6 + i] = 1.0;
         }
-        vec![stm0]
-    };
+        stms.push(stm0);
+        eval_idx = 1;
+    }
 
     while t < t_eval[t_eval.len() - 1] && n_steps < s_max {
         n_steps += 1;
