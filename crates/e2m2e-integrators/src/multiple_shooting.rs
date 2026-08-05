@@ -12,6 +12,7 @@
 
 use e2m2e_forces::forces::compiled::{compute_total_acceleration_and_jacobian, CompiledForce};
 use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm;
+use e2m2e_propagation::rk_methods::RkMethod;
 use pyo3::prelude::*;
 
 /// 最小二乘求解结果。
@@ -279,6 +280,7 @@ pub fn multiple_shooting_correct(
     rtol: f64,
     max_step: Option<f64>,
     verbose: bool,
+    method: RkMethod,
 ) -> Result<MultipleShootingRustResult, String> {
     let n_nodes = t_patch.len();
     let n_seg = n_nodes - 1;
@@ -368,6 +370,7 @@ pub fn multiple_shooting_correct(
                 rtol * 0.1,
                 max_step,
                 Some(500_000),
+                method,
             )?;
 
             let final_state = *result.states.last().ok_or("empty propagation result")?;
@@ -499,7 +502,7 @@ pub fn multiple_shooting_correct(
                     n_free_nodes,
                     alpha,
                 );
-                match try_residual(forces, observer, &t_try, &s_try, rtol, max_step) {
+                match try_residual(forces, observer, &t_try, &s_try, rtol, max_step, method) {
                     Ok(trial_res) if trial_res < max_res => {
                         t_work = t_try;
                         state_work = s_try;
@@ -589,6 +592,7 @@ fn try_residual(
     state_work: &[[f64; 6]],
     rtol: f64,
     max_step: Option<f64>,
+    method: RkMethod,
 ) -> Result<f64, String> {
     let n_seg = t_work.len() - 1;
     let mut final_states = Vec::with_capacity(n_seg);
@@ -603,6 +607,7 @@ fn try_residual(
             rtol * 0.1,
             max_step,
             Some(500_000),
+            method,
         )?;
         final_states.push(*result.states.last().ok_or("empty propagation result")?);
     }
@@ -614,7 +619,7 @@ fn try_residual(
 ///
 /// `forces` 是 Python 元组列表，每个元组描述一个力模型（格式同 `propagate_compiled`）。
 #[pyfunction]
-#[pyo3(signature = (forces, observer, t_patch, state_patch, var_time=false, fix_first_node=false, fixed_node_mask=None, max_iter=50, tolerance=1e-8, rtol=1e-10, max_step=None, verbose=false))]
+#[pyo3(signature = (forces, observer, t_patch, state_patch, var_time=false, fix_first_node=false, fixed_node_mask=None, max_iter=50, tolerance=1e-8, rtol=1e-10, max_step=None, verbose=false, method=RkMethod::Pd78))]
 #[allow(clippy::too_many_arguments)]
 pub fn multiple_shooting_correct_py(
     forces: Vec<PyObject>,
@@ -629,6 +634,7 @@ pub fn multiple_shooting_correct_py(
     rtol: f64,
     max_step: Option<f64>,
     verbose: bool,
+    method: RkMethod,
     py: Python<'_>,
 ) -> PyResult<MultipleShootingRustResult> {
     // 解析 forces: Vec<PyObject> -> Vec<CompiledForce>
@@ -671,6 +677,7 @@ pub fn multiple_shooting_correct_py(
             rtol,
             max_step,
             verbose,
+            method,
         )
     })
     .map_err(pyo3::exceptions::PyRuntimeError::new_err)

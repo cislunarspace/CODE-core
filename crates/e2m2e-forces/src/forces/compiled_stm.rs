@@ -9,10 +9,7 @@
 use super::compiled::{compute_total_acceleration_and_jacobian, CompiledForce};
 use super::nbody_stm;
 use e2m2e_propagation::butcher::{explicit_rk_step, suggest_next_step};
-use e2m2e_propagation::pd45::PD45_TABLE;
-
-/// PD45 嵌入误差估计的阶数（p=4 嵌入, 误差 ~ O(h^5)）。
-const PD45_EMBEDDED_ORDER: usize = 4;
+use e2m2e_propagation::rk_methods::RkMethod;
 
 /// 最小步长（秒），防止步长坍缩。
 const MIN_STEP: f64 = 1e-12;
@@ -85,6 +82,7 @@ pub fn propagate_compiled_stm(
     _atol: f64,
     max_step: Option<f64>,
     max_steps: Option<usize>,
+    method: RkMethod,
 ) -> Result<CompiledStmResult, String> {
     if t_eval.is_empty() {
         return Err("t_eval must not be empty".to_string());
@@ -149,7 +147,7 @@ pub fn propagate_compiled_stm(
             augmented_eom(forces_ref, observer_ref, ti, yi)
         };
 
-        let (y_new, error) = explicit_rk_step(&PD45_TABLE, t, &y, h, callback, Some(6))
+        let (y_new, error) = explicit_rk_step(method.table(), t, &y, h, callback, Some(6))
             .map_err(|e: String| format!("RK step error at t={}: {}", t, e))?;
 
         if error <= tol {
@@ -167,10 +165,10 @@ pub fn propagate_compiled_stm(
                 eval_idx += 1;
             }
 
-            h = suggest_next_step(h, error, tol, PD45_EMBEDDED_ORDER);
+            h = suggest_next_step(h, error, tol, method.embedded_order());
         } else {
             n_rejected += 1;
-            h = suggest_next_step(h, error, tol, PD45_EMBEDDED_ORDER);
+            h = suggest_next_step(h, error, tol, method.embedded_order());
         }
     }
 

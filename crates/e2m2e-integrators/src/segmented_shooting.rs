@@ -12,6 +12,7 @@
 
 use crate::multiple_shooting::{multiple_shooting_correct, MultipleShootingRustResult};
 use e2m2e_forces::forces::compiled::CompiledForce;
+use e2m2e_propagation::rk_methods::RkMethod;
 use pyo3::prelude::*;
 
 /// 分段打靶拼接结果。
@@ -107,6 +108,7 @@ fn correct_segment(
     tolerance: f64,
     rtol: f64,
     verbose: bool,
+    method: RkMethod,
 ) -> Result<MultipleShootingRustResult, String> {
     multiple_shooting_correct(
         forces,
@@ -121,6 +123,7 @@ fn correct_segment(
         rtol,
         None,
         verbose,
+        method,
     )
 }
 
@@ -136,6 +139,7 @@ pub fn segmented_shooting_correct(
     tolerance: f64,
     rtol: f64,
     verbose: bool,
+    method: RkMethod,
 ) -> Result<SegmentedShootingResult, String> {
     if t_patch.len() < 2 {
         return Err("need at least 2 patch points".to_string());
@@ -175,6 +179,7 @@ pub fn segmented_shooting_correct(
             tolerance,
             rtol,
             verbose,
+            method,
         )?;
 
         total_iterations += result.iterations;
@@ -243,6 +248,7 @@ pub fn segmented_shooting_correct(
                         tolerance,
                         rtol,
                         verbose,
+                        method,
                     )?;
                     total_iterations += result.iterations;
                     stage_residuals.push(result.max_residual);
@@ -306,7 +312,7 @@ pub fn segmented_shooting_correct(
 ///
 /// `forces` 是 Python 元组列表，每个元组描述一个力模型（格式同 `propagate_compiled`）。
 #[pyfunction]
-#[pyo3(signature = (forces, observer, t_patch, state_patch, points_per_segment=10, overlap_points=2, enable_merging=true, max_iter_per_segment=50, tolerance=1e-8, rtol=1e-10, verbose=false))]
+#[pyo3(signature = (forces, observer, t_patch, state_patch, points_per_segment=10, overlap_points=2, enable_merging=true, max_iter_per_segment=50, tolerance=1e-8, rtol=1e-10, verbose=false, method=RkMethod::Pd78))]
 #[allow(clippy::too_many_arguments)]
 pub fn segmented_shooting_correct_py(
     forces: Vec<PyObject>,
@@ -320,6 +326,7 @@ pub fn segmented_shooting_correct_py(
     tolerance: f64,
     rtol: f64,
     verbose: bool,
+    method: RkMethod,
     py: Python<'_>,
 ) -> PyResult<SegmentedShootingResult> {
     // 解析 forces: Vec<PyObject> -> Vec<CompiledForce>
@@ -364,6 +371,7 @@ pub fn segmented_shooting_correct_py(
         tolerance,
         rtol,
         verbose,
+        method,
     )
     .map_err(pyo3::exceptions::PyRuntimeError::new_err)
 }

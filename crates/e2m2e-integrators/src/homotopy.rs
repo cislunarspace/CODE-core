@@ -13,6 +13,7 @@
 use crate::multiple_shooting::{multiple_shooting_correct, MultipleShootingRustResult};
 use e2m2e_forces::forces::augmented_state::ThrustParams;
 use e2m2e_forces::forces::compiled::CompiledForce;
+use e2m2e_propagation::rk_methods::RkMethod;
 
 /// 同伦法求解器配置。
 pub struct HomotopyConfig {
@@ -103,6 +104,7 @@ impl HomotopySolver {
         ctx: &HomotopyProblem<'_>,
         thrust: &ThrustParams,
         verbose: bool,
+        method: RkMethod,
     ) -> Result<HomotopyResult, String> {
         let mut lambda = self.config.lambda_init;
         let mut lambda_history = vec![lambda];
@@ -114,7 +116,7 @@ impl HomotopySolver {
             eprintln!("同伦法求解：λ = {:.2}（能量最优）", lambda);
         }
 
-        let mut current_result = self.solve_with_lambda(ctx, thrust, lambda, verbose)?;
+        let mut current_result = self.solve_with_lambda(ctx, thrust, lambda, verbose, method)?;
 
         total_iterations += current_result.iterations;
         residual_history.push(current_result.max_residual);
@@ -148,7 +150,7 @@ impl HomotopySolver {
                 t_patch: &current_result.t_patch,
                 state_patch: &prev_state_patch,
             };
-            current_result = self.solve_with_lambda(&ctx_next, thrust, lambda, verbose)?;
+            current_result = self.solve_with_lambda(&ctx_next, thrust, lambda, verbose, method)?;
 
             total_iterations += current_result.iterations;
             residual_history.push(current_result.max_residual);
@@ -195,6 +197,7 @@ impl HomotopySolver {
         _thrust: &ThrustParams,
         _lambda: f64,
         verbose: bool,
+        method: RkMethod,
     ) -> Result<MultipleShootingRustResult, String> {
         // TODO: 实现带同伦参数的多重打靶求解
         // 当前使用标准多重打靶作为占位
@@ -223,6 +226,7 @@ impl HomotopySolver {
             self.config.rtol,
             None,
             verbose,
+            method,
         )
     }
 }

@@ -1101,9 +1101,19 @@ fn propagate_compiled(
     let mut y = y0;
     let mut t = t0;
     let mut h = h_init;
-    let mut times: Vec<f64> = vec![t0];
-    let mut states: Vec<Vec<f64>> = vec![y.clone()];
-    let mut eval_idx = 1usize; // t_eval[0] == t0 已经记录
+    // 输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初始状态、eval_idx 从 1 起步；
+    // 当 t_eval[0]>t0（逐段积分常态：patch point 时刻非整数小时，et_grid 整数
+    // 小时点严格大于 t0）时不预设 t0 到输出，eval_idx 从 0 起步由循环匹配。
+    // 此前硬编码 vec![t0] + eval_idx=1 假设 t_eval[0]==t0，导致 t_eval[0]>t0
+    // 时首个输出点状态错置为初值、与后续点错位。
+    let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
+    let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
+    let mut eval_idx = 0usize;
+    if !t_eval.is_empty() && (t0 - t_eval[0]).abs() <= 1e-9 {
+        times.push(t0);
+        states.push(y.clone());
+        eval_idx = 1;
+    }
     let mut n_steps = 0usize;
     let mut n_rejected = 0usize;
     let mut n_steps_capped = 0usize;
@@ -1662,7 +1672,7 @@ fn propagate_with_stm_py(
 ///                "n_steps": int, "n_rejected": int}`
 #[cfg(feature = "spice")]
 #[pyfunction]
-#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None))]
+#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None, method=RkMethod::Pd78))]
 #[allow(clippy::too_many_arguments)]
 fn propagate_compiled_stm_py(
     observer: &str,
@@ -1674,6 +1684,7 @@ fn propagate_compiled_stm_py(
     atol: f64,
     max_step: Option<f64>,
     max_steps: Option<usize>,
+    method: RkMethod,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
     use e2m2e_forces::forces::compiled::CompiledForce;
@@ -1700,7 +1711,7 @@ fn propagate_compiled_stm_py(
     state0.copy_from_slice(&initial_state);
 
     let result = propagate_compiled_stm(
-        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
+        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps, method,
     )
     .map_err(|e| {
         pyo3::exceptions::PyRuntimeError::new_err(format!("STM propagation failed: {}", e))
