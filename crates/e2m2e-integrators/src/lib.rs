@@ -1089,6 +1089,11 @@ fn propagate_compiled(
             "tol and h_init must be positive",
         ));
     }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
 
     // 解析 forces
     let mut forces: Vec<CompiledForce> = Vec::with_capacity(forces_py.len());
@@ -1101,9 +1106,19 @@ fn propagate_compiled(
     let mut y = y0;
     let mut t = t0;
     let mut h = h_init;
-    let mut times: Vec<f64> = vec![t0];
-    let mut states: Vec<Vec<f64>> = vec![y.clone()];
-    let mut eval_idx = 1usize; // t_eval[0] == t0 已经记录
+    // 输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初始状态、eval_idx 从 1 起步；
+    // 当 t_eval[0]>t0（逐段积分常态：patch point 时刻非整数小时，et_grid 整数
+    // 小时点严格大于 t0）时不预设 t0 到输出，eval_idx 从 0 起步由循环匹配。
+    // 此前硬编码 vec![t0] + eval_idx=1 假设 t_eval[0]==t0，导致 t_eval[0]>t0
+    // 时首个输出点状态错置为初值、与后续点错位。
+    let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
+    let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
+    let mut eval_idx = 0usize;
+    if !t_eval.is_empty() && (t0 - t_eval[0]).abs() <= 1e-9 {
+        times.push(t0);
+        states.push(y.clone());
+        eval_idx = 1;
+    }
     let mut n_steps = 0usize;
     let mut n_rejected = 0usize;
     let mut n_steps_capped = 0usize;
@@ -1278,9 +1293,17 @@ fn propagate_compiled_lowthrust(
     let mut y = y0;
     let mut t = t0;
     let mut h = h_init;
-    let mut times: Vec<f64> = vec![t0];
-    let mut states: Vec<Vec<f64>> = vec![y.clone()];
-    let mut eval_idx = 1usize; // t_eval[0] == t0 已经记录
+    // 输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初值、eval_idx 从 1 起步；
+    // 否则（逐段积分常态）不预设 t0 到输出、eval_idx 从 0 起步由循环匹配。
+    // 与 propagate_compiled 同源 bug 修复对齐（此前硬编码 vec![t0] + eval_idx=1）。
+    let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
+    let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
+    let mut eval_idx = 0usize;
+    if !t_eval.is_empty() && (t0 - t_eval[0]).abs() <= 1e-9 {
+        times.push(t0);
+        states.push(y.clone());
+        eval_idx = 1;
+    }
     let mut n_steps = 0usize;
     let mut n_rejected = 0usize;
     let mut n_steps_capped = 0usize;
@@ -1456,7 +1479,6 @@ fn propagate_compiled_lowthrust_sensitivity(
     let table = method.table();
     let mut t = t0;
     let mut h = h_init;
-    let mut eval_idx = 1usize;
     let mut n_steps = 0usize;
     let mut n_rejected = 0usize;
     let mut n_steps_capped = 0usize;
@@ -1464,11 +1486,22 @@ fn propagate_compiled_lowthrust_sensitivity(
     use std::cell::RefCell;
     let last_error: RefCell<Option<String>> = RefCell::new(None);
 
-    // 记录落在 t_eval 的点（首点已含初值）
-    let mut times: Vec<f64> = vec![t0];
-    let mut states: Vec<Vec<f64>> = vec![y[..7].to_vec()];
-    let mut stms: Vec<Vec<f64>> = vec![y[7..43].to_vec()];
-    let mut sens: Vec<Vec<f64>> = vec![y[43..64].to_vec()];
+    // 记录落在 t_eval 的点。输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初值
+    // （含 Φ=I₆、S=0）、eval_idx 从 1 起步；否则（逐段积分常态）不预设 t0 到
+    // 输出、eval_idx 从 0 起步由循环匹配。与 propagate_compiled 同源 bug 修复
+    // 对齐（此前硬编码 vec![t0] + eval_idx=1）。
+    let mut eval_idx = 0usize;
+    let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
+    let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
+    let mut stms: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
+    let mut sens: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
+    if !t_eval.is_empty() && (t0 - t_eval[0]).abs() <= 1e-9 {
+        times.push(t0);
+        states.push(y[..7].to_vec());
+        stms.push(y[7..43].to_vec());
+        sens.push(y[43..64].to_vec());
+        eval_idx = 1;
+    }
 
     while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
         n_steps += 1;
@@ -1662,7 +1695,7 @@ fn propagate_with_stm_py(
 ///                "n_steps": int, "n_rejected": int}`
 #[cfg(feature = "spice")]
 #[pyfunction]
-#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None))]
+#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None, method=RkMethod::Pd78))]
 #[allow(clippy::too_many_arguments)]
 fn propagate_compiled_stm_py(
     observer: &str,
@@ -1674,6 +1707,7 @@ fn propagate_compiled_stm_py(
     atol: f64,
     max_step: Option<f64>,
     max_steps: Option<usize>,
+    method: RkMethod,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
     use e2m2e_forces::forces::compiled::CompiledForce;
@@ -1700,7 +1734,7 @@ fn propagate_compiled_stm_py(
     state0.copy_from_slice(&initial_state);
 
     let result = propagate_compiled_stm(
-        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
+        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps, method,
     )
     .map_err(|e| {
         pyo3::exceptions::PyRuntimeError::new_err(format!("STM propagation failed: {}", e))

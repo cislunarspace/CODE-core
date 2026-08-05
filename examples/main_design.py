@@ -44,7 +44,7 @@ def main() -> None:
     from e2m2e.tools.viz import OrbitVisualizer
 
     # 1. 端到端设计一条 L2 Halo（CR3BP 初猜 → 星历修正 → 高精度预报）
-    print("\n1. 设计 L2 Halo 轨道（amplitude=30000 km，维持 2 年）")
+    print("\n1. 设计 L2 Halo 轨道（amplitude=30000 km，维持 30 天）")
     # 摄动开关：太阳第三体引力 + 地月非球形（10 阶）+ 炮弹模型光压
     perturbation = {
         "sun_body": 1,
@@ -66,7 +66,7 @@ def main() -> None:
         collinear_point=2,
         amplitude=30000.0,
         phase=0.0,
-        duration=2.0,
+        duration=30 / 365.25,
         output_step=3600.0,
         perturbation=perturbation,
         # 论文式分段打靶拼接（朱彦伟 2026）：逐段独立打靶转星历 + 远月点
@@ -86,7 +86,7 @@ def main() -> None:
     print(f"\n2. CR3BP 周期轨道周期 = {cr3bp.period:.6f}（无量纲）")
 
     # 3. 绘图：会合系 3D 轨道（加摄动后的 2 年拟周期预报轨迹）
-    print("\n3. 绘制会合系 3D 轨道（加摄动后拟周期轨迹，观察点对准 L2）")
+    print("\n3. 绘制会合系 3D 轨道（加摄动后 30 天拟周期轨迹，观察点对准 L2）")
     from e2m2e.algorithm.dynamics import LibrationPoint
     from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
 
@@ -101,7 +101,7 @@ def main() -> None:
     l2 = system.L_points[LibrationPoint.L2]  # L2 会合系坐标（质心归一）
 
     # 一次 3D 绘图：轨道 + 地月天体 + L2 平动点标注
-    ax3d = viz.plot_3d_orbit(states, label="L2 Halo 拟周期轨迹（2 年）")
+    ax3d = viz.plot_3d_orbit(states, label="L2 Halo 拟周期轨迹（30 天）")
     viz.plot_primary_bodies(ax=ax3d, is_3d=True)
     ax3d.scatter(l2[0], l2[1], l2[2], marker="x", color="red", s=80, zorder=6)
     ax3d.text(l2[0], l2[1], l2[2] + 0.03, "L2", color="red", fontsize=12, fontweight="bold")
@@ -113,7 +113,7 @@ def main() -> None:
     ax3d.set_xlabel("X（无量纲）")
     ax3d.set_ylabel("Y（无量纲）")
     ax3d.set_zlabel("Z（无量纲）")
-    ax3d.set_title("L2 Halo 拟周期轨迹会合系 3D（振幅 30000 km，2 年）")
+    ax3d.set_title("L2 Halo 拟周期轨迹会合系 3D（振幅 30000 km，30 天）")
     ax3d.legend(loc="upper right")
 
     if args.save:

@@ -9,10 +9,7 @@
 use super::compiled::{compute_total_acceleration_and_jacobian, CompiledForce};
 use super::nbody_stm;
 use e2m2e_propagation::butcher::{explicit_rk_step, suggest_next_step};
-use e2m2e_propagation::pd45::PD45_TABLE;
-
-/// PD45 嵌入误差估计的阶数（p=4 嵌入, 误差 ~ O(h^5)）。
-const PD45_EMBEDDED_ORDER: usize = 4;
+use e2m2e_propagation::rk_methods::RkMethod;
 
 /// 最小步长（秒），防止步长坍缩。
 const MIN_STEP: f64 = 1e-12;
@@ -85,6 +82,7 @@ pub fn propagate_compiled_stm(
     _atol: f64,
     max_step: Option<f64>,
     max_steps: Option<usize>,
+    method: RkMethod,
 ) -> Result<CompiledStmResult, String> {
     if t_eval.is_empty() {
         return Err("t_eval must not be empty".to_string());
@@ -105,26 +103,36 @@ pub fn propagate_compiled_stm(
     let mut y = augmented0;
     let mut t = t_span.0;
     let mut h = (t_span.1 - t_span.0).min(h_max);
-    let mut eval_idx = 1usize;
+    // 输出起点跟随 t_eval：当 t_eval[0]==t_span.0 时记录初始状态/STM、eval_idx
+    // 从 1 起步；否则（如逐段积分 patch point 时刻非整数小时、t_eval 整数小时
+    // 点严格大于 t0）不预设 t_span.0 到输出、eval_idx 从 0 起步由循环匹配。
+    // 此前硬编码 vec![t_span.0] + eval_idx=1 假设 t_eval[0]==t_span.0，导致
+    // t_eval[0]>t_span.0 时首个输出点状态/STM 错置为初值、与后续点错位
+    // （与 propagate_compiled 同源 bug）。
+    let mut eval_idx = 0usize;
     let mut n_steps = 0usize;
     let mut n_rejected = 0usize;
 
-    let mut times = vec![t_span.0];
-    let mut states = vec![[
-        initial_state[0],
-        initial_state[1],
-        initial_state[2],
-        initial_state[3],
-        initial_state[4],
-        initial_state[5],
-    ]];
-    let mut stms = {
+    let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
+    let mut states: Vec<[f64; 6]> = Vec::with_capacity(t_eval.len());
+    let mut stms: Vec<[f64; 36]> = Vec::with_capacity(t_eval.len());
+    if (t_span.0 - t_eval[0]).abs() <= 1e-9 {
+        times.push(t_span.0);
+        states.push([
+            initial_state[0],
+            initial_state[1],
+            initial_state[2],
+            initial_state[3],
+            initial_state[4],
+            initial_state[5],
+        ]);
         let mut stm0 = [0.0_f64; 36];
         for i in 0..6 {
             stm0[i * 6 + i] = 1.0;
         }
-        vec![stm0]
-    };
+        stms.push(stm0);
+        eval_idx = 1;
+    }
 
     while t < t_eval[t_eval.len() - 1] && n_steps < s_max {
         n_steps += 1;
@@ -149,7 +157,7 @@ pub fn propagate_compiled_stm(
             augmented_eom(forces_ref, observer_ref, ti, yi)
         };
 
-        let (y_new, error) = explicit_rk_step(&PD45_TABLE, t, &y, h, callback, Some(6))
+        let (y_new, error) = explicit_rk_step(method.table(), t, &y, h, callback, Some(6))
             .map_err(|e: String| format!("RK step error at t={}: {}", t, e))?;
 
         if error <= tol {
@@ -167,10 +175,10 @@ pub fn propagate_compiled_stm(
                 eval_idx += 1;
             }
 
-            h = suggest_next_step(h, error, tol, PD45_EMBEDDED_ORDER);
+            h = suggest_next_step(h, error, tol, method.embedded_order());
         } else {
             n_rejected += 1;
-            h = suggest_next_step(h, error, tol, PD45_EMBEDDED_ORDER);
+            h = suggest_next_step(h, error, tol, method.embedded_order());
         }
     }
 
