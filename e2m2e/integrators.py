@@ -34,6 +34,7 @@ try:
         solid_tide_step2,
         solve_ivp_events_py,
         spherical_harmonic_accel,
+        transfer_grid_search_py,
         transfer_grid_search_serial_py,
     )
     from e2m2e._integrators import cowell_step as _cowell_step
@@ -104,6 +105,7 @@ except ModuleNotFoundError:
     solid_tide_step2 = None  # type: ignore[misc,assignment]
     solve_ivp_events_py = None  # type: ignore[misc,assignment]
     spherical_harmonic_accel = None  # type: ignore[misc,assignment]
+    transfer_grid_search_py = None  # type: ignore[misc,assignment]
     transfer_grid_search_serial_py = None  # type: ignore[misc,assignment]
     _cowell_step = None  # type: ignore[misc,assignment]
     _multistep_step = None  # type: ignore[misc,assignment]
@@ -172,6 +174,7 @@ __all__ = [
     "disable_ephem_cache",
     "enable_ephem_cache",
     "ephem_ffi_call_count",
+    "grid_search_rust",
     "grid_search_rust_serial",
     "hello_integrators",
     "indirect_term_acceleration",
@@ -207,6 +210,7 @@ __all__ = [
     "spherical_harmonic_accel",
     "third_body_acceleration",
     "TransferPointResult",
+    "transfer_grid_search_py",
     "transfer_grid_search_serial_py",
 ]
 
@@ -511,6 +515,70 @@ def grid_search_rust_serial(
         float(rtol),
         float(atol),
         float(max_step),
+    )
+    return [_transfer_point_result_to_dict(r) for r in results]
+
+
+def grid_search_rust(
+    dep_states: npt.ArrayLike,
+    dep_times: npt.ArrayLike,
+    alpha_grid: npt.ArrayLike,
+    arrival_states: npt.ArrayLike,
+    *,
+    mu: float,
+    max_transfer_time: float,
+    integration_dt: float,
+    intersection_threshold: float,
+    min_distance_threshold: float,
+    collision_earth_radius: float,
+    collision_moon_radius: float,
+    rtol: float,
+    atol: float,
+    max_step: float,
+    parallel: bool | None = None,
+) -> list[dict[str, Any]]:
+    """转移网格搜索 Rust 后端（阶段 C，Rayon 并行 + GIL 释放）。
+
+    展平 POD 输入 → 调 ``transfer_grid_search_py``（``py.allow_threads``
+    释放 GIL + Rayon ``par_iter`` 真并行）→ 转 ``list[dict]``。返回字段与
+    顺序与 :func:`grid_search_rust_serial` 完全一致——并行与串行逐位相同
+    （``par_iter``+``collect`` 保序、``evaluate_point`` 纯函数）。
+
+    Args:
+        parallel: ``None``（默认）时由 ``E2M2E_SEARCH_PARALLEL`` 环境变量决定
+            （``"0"``→串行，其余/未设→并行）；显式 ``True``/``False`` 覆盖。
+            串/并一致性对照用 ``parallel=False`` 与 ``parallel=True`` 各跑一遍。
+        其余参数同 :func:`grid_search_rust_serial`。
+
+    Returns:
+        ``list[dict]``，长度 ``n_dep * n_alpha``，顺序为外层 departure、内层 alpha。
+    """
+    if transfer_grid_search_py is None:
+        raise RuntimeError("Rust 扩展未构建（transfer_grid_search_py 不可用）")
+    if CowellResult is not None:
+        _check_rust_abi()
+
+    dep_states_arr = np.asarray(dep_states, dtype=float).reshape(-1)
+    dep_times_arr = np.asarray(dep_times, dtype=float).reshape(-1)
+    alpha_arr = np.asarray(alpha_grid, dtype=float).reshape(-1)
+    arrival_arr = np.asarray(arrival_states, dtype=float).reshape(-1)
+
+    results = transfer_grid_search_py(
+        dep_states_arr.tolist(),
+        dep_times_arr.tolist(),
+        alpha_arr.tolist(),
+        arrival_arr.tolist(),
+        float(mu),
+        float(max_transfer_time),
+        float(integration_dt),
+        float(intersection_threshold),
+        float(min_distance_threshold),
+        float(collision_earth_radius),
+        float(collision_moon_radius),
+        float(rtol),
+        float(atol),
+        float(max_step),
+        parallel=parallel,
     )
     return [_transfer_point_result_to_dict(r) for r in results]
 

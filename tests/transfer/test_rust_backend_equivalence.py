@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -31,7 +33,7 @@ from e2m2e.algorithm.transfer.search_parallel import (
     sample_departure_points,
 )
 from e2m2e.data.types.orbit import Orbit
-from e2m2e.integrators import grid_search_rust_serial
+from e2m2e.integrators import grid_search_rust, grid_search_rust_serial
 
 MU = 1.21506683e-2  # 地月质量参数
 
@@ -275,3 +277,86 @@ def test_rust_serial_preserves_grid_order(
         # departure_time 与采样点一致；alpha 与网格点一致。
         assert r["departure_time"] == pytest.approx(dep_times[i_dep])
         assert r["alpha"] == pytest.approx(alpha_grid[i_alpha])
+
+
+def _run_grid_search(
+    searcher: TransferSearch,
+    dep_orbit: Orbit,
+    arr_orbit: Orbit,
+    parallel: bool | None,
+) -> list[dict[str, Any]]:
+    """展平网格输入 → 调 grid_search_rust（阶段 C 并行入口）。"""
+    dep_states, dep_times = sample_departure_points(dep_orbit, searcher.n_departure)
+    alpha_grid = np.linspace(searcher.alpha_min, searcher.alpha_max, searcher.n_alpha)
+    arrival_states = np.asarray(arr_orbit.states, dtype=float)
+    return grid_search_rust(
+        dep_states,
+        dep_times,
+        alpha_grid,
+        arrival_states,
+        mu=float(searcher.mu),
+        max_transfer_time=float(searcher.max_transfer_time),
+        integration_dt=float(searcher.integration_dt),
+        intersection_threshold=float(searcher.intersection_threshold),
+        min_distance_threshold=float(searcher.min_distance_threshold),
+        collision_earth_radius=float(searcher.collision_earth_radius),
+        collision_moon_radius=float(searcher.collision_moon_radius),
+        rtol=float(searcher.dynamics.rtol),
+        atol=float(searcher.dynamics.atol),
+        max_step=float(searcher.dynamics.max_step),
+        parallel=parallel,
+    )
+
+
+def test_parallel_equals_serial(
+    searcher: TransferSearch,
+    dep_orbit: Orbit,
+    arr_orbit: Orbit,
+) -> None:
+    """阶段 C：并行（Rayon par_iter）与串行逐候选逐字段位级一致。
+
+    par_iter + collect 保序，evaluate_point 是纯函数（直接调纯 Rust
+    ``propagate_cr3bp``，CR3BP 纯数学无 SPICE FFI），同一输入下两边浮点
+    运算完全相同——故可断言轨迹逐位相等、标量精确相等。
+    """
+    results_serial = _run_grid_search(searcher, dep_orbit, arr_orbit, parallel=False)
+    results_parallel = _run_grid_search(searcher, dep_orbit, arr_orbit, parallel=True)
+
+    n_expected = int(searcher.n_departure) * int(searcher.n_alpha)
+    assert len(results_serial) == n_expected
+    assert len(results_parallel) == n_expected
+
+    for idx, (s, p) in enumerate(zip(results_serial, results_parallel, strict=True)):
+        # 保序：顺序一致（无需排序），逐候选对照。
+        # 整数 / 布尔 / 字符串字段：精确相等。
+        assert s["status"] == p["status"], f"[{idx}] status: s={s['status']!r} p={p['status']!r}"
+        assert s["collision_body"] == p["collision_body"], f"[{idx}] collision_body"
+        for f in INT_FIELDS:
+            assert s[f] == p[f], f"[{idx}] {f}: s={s[f]!r} p={p[f]!r}"
+        for f in BOOL_FIELDS:
+            assert s[f] == p[f], f"[{idx}] {f}: s={s[f]!r} p={p[f]!r}"
+        # 浮点标量：位级相等（含 None / inf 特例）。
+        for f in FLOAT_FIELDS:
+            sv, pv = s[f], p[f]
+            if sv is None:
+                assert pv is None, f"[{idx}] {f}: s=None p={pv!r}"
+                continue
+            assert pv is not None, f"[{idx}] {f}: s={sv!r} p=None"
+            if np.isinf(sv) or np.isnan(sv):
+                assert sv == pv, f"[{idx}] {f}: s={sv!r} p={pv!r}"
+                continue
+            assert float(sv) == float(pv), f"[{idx}] {f}: s={sv!r} p={pv!r}"
+        # departure_state：6 维逐位相等。
+        np.testing.assert_array_equal(
+            s["departure_state"], p["departure_state"], err_msg=f"[{idx}] departure_state"
+        )
+        # 轨迹：逐位相等（核心等价性证据——同走 propagate_cr3bp）。
+        st, pt = s.get("transfer_trajectory"), p.get("transfer_trajectory")
+        if st is None:
+            assert pt is None, f"[{idx}] transfer_trajectory: s=None p 非 None"
+        else:
+            assert pt is not None, f"[{idx}] transfer_trajectory: s 非 None p=None"
+            st = np.asarray(st, dtype=float)
+            pt = np.asarray(pt, dtype=float)
+            assert st.shape == pt.shape, f"[{idx}] traj shape: s={st.shape} p={pt.shape}"
+            np.testing.assert_array_equal(st, pt, err_msg=f"[{idx}] transfer_trajectory")

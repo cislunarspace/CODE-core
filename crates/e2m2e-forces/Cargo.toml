@@ -22,3 +22,6 @@ e2m2e-spice = { path = "../e2m2e-spice", optional = true }
 # e2m2e-propagation 纯数学，不引入 spice 链路。
 e2m2e-propagation = { path = "../e2m2e-propagation" }
 cspice = { workspace = true, optional = true }
+# 转移网格搜索并行：transfer_grid_search_parallel 用 par_iter，CR3BP 纯数学
+# 无 SPICE FFI，rayon 安全（不需 multiple_shooting 的 StrictGuard/ephem_cache）。
+rayon = { workspace = true }

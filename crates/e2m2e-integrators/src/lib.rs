@@ -2465,6 +2465,90 @@ fn transfer_grid_search_serial_py(
     Ok(results.into_iter().map(TransferPointResult::from).collect())
 }
 
+/// Python 接口：转移网格搜索（阶段 C，Rayon 并行 + GIL 释放）。
+///
+/// 照搬 [`crate::multiple_shooting::multiple_shooting_correct_py`] 的
+/// `py.allow_threads` + 环境变量开关范式（`multiple_shooting.rs:660-676`）。
+/// 默认走并行 [`transfer_grid_search_parallel`]，`parallel=False` 或
+/// `E2M2E_SEARCH_PARALLEL=0` 回退串行 [`transfer_grid_search_serial`]——
+/// 供并行/串行位级一致性对照（两者结果逐位相同：`par_iter`+`collect` 保序、
+/// [`evaluate_point`] 纯函数）。
+///
+/// # 参数
+/// 同 [`transfer_grid_search_serial_py`]，新增关键字参数：
+/// - `parallel`: `None`（默认）时由 `E2M2E_SEARCH_PARALLEL` 决定（`"0"`→串行，
+///   其余/未设→并行）；显式 `True`/`False` 覆盖环境变量。
+///
+/// # GIL 与并行
+///
+/// `py.allow_threads` 释放 GIL 是 Rayon 真并行的前提——不释放则 GIL 序列化
+/// 所有 Rayon worker，形同串行。内部直接调纯 Rust
+/// [`e2m2e_forces::transfer_grid_search`] 核心，不绕道持 GIL 的
+/// `propagate_cr3bp_py`（这是最易踩的坑，见 transfer-grid-search-rust.md:109）。
+#[pyfunction]
+#[pyo3(signature = (dep_states, dep_times, alpha_grid, arrival_states, mu, max_transfer_time, integration_dt, intersection_threshold, min_distance_threshold, collision_earth_radius, collision_moon_radius, rtol, atol, max_step, *, parallel=None))]
+#[allow(clippy::too_many_arguments)]
+fn transfer_grid_search_py(
+    dep_states: Vec<f64>,
+    dep_times: Vec<f64>,
+    alpha_grid: Vec<f64>,
+    arrival_states: Vec<f64>,
+    mu: f64,
+    max_transfer_time: f64,
+    integration_dt: f64,
+    intersection_threshold: f64,
+    min_distance_threshold: f64,
+    collision_earth_radius: f64,
+    collision_moon_radius: f64,
+    rtol: f64,
+    atol: f64,
+    max_step: f64,
+    parallel: Option<bool>,
+    py: Python<'_>,
+) -> PyResult<Vec<TransferPointResult>> {
+    use e2m2e_forces::transfer_grid_search::{
+        transfer_grid_search_parallel, transfer_grid_search_serial, GridSearchParams,
+    };
+
+    let use_parallel = parallel
+        .unwrap_or_else(|| std::env::var("E2M2E_SEARCH_PARALLEL").map_or(true, |v| v != "0"));
+
+    let params = GridSearchParams {
+        mu,
+        max_transfer_time,
+        integration_dt,
+        intersection_threshold,
+        min_distance_threshold,
+        collision_earth_radius,
+        collision_moon_radius,
+        rtol,
+        atol,
+        max_step,
+    };
+
+    // 释放 GIL 让 Rayon 真并行；核心纯 Rust 不碰 Python 对象。
+    py.allow_threads(move || {
+        let results = if use_parallel {
+            transfer_grid_search_parallel(
+                &dep_states,
+                &dep_times,
+                &alpha_grid,
+                &arrival_states,
+                &params,
+            )
+        } else {
+            transfer_grid_search_serial(
+                &dep_states,
+                &dep_times,
+                &alpha_grid,
+                &arrival_states,
+                &params,
+            )
+        };
+        Ok(results.into_iter().map(TransferPointResult::from).collect())
+    })
+}
+
 /// 激活 Rust 星历预采样缓存。
 ///
 /// 在积分前把要用到的天体状态与帧旋转矩阵在均匀网格上预采样、建三次样条，
@@ -2627,6 +2711,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(detect_local_minimum_py, m)?)?;
     m.add_function(wrap_pyfunction!(check_collision_py, m)?)?;
     m.add_function(wrap_pyfunction!(transfer_grid_search_serial_py, m)?)?;
+    m.add_function(wrap_pyfunction!(transfer_grid_search_py, m)?)?;
     m.add_class::<TransferPointResult>()?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(spice_poc_body_position, m)?)?;

@@ -355,6 +355,72 @@ pub fn transfer_grid_search_serial(
     out
 }
 
+/// 并行网格搜索（Rayon `par_iter`，保序）。
+///
+/// 与 [`transfer_grid_search_serial`] 同样的 `idx → (i_dep, i_alpha)` 映射与
+/// [`evaluate_point`] 调用，唯一差别是 `into_par_iter` 并行求值。Rayon
+/// `par_iter` + `collect` 保序：各候选求值是纯函数（直接调纯 Rust
+/// [`crate::cr3bp::propagate_cr3bp`]，CR3BP 纯数学无 SPICE FFI、无线程
+/// 不安全状态），故并行与串行结果逐位相同。
+///
+/// # 并行安全前提
+///
+/// [`evaluate_point`] 调 [`crate::cr3bp::propagate_cr3bp`]（纯数学积分器，
+/// 无全局可变状态、无 SPICE FFI）与 [`crate::transfer_geometry`]（纯函数
+/// 几何核），均 `Send + Sync`。这与多重打靶段积分的 rayon 路径不同——后者
+/// 段积分内调 cspice 需 `StrictGuard` + 星历预采样；本函数零 cspice，rayon
+/// 安全前提更简单（见 `multiple_shooting.rs:347-359` 对比）。
+pub fn transfer_grid_search_parallel(
+    dep_states: &[f64],
+    dep_times: &[f64],
+    alpha_grid: &[f64],
+    arrival_states: &[f64],
+    params: &GridSearchParams,
+) -> Vec<TransferPointResult> {
+    use rayon::prelude::*;
+
+    assert!(
+        dep_states.len().is_multiple_of(6),
+        "dep_states 展平长度必须是 6 的倍数，得到 {}",
+        dep_states.len()
+    );
+    let n_dep = dep_states.len() / 6;
+    assert_eq!(
+        dep_times.len(),
+        n_dep,
+        "dep_times 长度 ({}) 须等于 n_dep ({})",
+        dep_times.len(),
+        n_dep
+    );
+    assert!(
+        arrival_states.len().is_multiple_of(6),
+        "arrival_states 展平长度必须是 6 的倍数，得到 {}",
+        arrival_states.len()
+    );
+    let n_alpha = alpha_grid.len();
+    let n_arrival = arrival_states.len() / 6;
+    assert!(n_arrival > 0, "arrival_states 不能为空");
+
+    let total = n_dep.checked_mul(n_alpha).expect("n_dep * n_alpha 溢出");
+
+    (0..total)
+        .into_par_iter()
+        .map(|idx| {
+            let i_dep = idx / n_alpha;
+            let i_alpha = idx % n_alpha;
+            let mut dep = [0.0_f64; 6];
+            dep.copy_from_slice(&dep_states[i_dep * 6..i_dep * 6 + 6]);
+            evaluate_point(
+                &dep,
+                dep_times[i_dep],
+                alpha_grid[i_alpha],
+                arrival_states,
+                params,
+            )
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,6 +522,57 @@ mod tests {
             // departure_state 前 3 维与 dep_states 对应行一致。
             for k in 0..3 {
                 assert!((r.departure_state[k] - dep_states[i_dep * 6 + k]).abs() < 1e-15);
+            }
+        }
+    }
+
+    /// 并行与串行逐位一致：par_iter+collect 保序 + evaluate_point 纯函数，
+    /// 两边走同一 propagate_cr3bp，结果逐字段相等（含轨迹与浮点标量）。
+    #[test]
+    fn parallel_matches_serial_bit_for_bit() {
+        let n_dep = 3;
+        let n_alpha = 4;
+        let dep = circular_orbit(0.9, 0.08, 40);
+        let dep_states: Vec<f64> = dep[..n_dep * 6].to_vec();
+        let dep_times: Vec<f64> = (0..n_dep).map(|i| i as f64).collect();
+        let alpha_grid = vec![0.9, 0.95, 1.0, 1.05];
+        let arrival = circular_orbit(0.7, 0.12, 30);
+
+        let serial =
+            transfer_grid_search_serial(&dep_states, &dep_times, &alpha_grid, &arrival, &params());
+        let parallel = transfer_grid_search_parallel(
+            &dep_states,
+            &dep_times,
+            &alpha_grid,
+            &arrival,
+            &params(),
+        );
+        assert_eq!(serial.len(), n_dep * n_alpha);
+        assert_eq!(parallel.len(), serial.len());
+
+        for (s, p) in serial.iter().zip(parallel.iter()) {
+            // 保序：逐候选 (departure_time, alpha) 对齐。
+            assert_eq!(s.departure_time, p.departure_time);
+            assert!((s.alpha - p.alpha).abs() < 1e-15);
+            assert_eq!(s.success, p.success);
+            assert_eq!(s.status, p.status);
+            assert_eq!(s.min_distance_idx, p.min_distance_idx);
+            assert_eq!(s.min_distance_orbit_idx, p.min_distance_orbit_idx);
+            assert_eq!(s.intersection_idx, p.intersection_idx);
+            assert_eq!(s.local_minimum_idx, p.local_minimum_idx);
+            assert_eq!(s.collision_idx, p.collision_idx);
+            assert_eq!(s.dv_departure.to_bits(), p.dv_departure.to_bits());
+            if let (Some(a), Some(b)) = (s.min_distance, p.min_distance) {
+                assert_eq!(a.to_bits(), b.to_bits());
+            }
+            if let (Some(a), Some(b)) = (
+                s.transfer_trajectory.as_ref(),
+                p.transfer_trajectory.as_ref(),
+            ) {
+                assert_eq!(a.len(), b.len());
+                for (x, y) in a.iter().zip(b.iter()) {
+                    assert_eq!(x.to_bits(), y.to_bits(), "轨迹浮点位级不一致");
+                }
             }
         }
     }
