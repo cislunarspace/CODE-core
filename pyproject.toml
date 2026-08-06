@@ -82,6 +82,9 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 testpaths = ["tests"]
 # 让 tests/kernel_helpers.py 在 xdist worker 中可导入
 pythonpath = ["tests"]
+# 默认排除 slow 标记的测试（design_orbit 端到端等）。显式跑用
+# ``uv run pytest -m slow``，命令行 -m 覆盖此处的 -m。
+addopts = ["-m", "not slow"]
 markers = [
     "slow: 运行时间较长的数值测试",
     "spice: 依赖 SPICE 内核的测试，内核缺失时跳过",

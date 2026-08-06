@@ -13,7 +13,7 @@ import pytest
 
 from e2m2e.algorithm.design import design_orbit
 
-pytestmark = pytest.mark.spice
+pytestmark = [pytest.mark.slow, pytest.mark.spice]
 
 # 30 天 Halo：main_design 默认参数，复现逐段积分场景
 DURATION_YEAR = 30 / 365.25
