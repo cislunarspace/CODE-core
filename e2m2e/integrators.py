@@ -20,6 +20,8 @@ try:
         lambert_izzo_py,
         pole_tide,
         project_hamiltonian_qf_py,
+        propagate_cr3bp_py,
+        propagate_cr3bp_stm_py,
         solid_tide_step1,
         solid_tide_step2,
         solve_ivp_events_py,
@@ -77,6 +79,8 @@ except ModuleNotFoundError:
     lambert_izzo_py = None  # type: ignore[misc,assignment]
     pole_tide = None  # type: ignore[misc,assignment]
     project_hamiltonian_qf_py = None  # type: ignore[misc,assignment]
+    propagate_cr3bp_py = None  # type: ignore[misc,assignment]
+    propagate_cr3bp_stm_py = None  # type: ignore[misc,assignment]
     solid_tide_step1 = None  # type: ignore[misc,assignment]
     solid_tide_step2 = None  # type: ignore[misc,assignment]
     solve_ivp_events_py = None  # type: ignore[misc,assignment]
@@ -158,6 +162,8 @@ __all__ = [
     "propagate_compiled_lowthrust",
     "propagate_compiled_lowthrust_sensitivity",
     "propagate_compiled_stm_py",
+    "propagate_cr3bp_py",
+    "propagate_cr3bp_stm_py",
     "propagate_with_stm_py",
     "reset_ephem_ffi_call_count",
     "rk_step",

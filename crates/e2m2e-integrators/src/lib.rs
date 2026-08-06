@@ -1752,6 +1752,131 @@ fn propagate_compiled_stm_py(
     Ok(dict.into())
 }
 
+/// Python 接口：CR3BP 6 维纯状态传播（PD78）。
+///
+/// 纯数学（无量纲），不依赖 SPICE。供 `CR3BP_Dynamics` 透明走 Rust。
+/// 循环结构与 `propagate_compiled_stm` 一致，保证与带 STM 路径的 states 逐位相同。
+///
+/// # 参数
+/// - `mu`: 质量参数 μ = m₂/(m₁+m₂)
+/// - `t_span`: `(t_start, t_end)` 积分区间（无量纲时间）
+/// - `t_eval`: 输出时间点数组
+/// - `initial_state`: 初始状态 `[x, y, z, vx, vy, vz]`
+/// - `rtol`, `atol`: 积分容差
+/// - `max_step`: 最大步长，`None` 则不限制
+/// - `max_steps`: 最大步数，`None` 则用默认上限
+///
+/// # 返回
+/// Python dict：`{"time": [...], "states": [[6], ...], "n_steps": int, "n_rejected": int}`
+#[pyfunction]
+#[pyo3(signature = (mu, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None))]
+#[allow(clippy::too_many_arguments)]
+fn propagate_cr3bp_py(
+    mu: f64,
+    t_span: (f64, f64),
+    t_eval: Vec<f64>,
+    initial_state: Vec<f64>,
+    rtol: f64,
+    atol: f64,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::cr3bp::propagate_cr3bp;
+
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    let result = propagate_cr3bp(
+        mu, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
+    )
+    .map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!("CR3BP propagation failed: {}", e))
+    })?;
+
+    let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
+
+    let dict = PyDict::new(py);
+    dict.set_item("time", result.times)?;
+    dict.set_item("states", states_list)?;
+    dict.set_item("n_steps", result.n_steps)?;
+    dict.set_item("n_rejected", result.n_rejected)?;
+    Ok(dict.into())
+}
+
+/// Python 接口：CR3BP 42 维增广状态传播（状态 + STM，PD78）。
+///
+/// 纯数学（无量纲），不依赖 SPICE。初始 STM 设为单位矩阵；步长误差控制只
+/// 统计前 6 维，避免 STM 分量主导步长。
+///
+/// # 参数
+/// 同 `propagate_cr3bp_py`。
+///
+/// # 返回
+/// Python dict：`{"states": [[6], ...], "stm": [[36], ...], "time": [...],
+/// "n_steps": int, "n_rejected": int}`；`stm[k][i*6+j] = ∂state(t_k)[i]/∂state(t0)[j]`。
+#[pyfunction]
+#[pyo3(signature = (mu, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None))]
+#[allow(clippy::too_many_arguments)]
+fn propagate_cr3bp_stm_py(
+    mu: f64,
+    t_span: (f64, f64),
+    t_eval: Vec<f64>,
+    initial_state: Vec<f64>,
+    rtol: f64,
+    atol: f64,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::cr3bp::propagate_cr3bp_stm;
+
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    let result = propagate_cr3bp_stm(
+        mu, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
+    )
+    .map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!("CR3BP STM propagation failed: {}", e))
+    })?;
+
+    let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
+    let stm_list: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();
+
+    let dict = PyDict::new(py);
+    dict.set_item("states", states_list)?;
+    dict.set_item("stm", stm_list)?;
+    dict.set_item("time", result.times)?;
+    dict.set_item("n_steps", result.n_steps)?;
+    dict.set_item("n_rejected", result.n_rejected)?;
+    Ok(dict.into())
+}
+
 /// 二体 Lambert 求解（Izzo 算法）的 Python 接口。
 ///
 /// # 参数
@@ -2007,6 +2132,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solid_tide_step1, m)?)?;
     m.add_function(wrap_pyfunction!(solid_tide_step2, m)?)?;
     m.add_function(wrap_pyfunction!(pole_tide, m)?)?;
+    m.add_function(wrap_pyfunction!(propagate_cr3bp_py, m)?)?;
+    m.add_function(wrap_pyfunction!(propagate_cr3bp_stm_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(spice_poc_body_position, m)?)?;
     #[cfg(feature = "spice")]

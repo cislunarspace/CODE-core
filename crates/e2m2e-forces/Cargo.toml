@@ -13,11 +13,12 @@ default = []
 spice = [
     "dep:cspice",
     "dep:e2m2e-spice",
-    "dep:e2m2e-propagation",
     "e2m2e-spice/spice",
 ]
 
 [dependencies]
 e2m2e-spice = { path = "../e2m2e-spice", optional = true }
-e2m2e-propagation = { path = "../e2m2e-propagation", optional = true }
+# 无条件依赖：cr3bp 模块（顶层非门控）复用其 explicit_rk_step / RkMethod。
+# e2m2e-propagation 纯数学，不引入 spice 链路。
+e2m2e-propagation = { path = "../e2m2e-propagation" }
 cspice = { workspace = true, optional = true }
