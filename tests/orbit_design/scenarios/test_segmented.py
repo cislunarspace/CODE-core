@@ -6,6 +6,9 @@
 ``eval_idx=1`` 跳过首点，导致 ``t_eval_seg[0] > seg_t0`` 时首个输出点状态错置
 为初值，相邻点 J2000 位置差塌缩到 ~1e-3 km（速度正常，位置却停滞），被 synodic
 坐标旋转放大成可见跳变。本测试独立校验星历 J2000 相邻点无此类停滞。
+
+属 tests/orbit_design 三层分层中的 L3（scenarios，端到端）：覆盖 design_orbit
+的 segmented 分段打靶全链路集成行为。
 """
 
 import numpy as np
