@@ -18,7 +18,8 @@ from typing import TYPE_CHECKING, Any, Protocol, overload
 
 import numpy as np
 import numpy.typing as npt
-from scipy.integrate import solve_ivp
+
+from e2m2e.integrators import RkMethod, solve_ivp_events
 
 if TYPE_CHECKING:
     from ..core.orbit import Orbit
@@ -159,7 +160,7 @@ class RelativeDynamics:
     ) -> tuple[np.ndarray, np.ndarray]:
         """传播相对状态（6 维）。
 
-        在目标轨道上逐点线性化，用变步长 RK45 积分 δẋ = A(t)δx。
+        在目标轨道上逐点线性化，用变步长 RK89 积分 δẋ = A(t)δx。
 
         Args:
             rho0: 初始相对状态 ``[δr, δv]``，形状 ``(6,)``
@@ -178,23 +179,27 @@ class RelativeDynamics:
             A = self.linear_model(t)
             return A @ rho
 
-        result = solve_ivp(
-            eom,
-            t_span,
-            rho0,
-            method="RK45",
-            rtol=rtol,
-            atol=atol,
-            max_step=max_step if max_step is not None else np.inf,
-            dense_output=True,
-        )
-        if not result.success:
-            raise RuntimeError(f"相对传播失败: {result.message}")
-
         # 均匀采样输出
         n = max(int((t_span[1] - t_span[0]) / (max_step or 0.01)) + 1, 2)
-        times = np.linspace(t_span[0], t_span[1], n)
-        rhos = result.sol(times).T
+        t_eval = np.linspace(t_span[0], t_span[1], n)
+
+        result = solve_ivp_events(
+            t_span,
+            rho0,
+            t_eval,
+            rtol,
+            atol,
+            eom,
+            events=[],
+            method=RkMethod.RK89,
+            max_step=max_step,
+        )
+        times = np.asarray(result["time"], dtype=float)
+        rhos = np.asarray(result["states"], dtype=float)
+        # 防御性校验：Rust 侧提前退出（如 max_steps 耗尽）须暴露，不允许把
+        # 截断结果当完整轨迹返回（issue #246，照抄 dynamics.py）。
+        if len(times) != n:
+            raise RuntimeError(f"相对传播返回 {len(times)} / {n} 个时间点，轨迹被截断")
         return times, rhos
 
     def propagate_with_stm(
@@ -348,22 +353,24 @@ class RelativeDynamics:
             raise ValueError(f"rho0 形状须为 (6,)，得到 {rho0.shape}")
 
         eom = self.encke_eom if method == "encke" else self.nonlinear_eom
-        result = solve_ivp(
-            eom,
+        n = max(int((t_span[1] - t_span[0]) / (max_step or 0.01)) + 1, 2)
+        t_eval = np.linspace(t_span[0], t_span[1], n)
+
+        result = solve_ivp_events(
             t_span,
             rho0,
-            method="RK45",
-            rtol=rtol,
-            atol=atol,
-            max_step=max_step if max_step is not None else np.inf,
-            dense_output=True,
+            t_eval,
+            rtol,
+            atol,
+            eom,
+            events=[],
+            method=RkMethod.RK89,
+            max_step=max_step,
         )
-        if not result.success:
-            raise RuntimeError(f"非线性相对传播失败: {result.message}")
-
-        n = max(int((t_span[1] - t_span[0]) / (max_step or 0.01)) + 1, 2)
-        times = np.linspace(t_span[0], t_span[1], n)
-        rhos = result.sol(times).T
+        times = np.asarray(result["time"], dtype=float)
+        rhos = np.asarray(result["states"], dtype=float)
+        if len(times) != n:
+            raise RuntimeError(f"非线性相对传播返回 {len(times)} / {n} 个时间点，轨迹被截断")
         return times, rhos
 
     # ------------------------------------------------------------------

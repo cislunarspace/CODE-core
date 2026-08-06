@@ -3,12 +3,12 @@
 
 提供平面截面与近拱点截面的定义，以及两类截面穿越检测：
 
-- **积分中检测**：``PoincareSection.event()`` 生成 scipy ``solve_ivp``
-  语义的事件函数，传给 ``Dynamics.propagate(events=...)``，由积分器在
-  步内定位穿越（scipy 侧用稠密输出求精），无需密采样。
+- **积分中检测**：``PoincareSection.event()`` 生成事件函数
+  ``g(t, state) -> float``（携带 ``direction``/``terminal`` 属性），传给
+  ``Dynamics.propagate(events=...)``，由积分器在步内定位穿越，无需密采样。
 - **事后检测**：``crossings``/``detect_crossings``，传播时密采样
   t_eval → 逐采样点求截面函数 s(t)（平面：state[axis]-value；近拱点：
-  r·v，r 为相对中心天体的位置）→ 符号变化区间内对线性插值态用 Brent
+  r·v，r 为相对中心天体的位置）→ 符号变化区间内对线性插值态用二分
   法求精，穿越态残差可达 1e-10 以下。
 """
 
@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy.optimize import brentq
 
 if TYPE_CHECKING:
     from ..dynamics.cr3bp_system import CR3BP_System
@@ -43,6 +42,46 @@ class SectionCrossings:
     trajectory_index: np.ndarray
 
 
+def _bisect_root(
+    f: Callable[[float], float],
+    a: float,
+    b: float,
+    *,
+    xtol: float = 1e-14,
+    max_iter: int = 50,
+) -> float:
+    """纯 Python 二分求根。
+
+    前提：``f(a)`` 与 ``f(b)`` 异号或其一为零（调用方
+    :func:`detect_crossings` 已保证截面函数在采样区间端点变号）。支持
+    时间递增或递减采样（``a`` 与 ``b`` 任意大小关系）。
+    bisection 线性收敛，50 次迭代区间缩至 2⁻⁵⁰ ≈ 9e-16，远超截面残差
+    1e-10 的需求；求精精度瓶颈是分段线性插值误差（~h²·|ÿ|/8），非求根
+    器本身。
+    """
+
+    fa = f(a)
+    fb = f(b)
+    if fa == 0.0:
+        return a
+    if fb == 0.0:
+        return b
+    # 归一化为 a < b，使区间长度恒正（detect_crossings 的采样时间可递减）
+    if a > b:
+        a, b = b, a
+        fa, fb = fb, fa
+    for _ in range(max_iter):
+        c = 0.5 * (a + b)
+        fc = f(c)
+        if fc == 0.0 or (b - a) * 0.5 < xtol:
+            return c
+        if fa * fc < 0:
+            b, fb = c, fc
+        else:
+            a, fa = c, fc
+    return 0.5 * (a + b)
+
+
 def _refine_crossing(
     t0: float,
     t1: float,
@@ -50,18 +89,17 @@ def _refine_crossing(
     y1: np.ndarray,
     section_fn: Callable[[np.ndarray], float],
 ) -> tuple[float, np.ndarray]:
-    """在符号变化区间 [t0, t1] 内对分段线性插值态用 Brent 法求精穿越点"""
+    """在符号变化区间 [t0, t1] 内对分段线性插值态用二分法求精穿越点"""
 
     def interp_state(t: float) -> np.ndarray:
         w = (t - t0) / (t1 - t0)
         return y0 + w * (y1 - y0)
 
-    t_cross = brentq(
+    t_cross = _bisect_root(
         lambda t: section_fn(interp_state(t)),
         t0,
         t1,
         xtol=1e-14,
-        rtol=1e-14,
     )
     return t_cross, interp_state(t_cross)
 
@@ -73,7 +111,7 @@ def detect_crossings(
 ) -> list[tuple[float, np.ndarray, int]]:
     """事后截面穿越检测
 
-    逐采样点求截面函数，符号变化区间内对分段线性插值态用 Brent 法求精。
+    逐采样点求截面函数，符号变化区间内对分段线性插值态用二分法求精。
     正向与反向（时间递减）积分均适用。
 
     Args:
@@ -119,10 +157,10 @@ class PoincareSection:
     def event(
         self, direction: int = 0, terminal: bool = False
     ) -> Callable[[float, np.ndarray], float]:
-        """生成 scipy ``solve_ivp`` 语义的事件函数，供积分中检测使用
+        """生成事件函数，供积分中检测使用
 
         返回的 callable ``g(t, state) -> float`` 可直接传给
-        ``Dynamics.propagate(events=...)``；函数对象携带 scipy 约定的
+        ``Dynamics.propagate(events=...)``；函数对象携带
         ``direction``/``terminal`` 属性。截面函数只依赖前 6 维物理状态，
         STM 增广传播（42 维状态）时自动截取前 6 维。
 
