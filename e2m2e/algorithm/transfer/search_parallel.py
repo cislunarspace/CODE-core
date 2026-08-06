@@ -335,7 +335,9 @@ def grid_search_rust_dispatch(
     - **Rust 扩展缺失**：``grid_search_rust`` 抛 ``RuntimeError``（``transfer_grid_search_py``
       为 None），回退 ``processes`` 后端。
 
-    ``n_workers==1`` 时 ``parallel=False``（Rust 串行），``>1`` 时 ``parallel=True``（Rayon）。
+    Rust 总是走 Rayon 多核并行（``parallel=True``）——网格搜索的目标是快速完成，
+    Rayon 进程内线程池默认用满 cpu_count 个线程。要限制线程数用 ``RAYON_NUM_THREADS``
+    环境变量。``n_workers`` 仅用于 monkeypatch 回退时的 Python 后端选择。
     """
     if _geometry_methods_monkeypatched(searcher):
         backend = "sequential" if n_workers == 1 else "processes"
@@ -381,7 +383,7 @@ def grid_search_rust_dispatch(
     alpha_grid = np.linspace(searcher.alpha_min, searcher.alpha_max, int(searcher.n_alpha))
     arrival_states = np.asarray(arrival_orbit.states, dtype=float)
     n_alpha = int(searcher.n_alpha)
-    parallel = n_workers != 1
+    parallel = True  # Rust Rayon 进程内线程池总是多核并行（网格搜索目标：快速完成）
 
     try:
         from ...integrators import grid_search_rust
