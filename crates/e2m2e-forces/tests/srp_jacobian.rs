@@ -73,7 +73,7 @@ fn test_srp_jacobian_nonzero() {
         shadow_bodies: vec![], // 无阴影 → 纯光照，避免阴影边界不连续
     };
 
-    let (acc, jac) = acceleration_and_jacobian(&force, et, &state, "EARTH")
+    let (acc, jac, _dadv) = acceleration_and_jacobian(&force, et, &state, "EARTH")
         .expect("SRP acceleration_and_jacobian failed");
 
     // 加速度必须非零（全光照 + 正面积/cr/mass）
@@ -114,7 +114,7 @@ fn test_srp_jacobian_matches_fd_reference() {
         shadow_bodies: vec![],
     };
 
-    let (_, jac) = acceleration_and_jacobian(&force, et, &state, "EARTH")
+    let (_, jac, _dadv) = acceleration_and_jacobian(&force, et, &state, "EARTH")
         .expect("acceleration_and_jacobian failed");
 
     // 前向差分参考（步长与 compiled.rs 一致）

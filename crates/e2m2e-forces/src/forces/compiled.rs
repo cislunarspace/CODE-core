@@ -260,7 +260,7 @@ pub fn acceleration_and_jacobian(
     et: f64,
     state: &[f64; 6],
     observer: &str,
-) -> Result<([f64; 3], [[f64; 3]; 3]), String> {
+) -> Result<([f64; 3], [[f64; 3]; 3], [[f64; 3]; 3]), String> {
     match force {
         CompiledForce::PointMass { mu } => {
             let r = [state[0], state[1], state[2]];
@@ -280,7 +280,8 @@ pub fn acceleration_and_jacobian(
                     jac[i][j] = -mu * (delta * inv_r3 - 3.0 * r[i] * r[j] * inv_r5);
                 }
             }
-            Ok((acc, jac))
+            let dadv = [[0.0_f64; 3]; 3];
+            Ok((acc, jac, dadv))
         }
         CompiledForce::GravityField {
             c_flat,
@@ -323,7 +324,8 @@ pub fn acceleration_and_jacobian(
             let r_sc = [state[0], state[1], state[2]];
             let acc = ctx.accel(&r_sc).map_err(|e| format!("{:?}", e))?;
             let jac = ctx.jacobian_fd(&r_sc).map_err(|e| format!("{:?}", e))?;
-            Ok((acc, jac))
+            let dadv = [[0.0_f64; 3]; 3];
+            Ok((acc, jac, dadv))
         }
         CompiledForce::ThirdBody { body, mu } => {
             let sc_pos = [state[0], state[1], state[2]];
@@ -331,11 +333,13 @@ pub fn acceleration_and_jacobian(
                 et, body, observer, &sc_pos, *mu, 1e-6,
             )
             .map_err(|e| format!("{:?}", e))?;
-            Ok((acc, jac))
+            let dadv = [[0.0_f64; 3]; 3];
+            Ok((acc, jac, dadv))
         }
         CompiledForce::IndirectTerm { .. } => {
             let acc = force.acceleration(et, state, observer)?;
-            Ok((acc, [[0.0; 3]; 3]))
+            let dadv = [[0.0_f64; 3]; 3];
+            Ok((acc, [[0.0; 3]; 3], dadv))
         }
         CompiledForce::SRP { .. } => {
             // 数值差分（与 GravityField::jacobian_fd 同模式，步长 sqrt(eps)*|r|）。
@@ -357,7 +361,8 @@ pub fn acceleration_and_jacobian(
                     jac[i][dim] = (a_plus[i] - a_minus[i]) / (2.0 * h);
                 }
             }
-            Ok((acc0, jac))
+            let dadv = [[0.0_f64; 3]; 3];
+            Ok((acc0, jac, dadv))
         }
         CompiledForce::EcomSrp { .. } => {
             // 数值差分（与 SRP 同模式）。
@@ -376,7 +381,8 @@ pub fn acceleration_and_jacobian(
                     jac[i][dim] = (a_plus[i] - a_minus[i]) / (2.0 * h);
                 }
             }
-            Ok((acc0, jac))
+            let dadv = [[0.0_f64; 3]; 3];
+            Ok((acc0, jac, dadv))
         }
         _ => Err("Jacobian not supported for this force type".to_string()),
     }
@@ -388,17 +394,19 @@ pub fn compute_total_acceleration_and_jacobian(
     et: f64,
     state: &[f64; 6],
     observer: &str,
-) -> Result<([f64; 3], [[f64; 3]; 3]), String> {
+) -> Result<([f64; 3], [[f64; 3]; 3], [[f64; 3]; 3]), String> {
     let mut total_acc = [0.0_f64; 3];
     let mut total_jac = [[0.0_f64; 3]; 3];
+    let mut total_dadv = [[0.0_f64; 3]; 3];
     for force in forces {
-        let (acc, jac) = acceleration_and_jacobian(force, et, state, observer)?;
+        let (acc, jac, dadv) = acceleration_and_jacobian(force, et, state, observer)?;
         for i in 0..3 {
             total_acc[i] += acc[i];
             for j in 0..3 {
                 total_jac[i][j] += jac[i][j];
+                total_dadv[i][j] += dadv[i][j];
             }
         }
     }
-    Ok((total_acc, total_jac))
+    Ok((total_acc, total_jac, total_dadv))
 }

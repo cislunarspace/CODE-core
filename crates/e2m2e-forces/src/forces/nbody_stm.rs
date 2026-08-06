@@ -45,14 +45,16 @@ pub struct NBodyConfig {
 /// - `r_sc`: 航天器位置 [x, y, z] km（相对原点天体）
 ///
 /// # 返回
-/// `(acc, jacobian)`：加速度 [f64; 3] 和雅可比 [[f64; 3]; 3]。
+/// `(acc, jacobian, dadv)`：加速度 [f64; 3]、雅可比 ∂a/∂r [[f64; 3]; 3]、
+/// 以及 ∂a/∂v [[f64; 3]; 3]（纯 N 体模型恒为零矩阵）。
 pub fn compute_nbody_acceleration_and_jacobian(
     config: &NBodyConfig,
     et: f64,
     r_sc: &[f64; 3],
-) -> Result<([f64; 3], [[f64; 3]; 3]), String> {
+) -> Result<([f64; 3], [[f64; 3]; 3], [[f64; 3]; 3]), String> {
     let mut acc = [0.0_f64; 3];
     let mut jac = [[0.0_f64; 3]; 3];
+    let dadv = [[0.0_f64; 3]; 3]; // N 体加速度不依赖速度
 
     for (body, gm) in config.bodies.iter().zip(config.gm_values.iter()) {
         if body == &config.origin {
@@ -95,7 +97,7 @@ pub fn compute_nbody_acceleration_and_jacobian(
         }
     }
 
-    Ok((acc, jac))
+    Ok((acc, jac, dadv))
 }
 
 /// 只计算 N 体加速度（不算雅可比）。
@@ -170,25 +172,30 @@ fn state_eom(config: &NBodyConfig, et: f64, state: &[f64; 6]) -> Result<[f64; 6]
 ///
 /// # 返回
 /// dΦ/dt（展平为 36 维）
-pub fn stm_derivative(stm: &[f64; 36], jac_da_dr: &[[f64; 3]; 3]) -> [f64; 36] {
+pub fn stm_derivative(
+    stm: &[f64; 36],
+    jac_da_dr: &[[f64; 3]; 3],
+    dadv: &[[f64; 3]; 3],
+) -> [f64; 36] {
     let mut dstm = [0.0_f64; 36];
     // dΦ/dt = A · Φ
-    // A = [0, I; U, 0]，其中 U = ∂a/∂r
+    // A = [0, I; ∂a/∂r, ∂a/∂v]
     //
     // 对于 Φ 的第 j 列（col_j），有：
     //   d(col_j)/dt = A · col_j
     //   前3行：= col_j[3:6]（来自 I 块）
-    //   后3行：= U · col_j[0:3]（来自 U 块）
+    //   后3行：= (∂a/∂r) · col_j[0:3] + (∂a/∂v) · col_j[3:6]
     for col in 0..6 {
         // 前 3 行：dstm[row][col] = stm[row+3][col]（即 I·Φ 的上半部分）
         for row in 0..3 {
             dstm[row * 6 + col] = stm[(row + 3) * 6 + col];
         }
-        // 后 3 行：dstm[row+3][col] = Σ_k U[row][k] * stm[k][col]
+        // 后 3 行：dstm[row+3][col] = Σ_k ∂a/∂r[row][k]*stm[k][col] + Σ_k ∂a/∂v[row][k]*stm[(k+3)][col]
         for row in 0..3 {
             let mut sum = 0.0;
             for k in 0..3 {
                 sum += jac_da_dr[row][k] * stm[k * 6 + col];
+                sum += dadv[row][k] * stm[(k + 3) * 6 + col];
             }
             dstm[(row + 3) * 6 + col] = sum;
         }
@@ -218,10 +225,10 @@ pub fn augmented_eom(
     stm.copy_from_slice(&augmented_state[6..42]);
 
     // 计算加速度和雅可比
-    let (acc, jac_da_dr) = compute_nbody_acceleration_and_jacobian(config, et, &r_sc)?;
+    let (acc, jac_da_dr, dadv) = compute_nbody_acceleration_and_jacobian(config, et, &r_sc)?;
 
     // STM 变分方程
-    let dstm = stm_derivative(&stm, &jac_da_dr);
+    let dstm = stm_derivative(&stm, &jac_da_dr, &dadv);
 
     // 组装增广状态导数
     let mut result = [0.0_f64; 42];
@@ -525,7 +532,7 @@ mod tests {
         let et = 0.0;
         let r = [7000.0, 0.0, 0.0]; // LEO
 
-        let (acc, jac) = compute_nbody_acceleration_and_jacobian(&config, et, &r).unwrap();
+        let (acc, jac, _dadv) = compute_nbody_acceleration_and_jacobian(&config, et, &r).unwrap();
 
         // a_x ≈ -μ/r² = -398600/7000² ≈ -8.13e-3 km/s²
         assert!(acc[0] < 0.0, "中心引力应指向 -x");
@@ -541,9 +548,9 @@ mod tests {
             r_plus[dim] += h;
             r_minus[dim] -= h;
 
-            let (acc_plus, _) =
+            let (acc_plus, _, _) =
                 compute_nbody_acceleration_and_jacobian(&config, et, &r_plus).unwrap();
-            let (acc_minus, _) =
+            let (acc_minus, _, _) =
                 compute_nbody_acceleration_and_jacobian(&config, et, &r_minus).unwrap();
 
             for i in 0..3 {
@@ -579,7 +586,7 @@ mod tests {
         let et = 0.0; // J2000
         let r = [7000.0, 0.0, 0.0]; // LEO
 
-        let (_, jac) = compute_nbody_acceleration_and_jacobian(&config, et, &r).unwrap();
+        let (_, jac, _dadv) = compute_nbody_acceleration_and_jacobian(&config, et, &r).unwrap();
 
         // 有限差分验证（中心天体 + 第三体一起测）
         let h = 1e-3; // km
@@ -589,9 +596,9 @@ mod tests {
             r_plus[dim] += h;
             r_minus[dim] -= h;
 
-            let (acc_plus, _) =
+            let (acc_plus, _, _) =
                 compute_nbody_acceleration_and_jacobian(&config, et, &r_plus).unwrap();
-            let (acc_minus, _) =
+            let (acc_minus, _, _) =
                 compute_nbody_acceleration_and_jacobian(&config, et, &r_minus).unwrap();
 
             for i in 0..3 {
@@ -627,8 +634,9 @@ mod tests {
 
         // 构造一个简单的雅可比
         let jac_da_dr = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]];
+        let dadv = [[0.0_f64; 3]; 3];
 
-        let dstm = stm_derivative(&stm, &jac_da_dr);
+        let dstm = stm_derivative(&stm, &jac_da_dr, &dadv);
 
         // 验证：dΦ/dt = A·Φ = A·I = A
         // A = [0₃ₓ₃  I₃ₓ₃]
@@ -649,7 +657,7 @@ mod tests {
             }
         }
 
-        // 后 3 行：dstm[row+3][col] = U[row][col]（因为 Φ=I，U·I = U）
+        // 后 3 行：dstm[row+3][col] = U[row][col]（因为 Φ=I，U·I = U，dadv=0）
         // 注意：A 的后 3 行前 3 列是 U，后 3 列是 0
         for row in 0..3 {
             for col in 0..6 {

@@ -41,8 +41,9 @@ fn augmented_eom(
     let mut stm = [0.0_f64; 36];
     stm.copy_from_slice(&augmented[6..42]);
 
-    let (acc, jac_da_dr) = compute_total_acceleration_and_jacobian(forces, et, &state6, observer)?;
-    let dstm = nbody_stm::stm_derivative(&stm, &jac_da_dr);
+    let (acc, jac_da_dr, dadv) =
+        compute_total_acceleration_and_jacobian(forces, et, &state6, observer)?;
+    let dstm = nbody_stm::stm_derivative(&stm, &jac_da_dr, &dadv);
 
     let mut result = vec![0.0_f64; 42];
     result[0] = state6[3];

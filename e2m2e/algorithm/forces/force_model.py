@@ -302,9 +302,9 @@ class ForceModel:
     # ── Rust propagate_compiled 快速路径（spice feature 启用时） ──
 
     # Rust STM 路径不支持的力模型类型：`acceleration_and_jacobian` 对
-    # 其余力（含 SRP）都有解析或 Rust 内有限差分雅可比，仅相对论修正
-    # 返回 Err（compiled.rs `_ => Err`）。
-    _STM_UNSUPPORTED_TYPES = ("RelativisticCorrection",)
+    # RelativisticCorrection 和 VariableMassFiniteBurn 返回 Err（compiled.rs `_ => Err`），
+    # 其余力（含 SRP）都有解析或 Rust 内有限差分雅可比。
+    _STM_UNSUPPORTED_TYPES = ("RelativisticCorrection", "VariableMassFiniteBurn")
 
     def _can_use_rust_path(self) -> bool:
         """检测所有 force 是否支持 Rust 编译 + spice feature 是否启用。

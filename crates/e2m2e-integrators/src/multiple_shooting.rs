@@ -376,13 +376,13 @@ pub fn multiple_shooting_correct(
             let final_state = *result.states.last().ok_or("empty propagation result")?;
             let final_stm = *result.stms.last().ok_or("empty STM result")?;
 
-            let (a0, _) = compute_total_acceleration_and_jacobian(
+            let (a0, _, _) = compute_total_acceleration_and_jacobian(
                 forces,
                 t_work[i],
                 &state_work[i],
                 observer,
             )?;
-            let (a1, _) = compute_total_acceleration_and_jacobian(
+            let (a1, _, _) = compute_total_acceleration_and_jacobian(
                 forces,
                 t_work[i + 1],
                 &final_state,

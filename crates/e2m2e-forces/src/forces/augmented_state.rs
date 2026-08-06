@@ -129,7 +129,7 @@ pub fn augmented_eom_7d_with_stm(
 
     // 1. 计算重力加速度 + 雅可比（6D）
     let state6 = [r[0], r[1], r[2], v[0], v[1], v[2]];
-    let (a_gravity, jac_da_dr) =
+    let (a_gravity, jac_da_dr, dadv) =
         super::compiled::compute_total_acceleration_and_jacobian(forces, et, &state6, observer)?;
 
     // 2. 计算推力加速度
@@ -147,8 +147,8 @@ pub fn augmented_eom_7d_with_stm(
 
     // 4. 计算 STM 导数
     // dΦ/dt = A * Φ，其中 A 是雅可比矩阵
-    // A = [0, I; da/dr, 0]（6×6）
-    let dstm = super::nbody_stm::stm_derivative(&stm, &jac_da_dr);
+    // A = [0, I; ∂a/∂r, ∂a/∂v]（6×6）
+    let dstm = super::nbody_stm::stm_derivative(&stm, &jac_da_dr, &dadv);
 
     // 5. 组装 43D 导数
     let mut result = [0.0_f64; 43];
@@ -212,7 +212,7 @@ pub fn augmented_eom_7d_with_sensitivity(
     let state6 = [r[0], r[1], r[2], v[0], v[1], v[2]];
 
     // 1. 重力加速度 + 雅可比 ∂a_grav/∂r（3×3）
-    let (a_gravity, jac_da_dr) =
+    let (a_gravity, jac_da_dr, dadv) =
         super::compiled::compute_total_acceleration_and_jacobian(forces, et, &state6, observer)?;
 
     // 2. 推力加速度（与 augmented_eom_7d 一致）
@@ -303,7 +303,7 @@ pub fn augmented_eom_7d_with_sensitivity(
     }
 
     // 6. dΦ/dt = ∂f[r,v]/∂[r,v] · Φ（6×6，质量不进 Φ）
-    let dstm = super::nbody_stm::stm_derivative(&stm, &jac_da_dr);
+    let dstm = super::nbody_stm::stm_derivative(&stm, &jac_da_dr, &dadv);
 
     // 7. 组装 64D 导数
     let mut result = [0.0_f64; 64];
