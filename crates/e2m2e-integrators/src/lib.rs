@@ -2331,6 +2331,140 @@ fn check_collision_py(
     ))
 }
 
+/// 单候选点评估结果（PyO3 绑定）。
+///
+/// 字段对齐 Python `search_single_departure` 组装的候选解 dict
+/// （`search_parallel.py:189-215` 成功 + `:135-150` 失败分支）。`get_all`
+/// 让所有字段在 Python 侧只读可访问；wrapper `grid_search_rust_serial`
+/// 转为 `list[dict]` 返回，保持与 Python sequential 后端返回类型一致。
+///
+/// pyclass 在本 crate（e2m2e-forces 无 pyo3 依赖，纯数学结果由
+/// [`TransferPointResult::from`] 转换）。
+#[pyclass(frozen, get_all)]
+#[derive(Clone, Debug)]
+pub struct TransferPointResult {
+    pub success: bool,
+    pub departure_state: Vec<f64>,
+    pub departure_time: f64,
+    pub alpha: f64,
+    pub transfer_trajectory: Option<Vec<f64>>,
+    pub transfer_times: Option<Vec<f64>>,
+    pub transfer_time: Option<f64>,
+    pub min_distance: Option<f64>,
+    pub min_distance_idx: Option<i64>,
+    pub min_distance_orbit_idx: Option<i64>,
+    pub dv_departure: f64,
+    pub dv_insertion: Option<f64>,
+    pub intersection_found: bool,
+    pub intersection_point: Option<Vec<f64>>,
+    pub intersection_idx: i64,
+    pub first_intersection_idx: Option<i64>,
+    pub first_intersection_time: Option<f64>,
+    pub first_min_distance_idx: Option<i64>,
+    pub first_min_distance_time: Option<f64>,
+    pub local_minimum_found: bool,
+    pub local_minimum_distance: f64,
+    pub local_minimum_idx: i64,
+    pub collision_found: bool,
+    pub collision_body: Option<String>,
+    pub collision_idx: i64,
+    pub status: String,
+}
+
+impl From<e2m2e_forces::transfer_grid_search::TransferPointResult> for TransferPointResult {
+    fn from(r: e2m2e_forces::transfer_grid_search::TransferPointResult) -> Self {
+        Self {
+            success: r.success,
+            departure_state: r.departure_state.to_vec(),
+            departure_time: r.departure_time,
+            alpha: r.alpha,
+            transfer_trajectory: r.transfer_trajectory,
+            transfer_times: r.transfer_times,
+            transfer_time: r.transfer_time,
+            min_distance: r.min_distance,
+            min_distance_idx: r.min_distance_idx,
+            min_distance_orbit_idx: r.min_distance_orbit_idx,
+            dv_departure: r.dv_departure,
+            dv_insertion: r.dv_insertion,
+            intersection_found: r.intersection_found,
+            intersection_point: r.intersection_point,
+            intersection_idx: r.intersection_idx,
+            first_intersection_idx: r.first_intersection_idx,
+            first_intersection_time: r.first_intersection_time,
+            first_min_distance_idx: r.first_min_distance_idx,
+            first_min_distance_time: r.first_min_distance_time,
+            local_minimum_found: r.local_minimum_found,
+            local_minimum_distance: r.local_minimum_distance,
+            local_minimum_idx: r.local_minimum_idx,
+            collision_found: r.collision_found,
+            collision_body: r.collision_body,
+            collision_idx: r.collision_idx,
+            status: r.status,
+        }
+    }
+}
+
+/// Python 接口：转移网格搜索（串行版，阶段 B）。
+///
+/// 不用 Rayon、不释放 GIL（阶段 C 加 `py.allow_threads` + Rayon `par_iter`）。
+/// 展平 POD 输入，调纯 Rust
+/// [`e2m2e_forces::transfer_grid_search::transfer_grid_search_serial`]，
+/// 返回 `Vec<TransferPointResult>`（保序：外层 departure、内层 alpha）。
+///
+/// # 参数
+/// - `dep_states`: `n_dep*6` 展平（行优先）
+/// - `dep_times`: `n_dep`
+/// - `alpha_grid`: `n_alpha`
+/// - `arrival_states`: `n_arrival*6` 展平（行优先）
+/// - 标量包：`mu` / `max_transfer_time` / `integration_dt` /
+///   `intersection_threshold` / `min_distance_threshold` /
+///   `collision_earth_radius` / `collision_moon_radius` / `rtol` / `atol` / `max_step`
+///
+/// # 返回
+/// `list[TransferPointResult]`，长度 `n_dep * n_alpha`。Python 侧
+/// `grid_search_rust_serial` 转 `list[dict]`。
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn transfer_grid_search_serial_py(
+    dep_states: Vec<f64>,
+    dep_times: Vec<f64>,
+    alpha_grid: Vec<f64>,
+    arrival_states: Vec<f64>,
+    mu: f64,
+    max_transfer_time: f64,
+    integration_dt: f64,
+    intersection_threshold: f64,
+    min_distance_threshold: f64,
+    collision_earth_radius: f64,
+    collision_moon_radius: f64,
+    rtol: f64,
+    atol: f64,
+    max_step: f64,
+) -> PyResult<Vec<TransferPointResult>> {
+    use e2m2e_forces::transfer_grid_search::{transfer_grid_search_serial, GridSearchParams};
+
+    let params = GridSearchParams {
+        mu,
+        max_transfer_time,
+        integration_dt,
+        intersection_threshold,
+        min_distance_threshold,
+        collision_earth_radius,
+        collision_moon_radius,
+        rtol,
+        atol,
+        max_step,
+    };
+    let results = transfer_grid_search_serial(
+        &dep_states,
+        &dep_times,
+        &alpha_grid,
+        &arrival_states,
+        &params,
+    );
+    Ok(results.into_iter().map(TransferPointResult::from).collect())
+}
+
 /// 激活 Rust 星历预采样缓存。
 ///
 /// 在积分前把要用到的天体状态与帧旋转矩阵在均匀网格上预采样、建三次样条，
@@ -2492,6 +2626,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(detect_intersection_py, m)?)?;
     m.add_function(wrap_pyfunction!(detect_local_minimum_py, m)?)?;
     m.add_function(wrap_pyfunction!(check_collision_py, m)?)?;
+    m.add_function(wrap_pyfunction!(transfer_grid_search_serial_py, m)?)?;
+    m.add_class::<TransferPointResult>()?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(spice_poc_body_position, m)?)?;
     #[cfg(feature = "spice")]

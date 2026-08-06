@@ -13,3 +13,4 @@ pub mod cr3bp;
 pub mod solid_tide;
 pub mod spherical_harmonic;
 pub mod transfer_geometry;
+pub mod transfer_grid_search;

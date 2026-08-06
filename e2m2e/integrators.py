@@ -14,6 +14,7 @@ try:
         MultistepMethod,
         MultistepResult,
         RkMethod,
+        TransferPointResult,
         build_cr3bp_hamiltonian_py,
         check_collision_py,
         compute_distance_series_py,
@@ -33,6 +34,7 @@ try:
         solid_tide_step2,
         solve_ivp_events_py,
         spherical_harmonic_accel,
+        transfer_grid_search_serial_py,
     )
     from e2m2e._integrators import cowell_step as _cowell_step
     from e2m2e._integrators import multistep_step as _multistep_step
@@ -82,6 +84,7 @@ except ModuleNotFoundError:
     MultistepMethod = None  # type: ignore[misc,assignment]
     MultistepResult = None  # type: ignore[misc,assignment]
     RkMethod = None  # type: ignore[misc,assignment]
+    TransferPointResult = None  # type: ignore[misc,assignment]
     build_cr3bp_hamiltonian_py = None  # type: ignore[misc,assignment]
     check_collision_py = None  # type: ignore[misc,assignment]
     compute_distance_series_py = None  # type: ignore[misc,assignment]
@@ -101,6 +104,7 @@ except ModuleNotFoundError:
     solid_tide_step2 = None  # type: ignore[misc,assignment]
     solve_ivp_events_py = None  # type: ignore[misc,assignment]
     spherical_harmonic_accel = None  # type: ignore[misc,assignment]
+    transfer_grid_search_serial_py = None  # type: ignore[misc,assignment]
     _cowell_step = None  # type: ignore[misc,assignment]
     _multistep_step = None  # type: ignore[misc,assignment]
     _rk_step = None  # type: ignore[misc,assignment]
@@ -168,6 +172,7 @@ __all__ = [
     "disable_ephem_cache",
     "enable_ephem_cache",
     "ephem_ffi_call_count",
+    "grid_search_rust_serial",
     "hello_integrators",
     "indirect_term_acceleration",
     "initialize_abm_history",
@@ -201,6 +206,8 @@ __all__ = [
     "spice_poc_furnsh",
     "spherical_harmonic_accel",
     "third_body_acceleration",
+    "TransferPointResult",
+    "transfer_grid_search_serial_py",
 ]
 
 
@@ -435,3 +442,116 @@ def solve_ivp_events(
         max_steps,
         state_error_dim,
     )
+
+
+def grid_search_rust_serial(
+    dep_states: npt.ArrayLike,
+    dep_times: npt.ArrayLike,
+    alpha_grid: npt.ArrayLike,
+    arrival_states: npt.ArrayLike,
+    *,
+    mu: float,
+    max_transfer_time: float,
+    integration_dt: float,
+    intersection_threshold: float,
+    min_distance_threshold: float,
+    collision_earth_radius: float,
+    collision_moon_radius: float,
+    rtol: float,
+    atol: float,
+    max_step: float,
+) -> list[dict[str, Any]]:
+    """转移网格搜索 Rust 串行后端（阶段 B）。
+
+    展平 POD 输入 → 调 ``transfer_grid_search_serial_py`` → 转 ``list[dict]``。
+    返回字段对齐 ``search_parallel.grid_search_sequential``，便于逐候选等价
+    对照（整数索引精确相等、浮点 ``allclose``）。
+
+    本 wrapper 只做数组→dict 转换，不依赖 transfer 算法层（分层：算法层调
+    数值层合法，数值层不反向依赖）。出发轨道采样（``sample_departure_points``）
+    与 Orbit 展平由调用方完成；阶段 D 的 ``grid_search_rust`` 编排器会在此之上
+    接入 ``TransferSearch``。
+
+    Args:
+        dep_states: ``(n_dep, 6)`` 或展平 ``n_dep*6`` 出发状态。
+        dep_times: ``(n_dep,)`` 出发时刻。
+        alpha_grid: ``(n_alpha,)`` 切向速度比 α 网格。
+        arrival_states: ``(n_arrival, 6)`` 或展平目标轨道状态。
+        mu / max_transfer_time / integration_dt / intersection_threshold /
+            min_distance_threshold / collision_earth_radius /
+            collision_moon_radius: CR3BP 与搜索标量配置。
+        rtol / atol / max_step: 积分器容差与最大步长。
+
+    Returns:
+        ``list[dict]``，长度 ``n_dep * n_alpha``，顺序为外层 departure、
+        内层 alpha（与 ``grid_search_sequential`` 一致）。
+    """
+    if transfer_grid_search_serial_py is None:
+        raise RuntimeError("Rust 扩展未构建（transfer_grid_search_serial_py 不可用）")
+    if CowellResult is not None:
+        _check_rust_abi()
+
+    dep_states_arr = np.asarray(dep_states, dtype=float).reshape(-1)
+    dep_times_arr = np.asarray(dep_times, dtype=float).reshape(-1)
+    alpha_arr = np.asarray(alpha_grid, dtype=float).reshape(-1)
+    arrival_arr = np.asarray(arrival_states, dtype=float).reshape(-1)
+
+    results = transfer_grid_search_serial_py(
+        dep_states_arr.tolist(),
+        dep_times_arr.tolist(),
+        alpha_arr.tolist(),
+        arrival_arr.tolist(),
+        float(mu),
+        float(max_transfer_time),
+        float(integration_dt),
+        float(intersection_threshold),
+        float(min_distance_threshold),
+        float(collision_earth_radius),
+        float(collision_moon_radius),
+        float(rtol),
+        float(atol),
+        float(max_step),
+    )
+    return [_transfer_point_result_to_dict(r) for r in results]
+
+
+def _transfer_point_result_to_dict(r: TransferPointResult) -> dict[str, Any]:
+    """``TransferPointResult`` pyclass → dict，字段对齐 ``search_single_departure``。
+
+    数组字段（``transfer_trajectory``/``intersection_point``/``transfer_times``）
+    还原为 numpy 数组，与 Python sequential 后端返回类型一致。
+    """
+    traj = r.transfer_trajectory
+    traj_arr = np.asarray(traj, dtype=float).reshape(-1, 6) if traj is not None else None
+    times = r.transfer_times
+    times_arr = np.asarray(times, dtype=float) if times is not None else None
+    int_pt = r.intersection_point
+    int_pt_arr = np.asarray(int_pt, dtype=float) if int_pt is not None else None
+    return {
+        "success": r.success,
+        "departure_state": np.asarray(r.departure_state, dtype=float),
+        "departure_time": r.departure_time,
+        "alpha": r.alpha,
+        "transfer_trajectory": traj_arr,
+        "transfer_times": times_arr,
+        "transfer_time": r.transfer_time,
+        "min_distance": r.min_distance,
+        "min_distance_idx": r.min_distance_idx,
+        "min_distance_orbit_idx": r.min_distance_orbit_idx,
+        "dv_departure": r.dv_departure,
+        "dv_insertion": r.dv_insertion,
+        "intersection_found": r.intersection_found,
+        "intersection_point": int_pt_arr,
+        "intersection_idx": r.intersection_idx,
+        "first_intersection_idx": r.first_intersection_idx,
+        "first_intersection_time": r.first_intersection_time,
+        "first_min_distance_idx": r.first_min_distance_idx,
+        "first_min_distance_time": r.first_min_distance_time,
+        "local_minimum_found": r.local_minimum_found,
+        "local_minimum_distance": r.local_minimum_distance,
+        "local_minimum_idx": r.local_minimum_idx,
+        "collision_found": r.collision_found,
+        "collision_body": r.collision_body,
+        "collision_idx": r.collision_idx,
+        "status": r.status,
+    }
