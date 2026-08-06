@@ -42,7 +42,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from e2m2e.io import (
+from scripts.dfh_inputs_dac import (
     format_inputs_control,
     format_inputs_design,
     format_inputs_propagate,

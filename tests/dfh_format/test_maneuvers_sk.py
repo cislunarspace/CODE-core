@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from e2m2e.io import parse_maneuvers, parse_sk_statistic, read_maneuvers, read_sk_statistic
+from e2m2e.data.types.maneuver import parse_maneuvers, read_maneuvers
+from e2m2e.data.types.sk_statistic import parse_sk_statistic, read_sk_statistic
 
 
 class TestManeuvers:

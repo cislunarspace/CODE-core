@@ -11,10 +11,10 @@ ControlMode=1 的默认参数，因此用默认参数调用即可复现。
 
 from pathlib import Path
 
-import e2m2e.io
-from e2m2e.io import format_inputs_control
+import scripts.dfh_inputs_dac as dfh_inputs_dac
+from scripts.dfh_inputs_dac import format_inputs_control
 
-GOLDEN = Path(e2m2e.io.__file__).parent / "data" / "inputs-dac.golden"
+GOLDEN = Path(dfh_inputs_dac.__file__).parent / "data" / "inputs-dac.golden"
 
 
 def _split_fields(line: str) -> tuple[str, str]:

@@ -8,10 +8,11 @@ from pathlib import Path
 
 import pytest
 
-import e2m2e.io
-from e2m2e.io import format_inputs_design, format_inputs_propagate, write_inputs_dac
+import scripts.dfh_inputs_dac as dfh_inputs_dac
+from scripts.dfh_inputs_dac import format_inputs_control as _fmt_ctrl
+from scripts.dfh_inputs_dac import format_inputs_design, format_inputs_propagate, write_inputs_dac
 
-GOLDEN = Path(e2m2e.io.__file__).parent / "data" / "inputs-dac.golden"
+GOLDEN = Path(dfh_inputs_dac.__file__).parent / "data" / "inputs-dac.golden"
 
 # golden 中 DRO 设计块的参数（L5-L29）
 DRO_PARAMS = {
@@ -154,15 +155,15 @@ class TestControl:
     """功能码 2（轨道控制）段生成：默认参数与 golden 控制段逐值一致。"""
 
     def test_line_count(self):
-        lines = e2m2e.io.format_inputs_control()
+        lines = _fmt_ctrl()
         assert len(lines) == 245
 
     def test_function_code_row(self):
-        lines = e2m2e.io.format_inputs_control()
+        lines = _fmt_ctrl()
         assert _value_tokens(lines[0]) == [2]
 
     def test_non_control_lines_byte_identical(self):
-        lines = e2m2e.io.format_inputs_control()
+        lines = _fmt_ctrl()
         golden = _golden_lines()
         # 控制段 L169-216（0 起始 168-215）之外逐字节保留
         assert lines[:168] == golden[:168]
@@ -170,7 +171,7 @@ class TestControl:
 
     def test_control_block_matches_golden_defaults(self):
         """默认参数生成的 48 行控制段与 golden 逐值一致。"""
-        lines = e2m2e.io.format_inputs_control()
+        lines = _fmt_ctrl()
         golden = _golden_lines()
         for i in range(168, 216):
             if i == 168:  # L169 为 #### 分隔行
@@ -180,7 +181,7 @@ class TestControl:
             )
 
     def test_parameter_override(self):
-        lines = e2m2e.io.format_inputs_control(
+        lines = _fmt_ctrl(
             control_mode=3,
             is_nrho=1,
             special_mode=2,
@@ -196,7 +197,7 @@ class TestControl:
         assert _value_tokens(lines[207]) == [0.05]
 
     def test_perturbation_override(self):
-        lines = e2m2e.io.format_inputs_control(
+        lines = _fmt_ctrl(
             perturbation={"solar_radiation": 1, "coupling": 0},
             real_perturbation={"solar_radiation": 1, "coupling": 0},
         )

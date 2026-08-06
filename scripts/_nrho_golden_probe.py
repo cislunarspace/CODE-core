@@ -16,7 +16,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from e2m2e.io import format_inputs_design, write_inputs_dac
+from scripts.dfh_inputs_dac import format_inputs_design, write_inputs_dac
 
 ORBIT_DIR = Path(
     r"C:\Users\ouyangjiahong\Downloads\Compressed\orbit-design-module"

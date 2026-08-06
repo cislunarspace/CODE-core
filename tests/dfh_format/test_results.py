@@ -3,7 +3,12 @@
 import numpy as np
 import pytest
 
-from e2m2e.io import parse_results_hmn, parse_results_multi, read_results_hmn, read_results_wsb
+from scripts.dfh_results import (
+    parse_results_hmn,
+    parse_results_multi,
+    read_results_hmn,
+    read_results_wsb,
+)
 
 
 class TestResultsHmn:

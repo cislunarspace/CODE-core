@@ -33,7 +33,7 @@ class TestEphemerisTable:
 
     def test_roundtrip_via_io_functions(self, tmp_path):
         """与 io/ 临时脚本的读写函数互通。"""
-        from e2m2e.io.ephemeris import read_ephemeris, write_ephemeris
+        from e2m2e.data.types.trajectory import read_ephemeris, write_ephemeris
 
         t = _table()
         out = tmp_path / "EPHEMERIDES_OUT.TXT"

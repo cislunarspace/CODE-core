@@ -25,13 +25,13 @@ import pytest
 
 from e2m2e.algorithm.design.design_orbit import DesignNotConvergedError, design_orbit
 from e2m2e.algorithm.station_keeping.controller import control_orbit
-from e2m2e.io import (
+from e2m2e.data.types.maneuver import read_maneuvers
+from e2m2e.data.types.sk_statistic import read_sk_statistic
+from e2m2e.data.types.trajectory import read_ephemeris
+from scripts.dfh_inputs_dac import (
     format_inputs_control,
     format_inputs_design,
     format_inputs_propagate,
-    read_ephemeris,
-    read_maneuvers,
-    read_sk_statistic,
     write_inputs_dac,
 )
 

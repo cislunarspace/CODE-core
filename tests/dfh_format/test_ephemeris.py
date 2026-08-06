@@ -3,7 +3,12 @@
 import numpy as np
 import pytest
 
-from e2m2e.io import EphemerisTable, parse_ephemeris, read_ephemeris, write_ephemeris
+from e2m2e.data.types.trajectory import (
+    EphemerisTable,
+    parse_ephemeris,
+    read_ephemeris,
+    write_ephemeris,
+)
 
 
 class TestReadEphemeris:

@@ -7,8 +7,8 @@
    星历 N 体模型下多重打靶收敛（``algorithms.ephemeris_correction``
    注册表）；
 3. 标称星历：以修正后首节点状态为初值，在
-   ``io.dfh_perturbation_to_force_config`` 映射出的高精度力模型下
-   长期预报，输出 DFH 同格式星历（``io.EphemerisTable``）。
+   ``dfh_perturbation_to_force_config`` 映射出的高精度力模型下
+   长期预报，输出 DFH 同格式星历（``EphemerisTable``）。
 
 参数语义对齐 MATLAB ``design_orbit.m`` 与 inputs-dac.txt 设计块：
 DRO 振幅+初始相位；Halo 共线点编号+带符号面外振幅+初始相位；
@@ -38,7 +38,7 @@ from typing import Any
 
 import numpy as np
 
-from e2m2e.io import EphemerisTable
+from e2m2e.data.types.trajectory import EphemerisTable
 
 from ...data.kernels._spice_loader import get_spiceypy
 from ...data.kernels.manager import SPICEManager
@@ -166,7 +166,7 @@ class OrbitDesignResult:
 
     def write_ephemeris(self, path: str | Path) -> None:
         """按 DFH EPHEMERIDES 格式写出标称星历。"""
-        from e2m2e.io import write_ephemeris
+        from ...data.types.trajectory import write_ephemeris
 
         write_ephemeris(self.ephemeris, path)
 
@@ -745,8 +745,8 @@ def design_orbit(
         duration: 维持时间（年，0 < d ≤ 20）。
         output_step: 星历输出间隔（秒）。
         perturbation: DFH 摄动开关字典（键与取值同
-            ``io.inputs_dac.DEFAULT_PERTURBATION``），经
-            ``io.dfh_perturbation_to_force_config`` 映射为力模型。缺省时用
+            ``DEFAULT_PERTURBATION``），经
+            ``dfh_perturbation_to_force_config`` 映射为力模型。缺省时用
             ``DEFAULT_DESIGN_PERTURBATION``：光压炮弹模型、关耦合项
             （ECOM 光压与耦合项属 #253，需要时显式开启会抛
             ``NotImplementedError``）。

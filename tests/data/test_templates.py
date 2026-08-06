@@ -69,8 +69,8 @@ class TestPerturbationDefaults:
         assert len(DEFAULT_DYB) == 9
 
     def test_io_uses_data_layer_defaults(self):
-        from e2m2e.io import DEFAULT_DYB as io_dyb
-        from e2m2e.io import DEFAULT_PERTURBATION as io_perturb
+        from e2m2e.data.templates.perturbations import DEFAULT_DYB as io_dyb
+        from e2m2e.data.templates.perturbations import DEFAULT_PERTURBATION as io_perturb
 
         assert io_dyb == DEFAULT_DYB
         assert io_perturb == DEFAULT_PERTURBATION

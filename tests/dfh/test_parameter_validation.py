@@ -10,7 +10,7 @@ import pytest
 
 from e2m2e.algorithm.design import design_orbit
 from e2m2e.algorithm.station_keeping import control_orbit
-from e2m2e.io import format_inputs_propagate
+from scripts.dfh_inputs_dac import format_inputs_propagate
 
 
 # =============================================================================

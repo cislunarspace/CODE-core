@@ -19,7 +19,11 @@
 import numpy as np
 import pytest
 
-from e2m2e.io import format_inputs_control, format_inputs_design, format_inputs_propagate
+from scripts.dfh_inputs_dac import (
+    format_inputs_control,
+    format_inputs_design,
+    format_inputs_propagate,
+)
 
 EPOCH = [2024, 1, 1, 0, 0, 0.0]
 

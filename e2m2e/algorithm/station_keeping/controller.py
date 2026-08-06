@@ -22,11 +22,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from e2m2e.io.ephemeris import read_ephemeris
-from e2m2e.io.inputs_dac import DEFAULT_DYB, DEFAULT_PERTURBATION
-
 from ...data.kernels.manager import SPICEManager
+from ...data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
 from ...data.types import EphemerisTable, ManeuverTable, SKStatistic
+from ...data.types.trajectory import read_ephemeris
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
@@ -72,9 +71,9 @@ class ControlOrbitResult:
 
     def write_outputs(self, out_dir: str | Path, mode: int = 1) -> list[Path]:
         """把三个输出文件写入目录（SK_STATISTIC/MANEUVERS/受控星历）。"""
-        from e2m2e.io.ephemeris import write_ephemeris
-        from e2m2e.io.maneuvers import write_maneuvers
-        from e2m2e.io.sk_statistic import write_sk_statistic
+        from ...data.types.maneuver import write_maneuvers
+        from ...data.types.sk_statistic import write_sk_statistic
+        from ...data.types.trajectory import write_ephemeris
 
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)

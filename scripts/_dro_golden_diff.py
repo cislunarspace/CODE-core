@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 from e2m2e.algorithm.design import design_orbit
-from e2m2e.io import read_ephemeris
+from e2m2e.data.types.trajectory import read_ephemeris
 
 t0 = time.time()
 r = design_orbit(

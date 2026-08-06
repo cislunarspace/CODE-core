@@ -24,7 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
+from e2m2e.data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
 
 __all__ = [
     "DEFAULT_DYB",

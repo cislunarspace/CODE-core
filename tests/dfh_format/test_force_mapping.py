@@ -4,7 +4,7 @@ import pytest
 
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.force_config import dump_force_config, load_force_config
-from e2m2e.io import PLANET_BODIES, dfh_perturbation_to_force_config
+from e2m2e.algorithm.forces.force_mapping import PLANET_BODIES, dfh_perturbation_to_force_config
 
 _ALL_OFF = {
     "sun_body": 0,
