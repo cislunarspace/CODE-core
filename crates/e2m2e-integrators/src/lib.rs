@@ -1674,6 +1674,77 @@ fn propagate_with_stm_py(
     Ok(dict.into())
 }
 
+/// Python 接口：6 维纯状态传播（不含 STM）。
+///
+/// 纯 N 体模型，与 `propagate_with_stm_py` 同用 `solve_ivp_capped`，保证
+/// 两条路径的 states 前 6 维逐位相等（parity）。供 `EphemerisDynamics`
+/// 的纯状态路径（`with_stm=False`）透明走 Rust，省去 42 维 STM 的开销。
+///
+/// # 参数
+/// 同 `propagate_with_stm_py`，但不返回 STM。
+///
+/// # 返回
+/// Python dict：`{"states": [[6], ...], "time": [...]}`
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[pyo3(signature = (bodies, origin, gm_values, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None))]
+#[allow(clippy::too_many_arguments)]
+fn propagate_with_state_py(
+    bodies: Vec<String>,
+    origin: String,
+    gm_values: Vec<f64>,
+    t_span: (f64, f64),
+    t_eval: Vec<f64>,
+    initial_state: Vec<f64>,
+    rtol: f64,
+    atol: f64,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::forces::nbody_stm::{propagate_with_state, NBodyConfig};
+
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    if gm_values.len() != bodies.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "gm_values length ({}) must match bodies length ({})",
+            gm_values.len(),
+            bodies.len()
+        )));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+
+    let config = NBodyConfig {
+        bodies,
+        origin,
+        gm_values,
+    };
+
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    let result = propagate_with_state(
+        &config, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
+    )
+    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("propagation failed: {}", e)))?;
+
+    let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
+
+    let dict = PyDict::new(py);
+    dict.set_item("states", states_list)?;
+    dict.set_item("time", result.times)?;
+    Ok(dict.into())
+}
+
 /// 编译型力模型 + STM 的 PD45 传播（消除 cspice 隔离）。
 ///
 /// 与 `propagate_with_stm_py`（纯 NBody）不同，本函数支持所有编译型力模型：
@@ -2327,6 +2398,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(augmented_eom_7d_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_with_stm_py, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(propagate_with_state_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
     #[cfg(feature = "spice")]

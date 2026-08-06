@@ -5,6 +5,8 @@
 //!    加速度 a 和雅可比 ∂a/∂r（从 `_compute_acc_and_jacobian` 迁移）
 //! 2. `propagate_with_stm`：42 维增广状态传播（6 状态 + 36 STM 展平），
 //!    使用 `solve_ivp_capped` + STM 变分方程（dΦ/dt = A·Φ）
+//! 3. `propagate_with_state`：6 维纯状态传播，与 `propagate_with_stm` 同用
+//!    `solve_ivp_capped`，保证两条路径 states 前 6 维逐位相等（parity）。
 //!
 //! ## 物理模型
 //! 以 `origin` 为坐标原点的受限 N 体问题：
@@ -94,6 +96,70 @@ pub fn compute_nbody_acceleration_and_jacobian(
     }
 
     Ok((acc, jac))
+}
+
+/// 只计算 N 体加速度（不算雅可比）。
+///
+/// 加速度公式与 `compute_nbody_acceleration_and_jacobian` 逐位相同：中心
+/// 天体用相同的 `r_safe` 钳位与 `inv_r3`，摄动天体改用
+/// `spk_accel::third_body_acceleration`（只查一次 SPICE，不算雅可比——其
+/// 加速度公式与 `third_body_acceleration_and_jacobian` 逐字一致，见
+/// `spk_accel.rs`）。
+///
+/// 供纯状态传播 `propagate_with_state` 使用。逐位相同的加速度是纯状态
+/// 路径与 STM 路径 states 前 6 维逐位一致（parity）的前提：两条路径同用
+/// `solve_ivp_capped`（相同积分循环），当初始步长被 `max_step` 钳位时
+/// （星历传播 km 量级状态下的常态），步长序列完全一致。
+pub fn compute_nbody_acceleration(
+    config: &NBodyConfig,
+    et: f64,
+    r_sc: &[f64; 3],
+) -> Result<[f64; 3], String> {
+    let mut acc = [0.0_f64; 3];
+
+    for (body, gm) in config.bodies.iter().zip(config.gm_values.iter()) {
+        if body == &config.origin {
+            // 中心天体：a = -μ·r/|r|³（与 compute_nbody_acceleration_and_jacobian 逐位相同）
+            let r_norm_sq = r_sc[0] * r_sc[0] + r_sc[1] * r_sc[1] + r_sc[2] * r_sc[2];
+            let r_norm = r_norm_sq.sqrt();
+            let r_safe = if r_norm < MIN_DISTANCE {
+                MIN_DISTANCE
+            } else {
+                r_norm
+            };
+            let inv_r3 = 1.0 / (r_safe * r_safe * r_safe);
+            for i in 0..3 {
+                acc[i] -= gm * r_sc[i] * inv_r3;
+            }
+        } else {
+            // 摄动天体：只算加速度，不算雅可比（避免雅可比开销）
+            let a_body = spk_accel::third_body_acceleration(
+                et,
+                body,
+                &config.origin,
+                r_sc,
+                *gm,
+                MIN_DISTANCE,
+            )
+            .map_err(|e| format!("SPICE query failed for {}: {:?}", body, e))?;
+            for i in 0..3 {
+                acc[i] += a_body[i];
+            }
+        }
+    }
+
+    Ok(acc)
+}
+
+/// 6 维纯状态右端项 `[v(3), a(3)]`。
+///
+/// 加速度由 `compute_nbody_acceleration` 计算，与 `augmented_eom` 中的
+/// 加速度逐位相同。供 `propagate_with_state` 使用。
+fn state_eom(config: &NBodyConfig, et: f64, state: &[f64; 6]) -> Result<[f64; 6], String> {
+    let r_sc = [state[0], state[1], state[2]];
+    let v = [state[3], state[4], state[5]];
+    let acc = compute_nbody_acceleration(config, et, &r_sc)?;
+    Ok([v[0], v[1], v[2], acc[0], acc[1], acc[2]])
 }
 
 /// STM 变分方程的右端项：dΦ/dt = A · Φ。
@@ -285,6 +351,103 @@ pub fn propagate_with_stm(
         stms,
         times,
     })
+}
+
+/// 纯状态传播结果（不含 STM）。
+pub struct StatePropagationResult {
+    /// 各 `t_eval` 时刻的状态向量 `[x, y, z, vx, vy, vz]`（km, km/s）。
+    pub states: Vec<[f64; 6]>,
+    /// 实际输出的时间点（与 `t_eval` 一一对应）。
+    pub times: Vec<f64>,
+}
+
+/// 6 维纯状态传播（不含 STM）。
+///
+/// 与 `propagate_with_stm` 同用 `solve_ivp_capped`（DOP853），因此两条路径
+/// 走同一积分循环：相同的 PD78 Butcher 表、相同的 `error_dim = Some(6)`
+/// 误差统计、相同的 `suggest_next_step` 步长建议。星历传播的状态为 km
+/// 量级，自适应初始步长远大于 `max_step`，故两条路径的初始步长都被
+/// `max_step` 钳位为同一值，后续步长序列完全一致——states 前 6 维与
+/// `propagate_with_stm` 逐位相等（parity）。
+///
+/// 力模型回调 `state_eom` 只算加速度（`compute_nbody_acceleration`），
+/// 不算雅可比，比 42 维 STM 路径省去雅可比与 STM 变分方程的开销。
+/// `solve_ivp_capped` 内部按 `t_span` 方向带符号步进，支持双向积分
+/// （`t_span.1 < t_span.0`）。
+///
+/// # 参数
+/// - `config`: N 体力模型配置
+/// - `t_span`: 积分区间 `(t_start, t_end)`（SPICE et 秒）
+/// - `t_eval`: 输出时间点（须在 `t_span` 内，方向与 `t_span` 一致）
+/// - `initial_state`: 初始状态 `[x, y, z, vx, vy, vz]`（km, km/s）
+/// - `rtol`, `atol`: 积分容差
+/// - `max_step`: 最大步长（秒），`None` 则不限制
+/// - `max_steps`: 最大步数，`None` 则用默认上限
+///
+/// # 返回
+/// `StatePropagationResult`：每个 `t_eval` 对应的状态和时间。
+///
+/// # 错误
+/// - 初值处右端项求值失败（如 SPICE 内核缺失）；
+/// - 积分提前退出导致输出点数少于 `t_eval.len()`（不允许静默截断，issue #246）。
+#[allow(clippy::too_many_arguments)]
+pub fn propagate_with_state(
+    config: &NBodyConfig,
+    t_span: (f64, f64),
+    t_eval: &[f64],
+    initial_state: &[f64; 6],
+    rtol: f64,
+    atol: f64,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+) -> Result<StatePropagationResult, String> {
+    use e2m2e_propagation::solve_ivp::solve_ivp_capped;
+
+    // 预检：初值处右端项必须可求值（issue #246，与 propagate_with_stm 一致）。
+    state_eom(config, t_span.0, initial_state)?;
+
+    let h_max = max_step.unwrap_or(f64::INFINITY);
+    let s_max = max_steps.unwrap_or(500_000);
+
+    let sol = solve_ivp_capped(
+        |t: f64, y: &[f64]| -> Result<Vec<f64>, String> {
+            let mut s = [0.0_f64; 6];
+            s.copy_from_slice(&y[..6]);
+            let result = state_eom(config, t, &s)?;
+            Ok(result.to_vec())
+        },
+        t_span,
+        initial_state,
+        t_eval,
+        rtol,
+        atol,
+        h_max,
+        s_max,
+        Some(6), // 全 6 维统计误差，与 propagate_with_stm 的前 6 维语义一致
+    );
+
+    // 完整性校验（issue #246，与 propagate_with_stm 一致）。
+    if sol.len() != t_eval.len() {
+        return Err(format!(
+            "propagation truncated: got {} of {} time points (t_span=({:.3}, {:.3})); \
+             likely cause: SPICE kernels not loaded or step size collapsed",
+            sol.len(),
+            t_eval.len(),
+            t_span.0,
+            t_span.1,
+        ));
+    }
+
+    let mut states = Vec::with_capacity(sol.len());
+    let mut times = Vec::with_capacity(sol.len());
+    for (i, y) in sol.iter().enumerate() {
+        let mut s = [0.0_f64; 6];
+        s.copy_from_slice(&y[..6]);
+        states.push(s);
+        times.push(t_eval[i]);
+    }
+
+    Ok(StatePropagationResult { states, times })
 }
 
 #[cfg(test)]

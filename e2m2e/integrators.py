@@ -46,6 +46,7 @@ try:
             propagate_compiled_lowthrust,
             propagate_compiled_lowthrust_sensitivity,
             propagate_compiled_stm_py,
+            propagate_with_state_py,
             propagate_with_stm_py,
             reset_ephem_ffi_call_count,
             segmented_shooting_correct_py,
@@ -63,6 +64,7 @@ try:
         propagate_compiled_lowthrust = None  # type: ignore[misc,assignment]
         propagate_compiled_lowthrust_sensitivity = None  # type: ignore[misc,assignment]
         propagate_compiled_stm_py = None  # type: ignore[misc,assignment]
+        propagate_with_state_py = None  # type: ignore[misc,assignment]
         propagate_with_stm_py = None  # type: ignore[misc,assignment]
         reset_ephem_ffi_call_count = None  # type: ignore[misc,assignment]
         segmented_shooting_correct_py = None  # type: ignore[misc,assignment]
@@ -102,6 +104,7 @@ except ModuleNotFoundError:
     propagate_compiled_lowthrust = None  # type: ignore[misc,assignment]
     propagate_compiled_lowthrust_sensitivity = None  # type: ignore[misc,assignment]
     propagate_compiled_stm_py = None  # type: ignore[misc,assignment]
+    propagate_with_state_py = None  # type: ignore[misc,assignment]
     propagate_with_stm_py = None  # type: ignore[misc,assignment]
     reset_ephem_ffi_call_count = None  # type: ignore[misc,assignment]
     segmented_shooting_correct_py = None  # type: ignore[misc,assignment]
@@ -170,6 +173,7 @@ __all__ = [
     "propagate_bcr4bp_stm_py",
     "propagate_cr3bp_py",
     "propagate_cr3bp_stm_py",
+    "propagate_with_state_py",
     "propagate_with_stm_py",
     "reset_ephem_ffi_call_count",
     "rk_step",

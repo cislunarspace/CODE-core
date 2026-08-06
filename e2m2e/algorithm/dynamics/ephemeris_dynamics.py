@@ -42,13 +42,15 @@ from .dynamics import Dynamics
 from .ephemeris_system import EphemerisSystem
 
 try:
-    from e2m2e.integrators import propagate_with_stm_py
+    from e2m2e.integrators import propagate_with_state_py, propagate_with_stm_py
 
-    if propagate_with_stm_py is None:
+    if propagate_with_stm_py is None or propagate_with_state_py is None:
         raise ImportError
     _HAS_RUST_STM = True
+    _HAS_RUST_STATE = True
 except ImportError:
     _HAS_RUST_STM = False
+    _HAS_RUST_STATE = False
 
 
 class EphemerisDynamics(Dynamics):
@@ -100,9 +102,16 @@ class EphemerisDynamics(Dynamics):
     ) -> dict[str, Any]:
         """增广状态积分（含 STM），优先走 Rust 快速路径。
 
-        Rust STM 路径不支持事件检测；传入 events 时回退 scipy 路径。
+        Rust STM 路径不支持事件检测。全仓无调用者给 ``EphemerisDynamics`` 传
+        ``events``，故 ``events`` 非 None 时直接 ``NotImplementedError``
+        （显式报错优于静默回退 scipy）。
         """
-        if _HAS_RUST_STM and events is None:
+        if events is not None:
+            raise NotImplementedError(
+                "EphemerisDynamics 的 STM 传播不支持事件检测（events 非 None）；"
+                "如需事件检测请改用 solve_ivp_events"
+            )
+        if _HAS_RUST_STM:
             return self._propagate_with_stm_rust(
                 initial_state,
                 t_span,
@@ -164,6 +173,86 @@ class EphemerisDynamics(Dynamics):
         self.last_stm = stm
 
         return {"time": time, "states": states, "stm": stm}
+
+    def _propagate_state_only(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+        with_jacobi: bool,
+        events: list[Callable[[float, np.ndarray], float]] | None = None,
+    ) -> dict[str, Any]:
+        """纯状态积分（不含 STM），优先走 Rust 快速路径。
+
+        Rust 纯状态路径与 STM 路径同用 ``solve_ivp_capped``，states 前 6 维
+        与 STM 路径逐位一致（parity），且省去 42 维 STM 变分方程的开销。
+        不支持事件检测；``events`` 非 None 时直接 ``NotImplementedError``。
+        """
+        if events is not None:
+            raise NotImplementedError(
+                "EphemerisDynamics 的纯状态传播不支持事件检测（events 非 None）；"
+                "如需事件检测请改用 solve_ivp_events"
+            )
+        if _HAS_RUST_STATE:
+            return self._propagate_state_rust(
+                initial_state,
+                t_span,
+                t_eval,
+                max_step,
+            )
+        return super()._propagate_state_only(
+            initial_state,
+            t_span,
+            t_eval,
+            max_step,
+            with_jacobi,
+            events,
+        )
+
+    def _propagate_state_rust(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+    ) -> dict[str, Any]:
+        """Rust 快速路径：调用 propagate_with_state_py 完成纯状态传播。"""
+        system: EphemerisSystem = self.system
+        bodies = list(system.bodies)
+        origin = system.origin
+        gm_values = [float(gm) for gm in system.get_gm_values()]
+
+        if t_eval is not None:
+            t_eval_list = [float(t) for t in np.asarray(t_eval, dtype=float).ravel()]
+        else:
+            t_eval_list = [float(t_span[0]), float(t_span[1])]
+
+        result = propagate_with_state_py(
+            bodies=bodies,
+            origin=origin,
+            gm_values=gm_values,
+            t_span=(float(t_span[0]), float(t_span[1])),
+            t_eval=t_eval_list,
+            initial_state=[float(x) for x in initial_state[:6]],
+            rtol=self.rtol,
+            atol=self.atol,
+            max_step=float(max_step),
+        )
+
+        states = np.array(result["states"])
+        time = np.array(result["time"])
+
+        # 防御性校验（issue #246，与 _propagate_with_stm_rust 一致）。
+        if len(time) != len(t_eval_list):
+            raise RuntimeError(
+                f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
+                f"requested time points; the trajectory is truncated"
+            )
+
+        self.last_trajectory = (time, states)
+
+        return {"time": time, "states": states}
 
     def _compute_acc_and_jacobian(
         self,
