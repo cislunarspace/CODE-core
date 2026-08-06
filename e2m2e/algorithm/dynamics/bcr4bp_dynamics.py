@@ -31,6 +31,16 @@ from .bcr4bp_system import BCR4BPSystem
 from .dynamics import Dynamics
 from .potential import pseudo_potential_hessian
 
+# Rust BCR4BP 快速路径探测：扩展未构建（如 doc build）时静默降级到 scipy。
+try:
+    from e2m2e.integrators import propagate_bcr4bp_py, propagate_bcr4bp_stm_py
+
+    if propagate_bcr4bp_stm_py is None or propagate_bcr4bp_py is None:
+        raise ImportError
+    _HAS_RUST_BCR4BP_STM = True
+except ImportError:
+    _HAS_RUST_BCR4BP_STM = False
+
 
 class BCR4BP_Dynamics(Dynamics):
     """BCR4BP 动力学方程（CR3BP + 太阳质点摄动）
@@ -174,6 +184,141 @@ class BCR4BP_Dynamics(Dynamics):
         stm_dot = A @ stm
 
         return np.concatenate([state_derivative, stm_dot.flatten()])
+
+    def _propagate_with_stm(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+        with_jacobi: bool,
+        events: list[Callable[[float, np.ndarray], float]] | None = None,
+    ) -> dict[str, Any]:
+        """增广状态积分（含 STM），优先走 Rust 快速路径。
+
+        BCR4BP 的 Rust 路径不支持事件检测，且按设计不静默回退 scipy：
+        传入 ``events`` 直接报错（信任 Rust 路径，避免悄悄退回 scipy）。
+        扩展未构建（``_HAS_RUST_BCR4BP_STM=False``）时降级 scipy。
+        """
+        if events is not None:
+            raise NotImplementedError("BCR4BP Rust 路径不支持事件检测，且不提供 scipy 回退")
+        if _HAS_RUST_BCR4BP_STM:
+            return self._propagate_with_stm_rust(
+                initial_state, t_span, t_eval, max_step, with_jacobi
+            )
+        return super()._propagate_with_stm(
+            initial_state, t_span, t_eval, max_step, with_jacobi, events
+        )
+
+    def _propagate_with_stm_rust(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+        with_jacobi: bool,
+    ) -> dict[str, Any]:
+        """Rust 快速路径：调用 propagate_bcr4bp_stm_py 完成 STM 传播。
+
+        初始 STM 由 Rust 侧设为单位矩阵，返回的 stm 形状为 (n, 6, 6)，
+        ``stm[k][i][j] = ∂state(t_k)[i]/∂state(t0)[j]``。
+        """
+        mu = float(self.system.mu)
+        if t_eval is not None:
+            t_eval_list = [float(t) for t in np.asarray(t_eval, dtype=float).ravel()]
+        else:
+            t_eval_list = [float(t_span[0]), float(t_span[1])]
+
+        result = propagate_bcr4bp_stm_py(
+            mu=mu,
+            mu_sun=float(self.system.sun_mass),
+            sun_distance=float(self.system.sun_distance),
+            sun_angular_rate=float(self.system.sun_angular_rate),
+            sun_phase0=float(self.system.sun_phase0),
+            t_span=(float(t_span[0]), float(t_span[1])),
+            t_eval=t_eval_list,
+            initial_state=[float(x) for x in initial_state[:6]],
+            rtol=self.rtol,
+            atol=self.atol,
+            max_step=float(max_step),
+        )
+
+        states = np.array(result["states"])
+        stm = np.array(result["stm"]).reshape(-1, 6, 6)
+        time = np.array(result["time"])
+
+        # 防御性校验：Rust 侧任何提前退出都必须在这里暴露，不允许把截断
+        # 结果当完整轨迹返回（issue #246，照抄 cr3bp 的 _propagate_with_stm_rust）。
+        if len(time) != len(t_eval_list):
+            raise RuntimeError(
+                f"Rust STM propagation returned {len(time)} of {len(t_eval_list)} "
+                f"requested time points; the trajectory is truncated"
+            )
+
+        self.last_trajectory = (time, states)
+        self.last_stm = stm
+
+        out: dict[str, Any] = {"time": time, "states": states, "stm": stm}
+        if with_jacobi:
+            out = self._handle_jacobi(states, out)
+        return out
+
+    def _propagate_state_only(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+        with_jacobi: bool,
+        events: list[Callable[[float, np.ndarray], float]] | None = None,
+    ) -> dict[str, Any]:
+        """纯状态积分（不含 STM），优先走 Rust 快速路径。
+
+        BCR4BP 的 Rust 路径不支持事件检测，且不静默回退 scipy：传入
+        ``events`` 直接报错。扩展未构建时降级 scipy。
+        """
+        if events is not None:
+            raise NotImplementedError("BCR4BP Rust 路径不支持事件检测，且不提供 scipy 回退")
+        if _HAS_RUST_BCR4BP_STM:
+            mu = float(self.system.mu)
+            if t_eval is not None:
+                t_eval_list = [float(t) for t in np.asarray(t_eval, dtype=float).ravel()]
+            else:
+                t_eval_list = [float(t_span[0]), float(t_span[1])]
+
+            result = propagate_bcr4bp_py(
+                mu=mu,
+                mu_sun=float(self.system.sun_mass),
+                sun_distance=float(self.system.sun_distance),
+                sun_angular_rate=float(self.system.sun_angular_rate),
+                sun_phase0=float(self.system.sun_phase0),
+                t_span=(float(t_span[0]), float(t_span[1])),
+                t_eval=t_eval_list,
+                initial_state=[float(x) for x in initial_state[:6]],
+                rtol=self.rtol,
+                atol=self.atol,
+                max_step=float(max_step),
+            )
+
+            states = np.array(result["states"])
+            time = np.array(result["time"])
+
+            if len(time) != len(t_eval_list):
+                raise RuntimeError(
+                    f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
+                    f"requested time points; the trajectory is truncated"
+                )
+
+            self.last_trajectory = (time, states)
+
+            out: dict[str, Any] = {"time": time, "states": states}
+            if with_jacobi:
+                out = self._handle_jacobi(states, out)
+            return out
+
+        return super()._propagate_state_only(
+            initial_state, t_span, t_eval, max_step, with_jacobi, events
+        )
 
     def compute_state_transition_matrix(
         self, initial_state: npt.ArrayLike, t: float, t0: float = 0.0
