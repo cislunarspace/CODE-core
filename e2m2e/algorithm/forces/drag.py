@@ -83,6 +83,18 @@ class DragModel(PhysicalModel):
         """弹道系数 ``Cd·A/m``，单位 m²/kg。"""
         return self._cd * self._area / self._mass
 
+    def to_rust_spec(self, system: Any) -> tuple | None:
+        """序列化为 Rust ``("drag", area, mass, cd, propagation_frame)`` 元组。
+
+        需要 system 提供 SPICE 以做 ITRF93 pxform 帧旋转。若 system 未暴露
+        spice 属性则返回 None，让 ForceModel 回退 Python 路径。
+        """
+        if getattr(system, "spice", None) is None:
+            return None
+        if self._body.upper() != "EARTH":
+            return None  # 仅支持地球阻力（ITRF93 帧旋转专用于地球）
+        return ("drag", self._area, self._mass, self._cd, "J2000")
+
     def compute_acceleration(
         self,
         t: float,

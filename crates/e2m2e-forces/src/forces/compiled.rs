@@ -5,6 +5,7 @@
 //!
 //! 与 `rk_step + Python callback` 模式相比，本模块消除 30 万次 GIL 跨界。
 
+use crate::forces::drag;
 use crate::forces::ecom;
 use crate::forces::gravity_field::{self, GravityFieldContext, TideConfig, TideMode};
 use crate::forces::relativistic;
@@ -78,6 +79,16 @@ pub enum CompiledForce {
         throttle: f64,
         /// 推力方向单位向量（惯性系）
         direction: [f64; 3],
+    },
+    /// 大气阻力力模型。
+    ///
+    /// ITRF93 系内计算阻力加速度，含帧旋转变换。
+    Drag {
+        area: f64,
+        mass: f64,
+        cd: f64,
+        /// 传播系 frame（通常 "J2000"）
+        propagation_frame: String,
     },
 }
 
@@ -214,6 +225,13 @@ impl CompiledForce {
                     accel_mag_km_s2 * direction[2],
                 ])
             }
+            Self::Drag {
+                area,
+                mass,
+                cd,
+                propagation_frame,
+            } => drag::drag_accel(et, state, *area, *mass, *cd, propagation_frame)
+                .map_err(|e| format!("{:?}", e)),
         }
     }
 }
@@ -245,6 +263,7 @@ pub fn supports_jacobian(force: &CompiledForce) -> bool {
             | CompiledForce::IndirectTerm { .. }
             | CompiledForce::SRP { .. }
             | CompiledForce::EcomSrp { .. }
+            | CompiledForce::Drag { .. }
     )
 }
 
@@ -383,6 +402,17 @@ pub fn acceleration_and_jacobian(
             }
             let dadv = [[0.0_f64; 3]; 3];
             Ok((acc0, jac, dadv))
+        }
+        CompiledForce::Drag {
+            area,
+            mass,
+            cd,
+            propagation_frame,
+        } => {
+            let result =
+                drag::drag_accel_and_jacobian(et, state, *area, *mass, *cd, propagation_frame)
+                    .map_err(|e| format!("{:?}", e))?;
+            Ok((result.acc, result.jac_da_dr, result.jac_da_dv))
         }
         _ => Err("Jacobian not supported for this force type".to_string()),
     }

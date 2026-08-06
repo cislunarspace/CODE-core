@@ -1037,6 +1037,18 @@ pub(crate) fn parse_force_tuple(
                 direction: [direction[0], direction[1], direction[2]],
             })
         }
+        "drag" => {
+            let area: f64 = tuple.get_item(1)?.extract()?;
+            let mass: f64 = tuple.get_item(2)?.extract()?;
+            let cd: f64 = tuple.get_item(3)?.extract()?;
+            let propagation_frame: String = tuple.get_item(4)?.extract()?;
+            Ok(CompiledForce::Drag {
+                area,
+                mass,
+                cd,
+                propagation_frame,
+            })
+        }
         _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
             "unknown force tag {:?}",
             tag
