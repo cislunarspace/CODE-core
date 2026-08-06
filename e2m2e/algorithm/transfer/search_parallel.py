@@ -247,8 +247,20 @@ def dispatch_grid_search(
     if n_workers is None:
         n_workers = multiprocessing.cpu_count()
     pb = parallel_backend.strip().lower()
-    if pb not in ("processes", "threads"):
-        raise ValueError("parallel_backend 须为 'processes' 或 'threads'")
+    if pb not in ("processes", "threads", "rust"):
+        raise ValueError("parallel_backend 须为 'processes'、'threads' 或 'rust'")
+    if pb == "rust":
+        return grid_search_rust_dispatch(
+            searcher,
+            departure_orbit,
+            arrival_orbit,
+            departure_states,
+            departure_times,
+            dep_name,
+            arr_name,
+            verbose,
+            n_workers,
+        )
     if n_workers == 1:
         return grid_search_sequential(
             searcher,
@@ -280,6 +292,143 @@ def dispatch_grid_search(
         verbose,
         n_workers,
     )
+
+
+def _geometry_methods_monkeypatched(searcher: TransferSearch) -> bool:
+    """检测 ``TransferSearch`` 的三个几何方法是否被 ``monkeypatch.setattr`` 替换。
+
+    Rust 后端整体下沉积分/碰撞/局部极小三步，不经过 Python 方法分发；若这些方法
+    被 patch（测试注入合成行为），直接走 Rust 会让 patch 形同虚设。判定依据：原始
+    方法定义在 ``transfer_search`` 模块，``__qualname__`` 形如
+    ``TransferSearch._forward_integrate``；测试注入的函数定义在别处，qualname 必然不同。
+    """
+    for name in ("_forward_integrate", "_check_collision", "_detect_local_minimum"):
+        method = getattr(type(searcher), name, None)
+        if method is None:
+            continue
+        if getattr(method, "__qualname__", None) != f"TransferSearch.{name}":
+            return True
+    return False
+
+
+def grid_search_rust_dispatch(
+    searcher: TransferSearch,
+    departure_orbit: Orbit,
+    arrival_orbit: Orbit,
+    departure_states: np.ndarray,
+    departure_times: np.ndarray,
+    dep_name: str,
+    arr_name: str,
+    verbose: bool,
+    n_workers: int,
+) -> list[dict[str, Any]]:
+    """Rust + Rayon 后端网格搜索分发（阶段 D1）。
+
+    展平 POD 输入喂给 :func:`e2m2e.integrators.grid_search_rust`（``py.allow_threads``
+    释放 GIL + Rayon ``par_iter``），拿回候选解后追加 ``departure_time_index`` /
+    ``departure_orbit_name`` / ``arrival_orbit_name``，对齐 Python sequential 后端字段。
+
+    两种情况回退 Python 路径（结果正确，仅降速）：
+
+    - **monkeypatch 缝**：几何方法被替换时（见 :func:`_geometry_methods_monkeypatched`），
+      Rust 内核不经过 Python 分发，patch 不生效——回退保住测试语义。
+    - **Rust 扩展缺失**：``grid_search_rust`` 抛 ``RuntimeError``（``transfer_grid_search_py``
+      为 None），回退 ``processes`` 后端。
+
+    ``n_workers==1`` 时 ``parallel=False``（Rust 串行），``>1`` 时 ``parallel=True``（Rayon）。
+    """
+    if _geometry_methods_monkeypatched(searcher):
+        backend = "sequential" if n_workers == 1 else "processes"
+        if verbose:
+            logger.info("Rust 后端检测到几何方法被 monkeypatch，回退 Python（%s）", backend)
+        if n_workers == 1:
+            return grid_search_sequential(
+                searcher,
+                departure_states,
+                departure_times,
+                arrival_orbit,
+                dep_name,
+                arr_name,
+                verbose,
+            )
+        return grid_search_parallel_processes(
+            searcher,
+            departure_states,
+            departure_times,
+            arrival_orbit,
+            dep_name,
+            arr_name,
+            verbose,
+            n_workers,
+        )
+
+    if (
+        searcher.alpha_min is None
+        or searcher.alpha_max is None
+        or searcher.n_alpha is None
+        or searcher.max_transfer_time is None
+        or searcher.integration_dt is None
+        or searcher.intersection_threshold is None
+        or searcher.min_distance_threshold is None
+        or searcher.collision_earth_radius is None
+        or searcher.collision_moon_radius is None
+    ):
+        raise ValueError(
+            "请先设置 alpha_min, alpha_max, n_alpha, max_transfer_time, integration_dt, "
+            "intersection_threshold, min_distance_threshold, collision_earth_radius, "
+            "collision_moon_radius"
+        )
+    alpha_grid = np.linspace(searcher.alpha_min, searcher.alpha_max, int(searcher.n_alpha))
+    arrival_states = np.asarray(arrival_orbit.states, dtype=float)
+    n_alpha = int(searcher.n_alpha)
+    parallel = n_workers != 1
+
+    try:
+        from ...integrators import grid_search_rust
+
+        results = grid_search_rust(
+            departure_states,
+            departure_times,
+            alpha_grid,
+            arrival_states,
+            mu=float(searcher.mu),
+            max_transfer_time=float(searcher.max_transfer_time),
+            integration_dt=float(searcher.integration_dt),
+            intersection_threshold=float(searcher.intersection_threshold),
+            min_distance_threshold=float(searcher.min_distance_threshold),
+            collision_earth_radius=float(searcher.collision_earth_radius),
+            collision_moon_radius=float(searcher.collision_moon_radius),
+            rtol=float(searcher.dynamics.rtol),
+            atol=float(searcher.dynamics.atol),
+            max_step=float(searcher.dynamics.max_step),
+            parallel=parallel,
+        )
+    except (ImportError, RuntimeError) as exc:
+        if verbose:
+            logger.info("Rust 后端不可用（%s），回退 processes", exc)
+        return grid_search_parallel_processes(
+            searcher,
+            departure_states,
+            departure_times,
+            arrival_orbit,
+            dep_name,
+            arr_name,
+            verbose,
+            n_workers,
+        )
+
+    for idx, r in enumerate(results):
+        r["departure_time_index"] = idx // n_alpha
+        r["departure_orbit_name"] = dep_name
+        r["arrival_orbit_name"] = arr_name
+
+    if verbose:
+        mode = "Rayon 并行" if parallel else "Rust 串行"
+        print(
+            f"  Rust 后端（{mode}）: {len(departure_states)}×{n_alpha}={len(results)} 评估",
+            flush=True,
+        )
+    return results
 
 
 def grid_search_sequential(

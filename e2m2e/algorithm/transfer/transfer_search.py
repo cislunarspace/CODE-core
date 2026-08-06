@@ -116,10 +116,14 @@ class TransferSearch:
         return self
 
     def set_parallel_backend(self, backend: str) -> TransferSearch:
-        """设置并行后端：``processes`` （默认）或 ``threads``。"""
+        """设置并行后端：``processes``（默认）、``threads`` 或 ``rust``。
+
+        ``rust`` 走 Rust+Rayon 内核（需 Rust 扩展已构建且几何方法未被 monkeypatch；
+        任一不满足时自动回退 ``processes``）。``processes``/``threads`` 行为不变。
+        """
         b = backend.strip().lower()
-        if b not in ("processes", "threads"):
-            raise ValueError("parallel_backend 须为 'processes' 或 'threads'")
+        if b not in ("processes", "threads", "rust"):
+            raise ValueError("parallel_backend 须为 'processes'、'threads' 或 'rust'")
         self._parallel_backend = b
         return self
 
