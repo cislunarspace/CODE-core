@@ -7,8 +7,9 @@
 
 SPICE 内核文件说明：
 
-1. **闰秒内核**（``.tls``）：提供 UTC ↔ ET 时间转换所需的闰秒表。自动在
-   ``kernels/`` 目录和 ``SPICE_KERNEL_DIR`` 环境变量指定的路径中搜索。
+1. **闰秒内核**（``.tls``）：提供 UTC ↔ ET 时间转换所需的闰秒表。自动
+   在被加载内核的同级目录、仓库内置 ``kernels/`` 目录、
+   ``SPICE_KERNEL_DIR`` 环境变量指定的路径中按序搜索。
 2. **星历内核**（``.bsp``）：包含天体位置/速度数据（如 JPL DE440）。
    需要手动加载，可通过 :meth:`SPICEManager.find_ephemeris_kernel` 搜索或
    :meth:`SPICEManager.load_kernel` 加载。
@@ -19,6 +20,7 @@ SPICE 内核文件说明：
 from __future__ import annotations
 
 import inspect
+import logging
 import os
 import threading
 from pathlib import Path
@@ -172,17 +174,34 @@ class SPICEManager(EphemerisProvider):
         # 优先走 cache，避免逐步跨 Python↔C 边界查 SPICE）。见 ephem_cache.py。
         self._ephem_cache: EphemCache | None = None
 
-    def _ensure_leapseconds(self):
-        """确保闰秒内核已加载（线程安全）。"""
+    def _ensure_leapseconds(self, search_dir: str | None = None):
+        """确保闰秒内核已加载（线程安全）。
+
+        Args:
+            search_dir: 额外的搜索目录（如被加载内核的同级目录），优先级
+                高于 ``_LEAPSECOND_SEARCH_PATHS``。传 None 或空串时仅搜索
+                默认路径。找不到时发告警但不 raise（保留用户自行 furnsh 的
+                可能），``_leapseconds_loaded`` 保持 False 以便后续重试。
+        """
         if SPICEManager._leapseconds_loaded:
             return
         with SPICEManager._leapseconds_lock:
             if SPICEManager._leapseconds_loaded:
                 return
-            path = _find_leapseconds_kernel()
+            # search_dir 优先级最高，置列表首位；空串回退默认搜索路径。
+            search_paths = (
+                [search_dir, *_LEAPSECOND_SEARCH_PATHS] if search_dir else _LEAPSECOND_SEARCH_PATHS
+            )
+            path = _find_leapseconds_kernel(search_paths)
             if path:
                 get_spiceypy().furnsh(path)
                 SPICEManager._leapseconds_loaded = True
+            else:
+                logging.getLogger(__name__).warning(
+                    "未找到闰秒内核（.tls）：UTC↔ET 时间转换将失败"
+                    "（SPICE NOLEAPSECONDS）。请设置 SPICE_KERNEL_DIR 环境变量，"
+                    "或将 naif0012.tls 放入内核目录。"
+                )
 
     def load_kernel(self, path: str) -> None:
         """加载一个 SPICE 内核文件（.bsp / .bpc / .tf 等）。
@@ -194,7 +213,9 @@ class SPICEManager(EphemerisProvider):
         """
         if not os.path.exists(path):
             raise FileNotFoundError(f"Kernel file not found: {path}")
-        self._ensure_leapseconds()
+        # 把被加载内核的同级目录纳入闰秒搜索（最高优先级），覆盖 PyPI 安装或
+        # 非 repo 环境下用户把 naif0012.tls 与 .bsp 放一起的常见用法。
+        self._ensure_leapseconds(search_dir=os.path.dirname(path))
         get_spiceypy().furnsh(path)
         # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（静态链接，
         # 内核池不共享）。spice feature 启用时双 furnsh，让下沉到 Rust
