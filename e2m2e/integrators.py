@@ -15,6 +15,11 @@ try:
         MultistepResult,
         RkMethod,
         build_cr3bp_hamiltonian_py,
+        check_collision_py,
+        compute_distance_series_py,
+        compute_min_distance_py,
+        detect_intersection_py,
+        detect_local_minimum_py,
         hello_integrators,
         lambert_batch_py,
         lambert_izzo_py,
@@ -78,6 +83,11 @@ except ModuleNotFoundError:
     MultistepResult = None  # type: ignore[misc,assignment]
     RkMethod = None  # type: ignore[misc,assignment]
     build_cr3bp_hamiltonian_py = None  # type: ignore[misc,assignment]
+    check_collision_py = None  # type: ignore[misc,assignment]
+    compute_distance_series_py = None  # type: ignore[misc,assignment]
+    compute_min_distance_py = None  # type: ignore[misc,assignment]
+    detect_intersection_py = None  # type: ignore[misc,assignment]
+    detect_local_minimum_py = None  # type: ignore[misc,assignment]
     hello_integrators = None  # type: ignore[misc,assignment]
     lambert_batch_py = None  # type: ignore[misc,assignment]
     lambert_izzo_py = None  # type: ignore[misc,assignment]
@@ -148,8 +158,13 @@ def _check_rust_abi() -> None:
 __all__ = [
     "augmented_eom_7d_py",
     "build_cr3bp_hamiltonian_py",
+    "check_collision_py",
     "CowellResult",
     "cowell_step",
+    "compute_distance_series_py",
+    "compute_min_distance_py",
+    "detect_intersection_py",
+    "detect_local_minimum_py",
     "disable_ephem_cache",
     "enable_ephem_cache",
     "ephem_ffi_call_count",
