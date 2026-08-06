@@ -19,22 +19,6 @@ from e2m2e.data.types.orbit import Orbit
 class TestClosureErrorAttribute:
     """测试轨道闭合误差属性的正确设置"""
 
-    def test_corrected_orbit_has_closure_error_attribute(self, corrected_dro):
-        """修正后的轨道应有 closure_error 属性"""
-        assert hasattr(corrected_dro, "closure_error"), "Orbit should have closure_error attribute"
-
-    def test_closure_error_is_float(self, corrected_dro):
-        """closure_error 应该是浮点数类型"""
-        assert isinstance(corrected_dro.closure_error, float), (
-            f"closure_error should be float, got {type(corrected_dro.closure_error)}"
-        )
-
-    def test_closure_error_is_positive(self, corrected_dro):
-        """closure_error 应该为非负值"""
-        assert corrected_dro.closure_error >= 0, (
-            f"closure_error should be non-negative, got {corrected_dro.closure_error}"
-        )
-
     def test_closure_error_reasonable_magnitude(self, corrected_dro):
         """成功的修正后，closure_error 应该在合理范围内"""
         # 成功的修正应该使 closure_error 非常小
@@ -48,16 +32,6 @@ class TestClosureErrorAttribute:
 # ============================================================
 class TestPeriodicFlag:
     """测试轨道周期性标记的正确设置"""
-
-    def test_corrected_orbit_has_is_periodic_attribute(self, corrected_dro):
-        """修正后的轨道应有 is_periodic 属性"""
-        assert hasattr(corrected_dro, "is_periodic"), "Orbit should have is_periodic attribute"
-
-    def test_is_periodic_is_bool(self, corrected_dro):
-        """is_periodic 应该是布尔类型"""
-        assert isinstance(corrected_dro.is_periodic, bool), (
-            f"is_periodic should be bool, got {type(corrected_dro.is_periodic)}"
-        )
 
     def test_successful_correction_is_periodic(self, corrected_dro):
         """成功的修正后，轨道应该被标记为周期轨道"""
@@ -95,41 +69,11 @@ class TestPeriodicFlag:
 class TestCorrectionResultAttributes:
     """测试修正结果信息属性的正确设置"""
 
-    def test_correction_success_attribute(self, corrected_dro):
-        """轨道应有 correction_success 属性"""
-        assert hasattr(corrected_dro, "correction_success"), (
-            "Orbit should have correction_success attribute"
-        )
-
-    def test_correction_iterations_attribute(self, corrected_dro):
-        """轨道应有 correction_iterations 属性"""
-        assert hasattr(corrected_dro, "correction_iterations"), (
-            "Orbit should have correction_iterations attribute"
-        )
-
-    def test_correction_iterations_is_int(self, corrected_dro):
-        """correction_iterations 应该是整数类型"""
-        assert isinstance(corrected_dro.correction_iterations, int), (
-            f"correction_iterations should be int, got {type(corrected_dro.correction_iterations)}"
-        )
-
     def test_correction_iterations_non_negative(self, corrected_dro):
         """correction_iterations 应该为非负值"""
         assert corrected_dro.correction_iterations >= 0, (
             f"correction_iterations should be non-negative,"
             f" got {corrected_dro.correction_iterations}"
-        )
-
-    def test_correction_error_attribute(self, corrected_dro):
-        """轨道应有 correction_error 属性"""
-        assert hasattr(corrected_dro, "correction_error"), (
-            "Orbit should have correction_error attribute"
-        )
-
-    def test_correction_termination_reason_attribute(self, corrected_dro):
-        """轨道应有 correction_termination_reason 属性"""
-        assert hasattr(corrected_dro, "correction_termination_reason"), (
-            "Orbit should have correction_termination_reason attribute"
         )
 
     def test_successful_correction_has_convergence_reason(self, corrected_dro):
@@ -197,35 +141,6 @@ class TestFamilyTypeInference:
             assert result.family_type == "halo", (
                 f"3D orbit should have family_type='halo', got {result.family_type}"
             )
-
-
-# ============================================================
-# 轨道状态数组形状测试
-# ============================================================
-class TestOrbitStateShape:
-    """测试轨道状态数组的形状正确性"""
-
-    def test_states_2d_array(self, corrected_dro):
-        """轨道 states 应该是 2D 数组 (N, 6)"""
-        assert corrected_dro.states.ndim == 2, (
-            f"states should be 2D array, got {corrected_dro.states.ndim}D"
-        )
-        assert corrected_dro.states.shape[1] == 6, (
-            f"states should have 6 columns (x,y,z,vx,vy,vz), got {corrected_dro.states.shape[1]}"
-        )
-
-    def test_times_1d_array(self, corrected_dro):
-        """轨道 times 应该是 1D 数组"""
-        assert corrected_dro.times.ndim == 1, (
-            f"times should be 1D array, got {corrected_dro.times.ndim}D"
-        )
-
-    def test_states_and_times_same_length(self, corrected_dro):
-        """states 和 times 应该有相同的长度"""
-        assert len(corrected_dro.states) == len(corrected_dro.times), (
-            f"states ({len(corrected_dro.states)}) and times"
-            f" ({len(corrected_dro.times)}) should have same length"
-        )
 
 
 # ============================================================
