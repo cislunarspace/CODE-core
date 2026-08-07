@@ -1061,6 +1061,15 @@ pub(crate) fn parse_force_tuple(
     }
 }
 
+/// `propagate_compiled` 主循环（释 GIL 段）的输出：time / states / 步数统计。
+/// 独立成 type alias 修 clippy `type_complexity`（与 `AccelJacobiResult` 同法）。
+///
+/// 与唯一使用者 `propagate_compiled` 同步 cfg：无 spice feature 时该函数被
+/// 编译期剔除，alias 须一并剔除，否则 `cargo clippy --workspace`（默认无 spice）
+/// 报 dead_code（#318 CI）。
+#[cfg(feature = "spice")]
+type CompiledPropResult = (Vec<f64>, Vec<Vec<f64>>, usize, usize, usize);
+
 /// 全 Rust 力模型传播器（消除 Python↔Rust 跨界）。
 ///
 /// Python 侧把所有 force 序列化为元组列表，Rust 在内部循环里直接调
@@ -1118,94 +1127,97 @@ fn propagate_compiled(
         forces.push(parse_force_tuple(&item)?);
     }
 
-    let table = method.table();
-    let n = y0.len();
-    let mut y = y0;
-    let mut t = t0;
-    let mut h = h_init;
-    // 输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初始状态、eval_idx 从 1 起步；
-    // 当 t_eval[0]>t0（逐段积分常态：patch point 时刻非整数小时，et_grid 整数
-    // 小时点严格大于 t0）时不预设 t0 到输出，eval_idx 从 0 起步由循环匹配。
-    // 此前硬编码 vec![t0] + eval_idx=1 假设 t_eval[0]==t0，导致 t_eval[0]>t0
-    // 时首个输出点状态错置为初值、与后续点错位。
-    let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
-    let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
-    let mut eval_idx = 0usize;
-    if !t_eval.is_empty() && (t0 - t_eval[0]).abs() <= 1e-9 {
-        times.push(t0);
-        states.push(y.clone());
-        eval_idx = 1;
-    }
-    let mut n_steps = 0usize;
-    let mut n_rejected = 0usize;
-    let mut n_steps_capped = 0usize;
-
-    // 用 RefCell 包装 cspice 错误状态（不能直接通过 explicit_rk_step 的 E 传）
-    use std::cell::RefCell;
-    let last_error: RefCell<Option<String>> = RefCell::new(None);
-
-    while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
-        n_steps += 1;
-        // 限制步长不超过下一个评估点（提高 t_eval 命中率），且不超过
-        // h_init（作为最大步长：稀疏 t_eval 下自适应步长失控，实测
-        // 2 点 vs 31 点网格的 30 天结果差 22 万 km）
-        if eval_idx < t_eval.len() {
-            let t_next_eval = t_eval[eval_idx];
-            if t + h > t_next_eval {
-                h = t_next_eval - t;
-            }
-        }
-        if h > h_init {
-            n_steps_capped += 1;
-            h = h_init;
-        }
-
-        // RK 单步：用 Rust 闭包调 compute_total_acceleration
-        let forces_ref = &forces;
-        let observer_ref = observer;
-        let err_cell = &last_error;
-        let callback = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
-            let state6 = [yi[0], yi[1], yi[2], yi[3], yi[4], yi[5]];
-            compute_total_acceleration(forces_ref, ti, &state6, observer_ref)
-                .map(|a| vec![yi[3], yi[4], yi[5], a[0], a[1], a[2]])
-                .inspect_err(|e| {
-                    *err_cell.borrow_mut() = Some(e.clone());
-                })
-        };
-
-        let (y_new, error) = match explicit_rk_step(table, t, &y, h, callback, None) {
-            Ok(r) => r,
-            Err(msg) => {
-                return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-                    "RK step force error: {}",
-                    msg
-                )));
-            }
-        };
-        let _ = n;
-
-        if error <= tol {
-            t += h;
-            y = y_new;
-            // 输出落在 t_eval 的点
-            while eval_idx < t_eval.len() && t >= t_eval[eval_idx] - 1e-9 {
-                times.push(t_eval[eval_idx]);
+    // 主积分循环包进 py.allow_threads 释放 GIL：compiled 力模型为纯 Rust
+    // （compute_total_acceleration 不回调 Python，cspice 走 FFI），与
+    // multiple_shooting_correct / transfer_grid_search 路径同理（#318）。
+    // 释 GIL 段（闭包内）：RK 主循环 + 每步 compute_total_acceleration；
+    // 持 GIL 段（闭包外）：上面的 force 元组解析 + 下面的 PyDict 返回构造。
+    // 闭包内不构造 PyErr（不借 Python 对象），仅回传 String，闭包外 map_err 转 PyErr。
+    let (times, states, n_steps, n_rejected, n_steps_capped) = py
+        .allow_threads(move || -> Result<CompiledPropResult, String> {
+            let table = method.table();
+            let mut y = y0;
+            let mut t = t0;
+            let mut h = h_init;
+            // 输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初始状态、eval_idx 从 1 起步；
+            // 当 t_eval[0]>t0（逐段积分常态：patch point 时刻非整数小时，et_grid 整数
+            // 小时点严格大于 t0）时不预设 t0 到输出，eval_idx 从 0 起步由循环匹配。
+            // 此前硬编码 vec![t0] + eval_idx=1 假设 t_eval[0]==t0，导致 t_eval[0]>t0
+            // 时首个输出点状态错置为初值、与后续点错位。
+            let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
+            let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
+            let mut eval_idx = 0usize;
+            if !t_eval.is_empty() && (t0 - t_eval[0]).abs() <= 1e-9 {
+                times.push(t0);
                 states.push(y.clone());
-                eval_idx += 1;
+                eval_idx = 1;
             }
-            let h_next = suggest_next_step(h, error, tol, method.embedded_order());
-            h = h_next;
-        } else {
-            n_rejected += 1;
-            let h_next = suggest_next_step(h, error, tol, method.embedded_order());
-            h = h_next;
-            if h < 1e-12 * (t_eval[t_eval.len() - 1] - t0).abs() {
-                return Err(pyo3::exceptions::PyRuntimeError::new_err(
-                    "step size collapsed below minimum",
-                ));
+            let mut n_steps = 0usize;
+            let mut n_rejected = 0usize;
+            let mut n_steps_capped = 0usize;
+
+            // 用 RefCell 包装 cspice 错误状态（不能直接通过 explicit_rk_step 的 E 传）
+            use std::cell::RefCell;
+            let last_error: RefCell<Option<String>> = RefCell::new(None);
+
+            while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
+                n_steps += 1;
+                // 限制步长不超过下一个评估点（提高 t_eval 命中率），且不超过
+                // h_init（作为最大步长：稀疏 t_eval 下自适应步长失控，实测
+                // 2 点 vs 31 点网格的 30 天结果差 22 万 km）
+                if eval_idx < t_eval.len() {
+                    let t_next_eval = t_eval[eval_idx];
+                    if t + h > t_next_eval {
+                        h = t_next_eval - t;
+                    }
+                }
+                if h > h_init {
+                    n_steps_capped += 1;
+                    h = h_init;
+                }
+
+                // RK 单步：用 Rust 闭包调 compute_total_acceleration
+                let forces_ref = &forces;
+                let observer_ref = observer;
+                let err_cell = &last_error;
+                let callback = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
+                    let state6 = [yi[0], yi[1], yi[2], yi[3], yi[4], yi[5]];
+                    compute_total_acceleration(forces_ref, ti, &state6, observer_ref)
+                        .map(|a| vec![yi[3], yi[4], yi[5], a[0], a[1], a[2]])
+                        .inspect_err(|e| {
+                            *err_cell.borrow_mut() = Some(e.clone());
+                        })
+                };
+
+                let (y_new, error) = match explicit_rk_step(table, t, &y, h, callback, None) {
+                    Ok(r) => r,
+                    Err(msg) => return Err(format!("RK step force error: {}", msg)),
+                };
+
+                if error <= tol {
+                    t += h;
+                    y = y_new;
+                    // 输出落在 t_eval 的点
+                    while eval_idx < t_eval.len() && t >= t_eval[eval_idx] - 1e-9 {
+                        times.push(t_eval[eval_idx]);
+                        states.push(y.clone());
+                        eval_idx += 1;
+                    }
+                    let h_next = suggest_next_step(h, error, tol, method.embedded_order());
+                    h = h_next;
+                } else {
+                    n_rejected += 1;
+                    let h_next = suggest_next_step(h, error, tol, method.embedded_order());
+                    h = h_next;
+                    if h < 1e-12 * (t_eval[t_eval.len() - 1] - t0).abs() {
+                        return Err("step size collapsed below minimum".to_string());
+                    }
+                }
             }
-        }
-    }
+
+            Ok((times, states, n_steps, n_rejected, n_steps_capped))
+        })
+        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
 
     // 返回 dict
     let dict = PyDict::new(py);
