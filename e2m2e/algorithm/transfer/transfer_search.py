@@ -36,6 +36,20 @@ from .transfer_optimization import (
 DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / CR3BP_System.EARTH_MOON_DISTANCE_KM
 
 
+def _default_parallel_backend() -> str:
+    """默认并行后端：有 Rust 扩展（``e2m2e._integrators`` 可导入）时 ``rust``，否则 ``processes``。
+
+    PRD #314 §6 / issue #316 item ④：默认走 rust（5–10× 加速，见 ADR 0017 基准），
+    扩展未构建时回退 processes。rust 后端在几何方法被 monkeypatch 或扩展内部
+    异常时仍会自动回退 processes（见 :func:`grid_search_rust_dispatch`）。
+    """
+    try:
+        import e2m2e._integrators  # noqa: F401
+    except ImportError:
+        return "processes"
+    return "rust"
+
+
 class TransferSearch:
     """通用轨道转移搜索算法。
 
@@ -80,7 +94,7 @@ class TransferSearch:
         self._optimized_result: Any = None
         self._verbose = True
         self._n_workers: int | None = None
-        self._parallel_backend: str = "processes"
+        self._parallel_backend: str = _default_parallel_backend()
         self._propulsion = ImpulsivePropulsion()
         self._config: TransferConfig = config if config is not None else TransferConfig()
 
@@ -116,10 +130,11 @@ class TransferSearch:
         return self
 
     def set_parallel_backend(self, backend: str) -> TransferSearch:
-        """设置并行后端：``processes``（默认）、``threads`` 或 ``rust``。
+        """设置并行后端：``rust``（有 Rust 扩展时的默认）、``processes`` 或 ``threads``。
 
-        ``rust`` 走 Rust+Rayon 内核（需 Rust 扩展已构建且几何方法未被 monkeypatch；
-        任一不满足时自动回退 ``processes``）。``processes``/``threads`` 行为不变。
+        构造后默认由 :func:`_default_parallel_backend` 决定（扩展已构建 → ``rust``，
+        否则 ``processes``）。``rust`` 走 Rust+Rayon 内核（几何方法被 monkeypatch
+        或扩展异常时自动回退 ``processes``）。``processes``/``threads`` 行为不变。
         """
         b = backend.strip().lower()
         if b not in ("processes", "threads", "rust"):
@@ -157,9 +172,14 @@ class TransferSearch:
         arrival_orbit: Orbit | None = None,
         verbose: bool = True,
         n_workers: int | None = None,
-        parallel_backend: str = "processes",
+        parallel_backend: str | None = None,
     ) -> list[dict[str, Any]]:
         """执行网格搜索。"""
+        # None → 用实例属性（由 set_parallel_backend / _default_parallel_backend 设）；
+        # 显式传入则覆盖。连起来后 set_parallel_backend 才对 search() 生效。
+        parallel_backend = (
+            parallel_backend if parallel_backend is not None else self._parallel_backend
+        )
         dep_orbit = departure_orbit if departure_orbit is not None else self._departure_orbit
         arr_orbit = arrival_orbit if arrival_orbit is not None else self._arrival_orbit
         if dep_orbit is None or arr_orbit is None:

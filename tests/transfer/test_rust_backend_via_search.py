@@ -21,7 +21,7 @@ from numpy.testing import assert_allclose
 pytest.importorskip("e2m2e._integrators")
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
-from e2m2e.algorithm.transfer import TransferSearch
+from e2m2e.algorithm.transfer import TransferSearch, search_parallel
 from e2m2e.data.types.orbit import Orbit
 
 MU = 1.21506683e-2  # 地月质量参数
@@ -241,3 +241,65 @@ def test_search_rust_falls_back_when_monkeypatched(
     assert call_count["n"] == int(searcher.n_departure) * int(searcher.n_alpha)
     n_expected = int(searcher.n_departure) * int(searcher.n_alpha)
     assert len(results) == n_expected
+
+
+def test_search_default_backend_is_rust_when_built(
+    searcher: TransferSearch,
+    dep_orbit: Orbit,
+    arr_orbit: Orbit,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """扩展已构建时默认 backend = rust（#316 item ④）。
+
+    TransferSearch() 构造后 ``_parallel_backend`` 由 :func:`_default_parallel_backend`
+    决定；扩展已构建（本测试被 importorskip 守卫）→ ``"rust"``。``search()`` 不传
+    ``parallel_backend`` 时走实例默认 → 路由到 :func:`grid_search_rust_dispatch`。
+    """
+    assert searcher._parallel_backend == "rust"
+
+    rust_called = {"v": False}
+    real = search_parallel.grid_search_rust_dispatch
+
+    def spy(*args: object, **kwargs: object) -> list[dict[str, Any]]:
+        rust_called["v"] = True
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(search_parallel, "grid_search_rust_dispatch", spy)
+
+    results = searcher.search(
+        departure_orbit=dep_orbit,
+        arrival_orbit=arr_orbit,
+        verbose=False,
+        n_workers=2,
+    )
+    assert rust_called["v"], "默认 backend 应路由到 grid_search_rust_dispatch（rust）"
+    assert len(results) == int(searcher.n_departure) * int(searcher.n_alpha)
+
+
+def test_set_parallel_backend_then_search_routes_to_it(
+    searcher: TransferSearch,
+    dep_orbit: Orbit,
+    arr_orbit: Orbit,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """set_parallel_backend('processes') 后 search() 不传 backend → 走 processes。
+
+    验证 search() 的 ``parallel_backend=None`` sentinel 确实回落到实例属性（此前
+    search() 参数默认是 ``"processes"`` 字面量，set_parallel_backend 对它不生效）。
+    走 processes 时 dispatch 不应碰 grid_search_rust_dispatch。
+    """
+    searcher.set_parallel_backend("processes")
+    assert searcher._parallel_backend == "processes"
+
+    def rust_should_not_fire(*args: object, **kwargs: object) -> list[dict[str, Any]]:
+        raise AssertionError("backend=processes 不应路由到 grid_search_rust_dispatch")
+
+    monkeypatch.setattr(search_parallel, "grid_search_rust_dispatch", rust_should_not_fire)
+
+    results = searcher.search(
+        departure_orbit=dep_orbit,
+        arrival_orbit=arr_orbit,
+        verbose=False,
+        n_workers=1,  # processes + n_workers=1 → sequential
+    )
+    assert len(results) == int(searcher.n_departure) * int(searcher.n_alpha)
