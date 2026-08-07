@@ -233,9 +233,13 @@ mod tests {
         }
     }
 
-    /// MOON 第三体加速度应为有限值，量级 ~10⁻⁵ km/s²（地心 LEO 处月球潮汐量级）。
+    /// MOON 第三体加速度应为有限值，量级 ~10⁻⁹ km/s²（地心 LEO 处月球潮汐残差）。
+    ///
+    /// 第三体摄动 = 直接引力 − 间接引力，两项主项（~μ/r_moon² ≈ 3×10⁻⁵ km/s²）
+    /// 几乎抵消，残差是潮汐量级 μ·r_sc/r_moon³ ≈ 6×10⁻¹⁰ km/s²，而非引力主项本身。
     #[test]
     fn third_body_moon_finite_and_scale() {
+        let _g = crate::lock_spice_for_test();
         load_kernels();
         let et = 0.0; // J2000
         let sc_pos = [7000.0, 0.0, 0.0]; // LEO
@@ -243,9 +247,10 @@ mod tests {
         let a = third_body_acceleration(et, "MOON", "EARTH", &sc_pos, mu_moon, 1e-6)
             .expect("third_body_acceleration failed");
         let norm = (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt();
-        // LEO 处月球第三体摄动 ~1e-5 km/s² = 1e-2 m/s²
+        // LEO 处月球第三体潮汐残差 ~1e-9 km/s² = 1e-6 m/s²；
+        // 上限 < 1e-7 可捕获间接项漏算/符号错（届时退化为引力主项 ~3e-5 km/s²）。
         assert!(
-            norm > 1e-7 && norm < 1e-4,
+            norm > 1e-11 && norm < 1e-7,
             "moon 3rd body |a|={} out of range",
             norm
         );
@@ -254,6 +259,7 @@ mod tests {
     /// SUN 第三体加速度量级 ~10⁻⁷ km/s²。
     #[test]
     fn third_body_sun_finite() {
+        let _g = crate::lock_spice_for_test();
         load_kernels();
         let et = 0.0;
         let sc_pos = [7000.0, 0.0, 0.0];
@@ -268,6 +274,7 @@ mod tests {
     /// 间接项：MOON 在地心原点的 -μ·r/|r|³ 应有限。
     #[test]
     fn indirect_term_moon_finite() {
+        let _g = crate::lock_spice_for_test();
         load_kernels();
         let et = 0.0;
         let mu_moon = 4902.8001;

@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Fixed
 - 积分器主循环补 `py.allow_threads` 释放 GIL（#318/#313）：`propagate_compiled`（#318）与 CR3BP/BCR4BP PD78 的 4 个绑定（含 STM 变体，#313）主循环整段释放 GIL，长期预报与 STM 修正段不再阻塞其他 Python 线程；design_dro STM 修正冻结主线程的根因消除；顺带修零跨度守卫（`compute_stm(t=0)` latent bug，释 GIL 前不可达）。各配心跳回归测试。
 - Python STM 回退路径补 ∂a/∂v（#317）：`_compute_total_jacobian` 返回值由 ∂a/∂r 扩为 (∂a/∂r, ∂a/∂v)，无解析雅可比力走中心差分同时扰动位置与速度。消除速度依赖力（drag）在无 SPICE 走 Python 回退时静默丢失速度块雅可比的隐患（当前 drag 必走 Rust、回退不可达，属预防性修补）。
+- `spk_accel` 月球第三体 sanity test 断言量级修正 + cspice 单测串行化：原断言把引力主项（~3×10⁻⁵ km/s²）误当第三体摄动，实际是直接项−间接项的潮汐残差（~6×10⁻¹⁰ km/s²，实测 8.3×10⁻¹⁰）；改为 [1e-11, 1e-7]，上限可捕获间接项漏算。另给 6 个调 cspice 的单测（spk_accel / spice_ffi）加 crate 级串行锁，避免多线程并发撞 cspice 全局状态（产品积分走 ephem_cache 内存表不受影响）。
 
 ### Changed
 - 步长塌缩错误前缀提为跨语言命名常量（#317），Rust↔Python 稳定契约不再靠裸字符串匹配；新增 ADR 0018（Jacobian ∂a/∂v 接口）、ADR 0019（drag Rust ITRF93 帧旋转）为既有决策补文档落点。

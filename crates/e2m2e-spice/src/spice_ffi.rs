@@ -306,6 +306,7 @@ mod tests {
     /// pxform 在 et=0 的 ITRF93→J2000 应该是有限旋转矩阵。
     #[test]
     fn pxform_itrf93_to_j2000() {
+        let _g = crate::lock_spice_for_test();
         load_kernels();
         let r = pxform("ITRF93", "J2000", 0.0).expect("pxform failed");
         // 旋转矩阵的每行模 1
@@ -318,6 +319,7 @@ mod tests {
     /// spkezr 应该与 cspice 0.1 高层 easier_reader 给出相同结果。
     #[test]
     fn spkezr_matches_cspice_high_level() {
+        let _g = crate::lock_spice_for_test();
         load_kernels();
         use cspice::common::AberrationCorrection;
         use cspice::spk::easier_reader;
@@ -348,6 +350,7 @@ mod tests {
     /// 解析成 de440s 不含的本体 499 导致 SPKINSUFFDATA。
     #[test]
     fn register_bodies_maps_planets_to_barycenter() {
+        let _g = crate::lock_spice_for_test();
         load_kernels();
         register_bodies();
         assert_eq!(bodn2c("MARS"), Some(4));
