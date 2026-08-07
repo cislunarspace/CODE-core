@@ -313,6 +313,20 @@ const fn parse_abi_version(s: &str) -> u32 {
 }
 
 /// 从 abi-version.txt 读取（单一来源），build.rs 同步生成 Python 侧 _rust_abi.py。
+///
+/// # 版本沿革（issue #317 第 3.3 项）
+///
+/// abi-version 只在**新增/改 pyfunction 边界**时 bump（Rust 内部函数签名
+/// 变更不 bump——它们不是 Python 可见的 ABI）。每次 bump 须在本节补行：
+///
+/// - **v1**（#300，5b616cc）：初始 ABI 版本戳 + 统一网关 ``_check_rust_abi``。
+/// - **v2**（3b28353）：新增 ``propagate_with_state_py``（EphemerisDynamics
+///   纯状态 Rust 路径）。
+/// - **v3**（ff63403）：新增 ``transfer_grid_search_serial_py`` +
+///   ``TransferPointResult`` pyclass（转移网格搜索串行评估）。
+///
+/// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
+/// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
 const RUST_PY_ABI: u32 = parse_abi_version(include_str!("../abi-version.txt"));
 
 /// 返回 Rust↔Python ABI 版本号（编译期常量，反映此 .pyd/.so 真实状态）。

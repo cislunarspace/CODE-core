@@ -1,9 +1,11 @@
 //! 大气阻力力模型 Rust 移植（仅 `spice` feature 下编译）。
 //!
 //! 1:1 移植自 Python `drag.py:DragModel.compute_acceleration`：
-//! - ITRF93 pxform 帧旋转（替代原 ITRFApproxAxes，决策 1b）
+//! - ITRF93 pxform 帧旋转（替代原 ITRFApproxAxes，见 ADR 0019；Python 路径仍用
+//!   ITRFApproxAxes，差异由 ADR 0019 记录）
 //! - 密度：`atmosphere::density(altitude_km, f107, ap)`
 //! - 雅可比：中心差分 FD，扰动 J2000 状态 6 分量计算 ∂a/∂r 与 ∂a/∂v
+//!   （drag 依赖速度，∂a/∂v ≠ 0，接口扩三元组见 ADR 0018）
 
 use crate::atmosphere;
 use e2m2e_spice::spice_ffi::{mat3_mul_vec, mat3_t_mul_vec, pxform, SpiceFfiError};
@@ -105,9 +107,10 @@ pub fn drag_accel(
     let r_itrf = mat3_t_mul_vec(&r_itrf_to_prop, &r_j2000);
     let v_itrf = mat3_t_mul_vec(&r_itrf_to_prop, &v_j2000);
 
+    // Step 3: ITRF 系内阻力（纯物理公式，见 drag_accel_in_body_fixed）。
     let a_itrf = drag_accel_in_body_fixed(&r_itrf, &v_itrf, area, mass, cd, f107, ap);
 
-    // Step 5: 旋转回 propagation frame。
+    // Step 4: 旋转回 propagation frame。
     let a_prop = mat3_mul_vec(&r_itrf_to_prop, &a_itrf);
     Ok(a_prop)
 }

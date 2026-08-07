@@ -66,11 +66,14 @@ class PhysicalModel(abc.ABC):
     ) -> npt.NDArray[np.floating] | None:
         """返回加速度对位置的偏导 ∂a/∂r（3×3）。
 
-        供 STM 变分方程组装雅可比矩阵 A = [[0, I], [∂a/∂r, 0]] 用。
-        N 体问题中无速度相关力，故 ∂a/∂v = 0，只需位置块。
+        供 STM 变分方程组装雅可比矩阵 ``A = [[0, I], [∂a/∂r, ∂a/∂v]]`` 的左下
+        位置块用。本方法只覆盖 ``∂a/∂r``；``∂a/∂v`` 由 ``ForceModel`` 按力的
+        性质推导（位置型力为零、速度依赖力走有限差分），不在此契约内——
+        详见 ADR 0018 与 ``ForceModel._compute_total_jacobian``。
 
         默认返回 ``None``，表示该力不提供解析雅可比，由 ``ForceModel``
-        走有限差分兜底（三点中心差分调 ``compute_acceleration``）。
+        走有限差分兜底（三点中心差分调 ``compute_acceleration``，同时给出
+        ``∂a/∂r`` 与 ``∂a/∂v``）。
 
         Args:
             t: 时间，单位为 SPICE et（秒 past J2000）。

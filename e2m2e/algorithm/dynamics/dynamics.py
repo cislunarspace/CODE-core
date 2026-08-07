@@ -45,6 +45,14 @@ try:
 except ImportError:
     _HAS_RUST_CR3BP_STM = False
 
+# 跨语言契约（issue #317 第 3.1 项）：Rust ``propagate_cr3bp``（cr3bp.rs）步长
+# 塌缩错误形如 "step size collapsed below minimum ..."。``EphemerisDynamics
+# ._propagate_state_only`` 据此前缀识别该失败并转成空 states（对齐 scipy 失败
+# 语义，让上层 NLP 走 dv=1e10 惩罚）。改 Rust 该错误消息须同步本标记——Rust
+# 侧对应注释见 cr3bp.rs ``MIN_STEP`` 处。本字符串是 Python↔Rust 的稳定契约，
+# 勿当作普通文案随意改写。
+_RUST_STEP_COLLAPSED_MARKER = "step size collapsed"
+
 
 class Dynamics:
     """通用天体系统动力学基类
@@ -612,7 +620,7 @@ class CR3BP_Dynamics(Dynamics):
                         f"requested time points; the trajectory is truncated"
                     )
             except RuntimeError as e:
-                if "step size collapsed" in str(e):
+                if _RUST_STEP_COLLAPSED_MARKER in str(e):
                     return {"time": np.array([]), "states": np.empty((0, 6))}
                 raise
 

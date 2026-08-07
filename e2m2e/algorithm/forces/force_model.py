@@ -225,47 +225,86 @@ class ForceModel:
         self,
         t: float,
         state: npt.NDArray[np.floating],
-    ) -> npt.NDArray[np.floating]:
-        """计算所有启用力模型的叠加雅可比 ∂a/∂r（3×3）。
+    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        """计算所有启用力模型的叠加雅可比 ``(∂a/∂r, ∂a/∂v)``，各 3×3。
 
-        对齐 GMAT ``ODEModel::GetDerivatives``：组合模型的雅可比是各力雅可比
-        之和（``∂(a₁+a₂)/∂r = ∂a₁/∂r + ∂a₂/∂r``，无交叉耦合）。返回 ``None``
-        雅可比的力用三点中心差分兜底（调 ``compute_acceleration``）。
+        对齐 GMAT ``ODEModel::GetDerivatives`` 与 Rust
+        ``acceleration_and_jacobian`` 三元组（ADR 0018）：组合模型的雅可比
+        是各力雅可比之和（``∂(a₁+a₂)/∂r = ∂a₁/∂r + ∂a₂/∂r``，速度块同理），
+        无交叉耦合。
+
+        - 解析雅可比力（``compute_jacobian`` 返回 ``∂a/∂r`` 非 ``None``）：
+          ``∂a/∂v = 0``。``compute_jacobian`` 契约只覆盖 ``∂a/∂r``（见
+          :class:`PhysicalModel`），现有解析力（点质量、第三体、间接项、SRP）
+          均为位置型，速度块为零正确。
+        - 无解析雅可比力（返回 ``None``）：位置与速度均走三点中心差分，给出
+          ``∂a/∂r`` 与 ``∂a/∂v`` 真值。速度依赖力（如 drag）的 ``∂a/∂v``
+          由此捕获，不再静默置零（issue #317 第 2.1 项，详见 ADR 0018）。
         """
-        total = np.zeros((3, 3), dtype=float)
+        total_dr = np.zeros((3, 3), dtype=float)
+        total_dv = np.zeros((3, 3), dtype=float)
         r_norm = float(np.linalg.norm(state[:3]))
-        # 有限差分步长：sqrt(eps) * r_norm，保证相对扰动在机器精度量级
-        delta = max(np.sqrt(np.finfo(float).eps) * r_norm, 1e-6)
+        v_norm = float(np.linalg.norm(state[3:6]))
+        # 有限差分步长：sqrt(eps)·norm，floor 1e-6 保证 v=0 时仍有有效步长
+        delta_r = max(np.sqrt(np.finfo(float).eps) * r_norm, 1e-6)
+        delta_v = max(np.sqrt(np.finfo(float).eps) * v_norm, 1e-6)
         for entry in self._entries:
             if not entry.enabled:
                 continue
             jac = entry.force.compute_jacobian(t, state, self.system)
             if jac is None:
-                jac = self._finite_diff_jacobian(entry.force, t, state, delta)
-            total = total + jac
-        return total
+                dadr, dadv = self._finite_diff_jacobians(entry.force, t, state, delta_r, delta_v)
+            else:
+                dadr = jac
+                dadv = np.zeros((3, 3), dtype=float)
+            total_dr = total_dr + dadr
+            total_dv = total_dv + dadv
+        return total_dr, total_dv
 
-    def _finite_diff_jacobian(
+    def _finite_diff_jacobians(
         self,
         force: PhysicalModel,
         t: float,
         state: npt.NDArray[np.floating],
+        delta_r: float,
+        delta_v: float,
+    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        """三点中心差分估算单个力的 ``(∂a/∂r, ∂a/∂v)``，各 3×3。
+
+        对位置三分量以 ``delta_r``、速度三分量以 ``delta_v`` 各扰动 ±，调
+        ``compute_acceleration`` 取差分。与 Rust ``drag_accel_and_jacobian``
+        的全 6 分量 FD 同构（ADR 0018）：速度块对位置型力恒为零（加速度不
+        依赖速度，扰动速度给出相同加速度），速度依赖力（drag）给出真值。
+        """
+        dadr = self._fd_block(force, t, state, 0, delta_r)
+        dadv = self._fd_block(force, t, state, 3, delta_v)
+        return dadr, dadv
+
+    def _fd_block(
+        self,
+        force: PhysicalModel,
+        t: float,
+        state: npt.NDArray[np.floating],
+        offset: int,
         delta: float,
     ) -> npt.NDArray[np.floating]:
-        """三点中心差分估算单个力的 ∂a/∂r（3×3）。
+        """三点中心差分估算单个力的一个 3×3 块（``offset=0`` → ∂a/∂r，
+        ``offset=3`` → ∂a/∂v）。
 
-        对位置三分量各扰动 ±delta，调 ``compute_acceleration`` 取差分。
+        对 ``state[offset:offset+3]`` 三分量各扰动 ±delta，调
+        ``compute_acceleration`` 取差分。位置块与速度块形状同构，抽此助手
+        复用以消除重复（Fowler 重复代码坏味）。
         """
-        jac = np.zeros((3, 3), dtype=float)
+        block = np.zeros((3, 3), dtype=float)
         for i in range(3):
             state_plus = state.copy()
             state_minus = state.copy()
-            state_plus[i] += delta
-            state_minus[i] -= delta
+            state_plus[offset + i] += delta
+            state_minus[offset + i] -= delta
             a_plus = force.compute_acceleration(t, state_plus, self.system)
             a_minus = force.compute_acceleration(t, state_minus, self.system)
-            jac[:, i] = (a_plus - a_minus) / (2.0 * delta)
-        return jac
+            block[:, i] = (a_plus - a_minus) / (2.0 * delta)
+        return block
 
     def equations_of_motion(
         self, t: float, state: npt.NDArray[np.floating]
@@ -284,18 +323,20 @@ class ForceModel:
         """增广运动方程闭包（42 维 [v, a, Φ̇]）。
 
         拆出状态与 STM，算加速度和雅可比，组装
-        ``A = [[0, I], [∂a/∂r, 0]]``，返回 ``[v, a, (A@Φ).flatten()]``。
-        对齐 GMAT ``CompleteDerivativeCalculations``：力模型只供 Ã 的左下块，
-        变分方程 Φ̇ = AΦ 在此集中求解。
+        ``A = [[0, I], [∂a/∂r, ∂a/∂v]]``，返回 ``[v, a, (A@Φ).flatten()]``。
+        对齐 GMAT ``CompleteDerivativeCalculations``：力模型只供 Ã 的左下两块
+        （``∂a/∂r``、``∂a/∂v``），变分方程 Φ̇ = AΦ 在此集中求解。``∂a/∂v``
+        对位置型力为零、对速度依赖力（drag）非零（ADR 0018）。
         """
         state = augmented_state[:6]
         stm = augmented_state[6:].reshape((6, 6))
         acceleration = self._compute_total_acceleration(t, state)
-        dacc_dr = self._compute_total_jacobian(t, state)
+        dacc_dr, dacc_dv = self._compute_total_jacobian(t, state)
 
         A = np.zeros((6, 6))
         A[:3, 3:] = np.eye(3)
         A[3:, :3] = dacc_dr
+        A[3:, 3:] = dacc_dv
         stm_dot = A @ stm
         return np.concatenate([state[3:6], acceleration, stm_dot.flatten()])
 

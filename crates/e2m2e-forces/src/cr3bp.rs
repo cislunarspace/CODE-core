@@ -19,6 +19,12 @@ use e2m2e_propagation::rk_methods::RkMethod;
 pub const MIN_DISTANCE: f64 = 1e-10;
 
 /// 最小步长（相对于积分区间），防止步长坍缩。
+///
+/// 步长塌缩时本模块返回 ``Err("step size collapsed below minimum ...")``。
+/// 该前缀 ``"step size collapsed"`` 是 Python↔Rust 跨语言契约：Python
+/// ``EphemerisDynamics._propagate_state_only``（dynamics.py，
+/// ``_RUST_STEP_COLLAPSED_MARKER``）据此识别失败并转成空 states。改写本错误
+/// 消息须同步 Python 侧标记（issue #317 第 3.1 项）。
 const MIN_STEP: f64 = 1e-12;
 
 /// CR3BP 6 维运动方程右端项 `[vx, vy, vz, ax, ay, az]`。
