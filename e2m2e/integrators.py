@@ -464,6 +464,7 @@ def grid_search_rust_serial(
     rtol: float,
     atol: float,
     max_step: float,
+    progress_callback: Callable[[int], Any] | None = None,
 ) -> list[dict[str, Any]]:
     """转移网格搜索 Rust 串行后端（阶段 B）。
 
@@ -485,6 +486,9 @@ def grid_search_rust_serial(
             min_distance_threshold / collision_earth_radius /
             collision_moon_radius: CR3BP 与搜索标量配置。
         rtol / atol / max_step: 积分器容差与最大步长。
+        progress_callback: ``cb(delta: int) -> None``，每个 departure 完成
+            调一次（出发粒度）；``None`` 不回调。Rust 端走 channel + drainer
+            线程，释放 GIL 后实时回调。
 
     Returns:
         ``list[dict]``，长度 ``n_dep * n_alpha``，顺序为外层 departure、
@@ -515,6 +519,7 @@ def grid_search_rust_serial(
         float(rtol),
         float(atol),
         float(max_step),
+        progress_callback=progress_callback,
     )
     return [_transfer_point_result_to_dict(r) for r in results]
 
@@ -536,6 +541,8 @@ def grid_search_rust(
     atol: float,
     max_step: float,
     parallel: bool | None = None,
+    n_workers: int | None = None,
+    progress_callback: Callable[[int], Any] | None = None,
 ) -> list[dict[str, Any]]:
     """转移网格搜索 Rust 后端（阶段 C，Rayon 并行 + GIL 释放）。
 
@@ -548,6 +555,14 @@ def grid_search_rust(
         parallel: ``None``（默认）时由 ``E2M2E_SEARCH_PARALLEL`` 环境变量决定
             （``"0"``→串行，其余/未设→并行）；显式 ``True``/``False`` 覆盖。
             串/并一致性对照用 ``parallel=False`` 与 ``parallel=True`` 各跑一遍。
+        n_workers: ``None``（默认）时用 Rayon 全局线程池，线程数由
+            ``RAYON_NUM_THREADS`` 决定（未设则 cpu 核数）；显式传入时 Rust 端
+            建一次性 ``ThreadPoolBuilder`` 限定 ``max(n_workers, 1)`` 个线程并
+            ``install`` 本次 compute，覆盖 ``RAYON_NUM_THREADS``。串行模式
+            （``parallel=False``）下无线程池，此参数被忽略。
+        progress_callback: ``cb(delta: int) -> None``，每个 departure 完成
+            调一次（出发粒度）；``None`` 不回调。Rust 端走 channel + drainer
+            线程，释放 GIL 后实时回调。
         其余参数同 :func:`grid_search_rust_serial`。
 
     Returns:
@@ -579,6 +594,8 @@ def grid_search_rust(
         float(atol),
         float(max_step),
         parallel=parallel,
+        n_workers=n_workers,
+        progress_callback=progress_callback,
     )
     return [_transfer_point_result_to_dict(r) for r in results]
 

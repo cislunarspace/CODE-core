@@ -266,6 +266,10 @@ pub fn evaluate_point(
     } else {
         "no_intersection".to_string()
     };
+    // 仅 success 候选回传轨迹：collision / no_intersection 的整段轨迹对下游
+    // 选优无价值，丢弃以省跨 FFI 传输与内存（#316 item ③）。两端（Rust 内核
+    // + Python search_single_departure）一致过滤，等价性对照仍通过。
+    let keep_traj = status == "success";
 
     let transfer_time = *traj_times.last().unwrap_or(&params.max_transfer_time);
 
@@ -274,8 +278,8 @@ pub fn evaluate_point(
         departure_state: *departure_state,
         departure_time,
         alpha,
-        transfer_trajectory: Some(traj_flat),
-        transfer_times: Some(traj_times),
+        transfer_trajectory: if keep_traj { Some(traj_flat) } else { None },
+        transfer_times: if keep_traj { Some(traj_times) } else { None },
         transfer_time: Some(transfer_time),
         min_distance: Some(min_dist),
         min_distance_idx: Some(min_idx as i64),
@@ -308,12 +312,16 @@ pub fn evaluate_point(
 ///
 /// 输入展平约定：`dep_states`/`arrival_states` 为 n×6 行优先，`dep_times`/
 /// `alpha_grid` 一维。
+///
+/// `progress_tx` 传入时，每个 departure 的最后一个 α 完成后 send `1`
+/// （出发粒度，与 [`transfer_grid_search_parallel`] 语义一致）；`None` 不发。
 pub fn transfer_grid_search_serial(
     dep_states: &[f64],
     dep_times: &[f64],
     alpha_grid: &[f64],
     arrival_states: &[f64],
     params: &GridSearchParams,
+    progress_tx: Option<&crossbeam_channel::Sender<usize>>,
 ) -> Vec<TransferPointResult> {
     assert!(
         dep_states.len().is_multiple_of(6),
@@ -351,6 +359,12 @@ pub fn transfer_grid_search_serial(
             arrival_states,
             params,
         ));
+        // 该 departure 的最后一个 α 完成 → 通知一次（出发粒度进度回调）。
+        if i_alpha + 1 == n_alpha {
+            if let Some(tx) = progress_tx {
+                let _ = tx.send(1);
+            }
+        }
     }
     out
 }
@@ -362,6 +376,10 @@ pub fn transfer_grid_search_serial(
 /// `par_iter` + `collect` 保序：各候选求值是纯函数（直接调纯 Rust
 /// [`crate::cr3bp::propagate_cr3bp`]，CR3BP 纯数学无 SPICE FFI、无线程
 /// 不安全状态），故并行与串行结果逐位相同。
+///
+/// `progress_tx` 传入时，用 per-departure 原子计数实现「某 departure 的
+/// 最后一个 α 完成时 send 一次」——每个 departure 恰好 send 一次，与
+/// [`transfer_grid_search_serial`] 出发粒度语义一致；`None` 不发。
 ///
 /// # 并行安全前提
 ///
@@ -376,8 +394,10 @@ pub fn transfer_grid_search_parallel(
     alpha_grid: &[f64],
     arrival_states: &[f64],
     params: &GridSearchParams,
+    progress_tx: Option<&crossbeam_channel::Sender<usize>>,
 ) -> Vec<TransferPointResult> {
     use rayon::prelude::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     assert!(
         dep_states.len().is_multiple_of(6),
@@ -403,6 +423,12 @@ pub fn transfer_grid_search_parallel(
 
     let total = n_dep.checked_mul(n_alpha).expect("n_dep * n_alpha 溢出");
 
+    // per-departure 完成计数：第 i_dep 个 departure 的 α 全部完成时 send 一次。
+    // fetch_add 返回值达到 n_alpha-1 的那个 worker 独占 send 职责——每个 departure
+    // 恰好触发一次（与 serial 的 i_alpha+1==n_alpha 语义一致）。Relaxed 序足够：
+    // 只读本 departure 的计数，无需跨 departure 同步。
+    let done: Vec<AtomicUsize> = (0..n_dep).map(|_| AtomicUsize::new(0)).collect();
+
     (0..total)
         .into_par_iter()
         .map(|idx| {
@@ -410,13 +436,21 @@ pub fn transfer_grid_search_parallel(
             let i_alpha = idx % n_alpha;
             let mut dep = [0.0_f64; 6];
             dep.copy_from_slice(&dep_states[i_dep * 6..i_dep * 6 + 6]);
-            evaluate_point(
+            let r = evaluate_point(
                 &dep,
                 dep_times[i_dep],
                 alpha_grid[i_alpha],
                 arrival_states,
                 params,
-            )
+            );
+            // 该 departure 最后一个完成的 α 触发一次 send（与 serial 语义一致）。
+            let prev = done[i_dep].fetch_add(1, Ordering::Relaxed);
+            if prev + 1 == n_alpha {
+                if let Some(tx) = progress_tx {
+                    let _ = tx.send(1);
+                }
+            }
+            r
         })
         .collect()
 }
@@ -467,7 +501,12 @@ mod tests {
         assert_ne!(r.status, "integration_failed");
         assert!(r.min_distance.is_some());
         assert!(r.min_distance_idx.is_some());
-        assert!(r.transfer_trajectory.is_some());
+        // item ③：仅 status=="success" 回传轨迹。本温和场景 dep(xc=0.9) 与
+        // arrival(xc=0.7) 最近距超过 min_distance_threshold=0.05，status=
+        // no_intersection，故 trajectory=None（积分成功分支仍填 min_distance
+        // 等几何字段；轨迹是否回传由 status 决定）。
+        assert_eq!(r.transfer_trajectory.is_some(), r.status == "success");
+        assert_eq!(r.transfer_times.is_some(), r.status == "success");
         // dv_departure = |alpha·vel - vel| = |alpha-1|·|vel|；alpha=1 → 0。
         assert!(r.dv_departure < 1e-12);
     }
@@ -510,8 +549,14 @@ mod tests {
         let alpha_grid = vec![0.9, 1.0, 1.1];
         let arrival = circular_orbit(0.7, 0.12, 30);
 
-        let results =
-            transfer_grid_search_serial(&dep_states, &dep_times, &alpha_grid, &arrival, &params());
+        let results = transfer_grid_search_serial(
+            &dep_states,
+            &dep_times,
+            &alpha_grid,
+            &arrival,
+            &params(),
+            None,
+        );
         assert_eq!(results.len(), n_dep * n_alpha);
         // 顺序：idx = i_dep * n_alpha + i_alpha。
         for (idx, r) in results.iter().enumerate() {
@@ -538,14 +583,21 @@ mod tests {
         let alpha_grid = vec![0.9, 0.95, 1.0, 1.05];
         let arrival = circular_orbit(0.7, 0.12, 30);
 
-        let serial =
-            transfer_grid_search_serial(&dep_states, &dep_times, &alpha_grid, &arrival, &params());
+        let serial = transfer_grid_search_serial(
+            &dep_states,
+            &dep_times,
+            &alpha_grid,
+            &arrival,
+            &params(),
+            None,
+        );
         let parallel = transfer_grid_search_parallel(
             &dep_states,
             &dep_times,
             &alpha_grid,
             &arrival,
             &params(),
+            None,
         );
         assert_eq!(serial.len(), n_dep * n_alpha);
         assert_eq!(parallel.len(), serial.len());

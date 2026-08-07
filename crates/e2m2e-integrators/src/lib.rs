@@ -2409,12 +2409,56 @@ impl From<e2m2e_forces::transfer_grid_search::TransferPointResult> for TransferP
     }
 }
 
+/// 建进度回调 drainer（#316 item ①）。
+///
+/// `callback=Some(cb)` 时建 unbounded channel，spawn 独立 OS 线程排空 rx：
+/// 每次先 `recv` 阻塞拿一个 delta，再 `try_recv` 聚合已入队但未处理的 delta，
+/// 合并后 `Python::with_gil` reacquire GIL 调 `cb(delta)`——聚合减少 GIL 获取
+/// 次数。返回 `(Some(tx), Some(handle))`，tx 喂给 e2m2e-forces 网格内核。
+///
+/// `callback=None` 返回 `(None, None)`，内核 `progress_tx=None` 不发。
+///
+/// # GIL 协同
+///
+/// 调用方（`transfer_grid_search_*_py`）把 channel 创建 + compute + drainer
+/// join 全包在 `py.allow_threads` 内：主线程释放 GIL 跑 Rust compute，drainer
+/// 线程才能 reacquire GIL 实时回调。compute 结束后 `drop(tx)` → rx 迭代终止
+/// → drainer 线程干净退出 → join 返回。
+fn spawn_progress_drainer(
+    callback: Option<PyObject>,
+) -> (
+    Option<crossbeam_channel::Sender<usize>>,
+    Option<std::thread::JoinHandle<()>>,
+) {
+    match callback {
+        Some(cb) => {
+            let (tx, rx) = crossbeam_channel::unbounded::<usize>();
+            let drainer = std::thread::spawn(move || {
+                while let Ok(n) = rx.recv() {
+                    let mut delta = n;
+                    while let Ok(m) = rx.try_recv() {
+                        delta += m;
+                    }
+                    // call1 返回的 Bound 引用 GIL lifetime，不能逃逸 with_gil
+                    // 闭包；闭包内丢弃返回值（回调失败不终止 drainer）。
+                    Python::with_gil(|py| {
+                        let _ = cb.bind(py).call1((delta,));
+                    });
+                }
+            });
+            (Some(tx), Some(drainer))
+        }
+        None => (None, None),
+    }
+}
+
 /// Python 接口：转移网格搜索（串行版，阶段 B）。
 ///
-/// 不用 Rayon、不释放 GIL（阶段 C 加 `py.allow_threads` + Rayon `par_iter`）。
 /// 展平 POD 输入，调纯 Rust
 /// [`e2m2e_forces::transfer_grid_search::transfer_grid_search_serial`]，
 /// 返回 `Vec<TransferPointResult>`（保序：外层 departure、内层 alpha）。
+/// 串行不用 Rayon，但传入 `progress_callback` 时仍走 `py.allow_threads`
+/// 释放 GIL——否则 drainer 线程拿不到 GIL，回调退化为 compute 结束后批量触发。
 ///
 /// # 参数
 /// - `dep_states`: `n_dep*6` 展平（行优先）
@@ -2424,11 +2468,14 @@ impl From<e2m2e_forces::transfer_grid_search::TransferPointResult> for TransferP
 /// - 标量包：`mu` / `max_transfer_time` / `integration_dt` /
 ///   `intersection_threshold` / `min_distance_threshold` /
 ///   `collision_earth_radius` / `collision_moon_radius` / `rtol` / `atol` / `max_step`
+/// - `progress_callback`（关键字）：`cb(delta: int) -> None`，每个 departure 完成
+///   调一次（出发粒度）；`None` 不回调。
 ///
 /// # 返回
 /// `list[TransferPointResult]`，长度 `n_dep * n_alpha`。Python 侧
 /// `grid_search_rust_serial` 转 `list[dict]`。
 #[pyfunction]
+#[pyo3(signature = (dep_states, dep_times, alpha_grid, arrival_states, mu, max_transfer_time, integration_dt, intersection_threshold, min_distance_threshold, collision_earth_radius, collision_moon_radius, rtol, atol, max_step, *, progress_callback=None))]
 #[allow(clippy::too_many_arguments)]
 fn transfer_grid_search_serial_py(
     dep_states: Vec<f64>,
@@ -2445,6 +2492,8 @@ fn transfer_grid_search_serial_py(
     rtol: f64,
     atol: f64,
     max_step: f64,
+    progress_callback: Option<PyObject>,
+    py: Python<'_>,
 ) -> PyResult<Vec<TransferPointResult>> {
     use e2m2e_forces::transfer_grid_search::{transfer_grid_search_serial, GridSearchParams};
 
@@ -2460,14 +2509,26 @@ fn transfer_grid_search_serial_py(
         atol,
         max_step,
     };
-    let results = transfer_grid_search_serial(
-        &dep_states,
-        &dep_times,
-        &alpha_grid,
-        &arrival_states,
-        &params,
-    );
-    Ok(results.into_iter().map(TransferPointResult::from).collect())
+    let forces_results = py.allow_threads(move || {
+        let (tx, drainer) = spawn_progress_drainer(progress_callback);
+        let results = transfer_grid_search_serial(
+            &dep_states,
+            &dep_times,
+            &alpha_grid,
+            &arrival_states,
+            &params,
+            tx.as_ref(),
+        );
+        drop(tx);
+        if let Some(h) = drainer {
+            let _ = h.join();
+        }
+        results
+    });
+    Ok(forces_results
+        .into_iter()
+        .map(TransferPointResult::from)
+        .collect())
 }
 
 /// Python 接口：转移网格搜索（阶段 C，Rayon 并行 + GIL 释放）。
@@ -2483,15 +2544,22 @@ fn transfer_grid_search_serial_py(
 /// 同 [`transfer_grid_search_serial_py`]，新增关键字参数：
 /// - `parallel`: `None`（默认）时由 `E2M2E_SEARCH_PARALLEL` 决定（`"0"`→串行，
 ///   其余/未设→并行）；显式 `True`/`False` 覆盖环境变量。
+/// - `n_workers`: `None`（默认）时用 Rayon 全局线程池（线程数由
+///   `RAYON_NUM_THREADS` 决定，未设则 cpu 核数）；显式 `Some(n)` 时建一次性
+///   `ThreadPoolBuilder` 限定 `n.max(1)` 个线程并 `install` 本次 compute——
+///   覆盖 `RAYON_NUM_THREADS`。串行模式忽略此参数（无线程池）。
+/// - `progress_callback`: 同 [`transfer_grid_search_serial_py`]。
 ///
 /// # GIL 与并行
 ///
-/// `py.allow_threads` 释放 GIL 是 Rayon 真并行的前提——不释放则 GIL 序列化
-/// 所有 Rayon worker，形同串行。内部直接调纯 Rust
+/// `py.allow_threads` 释放 GIL 是 Rayon 真并行 + drainer 实时回调的前提——
+/// 不释放则 GIL 序列化所有 Rayon worker、drainer 拿不到 GIL。channel 创建 +
+/// ThreadPoolBuilder + compute + drainer join 全在闭包内，tx 在闭包内 drop，
+/// drainer 干净退出。内部直接调纯 Rust
 /// [`e2m2e_forces::transfer_grid_search`] 核心，不绕道持 GIL 的
 /// `propagate_cr3bp_py`（这是最易踩的坑，见 transfer-grid-search-rust.md:109）。
 #[pyfunction]
-#[pyo3(signature = (dep_states, dep_times, alpha_grid, arrival_states, mu, max_transfer_time, integration_dt, intersection_threshold, min_distance_threshold, collision_earth_radius, collision_moon_radius, rtol, atol, max_step, *, parallel=None))]
+#[pyo3(signature = (dep_states, dep_times, alpha_grid, arrival_states, mu, max_transfer_time, integration_dt, intersection_threshold, min_distance_threshold, collision_earth_radius, collision_moon_radius, rtol, atol, max_step, *, parallel=None, n_workers=None, progress_callback=None))]
 #[allow(clippy::too_many_arguments)]
 fn transfer_grid_search_py(
     dep_states: Vec<f64>,
@@ -2509,10 +2577,13 @@ fn transfer_grid_search_py(
     atol: f64,
     max_step: f64,
     parallel: Option<bool>,
+    n_workers: Option<usize>,
+    progress_callback: Option<PyObject>,
     py: Python<'_>,
 ) -> PyResult<Vec<TransferPointResult>> {
     use e2m2e_forces::transfer_grid_search::{
         transfer_grid_search_parallel, transfer_grid_search_serial, GridSearchParams,
+        TransferPointResult as ForcesTransferPointResult,
     };
 
     let use_parallel = parallel
@@ -2531,27 +2602,60 @@ fn transfer_grid_search_py(
         max_step,
     };
 
-    // 释放 GIL 让 Rayon 真并行；核心纯 Rust 不碰 Python 对象。
-    py.allow_threads(move || {
-        let results = if use_parallel {
-            transfer_grid_search_parallel(
-                &dep_states,
-                &dep_times,
-                &alpha_grid,
-                &arrival_states,
-                &params,
-            )
-        } else {
-            transfer_grid_search_serial(
-                &dep_states,
-                &dep_times,
-                &alpha_grid,
-                &arrival_states,
-                &params,
-            )
+    // 仅并行模式 + 显式 n_workers 时建一次性线程池（install 覆盖 RAYON_NUM_THREADS）。
+    // 在 allow_threads 之前构建——build 失败走 PyResult 而非 FFI 边界 panic（线程创建
+    // OOM/OS 限制极少见，但 panic 会拖垮整个 Python 进程）；串行模式不建池（install
+    // 对单线程 work 无意义，省一次线程创建）。
+    let pool = match n_workers {
+        Some(n) if use_parallel => Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(n.max(1))
+                .build()
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?,
+        ),
+        _ => None,
+    };
+
+    // 释放 GIL 让 Rayon 真并行 + drainer 实时回调；核心纯 Rust 不碰 Python 对象。
+    let forces_results = py.allow_threads(move || {
+        let (tx, drainer) = spawn_progress_drainer(progress_callback);
+        let work = || -> Vec<ForcesTransferPointResult> {
+            if use_parallel {
+                transfer_grid_search_parallel(
+                    &dep_states,
+                    &dep_times,
+                    &alpha_grid,
+                    &arrival_states,
+                    &params,
+                    tx.as_ref(),
+                )
+            } else {
+                transfer_grid_search_serial(
+                    &dep_states,
+                    &dep_times,
+                    &alpha_grid,
+                    &arrival_states,
+                    &params,
+                    tx.as_ref(),
+                )
+            }
         };
-        Ok(results.into_iter().map(TransferPointResult::from).collect())
-    })
+        // Some(pool) → install 到一次性线程池；None → Rayon 全局池（RAYON_NUM_THREADS）。
+        let results = if let Some(p) = pool.as_ref() {
+            p.install(work)
+        } else {
+            work()
+        };
+        drop(tx);
+        if let Some(h) = drainer {
+            let _ = h.join();
+        }
+        results
+    });
+    Ok(forces_results
+        .into_iter()
+        .map(TransferPointResult::from)
+        .collect())
 }
 
 /// 激活 Rust 星历预采样缓存。

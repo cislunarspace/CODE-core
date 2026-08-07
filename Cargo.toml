@@ -19,3 +19,7 @@ cspice = "0.1"
 cspice-sys = { version = "1.0", features = ["downloadcspice"] }
 # 多重打靶段积分并行（段间相互独立，rayon par_iter 线性加速）
 rayon = "1.10"
+# 转移网格搜索进度回调：Rust worker 跨线程发送完成信号给 FFI drainer 线程，
+# drainer reacquire GIL 调 Python callable（Sender 为 Send+Sync，可被 rayon
+# 多 worker 共享引用；std::sync::mpsc::Sender 是 !Sync，做不到）。
+crossbeam-channel = "0.5"

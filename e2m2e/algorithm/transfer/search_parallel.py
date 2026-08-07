@@ -186,13 +186,21 @@ def search_single_departure(
                 first_md_idx = None
                 first_md_time = None
 
+            if collision:
+                status = "collision"
+            elif intersection or min_dist < mdt:
+                status = "success"
+            else:
+                status = "no_intersection"
+            # item ③：仅 success 候选回传轨迹（与 Rust evaluate_point 一致），
+            # collision / no_intersection 的整段轨迹对下游选优无价值，丢弃省内存。
             result = {
                 "success": True,
                 "departure_state": departure_state,
                 "departure_time": departure_time,
                 "alpha": alpha,
-                "transfer_trajectory": traj_states,
-                "transfer_times": traj_times,
+                "transfer_trajectory": traj_states if status == "success" else None,
+                "transfer_times": traj_times if status == "success" else None,
                 "transfer_time": traj_times[-1],
                 "min_distance": min_dist,
                 "min_distance_idx": min_idx,
@@ -212,13 +220,8 @@ def search_single_departure(
                 "collision_found": collision,
                 "collision_body": body,
                 "collision_idx": col_idx,
+                "status": status,
             }
-            if collision:
-                result["status"] = "collision"
-            elif intersection or min_dist < mdt:
-                result["status"] = "success"
-            else:
-                result["status"] = "no_intersection"
             results.append(result)
         finally:
             if pbar is not None:
@@ -335,9 +338,12 @@ def grid_search_rust_dispatch(
     - **Rust 扩展缺失**：``grid_search_rust`` 抛 ``RuntimeError``（``transfer_grid_search_py``
       为 None），回退 ``processes`` 后端。
 
-    Rust 总是走 Rayon 多核并行（``parallel=True``）——网格搜索的目标是快速完成，
-    Rayon 进程内线程池默认用满 cpu_count 个线程。要限制线程数用 ``RAYON_NUM_THREADS``
-    环境变量。``n_workers`` 仅用于 monkeypatch 回退时的 Python 后端选择。
+    Rust 总是走 Rayon 多核并行（``parallel=True``）——网格搜索的目标是快速完成。
+    ``n_workers`` 直接转发给 Rust 端 ``ThreadPoolBuilder.num_threads`` 限定线程数，
+    覆盖 ``RAYON_NUM_THREADS``（该环境变量仅在 :func:`grid_search_rust` 的
+    ``n_workers=None`` 时生效，本 dispatch 路径总传入有限整数）；monkeypatch 回退
+    时 ``n_workers`` 用于选择 Python 后端的进程数。``verbose`` 时建 tqdm 进度条，
+    出发粒度（Rust 端每完成一个 departure 触发一次回调）。
     """
     if _geometry_methods_monkeypatched(searcher):
         backend = "sequential" if n_workers == 1 else "processes"
@@ -383,7 +389,18 @@ def grid_search_rust_dispatch(
     alpha_grid = np.linspace(searcher.alpha_min, searcher.alpha_max, int(searcher.n_alpha))
     arrival_states = np.asarray(arrival_orbit.states, dtype=float)
     n_alpha = int(searcher.n_alpha)
-    parallel = True  # Rust Rayon 进程内线程池总是多核并行（网格搜索目标：快速完成）
+    parallel = True  # Rust Rayon 多核并行（网格搜索目标：快速完成）
+    n_dep = len(departure_states)
+
+    # 进度条：出发粒度（Rust 端每完成一个 departure 调一次 callback）。
+    pbar: Any | None = None
+    callback: Any | None = None
+    if verbose and n_dep > 0:
+        pbar = open_search_progress_bar(n_dep, "网格搜索(Rust)")
+
+        def callback(delta: int) -> None:
+            if pbar is not None:
+                pbar.update(delta)
 
     try:
         from ...integrators import grid_search_rust
@@ -404,8 +421,14 @@ def grid_search_rust_dispatch(
             atol=float(searcher.dynamics.atol),
             max_step=float(searcher.dynamics.max_step),
             parallel=parallel,
+            n_workers=n_workers,
+            progress_callback=callback,
         )
     except (ImportError, RuntimeError) as exc:
+        # 回退 processes 后端（自带进度条），关掉 Rust 的空进度条避免重复显示。
+        if pbar is not None:
+            pbar.close()
+            pbar = None
         if verbose:
             logger.info("Rust 后端不可用（%s），回退 processes", exc)
         return grid_search_parallel_processes(
@@ -418,6 +441,9 @@ def grid_search_rust_dispatch(
             verbose,
             n_workers,
         )
+    finally:
+        if pbar is not None:
+            pbar.close()
 
     for idx, r in enumerate(results):
         r["departure_time_index"] = idx // n_alpha
@@ -427,7 +453,7 @@ def grid_search_rust_dispatch(
     if verbose:
         mode = "Rayon 并行" if parallel else "Rust 串行"
         print(
-            f"  Rust 后端（{mode}）: {len(departure_states)}×{n_alpha}={len(results)} 评估",
+            f"  Rust 后端（{mode}）: {n_dep}×{n_alpha}={len(results)} 评估",
             flush=True,
         )
     return results
