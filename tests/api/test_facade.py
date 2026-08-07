@@ -9,12 +9,15 @@ from pydantic import ValidationError
 from e2m2e.api.facade import Facade, mcp_tools
 from e2m2e.api.models import (
     ControlOrbitRequest,
+    ControlOrbitResponse,
     DesignOrbitRequest,
+    DesignOrbitResponse,
     OrbitError,
     PropagationRequest,
     SpacetimeTransformRequest,
     TransferDesignRequest,
 )
+from e2m2e.data.types.trajectory import EphemerisTable
 
 
 class TestDesignOrbitRequest:
@@ -213,3 +216,213 @@ class TestFacadeCallChain:
         result = _details_to_dict(details)
         assert result["array"] == [1.0, 2.0]
         assert result["nested"]["tuple"] == [[3.0], 4.0]
+
+
+# ---------------------------------------------------------------------------
+# 几何字段补齐（#312）：Facade Response 须带 mu/states/times/ephemeris，
+# 让下游（transfer-orbit-design）可退回 Facade、移除 algorithm 层直调。
+# 这些测试不依赖 SPICE：直接验证序列化助手 + 纯翻译函数 + Pydantic 模型。
+# ---------------------------------------------------------------------------
+
+
+def _make_ephemeris(n: int = 3, with_jd: bool = False) -> EphemerisTable:
+    """构造一个小型 EphemerisTable（无 SPICE 依赖），供翻译测试用。"""
+    return EphemerisTable(
+        year=np.full(n, 2024, dtype=int),
+        month=np.full(n, 1, dtype=int),
+        day=np.full(n, 1, dtype=int),
+        hour=np.arange(n, dtype=int),
+        minute=np.zeros(n, dtype=int),
+        second=np.zeros(n, dtype=float),
+        position_km=np.arange(n * 3, dtype=float).reshape(n, 3),
+        velocity_mps=np.full((n, 3), 1000.0),
+        synodic_position=np.full((n, 3), 0.5),
+        times_jd_tdb=np.linspace(2460310.0, 2460311.0, n) if with_jd else None,
+    )
+
+
+class TestEphemerisToDict:
+    def test_serializes_ndarrays_to_lists(self):
+        from e2m2e.api.facade import _ephemeris_to_dict
+
+        d = _ephemeris_to_dict(_make_ephemeris(n=2))
+        assert d is not None
+        # ndarray → list
+        assert d["position_km"] == [[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]]
+        assert d["velocity_mps"] == [[1000.0, 1000.0, 1000.0]] * 2
+        assert d["synodic_position"] == [[0.5, 0.5, 0.5]] * 2
+        assert d["year"] == [2024, 2024]
+        assert d["hour"] == [0, 1]
+        # 全字段在列（EphemerisTable 数据列）
+        assert set(d) == {
+            "year",
+            "month",
+            "day",
+            "hour",
+            "minute",
+            "second",
+            "position_km",
+            "velocity_mps",
+            "synodic_position",
+            "times_jd_tdb",
+        }
+
+    def test_times_jd_tdb_none_and_populated(self):
+        from e2m2e.api.facade import _ephemeris_to_dict
+
+        # design 链路不填 times_jd_tdb → None
+        d_none = _ephemeris_to_dict(_make_ephemeris(with_jd=False))
+        assert d_none["times_jd_tdb"] is None
+        # 传播链路填了 times_jd_tdb → list
+        d_jd = _ephemeris_to_dict(_make_ephemeris(with_jd=True))
+        assert d_jd["times_jd_tdb"] == pytest.approx([2460310.0, 2460310.5, 2460311.0])
+
+    def test_none_input_returns_none(self):
+        from e2m2e.api.facade import _ephemeris_to_dict
+
+        assert _ephemeris_to_dict(None) is None
+
+
+class TestDesignResultToResponse:
+    def _mock_result(self, *, with_system: bool = True):
+        """构造一个鸭子类型的 OrbitDesignResult（不调算法层、不需 SPICE）。"""
+        from types import SimpleNamespace
+
+        system = SimpleNamespace(mu=0.0121506683) if with_system else None
+        cr3bp_orbit = SimpleNamespace(
+            states=np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 0.1, 0.1, 0.1]]),
+            times=np.array([0.0, 1.234]),
+            system=system,
+        )
+        correction = SimpleNamespace(converged=True, iterations=4)
+        return SimpleNamespace(
+            orbit_type="DRO",
+            epoch_utc="2024-01-01T00:00:00.000",
+            duration_day=365.25,
+            output_step_sec=3600.0,
+            initial_state=np.zeros(6),
+            ephemeris=_make_ephemeris(n=3),
+            cr3bp_orbit=cr3bp_orbit,
+            cr3bp_jacobi=3.16,
+            correction=correction,
+            force_config={"sun_body": 1},
+        )
+
+    def test_extracts_geometry_fields(self):
+        from e2m2e.api.facade import _design_result_to_response
+
+        resp = _design_result_to_response(self._mock_result())
+        # 摘要字段保留
+        assert resp.orbit_type == "DRO"
+        assert resp.cr3bp_jacobi == pytest.approx(3.16)
+        assert resp.correction_converged is True
+        assert resp.correction_iterations == 4
+        assert resp.initial_state == [0.0] * 6
+        # 新增几何字段
+        assert resp.mu == pytest.approx(0.0121506683)
+        assert resp.states == [[0.0] * 6, [1.0, 1.0, 1.0, 0.1, 0.1, 0.1]]
+        assert resp.times == [0.0, 1.234]
+        assert resp.ephemeris is not None
+        assert resp.ephemeris["position_km"] == [[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]]
+
+    def test_mu_none_when_system_missing(self):
+        """system 未绑定时 mu 防御性回退为 None（同下游 getattr 约定）。"""
+        from e2m2e.api.facade import _design_result_to_response
+
+        resp = _design_result_to_response(self._mock_result(with_system=False))
+        assert resp.mu is None
+        # 其余几何字段仍正常
+        assert resp.states == [[0.0] * 6, [1.0, 1.0, 1.0, 0.1, 0.1, 0.1]]
+
+
+class TestControlResultToResponse:
+    def _mock_result(self, *, controlled):
+        from types import SimpleNamespace
+
+        from e2m2e.data.types.maneuver import ManeuverTable
+        from e2m2e.data.types.sk_statistic import SKStatistic
+
+        return SimpleNamespace(
+            num_failed=1,
+            sk_statistic=SKStatistic(rows=np.zeros((2, 3)), num_failed=1),
+            maneuvers=ManeuverTable(mjd_tdb=np.array([60000.0]), delta_v_mps=np.array([1.0])),
+            controlled_ephemeris=_make_ephemeris(n=2) if controlled else None,
+        )
+
+    def test_with_controlled_ephemeris_and_mu_echo(self):
+        from e2m2e.api.facade import _control_result_to_response
+
+        resp = _control_result_to_response(self._mock_result(controlled=True), mu=0.0121506683)
+        assert resp.num_failed == 1
+        assert resp.controlled_ephemeris is not None
+        assert resp.controlled_ephemeris["synodic_position"] == [[0.5, 0.5, 0.5]] * 2
+        # mu 由请求透传（算法层不产 mu）
+        assert resp.mu == pytest.approx(0.0121506683)
+
+    def test_all_failed_no_controlled_ephemeris(self):
+        from e2m2e.api.facade import _control_result_to_response
+
+        resp = _control_result_to_response(self._mock_result(controlled=False), mu=None)
+        assert resp.controlled_ephemeris is None
+        assert resp.mu is None
+
+
+class TestGeometryModelFields:
+    """Pydantic 模型字段验收（#312）。"""
+
+    def test_design_response_carries_geometry(self):
+        resp = DesignOrbitResponse(
+            orbit_type="DRO",
+            epoch_utc="2024-01-01T00:00:00.000",
+            duration_day=365.25,
+            initial_state=[0.0] * 6,
+            cr3bp_jacobi=3.16,
+            correction_converged=True,
+            correction_iterations=4,
+            force_config={"sun_body": 1},
+            mu=0.0121506683,
+            states=[[0.0] * 6],
+            times=[0.0],
+            ephemeris={"position_km": [[0.0, 0.0, 0.0]]},
+        )
+        # 序列化往返：ndarray-free dict/list 可 JSON 化
+        dumped = resp.model_dump()
+        assert dumped["mu"] == pytest.approx(0.0121506683)
+        assert dumped["states"] == [[0.0] * 6]
+        assert dumped["ephemeris"]["position_km"] == [[0.0, 0.0, 0.0]]
+
+    def test_design_response_mu_optional(self):
+        """mu 防御性可空（system 未绑定时）。"""
+        resp = DesignOrbitResponse(
+            orbit_type="DRO",
+            epoch_utc="2024-01-01T00:00:00.000",
+            duration_day=365.25,
+            initial_state=[0.0] * 6,
+            cr3bp_jacobi=3.16,
+            correction_converged=True,
+            correction_iterations=4,
+            force_config={},
+            mu=None,
+            states=[],
+            times=[],
+            ephemeris={},
+        )
+        assert resp.mu is None
+
+    def test_control_response_backward_compatible(self):
+        """新增字段带默认值：旧路径（仅摘要）构造不报错。"""
+        resp = ControlOrbitResponse(
+            num_failed=0,
+            sk_statistic={"rows": [[0.0]], "num_failed": 0},
+            maneuvers={"mjd_tdb": [60000.0], "delta_v_mps": [1.0]},
+        )
+        assert resp.controlled_ephemeris is None
+        assert resp.mu is None
+
+    def test_control_request_accepts_mu(self):
+        """mu 透传字段（画地月/L 点标注用）。"""
+        req = ControlOrbitRequest(input_ephemeris="x", mu=0.0121506683)
+        assert req.mu == pytest.approx(0.0121506683)
+        # 缺省 None
+        req_default = ControlOrbitRequest(input_ephemeris="x")
+        assert req_default.mu is None

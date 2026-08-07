@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **Facade Response 补齐轨道几何字段**（#312）：`DesignOrbitResponse` 增 `mu` / `states` / `times` / `ephemeris`（CR3BP 参考轨道 + 标称星历），`ControlOrbitResponse` 增 `controlled_ephemeris` / `mu`（请求透传）。下游（transfer-orbit-design）可退回 Facade、移除 algorithm 层直调（下游 ADR 0011 缓解措施 3 / ADR 0012）。`ephemeris`/`controlled_ephemeris` 为 `EphemerisTable` 全字段 dict，重建容器过滤 None 值即可。
+
 ## [5.6.0] - 2026-08-07
 
 ### Added

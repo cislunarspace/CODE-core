@@ -76,7 +76,14 @@ class DesignOrbitRequest(_ApiModel):
 
 
 class DesignOrbitResponse(_ApiModel):
-    """任务轨道设计输出。"""
+    """任务轨道设计输出。
+
+    几何字段（``mu`` / ``states`` / ``times`` / ``ephemeris``，#312）让下游
+    （画图 / 落盘 / design→control 链式）可仅依赖 Facade，不必穿透 algorithm
+    层。``states`` / ``times`` 为 CR3BP 参考周期轨道（无量纲会合系），
+    ``ephemeris`` 为标称星历（GCRS km / 速度 m/s + 会合系，``EphemerisTable``
+    全字段）。同 ``PropagationResponse``，Response 带大数组是本仓库既有约定。
+    """
 
     orbit_type: str
     epoch_utc: str
@@ -86,6 +93,22 @@ class DesignOrbitResponse(_ApiModel):
     correction_converged: bool
     correction_iterations: int
     force_config: dict[str, Any]
+    mu: float | None = Field(
+        default=None,
+        description="CR3BP 质量比 μ = m₂/(m₁+m₂)；构造 CR3BP_System、画地月/L 点标注用",
+    )
+    states: list[list[float]] = Field(
+        default_factory=list,
+        description="CR3BP 参考周期轨道状态序列 (n,6)，无量纲会合系",
+    )
+    times: list[float] = Field(
+        default_factory=list,
+        description="CR3BP 参考周期轨道时间序列 (n,)，无量纲",
+    )
+    ephemeris: dict[str, Any] | None = Field(
+        default=None,
+        description="标称星历（EphemerisTable 全字段：UTC + GCRS km/m/s + 会合系）",
+    )
 
 
 class ControlOrbitRequest(_ApiModel):
@@ -105,14 +128,31 @@ class ControlOrbitRequest(_ApiModel):
     srp_torque: list[float] | None = Field(
         default=None, description="常值 SRP 力矩 [τx,τy,τz]（N·m）"
     )
+    mu: float | None = Field(
+        default=None,
+        description="CR3BP 质量比 μ（透传到响应，画地月/L 点标注用）；算法层不产 mu",
+    )
 
 
 class ControlOrbitResponse(_ApiModel):
-    """轨道保持输出。"""
+    """轨道保持输出。
+
+    几何字段（``controlled_ephemeris`` / ``mu``，#312）：``controlled_ephemeris``
+    为最后一次蒙特卡洛样本的受控真实轨道星历（``EphemerisTable`` 全字段；
+    全失败时 ``None``）；``mu`` 由请求透传（算法层不产 mu）。
+    """
 
     num_failed: int
     sk_statistic: dict[str, Any]
     maneuvers: dict[str, Any]
+    controlled_ephemeris: dict[str, Any] | None = Field(
+        default=None,
+        description="受控星历（EphemerisTable 全字段）；所有蒙特卡洛样本失败时 None",
+    )
+    mu: float | None = Field(
+        default=None,
+        description="CR3BP 质量比 μ（请求透传，画地月/L 点标注用）",
+    )
 
 
 class TransferDesignRequest(_ApiModel):

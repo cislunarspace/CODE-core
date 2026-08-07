@@ -12,7 +12,7 @@ transfer_design/orbit_propagation/spacetime_transform），二档子任务已接
 from __future__ import annotations
 
 import dataclasses
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -32,6 +32,12 @@ from .models import (
 )
 
 __all__ = ["Facade", "mcp_tools"]
+
+if TYPE_CHECKING:
+    # 仅类型检查用：算法/数据层结果类型（运行时懒加载，见各 Facade 方法内 import）。
+    from e2m2e.algorithm.design import OrbitDesignResult
+    from e2m2e.algorithm.station_keeping import ControlOrbitResult
+    from e2m2e.data.types.trajectory import EphemerisTable
 
 
 def mcp_exposed(func):
@@ -62,6 +68,72 @@ def _serialize_value(value: Any) -> Any:
     if isinstance(value, dict):
         return {k: _serialize_value(v) for k, v in value.items()}
     return value
+
+
+def _ephemeris_to_dict(ephemeris: EphemerisTable | None) -> dict[str, Any] | None:
+    """把 ``EphemerisTable`` 序列化为 JSON 兼容 dict（ndarray → list）。
+
+    迭代 ``dataclasses.fields(EphemerisTable)`` 取全字段（自动跟随容器
+    演进），跳过 ``raw_text``（原始文件文本，程序生成时为空串、读入时为
+    大字符串，下游重建容器不需要）。``times_jd_tdb`` 设计链路不填 → None。
+    下游过滤 None 值即可重建 ``EphemerisTable``。``None`` 输入返回 ``None``
+    （control 全样本失败时受控星历缺失）。
+    """
+    if ephemeris is None:
+        return None
+    return {
+        f.name: _serialize_value(getattr(ephemeris, f.name))
+        for f in dataclasses.fields(ephemeris)
+        if f.name != "raw_text"
+    }
+
+
+def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse:
+    """把 ``OrbitDesignResult`` 翻译为 ``DesignOrbitResponse``（含几何字段，#312）。
+
+    纯翻译、无副作用、不依赖 SPICE：从 ``cr3bp_orbit`` 提取 ``states`` /
+    ``times`` / ``mu``（mu 防御 getattr——``Orbit.system`` 缺省 None，
+    未绑定时 mu 回退 None，同下游 ``facade_bridge`` 约定），``ephemeris``
+    走 :func:`_ephemeris_to_dict`。提取为独立函数便于单测。
+    """
+    cr3bp_orbit = result.cr3bp_orbit
+    return DesignOrbitResponse(
+        orbit_type=result.orbit_type,
+        epoch_utc=result.epoch_utc,
+        duration_day=result.duration_day,
+        initial_state=result.initial_state.tolist(),
+        cr3bp_jacobi=result.cr3bp_jacobi,
+        correction_converged=result.correction.converged,
+        correction_iterations=result.correction.iterations,
+        force_config=result.force_config,
+        mu=getattr(cr3bp_orbit.system, "mu", None),
+        states=cr3bp_orbit.states.tolist(),
+        times=cr3bp_orbit.times.tolist(),
+        ephemeris=_ephemeris_to_dict(result.ephemeris),
+    )
+
+
+def _control_result_to_response(
+    result: ControlOrbitResult, *, mu: float | None
+) -> ControlOrbitResponse:
+    """把 ``ControlOrbitResult`` 翻译为 ``ControlOrbitResponse``（含几何字段，#312）。
+
+    ``controlled_ephemeris`` 来自最后一次蒙特卡洛样本（全失败时 None）；
+    ``mu`` 由请求透传——算法层不产 mu，design→control 链式时由调用方注入。
+    """
+    return ControlOrbitResponse(
+        num_failed=result.num_failed,
+        sk_statistic={
+            "rows": result.sk_statistic.rows.tolist(),
+            "num_failed": result.sk_statistic.num_failed,
+        },
+        maneuvers={
+            "mjd_tdb": result.maneuvers.mjd_tdb.tolist(),
+            "delta_v_mps": result.maneuvers.delta_v_mps.tolist(),
+        },
+        controlled_ephemeris=_ephemeris_to_dict(result.controlled_ephemeris),
+        mu=mu,
+    )
 
 
 class Facade:
@@ -111,16 +183,7 @@ class Facade:
                 correction_method=request.correction_method,
                 kernel_dir=self._config.kernel_dir,
             )
-            return DesignOrbitResponse(
-                orbit_type=result.orbit_type,
-                epoch_utc=result.epoch_utc,
-                duration_day=result.duration_day,
-                initial_state=result.initial_state.tolist(),
-                cr3bp_jacobi=result.cr3bp_jacobi,
-                correction_converged=result.correction.converged,
-                correction_iterations=result.correction.iterations,
-                force_config=result.force_config,
-            )
+            return _design_result_to_response(result)
         except OrbitError:
             raise
         except (ValueError, TypeError) as exc:
@@ -153,17 +216,7 @@ class Facade:
                 spacecraft_mass=request.spacecraft_mass,
                 srp_torque=request.srp_torque,
             )
-            return ControlOrbitResponse(
-                num_failed=result.num_failed,
-                sk_statistic={
-                    "rows": result.sk_statistic.rows.tolist(),
-                    "num_failed": result.sk_statistic.num_failed,
-                },
-                maneuvers={
-                    "mjd_tdb": result.maneuvers.mjd_tdb.tolist(),
-                    "delta_v_mps": result.maneuvers.delta_v_mps.tolist(),
-                },
-            )
+            return _control_result_to_response(result, mu=request.mu)
         except OrbitError:
             raise
         except (ValueError, TypeError) as exc:
