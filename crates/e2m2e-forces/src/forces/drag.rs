@@ -28,25 +28,32 @@ pub struct AccelDrag {
 /// 公式（与 Python `_compute_drag_in_itrf` 逐位一致）：
 /// ```text
 /// altitude = |r| - R_EARTH
-/// ρ = atmosphere::density(altitude, f107_default, ap_default)
+/// ρ = atmosphere::density(altitude, f107, ap)
 /// v_si = v * 1000
 /// a_km = [-1/2 * ρ * BC * |v_si| * v_si] / 1000
 ///      = -1/2 * ρ * BC * 1000 * |v| * v
 /// ```
 ///
+/// `f107`/`ap` 为太阳活动参数（对应 Python `ExponentialAtmosphere.f107`/`.ap`），
+/// 由调用方从 `DragModel` 注入的大气模型透传，避免在此硬编码默认值导致与
+/// Python 路径静默分歧（见 issue #315）。
+///
 /// # 注意
 /// 本函数假设输入已在 ITRF（或等价 body-fixed 系）中，不做 pxform 旋转。
 /// 供 `drag_accel` 管线内部调用，也供单元测试直接使用（不依赖 SPICE 内核）。
+#[allow(clippy::too_many_arguments)]
 pub fn drag_accel_in_body_fixed(
     r_bf: &[f64; 3],
     v_bf: &[f64; 3],
     area: f64,
     mass: f64,
     cd: f64,
+    f107: f64,
+    ap: f64,
 ) -> [f64; 3] {
     let r_norm = (r_bf[0] * r_bf[0] + r_bf[1] * r_bf[1] + r_bf[2] * r_bf[2]).sqrt();
     let altitude_km = r_norm - EARTH_RADIUS_KM;
-    let rho = atmosphere::density(altitude_km, 150.0, 15.0); // kg/m³，默认 f107/ap
+    let rho = atmosphere::density(altitude_km, f107, ap); // kg/m³
 
     let v_mag = (v_bf[0] * v_bf[0] + v_bf[1] * v_bf[1] + v_bf[2] * v_bf[2]).sqrt();
     if rho == 0.0 || v_mag == 0.0 {
@@ -73,12 +80,15 @@ pub fn drag_accel_in_body_fixed(
 /// 2. state_J2000 → state_ITRF（R^T rotation，与 GravityField pxform 模式一致）
 /// 3. `drag_accel_in_body_fixed` 算 ITRF 系内阻力
 /// 4. a_ITRF → a_J2000（正向 R rotation）
+#[allow(clippy::too_many_arguments)]
 pub fn drag_accel(
     et: f64,
     state: &[f64; 6],
     area: f64,
     mass: f64,
     cd: f64,
+    f107: f64,
+    ap: f64,
     propagation_frame: &str,
 ) -> Result<[f64; 3], SpiceFfiError> {
     // Step 1: 查 ITRF93 → propagation_frame（"J2000"）。
@@ -95,7 +105,7 @@ pub fn drag_accel(
     let r_itrf = mat3_t_mul_vec(&r_itrf_to_prop, &r_j2000);
     let v_itrf = mat3_t_mul_vec(&r_itrf_to_prop, &v_j2000);
 
-    let a_itrf = drag_accel_in_body_fixed(&r_itrf, &v_itrf, area, mass, cd);
+    let a_itrf = drag_accel_in_body_fixed(&r_itrf, &v_itrf, area, mass, cd, f107, ap);
 
     // Step 5: 旋转回 propagation frame。
     let a_prop = mat3_mul_vec(&r_itrf_to_prop, &a_itrf);
@@ -105,15 +115,18 @@ pub fn drag_accel(
 /// 计算 drag 加速度 + 有限差分雅可比矩阵（∂a/∂r, ∂a/∂v）。
 ///
 /// FD 在 J2000 分量上实施中心差分、封装完整管线（12 次 accel 评估）。
+#[allow(clippy::too_many_arguments)]
 pub fn drag_accel_and_jacobian(
     et: f64,
     state: &[f64; 6],
     area: f64,
     mass: f64,
     cd: f64,
+    f107: f64,
+    ap: f64,
     propagation_frame: &str,
 ) -> Result<AccelDrag, SpiceFfiError> {
-    let acc0 = drag_accel(et, state, area, mass, cd, propagation_frame)?;
+    let acc0 = drag_accel(et, state, area, mass, cd, f107, ap, propagation_frame)?;
 
     // 中心差分步长：√ε · max(1, |component|)，与 GravityField/SRP 统一
     let h_step = |val: f64| -> f64 { (f64::EPSILON.sqrt() * val.abs().max(1.0)).max(1e-6) };
@@ -126,8 +139,8 @@ pub fn drag_accel_and_jacobian(
         let mut s_minus = *state;
         s_plus[dim] += h;
         s_minus[dim] -= h;
-        let a_plus = drag_accel(et, &s_plus, area, mass, cd, propagation_frame)?;
-        let a_minus = drag_accel(et, &s_minus, area, mass, cd, propagation_frame)?;
+        let a_plus = drag_accel(et, &s_plus, area, mass, cd, f107, ap, propagation_frame)?;
+        let a_minus = drag_accel(et, &s_minus, area, mass, cd, f107, ap, propagation_frame)?;
         for i in 0..3 {
             jac_da_dr[i][dim] = (a_plus[i] - a_minus[i]) / (2.0 * h);
         }
@@ -141,8 +154,8 @@ pub fn drag_accel_and_jacobian(
         let mut s_minus = *state;
         s_plus[3 + dim] += h;
         s_minus[3 + dim] -= h;
-        let a_plus = drag_accel(et, &s_plus, area, mass, cd, propagation_frame)?;
-        let a_minus = drag_accel(et, &s_minus, area, mass, cd, propagation_frame)?;
+        let a_plus = drag_accel(et, &s_plus, area, mass, cd, f107, ap, propagation_frame)?;
+        let a_minus = drag_accel(et, &s_minus, area, mass, cd, f107, ap, propagation_frame)?;
         for i in 0..3 {
             jac_da_dv[i][dim] = (a_plus[i] - a_minus[i]) / (2.0 * h);
         }
@@ -173,7 +186,7 @@ mod tests {
     fn test_drag_zero_velocity_is_zero() {
         let r = [6778.0, 0.0, 0.0];
         let v = [0.0, 0.0, 0.0];
-        let acc = drag_accel_in_body_fixed(&r, &v, 10.0, 1000.0, 2.2);
+        let acc = drag_accel_in_body_fixed(&r, &v, 10.0, 1000.0, 2.2, 150.0, 15.0);
         assert_eq!(acc, [0.0; 3]);
     }
 
@@ -182,7 +195,7 @@ mod tests {
     fn test_drag_above_ceiling_is_zero() {
         let r = [7578.0, 0.0, 0.0];
         let v = [6.0, 0.0, 0.0];
-        let acc = drag_accel_in_body_fixed(&r, &v, 10.0, 1000.0, 2.2);
+        let acc = drag_accel_in_body_fixed(&r, &v, 10.0, 1000.0, 2.2, 150.0, 15.0);
         assert_eq!(acc, [0.0; 3]);
     }
 
@@ -191,7 +204,7 @@ mod tests {
     fn test_drag_opposes_velocity() {
         let r = [6778.0, 0.0, 0.0];
         let v = [0.0, 7.7, 0.0];
-        let acc = drag_accel_in_body_fixed(&r, &v, 10.0, 1000.0, 2.2);
+        let acc = drag_accel_in_body_fixed(&r, &v, 10.0, 1000.0, 2.2, 150.0, 15.0);
         assert!(acc[1] < 0.0, "阻力 y 分量应为负，got {:?}", acc);
         assert!(
             acc[0].abs() < acc[1].abs() * 1e-12,
@@ -216,7 +229,7 @@ mod tests {
         let mass = 1000.0;
         let cd = 2.2;
 
-        let acc = drag_accel_in_body_fixed(&r, &v, area, mass, cd);
+        let acc = drag_accel_in_body_fixed(&r, &v, area, mass, cd, 150.0, 15.0);
 
         let rho = atmosphere::density(altitude, 150.0, 15.0);
         let bc = cd * area / mass;
@@ -242,12 +255,12 @@ mod tests {
 
         let acc_400 = {
             let r = [EARTH_RADIUS_KM + 400.0, 0.0, 0.0];
-            let a = drag_accel_in_body_fixed(&r, &v, area, mass, cd);
+            let a = drag_accel_in_body_fixed(&r, &v, area, mass, cd, 150.0, 15.0);
             (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt()
         };
         let acc_800 = {
             let r = [EARTH_RADIUS_KM + 800.0, 0.0, 0.0];
-            let a = drag_accel_in_body_fixed(&r, &v, area, mass, cd);
+            let a = drag_accel_in_body_fixed(&r, &v, area, mass, cd, 150.0, 15.0);
             (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt()
         };
 
@@ -255,5 +268,47 @@ mod tests {
         assert!(acc_800 > 0.0);
         // 800 km 处密度约 1.137e-14 <= 400 km 处 ~2.803e-12 的 1/100
         assert!(acc_800 < acc_400 / 100.0);
+    }
+
+    /// 回归 #315：f107/ap 必须真正透传到 density，而非硬编码默认值。
+    ///
+    /// 阻力加速度 ∝ ρ ∝ solar_activity_factor(f107, ap)，故非默认配置下的加速度
+    /// 应严格等于默认配置加速度乘以因子比。若函数仍硬编码 150/15，两组结果会
+    /// 完全相同，比例恒为 1，本测试即失败。
+    #[test]
+    fn test_drag_uses_configured_f107_ap() {
+        let r = [EARTH_RADIUS_KM + 400.0, 0.0, 0.0];
+        let v = [0.0, 7.7, 0.0];
+        let area = 10.0;
+        let mass = 1000.0;
+        let cd = 2.2;
+
+        let acc_default = drag_accel_in_body_fixed(&r, &v, area, mass, cd, 150.0, 15.0);
+        let acc_hot = drag_accel_in_body_fixed(&r, &v, area, mass, cd, 200.0, 50.0);
+
+        // 解析因子比：solar_activity_factor(200,50) / solar_activity_factor(150,15)
+        // = (1+0.5·50/150)·(1+0.1·35/15) / 1
+        let factor_ratio =
+            (1.0 + 0.5 * (200.0 - 150.0) / 150.0) * (1.0 + 0.1 * (50.0 - 15.0) / 15.0);
+
+        for i in 0..3 {
+            if acc_default[i].abs() > 1e-30 {
+                let rel = (acc_hot[i] / acc_default[i] - factor_ratio).abs();
+                assert!(
+                    rel <= 1e-12,
+                    "分量 {i}: 加速度比例偏离因子比 {factor_ratio:.6}，rel={rel:e}；\
+                     f107/ap 未透传到 density（#315 回归）"
+                );
+            }
+        }
+
+        // sanity：非默认配置下加速度确实不同（因子比 ≠ 1）
+        let mag_default =
+            (acc_default[0].powi(2) + acc_default[1].powi(2) + acc_default[2].powi(2)).sqrt();
+        let mag_hot = (acc_hot[0].powi(2) + acc_hot[1].powi(2) + acc_hot[2].powi(2)).sqrt();
+        assert!(
+            (mag_hot / mag_default - factor_ratio).abs() <= 1e-12,
+            "量级比例应等于因子比 {factor_ratio:.6}"
+        );
     }
 }

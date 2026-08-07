@@ -90,6 +90,10 @@ pub enum CompiledForce {
         area: f64,
         mass: f64,
         cd: f64,
+        /// F10.7 太阳射电通量（sfu），来自 `ExponentialAtmosphere.f107`。
+        f107: f64,
+        /// Ap 地磁指数，来自 `ExponentialAtmosphere.ap`。
+        ap: f64,
         /// 传播系 frame（通常 "J2000"）
         propagation_frame: String,
     },
@@ -232,8 +236,10 @@ impl CompiledForce {
                 area,
                 mass,
                 cd,
+                f107,
+                ap,
                 propagation_frame,
-            } => drag::drag_accel(et, state, *area, *mass, *cd, propagation_frame)
+            } => drag::drag_accel(et, state, *area, *mass, *cd, *f107, *ap, propagation_frame)
                 .map_err(|e| format!("{:?}", e)),
         }
     }
@@ -410,11 +416,21 @@ pub fn acceleration_and_jacobian(
             area,
             mass,
             cd,
+            f107,
+            ap,
             propagation_frame,
         } => {
-            let result =
-                drag::drag_accel_and_jacobian(et, state, *area, *mass, *cd, propagation_frame)
-                    .map_err(|e| format!("{:?}", e))?;
+            let result = drag::drag_accel_and_jacobian(
+                et,
+                state,
+                *area,
+                *mass,
+                *cd,
+                *f107,
+                *ap,
+                propagation_frame,
+            )
+            .map_err(|e| format!("{:?}", e))?;
             Ok((result.acc, result.jac_da_dr, result.jac_da_dv))
         }
         _ => Err("Jacobian not supported for this force type".to_string()),

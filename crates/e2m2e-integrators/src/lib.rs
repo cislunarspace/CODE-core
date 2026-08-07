@@ -1038,14 +1038,19 @@ pub(crate) fn parse_force_tuple(
             })
         }
         "drag" => {
+            // 元组格式：("drag", area, mass, cd, propagation_frame, f107, ap)
             let area: f64 = tuple.get_item(1)?.extract()?;
             let mass: f64 = tuple.get_item(2)?.extract()?;
             let cd: f64 = tuple.get_item(3)?.extract()?;
             let propagation_frame: String = tuple.get_item(4)?.extract()?;
+            let f107: f64 = tuple.get_item(5)?.extract()?;
+            let ap: f64 = tuple.get_item(6)?.extract()?;
             Ok(CompiledForce::Drag {
                 area,
                 mass,
                 cd,
+                f107,
+                ap,
                 propagation_frame,
             })
         }

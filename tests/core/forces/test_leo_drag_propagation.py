@@ -142,3 +142,58 @@ def test_leo_drag_semi_major_axis_decays(leo_system):
         f"半长轴衰减量级偏差过大: measured={delta_a_per_day:.4f} km/day, "
         f"theory={delta_a_theory:.4f} km/day, error={relative_error:.1%}"
     )
+
+
+@pytest.mark.spice
+def test_drag_rust_path_respects_configured_f107_ap(leo_system):
+    """#315 端到端：Rust 路径必须响应用户配置的 f107/ap。
+
+    全链验证：``DragModel.to_rust_spec``（带 f107/ap）→ lib.rs 解析 7 元组 →
+    ``CompiledForce::Drag`` → ``drag_accel`` → ``density(h, f107, ap)``。
+
+    隔离手法：两轮都用 Rust 路径（``propagate_compiled``），仅改大气模型 f107/ap。
+    Rust 内部 ITRF93 pxform 帧旋转在两轮间完全相同、相消，残差纯来自密度差。
+
+    判据：bug 修复前 Rust 硬编码 150/15，改 f107/ap 不影响结果 → 两轮末态相同
+    （diff≈0）；修复后两轮末态应有可测差异（~10 m 量级）。
+
+    注：不能直接比 Rust vs Python 末态——Rust 用 SPICE ITRF93 pxform、Python 用
+    ITRFApproxAxes 近似旋转，固有 ~7 m 基线分歧（drag.rs 决策 1b），且该基线随
+    密度放大，会淹没 f107/ap 信号。帧旋转一致性是独立议题，不在 #315 范围。
+    """
+    system = leo_system
+    mu = _MU_EARTH
+
+    a0 = _EARTH_R_KM + 400.0  # 400 km 圆轨道，drag 量级可感知
+    y0 = _keplerian_to_cartesian(a0, 0.0, 51.6, 0.0, 0.0, 0.0, mu)
+
+    spice = system.spice
+    et0 = spice.utc_to_et("2025-06-21T11:00:06")
+    dt = 5400.0  # ~0.6 圈，足以让密度差放大到可测
+    t_eval = np.array([et0, et0 + dt])
+
+    def propagate_rust(f107: float, ap: float) -> np.ndarray:
+        drag = DragModel(
+            atmosphere=ExponentialAtmosphere(f107=f107, ap=ap),
+            area=10.0,
+            mass=1000.0,
+            cd=2.2,
+        )
+        gravity = GravityField(body="EARTH", degree=2, order=0)
+        fm = ForceModel(system, forces=[gravity, drag])
+        fm.rtol = 1e-10
+        assert fm._can_use_rust_path(), "spice 构建下应走 Rust 路径"
+        result = fm.propagate(y0, (et0, et0 + dt), t_eval=t_eval, max_steps=200_000)
+        return np.asarray(result["states"][-1])
+
+    state_default = propagate_rust(150.0, 15.0)
+    state_hot = propagate_rust(200.0, 50.0)
+
+    diff = np.linalg.norm(state_hot - state_default)
+    # 修复前 diff≈0（Rust 忽略 f107/ap）；修复后密度因子 1.44 → drag 差 ~44%，
+    # 5400s 短弧末态差约 1e-2 km（~10 m）。下界 1e-3 km（1 m）留一个数量级余量，
+    # 远高于 0，可靠区分 bug 是否回归。
+    assert diff > 1e-3, (
+        f"Rust 路径改 f107/ap 后末态几乎不变（diff={diff:.3e} km），"
+        "f107/ap 未透传到 density（#315 回归）"
+    )

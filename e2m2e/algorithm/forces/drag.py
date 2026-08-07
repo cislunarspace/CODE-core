@@ -84,7 +84,10 @@ class DragModel(PhysicalModel):
         return self._cd * self._area / self._mass
 
     def to_rust_spec(self, system: Any) -> tuple | None:
-        """序列化为 Rust ``("drag", area, mass, cd, propagation_frame)`` 元组。
+        """序列化为 Rust ``("drag", area, mass, cd, propagation_frame, f107, ap)`` 元组。
+
+        f107/ap 从注入的大气模型取出，确保 Rust 路径与 Python ``compute_acceleration``
+        用同一组太阳活动参数（否则非默认配置下密度因子分歧，见 issue #315）。
 
         需要 system 提供 SPICE 以做 ITRF93 pxform 帧旋转。若 system 未暴露
         spice 属性则返回 None，让 ForceModel 回退 Python 路径。
@@ -93,7 +96,15 @@ class DragModel(PhysicalModel):
             return None
         if self._body.upper() != "EARTH":
             return None  # 仅支持地球阻力（ITRF93 帧旋转专用于地球）
-        return ("drag", self._area, self._mass, self._cd, "J2000")
+        return (
+            "drag",
+            self._area,
+            self._mass,
+            self._cd,
+            "J2000",
+            self._atmosphere.f107,
+            self._atmosphere.ap,
+        )
 
     def compute_acceleration(
         self,
