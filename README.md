@@ -30,7 +30,11 @@ uv add e2m2e
 git clone https://github.com/cislunarspace/e2m2e.git
 cd e2m2e
 uv sync
+make setup   # 拉取 CSPICE 编译包 + SPICE 内核（cspice-v1 / kernels-v1 release，首次必跑）
+make dev     # maturin develop 构建并安装 Rust 扩展（spice 默认开启）
 ```
+
+> 开发入口统一走 `Makefile`：它自动从 `scripts/download_cspice.py` 解析并 `export CSPICE_DIR`，让 spice（默认 feature）的构建跳过国内不可达的 NAIF 源码下载。常用目标：`make dev` / `make test` / `make check` / `make setup`（`make help` 列全部）。裸 `cargo` / `maturin` 命令需自行 `export CSPICE_DIR=$(python3 scripts/download_cspice.py --print-cspice-dir)`。
 
 ### conda
 
@@ -58,7 +62,7 @@ pip install e2m2e[normal-form]
 
 星历动力学需要 NASA SPICE 内核文件，放置在 `kernels/` 目录或 `$SPICE_KERNEL_DIR` 指定的路径。
 
-国内用户推荐从项目的 [GitHub Release](https://github.com/cislunarspace/e2m2e/releases) 下载：`kernels-v1` 中打包了全部必需内核（行星星历、地球自转、月球姿态、闰秒与行星常数），下载后放入 `kernels/` 目录即可。官方来源（网络可达时）：[NASA NAIF](https://naif.jpl.nasa.gov/naif/data.html)。
+国内用户推荐从项目的 [GitHub Release](https://github.com/cislunarspace/e2m2e/releases) 下载：`kernels-v1` 中打包了全部必需内核（行星星历、地球自转、月球姿态、闰秒与行星常数），下载后放入 `kernels/` 目录即可——`make setup` 已自动完成此步（见 `scripts/download_kernels.py`）。官方来源（网络可达时）：[NASA NAIF](https://naif.jpl.nasa.gov/naif/data.html)。
 
 ## 快速开始
 
@@ -162,8 +166,9 @@ uv run sphinx-build -b html docs docs/_build/html
 ## 测试与代码规范
 
 ```bash
-uv run pytest tests/
-uv run ruff check .
+make test     # = cargo test --workspace + pytest（spice 默认，需先 make setup 拉内核）
+make check    # cargo fmt/clippy + ruff
+# 或单独：uv run pytest tests/、uv run ruff check .
 ```
 
 ## 贡献

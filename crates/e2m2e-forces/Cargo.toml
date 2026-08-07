@@ -9,7 +9,10 @@ name = "e2m2e_forces"
 crate-type = ["rlib"]
 
 [features]
-default = []
+# spice 默认开启：drag/星历等力模型依赖 CSPICE FFI，与 e2m2e-integrators 的
+# default=["spice"] 对齐（见该 crate 注释）。单独 cargo build -p e2m2e-forces
+# 也带 spice。CSPICE 由 scripts/download_cspice.py 提供（CSPICE_DIR）。
+default = ["spice"]
 spice = [
     "dep:cspice",
     "dep:e2m2e-spice",

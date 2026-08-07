@@ -22,16 +22,15 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: astral-sh/setup-uv@v7
-      # Rust 格式与风格（无 spice）
+      # spice 为默认 feature（crates/*/Cargo.toml default=["spice"]）：cargo fmt
+      # 不编译、无需 CSPICE；cargo clippy 编译 spice 代码，须先下 CSPICE 编译包
+      # 并设 CSPICE_DIR（cspice-v1 release，cspice-sys 据此跳过国内不可达的 NAIF 下载）。
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace -- -D warnings
-      # spice-gated 代码的编译与 lint：编译包来自 cspice-v1 release，
-      # 设好 CSPICE_DIR 后 cspice-sys 跳过 NAIF 下载（国内网络常不可达）。
       - name: 下载 SPICE 编译包（cspice-v1 release）
         run: uv run python scripts/download_cspice.py >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: cargo clippy --workspace --features spice -- -D warnings
+      - run: cargo clippy --workspace -- -D warnings
       # Python 格式与风格
       - run: uv sync --group dev
       - run: uv run ruff check .

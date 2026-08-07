@@ -70,6 +70,10 @@ Issues = "https://github.com/cislunarspace/e2m2e/issues"
 manifest-path = "crates/e2m2e-integrators/Cargo.toml"
 module-name = "e2m2e._integrators"
 python-source = "."
+# spice 为必选 feature（ crates/*/Cargo.toml 的 default 已含 spice，此处显式
+# 再声明一次作双保险）：maturin build/develop 永远带 CSPICE，不产无 spice 子集。
+# 构建前需 export CSPICE_DIR（见 Makefile / scripts/download_cspice.py）。
+features = ["spice"]
 
 [tool.ruff]
 line-length = 100

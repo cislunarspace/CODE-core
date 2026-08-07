@@ -9,7 +9,10 @@ name = "e2m2e_spice"
 crate-type = ["rlib"]
 
 [features]
-default = []
+# spice 默认开启：本 crate 即 SPICE FFI 绑定，无 spice feature 则为空壳。
+# 与 workspace 其余 crate 的 default=["spice"] 对齐。CSPICE 由
+# scripts/download_cspice.py 提供（CSPICE_DIR）。
+default = ["spice"]
 spice = ["dep:cspice", "dep:cspice-sys"]
 
 [dependencies]

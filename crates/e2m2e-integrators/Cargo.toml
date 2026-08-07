@@ -8,7 +8,11 @@ name = "e2m2e_integrators"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = []
+# spice 默认开启：STM 传播/多重打靶/受控动力学等 Rust 快速路径均依赖 CSPICE，
+# 普通构建（cargo build / maturin develop）必须含 spice，不再产无 spice 子集。
+# CSPICE 经 scripts/download_cspice.py 从 cspice-v1 release 取预编译包（设 CSPICE_DIR），
+# cspice-sys 据此跳过 NAIF 源码下载（国内常不可达）。见 Makefile / README。
+default = ["spice"]
 spice = ["dep:cspice", "dep:cspice-sys", "e2m2e-forces/spice", "e2m2e-spice/spice"]
 
 [dependencies]
