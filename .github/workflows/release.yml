@@ -27,19 +27,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: astral-sh/setup-uv@v7
-      # 无 spice 的常规测试
-      - run: cargo test --workspace
-      # 下载 SPICE 编译包 + 内核，跑 spice-gated 测试（forces 等）
+      # spice 为默认 feature：cargo test --workspace 编译并跑 spice-gated 代码，
+      # 须先下 CSPICE 编译包（CSPICE_DIR）与 SPICE 内核（kernels/）。
       - name: 下载 SPICE 编译包（cspice-v1 release）
         run: uv run python scripts/download_cspice.py >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: 下载 SPICE 内核（kernels-v1 release）
-        run: gh release download kernels-v1 --pattern '*.bsp' --pattern '*.tls' --pattern '*.tpc' --pattern '*.bpc' --pattern '*.tf' --dir kernels/ --clobber
+        run: uv run python scripts/download_kernels.py
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # --test-threads=1 因 cspice 有全局线程锁
-      - run: cargo test -p e2m2e-forces --features spice -- --test-threads=1
+      # --test-threads=1：CSPICE 全局线程锁，spice-gated 测试串行避免竞争。
+      # spice 默认开启后单趟 cargo test --workspace 即覆盖原 forces 单独 spice 趟。
+      - run: cargo test --workspace -- --test-threads=1
 
   build:
     needs: [lint, test]
@@ -96,9 +96,11 @@ jobs:
         with:
           target: ${{ matrix.target }}
           command: build
-          # spice feature：内含 CSPICE（经 CSPICE_DIR 指向 cspice-v1 release
-          # 预编译包，见上方下载步骤），提供 STM 传播/打靶等 Rust 快速路径，署名见 NOTICE
-          args: --release --out dist --features spice
+          # spice 为默认 feature（crates/*/Cargo.toml default=["spice"]，pyproject
+          # [tool.maturin] features 再声明一次），含 CSPICE（经 CSPICE_DIR 指向
+          # cspice-v1 release 预编译包，见上方下载步骤），提供 STM 传播/打靶等 Rust
+          # 快速路径，署名见 NOTICE。故 args 无需再显式 --features spice。
+          args: --release --out dist
           manylinux: 2_28
           before-script-linux: |
             set -eux
