@@ -542,6 +542,11 @@ class CR3BP_Dynamics(Dynamics):
         mu = float(self.system.mu)
         if t_eval is not None:
             t_eval_list = [float(t) for t in np.asarray(t_eval, dtype=float).ravel()]
+        elif t_span[0] == t_span[1]:
+            # 零跨度（如 compute_state_transition_matrix(t=0)）：合成 [t0, t0] 会让
+            # Rust 核心输出点去重只产 1 点、触发长度校验；退化为单点 [t0]，与 scipy
+            # t_eval=None 的零跨度行为一致（STM 即单位阵、状态即初值，无需积分）。
+            t_eval_list = [float(t_span[0])]
         else:
             t_eval_list = [float(t_span[0]), float(t_span[1])]
 
@@ -592,6 +597,9 @@ class CR3BP_Dynamics(Dynamics):
             mu = float(self.system.mu)
             if t_eval is not None:
                 t_eval_list = [float(t) for t in np.asarray(t_eval, dtype=float).ravel()]
+            elif t_span[0] == t_span[1]:
+                # 零跨度：同 _propagate_with_stm_rust，退化为单点避免重复点触发长度校验。
+                t_eval_list = [float(t_span[0])]
             else:
                 t_eval_list = [float(t_span[0]), float(t_span[1])]
 

@@ -1913,12 +1913,18 @@ fn propagate_cr3bp_py(
     let mut state0 = [0.0_f64; 6];
     state0.copy_from_slice(&initial_state);
 
-    let result = propagate_cr3bp(
-        mu, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
-    )
-    .map_err(|e| {
-        pyo3::exceptions::PyRuntimeError::new_err(format!("CR3BP propagation failed: {}", e))
-    })?;
+    // 积分包进 py.allow_threads 释放 GIL：PD78 纯 Rust（不回调 Python），与
+    // propagate_compiled / multiple_shooting_correct 同理（#313）。释 GIL 段 =
+    // propagate_cr3bp 主循环；持 GIL 段 = 上面的入参校验 + 下面的 PyDict 构造。
+    // 闭包内不构造 PyErr，仅回传 String，闭包外 map_err 转 PyErr。
+    let result = py
+        .allow_threads(|| {
+            propagate_cr3bp(
+                mu, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
+            )
+            .map_err(|e| format!("CR3BP propagation failed: {e}"))
+        })
+        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
 
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
 
@@ -1972,12 +1978,17 @@ fn propagate_cr3bp_stm_py(
     let mut state0 = [0.0_f64; 6];
     state0.copy_from_slice(&initial_state);
 
-    let result = propagate_cr3bp_stm(
-        mu, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
-    )
-    .map_err(|e| {
-        pyo3::exceptions::PyRuntimeError::new_err(format!("CR3BP STM propagation failed: {}", e))
-    })?;
+    // 积分包进 py.allow_threads 释放 GIL：PD78 纯 Rust（不回调 Python），与
+    // propagate_compiled 同理（#313，design_dro STM 修正段冻结主线程的根因）。
+    // 释 GIL 段 = propagate_cr3bp_stm 主循环；持 GIL 段 = 入参校验 + PyDict 构造。
+    let result = py
+        .allow_threads(|| {
+            propagate_cr3bp_stm(
+                mu, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
+            )
+            .map_err(|e| format!("CR3BP STM propagation failed: {e}"))
+        })
+        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
 
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
     let stm_list: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();
@@ -2048,23 +2059,28 @@ fn propagate_bcr4bp_py(
     let mut state0 = [0.0_f64; 6];
     state0.copy_from_slice(&initial_state);
 
-    let result = propagate_bcr4bp(
-        mu,
-        mu_sun,
-        sun_distance,
-        sun_angular_rate,
-        sun_phase0,
-        t_span,
-        &t_eval,
-        &state0,
-        rtol,
-        atol,
-        max_step,
-        max_steps,
-    )
-    .map_err(|e| {
-        pyo3::exceptions::PyRuntimeError::new_err(format!("BCR4BP propagation failed: {}", e))
-    })?;
+    // 积分包进 py.allow_threads 释放 GIL：PD78 纯 Rust（不回调 Python），与
+    // propagate_compiled 同理（#313）。释 GIL 段 = propagate_bcr4bp 主循环；
+    // 持 GIL 段 = 入参校验 + PyDict 构造。
+    let result = py
+        .allow_threads(|| {
+            propagate_bcr4bp(
+                mu,
+                mu_sun,
+                sun_distance,
+                sun_angular_rate,
+                sun_phase0,
+                t_span,
+                &t_eval,
+                &state0,
+                rtol,
+                atol,
+                max_step,
+                max_steps,
+            )
+            .map_err(|e| format!("BCR4BP propagation failed: {e}"))
+        })
+        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
 
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
 
@@ -2119,23 +2135,28 @@ fn propagate_bcr4bp_stm_py(
     let mut state0 = [0.0_f64; 6];
     state0.copy_from_slice(&initial_state);
 
-    let result = propagate_bcr4bp_stm(
-        mu,
-        mu_sun,
-        sun_distance,
-        sun_angular_rate,
-        sun_phase0,
-        t_span,
-        &t_eval,
-        &state0,
-        rtol,
-        atol,
-        max_step,
-        max_steps,
-    )
-    .map_err(|e| {
-        pyo3::exceptions::PyRuntimeError::new_err(format!("BCR4BP STM propagation failed: {}", e))
-    })?;
+    // 积分包进 py.allow_threads 释放 GIL：PD78 纯 Rust（不回调 Python），与
+    // propagate_compiled 同理（#313）。释 GIL 段 = propagate_bcr4bp_stm 主循环；
+    // 持 GIL 段 = 入参校验 + PyDict 构造。
+    let result = py
+        .allow_threads(|| {
+            propagate_bcr4bp_stm(
+                mu,
+                mu_sun,
+                sun_distance,
+                sun_angular_rate,
+                sun_phase0,
+                t_span,
+                &t_eval,
+                &state0,
+                rtol,
+                atol,
+                max_step,
+                max_steps,
+            )
+            .map_err(|e| format!("BCR4BP STM propagation failed: {e}"))
+        })
+        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
 
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
     let stm_list: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();
