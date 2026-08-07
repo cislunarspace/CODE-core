@@ -12,6 +12,9 @@ use crate::forces::relativistic;
 use crate::forces::srp;
 use e2m2e_spice::spk_accel;
 
+/// 加速度 + 雅可比（∂a/∂r + ∂a/∂v）三元组的返回类型：纯状态/STM 传播共用。
+pub type AccelJacobiResult = Result<([f64; 3], [[f64; 3]; 3], [[f64; 3]; 3]), String>;
+
 /// 编译后的 force（enum，dispatch 用 match）。
 ///
 /// 每个 variant 持有该 force 的全部配置。Python 侧用元组序列化（见
@@ -279,7 +282,7 @@ pub fn acceleration_and_jacobian(
     et: f64,
     state: &[f64; 6],
     observer: &str,
-) -> Result<([f64; 3], [[f64; 3]; 3], [[f64; 3]; 3]), String> {
+) -> AccelJacobiResult {
     match force {
         CompiledForce::PointMass { mu } => {
             let r = [state[0], state[1], state[2]];
@@ -424,7 +427,7 @@ pub fn compute_total_acceleration_and_jacobian(
     et: f64,
     state: &[f64; 6],
     observer: &str,
-) -> Result<([f64; 3], [[f64; 3]; 3], [[f64; 3]; 3]), String> {
+) -> AccelJacobiResult {
     let mut total_acc = [0.0_f64; 3];
     let mut total_jac = [[0.0_f64; 3]; 3];
     let mut total_dadv = [[0.0_f64; 3]; 3];

@@ -20,6 +20,7 @@
 //! dΦ/dt = A · Φ,  A = [0₃ₓ₃  I₃ₓ₃; ∂a/∂r  0₃ₓ₃]
 //! ```
 
+use super::compiled::AccelJacobiResult;
 use e2m2e_spice::spk_accel;
 
 /// 最小距离钳位（km），防止除零。
@@ -51,7 +52,7 @@ pub fn compute_nbody_acceleration_and_jacobian(
     config: &NBodyConfig,
     et: f64,
     r_sc: &[f64; 3],
-) -> Result<([f64; 3], [[f64; 3]; 3], [[f64; 3]; 3]), String> {
+) -> AccelJacobiResult {
     let mut acc = [0.0_f64; 3];
     let mut jac = [[0.0_f64; 3]; 3];
     let dadv = [[0.0_f64; 3]; 3]; // N 体加速度不依赖速度
