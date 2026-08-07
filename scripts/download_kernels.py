@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import sys
 import urllib.request
@@ -36,7 +37,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 def _api_headers() -> dict[str, str]:
     headers = {"Accept": "application/vnd.github+json"}
-    token = __import__("os").environ.get("GH_TOKEN") or __import__("os").environ.get("GITHUB_TOKEN")
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
     return headers
