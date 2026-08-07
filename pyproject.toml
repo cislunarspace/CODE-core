@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "e2m2e"
-version = "5.5.0"
+version = "5.6.0"
 description = "Earth to Moon, Moon to Earth — 地月空间转移轨道设计库"
 readme = "README.md"
 requires-python = ">=3.10"

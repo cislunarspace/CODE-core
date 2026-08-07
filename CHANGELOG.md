@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-08-07
+
+### Added
+- **转移网格搜索 Rust Rayon 化**（#316）：搜索路径全链路 Rust 化——5 个几何函数 Rust 化 → 6 步评估单元串行版 → Rayon 段间并行（`py.allow_threads` 释放 GIL）→ `TransferSearch` 接入（`set_parallel_backend='rust'` 路由）→ 基准对齐 + ADR 0017 + `parallel=True` → 进度回调 + n_workers 转发 + 轨迹过滤 → 默认后端切 rust
+- **Drag 力 Rust 传播**（#315）：Rust atmosphere 模块（USSA76 大气密度）+ CompiledForce 雅可比扩 ∂a/∂v（3×6）+ Drag 接入 Rust 传播（ITRF93 pxform 取风系大气速度）；drag 路径透传 f107/ap 到 density，消除与 Python 静默分歧
+- **动力学 Rust PD78 传播**：CR3BP_Dynamics（STM 路径透明加速）、BCR4BP_Dynamics（CR3BP + 太阳解析第三体）、EphemerisDynamics（新增 Rust 纯状态路径）接入 Rust PD78 步进器
+
+### Changed
+- **移除 scipy 回退**（迁移路线图）：EphemerisDynamics、proximity/manifold 积分改走 Rust `solve_ivp_events`，截面求根走纯 Python bisection
+- 删除 `io` 包，DFH 格式读写迁入 `data/types`（第 5 批架构清理；顶层 `__init__` 未导出，不影响公开 API）
+- 轨道设计测试重组：建 `tests/orbit_design/` 骨架（初猜 / correction / continuation 分层），design_orbit 端到端迁入 `scenarios/`（L3，默认不跑），清理低价值测试（类型/属性断言 + 元测试）
+
+### Fixed
+- `propagate_compiled` 逐段积分首点错置（#310）：打靶升级 PD78；补齐同类 eval_idx 硬编码与空 t_eval 守卫
+- CR3BP 步长塌缩回归（task#3 遗留）：积分器抛错时 catch + 调用方走惩罚/插值降级
+- 闰秒内核搜索路径增强（search_dir + 同级目录 + 告警不 raise）
+
 ## [5.5.0] - 2026-08-04
 
 ### Added
