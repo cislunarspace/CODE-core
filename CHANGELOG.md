@@ -6,8 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [5.6.1] - 2026-08-07
+
 ### Added
-- **Facade Response 补齐轨道几何字段**（#312）：`DesignOrbitResponse` 增 `mu` / `states` / `times` / `ephemeris`（CR3BP 参考轨道 + 标称星历），`ControlOrbitResponse` 增 `controlled_ephemeris` / `mu`（请求透传）。下游（transfer-orbit-design）可退回 Facade、移除 algorithm 层直调（下游 ADR 0011 缓解措施 3 / ADR 0012）。`ephemeris`/`controlled_ephemeris` 为 `EphemerisTable` 全字段 dict，重建容器过滤 None 值即可。
+- **Facade Response 补齐轨道几何字段**（#312）：`DesignOrbitResponse` 增 `mu` / `states` / `times` / `ephemeris`（CR3BP 参考轨道 + 标称星历），`ControlOrbitResponse` 增 `controlled_ephemeris` / `mu`（请求透传）。下游可退回 Facade、移除 algorithm 层直调（下游 ADR 0011 缓解措施 3 / ADR 0012）。`ephemeris`/`controlled_ephemeris` 为 `EphemerisTable` 全字段 dict，重建容器过滤 None 值即可。
+
+### Fixed
+- 积分器主循环补 `py.allow_threads` 释放 GIL（#318/#313）：`propagate_compiled`（#318）与 CR3BP/BCR4BP PD78 的 4 个绑定（含 STM 变体，#313）主循环整段释放 GIL，长期预报与 STM 修正段不再阻塞其他 Python 线程；design_dro STM 修正冻结主线程的根因消除；顺带修零跨度守卫（`compute_stm(t=0)` latent bug，释 GIL 前不可达）。各配心跳回归测试。
+- Python STM 回退路径补 ∂a/∂v（#317）：`_compute_total_jacobian` 返回值由 ∂a/∂r 扩为 (∂a/∂r, ∂a/∂v)，无解析雅可比力走中心差分同时扰动位置与速度。消除速度依赖力（drag）在无 SPICE 走 Python 回退时静默丢失速度块雅可比的隐患（当前 drag 必走 Rust、回退不可达，属预防性修补）。
+
+### Changed
+- 步长塌缩错误前缀提为跨语言命名常量（#317），Rust↔Python 稳定契约不再靠裸字符串匹配；新增 ADR 0018（Jacobian ∂a/∂v 接口）、ADR 0019（drag Rust ITRF93 帧旋转）为既有决策补文档落点。
+- spice 升为默认 feature + 开发入口自动化（#313）：crates default 改 `["spice"]`、pyproject maturin `features=["spice"]` 双保险，不再产无 spice 子集，CI 单趟 clippy/test 即覆盖；新增 `Makefile`（setup/dev/test/check，自动 export CSPICE_DIR/LIBCLANG_PATH）与 `scripts/download_kernels.py`（从 kernels-v1 幂等下载内核）。
 
 ## [5.6.0] - 2026-08-07
 
