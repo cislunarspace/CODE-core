@@ -14,6 +14,8 @@ import pytest
 
 from e2m2e.algorithm.ephemeris_correction import homotopy
 
+pytestmark = [pytest.mark.l3]
+
 
 def _fake_dynamics():
     return SimpleNamespace(

@@ -214,8 +214,7 @@ def propagate_parametric(
         - ``rho_out``: ``(M, 6)`` rho 状态。
         - ``pos_err_km``: ``(M,)`` 位置误差（km），无真值时为 ``None``。
     """
-    from scipy.integrate import solve_ivp
-
+    from ._solve_ivp_rust import solve_ivp_rust
     from .coord_trans.cm_param import cm_to_param, param_to_cm
 
     if nf_result.catalog_transformer is None:
@@ -243,11 +242,10 @@ def propagate_parametric(
     # 积分 Hamilton 正则方程（CM 笛卡尔坐标）
     span = t_arr[-1] - t_arr[0]
     max_step = 0.1 * abs(span)
-    sol = solve_ivp(
+    sol = solve_ivp_rust(
         fun=lambda t, X: _eval_hamiltonian_rhs(t, X, hamiltonian_terms, tlist),
-        t_span=[t_arr[0], t_arr[-1]],
+        t_span=(t_arr[0], t_arr[-1]),
         y0=X0_cm,
-        method="DOP853",
         t_eval=t_arr,
         rtol=1e-12,
         atol=1e-14,

@@ -10,7 +10,7 @@ from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.solver.multiple_shooting import MultipleShooting
 
-pytestmark = pytest.mark.spice
+pytestmark = [pytest.mark.spice, pytest.mark.l3]
 
 
 # =============================================================================

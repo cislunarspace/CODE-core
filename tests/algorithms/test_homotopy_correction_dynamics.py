@@ -15,6 +15,8 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.ephemeris_correction.homotopy import HomotopyEphemerisDynamics
 from e2m2e.mbse.data.enums import ReferenceFrame
 
+pytestmark = [pytest.mark.l3]
+
 
 class FakeSpice:
     """Deterministic SPICE stand-in: small bodies, constant GM, simple analytic positions."""

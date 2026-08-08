@@ -101,7 +101,7 @@ class TestDynamicsBaseClassAnnotation:
 #   spice_manager, spice_eph_system, spice_eph_dynamics, spice_syn_j2000,
 #   reference_epoch, spice_kernel_path
 
-pytestmark = pytest.mark.spice
+pytestmark = [pytest.mark.spice, pytest.mark.l3]
 
 
 class TestEphemerisDynamicsCodePath:

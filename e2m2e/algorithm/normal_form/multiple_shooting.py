@@ -318,7 +318,7 @@ class ODESubstituteSolver:
         self, t0: float, tf: float, x0: npt.ArrayLike
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """积分单段并用中心差分近似 STM。"""
-        from scipy.integrate import solve_ivp
+        from ._solve_ivp_rust import solve_ivp_rust
 
         x0_arr = np.asarray(x0, dtype=float).ravel()
         if x0_arr.shape != (6,):
@@ -331,12 +331,13 @@ class ODESubstituteSolver:
         if self.max_step is not None:
             opts["max_step"] = float(self.max_step)
 
-        sol = solve_ivp(
-            lambda t, X: np.asarray(self.rhs(t, X), dtype=float).ravel(),
-            (float(t0), float(tf)),
-            x0_arr,
-            method="DOP853",
-            **opts,
+        sol = solve_ivp_rust(
+            fun=lambda t, X: np.asarray(self.rhs(t, X), dtype=float).ravel(),
+            t_span=(float(t0), float(tf)),
+            y0=x0_arr,
+            rtol=float(self.rtol),
+            atol=float(self.atol),
+            max_step=float(self.max_step) if self.max_step is not None else None,
         )
         if not sol.success:
             raise RuntimeError(f"ODE 积分失败：{sol.message}")
@@ -345,24 +346,29 @@ class ODESubstituteSolver:
         # STM：用 6 组扰动分别积分；与 qiao ``Calc_Phi_rho`` 一致
         phi = np.zeros((6, 6), dtype=float)
         eps = float(self.stm_eps)
+        _rtol_val = float(self.rtol)
+        _atol_val = float(self.atol)
+        _max_step_val = float(self.max_step) if self.max_step is not None else None
         for k in range(6):
             xp = x0_arr.copy()
             xp[k] += eps
             xm = x0_arr.copy()
             xm[k] -= eps
-            sol_p = solve_ivp(
-                lambda t, X: np.asarray(self.rhs(t, X), dtype=float).ravel(),
-                (float(t0), float(tf)),
-                xp,
-                method="DOP853",
-                **opts,
+            sol_p = solve_ivp_rust(
+                fun=lambda t, X: np.asarray(self.rhs(t, X), dtype=float).ravel(),
+                t_span=(float(t0), float(tf)),
+                y0=xp,
+                rtol=_rtol_val,
+                atol=_atol_val,
+                max_step=_max_step_val,
             )
-            sol_m = solve_ivp(
-                lambda t, X: np.asarray(self.rhs(t, X), dtype=float).ravel(),
-                (float(t0), float(tf)),
-                xm,
-                method="DOP853",
-                **opts,
+            sol_m = solve_ivp_rust(
+                fun=lambda t, X: np.asarray(self.rhs(t, X), dtype=float).ravel(),
+                t_span=(float(t0), float(tf)),
+                y0=xm,
+                rtol=_rtol_val,
+                atol=_atol_val,
+                max_step=_max_step_val,
             )
             phi[:, k] = (sol_p.y[:, -1] - sol_m.y[:, -1]) / (2.0 * eps)
 

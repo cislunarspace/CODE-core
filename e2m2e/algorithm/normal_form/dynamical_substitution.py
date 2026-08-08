@@ -284,7 +284,7 @@ class DynamicalSubstituteCorrector:
         solver: SubstituteSolver,
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """在 ``t_Q`` 节点基础上做稠密输出（DOP853 高阶积分）。"""
-        from scipy.integrate import solve_ivp
+        from ._solve_ivp_rust import solve_ivp_rust
 
         t_Q = shooting.t_Q
         X_Q = shooting.X_Q
@@ -301,8 +301,8 @@ class DynamicalSubstituteCorrector:
             seg_t = t_dense[(t_dense >= t_lo - 1e-9) & (t_dense <= t_hi + 1e-9)]
             if seg_t.size == 0:
                 continue
-            sol = solve_ivp(
-                lambda t, X: (
+            sol = solve_ivp_rust(
+                fun=lambda t, X: (
                     np.asarray(
                         solver.propagate_segment.__self__.rhs(t, X),  # type: ignore[attr-defined]
                         dtype=float,
@@ -310,10 +310,9 @@ class DynamicalSubstituteCorrector:
                     if hasattr(solver.propagate_segment, "__self__")
                     else _ode_rhs_via_solver(solver, t, X)
                 ),
-                (float(seg_t[0]), float(seg_t[-1])),
-                np.asarray(X_Q[i], dtype=float),
+                t_span=(float(seg_t[0]), float(seg_t[-1])),
+                y0=np.asarray(X_Q[i], dtype=float),
                 t_eval=seg_t,
-                method="DOP853",
                 rtol=1e-10,
                 atol=1e-12,
             )

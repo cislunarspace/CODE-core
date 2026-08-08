@@ -35,7 +35,7 @@ from scripts.dfh_inputs_dac import (
     write_inputs_dac,
 )
 
-pytestmark = [pytest.mark.slow, pytest.mark.e2e]
+pytestmark = [pytest.mark.slow, pytest.mark.e2e, pytest.mark.l3]
 
 EPOCH = [2024, 1, 1, 0, 0, 0.0]
 DESIGN_PERTURBATION = {

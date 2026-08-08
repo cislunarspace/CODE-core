@@ -33,6 +33,9 @@ Hamilton 流的右端 ``dX/dt = J·∇W`` 用向量化实现
 - qiao 依赖 ``globalparam.odeoptions``（``scipy.solve_ivp`` 选项）；本模块
   显式传 ``DOP853`` 默认容差（``rtol=1e-11``、``atol=1e-13``），不引入
   全局可变状态。
+- **scipy 保留**（issue #336 例外）：``_apply_lie_series`` 积分复值 Lie 级数
+  Hamilton 流（``dX/dt = J·grad(W)``），Rust 侧 ``solve_ivp_py`` 仅支持实值，
+  故此处保留 ``scipy.integrate.solve_ivp``。其余 normal_form 积分路径均已迁至 Rust。
 """
 
 from __future__ import annotations

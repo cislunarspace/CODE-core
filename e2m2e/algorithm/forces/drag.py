@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 import numpy as np
@@ -123,6 +124,13 @@ class DragModel(PhysicalModel):
         Returns:
             加速度向量，形状 ``(3,)``，单位 km/s²。
         """
+        warnings.warn(
+            f"{self.__class__.__name__}.compute_acceleration 走 Python 回退路径，"
+            "应优先走 Rust 编译路径。"
+            " 注意：已知分歧（issue #315），Rust 路径硬编码 f107/ap 与 Python 路径有 ~17% 偏移。",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         state_arr = np.asarray(state, dtype=float)
         if state_arr.shape[0] < 6:
             raise ValueError("state must have at least 6 elements")

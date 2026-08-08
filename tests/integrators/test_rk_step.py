@@ -8,6 +8,8 @@ import math
 import numpy as np
 import pytest
 
+pytestmark = [pytest.mark.l1]
+
 
 def test_hello_integrators_smoke():
     """Smoke test: the Rust extension module imports and responds."""

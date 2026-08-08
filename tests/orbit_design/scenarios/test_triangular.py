@@ -33,6 +33,7 @@ pytestmark = [
     pytest.mark.e2e,
     pytest.mark.spice,
     pytest.mark.skipif(not _SPICE_AVAILABLE, reason="SPICE kernels not available"),
+    pytest.mark.l3,
 ]
 
 

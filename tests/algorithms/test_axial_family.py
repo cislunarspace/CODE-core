@@ -15,6 +15,8 @@ from e2m2e.algorithm.family.cr3bp_orbits import (
     earth_moon_system,
 )
 
+pytestmark = [pytest.mark.l4]
+
 CHAR_LENGTH_KM = 384400.0
 
 

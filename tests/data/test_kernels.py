@@ -9,7 +9,7 @@ import pytest
 from e2m2e.data.kernels.manager import SPICEManager
 from e2m2e.data.kernels.provider import EphemerisProvider
 
-pytestmark = pytest.mark.spice
+pytestmark = [pytest.mark.spice, pytest.mark.l3]
 
 
 def _kernel_path() -> str | None:

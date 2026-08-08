@@ -101,7 +101,7 @@ class TestPointMassGravitySerialization:
 # =============================================================================
 # 完整 ForceModel 往返：单点加速度一致性（需 SPICE 系统）
 # =============================================================================
-pytestmark = pytest.mark.spice
+pytestmark = [pytest.mark.spice, pytest.mark.l3]
 
 
 class TestForceModelRoundTripWithPointMassAndThirdBody:

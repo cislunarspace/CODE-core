@@ -86,13 +86,19 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 testpaths = ["tests"]
 # 让 tests/kernel_helpers.py 在 xdist worker 中可导入
 pythonpath = ["tests"]
-# 默认排除 slow 标记的测试（design_orbit 端到端等）。显式跑用
-# ``uv run pytest -m slow``，命令行 -m 覆盖此处的 -m。
-addopts = ["-m", "not slow"]
+# 默认排除 l3（集成/端到端）和 slow 标记的测试。日常开发跑 L1+L2：
+# ``uv run pytest``。跑全部层：``uv run pytest -m ""``。跑单层：
+# ``uv run pytest -m l1`` / ``-m l2`` / ``-m l3`` / ``-m l4``。
+# 命令行 -m 覆盖此处的 addopts -m。
+addopts = ["-m", "not l3 and not slow"]
 markers = [
     "slow: 运行时间较长的数值测试",
     "spice: 依赖 SPICE 内核的测试，内核缺失时跳过",
     "e2e: 依赖 DFH_DAC.exe 的端到端测试，exe 缺失时跳过",
+    "l1: ADR 0013 第1层——Rust 单元 / 纯数学验证（无 SPICE 依赖，<1s）",
+    "l2: ADR 0013 第2层——Python 算法单元（微分校正、延拓、力模型等，<10s）",
+    "l3: ADR 0013 第3层——集成测试（跨层链路 + 端到端星历场景，可能>60s）",
+    "l4: ADR 0013 第4层——物理不变量贯穿（Jacobi 守恒、辛性质等）",
 ]
 
 [tool.coverage.run]

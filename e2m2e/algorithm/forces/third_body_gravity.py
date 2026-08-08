@@ -97,6 +97,12 @@ class ThirdBodyGravity(PhysicalModel):
 
         距离低于 ``MIN_DISTANCE`` 时钳位，避免除零（发出 ``UserWarning``）。
         """
+        warnings.warn(
+            f"{self.__class__.__name__}.compute_acceleration 走 Python 回退路径，"
+            "应优先走 Rust 编译路径。",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         mu = self._resolve_mu(system)
 
         # 走 Rust cspice 路径（spice feature 启用时）；否则走 Python spiceypy。

@@ -87,4 +87,16 @@ spice feature 的构建约定：`cspice-sys` 经 `downloadcspice` 在构建时�
 
 ## 修订（2026-08，spice 升为默认 feature）
 
-spice 现为默认 feature：crates `default = ["spice"]` + pyproject `features=["spice"]` 双保险，`maturin develop` 默认带 spice，不再产无 spice 子集；release wheel 已带 spice（ADR 0009 落实）。scipy 回退路径已移除，积分/打靶/截面统一走 Rust。上一段中"默认不带 spice""release wheel 暂不带 spice""静默降级""importorskip 跳过"均已不再适用。
+spice 现为默认 feature：crates `default = ["spice"]` + pyproject `features=["spice"]` 双保险，`maturin develop` 默认带 spice，不再产无 spice 子集；release wheel 已带 spice（ADR 0009 落实）。
+
+**动力学积分核心路径统一走 Rust。** 积分（`rk_step`/`multistep_step`/`cowell_step`/`solve_ivp`）、传播（`propagate_compiled`/`propagate_with_stm_py`）、力模型（PointMass/ThirdBody/GravityField/Drag/SRP/Relativistic）、多重打靶、转移网格搜索均已迁入 Rust。spice feature 默认启用后，正常操作中所有核心计算路径不经过 Python scipy。
+
+**以下场景保留 scipy 路径**（有意的设计选择，非临时遗漏）：
+
+- **事件检测**（`CR3BP_Dynamics._propagate_with_stm(events=...)`）：Rust `solve_ivp_events_py` 已实现但事件检测语义与 scipy 不完全对齐，`CR3BP_Dynamics` 在传入 events 时回退 scipy。（`BCR4BP_Dynamics` 传入 events 时抛 `NotImplementedError`——行为不一致，见 #333。）
+- **防御性回退**（`Dynamics` 基类 `_propagate_with_stm`/`_propagate_state_only`、`EphemerisDynamics._propagate`）：Rust 扩展不可用时（`_HAS_RUST_* = False`）回退 `scipy.integrate.solve_ivp`。spice feature 默认启用后此路径在正常操作中不可达，保留作为构建失败时的降级路径。
+- **NLP 优化**（`transfer/nlp_scipy.py`）：COPT 不可用时回退 SciPy SLSQP。ADR 0017 明确 NLP 留在 Python 层。
+- **Normal form 传播**（`normal_form/multiple_shooting.py`、`dynamical_substitution.py`、`propagation.py`、`quasi_floquet.py`）：已迁至 Rust `solve_ivp_py`（#336）。保留 scipy 的仅剩 `coord_trans/qf_cm.py` 的复值 Lie 级数流——Rust `solve_ivp_py` 仅支持实值。`scipy.linalg.expm`（矩阵指数）和 `scipy.optimize.fsolve` 暂无 Rust 替代，保留。
+- **平动点解算与初值生成**（`scipy.optimize.fsolve`/`brentq`）：用于 L1/L2 位置解算、Halo 轨道初始猜测等。单次调用，迁移收益低。
+
+以上保留路径的上一次修订中"scipy 回退路径已移除""所有事情统一走 Rust"的措辞过于绝对，特此修正。

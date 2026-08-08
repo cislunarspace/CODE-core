@@ -18,6 +18,7 @@ DFH 的 DYB 9 系数含义：
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -175,6 +176,12 @@ class EcomSolarRadiationPressure(PhysicalModel):
         取阴影模型的光照份额（无阴影时为全光照），调用纯函数
         ``_compute_ecom_acceleration``。要求参考系为惯性系。
         """
+        warnings.warn(
+            f"{self.__class__.__name__}.compute_acceleration 走 Python 回退路径，"
+            "应优先走 Rust 编译路径。",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         _cs, spice, origin = require_inertial_frame(system, t)
         sc_pos = np.asarray(state, dtype=float)[:3]
         sun_pos = spice.get_body_state("SUN", t, "J2000", origin)[:3]

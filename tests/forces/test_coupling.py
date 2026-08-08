@@ -6,6 +6,8 @@ import pytest
 
 from e2m2e.algorithm.forces.force_mapping import dfh_perturbation_to_force_config
 
+pytestmark = [pytest.mark.l1]
+
 
 class TestCouplingMapping:
     """coupling 开关到力模型配置的映射。"""

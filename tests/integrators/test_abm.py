@@ -14,6 +14,8 @@ from e2m2e.integrators import (
 )
 from tests.integrators.conftest import normalized_leo_j2
 
+pytestmark = [pytest.mark.l1]
+
 
 def _propagate_abm(f, y0, h, target_t, t0=0.0):
     """Fixed-step ABM propagation to ``target_t``. Returns (t, y)."""

@@ -8,6 +8,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm import ephemeris_correction
 from e2m2e.algorithm.ephemeris_correction import (
@@ -17,6 +18,8 @@ from e2m2e.algorithm.ephemeris_correction import (
     two_level,
 )
 from e2m2e.mbse.data.enums import BoundaryMode
+
+pytestmark = [pytest.mark.l3]
 
 
 def test_standard_method_uses_multiple_shooting_and_normalizes_result(monkeypatch):

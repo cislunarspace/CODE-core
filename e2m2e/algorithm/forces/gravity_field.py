@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -416,6 +417,12 @@ class GravityField(PhysicalModel):
         Returns:
             加速度向量,在 system.coordinate_system 下。
         """
+        warnings.warn(
+            f"{self.__class__.__name__}.compute_acceleration 走 Python 回退路径，"
+            "应优先走 Rust 编译路径。",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         state_arr = np.asarray(state, dtype=float)
         if state_arr.shape[0] < 3:
             raise ValueError("state must have at least 3 elements")

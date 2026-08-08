@@ -27,7 +27,7 @@ from e2m2e.algorithm.forces import (
 )
 from e2m2e.algorithm.forces.physical_model import PhysicalModel
 
-pytestmark = pytest.mark.spice
+pytestmark = [pytest.mark.spice, pytest.mark.l3]
 
 
 def _make_force_model_system(spice_eph_system, spice_manager):

@@ -512,7 +512,7 @@ def _solve_qf_matrix(
                替代。对 ``λT ≳ 40``（如 L2 的 30 天窗口）仍可能精度不足，
                需完整多点打靶（见 issue #328）。
     """
-    from scipy.integrate import solve_ivp
+    from ._solve_ivp_rust import solve_ivp_rust
 
     rhs = _qf_rhs_factory(M_at, D)
     B0 = np.eye(6, dtype=float).ravel()
@@ -520,12 +520,11 @@ def _solve_qf_matrix(
     t_arr = np.asarray(tlist, dtype=float).ravel()
 
     if segment is None or segment <= 0:
-        sol = solve_ivp(
-            rhs,
-            (float(t_arr[0]), float(t_arr[-1])),
-            B0,
+        sol = solve_ivp_rust(
+            fun=rhs,
+            t_span=(float(t_arr[0]), float(t_arr[-1])),
+            y0=B0,
             t_eval=t_arr,
-            method="DOP853",
             rtol=rtol,
             atol=atol,
         )
@@ -550,9 +549,10 @@ def _solve_qf_segmented(
     段边界为 ``segment`` 的整数倍（夹在 ``[t_arr[0], t_arr[-1]]`` 之间）。
     每段独立 DOP853 积分，段末用 :func:`symplectic_project` 把 ``B`` 拉回
     辛群，抑制 ``e^(λt)`` 增长导致的辛误差累积。段内对 ``t_arr`` 的采样点
-    用 ``dense_output`` 取值，保持采样点不偏移。
+    用段积分的 ``t_eval`` 直接输出（Rust ``solve_ivp_py`` 无稠密输出插值器，
+    故把采样点并入段 ``t_eval`` 网格，而非事后插值）。
     """
-    from scipy.integrate import solve_ivp
+    from ._solve_ivp_rust import solve_ivp_rust
 
     t0 = float(t_arr[0])
     tf = float(t_arr[-1])
@@ -566,41 +566,40 @@ def _solve_qf_segmented(
     cur_B = B0.copy()
     cur_t = t0
 
-    def _take_samples(sol, t_lo: float, t_hi: float, start_i: int) -> int:
-        """从 dense_output 取 (t_lo, t_hi] 内的 t_arr 采样点，返回下一个下标。"""
-        j = start_i
-        while j < N and t_arr[j] <= t_hi + 1e-12:
-            if t_arr[j] > t_lo + 1e-12:  # 跳过段首（已由上段末填）
-                B_out[j] = sol.sol(float(t_arr[j])).reshape(6, 6)
-            j += 1
-        return j
-
     next_i = 1  # t_arr[0] 已填
     for t_end in seg_ends:
-        sol = solve_ivp(
-            rhs,
-            (cur_t, float(t_end)),
-            cur_B,
-            method="DOP853",
+        t_hi = float(t_end)
+        # 段内采样点：包含段首 cur_t + t_arr 中落在 (cur_t, t_hi] 的点
+        seg_mask = (t_arr > cur_t - 1e-12) & (t_arr <= t_hi + 1e-12)
+        seg_t_eval = np.concatenate([[cur_t], t_arr[seg_mask]])
+        sol = solve_ivp_rust(
+            fun=rhs,
+            t_span=(cur_t, t_hi),
+            y0=cur_B,
+            t_eval=seg_t_eval,
             rtol=rtol,
             atol=atol,
-            dense_output=True,
         )
         if not sol.success:
             raise RuntimeError(f"QF 分段积分失败（段 [{cur_t}, {t_end}]）：{sol.message}")
-        next_i = _take_samples(sol, cur_t, float(t_end), next_i)
+        seg_y = np.asarray(sol.y)
+        # seg_t_eval[0] = cur_t（段首，已由上段末填，跳过）；
+        # seg_t_eval[1:] 对应 t_arr 中 seg_mask 为 True 的点，按顺序写入 B_out
+        sample_indices = np.where(seg_mask)[0]
+        for m, idx in enumerate(sample_indices):
+            B_out[idx] = seg_y[:, m + 1].reshape(6, 6)
+        next_i = int(sample_indices[-1] + 1) if sample_indices.size > 0 else next_i
         # 段末投影，作为下段初值
         cur_B = symplectic_project(sol.y[:, -1].reshape(6, 6)).ravel()
-        cur_t = float(t_end)
+        cur_t = t_hi
 
     # 末段：积分到 tf
     if cur_t < tf - 1e-12:
-        sol = solve_ivp(
-            rhs,
-            (cur_t, tf),
-            cur_B,
+        sol = solve_ivp_rust(
+            fun=rhs,
+            t_span=(cur_t, tf),
+            y0=cur_B,
             t_eval=t_arr[next_i:],
-            method="DOP853",
             rtol=rtol,
             atol=atol,
         )
@@ -711,7 +710,7 @@ def _multipoint_thomas(
     高斯-牛顿迭代解连续性 ``Φ_i·B_i − B_{i+1} = 0``（边界 ``B_N=I``），
     正则化 ``D_i = I + Φ_i·Φ_i^T`` 保证可逆（Levenberg-Marquardt 式）。
     """
-    from scipy.integrate import solve_ivp
+    from ._solve_ivp_rust import solve_ivp_rust
 
     I6 = np.eye(6)
     n_nodes = t_nodes.size
@@ -729,11 +728,10 @@ def _multipoint_thomas(
             A36_t = np.kron(Mt, I6) - np.kron(I6, D.T)
             return (A36_t @ Phi).ravel()
 
-        sol = solve_ivp(
-            rhs_phi,
-            (float(t_nodes[k]), float(t_nodes[k + 1])),
-            I36.ravel(),
-            method="DOP853",
+        sol = solve_ivp_rust(
+            fun=rhs_phi,
+            t_span=(float(t_nodes[k]), float(t_nodes[k + 1])),
+            y0=I36.ravel(),
             rtol=rtol,
             atol=atol,
         )
@@ -799,8 +797,9 @@ def _densify_b_multipoint(
     atol: float,
 ) -> npt.NDArray[np.floating]:
     """节点间稠密化：对每个采样点，用段 STM 单步传播节点 ``B`` 到该点。"""
-    from scipy.integrate import solve_ivp
     from scipy.linalg import expm
+
+    from ._solve_ivp_rust import solve_ivp_rust
 
     I6 = np.eye(6)
     n = t_arr.size
@@ -838,11 +837,10 @@ def _densify_b_multipoint(
             def rhs_vec(tt: float, X36: npt.ArrayLike) -> npt.NDArray[np.floating]:
                 return rhs36(tt, np.asarray(X36).ravel().reshape(6, 6)).ravel()
 
-            sol = solve_ivp(
-                rhs_vec,
-                (t_lo, float(t)),
-                B_nodes[k].ravel(),
-                method="DOP853",
+            sol = solve_ivp_rust(
+                fun=rhs_vec,
+                t_span=(t_lo, float(t)),
+                y0=B_nodes[k].ravel(),
                 rtol=rtol,
                 atol=atol,
             )

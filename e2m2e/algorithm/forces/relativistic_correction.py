@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 import numpy as np
@@ -149,6 +150,12 @@ class RelativisticCorrection(PhysicalModel):
         system: Any,
     ) -> npt.NDArray[np.floating]:
         """返回相对论修正加速度，km/s²。"""
+        warnings.warn(
+            f"{self.__class__.__name__}.compute_acceleration 走 Python 回退路径，"
+            "应优先走 Rust 编译路径。",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         state_arr = np.asarray(state, dtype=float)
         rv = state_arr[:3].copy()
         vv = state_arr[3:6].copy()

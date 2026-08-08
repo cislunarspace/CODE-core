@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -68,6 +69,12 @@ class IndirectTerm(PhysicalModel):
 
         ``r_body=0`` 时返回零向量，避免除零。
         """
+        warnings.warn(
+            f"{self.__class__.__name__}.compute_acceleration 走 Python 回退路径，"
+            "应优先走 Rust 编译路径。",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         mu = self._resolve_mu(system)
 
         # 走 Rust cspice 路径（spice feature 启用时）；否则走 Python spiceypy。

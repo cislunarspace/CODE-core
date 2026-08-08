@@ -22,7 +22,7 @@ from numpy.testing import assert_allclose
 from e2m2e.algorithm.solver.multiple_shooting import MultipleShooting
 from e2m2e.data.types.orbit import Orbit
 
-pytestmark = pytest.mark.spice
+pytestmark = [pytest.mark.spice, pytest.mark.l3]
 
 # =============================================================================
 # 物理参数

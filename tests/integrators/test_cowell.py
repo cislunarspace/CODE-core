@@ -14,6 +14,8 @@ from e2m2e.integrators import (
 )
 from tests.integrators.conftest import EARTH_J2, normalized_leo_j2, propagate_rk
 
+pytestmark = [pytest.mark.l1]
+
 
 def _j2_accel_normalised(t: float, x: np.ndarray) -> np.ndarray:  # noqa: ARG001
     """Two-body + J2 acceleration as a function of position only (normalised:
