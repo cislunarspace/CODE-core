@@ -104,6 +104,18 @@ DAYS_PER_YEAR = 365.25
 #: 部分轨道本就不可达，进一步佐证 2e-2 是更贴合物理的默认。
 CORRECTION_TOL_KM = 2e-2
 
+#: 星历修正的速度连续目标（km/s）。0.01 m/s——patch point 速度跳变小于此即视为
+#: 光滑轨道（非需脉冲拼接的断弧）。依据：DRO 等中性稳定轨道，速度连续的修正解
+#: 才落在准周期轨道上，自由外推才有界（实测 amp=60000 DRO 坏历元，速度残差
+#: 从 ~25 m/s 压到 <0.01 m/s 后，30 天传播从发散 200000 km 收敛到有界 ~80000 km）。
+VELOCITY_TOL_KMS = 1e-5
+
+#: 多重打靶速度残差加权 = 位置容差 / 速度容差。Rust 打靶残差向量把位置（km）与
+#: 速度（km/s）混在一起取 ‖F‖²，cislunar 下位置项（几百 km）单边主导，速度项被
+#: 忽略，求解器停在"位置连续 / 速度跳变数十 m/s"的局部极小。乘以 vel_weight 后
+#: 两者在容差尺度可比，LM 真正压速度连续（见 Rust ``build_residual`` 注释）。
+CORRECTION_VEL_WEIGHT = CORRECTION_TOL_KM / VELOCITY_TOL_KMS
+
 #: 每圈 patch 节点数（均匀采样）；NRHO 用近月点加密采样替代
 _POINTS_PER_REV = 8
 
@@ -564,6 +576,7 @@ def _design_apolune_segmented(
     *,
     max_iter: int = 50,
     tolerance: float = CORRECTION_TOL_KM,
+    vel_weight: float = CORRECTION_VEL_WEIGHT,
     verbose: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """论文式分段打靶拼接（朱彦伟 2026）：逐段独立转星历 + 远月点分层合并。
@@ -632,6 +645,7 @@ def _design_apolune_segmented(
                 max_iter=max_iter,
                 tolerance=tolerance,
                 rtol=1e-10,
+                vel_weight=vel_weight,
             )
         except RuntimeError as e:
             raise DesignNotConvergedError(f"分段打靶段 {len(seg_t) + 1} 积分失败: {e}") from e
@@ -685,6 +699,7 @@ def _design_apolune_segmented(
                     max_iter=max_iter,
                     tolerance=tolerance,
                     rtol=1e-10,
+                    vel_weight=vel_weight,
                 )
             except RuntimeError as e:
                 # 合并段打靶失败：整条轨道在此无法拼接连续，明确报错而非
@@ -774,21 +789,21 @@ def design_orbit(
         spice: 已加载内核的 ``SPICEManager``；缺省自动创建并加载
             ``kernel_dir``（默认仓库 ``kernels/``）下的内核。
         kernel_dir: SPICE 内核目录。
-        correction_method: 星历修正方法。默认 ``"two_level"``——端点固定 +
-            回溯线搜索（Marchand-Howell-Wilson 两层法），对全部六类轨道
-            （DRO/Halo/NRHO/Lissajous/L4/L5）可靠；``"segmented"`` 论文式
-            分段打靶拼接（逐段独立 var_time 打靶转星历 + 远月点分层合并，
-            朱彦伟 2026），对 Halo/NRHO 等不稳定轨道在星历模型下长期保形，
-            但近月紧凑轨道（如 amplitude=10000 的 DRO）段打靶残差
-            ~7e-2 km 超出 2e-2 容差，需显式开启时注意；
-            ``"standard"`` 全自由变量无步长控制，仅对稳定 DRO 可靠；
-            ``"homotopy"`` 同伦过渡（质点 N 体语义）。
-        correction_revolutions: 星历修正弧长（圈数）。
-        correction_velocity_tolerance: 速度残差容差（km/s，仅 ``"two_level"``）。
-            默认 0.1（100 mm/s）。two_level 的 Level 2（速度连续）对紧凑近月轨道
-            （NRHO 近月点 STM 病态）存在 ~70-90 mm/s 的收敛底线，多轮迭代/加密
-            取点/月球非球形均无法突破；位置连续性（亚毫米）才是 patch point 质量
-            的主导因素，0.1 容留裕度使位置已亚毫米连续的解判通过。
+        correction_method: 星历修正方法。默认 ``"two_level"``——Rust 多重打靶
+            + 速度加权（``vel_weight=pos_tol/vel_tol``），把 patch point 位置
+            连续与速度连续同时压到容差（速度 ≤0.01 m/s），修正解落在准周期轨道
+            上、自由外推有界（修 #324：大幅 DRO 在坏历元从发散 200000 km 收敛
+            到有界 ~80000 km）；全程预制星历表（cspice 缓存）。
+            ``"segmented"`` 论文式分段打靶拼接（逐段独立 var_time 打靶转星历 +
+            远月点分层合并，朱彦伟 2026），对 Halo/NRHO 等不稳定轨道在星历模型下
+            长期保形，同样带速度加权；``"homotopy"`` 同伦过渡（质点 N 体语义，
+            走旧 Python 路径，不含速度加权）。
+            ``"standard"``/``"rust"`` 等价于默认的 Rust 多重打靶路径。
+        correction_revolutions: 星历修正弧长（圈数）。默认 1：中性稳定轨道（DRO）
+            速度连续的初值即落在准周期轨道上，自由外推全程有界，无需多圈修正。
+        correction_velocity_tolerance: 速度残差容差（km/s，仅 ``"homotopy"`` 旧路径）。
+            默认 0.1。默认 Rust 路径不用此参数，改由 ``VELOCITY_TOL_KMS``（0.01 m/s）
+            与 ``CORRECTION_TOL_KM`` 派生 ``vel_weight`` 硬绑。
         verbose: 修正过程显示进度条。
 
     Returns:
@@ -993,8 +1008,8 @@ def design_orbit(
         _cache_bodies = list(dict.fromkeys([*bodies, *_perturber_names]))
         spice.enable_ephem_cache(
             _cache_bodies,
-            et0,
-            float(max(et_grid[-1], t_patch_j2000_n[-1])),
+            float(et0) - float(period) * float(t_c),
+            float(max(et_grid[-1], t_patch_j2000_n[-1])) + float(period) * float(t_c),
             dt=3600.0,
             observer="EARTH",
             frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
@@ -1066,49 +1081,137 @@ def design_orbit(
             force_config=force_config,
         )
 
-    # --- 其他方法（standard / two_level / homotopy）：单圈修正 + 长期预报 ---
+    # --- 默认 / standard / two_level：Rust 多重打靶（速度加权）+ 长期预报 ---
+    # 旧 two_level（Python）残差向量把位置 km 与速度 km/s 混在一起，cislunar 下
+    # 位置项单边主导，Level 2 速度连续化不跑，修正产出是位置连续但速度跳变
+    # ~50 m/s 的断弧——自由外推大幅 DRO 一两个月发散到 20 万 km（#324）。
+    # 改走 Rust 打靶 + vel_weight（=pos_tol/vel_tol）：速度项加权后在容差尺度
+    # 与位置可比，LM 真正压速度连续到 ≤0.01 m/s，修正解落在准周期轨道上，
+    # 自由外推有界。同时全程预制星历表（cspice 缓存），不再逐步 FFI。
     if correction_method == "homotopy":
-        # homotopy 的同伦插值建立在质点 N 体语义上，不支持 ForceModel
+        # homotopy 同伦插值建立在质点 N 体语义上，不支持 ForceModel——保留旧 Python 路径
         eph_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
         eph_dynamics = EphemerisDynamics(system=eph_system)
         eph_dynamics.rtol = 1e-12
         eph_dynamics.atol = 1e-12
         eph_dynamics.max_step = 600.0
-        correction_dynamics: Any = eph_dynamics
-        homotopy_base_bodies = ["EARTH", "MOON"]
-    else:
-        # standard / two_level：用全摄动 ForceModel，与预报一致
-        correction_dynamics = fm
-        homotopy_base_bodies = None
-
-    correction = correct_ephemeris_patch_points(
-        method=correction_method,
-        dynamics=correction_dynamics,
-        t_patch=t_patch_j2000,
-        state_patch=state_patch_j2000,
-        tolerance=CORRECTION_TOL_KM,
-        max_iter=50,
-        verbose=verbose,
-        n_workers=1,
-        kernel_dir=kernel_dir,
-        velocity_tolerance=correction_velocity_tolerance,
-        base_bodies=homotopy_base_bodies,
-    )
-    if not correction.converged:
-        raise DesignNotConvergedError(
-            f"{sel} 星历修正（{correction_method}）未收敛：迭代 {correction.iterations} 次，"
-            f"最大残差 {correction.max_residual:.3e} km"
+        correction = correct_ephemeris_patch_points(
+            method="homotopy",
+            dynamics=eph_dynamics,
+            t_patch=t_patch_j2000,
+            state_patch=state_patch_j2000,
+            tolerance=CORRECTION_TOL_KM,
+            max_iter=50,
+            verbose=verbose,
+            n_workers=1,
+            kernel_dir=kernel_dir,
+            base_bodies=["EARTH", "MOON"],
+        )
+        if not correction.converged:
+            raise DesignNotConvergedError(
+                f"{sel} 星历修正（homotopy）未收敛：迭代 {correction.iterations} 次，"
+                f"最大残差 {correction.max_residual:.3e} km"
+            )
+        t0_corr = float(correction.t_patch[0])
+        out = fm.propagate(
+            correction.state_patch[0],
+            (min(t0_corr, et0), float(et_grid[-1])),
+            t_eval=et_grid,
+            max_steps=2_000_000,
+        )
+        ephemeris = _build_ephemeris_table(
+            spice, syn_j2000, et0, et_grid, np.asarray(out["states"], dtype=float)
+        )
+        return OrbitDesignResult(
+            orbit_type=sel,
+            epoch_utc=epoch_iso,
+            duration_day=duration_day,
+            output_step_sec=float(output_step),
+            initial_state=np.asarray(correction.state_patch[0], dtype=float),
+            ephemeris=ephemeris,
+            cr3bp_orbit=cr3bp_orbit,
+            cr3bp_jacobi=jacobi,
+            correction=correction,
+            force_config=force_config,
         )
 
-    # --- 长期预报：复用打靶的 fm，模型完全一致 ---
-    t0_corr = float(correction.t_patch[0])
-    out = fm.propagate(
-        correction.state_patch[0],
-        (min(t0_corr, et0), float(et_grid[-1])),
-        t_eval=et_grid,
-        max_steps=2_000_000,
-    )
+    # 默认路径（稳定轨道）：Rust 多重打靶 + vel_weight
+    if correction_method not in ("two_level", "standard", "rust"):
+        raise ValueError(
+            "correction_method 需为 segmented / homotopy / two_level / standard / rust，"
+            f"当前 {correction_method!r}"
+        )
+    from e2m2e.integrators import multiple_shooting_correct_py as _msc
 
+    from ..ephemeris_correction.types import EphemerisCorrectionResult
+
+    forces_py = []
+    for entry in fm.list_forces():
+        if not entry.enabled:
+            continue
+        if type(entry.force).__name__ == "RelativisticCorrection":
+            continue
+        spec = entry.force.to_rust_spec(full_system)
+        if spec is not None:
+            forces_py.append(spec)
+    _perturber_map = {"EARTH": ["SUN", "MOON"], "MOON": ["EARTH"]}
+    _perturber_names = {p for b in bodies for p in _perturber_map.get(b.upper(), [])}
+    _cache_bodies = list(dict.fromkeys([*bodies, *_perturber_names]))
+    # var_time 打靶会把节点时间当自由变量，迭代中可把节点移到 patch 区间之外
+    # （实测可前移 ~20h）。cache 上下界各留 1 周期余量，避免越界报错。
+    _cache_margin = float(period) * float(t_c)
+    spice.enable_ephem_cache(
+        _cache_bodies,
+        float(min(et0, t_patch_j2000[0])) - _cache_margin,
+        float(max(et_grid[-1], t_patch_j2000[-1])) + _cache_margin,
+        dt=3600.0,
+        observer="EARTH",
+        frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
+    )
+    try:
+        # 不稳定轨道（Halo/NRHO，STM 谱半径 ~1e7/圈）单弧打靶每轮线搜索代价高、
+        # 收敛慢；正路是延拓计算 + 缓存初值复用（独立工作）。在此之前给低 max_iter
+        # 使其快速判定不收敛（抛 DesignNotConvergedError 供上层 skip），避免长时挂起。
+        _ms_max_iter = 25 if sel in ("HALO", "NRHO") else 80
+        result = _msc(
+            forces_py,
+            "EARTH",
+            list(t_patch_j2000),
+            [list(map(float, x)) for x in state_patch_j2000],
+            var_time=True,
+            fix_first_node=False,
+            fixed_node_mask=None,
+            max_iter=_ms_max_iter,
+            tolerance=CORRECTION_TOL_KM,
+            rtol=1e-10,
+            vel_weight=CORRECTION_VEL_WEIGHT,
+        )
+        if not result.converged:
+            raise DesignNotConvergedError(
+                f"{sel} 星历修正（Rust 多重打靶）未收敛：迭代 {result.iterations} 次，"
+                f"位置残差 {result.position_residual:.3e} km，"
+                f"速度残差 {result.velocity_residual:.3e} km/s"
+            )
+        t0_corr = float(result.t_patch[0])
+        out = fm.propagate(
+            np.asarray(result.state_patch[0], dtype=float),
+            (min(t0_corr, et0), float(et_grid[-1])),
+            t_eval=et_grid,
+            max_steps=2_000_000,
+        )
+    finally:
+        spice.disable_ephem_cache()
+
+    correction = EphemerisCorrectionResult(
+        converged=True,
+        iterations=int(result.iterations),
+        max_residual=float(result.max_residual),
+        residual_history=[float(x) for x in result.residual_history],
+        t_patch=np.asarray(result.t_patch, dtype=float),
+        state_patch=np.asarray(result.state_patch, dtype=float),
+        velocity_residual=float(result.velocity_residual),
+        velocity_residual_history=[float(result.velocity_residual)],
+    )
     ephemeris = _build_ephemeris_table(
         spice, syn_j2000, et0, et_grid, np.asarray(out["states"], dtype=float)
     )
@@ -1118,7 +1221,7 @@ def design_orbit(
         epoch_utc=epoch_iso,
         duration_day=duration_day,
         output_step_sec=float(output_step),
-        initial_state=np.asarray(correction.state_patch[0], dtype=float),
+        initial_state=np.asarray(result.state_patch[0], dtype=float),
         ephemeris=ephemeris,
         cr3bp_orbit=cr3bp_orbit,
         cr3bp_jacobi=jacobi,

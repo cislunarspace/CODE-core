@@ -107,6 +107,7 @@ fn correct_segment(
     max_iter: usize,
     tolerance: f64,
     rtol: f64,
+    vel_weight: f64,
     verbose: bool,
     method: RkMethod,
 ) -> Result<MultipleShootingRustResult, String> {
@@ -122,6 +123,7 @@ fn correct_segment(
         tolerance,
         rtol,
         None,
+        vel_weight,
         verbose,
         method,
     )
@@ -138,6 +140,7 @@ pub fn segmented_shooting_correct(
     max_iter_per_segment: usize,
     tolerance: f64,
     rtol: f64,
+    vel_weight: f64,
     verbose: bool,
     method: RkMethod,
 ) -> Result<SegmentedShootingResult, String> {
@@ -178,6 +181,7 @@ pub fn segmented_shooting_correct(
             max_iter_per_segment,
             tolerance,
             rtol,
+            vel_weight,
             verbose,
             method,
         )?;
@@ -247,6 +251,7 @@ pub fn segmented_shooting_correct(
                         max_iter_per_segment,
                         tolerance,
                         rtol,
+                        vel_weight,
                         verbose,
                         method,
                     )?;
@@ -312,7 +317,7 @@ pub fn segmented_shooting_correct(
 ///
 /// `forces` 是 Python 元组列表，每个元组描述一个力模型（格式同 `propagate_compiled`）。
 #[pyfunction]
-#[pyo3(signature = (forces, observer, t_patch, state_patch, points_per_segment=10, overlap_points=2, enable_merging=true, max_iter_per_segment=50, tolerance=1e-8, rtol=1e-10, verbose=false, method=RkMethod::Pd78))]
+#[pyo3(signature = (forces, observer, t_patch, state_patch, points_per_segment=10, overlap_points=2, enable_merging=true, max_iter_per_segment=50, tolerance=1e-8, rtol=1e-10, vel_weight=1.0, verbose=false, method=RkMethod::Pd78))]
 #[allow(clippy::too_many_arguments)]
 pub fn segmented_shooting_correct_py(
     forces: Vec<PyObject>,
@@ -325,6 +330,7 @@ pub fn segmented_shooting_correct_py(
     max_iter_per_segment: usize,
     tolerance: f64,
     rtol: f64,
+    vel_weight: f64,
     verbose: bool,
     method: RkMethod,
     py: Python<'_>,
@@ -370,6 +376,7 @@ pub fn segmented_shooting_correct_py(
         max_iter_per_segment,
         tolerance,
         rtol,
+        vel_weight,
         verbose,
         method,
     )

@@ -225,6 +225,7 @@ impl HomotopySolver {
             self.config.tolerance,
             self.config.rtol,
             None,
+            1.0, // homotopy 走质点 N 体，沿用原混合单位行为
             verbose,
             method,
         )
