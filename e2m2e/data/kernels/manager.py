@@ -223,11 +223,11 @@ class SPICEManager(EphemerisProvider):
         # 此处为内核加载的跨层桥接（ADR 0012 的 data/ → 仅外部库例外，
         # 迁移期保留，第 5 批评估归属）。
         try:
-            from e2m2e.integrators import spice_poc_furnsh  # noqa: F401
+            from e2m2e.integrators import spice_furnsh  # noqa: F401
 
-            if spice_poc_furnsh is None:
+            if spice_furnsh is None:
                 raise ImportError
-            spice_poc_furnsh(path)
+            spice_furnsh(path)
         except ImportError:
             pass
 
