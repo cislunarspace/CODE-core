@@ -1,7 +1,7 @@
 """机动序列表容器。
 
 通用数据容器（ADR 0011 迁移，源：``io/maneuvers.py`` 的
-``ManeuverTable``）。DFH 文本格式序列化函数与本容器同生命周期，
+``ManeuverTable``）。文本格式序列化函数与本容器同生命周期，
 算法层（站保）直接使用本容器与序列化函数。
 """
 
@@ -61,7 +61,7 @@ def read_maneuvers(path: str | Path) -> ManeuverTable:
 
 
 def _format_delta_v(v: float) -> str:
-    """DFH 风格脉冲大小：|v| ≥ 0.1 用定点 15 位小数，否则科学计数。"""
+    """文本样式脉冲大小：|v| ≥ 0.1 用定点 15 位小数，否则科学计数。"""
     if abs(v) < 0.1:
         return f"{v:>22.15E}"
     return f"{v:>22.15f}"

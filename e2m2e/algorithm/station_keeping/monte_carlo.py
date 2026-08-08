@@ -210,7 +210,7 @@ class RustPropagator:
 class PropagatorFactory:
     """力模型配置 → 传播器工厂（真实力模型的光压乘子每弧段可换）。
 
-    容差/步长取站保统计量级够用的默认（1e-10、3600 s）：DFH 黄金对比的
+    容差/步长取站保统计量级够用的默认（1e-10、3600 s）：历史标定对比的
     对象是统计特征（±30% 量级），1e-12 容差只增加耗时（实测 4 控制 × 2
     样本 156 s → 约 3 倍提速空间）。
     """
@@ -320,7 +320,7 @@ class MonteCarloResult:
         无角动量管理时 3 列（仿真序号/总 Δv/最大 Δv，序号在写出时追加）；
         含角动量管理时 5 列（追加姿态总 Δv、姿态独立 Δv）。
 
-        对齐 DFH 口径：失败样本不写统计行（黄金样本中失败行缺失）。
+        对齐外部工具口径：失败样本不写统计行（历史标定样本中失败行缺失）。
         """
         keep = ~self.failed_mask
         if self.attitude_delta_v.size > 0:
@@ -801,7 +801,7 @@ def run_monte_carlo(
     Args:
         nominal_ephemeris: 标称轨道星历（FR1 ``design_orbit`` 产物）
         spice: SPICE 管理器（``n_workers>1`` 时仅用于构造标称视图）
-        system: 星历动力学系统（地心 ICRF，见 tests/dfh 的 system fixture）
+        system: 星历动力学系统（地心 ICRF）
         force_config_ctrl: 控制（理论）力模型配置（表 5-3 左列）
         force_config_true: 真实（实际）力模型配置（表 5-3 右列）
         control_mode: 1=目标点宽松、2=目标点严格、3=特征点

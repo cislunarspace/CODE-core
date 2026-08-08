@@ -1,6 +1,6 @@
-"""DFH 功能码 2（任务轨道控制/轨道保持）对齐入口。
+"""功能码 2（任务轨道控制/轨道保持）对齐入口。
 
-端到端复现 DFH 轨道保持功能：输入标称轨道星历（FR1 ``design_orbit``
+端到端轨道保持功能：输入标称轨道星历（FR1 ``design_orbit``
 产物），按控制模式（特征点/目标点严格/目标点宽松，可选角动量管理）施加
 脉冲控制，以三轨道结构（目标/真实/测量）仿真测定轨与控制误差，蒙特卡洛
 批量评估，输出 SK_STATISTIC / MANEUVERS / 受控星历。算法以《控制方案.md》
@@ -31,7 +31,7 @@ from ..coordinate.standard_axes import ICRSAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
 from ..design.design_orbit import default_kernel_dir, load_design_kernels
 from ..dynamics import EphemerisSystem
-from ..forces.force_mapping import dfh_perturbation_to_force_config
+from ..forces.force_mapping import perturbation_to_force_config
 from .monte_carlo import MonteCarloResult, run_monte_carlo
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 __all__ = ["ControlOrbitResult", "control_orbit"]
 
-#: 受控星历输出文件名（按控制模式分文件，对齐 DFH；mode 4-6 沿用基础模式文件名）
+#: 受控星历输出文件名（按控制模式分文件，mode 4-6 沿用基础模式文件名）
 _EPHEMERIS_NAMES = {1: "EPHEMERIDES_LOOSE", 2: "EPHEMERIDES_TIGHT", 3: "EPHEMERIDES_SPECIAL"}
 
 #: e2m2e 能力边界内的默认摄动开关：球模型光压、关耦合项（MATLAB 默认
@@ -132,7 +132,7 @@ def control_orbit(
     tight_max_iter: int = 6,
     special_damping_factor: float = 1.0,
 ) -> ControlOrbitResult:
-    """端到端轨道保持仿真（DFH 功能码 2）。
+    """端到端轨道保持仿真。
 
     Args:
         input_ephemeris: 标称轨道星历文件路径或 ``EphemerisTable``
@@ -145,7 +145,7 @@ def control_orbit(
         feedback_arc: 目标点模式反馈弧段（天）
         special_crossings: 特征点目标穿越 x-z 平面次数
         num_controls: 控制次数（总时间 = (N-1)·间隔）
-        num_monte_carlo: 蒙特卡洛样本数（DFH 惯例 100）
+        num_monte_carlo: 蒙特卡洛样本数（惯例 100）
         output_step: 受控星历输出间隔（秒）
         position_accuracy / velocity_accuracy: 测定轨 1-sigma（m / m/s）
         thrust_angle_err / thrust_mean / thrust_rel_err / thrust_abs_err /
@@ -241,13 +241,13 @@ def control_orbit(
     theory_pert = {**_DEFAULT_CTRL_PERTURBATION, **(perturbation or {})}
     real_pert = {**theory_pert, **(real_perturbation or {})}
 
-    cfg_ctrl = dfh_perturbation_to_force_config(
+    cfg_ctrl = perturbation_to_force_config(
         theory_pert,
         earth_degree=earth_degree,
         moon_degree=moon_degree,
         dyb=dyb_vals,
     )
-    cfg_true = dfh_perturbation_to_force_config(
+    cfg_true = perturbation_to_force_config(
         real_pert,
         earth_degree=real_earth_degree,
         moon_degree=real_moon_degree,

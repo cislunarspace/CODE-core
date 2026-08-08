@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from e2m2e.algorithm.forces.force_mapping import dfh_perturbation_to_force_config
+from e2m2e.algorithm.forces.force_mapping import perturbation_to_force_config
 
 pytestmark = [pytest.mark.l1]
 
@@ -14,7 +14,7 @@ class TestCouplingMapping:
 
     def test_coupling_on_enables_solid_tide(self):
         """coupling=1 强制 tide_mode='solid'。"""
-        cfg = dfh_perturbation_to_force_config(
+        cfg = perturbation_to_force_config(
             {"coupling": 1, "earth_nonspherical": 1},
             earth_degree=4,
         )
@@ -27,7 +27,7 @@ class TestCouplingMapping:
 
     def test_coupling_off_no_solid_tide(self):
         """coupling=0 + tide=0 → tide_mode='none'。"""
-        cfg = dfh_perturbation_to_force_config(
+        cfg = perturbation_to_force_config(
             {"coupling": 0, "tide": 0, "earth_nonspherical": 1},
             earth_degree=4,
         )
@@ -40,7 +40,7 @@ class TestCouplingMapping:
 
     def test_coupling_forces_tide_even_when_tide_off(self):
         """coupling=1 + tide=0 → tide_mode='solid'（耦合项独立于 tide 开关）。"""
-        cfg = dfh_perturbation_to_force_config(
+        cfg = perturbation_to_force_config(
             {"coupling": 1, "tide": 0, "earth_nonspherical": 1},
             earth_degree=4,
         )
@@ -52,15 +52,15 @@ class TestCouplingMapping:
         assert gf["params"]["tide_mode"] == "solid"
 
     def test_default_perturbation_no_error(self):
-        """DFH 默认配置（coupling=1, tide=1）不再抛 NotImplementedError。"""
+        """默认配置（coupling=1, tide=1）不再抛 NotImplementedError。"""
         from e2m2e.data.templates.perturbations import DEFAULT_PERTURBATION
 
         # 应正常返回，不抛异常
-        cfg = dfh_perturbation_to_force_config(DEFAULT_PERTURBATION, earth_degree=4)
+        cfg = perturbation_to_force_config(DEFAULT_PERTURBATION, earth_degree=4)
         assert "forces" in cfg
         assert len(cfg["forces"]) > 0
 
     def test_coupling_requires_earth_nonspherical(self):
         """coupling=1 + earth_nonspherical=0 应抛 ValueError。"""
         with pytest.raises(ValueError, match="earth_nonspherical"):
-            dfh_perturbation_to_force_config({"coupling": 1, "earth_nonspherical": 0})
+            perturbation_to_force_config({"coupling": 1, "earth_nonspherical": 0})

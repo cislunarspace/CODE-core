@@ -115,7 +115,7 @@ class LooseTargetPointLaw:
     Δv* = -(Q + BᵀRB + DᵀSD)⁻¹·[(BᵀRB + DᵀSD)·v₀ + (BᵀRA + DᵀSC)·p₀]
 
     对 NRHO 这类强不稳定轨道，A 块（位置-位置）放大巨大，BᵀRA·p₀ 项
-    主导控制量（实测 p₀~90 km 时 Δv 达 m/s 量级，与 DFH 黄金样本一致）。
+    主导控制量（实测 p₀~90 km 时 Δv 达 m/s 量级，与历史标定样本一致）。
 
     Attributes:
         feedback_arc_days: 反馈弧段长度（天），目标节点时间偏移

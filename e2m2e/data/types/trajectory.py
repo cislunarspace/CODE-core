@@ -1,8 +1,8 @@
 """轨迹数据容器：EphemerisTable（通用星历容器）与 NominalOrbit（名义轨道契约）。
 
-- ``EphemerisTable``：UTC + GCRS 位置 km/速度 m/s + 会合系位置，通用容器，非 DFH
-  专属（ADR 0011 迁移，源：``io/ephemeris.py``）。DFH 文本格式 parse/read/write
-  函数与本容器同生命周期，不作独立脚本。
+- ``EphemerisTable``：UTC + GCRS 位置 km/速度 m/s + 会合系位置，通用容器（ADR 0011
+  迁移，源：``io/ephemeris.py``）。文本格式 parse/read/write 函数与本容器同生命周期，
+  不作独立脚本。
 - ``NominalOrbit``：FR1↔FR2 数据契约（ADR 0015，Gómez vol I §8.2.3）：等间距历元
   状态表 + Floquet 基 + 投影因子表 + 高次插值器。Floquet 基 + 投影因子由 FR1
   预计算，控制全程插值不复算。
@@ -37,7 +37,7 @@ class EphemerisTable:
         synodic_position: 地月会合系位置（无量纲），形状 ``(n, 3)``
         raw_text: 原始文件文本；程序生成（非读入）时为空串。
         times_jd_tdb: 历元 TDB 儒略日序列（形状 ``(n,)``），由预报/设计链路
-            填充；读入的 DFH 星历可能为 ``None``。JD_TDB = 2451545.0 + ET/86400。
+            填充；读入的星历可能为 ``None``。JD_TDB = 2451545.0 + ET/86400。
     """
 
     year: np.ndarray
@@ -84,7 +84,7 @@ class NominalOrbit:
 
 
 # ===========================================================================
-# DFH EPHEMERIDES_*.TXT 文本格式序列化
+# EPHEMERIDES_*.TXT 文本格式序列化
 # ===========================================================================
 
 
@@ -138,7 +138,7 @@ def read_ephemeris(path: str | Path) -> EphemerisTable:
 
 
 def write_ephemeris(table: EphemerisTable, path: str | Path) -> Path:
-    """按 DFH 格式写出星历文件（CRLF 行尾，UTF-8 无 BOM），返回写入的文件路径。"""
+    """按文本格式写出星历文件（CRLF 行尾，UTF-8 无 BOM），返回写入的文件路径。"""
     lines = []
     for k in range(len(table)):
         head = (

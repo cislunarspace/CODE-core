@@ -1,12 +1,12 @@
-"""DFH 摄动开关 → e2m2e 力模型配置映射表。
+"""摄动开关 → e2m2e 力模型配置映射表。
 
-DFH（inputs-dac.txt 第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月球质点
+inputs-dac.txt（第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月球质点
 引力常开 + 一组摄动开关"；e2m2e 侧是 ``ForceModel`` 聚合若干
 ``PhysicalModel``（ADR 0004 配置驱动）。本模块给出两者的逐项对应，产出
 ``ForceModel.from_config`` 可直接消费的配置字典，保证"同款力模型"两侧
 可复现。
 
-对应关系（地心 GCRS 传播，与 ``scripts/compare_with_dfh.py`` 的组装一致）：
+对应关系（地心 GCRS 传播）如下：
 
 - 基础模型（常开）：地球质点 ``PointMassGravity(EARTH)``（状态以地心为
   原点，中心项模型适用）；月球质点 ``ThirdBodyGravity(MOON)``——地心
@@ -21,16 +21,16 @@ DFH（inputs-dac.txt 第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月�
 - ``sun_body=1``：``ThirdBodyGravity(SUN)``。
 - ``planets=1``：七大行星（水星~海王星）各一个 ``ThirdBodyGravity``。
 - ``solar_radiation=1``（炮弹模型）：``SolarRadiationPressure``，
-  ``area=等效面质比, mass=1, cr=1``——DFH 的"等效面质比"（dyb[0]）已把
-  Cr 折进去，故 cr 取 1；无阴影模型（DFH 阴影行为未确认）。
+  ``area=等效面质比, mass=1, cr=1``——输入侧"等效面质比"（dyb[0]）已把
+  Cr 折进去，故 cr 取 1；无阴影模型（阴影行为未确认）。
 - ``solar_radiation=2``（ECOM）：未实现，``NotImplementedError``（#253）。
 - ``atmosphere=1``：``DragModel``（ExponentialAtmosphere 默认 f107/ap，
-  cd=2.2，面积同取等效面质比；DFH 侧 Cd/大气模型参数不可见）。
+  cd=2.2，面积同取等效面质比；输入侧 Cd/大气模型参数不可见）。
 - ``relativity=1``：``RelativisticCorrection(EARTH)``，仅 Schwarzschild
-  主项（DFH 修正项构成未确认，待 P0 对齐实验核实）。
+  主项（修正项构成未确认，待 P0 对齐实验核实）。
 - ``tide=1``：地球固体潮，挂在地球 ``GravityField`` 的
   ``tide_mode="solid"`` 上——因此要求 ``earth_nonspherical=1``，
-  否则抛 ``ValueError``。月球引力场不带潮（DFH 开关写明"地球的潮汐"）。
+  否则抛 ``ValueError``。月球引力场不带潮（开关写明"地球的潮汐"）。
 - ``coupling=1``（地球非球形×大天体耦合项）：强制启用固体潮
   ``tide_mode="solid"``（与 ``tide=1`` 共用 IERS TN32 固体潮公式）。
 
@@ -45,9 +45,9 @@ from typing import Any
 
 from ...data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
 
-__all__ = ["PLANET_BODIES", "dfh_perturbation_to_force_config"]
+__all__ = ["PLANET_BODIES", "perturbation_to_force_config"]
 
-#: DFH "大行星的第三体引力"对应的摄动天体（地球除外，月球有独立开关）
+#: "大行星的第三体引力"对应的摄动天体（地球除外，月球有独立开关）
 PLANET_BODIES: tuple[str, ...] = (
     "MERCURY",
     "VENUS",
@@ -91,7 +91,7 @@ def _unique_names(types: list[str]) -> list[str]:
     return names
 
 
-def dfh_perturbation_to_force_config(
+def perturbation_to_force_config(
     perturbation: dict[str, int] | None = None,
     *,
     earth_degree: int = 10,
@@ -99,14 +99,14 @@ def dfh_perturbation_to_force_config(
     dyb: Sequence[float] | None = None,
     area_to_mass: float | None = None,
 ) -> dict[str, Any]:
-    """把 DFH 摄动开关映射为 e2m2e ``ForceModel`` 配置字典。
+    """把摄动开关映射为 e2m2e ``ForceModel`` 配置字典。
 
     Args:
         perturbation: 摄动开关字典（键与取值同 ``inputs_dac`` 的
             ``DEFAULT_PERTURBATION``）；缺省项取默认值。
         earth_degree: 地球非球形引力位阶次数（degree=order）。
         moon_degree: 月球非球形引力位阶次数（degree=order）。
-        dyb: DFH DYB 系数 9 分量；``dyb[0]`` 为等效面质比（m²/kg），
+        dyb: DYB 面质比系数 9 分量；``dyb[0]`` 为等效面质比（m²/kg），
             炮弹光压与大气阻力共用；其余分量在炮弹档忽略。
         area_to_mass: 显式等效面质比（m²/kg），给出时覆盖 ``dyb[0]``。
 

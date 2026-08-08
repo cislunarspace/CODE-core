@@ -94,7 +94,7 @@ addopts = ["-m", "not l3 and not slow"]
 markers = [
     "slow: 运行时间较长的数值测试",
     "spice: 依赖 SPICE 内核的测试，内核缺失时跳过",
-    "e2e: 依赖 DFH_DAC.exe 的端到端测试，exe 缺失时跳过",
+    "e2e: Lissajous/triangular 场景端到端测试",
     "l1: ADR 0013 第1层——Rust 单元 / 纯数学验证（无 SPICE 依赖，<1s）",
     "l2: ADR 0013 第2层——Python 算法单元（微分校正、延拓、力模型等，<10s）",
     "l3: ADR 0013 第3层——集成测试（跨层链路 + 端到端星历场景，可能>60s）",

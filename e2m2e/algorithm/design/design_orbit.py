@@ -1,26 +1,26 @@
-"""任务轨道设计入口（DFH 功能码 1 对齐层）。
+"""任务轨道设计入口。
 
 链路（对齐 ``docs/plans/dfh-parity-prd.md`` FR1）：
 
-1. CR3BP 初猜：按 DFH 形状参数生成周期轨道（``cr3bp_orbits``）；
+1. CR3BP 初猜：按形状参数生成周期轨道（``cr3bp_orbits``）；
 2. 星历修正：周期轨道采样 patch points → synodic→J2000 转换 →
    星历 N 体模型下多重打靶收敛（``algorithms.ephemeris_correction``
    注册表）；
 3. 标称星历：以修正后首节点状态为初值，在
-   ``dfh_perturbation_to_force_config`` 映射出的高精度力模型下
-   长期预报，输出 DFH 同格式星历（``EphemerisTable``）。
+   ``perturbation_to_force_config`` 映射出的高精度力模型下
+   长期预报，输出文本格式星历（``EphemerisTable``）。
 
 参数语义对齐 MATLAB ``design_orbit.m`` 与 inputs-dac.txt 设计块：
 DRO 振幅+初始相位；Halo 共线点编号+带符号面外振幅+初始相位；
 NRHO 共线点编号+北/南+近月点高度+初始相位。初始相位为周期份额
 （0~1），历元时刻的状态 = 周期轨道参考状态沿轨道推进 ``phase × T``；
-相位零点按 DFH 黄金样本标定——Halo/NRHO 在 y=0 穿越点，DRO 在远侧
+相位零点按历史标定——Halo/NRHO 在 y=0 穿越点，DRO 在远侧
 x 轴穿越点（e2m2e 的 DRO 参考状态为近侧穿越点，内部偏移半周期）。
-DRO 振幅取一个周期内距月距离最小/最大值的均值（同按黄金样本标定）。
+DRO 振幅取一个周期内距月距离最小/最大值的均值（同按历史标定）。
 
-已知系统差（与 tests/dfh 回归测试共用同一套假设）：
+已知系统差（历史标定值）：
 
-- DFH 输出 GCRS，e2m2e 在 ICRF（J2000）下传播，frame bias（~23 mas）
+- 参考输出 GCRS，e2m2e 在 ICRF（J2000）下传播，frame bias（~23 mas）
   在月距量级约 0.04 km，计入对比容差；
 - 维持时间按 1 年 = 365.25 天折算；
 - NRHO 近月点高度起算面取月球平均半径 1737.4 km。
@@ -127,7 +127,7 @@ _BODY_FIXED_KERNELS = [
     "SPICELunaFrameKernel.tf",
 ]
 
-#: de440s 只有行星质心段，照 tests/dfh 的做法把行星名注册到质心 ID
+#: de440s 只有行星质心段，按通用做法把行星名注册到质心 ID
 _BODY_ID_ALIASES = [
     ("MERCURY", 1),
     ("VENUS", 2),
@@ -156,7 +156,7 @@ class OrbitDesignResult:
         duration_day: 维持时间（天）。
         output_step_sec: 星历输出间隔（秒）。
         initial_state: 历元时刻惯性系状态（km, km/s），星历修正后首节点。
-        ephemeris: 标称星历（DFH 同格式容器：UTC + GCRS 位置 km /
+        ephemeris: 标称星历（文本格式容器：UTC + GCRS 位置 km /
             速度 m/s + 地月会合系无量纲位置）。
         cr3bp_orbit: CR3BP 周期轨道（参考相位，无量纲）。
         cr3bp_jacobi: CR3BP 周期轨道的 Jacobi 常数。
@@ -177,7 +177,7 @@ class OrbitDesignResult:
     force_config: dict[str, Any]
 
     def write_ephemeris(self, path: str | Path) -> None:
-        """按 DFH EPHEMERIDES 格式写出标称星历。"""
+        """按文本格式写出标称星历。"""
         from ...data.types.trajectory import write_ephemeris
 
         write_ephemeris(self.ephemeris, path)
@@ -528,11 +528,11 @@ def _build_ephemeris_table(
     et_grid: np.ndarray,
     states: np.ndarray,
 ) -> EphemerisTable:
-    """把传播结果组装成 DFH 同格式星历表（UTC + GCRS + 地月会合系）。
+    """把传播结果组装成文本格式星历表（UTC + GCRS + 地月会合系）。
 
-    DFH 的地月会合系为地心归一（月球在 +x 单位距离处；依据：DFH 设计
-    黄金样本中 DRO 轨道在该约定下关于 x=1 近似对称）；内部转换器输出
-    质心归一（月球在 1-mu），x 分量加 mu 平移对齐。
+    地月会合系为地心归一（月球在 +x 单位距离处；依据：历史标定样本中
+    DRO 轨道在该约定下关于 x=1 近似对称）；内部转换器输出质心归一（月球在
+    1-mu），x 分量加 mu 平移对齐。
     """
     t_c = syn_j2000.cr3bp_system.characteristic_time
     assert t_c is not None
@@ -778,9 +778,9 @@ def design_orbit(
         epoch: 起始历元 UTC，``[年, 月, 日, 时, 分, 秒]`` 或 ISO 字符串。
         duration: 维持时间（年，0 < d ≤ 20）。
         output_step: 星历输出间隔（秒）。
-        perturbation: DFH 摄动开关字典（键与取值同
+        perturbation: 摄动开关字典（键与取值同
             ``DEFAULT_PERTURBATION``），经
-            ``dfh_perturbation_to_force_config`` 映射为力模型。缺省时用
+            ``perturbation_to_force_config`` 映射为力模型。缺省时用
             ``DEFAULT_DESIGN_PERTURBATION``：光压炮弹模型、关耦合项
             （ECOM 光压与耦合项属 #253，需要时显式开启会抛
             ``NotImplementedError``）。
@@ -850,9 +850,9 @@ def design_orbit(
     # --- 2. 相位 → 历元状态，采样 patch points，转 J2000 ---
     assert cr3bp_orbit.period is not None
     period = float(cr3bp_orbit.period)
-    # 相位零点约定：Halo/NRHO 的参考状态（y=0 穿越点）与 DFH 黄金样本的
-    # phase=0 起点一致；DRO 的参考状态是近侧穿越点，而 DFH 相位零点在远侧
-    # 穿越点（黄金样本标定：DFH phase=0.5001 的 DRO 首行恰在近侧穿越点，
+    # 相位零点约定：Halo/NRHO 的参考状态（y=0 穿越点）与历史标定样本
+    # 的 phase=0 起点一致；DRO 的参考状态是近侧穿越点，而相位零点在远侧
+    # 穿越点（历史标定：标定样本 phase=0.5001 的 DRO 首行恰在近侧穿越点，
     # 距月取最小值），差半个周期
     if sel in ("LISSAJOUS", "L4", "L5"):
         # 面内/面外相位已体现在初猜状态（t=0 即历元状态）
@@ -905,7 +905,7 @@ def design_orbit(
     # --- 3. 星历修正（N 体模型多重打靶） ---
     # 默认光压用炮弹模型、关耦合项（ECOM/耦合属 #253，显式开启会报错）
     from ..forces import ForceModel
-    from ..forces.force_mapping import dfh_perturbation_to_force_config
+    from ..forces.force_mapping import perturbation_to_force_config
 
     if perturbation is None:
         perturbation = DEFAULT_DESIGN_PERTURBATION
@@ -925,7 +925,7 @@ def design_orbit(
         axes=ICRSAxes(),
         origin=CelestialBodyOrigin(body="EARTH", spice=spice),
     )
-    force_config = dfh_perturbation_to_force_config(
+    force_config = perturbation_to_force_config(
         perturbation, earth_degree=earth_degree, moon_degree=moon_degree, dyb=dyb
     )
     fm = ForceModel.from_config(force_config, full_system)
