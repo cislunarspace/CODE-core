@@ -66,6 +66,23 @@ impl From<CacheMissError> for cspice::Error {
     }
 }
 
+/// 采样体状态向量（位置 + 速度，共 6 个分量）。
+type BodySample = [f64; 6];
+/// 3×3 旋转矩阵。
+type FrameMatrix = [[f64; 3]; 3];
+/// 6×6 状态变换矩阵。
+type SxformMatrix = [[f64; 6]; 6];
+
+/// (key, 采样数据) 类型别名（Vec，用于 build 内部暂存）。
+type BodyGrids = Vec<((String, String), Vec<BodySample>)>;
+type FrameGrids = Vec<((String, String), Vec<FrameMatrix>)>;
+type SxformGrids = Vec<((String, String), Vec<SxformMatrix>)>;
+
+/// 单个采样点类型（用于公共 API 参数切片）。
+type BodyEntry = ((String, String), Vec<BodySample>);
+type FrameEntry = ((String, String), Vec<FrameMatrix>);
+type SxformEntry = ((String, String), Vec<SxformMatrix>);
+
 /// 自然三次样条：预解二阶导数，查询 O(log N) 二分定位 + O(1) 求值。
 ///
 /// 构造时用追赶法解三对角系统求各节点二阶导数 `m`（自然边界 m₀=mₙ=0）。
@@ -200,7 +217,10 @@ impl EphemCache {
     ///
     /// 对每个 (target, observer) 在 [et_start, et_end] 上以 dt 步长采样位置/速度；
     /// 对每个 (from, to) 帧对采样 pxform 的 9 个分量；
-    /// 对每个 (from, to) sxform 对采样 sxform 的 36 个分量。各建自然三次样条。
+    /// 对每个 (from, to) sxform 对采样 sxform 的 36 个分量。
+    ///
+    /// 内部先通过 cspice 采集原始网格，再委托给 [`EphemCache::from_raw_grids`]
+    /// 做样条拟合——后者可供无 cspice 内核的测试直接构造缓存。
     pub fn build(
         bodies: &[(String, String)],
         frames: &[(String, String)],
@@ -222,13 +242,11 @@ impl EphemCache {
         let n = ((t1 - t0) / dt).ceil() as usize + 1;
         let t_grid: Vec<f64> = (0..n).map(|i| t0 + i as f64 * dt).collect();
 
-        let mut body_map = HashMap::new();
+        // ── 采集 body 原始网格 ──
+        let mut body_grids: BodyGrids = Vec::with_capacity(bodies.len());
         for (target, observer) in bodies {
-            let mut pos_grids = [vec![0.0_f64; n], vec![0.0_f64; n], vec![0.0_f64; n]];
-            let mut vel_grids = [vec![0.0_f64; n], vec![0.0_f64; n], vec![0.0_f64; n]];
-            for i in 0..n {
-                let et = t_grid[i];
-                // 先查帧缓存避免：这里用 cspice 直接读
+            let mut states = Vec::with_capacity(n);
+            for &et in &t_grid {
                 let et_tdb = Et::from(et);
                 let (state, _lt) = easier_reader(
                     target,
@@ -238,54 +256,149 @@ impl EphemCache {
                     observer,
                 )
                 .map_err(|e| SpiceFfiError::Failed(format!("cspice read: {e:?}")))?;
-                pos_grids[0][i] = state.position.x;
-                pos_grids[1][i] = state.position.y;
-                pos_grids[2][i] = state.position.z;
-                vel_grids[0][i] = state.velocity.0[0];
-                vel_grids[1][i] = state.velocity.0[1];
-                vel_grids[2][i] = state.velocity.0[2];
+                states.push([
+                    state.position.x,
+                    state.position.y,
+                    state.position.z,
+                    state.velocity.0[0],
+                    state.velocity.0[1],
+                    state.velocity.0[2],
+                ]);
+            }
+            body_grids.push(((target.clone(), observer.clone()), states));
+        }
+
+        // ── 采集 frame 原始网格 ──
+        let mut frame_grids: FrameGrids = Vec::with_capacity(frames.len());
+        for (from, to) in frames {
+            let mut mats = Vec::with_capacity(n);
+            for &et in &t_grid {
+                let r = pxform(from, to, et)?;
+                mats.push(r);
+            }
+            frame_grids.push(((from.clone(), to.clone()), mats));
+        }
+
+        // ── 采集 sxform 原始网格 ──
+        let mut sx_grids: SxformGrids = Vec::with_capacity(sxform_pairs.len());
+        for (from, to) in sxform_pairs {
+            let mut mats = Vec::with_capacity(n);
+            for &et in &t_grid {
+                let m = crate::spice_ffi::sxform(from, to, et)?;
+                mats.push(m);
+            }
+            sx_grids.push(((from.clone(), to.clone()), mats));
+        }
+
+        Self::from_raw_grids(&t_grid, &body_grids, &frame_grids, &sx_grids)
+    }
+
+    /// 由预采样原始网格直接构造缓存，不经 cspice / 内核。
+    ///
+    /// 与 [`EphemCache::build`] 共享样条拟合逻辑，但跳过 cspice 采样——供无
+    /// 内核依赖的单元测试，以及未来非 SPICE 星历源（如自定义解析星历）使用。
+    ///
+    /// # 参数
+    /// - `t_grid`: 采样时刻，须严格递增、长度 ≥ 2；成为缓存覆盖范围。
+    /// - `bodies`: 每个 (target, observer) 在各采样点的 6 维状态 [x,y,z,vx,vy,vz]。
+    /// - `frames`: 每个 (from, to) 在各采样点的 3×3 旋转矩阵。
+    /// - `sxforms`: 每个 (from, to) 在各采样点的 6×6 状态变换矩阵。
+    ///
+    /// 各 body/frame/sxform 序列长度须等于 `t_grid.len()`。
+    pub fn from_raw_grids(
+        t_grid: &[f64],
+        bodies: &[BodyEntry],
+        frames: &[FrameEntry],
+        sxforms: &[SxformEntry],
+    ) -> Result<Self, SpiceFfiError> {
+        let n = t_grid.len();
+        if n < 2 {
+            return Err(SpiceFfiError::Failed("t_grid 至少需要 2 个采样点".into()));
+        }
+        if !t_grid.windows(2).all(|w| w[0] < w[1]) {
+            return Err(SpiceFfiError::Failed("t_grid 必须严格递增".into()));
+        }
+        for ((tgt, obs), states) in bodies {
+            if states.len() != n {
+                return Err(SpiceFfiError::Failed(format!(
+                    "body ({tgt}, {obs}) 状态数 {} != 网格长度 {n}",
+                    states.len()
+                )));
+            }
+        }
+        for ((from, to), mats) in frames {
+            if mats.len() != n {
+                return Err(SpiceFfiError::Failed(format!(
+                    "frame ({from}, {to}) 矩阵数 {} != 网格长度 {n}",
+                    mats.len()
+                )));
+            }
+        }
+        for ((from, to), mats) in sxforms {
+            if mats.len() != n {
+                return Err(SpiceFfiError::Failed(format!(
+                    "sxform ({from}, {to}) 矩阵数 {} != 网格长度 {n}",
+                    mats.len()
+                )));
+            }
+        }
+
+        let t = t_grid.to_vec();
+
+        // ── 对 body 建样条 ──
+        let mut body_map = HashMap::new();
+        for ((target, observer), states) in bodies {
+            let mut pos_grids = [vec![0.0_f64; n], vec![0.0_f64; n], vec![0.0_f64; n]];
+            let mut vel_grids = [vec![0.0_f64; n], vec![0.0_f64; n], vec![0.0_f64; n]];
+            for (i, s) in states.iter().enumerate() {
+                pos_grids[0][i] = s[0];
+                pos_grids[1][i] = s[1];
+                pos_grids[2][i] = s[2];
+                vel_grids[0][i] = s[3];
+                vel_grids[1][i] = s[4];
+                vel_grids[2][i] = s[5];
             }
             let pos = [
-                CubicSpline::new(t_grid.clone(), pos_grids[0].clone()),
-                CubicSpline::new(t_grid.clone(), pos_grids[1].clone()),
-                CubicSpline::new(t_grid.clone(), pos_grids[2].clone()),
+                CubicSpline::new(t.clone(), pos_grids[0].clone()),
+                CubicSpline::new(t.clone(), pos_grids[1].clone()),
+                CubicSpline::new(t.clone(), pos_grids[2].clone()),
             ];
             let vel = [
-                CubicSpline::new(t_grid.clone(), vel_grids[0].clone()),
-                CubicSpline::new(t_grid.clone(), vel_grids[1].clone()),
-                CubicSpline::new(t_grid.clone(), vel_grids[2].clone()),
+                CubicSpline::new(t.clone(), vel_grids[0].clone()),
+                CubicSpline::new(t.clone(), vel_grids[1].clone()),
+                CubicSpline::new(t.clone(), vel_grids[2].clone()),
             ];
             body_map.insert((target.clone(), observer.clone()), BodySpline { pos, vel });
         }
 
+        // ── 对 frame 建样条 ──
         let mut frame_map = HashMap::new();
-        for (from, to) in frames {
+        for ((from, to), mats) in frames {
             let mut comps_grids: [Vec<f64>; 9] = Default::default();
             for g in comps_grids.iter_mut() {
                 *g = vec![0.0_f64; n];
             }
-            for i in 0..n {
-                let r = pxform(from, to, t_grid[i])?;
+            for (i, r) in mats.iter().enumerate() {
                 for k in 0..9 {
                     comps_grids[k][i] = r[k / 3][k % 3];
                 }
             }
-            let comps = comps_grids.map(|g| CubicSpline::new(t_grid.clone(), g));
+            let comps = comps_grids.map(|g| CubicSpline::new(t.clone(), g));
             frame_map.insert((from.clone(), to.clone()), FrameSpline { comps });
         }
 
+        // ── 对 sxform 建样条 ──
         let mut sxform_map = HashMap::new();
-        for (from, to) in sxform_pairs {
+        for ((from, to), mats) in sxforms {
             let mut comps_grids: [Vec<f64>; 36] = std::array::from_fn(|_| vec![0.0_f64; n]);
-            for i in 0..n {
-                let m = crate::spice_ffi::sxform(from, to, t_grid[i])?;
+            for (i, m) in mats.iter().enumerate() {
                 for r in 0..6 {
                     for c in 0..6 {
                         comps_grids[r * 6 + c][i] = m[r][c];
                     }
                 }
             }
-            let comps = comps_grids.map(|g| CubicSpline::new(t_grid.clone(), g));
+            let comps = comps_grids.map(|g| CubicSpline::new(t.clone(), g));
             sxform_map.insert((from.clone(), to.clone()), SxformSpline { comps });
         }
 
