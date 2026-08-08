@@ -26,7 +26,13 @@ jobs:
       # 不编译、无需 CSPICE；cargo clippy 编译 spice 代码，须先下 CSPICE 编译包
       # 并设 CSPICE_DIR（cspice-v1 release，cspice-sys 据此跳过国内不可达的 NAIF 下载）。
       - run: cargo fmt --all -- --check
-      - name: 下载 SPICE 编译包（cspice-v1 release）
+      - name: 恢复 SPICE 编译包缓存
+        id: cache-cspice
+        uses: actions/cache@v4
+        with:
+          path: .cspice
+          key: cspice-${{ runner.os }}-v1
+      - name: 下载 SPICE 编译包（cspice-v1 release；缓存命中则跳过）
         run: uv run python scripts/download_cspice.py >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
