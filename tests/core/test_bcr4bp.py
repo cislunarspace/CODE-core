@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -357,6 +359,152 @@ class TestEphemerisComparison:
             f"2 天外推 BCR4BP 误差 {err_bcr4bp_2d:.1f} km 应小于 "
             f"CR3BP 误差 {err_cr3bp_2d:.1f} km（太阳项的改善）"
         )
+
+
+# =============================================================================
+# F. 事件检测（Issue #333：BCR4BP 与 CR3BP 事件处理行为一致）
+# =============================================================================
+class TestBCR4BPEvents:
+    """BCR4BP events 检测：验证 scipy 回退与事件语义。
+
+    BCR4BP Rust 路径不支持事件检测；传入 events 时回退 scipy 并发出
+    ``warnings.warn``。本类测试验证该回退可用、事件穿越正确、与事后
+    检测一致。
+    """
+
+    # 初值状态（y=0.05，接近 Earth），保证先下行穿越 y=0 面。
+    OFF_PLANE_STATE = np.array([0.8, 0.05, 0.0, 0.0, 0.0, 0.0])
+
+    @pytest.fixture
+    def y0_off_plane(self):
+        return self.OFF_PLANE_STATE.copy()
+
+    def test_events_no_longer_raise(self, bcr4bp_dynamics, y0_off_plane):
+        """传入 events 不应再抛出 NotImplementedError。"""
+        from e2m2e.algorithm.manifold.sections import PoincareSection
+
+        section = PoincareSection.plane(axis=1, value=0.0)
+        event = section.event(direction=-1)
+
+        result = bcr4bp_dynamics.propagate(y0_off_plane, (0.0, 5.0), events=[event])
+        assert "time" in result
+        assert "states" in result
+
+    def test_events_emit_warning(self, bcr4bp_dynamics, y0_off_plane):
+        """传入 events 时应发出 UserWarning（回退 scipy 提示）。"""
+        from e2m2e.algorithm.manifold.sections import PoincareSection
+
+        section = PoincareSection.plane(axis=1, value=0.0)
+        event = section.event(direction=-1)
+
+        with pytest.warns(UserWarning, match="回退到 scipy"):
+            bcr4bp_dynamics.propagate(y0_off_plane, (0.0, 5.0), events=[event])
+
+    def test_no_warning_without_events(self, bcr4bp_dynamics, sample_state):
+        """不传 events 时不应发出警告（正常 Rust / scipy 路径）。"""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            bcr4bp_dynamics.propagate(sample_state, (0.0, 1.0))
+
+    def test_terminal_event_stops_at_xz_plane(self, bcr4bp_dynamics, y0_off_plane):
+        """terminal 事件在首次下行穿越 xz 平面（y=0）时截断积分。"""
+        from e2m2e.algorithm.manifold.sections import PoincareSection
+
+        section = PoincareSection.plane(axis=1, value=0.0)
+        event = section.event(direction=-1, terminal=True)
+
+        result = bcr4bp_dynamics.propagate(y0_off_plane, (0.0, 10.0), events=[event])
+
+        t_events = result["t_events"][0]
+        y_events = result["y_events"][0]
+        assert len(t_events) == 1
+        # scipy terminal 语义：轨迹末点即事件点
+        assert result["time"][-1] == t_events[-1]
+        assert result["time"][-1] < 10.0
+        # 事件点落在 y=0 截面上，且为下行穿越（vy < 0）
+        assert abs(y_events[0][1]) < 1e-10
+        assert y_events[0][4] < 0
+
+    def test_direction_filter(self, bcr4bp_dynamics, y0_off_plane):
+        """direction 过滤：下行/上行事件各自只记对应方向的穿越。"""
+        from e2m2e.algorithm.manifold.sections import PoincareSection
+
+        section = PoincareSection.plane(axis=1, value=0.0)
+        down = section.event(direction=-1)
+        up = section.event(direction=1)
+
+        result = bcr4bp_dynamics.propagate(y0_off_plane, (0.0, 10.0), events=[down, up])
+
+        t_down, t_up = result["t_events"]
+        y_down, y_up = result["y_events"]
+        assert len(t_down) > 0
+        assert len(t_up) > 0
+        assert t_down[0] < t_up[0]
+        assert np.all(np.abs(y_down[:, 1]) < 1e-10)
+        assert np.all(y_down[:, 4] < 0)
+        assert np.all(np.abs(y_up[:, 1]) < 1e-10)
+        assert np.all(y_up[:, 4] > 0)
+
+    def test_event_matches_post_hoc_detection(self, bcr4bp_dynamics, y0_off_plane):
+        """积分中检测与事后 detect_crossings 的穿越时刻一致。"""
+        from e2m2e.algorithm.manifold.sections import PoincareSection, detect_crossings
+
+        section = PoincareSection.plane(axis=1, value=0.0)
+        t_eval = np.linspace(0.0, 10.0, 2001)
+
+        result = bcr4bp_dynamics.propagate(
+            y0_off_plane,
+            (0.0, 10.0),
+            t_eval=t_eval,
+            events=[section.event(direction=-1)],
+        )
+
+        post_hoc = detect_crossings(result["time"], result["states"], section)
+        t_post_down = np.array([t for t, state, _ in post_hoc if state[4] < 0])
+        t_event_down = np.asarray(result["t_events"][0])
+
+        assert len(t_event_down) == len(t_post_down)
+        # 事后检测基于密采样点的线性插值，自身误差 ~dt²；容差取 1e-5
+        np.testing.assert_allclose(t_event_down, t_post_down, atol=1e-5)
+
+    def test_single_event_callable_accepted(self, bcr4bp_dynamics, y0_off_plane):
+        """events 可传单个 callable（scipy 风格），自动包装为列表。"""
+        from e2m2e.algorithm.manifold.sections import PoincareSection
+
+        section = PoincareSection.plane(axis=1, value=0.0)
+        result = bcr4bp_dynamics.propagate(
+            y0_off_plane,
+            (0.0, 10.0),
+            events=section.event(direction=-1),
+        )
+        assert len(result["t_events"]) == 1
+        assert len(result["t_events"][0]) > 0
+
+    def test_events_with_stm(self, bcr4bp_dynamics, y0_off_plane):
+        """STM 增广传播下事件函数接收 42 维状态；section.event 自动截取前 6 维。"""
+        from e2m2e.algorithm.manifold.sections import PoincareSection
+
+        section = PoincareSection.plane(axis=1, value=0.0)
+        event = section.event(direction=-1, terminal=True)
+
+        result = bcr4bp_dynamics.propagate(
+            y0_off_plane,
+            (0.0, 10.0),
+            with_stm=True,
+            events=[event],
+        )
+
+        assert len(result["t_events"][0]) == 1
+        # y_events 携带增广状态（6 + 36 = 42 维）
+        assert result["y_events"][0].shape == (1, 42)
+        assert result["stm"].shape[1:] == (6, 6)
+        assert result["time"][-1] == result["t_events"][0][-1]
+
+    def test_no_events_no_event_keys(self, bcr4bp_dynamics, sample_state):
+        """不传 events 时返回字典不含事件键（保持原契约）。"""
+        result = bcr4bp_dynamics.propagate(sample_state, (0.0, 1.0))
+        assert "t_events" not in result
+        assert "y_events" not in result
 
 
 if __name__ == "__main__":
