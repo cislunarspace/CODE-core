@@ -145,7 +145,6 @@ examples/main_*.png
 .zcode/
 *.pdb
 AGENTS.md
-CLAUDE.md
 CONTEXT.md
 CONTEXT-MAP.md
 docs/agents/
