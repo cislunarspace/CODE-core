@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [5.6.2] - 2026-08-08
+
+### Fixed
+- **Lissajous 初猜改用中心流形约化，返回多点有界轨迹**（#323）：CR3BP 层 Lissajous 初猜从旧方法改为 `force_cr3bp` 中心流形约化，返回多点有界参考轨迹，修复 #323 大振幅星历长期预报发散问题。顺带补充 `two_level` 轨迹覆盖守卫。
+
+### Changed
+- orbit-design 代码清理（#325）：旋转阵去重、删除未使用的 `order` 形参、import 提至模块顶层、删除死代码。
+
+### Docs
+- 修正五层架构迁移后的过时文档与 rst 引用。
+
 ## [5.6.1] - 2026-08-07
 
 ### Added
