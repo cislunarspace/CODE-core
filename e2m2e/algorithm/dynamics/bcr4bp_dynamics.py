@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
 from typing import Any
 
@@ -196,12 +197,19 @@ class BCR4BP_Dynamics(Dynamics):
     ) -> dict[str, Any]:
         """增广状态积分（含 STM），优先走 Rust 快速路径。
 
-        BCR4BP 的 Rust 路径不支持事件检测，且按设计不静默回退 scipy：
-        传入 ``events`` 直接报错（信任 Rust 路径，避免悄悄退回 scipy）。
+        BCR4BP 的 Rust 路径不支持事件检测；传入 ``events`` 时回退 scipy
+        路径并发出警告（事件积分器实现差异可能导致微小精度偏差）。
         扩展未构建（``_HAS_RUST_BCR4BP_STM=False``）时降级 scipy。
         """
         if events is not None:
-            raise NotImplementedError("BCR4BP Rust 路径不支持事件检测，且不提供 scipy 回退")
+            warnings.warn(
+                "BCR4BP Rust 路径不支持事件检测，回退到 scipy 路径；"
+                "事件检测精度可能因积分器实现差异而有微小偏差",
+                stacklevel=2,
+            )
+            return super()._propagate_with_stm(
+                initial_state, t_span, t_eval, max_step, with_jacobi, events
+            )
         if _HAS_RUST_BCR4BP_STM:
             return self._propagate_with_stm_rust(
                 initial_state, t_span, t_eval, max_step, with_jacobi
@@ -274,11 +282,19 @@ class BCR4BP_Dynamics(Dynamics):
     ) -> dict[str, Any]:
         """纯状态积分（不含 STM），优先走 Rust 快速路径。
 
-        BCR4BP 的 Rust 路径不支持事件检测，且不静默回退 scipy：传入
-        ``events`` 直接报错。扩展未构建时降级 scipy。
+        BCR4BP 的 Rust 路径不支持事件检测；传入 ``events`` 时回退 scipy
+        路径并发出警告（事件积分器实现差异可能导致微小精度偏差）。
+        扩展未构建时降级 scipy。
         """
         if events is not None:
-            raise NotImplementedError("BCR4BP Rust 路径不支持事件检测，且不提供 scipy 回退")
+            warnings.warn(
+                "BCR4BP Rust 路径不支持事件检测，回退到 scipy 路径；"
+                "事件检测精度可能因积分器实现差异而有微小偏差",
+                stacklevel=2,
+            )
+            return super()._propagate_state_only(
+                initial_state, t_span, t_eval, max_step, with_jacobi, events
+            )
         if _HAS_RUST_BCR4BP_STM:
             mu = float(self.system.mu)
             if t_eval is not None:

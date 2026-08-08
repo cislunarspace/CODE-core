@@ -58,7 +58,7 @@ try:
             propagate_with_stm_py,
             reset_ephem_ffi_call_count,
             segmented_shooting_correct_py,
-            spice_poc_furnsh,
+            spice_furnsh,
             third_body_acceleration,
         )
     except ImportError:
@@ -76,7 +76,7 @@ try:
         propagate_with_stm_py = None  # type: ignore[misc,assignment]
         reset_ephem_ffi_call_count = None  # type: ignore[misc,assignment]
         segmented_shooting_correct_py = None  # type: ignore[misc,assignment]
-        spice_poc_furnsh = None  # type: ignore[misc,assignment]
+        spice_furnsh = None  # type: ignore[misc,assignment]
         third_body_acceleration = None  # type: ignore[misc,assignment]
 except ModuleNotFoundError:
     # _integrators is a compiled Rust extension; allow import for doc builds
@@ -124,7 +124,7 @@ except ModuleNotFoundError:
     propagate_with_stm_py = None  # type: ignore[misc,assignment]
     reset_ephem_ffi_call_count = None  # type: ignore[misc,assignment]
     segmented_shooting_correct_py = None  # type: ignore[misc,assignment]
-    spice_poc_furnsh = None  # type: ignore[misc,assignment]
+    spice_furnsh = None  # type: ignore[misc,assignment]
     third_body_acceleration = None  # type: ignore[misc,assignment]
 
 # ---- Python↔Rust ABI 版本校验 ----
@@ -206,7 +206,7 @@ __all__ = [
     "solid_tide_step2",
     "solve_ivp_events",
     "solve_ivp_events_py",
-    "spice_poc_furnsh",
+    "spice_furnsh",
     "spherical_harmonic_accel",
     "third_body_acceleration",
     "TransferPointResult",

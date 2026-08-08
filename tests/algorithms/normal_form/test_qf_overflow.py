@@ -69,11 +69,6 @@ class TestSolveQfMatrixStability:
         B = _solve_qf_matrix(M_at, D, tlist, segment=None)
         assert _max_symplectic_error(B) < 1e-6
 
-    @pytest.mark.xfail(
-        reason="normal_form 迁至 Rust solve_ivp 后，分段与单积分在短窗口下"
-        "不再逐位一致（见 issue #340）；逐段积分本身与 scipy 等价，"
-        "差异源于段间辛投影路径的数值灵敏度。"
-    )
     def test_short_window_segmented_matches_single(self, l2_M_D):
         """短窗口下，分段（segment=0.4）与单次积分结果应一致。"""
         M_at, D, lam = l2_M_D

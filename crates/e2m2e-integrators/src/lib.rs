@@ -657,7 +657,7 @@ fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Ve
     Ok(vec![state.position.x, state.position.y, state.position.z])
 }
 
-/// PoC：在 Rust cspice 内核池加载一个内核文件。
+/// 在 Rust cspice 内核池加载一个内核文件。
 ///
 /// Rust cspice 与 Python spiceypy 是**独立的 CSPICE 实例**（静态链接，全局状态
 /// 不共享）。Python 侧 furnsh 的内核，Rust 看不见；反之亦然。要让 Rust 查询
@@ -669,7 +669,7 @@ fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Ve
 /// "MARS" 解析成不存在的本体 499。
 #[cfg(feature = "spice")]
 #[pyfunction]
-fn spice_poc_furnsh(path: &str) -> PyResult<()> {
+fn spice_furnsh(path: &str) -> PyResult<()> {
     static REGISTERED: std::sync::Once = std::sync::Once::new();
     REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
     cspice::data::furnish(path)
@@ -2872,7 +2872,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(spice_poc_body_position, m)?)?;
     #[cfg(feature = "spice")]
-    m.add_function(wrap_pyfunction!(spice_poc_furnsh, m)?)?;
+    m.add_function(wrap_pyfunction!(spice_furnsh, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(third_body_acceleration, m)?)?;
     #[cfg(feature = "spice")]

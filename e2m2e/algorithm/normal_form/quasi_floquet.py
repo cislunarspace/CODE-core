@@ -550,7 +550,8 @@ def _solve_qf_segmented(
     每段独立 DOP853 积分，段末用 :func:`symplectic_project` 把 ``B`` 拉回
     辛群，抑制 ``e^(λt)`` 增长导致的辛误差累积。段内对 ``t_arr`` 的采样点
     用段积分的 ``t_eval`` 直接输出（Rust ``solve_ivp_py`` 无稠密输出插值器，
-    故把采样点并入段 ``t_eval`` 网格，而非事后插值）。
+    故把采样点与段末 ``t_hi`` 一并纳入 ``t_eval`` 网格，确保段末投影用的
+    ``B`` 位于精确段边界时刻）。
     """
     from ._solve_ivp_rust import solve_ivp_rust
 
@@ -569,9 +570,11 @@ def _solve_qf_segmented(
     next_i = 1  # t_arr[0] 已填
     for t_end in seg_ends:
         t_hi = float(t_end)
-        # 段内采样点：包含段首 cur_t + t_arr 中落在 (cur_t, t_hi] 的点
+        # 段内采样点：落在 (cur_t, t_hi] 内的 t_arr 点 + 段末 t_hi。
+        # Rust solve_ivp_py 无稠密输出插值器，只输出 t_eval 上的点，
+        # 因此 t_hi 必须纳入 t_eval 尾部以获取段末状态用于辛投影。
         seg_mask = (t_arr > cur_t - 1e-12) & (t_arr <= t_hi + 1e-12)
-        seg_t_eval = np.concatenate([[cur_t], t_arr[seg_mask]])
+        seg_t_eval = np.concatenate([[cur_t], t_arr[seg_mask], [t_hi]])
         sol = solve_ivp_rust(
             fun=rhs,
             t_span=(cur_t, t_hi),
@@ -583,14 +586,15 @@ def _solve_qf_segmented(
         if not sol.success:
             raise RuntimeError(f"QF 分段积分失败（段 [{cur_t}, {t_end}]）：{sol.message}")
         seg_y = np.asarray(sol.y)
-        # seg_t_eval[0] = cur_t（段首，已由上段末填，跳过）；
-        # seg_t_eval[1:] 对应 t_arr 中 seg_mask 为 True 的点，按顺序写入 B_out
+        # seg_t_eval = [cur_t, t_arr[seg_mask]..., t_hi]
+        # seg_y[:, 0] = cur_t（段首，已由上段末填，跳过）
+        # seg_y[:, 1:M+1] 对应 t_arr[seg_mask] 的采样点（M = len(seg_mask)）
+        # seg_y[:, -1] = t_hi（段末，用于辛投影作为下段初值）
         sample_indices = np.where(seg_mask)[0]
         for m, idx in enumerate(sample_indices):
             B_out[idx] = seg_y[:, m + 1].reshape(6, 6)
         next_i = int(sample_indices[-1] + 1) if sample_indices.size > 0 else next_i
-        # 段末投影，作为下段初值
-        cur_B = symplectic_project(sol.y[:, -1].reshape(6, 6)).ravel()
+        cur_B = symplectic_project(seg_y[:, -1].reshape(6, 6)).ravel()
         cur_t = t_hi
 
     # 末段：积分到 tf

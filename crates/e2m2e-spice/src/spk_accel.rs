@@ -4,7 +4,7 @@
 //! "SPICE 查扰动体位置 + 第三体摄动加速度公式" 合并为一次 Rust 调用，
 //! 消除每步 Python↔cspice 跨界 + numpy 数组分配开销。
 //!
-//! 设计：Python 侧 ``ThirdBodyGravity`` 在初始化时调 ``spice_poc_furnsh``
+//! 设计：Python 侧 ``ThirdBodyGravity`` 在初始化时调 ``spice_furnsh``
 //! 加载内核（与 Python spiceypy 双 furnsh），运行时直接调本模块函数。
 
 use cspice::common::AberrationCorrection;

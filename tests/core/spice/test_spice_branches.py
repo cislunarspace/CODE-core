@@ -81,7 +81,7 @@ class TestLoadKernelAutoLoadsLeapseconds:
         with (
             patch("e2m2e.data.kernels.manager.get_spiceypy", return_value=fake_spice),
             # 屏蔽 Rust cspice furnsh：假 bsp 进 cspice 会报错，且与闰秒逻辑无关。
-            patch("e2m2e.integrators.spice_poc_furnsh", None),
+            patch("e2m2e.integrators.spice_furnsh", None),
         ):
             mgr = SPICEManager()
             mgr.load_kernel(str(bsp_path))
@@ -103,7 +103,7 @@ class TestLoadKernelAutoLoadsLeapseconds:
         fake_spice = MagicMock()
         with (
             patch("e2m2e.data.kernels.manager.get_spiceypy", return_value=fake_spice),
-            patch("e2m2e.integrators.spice_poc_furnsh", None),
+            patch("e2m2e.integrators.spice_furnsh", None),
         ):
             mgr = SPICEManager()
             with caplog.at_level(logging.WARNING, logger="e2m2e.data.kernels.manager"):
@@ -116,3 +116,17 @@ class TestLoadKernelAutoLoadsLeapseconds:
         assert loaded == [str(bsp_path)]
         assert any("naif0012.tls" in r.message for r in caplog.records)
         assert any("NOLEAPSECONDS" in r.message for r in caplog.records)
+
+
+class TestSpiceFurnshSmoke:
+    """spice_furnsh 将内核文件加载到 Rust cspice 内核池（与 Python spiceypy 独立）。"""
+
+    @pytest.mark.spice
+    def test_furnsh_loads_kernel_successfully(self):
+        """furnsh 一个真实内核文件不抛异常（Rust cspice 静默加载）。"""
+        from e2m2e.integrators import spice_furnsh
+
+        # naif0012.tls 是项目仓库内置的闰秒内核
+        kernel_path = "kernels/naif0012.tls"
+        spice_furnsh(kernel_path)
+        # 函数签名返回 ()，不抛异常即成功。

@@ -135,7 +135,7 @@ const BODY_ALIASES: &[(&str, SpiceInt)] = &[
 /// spiceypy.boddef）。`boddef_c` 只改名字→ID 映射表，不需要内核加载，
 /// 对同一 (name, id) 重复调用幂等。
 ///
-/// 应在任何 `spkezr`/`bodvrd` 之前调用一次（见 `spice_poc_furnsh` 里的
+/// 应在任何 `spkezr`/`bodvrd` 之前调用一次（见 `spice_furnsh` 里的
 /// `Once` 触发）。
 pub fn register_bodies() {
     for (name, code) in BODY_ALIASES {
