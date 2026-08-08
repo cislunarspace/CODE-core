@@ -1,6 +1,6 @@
 # ADR 0011：五层架构与激进式全量重命名
 
-**状态**：已接受（规划中）
+**状态**：已接受（已实施）
 **日期**：2026-07-31
 **关联**：`docs/architecture/architecture.md`、`docs/architecture-design-discussion.md`
 

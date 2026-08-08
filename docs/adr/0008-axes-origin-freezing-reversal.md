@@ -57,7 +57,7 @@ wontfix 关闭。
 
 4. **YAGNI。** 代码风格层面"作者不应主动写 mutate"已由
    `tests/core/coordinate/test_coordinate_immutability.py` 的 grep
-   守门员覆盖（扫描 `e2m2e/core/` 内的 `cs.axes = X` 这类赋值）。
+   守门员覆盖（扫描 `e2m2e/algorithm/coordinate/` 内的 `cs.axes = X` 这类赋值）。
    运行时偷换防护与之不同，本就不在应用层。
 
 ## 结果

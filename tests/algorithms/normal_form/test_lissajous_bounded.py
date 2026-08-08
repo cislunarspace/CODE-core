@@ -42,12 +42,18 @@ def l2_lissajous_orbit(earth_moon_system):
 
 @pytest.fixture
 def l2_context(earth_moon_system):
-    """L2 共线点上下文（order=5，与 fast pipeline 匹配）。"""
+    """L2 共线点上下文（order=5，与 fast pipeline 匹配）。
+
+    ``force_cr3bp=True`` 显式声明纯 CR3BP 约化：本测试验证的就是 CR3BP
+    Lissajous 的有界性，与星历无关；也使测试不受全局 SPICE 内核态（其他
+    用例加载后未卸载）的影响——整条约化路径直接用 CR3BP 常量、不探 SPICE。
+    """
     return NormalFormContext(
         system=earth_moon_system,
         libration_point=LibrationPoint.L2,
         epoch=JD0_J2000,
         order=5,
+        force_cr3bp=True,
     )
 
 

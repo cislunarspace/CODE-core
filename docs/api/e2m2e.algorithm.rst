@@ -1,4 +1,4 @@
-e2m2e.algorithm ???
+e2m2e.algorithm package
 =======================
 
 .. automodule:: e2m2e.algorithm
@@ -8,7 +8,7 @@ Submodules
 ----------
 
 e2m2e.algorithm.solver.continuation module
--------------------------------------
+------------------------------------------
 
 .. automodule:: e2m2e.algorithm.solver.continuation
    :members:
@@ -16,7 +16,7 @@ e2m2e.algorithm.solver.continuation module
    :show-inheritance:
 
 e2m2e.algorithm.solver.differential_correction module
--------------------------------------------------
+-----------------------------------------------------
 
 .. automodule:: e2m2e.algorithm.solver.differential_correction
    :members:
@@ -24,7 +24,7 @@ e2m2e.algorithm.solver.differential_correction module
    :show-inheritance:
 
 e2m2e.algorithm.solver.multiple_shooting module
-------------------------------------------
+-----------------------------------------------
 
 .. automodule:: e2m2e.algorithm.solver.multiple_shooting
    :members:
@@ -32,7 +32,7 @@ e2m2e.algorithm.solver.multiple_shooting module
    :show-inheritance:
 
 e2m2e.algorithm.solver.two_level_multiple_shooting module
-----------------------------------------------------
+---------------------------------------------------------
 
 .. automodule:: e2m2e.algorithm.solver.two_level_multiple_shooting
    :members:
@@ -48,7 +48,7 @@ e2m2e.algorithm.stability module
    :show-inheritance:
 
 e2m2e.algorithm.manifold.manifolds module
-----------------------------------
+-----------------------------------------
 
 .. automodule:: e2m2e.algorithm.manifold.manifolds
    :members:
@@ -56,7 +56,7 @@ e2m2e.algorithm.manifold.manifolds module
    :show-inheritance:
 
 e2m2e.algorithm.manifold.sections module
----------------------------------
+----------------------------------------
 
 .. automodule:: e2m2e.algorithm.manifold.sections
    :members:
@@ -64,13 +64,13 @@ e2m2e.algorithm.manifold.sections module
    :show-inheritance:
 
 e2m2e.algorithm.family.strategies package
--------------------------------------
+-----------------------------------------
 
 .. automodule:: e2m2e.algorithm.family.strategies
    :no-index:
 
 e2m2e.algorithm.family.strategies.base module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.algorithm.family.strategies.base
    :members:
@@ -78,7 +78,7 @@ e2m2e.algorithm.family.strategies.base module
    :show-inheritance:
 
 e2m2e.algorithm.family.strategies.halo module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.algorithm.family.strategies.halo
    :members:
@@ -86,7 +86,7 @@ e2m2e.algorithm.family.strategies.halo module
    :show-inheritance:
 
 e2m2e.algorithm.family.strategies.symmetric_2d module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.algorithm.family.strategies.symmetric_2d
    :members:
@@ -94,15 +94,39 @@ e2m2e.algorithm.family.strategies.symmetric_2d module
    :show-inheritance:
 
 e2m2e.algorithm.family.strategies.symmetric_3d module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.algorithm.family.strategies.symmetric_3d
    :members:
    :undoc-members:
    :show-inheritance:
 
+e2m2e.algorithm.family.strategies.axial module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.algorithm.family.strategies.axial
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.algorithm.family.strategies.lpo module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.algorithm.family.strategies.lpo
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.algorithm.family.strategies.spo module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.algorithm.family.strategies.spo
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 e2m2e.algorithm.family.halo_initial_guess module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.algorithm.family.halo_initial_guess
    :members:

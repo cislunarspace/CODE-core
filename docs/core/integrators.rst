@@ -125,7 +125,7 @@ PD45 是低阶、低开销的默认选择；PD78 和 RK89 在相同容差下步�
 - ``h0`` — 初始试探步长。自适应控制器会在几步内收敛到合适步长，``h0`` 只需大致量级正确即可。
 - ``result.error`` — 高阶解与嵌入解的 L2 范数差，即局部截断误差估计。
 - ``result.h_next`` — 控制器建议的下一步长：``h_next = h * clamp(0.9 * (tol/error)^(1/(p+1)), 0.1, 5)``，其中 ``p`` 为嵌入阶数。
-- ``state_error_dim`` — 可选参数，``rk_step`` 与 ``solve_ivp_py`` 均支持。步长误差控制只统计前 N 维状态（``None`` 时统计全部）；STM 增广传播时传 6，让 36 个 STM 分量不主导步长。
+- ``state_error_dim`` — 可选参数，``rk_step`` 与 ``solve_ivp_events`` 均支持。步长误差控制只统计前 N 维状态（``None`` 时统计全部）；STM 增广传播时传 6，让 36 个 STM 分量不主导步长。
 
 
 Adams-Bashforth-Moulton（固定步长多步）

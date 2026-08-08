@@ -139,3 +139,145 @@ def compute_lissajous_initial_guess(
 
     nominal_period = 2.0 * np.pi / omega_xy  # 面内周期（TU）
     return state0, nominal_period
+
+
+# =============================================================================
+# 非线性 CR3BP 下的有界 Lissajous 轨迹（中心流形约化）
+# =============================================================================
+#
+# 一阶线性初猜精确落在线性中心流形上（不稳定/稳定分量为机器零），但在
+# **含不稳定方向的完整 CR3BP** 里传播必然发散：非线性中心流形在 O(α²) 处
+# 弯曲，残余的双曲-中心耦合经 e^(λt)（L2 λ≈2.16/TU）放大，3 周期放大
+# ~3e9，面内偏移长到百万 km。任何有限阶近似都逃不开这条不稳定方向。
+#
+# 唯一可靠的有界轨迹来源是 **约化流**：用辛 Lie 变换消去 Hamiltonian 里
+# 全部 k₁≠k₂ 的双曲-中心耦合项（Jorba-Masdemont 1999 §2；Gómez 2001
+# Vol.III），在双曲方向冻结（q₁=p₁）的 4D 中心流形上积分约化 Hamiltonian
+# （``propagate_parametric``），逐时刻转回物理坐标。这给出真正有界的准周期
+# Lissajous 轨迹（面内 ~2× 振幅），代价是每个 (μ, 平动点, 阶数) 跑一次
+# 中心流形约化 + 一次参数化传播。
+
+#: 中心流形约化阶数。order 5 已足以消去主导双曲耦合、压住发散（实测面内
+#: 偏移 ~2× 振幅）；6 留余量。``reduce`` 耗时 ~O(order²)：5≈0.5s, 6≈0.7s,
+#: 8≈1.4s, 12≈20s。
+_LISSAJOUS_NF_ORDER = 6
+
+#: 默认轨迹覆盖的名义周期数（"初猜有效时段"）。足够 two_level 默认 1 圈
+#: patch-point 采样 + 下游可视化；segmented 长弧由 ``design_orbit`` 按需
+#: 重建更长轨迹。
+_LISSAJOUS_DEFAULT_PERIODS = 3
+
+#: 轨迹每周期采样点数（可视化平滑 + patch-point 插值精度）。
+_LISSAJOUS_POINTS_PER_PERIOD = 60
+
+
+def _rho_from_synodic(
+    state_syn: npt.NDArray[np.floating], mu: float, libration_position: npt.NDArray[np.floating]
+) -> npt.NDArray[np.floating]:
+    """synodic 质心系状态 → normal_form 的 rho 状态（相对平动点）。
+
+    normal_form 的 ``libration_position`` 取地心锚定约定（L2 = 1+γ），故
+    rho[0] = (质心 x + μ) − libration_position[0] = 质心 x − 平动点(质心)；
+    y/z 与速度是平移不变量，直接复用。
+    """
+    rho = np.array(state_syn, dtype=float)
+    rho[0] = (float(state_syn[0]) + mu) - float(libration_position[0])
+    return rho
+
+
+def compute_lissajous_bounded_trajectory(
+    system: CR3BP_System,
+    collinear_point: int,
+    amplitude_in_km: float,
+    amplitude_out_km: float,
+    phase_in: float,
+    phase_out: float,
+    *,
+    n_periods: int = _LISSAJOUS_DEFAULT_PERIODS,
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating], float]:
+    """生成非线性 CR3BP 下有界的 Lissajous 轨迹（中心流形约化流）。
+
+    流程：一阶线性初猜（``compute_lissajous_initial_guess``）→ 转 rho →
+    中心流形约化（``NormalFormPipeline.reduce``，消去双曲-中心耦合）→
+    在约化 Hamiltonian 上传播（``propagate_parametric``，双曲方向冻结）→
+    逐点转回 synodic 质心系。产物在完整 CR3BP 下**保持有界**（面内 ~2×
+    振幅），供 ``design_lissajous`` 返回多点轨迹、供下游 patch-point 采样
+    与可视化。
+
+    约化流是任何有限阶近似里**唯一**绕开不稳定方向的有界轨迹来源：把初猜
+    状态或其中心流形投影直接喂回原生 CR3BP 传播，残余 O(αⁿ⁺¹) 双曲耦合
+    仍经 e^(λt) 放大而发散（实测 3 周期偏移 ~70 万 km）。
+
+    Args:
+        system: CR3BP 系统（含已计算的平动点）。
+        collinear_point: 共线点编号 1/2/3。
+        amplitude_in_km: 面内振幅（km）。
+        amplitude_out_km: 面外振幅（km）。
+        phase_in / phase_out: 面内/面外初始相位（0~1）。
+        n_periods: 轨迹覆盖的名义周期数。
+
+    Returns:
+        (states, times, nominal_period)：``states`` 形状 (M, 6) synodic 质心
+        系无量纲状态，``times`` 形状 (M,) 对应无量纲时间（TU = T/(2π)，与
+        :class:`CR3BP_Dynamics` 一致），``nominal_period`` 面内名义周期。
+
+    Raises:
+        RuntimeError: 中心流形约化或参数化传播失败（非典型参数下可能发生）。
+    """
+    # 惰性导入：normal_form 依赖较重，仅在真正生成有界轨迹时引入。
+    from ..normal_form.constants import JD0_J2000
+    from ..normal_form.constants import LibrationPoint as NFLib
+    from ..normal_form.context import NormalFormContext
+    from ..normal_form.pipeline import NormalFormPipeline
+    from ..normal_form.propagation import propagate_parametric
+
+    if not system.has_L_points:
+        system.compute_libration_points()
+
+    state0, nominal_period = compute_lissajous_initial_guess(
+        system, collinear_point, amplitude_in_km, amplitude_out_km, phase_in, phase_out
+    )
+
+    ctx = NormalFormContext(
+        system=system,
+        libration_point=NFLib(collinear_point),
+        epoch=JD0_J2000,
+        order=_LISSAJOUS_NF_ORDER,
+        force_cr3bp=True,
+    )
+    libration_position = np.asarray(ctx.libration_position, dtype=float)
+    mu = float(system.mu)
+
+    rho0 = _rho_from_synodic(state0, mu, libration_position)
+
+    # fast 流水线参数（与 tests/algorithms/normal_form 一致）。CR3BP 模式由
+    # ctx.force_cr3bp 声明：整条约化路径（DS rhs、Bdot2A 的 C_pq、rho↔EM 旋转
+    # 矩阵）一律直接用 CR3BP 常量、不探 SPICE 星历——design_orbit 会全局加载
+    # SPICE 内核，否则星历几何进入约化会使 quasi-Floquet↔CM Lie ODE 失稳。
+    pipeline = NormalFormPipeline(
+        context=ctx,
+        center_max_order=_LISSAJOUS_NF_ORDER,
+        center_steps=("invariant", "center"),
+        dynamical_kwargs={
+            "t_total": 4.0,
+            "node_step": 0.8,
+            "dense_step": 0.2,
+            "max_iter": 3,
+            "tolerance": 1e-6,
+            "prefer": "fft",
+        },
+    )
+    nf_result = pipeline.reduce(rho0)
+    if not nf_result.success or nf_result.catalog_transformer is None:
+        raise RuntimeError(f"共线点 L{collinear_point} 中心流形约化失败：{nf_result.message}")
+
+    n_points = max(_LISSAJOUS_POINTS_PER_PERIOD * n_periods, 30)
+    t_span = np.linspace(0.0, n_periods * nominal_period, n_points)
+    t_out, rho_out, _ = propagate_parametric(rho0, t_span, nf_result, ctx)
+    if rho_out.shape[0] < 2:
+        raise RuntimeError(f"共线点 L{collinear_point} Lissajous 参数化传播失败（积分未产出轨迹）")
+
+    # 逐点 rho → synodic 质心系（仅 x 分量平移，y/z/速度不变）。
+    states = np.array(rho_out, dtype=float)
+    states[:, 0] = rho_out[:, 0] + libration_position[0] - mu
+    return states, np.asarray(t_out, dtype=float), nominal_period

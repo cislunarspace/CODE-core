@@ -13,9 +13,10 @@ Subpackages
    :maxdepth: 2
 
    e2m2e.algorithm
+   e2m2e.transfer
    e2m2e.data
    e2m2e.api
-   e2m2e.tools.viz
+   e2m2e.visualization
    e2m2e.mbse
 
 Submodules

@@ -1,5 +1,5 @@
 e2m2e.algorithm.transfer package
-=======================
+================================
 
 .. automodule:: e2m2e.algorithm.transfer
    :no-index:
@@ -8,7 +8,7 @@ Submodules
 ----------
 
 e2m2e.algorithm.transfer.transfer module
--------------------------------
+----------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.transfer
    :members:
@@ -16,7 +16,7 @@ e2m2e.algorithm.transfer.transfer module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.transfer_optimization module
----------------------------------------------
+-----------------------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.transfer_optimization
    :members:
@@ -24,7 +24,7 @@ e2m2e.algorithm.transfer.transfer_optimization module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.transfer_search module
---------------------------------------
+-----------------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.transfer_search
    :members:
@@ -32,7 +32,7 @@ e2m2e.algorithm.transfer.transfer_search module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.config module
-----------------------------
+--------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.config
    :members:
@@ -40,7 +40,7 @@ e2m2e.algorithm.transfer.config module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.propulsion module
----------------------------------
+------------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.propulsion
    :members:
@@ -48,7 +48,7 @@ e2m2e.algorithm.transfer.propulsion module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.terminal module
--------------------------------
+----------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.terminal
    :members:
@@ -56,7 +56,7 @@ e2m2e.algorithm.transfer.terminal module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.cost module
---------------------------
+------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.cost
    :members:
@@ -64,7 +64,7 @@ e2m2e.algorithm.transfer.cost module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.lambert module
-------------------------------
+---------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.lambert
    :members:
@@ -72,7 +72,7 @@ e2m2e.algorithm.transfer.lambert module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.porkchop module
--------------------------------
+----------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.porkchop
    :members:
@@ -80,7 +80,7 @@ e2m2e.algorithm.transfer.porkchop module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.three_body_lambert module
------------------------------------------
+--------------------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.three_body_lambert
    :members:
@@ -88,7 +88,7 @@ e2m2e.algorithm.transfer.three_body_lambert module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.multi_impulse module
-------------------------------------
+---------------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.multi_impulse
    :members:
@@ -96,7 +96,7 @@ e2m2e.algorithm.transfer.multi_impulse module
    :show-inheritance:
 
 e2m2e.algorithm.transfer.low_energy module
----------------------------------
+------------------------------------------
 
 .. automodule:: e2m2e.algorithm.transfer.low_energy
    :members:
