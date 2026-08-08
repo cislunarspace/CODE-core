@@ -453,7 +453,9 @@ class TestBCR4BPEvents:
         t_eval = np.linspace(0.0, 10.0, 2001)
 
         result = bcr4bp_dynamics.propagate(
-            y0_off_plane, (0.0, 10.0), t_eval=t_eval,
+            y0_off_plane,
+            (0.0, 10.0),
+            t_eval=t_eval,
             events=[section.event(direction=-1)],
         )
 
@@ -471,7 +473,9 @@ class TestBCR4BPEvents:
 
         section = PoincareSection.plane(axis=1, value=0.0)
         result = bcr4bp_dynamics.propagate(
-            y0_off_plane, (0.0, 10.0), events=section.event(direction=-1),
+            y0_off_plane,
+            (0.0, 10.0),
+            events=section.event(direction=-1),
         )
         assert len(result["t_events"]) == 1
         assert len(result["t_events"][0]) > 0
@@ -484,7 +488,10 @@ class TestBCR4BPEvents:
         event = section.event(direction=-1, terminal=True)
 
         result = bcr4bp_dynamics.propagate(
-            y0_off_plane, (0.0, 10.0), with_stm=True, events=[event],
+            y0_off_plane,
+            (0.0, 10.0),
+            with_stm=True,
+            events=[event],
         )
 
         assert len(result["t_events"][0]) == 1
