@@ -853,7 +853,18 @@ def design_orbit(
         state0_syn = np.asarray(cr3bp_orbit.states[0], dtype=float)
 
     if sel == "LISSAJOUS" and cr3bp_orbit.states.shape[0] > 1:
-        # 准周期 Lissajous：从中心流形有界轨迹采样（原生重传播会发散）
+        # 准周期 Lissajous：从中心流形有界轨迹采样（原生重传播会发散）；
+        # correction_revolutions 超出现轨迹覆盖时按需重建更长轨迹（同 segmented）
+        if float(cr3bp_orbit.times[-1]) < (correction_revolutions - 1e-9) * period:
+            cr3bp_orbit = design_lissajous(
+                int(params["collinear_point"]),
+                params["amplitude_in"],
+                params["amplitude_out"],
+                params["phase_in"],
+                params["phase_out"],
+                dynamics=dynamics,
+                n_periods=correction_revolutions,
+            )
         t_patch_syn, state_patch_syn = _sample_patch_points_from_trajectory(
             cr3bp_orbit, period, correction_revolutions
         )
@@ -945,7 +956,6 @@ def design_orbit(
                     dynamics=dynamics,
                     n_periods=n_rev,
                 )
-                state0_syn = np.asarray(cr3bp_orbit.states[0], dtype=float)
             t_patch_syn_n, state_patch_syn_n = _sample_patch_points_from_trajectory(
                 cr3bp_orbit, period, n_rev
             )

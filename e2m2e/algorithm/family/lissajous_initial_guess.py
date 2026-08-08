@@ -185,15 +185,6 @@ def _rho_from_synodic(
     return rho
 
 
-def _synodic_from_rho(
-    rho: npt.NDArray[np.floating], mu: float, libration_position: npt.NDArray[np.floating]
-) -> npt.NDArray[np.floating]:
-    """rho 状态 → synodic 质心系状态（``_rho_from_synodic`` 的逆）。"""
-    state = np.array(rho, dtype=float)
-    state[0] = float(rho[0]) + float(libration_position[0]) - mu
-    return state
-
-
 def compute_lissajous_bounded_trajectory(
     system: CR3BP_System,
     collinear_point: int,
