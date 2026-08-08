@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [5.6.3] - 2026-08-08
+
+### Added
+- **Rust 单元测试补充**（#329）：e2m2e-propagation 新增 4 个集成测试文件（Butcher 表行和条件、二体解析解对照、Lambert-Hohmann 一致检验、Cowell 匀加速），e2m2e-spice 新增 `EphemCache::from_raw_grids` 公共构造器 + 9 项无内核正确性测试（样条误差界、往返位插值、帧旋转正交性），全部基于解析解与物理不变量。
+- **测试分层标记 l1/l2/l3/l4**（#328）：按 ADR 0013 为 39 个测试文件打上分层标记，默认排除 l3/slow，支持 `-m l1`/`l2`/`l3`/`l4` 按层独立运行。
+
+### Fixed
+- **大幅 DRO 星历发散**（#324）：Rust 多重打靶残差向量中位置残差（几百 km）单边主导速度残差（~0.04 km/s），LM 停在"位置连续/速度跳变 25-50 m/s"的局部极小。速度分量引入 `vel_weight` 加权使两者在容差尺度可比，大幅 DRO 从发散（20 万 km/月）修复到有界（~7 万 km/月）、速度残差归零。
+- **BCR4BP 事件检测回退 scipy**（#333）：与 CR3BP_Dynamics 对齐，传入 events 时回退 scipy solve_ivp 并发出警告，不再抛出 NotImplementedError。
+- **normal_form 分段积分边界时刻对齐**（#340）：段末状态边界时刻对齐，消除短窗口不一致。
+
+### Changed
+- **normal_form scipy → Rust 迁移**（#336）：新增 `_solve_ivp_rust.py` 适配器，中心流形 Hamilton 正则方程传播、段积分、稠密输出采样、QF 矩阵积分（36D/1296D）改走 Rust `solve_ivp_py`（DOP853），仅复值 Lie 级数流保留 scipy。
+- **`spice_poc_furnsh` 重命名为 `spice_furnsh`**（#332）：移除生产 API 的 "poc" 前缀。
+- **DFH 对拍残留移除**（#338）：删 tests/dfh/ 对拍回归与 scripts/ 下黄金样本/临时诊断脚本，`tests/dfh_format/` 更名 `tests/format/`，`dfh_perturbation_to_force_config` 改名 `perturbation_to_force_config`。
+- **力模型 `compute_acceleration` 标注 DeprecationWarning**（#331）：8 个力模型类的 Python 加速度计算已被 Rust 编译路径取代，标注弃用提示。
+- **golden regression 测试移入 scripts/**（#326）：DFH 比对脚本从 CI 路径移出，需时手动运行。
+- **`tests/algorithm/` 归入 `tests/algorithms/`**（#327）：消除五层架构重命名后的目录并存。
+- **ADR 0002 修订 3 措辞修正**（#330）：逐项列出 scipy 回退路径的保留场景（事件检测、防御性回退、NLP、normal_form 传播、平动点解算），替代"已全部移除"的绝对表述。
+- **CLAUDE.md 入库**：项目级 Claude 指令随仓库版本化。
+- **CI lint 缓存 `.cspice` 目录**（#347）：用 `actions/cache@v4` 缓存预编译包，`download_cspice.py` 检测到 `SpiceUsr.h` 存在即跳过下载。
+
 ## [5.6.2] - 2026-08-08
 
 ### Fixed
