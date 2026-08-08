@@ -143,4 +143,4 @@ class TestDesignOrbitLissajous:
         assert result.cr3bp_orbit is not None
         assert isinstance(result.cr3bp_jacobi, float)
         assert result.cr3bp_orbit.states is not None
-        assert len(result.cr3bp_orbit.states) > 0
+        assert len(result.cr3bp_orbit.states) > 1

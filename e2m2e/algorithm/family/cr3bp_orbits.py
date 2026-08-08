@@ -49,7 +49,10 @@ from ..solver.differential_correction import DifferentialCorrection
 from .axial_initial_guess import compute_axial_initial_guess
 from .halo_family import halo_pseudo_arclength_continuation
 from .halo_initial_guess import compute_halo_initial_guess
-from .lissajous_initial_guess import compute_lissajous_initial_guess
+from .lissajous_initial_guess import (
+    compute_lissajous_bounded_trajectory,
+    compute_lissajous_initial_guess,
+)
 from .lpo_initial_guess import compute_lpo_initial_guess
 from .spo_initial_guess import compute_spo_initial_guess
 from .triangular_initial_guess import compute_triangular_initial_guess
@@ -614,28 +617,65 @@ def design_lissajous(
     phase_out: float,
     *,
     dynamics: CR3BP_Dynamics | None = None,
+    n_periods: int = 3,
 ) -> Orbit:
-    """生成指定共线点（L1/L2/L3）的 Lissajous 拟周期轨道初猜。
+    """生成指定共线点（L1/L2/L3）的 Lissajous 拟周期轨道。
 
-    Lissajous 面内/面外频率不可约，是准周期轨道，不做周期闭合；初猜
-    状态作为星历修正 patch points 的采样基准，由 ``design_orbit`` 的
-    下游多重打靶精化。``period`` 取面内名义周期 2π/ω_xy。
+    Lissajous 面内/面外频率不可约，是准周期轨道，不做周期闭合。一阶线性
+    初猜在非线性 CR3BP 下必发散（不稳定方向泄漏，见
+    :func:`compute_lissajous_bounded_trajectory`），故本函数返回**中心流形
+    约化流的有界多点轨迹**（覆盖 ``n_periods`` 个名义周期），供下游可视化
+    与 patch-point 采样直接使用——原生 CR3BP 重传播会重新激发不稳定方向
+    而发散，下游不得用 ``states[0]`` 重传播。
+
+    ``period`` 取面内名义周期 2π/ω_xy；``states[0]`` 为历元参考状态。
+
+    Args:
+        collinear_point: 共线点编号 1/2/3。
+        amplitude_in_km / amplitude_out_km: 面内/面外振幅（km）。
+        phase_in / phase_out: 面内/面外初始相位（0~1）。
+        dynamics: CR3BP 动力学；缺省构造标准地月系统。
+        n_periods: 返回轨迹覆盖的名义周期数（默认 3）。
+
+    Returns:
+        含多点有界轨迹的 :class:`Orbit`。中心流形约化失败时退回一阶线性
+        单点初猜并发出 :class:`RuntimeWarning`（保下游不崩，但失去有界性）。
     """
+    import warnings
+
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
-    state0, nominal_period = compute_lissajous_initial_guess(
-        dynamics.system,
-        collinear_point,
-        amplitude_in_km,
-        amplitude_out_km,
-        phase_in,
-        phase_out,
-    )
-    orbit = Orbit(
-        states=state0.reshape(1, -1),
-        times=np.array([0.0]),
-        system=dynamics.system,
-    )
+
+    try:
+        states, times, nominal_period = compute_lissajous_bounded_trajectory(
+            dynamics.system,
+            collinear_point,
+            amplitude_in_km,
+            amplitude_out_km,
+            phase_in,
+            phase_out,
+            n_periods=n_periods,
+        )
+    except RuntimeError as exc:
+        # 非典型参数下中心流形约化可能失败：退回线性单点初猜，明确告警。
+        # 下游此时不应依赖有界性（patch-point 采样仍会发散）。
+        warnings.warn(
+            f"中心流形约化失败，退回一阶线性 Lissajous 初猜（无有界性保证）：{exc}",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        state0, nominal_period = compute_lissajous_initial_guess(
+            dynamics.system,
+            collinear_point,
+            amplitude_in_km,
+            amplitude_out_km,
+            phase_in,
+            phase_out,
+        )
+        states = state0.reshape(1, -1)
+        times = np.array([0.0])
+
+    orbit = Orbit(states=states, times=times, system=dynamics.system)
     orbit.period = nominal_period
     orbit.family_type = "lissajous"
     orbit.parameters = {

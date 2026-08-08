@@ -74,6 +74,7 @@ class NormalFormContext:
         mu_m: float | None = None,
         mu_s: float | None = None,
         frequency_scale: float = 1.0,
+        force_cr3bp: bool = False,
     ) -> None:
         """构造上下文。
 
@@ -89,6 +90,13 @@ class NormalFormContext:
             mu_e: 覆盖默认地球引力常数。
             mu_m: 覆盖默认月球引力常数。
             mu_s: 覆盖默认太阳引力常数。
+            force_cr3bp: 强制纯 CR3BP 模式——整条约化路径（动力学替代 rhs、
+                ``Bdot2A`` 的 ``C_pq``、rho↔EM 旋转矩阵 ``C``）一律直接用
+                CR3BP 常量，**不探 SPICE 星历**。用于只要 CR3BP 中心流形约化
+                的场景（如 ``design_lissajous`` 生成有界 Lissajous）：即便进程
+                已全局加载 SPICE 内核也走 CR3BP，避免星历几何进入约化、使
+                quasi-Floquet↔中心流形 Lie 级数 ODE 失稳。是 CR3BP 约化的
+                正路声明，不是"SPICE 不可用→降级"。
 
         Raises:
             ValueError: ``order`` 非正整数；``libration_point`` 非法。
@@ -135,6 +143,8 @@ class NormalFormContext:
         # 频率体系（可选 frequency_scale 缩放，用于 γ 缩放坐标：t'=t/γ^{3/2}
         # 使频率变为 ω·γ^{3/2}，让 Hamiltonian 高阶系数 c_n=O(1)）
         self.frequency_scale: float = float(frequency_scale)
+        # CR3BP 模式声明（见 __init__ docstring）：整条约化路径不探 SPICE。
+        self.force_cr3bp: bool = bool(force_cr3bp)
         self.base_frequencies: npt.NDArray[np.floating] = (
             np.array(BASE_FREQUENCIES, dtype=float) * self.frequency_scale
         )

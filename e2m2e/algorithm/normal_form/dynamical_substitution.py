@@ -253,7 +253,10 @@ class DynamicalSubstituteCorrector:
 
         探测性求值一次：SPICE 缺失（如未加载 ``naif*.tls``）会在
         ``str2et`` 抛 :class:`SpiceNOLEAPSECONDS`，此时回退到纯 CR3BP。
+        ``context.force_cr3bp=True`` 时跳过 SPICE 探测，直接用纯 CR3BP rhs。
         """
+        if self.context.force_cr3bp:
+            return _build_dynamics_rhs_circular(self.context), None
         try:
             rhs, provider = _build_dynamics_rhs_spice(self.context)
             _ = rhs(0.0, np.zeros(6))
@@ -439,9 +442,10 @@ def _bdot2a(
     A = -Bdot + C_pq @ B
     Adot = -Bddot + (dC_pq) @ B + C_pq @ Bdot
 
-    ``C_pq`` 与 ``dC_pq`` 通过 :func:`._ephemeris.eval_params` 取；
-    退化到纯 CR3BP 时 ``C_pq`` 为旋转矩阵系数 ``[[0,1,0],[-1,0,0],[0,0,0]]``、
-    ``dC_pq = 0``（无量纲时间下为常数）。
+    ``C_pq`` 与 ``dC_pq`` 默认通过 :func:`._ephemeris.eval_params`（SPICE
+    星历）取。``context.force_cr3bp=True`` 时**显式走纯 CR3BP**（自治）：
+    ``C_pq`` 恒为旋转矩阵系数 ``[[0,1,0],[-1,0,0],[0,0,0]]``、``dC_pq = 0``，
+    不探 SPICE、不触发星历失败回退——这是 CR3BP 中心流形约化的正路，不是降级。
     """
     B = np.asarray(B, dtype=float)
     Bdot = np.asarray(Bdot, dtype=float)
@@ -454,42 +458,47 @@ def _bdot2a(
     if tlist.shape[0] != n:
         raise ValueError(f"tlist 长度必须等于 B 行数：{tlist.shape[0]} vs {n}")
 
-    try:
-        from ._ephemeris import eval_params as _eval_params
-
-        Cpq_seq: list[np.ndarray] = []
-        dCpq_seq: list[np.ndarray] = []
-        tu_days = float(context.TU) / 86400.0
-        for t in tlist:
-            jd = float(context.epoch) + float(t) * tu_days
-            params = _eval_params(jd, context)
-            cpq = np.array(
-                [
-                    [params["Cpq1"], params["Cpq2"], params["Cpq3"]],
-                    [params["Cpq4"], params["Cpq5"], params["Cpq6"]],
-                    [params["Cpq7"], params["Cpq8"], params["Cpq9"]],
-                ],
-                dtype=float,
-            )
-            cqq = np.array(
-                [
-                    [params["Cqq1"], params["Cqq2"], params["Cqq3"]],
-                    [params["Cqq4"], params["Cqq5"], params["Cqq6"]],
-                    [params["Cqq7"], params["Cqq8"], params["Cqq9"]],
-                ],
-                dtype=float,
-            )
-            dcpq = cqq - cpq @ cpq  # d/dt(C_pq) = C_qq - C_pq^2
-            Cpq_seq.append(cpq)
-            dCpq_seq.append(dcpq)
-    except Exception as exc:
-        warnings.warn(
-            f"_ephemeris.eval_params 失败（{exc}）；退化到纯 CR3BP 旋转矩阵。",
-            stacklevel=2,
-        )
+    if context.force_cr3bp:
+        # 显式 CR3BP（自治系统）：C_pq 恒为旋转矩阵、dC_pq=0，无需 SPICE 星历。
         cpq_const = np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
-        Cpq_seq = [cpq_const] * n
-        dCpq_seq = [np.zeros((3, 3))] * n
+        Cpq_seq: list[np.ndarray] = [cpq_const] * n
+        dCpq_seq: list[np.ndarray] = [np.zeros((3, 3))] * n
+    else:
+        Cpq_seq, dCpq_seq = [], []
+        try:
+            from ._ephemeris import eval_params as _eval_params
+
+            tu_days = float(context.TU) / 86400.0
+            for t in tlist:
+                jd = float(context.epoch) + float(t) * tu_days
+                params = _eval_params(jd, context)
+                cpq = np.array(
+                    [
+                        [params["Cpq1"], params["Cpq2"], params["Cpq3"]],
+                        [params["Cpq4"], params["Cpq5"], params["Cpq6"]],
+                        [params["Cpq7"], params["Cpq8"], params["Cpq9"]],
+                    ],
+                    dtype=float,
+                )
+                cqq = np.array(
+                    [
+                        [params["Cqq1"], params["Cqq2"], params["Cqq3"]],
+                        [params["Cqq4"], params["Cqq5"], params["Cqq6"]],
+                        [params["Cqq7"], params["Cqq8"], params["Cqq9"]],
+                    ],
+                    dtype=float,
+                )
+                dcpq = cqq - cpq @ cpq  # d/dt(C_pq) = C_qq - C_pq^2
+                Cpq_seq.append(cpq)
+                dCpq_seq.append(dcpq)
+        except Exception as exc:
+            warnings.warn(
+                f"_ephemeris.eval_params 失败（{exc}）；退化到纯 CR3BP 旋转矩阵。",
+                stacklevel=2,
+            )
+            cpq_const = np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+            Cpq_seq = [cpq_const] * n
+            dCpq_seq = [np.zeros((3, 3))] * n
 
     A = np.zeros_like(B)
     Adot = np.zeros_like(B)

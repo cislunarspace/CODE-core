@@ -8,7 +8,10 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import LibrationPoint
-from e2m2e.algorithm.family.lissajous_initial_guess import compute_lissajous_initial_guess
+from e2m2e.algorithm.family.lissajous_initial_guess import (
+    compute_lissajous_bounded_trajectory,
+    compute_lissajous_initial_guess,
+)
 
 # =============================================================================
 # Module identity
@@ -108,3 +111,45 @@ class TestLissajousInitialGuess:
         state0, T = compute_lissajous_initial_guess(earth_moon_system, L, 1000.0, 5000.0, 0.0, 0.0)
         assert np.all(np.isfinite(state0))
         assert np.isfinite(T)
+
+
+# =============================================================================
+# compute_lissajous_bounded_trajectory
+# =============================================================================
+
+
+@pytest.mark.slow
+class TestLissajousBoundedTrajectory:
+    """compute_lissajous_bounded_trajectory 返回中心流形约化的多点有界轨迹。"""
+
+    @pytest.mark.parametrize("L", [1, 2])
+    @pytest.mark.parametrize("ain, aout", [(500.0, 2000.0), (2500.0, 7500.0)])
+    def test_bounded_trajectory(self, earth_moon_system, L: int, ain: float, aout: float):
+        """返回多点 synodic 质心系有界轨迹，面内偏移 ~2× 振幅量级。"""
+        result = compute_lissajous_bounded_trajectory(earth_moon_system, L, ain, aout, 0.01, 0.55)
+        # 三元组 (states, times, period)
+        assert isinstance(result, tuple) and len(result) == 3
+        states, times, period = result
+        states = np.asarray(states)
+        times = np.asarray(times)
+
+        # states 形状 (M, 6) 且 M > 1（多点轨迹，非线性种子单点）
+        assert states.ndim == 2
+        assert states.shape[1] == 6
+        assert states.shape[0] > 1
+
+        # times 形状 (M,)、首元素≈0、非负且单调递增
+        assert times.shape == (states.shape[0],)
+        assert times[0] == pytest.approx(0.0, abs=1e-9)
+        assert np.all(times >= 0.0)
+        assert np.all(np.diff(times) > 0.0)
+
+        # period > 0
+        assert period > 0
+
+        # 有界性：面内偏移相对平动点（km），量级 ~2× 振幅，留 3× 余量
+        l_c = earth_moon_system.characteristic_length
+        assert l_c is not None
+        lp = earth_moon_system.get_libration_point(LibrationPoint(L))
+        rel = (states[:, :3] - lp) * l_c
+        assert np.max(np.abs(rel[:, :2])) < 3 * ain

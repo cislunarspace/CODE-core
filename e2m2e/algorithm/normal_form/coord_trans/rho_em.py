@@ -60,11 +60,18 @@ def _resolve_C_Cdot(
     """在时刻 ``t``（归一化 TU）求值 EMR 旋转矩阵 ``C`` 与 ``Cdot_dim``。
 
     返回 ``C`` 与无量纲化时间导数 ``Cdot_dim = Cdot · TU``——这是
-    动量耦合公式 ``p = ρ̇ − Cdot_dimᵀ · C · ρ`` 直接需要的形式。SPICE
-    不可用时退化到纯 CR3BP（``C`` 常值、``Cdot_dim = 0``）。
+    动量耦合公式 ``p = ρ̇ − Cdot_dimᵀ · C · ρ`` 直接需要的形式。
+
+    - ``context.force_cr3bp=True``：**显式纯 CR3BP**——``C`` 取会合系常值
+      旋转、``Cdot_dim = 0``，不探 SPICE。这是 CR3BP 中心流形约化的正路
+      （动量耦合项消失、``p = ρ̇``），不是降级。
+    - 默认：通过 :mod:`._ephemeris` 取月球瞬时姿态（SPICE）；SPICE 不可用时
+      退化到上述 CR3BP 常值（保留向后兼容）。
 
     与 :mod:`._ephemeris.eval_params` 一致：``Cpq = Cdot_dimᵀ · C``。
     """
+    if context.force_cr3bp:
+        return _CR3BP_C.copy(), np.zeros((3, 3), dtype=float)
     tu_days = float(context.TU) / 86400.0
     jd = float(context.epoch) + float(t) * tu_days
     try:

@@ -490,6 +490,25 @@ def _sample_patch_points(
     return t_patch, state_patch
 
 
+def _sample_patch_points_from_trajectory(
+    orbit: Orbit, period: float, n_revolutions: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """从轨道自带稠密轨迹插值 patch points（准周期 Lissajous 用）。
+
+    准周期 Lissajous 不能用 :func:`_sample_patch_points`——它原生 CR3BP
+    重传播 ``states[0]``，会重新激发不稳定方向而发散（issue #323 根因）。
+    改从 ``orbit`` 的中心流形有界轨迹跨 ``n_revolutions`` 圈均匀采样
+    ``_POINTS_PER_REV`` 点/圈、逐分量线性插值。调用方须保证
+    ``orbit.times`` 覆盖 ``[0, n_revolutions·period]``。
+    """
+    n_points = _POINTS_PER_REV * n_revolutions
+    t_patch = np.linspace(0.0, n_revolutions * period, n_points, endpoint=False)
+    states = np.empty((n_points, 6))
+    for i in range(6):
+        states[:, i] = np.interp(t_patch, orbit.times, orbit.states[:, i])
+    return t_patch, states
+
+
 def _build_ephemeris_table(
     spice: SPICEManager,
     syn_j2000: SynodicJ2000System,
@@ -833,13 +852,19 @@ def design_orbit(
     else:
         state0_syn = np.asarray(cr3bp_orbit.states[0], dtype=float)
 
-    t_patch_syn, state_patch_syn = _sample_patch_points(
-        dynamics,
-        state0_syn,
-        period,
-        correction_revolutions,
-        perilune_clustered=(sel == "NRHO"),
-    )
+    if sel == "LISSAJOUS" and cr3bp_orbit.states.shape[0] > 1:
+        # 准周期 Lissajous：从中心流形有界轨迹采样（原生重传播会发散）
+        t_patch_syn, state_patch_syn = _sample_patch_points_from_trajectory(
+            cr3bp_orbit, period, correction_revolutions
+        )
+    else:
+        t_patch_syn, state_patch_syn = _sample_patch_points(
+            dynamics,
+            state0_syn,
+            period,
+            correction_revolutions,
+            perilune_clustered=(sel == "NRHO"),
+        )
 
     epoch_iso = _epoch_to_iso(epoch)
     et0 = spice.utc_to_et(epoch_iso)
@@ -908,17 +933,34 @@ def design_orbit(
                 forces_py.append(spec)
         # 覆盖整条 duration 所需圈数（ceil 保证 et_grid 尾部有数据）
         n_rev = max(1, math.ceil(duration_sec / (period * t_c)))
-        # 按 n_rev 圈重采样整条 tile（初猜）。Halo/NRHO 都用近月点加密：
-        # 近月点速度大、STM 病态，等间隔采样让近月点落在节点之间而欠约束，
-        # 实测加密后打靶残差更低（8e-2 → 1.2e-2 km），长期保形更好。
-        perilune_clustered = sel in ("HALO", "NRHO")
-        t_patch_syn_n, state_patch_syn_n = _sample_patch_points(
-            dynamics,
-            state0_syn,
-            period,
-            n_rev,
-            perilune_clustered=perilune_clustered,
-        )
+        if sel == "LISSAJOUS" and cr3bp_orbit.states.shape[0] > 1:
+            # 准周期 Lissajous：重建覆盖 n_rev 圈的有界轨迹再插值采样
+            if float(cr3bp_orbit.times[-1]) < (n_rev - 1e-9) * period:
+                cr3bp_orbit = design_lissajous(
+                    int(params["collinear_point"]),
+                    params["amplitude_in"],
+                    params["amplitude_out"],
+                    params["phase_in"],
+                    params["phase_out"],
+                    dynamics=dynamics,
+                    n_periods=n_rev,
+                )
+                state0_syn = np.asarray(cr3bp_orbit.states[0], dtype=float)
+            t_patch_syn_n, state_patch_syn_n = _sample_patch_points_from_trajectory(
+                cr3bp_orbit, period, n_rev
+            )
+        else:
+            # 按 n_rev 圈重采样整条 tile（初猜）。Halo/NRHO 都用近月点加密：
+            # 近月点速度大、STM 病态，等间隔采样让近月点落在节点之间而欠约束，
+            # 实测加密后打靶残差更低（8e-2 → 1.2e-2 km），长期保形更好。
+            perilune_clustered = sel in ("HALO", "NRHO")
+            t_patch_syn_n, state_patch_syn_n = _sample_patch_points(
+                dynamics,
+                state0_syn,
+                period,
+                n_rev,
+                perilune_clustered=perilune_clustered,
+            )
         t_patch_j2000_n = et0 + t_patch_syn_n * t_c
         state_patch_j2000_n = syn_j2000.batch_synodic_to_j2000(
             states_syn=state_patch_syn_n, t_syn_arr=t_patch_syn_n, et0=et0
