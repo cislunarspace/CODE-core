@@ -1,5 +1,7 @@
 # 迁移任务：e2m2e 五层架构落地
 
+> **状态：已完成（2026-08）。** 旧包 core/algorithms/transfer/dfh/io/visualization/proximity 已删除，五层结构（data/crates/algorithm/api/tools）已落地，完成标准的 6 项均满足。本文保留作迁移过程的历史记录，下方模块映射表仍有参考价值。
+
 > 本指令交给 Codex 执行。执行前先读以下文件，它们是迁移的完整依据：
 > - `docs/architecture/architecture.md`（最终形态架构）
 > - `docs/architecture-design-discussion.md`（48 问共识，每个模块标注"源：xxx 迁入"）

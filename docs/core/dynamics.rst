@@ -44,7 +44,8 @@ CR3BP 动力学
 
 .. code-block:: python
 
-   from e2m2e.algorithm.dynamics import CR3BP_System, CR3BP_Dynamics, Orbit
+   from e2m2e.algorithm.dynamics import CR3BP_System, CR3BP_Dynamics
+   from e2m2e.data.types.orbit import Orbit
    import numpy as np
 
    system = CR3BP_System(
@@ -124,7 +125,7 @@ BCR4BP 无 Jacobi 积分（太阳项显式含时），``with_jacobi=True`` 抛
 
 .. code-block:: python
 
-   from e2m2e.algorithm.dynamics import CelestialBodyOrigin, CoordinateSystem, ICRSAxes
+   from e2m2e.algorithm.coordinate import CelestialBodyOrigin, CoordinateSystem, ICRSAxes
    from e2m2e.algorithm.forces import ForceModel, GravityField
 
    # ForceModel 要求系统持有坐标系（球谐引力等力需要坐标变换）
@@ -174,4 +175,4 @@ scipy 语义的事件函数（截面函数只依赖前 6 维，增广传播时�
 的薄封装）在积分内循环完成，每个接受步端点评估事件函数，符号变化时
 步内二分求精，末点为求精后的事件点而非触发步终点；返回字典新增
 ``t_events``/``y_events``/``n_steps``。求精精度受步内线性插值误差限制，
-需要更紧的事件时刻时减小 ``max_step``。
+需要更紧的事件时刻时减小 ``initial_step``，或调小 ``ForceModel.DEFAULT_MAX_STEP``。

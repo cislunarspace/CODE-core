@@ -57,6 +57,21 @@
      - XZ 平面
      - x0, 平动点
      - z0, y_dot0, T_half
+   * - ``axial_fixed_vz0``
+     - Axial（Gómez Type B 分岔）
+     - x 轴
+     - vz0, 平动点
+     - x0, y_dot0, T_half
+   * - ``spo_fixed_x0``
+     - L4/L5 短周期（SPO）
+     - 无（全周期闭合）
+     - x0
+     - y0, vx0, vy0, T_full
+   * - ``lpo_fixed_x0``
+     - L4/L5 长周期（LPO）
+     - 无（全周期闭合）
+     - x0
+     - y0, vx0, vy0, T_full
 
 策略选择指南
 ------------
@@ -67,6 +82,8 @@
 - 固定周期轨道（如 DRO）：使用 ``symmetric_2d_fixed_t`` 固定半周期，调整 x0 和 y_dot0。
 - 共振轨道（从 y 轴出发）：使用 ``symmetric_2d_fixed_y0`` 固定 y0，调整 x_dot0 和半周期。
 - Halo 轨道（三维，XZ 平面对称）：使用 ``halo_fixed_z0`` 固定 z 振幅，或 ``halo_fixed_x0`` 固定 x 坐标。
+- Axial 轨道（L1/L2，Gómez Type B 分岔，xy 平面出发）：使用 ``axial_fixed_vz0`` 固定 vz0，调整 x0、y_dot0 和半周期。
+- L4/L5 短周期 / 长周期（SPO/LPO，平面无对称）：使用 ``spo_fixed_x0`` / ``lpo_fixed_x0`` 固定 x0，全周期闭合。
 - 一般空间周期轨道：使用 ``symmetric_3d_fixed_x0`` 或 ``symmetric_xz_fixed_*`` 变体。
 
 对称性原理

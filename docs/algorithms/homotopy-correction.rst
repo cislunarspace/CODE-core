@@ -78,7 +78,7 @@ API
    )
    from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
    from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
-   from e2m2e.mbse.data.enums import ReferenceFrame
+   from e2m2e.data.templates.enums import ReferenceFrame
    from e2m2e.data.kernels.manager import SPICEManager
 
    spice = SPICEManager()
@@ -161,7 +161,7 @@ API
    from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
    from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
    from e2m2e.data.kernels.manager import SPICEManager
-   from e2m2e.mbse.data.enums import ReferenceFrame
+   from e2m2e.data.templates.enums import ReferenceFrame
 
    KERNEL_DIR = "/path/to/kernels"
    spice = SPICEManager()
@@ -235,9 +235,6 @@ API
 
 - :mod:`tests.algorithms.test_ephemeris_correction_dispatch`：
   dispatch delegation。
-- :mod:`tests.algorithms.test_homotopy_correction_smoke` /
-  :mod:`tests.algorithms.test_homotopy_module_invariants`：
-  公共 API、参数透传、模块不循环导入。
 - :mod:`tests.algorithms.test_homotopy_correction_orchestration`：
   参数校验、容差分层、初值传递、失败路径、残差历史可观测性。
 - :mod:`tests.algorithms.test_homotopy_correction_dynamics`：

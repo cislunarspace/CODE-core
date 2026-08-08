@@ -1,6 +1,6 @@
 # e2m2e 架构设计
 
-> 本文描述 e2m2e 的**最终形态**架构。设计过程记录见 `docs/architecture-design-discussion.md`，逐项架构决策见 `docs/adr/`。当前代码（core/algorithms/transfer/dfh/io/visualization）处于过渡形态，将按本文迁移。
+> 本文描述 e2m2e 的架构（五层已落地，旧包 core/algorithms/transfer/dfh/io/visualization/proximity 已删除）。设计过程记录见 `docs/architecture-design-discussion.md`，逐项架构决策见 `docs/adr/`。
 
 ## 总体定位
 
@@ -45,7 +45,7 @@ e2m2e/
 └── _integrators/  # Rust 绑定（内部）
 ```
 
-`core` 拆散后顶层无 `core`。旧路径（`e2m2e.core`、`e2m2e.algorithms` 等）经 `sys.modules` 别名过渡，最终移除。
+`core` 拆散后顶层无 `core`。旧路径（`e2m2e.core`、`e2m2e.algorithms` 等）已删除。
 
 ## 第1层 数据层 `data/`
 
@@ -208,17 +208,13 @@ docs/
 
 README 加"能力与实现状态"表（每个能力标 已实现/部分/未实现）。占位函数 docstring 写清实现状态。
 
-## 迁移路径（过渡路线）
+## 迁移记录（已完成）
 
-- 激进式全量重命名：现有 core/algorithms/transfer/dfh/io/visualization → 新五层。
-- 用 sys.modules 别名过渡（旧路径不破坏既有 import）。
-- 按依赖序分批重命名（先 data → 数值/算法 → api/tools），每批一 commit、跑通该批测试再动下一批。
-- 现有 HEAD（FR1-FR5 全绿）是产品基线，重命名后每批回归。
-- 未实现能力（ECOM 光压、角动量管理、LGA/WSB 等）：代码留模板（占位函数 + NotImplementedError）+ 用法文档说明 + README 说明。
+迁移已于 2026-08 完成，过程见 `docs/architecture/migration-to-five-layer.md`（历史任务指令）。旧包 core/algorithms/transfer/dfh/io/visualization/proximity 已删除，sys.modules 别名已移除。迁移时留作占位的能力（ECOM 光压、角动量管理、LGA/WSB/HMN 转移、低推力等）现已落地，见 README 能力表。
 
 ## 依赖与 extras
 
-- 核心依赖轻量：numpy/scipy/pydantic/r2s2/spiceypy。
+- 核心依赖轻量：numpy/scipy/pydantic/r2s2/spiceypy/pyerfa/tqdm。
 - `[normal-form]`：sympy/joblib（正规化）。
 - `[viz]`：matplotlib 等（可视化）。
 - `[mcp]`：MCP 协议层（部署 MCP 服务器时）。

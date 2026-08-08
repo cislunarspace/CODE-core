@@ -1,8 +1,8 @@
-# 架构设计讨论记录（进行中）
+# 架构设计讨论记录（已完成）
 
 > 本文记录 e2m2e 架构设计的讨论共识，随讨论推进更新。最终形态见《架构设计.md》用户草案 + 本文共识；代码落地时据此留模板。
 >
-> 状态：讨论中。已共识条目标 ✅，待定条目标 ⏳。
+> 状态：讨论已完成（2026-08），核心架构决策已全部落地。共识条目标 ✅。
 
 ## 〇、总体定位（已确认）
 
@@ -183,7 +183,7 @@ e2m2e/tools/
 
 - ✅ **顶层结构（最终形态）**：`e2m2e/data`（第1层）+ `e2m2e/algorithm`（第3层，**单数随草案**）+ `e2m2e/api`（第4层）+ `e2m2e/tools`（第5层）+ `e2m2e/integrators.py`（数值层门面，保留顶层）+ `e2m2e/mbse`（SysML 文档产物，保留独立顶层）+ `_integrators`（Rust 绑定内部）。**core 拆散后顶层无 core**；`e2m2e.algorithms` → `e2m2e.algorithm`（旧名 sys.modules 别名过渡）。
 - ✅ **Rust 绑定模块保留 `e2m2e._integrators`**（内部模块名不对外承诺，用户经 e2m2e.integrators 门面调用）；不改 `_core`（core 在新架构已拆散，改名易混淆）。
-- ✅ **extras 依赖分组**：`[normal-form]`（sympy/joblib，保留现状）+ `[viz]`（matplotlib 等，tools/viz）+ `[mcp]`（MCP 协议层，部署 MCP 服务器时装）。核心依赖轻量（numpy/scipy/pydantic/r2s2/spiceypy 必需），MCP 是服务化封装可选项，CLI mcp-serve 缺依赖时给清晰报错。
+- ✅ **extras 依赖分组**：`[normal-form]`（sympy/joblib，保留现状）+ `[viz]`（matplotlib 等，tools/viz）+ `[mcp]`（MCP 协议层，部署 MCP 服务器时装）。核心依赖轻量（numpy/scipy/pydantic/r2s2/spiceypy/pyerfa/tqdm 必需），MCP 是服务化封装可选项，CLI mcp-serve 缺依赖时给清晰报错。
 - ✅ **文档结构（最终形态）**：Sphinx（现状）docs/index + getting-started + data/ + algorithm/ + api/ + tools/ + reference/ + adr/。**README 加"能力与实现状态"表**（每个能力标 已实现/部分/未实现），Sphinx 模块 docstring 标注实现状态，占位函数 docstring 写清"实现状态：未实现，待补 XXX"。**docs/architecture/**（新）放架构说明 + 讨论记录。
 - ✅ **命名规范**：不统一类名风格（`CR3BP_System`/`CR3BP_Dynamics` 保留——三体问题文献惯例，且重命名已是大变更）；新五层包名全小写 + 下划线（data/algorithm/api/tools）；新增代码遵循 CLAUDE.md（snake_case 函数、PascalCase 类）。
 - ✅ **依赖方向规则（硬规则）**：api/ → algorithm/ + data/；algorithm/ → data/ + _integrators；data/ → 仅外部库（SPICE/r2s2/numpy）；integrators.py 门面 → _integrators；tools/ → 任意（辅助，核心不 import tools/）。**算法层不 import api/**、**数据层不 import algorithm/**。Pydantic 只在 api/ 边界，算法层用 numpy/dataclass。CI 跑 import 检查强制。
@@ -192,7 +192,7 @@ e2m2e/tools/
 - ✅ **proximity 的 MCP 归属**：`relative_motion` 标二档（mcp_exposed=True，交会接近是 Agent 能直接用的任务级能力）；`safety` 标三档（保持点安全偏分析，不注册）。
 - ✅ **设计树走完（48 问）**：核心架构决策已全部确认，进入整理阶段——把讨论记录整理成正式架构文档 + ADR + 模板骨架。
 
-## 四、迁移路径（过渡路线，非最终形态）
+## 三、验证策略（续）——正确性与测试标准
 
 - ✅ **正确性由物理定义裁决**：解析解对照（二体传播闭合、圆轨道半径不变、Jacobi 常数守恒、STM 行列式=1 辛性质、霍曼转移 Δv 匹配理论值）+ 物理不变量，这些是"定义"，算对了自然满足。
 - ✅ **测试标准允许文献公式/解析值，不允许其他软件运行输出**。Vallado 公式、Richardson 系数等是"轨道力学公理"（定义的一部分）；跟 DFH 等软件跑一遍比对是"别的软件输出"，不需要。
@@ -242,7 +242,7 @@ e2m2e/tools/
 
 以下项在追问过程中已解决，全部转为✅（见上文对应条目）：MCP 工具清单一档/二档边界（一档稳定、二档三档会扩）；transfer_orbit 进一档（最终形态必然）；golden 不建（无待定位置）；Facade 覆盖二档（纯派生）；logging 用标准 logging + 键值对（不用 structlog）；文档结构（Sphinx 新五层 + README 能力状态表）；模板形态（占位函数 + 抛错测试）。
 
-真正剩余待定（进入实现阶段时细化）：
-1. ⏳ 迁移的**分批顺序细目**（data → 数值/算法 → api/tools 每批具体哪些文件）
-2. ⏳ 每个 Facade 方法的 Pydantic 模型字段清单（参数单位/默认值/取值域）
-3. ⏳ 未实现能力的完整清单（ECOM 光压 #253、角动量管理 #261、LGA/WSB、星历转移闭合 + 其他 gap-analysis 主题）
+以下三项在后续实现阶段均已解决：
+1. ✅ 迁移的**分批顺序细目**——见 `docs/architecture/migration-to-five-layer.md`（迁移已完成，旧包已删）
+2. ✅ 每个 Facade 方法的 Pydantic 模型字段清单——`e2m2e/api/models.py` 已落地（DesignOrbitRequest/Response 等）
+3. ✅ 未实现能力的完整清单——ECOM 光压、角动量管理、LGA/WSB/HMN 转移、低推力均已实现，见 README 能力表

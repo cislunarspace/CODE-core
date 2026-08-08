@@ -39,6 +39,9 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
    * - SolarRadiationPressure
      - 太阳光压（cannonball + 可选阴影模型）
      - ``SolarRadiationPressure``
+   * - EcomSolarRadiationPressure
+     - ECOM 经验光压（9 系数 DYB 参数化，DFH 兼容）
+     - ``EcomSolarRadiationPressure``
    * - FiniteBurn
      - 连续推力（封闭 DSL：constant/pulse 推力 + fixed 方向）
      - ``FiniteBurn``
@@ -370,12 +373,9 @@ origin→SSB 查询（该量在 ``r_body_icrf`` 短路分支未被使用）。
 
    import numpy as np
 
-   from e2m2e.algorithm.dynamics import (
-       CoordinateSystem,
-       EphemerisSystem,
-       ICRSAxes,
-       SPICEManager,
-   )
+   from e2m2e.algorithm.coordinate import CoordinateSystem, ICRSAxes
+   from e2m2e.algorithm.dynamics import EphemerisSystem
+   from e2m2e.data.kernels.manager import SPICEManager
    from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
    from e2m2e.algorithm.forces import ForceModel
 
@@ -565,6 +565,10 @@ e2m2e 提供基于 cannonball 模型的太阳辐射压（SRP）力模型，以�
 ``m`` 为质量（kg）。``flux ∈ [0, 1]`` 由阴影模型给出，全光照为 1，本影为 0。
 
 **参数说明：**
+
+.. list-table::
+   :header-rows: 1
+
    * - 参数
      - 含义
      - 默认值
@@ -663,13 +667,13 @@ SRP 工作流示例
 
    import numpy as np
 
-   from e2m2e.algorithm.dynamics import (
+   from e2m2e.algorithm.coordinate import (
        CelestialBodyOrigin,
        CoordinateSystem,
-       EphemerisSystem,
        ICRSAxes,
-       SPICEManager,
    )
+   from e2m2e.algorithm.dynamics import EphemerisSystem
+   from e2m2e.data.kernels.manager import SPICEManager
    from e2m2e.algorithm.forces import (
        SolarRadiationPressure,
        ConicalShadowModel,

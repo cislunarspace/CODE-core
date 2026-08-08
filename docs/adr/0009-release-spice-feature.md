@@ -58,4 +58,4 @@ cspice-sys 用 cc 从源码编译 CSPICE，不依赖预编译库：
 1. release.yml 的 maturin build 加 `--features spice`，经 downloadcspice
    构建（与 CI 同机制）。
 2. 仓库根加 NOTICE 文件，注明 CSPICE 归属 NASA/JPL NAIF；sdist 一并打包。
-3. 安装文档补充说明：wheel 自带 Rust 快速路径，源码构建默认不带 spice。
+3. 安装文档补充说明：wheel 自带 Rust 快速路径；源码构建也默认带 spice（Cargo default feature，见 ADR 0002 2026-08 修订）。

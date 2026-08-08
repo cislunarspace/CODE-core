@@ -32,7 +32,8 @@
 
 .. code-block:: python
 
-   from e2m2e.algorithm.dynamics import CR3BP_System, Orbit, CR3BP_Dynamics
+   from e2m2e.algorithm.dynamics import CR3BP_System, CR3BP_Dynamics
+   from e2m2e.data.types.orbit import Orbit
    from e2m2e.algorithm.solver import DifferentialCorrection, Continuation
    import numpy as np
 
@@ -137,13 +138,13 @@
 
 .. code-block:: python
 
-   from e2m2e.algorithm.dynamics import (
+   from e2m2e.algorithm.coordinate import (
        CelestialBodyOrigin,
        CoordinateSystem,
-       EphemerisSystem,
        ICRSAxes,
-       SPICEManager,
    )
+   from e2m2e.algorithm.dynamics import EphemerisSystem
+   from e2m2e.data.kernels.manager import SPICEManager
    from e2m2e.algorithm.forces import ForceModel, GravityField, DragModel
    from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 

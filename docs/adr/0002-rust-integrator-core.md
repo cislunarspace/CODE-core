@@ -84,3 +84,7 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 单 crate 拆为四个：`e2m2e-integrators`（pyo3 绑定与编译入口，maturin 唯一打包目标）、`e2m2e-propagation`（纯数学积分器）、`e2m2e-forces`（N 体 STM、重力场）、`e2m2e-spice`（CSPICE FFI）。决策 3 随之部分失效：传播已进入 Rust（`propagate_compiled`、`propagate_with_stm_py`），原因是 cspice 内核池是进程级单例，SPICE 相关的传播与 STM 必须和力模型编进同一个扩展，无法留在 Python 编排层。
 
 spice feature 的构建约定：`cspice-sys` 经 `downloadcspice` 在构建时从 NAIF 官网下载 CSPICE 源码，无需手工安装（也可用 `CSPICE_DIR` 指向本机安装）。`maturin develop` 默认不带 spice，`maturin develop --features spice` 才包含 STM 传播、打靶、第三体等 Rust 快速路径；无 spice 时 Python 侧全部静默降级到慢路径，对应测试以 `importorskip` 跳过。**release wheel 暂不带 spice**：带上意味着 wheel 内嵌 CSPICE 且构建依赖 NAIF 官网可达性，许可与发布稳定性需单独评估后再开。CI 以 `cargo clippy --workspace --features spice` 兜底 spice-gated 代码的编译。
+
+## 修订（2026-08，spice 升为默认 feature）
+
+spice 现为默认 feature：crates `default = ["spice"]` + pyproject `features=["spice"]` 双保险，`maturin develop` 默认带 spice，不再产无 spice 子集；release wheel 已带 spice（ADR 0009 落实）。scipy 回退路径已移除，积分/打靶/截面统一走 Rust。上一段中"默认不带 spice""release wheel 暂不带 spice""静默降级""importorskip 跳过"均已不再适用。

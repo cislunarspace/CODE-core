@@ -78,7 +78,7 @@ ET 秒，``dt`` 为网格步长（秒）。
 
 .. code-block:: python
 
-   from e2m2e.algorithm.dynamics import ReferenceFrame
+   from e2m2e.data.templates.enums import ReferenceFrame
    from e2m2e.data.kernels.manager import SPICEManager
    from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 

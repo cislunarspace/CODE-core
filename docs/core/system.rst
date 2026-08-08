@@ -136,7 +136,9 @@ BCR4BP 系统
 
 .. code-block:: python
 
-   from e2m2e.algorithm.dynamics import EphemerisSystem, ReferenceFrame, SPICEManager
+   from e2m2e.algorithm.dynamics import EphemerisSystem
+   from e2m2e.data.templates.enums import ReferenceFrame
+   from e2m2e.data.kernels.manager import SPICEManager
 
    spice = SPICEManager()
    spice.load_kernel("kernels/de440s.bsp")

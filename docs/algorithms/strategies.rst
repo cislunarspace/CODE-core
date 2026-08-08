@@ -20,11 +20,17 @@ e2m2e 提供以下策略函数：
 - ``symmetric_3d_fixed_x0`` — 固定 x0，调整 z0、y_dot0 和半周期。
 - ``symmetric_xz_fixed_x0`` — XZ 平面对称，固定 x0。
 - ``symmetric_xz_fixed_z0`` — XZ 平面对称，固定 z0。
+- ``axial_fixed_vz0`` — Axial 轨道（Gómez Type B 分岔），x 轴对称，固定 vz0，调整 x0、y_dot0 和半周期。
 
 **Halo 专用策略：**
 
 - ``halo_fixed_z0`` — 固定 z 振幅和平动点，调整 x0、y_dot0 和半周期。
 - ``halo_fixed_x0`` — 固定 x 坐标和平动点。
+
+**L4/L5 三角平动点策略（平面，无对称，全周期闭合）：**
+
+- ``spo_fixed_x0`` — L4/L5 短周期（SPO），固定 x0，调整 y0、vx0、vy0 和全周期。
+- ``lpo_fixed_x0`` — L4/L5 长周期（LPO），与 SPO 同框架（大振幅成员呈马蹄形）。
 
 CorrectionConfig
 ----------------
