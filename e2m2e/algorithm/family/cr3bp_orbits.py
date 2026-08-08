@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
 
 import numpy as np
@@ -641,8 +642,6 @@ def design_lissajous(
         含多点有界轨迹的 :class:`Orbit`。中心流形约化失败时退回一阶线性
         单点初猜并发出 :class:`RuntimeWarning`（保下游不崩，但失去有界性）。
     """
-    import warnings
-
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
 

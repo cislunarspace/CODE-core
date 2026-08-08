@@ -194,7 +194,6 @@ def compute_lissajous_bounded_trajectory(
     phase_out: float,
     *,
     n_periods: int = _LISSAJOUS_DEFAULT_PERIODS,
-    order: int = _LISSAJOUS_NF_ORDER,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating], float]:
     """生成非线性 CR3BP 下有界的 Lissajous 轨迹（中心流形约化流）。
 
@@ -216,7 +215,6 @@ def compute_lissajous_bounded_trajectory(
         amplitude_out_km: 面外振幅（km）。
         phase_in / phase_out: 面内/面外初始相位（0~1）。
         n_periods: 轨迹覆盖的名义周期数。
-        order: 中心流形 Lie 变换截断阶数。
 
     Returns:
         (states, times, nominal_period)：``states`` 形状 (M, 6) synodic 质心
@@ -244,7 +242,7 @@ def compute_lissajous_bounded_trajectory(
         system=system,
         libration_point=NFLib(collinear_point),
         epoch=JD0_J2000,
-        order=order,
+        order=_LISSAJOUS_NF_ORDER,
         force_cr3bp=True,
     )
     libration_position = np.asarray(ctx.libration_position, dtype=float)
@@ -258,7 +256,7 @@ def compute_lissajous_bounded_trajectory(
     # SPICE 内核，否则星历几何进入约化会使 quasi-Floquet↔CM Lie ODE 失稳。
     pipeline = NormalFormPipeline(
         context=ctx,
-        center_max_order=order,
+        center_max_order=_LISSAJOUS_NF_ORDER,
         center_steps=("invariant", "center"),
         dynamical_kwargs={
             "t_total": 4.0,

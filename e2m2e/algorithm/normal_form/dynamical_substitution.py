@@ -71,6 +71,12 @@ DEFAULT_MAX_ITER: int = 19
 #: qiao Code05 收敛容差：``1e-11``。
 DEFAULT_TOLERANCE: float = 1e-11
 
+#: 纯 CR3BP（自治）的 Coriolis 阵 ``C_pq = [[0,1,0],[-1,0,0],[0,0,0]]``。
+#: ``Bdot2A`` 与降级路径共用——避免在 ``_bdot2a`` 内联两份同值矩阵。
+_CR3BP_CPQ: npt.NDArray[np.floating] = np.array(
+    [[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=float
+)
+
 
 # ---------------------------------------------------------------------------
 # 结果容器
@@ -460,8 +466,7 @@ def _bdot2a(
 
     if context.force_cr3bp:
         # 显式 CR3BP（自治系统）：C_pq 恒为旋转矩阵、dC_pq=0，无需 SPICE 星历。
-        cpq_const = np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
-        Cpq_seq: list[np.ndarray] = [cpq_const] * n
+        Cpq_seq: list[np.ndarray] = [_CR3BP_CPQ] * n
         dCpq_seq: list[np.ndarray] = [np.zeros((3, 3))] * n
     else:
         Cpq_seq, dCpq_seq = [], []
@@ -496,8 +501,7 @@ def _bdot2a(
                 f"_ephemeris.eval_params 失败（{exc}）；退化到纯 CR3BP 旋转矩阵。",
                 stacklevel=2,
             )
-            cpq_const = np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
-            Cpq_seq = [cpq_const] * n
+            Cpq_seq = [_CR3BP_CPQ] * n
             dCpq_seq = [np.zeros((3, 3))] * n
 
     A = np.zeros_like(B)
