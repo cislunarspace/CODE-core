@@ -39,10 +39,16 @@ pub struct MultipleShootingRustResult {
     /// 实际迭代次数
     #[pyo3(get)]
     pub iterations: usize,
-    /// 最终最大残差
+    /// 最终最大残差（加权 max：位置分量原值，速度分量 × vel_weight）。
     #[pyo3(get)]
     pub max_residual: f64,
-    /// 每次迭代最大残差的历史
+    /// 最终最大位置残差（km，未加权）。分离报告便于诊断速度连续性。
+    #[pyo3(get)]
+    pub position_residual: f64,
+    /// 最终最大速度残差（km/s，未加权）。
+    #[pyo3(get)]
+    pub velocity_residual: f64,
+    /// 每次迭代最大残差的历史（加权 max）
     #[pyo3(get)]
     pub residual_history: Vec<f64>,
 }
@@ -51,14 +57,45 @@ pub struct MultipleShootingRustResult {
 ///
 /// 残差定义：F_i = φ(t_{i+1}; t_i, x_i) - x_{i+1}
 /// 即第 i 段积分终端状态与第 i+1 个节点状态的差值。
-fn build_residual(final_states: &[[f64; 6]], state_work: &[[f64; 6]], n_seg: usize) -> Vec<f64> {
+///
+/// **速度加权**：位置分量（j=0..2，km）原值，速度分量（j=3..5，km/s）× vel_weight。
+/// 不加权时位置残差（cislunar 量级几百 km）主导 LM 的 ‖F‖²，速度残差（~0.04 km/s）
+/// 被忽略，求解器停在"位置连续 / 速度跳变数十 m/s"的局部极小——轨迹实质是需脉冲
+/// 拼接的断弧而非光滑轨道。vel_weight = pos_tol/vel_tol 使两者在容差尺度可比，
+/// LM 真正压速度连续（如 pos_tol=2e-2 km、vel_tol=1e-5 km/s → vel_weight=2000）。
+fn build_residual(
+    final_states: &[[f64; 6]],
+    state_work: &[[f64; 6]],
+    n_seg: usize,
+    vel_weight: f64,
+) -> Vec<f64> {
     let mut f = vec![0.0_f64; n_seg * 6];
     for i in 0..n_seg {
         for j in 0..6 {
-            f[i * 6 + j] = final_states[i][j] - state_work[i + 1][j];
+            let raw = final_states[i][j] - state_work[i + 1][j];
+            f[i * 6 + j] = if j >= 3 { raw * vel_weight } else { raw };
         }
     }
     f
+}
+
+/// 计算未加权的位置/速度最大残差（km, km/s），用于结果诊断与收敛判据的分离报告。
+fn position_velocity_residual(
+    final_states: &[[f64; 6]],
+    state_work: &[[f64; 6]],
+    n_seg: usize,
+) -> (f64, f64) {
+    let mut max_pos = 0.0_f64;
+    let mut max_vel = 0.0_f64;
+    for i in 0..n_seg {
+        for j in 0..3 {
+            max_pos = max_pos.max((final_states[i][j] - state_work[i + 1][j]).abs());
+        }
+        for j in 3..6 {
+            max_vel = max_vel.max((final_states[i][j] - state_work[i + 1][j]).abs());
+        }
+    }
+    (max_pos, max_vel)
 }
 
 /// 构建雅可比矩阵 DF（固定时间模式）。
@@ -74,6 +111,7 @@ fn build_jacobian_fixed_time(
     n_seg: usize,
     n_vars: usize,
     free_pos: &[Option<usize>],
+    vel_weight: f64,
 ) -> Vec<f64> {
     let n_constraints = n_seg * 6;
     let mut df = vec![0.0_f64; n_constraints * n_vars];
@@ -83,15 +121,17 @@ fn build_jacobian_fixed_time(
         // ∂F_i/∂x_i = Φ_i（仅当 x_i 是自由变量）
         if let Some(col_block) = free_pos[i] {
             for row in 0..6 {
+                let w = if row >= 3 { vel_weight } else { 1.0 };
                 for col in 0..6 {
-                    df[(r_start + row) * n_vars + col_block * 6 + col] = stms[i][row * 6 + col];
+                    df[(r_start + row) * n_vars + col_block * 6 + col] = w * stms[i][row * 6 + col];
                 }
             }
         }
         // ∂F_i/∂x_{i+1} = -I_6（仅当 x_{i+1} 是自由变量）
         if let Some(col_block) = free_pos[i + 1] {
             for j in 0..6 {
-                df[(r_start + j) * n_vars + col_block * 6 + j] = -1.0;
+                let w = if j >= 3 { vel_weight } else { 1.0 };
+                df[(r_start + j) * n_vars + col_block * 6 + j] = -w;
             }
         }
     }
@@ -106,6 +146,7 @@ fn build_jacobian_fixed_time(
 ///   ∂F_i/∂x_{i+1} = -I_6，列块 = free_pos[i+1]
 ///   ∂F_i/∂t_i     = -f(t_i, x_i)
 ///   ∂F_i/∂t_{i+1} = f(t_{i+1}, φ_i)
+#[allow(clippy::too_many_arguments)]
 fn build_jacobian_variable_time(
     stms: &[[f64; 36]],
     f_starts: &[[f64; 6]],
@@ -114,6 +155,7 @@ fn build_jacobian_variable_time(
     n_vars: usize,
     n_free_nodes: usize,
     free_pos: &[Option<usize>],
+    vel_weight: f64,
 ) -> Vec<f64> {
     let n_constraints = n_seg * 6;
     let mut df = vec![0.0_f64; n_constraints * n_vars];
@@ -123,24 +165,28 @@ fn build_jacobian_variable_time(
         // ∂F_i/∂x_i = Φ_i（仅当 x_i 是自由变量）
         if let Some(col_block) = free_pos[i] {
             for row in 0..6 {
+                let w = if row >= 3 { vel_weight } else { 1.0 };
                 for col in 0..6 {
-                    df[(r_start + row) * n_vars + col_block * 6 + col] = stms[i][row * 6 + col];
+                    df[(r_start + row) * n_vars + col_block * 6 + col] = w * stms[i][row * 6 + col];
                 }
             }
         }
         // ∂F_i/∂x_{i+1} = -I_6（仅当 x_{i+1} 是自由变量）
         if let Some(col_block) = free_pos[i + 1] {
             for j in 0..6 {
-                df[(r_start + j) * n_vars + col_block * 6 + j] = -1.0;
+                let w = if j >= 3 { vel_weight } else { 1.0 };
+                df[(r_start + j) * n_vars + col_block * 6 + j] = -w;
             }
         }
         // ∂F_i/∂t_i = -f(t_i, x_i)
         for j in 0..6 {
-            df[(r_start + j) * n_vars + n_free_nodes * 6 + i] = -f_starts[i][j];
+            let w = if j >= 3 { vel_weight } else { 1.0 };
+            df[(r_start + j) * n_vars + n_free_nodes * 6 + i] = -w * f_starts[i][j];
         }
         // ∂F_i/∂t_{i+1} = f(t_{i+1}, φ_i)
         for j in 0..6 {
-            df[(r_start + j) * n_vars + n_free_nodes * 6 + i + 1] = f_ends[i][j];
+            let w = if j >= 3 { vel_weight } else { 1.0 };
+            df[(r_start + j) * n_vars + n_free_nodes * 6 + i + 1] = w * f_ends[i][j];
         }
     }
     df
@@ -262,9 +308,12 @@ fn least_squares_solve(
 /// * `fixed_node_mask` - 固定任意节点子集（`None` 时用 `fix_first_node`）。
 ///   拼接/锚定远月点需要固定段首/两端。长度必须等于节点数。
 /// * `max_iter` - 最大迭代次数
-/// * `tolerance` - 收敛容差
+/// * `tolerance` - 收敛容差（加权 max 残差：max(pos_res, vel_weight·vel_res)）
 /// * `rtol` - 积分相对容差
 /// * `max_step` - 积分最大步长（可选）
+/// * `vel_weight` - 速度残差加权（位置分量原值、速度分量 × vel_weight 进 ‖F‖²）。
+///   默认建议 pos_tol/vel_tol：使位置与速度在容差尺度可比，避免 LM 偏废速度连续。
+///   1.0 退化为原混合单位行为（cislunar 下速度被位置主导）。
 /// * `verbose` - 是否输出进度
 #[allow(clippy::too_many_arguments)]
 pub fn multiple_shooting_correct(
@@ -279,6 +328,7 @@ pub fn multiple_shooting_correct(
     tolerance: f64,
     rtol: f64,
     max_step: Option<f64>,
+    vel_weight: f64,
     verbose: bool,
     method: RkMethod,
 ) -> Result<MultipleShootingRustResult, String> {
@@ -309,6 +359,9 @@ pub fn multiple_shooting_correct(
     let mut state_work = state_patch.to_vec();
     let mut residual_history = Vec::new();
     let mut converged = false;
+    // 末轮未加权位置/速度残差（结果分离报告）
+    let mut final_pos_res = f64::INFINITY;
+    let mut final_vel_res = f64::INFINITY;
 
     // 自由节点映射：free_pos[i] = 节点 i 在自由变量序列中的位置（固定节点为 None）。
     // 由 fixed_node_mask（若给出）或 fix_first_node（兼容）派生。
@@ -426,9 +479,13 @@ pub fn multiple_shooting_correct(
             f_ends.push(f_end);
         }
 
-        // 第二步：构建残差向量
-        let f = build_residual(&final_states, &state_work, n_seg);
+        // 第二步：构建残差向量（速度分量 × vel_weight 加权）
+        let f = build_residual(&final_states, &state_work, n_seg, vel_weight);
         let max_res = f.iter().map(|x| x.abs()).fold(0.0_f64, f64::max);
+        // 未加权位置/速度残差（诊断 + 结果分离报告）
+        let (pos_res, vel_res) = position_velocity_residual(&final_states, &state_work, n_seg);
+        final_pos_res = pos_res;
+        final_vel_res = vel_res;
         residual_history.push(max_res);
 
         if verbose {
@@ -467,7 +524,7 @@ pub fn multiple_shooting_correct(
             }
         }
 
-        // 第三步：构建雅可比矩阵
+        // 第三步：构建雅可比矩阵（速度行同步加权，保持 DF = W·DF₀ 与加权残差一致）
         let df = if var_time {
             build_jacobian_variable_time(
                 &stms,
@@ -477,9 +534,10 @@ pub fn multiple_shooting_correct(
                 n_vars,
                 n_free_nodes,
                 &free_pos,
+                vel_weight,
             )
         } else {
-            build_jacobian_fixed_time(&stms, n_seg, n_vars, &free_pos)
+            build_jacobian_fixed_time(&stms, n_seg, n_vars, &free_pos, vel_weight)
         };
 
         // 第四步：LM 阻尼最小二乘 + 回溯线搜索。
@@ -502,7 +560,9 @@ pub fn multiple_shooting_correct(
                     n_free_nodes,
                     alpha,
                 );
-                match try_residual(forces, observer, &t_try, &s_try, rtol, max_step, method) {
+                match try_residual(
+                    forces, observer, &t_try, &s_try, rtol, max_step, method, vel_weight,
+                ) {
                     Ok(trial_res) if trial_res < max_res => {
                         t_work = t_try;
                         state_work = s_try;
@@ -540,6 +600,8 @@ pub fn multiple_shooting_correct(
         converged,
         iterations: residual_history.len(),
         max_residual: *residual_history.last().unwrap_or(&f64::INFINITY),
+        position_residual: final_pos_res,
+        velocity_residual: final_vel_res,
         residual_history,
     })
 }
@@ -585,6 +647,8 @@ fn apply_dx_t(
 }
 
 /// 试算一组状态/时间节点下的最大残差（供回溯线搜索验收）。积分失败视为不下降。
+/// 速度加权与主循环一致，保证线搜索比较的是同一加权目标。
+#[allow(clippy::too_many_arguments)]
 fn try_residual(
     forces: &[CompiledForce],
     observer: &str,
@@ -593,6 +657,7 @@ fn try_residual(
     rtol: f64,
     max_step: Option<f64>,
     method: RkMethod,
+    vel_weight: f64,
 ) -> Result<f64, String> {
     let n_seg = t_work.len() - 1;
     let mut final_states = Vec::with_capacity(n_seg);
@@ -611,7 +676,7 @@ fn try_residual(
         )?;
         final_states.push(*result.states.last().ok_or("empty propagation result")?);
     }
-    let f = build_residual(&final_states, state_work, n_seg);
+    let f = build_residual(&final_states, state_work, n_seg, vel_weight);
     Ok(f.iter().map(|x| x.abs()).fold(0.0_f64, f64::max))
 }
 
@@ -619,7 +684,7 @@ fn try_residual(
 ///
 /// `forces` 是 Python 元组列表，每个元组描述一个力模型（格式同 `propagate_compiled`）。
 #[pyfunction]
-#[pyo3(signature = (forces, observer, t_patch, state_patch, var_time=false, fix_first_node=false, fixed_node_mask=None, max_iter=50, tolerance=1e-8, rtol=1e-10, max_step=None, verbose=false, method=RkMethod::Pd78))]
+#[pyo3(signature = (forces, observer, t_patch, state_patch, var_time=false, fix_first_node=false, fixed_node_mask=None, max_iter=50, tolerance=1e-8, rtol=1e-10, max_step=None, vel_weight=1.0, verbose=false, method=RkMethod::Pd78))]
 #[allow(clippy::too_many_arguments)]
 pub fn multiple_shooting_correct_py(
     forces: Vec<PyObject>,
@@ -633,6 +698,7 @@ pub fn multiple_shooting_correct_py(
     tolerance: f64,
     rtol: f64,
     max_step: Option<f64>,
+    vel_weight: f64,
     verbose: bool,
     method: RkMethod,
     py: Python<'_>,
@@ -676,6 +742,7 @@ pub fn multiple_shooting_correct_py(
             tolerance,
             rtol,
             max_step,
+            vel_weight,
             verbose,
             method,
         )
@@ -698,7 +765,7 @@ mod tests {
             [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
             [7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
         ];
-        let f = build_residual(&final_states, &state_work, 2);
+        let f = build_residual(&final_states, &state_work, 2, 1.0);
         assert_eq!(f.len(), 12);
         // 第一段残差：final_states[0] - state_work[1] = [0, 0, 0, 0, 0, 0]
         for i in 0..6 {
@@ -715,7 +782,7 @@ mod tests {
         let stms = vec![[0.0_f64; 36]; 2];
         // 全自由：free_pos = [Some(0), Some(1), Some(2)]，列块 j 对应 x_j
         let free_pos = [Some(0usize), Some(1), Some(2)];
-        let df = build_jacobian_fixed_time(&stms, 2, 18, &free_pos);
+        let df = build_jacobian_fixed_time(&stms, 2, 18, &free_pos, 1.0);
         assert_eq!(df.len(), 12 * 18);
         // 验证结构：DF[0:6, 0:6] = Φ_0 = 0（stms 全 0）
         // DF[0:6, 6:12] = -I_6（∂F_0/∂x_1）
@@ -738,7 +805,7 @@ mod tests {
         // fix_first_node 兼容：3 个节点，固定 x_0，自由变量 = [x_1, x_2]，
         // n_vars = 2*6 = 12。列块 0 对应 x_1，列块 1 对应 x_2。
         let free_pos = [None, Some(0usize), Some(1)];
-        let df = build_jacobian_fixed_time(&stms, 2, 12, &free_pos);
+        let df = build_jacobian_fixed_time(&stms, 2, 12, &free_pos, 1.0);
         assert_eq!(df.len(), 12 * 12);
         // DF[0:6, 0:6] = -I_6（∂F_0/∂x_1，x_0 固定无列）
         for i in 0..6 {
@@ -760,7 +827,7 @@ mod tests {
         // 4 节点固定首末（合并段拼接锚点）：free_pos = [None, Some(0), Some(1), None]，
         // n_vars = 2*6 = 12，n_seg = 3。
         let free_pos = [None, Some(0usize), Some(1), None];
-        let df = build_jacobian_fixed_time(&stms, 3, 12, &free_pos);
+        let df = build_jacobian_fixed_time(&stms, 3, 12, &free_pos, 1.0);
         assert_eq!(df.len(), 18 * 12);
         // DF[0:6, 0:6] = -I_6（∂F_0/∂x_1，x_0 固定、x_1 自由）
         for i in 0..6 {
