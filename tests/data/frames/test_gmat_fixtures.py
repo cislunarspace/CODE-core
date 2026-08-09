@@ -71,7 +71,7 @@ def test_eop_out_of_range_raises_by_default_and_can_clamp():
     assert clamped.mjd == pytest.approx(eop.start_mjd)
 
 
-def test_time_converter_epoch_goldens_for_j2000_2017_and_2026():
+def test_time_converter_epoch_conversions_for_j2000_2017_and_2026():
     table = TaiUtcTable.from_file(gmat_fixture_path("tai-utc.dat"))
     converter = TimeSystemConverter(table)
     cases = [
@@ -103,7 +103,7 @@ def test_time_converter_keeps_et_public_and_exposes_low_level_a1():
     assert converter.et_to_tt_mjd(0.0) == pytest.approx(51544.5, abs=1e-8)
 
 
-def test_erfa_xys_provider_matches_committed_epoch_goldens():
+def test_erfa_xys_provider_matches_reference_epoch_values():
     provider = ErfaXysProvider()
 
     assert provider.xys(51544.5) == pytest.approx(
@@ -127,7 +127,7 @@ def test_erfa_xys_provider_rejects_invalid_time_input():
         provider.xys(np.inf)
 
 
-def test_gmat_itrf_reduction_returns_stage_golden_matrix():
+def test_gmat_itrf_reduction_returns_expected_rotation_matrix():
     table = TaiUtcTable.from_file(gmat_fixture_path("tai-utc.dat"))
     eop = EopFile.from_file(gmat_fixture_path("eopc04_08.62-now.trimmed"))
     reduction = GmatItrfReduction(

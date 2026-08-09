@@ -10,7 +10,7 @@ pytestmark = pytest.mark.aux
 
 
 class TestManeuvers:
-    def test_golden_fixture(self, fixtures_dir):
+    def test_read_maneuvers_fixture(self, fixtures_dir):
         m = read_maneuvers(fixtures_dir / "MANEUVERS.TXT")
         assert len(m) == 119
         assert m.mjd_tdb[0] == pytest.approx(51544.5007428704)
@@ -36,7 +36,7 @@ class TestManeuvers:
 
 
 class TestSKStatistic:
-    def test_golden_fixture_three_columns(self, fixtures_dir):
+    def test_read_sk_statistic_fixture(self, fixtures_dir):
         s = read_sk_statistic(fixtures_dir / "SK_STATISTIC.TXT")
         assert len(s) == 100
         assert s.rows.shape == (100, 3)
