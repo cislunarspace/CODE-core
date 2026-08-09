@@ -52,16 +52,13 @@ def _departure_target():
     return departure, target, rT
 
 
-def test_low_thrust_orchestrator_converges():
-    """transfer_orbit("low_thrust", ...) 编排路由端到端收敛。
-
-    纯二体（SimpleNamespace + PointMassGravity），不依赖 SPICE。
-    目标：7000→7200 km 圆轨道，T=0.5N, Isp=3000s, m0=1000kg。
-    """
+@pytest.fixture(scope="module")
+def low_thrust_result():
+    """共享一次低推力编排结果（module 级，3 测试复用）。"""
     system, forces = _system_forces()
     departure, target, rT = _departure_target()
 
-    result = transfer_orbit(
+    return transfer_orbit(
         "low_thrust",
         engine_config=EngineConfig(t_max=0.5, isp=3000.0),
         initial_mass=1000.0,
@@ -74,6 +71,15 @@ def test_low_thrust_orchestrator_converges():
         departure_state=departure,
         target_state=target,
     )
+
+
+def test_low_thrust_orchestrator_converges(low_thrust_result):
+    """低推力编排器端到端收敛。
+
+    纯二体（SimpleNamespace + PointMassGravity），不依赖 SPICE。
+    目标：7000→7200 km 圆轨道，T=0.5N, Isp=3000s, m0=1000kg。
+    """
+    result = low_thrust_result
 
     assert isinstance(result, TransferDesignResult)
     assert result.transfer_type == "low_thrust"
@@ -85,24 +91,9 @@ def test_low_thrust_orchestrator_converges():
     assert result.details.terminal_residual_v < 0.1  # km/s
 
 
-def test_low_thrust_mass_history_monotone():
+def test_low_thrust_mass_history_monotone(low_thrust_result):
     """质量单调递减、各段控制 throttle ∈ [0,1]。"""
-    system, forces = _system_forces()
-    departure, target, rT = _departure_target()
-
-    result = transfer_orbit(
-        "low_thrust",
-        engine_config=EngineConfig(t_max=0.5, isp=3000.0),
-        initial_mass=1000.0,
-        n_segments=5,
-        target_oe=(rT, 0.0, 0.0),
-        solver_method="shooting",
-        duration_days=3.0,
-        system=system,
-        forces=forces,
-        departure_state=departure,
-        target_state=target,
-    )
+    result = low_thrust_result
 
     # 质量单调递减（数值容许小波动）
     masses = result.details.states_7d[:, 6]
@@ -115,7 +106,7 @@ def test_low_thrust_mass_history_monotone():
         assert 0.0 <= seg.throttle <= 1.0, f"段 {i} throttle={seg.throttle:.4f} 超出 [0, 1]"
 
 
-def test_low_thrust_vs_impulsive_delta_v_comparison():
+def test_low_thrust_vs_impulsive_delta_v_comparison(low_thrust_result):
     """同任务场景低推力等效 Δv >= 脉冲 Δv（物理定律约束）。
 
     低推力因持续推力损失（gravity loss），等效 Δv 应 >= 霍曼脉冲 Δv。
@@ -128,22 +119,7 @@ def test_low_thrust_vs_impulsive_delta_v_comparison():
     dv1, dv2 = hohmann_delta_v(r1, r2)
     dv_impulsive = dv1 + dv2
 
-    system, forces = _system_forces()
-    departure, target, rT = _departure_target()
-
-    result = transfer_orbit(
-        "low_thrust",
-        engine_config=EngineConfig(t_max=0.5, isp=3000.0),
-        initial_mass=1000.0,
-        n_segments=5,
-        target_oe=(rT, 0.0, 0.0),
-        solver_method="shooting",
-        duration_days=3.0,
-        system=system,
-        forces=forces,
-        departure_state=departure,
-        target_state=target,
-    )
+    result = low_thrust_result
 
     dv_lt = result.details.equivalent_delta_v
     assert dv_lt > 0.0, f"低推力等效 Δv 应为正: {dv_lt}"
