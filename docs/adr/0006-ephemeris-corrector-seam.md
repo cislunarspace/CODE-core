@@ -59,7 +59,7 @@ ADR-0005 把 `TwoLevelMultipleShooting` 作为独立算法加入，但分发层�
 
 - `e2m2e/algorithms/ephemeris_correction_types.py`：`EphemerisCorrectionResult`、`PatchPointCorrector` Protocol、`UnsupportedCorrectorMethodError`。
 - `e2m2e/algorithms/ephemeris_correction.py`：三个私有 `PatchPointCorrector` 实现（`_StandardPatchPointCorrector`、`_TwoLevelPatchPointCorrector`、`_HomotopyPatchPointCorrector`）、`_REGISTRY` 注册表。
-- `tests/algorithms/test_patch_point_corrector.py`：接缝协议、注册表、分发、错误处理测试（20 个）。
+- `tests/algorithm/correction/test_patch_point_corrector.py`：接缝协议、注册表、分发、错误处理测试（20 个）。
 - `docs/adr/0006-ephemeris-corrector-seam.md`。
 
 ### 变更

@@ -124,7 +124,7 @@ Lambert 问题，得到双脉冲 ΔV 网格，即 porkchop 图的数据层。出
 返回 :class:`~e2m2e.algorithm.transfer.config.TransferSolution`，单弧，物理单位；
 未收敛时 ``converged=False`` 且 ``message`` 说明残余误差。典型场景（同一周期
 轨道上两相位点间转移、Lyapunov → Halo 交会）的收敛行为见
-``tests/transfer/test_three_body_lambert.py``。
+``tests/algorithm/transfer/test_three_body_lambert.py``。
 
 多脉冲转移与主矢量检验
 ----------------------
@@ -189,7 +189,7 @@ p(t0) = Δv̂₀、p(tf) = Δv̂_f 确定主矢量初值，协态经 STM 携载�
        )
        sol3 = transfer.optimize(3, x0=x0)   # 三脉冲总 ΔV 低于双脉冲
 
-完整算例见 ``tests/transfer/test_multi_impulse.py``。
+完整算例见 ``tests/algorithm/transfer/test_multi_impulse.py``。
 
 .. automodule:: e2m2e.algorithm.transfer.lambert
    :members:

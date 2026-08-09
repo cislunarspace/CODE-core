@@ -856,7 +856,7 @@ wheels = [
 
 [[package]]
 name = "e2m2e"
-version = "5.6.3"
+version = "5.6.4"
 source = { editable = "." }
 dependencies = [
     { name = "calcephpy", version = "5.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14' or sys_platform != 'win32'" },

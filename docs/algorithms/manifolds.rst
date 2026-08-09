@@ -123,7 +123,7 @@
 
 返回两段弧的 :class:`~e2m2e.algorithm.transfer.config.TransferSolution`，物理单位。
 当前仅支持 CR3BP 模型；星历转换（CR3BP 闭合解 → 星历模型）尚未接入，
-``epoch`` 参数为其预留入口。端到端基准见 ``tests/transfer/test_low_energy.py``：
+``epoch`` 参数为其预留入口。端到端基准见 ``tests/algorithm/transfer/test_low_energy.py``：
 L1 Lyapunov 族内中间轨道到大幅值轨道，拼接脉冲在几十 m/s 量级。
 
 .. automodule:: e2m2e.algorithm.manifold.manifolds

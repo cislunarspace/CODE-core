@@ -56,7 +56,7 @@ wontfix 关闭。
    服务，得不偿失。
 
 4. **YAGNI。** 代码风格层面"作者不应主动写 mutate"已由
-   `tests/core/coordinate/test_coordinate_immutability.py` 的 grep
+   `tests/algorithm/coordinate/test_coordinate_immutability.py` 的 grep
    守门员覆盖（扫描 `e2m2e/algorithm/coordinate/` 内的 `cs.axes = X` 这类赋值）。
    运行时偷换防护与之不同，本就不在应用层。
 
@@ -74,7 +74,7 @@ wontfix 关闭。
 
 - `TestCoordinateSystemOrthogonality`、`TestCoordinateSystemTransformVector`
   （零向量）：与冻结无关，保留。
-- `tests/core/coordinate/test_coordinate_immutability.py` 的 grep
+- `tests/algorithm/coordinate/test_coordinate_immutability.py` 的 grep
   守门员：保留。它防的是"代码作者主动写 mutate"（静态代码风格），
   不是"运行时偷换"（动态防护）。两者职责不同，前者与冻结无关。
 

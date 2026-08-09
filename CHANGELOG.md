@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [5.6.4] - 2026-08-09
+
+### Added
+- **ELFO 冻结轨道设计**（#350，closes #348）：`design_orbit` 统一入口新增 ELFO 分支——经典六根数构造初值 → 全摄动传播 → 月心根数漂移分析，复用 CR3BP 管线的力模型路径（GRGM900C 10×10 + EGM96 10×10 + 第三体 + 炮弹光压）。`OrbitDesignResult`/`DesignOrbitResponse` 新增 5 个月心漂移字段（`drift_e`、`drift_aop_deg`、`drift_rp_km`、`secular_aop_rate_deg_per_year`、`moon_centric_elements`），ELFO 场景下 CR3BP 字段留空。
+- **双 CSPICE 实例双侧同步**（#357，closes #334）：Python（spiceypy）与 Rust（cspice-sys）是两个独立 CSPICE 实例，内核池与名字表互不共享；本 PR 强制 `furnsh`+`boddef` 双侧同步，补齐 Rust 侧错误处理与诊断入口——新增 `spice_spkezr`/`spice_pxform` pyfunction 供 Python 直接查 Rust 实例做双侧对拍（`e2m2e-integrators` ABI v3→v4）。
+- **测试套件按功能类目重组**（#359，ADR 0021）：7 类功能标记（`theory`/`integrator`/`force`/`data`/`orchestration`/`interface`/`aux`）+ `slow`/`spice` 正交标记，取代 L1–L4 速度分层；测试目录迁至镜像源包的 `tests/algorithm/`。CI 维持静态门，测试在 release 前跑全量。
+
+### Changed
+- **`design_orbit` 签名重构**（#350）：散参改为 `DesignOrbitRequest` 模型入口，`duration` 单位从年改为秒（clean break），参数校验迁移到 Pydantic `model_validator`；Facade 直接透传 request 对象，不再逐字段解包。
+- **Rust SPICE 错误处理加固**（#357）：`erract`/`errdev` 显式设 RETURN/NULL，消除对上游 cspice crate 初始化顺序的依赖（默认 ABORT 出错即 exit）；错误信息由 SHORT 升级为 SHORT+LONG+traceback；`spkezr`/`pxform` 入口经 `ktotal` 预检内核池，空时报项目语境错误（ADR 0020，不走 FFI、不字符串匹配）。
+- **SPICEManager 收口 boddef**（#357）：`_BODY_ID_ALIASES` 单一归属 `SPICEManager`（`design_orbit` 不再自带表），`load_kernel` 首次调用在 spiceypy 侧 boddef 全部别名，对称 Rust 侧 `register_bodies`；多进程 `_worker_init` 改走 `SPICEManager.load_kernel` 双侧 furnsh，不再直接 `spiceypy.furnsh`。
+- **ADR 0013「测试分层」标注已被 ADR 0021 取代**（#359）：0013 其余不变。
+
+### Docs
+- 修正 #359 测试目录迁移后失效的 tests 路径引用（ADR 0006/0007/0008、`manifolds.rst`、`lambert.rst`）。
+- README `design_orbit` 示例 `duration` 语义同步（年→秒）、bibtex 版本号同步。
+
 ## [5.6.3] - 2026-08-08
 
 ### Added

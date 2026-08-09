@@ -82,7 +82,7 @@ result = facade.design_orbit(
     amplitude=30000.0,  # 面外振幅（km，取值 ±73000，正北负南）
     phase=0.0,  # 初始相位（周期份额 0~1）
     epoch=[2024, 1, 1, 0, 0, 0.0],  # 起始历元 UTC：[年,月,日,时,分,秒]
-    duration=1.0,  # 维持时间（年）
+    duration=365.25 * 86400.0,  # 维持时间（秒，约 1 年）
     output_step=3600.0,  # 星历输出间隔（秒）
 )
 
@@ -189,7 +189,7 @@ make check    # cargo fmt/clippy + ruff
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {5.6.2},
+  version = {5.6.4},
   year = {2026},
 }
 ```

@@ -101,7 +101,7 @@ VNB、LVLH 作为 `DynamicAxes` 子类实现。静态坐标轴不受影响。
 - `e2m2e/core/dynamic_axes.py`：`DynamicAxes` 抽象基类。
 - `e2m2e/core/vnb_axes.py`：`VNBAxes` 实现。
 - `e2m2e/core/lvlh_axes.py`：`LVLHAxes` 实现。
-- `tests/core/coordinate/test_dynamic_axes.py`：VNB/LVLH 方向正确性测试（与 GMAT 对比）。
+- `tests/algorithm/coordinate/test_dynamic_axes.py`：VNB/LVLH 方向正确性测试（与 GMAT 对比）。
 
 ### 变更
 
