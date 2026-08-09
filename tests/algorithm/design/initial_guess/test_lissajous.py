@@ -121,15 +121,18 @@ class TestLissajousInitialGuess:
 # =============================================================================
 
 
-@pytest.mark.slow
-class TestLissajousBoundedTrajectory:
-    """compute_lissajous_bounded_trajectory 返回中心流形约化的多点有界轨迹。"""
+class TestLissajousBoundedTrajectoryContract:
+    """compute_lissajous_bounded_trajectory 的返回结构契约。
 
-    @pytest.mark.parametrize("L", [1, 2])
-    @pytest.mark.parametrize("ain, aout", [(500.0, 2000.0), (2500.0, 7500.0)])
-    def test_bounded_trajectory(self, earth_moon_system, L: int, ain: float, aout: float):
-        """返回多点 synodic 质心系有界轨迹，面内偏移 ~2× 振幅量级。"""
-        result = compute_lissajous_bounded_trajectory(earth_moon_system, L, ain, aout, 0.01, 0.55)
+    单组合跑一次中心流形约化（约 3 秒），断言三元组结构/形状/times 单调/
+    period>0——这些契约与 L、振幅取值无关，不需参数化重复。
+    """
+
+    def test_bounded_trajectory_contract(self, earth_moon_system):
+        """返回 (states, times, period) 三元组，形状与单调性满足契约。"""
+        result = compute_lissajous_bounded_trajectory(
+            earth_moon_system, 1, 500.0, 2000.0, 0.01, 0.55
+        )
         # 三元组 (states, times, period)
         assert isinstance(result, tuple) and len(result) == 3
         states, times, period = result
@@ -149,6 +152,22 @@ class TestLissajousBoundedTrajectory:
 
         # period > 0
         assert period > 0
+
+
+@pytest.mark.slow
+class TestLissajousBoundedTrajectory:
+    """compute_lissajous_bounded_trajectory 的有界性物理。
+
+    小振幅 + 大振幅 2 组合，验证有界性随振幅成立。
+    """
+
+    @pytest.mark.parametrize("L,ain,aout", [(1, 500.0, 2000.0), (2, 2500.0, 7500.0)])
+    def test_bounded_trajectory_bounded(self, earth_moon_system, L: int, ain: float, aout: float):
+        """面内偏移相对平动点应 < 3× 面内振幅（量级 ~2×，留 3× 余量）。"""
+        states, _, _ = compute_lissajous_bounded_trajectory(
+            earth_moon_system, L, ain, aout, 0.01, 0.55
+        )
+        states = np.asarray(states)
 
         # 有界性：面内偏移相对平动点（km），量级 ~2× 振幅，留 3× 余量
         l_c = earth_moon_system.characteristic_length

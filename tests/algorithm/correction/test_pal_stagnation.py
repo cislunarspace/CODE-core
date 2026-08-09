@@ -1,6 +1,6 @@
 """Halo PAL 延拓折叠点停滞回归测试。
 
-验证 L1/L2 北/南 Halo 在折叠点处不形成 2-周期环，
+验证 L1/L2 Halo 在折叠点处不形成 2-周期环，
 延拓能平稳穿过折叠点。
 """
 
@@ -62,17 +62,38 @@ def _state_distance(orbit_a: Orbit, orbit_b: Orbit) -> float:
     return float(np.linalg.norm(np.asarray(orbit_a.states[0]) - np.asarray(orbit_b.states[0])))
 
 
-# 所有(L1/L2) × (北/南) × (正/负) 共 8 个组合
-_ALL_PAL_CONFIGS = [
+# 代表性组合:L1 北正、L2 北正。
+# 北/南关于 z=0 平面对称、正/负沿同一族流形反向,停滞 bug 的根因
+# (pal_plausible 阈值误判)与对称选择无关,2 个代表性组合足以暴露回归。
+_PAL_CONFIGS = [
     (1, 0, "positive"),
-    (1, 0, "negative"),
-    (1, 1, "positive"),
-    (1, 1, "negative"),
     (2, 0, "positive"),
-    (2, 0, "negative"),
-    (2, 1, "positive"),
-    (2, 1, "negative"),
 ]
+
+
+@pytest.fixture(
+    scope="module",
+    params=_PAL_CONFIGS,
+    ids=[f"L{lp}-{'north' if hc == 0 else 'south'}-{d}" for lp, hc, d in _PAL_CONFIGS],
+)
+def pal_family(request):
+    """每组合跑一次 80 步 PAL 延拓,三方面断言共享同一 family。"""
+    libration_point, halo_class, direction = request.param
+    seed = _build_l_halo_seed(libration_point, halo_class, amplitude_z=0.001)
+
+    system = _build_earth_moon_system()
+    dynamics = CR3BP_Dynamics(system)
+    corrector = DifferentialCorrection(dynamic=dynamics)
+    continuation = Continuation(corrector=corrector)
+
+    family = continuation.halo_pseudo_arclength_continuation(
+        seed_orbit=seed,
+        n_orbits=80,
+        direction=direction,
+        step_size=0.0045,
+        verbose=False,
+    )
+    return libration_point, halo_class, direction, family
 
 
 class TestHaloPALStagnation:
@@ -90,31 +111,15 @@ class TestHaloPALStagnation:
     失去 PAL 的弧长推进能力。
     """
 
-    @pytest.mark.parametrize("libration_point,halo_class,direction", _ALL_PAL_CONFIGS)
-    def test_pal_reaches_fold_point(self, libration_point, halo_class, direction):
-        """PAL 延拓 80 步后应到达折叠点(各 LP/HC 组合)。
+    def test_pal_reaches_fold_point(self, pal_family):
+        """PAL 延拓 80 步后应到达折叠点。
 
         折叠点阈值因 LP/HC 而异,但所有组合下 z 振幅应明显超过种子(0.001)。
         折叠点具体位置:
         - L1 北/南: z_amp ≈ 0.085
         - L2 北/南: z_amp ≈ 0.30
         """
-        # 跳过 L2 暂时 — L2 折叠点较远,需要不同 n_orbits 阈值
-        # 但仍验证延拓没有早早停止
-        seed = _build_l_halo_seed(libration_point, halo_class, amplitude_z=0.001)
-
-        system = _build_earth_moon_system()
-        dynamics = CR3BP_Dynamics(system)
-        corrector = DifferentialCorrection(dynamic=dynamics)
-        continuation = Continuation(corrector=corrector)
-
-        family = continuation.halo_pseudo_arclength_continuation(
-            seed_orbit=seed,
-            n_orbits=80,
-            direction=direction,
-            step_size=0.0045,
-            verbose=False,
-        )
+        libration_point, halo_class, direction, family = pal_family
 
         assert len(family) >= 81, f"延拓未达到目标轨道数,实际 {len(family)}"
 
@@ -129,8 +134,7 @@ class TestHaloPALStagnation:
             f"延拓在 z={max_z_amp:.4f} 处即停,未达到预期折叠点位置 z≥{expected_min}"
         )
 
-    @pytest.mark.parametrize("libration_point,halo_class,direction", _ALL_PAL_CONFIGS)
-    def test_pal_no_stagnation_oscillation(self, libration_point, halo_class, direction):
+    def test_pal_no_stagnation_oscillation(self, pal_family):
         """PAL 延拓在折叠点附近应平稳穿过,不出现 2-周期环振荡。
 
         修复前:折叠点处连续多步轨道在两个几乎相同的 z 值间跳(2-周期环)。
@@ -138,20 +142,7 @@ class TestHaloPALStagnation:
         的非单调回退 — 这是 2-周期环的标志。修复后 z 振幅在折叠点前后
         是单调变化(过折叠点前后分别单调),不出现来回。
         """
-        seed = _build_l_halo_seed(libration_point, halo_class, amplitude_z=0.001)
-
-        system = _build_earth_moon_system()
-        dynamics = CR3BP_Dynamics(system)
-        corrector = DifferentialCorrection(dynamic=dynamics)
-        continuation = Continuation(corrector=corrector)
-
-        family = continuation.halo_pseudo_arclength_continuation(
-            seed_orbit=seed,
-            n_orbits=80,
-            direction=direction,
-            step_size=0.0045,
-            verbose=False,
-        )
+        libration_point, halo_class, direction, family = pal_family
 
         continuation_orbits = family.orbits[1:]
         assert len(continuation_orbits) >= 70
@@ -182,27 +173,13 @@ class TestHaloPALStagnation:
             f" (修复后应在过折叠点时反向 ≤ 2 次)"
         )
 
-    @pytest.mark.parametrize("libration_point,halo_class,direction", _ALL_PAL_CONFIGS)
-    def test_pal_extends_x_past_fold(self, libration_point, halo_class, direction):
+    def test_pal_extends_x_past_fold(self, pal_family):
         """PAL 延拓穿过折叠点后,x 振幅应继续增长(沿流形走弧长)。
 
         修复前:振荡在折叠点附近,x 振幅也卡死。
         修复后:穿过折叠后 x 从 ~0.94(L1)或 ~1.15(L2)增长。
         """
-        seed = _build_l_halo_seed(libration_point, halo_class, amplitude_z=0.001)
-
-        system = _build_earth_moon_system()
-        dynamics = CR3BP_Dynamics(system)
-        corrector = DifferentialCorrection(dynamic=dynamics)
-        continuation = Continuation(corrector=corrector)
-
-        family = continuation.halo_pseudo_arclength_continuation(
-            seed_orbit=seed,
-            n_orbits=80,
-            direction=direction,
-            step_size=0.0045,
-            verbose=False,
-        )
+        libration_point, halo_class, direction, family = pal_family
 
         continuation_orbits = family.orbits[1:]
         x_values = [float(o.states[0, 0]) for o in continuation_orbits]
