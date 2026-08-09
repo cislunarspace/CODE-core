@@ -19,6 +19,8 @@ from e2m2e.api.models import (
 )
 from e2m2e.data.types.trajectory import EphemerisTable
 
+pytestmark = pytest.mark.interface
+
 
 class TestDesignOrbitRequest:
     def test_defaults(self):

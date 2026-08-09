@@ -13,6 +13,9 @@ from e2m2e.data.frames import (
     frame_rotation,
 )
 
+pytestmark = pytest.mark.data
+
+
 _FIXTURE_DIR = Path(__file__).resolve().parents[1] / "core" / "coordinate" / "fixtures" / "gmat"
 
 

@@ -1,5 +1,7 @@
 """data/templates/：常量、种子、枚举、schema 数据测试。"""
 
+import pytest
+
 from e2m2e.data.templates import (
     AU,
     CHAR_LENGTH_KM,
@@ -19,6 +21,8 @@ from e2m2e.data.templates import (
     force_config,
     seed,
 )
+
+pytestmark = pytest.mark.data
 
 
 class TestSystemsConstants:

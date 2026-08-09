@@ -18,6 +18,8 @@ import pytest
 
 from e2m2e.data.kernels.manager import SPICEManager, _call_rust_or_compat_error
 
+pytestmark = pytest.mark.data
+
 
 # =============================================================================
 # 守卫函数单元测试（注入伪造 callable，无需编译扩展）

@@ -13,6 +13,8 @@ from e2m2e.mbse.requirements.base import (
     RequirementRegistry,
 )
 
+pytestmark = pytest.mark.aux
+
 
 def make_requirement(
     req_id: str,

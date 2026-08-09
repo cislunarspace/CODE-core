@@ -45,7 +45,7 @@ builder（写/修代码）+ checker（跑全部检查）+ loop-go（驱动循环
 
 - Rust 扩展：`maturin develop` 构建 `e2m2e._integrators`，spice 现为默认 feature（crates `default = ["spice"]` + pyproject `features=["spice"]` 双保险），不再产无 spice 子集。默认 debug 构建较慢（约 5 倍），日常迭代/运行建议 `maturin develop --release`。
 - 开发入口走 `Makefile`：`make dev`（= `maturin develop --release`，自动 `export CSPICE_DIR`/`LIBCLANG_PATH`）、`make test`、`make check`、`make setup`（拉 CSPICE 编译包 + SPICE 内核）。CSPICE 经 `scripts/download_cspice.py` 从 GitHub `cspice-v1` release 取预编译包（`make dev` 自动 `export CSPICE_DIR`），`cspice-sys` 据此跳过 NAIF 源码下载（国内 naif 常不可达）；无 `CSPICE_DIR` 时回退 `cspice-sys` 的 `downloadcspice` 从 NAIF 官网下源码。
-- 测试：默认 `uv run pytest` 只跑 L1+L2（addopts 已排除 `l3`/`slow`）。日常验证优先定点跑受影响文件，如 `uv run pytest tests/transfer/`，别一律全量。需全量（含 L3）用 `uv run pytest -m ""`，单跑某层用 `-m l1`/`l2`/`l3`/`l4`。spice 默认，需先 `make setup` 拉内核。
+- 测试：默认 `uv run pytest` 排除 `slow`（`addopts` 已配）；按功能类选跑 `-m theory`/`-m orchestration`/`-m data` 等；全量（含 slow）用 `uv run pytest -m ""`；release 前跑全量。spice 默认，需先 `make setup` 拉内核。
 - 提交前检查：`uv run ruff check .`、`uv run ruff format --check .`、`uv run mypy e2m2e/ --ignore-missing-imports`、`cargo fmt --all -- --check`、`cargo clippy --workspace -- -D warnings`。
 
 ## 编码准则

@@ -8,6 +8,8 @@ import pytest
 
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
 
+pytestmark = pytest.mark.data
+
 
 def _sample_orbit(period: float = 1.0) -> Orbit:
     t = np.linspace(0, 1, 50)
