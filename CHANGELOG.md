@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
-## [5.6.4] - 2026-08-09
+## [5.6.4] - 2026-08-10
 
 ### Added
 - **ELFO 冻结轨道设计**（#350，closes #348）：`design_orbit` 统一入口新增 ELFO 分支——经典六根数构造初值 → 全摄动传播 → 月心根数漂移分析，复用 CR3BP 管线的力模型路径（GRGM900C 10×10 + EGM96 10×10 + 第三体 + 炮弹光压）。`OrbitDesignResult`/`DesignOrbitResponse` 新增 5 个月心漂移字段（`drift_e`、`drift_aop_deg`、`drift_rp_km`、`secular_aop_rate_deg_per_year`、`moon_centric_elements`），ELFO 场景下 CR3BP 字段留空。
@@ -18,6 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Rust SPICE 错误处理加固**（#357）：`erract`/`errdev` 显式设 RETURN/NULL，消除对上游 cspice crate 初始化顺序的依赖（默认 ABORT 出错即 exit）；错误信息由 SHORT 升级为 SHORT+LONG+traceback；`spkezr`/`pxform` 入口经 `ktotal` 预检内核池，空时报项目语境错误（ADR 0020，不走 FFI、不字符串匹配）。
 - **SPICEManager 收口 boddef**（#357）：`_BODY_ID_ALIASES` 单一归属 `SPICEManager`（`design_orbit` 不再自带表），`load_kernel` 首次调用在 spiceypy 侧 boddef 全部别名，对称 Rust 侧 `register_bodies`；多进程 `_worker_init` 改走 `SPICEManager.load_kernel` 双侧 furnsh，不再直接 `spiceypy.furnsh`。
 - **ADR 0013「测试分层」标注已被 ADR 0021 取代**（#359）：0013 其余不变。
+- **calcephpy Windows 免编译**（#362/#363/#364）：新增 `calcephpy-wheel.yml` 为 cp310–cp313 构建 win_amd64 wheel 发到 `calcephpy-v1` release；`pyproject.toml` 经 `[tool.uv.sources]` 在 Windows 直拉预编译 wheel，免去 cmake+MSVC 现场编译，其他平台回落 PyPI sdist。
+- **slow 测试 e2e 解散与契约下沉**（#361，ADR 0021）：A 类 e2e 按断言解散合并（lissajous + triangular 参数化、共享 fixture、新增 Jacobi 守恒漂移断言），B 类 fixture 共享收敛（pal_stagnation 延拓 24→2 次），字段形状契约下沉到零管线单元测试；homotopy/segmented 为开发中 feat，显式 `pytest.skip`。
+
+### Fixed
+- **frozen 轨道 e2e 静默 skip**（#371）：`test_frozen_orbit_e2e.py` 内核相对路径少算一级，`_SPICE_AVAILABLE` 恒为 False 致整组从未实跑（ADR 0020 禁止的隐式降级）；改用 `kernel_helpers.SPICE_KERNEL_DIR` 后首次实跑，暴露 `drift_e` 实测与设计报告量值不符（跟踪于 #370）。
 
 ### Docs
 - 修正 #359 测试目录迁移后失效的 tests 路径引用（ADR 0006/0007/0008、`manifolds.rst`、`lambert.rst`）。
