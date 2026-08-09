@@ -49,9 +49,10 @@ jobs:
       - name: Smoke test（安装并 import）
         shell: pwsh
         run: |
-          # calcephpy 运行时依赖 numpy（install_requires 声明），先装再 import。
+          # calcephpy 的 install_requires 误把 cython/setuptools 当 runtime
+          # 依赖（实为构建期），--no-deps 只装 wheel 本身验证；numpy 是真 runtime 依赖，预装。
           pip install numpy
-          pip install --no-index --find-links wheelhouse/ calcephpy
+          pip install --no-deps --no-index --find-links wheelhouse/ calcephpy
           python -c "import calcephpy; print('calcephpy import OK')"
       - uses: actions/upload-artifact@v7
         with:
