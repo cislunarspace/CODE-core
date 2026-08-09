@@ -745,7 +745,7 @@ wheels = [
 
 [[package]]
 name = "e2m2e"
-version = "5.6.2"
+version = "5.6.3"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },

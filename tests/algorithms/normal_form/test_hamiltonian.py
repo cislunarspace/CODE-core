@@ -89,25 +89,6 @@ requires_qiao = pytest.mark.skipif(
 )
 
 
-@pytest.fixture
-def spice_loaded():
-    """加载 leapseconds + 任一可用 SPK；不可用时跳过。"""
-    if not _has_spice:
-        pytest.skip("SPICE kernels not available")
-    import spiceypy as spice
-
-    for fname in ("naif0012.tls", "naif0011.tls"):
-        path = os.path.join(_SPICE_KERNEL_DIR, fname)
-        if os.path.exists(path):
-            spice.furnsh(path)
-    for fname in ("de440.bsp", "de440s.bsp", "de438.bsp", "de435.bsp", "de430.bsp"):
-        path = os.path.join(_SPICE_KERNEL_DIR, fname)
-        if os.path.exists(path):
-            spice.furnsh(path)
-            return path
-    pytest.skip("No SPICE ephemeris kernel (.bsp) found")
-
-
 # ---------------------------------------------------------------------------
 # 构造烟测（纯符号，不需 SPICE）
 # ---------------------------------------------------------------------------
@@ -204,7 +185,7 @@ def test_dynamic_param_names_cover_eval_params_keys():
 
 
 @requires_spice
-def test_evaluate_hamiltonian_runs(spice_loaded, l1_hamiltonian, l1_context):
+def test_evaluate_hamiltonian_runs(spice_manager, l1_hamiltonian, l1_context):
     """对一组时刻求值 Hamilton 量，运行无异常。"""
     times = np.linspace(0.0, 5.0, 6)
     evaled = evaluate_hamiltonian(l1_hamiltonian, times, l1_context)
@@ -222,7 +203,7 @@ def test_evaluate_hamiltonian_runs(spice_loaded, l1_hamiltonian, l1_context):
 
 
 @requires_spice
-def test_hamiltonian_constant_term_matches_qiao_value(spice_loaded, l1_hamiltonian, l1_context):
+def test_hamiltonian_constant_term_matches_qiao_value(spice_manager, l1_hamiltonian, l1_context):
     """L1 Hamilton 常数项与 qiao ``L1_EM_Hamilton.mat`` 在 t=0 一致。"""
     times = np.array([0.0])
     h0 = hamiltonian_constant_term(l1_hamiltonian, times, l1_context)
@@ -230,7 +211,7 @@ def test_hamiltonian_constant_term_matches_qiao_value(spice_loaded, l1_hamiltoni
 
 
 @requires_qiao
-def test_evaluate_hamiltonian_against_qiao_fixture(spice_loaded, l1_context, l1_legendre):
+def test_evaluate_hamiltonian_against_qiao_fixture(spice_manager, l1_context, l1_legendre):
     """与 qiao ``L1_EM_Hamilton.mat`` 在 t=0 处逐项比对。
 
     qiao fixture 在 N=15 上有 687 项；本测试只用 order=4，因此 qiao 中
@@ -275,7 +256,7 @@ def test_evaluate_hamiltonian_against_qiao_fixture(spice_loaded, l1_context, l1_
 
 
 @requires_spice
-def test_evaluate_hamiltonian_time_series_bounded(spice_loaded, l1_hamiltonian, l1_context):
+def test_evaluate_hamiltonian_time_series_bounded(spice_manager, l1_hamiltonian, l1_context):
     """时间序列的常数项 H_0(t) 在 [0, 10] TU 内单调有界（不应发散）。"""
     times = np.linspace(0.0, 10.0, 11)
     h0 = hamiltonian_constant_term(l1_hamiltonian, times, l1_context)
@@ -285,7 +266,7 @@ def test_evaluate_hamiltonian_time_series_bounded(spice_loaded, l1_hamiltonian, 
 
 
 @requires_spice
-def test_build_evaluate_l1_order4_within_timeout(spice_loaded, l1_context):
+def test_build_evaluate_l1_order4_within_timeout(spice_manager, l1_context):
     """构造 + 一次 evaluate 不应超过 30 s（SPICE 内核已加载）。"""
     leg = expand_legendre_1_over_r(4)
     t0 = time.time()

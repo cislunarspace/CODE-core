@@ -34,25 +34,6 @@ _requires_spice = pytest.mark.skipif(
 )
 
 
-@pytest.fixture
-def _spice_loaded():
-    """加载 leapseconds + 任一可用 SPK；不可用时跳过。"""
-    if not _has_spice_kernels():
-        pytest.skip("SPICE kernels not available")
-    import spiceypy as spice
-
-    for fname in ("naif0012.tls", "naif0011.tls"):
-        path = os.path.join(_SPICE_KERNEL_DIR, fname)
-        if os.path.exists(path):
-            spice.furnsh(path)
-    for fname in ("de440.bsp", "de440s.bsp", "de438.bsp", "de435.bsp", "de430.bsp"):
-        path = os.path.join(_SPICE_KERNEL_DIR, fname)
-        if os.path.exists(path):
-            spice.furnsh(path)
-            return path
-    pytest.skip("No SPICE ephemeris kernel (.bsp) found")
-
-
 def _time_ephemeris_available() -> bool:
     """检查 de440t.bsp 是否存在（含时间星历的历表）。"""
     if not os.path.isdir(_SPICE_KERNEL_DIR):
@@ -62,7 +43,7 @@ def _time_ephemeris_available() -> bool:
 
 @_requires_spice
 class TestSpacetimeConvertSynodic:
-    def test_j2000_to_synodic_and_back(self, _spice_loaded, earth_moon_system):
+    def test_j2000_to_synodic_and_back(self, spice_manager, earth_moon_system):
         et0_jd = 2459000.0
         j2000_state = np.array([380000.0, 0.0, 0.0, 0.0, 1.0, 0.0])
 

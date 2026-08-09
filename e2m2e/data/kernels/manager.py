@@ -78,6 +78,27 @@ _LEAPSECOND_SEARCH_PATHS: list[str] = [
     os.environ.get("SPICE_KERNEL_DIR", ""),
 ]
 
+#: 行星名→质心/本体 NAIF ID 别名表。de440s/de430/de440 全本只含行星**质心**
+#: 段 + 地球族本体 + 月球 + 太阳，不含行星本体段（499/599/…）；CSPICE 默认表
+#: 把 "MARS" 解析成本体 499（de440s 不含）而非质心 4。本表把这些名字注册到
+#: 质心/本体 ID，使 Python spiceypy 实例与 Rust cspice 实例（那边在
+#: ``spice_ffi::register_bodies`` 注册同一份表）解析一致。
+#:
+#: 单一归属 SPICEManager 模块；design_orbit 不再自带表。两份表（Python 这里 +
+#: Rust ``BODY_ALIASES``）保持一致，不做跨语言单源（issue #334 显式 out of scope）。
+_BODY_ID_ALIASES: list[tuple[str, int]] = [
+    ("MERCURY", 1),
+    ("VENUS", 2),
+    ("EARTH", 399),
+    ("MARS", 4),
+    ("JUPITER", 5),
+    ("SATURN", 6),
+    ("URANUS", 7),
+    ("NEPTUNE", 8),
+    ("MOON", 301),
+    ("SUN", 10),
+]
+
 
 def _find_leapseconds_kernel(search_paths: list[str] | None = None) -> str | None:
     """在预定义的搜索路径中查找闰秒内核文件（.tls）。"""
@@ -167,6 +188,7 @@ class SPICEManager(EphemerisProvider):
 
     _leapseconds_loaded: bool = False
     _leapseconds_lock = threading.Lock()
+    _bodies_registered: bool = False
 
     def __init__(self) -> None:
         """初始化 SPICE 管理器。"""
@@ -216,6 +238,13 @@ class SPICEManager(EphemerisProvider):
         # 把被加载内核的同级目录纳入闰秒搜索（最高优先级），覆盖 PyPI 安装或
         # 非 repo 环境下用户把 naif0012.tls 与 .bsp 放一起的常见用法。
         self._ensure_leapseconds(search_dir=os.path.dirname(path))
+        # 首次加载时在本（Python spiceypy）实例注册行星名→质心/本体 ID 别名
+        # （类级 once 标志，对称于 Rust 侧 furnsh 时 register_bodies 的 Once）。
+        # boddef 对同一 (name, id) 幂等，重复调用无害。
+        if not SPICEManager._bodies_registered:
+            for name, naif_id in _BODY_ID_ALIASES:
+                get_spiceypy().boddef(name, naif_id)
+            SPICEManager._bodies_registered = True
         get_spiceypy().furnsh(path)
         # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（静态链接，
         # 内核池不共享）。spice feature 启用时双 furnsh，让下沉到 Rust

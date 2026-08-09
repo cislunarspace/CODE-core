@@ -40,7 +40,6 @@ import numpy as np
 
 from e2m2e.data.types.trajectory import EphemerisTable
 
-from ...data.kernels._spice_loader import get_spiceypy
 from ...data.kernels.manager import SPICEManager
 from ...data.templates.perturbations import DEFAULT_PERTURBATION
 from ...data.types.orbit import Orbit
@@ -127,20 +126,6 @@ _BODY_FIXED_KERNELS = [
     "SPICELunaFrameKernel.tf",
 ]
 
-#: de440s 只有行星质心段，按通用做法把行星名注册到质心 ID
-_BODY_ID_ALIASES = [
-    ("MERCURY", 1),
-    ("VENUS", 2),
-    ("EARTH", 399),
-    ("MARS", 4),
-    ("JUPITER", 5),
-    ("SATURN", 6),
-    ("URANUS", 7),
-    ("NEPTUNE", 8),
-    ("MOON", 301),
-    ("SUN", 10),
-]
-
 
 class DesignNotConvergedError(RuntimeError):
     """星历修正未收敛。"""
@@ -199,13 +184,14 @@ def default_kernel_dir() -> str:
 
 
 def load_design_kernels(spice: SPICEManager, kernel_dir: str | None = None) -> list[str]:
-    """加载设计链路所需内核：行星历 + body-fixed 帧内核，注册行星名。
+    """加载设计链路所需内核：行星历 + body-fixed 帧内核。
+
+    行星名→质心/本体 NAIF ID 别名由 :meth:`SPICEManager.load_kernel` 首次
+    调用时统一注册（双侧同步，见 ``_BODY_ID_ALIASES``）。
 
     返回实际加载的内核路径列表（调用方管理卸载）。
     """
     kernel_dir = kernel_dir or default_kernel_dir()
-    for name, naif_id in _BODY_ID_ALIASES:
-        get_spiceypy().boddef(name, naif_id)
     loaded: list[str] = []
     for name in ["de440s.bsp", "de430.bsp"]:
         path = os.path.join(kernel_dir, name)

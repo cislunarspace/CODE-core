@@ -34,25 +34,6 @@ _requires_spice = pytest.mark.skipif(
 )
 
 
-@pytest.fixture
-def _spice_loaded():
-    """加载 leapseconds + 任一可用 SPK；不可用时跳过。"""
-    if not _has_spice_kernels():
-        pytest.skip("SPICE kernels not available")
-    import spiceypy as spice
-
-    for fname in ("naif0012.tls", "naif0011.tls"):
-        path = os.path.join(_SPICE_KERNEL_DIR, fname)
-        if os.path.exists(path):
-            spice.furnsh(path)
-    for fname in ("de440.bsp", "de440s.bsp", "de438.bsp", "de435.bsp", "de430.bsp"):
-        path = os.path.join(_SPICE_KERNEL_DIR, fname)
-        if os.path.exists(path):
-            spice.furnsh(path)
-            return path
-    pytest.skip("No SPICE ephemeris kernel (.bsp) found")
-
-
 class TestExtractBodies:
     def test_single_body(self):
         cfg = {
@@ -103,7 +84,7 @@ class TestExtractBodies:
 
 @_requires_spice
 class TestPropagateOrbit:
-    def test_default_three_body(self, _spice_loaded, reference_epoch):
+    def test_default_three_body(self, spice_manager, reference_epoch):
         initial_state = np.array(
             [
                 -6000.0,  # km
@@ -125,7 +106,7 @@ class TestPropagateOrbit:
         assert result.velocity_mps.shape == (25, 3)
         assert not np.allclose(result.position_km[0], result.position_km[-1])
 
-    def test_epoch_tuple(self, _spice_loaded):
+    def test_epoch_tuple(self, spice_manager):
         initial_state = np.zeros(6)
         result = propagate_orbit(
             initial_state=initial_state,
@@ -151,7 +132,7 @@ class TestPropagateOrbit:
                 duration=0.0,
             )
 
-    def test_custom_force_config(self, _spice_loaded, reference_epoch):
+    def test_custom_force_config(self, spice_manager, reference_epoch):
         force_config = {
             "version": 1,
             "forces": [

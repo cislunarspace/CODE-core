@@ -428,5 +428,34 @@ class TestMultipleShootingVerbose:
             assert mock_tqdm.called
 
 
+# =============================================================================
+# 需求: 多进程子进程内核加载经 SPICEManager（双侧 furnsh）
+# =============================================================================
+class TestMultipleShootingMultiprocess:
+    """多进程模式下，子进程内核加载经 ``SPICEManager.load_kernel``。
+
+    子进程是新进程、CSPICE 内核池为空。``_worker_init`` →
+    ``_load_worker_kernels`` → ``SPICEManager.load_kernel`` 须在 Python
+    spiceypy 与 Rust cspice 两侧 furnsh，下沉到 Rust 的力模型查询（经
+    ``EphemerisDynamics.propagate`` → ``propagate_with_stm_py``）才能查到
+    天体状态。本测试守护这一加载链不被绕过（issue #334）。
+    """
+
+    def test_multiprocess_worker_loads_rust_kernels(
+        self, spice_eph_dynamics, spice_kernel_path, simple_patch_points
+    ):
+        """n_workers>1 + kernel_dir：correct 不报 SPICE 错误（Rust 侧已 furnsh）。"""
+        import os
+
+        from e2m2e.algorithm.solver.multiple_shooting import MultipleShooting
+
+        kernel_dir = os.path.dirname(spice_kernel_path)
+        ms = MultipleShooting(dynamics=spice_eph_dynamics, n_workers=2, kernel_dir=kernel_dir)
+        t_patch, state_patch = simple_patch_points
+        # 不关心收敛，只关心多进程 worker 加载内核后 Rust 力模型查询不报错。
+        result = ms.correct(t_patch=t_patch, state_patch=state_patch, max_iter=3, verbose=False)
+        assert result is not None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

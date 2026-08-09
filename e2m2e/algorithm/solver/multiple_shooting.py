@@ -11,12 +11,16 @@ from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 from tqdm.auto import tqdm
 
 from ...data.templates.enums import ConvergenceState, ReferenceFrame
+
+if TYPE_CHECKING:
+    from ...data.kernels.manager import SPICEManager
 
 # Unicode sparkline 字符，用于在终端内渲染残差收敛曲线
 _SPARK_CHARS = " ▁▂▃▄▅▆▇█"
@@ -30,6 +34,30 @@ _SPARK_CHARS = " ▁▂▃▄▅▆▇█"
 _worker_dynamics = None  # 进程全局：仅在子进程中被 _worker_init 赋值
 
 
+def _load_worker_kernels(spice: SPICEManager, kernel_dir: str) -> str:
+    """子进程内核加载：闰秒 + 星历，统一走 ``SPICEManager.load_kernel``。
+
+    ``load_kernel`` 在 Python spiceypy 与 Rust cspice 两个独立 CSPICE 实例**双侧**
+    furnsh，并对称注册行星名别名（类级 once）。多进程 worker 是新进程、内核池为空，
+    必须经此入口加载，否则下沉到 Rust 的力模型查询会因 Rust 实例无内核报错。
+
+    Returns:
+        实际加载的 ``.bsp`` 内核路径。
+    """
+    import os
+
+    # 加载闰秒内核（naif0012.tls）：与 bsp 同目录。load_kernel 内部 _ensure_leapseconds
+    # 会自动搜索，但显式加载更稳（避免 search_dir 推断差异）。幂等。
+    tls_path = os.path.join(kernel_dir, "naif0012.tls")
+    if os.path.isfile(tls_path):
+        spice.load_kernel(tls_path)
+
+    # 加载星历内核（de440.bsp 或同目录下优先级最高的 .bsp 文件）
+    bsp_path = spice.find_ephemeris_kernel(kernel_dir)
+    spice.load_kernel(bsp_path)
+    return bsp_path
+
+
 def _worker_init(
     kernel_dir: str,
     bodies: list[str],
@@ -39,10 +67,12 @@ def _worker_init(
     atol: float,
     max_step: float,
 ) -> None:
-    """子进程初始化：重载 SPICE 内核并构建 EphemerisDynamics。
+    """子进程初始化：经 ``SPICEManager`` 重载内核并构建 EphemerisDynamics。
 
     该函数由 ProcessPoolExecutor(initializer=...) 在每个工作进程启动时调用一次。
-    内核加载结果写入进程全局 CSPICE 内核池，动力学对象保存在 ``_worker_dynamics``。
+    内核加载经 :func:`_load_worker_kernels` → ``SPICEManager.load_kernel``，在
+    Python spiceypy 与 Rust cspice 两侧 furnsh（不再直接调 ``spiceypy.furnsh``
+    或手篡内部 once 标志）。动力学对象保存在 ``_worker_dynamics``。
 
     Args:
         kernel_dir: 包含 ``.bsp`` 和 ``.tls`` 内核文件的目录路径。
@@ -53,26 +83,13 @@ def _worker_init(
         atol: ODE 积分绝对容差。
         max_step: ODE 最大步长（秒）。
     """
-    import os
-
-    import spiceypy
-
     from ...data.kernels.manager import SPICEManager
     from ..dynamics import EphemerisDynamics, EphemerisSystem
 
     global _worker_dynamics
 
     spice = SPICEManager()
-
-    # 加载闰秒内核（naif0012.tls）
-    tls_path = os.path.join(kernel_dir, "naif0012.tls")
-    if os.path.isfile(tls_path):
-        spiceypy.furnsh(tls_path)
-        SPICEManager._leapseconds_loaded = True
-
-    # 加载星历内核（de440.bsp 或同目录下优先级最高的 .bsp 文件）
-    bsp_path = spice.find_ephemeris_kernel(kernel_dir)
-    spiceypy.furnsh(bsp_path)
+    _load_worker_kernels(spice, kernel_dir)
 
     # 构建动力学对象并覆盖积分参数
     eph_system = EphemerisSystem(bodies=bodies, spice=spice, origin=origin, frame=frame)

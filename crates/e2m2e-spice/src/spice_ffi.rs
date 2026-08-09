@@ -21,8 +21,8 @@
 #[cfg(test)]
 use cspice_sys::bodn2c_c;
 use cspice_sys::{
-    boddef_c, bodvrd_c, failed_c, getmsg_c, pxform_c, reset_c, spkezr_c, sxform_c, ConstSpiceChar,
-    SpiceInt,
+    boddef_c, bodvrd_c, erract_c, errdev_c, failed_c, getmsg_c, ktotal_c, pxform_c, qcktrc_c,
+    reset_c, spkezr_c, sxform_c, ConstSpiceChar, SpiceInt,
 };
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -46,18 +46,49 @@ fn bump_ffi_calls() {
     FFI_CALLS.fetch_add(1, Ordering::Relaxed);
 }
 
-/// 取 CSPICE 短错误消息（调用前必须 failed_c() == true）。
-fn get_short_error_message() -> String {
-    let mut msg_buf = vec![0i8; 256];
-    let short_c = CString::new("SHORT").unwrap();
+/// 取 CSPICE 指定类别消息（调用前后状态不限）。`option` 为 "SHORT"/"LONG"/
+/// "EXPLAIN" 等（见 getmsg_c 文档）。缓冲在首个 null 处截断。
+fn getmsg(option: &str, len: usize) -> String {
+    let opt_c = CString::new(option).expect("CSPICE option contains null byte");
+    let mut msg_buf = vec![0i8; len];
     unsafe {
         getmsg_c(
-            short_c.as_ptr() as *mut ConstSpiceChar,
-            256,
+            opt_c.as_ptr() as *mut ConstSpiceChar,
+            len as SpiceInt,
             msg_buf.as_mut_ptr() as *mut c_char,
         );
     }
     c_chars_to_string(&msg_buf)
+}
+
+/// 取 CSPICE traceback（qcktrc_c 包装）。缓冲在首个 null 处截断。
+fn qcktrc(len: usize) -> String {
+    let mut trace_buf = vec![0i8; len];
+    unsafe {
+        qcktrc_c(len as SpiceInt, trace_buf.as_mut_ptr() as *mut c_char);
+    }
+    c_chars_to_string(&trace_buf)
+}
+
+/// 取 CSPICE 完整错误信息：SHORT + LONG + traceback（调用前必须 failed_c()==true）。
+///
+/// SHORT 仅 256 字节、常被截断；LONG 是完整描述，traceback 指向出错调用栈。
+/// 三者拼接，空段跳过，让上层异常携带可定位的错误信息。
+fn get_full_error_message() -> String {
+    let short = getmsg("SHORT", 256);
+    let long = getmsg("LONG", 2048);
+    let traceback = qcktrc(2048);
+    let mut parts: Vec<String> = Vec::new();
+    if !short.is_empty() {
+        parts.push(short);
+    }
+    if !long.is_empty() {
+        parts.push(long);
+    }
+    if !traceback.is_empty() {
+        parts.push(format!("Traceback:\n{traceback}"));
+    }
+    parts.join("\n\n")
 }
 
 /// 把 CSPICE 返回的 C char 数组转成 Rust String（在首个 null 处截断）。
@@ -73,7 +104,7 @@ fn c_chars_to_string(buf: &[i8]) -> String {
 /// CSPICE FFI 调用错误。
 #[derive(Debug)]
 pub enum SpiceFfiError {
-    /// `failed_c()` 在调用后返回 true；含短错误描述（来自 erract_c 的 REPORT）
+    /// `failed_c()` 在调用后返回 true；含完整错误描述（SHORT + LONG + traceback）。
     Failed(String),
 }
 
@@ -94,7 +125,7 @@ fn check_spice_error() -> Result<(), SpiceFfiError> {
     unsafe {
         let failed: bool = failed_c() != 0;
         if failed {
-            let msg = get_short_error_message();
+            let msg = get_full_error_message();
             reset_c();
             return Err(SpiceFfiError::Failed(msg));
         }
@@ -108,7 +139,7 @@ fn to_cstring(s: &str) -> CString {
 }
 
 /// 行星名→NAIF ID 别名表，与 Python 侧
-/// `e2m2e/dfh/design_orbit.py:_BODY_ID_ALIASES` 保持一致。
+/// `e2m2e/data/kernels/manager.py:_BODY_ID_ALIASES` 保持一致。
 ///
 /// 背景：de440s/de430/de440 全本只含行星**质心**段（水~海王 ID 1~8）+
 /// 地球族本体（199/299/399）+ 月球（301）+ 太阳（10），**不含**行星本体段
@@ -116,7 +147,7 @@ fn to_cstring(s: &str) -> CString {
 /// BARYCENTER" 解析成 4。DFH（qiao 版 README:308-321）与天体力学惯例对
 /// 大行星第三体摄动一律用**质心**（含卫星总质量）；e2m2e 所有非 STM 路径
 /// 与 GM 值也已统一用质心。本表把这些名字注册到质心/本体 ID，使本（Rust）
-/// CSPICE 实例的解析与 Python spiceypy 实例（那边在 design_orbit 里做同样
+/// CSPICE 实例的解析与 Python spiceypy 实例（那边在 manager.load_kernel 里做同样
 /// 的 boddef）以及与 DFH 一致。
 const BODY_ALIASES: &[(&str, SpiceInt)] = &[
     ("MERCURY", 1),
@@ -131,13 +162,43 @@ const BODY_ALIASES: &[(&str, SpiceInt)] = &[
     ("SUN", 10),
 ];
 
+/// 显式设置 CSPICE 错误动作与输出设备，消除对上游 cspice crate 初始化
+/// 顺序的依赖。
+///
+/// CSPICE 默认错误动作是 ABORT（出错即 `exit(1)` 杀进程）。cspice 0.1 crate
+/// 的 `set_error_defaults`（动作 RETURN、设备 NULL）只在首次 `with_spice_lock`
+/// 时触发；本模块的 FFI 包装不经 `with_spice_lock`，若该锁还没被任何路径
+/// 触发过，CSPICE 就以默认 ABORT 运行——spkezr/pxform 出错会直接终止
+/// Python 进程而非抛异常。本函数把动作显式设为 RETURN（出错置 `failed_c()`
+/// 后返回）、设备设为 NULL（错误信息经 `getmsg_c` 取回，不污染 stderr），
+/// 保证本实例首次被使用前已进入"出错返回"模式。幂等，重复调用无害。
+fn init_error_handling() {
+    let set_c = CString::new("SET").unwrap();
+    let return_c = CString::new("RETURN").unwrap();
+    let null_c = CString::new("NULL").unwrap();
+    unsafe {
+        erract_c(
+            set_c.as_ptr() as *mut ConstSpiceChar,
+            0,
+            return_c.as_ptr() as *mut ConstSpiceChar,
+        );
+        errdev_c(
+            set_c.as_ptr() as *mut ConstSpiceChar,
+            0,
+            null_c.as_ptr() as *mut ConstSpiceChar,
+        );
+    }
+}
+
 /// 在本 CSPICE 实例注册 [`BODY_ALIASES`] 里的行星名别名（等价 Python
 /// spiceypy.boddef）。`boddef_c` 只改名字→ID 映射表，不需要内核加载，
 /// 对同一 (name, id) 重复调用幂等。
 ///
-/// 应在任何 `spkezr`/`bodvrd` 之前调用一次（见 `spice_furnsh` 里的
-/// `Once` 触发）。
+/// 同时显式设置 CSPICE 错误动作（见 [`init_error_handling`]），消除对上游
+/// crate 初始化顺序的依赖。应在任何 `spkezr`/`bodvrd` 之前调用一次（见
+/// `spice_furnsh` 里的 `Once` 触发）。
 pub fn register_bodies() {
+    init_error_handling();
     for (name, code) in BODY_ALIASES {
         let name_c = to_cstring(name);
         unsafe {
@@ -162,10 +223,32 @@ fn bodn2c(name: &str) -> Option<SpiceInt> {
     }
 }
 
+/// ktotal_c 包装：返回当前已加载的指定类型内核数。`kind` 通常为 "ALL"。
+///
+/// 供 spkezr/pxform 入口预检内核池是否为空（见 ADR 0020：用状态查询预检，
+/// 不用 CSPICE 错误码字符串匹配翻译）。
+pub fn ktotal(kind: &str) -> Result<i32, SpiceFfiError> {
+    let kind_c = to_cstring(kind);
+    let mut count: SpiceInt = 0;
+    unsafe {
+        ktotal_c(kind_c.as_ptr() as *mut ConstSpiceChar, &mut count);
+        check_spice_error()?;
+    }
+    Ok(count as i32)
+}
+
+/// 内核池为空时的项目语境错误信息。spkezr/pxform 入口预检复用。
+const NO_KERNEL_MSG: &str = "Rust CSPICE 实例无内核加载——请经 SPICEManager.load_kernel 加载";
+
 /// pxform_c 包装：返回 from→to 在 et 时刻的 3×3 旋转矩阵（行优先）。
 ///
 /// 等价于 Python spiceypy.pxform(from, to, et)。
 pub fn pxform(from: &str, to: &str, et: f64) -> Result<[[f64; 3]; 3], SpiceFfiError> {
+    // 入口预检：内核池为空时直接报项目语境错误，不走 FFI（避免 CSPICE 内部
+    // 错误码上冒或 erract 兜底杀进程）。
+    if ktotal("ALL")? == 0 {
+        return Err(SpiceFfiError::Failed(NO_KERNEL_MSG.into()));
+    }
     bump_ffi_calls();
     let from_c = to_cstring(from);
     let to_c = to_cstring(to);
@@ -213,6 +296,11 @@ pub fn spkezr(
     abcorr: &str,
     observer: &str,
 ) -> Result<([f64; 6], f64), SpiceFfiError> {
+    // 入口预检：内核池为空时直接报项目语境错误，不走 FFI（避免 CSPICE 内部
+    // 错误码上冒或 erract 兜底杀进程）。
+    if ktotal("ALL")? == 0 {
+        return Err(SpiceFfiError::Failed(NO_KERNEL_MSG.into()));
+    }
     bump_ffi_calls();
     let target_c = to_cstring(target);
     let frame_c = to_cstring(frame);

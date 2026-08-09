@@ -59,6 +59,8 @@ try:
             reset_ephem_ffi_call_count,
             segmented_shooting_correct_py,
             spice_furnsh,
+            spice_pxform,
+            spice_spkezr,
             third_body_acceleration,
         )
     except ImportError:
@@ -77,6 +79,8 @@ try:
         reset_ephem_ffi_call_count = None  # type: ignore[misc,assignment]
         segmented_shooting_correct_py = None  # type: ignore[misc,assignment]
         spice_furnsh = None  # type: ignore[misc,assignment]
+        spice_pxform = None  # type: ignore[misc,assignment]
+        spice_spkezr = None  # type: ignore[misc,assignment]
         third_body_acceleration = None  # type: ignore[misc,assignment]
 except ModuleNotFoundError:
     # _integrators is a compiled Rust extension; allow import for doc builds
@@ -125,6 +129,8 @@ except ModuleNotFoundError:
     reset_ephem_ffi_call_count = None  # type: ignore[misc,assignment]
     segmented_shooting_correct_py = None  # type: ignore[misc,assignment]
     spice_furnsh = None  # type: ignore[misc,assignment]
+    spice_pxform = None  # type: ignore[misc,assignment]
+    spice_spkezr = None  # type: ignore[misc,assignment]
     third_body_acceleration = None  # type: ignore[misc,assignment]
 
 # ---- Python↔Rust ABI 版本校验 ----
@@ -207,6 +213,8 @@ __all__ = [
     "solve_ivp_events",
     "solve_ivp_events_py",
     "spice_furnsh",
+    "spice_pxform",
+    "spice_spkezr",
     "spherical_harmonic_accel",
     "third_body_acceleration",
     "TransferPointResult",
