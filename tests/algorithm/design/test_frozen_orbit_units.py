@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-pytestmark = pytest.mark.l1
+pytestmark = pytest.mark.orchestration
 
 MU_MOON = 4902.799967088639
 

@@ -14,7 +14,7 @@ from e2m2e.integrators import (
 )
 from tests.numerical.integrators.conftest import normalized_leo_j2
 
-pytestmark = [pytest.mark.l1]
+pytestmark = pytest.mark.integrator
 
 
 def _propagate_abm(f, y0, h, target_t, t0=0.0):

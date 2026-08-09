@@ -3,7 +3,11 @@
 验证版本号、作者、导出列表与可导入性。
 """
 
+import pytest
+
 import e2m2e
+
+pytestmark = pytest.mark.aux
 
 
 class TestPackageMetadata:

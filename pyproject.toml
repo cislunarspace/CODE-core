@@ -86,19 +86,21 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 testpaths = ["tests"]
 # 让 tests/kernel_helpers.py 在 xdist worker 中可导入
 pythonpath = ["tests"]
-# 默认排除 l3（集成/端到端）和 slow 标记的测试。日常开发跑 L1+L2：
-# ``uv run pytest``。跑全部层：``uv run pytest -m ""``。跑单层：
-# ``uv run pytest -m l1`` / ``-m l2`` / ``-m l3`` / ``-m l4``。
+# 默认排除 ``slow``（运行时间较长的数值测试）。日常开发跑 ``uv run pytest``。
+# 按功能类选跑：``uv run pytest -m theory`` / ``-m orchestration`` / ``-m data`` ……
+# 全量（含 slow）：``uv run pytest -m ""``。release 前跑全量。
 # 命令行 -m 覆盖此处的 addopts -m。
-addopts = ["-m", "not l3 and not slow"]
+addopts = ["-m", "not slow"]
 markers = [
-    "slow: 运行时间较长的数值测试",
-    "spice: 依赖 SPICE 内核的测试，内核缺失时跳过",
-    "e2e: Lissajous/triangular 场景端到端测试",
-    "l1: ADR 0013 第1层——Rust 单元 / 纯数学验证（无 SPICE 依赖，<1s）",
-    "l2: ADR 0013 第2层——Python 算法单元（微分校正、延拓、力模型等，<10s）",
-    "l3: ADR 0013 第3层——集成测试（跨层链路 + 端到端星历场景，可能>60s）",
-    "l4: ADR 0013 第4层——物理不变量贯穿（Jacobi 守恒、辛性质等）",
+    "slow: 运行时间较长的数值测试（正交于功能类）",
+    "spice: 依赖 SPICE 内核的测试，内核缺失时跳过（正交于功能类）",
+    "theory: 数理/物理理论——解析对照、守恒律、闭式解",
+    "integrator: 积分器——传播器算法、步长控制、dense output",
+    "force: 力模型——PointMass/third-body/SRP/drag 计算与配置",
+    "data: 数据层——内核/帧/类型/IO/模板 + 坐标转换",
+    "orchestration: 算法编排（层3）——族/转移/设计/校正/站保/流形",
+    "interface: 接口（层4）——Facade/MCP/CLI/Pydantic 模型",
+    "aux: 工具/辅助——viz/logging/format/MBSE/架构元测试",
 ]
 
 [tool.coverage.run]

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pytest
 
+pytestmark = pytest.mark.aux
+
 
 def test_design_orbit_implemented():
     """design_orbit 已实现：DesignOrbitRequest 校验先于占位抛错。"""

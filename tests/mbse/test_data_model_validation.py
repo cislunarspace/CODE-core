@@ -3,7 +3,11 @@
 验证 OrbitProperties 提供合理的默认值。
 """
 
+import pytest
+
 from e2m2e.mbse.data.core_models import OrbitProperties
+
+pytestmark = pytest.mark.aux
 
 
 class TestOrbitProperties:

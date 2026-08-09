@@ -17,7 +17,7 @@ from e2m2e.algorithm.forces import ForceModel, GravityField, ThirdBodyGravity
 from e2m2e.data.kernels.manager import SPICEManager
 from e2m2e.integrators import disable_ephem_cache, enable_ephem_cache
 
-pytestmark = [pytest.mark.l3]
+pytestmark = pytest.mark.force
 
 
 def _semi_major_axis(state, mu):

@@ -17,6 +17,9 @@ from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
 from e2m2e.data.kernels.manager import SPICEManager
 
+pytestmark = pytest.mark.force
+
+
 _AU_KM = 149597870.691
 _P_SRP_1AU = 4.56e-6
 _MU_EARTH = 398600.4415  # km³/s²

@@ -5,10 +5,14 @@
 """
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.forces import PointMassGravity
 from e2m2e.algorithm.transfer import EngineConfig, LowThrustShooting
 from e2m2e.algorithm.transfer.qlaw import qlaw_guess, rv_to_keplerian
+
+pytestmark = pytest.mark.orchestration
+
 
 MU = 398600.435507  # km³/s²，地球
 

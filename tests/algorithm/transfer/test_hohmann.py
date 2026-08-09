@@ -25,6 +25,8 @@ from e2m2e.algorithm.transfer.hohmann import (
     scan_lambert_delta_v,
 )
 
+pytestmark = pytest.mark.orchestration
+
 
 class TestRotationMatrix:
     """旋转矩阵单元测试。"""

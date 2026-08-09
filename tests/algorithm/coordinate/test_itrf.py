@@ -21,6 +21,8 @@ from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin, Ine
 from e2m2e.data.frames.gmat_fixture import CoordinateDataError, gmat_data_dir
 from e2m2e.data.kernels.manager import SPICEManager
 
+pytestmark = pytest.mark.data
+
 
 @pytest.fixture
 def spice_manager():

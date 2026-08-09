@@ -17,7 +17,10 @@ import pytest
 
 from e2m2e import integrators as gw
 
-pytestmark = pytest.mark.spice
+pytestmark = [
+    pytest.mark.aux,
+    pytest.mark.spice,
+]
 
 # 模块级 gate：无编译扩展时跳过全文件（CI 有 .pyd，不跳过）
 _py_abi_version = pytest.importorskip(

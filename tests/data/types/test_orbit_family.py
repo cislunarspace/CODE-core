@@ -12,6 +12,8 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_System
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
 
+pytestmark = pytest.mark.data
+
 
 class TestOrbitFamilyCreation:
     """测试轨道族创建"""

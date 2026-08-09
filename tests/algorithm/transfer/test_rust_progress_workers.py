@@ -22,6 +22,9 @@ pytest.importorskip("e2m2e._integrators")
 
 from e2m2e.integrators import grid_search_rust  # noqa: E402
 
+pytestmark = pytest.mark.orchestration
+
+
 MU = 1.21506683e-2  # 地月质量参数
 
 

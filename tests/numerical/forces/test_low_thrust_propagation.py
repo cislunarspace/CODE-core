@@ -14,6 +14,8 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import FiniteBurn, ForceModel, GravityField
 from e2m2e.data.kernels.manager import SPICEManager
 
+pytestmark = pytest.mark.force
+
 
 def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
     """将开普勒根数转为笛卡尔状态。"""

@@ -16,6 +16,8 @@ from e2m2e.algorithm.transfer import TransferOptimizationResult
 from e2m2e.mbse.data.enums import TransferType
 from e2m2e.tools.viz.transfer import TransferPlotter
 
+pytestmark = pytest.mark.aux
+
 
 @pytest.fixture
 def system():

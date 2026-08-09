@@ -27,6 +27,9 @@ from e2m2e.algorithm.normal_form.dynamical_substitution import DynamicalSubstitu
 from e2m2e.algorithm.normal_form.quasi_floquet import QuasiFloquetResult, real_normal_form_matrix
 from e2m2e.algorithm.normal_form.types import NormalFormResult
 
+pytestmark = pytest.mark.theory
+
+
 # ---------------------------------------------------------------------------
 # 公共 fixture（沿用 test_catalog.py 的范式）
 # ---------------------------------------------------------------------------

@@ -9,6 +9,8 @@ import pytest
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.thrust import ImpulsiveBurn
 
+pytestmark = pytest.mark.force
+
 
 class _FakeSystem:
     """仅用于传播测试的最小 System 桩。"""

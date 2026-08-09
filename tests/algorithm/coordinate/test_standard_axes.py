@@ -4,8 +4,11 @@
 """
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.coordinate.standard_axes import IAU2000EqAxes, ICRSAxes
+
+pytestmark = pytest.mark.data
 
 
 class TestICRSAxes:

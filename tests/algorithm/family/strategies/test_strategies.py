@@ -17,6 +17,8 @@ from e2m2e.algorithm.family.strategies import (
     symmetric_xz_fixed_z0,
 )
 
+pytestmark = pytest.mark.orchestration
+
 
 class TestCorrectionConfig:
     """CorrectionConfig 不可变数据类"""

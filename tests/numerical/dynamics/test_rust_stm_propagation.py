@@ -8,7 +8,10 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-pytestmark = [pytest.mark.spice, pytest.mark.l3]
+pytestmark = [
+    pytest.mark.integrator,
+    pytest.mark.spice,
+]
 
 
 @pytest.fixture

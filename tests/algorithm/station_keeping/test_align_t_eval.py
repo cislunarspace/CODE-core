@@ -5,9 +5,12 @@
 """
 
 import numpy as np
+import pytest
 from numpy.testing import assert_array_equal
 
 from e2m2e.algorithm.station_keeping.monte_carlo import RustPropagator
+
+pytestmark = pytest.mark.orchestration
 
 
 class TestAlignTEval:

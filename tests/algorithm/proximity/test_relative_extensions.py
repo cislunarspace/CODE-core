@@ -9,6 +9,9 @@ from e2m2e.algorithm.proximity.phasing import phasing_search
 from e2m2e.algorithm.proximity.relative_dynamics import RelativeDynamics, TargetOrbit
 from e2m2e.data.types.orbit import Orbit
 
+pytestmark = pytest.mark.orchestration
+
+
 MU_EARTH_MOON = 0.0121505856
 
 

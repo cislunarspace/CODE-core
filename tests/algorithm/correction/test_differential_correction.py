@@ -5,9 +5,13 @@
 """
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.types.orbit import Orbit
+
+pytestmark = pytest.mark.orchestration
+
 
 # 公共 fixtures 从 tests/algorithms/conftest.py 导入：
 #   dro_dynamics, dro_corrector, dro_seed_orbit, corrected_dro

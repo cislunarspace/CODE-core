@@ -20,6 +20,8 @@ from numpy.testing import assert_allclose
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.physical_model import PhysicalModel
 
+pytestmark = pytest.mark.force
+
 
 class _FakeSystem:
     """最小 system 桩：提供 coordinate_system 占位即可（测试力不查 system）。"""

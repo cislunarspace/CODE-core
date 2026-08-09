@@ -16,6 +16,9 @@ from e2m2e.algorithm.transfer.transfer_optimization import (
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.mbse.data.enums import TransferType
 
+pytestmark = pytest.mark.orchestration
+
+
 # =============================================================================
 # Fixtures
 # =============================================================================

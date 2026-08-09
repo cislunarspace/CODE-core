@@ -9,6 +9,8 @@ from e2m2e.algorithm.family.triangular_initial_guess import (
     compute_triangular_initial_guess,
 )
 
+pytestmark = pytest.mark.orchestration
+
 
 class TestTriangularModes:
     def test_frequencies_satisfy_characteristic_equation(self, earth_moon_system):

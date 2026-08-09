@@ -6,7 +6,7 @@ import pytest
 
 from e2m2e.algorithm.forces.force_mapping import perturbation_to_force_config
 
-pytestmark = [pytest.mark.l1]
+pytestmark = pytest.mark.force
 
 
 class TestCouplingMapping:

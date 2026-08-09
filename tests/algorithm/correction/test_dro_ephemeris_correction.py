@@ -12,7 +12,10 @@ from e2m2e.algorithm.solver.differential_correction import DifferentialCorrectio
 from e2m2e.algorithm.solver.multiple_shooting import MultipleShooting
 from e2m2e.data.types.orbit import Orbit
 
-pytestmark = [pytest.mark.spice, pytest.mark.l3]
+pytestmark = [
+    pytest.mark.orchestration,
+    pytest.mark.spice,
+]
 
 # =============================================================================
 # 物理参数

@@ -9,6 +9,9 @@ import pytest
 
 from e2m2e.algorithm.propagation import _extract_bodies, propagate_orbit
 
+pytestmark = pytest.mark.integrator
+
+
 # ---------------------------------------------------------------------------
 # SPICE 与 kernel 可用性检测（与 tests/algorithms/normal_form/test_hamiltonian.py 一致）
 # ---------------------------------------------------------------------------

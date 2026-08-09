@@ -7,6 +7,8 @@ from e2m2e.algorithm.transfer.mission_assessment import MissionAssessment
 from e2m2e.algorithm.transfer.porkchop import PorkchopData
 from e2m2e.algorithm.transfer.solution_database import SolutionDatabase
 
+pytestmark = pytest.mark.orchestration
+
 
 class TestMissionAssessment:
     """多指标加权综合评估。"""

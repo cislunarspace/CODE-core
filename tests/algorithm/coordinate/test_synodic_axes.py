@@ -7,8 +7,11 @@
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.coordinate.synodic_axes import SynodicAxes
+
+pytestmark = pytest.mark.data
 
 
 def _make_mock_spice(moon_pos=None, moon_vel=None):

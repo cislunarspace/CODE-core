@@ -9,6 +9,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+pytestmark = pytest.mark.orchestration
+
 
 class TestTransferCreation:
     """Test Transfer class instantiation and configuration."""

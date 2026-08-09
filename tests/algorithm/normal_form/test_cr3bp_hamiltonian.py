@@ -16,6 +16,8 @@ from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form import NormalFormContext
 from e2m2e.algorithm.normal_form.hamiltonian import build_cr3bp_hamiltonian
 
+pytestmark = pytest.mark.theory
+
 
 @pytest.fixture
 def l2_context(earth_moon_system) -> NormalFormContext:

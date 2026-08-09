@@ -32,6 +32,9 @@ pytest.importorskip("e2m2e._integrators")
 
 from e2m2e.integrators import propagate_cr3bp_stm_py
 
+pytestmark = pytest.mark.integrator
+
+
 if propagate_cr3bp_stm_py is None:
     pytest.skip("propagate_cr3bp_stm_py 需要 Rust 扩展构建", allow_module_level=True)
 

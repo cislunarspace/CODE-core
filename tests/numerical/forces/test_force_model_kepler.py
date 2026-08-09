@@ -4,8 +4,11 @@
 """
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.forces import ForceModel
+
+pytestmark = pytest.mark.force
 
 
 class _FakeSystem:

@@ -22,6 +22,9 @@ from e2m2e.algorithm.ephemeris_correction import (
     two_level,
 )
 
+pytestmark = pytest.mark.orchestration
+
+
 # ---------------------------------------------------------------------------
 # 接缝类型测试
 # ---------------------------------------------------------------------------

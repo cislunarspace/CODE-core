@@ -17,6 +17,9 @@ from e2m2e.algorithm.normal_form.polynomial import (
     poly_subs,
 )
 
+pytestmark = pytest.mark.theory
+
+
 # 标准正则坐标（替换后的「新变量」约定用这套命名）。
 Q1, Q2, Q3, P1, P2, P3 = sp.symbols("q1 q2 q3 p1 p2 p3", real=True)
 NEW_VARS = (Q1, Q2, Q3, P1, P2, P3)

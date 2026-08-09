@@ -23,6 +23,9 @@ from e2m2e.algorithm.normal_form.hamiltonian import (
 )
 from e2m2e.algorithm.normal_form.legendre import expand_legendre_1_over_r
 
+pytestmark = pytest.mark.theory
+
+
 # ---------------------------------------------------------------------------
 # 公共 fixture：可复用的上下文与 Legendre 展开
 # ---------------------------------------------------------------------------

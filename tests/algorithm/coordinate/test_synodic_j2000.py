@@ -10,7 +10,10 @@ from numpy.testing import assert_allclose
 from e2m2e.algorithm.coordinate import SynodicJ2000System
 from e2m2e.algorithm.dynamics import CR3BP_System
 
-pytestmark = pytest.mark.spice
+pytestmark = [
+    pytest.mark.data,
+    pytest.mark.spice,
+]
 
 
 # =============================================================================

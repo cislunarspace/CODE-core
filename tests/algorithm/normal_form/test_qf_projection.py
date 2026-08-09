@@ -16,6 +16,8 @@ pytest.importorskip("sympy")
 
 from e2m2e.algorithm.normal_form.qf_projection import project_hamiltonian_to_qf
 
+pytestmark = pytest.mark.theory
+
 
 def _make_qf_result(B_samples: np.ndarray, tlist: np.ndarray) -> MagicMock:
     """构造一个提供 ``B(t)`` 与 ``tlist`` 的 mock QF result。"""

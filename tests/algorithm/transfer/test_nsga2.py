@@ -5,6 +5,9 @@ import pytest
 
 from e2m2e.algorithm.transfer.nsga2 import NSGA2Result, nsga2
 
+pytestmark = pytest.mark.orchestration
+
+
 # ----------------------------------------------------------------------
 # 模块级目标函数（ProcessPoolExecutor 可 pickle）
 # ----------------------------------------------------------------------

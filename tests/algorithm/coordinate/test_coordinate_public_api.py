@@ -4,6 +4,7 @@
 """
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.coordinate import (
     Axes,
@@ -17,6 +18,8 @@ from e2m2e.algorithm.coordinate import (
     Origin,
     standard_itrf,
 )
+
+pytestmark = pytest.mark.data
 
 
 def test_public_coordinate_exports_are_available():

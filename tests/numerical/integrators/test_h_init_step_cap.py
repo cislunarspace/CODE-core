@@ -12,7 +12,10 @@ import pytest
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.point_mass_gravity import PointMassGravity
 
-pytestmark = [pytest.mark.spice, pytest.mark.l3]
+pytestmark = [
+    pytest.mark.integrator,
+    pytest.mark.spice,
+]
 
 # 地球引力参数 (km³/s²)
 EARTH_MU = 398600.4418

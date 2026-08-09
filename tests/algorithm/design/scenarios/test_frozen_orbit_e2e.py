@@ -27,7 +27,7 @@ _SPICE_AVAILABLE = os.path.isdir(_SPICE_KERNEL_DIR) and any(
 )
 
 pytestmark = [
-    pytest.mark.l3,
+    pytest.mark.orchestration,
     pytest.mark.slow,
     pytest.mark.spice,
     pytest.mark.skipif(not _SPICE_AVAILABLE, reason="SPICE kernels not available"),

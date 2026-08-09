@@ -10,7 +10,10 @@ from numpy.testing import assert_allclose
 from e2m2e.algorithm.solver.multiple_shooting import convert_to_j2000, sample_patch_points
 from e2m2e.data.types.orbit import Orbit
 
-pytestmark = [pytest.mark.spice, pytest.mark.l3]
+pytestmark = [
+    pytest.mark.orchestration,
+    pytest.mark.spice,
+]
 
 
 # =============================================================================

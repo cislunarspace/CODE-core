@@ -22,7 +22,10 @@ from e2m2e.algorithm.forces import (
     ThirdBodyGravity,
 )
 
-pytestmark = pytest.mark.spice
+pytestmark = [
+    pytest.mark.force,
+    pytest.mark.spice,
+]
 
 # 公共 SPICE fixtures 来自 tests/conftest.py:
 #   spice_manager, spice_eph_system, spice_eph_dynamics, reference_et,

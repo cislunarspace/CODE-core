@@ -14,6 +14,9 @@ from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 from e2m2e.algorithm.forces.drag import DragModel
 from e2m2e.data.kernels.manager import SPICEManager
 
+pytestmark = pytest.mark.force
+
+
 _EARTH_R_KM = 6378.137
 _KM_TO_M = 1000.0
 

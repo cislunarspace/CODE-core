@@ -20,6 +20,9 @@ from e2m2e.algorithm.transfer import (
     TransferSolution,
 )
 
+pytestmark = pytest.mark.orchestration
+
+
 MU_EARTH = 398600.4418  # km³/s²
 
 R1 = 7000.0  # km

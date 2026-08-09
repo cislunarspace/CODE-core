@@ -10,6 +10,8 @@ from e2m2e.data.types.trajectory import (
     write_ephemeris,
 )
 
+pytestmark = pytest.mark.aux
+
 
 class TestReadEphemeris:
     def test_dac_fixture_row_count_and_columns(self, fixtures_dir):

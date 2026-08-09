@@ -8,6 +8,9 @@ import pytest
 
 from e2m2e.algorithm.coordinate.standard_dynamic_axes import LVLHAxes, VNBAxes
 
+pytestmark = pytest.mark.data
+
+
 # ---------------------------------------------------------------------------
 # 公共状态
 # ---------------------------------------------------------------------------

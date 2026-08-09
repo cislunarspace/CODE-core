@@ -29,6 +29,9 @@ from e2m2e.algorithm.solver.continuation import Continuation
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from tests.algorithm.design import seeds
 
+pytestmark = pytest.mark.orchestration
+
+
 #: 每族要走的延拓步数
 N_STEPS = 5
 #: 延拓链散度上界。区别于修正测试的 1e-6 精度检查：SPO/LPO 用 3 约束全周期

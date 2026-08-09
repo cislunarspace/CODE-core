@@ -8,6 +8,8 @@ import pytest
 
 from e2m2e.algorithm.forces import PhysicalModel
 
+pytestmark = pytest.mark.force
+
 
 class ConstantForce(PhysicalModel):
     """测试用恒力模型。"""

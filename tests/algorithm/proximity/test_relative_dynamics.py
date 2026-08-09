@@ -8,6 +8,9 @@ from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.proximity.relative_dynamics import RelativeDynamics, RelativeState, TargetOrbit
 from e2m2e.data.types.orbit import Orbit
 
+pytestmark = pytest.mark.orchestration
+
+
 MU_EARTH_MOON = 0.0121505856  # 地月质量比
 
 

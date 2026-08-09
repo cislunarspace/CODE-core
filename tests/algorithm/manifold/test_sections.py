@@ -11,6 +11,9 @@ import pytest
 from e2m2e.algorithm.manifold import ManifoldKind, ManifoldTube, PoincareSection, SectionCrossings
 from e2m2e.data.types.orbit import Orbit
 
+pytestmark = pytest.mark.orchestration
+
+
 # 3:1 DRO 种子（与 tests/conftest.py 一致），用于绕月弧的近拱点检测
 DRO_X0 = 0.79188556619742
 DRO_VY0 = 0.573665890385585

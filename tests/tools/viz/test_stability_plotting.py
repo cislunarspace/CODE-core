@@ -14,6 +14,9 @@ from e2m2e.algorithm.stability import StabilityAnalysis
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
 from e2m2e.tools.viz import FamilyPlotter
 
+pytestmark = pytest.mark.aux
+
+
 MU = 1.21506683e-2
 
 

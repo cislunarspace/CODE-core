@@ -12,6 +12,8 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
 
+pytestmark = pytest.mark.theory
+
 
 class TestLibrationPointEnum:
     """Tests for LibrationPoint enum"""

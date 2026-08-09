@@ -15,7 +15,7 @@ from tests.numerical.integrators.conftest import (
     propagate_rk,
 )
 
-pytestmark = [pytest.mark.l1]
+pytestmark = pytest.mark.integrator
 
 
 def test_rk89_imports():

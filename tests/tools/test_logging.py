@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import logging
 
+import pytest
+
 from e2m2e.tools.logging import KeyValueFormatter, configure_logging
+
+pytestmark = pytest.mark.aux
 
 
 class TestKeyValueFormatter:

@@ -1,5 +1,9 @@
 """转移模块导出卫生测试。"""
 
+import pytest
+
+pytestmark = pytest.mark.orchestration
+
 
 def test_module_does_not_export_nlp_result():
     """NLPOptimizationResult 不应再从 e2m2e.algorithm.transfer 公共导出。"""

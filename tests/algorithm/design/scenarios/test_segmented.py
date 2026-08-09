@@ -17,7 +17,11 @@ import pytest
 from e2m2e.algorithm.design import design_orbit
 from e2m2e.api.models import DesignOrbitRequest
 
-pytestmark = [pytest.mark.slow, pytest.mark.spice, pytest.mark.l3]
+pytestmark = [
+    pytest.mark.orchestration,
+    pytest.mark.slow,
+    pytest.mark.spice,
+]
 
 # 30 天 Halo：main_design 默认参数，复现逐段积分场景
 DURATION_SEC = 30 * 86400.0

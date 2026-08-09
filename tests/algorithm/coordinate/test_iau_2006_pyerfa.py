@@ -20,6 +20,9 @@ from e2m2e.algorithm.coordinate.iau_2006 import (
 )
 from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
 
+pytestmark = pytest.mark.data
+
+
 # 单一 T 值:框架先立,后续要更严再加 T 扫描
 T_TEST = 0.5
 # T=0.5 时,et(秒) = T * 36525 * 86400

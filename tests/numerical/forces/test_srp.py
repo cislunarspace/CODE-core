@@ -12,6 +12,9 @@ from e2m2e.algorithm.forces import PhysicalModel
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
 from e2m2e.data.templates.systems import AU as _AU_KM
 
+pytestmark = pytest.mark.force
+
+
 # 太阳光压常数（N/m² @ 1 AU）。
 _P_SRP_1AU = 4.56e-6
 

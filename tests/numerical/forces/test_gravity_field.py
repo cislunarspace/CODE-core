@@ -12,6 +12,8 @@ import pytest
 
 from e2m2e.algorithm.forces import GravityField
 
+pytestmark = pytest.mark.force
+
 
 @pytest.fixture
 def minimal_gravity_file(tmp_path):

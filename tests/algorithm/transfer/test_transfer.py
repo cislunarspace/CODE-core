@@ -12,6 +12,8 @@ from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import Transfer, TransferConfig, TransferOptimizationResult
 from e2m2e.data.types.orbit import Orbit
 
+pytestmark = pytest.mark.orchestration
+
 
 def test_transfer_has_no_convert_nlp_result_method(dynamics):
     """Transfer 不应再包含 _convert_nlp_result 转换函数。"""

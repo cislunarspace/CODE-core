@@ -13,6 +13,9 @@ from e2m2e.algorithm.station_keeping.target_point import (
     StrictTargetPointLaw,
 )
 
+pytestmark = pytest.mark.orchestration
+
+
 _SECONDS_PER_DAY = 86400.0
 
 

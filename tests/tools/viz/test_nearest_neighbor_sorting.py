@@ -12,6 +12,8 @@ matplotlib.use("Agg")
 from e2m2e.algorithm.dynamics import CR3BP_System
 from e2m2e.tools.viz.base import OrbitVisualizer
 
+pytestmark = pytest.mark.aux
+
 
 @pytest.fixture
 def visualizer():

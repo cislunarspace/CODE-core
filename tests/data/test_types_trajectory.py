@@ -5,6 +5,8 @@ import pytest
 
 from e2m2e.data.types.trajectory import EphemerisTable, NominalOrbit
 
+pytestmark = pytest.mark.data
+
 
 def _table() -> EphemerisTable:
     return EphemerisTable(

@@ -16,6 +16,8 @@ from e2m2e.algorithm.forces import GravityField
 from e2m2e.algorithm.transfer import EngineConfig, LowThrustShooting
 from e2m2e.data.kernels.manager import SPICEManager
 
+pytestmark = pytest.mark.orchestration
+
 
 def _semi_major_axis(state, mu):
     """从状态向量用能量公式计算半长轴。"""

@@ -15,6 +15,8 @@ from e2m2e.algorithm.dynamics import CR3BP_System
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.tools.viz.transfer import TransferPlotter
 
+pytestmark = pytest.mark.aux
+
 
 @pytest.fixture
 def system():

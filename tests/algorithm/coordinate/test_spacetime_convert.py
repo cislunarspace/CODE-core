@@ -9,6 +9,9 @@ import pytest
 
 from e2m2e.algorithm.coordinate import spacetime_convert
 
+pytestmark = pytest.mark.data
+
+
 # ---------------------------------------------------------------------------
 # SPICE 与 kernel 可用性检测（与 tests/algorithms/normal_form/test_hamiltonian.py 一致）
 # ---------------------------------------------------------------------------

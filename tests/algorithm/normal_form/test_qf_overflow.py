@@ -24,6 +24,8 @@ from e2m2e.algorithm.normal_form.quasi_floquet import (
     real_normal_form_matrix,
 )
 
+pytestmark = pytest.mark.theory
+
 
 @pytest.fixture
 def l2_M_D():

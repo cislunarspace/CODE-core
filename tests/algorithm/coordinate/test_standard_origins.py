@@ -5,7 +5,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
+
+pytestmark = pytest.mark.data
 
 
 class TestCelestialBodyOriginBodyProperty:

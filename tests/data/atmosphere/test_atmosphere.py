@@ -8,6 +8,9 @@ import pytest
 
 from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 
+pytestmark = pytest.mark.data
+
+
 # USSA76 指数模型基准密度（kg/m³），用于验证误差 < 20%。
 # 这些是 US Standard Atmosphere 1976 分段指数拟合的标准断点值。
 USS76_REFERENCE_DENSITY = {

@@ -18,6 +18,9 @@ from e2m2e.algorithm.solver.differential_correction import DifferentialCorrectio
 from e2m2e.algorithm.transfer import StateTerminal, ThreeBodyLambert, TransferSolution
 from e2m2e.data.types.orbit import Orbit
 
+pytestmark = pytest.mark.orchestration
+
+
 # 地月系统质量参数（与 tests/algorithms/conftest.py 一致）
 MU = 1.21506683e-2
 DU = 384405.0  # km

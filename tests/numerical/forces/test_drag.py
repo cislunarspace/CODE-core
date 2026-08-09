@@ -14,6 +14,8 @@ from e2m2e.algorithm.forces.drag import DragModel
 from e2m2e.data.templates.systems import KM_TO_M as _KM_TO_M
 from e2m2e.data.templates.systems import R_EARTH as _EARTH_R_KM
 
+pytestmark = pytest.mark.force
+
 
 def _system_with_spice():
     """最小 system 桩：to_rust_spec 只检查 getattr(system, 'spice') 非 None。"""

@@ -17,6 +17,9 @@ from e2m2e.algorithm.normal_form.legendre import (
     expand_legendre_for_body,
 )
 
+pytestmark = pytest.mark.theory
+
+
 # ---------------------------------------------------------------------------
 # 基本烟测
 # ---------------------------------------------------------------------------

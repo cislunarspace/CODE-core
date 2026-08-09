@@ -9,6 +9,8 @@ from e2m2e.algorithm.proximity.safety import (
     max_collision_probability,
 )
 
+pytestmark = pytest.mark.orchestration
+
 
 class TestSafetyRegion:
     """安全域几何。"""

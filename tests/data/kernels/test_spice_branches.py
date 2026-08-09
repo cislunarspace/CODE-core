@@ -10,6 +10,8 @@ import pytest
 
 from e2m2e.data.kernels.manager import _GM_VALUES, SPICEManager
 
+pytestmark = pytest.mark.data
+
 
 class TestLoadKernelFileNotFound:
     def test_raises_for_missing_file(self):

@@ -11,7 +11,7 @@ from scipy.integrate import solve_ivp
 from e2m2e.integrators import RkMethod
 from tests.numerical.integrators.conftest import normalized_leo_j2, propagate_rk
 
-pytestmark = [pytest.mark.l1]
+pytestmark = pytest.mark.integrator
 
 
 def test_rk_family_matches_dop853():

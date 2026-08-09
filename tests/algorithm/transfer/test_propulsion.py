@@ -11,6 +11,9 @@ import pytest
 from e2m2e.algorithm.transfer.cost import TransferCost
 from e2m2e.algorithm.transfer.propulsion import ImpulsivePropulsion
 
+pytestmark = pytest.mark.orchestration
+
+
 # =============================================================================
 # ImpulsivePropulsion 初始化
 # =============================================================================

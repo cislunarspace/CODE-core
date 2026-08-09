@@ -10,6 +10,9 @@ import pytest
 
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 
+pytestmark = pytest.mark.force
+
+
 _AU_KM = 149597870.691
 _R_EARTH = 6378.1363
 _R_SUN = 695700.0

@@ -4,8 +4,11 @@
 """
 
 import matplotlib
+import pytest
 
 from e2m2e.tools.viz.config import PlotConfig
+
+pytestmark = pytest.mark.aux
 
 
 class TestApplyRcParams:

@@ -13,6 +13,9 @@ from e2m2e.algorithm.family.lissajous_initial_guess import (
     compute_lissajous_initial_guess,
 )
 
+pytestmark = pytest.mark.orchestration
+
+
 # =============================================================================
 # Module identity
 # =============================================================================

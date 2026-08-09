@@ -6,11 +6,15 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
 from e2m2e.data.templates.systems import AU as _AU_KM
 from e2m2e.data.templates.systems import R_EARTH as _R_EARTH
+
+pytestmark = pytest.mark.force
+
 
 _R_SUN = 695700.0
 _P_SRP_1AU = 4.56e-6

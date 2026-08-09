@@ -12,7 +12,10 @@ from e2m2e.algorithm.dynamics import Dynamics
 from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.mbse.data.enums import ReferenceFrame
 
-pytestmark = [pytest.mark.spice, pytest.mark.l3]
+pytestmark = [
+    pytest.mark.theory,
+    pytest.mark.spice,
+]
 
 
 # =============================================================================

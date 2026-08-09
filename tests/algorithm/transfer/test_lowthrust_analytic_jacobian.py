@@ -14,6 +14,8 @@ from e2m2e.integrators import (
     propagate_compiled_lowthrust_sensitivity,
 )
 
+pytestmark = pytest.mark.integrator
+
 
 def _assert_sensitivity_match(name, analytic, fd, indices, rel_tol=1e-5, abs_floor=1e-6):
     """校验解析灵敏度 vs 有限差分一致。

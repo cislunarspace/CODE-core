@@ -19,7 +19,7 @@ from e2m2e.algorithm.ephemeris_correction import (
 )
 from e2m2e.mbse.data.enums import BoundaryMode
 
-pytestmark = [pytest.mark.l3]
+pytestmark = pytest.mark.orchestration
 
 
 def test_standard_method_uses_multiple_shooting_and_normalizes_result(monkeypatch):

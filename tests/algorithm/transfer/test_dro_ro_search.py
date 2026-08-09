@@ -7,6 +7,8 @@ from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import DEFAULT_MIN_DISTANCE_THRESHOLD_DU, TransferSearch
 from e2m2e.data.types.orbit import Orbit
 
+pytestmark = pytest.mark.orchestration
+
 
 @pytest.fixture
 def system():

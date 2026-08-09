@@ -12,6 +12,9 @@ from e2m2e.algorithm.family.halo_initial_guess import (
     halo_third_order_approximation,
 )
 
+pytestmark = pytest.mark.orchestration
+
+
 MU = 0.012150585  # Earth-Moon mass ratio
 
 

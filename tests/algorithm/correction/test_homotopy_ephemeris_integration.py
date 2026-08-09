@@ -15,7 +15,10 @@ from e2m2e.algorithm.ephemeris_correction.homotopy import (
     correct_with_homotopy,
 )
 
-pytestmark = [pytest.mark.spice, pytest.mark.l3]
+pytestmark = [
+    pytest.mark.orchestration,
+    pytest.mark.spice,
+]
 
 
 def _trivial_pseudo_dro(spice_eph_dynamics, n_points: int = 5):

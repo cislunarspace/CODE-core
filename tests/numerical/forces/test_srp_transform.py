@@ -16,6 +16,9 @@ from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
 from e2m2e.data.kernels.manager import SPICEManager
 
+pytestmark = pytest.mark.force
+
+
 _R_EARTH = 6378.1363
 _R_SUN = 695700.0
 

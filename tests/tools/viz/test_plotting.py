@@ -17,6 +17,8 @@ from e2m2e.data.types.orbit import Orbit, OrbitFamily
 from e2m2e.tools.viz.base import OrbitVisualizer
 from e2m2e.tools.viz.family import FamilyPlotter
 
+pytestmark = pytest.mark.aux
+
 
 class TestOrbitVisualizerCreation:
     """测试可视化器创建"""

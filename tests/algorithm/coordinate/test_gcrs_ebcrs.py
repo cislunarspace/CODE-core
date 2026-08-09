@@ -28,7 +28,10 @@ from kernel_helpers import SPICE_KERNEL_DIR
 from e2m2e.algorithm.coordinate import GCRSEBCRSSystem
 from e2m2e.data.frames.gmat_fixture import CoordinateDataError
 
-pytestmark = pytest.mark.spice
+pytestmark = [
+    pytest.mark.data,
+    pytest.mark.spice,
+]
 
 _CONSTANTS_KMS = Constants.UNIT_KM | Constants.UNIT_SEC | Constants.USE_NAIFID
 

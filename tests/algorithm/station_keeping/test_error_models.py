@@ -1,6 +1,7 @@
 """station_keeping 误差模型单测（纯 numpy，不依赖 SPICE/pyd）。"""
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.station_keeping.error_models import (
     BoxMullerSampler,
@@ -8,6 +9,8 @@ from e2m2e.algorithm.station_keeping.error_models import (
     SrpErrorModel,
     ThrustExecutionError,
 )
+
+pytestmark = pytest.mark.orchestration
 
 
 class TestBoxMullerSampler:

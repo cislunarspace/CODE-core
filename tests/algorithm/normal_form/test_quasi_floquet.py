@@ -41,6 +41,9 @@ from e2m2e.algorithm.normal_form.quasi_floquet import (
     vector_to_sp6,
 )
 
+pytestmark = pytest.mark.theory
+
+
 # ---------------------------------------------------------------------------
 # 公共 fixture（复用 test_dynamical_substitution 的范式）
 # ---------------------------------------------------------------------------

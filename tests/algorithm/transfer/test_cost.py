@@ -8,6 +8,8 @@ import pytest
 
 from e2m2e.algorithm.transfer.cost import compute_transfer_cost
 
+pytestmark = pytest.mark.orchestration
+
 
 def test_transfer_cost_zero_when_velocities_match():
     """出发/注入速度相同、末端/插入速度相同 → 成本为 0"""

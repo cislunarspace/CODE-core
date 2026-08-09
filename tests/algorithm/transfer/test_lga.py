@@ -25,6 +25,9 @@ from e2m2e.algorithm.transfer.lga import (
     search_lga_trajectories,
 )
 
+pytestmark = pytest.mark.orchestration
+
+
 # 地月 CR3BP 参数
 MU = 1.21506683e-2
 DU = 384405.0  # km

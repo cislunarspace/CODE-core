@@ -15,7 +15,7 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.ephemeris_correction.homotopy import HomotopyEphemerisDynamics
 from e2m2e.mbse.data.enums import ReferenceFrame
 
-pytestmark = [pytest.mark.l3]
+pytestmark = pytest.mark.orchestration
 
 
 class FakeSpice:

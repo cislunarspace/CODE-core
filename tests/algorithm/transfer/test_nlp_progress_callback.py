@@ -10,6 +10,8 @@ from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import DROTRONLPOptimizer
 from e2m2e.data.types.orbit import Orbit
 
+pytestmark = pytest.mark.orchestration
+
 
 def _simple_orbit(n: int = 80) -> Orbit:
     t = np.linspace(0, 6.28, n)

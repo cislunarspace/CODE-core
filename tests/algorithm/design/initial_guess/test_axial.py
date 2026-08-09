@@ -10,6 +10,9 @@ import pytest
 from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.family.axial_initial_guess import compute_axial_initial_guess
 
+pytestmark = pytest.mark.orchestration
+
+
 # =============================================================================
 # Module identity
 # =============================================================================

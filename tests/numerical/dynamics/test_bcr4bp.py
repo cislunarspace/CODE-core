@@ -19,6 +19,9 @@ from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 
+pytestmark = pytest.mark.theory
+
+
 MU = 0.0121506683
 
 

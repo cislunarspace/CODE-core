@@ -24,7 +24,7 @@ from e2m2e.data.types.orbit import Orbit
 
 # 集成/端到端层：族延拓 + 流形传播 + 转移优化共享会话级 fixture，默认全量不跑。
 # 跑本文件：uv run pytest -m l3 tests/transfer/test_low_energy.py
-pytestmark = pytest.mark.l3
+pytestmark = pytest.mark.orchestration
 
 MU = 1.21506683e-2
 DU = 384405.0  # km

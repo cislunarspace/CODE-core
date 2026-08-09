@@ -10,6 +10,8 @@ import pytest
 
 from e2m2e.algorithm.forces import IndirectTerm
 
+pytestmark = pytest.mark.force
+
 
 class _FakeSystem:
     """最小 System 桩，提供 gravitational_parameter 与 get_body_position。"""

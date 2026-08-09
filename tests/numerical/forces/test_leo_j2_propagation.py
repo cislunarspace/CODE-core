@@ -10,6 +10,8 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import ForceModel, GravityField
 from e2m2e.data.kernels.manager import SPICEManager
 
+pytestmark = pytest.mark.force
+
 
 @pytest.fixture
 def leo_system(spice_kernel_path):

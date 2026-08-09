@@ -233,16 +233,16 @@ API
 测试覆盖
 --------
 
-- :mod:`tests.algorithms.test_ephemeris_correction_dispatch`：
+- :mod:`tests.algorithm.correction.test_ephemeris_correction_dispatch`：
   dispatch delegation。
-- :mod:`tests.algorithms.test_homotopy_correction_orchestration`：
+- :mod:`tests.algorithm.correction.test_homotopy_correction_orchestration`：
   参数校验、容差分层、初值传递、失败路径、残差历史可观测性。
-- :mod:`tests.algorithms.test_homotopy_correction_dynamics`：
+- :mod:`tests.algorithm.correction.test_homotopy_correction_dynamics`：
   ``HomotopyEphemerisDynamics`` 在 lambda=0/1/中间值的加速度/雅可比
   线性插值语义，使用 ``FakeSpice`` 不依赖真实内核。
-- :mod:`tests.algorithms.test_homotopy_two_level`：
+- :mod:`tests.algorithm.correction.test_homotopy_two_level`：
   two_level 路径的 delegation、聚合语义、参数校验。
-- :mod:`tests.algorithms.test_homotopy_ephemeris_integration`：
+- :mod:`tests.algorithm.correction.test_homotopy_ephemeris_integration`：
   真实 SPICE 内核的端到端集成测试，无内核时自动 ``skip`` 。
 
 参考

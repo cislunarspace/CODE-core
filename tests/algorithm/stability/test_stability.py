@@ -10,6 +10,8 @@ from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.stability import BifurcationType, StabilityAnalysis, StabilityType
 from e2m2e.data.types.orbit import Orbit
 
+pytestmark = pytest.mark.theory
+
 
 class TestStabilityAnalysisCreation:
     """测试稳定性分析创建"""

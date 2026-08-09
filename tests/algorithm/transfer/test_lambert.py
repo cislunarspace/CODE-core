@@ -6,6 +6,9 @@ from scipy.integrate import solve_ivp
 
 from e2m2e.algorithm.transfer import LambertSolution, solve_lambert, solve_lambert_batch
 
+pytestmark = pytest.mark.orchestration
+
+
 MU = 398600.4418
 
 # Vallado 经典算例（poliastro / Orekit 同款回归基准）

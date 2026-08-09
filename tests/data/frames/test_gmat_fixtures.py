@@ -13,6 +13,8 @@ from e2m2e.data.frames.eop import ARCSEC_TO_RAD, EopFile
 from e2m2e.data.frames.gmat_fixture import CoordinateDataError, gmat_fixture_path
 from e2m2e.data.frames.leap_seconds import TaiUtcTable
 
+pytestmark = pytest.mark.data
+
 
 def test_tai_utc_table_preserves_post_2017_leap_seconds():
     table = TaiUtcTable.from_file(gmat_fixture_path("tai-utc.dat"))

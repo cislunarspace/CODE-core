@@ -31,11 +31,10 @@ _SPICE_AVAILABLE = os.path.isdir(_SPICE_KERNEL_DIR) and any(
 )
 
 pytestmark = [
+    pytest.mark.orchestration,
     pytest.mark.slow,
-    pytest.mark.e2e,
     pytest.mark.spice,
     pytest.mark.skipif(not _SPICE_AVAILABLE, reason="SPICE kernels not available"),
-    pytest.mark.l3,
 ]
 
 # 0.05 年 ≈ 18 天

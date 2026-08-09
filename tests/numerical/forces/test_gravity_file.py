@@ -8,6 +8,8 @@ import pytest
 
 from e2m2e.algorithm.forces.gravity_file import load_gfc_file
 
+pytestmark = pytest.mark.force
+
 
 def _minimal_gfc_content():
     return """modelname EGM96_TEST

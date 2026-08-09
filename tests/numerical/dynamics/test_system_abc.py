@@ -10,6 +10,8 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.dynamics.system import System
 from e2m2e.mbse.data.enums import ReferenceFrame, UnitSystem
 
+pytestmark = pytest.mark.theory
+
 
 class FakeSpiceManager:
     """System 接口测试使用的最小 SPICE 替身。"""

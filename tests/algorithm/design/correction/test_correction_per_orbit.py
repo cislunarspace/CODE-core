@@ -10,6 +10,9 @@ import pytest
 # DifferentialCorrection 默认最大迭代次数，用作迭代次数合理性上界。
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 
+pytestmark = pytest.mark.orchestration
+
+
 # (orbit_id, session 缓存 fixture 名) —— parametrize 项与缓存一一对应。
 CORRECTION_CASES = [
     ("dro", "corrected_dro"),

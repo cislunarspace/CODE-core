@@ -39,6 +39,9 @@ from e2m2e.algorithm.normal_form.multiple_shooting import (
     solve_block_tridiagonal,
 )
 
+pytestmark = pytest.mark.theory
+
+
 # ---------------------------------------------------------------------------
 # 公共 fixture
 # ---------------------------------------------------------------------------

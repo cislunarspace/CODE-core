@@ -6,6 +6,9 @@ import pytest
 from e2m2e.algorithm.transfer.porkchop import PorkchopData, porkchop
 from e2m2e.algorithm.transfer.terminal import TerminalCondition
 
+pytestmark = pytest.mark.orchestration
+
+
 MU_EARTH = 398600.4418  # km³/s²
 
 

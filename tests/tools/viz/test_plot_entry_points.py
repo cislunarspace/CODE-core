@@ -17,6 +17,8 @@ from e2m2e.tools.viz.base import OrbitVisualizer
 from e2m2e.tools.viz.family import FamilyPlotter
 from e2m2e.tools.viz.transfer import TransferPlotter
 
+pytestmark = pytest.mark.aux
+
 
 @pytest.fixture
 def system():

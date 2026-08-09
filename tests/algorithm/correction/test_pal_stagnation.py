@@ -15,7 +15,10 @@ from e2m2e.algorithm.solver.differential_correction import DifferentialCorrectio
 from e2m2e.data.types.orbit import Orbit
 
 # 测试运行较慢(约 30-60 秒),只在不在 fast 模式时跑
-pytestmark = [pytest.mark.slow, pytest.mark.l3]
+pytestmark = [
+    pytest.mark.orchestration,
+    pytest.mark.slow,
+]
 
 
 def _build_earth_moon_system() -> CR3BP_System:

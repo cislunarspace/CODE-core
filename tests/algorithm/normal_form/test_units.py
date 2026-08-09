@@ -17,6 +17,8 @@ from e2m2e.algorithm.normal_form import NormalFormContext
 from e2m2e.algorithm.normal_form.constants import LU_KM, MU, TU_S, VU_KMS
 from e2m2e.algorithm.normal_form.units import from_normalized, to_normalized
 
+pytestmark = pytest.mark.theory
+
 
 @pytest.fixture
 def ctx(earth_moon_system) -> NormalFormContext:

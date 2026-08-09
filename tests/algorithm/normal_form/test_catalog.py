@@ -55,6 +55,9 @@ from e2m2e.algorithm.normal_form.quasi_floquet import (
     real_normal_form_matrix,
 )
 
+pytestmark = pytest.mark.theory
+
+
 # ---------------------------------------------------------------------------
 # 公共 fixture（沿用 test_center_manifold / test_quasi_floquet 的范式）
 # ---------------------------------------------------------------------------

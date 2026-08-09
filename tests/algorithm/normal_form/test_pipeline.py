@@ -35,6 +35,9 @@ from e2m2e.algorithm.normal_form.dynamical_substitution import (
 )
 from e2m2e.algorithm.normal_form.quasi_floquet import QuasiFloquetResult
 
+pytestmark = pytest.mark.theory
+
+
 # ---------------------------------------------------------------------------
 # 公共 fixture
 # ---------------------------------------------------------------------------

@@ -6,12 +6,15 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.coordinate.axes import Axes
 from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 from e2m2e.algorithm.coordinate.dynamic_axes import DynamicAxes
 from e2m2e.algorithm.coordinate.origin import Origin
 from e2m2e.algorithm.forces import ForceModel, PhysicalModel
+
+pytestmark = pytest.mark.force
 
 
 class _FixedOrigin(Origin):

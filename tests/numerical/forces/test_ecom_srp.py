@@ -17,7 +17,7 @@ from e2m2e.algorithm.forces.ecom_srp import (
 )
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
 
-pytestmark = [pytest.mark.l1]
+pytestmark = pytest.mark.force
 
 
 class TestEcomConstruction:

@@ -15,6 +15,9 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 from e2m2e.data.kernels.manager import SPICEManager
 
+pytestmark = pytest.mark.force
+
+
 _MOON_R_KM = 1737.4
 
 

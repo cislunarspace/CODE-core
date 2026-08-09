@@ -10,6 +10,8 @@ import pytest
 
 from e2m2e.data.types.orbit import Orbit
 
+pytestmark = pytest.mark.data
+
 
 @pytest.fixture
 def sample_orbit():

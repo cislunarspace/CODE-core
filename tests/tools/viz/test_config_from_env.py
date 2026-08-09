@@ -9,6 +9,8 @@ import pytest
 
 from e2m2e.tools.viz.config import BODY_ICON_SCALE_ENV, PlotConfig
 
+pytestmark = pytest.mark.aux
+
 
 class TestFromEnvBodyIconScale:
     """测试 BODY_ICON_SCALE_ENV 环境变量解析。"""

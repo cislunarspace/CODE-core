@@ -27,10 +27,13 @@ try:
 except ImportError:
     _HAS_RUST_PROPAGATION = False
 
-pytestmark = pytest.mark.skipif(
-    not _HAS_RUST_PROPAGATION,
-    reason="propagate_compiled_lowthrust Rust binding not available",
-)
+pytestmark = [
+    pytest.mark.orchestration,
+    pytest.mark.skipif(
+        not _HAS_RUST_PROPAGATION,
+        reason="propagate_compiled_lowthrust Rust binding not available",
+    ),
+]
 
 
 def _system_forces():

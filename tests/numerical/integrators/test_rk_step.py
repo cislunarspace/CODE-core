@@ -8,7 +8,7 @@ import math
 import numpy as np
 import pytest
 
-pytestmark = [pytest.mark.l1]
+pytestmark = pytest.mark.integrator
 
 
 def test_hello_integrators_smoke():

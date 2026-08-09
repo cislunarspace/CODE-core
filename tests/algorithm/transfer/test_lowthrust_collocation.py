@@ -7,10 +7,14 @@
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.forces import PointMassGravity
 from e2m2e.algorithm.transfer import EngineConfig, LowThrustCollocation, LowThrustShooting
 from e2m2e.integrators import RkMethod, propagate_compiled_lowthrust
+
+pytestmark = pytest.mark.orchestration
+
 
 MU = 398600.435507
 

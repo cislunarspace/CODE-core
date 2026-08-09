@@ -11,6 +11,8 @@ from e2m2e.algorithm.coordinate.axes import Axes
 from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 from e2m2e.algorithm.coordinate.origin import Origin
 
+pytestmark = pytest.mark.data
+
 
 class FixedAxes(Axes):
     """Axes that rotates vectors by a fixed angle around the z-axis."""

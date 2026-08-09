@@ -35,6 +35,9 @@ from e2m2e.algorithm.transfer.search_parallel import (
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.integrators import grid_search_rust, grid_search_rust_serial
 
+pytestmark = pytest.mark.orchestration
+
+
 MU = 1.21506683e-2  # 地月质量参数
 
 # 整数索引字段：精确相等（含 None，未命中时两边都 None）。

@@ -17,6 +17,8 @@ from e2m2e.algorithm.station_keeping.momentum_management import (
     validate_engine_layout,
 )
 
+pytestmark = pytest.mark.orchestration
+
 
 def _full_rank_layout() -> EngineLayout:
     """6 发动机满秩布局（rᵢ 与 eᵢ 不平行，E 与 E_r 各自满秩）。

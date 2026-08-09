@@ -13,7 +13,7 @@ from e2m2e.algorithm.solver.two_level_multiple_shooting import (
 )
 from e2m2e.mbse.data.enums import BoundaryMode, TwoLevelMultipleShootingStatus
 
-pytestmark = [pytest.mark.l3]
+pytestmark = pytest.mark.orchestration
 
 
 class LinearDynamics:

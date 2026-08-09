@@ -8,6 +8,8 @@ import pytest
 
 from e2m2e.algorithm.forces import ForceModel, PhysicalModel
 
+pytestmark = pytest.mark.force
+
 
 class _FakeSystem:
     """仅用于聚合测试的最小 System 桩。"""

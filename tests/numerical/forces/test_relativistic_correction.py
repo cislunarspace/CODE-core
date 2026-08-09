@@ -15,6 +15,8 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import ForceModel, GravityField, RelativisticCorrection
 from e2m2e.data.kernels.manager import SPICEManager
 
+pytestmark = pytest.mark.force
+
 
 def _make_system(mu: float = 398600.435507):
     """返回一个只提供 gravitational_parameter 的最小 system stub。"""

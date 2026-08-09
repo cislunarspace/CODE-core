@@ -23,7 +23,10 @@ import spiceypy
 
 from e2m2e.integrators import reset_ephem_ffi_call_count, spice_spkezr
 
-pytestmark = [pytest.mark.l2, pytest.mark.spice]
+pytestmark = [
+    pytest.mark.data,
+    pytest.mark.spice,
+]
 
 
 @pytest.fixture(autouse=True)

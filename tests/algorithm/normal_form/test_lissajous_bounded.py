@@ -22,6 +22,9 @@ from e2m2e.algorithm.normal_form.context import NormalFormContext
 from e2m2e.algorithm.normal_form.pipeline import NormalFormPipeline
 from e2m2e.algorithm.normal_form.propagation import propagate_parametric
 
+pytestmark = pytest.mark.theory
+
+
 MU_EM = 1.215058560962404e-2
 
 

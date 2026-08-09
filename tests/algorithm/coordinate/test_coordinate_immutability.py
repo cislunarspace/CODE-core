@@ -15,6 +15,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.data
+
 
 def test_no_axes_or_origin_attribute_mutation_in_coordinate():
     """坐标模块内不应出现 axes.attr = ... / origin.attr = ... 等 mutate。

@@ -17,6 +17,9 @@ from e2m2e.algorithm.forces.earth_tide import (
     solid_tide_step2,
 )
 
+pytestmark = pytest.mark.force
+
+
 # 物理常量(量级参考用)
 _MOON_MU = 4902.8001  # km³/s²
 _EARTH_MU = 398600.4415  # km³/s²

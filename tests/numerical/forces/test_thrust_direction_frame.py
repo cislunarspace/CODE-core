@@ -9,6 +9,9 @@ import pytest
 
 from e2m2e.algorithm.forces import FiniteBurn
 
+pytestmark = pytest.mark.force
+
+
 # --- 构造辅助 ---
 
 

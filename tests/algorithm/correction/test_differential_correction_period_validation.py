@@ -3,7 +3,12 @@
 验证无效周期被拒绝、终止原因记录与修正量历史追踪。
 """
 
+import pytest
+
 from e2m2e.data.types.orbit import Orbit
+
+pytestmark = pytest.mark.orchestration
+
 
 # 公共 fixtures 从 tests/algorithms/conftest.py 导入：
 #   dro_dynamics, dro_corrector, dro_seed_orbit, corrected_dro

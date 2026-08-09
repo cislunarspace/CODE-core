@@ -10,7 +10,10 @@ from numpy.testing import assert_allclose
 from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form.context import NormalFormContext
 
-pytestmark = pytest.mark.spice
+pytestmark = [
+    pytest.mark.data,
+    pytest.mark.spice,
+]
 
 
 # =============================================================================

@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.force
+
 
 @pytest.fixture
 def output_dir(tmp_path: Path) -> Path:

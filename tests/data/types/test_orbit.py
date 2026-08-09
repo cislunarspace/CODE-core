@@ -13,6 +13,8 @@ import pytest
 
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
 
+pytestmark = pytest.mark.data
+
 
 class TestOrbitInit:
     """Tests for Orbit initialization"""

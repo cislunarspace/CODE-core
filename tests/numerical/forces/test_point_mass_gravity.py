@@ -8,6 +8,8 @@ import pytest
 
 from e2m2e.algorithm.forces import PointMassGravity
 
+pytestmark = pytest.mark.force
+
 
 class _FakeSystem:
     """最小 System 桩，提供 gravitational_parameter。"""

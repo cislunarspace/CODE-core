@@ -30,6 +30,9 @@ pytest.importorskip("e2m2e._integrators")
 
 from e2m2e.integrators import RkMethod, propagate_compiled
 
+pytestmark = pytest.mark.integrator
+
+
 if propagate_compiled is None:
     pytest.skip("propagate_compiled 需要 spice-feature 构建", allow_module_level=True)
 

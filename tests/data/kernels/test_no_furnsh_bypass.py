@@ -21,7 +21,7 @@ import re
 
 import pytest
 
-pytestmark = pytest.mark.l1
+pytestmark = pytest.mark.data
 
 # 仓库根：tests/core/spice/ → 上溯四级
 _REPO_ROOT = os.path.dirname(

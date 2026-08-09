@@ -6,6 +6,9 @@ from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.force_config import dump_force_config, load_force_config
 from e2m2e.algorithm.forces.force_mapping import PLANET_BODIES, perturbation_to_force_config
 
+pytestmark = pytest.mark.force
+
+
 _ALL_OFF = {
     "sun_body": 0,
     "planets": 0,

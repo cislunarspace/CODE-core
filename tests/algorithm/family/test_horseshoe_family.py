@@ -18,7 +18,7 @@ from e2m2e.algorithm.family.cr3bp_orbits import (
     design_horseshoe,
 )
 
-pytestmark = [pytest.mark.l4]
+pytestmark = pytest.mark.orchestration
 
 CHAR_LENGTH_KM = 384400.0
 

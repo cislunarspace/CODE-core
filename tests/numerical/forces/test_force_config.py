@@ -21,6 +21,8 @@ from e2m2e.algorithm.forces.force_config import (
     load_force_config,
 )
 
+pytestmark = pytest.mark.force
+
 
 class _FakeSystem:
     """仅用于配置测试的最小 System 桩（力构造不需 system，仅 ForceModel 需要）。"""

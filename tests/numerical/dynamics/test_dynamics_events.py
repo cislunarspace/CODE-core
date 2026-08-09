@@ -10,6 +10,8 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.manifold.sections import PoincareSection, detect_crossings
 
+pytestmark = pytest.mark.theory
+
 
 @pytest.fixture
 def dynamics():

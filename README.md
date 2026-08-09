@@ -171,6 +171,8 @@ make check    # cargo fmt/clippy + ruff
 # 或单独：uv run pytest tests/、uv run ruff check .
 ```
 
+测试按 7 个功能类标记组织（`theory`/`integrator`/`force`/`data`/`orchestration`/`interface`/`aux`，详见 `docs/adr/0021-test-suite-functional-categories.md`）。
+
 ## 贡献
 
 1. Fork 本仓库

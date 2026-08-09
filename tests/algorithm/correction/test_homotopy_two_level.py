@@ -16,7 +16,7 @@ from e2m2e.algorithm import ephemeris_correction
 from e2m2e.algorithm.ephemeris_correction import homotopy
 from e2m2e.mbse.data.enums import BoundaryMode
 
-pytestmark = [pytest.mark.l3]
+pytestmark = pytest.mark.orchestration
 
 
 def _fake_dynamics():

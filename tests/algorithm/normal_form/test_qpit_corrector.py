@@ -13,6 +13,9 @@ from e2m2e.algorithm.normal_form.context import NormalFormContext
 from e2m2e.algorithm.normal_form.corrector import QPITCorrector, QPITCorrectorResult
 from e2m2e.algorithm.normal_form.pipeline import NormalFormPipeline
 
+pytestmark = pytest.mark.theory
+
+
 MU_EM = 1.215058560962404e-2
 
 
