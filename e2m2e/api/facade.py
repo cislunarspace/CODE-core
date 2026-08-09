@@ -91,25 +91,38 @@ def _ephemeris_to_dict(ephemeris: EphemerisTable | None) -> dict[str, Any] | Non
 def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse:
     """把 ``OrbitDesignResult`` 翻译为 ``DesignOrbitResponse``（含几何字段，#312）。
 
-    纯翻译、无副作用、不依赖 SPICE：从 ``cr3bp_orbit`` 提取 ``states`` /
-    ``times`` / ``mu``（mu 防御 getattr——``Orbit.system`` 缺省 None，
-    未绑定时 mu 回退 None，同下游 ``facade_bridge`` 约定），``ephemeris``
-    走 :func:`_ephemeris_to_dict`。提取为独立函数便于单测。
+    纯翻译、无副作用、不依赖 SPICE。ELFO 场景下 ``cr3bp_orbit`` /
+    ``correction`` 为 None，对应字段输出默认值（mu=None、states/times 空、
+    correction_converged=False）。CR3BP 场景下从 ``cr3bp_orbit`` 提取
+    ``states`` / ``times`` / ``mu``。
     """
     cr3bp_orbit = result.cr3bp_orbit
+    correction = result.correction
+    if cr3bp_orbit is not None:
+        mu = getattr(cr3bp_orbit.system, "mu", None)
+        states = cr3bp_orbit.states.tolist()
+        times = cr3bp_orbit.times.tolist()
+    else:
+        mu = None
+        states = []
+        times = []
     return DesignOrbitResponse(
         orbit_type=result.orbit_type,
         epoch_utc=result.epoch_utc,
         duration_day=result.duration_day,
         initial_state=result.initial_state.tolist(),
         cr3bp_jacobi=result.cr3bp_jacobi,
-        correction_converged=result.correction.converged,
-        correction_iterations=result.correction.iterations,
+        correction_converged=correction.converged if correction else False,
+        correction_iterations=correction.iterations if correction else 0,
         force_config=result.force_config,
-        mu=getattr(cr3bp_orbit.system, "mu", None),
-        states=cr3bp_orbit.states.tolist(),
-        times=cr3bp_orbit.times.tolist(),
+        mu=mu,
+        states=states,
+        times=times,
         ephemeris=_ephemeris_to_dict(result.ephemeris),
+        drift_e=result.drift_e,
+        drift_aop_deg=result.drift_aop_deg,
+        drift_rp_km=result.drift_rp_km,
+        secular_aop_rate_deg_per_year=result.secular_aop_rate_deg_per_year,
     )
 
 
@@ -166,23 +179,7 @@ class Facade:
             request = DesignOrbitRequest(**params)
             from e2m2e.algorithm.design import design_orbit as _design
 
-            result = _design(
-                request.orbit_type,
-                amplitude=request.amplitude,
-                phase=request.phase,
-                collinear_point=request.collinear_point,
-                north_south=request.north_south,
-                perilune_height=request.perilune_height,
-                amplitude_in=request.amplitude_in,
-                amplitude_out=request.amplitude_out,
-                phase_in=request.phase_in,
-                phase_out=request.phase_out,
-                epoch=request.epoch,
-                duration=request.duration,
-                output_step=request.output_step,
-                correction_method=request.correction_method,
-                kernel_dir=self._config.kernel_dir,
-            )
+            result = _design(request, kernel_dir=self._config.kernel_dir)
             return _design_result_to_response(result)
         except OrbitError:
             raise

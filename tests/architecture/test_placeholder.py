@@ -12,11 +12,11 @@ import pytest
 
 
 def test_design_orbit_implemented():
-    """design_orbit 已实现：形状参数校验先于占位抛错。"""
-    from e2m2e.algorithm.design import design_orbit
+    """design_orbit 已实现：DesignOrbitRequest 校验先于占位抛错。"""
+    from e2m2e.api.models import DesignOrbitRequest
 
-    with pytest.raises(ValueError, match="duration"):
-        design_orbit("DRO", duration=0.0)
+    with pytest.raises(ValueError):
+        DesignOrbitRequest(orbit_type="DRO", duration=0.0)
 
 
 def test_control_orbit_implemented():

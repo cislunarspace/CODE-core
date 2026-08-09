@@ -34,7 +34,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -68,6 +68,9 @@ from ..family.cr3bp_orbits import (
 )
 from ..solver.multiple_shooting import sample_patch_points_perilune_clustered
 
+if TYPE_CHECKING:
+    from ...api.models import DesignOrbitRequest
+
 __all__ = [
     "DesignNotConvergedError",
     "OrbitDesignResult",
@@ -84,9 +87,6 @@ DEFAULT_DESIGN_PERTURBATION: dict[str, int] = {
     "solar_radiation": 1,
     "coupling": 0,
 }
-
-#: 维持时间年→天折算
-DAYS_PER_YEAR = 365.25
 
 #: 星历修正的默认收敛容差（km，6 维状态 max 范数：位置 km + 速度 km/s）。
 #:
@@ -151,18 +151,23 @@ class OrbitDesignResult:
     """任务轨道设计结果。
 
     Attributes:
-        orbit_type: 轨道类型（``"DRO"`` / ``"HALO"`` / ``"NRHO"``）。
+        orbit_type: 轨道类型（``"DRO"`` / ``"HALO"`` / ``"NRHO"`` / ``"ELFO"``）。
         epoch_utc: 起始历元 UTC（ISO 字符串）。
         duration_day: 维持时间（天）。
         output_step_sec: 星历输出间隔（秒）。
         initial_state: 历元时刻惯性系状态（km, km/s），星历修正后首节点。
         ephemeris: 标称星历（文本格式容器：UTC + GCRS 位置 km /
             速度 m/s + 地月会合系无量纲位置）。
-        cr3bp_orbit: CR3BP 周期轨道（参考相位，无量纲）。
-        cr3bp_jacobi: CR3BP 周期轨道的 Jacobi 常数。
+        cr3bp_orbit: CR3BP 周期轨道（参考相位，无量纲）；ELFO 场景为 None。
+        cr3bp_jacobi: CR3BP 周期轨道的 Jacobi 常数；ELFO 场景为 nan。
         correction: 星历修正结果（收敛标志、迭代次数、残差历史、修正后
-            patch points）。
+            patch points）；ELFO 场景为 None。
         force_config: 标称预报使用的力模型配置字典。
+        drift_e: 传播弧段 Δe 首末差（仅 ELFO）。
+        drift_aop_deg: 传播弧段 Δω 首末差（度，仅 ELFO）。
+        drift_rp_km: 传播弧段 Δrp 首末差（km，仅 ELFO）。
+        secular_aop_rate_deg_per_year: ω 线性拟合年漂移率（仅 ELFO）。
+        moon_centric_elements: 月心惯性系根数序列（仅 ELFO）。
     """
 
     orbit_type: str
@@ -171,10 +176,15 @@ class OrbitDesignResult:
     output_step_sec: float
     initial_state: np.ndarray
     ephemeris: EphemerisTable
-    cr3bp_orbit: Orbit
+    cr3bp_orbit: Orbit | None
     cr3bp_jacobi: float
-    correction: EphemerisCorrectionResult
+    correction: EphemerisCorrectionResult | None
     force_config: dict[str, Any]
+    drift_e: float | None = None
+    drift_aop_deg: float | None = None
+    drift_rp_km: float | None = None
+    secular_aop_rate_deg_per_year: float | None = None
+    moon_centric_elements: dict[str, np.ndarray] | None = None
 
     def write_ephemeris(self, path: str | Path) -> None:
         """按文本格式写出标称星历。"""
@@ -728,118 +738,180 @@ def _design_apolune_segmented(
     return np.asarray(all_t, dtype=float), np.asarray(all_s, dtype=float), max_residual
 
 
+def _design_elfo(
+    request: DesignOrbitRequest,
+    spice: SPICEManager,
+    kernel_dir: str,
+    verbose: bool,  # noqa: ARG001
+) -> OrbitDesignResult:
+    """ELFO 冻结轨道管线：经典根数 → 地心初值 → 全摄动传播 → 月心漂移分析。"""
+
+    from ..forces import ForceModel
+    from ..forces.force_mapping import perturbation_to_force_config  # noqa: I001
+    from .frozen_orbit import (
+        MU_MOON,
+        R_MOON,
+        _compute_drift,
+        _extract_moon_centric_elements,
+        _oe2cart,
+    )
+
+    # model_validator 已确保 ELFO 必填字段非 None
+    assert request.semi_major_axis is not None
+    assert request.inclination is not None
+    assert request.arg_of_pericenter is not None
+    assert request.perilune_height is not None
+    assert request.duration is not None
+
+    a = float(request.semi_major_axis)
+    rp = R_MOON + float(request.perilune_height)
+    e = 1.0 - rp / a
+    i_deg = float(request.inclination)
+    aop_deg = float(request.arg_of_pericenter)
+    duration_sec = float(request.duration)
+    output_step = float(request.output_step)
+    perturbation = (
+        request.perturbation if request.perturbation is not None else DEFAULT_DESIGN_PERTURBATION
+    )
+
+    epoch_iso = _epoch_to_iso(request.epoch)
+    et0 = spice.utc_to_et(epoch_iso)
+
+    # 力模型（与 CR3BP 管线同路径）
+    sw = dict(perturbation)
+    bodies = ["EARTH", "MOON"]
+    if sw["sun_body"]:
+        bodies.append("SUN")
+    if sw["planets"]:
+        bodies += ["MERCURY", "VENUS", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE"]
+    full_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
+    full_system.coordinate_system = CoordinateSystem(
+        axes=ICRSAxes(),
+        origin=CelestialBodyOrigin(body="EARTH", spice=spice),
+    )
+    force_config = perturbation_to_force_config(
+        perturbation,
+        earth_degree=request.earth_degree,
+        moon_degree=request.moon_degree,
+        dyb=request.dyb,
+    )
+    fm = ForceModel.from_config(force_config, full_system)
+    fm.rtol = 1e-12
+    fm.atol = 1e-12
+    fm.max_step = 600.0
+
+    # 初值：月心根数 → 月心笛卡尔 → 叠加月球地心状态
+    moon_state = spice.get_body_state("MOON", et0, "J2000", "EARTH")
+    seleno = _oe2cart(a, e, i_deg, 0.0, aop_deg, 0.0, MU_MOON)
+    state0 = np.concatenate(
+        [
+            seleno[:3] + moon_state[:3],
+            seleno[3:6] + moon_state[3:6],
+        ]
+    )
+
+    # 传播
+    et_end = et0 + duration_sec
+    et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * output_step, output_step)
+    out = fm.propagate(state0, (et0, et_end), t_eval=et_grid, max_steps=5_000_000)
+    states = np.asarray(out["states"], dtype=float)
+    n_pts = len(states)
+    times = et_grid[:n_pts]
+
+    # 月心根数提取与漂移统计
+    moon_oe = _extract_moon_centric_elements(times, states, spice)
+    drift = _compute_drift(moon_oe, times=times, output_step_sec=output_step)
+
+    # 星历表（ELFO 仍输出地心惯性系 + 会合系，格式与 CR3BP 一致）
+    system = earth_moon_system()
+    syn_j2000 = SynodicJ2000System(cr3bp_system=system, spice=spice)
+    ephemeris = _build_ephemeris_table(spice, syn_j2000, et0, et_grid[:n_pts], states)
+
+    return OrbitDesignResult(
+        orbit_type="ELFO",
+        epoch_utc=epoch_iso,
+        duration_day=duration_sec / 86400.0,
+        output_step_sec=output_step,
+        initial_state=state0,
+        ephemeris=ephemeris,
+        cr3bp_orbit=None,
+        cr3bp_jacobi=float("nan"),
+        correction=None,
+        force_config=force_config,
+        drift_e=drift["drift_e"],
+        drift_aop_deg=drift["drift_aop_deg"],
+        drift_rp_km=drift["drift_rp_km"],
+        secular_aop_rate_deg_per_year=drift["secular_aop_rate_deg_per_year"],
+        moon_centric_elements=moon_oe,
+    )
+
+
 def design_orbit(
-    orbit_type: str,
+    request: DesignOrbitRequest,
     *,
-    amplitude: float | None = None,
-    phase: float | None = None,
-    collinear_point: int | None = None,
-    north_south: int | None = None,
-    perilune_height: float | None = None,
-    amplitude_in: float | None = None,
-    amplitude_out: float | None = None,
-    phase_in: float | None = None,
-    phase_out: float | None = None,
-    epoch: Sequence[float] | str = (2024, 1, 1, 0, 0, 0.0),
-    duration: float = 1.0,
-    output_step: float = 3600.0,
-    perturbation: dict[str, int] | None = None,
-    dyb: Sequence[float] | None = None,
-    earth_degree: int = 10,
-    moon_degree: int = 10,
     spice: SPICEManager | None = None,
     kernel_dir: str | None = None,
-    correction_method: str = "two_level",
-    correction_revolutions: int = 1,
-    correction_velocity_tolerance: float = 0.1,
     verbose: bool = False,
 ) -> OrbitDesignResult:
-    """端到端设计标称轨道（DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial/L4_SPO/L5_SPO/L4_LPO/L5_LPO/L4_HORSESHOE/L5_HORSESHOE）。
+    """端到端设计标称轨道（DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial/.../ELFO）。
+
+    通过 ``request.orbit_type`` 在内部分派管线：
+
+    - **CR3BP 类型**（DRO/NRHO/Halo/Lissajous/…）：CR3BP 初猜 → 星历修正
+      （多重打靶）→ 高精度长期预报。
+    - **ELFO**：经典开普勒根数构造初值 → 全摄动传播 → 月心根数漂移分析。
 
     Args:
-        orbit_type: ``"DRO"`` / ``"DPO"`` / ``"NRHO"`` / ``"Halo"`` /
-            ``"Lissajous"`` / ``"L4"`` / ``"L5"`` / ``"AXIAL"`` /
-            ``"L4_SPO"`` / ``"L5_SPO"`` / ``"L4_LPO"`` / ``"L5_LPO"`` /
-            ``"L4_HORSESHOE"`` / ``"L5_HORSESHOE"``。
-        amplitude: 振幅（km）。DRO 1737~110000，默认 10000；DPO 1737~110000，
-            默认 20000；Halo 面外振幅 ±73000（正北负南），默认 30000；
-            Axial z 振幅 ±60000（正上下族），默认 5000；NRHO 不用。
-        phase: 初始相位（周期份额）。DRO/DPO/Halo/Axial 取值 0~1，默认
-            0.5001/0/0；NRHO 取值 0.01~0.99，默认 0.5。
-        collinear_point: 共线平动点编号 1/2（Halo/NRHO，默认 2）。
-            Lissajous/Axial 取 1/2/3（默认 2）。
-        north_south: 1=北 / 2=南（NRHO，默认 2）。
-        perilune_height: 近月点高度（km，100~10000，NRHO，默认 5000）。
-        amplitude_in / amplitude_out: 面内/面外振幅（km）。Lissajous
-            L1/L2 各 ≤ 7600、L3 各 ≤ 100000（默认 2500/7500）；L4/L5 面内
-            ≤ 10000、面外 ≤ 76000（默认 8000/6000）。
-        phase_in / phase_out: 面内/面外初始相位（0~1）。Lissajous 默认
-            0.01/0.55；L4/L5 默认 0/0。
-        epoch: 起始历元 UTC，``[年, 月, 日, 时, 分, 秒]`` 或 ISO 字符串。
-        duration: 维持时间（年，0 < d ≤ 20）。
-        output_step: 星历输出间隔（秒）。
-        perturbation: 摄动开关字典（键与取值同
-            ``DEFAULT_PERTURBATION``），经
-            ``perturbation_to_force_config`` 映射为力模型。缺省时用
-            ``DEFAULT_DESIGN_PERTURBATION``：光压炮弹模型、关耦合项
-            （ECOM 光压与耦合项属 #253，需要时显式开启会抛
-            ``NotImplementedError``）。
-        dyb: DYB 系数 9 分量（``dyb[0]`` = 等效面质比 m²/kg）。
-        earth_degree / moon_degree: 引力场阶次。
-        spice: 已加载内核的 ``SPICEManager``；缺省自动创建并加载
-            ``kernel_dir``（默认仓库 ``kernels/``）下的内核。
+        request: ``DesignOrbitRequest``，经 model_validator 校验并填充默认值。
+        spice: 已加载内核的 ``SPICEManager``；缺省自动创建并加载。
         kernel_dir: SPICE 内核目录。
-        correction_method: 星历修正方法。默认 ``"two_level"``——Rust 多重打靶
-            + 速度加权（``vel_weight=pos_tol/vel_tol``），把 patch point 位置
-            连续与速度连续同时压到容差（速度 ≤0.01 m/s），修正解落在准周期轨道
-            上、自由外推有界（修 #324：大幅 DRO 在坏历元从发散 200000 km 收敛
-            到有界 ~80000 km）；全程预制星历表（cspice 缓存）。
-            ``"segmented"`` 论文式分段打靶拼接（逐段独立 var_time 打靶转星历 +
-            远月点分层合并，朱彦伟 2026），对 Halo/NRHO 等不稳定轨道在星历模型下
-            长期保形，同样带速度加权；``"homotopy"`` 同伦过渡（质点 N 体语义，
-            走旧 Python 路径，不含速度加权）。
-            ``"standard"``/``"rust"`` 等价于默认的 Rust 多重打靶路径。
-        correction_revolutions: 星历修正弧长（圈数）。默认 1：中性稳定轨道（DRO）
-            速度连续的初值即落在准周期轨道上，自由外推全程有界，无需多圈修正。
-        correction_velocity_tolerance: 速度残差容差（km/s，仅 ``"homotopy"`` 旧路径）。
-            默认 0.1。默认 Rust 路径不用此参数，改由 ``VELOCITY_TOL_KMS``（0.01 m/s）
-            与 ``CORRECTION_TOL_KM`` 派生 ``vel_weight`` 硬绑。
         verbose: 修正过程显示进度条。
 
     Returns:
-        ``OrbitDesignResult``（标称星历 + 收敛信息）。
+        ``OrbitDesignResult``（标称星历 + 收敛/漂移信息）。
 
     Raises:
         ValueError: 形状参数/任务参数超界。
         NotImplementedError: 摄动开关含 ECOM 光压或耦合项（#253）。
         DesignNotConvergedError: 星历修正未收敛。
     """
-    sel = orbit_type.upper()
-    if not 0.0 < float(duration) <= 20.0:
-        raise ValueError(f"duration 应大于 0 且不超过 20 年，实际为 {duration}")
-    if float(output_step) <= 0.0:
-        raise ValueError(f"output_step 必须为正数，当前 {output_step}")
-    if correction_revolutions < 1:
-        raise ValueError(f"correction_revolutions 必须 ≥ 1，当前 {correction_revolutions}")
-
-    # --- 1. CR3BP 初猜 ---
-    params = _validate_params(
-        sel,
-        amplitude=amplitude,
-        phase=phase,
-        collinear_point=collinear_point,
-        north_south=north_south,
-        perilune_height=perilune_height,
-        amplitude_in=amplitude_in,
-        amplitude_out=amplitude_out,
-        phase_in=phase_in,
-        phase_out=phase_out,
-    )
+    sel = request.orbit_type.upper()
 
     if spice is None:
         spice = SPICEManager()
         load_design_kernels(spice, kernel_dir)
     kernel_dir = kernel_dir or default_kernel_dir()
+
+    # --- ELFO 管线 ---
+    if sel == "ELFO":
+        return _design_elfo(request, spice, kernel_dir, verbose)
+
+    # --- CR3BP 管线 ---
+    # model_validator 已按 orbit_type 填充默认值，此处构建 params dict
+    _params_attrs = (
+        "amplitude",
+        "phase",
+        "collinear_point",
+        "north_south",
+        "perilune_height",
+        "amplitude_in",
+        "amplitude_out",
+        "phase_in",
+        "phase_out",
+    )
+    params: dict[str, float | int] = {}
+    for attr in _params_attrs:
+        v = getattr(request, attr)
+        if v is not None:
+            params[attr] = v
+
+    output_step = float(request.output_step)
+    perturbation = request.perturbation
+    earth_degree = request.earth_degree
+    moon_degree = request.moon_degree
+    dyb = request.dyb
+    correction_method = request.correction_method
+    correction_revolutions = request.correction_revolutions
 
     system = earth_moon_system()
     dynamics = CR3BP_Dynamics(system)
@@ -847,15 +919,10 @@ def design_orbit(
     phase = float(params.get("phase", 0.0))
     jacobi = float(system.get_jacobi_constant(cr3bp_orbit.states[0]))
 
-    # --- 2. 相位 → 历元状态，采样 patch points，转 J2000 ---
+    # --- 相位 → 历元状态，采样 patch points，转 J2000 ---
     assert cr3bp_orbit.period is not None
     period = float(cr3bp_orbit.period)
-    # 相位零点约定：Halo/NRHO 的参考状态（y=0 穿越点）与历史标定样本
-    # 的 phase=0 起点一致；DRO 的参考状态是近侧穿越点，而相位零点在远侧
-    # 穿越点（历史标定：标定样本 phase=0.5001 的 DRO 首行恰在近侧穿越点，
-    # 距月取最小值），差半个周期
     if sel in ("LISSAJOUS", "L4", "L5"):
-        # 面内/面外相位已体现在初猜状态（t=0 即历元状态）
         t0_syn = 0.0
     else:
         phase_offset = 0.5 if sel in ("DRO", "DPO") else 0.0
@@ -868,8 +935,6 @@ def design_orbit(
         state0_syn = np.asarray(cr3bp_orbit.states[0], dtype=float)
 
     if sel == "LISSAJOUS" and cr3bp_orbit.states.shape[0] > 1:
-        # 准周期 Lissajous：从中心流形有界轨迹采样（原生重传播会发散）；
-        # correction_revolutions 超出现轨迹覆盖时按需重建更长轨迹（同 segmented）
         if float(cr3bp_orbit.times[-1]) < (correction_revolutions - 1e-9) * period:
             cr3bp_orbit = design_lissajous(
                 int(params["collinear_point"]),
@@ -892,7 +957,7 @@ def design_orbit(
             perilune_clustered=(sel == "NRHO"),
         )
 
-    epoch_iso = _epoch_to_iso(epoch)
+    epoch_iso = _epoch_to_iso(request.epoch)
     et0 = spice.utc_to_et(epoch_iso)
     t_c = system.characteristic_time
     assert t_c is not None
@@ -902,8 +967,7 @@ def design_orbit(
     )
     t_patch_j2000 = et0 + t_patch_syn * t_c
 
-    # --- 3. 星历修正（N 体模型多重打靶） ---
-    # 默认光压用炮弹模型、关耦合项（ECOM/耦合属 #253，显式开启会报错）
+    # --- 力模型构建（修正 + 长期预报共用） ---
     from ..forces import ForceModel
     from ..forces.force_mapping import perturbation_to_force_config
 
@@ -916,10 +980,6 @@ def design_orbit(
     if sw["planets"]:
         bodies += ["MERCURY", "VENUS", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE"]
 
-    # --- 3. 星历修正（多重打靶）+ 4. 高精度长期预报：共用同一力模型 ---
-    # 关键：打靶修正与长期预报必须用同一套力模型，否则修正初值在预报模型下
-    # 不是平衡态，非线性放大后轨道发散。homotopy 方法内部硬绑 EphemerisDynamics
-    # （仅质点 N 体），无法挂全摄动，故单独走旧路径。
     full_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
     full_system.coordinate_system = CoordinateSystem(
         axes=ICRSAxes(),
@@ -933,9 +993,10 @@ def design_orbit(
     fm.atol = 1e-12
     fm.max_step = 600.0
 
-    duration_day = float(duration) * DAYS_PER_YEAR
-    duration_sec = duration_day * 86400.0
-    et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * float(output_step), float(output_step))
+    assert request.duration is not None  # model_validator 已填默认值
+    duration_sec = float(request.duration)
+    duration_day = duration_sec / 86400.0
+    et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * output_step, output_step)
 
     if correction_method == "segmented":
         # --- segmented：论文式分段打靶拼接（默认方法）---

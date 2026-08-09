@@ -41,6 +41,7 @@ def main() -> None:
     setup_cjk_font()
 
     from e2m2e.algorithm.design import design_orbit
+    from e2m2e.api.models import DesignOrbitRequest
     from e2m2e.tools.viz import OrbitVisualizer
 
     # 1. 端到端设计一条 L2 Halo（CR3BP 初猜 → 星历修正 → 高精度预报）
@@ -62,17 +63,16 @@ def main() -> None:
         print(f"     {k} = {v}")
     t0 = time.perf_counter()
     result = design_orbit(
-        "Halo",
-        collinear_point=2,
-        amplitude=30000.0,
-        phase=0.0,
-        duration=30 / 365.25,
-        output_step=3600.0,
-        perturbation=perturbation,
-        # 论文式分段打靶拼接（朱彦伟 2026）：逐段独立打靶转星历 + 远月点
-        # 分层合并，对 Halo 等不稳定轨道长期保形。默认 two_level 适合
-        # 单圈修正 + 短期预报；segmented 显式用于长期设计。
-        correction_method="segmented",
+        DesignOrbitRequest(
+            orbit_type="HALO",
+            collinear_point=2,
+            amplitude=30000.0,
+            phase=0.0,
+            duration=30 * 86400.0,
+            output_step=3600.0,
+            perturbation=perturbation,
+            correction_method="segmented",
+        )
     )
     elapsed = time.perf_counter() - t0
     print(f"   耗时 {elapsed:.1f} s")

@@ -24,10 +24,11 @@ import numpy as np  # noqa: E402
 
 from e2m2e.algorithm.design.design_orbit import design_orbit  # noqa: E402
 from e2m2e.algorithm.station_keeping.controller import control_orbit  # noqa: E402
+from e2m2e.api.models import DesignOrbitRequest  # noqa: E402
 
 # ─── 轨道与仿真参数 ───────────────────────────────────────────────────────────
 EPOCH = [2024, 1, 1, 0, 0, 0.0]
-ORBIT_DURATION_YEARS = 0.05  # ~18 天，足够 5 个控制节点（间隔 3 天）
+ORBIT_DURATION_SEC = 0.05 * 365.25 * 86400  # ~18 天，足够 5 个控制节点（间隔 3 天）
 CONTROL_INTERVAL_DAYS = 3.0  # 短间隔，快速验证
 FEEDBACK_ARC_DAYS = 3.0  # 与 control_interval 对齐
 NUM_CONTROLS = 5
@@ -97,13 +98,15 @@ if __name__ == "__main__":
     # Step 1: 生成标称 NRHO 轨道
     print("\n[1/4] 生成标称 NRHO 轨道 ...")
     orbit_result = design_orbit(
-        "NRHO",
-        collinear_point=2,
-        north_south=1,
-        perilune_height=3500.0,
-        epoch=EPOCH,
-        duration=ORBIT_DURATION_YEARS,
-        output_step=OUTPUT_STEP,
+        DesignOrbitRequest(
+            orbit_type="NRHO",
+            collinear_point=2,
+            north_south=1,
+            perilune_height=3500.0,
+            epoch=EPOCH,
+            duration=ORBIT_DURATION_SEC,
+            output_step=OUTPUT_STEP,
+        )
     )
     NOMINAL_EPH = orbit_result.ephemeris
     print(f"  标称星历行数: {len(NOMINAL_EPH)}")

@@ -158,35 +158,35 @@ class TestPhysicalInvariants:
 
 
 class TestAxialDesignOrbit:
-    """design_orbit 入口分发 AXIAL。"""
+    """DesignOrbitRequest 校验 AXIAL 参数。"""
 
     def test_design_orbit_validates_axial_params(self):
-        """design_orbit("AXIAL", ...) 参数校验先于实现：duration 校验优先。"""
-        from e2m2e.algorithm.design import design_orbit
+        """duration=0 应在模型层被拒。"""
+        from e2m2e.api.models import DesignOrbitRequest
 
-        with pytest.raises(ValueError, match="duration"):
-            design_orbit("AXIAL", duration=0.0)
+        with pytest.raises(ValueError):
+            DesignOrbitRequest(orbit_type="AXIAL", duration=0.0)
 
     def test_design_orbit_rejects_bad_collinear_point(self):
         """collinear_point=4 应抛 ValueError。"""
-        from e2m2e.algorithm.design import design_orbit
+        from e2m2e.api.models import DesignOrbitRequest
 
-        with pytest.raises(ValueError, match="collinear_point"):
-            design_orbit("AXIAL", collinear_point=4, duration=0.5)
+        with pytest.raises(ValueError):
+            DesignOrbitRequest(orbit_type="AXIAL", collinear_point=4)
 
     def test_design_orbit_rejects_amplitude_out_of_range(self):
         """|amplitude| > 60000 km 应抛 ValueError。"""
-        from e2m2e.algorithm.design import design_orbit
+        from e2m2e.api.models import DesignOrbitRequest
 
         with pytest.raises(ValueError, match="amplitude"):
-            design_orbit("AXIAL", amplitude=80000.0, duration=0.5)
+            DesignOrbitRequest(orbit_type="AXIAL", amplitude=80000.0)
 
     def test_design_orbit_rejects_bad_phase(self):
         """phase 超界应抛 ValueError。"""
-        from e2m2e.algorithm.design import design_orbit
+        from e2m2e.api.models import DesignOrbitRequest
 
-        with pytest.raises(ValueError, match="phase"):
-            design_orbit("AXIAL", phase=1.5, duration=0.5)
+        with pytest.raises(ValueError):
+            DesignOrbitRequest(orbit_type="AXIAL", phase=1.5)
 
     def test_validate_params_axial_defaults(self):
         """_validate_params 对 AXIAL 填默认值（collinear_point=2, amplitude=5000, phase=0）。"""

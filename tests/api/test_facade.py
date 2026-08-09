@@ -23,15 +23,20 @@ from e2m2e.data.types.trajectory import EphemerisTable
 class TestDesignOrbitRequest:
     def test_defaults(self):
         req = DesignOrbitRequest(orbit_type="DRO")
-        assert req.duration == 1.0
+        assert req.duration == 31557600.0  # 1 年 = 365.25 × 86400 秒
         assert req.output_step == 3600.0
         assert req.correction_method == "two_level"
 
-    def test_duration_bounds(self):
+    def test_duration_must_be_positive(self):
         with pytest.raises(ValidationError):
             DesignOrbitRequest(orbit_type="DRO", duration=0.0)
-        with pytest.raises(ValidationError):
-            DesignOrbitRequest(orbit_type="DRO", duration=21.0)
+
+    def test_elfo_defaults(self):
+        req = DesignOrbitRequest(orbit_type="ELFO", semi_major_axis=3000.0)
+        assert req.duration == 5184000.0  # 60 天
+        assert req.inclination == 75.0
+        assert req.arg_of_pericenter == 270.0
+        assert req.perilune_height == 200.0
 
     def test_perilune_height_bounds(self):
         with pytest.raises(ValidationError):
@@ -306,6 +311,10 @@ class TestDesignResultToResponse:
             cr3bp_jacobi=3.16,
             correction=correction,
             force_config={"sun_body": 1},
+            drift_e=None,
+            drift_aop_deg=None,
+            drift_rp_km=None,
+            secular_aop_rate_deg_per_year=None,
         )
 
     def test_extracts_geometry_fields(self):

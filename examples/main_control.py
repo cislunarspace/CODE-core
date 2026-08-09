@@ -42,6 +42,7 @@ def main() -> None:
 
     from e2m2e.algorithm.design import design_orbit
     from e2m2e.algorithm.station_keeping import control_orbit
+    from e2m2e.api.models import DesignOrbitRequest
     from e2m2e.tools.viz import OrbitVisualizer
 
     # 1. 设计一条短弧 Halo 标称轨道（供轨道保持）
@@ -62,13 +63,15 @@ def main() -> None:
     for k, v in perturbation.items():
         print(f"     {k} = {v}")
     result = design_orbit(
-        "Halo",
-        collinear_point=2,
-        amplitude=30000.0,
-        phase=0.0,
-        duration=0.1,
-        output_step=3600.0,
-        perturbation=perturbation,
+        DesignOrbitRequest(
+            orbit_type="HALO",
+            collinear_point=2,
+            amplitude=30000.0,
+            phase=0.0,
+            duration=0.1 * 365.25 * 86400,
+            output_step=3600.0,
+            perturbation=perturbation,
+        )
     )
     print(f"   星历行数 = {len(result.ephemeris)}")
 

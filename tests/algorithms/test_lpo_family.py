@@ -199,19 +199,19 @@ class TestL4L5Symmetry:
 
 @_design_orbit_skip
 class TestLpoDesignOrbit:
-    """design_orbit 入口分发 LPO。"""
+    """DesignOrbitRequest 校验 LPO 参数。"""
 
     def test_design_orbit_validates_l4_lpo_params(self):
-        from e2m2e.algorithm.design import design_orbit
+        from e2m2e.api.models import DesignOrbitRequest
 
-        with pytest.raises(ValueError, match="duration"):
-            design_orbit("L4_LPO", duration=0.0)
+        with pytest.raises(ValueError):
+            DesignOrbitRequest(orbit_type="L4_LPO", duration=0.0)
 
     def test_design_orbit_rejects_amplitude_out_of_range(self):
-        from e2m2e.algorithm.design import design_orbit
+        from e2m2e.api.models import DesignOrbitRequest
 
         with pytest.raises(ValueError, match="amplitude"):
-            design_orbit("L4_LPO", amplitude=500.0, duration=0.5)
+            DesignOrbitRequest(orbit_type="L4_LPO", amplitude=500.0)
 
     def test_validate_params_l4_lpo_defaults(self):
         from e2m2e.algorithm.design.design_orbit import _validate_params

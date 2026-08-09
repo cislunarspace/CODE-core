@@ -198,28 +198,28 @@ class TestDpoNotDro:
 
 
 class TestDpoDesignOrbit:
-    """design_orbit 入口分发 DPO。"""
+    """DesignOrbitRequest 校验 DPO 参数。"""
 
     def test_design_orbit_validates_dpo_params(self):
-        """design_orbit("DPO", ...) 参数校验先于实现：duration 校验优先。"""
-        from e2m2e.algorithm.design import design_orbit
+        """duration=0 应在模型层被拒。"""
+        from e2m2e.api.models import DesignOrbitRequest
 
-        with pytest.raises(ValueError, match="duration"):
-            design_orbit("DPO", duration=0.0)
+        with pytest.raises(ValueError):
+            DesignOrbitRequest(orbit_type="DPO", duration=0.0)
 
     def test_design_orbit_rejects_amplitude_out_of_range(self):
         """amplitude < 1737 km 应抛 ValueError。"""
-        from e2m2e.algorithm.design import design_orbit
+        from e2m2e.api.models import DesignOrbitRequest
 
         with pytest.raises(ValueError, match="amplitude"):
-            design_orbit("DPO", amplitude=500.0, duration=0.5)
+            DesignOrbitRequest(orbit_type="DPO", amplitude=500.0)
 
     def test_design_orbit_rejects_bad_phase(self):
         """phase 超界应抛 ValueError。"""
-        from e2m2e.algorithm.design import design_orbit
+        from e2m2e.api.models import DesignOrbitRequest
 
-        with pytest.raises(ValueError, match="phase"):
-            design_orbit("DPO", phase=1.5, duration=0.5)
+        with pytest.raises(ValueError):
+            DesignOrbitRequest(orbit_type="DPO", phase=1.5)
 
     def test_validate_params_dpo_defaults(self):
         """_validate_params 对 DPO 填默认值（amplitude=20000, phase=0.5001）。"""

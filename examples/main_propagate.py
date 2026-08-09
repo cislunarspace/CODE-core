@@ -42,6 +42,7 @@ def main() -> None:
 
     from e2m2e.algorithm.design import design_orbit
     from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
+    from e2m2e.api.models import DesignOrbitRequest
     from e2m2e.tools.viz import OrbitVisualizer
 
     # 1. 设计一条短弧 Halo 作为预报起点（duration=0.02 年 ≈ 7.3 天）
@@ -62,13 +63,15 @@ def main() -> None:
     for k, v in perturbation.items():
         print(f"     {k} = {v}")
     result = design_orbit(
-        "Halo",
-        collinear_point=2,
-        amplitude=30000.0,
-        phase=0.0,
-        duration=0.02,
-        output_step=3600.0,
-        perturbation=perturbation,
+        DesignOrbitRequest(
+            orbit_type="HALO",
+            collinear_point=2,
+            amplitude=30000.0,
+            phase=0.0,
+            duration=0.02 * 365.25 * 86400,
+            output_step=3600.0,
+            perturbation=perturbation,
+        )
     )
     print(f"   初始状态 = {np.round(result.initial_state, 3)}")
 

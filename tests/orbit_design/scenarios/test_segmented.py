@@ -15,11 +15,12 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.design import design_orbit
+from e2m2e.api.models import DesignOrbitRequest
 
 pytestmark = [pytest.mark.slow, pytest.mark.spice, pytest.mark.l3]
 
 # 30 天 Halo：main_design 默认参数，复现逐段积分场景
-DURATION_YEAR = 30 / 365.25
+DURATION_SEC = 30 * 86400.0
 AMPLITUDE_KM = 30000.0
 
 PERTURBATION = {
@@ -44,14 +45,16 @@ MIN_HOURLY_DRIFT_KM = 10.0
 def segmented_result():
     """跑一次 30 天 Halo segmented 设计，模块内复用（耗时 ~4 分钟）。"""
     return design_orbit(
-        "Halo",
-        collinear_point=2,
-        amplitude=AMPLITUDE_KM,
-        phase=0.0,
-        duration=DURATION_YEAR,
-        output_step=3600.0,
-        perturbation=PERTURBATION,
-        correction_method="segmented",
+        DesignOrbitRequest(
+            orbit_type="HALO",
+            collinear_point=2,
+            amplitude=AMPLITUDE_KM,
+            phase=0.0,
+            duration=DURATION_SEC,
+            output_step=3600.0,
+            perturbation=PERTURBATION,
+            correction_method="segmented",
+        )
     )
 
 
