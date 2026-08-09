@@ -345,6 +345,28 @@ class TestDesignResultToResponse:
         # 其余几何字段仍正常
         assert resp.states == [[0.0] * 6, [1.0, 1.0, 1.0, 0.1, 0.1, 0.1]]
 
+    def test_orbit_design_result_field_contract(self):
+        """OrbitDesignResult 字段契约：initial_state 6 维、cr3bp_orbit 多点、jacobi float。
+
+        从 design/scenarios/test_lissajous.py & test_triangular.py 的
+        initial_state_shape / cr3bp_orbit_present 断言下沉（ADR 0021）：
+        字段契约归 interface 类，用 mock result 零管线验证，不靠真传播。
+        """
+        from e2m2e.api.facade import _design_result_to_response
+
+        result = self._mock_result()
+        # algorithm 层 OrbitDesignResult 字段契约
+        assert result.initial_state.shape == (6,)
+        assert result.cr3bp_orbit is not None
+        assert isinstance(result.cr3bp_jacobi, float)
+        assert len(result.cr3bp_orbit.states) > 1
+        # 翻译到 api 层 Response 后对应字段
+        resp = _design_result_to_response(result)
+        assert len(resp.initial_state) == 6
+        assert isinstance(resp.cr3bp_jacobi, float)
+        assert len(resp.states) > 1
+        assert isinstance(resp.mu, float)
+
 
 class TestControlResultToResponse:
     def _mock_result(self, *, controlled):
@@ -437,3 +459,39 @@ class TestGeometryModelFields:
         # 缺省 None
         req_default = ControlOrbitRequest(input_ephemeris="x")
         assert req_default.mu is None
+
+
+class TestWsbTransferDetailsContract:
+    """WsbTransferDetails 字段类型契约（从 transfer/test_wsb.py 下沉）。
+
+    字段类型契约不靠真 WSB 搜索验证，直接构造 dataclass 断言（ADR 0021：
+    字段契约归 interface 类，零管线）。
+    """
+
+    def test_field_types(self):
+        from e2m2e.algorithm.transfer import WsbSearchParams, WsbTransferDetails
+
+        details = WsbTransferDetails(
+            tli_epoch="2025-01-01T00:00:00",
+            tof_sec=1e7,
+            perilune_alt_km=100.0,
+            perilune_vel_km_s=2.5,
+            perilune_state=np.zeros(6),
+            h2_kepler=-0.5,
+            dv_departure_km_s=3.1,
+            dv_arrival_km_s=0.8,
+            n_candidates_searched=100,
+            n_candidates_feasible=5,
+            converged=True,
+            search_params=WsbSearchParams(),
+        )
+        assert isinstance(details.tof_sec, float)
+        assert isinstance(details.perilune_alt_km, float)
+        assert isinstance(details.perilune_vel_km_s, float)
+        assert isinstance(details.dv_departure_km_s, float)
+        assert isinstance(details.dv_arrival_km_s, float)
+        assert isinstance(details.h2_kepler, float)
+        assert isinstance(details.n_candidates_searched, int)
+        assert isinstance(details.n_candidates_feasible, int)
+        assert isinstance(details.converged, bool)
+        assert isinstance(details.search_params, WsbSearchParams)

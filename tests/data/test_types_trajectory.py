@@ -53,3 +53,38 @@ class TestNominalOrbit:
         )
         with pytest.raises(NotImplementedError, match="插值器"):
             orbit.state_at(0.5)
+
+
+class TestEphemerisFieldContract:
+    """EphemerisTable 字段形状契约（从 design/scenarios e2e 测试下沉）。
+
+    ADR 0021：字段形状契约归 data 类，不靠真 design_orbit 传播验证。
+    覆盖原 test_lissajous.py / test_triangular.py 的 output_shape /
+    epoch_matches_input 断言。
+    """
+
+    def test_position_velocity_synodic_shapes(self):
+        """position_km / velocity_mps / synodic_position 形状均为 (n, 3)。"""
+        n = 5
+        t = EphemerisTable(
+            year=np.full(n, 2025, dtype=int),
+            month=np.full(n, 1, dtype=int),
+            day=np.full(n, 1, dtype=int),
+            hour=np.arange(n, dtype=int),
+            minute=np.zeros(n, dtype=int),
+            second=np.zeros(n, dtype=float),
+            position_km=np.arange(n * 3, dtype=float).reshape(n, 3),
+            velocity_mps=np.full((n, 3), 1000.0),
+            synodic_position=np.full((n, 3), 0.5),
+        )
+        assert len(t) == n
+        assert t.position_km.shape == (n, 3)
+        assert t.velocity_mps.shape == (n, 3)
+        assert t.synodic_position.shape == (n, 3)
+
+    def test_epoch_first_row_indexable(self):
+        """起始历元字段（year/month/day）可索引访问，反映输入 epoch。"""
+        t = _table()
+        assert t.year[0] == 2024
+        assert t.month[0] == 1
+        assert t.day[0] == 1
