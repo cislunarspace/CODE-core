@@ -1,0 +1,83 @@
+# 构建 calcephpy 的 Windows 预编译 wheel，发布到 calcephpy-v1 release。
+#
+# 背景：PyPI 上 calcephpy==5.0.0 只有 sdist，Windows 安装须现场编译
+# （cmake + MSVC），开发者 clone e2m2e / transfer-orbit-design 后 uv sync
+# 常因缺编译器失败。e2m2e 经 r2s2 传递依赖 calcephpy，故 wheel 发到本仓库，
+# 两个下游仓库的 [tool.uv] find-links 指向此 release 即可免编译。
+#
+# calcephpy 是 IMCCE/CNRS 的 CALCEPH 库的 Python 绑定（CeCILL-C/B 或
+# CeCILL v2.1 许可），版权归 IMCCE；此处仅提供预编译二进制便利，不修改
+# 上游源码。触发：手动（Actions → Run workflow），或修改本 workflow 时自动。
+
+name: Build calcephpy wheels
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/calcephpy-wheel.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 覆盖 e2m2e 声明支持的 Python 3.10–3.13；下游 transfer-orbit-design
+        # 要求 >=3.13，亦在此范围内。calcephpy 5.0.0 的 Cython 扩展每个
+        # CPython 次版本 ABI 不同，须逐版本编译。
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Show toolchain
+        shell: pwsh
+        run: |
+          python --version
+          cmake --version
+      # --no-deps：只构建 calcephpy 本身的 wheel，不去构建 runtime 声明的
+      # numpy/cython/setuptools。PEP 517 隔离环境自动装 build-system.requires
+      # （setuptools + cython）。setup.py 把 PYTHON=sys.executable 传给 cmake
+      # 的 find_package(Python)，故 matrix 里 setup-python 装的版本即编译版本。
+      - name: Build wheel
+        run: pip wheel calcephpy==5.0.0 --no-deps -w wheelhouse/
+      - name: Smoke test（安装并 import）
+        shell: pwsh
+        run: |
+          # calcephpy 运行时依赖 numpy（install_requires 声明），先装再 import。
+          pip install numpy
+          pip install --no-index --find-links wheelhouse/ calcephpy
+          python -c "import calcephpy; print('calcephpy import OK')"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheel-py${{ matrix.python }}
+          path: wheelhouse/*.whl
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist/
+          merge-multiple: true
+      - name: List wheels
+        run: ls -la dist/
+      - name: Upload to calcephpy-v1 release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # release 不存在则创建（tag 指向 master HEAD）；已存在则跳过创建。
+          # upload --clobber 覆盖同名 asset，保证重跑幂等。
+          gh release create calcephpy-v1 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target master \
+            --title "calcephpy 预编译 wheel（Windows）" \
+            --notes "calcephpy 5.0.0 的 Windows 预编译 wheel（cp310–cp313，win_amd64）。PyPI 仅有 sdist，Windows 需 MSVC 现场编译；此处提供预编译产物，供 e2m2e / transfer-orbit-design 的 uv sync 经 find-links 直接拉取。calcephpy 归 IMCCE/CNRS，CeCILL-C/B 或 CeCILL v2.1 许可。" \
+            || true
+          gh release upload calcephpy-v1 dist/*.whl --repo "$GITHUB_REPOSITORY" --clobber
