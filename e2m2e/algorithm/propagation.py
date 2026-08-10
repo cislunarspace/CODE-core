@@ -18,7 +18,11 @@ __all__ = ["propagate_orbit"]
 _J2000_JD_TDB = 2451545.0
 _SECONDS_PER_DAY = 86400.0
 
-#: 默认三体力模型（地月日点质量引力）
+#: 默认三体力模型（地球点质量引力 + 月球/太阳第三体引力）
+#:
+#: 注意：月球/太阳必须用 ``ThirdBodyGravity``——``PointMassGravity`` 假设状态
+#: 以该天体为原点（中心项），地心传播下会把月心/日心引力错算成朝向地心，太阳
+#: mu 主导下任何合理轨道初值都会步长坍缩。见 ``force_mapping`` 文档约定。
 _DEFAULT_FORCE_CONFIG: dict[str, Any] = {
     "version": 1,
     "forces": [
@@ -30,15 +34,15 @@ _DEFAULT_FORCE_CONFIG: dict[str, Any] = {
         },
         {
             "name": "gravity_moon",
-            "type": "PointMassGravity",
+            "type": "ThirdBodyGravity",
             "enabled": True,
-            "params": {"body": "MOON", "mu": 4902.800118},
+            "params": {"body": "MOON"},
         },
         {
             "name": "gravity_sun",
-            "type": "PointMassGravity",
+            "type": "ThirdBodyGravity",
             "enabled": True,
-            "params": {"body": "SUN", "mu": 1.32712440018e11},
+            "params": {"body": "SUN"},
         },
     ],
 }
