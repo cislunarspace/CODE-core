@@ -37,7 +37,7 @@ _EPS = 50.0 / DU
 
 
 def _make_l1_lyapunov_orbit(system, dynamics) -> tuple[Orbit, DifferentialCorrection]:
-    """生成地月 L1 小振幅 Lyapunov 轨道（与 tests/algorithms/test_manifolds.py 同法）。"""
+    """生成地月 L1 小振幅 Lyapunov 轨道（与 tests/algorithm/manifold/test_manifolds.py 同法）。"""
     gamma = _compute_gamma(MU, 1)
     x_l1 = 1 - MU - gamma
 

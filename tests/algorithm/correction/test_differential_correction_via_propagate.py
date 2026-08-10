@@ -15,7 +15,7 @@ from e2m2e.data.types.orbit import Orbit
 # 地月系统质量比
 MU = 1.21506683e-2
 
-# 公共 fixtures 从 tests/algorithms/conftest.py 导入：
+# 公共 fixtures 从 tests/algorithm/conftest.py 导入：
 #   dro_dynamics, dro_corrector, dro_seed_orbit, corrected_dro
 
 

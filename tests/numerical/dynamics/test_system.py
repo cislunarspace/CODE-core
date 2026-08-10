@@ -365,8 +365,8 @@ class TestCR3BPSystemPhysicalConstants:
         assert expected == CR3BP_System.YEAR
 
 
-# --- Ported from tests/core/system/test_system_info.py ---
-# info() method tests — unique coverage not in the main system test suite
+# --- info() method tests（迁移前位于旧 core 包）---
+# unique coverage not in the main system test suite
 
 
 @pytest.fixture

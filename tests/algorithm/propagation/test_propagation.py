@@ -13,7 +13,7 @@ pytestmark = pytest.mark.integrator
 
 
 # ---------------------------------------------------------------------------
-# SPICE 与 kernel 可用性检测（与 tests/algorithms/normal_form/test_hamiltonian.py 一致）
+# SPICE 与 kernel 可用性检测（与 tests/algorithm/normal_form/test_hamiltonian.py 一致）
 # ---------------------------------------------------------------------------
 
 _SPICE_KERNEL_DIR = os.environ.get(

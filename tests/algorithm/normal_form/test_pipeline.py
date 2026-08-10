@@ -275,7 +275,7 @@ def test_qiao_L1_Halo_Large_regression_is_skipped_without_fixture():
     该回归需要：
 
     1. qiao ``L1_rho2param_data.npz``（或等价 fixture）放入
-       ``tests/algorithms/normal_form/data/``；
+       ``tests/algorithm/normal_form/data/``；
     2. SPICE 内核（``.tls`` + ``.bsp``）+ 完整 ``T_total = 0.1·2^16`` 窗口，
        使动力学替代走星历模型而非纯 CR3BP 退路。
 

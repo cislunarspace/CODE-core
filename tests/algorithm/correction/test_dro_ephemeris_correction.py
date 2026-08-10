@@ -55,7 +55,7 @@ def dro_orbit(cr3bp_dynamics, cr3bp_system):
     corrector.setup_2D_symmetric_x_fixed_x0(DRO_31_X0)
     result = corrector.iterate_correction(seed_orbit, verbose=False)
 
-    # DRO 微分修正在此标准 seed 下应收敛（与 tests/algorithms/conftest.py 的
+    # DRO 微分修正在此标准 seed 下应收敛（与 tests/algorithm/conftest.py 的
     # corrected_dro fixture 一致）；不收敛是回归，直接失败而非 skip（issue #218）
     assert result is not None and corrector.success, "DRO 微分修正未收敛"
     return result

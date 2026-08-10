@@ -21,7 +21,7 @@ from e2m2e.data.types.orbit import Orbit
 pytestmark = pytest.mark.orchestration
 
 
-# 地月系统质量参数（与 tests/algorithms/conftest.py 一致）
+# 地月系统质量参数（与 tests/algorithm/conftest.py 一致）
 MU = 1.21506683e-2
 DU = 384405.0  # km
 
@@ -36,7 +36,7 @@ def _make_system():
 
 
 def _make_l1_lyapunov_orbit(system) -> Orbit:
-    """生成地月 L1 小振幅 Lyapunov 轨道（与 tests/algorithms/test_manifolds.py 同法）。"""
+    """生成地月 L1 小振幅 Lyapunov 轨道（与 tests/algorithm/manifold/test_manifolds.py 同法）。"""
     dynamics = CR3BP_Dynamics(system)
     gamma = _compute_gamma(MU, 1)
     x_l1 = 1 - MU - gamma

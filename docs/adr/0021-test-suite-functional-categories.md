@@ -33,3 +33,12 @@ ADR 0013 定下"正确性由物理定义裁决"，并附一句"测试分层：Ru
 
 - `pyproject.toml` markers 换 7 类 + `slow`/`spice`；`architecture.md §验证策略` 删 L1–L4 段；本 ADR 取代 ADR 0013 中"测试分层"那句（0013 其余不变）。
 - 迁移分三 PR：①`git mv` 纯移动（保历史、不改逻辑、不换标记）；②逐文件打功能类标记、去 l1–l4/e2e；③清理结构债（私有符号测试、golden/gmat/dfh 术语、#358 归类）。
+
+## 迁移 checklist（防引用遗留）
+
+`tests/` 下目录一旦删除，源码与测试代码里指向它的字符串就成了死引用——`linked_tests` 追踪、注释、docstring 都可能藏着。CI 由 `scripts/check_deleted_dir_refs.py` 把关（已删目录清单在该脚本顶 `DELETED_DIRS` 维护）。删目录前/后都应：
+
+- 把目录加入 `DELETED_DIRS`，跑 `uv run python scripts/check_deleted_dir_refs.py`，并 `grep -rn "tests/<旧目录>" e2m2e/ tests/` 复核（脚本只拦代码，文档由人审）。
+- 源码字符串/注释/docstring 里的旧路径全部清理或重映射——迁移完成的标志是无任何旧路径引用。
+- `linked_tests` 一类的需求↔测试追踪最易漏（#373 漏了 `tests/core`、#372 漏了 `tests/algorithms`），按迁移表逐条重映射到新路径。
+- 历史标注（"ported from …"）改写为不引用旧路径的表述（如"迁移前位于旧 core 包"），或删除。

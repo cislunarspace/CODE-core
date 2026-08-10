@@ -13,7 +13,7 @@ from e2m2e.data.types.orbit import Orbit
 pytestmark = pytest.mark.orchestration
 
 
-# 公共 fixtures 从 tests/algorithms/conftest.py 导入：
+# 公共 fixtures 从 tests/algorithm/conftest.py 导入：
 #   dro_dynamics, dro_corrector, dro_seed_orbit, corrected_dro
 # 这里仅在需要测试 _非_标准配置时构造自己的 corrector。
 

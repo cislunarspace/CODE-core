@@ -43,6 +43,8 @@ jobs:
       - run: uv run ruff format --check .
       # 五层依赖方向检查（ADR 0012）：data/algorithm/api 无越层 import
       - run: uv run python scripts/check_layer_imports.py
+      # 已删目录无引用检查（ADR 0021 迁移防漏，#372）
+      - run: uv run python scripts/check_deleted_dir_refs.py
 
 
   typecheck:

@@ -10,7 +10,7 @@ from e2m2e.data.types.orbit import Orbit, OrbitFamily
 pytestmark = pytest.mark.orchestration
 
 
-# 公共 fixtures 从 tests/algorithms/conftest.py 导入：
+# 公共 fixtures 从 tests/algorithm/conftest.py 导入：
 #   dro_dynamics, dro_corrector, dro_seed_orbit, corrected_dro, dro_continuation
 
 

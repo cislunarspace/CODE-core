@@ -400,7 +400,7 @@ def test_W_poly_regression_against_qiao_L1DynSubs_npz():
     均不可得，故以 ``pytest.skip`` 守卫占位。
 
     解锁条件（任一）：
-    1. 将 qiao ``L1DynSubs.npz`` 放入 ``tests/algorithms/normal_form/data/``；
+    1. 将 qiao ``L1DynSubs.npz`` 放入 ``tests/algorithm/normal_form/data/``；
     2. 提供 SPICE 内核（``.tls`` + ``.bsp``）并在长窗口下跑 reduce。
 
     fixture 就绪后，本测试应加载 npz 中的 ``W_poly``，与

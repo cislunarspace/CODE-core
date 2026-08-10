@@ -43,7 +43,7 @@ def dynamics(earth_moon_system):
 
 @pytest.fixture
 def dummy_orbit(earth_moon_system):
-    # DRO 种子初值（Cui et al. 2025，同 tests/algorithms/conftest.py）：稳定周期
+    # DRO 种子初值（Cui et al. 2025，同 tests/algorithm/conftest.py）：稳定周期
     # 轨道，远离月球，CR3BP 积分到任意相位都不发散。测试只用首点与 period，
     # 故 50 点填同值即可。
     state0 = np.array([0.79188556619742, 0.0, 0.0, 0.0, 0.573665890385585, 0.0])

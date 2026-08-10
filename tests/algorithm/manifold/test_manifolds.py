@@ -19,7 +19,7 @@ from e2m2e.data.types.orbit import Orbit
 pytestmark = pytest.mark.orchestration
 
 
-# 地月系统质量参数（与 tests/algorithms/conftest.py 一致）
+# 地月系统质量参数（与 tests/algorithm/conftest.py 一致）
 MU = 1.21506683e-2
 DU = 384405.0  # km
 

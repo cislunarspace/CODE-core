@@ -250,7 +250,7 @@ def compute_lissajous_bounded_trajectory(
 
     rho0 = _rho_from_synodic(state0, mu, libration_position)
 
-    # fast 流水线参数（与 tests/algorithms/normal_form 一致）。CR3BP 模式由
+    # fast 流水线参数（与 tests/algorithm/normal_form 一致）。CR3BP 模式由
     # ctx.force_cr3bp 声明：整条约化路径（DS rhs、Bdot2A 的 C_pq、rho↔EM 旋转
     # 矩阵）一律直接用 CR3BP 常量、不探 SPICE 星历——design_orbit 会全局加载
     # SPICE 内核，否则星历几何进入约化会使 quasi-Floquet↔CM Lie ODE 失稳。

@@ -40,7 +40,7 @@ TRIANGULAR: dict[int, dict[str, float]] = {
 
 # --- 阶段 2：修正/延拓标准种子（来源标注于各条）---
 
-# DRO 地月（Cui et al. 2025 单圈 DRO，与 tests/algorithms/conftest 一致）
+# DRO 地月（Cui et al. 2025 单圈 DRO，与 tests/algorithm/conftest 一致）
 DRO_X0 = 0.79188556619742
 DRO_VY0 = 0.573665890385585
 DRO_PERIOD = 6.307498
