@@ -67,12 +67,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # python 为版本号（3.10 等），目录名是 cp310-cp310（无点、去 cp 前缀）。
-        python: ["3.10", "3.11", "3.12", "3.13"]
+        # python 为 CPython 目录缩写（cp310 等），版本号取点去前缀（cp310-cp310）。
+        # 不能直接用 3.13 拼路径（会得到 cp3.13-cp3.13 这种带点的错误目录）。
+        python: ["cp310", "cp311", "cp312", "cp313"]
     container:
       image: quay.io/pypa/manylinux_2_28_x86_64
     env:
-      PY: /opt/python/cp${{ matrix.python }}-cp${{ matrix.python }}
+      PY: /opt/python/${{ matrix.python }}-${{ matrix.python }}
     steps:
       - name: Show toolchain
         run: |
