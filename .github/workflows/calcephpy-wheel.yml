@@ -67,13 +67,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["cp310", "cp311", "cp312", "cp313"]
+        # python 为版本号（3.10 等），目录名是 cp310-cp310（无点、去 cp 前缀）。
+        python: ["3.10", "3.11", "3.12", "3.13"]
     container:
       image: quay.io/pypa/manylinux_2_28_x86_64
+    env:
+      PY: /opt/python/cp${{ matrix.python }}-cp${{ matrix.python }}
     steps:
       - name: Show toolchain
         run: |
-          /opt/python/${{ matrix.python }}-cp${{ matrix.python }}/bin/python --version
+          ${PY}/bin/python --version
           cmake --version
       # 每个 CPython 建独立 venv：镜像里 /opt/python 各版本是独立安装的，
       # 直接 pip install 会装到系统里污染其他版本。--no-deps 同上（calcephpy
@@ -81,7 +84,7 @@ jobs:
       - name: Build wheel
         run: |
           set -eux
-          /opt/python/${{ matrix.python }}-cp${{ matrix.python }}/bin/python -m venv /tmp/v
+          ${PY}/bin/python -m venv /tmp/v
           /tmp/v/bin/pip install --no-cache-dir cython
           /tmp/v/bin/pip wheel calcephpy==5.0.0 --no-deps -w /tmp/wheelhouse/
       - name: auditwheel repair（打 manylinux 标签并校验合规性）
