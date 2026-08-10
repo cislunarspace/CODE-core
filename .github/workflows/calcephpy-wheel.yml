@@ -60,39 +60,43 @@ jobs:
           name: wheel-py${{ matrix.python }}
           path: wheelhouse/*.whl
 
-  # Linux wheel：manylinux_2_28 镜像自带 cmake+gcc，与 Windows job 相同思路，
-  # 在镜像里现场编译后经 auditwheel 重打包成 manylinux_2_28 标签（并校验合规性）。
+  # Linux wheel：manylinux_2_28 镜像自带 cmake+gcc 与 uv。用 uv 安装完整版
+  # CPython（python-build-standalone 自带 include + libpython.so），因为镜像
+  # 自带的 /opt/python/* 是 stripped 版、缺 libpython，无法满足 calcephpy 的
+  # cmake find_package(Python Development)。构建后经 auditwheel 打 manylinux
+  # 标签并校验合规性。
   build-linux:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # python 为 CPython 目录缩写（cp310 等），版本号取点去前缀（cp310-cp310）。
-        # 不能直接用 3.13 拼路径（会得到 cp3.13-cp3.13 这种带点的错误目录）。
-        python: ["cp310", "cp311", "cp312", "cp313"]
+        python: ["3.10", "3.11", "3.12", "3.13"]
     container:
       image: quay.io/pypa/manylinux_2_28_x86_64
     env:
-      PY: /opt/python/${{ matrix.python }}-${{ matrix.python }}
+      # uv python install 装的完整 CPython 的 bin 目录（安装后取真实路径）
+      PY_VER: ${{ matrix.python }}
     steps:
       - name: Show toolchain
         run: |
-          ${PY}/bin/python --version
           cmake --version
-      # 每个 CPython 建独立 venv：镜像里 /opt/python 各版本是独立安装的，
-      # 直接 pip install 会装到系统里污染其他版本。--no-deps 同上（calcephpy
-      # 把构建期依赖误列为 runtime，见 Windows job 注释）。
-      #
-      # --no-build-isolation：默认 pip wheel 会建 PEP 517 隔离 venv，里面没有
-      # libpython（manylinux 的 venv 不带开发文件），cmake 的 find_package(Python)
-      # 会因找不到 Python_INCLUDE_DIRS/LIBRARIES 失败。--no-build-isolation 改用
-      # 真实 CPython（含 include/libpython），cmake 能定位 Python。需先预装
-      # setuptools + cython（构建后端与 Cython 生成器）。
+          uv --version
+      - name: 安装完整版 CPython（含 libpython 开发文件）
+        run: |
+          set -eux
+          uv python install ${PY_VER}
+          echo "PY=$(uv python find ${PY_VER})" >> "$GITHUB_ENV"
+          echo "PYROOT=$(dirname "$(dirname "$(uv python find ${PY_VER})")")" >> "$GITHUB_ENV"
       - name: Build wheel
         run: |
           set -eux
           ${PY}/bin/python -m venv /tmp/v
           /tmp/v/bin/pip install --no-cache-dir setuptools cython wheel
+          cd /tmp
+          # Python_EXECUTABLE + Python_ROOT_DIR：让 cmake 找到完整 CPython 的
+          # include/libpython（stripped 的 /opt/python 找不到）。
+          export Python_EXECUTABLE=$PY
+          export Python_ROOT_DIR=$PYROOT
           /tmp/v/bin/pip wheel calcephpy==5.0.0 --no-deps --no-build-isolation -w /tmp/wheelhouse/
       - name: auditwheel repair（打 manylinux 标签并校验合规性）
         run: |
