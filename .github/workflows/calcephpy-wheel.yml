@@ -82,12 +82,18 @@ jobs:
       # 每个 CPython 建独立 venv：镜像里 /opt/python 各版本是独立安装的，
       # 直接 pip install 会装到系统里污染其他版本。--no-deps 同上（calcephpy
       # 把构建期依赖误列为 runtime，见 Windows job 注释）。
+      #
+      # --no-build-isolation：默认 pip wheel 会建 PEP 517 隔离 venv，里面没有
+      # libpython（manylinux 的 venv 不带开发文件），cmake 的 find_package(Python)
+      # 会因找不到 Python_INCLUDE_DIRS/LIBRARIES 失败。--no-build-isolation 改用
+      # 真实 CPython（含 include/libpython），cmake 能定位 Python。需先预装
+      # setuptools + cython（构建后端与 Cython 生成器）。
       - name: Build wheel
         run: |
           set -eux
           ${PY}/bin/python -m venv /tmp/v
-          /tmp/v/bin/pip install --no-cache-dir cython
-          /tmp/v/bin/pip wheel calcephpy==5.0.0 --no-deps -w /tmp/wheelhouse/
+          /tmp/v/bin/pip install --no-cache-dir setuptools cython wheel
+          /tmp/v/bin/pip wheel calcephpy==5.0.0 --no-deps --no-build-isolation -w /tmp/wheelhouse/
       - name: auditwheel repair（打 manylinux 标签并校验合规性）
         run: |
           set -eux
