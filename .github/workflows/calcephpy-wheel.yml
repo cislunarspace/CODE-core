@@ -85,14 +85,14 @@ jobs:
         run: |
           set -eux
           uv python install ${PY_VER}
+          # uv python find 返回的是 python 可执行文件完整路径（.../bin/python3.x）
           echo "PY=$(uv python find ${PY_VER})" >> "$GITHUB_ENV"
           echo "PYROOT=$(dirname "$(dirname "$(uv python find ${PY_VER})")")" >> "$GITHUB_ENV"
       - name: Build wheel
         run: |
           set -eux
-          ${PY}/bin/python -m venv /tmp/v
+          ${PY} -m venv /tmp/v
           /tmp/v/bin/pip install --no-cache-dir setuptools cython wheel
-          cd /tmp
           # Python_EXECUTABLE + Python_ROOT_DIR：让 cmake 找到完整 CPython 的
           # include/libpython（stripped 的 /opt/python 找不到）。
           export Python_EXECUTABLE=$PY
