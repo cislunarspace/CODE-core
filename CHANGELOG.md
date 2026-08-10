@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [5.6.5] - 2026-08-10
+
+### Fixed
+- **Halo/NRHO 星历修正多圈发散**（f70252c）：`design_orbit` 入口对 Halo/NRHO 自动重定向 segmented 修正——two_level/standard 的"修正 1 圈 + 自由外推"对不稳定轨道（STM ~1e7/圈）必发散（实测第二圈起圈间偏差 ~7 万 km、第三圈漂离 L2）；segmented 全程分段打靶拼接，第 1 步多圈长段（节点密、段内约束强）+ 固定节点时刻 `var_time=False`（对齐朱彦伟 2026、杨洪伟 2015、刘刚 2017），产出不发散的标称参考轨道。two_level/standard 仅留稳定轨道（DRO 等）。星历 Halo 的圈间漂移是固有准周期特征，由 `station_keeping` 处理，不在本转换范围。
+
 ## [5.6.4] - 2026-08-10
 
 ### Added
