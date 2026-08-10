@@ -1,7 +1,8 @@
 """GMAT 裁剪 fixture 发现工具（开发期测试辅助）。
 
 ADR 0011 迁移：自 ``core/coordinate/gmat_data.py`` 迁入数据层。GMAT
-数据文件（EOP/闰秒）是开发期对照数据（ADR 0013），路径发现工具归数据层，
+数据文件（EOP/闰秒）作解析器测试**输入**（IERS 公布的物理事实），
+非对照标准（ADR 0013 禁其他软件输出做判据）。路径发现工具归数据层，
 供 ``algorithm/coordinate/`` 的 GMAT-compatible 坐标轴与测试使用。
 """
 
@@ -13,7 +14,7 @@ from pathlib import Path
 from .eop import CoordinateDataError
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_COMMITTED_GMAT_FIXTURE_DIR = _REPO_ROOT / "tests" / "core" / "coordinate" / "fixtures" / "gmat"
+_COMMITTED_GMAT_FIXTURE_DIR = _REPO_ROOT / "tests" / "data" / "frames" / "fixtures" / "gmat"
 
 
 def committed_gmat_fixture_dir() -> Path:

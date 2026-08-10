@@ -2,7 +2,7 @@
 
 对照 ``docs/plans/lowthrust-shooting-prd.md``：min-fuel 轨道提升闭环、零推力
 退化、段间连续性、决策变量规模。复用与
-``tests/core/forces/test_low_thrust_variable_mass.py`` 相同的 Earth 星历 fixture。
+``tests/numerical/forces/test_low_thrust_variable_mass.py`` 相同的 Earth 星历 fixture。
 """
 
 import numpy as np

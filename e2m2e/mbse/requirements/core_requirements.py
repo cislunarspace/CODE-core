@@ -18,7 +18,10 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.orbit", "e2m2e.core.dynamics"],
-        linked_tests=["tests/core/test_orbit.py", "tests/core/test_dynamics.py"],
+        linked_tests=[
+            "tests/data/types/test_orbit.py",
+            "tests/numerical/dynamics/test_dynamics.py",
+        ],
     ),
     Requirement(
         id="REQ-002",
@@ -31,8 +34,8 @@ CORE_REQUIREMENTS = [
         verification_method="test",
         linked_code=["e2m2e.core.dynamics", "e2m2e.core.ephemeris_dynamics"],
         linked_tests=[
-            "tests/core/test_dynamics.py",
-            "tests/core/dynamics/test_ephemeris_dynamics.py",
+            "tests/numerical/dynamics/test_dynamics.py",
+            "tests/numerical/dynamics/test_ephemeris_dynamics.py",
         ],
     ),
     Requirement(
@@ -43,7 +46,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.dynamics"],
-        linked_tests=["tests/core/test_dynamics.py"],
+        linked_tests=["tests/numerical/dynamics/test_dynamics.py"],
     ),
     Requirement(
         id="REQ-004",
@@ -55,7 +58,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="analysis",
         linked_code=["e2m2e.core.dynamics"],
-        linked_tests=["tests/core/test_dynamics.py"],
+        linked_tests=["tests/numerical/dynamics/test_dynamics.py"],
     ),
     # ---- 继承与接口 ----
     Requirement(
@@ -66,7 +69,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
         linked_code=["e2m2e.core.dynamics", "e2m2e.core.ephemeris_dynamics"],
-        linked_tests=["tests/core/dynamics/test_ephemeris_dynamics.py"],
+        linked_tests=["tests/numerical/dynamics/test_ephemeris_dynamics.py"],
     ),
     Requirement(
         id="REQ-006",
@@ -76,7 +79,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.coordinate_system", "e2m2e.core.synodic_j2000"],
-        linked_tests=["tests/core/coordinate/test_synodic_j2000.py"],
+        linked_tests=["tests/algorithm/coordinate/test_synodic_j2000.py"],
     ),
     # ---- 物理模型精度 ----
     Requirement(
@@ -87,7 +90,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.system"],
-        linked_tests=["tests/core/test_system.py"],
+        linked_tests=["tests/numerical/dynamics/test_system.py"],
     ),
     Requirement(
         id="REQ-011",
@@ -97,7 +100,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHOULD,
         verification_method="test",
         linked_code=["e2m2e.core.system"],
-        linked_tests=["tests/core/test_system.py"],
+        linked_tests=["tests/numerical/dynamics/test_system.py"],
     ),
     Requirement(
         id="REQ-012",
@@ -107,7 +110,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
         linked_code=["e2m2e.core.dynamics"],
-        linked_tests=["tests/core/test_dynamics.py"],
+        linked_tests=["tests/numerical/dynamics/test_dynamics.py"],
     ),
     # ---- 轨道数据 ----
     Requirement(
@@ -118,7 +121,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.orbit"],
-        linked_tests=["tests/core/orbit/test_orbit_io.py"],
+        linked_tests=["tests/data/types/test_orbit_io.py"],
     ),
     Requirement(
         id="REQ-021",
@@ -128,7 +131,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHOULD,
         verification_method="test",
         linked_code=["e2m2e.core.orbit"],
-        linked_tests=["tests/core/test_orbit.py"],
+        linked_tests=["tests/data/types/test_orbit.py"],
     ),
     Requirement(
         id="REQ-022",
@@ -140,7 +143,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.orbit"],
-        linked_tests=["tests/core/orbit/test_orbit_family.py"],
+        linked_tests=["tests/data/types/test_orbit_family.py"],
     ),
     # ---- 星历动力学 ----
     # 注：EphemerisDynamics 已降级为遗留内部实现（仅供 multiple_shooting/homotopy
@@ -156,7 +159,7 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.core.ephemeris_dynamics"],
-        linked_tests=["tests/core/dynamics/test_ephemeris_dynamics.py"],
+        linked_tests=["tests/numerical/dynamics/test_ephemeris_dynamics.py"],
     ),
     Requirement(
         id="REQ-026",
@@ -169,6 +172,6 @@ CORE_REQUIREMENTS = [
         priority=RequirementPriority.SHOULD,
         verification_method="test",
         linked_code=["e2m2e.core.ephemeris_dynamics"],
-        linked_tests=["tests/core/dynamics/test_ephemeris_dynamics.py"],
+        linked_tests=["tests/numerical/dynamics/test_ephemeris_dynamics.py"],
     ),
 ]

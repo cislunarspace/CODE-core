@@ -1,13 +1,16 @@
 """GMAT fixture 解析器、时间转换与约化测试。
 
-覆盖 TAI-UTC 表、EOP 文件、时间转换器与 ITRF 矩阵黄金值。
+覆盖 TAI-UTC 表、EOP 文件、时间转换器与 ITRF 矩阵（动态对照 SPICE ITRF93）。
 """
+
+import os
 
 import numpy as np
 import pytest
 
 from e2m2e.algorithm.coordinate.gmat_itrf import GmatItrfReduction
 from e2m2e.algorithm.coordinate.gmat_time import TimeSystemConverter
+from e2m2e.algorithm.coordinate.standard_axes import ITRFSpiceAxes
 from e2m2e.algorithm.coordinate.xys import ErfaXysProvider
 from e2m2e.data.frames.eop import ARCSEC_TO_RAD, EopFile
 from e2m2e.data.frames.gmat_fixture import CoordinateDataError, gmat_fixture_path
@@ -104,6 +107,13 @@ def test_time_converter_keeps_et_public_and_exposes_low_level_a1():
 
 
 def test_erfa_xys_provider_matches_reference_epoch_values():
+    """参考值取自 SOFA ``iauXys06a``（``erfa.xys06a``，IAU 2006 岁差 + 2000A 章动模型）。
+
+    三个历元分别对应 J2000（TT MJD 51544.5）、2017-01-01、2026-06-12
+    （2026 年 EOP fixture 采样窗口）。SOFA IAU 2006/2000A 模型是物理定义
+    （ADR 0013 决策 2 允许的文献值），非 golden 对照。实测与
+    ``erfa.xys06a(jd, 0.0)`` 逐位一致。
+    """
     provider = ErfaXysProvider()
 
     assert provider.xys(51544.5) == pytest.approx(
@@ -127,7 +137,23 @@ def test_erfa_xys_provider_rejects_invalid_time_input():
         provider.xys(np.inf)
 
 
-def test_gmat_itrf_reduction_returns_expected_rotation_matrix():
+def test_gmat_itrf_reduction_matches_spice_itrf93():
+    """GMAT 原生约化的 ITRF 旋转矩阵动态对照 SPICE ITRF93（ADR 0003 决策 5）。
+
+    硬编码矩阵已删除：golden 对照违反 ADR 0013（只证回归不证正确），
+    正确性由动态对照 SPICE ITRF93 在 1e-7 量级裁决（原生链采用约化的 IAU
+    岁差章动 + 线性插值 EOP，精度预期在 1e-7，非 SPICE 的 1e-12 量级）。
+    保留物理定义断言 R @ R.T == I（正交性）。
+    """
+    from kernel_helpers import load_body_fixed_kernels, unload_kernels
+
+    from e2m2e.data.kernels.manager import SPICEManager
+
+    manager = SPICEManager()
+    loaded = load_body_fixed_kernels(manager)
+    if "earth_latest_high_prec.bpc" not in [os.path.basename(p) for p in loaded]:
+        pytest.skip("需 ITRF93 BPC 内核做 SPICE 动态对照（ADR 0003 决策 5）")
+
     table = TaiUtcTable.from_file(gmat_fixture_path("tai-utc.dat"))
     eop = EopFile.from_file(gmat_fixture_path("eopc04_08.62-now.trimmed"))
     reduction = GmatItrfReduction(
@@ -135,22 +161,12 @@ def test_gmat_itrf_reduction_returns_expected_rotation_matrix():
     )
 
     rotation, rate = reduction.rotation_and_rate(0.0)
+    expected_rotation, expected_rate = ITRFSpiceAxes(frame="ITRF93").rotation_and_rate(0.0)
 
-    expected_rotation = np.array(
-        [
-            [1.7698059086970885e-01, 9.8421434140198782e-01, -2.5180552539875151e-05],
-            [-9.8421434146500908e-01, 1.7698059017814771e-01, -2.7473499692626049e-05],
-            [-2.2583343356466699e-05, 2.9645337144618008e-05, 9.9999999930557326e-01],
-        ]
-    )
-    expected_rate = np.array(
-        [
-            [7.1770042281617740e-05, -1.2905628333586957e-05, -3.8737281106045770e-11],
-            [1.2905628279101173e-05, 7.1770042289155805e-05, 1.2876618117528296e-10],
-            [2.2953613657794217e-09, 1.6621400564072720e-09, 2.5622314985763502e-15],
-        ]
-    )
-
-    np.testing.assert_allclose(rotation, expected_rotation, atol=1e-14)
-    np.testing.assert_allclose(rate, expected_rate, atol=1e-14)
-    np.testing.assert_allclose(rotation @ rotation.T, np.eye(3), atol=1e-14)
+    try:
+        np.testing.assert_allclose(rotation, expected_rotation, atol=1e-7)
+        np.testing.assert_allclose(rate, expected_rate, atol=1e-7)
+        # 物理定义：旋转矩阵正交
+        np.testing.assert_allclose(rotation @ rotation.T, np.eye(3), atol=1e-14)
+    finally:
+        unload_kernels(manager, loaded)
