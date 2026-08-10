@@ -4,11 +4,12 @@
 
 1. CR3BP 初猜：按形状参数生成周期轨道（``cr3bp_orbits``）；
 2. 星历修正：周期轨道采样 patch points → synodic→J2000 转换 →
-   星历 N 体模型下多重打靶收敛（``algorithms.ephemeris_correction``
-   注册表）；
-3. 标称星历：以修正后首节点状态为初值，在
-   ``perturbation_to_force_config`` 映射出的高精度力模型下
-   长期预报，输出文本格式星历（``EphemerisTable``）。
+   星历 N 体模型下多重打靶收敛。稳定轨道（DRO 等）走 two_level
+   （Rust 打靶 + vel_weight），不稳定轨道（Halo/NRHO）走 segmented
+   （分段打靶拼接，全程分段约束、不依赖自由外推）；
+3. 标称星历：以修正后状态为初值，在 ``perturbation_to_force_config``
+   映射出的高精度力模型下生成——two_level 自由外推整段 duration，
+   segmented 逐段积分填满 et_grid。输出文本格式星历（``EphemerisTable``）。
 
 参数语义对齐 MATLAB ``design_orbit.m`` 与 inputs-dac.txt 设计块：
 DRO 振幅+初始相位；Halo 共线点编号+带符号面外振幅+初始相位；
@@ -573,36 +574,40 @@ def _design_apolune_segmented(
     max_iter: int = 50,
     tolerance: float = CORRECTION_TOL_KM,
     vel_weight: float = CORRECTION_VEL_WEIGHT,
+    var_time: bool = True,
     verbose: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    """论文式分段打靶拼接（朱彦伟 2026）：逐段独立转星历 + 远月点分层合并。
+    """分段打靶星历转换（朱彦伟 2026 多重打靶拼接）。
 
-    Halo/NRHO 在星历模型下极不稳定（STM 谱半径 ~1e7/圈），CR3BP 初猜
-    第 1 圈就偏离 2e5 km，一次性对整条长弧打靶（或逐圈滚动复用上圈末端）
-    必发散。本方法对齐论文三步：
+    将 CR3BP 周期解转换到星历模型：整条 CR3BP tile 按 ``revs_per_group``
+    圈切段，每段独立多重打靶转星历；段数 >1 时分层两两合并（固定首末远月点、
+    内部 seam 自由连续化）直至整条连续。
 
-    1. **逐段独立转星历**：整条 CR3BP tile 按 ``revs_per_group`` 圈切段，
-       每段独立调 Rust 多重打靶（``var_time=True`` 自由时间 + 全自由
-       min-norm + LM 阻尼 + 回溯线搜索），把 CR3BP 周期解转换到星历模型。
-       各段内部连续、形状保形（实证 res~1e-1 km，会合系 x 紧邻 L2）。
-    2. **远月点分层合并**：把相邻已转星历的段两两合并，合并段固定
-       **两端远月点**（拼接锚点），内部 seam 节点自由连续化，段长每层
-       翻倍但有界（论文式拼接）。直到拼成整条连续轨迹。
+    关键配置（实测 Halo/NRHO，对齐文献）：
+
+    - **第 1 步段长**：Halo/NRHO 用多圈长段（调用方传 ``min(n_rev, 3)``）。
+      长段节点密、段内约束强，单弧打靶即可收敛且各段不漂离真实动力学；
+      1 圈短段各段独立修正后会漂走（seam 跳 ~1e5 km，合并层无法消除——
+      STM 条件数分析见 Liu & Liu 2025 §3）。
+    - **var_time**：Halo/NRHO 固定节点时刻（False，对齐杨洪伟 2015、
+      刘刚 2017）；稳定轨道（DRO 等）保留自由时刻（True）吸收 CR3BP→星历
+      的时间偏差。
+
+    星历下 Halo/NRHO 的圈间漂移是标称轨道的固有准周期特征（星历非严格周期），
+    由轨道保持（``algorithm.station_keeping``）处理，不在本转换范围内。
 
     Args:
         forces_py: 全摄动 Rust forces 序列（与长期预报同模型）。
         observer: 坐标系原点（"EARTH"）。
-        t_patch_j2000 / state_patch_j2000: 整条 CR3BP tile（J2000，
-            km/km/s），每 ``revs_per_group`` 圈一组切段。
-        revs_per_group: 第 1 步每组圈数（段长上限）。实证 Halo 单圈段
-            保形；组内圈数越多段越短、初猜越贴真实动力学，但段数多。
-            默认在调用方决定（30 天小场景用 1，2 年用若干圈）。
-        points_per_rev: 每圈节点数（由采样 tile 推断，NRHO 近月加密时
-            不是 8 的倍数——不能硬编码）。
+        t_patch_j2000 / state_patch_j2000: 整条 CR3BP tile（J2000, km/km/s）。
+        revs_per_group: 第 1 步每组圈数。短期（≤ 该圈数）单段即收敛；
+            长期分段后由分层合并拼接。
+        points_per_rev: 每圈节点数（由采样 tile 推断，NRHO 近月加密时非整除）。
+        var_time: 节点时刻是否作为自由变量。Halo/NRHO 传 False（见上）。
 
     Returns:
-        ``(t_patch, state_patch, max_residual)``（J2000），整条连续星历轨迹
-        与全程各段/合并段的最大打靶残差（km，供结果对象填充）。
+        ``(t_patch, state_patch, max_residual)``（J2000），整条连续星历轨迹与
+        全程各段/合并段的最大打靶残差（km）。
     """
     from e2m2e.integrators import multiple_shooting_correct_py
 
@@ -635,7 +640,7 @@ def _design_apolune_segmented(
                 observer,
                 list(t_seg),
                 [list(map(float, x)) for x in s_seg],
-                var_time=True,
+                var_time=var_time,
                 fix_first_node=False,
                 fixed_node_mask=None,
                 max_iter=max_iter,
@@ -689,7 +694,7 @@ def _design_apolune_segmented(
                     observer,
                     list(t_comb),
                     [list(map(float, x)) for x in s_comb],
-                    var_time=True,
+                    var_time=var_time,
                     fix_first_node=False,
                     fixed_node_mask=mask,
                     max_iter=max_iter,
@@ -898,6 +903,12 @@ def design_orbit(
     dyb = request.dyb
     correction_method = request.correction_method
     correction_revolutions = request.correction_revolutions
+    # Halo/NRHO 不稳定：two_level/standard 的"修正 1 圈 + 自由外推"必发散，
+    # homotopy 不支持 ForceModel。统一走 segmented（全程分段打靶），产出
+    # 不发散的标称参考轨道。圈间漂移是固有准周期特征，由 station_keeping
+    # 处理（架构分工见 docs/architecture/architecture.md §总体定位）。
+    if sel in ("HALO", "NRHO") and correction_method != "segmented":
+        correction_method = "segmented"
 
     system = earth_moon_system()
     dynamics = CR3BP_Dynamics(system)
@@ -1062,10 +1073,11 @@ def design_orbit(
             frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
         )
         try:
-            # 第 1 步段长（每组圈数）：段长与论文结构一致，段内圈数
-            # 控制在单圈量级（Halo 初猜在星历下第 1 圈就偏，段越短
-            # 初猜越贴真实动力学）。默认组内 3 圈，段多时自动增。
-            revs_per_group = max(1, min(3, n_rev))
+            # 第 1 步段长（每组圈数）。对齐朱彦伟2026 多重打靶拼接：长段（多圈）
+            # 节点密、段内约束强，各段修到正确星历弧而非漂走（1 圈短段各段漂、
+            # seam 跳 ~1e5 km 合并不了）。Halo/NRHO 用多圈/段（上限 3 圈，试错）；
+            # 稳定轨道（DRO 等）沿用 3 圈/段。配合下方 var_time=False 固定时刻。
+            revs_per_group = min(n_rev, 3) if sel in ("HALO", "NRHO") else max(1, min(3, n_rev))
             t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
                 forces_py,
                 "EARTH",
@@ -1075,6 +1087,7 @@ def design_orbit(
                 per_rev,
                 max_iter=50,
                 tolerance=CORRECTION_TOL_KM,
+                var_time=sel not in ("HALO", "NRHO"),
                 verbose=verbose,
             )
 
@@ -1128,13 +1141,14 @@ def design_orbit(
             force_config=force_config,
         )
 
-    # --- 默认 / standard / two_level：Rust 多重打靶（速度加权）+ 长期预报 ---
+    # --- 稳定轨道路径（DRO 等）：Rust 多重打靶（速度加权）+ 长期预报 ---
+    # Halo/NRHO 已在上方重定向到 segmented（自由外推对不稳定轨道必发散）。
     # 旧 two_level（Python）残差向量把位置 km 与速度 km/s 混在一起，cislunar 下
     # 位置项单边主导，Level 2 速度连续化不跑，修正产出是位置连续但速度跳变
     # ~50 m/s 的断弧——自由外推大幅 DRO 一两个月发散到 20 万 km（#324）。
     # 改走 Rust 打靶 + vel_weight（=pos_tol/vel_tol）：速度项加权后在容差尺度
     # 与位置可比，LM 真正压速度连续到 ≤0.01 m/s，修正解落在准周期轨道上，
-    # 自由外推有界。同时全程预制星历表（cspice 缓存），不再逐步 FFI。
+    # 稳定轨道自由外推有界。同时全程预制星历表（cspice 缓存），不再逐步 FFI。
     if correction_method == "homotopy":
         # homotopy 同伦插值建立在质点 N 体语义上，不支持 ForceModel——保留旧 Python 路径
         eph_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
