@@ -28,7 +28,7 @@ jobs:
       - run: cargo fmt --all -- --check
       - name: 恢复 SPICE 编译包缓存
         id: cache-cspice
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cspice
           key: cspice-${{ runner.os }}-v1
