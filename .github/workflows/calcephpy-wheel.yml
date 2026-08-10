@@ -1,9 +1,10 @@
-# 构建 calcephpy 的 Windows 预编译 wheel，发布到 calcephpy-v1 release。
+# 构建 calcephpy 的 Windows + Linux 预编译 wheel，发布到 calcephpy-v1 release。
 #
 # 背景：PyPI 上 calcephpy==5.0.0 只有 sdist，Windows 安装须现场编译
-# （cmake + MSVC），开发者 clone e2m2e / transfer-orbit-design 后 uv sync
-# 常因缺编译器失败。e2m2e 经 r2s2 传递依赖 calcephpy，故 wheel 发到本仓库，
-# 两个下游仓库的 [tool.uv] find-links 指向此 release 即可免编译。
+# （cmake + MSVC）、Linux 安装须现场编译（cmake + gcc），开发者 clone
+# e2m2e / transfer-orbit-design 后 uv sync 常因缺编译器失败。e2m2e 经 r2s2
+# 传递依赖 calcephpy，故 wheel 发到本仓库，两个下游仓库的 [tool.uv] find-links
+# 指向此 release 即可免编译。
 #
 # calcephpy 是 IMCCE/CNRS 的 CALCEPH 库的 Python 绑定（CeCILL-C/B 或
 # CeCILL v2.1 许可），版权归 IMCCE；此处仅提供预编译二进制便利，不修改
@@ -59,8 +60,48 @@ jobs:
           name: wheel-py${{ matrix.python }}
           path: wheelhouse/*.whl
 
+  # Linux wheel：manylinux_2_28 镜像自带 cmake+gcc，与 Windows job 相同思路，
+  # 在镜像里现场编译后经 auditwheel 重打包成 manylinux_2_28 标签（并校验合规性）。
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["cp310", "cp311", "cp312", "cp313"]
+    container:
+      image: quay.io/pypa/manylinux_2_28_x86_64
+    steps:
+      - name: Show toolchain
+        run: |
+          /opt/python/${{ matrix.python }}-cp${{ matrix.python }}/bin/python --version
+          cmake --version
+      # 每个 CPython 建独立 venv：镜像里 /opt/python 各版本是独立安装的，
+      # 直接 pip install 会装到系统里污染其他版本。--no-deps 同上（calcephpy
+      # 把构建期依赖误列为 runtime，见 Windows job 注释）。
+      - name: Build wheel
+        run: |
+          set -eux
+          /opt/python/${{ matrix.python }}-cp${{ matrix.python }}/bin/python -m venv /tmp/v
+          /tmp/v/bin/pip install --no-cache-dir cython
+          /tmp/v/bin/pip wheel calcephpy==5.0.0 --no-deps -w /tmp/wheelhouse/
+      - name: auditwheel repair（打 manylinux 标签并校验合规性）
+        run: |
+          set -eux
+          auditwheel repair -w /tmp/repaired /tmp/wheelhouse/*.whl
+          ls -la /tmp/repaired/
+      - name: Smoke test（安装并 import）
+        run: |
+          set -eux
+          /tmp/v/bin/pip install numpy
+          /tmp/v/bin/pip install --no-deps --no-index --find-links /tmp/repaired/ calcephpy
+          /tmp/v/bin/python -c "import calcephpy; print('calcephpy import OK')"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheel-linux-${{ matrix.python }}
+          path: /tmp/repaired/*.whl
+
   release:
-    needs: build
+    needs: [build, build-linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8
@@ -78,7 +119,8 @@ jobs:
           gh release create calcephpy-v1 \
             --repo "$GITHUB_REPOSITORY" \
             --target master \
-            --title "calcephpy 预编译 wheel（Windows）" \
-            --notes "calcephpy 5.0.0 的 Windows 预编译 wheel（cp310–cp313，win_amd64）。PyPI 仅有 sdist，Windows 需 MSVC 现场编译；此处提供预编译产物，供 e2m2e / transfer-orbit-design 的 uv sync 经 find-links 直接拉取。calcephpy 归 IMCCE/CNRS，CeCILL-C/B 或 CeCILL v2.1 许可。" \
+            --title "calcephpy 预编译 wheel（Windows + Linux）" \
+            --notes "calcephpy 5.0.0 的预编译 wheel：Windows（cp310–cp313，win_amd64）+ Linux（cp310–cp313，manylinux_2_28_x86_64）。PyPI 仅有 sdist，Windows 需 MSVC、Linux 需 gcc 现场编译；此处提供预编译产物，供 e2m2e / transfer-orbit-design 的 uv sync 经 find-links 直接拉取。calcephpy 归 IMCCE/CNRS，CeCILL-C/B 或 CeCILL v2.1 许可。" \
             || true
           gh release upload calcephpy-v1 dist/*.whl --repo "$GITHUB_REPOSITORY" --clobber
+
