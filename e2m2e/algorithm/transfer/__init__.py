@@ -20,6 +20,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from ...data.constants import SECONDS_PER_DAY
 from ..forces import PointMassGravity
 from .config import (
     TransferArc,
@@ -688,7 +689,7 @@ def _transfer_orbit_low_thrust(
     # 4. 时间基准
     has_spice = hasattr(system, "spice") and system.spice is not None
     t0 = system.spice.utc_to_et(tli_params.epoch) if has_spice and tli_params is not None else 0.0
-    tf = t0 + duration_days * 86400.0
+    tf = t0 + duration_days * SECONDS_PER_DAY
 
     # 5. 目标轨道根数（默认圆轨道，从目标状态反推半长轴）
     if target_oe is None:
@@ -803,8 +804,8 @@ def _transfer_orbit_hmn(
     r0, v0 = construct_departure_state(tli_params)
 
     if tof_range is not None:
-        tof_min_sec = tof_range[0] * 86400.0
-        tof_max_sec = tof_range[1] * 86400.0
+        tof_min_sec = tof_range[0] * SECONDS_PER_DAY
+        tof_max_sec = tof_range[1] * SECONDS_PER_DAY
         tof_grid = np.linspace(tof_min_sec, tof_max_sec, _DEFAULT_TOF_GRID_POINTS)
 
         # 优先从 target_ephemeris 提取目标状态（RED-2）

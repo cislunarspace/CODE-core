@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants import SECONDS_PER_DAY
 from ...data.frames.eop import CoordinateDataError, EopFile
 from ...data.frames.gmat_fixture import gmat_fixture_path
 from ...data.frames.leap_seconds import TaiUtcTable
@@ -160,7 +161,7 @@ def _greenwich_apparent_sidereal_time(et: float) -> float:
     from .iau_2006 import _seconds_to_julian_centuries, nutation_angles
 
     t = _seconds_to_julian_centuries(et)
-    days = et / 86400.0
+    days = et / SECONDS_PER_DAY
     gmst_deg = 280.46061837 + 360.98564736629 * days + 0.000387933 * t**2 - t**3 / 38710000.0
     gmst = np.deg2rad(gmst_deg % 360.0)
     dpsi, _deps, eps0 = nutation_angles(t)

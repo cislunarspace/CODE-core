@@ -10,14 +10,14 @@ import pytest
 
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
-from e2m2e.data.templates.systems import AU as _AU_KM
-from e2m2e.data.templates.systems import R_EARTH as _R_EARTH
+from e2m2e.data.constants import AU_KM as _AU_KM
+from e2m2e.data.constants import SOLAR_PRESSURE_1AU as _P_SRP_1AU
+from e2m2e.data.constants.bodies import EARTH, SUN
 
 pytestmark = pytest.mark.force
 
-
-_R_SUN = 695700.0
-_P_SRP_1AU = 4.56e-6
+_R_SUN = SUN.mean_radius_km
+_R_EARTH = EARTH.gravity_ref_radius_km
 
 
 def test_srp_stores_injected_shadow() -> None:

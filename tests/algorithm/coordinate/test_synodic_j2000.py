@@ -9,6 +9,7 @@ from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.coordinate import SynodicJ2000System
 from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.data.constants import Datum
 
 pytestmark = [
     pytest.mark.data,
@@ -19,7 +20,7 @@ pytestmark = [
 # =============================================================================
 # Fixtures
 # =============================================================================
-MU = 1.21506683e-2
+MU = Datum.DE421.mu
 
 # 公共 SPICE fixtures 来自 tests/conftest.py:
 #   spice_manager, spice_eph_system, spice_eph_dynamics, spice_syn_j2000,

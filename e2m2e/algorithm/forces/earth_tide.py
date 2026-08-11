@@ -15,6 +15,8 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants import DAYS_PER_JULIAN_CENTURY
+
 # ----------------------------------------------------------------------------
 # Love 数(GMAT LM_SetDefaultEarthTide 默认值,硬编码)
 # KEarth[n][m]:n=2,3 阶位移 Love 数;n=0,1,4 为零
@@ -81,8 +83,6 @@ def load_love_number_file(path: str | Path) -> npt.NDArray[np.floating]:
 # ----------------------------------------------------------------------------
 
 _JD_J2000 = 2451545.0
-_DAYS_PER_JULIAN_CENTURY = 36525.0
-_DAYS_PER_YEAR = 365.25
 _RAD_PER_DEG = np.pi / 180.0
 
 # ----------------------------------------------------------------------------
@@ -201,7 +201,7 @@ def _delaunay_args_and_gmst(jd: float) -> tuple[npt.NDArray[np.floating], float]
     Returns:
         (F, GMST):F 为长度 5 的数组(度),GMST 为标量(度)。
     """
-    t = (jd - _JD_J2000) / _DAYS_PER_JULIAN_CENTURY
+    t = (jd - _JD_J2000) / DAYS_PER_JULIAN_CENTURY
     t2 = t * t
     t3 = t2 * t
     t4 = t3 * t

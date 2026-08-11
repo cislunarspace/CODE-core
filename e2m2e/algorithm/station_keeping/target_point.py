@@ -24,11 +24,10 @@ from typing import Protocol
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants import SECONDS_PER_DAY
 from .special_point import StmPropagator
 
 __all__ = ["NominalOrbitView", "StrictTargetPointLaw", "LooseTargetPointLaw"]
-
-_SECONDS_PER_DAY = 86400.0
 
 
 class NominalOrbitView(Protocol):
@@ -74,7 +73,7 @@ class StrictTargetPointLaw:
             Δv 矢量（km/s）
         """
         state0 = np.asarray(state0, dtype=float)
-        t_j = t0 + self.feedback_arc_days * _SECONDS_PER_DAY
+        t_j = t0 + self.feedback_arc_days * SECONDS_PER_DAY
         r_target = nominal.state_at(t_j)[:3]
 
         # 用 STM 一次传播取线性初值 Δv₀ = -B⁻¹·dr_free（自由外推偏差），省去
@@ -143,7 +142,7 @@ class LooseTargetPointLaw:
         相对标称的偏差；A/B/C/D 为 Φ(t_j, t₀) 的四块。
         """
         state0 = np.asarray(state0, dtype=float)
-        t_j = t0 + self.feedback_arc_days * _SECONDS_PER_DAY
+        t_j = t0 + self.feedback_arc_days * SECONDS_PER_DAY
 
         res = propagator.propagate_with_stm(state0, t0, np.array([t_j]))
         stm = np.asarray(res["stm"])[0]

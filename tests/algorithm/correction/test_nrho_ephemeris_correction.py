@@ -20,6 +20,7 @@ import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.solver.multiple_shooting import MultipleShooting
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = [
@@ -28,10 +29,10 @@ pytestmark = [
 ]
 
 # =============================================================================
-# 物理参数
+# 物理参数（DE421 基准）
 # =============================================================================
-MU = 1.21506683e-2
-TU_SECONDS = 4.34811305 * 86400  # 秒
+MU = Datum.DE421.mu
+TU_SECONDS = Datum.DE421.char_time_s  # 秒
 
 N_PATCH_POINTS = 8
 POSITION_CONTINUITY_TOL = 1e-6  # km

@@ -8,13 +8,16 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates.systems import KM_TO_M, R_EARTH
+from ...data.constants import KM_TO_M
+from ...data.constants.bodies import EARTH
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ITRFApproxAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
 from .atmosphere import ExponentialAtmosphere
 from .exceptions import CoordinateTransformError
 from .physical_model import PhysicalModel
+
+R_EARTH: float = EARTH.gravity_ref_radius_km  # type: ignore[assignment]
 
 
 class DragModel(PhysicalModel):

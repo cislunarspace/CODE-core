@@ -6,6 +6,7 @@ import os
 
 import numpy as np
 import pytest
+from kernel_helpers import SPICE_KERNEL_DIR
 
 from e2m2e.algorithm.coordinate import spacetime_convert
 
@@ -13,21 +14,16 @@ pytestmark = pytest.mark.data
 
 
 # ---------------------------------------------------------------------------
-# SPICE 与 kernel 可用性检测（与 tests/algorithm/normal_form/test_hamiltonian.py 一致）
+# SPICE 与 kernel 可用性检测
 # ---------------------------------------------------------------------------
-
-_SPICE_KERNEL_DIR = os.environ.get(
-    "SPICE_KERNEL_DIR",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "kernels"),
-)
 
 
 def _has_spice_kernels() -> bool:
     """检查 SPICE .tls + .bsp 都可用。"""
-    if not os.path.isdir(_SPICE_KERNEL_DIR):
+    if not os.path.isdir(SPICE_KERNEL_DIR):
         return False
-    has_tls = any(f.endswith(".tls") for f in os.listdir(_SPICE_KERNEL_DIR))
-    has_bsp = any(f.endswith(".bsp") for f in os.listdir(_SPICE_KERNEL_DIR))
+    has_tls = any(f.endswith(".tls") for f in os.listdir(SPICE_KERNEL_DIR))
+    has_bsp = any(f.endswith(".bsp") for f in os.listdir(SPICE_KERNEL_DIR))
     return has_tls and has_bsp
 
 
@@ -39,9 +35,9 @@ _requires_spice = pytest.mark.skipif(
 
 def _time_ephemeris_available() -> bool:
     """检查 de440t.bsp 是否存在（含时间星历的历表）。"""
-    if not os.path.isdir(_SPICE_KERNEL_DIR):
+    if not os.path.isdir(SPICE_KERNEL_DIR):
         return False
-    return os.path.exists(os.path.join(_SPICE_KERNEL_DIR, "de440t.bsp"))
+    return os.path.exists(os.path.join(SPICE_KERNEL_DIR, "de440t.bsp"))
 
 
 @_requires_spice
@@ -95,7 +91,7 @@ _time_ephemeris_available_mark = pytest.mark.skipif(
 @_time_ephemeris_available_mark
 class TestSpacetimeConvertGcrsEbcrs:
     def test_gcrs_to_ebcrs_round_trip(self):
-        ephemeris_path = os.path.join(_SPICE_KERNEL_DIR, "de440t.bsp")
+        ephemeris_path = os.path.join(SPICE_KERNEL_DIR, "de440t.bsp")
         position = np.array([7000.0, 0.0, 0.0])
         jd_tt = 2459000.0
 

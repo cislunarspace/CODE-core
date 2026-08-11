@@ -8,7 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from e2m2e.data.kernels.manager import _GM_VALUES, SPICEManager
+from e2m2e.data.constants import EARTH, MOON, SUN
+from e2m2e.data.kernels.manager import SPICEManager
 
 pytestmark = pytest.mark.data
 
@@ -20,25 +21,25 @@ class TestLoadKernelFileNotFound:
             mgr.load_kernel("/nonexistent/path.bsp")
 
 
-class TestGetGmFromCache:
-    def test_earth_gm_from_cache(self):
+class TestGetGmFromBodies:
+    def test_earth_gm_from_bodies(self):
         mgr = SPICEManager()
         gm = mgr.get_gm("EARTH")
-        assert gm == _GM_VALUES["EARTH"]
+        assert gm == EARTH.gm_by_datum["DE440"]
 
-    def test_moon_gm_from_cache(self):
+    def test_moon_gm_from_bodies(self):
         mgr = SPICEManager()
         gm = mgr.get_gm("MOON")
-        assert gm == _GM_VALUES["MOON"]
+        assert gm == MOON.gm_by_datum["DE440"]
 
-    def test_sun_gm_from_cache(self):
+    def test_sun_gm_from_bodies(self):
         mgr = SPICEManager()
         gm = mgr.get_gm("SUN")
-        assert gm == _GM_VALUES["SUN"]
+        assert gm == SUN.gm_by_datum["DE440"]
 
     def test_case_insensitive_lookup(self):
         mgr = SPICEManager()
-        assert mgr.get_gm("earth") == _GM_VALUES["EARTH"]
+        assert mgr.get_gm("earth") == EARTH.gm_by_datum["DE440"]
 
 
 class TestFindEphemerisKernelNonexistent:

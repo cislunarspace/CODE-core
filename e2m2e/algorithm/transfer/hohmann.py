@@ -15,9 +15,13 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from e2m2e.data.templates.systems import MU_EARTH, R_EARTH
+from e2m2e.data.constants.bodies import EARTH
+from e2m2e.data.constants.datums import Datum
 
 from .lambert import solve_lambert_batch
+
+MU_EARTH: float = Datum.WGS84.earth_gm  # type: ignore[assignment]
+R_EARTH: float = EARTH.gravity_ref_radius_km  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)

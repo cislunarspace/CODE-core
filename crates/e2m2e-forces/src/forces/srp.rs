@@ -5,26 +5,32 @@
 //! - 阴影用 M&G §3.4.2 圆锥几何（视角径 a/b、角距 c、四分支判定 + 精确圆面
 //!   重叠面积），多遮挡体按 GMAT GMT-6543 合成
 
+use e2m2e_propagation::constants::{AU_KM as AU_KM_CONST, KM_TO_M, SOLAR_PRESSURE_1AU};
 use e2m2e_spice::spice_ffi::{spkezr, SpiceFfiError};
 
 /// SRP 常量（与 Python srp.py 一致）。
-const P_SRP_1AU: f64 = 4.56e-6; // N/m²
-const AU_KM: f64 = 1.49597870700e8; // km
-const KM_TO_M: f64 = 1000.0;
+const P_SRP_1AU: f64 = SOLAR_PRESSURE_1AU;
+const AU_KM: f64 = AU_KM_CONST;
+
+use e2m2e_propagation::constants::{
+    EARTH_GRAVITY_REF_RADIUS_KM, JUPITER_MEAN_RADIUS_KM, MARS_MEAN_RADIUS_KM,
+    MERCURY_MEAN_RADIUS_KM, MOON_MEAN_RADIUS_KM, NEPTUNE_MEAN_RADIUS_KM, SATURN_MEAN_RADIUS_KM,
+    SUN_MEAN_RADIUS_KM, URANUS_MEAN_RADIUS_KM, VENUS_MEAN_RADIUS_KM,
+};
 
 /// 天体半径表（km，与 Python shadow._BODY_RADII_KM 一致）。
 pub fn body_radius(body: &str) -> Option<f64> {
     match body {
-        "SUN" => Some(695700.0),
-        "EARTH" => Some(6378.1363),
-        "MOON" => Some(1737.4),
-        "MARS" => Some(3396.19),
-        "JUPITER" => Some(71492.0),
-        "VENUS" => Some(6051.8),
-        "MERCURY" => Some(2440.53),
-        "SATURN" => Some(60268.0),
-        "URANUS" => Some(25559.0),
-        "NEPTUNE" => Some(24764.0),
+        "SUN" => Some(SUN_MEAN_RADIUS_KM),
+        "EARTH" => Some(EARTH_GRAVITY_REF_RADIUS_KM),
+        "MOON" => Some(MOON_MEAN_RADIUS_KM),
+        "MARS" => Some(MARS_MEAN_RADIUS_KM),
+        "JUPITER" => Some(JUPITER_MEAN_RADIUS_KM),
+        "VENUS" => Some(VENUS_MEAN_RADIUS_KM),
+        "MERCURY" => Some(MERCURY_MEAN_RADIUS_KM),
+        "SATURN" => Some(SATURN_MEAN_RADIUS_KM),
+        "URANUS" => Some(URANUS_MEAN_RADIUS_KM),
+        "NEPTUNE" => Some(NEPTUNE_MEAN_RADIUS_KM),
         _ => None,
     }
 }

@@ -16,6 +16,7 @@ from e2m2e.algorithm.family.strategies import (
     symmetric_xz_fixed_x0,
     symmetric_xz_fixed_z0,
 )
+from e2m2e.data.constants import Datum
 
 pytestmark = pytest.mark.orchestration
 
@@ -127,7 +128,7 @@ class TestStrategyIntegration:
         from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 
         system = CR3BP_System(
-            mu=0.0121506683, primary="Earth", secondary="Moon"
+            mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
         )._with_default_scales()
         dynamics = CR3BP_Dynamics(system)
         dc = DifferentialCorrection(dynamics)
@@ -144,7 +145,7 @@ class TestStrategyIntegration:
         from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 
         system = CR3BP_System(
-            mu=0.0121506683, primary="Earth", secondary="Moon"
+            mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
         )._with_default_scales()
         dynamics = CR3BP_Dynamics(system)
         dc = DifferentialCorrection(dynamics)

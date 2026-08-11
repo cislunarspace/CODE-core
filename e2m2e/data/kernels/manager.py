@@ -29,29 +29,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants.bodies import _BODIES_BY_NAME
 from ._spice_loader import get_spiceypy
 from .provider import EphemerisProvider
 
 if TYPE_CHECKING:
     from .ephem_cache import EphemCache
-
-# 常用天体的引力参数 GM（km³/s²）。
-# 键名为 NAIF 标准天体名称的大写形式。
-# 数值来源：JPL DE440 行星历表（TDB 时间框架）。
-_GM_VALUES: dict[str, float] = {
-    "SUN": 1.32712440018e11,
-    "MERCURY": 22031.868551,
-    "VENUS": 324858.592000,
-    "EARTH": 398600.435507,
-    "MOON": 4902.800118,
-    "MARS": 42828.375816,
-    "JUPITER": 126712764.100000,
-    "SATURN": 37940584.841800,
-    "URANUS": 5794556.400000,
-    "NEPTUNE": 6836527.100580,
-    "EMB": 403503.235502,  # 地月质心（Earth-Moon Barycenter）
-    "PLUTO": 975.500000,  # 矮行星，供扩展使用
-}
 
 # 常用天体的 NAIF ID 映射表，用于将天体名称转换为 SPICE 所需的整数 ID。
 _NAIF_IDS: dict[str, int] = {
@@ -451,11 +434,13 @@ class SPICEManager(EphemerisProvider):
     def get_gm(self, body: str) -> float:
         """获取天体的引力参数 GM（km³/s²）。
 
-        优先从本地缓存字典中查找；若未命中，则通过 SPICE 内核实时读取。
+        优先从 ``data.constants.bodies`` 的 DE440 GM 表中取；若该天体没有
+        DE440 记录，则通过 SPICE 内核实时读取。
         """
         name_upper = body.upper()
-        if name_upper in _GM_VALUES:
-            return _GM_VALUES[name_upper]
+        body_obj = _BODIES_BY_NAME.get(name_upper)
+        if body_obj is not None and "DE440" in body_obj.gm_by_datum:
+            return body_obj.gm_by_datum["DE440"]
         body_id = _NAIF_IDS.get(name_upper, body)
         vals = get_spiceypy().bodvrd(str(body_id), "GM", 1)
         return float(vals[1][0])

@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants import AU_KM, Datum
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ITRFSpiceAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
@@ -44,8 +45,8 @@ _DEFAULT_TIDE_FILE_BY_BODY: dict[str, str | None] = {
     "MOON": "grgm900c.tide",
 }
 # Sun/Moon 平均半长轴(永久潮汐修正用,近似)
-_A_SUN_KM = 1.495978707e8
-_A_MOON_KM = 384400.0
+_A_SUN_KM = AU_KM
+_A_MOON_KM = Datum.DE421.char_length_km
 
 # 每个中心天体做固体潮时的扰动体列表(body 名)。地球受 Sun+Moon 扰动,
 # 月球受 Earth 扰动(GMAT 行为)。

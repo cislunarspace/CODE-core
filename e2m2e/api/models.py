@@ -11,6 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from e2m2e.data.constants import SECONDS_PER_DAY
+
 __all__ = [
     "OrbitError",
     "DesignOrbitRequest",
@@ -283,7 +285,7 @@ class ControlOrbitRequest(_ApiModel):
     special_mode: int = Field(default=1, ge=1, le=2)
     num_controls: int = Field(default=120, ge=1)
     num_monte_carlo: int = Field(default=5, ge=1)
-    output_step: float = Field(default=86400.0, gt=0.0)
+    output_step: float = Field(default=SECONDS_PER_DAY, gt=0.0)
     engine_layout: Any = Field(default=None, description="EngineLayout（角动量管理 4-6 必填）")
     momentum_interval: float = Field(default=5.0, gt=0.0, description="角动量卸载间隔（天）")
     srp_offset_m: list[float] | None = Field(default=None, description="SRP 压心偏移 [x,y,z]（m）")

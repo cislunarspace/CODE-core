@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from e2m2e.data.constants import SECONDS_PER_DAY
+
 from .config import Config
 from .models import (
     ControlOrbitRequest,
@@ -299,7 +301,7 @@ class Facade:
                 duration_sec=float(request.duration),
                 output_step=float(request.output_step),
                 n_points=len(result.year),
-                time_sec=((times_jd - times_jd[0]) * 86400.0).tolist(),
+                time_sec=((times_jd - times_jd[0]) * SECONDS_PER_DAY).tolist(),
                 times_jd_tdb=times_jd.tolist(),
                 position_km=result.position_km.tolist(),
                 velocity_km_s=vel_km_s.tolist(),

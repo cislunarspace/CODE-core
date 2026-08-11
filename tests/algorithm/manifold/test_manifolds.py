@@ -14,13 +14,14 @@ from e2m2e.algorithm.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.family.halo_initial_guess import _compute_gamma
 from e2m2e.algorithm.manifold import InvariantManifold, ManifoldKind, PoincareSection
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.orchestration
 
 
-# 地月系统质量参数（与 tests/algorithm/conftest.py 一致）
-MU = 1.21506683e-2
+# 地月系统质量参数（DE421 基准）
+MU = Datum.DE421.mu
 DU = 384405.0  # km
 
 # L1 Lyapunov 面内振幅（无量纲，距 L1 的 x 偏移）

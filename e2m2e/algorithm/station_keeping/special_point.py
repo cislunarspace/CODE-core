@@ -27,12 +27,12 @@ from typing import TYPE_CHECKING, Protocol
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants import SECONDS_PER_DAY
+
 if TYPE_CHECKING:
     from .target_point import NominalOrbitView
 
 __all__ = ["SpecialPointLaw", "StmPropagator", "SynodicView"]
-
-_SECONDS_PER_DAY = 86400.0
 
 
 class StmPropagator(Protocol):
@@ -271,8 +271,8 @@ class SpecialPointLaw:
 
             # 迭代后期只在上次穿越时刻附近搜索（穿越时刻随 v0 收敛而稳定）
             window = (
-                t_star - self.window_days * _SECONDS_PER_DAY,
-                t_star + self.window_days * _SECONDS_PER_DAY,
+                t_star - self.window_days * SECONDS_PER_DAY,
+                t_star + self.window_days * SECONDS_PER_DAY,
             )
 
         if g_norm >= self.tolerance:

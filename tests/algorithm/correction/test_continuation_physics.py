@@ -9,13 +9,16 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_System
 from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.solver.continuation import compute_F_and_dF_symmetric_xz_plane
+from e2m2e.data.constants import Datum
 
 pytestmark = pytest.mark.orchestration
 
 
 @pytest.fixture
 def earth_moon_dynamics():
-    system = CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+    system = CR3BP_System(
+        mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
+    )._with_default_scales()
     return CR3BP_Dynamics(system)
 
 

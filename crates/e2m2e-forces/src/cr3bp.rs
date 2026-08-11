@@ -425,7 +425,7 @@ pub fn propagate_cr3bp_stm(
 mod tests {
     use super::*;
 
-    const MU_EARTH_MOON: f64 = 0.0121505856; // 地月系质量参数
+    const MU_EARTH_MOON: f64 = e2m2e_propagation::constants::DATUM_DE421_MU; // 地月系质量参数（DE421）
 
     /// EOM 与 Python 参考值对比：L1 附近的 Halo 轨道初值。
     #[test]

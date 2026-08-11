@@ -525,8 +525,8 @@ pub fn propagate_bcr4bp_stm(
 mod tests {
     use super::*;
 
-    // 地月系参数（与 bcr4bp_system.py 的 BCR4BPSystem.earth_moon 默认值一致）
-    const MU_EARTH_MOON: f64 = 0.0121506683;
+    // 地月系质量参数（单一来源：constants.toml → e2m2e_propagation 生成；DE421）
+    const MU_EARTH_MOON: f64 = e2m2e_propagation::constants::DATUM_DE421_MU;
     const MU_SUN: f64 = 328900.56; // GM_sun / GM_EMB（DE440）
     const SUN_DISTANCE: f64 = 389.0; // 日地平均距离 / 地月距离
     const SUN_OMEGA: f64 = -0.92520; // 会合系中太阳逆行角速度

@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ...data.constants import SECONDS_PER_DAY
 from ...data.kernels.manager import SPICEManager
 from ...data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
 from ...data.types import EphemerisTable, ManeuverTable, SKStatistic
@@ -100,7 +101,7 @@ def control_orbit(
     special_crossings: int = 3,
     num_controls: int = 120,
     num_monte_carlo: int = 5,
-    output_step: float = 86400.0,
+    output_step: float = SECONDS_PER_DAY,
     position_accuracy: float = 1500.0,
     velocity_accuracy: float = 0.002,
     thrust_angle_err: float = 0.333,

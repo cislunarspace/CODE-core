@@ -10,6 +10,8 @@
 - ``enums.py``：领域枚举（源 ``core/enums.py`` + ``mbse/data/enums.py``）。
 """
 
+from __future__ import annotations
+
 from .enums import (
     BifurcationLabel,
     BoundaryMode,
@@ -30,16 +32,8 @@ from .seed import (
     EARTH_MOON_MU,
     MOON_RADIUS_KM,
 )
-from .systems import AU, DAY, EARTH_MOON_DISTANCE_KM, KM_TO_M, R_EARTH, YEAR, G
 
 __all__ = [
-    "AU",
-    "DAY",
-    "EARTH_MOON_DISTANCE_KM",
-    "G",
-    "KM_TO_M",
-    "R_EARTH",
-    "YEAR",
     "CHAR_LENGTH_KM",
     "CHAR_PERIOD_SEC",
     "EARTH_MOON_MU",

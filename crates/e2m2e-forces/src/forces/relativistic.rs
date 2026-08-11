@@ -5,19 +5,23 @@
 //! - Lense-Thirring（自转角动量 LT，需要 sxform + 旋转矩阵导数）
 //! - de Sitter（geodesic precession）
 
+use e2m2e_propagation::constants::{
+    EARTH_GRAVITY_REF_RADIUS_KM, JUPITER_MEAN_RADIUS_KM, MARS_MEAN_RADIUS_KM, MOON_MEAN_RADIUS_KM,
+    SPEED_OF_LIGHT_KMS, SUN_MEAN_RADIUS_KM,
+};
 use e2m2e_spice::spice_ffi::{spkezr, sxform, SpiceFfiError};
 
 /// 默认光速（km/s）。
-const C_DEFAULT: f64 = 299792.458;
+const C_DEFAULT: f64 = SPEED_OF_LIGHT_KMS;
 
 /// 中心天体赤道半径默认表（与 Python _DEFAULT_BODY_RADII_KM 一致）。
 fn default_body_radius(body: &str) -> Option<f64> {
     match body {
-        "EARTH" => Some(6378.1363),
-        "MOON" => Some(1737.4),
-        "SUN" => Some(695700.0),
-        "MARS" => Some(3396.19),
-        "JUPITER" => Some(71492.0),
+        "EARTH" => Some(EARTH_GRAVITY_REF_RADIUS_KM),
+        "MOON" => Some(MOON_MEAN_RADIUS_KM),
+        "SUN" => Some(SUN_MEAN_RADIUS_KM),
+        "MARS" => Some(MARS_MEAN_RADIUS_KM),
+        "JUPITER" => Some(JUPITER_MEAN_RADIUS_KM),
         _ => None,
     }
 }

@@ -2,20 +2,30 @@
 
 import pytest
 
+from e2m2e.data.constants import (
+    AU_KM,
+    EARTH_MOON_DISTANCE_KM,
+    KM_TO_M,
+    SUN,
+    Datum,
+)
+from e2m2e.data.constants import (
+    GRAVITATIONAL_CONSTANT as G,
+)
+from e2m2e.data.constants import (
+    SECONDS_PER_DAY as DAY,
+)
+from e2m2e.data.constants import (
+    SECONDS_PER_JULIAN_YEAR as YEAR,
+)
+from e2m2e.data.constants.bodies import EARTH
 from e2m2e.data.templates import (
-    AU,
     CHAR_LENGTH_KM,
     CHAR_PERIOD_SEC,
-    DAY,
     DEFAULT_DYB,
     DEFAULT_PERTURBATION,
-    EARTH_MOON_DISTANCE_KM,
     EARTH_MOON_MU,
-    KM_TO_M,
     MOON_RADIUS_KM,
-    R_EARTH,
-    YEAR,
-    G,
     OrbitFamilyType,
     ReferenceFrame,
     force_config,
@@ -24,11 +34,13 @@ from e2m2e.data.templates import (
 
 pytestmark = pytest.mark.data
 
+R_EARTH = EARTH.gravity_ref_radius_km
+
 
 class TestSystemsConstants:
     def test_physical_constants(self):
         assert R_EARTH == 6378.1363
-        assert AU == 149597870.7
+        assert AU_KM == 149597870.7
         assert KM_TO_M == 1000.0
 
     def test_cr3bp_standard(self):
@@ -37,20 +49,32 @@ class TestSystemsConstants:
         assert DAY == 86400
         assert YEAR == 365.25 * 86400
 
-    def test_single_source_with_core_constants(self):
-        """core/constants.py 是 shim，值与数据层一致。"""
-        from e2m2e.data.templates.systems import AU as core_au
-        from e2m2e.data.templates.systems import R_EARTH as core_rearth
+    def test_algorithm_layer_single_source(self):
+        """算法层不再硬编码物理常量：常量子来自 data.constants 单一来源。"""
+        from e2m2e.algorithm.dynamics.bcr4bp_system import BCR4BPSystem
+        from e2m2e.algorithm.dynamics.cr3bp_system import CR3BP_System
+        from e2m2e.algorithm.forces.force_mapping import perturbation_to_force_config
+        from e2m2e.algorithm.forces.gravity_file import _DEFAULT_MU
+        from e2m2e.algorithm.propagation import _DEFAULT_FORCE_CONFIG
+        from e2m2e.data.constants import SPEED_OF_LIGHT_KMS
 
-        assert core_au == AU
-        assert core_rearth == R_EARTH
+        assert SUN.gm_by_datum["DE440"] == BCR4BPSystem.SUN_GM_KM3_S2
+        assert CR3BP_System.DAY == DAY
+        assert CR3BP_System.YEAR == YEAR
+        assert EARTH.gm_by_datum["DE421"] == _DEFAULT_MU
+        assert _DEFAULT_FORCE_CONFIG["forces"][0]["params"]["mu"] == Datum.DE440.earth_gm
+        relativity_cfg = perturbation_to_force_config({"relativity": 1})
+        relativity = next(
+            f for f in relativity_cfg["forces"] if f["type"] == "RelativisticCorrection"
+        )
+        assert relativity["params"]["c"] == SPEED_OF_LIGHT_KMS
 
 
 class TestSeedConstants:
     def test_seed_values(self):
-        assert EARTH_MOON_MU == 0.0121506683
-        assert CHAR_LENGTH_KM == 384400.0
-        assert CHAR_PERIOD_SEC == 27.32 * 86400.0
+        assert Datum.DE421.mu == EARTH_MOON_MU
+        assert Datum.DE421.char_length_km == CHAR_LENGTH_KM
+        assert 2 * 3.141592653589793 * Datum.DE421.char_time_s == CHAR_PERIOD_SEC
         assert MOON_RADIUS_KM == 1737.4
         assert seed._DRO_SEED_X0 == 0.79188556619742
         assert seed._HALO_SEED_Z0 == 0.001

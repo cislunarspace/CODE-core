@@ -14,7 +14,9 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates.systems import AU as _AU_KM
+from ...data.constants import AU_KM as _AU_KM
+from ...data.constants import Datum
+from ...data.constants.bodies import EMB, SUN
 from .cr3bp_system import CR3BP_System
 
 
@@ -40,9 +42,9 @@ class BCR4BPSystem(CR3BP_System):
     对应 CR3BP 的平动点，仅作参考位置使用。
     """
 
-    # 太阳参数取值来源（DE440，与 e2m2e/core/spice.py 的 _GM_VALUES 一致）
-    SUN_GM_KM3_S2 = 1.32712440018e11  # 太阳 GM (km^3/s^2), DE440
-    EARTH_MOON_GM_KM3_S2 = 403503.235502  # 地月质心 GM (km^3/s^2), DE440
+    # 太阳参数取值来源（DE440，与 data.constants.bodies 一致）
+    SUN_GM_KM3_S2 = SUN.gm_by_datum["DE440"]  # 太阳 GM (km^3/s^2), DE440
+    EARTH_MOON_GM_KM3_S2 = EMB.gm_by_datum["DE440"]  # 地月质心 GM (km^3/s^2), DE440
     SUN_EARTH_DISTANCE_KM = _AU_KM  # 日地平均距离 (km), GMAT nominalSun
 
     def __init__(
@@ -58,7 +60,8 @@ class BCR4BPSystem(CR3BP_System):
         """初始化 BCR4BP 系统
 
         Args:
-            mu: 质量参数 μ = m2/(m1+m2)
+            mu: 质量参数 μ = m2/(m1+m2)。地月系默认使用 DE421 基准
+                ``Datum.DE421.mu``，废弃 1965 旧值 0.0121506683。
             primary: 主天体名称
             secondary: 次天体名称
             sun_mass: 太阳无量纲质量；None 时按地月系默认值
@@ -94,17 +97,17 @@ class BCR4BPSystem(CR3BP_System):
     @classmethod
     def earth_moon(
         cls,
-        mu: float = 0.0121506683,
+        mu: float = Datum.DE421.mu,
         sun_phase0: float = 0.0,
     ) -> BCR4BPSystem:
         """构造标准地月 BCR4BP 系统（含默认特征尺度）
 
         特征尺度与 ``CR3BP_System._with_default_scales`` 的地月分支一致
         （DU = 384405 km，周期 27.32 天），太阳参数取 DE440 / 日地平均
-        距离推导的无量纲值。
+        距离推导的无量纲值。地月 μ 默认使用 DE421 基准。
 
         Args:
-            mu: 地月质量参数，默认 0.0121506683（与 conftest 地月系统一致）
+            mu: 地月质量参数，默认 ``Datum.DE421.mu``。
             sun_phase0: t = 0 时刻的太阳相位角（弧度）
 
         Returns:

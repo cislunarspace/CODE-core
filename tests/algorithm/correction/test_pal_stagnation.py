@@ -12,6 +12,7 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.solver.continuation import Continuation
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
 # 测试运行较慢(约 30-60 秒),只在不在 fast 模式时跑
@@ -22,7 +23,7 @@ pytestmark = [
 
 
 def _build_earth_moon_system() -> CR3BP_System:
-    return CR3BP_System(mu=1.21506683e-2, primary="earth", secondary="moon")
+    return CR3BP_System(mu=Datum.DE421.mu, primary="earth", secondary="moon")
 
 
 def _build_l_halo_seed(libration_point: int, halo_class: int, amplitude_z: float = 0.001) -> Orbit:

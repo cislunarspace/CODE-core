@@ -10,13 +10,10 @@ import pytest
 
 from e2m2e.algorithm.forces import PhysicalModel
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
-from e2m2e.data.templates.systems import AU as _AU_KM
+from e2m2e.data.constants import AU_KM as _AU_KM
+from e2m2e.data.constants import SOLAR_PRESSURE_1AU as _P_SRP_1AU
 
 pytestmark = pytest.mark.force
-
-
-# 太阳光压常数（N/m² @ 1 AU）。
-_P_SRP_1AU = 4.56e-6
 
 
 def test_srp_is_physical_model() -> None:

@@ -10,9 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from ...data.constants import SECONDS_PER_DAY
 from .eop import JD_MJD_OFFSET, CoordinateDataError
-
-SECONDS_PER_DAY = 86400.0
 
 
 @dataclass(frozen=True)

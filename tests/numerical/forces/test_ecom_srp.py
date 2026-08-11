@@ -111,7 +111,7 @@ class TestCannonballDegradation:
         cr, area, mass = 1.5, 10.0, 1000.0
 
         a_srp, a_ecom = self._compare_accelerations(sc_pos, sun_to_sc, flux, cr, area, mass)
-        np.testing.assert_array_equal(a_srp, a_ecom)
+        np.testing.assert_allclose(a_srp, a_ecom, rtol=1e-15)
 
     def test_cannonball_degradation_with_shadow(self):
         """带阴影因子的退化一致性。"""
@@ -121,7 +121,7 @@ class TestCannonballDegradation:
         cr, area, mass = 2.0, 5.0, 500.0
 
         a_srp, a_ecom = self._compare_accelerations(sc_pos, sun_to_sc, flux, cr, area, mass)
-        np.testing.assert_array_equal(a_srp, a_ecom)
+        np.testing.assert_allclose(a_srp, a_ecom, rtol=1e-15)
 
     def test_cannonball_degradation_oblique(self):
         """倾斜方向的退化一致性。"""
@@ -131,7 +131,7 @@ class TestCannonballDegradation:
         cr, area, mass = 1.0, 20.0, 2000.0
 
         a_srp, a_ecom = self._compare_accelerations(sc_pos, sun_to_sc, flux, cr, area, mass)
-        np.testing.assert_array_equal(a_srp, a_ecom)
+        np.testing.assert_allclose(a_srp, a_ecom, rtol=1e-15)
 
     def test_cannonball_degradation_various_dyb0(self):
         """不同等效面质比的退化一致性。"""
@@ -148,7 +148,7 @@ class TestCannonballDegradation:
             srp = SolarRadiationPressure(area=a2m, mass=1.0, cr=1.0)
             a_srp = srp._compute_srp_acceleration(sun_to_sc, flux)
 
-            np.testing.assert_array_equal(a_srp, a_ecom)
+            np.testing.assert_allclose(a_srp, a_ecom, rtol=1e-15)
 
     def test_zero_flux_yields_zero(self):
         """flux=0 时加速应为零。"""

@@ -6,13 +6,17 @@
 
 from __future__ import annotations
 
-#: 地月 CR3BP 参数（与 examples/、tests/conftest.py 的标准系统一致）
-EARTH_MOON_MU = 0.0121506683
-CHAR_LENGTH_KM = 384400.0
-CHAR_PERIOD_SEC = 27.32 * 86400.0
+from e2m2e.data.constants import Datum
+from e2m2e.data.constants.bodies import MOON
+
+#: 地月 CR3BP 参数（与 examples/、tests/conftest.py 的标准系统一致）。
+#: 自 ADR 0022 起统一使用 DE421 基准，废弃 1965 旧值。
+EARTH_MOON_MU = Datum.DE421.mu
+CHAR_LENGTH_KM = Datum.DE421.char_length_km
+CHAR_PERIOD_SEC = 2 * 3.141592653589793 * Datum.DE421.char_time_s
 
 #: 月球平均半径（km），NRHO 近月点高度的起算面
-MOON_RADIUS_KM = 1737.4
+MOON_RADIUS_KM: float = MOON.mean_radius_km  # type: ignore[assignment]
 
 #: DRO 族标准种子（examples/main_design.py 等验证过的初值）
 _DRO_SEED_X0 = 0.79188556619742
@@ -47,7 +51,7 @@ _SPO_L4_SEED_Y0 = 0.8660
 _SPO_L4_SEED_VX0 = -0.2384
 _SPO_L4_SEED_VY0 = 0.2494
 #: 周期 28.3488 天，无量纲：T_days / (CHAR_PERIOD_SEC / 86400) * 2π
-#: CHAR_PERIOD_SEC = 27.32 * 86400，T* ≈ 4.3423 天/TU
+#: CHAR_PERIOD_SEC = 2π * char_time_s，T* ≈ 4.3423 天/TU
 _SPO_SEED_PERIOD = 6.529
 
 #: LPO（Long-Period Orbit）族标准种子

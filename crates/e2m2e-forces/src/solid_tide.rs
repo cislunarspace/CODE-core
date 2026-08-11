@@ -16,10 +16,14 @@
 // 时间与角度常量
 // ----------------------------------------------------------------------------
 
+use e2m2e_propagation::constants::{
+    DAYS_PER_JULIAN_CENTURY as DAYS_PER_JULIAN_CENTURY_CONST,
+    DAYS_PER_JULIAN_YEAR as DAYS_PER_YEAR_CONST, RAD_PER_DEG,
+};
+
 const JD_J2000: f64 = 2451545.0;
-const DAYS_PER_JULIAN_CENTURY: f64 = 36525.0;
-const DAYS_PER_YEAR: f64 = 365.25;
-const RAD_PER_DEG: f64 = std::f64::consts::PI / 180.0;
+const DAYS_PER_JULIAN_CENTURY: f64 = DAYS_PER_JULIAN_CENTURY_CONST;
+const DAYS_PER_YEAR: f64 = DAYS_PER_YEAR_CONST;
 
 // ----------------------------------------------------------------------------
 // Table 6.3（IERS TN32 p.64/66，迁移 GMAT HarmonicGravity.cpp 静态数组）

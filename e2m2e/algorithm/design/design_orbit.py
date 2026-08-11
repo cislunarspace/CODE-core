@@ -41,6 +41,7 @@ import numpy as np
 
 from e2m2e.data.types.trajectory import EphemerisTable
 
+from ...data.constants import SECONDS_PER_DAY
 from ...data.kernels.manager import SPICEManager
 from ...data.templates.perturbations import DEFAULT_PERTURBATION
 from ...data.types.orbit import Orbit
@@ -821,7 +822,7 @@ def _design_elfo(
     return OrbitDesignResult(
         orbit_type="ELFO",
         epoch_utc=epoch_iso,
-        duration_day=duration_sec / 86400.0,
+        duration_day=duration_sec / SECONDS_PER_DAY,
         output_step_sec=output_step,
         initial_state=state0,
         ephemeris=ephemeris,
@@ -992,7 +993,7 @@ def design_orbit(
 
     assert request.duration is not None  # model_validator 已填默认值
     duration_sec = float(request.duration)
-    duration_day = duration_sec / 86400.0
+    duration_day = duration_sec / SECONDS_PER_DAY
     et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * output_step, output_step)
 
     if correction_method == "segmented":

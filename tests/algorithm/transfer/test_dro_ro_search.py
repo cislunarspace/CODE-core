@@ -5,6 +5,7 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import DEFAULT_MIN_DISTANCE_THRESHOLD_DU, TransferSearch
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.orchestration
@@ -12,7 +13,7 @@ pytestmark = pytest.mark.orchestration
 
 @pytest.fixture
 def system():
-    return CR3BP_System(mu=1.21506683e-2, primary="earth", secondary="moon")
+    return CR3BP_System(mu=Datum.DE421.mu, primary="earth", secondary="moon")
 
 
 @pytest.fixture

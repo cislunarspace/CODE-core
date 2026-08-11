@@ -17,8 +17,7 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-# 儒略世纪长度（天）
-_DAYS_PER_JULIAN_CENTURY = 36525.0
+from ...data.constants import DAYS_PER_JULIAN_CENTURY, SECONDS_PER_DAY
 
 
 def _seconds_to_julian_centuries(et: float) -> float:
@@ -32,7 +31,7 @@ def _seconds_to_julian_centuries(et: float) -> float:
     """
     # J2000.0 对应的 SPICE 历书时为 0 秒
     # 1 儒略世纪 = 36525 天 = 36525 * 86400 秒
-    return et / (_DAYS_PER_JULIAN_CENTURY * 86400.0)
+    return et / (DAYS_PER_JULIAN_CENTURY * SECONDS_PER_DAY)
 
 
 def _arcseconds_to_radians(arcsec: float) -> float:

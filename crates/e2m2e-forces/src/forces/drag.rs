@@ -8,13 +8,11 @@
 //!   （drag 依赖速度，∂a/∂v ≠ 0，接口扩三元组见 ADR 0018）
 
 use crate::atmosphere;
+use e2m2e_propagation::constants::{EARTH_GRAVITY_REF_RADIUS_KM, KM_TO_M};
 use e2m2e_spice::spice_ffi::{mat3_mul_vec, mat3_t_mul_vec, pxform, SpiceFfiError};
 
 /// 地球赤道半径（km），与 Python `R_EARTH = 6378.1363` 一致。
-const EARTH_RADIUS_KM: f64 = 6378.1363;
-
-/// 千米 → 米换算因子，与 Python `KM_TO_M = 1000.0` 一致。
-const KM_TO_M: f64 = 1000.0;
+const EARTH_RADIUS_KM: f64 = EARTH_GRAVITY_REF_RADIUS_KM;
 
 /// 阻力加速度 + 雅可比结果。
 pub struct AccelDrag {

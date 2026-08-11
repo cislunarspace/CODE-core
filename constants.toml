@@ -1,0 +1,143 @@
+# 物理常数单一来源（single source of truth）。
+#
+# 本文件为 e2m2e 全库物理常数的唯一来源：
+# - Python 侧 ``e2m2e.data.constants`` 运行期从本文件加载。
+# - Rust 侧 ``e2m2e-propagation`` 构建期解析本文件，生成 ``constants.rs``
+#   并通过 ``include!`` 引入。
+#
+# 所有数值单位统一为 km / s / kg 系；GM 单位为 km³/s²。
+
+# -----------------------------------------------------------------------------
+# 通用物理常量（全库一套）
+# -----------------------------------------------------------------------------
+[universal]
+speed_of_light_kms = { value = 299792.458, source = "SI" }
+gravitational_constant = { value = 6.67430e-20, source = "CODATA2018" }
+au_km = { value = 149597870.7, source = "IAU2012" }
+seconds_per_day = { value = 86400.0, source = "SI" }
+earth_moon_distance_km = { value = 384405.0, source = "Cui2025" }
+days_per_julian_year = { value = 365.25, source = "SI" }
+days_per_julian_century = { value = 36525.0, source = "SI" }
+km_to_m = { value = 1000.0, source = "SI" }
+solar_flux_w_m2 = { value = 1367.0, source = "GMAT" }
+solar_flux_tsi_w_m2 = { value = 1361.0, source = "Pesce2023" }
+rad_per_deg = { value = 0.017453292519943295, source = "SI" }
+
+# -----------------------------------------------------------------------------
+# 基准集（datum）：每套内部 GM、μ、特征长度、特征时间来自同一来源。
+# -----------------------------------------------------------------------------
+[datum.DE421]
+mu = { value = 0.012150585350562453, source = "DE421" }
+char_length_km = { value = 384400.0, source = "literature" }
+char_time_s = { value = 375190.2588926273, source = "literature" }
+earth_gm = { value = 398600.4415, source = "DE421" }
+moon_gm = { value = 4902.8005821478, source = "DE421" }
+sun_gm = { value = 1.32712428e11, source = "DE421" }
+emb_gm = { value = 403503.242083, source = "DE421" }
+
+[datum.DE440]
+mu = { value = 0.012150584394709708, source = "DE440" }
+earth_gm = { value = 398600.435507, source = "DE440" }
+moon_gm = { value = 4902.800118, source = "DE440" }
+sun_gm = { value = 1.32712440018e11, source = "DE440" }
+emb_gm = { value = 403503.235502, source = "DE440" }
+
+[datum.WGS84]
+earth_gm = { value = 398600.4418, source = "WGS84" }
+earth_radius_km = { value = 6378.137, source = "WGS84" }
+earth_flattening = { value = 0.0033528106647474805, source = "WGS84" }
+
+# -----------------------------------------------------------------------------
+# 天体参数目录
+# -----------------------------------------------------------------------------
+[body.SUN]
+mean_radius_km = { value = 696000.0, source = "Vallado" }
+naif_id = { value = 10, source = "NAIF" }
+
+[body.SUN.gm]
+DE440 = { value = 1.32712440018e11, source = "DE440" }
+
+[body.EARTH]
+mean_radius_km = { value = 6378.137, source = "WGS84" }
+gravity_ref_radius_km = { value = 6378.1363, source = "GMAT" }
+flattening = { value = 0.0033528106647474805, source = "WGS84" }
+naif_id = { value = 399, source = "NAIF" }
+rotation_rate_iers_rad_s = { value = 7.292115146706979e-5, source = "IERS" }
+rotation_rate_gmat_rad_s = { value = 7.29211585530e-5, source = "GMAT" }
+
+[body.EARTH.gm]
+DE421 = { value = 398600.4415, source = "DE421" }
+DE440 = { value = 398600.435507, source = "DE440" }
+WGS84 = { value = 398600.4418, source = "WGS84" }
+
+[body.MOON]
+mean_radius_km = { value = 1737.4, source = "IAU2015" }
+gravity_ref_radius_km = { value = 1738.0, source = "GRGM900C" }
+naif_id = { value = 301, source = "NAIF" }
+
+[body.MOON.gm]
+DE421 = { value = 4902.8005821478, source = "DE421" }
+DE440 = { value = 4902.800118, source = "DE440" }
+
+[body.EMB]
+naif_id = { value = 3, source = "NAIF" }
+
+[body.EMB.gm]
+DE421 = { value = 403503.242083, source = "DE421" }
+DE440 = { value = 403503.235502, source = "DE440" }
+
+[body.MERCURY]
+mean_radius_km = { value = 2440.53, source = "IAU2015" }
+naif_id = { value = 199, source = "NAIF" }
+
+[body.MERCURY.gm]
+DE440 = { value = 22031.868551, source = "DE440" }
+
+[body.VENUS]
+mean_radius_km = { value = 6051.8, source = "IAU2015" }
+naif_id = { value = 299, source = "NAIF" }
+
+[body.VENUS.gm]
+DE440 = { value = 324858.592000, source = "DE440" }
+
+[body.MARS]
+mean_radius_km = { value = 3396.19, source = "IAU2015" }
+naif_id = { value = 499, source = "NAIF" }
+
+[body.MARS.gm]
+DE440 = { value = 42828.375816, source = "DE440" }
+
+[body.JUPITER]
+mean_radius_km = { value = 71492.0, source = "IAU2015" }
+naif_id = { value = 599, source = "NAIF" }
+
+[body.JUPITER.gm]
+DE440 = { value = 126712764.100000, source = "DE440" }
+
+[body.SATURN]
+mean_radius_km = { value = 60268.0, source = "IAU2015" }
+naif_id = { value = 699, source = "NAIF" }
+
+[body.SATURN.gm]
+DE440 = { value = 37940584.841800, source = "DE440" }
+
+[body.URANUS]
+mean_radius_km = { value = 25559.0, source = "IAU2015" }
+naif_id = { value = 799, source = "NAIF" }
+
+[body.URANUS.gm]
+DE440 = { value = 5794556.400000, source = "DE440" }
+
+[body.NEPTUNE]
+mean_radius_km = { value = 24764.0, source = "IAU2015" }
+naif_id = { value = 899, source = "NAIF" }
+
+[body.NEPTUNE.gm]
+DE440 = { value = 6836527.100580, source = "DE440" }
+
+[body.PLUTO]
+mean_radius_km = { value = 1188.3, source = "IAU2015" }
+naif_id = { value = 999, source = "NAIF" }
+
+[body.PLUTO.gm]
+DE440 = { value = 975.500000, source = "DE440" }

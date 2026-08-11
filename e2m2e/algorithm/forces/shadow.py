@@ -12,22 +12,22 @@ References:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates.systems import R_EARTH
+from ...data.constants.bodies import EARTH, MOON, SUN
 from .physical_model import require_inertial_frame
 
 if TYPE_CHECKING:
     from ..system import System
 
-# 默认遮挡体赤道半径（km），取 GMAT PCK 值。可通过 radii 覆盖参数扩展。
+# 默认遮挡体赤道半径（km），取 GMAT PCK / IAU 2015 值。可通过 radii 覆盖参数扩展。
 _BODY_RADII_KM: dict[str, float] = {
-    "EARTH": R_EARTH,
-    "MOON": 1737.4,
-    "SUN": 695700.0,
+    "EARTH": cast(float, EARTH.gravity_ref_radius_km),
+    "MOON": cast(float, MOON.mean_radius_km),
+    "SUN": cast(float, SUN.mean_radius_km),
 }
 
 

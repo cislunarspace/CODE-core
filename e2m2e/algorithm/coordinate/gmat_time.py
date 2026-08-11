@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import erfa
 
-from ...data.frames.leap_seconds import SECONDS_PER_DAY, TaiUtcTable
+from ...data.constants import SECONDS_PER_DAY
+from ...data.frames.leap_seconds import TaiUtcTable
 
 A1_TAI_OFFSET = 0.0343817
 TT_TAI_OFFSET = 32.184

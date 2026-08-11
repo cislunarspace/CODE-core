@@ -12,12 +12,13 @@ import pytest
 matplotlib.use("Agg")
 
 from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.data.constants import Datum
 from e2m2e.tools.viz.family import FamilyPlotter
 
 pytestmark = pytest.mark.aux
 
 
-MU = 1.21506683e-2
+MU = Datum.DE421.mu
 
 
 @pytest.fixture

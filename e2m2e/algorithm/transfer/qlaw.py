@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants import Datum
 from ..forces import PhysicalModel
 from .lowthrust_shooting import EngineConfig, LowThrustSegment
 
@@ -426,7 +427,7 @@ def _resolve_mu(system: object, forces: Sequence[PhysicalModel]) -> float:
         except Exception:
             pass
     # 纯二体测试兜底
-    return 398600.435507
+    return Datum.DE440.earth_gm
 
 
 def _estimate_h(dt: float) -> float:

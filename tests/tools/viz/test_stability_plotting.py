@@ -11,13 +11,14 @@ matplotlib.use("Agg")
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.stability import StabilityAnalysis
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
 from e2m2e.tools.viz import FamilyPlotter
 
 pytestmark = pytest.mark.aux
 
 
-MU = 1.21506683e-2
+MU = Datum.DE421.mu
 
 
 def _make_orbit(x0: float, period: float, system: CR3BP_System) -> Orbit:

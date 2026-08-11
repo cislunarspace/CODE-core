@@ -22,12 +22,13 @@ pytest.importorskip("e2m2e._integrators")
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import TransferSearch, search_parallel
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.orchestration
 
 
-MU = 1.21506683e-2  # 地月质量参数
+MU = Datum.DE421.mu  # 地月质量参数
 
 # 整数索引字段：精确相等（含 None，未命中时两边都 None）。
 INT_FIELDS = [

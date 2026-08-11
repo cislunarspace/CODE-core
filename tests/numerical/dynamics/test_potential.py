@@ -9,6 +9,7 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System, LibrationPoint
 from e2m2e.algorithm.dynamics.potential import pseudo_potential_hessian
+from e2m2e.data.constants import Datum
 
 pytestmark = pytest.mark.theory
 
@@ -31,7 +32,7 @@ class TestPseudoPotentialHessian:
         ],
     )
     def test_symmetry(self, x, y, z):
-        mu = 0.0121505856
+        mu = Datum.DE421.mu
         H = pseudo_potential_hessian(mu, x, y, z)
         np.testing.assert_allclose(H, H.T, atol=1e-14)
 
@@ -47,7 +48,7 @@ class TestPseudoPotentialHessian:
     )
     def test_finite_difference_consistency(self, x, y, z):
         """Hessian entries should agree with central finite-difference second derivatives."""
-        mu = 0.0121505856
+        mu = Datum.DE421.mu
         eps = 1e-5
         H = pseudo_potential_hessian(mu, x, y, z)
 
@@ -96,19 +97,19 @@ class TestPseudoPotentialHessian:
         np.testing.assert_allclose(H[1, 2], fd_yz, rtol=1e-5)
 
     def test_diagonal_at_origin(self):
-        mu = 0.0121505856
+        mu = Datum.DE421.mu
         H = pseudo_potential_hessian(mu, 0.0, 0.0, 0.0)
         assert H[0, 2] == 0.0
         assert H[1, 2] == 0.0
 
 
 class TestRegressionStabilityIndex:
-    """Stability indices at L1/L2/L3 must match pre-refactor values."""
+    """Stability indices at L1/L2/L3 with DE421 datum."""
 
     @pytest.fixture
     def system(self):
         sys = CR3BP_System(
-            mu=0.0121506683, primary="Earth", secondary="Moon"
+            mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
         )._with_default_scales()
         sys.compute_libration_points()
         return sys
@@ -116,26 +117,26 @@ class TestRegressionStabilityIndex:
     @pytest.mark.parametrize(
         "lp, expected_max_real",
         [
-            (LibrationPoint.L1, 2.93205696),
-            (LibrationPoint.L2, 2.15867357),
-            (LibrationPoint.L3, 0.17787596),
+            (LibrationPoint.L1, 2.932055930434),
+            (LibrationPoint.L2, 2.158674322705),
+            (LibrationPoint.L3, 0.177875357099),
         ],
     )
     def test_max_real_part(self, system, lp, expected_max_real):
         result = system.compute_stability_index(lp)
-        np.testing.assert_allclose(result["max_real_part"], expected_max_real, rtol=1e-8)
+        np.testing.assert_allclose(result["max_real_part"], expected_max_real, rtol=1e-10)
 
     @pytest.mark.parametrize(
         "lp, expected_max_imag",
         [
-            (LibrationPoint.L1, 2.33438653),
-            (LibrationPoint.L2, 1.86264542),
-            (LibrationPoint.L3, 1.01041996),
+            (LibrationPoint.L1, 2.334385883065),
+            (LibrationPoint.L2, 1.862645863558),
+            (LibrationPoint.L3, 1.010419895129),
         ],
     )
     def test_max_imag_part(self, system, lp, expected_max_imag):
         result = system.compute_stability_index(lp)
-        np.testing.assert_allclose(result["max_imag_part"], expected_max_imag, rtol=1e-8)
+        np.testing.assert_allclose(result["max_imag_part"], expected_max_imag, rtol=1e-10)
 
     def test_collinear_points_unstable(self, system):
         for lp in [LibrationPoint.L1, LibrationPoint.L2, LibrationPoint.L3]:
@@ -145,15 +146,15 @@ class TestRegressionStabilityIndex:
     @pytest.mark.parametrize(
         "lp, expected_uxx",
         [
-            (LibrationPoint.L1, 11.29519506),
-            (LibrationPoint.L2, 7.38084721),
-            (LibrationPoint.L3, 3.02138270),
+            (LibrationPoint.L1, 11.295189056284),
+            (LibrationPoint.L2, 7.380850436958),
+            (LibrationPoint.L3, 3.021382556380),
         ],
     )
     def test_a_matrix_uxx(self, system, lp, expected_uxx):
         result = system.compute_stability_index(lp)
         A = result["linear_matrix"]
-        np.testing.assert_allclose(A[3, 0], expected_uxx, rtol=1e-8)
+        np.testing.assert_allclose(A[3, 0], expected_uxx, rtol=1e-10)
 
 
 class TestRegressionJacobianA:
@@ -164,7 +165,7 @@ class TestRegressionJacobianA:
         from e2m2e.algorithm.dynamics import CR3BP_System
 
         sys = CR3BP_System(
-            mu=0.0121506683, primary="Earth", secondary="Moon"
+            mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
         )._with_default_scales()
         return CR3BP_Dynamics(system=sys)
 

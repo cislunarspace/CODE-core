@@ -14,6 +14,7 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.solver.continuation import Continuation
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
 # DRO seed parameters (Cui et al. 2025) — standardise the suite on this seed.
@@ -109,4 +110,4 @@ def _make_earth_moon_system():
     """
     from e2m2e.algorithm.dynamics import CR3BP_System
 
-    return CR3BP_System(mu=1.21506683e-2, primary="earth", secondary="moon")
+    return CR3BP_System(mu=Datum.DE421.mu, primary="earth", secondary="moon")

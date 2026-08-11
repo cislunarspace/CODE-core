@@ -12,11 +12,11 @@
 //! 当仅 dyb[0] 非零时，模型退化为标准 cannonball SRP。
 
 use crate::forces::srp;
+use e2m2e_propagation::constants::{AU_KM as AU_KM_CONST, KM_TO_M, SOLAR_PRESSURE_1AU};
 use e2m2e_spice::spice_ffi::SpiceFfiError;
 
-const P_SRP_1AU: f64 = 4.56e-6; // N/m²
-const AU_KM: f64 = 1.49597870700e8; // km
-const KM_TO_M: f64 = 1000.0;
+const P_SRP_1AU: f64 = SOLAR_PRESSURE_1AU;
+const AU_KM: f64 = AU_KM_CONST;
 
 fn cross(a: &[f64; 3], b: &[f64; 3]) -> [f64; 3] {
     [

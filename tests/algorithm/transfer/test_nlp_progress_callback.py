@@ -8,6 +8,7 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import DROTRONLPOptimizer
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.orchestration
@@ -29,7 +30,7 @@ def _simple_orbit(n: int = 80) -> Orbit:
 
 @pytest.fixture
 def system():
-    return CR3BP_System(mu=1.21506683e-2, primary="earth", secondary="moon")
+    return CR3BP_System(mu=Datum.DE421.mu, primary="earth", secondary="moon")
 
 
 @pytest.fixture

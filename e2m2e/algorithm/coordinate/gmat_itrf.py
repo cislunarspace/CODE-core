@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants import DAYS_PER_JULIAN_CENTURY, SECONDS_PER_DAY
+from ...data.constants.bodies import EARTH
 from ...data.frames.eop import EopFile, EopSample
 from .gmat_time import TimeSystemConverter
 from .xys import XysProvider
 
-SECONDS_PER_DAY = 86400.0
 J2000_JD = 2451545.0
 J2000_MJD = 51544.5
-DAYS_PER_JULIAN_CENTURY = 36525.0
-EARTH_ROTATION_RATE = 7.292115146706979e-5
+EARTH_ROTATION_RATE: float = cast(float, EARTH.rotation_rate_iers_rad_s)
 ARCSEC_TO_RAD = np.pi / (180.0 * 3600.0)
 
 

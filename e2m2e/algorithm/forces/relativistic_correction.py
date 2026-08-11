@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import warnings
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates.systems import R_EARTH
+from ...data.constants import SPEED_OF_LIGHT_KMS
+from ...data.constants.bodies import EARTH, JUPITER, MARS, MOON, SUN
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes, ITRFSpiceAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
@@ -25,11 +26,11 @@ class RelativisticCorrection(PhysicalModel):
 
     # 常用天体赤道半径 (km)，与 GMAT 默认值/IAU 标准一致。
     _DEFAULT_BODY_RADII_KM: dict[str, float] = {
-        "EARTH": R_EARTH,
-        "MOON": 1737.4,
-        "SUN": 696000.0,
-        "MARS": 3396.19,
-        "JUPITER": 71492.0,
+        "EARTH": cast(float, EARTH.gravity_ref_radius_km),
+        "MOON": cast(float, MOON.mean_radius_km),
+        "SUN": cast(float, SUN.mean_radius_km),
+        "MARS": cast(float, MARS.mean_radius_km),
+        "JUPITER": cast(float, JUPITER.mean_radius_km),
     }
 
     def __init__(
@@ -42,7 +43,7 @@ class RelativisticCorrection(PhysicalModel):
         enable_de_sitter: bool = True,
         angular_momentum_vector: npt.ArrayLike | None = None,
         body_radius: float | None = None,
-        c: float = 299792.458,
+        c: float = SPEED_OF_LIGHT_KMS,
         gamma: float = 1.0,
     ) -> None:
         self._central_body = central_body.upper()

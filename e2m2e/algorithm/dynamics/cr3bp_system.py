@@ -14,22 +14,25 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import fsolve
 
-from ...data.templates.enums import ReferenceFrame, UnitSystem
-from ...data.templates.systems import (
-    AU as _AU_KM,
+from ...data.constants import (
+    AU_KM as _AU_KM,
 )
-from ...data.templates.systems import (
-    DAY as _SYSTEM_DAY,
-)
-from ...data.templates.systems import (
+from ...data.constants import (
     EARTH_MOON_DISTANCE_KM as _SYSTEM_EM_DISTANCE,
 )
-from ...data.templates.systems import (
-    YEAR as _SYSTEM_YEAR,
+from ...data.constants import (
+    GRAVITATIONAL_CONSTANT as _SYSTEM_G,
 )
-from ...data.templates.systems import (
-    G as _SYSTEM_G,
+from ...data.constants import (
+    SECONDS_PER_DAY as _SYSTEM_DAY,
 )
+from ...data.constants import (
+    SECONDS_PER_JULIAN_YEAR as _SYSTEM_YEAR,
+)
+from ...data.constants import (
+    Datum,
+)
+from ...data.templates.enums import ReferenceFrame, UnitSystem
 from .potential import pseudo_potential_hessian
 from .system import System
 
@@ -120,21 +123,24 @@ class CR3BP_System(System):
         """使用默认特征尺度初始化并返回自身。
 
         典型用法：`CR3BP_System(mu=..., primary=..., secondary=...)._with_default_scales()`。
+
+        地月系统使用 DE421 基准自洽的特征长度/周期；日地、木日系统保持原
+        有近似尺度。
         """
         if self.primary_body == "Earth" and self.secondary_body == "Moon":
             self.set_characteristic_scales(
-                distance=CR3BP_System.EARTH_MOON_DISTANCE_KM,
-                period=27.32 * 86400,
+                distance=Datum.DE421.char_length_km,
+                period=2 * np.pi * Datum.DE421.char_time_s,
             )
         elif self.primary_body == "Sun" and self.secondary_body == "Earth":
             self.set_characteristic_scales(
                 distance=CR3BP_System.AU,
-                period=365.25 * 86400,
+                period=365.25 * _SYSTEM_DAY,
             )
         elif self.primary_body == "Sun" and self.secondary_body == "Jupiter":
             self.set_characteristic_scales(
                 distance=5.2 * CR3BP_System.AU,
-                period=11.86 * 365.25 * 86400,
+                period=11.86 * 365.25 * _SYSTEM_DAY,
             )
         else:
             raise ValueError(

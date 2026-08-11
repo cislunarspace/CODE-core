@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants import SECONDS_PER_DAY
 from ..dynamics.cr3bp_system import LibrationPoint
 from .synodic_axes import SynodicAxes
 
@@ -84,7 +85,7 @@ def tu_to_et(t_nd: float, context: RhoContext, system: EphemerisSystem) -> float
         context: 标准形上下文，提供 ``jd0`` 与 ``TU``。
         system: 星历系统，提供 SPICE 访问。
     """
-    jd = context.jd0 + t_nd * context.TU / 86400.0
+    jd = context.jd0 + t_nd * context.TU / SECONDS_PER_DAY
     return _jd_to_et(jd, system)
 
 
@@ -160,7 +161,7 @@ def rho_to_eci(
     LU = context.LU
     TU = context.TU
 
-    jd = context.jd0 + t_nd * TU / 86400.0
+    jd = context.jd0 + t_nd * TU / SECONDS_PER_DAY
     et = _jd_to_et(jd, system)
 
     C, Cdot = compute_emr_rotation(et, system)
@@ -201,7 +202,7 @@ def eci_to_rho(
     LU = context.LU
     TU = context.TU
 
-    jd = context.jd0 + t_nd * TU / 86400.0
+    jd = context.jd0 + t_nd * TU / SECONDS_PER_DAY
     et = _jd_to_et(jd, system)
 
     C, Cdot = compute_emr_rotation(et, system)

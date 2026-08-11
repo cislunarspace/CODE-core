@@ -10,10 +10,11 @@ from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.dynamics.dynamics import Dynamics
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
 # 地月系统质量比
-MU = 1.21506683e-2
+MU = Datum.DE421.mu
 
 # 公共 fixtures 从 tests/algorithm/conftest.py 导入：
 #   dro_dynamics, dro_corrector, dro_seed_orbit, corrected_dro

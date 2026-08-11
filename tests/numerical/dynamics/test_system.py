@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
+from e2m2e.data.constants import Datum
 
 pytestmark = pytest.mark.theory
 
@@ -86,22 +87,22 @@ class TestCR3BPSystemKnownSystems:
     """Tests for CR3BP_System direct constructor + _with_default_scales helper."""
 
     def test_earth_moon_system(self, earth_moon_system):
-        """Test Earth-Moon system creation"""
-        assert earth_moon_system.mu == pytest.approx(1.21506683e-2, abs=1e-12)
+        """Test Earth-Moon system creation uses DE421 datum."""
+        assert earth_moon_system.mu == pytest.approx(Datum.DE421.mu, abs=1e-12)
         assert earth_moon_system.primary_body == "Earth"
         assert earth_moon_system.secondary_body == "Moon"
 
     def test_earth_moon_mu_full_precision(self):
-        """Earth-Moon mu must match Cui et al. 2025 Table 1 to 10 digits."""
+        """Earth-Moon mu must match DE421 datum to 10 digits."""
         system = CR3BP_System(
-            mu=0.0121506683, primary="Earth", secondary="Moon"
+            mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
         )._with_default_scales()
-        assert system.mu == pytest.approx(1.21506683e-2, rel=0, abs=1e-12)
+        assert system.mu == pytest.approx(Datum.DE421.mu, rel=0, abs=1e-12)
 
     def test_with_default_scales_auto_sets_scales(self):
         """_with_default_scales should auto-initialize characteristic scales."""
         system = CR3BP_System(
-            mu=0.0121506683, primary="Earth", secondary="Moon"
+            mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
         )._with_default_scales()
         assert system.is_initialized is True
         assert system.characteristic_length is not None
@@ -109,18 +110,20 @@ class TestCR3BPSystemKnownSystems:
         assert system.characteristic_velocity is not None
 
     def test_earth_moon_distance_matches_paper(self):
-        """Earth-Moon characteristic length must be 384405 km (Cui et al. 2025)."""
+        """Earth-Moon characteristic length must match DE421 datum."""
         system = CR3BP_System(
-            mu=0.0121506683, primary="Earth", secondary="Moon"
+            mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
         )._with_default_scales()
-        assert system.characteristic_length == pytest.approx(384405.0, abs=1e-6)
+        assert system.characteristic_length == pytest.approx(Datum.DE421.char_length_km, abs=1e-6)
 
     def test_earth_moon_TU_days(self):
-        """Earth-Moon characteristic time must match 4.34811305 days."""
+        """Earth-Moon characteristic time must match DE421 datum."""
         system = CR3BP_System(
-            mu=0.0121506683, primary="Earth", secondary="Moon"
+            mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
         )._with_default_scales()
-        assert system.characteristic_time / 86400 == pytest.approx(4.34811305, abs=1e-8)
+        assert system.characteristic_time / 86400 == pytest.approx(
+            Datum.DE421.char_time_s / 86400, abs=1e-8
+        )
 
     def test_sun_earth_system(self, sun_earth_system):
         """Test Sun-Earth system creation"""
@@ -143,7 +146,7 @@ class TestCR3BPSystemKnownSystems:
         """Test _with_default_scales supports expected primary/secondary pairs."""
         for primary, secondary in [("Earth", "Moon"), ("Sun", "Earth"), ("Sun", "Jupiter")]:
             mu = {
-                ("Earth", "Moon"): 1.21506683e-2,
+                ("Earth", "Moon"): Datum.DE421.mu,
                 ("Sun", "Earth"): 3.0039e-6,
                 ("Sun", "Jupiter"): 0.0009535,
             }[(primary, secondary)]
@@ -333,15 +336,16 @@ class TestCR3BPSystemDUTUVUProperties:
 
     def test_DU_returns_kilometers(self, earth_moon_system):
         """DU returns characteristic length in km."""
-        assert pytest.approx(384405.0, abs=1e-6) == earth_moon_system.DU
+        assert pytest.approx(Datum.DE421.char_length_km, abs=1e-6) == earth_moon_system.DU
 
     def test_TU_returns_days(self, earth_moon_system):
         """TU returns characteristic time in days (TOD convention)."""
-        assert pytest.approx(4.34811305, abs=1e-8) == earth_moon_system.TU
+        assert pytest.approx(Datum.DE421.char_time_s / 86400, abs=1e-8) == earth_moon_system.TU
 
     def test_VU_returns_meters_per_second(self, earth_moon_system):
         """VU returns characteristic velocity in m/s (TOD convention)."""
-        assert pytest.approx(1023.23281, abs=0.01) == earth_moon_system.VU
+        expected_vu = Datum.DE421.char_length_km / Datum.DE421.char_time_s * 1000.0
+        assert pytest.approx(expected_vu, abs=0.01) == earth_moon_system.VU
 
 
 class TestCR3BPSystemPhysicalConstants:
@@ -372,7 +376,7 @@ class TestCR3BPSystemPhysicalConstants:
 @pytest.fixture
 def uninitialized_system():
     """Create Earth-Moon system without initialized characteristic scales."""
-    return CR3BP_System(mu=1.21506683e-2, primary="Earth", secondary="Moon")
+    return CR3BP_System(mu=Datum.DE421.mu, primary="Earth", secondary="Moon")
 
 
 @pytest.fixture
@@ -409,7 +413,7 @@ class TestInfoDefault:
         """Default mode includes basic parameters."""
         output = _capture_info(earth_moon_system)
         assert "Earth-Moon" in output
-        assert "1.215067e-02" in output
+        assert f"{Datum.DE421.mu:.6e}" in output
         assert "主天体：Earth" in output
         assert "次天体：Moon" in output
 
@@ -441,11 +445,11 @@ class TestInfoAll:
         """All mode shows specific values when characteristic scales are set."""
         output = _capture_info(initialized_system, mode="all")
         assert "特征尺度:" in output
-        assert "特征长度：384405.00 km" in output
+        assert f"特征长度：{Datum.DE421.char_length_km:.2f} km" in output
         assert "特征速度" in output
         assert "平均角速度" in output
         assert "轨道周期" in output
-        assert "半长轴：384405.00 km" in output
+        assert f"半长轴：{Datum.DE421.char_length_km:.2f} km" in output
 
     def test_all_no_libration_points(self, uninitialized_system):
         """All mode shows hint when libration points are not computed."""

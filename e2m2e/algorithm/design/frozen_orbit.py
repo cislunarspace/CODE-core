@@ -14,14 +14,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ...data.constants import SECONDS_PER_JULIAN_YEAR
+
 if TYPE_CHECKING:
     from ..data.kernels.manager import SPICEManager
 
 # GRGM900C 月球引力场模型常数
 R_MOON = 1738.0  # km（参考半径）
 MU_MOON = 4902.799967088639  # km³/s²
-
-_SECONDS_PER_DAY = 86400.0
 
 
 def _oe2cart(
@@ -220,13 +220,13 @@ def _compute_drift(
         x = np.arange(n_pts, dtype=float)
         slope_per_point = float(np.polyfit(x, np.degrees(aop_unwrap), 1)[0])
         if output_step_sec is not None and output_step_sec > 0:
-            points_per_year = 365.25 * _SECONDS_PER_DAY / output_step_sec
+            points_per_year = SECONDS_PER_JULIAN_YEAR / output_step_sec
             secular_rate = slope_per_point * points_per_year
         elif times is not None and n_pts >= 2:
             total_sec = float(times[-1] - times[0])
             if total_sec > 0:
                 slope_per_sec = slope_per_point * (n_pts - 1) / total_sec
-                secular_rate = slope_per_sec * 365.25 * _SECONDS_PER_DAY
+                secular_rate = slope_per_sec * SECONDS_PER_JULIAN_YEAR
 
     return {
         "drift_e": drift_e,

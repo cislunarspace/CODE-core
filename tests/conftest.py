@@ -11,6 +11,7 @@ import pytest
 from kernel_helpers import SPICE_KERNEL_DIR
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
 
@@ -20,8 +21,8 @@ def pytest_configure(config):
 
 @pytest.fixture
 def earth_moon_system():
-    """Create an Earth-Moon CR3BP system"""
-    return CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+    """Create an Earth-Moon CR3BP system using DE421 datum."""
+    return CR3BP_System(mu=Datum.DE421.mu, primary="Earth", secondary="Moon")._with_default_scales()
 
 
 @pytest.fixture
@@ -76,10 +77,10 @@ def initialized_system(earth_moon_system):
 # SPICE_KERNEL_DIR / BODY_FIXED_KERNELS / load_body_fixed_kernels /
 # unload_kernels 已移至 tests/kernel_helpers.py（见该模块 docstring 说明）。
 
-# 地月系统物理参数
-MU = 1.21506683e-2
-DU = 3.84405e5  # km
-TU_SECONDS = 4.34811305 * 86400  # 秒
+# 地月系统物理参数（DE421 基准）
+MU = 1.2150585350562453e-2
+DU = 3.84400e5  # km
+TU_SECONDS = 3.751902588926273e5  # 秒
 VU = DU / TU_SECONDS  # km/s
 
 

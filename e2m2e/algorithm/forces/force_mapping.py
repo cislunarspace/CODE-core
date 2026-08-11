@@ -43,6 +43,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from ...data.constants import SPEED_OF_LIGHT_KMS
 from ...data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
 
 __all__ = ["PLANET_BODIES", "perturbation_to_force_config"]
@@ -222,7 +223,7 @@ def perturbation_to_force_config(
                 "enable_de_sitter": False,
                 "angular_momentum_vector": None,
                 "body_radius": None,
-                "c": 299792.458,
+                "c": SPEED_OF_LIGHT_KMS,
                 "gamma": 1.0,
             },
         )

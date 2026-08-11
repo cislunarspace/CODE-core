@@ -12,6 +12,11 @@
 
 use crate::solid_tide;
 use crate::spherical_harmonic;
+use e2m2e_propagation::constants::{
+    EARTH_GM_DE440, EMB_GM_DE440, JUPITER_GM_DE440, MARS_GM_DE440, MERCURY_GM_DE440, MOON_GM_DE440,
+    NEPTUNE_GM_DE440, PLUTO_GM_DE440, SATURN_GM_DE440, SUN_GM_DE440, URANUS_GM_DE440,
+    VENUS_GM_DE440,
+};
 use e2m2e_spice::spice_ffi::{mat3_mul_vec, mat3_t_mul_vec, pxform, SpiceFfiError};
 
 /// 潮汐配置（与 Python ``tide_mode`` 三档对应）。
@@ -31,23 +36,24 @@ pub enum TideMode {
     SolidAndPole,
 }
 
-/// GM 值硬编码表（与 Python e2m2e.core.spice._GM_VALUES 一致）。
+/// GM 值从 ``constants.toml`` 生成（与 Python 侧单一来源一致）。
 ///
 /// DE430 bsp 不带 GM 数据，cspice bodvrd 会 KERNELVARNOTFOUND。
 /// 与 Python 一致用本地字典。
 fn gm_for_body(body: &str) -> Option<f64> {
     match body {
-        "SUN" => Some(1.32712440018e11),
-        "MERCURY" => Some(22031.868551),
-        "VENUS" => Some(324858.592000),
-        "EARTH" => Some(398600.435507),
-        "MOON" => Some(4902.800118),
-        "MARS" => Some(42828.375816),
-        "JUPITER" => Some(126712764.100000),
-        "SATURN" => Some(37940584.841800),
-        "URANUS" => Some(5794556.400000),
-        "NEPTUNE" => Some(6836527.100580),
-        "EMB" => Some(403503.235502),
+        "SUN" => Some(SUN_GM_DE440),
+        "MERCURY" => Some(MERCURY_GM_DE440),
+        "VENUS" => Some(VENUS_GM_DE440),
+        "EARTH" => Some(EARTH_GM_DE440),
+        "MOON" => Some(MOON_GM_DE440),
+        "MARS" => Some(MARS_GM_DE440),
+        "JUPITER" => Some(JUPITER_GM_DE440),
+        "SATURN" => Some(SATURN_GM_DE440),
+        "URANUS" => Some(URANUS_GM_DE440),
+        "NEPTUNE" => Some(NEPTUNE_GM_DE440),
+        "PLUTO" => Some(PLUTO_GM_DE440),
+        "EMB" => Some(EMB_GM_DE440),
         _ => None,
     }
 }

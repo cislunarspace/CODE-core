@@ -22,12 +22,13 @@ from e2m2e.algorithm.transfer.hohmann import TliParams
 from e2m2e.algorithm.transfer.wsb import (
     compute_kepler_energy_moon,
 )
+from e2m2e.data.constants import Datum
 
 pytestmark = pytest.mark.orchestration
 
 
-# 地月 CR3BP 参数
-MU = 1.21506683e-2
+# 地月 CR3BP 参数（DE421 基准）
+MU = Datum.DE421.mu
 DU = 384405.0  # km
 
 

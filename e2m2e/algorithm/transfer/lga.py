@@ -16,13 +16,15 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ...data.constants import SECONDS_PER_DAY
+from ...data.constants.bodies import MOON
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
 
 logger = logging.getLogger(__name__)
 
 # 月球半径 (km)
-R_MOON_KM: float = 1737.4
+R_MOON_KM: float = MOON.require_mean_radius_km()
 
 
 @dataclass(frozen=True)
@@ -160,8 +162,8 @@ def search_lga_trajectories(
     )
     # TOF 网格（无量纲时间）
     tof_grid_dim = np.linspace(
-        params.tof_range[0] * 86400.0 / char_time,
-        params.tof_range[1] * 86400.0 / char_time,
+        params.tof_range[0] * SECONDS_PER_DAY / char_time,
+        params.tof_range[1] * SECONDS_PER_DAY / char_time,
         params.n_tof,
     )
 

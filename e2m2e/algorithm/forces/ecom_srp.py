@@ -24,15 +24,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates.systems import AU, KM_TO_M
+from ...data.constants import AU_KM, KM_TO_M, SOLAR_PRESSURE_1AU
 from .physical_model import PhysicalModel, require_inertial_frame
 
 if TYPE_CHECKING:
     from ..system import System
     from .shadow import ConicalShadowModel
-
-# 1 AU 处太阳光压常数（N/m²）。等价于 GMAT flux/c = 1367 / 2.998e8。
-_P_SRP_1AU = 4.56e-6
 
 
 def _cross(a: npt.NDArray, b: npt.NDArray) -> npt.NDArray:
@@ -145,7 +142,7 @@ class EcomSolarRadiationPressure(PhysicalModel):
         d_hat, y_hat, b_hat = _build_dyb_frame(sc, vec)
 
         # 基础加速度幅值
-        pressure = _P_SRP_1AU * (AU / r) ** 2  # N/m²
+        pressure = SOLAR_PRESSURE_1AU * (AU_KM / r) ** 2  # N/m²
         a0 = flux_factor * pressure * self._dyb[0] / KM_TO_M  # km/s²
 
         # 太阳平近点角（简化：u=0）

@@ -2973,5 +2973,13 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<StepResult>()?;
     m.add_class::<MultistepResult>()?;
     m.add_class::<CowellResult>()?;
+
+    // Rust 物理常量同源核对入口（#377 阶段2）：把 e2m2e-propagation 从
+    // constants.toml 生成的常量以 `_propagation_constants` 子模块挂出，
+    // 供 Python 侧逐位对拍。
+    m.add_submodule(&e2m2e_propagation::_propagation_constants_module_bound(
+        m.py(),
+    )?)?;
+
     Ok(())
 }

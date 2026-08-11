@@ -9,6 +9,7 @@ import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.data.constants import Datum
 
 pytestmark = pytest.mark.theory
 
@@ -18,8 +19,8 @@ pytestmark = pytest.mark.theory
 # =============================================================================
 @pytest.fixture
 def earth_moon_system():
-    """Create Earth-Moon CR3BP system."""
-    return CR3BP_System(mu=0.0121506683, primary="Earth", secondary="Moon")._with_default_scales()
+    """Create Earth-Moon CR3BP system using DE421 datum."""
+    return CR3BP_System(mu=Datum.DE421.mu, primary="Earth", secondary="Moon")._with_default_scales()
 
 
 @pytest.fixture

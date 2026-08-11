@@ -13,6 +13,7 @@ from typing import Any
 
 import numpy as np
 
+from ...data.constants import SECONDS_PER_DAY
 from .axes import Axes
 from .coordinate_system import CoordinateSystem
 from .dynamic_axes import DynamicAxes
@@ -71,7 +72,6 @@ __all__ = [
 
 #: SPICE ET 秒 → JD_TDB 转换基准
 _JD_TDB_AT_ET0 = 2451545.0
-_SECONDS_PER_DAY = 86400.0
 
 
 def spacetime_convert(
@@ -101,7 +101,7 @@ def spacetime_convert(
         raise ValueError(f"state 应为一维数组，实际形状 {state_arr.shape}")
 
     et0_jd = float(kwargs.get("et0_jd", _JD_TDB_AT_ET0))
-    et0 = (et0_jd - _JD_TDB_AT_ET0) * _SECONDS_PER_DAY
+    et0 = (et0_jd - _JD_TDB_AT_ET0) * SECONDS_PER_DAY
 
     if transform_type in ("synodic_to_j2000", "j2000_to_synodic"):
         from ...data.kernels.manager import SPICEManager
@@ -128,11 +128,11 @@ def spacetime_convert(
     if transform_type == "synodic_to_j2000":
         t_syn = float(epoch)
         result = conv.synodic_to_j2000(state_arr, t_syn, et0)
-        out_time = et0_jd + t_syn * conv._get_time_unit() / _SECONDS_PER_DAY
+        out_time = et0_jd + t_syn * conv._get_time_unit() / SECONDS_PER_DAY
     elif transform_type == "j2000_to_synodic":
         t_syn = float(epoch)
         result = conv.j2000_to_synodic(state_arr, t_syn, et0)
-        out_time = et0_jd + t_syn * conv._get_time_unit() / _SECONDS_PER_DAY
+        out_time = et0_jd + t_syn * conv._get_time_unit() / SECONDS_PER_DAY
     elif transform_type == "gcrs_to_ebcrs":
         if state_arr.shape[0] != 3:
             raise ValueError(f"GCRS→EBCRS 输入应为 3 维位置，实际 {state_arr.shape[0]} 维")

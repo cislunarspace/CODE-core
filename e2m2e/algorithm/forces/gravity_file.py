@@ -12,15 +12,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates.systems import R_EARTH
+from ...data.constants import SECONDS_PER_JULIAN_YEAR
+from ...data.constants.bodies import EARTH
 
-_DEFAULT_MU = 398600.4415  # km^3/s^2
-_DEFAULT_RADIUS = R_EARTH  # km
-_SECONDS_PER_YEAR = 365.25 * 86400.0  # 儒略年,与 GMAT DAYS_PER_YEAR 一致
+_DEFAULT_MU = EARTH.gm_by_datum["DE421"]  # km^3/s^2
+_DEFAULT_RADIUS: float = cast(float, EARTH.gravity_ref_radius_km)  # km
 
 
 @dataclass(frozen=True)
@@ -427,5 +428,5 @@ def extrapolate_coefficients(
     Returns:
         外推后的 (C_out, S_out),新数组(不修改输入)。
     """
-    dt_years = (t - t0) / _SECONDS_PER_YEAR
+    dt_years = (t - t0) / SECONDS_PER_JULIAN_YEAR
     return C + dotC * dt_years, S + dotS * dt_years

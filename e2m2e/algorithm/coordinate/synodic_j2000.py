@@ -12,13 +12,14 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants import SECONDS_PER_DAY
 from ..dynamics.cr3bp_system import CR3BP_System
 from .coordinate_system import CoordinateSystem
 from .standard_axes import ICRSAxes
 from .standard_origins import CelestialBodyOrigin
 from .synodic_axes import SynodicAxes
 
-_TU_SECONDS_DEFAULT = 4.34811305 * 86400.0
+_TU_SECONDS_DEFAULT = 4.34811305 * SECONDS_PER_DAY
 
 
 class SynodicJ2000System:

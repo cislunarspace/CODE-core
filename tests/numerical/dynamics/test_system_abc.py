@@ -8,6 +8,7 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
 from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.dynamics.system import System
+from e2m2e.data.constants import Datum
 from e2m2e.mbse.data.enums import ReferenceFrame, UnitSystem
 
 pytestmark = pytest.mark.theory
@@ -28,7 +29,7 @@ class FakeSpiceManager:
 
 @pytest.fixture
 def earth_moon():
-    return CR3BP_System(mu=1.21506683e-2, primary="Earth", secondary="Moon")
+    return CR3BP_System(mu=Datum.DE421.mu, primary="Earth", secondary="Moon")
 
 
 @pytest.fixture

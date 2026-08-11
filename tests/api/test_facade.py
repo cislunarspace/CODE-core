@@ -17,6 +17,7 @@ from e2m2e.api.models import (
     SpacetimeTransformRequest,
     TransferDesignRequest,
 )
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.trajectory import EphemerisTable
 
 pytestmark = pytest.mark.interface
@@ -295,7 +296,7 @@ class TestDesignResultToResponse:
         """构造一个鸭子类型的 OrbitDesignResult（不调算法层、不需 SPICE）。"""
         from types import SimpleNamespace
 
-        system = SimpleNamespace(mu=0.0121506683) if with_system else None
+        system = SimpleNamespace(mu=Datum.DE421.mu) if with_system else None
         cr3bp_orbit = SimpleNamespace(
             states=np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 0.1, 0.1, 0.1]]),
             times=np.array([0.0, 1.234]),
@@ -330,7 +331,7 @@ class TestDesignResultToResponse:
         assert resp.correction_iterations == 4
         assert resp.initial_state == [0.0] * 6
         # 新增几何字段
-        assert resp.mu == pytest.approx(0.0121506683)
+        assert resp.mu == pytest.approx(Datum.DE421.mu)
         assert resp.states == [[0.0] * 6, [1.0, 1.0, 1.0, 0.1, 0.1, 0.1]]
         assert resp.times == [0.0, 1.234]
         assert resp.ephemeris is not None
@@ -385,12 +386,12 @@ class TestControlResultToResponse:
     def test_with_controlled_ephemeris_and_mu_echo(self):
         from e2m2e.api.facade import _control_result_to_response
 
-        resp = _control_result_to_response(self._mock_result(controlled=True), mu=0.0121506683)
+        resp = _control_result_to_response(self._mock_result(controlled=True), mu=Datum.DE421.mu)
         assert resp.num_failed == 1
         assert resp.controlled_ephemeris is not None
         assert resp.controlled_ephemeris["synodic_position"] == [[0.5, 0.5, 0.5]] * 2
         # mu 由请求透传（算法层不产 mu）
-        assert resp.mu == pytest.approx(0.0121506683)
+        assert resp.mu == pytest.approx(Datum.DE421.mu)
 
     def test_all_failed_no_controlled_ephemeris(self):
         from e2m2e.api.facade import _control_result_to_response
@@ -413,14 +414,14 @@ class TestGeometryModelFields:
             correction_converged=True,
             correction_iterations=4,
             force_config={"sun_body": 1},
-            mu=0.0121506683,
+            mu=Datum.DE421.mu,
             states=[[0.0] * 6],
             times=[0.0],
             ephemeris={"position_km": [[0.0, 0.0, 0.0]]},
         )
         # 序列化往返：ndarray-free dict/list 可 JSON 化
         dumped = resp.model_dump()
-        assert dumped["mu"] == pytest.approx(0.0121506683)
+        assert dumped["mu"] == pytest.approx(Datum.DE421.mu)
         assert dumped["states"] == [[0.0] * 6]
         assert dumped["ephemeris"]["position_km"] == [[0.0, 0.0, 0.0]]
 
@@ -454,8 +455,8 @@ class TestGeometryModelFields:
 
     def test_control_request_accepts_mu(self):
         """mu 透传字段（画地月/L 点标注用）。"""
-        req = ControlOrbitRequest(input_ephemeris="x", mu=0.0121506683)
-        assert req.mu == pytest.approx(0.0121506683)
+        req = ControlOrbitRequest(input_ephemeris="x", mu=Datum.DE421.mu)
+        assert req.mu == pytest.approx(Datum.DE421.mu)
         # 缺省 None
         req_default = ControlOrbitRequest(input_ephemeris="x")
         assert req_default.mu is None

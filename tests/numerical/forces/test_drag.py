@@ -11,8 +11,10 @@ import pytest
 from e2m2e.algorithm.forces import PhysicalModel
 from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 from e2m2e.algorithm.forces.drag import DragModel
-from e2m2e.data.templates.systems import KM_TO_M as _KM_TO_M
-from e2m2e.data.templates.systems import R_EARTH as _EARTH_R_KM
+from e2m2e.data.constants import KM_TO_M as _KM_TO_M
+from e2m2e.data.constants.bodies import EARTH as _EARTH
+
+_EARTH_R_KM = _EARTH.gravity_ref_radius_km
 
 pytestmark = pytest.mark.force
 

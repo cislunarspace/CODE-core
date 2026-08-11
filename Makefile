@@ -16,7 +16,7 @@ export CSPICE_DIR
 # （命令行 make LIBCLANG_PATH=... 仍可覆盖）。优先 llvm-config --libdir（版本无关，
 # 其次版本化 llvm-config-*），回退 /usr/lib 探测。
 LLVM_CONFIG   := $(shell command -v llvm-config 2>/dev/null || ls /usr/bin/llvm-config-* 2>/dev/null | head -1)
-LIBCLANG_PATH := $(or $(shell $(LLVM_CONFIG) --libdir 2>/dev/null),$(shell find /usr/lib -maxdepth 4 -name libclang.so 2>/dev/null | head -1 | xargs dirname 2>/dev/null))
+LIBCLANG_PATH := $(or $(LIBCLANG_PATH),$(shell $(LLVM_CONFIG) --libdir 2>/dev/null),$(shell find /usr/lib -maxdepth 4 -name 'libclang*.so*' 2>/dev/null | head -1 | xargs dirname 2>/dev/null))
 export LIBCLANG_PATH
 
 .DEFAULT_GOAL := help

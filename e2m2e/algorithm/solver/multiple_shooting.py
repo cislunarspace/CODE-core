@@ -17,6 +17,7 @@ import numpy as np
 import numpy.typing as npt
 from tqdm.auto import tqdm
 
+from ...data.constants import SECONDS_PER_DAY
 from ...data.templates.enums import ConvergenceState, ReferenceFrame
 
 if TYPE_CHECKING:
@@ -675,7 +676,7 @@ def convert_to_j2000(
     states_syn = np.asarray(states_syn, dtype=float)
 
     # 时间转换：归一化时间 → SPICE ephemeris time（秒）
-    tu_seconds = tu_days * 86400  # 将 TU 天数转换为秒数
+    tu_seconds = tu_days * SECONDS_PER_DAY  # 将 TU 天数转换为秒数
     t_patch_j2000 = reference_et + t_patch_syn * tu_seconds
 
     # 状态转换：synodic 坐标系 → J2000 惯性坐标系
