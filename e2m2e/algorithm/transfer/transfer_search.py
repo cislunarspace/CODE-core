@@ -24,6 +24,7 @@ import numpy as np
 
 from ...data.types.orbit import Orbit
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
+from ..results import TransferCandidateResult
 from . import search_geometry, search_parallel
 from .config import TransferConfig, TransferOptimizationResult
 from .propulsion import ImpulsivePropulsion
@@ -85,7 +86,7 @@ class TransferSearch:
         self.name = name
         self._departure_orbit: Orbit | None = None
         self._arrival_orbit: Orbit | None = None
-        self._search_results: list[dict[str, Any]] | None = None
+        self._search_results: list[TransferCandidateResult] | None = None
         self._optimized_result: Any = None
         self._verbose = True
         self._n_workers: int | None = None
@@ -144,7 +145,7 @@ class TransferSearch:
                 setattr(self, key, value)
         return self
 
-    def get_feasible_results(self) -> list[dict[str, Any]]:
+    def get_feasible_results(self) -> list[TransferCandidateResult]:
         if self._search_results is None:
             return []
         return [r for r in self._search_results if self._is_feasible(r)]
@@ -168,7 +169,7 @@ class TransferSearch:
         verbose: bool = True,
         n_workers: int | None = None,
         parallel_backend: str | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[TransferCandidateResult]:
         """执行网格搜索。"""
         # None → 用实例属性（由 set_parallel_backend / _default_parallel_backend 设）；
         # 显式传入则覆盖。连起来后 set_parallel_backend 才对 search() 生效。
@@ -230,7 +231,9 @@ class TransferSearch:
 
         return results
 
-    def optimize(self, initial_guess: dict[str, Any] | None = None) -> TransferOptimizationResult:
+    def optimize(
+        self, initial_guess: TransferCandidateResult | dict[str, Any] | None = None
+    ) -> TransferOptimizationResult:
         """执行优化。"""
         if self._departure_orbit is None or self._arrival_orbit is None:
             raise ValueError("必须先设置 departure_orbit 和 arrival_orbit")
@@ -293,7 +296,7 @@ class TransferSearch:
     # 既有测试调用 ``searcher._x`` 或 ``monkeypatch.setattr(TransferSearch, "_x", ...)``；
     # 委托到 :mod:`search_geometry` / :mod:`search_parallel` 使这些调用在拆分后继续生效。
 
-    def _is_feasible(self, result: dict[str, Any]) -> bool:
+    def _is_feasible(self, result: TransferCandidateResult) -> bool:
         return search_geometry.is_feasible_result(
             result,
             self.min_distance_threshold,

@@ -20,6 +20,7 @@ from tqdm.auto import tqdm
 from ...data.templates import ConvergenceState, FailureCause
 from ...data.types.orbit import Orbit
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
+from ..results import TransferCandidateResult
 from .search_progress import (
     AggregatePbarWithSlot,
     open_parallel_worker_progress_bars,
@@ -89,7 +90,7 @@ def search_single_departure(
     pbar: Any | None = None,
     departure_index: int | None = None,
     progress_queue: Any | None = None,
-) -> list[dict[str, Any]]:
+) -> list[TransferCandidateResult]:
     """对单出发点执行 α 网格搜索。"""
     a0 = searcher.alpha_min
     a1 = searcher.alpha_max
@@ -114,7 +115,7 @@ def search_single_departure(
     alpha_grid = np.linspace(a0, a1, na)
     n_alpha = int(na)
 
-    results: list[dict[str, Any]] = []
+    results: list[TransferCandidateResult] = []
     for i_alpha, alpha in enumerate(alpha_grid, start=1):
         try:
             if verbose:
@@ -134,21 +135,21 @@ def search_single_departure(
                     exc_info=True,
                 )
                 results.append(
-                    {
-                        "status": ConvergenceState.FAILED,
-                        "cause": FailureCause.INTEGRATION_FAILED,
-                        "message": "转移轨迹积分失败",
-                        "departure_state": departure_state,
-                        "departure_time": departure_time,
-                        "alpha": alpha,
-                        "dv_departure": dv_departure,
-                        "dv_insertion": None,
-                        "min_distance_orbit_idx": None,
-                        "first_intersection_idx": None,
-                        "first_intersection_time": None,
-                        "first_min_distance_idx": None,
-                        "first_min_distance_time": None,
-                    }
+                    TransferCandidateResult(
+                        status=ConvergenceState.FAILED,
+                        cause=FailureCause.INTEGRATION_FAILED,
+                        message="转移轨迹积分失败",
+                        departure_state=departure_state,
+                        departure_time=departure_time,
+                        alpha=alpha,
+                        dv_departure=dv_departure,
+                        dv_insertion=None,
+                        min_distance_orbit_idx=None,
+                        first_intersection_idx=None,
+                        first_intersection_time=None,
+                        first_min_distance_idx=None,
+                        first_min_distance_time=None,
+                    )
                 )
                 continue
 
@@ -202,37 +203,35 @@ def search_single_departure(
                 message = "未达到目标轨道"
             # item ③：仅 success 候选回传轨迹（与 Rust evaluate_point 一致），
             # collision / no_intersection 的整段轨迹对下游选优无价值，丢弃省内存。
-            result = {
-                "status": status,
-                "cause": cause,
-                "message": message,
-                "departure_state": departure_state,
-                "departure_time": departure_time,
-                "alpha": alpha,
-                "transfer_trajectory": traj_states
-                if status is ConvergenceState.CONVERGED
-                else None,
-                "transfer_times": traj_times if status is ConvergenceState.CONVERGED else None,
-                "transfer_time": traj_times[-1],
-                "min_distance": min_dist,
-                "min_distance_idx": min_idx,
-                "min_distance_orbit_idx": int(orbit_idx),
-                "dv_departure": dv_departure,
-                "dv_insertion": dv_insertion,
-                "intersection_found": intersection,
-                "intersection_point": int_point,
-                "intersection_idx": int_idx,
-                "first_intersection_idx": first_int_idx,
-                "first_intersection_time": first_int_time,
-                "first_min_distance_idx": first_md_idx,
-                "first_min_distance_time": first_md_time,
-                "local_minimum_found": local_min,
-                "local_minimum_distance": local_min_dist,
-                "local_minimum_idx": local_min_idx,
-                "collision_found": collision,
-                "collision_body": body,
-                "collision_idx": col_idx,
-            }
+            result = TransferCandidateResult(
+                status=status,
+                cause=cause,
+                message=message,
+                departure_state=departure_state,
+                departure_time=departure_time,
+                alpha=alpha,
+                transfer_trajectory=traj_states if status is ConvergenceState.CONVERGED else None,
+                transfer_times=traj_times if status is ConvergenceState.CONVERGED else None,
+                transfer_time=traj_times[-1],
+                min_distance=min_dist,
+                min_distance_idx=min_idx,
+                min_distance_orbit_idx=int(orbit_idx),
+                dv_departure=dv_departure,
+                dv_insertion=dv_insertion,
+                intersection_found=intersection,
+                intersection_point=int_point,
+                intersection_idx=int_idx,
+                first_intersection_idx=first_int_idx,
+                first_intersection_time=first_int_time,
+                first_min_distance_idx=first_md_idx,
+                first_min_distance_time=first_md_time,
+                local_minimum_found=local_min,
+                local_minimum_distance=local_min_dist,
+                local_minimum_idx=local_min_idx,
+                collision_found=collision,
+                collision_body=body,
+                collision_idx=col_idx,
+            )
             results.append(result)
         finally:
             if pbar is not None:
@@ -251,7 +250,7 @@ def dispatch_grid_search(
     verbose: bool,
     n_workers: int | None,
     parallel_backend: str,
-) -> list[dict[str, Any]]:
+) -> list[TransferCandidateResult]:
     """网格搜索分发。"""
     dep_name = getattr(departure_orbit, "name", "unknown")
     arr_name = getattr(arrival_orbit, "name", "unknown")
@@ -335,7 +334,7 @@ def grid_search_rust_dispatch(
     arr_name: str,
     verbose: bool,
     n_workers: int,
-) -> list[dict[str, Any]]:
+) -> list[TransferCandidateResult]:
     """Rust + Rayon 后端网格搜索分发（阶段 D1）。
 
     展平 POD 输入喂给 :func:`e2m2e.integrators.grid_search_rust`（``py.allow_threads``
@@ -435,18 +434,23 @@ def grid_search_rust_dispatch(
         if pbar is not None:
             pbar.close()
 
-    for idx, r in enumerate(results):
-        r["departure_time_index"] = idx // n_alpha
-        r["departure_orbit_name"] = dep_name
-        r["arrival_orbit_name"] = arr_name
+    candidates = [
+        TransferCandidateResult(
+            **r,
+            departure_time_index=idx // n_alpha,
+            departure_orbit_name=dep_name,
+            arrival_orbit_name=arr_name,
+        )
+        for idx, r in enumerate(results)
+    ]
 
     if verbose:
         mode = "Rayon 并行" if parallel else "Rust 串行"
         print(
-            f"  Rust 后端（{mode}）: {n_dep}×{n_alpha}={len(results)} 评估",
+            f"  Rust 后端（{mode}）: {n_dep}×{n_alpha}={len(candidates)} 评估",
             flush=True,
         )
-    return results
+    return candidates
 
 
 def grid_search_sequential(
@@ -457,9 +461,9 @@ def grid_search_sequential(
     dep_name: str,
     arr_name: str,
     verbose: bool,
-) -> list[dict[str, Any]]:
+) -> list[TransferCandidateResult]:
     """串行网格搜索。"""
-    all_results: list[dict[str, Any]] = []
+    all_results: list[TransferCandidateResult] = []
     total_departures = len(departure_states)
     n_alpha_v = searcher.n_alpha
     if n_alpha_v is None:
@@ -485,9 +489,9 @@ def grid_search_sequential(
                 departure_index=i,
             )
             for r in results:
-                r["departure_orbit_name"] = dep_name
-                r["arrival_orbit_name"] = arr_name
-                r["departure_time_index"] = i
+                r.departure_orbit_name = dep_name
+                r.arrival_orbit_name = arr_name
+                r.departure_time_index = i
             all_results.extend(results)
     finally:
         if pbar is not None:
@@ -526,7 +530,7 @@ def grid_search_parallel_processes(
     arr_name: str,
     verbose: bool,
     n_workers: int,
-) -> list[dict[str, Any]]:
+) -> list[TransferCandidateResult]:
     """多进程并行：每进程独立 Python 解释器，利于 CPU 密集积分。"""
     total_departures = len(departure_states)
     n_alpha_v = searcher.n_alpha
@@ -534,7 +538,7 @@ def grid_search_parallel_processes(
         raise ValueError("n_alpha 未设置")
     n_alpha = int(n_alpha_v)
     total_steps = total_departures * n_alpha
-    all_results: list[dict[str, Any]] = []
+    all_results: list[TransferCandidateResult] = []
 
     arrival_states = np.asarray(arrival_orbit.states)
     arrival_times_a = np.asarray(arrival_orbit.times)
@@ -654,7 +658,7 @@ def _run_departure_with_worker_slot(
     worker_bars: list[Any] | None,
     aggregate_pbar: Any | None,
     aggregate_lock: threading.Lock | None,
-) -> list[dict[str, Any]]:
+) -> list[TransferCandidateResult]:
     """取槽 → 跑单出发点 α 网格 → 还槽。"""
     slot = slot_queue.get()
     try:
@@ -688,7 +692,7 @@ def grid_search_parallel_threads(
     arr_name: str,
     verbose: bool,
     n_workers: int,
-) -> list[dict[str, Any]]:
+) -> list[TransferCandidateResult]:
     """多线程并行搜索：支持细粒度 tqdm 进度条。"""
     total_departures = len(departure_states)
     n_alpha_v = searcher.n_alpha
@@ -696,7 +700,7 @@ def grid_search_parallel_threads(
         raise ValueError("n_alpha 未设置")
     n_alpha = int(n_alpha_v)
     total_steps = total_departures * n_alpha
-    all_results: list[dict[str, Any]] = []
+    all_results: list[TransferCandidateResult] = []
 
     worker_bars: list[Any] | None = None
     aggregate_pbar: Any | None = None
@@ -781,9 +785,9 @@ def grid_search_parallel_threads(
                 try:
                     results = future.result()
                     for r in results:
-                        r["departure_orbit_name"] = dep_name
-                        r["arrival_orbit_name"] = arr_name
-                        r["departure_time_index"] = futures[future]
+                        r.departure_orbit_name = dep_name
+                        r.arrival_orbit_name = arr_name
+                        r.departure_time_index = futures[future]
                     all_results.extend(results)
                 except Exception as e:
                     if verbose:
@@ -822,7 +826,7 @@ def process_departure_worker(
     dep_name: str,
     arr_name: str,
     progress_queue: Any | None = None,
-) -> list[dict[str, Any]]:
+) -> list[TransferCandidateResult]:
     """子进程入口（模块级，便于 Windows spawn 下 pickle）。"""
     from .transfer_search import TransferSearch
 
@@ -858,12 +862,12 @@ def process_departure_worker(
         progress_queue=progress_queue,
     )
     for r in results:
-        r["departure_orbit_name"] = dep_name
-        r["arrival_orbit_name"] = arr_name
-        r["departure_time_index"] = idx
+        r.departure_orbit_name = dep_name
+        r.arrival_orbit_name = arr_name
+        r.departure_time_index = idx
     return results
 
 
-def process_departure_worker_packed(packed: tuple[Any, ...]) -> list[dict[str, Any]]:
+def process_departure_worker_packed(packed: tuple[Any, ...]) -> list[TransferCandidateResult]:
     """单元组打包，供 ``ProcessPoolExecutor`` 提交。"""
     return process_departure_worker(*packed)

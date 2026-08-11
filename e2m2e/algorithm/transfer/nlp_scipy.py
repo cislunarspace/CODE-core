@@ -14,6 +14,7 @@ import numpy as np
 from scipy.optimize import Bounds, minimize
 
 from ...data.templates import ConvergenceState, FailureCause
+from ..results import scipy_slsqp_status
 from .config import TransferOptimizationResult
 from .nlp_core import NLPOptimizationVariables
 
@@ -136,15 +137,7 @@ def solve_with_scipy(
             callback=_scipy_callback,
         )
 
-        if result.success:
-            status = ConvergenceState.CONVERGED
-            cause = FailureCause.NONE
-        elif result.status == 9:
-            status = ConvergenceState.MAX_ITERATIONS
-            cause = FailureCause.MAX_ITERATIONS_REACHED
-        else:
-            status = ConvergenceState.INFEASIBLE
-            cause = FailureCause.CONSTRAINT_VIOLATION
+        status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
         message = result.message
         final_y = result.x
 

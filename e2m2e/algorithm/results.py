@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+
+import numpy as np
 
 from ..data.templates import ConvergenceState, FailureCause
 
@@ -92,18 +94,60 @@ class ContinuationResult:
         ResultStatus(self.status, self.cause, self.message)
 
 
-@dataclass(frozen=True)
+@dataclass
 class TransferCandidateResult:
-    """转移搜索单格的类型化候选评估。"""
+    """转移搜索单格的类型化候选评估。
+
+    承载搜索阶段对单个 ``(departure, alpha)`` 候选的全部几何与可行性信息。
+    替代历史裸字典（ADR 0024）；``get``/``__getitem__`` 提供对字典风格
+    消费方的兼容读取。
+    """
 
     status: ConvergenceState
     cause: FailureCause
     message: str
-    trajectory: Any | None = None
-    details: dict[str, Any] = field(default_factory=dict)
+    departure_state: np.ndarray | None = None
+    departure_time: float = 0.0
+    alpha: float = 0.0
+    transfer_trajectory: Any | None = None
+    transfer_times: Any | None = None
+    transfer_time: float | None = None
+    min_distance: float = float("inf")
+    min_distance_idx: int | None = None
+    min_distance_orbit_idx: int | None = None
+    dv_departure: float = 0.0
+    dv_insertion: float | None = None
+    intersection_found: bool = False
+    intersection_point: Any | None = None
+    intersection_idx: int | None = None
+    first_intersection_idx: int | None = None
+    first_intersection_time: float | None = None
+    first_min_distance_idx: int | None = None
+    first_min_distance_time: float | None = None
+    local_minimum_found: bool = False
+    local_minimum_distance: float = float("inf")
+    local_minimum_idx: int | None = None
+    collision_found: bool = False
+    collision_body: str | None = None
+    collision_idx: int | None = None
+    departure_orbit_name: str | None = None
+    arrival_orbit_name: str | None = None
+    departure_time_index: int | None = None
 
     def __post_init__(self) -> None:
         ResultStatus(self.status, self.cause, self.message)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """字典风格读取兼容。"""
+        return getattr(self, key, default)
+
+    def __getitem__(self, key: str) -> Any:
+        """字典风格下标读取兼容。"""
+        return getattr(self, key)
+
+    def __contains__(self, key: object) -> bool:
+        """字典风格成员检查兼容。"""
+        return isinstance(key, str) and hasattr(self, key)
 
 
 @dataclass(frozen=True)

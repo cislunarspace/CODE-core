@@ -303,13 +303,19 @@ def control_orbit(
         tight_max_iter=tight_max_iter,
         special_damping_factor=special_damping_factor,
     )
-    status = (
-        ConvergenceState.CONVERGED
-        if result.num_failed < num_monte_carlo
-        else ConvergenceState.FAILED
-    )
-    cause = FailureCause.NONE if status is ConvergenceState.CONVERGED else FailureCause.UNKNOWN
-    message = "任务完成" if status is ConvergenceState.CONVERGED else "全部蒙特卡洛样本失败"
+    if result.num_failed == 0:
+        status = ConvergenceState.CONVERGED
+        cause = FailureCause.NONE
+        message = "任务完成"
+    elif result.num_failed < num_monte_carlo:
+        # 部分蒙特卡洛样本失败：保留 num_failed 统计，但不伪装整体成功。
+        status = ConvergenceState.INFEASIBLE
+        cause = FailureCause.CONSTRAINT_VIOLATION
+        message = f"部分蒙特卡洛样本失败（{result.num_failed}/{num_monte_carlo}）"
+    else:
+        status = ConvergenceState.FAILED
+        cause = FailureCause.UNKNOWN
+        message = "全部蒙特卡洛样本失败"
     return ControlOrbitResult(
         sk_statistic=result.sk_statistic(),
         num_failed=result.num_failed,

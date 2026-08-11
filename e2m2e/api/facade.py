@@ -67,16 +67,21 @@ def _result_triplet(result: Any) -> tuple[ConvergenceState, FailureCause, str]:
 
 
 def _exception_triplet(exc: Exception) -> tuple[ConvergenceState, FailureCause, str]:
-    """读取算法异常携带的最终状态三元组。"""
-    try:
-        return exc.status, exc.cause, exc.message  # type: ignore[attr-defined]
-    except AttributeError as missing:
-        raise OrbitError(
-            "RESULT_CONTRACT_FAILED",
-            "算法异常缺少 status/cause/message 契约",
-            status=ConvergenceState.FAILED,
-            cause=FailureCause.BACKEND_FAILURE,
-        ) from missing
+    """读取算法异常携带的最终状态三元组。
+
+    异常自身携带三元组时原样返回；否则按算法层普通失败处理（保留原始
+    诊断信息），不让 Facade 吞掉 message 或误报契约错误。
+    """
+    status = getattr(exc, "status", None)
+    cause = getattr(exc, "cause", None)
+    message = getattr(exc, "message", None)
+    if status is not None and cause is not None:
+        return status, cause, message or str(exc)
+    return (
+        ConvergenceState.FAILED,
+        FailureCause.UNKNOWN,
+        str(exc),
+    )
 
 
 def _details_to_dict(details: Any) -> dict[str, Any]:
