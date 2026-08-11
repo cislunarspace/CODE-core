@@ -42,12 +42,13 @@ pub const DV_PENALTY: f64 = 1e10;
 ///
 /// 字段对齐 Python `search_single_departure` 组装的候选解 dict
 /// （`search_parallel.py:189-215` 成功分支 + `:135-150` 失败分支）。
-/// 成功分支填全部字段；失败分支（积分发散）填 `success=false` +
-/// `status="integration_failed"` + `dv_departure=1e10` 惩罚，几何字段为
-/// `None`/默认（与 Python 失败 dict 字段集合对齐）。
+/// 成功分支填全部字段；积分失败分支填 ``status="failed"``、
+/// ``cause="integration_failed"`` 与诊断消息，几何字段为 ``None``/默认。
 #[derive(Clone, Debug)]
 pub struct TransferPointResult {
-    pub success: bool,
+    pub status: String,
+    pub cause: String,
+    pub message: String,
     pub departure_state: [f64; 6],
     pub departure_time: f64,
     pub alpha: f64,
@@ -79,8 +80,6 @@ pub struct TransferPointResult {
     pub collision_body: Option<String>,
     /// 未命中 `-1`。
     pub collision_idx: i64,
-    /// `success` / `collision` / `no_intersection` / `integration_failed`。
-    pub status: String,
 }
 
 /// 网格搜索标量配置包（Python 端展平传入，对齐 `_process_pack_base`）。
@@ -157,7 +156,9 @@ pub fn evaluate_point(
     let Ok(propagated) = integration else {
         // 积分失败（步长塌缩）：dv 惩罚分支，不穿透 Err。
         return TransferPointResult {
-            success: false,
+            status: "failed".to_string(),
+            cause: "integration_failed".to_string(),
+            message: "转移轨迹积分失败".to_string(),
             departure_state: *departure_state,
             departure_time,
             alpha,
@@ -182,7 +183,6 @@ pub fn evaluate_point(
             collision_found: false,
             collision_body: None,
             collision_idx: -1,
-            status: "integration_failed".to_string(),
         };
     };
 
@@ -259,22 +259,21 @@ pub fn evaluate_point(
     let first_min_distance_time = first_min_distance_idx.map(|i| traj_times[i as usize]);
 
     // Step6 组装 status（与 search_parallel.py:216-221 一致）。
-    let status = if collision_found {
-        "collision".to_string()
+    let (status, cause, message) = if collision_found {
+        ("collision", "body_collision", "发生天体碰撞")
     } else if intersection_found || min_dist < params.min_distance_threshold {
-        "success".to_string()
+        ("converged", "none", "找到可行转移候选")
     } else {
-        "no_intersection".to_string()
+        ("infeasible", "no_intersection", "未达到目标轨道")
     };
-    // 仅 success 候选回传轨迹：collision / no_intersection 的整段轨迹对下游
-    // 选优无价值，丢弃以省跨 FFI 传输与内存（#316 item ③）。两端（Rust 内核
-    // + Python search_single_departure）一致过滤，等价性对照仍通过。
-    let keep_traj = status == "success";
+    let keep_traj = status == "converged";
 
     let transfer_time = *traj_times.last().unwrap_or(&params.max_transfer_time);
 
     TransferPointResult {
-        success: true,
+        status: status.to_string(),
+        cause: cause.to_string(),
+        message: message.to_string(),
         departure_state: *departure_state,
         departure_time,
         alpha,
@@ -299,7 +298,6 @@ pub fn evaluate_point(
         collision_found,
         collision_body,
         collision_idx,
-        status,
     }
 }
 
@@ -489,7 +487,7 @@ mod tests {
         s
     }
 
-    /// 评估单点应填充所有成功分支字段（success=true、status 非 failed）。
+    /// 评估单点应填充状态三元组和几何字段。
     #[test]
     fn evaluate_point_success_branch_populates_fields() {
         let dep = circular_orbit(0.9, 0.08, 40);
@@ -497,22 +495,22 @@ mod tests {
         let mut dep0 = [0.0_f64; 6];
         dep0.copy_from_slice(&dep[..6]);
         let r = evaluate_point(&dep0, 0.0, 1.0, &arrival, &params());
-        assert!(r.success);
-        assert_ne!(r.status, "integration_failed");
+        assert_ne!(r.status, "failed");
+        assert_ne!(r.cause, "integration_failed");
         assert!(r.min_distance.is_some());
         assert!(r.min_distance_idx.is_some());
-        // item ③：仅 status=="success" 回传轨迹。本温和场景 dep(xc=0.9) 与
+        // item ③：仅 status=="converged" 回传轨迹。本温和场景 dep(xc=0.9) 与
         // arrival(xc=0.7) 最近距超过 min_distance_threshold=0.05，status=
-        // no_intersection，故 trajectory=None（积分成功分支仍填 min_distance
+        // infeasible，故 trajectory=None（积分成功分支仍填 min_distance
         // 等几何字段；轨迹是否回传由 status 决定）。
-        assert_eq!(r.transfer_trajectory.is_some(), r.status == "success");
-        assert_eq!(r.transfer_times.is_some(), r.status == "success");
+        assert_eq!(r.transfer_trajectory.is_some(), r.status == "converged");
+        assert_eq!(r.transfer_times.is_some(), r.status == "converged");
         // dv_departure = |alpha·vel - vel| = |alpha-1|·|vel|；alpha=1 → 0。
         assert!(r.dv_departure < 1e-12);
     }
 
     /// dv 惩罚分支：状态合理应不触发；本测试用病态 rtol 强制步长塌缩，
-    /// 验证失败分支字段语义（dv=1e10、status=integration_failed）。
+    /// 验证失败分支字段语义（dv=1e10、status=failed）。
     #[test]
     fn evaluate_point_integration_failure_penalty() {
         let dep = circular_orbit(0.9, 0.08, 40);
@@ -530,8 +528,8 @@ mod tests {
         let r = evaluate_point(&dep0, 0.0, 1.0, &arrival, &bad);
         // 无论是否触发（取决于 propagate_cr3bp 的步长下限），都不应穿透 Err；
         // 触发时检查惩罚字段；未触发时跳过（温和参数下 propagate 可能仍返回 Ok）。
-        if !r.success {
-            assert_eq!(r.status, "integration_failed");
+        if r.status == "failed" {
+            assert_eq!(r.cause, "integration_failed");
             assert_eq!(r.dv_departure, DV_PENALTY);
             assert!(r.min_distance.is_none());
             assert!(r.transfer_trajectory.is_none());
@@ -606,8 +604,9 @@ mod tests {
             // 保序：逐候选 (departure_time, alpha) 对齐。
             assert_eq!(s.departure_time, p.departure_time);
             assert!((s.alpha - p.alpha).abs() < 1e-15);
-            assert_eq!(s.success, p.success);
             assert_eq!(s.status, p.status);
+            assert_eq!(s.cause, p.cause);
+            assert_eq!(s.message, p.message);
             assert_eq!(s.min_distance_idx, p.min_distance_idx);
             assert_eq!(s.min_distance_orbit_idx, p.min_distance_orbit_idx);
             assert_eq!(s.intersection_idx, p.intersection_idx);

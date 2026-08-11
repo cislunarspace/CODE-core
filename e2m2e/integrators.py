@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 
+from e2m2e.algorithm.results import ResultStatus
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.exceptions import RustExtensionUnavailableError
 
 # 扩展符号在运行时逐个装载；静态类型检查将其视为动态对象。
@@ -29,7 +31,6 @@ if TYPE_CHECKING:
     lambert_izzo_py: Any
     pole_tide: Any
     project_hamiltonian_qf_py: Any
-    multiple_shooting_correct_py: Any
     propagate_bcr4bp_py: Any
     propagate_bcr4bp_stm_py: Any
     propagate_compiled: Any
@@ -116,6 +117,45 @@ except ImportError:
 for _symbol in _RUST_SYMBOLS:
     _extension_symbol = _symbol.removeprefix("_")
     globals()[_symbol] = getattr(_rust_extension, _extension_symbol, None)
+
+
+class _ShootingResult:
+    """将 Rust 打靶结果在边界处规范化为领域枚举。"""
+
+    def __init__(self, raw: Any) -> None:
+        self._raw = raw
+        self.status = ConvergenceState(raw.status)
+        self.cause = FailureCause(raw.cause)
+        self.message = str(raw.message)
+        ResultStatus(self.status, self.cause, self.message)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._raw, name)
+
+
+_multiple_shooting_correct_py_raw: Any = globals()["multiple_shooting_correct_py"]
+_segmented_shooting_correct_py_raw: Any = globals()["segmented_shooting_correct_py"]
+
+
+def multiple_shooting_correct_py(*args: Any, **kwargs: Any) -> _ShootingResult:
+    """调用 Rust 多重打靶，并立即校验最终状态三元组。"""
+    require_rust_extension("multiple_shooting_correct_py")
+    if _multiple_shooting_correct_py_raw is None:
+        raise RustExtensionUnavailableError(
+            "e2m2e._integrators 缺少所需符号：multiple_shooting_correct_py。请先重建：make dev"
+        )
+    return _ShootingResult(_multiple_shooting_correct_py_raw(*args, **kwargs))
+
+
+def segmented_shooting_correct_py(*args: Any, **kwargs: Any) -> _ShootingResult:
+    """调用 Rust 分段打靶，并立即校验最终状态三元组。"""
+    require_rust_extension("segmented_shooting_correct_py")
+    if _segmented_shooting_correct_py_raw is None:
+        raise RustExtensionUnavailableError(
+            "e2m2e._integrators 缺少所需符号：segmented_shooting_correct_py。请先重建：make dev"
+        )
+    return _ShootingResult(_segmented_shooting_correct_py_raw(*args, **kwargs))
+
 
 # ---- Python↔Rust ABI 版本校验 ----
 # 单一来源：crates/e2m2e-integrators/abi-version.txt
@@ -619,8 +659,17 @@ def _transfer_point_result_to_dict(r: TransferPointResult) -> dict[str, Any]:
     times_arr = np.asarray(times, dtype=float) if times is not None else None
     int_pt = r.intersection_point
     int_pt_arr = np.asarray(int_pt, dtype=float) if int_pt is not None else None
+    status = ConvergenceState(r.status)
+    cause_value = r.cause
+    if cause_value == "infeasible":
+        cause_value = "no_intersection"
+    cause = FailureCause(cause_value)
+    message = r.message
+    ResultStatus(status, cause, message)
     return {
-        "success": r.success,
+        "status": status,
+        "cause": cause,
+        "message": message,
         "departure_state": np.asarray(r.departure_state, dtype=float),
         "departure_time": r.departure_time,
         "alpha": r.alpha,
@@ -645,5 +694,4 @@ def _transfer_point_result_to_dict(r: TransferPointResult) -> dict[str, Any]:
         "collision_found": r.collision_found,
         "collision_body": r.collision_body,
         "collision_idx": r.collision_idx,
-        "status": r.status,
     }
