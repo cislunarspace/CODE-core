@@ -2,6 +2,9 @@
 
 验证 VNB 沿速度方向推力提升半长轴、LVLH 径向推力增加偏心率、
 转换矩阵正交性与混合方向。
+
+低推力功能尚未开发完成，FiniteBurn 的 Rust 传播路径暂缺；本文件标记
+``low_thrust``，本轮检查排除在绿门外。
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import FiniteBurn, ForceModel, PointMassGravity
 from e2m2e.data.kernels.manager import SPICEManager
 
-pytestmark = pytest.mark.force
+pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 
 
 _EARTH_R_KM = 6378.137

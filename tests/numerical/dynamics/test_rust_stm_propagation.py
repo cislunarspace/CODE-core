@@ -8,6 +8,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
+from e2m2e.exceptions import RustExtensionUnavailableError
+
 pytestmark = [
     pytest.mark.integrator,
     pytest.mark.spice,
@@ -29,14 +31,18 @@ def reference_et(spice_manager, reference_epoch):
 
 
 class TestRustStmAvailability:
-    """测试 Rust STM 模块是否可用"""
+    """测试 Rust STM 模块的能力错误。"""
 
-    def test_rust_stm_import_flag(self):
-        """应能检测到 propagate_with_stm_py 是否可用"""
-        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
+    def test_rust_stm_missing_extension_raises_capability_error(self, monkeypatch):
+        """扩展缺失时在使用处给出构建指引，不影响模块导入。"""
+        import e2m2e.integrators as integrators
 
-        # 无论是否安装了 spice wheel，flag 都应该是 bool
-        assert isinstance(_HAS_RUST_STM, bool)
+        monkeypatch.setattr(integrators, "_rust_extension", None)
+        monkeypatch.setattr(integrators, "_abi_ok", False)
+        monkeypatch.setattr(integrators, "propagate_with_stm_py", None)
+
+        with pytest.raises(RustExtensionUnavailableError, match="make dev"):
+            integrators.require_rust_extension("propagate_with_stm_py")
 
 
 class TestRustStmPropagation:
@@ -44,11 +50,6 @@ class TestRustStmPropagation:
 
     def test_rust_propagate_with_stm_shape(self, spice_eph_dynamics, reference_et, leo_state):
         """Rust 路径应返回正确形状的 states/stm/time"""
-        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
-
-        if not _HAS_RUST_STM:
-            pytest.skip("propagate_with_stm_py 不可用（未安装 spice wheel）")
-
         t_span = (reference_et, reference_et + 5400)  # 1.5 小时
         t_eval = np.linspace(t_span[0], t_span[1], 50)
         result = spice_eph_dynamics._propagate_with_stm_rust(
@@ -61,11 +62,6 @@ class TestRustStmPropagation:
 
     def test_rust_stm_initial_is_identity(self, spice_eph_dynamics, reference_et, leo_state):
         """Rust 路径的初始 STM 应为单位矩阵"""
-        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
-
-        if not _HAS_RUST_STM:
-            pytest.skip("propagate_with_stm_py 不可用（未安装 spice wheel）")
-
         t_span = (reference_et, reference_et + 3600)
         t_eval = np.linspace(t_span[0], t_span[1], 100)
         result = spice_eph_dynamics._propagate_with_stm_rust(
@@ -76,11 +72,6 @@ class TestRustStmPropagation:
 
     def test_rust_vs_python_stm_leo_one_period(self, spice_eph_dynamics, reference_et, leo_state):
         """Rust 与 Python STM 在 LEO 一个周期内一致性"""
-        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
-
-        if not _HAS_RUST_STM:
-            pytest.skip("propagate_with_stm_py 不可用（未安装 spice wheel）")
-
         # LEO 约 90 分钟
         period = 2 * np.pi * np.sqrt(6778**3 / 398600.436)
         t_span = (reference_et, reference_et + period)
@@ -122,11 +113,6 @@ class TestRustStmPropagation:
 
     def test_rust_propagate_api_entry(self, spice_eph_dynamics, reference_et, leo_state):
         """通过 propagate(with_stm=True) 入口应自动走 Rust 路径"""
-        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
-
-        if not _HAS_RUST_STM:
-            pytest.skip("propagate_with_stm_py 不可用（未安装 spice wheel）")
-
         t_span = (reference_et, reference_et + 3600)
         result = spice_eph_dynamics.propagate(leo_state, t_span, with_stm=True)
 
@@ -147,11 +133,6 @@ class TestRustStatePropagation:
         max_step（~540s），初始步长被 max_step 钳位为同一值，故步长序列
         完全一致，states 前 6 维逐位相等。这是"两条路径等价"的直接证据。
         """
-        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
-
-        if not _HAS_RUST_STM:
-            pytest.skip("propagate_with_state_py 不可用（未安装 spice wheel）")
-
         t_span = (reference_et, reference_et + 5400)
         t_eval = np.linspace(t_span[0], t_span[1], 50)
         max_step = spice_eph_dynamics._get_max_step(t_span)
@@ -169,11 +150,6 @@ class TestRustStatePropagation:
 
     def test_state_rust_vs_scipy(self, spice_eph_dynamics, reference_et, leo_state):
         """纯状态 Rust vs SciPy 基类：states 一致（独立 DOP853 实现累积差异）。"""
-        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
-
-        if not _HAS_RUST_STM:
-            pytest.skip("propagate_with_state_py 不可用（未安装 spice wheel）")
-
         t_span = (reference_et, reference_et + 5400)
         t_eval = np.linspace(t_span[0], t_span[1], 50)
         max_step = spice_eph_dynamics._get_max_step(t_span)
@@ -206,11 +182,6 @@ class TestRustStatePropagation:
         回归 test_propagate_backward_time：覆写 _propagate_state_only 后，
         backward 传播走 Rust 纯状态路径（solve_ivp_capped 的 dir 逻辑）。
         """
-        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STM
-
-        if not _HAS_RUST_STM:
-            pytest.skip("propagate_with_state_py 不可用（未安装 spice wheel）")
-
         t_span = (reference_et, reference_et - 3600)
         result = spice_eph_dynamics._propagate_state_rust(
             leo_state, t_span, None, spice_eph_dynamics._get_max_step(t_span)
@@ -234,10 +205,6 @@ class TestRustStatePropagation:
 
     def test_events_not_implemented_state_only(self, spice_eph_dynamics, reference_et, leo_state):
         """with_stm=False + events 非 None 应 raise NotImplementedError。"""
-        from e2m2e.algorithm.dynamics.ephemeris_dynamics import _HAS_RUST_STATE
-
-        if not _HAS_RUST_STATE:
-            pytest.skip("Rust 扩展不可用时 events 走 scipy 兜底，不 raise")
 
         def event_fn(t, state):
             return float(state[0])

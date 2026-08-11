@@ -331,13 +331,9 @@ def grid_search_rust_dispatch(
     释放 GIL + Rayon ``par_iter``），拿回候选解后追加 ``departure_time_index`` /
     ``departure_orbit_name`` / ``arrival_orbit_name``，对齐 Python sequential 后端字段。
 
-    两种情况回退 Python 路径（结果正确，仅降速）：
-
-    - **monkeypatch 缝**：几何方法被替换时（见 :func:`_geometry_methods_monkeypatched`），
-      Rust 内核不经过 Python 分发，patch 不生效——回退保住测试语义。
-    - **Rust 扩展缺失**：``grid_search_rust`` 抛 ``RuntimeError``（``transfer_grid_search_py``
-      为 None），回退 ``processes`` 后端。
-
+    几何方法被 monkeypatch 时，Rust 内核不经过 Python 分发，故保留 Python
+    路径以维持测试注入语义。除此之外 Rust 扩展或符号缺失必须直接报告，不能
+    默认改用进程后端（issue #378）。
     Rust 总是走 Rayon 多核并行（``parallel=True``）——网格搜索的目标是快速完成。
     ``n_workers`` 直接转发给 Rust 端 ``ThreadPoolBuilder.num_threads`` 限定线程数，
     覆盖 ``RAYON_NUM_THREADS``（该环境变量仅在 :func:`grid_search_rust` 的
@@ -423,23 +419,6 @@ def grid_search_rust_dispatch(
             parallel=parallel,
             n_workers=n_workers,
             progress_callback=callback,
-        )
-    except (ImportError, RuntimeError) as exc:
-        # 回退 processes 后端（自带进度条），关掉 Rust 的空进度条避免重复显示。
-        if pbar is not None:
-            pbar.close()
-            pbar = None
-        if verbose:
-            logger.info("Rust 后端不可用（%s），回退 processes", exc)
-        return grid_search_parallel_processes(
-            searcher,
-            departure_states,
-            departure_times,
-            arrival_orbit,
-            dep_name,
-            arr_name,
-            verbose,
-            n_workers,
         )
     finally:
         if pbar is not None:

@@ -1,10 +1,9 @@
 """力模型类：ForceModel/PhysicalModel 子类/推力。
 
-Python 类是"力模型定义"（参数验证 + to_rust_spec 序列化 + 无 Rust 时的兜底
-计算），与 Rust ``e2m2e-forces`` 的 CompiledForce 枚举对应（ADR 0011 迁移，
-源：``core/forces/``）。配置 schema 在 ``data/templates/force_config.py``
-（纯数据）；大气密度模型（``atmosphere.py``）一并迁入（源
-``core/atmosphere/``）。
+Python 类是"力模型定义"（参数验证 + to_rust_spec 序列化），与 Rust
+``e2m2e-forces`` 的 CompiledForce 枚举对应（ADR 0011，源：``core/forces/``）。
+配置 schema 在 ``data/templates/force_config.py``（纯数据）；大气密度模型
+（``atmosphere.py``）一并迁入（源 ``core/atmosphere/``）。
 
 未实现（对外承诺能力）：ECOM 光压（原 #253），占位抛 ``NotImplementedError``。
 """

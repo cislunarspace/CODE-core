@@ -16,6 +16,8 @@ from collections.abc import Callable
 import numpy as np
 import numpy.typing as npt
 
+from e2m2e.exceptions import RustExtensionUnavailableError
+
 
 class _RustOdeResult:
     """与 ``scipy.optimize.OdeResult`` 兼容的 Rust 积分结果。
@@ -78,7 +80,10 @@ def solve_ivp_rust(
     try:
         from e2m2e._integrators import solve_ivp_py
     except ImportError as exc:
-        raise RuntimeError("Rust 扩展未构建，无法使用 solve_ivp_rust") from exc
+        raise RustExtensionUnavailableError(
+            "e2m2e._integrators 不可用（Rust 扩展未构建），无法使用 solve_ivp_rust。"
+            "请先构建：make dev"
+        ) from exc
 
     y0_arr = np.asarray(y0, dtype=float).ravel()
     t0, tf = float(t_span[0]), float(t_span[1])

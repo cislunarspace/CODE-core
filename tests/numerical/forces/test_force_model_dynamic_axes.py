@@ -102,46 +102,40 @@ class _FakeSystemNoUpdate:
 
 
 class ConstantForce(PhysicalModel):
-    """测试用恒力模型。"""
+    """测试用恒力模型（无 Rust spec）。"""
 
     def __init__(self, acceleration):
         self._acceleration = np.asarray(acceleration, dtype=float)
 
-    def compute_acceleration(self, t, state, system):
-        return self._acceleration.copy()
-
 
 def test_propagate_calls_update_before_loop_and_each_step():
-    """传播应在循环开始前和每个 rk_step 前调用 update_coordinate_systems。"""
+    """传播应在循环开始前和每个 rk_step 前调用 update_coordinate_systems。
+
+    issue #378：ForceModel 传播改走 Rust compiled 路径后，坐标系更新由
+    Rust 内部按步完成，Python 侧不再逐回调 ``update_coordinate_systems``。
+    本测试转为验证：无 Rust spec 的力在传播入口显式报错，不进入任何
+    Python 坐标系更新循环。
+    """
     axes = _MockDynamicAxes()
     system = _FakeSystemWithDynamicAxes(axes)
     fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, 0.0])])
 
     y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-    result = fm.propagate(y0, (0.0, 10.0), t_eval=np.linspace(0.0, 10.0, 3))
+    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+        fm.propagate(y0, (0.0, 10.0), t_eval=np.linspace(0.0, 10.0, 3))
 
-    assert result["time"][-1] == 10.0
-    # 至少有一次循环前调用 + 若干步内调用
-    assert len(axes.calls) >= 2
-
-    # 第一次调用是循环前（t0）
-    assert axes.calls[0][0] == 0.0
-    np.testing.assert_allclose(axes.calls[0][1], y0)
-
-    # 后续每次调用都是某个步进时刻
-    for t_call, _ in axes.calls[1:]:
-        assert 0.0 <= t_call <= 10.0
+    # 未进入传播循环，不应有坐标系更新调用
+    assert len(axes.calls) == 0
 
 
 def test_propagate_compatible_with_old_system_without_update():
-    """旧 System 无 update_coordinate_systems 方法时不应抛异常。"""
+    """旧 System 无 update_coordinate_systems 方法时，无 Rust spec 力仍显式报错。"""
     system = _FakeSystemNoUpdate()
     fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, 0.0])])
 
     y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-    result = fm.propagate(y0, (0.0, 1.0), t_eval=np.linspace(0.0, 1.0, 3))
-
-    assert result["time"][-1] == 1.0
+    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+        fm.propagate(y0, (0.0, 1.0), t_eval=np.linspace(0.0, 1.0, 3))
 
 
 def test_system_update_coordinate_systems_updates_dynamic_axes():

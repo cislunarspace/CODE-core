@@ -16,7 +16,7 @@ from e2m2e.algorithm.forces import GravityField
 from e2m2e.algorithm.transfer import EngineConfig, LowThrustShooting
 from e2m2e.data.kernels.manager import SPICEManager
 
-pytestmark = pytest.mark.orchestration
+pytestmark = [pytest.mark.orchestration, pytest.mark.low_thrust]
 
 
 def _semi_major_axis(state, mu):

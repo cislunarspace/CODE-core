@@ -2,18 +2,10 @@
 
 from __future__ import annotations
 
-import warnings
-from typing import Any, cast
-
 import numpy as np
 import numpy.typing as npt
 
 from ...data.constants import SPEED_OF_LIGHT_KMS
-from ...data.constants.bodies import EARTH, JUPITER, MARS, MOON, SUN
-from ..coordinate.coordinate_system import CoordinateSystem
-from ..coordinate.standard_axes import ICRSAxes, ITRFSpiceAxes
-from ..coordinate.standard_origins import CelestialBodyOrigin
-from .exceptions import RelativisticCorrectionError
 from .physical_model import PhysicalModel
 
 
@@ -22,16 +14,11 @@ class RelativisticCorrection(PhysicalModel):
 
     实现 Schwarzschild、Lense-Thirring 与 de Sitter（geodesic）三项相对论
     加速度修正，公式与 GMAT R2026a ``RelativisticCorrection`` 对齐。
-    """
 
-    # 常用天体赤道半径 (km)，与 GMAT 默认值/IAU 标准一致。
-    _DEFAULT_BODY_RADII_KM: dict[str, float] = {
-        "EARTH": cast(float, EARTH.gravity_ref_radius_km),
-        "MOON": cast(float, MOON.mean_radius_km),
-        "SUN": cast(float, SUN.mean_radius_km),
-        "MARS": cast(float, MARS.mean_radius_km),
-        "JUPITER": cast(float, JUPITER.mean_radius_km),
-    }
+    加速度计算全部由 Rust 编译路径承载（``("relativistic", ...)`` 力元组，
+    ``crates/e2m2e-forces/src/forces/relativistic.rs``），Python 侧不保留参考
+    实现（issue #378）。
+    """
 
     def __init__(
         self,
@@ -143,118 +130,3 @@ class RelativisticCorrection(PhysicalModel):
             self._body_radius,
             self._gamma,
         )
-
-    def compute_acceleration(
-        self,
-        t: float,
-        state: npt.ArrayLike,
-        system: Any,
-    ) -> npt.NDArray[np.floating]:
-        """返回相对论修正加速度，km/s²。"""
-        warnings.warn(
-            f"{self.__class__.__name__}.compute_acceleration 走 Python 回退路径，"
-            "应优先走 Rust 编译路径。",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        state_arr = np.asarray(state, dtype=float)
-        rv = state_arr[:3].copy()
-        vv = state_arr[3:6].copy()
-
-        mu = float(system.gravitational_parameter(self._central_body))
-        c = self._c
-        c2 = c * c
-        r = float(np.linalg.norm(rv))
-        v = float(np.linalg.norm(vv))
-
-        acc = np.zeros(3, dtype=float)
-
-        if self._enable_schwarzschild:
-            s1 = mu / (c2 * r * r * r)
-            s2 = ((4.0 * mu / r) - (v * v)) * rv
-            rv_dot_vv = float(np.dot(rv, vv))
-            s3 = 4.0 * rv_dot_vv * vv
-            acc = acc + self._gamma * s1 * (s2 + s3)
-
-        if self._enable_lense_thirring:
-            j_vec = self._angular_momentum_vector
-            if j_vec is None:
-                j_vec = self._compute_angular_momentum(t, system)
-            rv_cross_vv = np.cross(rv, vv)
-            vv_cross_j = np.cross(vv, j_vec)
-            lt1 = 2.0 * mu / (c2 * r * r * r)
-            lt2 = (3.0 / (r * r)) * np.dot(rv, j_vec)
-            acc = acc + lt1 * (lt2 * rv_cross_vv + vv_cross_j)
-
-        if self._enable_de_sitter and self._primary_body is not None:
-            omega = self._compute_de_sitter_omega(t, system)
-            acc = acc + 2.0 * np.cross(omega, vv)
-
-        return acc
-
-    def _compute_de_sitter_omega(self, t: float, system: Any) -> npt.NDArray[np.floating]:
-        """计算 de Sitter（geodesic）项的 omega 矢量。"""
-        spice = system.spice
-        primary = self._primary_body
-        central_state = spice.get_body_state(
-            self._central_body, t, "J2000", "SOLAR SYSTEM BARYCENTER"
-        )
-        primary_state = spice.get_body_state(primary, t, "J2000", "SOLAR SYSTEM BARYCENTER")
-        rel_state = central_state - primary_state
-        r_vec = rel_state[:3]
-        v_vec = rel_state[3:6]
-        r = float(np.linalg.norm(r_vec))
-        mu_primary = float(system.gravitational_parameter(primary))
-        c2 = self._c * self._c
-        factor = -mu_primary / (c2 * r * r * r)
-        pos = factor * r_vec
-        vel = 1.5 * v_vec
-        return np.cross(vel, pos)
-
-    def _compute_angular_momentum(self, t: float, system: Any) -> npt.NDArray[np.floating]:
-        """通过 bodyFixed -> inertial 旋转矩阵实时计算角动量矢量 J。"""
-        try:
-            spice = system.spice
-            # body_inertial 备用：GMAT 同时构造 fixed/inertial 两个
-            # 坐标系；这里只使用 fixed 系，如需反算惯系轴可参考展开。
-            body_inertial = CoordinateSystem(  # noqa: F841
-                axes=ICRSAxes(),
-                origin=CelestialBodyOrigin(body=self._central_body, spice=spice),
-            )
-            body_fixed = CoordinateSystem(
-                axes=ITRFSpiceAxes(),
-                origin=CelestialBodyOrigin(body=self._central_body, spice=spice),
-            )
-            R, Rdot = body_fixed.axes.rotation_and_rate(t)
-        except Exception as exc:
-            raise RelativisticCorrectionError(
-                "Automatic angular momentum computation requires a body-fixed "
-                "coordinate system and SPICE binary PCK kernels. Provide "
-                "angular_momentum_vector explicitly, or load the required kernels."
-            ) from exc
-
-        # GMAT: bodySpinVector 从 fixed -> inertial 的 R 和 Rdot 提取
-        body_spin_vector = np.array(
-            [
-                -R[0, 2] * Rdot[0, 1] - R[1, 2] * Rdot[1, 1] - R[2, 2] * Rdot[2, 1],
-                R[0, 2] * Rdot[0, 0] + R[1, 2] * Rdot[1, 0] + R[2, 2] * Rdot[2, 0],
-                -R[0, 1] * Rdot[0, 0] - R[1, 1] * Rdot[1, 0] - R[2, 1] * Rdot[2, 0],
-            ]
-        )
-        body_spin_rate = float(np.linalg.norm(body_spin_vector))
-
-        radius = self._resolve_body_radius()
-        J1 = np.array([0.0, 0.0, (2.0 / 5.0) * radius * radius * body_spin_rate])
-        return R @ J1
-
-    def _resolve_body_radius(self) -> float:
-        """返回中心天体赤道半径（km）。"""
-        if self._body_radius is not None:
-            return float(self._body_radius)
-        try:
-            return self._DEFAULT_BODY_RADII_KM[self._central_body]
-        except KeyError as exc:
-            raise RelativisticCorrectionError(
-                f"No default body radius for {self._central_body!r}. "
-                "Provide body_radius explicitly."
-            ) from exc

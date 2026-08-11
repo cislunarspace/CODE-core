@@ -497,26 +497,24 @@ def build_cr3bp_hamiltonian(
     )
 
     # Rust 数值路径（e2m2e._integrators）：JM c_n 形式直接生成系数，
-    # 不依赖 sympy 符号展开（26s → ms）。共线点（gamma 有定义）可用；
-    # 扩展未编译或三角点回退符号路径。
+    # 不依赖 sympy 符号展开（26s → ms）。共线点（gamma 有定义）必须使用
+    # Rust；三角点没有该输入语义，才保留符号路径。
     if ctx_cr3bp.gamma is not None:
-        try:
-            from e2m2e.integrators import build_cr3bp_hamiltonian_py
-        except ImportError:
-            build_cr3bp_hamiltonian_py = None
-        if build_cr3bp_hamiltonian_py is not None:
-            gamma = float(ctx_cr3bp.gamma)
-            mu_val = float(ctx_cr3bp.mu)
-            rho_e_ratio = gamma / (1.0 + gamma)  # 地球项 γ/(1+γ)
-            pows, coefs = build_cr3bp_hamiltonian_py(mu_val, gamma, rho_e_ratio, deg)
-            numeric_rust: dict[tuple[int, ...], float] = {
-                tuple(int(p) for p in pow_t): float(c) for pow_t, c in zip(pows, coefs, strict=True)
-            }
-            # 与符号路径一致：强制平动点平衡（删一阶项）
-            numeric_rust = {k: v for k, v in numeric_rust.items() if sum(k) != 1}
-            if not numeric_rust:
-                numeric_rust[(0, 0, 0, 0, 0, 0)] = 0.0
-            return numeric_rust
+        from e2m2e.integrators import build_cr3bp_hamiltonian_py, require_rust_extension
+
+        require_rust_extension("build_cr3bp_hamiltonian_py")
+        gamma = float(ctx_cr3bp.gamma)
+        mu_val = float(ctx_cr3bp.mu)
+        rho_e_ratio = gamma / (1.0 + gamma)  # 地球项 γ/(1+γ)
+        pows, coefs = build_cr3bp_hamiltonian_py(mu_val, gamma, rho_e_ratio, deg)
+        numeric_rust: dict[tuple[int, ...], float] = {
+            tuple(int(p) for p in pow_t): float(c) for pow_t, c in zip(pows, coefs, strict=True)
+        }
+        # 与符号路径一致：强制平动点平衡（删一阶项）
+        numeric_rust = {k: v for k, v in numeric_rust.items() if sum(k) != 1}
+        if not numeric_rust:
+            numeric_rust[(0, 0, 0, 0, 0, 0)] = 0.0
+        return numeric_rust
 
     legendre = expand_legendre_1_over_r(max_degree=deg)
     H_sym = build_hamiltonian(ctx_cr3bp, legendre, max_degree=deg, store_sources=False)

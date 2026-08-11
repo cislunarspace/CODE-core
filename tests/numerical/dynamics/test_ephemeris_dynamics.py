@@ -299,7 +299,6 @@ class TestRustStmErrorHandling:
             }
 
         monkeypatch.setattr(ephem_dyn, "propagate_with_stm_py", fake_propagate)
-        monkeypatch.setattr(ephem_dyn, "_HAS_RUST_STM", True)
 
         t_eval = np.linspace(0.0, 100.0, 101)
         with pytest.raises(RuntimeError, match="truncated"):

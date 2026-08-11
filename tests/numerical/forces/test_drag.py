@@ -1,20 +1,17 @@
 """DragModel 大气阻力力模型测试。
 
-覆盖 PhysicalModel 子类关系、加速度方向、量级公式与边界。
+Python 单点 ``compute_acceleration`` 已按 issue #378 删除；阻力物理行为由
+Rust ``drag_accel_in_body_fixed`` 单元测试与 Rust ``propagate_compiled``
+端到端传播覆盖。本文件保留构造校验、弹道系数与 ``to_rust_spec`` 序列化契约。
 """
 
 import types
 
-import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import PhysicalModel
 from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 from e2m2e.algorithm.forces.drag import DragModel
-from e2m2e.data.constants import KM_TO_M as _KM_TO_M
-from e2m2e.data.constants.bodies import EARTH as _EARTH
-
-_EARTH_R_KM = _EARTH.gravity_ref_radius_km
 
 pytestmark = pytest.mark.force
 
@@ -31,78 +28,6 @@ def test_drag_model_is_physical_model():
     assert isinstance(drag, PhysicalModel)
 
 
-def test_compute_acceleration_returns_three_vector():
-    """compute_acceleration 返回形状 (3,) 的加速度向量。
-
-    system=None 时假设状态已在 ITRF 中（与 GravityField 隔离测试模式一致）。
-    """
-    atm = ExponentialAtmosphere()
-    drag = DragModel(atmosphere=atm, area=10.0, mass=1000.0)
-
-    # 400 km 高度，ITRF 中位置 [km]、速度 [km/s]
-    state = np.array([6778.0, 0.0, 0.0, 0.0, 7.7, 0.0])
-    acc = drag.compute_acceleration(0.0, state, None)
-
-    assert isinstance(acc, np.ndarray)
-    assert acc.shape == (3,)
-
-
-def test_drag_acceleration_opposes_velocity():
-    """阻力加速度方向与速度方向相反。"""
-    atm = ExponentialAtmosphere()
-    drag = DragModel(atmosphere=atm, area=10.0, mass=1000.0)
-
-    # 速度在 +y 方向，阻力应在 -y 方向
-    state = np.array([6778.0, 0.0, 0.0, 0.0, 7.7, 0.0])
-    acc = drag.compute_acceleration(0.0, state, None)
-
-    assert acc[1] < 0.0, "阻力 y 分量应为负（反速度方向）"
-    # x、z 分量应可忽略（速度纯 y 方向）
-    assert abs(acc[0]) < abs(acc[1]) * 1e-12
-    assert abs(acc[2]) < abs(acc[1]) * 1e-12
-
-
-def test_drag_magnitude_matches_formula():
-    """阻力加速度量级与解析公式 a = 0.5·ρ·BC·v² 一致（验证单位转换正确）。"""
-    atm = ExponentialAtmosphere()
-    cd, area, mass = 2.2, 10.0, 1000.0
-    drag = DragModel(atmosphere=atm, area=area, mass=mass, cd=cd)
-
-    state = np.array([6778.0, 0.0, 0.0, 0.0, 7.7, 0.0])
-    acc = drag.compute_acceleration(0.0, state, None)
-
-    # 手工计算（SI）
-    altitude = 6778.0 - _EARTH_R_KM
-    rho = atm.density(altitude)  # kg/m³
-    v = 7.7 * _KM_TO_M  # m/s
-    bc = cd * area / mass  # m²/kg
-    a_expected_si = 0.5 * rho * bc * v**2  # m/s²
-    a_expected_km = a_expected_si / _KM_TO_M  # km/s²
-
-    np.testing.assert_allclose(np.linalg.norm(acc), a_expected_km, rtol=1e-10)
-
-
-def test_drag_above_ceiling_is_zero():
-    """高度超过大气模型上限（1000 km）时阻力为零。"""
-    atm = ExponentialAtmosphere()
-    drag = DragModel(atmosphere=atm, area=10.0, mass=1000.0)
-
-    # ~1200 km 高度（超过 1000 km 上限）
-    state = np.array([7578.0, 0.0, 0.0, 0.0, 6.0, 0.0])
-    acc = drag.compute_acceleration(0.0, state, None)
-    np.testing.assert_array_equal(acc, np.zeros(3))
-
-
-def test_drag_zero_velocity_is_zero():
-    """相对速度为零时阻力为零。"""
-    atm = ExponentialAtmosphere()
-    drag = DragModel(atmosphere=atm, area=10.0, mass=1000.0)
-
-    state = np.array([6778.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-    acc = drag.compute_acceleration(0.0, state, None)
-    np.testing.assert_array_equal(acc, np.zeros(3))
-
-
 def test_drag_model_rejects_nonpositive_area():
     """截面积必须为正。"""
     atm = ExponentialAtmosphere()
@@ -115,6 +40,20 @@ def test_drag_model_rejects_nonpositive_mass():
     atm = ExponentialAtmosphere()
     with pytest.raises(ValueError, match="mass"):
         DragModel(atmosphere=atm, area=10.0, mass=-5.0)
+
+
+def test_drag_model_rejects_nonpositive_cd():
+    """阻力系数必须为正。"""
+    atm = ExponentialAtmosphere()
+    with pytest.raises(ValueError, match="cd"):
+        DragModel(atmosphere=atm, area=10.0, mass=1000.0, cd=0.0)
+
+
+def test_drag_ballistic_coefficient():
+    """弹道系数 = Cd·A/m。"""
+    atm = ExponentialAtmosphere()
+    drag = DragModel(atmosphere=atm, area=10.0, mass=1000.0, cd=2.2)
+    assert drag.ballistic_coefficient == pytest.approx(2.2 * 10.0 / 1000.0)
 
 
 def test_to_rust_spec_carries_f107_ap():
@@ -149,6 +88,12 @@ def test_to_rust_spec_carries_f107_ap():
 
 
 def test_to_rust_spec_none_without_spice():
-    """system 无 spice 属性时 to_rust_spec 返回 None，回退 Python 路径。"""
+    """system 无 spice 属性时 to_rust_spec 返回 None，由 ForceModel 显式报错。"""
     drag = DragModel(atmosphere=ExponentialAtmosphere(), area=10.0, mass=1000.0)
     assert drag.to_rust_spec(types.SimpleNamespace()) is None
+
+
+def test_to_rust_spec_none_for_non_earth_body():
+    """中心天体非 EARTH 时 to_rust_spec 返回 None（仅支持地球阻力）。"""
+    drag = DragModel(atmosphere=ExponentialAtmosphere(), area=10.0, mass=1000.0, body="MOON")
+    assert drag.to_rust_spec(_system_with_spice()) is None

@@ -38,19 +38,10 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from e2m2e.integrators import propagate_with_state_py, propagate_with_stm_py, require_rust_extension
+
 from .dynamics import Dynamics
 from .ephemeris_system import EphemerisSystem
-
-try:
-    from e2m2e.integrators import propagate_with_state_py, propagate_with_stm_py
-
-    if propagate_with_stm_py is None or propagate_with_state_py is None:
-        raise ImportError
-    _HAS_RUST_STM = True
-    _HAS_RUST_STATE = True
-except ImportError:
-    _HAS_RUST_STM = False
-    _HAS_RUST_STATE = False
 
 
 class EphemerisDynamics(Dynamics):
@@ -111,20 +102,12 @@ class EphemerisDynamics(Dynamics):
                 "EphemerisDynamics 的 STM 传播不支持事件检测（events 非 None）；"
                 "如需事件检测请改用 solve_ivp_events"
             )
-        if _HAS_RUST_STM:
-            return self._propagate_with_stm_rust(
-                initial_state,
-                t_span,
-                t_eval,
-                max_step,
-            )
-        return super()._propagate_with_stm(
+        require_rust_extension("propagate_with_stm_py")
+        return self._propagate_with_stm_rust(
             initial_state,
             t_span,
             t_eval,
             max_step,
-            with_jacobi,
-            events,
         )
 
     def _propagate_with_stm_rust(
@@ -194,20 +177,12 @@ class EphemerisDynamics(Dynamics):
                 "EphemerisDynamics 的纯状态传播不支持事件检测（events 非 None）；"
                 "如需事件检测请改用 solve_ivp_events"
             )
-        if _HAS_RUST_STATE:
-            return self._propagate_state_rust(
-                initial_state,
-                t_span,
-                t_eval,
-                max_step,
-            )
-        return super()._propagate_state_only(
+        require_rust_extension("propagate_with_state_py")
+        return self._propagate_state_rust(
             initial_state,
             t_span,
             t_eval,
             max_step,
-            with_jacobi,
-            events,
         )
 
     def _propagate_state_rust(

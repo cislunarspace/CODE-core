@@ -16,7 +16,7 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import ForceModel, GravityField, VariableMassFiniteBurn
 from e2m2e.data.kernels.manager import SPICEManager
 
-pytestmark = pytest.mark.force
+pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 
 
 def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
@@ -129,12 +129,24 @@ def _build_lowthrust_problem(system, thrust, isp, mass, direction_kind="velocity
 
 
 @pytest.mark.spice
-def test_variable_mass_thrust_semi_major_axis_rate(earth_ephemeris_system):
-    """可变质量低推力圆轨道提升：半长轴变化率与解析公式误差 < 5%。
+def test_variable_mass_events_are_rejected_before_rust_propagation(earth_ephemeris_system):
+    """可变质量低推力带 events 时必须在进入 Rust 路径前显式报错。"""
+    fm, y0 = _build_lowthrust_problem(
+        earth_ephemeris_system, thrust=0.1, isp=3000.0, mass=1000.0, direction_kind="fixed"
+    )
+    et0 = earth_ephemeris_system.spice.utc_to_et("2025-06-21T11:00:06")
 
-    解析式（恒定质量近似，短弧质量变化 < 1% 时成立）：
-        a(t) = (a0^(3/2) + 3/2·√μ·(T/m)·t)^(2/3)
-    """
+    with pytest.raises(NotImplementedError, match="事件传播"):
+        fm.propagate(
+            y0,
+            (et0, et0 + 60.0),
+            events=[lambda _t, state: float(state[0])],
+        )
+
+
+@pytest.mark.spice
+def test_variable_mass_thrust_semi_major_axis_rate(earth_ephemeris_system):
+    """可变质量低推力圆轨道提升：半长轴变化率与解析公式误差 < 5%。"""
     system = earth_ephemeris_system
     mu = system.gravitational_parameter("EARTH")
 
@@ -215,11 +227,8 @@ def test_variable_mass_uses_rust_path(earth_ephemeris_system):
 
 
 @pytest.mark.spice
-def test_variable_mass_callable_direction_python_fallback(earth_ephemeris_system):
-    """可调用方向使 to_rust_spec 返回 None，回退 Python eom 仍能传播。
-
-    回退路径质量同样消耗（Python eom 取 state[6] 为质量）。
-    """
+def test_variable_mass_callable_direction_rust_rejects_unsupported_force(earth_ephemeris_system):
+    """Rust 不支持可调用方向时显式拒绝，不隐式回退 Python。"""
     system = earth_ephemeris_system
 
     thrust = 0.1
@@ -228,7 +237,7 @@ def test_variable_mass_callable_direction_python_fallback(earth_ephemeris_system
     duration_s = 0.25 * 86400.0
 
     fm, y0 = _build_lowthrust_problem(system, thrust, isp, mass, direction_kind="velocity")
-    # 可调用方向 → to_rust_spec 返回 None，无法走 Rust 路径
+    # 可调用方向不能序列化为 Rust force spec，必须显式拒绝。
     burn = next(e.force for e in fm._entries if isinstance(e.force, VariableMassFiniteBurn))
     assert burn.to_rust_spec(system) is None
 
@@ -236,10 +245,7 @@ def test_variable_mass_callable_direction_python_fallback(earth_ephemeris_system
     t_span = (et0, et0 + duration_s)
     t_eval = np.array([et0, et0 + duration_s])
 
-    # ForceModel._propagate_lowthrust 在可调用方向时会 raise NotImplementedError
-    # （无法下沉到 Rust）。这条路径的完整 Python 回退不在本期范围；这里验证
-    # 它明确报错而非静默走错路径。
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotImplementedError, match="callable direction.*Rust"):
         fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
 

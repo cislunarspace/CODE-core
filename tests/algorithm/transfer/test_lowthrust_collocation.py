@@ -13,7 +13,7 @@ from e2m2e.algorithm.forces import PointMassGravity
 from e2m2e.algorithm.transfer import EngineConfig, LowThrustCollocation, LowThrustShooting
 from e2m2e.integrators import RkMethod, propagate_compiled_lowthrust
 
-pytestmark = pytest.mark.orchestration
+pytestmark = [pytest.mark.orchestration, pytest.mark.low_thrust]
 
 
 MU = 398600.435507

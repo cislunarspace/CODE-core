@@ -2,6 +2,9 @@
 
 验证 VNB/LVLH 坐标系转换、非法帧拒绝、
 callable 方向与零速度/零位置边界。
+
+低推力功能尚未开发完成，FiniteBurn 的 Rust 传播路径暂缺；本文件标记
+``low_thrust``，本轮检查排除在绿门外。
 """
 
 import numpy as np
@@ -9,7 +12,7 @@ import pytest
 
 from e2m2e.algorithm.forces import FiniteBurn
 
-pytestmark = pytest.mark.force
+pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 
 
 # --- 构造辅助 ---

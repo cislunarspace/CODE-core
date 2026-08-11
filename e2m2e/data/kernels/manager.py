@@ -99,7 +99,7 @@ def _find_leapseconds_kernel(search_paths: list[str] | None = None) -> str | Non
 _STALE_BINARY_HINT = (
     "e2m2e._integrators 编译产物（.pyd/.so）落后于源码："
     "Rust 函数 {fn_name!r} 缺少关键字参数 {missing}。"
-    "请重建 Rust 扩展：uv run maturin develop --features spice"
+    "请重建 Rust 扩展：make dev（等价于 uv run maturin develop --release）"
 )
 
 
@@ -234,14 +234,10 @@ class SPICEManager(EphemerisProvider):
         # 的力（ThirdBody/Indirect/...）也能查到。Rust 绑定是数值层，
         # 此处为内核加载的跨层桥接（ADR 0012 的 data/ → 仅外部库例外，
         # 迁移期保留，第 5 批评估归属）。
-        try:
-            from e2m2e.integrators import spice_furnsh  # noqa: F401
+        from e2m2e.integrators import spice_furnsh
 
-            if spice_furnsh is None:
-                raise ImportError
+        if spice_furnsh is not None:
             spice_furnsh(path)
-        except ImportError:
-            pass
 
     def unload_kernel(self, path: str) -> None:
         """卸载一个已加载的 SPICE 内核文件，释放相关资源。"""
@@ -301,62 +297,51 @@ class SPICEManager(EphemerisProvider):
         # body 同时注册名字与 NAIF-ID 两种键，保证 ThirdBody 查询（用 ID）
         # 与 GravityField 查询（用名字）都命中。Rust 采样同样走 cspice，
         # 之后积分查表。
+        from e2m2e.integrators import enable_ephem_cache as _rust_enable
+        from e2m2e.integrators import require_rust_extension
+
+        require_rust_extension("enable_ephem_cache")
+        # 天体名 → NAIF-ID 字符串（与 third_body_gravity.py 的
+        # _name_or_id 一致；失败保留名字）
         try:
-            from e2m2e.integrators import enable_ephem_cache as _rust_enable
+            import spiceypy as _sp
 
-            if _rust_enable is None:
-                raise ImportError  # extension absent or not built with spice
-            # 天体名 → NAIF-ID 字符串（与 third_body_gravity.py 的
-            # _name_or_id 一致；失败保留名字）
-            try:
-                import spiceypy as _sp
+            id_keys = [str(_sp.bods2c(b)) if _sp.bods2c(b) > 0 else b.upper() for b in bodies]
+        except Exception:
+            id_keys = [b.upper() for b in bodies]
 
-                id_keys = [str(_sp.bods2c(b)) if _sp.bods2c(b) > 0 else b.upper() for b in bodies]
-            except Exception:
-                id_keys = [b.upper() for b in bodies]
-
-            frame_pairs = frame_pairs or [(frame, "J2000")]
-            sxform_pairs = sxform_pairs or []
-            # 经守卫转发：编译产物过期（签名缺 dt/sxform_pairs）时抛带"请重建"
-            # 提示的 RuntimeError，而非栈顶深处的裸 TypeError。见函数 docstring。
-            _call_rust_or_compat_error(
-                _rust_enable,
-                [
-                    (k, observer.upper())
-                    for b, kid in zip(bodies, id_keys, strict=True)
-                    for k in (b.upper(), kid)
-                ]
-                + [
-                    (k, "SOLAR SYSTEM BARYCENTER")
-                    for b, kid in zip(bodies, id_keys, strict=True)
-                    if b.upper() != "SOLAR SYSTEM BARYCENTER"
-                    for k in (b.upper(), kid)
-                ],
-                frame_pairs,
-                et_start,
-                et_end,
-                fn_name="enable_ephem_cache",
-                required_kwargs=("dt", "sxform_pairs"),
-                dt=dt,
-                sxform_pairs=sxform_pairs,
-            )
-        except ImportError:
-            # 非 spice 构建（_integrators 模块/函数缺失）：仅 Python 层缓存生效。
-            # 扩展存在但签名过期（旧 .pyd）的情形已由 _call_rust_or_compat_error
-            # 转为 RuntimeError，不在此兜底——需让用户看到"请重建"。
-            pass
+        frame_pairs = frame_pairs or [(frame, "J2000")]
+        sxform_pairs = sxform_pairs or []
+        _call_rust_or_compat_error(
+            _rust_enable,
+            [
+                (k, observer.upper())
+                for b, kid in zip(bodies, id_keys, strict=True)
+                for k in (b.upper(), kid)
+            ]
+            + [
+                (k, "SOLAR SYSTEM BARYCENTER")
+                for b, kid in zip(bodies, id_keys, strict=True)
+                if b.upper() != "SOLAR SYSTEM BARYCENTER"
+                for k in (b.upper(), kid)
+            ],
+            frame_pairs,
+            et_start,
+            et_end,
+            fn_name="enable_ephem_cache",
+            required_kwargs=("dt", "sxform_pairs"),
+            dt=dt,
+            sxform_pairs=sxform_pairs,
+        )
 
     def disable_ephem_cache(self) -> None:
         """关闭预插值星历缓存（Python 层 + Rust 层），回退到逐步 SPICE 查询。"""
         self._ephem_cache = None
-        try:
-            from e2m2e.integrators import disable_ephem_cache as _rust_disable
+        from e2m2e.integrators import disable_ephem_cache as _rust_disable
+        from e2m2e.integrators import require_rust_extension
 
-            if _rust_disable is None:
-                raise ImportError
-            _rust_disable()
-        except ImportError:
-            pass
+        require_rust_extension("disable_ephem_cache")
+        _rust_disable()
 
     # ---- EphemerisProvider 时间方法 ----
 

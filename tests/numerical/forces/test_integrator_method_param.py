@@ -7,23 +7,11 @@ PD45 与 PD78 传播同一轨道结果量级一致。
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.forces import ForceModel, PhysicalModel
+from e2m2e.algorithm.forces import ForceModel, PointMassGravity
 from e2m2e.algorithm.forces.thrust import ImpulsiveBurn
 from e2m2e.integrators import RkMethod
 
 pytestmark = pytest.mark.force
-
-
-class PointMassTestForce(PhysicalModel):
-    """测试用中心引力模型，返回 -mu/r^3 * r。"""
-
-    def __init__(self, mu: float):
-        self.mu = float(mu)
-
-    def compute_acceleration(self, t, state, system):
-        r = np.asarray(state[:3], dtype=float)
-        rr = np.dot(r, r)
-        return -self.mu / (rr * np.sqrt(rr)) * r
 
 
 class _FakeSystem:
@@ -31,6 +19,7 @@ class _FakeSystem:
 
     def __init__(self):
         self.coordinate_system = object()
+        self.origin = "EARTH"
 
     @property
     def frame(self):
@@ -52,7 +41,7 @@ def test_propagate_pd78_works():
     """PD78 积分器可正常传播。"""
     system = _FakeSystem()
     mu = 398600.4415
-    fm = ForceModel(system, forces=[PointMassTestForce(mu)])
+    fm = ForceModel(system, forces=[PointMassGravity("EARTH", mu=mu)])
 
     r = 6778.0
     v = np.sqrt(mu / r)
@@ -71,7 +60,7 @@ def test_propagate_pd45_and_pd78_similar_results():
     """同一初值分别用 PD45 和 PD78 传播，末状态应相近。"""
     system = _FakeSystem()
     mu = 398600.4415
-    fm = ForceModel(system, forces=[PointMassTestForce(mu)])
+    fm = ForceModel(system, forces=[PointMassGravity("EARTH", mu=mu)])
 
     r = 6778.0
     v = np.sqrt(mu / r)
@@ -92,7 +81,7 @@ def test_propagate_default_method_is_pd45():
     """默认参数不指定 method 时，行为与显式传 PD45 一致。"""
     system = _FakeSystem()
     mu = 398600.4415
-    fm = ForceModel(system, forces=[PointMassTestForce(mu)])
+    fm = ForceModel(system, forces=[PointMassGravity("EARTH", mu=mu)])
 
     r = 6778.0
     v = np.sqrt(mu / r)

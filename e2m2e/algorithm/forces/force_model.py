@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e.integrators import RkMethod, rk_step
+from e2m2e.integrators import RkMethod, require_rust_extension
 
 from .physical_model import PhysicalModel
 from .thrust import BurnApplication, ImpulsiveBurn
@@ -208,138 +208,6 @@ class ForceModel:
                 raise ValueError(f"force name {index!r} not found in ForceModel")
         self._entries = tuple(entries)
 
-    def _compute_total_acceleration(
-        self,
-        t: float,
-        state: npt.NDArray[np.floating],
-    ) -> npt.NDArray[np.floating]:
-        """计算所有启用力模型在当前状态下的总加速度。"""
-        total = np.zeros(3, dtype=float)
-        for entry in self._entries:
-            if not entry.enabled:
-                continue
-            total = total + entry.force.compute_acceleration(t, state, self.system)
-        return total
-
-    def _compute_total_jacobian(
-        self,
-        t: float,
-        state: npt.NDArray[np.floating],
-    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-        """计算所有启用力模型的叠加雅可比 ``(∂a/∂r, ∂a/∂v)``，各 3×3。
-
-        对齐 GMAT ``ODEModel::GetDerivatives`` 与 Rust
-        ``acceleration_and_jacobian`` 三元组（ADR 0018）：组合模型的雅可比
-        是各力雅可比之和（``∂(a₁+a₂)/∂r = ∂a₁/∂r + ∂a₂/∂r``，速度块同理），
-        无交叉耦合。
-
-        - 解析雅可比力（``compute_jacobian`` 返回 ``∂a/∂r`` 非 ``None``）：
-          ``∂a/∂v = 0``。``compute_jacobian`` 契约只覆盖 ``∂a/∂r``（见
-          :class:`PhysicalModel`），现有解析力（点质量、第三体、间接项、SRP）
-          均为位置型，速度块为零正确。
-        - 无解析雅可比力（返回 ``None``）：位置与速度均走三点中心差分，给出
-          ``∂a/∂r`` 与 ``∂a/∂v`` 真值。速度依赖力（如 drag）的 ``∂a/∂v``
-          由此捕获，不再静默置零（issue #317 第 2.1 项，详见 ADR 0018）。
-        """
-        total_dr = np.zeros((3, 3), dtype=float)
-        total_dv = np.zeros((3, 3), dtype=float)
-        r_norm = float(np.linalg.norm(state[:3]))
-        v_norm = float(np.linalg.norm(state[3:6]))
-        # 有限差分步长：sqrt(eps)·norm，floor 1e-6 保证 v=0 时仍有有效步长
-        delta_r = max(np.sqrt(np.finfo(float).eps) * r_norm, 1e-6)
-        delta_v = max(np.sqrt(np.finfo(float).eps) * v_norm, 1e-6)
-        for entry in self._entries:
-            if not entry.enabled:
-                continue
-            jac = entry.force.compute_jacobian(t, state, self.system)
-            if jac is None:
-                dadr, dadv = self._finite_diff_jacobians(entry.force, t, state, delta_r, delta_v)
-            else:
-                dadr = jac
-                dadv = np.zeros((3, 3), dtype=float)
-            total_dr = total_dr + dadr
-            total_dv = total_dv + dadv
-        return total_dr, total_dv
-
-    def _finite_diff_jacobians(
-        self,
-        force: PhysicalModel,
-        t: float,
-        state: npt.NDArray[np.floating],
-        delta_r: float,
-        delta_v: float,
-    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-        """三点中心差分估算单个力的 ``(∂a/∂r, ∂a/∂v)``，各 3×3。
-
-        对位置三分量以 ``delta_r``、速度三分量以 ``delta_v`` 各扰动 ±，调
-        ``compute_acceleration`` 取差分。与 Rust ``drag_accel_and_jacobian``
-        的全 6 分量 FD 同构（ADR 0018）：速度块对位置型力恒为零（加速度不
-        依赖速度，扰动速度给出相同加速度），速度依赖力（drag）给出真值。
-        """
-        dadr = self._fd_block(force, t, state, 0, delta_r)
-        dadv = self._fd_block(force, t, state, 3, delta_v)
-        return dadr, dadv
-
-    def _fd_block(
-        self,
-        force: PhysicalModel,
-        t: float,
-        state: npt.NDArray[np.floating],
-        offset: int,
-        delta: float,
-    ) -> npt.NDArray[np.floating]:
-        """三点中心差分估算单个力的一个 3×3 块（``offset=0`` → ∂a/∂r，
-        ``offset=3`` → ∂a/∂v）。
-
-        对 ``state[offset:offset+3]`` 三分量各扰动 ±delta，调
-        ``compute_acceleration`` 取差分。位置块与速度块形状同构，抽此助手
-        复用以消除重复（Fowler 重复代码坏味）。
-        """
-        block = np.zeros((3, 3), dtype=float)
-        for i in range(3):
-            state_plus = state.copy()
-            state_minus = state.copy()
-            state_plus[offset + i] += delta
-            state_minus[offset + i] -= delta
-            a_plus = force.compute_acceleration(t, state_plus, self.system)
-            a_minus = force.compute_acceleration(t, state_minus, self.system)
-            block[:, i] = (a_plus - a_minus) / (2.0 * delta)
-        return block
-
-    def equations_of_motion(
-        self, t: float, state: npt.NDArray[np.floating]
-    ) -> npt.NDArray[np.floating]:
-        """运动方程（兼容 Dynamics 接口，6 维）。"""
-        return self._eom_func(t, state)
-
-    def _eom_func(self, t: float, state: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
-        """运动方程闭包（6 维 [v, a]）。"""
-        acceleration = self._compute_total_acceleration(t, state)
-        return np.concatenate([state[3:6], acceleration])
-
-    def _eom_func_with_stm(
-        self, t: float, augmented_state: npt.NDArray[np.floating]
-    ) -> npt.NDArray[np.floating]:
-        """增广运动方程闭包（42 维 [v, a, Φ̇]）。
-
-        拆出状态与 STM，算加速度和雅可比，组装
-        ``A = [[0, I], [∂a/∂r, ∂a/∂v]]``，返回 ``[v, a, (A@Φ).flatten()]``。
-        对齐 GMAT ``CompleteDerivativeCalculations``：力模型只供 Ã 的左下两块
-        （``∂a/∂r``、``∂a/∂v``），变分方程 Φ̇ = AΦ 在此集中求解。``∂a/∂v``
-        对位置型力为零、对速度依赖力（drag）非零（ADR 0018）。
-        """
-        state = augmented_state[:6]
-        stm = augmented_state[6:].reshape((6, 6))
-        acceleration = self._compute_total_acceleration(t, state)
-        dacc_dr, dacc_dv = self._compute_total_jacobian(t, state)
-
-        A = np.zeros((6, 6))
-        A[:3, 3:] = np.eye(3)
-        A[3:, :3] = dacc_dr
-        A[3:, 3:] = dacc_dv
-        stm_dot = A @ stm
-        return np.concatenate([state[3:6], acceleration, stm_dot.flatten()])
-
     # ── Rust propagate_compiled 快速路径（spice feature 启用时） ──
 
     # Rust STM 路径不支持的力模型类型：`acceleration_and_jacobian` 对
@@ -347,51 +215,35 @@ class ForceModel:
     # 其余力（含 SRP）都有解析或 Rust 内有限差分雅可比。
     _STM_UNSUPPORTED_TYPES = ("RelativisticCorrection", "VariableMassFiniteBurn")
 
-    def _can_use_rust_path(self) -> bool:
-        """检测所有 force 是否支持 Rust 编译 + spice feature 是否启用。
+    def _require_rust_capability(self, *, stm: bool) -> None:
+        """校验 Rust 扩展可用且所有启用力模型支持 Rust 编译；不满足即显式报错。
 
-        任一 force ``to_rust_spec()`` 返回 ``None``，或 import propagate_compiled
-        失败（spice feature 未编译），返回 ``False``，propagate 回退 Python eom。
+        issue #378：核心传播一律走编译 Rust，扩展不可用（抛
+        :class:`RustExtensionUnavailableError`）或某 force 无 ``to_rust_spec``
+        （抛 ``NotImplementedError`` 能力错误）时不再静默回退 Python/scipy。
+
+        Args:
+            stm: 目标路径是否含 STM（``propagate_compiled_stm_py``）。
         """
-        try:
-            from e2m2e.integrators import propagate_compiled  # noqa: F401
-
-            if propagate_compiled is None:
-                raise ImportError
-        except ImportError:
-            return False
+        if stm:
+            require_rust_extension("propagate_compiled_stm_py")
+        else:
+            require_rust_extension("propagate_compiled")
         for entry in self._entries:
             if not entry.enabled:
                 continue
-            if entry.force.to_rust_spec(self.system) is None:
-                return False
-        return True
-
-    def _can_use_rust_stm_path(self) -> bool:
-        """检测是否可用 Rust compiled STM 路径。
-
-        条件：
-        1. ``propagate_compiled_stm_py`` 可 import（spice feature 启用）
-        2. 所有启用的 force 都有 ``to_rust_spec``
-        3. 无 Relativistic 等 Rust 侧无雅可比的力模型（SRP 允许——
-           Rust 内有限差分雅可比，不跨语言边界，比 Python 侧差分快一个量级）
-        """
-        try:
-            from e2m2e.integrators import propagate_compiled_stm_py  # noqa: F401
-
-            if propagate_compiled_stm_py is None:
-                raise ImportError
-        except ImportError:
-            return False
-        for entry in self._entries:
-            if not entry.enabled:
-                continue
-            if entry.force.to_rust_spec(self.system) is None:
-                return False
-            type_name = type(entry.force).__name__
-            if type_name in self._STM_UNSUPPORTED_TYPES:
-                return False
-        return True
+            force = entry.force
+            if stm and type(force).__name__ in self._STM_UNSUPPORTED_TYPES:
+                raise NotImplementedError(
+                    f"force {type(force).__name__}（name={entry.name!r}）不支持 STM "
+                    "传播（Rust acceleration_and_jacobian 对该力返回 Err）。"
+                    "issue #378：不再回退 Python FD 路径。"
+                )
+            if force.to_rust_spec(self.system) is None:
+                raise NotImplementedError(
+                    f"force {type(force).__name__}（name={entry.name!r}）不支持 Rust "
+                    "编译传播（to_rust_spec 返回 None）。issue #378：不再静默回退 Python。"
+                )
 
     def _propagate_via_rust(
         self,
@@ -407,6 +259,7 @@ class ForceModel:
 
         自动序列化所有 force，调 Rust 入口。返回格式与 Python propagate 一致。
         """
+        require_rust_extension("propagate_compiled")
         from e2m2e.integrators import RkMethod, propagate_compiled
 
         forces_py = []
@@ -415,10 +268,10 @@ class ForceModel:
                 continue
             spec = entry.force.to_rust_spec(self.system)
             if spec is None:
-                # _can_use_rust_path 已过滤，理论不会到这
+                # _require_rust_capability 已过滤，理论不会到这
                 raise RuntimeError(
                     f"force {entry.force.__class__.__name__} lacks to_rust_spec; "
-                    "should be filtered by _can_use_rust_path"
+                    "should be filtered by _require_rust_capability"
                 )
             forces_py.append(spec)
 
@@ -520,7 +373,10 @@ class ForceModel:
         throttle = float(thrust_spec[3])
         direction = (float(thrust_spec[4]), float(thrust_spec[5]), float(thrust_spec[6]))
 
-        from e2m2e.integrators import RkMethod, propagate_compiled_lowthrust
+        from e2m2e.integrators import RkMethod
+
+        require_rust_extension("propagate_compiled_lowthrust")
+        from e2m2e.integrators import propagate_compiled_lowthrust
 
         t_eval_arr = self._prepare_t_eval(t0, tf, t_eval)
         observer = getattr(self.system, "origin", "EARTH")
@@ -561,6 +417,7 @@ class ForceModel:
 
         自动序列化所有 force，调 Rust STM 入口。返回格式与 Python propagate 一致。
         """
+        require_rust_extension("propagate_compiled_stm_py")
         from e2m2e.integrators import propagate_compiled_stm_py
 
         forces_py = []
@@ -571,7 +428,7 @@ class ForceModel:
             if spec is None:
                 raise RuntimeError(
                     f"force {entry.force.__class__.__name__} lacks to_rust_spec; "
-                    "should be filtered by _can_use_rust_stm_path"
+                    "should be filtered by _require_rust_capability"
                 )
             forces_py.append(spec)
 
@@ -603,56 +460,6 @@ class ForceModel:
             "n_rejected": result["n_rejected"],
         }
 
-    def _propagate_via_solve_ivp_events(
-        self,
-        y0: npt.NDArray[np.floating],
-        t0: float,
-        tf: float,
-        t_eval: npt.ArrayLike,
-        max_steps: int,
-        event_funcs: list[Callable[[float, npt.NDArray[np.floating]], float]],
-        method: RkMethod,
-    ) -> dict[str, Any]:
-        """走 Rust solve_ivp_events（事件检测在 Rust 积分内循环完成）。
-
-        每个接受步端点评估事件函数，符号变化时步内二分求精；触发即停
-        （ForceModel 事件语义：全部 terminal、双向）。与下方 Python 积分
-        循环的区别：末点是求精后的事件点而非触发步终点，且单步不再受
-        t_eval 钳制。
-        """
-        from e2m2e.integrators import solve_ivp_events
-
-        def eom(t: float, state: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
-            # 动态坐标系按回调时刻/状态逐次更新（比按步更新更细，语义一致）
-            if hasattr(self.system, "update_coordinate_systems"):
-                self.system.update_coordinate_systems(t, state[: self.STATE_DIM])
-            return self._eom_func(t, state)
-
-        result = solve_ivp_events(
-            (t0, tf),
-            y0,
-            t_eval,
-            float(self.rtol),
-            float(self.atol),
-            eom,
-            [(func, True, 0.0) for func in event_funcs],
-            method=method,
-            max_step=float(self.max_step),
-            max_steps=int(max_steps),
-        )
-
-        times = np.asarray(result["time"], dtype=float)
-        states = np.asarray(result["states"], dtype=float)
-        self.last_trajectory = (times, states)
-        return {
-            "time": times,
-            "states": states,
-            "terminal_event_index": result["terminal_event"],
-            "t_events": [np.asarray(ts, dtype=float) for ts in result["t_events"]],
-            "y_events": [np.asarray(ys, dtype=float) for ys in result["y_events"]],
-            "n_steps": result["n_steps"],
-        }
-
     def propagate(
         self,
         initial_state: npt.ArrayLike,
@@ -666,19 +473,25 @@ class ForceModel:
         max_steps: int = 100_000,
         method: RkMethod | None = None,
     ) -> dict[str, Any]:
-        """使用 Rust rk_step 传播轨迹。
+        """使用 Rust 编译传播轨迹（零跨界）。
+
+        issue #378：默认传播一律走编译 Rust（``propagate_compiled`` /
+        ``propagate_compiled_stm_py`` / ``propagate_compiled_lowthrust``）。
+        扩展不可用（``RustExtensionUnavailableError``）或力模型无 Rust spec
+        （``NotImplementedError`` 能力错误）时显式报错，不再静默回退
+        Python/scipy。
 
         Args:
             initial_state: 初始状态向量，形状 (6,)。
             t_span: 时间区间 [t0, tf]，单位为 SPICE et 秒。
             t_eval: 评估时间点数组，默认 linspace(t0, tf, 100)。
             with_stm: 是否同时积分状态转移矩阵。返回字典额外含 ``stm`` 键，
-                形状 (n_points, 6, 6)。STM 不参与步长误差控制（对齐 GMAT），
-                仅前 6 维物理状态决定接受/拒绝步长。
+                形状 (n_points, 6, 6)。STM 不参与步长误差控制（对齐 GMAT）。
             with_jacobi: 不支持，传 True 抛 NotImplementedError。
             initial_step: 初始步长，默认从初始状态估算。
-            events: 简单终止事件列表，每个事件返回标量，符号变化时停止。
-                ``with_stm=True`` 时事件函数接收 6 维状态（非增广状态）。
+            events: 不支持。ForceModel 事件传播需要 compiled-forces Rust API，
+                当前未提供，传 events 抛 NotImplementedError（不能回退 Python
+                RHS，issue #378）。
             max_steps: 最大积分步数，默认 100_000。
             method: Runge-Kutta 积分器方法，默认 PD45。
 
@@ -699,6 +512,13 @@ class ForceModel:
                 "ForceModel propagation only supports forward integration (tf >= t0)."
             )
 
+        if events is not None:
+            raise NotImplementedError(
+                "ForceModel 事件传播需要 compiled-forces Rust API（事件检测与"
+                "力求值都在 Rust 内循环完成）；当前未提供，传 events 不支持。"
+                "issue #378：不再回退 Python RHS。"
+            )
+
         # ── 可变质量低推力 7D 路径 ──
         # 当 force 列表含 VariableMassFiniteBurn 时，状态为 7D [r, v, m]，质量
         # 随推力消耗，走 Rust propagate_compiled_lowthrust。与 6D 主路径隔离，
@@ -710,29 +530,7 @@ class ForceModel:
         if y0.shape != (self.STATE_DIM,):
             raise ValueError(f"initial_state must have shape ({self.STATE_DIM},)")
 
-        if tf == t0:
-            if with_stm:
-                np.concatenate([y0, np.eye(self.STATE_DIM).flatten()])
-                self.last_trajectory = (np.array([t0]), y0.reshape(1, -1))
-                return {
-                    "time": np.array([t0]),
-                    "states": y0.reshape(1, -1),
-                    "stm": np.eye(self.STATE_DIM).reshape(1, self.STATE_DIM, self.STATE_DIM),
-                    "terminal_event_index": None,
-                }
-            self.last_trajectory = (np.array([t0]), y0.reshape(1, -1))
-            return {
-                "time": np.array([t0]),
-                "states": y0.reshape(1, -1),
-                "terminal_event_index": None,
-            }
-
-        # with_stm 时拼单位阵成 42 维增广状态 [r, v, Φ_flat]
-        y = np.concatenate([y0, np.eye(self.STATE_DIM).flatten()]) if with_stm else y0
-
         t_eval = self._prepare_t_eval(t0, tf, t_eval)
-        max_step = float(self.max_step)
-        min_step = 1e-12 * abs(tf - t0)
         tol = float(self.rtol)
 
         if initial_step is not None:
@@ -742,130 +540,27 @@ class ForceModel:
         else:
             h = self._estimate_initial_step(y0, t0, tf)
 
-        eom = self._eom_func_with_stm if with_stm else self._eom_func
-        # STM 分量不参与步长误差控制，只看前 6 维物理状态
-        error_dim = self.STATE_DIM if with_stm else None
-        event_funcs = list(events) if events is not None else []
-        # 事件函数接收 6 维状态，with_stm 时从增广状态取前 6 维
-        event_values_prev = [func(t0, y0) for func in event_funcs]
+        # ── 零时长：先检查扩展/spec，防绕过（issue #378）──
+        if tf == t0:
+            self._require_rust_capability(stm=with_stm)
+            self.last_trajectory = (np.array([t0]), y0.reshape(1, -1))
+            out: dict[str, Any] = {
+                "time": np.array([t0]),
+                "states": y0.reshape(1, -1),
+                "terminal_event_index": None,
+            }
+            if with_stm:
+                out["stm"] = np.eye(self.STATE_DIM).reshape(1, self.STATE_DIM, self.STATE_DIM)
+            return out
 
-        # ── Rust propagate_compiled 快速路径 ──
-        # 条件：无 STM、无 events、spice feature 启用、所有 force 支持 Rust 编译。
-        # 满足时走零跨界 Rust 内循环（30 天 NRHO 9.6s vs Python 95s），否则回退。
-        if not with_stm and not event_funcs and self._can_use_rust_path():
-            return self._propagate_via_rust(y0, t0, tf, t_eval, tol, h, max_steps)
-
-        # ── Rust compiled STM 快速路径 ──
-        # 条件：with_stm、无 events、所有 force 支持 Jacobian。
-        # 消除 cspice 隔离：STM 传播在 integrators .so 内完成，共享内核池。
-        if with_stm and not event_funcs and self._can_use_rust_stm_path():
+        # ── Rust compiled STM 路径 ──
+        if with_stm:
+            self._require_rust_capability(stm=True)
             return self._propagate_via_rust_stm(y0, t0, tf, t_eval, tol, max_steps)
 
-        # ── Rust solve_ivp_events 事件路径 ──
-        # 条件：有 events、无 STM、扩展已构建。事件检测与步内求精在 Rust 积分
-        # 内循环完成，替代下方手搓 Python 循环。with_stm + events 仍走 Python
-        # 循环（solve_ivp_events 不支持事件函数只收 6 维状态的增广传播）。
-        if event_funcs and not with_stm:
-            try:
-                from e2m2e.integrators import solve_ivp_events_py  # noqa: F401
-
-                if solve_ivp_events_py is None:
-                    raise ImportError
-            except ImportError:
-                pass  # 扩展未构建：回退下方 Python 积分循环
-            else:
-                return self._propagate_via_solve_ivp_events(
-                    y0, t0, tf, t_eval, max_steps, event_funcs, method
-                )
-
-        # 循环开始前更新动态坐标系（用 6 维物理状态）
-        if hasattr(self.system, "update_coordinate_systems"):
-            self.system.update_coordinate_systems(t0, y0)
-
-        times: list[float] = [t0]
-        states: list[npt.NDArray[np.floating]] = [y0.copy()]
-        stm_list: list[npt.NDArray[np.floating]] | None = (
-            [np.eye(self.STATE_DIM)] if with_stm else None
-        )
-        terminal_event_index: int | None = None
-
-        t = t0
-        eval_index = 1  # t_eval[0] == t0 already recorded
-        step_count = 0
-
-        while t < tf:
-            step_count += 1
-            if step_count > max_steps:
-                raise RuntimeError(f"ForceModel propagation exceeded maximum steps ({max_steps}).")
-
-            h = min(h, max_step)
-            if eval_index < len(t_eval):
-                h = min(h, t_eval[eval_index] - t)
-            h = max(h, min_step)
-
-            # 每个 rk_step 前更新动态坐标系（用 6 维物理状态）
-            if hasattr(self.system, "update_coordinate_systems"):
-                self.system.update_coordinate_systems(t, y[: self.STATE_DIM])
-
-            result = rk_step(method, t, y, h, tol, eom, state_error_dim=error_dim)
-
-            if result.error <= tol:
-                # Accept step
-                t_new = t + h
-                y_new = np.asarray(result.y_new, dtype=float)
-                state_new = y_new[: self.STATE_DIM] if with_stm else y_new
-
-                # Event detection（事件函数接收 6 维状态）
-                for idx, func in enumerate(event_funcs):
-                    g_prev = event_values_prev[idx]
-                    g_curr = func(t_new, state_new)
-                    if g_prev * g_curr < 0:
-                        terminal_event_index = idx
-                        break
-                    event_values_prev[idx] = g_curr
-
-                if terminal_event_index is not None:
-                    times.append(t_new)
-                    states.append(state_new)
-                    if with_stm:
-                        stm_list.append(  # type: ignore[union-attr]
-                            y_new[self.STATE_DIM :].reshape(self.STATE_DIM, self.STATE_DIM)
-                        )
-                    break
-
-                t = t_new
-                y = y_new
-
-                # Record t_eval points
-                while eval_index < len(t_eval) and abs(t - t_eval[eval_index]) < 1e-14:
-                    times.append(t)
-                    states.append(state_new.copy())
-                    if with_stm:
-                        stm_list.append(y[self.STATE_DIM :].reshape(self.STATE_DIM, self.STATE_DIM))  # type: ignore[union-attr]
-                    eval_index += 1
-
-                if t >= tf:
-                    break
-
-                h = result.h_next
-            else:
-                # Reject step
-                if result.h_next < min_step:
-                    raise RuntimeError("Step size below minimum; integration failed.")
-                h = result.h_next
-
-        time_array = np.asarray(times, dtype=float)
-        state_array = np.asarray(states, dtype=float)
-        self.last_trajectory = (time_array, state_array)
-
-        out: dict[str, Any] = {
-            "time": time_array,
-            "states": state_array,
-            "terminal_event_index": terminal_event_index,
-        }
-        if with_stm:
-            out["stm"] = np.asarray(stm_list, dtype=float)  # type: ignore[arg-type]
-        return out
+        # ── Rust propagate_compiled 快速路径 ──
+        self._require_rust_capability(stm=False)
+        return self._propagate_via_rust(y0, t0, tf, t_eval, tol, h, max_steps)
 
     def propagate_maneuvers(
         self,

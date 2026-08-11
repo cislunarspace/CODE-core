@@ -1,129 +1,99 @@
-"""ForceModel 传播循环测试。
+"""ForceModel 编译传播的能力边界测试。
 
-覆盖恒力抛物线轨迹、t_eval 精确输出与终止事件。
+自定义 Python 力和事件都没有对应的 compiled-forces Rust API，必须显式报错，
+不能退回 Python 力循环或 scipy 事件积分。
 """
 
 import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import ForceModel, PhysicalModel
+from e2m2e.algorithm.forces.point_mass_gravity import PointMassGravity
+from e2m2e.algorithm.forces.thrust import FiniteBurn, VariableMassFiniteBurn
 
 pytestmark = pytest.mark.force
 
 
 class ConstantForce(PhysicalModel):
-    """测试用恒力模型。"""
+    """无 Rust spec 的测试力。"""
 
     def __init__(self, acceleration):
         self._acceleration = np.asarray(acceleration, dtype=float)
 
-    def compute_acceleration(self, t, state, system):
-        return self._acceleration.copy()
-
 
 class _FakeSystem:
-    """仅用于传播测试的最小 System 桩。"""
+    """仅用于能力检查的最小 System 桩。"""
 
-    def __init__(self):
-        self.coordinate_system = object()
+    coordinate_system = object()
 
-    @property
-    def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
-
-        return ReferenceFrame.J2000
-
-    @property
-    def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
-
-        return UnitSystem.SI
-
-    def gravitational_parameter(self, body):
-        return 398600.4415
+    def gravitational_parameter(self, _body):
+        return 398600.4418
 
 
-def test_propagate_constant_force_matches_parabola():
-    """恒力下传播轨迹应为抛物线。"""
-    system = _FakeSystem()
-    fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, 1.0])])
+def test_propagate_rejects_force_without_rust_spec():
+    """无 Rust spec 的力不可触发 Python 传播回退。"""
+    force_model = ForceModel(_FakeSystem(), forces=[ConstantForce([0.0, 0.0, 1.0])])
 
-    y0 = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
-    result = fm.propagate(y0, (0.0, 1.0), t_eval=np.linspace(0.0, 1.0, 11))
+    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+        force_model.propagate(np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]), (0.0, 1.0))
 
-    time = result["time"]
-    states = result["states"]
 
-    # 解析解：x = t, z = 0.5 * t^2
-    expected_x = time
-    expected_z = 0.5 * time**2
+def test_propagate_point_mass_uses_rust_and_honors_t_eval():
+    """PointMass 的 compiled propagation 返回真实轨迹与规范化输出时间。"""
+    force_model = ForceModel(_FakeSystem(), forces=[PointMassGravity("EARTH", mu=398600.4418)])
+    y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.546049108166282, 0.0])
+    t_eval = np.array([0.0, 10.0, 30.0])
 
-    np.testing.assert_allclose(states[:, 0], expected_x, rtol=1e-6)
-    np.testing.assert_allclose(states[:, 2], expected_z, rtol=1e-6)
+    result = force_model.propagate(y0, (0.0, 30.0), t_eval=t_eval)
+
+    np.testing.assert_array_equal(result["time"], t_eval)
+    assert result["states"].shape == (3, 6)
+    np.testing.assert_allclose(result["states"][0], y0, atol=0.0)
+    assert not np.allclose(result["states"][-1], y0)
     assert result["terminal_event_index"] is None
 
 
-def test_propagate_records_t_eval_points():
-    """输出 time 应精确等于 t_eval。"""
-    system = _FakeSystem()
-    fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, 0.0])])
-
-    y0 = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
-    t_eval = np.array([0.0, 0.1, 0.5, 1.0])
-    result = fm.propagate(y0, (0.0, 1.0), t_eval=t_eval)
-
-    np.testing.assert_array_almost_equal(result["time"], t_eval)
-
-
-def test_propagate_termination_event():
-    """终止事件在高度穿过零时停止。"""
-    system = _FakeSystem()
-    fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, -1.0])])
-
-    y0 = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
-
-    def hit_ground(t, y):
-        return y[2]
-
-    result = fm.propagate(
-        y0,
-        (0.0, 5.0),
-        t_eval=np.linspace(0.0, 5.0, 6),
-        events=[hit_ground],
+def test_finite_burn_propagation_reports_unsupported_rust_capability():
+    """FiniteBurn 没有 Rust spec 时，传播必须显式报告能力边界。"""
+    burn = FiniteBurn(
+        thrust_profile=lambda _t: 10.0,
+        direction=[1.0, 0.0, 0.0],
+        mass=1000.0,
     )
+    force_model = ForceModel(_FakeSystem(), forces=[burn])
 
-    assert result["terminal_event_index"] == 0
-    # 事件在 t=sqrt(2) 附近触发；由于 t_eval 钳制，最后输出点可能到 2.0
-    assert result["time"][-1] <= 2.0
-    assert result["time"][-1] > 1.3
+    with pytest.raises(NotImplementedError, match="FiniteBurn.*Rust"):
+        force_model.propagate(
+            np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]),
+            (0.0, 1.0),
+        )
 
 
-def test_propagate_termination_event_refined_by_rust():
-    """Rust solve_ivp_events 路径：事件时刻步内求精，末点落在事件面上。"""
-    integrators = pytest.importorskip("e2m2e._integrators")
-    if not hasattr(integrators, "solve_ivp_events_py"):
-        pytest.skip("需要带 solve_ivp_events_py 的 Rust 扩展")
-
-    system = _FakeSystem()
-    fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, -1.0])])
-    # 步内求精基于线性插值，误差 ~h²/8；max_step=0.01 时约 1e-5
-    fm.max_step = 0.01
-
-    y0 = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
-
-    def hit_ground(t, y):
-        return y[2]
-
-    result = fm.propagate(
-        y0,
-        (0.0, 5.0),
-        t_eval=np.linspace(0.0, 5.0, 6),
-        events=[hit_ground],
+def test_variable_mass_propagate_rejects_events_before_rust_path():
+    """低推力路径不能忽略 events 或退回 Python 力传播。"""
+    burn = VariableMassFiniteBurn(
+        thrust=0.1,
+        isp=3000.0,
+        initial_mass=1000.0,
+        direction=np.array([1.0, 0.0, 0.0]),
     )
+    force_model = ForceModel(_FakeSystem(), forces=[burn])
 
-    assert result["terminal_event_index"] == 0
-    # z(t) = 1 - t²/2，零点在 t = √2
-    assert result["time"][-1] == pytest.approx(np.sqrt(2.0), abs=1e-3)
-    assert abs(result["states"][-1][2]) < 1e-3
-    assert len(result["t_events"][0]) == 1
-    assert result["t_events"][0][0] == pytest.approx(np.sqrt(2.0), abs=1e-3)
+    with pytest.raises(NotImplementedError, match="事件传播"):
+        force_model.propagate(
+            np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0, 1000.0]),
+            (0.0, 1.0),
+            events=[lambda _t, state: float(state[0])],
+        )
+
+
+def test_propagate_rejects_events_without_compiled_forces_api():
+    """事件传播不进入 Python 力循环。"""
+    force_model = ForceModel(_FakeSystem())
+
+    with pytest.raises(NotImplementedError, match="事件传播"):
+        force_model.propagate(
+            np.zeros(6),
+            (0.0, 1.0),
+            events=[lambda _t, state: float(state[2])],
+        )

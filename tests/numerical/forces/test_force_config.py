@@ -142,7 +142,7 @@ def test_finite_burn_pulse_round_trip():
 
 
 def test_finite_burn_built_force_computes_correct_acceleration():
-    """DSL 构造的 FiniteBurn 物理行为正确（恒推力 10N / 1000kg → 1e-5 km/s²）。"""
+    """DSL 构造的 FiniteBurn 在传播入口明确拒绝未实现的 Rust 能力。"""
     system = _FakeSystem()
     config_dict = {
         "version": 1,
@@ -161,10 +161,9 @@ def test_finite_burn_built_force_computes_correct_acceleration():
     }
 
     fm = ForceModel.from_config(config_dict, system)
-    engine = fm.get_force("engine")
 
-    acc = engine.compute_acceleration(0.0, np.zeros(6), system)
-    np.testing.assert_allclose(acc, [1e-5, 0.0, 0.0])
+    with pytest.raises(NotImplementedError, match="FiniteBurn.*Rust"):
+        fm.propagate(np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), (0.0, 1.0))
 
 
 def test_finite_burn_unknown_callable_not_serializable():
@@ -300,10 +299,11 @@ def test_finite_burn_vnb_direction_frame_round_trip():
 
     assert ForceModel.to_config(fm) == config_dict
 
-    # 物理行为验证：VNB 下 [1,0,0] = V 方向 = 速度方向
-    engine = fm.get_force("engine")
-    acc = engine.compute_acceleration(0.0, np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), system)
-    np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0], atol=1e-12)
+    with pytest.raises(NotImplementedError, match="FiniteBurn.*Rust"):
+        fm.propagate(
+            np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]),
+            (0.0, 1.0),
+        )
 
 
 def test_finite_burn_lvlh_direction_frame_round_trip():
@@ -330,10 +330,11 @@ def test_finite_burn_lvlh_direction_frame_round_trip():
 
     assert ForceModel.to_config(fm) == config_dict
 
-    # 物理行为验证：LVLH 下 [0,0,1] = N 方向 = R × V
-    engine = fm.get_force("engine")
-    acc = engine.compute_acceleration(0.0, np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), system)
-    np.testing.assert_allclose(acc, [0.0, 0.0, 1e-5], atol=1e-12)
+    with pytest.raises(NotImplementedError, match="FiniteBurn.*Rust"):
+        fm.propagate(
+            np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]),
+            (0.0, 1.0),
+        )
 
 
 def test_finite_burn_invalid_direction_frame_from_config_raises():

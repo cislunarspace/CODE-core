@@ -16,6 +16,7 @@ class _FakeSystem:
 
     def __init__(self):
         self.coordinate_system = object()
+        self.origin = "EARTH"
 
     @property
     def frame(self):

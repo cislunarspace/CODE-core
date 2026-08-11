@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING
-
-import numpy as np
-import numpy.typing as npt
 
 from .physical_model import PhysicalModel
 
 if TYPE_CHECKING:
-    from ..system import System
+    pass
 
 
 class IndirectTerm(PhysicalModel):
@@ -34,7 +30,7 @@ class IndirectTerm(PhysicalModel):
     Args:
         body: 摄动天体名称（如 ``'MOON'``）。
         mu: 引力参数（km³/s²）。为 ``None`` 时，
-            在 ``compute_acceleration`` 中从 ``system.gravitational_parameter(body)`` 获取。
+            在 ``to_rust_spec`` 中从 ``system.gravitational_parameter(body)`` 获取。
     """
 
     def __init__(self, body: str, mu: float | None = None) -> None:
@@ -55,59 +51,6 @@ class IndirectTerm(PhysicalModel):
         """序列化为 ``("indirect", naif_id_str, mu)``。"""
         from .third_body_gravity import ThirdBodyGravity
 
-        mu = self._mu if self._mu is not None else system.gravitational_parameter(self._body)
+        mu = self._resolve_mu(system)
         naif_id = ThirdBodyGravity._name_or_id(self._body)
         return ("indirect", naif_id, float(mu))
-
-    def compute_acceleration(
-        self,
-        t: float,
-        state: npt.ArrayLike,
-        system: System,
-    ) -> npt.NDArray[np.floating]:
-        """返回间接项加速度，km/s²。
-
-        ``r_body=0`` 时返回零向量，避免除零。
-        """
-        warnings.warn(
-            f"{self.__class__.__name__}.compute_acceleration 走 Python 回退路径，"
-            "应优先走 Rust 编译路径。",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        mu = self._resolve_mu(system)
-
-        # 走 Rust cspice 路径（spice feature 启用时）；否则走 Python spiceypy。
-        # 两路数值一致（机器精度），Rust 版避免跨界 + numpy 数组分配。
-        # 只在 system 暴露 spice 属性（真实 EphemerisSystem）时走 Rust，
-        # 桩 system（如单元测试 mock）回退到 Python 路径。
-        if getattr(system, "spice", None) is not None:
-            try:
-                from e2m2e.integrators import indirect_term_acceleration  # noqa: F401
-
-                if indirect_term_acceleration is None:
-                    raise ImportError
-                from .third_body_gravity import ThirdBodyGravity
-
-                observer = getattr(system, "origin", "EARTH")
-                observer_id = ThirdBodyGravity._name_or_id(observer)
-                target_id = ThirdBodyGravity._name_or_id(self._body)
-                a = indirect_term_acceleration(float(t), target_id, observer_id, float(mu))
-                return np.asarray(a, dtype=float)
-            except ImportError:
-                pass
-
-        r_ob = np.asarray(system.get_body_position(self._body, t), dtype=float)
-        n = float(np.linalg.norm(r_ob))
-        if n < 1e-6:
-            return np.zeros(3)
-        return -mu * r_ob / n**3
-
-    def compute_jacobian(
-        self,
-        t: float,
-        state: npt.ArrayLike,
-        system: System,
-    ) -> npt.NDArray[np.floating] | None:
-        """间接项不依赖航天器位置，∂a/∂r 恒为零矩阵。"""
-        return np.zeros((3, 3))

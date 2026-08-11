@@ -90,11 +90,17 @@ def test_equatorial_leo_crosses_earth_shadow(earth_icrf_system) -> None:
     times = result["time"]
     states = result["states"]
 
-    # 逐点算 SRP 加速度量级与光照份额
+    # 逐点算阴影光照份额与 SRP 量级（Rust 单点绑定）
+    from e2m2e.integrators import srp_acceleration
+
     flux = np.array([shadow.flux_factor(times[i], states[i], system) for i in range(len(times))])
     srp_mag = np.array(
         [
-            np.linalg.norm(srp.compute_acceleration(times[i], states[i], system))
+            np.linalg.norm(
+                srp_acceleration(
+                    times[i], states[i, :3].tolist(), srp.area, srp.mass, srp.cr, ["EARTH"], "EARTH"
+                )
+            )
             for i in range(len(times))
         ]
     )

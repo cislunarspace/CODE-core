@@ -6,19 +6,16 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.forces import ForceModel, PhysicalModel
+from e2m2e.algorithm.forces import ForceModel, PhysicalModel, PointMassGravity
 
 pytestmark = pytest.mark.force
 
 
 class ConstantForce(PhysicalModel):
-    """测试用恒力模型。"""
+    """测试用恒力模型（无 Rust spec）。"""
 
     def __init__(self, acceleration):
         self._acceleration = np.asarray(acceleration, dtype=float)
-
-    def compute_acceleration(self, t, state, system):
-        return self._acceleration.copy()
 
 
 class _FakeSystem:
@@ -26,6 +23,7 @@ class _FakeSystem:
 
     def __init__(self):
         self.coordinate_system = object()
+        self.origin = "EARTH"
 
     @property
     def frame(self):
@@ -44,9 +42,21 @@ class _FakeSystem:
 
 
 def test_propagate_zero_span_returns_initial_state():
-    """t_span 两端相等时返回初始状态。"""
+    """t_span 两端相等时返回初始状态（无启用力时直接返回）。"""
     system = _FakeSystem()
-    fm = ForceModel(system, forces=[ConstantForce([1.0, 0.0, 0.0])])
+    fm = ForceModel(system)
+    y0 = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+
+    result = fm.propagate(y0, (2.0, 2.0))
+
+    np.testing.assert_array_equal(result["time"], np.array([2.0]))
+    np.testing.assert_array_equal(result["states"][0], y0)
+
+
+def test_propagate_zero_span_with_rust_force_returns_initial_state():
+    """t_span 两端相等且含 Rust 力时仍返回初始状态。"""
+    system = _FakeSystem()
+    fm = ForceModel(system, forces=[PointMassGravity("EARTH", mu=398600.4415)])
     y0 = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
 
     result = fm.propagate(y0, (2.0, 2.0))
@@ -66,11 +76,11 @@ def test_propagate_rejects_backward_integration():
 def test_propagate_with_stm_returns_kinematic_stm():
     """with_stm=True 返回 STM；恒力下 STM 为纯运动学 [[I, tI],[0, I]]。
 
-    ConstantForce 加速度不依赖位置，∂a/∂r = 0（经有限差分兜底得到），
-    故 STM 退化为自由质点的运动学转移矩阵。
+    无外力（自由质点）时 ∂a/∂r = 0、∂a/∂v = 0，STM 退化为
+    [[I, t·I], [0, I]]。
     """
     system = _FakeSystem()
-    fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, 0.0])])
+    fm = ForceModel(system)
     y0 = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
     dt = 2.0
 

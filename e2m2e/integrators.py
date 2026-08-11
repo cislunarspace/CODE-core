@@ -1,137 +1,121 @@
-"""Public Python shim for the Rust integrator extension."""
+"""Rust 积分器扩展的公共 Python 适配层。"""
+# ruff: noqa: F821, F822
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
 
-try:
-    from e2m2e._integrators import (
-        CowellResult,
-        MultistepMethod,
-        MultistepResult,
-        RkMethod,
-        TransferPointResult,
-        build_cr3bp_hamiltonian_py,
-        check_collision_py,
-        compute_distance_series_py,
-        compute_min_distance_py,
-        detect_intersection_py,
-        detect_local_minimum_py,
-        hello_integrators,
-        lambert_batch_py,
-        lambert_izzo_py,
-        pole_tide,
-        project_hamiltonian_qf_py,
-        propagate_bcr4bp_py,
-        propagate_bcr4bp_stm_py,
-        propagate_cr3bp_py,
-        propagate_cr3bp_stm_py,
-        solid_tide_step1,
-        solid_tide_step2,
-        solve_ivp_events_py,
-        spherical_harmonic_accel,
-        transfer_grid_search_py,
-        transfer_grid_search_serial_py,
-    )
-    from e2m2e._integrators import cowell_step as _cowell_step
-    from e2m2e._integrators import multistep_step as _multistep_step
-    from e2m2e._integrators import rk_step as _rk_step
+from e2m2e.exceptions import RustExtensionUnavailableError
 
-    # Spice-gated symbols: absent when extension built without --features spice.
-    try:
-        from e2m2e._integrators import (
-            augmented_eom_7d_py,
-            disable_ephem_cache,
-            enable_ephem_cache,
-            ephem_ffi_call_count,
-            indirect_term_acceleration,
-            multiple_shooting_correct_py,
-            propagate_compiled,
-            propagate_compiled_lowthrust,
-            propagate_compiled_lowthrust_sensitivity,
-            propagate_compiled_stm_py,
-            propagate_with_state_py,
-            propagate_with_stm_py,
-            reset_ephem_ffi_call_count,
-            segmented_shooting_correct_py,
-            spice_furnsh,
-            spice_pxform,
-            spice_spkezr,
-            third_body_acceleration,
-        )
-    except ImportError:
-        augmented_eom_7d_py = None  # type: ignore[misc,assignment]
-        disable_ephem_cache = None  # type: ignore[misc,assignment]
-        enable_ephem_cache = None  # type: ignore[misc,assignment]
-        ephem_ffi_call_count = None  # type: ignore[misc,assignment]
-        indirect_term_acceleration = None  # type: ignore[misc,assignment]
-        multiple_shooting_correct_py = None  # type: ignore[misc,assignment]
-        propagate_compiled = None  # type: ignore[misc,assignment]
-        propagate_compiled_lowthrust = None  # type: ignore[misc,assignment]
-        propagate_compiled_lowthrust_sensitivity = None  # type: ignore[misc,assignment]
-        propagate_compiled_stm_py = None  # type: ignore[misc,assignment]
-        propagate_with_state_py = None  # type: ignore[misc,assignment]
-        propagate_with_stm_py = None  # type: ignore[misc,assignment]
-        reset_ephem_ffi_call_count = None  # type: ignore[misc,assignment]
-        segmented_shooting_correct_py = None  # type: ignore[misc,assignment]
-        spice_furnsh = None  # type: ignore[misc,assignment]
-        spice_pxform = None  # type: ignore[misc,assignment]
-        spice_spkezr = None  # type: ignore[misc,assignment]
-        third_body_acceleration = None  # type: ignore[misc,assignment]
-except ModuleNotFoundError:
-    # _integrators is a compiled Rust extension; allow import for doc builds
-    # where the extension is not built.
-    CowellResult = None  # type: ignore[misc,assignment]
-    MultistepMethod = None  # type: ignore[misc,assignment]
-    MultistepResult = None  # type: ignore[misc,assignment]
-    RkMethod = None  # type: ignore[misc,assignment]
-    TransferPointResult = None  # type: ignore[misc,assignment]
-    build_cr3bp_hamiltonian_py = None  # type: ignore[misc,assignment]
-    check_collision_py = None  # type: ignore[misc,assignment]
-    compute_distance_series_py = None  # type: ignore[misc,assignment]
-    compute_min_distance_py = None  # type: ignore[misc,assignment]
-    detect_intersection_py = None  # type: ignore[misc,assignment]
-    detect_local_minimum_py = None  # type: ignore[misc,assignment]
-    hello_integrators = None  # type: ignore[misc,assignment]
-    lambert_batch_py = None  # type: ignore[misc,assignment]
-    lambert_izzo_py = None  # type: ignore[misc,assignment]
-    pole_tide = None  # type: ignore[misc,assignment]
-    project_hamiltonian_qf_py = None  # type: ignore[misc,assignment]
-    propagate_bcr4bp_py = None  # type: ignore[misc,assignment]
-    propagate_bcr4bp_stm_py = None  # type: ignore[misc,assignment]
-    propagate_cr3bp_py = None  # type: ignore[misc,assignment]
-    propagate_cr3bp_stm_py = None  # type: ignore[misc,assignment]
-    solid_tide_step1 = None  # type: ignore[misc,assignment]
-    solid_tide_step2 = None  # type: ignore[misc,assignment]
-    solve_ivp_events_py = None  # type: ignore[misc,assignment]
-    spherical_harmonic_accel = None  # type: ignore[misc,assignment]
-    transfer_grid_search_py = None  # type: ignore[misc,assignment]
-    transfer_grid_search_serial_py = None  # type: ignore[misc,assignment]
-    _cowell_step = None  # type: ignore[misc,assignment]
-    _multistep_step = None  # type: ignore[misc,assignment]
-    _rk_step = None  # type: ignore[misc,assignment]
-    augmented_eom_7d_py = None  # type: ignore[misc,assignment]
-    disable_ephem_cache = None  # type: ignore[misc,assignment]
-    enable_ephem_cache = None  # type: ignore[misc,assignment]
-    ephem_ffi_call_count = None  # type: ignore[misc,assignment]
-    indirect_term_acceleration = None  # type: ignore[misc,assignment]
-    multiple_shooting_correct_py = None  # type: ignore[misc,assignment]
-    propagate_compiled = None  # type: ignore[misc,assignment]
-    propagate_compiled_lowthrust = None  # type: ignore[misc,assignment]
-    propagate_compiled_lowthrust_sensitivity = None  # type: ignore[misc,assignment]
-    propagate_compiled_stm_py = None  # type: ignore[misc,assignment]
-    propagate_with_state_py = None  # type: ignore[misc,assignment]
-    propagate_with_stm_py = None  # type: ignore[misc,assignment]
-    reset_ephem_ffi_call_count = None  # type: ignore[misc,assignment]
-    segmented_shooting_correct_py = None  # type: ignore[misc,assignment]
-    spice_furnsh = None  # type: ignore[misc,assignment]
-    spice_pxform = None  # type: ignore[misc,assignment]
-    spice_spkezr = None  # type: ignore[misc,assignment]
-    third_body_acceleration = None  # type: ignore[misc,assignment]
+# 扩展符号在运行时逐个装载；静态类型检查将其视为动态对象。
+if TYPE_CHECKING:
+    augmented_eom_7d_py: Any
+    build_cr3bp_hamiltonian_py: Any
+    check_collision_py: Any
+    compute_distance_series_py: Any
+    compute_min_distance_py: Any
+    detect_intersection_py: Any
+    detect_local_minimum_py: Any
+    disable_ephem_cache: Any
+    enable_ephem_cache: Any
+    ephem_ffi_call_count: Any
+    hello_integrators: Any
+    lambert_batch_py: Any
+    lambert_izzo_py: Any
+    pole_tide: Any
+    project_hamiltonian_qf_py: Any
+    multiple_shooting_correct_py: Any
+    propagate_bcr4bp_py: Any
+    propagate_bcr4bp_stm_py: Any
+    propagate_compiled: Any
+    propagate_compiled_lowthrust: Any
+    propagate_compiled_lowthrust_sensitivity: Any
+    propagate_compiled_stm_py: Any
+    propagate_cr3bp_py: Any
+    propagate_cr3bp_stm_py: Any
+    propagate_with_state_py: Any
+    propagate_with_stm_py: Any
+    solid_tide_step1: Any
+    solid_tide_step2: Any
+    solve_ivp_events_py: Any
+    spice_furnsh: Any
+    spice_pxform: Any
+    spice_spkezr: Any
+    third_body_acceleration: Any
+    transfer_grid_search_py: Any
+    transfer_grid_search_serial_py: Any
+    CowellResult: Any
+    MultistepMethod: Any
+    MultistepResult: Any
+    RkMethod: Any
+    TransferPointResult: Any
+    _cowell_step: Any
+    _multistep_step: Any
+    _rk_step: Any
+
+_RUST_SYMBOLS = (
+    "CowellResult",
+    "MultistepMethod",
+    "MultistepResult",
+    "RkMethod",
+    "TransferPointResult",
+    "_cowell_step",
+    "_multistep_step",
+    "_rk_step",
+    "augmented_eom_7d_py",
+    "build_cr3bp_hamiltonian_py",
+    "check_collision_py",
+    "compute_distance_series_py",
+    "compute_min_distance_py",
+    "detect_intersection_py",
+    "detect_local_minimum_py",
+    "disable_ephem_cache",
+    "enable_ephem_cache",
+    "ephem_ffi_call_count",
+    "hello_integrators",
+    "indirect_term_acceleration",
+    "lambert_batch_py",
+    "lambert_izzo_py",
+    "multiple_shooting_correct_py",
+    "pole_tide",
+    "project_hamiltonian_qf_py",
+    "propagate_bcr4bp_py",
+    "propagate_bcr4bp_stm_py",
+    "propagate_compiled",
+    "propagate_compiled_lowthrust",
+    "propagate_compiled_lowthrust_sensitivity",
+    "propagate_compiled_stm_py",
+    "propagate_cr3bp_py",
+    "propagate_cr3bp_stm_py",
+    "propagate_with_state_py",
+    "propagate_with_stm_py",
+    "reset_ephem_ffi_call_count",
+    "segmented_shooting_correct_py",
+    "solid_tide_step1",
+    "solid_tide_step2",
+    "solve_ivp_events_py",
+    "spice_furnsh",
+    "spice_pxform",
+    "spice_spkezr",
+    "spherical_harmonic_accel",
+    "third_body_acceleration",
+    "transfer_grid_search_py",
+    "transfer_grid_search_serial_py",
+)
+
+try:
+    _rust_extension: Any = importlib.import_module("e2m2e._integrators")
+except ImportError:
+    _rust_extension = None
+
+for _symbol in _RUST_SYMBOLS:
+    _extension_symbol = _symbol.removeprefix("_")
+    globals()[_symbol] = getattr(_rust_extension, _extension_symbol, None)
 
 # ---- Python↔Rust ABI 版本校验 ----
 # 单一来源：crates/e2m2e-integrators/abi-version.txt
@@ -145,26 +129,55 @@ _abi_ok: bool = False  # 进程级一次性缓存
 
 
 def _check_rust_abi() -> None:
-    """校验 Rust 扩展 ABI 版本；过期即报，缺失则静默跳过。
+    """校验 Rust 扩展 ABI 版本；过期或缺失即报，结果进程级缓存。
 
-    在首次使用 Rust 扩展符号时调用（惰性），结果缓存。扩展不存在时（
-    ``ImportError``）保留原有静默降级路径（doc build / 无 spice 构建合法）。
+    在首次使用 Rust 扩展符号时调用（惰性）。扩展不存在时抛
+    :class:`RustExtensionUnavailableError`（带 ``make dev`` 指引）——
+    不再静默降级（issue #378）。过期二进制抛 ``RuntimeError``。
     """
     global _abi_ok
     if _abi_ok:
         return
     try:
-        from e2m2e._integrators import _py_abi_version
-    except ImportError:
-        _abi_ok = True  # 无扩展 → 保留降级，不报
-        return
+        rust_extension = importlib.import_module("e2m2e._integrators")
+    except ImportError as exc:
+        raise RustExtensionUnavailableError(
+            "e2m2e._integrators 不可用（Rust 扩展未构建）。请先构建：make dev"
+        ) from exc
+    _py_abi_version = getattr(rust_extension, "_py_abi_version", None)
+    if _py_abi_version is None:
+        raise RustExtensionUnavailableError(
+            "e2m2e._integrators 缺少所需符号：_py_abi_version。请先构建：make dev"
+        )
     actual = _py_abi_version()
     if actual < _MIN_REQUIRED_RUST_ABI:
         raise RuntimeError(
             f"e2m2e._integrators 编译产物过期（ABI v{actual} < 所需 v{_MIN_REQUIRED_RUST_ABI}）。"
-            "请重建 Rust 扩展：uv run maturin develop --features spice"
+            "请重建 Rust 扩展：make dev"
         )
     _abi_ok = True
+
+
+def require_rust_extension(*required_symbols: str) -> None:
+    """确保 Rust 扩展可用且指定的模块级符号存在；否则抛 ``RustExtensionUnavailableError``。
+
+    在使用 Rust 扩展符号的每个入口调用。扩展未构建、构建不含 spice
+    feature、或符号缺失时，抛带 ``make dev`` 指引的
+    :class:`RustExtensionUnavailableError`——不允许静默回退到 Python/scipy
+    （issue #378）。``required_symbols`` 是 ``e2m2e.integrators`` 模块级
+    符号名；扩展缺失时符号为 ``None``。
+
+    Example:
+        >>> require_rust_extension("propagate_compiled", "spice_furnsh")
+    """
+    _check_rust_abi()
+    missing = [name for name in required_symbols if globals().get(name) is None]
+    if missing:
+        raise RustExtensionUnavailableError(
+            "e2m2e._integrators 缺少所需符号："
+            + ", ".join(missing)
+            + "。spice 是默认且唯一支持的 feature；请用 make dev 重建扩展。"
+        )
 
 
 __all__ = [
@@ -207,6 +220,7 @@ __all__ = [
     "reset_ephem_ffi_call_count",
     "rk_step",
     "RkMethod",
+    "require_rust_extension",
     "segmented_shooting_correct_py",
     "solid_tide_step1",
     "solid_tide_step2",
@@ -232,16 +246,15 @@ def rk_step(
     f: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
     state_error_dim: int | None = None,
 ):
-    """Take a single Runge-Kutta step using the Rust integrator core.
+    """使用 Rust 积分器内核执行单个 Runge-Kutta 步。
 
-    The callback ``f`` receives a NumPy ndarray and must return one of the same
-    length. Returns a ``StepResult`` with ``y_new``, ``error``, ``h_next``.
+    回调 ``f`` 接收 NumPy ndarray，并须返回同长度数组。返回的 ``StepResult``
+    包含 ``y_new``、``error``、``h_next``。
 
     ``state_error_dim``：步长误差控制只统计前 N 维（``None`` 时统计全部）。
     STM 增广传播时传 6，让状态转移矩阵的 36 个分量不主导步长控制。
     """
-    if CowellResult is not None:
-        _check_rust_abi()
+    require_rust_extension("_rk_step", "RkMethod")
     y = np.asarray(y, dtype=float)
 
     def _adapt(t_i: float, y_i: list[float]) -> list[float]:
@@ -261,18 +274,16 @@ def multistep_step(
     f: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
     history: list[npt.ArrayLike],
 ):
-    """Take a single multistep predictor-corrector step.
+    """执行单个多步预测-校正步。
 
-    ``history`` must hold ``method.steps()`` derivative samples (oldest first),
-    each the same length as ``y``, at equal spacing ``h``. The callback ``f``
-    has the same signature as for :func:`rk_step`. Returns a
-    ``MultistepResult`` whose ``history`` is the rolled buffer for the next step.
+    ``history`` 须按从旧到新的顺序保存 ``method.steps()`` 个导数样本，每个样本
+    与 ``y`` 等长，间隔均为 ``h``。回调 ``f`` 的签名与 :func:`rk_step` 相同。
+    返回 ``MultistepResult``，其 ``history`` 是供下一步使用的滚动缓冲区。
 
-    The step size is assumed fixed; changing ``h`` requires re-initialising the
-    history (see :func:`initialize_abm_history`).
+    假定步长固定；改变 ``h`` 后须重新初始化 history（见
+    :func:`initialize_abm_history`）。
     """
-    if CowellResult is not None:
-        _check_rust_abi()
+    require_rust_extension("_multistep_step", "MultistepMethod")
     y = np.asarray(y, dtype=float)
 
     def _adapt(t_i: float, y_i: list[float]) -> list[float]:
@@ -292,14 +303,13 @@ def initialize_abm_history(
     n_stages: int = 3,
     tol: float = 1e-12,
 ) -> tuple[float, np.ndarray, list[list[float]]]:
-    """Bootstrap the ABM history by running ``n_stages`` RK89 steps.
+    """以 ``n_stages`` 个 RK89 步启动 ABM history。
 
-    The ABM method consumes 4 derivative samples; with the default
-    ``n_stages=3`` this returns ``(t0 + 3h, y(3h), [f_0, f_1, f_2, f_3])``.
-    The returned history is ready to feed into :func:`multistep_step`.
+    ABM 方法使用 4 个导数样本；默认 ``n_stages=3`` 时返回
+    ``(t0 + 3h, y(3h), [f_0, f_1, f_2, f_3])``，其中 history 可直接传给
+    :func:`multistep_step`。
     """
-    if CowellResult is not None:
-        _check_rust_abi()
+    require_rust_extension("RkMethod")
     y = np.asarray(y0, dtype=float).copy()
     t = float(t0)
     history: list[list[float]] = [np.asarray(f(t, y), dtype=float).tolist()]
@@ -318,17 +328,15 @@ def cowell_step(
     accel: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
     history: list[npt.ArrayLike],
 ):
-    """Take a single Cowell (Störmer-Cowell) 8th-order step for ``x'' = a(t, x)``.
+    """对 ``x'' = a(t, x)`` 执行单个 Cowell（Störmer-Cowell）8 阶步。
 
-    ``history`` = ``[x_{n-1}, x_n, a_{n-7}, ..., a_n]`` (10 vectors: 2 position
-    samples + 8 acceleration samples, oldest first). ``accel(t, x)`` returns the
-    acceleration depending on position only (gravity, J2). Output is position
-    only. Fixed step.
+    ``history`` = ``[x_{n-1}, x_n, a_{n-7}, ..., a_n]``（10 个向量：2 个位置
+    样本与 8 个加速度样本，按从旧到新排列）。``accel(t, x)`` 返回只依赖位置的
+    加速度（引力、J2）。输出仅含位置，步长固定。
 
-    Returns a ``CowellResult`` with ``x_new``, ``error``, ``h_next``, ``history``.
+    返回的 ``CowellResult`` 包含 ``x_new``、``error``、``h_next``、``history``。
     """
-    if CowellResult is not None:
-        _check_rust_abi()
+    require_rust_extension("_cowell_step")
     hist_lists = [np.asarray(hi, dtype=float).tolist() for hi in history]
 
     def _adapt(t_i: float, x_i: list[float]) -> list[float]:
@@ -348,16 +356,14 @@ def initialize_cowell_history(
     n_startup: int = 7,
     tol: float = 1e-12,
 ) -> tuple[float, np.ndarray, np.ndarray, list[list[float]]]:
-    """Bootstrap the 8th-order Cowell history via ``n_startup`` RK89 steps.
+    """以 ``n_startup`` 个 RK89 步启动 8 阶 Cowell history。
 
-    Returns ``(t, x, v, history)`` with
-    ``history = [x_{n-1}, x_n, a_{n-7}, ..., a_n]`` (2 positions + 8
-    accelerations, ready for :func:`cowell_step`). ``n_startup`` must be ≥ 7 so
-    the 8 most recent acceleration samples are available; with the default
-    ``n_startup=7`` the state advances to ``t0 + 7h``.
+    返回 ``(t, x, v, history)``，其中
+    ``history = [x_{n-1}, x_n, a_{n-7}, ..., a_n]``（2 个位置与 8 个加速度，
+    可直接传给 :func:`cowell_step`）。``n_startup`` 须不小于 7，以获得最近的
+    8 个加速度样本；默认 ``n_startup=7`` 时状态推进至 ``t0 + 7h``。
     """
-    if CowellResult is not None:
-        _check_rust_abi()
+    require_rust_extension("RkMethod")
     if n_startup < 7:
         raise ValueError(
             f"8th-order Cowell needs n_startup >= 7 (8 acceleration samples), got {n_startup}"
@@ -423,8 +429,7 @@ def solve_ivp_events(
         事件点）、``t_events``/``y_events``（逐事件的触发时刻与状态列表）、
         ``terminal_event``（触发终止的事件索引或 None）、``n_steps``。
     """
-    if CowellResult is not None:
-        _check_rust_abi()
+    require_rust_extension("solve_ivp_events_py")
     y0_arr = np.asarray(y0, dtype=float)
 
     def _adapt_rhs(t_i: float, y_i: list[float]) -> list[float]:
@@ -502,10 +507,7 @@ def grid_search_rust_serial(
         ``list[dict]``，长度 ``n_dep * n_alpha``，顺序为外层 departure、
         内层 alpha（与 ``grid_search_sequential`` 一致）。
     """
-    if transfer_grid_search_serial_py is None:
-        raise RuntimeError("Rust 扩展未构建（transfer_grid_search_serial_py 不可用）")
-    if CowellResult is not None:
-        _check_rust_abi()
+    require_rust_extension("transfer_grid_search_serial_py")
 
     dep_states_arr = np.asarray(dep_states, dtype=float).reshape(-1)
     dep_times_arr = np.asarray(dep_times, dtype=float).reshape(-1)
@@ -576,10 +578,7 @@ def grid_search_rust(
     Returns:
         ``list[dict]``，长度 ``n_dep * n_alpha``，顺序为外层 departure、内层 alpha。
     """
-    if transfer_grid_search_py is None:
-        raise RuntimeError("Rust 扩展未构建（transfer_grid_search_py 不可用）")
-    if CowellResult is not None:
-        _check_rust_abi()
+    require_rust_extension("transfer_grid_search_py")
 
     dep_states_arr = np.asarray(dep_states, dtype=float).reshape(-1)
     dep_times_arr = np.asarray(dep_times, dtype=float).reshape(-1)

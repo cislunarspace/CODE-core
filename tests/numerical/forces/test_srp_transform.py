@@ -1,19 +1,20 @@
 """SRP / Shadow 系统感知路径集成测试（需 SPICE 内核）。
 
-验证 compute_acceleration / flux_factor 通过 system 取太阳位置后与手动计算一致。
+验证 Rust ``srp_acceleration`` 绑定通过 SPICE 取太阳位置后，与阴影几何
+``flux_factor`` 及 cannonball 公式一致。
 """
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
+from e2m2e._integrators import srp_acceleration
 
 from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
 from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
 from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
-from e2m2e.algorithm.forces.srp import SolarRadiationPressure
 from e2m2e.data.kernels.manager import SPICEManager
 
 pytestmark = pytest.mark.force
@@ -21,6 +22,8 @@ pytestmark = pytest.mark.force
 
 _R_EARTH = 6378.1363
 _R_SUN = 695700.0
+_P_SRP_1AU = 4.56e-6
+_AU_KM = 149597870.691
 
 
 @pytest.fixture
@@ -84,23 +87,28 @@ def test_shadow_flux_factor_umbra_for_anti_sun_leo(earth_icrf_system) -> None:
 
 
 @pytest.mark.spice
-def test_srp_compute_acceleration_matches_manual(earth_icrf_system) -> None:
-    """compute_acceleration(t, state, system) 与手算一致（SPICE 取日位 + 纯函数）。"""
+def test_srp_rust_binding_matches_cannonball_formula(earth_icrf_system) -> None:
+    """Rust ``srp_acceleration`` 与 cannonball 公式 + 阴影 flux 一致。"""
     system = earth_icrf_system
     et = system.spice.utc_to_et("2025-06-21T11:00:06")
     state = np.array([6778.0, 0.0, 0.0, 0.0, 7.7, 0.0])
 
-    shadow = ConicalShadowModel(bodies=["EARTH"])
-    srp = SolarRadiationPressure(area=10.0, mass=1000.0, cr=1.5, shadow=shadow)
-
-    acc_system = srp.compute_acceleration(et, state, system)
+    area, mass, cr = 10.0, 1000.0, 1.5
+    acc = srp_acceleration(et, state[:3].tolist(), area, mass, cr, ["EARTH"], "EARTH")
 
     # 手算
     sun_pos = _sun_pos_rel_earth(system, et)
     sun_to_sc = state[:3] - sun_pos
+    r = np.linalg.norm(sun_to_sc)
+    shadow = ConicalShadowModel(bodies=["EARTH"])
     flux = shadow.flux_factor(et, state, system)
-    acc_manual = srp._compute_srp_acceleration(sun_to_sc, flux)
-    np.testing.assert_allclose(acc_system, acc_manual, rtol=1e-12)
+    expected_si = flux * _P_SRP_1AU * (_AU_KM / r) ** 2 * cr * area / mass
+    expected_km = expected_si / 1000.0
+    expected_dir = sun_to_sc / r
+
+    np.testing.assert_allclose(np.linalg.norm(acc), expected_km, rtol=1e-10)
+    cos_angle = np.dot(acc, expected_dir) / (np.linalg.norm(acc) * np.linalg.norm(expected_dir))
+    assert cos_angle == pytest.approx(1.0, abs=1e-9)
 
 
 @pytest.mark.spice
@@ -110,8 +118,7 @@ def test_srp_acceleration_points_away_from_sun(earth_icrf_system) -> None:
     et = system.spice.utc_to_et("2025-06-21T11:00:06")
     state = np.array([6778.0, 0.0, 0.0, 0.0, 7.7, 0.0])
 
-    srp = SolarRadiationPressure(area=10.0, mass=1000.0, cr=1.5)  # 无阴影
-    acc = srp.compute_acceleration(et, state, system)
+    acc = srp_acceleration(et, state[:3].tolist(), 10.0, 1000.0, 1.5, [], "EARTH")
 
     sun_pos = _sun_pos_rel_earth(system, et)
     sun_to_sc = state[:3] - sun_pos

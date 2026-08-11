@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -10,21 +9,12 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from ...data.constants import AU_KM, Datum
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ITRFSpiceAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
-from .earth_tide import (
-    _K_EARTH,
-    _K_PLUS_EARTH,
-    load_love_number_file,
-    permanent_tide_correction,
-    pole_tide,
-    solid_tide_step1,
-    solid_tide_step2,
-)
+from .earth_tide import _K_EARTH, _K_PLUS_EARTH, load_love_number_file
 from .exceptions import CoordinateTransformError
-from .gravity_file import extrapolate_coefficients, load_gravity_file
+from .gravity_file import load_gravity_file
 from .physical_model import PhysicalModel
 
 # 按中心天体的默认 body-fixed SPICE frame。
@@ -44,26 +34,15 @@ _DEFAULT_TIDE_FILE_BY_BODY: dict[str, str | None] = {
     "EARTH": None,
     "MOON": "grgm900c.tide",
 }
-# Sun/Moon 平均半长轴(永久潮汐修正用,近似)
-_A_SUN_KM = AU_KM
-_A_MOON_KM = Datum.DE421.char_length_km
-
-# 每个中心天体做固体潮时的扰动体列表(body 名)。地球受 Sun+Moon 扰动,
-# 月球受 Earth 扰动(GMAT 行为)。
-_PERTURBERS_BY_BODY: dict[str, list[str]] = {
-    "EARTH": ["SUN", "MOON"],
-    "MOON": ["EARTH"],
-}
-# 查扰动体位置时用到的观察者(中心天体)映射,与 _PERTURBERS_BY_BODY 对齐。
-# get_body_position(target, et, frame, observer) 的 observer 即中心天体。
 
 
 class GravityField(PhysicalModel):
     """球谐重力场模型。
 
     在指定的固连坐标系（默认 ITRF93）中展开球谐级数，计算引力加速度。
-    力模型接口约定：输入状态与输出加速度均在 ``system.coordinate_system``
-    下；本类内部负责转换到输入坐标系并转回。
+    加速度计算全部由 Rust 编译路径承载（``("gravity", ...)`` 力元组，
+    ``crates/e2m2e-forces/src/forces/gravity_field.rs``，含潮汐），Python 侧
+    不保留参考实现（issue #378）。
     """
 
     def __init__(
@@ -260,126 +239,21 @@ class GravityField(PhysicalModel):
             k_plus_flat,
         )
 
-    @property
-    def tide_convention(self) -> str:
-        """系数约定。"""
-        return self._tide_convention
-
-    def _effective_coefficients(
-        self, t: float, system: Any
-    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-        """返回 t 时刻的有效 C/S(含 dot 外推 + 潮汐修正)。
-
-        潮汐路径按中心天体分流:
-        - ``EARTH``:扰动体 [Sun, Moon],Love 数取硬编码 ``_K_EARTH``/
-          ``_K_PLUS_EARTH``;Step1 后追加地球专用 Step2/极潮/永久潮。与重构前
-          行为逐字一致(回归验证 atol=1e-12)。
-        - ``MOON``:扰动体 [Earth](地球相对月球的位置),Love 数从
-          ``grgm900c.tide`` 读(k₂=0.024116);只做 Step1,不做 Step2/极潮。
-
-        Args:
-            t: SPICE et 秒。
-            system: 动力学系统;tide_mode 非 none 时需暴露 ``spice`` 属性以查
-                扰动体位置与 GM。
-
-        Returns:
-            (C_eff, S_eff),形状与 ``self._data.C`` 一致。
-        """
-        C = self._data.C.copy()
-        S = self._data.S.copy()
-
-        # dot 项历元外推
-        if self._epoch is not None and np.any(self._data.dotC):
-            C, S = extrapolate_coefficients(C, S, self._data.dotC, self._data.dotS, t, self._epoch)
-
-        if self._tide_mode == "none":
-            return C, S
-
-        spice = getattr(system, "spice", None) if system is not None else None
-        if spice is None:
-            raise CoordinateTransformError(
-                "tide_mode != 'none' requires system.spice for perturber ephemeris"
-            )
-
-        # 查扰动体位置/GM(observer 为中心天体)。位置在中心天体 body-fixed 系下。
-        perturber_names = _PERTURBERS_BY_BODY.get(self._body)
-        if perturber_names is None:
-            raise CoordinateTransformError(f"solid tide not configured for body={self._body!r}")
-        perturbers = [
-            (
-                spice.get_body_position(name, t, self._input_frame, self._body),
-                spice.get_gm(name),
-            )
-            for name in perturber_names
-        ]
-
-        mu_central = self._data.mu
-        r_central = self._data.radius
-
-        # 固体潮 Step 1(天体无关:扰动体列表 + 该天体的 Love 数表)
-        k_love, k_plus = self._resolve_love_numbers()
-        dC, dS = solid_tide_step1(
-            perturbers,
-            k_love=k_love,
-            k_plus=k_plus,
-            mu_central=mu_central,
-            r_central=r_central,
-        )
-
-        # 地球专用:Step2(频率相关)+ 极潮 + 永久潮汐修正
-        if self._body == "EARTH":
-            # 固体潮 Step 2(频率相关,Delaunay 幅角)
-            dC2, dS2 = solid_tide_step2(t)
-            dC = dC + dC2
-            dS = dS + dS2
-
-            # zero-tide:减去永久潮汐(系数已含永久分量)
-            if self._tide_convention == "zero_tide":
-                mu_sun = spice.get_gm("SUN")
-                mu_moon = spice.get_gm("MOON")
-                dC_perm, dS_perm = permanent_tide_correction(
-                    mu_sun, mu_moon, mu_central, r_central, _A_SUN_KM, _A_MOON_KM
-                )
-                dC = dC - dC_perm
-                dS = dS - dS_perm
-
-            # 极档:叠加极潮
-            if self._tide_mode == "solid_and_pole":
-                if self._polar_motion_provider is None:
-                    raise ValueError("tide_mode='solid_and_pole' requires polar_motion_provider")
-                xp, yp = self._polar_motion_provider(t)
-                dC_pole, dS_pole = pole_tide(t, xp, yp)
-                dC = dC + dC_pole
-                dS = dS + dS_pole
-
-        # pad ΔC/ΔS(5×5)到 C/S 形状(degree 可能 > 4)
-        n = min(5, C.shape[0])
-        dC_padded = np.zeros_like(C)
-        dS_padded = np.zeros_like(S)
-        dC_padded[:n, :n] = dC[:n, :n]
-        dS_padded[:n, :n] = dS[:n, :n]
-        return C + dC_padded, S + dS_padded
-
     def _load_love_numbers(
         self,
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
-        """按 ``body`` 解析固体潮 Love 数表 (k_love, k_plus)。构造时调用一次。
-
-        地球用硬编码常量(``_K_EARTH`` / ``_K_PLUS_EARTH``);月球从包内
-        ``grgm900c.tide`` 读取(仅 k₂=0.024116,无弹性 3 阶位移 → k_plus=None)。
-        """
+        """按中心天体加载固体潮 Love 数表。"""
         if self._body == "EARTH":
             return _K_EARTH, _K_PLUS_EARTH
         tide_file = _DEFAULT_TIDE_FILE_BY_BODY.get(self._body)
         if tide_file is None:
             raise CoordinateTransformError(f"no Love number source for body={self._body!r}")
         from importlib import resources
+        from tempfile import NamedTemporaryFile
 
         ref = resources.files("e2m2e.algorithm.forces.data").joinpath(tide_file)
         with ref.open("r", encoding="utf-8") as f:
             content = f.read()
-        from tempfile import NamedTemporaryFile
-
         with NamedTemporaryFile(mode="w", suffix=".tide", delete=False) as tmp:
             tmp.write(content)
             tmp_path = tmp.name
@@ -387,134 +261,12 @@ class GravityField(PhysicalModel):
             k_love = load_love_number_file(tmp_path)
         finally:
             Path(tmp_path).unlink()
-        # 月球等无弹性 3 阶位移贡献。
         return k_love, None
 
-    def _resolve_love_numbers(
-        self,
-    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
-        """返回缓存的 Love 数表（构造时一次性解析，避免每步重读文件）。
-
-        仅在 ``tide_mode != "none"`` 时被调（由 ``_effective_coefficients``
-        把守），故 ``_love_cache`` 此时必非 ``None``。
-        """
-        assert self._love_cache is not None  # tide_mode != "none" 不变量
-        return self._love_cache
-
-    def compute_acceleration(
-        self,
-        t: float,
-        state: npt.ArrayLike,
-        system: Any,
-    ) -> npt.NDArray[np.floating]:
-        """计算引力加速度。
-
-        Args:
-            t: SPICE et 时间。
-            state: 状态向量,在 system.coordinate_system 下。
-            system: 动力学系统;若传入 None,则假设状态已在 input_frame 下
-                (仅用于隔离测试,tide_mode 必须为 none)。
-
-        Returns:
-            加速度向量,在 system.coordinate_system 下。
-        """
-        warnings.warn(
-            f"{self.__class__.__name__}.compute_acceleration 走 Python 回退路径，"
-            "应优先走 Rust 编译路径。",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        state_arr = np.asarray(state, dtype=float)
-        if state_arr.shape[0] < 3:
-            raise ValueError("state must have at least 3 elements")
-
-        if system is None:
-            r_input = state_arr[:3].copy()
-        else:
-            r_input = self._transform_position_to_input_frame(t, state_arr, system)
-
-        # 潮汐/dot 外推是时变的,每步重算有效系数
-        needs_effective = self._tide_mode != "none" or (
-            self._epoch is not None and np.any(self._data.dotC)
-        )
-        if needs_effective:
-            C_eff, S_eff = self._effective_coefficients(t, system)
-        else:
-            C_eff, S_eff = None, None
-
-        acc_input = self._compute_acceleration_in_input_frame(r_input, C_eff, S_eff)
-
-        if system is None:
-            return acc_input
-
-        return self._transform_vector_from_input_frame(t, acc_input, system)
-
-    def _compute_acceleration_in_input_frame(
-        self,
-        r: npt.NDArray[np.floating],
-        C: npt.NDArray[np.floating] | None = None,
-        S: npt.NDArray[np.floating] | None = None,
-    ) -> npt.NDArray[np.floating]:
-        """在输入坐标系(固连系)中计算引力加速度。
-
-        算法（球坐标分量法 + 完全正规化 associated Legendre）1:1 移植到 Rust
-        （``crates/e2m2e-integrators/src/spherical_harmonic.rs``），Python 侧仅
-        做参数打包与一次 FFI 调用。精度回归：与原 Python 实现逐项一致，最大
-        绝对差 < 1e-30（机器精度）。背景：profile 显示原三层 Python 循环占满配
-        直推 32% 耗时（#330）。
-
-        Args:
-            r: 位置,在 input_frame 下。
-            C, S: 可选的有效球谐系数(含潮汐/dot);``None`` 用文件原始系数。
-        """
-        if C is None:
-            C = self._data.C
-        if S is None:
-            S = self._data.S
-        from e2m2e.integrators import spherical_harmonic_accel
-
-        a = spherical_harmonic_accel(
-            np.asarray(r, dtype=float).ravel().tolist(),
-            np.asarray(C, dtype=float).ravel(order="C").tolist(),
-            np.asarray(S, dtype=float).ravel(order="C").tolist(),
-            float(self._data.mu),
-            float(self._data.radius),
-            int(self._degree),
-            int(self._order),
-        )
-        return np.array(a, dtype=float)
-
-    def _transform_position_to_input_frame(
-        self, t: float, state: npt.NDArray[np.floating], system: Any
-    ) -> npt.NDArray[np.floating]:
-        """把状态位置转换到输入坐标系。"""
-        input_cs = self._get_input_coordinate_system(system)
-        try:
-            state_input = system.coordinate_system.transform_state(
-                state, from_cs=system.coordinate_system, to_cs=input_cs, et=t
-            )
-        except Exception as exc:
-            raise CoordinateTransformError(
-                f"Failed to transform state to {self._input_frame}"
-            ) from exc
-        return state_input[:3]
-
-    def _transform_vector_from_input_frame(
-        self,
-        t: float,
-        vector: npt.NDArray[np.floating],
-        system: Any,
-    ) -> npt.NDArray[np.floating]:
-        """把输入坐标系中的矢量转换回参考系。"""
-        input_cs = self._get_input_coordinate_system(system)
-        try:
-            return system.coordinate_system.transform_vector(
-                vector, from_cs=input_cs, to_cs=system.coordinate_system, et=t
-            )
-        except Exception as exc:
-            raise CoordinateTransformError(
-                f"Failed to transform acceleration from {self._input_frame}"
-            ) from exc
+    @property
+    def tide_convention(self) -> str:
+        """系数约定。"""
+        return self._tide_convention
 
     def _get_input_coordinate_system(self, system: Any) -> CoordinateSystem:
         """构造输入坐标系（固连系）。

@@ -37,16 +37,11 @@ DEFAULT_MIN_DISTANCE_THRESHOLD_DU = 100.0 / CR3BP_System.EARTH_MOON_DISTANCE_KM
 
 
 def _default_parallel_backend() -> str:
-    """默认并行后端：有 Rust 扩展（``e2m2e._integrators`` 可导入）时 ``rust``，否则 ``processes``。
+    """默认使用 Rust 后端；无扩展时在使用处报告扩展不可用。
 
-    PRD #314 §6 / issue #316 item ④：默认走 rust（5–10× 加速，见 ADR 0017 基准），
-    扩展未构建时回退 processes。rust 后端在几何方法被 monkeypatch 或扩展内部
-    异常时仍会自动回退 processes（见 :func:`grid_search_rust_dispatch`）。
+    ``processes`` 和 ``threads`` 仅在调用方显式选择时保留。不能因 Rust 扩展
+    缺失而悄然改变默认算法与并行模型（issue #378）。
     """
-    try:
-        import e2m2e._integrators  # noqa: F401
-    except ImportError:
-        return "processes"
     return "rust"
 
 

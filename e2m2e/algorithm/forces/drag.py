@@ -2,22 +2,10 @@
 
 from __future__ import annotations
 
-import warnings
 from typing import Any
 
-import numpy as np
-import numpy.typing as npt
-
-from ...data.constants import KM_TO_M
-from ...data.constants.bodies import EARTH
-from ..coordinate.coordinate_system import CoordinateSystem
-from ..coordinate.standard_axes import ITRFApproxAxes
-from ..coordinate.standard_origins import CelestialBodyOrigin
 from .atmosphere import ExponentialAtmosphere
-from .exceptions import CoordinateTransformError
 from .physical_model import PhysicalModel
-
-R_EARTH: float = EARTH.gravity_ref_radius_km  # type: ignore[assignment]
 
 
 class DragModel(PhysicalModel):
@@ -26,8 +14,11 @@ class DragModel(PhysicalModel):
     在 ITRF（地固系）中计算大气密度与相对速度，求得阻力加速度后转换回
     参考系。大气在 ITRF 中静止，因此相对速度等于航天器 ITRF 速度。
 
-    力模型接口约定：输入状态与输出加速度均在 ``system.coordinate_system``
-    下；本类内部负责转换到 ITRF 并转回。
+    加速度计算全部由 Rust 编译路径承载（``("drag", ...)`` 力元组，
+    ``crates/e2m2e-forces/src/forces/drag.rs``），Python 侧不保留参考实现
+    （issue #378）。``to_rust_spec`` 需 system 提供 SPICE（ITRF93 pxform
+    帧旋转）；不满足时返回 ``None``，``ForceModel.propagate`` 据此显式报
+    能力错误（不静默回退）。
 
     Args:
         atmosphere: 大气密度模型（依赖注入）。
@@ -90,11 +81,12 @@ class DragModel(PhysicalModel):
     def to_rust_spec(self, system: Any) -> tuple | None:
         """序列化为 Rust ``("drag", area, mass, cd, propagation_frame, f107, ap)`` 元组。
 
-        f107/ap 从注入的大气模型取出，确保 Rust 路径与 Python ``compute_acceleration``
-        用同一组太阳活动参数（否则非默认配置下密度因子分歧，见 issue #315）。
+        f107/ap 从注入的大气模型取出，确保 Rust 路径与配置用同一组太阳活动
+        参数（issue #315 的 drag 静默分歧先例，Rust 与配置同源）。
 
         需要 system 提供 SPICE 以做 ITRF93 pxform 帧旋转。若 system 未暴露
-        spice 属性则返回 None，让 ForceModel 回退 Python 路径。
+        spice 属性、或中心天体非 EARTH，返回 None——由 ``ForceModel.propagate``
+        显式报能力错误，不静默回退 Python 路径。
         """
         if getattr(system, "spice", None) is None:
             return None
@@ -109,109 +101,3 @@ class DragModel(PhysicalModel):
             self._atmosphere.f107,
             self._atmosphere.ap,
         )
-
-    def compute_acceleration(
-        self,
-        t: float,
-        state: npt.ArrayLike,
-        system: Any,
-    ) -> npt.NDArray[np.floating]:
-        """计算大气阻力加速度。
-
-        Args:
-            t: SPICE et 时间（秒）。
-            state: 状态向量，在 ``system.coordinate_system`` 下。
-            system: 动力学系统；若为 ``None`` 则假设状态已在 ITRF 下
-                （仅用于隔离测试）。
-
-        Returns:
-            加速度向量，形状 ``(3,)``，单位 km/s²。
-        """
-        warnings.warn(
-            f"{self.__class__.__name__}.compute_acceleration 走 Python 回退路径，"
-            "应优先走 Rust 编译路径。"
-            " 注意：已知分歧（issue #315），Rust 路径硬编码 f107/ap 与 Python 路径有 ~17% 偏移。",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        state_arr = np.asarray(state, dtype=float)
-        if state_arr.shape[0] < 6:
-            raise ValueError("state must have at least 6 elements")
-
-        if system is None:
-            r_itrf = state_arr[:3].copy()
-            v_itrf = state_arr[3:6].copy()
-            a_drag = self._compute_drag_in_itrf(r_itrf, v_itrf)
-            return a_drag
-
-        state_itrf = self._transform_state_to_itrf(t, state_arr, system)
-        r_itrf = state_itrf[:3]
-        v_itrf = state_itrf[3:6]
-        a_drag_itrf = self._compute_drag_in_itrf(r_itrf, v_itrf)
-        return self._transform_vector_from_itrf(t, a_drag_itrf, system)
-
-    def _compute_drag_in_itrf(
-        self,
-        r_itrf: npt.NDArray[np.floating],
-        v_itrf: npt.NDArray[np.floating],
-    ) -> npt.NDArray[np.floating]:
-        """在 ITRF 中计算阻力加速度，返回 km/s²。"""
-        altitude_km = float(np.linalg.norm(r_itrf)) - R_EARTH
-        rho = self._atmosphere.density(altitude_km)  # kg/m³
-
-        # 大气在 ITRF 中静止，相对速度 = ITRF 速度；转 SI（m/s）
-        v_rel = v_itrf * KM_TO_M  # m/s
-        v_rel_mag = float(np.linalg.norm(v_rel))
-
-        if rho == 0.0 or v_rel_mag == 0.0:
-            return np.zeros(3)
-
-        bc = self.ballistic_coefficient  # m²/kg
-
-        # a_drag [m/s²] = -0.5 · ρ · BC · |v_rel|² · v̂_rel
-        # 等价于 -0.5 · ρ · BC · |v_rel| · v_rel
-        a_drag_si = -0.5 * rho * bc * v_rel_mag * v_rel
-        return a_drag_si / KM_TO_M  # 转回 km/s²
-
-    def _transform_state_to_itrf(
-        self, t: float, state: npt.NDArray[np.floating], system: Any
-    ) -> npt.NDArray[np.floating]:
-        """把状态转换到 ITRF。"""
-        input_cs = self._get_itrf_coordinate_system(system)
-        try:
-            state_itrf = system.coordinate_system.transform_state(
-                state, from_cs=system.coordinate_system, to_cs=input_cs, et=t
-            )
-        except Exception as exc:
-            raise CoordinateTransformError(
-                f"Failed to transform state to ITRF for body {self._body}"
-            ) from exc
-        return state_itrf
-
-    def _transform_vector_from_itrf(
-        self,
-        t: float,
-        vector: npt.NDArray[np.floating],
-        system: Any,
-    ) -> npt.NDArray[np.floating]:
-        """把 ITRF 中的加速度矢量转换回参考系。"""
-        input_cs = self._get_itrf_coordinate_system(system)
-        try:
-            return system.coordinate_system.transform_vector(
-                vector, from_cs=input_cs, to_cs=system.coordinate_system, et=t
-            )
-        except Exception as exc:
-            raise CoordinateTransformError(
-                "Failed to transform drag acceleration from ITRF"
-            ) from exc
-
-    def _get_itrf_coordinate_system(self, system: Any) -> CoordinateSystem:
-        """构造 ITRF 坐标系（地固系）。"""
-        spice = getattr(system, "spice", None)
-        if spice is None:
-            raise CoordinateTransformError(
-                "system must expose a 'spice' attribute for ITRF transforms"
-            )
-        axes = ITRFApproxAxes()
-        origin = CelestialBodyOrigin(body=self._body, spice=spice)
-        return CoordinateSystem(axes=axes, origin=origin)

@@ -217,40 +217,18 @@ class FiniteBurn(PhysicalModel):
             t, direction_local, state, self._direction_frame, self._axes
         )
 
-    def compute_acceleration(
-        self,
-        t: float,
-        state: npt.ArrayLike,
-        system: object,
-    ) -> npt.NDArray[np.floating]:
-        """返回推力加速度，km/s²。
+    def to_rust_spec(self, system: object) -> tuple | None:
+        """``FiniteBurn`` 不支持 Rust 编译路径，显式抛 ``NotImplementedError``。
 
-        ``thrust_profile(t) == 0`` 时返回 ``zeros(3)``；负推力 raise。
+        质量恒定的连续推力没有对应的 Rust ``CompiledForce`` 变体（Rust 侧
+        只有可变质量 ``LowThrust``）。需要推力传播请改用
+        :class:`VariableMassFiniteBurn`（7D 状态，走
+        ``propagate_compiled_lowthrust``）。issue #378：不允许静默回退 Python。
         """
-        magnitude = float(self._thrust_profile(t))
-        if magnitude < 0.0:
-            raise ValueError(f"thrust_profile returned negative value {magnitude}")
-        if magnitude == 0.0:
-            return np.zeros(3)
-        direction = self._direction
-        if callable(direction):
-            direction = direction(t, np.asarray(state, dtype=float))
-        direction = np.asarray(direction, dtype=float)
-        norm = np.linalg.norm(direction)
-        if norm < 1e-15:
-            raise ValueError("direction must be a non-zero vector")
-        direction_hat = direction / norm
-
-        if self._direction_frame is not None:
-            state_arr = np.asarray(state, dtype=float)
-            direction_hat = self._resolve_direction_in_frame(t, direction_hat, state_arr)
-            # 重新归一化（坐标转换可能改变长度）
-            new_norm = np.linalg.norm(direction_hat)
-            if new_norm < 1e-15:
-                raise ValueError("resolved direction is zero vector")
-            direction_hat = direction_hat / new_norm
-
-        return (magnitude / self._mass) * direction_hat / 1000.0
+        raise NotImplementedError(
+            "FiniteBurn 不支持 Rust 编译传播（无对应 CompiledForce 变体）；"
+            "如需推力传播请改用 VariableMassFiniteBurn。"
+        )
 
 
 class VariableMassFiniteBurn(PhysicalModel):
@@ -338,48 +316,6 @@ class VariableMassFiniteBurn(PhysicalModel):
     def direction_frame(self) -> str | None:
         """方向解释坐标系：'VNB'、'LVLH' 或 None。"""
         return self._direction_frame
-
-    def compute_acceleration(
-        self,
-        t: float,
-        state: npt.ArrayLike,
-        system: object,
-    ) -> npt.NDArray[np.floating]:
-        """返回推力加速度，km/s²。质量取自 ``state[6]``。
-
-        ``thrust == 0`` 时返回 ``zeros(3)``。
-        """
-        state_arr = np.asarray(state, dtype=float)
-        if state_arr.shape[0] < 7:
-            raise ValueError(
-                "VariableMassFiniteBurn requires a 7D state (state[6] = mass), "
-                f"got state with leading dim {state_arr.shape[0]}"
-            )
-        mass = float(state_arr[6])
-        if mass <= 0.0:
-            raise ValueError(f"mass (state[6]) must be positive, got {mass}")
-        if self._thrust == 0.0:
-            return np.zeros(3)
-
-        direction = self._direction
-        if callable(direction):
-            direction = direction(t, state_arr)
-        direction = np.asarray(direction, dtype=float)
-        norm = np.linalg.norm(direction)
-        if norm < 1e-15:
-            raise ValueError("direction must be a non-zero vector")
-        direction_hat = direction / norm
-
-        if self._direction_frame is not None:
-            direction_hat = _resolve_thrust_direction(
-                t, direction_hat, state_arr, self._direction_frame, self._axes
-            )
-            new_norm = np.linalg.norm(direction_hat)
-            if new_norm < 1e-15:
-                raise ValueError("resolved direction is zero vector")
-            direction_hat = direction_hat / new_norm
-
-        return (self._thrust / mass) * direction_hat / 1000.0
 
     def to_rust_spec(self, system: object) -> tuple | None:
         """序列化为低推力 7D 传播路径接受的推力规格。

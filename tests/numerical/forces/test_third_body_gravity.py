@@ -1,7 +1,7 @@
 """ThirdBodyGravity 测试（issue #182）。
 
 验证第三体引力摄动模型：
-  A. 单点加速度与 EphemerisDynamics 的第三体分支逐字一致；
+  A. Rust 单点 ``third_body_acceleration`` 与 EphemerisDynamics 第三体分支一致；
   B. 力分解路径 (ForceModel) 与 EphemerisDynamics 传播同一条 cislunar
      轨道，末状态位置差自洽。
 """
@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
@@ -21,6 +20,7 @@ from e2m2e.algorithm.forces import (
     PointMassGravity,
     ThirdBodyGravity,
 )
+from e2m2e.integrators import indirect_term_acceleration, third_body_acceleration
 
 pytestmark = [
     pytest.mark.force,
@@ -85,12 +85,13 @@ class TestThirdBodyGravityInterface:
         force = ThirdBodyGravity(body="moon")
         assert force.body == "MOON"
 
-    def test_compute_acceleration_shape(self, spice_eph_system, reference_et, dro_state):
-        """加速度输出应为 (3,)。"""
+    def test_to_rust_spec_serializes_body_and_mu(self, spice_eph_system):
+        """to_rust_spec 返回 ("third_body", body, mu)。"""
         force = ThirdBodyGravity("MOON")
-        acc = force.compute_acceleration(reference_et, dro_state, spice_eph_system)
-        assert acc.shape == (3,)
-        assert np.all(np.isfinite(acc))
+        spec = force.to_rust_spec(spice_eph_system)
+        assert spec[0] == "third_body"
+        assert spec[1] == "MOON"
+        assert spec[2] == pytest.approx(spice_eph_system.get_gm("MOON"))
 
     def test_no_origin_parameter_exposed(self):
         """构造函数不应暴露 origin 参数（接口约定）。"""
@@ -101,57 +102,39 @@ class TestThirdBodyGravityInterface:
 
 
 # =============================================================================
-# A. 单元测试：单点加速度 == EphemerisDynamics 第三体分支
+# A. Rust 单点绑定 == EphemerisDynamics 第三体分支
 # =============================================================================
 class TestThirdBodyAccelMatchesEphemeris:
-    """单点加速度逐字对齐 EphemerisDynamics 的第三体分支。"""
+    """Rust 单点加速度逐字对齐 EphemerisDynamics 的第三体分支。"""
 
     def test_moon_single_point_matches_ephemeris_branch(
-        self, spice_eph_dynamics, spice_eph_system, reference_et, dro_state
+        self, spice_eph_dynamics, reference_et, dro_state
     ):
-        """ThirdBodyGravity("MOON") 的单点加速度 == EphemerisDynamics 月球第三体增量。"""
+        """third_body_acceleration("MOON") == EphemerisDynamics 月球第三体增量。"""
         expected = _third_body_contribution(spice_eph_dynamics, reference_et, dro_state[:3], "MOON")
 
-        force = ThirdBodyGravity("MOON")
-        acc = force.compute_acceleration(reference_et, dro_state, spice_eph_system)
-
-        assert_allclose(acc, expected, atol=1e-12)
+        mu = spice_eph_dynamics.system.get_gm("MOON")
+        acc = third_body_acceleration(reference_et, "MOON", "EARTH", dro_state[:3].tolist(), mu)
+        np.testing.assert_allclose(acc, expected, atol=1e-12)
 
     def test_sun_single_point_matches_ephemeris_branch(
-        self, spice_eph_dynamics, spice_eph_system, reference_et, dro_state
+        self, spice_eph_dynamics, reference_et, dro_state
     ):
-        """ThirdBodyGravity("SUN") 的单点加速度 == EphemerisDynamics 太阳第三体增量。"""
+        """third_body_acceleration("SUN") == EphemerisDynamics 太阳第三体增量。"""
         expected = _third_body_contribution(spice_eph_dynamics, reference_et, dro_state[:3], "SUN")
 
-        force = ThirdBodyGravity("SUN")
-        acc = force.compute_acceleration(reference_et, dro_state, spice_eph_system)
+        mu = spice_eph_dynamics.system.get_gm("SUN")
+        acc = third_body_acceleration(reference_et, "SUN", "EARTH", dro_state[:3].tolist(), mu)
+        np.testing.assert_allclose(acc, expected, atol=1e-12)
 
-        assert_allclose(acc, expected, atol=1e-12)
+    def test_indirect_term_matches_point_mass_formula(self, spice_eph_dynamics, reference_et):
+        """indirect_term_acceleration("MOON") == -mu·r_ob/|r_ob|³。"""
+        mu = spice_eph_dynamics.system.get_gm("MOON")
+        r_ob = np.asarray(spice_eph_dynamics.system.get_body_position("MOON", reference_et))
+        expected = -mu / np.linalg.norm(r_ob) ** 3 * r_ob
 
-    def test_sum_decomposition_matches_total(
-        self, spice_eph_dynamics, spice_eph_system, reference_et, dro_state
-    ):
-        """PointMass(EARTH) + ThirdBody(MOON) + ThirdBody(SUN) == EphemerisDynamics 总加速度。
-
-        将 EphemerisDynamics 的总加速度（地+月+日）分解为：
-        地球中心引力 + 月球第三体 + 太阳第三体，验证二者一致。
-        """
-        # EphemerisDynamics 的总加速度（不含 STM 部分的雅可比）
-        total_acc, _ = spice_eph_dynamics._compute_acc_and_jacobian(
-            reference_et, dro_state[:3], need_jacobian=False
-        )
-
-        # 力分解路径：地球中心引力 + 月/日第三体
-        earth = PointMassGravity("EARTH")
-        moon = ThirdBodyGravity("MOON")
-        sun = ThirdBodyGravity("SUN")
-        decomposed = (
-            earth.compute_acceleration(reference_et, dro_state, spice_eph_system)
-            + moon.compute_acceleration(reference_et, dro_state, spice_eph_system)
-            + sun.compute_acceleration(reference_et, dro_state, spice_eph_system)
-        )
-
-        assert_allclose(decomposed, total_acc, atol=1e-9)
+        acc = indirect_term_acceleration(reference_et, "MOON", "EARTH", mu)
+        np.testing.assert_allclose(acc, expected, rtol=1e-10)
 
 
 # =============================================================================

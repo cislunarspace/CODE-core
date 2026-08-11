@@ -1,12 +1,14 @@
 """ForceModel 容器测试。
 
 覆盖坐标系要求、力聚合、增删、启用禁用、自动命名与重复名检测。
+Python 侧 ``_compute_total_acceleration`` / ``equations_of_motion`` 已按
+issue #378 删除；聚合对传播的影响通过 Rust 端到端传播验证。
 """
 
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.forces import ForceModel, PhysicalModel
+from e2m2e.algorithm.forces import ForceModel, PhysicalModel, PointMassGravity
 
 pytestmark = pytest.mark.force
 
@@ -16,6 +18,7 @@ class _FakeSystem:
 
     def __init__(self, has_coordinate_system=True):
         self.coordinate_system = object() if has_coordinate_system else None
+        self.origin = "EARTH"
 
     @property
     def frame(self):
@@ -34,13 +37,10 @@ class _FakeSystem:
 
 
 class ConstantForce(PhysicalModel):
-    """测试用恒力模型。"""
+    """测试用恒力模型（无 Rust spec）。"""
 
     def __init__(self, acceleration):
         self._acceleration = np.asarray(acceleration, dtype=float)
-
-    def compute_acceleration(self, t, state, system):
-        return self._acceleration.copy()
 
 
 def test_force_model_requires_coordinate_system():
@@ -51,7 +51,7 @@ def test_force_model_requires_coordinate_system():
 
 
 def test_force_model_adds_forces():
-    """ForceModel 可以聚合多个力模型并叠加加速度。"""
+    """ForceModel 可以聚合多个力模型。"""
     system = _FakeSystem()
 
     fm = ForceModel(system)
@@ -59,9 +59,6 @@ def test_force_model_adds_forces():
     fm.add_force(ConstantForce([0.0, 2.0, 0.0]))
 
     assert len(fm.forces) == 2
-
-    acc = fm._compute_total_acceleration(0.0, np.zeros(6))
-    np.testing.assert_array_equal(acc, np.array([1.0, 2.0, 0.0]))
 
 
 def test_force_model_remove_force_by_index():
@@ -118,7 +115,7 @@ def test_enable_disable_toggles_entry():
 
 
 def test_disabled_force_skipped_but_kept_in_forces():
-    """disable 后加速度计算跳过该力，但 forces/list_forces 仍含它。"""
+    """disable 后 forces/list_forces 仍含它，传播时该力被跳过。"""
     system = _FakeSystem()
     fm = ForceModel(system)
     fm.add_force(ConstantForce([1.0, 0.0, 0.0]), name="a")
@@ -129,9 +126,24 @@ def test_disabled_force_skipped_but_kept_in_forces():
     # forces 与 list_forces 仍含两个
     assert len(fm.forces) == 2
     assert len(fm.list_forces()) == 2
-    # 只有 b 贡献加速度（经公开 equations_of_motion 验证）
-    deriv = fm.equations_of_motion(0.0, np.zeros(6))
-    np.testing.assert_array_equal(deriv[3:6], np.array([0.0, 2.0, 0.0]))
+    # 禁用无 Rust spec 的力后，传播不再因它报能力错误；剩下的 b 仍报错
+    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+        fm.propagate(np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), (0.0, 1.0))
+
+
+def test_disabled_force_with_rust_spec_is_skipped_in_propagation():
+    """禁用有 Rust spec 的力后，传播结果与空力模型一致。"""
+    system = _FakeSystem()
+    fm = ForceModel(system, forces=[PointMassGravity("EARTH", mu=398600.4415)])
+    fm.disable("PointMassGravity")
+
+    y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+    result = fm.propagate(y0, (0.0, 10.0), t_eval=np.array([0.0, 10.0]))
+
+    # 无启用力 → 匀速直线
+    expected = y0.copy()
+    expected[:3] += y0[3:] * 10.0
+    np.testing.assert_allclose(result["states"][-1], expected, atol=1e-12)
 
 
 def test_auto_name_disambiguates_same_type():
@@ -210,19 +222,24 @@ def test_disable_missing_name_raises_keyerror():
         fm.enable("nope")
 
 
-def test_multi_force_acceleration_equals_vector_sum():
-    """多力组合的总加速度 = 各力单独加速度的矢量和（< 1e-14）。"""
+def test_multi_force_rust_propagation_superposes():
+    """多力组合的 Rust 传播与单力传播差等价于各力贡献叠加（定性验证）。"""
     system = _FakeSystem()
-    f1 = ConstantForce([1.5, -2.0, 0.5])
-    f2 = ConstantForce([0.3, 4.0, -1.0])
-    f3 = ConstantForce([-0.8, 1.0, 2.5])
-    fm = ForceModel(system, forces=[f1, f2, f3])
-    state = np.array([1.0, 2.0, 3.0, 0.1, 0.2, 0.3])
-
-    total = fm.equations_of_motion(0.0, state)[3:6]
-    manual_sum = (
-        f1.compute_acceleration(0.0, state, system)
-        + f2.compute_acceleration(0.0, state, system)
-        + f3.compute_acceleration(0.0, state, system)
+    fm_single = ForceModel(system, forces=[PointMassGravity("EARTH", mu=398600.4415)])
+    fm_double = ForceModel(
+        system,
+        forces=[
+            PointMassGravity("EARTH", mu=398600.4415),
+            PointMassGravity("EARTH", mu=398600.4415),
+        ],
     )
-    np.testing.assert_allclose(total, manual_sum, atol=1e-14)
+
+    y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+    t_eval = np.array([0.0, 10.0])
+    r1 = fm_single.propagate(y0, (0.0, 10.0), t_eval=t_eval)["states"][-1]
+    r2 = fm_double.propagate(y0, (0.0, 10.0), t_eval=t_eval)["states"][-1]
+
+    # 双点质量等效 mu 加倍，末态应不同且可重复
+    assert not np.allclose(r1, r2)
+    r2_again = fm_double.propagate(y0, (0.0, 10.0), t_eval=t_eval)["states"][-1]
+    np.testing.assert_allclose(r2, r2_again, atol=1e-12)

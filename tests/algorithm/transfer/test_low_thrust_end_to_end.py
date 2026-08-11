@@ -29,6 +29,7 @@ except ImportError:
 
 pytestmark = [
     pytest.mark.orchestration,
+    pytest.mark.low_thrust,
     pytest.mark.skipif(
         not _HAS_RUST_PROPAGATION,
         reason="propagate_compiled_lowthrust Rust binding not available",

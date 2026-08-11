@@ -13,12 +13,41 @@ argument 'sxform_pairs'"），栈顶远离调用点，用户无从得知只需�
 from __future__ import annotations
 
 import inspect
+import sys
+import types
 
 import pytest
 
+from e2m2e import integrators as gw
 from e2m2e.data.kernels.manager import SPICEManager, _call_rust_or_compat_error
+from e2m2e.exceptions import RustExtensionUnavailableError
 
 pytestmark = pytest.mark.data
+
+
+class TestRustExtensionAvailability:
+    """扩展缺失与 ABI 过期时的失败契约。"""
+
+    def test_absent_extension_raises_unavailable_error(self, monkeypatch):
+        """扩展缺失不再静默降级。"""
+        monkeypatch.setitem(sys.modules, "e2m2e._integrators", None)
+        monkeypatch.setattr(gw, "_abi_ok", False)
+
+        with pytest.raises(RustExtensionUnavailableError, match="make dev"):
+            gw._check_rust_abi()
+
+    def test_import_time_check_catches_stale_binary(self, monkeypatch):
+        """已加载的过期扩展在 ABI 检查时明确失败。"""
+        monkeypatch.setitem(
+            sys.modules,
+            "e2m2e._integrators",
+            types.SimpleNamespace(_py_abi_version=lambda: 0),
+        )
+        monkeypatch.setattr(gw, "_abi_ok", False)
+        monkeypatch.setattr(gw, "_MIN_REQUIRED_RUST_ABI", 1)
+
+        with pytest.raises(RuntimeError, match="make dev"):
+            gw._check_rust_abi()
 
 
 # =============================================================================
@@ -53,7 +82,7 @@ class TestCallRustOrCompatError:
         def stale_fn(targets, frame_pairs, et_start, et_end, *, dt=3600.0):
             raise AssertionError("过期函数不应被调用：预检应先拦截")
 
-        with pytest.raises(RuntimeError) as excinfo:
+        with pytest.raises(RuntimeError, match="make dev") as excinfo:
             _call_rust_or_compat_error(
                 stale_fn,
                 [],
@@ -192,10 +221,10 @@ class TestEnableEphemCacheWiring:
         with pytest.raises(RuntimeError, match="maturin"):
             spice.enable_ephem_cache(["EARTH"], 0.0, 100.0, sxform_pairs=[])
 
-    def test_absent_extension_still_degrades_silently(self, monkeypatch):
-        """扩展根本不存在时，仍走原 ImportError 容错（仅 Python 层缓存生效）。"""
+    def test_absent_extension_raises_unavailable_error(self, monkeypatch):
+        """扩展缺失时，不得仅保留 Python 缓存而继续运行。"""
         monkeypatch.setattr("e2m2e.integrators.enable_ephem_cache", None)
 
         spice = SPICEManager()
-        # 不应抛异常——静默降级（与历史行为一致，未被守卫破坏）
-        spice.enable_ephem_cache(["EARTH"], 0.0, 100.0, sxform_pairs=[])
+        with pytest.raises(RustExtensionUnavailableError, match="make dev"):
+            spice.enable_ephem_cache(["EARTH"], 0.0, 100.0, sxform_pairs=[])

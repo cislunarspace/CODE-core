@@ -154,7 +154,8 @@ class TestForceModelRoundTripWithPointMassAndThirdBody:
         # 二次往返幂等：fm2 再 to_config 与原 config 字典相等
         assert ForceModel.to_config(fm2) == config
 
-        # 物理一致性：单点加速度一致
-        acc1 = fm._compute_total_acceleration(reference_et, state)
-        acc2 = fm2._compute_total_acceleration(reference_et, state)
-        assert_allclose(acc2, acc1, atol=1e-12)
+        # 物理一致性：短弧 Rust 传播末态一致
+        t_eval = np.array([reference_et, reference_et + 60.0])
+        r1 = fm.propagate(state, (reference_et, reference_et + 60.0), t_eval=t_eval)["states"][-1]
+        r2 = fm2.propagate(state, (reference_et, reference_et + 60.0), t_eval=t_eval)["states"][-1]
+        assert_allclose(r2, r1, atol=1e-12)

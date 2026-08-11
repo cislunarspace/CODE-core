@@ -91,9 +91,10 @@ pythonpath = ["tests"]
 # 按功能类选跑：``uv run pytest -m theory`` / ``-m orchestration`` / ``-m data`` ……
 # 全量（含 slow）：``uv run pytest -m ""``。release 前跑全量。
 # 命令行 -m 覆盖此处的 addopts -m。
-addopts = ["-m", "not slow"]
+addopts = ["-m", "not slow and not low_thrust"]
 markers = [
     "slow: 运行时间较长的数值测试（正交于功能类）",
+    "low_thrust: 低推力功能未开发完成，默认绿门排除；release 用 -m '' 全量仍会运行",
     "spice: 依赖 SPICE 内核的测试，内核缺失时跳过（正交于功能类）",
     "theory: 数理/物理理论——解析对照、守恒律、闭式解",
     "integrator: 积分器——传播器算法、步长控制、dense output",

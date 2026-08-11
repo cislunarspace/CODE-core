@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from e2m2e.algorithm.dynamics.dynamics import Dynamics
 from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
 from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.ephemeris_correction.homotopy import HomotopyEphemerisDynamics
@@ -139,11 +140,7 @@ def test_lambda_weight_outside_unit_interval_raises(full_dynamics):
 
 def test_homotopy_dynamics_keeps_propagate_working(fake_spice, monkeypatch):
     """End-to-end: a short propagation through HomotopyEphemerisDynamics succeeds."""
-    # FakeSpice 的解析位置模型只有纯 Python 积分路径可见；Rust 快速路径
-    # （propagate_with_stm_py）直接查询进程内真实 SPICE 内核池，绕开 FakeSpice，
-    # 且在内核缺失时静默返回截断结果。本测试验证的是 lambda 插值语义，
-    # 固定走 Python 路径，与进程内是否加载过真实内核解耦。
-    monkeypatch.setattr("e2m2e.algorithm.dynamics.ephemeris_dynamics._HAS_RUST_STM", False)
+    # FakeSpice 只提供 Python 运动方程查询；显式调用基类 SciPy 路径，测试 lambda 插值语义。
     system = EphemerisSystem(
         bodies=["EARTH", "MOON", "SUN"],
         spice=fake_spice,
@@ -152,11 +149,15 @@ def test_homotopy_dynamics_keeps_propagate_working(fake_spice, monkeypatch):
     )
     hom = HomotopyEphemerisDynamics(system=system, base_bodies=["EARTH", "MOON"], lambda_weight=0.5)
     initial_state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-    result = hom.propagate(
-        initial_state=initial_state,
-        t_span=(0.0, 100.0),
-        t_eval=np.linspace(0.0, 100.0, 101),
-        with_stm=True,
+    t_span = (0.0, 100.0)
+    t_eval = np.linspace(*t_span, 101)
+    result = Dynamics._propagate_with_stm(
+        hom,
+        initial_state,
+        t_span,
+        t_eval,
+        hom._get_max_step(t_span),
+        with_jacobi=False,
     )
     assert result["states"].shape == (101, 6)
     assert result["stm"].shape == (101, 6, 6)

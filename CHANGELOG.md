@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Changed
+- **显式事件的传播分派**（#378，ADR 0023）：CR3BP/BCR4BP 仅在调用者传入 `events` 时使用 SciPy 事件积分，该例外由输入触发，与 Rust 扩展可用性无关；未传事件时仍要求 Rust 路径，扩展缺失显式报错。ForceModel 事件传播明确未实现，Rust 事件细化由 `solve_ivp_events` 单独提供。
 - **物理常数独立管理，默认地月 μ 切到 DE421**（#377，ADR 0022）：新建 `data/constants/` 常数层（与 `data/templates/` 平级），作为全库物理常数唯一来源——通用物理常量（光速、G、AU、时间常量、太阳常数）全库一套，天体参数按"基准（datum）"组织成自洽集合（DE421 / DE440 / WGS-84），调用方按场景取 `Datum.DE421.mu` 等。Python 与 Rust 从仓库根 `constants.toml` 单一来源构建期生成，两边数值不再各自漂移。此前同一物理量多套值并存的不一致（地月 μ 三套、地球 GM 五值、太阳半径 695700/696000 分叉等 9 类）随收编消除；太阳半径统一为 696000 km（Vallado）。**行为变化：默认地月质量比 μ 从 1965 旧值 0.0121506683 切到 DE421 0.012150585350562453，CR3BP 轨道族/平动点的数值结果会变**；旧值不再支持（一刀切，无 legacy 复现选项）。BCR4BP 太阳无量纲参数（MU_SUN/SUN_DISTANCE/SUN_OMEGA）保留 Topputo 文献约定；normal-form 的 qiao μ（0.012150585609624）为独立模型约定，不并入基准集。
 
 ## [5.6.5] - 2026-08-10

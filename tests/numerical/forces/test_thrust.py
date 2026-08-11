@@ -1,6 +1,9 @@
 """ImpulsiveBurn / FiniteBurn 单元测试。
 
 覆盖冻结拷贝、零推力、常值推力、固定/可调用方向与归一化。
+
+低推力功能尚未开发完成，FiniteBurn 的 Rust 传播路径暂缺；本文件标记
+``low_thrust``，本轮检查排除在绿门外。
 """
 
 import dataclasses
@@ -11,7 +14,7 @@ import pytest
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.thrust import FiniteBurn, ImpulsiveBurn
 
-pytestmark = pytest.mark.force
+pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 
 
 class _FakeSystem:

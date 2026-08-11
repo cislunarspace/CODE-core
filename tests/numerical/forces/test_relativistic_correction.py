@@ -1,9 +1,9 @@
 """相对论修正力模型测试。
 
-覆盖有限加速度、Schwarzschild 开关、配置 round-trip 与三项独立启用。
+Python 单点 ``compute_acceleration`` 已按 issue #378 删除；相对论物理行为由
+Rust ``propagate_compiled`` 承载。本文件保留配置 round-trip 与 Rust 端到端
+传播验证。
 """
-
-import types
 
 import numpy as np
 import pytest
@@ -16,24 +16,6 @@ from e2m2e.algorithm.forces import ForceModel, GravityField, RelativisticCorrect
 from e2m2e.data.kernels.manager import SPICEManager
 
 pytestmark = pytest.mark.force
-
-
-def _make_system(mu: float = 398600.435507):
-    """返回一个只提供 gravitational_parameter 的最小 system stub。"""
-
-    def get_body_state(target, et, frame, observer):
-        # 返回一个假想的地球绕太阳状态：1 AU x 方向，30 km/s y 方向
-        if target.upper() == "EARTH":
-            return np.array([1.496e8, 0.0, 0.0, 0.0, 29.78, 0.0])
-        if target.upper() == "SUN":
-            return np.zeros(6)
-        raise ValueError(f"unknown body {target}")
-
-    spice = types.SimpleNamespace(get_body_state=get_body_state)
-    return types.SimpleNamespace(
-        gravitational_parameter=lambda _body: mu,
-        spice=spice,
-    )
 
 
 def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
@@ -111,45 +93,6 @@ def earth_ephemeris_system(spice_kernel_path):
 _EARTH_ANGULAR_MOMENTUM = np.array([0.0, 0.0, 1.18e3])
 
 
-def test_relativistic_correction_returns_finite_acceleration():
-    """Tracer bullet: RelativisticCorrection 能返回一个有限小的三维加速度。"""
-    force = RelativisticCorrection(
-        central_body="EARTH",
-        angular_momentum_vector=[0.0, 0.0, 7.5e33],
-    )
-
-    system = _make_system()
-    state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-    acc = force.compute_acceleration(0.0, state, system)
-
-    assert acc.shape == (3,)
-    assert np.all(np.isfinite(acc))
-
-
-def test_schwarzschild_switch_controls_acceleration():
-    """Schwarzschild 开关能控制该项加速度是否为零。"""
-    system = _make_system()
-    state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-
-    force_on = RelativisticCorrection(
-        central_body="EARTH",
-        enable_lense_thirring=False,
-        enable_de_sitter=False,
-    )
-    acc_on = force_on.compute_acceleration(0.0, state, system)
-
-    force_off = RelativisticCorrection(
-        central_body="EARTH",
-        enable_schwarzschild=False,
-        enable_lense_thirring=False,
-        enable_de_sitter=False,
-    )
-    acc_off = force_off.compute_acceleration(0.0, state, system)
-
-    assert np.linalg.norm(acc_on) > 0.0
-    np.testing.assert_array_equal(acc_off, np.zeros(3))
-
-
 def test_config_round_trip():
     """RelativisticCorrection 支持 ForceModel 配置往返。"""
     from e2m2e.algorithm.forces.force_config import build_force, serialize_force
@@ -179,45 +122,6 @@ def test_config_round_trip():
     assert restored.body_radius == pytest.approx(6378.137)
     assert restored.c == pytest.approx(299792.458)
     assert restored.gamma == pytest.approx(1.0)
-
-
-@pytest.mark.parametrize(
-    "enabled_term",
-    ["schwarzschild", "lense_thirring", "de_sitter"],
-)
-def test_each_term_can_be_enabled_independently(enabled_term: str):
-    """三项相对论效应可以独立启用并产生非零加速度。"""
-    system = _make_system()
-    state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-
-    kwargs = {
-        "central_body": "EARTH",
-        "enable_schwarzschild": False,
-        "enable_lense_thirring": False,
-        "enable_de_sitter": False,
-        "angular_momentum_vector": [0.0, 0.0, 7.5e33],
-    }
-    kwargs[f"enable_{enabled_term}"] = True
-
-    force = RelativisticCorrection(**kwargs)
-    acc = force.compute_acceleration(0.0, state, system)
-    assert np.linalg.norm(acc) > 0.0, f"{enabled_term} 启用后应产生非零加速度"
-
-
-def test_automatic_angular_momentum_raises_without_kernels():
-    """未提供角动量覆盖值且无法自动计算时，应抛出 RelativisticCorrectionError。"""
-    system = _make_system()
-    state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-
-    force = RelativisticCorrection(
-        central_body="EARTH",
-        enable_schwarzschild=False,
-        enable_lense_thirring=True,
-        enable_de_sitter=False,
-    )
-
-    with pytest.raises(Exception, match="."):  # 当前为 RelativisticCorrectionError
-        force.compute_acceleration(0.0, state, system)
 
 
 @pytest.mark.spice

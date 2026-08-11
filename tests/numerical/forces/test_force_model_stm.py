@@ -1,10 +1,11 @@
 """ForceModel STM（状态转移矩阵）支持测试。
 
-验证路线 B 的核心：ForceModel 通过组合式雅可比叠加 + 变分方程积分出的 STM，
-与物理等价的 EphemerisDynamics（解析 N 体 STM）逐元素一致。这保证雅可比
-叠加正确性——两者加速度公式相同，STM 必须一致。
+验证 ForceModel 通过 Rust compiled STM 传播（``propagate_compiled_stm_py``）
+得到的 STM，与物理等价的 EphemerisDynamics（解析 N 体 STM）逐元素一致。
+这保证雅可比叠加正确性——两者加速度公式相同，STM 必须一致。
 
-同时验证有限差分雅可比兜底路径的正确性。
+issue #378：Python 侧自定义力（无 Rust spec）不再支持传播；``with_stm=True``
+对无 spec 的力显式报能力错误。
 """
 
 from __future__ import annotations
@@ -22,10 +23,10 @@ from e2m2e.algorithm.forces import (
     ForceModel,
     GravityField,
     IndirectTerm,
+    PhysicalModel,
     PointMassGravity,
     ThirdBodyGravity,
 )
-from e2m2e.algorithm.forces.physical_model import PhysicalModel
 
 pytestmark = [
     pytest.mark.force,
@@ -141,64 +142,33 @@ class TestForceModelSTMConsistency:
 
 
 # =============================================================================
-# 有限差分雅可比兜底
+# 无 Rust spec 的自定义力：能力边界
 # =============================================================================
-class _AnalyticTestForce(PhysicalModel):
-    """有解析雅可比的测试力（简谐振子型），用于校准有限差分。"""
+class _CustomTestForce(PhysicalModel):
+    """无 Rust spec 的测试力。"""
 
     def __init__(self, k: float = 1.0):
         self._k = k
 
-    def compute_acceleration(self, t, state, system):
-        r = np.asarray(state, dtype=float)[:3]
-        return -self._k * r
 
-    def compute_jacobian(self, t, state, system):
-        return -self._k * np.eye(3)
+class TestCustomForceStmCapability:
+    """自定义 Python 力无 Rust spec，with_stm=True 必须显式报错。"""
 
-
-class _NoJacobianTestForce(PhysicalModel):
-    """不提供解析雅可比的测试力（与 _AnalyticTestForce 同物理）。"""
-
-    def __init__(self, k: float = 1.0):
-        self._k = k
-
-    def compute_acceleration(self, t, state, system):
-        r = np.asarray(state, dtype=float)[:3]
-        return -self._k * r
-
-    # compute_jacobian 继承基类默认返回 None
-
-
-class TestFiniteDiffJacobianFallback:
-    """验证 ForceModel 对无解析雅可比的力用有限差分兜底。"""
-
-    def test_finite_diff_matches_analytic_stm(self, spice_eph_system, spice_manager):
-        """同物理的力，解析雅可比 vs 有限差分雅可比，STM 应接近。"""
+    def test_custom_force_stm_propagation_rejected(self, spice_eph_system, spice_manager):
+        """无 Rust spec 的力不可触发 Python FD 回退。"""
         system = _make_force_model_system(spice_eph_system, spice_manager)
+        fm = ForceModel(system, forces=[_CustomTestForce(k=1.0)])
 
-        state0 = np.array([1.0, 0.0, 0.0, 0.0, 0.1, 0.0])
-        t_span = (0.0, 1.0)
-
-        # 解析路径
-        fm_analytic = ForceModel(system, forces=[_AnalyticTestForce(k=1.0)])
-        res_a = fm_analytic.propagate(state0, t_span, with_stm=True)
-
-        # 有限差分路径
-        fm_fd = ForceModel(system, forces=[_NoJacobianTestForce(k=1.0)])
-        res_f = fm_fd.propagate(state0, t_span, with_stm=True)
-
-        assert_allclose(
-            res_a["stm"][-1],
-            res_f["stm"][-1],
-            atol=1e-6,
-            rtol=1e-6,
-            err_msg="有限差分雅可比与解析雅可比的 STM 偏差过大",
-        )
+        with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+            fm.propagate(
+                np.array([1.0, 0.0, 0.0, 0.0, 0.1, 0.0]),
+                (0.0, 1.0),
+                with_stm=True,
+            )
 
 
 # =============================================================================
-# 球谐引力 STM 通路（GravityField 走有限差分雅可比兜底）
+# 球谐引力 STM 通路（GravityField 走 Rust 内有限差分雅可比）
 # =============================================================================
 @pytest.fixture
 def body_fixed_system(spice_kernel_path):
@@ -225,8 +195,8 @@ def body_fixed_system(spice_kernel_path):
 class TestGravityFieldSTM:
     """含球谐引力的 ForceModel STM 通路验证。
 
-    GravityField 不实现 compute_jacobian，走有限差分兜底。验证整条链路
-    （球谐加速度 + body-fixed 坐标变换 + 有限差分雅可比 + 变分方程）能跑通，
+    GravityField 在 Rust 侧用 body-fixed 有限差分雅可比。验证整条链路
+    （球谐加速度 + body-fixed 坐标变换 + FD 雅可比 + 变分方程）能跑通，
     且 STM 物理合理。
 
     力组合：地球 J2 + 月球球谐(10×10) + 月球间接项 + 太阳第三体。

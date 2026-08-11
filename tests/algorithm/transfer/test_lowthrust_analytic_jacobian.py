@@ -14,7 +14,7 @@ from e2m2e.integrators import (
     propagate_compiled_lowthrust_sensitivity,
 )
 
-pytestmark = pytest.mark.integrator
+pytestmark = [pytest.mark.integrator, pytest.mark.low_thrust]
 
 
 def _assert_sensitivity_match(name, analytic, fd, indices, rel_tol=1e-5, abs_floor=1e-6):

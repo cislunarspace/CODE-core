@@ -68,12 +68,10 @@ def project_hamiltonian_to_qf(
         pows.append([int(p) for p in pow_tuple])
         coefs.append(float(arr[0]))
 
-    try:
-        from e2m2e.integrators import project_hamiltonian_qf_py
-    except ImportError:
-        project_hamiltonian_qf_py = None
+    if scalar_only and pows:
+        from e2m2e.integrators import project_hamiltonian_qf_py, require_rust_extension
 
-    if scalar_only and pows and project_hamiltonian_qf_py is not None:
+        require_rust_extension("project_hamiltonian_qf_py")
         b_seq = [np.asarray(qf_result.B(t), dtype=float).ravel().tolist() for t in tlist]
         out_pows, out_coefs = project_hamiltonian_qf_py(pows, coefs, b_seq)
         coef_matrix = np.asarray(out_coefs, dtype=float)  # (M, K)
