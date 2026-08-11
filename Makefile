@@ -7,6 +7,8 @@
 
 PYTHON := python3
 UV     := uv run
+PYTEST_WORKERS ?= auto
+PYTEST_DIST ?= loadscope
 
 # 首次即自动落盘并解析路径：已缓存时 download_cspice.py 仅 stat（近乎零开销）。
 CSPICE_DIR := $(shell $(PYTHON) scripts/download_cspice.py --print-cspice-dir 2>/dev/null)
@@ -43,8 +45,8 @@ test: test-rust test-python  ## 全量测试（Rust 工作区 + Python）
 test-rust:  ## Rust 工作区测试（spice 默认；串行）
 	cargo test --workspace -- --test-threads=1
 
-test-python:  ## Python 测试（含 spice-gated，需先 make setup 拉内核）
-	$(UV) pytest tests/
+test-python:  ## Python 测试（默认 xdist 并行；含 spice-gated，需先 make setup 拉内核）
+	$(UV) pytest tests/ -n $(PYTEST_WORKERS) --dist $(PYTEST_DIST)
 
 check:  ## 格式 + lint（Rust + Python）
 	cargo fmt --all -- --check
