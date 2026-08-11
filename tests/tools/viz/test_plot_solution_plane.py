@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 from e2m2e.algorithm.dynamics import CR3BP_System
 from e2m2e.algorithm.transfer import TransferOptimizationResult
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.mbse.data.enums import TransferType
 from e2m2e.tools.viz.transfer import TransferPlotter
 
@@ -31,7 +32,9 @@ def _make_result(
     delta_v1: float,
     delta_v2: float,
     transfer_type: TransferType = TransferType.DIRECT,
-    success: bool = True,
+    status: ConvergenceState = ConvergenceState.CONVERGED,
+    cause: FailureCause = FailureCause.NONE,
+    **kwargs,
 ) -> TransferOptimizationResult:
     return TransferOptimizationResult(
         transfer_time=transfer_time,
@@ -39,7 +42,8 @@ def _make_result(
         delta_v2=delta_v2,
         total_delta_v=delta_v1 + delta_v2,
         transfer_type=transfer_type,
-        success=success,
+        status=status,
+        cause=cause,
         message="",
     )
 
@@ -106,7 +110,15 @@ class TestPlotSolutionPlaneEmptyData:
 
     def test_all_failed_no_error(self, system):
         viz = TransferPlotter(system)
-        results = [_make_result(5.0, 0.1, 0.1, success=False)]
+        results = [
+            _make_result(
+                5.0,
+                0.1,
+                0.1,
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.UNKNOWN,
+            )
+        ]
         ax = viz.plot_solution_plane(results)
         assert ax is not None
         plt.close("all")
@@ -160,7 +172,9 @@ class TestPlotSolutionPlaneDictInput:
                 "delta_v2": 0.05,
                 "objective_value": 0.15,
                 "transfer_type": "direct",
-                "success": True,
+                "status": ConvergenceState.CONVERGED,
+                "cause": FailureCause.NONE,
+                "message": "收敛",
             },
             {
                 "transfer_time": 15.0,
@@ -168,7 +182,9 @@ class TestPlotSolutionPlaneDictInput:
                 "delta_v2": 0.1,
                 "objective_value": 0.3,
                 "transfer_type": "lga",
-                "success": True,
+                "status": ConvergenceState.CONVERGED,
+                "cause": FailureCause.NONE,
+                "message": "收敛",
             },
         ]
         ax = viz.plot_solution_plane(results)

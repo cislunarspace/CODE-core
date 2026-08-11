@@ -7,6 +7,7 @@ CR3BP 纯数值测试不需要 SPICE，用 CR3BP_System(mu=MU)._with_default_sca
 from __future__ import annotations
 
 import math
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -25,6 +26,7 @@ from e2m2e.algorithm.transfer.lga import (
     search_lga_trajectories,
 )
 from e2m2e.data.constants import Datum
+from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 
@@ -183,7 +185,7 @@ class TestLgaRefine:
         return system, dynamics, dep_state, tgt_state
 
     def test_refine_candidate_converges(self, cr3bp_setup):
-        """最优候选经 _refine_lga_candidate 精化后 converged=True。"""
+        """最优候选经 _refine_lga_candidate 精化后状态为收敛。"""
         system, dynamics, dep_state, tgt_state = cr3bp_setup
         candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
         if not candidates:
@@ -192,7 +194,7 @@ class TestLgaRefine:
         best = candidates[0]
         refined = _refine_lga_candidate(best, system, dynamics, tgt_state)
         tof_arr = (best.arrival_time_dim - best.perilune_time_dim) * system.characteristic_time
-        assert refined.converged, (
+        assert refined.status is ConvergenceState.CONVERGED, (
             f"精化应收敛：best.total_dv={best.total_dv:.4f}, tof_arrival={tof_arr:.2f}s"
         )
 
@@ -351,6 +353,34 @@ class TestLgaTransferOrbit:
 
         assert isinstance(result, TransferDesignResult)
         assert result.transfer_type == "LGA"
+        assert [stage.name for stage in result.stages] == ["search", "refinement", "shooting"]
+        assert result.stages[0].applicable and result.stages[0].executed
+        assert result.stages[0].result_status in (
+            ConvergenceState.CONVERGED,
+            ConvergenceState.INFEASIBLE,
+        )
+        if result.stages[0].result_status is ConvergenceState.INFEASIBLE:
+            assert result.stages[1].executed is False
+            assert result.stages[1].result_status is None
+            assert result.stages[2].executed is False
+            assert result.stages[2].result_status is None
+
+    def test_search_failure_leaves_followup_stages_unexecuted(self):
+        """搜索无候选时，精化和打靶不以失败原因占位。"""
+        tli_params = TliParams(parking_alt_km=200.0, inclination_deg=0.0)
+        with patch("e2m2e.algorithm.transfer.search_lga_trajectories", return_value=[]):
+            result = transfer_orbit(
+                "LGA",
+                tli_params=tli_params,
+                target_ephemeris=self._make_target_ephemeris(),
+            )
+
+        search, refinement, shooting = result.stages
+        assert search.result_status is ConvergenceState.INFEASIBLE
+        assert refinement.applicable and not refinement.executed
+        assert refinement.result_status is None
+        assert shooting.applicable and not shooting.executed
+        assert shooting.result_status is None
 
     def test_lga_details_populated(self):
         """details 包含 LgaTransferDetails 全部字段。"""
@@ -377,7 +407,7 @@ class TestLgaTransferOrbit:
         assert isinstance(details.dv_arrival_km_s, float)
         assert isinstance(details.n_candidates_searched, int)
         assert isinstance(details.n_candidates_feasible, int)
-        assert isinstance(details.converged, bool)
+        assert isinstance(details.status, ConvergenceState)
         assert isinstance(details.search_params, LgaSearchParams)
 
     def test_unsupported_type_still_raises(self):

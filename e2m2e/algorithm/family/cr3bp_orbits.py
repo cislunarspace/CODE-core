@@ -92,10 +92,10 @@ def _moon_distance_minmax(
 
 
 def _correct_or_raise(corrector: DifferentialCorrection, guess: Orbit, label: str) -> Orbit:
-    orbit = corrector.iterate_correction(initial_guess=guess, verbose=False)
-    if orbit is None:
-        raise Cr3bpOrbitError(f"{label} 微分修正未收敛: {corrector.termination_reason}")
-    return orbit
+    result = corrector.iterate_correction(initial_guess=guess, verbose=False)
+    if result.orbit is None:
+        raise Cr3bpOrbitError(f"{label} 微分修正未收敛: {result.message}")
+    return result.orbit
 
 
 def _require_orbit(o: Orbit | None) -> Orbit:
@@ -803,10 +803,11 @@ def _correct_spo(
     )
     seed.period = period
 
-    orbit = corrector.iterate_full_period_correction(seed, verbose=False)
+    result = corrector.iterate_full_period_correction(seed, verbose=False)
+    orbit = result.orbit
     if orbit is None:
         raise Cr3bpOrbitError(
-            f"SPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {corrector.termination_reason}"
+            f"SPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {result.message}"
         )
     assert orbit.period is not None
     if orbit.period < 1.0 or orbit.period > 15.0:
@@ -987,10 +988,11 @@ def _correct_lpo(
     )
     seed.period = period
 
-    orbit = corrector.iterate_full_period_correction(seed, verbose=False)
+    result = corrector.iterate_full_period_correction(seed, verbose=False)
+    orbit = result.orbit
     if orbit is None:
         raise Cr3bpOrbitError(
-            f"LPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {corrector.termination_reason}"
+            f"LPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {result.message}"
         )
     assert orbit.period is not None
     # LPO 周期范围：极限 21.07 nd（~91 天），大振幅可到 ~30+ nd

@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
 from e2m2e.tools.viz.base import OrbitVisualizer
 from e2m2e.tools.viz.family import FamilyPlotter
@@ -80,11 +81,30 @@ class TestTransferPlotterPlotEntryPoint:
                 "delta_v2": 0.05,
                 "objective_value": 0.15,
                 "transfer_type": "direct",
-                "success": True,
+                "status": ConvergenceState.CONVERGED,
+                "cause": FailureCause.NONE,
+                "message": "收敛",
             }
         ]
         ax = viz.plot(results)
         assert ax is not None
+        plt.close("all")
+
+    def test_plot_rejects_legacy_success_dict(self, system):
+        """ADR 0024：旧 success dict 不再透传，缺少三元组即报契约错误。"""
+        viz = TransferPlotter(system)
+        results = [
+            {
+                "transfer_time": 5.0,
+                "delta_v1": 0.1,
+                "delta_v2": 0.05,
+                "objective_value": 0.15,
+                "transfer_type": "direct",
+                "success": True,
+            }
+        ]
+        with pytest.raises(ValueError, match="status/cause/message"):
+            viz.plot(results)
         plt.close("all")
 
 

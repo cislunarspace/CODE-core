@@ -19,6 +19,7 @@ from e2m2e.algorithm.transfer import (
     StateTerminal,
     TransferSolution,
 )
+from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 
@@ -53,7 +54,7 @@ class TestHohmannPrimer:
     def test_hohmann_satisfies_lawden(self):
         transfer = _make_transfer(TOF_HOHMANN)
         sol = transfer.optimize(2)
-        assert sol.converged
+        assert sol.status is ConvergenceState.CONVERGED
         # 霍曼 ΔV 基准（LEO→GEO 量级，解析值 3.7708 km/s）
         assert sol.total_delta_v == pytest.approx(3.7708, abs=1e-3)
 
@@ -95,7 +96,7 @@ class TestNonOptimalGeometry:
         )
         sol3 = transfer.optimize(3, x0=x0)
 
-        assert sol3.converged, sol3.message
+        assert sol3.status is ConvergenceState.CONVERGED, sol3.message
         assert sol3.total_delta_v < sol2.total_delta_v - 0.05
 
 
@@ -107,7 +108,7 @@ class TestThreeImpulseStructure:
         sol = transfer.optimize(3)
 
         assert isinstance(sol, TransferSolution)
-        assert sol.converged, sol.message
+        assert sol.status is ConvergenceState.CONVERGED, sol.message
         assert sol.n_iter > 0
         # 三脉冲 = 两段滑行弧 + 到达脉冲
         assert len(sol.arcs) == 2

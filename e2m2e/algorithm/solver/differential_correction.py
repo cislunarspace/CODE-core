@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from ...data.templates import ConvergenceState, FailureCause
 from ...data.types.orbit import Orbit
 from ..dynamics import CR3BP_Dynamics
 
@@ -21,6 +22,7 @@ from ..family.halo_initial_guess import (  # noqa: F401
     compute_halo_initial_guess,
     halo_third_order_approximation,
 )
+from ..results import DifferentialCorrectionResult
 
 if TYPE_CHECKING:
     from ..family.strategies.base import CorrectionConfig
@@ -88,19 +90,19 @@ class DifferentialCorrection:
         self.max_iterations = self.DEFAULT_MAX_ITERATIONS
         self.damping_factor = self.DEFAULT_DAMPING_FACTOR
 
-        self.convergence_history: list[float] = []
+        self.convergence_history: list[dict[str, Any]] = []
         self.error_history: list[float] = []
         self.correction_history: list[float] = []
         self.iteration_count = 0
-        self.converged = False
+        self._converged = False
 
-        self.current_error = None
+        self.current_error: float | None = None
 
-        self.initial_guess = None
-        self.final_solution = None
-        self.solution_time = None
+        self.initial_guess: np.ndarray | None = None
+        self.final_solution: np.ndarray | None = None
+        self.solution_time: float | None = None
 
-        self.jacobian_matrix = None
+        self.jacobian_matrix: np.ndarray | None = None
 
         self.constraint_indices: list[int] = []
         self.free_variable_indices: list[int] = []
@@ -121,8 +123,9 @@ class DifferentialCorrection:
             "jacobian_evaluations": 0,
         }
 
-        self.termination_reason = None
-        self.success = False
+        self._outcome_status: ConvergenceState | None = None
+        self._outcome_cause: FailureCause | None = None
+        self._outcome_message = ""
 
     def setup_2D_symmetric_x_fixed_x0(self, x0=0.0):
         """配置平面问题中固定初始x坐标的对称周期轨道搜索
@@ -466,9 +469,22 @@ class DifferentialCorrection:
         self.error_history = []
         self.correction_history = []
         self.iteration_count = 0
-        self.converged = False
-        self.termination_reason = None
-        self.success = False
+        self._converged = False
+        self.current_error = None
+        self._outcome_status = None
+        self._outcome_cause = None
+        self._outcome_message = ""
+
+    def _set_outcome(
+        self,
+        status: ConvergenceState,
+        cause: FailureCause,
+        message: str,
+    ) -> None:
+        """记录本次迭代的最终状态，供结果对象统一对外表达。"""
+        self._outcome_status = status
+        self._outcome_cause = cause
+        self._outcome_message = message
 
     def _compute_jacobian_finite_diff(self, current_state, current_time):
         """使用有限差分法计算雅可比矩阵
@@ -533,7 +549,9 @@ class DifferentialCorrection:
         self.performance_stats["jacobian_evaluations"] += 1
         return jacobian
 
-    def iterate_correction(self, initial_guess, verbose=False, callback=None):
+    def iterate_correction(
+        self, initial_guess, verbose=False, callback=None
+    ) -> DifferentialCorrectionResult:
         """迭代修正主算法（基于STM的牛顿法）
 
         通过状态转移矩阵(STM)构建雅可比矩阵，使用牛顿迭代法修正自由变量，
@@ -564,8 +582,10 @@ class DifferentialCorrection:
 
         self.initial_guess = initial_guess.states[0]
         self.iteration_count = 0
-        self.converged = False
-        self.success = False
+        self._converged = False
+        self._outcome_status = None
+        self._outcome_cause = None
+        self._outcome_message = ""
 
         # 固定T模式下使用预设的T_half，否则从轨道周期计算
         if "T_half" in self.fixed_parameters:
@@ -573,7 +593,7 @@ class DifferentialCorrection:
         else:
             half_period_time = initial_guess.period / 2
 
-        current_state = self.initial_guess.copy()
+        current_state = initial_guess.states[0].copy()
         current_time = half_period_time
 
         if verbose:
@@ -617,7 +637,11 @@ class DifferentialCorrection:
             except Exception as e:
                 if verbose:
                     logger.info("  积分失败: %s", e)
-                self.termination_reason = f"积分失败: {e}"
+                self._set_outcome(
+                    ConvergenceState.FAILED,
+                    FailureCause.INTEGRATION_FAILED,
+                    f"积分失败: {e}",
+                )
                 break
 
             # 2. 计算约束残差
@@ -629,7 +653,7 @@ class DifferentialCorrection:
                 ]
             )
             error_vector = constraint - target
-            current_error = np.linalg.norm(error_vector)
+            current_error = float(np.linalg.norm(error_vector))
 
             self.error_history.append(current_error)
 
@@ -647,8 +671,10 @@ class DifferentialCorrection:
                 logger.info("迭代 %d: 约束残差范数 = %.2e", iteration + 1, current_error)
 
             if current_error < self.tolerance:
-                self.converged = True
-                self.termination_reason = "收敛成功：误差小于容差"
+                self._converged = True
+                self._set_outcome(
+                    ConvergenceState.CONVERGED, FailureCause.NONE, "收敛成功：误差小于容差"
+                )
                 self.current_error = current_error  # 保存误差值
                 if verbose:
                     logger.info("[OK] 收敛成功！最终误差: %.2e", current_error)
@@ -658,7 +684,11 @@ class DifferentialCorrection:
 
             # 4. 检查发散
             if current_error > self.divergence_limit:
-                self.termination_reason = "发散：误差超过限制"
+                self._set_outcome(
+                    ConvergenceState.DIVERGED,
+                    FailureCause.DIVERGENCE_DETECTED,
+                    "发散：误差超过限制",
+                )
                 if verbose:
                     logger.warning("[WARN] 迭代发散，误差 = %.2e", current_error)
                 if callback:
@@ -692,12 +722,16 @@ class DifferentialCorrection:
             except np.linalg.LinAlgError:
                 if verbose:
                     logger.warning("  雅可比矩阵奇异，无法求解修正量。")
-                self.termination_reason = "雅可比矩阵奇异"
+                self._set_outcome(
+                    ConvergenceState.FAILED,
+                    FailureCause.SINGULAR_JACOBIAN,
+                    "雅可比矩阵奇异",
+                )
                 if callback:
                     callback(iteration + 1, current_error, False)
                 break
 
-            correction_norm = np.linalg.norm(delta)
+            correction_norm = float(np.linalg.norm(delta))
             self.correction_history.append(correction_norm)
 
             # 7. 牛顿更新: X_new = X_old - J^{-1} * F
@@ -727,11 +761,15 @@ class DifferentialCorrection:
                 logger.info("  新半周期: T/2=%.6f", current_time)
 
             # 检查停滞（仅在未收敛的情况下检查）
-            if not self.converged and correction_norm < self.stagnation_limit:
+            if not self._converged and correction_norm < self.stagnation_limit:
                 # 修正量过小时，若误差已足够小，也视为收敛成功
                 if current_error < 1e-8:
-                    self.converged = True
-                    self.termination_reason = "收敛成功：修正量过小但误差足够小"
+                    self._converged = True
+                    self._set_outcome(
+                        ConvergenceState.CONVERGED,
+                        FailureCause.NONE,
+                        "收敛成功：修正量过小但误差足够小",
+                    )
                     self.current_error = current_error
                     if verbose:
                         logger.info(
@@ -743,7 +781,11 @@ class DifferentialCorrection:
                         callback(iteration + 1, current_error, True)
                     break
                 else:
-                    self.termination_reason = "停滞：修正量过小"
+                    self._set_outcome(
+                        ConvergenceState.STAGNATED,
+                        FailureCause.STAGNATION_DETECTED,
+                        "停滞：修正量过小",
+                    )
                     if verbose:
                         logger.info("  停滞：修正量 = %.2e", correction_norm)
                     if callback:
@@ -753,7 +795,7 @@ class DifferentialCorrection:
             if callback:
                 callback(iteration + 1, current_error, False)
 
-        if self.converged:
+        if self._converged:
             # 验证周期合理性（防止收敛到无效解如周期接近0的轨道）
             if self.setup_type in (
                 "halo_orbit_fixed_z0",
@@ -764,16 +806,16 @@ class DifferentialCorrection:
             else:
                 min_valid_period = 1e-6
             if 2 * current_time < min_valid_period:
-                self.converged = False
-                self.success = False
-                self.termination_reason = (
-                    f"收敛但周期无效: T={2 * current_time:.6e} < {min_valid_period}"
+                self._converged = False
+                self._set_outcome(
+                    ConvergenceState.INFEASIBLE,
+                    FailureCause.INVALID_PERIOD,
+                    f"收敛但周期无效: T={2 * current_time:.6e} < {min_valid_period}",
                 )
                 if verbose:
-                    logger.info("微分修正失败: %s", self.termination_reason)
-                return None
+                    logger.info("微分修正失败: %s", self._outcome_message)
+                return self._result_from_state(None)
 
-            self.success = True
             self.final_solution = current_state.copy()
             self.solution_time = current_time
 
@@ -787,12 +829,15 @@ class DifferentialCorrection:
                 logger.info("=" * 60)
 
             result_dict = self._build_result(current_state, current_time)
-            return self._create_corrected_orbit(result_dict)
+            return self._result_from_state(self._create_corrected_orbit(result_dict))
         else:
             if verbose:
-                logger.info("微分修正失败: %s", self.termination_reason)
+                logger.info("微分修正失败: %s", self._outcome_message)
+        return self._result_from_state(None)
 
-    def iterate_full_period_correction(self, initial_guess, verbose=False, callback=None):
+    def iterate_full_period_correction(
+        self, initial_guess, verbose=False, callback=None
+    ) -> DifferentialCorrectionResult:
         """全周期闭合修正（适用于无对称性的周期轨道，如 SPO）。
 
         与 iterate_correction 的区别：
@@ -812,10 +857,12 @@ class DifferentialCorrection:
         """
         self.initial_guess = initial_guess.states[0].copy()
         self.iteration_count = 0
-        self.converged = False
-        self.success = False
+        self._converged = False
+        self._outcome_status = None
+        self._outcome_cause = None
+        self._outcome_message = ""
 
-        current_state = self.initial_guess.copy()
+        current_state = initial_guess.states[0].copy()
         current_period = initial_guess.period  # 全周期（非半周期）
 
         if verbose:
@@ -854,14 +901,18 @@ class DifferentialCorrection:
             except Exception as e:
                 if verbose:
                     logger.info("  积分失败: %s", e)
-                self.termination_reason = f"积分失败: {e}"
+                self._set_outcome(
+                    ConvergenceState.FAILED,
+                    FailureCause.INTEGRATION_FAILED,
+                    f"积分失败: {e}",
+                )
                 break
 
             # 2. 计算闭合残差：state(T) - state(0) 在约束分量上
             error_vector = np.array(
                 [final_state[idx] - current_state[idx] for idx in self.constraint_indices]
             )
-            current_error = np.linalg.norm(error_vector)
+            current_error = float(np.linalg.norm(error_vector))
 
             self.error_history.append(current_error)
             self.convergence_history.append(
@@ -878,8 +929,10 @@ class DifferentialCorrection:
                 logger.info("迭代 %d: 闭合残差范数 = %.2e", iteration + 1, current_error)
 
             if current_error < self.tolerance:
-                self.converged = True
-                self.termination_reason = "收敛成功：闭合残差小于容差"
+                self._converged = True
+                self._set_outcome(
+                    ConvergenceState.CONVERGED, FailureCause.NONE, "收敛成功：闭合残差小于容差"
+                )
                 self.current_error = current_error
                 if verbose:
                     logger.info("[OK] 收敛成功！最终误差: %.2e", current_error)
@@ -888,7 +941,11 @@ class DifferentialCorrection:
                 break
 
             if current_error > self.divergence_limit:
-                self.termination_reason = "发散：误差超过限制"
+                self._set_outcome(
+                    ConvergenceState.DIVERGED,
+                    FailureCause.DIVERGENCE_DETECTED,
+                    "发散：误差超过限制",
+                )
                 if callback:
                     callback(iteration + 1, current_error, False)
                 break
@@ -925,12 +982,16 @@ class DifferentialCorrection:
             except np.linalg.LinAlgError:
                 if verbose:
                     logger.warning("  雅可比矩阵奇异，无法求解修正量。")
-                self.termination_reason = "雅可比矩阵奇异"
+                self._set_outcome(
+                    ConvergenceState.FAILED,
+                    FailureCause.SINGULAR_JACOBIAN,
+                    "雅可比矩阵奇异",
+                )
                 if callback:
                     callback(iteration + 1, current_error, False)
                 break
 
-            correction_norm = np.linalg.norm(delta)
+            correction_norm = float(np.linalg.norm(delta))
             self.correction_history.append(correction_norm)
 
             # 5. 更新自由变量
@@ -950,13 +1011,21 @@ class DifferentialCorrection:
             # 6. 停滞检查
             if correction_norm < self.stagnation_limit:
                 if current_error < 1e-8:
-                    self.converged = True
-                    self.termination_reason = "收敛成功：修正量过小但误差足够小"
+                    self._converged = True
+                    self._set_outcome(
+                        ConvergenceState.CONVERGED,
+                        FailureCause.NONE,
+                        "收敛成功：修正量过小但误差足够小",
+                    )
                     self.current_error = current_error
                     if callback:
                         callback(iteration + 1, current_error, True)
                     break
-                self.termination_reason = "停滞：修正量过小"
+                self._set_outcome(
+                    ConvergenceState.STAGNATED,
+                    FailureCause.STAGNATION_DETECTED,
+                    "停滞：修正量过小",
+                )
                 if callback:
                     callback(iteration + 1, current_error, False)
                 break
@@ -964,14 +1033,16 @@ class DifferentialCorrection:
             if callback:
                 callback(iteration + 1, current_error, False)
 
-        if self.converged:
+        if self._converged:
             if current_period < 1e-6:
-                self.converged = False
-                self.success = False
-                self.termination_reason = f"收敛但周期无效: T={current_period:.6e}"
-                return None
+                self._converged = False
+                self._set_outcome(
+                    ConvergenceState.INFEASIBLE,
+                    FailureCause.INVALID_PERIOD,
+                    f"收敛但周期无效: T={current_period:.6e}",
+                )
+                return self._result_from_state(None)
 
-            self.success = True
             self.final_solution = current_state.copy()
             self.solution_time = current_period
 
@@ -989,13 +1060,33 @@ class DifferentialCorrection:
                 "period": current_period,
                 "half_period": current_period / 2,
                 "setup_type": self.setup_type,
-                "converged": self.converged,
                 "error": self.current_error,
             }
-            return self._create_corrected_orbit(result_dict)
+            return self._result_from_state(self._create_corrected_orbit(result_dict))
         else:
             if verbose:
-                logger.info("微分修正失败: %s", self.termination_reason)
+                logger.info("微分修正失败: %s", self._outcome_message)
+        return self._result_from_state(None)
+
+    def _result_from_state(self, orbit: Orbit | None) -> DifferentialCorrectionResult:
+        if self._converged:
+            status, cause = ConvergenceState.CONVERGED, FailureCause.NONE
+            message = self._outcome_message
+        elif self._outcome_status is not None and self._outcome_cause is not None:
+            status, cause = self._outcome_status, self._outcome_cause
+            message = self._outcome_message
+        else:
+            status, cause = ConvergenceState.MAX_ITERATIONS, FailureCause.MAX_ITERATIONS_REACHED
+            message = "达到最大迭代次数"
+        return DifferentialCorrectionResult(
+            status=status,
+            cause=cause,
+            message=message,
+            orbit=orbit,
+            iterations=self.iteration_count,
+            residual=self.current_error,
+            residual_history=tuple(float(error) for error in self.error_history),
+        )
 
     def _build_result(self, final_state, half_period):
         """构建修正结果字典
@@ -1012,8 +1103,7 @@ class DifferentialCorrection:
             "period": 2 * half_period,
             "half_period": half_period,
             "setup_type": self.setup_type,
-            "converged": self.converged,
-            "error": self.current_error if hasattr(self, "current_error") else None,
+            "error": self.current_error,
         }
 
     def _create_corrected_orbit(self, result):
@@ -1080,11 +1170,6 @@ class DifferentialCorrection:
         orbit.is_periodic = bool(closure_error < 1e-8)
         orbit.family_type = self._infer_family_type()
 
-        # 保存修正结果信息到 Orbit 对象
-        orbit.correction_success = self.success
-        orbit.correction_iterations = self.iteration_count
-        orbit.correction_error = result.get("error")
-        orbit.correction_termination_reason = self.termination_reason
         orbit.closure_error = float(closure_error)
 
         return orbit
@@ -1105,7 +1190,7 @@ class DifferentialCorrection:
         Returns:
             bool: 是否收敛
         """
-        return self.converged
+        return self._converged
 
     def get_convergence_history(self):
         """获取收敛历史
@@ -1117,12 +1202,13 @@ class DifferentialCorrection:
             "errors": self.error_history,
             "corrections": self.correction_history,
             "iterations": self.iteration_count,
-            "converged": self.converged,
-            "termination_reason": self.termination_reason,
+            "status": self._outcome_status,
+            "cause": self._outcome_cause,
+            "message": self._outcome_message,
         }
 
     def __str__(self):
-        return f"DifferentialCorrection(setup={self.setup_type}, converged={self.converged})"
+        return f"DifferentialCorrection(setup={self.setup_type})"
 
     def __repr__(self):
         return (

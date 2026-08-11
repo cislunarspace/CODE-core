@@ -5,9 +5,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
 
+from ...data.templates import ConvergenceState
 from ...data.types.orbit import Orbit
+
+if TYPE_CHECKING:
+    from ..results import TransferCandidateResult
 
 MAX_DISTANCE_PAIRS = 10_000_000
 
@@ -104,7 +110,7 @@ def check_collision(
 
 
 def is_feasible_result(
-    result: dict,
+    result: TransferCandidateResult | dict[str, Any],
     min_distance_threshold: float | None,
     default_min_distance_threshold: float,
 ) -> bool:
@@ -113,6 +119,9 @@ def is_feasible_result(
         if min_distance_threshold is not None
         else default_min_distance_threshold
     )
+    status = result.get("status")
+    if status is not None and status is not ConvergenceState.CONVERGED:
+        return False
     if result.get("collision_found", False):
         return False
     md = float(result.get("min_distance", float("inf")))

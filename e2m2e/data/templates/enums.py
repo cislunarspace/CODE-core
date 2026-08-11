@@ -52,22 +52,36 @@ class BoundaryMode(enum.Enum):
     FIXED_ENDPOINTS = "fixed_endpoints"
 
 
-class TwoLevelMultipleShootingStatus(enum.Enum):
-    """两层多重打靶的结果状态。"""
-
-    CONVERGED = "converged"
-    MAX_ITERATIONS = "max_iterations"
-    LEVEL1_FAILED = "level1_failed"
-
-
 class ConvergenceState(enum.Enum):
-    """算法收敛状态（用于状态机图）"""
+    """算法最终状态。"""
 
     ITERATING = "iterating"
     CONVERGED = "converged"
     DIVERGED = "diverged"
     STAGNATED = "stagnated"
     MAX_ITERATIONS = "max_iterations"
+    INFEASIBLE = "infeasible"
+    COLLISION = "collision"
+    FAILED = "failed"
+
+
+class FailureCause(enum.Enum):
+    """算法最终结局的稳定原因码。"""
+
+    NONE = "none"
+    INTEGRATION_FAILED = "integration_failed"
+    SINGULAR_JACOBIAN = "singular_jacobian"
+    INVALID_PERIOD = "invalid_period"
+    MAX_ITERATIONS_REACHED = "max_iterations_reached"
+    STAGNATION_DETECTED = "stagnation_detected"
+    DIVERGENCE_DETECTED = "divergence_detected"
+    NO_INTERSECTION = "no_intersection"
+    CONSTRAINT_VIOLATION = "constraint_violation"
+    BODY_COLLISION = "body_collision"
+    LEVEL1_CORRECTION_FAILED = "level1_correction_failed"
+    BACKEND_FAILURE = "backend_failure"
+    INVALID_INPUT = "invalid_input"
+    UNKNOWN = "unknown"
 
 
 class OrbitFamilyType(enum.Enum):

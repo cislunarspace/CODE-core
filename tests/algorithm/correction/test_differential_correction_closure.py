@@ -74,19 +74,18 @@ class TestPeriodicFlag:
 class TestCorrectionResultAttributes:
     """测试修正结果信息属性的正确设置"""
 
-    def test_correction_iterations_non_negative(self, corrected_dro):
-        """correction_iterations 应该为非负值"""
-        assert corrected_dro.correction_iterations >= 0, (
-            f"correction_iterations should be non-negative,"
-            f" got {corrected_dro.correction_iterations}"
-        )
+    def test_correction_iterations_non_negative(self, dro_corrector, dro_seed_orbit):
+        """修正结果的迭代次数应为非负值。"""
+        result = dro_corrector.iterate_correction(dro_seed_orbit)
+        assert result.iterations >= 0
 
-    def test_successful_correction_has_convergence_reason(self, corrected_dro):
-        """成功的修正应该有收敛的 termination_reason"""
-        if corrected_dro.correction_success:
-            assert corrected_dro.correction_termination_reason is not None, (
-                "Successful correction should have termination_reason"
-            )
+    def test_successful_correction_has_convergence_reason(self, dro_corrector, dro_seed_orbit):
+        """成功修正应携带稳定的成功状态和消息。"""
+        result = dro_corrector.iterate_correction(dro_seed_orbit)
+        if result.orbit is not None:
+            assert result.status.value == "converged"
+            assert result.cause.value == "none"
+            assert result.message
 
 
 # ============================================================
@@ -122,10 +121,10 @@ class TestFamilyTypeInference:
 
     def test_2d_orbit_family_type_lyapunov(self, dro_corrector, dro_seed_orbit):
         """2D 对称轨道应该被识别为 lyapunov 类型"""
-        orbit = dro_corrector.iterate_correction(dro_seed_orbit)
-        if orbit is not None:
-            assert orbit.family_type == "lyapunov", (
-                f"2D orbit should have family_type='lyapunov', got {orbit.family_type}"
+        result = dro_corrector.iterate_correction(dro_seed_orbit)
+        if result.orbit is not None:
+            assert result.orbit.family_type == "lyapunov", (
+                f"2D orbit should have family_type='lyapunov', got {result.orbit.family_type}"
             )
 
     def test_3d_orbit_family_type_halo(self, dro_dynamics):
@@ -157,9 +156,9 @@ class TestBoundaryCases:
     def test_very_small_step_correction(self, dro_corrector, dro_seed_orbit):
         """测试修正器处理极小步长的能力"""
         dro_corrector.max_iterations = 10
-        orbit = dro_corrector.iterate_correction(dro_seed_orbit, verbose=False)
-        # 应该成功或返回 None，不应崩溃
-        assert orbit is None or isinstance(orbit, Orbit)
+        result = dro_corrector.iterate_correction(dro_seed_orbit, verbose=False)
+        # 应返回状态化结果，且不应崩溃
+        assert result.status.value != "iterating"
 
     def test_none_result_handling(self, dro_dynamics):
         """测试修正失败返回 None 的情况"""
@@ -175,5 +174,6 @@ class TestBoundaryCases:
         bad_orbit.period = 0.01
 
         result = corrector.iterate_correction(bad_orbit)
-        # 应该返回 None
-        assert result is None
+        # 应返回包含失败状态的结果
+        assert result.orbit is None
+        assert result.status.value != "converged"

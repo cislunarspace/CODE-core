@@ -10,7 +10,9 @@
 //! 3. 逐步合并相邻段，继续修正
 //! 4. 重复直到所有段合并为一条完整轨迹
 
-use crate::multiple_shooting::{multiple_shooting_correct, MultipleShootingRustResult};
+use crate::multiple_shooting::{
+    multiple_shooting_correct, MultipleShootingRustResult, SolverTermination,
+};
 use e2m2e_forces::forces::compiled::CompiledForce;
 use e2m2e_propagation::rk_methods::RkMethod;
 use pyo3::prelude::*;
@@ -25,9 +27,15 @@ pub struct SegmentedShootingResult {
     /// 修正后的状态量
     #[pyo3(get)]
     pub state_patch: Vec<Vec<f64>>,
-    /// 是否收敛
+    /// 最终状态（受控值，与多重打靶结果契约一致）。
     #[pyo3(get)]
-    pub converged: bool,
+    pub status: String,
+    /// 最终原因（受控值，与 `status` 一一对应）。
+    #[pyo3(get)]
+    pub cause: String,
+    /// 面向调用方的最终诊断信息。
+    #[pyo3(get)]
+    pub message: String,
     /// 总迭代次数
     #[pyo3(get)]
     pub total_iterations: usize,
@@ -40,6 +48,31 @@ pub struct SegmentedShootingResult {
     /// 分段数
     #[pyo3(get)]
     pub n_segments: usize,
+}
+
+impl SegmentedShootingResult {
+    fn new(
+        t_patch: Vec<f64>,
+        state_patch: Vec<Vec<f64>>,
+        total_iterations: usize,
+        max_residual: f64,
+        stage_residuals: Vec<f64>,
+        n_segments: usize,
+        outcome: SolverTermination,
+    ) -> Self {
+        let (status, cause, message) = outcome.contract();
+        Self {
+            t_patch,
+            state_patch,
+            status: status.to_string(),
+            cause: cause.to_string(),
+            message: message.to_string(),
+            total_iterations,
+            max_residual,
+            stage_residuals,
+            n_segments,
+        }
+    }
 }
 
 /// 分段配置。
@@ -158,7 +191,7 @@ pub fn segmented_shooting_correct(
     let n_segments = segments.len();
     let mut total_iterations = 0;
     let mut stage_residuals = Vec::new();
-    let mut converged = true;
+    let mut outcome = SolverTermination::Converged;
 
     if verbose {
         eprintln!(
@@ -189,8 +222,8 @@ pub fn segmented_shooting_correct(
         total_iterations += result.iterations;
         stage_residuals.push(result.max_residual);
 
-        if !result.converged {
-            converged = false;
+        if result.outcome() != SolverTermination::Converged {
+            outcome = result.outcome();
             if verbose {
                 eprintln!(
                     "    段 {} 未收敛，残差 = {:.2e}",
@@ -257,8 +290,8 @@ pub fn segmented_shooting_correct(
                     )?;
                     total_iterations += result.iterations;
                     stage_residuals.push(result.max_residual);
-                    if !result.converged {
-                        converged = false;
+                    if result.outcome() != SolverTermination::Converged {
+                        outcome = result.outcome();
                     }
                     corrected.push((result.t_patch, result.state_patch));
                 } else {
@@ -275,15 +308,15 @@ pub fn segmented_shooting_correct(
         let (final_t, final_s) = current_segments.into_iter().next().unwrap();
         let final_state: Vec<Vec<f64>> = final_s.iter().map(|s| s.to_vec()).collect();
 
-        Ok(SegmentedShootingResult {
-            t_patch: final_t,
-            state_patch: final_state,
-            converged,
+        Ok(SegmentedShootingResult::new(
+            final_t,
+            final_state,
             total_iterations,
-            max_residual: *stage_residuals.last().unwrap_or(&f64::INFINITY),
+            *stage_residuals.last().unwrap_or(&f64::INFINITY),
             stage_residuals,
             n_segments,
-        })
+            outcome,
+        ))
     } else {
         let mut all_t = Vec::new();
         let mut all_s = Vec::new();
@@ -301,15 +334,15 @@ pub fn segmented_shooting_correct(
 
         let final_state: Vec<Vec<f64>> = all_s.iter().map(|s| s.to_vec()).collect();
 
-        Ok(SegmentedShootingResult {
-            t_patch: all_t,
-            state_patch: final_state,
-            converged,
+        Ok(SegmentedShootingResult::new(
+            all_t,
+            final_state,
             total_iterations,
-            max_residual: *stage_residuals.last().unwrap_or(&f64::INFINITY),
+            *stage_residuals.last().unwrap_or(&f64::INFINITY),
             stage_residuals,
             n_segments,
-        })
+            outcome,
+        ))
     }
 }
 

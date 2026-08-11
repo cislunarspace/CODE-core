@@ -12,6 +12,8 @@ import numpy as np
 import numpy.typing as npt
 
 from ...algorithm.dynamics import CR3BP_System
+from ...algorithm.results import ResultStatus
+from ...data.templates import ConvergenceState
 from .base import OrbitVisualizer
 from .config import PlotConfig
 
@@ -75,7 +77,7 @@ class TransferPlotter(OrbitVisualizer):
 
         # 解析结果，过滤优化失败的解
         parsed = self._parse_solution_results(results)
-        valid = [r for r in parsed if r["success"]]
+        valid = [r for r in parsed if r.get("status") is ConvergenceState.CONVERGED]
         if not valid:
             ax.text(
                 0.5,
@@ -225,20 +227,29 @@ class TransferPlotter(OrbitVisualizer):
     def _parse_solution_results(self, results) -> list:
         """将搜索结果解析为统一的 dict 格式。
 
-        支持两种输入：原始 dict 直接透传，TransferOptimizationResult 对象提取字段。
+        只接受已迁移的结果：``TransferOptimizationResult`` 对象，或携带
+        ``status``/``cause``/``message`` 且组合经 ``ResultStatus`` 校验的 dict。
+        旧的 ``success`` dict 不再透传（ADR 0024：不设运行时兼容层）。
 
         Args:
             results: 搜索结果列表，元素为 dict 或 TransferOptimizationResult。
 
         Returns:
             统一的 dict 列表，每个 dict 包含 transfer_time/delta_v1/delta_v2/
-            objective_value/success/transfer_type 字段。
+            objective_value/status/cause/message/transfer_type 字段。
         """
         if not results:
             return []
         parsed = []
         for r in results:
             if isinstance(r, dict):
+                missing = {"status", "cause", "message"} - r.keys()
+                if missing:
+                    raise ValueError(
+                        f"搜索结果 dict 缺少结果状态三元组: {sorted(missing)}；"
+                        "迁移后的结果必须携带 status/cause/message（ADR 0024）"
+                    )
+                ResultStatus(r["status"], r["cause"], r["message"])
                 parsed.append(r)
             else:
                 parsed.append(
@@ -247,7 +258,9 @@ class TransferPlotter(OrbitVisualizer):
                         "delta_v1": r.delta_v1,
                         "delta_v2": r.delta_v2,
                         "objective_value": getattr(r, "total_delta_v", r.delta_v1 + r.delta_v2),
-                        "success": r.success,
+                        "status": r.status,
+                        "cause": r.cause,
+                        "message": r.message,
                         # transfer_type 可能是枚举值（.value 取字符串）
                         # 也可能已经是字符串（来自反序列化结果），两种情况统一处理
                         "transfer_type": r.transfer_type.value

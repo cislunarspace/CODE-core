@@ -21,7 +21,9 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ...data.constants import SECONDS_PER_DAY
+from ...data.templates import ConvergenceState, FailureCause
 from ..forces import PointMassGravity
+from ..results import ResultStatus, StageRecord
 from .config import (
     TransferArc,
     TransferConfig,
@@ -150,6 +152,10 @@ class TransferDesignResult:
         delta_v: 总 Δv（km/s）。
         trajectory: 转移轨迹。
         details: 设计细节（弹道参数汇总）。
+        stages: 搜索、精化和打靶等可选阶段的执行记录。
+        status: 任务最终状态。
+        cause: 导致该状态的原因码。
+        message: 人类可读诊断。
     """
 
     transfer_type: str
@@ -162,6 +168,13 @@ class TransferDesignResult:
         | LowThrustTransferDetails
         | dict[str, Any]
     ) = field(default_factory=dict)
+    stages: tuple[StageRecord, ...] = ()
+    status: ConvergenceState = ConvergenceState.CONVERGED
+    cause: FailureCause = FailureCause.NONE
+    message: str = "任务完成"
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 @dataclass
@@ -204,8 +217,13 @@ class LgaTransferDetails:
     jacobi_arrival: float
     n_candidates_searched: int
     n_candidates_feasible: int
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
     search_params: LgaSearchParams
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 @dataclass
@@ -222,8 +240,13 @@ class WsbTransferDetails:
     dv_arrival_km_s: float
     n_candidates_searched: int
     n_candidates_feasible: int
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
     search_params: WsbSearchParams
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 def _equivalent_delta_v(m0: float, mf: float, isp: float) -> float:
@@ -252,9 +275,10 @@ class LowThrustTransferDetails:
         equivalent_delta_v: 等效 Δv (km/s)，Tsiolkovsky 方程反算。
         n_segments: 求解器段数。
         solver_method: 求解方法 ("shooting" / "collocation")。
-        converged: 是否收敛。
+        status: 求解最终状态。
+        cause: 求解最终原因。
+        message: 求解器消息。
         n_iter: 迭代次数。
-        solver_message: 求解器消息。
         terminal_residual_r: 终端位置残差 (km)。
         terminal_residual_v: 终端速度残差 (km/s)。
         time: 采样时间序列 (M,)，SPICE et 秒。
@@ -270,15 +294,19 @@ class LowThrustTransferDetails:
     equivalent_delta_v: float
     n_segments: int
     solver_method: str  # "shooting" | "collocation"
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
     n_iter: int
-    solver_message: str
     terminal_residual_r: float  # km
     terminal_residual_v: float  # km/s
     time: NDArray[np.float64]
     states_7d: NDArray[np.float64]
     segments: tuple[LowThrustSegment, ...]
     qlaw_q_history: NDArray[np.float64] | None = None
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 def transfer_orbit(
@@ -469,7 +497,9 @@ def _transfer_orbit_lga(
             jacobi_arrival=0.0,
             n_candidates_searched=n_searched,
             n_candidates_feasible=0,
-            converged=False,
+            status=ConvergenceState.INFEASIBLE,
+            cause=FailureCause.NO_INTERSECTION,
+            message="搜索未找到可行候选",
             search_params=params,
         )
         return TransferDesignResult(
@@ -477,6 +507,20 @@ def _transfer_orbit_lga(
             delta_v=float("inf"),
             trajectory=None,
             details=details,
+            status=details.status,
+            cause=details.cause,
+            message=details.message,
+            stages=(
+                StageRecord(
+                    "search",
+                    applicable=True,
+                    executed=True,
+                    result_status=ConvergenceState.INFEASIBLE,
+                    message="未找到可行候选",
+                ),
+                StageRecord("refinement", applicable=True, executed=False, result_status=None),
+                StageRecord("shooting", applicable=True, executed=False, result_status=None),
+            ),
         )
 
     # 4. 取最优候选
@@ -503,7 +547,9 @@ def _transfer_orbit_lga(
         jacobi_arrival=refined.jacobi_arrival,
         n_candidates_searched=n_searched,
         n_candidates_feasible=n_feasible,
-        converged=refined.converged,
+        status=refined.status,
+        cause=refined.cause,
+        message=refined.message,
         search_params=params,
     )
 
@@ -512,6 +558,26 @@ def _transfer_orbit_lga(
         delta_v=refined.total_dv,
         trajectory=None,
         details=details,
+        status=refined.status,
+        cause=refined.cause,
+        message=refined.message,
+        stages=(
+            StageRecord(
+                "search",
+                applicable=True,
+                executed=True,
+                result_status=ConvergenceState.CONVERGED,
+                message="找到可行候选",
+            ),
+            StageRecord("refinement", applicable=True, executed=True, result_status=refined.status),
+            StageRecord(
+                "shooting",
+                applicable=True,
+                executed=True,
+                result_status=refined.status,
+                message=refined.message,
+            ),
+        ),
     )
 
 
@@ -574,7 +640,9 @@ def _transfer_orbit_wsb(
             dv_arrival_km_s=float("inf"),
             n_candidates_searched=n_searched,
             n_candidates_feasible=0,
-            converged=False,
+            status=ConvergenceState.INFEASIBLE,
+            cause=FailureCause.NO_INTERSECTION,
+            message="搜索未找到可行候选",
             search_params=params,
         )
         return TransferDesignResult(
@@ -582,6 +650,20 @@ def _transfer_orbit_wsb(
             delta_v=float("inf"),
             trajectory=None,
             details=details,
+            status=details.status,
+            cause=details.cause,
+            message=details.message,
+            stages=(
+                StageRecord(
+                    "search",
+                    applicable=True,
+                    executed=True,
+                    result_status=ConvergenceState.INFEASIBLE,
+                    message="未找到可行候选",
+                ),
+                StageRecord("refinement", applicable=True, executed=False, result_status=None),
+                StageRecord("shooting", applicable=True, executed=False, result_status=None),
+            ),
         )
 
     # 4. 取最优候选
@@ -607,7 +689,9 @@ def _transfer_orbit_wsb(
         dv_arrival_km_s=refined.dv_arrival,
         n_candidates_searched=n_searched,
         n_candidates_feasible=n_feasible,
-        converged=refined.converged,
+        status=refined.status,
+        cause=refined.cause,
+        message=refined.message,
         search_params=params,
     )
 
@@ -616,6 +700,26 @@ def _transfer_orbit_wsb(
         delta_v=refined.total_dv,
         trajectory=None,
         details=details,
+        status=refined.status,
+        cause=refined.cause,
+        message=refined.message,
+        stages=(
+            StageRecord(
+                "search",
+                applicable=True,
+                executed=True,
+                result_status=ConvergenceState.CONVERGED,
+                message="找到可行候选",
+            ),
+            StageRecord("refinement", applicable=True, executed=True, result_status=refined.status),
+            StageRecord(
+                "shooting",
+                applicable=True,
+                executed=True,
+                result_status=refined.status,
+                message=refined.message,
+            ),
+        ),
     )
 
 
@@ -756,9 +860,10 @@ def _transfer_orbit_low_thrust(
         equivalent_delta_v=equiv_dv,
         n_segments=n_segments,
         solver_method=solver_method,
-        converged=sol.converged,
+        status=sol.status,
+        cause=sol.cause,
+        message=sol.message,
         n_iter=sol.n_iter,
-        solver_message=sol.message,
         terminal_residual_r=terminal_residual_r,
         terminal_residual_v=terminal_residual_v,
         time=sol.time.astype(np.float64),
@@ -772,6 +877,20 @@ def _transfer_orbit_low_thrust(
         delta_v=equiv_dv,
         trajectory=sol.states,
         details=details,
+        status=sol.status,
+        cause=sol.cause,
+        message=sol.message,
+        stages=(
+            StageRecord("search", applicable=False, executed=False, result_status=None),
+            StageRecord("refinement", applicable=False, executed=False, result_status=None),
+            StageRecord(
+                "shooting",
+                applicable=True,
+                executed=True,
+                result_status=sol.status,
+                message=sol.message,
+            ),
+        ),
     )
 
 
@@ -835,7 +954,7 @@ def _transfer_orbit_hmn(
             v0=v0 + np.array([0.0, dv1, 0.0]) if tof_range is None else v0_lambert,
             tof=tof,
         )
-        if shoot_result.converged:
+        if shoot_result.status is ConvergenceState.CONVERGED:
             # 用打靶收敛的出发状态更新 delta_v 和 departure_state
             v0_shot = shoot_result.state_patch[0, 3:6]
             dv1 = float(np.linalg.norm(v0_shot - v0))
@@ -862,9 +981,37 @@ def _transfer_orbit_hmn(
         delta_v_theory=(dv1, dv2),
     )
 
+    if dynamics is None:
+        status = ConvergenceState.CONVERGED
+        cause = FailureCause.NONE
+        message = "霍曼转移完成"
+    else:
+        status = shoot_result.status
+        cause = shoot_result.cause
+        message = shoot_result.message
+
     return TransferDesignResult(
         transfer_type="HMN",
         delta_v=dv1 + dv2,
         trajectory=trajectory,
         details=details,
+        status=status,
+        cause=cause,
+        message=message,
+        stages=(
+            StageRecord(
+                "search",
+                applicable=tof_range is not None,
+                executed=tof_range is not None,
+                result_status=ConvergenceState.CONVERGED if tof_range is not None else None,
+            ),
+            StageRecord("refinement", applicable=False, executed=False, result_status=None),
+            StageRecord(
+                "shooting",
+                applicable=dynamics is not None,
+                executed=dynamics is not None,
+                result_status=shoot_result.status if dynamics is not None else None,
+                message=shoot_result.message if dynamics is not None else "",
+            ),
+        ),
     )

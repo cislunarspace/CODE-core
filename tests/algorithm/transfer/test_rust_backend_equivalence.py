@@ -7,7 +7,7 @@
 - 整数索引字段（argmin / 首次命中步）：**精确相等**——分叉即算法不一致
   （非数值噪声）。Python sequential 与 Rust 都走同一个 Rust ``propagate_cr3bp``，
   states 逐位相同，故 argmin 必然一致。
-- 布尔字段（success / intersection_found / ...）：精确相等
+- 布尔领域事实（intersection_found / ...）：精确相等
 - 浮点字段（min_distance / dv_departure / ...）：``assert_allclose(rtol=1e-9, atol=1e-12)``
 
 网格选得温和（窄 α 范围、短 transfer_time），不触发积分发散分支；若触发，
@@ -54,7 +54,6 @@ INT_FIELDS = [
 
 # 布尔字段：精确相等。
 BOOL_FIELDS = [
-    "success",
     "intersection_found",
     "collision_found",
     "local_minimum_found",
@@ -136,7 +135,7 @@ def _sort_key(r: dict) -> tuple:
 
 def _assert_candidate_equal(py_r: dict, rs_r: dict) -> None:
     """逐字段对照单个候选解（Python sequential vs Rust serial）。"""
-    # status 字符串精确相等（success/collision/no_intersection/integration_failed）。
+    # 状态枚举精确相等。
     assert py_r["status"] == rs_r["status"], f"status: py={py_r['status']!r} rs={rs_r['status']!r}"
     # collision_body 字符串精确相等（None / "earth" / "moon"）。
     assert py_r["collision_body"] == rs_r["collision_body"], (
@@ -152,7 +151,7 @@ def _assert_candidate_equal(py_r: dict, rs_r: dict) -> None:
         assert py_r[f] == rs_r[f], f"{f}: py={py_r[f]!r} rs={rs_r[f]!r}"
 
     # 浮点：allclose（None / inf 特例）。
-    integration_failed = py_r["status"] == "integration_failed"
+    integration_failed = py_r["cause"].value == "integration_failed"
     for f in FLOAT_FIELDS:
         py_v = py_r[f]
         rs_v = rs_r[f]

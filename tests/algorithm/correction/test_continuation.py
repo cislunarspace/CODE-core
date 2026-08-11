@@ -8,6 +8,7 @@ import logging
 
 import pytest
 
+from e2m2e.algorithm.results import ContinuationResult
 from e2m2e.algorithm.solver.continuation import Continuation
 from e2m2e.data.types.orbit import OrbitFamily
 
@@ -119,7 +120,8 @@ class TestBidirectionalContinuation:
         )
 
         assert result is not None
-        assert isinstance(result, OrbitFamily)
+        assert isinstance(result, ContinuationResult)
+        assert isinstance(result.family, OrbitFamily)
 
     def test_backward_continuation(self, dro_continuation, corrected_dro):
         """测试反向延拓（参数减小方向）"""
@@ -132,7 +134,8 @@ class TestBidirectionalContinuation:
         )
 
         assert result is not None
-        assert isinstance(result, OrbitFamily)
+        assert isinstance(result, ContinuationResult)
+        assert isinstance(result.family, OrbitFamily)
 
     def test_bidirectional_continuation(self, dro_continuation, corrected_dro):
         """测试双向延拓"""
@@ -145,9 +148,10 @@ class TestBidirectionalContinuation:
         )
 
         assert result is not None
-        assert isinstance(result, OrbitFamily)
+        assert isinstance(result, ContinuationResult)
+        assert isinstance(result.family, OrbitFamily)
         # 双向延拓后，轨道数量应该大于 1
-        assert len(result) >= 1
+        assert len(result.family) >= 1
 
 
 # ============================================================
@@ -240,8 +244,9 @@ class TestTerminationConditions:
         """终止原因应该被设置"""
         # 使用一个会导致终止的范围
         dro_continuation.max_orbits = 2
+        result = None
         with contextlib.suppress(Exception):
-            dro_continuation.natural_continuation(
+            result = dro_continuation.natural_continuation(
                 seed_orbit=corrected_dro,
                 param_range=(0.78, 0.85),
                 step_size=0.001,
@@ -250,7 +255,7 @@ class TestTerminationConditions:
 
         # 如果延拓达到最大轨道数，应该设置终止原因
         if len(dro_continuation.family_orbits) >= dro_continuation.max_orbits:
-            assert dro_continuation.termination_reason is not None
+            assert result.message
 
 
 # ============================================================
@@ -310,7 +315,8 @@ class TestBoundaryCases:
         )
 
         # 应该返回 OrbitFamily 对象
-        assert result is None or isinstance(result, OrbitFamily)
+        assert isinstance(result, ContinuationResult)
+        assert isinstance(result.family, OrbitFamily)
 
     def test_invalid_step_size(self, dro_continuation, corrected_dro):
         """无效步长应该被处理"""
@@ -337,7 +343,8 @@ class TestBoundaryCases:
         )
 
         # 应该返回结果或优雅地处理
-        assert result is None or isinstance(result, OrbitFamily)
+        assert isinstance(result, ContinuationResult)
+        assert isinstance(result.family, OrbitFamily)
 
 
 # ============================================================
@@ -363,8 +370,8 @@ class TestEndToEndPipeline:
         )
 
         assert family_result is not None
-        assert len(family_result) > 0
-        for orbit in family_result:
+        assert len(family_result.family) > 0
+        for orbit in family_result.family:
             if orbit is not None:
                 assert orbit.period > 0
 
@@ -380,4 +387,4 @@ class TestEndToEndPipeline:
             verbose=False,
         )
         if result_family is not None:
-            assert len(result_family) >= 0
+            assert len(result_family.family) >= 0

@@ -326,6 +326,8 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   ``TransferPointResult`` pyclass（转移网格搜索串行评估）。
 /// - **v4**（#334）：新增 ``spice_spkezr`` + ``spice_pxform``（Rust CSPICE
 ///   实例诊断查询 API）。
+/// - **v5**：多重与分段打靶结果将公开 ``converged`` 替换为
+///   ``status`` / ``cause`` / ``message`` 三元组。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -2438,7 +2440,9 @@ fn check_collision_py(
 #[pyclass(frozen, get_all)]
 #[derive(Clone, Debug)]
 pub struct TransferPointResult {
-    pub success: bool,
+    pub status: String,
+    pub cause: String,
+    pub message: String,
     pub departure_state: Vec<f64>,
     pub departure_time: f64,
     pub alpha: f64,
@@ -2463,13 +2467,14 @@ pub struct TransferPointResult {
     pub collision_found: bool,
     pub collision_body: Option<String>,
     pub collision_idx: i64,
-    pub status: String,
 }
 
 impl From<e2m2e_forces::transfer_grid_search::TransferPointResult> for TransferPointResult {
     fn from(r: e2m2e_forces::transfer_grid_search::TransferPointResult) -> Self {
         Self {
-            success: r.success,
+            status: r.status,
+            cause: r.cause,
+            message: r.message,
             departure_state: r.departure_state.to_vec(),
             departure_time: r.departure_time,
             alpha: r.alpha,
@@ -2494,7 +2499,6 @@ impl From<e2m2e_forces::transfer_grid_search::TransferPointResult> for TransferP
             collision_found: r.collision_found,
             collision_body: r.collision_body,
             collision_idx: r.collision_idx,
-            status: r.status,
         }
     }
 }

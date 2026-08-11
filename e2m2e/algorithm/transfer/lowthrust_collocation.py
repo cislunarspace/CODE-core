@@ -28,7 +28,9 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import Bounds, minimize
 
+from ...data.templates import ConvergenceState, FailureCause
 from ..forces import PhysicalModel
+from ..results import scipy_slsqp_status
 from .lowthrust_shooting import EngineConfig, LowThrustSegment, LowThrustShootingSolution
 
 if TYPE_CHECKING:
@@ -133,12 +135,14 @@ class LowThrustCollocation:
             constraints=constraints,
             options={"ftol": ftol, "maxiter": maxiter, "disp": verbose},
         )
+        status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
         return self._build_solution(
             result.x,
             n_segments,
-            converged=bool(result.success),
-            n_iter=int(result.nit),
+            status=status,
+            cause=cause,
             message=str(result.message),
+            n_iter=int(result.nit),
         )
 
     def solve_from_qlaw(
@@ -296,9 +300,10 @@ class LowThrustCollocation:
         z: npt.NDArray[np.floating],
         n_segments: int,
         *,
-        converged: bool,
-        n_iter: int,
+        status: ConvergenceState,
+        cause: FailureCause,
         message: str,
+        n_iter: int,
     ) -> LowThrustShootingSolution:
         """从决策向量构造解。"""
         n_nodes = n_segments + 1
@@ -320,7 +325,8 @@ class LowThrustCollocation:
             segments=segments,
             final_mass=final_mass,
             fuel_consumed=self._initial_mass - final_mass,
-            converged=converged,
-            n_iter=n_iter,
+            status=status,
+            cause=cause,
             message=message,
+            n_iter=n_iter,
         )

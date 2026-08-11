@@ -12,6 +12,7 @@ from e2m2e.algorithm.normal_form.constants import JD0_J2000, LibrationPoint
 from e2m2e.algorithm.normal_form.context import NormalFormContext
 from e2m2e.algorithm.normal_form.corrector import QPITCorrector, QPITCorrectorResult
 from e2m2e.algorithm.normal_form.pipeline import NormalFormPipeline
+from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.theory
 
@@ -70,7 +71,7 @@ class TestQPITCorrector:
             periods=2,
         )
         assert isinstance(result, QPITCorrectorResult)
-        assert result.converged
+        assert result.status is ConvergenceState.CONVERGED
         assert result.iterations <= 3
 
     def test_output_shapes(self, nf_result_and_context):

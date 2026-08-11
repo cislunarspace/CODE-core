@@ -88,10 +88,6 @@ class Orbit:
             "tags": [],
         }
 
-        self.correction_success: bool | None = None
-        self.correction_iterations: int | None = None
-        self.correction_error: float | None = None
-        self.correction_termination_reason: str | None = None
         self.closure_error: float | None = None
 
         self.compute_basic_properties()
@@ -327,10 +323,6 @@ class Orbit:
 
         new_orbit.metadata = self.metadata.copy()
 
-        new_orbit.correction_success = self.correction_success
-        new_orbit.correction_iterations = self.correction_iterations
-        new_orbit.correction_error = self.correction_error
-        new_orbit.correction_termination_reason = self.correction_termination_reason
         new_orbit.closure_error = self.closure_error
 
         return new_orbit

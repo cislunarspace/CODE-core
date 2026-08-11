@@ -53,7 +53,9 @@ def _make_l1_lyapunov_orbit(system, dynamics) -> tuple[Orbit, DifferentialCorrec
     corrector.setup_2D_symmetric_x_fixed_x0(x0)
     seed = Orbit(states=[[x0, 0, 0, 0, mode[4] * _LYAP_AX, 0]], times=[0], system=system)
     seed.period = 2 * np.pi / eigenvalues[idx].imag
-    orbit = corrector.iterate_correction(seed, verbose=False)
+    result = corrector.iterate_correction(seed, verbose=False)
+    assert result.orbit is not None, "L1 Lyapunov 轨道微分修正失败"
+    orbit = result.orbit
     assert orbit is not None, "L1 Lyapunov 轨道微分修正失败"
     orbit.system = system
     return orbit, corrector
@@ -67,13 +69,13 @@ def lyapunov_family():
     lyap0, corrector = _make_l1_lyapunov_orbit(system, dynamics)
 
     cont = Continuation(corrector=corrector)
-    family = cont.natural_continuation(
+    continuation_result = cont.natural_continuation(
         seed_orbit=lyap0,
         param_range=(float(lyap0.states[0][0]), float(lyap0.states[0][0]) + _CONTINUE_DX),
         step_size=0.005,
         verbose=False,
     )
-    orbits = family.orbits
+    orbits = continuation_result.family.orbits
     assert len(orbits) > _MID_INDEX, "Lyapunov 族延拓轨道数不足"
     for o in orbits:
         o.system = system

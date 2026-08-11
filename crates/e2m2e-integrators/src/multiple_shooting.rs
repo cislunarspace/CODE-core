@@ -33,9 +33,15 @@ pub struct MultipleShootingRustResult {
     /// 修正后的状态量，形状 (N, 6)
     #[pyo3(get)]
     pub state_patch: Vec<[f64; 6]>,
-    /// 是否收敛
+    /// 最终状态（受控值：`converged` / `max_iterations` / `stagnated`）。
     #[pyo3(get)]
-    pub converged: bool,
+    pub status: String,
+    /// 最终原因（受控值，与 `status` 一一对应）。
+    #[pyo3(get)]
+    pub cause: String,
+    /// 面向调用方的最终诊断信息。
+    #[pyo3(get)]
+    pub message: String,
     /// 实际迭代次数
     #[pyo3(get)]
     pub iterations: usize,
@@ -51,6 +57,62 @@ pub struct MultipleShootingRustResult {
     /// 每次迭代最大残差的历史（加权 max）
     #[pyo3(get)]
     pub residual_history: Vec<f64>,
+    outcome: SolverTermination,
+}
+
+/// 多重打靶的最终状态。仅在结果构造处映射为 Python 边界的受控字符串。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SolverTermination {
+    Converged,
+    MaxIterations,
+    Stagnated,
+}
+
+impl SolverTermination {
+    pub(crate) fn contract(self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            Self::Converged => ("converged", "none", "多重打靶收敛"),
+            Self::MaxIterations => (
+                "max_iterations",
+                "max_iterations_reached",
+                "多重打靶达到最大迭代次数",
+            ),
+            Self::Stagnated => ("stagnated", "stagnation_detected", "多重打靶迭代停滞"),
+        }
+    }
+}
+
+impl MultipleShootingRustResult {
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        t_patch: Vec<f64>,
+        state_patch: Vec<[f64; 6]>,
+        iterations: usize,
+        max_residual: f64,
+        position_residual: f64,
+        velocity_residual: f64,
+        residual_history: Vec<f64>,
+        outcome: SolverTermination,
+    ) -> Self {
+        let (status, cause, message) = outcome.contract();
+        Self {
+            t_patch,
+            state_patch,
+            status: status.to_string(),
+            cause: cause.to_string(),
+            message: message.to_string(),
+            iterations,
+            max_residual,
+            position_residual,
+            velocity_residual,
+            residual_history,
+            outcome,
+        }
+    }
+
+    pub(crate) fn outcome(&self) -> SolverTermination {
+        self.outcome
+    }
 }
 
 /// 构建残差向量 F。
@@ -359,6 +421,7 @@ pub fn multiple_shooting_correct(
     let mut state_work = state_patch.to_vec();
     let mut residual_history = Vec::new();
     let mut converged = false;
+    let mut termination = SolverTermination::MaxIterations;
     // 末轮未加权位置/速度残差（结果分离报告）
     let mut final_pos_res = f64::INFINITY;
     let mut final_vel_res = f64::INFINITY;
@@ -499,6 +562,7 @@ pub fn multiple_shooting_correct(
         // 判断收敛
         if max_res < tolerance {
             converged = true;
+            termination = SolverTermination::Converged;
             break;
         }
 
@@ -517,6 +581,7 @@ pub fn multiple_shooting_correct(
                             improvement
                         );
                     }
+                    termination = SolverTermination::Stagnated;
                     break;
                 }
             } else {
@@ -590,20 +655,22 @@ pub fn multiple_shooting_correct(
                     max_res
                 );
             }
+            termination = SolverTermination::Stagnated;
             break;
         }
     }
 
-    Ok(MultipleShootingRustResult {
-        t_patch: t_work,
-        state_patch: state_work,
-        converged,
-        iterations: residual_history.len(),
-        max_residual: *residual_history.last().unwrap_or(&f64::INFINITY),
-        position_residual: final_pos_res,
-        velocity_residual: final_vel_res,
+    debug_assert_eq!(converged, termination == SolverTermination::Converged);
+    Ok(MultipleShootingRustResult::new(
+        t_work,
+        state_work,
+        residual_history.len(),
+        *residual_history.last().unwrap_or(&f64::INFINITY),
+        final_pos_res,
+        final_vel_res,
         residual_history,
-    })
+        termination,
+    ))
 }
 
 /// 对状态应用修正量 dX（只更新自由节点，按 free_pos 映射）。
@@ -870,5 +937,22 @@ mod tests {
         // 阻尼极小：接近 min-norm 解 [-2, 0]
         assert!((result.dx[0] - (-2.0)).abs() < 1e-8);
         assert!(result.dx[1].abs() < 1e-8);
+    }
+
+    #[test]
+    fn result_constructor_keeps_status_cause_message_consistent() {
+        let result = MultipleShootingRustResult::new(
+            vec![0.0, 1.0],
+            vec![[0.0; 6]; 2],
+            3,
+            1.0,
+            1.0,
+            1.0,
+            vec![1.0],
+            SolverTermination::Stagnated,
+        );
+        assert_eq!(result.status, "stagnated");
+        assert_eq!(result.cause, "stagnation_detected");
+        assert_eq!(result.message, "多重打靶迭代停滞");
     }
 }

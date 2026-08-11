@@ -26,6 +26,7 @@ from e2m2e.algorithm.normal_form.center_manifold import CenterManifoldReducer
 from e2m2e.algorithm.normal_form.dynamical_substitution import DynamicalSubstituteResult
 from e2m2e.algorithm.normal_form.quasi_floquet import QuasiFloquetResult, real_normal_form_matrix
 from e2m2e.algorithm.normal_form.types import NormalFormResult
+from e2m2e.data.templates import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.theory
 
@@ -125,6 +126,9 @@ def _make_normal_form_result(l1_context, *, n=96, T=3.0, max_order=5, with_terms
     return NormalFormResult(
         context=l1_context,
         order=l1_context.order,
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
+        message="测试化简完成",
         ds_result=ds,
         qf_result=qf,
         cm_result=cm,
@@ -152,6 +156,9 @@ def test_load_returns_normal_form_result(l1_context, tmp_path):
     path = tmp_path / "test.npz"
     result.save(path)
     loaded = NormalFormResult.load(path)
+    assert loaded.status is ConvergenceState.CONVERGED
+    assert loaded.cause is FailureCause.NONE
+    assert loaded.message == "测试化简完成"
     assert isinstance(loaded, NormalFormResult)
 
 
@@ -411,3 +418,30 @@ def test_fft_components_roundtrip(l1_context, tmp_path):
     assert len(loaded.ds_result.fft_components["y"]) == 1
     assert len(loaded.ds_result.fft_components["z"]) == 0
     np.testing.assert_allclose(loaded.ds_result.fft_components["x"][0].freq, 0.1, atol=1e-14)
+
+
+# ---------------------------------------------------------------------------
+# 持久化格式迁移
+# ---------------------------------------------------------------------------
+
+
+def test_load_rejects_old_format_without_status_fields(l1_context, tmp_path):
+    """旧 NPZ 缺少状态三元组时必须要求重新计算。"""
+    path = tmp_path / "legacy.npz"
+    np.savez(
+        path,
+        _fmt_version=np.array(1),
+        _ctx_system=np.frombuffer(b"CR3BP_System", dtype=np.uint8),
+    )
+
+    with pytest.raises(ValueError, match="旧格式"):
+        NormalFormResult.load(path)
+
+
+def test_load_rejects_missing_status_fields(l1_context, tmp_path):
+    """标称新格式缺状态字段时必须给出明确迁移错误。"""
+    path = tmp_path / "incomplete.npz"
+    np.savez(path, _fmt_version=np.array(2))
+
+    with pytest.raises(ValueError, match="缺少必需字段"):
+        NormalFormResult.load(path)

@@ -9,6 +9,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from e2m2e.data.templates import ConvergenceState
+
 pytestmark = pytest.mark.orchestration
 
 
@@ -66,7 +68,7 @@ class TestTransferOptimization:
         )
 
         assert result is not None
-        assert hasattr(result, "success")
+        assert isinstance(result.status, ConvergenceState)
         assert hasattr(result, "total_delta_v")
         assert hasattr(result, "departure_state")
         assert hasattr(result, "insertion_state")

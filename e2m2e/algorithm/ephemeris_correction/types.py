@@ -15,6 +15,9 @@ from typing import Protocol, runtime_checkable
 
 import numpy as np
 
+from ...data.templates import ConvergenceState, FailureCause
+from ..results import ResultStatus
+
 
 @dataclass(frozen=True)
 class EphemerisCorrectionResult:
@@ -34,7 +37,9 @@ class EphemerisCorrectionResult:
         velocity_residual_history: 速度残差历史（仅两层修正有值）
     """
 
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
     iterations: int
     max_residual: float
     residual_history: list[float]
@@ -42,6 +47,9 @@ class EphemerisCorrectionResult:
     state_patch: np.ndarray
     velocity_residual: float | None = None
     velocity_residual_history: list[float] | None = None
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 @runtime_checkable

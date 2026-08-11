@@ -9,6 +9,7 @@ from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.solver.multiple_shooting import convert_to_j2000, sample_patch_points
 from e2m2e.data.constants import Datum
+from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = [
@@ -50,9 +51,9 @@ def dro_orbit(cr3bp_dynamics):
     corrector.setup_2D_symmetric_x_fixed_x0(DRO_31_X0)
     result = corrector.iterate_correction(seed_orbit, verbose=False)
 
-    assert result is not None
-    assert corrector.success
-    return result
+    assert result.status is ConvergenceState.CONVERGED
+    assert result.orbit is not None
+    return result.orbit
 
 
 # =============================================================================

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from ...data.templates import ConvergenceState, FailureCause
 from .config import TransferOptimizationResult
 from .nlp_core import NLPOptimizationVariables
 
@@ -309,12 +310,13 @@ if NlpCallbackBase is not None:
             assert COPT is not None
             assert self.callback is not None
             opt_vars = NLPOptimizationVariables.from_array(self.callback.x)
-            success = self.model.status == COPT.OPTIMAL
+            converged = self.model.status == COPT.OPTIMAL
 
             return self.optimizer._build_result(
                 opt_vars,
-                success,
-                "COPT solution" if success else f"COPT status: {self.model.status}",
+                ConvergenceState.CONVERGED if converged else ConvergenceState.FAILED,
+                FailureCause.NONE if converged else FailureCause.BACKEND_FAILURE,
+                "COPT solution" if converged else f"COPT status: {self.model.status}",
             )
 
 
@@ -402,7 +404,8 @@ def optimize_with_copt(
         except RuntimeError:
             return optimizer._build_result(
                 NLPOptimizationVariables.from_array(np.asarray(x0, dtype=float)),
-                False,
+                ConvergenceState.FAILED,
+                FailureCause.BACKEND_FAILURE,
                 "COPT 未收敛且无可用解向量",
             )
     except Exception:

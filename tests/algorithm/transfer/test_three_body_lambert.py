@@ -17,6 +17,7 @@ from e2m2e.algorithm.family.halo_initial_guess import _compute_gamma, compute_ha
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.algorithm.transfer import StateTerminal, ThreeBodyLambert, TransferSolution
 from e2m2e.data.constants import Datum
+from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.orchestration
@@ -53,10 +54,11 @@ def _make_l1_lyapunov_orbit(system) -> Orbit:
     corrector.setup_2D_symmetric_x_fixed_x0(x0)
     seed = Orbit(states=[[x0, 0, 0, 0, mode[4] * _LYAP_AX, 0]], times=[0], system=system)
     seed.period = 2 * np.pi / eigenvalues[idx].imag
-    orbit = corrector.iterate_correction(seed, verbose=False)
-    assert orbit is not None, "L1 Lyapunov 轨道微分修正失败"
-    orbit.system = system
-    return orbit
+    result = corrector.iterate_correction(seed, verbose=False)
+    assert result.status is ConvergenceState.CONVERGED, result.message
+    assert result.orbit is not None, "L1 Lyapunov 轨道微分修正失败"
+    result.orbit.system = system
+    return result.orbit
 
 
 def _make_l1_halo_orbit(system) -> Orbit:
@@ -71,10 +73,11 @@ def _make_l1_halo_orbit(system) -> Orbit:
         system=system,
     )
     seed.period = guess["T_half"] * 2
-    orbit = corrector.iterate_correction(initial_guess=seed, verbose=False)
-    assert orbit is not None, "L1 Halo 轨道微分修正失败"
-    orbit.system = system
-    return orbit
+    result = corrector.iterate_correction(initial_guess=seed, verbose=False)
+    assert result.status is ConvergenceState.CONVERGED, result.message
+    assert result.orbit is not None, "L1 Halo 轨道微分修正失败"
+    result.orbit.system = system
+    return result.orbit
 
 
 @pytest.fixture(scope="session")
@@ -108,7 +111,7 @@ class TestPeriodicOrbitTransfer:
         sol = shooter.solve(StateTerminal(s0, 0.0), StateTerminal(s1, dt * tu), dt * tu)
 
         assert isinstance(sol, TransferSolution)
-        assert sol.converged, sol.message
+        assert sol.status is ConvergenceState.CONVERGED, sol.message
         assert sol.n_iter <= shooter.max_iterations
         # 端点在同一轨道上：出发/到达脉冲为小量
         assert sol.arcs[0].delta_v < 1e-6  # km/s
@@ -132,7 +135,7 @@ class TestPeriodicOrbitTransfer:
         sol = shooter.solve(
             StateTerminal(s0, 0.0), StateTerminal(s1, dt * tu), dt * tu, guess="orbit"
         )
-        assert sol.converged, sol.message
+        assert sol.status is ConvergenceState.CONVERGED, sol.message
         assert sol.arcs[0].delta_v < 1e-6
 
     def test_invalid_guess_raises(self, earth_moon_dynamics):
@@ -180,6 +183,6 @@ class TestRendezvous:
         shooter = ThreeBodyLambert(dynamics)
         sol = shooter.solve(StateTerminal(s0, 0.0), StateTerminal(s1, tof * tu), tof * tu)
 
-        assert sol.converged, sol.message
+        assert sol.status is ConvergenceState.CONVERGED, sol.message
         pos_err = np.linalg.norm(sol.arcs[0].states[-1][:3] - s1[:3])
         assert pos_err < 1e-2  # km

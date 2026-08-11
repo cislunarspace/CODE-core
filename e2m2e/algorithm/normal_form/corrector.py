@@ -14,6 +14,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
+from ...data.templates import ConvergenceState, FailureCause
+from ..results import ResultStatus
+
 if TYPE_CHECKING:
     from .context import NormalFormContext
     from .types import NormalFormResult
@@ -23,12 +26,17 @@ if TYPE_CHECKING:
 class QPITCorrectorResult:
     """QPIT 修正结果。"""
 
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
     iterations: int
     param: npt.NDArray[np.floating]  # (6,) [q1, p1, I2, theta2, I3, theta3]
     residual_history: list[float]  # 每次迭代的振幅偏差 (km)
     amplitude_in_actual: float  # 实际平面内振幅 (km)
     amplitude_out_actual: float  # 实际平面外振幅 (km)
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 @dataclass
@@ -114,7 +122,9 @@ class QPITCorrector:
             if residual < self.tolerance:
                 param = np.array([q1_0, p1_0, I2, theta2_0, I3, theta3_0])
                 return QPITCorrectorResult(
-                    converged=True,
+                    status=ConvergenceState.CONVERGED,
+                    cause=FailureCause.NONE,
+                    message=f"振幅残差 {residual:.3e} km 已满足容差 {self.tolerance:.3e} km",
                     iterations=iteration + 1,
                     param=param,
                     residual_history=residual_history,
@@ -150,7 +160,9 @@ class QPITCorrector:
         amp_in = np.sqrt(2.0 * I2) * self.context.LU
         amp_out = np.sqrt(2.0 * I3) * self.context.LU
         return QPITCorrectorResult(
-            converged=False,
+            status=ConvergenceState.MAX_ITERATIONS,
+            cause=FailureCause.MAX_ITERATIONS_REACHED,
+            message=f"达到最大迭代次数 {self.max_iter}，振幅残差 {residual_history[-1]:.3e} km",
             iterations=self.max_iter,
             param=param,
             residual_history=residual_history,

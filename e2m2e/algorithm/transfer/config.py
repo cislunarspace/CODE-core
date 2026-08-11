@@ -14,7 +14,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.enums import TransferType
+from ..results import ResultStatus
 
 DU = 3.84405000e5
 
@@ -92,8 +94,9 @@ class TransferOptimizationResult:
     """转移优化结果
 
     Attributes:
-        success: 优化是否成功
-        message: 求解器消息
+        status: 优化最终状态。
+        cause: 导致该状态的原因码。
+        message: 人类可读诊断。
         departure_state: 出发点状态 [x, y, z, vx, vy, vz]
         departure_alpha: 出发点切向速度比
         departure_beta: 出发点法向速度比
@@ -110,7 +113,8 @@ class TransferOptimizationResult:
         transfer_type: 转移类型
     """
 
-    success: bool = False
+    status: ConvergenceState = ConvergenceState.FAILED
+    cause: FailureCause = FailureCause.UNKNOWN
     message: str = ""
     departure_state: np.ndarray | None = None
     departure_alpha: float = 0.0
@@ -126,6 +130,9 @@ class TransferOptimizationResult:
     transfer_trajectory_times: np.ndarray | None = None
     constraints_violation: float = 0.0
     transfer_type: TransferType = TransferType.DIRECT
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 @dataclass(frozen=True)
@@ -155,7 +162,8 @@ class TransferSolution:
         arrival_delta_v: 到达脉冲（末段弧之后的交会/入轨脉冲），km/s
         total_delta_v: 全部脉冲之和，km/s
         transfer_time: 总飞行时间，s
-        converged: 打靶/修正是否收敛
+        status: 算法最终状态
+        cause: 算法最终原因码
         n_iter: Newton 迭代次数（流水线取末次修正的迭代数）
         message: 附加说明（未收敛原因、流水线备注等）
     """
@@ -164,6 +172,10 @@ class TransferSolution:
     arrival_delta_v: float
     total_delta_v: float
     transfer_time: float
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
     n_iter: int
-    message: str = ""
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)

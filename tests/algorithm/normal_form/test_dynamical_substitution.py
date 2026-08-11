@@ -38,6 +38,7 @@ from e2m2e.algorithm.normal_form.multiple_shooting import (
     multiple_shooting_newton,
     solve_block_tridiagonal,
 )
+from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.theory
 
@@ -238,6 +239,7 @@ def test_multiple_shooting_newton_converges_on_toy_dynamics():
         tolerance=1e-9,
     )
     assert isinstance(result, MultipleShootingResult)
+    assert result.status is ConvergenceState.CONVERGED
     # 即使不严格收敛，残差应显著下降
     assert result.max_residual < 1.0
     assert len(result.residual_history) == result.iterations

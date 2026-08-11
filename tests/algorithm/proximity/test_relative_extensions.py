@@ -7,6 +7,7 @@ from e2m2e.algorithm.dynamics import CR3BP_System
 from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.proximity.phasing import phasing_search
 from e2m2e.algorithm.proximity.relative_dynamics import RelativeDynamics, TargetOrbit
+from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.orchestration
@@ -135,7 +136,7 @@ class TestPhasing:
         tof_grid = np.array([1.0])
         solutions = phasing_search(orbit, dphase=np.pi, tof_grid=tof_grid, dynamics=dynamics)
         sol = solutions[0]
-        if sol.converged:
+        if sol.status is ConvergenceState.CONVERGED:
             assert len(sol.maneuvers) == 2
             assert sol.maneuvers[0].t == pytest.approx(sol.maneuvers[1].t - sol.tof)
             assert sol.total_dv >= 0.0
@@ -146,5 +147,5 @@ class TestPhasing:
         tof_grid = np.array([1.0])
         solutions = phasing_search(orbit, dphase=0.0, tof_grid=tof_grid, dynamics=dynamics)
         sol = solutions[0]
-        if sol.converged:
+        if sol.status is ConvergenceState.CONVERGED:
             assert sol.total_dv == pytest.approx(0.0, abs=1e-10)

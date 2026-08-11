@@ -25,7 +25,9 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import Bounds, minimize
 
+from ...data.templates import ConvergenceState, FailureCause
 from ..forces import PhysicalModel
+from ..results import ResultStatus, scipy_slsqp_status
 
 if TYPE_CHECKING:
     from ..dynamics import System
@@ -79,7 +81,8 @@ class LowThrustShootingSolution:
          segments: 各段常量控制。
          final_mass: 末态质量（kg）。
          fuel_consumed: 燃料消耗（kg），``= m0 - final_mass``。
-         converged: SLSQP 是否收敛。
+         status: 算法最终状态。
+         cause: 算法最终原因码。
          n_iter: SLSQP 迭代次数。
          message: SLSQP 状态消息。
     """
@@ -89,9 +92,13 @@ class LowThrustShootingSolution:
     segments: tuple[LowThrustSegment, ...]
     final_mass: float
     fuel_consumed: float
-    converged: bool
-    n_iter: int
+    status: ConvergenceState
+    cause: FailureCause
     message: str
+    n_iter: int
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 class LowThrustShooting:
@@ -252,11 +259,13 @@ class LowThrustShooting:
             options={"ftol": ftol, "maxiter": maxiter, "disp": verbose},
         )
 
+        status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
         return self._build_solution(
             result.x,
-            converged=bool(result.success),
-            n_iter=int(result.nit),
+            status=status,
+            cause=cause,
             message=str(result.message),
+            n_iter=int(result.nit),
         )
 
     # ---- 内部：决策向量解码与传播接龙 ----
@@ -451,9 +460,10 @@ class LowThrustShooting:
         self,
         y: npt.NDArray[np.floating],
         *,
-        converged: bool,
-        n_iter: int,
+        status: ConvergenceState,
+        cause: FailureCause,
         message: str,
+        n_iter: int,
     ) -> LowThrustShootingSolution:
         """从决策向量构造解：再传播一次拿完整轨迹，组装控制历史。"""
         times, states = self._propagate_chain(y)
@@ -469,7 +479,8 @@ class LowThrustShooting:
             segments=segments,
             final_mass=final_mass,
             fuel_consumed=self._initial_mass - final_mass,
-            converged=converged,
-            n_iter=n_iter,
+            status=status,
+            cause=cause,
             message=message,
+            n_iter=n_iter,
         )

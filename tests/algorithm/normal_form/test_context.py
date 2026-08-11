@@ -24,6 +24,7 @@ from e2m2e.algorithm.normal_form.constants import (
     MU_S,
     TU_S,
 )
+from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.theory
 
@@ -290,7 +291,7 @@ def test_normal_form_result_is_constructible(earth_moon_system):
     res = NormalFormResult(context=ctx, order=2)
     assert res.context is ctx
     assert res.order == 2
-    assert res.success is False
+    assert res.status is ConvergenceState.FAILED
     assert res.metadata == {}
 
 

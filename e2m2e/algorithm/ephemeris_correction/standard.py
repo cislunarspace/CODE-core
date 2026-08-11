@@ -52,7 +52,9 @@ class _StandardPatchPointCorrector:
             verbose=verbose,
         )
         return EphemerisCorrectionResult(
-            converged=result.converged,
+            status=result.status,
+            cause=result.cause,
+            message=result.message,
             iterations=result.outer_iterations,
             max_residual=float(result.max_residual),
             residual_history=[float(v) for v in result.residual_history],

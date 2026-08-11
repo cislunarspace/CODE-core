@@ -24,6 +24,7 @@ from typing import Any, cast
 import numpy as np
 import numpy.typing as npt
 
+from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.enums import BoundaryMode
 from ..dynamics import EphemerisDynamics, EphemerisSystem
 from ..solver.multiple_shooting import MultipleShooting, MultipleShootingResult
@@ -173,7 +174,9 @@ def correct_with_homotopy(
     position_histories: list[float] = []
     velocity_histories: list[float] = []
     iterations_total = 0
-    final_converged = False
+    final_status = ConvergenceState.FAILED
+    final_cause = FailureCause.UNKNOWN
+    final_message = "同伦修正尚未执行"
     final_max_residual = float("inf")
     final_velocity_residual: float | None = None
     last_t = t_work
@@ -211,7 +214,9 @@ def correct_with_homotopy(
                 )
                 position_histories.extend(float(v) for v in step_result.residual_history)
                 iterations_total += int(step_result.outer_iterations)
-                final_converged = bool(step_result.converged)
+                final_status = step_result.status
+                final_cause = step_result.cause
+                final_message = step_result.message
                 final_max_residual = float(step_result.max_residual)
                 last_t = step_result.t_patch
                 last_state = step_result.state_patch
@@ -236,7 +241,9 @@ def correct_with_homotopy(
                 position_histories.extend(pos_hist)
                 velocity_histories.extend(vel_hist)
                 iterations_total += int(two_level_result.outer_iterations)
-                final_converged = bool(two_level_result.converged)
+                final_status = two_level_result.status
+                final_cause = two_level_result.cause
+                final_message = two_level_result.message
                 final_max_residual = float(two_level_result.final_position_residual)
                 final_velocity_residual = float(two_level_result.final_velocity_residual)
                 last_t = two_level_result.t_patch
@@ -254,7 +261,9 @@ def correct_with_homotopy(
         state_work = np.asarray(step_result.state_patch, dtype=float).copy()
 
     return EphemerisCorrectionResult(
-        converged=final_converged,
+        status=final_status,
+        cause=final_cause,
+        message=f"同伦末步：{final_message}",
         iterations=iterations_total,
         max_residual=final_max_residual,
         residual_history=position_histories,

@@ -9,6 +9,7 @@ import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.solver.multiple_shooting import MultipleShooting
+from e2m2e.data.templates import ConvergenceState
 
 pytestmark = [
     pytest.mark.orchestration,
@@ -153,7 +154,7 @@ class TestMultipleShootingCorrection:
             state_patch=state_patch,
             max_iter=20,
         )
-        assert hasattr(result, "converged")
+        assert hasattr(result, "status")
         assert hasattr(result, "outer_iterations")
         assert hasattr(result, "status")
         assert hasattr(result, "max_residual")
@@ -169,7 +170,9 @@ class TestMultipleShootingCorrection:
         )
 
         # 不收敛应直接失败而非 skip，否则算法回归会被绿色报告掩盖（issue #218）
-        assert result.converged, f"多重打靶未收敛 (residual={result.max_residual:.2e})"
+        assert result.status is ConvergenceState.CONVERGED, (
+            f"多重打靶未收敛 (residual={result.max_residual:.2e})"
+        )
         corrected_states = result.state_patch
         for i in range(len(corrected_states) - 1):
             (
@@ -222,7 +225,9 @@ class TestMultipleShootingTimeOptions:
             max_iter=20,
         )
         # 固定时间修正在 simple_patch_points 上应能收敛；不收敛是回归（issue #218）
-        assert result.converged, f"多重打靶未收敛 (residual={result.max_residual:.2e})"
+        assert result.status is ConvergenceState.CONVERGED, (
+            f"多重打靶未收敛 (residual={result.max_residual:.2e})"
+        )
         assert_allclose(result.t_patch, t_patch, atol=1e-10)
 
     def test_variable_time_correction(self, ms_corrector, simple_patch_points):
@@ -235,7 +240,9 @@ class TestMultipleShootingTimeOptions:
             max_iter=20,
         )
         # 可变时间修正在 simple_patch_points 上应能收敛；不收敛是回归（issue #218）
-        assert result.converged, f"多重打靶未收敛 (residual={result.max_residual:.2e})"
+        assert result.status is ConvergenceState.CONVERGED, (
+            f"多重打靶未收敛 (residual={result.max_residual:.2e})"
+        )
         assert result.t_patch is not None
         assert len(result.t_patch) == len(t_patch)
 
@@ -316,7 +323,7 @@ class TestMultipleShootingVerbose:
             max_iter=5,
         )
         assert result is not None
-        assert hasattr(result, "converged")
+        assert hasattr(result, "status")
         assert hasattr(result, "outer_iterations")
 
     def test_verbose_false_no_tqdm_output(self, ms_corrector, simple_patch_points, capsys):
@@ -347,7 +354,7 @@ class TestMultipleShootingVerbose:
             max_iter=10,
             verbose=False,
         )
-        assert result.converged == result_ref.converged
+        assert result.status == result_ref.status
         assert result.outer_iterations == result_ref.outer_iterations
         np.testing.assert_allclose(result.max_residual, result_ref.max_residual, rtol=1e-12)
         if result.residual_history and result_ref.residual_history:
@@ -388,7 +395,7 @@ class TestMultipleShootingVerbose:
                 verbose=True,
             )
 
-            n_calls = result.outer_iterations if result.converged else 5
+            n_calls = result.outer_iterations if result.status is ConvergenceState.CONVERGED else 5
             assert (
                 mock_bar.set_postfix.call_count >= n_calls or mock_bar.update.call_count >= n_calls
             )

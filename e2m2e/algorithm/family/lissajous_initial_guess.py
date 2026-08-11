@@ -23,6 +23,7 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
+from ...data.templates import ConvergenceState
 from ..dynamics import CR3BP_System, LibrationPoint
 
 #: 共线点编号 → LibrationPoint 枚举
@@ -268,7 +269,7 @@ def compute_lissajous_bounded_trajectory(
         },
     )
     nf_result = pipeline.reduce(rho0)
-    if not nf_result.success or nf_result.catalog_transformer is None:
+    if nf_result.status is not ConvergenceState.CONVERGED or nf_result.catalog_transformer is None:
         raise RuntimeError(f"共线点 L{collinear_point} 中心流形约化失败：{nf_result.message}")
 
     n_points = max(_LISSAJOUS_POINTS_PER_PERIOD * n_periods, 30)

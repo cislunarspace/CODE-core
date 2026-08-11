@@ -11,6 +11,7 @@ from numpy.testing import assert_allclose
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.algorithm.solver.multiple_shooting import MultipleShooting
 from e2m2e.data.constants import Datum
+from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = [
@@ -58,8 +59,9 @@ def dro_orbit(cr3bp_dynamics, cr3bp_system):
 
     # DRO 微分修正在此标准 seed 下应收敛（与 tests/algorithm/conftest.py 的
     # corrected_dro fixture 一致）；不收敛是回归，直接失败而非 skip（issue #218）
-    assert result is not None and corrector.success, "DRO 微分修正未收敛"
-    return result
+    assert result.status is ConvergenceState.CONVERGED, "DRO 微分修正未收敛"
+    assert result.orbit is not None
+    return result.orbit
 
 
 @pytest.fixture(scope="module")
@@ -277,7 +279,9 @@ class TestStep4MultipleShootingCorrection:
             tolerance=POSITION_CONTINUITY_TOL,
         )
 
-        assert result.converged, f"Multiple Shooting 未收敛，迭代 {result.outer_iterations} 次"
+        assert result.status is ConvergenceState.CONVERGED, (
+            f"Multiple Shooting 未收敛，迭代 {result.outer_iterations} 次"
+        )
 
 
 # =============================================================================
@@ -289,7 +293,7 @@ class TestStep5Validation:
     def test_position_continuity(self, correction_result):
         """修正后相邻段端点位置连续性误差应 < 1e-6 km"""
         result = correction_result
-        assert result.converged, "修正应收敛"
+        assert result.status is ConvergenceState.CONVERGED, "修正应收敛"
         assert result.max_residual < POSITION_CONTINUITY_TOL, (
             f"最大残差 {result.max_residual:.2e} km > {POSITION_CONTINUITY_TOL}"
         )
@@ -297,7 +301,9 @@ class TestStep5Validation:
     def test_orbit_shape_preserved(self, correction_result):
         """修正后轨道形状应与 CR3BP DRO 相似"""
         result = correction_result
-        assert result.converged, f"修正未收敛 (residual={result.max_residual:.2e})"
+        assert result.status is ConvergenceState.CONVERGED, (
+            f"修正未收敛 (residual={result.max_residual:.2e})"
+        )
 
         corrected_states = result.state_patch
         distances = np.linalg.norm(corrected_states[:, :3], axis=1)
@@ -319,7 +325,9 @@ class TestDROEphemerisPipeline:
         """完整流程: DRO生成 → 采样 → 坐标转换 → 星历修正 → 验证"""
         result = correction_result
 
-        assert result.converged, f"修正未收敛，迭代 {result.outer_iterations} 次"
+        assert result.status is ConvergenceState.CONVERGED, (
+            f"修正未收敛，迭代 {result.outer_iterations} 次"
+        )
         assert result.max_residual < POSITION_CONTINUITY_TOL, (
             f"最大位置连续性误差 {result.max_residual:.2e} km > {POSITION_CONTINUITY_TOL} km"
         )
@@ -367,7 +375,9 @@ class TestDROEphemerisPipeline:
                 )
                 _correction_cache[cache_key] = result
 
-            assert result.converged, f"{n_points} 个 patch points 时修正未收敛"
+            assert result.status is ConvergenceState.CONVERGED, (
+                f"{n_points} 个 patch points 时修正未收敛"
+            )
 
 
 if __name__ == "__main__":

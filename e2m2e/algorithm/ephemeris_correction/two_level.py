@@ -44,7 +44,9 @@ class _TwoLevelPatchPointCorrector:
         )
         position_history, velocity_history = _split_residual_history(result.residual_history)
         return EphemerisCorrectionResult(
-            converged=result.converged,
+            status=result.status,
+            cause=result.cause,
+            message=result.message,
             iterations=result.outer_iterations,
             max_residual=float(result.final_position_residual),
             residual_history=position_history,

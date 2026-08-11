@@ -166,10 +166,12 @@ uv run sphinx-build -b html docs docs/_build/html
 ## 测试与代码规范
 
 ```bash
-make test     # = cargo test --workspace + pytest（spice 默认，需先 make setup 拉内核）
+make test     # Rust 测试 + Python xdist 并行测试（spice 默认，需先 make setup 拉内核）
 make check    # cargo fmt/clippy + ruff
-# 或单独：uv run pytest tests/、uv run ruff check .
+# 或单独：uv run pytest tests/ -n auto --dist loadscope、uv run ruff check .
 ```
+
+Python 测试默认用全部可用 CPU 并行执行。`loadscope` 将同一测试类或模块放在同一 worker，既复用 module/class scope fixture，也减少 SPICE 等模块级状态跨 worker 竞争。只有经确认依赖进程内全局状态的最小测试组才允许显式使用 `-n 0` 串行，并应在测试文档中说明原因。可用 `make PYTEST_WORKERS=8 test-python` 限制 worker 数。
 
 测试按 7 个功能类标记组织（`theory`/`integrator`/`force`/`data`/`orchestration`/`interface`/`aux`，详见 `docs/adr/0021-test-suite-functional-categories.md`）。
 

@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 
+from ...data.templates import ConvergenceState, FailureCause
 from .center_manifold import CenterManifoldReducer
 from .dynamical_substitution import (
     DEFAULT_DENSE_STEP,
@@ -192,7 +193,8 @@ class NormalFormPipeline:
             context=self.context,
             order=int(self.context.order),
             substitute_residual=float(ds_result.residual_norm),
-            success=True,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
             message="流水线四步全部完成",
             metadata={
                 "quasi_floquet_method": self.quasi_floquet_method,
@@ -241,7 +243,8 @@ class NormalFormPipeline:
         return NormalFormResult(
             context=self.context,
             order=int(self.context.order),
-            success=False,
+            status=ConvergenceState.FAILED,
+            cause=FailureCause.BACKEND_FAILURE,
             message=f"步骤 {step!r} 失败：{type(exc).__name__}: {exc}",
             metadata={"failed_step": step, "exception_type": type(exc).__name__},
             ds_result=ds_result,

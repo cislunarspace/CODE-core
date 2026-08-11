@@ -10,7 +10,9 @@
 //! 3. **同伦函数**：`J_λ = ∫ [(1-λ)u² + λu] dt`，λ: 0 → 1
 //! 4. **Sigmoid 平滑**：`u = 1/2 [1 + tanh(S/ε)]`，ε → 0
 
-use crate::multiple_shooting::{multiple_shooting_correct, MultipleShootingRustResult};
+use crate::multiple_shooting::{
+    multiple_shooting_correct, MultipleShootingRustResult, SolverTermination,
+};
 use e2m2e_forces::forces::augmented_state::ThrustParams;
 use e2m2e_forces::forces::compiled::CompiledForce;
 use e2m2e_propagation::rk_methods::RkMethod;
@@ -53,8 +55,12 @@ pub struct HomotopyResult {
     pub t_patch: Vec<f64>,
     /// 最终的 patch points（状态，7D：[r, v, m]）
     pub state_patch: Vec<[f64; 7]>,
-    /// 是否收敛
-    pub converged: bool,
+    /// 最终状态（受控值，与多重打靶结果契约一致）。
+    pub status: String,
+    /// 最终原因（受控值，与 `status` 一一对应）。
+    pub cause: String,
+    /// 面向调用方的最终诊断信息。
+    pub message: String,
     /// 总迭代次数
     pub total_iterations: usize,
     /// 最终残差
@@ -63,6 +69,31 @@ pub struct HomotopyResult {
     pub lambda_history: Vec<f64>,
     /// 每个 λ 步的残差历史
     pub residual_history: Vec<f64>,
+}
+
+impl HomotopyResult {
+    fn new(
+        t_patch: Vec<f64>,
+        state_patch: Vec<[f64; 7]>,
+        total_iterations: usize,
+        max_residual: f64,
+        lambda_history: Vec<f64>,
+        residual_history: Vec<f64>,
+        outcome: SolverTermination,
+    ) -> Self {
+        let (status, cause, message) = outcome.contract();
+        Self {
+            t_patch,
+            state_patch,
+            status: status.to_string(),
+            cause: cause.to_string(),
+            message: message.to_string(),
+            total_iterations,
+            max_residual,
+            lambda_history,
+            residual_history,
+        }
+    }
 }
 
 /// 同伦法问题定义：打包在多个函数间重复出现的参数。
@@ -167,9 +198,10 @@ impl HomotopySolver {
             }
         }
 
-        Ok(HomotopyResult {
-            t_patch: current_result.t_patch,
-            state_patch: current_result
+        let outcome = current_result.outcome();
+        Ok(HomotopyResult::new(
+            current_result.t_patch,
+            current_result
                 .state_patch
                 .iter()
                 .map(|s| {
@@ -180,12 +212,12 @@ impl HomotopySolver {
                     s7
                 })
                 .collect(),
-            converged: current_result.converged,
             total_iterations,
-            max_residual: current_result.max_residual,
+            current_result.max_residual,
             lambda_history,
             residual_history,
-        })
+            outcome,
+        ))
     }
 
     /// 使用指定的 λ 值求解。

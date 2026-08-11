@@ -66,7 +66,8 @@ class TestSetup:
         )
 
         # 执行迭代修正
-        result_orbit = corrector.iterate_correction(initial_guess=orbit_init, verbose=False)
+        result = corrector.iterate_correction(initial_guess=orbit_init, verbose=False)
+        result_orbit = result.orbit
 
         # 验证结果
         if result_orbit is not None:
@@ -75,7 +76,7 @@ class TestSetup:
             assert abs(result_orbit.period - target_period) < 1e-4, (
                 f"周期误差过大: 期望 {target_period}, 实际 {result_orbit.period}"
             )
-            assert corrector.converged is True
+            assert result.status.value == "converged"
         # 如果 result_orbit 为 None，可能是初始猜测导致发散，不强制失败
 
     def test_setup_3d_symmetric_x_fixed_x0(self, dro_dynamics):
@@ -133,12 +134,12 @@ class TestSetup:
         """配置时应重置收敛历史"""
         corrector = DifferentialCorrection(dro_dynamics)
         corrector.error_history = [1.0, 0.5]
-        corrector.converged = True
+        corrector._converged = True
 
         corrector.setup_2D_symmetric_x_fixed_x0(x0=0.8)
 
         assert corrector.error_history == []
-        assert corrector.converged is False
+        assert corrector._converged is False
 
 
 # ============================================================
@@ -153,10 +154,10 @@ class TestIterateCorrection:
 
     def test_corrector_state_after_convergence(self, dro_corrector, dro_seed_orbit):
         """收敛后修正器内部状态正确"""
-        dro_corrector.iterate_correction(dro_seed_orbit)
+        dro_result = dro_corrector.iterate_correction(dro_seed_orbit)
 
-        assert dro_corrector.converged is True
-        assert dro_corrector.success is True
+        assert dro_result.status.value == "converged"
+        assert dro_result.cause.value == "none"
         assert dro_corrector.check_convergence() is True
         assert dro_corrector.final_solution is not None
         assert dro_corrector.solution_time is not None
@@ -276,8 +277,9 @@ class TestConvergenceHistory:
         assert "errors" in history
         assert "corrections" in history
         assert "iterations" in history
-        assert "converged" in history
-        assert "termination_reason" in history
+        assert "status" in history
+        assert "cause" in history
+        assert "message" in history
 
     def test_convergence_history_length(self, dro_corrector, dro_seed_orbit):
         """误差历史长度应等于迭代次数"""
@@ -303,8 +305,8 @@ class TestFailureCases:
         bad_guess.period = 0.1
 
         result = corrector.iterate_correction(bad_guess)
-        # 极差猜测可能收敛或不收敛，但不应崩溃
-        assert result is None or isinstance(result, Orbit)
+        # 极差猜测可能收敛或不收敛，但必须返回状态化结果
+        assert result.status.value != "iterating"
 
     def test_repr_and_str(self, dro_corrector):
         """__str__ 和 __repr__ 不应抛出异常"""
@@ -355,5 +357,5 @@ class TestCallback:
     def test_callback_none_does_not_affect_result(self, dro_corrector, dro_seed_orbit):
         """callback=None（默认值）不影响迭代修正行为"""
         result = dro_corrector.iterate_correction(dro_seed_orbit, callback=None)
-        assert result is not None
-        assert dro_corrector.converged is True
+        assert result.orbit is not None
+        assert result.status.value == "converged"

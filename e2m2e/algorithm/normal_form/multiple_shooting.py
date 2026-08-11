@@ -37,6 +37,9 @@ from typing import Protocol, runtime_checkable
 import numpy as np
 import numpy.typing as npt
 
+from ...data.templates import ConvergenceState, FailureCause
+from ..results import ResultStatus
+
 #: ``(N, 6)`` 节点状态数组；每行 ``[q1, q2, q3, p1, p2, p3]`` （rho 坐标）。
 PatchStates = npt.NDArray[np.floating]
 #: ``(N-1, 6, 6)`` 状态转移矩阵 ``Φ_i = Φ(t_{i+1}; t_i, X_i)``。
@@ -89,7 +92,9 @@ class MultipleShootingResult:
         max_residual: 最终迭代最大连续性残差 ``max_i ‖Xf_i − X_Q_{i+1}‖``。
         mean_residual: 平均连续性残差。
         iterations: 实际迭代轮数。
-        converged: 是否在容差内收敛。
+        status: 算法最终状态。
+        cause: 算法终止原因。
+        message: 人类可读的终止说明。
         residual_history: 每轮最大残差的历史。
     """
 
@@ -98,8 +103,13 @@ class MultipleShootingResult:
     max_residual: float
     mean_residual: float
     iterations: int
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
     residual_history: tuple[float, ...] = ()
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +247,9 @@ def multiple_shooting_newton(
         raise ValueError("t_Q 至少需要 2 个节点")
 
     history: list[float] = []
-    converged = False
+    status = ConvergenceState.MAX_ITERATIONS
+    cause = FailureCause.MAX_ITERATIONS_REACHED
+    message = f"达到最大迭代次数 {max_iter}"
     iterations = 0
     max_residual = float("inf")
 
@@ -263,7 +275,9 @@ def multiple_shooting_newton(
 
         # 收敛判定
         if max_residual < tolerance and it >= min_iter:
-            converged = True
+            status = ConvergenceState.CONVERGED
+            cause = FailureCause.NONE
+            message = f"连续性残差 {max_residual:.3e} 已满足容差 {tolerance:.3e}"
             break
 
         # 平整整轮：连续 3 轮残差下降 < 1% 且 it ≥ min_iter
@@ -274,6 +288,9 @@ def multiple_shooting_newton(
             and history[-1] >= history[-2] * 0.99
             and history[-2] >= history[-3] * 0.99
         ):
+            status = ConvergenceState.STAGNATED
+            cause = FailureCause.STAGNATION_DETECTED
+            message = f"连续 3 轮残差未显著下降，最终残差 {max_residual:.3e}"
             break
 
         X_Q = X_Q + delta_Q
@@ -284,7 +301,9 @@ def multiple_shooting_newton(
         max_residual=max_residual,
         mean_residual=mean_residual,
         iterations=iterations,
-        converged=converged,
+        status=status,
+        cause=cause,
+        message=message,
         residual_history=tuple(history),
     )
 
