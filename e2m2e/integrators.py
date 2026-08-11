@@ -19,6 +19,7 @@ try:
         check_collision_py,
         compute_distance_series_py,
         compute_min_distance_py,
+        design_lpo_py,
         detect_intersection_py,
         detect_local_minimum_py,
         hello_integrators,
@@ -94,6 +95,7 @@ except ModuleNotFoundError:
     check_collision_py = None  # type: ignore[misc,assignment]
     compute_distance_series_py = None  # type: ignore[misc,assignment]
     compute_min_distance_py = None  # type: ignore[misc,assignment]
+    design_lpo_py = None  # type: ignore[misc,assignment]
     detect_intersection_py = None  # type: ignore[misc,assignment]
     detect_local_minimum_py = None  # type: ignore[misc,assignment]
     hello_integrators = None  # type: ignore[misc,assignment]
@@ -177,6 +179,7 @@ __all__ = [
     "compute_min_distance_py",
     "detect_intersection_py",
     "detect_local_minimum_py",
+    "design_lpo_py",
     "disable_ephem_cache",
     "enable_ephem_cache",
     "ephem_ffi_call_count",

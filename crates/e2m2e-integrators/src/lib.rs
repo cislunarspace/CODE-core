@@ -9,8 +9,11 @@ use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyList};
 
+pub mod design_lpo;
 #[cfg(feature = "spice")]
 pub mod homotopy;
+pub mod lpo_correction;
+pub mod lpo_family;
 #[cfg(feature = "spice")]
 pub mod multiple_shooting;
 pub mod normal_form;
@@ -326,6 +329,7 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   ``TransferPointResult`` pyclass（转移网格搜索串行评估）。
 /// - **v4**（#334）：新增 ``spice_spkezr`` + ``spice_pxform``（Rust CSPICE
 ///   实例诊断查询 API）。
+/// - **v5**（M4）：新增 ``design_lpo_py``（L4/L5 三角平动点周期轨道 Rust 设计接口）。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -2882,6 +2886,9 @@ fn augmented_eom_7d_py(
 
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
+    m.add_submodule(&e2m2e_propagation::_propagation_constants_module_bound(
+        m.py(),
+    )?)?;
     m.add_function(wrap_pyfunction!(_py_abi_version, m)?)?;
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
     m.add_function(wrap_pyfunction!(normal_form::project_hamiltonian_qf_py, m)?)?;
@@ -2904,6 +2911,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_cr3bp_stm_py, m)?)?;
     m.add_function(wrap_pyfunction!(propagate_bcr4bp_py, m)?)?;
     m.add_function(wrap_pyfunction!(propagate_bcr4bp_stm_py, m)?)?;
+    m.add_function(wrap_pyfunction!(design_lpo::design_lpo_py, m)?)?;
     m.add_function(wrap_pyfunction!(compute_distance_series_py, m)?)?;
     m.add_function(wrap_pyfunction!(compute_min_distance_py, m)?)?;
     m.add_function(wrap_pyfunction!(detect_intersection_py, m)?)?;
@@ -2953,7 +2961,6 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_with_state_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
-    #[cfg(feature = "spice")]
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(
         multiple_shooting::multiple_shooting_correct_py,

@@ -23,6 +23,7 @@ import warnings
 from collections.abc import Callable
 
 import numpy as np
+import numpy.typing as npt
 
 from ...data.templates.seed import (  # noqa: F401
     _AXIAL_SEED_VZ0,
@@ -56,7 +57,10 @@ from .lissajous_initial_guess import (
 )
 from .lpo_initial_guess import compute_lpo_initial_guess
 from .spo_initial_guess import compute_spo_initial_guess
-from .triangular_initial_guess import compute_triangular_initial_guess
+from .triangular_initial_guess import (
+    _triangular_modes,
+    compute_triangular_initial_guess,
+)
 
 
 class Cr3bpOrbitError(RuntimeError):
@@ -944,98 +948,92 @@ def design_spo(
     )
 
 
-def _correct_lpo(
-    dynamics: CR3BP_Dynamics,
-    x0: float,
-    libration_point: int,
-    guess: Orbit | None,
-) -> Orbit:
-    """在 x₀ 处修正 LPO（通用平面周期修正，无对称性假设）。
+def _triangular_modes_for_lpo(
+    system: CR3BP_System, point: int
+) -> tuple[float, npt.NDArray[np.complexfloating], npt.NDArray[np.floating]]:
+    """提取 LPO 设计所需的长周期模态常量。
 
-    与 _correct_spo 同构，但使用长周期模态初猜。
-    LPO 不稳定（λ≈1.8），修正器需要更严格的收敛条件。
-
-    大振幅 LPO 呈马蹄形（Horseshoe），跨越 L4-L1-L5
-    （Marchal 1990, Brown 猜想 C.2）。
-
-    首次调用（guess=None）使用线性化长周期模态初猜。
-    后续调用保留已收敛轨道状态作初猜。
+    复用 ``triangular_initial_guess._triangular_modes`` 的特征分解结果，
+    返回 (omega_l, v_l, x_L)。
     """
-    if guess is None:
-        # 从线性化长周期模态构造初猜（小振幅初猜对 Newton 收敛足够近）
-        state, period = compute_lpo_initial_guess(
-            dynamics.system,
-            libration_point,
-            amplitude_km=1000.0,
-        )
-        # 覆盖 x₀ 到族参数指定值
-        state[0] = x0
-    else:
-        state = guess.states[0].copy()
-        state[0] = x0
-        state[2] = 0.0
-        state[5] = 0.0
-        assert guess.period is not None
-        period = guess.period
+    _omega_s, _v_s, omega_l, v_l, _omega_v, _v_z, x_L = _triangular_modes(system, point)
+    return omega_l, v_l, x_L
 
-    corrector = DifferentialCorrection(dynamics)
-    corrector.setup_lpo_fixed_x0(x0=x0, libration_point=libration_point)
-    seed = Orbit(
-        states=state.reshape(1, -1),
-        times=np.array([0.0]),
-        system=dynamics.system,
-    )
-    seed.period = period
 
-    orbit = corrector.iterate_full_period_correction(seed, verbose=False)
-    if orbit is None:
-        raise Cr3bpOrbitError(
-            f"LPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {corrector.termination_reason}"
-        )
-    assert orbit.period is not None
-    # LPO 周期范围：极限 21.07 nd（~91 天），大振幅可到 ~30+ nd
-    if orbit.period < 10.0 or orbit.period > 50.0:
-        raise Cr3bpOrbitError(
-            f"LPO(L{libration_point}, x0={x0:.6f}) 周期异常（T={orbit.period:.3f}，预期 10.0-50.0）"
-        )
+def _flatten_complex_vector(v: npt.NDArray[np.complexfloating]) -> list[float]:
+    """6 维复向量展平为 12 元素 list：实部/虚部交错。
+
+    顺序：[re0, im0, re1, im1, ..., re5, im5]，与 Rust ``lpo_family`` 约定一致。
+    """
+    flat = np.column_stack([np.real(v), np.imag(v)]).ravel()
+    return [float(x) for x in flat]
+
+
+def _build_lpo_orbit(
+    result: dict,
+    system: CR3BP_System,
+    libration_point: int,
+) -> Orbit:
+    """把 Rust ``design_lpo_py`` 返回的 dict 封装成 Orbit。"""
+    state = np.asarray(result["state"], dtype=float)
+    period = float(result["period"])
+    orbit = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=system)
+    orbit.period = period
+    orbit.family_type = f"L{libration_point}"
+    orbit.parameters = {
+        "point": libration_point,
+        "amplitude_du": float(result["amplitude_du"]),
+    }
+    orbit.correction_success = bool(result["converged"])
+    orbit.correction_iterations = int(result["iterations"])
     return orbit
 
 
-def design_lpo(
+def _call_design_lpo_rust(
+    libration_point: int,
+    amplitude_km: float,
+    dynamics: CR3BP_Dynamics,
+    tol_km: float,
+) -> Orbit:
+    """调 Rust ``design_lpo_py`` 生成 LPO 轨道，失败转 Cr3bpOrbitError。"""
+    from e2m2e.integrators import design_lpo_py
+
+    du = dynamics.system.characteristic_length
+    assert du is not None
+    mu = dynamics.system.mu
+    omega_l, v_l, x_L = _triangular_modes_for_lpo(dynamics.system, libration_point)
+    v_l_flat = _flatten_complex_vector(v_l)
+
+    try:
+        result = design_lpo_py(
+            point=libration_point,
+            amplitude_km=amplitude_km,
+            mu=mu,
+            char_length_km=du,
+            omega_l=omega_l,
+            v_l=v_l_flat,
+            x_l=[float(x) for x in x_L],
+            rtol=dynamics.rtol,
+            atol=dynamics.atol,
+            tol_km=tol_km,
+        )
+    except RuntimeError as exc:
+        raise Cr3bpOrbitError(str(exc)) from None
+
+    return _build_lpo_orbit(result, dynamics.system, libration_point)
+
+
+def _design_lpo_python(
     libration_point: int,
     amplitude_km: float,
     *,
     dynamics: CR3BP_Dynamics | None = None,
     tol_km: float = 20.0,
 ) -> Orbit:
-    r"""生成指定振幅的 L4/L5 LPO 周期轨道。
+    r"""生成指定振幅的 L4/L5 LPO 周期轨道（Python 参考实现）。
 
-    LPO（Long-Period Orbit）是 CR3BP 中围绕三角平动点的长周期族
-    成员（Gómez vol II, $\mathcal{L}_l$）。小振幅时为椭圆形，大振幅
-    时呈马蹄形（Horseshoe），跨越 L4-L1-L5（Marchal 1990, Brown C.2）。
-
-    振幅定义同 SPO：一个周期内距 L4/L5 径向距离最小/最大值的均值（km）。
-    以 x₀ 为族参数，用网格搜索 + 局部精化逼近目标振幅。
-
-    实现策略（网格搜索 + 局部二分）：
-    LPO 长周期族的振幅-x₀ 映射高度非单调（小振幅椭圆 → 混沌过渡区 →
-    大振幅马蹄族），简单二分搜索无法收敛。改用两步策略：
-    1) 均匀网格采样 x₀，找到振幅最接近目标的候选点；
-    2) 在候选点附近做局部二分精化（利用局部单调性）。
-
-    Args:
-        libration_point: 平动点编号（4=L4, 5=L5）。
-        amplitude_km: 目标振幅（km）。
-        dynamics: CR3BP 动力学对象；缺省构造标准地月系统。
-        tol_km: 振幅匹配容差（km），默认 20。
-
-    Returns:
-        修正后的 LPO 周期轨道（小振幅椭圆 或 大振幅马蹄形）。
-
-    References:
-        Gómez et al. (2001). Vol. II. 长周期族 L_l。
-        Marchal (1990). The Three-Body Problem. Brown 猜想 C.2。
-        Taylor (1981). A&A 103, 288. 马蹄周期轨道数值计算。
+    仅用于等价性测试 / 降级场景；默认 ``design_lpo`` 走 Rust 快速路径。
+    实现与历史 ``design_lpo`` 保持一致：网格搜索 + 局部二分。
     """
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
@@ -1051,11 +1049,6 @@ def design_lpo(
 
     lp_x = 0.5 - mu
 
-    # LPO 长周期族的振幅-x₀ 映射高度非单调（小振幅椭圆族 → 混沌过渡区 →
-    # 大振幅马蹄族），不能用简单二分搜索。改用分层网格搜索 + 局部精化：
-    # 1) 粗网格（20 点）找到振幅最接近目标的候选区间
-    # 2) 细网格（10 点）在候选区间内精化
-    # 3) 局部二分搜索（10 步）做最终精化
     x_lo = lp_x - 0.20  # 大振幅端（马蹄方向）
     x_hi = lp_x + 0.05  # 小振幅端
 
@@ -1138,6 +1131,110 @@ def design_lpo(
         f"LPO(L{libration_point}, amp={amplitude_km:.0f} km) 未命中目标"
         f"（最佳误差 {best_err * du:.0f} km）"
     )
+
+
+def design_lpo(
+    libration_point: int,
+    amplitude_km: float,
+    *,
+    dynamics: CR3BP_Dynamics | None = None,
+    tol_km: float = 20.0,
+) -> Orbit:
+    r"""生成指定振幅的 L4/L5 LPO 周期轨道。
+
+    LPO（Long-Period Orbit）是 CR3BP 中围绕三角平动点的长周期族
+    成员（Gómez vol II, $\mathcal{L}_l$）。小振幅时为椭圆形，大振幅
+    时呈马蹄形（Horseshoe），跨越 L4-L1-L5（Marchal 1990, Brown C.2）。
+
+    振幅定义同 SPO：一个周期内距 L4/L5 径向距离最小/最大值的均值（km）。
+    以 x₀ 为族参数，用分层网格搜索 + 局部精化逼近目标振幅。
+
+    默认走 Rust + Rayon 并行快速路径（``e2m2e._integrators.design_lpo_py``）；
+    Python 参考实现保留为 ``_design_lpo_python``，供等价性测试与降级使用。
+
+    Args:
+        libration_point: 平动点编号（4=L4, 5=L5）。
+        amplitude_km: 目标振幅（km）。
+        dynamics: CR3BP 动力学对象；缺省构造标准地月系统。
+        tol_km: 振幅匹配容差（km），默认 20。
+
+    Returns:
+        修正后的 LPO 周期轨道（小振幅椭圆 或 大振幅马蹄形）。
+
+    References:
+        Gómez et al. (2001). Vol. II. 长周期族 L_l。
+        Marchal (1990). The Three-Body Problem. Brown C.2 证实。
+        Murray & Dermott (1999). §3.9 Horseshoe 运动学描述。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+
+    try:
+        from e2m2e.integrators import design_lpo_py  # noqa: F401
+    except ImportError:
+        design_lpo_py = None  # type: ignore[misc,assignment]
+
+    if design_lpo_py is None:
+        return _design_lpo_python(libration_point, amplitude_km, dynamics=dynamics, tol_km=tol_km)
+
+    return _call_design_lpo_rust(libration_point, amplitude_km, dynamics, tol_km)
+
+
+def _correct_lpo(
+    dynamics: CR3BP_Dynamics,
+    x0: float,
+    libration_point: int,
+    guess: Orbit | None,
+) -> Orbit:
+    """在 x₀ 处修正 LPO（通用平面周期修正，无对称性假设）。
+
+    与 _correct_spo 同构，但使用长周期模态初猜。
+    LPO 不稳定（λ≈1.8），修正器需要更严格的收敛条件。
+
+    大振幅 LPO 呈马蹄形（Horseshoe），跨越 L4-L1-L5
+    （Marchal 1990, Brown 猜想 C.2）。
+
+    首次调用（guess=None）使用线性化长周期模态初猜。
+    后续调用保留已收敛轨道状态作初猜。
+    """
+    if guess is None:
+        # 从线性化长周期模态构造初猜（小振幅初猜对 Newton 收敛足够近）
+        state, period = compute_lpo_initial_guess(
+            dynamics.system,
+            libration_point,
+            amplitude_km=1000.0,
+        )
+        # 覆盖 x₀ 到族参数指定值
+        state[0] = x0
+    else:
+        state = guess.states[0].copy()
+        state[0] = x0
+        state[2] = 0.0
+        state[5] = 0.0
+        assert guess.period is not None
+        period = guess.period
+
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_lpo_fixed_x0(x0=x0, libration_point=libration_point)
+    seed = Orbit(
+        states=state.reshape(1, -1),
+        times=np.array([0.0]),
+        system=dynamics.system,
+    )
+    seed.period = period
+
+    orbit = corrector.iterate_full_period_correction(seed, verbose=False)
+    if orbit is None:
+        raise Cr3bpOrbitError(
+            f"LPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {corrector.termination_reason}"
+        )
+    assert orbit.period is not None
+    # LPO 周期范围：极限 21.07 nd（~91 天），大振幅可到 ~30+ nd
+    if orbit.period < 10.0 or orbit.period > 50.0:
+        raise Cr3bpOrbitError(
+            f"LPO(L{libration_point}, x0={x0:.6f}) 周期异常（T={orbit.period:.3f}，预期 10.0-50.0）"
+        )
+    return orbit
 
 
 def design_horseshoe(
