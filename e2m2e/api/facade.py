@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from e2m2e.data.constants import SECONDS_PER_DAY
+from e2m2e.data.templates import ConvergenceState, FailureCause
 
 from .config import Config
 from .models import (
@@ -46,6 +47,36 @@ def mcp_exposed(func):
     """标记 Facade 方法对 MCP 暴露（纯派生 + 元数据标记，ADR 0014）。"""
     func.mcp_exposed = True  # type: ignore[attr-defined]
     return func
+
+
+def _result_triplet(result: Any) -> tuple[ConvergenceState, FailureCause, str]:
+    """读取算法任务结果的最终状态三元组。"""
+    try:
+        if isinstance(result, dict):
+            triplet = result["status"], result["cause"], result["message"]
+        else:
+            triplet = result.status, result.cause, result.message
+    except (AttributeError, KeyError) as exc:
+        raise OrbitError(
+            "RESULT_CONTRACT_FAILED",
+            "算法任务结果缺少 status/cause/message 契约",
+            status=ConvergenceState.FAILED,
+            cause=FailureCause.BACKEND_FAILURE,
+        ) from exc
+    return triplet
+
+
+def _exception_triplet(exc: Exception) -> tuple[ConvergenceState, FailureCause, str]:
+    """读取算法异常携带的最终状态三元组。"""
+    try:
+        return exc.status, exc.cause, exc.message  # type: ignore[attr-defined]
+    except AttributeError as missing:
+        raise OrbitError(
+            "RESULT_CONTRACT_FAILED",
+            "算法异常缺少 status/cause/message 契约",
+            status=ConvergenceState.FAILED,
+            cause=FailureCause.BACKEND_FAILURE,
+        ) from missing
 
 
 def _details_to_dict(details: Any) -> dict[str, Any]:
@@ -95,7 +126,7 @@ def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse
 
     纯翻译、无副作用、不依赖 SPICE。ELFO 场景下 ``cr3bp_orbit`` /
     ``correction`` 为 None，对应字段输出默认值（mu=None、states/times 空、
-    correction_converged=False）。CR3BP 场景下从 ``cr3bp_orbit`` 提取
+    correction_iterations=0）。CR3BP 场景下从 ``cr3bp_orbit`` 提取
     ``states`` / ``times`` / ``mu``。
     """
     cr3bp_orbit = result.cr3bp_orbit
@@ -114,7 +145,9 @@ def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse
         duration_day=result.duration_day,
         initial_state=result.initial_state.tolist(),
         cr3bp_jacobi=result.cr3bp_jacobi,
-        correction_converged=correction.converged if correction else False,
+        status=result.status,
+        cause=result.cause,
+        message=result.message,
         correction_iterations=correction.iterations if correction else 0,
         force_config=result.force_config,
         mu=mu,
@@ -137,6 +170,9 @@ def _control_result_to_response(
     ``mu`` 由请求透传——算法层不产 mu，design→control 链式时由调用方注入。
     """
     return ControlOrbitResponse(
+        status=result.status,
+        cause=result.cause,
+        message=result.message,
         num_failed=result.num_failed,
         sk_statistic={
             "rows": result.sk_statistic.rows.tolist(),
@@ -186,9 +222,15 @@ class Facade:
         except OrbitError:
             raise
         except (ValueError, TypeError) as exc:
-            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
         except Exception as exc:
-            raise OrbitError("DESIGN_FAILED", str(exc)) from exc
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError("DESIGN_FAILED", message, status=status, cause=cause) from exc
 
     @mcp_exposed
     def control_orbit(self, **params) -> ControlOrbitResponse:
@@ -219,9 +261,15 @@ class Facade:
         except OrbitError:
             raise
         except (ValueError, TypeError) as exc:
-            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
         except Exception as exc:
-            raise OrbitError("CONTROL_FAILED", str(exc)) from exc
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError("CONTROL_FAILED", message, status=status, cause=cause) from exc
 
     @mcp_exposed
     def transfer_design(self, **params) -> TransferDesignResponse:
@@ -259,7 +307,11 @@ class Facade:
                 if result.trajectory is not None and isinstance(result.trajectory, np.ndarray)
                 else result.trajectory
             )
+            status, cause, message = _result_triplet(result)
             return TransferDesignResponse(
+                status=status,
+                cause=cause,
+                message=message,
                 transfer_type=result.transfer_type,
                 delta_v=result.delta_v,
                 trajectory=trajectory,
@@ -270,9 +322,15 @@ class Facade:
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
         except NotImplementedError as exc:
-            raise OrbitError("NOT_IMPLEMENTED", str(exc)) from exc
+            raise OrbitError(
+                "NOT_IMPLEMENTED",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.BACKEND_FAILURE,
+            ) from exc
         except Exception as exc:
-            raise OrbitError("TRANSFER_FAILED", str(exc)) from exc
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError("TRANSFER_FAILED", message, status=status, cause=cause) from exc
 
     @mcp_exposed
     def orbit_propagation(self, **params) -> PropagationResponse:
@@ -293,28 +351,39 @@ class Facade:
                 output_step=request.output_step,
                 kernel_dir=self._config.kernel_dir,
             )
-            times_jd = result.times_jd_tdb
+            ephemeris = result.ephemeris
+            times_jd = ephemeris.times_jd_tdb
             assert times_jd is not None  # propagate_orbit 始终填充
-            vel_km_s = result.velocity_mps / 1000.0
+            status, cause, message = _result_triplet(result)
+            vel_km_s = ephemeris.velocity_mps / 1000.0
             return PropagationResponse(
+                status=status,
+                cause=cause,
+                message=message,
                 epoch_utc=str(request.epoch) if isinstance(request.epoch, str) else "",
                 duration_sec=float(request.duration),
                 output_step=float(request.output_step),
-                n_points=len(result.year),
+                n_points=len(ephemeris.year),
                 time_sec=((times_jd - times_jd[0]) * SECONDS_PER_DAY).tolist(),
                 times_jd_tdb=times_jd.tolist(),
-                position_km=result.position_km.tolist(),
+                position_km=ephemeris.position_km.tolist(),
                 velocity_km_s=vel_km_s.tolist(),
-                final_state=result.position_km[-1].tolist() + vel_km_s[-1].tolist(),
+                final_state=ephemeris.position_km[-1].tolist() + vel_km_s[-1].tolist(),
             )
         except OrbitError:
             raise
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
         except NotImplementedError as exc:
-            raise OrbitError("NOT_IMPLEMENTED", str(exc)) from exc
+            raise OrbitError(
+                "NOT_IMPLEMENTED",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.BACKEND_FAILURE,
+            ) from exc
         except Exception as exc:
-            raise OrbitError("PROPAGATION_FAILED", str(exc)) from exc
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError("PROPAGATION_FAILED", message, status=status, cause=cause) from exc
 
     @mcp_exposed
     def spacetime_transform(self, **params) -> SpacetimeTransformResponse:
@@ -344,7 +413,11 @@ class Facade:
                 converted_states.append(result["state"].tolist())
                 converted_times.append(float(result["time"]))
 
+            status, cause, message = _result_triplet(result)
             return SpacetimeTransformResponse(
+                status=status,
+                cause=cause,
+                message=message,
                 states=converted_states,
                 times=converted_times,
                 transform_type=request.transform_type,
@@ -358,9 +431,15 @@ class Facade:
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
         except NotImplementedError as exc:
-            raise OrbitError("NOT_IMPLEMENTED", str(exc)) from exc
+            raise OrbitError(
+                "NOT_IMPLEMENTED",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.BACKEND_FAILURE,
+            ) from exc
         except Exception as exc:
-            raise OrbitError("TRANSFORM_FAILED", str(exc)) from exc
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError("TRANSFORM_FAILED", message, status=status, cause=cause) from exc
 
     # ---- 二档子任务（mcp_exposed=True）----
 

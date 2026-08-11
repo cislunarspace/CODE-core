@@ -78,7 +78,7 @@ def _correct_lyapunov_fixed_x0(
     corrector.setup_2D_symmetric_x_fixed_x0(x0=x0)
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = period
-    return corrector.iterate_correction(initial_guess=seed, verbose=False)
+    return corrector.iterate_correction(initial_guess=seed, verbose=False).orbit
 
 
 def _correct_lyapunov_fixed_t(
@@ -98,7 +98,7 @@ def _correct_lyapunov_fixed_t(
     corrector.setup_2D_symmetric_x_fixed_t(t_half=t_half)
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = 2.0 * t_half
-    return corrector.iterate_correction(initial_guess=seed, verbose=False)
+    return corrector.iterate_correction(initial_guess=seed, verbose=False).orbit
 
 
 def _vertical_trace(dynamics: CR3BP_Dynamics, orbit: Orbit) -> float:

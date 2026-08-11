@@ -24,6 +24,7 @@ from e2m2e.algorithm.transfer.hohmann import (
     keplerian_to_cartesian,
     scan_lambert_delta_v,
 )
+from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 
@@ -192,6 +193,11 @@ class TestTransferOrbitHmn:
         result = transfer_orbit("HMN", tli_params=params, target_orbit_radius_km=384405.0)
         assert isinstance(result, TransferDesignResult)
         assert result.transfer_type == "HMN"
+        assert [stage.name for stage in result.stages] == ["search", "refinement", "shooting"]
+        for stage in result.stages:
+            assert stage.applicable is False
+            assert stage.executed is False
+            assert stage.result_status is None
 
     def test_delta_v_matches_analytical(self):
         """result.delta_v 与 hohmann_delta_v(r1, r2) 之和一致。"""
@@ -452,7 +458,7 @@ class TestEphemerisShooting:
             tolerance=1e-6,
         )
 
-        assert result.converged is True
+        assert result.status is ConvergenceState.CONVERGED, result.message
         assert result.max_residual < 1e-6
         assert result.outer_iterations <= 30
 
@@ -474,7 +480,7 @@ class TestEphemerisShooting:
             tolerance=1e-6,
         )
 
-        assert result.converged is True
+        assert result.status is ConvergenceState.CONVERGED, result.message
         radii = np.linalg.norm(result.state_patch[:, :3], axis=1)
         # 出发点半径应在 LEO 附近
         assert radii[0] < r1 * 1.5

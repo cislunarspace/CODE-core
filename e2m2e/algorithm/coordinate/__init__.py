@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 
 from ...data.constants import SECONDS_PER_DAY
+from ...data.templates import ConvergenceState, FailureCause
 from .axes import Axes
 from .coordinate_system import CoordinateSystem
 from .dynamic_axes import DynamicAxes
@@ -149,4 +150,7 @@ def spacetime_convert(
         "time": float(out_time),
         "transform_type": transform_type,
         "details": {"epoch_in": float(epoch), "et0_jd": et0_jd},
+        "status": ConvergenceState.CONVERGED,
+        "cause": FailureCause.NONE,
+        "message": "任务完成",
     }

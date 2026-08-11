@@ -16,7 +16,6 @@ from .enums import (
     StabilityLabel,
     TransferPhase,
     TransferType,
-    TwoLevelMultipleShootingStatus,
     UnitSystem,
 )
 
@@ -30,7 +29,6 @@ __all__ = [
     "StabilityLabel",
     "TransferPhase",
     "TransferType",
-    "TwoLevelMultipleShootingStatus",
     "UnitSystem",
     "OrbitProperties",
 ]

@@ -17,6 +17,7 @@ from e2m2e.algorithm.ephemeris_correction import (
     standard,
     two_level,
 )
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.mbse.data.enums import BoundaryMode
 
 pytestmark = pytest.mark.orchestration
@@ -35,7 +36,9 @@ def test_standard_method_uses_multiple_shooting_and_normalizes_result(monkeypatc
         def correct(self, **kwargs):
             calls["correct"] = kwargs
             return SimpleNamespace(
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="收敛",
                 outer_iterations=3,
                 max_residual=1.2,
                 residual_history=[3, 2, 1.2],
@@ -66,7 +69,7 @@ def test_standard_method_uses_multiple_shooting_and_normalizes_result(monkeypatc
         "tolerance": 1e-3,
         "verbose": True,
     }
-    assert result.converged is True
+    assert result.status is ConvergenceState.CONVERGED
     assert result.iterations == 3
     assert result.max_residual == 1.2
     assert result.residual_history == [3.0, 2.0, 1.2]
@@ -86,7 +89,9 @@ def test_two_level_method_uses_two_level_solver_and_preserves_velocity_diagnosti
         def correct(self, **kwargs):
             calls["correct"] = kwargs
             return SimpleNamespace(
-                converged=False,
+                status=ConvergenceState.MAX_ITERATIONS,
+                cause=FailureCause.MAX_ITERATIONS_REACHED,
+                message="达到最大迭代次数",
                 outer_iterations=4,
                 final_position_residual=2.5,
                 final_velocity_residual=0.4,
@@ -124,7 +129,7 @@ def test_two_level_method_uses_two_level_solver_and_preserves_velocity_diagnosti
         "boundary": BoundaryMode.FIXED_ENDPOINTS,
         "verbose": True,
     }
-    assert result.converged is False
+    assert result.status is not ConvergenceState.CONVERGED
     assert result.iterations == 4
     assert result.max_residual == 2.5
     assert result.residual_history == [5.0, 2.5]
@@ -144,7 +149,9 @@ def test_homotopy_method_delegates_to_correct_with_homotopy(monkeypatch):
         captured["state_patch"] = state_patch_arg
         captured.update(kwargs)
         return ephemeris_correction.EphemerisCorrectionResult(
-            converged=True,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="收敛",
             iterations=2,
             max_residual=1.0e-9,
             residual_history=[1.0e-6, 1.0e-9],
@@ -175,4 +182,4 @@ def test_homotopy_method_delegates_to_correct_with_homotopy(monkeypatch):
     assert captured["max_iter"] == 5
     assert captured["n_workers"] == 1
     assert captured["kernel_dir"] == "kernels"
-    assert result.converged is True
+    assert result.status is ConvergenceState.CONVERGED

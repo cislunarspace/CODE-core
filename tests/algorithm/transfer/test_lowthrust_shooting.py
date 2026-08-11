@@ -15,6 +15,7 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import GravityField
 from e2m2e.algorithm.transfer import EngineConfig, LowThrustShooting
 from e2m2e.data.kernels.manager import SPICEManager
+from e2m2e.data.templates import ConvergenceState
 
 pytestmark = [pytest.mark.orchestration, pytest.mark.low_thrust]
 
@@ -187,7 +188,7 @@ def test_lowthrust_shooting_known_control_reproduction(earth_ephemeris_system):
     assert residual < 1e-3, f"末态应匹配目标, 残差 {residual:.3e}"
 
     # 已知控制 throttle=0.7，min-fuel 会尝试降低油门省燃料（若可行域允许）
-    assert sol.converged or residual < 1e-2, f"应收敛: {sol.message}"
+    assert sol.status is ConvergenceState.CONVERGED or residual < 1e-2, f"应收敛: {sol.message}"
     assert sol.fuel_consumed > 0.0
     # 燃料消耗 ≤ 已知满推力上限
     g0 = 9.81

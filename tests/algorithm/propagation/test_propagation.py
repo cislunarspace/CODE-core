@@ -9,6 +9,7 @@ import pytest
 from kernel_helpers import SPICE_KERNEL_DIR
 
 from e2m2e.algorithm.propagation import _extract_bodies, propagate_orbit
+from e2m2e.data.templates import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.integrator
 
@@ -104,10 +105,13 @@ class TestPropagateOrbit:
             duration=86400.0,
             output_step=3600.0,
         )
-        assert len(result) == 25  # 0..24h inclusive
-        assert result.position_km.shape == (25, 3)
-        assert result.velocity_mps.shape == (25, 3)
-        assert not np.allclose(result.position_km[0], result.position_km[-1])
+        assert len(result.ephemeris) == 25  # 0..24h inclusive
+        assert result.ephemeris.position_km.shape == (25, 3)
+        assert result.ephemeris.velocity_mps.shape == (25, 3)
+        assert result.status is ConvergenceState.CONVERGED
+        assert result.cause is FailureCause.NONE
+        assert result.message == "任务完成"
+        assert not np.allclose(result.ephemeris.position_km[0], result.ephemeris.position_km[-1])
 
     def test_epoch_tuple(self, spice_manager):
         # 非奇异初值（地球点质量即可，聚焦 epoch 元组解析）
@@ -129,7 +133,7 @@ class TestPropagateOrbit:
             force_config=force_config,
             output_step=3600.0,
         )
-        assert len(result) == 2
+        assert len(result.ephemeris) == 2
 
     def test_invalid_initial_state_shape(self):
         with pytest.raises(ValueError, match="initial_state"):
@@ -172,4 +176,4 @@ class TestPropagateOrbit:
             force_config=force_config,
             output_step=3600.0,
         )
-        assert len(result) == 25
+        assert len(result.ephemeris) == 25

@@ -220,7 +220,8 @@ def design_low_energy_transfer(
         arrival_delta_v=leg2.arrival_delta_v,
         total_delta_v=total,
         transfer_time=float(times_a[-1] + tof_b_s),
-        converged=leg2.converged,
+        status=leg2.status,
+        cause=leg2.cause,
         n_iter=leg2.n_iter,
         message=message,
     )

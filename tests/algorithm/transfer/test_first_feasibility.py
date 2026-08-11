@@ -11,6 +11,7 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import TransferSearch
 from e2m2e.data.constants import Datum
+from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.orchestration
@@ -192,8 +193,8 @@ class TestSearchFirstFeasibilityFields:
         assert r["first_intersection_time"] is None
         assert r["first_min_distance_idx"] is None
         assert r["first_min_distance_time"] is None
-        # 不应判定为 success
-        assert r["status"] != "success"
+        # 不应判定为收敛
+        assert r["status"] is not ConvergenceState.CONVERGED
 
     def test_fields_self_consistent_with_min_distance(self, searcher, monkeypatch):
         """E1 自洽性：first_intersection_idx 存在 ⇒ d_per_step[idx]<=ith

@@ -1,4 +1,4 @@
-"""Rust 网格搜索进度回调、n_workers 转发、非 success 轨迹过滤（#316 前三项）。
+"""Rust 网格搜索进度回调、n_workers 转发与候选轨迹过滤（#316 前三项）。
 
 三个独立档：
 
@@ -6,7 +6,7 @@
    累加 delta 之和等于出发点数（而非 n_dep*n_alpha）。
 2. ``n_workers`` 转发 Rayon ThreadPoolBuilder 后结果与全局池一致——
    evaluate_point 是纯函数，线程数不影响数值与索引。
-3. 非 success 候选不回传轨迹——collision / no_intersection 的
+3. 非收敛候选不回传轨迹——collision / no_intersection 的
    ``transfer_trajectory`` / ``transfer_times`` 为 None（与 Rust evaluate_point 一致）。
 """
 
@@ -21,6 +21,7 @@ import pytest
 pytest.importorskip("e2m2e._integrators")
 
 from e2m2e.data.constants import Datum
+from e2m2e.data.templates import ConvergenceState
 from e2m2e.integrators import grid_search_rust  # noqa: E402
 
 pytestmark = pytest.mark.orchestration
@@ -120,15 +121,15 @@ def test_n_workers_forwarded_results_equivalent() -> None:
         assert a["min_distance_orbit_idx"] == b["min_distance_orbit_idx"], (
             f"[{i}] min_distance_orbit_idx"
         )
-        for f in ("success", "intersection_found", "collision_found", "local_minimum_found"):
+        for f in ("intersection_found", "collision_found", "local_minimum_found"):
             assert a[f] == b[f], f"[{i}] {f}: {a[f]!r} vs {b[f]!r}"
 
 
-def test_trajectory_filtered_for_non_success() -> None:
-    """非 success 候选不回传轨迹；success 候选轨迹非 None。
+def test_trajectory_filtered_for_non_converged() -> None:
+    """非收敛候选不回传轨迹；收敛候选轨迹非 None。
 
     远场景（arrival xc=50）全部 no_intersection，轨迹全 None；近场景（arrival
-    与 dep 同心 xc=0.9、半径差 0.04<阈值）至少有一个 success 候选，其轨迹非 None。
+    与 dep 同心 xc=0.9、半径差 0.04<阈值）至少有一个收敛候选，其轨迹非 None。
     """
     n_dep, n_alpha = 3, 4
     dep_states = _circular_orbit(0.9, 0.08, 40)[:n_dep]
@@ -140,25 +141,25 @@ def test_trajectory_filtered_for_non_success() -> None:
     r_far = grid_search_rust(**_kwargs(dep_states, dep_times, alpha_grid, arrival_far))
     assert len(r_far) == n_dep * n_alpha
     statuses_far = {r["status"] for r in r_far}
-    assert "success" not in statuses_far, "远场景不应出现 success"
+    assert ConvergenceState.CONVERGED not in statuses_far, "远场景不应出现收敛候选"
     for r in r_far:
-        assert r["transfer_trajectory"] is None, (
-            f"non-success 候选不应回传轨迹，status={r['status']!r}"
-        )
+        assert r["transfer_trajectory"] is None, f"非收敛候选不应回传轨迹，status={r['status']!r}"
         assert r["transfer_times"] is None
 
     # 近场景：arrival 与 dep 同心（xc=0.9），半径 0.12 vs dep 0.08，
-    # 半径差 0.04 < min_distance_threshold=0.05，α=1.0 时轨迹最近距 ≈0.04 → success。
+    # 半径差 0.04 < min_distance_threshold=0.05，α=1.0 时轨迹最近距 ≈0.04 → 收敛。
     arrival_near = _circular_orbit(0.9, 0.12, 30)
     r_near = grid_search_rust(**_kwargs(dep_states, dep_times, alpha_grid, arrival_near))
     assert len(r_near) == n_dep * n_alpha
-    assert any(r["status"] == "success" for r in r_near), "近场景应至少有一个 success 候选"
+    assert any(r["status"] is ConvergenceState.CONVERGED for r in r_near), (
+        "近场景应至少有一个收敛候选"
+    )
     for r in r_near:
-        if r["status"] == "success":
-            assert r["transfer_trajectory"] is not None, "success 候选轨迹不应为 None"
+        if r["status"] is ConvergenceState.CONVERGED:
+            assert r["transfer_trajectory"] is not None, "收敛候选轨迹不应为 None"
             assert r["transfer_times"] is not None
         else:
             assert r["transfer_trajectory"] is None, (
-                f"non-success 候选不应回传轨迹，status={r['status']!r}"
+                f"非收敛候选不应回传轨迹，status={r['status']!r}"
             )
             assert r["transfer_times"] is None

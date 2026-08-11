@@ -16,6 +16,7 @@ from typing import Literal
 
 import numpy as np
 
+from ...data.templates import ConvergenceState, FailureCause
 from ..dynamics import CR3BP_Dynamics
 from .config import TransferArc, TransferSolution
 from .lambert import solve_lambert
@@ -73,7 +74,7 @@ class ThreeBodyLambert:
                 ``"orbit"`` 直接用 term0 的速度
 
         Returns:
-            :class:`TransferSolution`，单弧，物理单位；未收敛时 ``converged=False``
+            :class:`TransferSolution`，单弧，物理单位；失败时返回对应状态与原因码
         """
         x0 = self.system.physical_to_dimensionless(term0.state)
         x1 = self.system.physical_to_dimensionless(term1.state)
@@ -89,7 +90,7 @@ class ThreeBodyLambert:
         else:
             raise ValueError(f"guess 必须是 'lambert' 或 'orbit'，得到 {guess!r}")
 
-        v0, error, n_iter, converged = self._shoot(r0, rf, v0, tof_dim)
+        v0, error, n_iter, status, cause = self._shoot(r0, rf, v0, tof_dim)
 
         # 末次传播取收敛弧（未收敛时取最后一次迭代弧）
         result = self.dynamics.propagate(
@@ -102,15 +103,20 @@ class ThreeBodyLambert:
         delta_v1 = float(np.linalg.norm(v0 - x0[3:]) * v_char)
         arrival_delta_v = float(np.linalg.norm(result["states"][-1][3:] - x1[3:]) * v_char)
 
-        message = "" if converged else f"Newton 未收敛：末端位置误差 {error:.3e}（无量纲）"
+        message = (
+            "三体 Lambert 打靶收敛"
+            if status is ConvergenceState.CONVERGED
+            else f"Newton 打靶未收敛：末端位置误差 {error:.3e}（无量纲）"
+        )
         return TransferSolution(
             arcs=(TransferArc(states=states_phys, times=times_phys, delta_v=delta_v1),),
             arrival_delta_v=arrival_delta_v,
             total_delta_v=delta_v1 + arrival_delta_v,
             transfer_time=float(tof),
-            converged=converged,
-            n_iter=n_iter,
+            status=status,
+            cause=cause,
             message=message,
+            n_iter=n_iter,
         )
 
     # ---- 内部实现 ----
@@ -120,7 +126,7 @@ class ThreeBodyLambert:
 
     def _shoot(
         self, r0: np.ndarray, rf: np.ndarray, v0: np.ndarray, tof_dim: float
-    ) -> tuple[np.ndarray, float, int, bool]:
+    ) -> tuple[np.ndarray, float, int, ConvergenceState, FailureCause]:
         """阻尼 Newton 打靶：修正 v0 使传播 tof_dim 后位置命中 rf。
 
         雅各比取末端 STM 的 Φ_rv 块；奇异时回退最小二乘；整步使误差增大时
@@ -136,10 +142,15 @@ class ThreeBodyLambert:
             err = result["states"][-1][:3] - rf
             error = float(np.linalg.norm(err))
             if not np.isfinite(error) or error > self.DIVERGENCE_LIMIT:
-                logger.warning("三体打靶发散：迭代 %d 误差 %.3e", n_iter, error)
-                return v0, error, n_iter, False
+                return (
+                    v0,
+                    error,
+                    n_iter,
+                    ConvergenceState.DIVERGED,
+                    FailureCause.DIVERGENCE_DETECTED,
+                )
             if error < self.tolerance:
-                return v0, error, n_iter, True
+                return v0, error, n_iter, ConvergenceState.CONVERGED, FailureCause.NONE
 
             phi_rv = np.asarray(result["stm"])[-1][0:3, 3:6]
             try:
@@ -157,7 +168,18 @@ class ThreeBodyLambert:
                     break
                 alpha *= 0.5
             else:
-                logger.warning("三体打靶线搜索失败：迭代 %d 误差 %.3e", n_iter, error)
-                return v0, error, n_iter, False
+                return (
+                    v0,
+                    error,
+                    n_iter,
+                    ConvergenceState.STAGNATED,
+                    FailureCause.STAGNATION_DETECTED,
+                )
 
-        return v0, error, self.max_iterations, False
+        return (
+            v0,
+            error,
+            self.max_iterations,
+            ConvergenceState.MAX_ITERATIONS,
+            FailureCause.MAX_ITERATIONS_REACHED,
+        )

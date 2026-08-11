@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.ephemeris_correction import homotopy
+from e2m2e.data.templates import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 
@@ -114,7 +115,9 @@ def test_intermediate_steps_use_loose_tolerance_final_uses_strict():
             captured_tols.append(kwargs["tolerance"])
             _ = self.dynamics.lambda_weight  # ensure attribute is readable
             return SimpleNamespace(
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="修正收敛",
                 outer_iterations=1,
                 max_residual=1e-12,
                 residual_history=[1e-12],
@@ -152,7 +155,9 @@ def test_each_step_seeded_with_previous_step_output():
             seeded.append((np.array(kwargs["t_patch"]), np.array(kwargs["state_patch"])))
             # Return a slightly perturbed result so we can check seeding
             return SimpleNamespace(
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="修正收敛",
                 outer_iterations=1,
                 max_residual=1e-12,
                 residual_history=[1e-12],
@@ -183,7 +188,9 @@ def test_each_step_seeded_with_previous_step_output():
 
 
 def test_failed_intermediate_step_still_seeds_next_step():
-    """Even if a lambda step reports converged=False, its output is used to seed the next."""
+    """Even if a lambda step reports status=ConvergenceState.FAILED,
+    cause=FailureCause.UNKNOWN,
+    message="修正失败", its output is used to seed the next."""
     t_patch = np.array([0.0, 100.0])
     state_patch = np.ones((2, 6))
     seeded: list[tuple[np.ndarray, np.ndarray]] = []
@@ -195,7 +202,9 @@ def test_failed_intermediate_step_still_seeds_next_step():
         def correct(self, **kwargs):
             seeded.append((np.array(kwargs["t_patch"]), np.array(kwargs["state_patch"])))
             return SimpleNamespace(
-                converged=False,  # intermediate failure
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.UNKNOWN,
+                message="修正失败",  # intermediate failure
                 outer_iterations=5,
                 max_residual=1.0e-3,
                 residual_history=[1e-2, 1e-3],
@@ -219,7 +228,7 @@ def test_failed_intermediate_step_still_seeds_next_step():
     # Both steps were attempted
     assert len(seeded) == 2
     # Aggregated: converged comes from the LAST step, residuals flatten
-    assert result.converged is False
+    assert result.status is not ConvergenceState.CONVERGED
     assert result.iterations == 10
     assert result.residual_history == [1e-2, 1e-3, 1e-2, 1e-3]
     assert result.max_residual == 1.0e-3
@@ -235,7 +244,9 @@ def test_aggregated_fields_follow_spec():
 
         def correct(self, **kwargs):
             return SimpleNamespace(
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="修正收敛",
                 outer_iterations=2,
                 max_residual=2.0e-9,
                 residual_history=[1.0e-7, 2.0e-9],
@@ -256,7 +267,7 @@ def test_aggregated_fields_follow_spec():
             lambda_steps=[0.25, 0.5, 0.75, 1.0],
         )
 
-    assert result.converged is True
+    assert result.status is ConvergenceState.CONVERGED
     assert result.iterations == 2 * 4  # 2 iterations per step * 4 steps
     assert result.max_residual == 2.0e-9
     assert result.residual_history == [1.0e-7, 2.0e-9] * 4
@@ -274,7 +285,9 @@ def test_aggregated_fields_follow_spec():
 
 
 def test_final_step_nonconvergence_aggregates_to_converged_false():
-    """If the final step returns converged=False, the aggregated result is converged=False.
+    """If the final step returns status=ConvergenceState.FAILED,
+                cause=FailureCause.UNKNOWN,
+                message="修正失败", the aggregated result is converged=False.
 
     The aggregated max_residual matches the final step's max_residual, and
     residual_history still includes every step's contribution.
@@ -288,7 +301,9 @@ def test_final_step_nonconvergence_aggregates_to_converged_false():
 
         def correct(self, **kwargs):
             return SimpleNamespace(
-                converged=False,
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.UNKNOWN,
+                message="修正失败",
                 outer_iterations=10,
                 max_residual=1.0e-5,
                 residual_history=[1.0e-3, 1.0e-5],
@@ -309,7 +324,7 @@ def test_final_step_nonconvergence_aggregates_to_converged_false():
             lambda_steps=[0.5, 1.0],
         )
 
-    assert result.converged is False
+    assert result.status is not ConvergenceState.CONVERGED
     assert result.max_residual == 1.0e-5  # final step's max_residual
     # residual_history is the concatenation of both steps' histories
     assert result.residual_history == [1.0e-3, 1.0e-5, 1.0e-3, 1.0e-5]
@@ -332,7 +347,9 @@ def test_inner_step_exception_raises_with_context():
             if abs(self.dynamics.lambda_weight - 0.75) < 1e-12:
                 raise RuntimeError("upstream solver failure")
             return SimpleNamespace(
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="修正收敛",
                 outer_iterations=1,
                 max_residual=1.0e-9,
                 residual_history=[1.0e-9],
@@ -370,7 +387,9 @@ def test_residual_history_not_dropped_when_intermediate_step_fails():
         [
             # step 0: converges
             SimpleNamespace(
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="修正收敛",
                 outer_iterations=3,
                 max_residual=1.0e-9,
                 residual_history=[1.0e-7, 1.0e-8, 1.0e-9],
@@ -379,7 +398,9 @@ def test_residual_history_not_dropped_when_intermediate_step_fails():
             ),
             # step 1: does NOT converge, but reports a residual history
             SimpleNamespace(
-                converged=False,
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.UNKNOWN,
+                message="修正失败",
                 outer_iterations=5,
                 max_residual=1.0e-4,
                 residual_history=[1.0e-3, 1.0e-4],
@@ -388,7 +409,9 @@ def test_residual_history_not_dropped_when_intermediate_step_fails():
             ),
             # step 2: final step
             SimpleNamespace(
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="修正收敛",
                 outer_iterations=2,
                 max_residual=1.0e-9,
                 residual_history=[1.0e-8, 1.0e-9],
@@ -419,7 +442,7 @@ def test_residual_history_not_dropped_when_intermediate_step_fails():
         )
 
     # Aggregated: final step converged → True
-    assert result.converged is True
+    assert result.status is ConvergenceState.CONVERGED
     # No history entries lost: 3 + 2 + 2 = 7 entries in order
     assert result.residual_history == [
         1.0e-7,

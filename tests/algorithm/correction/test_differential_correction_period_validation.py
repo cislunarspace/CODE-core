@@ -5,6 +5,7 @@
 
 import pytest
 
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.orchestration
@@ -30,9 +31,9 @@ class TestPeriodValidation:
 
         result = dro_corrector.iterate_correction(valid_orbit, verbose=False)
 
-        # 如果收敛成功，结果不应为None
-        if result is not None:
-            assert result.period >= 1e-6
+        # 如果有轨道，周期应该有效
+        if result.orbit is not None:
+            assert result.orbit.period >= 1e-6
 
     def test_period_validation_constant_value(self, dro_corrector):
         """测试周期验证阈值为1e-6"""
@@ -54,10 +55,12 @@ class TestPeriodValidation:
 
         result = dro_corrector.iterate_correction(orbit, verbose=False)
 
-        # 结果可能为None（如果初始猜测不好），但如果返回了轨道，周期应该有效
-        if result is not None:
-            assert result.period >= 1e-6, f"Expected period >= 1e-6, got {result.period}"
-            assert dro_corrector.termination_reason is not None
+        # 结果可能没有轨道（如果初始猜测不好），但生成的轨道周期应该有效
+        if result.orbit is not None:
+            assert result.orbit.period >= 1e-6, (
+                f"Expected period >= 1e-6, got {result.orbit.period}"
+            )
+            assert result.message
 
 
 class TestPeriodValidationEdgeCases:
@@ -74,9 +77,9 @@ class TestPeriodValidationEdgeCases:
 
         result = dro_corrector.iterate_correction(orbit, verbose=False)
 
-        # 如果结果不为None，验证周期有效性
-        if result is not None:
-            assert result.period >= 1e-6
+        # 如果有轨道，验证周期有效性
+        if result.orbit is not None:
+            assert result.orbit.period >= 1e-6
 
     def test_corrector_tracks_termination_reason(self, dro_corrector):
         """测试修正器能记录终止原因"""
@@ -87,10 +90,10 @@ class TestPeriodValidationEdgeCases:
         )
         orbit.period = 6.307498
 
-        dro_corrector.iterate_correction(orbit, verbose=False)
+        result = dro_corrector.iterate_correction(orbit, verbose=False)
 
         # 验证有终止原因记录
-        assert dro_corrector.termination_reason is not None
+        assert result.message
 
 
 class TestPeriodValidationFailureMode:
@@ -108,12 +111,10 @@ class TestPeriodValidationFailureMode:
 
         result = dro_corrector.iterate_correction(orbit, verbose=False)
 
-        # 无效周期应该导致返回None或success=False
-        if result is None:
-            assert not dro_corrector.success
-            assert "周期" in dro_corrector.termination_reason or (
-                "period" in dro_corrector.termination_reason.lower()
-            )
+        # 无效周期应该导致返回非收敛状态
+        assert result.status is not ConvergenceState.CONVERGED
+        if result.cause is FailureCause.INVALID_PERIOD:
+            assert "周期" in result.message or "period" in result.message.lower()
 
 
 class TestCorrectionNormTermination:
@@ -131,18 +132,14 @@ class TestCorrectionNormTermination:
         )
         orbit.period = 6.307498
 
-        dro_corrector.iterate_correction(orbit, verbose=False)
+        result = dro_corrector.iterate_correction(orbit, verbose=False)
 
         # 如果成功，验证终止原因
-        if dro_corrector.success:
+        if result.status is ConvergenceState.CONVERGED:
             # 终止原因可能是:
             # 1. 正常收敛 (误差小于容差)
             # 2. 修正量过小但误差足够小
-            assert dro_corrector.termination_reason in [
-                "收敛成功：误差小于容差",
-                "收敛成功：修正量过小但误差足够小",
-                "收敛成功",
-            ]
+            assert result.cause is FailureCause.NONE
 
     def test_correction_history_tracked(self, dro_corrector):
         """测试修正量历史被正确追踪"""
@@ -167,9 +164,9 @@ class TestCorrectionNormTermination:
         )
         orbit.period = 3.0
 
-        dro_corrector.iterate_correction(orbit, verbose=False)
+        result = dro_corrector.iterate_correction(orbit, verbose=False)
 
         # 如果不成功，检查终止原因
-        if not dro_corrector.success:
+        if result.status is not ConvergenceState.CONVERGED:
             # 可能是停滞（修正量过小）或周期无效
-            assert dro_corrector.termination_reason is not None
+            assert result.message

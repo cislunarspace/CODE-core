@@ -43,7 +43,6 @@ INT_FIELDS = [
 
 # 布尔字段：精确相等。
 BOOL_FIELDS = [
-    "success",
     "intersection_found",
     "collision_found",
     "local_minimum_found",
@@ -134,7 +133,7 @@ def _assert_candidate_equal(py_r: dict[str, Any], rust_r: dict[str, Any]) -> Non
     for f in BOOL_FIELDS:
         assert py_r[f] == rust_r[f], f"{f}: py={py_r[f]!r} rust={rust_r[f]!r}"
 
-    integration_failed = py_r["status"] == "integration_failed"
+    integration_failed = py_r["cause"].value == "integration_failed"
     for f in FLOAT_FIELDS:
         py_v = py_r[f]
         rust_v = rust_r[f]

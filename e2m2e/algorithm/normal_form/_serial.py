@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from ...data.templates import ConvergenceState, FailureCause
+
 if TYPE_CHECKING:
     from .types import NormalFormResult
 
@@ -156,7 +158,9 @@ def _ds_to_dict(ds: Any) -> dict[str, Any]:
         d["_ds_sh_max_residual"] = np.array(sr.max_residual)
         d["_ds_sh_mean_residual"] = np.array(sr.mean_residual)
         d["_ds_sh_iterations"] = np.array(sr.iterations)
-        d["_ds_sh_converged"] = np.array(int(sr.converged))
+        d["_ds_sh_status"] = _encode_str(sr.status.value)
+        d["_ds_sh_cause"] = _encode_str(sr.cause.value)
+        d["_ds_sh_message"] = _encode_str(sr.message)
         d["_ds_sh_residual_history"] = np.array(sr.residual_history, dtype=float)
     return d
 
@@ -224,7 +228,9 @@ def _ds_from_dict(d: dict[str, Any], ctx: Any) -> Any:
             max_residual=float(d["_ds_sh_max_residual"]),
             mean_residual=float(d["_ds_sh_mean_residual"]),
             iterations=int(d["_ds_sh_iterations"]),
-            converged=bool(int(d["_ds_sh_converged"])),
+            status=ConvergenceState(str(d["_ds_sh_status"])),
+            cause=FailureCause(str(d["_ds_sh_cause"])),
+            message=str(d["_ds_sh_message"]),
             residual_history=tuple(float(x) for x in d["_ds_sh_residual_history"]),
         )
 
@@ -356,7 +362,7 @@ def result_to_npz_dict(result: NormalFormResult) -> dict[str, Any]:
     d: dict[str, Any] = {}
 
     # 标记格式版本
-    d["_fmt_version"] = np.array(1)
+    d["_fmt_version"] = np.array(2)
 
     # context
     d.update(_context_to_dict(result.context))
@@ -364,7 +370,8 @@ def result_to_npz_dict(result: NormalFormResult) -> dict[str, Any]:
     # 顶层字段
     d["_nfr_order"] = np.array(result.order)
     d["_nfr_residual"] = np.array(result.substitute_residual)
-    d["_nfr_success"] = np.array(int(result.success))
+    d["_nfr_status"] = _encode_str(result.status.value)
+    d["_nfr_cause"] = _encode_str(result.cause.value)
     d["_nfr_message"] = _encode_str(result.message)
 
     # 子结果
@@ -391,13 +398,32 @@ def result_from_npz_dict(d: dict[str, Any]) -> NormalFormResult:
     from .catalog import LibrationCatalogData, LibrationCatalogTransformer
     from .types import NormalFormResult
 
+    if "_fmt_version" not in d:
+        raise ValueError("NormalFormResult 持久化文件缺少格式版本，无法迁移旧格式")
+    fmt_version = int(d["_fmt_version"])
+    if fmt_version < 2:
+        raise ValueError(
+            "NormalFormResult 持久化文件为旧格式（缺少 status/cause/message），请重新计算并保存"
+        )
+    required_keys = ("_nfr_status", "_nfr_cause", "_nfr_message")
+    missing = [key for key in required_keys if key not in d]
+    if missing:
+        raise ValueError(
+            f"NormalFormResult 持久化文件缺少必需字段 {', '.join(missing)}，请重新计算并保存"
+        )
+
     # 把 bytes ndarray 解码回 str
     _STR_KEYS = {
         "_ctx_system",
         "_ctx_point",
         "_ds_backend",
+        "_ds_sh_status",
+        "_ds_sh_cause",
+        "_ds_sh_message",
         "_qf_method",
         "_cm_steps",
+        "_nfr_status",
+        "_nfr_cause",
         "_nfr_message",
     }
     for k in _STR_KEYS:
@@ -408,7 +434,8 @@ def result_from_npz_dict(d: dict[str, Any]) -> NormalFormResult:
 
     order = int(d["_nfr_order"])
     residual = float(d["_nfr_residual"])
-    success = bool(int(d["_nfr_success"]))
+    status = ConvergenceState(str(d["_nfr_status"]))
+    cause = FailureCause(str(d["_nfr_cause"]))
     message = str(d["_nfr_message"])
 
     # 子结果
@@ -439,7 +466,8 @@ def result_from_npz_dict(d: dict[str, Any]) -> NormalFormResult:
         context=ctx,
         order=order,
         substitute_residual=residual,
-        success=success,
+        status=status,
+        cause=cause,
         message=message,
         ds_result=ds_result,
         qf_result=qf_result,

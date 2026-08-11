@@ -23,6 +23,7 @@ from e2m2e.algorithm.transfer.wsb import (
     compute_kepler_energy_moon,
 )
 from e2m2e.data.constants import Datum
+from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 
@@ -341,7 +342,7 @@ class TestWsbTransferOrbit:
         assert result.transfer_type == "WSB"
         details = result.details
         assert isinstance(details, WsbTransferDetails)
-        if not details.converged:
+        if details.status is not ConvergenceState.CONVERGED:
             pytest.skip("小网格 WSB 搜索未找到可行候选（参数空间可能无解）")
         # 有候选：dv 落在地月转移合理量级（~3-5 km/s）
         assert 0.5 < result.delta_v < 10.0, (

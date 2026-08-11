@@ -11,7 +11,10 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.integrators import lambert_batch_py, lambert_izzo_py
+
+from ..results import ResultStatus
 
 
 @dataclass(frozen=True)
@@ -21,16 +24,23 @@ class LambertSolution:
     Attributes:
         v0: 出发速度，形状 ``(3,)``，km/s
         vf: 到达速度，形状 ``(3,)``，km/s
-        converged: 是否收敛（不收敛时 Rust 侧直接抛错，故恒为 True）
+        status: 算法最终状态（Rust 后端失败时直接抛错）
+        cause: 算法最终原因码
+        message: 求解器结果说明
         n_iter: Householder 迭代次数
         revs: 完整圈数
     """
 
     v0: np.ndarray
     vf: np.ndarray
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
     n_iter: int
     revs: int
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 def _parse_direction(direction: str) -> bool:
@@ -81,7 +91,9 @@ def solve_lambert(
     return LambertSolution(
         v0=np.asarray(result["v0"], dtype=float),
         vf=np.asarray(result["vf"], dtype=float),
-        converged=True,
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
+        message="Lambert 求解完成",
         n_iter=int(result["n_iter"]),
         revs=int(revs),
     )

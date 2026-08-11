@@ -26,8 +26,10 @@ import numpy as np
 
 from ...data.constants import SECONDS_PER_DAY
 from ...data.constants.bodies import MOON
+from ...data.templates import ConvergenceState, FailureCause
 from ..dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
+from ..results import ResultStatus
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +109,12 @@ class WsbCandidate:
     dv_arrival: float
     total_dv: float
     arrival_time_dim: float
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 def compute_kepler_energy_moon(state: np.ndarray, mu: float) -> float:
@@ -350,7 +357,9 @@ def _wsb_worker(
                 dv_arrival=dv_arr,
                 total_dv=total_dv,
                 arrival_time_dim=arrival_time_dim,
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="找到 WSB 候选",
             )
         )
 
@@ -366,7 +375,7 @@ def _refine_wsb_candidate(
     """用 ThreeBodyLambert 打靶精化 WSB 候选。
 
     到达段（perilune → target）用 ThreeBodyLambert 修正到达速度。
-    打靶失败时返回原始候选（converged=False）。
+    打靶未达到收敛状态时返回原始候选。
     """
     from .terminal import StateTerminal
     from .three_body_lambert import ThreeBodyLambert
@@ -395,7 +404,7 @@ def _refine_wsb_candidate(
             guess="lambert",
         )
 
-        if arrival_leg.converged:
+        if arrival_leg.status is ConvergenceState.CONVERGED:
             v_arrival_shot = arrival_leg.arcs[-1].states[-1][3:]
             v_target_phys = target_phys[3:]
             dv_arr = float(np.linalg.norm(v_arrival_shot - v_target_phys))
@@ -414,7 +423,9 @@ def _refine_wsb_candidate(
                 dv_arrival=dv_arr,
                 total_dv=candidate.dv_departure + dv_arr,
                 arrival_time_dim=candidate.arrival_time_dim,
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="找到 WSB 候选",
             )
     except (RuntimeError, ValueError, np.linalg.LinAlgError):
         logger.debug("ThreeBodyLambert 打靶失败，保留原始候选", exc_info=True)
@@ -433,5 +444,7 @@ def _refine_wsb_candidate(
         dv_arrival=candidate.dv_arrival,
         total_dv=candidate.total_dv,
         arrival_time_dim=candidate.arrival_time_dim,
-        converged=False,
+        status=ConvergenceState.MAX_ITERATIONS,
+        cause=FailureCause.MAX_ITERATIONS_REACHED,
+        message="WSB 候选精化未收敛",
     )

@@ -11,7 +11,8 @@ from e2m2e.algorithm.solver.two_level_multiple_shooting import (
     TwoLevelMultipleShooting,
     TwoLevelMultipleShootingResult,
 )
-from e2m2e.mbse.data.enums import BoundaryMode, TwoLevelMultipleShootingStatus
+from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.mbse.data.enums import BoundaryMode
 
 pytestmark = pytest.mark.orchestration
 
@@ -157,7 +158,7 @@ def test_correct_boundary_accepts_enum_type():
     state_patch = np.zeros((3, 6))
 
     result = solver.correct(t_patch, state_patch, boundary=BoundaryMode.FIXED_ENDPOINTS)
-    assert result.converged is True
+    assert result.status is ConvergenceState.CONVERGED
 
 
 def test_correct_boundary_rejects_string():
@@ -191,8 +192,8 @@ def test_correct_reports_level1_failure_when_segments_cannot_hit_positions():
         velocity_tolerance=1e-12,
     )
 
-    assert result.converged is False
-    assert result.status == TwoLevelMultipleShootingStatus.LEVEL1_FAILED
+    assert result.status is not ConvergenceState.CONVERGED
+    assert result.cause is FailureCause.LEVEL1_CORRECTION_FAILED
     assert result.outer_iterations == 2
     # level1_iterations 现在为 list[list[int]]，外层迭代次数 = 2，每轮 2 段
     assert len(result.level1_iterations) == 2
@@ -226,8 +227,8 @@ def test_correct_converges_linear_patch_points_without_mutating_inputs():
 
     np.testing.assert_allclose(t_patch, original_t_patch)
     np.testing.assert_allclose(state_patch, original_state_patch)
-    assert result.converged is True
-    assert result.status == TwoLevelMultipleShootingStatus.CONVERGED
+    assert result.status is ConvergenceState.CONVERGED
+    assert result.status is ConvergenceState.CONVERGED
     assert result.state_patch.shape == (3, 6)
     assert result.t_patch.shape == (3,)
     assert result.outer_iterations >= 1
@@ -284,7 +285,7 @@ def test_correct_level1_position_tolerance_parameter():
         level1_position_tolerance=1e-6,
     )
 
-    assert result.converged is True
+    assert result.status is ConvergenceState.CONVERGED
 
 
 def test_correct_max_aggregation_for_residuals():

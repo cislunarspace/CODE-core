@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from tqdm.auto import tqdm
 
+from ...data.templates import ConvergenceState, FailureCause
 from ...data.types.orbit import Orbit
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from .search_progress import (
@@ -134,11 +135,12 @@ def search_single_departure(
                 )
                 results.append(
                     {
-                        "success": False,
+                        "status": ConvergenceState.FAILED,
+                        "cause": FailureCause.INTEGRATION_FAILED,
+                        "message": "转移轨迹积分失败",
                         "departure_state": departure_state,
                         "departure_time": departure_time,
                         "alpha": alpha,
-                        "status": "integration_failed",
                         "dv_departure": dv_departure,
                         "dv_insertion": None,
                         "min_distance_orbit_idx": None,
@@ -187,20 +189,30 @@ def search_single_departure(
                 first_md_time = None
 
             if collision:
-                status = "collision"
+                status = ConvergenceState.COLLISION
+                cause = FailureCause.BODY_COLLISION
+                message = f"与{body}发生碰撞"
             elif intersection or min_dist < mdt:
-                status = "success"
+                status = ConvergenceState.CONVERGED
+                cause = FailureCause.NONE
+                message = "找到可行转移候选"
             else:
-                status = "no_intersection"
+                status = ConvergenceState.INFEASIBLE
+                cause = FailureCause.NO_INTERSECTION
+                message = "未达到目标轨道"
             # item ③：仅 success 候选回传轨迹（与 Rust evaluate_point 一致），
             # collision / no_intersection 的整段轨迹对下游选优无价值，丢弃省内存。
             result = {
-                "success": True,
+                "status": status,
+                "cause": cause,
+                "message": message,
                 "departure_state": departure_state,
                 "departure_time": departure_time,
                 "alpha": alpha,
-                "transfer_trajectory": traj_states if status == "success" else None,
-                "transfer_times": traj_times if status == "success" else None,
+                "transfer_trajectory": traj_states
+                if status is ConvergenceState.CONVERGED
+                else None,
+                "transfer_times": traj_times if status is ConvergenceState.CONVERGED else None,
                 "transfer_time": traj_times[-1],
                 "min_distance": min_dist,
                 "min_distance_idx": min_idx,
@@ -220,7 +232,6 @@ def search_single_departure(
                 "collision_found": collision,
                 "collision_body": body,
                 "collision_idx": col_idx,
-                "status": status,
             }
             results.append(result)
         finally:

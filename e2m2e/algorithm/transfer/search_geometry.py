@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ...data.templates import ConvergenceState
 from ...data.types.orbit import Orbit
 
 MAX_DISTANCE_PAIRS = 10_000_000
@@ -113,6 +114,9 @@ def is_feasible_result(
         if min_distance_threshold is not None
         else default_min_distance_threshold
     )
+    status = result.get("status")
+    if status is not None and status is not ConvergenceState.CONVERGED:
+        return False
     if result.get("collision_found", False):
         return False
     md = float(result.get("min_distance", float("inf")))

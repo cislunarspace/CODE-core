@@ -18,8 +18,6 @@
 明确的小 Lyapunov 轨道作为输入——这正是 quasi-Floquet 变换的设计场景。
 """
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 from scipy.integrate import solve_ivp

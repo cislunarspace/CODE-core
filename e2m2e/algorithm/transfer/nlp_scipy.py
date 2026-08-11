@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy.optimize import Bounds, minimize
 
+from ...data.templates import ConvergenceState, FailureCause
 from .config import TransferOptimizationResult
 from .nlp_core import NLPOptimizationVariables
 
@@ -135,25 +136,39 @@ def solve_with_scipy(
             callback=_scipy_callback,
         )
 
-        success = result.success
+        if result.success:
+            status = ConvergenceState.CONVERGED
+            cause = FailureCause.NONE
+        elif result.status == 9:
+            status = ConvergenceState.MAX_ITERATIONS
+            cause = FailureCause.MAX_ITERATIONS_REACHED
+        else:
+            status = ConvergenceState.INFEASIBLE
+            cause = FailureCause.CONSTRAINT_VIOLATION
         message = result.message
         final_y = result.x
 
     except Exception as e:
-        success = False
+        status = ConvergenceState.FAILED
+        cause = FailureCause.BACKEND_FAILURE
         message = f"优化失败: {str(e)}"
         final_y = y0
 
     # 9. 组装结果
     opt_vars = NLPOptimizationVariables.from_array(final_y)
     opt_result = optimizer._build_result(
-        opt_vars, success, message, use_relaxed_velocity_constraint, velocity_angle_constraint
+        opt_vars,
+        status,
+        cause,
+        message,
+        use_relaxed_velocity_constraint,
+        velocity_angle_constraint,
     )
 
     # 10. verbose 结果输出
     if verbose:
         print("\n优化结果:")
-        print(f"  成功: {opt_result.success}")
+        print(f"  状态: {opt_result.status.value}")
         print(f"  消息: {opt_result.message}")
         print(f"  α={opt_result.departure_alpha:.6f}")
         print(f"  T={opt_result.transfer_time:.6f}")

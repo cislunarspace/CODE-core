@@ -19,6 +19,7 @@ from typing import Any
 
 import numpy as np
 
+from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.enums import TransferType
 from ...data.types.orbit import Orbit
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
@@ -482,7 +483,8 @@ class DROTRONLPOptimizer:
     def _build_result(
         self,
         variables: NLPOptimizationVariables,
-        success: bool,
+        status: ConvergenceState,
+        cause: FailureCause,
         message: str,
         use_relaxed_constraint: bool = False,
         velocity_angle_constraint: float = 0.0,
@@ -512,7 +514,7 @@ class DROTRONLPOptimizer:
         )
 
         violation = {}
-        if success:
+        if status is ConvergenceState.CONVERGED:
             violation["position"] = self.constraint_position(variables.to_array())
             if use_relaxed_constraint:
                 violation["velocity"] = max(
@@ -528,7 +530,8 @@ class DROTRONLPOptimizer:
         transfer_type = self._classify_transfer(transfer_time, times, states, insertion_state)
 
         return TransferOptimizationResult(
-            success=success,
+            status=status,
+            cause=cause,
             message=message,
             departure_state=dep_state.copy(),
             departure_alpha=alpha,

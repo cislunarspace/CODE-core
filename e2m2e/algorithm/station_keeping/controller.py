@@ -24,6 +24,7 @@ import numpy as np
 
 from ...data.constants import SECONDS_PER_DAY
 from ...data.kernels.manager import SPICEManager
+from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
 from ...data.types import EphemerisTable, ManeuverTable, SKStatistic
 from ...data.types.trajectory import read_ephemeris
@@ -33,6 +34,7 @@ from ..coordinate.standard_origins import CelestialBodyOrigin
 from ..design.design_orbit import default_kernel_dir, load_design_kernels
 from ..dynamics import EphemerisSystem
 from ..forces.force_mapping import perturbation_to_force_config
+from ..results import ResultStatus, StageRecord
 from .monte_carlo import MonteCarloResult, run_monte_carlo
 
 if TYPE_CHECKING:
@@ -69,6 +71,13 @@ class ControlOrbitResult:
     maneuvers: ManeuverTable
     controlled_ephemeris: EphemerisTable | None
     raw: MonteCarloResult = field(repr=False)
+    status: ConvergenceState = ConvergenceState.CONVERGED
+    cause: FailureCause = FailureCause.NONE
+    message: str = "任务完成"
+    stages: tuple[StageRecord, ...] = ()
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
     def write_outputs(self, out_dir: str | Path, mode: int = 1) -> list[Path]:
         """把三个输出文件写入目录（SK_STATISTIC/MANEUVERS/受控星历）。"""
@@ -294,10 +303,21 @@ def control_orbit(
         tight_max_iter=tight_max_iter,
         special_damping_factor=special_damping_factor,
     )
+    status = (
+        ConvergenceState.CONVERGED
+        if result.num_failed < num_monte_carlo
+        else ConvergenceState.FAILED
+    )
+    cause = FailureCause.NONE if status is ConvergenceState.CONVERGED else FailureCause.UNKNOWN
+    message = "任务完成" if status is ConvergenceState.CONVERGED else "全部蒙特卡洛样本失败"
     return ControlOrbitResult(
         sk_statistic=result.sk_statistic(),
         num_failed=result.num_failed,
         maneuvers=result.maneuver_table(),
         controlled_ephemeris=result.controlled_ephemeris,
         raw=result,
+        status=status,
+        cause=cause,
+        message=message,
+        stages=(StageRecord("monte_carlo", applicable=True, executed=True, result_status=status),),
     )

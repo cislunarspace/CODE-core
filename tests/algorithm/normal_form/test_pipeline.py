@@ -34,6 +34,7 @@ from e2m2e.algorithm.normal_form.dynamical_substitution import (
     DynamicalSubstituteResult,
 )
 from e2m2e.algorithm.normal_form.quasi_floquet import QuasiFloquetResult
+from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.theory
 
@@ -123,7 +124,7 @@ def test_reduce_returns_normal_form_result(fast_pipeline):
     assert isinstance(result.cm_result, CenterManifoldResult)
     assert result.catalog_transformer is not None
     # 通用诊断字段
-    assert result.success is True
+    assert result.status is ConvergenceState.CONVERGED
     assert isinstance(result.message, str) and result.message
     assert np.isfinite(result.residual)
 
@@ -174,7 +175,7 @@ def test_reduce_works_without_spice_kernels(fast_pipeline, monkeypatch):
         warnings.simplefilter("ignore")
         result = fast_pipeline.reduce(x0)
 
-    assert result.success is True
+    assert result.status is ConvergenceState.CONVERGED
     assert result.ds_result.spice_available is False
     assert result.catalog_transformer is not None
 
@@ -203,7 +204,7 @@ def test_reduce_accepts_orbit_like_object(fast_pipeline, l1_context):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         result = fast_pipeline.reduce(orbit)
-    assert result.success is True
+    assert result.status is ConvergenceState.CONVERGED
 
 
 def test_failure_records_completed_subresults(l1_context, monkeypatch):
@@ -235,7 +236,7 @@ def test_failure_records_completed_subresults(l1_context, monkeypatch):
         warnings.simplefilter("ignore")
         result = pipeline.reduce(x0)
 
-    assert result.success is False
+    assert result.status is ConvergenceState.FAILED
     assert "quasi_floquet" in result.message
     # DS 步已完成，后续步骤为 None
     assert isinstance(result.ds_result, DynamicalSubstituteResult)

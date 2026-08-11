@@ -18,7 +18,8 @@ import numpy.typing as npt
 from tqdm.auto import tqdm
 
 from ...data.constants import SECONDS_PER_DAY
-from ...data.templates.enums import ConvergenceState, ReferenceFrame
+from ...data.templates import ConvergenceState, FailureCause, ReferenceFrame
+from ..results import ResultStatus
 
 if TYPE_CHECKING:
     from ...data.kernels.manager import SPICEManager
@@ -140,25 +141,19 @@ def _sparkline(values: list[float]) -> str:
 
 @dataclass(frozen=True)
 class MultipleShootingResult:
-    """多重打靶法迭代修正的结果。
-
-    Attributes:
-        t_patch: 修正后的时间节点数组，形状 (N,)
-        state_patch: 修正后的状态量数组，形状 (N, 6)，每行依次为 [x, y, z, vx, vy, vz]
-        converged: 是否在最大迭代次数内收敛
-        status: 终止原因枚举
-        outer_iterations: 实际迭代次数
-        max_residual: 最终迭代的最大残差
-        residual_history: 每次迭代最大残差的历史记录
-    """
+    """多重打靶法迭代修正的结果。"""
 
     t_patch: np.ndarray
     state_patch: np.ndarray
-    converged: bool
     status: ConvergenceState
+    cause: FailureCause
+    message: str
     outer_iterations: int
     max_residual: float
     residual_history: list[float]
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 class MultipleShooting:
@@ -439,8 +434,9 @@ class MultipleShooting:
                     return MultipleShootingResult(
                         t_patch=t_work.copy(),
                         state_patch=state_work.copy(),
-                        converged=True,
                         status=ConvergenceState.CONVERGED,
+                        cause=FailureCause.NONE,
+                        message="多重打靶收敛",
                         outer_iterations=iteration + 1,
                         max_residual=max_res,
                         residual_history=list(residual_history),
@@ -515,8 +511,9 @@ class MultipleShooting:
         return MultipleShootingResult(
             t_patch=t_work.copy(),
             state_patch=state_work.copy(),
-            converged=False,
             status=ConvergenceState.MAX_ITERATIONS,
+            cause=FailureCause.MAX_ITERATIONS_REACHED,
+            message=f"多重打靶达到最大迭代次数 {_max_iter}",
             outer_iterations=_max_iter,
             max_residual=residual_history[-1] if residual_history else float("inf"),
             residual_history=list(residual_history),

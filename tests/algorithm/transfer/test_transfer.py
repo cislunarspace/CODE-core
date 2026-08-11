@@ -10,6 +10,7 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import Transfer, TransferConfig, TransferOptimizationResult
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.orchestration
@@ -50,7 +51,8 @@ def test_transfer_dispatches_to_copt_when_enabled(dynamics, dummy_orbit):
     transfer = Transfer(dynamics).set_orbit(dummy_orbit, dummy_orbit)
     transfer.config.nlp_use_copt = True
     expected_result = TransferOptimizationResult(
-        success=True,
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
         total_delta_v=1.23,
         transfer_time=12.0,
     )
@@ -58,7 +60,7 @@ def test_transfer_dispatches_to_copt_when_enabled(dynamics, dummy_orbit):
     with patch("e2m2e.algorithm.transfer.transfer.DROTRONLPOptimizer") as MockOptimizer:
         instance = MockOptimizer.return_value
         instance.optimize.return_value = TransferOptimizationResult(
-            success=False, total_delta_v=99.0
+            status=ConvergenceState.FAILED, cause=FailureCause.UNKNOWN, total_delta_v=99.0
         )
         with (
             patch(
@@ -83,7 +85,8 @@ def test_transfer_uses_config_to_initialize_optimizer(dynamics, dummy_orbit):
     """Transfer.optimize 应通过 config 构造优化器，不再 poke 属性。"""
     transfer = Transfer(dynamics).set_orbit(dummy_orbit, dummy_orbit)
     expected_result = TransferOptimizationResult(
-        success=True,
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
         total_delta_v=1.23,
         transfer_time=12.0,
     )

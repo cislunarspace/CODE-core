@@ -13,6 +13,7 @@ from e2m2e.algorithm.transfer.transfer_optimization import (
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
 )
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.mbse.data.enums import TransferType
 
@@ -125,17 +126,19 @@ def test_scipy_optimizer_returns_transfer_result(optimizer):
     )
 
     result = optimizer_with_config._build_result(
-        NLPOptimizationVariables(alpha=1.0, transfer_time=10.0, t_ins=5.0),
-        success=True,
+        NLPOptimizationVariables(alpha=1.0, transfer_time=10.0, t_ins=0.0),
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
         message="test",
     )
 
     assert isinstance(result, TransferOptimizationResult)
-    assert result.success
+    assert result.status is ConvergenceState.CONVERGED
+    assert result.cause is FailureCause.NONE
     assert result.total_delta_v >= 0.0
     assert result.transfer_time == pytest.approx(10.0)
     assert result.departure_alpha == pytest.approx(1.0)
-    assert result.t_ins == pytest.approx(5.0)
+    assert result.t_ins == pytest.approx(0.0)
 
 
 def test_transfer_type_enum_values():

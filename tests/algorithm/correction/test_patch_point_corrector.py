@@ -21,6 +21,7 @@ from e2m2e.algorithm.ephemeris_correction import (
     standard,
     two_level,
 )
+from e2m2e.data.templates import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 
@@ -49,7 +50,9 @@ class TestEphemerisCorrectionResult:
     def test_is_frozen_dataclass(self):
         """结果应为不可变 dataclass。"""
         result = EphemerisCorrectionResult(
-            converged=True,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="修正收敛",
             iterations=1,
             max_residual=1e-9,
             residual_history=[1e-9],
@@ -57,12 +60,14 @@ class TestEphemerisCorrectionResult:
             state_patch=np.zeros((1, 6)),
         )
         with pytest.raises(AttributeError):
-            result.converged = False  # type: ignore[misc]
+            result.status = ConvergenceState.FAILED  # type: ignore[misc]  # type: ignore[misc]
 
     def test_velocity_fields_default_to_none(self):
         """velocity_residual 和 velocity_residual_history 默认为 None。"""
         result = EphemerisCorrectionResult(
-            converged=True,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="修正收敛",
             iterations=1,
             max_residual=1e-9,
             residual_history=[1e-9],
@@ -161,7 +166,9 @@ class TestDispatch:
 
             def correct(self, **kwargs):
                 return SimpleNamespace(
-                    converged=True,
+                    status=ConvergenceState.CONVERGED,
+                    cause=FailureCause.NONE,
+                    message="修正收敛",
                     outer_iterations=2,
                     max_residual=1e-9,
                     residual_history=[1e-6, 1e-9],
@@ -183,7 +190,7 @@ class TestDispatch:
         )
 
         assert isinstance(result, EphemerisCorrectionResult)
-        assert result.converged is True
+        assert result.status is ConvergenceState.CONVERGED
         assert result.iterations == 2
         assert result.velocity_residual is None
 
@@ -198,7 +205,9 @@ class TestDispatch:
 
             def correct(self, **kwargs):
                 return SimpleNamespace(
-                    converged=False,
+                    status=ConvergenceState.FAILED,
+                    cause=FailureCause.UNKNOWN,
+                    message="修正失败",
                     outer_iterations=4,
                     final_position_residual=2.5,
                     final_velocity_residual=0.4,
@@ -222,7 +231,7 @@ class TestDispatch:
         )
 
         assert isinstance(result, EphemerisCorrectionResult)
-        assert result.converged is False
+        assert result.status is not ConvergenceState.CONVERGED
         assert result.velocity_residual == 0.4
         assert result.velocity_residual_history == [1.0, 0.4]
 
@@ -233,7 +242,9 @@ class TestDispatch:
 
         def fake_homotopy(dynamics, t_patch, state_patch, **kwargs):
             return EphemerisCorrectionResult(
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="修正收敛",
                 iterations=1,
                 max_residual=1e-9,
                 residual_history=[1e-9],
@@ -256,7 +267,7 @@ class TestDispatch:
         )
 
         assert isinstance(result, EphemerisCorrectionResult)
-        assert result.converged is True
+        assert result.status is ConvergenceState.CONVERGED
 
     def test_standard_corrector_satisfies_protocol(self, monkeypatch):
         """_StandardPatchPointCorrector 应满足 PatchPointCorrector 协议。"""
@@ -267,7 +278,9 @@ class TestDispatch:
 
             def correct(self, **kwargs):
                 return SimpleNamespace(
-                    converged=True,
+                    status=ConvergenceState.CONVERGED,
+                    cause=FailureCause.NONE,
+                    message="修正收敛",
                     outer_iterations=1,
                     max_residual=1e-9,
                     residual_history=[1e-9],
@@ -290,7 +303,9 @@ class TestDispatch:
 
             def correct(self, **kwargs):
                 return SimpleNamespace(
-                    converged=True,
+                    status=ConvergenceState.CONVERGED,
+                    cause=FailureCause.NONE,
+                    message="修正收敛",
                     outer_iterations=1,
                     final_position_residual=1e-9,
                     final_velocity_residual=1e-12,

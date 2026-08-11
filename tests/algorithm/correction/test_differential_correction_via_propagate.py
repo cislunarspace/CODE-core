@@ -11,6 +11,7 @@ from numpy.testing import assert_allclose
 from e2m2e.algorithm.dynamics.dynamics import Dynamics
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.constants import Datum
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit
 
 # 地月系统质量比
@@ -120,10 +121,11 @@ class TestEphemerisDynamicsCodePath:
 
         corrector = DifferentialCorrection(spice_eph_dynamics)
         corrector.setup_type = "2D_symmetric_x_fixed_x0"
-        corrector.converged = True
-        corrector.success = True
+        corrector._converged = True
         corrector.current_error = 1e-8
-        corrector.termination_reason = "test"
+        corrector._outcome_status = ConvergenceState.CONVERGED
+        corrector._outcome_cause = FailureCause.NONE
+        corrector._outcome_message = "test"
         corrector.tolerance = 1e-6
 
         result_dict = {
@@ -131,7 +133,6 @@ class TestEphemerisDynamicsCodePath:
             "period": 2 * half_period,
             "half_period": half_period,
             "setup_type": corrector.setup_type,
-            "converged": True,
             "error": 1e-8,
         }
 
@@ -176,8 +177,9 @@ class TestEphemerisDynamicsCodePath:
         result = corrector.iterate_correction(guess, verbose=False)
 
         assert result is not None, (
-            f"EphemerisDynamics correction did not produce orbit. "
-            f"termination: {corrector.termination_reason}"
+            f"EphemerisDynamics correction did not produce orbit. termination: {result.message}"
         )
-        assert isinstance(result, Orbit)
-        assert corrector.converged, f"Correction did not converge: {corrector.termination_reason}"
+        assert result.orbit is not None
+        assert result.status is ConvergenceState.CONVERGED, (
+            f"Correction did not converge: {result.message}"
+        )

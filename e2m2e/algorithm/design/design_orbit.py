@@ -43,6 +43,7 @@ from e2m2e.data.types.trajectory import EphemerisTable
 
 from ...data.constants import SECONDS_PER_DAY
 from ...data.kernels.manager import SPICEManager
+from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.perturbations import DEFAULT_PERTURBATION
 from ...data.types.orbit import Orbit
 from ..coordinate.coordinate_system import CoordinateSystem
@@ -67,6 +68,7 @@ from ..family.cr3bp_orbits import (
     design_triangular,
     earth_moon_system,
 )
+from ..results import ResultStatus, StageRecord
 from ..solver.multiple_shooting import sample_patch_points_perilune_clustered
 
 if TYPE_CHECKING:
@@ -130,7 +132,20 @@ _BODY_FIXED_KERNELS = [
 
 
 class DesignNotConvergedError(RuntimeError):
-    """星历修正未收敛。"""
+    """任务轨道设计未生成可用标称轨道。"""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status: ConvergenceState = ConvergenceState.FAILED,
+        cause: FailureCause = FailureCause.UNKNOWN,
+    ) -> None:
+        super().__init__(message)
+        ResultStatus(status, cause, message)
+        self.status = status
+        self.cause = cause
+        self.message = message
 
 
 @dataclass
@@ -167,7 +182,15 @@ class OrbitDesignResult:
     cr3bp_jacobi: float
     correction: EphemerisCorrectionResult | None
     force_config: dict[str, Any]
+    status: ConvergenceState = ConvergenceState.CONVERGED
+    cause: FailureCause = FailureCause.NONE
+    message: str = "任务完成"
+    stages: tuple[StageRecord, ...] = ()
     drift_e: float | None = None
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
+
     drift_aop_deg: float | None = None
     drift_rp_km: float | None = None
     secular_aop_rate_deg_per_year: float | None = None
@@ -178,6 +201,27 @@ class OrbitDesignResult:
         from ...data.types.trajectory import write_ephemeris
 
         write_ephemeris(self.ephemeris, path)
+
+
+def _design_stages() -> tuple[StageRecord, ...]:
+    """返回成功设计链路的阶段记录。"""
+    return (
+        StageRecord(
+            "initial_guess",
+            applicable=True,
+            executed=True,
+            result_status=ConvergenceState.CONVERGED,
+        ),
+        StageRecord(
+            "ephemeris_correction",
+            applicable=True,
+            executed=True,
+            result_status=ConvergenceState.CONVERGED,
+        ),
+        StageRecord(
+            "propagation", applicable=True, executed=True, result_status=ConvergenceState.CONVERGED
+        ),
+    )
 
 
 def default_kernel_dir() -> str:
@@ -650,11 +694,16 @@ def _design_apolune_segmented(
                 vel_weight=vel_weight,
             )
         except RuntimeError as e:
-            raise DesignNotConvergedError(f"分段打靶段 {len(seg_t) + 1} 积分失败: {e}") from e
-        if not result.converged:
+            raise DesignNotConvergedError(
+                f"分段打靶段 {len(seg_t) + 1} 积分失败: {e}",
+                cause=FailureCause.INTEGRATION_FAILED,
+            ) from e
+        if result.status is not ConvergenceState.CONVERGED:
             raise DesignNotConvergedError(
                 f"分段打靶段 {len(seg_t) + 1} 未收敛"
-                f"（残差 {result.max_residual:.3e} km > 容差 {tolerance:.3e} km）"
+                f"（残差 {result.max_residual:.3e} km > 容差 {tolerance:.3e} km）",
+                status=result.status,
+                cause=result.cause,
             )
         sp = np.asarray(result.state_patch)
         seg_t.append(np.asarray(result.t_patch, dtype=float))
@@ -706,11 +755,16 @@ def _design_apolune_segmented(
             except RuntimeError as e:
                 # 合并段打靶失败：整条轨道在此无法拼接连续，明确报错而非
                 # 静默回退（回退保留两段会让 seam 处轨道不连续，产出错误结果）
-                raise DesignNotConvergedError(f"分层合并第 {layer} 层段打靶积分失败: {e}") from e
-            if not result.converged:
+                raise DesignNotConvergedError(
+                    f"分层合并第 {layer} 层段打靶积分失败: {e}",
+                    cause=FailureCause.INTEGRATION_FAILED,
+                ) from e
+            if result.status is not ConvergenceState.CONVERGED:
                 raise DesignNotConvergedError(
                     f"分层合并第 {layer} 层段未收敛"
-                    f"（残差 {result.max_residual:.3e} km > 容差 {tolerance:.3e} km）"
+                    f"（残差 {result.max_residual:.3e} km > 容差 {tolerance:.3e} km）",
+                    status=result.status,
+                    cause=result.cause,
                 )
             spm = np.asarray(result.state_patch)
             merged_t.append(np.asarray(result.t_patch, dtype=float))
@@ -830,6 +884,18 @@ def _design_elfo(
         cr3bp_jacobi=float("nan"),
         correction=None,
         force_config=force_config,
+        stages=(
+            StageRecord("initial_guess", applicable=False, executed=False, result_status=None),
+            StageRecord(
+                "ephemeris_correction", applicable=False, executed=False, result_status=None
+            ),
+            StageRecord(
+                "propagation",
+                applicable=True,
+                executed=True,
+                result_status=ConvergenceState.CONVERGED,
+            ),
+        ),
         drift_e=drift["drift_e"],
         drift_aop_deg=drift["drift_aop_deg"],
         drift_rp_km=drift["drift_rp_km"],
@@ -1108,7 +1174,10 @@ def design_orbit(
                 )
                 states_list.append(np.asarray(out_seg["states"], dtype=float))
             if not states_list:
-                raise DesignNotConvergedError("segmented 拼接未生成任何星历点")
+                raise DesignNotConvergedError(
+                    "segmented 拼接未生成任何星历点",
+                    cause=FailureCause.INTEGRATION_FAILED,
+                )
             states_dense = np.concatenate(states_list, axis=0)
             # 去重（段间共享端点）
             if len(states_dense) > 1:
@@ -1120,7 +1189,9 @@ def design_orbit(
             spice.disable_ephem_cache()
 
         correction = EphemerisCorrectionResult(
-            converged=True,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="收敛",
             iterations=0,
             max_residual=max_residual,
             residual_history=[],
@@ -1140,6 +1211,7 @@ def design_orbit(
             cr3bp_jacobi=jacobi,
             correction=correction,
             force_config=force_config,
+            stages=_design_stages(),
         )
 
     # --- 稳定轨道路径（DRO 等）：Rust 多重打靶（速度加权）+ 长期预报 ---
@@ -1169,10 +1241,12 @@ def design_orbit(
             kernel_dir=kernel_dir,
             base_bodies=["EARTH", "MOON"],
         )
-        if not correction.converged:
+        if correction.status is not ConvergenceState.CONVERGED:
             raise DesignNotConvergedError(
                 f"{sel} 星历修正（homotopy）未收敛：迭代 {correction.iterations} 次，"
-                f"最大残差 {correction.max_residual:.3e} km"
+                f"最大残差 {correction.max_residual:.3e} km",
+                status=correction.status,
+                cause=correction.cause,
             )
         t0_corr = float(correction.t_patch[0])
         out = fm.propagate(
@@ -1195,6 +1269,7 @@ def design_orbit(
             cr3bp_jacobi=jacobi,
             correction=correction,
             force_config=force_config,
+            stages=_design_stages(),
         )
 
     # 默认路径（稳定轨道）：Rust 多重打靶 + vel_weight
@@ -1248,11 +1323,13 @@ def design_orbit(
             rtol=1e-10,
             vel_weight=CORRECTION_VEL_WEIGHT,
         )
-        if not result.converged:
+        if result.status is not ConvergenceState.CONVERGED:
             raise DesignNotConvergedError(
                 f"{sel} 星历修正（Rust 多重打靶）未收敛：迭代 {result.iterations} 次，"
                 f"位置残差 {result.position_residual:.3e} km，"
-                f"速度残差 {result.velocity_residual:.3e} km/s"
+                f"速度残差 {result.velocity_residual:.3e} km/s",
+                status=result.status,
+                cause=result.cause,
             )
         t0_corr = float(result.t_patch[0])
         out = fm.propagate(
@@ -1265,7 +1342,9 @@ def design_orbit(
         spice.disable_ephem_cache()
 
     correction = EphemerisCorrectionResult(
-        converged=True,
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
+        message="收敛",
         iterations=int(result.iterations),
         max_residual=float(result.max_residual),
         residual_history=[float(x) for x in result.residual_history],

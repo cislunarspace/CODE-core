@@ -30,6 +30,8 @@ import numpy.typing as npt
 from scipy.integrate import solve_ivp
 from scipy.optimize import Bounds, minimize
 
+from ...data.templates import ConvergenceState, FailureCause
+from ..results import scipy_slsqp_status
 from .config import TransferArc, TransferSolution
 from .lambert import solve_lambert
 from .terminal import StateTerminal
@@ -246,7 +248,13 @@ class MultiImpulseTransfer:
         closure = self._resolve_closure(closure)
         n_mid = n_impulses - 2
         if n_mid == 0:
-            return self._build_solution(np.empty(0), closure, converged=True)
+            return self._build_solution(
+                np.empty(0),
+                closure,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="双脉冲封闭完成",
+            )
 
         lb, ub = self._resolve_bounds(n_mid, bounds, min_dt)
         y0 = np.asarray(x0, dtype=float) if x0 is not None else self._default_x0(n_mid, closure)
@@ -266,10 +274,12 @@ class MultiImpulseTransfer:
             constraints=constraints,
             options={"ftol": 1e-12, "maxiter": 500, "disp": verbose},
         )
+        status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
         return self._build_solution(
             result.x,
             closure,
-            converged=bool(result.success),
+            status=status,
+            cause=cause,
             n_iter=int(result.nit),
             message=str(result.message),
         )
@@ -483,7 +493,7 @@ class MultiImpulseTransfer:
                     StateTerminal(np.concatenate([r_b, np.zeros(3)]), dt),
                     dt,
                 )
-                if not shot.converged:
+                if shot.status is not ConvergenceState.CONVERGED:
                     raise RuntimeError(f"三体打靶未收敛（弧 {k}）：{shot.message}")
                 legs.append((shot.arcs[0].states[0][3:], shot.arcs[0].states[-1][3:]))
         return legs
@@ -504,7 +514,8 @@ class MultiImpulseTransfer:
         y: np.ndarray,
         closure: Closure,
         *,
-        converged: bool,
+        status: ConvergenceState,
+        cause: FailureCause,
         n_iter: int = 0,
         message: str = "",
     ) -> TransferSolution:
@@ -549,7 +560,8 @@ class MultiImpulseTransfer:
             arrival_delta_v=arrival_dv_mag,
             total_delta_v=total,
             transfer_time=self._tof,
-            converged=converged,
+            status=status,
+            cause=cause,
             n_iter=n_iter,
             message=message,
         )

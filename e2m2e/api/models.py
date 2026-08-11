@@ -11,10 +11,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from e2m2e.algorithm.results import ResultStatus
 from e2m2e.data.constants import SECONDS_PER_DAY
+from e2m2e.data.templates import ConvergenceState, FailureCause
 
 __all__ = [
     "OrbitError",
+    "ResultResponse",
     "DesignOrbitRequest",
     "DesignOrbitResponse",
     "ControlOrbitRequest",
@@ -42,11 +45,16 @@ class OrbitError(Exception):
         code: str = "ERROR",
         message: str = "",
         details: dict[str, Any] | None = None,
+        status: ConvergenceState = ConvergenceState.FAILED,
+        cause: FailureCause = FailureCause.UNKNOWN,
     ) -> None:
         super().__init__(message)
+        ResultStatus(status, cause, message)
         self.code = code
         self.message = message
         self.details = details or {}
+        self.status = status
+        self.cause = cause
 
     def __str__(self) -> str:
         return f"[{self.code}] {self.message}"
@@ -234,7 +242,20 @@ class DesignOrbitRequest(_ApiModel):
         return self
 
 
-class DesignOrbitResponse(_ApiModel):
+class ResultResponse(_ApiModel):
+    """Facade 成功处理后的任务最终状态三元组。"""
+
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+
+    @model_validator(mode="after")
+    def _validate_result_status(self) -> ResultResponse:
+        ResultStatus(self.status, self.cause, self.message)
+        return self
+
+
+class DesignOrbitResponse(ResultResponse):
     """任务轨道设计输出。
 
     几何字段（``mu`` / ``states`` / ``times`` / ``ephemeris``，#312）让下游
@@ -249,7 +270,6 @@ class DesignOrbitResponse(_ApiModel):
     duration_day: float
     initial_state: list[float]
     cr3bp_jacobi: float
-    correction_converged: bool
     correction_iterations: int
     force_config: dict[str, Any]
     mu: float | None = Field(
@@ -299,7 +319,7 @@ class ControlOrbitRequest(_ApiModel):
     )
 
 
-class ControlOrbitResponse(_ApiModel):
+class ControlOrbitResponse(ResultResponse):
     """轨道保持输出。
 
     几何字段（``controlled_ephemeris`` / ``mu``，#312）：``controlled_ephemeris``
@@ -339,7 +359,7 @@ class TransferDesignRequest(_ApiModel):
     wsb_search_params: Any = Field(default=None, description="WSB 搜索参数（WsbSearchParams 实例）")
 
 
-class TransferDesignResponse(_ApiModel):
+class TransferDesignResponse(ResultResponse):
     """转移轨道设计输出。"""
 
     transfer_type: str
@@ -362,7 +382,7 @@ class PropagationRequest(_ApiModel):
     output_step: float = Field(default=3600.0, gt=0.0, description="输出间隔（秒）")
 
 
-class PropagationResponse(_ApiModel):
+class PropagationResponse(ResultResponse):
     """轨道预报输出。"""
 
     epoch_utc: str
@@ -388,7 +408,7 @@ class SpacetimeTransformRequest(_ApiModel):
     ephemeris_path: str | None = Field(default=None, description="历表路径（GCRS↔EBCRS 必需）")
 
 
-class SpacetimeTransformResponse(_ApiModel):
+class SpacetimeTransformResponse(ResultResponse):
     """时空坐标转换输出。"""
 
     states: list[list[float]]

@@ -9,6 +9,7 @@ import pytest
 from kernel_helpers import SPICE_KERNEL_DIR
 
 from e2m2e.algorithm.coordinate import spacetime_convert
+from e2m2e.data.templates import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.data
 
@@ -54,6 +55,9 @@ class TestSpacetimeConvertSynodic:
         )
         assert result_syn["state"].shape == (6,)
         assert result_syn["transform_type"] == "j2000_to_synodic"
+        assert result_syn["status"] is ConvergenceState.CONVERGED
+        assert result_syn["cause"] is FailureCause.NONE
+        assert result_syn["message"] == "任务完成"
 
         result_back = spacetime_convert(
             "synodic_to_j2000",

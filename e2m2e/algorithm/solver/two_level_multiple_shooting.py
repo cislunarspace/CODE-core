@@ -15,7 +15,9 @@ from dataclasses import dataclass
 import numpy as np
 from tqdm.auto import tqdm
 
-from ...data.templates.enums import BoundaryMode, TwoLevelMultipleShootingStatus
+from ...data.templates import ConvergenceState, FailureCause
+from ...data.templates.enums import BoundaryMode
+from ..results import ResultStatus
 
 
 @dataclass(frozen=True)
@@ -38,8 +40,9 @@ class TwoLevelMultipleShootingResult:
 
     t_patch: np.ndarray
     state_patch: np.ndarray
-    converged: bool
-    status: TwoLevelMultipleShootingStatus
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
     outer_iterations: int
     level1_iterations: list[list[int]]
     final_position_residual: float
@@ -47,6 +50,9 @@ class TwoLevelMultipleShootingResult:
     per_patch_position_residual: np.ndarray
     per_patch_velocity_residual: np.ndarray
     residual_history: list[tuple[float, float]]
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 def _build_level1_constraint(
@@ -268,8 +274,9 @@ class TwoLevelMultipleShooting:
                 return self._result(
                     t_work,
                     state_work,
-                    True,
-                    TwoLevelMultipleShootingStatus.CONVERGED,
+                    ConvergenceState.CONVERGED,
+                    FailureCause.NONE,
+                    "两层多重打靶收敛",
                     outer_index + 1,
                     level1_iterations,
                     final_position,
@@ -298,8 +305,9 @@ class TwoLevelMultipleShooting:
                 return self._result(
                     t_work,
                     state_work,
-                    True,
-                    TwoLevelMultipleShootingStatus.CONVERGED,
+                    ConvergenceState.CONVERGED,
+                    FailureCause.NONE,
+                    "两层多重打靶收敛",
                     outer_index + 1,
                     level1_iterations,
                     final_position,
@@ -312,16 +320,20 @@ class TwoLevelMultipleShooting:
                     f"maxP={position_residual:.2e} maxV={velocity_residual:.3e}"
                 )
 
-        status = (
-            TwoLevelMultipleShootingStatus.LEVEL1_FAILED
-            if had_level1_failure
-            else TwoLevelMultipleShootingStatus.MAX_ITERATIONS
-        )
         return self._result(
             t_work,
             state_work,
-            False,
-            status,
+            (ConvergenceState.FAILED if had_level1_failure else ConvergenceState.MAX_ITERATIONS),
+            (
+                FailureCause.LEVEL1_CORRECTION_FAILED
+                if had_level1_failure
+                else FailureCause.MAX_ITERATIONS_REACHED
+            ),
+            (
+                "两层多重打靶的 Level 1 修正未收敛"
+                if had_level1_failure
+                else "两层多重打靶达到最大迭代次数"
+            ),
             max_outer_iterations,
             level1_iterations,
             final_position,
@@ -591,8 +603,9 @@ class TwoLevelMultipleShooting:
     def _result(
         t_patch: np.ndarray,
         state_patch: np.ndarray,
-        converged: bool,
-        status: TwoLevelMultipleShootingStatus,
+        status: ConvergenceState,
+        cause: FailureCause,
+        message: str,
         outer_iterations: int,
         level1_iterations: list[list[int]],
         per_patch_position_residual: np.ndarray,
@@ -604,8 +617,9 @@ class TwoLevelMultipleShooting:
         Args:
             t_patch: 最终时间节点数组
             state_patch: 最终状态量数组
-            converged: 是否收敛
-            status: 终止原因枚举
+            status: 最终状态
+            cause: 终止原因
+            message: 终止信息
             outer_iterations: 外层迭代次数
             level1_iterations: 各段 Level 1 迭代次数
             per_patch_position_residual: 各段位置残差
@@ -618,8 +632,9 @@ class TwoLevelMultipleShooting:
         return TwoLevelMultipleShootingResult(
             t_patch=t_patch.copy(),
             state_patch=state_patch.copy(),
-            converged=converged,
             status=status,
+            cause=cause,
+            message=message,
             outer_iterations=outer_iterations,
             level1_iterations=[list(seg) for seg in level1_iterations],
             final_position_residual=float(np.max(per_patch_position_residual)),

@@ -11,6 +11,7 @@ import logging
 
 import numpy as np
 
+from ...data.templates import ConvergenceState
 from ...data.types.orbit import Orbit, OrbitFamily
 
 logger = logging.getLogger(__name__)
@@ -94,10 +95,11 @@ def generate_halo_seed_orbit(
         logger.info("  初始猜测: x0=%.6f, vy0=%.6f", guess["x0"], guess["vy0"])
         logger.info("  预估周期: %.4f TU", initial_orbit.period)
 
-    orbit = continuation.correction.iterate_correction(
+    result = continuation.correction.iterate_correction(
         initial_guess=initial_orbit,
         verbose=verbose,
     )
+    orbit = result.orbit
 
     if orbit is not None:
         _tag_halo_family(orbit, libration_point, halo_class)
@@ -220,18 +222,19 @@ def generate_halo_family(
             )
             guess.period = current_orbit.period
 
-            orbit = continuation.correction.iterate_correction(guess, verbose=False)
+            result = continuation.correction.iterate_correction(guess, verbose=False)
+            orbit = result.orbit
 
-            if orbit is not None and orbit.correction_success:
+            if orbit is not None and result.status is ConvergenceState.CONVERGED:
                 _tag_halo_family(orbit, libration_point, halo_class)
                 family.append(orbit)
                 current_orbit = orbit
                 current_z = target_z
 
                 if continuation.step_size_adaptation:
-                    if orbit.correction_iterations < 5:
+                    if result.iterations < 5:
                         current_step = min(current_step * growth, max_step)
-                    elif orbit.correction_iterations > 20:
+                    elif result.iterations > 20:
                         current_step = max(current_step * shrink, min_step)
 
                 if progress_callback is not None:

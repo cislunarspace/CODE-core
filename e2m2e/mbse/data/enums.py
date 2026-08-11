@@ -15,7 +15,6 @@ from e2m2e.data.templates.enums import (
     StabilityLabel,
     TransferPhase,
     TransferType,
-    TwoLevelMultipleShootingStatus,
     UnitSystem,
 )
 
@@ -25,7 +24,6 @@ __all__ = [
     "ProjectionPlane",
     "ReferenceFrame",
     "TransferType",
-    "TwoLevelMultipleShootingStatus",
     "UnitSystem",
     "OrbitFamilyType",
     "StabilityLabel",

@@ -18,8 +18,10 @@ import numpy as np
 
 from ...data.constants import SECONDS_PER_DAY
 from ...data.constants.bodies import MOON
+from ...data.templates import ConvergenceState, FailureCause
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
+from ..results import ResultStatus
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +77,12 @@ class LgaCandidate:
     jacobi_departure: float
     jacobi_arrival: float
     arrival_time_dim: float
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 def _compute_jacobi(state: np.ndarray, mu: float) -> float:
@@ -252,7 +259,9 @@ def search_lga_trajectories(
                     jacobi_departure=jac_dep,
                     jacobi_arrival=jac_arr,
                     arrival_time_dim=arrival_time_dim,
-                    converged=True,
+                    status=ConvergenceState.CONVERGED,
+                    cause=FailureCause.NONE,
+                    message="找到 LGA 候选",
                 )
             )
 
@@ -272,7 +281,7 @@ def _refine_lga_candidate(
     1. 到达段：perilune → target（ThreeBodyLambert 打靶修正到达速度）
     2. 打靶后的到达速度更新 Δv 计算。
 
-    如果打靶失败，返回原始候选（converged=False）。
+    如果打靶未达到收敛状态，返回原始候选。
     """
     from .terminal import StateTerminal
     from .three_body_lambert import ThreeBodyLambert
@@ -302,7 +311,7 @@ def _refine_lga_candidate(
             guess="lambert",
         )
 
-        if arrival_leg.converged:
+        if arrival_leg.status is ConvergenceState.CONVERGED:
             # 更新 Δv
             v_arrival_shot = arrival_leg.arcs[-1].states[-1][3:]
             v_target_phys = target_phys[3:]
@@ -322,7 +331,9 @@ def _refine_lga_candidate(
                 jacobi_departure=candidate.jacobi_departure,
                 jacobi_arrival=candidate.jacobi_arrival,
                 arrival_time_dim=candidate.arrival_time_dim,
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="找到 LGA 候选",
             )
     except (RuntimeError, ValueError, np.linalg.LinAlgError):
         logger.debug("ThreeBodyLambert 打靶失败，保留原始候选", exc_info=True)
@@ -342,5 +353,7 @@ def _refine_lga_candidate(
         jacobi_departure=candidate.jacobi_departure,
         jacobi_arrival=candidate.jacobi_arrival,
         arrival_time_dim=candidate.arrival_time_dim,
-        converged=False,
+        status=ConvergenceState.MAX_ITERATIONS,
+        cause=FailureCause.MAX_ITERATIONS_REACHED,
+        message="LGA 候选精化未收敛",
     )

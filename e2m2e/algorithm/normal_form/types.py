@@ -15,6 +15,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ...data.templates import ConvergenceState, FailureCause
+from ..results import ResultStatus
+
 if TYPE_CHECKING:
     from .catalog import LibrationCatalogTransformer
     from .center_manifold import CenterManifoldResult
@@ -65,13 +68,17 @@ class NormalFormResult:
     context: NormalFormContext
     order: int
     substitute_residual: float = 0.0
-    success: bool = False
+    status: ConvergenceState = ConvergenceState.FAILED
+    cause: FailureCause = FailureCause.UNKNOWN
     message: str = ""
     metadata: dict[str, object] = field(default_factory=dict)
     ds_result: DynamicalSubstituteResult | None = None
     qf_result: QuasiFloquetResult | None = None
     cm_result: CenterManifoldResult | None = None
     catalog_transformer: LibrationCatalogTransformer | None = None
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
     @property
     def residual(self) -> float:

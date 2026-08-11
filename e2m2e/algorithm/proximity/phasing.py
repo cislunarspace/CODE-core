@@ -19,7 +19,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
+from ...data.templates import ConvergenceState, FailureCause
 from ..proximity.relative_dynamics import DynamicsLike, RelativeDynamics, TargetOrbit
+from ..results import ResultStatus
 
 if TYPE_CHECKING:
     from ...data.types.orbit import Orbit
@@ -52,7 +54,12 @@ class PhasingSolution:
     maneuvers: list[PhasingManeuver]
     tof: float
     total_dv: float
-    converged: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
 
 
 def phasing_search(
@@ -142,7 +149,14 @@ def _solve_two_impulse(
         Phi_rv_inv = np.linalg.inv(Phi_rv)
         dv1 = -Phi_rv_inv @ (Phi_rr @ dr0 + Phi_rv @ dv0)
     except np.linalg.LinAlgError:
-        return PhasingSolution(maneuvers=[], tof=tof, total_dv=np.inf, converged=False)
+        return PhasingSolution(
+            maneuvers=[],
+            tof=tof,
+            total_dv=np.inf,
+            status=ConvergenceState.FAILED,
+            cause=FailureCause.SINGULAR_JACOBIAN,
+            message="调相状态转移矩阵奇异",
+        )
 
     # 第二脉冲：消除末端速度
     # δv_f = Φ_vr δr₀ + Φ_vv (δv₀ + Δv₁)
@@ -155,4 +169,11 @@ def _solve_two_impulse(
         PhasingManeuver(t=t0 + tof, dv=dv2),
     ]
     total_dv = float(np.linalg.norm(dv1) + np.linalg.norm(dv2))
-    return PhasingSolution(maneuvers=maneuvers, tof=tof, total_dv=total_dv, converged=True)
+    return PhasingSolution(
+        maneuvers=maneuvers,
+        tof=tof,
+        total_dv=total_dv,
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
+        message="调相求解完成",
+    )

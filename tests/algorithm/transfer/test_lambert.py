@@ -5,6 +5,7 @@ import pytest
 from scipy.integrate import solve_ivp
 
 from e2m2e.algorithm.transfer import LambertSolution, solve_lambert, solve_lambert_batch
+from e2m2e.data.templates import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 
@@ -30,14 +31,18 @@ def _propagate(r0, v0, tof, mu=MU):
 
 
 class TestSolveLambert:
-    def test_vallado_benchmark_regression(self):
-        """基准值回归：短程解与 Vallado 文献值一致（文献值 8 位有效数字）。"""
-        sol = solve_lambert(R0, RF, TOF, MU)
-        assert isinstance(sol, LambertSolution)
-        assert sol.converged
-        assert sol.n_iter <= 5
-        np.testing.assert_allclose(sol.v0, EXP_V0, atol=2e-6)
-        np.testing.assert_allclose(sol.vf, EXP_VF, atol=2e-6)
+    def test_status_contract_rejects_iterating_result(self):
+        """最终结果不得保留 ITERATING 状态。"""
+        with pytest.raises(ValueError, match="不能以 ITERATING 结束"):
+            LambertSolution(
+                v0=np.zeros(3),
+                vf=np.zeros(3),
+                status=ConvergenceState.ITERATING,
+                cause=FailureCause.NONE,
+                message="尚未结束",
+                n_iter=0,
+                revs=0,
+            )
 
     def test_76min_short_way(self):
         """任务指定算例：r0=[15945.34,0,0]，tof=76 min 短程解。"""

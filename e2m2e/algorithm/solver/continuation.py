@@ -9,6 +9,7 @@ import logging
 
 import numpy as np
 
+from ...data.templates import ConvergenceState, FailureCause
 from ...data.types.orbit import Orbit, OrbitFamily
 from ..dynamics import CR3BP_Dynamics
 from ..family.halo_family import (
@@ -16,6 +17,7 @@ from ..family.halo_family import (
     generate_halo_seed_orbit,
     halo_pseudo_arclength_continuation,
 )
+from ..results import ContinuationResult
 from .differential_correction import DifferentialCorrection
 
 logger = logging.getLogger(__name__)
@@ -184,7 +186,9 @@ class Continuation:
 
         # 终止条件
         self.max_orbits = 100
-        self.termination_reason: str | None = None
+        self._outcome_status: ConvergenceState | None = None
+        self._outcome_cause: FailureCause | None = None
+        self._outcome_message = ""
 
     def natural_continuation(
         self,
@@ -302,7 +306,7 @@ class Continuation:
             logger.info("  成功: %d, 失败: %d", stats["successful_steps"], stats["failed_steps"])
             logger.info("  轨道已按距离种子轨道的步数排序: 0, 1, -1, 2, -2, ...")
 
-        return orbit_family
+        return self._continuation_result(orbit_family)
 
     def _sweep(
         self,
@@ -361,9 +365,10 @@ class Continuation:
                 guess_orbit = current_orbit.copy()
                 guess_orbit.period = current_orbit.period + direction_sign * step_size * 2
 
-            orbit = self.correction.iterate_correction(guess_orbit, verbose=verbose)
+            result = self.correction.iterate_correction(guess_orbit, verbose=verbose)
+            orbit = result.orbit
 
-            if orbit is not None and orbit.correction_success:
+            if orbit is not None and result.status is ConvergenceState.CONVERGED:
                 signed_step = direction_sign * (i + 1)
                 orbit.metadata["continuation_step"] = signed_step
                 results.append((orbit, signed_step))
@@ -387,16 +392,18 @@ class Continuation:
                         logger.info("  %s延拓进度：已完成 %d 条轨道", direction_label, i + 1)
 
                 if self.step_size_adaptation:
-                    if orbit.correction_iterations < 3:
+                    if result.iterations < 3:
                         step_size = min(step_size * self.step_growth_factor, self.max_step_size)
-                    elif orbit.correction_iterations > 8:
+                    elif result.iterations > 8:
                         step_size = max(step_size * self.step_reduction_factor, self.min_step_size)
             else:
                 self.continuation_stats["failed_steps"] += 1
 
                 step_size *= self.step_reduction_factor
                 if step_size < self.min_step_size:
-                    self.termination_reason = "步长过小，延拓终止"
+                    self._outcome_status = ConvergenceState.STAGNATED
+                    self._outcome_cause = FailureCause.STAGNATION_DETECTED
+                    self._outcome_message = "步长过小，延拓终止"
                     if verbose:
                         logger.info(
                             "%s步长过小，延拓终止于第 %d 条轨道",
@@ -411,7 +418,9 @@ class Continuation:
             i += 1
 
             if 1 + len(results) >= self.max_orbits:
-                self.termination_reason = "达到最大轨道数限制"
+                self._outcome_status = ConvergenceState.MAX_ITERATIONS
+                self._outcome_cause = FailureCause.MAX_ITERATIONS_REACHED
+                self._outcome_message = "达到最大轨道数限制"
                 break
 
         return results
@@ -528,7 +537,9 @@ class Continuation:
         # 动态步长(支持自适应缩减)
         current_step_size = float(step_size)
         # 记录终止原因(给调用方诊断)
-        self.termination_reason = None
+        self._outcome_status = None
+        self._outcome_cause = None
+        self._outcome_message = ""
 
         for n in range(n_orbits):
             if verbose and (n + 1) % 5 == 0:
@@ -676,16 +687,20 @@ class Continuation:
             )
             guess_orbit.period = tf_corr
 
-            orbit = self.correction.iterate_correction(guess_orbit, verbose=False)
+            result = self.correction.iterate_correction(guess_orbit, verbose=False)
+            orbit = result.orbit
 
             # PAL 初值在固定 x0 下常落入寄生根或与 STM 牛顿不兼容；与种子生成一致改用固定 z0 再试
-            if (orbit is None or not orbit.correction_success) and dc_scheme == "matlab_halo_type1":
+            if (
+                orbit is None or result.status is not ConvergenceState.CONVERGED
+            ) and dc_scheme == "matlab_halo_type1":
                 self.correction.setup_halo_orbit_fixed_z0(
                     z0=SV0_corr[2], libration_point=libration_point
                 )
-                orbit = self.correction.iterate_correction(guess_orbit, verbose=False)
+                result = self.correction.iterate_correction(guess_orbit, verbose=False)
+            orbit = result.orbit
 
-            if orbit is not None and orbit.correction_success:
+            if orbit is not None and result.status is ConvergenceState.CONVERGED:
                 orbit_family.add_orbit(orbit)
                 family_states.append(orbit.states[0].copy())
 
@@ -719,6 +734,7 @@ class Continuation:
                         stagnation_count = 0
                 prev_orbit_state = new_state.copy()
 
+                assert orbit.period is not None
                 X = np.array(
                     [
                         orbit.states[0, 0],
@@ -750,13 +766,37 @@ class Continuation:
             else:
                 if verbose:
                     logger.warning("  轨道 %d: 微分修正失败", n + 1)
-                self.termination_reason = "微分修正失败"
+                self._outcome_status = ConvergenceState.FAILED
+                self._outcome_cause = FailureCause.UNKNOWN
+                self._outcome_message = "微分修正失败"
                 break
 
         if verbose:
             logger.info("伪弧长延拓完成：共生成 %d 条轨道", len(orbit_family))
 
-        return orbit_family
+        return self._continuation_result(orbit_family)
+
+    def _continuation_result(self, family: OrbitFamily) -> ContinuationResult:
+        if self._outcome_status is None or self._outcome_cause is None:
+            status, cause, message = (
+                ConvergenceState.CONVERGED,
+                FailureCause.NONE,
+                "延拓完成",
+            )
+        else:
+            status, cause, message = (
+                self._outcome_status,
+                self._outcome_cause,
+                self._outcome_message,
+            )
+        return ContinuationResult(
+            status=status,
+            cause=cause,
+            message=message,
+            family=family,
+            steps=self.continuation_stats["successful_steps"],
+            step_size=self.step_size,
+        )
 
     def _infer_param_index(self):
         """根据延拓参数名称推断索引"""
@@ -781,7 +821,9 @@ class Continuation:
             "periods": np.array(self.family_periods),
             "n_orbits": len(self.family_orbits),
             "stats": self.continuation_stats,
-            "termination_reason": self.termination_reason,
+            "status": self._outcome_status,
+            "cause": self._outcome_cause,
+            "message": self._outcome_message,
         }
 
     # Halo 专用编排（generate_halo_seed_orbit / generate_halo_family /

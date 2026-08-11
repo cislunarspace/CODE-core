@@ -14,6 +14,7 @@ import pytest
 
 from e2m2e.algorithm import ephemeris_correction
 from e2m2e.algorithm.ephemeris_correction import homotopy
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.mbse.data.enums import BoundaryMode
 
 pytestmark = pytest.mark.orchestration
@@ -47,7 +48,9 @@ def test_two_level_inner_method_is_dispatched_to_two_level_solver():
         def correct(self, **kwargs):
             captured.append(kwargs)
             return SimpleNamespace(
-                converged=True,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="收敛",
                 outer_iterations=2,
                 level1_iterations=[[1, 1]],
                 final_position_residual=1.0e-3,
@@ -81,7 +84,8 @@ def test_two_level_inner_method_is_dispatched_to_two_level_solver():
     assert captured[0]["boundary"] == BoundaryMode.FIXED_ENDPOINTS
 
     # Aggregated result follows the two-level aggregation spec
-    assert result.converged is True
+    assert result.status is ConvergenceState.CONVERGED
+    assert result.cause is FailureCause.NONE
     assert result.iterations == 4  # 2 outer iters * 2 steps
     assert result.max_residual == 1.0e-3
     # position residuals: only the position component of residual_history
@@ -104,7 +108,9 @@ def test_two_level_dispatches_via_caller_with_inner_method_kwarg():
     def fake_correct_with_homotopy(dynamics_arg, t_patch_arg, state_patch_arg, **kwargs):
         captured.update(kwargs)
         return ephemeris_correction.EphemerisCorrectionResult(
-            converged=True,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="收敛",
             iterations=1,
             max_residual=1.0e-3,
             residual_history=[1.0e-3],
@@ -164,8 +170,9 @@ def test_two_level_uses_velocity_tolerance_default():
         def correct(self, **kwargs):
             velocity_tolerances.append(kwargs["velocity_tolerance"])
             return SimpleNamespace(
-                converged=True,
-                status="converged",
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="收敛",
                 outer_iterations=1,
                 level1_iterations=[1],
                 final_position_residual=1.0e-3,
@@ -205,8 +212,9 @@ def test_two_level_failed_final_step_aggregates_correctly():
 
         def correct(self, **kwargs):
             return SimpleNamespace(
-                converged=False,
-                status="max_iterations",
+                status=ConvergenceState.MAX_ITERATIONS,
+                cause=FailureCause.MAX_ITERATIONS_REACHED,
+                message="达到最大迭代次数",
                 outer_iterations=5,
                 level1_iterations=[[5, 5]],
                 final_position_residual=2.0e-3,
@@ -232,7 +240,8 @@ def test_two_level_failed_final_step_aggregates_correctly():
             inner_method="two_level",
         )
 
-    assert result.converged is False
+    assert result.status is ConvergenceState.MAX_ITERATIONS
+    assert result.cause is FailureCause.MAX_ITERATIONS_REACHED
     assert result.iterations == 10
     assert result.max_residual == 2.0e-3
     assert result.residual_history == [1.0e-2, 2.0e-3, 1.0e-2, 2.0e-3]

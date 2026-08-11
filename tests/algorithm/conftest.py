@@ -69,7 +69,7 @@ def _corrected_dro_cached(dro_seed_orbit) -> Orbit:
     dynamics = CR3BP_Dynamics(system)
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_2D_symmetric_x_fixed_x0(DRO_X0)
-    return corrector.iterate_correction(dro_seed_orbit, verbose=False)
+    return corrector.iterate_correction(dro_seed_orbit, verbose=False).orbit
 
 
 @pytest.fixture

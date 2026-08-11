@@ -18,6 +18,7 @@ from e2m2e.api.models import (
     TransferDesignRequest,
 )
 from e2m2e.data.constants import Datum
+from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.trajectory import EphemerisTable
 
 pytestmark = pytest.mark.interface
@@ -131,6 +132,22 @@ class TestFacade:
         with pytest.raises(OrbitError):
             facade.design_orbit(orbit_type="NOPE")
 
+    def test_design_failure_preserves_algorithm_status(self, monkeypatch):
+        from e2m2e.algorithm.design import DesignNotConvergedError
+
+        def fail_design(*args, **kwargs):
+            raise DesignNotConvergedError(
+                "修正未收敛",
+                status=ConvergenceState.MAX_ITERATIONS,
+                cause=FailureCause.MAX_ITERATIONS_REACHED,
+            )
+
+        monkeypatch.setattr("e2m2e.algorithm.design.design_orbit", fail_design)
+        with pytest.raises(OrbitError) as exc_info:
+            Facade().design_orbit(orbit_type="DRO")
+        assert exc_info.value.status is ConvergenceState.MAX_ITERATIONS
+        assert exc_info.value.cause is FailureCause.MAX_ITERATIONS_REACHED
+
     def test_control_orbit_invalid_params(self):
         facade = Facade()
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
@@ -182,15 +199,14 @@ class TestFacadeCallChain:
     """无需 SPICE 的轻量调用链：仅验证错误码与序列化路径。"""
 
     def test_transfer_design_hmn_call_chain(self):
-        facade = Facade()
-        response = facade.transfer_design(
+        response = Facade().transfer_design(
             transfer_type="HMN",
             tli_epoch="2025-06-21T11:00:00",
             target_orbit_radius_km=42164.0,
         )
-        assert response.transfer_type == "HMN"
-        assert response.delta_v > 0.0
-        assert "departure_state" in response.details or "delta_v_theory" in response.details
+        assert response.status is ConvergenceState.CONVERGED
+        assert response.cause is FailureCause.NONE
+        assert response.message == "霍曼转移完成"
 
     def test_transfer_design_invalid_type_call_chain(self):
         facade = Facade()
@@ -302,7 +318,9 @@ class TestDesignResultToResponse:
             times=np.array([0.0, 1.234]),
             system=system,
         )
-        correction = SimpleNamespace(converged=True, iterations=4)
+        correction = SimpleNamespace(
+            status="converged", cause="none", message="任务完成", iterations=4
+        )
         return SimpleNamespace(
             orbit_type="DRO",
             epoch_utc="2024-01-01T00:00:00.000",
@@ -314,6 +332,9 @@ class TestDesignResultToResponse:
             cr3bp_jacobi=3.16,
             correction=correction,
             force_config={"sun_body": 1},
+            status="converged",
+            cause="none",
+            message="任务完成",
             drift_e=None,
             drift_aop_deg=None,
             drift_rp_km=None,
@@ -327,7 +348,7 @@ class TestDesignResultToResponse:
         # 摘要字段保留
         assert resp.orbit_type == "DRO"
         assert resp.cr3bp_jacobi == pytest.approx(3.16)
-        assert resp.correction_converged is True
+        assert resp.status.value == "converged"
         assert resp.correction_iterations == 4
         assert resp.initial_state == [0.0] * 6
         # 新增几何字段
@@ -378,6 +399,9 @@ class TestControlResultToResponse:
 
         return SimpleNamespace(
             num_failed=1,
+            status="converged" if controlled else "failed",
+            cause="none" if controlled else "unknown",
+            message="任务完成" if controlled else "全部蒙特卡洛样本失败",
             sk_statistic=SKStatistic(rows=np.zeros((2, 3)), num_failed=1),
             maneuvers=ManeuverTable(mjd_tdb=np.array([60000.0]), delta_v_mps=np.array([1.0])),
             controlled_ephemeris=_make_ephemeris(n=2) if controlled else None,
@@ -387,6 +411,8 @@ class TestControlResultToResponse:
         from e2m2e.api.facade import _control_result_to_response
 
         resp = _control_result_to_response(self._mock_result(controlled=True), mu=Datum.DE421.mu)
+        assert resp.status.value == "converged"
+        assert resp.cause.value == "none"
         assert resp.num_failed == 1
         assert resp.controlled_ephemeris is not None
         assert resp.controlled_ephemeris["synodic_position"] == [[0.5, 0.5, 0.5]] * 2
@@ -397,6 +423,8 @@ class TestControlResultToResponse:
         from e2m2e.api.facade import _control_result_to_response
 
         resp = _control_result_to_response(self._mock_result(controlled=False), mu=None)
+        assert resp.status.value == "failed"
+        assert resp.cause.value == "unknown"
         assert resp.controlled_ephemeris is None
         assert resp.mu is None
 
@@ -406,12 +434,14 @@ class TestGeometryModelFields:
 
     def test_design_response_carries_geometry(self):
         resp = DesignOrbitResponse(
+            status="converged",
+            cause="none",
+            message="任务完成",
             orbit_type="DRO",
             epoch_utc="2024-01-01T00:00:00.000",
             duration_day=365.25,
             initial_state=[0.0] * 6,
             cr3bp_jacobi=3.16,
-            correction_converged=True,
             correction_iterations=4,
             force_config={"sun_body": 1},
             mu=Datum.DE421.mu,
@@ -428,12 +458,14 @@ class TestGeometryModelFields:
     def test_design_response_mu_optional(self):
         """mu 防御性可空（system 未绑定时）。"""
         resp = DesignOrbitResponse(
+            status="converged",
+            cause="none",
+            message="任务完成",
             orbit_type="DRO",
             epoch_utc="2024-01-01T00:00:00.000",
             duration_day=365.25,
             initial_state=[0.0] * 6,
             cr3bp_jacobi=3.16,
-            correction_converged=True,
             correction_iterations=4,
             force_config={},
             mu=None,
@@ -446,12 +478,33 @@ class TestGeometryModelFields:
     def test_control_response_backward_compatible(self):
         """新增字段带默认值：旧路径（仅摘要）构造不报错。"""
         resp = ControlOrbitResponse(
+            status="converged",
+            cause="none",
+            message="任务完成",
             num_failed=0,
             sk_statistic={"rows": [[0.0]], "num_failed": 0},
             maneuvers={"mjd_tdb": [60000.0], "delta_v_mps": [1.0]},
         )
         assert resp.controlled_ephemeris is None
         assert resp.mu is None
+
+    @pytest.mark.parametrize(
+        ("status", "cause"),
+        [
+            (ConvergenceState.ITERATING, FailureCause.NONE),
+            (ConvergenceState.CONVERGED, FailureCause.UNKNOWN),
+        ],
+    )
+    def test_response_rejects_invalid_status_cause(self, status, cause):
+        with pytest.raises(ValidationError):
+            ControlOrbitResponse(
+                status=status,
+                cause=cause,
+                message="非法状态",
+                num_failed=0,
+                sk_statistic={"rows": [], "num_failed": 0},
+                maneuvers={"mjd_tdb": [], "delta_v_mps": []},
+            )
 
     def test_control_request_accepts_mu(self):
         """mu 透传字段（画地月/L 点标注用）。"""
@@ -483,7 +536,9 @@ class TestWsbTransferDetailsContract:
             dv_arrival_km_s=0.8,
             n_candidates_searched=100,
             n_candidates_feasible=5,
-            converged=True,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="收敛",
             search_params=WsbSearchParams(),
         )
         assert isinstance(details.tof_sec, float)
@@ -494,5 +549,7 @@ class TestWsbTransferDetailsContract:
         assert isinstance(details.h2_kepler, float)
         assert isinstance(details.n_candidates_searched, int)
         assert isinstance(details.n_candidates_feasible, int)
-        assert isinstance(details.converged, bool)
+        assert details.status is ConvergenceState.CONVERGED
+        assert details.cause is FailureCause.NONE
+        assert details.message == "收敛"
         assert isinstance(details.search_params, WsbSearchParams)

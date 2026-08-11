@@ -6,14 +6,31 @@ EphemerisTable。单文件模块（不是目录）。
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
 from ..data.constants import SECONDS_PER_DAY, Datum
+from ..data.templates import ConvergenceState, FailureCause
 from ..data.types import EphemerisTable
+from .results import ResultStatus
 
-__all__ = ["propagate_orbit"]
+__all__ = ["PropagationResult", "propagate_orbit"]
+
+
+@dataclass(frozen=True)
+class PropagationResult:
+    """一次轨道预报任务的结果。"""
+
+    ephemeris: EphemerisTable
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
+
 
 #: J2000 历元的 TDB 儒略日（SPICE ET 定义为相对此历元的 TDB 秒）
 _J2000_JD_TDB = 2451545.0
@@ -55,7 +72,7 @@ def propagate_orbit(
     force_config: dict[str, Any] | None = None,
     output_step: float = 3600.0,
     **kwargs,
-) -> EphemerisTable:
+) -> PropagationResult:
     """高精度轨道预报。
 
     配 ForceModel 并传播，输出通用星历表容器（UTC + GCRS 位置/速度）。
@@ -69,7 +86,7 @@ def propagate_orbit(
         kwargs: 传给 ForceModel 的额外配置（如 system/spice 等）。
 
     Returns:
-        预报星历表。
+        含星历与最终状态三元组的预报结果。
 
     Raises:
         ValueError: 初值形状或时长非法。
@@ -143,7 +160,7 @@ def propagate_orbit(
         minutes[i] = mi
         seconds[i] = s
 
-    return EphemerisTable(
+    ephemeris = EphemerisTable(
         year=years,
         month=months,
         day=days,
@@ -154,6 +171,12 @@ def propagate_orbit(
         velocity_mps=states[:, 3:6].copy() * 1000.0,
         synodic_position=np.zeros((n, 3)),
         times_jd_tdb=(_J2000_JD_TDB + times / SECONDS_PER_DAY).copy(),
+    )
+    return PropagationResult(
+        ephemeris=ephemeris,
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
+        message="任务完成",
     )
 
 
