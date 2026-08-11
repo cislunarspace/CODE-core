@@ -12,27 +12,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
+from typing import cast
 
-import tomllib
-
+from ._loader import _load_section
 from .sources import ConstantSource
 
-
-def _load_bodies() -> dict[str, dict[str, object]]:
-    """从仓库根 constants.toml 加载 [body.*] 段。"""
-    path = Path(__file__).resolve().parents[3] / "constants.toml"
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"物理常数单一来源文件缺失：{path}\n"
-            f"请确认仓库根存在 constants.toml，它是 Python/Rust 物理常数的唯一来源。"
-        )
-    with path.open("rb") as f:
-        data = tomllib.load(f)
-    return data["body"]
-
-
-_BODIES = _load_bodies()
+_BODIES: dict[str, dict[str, object]] = cast(dict[str, dict[str, object]], _load_section("body"))
 
 
 def _scalar(section: dict[str, object], key: str) -> float | None:

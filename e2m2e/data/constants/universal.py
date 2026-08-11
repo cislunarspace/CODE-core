@@ -6,29 +6,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import cast
 
-import tomllib
-
+from ._loader import _load_section
 from .sources import ConstantSource
 
-
-def _load_universal() -> dict[str, dict[str, object]]:
-    """从仓库根 constants.toml 加载 [universal] 段。"""
-    # 包文件 -> e2m2e/data/constants/universal.py
-    # 向上四级到仓库根（constants.toml 所在）
-    path = Path(__file__).resolve().parents[3] / "constants.toml"
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"物理常数单一来源文件缺失：{path}\n"
-            f"请确认仓库根存在 constants.toml，它是 Python/Rust 物理常数的唯一来源。"
-        )
-    with path.open("rb") as f:
-        data = tomllib.load(f)
-    return data["universal"]
-
-
-_UNIVERSAL = _load_universal()
+_UNIVERSAL: dict[str, dict[str, object]] = cast(
+    dict[str, dict[str, object]], _load_section("universal")
+)
 
 
 def _value(key: str) -> float:

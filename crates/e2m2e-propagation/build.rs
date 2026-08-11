@@ -192,7 +192,11 @@ fn write_header(out: &mut String) {
     );
 }
 
-fn write_universal(out: &mut String, root: &HashMap<String, TomlValue>) {
+fn write_universal(
+    out: &mut String,
+    root: &HashMap<String, TomlValue>,
+    lookup: &mut Vec<(String, String)>,
+) {
     let uni = match table_path(root, &["universal"]) {
         Some(t) => t,
         None => return,
@@ -226,6 +230,7 @@ fn write_universal(out: &mut String, root: &HashMap<String, TomlValue>) {
         out.push_str(&format!(
             "/// {rust_name} (source: {src})\npub const {rust_name}: f64 = {val:e};\n\n"
         ));
+        lookup.push((format!("universal.{toml_key}"), rust_name.to_string()));
     }
 
     // 派生量：1 AU 光压（N/m²）
@@ -235,9 +240,17 @@ fn write_universal(out: &mut String, root: &HashMap<String, TomlValue>) {
     out.push_str(
         "pub const SOLAR_PRESSURE_1AU: f64 = SOLAR_FLUX_W_M2 / (SPEED_OF_LIGHT_KMS * KM_TO_M);\n\n",
     );
+    lookup.push((
+        "universal.solar_pressure_1au".to_string(),
+        "SOLAR_PRESSURE_1AU".to_string(),
+    ));
 }
 
-fn write_datum(out: &mut String, root: &HashMap<String, TomlValue>) {
+fn write_datum(
+    out: &mut String,
+    root: &HashMap<String, TomlValue>,
+    lookup: &mut Vec<(String, String)>,
+) {
     let datums = match table_path(root, &["datum"]) {
         Some(t) => t,
         None => return,
@@ -267,11 +280,16 @@ fn write_datum(out: &mut String, root: &HashMap<String, TomlValue>) {
             out.push_str(&format!(
                 "/// {rust_name} (datum {datum_name}, key {key})\npub const {rust_name}: f64 = {val:e};\n\n"
             ));
+            lookup.push((format!("datum.{datum_name}.{key}"), rust_name));
         }
     }
 }
 
-fn write_body(out: &mut String, root: &HashMap<String, TomlValue>) {
+fn write_body(
+    out: &mut String,
+    root: &HashMap<String, TomlValue>,
+    lookup: &mut Vec<(String, String)>,
+) {
     let bodies = match table_path(root, &["body"]) {
         Some(t) => t,
         None => return,
@@ -297,29 +315,53 @@ fn write_body(out: &mut String, root: &HashMap<String, TomlValue>) {
             out.push_str(&format!(
                 "pub const {prefix}_MEAN_RADIUS_KM: f64 = {v:e};\n\n"
             ));
+            lookup.push((
+                format!("body.{body_name}.mean_radius_km"),
+                format!("{prefix}_MEAN_RADIUS_KM"),
+            ));
         }
         if let Some(v) = value_or_inline(bt, "gravity_ref_radius_km") {
             out.push_str(&format!(
                 "pub const {prefix}_GRAVITY_REF_RADIUS_KM: f64 = {v:e};\n\n"
             ));
+            lookup.push((
+                format!("body.{body_name}.gravity_ref_radius_km"),
+                format!("{prefix}_GRAVITY_REF_RADIUS_KM"),
+            ));
         }
         if let Some(v) = value_or_inline(bt, "flattening") {
             out.push_str(&format!("pub const {prefix}_FLATTENING: f64 = {v:e};\n\n"));
+            lookup.push((
+                format!("body.{body_name}.flattening"),
+                format!("{prefix}_FLATTENING"),
+            ));
         }
         if let Some(v) = value_or_inline(bt, "rotation_rate_iers_rad_s") {
             out.push_str(&format!(
                 "pub const {prefix}_ROTATION_RATE_IERS_RAD_S: f64 = {v:e};\n\n"
+            ));
+            lookup.push((
+                format!("body.{body_name}.rotation_rate_iers_rad_s"),
+                format!("{prefix}_ROTATION_RATE_IERS_RAD_S"),
             ));
         }
         if let Some(v) = value_or_inline(bt, "rotation_rate_gmat_rad_s") {
             out.push_str(&format!(
                 "pub const {prefix}_ROTATION_RATE_GMAT_RAD_S: f64 = {v:e};\n\n"
             ));
+            lookup.push((
+                format!("body.{body_name}.rotation_rate_gmat_rad_s"),
+                format!("{prefix}_ROTATION_RATE_GMAT_RAD_S"),
+            ));
         }
         if let Some(v) = value_or_inline(bt, "naif_id") {
             // naif_id 通常作为 i32 常量
             let i = v as i32;
             out.push_str(&format!("pub const {prefix}_NAIF_ID: i32 = {i};\n\n"));
+            lookup.push((
+                format!("body.{body_name}.naif_id"),
+                format!("{prefix}_NAIF_ID as f64"),
+            ));
         }
 
         // GM 按 datum
@@ -332,9 +374,25 @@ fn write_body(out: &mut String, root: &HashMap<String, TomlValue>) {
                 let Some(val) = val else { continue };
                 let rust_name = format!("{prefix}_GM_{}", datum.to_uppercase());
                 out.push_str(&format!("pub const {rust_name}: f64 = {val:e};\n\n"));
+                lookup.push((format!("body.{body_name}.gm.{datum}"), rust_name));
             }
         }
     }
+}
+
+fn write_lookup(out: &mut String, lookup: &[(String, String)]) {
+    out.push_str(
+        "// ----------------------------------------------------------------------------\n",
+    );
+    out.push_str("// Constant lookup table (key -> const)\n");
+    out.push_str(
+        "// ----------------------------------------------------------------------------\n",
+    );
+    out.push_str("pub const CONSTANT_LOOKUP: &[(&str, f64)] = &[\n");
+    for (key, rust_name) in lookup {
+        out.push_str(&format!("    (\"{key}\", {rust_name}),\n"));
+    }
+    out.push_str("];\n\n");
 }
 
 fn main() {
@@ -353,9 +411,11 @@ fn main() {
 
     let mut generated = String::new();
     write_header(&mut generated);
-    write_universal(&mut generated, &root);
-    write_datum(&mut generated, &root);
-    write_body(&mut generated, &root);
+    let mut lookup: Vec<(String, String)> = Vec::new();
+    write_universal(&mut generated, &root, &mut lookup);
+    write_datum(&mut generated, &root, &mut lookup);
+    write_body(&mut generated, &root, &mut lookup);
+    write_lookup(&mut generated, &lookup);
 
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let out_file = out_dir.join("generated_constants.rs");

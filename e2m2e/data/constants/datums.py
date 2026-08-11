@@ -16,28 +16,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from typing import cast
 
-import tomllib
-
+from ._loader import _load_section
 from .sources import ConstantSource
 from .universal import SECONDS_PER_DAY
 
-
-def _load_datums() -> dict[str, dict[str, dict[str, object]]]:
-    """从仓库根 constants.toml 加载 [datum.*] 段。"""
-    path = Path(__file__).resolve().parents[3] / "constants.toml"
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"物理常数单一来源文件缺失：{path}\n"
-            f"请确认仓库根存在 constants.toml，它是 Python/Rust 物理常数的唯一来源。"
-        )
-    with path.open("rb") as f:
-        data = tomllib.load(f)
-    return data["datum"]
-
-
-_DATUMS = _load_datums()
+_DATUMS: dict[str, dict[str, dict[str, object]]] = cast(
+    dict[str, dict[str, dict[str, object]]], _load_section("datum")
+)
 
 
 def _datum_value(datum: str, key: str) -> float | None:
