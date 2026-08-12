@@ -8,7 +8,7 @@
 
 一次跨 `algorithm/` + `data/` + `api/` 的健壮性盘点（四路并行扫描）找出约 139 处"失败发生时，做了抛异常或带标记返回以外的事"的代码——静默返回近似值、自动换后端、放宽容差并报告成功、把失败藏进成功统计。它们分散在各层，但同源：**把"失败"当成"一种可接受的备选结果"，而不是"需要上抛或显式标记的事件"**。
 
-几条最典型的（完整清单见 `archive/plans/robustness-cleanup.md`）：
+几条最典型的：
 
 - **步长塌缩被静默吞掉**：`dynamics.py:611-633` 捕获 Rust 的 "step size collapsed" 错误（靠 `dynamics.py:54` 的字符串匹配），返回空 states；`propagate_orbit_state_at_time`（`dynamics.py:688-699`）拿到空 states 后退回轨道自身数据的插值，当成功结果返回。
 - **谎报收敛**：`differential_correction.py:730-744`，牛顿修正停滞（修正量 < 1e-14）但残差仍有 1e-8 时，直接标 `converged=True`——配置容差是 1e-12，等于静默放宽容差 4 个数量级。
@@ -113,7 +113,7 @@
 - 碰撞终止能力：CR3BP/BCR4BP body-radius 配置注入 + propagation 内事件检测（`g=|r|-R_body, terminal=True`）。
 - 能力缺失场景的显式 `backend="scipy"/"rust"` 参数（事件检测等），无 `auto`。
 
-### 变更（迁移顺序，详见 `archive/plans/robustness-cleanup.md`）
+### 变更（迁移顺序）
 
 1. 加 `PropagationFailure` 类型异常（零测试破坏，地基）。
 2. 决策 3：统一 `ConvergenceState` status 规范，各搜索结果对象对齐（多数测试断言 happy path，破坏小）。

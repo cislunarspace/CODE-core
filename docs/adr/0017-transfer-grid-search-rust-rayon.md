@@ -3,7 +3,6 @@
 **状态**：已采纳
 **日期**：2026-08-07
 **关联**：ADR 0002（Rust 积分器内核）、ADR 0011（五层架构）、ADR 0012（依赖方向）、ADR 0013（验证策略）、ADR 0016（EphemCache 架构）
-**设计文档**：`archive/plans/transfer-grid-search-rust.md`
 
 ## 背景
 
@@ -84,7 +83,7 @@ fn transfer_grid_search_py(...) -> Vec<TransferPointResult> {
 
 ## 基准数据
 
-三档并行度统一 `n_workers=4`、每档每 backend 跑 3 次取中位 wall-time（48 核机器，CR3BP 地月，DOP853 rtol=atol=1e-9）。完整配置与脚本见 `scripts/benchmark_transfer_search.py` 与 `archive/plans/transfer-grid-search-rust-benchmark.md`。
+三档并行度统一 `n_workers=4`、每档每 backend 跑 3 次取中位 wall-time（48 核机器，CR3BP 地月，DOP853 rtol=atol=1e-9）。基准脚本为 `scripts/benchmark_transfer_search.py`，可复现。
 
 | 规模 (dep×α) | 评估数 | processes(s) | threads(s) | rust(s) | rust vs processes |
 |---|---|---|---|---|---|

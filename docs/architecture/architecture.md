@@ -1,6 +1,6 @@
 # e2m2e 架构设计
 
-> 本文描述 e2m2e 的架构（五层已落地，旧包 core/algorithms/transfer/dfh/io/visualization/proximity 已删除）。设计过程记录见 `archive/architecture-design-discussion.md`，逐项架构决策见 `docs/adr/`。
+> 本文描述 e2m2e 的架构（五层已落地，旧包 core/algorithms/transfer/dfh/io/visualization/proximity 已删除）。逐项架构决策见 `docs/adr/`。
 
 ## 总体定位
 
@@ -209,7 +209,7 @@ README 加"能力与实现状态"表（每个能力标 已实现/部分/未实�
 
 ## 迁移记录（已完成）
 
-迁移已于 2026-08 完成，过程见 `archive/migration-to-five-layer.md`（历史任务指令）。旧包 core/algorithms/transfer/dfh/io/visualization/proximity 已删除，sys.modules 别名已移除。迁移时留作占位的能力（ECOM 光压、角动量管理、LGA/WSB/HMN 转移、低推力等）现已落地，见 README 能力表。
+迁移已于 2026-08 完成（ADR 0011）。旧包 core/algorithms/transfer/dfh/io/visualization/proximity 已删除，sys.modules 别名已移除。迁移时留作占位的能力（ECOM 光压、角动量管理、LGA/WSB/HMN 转移、低推力等）现已落地，见 README 能力表。
 
 ## 依赖与 extras
 
