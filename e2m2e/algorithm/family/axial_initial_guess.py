@@ -192,6 +192,19 @@ def _find_axial_bifurcation_seed(
 
         vt = _vertical_trace(dynamics, orbit)
         C = system.get_jacobi_constant(orbit.states[0])
+
+        # 跳支检测：vt 突变（远大于平滑延拓的每步变化）说明修正器收敛到了
+        # 另一条轨道支——L2 平面 Lyapunov 族大振幅处与近月轨道族交互，
+        # 实测 0.02 步长一步 vt 0.97→0.14、C 3.17→2.92（跳到近月支）；
+        # 平滑延拓下 0.02 步 vt 变化 ~5e-3，阈值 0.3 远高于正常波动，
+        # 对 L1（平滑）无影响。跳变时丢弃该轨道、减小步长从 prev 重试。
+        prev_vt = scan[-1][2]
+        if abs(vt - prev_vt) > 0.3:
+            t_step *= 0.5
+            if t_step < t_step_min:
+                break
+            continue
+
         assert orbit.period is not None
         scan.append((float(orbit.period), orbit, vt, C))
 
