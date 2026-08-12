@@ -122,6 +122,19 @@ CORRECTION_VEL_WEIGHT = CORRECTION_TOL_KM / VELOCITY_TOL_KMS
 #: 每圈 patch 节点数（均匀采样）；NRHO 用近月点加密采样替代
 _POINTS_PER_REV = 8
 
+#: 星历修正用固定时间打靶（var_time=False）的轨道族：Halo/NRHO（不稳定，
+#: 分段打靶全程固定时刻，对齐杨洪伟 2015）与拟周期/无周期闭合族
+#: （Lissajous / 三角平动点 L4/L5）。
+#:
+#: 拟周期族用固定时间的机理（#366）：CR3BP 初猜无周期闭合（Lissajous
+#: 面内/面外频率不可约；L4/L5 短/长周期模态耦合），自由时间模式下时间
+#: 自由度与沿流状态自由度近似线性相关（时间平移 δt ≈ 沿轨道移动 δt·f），
+#: 雅可比列病态，LM 陷入线性收敛卡在 0.5–174 km（实测 L2/L4/L5 迭代到
+#: 80 次上限不收敛）。固定时间下节点时刻保持 CR3BP 名义周期均匀采样，
+#: 位置/速度修正直接吸收星历偏差，Gauss-Newton 二次收敛（实测 4–6 迭代，
+#: 秒级到几十秒）。
+_FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "LISSAJOUS", "L4", "L5"})
+
 #: body-fixed 帧（ITRF93 / MOON_PA）所需内核文件名，与 tests/kernel_helpers.py 一致
 _BODY_FIXED_KERNELS = [
     "earth_latest_high_prec.bpc",
@@ -1143,7 +1156,8 @@ def design_orbit(
             # 第 1 步段长（每组圈数）。对齐朱彦伟2026 多重打靶拼接：长段（多圈）
             # 节点密、段内约束强，各段修到正确星历弧而非漂走（1 圈短段各段漂、
             # seam 跳 ~1e5 km 合并不了）。Halo/NRHO 用多圈/段（上限 3 圈，试错）；
-            # 稳定轨道（DRO 等）沿用 3 圈/段。配合下方 var_time=False 固定时刻。
+            # 稳定轨道（DRO 等）沿用 3 圈/段。配合下方 var_time 固定时刻族
+            # （_FIXED_TIME_ORBIT_TYPES，含 Halo/NRHO 与拟周期族）。
             revs_per_group = min(n_rev, 3) if sel in ("HALO", "NRHO") else max(1, min(3, n_rev))
             t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
                 forces_py,
@@ -1154,7 +1168,7 @@ def design_orbit(
                 per_rev,
                 max_iter=50,
                 tolerance=CORRECTION_TOL_KM,
-                var_time=sel not in ("HALO", "NRHO"),
+                var_time=sel not in _FIXED_TIME_ORBIT_TYPES,
                 verbose=verbose,
             )
 
@@ -1315,7 +1329,7 @@ def design_orbit(
             "EARTH",
             list(t_patch_j2000),
             [list(map(float, x)) for x in state_patch_j2000],
-            var_time=True,
+            var_time=sel not in _FIXED_TIME_ORBIT_TYPES,
             fix_first_node=False,
             fixed_node_mask=None,
             max_iter=_ms_max_iter,
