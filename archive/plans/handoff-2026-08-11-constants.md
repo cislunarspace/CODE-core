@@ -46,7 +46,7 @@ libclang 在 `/usr/lib/llvm-21/lib`（系统是 libclang-21.so，非 libclang.so
 3. **提交时排除两类文件**：
    - **CLAUDE.md**：用户手动加的 `## Python`（uv 管理虚拟环境）段，不是本任务内容，**不纳入提交**，保留。
    - **LPO 工作线遗留**（会话开始前就存在，与 #377 无关，**绝不提交**）：
-     `crates/e2m2e-integrators/src/{lib,design_lpo,lpo_correction,lpo_family}.rs`、`e2m2e/integrators.py`、`e2m2e/algorithm/family/cr3bp_orbits.py`、`crates/e2m2e-integrators/abi-version.txt`、`docs/plans/lpo-rust-rayon.md`、`tests/algorithm/family/test_lpo_rust_equivalence.py`
+     `crates/e2m2e-integrators/src/{lib,design_lpo,lpo_correction,lpo_family}.rs`、`e2m2e/integrators.py`、`e2m2e/algorithm/family/cr3bp_orbits.py`、`crates/e2m2e-integrators/abi-version.txt`、`archive/plans/lpo-rust-rayon.md`、`tests/algorithm/family/test_lpo_rust_equivalence.py`
 
 ## 两条已定决策（贯穿后续）
 

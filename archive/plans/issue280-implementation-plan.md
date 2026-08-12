@@ -105,7 +105,7 @@
 
 ### Phase 4：文档与收尾（~30min）
 
-1. **更新 `docs/plans/dfh-parity-prd.md` FR2**
+1. **更新 `archive/plans/dfh-parity-prd.md` FR2**
    - 验收标准打勾：`[x] TIGHT/SPECIAL 量级对齐（#280）`
    - 注明验证方式：物理定义验证（ADR 0013），非黄金样本
 
@@ -114,7 +114,7 @@
    - `special_point.py`：注释说明 `v_c` 因子和阻尼的物理/数值原因
 
 3. **删除旧计划文件**
-   - `docs/plans/issue280-implementation-plan.md`（本文件取代）
+   - `archive/plans/issue280-implementation-plan.md`（本文件取代）
 
 4. **Issue #280 更新**
    - 更新验收标准："与 DFH 一致（< 50%）" → "控制律正确实现《控制方案.md》公式，

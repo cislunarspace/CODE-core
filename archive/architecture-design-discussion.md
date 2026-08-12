@@ -243,6 +243,6 @@ e2m2e/tools/
 以下项在追问过程中已解决，全部转为✅（见上文对应条目）：MCP 工具清单一档/二档边界（一档稳定、二档三档会扩）；transfer_orbit 进一档（最终形态必然）；golden 不建（无待定位置）；Facade 覆盖二档（纯派生）；logging 用标准 logging + 键值对（不用 structlog）；文档结构（Sphinx 新五层 + README 能力状态表）；模板形态（占位函数 + 抛错测试）。
 
 以下三项在后续实现阶段均已解决：
-1. ✅ 迁移的**分批顺序细目**——见 `docs/architecture/migration-to-five-layer.md`（迁移已完成，旧包已删）
+1. ✅ 迁移的**分批顺序细目**——见 `archive/migration-to-five-layer.md`（迁移已完成，旧包已删）
 2. ✅ 每个 Facade 方法的 Pydantic 模型字段清单——`e2m2e/api/models.py` 已落地（DesignOrbitRequest/Response 等）
 3. ✅ 未实现能力的完整清单——ECOM 光压、角动量管理、LGA/WSB/HMN 转移、低推力均已实现，见 README 能力表

@@ -4,7 +4,7 @@
 
 > 本指令交给 Codex 执行。执行前先读以下文件，它们是迁移的完整依据：
 > - `docs/architecture/architecture.md`（最终形态架构）
-> - `docs/architecture-design-discussion.md`（48 问共识，每个模块标注"源：xxx 迁入"）
+> - `archive/architecture-design-discussion.md`（48 问共识，每个模块标注"源：xxx 迁入"）
 > - `docs/adr/0011-five-layer-architecture.md`（迁移决策）
 > - `docs/adr/0012-dependency-direction.md`（依赖规则）
 > - `docs/adr/0013-verification-by-definition.md`（验证策略）

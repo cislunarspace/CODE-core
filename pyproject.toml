@@ -85,7 +85,7 @@ pythonpath = ["tests"]
 # 默认测试门排除尚未完成的低推力功能；测试按功能类目组织，不按运行速度分层。
 addopts = ["-m", "not low_thrust"]
 markers = [
-    "low_thrust: 低推力功能未开发完成，默认绿门排除；release 用 -m '' 全量仍会运行",
+    "low_thrust: 低推力数学内核已实现，Facade 任务入口未完成，默认绿门排除；release 用 -m '' 全量仍会运行",
     "spice: 依赖 SPICE 内核的测试，内核缺失时跳过（正交于功能类）",
     "theory: 数理/物理理论——解析对照、守恒律、闭式解",
     "integrator: 积分器——传播器算法、步长控制、dense output",

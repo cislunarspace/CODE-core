@@ -33,7 +33,7 @@
 - `EngineConfig`、`LowThrustSegment`、`LowThrustShootingSolution` 数据类型
 - `VariableMassFiniteBurn` 力模型 + `to_rust_spec()` Rust 序列化
 
-规格见 `docs/plans/dfh-parity-prd.md` FR3 延伸要求。DFH 本身无小推力功能，本条无
+规格见 `archive/plans/dfh-parity-prd.md` FR3 延伸要求。DFH 本身无小推力功能，本条无
 黄金样本，验证用终端约束满足度与等效 Δv 口径一致的脉冲/小推力对比。
 
 ## 验收标准

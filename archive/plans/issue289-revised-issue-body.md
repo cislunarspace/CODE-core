@@ -61,4 +61,4 @@ SPO 是 CR3BP 中围绕 L4/L5 的短周期族成员（$\mathcal{L}_s$），周�
 - Gómez et al. (2001) Vol. II（L4/L5 周期轨道族结构 + 数值延拓方法）
 - Capdevila & Howell (2018) JGCD（CR3BP SPO 显式初始条件 + DRO↔SPO
   转移设计）
-- 详细实施方案：`docs/plans/issue289-spo-implementation-plan.md`
+- 详细实施方案：`archive/plans/issue289-spo-implementation-plan.md`

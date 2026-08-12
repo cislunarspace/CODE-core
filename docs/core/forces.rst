@@ -131,7 +131,7 @@ Atmosphere 1976 分段指数模型），``C_d`` 为阻力系数（默认 2.2）�
 Rust ``propagate_compiled_lowthrust``（受控 EOM 复用
 ``augmented_state::augmented_eom_7d``）。本期仅支持常量推力与固定方向
 （``to_rust_spec`` 非 ``None`` 才走 Rust 路径）；可调用方向暂返回
-``NotImplementedError``。详见 ``docs/plans/lowthrust-foundation-prd.md``。
+``NotImplementedError``。
 
 .. code-block:: python
 

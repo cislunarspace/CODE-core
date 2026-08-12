@@ -1,6 +1,6 @@
 # 第 5 批清理计划：io/ 全量迁出与旧包删除
 
-> 状态：待审查。本计划接续 `docs/architecture/migration-to-five-layer.md`，
+> 状态：待审查。本计划接续 `archive/migration-to-five-layer.md`，
 > 是五层架构迁移的最后一批。旧包 `core/`/`algorithms/`/`transfer/`/`dfh/`/
 > `visualization/`/`proximity/` 的 `__init__.py` 已删除，只剩 `io/`。
 

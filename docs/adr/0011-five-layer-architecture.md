@@ -2,7 +2,7 @@
 
 **状态**：已接受（已实施）
 **日期**：2026-07-31
-**关联**：`docs/architecture/architecture.md`、`docs/architecture-design-discussion.md`
+**关联**：`docs/architecture/architecture.md`、`archive/architecture-design-discussion.md`
 
 ## 背景
 
