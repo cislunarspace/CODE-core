@@ -979,28 +979,39 @@ def _correct_lpo(
         assert guess.period is not None
         period = guess.period
 
-    corrector = DifferentialCorrection(dynamics)
-    corrector.setup_lpo_fixed_x0(x0=x0, libration_point=libration_point)
-    seed = Orbit(
-        states=state.reshape(1, -1),
-        times=np.array([0.0]),
-        system=dynamics.system,
-    )
-    seed.period = period
+    # 搜索阶段放宽积分步长上限（#367）：默认 0.01 TU 对长周期 LPO
+    # （~21 TU/圈）意味着每次 STM 传播 ≥2100 步，网格搜索 45 点 × 修正
+    # 迭代 ~700 次传播共 ~110s。rtol=1e-12 自适应仍控制积分精度，max_step
+    # 只是上限：0.1 TU 下实测 2.5x 加速、收敛产物一致（振幅 49994 vs
+    # 50000 km、周期同 21.124 TU）。结束恢复，不污染调用方共享 dynamics。
+    _orig_max_step = dynamics.max_step
+    dynamics.max_step = max(dynamics.max_step, 0.1)
+    try:
+        corrector = DifferentialCorrection(dynamics)
+        corrector.setup_lpo_fixed_x0(x0=x0, libration_point=libration_point)
+        seed = Orbit(
+            states=state.reshape(1, -1),
+            times=np.array([0.0]),
+            system=dynamics.system,
+        )
+        seed.period = period
 
-    result = corrector.iterate_full_period_correction(seed, verbose=False)
-    orbit = result.orbit
-    if orbit is None:
-        raise Cr3bpOrbitError(
-            f"LPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {result.message}"
-        )
-    assert orbit.period is not None
-    # LPO 周期范围：极限 21.07 nd（~91 天），大振幅可到 ~30+ nd
-    if orbit.period < 10.0 or orbit.period > 50.0:
-        raise Cr3bpOrbitError(
-            f"LPO(L{libration_point}, x0={x0:.6f}) 周期异常（T={orbit.period:.3f}，预期 10.0-50.0）"
-        )
-    return orbit
+        result = corrector.iterate_full_period_correction(seed, verbose=False)
+        orbit = result.orbit
+        if orbit is None:
+            raise Cr3bpOrbitError(
+                f"LPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {result.message}"
+            )
+        assert orbit.period is not None
+        # LPO 周期范围：极限 21.07 nd（~91 天），大振幅可到 ~30+ nd
+        if orbit.period < 10.0 or orbit.period > 50.0:
+            raise Cr3bpOrbitError(
+                f"LPO(L{libration_point}, x0={x0:.6f}) 周期异常"
+                f"（T={orbit.period:.3f}，预期 10.0-50.0）"
+            )
+        return orbit
+    finally:
+        dynamics.max_step = _orig_max_step
 
 
 def design_lpo(

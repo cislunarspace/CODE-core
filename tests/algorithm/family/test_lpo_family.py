@@ -89,14 +89,14 @@ class TestRegistry:
 class TestDesignLpoConvergence:
     """design_lpo 端到端收敛测试。"""
 
-    def test_design_lpo_l4_converges(self):
-        orbit = design_lpo(4, 50000.0)
+    def test_design_lpo_l4_converges(self, l4_orbit):
+        orbit = l4_orbit
         assert orbit is not None
         assert orbit.period is not None
         assert orbit.period > 0
 
-    def test_design_lpo_l5_converges(self):
-        orbit = design_lpo(5, 50000.0)
+    def test_design_lpo_l5_converges(self, l5_orbit):
+        orbit = l5_orbit
         assert orbit is not None
         assert orbit.period is not None
         assert orbit.period > 0
