@@ -4,8 +4,9 @@
 供 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer` 选用。
 
 未安装 ``coptpy`` 时：本模块仍可被导入（``coptpy`` 退化为 ``None``），
-但 :class:`COPTNLPSolver` 退化为占位实现，:func:`optimize_with_copt`
-应通过 ``fallback_to_scipy`` 回退 SciPy 求解。
+:class:`COPTNLPSolver` 类不定义；:func:`optimize_with_copt` 默认直接报错
+（``fallback_to_scipy=False``，ADR 0020 决策 4：不隐式换后端），显式传
+``fallback_to_scipy=True`` 才回退 SciPy 求解。
 """
 
 from __future__ import annotations
@@ -333,7 +334,7 @@ def optimize_with_copt(
     optimizer: DROTRONLPOptimizer,
     initial_guess: NLPOptimizationVariables | None = None,
     *,
-    fallback_to_scipy: bool = True,
+    fallback_to_scipy: bool = False,
     max_iter: int = 1000,
     threads: int = 1,
     bar_threads: int = 1,
@@ -350,7 +351,9 @@ def optimize_with_copt(
         optimizer: 已设置 ``alpha_range`` / ``transfer_time_range`` / ``t_ins_range`` 的
             :class:`DROTRONLPOptimizer`
         initial_guess: 初始猜测 ``(α, T, t_ins)``；默认 ``(1, 10, 5)``
-        fallback_to_scipy: 未安装 COPT 或求解失败时是否回退 SciPy SLSQP
+        fallback_to_scipy: COPT 不可用或求解失败时是否回退 SciPy SLSQP。
+            默认 ``False``：COPT 缺失/失败即报错（ADR 0020 决策 4，资源
+            缺失不隐式换后端）；显式传 ``True`` 才保留回退。
         max_iter: ``COPT.Param.NLPIterLimit`` （最大迭代数）
         threads / bar_threads: ``COPT.Param.Threads`` / ``BarThreads``
             （Python 回调建议为 1）
@@ -371,7 +374,9 @@ def optimize_with_copt(
         if fallback_to_scipy:
             return _run_scipy()
         raise RuntimeError(
-            "coptpy 未安装，无法使用 COPT；请安装 coptpy 或设置 fallback_to_scipy=True"
+            "coptpy 未安装，无法使用 COPT 求解器；请 `pip install coptpy`，"
+            "或显式传 fallback_to_scipy=True 回退 SciPy SLSQP（ADR 0020："
+            "不隐式换后端）"
         )
 
     if initial_guess is None:

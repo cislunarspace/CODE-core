@@ -8,8 +8,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 - **三脉冲优化对零脉冲初猜提前收敛**（#384）：`MultiImpulseTransfer.optimize` 的 SLSQP 对"零脉冲初猜"（双脉冲弧上的点，目标值恰为双脉冲成本）数值敏感——目标函数在该平坦走廊上梯度极小，收敛判据可能提前触发、一步即停，三脉冲对 ΔV 几乎无改善（`test_multi_impulse` 随主矢量检验采样密度约半数配置失败，issue 报的改善量 2.96e-11 即此现象）。首次优化相对初猜改善不足时，现自动从微扰初猜（时刻整体 ×0.5/1.5/2.0、位置 ×0.9/1.1）重试并取总 ΔV 最小者；实测该场景三脉冲确有 0.78 km/s（约 11%）改善空间，断言与阈值不变。新增 n_samples=200 回归测试。
-
-### Fixed
 - **Lissajous/三角平动点星历修正不收敛**（#366）：`design_orbit` 对 LISSAJOUS-L2/L4/L5 在 Rust 多重打靶（容差 0.02 km）下迭代到 80 次上限仍不收敛（位置残差 0.16–174 km）。根因是拟周期族（面内/面外频率不可约、短/长周期模态耦合，无周期闭合）在自由时间打靶下时间自由度与沿流状态自由度近线性相关，雅可比列病态、LM 线性收敛卡死；固定时间（`var_time=False`，新增 `_FIXED_TIME_ORBIT_TYPES` 族集合）下节点时刻保持 CR3BP 名义周期均匀采样，位置/速度修正直接吸收星历偏差，实测 L1/L2/L3/L4/L5 全部 4–6 迭代收敛（秒级到 37 s）。`test_lissajous_triangular` 重启用 L2/L4/L5 参数化，Jacobi 漂移断言改相对判据（|ΔC|/|C| < 1e-3，约化误差随振幅增长是固有量级）。
 - **LPO 初猜网格搜索过慢**（#367）：`design_lpo` 网格搜索 45 点 × 微分修正 ~700 次 STM 传播，默认 `max_step=0.01 TU` 对长周期 LPO（~21 TU/圈）意味着每次传播 ≥2100 步，单次 `design_lpo` 112 s、`test_lpo_family` 全文件 12.7 分钟（默认套件 wall time 卡点）。`_correct_lpo` 搜索阶段临时放宽 `max_step` 到 0.1 TU（rtol=1e-12 自适应仍控精度，收敛产物一致），单次降至 46 s；`test_lpo_family` 收敛测试改吃共享 fixture，全文件降至 3.2 分钟。
 - **lowthrust 解析雅可比加速比断言 flaky**（#367）：`test_analytic_jacobian_speedup_over_finite_difference` 硬绑绝对加速比 >5.0，机器负载下实测 3.1x；改为 >1.5（只守护"解析实现未退化"，不硬绑绝对量级）。

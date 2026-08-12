@@ -390,18 +390,20 @@ class TestBCR4BPEvents:
         section = PoincareSection.plane(axis=1, value=0.0)
         event = section.event(direction=-1)
 
-        result = bcr4bp_dynamics.propagate(y0_off_plane, (0.0, 5.0), events=[event])
+        result = bcr4bp_dynamics.propagate(
+            y0_off_plane, (0.0, 5.0), events=[event], backend="scipy"
+        )
         assert "time" in result
         assert "states" in result
 
-    def test_events_emit_warning(self, bcr4bp_dynamics, y0_off_plane):
-        """传入 events 时应发出 UserWarning（回退 scipy 提示）。"""
+    def test_events_require_backend(self, bcr4bp_dynamics, y0_off_plane):
+        """events 非 None 时不传 backend 必须报错（ADR 0020 决策 4，不再静默回退）。"""
         from e2m2e.algorithm.manifold.sections import PoincareSection
 
         section = PoincareSection.plane(axis=1, value=0.0)
         event = section.event(direction=-1)
 
-        with pytest.warns(UserWarning, match="回退到 scipy"):
+        with pytest.raises(ValueError, match="backend"):
             bcr4bp_dynamics.propagate(y0_off_plane, (0.0, 5.0), events=[event])
 
     def test_no_warning_without_events(self, bcr4bp_dynamics, sample_state):
@@ -417,7 +419,9 @@ class TestBCR4BPEvents:
         section = PoincareSection.plane(axis=1, value=0.0)
         event = section.event(direction=-1, terminal=True)
 
-        result = bcr4bp_dynamics.propagate(y0_off_plane, (0.0, 10.0), events=[event])
+        result = bcr4bp_dynamics.propagate(
+            y0_off_plane, (0.0, 10.0), events=[event], backend="scipy"
+        )
 
         t_events = result["t_events"][0]
         y_events = result["y_events"][0]
@@ -437,7 +441,9 @@ class TestBCR4BPEvents:
         down = section.event(direction=-1)
         up = section.event(direction=1)
 
-        result = bcr4bp_dynamics.propagate(y0_off_plane, (0.0, 10.0), events=[down, up])
+        result = bcr4bp_dynamics.propagate(
+            y0_off_plane, (0.0, 10.0), events=[down, up], backend="scipy"
+        )
 
         t_down, t_up = result["t_events"]
         y_down, y_up = result["y_events"]
@@ -461,6 +467,7 @@ class TestBCR4BPEvents:
             (0.0, 10.0),
             t_eval=t_eval,
             events=[section.event(direction=-1)],
+            backend="scipy",
         )
 
         post_hoc = detect_crossings(result["time"], result["states"], section)
@@ -480,6 +487,7 @@ class TestBCR4BPEvents:
             y0_off_plane,
             (0.0, 10.0),
             events=section.event(direction=-1),
+            backend="scipy",
         )
         assert len(result["t_events"]) == 1
         assert len(result["t_events"][0]) > 0
@@ -496,6 +504,7 @@ class TestBCR4BPEvents:
             (0.0, 10.0),
             with_stm=True,
             events=[event],
+            backend="scipy",
         )
 
         assert len(result["t_events"][0]) == 1
@@ -509,6 +518,21 @@ class TestBCR4BPEvents:
         result = bcr4bp_dynamics.propagate(sample_state, (0.0, 1.0))
         assert "t_events" not in result
         assert "y_events" not in result
+
+    def test_rust_events_with_stm(self, bcr4bp_dynamics, y0_off_plane):
+        """rust 路径：BCR4BP 事件积分（含 STM）走通用 Rust 积分器。"""
+        from e2m2e.algorithm.manifold.sections import PoincareSection
+
+        section = PoincareSection.plane(axis=1, value=0.0)
+        event = section.event(direction=-1, terminal=True)
+
+        result = bcr4bp_dynamics.propagate(
+            y0_off_plane, (0.0, 5.0), with_stm=True, events=[event], backend="rust"
+        )
+
+        assert len(result["t_events"][0]) == 1
+        assert result["y_events"][0].shape == (1, 42)
+        assert result["time"][-1] == result["t_events"][0][-1]
 
 
 if __name__ == "__main__":

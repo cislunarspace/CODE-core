@@ -468,16 +468,17 @@ impl EphemCache {
 /// （纯数值，无 cspice），读锁并行不互相阻塞；enable/disable 写锁与读锁互斥。
 static CACHE: RwLock<Option<EphemCache>> = RwLock::new(None);
 
-/// strict 模式标记：开启后缓存 miss 返回 `Err`（硬失败），而非软回退 cspice。
-/// 由 `StrictGuard` RAII 管理（打靶并行区开启，保证零 cspice）。
+/// strict 模式标记（`StrictGuard` RAII 管理，打靶并行区开启）：并行区内即使
+/// 缓存未启用也硬失败，保证零 cspice（并行区 cspice 是内核池损坏/panic 的
+/// 根源）。缓存已启用后的 miss（区间外/缺 target）不受本标记控制——一律
+/// 返回 `Err`（ADR 0020 决策 4）；本标记只额外兜住"未启用缓存"场景。
 static STRICT: AtomicBool = AtomicBool::new(false);
 
 /// RAII：作用域内开启 strict 缓存模式，Drop 时恢复原值。
 ///
-/// 语义：strict 下任何 `lookup_*` 查询 miss（未启用/键缺失/越界）返回 `Err`，
-/// 由调用方 `?` 向上传播——杜绝力模型静默回退 cspice（并行区 cspice 是
-/// 内核池损坏/panic 的根源）。非 strict 下 `lookup_*` miss 返回 `Ok(None)`，
-/// 调用方按既有模式回退 cspice。
+/// 语义：strict 下 "未启用缓存" 的 `lookup_*` 查询返回 `Err`（硬失败），
+/// 由调用方 `?` 向上传播——杜绝并行区力模型静默回退 cspice。非 strict 下
+/// 未启用缓存返回 `Ok(None)`，调用方按既有模式回退 cspice（合法路径）。
 pub struct StrictGuard {
     prev: bool,
 }
@@ -517,8 +518,24 @@ pub fn disable() {
     *g = None;
 }
 
-/// strict-aware 查天体位置。miss 时非 strict 返回 `Ok(None)`（回退 cspice），
-/// strict 返回 `Err`。目标/原点/时刻与缓存匹配则返回样条插值位置。
+/// 缓存 key 归一化：NAIF ID 字符串（如 "301"）转名字（"MOON"）。
+/// ``to_rust_spec`` 把天体名转成 ID 字符串传给 ``easier_reader``，而
+/// ``enable_ephem_cache`` 侧用名字作 key——enable 后 miss 即硬失败
+/// （ADR 0020 决策 4），key 不一致必须在查询侧收敛而非静默回退。
+fn normalize_body_name(name: &str) -> &str {
+    if let Ok(id) = name.parse::<i32>() {
+        if let Some(canonical) = crate::spice_ffi::id_to_name(id) {
+            return canonical;
+        }
+    }
+    name
+}
+
+/// 查天体位置。缓存未启用（``enable_ephem_cache`` 未调用）时返回 `Ok(None)`
+/// （调用方回退 cspice，合法路径）；**启用后** miss（区间外 / 目标不在预采样
+/// 列表）一律返回 `Err`（ADR 0020 决策 4：enable 是用户要求缓存的信号，
+/// enable 后 miss 就是错误，不静默回退 cspice）。``StrictGuard`` 仅对
+/// "未启用缓存" 场景额外生效（并行区零 cspice 保险）。
 pub fn lookup_body_position(
     target: &str,
     observer: &str,
@@ -532,25 +549,22 @@ pub fn lookup_body_position(
             Ok(None)
         };
     };
-    let pos = cache.body_position(target, observer, et);
+    let pos = cache.body_position(normalize_body_name(target), observer, et);
     if pos.is_some() {
         return Ok(pos);
     }
-    if strict() {
-        if !(cache.et_start..=cache.et_end).contains(&et) {
-            return Err(CacheMissError::OutOfRange {
-                et,
-                start: cache.et_start,
-                end: cache.et_end,
-            });
-        }
-        Err(CacheMissError::KeyMiss(format!("({target}, {observer})")))
-    } else {
-        Ok(None)
+    // 缓存已启用但 miss：一律硬失败（不再区分 strict/非 strict）。
+    if !(cache.et_start..=cache.et_end).contains(&et) {
+        return Err(CacheMissError::OutOfRange {
+            et,
+            start: cache.et_start,
+            end: cache.et_end,
+        });
     }
+    Err(CacheMissError::KeyMiss(format!("({target}, {observer})")))
 }
 
-/// strict-aware 查帧旋转矩阵。语义同 `lookup_body_position`。
+/// 查帧旋转矩阵。语义同 `lookup_body_position`。
 pub fn lookup_frame_matrix(
     from: &str,
     to: &str,
@@ -568,18 +582,15 @@ pub fn lookup_frame_matrix(
     if m.is_some() {
         return Ok(m);
     }
-    if strict() {
-        if !(cache.et_start..=cache.et_end).contains(&et) {
-            return Err(CacheMissError::OutOfRange {
-                et,
-                start: cache.et_start,
-                end: cache.et_end,
-            });
-        }
-        Err(CacheMissError::KeyMiss(format!("frame ({from}, {to})")))
-    } else {
-        Ok(None)
+    // 缓存已启用但 miss：一律硬失败（不再区分 strict/非 strict）。
+    if !(cache.et_start..=cache.et_end).contains(&et) {
+        return Err(CacheMissError::OutOfRange {
+            et,
+            start: cache.et_start,
+            end: cache.et_end,
+        });
     }
+    Err(CacheMissError::KeyMiss(format!("frame ({from}, {to})")))
 }
 
 /// strict-aware 查帧 6×6 状态变换矩阵。语义同 `lookup_body_position`。
@@ -600,21 +611,18 @@ pub fn lookup_sxform(
     if m.is_some() {
         return Ok(m);
     }
-    if strict() {
-        if !(cache.et_start..=cache.et_end).contains(&et) {
-            return Err(CacheMissError::OutOfRange {
-                et,
-                start: cache.et_start,
-                end: cache.et_end,
-            });
-        }
-        Err(CacheMissError::KeyMiss(format!("sxform ({from}, {to})")))
-    } else {
-        Ok(None)
+    // 缓存已启用但 miss：一律硬失败（不再区分 strict/非 strict）。
+    if !(cache.et_start..=cache.et_end).contains(&et) {
+        return Err(CacheMissError::OutOfRange {
+            et,
+            start: cache.et_start,
+            end: cache.et_end,
+        });
     }
+    Err(CacheMissError::KeyMiss(format!("sxform ({from}, {to})")))
 }
 
-/// strict-aware 查天体速度。语义同 `lookup_body_position`。
+/// 查天体速度。语义同 `lookup_body_position`。
 pub fn lookup_body_velocity(
     target: &str,
     observer: &str,
@@ -628,22 +636,19 @@ pub fn lookup_body_velocity(
             Ok(None)
         };
     };
-    let vel = cache.body_velocity(target, observer, et);
+    let vel = cache.body_velocity(normalize_body_name(target), observer, et);
     if vel.is_some() {
         return Ok(vel);
     }
-    if strict() {
-        if !(cache.et_start..=cache.et_end).contains(&et) {
-            return Err(CacheMissError::OutOfRange {
-                et,
-                start: cache.et_start,
-                end: cache.et_end,
-            });
-        }
-        Err(CacheMissError::KeyMiss(format!("({target}, {observer})")))
-    } else {
-        Ok(None)
+    // 缓存已启用但 miss：一律硬失败（不再区分 strict/非 strict）。
+    if !(cache.et_start..=cache.et_end).contains(&et) {
+        return Err(CacheMissError::OutOfRange {
+            et,
+            start: cache.et_start,
+            end: cache.et_end,
+        });
     }
+    Err(CacheMissError::KeyMiss(format!("({target}, {observer})")))
 }
 
 #[cfg(test)]

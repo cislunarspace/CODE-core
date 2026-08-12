@@ -190,6 +190,16 @@ fn init_error_handling() {
     }
 }
 
+/// NAIF ID → 名字反查（基于 [`BODY_ALIASES`]）。供星历缓存 key 归一化等场景
+/// （to_rust_spec 把天体名转成 ID 字符串，缓存 enable 侧用名字）。未注册的
+/// ID 返回 `None`。
+pub fn id_to_name(id: SpiceInt) -> Option<&'static str> {
+    BODY_ALIASES
+        .iter()
+        .find(|(_, code)| *code == id)
+        .map(|(name, _)| *name)
+}
+
 /// 在本 CSPICE 实例注册 [`BODY_ALIASES`] 里的行星名别名（等价 Python
 /// spiceypy.boddef）。`boddef_c` 只改名字→ID 映射表，不需要内核加载，
 /// 对同一 (name, id) 重复调用幂等。

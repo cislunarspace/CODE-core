@@ -5,11 +5,12 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NoReturn
 
 import numpy as np
 import numpy.typing as npt
 
+from e2m2e.exceptions import RustExtensionUnavailableError
 from e2m2e.integrators import RkMethod, require_rust_extension
 
 from .physical_model import PhysicalModel
@@ -215,12 +216,32 @@ class ForceModel:
     # 其余力（含 SRP）都有解析或 Rust 内有限差分雅可比。
     _STM_UNSUPPORTED_TYPES = ("RelativisticCorrection", "VariableMassFiniteBurn")
 
+    def _raise_to_rust_spec_none(self, force_name: str) -> NoReturn:
+        """``to_rust_spec`` 返回 None 时按原因分流报错（ADR 0020 决策 4）。
+
+        ``system`` 无 ``spice``（资源缺失，环境没搭好）→
+        :class:`RustExtensionUnavailableError`，措辞含修复指引；
+        ``system`` 有 ``spice`` 但力仍无 Rust 实现（能力缺失，如非 EARTH
+        drag、特定潮汐模式）→ ``NotImplementedError``，措辞指明是模型限制。
+        """
+        if getattr(self.system, "spice", None) is None:
+            raise RustExtensionUnavailableError(
+                f"force {force_name} 需要 SPICE（system.spice 缺失）；请 make setup "
+                "下载内核或加载 .tls + .bsp（资源缺失，非能力限制）。"
+            )
+        raise NotImplementedError(
+            f"force {force_name} 无 Rust 实现（to_rust_spec 返回 None）；"
+            "该力不支持 Rust 编译传播（能力缺失）。"
+        )
+
     def _require_rust_capability(self, *, stm: bool) -> None:
         """校验 Rust 扩展可用且所有启用力模型支持 Rust 编译；不满足即显式报错。
 
         issue #378：核心传播一律走编译 Rust，扩展不可用（抛
         :class:`RustExtensionUnavailableError`）或某 force 无 ``to_rust_spec``
-        （抛 ``NotImplementedError`` 能力错误）时不再静默回退 Python/scipy。
+        （按原因分流：无 spice → ``RustExtensionUnavailableError``；能力缺失
+        → ``NotImplementedError``，ADR 0020 决策 4）时不再静默回退
+        Python/scipy。
 
         Args:
             stm: 目标路径是否含 STM（``propagate_compiled_stm_py``）。
@@ -240,10 +261,7 @@ class ForceModel:
                     "issue #378：不再回退 Python FD 路径。"
                 )
             if force.to_rust_spec(self.system) is None:
-                raise NotImplementedError(
-                    f"force {type(force).__name__}（name={entry.name!r}）不支持 Rust "
-                    "编译传播（to_rust_spec 返回 None）。issue #378：不再静默回退 Python。"
-                )
+                self._raise_to_rust_spec_none(type(force).__name__)
 
     def _propagate_via_rust(
         self,
@@ -269,10 +287,7 @@ class ForceModel:
             spec = entry.force.to_rust_spec(self.system)
             if spec is None:
                 # _require_rust_capability 已过滤，理论不会到这
-                raise RuntimeError(
-                    f"force {entry.force.__class__.__name__} lacks to_rust_spec; "
-                    "should be filtered by _require_rust_capability"
-                )
+                self._raise_to_rust_spec_none(entry.force.__class__.__name__)
             forces_py.append(spec)
 
         observer = getattr(self.system, "origin", "EARTH")
@@ -358,10 +373,7 @@ class ForceModel:
             else:
                 spec = entry.force.to_rust_spec(self.system)
                 if spec is None:
-                    raise NotImplementedError(
-                        f"force {entry.force.__class__.__name__} lacks to_rust_spec; "
-                        "cannot mix with VariableMassFiniteBurn on the Rust path"
-                    )
+                    self._raise_to_rust_spec_none(entry.force.__class__.__name__)
                 forces_py.append(spec)
 
         if thrust_spec is None:
@@ -426,10 +438,7 @@ class ForceModel:
                 continue
             spec = entry.force.to_rust_spec(self.system)
             if spec is None:
-                raise RuntimeError(
-                    f"force {entry.force.__class__.__name__} lacks to_rust_spec; "
-                    "should be filtered by _require_rust_capability"
-                )
+                self._raise_to_rust_spec_none(entry.force.__class__.__name__)
             forces_py.append(spec)
 
         observer = getattr(self.system, "origin", "EARTH")

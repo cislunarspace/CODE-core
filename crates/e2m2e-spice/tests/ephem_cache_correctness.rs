@@ -353,3 +353,31 @@ fn test_cache_miss_returns_none() {
     assert!(result.is_ok());
     assert!(result.unwrap().is_none());
 }
+
+#[test]
+fn test_enabled_cache_miss_is_error() {
+    // ADR 0020 决策 4：enable_ephem_cache 显式开启后，miss（区间外/缺 target）
+    // 一律报错，不再静默回退 cspice；未启用缓存才返回 Ok(None)（合法回退）。
+    let _guard = lock();
+    disable();
+
+    let t_grid: Vec<f64> = (0..20).map(|i| i as f64 * 0.3).collect();
+    let pos_fn = |t: f64| -> [f64; 3] { [t.sin(), t.cos(), t.powi(2)] };
+    let vel_fn = |t: f64| -> [f64; 3] { [t.cos(), -t.sin(), 2.0 * t] };
+    let cache = build_body_cache(&t_grid, "ND", &pos_fn, &vel_fn);
+    enable(cache);
+
+    // 区间外 miss → Err
+    let err = lookup_body_position("ND", "ORIGIN", 100.0);
+    assert!(err.is_err(), "启用缓存后区间外 miss 应报错");
+
+    // 缺 target miss → Err
+    let err = lookup_body_position("MOON", "ORIGIN", 1.0);
+    assert!(err.is_err(), "启用缓存后缺 target miss 应报错");
+
+    // 命中仍正常
+    let hit = lookup_body_position("ND", "ORIGIN", 0.3);
+    assert!(hit.unwrap().is_some());
+
+    disable();
+}

@@ -126,11 +126,13 @@ class TransferSearch:
         return self
 
     def set_parallel_backend(self, backend: str) -> TransferSearch:
-        """设置并行后端：``rust``（有 Rust 扩展时的默认）、``processes`` 或 ``threads``。
+        """设置并行后端：``rust``（默认）、``processes`` 或 ``threads``。
 
-        构造后默认由 :func:`_default_parallel_backend` 决定（扩展已构建 → ``rust``，
-        否则 ``processes``）。``rust`` 走 Rust+Rayon 内核（几何方法被 monkeypatch
-        或扩展异常时自动回退 ``processes``）。``processes``/``threads`` 行为不变。
+        默认恒为 ``rust``（:func:`_default_parallel_backend` 固定返回）：
+        Rust 扩展缺失时在使用处直接报错（issue #378，不静默回退
+        ``processes``）。``rust`` 走 Rust+Rayon 内核；几何方法被 monkeypatch
+        （测试注入缝）时回退 Python 路径，生产路径不触发。
+        ``processes``/``threads`` 行为不变。
         """
         b = backend.strip().lower()
         if b not in ("processes", "threads", "rust"):

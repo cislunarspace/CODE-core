@@ -96,3 +96,9 @@ ADR 0013 要求"按定义完成任务"——测试断言来自解析解和物理
 2. **三次样条精度测试**：对已知解析轨迹（如二体圆轨道），断言样条插值与解析值的误差在容差内。这是"按定义"——插值精度由数学定义裁决。
 3. **strict 模式行为测试**：断言 strict 下 miss 返回 `Err`、非 strict 下返回 `Ok(None)`。这是接口契约测试。
 4. **并行/串行一致性**：`E2M2E_MS_PARALLEL=0` 用于开发期验证并行与串行位级一致，是回归测试手段，不依赖外部软件。
+
+## 修订（2026-08-12，ADR 0020 决策 4）
+
+**缓存 miss 语义：enable 后即硬失败**。`enable_ephem_cache` 显式开启后，miss（查询时刻超出预采样区间 / target/observer 或 frame 对不在预采样列表）一律返回 `Err`，不再区分 strict/非 strict——"enable 是用户要求缓存的信号，enable 后 miss 就是错误"，不静默回退 cspice FFI（并行区内核池损坏风险）。
+
+**未启用缓存不是 miss**：全局缓存为 `None` 时 `lookup_*` 返回 `Ok(None)`，调用方回退 cspice（用户未要求缓存，合法路径）。`StrictGuard`（RAII，打靶并行区开启）保留为并行区额外保险：作用域内即使未启用缓存也硬失败，保证并行区零 cspice。原"非 strict 模式 miss 返回 `Ok(None)`"的行为仅剩"未启用缓存"一档。

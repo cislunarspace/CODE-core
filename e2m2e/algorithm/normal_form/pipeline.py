@@ -124,12 +124,13 @@ class NormalFormPipeline:
         catalog_transformer: LibrationCatalogTransformer | None = None
 
         # —— 步骤 1：动力学替代 ——
+        # ``spice_optional`` 用 DynamicalSubstituteCorrector 默认值 False：
+        # SPICE 不可用即抛（ADR 0020 决策 4，不隐式降级纯 CR3BP）。
         ds_kwargs: dict[str, Any] = {
             "t_total": DEFAULT_TOTAL_TU,
             "node_step": DEFAULT_NODE_STEP,
             "dense_step": DEFAULT_DENSE_STEP,
             "tolerance": DEFAULT_TOLERANCE,
-            "spice_optional": True,
         }
         ds_kwargs.update(self.dynamical_kwargs)
         try:
@@ -140,13 +141,16 @@ class NormalFormPipeline:
 
         # —— 步骤 2：quasi-Floquet ——
         try:
-            # CR3BP 降级路径：M(t) 常数，QF 变换退化为常数实标准形变换
-            # （method="constant"），B=V 不随 e^{λt} 增长；用户显式指定
-            # 的 multipoint/matrix 在长窗口下系数随窗口变化，短窗口 FFT
-            # 求解器有系统偏差（见 quasi_floquet 模块 docstring）。
             qf_method = self.quasi_floquet_method
-            if not ds_result.spice_available and qf_method not in ("constant",):
-                qf_method = "constant"
+            # CR3BP 降级路径（SPICE 不可用、动力学替代显式选了纯 CR3BP）下
+            # M(t) 是常数矩阵，QF 必须用 constant 方法（矩阵法在长窗口下
+            # 系数随窗口变化、短窗口 FFT 有系统偏差）。不静默改 method——
+            # 不匹配即报错，由调用方显式选择（ADR 0020 决策 4）。
+            if not ds_result.spice_available and qf_method != "constant":
+                raise RuntimeError(
+                    "SPICE 不可用（动力学替代已降级纯 CR3BP）时 quasi-Floquet 必须用 "
+                    "method='constant'（M(t) 常数矩阵）；请显式指定或加载 SPICE 内核。"
+                )
             qf_reducer = QuasiFloquetReducer(
                 context=self.context, method=qf_method, segment=self.qf_segment
             )

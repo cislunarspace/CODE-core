@@ -19,6 +19,7 @@ class _FakeSystem:
     def __init__(self, has_coordinate_system=True):
         self.coordinate_system = object() if has_coordinate_system else None
         self.origin = "EARTH"
+        self.spice = object()  # 模拟有 SPICE：力无 Rust spec 属能力缺失
 
     @property
     def frame(self):
@@ -127,7 +128,7 @@ def test_disabled_force_skipped_but_kept_in_forces():
     assert len(fm.forces) == 2
     assert len(fm.list_forces()) == 2
     # 禁用无 Rust spec 的力后，传播不再因它报能力错误；剩下的 b 仍报错
-    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+    with pytest.raises(NotImplementedError, match="无 Rust 实现"):
         fm.propagate(np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), (0.0, 1.0))
 
 

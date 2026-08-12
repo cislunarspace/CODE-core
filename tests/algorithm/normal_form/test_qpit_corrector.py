@@ -40,6 +40,8 @@ def nf_result_and_context(earth_moon_system):
     )
     pipeline = NormalFormPipeline(
         context=context,
+        # CR3BP 归一化模型（无 SPICE 内核池）下 QF 须用 constant 方法。
+        quasi_floquet_method="constant",
         center_max_order=5,
         center_steps=("invariant", "center"),
         dynamical_kwargs={
@@ -49,6 +51,9 @@ def nf_result_and_context(earth_moon_system):
             "max_iter": 3,
             "tolerance": 1e-6,
             "prefer": "fft",
+            # 本切片用 CR3BP 归一化模型（不加载 SPICE 内核池），显式声明
+            # 允许降级（ADR 0020 决策 4：显式选择，非隐式）。
+            "spice_optional": True,
         },
     )
     with warnings.catch_warnings():

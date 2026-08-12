@@ -77,7 +77,7 @@ def test_transfer_dispatches_to_copt_when_enabled(dynamics, dummy_orbit):
 
     assert result is expected_result
     mock_copt.assert_called_once()
-    assert mock_copt.call_args.kwargs["fallback_to_scipy"] is True
+    assert mock_copt.call_args.kwargs["fallback_to_scipy"] is False
     instance.optimize.assert_not_called()
 
 
@@ -122,3 +122,23 @@ def test_transfer_uses_config_to_initialize_optimizer(dynamics, dummy_orbit):
     assert "t_ins_range" not in call_kwargs
     assert "use_relaxed_velocity_constraint" not in call_kwargs
     assert "velocity_angle_constraint" not in call_kwargs
+
+
+def test_transfer_raises_when_copt_unavailable_but_requested(dynamics, dummy_orbit):
+    """nlp_use_copt=True 但 coptpy 未安装（_HAVE_COPT=False）时显式报错，
+    不静默回退 SciPy（ADR 0020 决策 4）。"""
+    transfer = Transfer(dynamics).set_orbit(dummy_orbit, dummy_orbit)
+    transfer.config.nlp_use_copt = True
+
+    with (
+        patch("e2m2e.algorithm.transfer.transfer.DROTRONLPOptimizer") as MockOptimizer,
+        patch("e2m2e.algorithm.transfer.transfer._HAVE_COPT", False),
+    ):
+        instance = MockOptimizer.return_value
+        with pytest.raises(RuntimeError, match="coptpy"):
+            transfer.optimize(
+                initial_guess={"alpha": 1.0, "transfer_time": 10.0, "t_ins": 5.0},
+                alpha_range=(0.5, 2.5),
+                t_ins_range=(0.0, 10.0),
+            )
+    instance.optimize.assert_not_called()

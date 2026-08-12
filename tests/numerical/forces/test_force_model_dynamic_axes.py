@@ -52,6 +52,7 @@ class _FakeSystemWithDynamicAxes:
     def __init__(self, axes: _MockDynamicAxes) -> None:
         origin = _FixedOrigin()
         self.coordinate_system = CoordinateSystem(axes, origin)
+        self.spice = object()  # 模拟有 SPICE：力无 Rust spec 属能力缺失
         self._update_calls: list[tuple[float, np.ndarray]] = []
 
     def update_coordinate_systems(self, t: float, state: np.ndarray) -> None:
@@ -84,6 +85,7 @@ class _FakeSystemNoUpdate:
         origin = _FixedOrigin()
         axes = _FixedAxes()
         self.coordinate_system = CoordinateSystem(axes, origin)
+        self.spice = object()  # 模拟有 SPICE：力无 Rust spec 属能力缺失
 
     @property
     def frame(self):
@@ -121,7 +123,7 @@ def test_propagate_calls_update_before_loop_and_each_step():
     fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, 0.0])])
 
     y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+    with pytest.raises(NotImplementedError, match="无 Rust 实现"):
         fm.propagate(y0, (0.0, 10.0), t_eval=np.linspace(0.0, 10.0, 3))
 
     # 未进入传播循环，不应有坐标系更新调用
@@ -134,7 +136,7 @@ def test_propagate_compatible_with_old_system_without_update():
     fm = ForceModel(system, forces=[ConstantForce([0.0, 0.0, 0.0])])
 
     y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+    with pytest.raises(NotImplementedError, match="无 Rust 实现"):
         fm.propagate(y0, (0.0, 1.0), t_eval=np.linspace(0.0, 1.0, 3))
 
 

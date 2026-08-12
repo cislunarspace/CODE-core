@@ -68,7 +68,9 @@ def fast_pipeline(l1_context) -> NormalFormPipeline:
     """
     return NormalFormPipeline(
         context=l1_context,
-        quasi_floquet_method="matrix",
+        # CR3BP 归一化模型（无 SPICE 内核池）下 QF 须用 constant 方法
+        # （M(t) 常数矩阵；ADR 0020 决策 4 显式选择，不静默降）。
+        quasi_floquet_method="constant",
         center_max_order=5,
         center_steps=("invariant", "center"),
         dynamical_kwargs={
@@ -78,6 +80,9 @@ def fast_pipeline(l1_context) -> NormalFormPipeline:
             "max_iter": 3,
             "tolerance": 1e-6,
             "prefer": "fft",
+            # 本切片用 CR3BP 归一化模型（不加载 SPICE 内核池），显式声明
+            # 允许降级（ADR 0020 决策 4：显式选择，非隐式）。
+            "spice_optional": True,
         },
     )
 
@@ -229,6 +234,8 @@ def test_failure_records_completed_subresults(l1_context, monkeypatch):
             "max_iter": 2,
             "tolerance": 1e-6,
             "prefer": "fft",
+            # 显式声明 CR3BP 模型（本测试测失败路径编排，不测 SPICE）。
+            "spice_optional": True,
         },
     )
     x0 = np.array([1e-3, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -258,7 +265,7 @@ def test_metadata_records_pipeline_config(fast_pipeline):
         warnings.simplefilter("ignore")
         result = fast_pipeline.reduce(x0)
 
-    assert result.metadata["quasi_floquet_method"] == "matrix"
+    assert result.metadata["quasi_floquet_method"] == "constant"
     assert result.metadata["center_max_order"] == 5
     assert result.metadata["center_steps"] == ("invariant", "center")
     assert "qf_symplectic_error" in result.metadata
