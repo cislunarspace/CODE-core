@@ -75,3 +75,39 @@ def test_rust_query_no_kernel_clear_error():
     assert "无内核加载" in output, f"错误信息应含'无内核加载'，实际: {output!r}"
     # 不含裸 CSPICE 内部错误码（ADR 0020：项目语境错误优先于内部码翻译）
     assert "SPKINSUFFDATA" not in output, f"不应含裸 CSPICE 码，实际: {output!r}"
+
+
+def test_unload_kernel_removes_rust_kernel(spice_kernel_path):
+    """SPICEManager.unload_kernel 应对称卸载 Rust 侧内核（issue #387）。
+
+    load_kernel 双 furnsh（Python + Rust 双侧，见 #357），unload_kernel 也须
+    双侧卸载：否则 Rust cspice 内核池残留已卸载文件，测试结果依赖同进程
+    执行顺序（先跑过加载内核的测试会让后续测试的 Rust 查询侥幸成功）。
+    用子进程隔离 Rust 全局状态，验证 unload 后 Rust 侧 spkezr 报"无内核加载"。
+    """
+    code = (
+        "from e2m2e.integrators import spice_spkezr\n"
+        "from e2m2e.data.kernels.manager import SPICEManager\n"
+        f"K = {spice_kernel_path!r}\n"
+        "m = SPICEManager()\n"
+        "m.load_kernel(K)\n"
+        "try:\n"
+        "    spice_spkezr('399', 0.0, 'J2000', 'NONE', '10')\n"
+        "    print('LOADED_OK')\n"
+        "except RuntimeError:\n"
+        "    print('LOADED_FAIL')\n"
+        "m.unload_kernel(K)\n"
+        "try:\n"
+        "    spice_spkezr('399', 0.0, 'J2000', 'NONE', '10')\n"
+        "    print('UNLOADED_STILL_OK')\n"
+        "except RuntimeError as e:\n"
+        "    print('UNLOADED_FAIL', str(e))\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=False
+    )
+    output = result.stdout + result.stderr
+    assert "LOADED_OK" in output, f"load 后 Rust 侧应可查询，实际: {output!r}"
+    assert "UNLOADED_FAIL" in output, f"unload 后 Rust 侧应无内核，实际: {output!r}"
+    assert "UNLOADED_STILL_OK" not in output, f"Rust 侧应已卸载，实际: {output!r}"
+    assert "无内核加载" in output, f"错误信息应含'无内核加载'，实际: {output!r}"
