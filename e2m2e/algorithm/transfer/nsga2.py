@@ -84,7 +84,7 @@ def nsga2(
     Args:
         objectives: 目标函数，签名 ``fn(x) -> (objectives, violation)``。
             ``objectives`` 形状 ``(n_obj,)``，全部最小化；``violation >= 0``，
-            0 表示可行。必须是**模块级可 pickle 函数**（并行评估要求）。
+            0 表示可行。必须是**模块级可 pickle 函数** （并行评估要求）。
         bounds: 决策变量边界 ``[(lo, hi), ...]``，长度 = n_dim。
         pop_size: 种群规模。
         n_gen: 进化代数。
@@ -98,7 +98,7 @@ def nsga2(
         verbose: 每代打印进度。
 
     Returns:
-        :class:`NSGA2Result`（Pareto 前沿 + 诊断信息）。
+        :class:`NSGA2Result` （Pareto 前沿 + 诊断信息）。
 
     Raises:
         ValueError: bounds 为空、pop_size < 4、目标函数返回长度不一致。

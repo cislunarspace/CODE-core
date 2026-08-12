@@ -232,7 +232,7 @@ fn multistep_step(
 
 /// 执行一次 Cowell (Störmer-Cowell) 8 阶单步，用于 x'' = a(t, x)。
 ///
-/// `history` = `[x_{n−1}, x_n, a_{n−7}, ..., a_n]`（10 个向量：2 个位置采样
+/// `history` = `[x_{n−1}, x_n, a_{n−7}, ..., a_n]` （10 个向量：2 个位置采样
 /// + 8 个加速度采样，由旧到新）。`accel` 计算 a(t, x)。
 /// 输出仅含位置。固定步长；改变 `h` 需重新初始化历史缓冲。
 #[pyfunction]
@@ -316,15 +316,15 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///
 /// # 版本沿革（issue #317 第 3.3 项）
 ///
-/// abi-version 只在**新增/改 pyfunction 边界**时 bump（Rust 内部函数签名
+/// abi-version 只在**新增/改 pyfunction 边界** 时 bump（Rust 内部函数签名
 /// 变更不 bump——它们不是 Python 可见的 ABI）。每次 bump 须在本节补行：
 ///
-/// - **v1**（#300，5b616cc）：初始 ABI 版本戳 + 统一网关 ``_check_rust_abi``。
-/// - **v2**（3b28353）：新增 ``propagate_with_state_py``（EphemerisDynamics
+/// - **v1** （#300，5b616cc）：初始 ABI 版本戳 + 统一网关 ``_check_rust_abi``。
+/// - **v2** （3b28353）：新增 ``propagate_with_state_py`` （EphemerisDynamics
 ///   纯状态 Rust 路径）。
-/// - **v3**（ff63403）：新增 ``transfer_grid_search_serial_py`` +
+/// - **v3** （ff63403）：新增 ``transfer_grid_search_serial_py`` +
 ///   ``TransferPointResult`` pyclass（转移网格搜索串行评估）。
-/// - **v4**（#334）：新增 ``spice_spkezr`` + ``spice_pxform``（Rust CSPICE
+/// - **v4** （#334）：新增 ``spice_spkezr`` + ``spice_pxform`` （Rust CSPICE
 ///   实例诊断查询 API）。
 /// - **v5**：多重与分段打靶结果将公开 ``converged`` 替换为
 ///   ``status`` / ``cause`` / ``message`` 三元组。
@@ -435,17 +435,19 @@ pub fn solve_ivp_py(
 /// 事件检测在 Rust 积分内循环完成：每个接受步的端点评估事件函数，
 /// 符号变化（经 direction 过滤）时在步内对线性插值态二分求精（无稠密输出）。
 ///
-/// # 参数
-/// - `events`: `[(callable, terminal, direction), ...]`，callable 为
-///   `g(t, y) -> float`；`terminal=True` 触发即停；`direction` > 0 只记
-///   上行穿越、< 0 只记下行、0 双向（scipy `solve_ivp` 语义）
-/// - `method`: RK 方法（默认 `Pd78`，即 DOP853）
-/// - 其余参数同 `solve_ivp_py`
+/// **参数**
 ///
-/// # 返回
-/// Python dict：`{"states", "time", "n_steps", "t_events", "y_events",
-/// "terminal_event"}`；terminal 截断时 `time`/`states` 末点为求精后的
-/// 事件点，`terminal_event` 为触发终止的事件索引（未终止为 None）。
+/// - ``events``: ``[(callable, terminal, direction), ...]``，callable 为
+///   ``g(t, y) -> float``；``terminal=True`` 触发即停；``direction`` > 0 只记
+///   上行穿越、< 0 只记下行、0 双向（scipy ``solve_ivp`` 语义）
+/// - ``method``: RK 方法（默认 ``Pd78``，即 DOP853）
+/// - 其余参数同 ``solve_ivp_py``
+///
+/// **返回**
+///
+/// Python dict：``{"states", "time", "n_steps", "t_events", "y_events", "terminal_event"}``；
+/// terminal 截断时 ``time``/``states`` 末点为求精后的事件点，
+/// ``terminal_event`` 为触发终止的事件索引（未终止为 None）。
 #[pyfunction]
 #[pyo3(signature = (t_span, y0, t_eval, rtol, atol, f, events, method=None, max_step=None, max_steps=None, state_error_dim=None))]
 #[allow(clippy::too_many_arguments)]
@@ -574,15 +576,17 @@ fn spherical_harmonic_accel(
 /// Python 侧 `earth_tide.solid_tide_step1` 的 Rust 加速版。输入扰动体位置由
 /// Python 完成坐标变换后传入（本函数不查 SPICE）。
 ///
-/// # 参数
-/// - `perturbers_flat`：扁平化扰动体列表，每 4 个一组 `[px, py, pz, gm]`（位置 km、
-///   gm km³/s²）。长度必须是 4 的倍数。
-/// - `k_love_flat`：Love 数表 5×5 行优先扁平化，长度 25。
-/// - `k_plus_flat`：弹性 Love 数 5 元素，或 `None`（无贡献）。
-/// - `mu_central`、`r_central`：中心天体 GM 与参考半径。
+/// **参数**
 ///
-/// # 返回
-/// 长度 50 的 `Vec<f64>`：`C(25) ++ S(25)`，各为 5×5 行优先扁平化。
+/// - ``perturbers_flat``：扁平化扰动体列表，每 4 个一组 ``[px, py, pz, gm]`` （位置 km、
+///   gm km³/s²）。长度必须是 4 的倍数。
+/// - ``k_love_flat``：Love 数表 5×5 行优先扁平化，长度 25。
+/// - ``k_plus_flat``：弹性 Love 数 5 元素，或 ``None`` （无贡献）。
+/// - ``mu_central``、``r_central``：中心天体 GM 与参考半径。
+///
+/// **返回**
+///
+/// 长度 50 的 ``Vec<f64>``：``C(25) ++ S(25)``，各为 5×5 行优先扁平化。
 #[pyfunction]
 fn solid_tide_step1(
     perturbers_flat: Vec<f64>,
@@ -621,13 +625,13 @@ fn solid_tide_step1(
     ))
 }
 
-/// 固体潮 Step 2（频率相关，地球专用）。返回长度 50 的 `Vec<f64>`（C25 + S25）。
+/// 固体潮 Step 2（频率相关，地球专用）。返回长度 50 的 ``Vec<f64>`` （C25 + S25）。
 #[pyfunction]
 fn solid_tide_step2(et: f64) -> PyResult<Vec<f64>> {
     Ok(e2m2e_forces::solid_tide::solid_tide_step2(et))
 }
 
-/// 极潮（固体极潮 + 海洋极潮，IERS TN32）。返回长度 50 的 `Vec<f64>`（C25 + S25）。
+/// 极潮（固体极潮 + 海洋极潮，IERS TN32）。返回长度 50 的 ``Vec<f64>`` （C25 + S25）。
 #[pyfunction]
 fn pole_tide(et: f64, xp: f64, yp: f64) -> PyResult<Vec<f64>> {
     Ok(e2m2e_forces::solid_tide::pole_tide(et, xp, yp))
@@ -671,7 +675,7 @@ fn ensure_bodies_registered() {
 
 /// 在 Rust cspice 内核池加载一个内核文件。
 ///
-/// Rust cspice 与 Python spiceypy 是**独立的 CSPICE 实例**（静态链接，全局状态
+/// Rust cspice 与 Python spiceypy 是**独立的 CSPICE 实例** （静态链接，全局状态
 /// 不共享）。Python 侧 furnsh 的内核，Rust 看不见；反之亦然。要让 Rust 查询
 /// 可用，必须用本函数在 Rust 侧再 furnsh 一次（同一份文件，两边独立加载）。
 ///
@@ -1153,10 +1157,10 @@ pub(crate) fn parse_force_tuple(
 }
 
 /// `propagate_compiled` 主循环（释 GIL 段）的输出：time / states / 步数统计。
-/// 独立成 type alias 修 clippy `type_complexity`（与 `AccelJacobiResult` 同法）。
+/// 独立成 type alias 修 clippy `type_complexity` （与 `AccelJacobiResult` 同法）。
 ///
 /// 与唯一使用者 `propagate_compiled` 同步 cfg：无 spice feature 时该函数被
-/// 编译期剔除，alias 须一并剔除，否则 `cargo clippy --workspace`（默认无 spice）
+/// 编译期剔除，alias 须一并剔除，否则 `cargo clippy --workspace` （默认无 spice）
 /// 报 dead_code（#318 CI）。
 #[cfg(feature = "spice")]
 type CompiledPropResult = (Vec<f64>, Vec<Vec<f64>>, usize, usize, usize);
@@ -1511,27 +1515,28 @@ fn propagate_compiled_lowthrust(
 
 /// 7D 可变质量低推力 + 灵敏度传播（64D 增广状态）。
 ///
-/// 在 `propagate_compiled_lowthrust`（7D 受控）基础上，同时积分：
+/// 在 ``propagate_compiled_lowthrust`` （7D 受控）基础上，同时积分：
 /// - Φ（6×6 状态对初值 STM，链式接龙用）
 /// - S（7×3 状态对控制参数 (throttle, θ₁, θ₂) 的灵敏度）
 ///
 /// 一次传播同时产出末端状态、STM、灵敏度，供低推力求解器组装解析雅可比
-/// （替代 SLSQP 数值差分）。详见 `docs/plans/lowthrust-analytic-jacobian-prd.md`。
+/// （替代 SLSQP 数值差分）。详见 ``docs/plans/lowthrust-analytic-jacobian-prd.md``。
 ///
-/// # 参数
-/// - `method`: RK 方法
-/// - `t0`: 起始时刻（SPICE et 秒）
-/// - `y0`: 初始状态，长度 7
-/// - `h_init`, `tol`: 步长控制
-/// - `t_eval`: 评估时刻数组（取首末两点即可）
-/// - `observer`: 传播系 origin
-/// - `forces_py`: 非推力 force 元组列表
-/// - `thrust_spec`: `(t_max, isp, throttle, θ₁, θ₂)`
-/// - `max_steps`: 最大步数
+/// **参数**
 ///
-/// # 返回
-/// Python dict：`{"time": [...], "states": [[7]], "stm": [[36]], "sensitivity": [[21]],
-///               "n_steps": int, "n_rejected": int}`（均为末端时刻的值序列）
+/// - ``method``: RK 方法
+/// - ``t0``: 起始时刻（SPICE et 秒）
+/// - ``y0``: 初始状态，长度 7
+/// - ``h_init``, ``tol``: 步长控制
+/// - ``t_eval``: 评估时刻数组（取首末两点即可）
+/// - ``observer``: 传播系 origin
+/// - ``forces_py``: 非推力 force 元组列表
+/// - ``thrust_spec``: ``(t_max, isp, throttle, θ₁, θ₂)``
+/// - ``max_steps``: 最大步数
+///
+/// **返回**
+///
+/// Python dict：``{"time": [...], "states": [[7]], "stm": [[36]], "sensitivity": [[21]], "n_steps": int, "n_rejected": int}`` （均为末端时刻的值序列）
 #[cfg(feature = "spice")]
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
@@ -1714,21 +1719,23 @@ fn propagate_compiled_lowthrust_sensitivity(
 /// Python 接口：42 维增广状态传播（状态 + STM）。
 ///
 /// 纯 N 体模型（EARTH/MOON/SUN 等），用于星历修正的逐段积分。
-/// 调用 `e2m2e-forces` 的 `propagate_with_stm`（DOP853 + STM 变分方程）。
+/// 调用 ``e2m2e-forces`` 的 ``propagate_with_stm`` （DOP853 + STM 变分方程）。
 ///
-/// # 参数
-/// - `bodies`: 天体名称列表（如 `["EARTH", "MOON", "SUN"]`）
-/// - `origin`: 原点天体名称（如 `"EARTH"`）
-/// - `gm_values`: 各天体的 GM（km³/s²），与 `bodies` 一一对应
-/// - `t_span`: `(t_start, t_end)` 积分区间（SPICE et 秒）
-/// - `t_eval`: 输出时间点数组
-/// - `initial_state`: 初始状态 `[x, y, z, vx, vy, vz]`（km, km/s）
-/// - `rtol`, `atol`: 积分容差
-/// - `max_step`: 最大步长（秒），`None` 则不限制
-/// - `max_steps`: 最大步数，`None` 则用默认上限
+/// **参数**
 ///
-/// # 返回
-/// Python dict：`{"states": [[6], ...], "stm": [[36], ...], "time": [...]}`
+/// - ``bodies``: 天体名称列表（如 ``["EARTH", "MOON", "SUN"]``）
+/// - ``origin``: 原点天体名称（如 ``"EARTH"``）
+/// - ``gm_values``: 各天体的 GM（km³/s²），与 ``bodies`` 一一对应
+/// - ``t_span``: ``(t_start, t_end)`` 积分区间（SPICE et 秒）
+/// - ``t_eval``: 输出时间点数组
+/// - ``initial_state``: 初始状态 ``[x, y, z, vx, vy, vz]`` （km, km/s）
+/// - ``rtol``, ``atol``: 积分容差
+/// - ``max_step``: 最大步长（秒），``None`` 则不限制
+/// - ``max_steps``: 最大步数，``None`` 则用默认上限
+///
+/// **返回**
+///
+/// Python dict：``{"states": [[6], ...], "stm": [[36], ...], "time": [...]}``
 #[cfg(feature = "spice")]
 #[pyfunction]
 #[pyo3(signature = (bodies, origin, gm_values, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None))]
@@ -1867,23 +1874,24 @@ fn propagate_with_state_py(
 
 /// 编译型力模型 + STM 的 PD45 传播（消除 cspice 隔离）。
 ///
-/// 与 `propagate_with_stm_py`（纯 NBody）不同，本函数支持所有编译型力模型：
+/// 与 ``propagate_with_stm_py`` （纯 NBody）不同，本函数支持所有编译型力模型：
 /// PointMass、GravityField、ThirdBody、IndirectTerm、SRP、Relativistic。
 /// 使用 integrators crate 的 cspice 实例，避免跨 .so 内核池隔离问题。
 ///
-/// # 参数
-/// - `observer`: 传播系 origin 天体名（如 "EARTH"）
-/// - `forces_py`: force 元组列表（格式同 `propagate_compiled`）
-/// - `t_span`: `(t_start, t_end)` 积分区间（SPICE et 秒）
-/// - `t_eval`: 输出时间点数组
-/// - `initial_state`: 初始状态 `[x, y, z, vx, vy, vz]`（km, km/s）
-/// - `rtol`, `atol`: 积分容差
-/// - `max_step`: 最大步长（秒），`None` 则不限制
-/// - `max_steps`: 最大步数，`None` 则用默认上限
+/// **参数**
 ///
-/// # 返回
-/// Python dict：`{"states": [[6], ...], "stm": [[36], ...], "time": [...],
-///                "n_steps": int, "n_rejected": int}`
+/// - ``observer``: 传播系 origin 天体名（如 "EARTH"）
+/// - ``forces_py``: force 元组列表（格式同 ``propagate_compiled``）
+/// - ``t_span``: ``(t_start, t_end)`` 积分区间（SPICE et 秒）
+/// - ``t_eval``: 输出时间点数组
+/// - ``initial_state``: 初始状态 ``[x, y, z, vx, vy, vz]`` （km, km/s）
+/// - ``rtol``, ``atol``: 积分容差
+/// - ``max_step``: 最大步长（秒），``None`` 则不限制
+/// - ``max_steps``: 最大步数，``None`` 则用默认上限
+///
+/// **返回**
+///
+/// Python dict：``{"states": [[6], ...], "stm": [[36], ...], "time": [...], "n_steps": int, "n_rejected": int}``
 #[cfg(feature = "spice")]
 #[pyfunction]
 #[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None, method=RkMethod::Pd78))]
@@ -1947,9 +1955,9 @@ fn propagate_compiled_stm_py(
 ///
 /// 步长塌缩（``StepCollapsed``）→ ``e2m2e.exceptions.PropagationFailure``
 /// （``E2M2EError`` 子类）；其他传播错误（``Other``）→ ``RuntimeError``。
-/// 两者消息前缀都加 ``prefix``（形如 "CR3BP propagation failed: ..."）。
-/// Python 侧据此按**类型**捕获，不再依赖错误消息字符串前缀匹配——改 Rust
-/// 措辞不影响 ``except PropagationFailure``（ADR 0020 决策 2）。
+/// 两者消息前缀都加 ``prefix`` （形如 "CR3BP propagation failed: ..."）。
+/// Python 侧据此按**类型** 捕获，不再依赖错误消息字符串前缀匹配——改 Rust
+/// 措辞不影响 ``except PropagationFailure`` （ADR 0020 决策 2）。
 ///
 /// 若 ``e2m2e.exceptions`` 不可导入（环境异常，正常不会发生），退化为
 /// ``RuntimeError``，保证失败不至因构造异常本身而丢失。
@@ -2330,7 +2338,7 @@ fn lambert_izzo_py(
 /// N×M 网格批量 Lambert 求解（porkchop 用）的 Python 接口。
 ///
 /// # 参数
-/// - `geometries`：几何列表，每项 `[r0x, r0y, r0z, rfx, rfy, rfz]`（km）
+/// - `geometries`：几何列表，每项 `[r0x, r0y, r0z, rfx, rfy, rfz]` （km）
 /// - `tofs`：飞行时间列表（s），对每个几何都求解一遍
 /// - `mu`/`long_way`/`revs`：同 `lambert_izzo_py`
 ///
@@ -2397,7 +2405,7 @@ fn require_states6(name: &str, states: &[f64]) -> PyResult<()> {
 
 /// 转移搜索几何核：轨迹每步到目标轨道采样点集合的最近距离与索引。
 ///
-/// 移植自 `search_geometry.compute_distance_series`（纯数学，非 SPICE 门控）。
+/// 移植自 `search_geometry.compute_distance_series` （纯数学，非 SPICE 门控）。
 /// `traj_states`/`orbit_states` 为 n×6 行优先展平，只用前 3 维位置；n_traj×n_orbit
 /// 超过 1e7 时内部分块（与 numpy 同阈值）。argmin 取首个（numpy 约定）。
 ///
@@ -2612,26 +2620,27 @@ fn spawn_progress_drainer(
 
 /// Python 接口：转移网格搜索（串行版，阶段 B）。
 ///
-/// 展平 POD 输入，调纯 Rust
-/// [`e2m2e_forces::transfer_grid_search::transfer_grid_search_serial`]，
-/// 返回 `Vec<TransferPointResult>`（保序：外层 departure、内层 alpha）。
-/// 串行不用 Rayon，但传入 `progress_callback` 时仍走 `py.allow_threads`
+/// 展平 POD 输入，调纯 Rust ``transfer_grid_search_serial``，
+/// 返回 ``Vec<TransferPointResult>`` （保序：外层 departure、内层 alpha）。
+/// 串行不用 Rayon，但传入 ``progress_callback`` 时仍走 ``py.allow_threads``
 /// 释放 GIL——否则 drainer 线程拿不到 GIL，回调退化为 compute 结束后批量触发。
 ///
-/// # 参数
-/// - `dep_states`: `n_dep*6` 展平（行优先）
-/// - `dep_times`: `n_dep`
-/// - `alpha_grid`: `n_alpha`
-/// - `arrival_states`: `n_arrival*6` 展平（行优先）
-/// - 标量包：`mu` / `max_transfer_time` / `integration_dt` /
-///   `intersection_threshold` / `min_distance_threshold` /
-///   `collision_earth_radius` / `collision_moon_radius` / `rtol` / `atol` / `max_step`
-/// - `progress_callback`（关键字）：`cb(delta: int) -> None`，每个 departure 完成
-///   调一次（出发粒度）；`None` 不回调。
+/// **参数**
 ///
-/// # 返回
-/// `list[TransferPointResult]`，长度 `n_dep * n_alpha`。Python 侧
-/// `grid_search_rust_serial` 转 `list[dict]`。
+/// - ``dep_states``: ``n_dep*6`` 展平（行优先）
+/// - ``dep_times``: ``n_dep``
+/// - ``alpha_grid``: ``n_alpha``
+/// - ``arrival_states``: ``n_arrival*6`` 展平（行优先）
+/// - 标量包：``mu`` / ``max_transfer_time`` / ``integration_dt`` / ``intersection_threshold`` /
+///   ``min_distance_threshold`` / ``collision_earth_radius`` / ``collision_moon_radius`` /
+///   ``rtol`` / ``atol`` / ``max_step``
+/// - ``progress_callback`` （关键字）：``cb(delta: int) -> None``，每个 departure 完成
+///   调一次（出发粒度）；``None`` 不回调。
+///
+/// **返回**
+///
+/// ``list[TransferPointResult]``，长度 ``n_dep * n_alpha``。Python 侧
+/// ``grid_search_rust_serial`` 转 ``list[dict]``。
 #[pyfunction]
 #[pyo3(signature = (dep_states, dep_times, alpha_grid, arrival_states, mu, max_transfer_time, integration_dt, intersection_threshold, min_distance_threshold, collision_earth_radius, collision_moon_radius, rtol, atol, max_step, *, progress_callback=None))]
 #[allow(clippy::too_many_arguments)]
@@ -2691,31 +2700,32 @@ fn transfer_grid_search_serial_py(
 
 /// Python 接口：转移网格搜索（阶段 C，Rayon 并行 + GIL 释放）。
 ///
-/// 照搬 [`crate::multiple_shooting::multiple_shooting_correct_py`] 的
-/// `py.allow_threads` + 环境变量开关范式（`multiple_shooting.rs:660-676`）。
-/// 默认走并行 [`transfer_grid_search_parallel`]，`parallel=False` 或
-/// `E2M2E_SEARCH_PARALLEL=0` 回退串行 [`transfer_grid_search_serial`]——
-/// 供并行/串行位级一致性对照（两者结果逐位相同：`par_iter`+`collect` 保序、
-/// [`evaluate_point`] 纯函数）。
+/// 照搬 ``multiple_shooting_correct_py`` 的
+/// ``py.allow_threads`` + 环境变量开关范式（``multiple_shooting.rs:660-676``）。
+/// 默认走并行 ``transfer_grid_search_parallel``，``parallel=False`` 或
+/// ``E2M2E_SEARCH_PARALLEL=0`` 回退串行 ``transfer_grid_search_serial``——
+/// 供并行/串行位级一致性对照（两者结果逐位相同：``par_iter``+``collect`` 保序、
+/// ``evaluate_point`` 纯函数）。
 ///
-/// # 参数
-/// 同 [`transfer_grid_search_serial_py`]，新增关键字参数：
-/// - `parallel`: `None`（默认）时由 `E2M2E_SEARCH_PARALLEL` 决定（`"0"`→串行，
-///   其余/未设→并行）；显式 `True`/`False` 覆盖环境变量。
-/// - `n_workers`: `None`（默认）时用 Rayon 全局线程池（线程数由
-///   `RAYON_NUM_THREADS` 决定，未设则 cpu 核数）；显式 `Some(n)` 时建一次性
-///   `ThreadPoolBuilder` 限定 `n.max(1)` 个线程并 `install` 本次 compute——
-///   覆盖 `RAYON_NUM_THREADS`。串行模式忽略此参数（无线程池）。
-/// - `progress_callback`: 同 [`transfer_grid_search_serial_py`]。
+/// **参数**
 ///
-/// # GIL 与并行
+/// 同 ``transfer_grid_search_serial_py``，新增关键字参数：
 ///
-/// `py.allow_threads` 释放 GIL 是 Rayon 真并行 + drainer 实时回调的前提——
+/// - ``parallel``: ``None`` （默认）时由 ``E2M2E_SEARCH_PARALLEL`` 决定（``"0"`` → 串行，
+///   其余/未设→并行）；显式 ``True``/``False`` 覆盖环境变量。
+/// - ``n_workers``: ``None`` （默认）时用 Rayon 全局线程池（线程数由
+///   ``RAYON_NUM_THREADS`` 决定，未设则 cpu 核数）；显式 ``Some(n)`` 时建一次性
+///   ``ThreadPoolBuilder`` 限定 ``n.max(1)`` 个线程并 ``install`` 本次 compute——
+///   覆盖 ``RAYON_NUM_THREADS``。串行模式忽略此参数（无线程池）。
+/// - ``progress_callback``: 同 ``transfer_grid_search_serial_py``。
+///
+/// **GIL 与并行**
+///
+/// ``py.allow_threads`` 释放 GIL 是 Rayon 真并行 + drainer 实时回调的前提——
 /// 不释放则 GIL 序列化所有 Rayon worker、drainer 拿不到 GIL。channel 创建 +
 /// ThreadPoolBuilder + compute + drainer join 全在闭包内，tx 在闭包内 drop，
-/// drainer 干净退出。内部直接调纯 Rust
-/// [`e2m2e_forces::transfer_grid_search`] 核心，不绕道持 GIL 的
-/// `propagate_cr3bp_py`（这是最易踩的坑，见 transfer-grid-search-rust.md:109）。
+/// drainer 干净退出。内部直接调纯 Rust ``transfer_grid_search`` 核心，不绕道持 GIL 的
+/// ``propagate_cr3bp_py`` （这是最易踩的坑，见 transfer-grid-search-rust.md:109）。
 #[pyfunction]
 #[pyo3(signature = (dep_states, dep_times, alpha_grid, arrival_states, mu, max_transfer_time, integration_dt, intersection_threshold, min_distance_threshold, collision_earth_radius, collision_moon_radius, rtol, atol, max_step, *, parallel=None, n_workers=None, progress_callback=None))]
 #[allow(clippy::too_many_arguments)]
@@ -2822,15 +2832,16 @@ fn transfer_grid_search_py(
 /// 装入进程级缓存。此后 Rust 力模型（ThirdBody/IndirectTerm/GravityField/Relativistic）
 /// 每步查表，不再调 cspice FFI。需在 SPICE 内核已加载后调用。
 ///
-/// # 参数
-/// - `targets`: 要缓存的天体对 ``[(target, observer), ...]``，如
+/// **参数**
+///
+/// - ``targets``: 要缓存的天体对 ``[(target, observer), ...]``，如
 ///   ``[("MOON", "EARTH"), ("SUN", "EARTH"), ("EARTH", "SOLAR SYSTEM BARYCENTER")]``
-/// - `frame_pairs`: 要缓存的帧旋转对 ``[(from, to), ...]``，如
+/// - ``frame_pairs``: 要缓存的帧旋转对 ``[(from, to), ...]``，如
 ///   ``[("ITRF93", "J2000"), ("MOON_PA", "J2000")]``
-/// - `sxform_pairs`: 要缓存的 6×6 状态变换对 ``[(from, to), ...]``，如
-///   ``[("ITRF93", "J2000")]``（Lense-Thirring 用）。关键字参数，默认 ``None``。
-/// - `et_start`, `et_end`: 积分时间范围（SPICE et 秒）
-/// - `dt`: 网格步长（秒），默认 3600
+/// - ``sxform_pairs``: 要缓存的 6×6 状态变换对 ``[(from, to), ...]``，如
+///   ``[("ITRF93", "J2000")]`` （Lense-Thirring 用）。关键字参数，默认 ``None``。
+/// - ``et_start``, ``et_end``: 积分时间范围（SPICE et 秒）
+/// - ``dt``: 网格步长（秒），默认 3600
 #[cfg(feature = "spice")]
 #[pyfunction]
 #[pyo3(signature = (targets, frame_pairs, et_start, et_end, dt=3600.0, *, sxform_pairs=None))]

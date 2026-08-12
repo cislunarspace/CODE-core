@@ -1,7 +1,7 @@
 """动力学系统抽象基类模块。
 
 定义 ``System`` 抽象基类，统一 CR3BP 系统与星历系统的公共接口。
-具体实现见 ``cr3bp_system.py``（``CR3BP_System``）和 ``ephemeris_system.py``
+具体实现见 ``cr3bp_system.py`` （``CR3BP_System``）和 ``ephemeris_system.py``
 （``EphemerisSystem``）。
 """
 

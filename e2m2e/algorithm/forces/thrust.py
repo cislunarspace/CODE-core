@@ -7,8 +7,8 @@ r"""推力与机动模型。
 - ``FiniteBurn``：连续推力加速度力模型，继承 ``PhysicalModel``，
   在传播过程中实时参与加速度计算。
 
-``FiniteBurn`` 合并了 GMAT R2026a 的 ``FiniteBurn``（配置）与
-``FiniteThrust``（力模型）两层，未引入 ``Thruster`` 硬件层。
+``FiniteBurn`` 合并了 GMAT R2026a 的 ``FiniteBurn`` （配置）与
+``FiniteThrust`` （力模型）两层，未引入 ``Thruster`` 硬件层。
 推力大小与方向解耦：``thrust_profile(t)`` 返回标量推力（N），
 ``direction`` 给出方向向量（固定向量或随状态更新的可调用），
 内部归一化为单位向量。质量为常量（不支持推进剂消耗）。
@@ -81,7 +81,7 @@ def _resolve_thrust_direction(
     复用 :class:`~e2m2e.core.standard_dynamic_axes.VNBAxes` /
     :class:`~e2m2e.core.standard_dynamic_axes.LVLHAxes` 构造旋转矩阵，
     再用 ``rotation @ direction_local`` 完成变换。轴向定义沿用
-    ``standard_dynamic_axes``（VNB/LVLH 按 GMAT 约定）。
+    ``standard_dynamic_axes`` （VNB/LVLH 按 GMAT 约定）。
 
     动态坐标轴类本身不校验状态退化情形，这里保留边界检查（零速度/零
     位置/共线 r-v），抛出含义清晰的 ``ValueError`` 并避免 ``LVLHAxes``
@@ -150,7 +150,7 @@ class FiniteBurn(PhysicalModel):
       :math:`N = R \\times V` (轨道面法向)。
 
     Args:
-        thrust_profile: ``t -> thrust``（N，标量；``0`` 表示关机）。
+        thrust_profile: ``t -> thrust`` （N，标量；``0`` 表示关机）。
         direction: 固定方向向量 ``(3,)``，或 ``(t, state) -> (3,)`` 可调用。
         mass: 航天器质量（kg，常量）。
         direction_frame: 方向解释坐标系，``"VNB"`` / ``"LVLH"`` / ``None``。
@@ -222,7 +222,7 @@ class FiniteBurn(PhysicalModel):
 
         质量恒定的连续推力没有对应的 Rust ``CompiledForce`` 变体（Rust 侧
         只有可变质量 ``LowThrust``）。需要推力传播请改用
-        :class:`VariableMassFiniteBurn`（7D 状态，走
+        :class:`VariableMassFiniteBurn` （7D 状态，走
         ``propagate_compiled_lowthrust``）。issue #378：不允许静默回退 Python。
         """
         raise NotImplementedError(

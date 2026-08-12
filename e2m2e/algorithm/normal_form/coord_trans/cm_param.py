@@ -1,6 +1,6 @@
 """CM ↔ param：中心流形坐标 ↔ 表征参数（复→极坐标，作用量-角变量）。
 
-迁移自 qiao ``Subfunction/coord_trans/param2ActionAngle.py``（仅
+迁移自 qiao ``Subfunction/coord_trans/param2ActionAngle.py`` （仅
 方向：CM → 作用量-角变量）+ 本仓库补齐的逆变换。对应变换链的最后一段：
 把中心流形坐标 ``(q1, q2, q3, p1, p2, p3)`` 转成表征参数
 ``(q1, p1, I2, θ2, I3, θ3)``。
@@ -18,7 +18,7 @@
 
 约定说明：
 
-- qiao ``param2ActionAngle`` 用 ``atan2(q2, p2)``（参数交换），本仓库
+- qiao ``param2ActionAngle`` 用 ``atan2(q2, p2)`` （参数交换），本仓库
   按 PRD 显式约定 ``atan2(p2, q2)``——二者互为 ``π/2 − θ`` 的镜像，但
   只要往返变换内部自洽（``θ2`` 算出来再用同公式反解），往返误差仍为
   机器精度。本模块在 docstring/常量上显式标注约定，避免与 qiao 混淆。

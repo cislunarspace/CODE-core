@@ -14,13 +14,13 @@ class IndirectTerm(PhysicalModel):
     """第三体引力的间接项（geocentric 加速系所需）。
 
     在以某天体（如地球）为原点的非惯性系下传播时，运动方程需对每个摄动
-    天体 :math:`i` 补一项 ``-μ_i · r_i / |r_i|³``（间接项），扣除摄动天体
+    天体 :math:`i` 补一项 ``-μ_i · r_i / |r_i|³`` （间接项），扣除摄动天体
     对原点的引力（见 ``EphemerisDynamics`` 的 N 体闭式公式）。
 
     ``ThirdBodyGravity`` 内部已自带间接项，但 ``GravityField`` 只算球谐
     直接引力（含中心项 degree=0），不带间接项。所以用 ``GravityField``
     模拟月球（中心+非球形）时，必须单独补月球间接项——既不能用
-    ``ThirdBodyGravity("MOON")``（会与 ``GravityField`` 的 degree=0 中心项
+    ``ThirdBodyGravity("MOON")`` （会与 ``GravityField`` 的 degree=0 中心项
     重复算月球点质量），也不能省略（地心系下物理不正确）。
 
     加速度：``-μ_body · r_body / |r_body|³``，其中 ``r_body`` 为摄动天体相对

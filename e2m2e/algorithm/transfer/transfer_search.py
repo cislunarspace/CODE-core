@@ -54,7 +54,7 @@ class TransferSearch:
     3. 前向积分获取转移轨迹
     4. 筛选与目标轨道相交或距离局部最小的候选解
 
-    搜索参数集中在 ``self.config``（:class:`TransferConfig`）的
+    搜索参数集中在 ``self.config`` （:class:`TransferConfig`）的
     ``search_*`` 字段中，``self.alpha_min`` 等裸名通过属性代理映射到前缀字段。
     """
 
@@ -126,9 +126,9 @@ class TransferSearch:
         return self
 
     def set_parallel_backend(self, backend: str) -> TransferSearch:
-        """设置并行后端：``rust``（默认）、``processes`` 或 ``threads``。
+        """设置并行后端：``rust`` （默认）、``processes`` 或 ``threads``。
 
-        默认恒为 ``rust``（:func:`_default_parallel_backend` 固定返回）：
+        默认恒为 ``rust`` （:func:`_default_parallel_backend` 固定返回）：
         Rust 扩展缺失时在使用处直接报错（issue #378，不静默回退
         ``processes``）。``rust`` 走 Rust+Rayon 内核；几何方法被 monkeypatch
         （测试注入缝）时回退 Python 路径，生产路径不触发。

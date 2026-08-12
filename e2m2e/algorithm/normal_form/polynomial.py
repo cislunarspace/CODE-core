@@ -1,7 +1,7 @@
 """多项式 dict 工具：``{pow_tuple: coefficient}`` 的内部表示与运算。
 
-对应 qiao 仓库的 ``poly_operator``（符号 / 混合系数）和
-``list_operator``（数值时间系列系数）两组辅助函数，但只取本切片需要的
+对应 qiao 仓库的 ``poly_operator`` （符号 / 混合系数）和
+``list_operator`` （数值时间系列系数）两组辅助函数，但只取本切片需要的
 子集——``expr2poly``、``poly2expr``、``poly_poisson``、
 ``poly_simplify`` 与对应的 ``polylist_*`` 数值版本。
 
@@ -11,7 +11,7 @@
   对应 ``(q1, q2, q3, p1, p2, p3)``；
 - 系数可以是 sympy 符号、纯数值（``int``/``float``）、或长度为 ``M`` 的
   一维 ``numpy.ndarray`` （数值时间序列）；
-- 零多项式统一表示为 ``{(0, 0, 0, 0, 0, 0): 0}``（或长度 ``M`` 的零数组）。
+- 零多项式统一表示为 ``{(0, 0, 0, 0, 0, 0): 0}`` （或长度 ``M`` 的零数组）。
 
 本模块属于 ``normal_form`` 包内部基础设施，只被同包的
 ``legendre`` / ``hamiltonian`` / 后续 ``reducer`` 调用，不对用户
@@ -336,7 +336,7 @@ def polylist_simplify(
     """数值版 ``poly_simplify``：合并同幂次项，剔除均幅值过小的时间序列。
 
     与 qiao ``polylist_simplify`` 等价，使用 ``mean abs`` 作为阈值。
-    系数为时间序列 ``ndarray``（实或复值皆可，仅做幅值阈值与逐项累加）。
+    系数为时间序列 ``ndarray`` （实或复值皆可，仅做幅值阈值与逐项累加）。
     """
     if not poly:
         return {(0,) * N_VARIABLES: np.zeros(1)}

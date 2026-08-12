@@ -38,7 +38,7 @@ class PointMassGravity(PhysicalModel):
     def to_rust_spec(self, system: System) -> tuple | None:
         """序列化为 Rust ``propagate_compiled`` 接受的 ``("point_mass", mu)`` 元组。
 
-        与 ``GravityField``（degree=0 等价点质量）的 Rust 路径对齐，但更轻量
+        与 ``GravityField`` （degree=0 等价点质量）的 Rust 路径对齐，但更轻量
         （不查 body-fixed 轴、不查星历）。``mu`` 为 ``None`` 时从 system 解析。
         """
         return ("point_mass", self._resolve_mu(system))

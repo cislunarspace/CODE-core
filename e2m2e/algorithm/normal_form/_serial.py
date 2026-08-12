@@ -11,7 +11,7 @@
 - ``_cm_*``  —— CenterManifoldResult
 - ``_nfr_*`` —— NormalFormResult 顶层字段
 
-tuple 键编码：``p0_p1_p2_p3_p4_p5``（下划线分隔非负整数）。
+tuple 键编码：``p0_p1_p2_p3_p4_p5`` （下划线分隔非负整数）。
 W_series 三层嵌套键编码：``w__{step}__o{order}__p0_p1_p2_p3_p4_p5``。
 """
 

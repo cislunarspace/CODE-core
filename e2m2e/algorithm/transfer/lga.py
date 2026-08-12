@@ -111,13 +111,14 @@ def search_lga_trajectories(
     搜索空间：出发速度方向角 x 飞行时间（TOF）二维网格。
 
     出发态为 LEO 停泊轨道（圆轨道速度）。对每个 (angle, tof) 组合：
+
     1. 从停泊轨道出发，沿 angle 方向施加逃逸速度级的 TLI 脉冲
-       （v_tli = v_escape * 1.01，方向由 angle 参数化，确保超逃逸速度）
+       （``v_tli = v_escape * 1.01``，方向由 angle 参数化，确保超逃逸速度）
     2. CR3BP 前向传播 tof 时间，检测近月点（PoincareSection.periapsis("moon")）
     3. 近月点高度在 perilune_alt_range 内的保留
     4. 继续传播，检测轨迹首次到达目标轨道距离（r_target）的时刻
-    5. Δv_dep = |v_departure - v_parking|
-       Δv_arr = |v_at_target_distance - v_target|
+    5. ``Δv_dep = |v_departure - v_parking|``
+       ``Δv_arr = |v_at_target_distance - v_target|``
     6. 总 Δv < max_total_dv 的保留为候选
 
     departure_phase_range 控制出发速度方向角范围（弧度）：

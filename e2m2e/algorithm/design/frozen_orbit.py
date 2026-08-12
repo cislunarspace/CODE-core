@@ -101,8 +101,8 @@ def _cart2oe(state: np.ndarray, mu: float) -> dict[str, float]:
         mu: 中心天体引力参数（km³/s²）。
 
     Returns:
-        包含 ``a``（km）、``e``、``i``（度）、``raan``（度）、
-        ``aop``（度）、``rp``（km）的字典。
+        包含 ``a`` （km）、``e``、``i`` （度）、``raan`` （度）、
+        ``aop`` （度）、``rp`` （km）的字典。
     """
     r = np.asarray(state[:3], dtype=float)
     v = np.asarray(state[3:6], dtype=float)

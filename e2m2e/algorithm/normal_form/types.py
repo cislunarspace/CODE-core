@@ -1,6 +1,6 @@
 """Normal-form 流水线的结果类型。
 
-``NormalFormResult`` 是 :class:`NormalFormPipeline`（issue #175）输出的统一
+``NormalFormResult`` 是 :class:`NormalFormPipeline` （issue #175）输出的统一
 载体：把前四个切片（动力学替代 / quasi-Floquet / 中心流形 / 表征参数目录）
 的结果聚合到一个不可变句柄里。通用化简诊断字段（Hamiltonian 系数、变换
 矩阵、残差）与各子结果句柄并存——前者供算法诊断，后者让外部用户一行代码

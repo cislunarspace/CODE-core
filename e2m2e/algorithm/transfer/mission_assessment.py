@@ -2,7 +2,7 @@
 
 在 Pareto 前沿上按用户权重把多目标标量化，辅助决策。对应规划文档
 「丁百慧式多指标加权」——但文档未展开「动态权值」语义，本实现为
-**静态加权**（与文档接口 stub 一致）。
+**静态加权** （与文档接口 stub 一致）。
 
 用法::
 
@@ -111,8 +111,8 @@ class MissionAssessment:
     ) -> MissionAssessment:
         """从 ParetoFront 结果构造评估器（推断指标名）。
 
-        支持 ``NSGA2Result``（用 ``obj_0..obj_{n-1}``）和
-        ``ParetoFront``（用 ``["dv", "tof"]`` 等 porkchop 字段名）。
+        支持 ``NSGA2Result`` （用 ``obj_0..obj_{n-1}``）和
+        ``ParetoFront`` （用 ``["dv", "tof"]`` 等 porkchop 字段名）。
         """
         if metric_names is not None:
             return cls(metric_names=metric_names)

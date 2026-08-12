@@ -1,15 +1,15 @@
 """r2s2 库适配器（时空参考系数据）。
 
 r2s2（中科院地月空间时空坐标系库）提供 TDT+GCRS ↔ TDB+EBCRS 相对论时空
-转换。本模块管**句柄管理**（历表打开/校验，进程级单例注意）与时间星历
+转换。本模块管**句柄管理** （历表打开/校验，进程级单例注意）与时间星历
 校验；转换接口由 ``EphemerisProvider`` 提供、转换算法在
-``algorithm/coordinate/``（源：``algorithm/coordinate/gcrs_ebcrs.py`` 句柄管理
+``algorithm/coordinate/`` （源：``algorithm/coordinate/gcrs_ebcrs.py`` 句柄管理
 部分，ADR 0011/0015 迁移）。
 
 已知限制：r2s2 的 ``R2S2.init_E`` 是进程级全局状态，多历表实例会互相
 覆盖（ADR 0010/0015）。
 
-历表要求：必须含内置时间星历（TT−TDB），推荐 JPL ``de440t.bsp``（注意带
+历表要求：必须含内置时间星历（TT−TDB），推荐 JPL ``de440t.bsp`` （注意带
 ``t`` 后缀的变体）；INPOP21a 的 spice 格式历表对（主文件 +
 ``*_time.bsp``）可作为路径列表传入。普通的 ``de440s.bsp``/``de440.bsp``
 不含时间星历，会在构造时报错。

@@ -26,7 +26,7 @@ Hamilton 系的共轭动量 ``p``，**不做物理量换算**——``q``、``p``
   重新解析求值（SPICE 不可用时退化到纯 CR3BP 常值旋转）。
 
 退化（纯 CR3BP）：``C`` 取会合系单位旋转 ``[[0,1,0],[-1,0,0],[0,0,0]]``、
-``Cdot = 0``（无量纲时间下为常数）。此时动量耦合项消失，
+``Cdot = 0`` （无量纲时间下为常数）。此时动量耦合项消失，
 ``p = ρ̇``——这正是切片 0–4 测试一直使用的纯 CR3BP 退路，往返误差
 应在机器精度内。
 """
@@ -57,7 +57,7 @@ _CR3BP_C: npt.NDArray[np.floating] = np.array(
 def _resolve_C_Cdot(
     context: NormalFormContext, t: float
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-    """在时刻 ``t``（归一化 TU）求值 EMR 旋转矩阵 ``C`` 与 ``Cdot_dim``。
+    """在时刻 ``t`` （归一化 TU）求值 EMR 旋转矩阵 ``C`` 与 ``Cdot_dim``。
 
     返回 ``C`` 与无量纲化时间导数 ``Cdot_dim = Cdot · TU``——这是
     动量耦合公式 ``p = ρ̇ − Cdot_dimᵀ · C · ρ`` 直接需要的形式。
@@ -107,7 +107,7 @@ def rho_to_em(
     t: float,
     context: NormalFormContext,
 ) -> npt.NDArray[np.floating]:
-    """rho 状态 → EM 坐标 ``(q, p)``（无量纲）。
+    """rho 状态 → EM 坐标 ``(q, p)`` （无量纲）。
 
     对应 qiao ``rho2param`` 第一段：``q = ρ``，
     ``p = ρ̇ − Cdot_dimᵀ · C · ρ``。

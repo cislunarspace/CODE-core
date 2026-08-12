@@ -2,7 +2,7 @@
 
 迁移自 qiao ``Subfunction/coord_trans/qpDS2qpEM.py`` /
 ``qpEM2qpDS.py``。对应变换链第二段：EM 坐标 ``(q, p)`` 与动力学
-替代坐标 ``(Q, P)`` 之间的**平移**关系。
+替代坐标 ``(Q, P)`` 之间的**平移** 关系。
 
 数学关系（qiao ``CONTEXT.md`` §三"动态替换"）：
 
@@ -21,8 +21,8 @@
 
 - qiao 通过 ``list_interp`` 在全局 ``data_array`` 上 Catmull-Rom 插值
   ``W_poly``；本仓库的 ``DynamicalSubstituteResult`` 已在每个采样点上
-  存好 ``W_poly``（``{pow_tuple: coef_array}``，6 个线性项），这里只做
-  **线性插值**到时刻 ``t`` 即可（与 :class:`QuasiFloquetResult.B_at` 的
+  存好 ``W_poly`` （``{pow_tuple: coef_array}``，6 个线性项），这里只做
+  **线性插值** 到时刻 ``t`` 即可（与 :class:`QuasiFloquetResult.B_at` 的
   策略一致）。Catmull-Rom 在等距光滑数据上与线性插值差别极小，且
   本仓库不引入 qiao 的二进制系数表。
 """

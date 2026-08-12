@@ -41,7 +41,7 @@ class NormalFormContext:
     采用固化值，与 qiao ``Global_File.py`` 保持一致。
 
     Attributes:
-        system: 关联的 e2m2e ``System``（一般 ``CR3BP_System``）。
+        system: 关联的 e2m2e ``System`` （一般 ``CR3BP_System``）。
         libration_point: 选定平动点。
         epoch: 参考历元儒略日。
         order: 法型展开阶数。

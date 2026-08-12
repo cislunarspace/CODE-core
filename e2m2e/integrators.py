@@ -176,7 +176,7 @@ def _check_rust_abi() -> None:
     """校验 Rust 扩展 ABI 版本；过期或缺失即报，结果进程级缓存。
 
     在首次使用 Rust 扩展符号时调用（惰性）。扩展不存在时抛
-    :class:`RustExtensionUnavailableError`（带 ``make dev`` 指引）——
+    :class:`RustExtensionUnavailableError` （带 ``make dev`` 指引）——
     不再静默降级（issue #378）。过期二进制抛 ``RuntimeError``。
     """
     global _abi_ok
@@ -376,7 +376,7 @@ def cowell_step(
 ):
     """对 ``x'' = a(t, x)`` 执行单个 Cowell（Störmer-Cowell）8 阶步。
 
-    ``history`` = ``[x_{n-1}, x_n, a_{n-7}, ..., a_n]``（10 个向量：2 个位置
+    ``history`` = ``[x_{n-1}, x_n, a_{n-7}, ..., a_n]`` （10 个向量：2 个位置
     样本与 8 个加速度样本，按从旧到新排列）。``accel(t, x)`` 返回只依赖位置的
     加速度（引力、J2）。输出仅含位置，步长固定。
 
@@ -405,7 +405,7 @@ def initialize_cowell_history(
     """以 ``n_startup`` 个 RK89 步启动 8 阶 Cowell history。
 
     返回 ``(t, x, v, history)``，其中
-    ``history = [x_{n-1}, x_n, a_{n-7}, ..., a_n]``（2 个位置与 8 个加速度，
+    ``history = [x_{n-1}, x_n, a_{n-7}, ..., a_n]`` （2 个位置与 8 个加速度，
     可直接传给 :func:`cowell_step`）。``n_startup`` 须不小于 7，以获得最近的
     8 个加速度样本；默认 ``n_startup=7`` 时状态推进至 ``t0 + 7h``。
     """
@@ -471,9 +471,9 @@ def solve_ivp_events(
         state_error_dim: 步长误差控制只统计前 N 维（用于 STM 增广传播）。
 
     Returns:
-        dict：``states``/``time``（t_eval 前缀，terminal 截断时末点为求精后的
-        事件点）、``t_events``/``y_events``（逐事件的触发时刻与状态列表）、
-        ``terminal_event``（触发终止的事件索引或 None）、``n_steps``。
+        dict：``states``/``time`` （t_eval 前缀，terminal 截断时末点为求精后的
+        事件点）、``t_events``/``y_events`` （逐事件的触发时刻与状态列表）、
+        ``terminal_event`` （触发终止的事件索引或 None）、``n_steps``。
     """
     require_rust_extension("solve_ivp_events_py")
     y0_arr = np.asarray(y0, dtype=float)
@@ -602,16 +602,17 @@ def grid_search_rust(
 ) -> list[dict[str, Any]]:
     """转移网格搜索 Rust 后端（阶段 C，Rayon 并行 + GIL 释放）。
 
-    展平 POD 输入 → 调 ``transfer_grid_search_py``（``py.allow_threads``
+    展平 POD 输入 → 调 ``transfer_grid_search_py`` （``py.allow_threads``
     释放 GIL + Rayon ``par_iter`` 真并行）→ 转 ``list[dict]``。返回字段与
     顺序与 :func:`grid_search_rust_serial` 完全一致——并行与串行逐位相同
     （``par_iter``+``collect`` 保序、``evaluate_point`` 纯函数）。
+    其余参数同 :func:`grid_search_rust_serial`。
 
     Args:
-        parallel: ``None``（默认）时由 ``E2M2E_SEARCH_PARALLEL`` 环境变量决定
+        parallel: ``None`` （默认）时由 ``E2M2E_SEARCH_PARALLEL`` 环境变量决定
             （``"0"``→串行，其余/未设→并行）；显式 ``True``/``False`` 覆盖。
             串/并一致性对照用 ``parallel=False`` 与 ``parallel=True`` 各跑一遍。
-        n_workers: ``None``（默认）时用 Rayon 全局线程池，线程数由
+        n_workers: ``None`` （默认）时用 Rayon 全局线程池，线程数由
             ``RAYON_NUM_THREADS`` 决定（未设则 cpu 核数）；显式传入时 Rust 端
             建一次性 ``ThreadPoolBuilder`` 限定 ``max(n_workers, 1)`` 个线程并
             ``install`` 本次 compute，覆盖 ``RAYON_NUM_THREADS``。串行模式
@@ -619,7 +620,6 @@ def grid_search_rust(
         progress_callback: ``cb(delta: int) -> None``，每个 departure 完成
             调一次（出发粒度）；``None`` 不回调。Rust 端走 channel + drainer
             线程，释放 GIL 后实时回调。
-        其余参数同 :func:`grid_search_rust_serial`。
 
     Returns:
         ``list[dict]``，长度 ``n_dep * n_alpha``，顺序为外层 departure、内层 alpha。

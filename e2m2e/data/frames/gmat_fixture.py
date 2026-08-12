@@ -1,7 +1,7 @@
 """GMAT 裁剪 fixture 发现工具（开发期测试辅助）。
 
 ADR 0011 迁移：自 ``core/coordinate/gmat_data.py`` 迁入数据层。GMAT
-数据文件（EOP/闰秒）作解析器测试**输入**（IERS 公布的物理事实），
+数据文件（EOP/闰秒）作解析器测试**输入** （IERS 公布的物理事实），
 非对照标准（ADR 0013 禁其他软件输出做判据）。路径发现工具归数据层，
 供 ``algorithm/coordinate/`` 的 GMAT-compatible 坐标轴与测试使用。
 """

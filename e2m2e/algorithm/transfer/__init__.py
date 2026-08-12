@@ -346,8 +346,8 @@ def transfer_orbit(
         engine_config: 推进配置（小推力转移必需）。
         initial_mass: 初始质量 kg（小推力转移必需）。
         n_segments: 求解器段数（小推力，默认 10）。
-        target_oe: Q-law 目标 ``(a_T, e_T, i_T)``（小推力可选）。
-        solver_method: 求解方法 ``"shooting"`` / ``"collocation"``（小推力，默认 ``"shooting"``）。
+        target_oe: Q-law 目标 ``(a_T, e_T, i_T)`` （小推力可选）。
+        solver_method: 求解方法 ``"shooting"`` / ``"collocation"`` （小推力，默认 ``"shooting"``）。
         duration_days: 飞行时间（天）（小推力，默认 30.0）。
         departure_state: 小推力出发状态 ``[r, v]`` (6,)，km / km/s（小推力可选）。
         target_state: 小推力目标末态 ``[r, v]`` (6,)，km / km/s（小推力可选）。
@@ -408,6 +408,7 @@ def _extract_target_state(target_ephemeris: Any) -> tuple[NDArray[np.float64], N
     """从 target_ephemeris 提取目标位置和速度。
 
     支持三种输入格式：
+
     - numpy ndarray (n, 6)：取最后一行。
     - NominalOrbit（有 .states 属性，形状 (n, 6)）：取最后一行。
     - EphemerisTable（有 position_km (n, 3) 和 velocity_mps (n, 3)）：

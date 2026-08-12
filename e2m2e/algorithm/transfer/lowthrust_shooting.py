@@ -1,6 +1,6 @@
 """低推力多段直接打靶求解器。
 
-在地基 ``VariableMassFiniteBurn`` / ``propagate_compiled_lowthrust``（7D 可变
+在地基 ``VariableMassFiniteBurn`` / ``propagate_compiled_lowthrust`` （7D 可变
 质量受控传播，commit ``b66fa88``）之上，建第一个低推力最优控制闭环求解器：
 单弧多段直接打靶，min-fuel，固定时间，段内常量控制。
 
@@ -72,10 +72,10 @@ class LowThrustSegment:
 class LowThrustShootingSolution:
     """低推力打靶求解结果。
 
-     对齐 :class:`~e2m2e.transfer.config.TransferSolution` 风格，额外携带控制
+    对齐 :class:`~e2m2e.transfer.config.TransferSolution` 风格，额外携带控制
     历史与 7D 状态（含质量剖面）。
 
-     Attributes:
+    Attributes:
          time: 采样时间序列，``(M,)``，SPICE et 秒。
          states: 状态序列，``(M, 7)``，``[x, y, z, vx, vy, vz, m]``。
          segments: 各段常量控制。
@@ -106,12 +106,12 @@ class LowThrustShooting:
 
     固定初态与目标末态位置/速度、固定飞行时间，以各段常量控制
     ``(throttle, 方向)`` 为决策变量，最小化燃料消耗（最大化末态质量）。
-    传播接龙复用地基 :func:`propagate_compiled_lowthrust`（7D 受控动力学）。
+    传播接龙复用地基 :func:`propagate_compiled_lowthrust` （7D 受控动力学）。
 
     Args:
         system: 动力学系统，提供 ``coordinate_system`` 与 ``origin``。
         forces: 非推力力模型列表（重力等）。各 force 须支持
-            ``to_rust_spec``（否则求解器在构造时抛错）。
+            ``to_rust_spec`` （否则求解器在构造时抛错）。
         engine: 推进配置（最大推力、比冲）。
         initial_state: 出发状态 ``[r, v]``，``(6,)``，km / km/s。
         initial_mass: 初始质量（kg）。
@@ -176,13 +176,13 @@ class LowThrustShooting:
     ) -> LowThrustShootingSolution:
         """用 Q-law 生成初猜，再解析雅可比打磨。
 
-         两级流程（gap-analysis）：Q-law 前向反馈积分产出次优控制历史
+        两级流程（gap-analysis）：Q-law 前向反馈积分产出次优控制历史
         （:func:`~e2m2e.transfer.qlaw.qlaw_guess`），喂 :meth:`solve` 做
-         min-fuel 最优控制打磨。Q-law 解决「满推力初猜推过头」的发散问题。
+        min-fuel 最优控制打磨。Q-law 解决「满推力初猜推过头」的发散问题。
 
-         Args:
+        Args:
              n_segments: 段数 N（Q-law 重采样 + 求解器决策变量数 = 3N）。
-             target_oe: Q-law 目标 ``(a_T, e_T, i_T)``（只控 a,e,i）。
+             target_oe: Q-law 目标 ``(a_T, e_T, i_T)`` （只控 a,e,i）。
              forces: 非推力力模型（与构造时一致，Q-law 用于查 μ）。
              step: Q-law 前向积分步长（秒）。
              use_analytic_jac: 打磨阶段用解析雅可比。
@@ -223,7 +223,7 @@ class LowThrustShooting:
 
         Args:
             n_segments: 段数 N，``≥ 1``。决策变量每段 ``(throttle, θ₁, θ₂)``，
-                总数 ``3N``（角度参数化方向，Du 2024 式 5）。
+                总数 ``3N`` （角度参数化方向，Du 2024 式 5）。
             x0: 初猜决策向量 ``(3N,)``；None 时 throttle 全满、方向角对齐初速。
             throttle_bounds: throttle 上下界，默认 ``(0, 1)``。
             use_analytic_jac: True 时用解析雅可比（灵敏度方程，每迭代 1 次传播）；
@@ -305,7 +305,7 @@ class LowThrustShooting:
     def _decode_segments(self, y: npt.NDArray[np.floating]) -> list[tuple[float, float, float]]:
         """决策向量 -> 各段 (throttle, θ₁, θ₂) 列表。
 
-        油门越出物理范围 [0, 1] 时抛 ``ValueError``（#352）：SLSQP 受 bounds
+        油门越出物理范围 [0, 1] 时抛 ``ValueError`` （#352）：SLSQP 受 bounds
         约束输出本不应越界，越界说明约束未生效或决策非法；静默 clip 会掩盖
         问题，且让传播用的油门与决策变量不一致。
         """
@@ -323,7 +323,7 @@ class LowThrustShooting:
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """接龙传播：返回合并时间序列 (M,) 与 7D 状态序列 (M, 7)。
 
-        用无灵敏度的 ``propagate_compiled_lowthrust``（重建轨迹用）。
+        用无灵敏度的 ``propagate_compiled_lowthrust`` （重建轨迹用）。
         """
         from e2m2e.integrators import RkMethod, propagate_compiled_lowthrust
 

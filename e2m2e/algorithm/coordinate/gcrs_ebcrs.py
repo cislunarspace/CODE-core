@@ -7,7 +7,7 @@ r2s2 直接覆盖 (TT, GCRS 地心位置) ↔ (TDB, BCRS 太阳系质心位置) 
 时空转换（``TT2TDB`` / ``TDB2TT``）。EBCRS 与 BCRS 只差原点平移，本模块用
 同一历表中的地月质心位置补上这一缺口：``x_ebcrs = xs - x_emb(t)``。
 
-历表要求：必须含内置时间星历（TT−TDB），推荐 JPL ``de440t.bsp``（注意带
+历表要求：必须含内置时间星历（TT−TDB），推荐 JPL ``de440t.bsp`` （注意带
 ``t`` 后缀的变体）；INPOP21a 的 spice 格式历表对（主文件 +
 ``*_time.bsp``）可作为路径列表传入。普通的 ``de440s.bsp``/``de440.bsp``
 不含时间星历，会在构造时报错；INPOP 原生格式（.dat）主文件与时间星历

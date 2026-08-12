@@ -30,7 +30,7 @@ def to_normalized(
 ) -> npt.NDArray[np.floating]:
     """SI 物理状态 → qiao 归一化状态。
 
-    位置除以 ``context.LU``（km），速度除以 ``context.VU``（km/s）。
+    位置除以 ``context.LU`` （km），速度除以 ``context.VU`` （km/s）。
     支持 ``(6,)`` 单状态与 ``(n, 6)`` 批量状态。
 
     Args:
@@ -58,7 +58,7 @@ def from_normalized(
 ) -> npt.NDArray[np.floating]:
     """qiao 归一化状态 → SI 物理状态。
 
-    位置乘以 ``context.LU``（km），速度乘以 ``context.VU``（km/s）。
+    位置乘以 ``context.LU`` （km），速度乘以 ``context.VU`` （km/s）。
     支持 ``(6,)`` 单状态与 ``(n, 6)`` 批量状态。
 
     Args:

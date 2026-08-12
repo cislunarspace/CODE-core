@@ -3,6 +3,7 @@
 Bucchioni 2022 保持点 + 被动安全校验 + Chan 最大碰撞概率。
 
 核心概念：
+
 - **保持点（Keeping Point）**：相对轨道上的安全驻留位置，自由漂移
   一圈后仍在安全域内
 - **安全域（Safety Region）**：球/椭球/逼近锥，分 keep-out（禁区）
@@ -26,9 +27,9 @@ class SafetyRegion:
     """安全域（球或逼近锥）。
 
     Attributes:
-        kind: ``"keep_out"``（禁区，不可进入）或 ``"approach"``（逼近区，
+        kind: ``"keep_out"`` （禁区，不可进入）或 ``"approach"`` （逼近区，
             可进入但需监控）
-        shape: ``"sphere"``（球）或 ``"cone"``（逼近锥）
+        shape: ``"sphere"`` （球）或 ``"cone"`` （逼近锥）
         center: 中心位置，形状 ``(3,)``，km（LVLH 系）
         radius: 半径（球）或锥底半径（锥），km
         cone_axis: 锥轴方向（仅 shape="cone" 时用），形状 ``(3,)``

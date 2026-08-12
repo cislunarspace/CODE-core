@@ -54,7 +54,7 @@ class Dynamics:
 
     契约（对应 MBSE REQ-002）：
     - ``propagate()`` 返回的 ``states`` 形状始终为 ``(n_points, 6)``
-    - ``stm``（如果存在）形状为 ``(n_points, 6, 6)``
+    - ``stm`` （如果存在）形状为 ``(n_points, 6, 6)``
 
     Attributes:
         system: 关联的系统对象
@@ -169,13 +169,13 @@ class Dynamics:
             with_jacobi: 是否沿轨迹逐点计算 Jacobi 常数
             events: 事件函数（单个 callable 或列表），scipy ``solve_ivp``
                 语义：``g(t, state) -> float``，零点即事件面；可给函数对象
-                设 ``terminal = True``（触发即停）与 ``direction``（> 0 只记
+                设 ``terminal = True`` （触发即停）与 ``direction`` （> 0 只记
                 上行穿越，< 0 只记下行，0 双向）属性。
                 ``with_stm=True`` 时事件函数接收 42 维增广状态。
             backend: 事件积分路径（ADR 0020 决策 4，能力缺失显式选择）：
                 仅当 ``events`` 非 None 时有意义，二选一：``"scipy"`` 走
                 scipy ``solve_ivp`` 事件积分；``"rust"`` 走 Rust
-                ``solve_ivp_events``（事件语义与 scipy 未完全对齐，由调用方
+                ``solve_ivp_events`` （事件语义与 scipy 未完全对齐，由调用方
                 显式选择并接受差异）。不传则报错；不允许 ``"auto"`` 等隐式
                 选择。无 ``events`` 时忽略（Rust 快速路径为唯一路径）。
             collision_detection: 是否启用碰撞终止（ADR 0020 决策 5）。启用时
@@ -686,7 +686,7 @@ class CR3BP_Dynamics(Dynamics):
 
         events 时按显式 ``backend`` 选择事件积分路径（ADR 0020 决策 4）：
         ``"scipy"`` 走 scipy ``solve_ivp``；``"rust"`` 走 Rust
-        ``solve_ivp_events``（事件语义与 scipy 未完全对齐，由调用方显式
+        ``solve_ivp_events`` （事件语义与 scipy 未完全对齐，由调用方显式
         选择并接受差异）。``backend`` 由 :meth:`propagate` 校验（不传报错、
         不允许 ``auto``）。无 events 时要求 Rust 扩展可用（issue #378：
         缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
@@ -715,7 +715,7 @@ class CR3BP_Dynamics(Dynamics):
         """Rust 事件积分路径（``solve_ivp_events``）——增广状态（含 STM）。
 
         CR3BP 专用传播（``propagate_cr3bp_stm_py``）不支持事件检测，事件
-        路径走通用 Rust 积分器 ``solve_ivp_events``（``e2m2e/integrators``）。
+        路径走通用 Rust 积分器 ``solve_ivp_events`` （``e2m2e/integrators``）。
         事件时刻由步内二分求精（无稠密输出），与 scipy 语义未完全对齐——
         由调用方显式选择（ADR 0020 决策 4）。输出格式对齐 scipy：
         ``t_events``/``y_events`` 为逐事件的 ndarray 列表。

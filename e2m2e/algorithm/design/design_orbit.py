@@ -664,7 +664,7 @@ def _design_apolune_segmented(
         var_time: 节点时刻是否作为自由变量。Halo/NRHO 传 False（见上）。
 
     Returns:
-        ``(t_patch, state_patch, max_residual)``（J2000），整条连续星历轨迹与
+        ``(t_patch, state_patch, max_residual)`` （J2000），整条连续星历轨迹与
         全程各段/合并段的最大打靶残差（km）。
     """
     from e2m2e.integrators import multiple_shooting_correct_py
@@ -928,7 +928,7 @@ def design_orbit(
 
     通过 ``request.orbit_type`` 在内部分派管线：
 
-    - **CR3BP 类型**（DRO/NRHO/Halo/Lissajous/…）：CR3BP 初猜 → 星历修正
+    - **CR3BP 类型** （DRO/NRHO/Halo/Lissajous/…）：CR3BP 初猜 → 星历修正
       （多重打靶）→ 高精度长期预报。
     - **ELFO**：经典开普勒根数构造初值 → 全摄动传播 → 月心根数漂移分析。
 
@@ -939,7 +939,7 @@ def design_orbit(
         verbose: 修正过程显示进度条。
 
     Returns:
-        ``OrbitDesignResult``（标称星历 + 收敛/漂移信息）。
+        ``OrbitDesignResult`` （标称星历 + 收敛/漂移信息）。
 
     Raises:
         ValueError: 形状参数/任务参数超界。

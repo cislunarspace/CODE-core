@@ -2,7 +2,7 @@
 
 迁移自 qiao ``Subfunction/coord_trans/qpQF2qpCM.py`` /
 ``qpCM2qpQF.py``——变换链中最复杂的一段。对应切片 #173 中心流形化简
-（Code10/Code11）的**坐标层面**应用：把 quasi-Floquet 坐标通过生成函数
+（Code10/Code11）的**坐标层面** 应用：把 quasi-Floquet 坐标通过生成函数
 ``W`` 的高阶 Lie 级数映射到中心流形坐标。
 
 算法（qiao ``CONTEXT.md`` §三"化简到中心流形"）：
@@ -11,9 +11,9 @@
    ``(q, p)`` 映到复坐标。``D`` 把双曲/中心方向拆成纯实/复分量：
    双曲方向 ``(q1, p1)`` 不变，平面/垂直中心方向
    ``(q2, p2)``/``(q3, p3)`` 各组合成 ``±i`` 模式（``√2`` 归一）。
-2. **逐阶 Lie 流**：对每个阶 ``order ≥ 2``（qiao ``W_series{3..N}``），
+2. **逐阶 Lie 流**：对每个阶 ``order ≥ 2`` （qiao ``W_series{3..N}``），
    用生成函数 ``W_order(q,p)`` 的 Hamilton 流
-   ``dX/dt = J·∇W_order`` 从 ``t=0`` 积到 ``t=1``（一步近恒等变换）。
+   ``dX/dt = J·∇W_order`` 从 ``t=0`` 积到 ``t=1`` （一步近恒等变换）。
    正向（QF→CM）取 ``W`` 系数取反；反向（CM→QF）不取反、阶序倒序。
 3. **复→实基底变换** ``Im2Re``：用 ``D`` 映回实坐标，取实部。
 
@@ -27,13 +27,13 @@ Hamilton 流的右端 ``dX/dt = J·∇W`` 用向量化实现
 - qiao 在 ``globalparam.data_array`` 上对每个 ``W_series`` 系数做
   Catmull-Rom 插值（``preinterp_coeffs`` 路径）；本仓库的
   :class:`CenterManifoldResult.W_series` 已按 ``{step: {order: {pow:
-  coef_array}}}`` 组织，本模块接收**已插值为标量**的系数表
-  ``W_series_at_t``（``{order: {pow: complex_scalar}}``），把插值决策上浮
+  coef_array}}}`` 组织，本模块接收**已插值为标量** 的系数表
+  ``W_series_at_t`` （``{order: {pow: complex_scalar}}``），把插值决策上浮
   到 :class:`LibrationCatalogTransformer`。
-- qiao 依赖 ``globalparam.odeoptions``（``scipy.solve_ivp`` 选项）；本模块
+- qiao 依赖 ``globalparam.odeoptions`` （``scipy.solve_ivp`` 选项）；本模块
   显式传 ``DOP853`` 默认容差（``rtol=1e-11``、``atol=1e-13``），不引入
   全局可变状态。
-- **scipy 保留**（issue #336 例外）：``_apply_lie_series`` 积分复值 Lie 级数
+- **scipy 保留** （issue #336 例外）：``_apply_lie_series`` 积分复值 Lie 级数
   Hamilton 流（``dX/dt = J·grad(W)``），Rust 侧 ``solve_ivp_py`` 仅支持实值，
   故此处保留 ``scipy.integrate.solve_ivp``。其余 normal_form 积分路径均已迁至 Rust。
 """
@@ -69,7 +69,7 @@ _D_INV: npt.NDArray[np.complex128] = cast("npt.NDArray[np.complex128]", np.linal
 
 
 def _re_to_im(X_real: npt.NDArray[np.floating]) -> npt.NDArray[np.complex128]:
-    """实数基 → 复数基：``X_im = D⁻¹ · X_real``（qiao ``Re2Im``）。"""
+    """实数基 → 复数基：``X_im = D⁻¹ · X_real`` （qiao ``Re2Im``）。"""
     return _D_INV @ np.asarray(X_real, dtype=float)
 
 
@@ -107,7 +107,7 @@ def _pack_wpoly(
     """把 ``W`` 多项式字典 ``{pow_tuple: scalar}`` 打包成 ``(exps, coefs)``。
 
     迁移自 qiao ``_pack_wpoly``。``exps`` 形状 ``(N, 6)``，``coefs`` 形状
-    ``(N,)``（复标量）。
+    ``(N,)`` （复标量）。
     """
     if not W_poly:
         return (
@@ -128,7 +128,7 @@ def _hamilton_flow_rhs(
     """Hamilton 流右端 ``dX/dt = J·∇W(X)``，向量化。
 
     迁移自 qiao ``_dynfunc_wtrans_vec``：降幂写法不做除法，在
-    ``qp_j=0, n_j=1`` 处 ``qp^(n-1)=0^0=1``（numpy 天然），与逐项版
+    ``qp_j=0, n_j=1`` 处 ``qp^(n-1)=0^0=1`` （numpy 天然），与逐项版
     整数幂语义逐位一致；除法写法会在该点产生 ``0/0=nan``。
     """
     B = X**exps  # (N, 6)，X^exp
@@ -158,10 +158,10 @@ def _apply_lie_series(
 
     迁移自 qiao ``qpQF2qpCM`` / ``qpCM2qpQF`` 的逐阶循环：
 
-    - ``forward=True``（QF→CM）：``W`` 系数取反，阶序升序 ``2..N``；
-    - ``forward=False``（CM→QF）：``W`` 系数不取反，阶序降序 ``N..2``。
+    - ``forward=True`` （QF→CM）：``W`` 系数取反，阶序升序 ``2..N``；
+    - ``forward=False`` （CM→QF）：``W`` 系数不取反，阶序降序 ``N..2``。
 
-    每阶一次 ``scipy.solve_ivp``（DOP853），末态作为下阶初值。
+    每阶一次 ``scipy.solve_ivp`` （DOP853），末态作为下阶初值。
 
     Args:
         X0: ``(6,)`` 复初值。
@@ -222,7 +222,7 @@ def qf_to_cm(
     Args:
         X_qf: ``(6,)`` QF 状态 ``[Q_qf, P_qf]``，无量纲实数。
         W_series_at_t: ``{order: {pow_tuple: complex_scalar}}``——在时刻
-            ``t`` 插值后的 :class:`CenterManifoldResult.W_series`（复值
+            ``t`` 插值后的 :class:`CenterManifoldResult.W_series` （复值
             系数，跨 ``invariant``/``center`` 两步合并）。
 
     Returns:

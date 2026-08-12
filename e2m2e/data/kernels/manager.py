@@ -7,10 +7,10 @@
 
 SPICE 内核文件说明：
 
-1. **闰秒内核**（``.tls``）：提供 UTC ↔ ET 时间转换所需的闰秒表。自动
+1. **闰秒内核** （``.tls``）：提供 UTC ↔ ET 时间转换所需的闰秒表。自动
    在被加载内核的同级目录、仓库内置 ``kernels/`` 目录、
    ``SPICE_KERNEL_DIR`` 环境变量指定的路径中按序搜索。
-2. **星历内核**（``.bsp``）：包含天体位置/速度数据（如 JPL DE440）。
+2. **星历内核** （``.bsp``）：包含天体位置/速度数据（如 JPL DE440）。
    需要手动加载，可通过 :meth:`SPICEManager.find_ephemeris_kernel` 搜索或
    :meth:`SPICEManager.load_kernel` 加载。
 
@@ -113,7 +113,7 @@ def _call_rust_or_compat_error(
 ):
     """调用 Rust pyfunction，把"编译产物过期"导致的签名漂移转成可操作错误。
 
-    ``.pyd``/``.so`` 落后于源码时，PyO3 在参数绑定阶段抛 ``TypeError``（如
+    ``.pyd``/``.so`` 落后于源码时，PyO3 在参数绑定阶段抛 ``TypeError`` （如
     ``got an unexpected keyword argument 'sxform_pairs'``），错误信息毫无指向、
     栈顶远离调用点。本函数先用 :func:`inspect.signature` 主动比对所需
     keyword-only 参数，缺失即抛带"请重建"提示的 :class:`RuntimeError`；无法

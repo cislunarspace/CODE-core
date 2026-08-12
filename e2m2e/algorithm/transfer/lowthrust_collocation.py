@@ -1,13 +1,13 @@
 """低推力 Hermite-Simpson 配点求解器。
 
-与 :class:`~e2m2e.transfer.lowthrust_shooting.LowThrustShooting`（直接打靶）
+与 :class:`~e2m2e.transfer.lowthrust_shooting.LowThrustShooting` （直接打靶）
 并列的直接法求解器。把节点状态与控制都作为决策变量，用 Hermite-Simpson 缺陷
 约束保证段间动力学连续——比单弧打靶更鲁棒、初猜要求低（Q-law 输出直接可用）。
 
 ## Hermite-Simpson 配点
 
-把 ``[t0,tf]`` 分 N 段（N+1 节点），决策变量 = 节点状态 ``{x_i}``（7D）+
-节点控制 ``{p_i=(throttle,θ₁,θ₂)}``（3D），共 ``10(N+1)``。缺陷约束（每段 7 维）：
+把 ``[t0,tf]`` 分 N 段（N+1 节点），决策变量 = 节点状态 ``{x_i}`` （7D）+
+节点控制 ``{p_i=(throttle,θ₁,θ₂)}`` （3D），共 ``10(N+1)``。缺陷约束（每段 7 维）：
 
 ```text
 x_c = (x_i + x_{i+1})/2 + (dt/8)(f_i − f_{i+1})
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 class LowThrustCollocation:
     """低推力 Hermite-Simpson 配点求解器（min-fuel）。
 
-    与 :class:`LowThrustShooting`（直接打靶）并列：打靶适合小规模高精度，配点
+    与 :class:`LowThrustShooting` （直接打靶）并列：打靶适合小规模高精度，配点
     适合大规模鲁棒。两者复用 ``EngineConfig``/``LowThrustSegment``/Q-law 初猜/
     ``LowThrustShootingSolution``。
 
@@ -108,7 +108,7 @@ class LowThrustCollocation:
             verbose: 打印 SLSQP 进度。
 
         Returns:
-            :class:`LowThrustShootingSolution`（节点状态 + 各段控制）。
+            :class:`LowThrustShootingSolution` （节点状态 + 各段控制）。
         """
         if n_segments < 1:
             raise ValueError(f"n_segments must be >= 1, got {n_segments}")

@@ -210,7 +210,7 @@ def scan_lambert_delta_v(
     """用 Lambert 批量扫描找最优 tof。
 
     对每个 tof 调用 solve_lambert_batch，计算总
-    Δv = |v0_lambert - v0_park| + |vf_lambert - v_target|，
+    ``Δv = |v0_lambert - v0_park| + |vf_lambert - v_target|``，
     返回 (最优 tof, 最优 v0_lambert, 最优 vf_lambert)。
 
     Args:
@@ -263,11 +263,12 @@ def ephemeris_shoot_transfer(
     """用 MultipleShooting 在给定动力学模型下修正 Lambert 初猜。
 
     步骤：
+
     1. 沿 Lambert 初猜弧段均匀采样 ``n_patches`` 个 patch point 时刻。
     2. 用动力学模型 ``dynamics.propagate`` 从 (r0, v0) 积分整条弧段，
        在各 patch point 时刻插值取状态作为初猜。
     3. 调用 ``MultipleShooting.correct()`` 收敛。
-    4. 返回 ``MultipleShootingResult``。
+    4. 返回 ``e2m2e.algorithm.solver.multiple_shooting.MultipleShootingResult``。
 
     Args:
         dynamics: 动力学对象，需提供 ``propagate(state, t_span, with_stm=True)``
@@ -281,7 +282,7 @@ def ephemeris_shoot_transfer(
         tolerance: 收敛容差，默认 1e-6。
 
     Returns:
-        MultipleShootingResult: 打靶修正结果。
+        :class:`~e2m2e.algorithm.solver.multiple_shooting.MultipleShootingResult`: 打靶修正结果。
 
     Raises:
         ValueError: n_patches < 2。

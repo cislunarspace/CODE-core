@@ -111,7 +111,7 @@ def _worker_propagate(state: np.ndarray, t_span: tuple[float, float]) -> dict:
         t_span: ``(t0, tf)``，SPICE ET（秒）。
 
     Returns:
-        包含 ``"states"``（6×n）、``"stm"``（6×6×n）、``"time"``（n,）的字典，
+        包含 ``"states"`` （6×n）、``"stm"`` （6×6×n）、``"time"`` （n,）的字典，
         但仅返回终端切片以减少 IPC 数据量：
         ``{"final_state": (6,), "final_stm": (6,6), "t_end": float}``。
     """

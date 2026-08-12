@@ -337,7 +337,7 @@ def grid_search_rust_dispatch(
 ) -> list[TransferCandidateResult]:
     """Rust + Rayon 后端网格搜索分发（阶段 D1）。
 
-    展平 POD 输入喂给 :func:`e2m2e.integrators.grid_search_rust`（``py.allow_threads``
+    展平 POD 输入喂给 :func:`e2m2e.integrators.grid_search_rust` （``py.allow_threads``
     释放 GIL + Rayon ``par_iter``），拿回候选解后追加 ``departure_time_index`` /
     ``departure_orbit_name`` / ``arrival_orbit_name``，对齐 Python sequential 后端字段。
 
@@ -346,7 +346,7 @@ def grid_search_rust_dispatch(
     默认改用进程后端（issue #378）。
     Rust 总是走 Rayon 多核并行（``parallel=True``）——网格搜索的目标是快速完成。
     ``n_workers`` 直接转发给 Rust 端 ``ThreadPoolBuilder.num_threads`` 限定线程数，
-    覆盖 ``RAYON_NUM_THREADS``（该环境变量仅在 :func:`grid_search_rust` 的
+    覆盖 ``RAYON_NUM_THREADS`` （该环境变量仅在 :func:`grid_search_rust` 的
     ``n_workers=None`` 时生效，本 dispatch 路径总传入有限整数）；monkeypatch 回退
     时 ``n_workers`` 用于选择 Python 后端的进程数。``verbose`` 时建 tqdm 进度条，
     出发粒度（Rust 端每完成一个 departure 触发一次回调）。

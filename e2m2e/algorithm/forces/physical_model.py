@@ -30,7 +30,7 @@ class PhysicalModel:
         """返回该力模型的引力参数 μ。
 
         显式设过 ``self._mu`` 就用它；否则从 ``system.gravitational_parameter``
-        查。``system`` 在隔离测试时可为 ``None``（只给 ``mu``、不查星历）；
+        查。``system`` 在隔离测试时可为 ``None`` （只给 ``mu``、不查星历）；
         当 ``mu`` 与 ``system`` 都缺失时抛 ``ValueError``，这是被
         ``test_*_no_system_no_mu_raises`` 固化的契约。
         """

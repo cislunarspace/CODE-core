@@ -179,7 +179,7 @@ if NlpCallbackBase is not None:
             return 0
 
     def _apply_copt_nlp_params(model: Any, options: dict[str, Any]) -> None:
-        """与参考脚本一致：``model.setParam(COPT.Param.*, ...)``（NLP 项 + 可选 TimeLimit）。"""
+        """与参考脚本一致：``model.setParam(COPT.Param.*, ...)`` （NLP 项 + 可选 TimeLimit）。"""
         assert COPT is not None
         model.setParam(COPT.Param.NLPTol, 1e-10)
         model.setParam(COPT.Param.NLPIterLimit, int(options.get("max_iter", 1000)))

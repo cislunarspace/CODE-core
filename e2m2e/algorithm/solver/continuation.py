@@ -445,7 +445,7 @@ class Continuation:
         """伪弧长延拓（对应 MATLAB ``continuation_PAL_CR3BP``，plane=13 / XZ 对称）
 
         自由变量 ``X = [rx, rz, vy, T/2]``，``Xdot = null(dF)``，PAL 约束
-        ``G = [F; (Xnew-X)·Xdot - ΔS]``；内层用 ``Xnew`` 计算 ``F``（与 MATLAB
+        ``G = [F; (Xnew-X)·Xdot - ΔS]``；内层用 ``Xnew`` 计算 ``F`` （与 MATLAB
         中仅用固定 ``X`` 相比更一致）。每步后用微分修正闭合。
 
         Args:

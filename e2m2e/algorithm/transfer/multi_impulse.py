@@ -1,8 +1,8 @@
 """多脉冲转移框架与 Lawden 主矢量检验。
 
-多脉冲 NLP 采用节点参数化：两端为固定 :class:`StateTerminal`（位置、速度、时刻
+多脉冲 NLP 采用节点参数化：两端为固定 :class:`StateTerminal` （位置、速度、时刻
 均固定），中途脉冲节点以 ``(t_i, r_i)`` 为决策变量，相邻节点间的弧段由 Lambert
-封闭——二体 :func:`solve_lambert`（快，默认，用于初扫）或
+封闭——二体 :func:`solve_lambert` （快，默认，用于初扫）或
 :class:`ThreeBodyLambert` 打靶（准，用于精修）。各节点的脉冲是封闭结果的输出
 （进出弧速度差），不是独立变量。这是 Prussing《Optimal Spacecraft Trajectories》
 第 5 章与宝音贺西等 (2025) 内层封闭/外层 NLP 结构的标准形式。

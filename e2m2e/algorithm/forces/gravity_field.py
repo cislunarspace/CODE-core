@@ -271,7 +271,7 @@ class GravityField(PhysicalModel):
     def _get_input_coordinate_system(self, system: Any) -> CoordinateSystem:
         """构造输入坐标系（固连系）。
 
-        按 ``self._input_frame``（默认按 ``body`` 推导）构造 SPICE-backed 坐标轴:
+        按 ``self._input_frame`` （默认按 ``body`` 推导）构造 SPICE-backed 坐标轴:
         地球 ``ITRF93``、月球 ``MOON_PA``。
         """
         spice = getattr(system, "spice", None)

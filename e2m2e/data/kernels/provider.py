@@ -6,7 +6,7 @@ jd_tdb_to_et）、状态（body_position/body_state/body_rotation）、帧
 （pxform），单点 + 批量。
 
 实现：
-- SPICE 实现 = :class:`SPICEManager`（``data/kernels/manager.py``）；
+- SPICE 实现 = :class:`SPICEManager` （``data/kernels/manager.py``）；
 - r2s2 实现 = ``data/frames/r2s2.py`` 的适配器（句柄管理 + TT↔TDB）。
 
 批量方法（body_states/body_positions 等）为后续 Rust 注入数据预留接口，

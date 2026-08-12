@@ -3,8 +3,8 @@
 ForceModel 满配直推的性能瓶颈在于每步每力调
 ``SPICEManager.get_body_position`` / ``get_body_state``——无缓存、每次跨
 Python↔C 边界查 SPICE。本模块在积分前用 SPICE 在均匀网格上预采样所有
-相关天体的 (R, V)，建 ``scipy.interpolate.CubicSpline``（C² 连续），之后
-查询走样条插值（纯数值）。源：``core/ephem_cache.py``（ADR 0011 迁移，
+相关天体的 (R, V)，建 ``scipy.interpolate.CubicSpline`` （C² 连续），之后
+查询走样条插值（纯数值）。源：``core/ephem_cache.py`` （ADR 0011 迁移，
 数据层自足）。
 
 为什么用三次样条而不是线性插值：线性插值 C⁰ 连续，网格点处导数不连续，
@@ -42,7 +42,8 @@ class EphemCache:
     Attributes:
         bodies: 缓存覆盖的天体名列表（大写）。
         et_start, et_end: 缓存覆盖的 ET 秒范围（含 margin）。
-        frame, observer: 采样时用的坐标系与观察者（查询必须匹配）。
+        frame: 采样时用的坐标系（查询必须匹配）。
+        observer: 采样时用的观察者（查询必须匹配）。
     """
 
     def __init__(
@@ -96,8 +97,8 @@ def build_ephem_cache(
 ) -> EphemCache:
     """构建预插值星历缓存。
 
-    在 ``[et_start, et_end]``（加两端 margin）上以 ``dt`` 步长均匀采样，
-    对每个天体在每个网格点调 ``spice.get_body_state``（此时走 SPICE），
+    在 ``[et_start, et_end]`` （加两端 margin）上以 ``dt`` 步长均匀采样，
+    对每个天体在每个网格点调 ``spice.get_body_state`` （此时走 SPICE），
     建 CubicSpline。
     """
     if et_end <= et_start:

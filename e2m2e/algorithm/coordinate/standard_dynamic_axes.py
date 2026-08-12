@@ -28,8 +28,8 @@ class VNBAxes(DynamicAxes):
     即 R 的第 0 列为 v_hat，第 1 列为 n_hat，第 2 列为 b_hat。
 
     Raises:
-        ValueError: 零速度（|v| < ``VELOCITY_NORM_MIN``）或零角动量
-            （|r×v| < ``ANGULAR_MOMENTUM_NORM_MIN``，即 r ∥ v 或 r=0）时
+        ValueError: 零速度（``|v| < VELOCITY_NORM_MIN``）或零角动量
+            （``|r×v| < ANGULAR_MOMENTUM_NORM_MIN``，即 r ∥ v 或 r=0）时
             轴向奇异（ADR 0007 补白 / ADR 0020 决策 5：退化态显式失败，
             不静默）；异常信息含实测范数与阈值。
     """
@@ -68,8 +68,8 @@ class LVLHAxes(DynamicAxes):
     即 R 的第 0 列为 r_hat，第 1 列为 v_hat，第 2 列为 h_hat。
 
     Raises:
-        ValueError: 零位置（|r| < ``POSITION_NORM_MIN``）或零角动量
-            （|r×v| < ``ANGULAR_MOMENTUM_NORM_MIN``，即 r ∥ v）时
+        ValueError: 零位置（``|r| < POSITION_NORM_MIN``）或零角动量
+            （``|r×v| < ANGULAR_MOMENTUM_NORM_MIN``，即 r ∥ v）时
             轴向奇异（ADR 0007 补白 / ADR 0020 决策 5：退化态显式失败，
             不静默）；异常信息含实测范数与阈值。
     """
