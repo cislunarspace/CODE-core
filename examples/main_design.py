@@ -49,7 +49,6 @@ def main() -> None:
 
     from e2m2e.algorithm.design import design_orbit
     from e2m2e.api.models import DesignOrbitRequest
-    from e2m2e.tools.viz import OrbitVisualizer
 
     # 1. 端到端设计一条 L2 Halo（CR3BP 初猜 → 星历修正 → 高精度预报）
     print("\n1. 设计 L2 Halo 轨道（amplitude=30000 km，维持 30 天）")
@@ -98,7 +97,6 @@ def main() -> None:
     from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
 
     system = earth_moon_system()
-    viz = OrbitVisualizer(system)
 
     # 画加摄动后的高精度预报星历（result.ephemeris），而非 CR3BP 理想周期解：
     # 摄动使轨道偏离闭合周期解，呈现拟周期。synodic_position 是地心归一（月球
@@ -107,9 +105,45 @@ def main() -> None:
     states[:, 0] -= system.mu
     l2 = system.L_points[LibrationPoint.L2]  # L2 会合系坐标（质心归一）
 
-    # 一次 3D 绘图：轨道 + 地月天体 + L2 平动点标注
-    ax3d = viz.plot_3d_orbit(states, label="L2 Halo 拟周期轨迹（30 天）")
-    viz.plot_primary_bodies(ax=ax3d, is_3d=True)
+    # 一次 3D 绘图：轨道 + 地月天体 + L2 平动点标注（直接用 matplotlib）
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure(figsize=(14, 10), dpi=100)
+    ax3d = fig.add_subplot(111, projection="3d")
+    ax3d.plot(
+        states[:, 0],
+        states[:, 1],
+        states[:, 2],
+        label="L2 Halo 拟周期轨迹（30 天）",
+        linewidth=1.5,
+        alpha=0.8,
+    )
+    # 天体标记（质心归一坐标：主天体在 -mu，次天体在 1-mu）
+    mu = system.mu
+    ax3d.plot(
+        [-mu],
+        [0],
+        [0],
+        marker="o",
+        color="blue",
+        markersize=14,
+        markeredgecolor="black",
+        markeredgewidth=1,
+        linestyle="None",
+        label="Earth",
+    )
+    ax3d.plot(
+        [1 - mu],
+        [0],
+        [0],
+        marker="o",
+        color="silver",
+        markersize=10,
+        markeredgecolor="black",
+        markeredgewidth=1,
+        linestyle="None",
+        label="Moon",
+    )
     ax3d.scatter(l2[0], l2[1], l2[2], marker="x", color="red", s=80, zorder=6)
     ax3d.text(l2[0], l2[1], l2[2] + 0.03, "L2", color="red", fontsize=12, fontweight="bold")
 
@@ -124,10 +158,15 @@ def main() -> None:
     ax3d.legend(loc="upper right")
 
     if args.save:
-        viz.save(str(_OUT_DIR / "main_design_halo.png"), dpi=150)
+        fig.savefig(
+            str(_OUT_DIR / "main_design_halo.png"),
+            dpi=150,
+            bbox_inches="tight",
+            pad_inches=0.1,
+        )
         print(f"   已保存 {_OUT_DIR / 'main_design_halo.png'}")
     else:
-        viz.show()
+        plt.show()
 
     print("\n" + "=" * 60)
     print("示例完成！")

@@ -52,11 +52,6 @@ normal-form = [
     "sympy>=1.12",
     "joblib>=1.3",
 ]
-# 可视化（tools/viz）：核心库不依赖 matplotlib（ADR 0011，MCP 无头部署
-# 不需要）。
-viz = [
-    "matplotlib>=3.7",
-]
 # MCP 协议层（api/mcp）：部署 MCP 服务器时装。
 mcp = [
     "mcp>=1.0",
@@ -98,7 +93,7 @@ markers = [
     "data: 数据层——内核/帧/类型/IO/模板 + 坐标转换",
     "orchestration: 算法编排（层3）——族/转移/设计/校正/站保/流形",
     "interface: 接口（层4）——Facade/MCP/CLI/Pydantic 模型",
-    "aux: 工具/辅助——viz/logging/format/MBSE/架构元测试",
+    "aux: 工具/辅助——logging/format/MBSE/架构元测试",
 ]
 
 [tool.coverage.run]
@@ -117,10 +112,6 @@ dev = [
     "ruff>=0.1",
     "mypy",
     "maturin>=1.0",
-    # matplotlib 默认装入开发环境：tests/tools/viz/ 是测试套件的一部分，缺
-    # 它会让套件收集直接 ImportError。库本身仍保持 viz extra 可选（ADR 0011
-    # 核心库不依赖 matplotlib）。
-    "matplotlib>=3.7",
 ]
 docs = [
     "sphinx>=7",

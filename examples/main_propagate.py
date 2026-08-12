@@ -50,7 +50,6 @@ def main() -> None:
     from e2m2e.algorithm.design import design_orbit
     from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
     from e2m2e.api.models import DesignOrbitRequest
-    from e2m2e.tools.viz import OrbitVisualizer
 
     # 1. 设计一条短弧 Halo 作为预报起点（duration=0.02 年 ≈ 7.3 天）
     print("\n1. 设计 L2 Halo 短弧（提供初始状态与力模型）")
@@ -122,13 +121,48 @@ def main() -> None:
     # 3. 绘制预报轨迹 3D（J2000，归一化到地月尺度）
     print("\n3. 绘制预报轨迹 3D")
     system_cr3bp = earth_moon_system()
-    viz = OrbitVisualizer(system_cr3bp)
 
     traj = states.copy()
     traj[:, :3] /= 384400.0  # 归一化以在会合系尺度下显示
 
-    ax3d = viz.plot_3d_orbit(traj, label="预报轨迹（60 天）")
-    viz.plot_primary_bodies(ax=ax3d, is_3d=True)
+    # 直接用 matplotlib 绘图：轨迹 + 地月天体标记
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure(figsize=(14, 10), dpi=100)
+    ax3d = fig.add_subplot(111, projection="3d")
+    ax3d.plot(
+        traj[:, 0],
+        traj[:, 1],
+        traj[:, 2],
+        label="预报轨迹（60 天）",
+        linewidth=1.5,
+        alpha=0.8,
+    )
+    mu = system_cr3bp.mu
+    ax3d.plot(
+        [-mu],
+        [0],
+        [0],
+        marker="o",
+        color="blue",
+        markersize=14,
+        markeredgecolor="black",
+        markeredgewidth=1,
+        linestyle="None",
+        label="Earth",
+    )
+    ax3d.plot(
+        [1 - mu],
+        [0],
+        [0],
+        marker="o",
+        color="silver",
+        markersize=10,
+        markeredgecolor="black",
+        markeredgewidth=1,
+        linestyle="None",
+        label="Moon",
+    )
     ax3d.set_xlabel("X（归一化）")
     ax3d.set_ylabel("Y（归一化）")
     ax3d.set_zlabel("Z（归一化）")
@@ -136,10 +170,15 @@ def main() -> None:
     ax3d.legend()
 
     if args.save:
-        viz.save(str(_OUT_DIR / "main_propagate_60d.png"), dpi=150)
+        fig.savefig(
+            str(_OUT_DIR / "main_propagate_60d.png"),
+            dpi=150,
+            bbox_inches="tight",
+            pad_inches=0.1,
+        )
         print(f"   已保存 {_OUT_DIR / 'main_propagate_60d.png'}")
     else:
-        viz.show()
+        plt.show()
 
     print("\n" + "=" * 60)
     print("示例完成！")

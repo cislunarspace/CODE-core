@@ -185,20 +185,6 @@
    et0 = spice.utc_to_et("2025-06-21T11:00:06")
    result = fm.propagate(state0, (et0, et0 + 86400.0))
 
-可视化
--------
-
-.. code-block:: python
-
-   from e2m2e.tools.viz import PlotConfig, FamilyPlotter
-
-   config = PlotConfig(title=32, label=28)
-   config.apply_rcparams()
-
-   plotter = FamilyPlotter(system, config)
-   jacobi_values = [system.get_jacobi_constant(o.states[0]) for o in cont_result.family.orbits]
-   plotter.plot_family_2d(cont_result.family, jacobi_values, title="DRO Family")
-
 下一步
 ------
 

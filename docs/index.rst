@@ -12,7 +12,6 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
 
    getting-started/installation
    getting-started/quickstart
-   getting-started/visualization
 
    core/system
    core/dynamics
@@ -22,7 +21,6 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
    core/forces
    core/integrators
    core/atmosphere
-   core/visualization
 
    algorithms/differential-correction
    algorithms/strategies

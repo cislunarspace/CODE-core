@@ -50,7 +50,6 @@ def main() -> None:
     from e2m2e.algorithm.design import design_orbit
     from e2m2e.algorithm.station_keeping import control_orbit
     from e2m2e.api.models import DesignOrbitRequest
-    from e2m2e.tools.viz import OrbitVisualizer
 
     # 1. 设计一条短弧 Halo 标称轨道（供轨道保持）
     print("\n1. 设计 L2 Halo 标称轨道")
@@ -106,39 +105,86 @@ def main() -> None:
     from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
 
     system = earth_moon_system()
-    viz = OrbitVisualizer(system)
 
     # 标称：会合系无量纲状态
     nominal = result.ephemeris.synodic_position
-    ax1 = viz.plot_2d_projection(
-        np.column_stack([nominal, np.zeros((len(nominal), 3))]),
-        plane="xz",
+
+    # 直接用 matplotlib 绘 x-z 投影：标称 vs 受控 + 地月天体 + 平动点
+    import matplotlib.pyplot as plt
+
+    from e2m2e.algorithm.dynamics import LibrationPoint
+
+    fig, ax1 = plt.subplots(figsize=(12, 10), dpi=100)
+    ax1.plot(
+        nominal[:, 0],
+        nominal[:, 2],
         label="标称轨道",
+        linewidth=1.5,
+        alpha=0.8,
     )
 
     # 受控：最后一次样本的受控星历（若可用）
     if ctl.controlled_ephemeris is not None:
         controlled = ctl.controlled_ephemeris.synodic_position
-        viz.plot_2d_projection(
-            np.column_stack([controlled, np.zeros((len(controlled), 3))]),
-            plane="xz",
+        ax1.plot(
+            controlled[:, 0],
+            controlled[:, 2],
             color="orange",
             label="受控轨道",
-            ax=ax1,
+            linewidth=1.5,
+            alpha=0.8,
         )
 
-    viz.plot_primary_bodies(ax=ax1)
-    viz.plot_libration_points(ax=ax1)
+    # 天体标记（质心归一坐标：主天体在 -mu，次天体在 1-mu）
+    mu = system.mu
+    ax1.scatter(
+        -mu,
+        0,
+        color="#2E86AB",
+        s=200,
+        edgecolors="#1A5276",
+        linewidth=1.5,
+        zorder=10,
+        label="Earth",
+    )
+    ax1.scatter(
+        1 - mu,
+        0,
+        color="#95A5A6",
+        s=100,
+        edgecolors="#566573",
+        linewidth=1.5,
+        zorder=10,
+        label="Moon",
+    )
+
+    # 五个平动点（灰色三角 + 标签）
+    for i, lp in enumerate(LibrationPoint):
+        coord = system.L_points[lp]
+        ax1.scatter(coord[0], coord[1], color="gray", marker="^", s=60, zorder=5)
+        ax1.annotate(
+            f"L{i + 1}",
+            (coord[0], coord[1]),
+            textcoords="offset points",
+            xytext=(5, 5),
+            fontsize=16,
+        )
+
     ax1.set_xlabel("X（无量纲）")
     ax1.set_ylabel("Z（无量纲）")
     ax1.set_title("L2 Halo 轨道保持：标称 vs 受控（会合系 x-z）")
     ax1.legend(loc="upper right")
 
     if args.save:
-        viz.save(str(_OUT_DIR / "main_control_halo.png"), dpi=150)
+        fig.savefig(
+            str(_OUT_DIR / "main_control_halo.png"),
+            dpi=150,
+            bbox_inches="tight",
+            pad_inches=0.1,
+        )
         print(f"   已保存 {_OUT_DIR / 'main_control_halo.png'}")
     else:
-        viz.show()
+        plt.show()
 
     print("\n" + "=" * 60)
     print("示例完成！")

@@ -16,7 +16,6 @@ Subpackages
    e2m2e.transfer
    e2m2e.data
    e2m2e.api
-   e2m2e.visualization
    e2m2e.mbse
 
 Submodules

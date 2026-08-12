@@ -48,7 +48,6 @@ def main() -> None:
     setup_cjk_font()
 
     from e2m2e.algorithm.transfer import solve_lambert
-    from e2m2e.tools.viz import OrbitVisualizer
 
     # 1. 构造二体 Lambert 问题：低轨 → 月球距离处，5 天转移
     print("\n1. 二体 Lambert：LEO → 月球距离，转移时间 5 天")
@@ -75,15 +74,50 @@ def main() -> None:
     from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
 
     system = earth_moon_system()
-    viz = OrbitVisualizer(system)
 
     # 归一化到地月尺度以便在会合系中显示（1 单位 = 384400 km）
     traj_syn = trajectory.copy()
     traj_syn[:, :3] /= 384400.0
-    traj_syn[:, :3] += np.array([0.0, 0.0, 0.0])  # 保持原点对齐
 
-    ax3d = viz.plot_3d_orbit(traj_syn, label="转移弧段")
-    viz.plot_primary_bodies(ax=ax3d, is_3d=True)
+    # 绘制转移轨迹 3D（直接用 matplotlib）
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure(figsize=(14, 10), dpi=100)
+    ax3d = fig.add_subplot(111, projection="3d")
+    ax3d.plot(
+        traj_syn[:, 0],
+        traj_syn[:, 1],
+        traj_syn[:, 2],
+        label="转移弧段",
+        linewidth=1.5,
+        alpha=0.8,
+    )
+    # 天体标记（质心归一坐标：主天体在 -mu，次天体在 1-mu）
+    mu = system.mu
+    ax3d.plot(
+        [-mu],
+        [0],
+        [0],
+        marker="o",
+        color="blue",
+        markersize=14,
+        markeredgecolor="black",
+        markeredgewidth=1,
+        linestyle="None",
+        label="Earth",
+    )
+    ax3d.plot(
+        [1 - mu],
+        [0],
+        [0],
+        marker="o",
+        color="silver",
+        markersize=10,
+        markeredgecolor="black",
+        markeredgewidth=1,
+        linestyle="None",
+        label="Moon",
+    )
     ax3d.set_xlabel("X（归一化）")
     ax3d.set_ylabel("Y（归一化）")
     ax3d.set_zlabel("Z（归一化）")
@@ -91,10 +125,15 @@ def main() -> None:
     ax3d.legend()
 
     if args.save:
-        viz.save(str(_OUT_DIR / "main_transfer_lambert.png"), dpi=150)
+        fig.savefig(
+            str(_OUT_DIR / "main_transfer_lambert.png"),
+            dpi=150,
+            bbox_inches="tight",
+            pad_inches=0.1,
+        )
         print(f"   已保存 {_OUT_DIR / 'main_transfer_lambert.png'}")
     else:
-        viz.show()
+        plt.show()
 
     print("\n" + "=" * 60)
     print("示例完成！")

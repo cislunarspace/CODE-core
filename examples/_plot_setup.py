@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """示例绘图共用配置：跨平台中文字体探测 + rcParams 应用。
 
-e2m2e 库的 ``PlotConfig.apply_rcparams`` 把字体设为 Times New Roman/DejaVu
-Serif（不含中文字符），标题含中文会显示豆腐块。示例脚本统一从这里探测
-系统可用的 CJK 字体并加入回退链，本机（SimHei/YaHei/Noto Sans SC）与
-服务器（Noto Sans CJK JP/AR PL UKai）都能正确显示中文。
+matplotlib 默认字体不含中文字符，标题含中文会显示豆腐块。示例脚本统一
+从这里探测系统可用的 CJK 字体并加入回退链，本机（SimHei/YaHei/Noto Sans
+SC）与服务器（Noto Sans CJK JP/AR PL UKai）都能正确显示中文。
 
 用法（在示例脚本 main() 内、import matplotlib 之后调用）：
     from _plot_setup import setup_cjk_font

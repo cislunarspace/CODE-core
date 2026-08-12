@@ -163,7 +163,6 @@ e2m2e/api/
 
 ```
 e2m2e/tools/
-├── viz/               # 可视化（可选依赖 [viz]）
 └── logging/           # 结构化日志
 ```
 
@@ -216,5 +215,4 @@ README 加"能力与实现状态"表（每个能力标 已实现/部分/未实�
 
 - 核心依赖轻量：numpy/scipy/pydantic/r2s2/spiceypy/pyerfa/tqdm。
 - `[normal-form]`：sympy/joblib（正规化）。
-- `[viz]`：matplotlib 等（可视化）。
 - `[mcp]`：MCP 协议层（部署 MCP 服务器时）。
