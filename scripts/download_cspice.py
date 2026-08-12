@@ -1,10 +1,10 @@
 """下载并解压 SPICE 编译包，输出 CSPICE_DIR 供 cspice-sys 构建使用。
 
-背景：``cspice-sys`` 默认的 ``downloadcspice`` 从 naif.jpl.nasa.gov 下载 CSPICE
-源码就地编译，国内网络常不可达（构建时 TCP 超时）。本脚本改从 e2m2e 的
-GitHub Release 下载预编译的 MICE 工具包（``cspice-windows-v1`` /
-``cspice-linux-v1``），解压后把 ``mice_{platform}`` 目录作为 ``CSPICE_DIR``
-输出。``cspice-sys`` 的 build.rs 检测到 ``CSPICE_DIR`` 即跳过 NAIF 下载
+背景：仓库不启用 ``cspice-sys`` 的 ``downloadcspice`` feature（其从 naif.jpl.nasa.gov 下载
+CSPICE 源码就地编译，国内网络常不可达，构建时 TCP 超时），CSPICE 一律经本脚本从
+e2m2e 的 GitHub Release 下载预编译的 MICE 工具包（``cspice-windows-v1`` /
+``cspice-linux-v1``），解压后把 ``mice_{platform}`` 目录作为 ``CSPICE_DIR`` 输出。
+``cspice-sys`` 的 build.rs 检测到 ``CSPICE_DIR`` 即使用之；缺 ``CSPICE_DIR`` 时构建直接报错
 （见 cspice-sys build.rs 第 21-33 行）。
 
 用法：
