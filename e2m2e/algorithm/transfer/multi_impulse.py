@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Literal
@@ -28,9 +29,10 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 import numpy.typing as npt
 from scipy.integrate import solve_ivp
-from scipy.optimize import Bounds, minimize
+from scipy.optimize import Bounds, OptimizeResult, minimize
 
 from ...data.templates import ConvergenceState, FailureCause
+from ...exceptions import PropagationFailure
 from ..results import scipy_slsqp_status
 from .config import TransferArc, TransferSolution
 from .lambert import solve_lambert
@@ -40,11 +42,19 @@ from .three_body_lambert import ThreeBodyLambert
 if TYPE_CHECKING:
     from ..dynamics import CR3BP_Dynamics
 
+logger = logging.getLogger(__name__)
+
 Closure = Literal["two_body", "three_body"]
 
 # 目标函数在弧段封闭失败（Lambert 不收敛、打靶发散、几何退化）时返回的罚值。
 # 正常 ΔV 量级为 km/s，1e3 足以把这类点逐出搜索域。
 _CLOSURE_PENALTY = 1e3
+
+# SLSQP 单次优化相对初猜的改善低于该值（km/s）视为"卡住"：目标函数在
+# 零脉冲初猜（双脉冲弧上的点，目标值恰为双脉冲成本）附近梯度极小，SLSQP
+# 收敛判据可能提前触发、一步即停（#384）。触发后从微扰初猜重试；正常收敛
+# 的改善为 0.1 量级。
+_STALLED_IMPROVEMENT = 1e-6
 
 # 二体传播（含 STM）的积分容差；主矢量对 STM 精度敏感，取紧容差
 _TB_RTOL = 1e-11
@@ -240,6 +250,11 @@ class MultiImpulseTransfer:
 
         Returns:
             :class:`TransferSolution`，弧段数 = n_impulses − 1
+
+        Note:
+            SLSQP 对零脉冲初猜（目标值恰为双脉冲成本的弧上点）数值敏感：目标函数
+            在该平坦走廊上梯度极小，收敛判据可能提前触发、一步即停（#384）。首次
+            优化相对初猜改善不足时，自动从微扰初猜重试，取总 ΔV 最小者。
         """
         if backend != "scipy":
             raise ValueError(f"当前仅支持 backend='scipy'，得到 {backend!r}")
@@ -266,15 +281,30 @@ class MultiImpulseTransfer:
             {"type": "ineq", "fun": lambda y, i=i: y[i + 1] - y[i] - min_dt}
             for i in range(n_mid - 1)
         ]
-        result = minimize(
-            lambda y: self._total_dv(y, closure),
-            y0,
-            method="SLSQP",
-            bounds=Bounds(lb, ub),
-            constraints=constraints,
-            options={"ftol": 1e-12, "maxiter": 500, "disp": verbose},
-        )
-        status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
+
+        def _solve(
+            start: np.ndarray,
+        ) -> tuple[OptimizeResult, ConvergenceState, FailureCause]:
+            result = minimize(
+                lambda y: self._total_dv(y, closure),
+                start,
+                method="SLSQP",
+                bounds=Bounds(lb, ub),
+                constraints=constraints,
+                options={"ftol": 1e-12, "maxiter": 500, "disp": verbose},
+            )
+            status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
+            return result, status, cause
+
+        # SLSQP 对零脉冲初猜数值敏感（#384）：目标函数在双脉冲弧附近梯度极小，
+        # 收敛判据可能提前触发、一步即停。首次优化改善不足时从微扰初猜重试，
+        # 取总 ΔV 最小者。
+        candidates = [_solve(y0)]
+        if self._total_dv(y0, closure) - candidates[0][0].fun < _STALLED_IMPROVEMENT:
+            logger.info("多脉冲优化相对初猜无改善（#384 零脉冲平坦区），微扰初猜重试")
+            for start in self._stalled_retries(y0, n_mid):
+                candidates.append(_solve(start))
+        result, status, cause = min(candidates, key=lambda c: c[0].fun)
         return self._build_solution(
             result.x,
             closure,
@@ -450,7 +480,8 @@ class MultiImpulseTransfer:
 
         该初猜对应零中途脉冲解（目标值即双脉冲成本），SLSQP 从可行邻域
         出发只降不升；比端点直线插值（可能穿过中心天体附近的退化几何）
-        稳健。封闭/传播失败时回退为端点线性插值。
+        稳健。封闭/传播失败（Lambert 无解、打靶未收敛、传播失败）时回退
+        为端点线性插值，并记录警告（#352：不静默退化）。
         """
         fracs = (np.arange(n_mid) + 1.0) / (n_mid + 1.0)
         try:
@@ -459,10 +490,30 @@ class MultiImpulseTransfer:
             t_eval = self.term0.time + np.concatenate([[0.0], fracs * self._tof])
             res = self._propagate_arc(state0, t_eval, closure, with_stm=False)
             positions = res["states"][1:, :3]
-        except Exception:
+        except (RuntimeError, ValueError, PropagationFailure) as e:
+            # 预期失败（Lambert 无解 / 打靶未收敛 / 传播失败）：回退线性插值
+            # 初猜并标记；编程错误（如参数形状）不被吞
+            logger.warning("双脉冲初猜失败，回退端点线性插值：%s", e)
             r0, rf = self.term0.state[:3], self.term1.state[:3]
             positions = np.array([r0 + f * (rf - r0) for f in fracs])
         return np.concatenate([fracs * self._tof, positions.ravel()])
+
+    def _stalled_retries(self, y0: np.ndarray, n_mid: int) -> list[np.ndarray]:
+        """SLSQP 卡在零脉冲平坦区（#384）时的微扰重试初猜。
+
+        时刻分量整体缩放（保持递增顺序）、位置分量小幅缩放，扰动后的起点
+        脱离双脉冲弧上的平坦走廊，通常能找到下降方向。
+        """
+        retries = []
+        for factor in (0.5, 1.5, 2.0):
+            p = y0.copy()
+            p[:n_mid] *= factor
+            retries.append(p)
+        for factor in (0.9, 1.1):
+            p = y0.copy()
+            p[n_mid:] *= factor
+            retries.append(p)
+        return retries
 
     def _node_positions(self, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """把决策向量解码为节点时刻（相对 s）与位置序列（含两端点）。"""
