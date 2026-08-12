@@ -1,12 +1,45 @@
 //! 二体 Lambert 求解器：Izzo (2015) 算法。
 //!
-//! 无量纲 x 域时间方程 + 三阶 Householder 迭代；初值按 Izzo/pykep 的
-//! 分段构造，多圈最小时间用 Halley 迭代定位。蓝本：Izzo 2015
-//! 《Revisiting Lambert's Problem》与 jacobwilliams 的 Fortran
-//! `lambert_module.f90`（pykep 移植）。
+//! 无量纲 x 域时间方程 + 三阶 Householder 迭代；初值按 Izzo 的
+//! 分段构造，多圈最小时间用 Halley 迭代定位。算法依据 Izzo 2015
+//! 《Revisiting Lambert's Problem》，代码结构参照 jacobwilliams 的
+//! Fortran `lambert_module.f90`（Fortran-Astrodynamics-Toolkit）移植。
 //!
 //! 多圈（revs ≥ 1）时每个 tof 存在左右两个分支解，本模块返回右分支
 //! （低能解，x > x_min）。
+//!
+//! ------------------------------------------------------------------------
+//! 本文件含移植自 Fortran-Astrodynamics-Toolkit 的代码。原项目以
+//! BSD-3-Clause 发布，转载其版权声明如下：
+//!
+//! Copyright (c) 2014-2025, Jacob Williams
+//! All rights reserved.
+//!
+//! Redistribution and use in source and binary forms, with or without
+//! modification, are permitted provided that the following conditions are met:
+//!
+//! * Redistributions of source code must retain the above copyright notice,
+//!   this list of conditions and the following disclaimer.
+//! * Redistributions in binary form must reproduce the above copyright notice,
+//!   this list of conditions and the following disclaimer in the documentation
+//!   and/or other materials provided with the distribution.
+//! * The names of its contributors may not be used to endorse or promote
+//!   products derived from this software without specific prior written
+//!   permission.
+//!
+//! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+//! AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+//! IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+//! ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+//! LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+//! CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+//! SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+//! INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+//! CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+//! ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+//! POSSIBILITY OF SUCH DAMAGE.
+//!
+//! 出处：https://github.com/jacobwilliams/Fortran-Astrodynamics-Toolkit
 
 use std::f64::consts::PI;
 
@@ -17,7 +50,7 @@ pub enum TransferDirection {
     LongWay,
 }
 
-/// Householder 收敛容差与最大迭代数（取自 pykep / Fortran 移植）。
+/// Householder 收敛容差与最大迭代数（取自 Fortran 蓝本）。
 const TOL_SINGLE_REV: f64 = 1e-5;
 const TOL_MULTI_REV: f64 = 1e-8;
 const MAX_HOUSEHOLDER_ITERS: u32 = 15;
