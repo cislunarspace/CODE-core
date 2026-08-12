@@ -77,7 +77,7 @@ class NavigationErrorModel:
         """叠加一次测定轨高斯扰动（式 5.37/5.38/5.39）。
 
         Args:
-            state: GCRS 状态 ``[x, y, z, vx, vy, vz]``（km, km/s）
+            state: GCRS 状态 ``[x, y, z, vx, vy, vz]`` （km, km/s）
             sampler: 标准正态采样器
 
         Returns:
@@ -118,12 +118,12 @@ class ThrustExecutionError:
 
         理论控制量 ``Δv_c`` 为 3 矢量（m/s）。结果约定：
 
-        - 不开机（``|Δv_c| < dv_min``）：返回 ``None``（零矢量），非失败
+        - 不开机（``|Δv_c| < dv_min``）：返回 ``None`` （零矢量），非失败
         - 绝对误差段：大小 ``Δv + N(0, abs_sigma)``、方向角加高斯误差
         - 相对误差段：大小 ``Δv·(1 + N(0, rel_sigma))``、方向角加高斯误差
         - 失败（``|Δv_c| > dv_max``）：返回 ``(None, True)``
 
-        方向误差按式 5.40 的球面角模型：``α``（方位角）与 ``β``（仰角）
+        方向误差按式 5.40 的球面角模型：``α`` （方位角）与 ``β`` （仰角）
         各加高斯误差，实际方向为 (cosβ'cosα', cosβ'sinα', sinβ')。
         """
         dv_c = np.asarray(dv_c, dtype=float)

@@ -2,6 +2,8 @@
 title: 功能需求
 ---
 
+# 功能需求
+
 ```mermaid
 requirementDiagram
     requirement REQ_001 {

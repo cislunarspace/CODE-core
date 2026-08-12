@@ -219,7 +219,7 @@ class ForceModel:
     def _raise_to_rust_spec_none(self, force_name: str) -> NoReturn:
         """``to_rust_spec`` 返回 None 时按原因分流报错（ADR 0020 决策 4）。
 
-        ``system`` 无 ``spice``（资源缺失，环境没搭好）→
+        ``system`` 无 ``spice`` （资源缺失，环境没搭好）→
         :class:`RustExtensionUnavailableError`，措辞含修复指引；
         ``system`` 有 ``spice`` 但力仍无 Rust 实现（能力缺失，如非 EARTH
         drag、特定潮汐模式）→ ``NotImplementedError``，措辞指明是模型限制。

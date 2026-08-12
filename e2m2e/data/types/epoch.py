@@ -1,6 +1,6 @@
 """时间类型：UTC/TDB/TAI 等时间尺度的类型别名与约定。
 
-**TDB 作动力学统一时间**（ADR 0015）：算法层/数值层内部统一用 ET(TDB) 或
+**TDB 作动力学统一时间** （ADR 0015）：算法层/数值层内部统一用 ET(TDB) 或
 JD_TDB；只有接口边界（api/Pydantic/输出格式）才转 UTC。
 
 时间转换是 ``EphemerisProvider`` 的方法（不单独 TimeSystem 类）：utc_to_tdb、

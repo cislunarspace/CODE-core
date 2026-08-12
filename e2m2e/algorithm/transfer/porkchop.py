@@ -361,7 +361,7 @@ def pareto_front(
     严格更优。前沿（rank 0）即不被任何有效点支配的点集。仅对有效点
     （``total`` 非 NaN）排序；NaN 组合不参与。
 
-    默认目标为 ``min(total)`` 与 ``min(tof)``（Topputo 2013 双目标范式）。
+    默认目标为 ``min(total)`` 与 ``min(tof)`` （Topputo 2013 双目标范式）。
     也支持 ``("dv1", "tof")`` 等其它字段组合；字段名必须是
     :class:`PorkchopData` 的 ndarray 字段。
 
@@ -373,7 +373,7 @@ def pareto_front(
         objectives: 两个目标字段名（越小越优）。
 
     Returns:
-        :class:`ParetoFront`（仅 rank 0 点）。
+        :class:`ParetoFront` （仅 rank 0 点）。
 
     Raises:
         ValueError: 目标字段名不存在，或无有效点。

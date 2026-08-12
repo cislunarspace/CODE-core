@@ -5,7 +5,7 @@ Hamiltonian 的双曲-中心耦合项，把非线性 Hamiltonian 化简为仅依
 作用量的函数：
 
 - **Step 1 ``"invariant"``** （qiao ``Code10_DepartInvarManifold``）：
-  消去 ``q_1^k·p_1^l``（``k ≠ l``）的双曲交叉项，判别条件
+  消去 ``q_1^k·p_1^l`` （``k ≠ l``）的双曲交叉项，判别条件
   ``pow(1)==pow(4)`` 保留双曲"循环坐标" ``I_1 = q_1·p_1``。经此步后
   双曲方向与中心方向解耦，中心部分可独立分析；
 - **Step 2 ``"center"``** （qiao ``Code11_DepartCenterManifold``）：
@@ -22,11 +22,11 @@ Hamiltonian 的双曲-中心耦合项，把非线性 Hamiltonian 化简为仅依
    :func:`_solve_wfunc_fft_imag` 给出特解 ``ẏ = k·y + f(t)``；
    特征频率 ``k = (j_1−i_1)·λ + (j_2−i_2)·i·ω_p + (j_3−i_3)·i·ω_v``；
 2. ``W_i`` 对各高阶 Hamiltonian 的贡献由 Poisson 括号链
-   ``ad_{W_i}^n / n!``（Lie 级数）累加，再加上 ``Ẇ_i`` 项更新各阶；
+   ``ad_{W_i}^n / n!`` （Lie 级数）累加，再加上 ``Ẇ_i`` 项更新各阶；
 3. 第 ``i`` 阶按判别条件删去被 ``W_i`` 消去的项。
 
 与 qiao 数值实现一致，每个化简步骤前后做复基底变换（
-:func:`_linear_basis_change`）：先虚变换 ``X = D·Y``（实坐标 → 复坐标，
+:func:`_linear_basis_change`）：先虚变换 ``X = D·Y`` （实坐标 → 复坐标，
 二阶部分成复对角形 ``λ·y1·y4 + i·ω_p·y2·y5 + i·ω_v·y3·y6``，同调方程
 的复值特征频率 ``k`` 只有在此坐标系下才与 ``H_2`` 的泊松谱匹配），
 Lie 变换完成后实变换 ``Y = D⁻¹·X`` 映回实坐标并取实部（吸收数值虚部
@@ -44,7 +44,7 @@ Public API：
 - :class:`CenterManifoldResult` —— 化简结果句柄；
 - :class:`CenterManifoldReducer` —— 上下文绑定的 reducer。
 
-输入 :class:`QuasiFloquetResult` 只提供二阶实标准形 ``D``（频率
+输入 :class:`QuasiFloquetResult` 只提供二阶实标准形 ``D`` （频率
 ``λ``、``ω_p``、``ω_v``）；高阶非线性 Hamiltonian 项需经
 ``hamiltonian_terms`` 参数注入（对应 qiao ``Code09`` 的
 ``L?_QF_Hamilton.npz``：``{pow_tuple: coef_array}``，系数为时间序列
@@ -96,8 +96,8 @@ class CenterManifoldResult:
         order: 化简截断阶数（``max_order``）。
         W_series: 各步、各阶生成函数 ``W`` 的系数表。结构
             ``{step_name: {order: {pow_tuple: coef_array}}}``，封装访问；
-            ``step_name ∈ {"invariant", "center"}``。系数为**复值**时间
-            序列 ``ndarray``（``invariant`` 步 W 天然实值、虚部≈0；
+            ``step_name ∈ {"invariant", "center"}``。系数为**复值** 时间
+            序列 ``ndarray`` （``invariant`` 步 W 天然实值、虚部≈0；
             ``center`` 步 W 为纯虚、实部≈0）——与 qiao Code10/Code11
             输出的复值 ``.npz`` 一致，供 ``coord_trans`` 的 QF↔CM Lie
             流在复域消费。不直接暴露 qiao 的 ``powers``/``coefficients``
@@ -117,7 +117,7 @@ class CenterManifoldResult:
 
     @property
     def max_hyperbolic_coupling(self) -> float:
-        """化简后剩余双曲-中心**耦合**项系数的最大绝对值。
+        """化简后剩余双曲-中心**耦合** 项系数的最大绝对值。
 
         耦合指双曲方向不平衡（``pow[0] != pow[3]``）且涉及中心方向的
         项——Step 1（``invariant``）的消去对象。双曲平衡的作用量项
@@ -262,7 +262,7 @@ def _linear_basis_change(
 
 
 def _characteristic_freq(pow_tuple: tuple[int, ...], lam: float, wp: float, wv: float) -> complex:
-    """同调方程的特征频率 ``k``（复值）。
+    """同调方程的特征频率 ``k`` （复值）。
 
     ``k = (j_1 − i_1)·λ + (j_2 − i_2)·i·ω_p + (j_3 − i_3)·i·ω_v``，
     其中 ``pow_tuple = (i_1, i_2, i_3, j_1, j_2, j_3)`` 对应
@@ -270,7 +270,7 @@ def _characteristic_freq(pow_tuple: tuple[int, ...], lam: float, wp: float, wv: 
     ``ω_p``/``ω_v`` 是平面/垂直中心频率。对应 qiao
     ``Solve_Wfunc_fft`` 中 ``k`` 的定义。
 
-    ``k == 0``（共振项）时同调方程不可解，调用方负责跳过此类项。
+    ``k == 0`` （共振项）时同调方程不可解，调用方负责跳过此类项。
     """
     i1, i2, i3, j1, j2, j3 = (int(p) for p in pow_tuple)
     return complex(
@@ -374,7 +374,7 @@ def _solve_wfunc_fft_imag(
     extension_ratio: float = _DEFAULT_EXTENSION_RATIO,
     mad_kval: float = _DEFAULT_MAD_KVAL,
 ) -> tuple[npt.NDArray[np.complex128], bool]:
-    """频域求解 ``ẏ = k·y + f(t)``（复值 ``f``，含 MAD 离群抑制）。
+    """频域求解 ``ẏ = k·y + f(t)`` （复值 ``f``，含 MAD 离群抑制）。
 
     迁移自 qiao ``Solve_Wfunc_fft_imag``：结构与 :func:`_solve_wfunc_fft`
     一致，但额外对 FFT 结果做 MAD 离群抑制，返回 ``(y, corrected)``。
@@ -585,9 +585,9 @@ def _lie_transform_step(
         tlist: 时间序列。
         lam, wp, wv: 频率（双曲/平面/垂直）。
         keep_criterion: 保留判据（决定**是否对该项求 W**）；满足者跳过
-            （W 记零）。Code10 用 ``_is_invariant_term``（``pow1==pow4``），
-            Code11 用 ``_is_center_term``（三对全平衡）。
-        delete_criterion: 该阶处理完后**删除**不满足此判据的项。
+            （W 记零）。Code10 用 ``_is_invariant_term`` （``pow1==pow4``），
+            Code11 用 ``_is_center_term`` （三对全平衡）。
+        delete_criterion: 该阶处理完后**删除** 不满足此判据的项。
             Code10 与 Code11 不同：Code10 删双曲不平衡项
             （``pow1≠pow4``），Code11 只删真正求过 W 的项
             （``list_iseliminate``）。
@@ -596,7 +596,7 @@ def _lie_transform_step(
 
     Returns:
         ``(H_by_order, W_series)``：``W_series`` 为
-        ``{order: {pow: W_coef}}``（复值，``W_coef`` 时间序列）。
+        ``{order: {pow: W_coef}}`` （复值，``W_coef`` 时间序列）。
 
     Notes:
         忠实迁移 qiao ``Code10``/``Code11`` 的逐阶循环：
@@ -700,7 +700,7 @@ def _delete_invariant(pow_tuple, eliminated: list[tuple[int, ...]]) -> bool:
 
     qiao ``Code10`` 第 280–287 行：``if pow(1) == pow(4) continue``
     （``pow(2)==pow(5) && pow(3)==pow(6)`` 在 qiao 源码中被注释掉）——
-    只删双曲方向不平衡的项，中心方向不平衡项**保留**给 Step 2
+    只删双曲方向不平衡的项，中心方向不平衡项**保留** 给 Step 2
     （``center``）处理。
     """
     return int(pow_tuple[0]) == int(pow_tuple[3])
@@ -709,7 +709,7 @@ def _delete_invariant(pow_tuple, eliminated: list[tuple[int, ...]]) -> bool:
 def _delete_center(pow_tuple, eliminated: list[tuple[int, ...]]) -> bool:
     """Code11 删除判据：保留非 eliminated 的项。
 
-    qiao ``Code11`` 第 146–148 行：只删 ``list_iseliminate``（即本阶求
+    qiao ``Code11`` 第 146–148 行：只删 ``list_iseliminate`` （即本阶求
     过 W 的项），其他项（包括 Poisson cascade 新生成的）保留。Code11
     的 ``keep_criterion`` 已是三对全平衡，故非 eliminated 项天然是作用量项。
     """
@@ -747,9 +747,9 @@ class CenterManifoldReducer:
 
         Args:
             qf_result: quasi-Floquet 变换结果（切片 #172），提供实标准形
-                ``D``（频率 ``λ``/``ω_p``/``ω_v``）与采样时间 ``tlist``。
+                ``D`` （频率 ``λ``/``ω_p``/``ω_v``）与采样时间 ``tlist``。
             hamiltonian_terms: 高阶 Hamiltonian 系数表
-                ``{pow_tuple: coef_array}``（对应 qiao ``Code09`` 的
+                ``{pow_tuple: coef_array}`` （对应 qiao ``Code09`` 的
                 ``L?_QF_Hamilton.npz``）。``None`` 时 reducer 只用二阶实
                 标准形项（平凡情形，仅供 smoke）。系数为时间序列
                 ``ndarray``，长度应与 ``qf_result.tlist`` 一致。
@@ -887,7 +887,7 @@ class CenterManifoldReducer:
 
         二阶项来自实标准形（``λ·q_1·p_1 + (ω_p/2)(q_2²+p_2²)
         + (ω_v/2)(q_3²+p_3²)``，对应 qiao ``Code09`` 的 ``NormalForm_poly``）；
-        高阶项来自 ``hamiltonian_terms``（若提供）。按总阶数分组。
+        高阶项来自 ``hamiltonian_terms`` （若提供）。按总阶数分组。
         """
         H_by_order: dict[int, dict[tuple[int, ...], npt.NDArray[np.floating]]] = {}
 
@@ -942,9 +942,9 @@ class CenterManifoldReducer:
 def _max_hyperbolic_center_coupling(
     terms: Mapping[tuple[int, ...], npt.ArrayLike],
 ) -> float:
-    """计算 Hamiltonian 表中双曲-中心**耦合**项系数的最大绝对值。
+    """计算 Hamiltonian 表中双曲-中心**耦合** 项系数的最大绝对值。
 
-    耦合指**双曲方向不平衡**（``pow[0] != pow[3]``）且涉及中心方向的
+    耦合指**双曲方向不平衡** （``pow[0] != pow[3]``）且涉及中心方向的
     项——Step 1（``invariant``）的消去对象。双曲方向平衡的项（如
     ``I₁³·I₂²``）只是作用量组合：在中心流形上 ``q₁=p₁=0`` 时自动为零，
     不是耦合，不统计在内。

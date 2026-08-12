@@ -30,7 +30,7 @@ fn binom(n: usize, k: usize) -> usize {
     r
 }
 
-/// 把 ``(Σ_j m_j·y_j)^n`` 的展开乘进 ``terms``（合并同幂次）。
+/// 把 ``(Σ_j m_j·y_j)^n`` 的展开乘进 ``terms`` （合并同幂次）。
 ///
 /// ``row`` 是变换矩阵一行的非零 ``(列号 j, 系数 m_j)`` 列表；``terms``
 /// 是当前部分展开表 ``{pow: coef}``。枚举 ``n`` 个因子分配到 ``row``
@@ -210,21 +210,23 @@ pub fn project_hamiltonian_qf_py(
 
 /// CR3BP Hamiltonian 构造（Jorba-Masdemont ``c_n·ρⁿ·P_n(x/ρ)`` 形式）。
 ///
-/// ``H = ½‖p‖² + y·p_x − x·p_y − Σ_{n≥2} c_n·ρⁿ·P_n(x/ρ)``（地心会合系、
+/// ``H = ½‖p‖² + y·p_x − x·p_y − Σ_{n≥2} c_n·ρⁿ·P_n(x/ρ)`` （地心会合系、
 /// 平动点偏移坐标），``c_n = (-1)ⁿ/γ³·[μ + (1−μ)·rho_e_ratioⁿ⁺¹]``
 /// （JM 1999 式 1）。``Q_n = ρⁿ·P_n(x/ρ)`` 用递推
 /// ``Q_n = ((2n−1)/n)·x·Q_{n−1} − ((n−1)/n)·ρ²·Q_{n−2}`` 展开为
 /// ``(x, y, z)`` 的多项式（纯数值，不依赖 sympy）。
 ///
-/// Args:
-///     mu: 质量比 μ。
-///     gamma: 共线平动点的 γ。
-///     rho_e_ratio: ``γ/(1+γ)``（L2 的 JM 展开比）。
-///     max_degree: 截断阶数（≥2）。
+/// **参数**
 ///
-/// Returns:
-///     ``(pows, coefs)``：``(K, 6)`` 幂次（后 3 位动量为 0）与 ``(K,)``
-///     系数。动能与科里奥利项（``½‖p‖²``、``y·p_x − x·p_y``）已包含。
+/// - ``mu``: 质量比 μ。
+/// - ``gamma``: 共线平动点的 γ。
+/// - ``rho_e_ratio``: ``γ/(1+γ)`` （L2 的 JM 展开比）。
+/// - ``max_degree``: 截断阶数（≥2）。
+///
+/// **返回**
+///
+/// ``(pows, coefs)``：``(K, 6)`` 幂次（后 3 位动量为 0）与 ``(K,)``
+/// 系数。动能与科里奥利项（``½‖p‖²``、``y·p_x − x·p_y``）已包含。
 #[pyfunction]
 #[pyo3(signature = (mu, gamma, rho_e_ratio, max_degree))]
 pub fn build_cr3bp_hamiltonian_py(

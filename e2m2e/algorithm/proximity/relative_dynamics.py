@@ -7,7 +7,7 @@
 - :class:`TargetOrbit`：目标轨道包装，提供任意时刻状态查询
 - :class:`RelativeDynamics`：RLM 线性化 + 相对状态/STM 传播
 
-坐标系约定：相对状态默认在**会合系（Synodic）**下定义（与 CR3BP 动力学
+坐标系约定：相对状态默认在**会合系（Synodic）** 下定义（与 CR3BP 动力学
 同系），LVLH 转换由调用方经 :class:`~e2m2e.core.coordinate.LVLHAxes` 完成。
 """
 
@@ -278,10 +278,10 @@ class RelativeDynamics:
 
         对每个引力中心，Encke 公式（Battin 标准形式）：
 
-            a_grav(r + δr) − a_grav(r) = −μ/|r|³ [f(q)·q·r + g(q)·δr]
+            ``a_grav(r + δr) - a_grav(r) = -μ/|r|³ [f(q)·q·r + g(q)·δr]``
 
         其中 ``q = (2r·δr + |δr|²)/|r|²``，
-        ``f(q) = ((1+q)^(−3/2) − 1)/q``（q→0 时 f→−3/2，用级数展开），
+        ``f(q) = ((1+q)^(−3/2) − 1)/q`` （q→0 时 f→−3/2，用级数展开），
         ``g(q) = (1+q)^(−3/2)``。
 
         Args:
@@ -341,7 +341,7 @@ class RelativeDynamics:
         Args:
             rho0: 初始相对状态 ``[δr, δv]``，形状 ``(6,)``
             t_span: 传播区间
-            method: ``"encke"``（推荐）或 ``"newton"``（两式相减，精度低）
+            method: ``"encke"`` （推荐）或 ``"newton"`` （两式相减，精度低）
             rtol, atol: 积分容差
             max_step: 最大步长
 

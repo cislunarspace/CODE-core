@@ -9,7 +9,7 @@
 设计函数 ``design_xxx(params) -> Orbit``；``algorithm/design`` 的
 ``design_orbit`` 查注册表按族分发（新族 = 写一个设计函数 + 注册）。
 
-``cr3bp_orbits``（六类初猜）依赖 ``algorithm/solver``，而 solver 依赖本包
+``cr3bp_orbits`` （六类初猜）依赖 ``algorithm/solver``，而 solver 依赖本包
 的 ``halo_initial_guess``——为打破包级循环导入，初猜函数经 PEP 562
 ``__getattr__`` 惰性导出。
 """

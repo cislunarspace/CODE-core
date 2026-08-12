@@ -591,7 +591,7 @@ class DROTRONLPOptimizer:
         - ``max(x) > 3.0``：轨迹绕到地月系统外侧，外部转移 ``TransferType.EXTERNAL``
         - 其余情况：含月球引力辅助的转移 ``TransferType.LGA``
 
-        积分失败或轨迹为空时返回 :class:`TransferType.UNKNOWN`（#352：
+        积分失败或轨迹为空时返回 :class:`TransferType.UNKNOWN` （#352：
         不再假装 DIRECT——空轨迹无法分类）。
 
         该结果会写入 :class:`TransferOptimizationResult.transfer_type`，

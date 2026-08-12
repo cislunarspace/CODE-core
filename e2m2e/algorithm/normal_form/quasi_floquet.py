@@ -17,10 +17,10 @@
   ``Ḃ = M·B − B·D``，事后用 Newton 迭代把每个采样点的 ``B`` 投影到
   最近的辛矩阵（qiao ``Code08_QuasiFloquet``）；
 - **李代数法** （``method="lie_algebra"``）：参数化 ``B = B₀·exp(ξ)``，
-  ``ξ ∈ sp(6, R)``（21 维），在李代数里做修正，``B`` 自动保辛（qiao
+  ``ξ ∈ sp(6, R)`` （21 维），在李代数里做修正，``B`` 自动保辛（qiao
   ``Code08_QuasiFloquet_LA``）；
 - **常数法** （``method="constant"``）：CR3BP 下 ``M`` 是常数矩阵，
-  方程 ``Ḃ = M·B − B·D`` 有常数解 ``B = V``（把 ``M`` 化到实标准形
+  方程 ``Ḃ = M·B − B·D`` 有常数解 ``B = V`` （把 ``M`` 化到实标准形
   ``D`` 的变换矩阵）。``V`` 的元素 O(1)、不随 ``e^{λt}`` 增长，投影到
   QF 坐标的 Hamiltonian 系数保持常数——中心流形化简的同调方程退化为
   代数除法（Gómez vol III §2.7.1），无需 FFT 频域求解。矩阵法/多点
@@ -98,7 +98,7 @@ def real_normal_form_transform(
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """CR3BP 常数 QF 变换矩阵 ``V``：``X = V·Y`` 把常数 ``M`` 化为实标准形。
 
-    ``M`` 必须是**常数 Hamilton 矩阵**（``MᵀJ + JM = 0``，如
+    ``M`` 必须是**常数 Hamilton 矩阵** （``MᵀJ + JM = 0``，如
     :func:`_cr3bp_hamiltonian_linearization` 的输出）——Hamilton 矩阵的
     特征向量满足 J 正交性，实标准形基 ``V`` 才能同时辛归一化与对角化
     （速度框架 ``[[0,I],[S,−2Ω×]]`` 不是 Hamilton 矩阵，其基无法辛
@@ -114,8 +114,8 @@ def real_normal_form_transform(
     并做辛归一化（``v_iᵀJv_{i+3} = 1`` 的列缩放 + 符号）与
     :func:`symplectic_project` 精修，使 ``VᵀJV = J``、``V⁻¹MV = D``。
     注：``ω_p`` 与 ``ω_v`` 按频率升序无法区分面内/面外（L1/L2 面内
-    频率更大），本函数按**特征向量的 z 分量占优**区分：z 占优为
-    ``ω_v``（垂直）、x/y 占优为 ``ω_p``（平面）。
+    频率更大），本函数按**特征向量的 z 分量占优** 区分：z 占优为
+    ``ω_v`` （垂直）、x/y 占优为 ``ω_p`` （平面）。
 
     Args:
         M: ``(6, 6)`` 常数 Hamilton 线性化矩阵。
@@ -194,7 +194,7 @@ def _cr3bp_hamiltonian_linearization(
 
         M_H = \\begin{pmatrix} C & I \\\\ S_{grav} & C \\end{pmatrix}
 
-    满足 ``M_HᵀJ + J·M_H = 0``（Hamilton 矩阵），其特征向量具有
+    满足 ``M_HᵀJ + J·M_H = 0`` （Hamilton 矩阵），其特征向量具有
     J 正交性，可构造同时辛归一化与对角化的实标准形变换
     （:func:`real_normal_form_transform`）。速度框架
     ``[[0, I], [S_eff, −2Ω×]]`` 不是 Hamilton 矩阵，不可用于此。
@@ -225,8 +225,8 @@ def _cr3bp_hamiltonian_linearization(
 def build_sp6_basis() -> list[npt.NDArray[np.floating]]:
     """构造 sp(6, R) 的 21 维正交基 ``{E_k}`` （Frobenius 归一）。
 
-    三块结构：``A`` 块 ``n²=9``（``E_ij = e_i e_jᵀ − e_{n+j} e_{n+i}ᵀ``）、
-    ``B`` 块 ``n(n+1)/2=6``（右上对称）、``C`` 块 ``n(n+1)/2=6``
+    三块结构：``A`` 块 ``n²=9`` （``E_ij = e_i e_jᵀ − e_{n+j} e_{n+i}ᵀ``）、
+    ``B`` 块 ``n(n+1)/2=6`` （右上对称）、``C`` 块 ``n(n+1)/2=6``
     （左下对称）。对应 qiao ``_build_sp6_basis``。
     """
     n = 3
@@ -346,9 +346,9 @@ def _cr3bp_hessian_symmetric(r: npt.NDArray[np.floating], mu: float) -> npt.NDAr
     坐标系与 qiao ``Dynfunc_rho`` 一致：地心会合系（地球在原点、月球在
     ``(1,0,0)``）。``r`` 为该系下的位置（如 ``ρ + 平动点位置``）。
 
-    有效势 ``Ω = ½(x²+y²) + (1−μ)/r₁ + μ/r₂``（离心绕地心，仅 x-y 平面），
+    有效势 ``Ω = ½(x²+y²) + (1−μ)/r₁ + μ/r₂`` （离心绕地心，仅 x-y 平面），
     其 Hessian 对角为 ``(1+2c₂, 1−c₂, −c₂)``，其中
-    ``c₂ = (1−μ)/r₁³ + μ/r₂³``，``r₁=|r|``（到地球）、``r₂=|r−(1,0,0)|``（到月球）。
+    ``c₂ = (1−μ)/r₁³ + μ/r₂³``，``r₁=|r|`` （到地球）、``r₂=|r−(1,0,0)|`` （到月球）。
     """
     mu1 = 1.0 - mu
     r1 = r  # 到地球（地心会合系地球在原点）
@@ -375,13 +375,13 @@ def _build_M_at(
     Callable[[float], npt.NDArray[np.floating]],
     npt.NDArray[np.floating],
 ]:
-    """从替代轨道构造 ``M(t)`` 的**连续**求值器与采样点栈。
+    """从替代轨道构造 ``M(t)`` 的**连续** 求值器与采样点栈。
 
-    ``M(t)`` 是**动量框架**（Hamiltonian 正则坐标 ``(q, p)``）的线性化
+    ``M(t)`` 是**动量框架** （Hamiltonian 正则坐标 ``(q, p)``）的线性化
     （:func:`_cr3bp_hamiltonian_linearization` 同款，Hamilton 矩阵，
     ``MᵀJ + JM = 0``）：
 
-    ``M = [[C, I₃], [S_grav, C]]``，``C = Ω×``（旋转耦合）、
+    ``M = [[C, I₃], [S_grav, C]]``，``C = Ω×`` （旋转耦合）、
     ``S_grav`` 为纯引力势 Hessian（无离心）。
 
     选动量框架而非速度框架 ``[[0, I], [S_eff, −2Ω×]]`` 的原因：
@@ -390,8 +390,8 @@ def _build_M_at(
     矩阵，特征向量具有 J 正交性，实标准形变换 ``V`` 可同时辛归一化与
     对角化，且 ``BᵀJB`` 是 ``Ḃ`` 方程的首次积分（速度框架两者皆不成立）。
 
-    关键：返回的求值器 ``M_at(t)`` 在任意 ``t`` 上**重新解析地**计算
-    ``S_grav``（先对轨道位置线性插值，再算对称 Hessian），因此在 ODE 的
+    关键：返回的求值器 ``M_at(t)`` 在任意 ``t`` 上**重新解析地** 计算
+    ``S_grav`` （先对轨道位置线性插值，再算对称 Hessian），因此在 ODE 的
     每个自适应步上 ``M(t)`` 都是精确的 Hamilton 矩阵。这避免了「预计算
     ``M`` 再线性插值」会让 ``MᵀJ+JM=0`` 在节点之间失效、从而破坏辛
     守恒的问题。
@@ -503,13 +503,13 @@ def _solve_qf_matrix(
             （仅适合 ``λT < 10`` 的小窗口）。非 ``None`` 时把积分区间按
             ``segment`` 分短段，每段末用 :func:`symplectic_project` 把 ``B``
             拉回辛群——抑制双曲方向 ``e^(λt)`` 增长导致的辛误差累积。
-            段长取 ``0.4``–``0.8``（与 qiao ``node_step`` 一致，使单段
+            段长取 ``0.4``–``0.8`` （与 qiao ``node_step`` 一致，使单段
             ``e^(λ·segment)`` 有限）。这避免长窗口的 overflow，但 ``B`` 的
             双曲分量仍按 ``e^(λt)`` 物理增长（中心流形约化本就如此）。
 
             .. note::
                分段 + 投影是 ``qiao`` 完整多点打靶（块三对角 Newton）的最小
-               替代。对 ``λT ≳ 40``（如 L2 的 30 天窗口）仍可能精度不足，
+               替代。对 ``λT ≳ 40`` （如 L2 的 30 天窗口）仍可能精度不足，
                需完整多点打靶（见 issue #328）。
     """
     from ._solve_ivp_rust import solve_ivp_rust
@@ -629,11 +629,11 @@ def _solve_qf_multipoint(
     rtol: float = 1e-11,
     atol: float = 1e-13,
 ) -> npt.NDArray[np.floating]:
-    """多点打靶法求 quasi-Floquet 变换 ``B(t)``（qiao Code08 路径）。
+    """多点打靶法求 quasi-Floquet 变换 ``B(t)`` （qiao Code08 路径）。
 
     把区间 ``[t0, tf]`` 按 ``node_step`` 分短段，每段用 36 维向量化 STM
-    ``Φ_i = expm((I⊗M − D^T⊗I)·node_step)``（短弧 ``e^(λ·node_step)`` 有限，
-    不 overflow），再解节点连续性方程 ``Φ_i·B_i = B_{i+1}``（边界 ``B_N=I``）
+    ``Φ_i = expm((I⊗M − D^T⊗I)·node_step)`` （短弧 ``e^(λ·node_step)`` 有限，
+    不 overflow），再解节点连续性方程 ``Φ_i·B_i = B_{i+1}`` （边界 ``B_N=I``）
     得各节点 ``B_i``，节点间用段 STM 单步稠密化。
 
     与单次积分 (:func:`_solve_qf_matrix`) 的根本区别：长窗口下 ``B(t)`` 的
@@ -642,18 +642,18 @@ def _solve_qf_multipoint(
     每段 STM 精度保持，连锁求解是纯线性代数——辛误差不随窗口增长。
 
     对 CR3BP（``M`` 常数），所有段 STM 相同，连续性方程有显式解
-    ``B_i = Φ^{-(N-i)}·B_N``（反向递推）；对时变 ``M``，逐段算 STM 后用
+    ``B_i = Φ^{-(N-i)}·B_N`` （反向递推）；对时变 ``M``，逐段算 STM 后用
     块三对角 Thomas 算法求解。
 
     Args:
-        node_step: 节点间距（TU），默认 ``0.8``（与 qiao ``Code08`` 一致，
+        node_step: 节点间距（TU），默认 ``0.8`` （与 qiao ``Code08`` 一致，
             使 ``e^(λ·node_step)`` 有限）。L2 ``λ≈2.16`` 时 ``0.8`` 给
             ``e^1.73≈5.6``。
         rtol/atol: 段 STM 数值积分容差（时变 ``M`` 用；常数 ``M`` 用
             ``expm`` 解析）。
 
     Returns:
-        ``(N, 6, 6)`` 采样点 ``B(t)``。``B(tlist[-1]) = I``（末节点边界）。
+        ``(N, 6, 6)`` 采样点 ``B(t)``。``B(tlist[-1]) = I`` （末节点边界）。
     """
     from scipy.linalg import expm
 
@@ -711,7 +711,7 @@ def _multipoint_thomas(
 ) -> list[npt.NDArray[np.floating]]:
     """时变 M 的块三对角多点打靶（qiao Code08:251-329 路径）。
 
-    高斯-牛顿迭代解连续性 ``Φ_i·B_i − B_{i+1} = 0``（边界 ``B_N=I``），
+    高斯-牛顿迭代解连续性 ``Φ_i·B_i − B_{i+1} = 0`` （边界 ``B_N=I``），
     正则化 ``D_i = I + Φ_i·Φ_i^T`` 保证可逆（Levenberg-Marquardt 式）。
     """
     from ._solve_ivp_rust import solve_ivp_rust
@@ -872,10 +872,10 @@ def _solve_qf_lie(
     不能简单令 ``ξ̇ = B⁻¹ Ḃ``：``d/dt exp(ξ) = exp(ξ)·ξ̇`` 仅当
     ``[ξ, ξ̇] = 0`` 时成立，一般情形需带 ``dexp`` 修正项
     ``ξ̇ = ad_ξ/(1−e^{−ad_ξ})(B⁻¹Ḃ)``。该项的 Bernoulli 级数在
-    ``‖ξ‖ ≳ 2π``（双曲方向 ``e^{λT}`` 增长后）发散，矩阵函数法在
+    ``‖ξ‖ ≳ 2π`` （双曲方向 ``e^{λT}`` 增长后）发散，矩阵函数法在
     ``1−e^{−ad_ξ}`` 奇异处失效，二者均不可靠。
 
-    改用 **commutator-free 4 阶 Lie group 积分器**（每步
+    改用 **commutator-free 4 阶 Lie group 积分器** （每步
     ``B ← B·exp(h·ξ_k)``，``ξ_k`` 由 RK4 加权的体速度
     ``B⁻¹Ḃ`` 的 sp(6) 投影给出）：``B·exp(sp(6))`` 恒辛，且 RK4
     以 ``h⁴`` 收敛到 ``Ḃ = M B − B D`` 的真解。这是数值稳健、
@@ -938,7 +938,7 @@ class QuasiFloquetReducer:
         project: 矩阵法是否在末尾做辛投影兜底（默认 ``True``）。
         rtol: ODE 相对容差。
         atol: ODE 绝对容差。
-        segment: 矩阵法分段辛重投影的段长（TU）。``None``（默认）单次积分，
+        segment: 矩阵法分段辛重投影的段长（TU）。``None`` （默认）单次积分，
             适合 ``λT < 10`` 的小窗口；非 ``None`` 时分短段 + 每段辛投影，
             抑制双曲方向 ``e^(λt)`` 增长导致的 overflow（详见
             :func:`_solve_qf_matrix`）。

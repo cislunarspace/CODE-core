@@ -1,8 +1,9 @@
 """重力场文件解析。
 
-支持两种格式:
-- ICGEM ``.gfc``（``load_gfc_file``）。
-- GMAT ``.cof``（``load_cof_file``），移植 GMAT ``HarmonicGravity.cpp`` 的
+支持两种格式：
+
+- ICGEM ``.gfc`` （``load_gfc_file``）。
+- GMAT ``.cof`` （``load_cof_file``），移植 GMAT ``HarmonicGravity.cpp`` 的
   ``LM_LoadCof`` 逻辑。
 
 统一入口 ``load_gravity_file`` 按文件扩展名分发。
@@ -204,9 +205,10 @@ def load_cof_file(
 ) -> GravityFileData:
     """加载 GMAT ``.cof`` 格式重力场文件。
 
-    解析逻辑移植自 GMAT ``HarmonicGravity.cpp`` 的 ``LM_LoadCof``。文件结构:
+    解析逻辑移植自 GMAT ``HarmonicGravity.cpp`` 的 ``LM_LoadCof``。文件结构：
 
     - 头行 ``POTFIELD<NNN><MMM> <flag> <Mu> <RefRadius> <Normalized>``
+
       - ``NNN``/``MMM`` 各 3 字符，分别为文件中包含的最大 degree 与 order
         （如 ``POTFIELD360360``）。
       - ``Mu`` 单位 m³/s²×1e9，解析时除以 1e9 得到 km³/s²。
@@ -215,7 +217,7 @@ def load_cof_file(
     - 系数行 ``RECOEF <n:3> <m:3> <Cnm:21> <Snm:21>``，按固定列宽解析
       （n=substr(8,3), m=substr(11,3), Cnm=substr(17,21), Snm=substr(38,21)）。
       m=0 时无 Snm 列。
-    - 以 ``COMMENT`` 或 ``C `` 开头的行为注释，跳过。
+    - 以 ``COMMENT`` 或 ``C`` + 空格开头的行为注释，跳过。
 
     返回结构与 :func:`load_gfc_file` 完全一致。COF 文件不含 dot 项,
     故 ``dotC``/``dotS`` 全零;COF 通常省略 C₀₀,此处补 1.0。

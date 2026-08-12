@@ -389,7 +389,7 @@ def reconstruct_signal(
 ) -> npt.NDArray[np.floating]:
     """从 FFT 频域表示重构时域信号 ``X(t) = Σ s·sin(ωt) + c·cos(ωt)``。
 
-    对应 qiao ``FFT_X``。当所有 ``amp_s == 0``（FFT 路径常见情况）时，
+    对应 qiao ``FFT_X``。当所有 ``amp_s == 0`` （FFT 路径常见情况）时，
     该函数退化为余弦和；一般配合 :func:`least_squares_sin_cos_fit`
     精细分配 ``(amp_s, amp_c)`` 后使用。
 

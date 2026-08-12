@@ -11,11 +11,11 @@ Hamiltonian 高阶项（阶 ≥ 3），经 quasi-Floquet 变换矩阵 ``B(t)`` �
 
 两条实现路径：
 
-1. **Rust 数值展开**（默认）：``e2m2e._integrators.project_hamiltonian_qf_py``
+1. **Rust 数值展开** （默认）：``e2m2e._integrators.project_hamiltonian_qf_py``
    对每个采样时刻做 ``X = B·Y`` 的数值多项式展开（multinomial 组合枚举），
    不依赖符号运算。CR3BP 标量系数路径下毫秒级完成。
-2. **sympy 符号展开**（回退）：扩展未编译、或系数为时间序列（星历路径）
-   时回退到 :func:`_project_hamiltonian_to_qf_sympy`（原实现，符号替换
+2. **sympy 符号展开** （回退）：扩展未编译、或系数为时间序列（星历路径）
+   时回退到 :func:`_project_hamiltonian_to_qf_sympy` （原实现，符号替换
    ``x_i → Σ_j B[i,j]·y_j`` + 逐时刻求值，较慢）。
 """
 
@@ -42,7 +42,7 @@ def project_hamiltonian_to_qf(
 
     Args:
         hamiltonian_terms: 平动点偏移坐标 ``(q1..p3)`` 下的 Hamiltonian
-            系数 dict ``{pow_tuple: float}``（如
+            系数 dict ``{pow_tuple: float}`` （如
             :func:`build_cr3bp_hamiltonian` 输出）。阶 < 3 的项被丢弃。
             系数为标量（CR3BP 自治）或 ``ndarray`` 时间序列。
         qf_result: quasi-Floquet 结果，提供 ``B(t)`` 与 ``tlist``。

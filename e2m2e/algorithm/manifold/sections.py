@@ -4,7 +4,7 @@
 提供平面截面与近拱点截面的定义，以及两类截面穿越检测：
 
 - **积分中检测**：``PoincareSection.event()`` 生成事件函数
-  ``g(t, state) -> float``（携带 ``direction``/``terminal`` 属性），传给
+  ``g(t, state) -> float`` （携带 ``direction``/``terminal`` 属性），传给
   ``Dynamics.propagate(events=...)``，由积分器在步内定位穿越，无需密采样。
 - **事后检测**：``crossings``/``detect_crossings``，传播时密采样
   t_eval → 逐采样点求截面函数 s(t)（平面：state[axis]-value；近拱点：

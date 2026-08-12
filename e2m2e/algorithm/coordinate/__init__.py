@@ -1,6 +1,6 @@
 """坐标转换算法：IAU2006/synodic↔J2000/GCRS↔EBCRS。
 
-转换**算法**归这里（ADR 0011 迁移，源：``core/coordinate/``），
+转换**算法** 归这里（ADR 0011 迁移，源：``core/coordinate/``），
 ``data/frames/`` 只留数据（EOP/闰秒/历表句柄，ADR 0015）。强化现有
 Axes/Origin/CoordinateSystem 抽象（不新增 Frame 抽象）：所有坐标系表达
 为 Axes + Origin + CoordinateSystem，时空间联合转换作为 CoordinateSystem

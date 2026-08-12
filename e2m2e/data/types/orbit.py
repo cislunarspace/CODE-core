@@ -2,7 +2,7 @@
 
 纯数据容器（ADR 0011 迁移，源：``core/orbit.py``）：states（形状
 (n_points, 6)）+ times + metadata + 可选 ``system`` 绑定（解释单位/坐标
-系）+ 手动设 ``period``（不自动算，需要时由调用方设）。``OrbitFamily``
+系）+ 手动设 ``period`` （不自动算，需要时由调用方设）。``OrbitFamily``
 是轨道族容器，一并归数据层（多轨道集合也是数据）。
 
 依赖方向：数据层不依赖算法层。``system`` 是鸭子类型绑定（解释单位/坐标

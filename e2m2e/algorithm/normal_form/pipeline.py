@@ -223,7 +223,7 @@ class NormalFormPipeline:
         """把入参归一化为 ``(6,)`` rho 状态数组。
 
         接受 ``(6,)`` 数组；Orbit-like 对象（带 ``.states``）取首帧。
-        形状非法时抛 :class:`ValueError`（调用方错误，直接上抛）。
+        形状非法时抛 :class:`ValueError` （调用方错误，直接上抛）。
         """
         if hasattr(orbit, "states"):
             arr = np.asarray(orbit.states, dtype=float)

@@ -196,7 +196,7 @@ class BCR4BP_Dynamics(Dynamics):
 
         events 时按显式 ``backend`` 选择事件积分路径（ADR 0020 决策 4）：
         ``"scipy"`` 走 scipy ``solve_ivp``；``"rust"`` 走 Rust
-        ``solve_ivp_events``（事件语义与 scipy 未完全对齐，由调用方显式
+        ``solve_ivp_events`` （事件语义与 scipy 未完全对齐，由调用方显式
         选择并接受差异）。``backend`` 由 :meth:`propagate` 校验（不传报错、
         不允许 ``auto``）。无 events 时要求 Rust 扩展可用（issue #378：
         缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。

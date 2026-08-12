@@ -174,15 +174,15 @@ def control_orbit(
         seed: 随机种子（同种子同结果）
         engine_layout: ``EngineLayout`` 实例（角动量管理模式 4-6 必填）
         momentum_interval: 角动量卸载间隔（天），0 表示与轨道控制同步
-        srp_offset_m: SRP 压心相对质心偏移 ``[x,y,z]``（m），常值
+        srp_offset_m: SRP 压心相对质心偏移 ``[x,y,z]`` （m），常值
         spacecraft_mass: 航天器质量（kg）
-        srp_torque: 常值 SRP 力矩 ``[τx,τy,τz]``（N·m）
+        srp_torque: 常值 SRP 力矩 ``[τx,τy,τz]`` （N·m）
         tight_tolerance_km: TIGHT 模式位置重合容差（km，默认 0.1）
         tight_max_iter: TIGHT 模式微分修正迭代上限（默认 6）
         special_damping_factor: SPECIAL 模式牛顿迭代阻尼因子（<1 时启用回溯，默认 1.0 不阻尼）
 
     Returns:
-        :class:`ControlOrbitResult`（SK_STATISTIC/MANEUVERS/受控星历）
+        :class:`ControlOrbitResult` （SK_STATISTIC/MANEUVERS/受控星历）
 
     Raises:
         ValueError: 参数超界（控制模式、误差参数等）

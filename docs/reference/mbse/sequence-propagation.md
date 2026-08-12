@@ -2,6 +2,8 @@
 title: 传播序列
 ---
 
+# 传播序列
+
 ```mermaid
 sequenceDiagram
     participant Client

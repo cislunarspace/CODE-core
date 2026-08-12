@@ -20,7 +20,7 @@ class XysProvider(abc.ABC):
 
     @abc.abstractmethod
     def xys(self, tt_mjd: float) -> tuple[float, float, float]:
-        """返回 TT MJD 对应的 ``X,Y,s``（弧度）。"""
+        """返回 TT MJD 对应的 ``X,Y,s`` （弧度）。"""
         raise NotImplementedError
 
 

@@ -22,7 +22,7 @@ class RustExtensionUnavailableError(E2M2EError, RuntimeError):
     未构建、构建不含 spice feature、或符号缺失时在使用处抛本异常，
     错误信息含 ``make dev`` 修复指引。
 
-    同时继承 :class:`E2M2EError`（库内统一捕获）与 :class:`RuntimeError`
+    同时继承 :class:`E2M2EError` （库内统一捕获）与 :class:`RuntimeError`
     （兼容既有裸 ``RuntimeError`` 捕获点）。
     """
 
@@ -37,7 +37,7 @@ class PropagationFailure(E2M2EError):
     ``"step size collapsed"`` 错误消息前缀匹配（issue #317 第 3.1 项），
     现已废弃。改写 Rust 侧错误消息措辞不再影响捕获。
 
-    继承 :class:`E2M2EError`（统一捕获契约），但不继承 :class:`RuntimeError`
+    继承 :class:`E2M2EError` （统一捕获契约），但不继承 :class:`RuntimeError`
     （与通用运行时错误区分；既有裸 ``except RuntimeError`` 不再兜住它）。
     """
 

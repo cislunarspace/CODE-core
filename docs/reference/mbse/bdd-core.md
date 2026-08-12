@@ -2,6 +2,8 @@
 title: 核心模块 BDD
 ---
 
+# 核心模块 BDD
+
 ```mermaid
 classDiagram
     class System {

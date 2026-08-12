@@ -177,7 +177,7 @@ class DynamicalSubstituteCorrector:
             :class:`DynamicalSubstituteResult`。
 
         Raises:
-            RuntimeError: 当 ``spice_optional=False``（默认）且 SPICE 不可用。
+            RuntimeError: 当 ``spice_optional=False`` （默认）且 SPICE 不可用。
         """
         seed_arr = self._normalize_seed(seed)
         n_nodes = int(round(self.t_total / self.node_step)) + 1
@@ -459,13 +459,13 @@ def _bdot2a(
     *,
     use_cr3bp: bool,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-    """``B, Bdot, Bddot`` → ``(A, Adot)``（qiao ``Bdot2A``）。
+    """``B, Bdot, Bddot`` → ``(A, Adot)`` （qiao ``Bdot2A``）。
 
     A = -Bdot + C_pq @ B
     Adot = -Bddot + (dC_pq) @ B + C_pq @ Bdot
 
-    ``C_pq`` 与 ``dC_pq`` 默认通过 :func:`._ephemeris.eval_params`（SPICE
-    星历）取。``use_cr3bp=True``（显式 ``force_cr3bp`` 或 SPICE 不可用降级）
+    ``C_pq`` 与 ``dC_pq`` 默认通过 :func:`._ephemeris.eval_params` （SPICE
+    星历）取。``use_cr3bp=True`` （显式 ``force_cr3bp`` 或 SPICE 不可用降级）
     时走纯 CR3BP（自治）：``C_pq`` 恒为旋转矩阵系数 ``[[0,1,0],[-1,0,0],
     [0,0,0]]``、``dC_pq = 0``，不探 SPICE——这是 CR3BP 中心流形约化的正路，
     不是降级。SPICE 可用（``use_cr3bp=False``）时星历失败抛异常（#352），
@@ -551,7 +551,7 @@ def _build_dynamics_rhs_circular(
 
     其中 ``r0`` 是平动点在地心会合系的位置（如 L2 = 1+γ）、``r_m=(1,0,0)``
     是月球位置、``ω=ẑ``。此形式由 qiao ``Dynfunc_rho`` 第 69 行的
-    ``−μ_m·rm/|rm|³ − r0dotdot``（平动点平衡条件）消去常数项得到。
+    ``−μ_m·rm/|rm|³ − r0dotdot`` （平动点平衡条件）消去常数项得到。
     """
     mu_e = float(context.mu_e)  # 归一化地球引力常数（≈1−μ）
     mu_m = float(context.mu_m)  # 归一化月球引力常数（≈μ）

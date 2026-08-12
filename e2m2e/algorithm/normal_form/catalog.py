@@ -27,7 +27,7 @@
 - **#175 可以直接复用本类**：``LibrationCatalogTransformer`` 的构造只
   依赖 ``context`` / ``ds_result`` / ``qf_result`` / ``cm_result`` 四个
   访问器，#175 的 ``NormalFormResult`` 只需暴露这四个属性即可无缝构造
-  ``LibrationCatalogData``（或直接传 ``LibrationCatalogData`` 当字段）。
+  ``LibrationCatalogData`` （或直接传 ``LibrationCatalogData`` 当字段）。
   本切片不在 ``types.NormalFormResult`` 上加字段，保持切片 0 容器稳定。
 """
 
@@ -60,8 +60,8 @@ class LibrationCatalogData:
     不可变：把切片 #171–#173 的三个结果 + 上下文打包，供
     :class:`LibrationCatalogTransformer` 绑定使用。
 
-    设计取舍见模块 docstring：本类是**坐标变换专用**聚合器，不复用
-    :class:`~e2m2e.algorithms.normal_form.types.NormalFormResult`（后者是
+    设计取舍见模块 docstring：本类是**坐标变换专用** 聚合器，不复用
+    :class:`~e2m2e.algorithms.normal_form.types.NormalFormResult` （后者是
     通用流水线结果容器）。#175 的最终 ``NormalFormResult`` 可暴露
     ``context``/``ds_result``/``qf_result``/``cm_result`` 四个属性后直接
     构造本类，或反过来把本类当字段嵌入。

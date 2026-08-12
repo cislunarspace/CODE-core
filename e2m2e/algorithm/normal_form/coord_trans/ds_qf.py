@@ -18,7 +18,7 @@
 - qiao 通过 ``get_QFmat(t, QFtrans_mat)`` 在 ``globalparam.data_array``
   上插值 ``B(t)``；本仓库的 :class:`QuasiFloquetResult.B_at` 已提供线性
   插值访问器，本模块直接接收插值后的 ``B_at_t``，把"何时插值"的决策
-  上浮到 :class:`LibrationCatalogTransformer`（与 EM/CM 段保持一致）。
+  上浮到 :class:`LibrationCatalogTransformer` （与 EM/CM 段保持一致）。
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def ds_to_qf(
     Args:
         X_ds: ``(6,)`` DS 状态 ``[Q, P]``，无量纲。
         B_at_t: ``(6, 6)`` 在时刻 ``t`` 插值后的 quasi-Floquet 矩阵
-            ``B(t)``（辛）。
+            ``B(t)`` （辛）。
 
     Returns:
         ``(6,)`` QF 状态 ``[Q_qf, P_qf]``，无量纲。
@@ -64,7 +64,7 @@ def qf_to_ds(
     Args:
         X_qf: ``(6,)`` QF 状态 ``[Q_qf, P_qf]``，无量纲。
         B_at_t: ``(6, 6)`` 在时刻 ``t`` 插值后的 quasi-Floquet 矩阵
-            ``B(t)``（辛）。
+            ``B(t)`` （辛）。
 
     Returns:
         ``(6,)`` DS 状态 ``[Q, P]``，无量纲。

@@ -19,7 +19,7 @@ B 是 Gauss 方程 3×3 子阵、M=∂Q/∂[a,e,i]（中心差分）。油门固
 
 Q-law 不用连续方向回调（现有传播只接受固定方向），而是把 ``[t0,tf]`` 分成 N
 段，每段用 Q-law 在段初算一个固定 ``(throttle, θ₁, θ₂)``，调
-:func:`propagate_compiled_lowthrust`（复用地基 Rust 7D 受控传播）传播该段，
+:func:`propagate_compiled_lowthrust` （复用地基 Rust 7D 受控传播）传播该段，
 段末状态作下段初态。产出直接是 :class:`LowThrustSegment` 序列，与求解器决策
 变量对齐。详见 ``docs/plans/qlaw-prd.md``。
 """

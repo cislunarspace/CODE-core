@@ -9,7 +9,7 @@
     rho → EM → DS → QF → CM → param
 
 - **rho ↔ EM** (:mod:`.rho_em`)：纯动量耦合 ``p = ρ̇ − Cdot_dimᵀ·C·ρ``；
-- **EM ↔ DS** (:mod:`.em_ds`)：平移 ``W(t) = [A, B]``（动力学替代）；
+- **EM ↔ DS** (:mod:`.em_ds`)：平移 ``W(t) = [A, B]`` （动力学替代）；
 - **DS ↔ QF** (:mod:`.ds_qf`)：矩阵变换 ``X_QF = B(t)⁻¹·X_DS``；
 - **QF ↔ CM** (:mod:`.qf_cm`)：高阶 Lie 级数（生成函数 ``W_series``）；
 - **CM ↔ param** (:mod:`.cm_param`)：复→极坐标（作用量-角变量）。
@@ -18,11 +18,11 @@
 结果句柄（切片 #171–#173 交付）：
 
 - :class:`~e2m2e.algorithms.normal_form.dynamical_substitution.DynamicalSubstituteResult`
-  提供 ``W_poly``（DS 平移，``{pow: coef_array}``）；
+  提供 ``W_poly`` （DS 平移，``{pow: coef_array}``）；
 - :class:`~e2m2e.algorithms.normal_form.quasi_floquet.QuasiFloquetResult`
-  提供 ``B_at(t)``（QF 矩阵插值访问器）；
+  提供 ``B_at(t)`` （QF 矩阵插值访问器）；
 - :class:`~e2m2e.algorithms.normal_form.center_manifold.CenterManifoldResult`
-  提供 ``W_series``（CM 高阶 Lie 级数，``{step: {order: {pow: coef_array}}}``）。
+  提供 ``W_series`` （CM 高阶 Lie 级数，``{step: {order: {pow: coef_array}}}``）。
 
 调用方负责把这三个结果聚合（:class:`~e2m2e.algorithms.normal_form.catalog.LibrationCatalogData`
 是开箱即用的聚合器）；本模块只做纯函数，不在内部缓存。

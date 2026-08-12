@@ -9,9 +9,11 @@
 并行化：ProcessPoolExecutor，每个 (sun_phase, tof) 独立。
 
 BCR4BP 旋转系→惯性系速度修正（任务 #259 方案）：
-    v_rel_moon = (vx - y, vy + x - (1-μ), vz)
+
+    ``v_rel_moon = (vx - y, vy + x - (1-μ), vz)``
+
 其中 (1-μ, 0, 0) 为月球在旋转系中的位置，减去月球惯性速度
-ω × r_moon = (0, 1-μ, 0) 得到相对月球的惯性系速度。
+``ω × r_moon = (0, 1-μ, 0)`` 得到相对月球的惯性系速度。
 """
 
 from __future__ import annotations
@@ -122,9 +124,10 @@ def compute_kepler_energy_moon(state: np.ndarray, mu: float) -> float:
     """BCR4BP 旋转系中相对月球的开普勒能量（无量纲）。
 
     速度从旋转系转换到惯性系并减去月球惯性速度，得到相对月球的速度：
-        v_rel = (vx - y, vy + x - (1-μ), vz)
 
-    H₂ = 0.5 * |v_rel|² - μ / |r - r_moon|
+        ``v_rel = (vx - y, vy + x - (1-μ), vz)``
+
+    ``H₂ = 0.5 * |v_rel|² - μ / |r - r_moon|``
 
     符号约定（Belbruno 2010 Eq 2.8）：
         H₂ < 0: 弹道捕获（束缚轨道，无需制动脉冲即被月球束缚）

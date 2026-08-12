@@ -2,7 +2,7 @@
 
 配置 JSON 是数据（可存盘、可版本化）：``{"version": 1, "forces": [...]}``，每条
 ``{name, type, enabled, params}``。构建逻辑（``ForceModel.from_config/to_config``）
-在 ``algorithm/forces/``（ADR 0011，ADR 0004 的 schema 不变，只拆"schema 数据"
+在 ``algorithm/forces/`` （ADR 0011，ADR 0004 的 schema 不变，只拆"schema 数据"
 与"构建逻辑"）。
 
 实现状态：骨架。schema 定义待从 ``core/forces/force_config.py`` 迁入。

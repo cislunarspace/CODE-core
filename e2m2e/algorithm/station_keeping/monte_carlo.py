@@ -115,7 +115,7 @@ class NominalOrbit:
 class RustPropagator:
     """Rust 编译力模型传播器（``StmPropagator`` 实现，单样本）。
 
-    直接调 ``propagate_compiled*_py``（不经 ``ForceModel``），绕开其 STM
+    直接调 ``propagate_compiled*_py`` （不经 ``ForceModel``），绕开其 STM
     路径对 SRP 的排除（站保控制模型含光压，STM 必须含光压贡献；Rust 侧
     已补 SRP 雅可比，见 ``compiled.rs::acceleration_and_jacobian``）。
     """
@@ -300,7 +300,7 @@ class MonteCarloResult:
         num_failed: 失败样本数
         maneuvers: 第一个样本的机动序列（et 秒, m/s）
         controlled_ephemeris: 第一个样本的受控星历（可为 None）
-        attitude_delta_v: 每样本姿态总 Δv（m/s），形状 ``(n_samples,)``（角动量管理）
+        attitude_delta_v: 每样本姿态总 Δv（m/s），形状 ``(n_samples,)`` （角动量管理）
         attitude_delta_v_independent: 每样本姿态独立 Δv（m/s），形状 ``(n_samples,)``
     """
 
@@ -660,7 +660,7 @@ def _run_sample(spec: dict[str, Any]) -> SampleResult:
 
 
 class SynodicJ2000Adapter:
-    """``SynodicView`` 协议适配：包装 ``SynodicJ2000System``（et 时间轴）。
+    """``SynodicView`` 协议适配：包装 ``SynodicJ2000System`` （et 时间轴）。
 
     ``SynodicJ2000System`` 的接口是 ``j2000_to_synodic(state, t_syn, et0)``
     （无量纲时间轴），特征点控制律需要 ``to_synodic(states, ets)`` 批量
@@ -831,7 +831,7 @@ def run_monte_carlo(
         srp_torque_nm: 常值 SRP 力矩（N·m）
 
     Returns:
-        :class:`MonteCarloResult`（含 SK_STATISTIC/MANEUVERS 组装方法）
+        :class:`MonteCarloResult` （含 SK_STATISTIC/MANEUVERS 组装方法）
     """
     nominal = NominalOrbit(nominal_ephemeris, spice)
     observer = getattr(system, "origin", "EARTH")

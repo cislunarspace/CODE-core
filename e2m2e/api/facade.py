@@ -112,7 +112,7 @@ def _ephemeris_to_dict(ephemeris: EphemerisTable | None) -> dict[str, Any] | Non
     """把 ``EphemerisTable`` 序列化为 JSON 兼容 dict（ndarray → list）。
 
     迭代 ``dataclasses.fields(EphemerisTable)`` 取全字段（自动跟随容器
-    演进），跳过 ``raw_text``（原始文件文本，程序生成时为空串、读入时为
+    演进），跳过 ``raw_text`` （原始文件文本，程序生成时为空串、读入时为
     大字符串，下游重建容器不需要）。``times_jd_tdb`` 设计链路不填 → None。
     下游过滤 None 值即可重建 ``EphemerisTable``。``None`` 输入返回 ``None``
     （control 全样本失败时受控星历缺失）。
@@ -127,7 +127,7 @@ def _ephemeris_to_dict(ephemeris: EphemerisTable | None) -> dict[str, Any] | Non
 
 
 def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse:
-    """把 ``OrbitDesignResult`` 翻译为 ``DesignOrbitResponse``（含几何字段，#312）。
+    """把 ``OrbitDesignResult`` 翻译为 ``DesignOrbitResponse`` （含几何字段，#312）。
 
     纯翻译、无副作用、不依赖 SPICE。ELFO 场景下 ``cr3bp_orbit`` /
     ``correction`` 为 None，对应字段输出默认值（mu=None、states/times 空、
@@ -169,7 +169,7 @@ def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse
 def _control_result_to_response(
     result: ControlOrbitResult, *, mu: float | None
 ) -> ControlOrbitResponse:
-    """把 ``ControlOrbitResult`` 翻译为 ``ControlOrbitResponse``（含几何字段，#312）。
+    """把 ``ControlOrbitResult`` 翻译为 ``ControlOrbitResponse`` （含几何字段，#312）。
 
     ``controlled_ephemeris`` 来自最后一次蒙特卡洛样本（全失败时 None）；
     ``mu`` 由请求透传——算法层不产 mu，design→control 链式时由调用方注入。

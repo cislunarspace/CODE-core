@@ -221,7 +221,7 @@ def multiple_shooting_newton(
     4. 否则 ``X_Q += delta_Q`` 继续迭代。
 
     Args:
-        initial: 初始 :class:`ShootingPatch`（包含 ``t_Q`` 与 ``X_Q``）。
+        initial: 初始 :class:`ShootingPatch` （包含 ``t_Q`` 与 ``X_Q``）。
         solver: :class:`SubstituteSolver` 实现，给出每段 ``(Xf, Φ)``。
         max_iter: 最大迭代轮数。
         tolerance: 收敛容差（最大连续性残差）。

@@ -41,7 +41,7 @@ class StmPropagator(Protocol):
     def propagate_with_stm(
         self, state0: npt.ArrayLike, t0: float, t_eval: npt.ArrayLike
     ) -> dict[str, npt.NDArray[np.floating]]:
-        """从 ``state0``（GCRS，km, km/s）在 ``t0`` 时刻传播到 ``t_eval``
+        """从 ``state0`` （GCRS，km, km/s）在 ``t0`` 时刻传播到 ``t_eval``
         各时间点（秒）。
 
         Returns:

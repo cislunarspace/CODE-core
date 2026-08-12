@@ -116,7 +116,7 @@ def _walk_family(
     seed_orbit: Orbit | None = None,
     max_iter: int = 60,
 ) -> Orbit:
-    """沿轨道族行走，使 ``measure(orbit(p))`` 命中 ``target``（±tol）。
+    """沿轨道族行走，使 ``measure(orbit(p))`` 命中 ``target`` （±tol）。
 
     ``correct_at(p, guess)`` 在族参数 ``p`` 处修正出周期轨道；``measure``
     提取该轨道用于匹配目标的标量（振幅/近月距等）。假定 measure 随 p
@@ -260,7 +260,7 @@ def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
 def _correct_halo(
     dynamics: CR3BP_Dynamics, z0: float, libration_point: int, guess: Orbit | None
 ) -> Orbit:
-    """在面外振幅 ``z0``（带符号，无量纲）处修正 Halo 轨道。"""
+    """在面外振幅 ``z0`` （带符号，无量纲）处修正 Halo 轨道。"""
     if guess is None:
         halo_class = 0 if z0 > 0 else 1
         g = compute_halo_initial_guess(
@@ -297,7 +297,7 @@ def _correct_halo_x0(
 ) -> Orbit:
     """固定 x 穿越点 ``x0`` 修正 Halo 族轨道（折叠点附近的族参数）。
 
-    固定 ``z0`` 的修正在 Halo 族折叠点（L2 约 |z0|≈0.17）前失效；
+    固定 ``z0`` 的修正在 Halo 族折叠点（L2 约 ``|z0|≈0.17``）前失效；
     折叠前后 ``x0`` 单调，改用它作族参数可一路走到 NRHO。
     """
     state = guess.states[0].copy()
@@ -312,7 +312,7 @@ def _correct_halo_x0(
 def _correct_axial(
     dynamics: CR3BP_Dynamics, vz0: float, libration_point: int, guess: Orbit | None
 ) -> Orbit:
-    """在面外速度 ``vz0``（带符号，无量纲）处修正 Axial 轨道（Type B）。
+    """在面外速度 ``vz0`` （带符号，无量纲）处修正 Axial 轨道（Type B）。
 
     Axial 轨道的初始状态为 (x0, 0, 0, 0, y_dot0, vz0)，利用 x 轴
     对称性做半周期修正（约束 y=0, z=0, x_dot=0 at T/2）。
@@ -447,7 +447,7 @@ def design_halo(
 
     ``amplitude_km`` 带符号：正为北族、负为南族（与 DFH ±73000 km 的
     约定一致）。振幅对应 Halo 参考状态（y=0 穿越点）的 z 坐标。
-    |z0| 不超过 ``_HALO_FOLD_Z0`` 时直接固定 z0 行走；更大振幅先走到
+    ``|z0|`` 不超过 ``_HALO_FOLD_Z0`` 时直接固定 z0 行走；更大振幅先走到
     折叠点前的族成员，再改用固定 x0 行走逼近目标。
     """
     if dynamics is None:
@@ -559,7 +559,7 @@ def design_nrho(
     """生成指定近月点高度的 NRHO 周期轨道（Halo 族特选成员）。
 
     北/南（``north_south`` 1/2）对应 ``halo_class`` 0/1；近月距目标为
-    ``perilune_height_km + MOON_RADIUS_KM``（距月心）。L2：先固定 z0
+    ``perilune_height_km + MOON_RADIUS_KM`` （距月心）。L2：先固定 z0
     走到折叠点前的族成员，再固定 x0 向月侧行走；L1：固定 x0 在折叠点
     两侧均失效，改用 PAL 延拓（``_walk_pal_to_perilune``）。近月距命中
     ``tol_km`` 内即停。
@@ -640,7 +640,7 @@ def design_lissajous(
 
     Returns:
         含多点有界轨迹的 :class:`Orbit`。中心流形约化失败时退回一阶线性
-        单点初猜并发出 :class:`RuntimeWarning`（保下游不崩，但失去有界性）。
+        单点初猜并发出 :class:`RuntimeWarning` （保下游不崩，但失去有界性）。
     """
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
@@ -742,7 +742,7 @@ def design_axial(
     """生成指定面外振幅的 Axial 周期轨道（Gómez Type B 分岔族）。
 
     ``amplitude_km`` 带符号：正为上族、负为下族。振幅 = 一个周期内
-    |z| 的最大值（km）。以面外速度 ``vz0`` 为族参数沿 Type B 分支行
+    ``|z|`` 的最大值（km）。以面外速度 ``vz0`` 为族参数沿 Type B 分支行
     走，从 Lyapunov 分岔邻域的小振幅种子出发逼近目标。
     """
     if dynamics is None:

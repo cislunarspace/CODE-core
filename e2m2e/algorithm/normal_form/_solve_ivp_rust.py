@@ -1,11 +1,11 @@
 """normal_form 的 Rust solve_ivp 适配器（issue #336）。
 
-将 ``scipy.integrate.solve_ivp`` 替换为 Rust 的 ``solve_ivp_py``（DOP853），
+将 ``scipy.integrate.solve_ivp`` 替换为 Rust 的 ``solve_ivp_py`` （DOP853），
 消除 normal_form 模块中的 scipy 积分路径依赖。适配器提供与 scipy 兼容的结果对象，
 让调用方改动最小。
 
 不支持：
-- ``dense_output=True``（Rust 侧无稠密输出插值器）→ 用密集 ``t_eval`` 替代
+- ``dense_output=True`` （Rust 侧无稠密输出插值器）→ 用密集 ``t_eval`` 替代
 - 复值 ODE（Rust 仅支持实值）→ ``qf_cm.py`` 的 Lie 级数流仍走 scipy
 """
 

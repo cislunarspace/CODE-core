@@ -15,14 +15,24 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinxcontrib.mermaid",
     "sphinx_copybutton",
+    "myst_parser",
 ]
 
 # 中文支持
 language = "zh_CN"
 locale_dirs = ["locale/"]
 
-# 源文件后缀
-source_suffix = ".rst"
+# MBSE 参考文档（.md）以 YAML frontmatter 的 title 作为页面标题
+myst_title_to_page_title = True
+
+# ADR 与 agents 文档面向开发协作，不进用户文档站点
+exclude_patterns = ["_build", "adr", "agents", "Thumbs.db", ".DS_Store"]
+
+# MBSE 参考文档（.md）里的 ```mermaid 围栏交给 sphinxcontrib-mermaid 渲染
+myst_fence_as_directive = ["mermaid"]
+
+# 源文件后缀：.rst 为主，.md（architecture / MBSE 参考）经 myst-parser 解析
+source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 master_doc = "index"
 
 # 项目信息
