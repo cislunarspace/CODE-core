@@ -86,11 +86,16 @@ class TestThirdBodyGravityInterface:
         assert force.body == "MOON"
 
     def test_to_rust_spec_serializes_body_and_mu(self, spice_eph_system):
-        """to_rust_spec 返回 ("third_body", body, mu)。"""
+        """to_rust_spec 返回 ("third_body", body, mu)。
+
+        body 字段是 NAIF ID 字符串：spiceypy 可用且天体在 boddef 注册时
+        （MOON→"301"），否则原样名字。环境固定 spiceypy>=8.1.0，故 MOON
+        解析为 "301"。
+        """
         force = ThirdBodyGravity("MOON")
         spec = force.to_rust_spec(spice_eph_system)
         assert spec[0] == "third_body"
-        assert spec[1] == "MOON"
+        assert spec[1] == "301"
         assert spec[2] == pytest.approx(spice_eph_system.get_gm("MOON"))
 
     def test_no_origin_parameter_exposed(self):

@@ -2,8 +2,9 @@
 #
 # spice 为必选 feature（crates/*/Cargo.toml default=["spice"]），普通 cargo/maturin
 # 构建都依赖 CSPICE。CSPICE_DIR 由 scripts/download_cspice.py 解析缓存目录后导出，
-# cspice-sys 据此跳过 NAIF 源码下载（国内网络常不可达）。故裸 cargo / maturin 命令
-# 需经本 Makefile，或自行 `export CSPICE_DIR=$(python3 scripts/download_cspice.py --print-cspice-dir)`。
+# cspice-sys 无 CSPICE_DIR 时直接构建报错（不启用 downloadcspice，杜绝走 NAIF 官网
+# 下载，国内网络常不可达）。故裸 cargo / maturin 命令需经本 Makefile，或自行
+# `export CSPICE_DIR=$(python3 scripts/download_cspice.py --print-cspice-dir)`。
 
 PYTHON := python3
 UV     := uv run

@@ -1943,6 +1943,39 @@ fn propagate_compiled_stm_py(
     Ok(dict.into())
 }
 
+/// 把 Rust 内部 [`e2m2e_forces::PropagateError`] 翻译成 Python 异常。
+///
+/// 步长塌缩（``StepCollapsed``）→ ``e2m2e.exceptions.PropagationFailure``
+/// （``E2M2EError`` 子类）；其他传播错误（``Other``）→ ``RuntimeError``。
+/// 两者消息前缀都加 ``prefix``（形如 "CR3BP propagation failed: ..."）。
+/// Python 侧据此按**类型**捕获，不再依赖错误消息字符串前缀匹配——改 Rust
+/// 措辞不影响 ``except PropagationFailure``（ADR 0020 决策 2）。
+///
+/// 若 ``e2m2e.exceptions`` 不可导入（环境异常，正常不会发生），退化为
+/// ``RuntimeError``，保证失败不至因构造异常本身而丢失。
+fn propagate_error_to_pyerr(
+    py: Python<'_>,
+    prefix: &str,
+    e: e2m2e_forces::PropagateError,
+) -> PyErr {
+    let msg = match &e {
+        e2m2e_forces::PropagateError::StepCollapsed(m) | e2m2e_forces::PropagateError::Other(m) => {
+            format!("{prefix}: {m}")
+        }
+    };
+    match e {
+        e2m2e_forces::PropagateError::StepCollapsed(_) => match py
+            .import("e2m2e.exceptions")
+            .and_then(|m| m.getattr("PropagationFailure"))
+            .and_then(|cls| cls.call1((msg.clone(),)))
+        {
+            Ok(instance) => PyErr::from_value(instance),
+            Err(_) => pyo3::exceptions::PyRuntimeError::new_err(msg),
+        },
+        e2m2e_forces::PropagateError::Other(_) => pyo3::exceptions::PyRuntimeError::new_err(msg),
+    }
+}
+
 /// Python 接口：CR3BP 6 维纯状态传播（PD78）。
 ///
 /// 纯数学（无量纲），不依赖 SPICE。供 `CR3BP_Dynamics` 透明走 Rust。
@@ -1993,15 +2026,14 @@ fn propagate_cr3bp_py(
     // 积分包进 py.allow_threads 释放 GIL：PD78 纯 Rust（不回调 Python），与
     // propagate_compiled / multiple_shooting_correct 同理（#313）。释 GIL 段 =
     // propagate_cr3bp 主循环；持 GIL 段 = 上面的入参校验 + 下面的 PyDict 构造。
-    // 闭包内不构造 PyErr，仅回传 String，闭包外 map_err 转 PyErr。
+    // 闭包内不构造 PyErr，仅回传 PropagateError，闭包外按类型翻译成 Python 异常。
     let result = py
         .allow_threads(|| {
             propagate_cr3bp(
                 mu, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
             )
-            .map_err(|e| format!("CR3BP propagation failed: {e}"))
         })
-        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
+        .map_err(|e| propagate_error_to_pyerr(py, "CR3BP propagation failed", e))?;
 
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
 

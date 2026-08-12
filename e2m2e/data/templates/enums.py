@@ -44,6 +44,7 @@ class TransferType(enum.Enum):
     LGA = "lga"  # Lunar Gravity Assist
     WSB = "wsb"  # Weak Stability Boundary (sun-perturbed indirect transfer)
     EXTERNAL = "external"
+    UNKNOWN = "unknown"  # 传播失败/轨迹为空，无法分类（#352，不再假 DIRECT）
 
 
 class BoundaryMode(enum.Enum):

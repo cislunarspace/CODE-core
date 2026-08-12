@@ -99,6 +99,25 @@ class TestNonOptimalGeometry:
         assert sol3.status is ConvergenceState.CONVERGED, sol3.message
         assert sol3.total_delta_v < sol2.total_delta_v - 0.05
 
+    def test_three_impulse_retries_stalled_initial_guess(self):
+        """零脉冲初猜使 SLSQP 提前收敛时，微扰重试仍应找到三脉冲降本（#384）。
+
+        建议插入点落在双脉冲弧上的位置随主矢量检验采样密度而变；n_samples=200
+        的建议点处于目标函数平坦走廊，SLSQP 一步即停（单次优化改善 ≈ 0）。
+        optimize 检测到改善不足后从微扰初猜重试，仍应显著降本。
+        """
+        transfer = _make_transfer(0.5 * TOF_HOHMANN)
+        sol2 = transfer.optimize(2)
+        report = transfer.check_primer_vector(sol2, n_samples=200)
+
+        x0 = np.concatenate(
+            [[report.suggested_insertion_time], report.suggested_insertion_position]
+        )
+        sol3 = transfer.optimize(3, x0=x0)
+
+        assert sol3.status is ConvergenceState.CONVERGED, sol3.message
+        assert sol3.total_delta_v < sol2.total_delta_v - 0.05
+
 
 class TestThreeImpulseStructure:
     """三脉冲 optimize 的收敛性与结果结构"""

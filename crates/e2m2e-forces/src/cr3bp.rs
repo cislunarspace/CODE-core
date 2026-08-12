@@ -20,11 +20,10 @@ pub const MIN_DISTANCE: f64 = 1e-10;
 
 /// 最小步长（相对于积分区间），防止步长坍缩。
 ///
-/// 步长塌缩时本模块返回 ``Err("step size collapsed below minimum ...")``。
-/// 该前缀 ``"step size collapsed"`` 是 Python↔Rust 跨语言契约：Python
-/// ``EphemerisDynamics._propagate_state_only``（dynamics.py，
-/// ``_RUST_STEP_COLLAPSED_MARKER``）据此识别失败并转成空 states。改写本错误
-/// 消息须同步 Python 侧标记（issue #317 第 3.1 项）。
+/// 步长塌缩时本模块返回
+/// ``PropagateError::StepCollapsed("step size collapsed ...")``；FFI 边界按
+/// 错误**类型**翻译成 Python ``PropagationFailure``（ADR 0020 决策 2），不再
+/// 依赖错误消息字符串做跨语言匹配。该措辞只是普通错误消息文本，可随意改写。
 const MIN_STEP: f64 = 1e-12;
 
 /// CR3BP 6 维运动方程右端项 `[vx, vy, vz, ax, ay, az]`。
@@ -177,7 +176,9 @@ pub struct Cr3bpStmResult {
 /// with_stm/纯状态逐位相同）。
 ///
 /// # 错误
-/// `t_eval` 为空、步长塌缩、或输出点数不足（不允许静默截断）。
+/// `t_eval` 为空、步长塌缩、或输出点数不足（不允许静默截断）时返回
+/// [`crate::PropagateError`]；步长塌缩为 [`crate::PropagateError::StepCollapsed`]，
+/// 其余为 [`crate::PropagateError::Other`]。
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_cr3bp(
     mu: f64,
@@ -188,9 +189,11 @@ pub fn propagate_cr3bp(
     _atol: f64,
     max_step: Option<f64>,
     max_steps: Option<usize>,
-) -> Result<Cr3bpStateResult, String> {
+) -> Result<Cr3bpStateResult, crate::PropagateError> {
     if t_eval.is_empty() {
-        return Err("t_eval must not be empty".to_string());
+        return Err(crate::PropagateError::Other(
+            "t_eval must not be empty".to_string(),
+        ));
     }
 
     let method = RkMethod::Pd78;
@@ -242,10 +245,10 @@ pub fn propagate_cr3bp(
             h = -h_max;
         }
         if h.abs() < MIN_STEP * span_abs {
-            return Err(format!(
+            return Err(crate::PropagateError::StepCollapsed(format!(
                 "step size collapsed below minimum after {} steps",
                 n_steps
-            ));
+            )));
         }
 
         let callback = |_ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
@@ -254,8 +257,10 @@ pub fn propagate_cr3bp(
             Ok(cr3bp_eom(mu, &s).to_vec())
         };
 
-        let (y_new, error) = explicit_rk_step(method.table(), t, &y, h, callback, None)
-            .map_err(|e: String| format!("RK step error at t={}: {}", t, e))?;
+        let (y_new, error) =
+            explicit_rk_step(method.table(), t, &y, h, callback, None).map_err(|e: String| {
+                crate::PropagateError::Other(format!("RK step error at t={}: {}", t, e))
+            })?;
 
         if error <= tol {
             t += h;
@@ -278,11 +283,11 @@ pub fn propagate_cr3bp(
     }
 
     if times.len() != t_eval.len() {
-        return Err(format!(
+        return Err(crate::PropagateError::Other(format!(
             "output length mismatch: got {} time points, expected {}",
             times.len(),
             t_eval.len()
-        ));
+        )));
     }
 
     Ok(Cr3bpStateResult {

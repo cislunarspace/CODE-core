@@ -40,18 +40,23 @@ class ThirdBodyGravity(PhysicalModel):
     def _name_or_id(name: str) -> str:
         """把天体名转 NAIF ID 字符串（cspice 0.1 无 boddef）。
 
-        优先用 spiceypy.bods2c（识别 boddef 注册过的天体）；失败则原样返回
-        （DE430 内置名 MOON/EARTH/SUN 等仍可用）。返回值传给 cspice
-        ``easier_reader``，后者接受名字或数字字符串。
+        优先用 spiceypy.bods2c（识别 boddef 注册过的天体）；未注册（spiceypy
+        抛 ``SpiceyError``）则原样返回（DE430 内置名 MOON/EARTH/SUN 等仍
+        可用）。只 catch spiceypy 错误（``SpiceyError``），不吞编程错误
+        （#352）：此前 ``except Exception`` 把 bods2c 的意外错误一并吞掉。
         """
         try:
             import spiceypy as _spiceypy
-
+        except ImportError:
+            # spiceypy 未安装：原样返回（cspice 0.1 无 boddef，名字直传即可）
+            return name
+        try:
             naif_id = _spiceypy.bods2c(name)
-            if naif_id > 0:
-                return str(naif_id)
-        except Exception:
-            pass
+        except _spiceypy.utils.exceptions.SpiceyError:
+            # 名字未在 boddef 注册：原样返回
+            return name
+        if naif_id > 0:
+            return str(naif_id)
         return name
 
     def __init__(self, body: str, mu: float | None = None) -> None:

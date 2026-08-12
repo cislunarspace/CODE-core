@@ -380,9 +380,9 @@ def evaluate_hamiltonian(
 def _eval_coef(coef: object, params: dict[str, float]) -> float:
     """对单个 sympy 系数用 ``params`` 替换后求 float。
 
-    ``coef = 0`` 或空 dict 项直接返回 0；sympy ``free_symbols`` 中
-    出现非 ``params`` 中键的符号时报 0 并保留 ``RuntimeWarning``，
-    避免静默丢失但又不会让整体时间序列崩溃。
+    ``coef = 0`` 直接返回 0（稀疏多项式缺项）；数值转换失败或出现非
+    ``params`` 键的符号时抛 ``ValueError``（#352）：求不出就该报错，不静默
+    用 0 填——0 会让下游误以为该项不存在，污染哈密顿量。
     """
     if coef == 0:
         return 0.0
@@ -391,8 +391,8 @@ def _eval_coef(coef: object, params: dict[str, float]) -> float:
             # coef 此处为数值（无 free_symbols），用 Any 表达 float() 调用。
             numeric: Any = coef
             return float(numeric)
-        except (TypeError, ValueError):
-            return 0.0
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"哈密顿量系数无法求值：{coef!r}") from exc
     # coef 此处为 sympy 表达式（含 free_symbols），用 Any 表达动态属性。
     sympy_coef: Any = coef
     sub_map: dict[object, float] = {}
@@ -404,9 +404,7 @@ def _eval_coef(coef: object, params: dict[str, float]) -> float:
         else:
             missing.append(str(name))
     if missing:
-        # 不抛错：用 0 填；保守处理，等价于 qiao eval 出现无法求值的项时
-        # 把该项记为 0（Code04 在 exceptions 时也是写 0.0）。
-        return 0.0
+        raise ValueError(f"哈密顿量系数含未提供参数 {missing}（coef={coef}）")
     return float(sympy_coef.subs(sub_map))
 
 

@@ -64,7 +64,15 @@ class ImpulsivePropulsion:
 
         normal_dir = np.cross(tangential, self.normal)
         norm_nd = np.linalg.norm(normal_dir)
-        normal_dir = np.array([1.0, 0.0, 0.0]) if norm_nd < 1e-10 else normal_dir / norm_nd
+        if norm_nd < 1e-10:
+            if beta != 0.0:
+                # 法向退化（速度方向与轨道面法向平行）且法向分量被请求：
+                # 方向未定义。此前静默替换为任意 [1,0,0]，谎报一个与几何无关
+                # 的方向（#352）。beta=0（纯切向）时法向不贡献，不受影响。
+                raise ValueError("轨道面法向退化：速度方向与法向量平行，法向分量未定义")
+            normal_dir = np.zeros(3)
+        else:
+            normal_dir = normal_dir / norm_nd
 
         v_injection = alpha * v_mag * tangential + beta * v_mag * normal_dir
 

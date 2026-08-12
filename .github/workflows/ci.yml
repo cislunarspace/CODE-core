@@ -33,7 +33,10 @@ jobs:
           path: .cspice
           key: cspice-${{ runner.os }}-v1
       - name: 下载 SPICE 编译包（cspice-v1 release；缓存命中则跳过）
-        run: uv run python scripts/download_cspice.py >> "$GITHUB_ENV"
+        # --no-sync：脚本只用标准库（urllib/zipfile），避免 uv run 先触发
+        # uv sync 构建扩展——此时 CSPICE_DIR 尚未设置、downloadcspice 已禁用
+        # （a80dbd8），构建会直接报错（鸡生蛋）。
+        run: uv run --no-sync python scripts/download_cspice.py >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: cargo clippy --workspace -- -D warnings
@@ -52,5 +55,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v7
+      # downloadcspice 已禁用（a80dbd8）：uv sync 构建扩展须先设 CSPICE_DIR
+      - name: 下载 SPICE 编译包（cspice-v1 release；缓存命中则跳过）
+        run: uv run --no-sync python scripts/download_cspice.py >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: uv sync --group dev
       - run: uv run mypy e2m2e/ --ignore-missing-imports

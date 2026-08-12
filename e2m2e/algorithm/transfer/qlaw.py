@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from ...data.constants import Datum
+from ...exceptions import PropagationFailure
 from ..forces import PhysicalModel
 from .lowthrust_shooting import EngineConfig, LowThrustSegment
 
@@ -41,6 +41,9 @@ if TYPE_CHECKING:
     from .lowthrust_shooting import LowThrustShooting
 
 _G0 = 9.81  # m/s²，与 lowthrust_shooting 一致
+
+#: Q-law 前向积分连续拒绝阈值：连续超过此数判轨迹发散（#352，防无限缩 h 空转）
+_MAX_REJECTED_STEPS = 100
 
 
 def rv_to_keplerian(
@@ -363,7 +366,9 @@ def qlaw_guess(
     h = step
     tol = 1e-10
     n_steps = 0
-    while t < tf and n_steps < 2_000_000:
+    max_steps = 2_000_000
+    rejected_streak = 0
+    while t < tf and n_steps < max_steps:
         n_steps += 1
         # 不越过 tf
         if t + h > tf:
@@ -375,10 +380,33 @@ def qlaw_guess(
             times_rec.append(t)
             states_rec.append(state.copy())
             h = float(res.h_next)
+            rejected_streak = 0
         else:
             h = float(res.h_next)
-        if h < 1e-6:
-            h = step  # 防步长坍缩
+            rejected_streak += 1
+            if rejected_streak >= _MAX_REJECTED_STEPS:
+                # 连续拒绝保险：h 未破地板但轨迹已发散时快速失败，避免空转
+                raise PropagationFailure(
+                    f"Q-law propagation failed: {rejected_streak} consecutive rejected "
+                    f"steps at t={t:.6g} (h={h:.3e}); trajectory diverges"
+                )
+        if h < 1e-6 and tf - t > 1e-6:
+            # 步长缩到机器精度地板：确定性传播失败（ADR 0020 决策 2）。不再
+            # 重置回原步长空转（此前最多空转 200 万步几乎不推进 t，最后用未
+            # 验收的中间态拼控制律返回，无失败标志）。收尾步（剩余不足
+            # 1e-6 s）不在此列。
+            raise PropagationFailure(
+                f"Q-law propagation failed: step size collapsed below 1e-6 at "
+                f"t={t:.6g} after {n_steps} steps"
+            )
+
+    if t < tf - 1e-9:
+        # 步数预算耗尽仍未到达终点：不把未经验收的中间态拼成控制律
+        raise PropagationFailure(
+            f"Q-law propagation failed: step budget ({max_steps}) exhausted at "
+            f"t={t:.6g} < tf={tf:.6g}; refusing to assemble segments from "
+            f"unverified intermediate state"
+        )
 
     # 重采样成 n_segments 段：每段取中点时刻的状态，算该时刻 Q-law 方向作段常量控制
     times_arr = np.asarray(times_rec)
@@ -414,7 +442,11 @@ def qlaw_guess(
 
 
 def _resolve_mu(system: object, forces: Sequence[PhysicalModel]) -> float:
-    """从 PointMassGravity 或系统查中心体 μ。"""
+    """从 PointMassGravity 或系统查中心体 μ；解析失败时抛异常。
+
+    此前查询失败静默回退地球 μ（``Datum.DE440.earth_gm``），非地球系统会被
+    用错动力学参数（#352）：μ 是动力学核心参数，查不到就该报错，不猜。
+    """
     from ..forces import PointMassGravity
 
     for f in forces:
@@ -422,12 +454,11 @@ def _resolve_mu(system: object, forces: Sequence[PhysicalModel]) -> float:
             return float(f.mu)
     if hasattr(system, "gravitational_parameter"):
         origin = getattr(system, "origin", "EARTH")
-        try:
-            return float(system.gravitational_parameter(origin))  # type: ignore[arg-type]
-        except Exception:
-            pass
-    # 纯二体测试兜底
-    return Datum.DE440.earth_gm
+        return float(system.gravitational_parameter(origin))  # type: ignore[arg-type]
+    raise RuntimeError(
+        "Q-law: 无法解析中心体 μ（forces 无 PointMassGravity.mu，"
+        "system 无 gravitational_parameter）"
+    )
 
 
 def _estimate_h(dt: float) -> float:

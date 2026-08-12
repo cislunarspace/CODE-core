@@ -28,6 +28,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy.integrate import solve_ivp
 
+from e2m2e.exceptions import PropagationFailure
 from e2m2e.integrators import require_rust_extension
 
 from .cr3bp_system import CR3BP_System
@@ -42,14 +43,6 @@ from e2m2e.integrators import (
     propagate_cr3bp_stm_py,
     solve_ivp_events,
 )
-
-# 跨语言契约（issue #317 第 3.1 项）：Rust ``propagate_cr3bp``（cr3bp.rs）步长
-# 塌缩错误形如 "step size collapsed below minimum ..."。``EphemerisDynamics
-# ._propagate_state_only`` 据此前缀识别该失败并转成空 states（对齐 scipy 失败
-# 语义，让上层 NLP 走 dv=1e10 惩罚）。改 Rust 该错误消息须同步本标记——Rust
-# 侧对应注释见 cr3bp.rs ``MIN_STEP`` 处。本字符串是 Python↔Rust 的稳定契约，
-# 勿当作普通文案随意改写。
-_RUST_STEP_COLLAPSED_MARKER = "step size collapsed"
 
 
 class Dynamics:
@@ -704,7 +697,7 @@ class CR3BP_Dynamics(Dynamics):
         else:
             t_eval_list = [float(t_span[0]), float(t_span[1])]
 
-        # 步长塌缩时 Rust 抛 RuntimeError；这里 catch 后返回空 states，
+        # 步长塌缩时 Rust 经 FFI 抛 PropagationFailure；这里 catch 后返回空 states，
         # 对齐 scipy 路径失败语义（失败返回空、不 raise），让上层
         # （TransferOptimization._evaluate_all）走 dv=1e10 惩罚，使 NLP
         # 优化器绕开发散点。仅 catch 步长塌缩；其他 RuntimeError（如截断）
@@ -728,10 +721,8 @@ class CR3BP_Dynamics(Dynamics):
                     f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
                     f"requested time points; the trajectory is truncated"
                 )
-        except RuntimeError as e:
-            if _RUST_STEP_COLLAPSED_MARKER in str(e):
-                return {"time": np.array([]), "states": np.empty((0, 6))}
-            raise
+        except PropagationFailure:
+            return {"time": np.array([]), "states": np.empty((0, 6))}
 
         self.last_trajectory = (time, states)
 

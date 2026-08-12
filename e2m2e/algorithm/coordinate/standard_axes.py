@@ -93,10 +93,9 @@ class GMATITRFAxes(Axes):
         eop_path: str | Path | None = None,
         xys_provider: XysProvider | None = None,
         eop_extrapolation: str = "raise",
-        compatibility: str | None = None,
     ) -> None:
-        if compatibility == "gmat" and eop_extrapolation == "raise":
-            eop_extrapolation = "clamp"
+        # EOP 越界策略显式由调用方选择："raise"（越界报错）或 "clamp"（夹取）。
+        # 不再由兼容性开关隐式改写（#352：静默切换改显式）。
         if eop_extrapolation not in {"raise", "clamp"}:
             raise ValueError("eop_extrapolation must be 'raise' or 'clamp'")
         tai_path = (

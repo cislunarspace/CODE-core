@@ -296,7 +296,10 @@ class TestStandardCoordinateSystems:
         from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 
         icrf = CoordinateSystem(axes=ICRSAxes(), origin=InertialOrigin())
-        itrf = CoordinateSystem(axes=GMATITRFAxes(compatibility="gmat"), origin=InertialOrigin())
+        # EOP 越界策略显式选择（#352 移除 compatibility 隐式切换后）
+        itrf = CoordinateSystem(
+            axes=GMATITRFAxes(eop_extrapolation="clamp"), origin=InertialOrigin()
+        )
         vec = np.array([1.0, 0.0, 0.0])
 
         itrf_vec = icrf.transform_vector(vec, from_cs=icrf, to_cs=itrf, et=0.0)
