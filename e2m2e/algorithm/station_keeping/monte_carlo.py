@@ -478,7 +478,10 @@ class SingleSampleSimulation:
                 delta_m_cum += _compute_dm(srp_torque, t_k - t_prev)
 
             # 判断事件类型
-            is_orbital = t_k in orbital_times or (has_mm and self.momentum_interval_sec <= 0)
+            # is_orbital：无角动量管理时所有事件都是轨道控制；有管理时按事件表
+            # 或同步模式（卸载间隔=0 与轨道控制合并）判定。has_mm=False 时不可
+            # 用 ``t_k in orbital_times`` 判定——orbital_times 仅在有 MM 时构造。
+            is_orbital = not has_mm or t_k in orbital_times or self.momentum_interval_sec <= 0
             is_momentum = has_mm and (t_k in momentum_times or self.momentum_interval_sec <= 0)
 
             # 控制量计算
@@ -534,10 +537,11 @@ class SingleSampleSimulation:
                 # 纯轨道控制（无角动量管理 或 角动量卸载间隔=0 与轨道同步）
                 dv_c = self.law.compute_maneuver(x_meas, t_k, propagator=prop_ctrl, nominal=nominal)
                 if dv_c is None:
-                    dv_r_orbital = None
-                    failed_k = False
-                else:
-                    dv_r_orbital, failed_k = self.thrust_error.apply(dv_c * 1000.0, self.sampler)
+                    # 控制律未产出机动（不收敛/未找到穿越点）：计为失败样本，
+                    # 不把失败藏进成功统计（#352）
+                    failed = True
+                    break
+                dv_r_orbital, failed_k = self.thrust_error.apply(dv_c * 1000.0, self.sampler)
                 if failed_k:
                     failed = True
                     break
