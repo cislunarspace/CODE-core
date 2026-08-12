@@ -15,11 +15,12 @@ PYTEST_DIST ?= loadscope
 CSPICE_DIR := $(shell $(PYTHON) scripts/download_cspice.py --print-cspice-dir 2>/dev/null)
 export CSPICE_DIR
 
-# libclang（cspice-sys 的 bindgen 需要）：用 := 覆盖环境里可能失效的旧值
-# （命令行 make LIBCLANG_PATH=... 仍可覆盖）。优先 llvm-config --libdir（版本无关，
+# libclang（cspice-sys 的 bindgen 需要）：先探测再回退环境值。探测结果覆盖环境里
+# 可能失效的旧值（如残留的 /tmp 路径），探测失败才用环境值兜底；命令行
+# make LIBCLANG_PATH=... 优先级最高，仍可覆盖。优先 llvm-config --libdir（版本无关，
 # 其次版本化 llvm-config-*），回退 /usr/lib 探测。
 LLVM_CONFIG   := $(shell command -v llvm-config 2>/dev/null || ls /usr/bin/llvm-config-* 2>/dev/null | head -1)
-LIBCLANG_PATH := $(or $(LIBCLANG_PATH),$(shell $(LLVM_CONFIG) --libdir 2>/dev/null),$(shell find /usr/lib -maxdepth 4 -name 'libclang*.so*' 2>/dev/null | head -1 | xargs dirname 2>/dev/null))
+LIBCLANG_PATH := $(or $(shell $(LLVM_CONFIG) --libdir 2>/dev/null),$(shell find /usr/lib -maxdepth 4 -name 'libclang*.so*' 2>/dev/null | head -1 | xargs dirname 2>/dev/null),$(LIBCLANG_PATH))
 export LIBCLANG_PATH
 
 .DEFAULT_GOAL := help

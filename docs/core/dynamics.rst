@@ -45,11 +45,12 @@ CR3BP 动力学
 .. code-block:: python
 
    from e2m2e.algorithm.dynamics import CR3BP_System, CR3BP_Dynamics
+   from e2m2e.data.constants import Datum
    from e2m2e.data.types.orbit import Orbit
    import numpy as np
 
    system = CR3BP_System(
-       mu=0.0121506683, primary="Earth", secondary="Moon"
+       mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
    )._with_default_scales()
    system.compute_libration_points()
 

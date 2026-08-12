@@ -1,7 +1,7 @@
 [package]
 name = "e2m2e-spice"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
 description = "SPICE FFI bindings for e2m2e"
 
 [lib]

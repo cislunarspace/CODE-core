@@ -23,29 +23,29 @@
 - `CHANGELOG.md`：保留 Keep a Changelog 的英文小节头（Added / Changed / Fixed / Removed），条目内容用中文。
 - `CODE_OF_CONDUCT.md`、`SECURITY.md` 等 GitHub 标准模板保留英文，不翻译。
 
-## Agent skills
+## 代理技能
 
-### Issue tracker
+### Issue 追踪
 
-Issues live as GitHub issues. Use the `gh` CLI for all operations. Pull requests are not treated as request channels. See `docs/agents/issue-tracker.md`.
+Issue 以 GitHub issue 形式存在；所有操作使用 `gh` CLI。拉取请求不作为请求渠道。见 `docs/agents/issue-tracker.md`。
 
-### Triage labels
+### 分诊标签
 
-Five canonical triage roles mapped 1:1 to GitHub labels (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+五个规范分诊角色与 GitHub 标签一一对应（needs-triage、needs-info、ready-for-agent、ready-for-human、wontfix）。见 `docs/agents/triage-labels.md`。
 
-### Domain docs
+### 领域文档
 
-Single-context repo. One `CONTEXT.md` at the root, ADRs under `docs/adr/`. See `docs/agents/domain.md`.
+单一上下文仓库：根目录一个 `CONTEXT.md`，ADR 位于 `docs/adr/`。见 `docs/agents/domain.md`。
 
-### Loop Engineering
+### 循环工程
 
 builder（写/修代码）+ checker（跑全部检查）+ loop-go（驱动循环直到检查通过）。见 `.claude/agents/builder.md`、`.claude/agents/checker.md`、`.claude/commands/loop-go.md`。
 
 ## 构建与测试
 
-- Rust 扩展：`maturin develop` 构建 `e2m2e._integrators`，spice 现为默认 feature（crates `default = ["spice"]` + pyproject `features=["spice"]` 双保险），不再产无 spice 子集。默认 debug 构建较慢（约 5 倍），日常迭代/运行建议 `maturin develop --release`。
-- 开发入口走 `Makefile`：`make dev`（= `maturin develop --release`，自动 `export CSPICE_DIR`/`LIBCLANG_PATH`）、`make test`、`make check`、`make setup`（拉 CSPICE 编译包 + SPICE 内核）。CSPICE 经 `scripts/download_cspice.py` 从 GitHub `cspice-v1` release 取预编译包（`make dev` 自动 `export CSPICE_DIR`）；`cspice-sys` 不启用 `downloadcspice` feature，无 `CSPICE_DIR` 时构建直接报错，不再静默走 NAIF 官网源码下载（国内 naif 常不可达）。
-- 测试：默认 `uv run pytest -n auto --dist loadscope` 排除 `slow`（`addopts` 已配）；按功能类选跑 `-m theory`/`-m orchestration`/`-m data` 等；全量（含 slow）用 `uv run pytest -m "" -n auto --dist loadscope`；release 前跑全量。Python 测试默认使用 xdist 并行，`loadscope` 保持模块/类 fixture 的复用并降低全局状态竞争；只有明确依赖进程内全局状态的最小测试组才串行，并记录原因。spice 默认，需先 `make setup` 拉内核。
+- Rust 扩展：`maturin develop` 构建 `e2m2e._integrators`，spice 现为默认 feature（crates `default = ["spice"]` + pyproject `features=["spice"]` 双保险），不再产无 spice 子集。debug 产物运行较慢（约 5 倍），性能基准/长期预报用 `make dev-release`（--release）。
+- 开发入口走 `Makefile`：`make dev`（= `maturin develop` debug，自动 `export CSPICE_DIR`/`LIBCLANG_PATH`）、`make dev-release`（= `maturin develop --release`）、`make test`、`make check`、`make setup`（拉 CSPICE 编译包 + SPICE 内核）。CSPICE 经 `scripts/download_cspice.py` 从 GitHub `cspice-v1` release 取预编译包（`make dev` 自动 `export CSPICE_DIR`）；`cspice-sys` 不启用 `downloadcspice` feature，无 `CSPICE_DIR` 时构建直接报错，不再静默走 NAIF 官网源码下载（国内 naif 常不可达）。
+- 测试：默认 `uv run pytest -n auto --dist loadscope` 运行统一测试套件，排除尚未完成的 `low_thrust`（`addopts` 已配）；按功能类选跑 `-m theory`/`-m orchestration`/`-m data` 等；需显式包含未完成功能时用 `uv run pytest -m "" -n auto --dist loadscope`。Python 测试默认使用 xdist 并行，`loadscope` 保持模块/类 fixture 的复用并降低全局状态竞争；只有明确依赖进程内全局状态的最小测试组才串行，并记录原因。spice 默认，需先 `make setup` 拉内核。
 - 提交前检查：`uv run ruff check .`、`uv run ruff format --check .`、`uv run mypy e2m2e/ --ignore-missing-imports`、`cargo fmt --all -- --check`、`cargo clippy --workspace -- -D warnings`。
 
 ## 编码准则
@@ -77,7 +77,7 @@ LLM 产出烂代码最大的根源，就是写新代码之前没有读懂现有�
 
 **做了架构决策（数据库 schema、API 形状、鉴权策略），要标出来。** 这些选择难以撤销，用户应当知道。
 
-**存在多种做法时，简要地列出来。** 两种，顶多三种，带上推荐。“A 更简单，但处理不了边界情况 X。B 全 cover，但引入对 Z 的依赖。除非你预期 X 真会发生，否则我选 A。”
+**存在多种做法时，简要地列出来。** 两种，顶多三种，带上推荐。“A 更简单，但处理不了边界情况 X。B 全覆盖，但引入对 Z 的依赖。除非你预期 X 真会发生，否则我选 A。”
 
 **有搞不懂的地方，停下。** 别用听起来像那么回事的代码去填糊涂。直接说哪里搞不懂，问。
 
@@ -106,11 +106,11 @@ async def send_welcome_email(user):
     await send_email(to=user.email, subject="Welcome", body=body)
 ```
 
-重复远比错误的抽象便宜。先 copy-paste 两次，再谈抽象。
+重复远比错误的抽象便宜。先复制粘贴两次，再谈抽象。
 
 **投机式的错误处理。** 为不可能发生的错误包 try/catch，对永远不为 null 的值加 null 检查，每一行都是别人得读懂的一行。只处理真正会发生的错误。
 
-**没必要的可配置性。** 你把 batch size 做成参数，把重试次数做成可配置，为永远不会变的东西加环境变量。每个配置项都是某人要做的一个决定、要设对的一个值。在有真正的理由之前，硬编码。
+**没必要的可配置性。** 你把批次大小做成参数，把重试次数做成可配置，为永远不会变的东西加环境变量。每个配置项都是某人要做的一个决定、要设对的一个值。在有真正的理由之前，硬编码。
 
 **死灵活性。** 只有一个实现的接口、只有一个子类的抽象基类，有成本（认知开销、间接层），在第二个实现真正出现之前零收益。
 
@@ -118,7 +118,7 @@ async def send_welcome_email(user):
 
 ### 4. 精准改动
 
-改现有代码时，diff 越小越好。你改的每一行都可能引入 bug、都得有人 review、还会永远留在 git blame 里。
+改现有代码时，diff 越小越好。你改的每一行都可能引入 bug、都得有人审查、还会永远留在 git blame 里。
 
 **别动没让你动的东西。** 修函数 A 的 bug，注意到函数 B 的变量名很怪，别管。函数 C 的注释有个错别字，别管。import 顺序不合你意，别管。你的活是修函数 A 的 bug。
 
@@ -140,7 +140,7 @@ async def send_welcome_email(user):
 
 **测行为，不测实现。** 检查构造函数有没有设好属性的测试一文不值；检查校验是否真的拦住坏输入的测试才有价值。
 
-**想想 happy path 之外的情况。** API 返回 500 时怎样？文件不存在时？用户提交空表单时？
+**想想顺利路径之外的情况。** API 返回 500 时怎样？文件不存在时？用户提交空表单时？
 
 **写不了测试，就说明原因。** “数据库调用跟业务逻辑紧耦合，没法轻松测”，这是个可能需要重构的信号。别默默跳过测试然后指望没事。
 
@@ -152,15 +152,15 @@ async def send_welcome_email(user):
 
 - “加校验” → “拦掉邮箱缺失或非法的输入，返回 400 并说明哪里错了，为这两种情况都加测试”
 - “修 bug” → “写一个复现上报行为的测试，让它通过，确认现有测试仍通过”
-- “提升性能” → “先 profile，定位瓶颈，修那一个具体问题，再测一次”
+- “提升性能” → “先做性能剖析，定位瓶颈，修那一个具体问题，再测一次”
 
 超过一步的活，执行前先说出计划：
 
 ```
 计划：
-1. 用 migration 加新的数据库列
-2. 更新 model 包含新字段
-3. 改 API endpoint 以接受并返回该字段
+1. 用迁移脚本加新的数据库列
+2. 更新模型，包含新字段
+3. 改 API 接口以接受并返回该字段
 4. 为该字段加校验
 5. 为新行为写测试
 6. 跑全量测试套件检查回归
@@ -178,7 +178,7 @@ async def send_welcome_email(user):
 
 **一次只改一处。** 改了三处然后 bug 没了，你不知道是哪一处修好的，也不知道另外两处有没有引入新 bug。改一处，测。再改一处，测。
 
-**没搞懂根因之前，别加 workaround。** 一个值意外为 null，搞清楚它为什么是 null。null 检查也许能防崩溃，但底下的 bug 还在，以后会换个样子冒出来。
+**没搞懂根因之前，别加绕过方案。** 一个值意外为 null，搞清楚它为什么是 null。null 检查也许能防崩溃，但底下的 bug 还在，以后会换个样子冒出来。
 
 **卡住了就说。** “我试了 X 和 Y 都没用，我看到的是这些，觉得问题可能在 Z 但没把握。”这比默默瞎试 20 轮有用得多。
 
@@ -215,7 +215,7 @@ async def send_welcome_email(user):
 
 **厨房水槽。** 让你加一个功能，你“顺手”重构半个代码库。别。做那一件事。
 
-**错误的抽象。** 你为一个只在一处存在的问题，造了一个漂亮的通用方案。重复远比错误的抽象便宜。先 copy-paste 两次，再谈抽象。
+**错误的抽象。** 你为一个只在一处存在的问题，造了一个漂亮的通用方案。重复远比错误的抽象便宜。先复制粘贴两次，再谈抽象。
 
 **隐形决策。** 你做了一个架构选择（数据库 schema、API 形状、鉴权策略），却没有把它作为一项决策标出来。这些选择难以撤销，用户应当知道你做了它。
 

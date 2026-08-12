@@ -22,13 +22,13 @@
    corrector.setup_2D_symmetric_x_fixed_x0(x0=initial_state[0])
 
    continuation = Continuation(corrector=corrector)
-   family = continuation.natural_continuation(
+   result = continuation.natural_continuation(
        seed_orbit=seed_dro,       # 种子轨道
        param_range=(0.14, 0.9),   # 参数扫描范围
        step_size=0.005,           # 步长
    )
 
-   print(f"生成 {len(family)} 条轨道")
+   print(f"生成 {len(result.family.orbits)} 条轨道")
 
 参数说明：
 

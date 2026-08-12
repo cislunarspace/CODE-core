@@ -23,6 +23,7 @@
 .. code-block:: python
 
    from e2m2e.algorithm.solver.two_level_multiple_shooting import TwoLevelMultipleShooting
+   from e2m2e.data.templates import ConvergenceState
 
    tms = TwoLevelMultipleShooting(dynamics=dynamics)
 
@@ -34,7 +35,7 @@
        velocity_tolerance=1e-6,
    )
 
-   if result.converged:
+   if result.status == ConvergenceState.CONVERGED:
        print(f"外层迭代: {result.outer_iterations}")
        print(f"位置残差: {result.final_position_residual:.2e}")
        print(f"速度残差: {result.final_velocity_residual:.2e}")

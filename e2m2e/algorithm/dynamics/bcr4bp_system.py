@@ -56,6 +56,8 @@ class BCR4BPSystem(CR3BP_System):
         sun_distance: float | None = None,
         sun_angular_rate: float | None = None,
         sun_phase0: float = 0.0,
+        primary_radius_km: float | None = None,
+        secondary_radius_km: float | None = None,
     ) -> None:
         """初始化 BCR4BP 系统
 
@@ -72,8 +74,17 @@ class BCR4BPSystem(CR3BP_System):
                 （需在 ``set_characteristic_scales`` 之后由
                 ``earth_moon`` 类方法设置，直接构造时请显式给出）
             sun_phase0: t = 0 时刻的太阳相位角（弧度）
+            primary_radius_km: 主天体半径（km），供碰撞终止（ADR 0020 决策 5）
+                使用；None 表示不启用碰撞检测。
+            secondary_radius_km: 次天体半径（km），同上。
         """
-        super().__init__(mu=mu, primary=primary, secondary=secondary)
+        super().__init__(
+            mu=mu,
+            primary=primary,
+            secondary=secondary,
+            primary_radius_km=primary_radius_km,
+            secondary_radius_km=secondary_radius_km,
+        )
 
         if sun_mass is None:
             sun_mass = self.SUN_GM_KM3_S2 / self.EARTH_MOON_GM_KM3_S2

@@ -79,17 +79,36 @@ class CR3BP_System(System):
     DAY = _SYSTEM_DAY
     YEAR = _SYSTEM_YEAR
 
-    def __init__(self, mu: float, primary: str, secondary: str) -> None:
+    def __init__(
+        self,
+        mu: float,
+        primary: str,
+        secondary: str,
+        primary_radius_km: float | None = None,
+        secondary_radius_km: float | None = None,
+    ) -> None:
         """初始化系统参数
 
         Args:
             mu: 质量参数 μ = m2/(m1+m2)
             primary: 主天体名称
             secondary: 次天体名称
+            primary_radius_km: 主天体半径（km），供碰撞终止（ADR 0020 决策 5）
+                使用；None 表示不启用碰撞检测。
+            secondary_radius_km: 次天体半径（km），同上。
         """
         self.primary_body: str = primary
         self.secondary_body: str = secondary
         self.mu: float = mu
+
+        for name, r in (
+            ("primary_radius_km", primary_radius_km),
+            ("secondary_radius_km", secondary_radius_km),
+        ):
+            if r is not None and r <= 0:
+                raise ValueError(f"{name} 必须为正，得到 {r}")
+        self.primary_radius_km: float | None = primary_radius_km
+        self.secondary_radius_km: float | None = secondary_radius_km
 
         if not (0 < mu < 0.5):
             raise ValueError(

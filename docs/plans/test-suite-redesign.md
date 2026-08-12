@@ -30,7 +30,7 @@ ADR 0013 定下"正确性由物理定义裁决"，并附一句"测试分层：Ru
 
 1. **分类轴从"速度/集成深度"换成"验证什么"**：封闭 7 类——`theory`（数理/物理理论）、`integrator`、`force`、`data`（数据层：内核/帧/类型/IO/模板 + 坐标转换）、`orchestration`（层3 算法编排）、`interface`（层4 门面）、`aux`（工具/辅助）。每测试恰好 1 主类。
 2. **目录镜像源结构**（导航用），**标记标功能类**（验证什么），两轴分离。`slow`/`spice` 正交于功能类。
-3. **废 `l1`/`l2`/`l3`/`l4`/`e2e`**；`addopts` 改 `-m "not slow"`。
+3. **废 `l1`/`l2`/`l3`/`l4`/`e2e` 和 `slow` 速度分层**；默认测试只排除尚未完成的 `low_thrust` 功能。
 4. **CI 维持静态门**（格式/风格/类型/层间 import），**测试在 release 前跑全量**。
 5. **`tests/` 按五层重排**（`data/`、`numerical/`、`algorithm/`、`api/`、`tools/`、`mbse/`、`_meta/`），消除死结构。
 
@@ -104,7 +104,7 @@ ADR 0013 定下"正确性由物理定义裁决"，并附一句"测试分层：Ru
 
 | 文件 | 当前内容 | 改成 |
 |---|---|---|
-| `pyproject.toml` `[tool.pytest.ini_options]` | `markers` 含 l1/l2/l3/l4/e2e/slow/spice；`addopts = ["-m","not l3 and not slow"]` | markers 换 7 类 + `slow`+`spice`；`addopts = ["-m","not slow"]`；更新默认排除注释 |
+| `pyproject.toml` `[tool.pytest.ini_options]` | `markers` 含 l1/l2/l3/l4/e2e/slow/spice；`addopts = ["-m","not l3 and not slow"]` | markers 换 7 类 + `spice`；`addopts` 只排除 `low_thrust`；不再按速度分层 |
 | `CLAUDE.md` 构建与测试段（line 48） | "默认只跑 L1+L2…单跑某层 `-m l1/l2/l3/l4`" | "默认排除 `slow`；按功能类选跑 `-m theory/data/...`；release 前全量 `-m ""`；spice 默认需 `make setup`" |
 | `docs/architecture/architecture.md` §验证策略（line 187–192） | "测试分层：Rust 单元→Python 单元→集成→物理不变量" | 删 L1–L4 段，换"按功能类目 + 按定义（ADR 0013）+ release 跑全量"，指向 ADR 0021 |
 | `docs/adr/0013-verification-by-definition.md` | 含"测试分层"那句 | 该句标注"已被 ADR 0021 取代"（0013 其余不变） |

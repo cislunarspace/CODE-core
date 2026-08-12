@@ -16,8 +16,8 @@ ADR 0013 定下"正确性由物理定义裁决"，并附一句"测试分层：Ru
 ## 决策
 
 1. **分类轴从"速度/集成深度"换成"验证什么"**：封闭 7 类——`theory`（数理/物理理论）、`integrator`、`force`、`data`（数据层：内核/帧/类型/IO/模板 + 坐标转换）、`orchestration`（层3 算法编排）、`interface`（层4 门面）、`aux`（工具/辅助）。每测试恰好 1 主类。
-2. **目录镜像源结构**（导航用），**标记标功能类**（验证什么），两轴分离。`slow`/`spice` 正交于功能类。
-3. **废 `l1`/`l2`/`l3`/`l4`/`e2e`**；`addopts` 改 `-m "not slow"`。
+2. **目录镜像源结构**（导航用），**标记标功能类**（验证什么），未完成功能用独立 marker 控制测试门（如 `low_thrust`）；不再建立速度分层。
+3. **废 `l1`/`l2`/`l3`/`l4`/`e2e` 和 `slow` 速度分层**；`addopts` 只排除尚未完成的 `low_thrust` 功能。
 4. **CI 维持静态门**（格式/风格/类型/层间 import），**测试在 release 前跑全量**。
 5. **`tests/` 按五层重排**（`data/`、`numerical/`、`algorithm/`、`api/`、`tools/`、`mbse/`、`_meta/`），消除死结构。
 
@@ -31,7 +31,7 @@ ADR 0013 定下"正确性由物理定义裁决"，并附一句"测试分层：Ru
 
 ## 结果
 
-- `pyproject.toml` markers 换 7 类 + `slow`/`spice`；`architecture.md §验证策略` 删 L1–L4 段；本 ADR 取代 ADR 0013 中"测试分层"那句（0013 其余不变）。
+- `pyproject.toml` markers 换 7 类 + `spice`；`addopts` 只排除 `low_thrust`；测试不再按速度分层，release 前跑全量。
 - 迁移分三 PR：①`git mv` 纯移动（保历史、不改逻辑、不换标记）；②逐文件打功能类标记、去 l1–l4/e2e；③清理结构债（私有符号测试、golden/gmat/dfh 术语、#358 归类）。
 
 ## 迁移 checklist（防引用遗留）

@@ -9,10 +9,11 @@
 .. code-block:: python
 
    from e2m2e.algorithm.dynamics import CR3BP_System
+   from e2m2e.data.constants import Datum
 
-   # 创建地月 CR3BP 系统
+   # 创建地月 CR3BP 系统（μ 取 DE421 基准，ADR 0022）
    system = CR3BP_System(
-       mu=0.0121506683,
+       mu=Datum.DE421.mu,
        primary="Earth",
        secondary="Moon",
    )._with_default_scales()
@@ -33,13 +34,14 @@
 .. code-block:: python
 
    from e2m2e.algorithm.dynamics import CR3BP_System, CR3BP_Dynamics
+   from e2m2e.data.constants import Datum
    from e2m2e.data.types.orbit import Orbit
    from e2m2e.algorithm.solver import DifferentialCorrection, Continuation
    import numpy as np
 
-   # 1. 创建系统与动力学
+   # 1. 创建系统与动力学（μ 取 DE421 基准，ADR 0022）
    system = CR3BP_System(
-       mu=0.0121506683, primary="Earth", secondary="Moon"
+       mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
    )._with_default_scales()
    system.compute_libration_points()
    dynamics = CR3BP_Dynamics(system)
@@ -47,23 +49,25 @@
    # 2. 种子轨道（DRO 初始猜测）
    initial_state = [0.79188556619742, 0.0, 0.0, 0.0, 0.53682, 0.0]
    seed_orbit = Orbit(states=[initial_state], times=[0], system=system)
+   seed_orbit.period = 6.307  # 周期初猜（TU），修正中迭代更新
 
    # 3. 微分修正：固定 x0 的 2D 对称策略
    corrector = DifferentialCorrection(dynamics)
    corrector.setup_2D_symmetric_x_fixed_x0(x0=initial_state[0])
-   seed_dro = corrector.iterate_correction(initial_guess=seed_orbit)
+   result = corrector.iterate_correction(initial_guess=seed_orbit)
+   seed_dro = result.orbit  # 修正后的轨道（None 表示失败）
 
    if seed_dro is not None:
        print(f"修正成功，周期 = {seed_dro.period:.6f}")
 
    # 4. 延拓生成轨道族
    continuation = Continuation(corrector=corrector)
-   family = continuation.natural_continuation(
+   cont_result = continuation.natural_continuation(
        seed_orbit=seed_dro,
        param_range=(0.14, 0.9),
        step_size=0.005,
    )
-   print(f"轨道族包含 {len(family)} 条轨道")
+   print(f"轨道族包含 {len(cont_result.family.orbits)} 条轨道")
 
 生成 Halo 轨道
 ---------------
@@ -73,7 +77,7 @@
    from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
 
    # Richardson 三阶解析近似生成初始猜测
-   z0 = 0.01  # z 方向振幅
+   z0 = 0.001  # z 方向振幅（小振幅种子，Richardson 近似精度高）
    guess = compute_halo_initial_guess(system.mu, z0, L=1, halo_class=0)
 
    initial_state = np.array([
@@ -92,7 +96,8 @@
    )
    initial_guess.period = guess["T_half"] * 2
 
-   halo = corrector.iterate_correction(initial_guess=initial_guess)
+   halo_result = corrector.iterate_correction(initial_guess=initial_guess)
+   halo = halo_result.orbit
    if halo is not None:
        print(f"Halo 周期: {halo.period:.6f}")
 
@@ -105,6 +110,7 @@
 .. code-block:: python
 
    from e2m2e.algorithm.solver import MultipleShooting, sample_patch_points
+   from e2m2e.data.templates import ConvergenceState
 
    ms = MultipleShooting(dynamics=dynamics)
    t_patch, state_patch = sample_patch_points(seed_dro, n_points=5)
@@ -117,7 +123,7 @@
        var_time=True,
    )
 
-   if result.converged:
+   if result.status == ConvergenceState.CONVERGED:
        print(f"收敛，最大残差 {result.max_residual:.2e}")
 
 转移轨道设计
@@ -190,7 +196,8 @@
    config.apply_rcparams()
 
    plotter = FamilyPlotter(system, config)
-   plotter.plot_family_2d(family, jacobi_values, title="DRO Family")
+   jacobi_values = [system.get_jacobi_constant(o.states[0]) for o in cont_result.family.orbits]
+   plotter.plot_family_2d(cont_result.family, jacobi_values, title="DRO Family")
 
 下一步
 ------

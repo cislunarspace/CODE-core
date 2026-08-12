@@ -71,6 +71,7 @@ e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍�
 
    from e2m2e.algorithm.dynamics.system import CR3BP_System
    from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+   from e2m2e.data.constants import Datum
    from e2m2e.algorithm.transfer import (
        Transfer,
        TransferSearch,
@@ -80,9 +81,9 @@ e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍�
        load_orbit_from_json,
    )
 
-   # 1. 建立动力学
+   # 1. 建立动力学（μ 取 DE421 基准，ADR 0022）
    system = CR3BP_System(
-       mu=0.0121506683, primary="Earth", secondary="Moon"
+       mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
    )._with_default_scales()
    system.compute_libration_points()
    dynamics = CR3BP_Dynamics(system)

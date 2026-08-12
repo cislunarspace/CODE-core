@@ -25,7 +25,14 @@ _OUT_DIR = pathlib.Path(__file__).resolve().parent
 def main() -> None:
     parser = argparse.ArgumentParser(description="转移轨道设计示例（二体 Lambert）")
     parser.add_argument("--save", action="store_true", help="存为 PNG 而非交互式显示")
+    parser.add_argument(
+        "--log-level", default="WARNING", help="日志级别（DEBUG/INFO/WARNING/ERROR）"
+    )
     args = parser.parse_args()
+
+    from e2m2e.tools.logging import configure_logging
+
+    configure_logging(level=args.log_level)
 
     print("=" * 60)
     print("e2m2e 转移轨道设计示例（二体 Lambert）")

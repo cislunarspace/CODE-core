@@ -49,7 +49,7 @@ def cr3bp_system():
 
 @pytest.fixture
 def sample_state():
-    """3:1 DRO 初始状态（无量纲，与 conftest 的 dro_31_state 一致）。"""
+    """3:1 DRO 初始状态（无量纲）。"""
     return np.array([1.1202109158830986, 0.0, 0.0, 0.0, -0.46178983697629084, 0.0])
 
 

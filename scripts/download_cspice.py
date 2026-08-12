@@ -11,8 +11,10 @@ e2m2e 的 GitHub Release 下载预编译的 MICE 工具包（``cspice-windows-v1
     python scripts/download_cspice.py [--cache-dir DIR]
     python scripts/download_cspice.py --print-cspice-dir
 
-不传参数：下载（若未缓存）+ 解压到缓存，在 stdout 打印 ``CSPICE_DIR=<dir>``。
-``--print-cspice-dir``：仅打印已解压的 ``CSPICE_DIR``（供 shell ``$(...)`` 捕获）。
+不传参数：下载（若未缓存）+ 解压到缓存，在 stdout 打印 ``CSPICE_DIR=<dir>``——
+正是 GitHub Actions ``>> "$GITHUB_ENV"`` 的变量文件格式（CI 用），也兼容
+``eval "$(python3 scripts/download_cspice.py)"`` 的 shell 赋值。
+``--print-cspice-dir``：仅打印已解压的 ``CSPICE_DIR`` 纯路径（供 shell ``$(...)`` 捕获）。
 
 默认缓存目录：仓库根 ``.cspice/``（gitignore 已忽略）。
 """
@@ -100,6 +102,8 @@ def main() -> None:
     if args.print_cspice_dir:
         print(cspice_dir)
         return
+    # 输出 GITHUB_ENV 变量文件格式（``NAME=VALUE``）：CI 用
+    # ``>> "$GITHUB_ENV"`` 落盘设置 CSPICE_DIR，shell 侧 ``eval $(...)`` 同样可用。
     print(f"CSPICE_DIR={cspice_dir}")
 
 

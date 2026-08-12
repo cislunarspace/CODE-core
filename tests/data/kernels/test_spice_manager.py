@@ -8,6 +8,7 @@ import os
 
 import numpy as np
 import pytest
+from kernel_helpers import SPICE_KERNEL_DIR
 from numpy.testing import assert_allclose
 
 from e2m2e.data.kernels.manager import SPICEManager
@@ -22,17 +23,28 @@ pytestmark = [
 # Fixtures
 # =============================================================================
 @pytest.fixture
-def spice_manager():
-    """创建 SPICEManager 实例"""
+def spice_kernel_dir():
+    """返回 SPICE 内核文件所在目录，不存在或无内核文件则跳过。"""
+    if not os.path.isdir(SPICE_KERNEL_DIR):
+        pytest.skip("SPICE kernel directory not found, set SPICE_KERNEL_DIR")
+    bsp_files = [f for f in os.listdir(SPICE_KERNEL_DIR) if f.endswith(".bsp")]
+    if not bsp_files:
+        pytest.skip("No .bsp kernel files found in SPICE kernel directory")
+    return SPICE_KERNEL_DIR
+
+
+@pytest.fixture
+def bare_spice_manager():
+    """未加载内核的裸 SPICEManager 实例（测类本身 API 用）。"""
     return SPICEManager()
 
 
 @pytest.fixture
-def loaded_spice(spice_manager, spice_kernel_path):
+def loaded_spice(bare_spice_manager, spice_kernel_path):
     """加载了 DE440 内核的 SPICEManager"""
-    spice_manager.load_kernel(spice_kernel_path)
-    yield spice_manager
-    spice_manager.unload_kernel(spice_kernel_path)
+    bare_spice_manager.load_kernel(spice_kernel_path)
+    yield bare_spice_manager
+    bare_spice_manager.unload_kernel(spice_kernel_path)
 
 
 # =============================================================================
@@ -46,22 +58,22 @@ class TestSPICEManagerInit:
         manager = SPICEManager()
         assert manager is not None
 
-    def test_has_load_kernel_method(self, spice_manager):
+    def test_has_load_kernel_method(self, bare_spice_manager):
         """SPICEManager 应有 load_kernel 方法"""
-        assert hasattr(spice_manager, "load_kernel")
-        assert callable(spice_manager.load_kernel)
+        assert hasattr(bare_spice_manager, "load_kernel")
+        assert callable(bare_spice_manager.load_kernel)
 
-    def test_has_unload_kernel_method(self, spice_manager):
+    def test_has_unload_kernel_method(self, bare_spice_manager):
         """SPICEManager 应有 unload_kernel 方法"""
-        assert hasattr(spice_manager, "unload_kernel")
+        assert hasattr(bare_spice_manager, "unload_kernel")
 
-    def test_has_utc_to_et_method(self, spice_manager):
+    def test_has_utc_to_et_method(self, bare_spice_manager):
         """SPICEManager 应有 utc_to_et 方法"""
-        assert hasattr(spice_manager, "utc_to_et")
+        assert hasattr(bare_spice_manager, "utc_to_et")
 
-    def test_has_get_body_state_method(self, spice_manager):
+    def test_has_get_body_state_method(self, bare_spice_manager):
         """SPICEManager 应有 get_body_state 方法"""
-        assert hasattr(spice_manager, "get_body_state")
+        assert hasattr(bare_spice_manager, "get_body_state")
 
 
 # =============================================================================
@@ -70,22 +82,22 @@ class TestSPICEManagerInit:
 class TestSPICEKernelLoading:
     """测试 SPICE 内核文件的加载和卸载"""
 
-    def test_load_de440_kernel(self, spice_manager, spice_kernel_path):
+    def test_load_de440_kernel(self, bare_spice_manager, spice_kernel_path):
         """应能成功加载 DE440 内核"""
-        spice_manager.load_kernel(spice_kernel_path)
-        spice_manager.unload_kernel(spice_kernel_path)
+        bare_spice_manager.load_kernel(spice_kernel_path)
+        bare_spice_manager.unload_kernel(spice_kernel_path)
 
-    def test_load_nonexistent_kernel_raises(self, spice_manager):
+    def test_load_nonexistent_kernel_raises(self, bare_spice_manager):
         """加载不存在的文件应抛出异常"""
         with pytest.raises((FileNotFoundError, OSError, RuntimeError)):
-            spice_manager.load_kernel("/nonexistent/path/de440.bsp")
+            bare_spice_manager.load_kernel("/nonexistent/path/de440.bsp")
 
-    def test_load_and_unload(self, spice_manager, spice_kernel_path):
+    def test_load_and_unload(self, bare_spice_manager, spice_kernel_path):
         """应能加载后卸载内核"""
-        spice_manager.load_kernel(spice_kernel_path)
-        spice_manager.unload_kernel(spice_kernel_path)
+        bare_spice_manager.load_kernel(spice_kernel_path)
+        bare_spice_manager.unload_kernel(spice_kernel_path)
         # 卸载后再次卸载不应崩溃
-        spice_manager.unload_kernel(spice_kernel_path)
+        bare_spice_manager.unload_kernel(spice_kernel_path)
 
 
 # =============================================================================
@@ -216,66 +228,66 @@ class TestSPICEManagerFindEphemerisKernel:
         此逻辑应属于 e2m2e 的 SPICEManager，使上层脚本无需重复实现。
 
     接口:
-        spice_manager.find_ephemeris_kernel(search_dir: str) -> str
+        bare_spice_manager.find_ephemeris_kernel(search_dir: str) -> str
         - search_dir: 要搜索的目录路径
         - 返回: 找到的第一个 .bsp 内核文件的绝对路径
         - 按优先级搜索: de440.bsp > de440s.bsp > de435.bsp > de438.bsp
         - 找不到则抛出 FileNotFoundError
     """
 
-    def test_has_find_ephemeris_kernel_method(self, spice_manager):
+    def test_has_find_ephemeris_kernel_method(self, bare_spice_manager):
         """SPICEManager 应有 find_ephemeris_kernel 方法"""
-        assert hasattr(spice_manager, "find_ephemeris_kernel")
-        assert callable(spice_manager.find_ephemeris_kernel)
+        assert hasattr(bare_spice_manager, "find_ephemeris_kernel")
+        assert callable(bare_spice_manager.find_ephemeris_kernel)
 
     @pytest.mark.spice
-    def test_find_kernel_in_valid_directory(self, spice_manager, spice_kernel_dir):
+    def test_find_kernel_in_valid_directory(self, bare_spice_manager, spice_kernel_dir):
         """在包含内核文件的目录中应能找到并返回路径"""
-        path = spice_manager.find_ephemeris_kernel(spice_kernel_dir)
+        path = bare_spice_manager.find_ephemeris_kernel(spice_kernel_dir)
         assert os.path.exists(path)
         assert path.endswith(".bsp")
 
     @pytest.mark.spice
-    def test_find_kernel_returns_existing_file(self, spice_manager, spice_kernel_dir):
+    def test_find_kernel_returns_existing_file(self, bare_spice_manager, spice_kernel_dir):
         """返回的路径应指向一个实际存在的文件"""
-        path = spice_manager.find_ephemeris_kernel(spice_kernel_dir)
+        path = bare_spice_manager.find_ephemeris_kernel(spice_kernel_dir)
         assert os.path.isfile(path)
 
-    def test_find_kernel_priority_de440_over_de438(self, spice_manager, tmp_path):
+    def test_find_kernel_priority_de440_over_de438(self, bare_spice_manager, tmp_path):
         """当 de440 和 de438 同时存在时，应返回 de440"""
         (tmp_path / "de440.bsp").write_bytes(b"fake")
         (tmp_path / "de438.bsp").write_bytes(b"fake")
-        path = spice_manager.find_ephemeris_kernel(str(tmp_path))
+        path = bare_spice_manager.find_ephemeris_kernel(str(tmp_path))
         assert path.endswith("de440.bsp")
 
-    def test_find_kernel_priority_de440s_over_de435(self, spice_manager, tmp_path):
+    def test_find_kernel_priority_de440s_over_de435(self, bare_spice_manager, tmp_path):
         """当 de440s 和 de435 同时存在时，应返回 de440s"""
         (tmp_path / "de440s.bsp").write_bytes(b"fake")
         (tmp_path / "de435.bsp").write_bytes(b"fake")
-        path = spice_manager.find_ephemeris_kernel(str(tmp_path))
+        path = bare_spice_manager.find_ephemeris_kernel(str(tmp_path))
         assert path.endswith("de440s.bsp")
 
-    def test_find_kernel_fallback_to_de435(self, spice_manager, tmp_path):
+    def test_find_kernel_fallback_to_de435(self, bare_spice_manager, tmp_path):
         """当只有 de435 存在时，应返回 de435"""
         (tmp_path / "de435.bsp").write_bytes(b"fake")
-        path = spice_manager.find_ephemeris_kernel(str(tmp_path))
+        path = bare_spice_manager.find_ephemeris_kernel(str(tmp_path))
         assert path.endswith("de435.bsp")
 
-    def test_find_kernel_fallback_to_de438(self, spice_manager, tmp_path):
+    def test_find_kernel_fallback_to_de438(self, bare_spice_manager, tmp_path):
         """当只有 de438 存在时，应返回 de438"""
         (tmp_path / "de438.bsp").write_bytes(b"fake")
-        path = spice_manager.find_ephemeris_kernel(str(tmp_path))
+        path = bare_spice_manager.find_ephemeris_kernel(str(tmp_path))
         assert path.endswith("de438.bsp")
 
-    def test_find_kernel_raises_when_not_found(self, spice_manager, tmp_path):
+    def test_find_kernel_raises_when_not_found(self, bare_spice_manager, tmp_path):
         """目录中无内核文件时应抛出 FileNotFoundError"""
         with pytest.raises(FileNotFoundError):
-            spice_manager.find_ephemeris_kernel(str(tmp_path))
+            bare_spice_manager.find_ephemeris_kernel(str(tmp_path))
 
-    def test_find_kernel_raises_when_dir_not_exists(self, spice_manager):
+    def test_find_kernel_raises_when_dir_not_exists(self, bare_spice_manager):
         """目录不存在时应抛出 FileNotFoundError"""
         with pytest.raises(FileNotFoundError):
-            spice_manager.find_ephemeris_kernel("/nonexistent/path/to/kernels")
+            bare_spice_manager.find_ephemeris_kernel("/nonexistent/path/to/kernels")
 
 
 if __name__ == "__main__":

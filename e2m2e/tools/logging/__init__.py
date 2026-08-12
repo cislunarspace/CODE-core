@@ -3,8 +3,9 @@
 标准 logging + 关键事件键值对、零新依赖（ADR 0011）：算法层保持
 ``logger.info``，打靶/延拓迭代等关键数值事件用键值对
 （``logger.info("correction_iter", iter=3, error=1e-8)``）；本模块提供
-配置工厂（Formatter 把键值对转 key=val）。api/config.py 控制级别和
-handler。
+配置工厂（Formatter 把键值对转 key=val）。
+应用入口（examples/ 等，包外）调用 ``configure_logging`` 控制级别和
+handler——库本身不配置日志（ADR 0012：api/ 不依赖 tools/）。
 """
 
 from __future__ import annotations

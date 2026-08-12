@@ -75,15 +75,19 @@ pip 安装
 
 .. code-block:: bash
 
-   # 默认构建（不含 spice 快速路径；debug 较慢，日常用 --release）
-   uv run maturin develop --release
+   make setup       # 拉取 CSPICE 编译包 + SPICE 内核（cspice-v1 / kernels-v1 release，首次必跑）
+   make dev         # maturin develop 构建并安装 Rust 扩展（spice 默认开启，debug）
+   make dev-release # 同 dev 但 --release（性能基准 / 长期预报用）
 
-   # 含 spice 快速路径（构建时自动从 NAIF 下载 CSPICE 源码编译，
-   # 需网络可达 naif.jpl.nasa.gov；也可设 CSPICE_DIR 指向本机 CSPICE 安装）
-   uv run maturin develop --release --features spice
+构建统一走 `Makefile`：它自动从 ``scripts/download_cspice.py`` 解析并
+``export CSPICE_DIR``。CSPICE 一律取 GitHub release 预编译包；缺
+``CSPICE_DIR`` 时构建直接报错（不启用 ``cspice-sys`` 的 ``downloadcspice``，
+杜绝走国内不可达的 NAIF 源码下载）。裸 ``cargo`` / ``maturin`` 命令需自行
+``export CSPICE_DIR=$(python3 scripts/download_cspice.py --print-cspice-dir)``。
 
-无 spice 的构建下，第三体引力、STM 传播、打靶等绑定缺席，Python 侧自动
-降级到纯 Python 路径，功能正确但更慢。
+spice 是默认 feature（``crates/*/Cargo.toml default=["spice"]`` +
+``pyproject features=["spice"]`` 双保险），不再产无 spice 子集；Rust 扩展
+不可用时显式报错，不静默降级到纯 Python 路径（ADR 0020）。
 
 SPICE 内核
 ----------

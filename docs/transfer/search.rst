@@ -176,11 +176,12 @@
 
    from e2m2e.algorithm.dynamics.system import CR3BP_System
    from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+   from e2m2e.data.constants import Datum
    from e2m2e.algorithm.transfer import TransferSearch, TransferConfig, load_orbit_from_json
 
-   # 建立系统
+   # 建立系统（μ 取 DE421 基准，ADR 0022）
    system = CR3BP_System(
-       mu=0.0121506683, primary="Earth", secondary="Moon"
+       mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
    )._with_default_scales()
    system.compute_libration_points()
    dynamics = CR3BP_Dynamics(system)

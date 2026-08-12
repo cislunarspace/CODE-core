@@ -1,11 +1,4 @@
-"""SPICE 内核加载/卸载辅助函数。
-
-从 tests/conftest.py 抽出为独立模块：测试文件若用 ``from conftest import ...``
-导入这些函数，在 pytest-xdist 并行下会与其他目录的 conftest.py 撞名
-（``sys.modules['conftest']`` 被先加载者占据），解析到错误的模块。
-改为从唯一命名的 ``kernel_helpers`` 导入（配合 pyproject 的
-``pythonpath = ["tests"]``）消除歧义。
-"""
+"""测试用的 SPICE 内核加载/卸载辅助模块。"""
 
 import os
 
@@ -14,9 +7,10 @@ SPICE_KERNEL_DIR = os.environ.get(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "kernels"),
 )
 
-# 定义 body-fixed 帧所需的 SPICE 内核文件名(issue #187):
-# 地球 ITRF93 需要 earth_latest_high_prec.bpc;text PCK 与月球 MOON_PA 需要
-# pck00010.tpc、SPICELunaCurrentKernel.bpc、SPICELunaFrameKernel.tf。
+# 定义 body-fixed 帧所需的 SPICE 内核文件名（issue #187）：
+# 地球 ITRF93 需要二进制 PCK（earth_latest_high_prec.bpc），
+# 月球 MOON_PA 需要文本 PCK（pck00010.tpc）、二进制 PCK（SPICELunaCurrentKernel.bpc）
+# 与帧内核（SPICELunaFrameKernel.tf）。
 BODY_FIXED_KERNELS = [
     "earth_latest_high_prec.bpc",
     "pck00010.tpc",
@@ -36,7 +30,7 @@ def load_body_fixed_kernels(spice) -> list[str]:
         spice: 已初始化的 :class:`~e2m2e.data.kernels.manager.SPICEManager`。
 
     Returns:
-        实际 furnsh 的内核绝对路径列表;调用方应在 teardown 时对其逆序 unload。
+        实际加载（furnsh）的内核绝对路径列表。调用方应在 teardown 时对其逆序卸载。
     """
     loaded: list[str] = []
     if not os.path.isdir(SPICE_KERNEL_DIR):

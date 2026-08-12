@@ -110,10 +110,11 @@
 .. code-block:: python
 
    from e2m2e.algorithm.transfer import OrbitTerminal, design_low_energy_transfer
+   from e2m2e.data.templates import ConvergenceState
 
    sol = design_low_energy_transfer(OrbitTerminal(departure_orbit), target_orbit)
 
-   if sol.converged:
+   if sol.status == ConvergenceState.CONVERGED:
        print(f"弧段数: {len(sol.arcs)}")           # 2
        print(f"出发脉冲: {sol.arcs[0].delta_v:.6f} km/s")
        print(f"拼接脉冲: {sol.arcs[1].delta_v:.6f} km/s")

@@ -16,6 +16,20 @@ from e2m2e.data.types.orbit import Orbit, OrbitFamily
 pytestmark = pytest.mark.data
 
 
+@pytest.fixture
+def sample_orbit():
+    """测试用样本轨道（旋转系中的近似圆周运动）。"""
+    t = np.linspace(0, 1, 50)
+    x = 0.8 + 0.1 * np.cos(2 * np.pi * t)
+    y = 0.1 * np.sin(2 * np.pi * t)
+    z = np.zeros_like(t)
+    vx = -0.1 * 2 * np.pi * np.sin(2 * np.pi * t)
+    vy = 0.1 * 2 * np.pi * np.cos(2 * np.pi * t)
+    vz = np.zeros_like(t)
+    states = np.column_stack([x, y, z, vx, vy, vz])
+    return Orbit(states=states, times=t)
+
+
 class TestOrbitInit:
     """Tests for Orbit initialization"""
 

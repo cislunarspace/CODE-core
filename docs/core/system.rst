@@ -26,9 +26,10 @@ CR3BP 系统
 .. code-block:: python
 
    from e2m2e.algorithm.dynamics import CR3BP_System
+   from e2m2e.data.constants import Datum
 
    system = CR3BP_System(
-       mu=0.0121506683,
+       mu=Datum.DE421.mu,
        primary="Earth",
        secondary="Moon",
    )._with_default_scales()

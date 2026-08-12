@@ -380,6 +380,24 @@ def uninitialized_system():
 
 
 @pytest.fixture
+def initialized_system(earth_moon_system):
+    """带特征尺度的地月系统。"""
+    return earth_moon_system
+
+
+@pytest.fixture
+def sun_earth_system():
+    """日地 CR3BP 系统。"""
+    return CR3BP_System(mu=3.0039e-06, primary="Sun", secondary="Earth")._with_default_scales()
+
+
+@pytest.fixture
+def sun_jupiter_system():
+    """木日 CR3BP 系统。"""
+    return CR3BP_System(mu=0.0009535, primary="Sun", secondary="Jupiter")._with_default_scales()
+
+
+@pytest.fixture
 def full_system(initialized_system):
     """Create fully initialized system with libration points and mass info."""
     initialized_system.compute_libration_points()

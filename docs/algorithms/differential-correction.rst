@@ -110,13 +110,14 @@ CR3BP 动力学在旋转坐标系中具有以下对称性：
 
    from e2m2e.algorithm.dynamics import CR3BP_System
    from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
+   from e2m2e.data.constants import Datum
    from e2m2e.data.types.orbit import Orbit
    from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
    import numpy as np
 
-   # 1. 创建地月系统
+   # 1. 创建地月系统（μ 取 DE421 基准，ADR 0022）
    system = CR3BP_System(
-       mu=0.0121506683, primary="Earth", secondary="Moon"
+       mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
    )._with_default_scales()
    system.set_characteristic_scales(384400, 27.32 * 86400)
    system.compute_libration_points()
@@ -139,15 +140,16 @@ CR3BP 动力学在旋转坐标系中具有以下对称性：
    initial_guess.period = 3.0  # 周期猜测（无量纲）
 
    # 5. 执行微分修正
-   orbit = corrector.iterate_correction(
+   result = corrector.iterate_correction(
        initial_guess=initial_guess, verbose=False
    )
+   orbit = result.orbit  # 修正后的轨道（None 表示失败）
 
    if orbit is not None:
        print(f"收敛: 周期={orbit.period:.4f}, 族={orbit.family_type}")
        print(f"初始状态: {orbit.states[0]}")
    else:
-       print(f"修正失败: {corrector.termination_reason}")
+       print(f"修正失败: {result.message}")
 
 对称 2D（固定周期 DRO）
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -167,7 +169,8 @@ CR3BP 动力学在旋转坐标系中具有以下对称性：
    )
    initial_guess.period = target_period
 
-   orbit = corrector.iterate_correction(initial_guess=initial_guess)
+   result = corrector.iterate_correction(initial_guess=initial_guess)
+   orbit = result.orbit
    if orbit is not None:
        print(f"DRO 周期: {orbit.period:.4f} (目标: {target_period})")
 
@@ -189,7 +192,8 @@ CR3BP 动力学在旋转坐标系中具有以下对称性：
    )
    initial_guess.period = 3.0
 
-   orbit = corrector.iterate_correction(initial_guess=initial_guess)
+   result = corrector.iterate_correction(initial_guess=initial_guess)
+   orbit = result.orbit
    if orbit is not None:
        print(f"3D 轨道周期: {orbit.period:.4f}")
 
@@ -202,7 +206,7 @@ Halo 轨道（固定 z 振幅）
 
    # 1. 使用 Richardson 三阶近似生成初始猜测
    mu = system.mu
-   z0 = 0.01  # z 方向振幅
+   z0 = 0.001  # z 方向振幅（小振幅种子，Richardson 近似精度高）
    guess = compute_halo_initial_guess(mu, z0, L=1, halo_class=0)
 
    # 2. 组装初始状态（北 Halo：z0 > 0）
@@ -223,7 +227,8 @@ Halo 轨道（固定 z 振幅）
    initial_guess.period = guess["T_half"] * 2
 
    # 4. 执行修正
-   orbit = corrector.iterate_correction(initial_guess=initial_guess)
+   result = corrector.iterate_correction(initial_guess=initial_guess)
+   orbit = result.orbit
    if orbit is not None:
        print(f"Halo 轨道周期: {orbit.period:.4f}")
        print(f"Jacobi 常数: {system.get_jacobi_constant(orbit.states[0]):.6f}")
@@ -267,7 +272,7 @@ Halo 轨道（固定 z 振幅）
    )
 
    # 获取配置对象
-   config = halo_fixed_z0(z0=0.01, libration_point=1)
+   config = halo_fixed_z0(z0=0.001, libration_point=1)
    print(config.setup_type)          # "halo_orbit_fixed_z0"
    print(config.free_variables)      # ["x0", "y_dot0", "T_half"]
    print(config.target_conditions)   # {"y": 0.0, "x_dot": 0.0, "z_dot": 0.0}

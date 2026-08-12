@@ -125,10 +125,3 @@ def test_mcp_server_placeholder():
 
     with pytest.raises(NotImplementedError, match="MCP"):
         create_server(None)
-
-
-def test_tools_logging_implemented():
-    """tools/logging 配置工厂已实现。"""
-    from e2m2e.tools.logging import configure_logging
-
-    configure_logging(level="ERROR")

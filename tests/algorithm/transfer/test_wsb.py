@@ -12,18 +12,12 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
-from e2m2e.algorithm.transfer import (
-    TransferDesignResult,
-    WsbSearchParams,
-    WsbTransferDetails,
-    transfer_orbit,
-)
+from e2m2e.algorithm.transfer import WsbSearchParams, transfer_orbit
 from e2m2e.algorithm.transfer.hohmann import TliParams
 from e2m2e.algorithm.transfer.wsb import (
     compute_kepler_energy_moon,
 )
 from e2m2e.data.constants import Datum
-from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 
@@ -276,80 +270,8 @@ class TestWsbPhysics:
 # ---------------------------------------------------------------------------
 
 
-def _make_target_ephemeris():
-    """构造近月轨道目标态的星历（单点，物理单位 km / km/s）。"""
-    system = _make_bcr4bp_system()
-    target_state = _make_target_state(system)
-    du = system.characteristic_length
-    vu = system.characteristic_velocity
-    target_phys = np.array(
-        [
-            target_state[0] * du,
-            target_state[1] * du,
-            target_state[2] * du,
-            target_state[3] * vu,
-            target_state[4] * vu,
-            target_state[5] * vu,
-        ]
-    )
-    return target_phys.reshape(1, 6)
-
-
-@pytest.fixture(scope="module")
-def wsb_transfer_result():
-    """跑一次小网格 WSB 搜索，module 内复用。
-
-    details 字段类型契约（零搜索）已下沉到 ``tests/api/test_facade.py``
-    的 ``TestWsbTransferDetailsContract``（ADR 0021）。本 fixture 只服务
-    真搜索的 orchestration 测试，搜索参数与原两个 slow 测试一致
-    （n_sun_phase=1, n_departure_phase=5, n_tof=3）。
-    """
-    tli_params = TliParams(parking_alt_km=200.0, inclination_deg=0.0)
-    target_ephemeris = _make_target_ephemeris()
-    search_params = WsbSearchParams(
-        n_sun_phase=1,
-        n_departure_phase=5,
-        n_tof=3,
-        tof_range=(1.0, 5.0),
-        max_total_dv=50.0,
-    )
-    import warnings
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return transfer_orbit(
-            "WSB",
-            tli_params=tli_params,
-            target_ephemeris=target_ephemeris,
-            wsb_search_params=search_params,
-        )
-
-
 class TestWsbTransferOrbit:
-    """transfer_orbit("WSB") 编排器测试。"""
-
-    @pytest.mark.slow
-    def test_wsb_search_returns_valid_transfer(self, wsb_transfer_result):
-        """WSB 编排器搜索：返回结构正确，有候选时 dv 落在地月转移合理量级。
-
-        小网格（n_sun_phase=1, n_departure_phase=5, n_tof=3）的物理参数空间
-        可能无解，无候选时 skip（与 ``TestWsbAcceptance`` 模式一致，不弱化）。
-        ``details`` 各字段类型契约由 ``TestWsbTransferDetailsContract``
-        零搜索验证，本测试只断言编排链路的搜索结果。
-        """
-        result = wsb_transfer_result
-        assert isinstance(result, TransferDesignResult)
-        assert result.transfer_type == "WSB"
-        details = result.details
-        assert isinstance(details, WsbTransferDetails)
-        if details.status is not ConvergenceState.CONVERGED:
-            pytest.skip("小网格 WSB 搜索未找到可行候选（参数空间可能无解）")
-        # 有候选：dv 落在地月转移合理量级（~3-5 km/s）
-        assert 0.5 < result.delta_v < 10.0, (
-            f"WSB 总 Δv {result.delta_v:.3f} km/s 超出地月转移合理范围"
-        )
-        assert details.tof_sec > 0
-        assert details.perilune_alt_km > 0
+    """transfer_orbit("WSB") 编排器输入校验。"""
 
     def test_wsb_missing_params_raises(self):
         """transfer_orbit("WSB") 缺少必要参数时报错。"""

@@ -22,7 +22,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -31,6 +31,7 @@ from scipy.integrate import solve_ivp
 from e2m2e.exceptions import PropagationFailure
 from e2m2e.integrators import require_rust_extension
 
+from ...data.templates import ConvergenceState, FailureCause
 from .cr3bp_system import CR3BP_System
 from .potential import pseudo_potential_hessian
 from .system import System
@@ -151,6 +152,7 @@ class Dynamics:
         | list[Callable[[float, np.ndarray], float]]
         | None = None,
         backend: Literal["scipy", "rust"] | None = None,
+        collision_detection: bool = False,
     ) -> dict[str, Any]:
         """传播轨迹（Template Method）
 
@@ -176,13 +178,22 @@ class Dynamics:
                 ``solve_ivp_events``（事件语义与 scipy 未完全对齐，由调用方
                 显式选择并接受差异）。不传则报错；不允许 ``"auto"`` 等隐式
                 选择。无 ``events`` 时忽略（Rust 快速路径为唯一路径）。
+            collision_detection: 是否启用碰撞终止（ADR 0020 决策 5）。启用时
+                从系统 body-radius 配置（``primary_radius_km``/
+                ``secondary_radius_km``）构造 ``g = |r - body_pos| - R_body``
+                的 ``terminal=True`` 事件，与 ``events`` 合并后走事件积分
+                （须显式 ``backend``）；半径未注入或特征尺度未初始化时抛
+                ``ValueError``。默认 False（不启用，行为与现状一致）。
 
         Returns:
             轨迹结果字典，包含 ``time`` 和 ``states`` 键；
             当 ``with_stm=True`` 时额外包含 ``stm`` 键；
             当 ``with_jacobi=True`` 时额外包含 ``jacobi`` 与 ``jacobi_error`` 键；
             当传入 ``events`` 时额外包含 ``t_events`` 与 ``y_events`` 键
-            （逐事件的触发时刻与状态数组，scipy 语义）
+            （逐事件的触发时刻与状态数组，scipy 语义）；
+            当 ``collision_detection=True`` 时额外包含 ``collision`` 键
+            （``None`` 表示未碰撞；否则为
+            ``{"body": 天体名, "t": 终止时刻, "state": 终止状态}``）。
         """
         initial_state = np.asarray(initial_state, dtype=float)
         max_step = self._get_max_step(t_span)
@@ -192,19 +203,35 @@ class Dynamics:
         if events is not None and len(events) == 0:
             # 空列表等价于无事件：不触发事件分支，走默认快速路径。
             events = None
+
+        immediate_collision: str | None = None
+        if collision_detection:
+            events, immediate_collision = self._setup_collision_detection(events, initial_state)
+
         if backend is not None and backend not in ("scipy", "rust"):
             raise ValueError("backend 必须是 'scipy' 或 'rust'；不允许 'auto' 等隐式选择")
         if events is not None and backend is None:
             raise ValueError("传入 events 时必须显式指定 backend='scipy' 或 backend='rust'")
 
+        if immediate_collision is not None:
+            # 初始状态已在天体半径内：scipy 事件不会对 g<0 的起点触发（需过零），
+            # 显式短路为即时碰撞（单点轨迹 + collision 标记）。
+            return self._immediate_collision(
+                initial_state, t_span[0], with_stm, with_jacobi, immediate_collision
+            )
+
         if with_stm:
-            return self._propagate_with_stm(
+            result = self._propagate_with_stm(
                 initial_state, t_span, t_eval, max_step, with_jacobi, events, backend
             )
         else:
-            return self._propagate_state_only(
+            result = self._propagate_state_only(
                 initial_state, t_span, t_eval, max_step, with_jacobi, events, backend
             )
+
+        if collision_detection:
+            result["collision"] = self._extract_collision(result)
+        return result
 
     def _propagate_with_stm(
         self,
@@ -292,11 +319,24 @@ class Dynamics:
         # result.y 形状为 (6, n_points)，转置为 (n_points, 6) — REQ-002
         states = result.y.T
 
+        # 显式 failure 标记（ADR 0020 决策 2）：步长塌缩/积分器未成功时返回
+        # DIVERGED 标记而非仅靠空 states 表达失败，下游不再用 len==0 嗅探。
+        if not result.success or states.shape[0] == 0:
+            return {
+                "time": np.array([]),
+                "states": np.empty((0, self.STATE_DIM)),
+                "status": ConvergenceState.DIVERGED,
+                "cause": FailureCause.DIVERGENCE_DETECTED,
+                "message": str(getattr(result, "message", "propagation failed")),
+            }
+
         self.last_trajectory = (result.t, states)
 
         out: dict[str, Any] = {
             "time": result.t,
             "states": states,
+            "status": ConvergenceState.CONVERGED,
+            "cause": FailureCause.NONE,
         }
 
         if events is not None:
@@ -360,6 +400,120 @@ class Dynamics:
             return abs(state[2] - value) < self.cross_section_tolerance
         else:
             raise ValueError(f"无效的平面: {plane}。可用平面: 'x', 'y', 'z'")
+
+    def _collision_specs(self) -> list[tuple[str, npt.NDArray[np.float64], float]]:
+        """从系统 body-radius 配置构造碰撞检测规格列表。
+
+        Returns:
+            ``(body, center, radius_km)`` 列表，center 为天体在会合系中的
+            位置（无量纲）。只包含已注入半径的天体。
+
+        Raises:
+            ValueError: 未注入任何 body-radius。
+        """
+        primary_r = getattr(self.system, "primary_radius_km", None)
+        secondary_r = getattr(self.system, "secondary_radius_km", None)
+        if primary_r is None and secondary_r is None:
+            raise ValueError(
+                "启用碰撞检测须先在系统注入 body-radius （primary_radius_km / secondary_radius_km）"
+            )
+        mu = float(cast(Any, self.system).mu)
+        specs: list[tuple[str, npt.NDArray[np.float64], float]] = []
+        if primary_r is not None:
+            specs.append(
+                (cast(Any, self.system).primary_body, np.array([-mu, 0.0, 0.0]), float(primary_r))
+            )
+        if secondary_r is not None:
+            specs.append(
+                (
+                    cast(Any, self.system).secondary_body,
+                    np.array([1.0 - mu, 0.0, 0.0]),
+                    float(secondary_r),
+                )
+            )
+        return specs
+
+    def _make_collision_event(
+        self, body: str, center: npt.ArrayLike, radius: float
+    ) -> Callable[[float, np.ndarray], float]:
+        """构造碰撞事件：g = |r - center| - radius，terminal=True。
+
+        只取状态前 3 维位置，兼容 ``with_stm=True`` 的 42 维增广状态。
+        """
+        center_arr = np.asarray(center, dtype=float)
+
+        def g(t: float, state: np.ndarray) -> float:
+            r = np.asarray(state[:3], dtype=float)
+            return float(np.linalg.norm(r - center_arr) - radius)
+
+        g.terminal = True  # type: ignore[attr-defined]
+        g.direction = 0  # type: ignore[attr-defined]
+        return g
+
+    def _setup_collision_detection(
+        self,
+        events: list[Callable[[float, np.ndarray], float]] | None,
+        initial_state: np.ndarray,
+    ) -> tuple[list[Callable[[float, np.ndarray], float]] | None, str | None]:
+        """构造碰撞事件并与用户事件合并，检测初始状态是否已在半径内。
+
+        Returns:
+            ``(合并后的事件列表, 即时碰撞天体名或 None)``。初始状态已在
+            天体半径内时返回天体名——scipy 事件不会对 g<0 的起点触发
+            （需过零），须由调用方短路为即时碰撞。
+        """
+        specs = self._collision_specs()
+        du_attr = getattr(self.system, "DU", None)
+        if du_attr is None:
+            raise ValueError("启用碰撞检测须系统支持特征尺度（CR3BP/BCR4BP）")
+        du = float(du_attr)
+        collision_events = [
+            self._make_collision_event(body, center, r_km / du) for body, center, r_km in specs
+        ]
+        self._collision_event_bodies = [body for body, _, _ in specs]
+        events = (list(events) if events else []) + collision_events
+        for body, center, r_km in specs:
+            if float(np.linalg.norm(initial_state[:3] - center)) < r_km / du:
+                return events, body
+        return events, None
+
+    def _immediate_collision(
+        self,
+        initial_state: np.ndarray,
+        t0: float,
+        with_stm: bool,
+        with_jacobi: bool,
+        body: str,
+    ) -> dict[str, Any]:
+        """初始状态已在天体半径内：返回单点轨迹 + 即时碰撞标记。"""
+        state = np.asarray(initial_state[:6], dtype=float).reshape(1, -1)
+        out: dict[str, Any] = {
+            "time": np.array([t0]),
+            "states": state,
+            "collision": {"body": body, "t": float(t0), "state": state[0]},
+        }
+        if with_stm:
+            out["stm"] = np.eye(self.STATE_DIM).reshape(1, self.STATE_DIM, self.STATE_DIM)
+        if with_jacobi:
+            out = self._handle_jacobi(state, out)
+        return out
+
+    def _extract_collision(self, result: dict[str, Any]) -> dict[str, Any] | None:
+        """从传播结果提取碰撞信息；未触发碰撞事件时返回 None。"""
+        t_events = result.get("t_events")
+        y_events = result.get("y_events")
+        if t_events is None or y_events is None:
+            return None
+        n_collision = len(self._collision_event_bodies)
+        for i, body in enumerate(self._collision_event_bodies):
+            idx = len(t_events) - n_collision + i
+            if idx < 0 or len(t_events[idx]) == 0:
+                continue
+            t = float(t_events[idx][-1])
+            y = np.asarray(y_events[idx][-1], dtype=float)
+            state = y[:6] if y.shape[0] > 6 else y
+            return {"body": body, "t": t, "state": state}
+        return None
 
     def __str__(self):
         return f"{self.__class__.__name__}(system={self.system})"
@@ -697,11 +851,10 @@ class CR3BP_Dynamics(Dynamics):
         else:
             t_eval_list = [float(t_span[0]), float(t_span[1])]
 
-        # 步长塌缩时 Rust 经 FFI 抛 PropagationFailure；这里 catch 后返回空 states，
-        # 对齐 scipy 路径失败语义（失败返回空、不 raise），让上层
-        # （TransferOptimization._evaluate_all）走 dv=1e10 惩罚，使 NLP
-        # 优化器绕开发散点。仅 catch 步长塌缩；其他 RuntimeError（如截断）
-        # 仍向上抛——那是真实 bug，该暴露。
+        # 步长塌缩时 Rust 经 FFI 抛 PropagationFailure；这里 catch 后返回带
+        # failure 标记的空 states（ADR 0020 决策 2），下游读 status/cause 而非
+        # 嗅探空 states。仅 catch 步长塌缩；其他 RuntimeError（如截断）仍向上
+        # 抛——那是真实 bug，该暴露。
         try:
             result = propagate_cr3bp_py(
                 mu=mu,
@@ -721,12 +874,23 @@ class CR3BP_Dynamics(Dynamics):
                     f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
                     f"requested time points; the trajectory is truncated"
                 )
-        except PropagationFailure:
-            return {"time": np.array([]), "states": np.empty((0, 6))}
+        except PropagationFailure as exc:
+            return {
+                "time": np.array([]),
+                "states": np.empty((0, 6)),
+                "status": ConvergenceState.DIVERGED,
+                "cause": FailureCause.DIVERGENCE_DETECTED,
+                "message": str(exc),
+            }
 
         self.last_trajectory = (time, states)
 
-        out: dict[str, Any] = {"time": time, "states": states}
+        out: dict[str, Any] = {
+            "time": time,
+            "states": states,
+            "status": ConvergenceState.CONVERGED,
+            "cause": FailureCause.NONE,
+        }
         if with_jacobi:
             out = self._handle_jacobi(states, out)
         return out
@@ -770,9 +934,26 @@ class CR3BP_Dynamics(Dynamics):
         time = np.asarray(result["time"])
         states = np.asarray(result["states"])
 
+        # 事件积分失败（空输出）同样带显式 failure 标记（ADR 0020 决策 2）。
+        if states.shape[0] == 0:
+            return {
+                "time": np.array([]),
+                "states": np.empty((0, self.STATE_DIM)),
+                "status": ConvergenceState.DIVERGED,
+                "cause": FailureCause.DIVERGENCE_DETECTED,
+                "message": "event propagation produced no output",
+                "t_events": [np.asarray([]) for _ in events],
+                "y_events": [np.asarray([]) for _ in events],
+            }
+
         self.last_trajectory = (time, states)
 
-        out: dict[str, Any] = {"time": time, "states": states}
+        out: dict[str, Any] = {
+            "time": time,
+            "states": states,
+            "status": ConvergenceState.CONVERGED,
+            "cause": FailureCause.NONE,
+        }
         out["t_events"] = [np.asarray(te) for te in result["t_events"]]
         out["y_events"] = [np.asarray(ye) for ye in result["y_events"]]
         if with_jacobi:

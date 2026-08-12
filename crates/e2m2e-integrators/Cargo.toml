@@ -1,7 +1,8 @@
 [package]
 name = "e2m2e-integrators"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
+description = "PyO3 bindings for e2m2e (propagation, forces, spice)"
 
 [lib]
 name = "e2m2e_integrators"

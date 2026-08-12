@@ -1,10 +1,9 @@
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
+# 变更日志
 
 ## [Unreleased]
+
+### Added
+- **碰撞终止 + 天体半径注入**（#355，ADR 0020 决策 5）：`Dynamics.propagate` 新增 `collision_detection` 开关，启用时以 `g = |r − r_body| − R_body` 构造碰撞事件，探测器与主/次天体表面接触即终止积分，结果附 `collision` 键（天体名、终止时刻、终止状态）；`CR3BP_System`/`BCR4BP_System` 新增 `primary_radius_km`/`secondary_radius_km` 半径配置注入，保留机器精度正则化。
 
 ### Fixed
 - **三脉冲优化对零脉冲初猜提前收敛**（#384）：`MultiImpulseTransfer.optimize` 的 SLSQP 对"零脉冲初猜"（双脉冲弧上的点，目标值恰为双脉冲成本）数值敏感——目标函数在该平坦走廊上梯度极小，收敛判据可能提前触发、一步即停，三脉冲对 ΔV 几乎无改善（`test_multi_impulse` 随主矢量检验采样密度约半数配置失败，issue 报的改善量 2.96e-11 即此现象）。首次优化相对初猜改善不足时，现自动从微扰初猜（时刻整体 ×0.5/1.5/2.0、位置 ×0.9/1.1）重试并取总 ΔV 最小者；实测该场景三脉冲确有 0.78 km/s（约 11%）改善空间，断言与阈值不变。新增 n_samples=200 回归测试。
@@ -13,10 +12,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **lowthrust 解析雅可比加速比断言 flaky**（#367）：`test_analytic_jacobian_speedup_over_finite_difference` 硬绑绝对加速比 >5.0，机器负载下实测 3.1x；改为 >1.5（只守护"解析实现未退化"，不硬绑绝对量级）。
 - **微分修正/延拓测试适配结果契约**（#367 连带）：#351 结果对象迁移后 `tests/algorithm/design` 的 12 个测试仍用已移除属性（`closure_error` 挂在结果对象、`correction_success`/`correction_iterations`/`ContinuationResult.orbits` 等改名），阻塞默认套件绿门；conftest 的 `_corrected_*_cached`/`corrected_*` fixture 改返回 `(orbit, result)`，correction/continuation 测试改用 `status`/`iterations`/`family.orbits` 新契约。
 - **低能转移流水线流形空轨迹崩溃**（#379）：出发/目标轨道某流形分支数值发散时，Rust 积分返回空 states（#246 语义），流形弧以空 `Orbit` 构造触发 `np.max` 崩溃；`InvariantManifold.propagate` 现跳过空轨迹弧，`test_pipeline_converges` 恢复断言（status API）并移除 skip。
+- **积分失败类型化**（#349）：新增 `PropagationFailure` 类型异常，消除步塌缩跨语言字符串匹配 catch。
+- **redline 静默退化清理**（#352）：微分修正停滞不再短路为成功（`is_periodic` 用配置容差）；控制律未产出机动计为失败样本（修复无角动量管理 Δv 不累计回归）；Q-law 步塌缩抛 `PropagationFailure`、μ 解析失败不静默替换；网格搜索碰撞格进失败侧；propulsion 法向退化、third_body except 收窄、normal-form dense output/星历失败等静默退化改抛。
+- **Rust 内核池双侧卸载**（#387）：`SPICEManager.unload_kernel` 对称调 Rust `spice_unload`（新增 pyo3 绑定 + `LOADED_KERNELS` 幂等清单，只卸载确已加载的文件），消除 Rust 内核池残留导致的测试顺序依赖。
 
 ### Changed
 - **显式事件的传播分派**（#378，ADR 0023）：CR3BP/BCR4BP 仅在调用者传入 `events` 时使用 SciPy 事件积分，该例外由输入触发，与 Rust 扩展可用性无关；未传事件时仍要求 Rust 路径，扩展缺失显式报错。ForceModel 事件传播明确未实现，Rust 事件细化由 `solve_ivp_events` 单独提供。
 - **物理常数独立管理，默认地月 μ 切到 DE421**（#377，ADR 0022）：新建 `data/constants/` 常数层（与 `data/templates/` 平级），作为全库物理常数唯一来源——通用物理常量（光速、G、AU、时间常量、太阳常数）全库一套，天体参数按"基准（datum）"组织成自洽集合（DE421 / DE440 / WGS-84），调用方按场景取 `Datum.DE421.mu` 等。Python 与 Rust 从仓库根 `constants.toml` 单一来源构建期生成，两边数值不再各自漂移。此前同一物理量多套值并存的不一致（地月 μ 三套、地球 GM 五值、太阳半径 695700/696000 分叉等 9 类）随收编消除；太阳半径统一为 696000 km（Vallado）。**行为变化：默认地月质量比 μ 从 1965 旧值 0.0121506683 切到 DE421 0.012150585350562453，CR3BP 轨道族/平动点的数值结果会变**；旧值不再支持（一刀切，无 legacy 复现选项）。BCR4BP 太阳无量纲参数（MU_SUN/SUN_DISTANCE/SUN_OMEGA）保留 Topputo 文献约定；normal-form 的 qiao μ（0.012150585609624）为独立模型约定，不并入基准集。
+- **移除隐式资源降级，能力缺失改显式报错**（#354/#388，ADR 0020 迁移第 5 步）：`Dynamics.propagate` 事件检测新增显式 `backend` 参数（不传报错、拒绝 auto；`events=[]` 等价无事件，走 Rust 快速路径）；`spice_optional` 默认改报错、QF method 显式选择；ephem cache enable 后 miss 一律报错（缓存 key 归一化，天体名↔NAIF ID 反查收敛）；COPT 不可用默认报错（`fallback_to_scipy` 默认 False）；`to_rust_spec` None 按资源/能力分流（`RustExtensionUnavailableError` vs `NotImplementedError`）；8 处 ADR 修订。
+- **cspice-sys 去除 downloadcspice feature**：缺 `CSPICE_DIR` 构建直接报错，不再静默走 NAIF 官网源码下载；CSPICE 一律经 `scripts/download_cspice.py` 取 GitHub `cspice-v1` release 预编译包。
+- **删除 slow 测试速度分层**：5.6.4 随 ADR 0021 引入的 slow 标记分层撤销（约 1040 行），测试组织回归功能类标记（`theory`/`orchestration`/`data` 等）。
+- **删除超时端到端测试**：删除超时低推力端到端测试与 GMAT ELFO 长弧回归，治理默认套件 wall time。
+
+### Docs
+- 删除 `SECURITY.md`（GitHub 标准模板不再保留）。
+- `constants.toml` 注释中的特殊符号改用 LaTeX 记号。
+- CLAUDE.md 英文翻译为中文。
+- 同步过时文档——spice 默认构建、DE421 μ、#351 结果契约。
 
 ## [5.6.5] - 2026-08-10
 
@@ -386,7 +398,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Jacobi 常数族绘图排序，消除错位伪影
 - 修复 core/algorithms 22 项、可视化 32 项测试
 
-## [3.2.0] - 2025-12-01
+## [3.2.0] - 2026-04-10
 
 ### Added
 - 星历动力学（`EphemerisDynamics`），支持 SPICE 内核
@@ -400,7 +412,132 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Fixed
 - 修复文档中 90 处失效锚点警告
 
-## [0.1.0] - 2025-06-21
+## [3.1.11] - 2026-03-19
+
+### Fixed
+- 修复延续算法 verbose 参数传递问题，改进停滞检测逻辑
+
+## [3.1.10] - 2026-03-19
+
+### Added
+- 新增 y 轴对称微分修正配置与步长控制
+
+## [3.1.9] - 2026-03-15
+
+### Added
+- 新增 3D 轨道族局部放大视图绘制方法
+
+## [3.1.8] - 2026-03-14
+
+### Added
+- 自然参数延拓支持双向延拓与自适应步长，优化 corrector 复用与轨道创建逻辑
+- 可视化新增学术规范字体配置与图像下载缓存
+
+## [3.1.7] - 2026-03-11
+
+### Changed
+- `out/` 纳入 .gitignore，调整 continuation 算法调试输出
+
+## [3.1.6] - 2026-03-11
+
+### Changed
+- 重构 OrbitFamily 初始化逻辑，优化 DifferentialCorrection 返回类型
+
+## [3.1.5] - 2026-03-11
+
+### Added
+- 差分修正算法新增误差与收敛历史记录
+
+## [3.1.4] - 2026-03-11
+
+### Added
+- 新增 Orbit 深拷贝方法与 OrbitFamily 属性方法
+
+## [3.1.3] - 2026-03-11
+
+### Docs
+- 移除 differential_correction 模块中的 TODO 注释
+
+## [3.1.2] - 2026-03-11
+
+### Changed
+- 移除 Orbit.copy 方法，简化 OrbitFamily 类
+
+## [3.1.1] - 2026-03-11
+
+### Changed
+- 移除 ContinuationDirection 枚举，简化 Continuation 类
+- 为核心与算法模块添加完整类型注解，DifferentialCorrection 初始化改经 self.dynamics
+### Added
+- 新增 DRO 轨道生成与延拓测试
+
+## [3.0.8] - 2026-03-11
+
+### Added
+- 补充稳定性分析与动力学模型测试
+
+## [3.0.7] - 2026-03-11
+
+### Changed
+- 补充 numpy 数组转换注释
+
+## [3.0.6] - 2026-03-10
+
+### Changed
+- 重构延拓算法以使用新的微分校正接口
+
+## [3.0.5] - 2026-03-10
+
+### Changed
+- 更新差分修正算法输出格式与注释
+
+## [3.0.4] - 2026-03-10
+
+### Changed
+- 测试导入语句适配新模块结构
+
+## [3.0.3] - 2026-03-10
+
+### Fixed
+- 修正平面对称周期轨道搜索的初始 x 坐标类型
+
+## [3.0.2] - 2026-03-10
+
+### Changed
+- 重构包导入结构，简化顶层 API，提升模块化
+
+## [2.0.1] - 2026-03-10
+
+### Added
+- 新增 py.typed marker 并补齐缺失符号导出，扩展 continuation 模块导出接口
+- 增强轨道文件保存功能并补充单元测试
+### Changed
+- 增强微分修正算法灵活性与健壮性（setup_2D_symmetric_x_fixed_x0 默认 x0=0）
+- 可视化强制要求传入 system 对象并简化 mu 初始化，大幅扩展可视化模块文档
+
+## [2.0.0] - 2026-03-06
+
+### Changed
+- 微分修正算法改用基于 STM 的牛顿法
+- CR3BP_System.info() 支持多模式输出
+- Orbit 插值器支持单点轨道初始化
+### Added
+- 重构测试结构，新增微分修正单元测试
+
+## [1.0.0] - 2026-03-06
+
+### Changed
+- 引入 .gitignore 并扩展 CR3BP_System 信息输出
+- 用 ruff 修复代码规范与格式问题，移除临时文件
+
+## [0.1.1] - 2026-03-04
+
+### Added
+- 新增 LICENSE
+### Docs
+- 更新 README：移除标题中的 emoji，修正导入路径
+
+## [0.1.0] - 2026-03-03
 
 ### Added
 - CR3BP 系统建模（`CR3BP_System`、`CR3BP_Dynamics`）

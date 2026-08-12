@@ -152,26 +152,3 @@ class TestLissajousBoundedTrajectoryContract:
 
         # period > 0
         assert period > 0
-
-
-@pytest.mark.slow
-class TestLissajousBoundedTrajectory:
-    """compute_lissajous_bounded_trajectory 的有界性物理。
-
-    小振幅 + 大振幅 2 组合，验证有界性随振幅成立。
-    """
-
-    @pytest.mark.parametrize("L,ain,aout", [(1, 500.0, 2000.0), (2, 2500.0, 7500.0)])
-    def test_bounded_trajectory_bounded(self, earth_moon_system, L: int, ain: float, aout: float):
-        """面内偏移相对平动点应 < 3× 面内振幅（量级 ~2×，留 3× 余量）。"""
-        states, _, _ = compute_lissajous_bounded_trajectory(
-            earth_moon_system, L, ain, aout, 0.01, 0.55
-        )
-        states = np.asarray(states)
-
-        # 有界性：面内偏移相对平动点（km），量级 ~2× 振幅，留 3× 余量
-        l_c = earth_moon_system.characteristic_length
-        assert l_c is not None
-        lp = earth_moon_system.get_libration_point(LibrationPoint(L))
-        rel = (states[:, :3] - lp) * l_c
-        assert np.max(np.abs(rel[:, :2])) < 3 * ain

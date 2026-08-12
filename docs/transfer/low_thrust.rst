@@ -36,6 +36,7 @@
 .. code-block:: python
 
    from e2m2e.algorithm.transfer import transfer_orbit, EngineConfig
+   from e2m2e.data.templates import ConvergenceState
 
    result = transfer_orbit(
        "low_thrust",
@@ -52,7 +53,7 @@
    # 结果访问
    print(f"等效 Δv = {result.details.equivalent_delta_v:.4f} km/s")
    print(f"燃料消耗 = {result.details.fuel_consumed:.2f} kg")
-   print(f"收敛 = {result.details.converged}")
+   print(f"收敛 = {result.details.status == ConvergenceState.CONVERGED}")
 
 配点法求解器（大规模更鲁棒）：
 

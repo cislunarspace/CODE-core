@@ -997,6 +997,7 @@ viz = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "matplotlib" },
     { name = "maturin" },
     { name = "mypy" },
     { name = "pytest" },
@@ -1040,6 +1041,7 @@ provides-extras = ["normal-form", "viz", "mcp"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "matplotlib", specifier = ">=3.7" },
     { name = "maturin", specifier = ">=1.0" },
     { name = "mypy" },
     { name = "pytest", specifier = ">=9.0.3" },

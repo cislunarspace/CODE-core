@@ -1,37 +1,24 @@
+# Rust 构建产物
 /target/
+# 库项目惯例：Cargo.lock 不入库（构建以 pyproject.toml / uv.lock 为准，
+# 本地 cargo 构建会自动生成）。
 Cargo.lock
-# Python 字节码和缓存文件
+
+# Python 字节码与缓存（无斜杠模式匹配所有层级）
 __pycache__/
 *.py[cod]
 *$py.class
-*.pyo
-*.pyd
 .Python
 
-# 包构建和分发文件
+# 包构建与分发产物
 build/
 dist/
 *.egg-info/
-*.egg
-.eggs/
-pip-wheel-metadata/
-wheels/
 *.whl
 *.tar.gz
-sdist/
+.cibuildwheel/
 
-# 安装和包管理文件
-.pip/
-Pipfile
-Pipfile.lock
-poetry.lock
-pdm.lock
-pyproject.toml.lock
-.pdm.toml
-.pdm-build/
-__pypackages__/
-
-# 虚拟环境和环境文件
+# 虚拟环境与环境文件
 .env
 .venv
 env/
@@ -44,16 +31,12 @@ conda-env/
 conda-meta/
 *.conda
 
-# 测试和覆盖率报告
+# 测试与覆盖率报告
 .coverage
 .coverage.*
-.cache
-nosetests.xml
 coverage.xml
 *.cover
 htmlcov/
-.tox/
-.nox/
 .pytest_cache/
 .mypy_cache/
 .dmypy.json
@@ -62,7 +45,7 @@ test_output/
 test-results/
 *.log
 
-# IDE 和编辑器文件
+# IDE、编辑器与操作系统文件
 .vscode/
 .idea/
 .claude/
@@ -73,37 +56,16 @@ test-results/
 *~
 .DS_Store
 Thumbs.db
-*.code-workspace
 
-# 操作系统临时文件
+# 临时与进程文件
 *.tmp
 *.temp
 *.pid
-*.seed
 *.pid.lock
+*.seed
 
-# SPICE kernel 大文件（超过 Gitee 100MB 限制）
-# 下载方式：https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/
-kernels/*.bsp
-
-# 特定于项目的临时文件
-temp.py
-*.ipynb
-.ipynb_checkpoints/
-*.mat
-*.npy
-*.npz
-*.pkl
-*.pickle
-
-# 文档构建文件
-docs/_build/
-site/
-website/build/
-website/.docusaurus/
-website/node_modules/
-
-# Ruff 缓存
+# 缓存目录
+.cache/
 .ruff_cache/
 
 # 编译扩展
@@ -113,34 +75,36 @@ website/node_modules/
 # build.rs 生成的 Python ABI 版本文件（构建产物，不入库）
 e2m2e/_rust_abi.py
 
-# cibuildwheel
-.cibuildwheel/
-
-# pyenv
-# Note: .python-version is tracked for uv
+# 文档构建产物（Sphinx）
+docs/_build/
 
 # 性能分析
 *.prof
 
-# 其他缓存目录
-.cache/
-.mypy_cache/
-.pytype/
-.pyre/
+# 数据文件（示例/试验产物）
+*.mat
+*.npy
+*.npz
+*.pkl
+*.pickle
 
-# 确保所有子目录中的 __pycache__ 都被忽略
-**/__pycache__/
-**/*.pyc
-**/*.pyo
-**/*.pyd
-
-# scripts 下的产物图（临时对比输出，不入库）
+# 笔记本与脚本临时产物
+*.ipynb
+.ipynb_checkpoints/
+temp.py
 scripts/*.png
-
-# examples 下的示例产物图（运行时 --save 生成，不入库）
 examples/main_*.png
 
-# agent/工具会话产物
+# SPICE 内核大文件（超过 Gitee 100MB 限制）
+# 下载方式：https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/
+kernels/*.bsp
+# 本地 CSPICE 库与下载缓存（scripts/download_cspice.py 生成）
+cspice/
+.cspice/
+# cspice 运行产生的 Fortran 临时输出
+fort.*
+
+# agent/工具会话产物（本地工作文件，不入库）
 .mimocode/
 .zcode/
 *.pdb
@@ -149,9 +113,4 @@ CONTEXT.md
 CONTEXT-MAP.md
 docs/agents/
 
-# 本地 CSPICE 库（第三方二进制，构建依赖本地安装，不入库）
-cspice/
-# download_cspice.py 的解压缓存（构建时生成）
-.cspice/
-# cspice 运行产生的 Fortran 临时输出
-fort.*
+# 注：.python-version 故意被跟踪（uv 与 CI 用它钉住 Python 3.13）

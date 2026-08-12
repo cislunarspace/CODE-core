@@ -1,31 +1,35 @@
-# Auto-detect text files and normalize line endings to LF
+# 自动检测文本文件并统一换行为 LF
 * text=auto eol=lf
 
 # Python
 *.py text diff=python
 *.pyi text
 
-# Documentation
+# Rust
+*.rs text diff=rust
+
+# 文档
 *.md text
 *.rst text
 *.txt text
 
-# Configuration
+# 配置
 *.toml text
 *.yaml text
 *.yml text
 *.json text
 *.ini text
 *.cfg text
+uv.lock text
 
-# Shell scripts — always LF
+# Shell 脚本——始终 LF
 *.sh text eol=lf
 
-# Windows batch — always CRLF
+# Windows 批处理——始终 CRLF
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
-# Notebooks and data files — binary
+# 笔记本与数据文件——二进制
 *.ipynb binary
 *.npy binary
 *.npz binary
@@ -34,13 +38,14 @@
 *.mat binary
 *.bsp binary
 
-# Compiled / build artifacts — binary
+# 编译产物——二进制
 *.so binary
 *.dylib binary
 *.dll binary
+*.pyd binary
 *.whl binary
 
-# Graphics
+# 图片
 *.png binary
 *.jpg binary
 *.jpeg binary
@@ -48,22 +53,16 @@
 *.svg text
 *.ico binary
 
-# Fonts
+# 字体
 *.ttf binary
 *.woff binary
 *.woff2 binary
 
-# Export-ignore: files excluded from git archive (sdist)
+# sdist 排除（git archive export-ignore）
 .gitattributes export-ignore
 .gitignore export-ignore
-.editorconfig export-ignore
 .github/ export-ignore
 tests/ export-ignore
 docs/ export-ignore
 scripts/ export-ignore
-mkdocs.yml export-ignore
 CHANGELOG.md export-ignore
-CONTRIBUTING.md export-ignore
-CONTRIBUTING_ZH.md export-ignore
-AGENTS.md export-ignore
-CLAUDE.md export-ignore

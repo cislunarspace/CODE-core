@@ -1,103 +1,38 @@
-"""pytest 配置与共享 fixture。
-
-提供地月/日地/木日 CR3BP 系统、
-SPICE 内核 fixture 与参考历元。
-"""
+"""pytest 配置与共享 fixture：CR3BP 系统、SPICE 内核 fixture 与参考历元。"""
 
 import os
 
-import numpy as np
 import pytest
 from kernel_helpers import SPICE_KERNEL_DIR
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.data.constants import Datum
-from e2m2e.data.types.orbit import Orbit
-
-
-def pytest_configure(config):
-    config.addinivalue_line("markers", "spice: marks tests requiring SPICE kernel files")
 
 
 @pytest.fixture
 def earth_moon_system():
-    """Create an Earth-Moon CR3BP system using DE421 datum."""
+    """地月 CR3BP 系统（DE421 基准）。
+
+    normal_form / design 切片以 qiao 文献参数（μ=1.215058560962404e-2、
+    地月距 384405 km、周期 27.32 d）局部覆盖本 fixture，见各自 conftest。
+    """
     return CR3BP_System(mu=Datum.DE421.mu, primary="Earth", secondary="Moon")._with_default_scales()
 
 
 @pytest.fixture
-def sun_earth_system():
-    """Create a Sun-Earth CR3BP system"""
-    return CR3BP_System(mu=3.0039e-06, primary="Sun", secondary="Earth")._with_default_scales()
-
-
-@pytest.fixture
-def sun_jupiter_system():
-    """Create a Sun-Jupiter CR3BP system"""
-    return CR3BP_System(mu=0.0009535, primary="Sun", secondary="Jupiter")._with_default_scales()
-
-
-@pytest.fixture
 def earth_moon_dynamics(earth_moon_system):
-    """Create Earth-Moon CR3BP dynamics"""
+    """地月 CR3BP 动力学。"""
     return CR3BP_Dynamics(system=earth_moon_system)
 
 
-@pytest.fixture
-def sample_state():
-    """Sample state vector near L1"""
-    return np.array([0.8, 0.0, 0.0, 0.0, 0.1, 0.0])
-
-
-@pytest.fixture
-def sample_orbit():
-    """Create a sample orbit for testing"""
-    # Create simple periodic-like orbit data
-    t = np.linspace(0, 1, 50)
-    # Simple circular-ish motion in rotating frame
-    x = 0.8 + 0.1 * np.cos(2 * np.pi * t)
-    y = 0.1 * np.sin(2 * np.pi * t)
-    z = np.zeros_like(t)
-    vx = -0.1 * 2 * np.pi * np.sin(2 * np.pi * t)
-    vy = 0.1 * 2 * np.pi * np.cos(2 * np.pi * t)
-    vz = np.zeros_like(t)
-    states = np.column_stack([x, y, z, vx, vy, vz])
-    return Orbit(states=states, times=t)
-
-
-@pytest.fixture
-def initialized_system(earth_moon_system):
-    """Earth-Moon system with characteristic scales set"""
-    return earth_moon_system
-
-
 # =============================================================================
-# Ephemeris model fixtures (需求: DRO CR3BP→星历模型转换)
+# SPICE 内核与星历数据（内核缺失时跳过）
 # =============================================================================
-# SPICE_KERNEL_DIR / BODY_FIXED_KERNELS / load_body_fixed_kernels /
-# unload_kernels 已移至 tests/kernel_helpers.py（见该模块 docstring 说明）。
-
-# 地月系统物理参数（DE421 基准）
-MU = 1.2150585350562453e-2
-DU = 3.84400e5  # km
-TU_SECONDS = 3.751902588926273e5  # 秒
-VU = DU / TU_SECONDS  # km/s
-
-
-@pytest.fixture
-def spice_kernel_dir():
-    """返回 SPICE 内核文件所在目录，不存在或无内核文件则跳过"""
-    if not os.path.isdir(SPICE_KERNEL_DIR):
-        pytest.skip("SPICE kernel directory not found, set SPICE_KERNEL_DIR")
-    bsp_files = [f for f in os.listdir(SPICE_KERNEL_DIR) if f.endswith(".bsp")]
-    if not bsp_files:
-        pytest.skip("No .bsp kernel files found in SPICE kernel directory")
-    return SPICE_KERNEL_DIR
 
 
 @pytest.fixture
 def spice_kernel_path():
-    """返回DE440内核文件路径，不存在则跳过"""
+    """返回 DE440 内核文件路径，不存在则跳过。"""
     kernel_file = os.path.join(SPICE_KERNEL_DIR, "de440.bsp")
     if not os.path.exists(kernel_file):
         kernel_file = os.path.join(SPICE_KERNEL_DIR, "de440s.bsp")
@@ -112,42 +47,21 @@ def spice_kernel_path():
 
 @pytest.fixture
 def reference_epoch():
-    """参考历元: 2025-06-21 11:00:06 UTC (J2000后的ET秒数)"""
+    """参考历元：2025-06-21 11:00:06 UTC（J2000 后的 ET 秒数）。"""
     return "2025-06-21T11:00:06"
 
 
-@pytest.fixture
-def dro_31_state():
-    """3:1 DRO初始状态（CR3BP旋转系，无量纲）"""
-    return np.array([1.1202109158830986, 0.0, 0.0, 0.0, -0.46178983697629084, 0.0])
-
-
-@pytest.fixture
-def dro_31_period():
-    """3:1 DRO周期（无量纲TU）"""
-    return 2.095
-
-
 # =============================================================================
-# SPICE ephemeris fixtures
+# SPICE 星历 fixture
 #
-# Six test files previously rebuilt this chain locally:
-#   tests/algorithm/correction/test_multiple_shooting.py
-#   tests/algorithm/correction/test_dro_ephemeris_correction.py
-#   tests/algorithm/correction/test_differential_correction_via_propagate.py
-#   tests/algorithm/correction/test_patch_point_utils.py
-#   tests/algorithm/coordinate/test_synodic_j2000.py
-#   tests/numerical/dynamics/test_ephemeris_dynamics.py
-#
-# The previous test_differential_correction_via_propagate._make_eph_dynamics helper had a kernel
-# leak (mgr.unload_kernel never called). These fixtures fix that by going
-# through proper yield-teardown.
+# 统一经 spice_manager 的 yield-teardown 加载/卸载内核，保证用完即卸
+# （此前出现过 unload_kernel 未调用导致的内核泄漏）。
 # =============================================================================
 
 
 @pytest.fixture
 def spice_manager(spice_kernel_path):
-    """SPICEManager with DE440/DE438/DE435 kernel loaded; auto-unload after test."""
+    """加载 DE440/DE438/DE435 内核的 SPICEManager，测试结束后自动卸载。"""
     from e2m2e.data.kernels.manager import SPICEManager
 
     mgr = SPICEManager()
@@ -158,7 +72,7 @@ def spice_manager(spice_kernel_path):
 
 @pytest.fixture
 def spice_eph_system(spice_manager):
-    """Earth-Moon-Sun ephemeris system in J2000, with origin at Earth."""
+    """J2000 下的地月日星历系统，原点在地球。"""
     from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
     from e2m2e.mbse.data.enums import ReferenceFrame
 
@@ -172,7 +86,7 @@ def spice_eph_system(spice_manager):
 
 @pytest.fixture
 def spice_eph_dynamics(spice_eph_system):
-    """Ephemeris N-body dynamics with relaxed rtol/atol/max_step for fast tests."""
+    """放宽 rtol/atol/max_step 的星历 N 体动力学，加速测试。"""
     from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
 
     d = EphemerisDynamics(system=spice_eph_system)
@@ -186,7 +100,7 @@ def spice_eph_dynamics(spice_eph_system):
 
 @pytest.fixture
 def spice_syn_j2000(earth_moon_system, spice_manager):
-    """Synodic ↔ J2000 coordinate transformer wired to the standard CR3BP system.
+    """同步系 ↔ J2000 坐标转换器，接入标准 CR3BP 系统。
 
     基于 ``CoordinateSystem`` 的 ``SynodicJ2000System`` 实现，接口包括
     ``synodic_to_j2000``、``j2000_to_synodic``、``batch_synodic_to_j2000``、

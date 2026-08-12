@@ -174,3 +174,43 @@ class TestLVLHaxes:
         np.testing.assert_allclose(h_hat, h / np.linalg.norm(h), atol=1e-14)
         # V = H × R
         np.testing.assert_allclose(v_hat, np.cross(h_hat, r_hat), atol=1e-14)
+
+
+# ---------------------------------------------------------------------------
+# 退化态（ADR 0007 补白 / ADR 0020 决策 5）：轴向奇异时显式失败
+# ---------------------------------------------------------------------------
+
+
+class TestDegenerateStates:
+    """零速度 / 零角动量 / 零位置时抛 ValueError，不静默产出 NaN 轴向。"""
+
+    # 零速度：v = 0
+    STATE_ZERO_VELOCITY = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    # 零角动量：r ∥ v（径向运动）
+    STATE_ZERO_ANGULAR_MOMENTUM = np.array([1.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+    # 零位置：r = 0
+    STATE_ZERO_POSITION = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+
+    def test_vnb_zero_velocity_raises(self):
+        """VNB：零速度时无法定义速度方向，抛 ValueError。"""
+        axes = VNBAxes()
+        with pytest.raises(ValueError, match="速度为零"):
+            axes.update(0.0, self.STATE_ZERO_VELOCITY)
+
+    def test_vnb_zero_angular_momentum_raises(self):
+        """VNB：零角动量（r ∥ v）时无法定义法向，抛 ValueError。"""
+        axes = VNBAxes()
+        with pytest.raises(ValueError, match="角动量为零"):
+            axes.update(0.0, self.STATE_ZERO_ANGULAR_MOMENTUM)
+
+    def test_lvlh_zero_position_raises(self):
+        """LVLH：零位置时无法定义径向，抛 ValueError。"""
+        axes = LVLHAxes()
+        with pytest.raises(ValueError, match="位置为零"):
+            axes.update(0.0, self.STATE_ZERO_POSITION)
+
+    def test_lvlh_zero_angular_momentum_raises(self):
+        """LVLH：零角动量（r ∥ v）时无法定义法向，抛 ValueError。"""
+        axes = LVLHAxes()
+        with pytest.raises(ValueError, match="角动量为零"):
+            axes.update(0.0, self.STATE_ZERO_ANGULAR_MOMENTUM)

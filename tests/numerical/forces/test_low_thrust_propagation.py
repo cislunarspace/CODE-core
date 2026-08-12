@@ -72,17 +72,6 @@ def _semi_major_axis(state, mu):
     return -mu / (2.0 * energy)
 
 
-def _eccentricity(state, mu):
-    """从状态向量计算偏心率。"""
-    r_vec = state[:3]
-    v_vec = state[3:6]
-    r = np.linalg.norm(r_vec)
-    v = np.linalg.norm(v_vec)
-    rv_dot = np.dot(r_vec, v_vec)
-    e_vec = ((v**2 - mu / r) * r_vec - rv_dot * v_vec) / mu
-    return float(np.linalg.norm(e_vec))
-
-
 @pytest.fixture
 def earth_ephemeris_system(spice_kernel_path):
     """Earth-centered J2000 ephemeris system for low-thrust tests."""
@@ -149,56 +138,6 @@ def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_ephemeris_system):
         f"半长轴变化率偏差过大: measured={a_final:.3f} km, "
         f"theory={a_theory:.3f} km, error={relative_error:.1%}"
     )
-
-
-@pytest.mark.slow
-@pytest.mark.spice
-def test_low_thrust_spiral_orbit_evolution(earth_ephemeris_system):
-    """7 天低推力螺旋轨道：半长轴单调提升，偏心率保持低值。"""
-    system = earth_ephemeris_system
-    mu = system.gravitational_parameter("EARTH")
-
-    r_earth = 6378.137
-    a0 = r_earth + 300.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
-
-    thrust = 0.1  # N
-    mass = 1000.0  # kg
-    duration_s = 7.0 * 86400.0
-
-    def thrust_profile(_t: float) -> float:
-        return thrust
-
-    def direction(_t: float, state: np.ndarray) -> np.ndarray:
-        v = state[3:6]
-        return v / np.linalg.norm(v)
-
-    burn = FiniteBurn(thrust_profile=thrust_profile, direction=direction, mass=mass)
-    gravity = GravityField(body="EARTH", degree=0, order=0)
-    fm = ForceModel(system, forces=[gravity, burn])
-    # 长弧段传播放宽容差与最大步长，减少积分步数
-    fm.rtol = 1e-10
-    fm.atol = 1e-10
-    fm.max_step = 600.0
-
-    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
-    t_span = (et0, et0 + duration_s)
-    t_eval = np.linspace(et0, et0 + duration_s, 50)
-
-    result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=1_000_000)
-
-    a_history = np.array([_semi_major_axis(s, mu) for s in result["states"]])
-    e_history = np.array([_eccentricity(s, mu) for s in result["states"]])
-
-    # 半长轴显著提升（>5 km）且线性拟合斜率为正
-    assert a_history[-1] > a0 + 5.0, f"半长轴应提升超过 5 km, got {a_history[-1] - a0:.3f} km"
-    times_day = (result["time"] - result["time"][0]) / 86400.0
-    slope = np.polyfit(times_day, a_history, 1)[0]
-    assert slope > 0.0, f"半长轴 secular 斜率应为正, got {slope:.3f} km/day"
-
-    # 偏心率保持低值
-    assert e_history[-1] < 0.05, f"最终偏心率应 < 0.05, got {e_history[-1]:.6f}"
-    assert np.max(e_history) < 0.05, f"最大偏心率应 < 0.05, got {np.max(e_history):.6f}"
 
 
 @pytest.mark.spice

@@ -37,8 +37,12 @@ make dev     # maturin develop 构建并安装 Rust 扩展（spice 默认开启�
 > 开发入口统一走 `Makefile`：它自动从 `scripts/download_cspice.py` 解析并 `export CSPICE_DIR`。
 > CSPICE 一律取 GitHub release 预编译包；缺 `CSPICE_DIR` 时构建直接报错（不启用 `cspice-sys`
 > 的 `downloadcspice`，杜绝走国内不可达的 NAIF 源码下载）。常用目标：`make dev` / `make test` /
-> `make check` / `make setup`（`make help` 列全部）。裸 `cargo` / `maturin` 命令需自行
-> `export CSPICE_DIR=$(python3 scripts/download_cspice.py --print-cspice-dir)`。
+> `make check` / `make setup`（`make help` 列全部）。裸 `cargo` / `maturin` 命令需自行设好
+> `CSPICE_DIR` 与 `LIBCLANG_PATH`（CI 用 `download_cspice.py >> "$GITHUB_ENV"` 落盘，本地手动则）：
+>
+> ```bash
+> export CSPICE_DIR=$(python3 scripts/download_cspice.py --print-cspice-dir)
+> ```
 
 ### conda
 

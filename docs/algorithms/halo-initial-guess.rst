@@ -13,7 +13,7 @@ Richardson (1980) 给出共线平动点附近 Halo 轨道的三阶解析解：
 
    from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
 
-   guess = compute_halo_initial_guess(mu=0.01215, z_amplitude=0.01, L=1, halo_class=0)
+   guess = compute_halo_initial_guess(mu=0.01215, z_amplitude=0.001, L=1, halo_class=0)
 
    print(f"x0 = {guess['x0']}")      # x 方向初始位置
    print(f"vy0 = {guess['vy0']}")    # y 方向初始速度
@@ -46,18 +46,18 @@ Richardson (1980) 给出共线平动点附近 Halo 轨道的三阶解析解：
    from e2m2e.data.types.orbit import Orbit
    import numpy as np
 
-   # 1. 解析近似
-   guess = compute_halo_initial_guess(mu=system.mu, z_amplitude=0.01, L=1, halo_class=0)
+   # 1. 解析近似（小振幅种子，Richardson 近似精度高）
+   guess = compute_halo_initial_guess(mu=system.mu, z_amplitude=0.001, L=1, halo_class=0)
 
    # 2. 组装初始状态
    initial_state = np.array([
-       guess["x0"], 0.0, 0.01,
+       guess["x0"], 0.0, 0.001,
        0.0, guess["vy0"], 0.0,
    ])
 
    # 3. 微分修正
    corrector = DifferentialCorrection(dynamics)
-   corrector.setup_halo_orbit_fixed_z0(z0=0.01, libration_point=1)
+   corrector.setup_halo_orbit_fixed_z0(z0=0.001, libration_point=1)
 
    initial_guess = Orbit(
        states=initial_state.reshape(1, -1),
@@ -66,7 +66,8 @@ Richardson (1980) 给出共线平动点附近 Halo 轨道的三阶解析解：
    )
    initial_guess.period = guess["T_half"] * 2
 
-   halo = corrector.iterate_correction(initial_guess=initial_guess)
+   halo_result = corrector.iterate_correction(initial_guess=initial_guess)
+   halo = halo_result.orbit  # 修正后的轨道（None 表示失败）
 
 参考
 ----

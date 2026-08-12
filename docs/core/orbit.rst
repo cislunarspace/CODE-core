@@ -58,14 +58,14 @@ Orbit 类
    from e2m2e.algorithm.solver import Continuation
 
    continuation = Continuation(corrector=corrector)
-   family = continuation.natural_continuation(
+   result = continuation.natural_continuation(
        seed_orbit=seed_dro,
        param_range=(0.14, 0.9),
        step_size=0.005,
    )
 
-   # 遍历族内轨道
-   for orbit in family:
+   # 遍历族内轨道（族在 result.family，OrbitFamily 可迭代）
+   for orbit in result.family:
        print(f"周期: {orbit.period:.6f}")
 
 CR3BP 周期轨道族类型

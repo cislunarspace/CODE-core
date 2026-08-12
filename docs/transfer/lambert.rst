@@ -105,6 +105,7 @@ Lambert 问题，得到双脉冲 ΔV 网格，即 porkchop 图的数据层。出
 .. code-block:: python
 
    from e2m2e.algorithm.transfer import StateTerminal, ThreeBodyLambert
+   from e2m2e.data.templates import ConvergenceState
 
    shooter = ThreeBodyLambert(dynamics)   # system 须已初始化特征尺度
 
@@ -116,7 +117,7 @@ Lambert 问题，得到双脉冲 ΔV 网格，即 porkchop 图的数据层。出
        guess="lambert",        # 初猜来源；"orbit" 直接用出发速度
    )
 
-   if sol.converged:
+   if sol.status == ConvergenceState.CONVERGED:
        print(f"出发脉冲: {sol.arcs[0].delta_v:.6f} km/s")
        print(f"到达脉冲: {sol.arrival_delta_v:.6f} km/s")
        print(f"总脉冲: {sol.total_delta_v:.6f} km/s")

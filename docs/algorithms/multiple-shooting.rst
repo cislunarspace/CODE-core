@@ -22,6 +22,7 @@
 .. code-block:: python
 
    from e2m2e.algorithm.solver import MultipleShooting, sample_patch_points
+   from e2m2e.data.templates import ConvergenceState
 
    ms = MultipleShooting(dynamics=dynamics)
 
@@ -37,7 +38,7 @@
        var_time=True,    # 允许调整时间节点
    )
 
-   if result.converged:
+   if result.status == ConvergenceState.CONVERGED:
        print(f"收敛，最大残差 {result.max_residual:.2e}")
        print(f"修正后 patch points: {result.state_patch}")
 
@@ -88,6 +89,7 @@ NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月�
 .. code-block:: python
 
    from e2m2e.algorithm.solver.two_level_multiple_shooting import TwoLevelMultipleShooting
+   from e2m2e.data.templates import ConvergenceState
 
    tms = TwoLevelMultipleShooting(dynamics=dynamics)
 
@@ -99,7 +101,7 @@ NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月�
        velocity_tolerance=1e-6,
    )
 
-   if result.converged:
+   if result.status == ConvergenceState.CONVERGED:
        print(f"外层迭代: {result.outer_iterations}")
        print(f"位置残差: {result.final_position_residual:.2e}")
        print(f"速度残差: {result.final_velocity_residual:.2e}")

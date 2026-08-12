@@ -145,6 +145,10 @@ class DROTRONLPOptimizer:
         self._verbose = config.nlp_verbose if config is not None else True
 
         self._last_trajectory: tuple[np.ndarray, np.ndarray] | None = None
+        # 最近一次传播的 failure 标记（ADR 0020 决策 2）：forward_integrate 写入，
+        # _evaluate_all 读取，替代下游 len(states)==0 嗅探。
+        self._last_prop_status: ConvergenceState = ConvergenceState.CONVERGED
+        self._last_prop_cause: FailureCause = FailureCause.NONE
         self._progress_callback: Callable | None = None
         self._eval_cache: dict[str, Any] | None = None
         self._eval_cache_key: bytes | None = None
@@ -243,7 +247,8 @@ class DROTRONLPOptimizer:
             initial_state=initial_state, t_span=(0.0, transfer_time)
         )
 
-        empty = len(states) == 0
+        # 显式 failure 标记（ADR 0020 决策 2）：读 status 而非嗅探 len(states)==0。
+        empty = self._last_prop_status is not ConvergenceState.CONVERGED
 
         final_state = states[-1] if not empty else np.zeros(6)
 
@@ -264,9 +269,10 @@ class DROTRONLPOptimizer:
             dv1 = cost.dv1
             dv2 = cost.dv2
         else:
-            # 积分失败时用大惩罚值 dv=1e10，使优化器远离此区域
-            dv1 = 1e10
-            dv2 = 1e10
+            # 传播失败无 Δv 值：不再用 1e10 惩罚污染目标（ADR 0020 决策 2），
+            # 不可行由约束冲突（pos_violation/vel_constraint）与 INFEASIBLE 表达。
+            dv1 = float("nan")
+            dv2 = float("nan")
             cost = None
 
         pos_diff = final_state[:3] - insertion_state[:3]
@@ -291,10 +297,15 @@ class DROTRONLPOptimizer:
             "insertion_state": insertion_state,
             "dv1": dv1,
             "dv2": dv2,
-            "objective": cost.total if cost is not None else 2e10,
+            # 传播失败目标为 inf（不可行域），不再用 2e10 惩罚值污染目标。
+            "objective": cost.total if cost is not None else float("inf"),
+            # 约束冲突保留有限大值 1e6：不可行信号，供优化器识别；非目标惩罚。
             "pos_violation": pos_violation if not empty else 1e6,
             "cos_angle": cos_angle,
             "vel_constraint": cos_angle - 1.0 if not empty else 1e6,
+            # 传播层 DIVERGED 在 NLP 层规范化为 INFEASIBLE；cause 透传诊断来源。
+            "status": ConvergenceState.INFEASIBLE if empty else ConvergenceState.CONVERGED,
+            "cause": self._last_prop_cause if empty else FailureCause.NONE,
             "empty": empty,
         }
 
@@ -353,6 +364,16 @@ class DROTRONLPOptimizer:
         times = result["time"]
         states = result["states"]
 
+        # 透传传播 failure 标记（ADR 0020 决策 2）：读 status/cause 而非下游
+        # len==0 嗅探。对未返回标记的传播实现做兜底：空 states 即视为 DIVERGED。
+        status = result.get("status", ConvergenceState.CONVERGED)
+        cause = result.get("cause", FailureCause.NONE)
+        if states.shape[0] == 0 and status is ConvergenceState.CONVERGED:
+            status = ConvergenceState.DIVERGED
+            cause = FailureCause.DIVERGENCE_DETECTED
+        self._last_prop_status = status
+        self._last_prop_cause = cause
+
         self._last_trajectory = (times, states)
 
         return times, states
@@ -379,7 +400,9 @@ class DROTRONLPOptimizer:
         """
         cache = self._evaluate_all(y)
         if cache["empty"]:
-            return 1e10
+            # 传播失败目标为 inf（ADR 0020 决策 2），不再用 1e10 惩罚污染目标；
+            # 不可行由约束冲突识别。
+            return float("inf")
         return cache["objective"]
 
     def constraint_position(self, y: np.ndarray) -> float:

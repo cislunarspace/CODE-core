@@ -12,8 +12,8 @@ Richardson 三阶解析近似为 Halo 轨道提供初始猜测：
 
    from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
 
-   # L1 Halo，z 方向振幅 0.01
-   guess = compute_halo_initial_guess(mu=system.mu, z_amplitude=0.01, L=1, halo_class=0)
+   # L1 Halo，z 方向振幅 0.001（小振幅种子，Richardson 近似精度高）
+   guess = compute_halo_initial_guess(mu=system.mu, z_amplitude=0.001, L=1, halo_class=0)
 
    print(f"x0 = {guess['x0']}")
    print(f"vy0 = {guess['vy0']}")
@@ -39,13 +39,13 @@ Richardson 三阶解析近似为 Halo 轨道提供初始猜测：
 
    # 1. 组装初始状态
    initial_state = np.array([
-       guess["x0"], 0.0, 0.01,
+       guess["x0"], 0.0, 0.001,
        0.0, guess["vy0"], 0.0,
    ])
 
    # 2. Halo 微分修正策略
    corrector = DifferentialCorrection(dynamics)
-   corrector.setup_halo_orbit_fixed_z0(z0=0.01, libration_point=1)
+   corrector.setup_halo_orbit_fixed_z0(z0=0.001, libration_point=1)
 
    initial_guess = Orbit(
        states=initial_state.reshape(1, -1),
@@ -55,7 +55,8 @@ Richardson 三阶解析近似为 Halo 轨道提供初始猜测：
    initial_guess.period = guess["T_half"] * 2
 
    # 3. 执行修正
-   halo = corrector.iterate_correction(initial_guess=initial_guess)
+   halo_result = corrector.iterate_correction(initial_guess=initial_guess)
+   halo = halo_result.orbit  # 修正后的轨道（None 表示失败）
    if halo is not None:
        print(f"Halo 周期: {halo.period:.6f}")
 

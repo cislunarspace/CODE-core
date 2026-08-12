@@ -161,6 +161,7 @@ API
    from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
    from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
    from e2m2e.data.kernels.manager import SPICEManager
+   from e2m2e.data.templates import ConvergenceState
    from e2m2e.data.templates.enums import ReferenceFrame
 
    KERNEL_DIR = "/path/to/kernels"
@@ -191,7 +192,11 @@ API
        kernel_dir=KERNEL_DIR,
        base_bodies=["EARTH", "MOON"],   # Earth+Moon → Earth+Moon+Sun
    )
-   print(result.converged, result.iterations, result.max_residual)
+   print(
+       result.status == ConvergenceState.CONVERGED,
+       result.iterations,
+       result.max_residual,
+   )
 
 **二层多重打靶同伦过渡** ：
 
@@ -210,7 +215,7 @@ API
        # velocity_tolerance=1e-6,         # 可选，默认 1e-6
    )
    print(
-       result_two_level.converged,
+       result_two_level.status == ConvergenceState.CONVERGED,
        result_two_level.velocity_residual,
        result_two_level.velocity_residual_history,
    )
@@ -242,8 +247,6 @@ API
   线性插值语义，使用 ``FakeSpice`` 不依赖真实内核。
 - :mod:`tests.algorithm.correction.test_homotopy_two_level`：
   two_level 路径的 delegation、聚合语义、参数校验。
-- :mod:`tests.algorithm.correction.test_homotopy_ephemeris_integration`：
-  真实 SPICE 内核的端到端集成测试，无内核时自动 ``skip`` 。
 
 参考
 ----
