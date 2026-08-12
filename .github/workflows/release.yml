@@ -17,9 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v7
-      - run: uv sync --group dev
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
+      # lint 只需 ruff，不装项目本体：uv sync 构建 editable 会编译 cspice-sys，
+      # 未设 CSPICE_DIR 直接 panic（v5.6.6 起禁用 downloadcspice）。
+      # 后续 uv run 加 --no-sync 防止触发重新同步。
+      - run: uv sync --group dev --no-install-project
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync ruff format --check .
 
   test:
     runs-on: ubuntu-latest
@@ -30,11 +33,13 @@ jobs:
       # spice 为默认 feature：cargo test --workspace 编译并跑 spice-gated 代码，
       # 须先下 CSPICE 编译包（CSPICE_DIR）与 SPICE 内核（kernels/）。
       - name: 下载 SPICE 编译包（cspice-v1 release）
-        run: uv run python scripts/download_cspice.py >> "$GITHUB_ENV"
+        # --no-sync：脚本只用标准库；uv run 默认先 sync 构建扩展，此时
+        # CSPICE_DIR 未设、cspice-sys 直接 panic（鸡生蛋，同 ci.yml）。
+        run: uv run --no-sync python scripts/download_cspice.py >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: 下载 SPICE 内核（kernels-v1 release）
-        run: uv run python scripts/download_kernels.py
+        run: uv run --no-sync python scripts/download_kernels.py
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # --test-threads=1：CSPICE 全局线程锁，spice-gated 测试串行避免竞争。
