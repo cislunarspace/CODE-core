@@ -1,5 +1,10 @@
 # 变更日志
 
+## [5.6.7] - 2026-08-12
+
+### Fixed
+- **发布物漏打包 `constants.toml`，5.6.6 wheel/sdist 均不可用**（#377 后续）：5.6.6 把物理常数单一来源放在仓库根 `constants.toml`，Python 加载器按仓库布局用 `parents[3]` 定位——wheel 不含该文件，安装后 `import e2m2e` 即 `FileNotFoundError`；sdist 同样缺失，从源码构建在 `build.rs` 直接 panic。单一来源迁入包内 `e2m2e/data/constants/constants.toml`（随 wheel/sdist 自动分发，仓库与安装布局下定位一致），Rust `build.rs` 改指包内同一份文件，单一来源关系不变。
+
 ## [5.6.6] - 2026-08-12
 
 ### Added

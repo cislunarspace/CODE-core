@@ -7,7 +7,7 @@
 - ``gravity_ref_radius_km``：重力场参考半径，来自系数文件头，用于球谐、
   固潮等重力模型。
 
-数值由仓库根 ``constants.toml`` 单一来源加载。
+数值由包内 ``constants.toml`` 单一来源加载。
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """通用物理常量（全库一套）。
 
 单位统一采用 km / s / kg 系；来源标注在 constants.toml。
-数值由仓库根 ``constants.toml`` 单一来源加载。
+数值由包内 ``constants.toml`` 单一来源加载。
 """
 
 from __future__ import annotations

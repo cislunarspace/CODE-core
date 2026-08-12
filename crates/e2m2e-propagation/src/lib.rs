@@ -1,7 +1,7 @@
 //! e2m2e-propagation: ODE integrators (RK, ABM, Cowell).
 //!
 //! 从 e2m2e-integrators 拆分，只包含纯数学积分器，不依赖 SPICE。
-//! 物理常数由 build.rs 从仓库根 constants.toml 生成，通过本模块统一导出。
+//! 物理常数由 build.rs 从包内 constants.toml 生成，通过本模块统一导出。
 
 pub mod abm;
 pub mod butcher;
