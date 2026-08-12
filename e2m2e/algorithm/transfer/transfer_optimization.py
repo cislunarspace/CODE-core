@@ -430,7 +430,11 @@ class DROTRONLPOptimizer:
         )
 
         if len(states) == 0:
-            return False, False
+            # 传播失败（轨迹为空）无法判断是否碰撞：不再谎报无碰撞（#352），
+            # 让调用方把该候选计为不可行。
+            from ...exceptions import PropagationFailure
+
+            raise PropagationFailure("check_collision: 轨迹为空（传播失败），无法判断是否碰撞")
 
         earth_collision = False
         moon_collision = False
@@ -564,7 +568,8 @@ class DROTRONLPOptimizer:
         - ``max(x) > 3.0``：轨迹绕到地月系统外侧，外部转移 ``TransferType.EXTERNAL``
         - 其余情况：含月球引力辅助的转移 ``TransferType.LGA``
 
-        积分失败或轨迹为空时按 :class:`TransferType.DIRECT` 返回。
+        积分失败或轨迹为空时返回 :class:`TransferType.UNKNOWN`（#352：
+        不再假装 DIRECT——空轨迹无法分类）。
 
         该结果会写入 :class:`TransferOptimizationResult.transfer_type`，
         可视化层（``plot_solution_plane(..., color_by="transfer_type")``）
@@ -580,7 +585,7 @@ class DROTRONLPOptimizer:
             转移类型枚举。
         """
         if len(states) == 0:
-            return TransferType.DIRECT
+            return TransferType.UNKNOWN
 
         x_max_traj = np.max(states[:, 0])
 

@@ -211,7 +211,7 @@ class DynamicalSubstituteCorrector:
         fft_components, backend = self._frequency_analysis(tlist, Xlist)
 
         # ---- 生成函数 W ----
-        W_poly, Wdot_poly = self._build_W(tlist, Xlist)
+        W_poly, Wdot_poly = self._build_W(tlist, Xlist, use_cr3bp=not spice_available)
 
         # ---- 包装成 Orbit ----
         substitute_orbit = Xlist
@@ -317,10 +317,11 @@ class DynamicalSubstituteCorrector:
                 atol=1e-12,
             )
             if not sol.success:
-                # 稠密输出失败不致命：回退到用节点的简化输出
-                pieces_t.append(np.array([t_lo, t_hi]))
-                pieces_X.append(np.vstack([X_Q[i], X_Q[i + 1]]))
-                continue
+                # 稠密输出失败不再用 2 点线性近似顶替（#352）：2 点线性会
+                # 污染下游 FFT 频率分析；改由 pipeline 统一降级为 FAILED 结果。
+                raise RuntimeError(
+                    f"稠密输出积分失败（段 {i}: t∈[{t_lo:.6g}, {t_hi:.6g}]）：{sol.message}"
+                )
             # 段 i 的末时刻 = 段 i+1 的初时刻，避免 tlist 出现重复点
             if i < n_seg - 1 and sol.t.size > 1:
                 pieces_t.append(sol.t[:-1])
@@ -361,10 +362,18 @@ class DynamicalSubstituteCorrector:
         self,
         tlist: npt.NDArray[np.floating],
         Xlist: npt.NDArray[np.floating],
+        *,
+        use_cr3bp: bool,
     ) -> tuple[
         dict[tuple[int, ...], npt.NDArray[np.floating]],
         dict[tuple[int, ...], npt.NDArray[np.floating]],
     ]:
+        """由 ``Xlist`` 数值微分得 ``W_poly`` / ``Wdot_poly``。
+
+        ``use_cr3bp`` 为 True（显式 force_cr3bp 或 SPICE 不可用降级）时
+        ``_bdot2a`` 走纯 CR3BP 旋转矩阵，不探 SPICE（#352：SPICE 可用时星历
+        失败不再静默退化为纯 CR3BP）。
+        """
         """由 ``Xlist`` 数值微分得 ``W_poly`` / ``Wdot_poly``。"""
         if tlist.size < 2:
             empty: dict[tuple[int, ...], npt.NDArray[np.floating]] = {}
@@ -376,7 +385,7 @@ class DynamicalSubstituteCorrector:
         # 二阶导：用中心差分，避免引入额外依赖
         Bddot = _second_derivative(Bdot, dt)
 
-        A, Adot = _bdot2a(self.context, B, Bdot, Bddot, tlist)
+        A, Adot = _bdot2a(self.context, B, Bdot, Bddot, tlist, use_cr3bp=use_cr3bp)
 
         W_poly: dict[tuple[int, ...], npt.NDArray[np.floating]] = {}
         Wdot_poly: dict[tuple[int, ...], npt.NDArray[np.floating]] = {}
@@ -441,6 +450,8 @@ def _bdot2a(
     Bdot: npt.NDArray[np.floating],
     Bddot: npt.NDArray[np.floating],
     tlist: npt.NDArray[np.floating],
+    *,
+    use_cr3bp: bool,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """``B, Bdot, Bddot`` → ``(A, Adot)``（qiao ``Bdot2A``）。
 
@@ -448,9 +459,11 @@ def _bdot2a(
     Adot = -Bddot + (dC_pq) @ B + C_pq @ Bdot
 
     ``C_pq`` 与 ``dC_pq`` 默认通过 :func:`._ephemeris.eval_params`（SPICE
-    星历）取。``context.force_cr3bp=True`` 时**显式走纯 CR3BP**（自治）：
-    ``C_pq`` 恒为旋转矩阵系数 ``[[0,1,0],[-1,0,0],[0,0,0]]``、``dC_pq = 0``，
-    不探 SPICE、不触发星历失败回退——这是 CR3BP 中心流形约化的正路，不是降级。
+    星历）取。``use_cr3bp=True``（显式 ``force_cr3bp`` 或 SPICE 不可用降级）
+    时走纯 CR3BP（自治）：``C_pq`` 恒为旋转矩阵系数 ``[[0,1,0],[-1,0,0],
+    [0,0,0]]``、``dC_pq = 0``，不探 SPICE——这是 CR3BP 中心流形约化的正路，
+    不是降级。SPICE 可用（``use_cr3bp=False``）时星历失败抛异常（#352），
+    不再静默退化为纯 CR3BP（那会丢星历摄动）。
     """
     B = np.asarray(B, dtype=float)
     Bdot = np.asarray(Bdot, dtype=float)
@@ -463,8 +476,9 @@ def _bdot2a(
     if tlist.shape[0] != n:
         raise ValueError(f"tlist 长度必须等于 B 行数：{tlist.shape[0]} vs {n}")
 
-    if context.force_cr3bp:
-        # 显式 CR3BP（自治系统）：C_pq 恒为旋转矩阵、dC_pq=0，无需 SPICE 星历。
+    if use_cr3bp:
+        # 纯 CR3BP（自治系统，显式选择或 SPICE 不可用降级）：C_pq 恒为旋转
+        # 矩阵、dC_pq=0，无需 SPICE 星历。
         Cpq_seq: list[np.ndarray] = [_CR3BP_CPQ] * n
         dCpq_seq: list[np.ndarray] = [np.zeros((3, 3))] * n
     else:
@@ -496,12 +510,13 @@ def _bdot2a(
                 Cpq_seq.append(cpq)
                 dCpq_seq.append(dcpq)
         except Exception as exc:
-            warnings.warn(
-                f"_ephemeris.eval_params 失败（{exc}）；退化到纯 CR3BP 旋转矩阵。",
-                stacklevel=2,
-            )
-            Cpq_seq = [_CR3BP_CPQ] * n
-            dCpq_seq = [np.zeros((3, 3))] * n
+            # SPICE 可用但星历参数解析失败：不再静默退化为纯 CR3BP 旋转矩阵
+            # （#352）——退化会用错 C_pq 污染 A/Adot、静默丢星历摄动。纯 CR3BP
+            # 应显式走 use_cr3bp=True（该路径不探 SPICE）。
+            raise RuntimeError(
+                f"_ephemeris.eval_params 失败：{exc}；不退化到纯 CR3BP 旋转矩阵"
+                f"（如需纯 CR3BP 请显式设置 context.force_cr3bp=True 或允许降级）"
+            ) from exc
 
     A = np.zeros_like(B)
     Adot = np.zeros_like(B)
