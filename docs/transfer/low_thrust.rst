@@ -115,10 +115,10 @@
 
 - ``initial_mass``: 航天器初始质量（kg）
 - ``n_segments``: 求解器段数。越多精度越高但计算越慢。典型值 5 – 50
-- ``solver_method``: ``"shooting"``（直接打靶，解析雅可比快 5-24x）或
-  ``"collocation"``（Hermite-Simpson 配点，大规模更鲁棒）
+- ``solver_method``: ``"shooting"`` （直接打靶，解析雅可比快 5-24x）或
+  ``"collocation"`` （Hermite-Simpson 配点，大规模更鲁棒）
 - ``duration_days``: 飞行时间（天）。LEO→GEO 约 100–300 天；LEO→月球约 3–180 天
-- ``target_oe``: Q-law 目标 ``(a_T, e_T, i_T)``（km, 无量纲, 无量纲）
+- ``target_oe``: Q-law 目标 ``(a_T, e_T, i_T)`` （km, 无量纲, 无量纲）
 
 质量演化与推力历史
 ------------------

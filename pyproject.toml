@@ -117,6 +117,7 @@ docs = [
     "sphinx-rtd-theme>=2",
     "sphinxcontrib-mermaid>=0.9",
     "sphinx-copybutton>=0.5",
+    "myst-parser>=2",
 ]
 
 [tool.uv.sources]

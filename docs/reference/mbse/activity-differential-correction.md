@@ -2,6 +2,8 @@
 title: 微分修正活动图
 ---
 
+# 微分修正活动图
+
 ```mermaid
 flowchart TD
     start([开始修正])

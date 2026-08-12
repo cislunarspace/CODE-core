@@ -6,6 +6,22 @@ title: MBSE 模型
 
 e2m2e 基于模型的系统工程（Model-Based Systems Engineering, MBSE）模型，围绕组件登记、需求追溯、Pydantic 数据模型和 Mermaid 图表生成构建。ADR-0001 已撤销装饰性的 Protocol 接缝；当前多态接缝由 `Dynamics` 基类承担。
 
+```{toctree}
+:hidden:
+
+system-overview
+bdd-core
+bdd-algorithms
+requirements
+activity-orbit-design
+activity-differential-correction
+sequence-propagation
+sequence-correction
+state-orbit-lifecycle
+state-convergence
+traceability-matrix
+```
+
 ## 架构
 
 | 文档 | 说明 |

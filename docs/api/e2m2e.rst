@@ -28,3 +28,19 @@ e2m2e.integrators module
    :members:
    :undoc-members:
    :show-inheritance:
+
+e2m2e.exceptions module
+-----------------------
+
+.. automodule:: e2m2e.exceptions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+e2m2e.tools.logging module
+--------------------------
+
+.. automodule:: e2m2e.tools.logging
+   :members:
+   :undoc-members:
+   :show-inheritance:

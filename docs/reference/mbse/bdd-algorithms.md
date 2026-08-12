@@ -2,6 +2,8 @@
 title: 算法模块 BDD
 ---
 
+# 算法模块 BDD
+
 ```mermaid
 classDiagram
     class DifferentialCorrection {

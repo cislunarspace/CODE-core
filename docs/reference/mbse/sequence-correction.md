@@ -2,6 +2,8 @@
 title: 修正序列
 ---
 
+# 修正序列
+
 ```mermaid
 sequenceDiagram
     participant Client

@@ -2,6 +2,8 @@
 title: 收敛状态机
 ---
 
+# 收敛状态机
+
 ```mermaid
 stateDiagram-v2
     [*] --> iterating
