@@ -118,3 +118,8 @@ fn transfer_grid_search_py(...) -> Vec<TransferPointResult> {
 
 - **新增 Rust 维护面**：`transfer_geometry` + `transfer_grid_search` 是新的需维护的 Rust 代码，几何函数须与 numpy 参照保持等价（由 `test_geometry_rust_vs_numpy` 兜底）。
 - **进度粒度退化**：rust 后端用出发点粒度回调（每完成一个 departure 触发，不逐 α），与 processes/threads 的逐 α tqdm 不同——逐 α 跨 FFI 会抵消吞吐。
+
+## 修订（2026-08-12，ADR 0020 决策 4）
+
+- **显式选 rust 但 Rust 不可用改报错**：原"Rust 扩展缺失时 `grid_search_rust` 抛 `RuntimeError`、回退 `processes`"改为直接报错（issue #378）——默认 `_default_parallel_backend` 恒为 `rust`，不因扩展缺失悄然改变并行模型；`processes`/`threads` 仅在调用方显式选择时使用。
+- **monkeypatch 缝豁免**：几何方法被 monkeypatch（测试 `setattr` 注入合成轨迹）时回退 Python 路径保留，但限定在测试路径（`_geometry_methods_monkeypatched` 检测），生产路径不触发（ADR 0020 决策 4 测试注入缝豁免）。

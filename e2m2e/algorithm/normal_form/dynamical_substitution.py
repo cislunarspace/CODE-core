@@ -145,8 +145,9 @@ class DynamicalSubstituteCorrector:
         max_iter: Newton 最大迭代轮数。
         tolerance: 收敛容差（最大连续性残差）。
         prefer: 频率分析后端选择（``"auto"``/``"naff"``/``"fft"``）。
-        spice_optional: SPICE 内核不可用时是否降级到纯 CR3BP。
-            ``True`` 时静默降级；``False`` 时抛 :class:`RuntimeError`。
+        spice_optional: SPICE 内核不可用时是否允许降级到纯 CR3BP。
+            默认 ``False``：SPICE 不可用即抛（ADR 0020 决策 4，资源缺失
+            不隐式降级）；显式传 ``True`` 才允许调用方显式接受降级。
     """
 
     context: NormalFormContext
@@ -156,7 +157,7 @@ class DynamicalSubstituteCorrector:
     max_iter: int = DEFAULT_MAX_ITER
     tolerance: float = DEFAULT_TOLERANCE
     prefer: str = "auto"
-    spice_optional: bool = True
+    spice_optional: bool = False
 
     # ------------------------------------------------------------------
     # 公开入口
@@ -176,7 +177,7 @@ class DynamicalSubstituteCorrector:
             :class:`DynamicalSubstituteResult`。
 
         Raises:
-            RuntimeError: 当 ``spice_optional=False`` 且 SPICE 不可用。
+            RuntimeError: 当 ``spice_optional=False``（默认）且 SPICE 不可用。
         """
         seed_arr = self._normalize_seed(seed)
         n_nodes = int(round(self.t_total / self.node_step)) + 1
@@ -188,7 +189,10 @@ class DynamicalSubstituteCorrector:
         rhs, provider = self._build_dynamics()
         spice_available = provider is not None
 
-        if not spice_available and not self.spice_optional:
+        # ``force_cr3bp=True`` 是调用方显式声明的 CR3BP 模型（不需要 SPICE），
+        # 不属"SPICE 缺失降级"，跳过检查；否则默认（``spice_optional=False``）
+        # SPICE 不可用即抛（ADR 0020 决策 4，不隐式降级）。
+        if not spice_available and not self.spice_optional and not self.context.force_cr3bp:
             raise RuntimeError(
                 "SPICE 内核不可用且 spice_optional=False。请加载 .tls + .bsp 或显式允许降级。"
             )
@@ -258,7 +262,9 @@ class DynamicalSubstituteCorrector:
         """构造 rho 坐标 ODE 右端项与（可选）SPICE provider。
 
         探测性求值一次：SPICE 缺失（如未加载 ``naif*.tls``）会在
-        ``str2et`` 抛 :class:`SpiceNOLEAPSECONDS`，此时回退到纯 CR3BP。
+        ``str2et`` 抛 :class:`SpiceNOLEAPSECONDS`。默认（``spice_optional
+        =False``）直接上抛（ADR 0020 决策 4，不隐式降级）；仅显式
+        ``spice_optional=True`` 时降级到纯 CR3BP。
         ``context.force_cr3bp=True`` 时跳过 SPICE 探测，直接用纯 CR3BP rhs。
         """
         if self.context.force_cr3bp:

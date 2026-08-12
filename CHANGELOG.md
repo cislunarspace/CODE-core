@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed
+- **Lissajous/三角平动点星历修正不收敛**（#366）：`design_orbit` 对 LISSAJOUS-L2/L4/L5 在 Rust 多重打靶（容差 0.02 km）下迭代到 80 次上限仍不收敛（位置残差 0.16–174 km）。根因是拟周期族（面内/面外频率不可约、短/长周期模态耦合，无周期闭合）在自由时间打靶下时间自由度与沿流状态自由度近线性相关，雅可比列病态、LM 线性收敛卡死；固定时间（`var_time=False`，新增 `_FIXED_TIME_ORBIT_TYPES` 族集合）下节点时刻保持 CR3BP 名义周期均匀采样，位置/速度修正直接吸收星历偏差，实测 L1/L2/L3/L4/L5 全部 4–6 迭代收敛（秒级到 37 s）。`test_lissajous_triangular` 重启用 L2/L4/L5 参数化，Jacobi 漂移断言改相对判据（|ΔC|/|C| < 1e-3，约化误差随振幅增长是固有量级）。
+- **LPO 初猜网格搜索过慢**（#367）：`design_lpo` 网格搜索 45 点 × 微分修正 ~700 次 STM 传播，默认 `max_step=0.01 TU` 对长周期 LPO（~21 TU/圈）意味着每次传播 ≥2100 步，单次 `design_lpo` 112 s、`test_lpo_family` 全文件 12.7 分钟（默认套件 wall time 卡点）。`_correct_lpo` 搜索阶段临时放宽 `max_step` 到 0.1 TU（rtol=1e-12 自适应仍控精度，收敛产物一致），单次降至 46 s；`test_lpo_family` 收敛测试改吃共享 fixture，全文件降至 3.2 分钟。
+- **lowthrust 解析雅可比加速比断言 flaky**（#367）：`test_analytic_jacobian_speedup_over_finite_difference` 硬绑绝对加速比 >5.0，机器负载下实测 3.1x；改为 >1.5（只守护"解析实现未退化"，不硬绑绝对量级）。
+- **微分修正/延拓测试适配结果契约**（#367 连带）：#351 结果对象迁移后 `tests/algorithm/design` 的 12 个测试仍用已移除属性（`closure_error` 挂在结果对象、`correction_success`/`correction_iterations`/`ContinuationResult.orbits` 等改名），阻塞默认套件绿门；conftest 的 `_corrected_*_cached`/`corrected_*` fixture 改返回 `(orbit, result)`，correction/continuation 测试改用 `status`/`iterations`/`family.orbits` 新契约。
+- **低能转移流水线流形空轨迹崩溃**（#379）：出发/目标轨道某流形分支数值发散时，Rust 积分返回空 states（#246 语义），流形弧以空 `Orbit` 构造触发 `np.max` 崩溃；`InvariantManifold.propagate` 现跳过空轨迹弧，`test_pipeline_converges` 恢复断言（status API）并移除 skip。
+
 ### Changed
 - **显式事件的传播分派**（#378，ADR 0023）：CR3BP/BCR4BP 仅在调用者传入 `events` 时使用 SciPy 事件积分，该例外由输入触发，与 Rust 扩展可用性无关；未传事件时仍要求 Rust 路径，扩展缺失显式报错。ForceModel 事件传播明确未实现，Rust 事件细化由 `solve_ivp_events` 单独提供。
 - **物理常数独立管理，默认地月 μ 切到 DE421**（#377，ADR 0022）：新建 `data/constants/` 常数层（与 `data/templates/` 平级），作为全库物理常数唯一来源——通用物理常量（光速、G、AU、时间常量、太阳常数）全库一套，天体参数按"基准（datum）"组织成自洽集合（DE421 / DE440 / WGS-84），调用方按场景取 `Datum.DE421.mu` 等。Python 与 Rust 从仓库根 `constants.toml` 单一来源构建期生成，两边数值不再各自漂移。此前同一物理量多套值并存的不一致（地月 μ 三套、地球 GM 五值、太阳半径 695700/696000 分叉等 9 类）随收编消除；太阳半径统一为 696000 km（Vallado）。**行为变化：默认地月质量比 μ 从 1965 旧值 0.0121506683 切到 DE421 0.012150585350562453，CR3BP 轨道族/平动点的数值结果会变**；旧值不再支持（一刀切，无 legacy 复现选项）。BCR4BP 太阳无量纲参数（MU_SUN/SUN_DISTANCE/SUN_OMEGA）保留 Topputo 文献约定；normal-form 的 qiao μ（0.012150585609624）为独立模型约定，不并入基准集。

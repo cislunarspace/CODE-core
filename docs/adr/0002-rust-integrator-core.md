@@ -85,6 +85,8 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 
 spice feature 的构建约定：`cspice-sys` 经 `downloadcspice` 在构建时从 NAIF 官网下载 CSPICE 源码，无需手工安装（也可用 `CSPICE_DIR` 指向本机安装）。`maturin develop` 默认不带 spice，`maturin develop --features spice` 才包含 STM 传播、打靶、第三体等 Rust 快速路径；无 spice 时 Python 侧全部静默降级到慢路径，对应测试以 `importorskip` 跳过。**release wheel 暂不带 spice**：带上意味着 wheel 内嵌 CSPICE 且构建依赖 NAIF 官网可达性，许可与发布稳定性需单独评估后再开。CI 以 `cargo clippy --workspace --features spice` 兜底 spice-gated 代码的编译。
 
+> 修订（2026-08，ADR 0020 决策 4）：spice 升为默认 feature 后本节过时——`maturin develop` 默认带 spice（见下节），无 spice 时的"静默降级到慢路径"改为报错（issue #378），对应测试的 `importorskip` 语义同步调整。
+
 ## 修订（2026-08，spice 升为默认 feature）
 
 spice 现为默认 feature：crates `default = ["spice"]` + pyproject `features=["spice"]` 双保险，`maturin develop` 默认带 spice，不再产无 spice 子集；release wheel 已带 spice（ADR 0009 落实）。
@@ -93,9 +95,9 @@ spice 现为默认 feature：crates `default = ["spice"]` + pyproject `features=
 
 **以下场景保留 scipy 路径**（有意的设计选择，非临时遗漏）：
 
-- **事件检测**（`CR3BP_Dynamics._propagate_with_stm(events=...)`）：Rust `solve_ivp_events_py` 已实现但事件检测语义与 scipy 不完全对齐，`CR3BP_Dynamics` 在传入 events 时回退 scipy。（`BCR4BP_Dynamics` 传入 events 时抛 `NotImplementedError`——行为不一致，见 #333。）
-- **防御性回退**（`Dynamics` 基类 `_propagate_with_stm`/`_propagate_state_only`、`EphemerisDynamics._propagate`）：Rust 扩展不可用时（`_HAS_RUST_* = False`）回退 `scipy.integrate.solve_ivp`。spice feature 默认启用后此路径在正常操作中不可达，保留作为构建失败时的降级路径。
-- **NLP 优化**（`transfer/nlp_scipy.py`）：COPT 不可用时回退 SciPy SLSQP。ADR 0017 明确 NLP 留在 Python 层。
+- **事件检测**（`CR3BP_Dynamics._propagate_with_stm(events=...)`）：Rust `solve_ivp_events_py` 已实现但事件检测语义与 scipy 不完全对齐，事件路径按显式 `backend="scipy"/"rust"` 二选一（ADR 0020 决策 4），不传报错、不允许 `auto`；`"scipy"` 走 scipy `solve_ivp`，`"rust"` 走 Rust `solve_ivp_events`（接受语义差异）。BCR4BP 同（#333 的 NotImplementedError 分歧已消除）。
+- **防御性回退**（`Dynamics` 基类 `_propagate_with_stm`/`_propagate_state_only`、`EphemerisDynamics._propagate`）：Rust 扩展不可用时不再回退 scipy——`require_rust_extension` 抛 `RustExtensionUnavailableError`（issue #378，ADR 0020 决策 4：资源缺失即报错）。
+- **NLP 优化**（`transfer/nlp_copt.py`）：COPT 不可用时默认报错（`fallback_to_scipy` 默认 `False`），显式传 `True` 才回退 SciPy SLSQP。ADR 0017 明确 NLP 留在 Python 层。
 - **Normal form 传播**（`normal_form/multiple_shooting.py`、`dynamical_substitution.py`、`propagation.py`、`quasi_floquet.py`）：已迁至 Rust `solve_ivp_py`（#336）。保留 scipy 的仅剩 `coord_trans/qf_cm.py` 的复值 Lie 级数流——Rust `solve_ivp_py` 仅支持实值。`scipy.linalg.expm`（矩阵指数）和 `scipy.optimize.fsolve` 暂无 Rust 替代，保留。
 - **平动点解算与初值生成**（`scipy.optimize.fsolve`/`brentq`）：用于 L1/L2 位置解算、Halo 轨道初始猜测等。单次调用，迁移收益低。
 

@@ -683,8 +683,40 @@ fn ensure_bodies_registered() {
 #[pyfunction]
 fn spice_furnsh(path: &str) -> PyResult<()> {
     ensure_bodies_registered();
-    cspice::data::furnish(path)
-        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {:?}", e)))
+    cspice::data::furnish(path).map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {:?}", e))
+    })?;
+    LOADED_KERNELS.lock().unwrap().push(path.to_string());
+    Ok(())
+}
+
+/// 已通过 [`spice_furnsh`] 加载到 Rust cspice 内核池的内核路径清单。
+///
+/// CSPICE `unload_c` 对未加载文件会设置错误信号，而 Python 侧
+/// `SPICEManager.unload_kernel` 的语义是幂等的（重复卸载不抛，见
+/// tests/data/kernels/test_spice_manager.py::test_load_and_unload）。清单保证
+/// [`spice_unload`] 只对确实 furnsh 过的文件调 `unload_c`，未加载文件静默跳过。
+#[cfg(feature = "spice")]
+static LOADED_KERNELS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+/// 从 Rust cspice 内核池卸载一个内核文件（与 [`spice_furnsh`] 对称）。
+///
+/// Rust cspice 与 Python spiceypy 独立（见 [`spice_furnsh`] 文档）。
+/// `SPICEManager.load_kernel` 双 furnsh，卸载必须对称：否则 Rust 内核池残留
+/// 已卸载文件，测试结果依赖同进程执行顺序（issue #387）。只卸载清单中
+/// 确已加载的文件，其余静默跳过（保持幂等语义）。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn spice_unload(path: &str) -> PyResult<()> {
+    let mut loaded = LOADED_KERNELS.lock().unwrap();
+    if !loaded.iter().any(|p| p == path) {
+        return Ok(());
+    }
+    cspice::data::unload(path).map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!("unload failed: {:?}", e))
+    })?;
+    loaded.retain(|p| p != path);
+    Ok(())
 }
 
 /// 诊断用：在 Rust CSPICE 实例上查 spkezr（与 spiceypy.spkezr 同名函数对齐）。
@@ -2920,6 +2952,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(spice_poc_body_position, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(spice_furnsh, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(spice_unload, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(spice_spkezr, m)?)?;
     #[cfg(feature = "spice")]

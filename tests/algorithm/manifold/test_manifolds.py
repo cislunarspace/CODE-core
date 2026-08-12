@@ -56,8 +56,9 @@ def _make_l1_lyapunov_orbit() -> Orbit:
     corrector.setup_2D_symmetric_x_fixed_x0(x0)
     seed = Orbit(states=[[x0, 0, 0, 0, vy0, 0]], times=[0], system=system)
     seed.period = period_guess
-    orbit = corrector.iterate_correction(seed, verbose=False)
-    assert orbit is not None, "L1 Lyapunov 轨道微分修正失败"
+    result = corrector.iterate_correction(seed, verbose=False)
+    assert result.orbit is not None, "L1 Lyapunov 轨道微分修正失败"
+    orbit = result.orbit
     orbit.system = system
     return orbit
 

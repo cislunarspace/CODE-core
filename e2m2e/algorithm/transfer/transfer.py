@@ -233,7 +233,12 @@ class Transfer:
         Returns:
             ``TransferOptimizationResult``。
         """
-        if self._config.nlp_use_copt and _HAVE_COPT:
+        if self._config.nlp_use_copt:
+            if not _HAVE_COPT:
+                raise RuntimeError(
+                    "nlp_use_copt=True 但 coptpy 未安装；请 `pip install coptpy`，"
+                    "或设 nlp_use_copt=False 使用 SciPy SLSQP（ADR 0020：不隐式换后端）"
+                )
             return optimize_with_copt(
                 optimizer,
                 initial_guess=initial_guess,

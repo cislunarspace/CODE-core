@@ -57,13 +57,15 @@ def _natural_continuation_5(seed, dynamics, setup_corrector, param_name, step):
 
     seed_param = float(seed.states[0, _param_index(param_name or _inferred_param(corrector))])
     # param_range 给一个宽上界，保证不因触界提前停；步数由 max_orbits 限到 5。
-    family = continuation.natural_continuation(
+    # natural_continuation 返回 ContinuationResult（#351 结果契约），
+    # 轨道族在 result.family。
+    result = continuation.natural_continuation(
         seed,
         param_range=(seed_param, seed_param + 1.0),
         step_size=step,
         verbose=False,
     )
-    new_orbits = [o for o in family.orbits if o.metadata.get("continuation_step", 0) != 0]
+    new_orbits = [o for o in result.family.orbits if o.metadata.get("continuation_step", 0) != 0]
     return new_orbits
 
 
@@ -73,6 +75,8 @@ def _full_period_continuation_5(seed, dynamics, setup_at, step):
     ``setup_at(corrector, x0)`` 在族参数 ``x0`` 处配置修正器。每步把上一条
     轨道的 x0 推进 ``step``，全周期闭合修正；返回 5 条新轨道。
     """
+    from e2m2e.data.templates import ConvergenceState
+
     corrector = DifferentialCorrection(dynamics)
     current = seed.copy()
     new_orbits = []
@@ -80,7 +84,12 @@ def _full_period_continuation_5(seed, dynamics, setup_at, step):
         guess = current.copy()
         guess.states[0, 0] = current.states[0, 0] + step
         setup_at(corrector, float(guess.states[0, 0]))
-        orbit = corrector.iterate_full_period_correction(guess, verbose=False)
+        result = corrector.iterate_full_period_correction(guess, verbose=False)
+        assert result.status is ConvergenceState.CONVERGED, (
+            f"全周期修正失败（{result.status}/{result.cause}）"
+        )
+        assert result.orbit is not None, "全周期修正未产出轨道"
+        orbit = result.orbit
         new_orbits.append(orbit)
         current = orbit
     return new_orbits
@@ -140,7 +149,8 @@ def run_lpo_l4(seed, dynamics):
     def setup_at(c, x0):
         c.setup_lpo_fixed_x0(x0, seeds.SPO_SEED_POINT)
 
-    return _full_period_continuation_5(lpo_seed, dynamics, setup_at, step=-0.01), 0
+    assert lpo_seed.orbit is not None, "LPO 种子修正未产出轨道"
+    return _full_period_continuation_5(lpo_seed.orbit, dynamics, setup_at, step=-0.01), 0
 
 
 def _make_seed(dynamics, state, period):
@@ -168,16 +178,15 @@ CONTINUATION_CASES = [
 @pytest.mark.parametrize("family_id, seed_fixture, runner", CONTINUATION_CASES)
 def test_continuation_chain(family_id, seed_fixture, runner, request, earth_moon_dynamics):
     """每族延拓 5 步：链不断、族参数单调、不发散。"""
-    seed = request.getfixturevalue(seed_fixture)
+    seed = request.getfixturevalue(seed_fixture)[0]
     new_orbits, param_idx = runner(seed, earth_moon_dynamics)
 
-    # 1) 延拓链不断：恰好 5 步且全部成功
+    # 1) 延拓链不断：恰好 5 步且全部成功（修正失败已在运行器内中断）
     assert len(new_orbits) == N_STEPS, (
         f"{family_id}: 延拓产出 {len(new_orbits)} 步（期望 {N_STEPS}），链断裂"
     )
     for i, orbit in enumerate(new_orbits):
         assert orbit is not None, f"{family_id} 第 {i + 1} 步返回 None"
-        assert orbit.correction_success, f"{family_id} 第 {i + 1} 步 correction_success 不为 True"
 
     # 2) 族参数随步单调连续（不断裂、不回头）
     params = np.array([float(o.states[0, param_idx]) for o in new_orbits])

@@ -92,9 +92,10 @@ def _corrected_dro_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     seed = _seed_orbit(dynamics, state, seeds.DRO_PERIOD)
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_2D_symmetric_x_fixed_x0(seeds.DRO_X0)
-    orbit = corrector.iterate_correction(seed, verbose=False)
+    result = corrector.iterate_correction(seed, verbose=False)
+    orbit = result.orbit
     assert orbit is not None, "DRO 修正未收敛"
-    return orbit
+    return orbit, result
 
 
 @pytest.fixture(scope="session")
@@ -111,9 +112,10 @@ def _corrected_halo_l1_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     seed = _seed_orbit(dynamics, state, 2.0 * g["T_half"])
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_halo_orbit_fixed_z0(seeds.HALO_SEED_Z0, 1)
-    orbit = corrector.iterate_correction(seed, verbose=False)
+    result = corrector.iterate_correction(seed, verbose=False)
+    orbit = result.orbit
     assert orbit is not None, "Halo L1 修正未收敛"
-    return orbit
+    return orbit, result
 
 
 @pytest.fixture(scope="session")
@@ -130,9 +132,10 @@ def _corrected_halo_l2_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     seed = _seed_orbit(dynamics, state, 2.0 * g["T_half"])
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_halo_orbit_fixed_z0(seeds.HALO_SEED_Z0, 2)
-    orbit = corrector.iterate_correction(seed, verbose=False)
+    result = corrector.iterate_correction(seed, verbose=False)
+    orbit = result.orbit
     assert orbit is not None, "Halo L2 修正未收敛"
-    return orbit
+    return orbit, result
 
 
 @pytest.fixture(scope="session")
@@ -143,9 +146,10 @@ def _corrected_lyapunov_l1_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     seed = _seed_orbit(dynamics, state, period)
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_2D_symmetric_x_fixed_x0(float(state[0]))
-    orbit = corrector.iterate_correction(seed, verbose=False)
+    result = corrector.iterate_correction(seed, verbose=False)
+    orbit = result.orbit
     assert orbit is not None, "Lyapunov L1 修正未收敛"
-    return orbit
+    return orbit, result
 
 
 @pytest.fixture(scope="session")
@@ -158,9 +162,10 @@ def _corrected_axial_l1_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     seed = _seed_orbit(dynamics, state, period)
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_axial_orbit_fixed_vz0(seeds.AXIAL_SEED_VZ0, seeds.AXIAL_SEED_POINT)
-    orbit = corrector.iterate_correction(seed, verbose=False)
+    result = corrector.iterate_correction(seed, verbose=False)
+    orbit = result.orbit
     assert orbit is not None, "Axial L1 修正未收敛"
-    return orbit
+    return orbit, result
 
 
 @pytest.fixture(scope="session")
@@ -171,9 +176,10 @@ def _corrected_dpo_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     seed = _seed_orbit(dynamics, state, seeds.DPO_PERIOD)
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_2D_symmetric_x_fixed_x0(seeds.DPO_X0)
-    orbit = corrector.iterate_correction(seed, verbose=False)
+    result = corrector.iterate_correction(seed, verbose=False)
+    orbit = result.orbit
     assert orbit is not None, "DPO 修正未收敛"
-    return orbit
+    return orbit, result
 
 
 @pytest.fixture(scope="session")
@@ -190,44 +196,52 @@ def _corrected_triangular_l4_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbi
     seed = _seed_orbit(dynamics, state, period)
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_spo_fixed_x0(float(state[0]), seeds.SPO_SEED_POINT)
-    orbit = corrector.iterate_full_period_correction(seed, verbose=False)
+    result = corrector.iterate_full_period_correction(seed, verbose=False)
+    orbit = result.orbit
     assert orbit is not None, "SPO L4 修正未收敛"
-    return orbit
+    return orbit, result
 
 
 # ---- 函数级 deepcopy 包装：单测可安全改写，session 缓存不受影响 ----
 
 
 @pytest.fixture
-def corrected_dro(_corrected_dro_cached: Orbit) -> Orbit:
-    return copy.deepcopy(_corrected_dro_cached)
+def corrected_dro(_corrected_dro_cached):
+    orbit, result = _corrected_dro_cached
+    return copy.deepcopy(orbit), result
 
 
 @pytest.fixture
-def corrected_halo_l1(_corrected_halo_l1_cached: Orbit) -> Orbit:
-    return copy.deepcopy(_corrected_halo_l1_cached)
+def corrected_halo_l1(_corrected_halo_l1_cached):
+    orbit, result = _corrected_halo_l1_cached
+    return copy.deepcopy(orbit), result
 
 
 @pytest.fixture
-def corrected_halo_l2(_corrected_halo_l2_cached: Orbit) -> Orbit:
-    return copy.deepcopy(_corrected_halo_l2_cached)
+def corrected_halo_l2(_corrected_halo_l2_cached):
+    orbit, result = _corrected_halo_l2_cached
+    return copy.deepcopy(orbit), result
 
 
 @pytest.fixture
-def corrected_lyapunov_l1(_corrected_lyapunov_l1_cached: Orbit) -> Orbit:
-    return copy.deepcopy(_corrected_lyapunov_l1_cached)
+def corrected_lyapunov_l1(_corrected_lyapunov_l1_cached):
+    orbit, result = _corrected_lyapunov_l1_cached
+    return copy.deepcopy(orbit), result
 
 
 @pytest.fixture
-def corrected_axial_l1(_corrected_axial_l1_cached: Orbit) -> Orbit:
-    return copy.deepcopy(_corrected_axial_l1_cached)
+def corrected_axial_l1(_corrected_axial_l1_cached):
+    orbit, result = _corrected_axial_l1_cached
+    return copy.deepcopy(orbit), result
 
 
 @pytest.fixture
-def corrected_dpo(_corrected_dpo_cached: Orbit) -> Orbit:
-    return copy.deepcopy(_corrected_dpo_cached)
+def corrected_dpo(_corrected_dpo_cached):
+    orbit, result = _corrected_dpo_cached
+    return copy.deepcopy(orbit), result
 
 
 @pytest.fixture
-def corrected_triangular_l4(_corrected_triangular_l4_cached: Orbit) -> Orbit:
-    return copy.deepcopy(_corrected_triangular_l4_cached)
+def corrected_triangular_l4(_corrected_triangular_l4_cached):
+    orbit, result = _corrected_triangular_l4_cached
+    return copy.deepcopy(orbit), result

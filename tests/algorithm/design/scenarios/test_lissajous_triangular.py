@@ -16,13 +16,9 @@ fixture 让收敛与有界两个测试复用同一次 ``design_orbit`` 调用，
 
 .. note::
 
-   当前仅 ``LISSAJOUS-L1`` 在 ``design_orbit``（Rust 多重打靶，容差 0.02 km）
-   下收敛。``L2`` / ``L4`` / ``L5`` 在小振幅（500/2000、300/1000）与默认振幅
-   （2500/7500、8000/6000）下均迭代到 80 次上限仍未收敛（位置残差
-   0.16–12 km，远超容差），属算法层限制，超出本 PR（测试重设计）范围。
-   字段形状契约（不依赖 ``design_orbit`` 收敛）已对所有 orbit_type 在
-   ``tests/data`` + ``tests/api`` 完整覆盖。待算法层调优多重打靶对 L2/L4/L5
-   的收敛性后，在后续 issue 把它们重新加入本文件参数化。
+   拟周期族（Lissajous / 三角平动点）星历修正用固定时间打靶：自由时间
+   模式下时间自由度与沿流状态自由度近线性相关、雅可比病态，LM 线性收敛
+   卡在 0.5–174 km（#366）；固定时间下 4–6 迭代收敛（秒级到几十秒）。
 
 依赖 SPICE 内核（``design_orbit`` 自动加载 ``kernels/``）。
 内核缺失时整组跳过。
@@ -38,6 +34,7 @@ from kernel_helpers import SPICE_KERNEL_DIR
 
 from e2m2e.algorithm.design import design_orbit
 from e2m2e.api.models import DesignOrbitRequest
+from e2m2e.data.templates import ConvergenceState
 
 _SPICE_AVAILABLE = os.path.isdir(SPICE_KERNEL_DIR) and any(
     f.endswith(".bsp") for f in os.listdir(SPICE_KERNEL_DIR)
@@ -55,12 +52,15 @@ pytestmark = [
 # 与原 test_lissajous 一致。
 DURATION_SEC = 0.05 * 365.25 * 86400
 
-# 集成收敛参数化。当前仅 LISSAJOUS-L1 在 design_orbit 下收敛：L2/L4/L5 在
-# 小振幅与默认振幅下均迭代到 80 次上限未达容差 0.02 km（位置残差
-# 0.16/0.66/12 km），属算法层限制（见模块 docstring）。
+# 集成收敛参数化。覆盖共线 Lissajous（L1/L2）与三角平动点（L4/L5）：
+# 拟周期族无周期闭合，星历修正用固定时间打靶（var_time=False，见
+# design_orbit._FIXED_TIME_ORBIT_TYPES 与 #366），Gauss-Newton 二次收敛。
 # (orbit_type, collinear_point, amplitude_in, amplitude_out)
 _ORBIT_CASES = [
     pytest.param(("LISSAJOUS", 1, 500.0, 2000.0), id="LISSAJOUS-L1"),
+    pytest.param(("LISSAJOUS", 2, 2500.0, 7500.0), id="LISSAJOUS-L2"),
+    pytest.param(("L4", None, 8000.0, 6000.0), id="L4"),
+    pytest.param(("L5", None, 8000.0, 6000.0), id="L5"),
 ]
 
 
@@ -105,7 +105,7 @@ def test_design_orbit_converges(design_case):
     """
     expected_type, result = design_case
     assert result.correction is not None
-    assert result.correction.converged
+    assert result.correction.status is ConvergenceState.CONVERGED
     assert result.ephemeris is not None
     assert len(result.ephemeris) > 0
     assert result.orbit_type == expected_type
@@ -117,7 +117,8 @@ def test_design_orbit_bounded(design_case):
     位置范围断言保留原 e2e 测试的物理判据（地月空间合理范围），验证高精度
     预报不爆炸。Jacobi 漂移断言验证轨道能量未发散：LISSAJOUS 的 cr3bp_orbit
     为中心流形约化的多点有界轨迹，沿轨道 Jacobi 漂移在约化精度量级（~1e-4，
-    非纯数值积分的 1e-10 守恒级），阈值 1e-3 验证轨道未发散到错误能量面。
+    非纯数值积分的 1e-10 守恒级），且随振幅增长（大振幅 L2 实测 ~1e-3）。
+    阈值取漂移相对能量面 <0.1%（|ΔC|/|C|），验证轨道未发散到错误能量面。
     """
     _, result = design_case
     pos_norms = np.linalg.norm(result.ephemeris.position_km, axis=1)
@@ -129,7 +130,8 @@ def test_design_orbit_bounded(design_case):
         system = result.cr3bp_orbit.system
         jacobi = np.array([system.get_jacobi_constant(s) for s in states])
         drift = float(jacobi.max() - jacobi.min())
-        assert drift < 1e-3, (
+        c_scale = float(max(abs(jacobi.min()), abs(jacobi.max())))
+        assert drift < 1e-3 * c_scale, (
             f"CR3BP 参考轨道 Jacobi 漂移 {drift:.2e} 超出中心流形约化精度范围"
             f"（C ∈ [{jacobi.min():.6f}, {jacobi.max():.6f}]）"
         )

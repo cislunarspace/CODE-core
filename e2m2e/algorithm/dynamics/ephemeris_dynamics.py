@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -90,12 +90,14 @@ class EphemerisDynamics(Dynamics):
         max_step: float,
         with_jacobi: bool,
         events: list[Callable[[float, np.ndarray], float]] | None = None,
+        backend: Literal["scipy", "rust"] | None = None,
     ) -> dict[str, Any]:
         """增广状态积分（含 STM），优先走 Rust 快速路径。
 
         Rust STM 路径不支持事件检测。全仓无调用者给 ``EphemerisDynamics`` 传
         ``events``，故 ``events`` 非 None 时直接 ``NotImplementedError``
-        （显式报错优于静默回退 scipy）。
+        （显式报错优于静默回退 scipy）。``backend`` 仅透传签名（ADR 0020
+        决策 4 参数形状一致），events 场景在本类直接报错。
         """
         if events is not None:
             raise NotImplementedError(
@@ -165,6 +167,7 @@ class EphemerisDynamics(Dynamics):
         max_step: float,
         with_jacobi: bool,
         events: list[Callable[[float, np.ndarray], float]] | None = None,
+        backend: Literal["scipy", "rust"] | None = None,
     ) -> dict[str, Any]:
         """纯状态积分（不含 STM），优先走 Rust 快速路径。
 

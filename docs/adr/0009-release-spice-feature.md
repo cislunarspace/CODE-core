@@ -59,3 +59,9 @@ cspice-sys 用 cc 从源码编译 CSPICE，不依赖预编译库：
    构建（与 CI 同机制）。
 2. 仓库根加 NOTICE 文件，注明 CSPICE 归属 NASA/JPL NAIF；sdist 一并打包。
 3. 安装文档补充说明：wheel 自带 Rust 快速路径；源码构建也默认带 spice（Cargo default feature，见 ADR 0002 2026-08 修订）。
+
+## 修订（2026-08-12，ADR 0020 决策 4）
+
+release 已带 spice 后，Python 侧对缺失 spice 绑定的 try/except 静默降级机制已删除：
+无 spice（环境没搭好）即报错（issue #378），不再静默回退慢路径。对应测试的
+`importorskip` 语义同步调整。

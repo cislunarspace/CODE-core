@@ -22,19 +22,36 @@ class ConstantForce(PhysicalModel):
 
 
 class _FakeSystem:
-    """仅用于能力检查的最小 System 桩。"""
+    """仅用于能力检查的最小 System 桩（模拟有 SPICE 的环境）。"""
 
     coordinate_system = object()
+    spice = object()
 
     def gravitational_parameter(self, _body):
         return 398600.4418
 
 
+class _NoSpiceSystem(_FakeSystem):
+    """无 ``spice`` 属性的 System 桩（模拟 SPICE 资源缺失的环境）。"""
+
+    spice = None
+
+
 def test_propagate_rejects_force_without_rust_spec():
-    """无 Rust spec 的力不可触发 Python 传播回退。"""
+    """有 SPICE 但力无 Rust spec（能力缺失）→ NotImplementedError。"""
     force_model = ForceModel(_FakeSystem(), forces=[ConstantForce([0.0, 0.0, 1.0])])
 
-    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+    with pytest.raises(NotImplementedError, match="无 Rust 实现"):
+        force_model.propagate(np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]), (0.0, 1.0))
+
+
+def test_propagate_reports_spice_missing_as_resource_error():
+    """system 无 spice（资源缺失）→ RustExtensionUnavailableError（ADR 0020 决策 4 分流）。"""
+    from e2m2e.exceptions import RustExtensionUnavailableError
+
+    force_model = ForceModel(_NoSpiceSystem(), forces=[ConstantForce([0.0, 0.0, 1.0])])
+
+    with pytest.raises(RustExtensionUnavailableError, match="需要 SPICE"):
         force_model.propagate(np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]), (0.0, 1.0))
 
 

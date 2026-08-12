@@ -47,6 +47,8 @@ if TYPE_CHECKING:
     spice_furnsh: Any
     spice_pxform: Any
     spice_spkezr: Any
+    spice_unload: Any
+    srp_acceleration: Any
     third_body_acceleration: Any
     transfer_grid_search_py: Any
     transfer_grid_search_serial_py: Any
@@ -103,7 +105,9 @@ _RUST_SYMBOLS = (
     "spice_furnsh",
     "spice_pxform",
     "spice_spkezr",
+    "spice_unload",
     "spherical_harmonic_accel",
+    "srp_acceleration",
     "third_body_acceleration",
     "transfer_grid_search_py",
     "transfer_grid_search_serial_py",
@@ -269,7 +273,9 @@ __all__ = [
     "spice_furnsh",
     "spice_pxform",
     "spice_spkezr",
+    "spice_unload",
     "spherical_harmonic_accel",
+    "srp_acceleration",
     "third_body_acceleration",
     "TransferPointResult",
     "transfer_grid_search_py",

@@ -21,9 +21,8 @@
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -38,7 +37,11 @@ from .system import System
 if TYPE_CHECKING:
     from ...data.types.orbit import Orbit
 
-from e2m2e.integrators import propagate_cr3bp_py, propagate_cr3bp_stm_py
+from e2m2e.integrators import (
+    propagate_cr3bp_py,
+    propagate_cr3bp_stm_py,
+    solve_ivp_events,
+)
 
 # 跨语言契约（issue #317 第 3.1 项）：Rust ``propagate_cr3bp``（cr3bp.rs）步长
 # 塌缩错误形如 "step size collapsed below minimum ..."。``EphemerisDynamics
@@ -154,6 +157,7 @@ class Dynamics:
         events: Callable[[float, np.ndarray], float]
         | list[Callable[[float, np.ndarray], float]]
         | None = None,
+        backend: Literal["scipy", "rust"] | None = None,
     ) -> dict[str, Any]:
         """传播轨迹（Template Method）
 
@@ -173,6 +177,12 @@ class Dynamics:
                 设 ``terminal = True``（触发即停）与 ``direction``（> 0 只记
                 上行穿越，< 0 只记下行，0 双向）属性。
                 ``with_stm=True`` 时事件函数接收 42 维增广状态。
+            backend: 事件积分路径（ADR 0020 决策 4，能力缺失显式选择）：
+                仅当 ``events`` 非 None 时有意义，二选一：``"scipy"`` 走
+                scipy ``solve_ivp`` 事件积分；``"rust"`` 走 Rust
+                ``solve_ivp_events``（事件语义与 scipy 未完全对齐，由调用方
+                显式选择并接受差异）。不传则报错；不允许 ``"auto"`` 等隐式
+                选择。无 ``events`` 时忽略（Rust 快速路径为唯一路径）。
 
         Returns:
             轨迹结果字典，包含 ``time`` 和 ``states`` 键；
@@ -186,14 +196,21 @@ class Dynamics:
 
         if events is not None and callable(events):
             events = [events]
+        if events is not None and len(events) == 0:
+            # 空列表等价于无事件：不触发事件分支，走默认快速路径。
+            events = None
+        if backend is not None and backend not in ("scipy", "rust"):
+            raise ValueError("backend 必须是 'scipy' 或 'rust'；不允许 'auto' 等隐式选择")
+        if events is not None and backend is None:
+            raise ValueError("传入 events 时必须显式指定 backend='scipy' 或 backend='rust'")
 
         if with_stm:
             return self._propagate_with_stm(
-                initial_state, t_span, t_eval, max_step, with_jacobi, events
+                initial_state, t_span, t_eval, max_step, with_jacobi, events, backend
             )
         else:
             return self._propagate_state_only(
-                initial_state, t_span, t_eval, max_step, with_jacobi, events
+                initial_state, t_span, t_eval, max_step, with_jacobi, events, backend
             )
 
     def _propagate_with_stm(
@@ -204,10 +221,13 @@ class Dynamics:
         max_step: float,
         with_jacobi: bool,
         events: list[Callable[[float, np.ndarray], float]] | None = None,
+        backend: Literal["scipy", "rust"] | None = None,
     ) -> dict[str, Any]:
         """增广状态积分（含 STM）
 
         初始 STM 设为单位矩阵，拼接为 STATE_DIM + STATE_DIM² 维增广状态后积分。
+        ``backend`` 由子类的 Rust 快速路径在 events 场景下使用；基类 scipy
+        实现忽略（事件积分只有 scipy 这一条实现）。
         """
         initial_stm = np.eye(self.STATE_DIM).flatten()
         augmented_state = np.concatenate([initial_state, initial_stm])
@@ -256,8 +276,13 @@ class Dynamics:
         max_step: float,
         with_jacobi: bool,
         events: list[Callable[[float, np.ndarray], float]] | None = None,
+        backend: Literal["scipy", "rust"] | None = None,
     ) -> dict[str, Any]:
-        """纯状态积分（不含 STM）"""
+        """纯状态积分（不含 STM）
+
+        ``backend`` 由子类的 Rust 快速路径在 events 场景下使用；基类 scipy
+        实现忽略（事件积分只有 scipy 这一条实现）。
+        """
         eom_func = self._get_eom_func(with_stm=False)
         result = solve_ivp(
             eom_func,
@@ -508,25 +533,86 @@ class CR3BP_Dynamics(Dynamics):
         max_step: float,
         with_jacobi: bool,
         events: list[Callable[[float, np.ndarray], float]] | None = None,
+        backend: Literal["scipy", "rust"] | None = None,
     ) -> dict[str, Any]:
         """增广状态积分（含 STM），优先走 Rust 快速路径。
 
-        Rust 路径不支持事件检测；仅当调用者显式传入 ``events`` 时改走
-        scipy。这是 ADR 0002 规定的事件语义例外，不取决于扩展是否可用，
-        并非 Rust 缺失时的 fallback。无 events 时要求 Rust 扩展可用（issue
-        #378：缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
+        events 时按显式 ``backend`` 选择事件积分路径（ADR 0020 决策 4）：
+        ``"scipy"`` 走 scipy ``solve_ivp``；``"rust"`` 走 Rust
+        ``solve_ivp_events``（事件语义与 scipy 未完全对齐，由调用方显式
+        选择并接受差异）。``backend`` 由 :meth:`propagate` 校验（不传报错、
+        不允许 ``auto``）。无 events 时要求 Rust 扩展可用（issue #378：
+        缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
         """
         if events is not None:
-            warnings.warn(
-                "CR3BP 显式传入 events 时使用 scipy 事件积分；这由 events 输入触发，"
-                "与 Rust 扩展可用性无关。",
-                stacklevel=2,
-            )
-            return super()._propagate_with_stm(
+            if backend == "scipy":
+                return super()._propagate_with_stm(
+                    initial_state, t_span, t_eval, max_step, with_jacobi, events
+                )
+            # backend == "rust"（propagate 已校验非 None 且合法）
+            return self._propagate_with_stm_rust_events(
                 initial_state, t_span, t_eval, max_step, with_jacobi, events
             )
         require_rust_extension("propagate_cr3bp_stm_py")
         return self._propagate_with_stm_rust(initial_state, t_span, t_eval, max_step, with_jacobi)
+
+    def _propagate_with_stm_rust_events(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+        with_jacobi: bool,
+        events: list[Callable[[float, np.ndarray], float]],
+    ) -> dict[str, Any]:
+        """Rust 事件积分路径（``solve_ivp_events``）——增广状态（含 STM）。
+
+        CR3BP 专用传播（``propagate_cr3bp_stm_py``）不支持事件检测，事件
+        路径走通用 Rust 积分器 ``solve_ivp_events``（``e2m2e/integrators``）。
+        事件时刻由步内二分求精（无稠密输出），与 scipy 语义未完全对齐——
+        由调用方显式选择（ADR 0020 决策 4）。输出格式对齐 scipy：
+        ``t_events``/``y_events`` 为逐事件的 ndarray 列表。
+        """
+        require_rust_extension("solve_ivp_events_py")
+        initial_stm = np.eye(self.STATE_DIM).flatten()
+        augmented_state = np.concatenate([initial_state, initial_stm])
+        eom_func = self._get_eom_func(with_stm=True)
+        event_specs = [
+            (g, bool(getattr(g, "terminal", False)), float(getattr(g, "direction", 0)))
+            for g in events
+        ]
+        if t_eval is not None:
+            t_eval_arr = np.asarray(t_eval, dtype=float)
+        else:
+            t_eval_arr = np.array([float(t_span[0]), float(t_span[1])])
+
+        result = solve_ivp_events(
+            t_span,
+            augmented_state,
+            t_eval_arr,
+            self.rtol,
+            self.atol,
+            eom_func,
+            event_specs,
+            max_step=float(max_step),
+            state_error_dim=self.STATE_DIM,
+        )
+
+        n = self.STATE_DIM
+        states_full = np.asarray(result["states"])
+        time = np.asarray(result["time"])
+        states = states_full[:, :n]
+        stm_matrices = states_full[:, n:].reshape(-1, n, n)
+
+        self.last_trajectory = (time, states)
+        self.last_stm = stm_matrices
+
+        out: dict[str, Any] = {"time": time, "states": states, "stm": stm_matrices}
+        out["t_events"] = [np.asarray(te) for te in result["t_events"]]
+        out["y_events"] = [np.asarray(ye) for ye in result["y_events"]]
+        if with_jacobi:
+            out = self._handle_jacobi(states, out)
+        return out
 
     def _propagate_with_stm_rust(
         self,
@@ -590,21 +676,22 @@ class CR3BP_Dynamics(Dynamics):
         max_step: float,
         with_jacobi: bool,
         events: list[Callable[[float, np.ndarray], float]] | None = None,
+        backend: Literal["scipy", "rust"] | None = None,
     ) -> dict[str, Any]:
         """纯状态积分（不含 STM），优先走 Rust 快速路径。
 
-        Rust 路径不支持事件检测；仅当调用者显式传入 ``events`` 时改走
-        scipy。这是 ADR 0002 规定的事件语义例外，不取决于扩展是否可用，
-        并非 Rust 缺失时的 fallback。无 events 时要求 Rust 扩展可用（issue
-        #378：缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
+        events 时按显式 ``backend`` 选择事件积分路径（ADR 0020 决策 4），
+        语义同 :meth:`_propagate_with_stm`。无 events 时要求 Rust 扩展可用
+        （issue #378：缺失即抛 RustExtensionUnavailableError，不静默降级
+        scipy）。
         """
         if events is not None:
-            warnings.warn(
-                "CR3BP 显式传入 events 时使用 scipy 事件积分；这由 events 输入触发，"
-                "与 Rust 扩展可用性无关。",
-                stacklevel=2,
-            )
-            return super()._propagate_state_only(
+            if backend == "scipy":
+                return super()._propagate_state_only(
+                    initial_state, t_span, t_eval, max_step, with_jacobi, events
+                )
+            # backend == "rust"（propagate 已校验非 None 且合法）
+            return self._propagate_state_only_rust_events(
                 initial_state, t_span, t_eval, max_step, with_jacobi, events
             )
         require_rust_extension("propagate_cr3bp_py")
@@ -649,6 +736,54 @@ class CR3BP_Dynamics(Dynamics):
         self.last_trajectory = (time, states)
 
         out: dict[str, Any] = {"time": time, "states": states}
+        if with_jacobi:
+            out = self._handle_jacobi(states, out)
+        return out
+
+    def _propagate_state_only_rust_events(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+        with_jacobi: bool,
+        events: list[Callable[[float, np.ndarray], float]],
+    ) -> dict[str, Any]:
+        """Rust 事件积分路径（``solve_ivp_events``）——纯状态（不含 STM）。
+
+        语义同 :meth:`_propagate_with_stm_rust_events`：CR3BP 专用传播不
+        支持事件检测，事件路径走通用 Rust 积分器，由调用方显式选择。
+        """
+        require_rust_extension("solve_ivp_events_py")
+        eom_func = self._get_eom_func(with_stm=False)
+        event_specs = [
+            (g, bool(getattr(g, "terminal", False)), float(getattr(g, "direction", 0)))
+            for g in events
+        ]
+        if t_eval is not None:
+            t_eval_arr = np.asarray(t_eval, dtype=float)
+        else:
+            t_eval_arr = np.array([float(t_span[0]), float(t_span[1])])
+
+        result = solve_ivp_events(
+            t_span,
+            initial_state,
+            t_eval_arr,
+            self.rtol,
+            self.atol,
+            eom_func,
+            event_specs,
+            max_step=float(max_step),
+        )
+
+        time = np.asarray(result["time"])
+        states = np.asarray(result["states"])
+
+        self.last_trajectory = (time, states)
+
+        out: dict[str, Any] = {"time": time, "states": states}
+        out["t_events"] = [np.asarray(te) for te in result["t_events"]]
+        out["y_events"] = [np.asarray(ye) for ye in result["y_events"]]
         if with_jacobi:
             out = self._handle_jacobi(states, out)
         return out

@@ -80,7 +80,7 @@ class TransferConfig:
     nlp_t_ins_range: tuple[float, float] | None = None
     nlp_transfer_time_range: tuple[float, float] | None = None
     nlp_use_copt: bool = False
-    nlp_fallback_to_scipy: bool = True
+    nlp_fallback_to_scipy: bool = False  # ADR 0020 决策 4：COPT 缺失/失败默认报错，显式 True 才回退
     nlp_verbose: bool = False
 
     @property

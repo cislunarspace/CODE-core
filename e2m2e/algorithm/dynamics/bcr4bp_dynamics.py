@@ -21,14 +21,18 @@
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e.integrators import propagate_bcr4bp_py, propagate_bcr4bp_stm_py, require_rust_extension
+from e2m2e.integrators import (
+    propagate_bcr4bp_py,
+    propagate_bcr4bp_stm_py,
+    require_rust_extension,
+    solve_ivp_events,
+)
 
 from .bcr4bp_system import BCR4BPSystem
 from .dynamics import Dynamics
@@ -186,26 +190,86 @@ class BCR4BP_Dynamics(Dynamics):
         max_step: float,
         with_jacobi: bool,
         events: list[Callable[[float, np.ndarray], float]] | None = None,
+        backend: Literal["scipy", "rust"] | None = None,
     ) -> dict[str, Any]:
         """增广状态积分（含 STM），优先走 Rust 快速路径。
 
-        BCR4BP 的 Rust 路径不支持事件检测；仅当调用者显式传入 ``events``
-        时走 scipy 路径并发出警告。这是 ADR 0002 规定的事件语义例外，
-        不取决于 Rust 扩展是否可用，非扩展缺失 fallback。无 events 时要求
-        Rust 扩展可用（issue #378：缺失即抛 RustExtensionUnavailableError，
-        不静默降级 scipy）。
+        events 时按显式 ``backend`` 选择事件积分路径（ADR 0020 决策 4）：
+        ``"scipy"`` 走 scipy ``solve_ivp``；``"rust"`` 走 Rust
+        ``solve_ivp_events``（事件语义与 scipy 未完全对齐，由调用方显式
+        选择并接受差异）。``backend`` 由 :meth:`propagate` 校验（不传报错、
+        不允许 ``auto``）。无 events 时要求 Rust 扩展可用（issue #378：
+        缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
         """
         if events is not None:
-            warnings.warn(
-                "BCR4BP 显式传入 events 时回退到 scipy 事件积分；这是由 events 输入"
-                "触发的设计例外，与 Rust 扩展可用性无关。",
-                stacklevel=2,
-            )
-            return super()._propagate_with_stm(
+            if backend == "scipy":
+                return super()._propagate_with_stm(
+                    initial_state, t_span, t_eval, max_step, with_jacobi, events
+                )
+            # backend == "rust"（propagate 已校验非 None 且合法）
+            return self._propagate_with_stm_rust_events(
                 initial_state, t_span, t_eval, max_step, with_jacobi, events
             )
         require_rust_extension("propagate_bcr4bp_stm_py")
         return self._propagate_with_stm_rust(initial_state, t_span, t_eval, max_step, with_jacobi)
+
+    def _propagate_with_stm_rust_events(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+        with_jacobi: bool,
+        events: list[Callable[[float, np.ndarray], float]],
+    ) -> dict[str, Any]:
+        """Rust 事件积分路径（``solve_ivp_events``）——增广状态（含 STM）。
+
+        BCR4BP 专用传播（``propagate_bcr4bp_stm_py``）不支持事件检测，事件
+        路径走通用 Rust 积分器 ``solve_ivp_events``。事件时刻由步内二分求精
+        （无稠密输出），与 scipy 语义未完全对齐——由调用方显式选择
+        （ADR 0020 决策 4）。输出格式对齐 scipy：``t_events``/``y_events``
+        为逐事件的 ndarray 列表。
+        """
+        require_rust_extension("solve_ivp_events_py")
+        initial_stm = np.eye(self.STATE_DIM).flatten()
+        augmented_state = np.concatenate([initial_state, initial_stm])
+        eom_func = self._get_eom_func(with_stm=True)
+        event_specs = [
+            (g, bool(getattr(g, "terminal", False)), float(getattr(g, "direction", 0)))
+            for g in events
+        ]
+        if t_eval is not None:
+            t_eval_arr = np.asarray(t_eval, dtype=float)
+        else:
+            t_eval_arr = np.array([float(t_span[0]), float(t_span[1])])
+
+        result = solve_ivp_events(
+            t_span,
+            augmented_state,
+            t_eval_arr,
+            self.rtol,
+            self.atol,
+            eom_func,
+            event_specs,
+            max_step=float(max_step),
+            state_error_dim=self.STATE_DIM,
+        )
+
+        n = self.STATE_DIM
+        states_full = np.asarray(result["states"])
+        time = np.asarray(result["time"])
+        states = states_full[:, :n]
+        stm_matrices = states_full[:, n:].reshape(-1, n, n)
+
+        self.last_trajectory = (time, states)
+        self.last_stm = stm_matrices
+
+        out: dict[str, Any] = {"time": time, "states": states, "stm": stm_matrices}
+        out["t_events"] = [np.asarray(te) for te in result["t_events"]]
+        out["y_events"] = [np.asarray(ye) for ye in result["y_events"]]
+        if with_jacobi:
+            out = self._handle_jacobi(states, out)
+        return out
 
     def _propagate_with_stm_rust(
         self,
@@ -268,22 +332,22 @@ class BCR4BP_Dynamics(Dynamics):
         max_step: float,
         with_jacobi: bool,
         events: list[Callable[[float, np.ndarray], float]] | None = None,
+        backend: Literal["scipy", "rust"] | None = None,
     ) -> dict[str, Any]:
         """纯状态积分（不含 STM），优先走 Rust 快速路径。
 
-        BCR4BP 的 Rust 路径不支持事件检测；仅当调用者显式传入 ``events``
-        时走 scipy 路径并发出警告。这是 ADR 0002 规定的事件语义例外，
-        不取决于 Rust 扩展是否可用，非扩展缺失 fallback。无 events 时要求
-        Rust 扩展可用（issue #378：缺失即抛 RustExtensionUnavailableError，
-        不静默降级 scipy）。
+        events 时按显式 ``backend`` 选择事件积分路径（ADR 0020 决策 4），
+        语义同 :meth:`_propagate_with_stm`。无 events 时要求 Rust 扩展可用
+        （issue #378：缺失即抛 RustExtensionUnavailableError，不静默降级
+        scipy）。
         """
         if events is not None:
-            warnings.warn(
-                "BCR4BP 显式传入 events 时回退到 scipy 事件积分；这是由 events 输入"
-                "触发的设计例外，与 Rust 扩展可用性无关。",
-                stacklevel=2,
-            )
-            return super()._propagate_state_only(
+            if backend == "scipy":
+                return super()._propagate_state_only(
+                    initial_state, t_span, t_eval, max_step, with_jacobi, events
+                )
+            # backend == "rust"（propagate 已校验非 None 且合法）
+            return self._propagate_state_only_rust_events(
                 initial_state, t_span, t_eval, max_step, with_jacobi, events
             )
         require_rust_extension("propagate_bcr4bp_py")
@@ -319,6 +383,54 @@ class BCR4BP_Dynamics(Dynamics):
         self.last_trajectory = (time, states)
 
         out: dict[str, Any] = {"time": time, "states": states}
+        if with_jacobi:
+            out = self._handle_jacobi(states, out)
+        return out
+
+    def _propagate_state_only_rust_events(
+        self,
+        initial_state: np.ndarray,
+        t_span: tuple[float, float],
+        t_eval: npt.ArrayLike | None,
+        max_step: float,
+        with_jacobi: bool,
+        events: list[Callable[[float, np.ndarray], float]],
+    ) -> dict[str, Any]:
+        """Rust 事件积分路径（``solve_ivp_events``）——纯状态（不含 STM）。
+
+        语义同 :meth:`_propagate_with_stm_rust_events`：BCR4BP 专用传播不
+        支持事件检测，事件路径走通用 Rust 积分器，由调用方显式选择。
+        """
+        require_rust_extension("solve_ivp_events_py")
+        eom_func = self._get_eom_func(with_stm=False)
+        event_specs = [
+            (g, bool(getattr(g, "terminal", False)), float(getattr(g, "direction", 0)))
+            for g in events
+        ]
+        if t_eval is not None:
+            t_eval_arr = np.asarray(t_eval, dtype=float)
+        else:
+            t_eval_arr = np.array([float(t_span[0]), float(t_span[1])])
+
+        result = solve_ivp_events(
+            t_span,
+            initial_state,
+            t_eval_arr,
+            self.rtol,
+            self.atol,
+            eom_func,
+            event_specs,
+            max_step=float(max_step),
+        )
+
+        time = np.asarray(result["time"])
+        states = np.asarray(result["states"])
+
+        self.last_trajectory = (time, states)
+
+        out: dict[str, Any] = {"time": time, "states": states}
+        out["t_events"] = [np.asarray(te) for te in result["t_events"]]
+        out["y_events"] = [np.asarray(ye) for ye in result["y_events"]]
         if with_jacobi:
             out = self._handle_jacobi(states, out)
         return out

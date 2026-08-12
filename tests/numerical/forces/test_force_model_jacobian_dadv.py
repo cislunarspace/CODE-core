@@ -17,10 +17,15 @@ pytestmark = pytest.mark.force
 
 
 class _FakeSystem:
-    """最小 system 桩：提供 coordinate_system 占位即可（测试力不查 system）。"""
+    """最小 system 桩：提供 coordinate_system 占位即可（测试力不查 system）。
+
+    ``spice`` 占位模拟有 SPICE 的环境——测试力无 Rust spec 属能力缺失
+    （NotImplementedError 分支），不是资源缺失。
+    """
 
     def __init__(self) -> None:
         self.coordinate_system = object()
+        self.spice = object()
 
 
 class _DampingForce(PhysicalModel):
@@ -41,7 +46,7 @@ def test_damping_force_propagation_rejected_without_rust_spec():
     """速度依赖的自定义阻尼力无 Rust spec，传播必须显式报错。"""
     fm = ForceModel(_FakeSystem(), forces=[_DampingForce(k=0.5)])
 
-    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+    with pytest.raises(NotImplementedError, match="无 Rust 实现"):
         fm.propagate(np.array([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]), (0.0, 1.0))
 
 
@@ -49,7 +54,7 @@ def test_damping_force_stm_propagation_rejected_without_rust_spec():
     """速度依赖的自定义阻尼力无 Rust spec，STM 传播必须显式报错。"""
     fm = ForceModel(_FakeSystem(), forces=[_DampingForce(k=0.5)])
 
-    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+    with pytest.raises(NotImplementedError, match="无 Rust 实现"):
         fm.propagate(np.array([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]), (0.0, 1.0), with_stm=True)
 
 
@@ -57,5 +62,5 @@ def test_position_only_force_propagation_rejected_without_rust_spec():
     """位置型自定义力无 Rust spec，传播同样显式报错。"""
     fm = ForceModel(_FakeSystem(), forces=[_PositionOnlyForce(k=1.0)])
 
-    with pytest.raises(NotImplementedError, match="不支持 Rust 编译传播"):
+    with pytest.raises(NotImplementedError, match="无 Rust 实现"):
         fm.propagate(np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]), (0.0, 1.0))

@@ -194,24 +194,28 @@ class TestRustStatePropagation:
         assert_allclose(result["states"][0], leo_state, atol=1e-9)
 
     def test_events_not_implemented_with_stm(self, spice_eph_dynamics, reference_et, leo_state):
-        """with_stm=True + events 非 None 应 raise NotImplementedError。"""
+        """with_stm=True + events 非 None 应 raise NotImplementedError（显式 backend）。"""
 
         def event_fn(t, state):
             return float(state[0])
 
         t_span = (reference_et, reference_et + 3600)
         with pytest.raises(NotImplementedError, match="事件检测"):
-            spice_eph_dynamics.propagate(leo_state, t_span, events=event_fn, with_stm=True)
+            spice_eph_dynamics.propagate(
+                leo_state, t_span, events=event_fn, with_stm=True, backend="scipy"
+            )
 
     def test_events_not_implemented_state_only(self, spice_eph_dynamics, reference_et, leo_state):
-        """with_stm=False + events 非 None 应 raise NotImplementedError。"""
+        """with_stm=False + events 非 None 应 raise NotImplementedError（显式 backend）。"""
 
         def event_fn(t, state):
             return float(state[0])
 
         t_span = (reference_et, reference_et + 3600)
         with pytest.raises(NotImplementedError, match="事件检测"):
-            spice_eph_dynamics.propagate(leo_state, t_span, events=event_fn, with_stm=False)
+            spice_eph_dynamics.propagate(
+                leo_state, t_span, events=event_fn, with_stm=False, backend="scipy"
+            )
 
 
 if __name__ == "__main__":

@@ -242,7 +242,15 @@ class SPICEManager(EphemerisProvider):
     def unload_kernel(self, path: str) -> None:
         """卸载一个已加载的 SPICE 内核文件，释放相关资源。"""
         get_spiceypy().unload(path)
-        # Rust cspice 侧没有 unload 包装，依赖进程退出释放（cspice 0.1 限制）。
+        # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（静态链接，
+        # 内核池不共享）。load_kernel 双 furnsh，此处对称卸载 Rust 侧，
+        # 避免 Rust 内核池残留导致测试结果依赖执行顺序（issue #387）。
+        # Rust 侧只卸载确经 spice_furnsh 加载过的文件，未加载时静默跳过
+        # （保持重复 unload 幂等）。
+        from e2m2e.integrators import spice_unload
+
+        if spice_unload is not None:
+            spice_unload(path)
 
     def enable_ephem_cache(
         self,

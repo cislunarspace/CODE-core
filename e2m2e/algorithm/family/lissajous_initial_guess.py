@@ -257,6 +257,9 @@ def compute_lissajous_bounded_trajectory(
     # SPICE 内核，否则星历几何进入约化会使 quasi-Floquet↔CM Lie ODE 失稳。
     pipeline = NormalFormPipeline(
         context=ctx,
+        # CR3BP 模型（force_cr3bp=True）下 M(t) 常数矩阵，QF 显式选 constant
+        # 方法（ADR 0020 决策 4：显式选择，不静默降）。
+        quasi_floquet_method="constant",
         center_max_order=_LISSAJOUS_NF_ORDER,
         center_steps=("invariant", "center"),
         dynamical_kwargs={
