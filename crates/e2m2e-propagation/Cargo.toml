@@ -2,6 +2,9 @@
 name = "e2m2e-propagation"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
 description = "ODE integrators for e2m2e (RK, ABM, Cowell)"
 
 [lib]

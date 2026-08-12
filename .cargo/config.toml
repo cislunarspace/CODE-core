@@ -1,0 +1,9 @@
+# Windows MSVC 链接修复（issue #395）：cspice-v1 release 的预编译 cspice.lib
+# 以静态 CRT（/MT）编译——其 COFF .drectve 段含 /DEFAULTLIB:"LIBCMT"（已用
+# objdump/strings 验证），而 PyO3 扩展按动态 CRT（/MD）链接，两者混链触发
+# LINK LNK4098，且跨边界分配/释放内存有堆崩溃风险。CSPICE 为纯 C 库，FFI
+# 边界只传调用方分配的缓冲区，无跨界 free，故禁止自动链接 LIBCMT、让其中
+# CRT 符号统一解析到 MSVCRT 是安全的，消除双 CRT 共存。
+# 根治办法是 cspice 编译包改 /MD 重出 release；此处为仓库侧修复。
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=/NODEFAULTLIB:LIBCMT"]

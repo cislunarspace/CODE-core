@@ -6,7 +6,13 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.coordinate.standard_dynamic_axes import LVLHAxes, VNBAxes
+from e2m2e.algorithm.coordinate.standard_dynamic_axes import (
+    ANGULAR_MOMENTUM_NORM_MIN,
+    POSITION_NORM_MIN,
+    VELOCITY_NORM_MIN,
+    LVLHAxes,
+    VNBAxes,
+)
 
 pytestmark = pytest.mark.data
 
@@ -214,3 +220,44 @@ class TestDegenerateStates:
         axes = LVLHAxes()
         with pytest.raises(ValueError, match="角动量为零"):
             axes.update(0.0, self.STATE_ZERO_ANGULAR_MOMENTUM)
+
+    # --- 阈值可观测（ADR 0020 决策 5）：异常信息含实测范数与阈值 ---
+
+    def test_vnb_zero_velocity_message_reports_measured_and_threshold(self):
+        """VNB 零速度异常信息含实测 |v| 与阈值。"""
+        axes = VNBAxes()
+        with pytest.raises(ValueError) as exc_info:
+            axes.update(0.0, self.STATE_ZERO_VELOCITY)
+        msg = str(exc_info.value)
+        assert "0.000e+00" in msg  # 实测 |v| = 0
+        assert f"{VELOCITY_NORM_MIN:.1e}" in msg
+
+    def test_vnb_small_angular_momentum_message_reports_measured(self):
+        """VNB 近零角动量异常信息含实测 |r×v|（非恰零，验证实测量确实写入）。"""
+        # r=[1,0,0], v=[1,1e-13,0] → r×v = [0,0,1e-13]，|h| = 1e-13 < 阈值
+        state = np.array([1.0, 0.0, 0.0, 1.0, 1e-13, 0.0])
+        axes = VNBAxes()
+        with pytest.raises(ValueError) as exc_info:
+            axes.update(0.0, state)
+        msg = str(exc_info.value)
+        assert "1.000e-13" in msg
+        assert f"{ANGULAR_MOMENTUM_NORM_MIN:.1e}" in msg
+
+    def test_lvlh_zero_position_message_reports_measured_and_threshold(self):
+        """LVLH 零位置异常信息含实测 |r| 与阈值。"""
+        axes = LVLHAxes()
+        with pytest.raises(ValueError) as exc_info:
+            axes.update(0.0, self.STATE_ZERO_POSITION)
+        msg = str(exc_info.value)
+        assert "0.000e+00" in msg  # 实测 |r| = 0
+        assert f"{POSITION_NORM_MIN:.1e}" in msg
+
+    def test_lvlh_small_angular_momentum_message_reports_measured(self):
+        """LVLH 近零角动量异常信息含实测 |r×v| 与阈值。"""
+        state = np.array([1.0, 0.0, 0.0, 1.0, 1e-13, 0.0])
+        axes = LVLHAxes()
+        with pytest.raises(ValueError) as exc_info:
+            axes.update(0.0, state)
+        msg = str(exc_info.value)
+        assert "1.000e-13" in msg
+        assert f"{ANGULAR_MOMENTUM_NORM_MIN:.1e}" in msg

@@ -3,6 +3,8 @@ name = "e2m2e-integrators"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+homepage.workspace = true
+repository.workspace = true
 description = "PyO3 bindings for e2m2e (propagation, forces, spice)"
 
 [lib]
