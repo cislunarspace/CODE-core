@@ -181,6 +181,11 @@ class InvariantManifold:
             states = np.asarray(result["states"], dtype=float)
             if section is not None:
                 times, states = self._truncate_at_first_crossing(times, states, section)
+            # 数值发散时 Rust 积分返回空 states（#246 语义：失败返回空、不 raise）；
+            # 空轨迹无法构成 Orbit（#379），跳过该种子弧，其余弧照常入管。
+            if len(states) == 0:
+                logger.warning("流形弧积分失败（空轨迹），跳过该种子")
+                continue
             trajectories.append(Orbit(states=states, times=times, system=self.orbit.system))
 
         return ManifoldTube(
