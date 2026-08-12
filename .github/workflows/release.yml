@@ -18,8 +18,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v7
       # lint 只需 ruff，不装项目本体：uv sync 构建 editable 会编译 cspice-sys，
-      # 未设 CSPICE_DIR 直接 panic（v5.6.6 起禁用 downloadcspice）。
-      # 后续 uv run 加 --no-sync 防止触发重新同步。
+      # 未设 CSPICE_DIR 直接报错（v5.6.6 起 CSPICE 只从 GitHub release 取
+      # 预编译包）。后续 uv run 加 --no-sync 防止触发重新同步。
       - run: uv sync --group dev --no-install-project
       - run: uv run --no-sync ruff check .
       - run: uv run --no-sync ruff format --check .
@@ -34,7 +34,7 @@ jobs:
       # 须先下 CSPICE 编译包（CSPICE_DIR）与 SPICE 内核（kernels/）。
       - name: 下载 SPICE 编译包（cspice-v1 release）
         # --no-sync：脚本只用标准库；uv run 默认先 sync 构建扩展，此时
-        # CSPICE_DIR 未设、cspice-sys 直接 panic（鸡生蛋，同 ci.yml）。
+        # CSPICE_DIR 未设、cspice-sys 直接报错（鸡生蛋，同 ci.yml）。
         run: uv run --no-sync python scripts/download_cspice.py >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
