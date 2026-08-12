@@ -1,6 +1,6 @@
 # 变更日志
 
-## [Unreleased]
+## [5.6.6] - 2026-08-12
 
 ### Added
 - **碰撞终止 + 天体半径注入**（#355，ADR 0020 决策 5）：`Dynamics.propagate` 新增 `collision_detection` 开关，启用时以 `g = |r − r_body| − R_body` 构造碰撞事件，探测器与主/次天体表面接触即终止积分，结果附 `collision` 键（天体名、终止时刻、终止状态）；`CR3BP_System`/`BCR4BP_System` 新增 `primary_radius_km`/`secondary_radius_km` 半径配置注入，保留机器精度正则化。
@@ -15,6 +15,7 @@
 - **积分失败类型化**（#349）：新增 `PropagationFailure` 类型异常，消除步塌缩跨语言字符串匹配 catch。
 - **redline 静默退化清理**（#352）：微分修正停滞不再短路为成功（`is_periodic` 用配置容差）；控制律未产出机动计为失败样本（修复无角动量管理 Δv 不累计回归）；Q-law 步塌缩抛 `PropagationFailure`、μ 解析失败不静默替换；网格搜索碰撞格进失败侧；propulsion 法向退化、third_body except 收窄、normal-form dense output/星历失败等静默退化改抛。
 - **Rust 内核池双侧卸载**（#387）：`SPICEManager.unload_kernel` 对称调 Rust `spice_unload`（新增 pyo3 绑定 + `LOADED_KERNELS` 幂等清单，只卸载确已加载的文件），消除 Rust 内核池残留导致的测试顺序依赖。
+- **LICENSE 与 NOTICE 未随 wheel 分发**：`license` 改 SPDX 字符串并加 `license-files`（PEP 639），wheel 的 `.dist-info/licenses/` 现含 LICENSE 与 NOTICE，补上 ADR 0009 的署名承诺；同步删除与 SPDX 冲突的 License classifier、移除从未使用的 `joblib` 依赖声明、maturin 下界抬到 >=1.8（PEP 639 支持）。
 
 ### Changed
 - **显式事件的传播分派**（#378，ADR 0023）：CR3BP/BCR4BP 仅在调用者传入 `events` 时使用 SciPy 事件积分，该例外由输入触发，与 Rust 扩展可用性无关；未传事件时仍要求 Rust 路径，扩展缺失显式报错。ForceModel 事件传播明确未实现，Rust 事件细化由 `solve_ivp_events` 单独提供。
@@ -29,6 +30,10 @@
 - `constants.toml` 注释中的特殊符号改用 LaTeX 记号。
 - CLAUDE.md 英文翻译为中文。
 - 同步过时文档——spice 默认构建、DE421 μ、#351 结果契约。
+- README 重写精简：删除使命叙述、配图与进度表格；能力按领域分组列写（时空系统/积分器与动力学/任务轨道设计/转移轨道设计/轨道控制/接口与工具）；安装只留 uv；快速开始缩为 Halo 最小示例；测试说明合并为七类边界清单；开头追加 stars 与 Rust stable 徽章。
+- `docs/adr/` 新增 README 索引（状态词汇、编号规则、模板与全量索引）；ADR 0020 与 0024 互加修订指针；12 篇状态词汇统一。
+- 删除 `archive/` 目录（20 篇已完成计划与讨论草案），任务跟踪归于 GitHub issue。
+- NOTICE 补 Lambert 求解器的 BSD-3 署名（蓝本 jacobwilliams Fortran-Astrodynamics-Toolkit）。
 
 ## [5.6.5] - 2026-08-10
 
