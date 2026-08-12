@@ -15,13 +15,12 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import ForceModel, GravityField
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
+from e2m2e.data.constants import SOLAR_PRESSURE_1AU
 from e2m2e.data.kernels.manager import SPICEManager
 
 pytestmark = pytest.mark.force
 
 
-_AU_KM = 149597870.691
-_P_SRP_1AU = 4.56e-6
 _MU_EARTH = 398600.4415  # km³/s²
 _EARTH_R_KM = 6378.137
 
@@ -111,7 +110,7 @@ def test_equatorial_leo_crosses_earth_shadow(earth_icrf_system) -> None:
 
     # 2) 本影段 SRP 加速度 ≈ 0；全光照段 ≈ 满 SRP（P·Cr·A/m·(AU/r)²，r≈1AU）
     cr, area, mass = 1.5, 20.0, 1000.0
-    full_mag_km = _P_SRP_1AU * cr * area / mass / 1000.0  # km/s²
+    full_mag_km = SOLAR_PRESSURE_1AU * cr * area / mass / 1000.0  # km/s²
     umbra_mask = flux < 1e-6
     sun_mask = flux > 0.99
     assert srp_mag[umbra_mask].max() < full_mag_km * 1e-6, "本影段 SRP 加速度应≈0"

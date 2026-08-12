@@ -85,6 +85,6 @@ def test_indirect_term_rust_binding_matches_point_mass_formula(spice_manager, re
     mu = 4902.800122
     acc = indirect_term_acceleration(et, "MOON", "EARTH", mu)
 
-    r_moon = np.asarray(spice_manager.get_body_position("MOON", et), dtype=float)
+    r_moon = np.asarray(spice_manager.get_body_position("MOON", et, "J2000", "EARTH"), dtype=float)
     expected = -mu / np.linalg.norm(r_moon) ** 3 * r_moon
     np.testing.assert_allclose(acc, expected, rtol=1e-10)

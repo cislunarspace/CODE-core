@@ -185,7 +185,7 @@ def test_drag_rust_path_respects_configured_f107_ap(leo_system):
         gravity = GravityField(body="EARTH", degree=2, order=0)
         fm = ForceModel(system, forces=[gravity, drag])
         fm.rtol = 1e-10
-        assert fm._can_use_rust_path(), "spice 构建下应走 Rust 路径"
+        # issue #385：#378 后 Rust 为唯一传播路径（无 Python 回退），propagate 成功即证明走 Rust
         result = fm.propagate(y0, (et0, et0 + dt), t_eval=t_eval, max_steps=200_000)
         return np.asarray(result["states"][-1])
 

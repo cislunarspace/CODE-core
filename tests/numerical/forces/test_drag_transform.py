@@ -30,8 +30,11 @@ _MU_EARTH = 398600.4415
 @pytest.fixture
 def earth_icrf_system(spice_kernel_path):
     """地球中心 ICRF 传播系统。"""
+    from kernel_helpers import load_body_fixed_kernels, unload_kernels
+
     spice = SPICEManager()
     spice.load_kernel(spice_kernel_path)
+    bf_kernels = load_body_fixed_kernels(spice)
     try:
         system = EphemerisSystem(
             bodies=["EARTH"],
@@ -44,6 +47,7 @@ def earth_icrf_system(spice_kernel_path):
         )
         yield system
     finally:
+        unload_kernels(spice, bf_kernels)
         spice.unload_kernel(spice_kernel_path)
 
 

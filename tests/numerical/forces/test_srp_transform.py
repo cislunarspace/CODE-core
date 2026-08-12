@@ -15,15 +15,11 @@ from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
 from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
 from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
+from e2m2e.data.constants import AU_KM, SOLAR_PRESSURE_1AU
+from e2m2e.data.constants.bodies import EARTH, SUN
 from e2m2e.data.kernels.manager import SPICEManager
 
 pytestmark = pytest.mark.force
-
-
-_R_EARTH = 6378.1363
-_R_SUN = 695700.0
-_P_SRP_1AU = 4.56e-6
-_AU_KM = 149597870.691
 
 
 @pytest.fixture
@@ -65,7 +61,9 @@ def test_shadow_flux_factor_matches_manual(earth_icrf_system) -> None:
     flux_system = shadow.flux_factor(et, state, system)
 
     sun_pos = _sun_pos_rel_earth(system, et)
-    flux_manual = shadow._body_flux_factor(sc_pos, np.zeros(3), sun_pos, _R_EARTH, _R_SUN)
+    flux_manual = shadow._body_flux_factor(
+        sc_pos, np.zeros(3), sun_pos, EARTH.gravity_ref_radius_km, SUN.mean_radius_km
+    )
     np.testing.assert_allclose(flux_system, flux_manual, rtol=1e-12)
 
 
@@ -102,7 +100,7 @@ def test_srp_rust_binding_matches_cannonball_formula(earth_icrf_system) -> None:
     r = np.linalg.norm(sun_to_sc)
     shadow = ConicalShadowModel(bodies=["EARTH"])
     flux = shadow.flux_factor(et, state, system)
-    expected_si = flux * _P_SRP_1AU * (_AU_KM / r) ** 2 * cr * area / mass
+    expected_si = flux * SOLAR_PRESSURE_1AU * (AU_KM / r) ** 2 * cr * area / mass
     expected_km = expected_si / 1000.0
     expected_dir = sun_to_sc / r
 
