@@ -1,6 +1,6 @@
 # ADR 0010：r2s2 接入与 TDT+GCRS ↔ TDB+EBCRS 时空坐标转换
 
-**状态**：已接受（已实施）
+**状态**：已采纳（已实施）
 **日期**：2026-07-30
 **关联**：issue #252、`archive/plans/dfh-parity-prd.md` FR5、ADR 0003（坐标三层抽象）、ADR 0007（动态轴）
 

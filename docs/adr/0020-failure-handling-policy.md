@@ -1,6 +1,6 @@
 # ADR 0020：失败处理策略——确定性失败抛异常，搜索不可行带标记，禁止隐式降级
 
-**状态**：已接受
+**状态**：已采纳（决策 3 经 ADR 0024 修订）
 **日期**：2026-08-09
 **关联**：ADR 0002（多处 scipy 回退被本 ADR 修订）、ADR 0003（坐标层"绝不自动降精度"——本 ADR 的直接前身）、ADR 0009、ADR 0014（决策 4 错误翻译）、ADR 0016、ADR 0017、ADR 0019
 
@@ -58,6 +58,8 @@
 - 废除 `bool | None` 三态、自由字符串 status、implicit None。`converged`/`success`/`correction_success` 作为 `status == CONVERGED` 的派生属性可兼容保留，但不得是唯一信号。
 
 先例：`design_orbit.py`（所有不收敛路径抛 `DesignNotConvergedError`）、`multiple_shooting.py`（`MultipleShootingResult(converged=False, status=...)`）已是仓内正确范式，本决策推广之。
+
+> **修订（2026-08-11，ADR 0024）**：布尔兼容投影不再保留——`success`/`converged`/`correction_success` 一律移除，不设运行时兼容层；`ConvergenceState` 在本决策的 `INFEASIBLE`/`COLLISION` 之外另增 `FAILED`。上文“作为派生属性可兼容保留”一句作废，其余条款不变。
 
 ### 决策 4：禁止隐式资源降级，区分两种不可用
 
@@ -129,6 +131,3 @@
 - `design_orbit.py` / `multiple_shooting.py` / `homotopy.py` 的抛异常 + 带标记返回范式（已是合规先例）。
 - IEEE 754 浮点定义域防护（如 arccos 前 clip 到 [-1,1]）。
 
-## 待补充
-
-- ADR 0007 的 VNB/LVLH 轴向定义在零速度/零角动量/零位置时奇异，原 ADR 未定退化态处置——本 ADR 决策 5 适用（机器精度正则化保留 + 退化态抛异常），实现时补。

@@ -1,6 +1,6 @@
 # ADR 0018：Jacobian 接口扩 ∂a/∂v，状态转移矩阵纳入速度依赖
 
-**状态**：已接受
+**状态**：已采纳
 **日期**：2026-08-07
 **关联**：ADR 0002（Rust 积分器内核）、ADR 0003（ITRF93 默认值）、ADR 0017（网格搜索 Rayon）、issue #317
 **关联代码**：`crates/e2m2e-forces/src/forces/{compiled,nbody_stm,augmented_state,compiled_stm}.rs`、`crates/e2m2e-integrators/src/multiple_shooting.rs`

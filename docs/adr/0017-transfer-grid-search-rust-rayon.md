@@ -1,6 +1,6 @@
 # ADR 0017：转移网格搜索纯数值内核下沉 Rayon
 
-**状态**：已接受
+**状态**：已采纳
 **日期**：2026-08-07
 **关联**：ADR 0002（Rust 积分器内核）、ADR 0011（五层架构）、ADR 0012（依赖方向）、ADR 0013（验证策略）、ADR 0016（EphemCache 架构）
 **设计文档**：`archive/plans/transfer-grid-search-rust.md`

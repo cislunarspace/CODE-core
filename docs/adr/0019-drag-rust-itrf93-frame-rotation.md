@@ -1,6 +1,6 @@
 # ADR 0019：drag Rust 移植用 ITRF93 pxform 帧旋转（替 ITRFApproxAxes）
 
-**状态**：已接受
+**状态**：已采纳
 **日期**：2026-08-07
 **关联**：ADR 0003（ITRF93 默认值与 GMAT 兼容）、ADR 0018（Jacobian ∂a/∂v）、issue #315、issue #317
 **关联代码**：`crates/e2m2e-forces/src/forces/drag.rs`、`e2m2e/algorithm/forces/drag.py`

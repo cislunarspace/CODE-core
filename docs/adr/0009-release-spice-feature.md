@@ -1,6 +1,6 @@
 # ADR 0009：release wheel 启用 spice feature
 
-**状态**：已接受（已实施）
+**状态**：已采纳（已实施）
 **日期**：2026-07-29
 **关联**：ADR 0002（Rust 积分器内核）、issue #246
 
@@ -51,7 +51,7 @@ cspice-sys 用 cc 从源码编译 CSPICE，不依赖预编译库：
   PC_Windows_VisualC_64bit 包）。
 - macOS：当前 release 矩阵不含，暂不评估。
 
-## 结论
+## 结果
 
 许可、体积、平台均无障碍，**release 启用 spice**（已实施）：
 
