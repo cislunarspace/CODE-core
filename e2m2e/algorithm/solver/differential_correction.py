@@ -762,35 +762,16 @@ class DifferentialCorrection:
 
             # 检查停滞（仅在未收敛的情况下检查）
             if not self._converged and correction_norm < self.stagnation_limit:
-                # 修正量过小时，若误差已足够小，也视为收敛成功
-                if current_error < 1e-8:
-                    self._converged = True
-                    self._set_outcome(
-                        ConvergenceState.CONVERGED,
-                        FailureCause.NONE,
-                        "收敛成功：修正量过小但误差足够小",
-                    )
-                    self.current_error = current_error
-                    if verbose:
-                        logger.info(
-                            "  收敛成功：修正量过小(%.2e)但误差已足够小(%.2e)",
-                            correction_norm,
-                            current_error,
-                        )
-                    if callback:
-                        callback(iteration + 1, current_error, True)
-                    break
-                else:
-                    self._set_outcome(
-                        ConvergenceState.STAGNATED,
-                        FailureCause.STAGNATION_DETECTED,
-                        "停滞：修正量过小",
-                    )
-                    if verbose:
-                        logger.info("  停滞：修正量 = %.2e", correction_norm)
-                    if callback:
-                        callback(iteration + 1, current_error, False)
-                    break
+                self._set_outcome(
+                    ConvergenceState.STAGNATED,
+                    FailureCause.STAGNATION_DETECTED,
+                    "停滞：修正量过小",
+                )
+                if verbose:
+                    logger.info("  停滞：修正量 = %.2e", correction_norm)
+                if callback:
+                    callback(iteration + 1, current_error, False)
+                break
 
             if callback:
                 callback(iteration + 1, current_error, False)
@@ -1010,17 +991,6 @@ class DifferentialCorrection:
 
             # 6. 停滞检查
             if correction_norm < self.stagnation_limit:
-                if current_error < 1e-8:
-                    self._converged = True
-                    self._set_outcome(
-                        ConvergenceState.CONVERGED,
-                        FailureCause.NONE,
-                        "收敛成功：修正量过小但误差足够小",
-                    )
-                    self.current_error = current_error
-                    if callback:
-                        callback(iteration + 1, current_error, True)
-                    break
                 self._set_outcome(
                     ConvergenceState.STAGNATED,
                     FailureCause.STAGNATION_DETECTED,
@@ -1167,7 +1137,7 @@ class DifferentialCorrection:
             system=self.dynamics.system,
         )
         orbit.period = full_period
-        orbit.is_periodic = bool(closure_error < 1e-8)
+        orbit.is_periodic = bool(closure_error < self.tolerance)
         orbit.family_type = self._infer_family_type()
 
         orbit.closure_error = float(closure_error)
