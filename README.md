@@ -4,14 +4,14 @@
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![PyPI](https://img.shields.io/pypi/v/e2m2e)](https://pypi.org/project/e2m2e/)
 [![CI](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml/badge.svg)](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml)
+[![GitHub stars](https://img.shields.io/github/stars/cislunarspace/e2m2e.svg)](https://github.com/cislunarspace/e2m2e/stargazers)
+[![Rust: stable](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 
 e2m2e 是面向地月空间任务规划的**算法工具集基础设施**。在“LLM+Agent”式自主任务规划系统中，大模型负责理解任务意图、分解与编排子任务，e2m2e 负责提供精确可靠的轨道计算工具：建立地月空间的动力学模型，生成周期轨道族，设计轨道之间的转移路径，并把结果画出来检查。
 
 ## 安装
 
-### uv（推荐）
-
-[uv](https://docs.astral.sh/uv/) 是本项目推荐的包管理器，速度快、依赖解析可靠。
+用 [uv](https://docs.astral.sh/uv/) 安装：
 
 ```bash
 uv pip install e2m2e
@@ -34,131 +34,77 @@ make setup   # 拉取 CSPICE 编译包 + SPICE 内核（cspice-v1 / kernels-v1 r
 make dev     # maturin develop 构建并安装 Rust 扩展（spice 默认开启）
 ```
 
-> 开发入口统一走 `Makefile`：它自动从 `scripts/download_cspice.py` 解析并 `export CSPICE_DIR`。
-> CSPICE 一律取 GitHub release 预编译包；缺 `CSPICE_DIR` 时构建直接报错（不启用 `cspice-sys`
-> 的 `downloadcspice`，杜绝走国内不可达的 NAIF 源码下载）。常用目标：`make dev` / `make test` /
-> `make check` / `make setup`（`make help` 列全部）。裸 `cargo` / `maturin` 命令需自行设好
-> `CSPICE_DIR` 与 `LIBCLANG_PATH`（CI 用 `download_cspice.py >> "$GITHUB_ENV"` 落盘，本地手动则）：
->
-> ```bash
-> export CSPICE_DIR=$(python3 scripts/download_cspice.py --print-cspice-dir)
-> ```
-
-### conda
-
-e2m2e 没有 conda-forge 包，conda 用来创建和管理 Python 环境，环境内仍用 pip 安装：
-
-```bash
-conda create -n e2m2e python=3.12
-conda activate e2m2e
-pip install e2m2e
-```
-
-### pip
-
-```bash
-pip install e2m2e
-```
-
-可选依赖（Hamiltonian 正规化流水线）：
-
-```bash
-pip install e2m2e[normal-form]
-```
-
 ### SPICE 内核
 
-星历动力学需要 NASA SPICE 内核文件，放置在 `kernels/` 目录或 `$SPICE_KERNEL_DIR` 指定的路径。
+星历动力学需要 NASA SPICE 内核文件。本项目测试所需的全部内核（行星星历、地球自转、月球姿态、闰秒与行星常数）已打包在 [GitHub Release](https://github.com/cislunarspace/e2m2e/releases) 的 `kernels-v1` 中。三种配置方式：
 
-国内用户推荐从项目的 [GitHub Release](https://github.com/cislunarspace/e2m2e/releases) 下载：`kernels-v1` 中打包了全部必需内核（行星星历、地球自转、月球姿态、闰秒与行星常数），下载后放入 `kernels/` 目录即可——`make setup` 已自动完成此步（见 `scripts/download_kernels.py`）。官方来源（网络可达时）：[NASA NAIF](https://naif.jpl.nasa.gov/naif/data.html)。
+- **自动配置（推荐）**：`make setup` 下载并放入 `kernels/`（见 `scripts/download_kernels.py`）。
+- **手动下载**：从 Release 下载 `kernels-v1`，解压到 `kernels/` 目录。
+- **自备数据**：使用自己的内核文件，放入 `kernels/` 目录，或将 `$SPICE_KERNEL_DIR` 指向其所在路径。
+
+官方来源：[NASA NAIF](https://naif.jpl.nasa.gov/naif/data.html)。
 
 ## 快速开始
 
-任务级一行接口：设计一条地月 L2 Halo 轨道。内部走完整链路：CR3BP 初猜 → 星历 N 体多重打靶修正 → 高精度长期预报。
-
-> 本示例走星历动力学，运行前请先完成上方「SPICE 内核」一节——仓库根目录 `kernels/` 已含全部必需内核，或设置 `$SPICE_KERNEL_DIR` 指向自备内核目录。
+设计一条地月 L2 Halo 轨道（需先完成上方「SPICE 内核」配置）：
 
 ```python
 from e2m2e.api import Facade
 
-facade = Facade()  # 默认从仓库 kernels/（或 $SPICE_KERNEL_DIR）加载 SPICE 内核
+facade = Facade()
 
-# 设计一条地月 L2 近直线 Halo 轨道
 result = facade.design_orbit(
     orbit_type="Halo",
-    collinear_point=2,  # 共线平动点：1 = L1（地月之间），2 = L2（月球背地侧，默认）
-    amplitude=30000.0,  # 面外振幅（km，取值 ±73000，正北负南）
-    phase=0.0,  # 初始相位（周期份额 0~1）
-    epoch=[2024, 1, 1, 0, 0, 0.0],  # 起始历元 UTC：[年,月,日,时,分,秒]
-    duration=365.25 * 86400.0,  # 维持时间（秒，约 1 年）
-    output_step=3600.0,  # 星历输出间隔（秒）
+    collinear_point=2,
+    amplitude=30000.0,
+    epoch=[2024, 1, 1, 0, 0, 0.0],
+    duration=365.25 * 86400.0,
 )
 
-print("轨道类型        :", result.orbit_type)
-print("起始历元 (UTC)  :", result.epoch_utc)
-print("维持时间 (天)   :", result.duration_day)
-print("CR3BP Jacobi 常数:", f"{result.cr3bp_jacobi:.6f}")
-print("星历修正收敛    :", result.correction_converged)
-print("星历修正迭代数  :", result.correction_iterations)
-print("初始状态 (J2000) :", [f"{v:.6f}" for v in result.initial_state])  # 位置 km + 速度 km/s
-print("力模型配置      :", result.force_config)
+print(result.orbit_type)
+print(result.initial_state)
 ```
 
-`Facade.design_orbit` 是任务级一档接口（ADR 0014）：把 CR3BP 初猜、星历修正、长期预报串成一条调用。同属 Facade 的能力还有轨道保持 `control_orbit`，以及 DRO/NRHO/Lissajous/L4/L5 等其他轨道类型（改 `orbit_type` 与对应形状参数即可）。
+参数含义、返回字段与其他轨道类型见[在线文档](https://cislunarspace.github.io/e2m2e/)；可运行示例见 [`examples/`](examples/) 目录。
 
-可运行示例见 [`examples/`](examples/) 目录：`main_design.py`（轨道设计）、`main_control.py`（轨道保持）、`main_transfer.py`（转移轨道）、`main_propagate.py`（轨道预报），均支持 `--save` 存图为 PNG。更多示例（星历动力学、多重打靶、转移设计、可视化）见[在线文档](https://cislunarspace.github.io/e2m2e/)。需要 DFH 格式标称星历文件时，可用 `e2m2e.algorithm.design.design_orbit`（其返回结果含 `ephemeris` 与 `write_ephemeris`）。
+## 能力
 
-## 使命与进度
+已建成与未建成的部分按领域列出。详细的能力清单与 API 文档见[在线文档](https://cislunarspace.github.io/e2m2e/)；逐版本变更见 [CHANGELOG.md](CHANGELOG.md)。
 
-航天任务规划正从“人在回路”走向自主规划。传统模式依赖地面人员逐级分解任务、调配资源，决策链条冗长，单次在轨服务任务的地面支持普遍在十余个小时。李胤慷等在[《基于“LLM+Agent”的在轨服务自主任务规划技术》](https://doi.org/10.19328/j.cnki.2096-8655.2026.01.016)（上海航天，2026）中提出了新架构：大模型负责语义理解、任务分解与编排，专业算法工具负责精确计算，两者通过 MCP 协议协同，分钟级生成全流程任务规划方案。
+**时空系统**
 
-![“LLM+Agent”协同推理决策架构（李胤慷等，2026）](docs/_static/paper/llm-agent-architecture.jpg)
+- 坐标系转换：J2000 / ITRF93（SPICE 高精度）/ IAU 2006，GMAT 兼容的原生 ITRF，动态坐标轴 VNB / LVLH。
+- 时空联合转换：TDT+GCRS ↔ TDB+EBCRS（r2s2 后端，含相对论项）。
+- SPICE 星历与时间管理：内核加载、UTC / TDB / TAI 时间尺度、天体状态与帧旋转查询。
 
-这套架构能否落地，关键在算法工具集。大模型是概率生成模型，自身做不了精确轨道计算，它输出的方案是否可信，取决于所调用工具的精度与可靠性。没有标准化、经过验证、可被调用的算法工具集，自主规划就是空中楼阁。
+**积分器与动力学**
 
-这里有一个容易产生的误解需要说清。用户把任务需求和相关信息输入大模型，大模型调用工具求解问题，最终呈现的结果并非大模型自身生成，而是工具计算得出的。大模型做的只是把工具的输出整理成便于人阅读和理解的形式。看起来像是模型直接根据输入生成了答案，实际上这些结果既不是大模型算出来的，也不是它推理出来的，而是工具的运算输出。因此，工具集的质量决定了整个系统的质量，这正是 e2m2e 要守住的地方。
+- Rust 积分器内核：单步 RK（PD45 / PD78 / RK89）、Adams 多步、Störmer–Cowell 二阶积分；状态转移矩阵（STM）传播；事件检测（terminal / direction 语义）。
+- 动力学模型：CR3BP（快速设计）、星历 N 体（SPICE，精确外推）、含太阳解析摄动的 BCR4BP，以及三者之间的转换。
+- 高精度力模型：点质量与第三体引力、球谐重力场（含固体潮）、ECOM 9 系数光压、大气阻力、太阳光压、连续推力，传播精度与 GMAT、DFH 对齐到亚百米级。
 
-![算法工具集整体架构（李胤慷等，2026）](docs/_static/paper/algorithm-toolkit-architecture.jpg)
+**任务轨道设计**
 
-地月空间是这套范式最重要的应用场景之一，空间站、导航与通信星座、月面往返都从这里起步。e2m2e 的使命是建设地月空间方向的算法工具集基础设施，把轨道建模、轨道生成、转移设计等算法做成精确、标准化、可被上层规划系统调用的开源工具库。上图中算法封装层与接口协议层的能力，正是 e2m2e 已经建成和正在补齐的部分。
+- 周期轨道族：DRO、Halo、Lyapunov、Lissajous、共振轨道（RO）、DPO、Axial、三角平动点 SPO / LPO、Horseshoe。
+- 数值算法：微分修正、多重打靶、延拓；全链路 CR3BP 初猜 → 星历修正 → 高精度预报。
+- 名义轨道契约（NominalOrbit）：等间距状态表 + Floquet 基 + 投影因子，供轨道保持直接消费。
 
-**已经建成：**
+**转移轨道设计**
 
-- 两套动力学模型：简化三体模型（CR3BP，用于快速设计）和高精度星历模型（基于 SPICE，用于精确外推），以及两者之间的转换；另有含太阳摄动的双圆四体模型（BCR4BP），太阳位置解析给出，无需星历
-- 周期轨道族生成：DRO、Halo、Lyapunov、Lissajous、共振轨道（RO）、DPO、Axial、三角平动点 SPO/LPO、Horseshoe 马蹄等，配微分修正、多重打靶、延拓等数值算法
-- 高精度力模型：点质量与第三体引力、球谐重力场（含固体潮、ECOM 9 系数光压）、大气阻力、太阳光压、连续推力，传播精度已与 GMAT、DFH 对齐到亚百米级
-- 转移轨道设计：Lambert 求解与 porkchop 扫描，多脉冲转移优化与 Lawden 主矢量检验，霍曼直接转移（HMN），月球引力辅助间接转移（LGA），低能间接转移（WSB 太阳引力辅助弹道捕获），低推力转移（Q-law 初猜 + 打靶/配点），网格搜索 + 非线性规划的两步法
-- 事件检测：轨道传播中检测截面穿越等事件，支持 terminal/direction 语义，走 Rust `solve_ivp_events` 快速路径
-- 不变流形与低能量转移：流形计算、庞加莱截面拼接、低能转移流水线
-- 坐标系转换（J2000/ITRF 等，与 GMAT 兼容）和 2D/3D 可视化
+- 脉冲转移：Lambert 求解与 porkchop 扫描、多脉冲优化（Lawden 主矢量检验）、霍曼直接转移（HMN）。
+- 低能量转移：月球引力辅助（LGA）、WSB 太阳引力辅助弹道捕获、不变流形与庞加莱截面拼接。
+- 低推力转移：Q-law 初猜 + 打靶 / 配点。
+- 网格搜索 + 非线性规划两步法（Rust Rayon 并行）。
 
-**正在进行和计划中的：**
+**轨道控制**
 
-- Hamiltonian 正规化流水线的进一步完善（把平动点附近轨道化简为少数表征参数）
-- 面向上层规划系统的服务化封装。下一步把 e2m2e 封装为 MCP 服务器，接入下图所示的异构模型交互框架，让大模型可以像调用 Lambert、C-W 工具一样调用地月轨道算法
+- 三种控制律：特征点、目标点严格、目标点宽松；蒙特卡洛测定轨与推力误差仿真。
+- 角动量管理：姿态发动机联合控制。
 
-![基于 MCP 的异构模型交互框架（李胤慷等，2026）](docs/_static/paper/mcp-interaction-framework.jpg)
+**接口与工具**
 
-### 能力与实现状态
-
-| 能力 | 实现状态 | 说明 |
-|------|---------|------|
-| 任务轨道设计（DRO/NRHO/Halo/Lissajous/L4/L5/DPO/Axial/SPO/LPO/Horseshoe） | 已实现 | CR3BP 初猜 → 星历修正 → 高精度预报全链路 |
-| 轨道保持（特征点/目标点严格/目标点宽松 + 蒙特卡洛） | 已实现 | 三控制律 + 三轨道误差仿真 |
-| 角动量管理 | 已实现 | 姿态发动机联合控制（#261） |
-| 转移轨道设计（HMN） | 已实现 | Lambert + 打靶组装 |
-| 转移轨道设计（LGA） | 已实现 | 月球引力辅助间接转移（#258） |
-| 转移轨道设计（WSB） | 已实现 | 太阳引力辅助低能间接转移，H₂<0 弹道捕获（#259） |
-| 低推力转移 | 已实现 | Q-law 初猜 + 打靶/配点/解析雅可比 |
-| 轨道预报 | 已实现 | ForceModel 高精度外推 |
-| 时空坐标转换（TDT+GCRS↔TDB+EBCRS） | 已实现 | r2s2 后端 |
-| ECOM 光压模型 | 已实现 | 9 系数经验光压模型（#253） |
-| 耦合项固体潮 | 已实现 | coupling=1 映射为固体潮强制启用（#277） |
-| 不变流形与低能量转移 | 已实现 | 流形 + 庞加莱截面 + 拼接 |
-| 正规化（normal form） | 已实现 | 可选依赖 `[normal-form]` |
-| MCP 服务 | 部分实现 | Facade 方法全集（`mcp_exposed`）可派生；`create_server`/`e2m2e mcp-serve` 占位，部署依赖 `[mcp]` extra |
-
-详细的能力清单与 API 文档见[在线文档](https://cislunarspace.github.io/e2m2e/)；逐版本变更见 [CHANGELOG.md](CHANGELOG.md)。
+- Facade 任务级入口，统一对外调用面。
+- 未建成：MCP 服务化封装——Facade 方法的元数据与派生机制已就位，`create_server` / `e2m2e mcp-serve` 尚为占位（`[mcp]` extra）。
 
 ## 文档
 
@@ -174,14 +120,21 @@ uv run sphinx-build -b html docs docs/_build/html
 ## 测试与代码规范
 
 ```bash
-make test     # Rust 测试 + Python xdist 并行测试（spice 默认，需先 make setup 拉内核）
+make test     # Rust 测试 + Python xdist 并行测试（需先 make setup 拉内核）
 make check    # cargo fmt/clippy + ruff
-# 或单独：uv run pytest tests/ -n auto --dist loadscope、uv run ruff check .
 ```
 
-Python 测试默认用全部可用 CPU 并行执行。`loadscope` 将同一测试类或模块放在同一 worker，既复用 module/class scope fixture，也减少 SPICE 等模块级状态跨 worker 竞争。只有经确认依赖进程内全局状态的最小测试组才允许显式使用 `-n 0` 串行，并应在测试文档中说明原因。可用 `make PYTEST_WORKERS=8 test-python` 限制 worker 数。
+测试按“验证什么”分七类，目录镜像源码结构：
 
-测试按 7 个功能类标记组织（`theory`/`integrator`/`force`/`data`/`orchestration`/`interface`/`aux`，详见 `docs/adr/0021-test-suite-functional-categories.md`）。
+- `theory`：数学公式与物理理论（解析解、Jacobi 常数等守恒量、文献公式）
+- `integrator`：积分器对解析轨道的精度
+- `force`：力模型的加速度与雅可比
+- `data`：内核、参考帧、物理常数等数据层
+- `orchestration`：设计、修正、转移等算法编排链路
+- `interface`：Facade API 的校验、响应与错误翻译
+- `aux`：日志等辅助工具
+
+断言来自解析解、守恒量与文献公式，不与其他软件对照。Rust 侧数值方法在 `crates/*/tests/` 对解析解。
 
 ## 贡献
 
@@ -203,10 +156,6 @@ Python 测试默认用全部可用 CPU 并行执行。`loadscope` 将同一测�
   year = {2026},
 }
 ```
-
-使命叙述依据的文献：
-
-> 李胤慷, 王浩, 袁容昊, 等. 基于“LLM+Agent”的在轨服务自主任务规划技术[J]. 上海航天（中英文）, 2026, 43(1): 169-179. DOI: [10.19328/j.cnki.2096-8655.2026.01.016](https://doi.org/10.19328/j.cnki.2096-8655.2026.01.016).
 
 ## License
 
