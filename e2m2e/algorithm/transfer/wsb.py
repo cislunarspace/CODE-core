@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import math
+import multiprocessing
 import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -218,7 +219,14 @@ def search_wsb_trajectories(
     tasks = [(float(sp), float(tof_sec)) for sp in sun_phase_grid for tof_sec in tof_grid_sec]
 
     all_candidates: list[WsbCandidate] = []
-    with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
+    # spawn 启动子进程（#367）：xdist 并行 worker 本身是多线程，fork 出的
+    # 子进程继承父进程锁状态，multiprocessing 在 pytest-xdist 下实测会
+    # futex 死锁；spawn 重新初始化解释器，无继承锁，安全。代价是 worker
+    # 启动时重新 import（一次性，任务网格远大于 worker 数）。
+    with ProcessPoolExecutor(
+        max_workers=os.cpu_count(),
+        mp_context=multiprocessing.get_context("spawn"),
+    ) as executor:
         futures = [
             executor.submit(
                 _wsb_worker,
