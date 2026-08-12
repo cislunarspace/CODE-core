@@ -118,15 +118,17 @@ class TestComputeDepartureVelocity:
         v[0] = 999.0
         assert state[3] == 1.0  # 原始状态未被修改
 
-    def test_normal_parallel_to_velocity_fallback(self):
-        """当法向量与速度方向平行时，normal_dir 计算退化，使用 fallback [1,0,0]。"""
-        # 速度沿 z 轴，默认法向也是 z 轴 → cross(t, n) = 0 → fallback normal_dir = [1,0,0]
+    def test_normal_parallel_to_velocity_raises(self):
+        """法向退化（速度与法向量平行）时抛异常，不替换为任意 [1,0,0]（#352）。
+
+        修复前：``normal_dir`` 退化时静默替换为任意 ``[1,0,0]``，法向分量
+        方向与几何无关（谎报一个不存在的方向）。法向未定义就该报错，不猜。
+        """
+        # 速度沿 z 轴，默认法向也是 z 轴 → cross(t, n) = 0 → 退化
         state = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
         p = ImpulsivePropulsion()
-        v = p.compute_departure_velocity(state, alpha=1.0, beta=0.5)
-        # 切向分量 alpha*|v|*t_hat = [0,0,1]
-        # 法向分量 beta*|v|*fallback = [0.5,0,0]
-        np.testing.assert_allclose(v, np.array([0.5, 0.0, 1.0]), atol=1e-12)
+        with pytest.raises(ValueError, match="法向退化"):
+            p.compute_departure_velocity(state, alpha=1.0, beta=0.5)
 
     def test_speed_magnitude(self):
         """注入速度大小 = |v| * sqrt(alpha^2 + beta^2)。"""

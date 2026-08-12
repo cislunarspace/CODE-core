@@ -303,9 +303,20 @@ class LowThrustShooting:
         return np.tile(seg_lb, n_segments), np.tile(seg_ub, n_segments)
 
     def _decode_segments(self, y: npt.NDArray[np.floating]) -> list[tuple[float, float, float]]:
-        """决策向量 -> 各段 (throttle, θ₁, θ₂) 列表。"""
+        """决策向量 -> 各段 (throttle, θ₁, θ₂) 列表。
+
+        油门越出物理范围 [0, 1] 时抛 ``ValueError``（#352）：SLSQP 受 bounds
+        约束输出本不应越界，越界说明约束未生效或决策非法；静默 clip 会掩盖
+        问题，且让传播用的油门与决策变量不一致。
+        """
         flat = np.asarray(y, dtype=float).reshape(-1, 3)
-        return [(float(np.clip(row[0], 0.0, 1.0)), float(row[1]), float(row[2])) for row in flat]
+        segs: list[tuple[float, float, float]] = []
+        for row in flat:
+            throttle = float(row[0])
+            if not 0.0 <= throttle <= 1.0:
+                raise ValueError(f"油门越出物理范围 [0, 1]：{throttle}")
+            segs.append((throttle, float(row[1]), float(row[2])))
+        return segs
 
     def _propagate_chain(
         self, y: npt.NDArray[np.floating]
