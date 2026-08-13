@@ -29,10 +29,10 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
-      - name: 安装编译工具（make/gcc/csh；csh 供 NAIF 个别构建脚本用）
+      - name: 安装编译工具（make/gcc/zip）
         run: |
           sudo apt-get update
-          sudo apt-get install -y make gcc csh zip
+          sudo apt-get install -y make gcc zip
       - name: 下载 CSPICE 源码包（NAIF 官网，runner 在海外可达）
         run: |
           curl -fL --retry 3 -o cspice.tar.Z \
@@ -46,14 +46,16 @@ jobs:
       - name: 编译（aarch64 native）
         run: |
           set -euxo pipefail
-          # NAIF 包无顶层 makefile，编译入口是 src/cspice/mkprodct.csh（同本地
-          # 交叉编译验证过的路径）；默认 TKCOMPILEOPTIONS 含 -m64，aarch64 gcc
-          # 不接受，须显式覆盖；TKCOMPILER 默认 gcc 即可，但仍显式声明。
-          export TKCOMPILER=gcc
-          export TKCOMPILEOPTIONS="-c -ansi -O2 -fPIC -DNON_UNIX_STDIO"
+          # NAIF 包无顶层 makefile，编译入口是 src/cspice/mkprodct.csh——但该脚本
+          # 是 csh 写的，tcsh 在 arm64 上有段错误 bug（实测 Segmentation fault，
+          # x86_64 正常）。这里用 bash 实现其库分支的等价逻辑（src/cspice 无
+          # .pgm，只走库分支）：编译全部 .c → ar 打包 → ranlib。
+          # 编译选项与 NAIF 默认一致，仅去掉 aarch64 不接受的 -m64。
           cd cspice/src/cspice
-          chmod u+x mkprodct.csh
-          ./mkprodct.csh 2>&1 | tail -30
+          ls *.c | xargs -P "$(nproc)" -I{} gcc -c -ansi -O2 -fPIC -DNON_UNIX_STDIO {}
+          ar crv ../../lib/cspice.a *.o
+          ranlib ../../lib/cspice.a
+          rm -f *.o
           ls -la ../../lib/
       - name: 校验产物并整理目录结构
         run: |
