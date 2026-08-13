@@ -121,8 +121,8 @@ def design_low_energy_transfer(
     Raises:
         ValueError: model 不支持，或两流形管在截面上无穿越点
 
-    TODO: 星历转换（CR3BP 闭合解 → 星历模型）未接入；接入时复用
-        ``e2m2e.algorithms.ephemeris_correction``，epoch 参数即为其入口。
+    TODO: 星历转换（CR3BP 闭合解 → 星历模型）未接入；接入时复用设计链路
+        ``e2m2e.algorithm.design`` 的 Rust 多重打靶修正，epoch 参数即为其入口。
     """
     if model != "cr3bp":
         raise ValueError(f"当前仅支持 model='cr3bp'，得到 {model!r}")

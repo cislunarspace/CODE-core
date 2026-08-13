@@ -28,6 +28,49 @@ def test_oe_cart_roundtrip():
         assert abs(oe["rp"] - a * (1 - e)) < 1e-6
 
 
+def test_cart2oe_batch_roundtrip():
+    """批量根数换算与经典根数定义互逆（与单点版同一物理定义）。"""
+    from e2m2e.algorithm.design.frozen_orbit import _cart2oe_batch, _oe2cart
+
+    cases = [
+        (3000, 0.354, 75.0, 0.0, 270.0, 0.0),
+        (5000, 0.612, 75.0, 30.0, 270.0, 45.0),
+        (15000, 0.871, 75.0, 90.0, 90.0, 180.0),
+    ]
+    states = np.vstack(
+        [_oe2cart(a, e, i, raan, aop, nu, MU_MOON) for a, e, i, raan, aop, nu in cases]
+    )
+    oe = _cart2oe_batch(states, MU_MOON)
+    for k, (a, e, i, _raan, _aop, _nu) in enumerate(cases):
+        assert abs(oe["a"][k] - a) < 1e-6, f"case {k} a={a}: got {oe['a'][k]}"
+        assert abs(oe["e"][k] - e) < 1e-10, f"case {k} e={e}: got {oe['e'][k]}"
+        assert abs(oe["i"][k] - i) < 1e-8, f"case {k} i={i}: got {oe['i'][k]}"
+        assert abs(oe["rp"][k] - a * (1 - e)) < 1e-6
+
+
+def test_cart2oe_batch_singular_branches():
+    """批量版退化分支：赤道轨道（n_norm≈0）与圆轨道（e≈0）不应产生 NaN。"""
+    from e2m2e.algorithm.design.frozen_orbit import _cart2oe_batch
+
+    rel = np.array(
+        [
+            # 赤道圆轨道：r 沿 x、v 沿 y → h 沿 z、n_vec≈0 且 e≈0
+            [5000.0, 0.0, 0.0, 0.0, np.sqrt(MU_MOON / 5000.0), 0.0],
+            # 近圆极轨道：r 沿 z、v 沿 y → e≈0 但 n_norm>0
+            [0.0, 0.0, 5000.0, 0.0, np.sqrt(MU_MOON / 5000.0), 0.0],
+            # 普通椭圆轨道
+            [5000.0, 2000.0, 3000.0, 0.1, 0.5, 0.2],
+        ]
+    )
+    oe = _cart2oe_batch(rel, MU_MOON)
+    for key in ("a", "e", "i", "raan", "aop", "rp"):
+        assert np.all(np.isfinite(oe[key])), f"键 {key} 含 NaN/inf"
+    # 退化分支的约定值：赤道轨道 raan=0（升交点未定义）
+    assert oe["raan"][0] == 0.0
+    # 近圆轨道（e≈0 但 n_norm>0）aop=0
+    assert oe["aop"][1] == 0.0
+
+
 def test_perilune_constraint():
     """rp = a(1-e) 应等于 R_MOON + perilune_height。"""
     from e2m2e.algorithm.design.frozen_orbit import R_MOON, _cart2oe, _oe2cart

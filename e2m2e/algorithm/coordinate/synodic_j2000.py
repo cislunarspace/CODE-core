@@ -82,13 +82,21 @@ class SynodicJ2000System:
         t_syn_arr: npt.ArrayLike,
         et0: float,
     ) -> npt.NDArray[np.floating]:
+        """批量 synodic→J2000（下沉 Rust，逐位对齐逐点版）。"""
+        from e2m2e.integrators import batch_synodic_to_j2000_py, require_rust_extension
+
+        require_rust_extension("batch_synodic_to_j2000_py")
         states_syn = np.asarray(states_syn, dtype=float)
         t_syn_arr = np.asarray(t_syn_arr, dtype=float)
         n = len(t_syn_arr)
-        results = np.empty((n, 6))
-        for i in range(n):
-            results[i] = self.synodic_to_j2000(states_syn[i], t_syn_arr[i], et0)
-        return results
+        flat = batch_synodic_to_j2000_py(
+            states_syn.ravel().tolist(),
+            t_syn_arr.ravel().tolist(),
+            float(et0),
+            float(self.cr3bp_system.mu),
+            float(self._get_time_unit()),
+        )
+        return np.asarray(flat, dtype=float).reshape(n, 6)
 
     def batch_j2000_to_synodic(
         self,
@@ -96,10 +104,18 @@ class SynodicJ2000System:
         t_syn_arr: npt.ArrayLike,
         et0: float,
     ) -> npt.NDArray[np.floating]:
+        """批量 J2000→synodic（下沉 Rust，逐位对齐逐点版）。"""
+        from e2m2e.integrators import batch_j2000_to_synodic_py, require_rust_extension
+
+        require_rust_extension("batch_j2000_to_synodic_py")
         states_j2000 = np.asarray(states_j2000, dtype=float)
         t_syn_arr = np.asarray(t_syn_arr, dtype=float)
         n = len(t_syn_arr)
-        results = np.empty((n, 6))
-        for i in range(n):
-            results[i] = self.j2000_to_synodic(states_j2000[i], t_syn_arr[i], et0)
-        return results
+        flat = batch_j2000_to_synodic_py(
+            states_j2000.ravel().tolist(),
+            t_syn_arr.ravel().tolist(),
+            float(et0),
+            float(self.cr3bp_system.mu),
+            float(self._get_time_unit()),
+        )
+        return np.asarray(flat, dtype=float).reshape(n, 6)

@@ -146,7 +146,7 @@ CORE_REQUIREMENTS = [
         linked_tests=["tests/data/types/test_orbit_family.py"],
     ),
     # ---- 星历动力学 ----
-    # 注：EphemerisDynamics 已降级为遗留内部实现（仅供 multiple_shooting/homotopy
+    # 注：EphemerisDynamics 已降级为遗留内部实现（仅供 multiple_shooting
     # 内部使用，新代码用 ForceModel）。下列需求保留以维持遗留消费者的测试覆盖。
     Requirement(
         id="REQ-025",
@@ -154,7 +154,7 @@ CORE_REQUIREMENTS = [
         category=RequirementCategory.INTERFACE,
         description=(
             "EphemerisDynamics 必须与 CR3BP_Dynamics 共享 Dynamics 基类接口。"
-            "（遗留实现，仅供 multiple_shooting/homotopy 内部使用；新代码用 ForceModel。）"
+            "（遗留实现，仅供 multiple_shooting 内部使用；新代码用 ForceModel。）"
         ),
         priority=RequirementPriority.SHALL,
         verification_method="test",

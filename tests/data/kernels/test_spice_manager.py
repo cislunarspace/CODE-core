@@ -136,6 +136,32 @@ class TestSPICETimeConversion:
         utc_out = loaded_spice.et_to_utc(et)
         assert utc_in == utc_out
 
+    def test_batch_et_to_utc_round_trip(self, loaded_spice):
+        """批量 ET→UTC 与 UTC→ET 互逆：已知历元分量应恢复（对称性）。"""
+        from e2m2e.integrators import batch_et_to_utc_py, require_rust_extension
+
+        require_rust_extension("batch_et_to_utc_py")
+        utc_cases = [
+            "2024-01-01T00:00:00",
+            "2025-06-21T11:00:06",
+            "2026-12-31T23:59:59",
+            "2017-01-01T00:00:00",  # 闰秒引入后早于首个闰秒的历元
+        ]
+        ets = [loaded_spice.utc_to_et(u) for u in utc_cases]
+        year, month, day, hour, minute, second = batch_et_to_utc_py(ets)
+        for k, utc in enumerate(utc_cases):
+            import datetime as _dt
+
+            dt = _dt.datetime.fromisoformat(utc)
+            assert (year[k], month[k], day[k], hour[k], minute[k], second[k]) == (
+                dt.year,
+                dt.month,
+                dt.day,
+                dt.hour,
+                dt.minute,
+                float(dt.second),
+            )
+
 
 # =============================================================================
 # Test 天体状态查询

@@ -141,43 +141,88 @@ def _cart2oe(state: np.ndarray, mu: float) -> dict[str, float]:
     return {"a": a, "e": e, "i": i, "raan": raan, "aop": aop, "rp": a * (1.0 - e)}
 
 
+def _cart2oe_batch(rel: np.ndarray, mu: float) -> dict[str, np.ndarray]:
+    """``(n, 6)`` 相对状态 → 经典根数序列（向量化，逐点语义对齐 :func:`_cart2oe`）。
+
+    Args:
+        rel: ``(n, 6)`` 数组 ``[x, y, z, vx, vy, vz]``（中心天体惯性系）。
+        mu: 中心天体引力参数（km³/s²）。
+
+    Returns:
+        各键 → ``(n,)`` 数组的字典，键同 :func:`_cart2oe`。
+    """
+    rel = np.asarray(rel, dtype=float)
+    n = rel.shape[0]
+    r = rel[:, :3]
+    v = rel[:, 3:]
+    r_norm = np.linalg.norm(r, axis=1)
+
+    h = np.cross(r, v)
+    h_norm = np.linalg.norm(h, axis=1)
+
+    energy = np.einsum("ij,ij->i", v, v) / 2.0 - mu / r_norm
+    a = np.where(np.abs(energy) > 1e-14, -mu / (2.0 * energy), np.inf)
+
+    e_vec = np.cross(v, h) / mu - r / r_norm[:, None]
+    e = np.linalg.norm(e_vec, axis=1)
+
+    inc = np.degrees(np.arccos(np.clip(h[:, 2] / h_norm, -1.0, 1.0)))
+
+    # 升交点矢量与保护除法（n_norm≈0 时分母换 1，分支掩码另行归零）
+    n_vec = np.cross(np.array([0.0, 0.0, 1.0]), h)
+    n_norm = np.linalg.norm(n_vec, axis=1)
+    mask_n = n_norm >= 1e-12
+    mask_e = e >= 1e-14
+
+    raan = np.zeros(n)
+    cos_raan = np.clip(n_vec[:, 0] / np.where(mask_n, n_norm, 1.0), -1.0, 1.0)
+    raan = np.where(mask_n, np.degrees(np.arccos(cos_raan)), 0.0)
+    raan = np.where(mask_n & (n_vec[:, 1] < 0), 360.0 - raan, raan)
+
+    # aop 三分支对齐 _cart2oe：n_norm<1e-12 用 arctan2（与 e 无关），
+    # 否则 e<1e-14 归零，其余走 arccos(dot/(n_norm·e)) 并处理 e_vec[2]<0。
+    aop = np.zeros(n)
+    aop_no_n = np.degrees(np.arctan2(e_vec[:, 1], e_vec[:, 0])) % 360.0
+    aop = np.where(~mask_n, aop_no_n, aop)
+    denom = np.where(mask_n & mask_e, n_norm * e, 1.0)
+    cos_aop = np.clip(np.einsum("ij,ij->i", n_vec, e_vec) / denom, -1.0, 1.0)
+    aop = np.where(mask_n & mask_e, np.degrees(np.arccos(cos_aop)), aop)
+    aop = np.where(mask_n & mask_e & (e_vec[:, 2] < 0), 360.0 - aop, aop)
+
+    return {"a": a, "e": e, "i": inc, "raan": raan, "aop": aop, "rp": a * (1.0 - e)}
+
+
 def _extract_moon_centric_elements(
     times: np.ndarray,
     states: np.ndarray,
     spice: SPICEManager,
     mu: float = MU_MOON,
 ) -> dict[str, np.ndarray]:
-    """从地心传播结果提取月心惯性系轨道根数序列。
+    """从地心传播结果提取月心惯性系轨道根数序列（向量化 + Rust 批量星历）。
 
     传播在地心系进行；冻结特性看的是月心根数。对每个输出时刻，从地心状态
-    中减去月球地心位置/速度，再换算为经典根数。
+    中减去月球地心位置/速度，再换算为经典根数。月球状态批量下沉 Rust
+    （``batch_body_states_py``），根数换算 numpy 向量化，无逐点 Python 循环。
 
     Args:
         times: ``(n,)`` ET 时间序列（秒）。
         states: ``(n, 6)`` 地心惯性系状态序列。
-        spice: 已加载内核的 SPICEManager。
+        spice: 已加载内核的 SPICEManager（保留签名兼容；查询已下沉 Rust 实例）。
         mu: 月球引力参数（km³/s²）。
 
     Returns:
         各键 → ``(n,)`` 数组的字典，键同 ``_cart2oe``。
     """
-    n = len(times)
-    oe_keys = ["a", "e", "i", "raan", "aop", "rp"]
-    oe = {k: np.zeros(n) for k in oe_keys}
+    from e2m2e.integrators import batch_body_states_py, require_rust_extension
 
-    for idx in range(n):
-        ms = spice.get_body_state("MOON", float(times[idx]), "J2000", "EARTH")
-        rel = np.concatenate(
-            [
-                states[idx, :3] - ms[:3],
-                states[idx, 3:6] - ms[3:6],
-            ]
-        )
-        row = _cart2oe(rel, mu)
-        for k in oe_keys:
-            oe[k][idx] = row[k]
-
-    return oe
+    require_rust_extension("batch_body_states_py")
+    times = np.asarray(times, dtype=float)
+    states = np.asarray(states, dtype=float)
+    moon = np.asarray(
+        batch_body_states_py("MOON", "EARTH", [float(t) for t in times]), dtype=float
+    ).reshape(-1, 6)
+    rel = np.concatenate([states[:, :3] - moon[:, :3], states[:, 3:] - moon[:, 3:]], axis=1)
+    return _cart2oe_batch(rel, mu)
 
 
 def _compute_drift(

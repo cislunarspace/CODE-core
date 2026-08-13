@@ -169,3 +169,35 @@ class StageRecord:
             raise ValueError("已执行阶段必须声明结果状态")
         if not self.executed and self.result_status is not None:
             raise ValueError("未执行阶段不能声明结果状态")
+
+
+@dataclass(frozen=True)
+class EphemerisCorrectionResult:
+    """星历修正统一结果（Rust 多重打靶结果的领域重包）。
+
+    Attributes:
+        status: 收敛状态
+        cause: 失败原因（收敛时为 NONE）
+        message: 状态描述
+        iterations: 迭代次数
+        max_residual: 最终最大残差
+        residual_history: 每次迭代最大残差的历史记录
+        t_patch: 修正后的时间节点数组
+        state_patch: 修正后的状态量数组
+        velocity_residual: 速度残差（Rust 打靶 vel_weight 路径有值）
+        velocity_residual_history: 速度残差历史（同上）
+    """
+
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+    iterations: int
+    max_residual: float
+    residual_history: list[float]
+    t_patch: np.ndarray
+    state_patch: np.ndarray
+    velocity_residual: float | None = None
+    velocity_residual_history: list[float] | None = None
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)

@@ -15,7 +15,11 @@ homepage = "https://github.com/cislunarspace/e2m2e"
 repository = "https://github.com/cislunarspace/e2m2e"
 
 [workspace.dependencies]
-pyo3 = { version = "0.24", features = ["extension-module", "abi3-py310"] }
+# extension-module 不在此处硬编码：该 feature 使 Linux 上所有构建目标
+# （含 cargo test 的测试二进制）跳过链接 libpython，cargo test 报
+# undefined symbol。由 e2m2e-integrators 的 "extension-module" feature
+# 按目标启用（pyproject [tool.maturin] features 显式传入，仅 cdylib 构建）。
+pyo3 = { version = "0.24", features = ["abi3-py310"] }
 cspice = "0.1"
 # CSPICE 一律经 scripts/download_cspice.py 提供（CSPICE_DIR，GitHub cspice-v1 release
 # 预编译包）。不启用 cspice-sys 的 downloadcspice feature：无 CSPICE_DIR 时构建直接

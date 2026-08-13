@@ -263,6 +263,35 @@ class TestBatchConversion:
         )
         assert_allclose(states_back, states_syn, atol=1e-8)
 
+    def test_batch_moon_position_definition(self, spice_syn_j2000, reference_et):
+        """会合系月球位置 (1-μ,0,0) 批量转 J2000 应落在 SPICE 月球位置上。
+
+        地月连线即会合轴 x 向（物理定义），批量版与逐点版共享该定义。
+        """
+        mu = spice_syn_j2000.cr3bp_system.mu
+        t_syn_arr = np.array([0.0, 0.5, 2.095])
+        states_syn = np.tile(np.array([1 - mu, 0.0, 0.0, 0.0, 0.0, 0.0]), (3, 1))
+        states_j2000 = spice_syn_j2000.batch_synodic_to_j2000(
+            states_syn=states_syn, t_syn_arr=t_syn_arr, et0=reference_et
+        )
+        for i, t_syn in enumerate(t_syn_arr):
+            t_c = spice_syn_j2000.cr3bp_system.characteristic_time
+            et = reference_et + t_syn * t_c
+            moon = spice_syn_j2000.spice.get_body_state("MOON", et, "J2000", "EARTH")
+            assert_allclose(states_j2000[i, :3], moon[:3], rtol=1e-9, atol=1e-3)
+
+    def test_batch_scale_definition(self, spice_syn_j2000, reference_et):
+        """批量转换的特征尺度：月球位置范数应等于地月距离（l_c 定义）。"""
+        mu = spice_syn_j2000.cr3bp_system.mu
+        t_syn_arr = np.linspace(0.0, 3.0, 12)
+        states_syn = np.tile(np.array([1 - mu, 0.0, 0.0, 0.0, 0.0, 0.0]), (12, 1))
+        states_j2000 = spice_syn_j2000.batch_synodic_to_j2000(
+            states_syn=states_syn, t_syn_arr=t_syn_arr, et0=reference_et
+        )
+        norms = np.linalg.norm(states_j2000[:, :3], axis=1)
+        # 地月距离在 ~3 个周期内变化 < 1%（月球轨道近圆）
+        assert np.all(norms > 3.5e5) and np.all(norms < 4.2e5)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

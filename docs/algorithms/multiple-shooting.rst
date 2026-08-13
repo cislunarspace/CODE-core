@@ -74,65 +74,14 @@ NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月�
 ``MultipleShooting.correct``。非 CR3BP 动力学（无 ``mu`` 属性）时
 退化为等时间间隔采样。
 
-两层多重打靶
-------------
-
-:class:`~e2m2e.algorithm.solver.two_level_multiple_shooting.TwoLevelMultipleShooting`
-将问题分解为两层交替求解：
-
-- **Level 1（局部问题）**：逐段调整出发速度使位置连续
-- **Level 2（全局问题）**：联合调整内部节点的位置和时间使速度连续
-
-这种分解将高维耦合问题拆解为交替求解的低维子问题，适用于自由时间多段轨道设计
-（如多圈共振轨道、星际转移等）。
-
-.. code-block:: python
-
-   from e2m2e.algorithm.solver.two_level_multiple_shooting import TwoLevelMultipleShooting
-   from e2m2e.data.templates import ConvergenceState
-
-   tms = TwoLevelMultipleShooting(dynamics=dynamics)
-
-   result = tms.correct(
-       t_patch=t_patch,
-       state_patch=state_patch,
-       max_outer_iterations=20,
-       position_tolerance=1e-8,
-       velocity_tolerance=1e-6,
-   )
-
-   if result.status == ConvergenceState.CONVERGED:
-       print(f"外层迭代: {result.outer_iterations}")
-       print(f"位置残差: {result.final_position_residual:.2e}")
-       print(f"速度残差: {result.final_velocity_residual:.2e}")
-
 星历修正
 --------
 
-多重打靶在星历模型中的应用，通过 :func:`~e2m2e.algorithm.ephemeris_correction.correct_ephemeris_patch_points`
-统一调度：
-
-.. code-block:: python
-
-   from e2m2e.algorithm.ephemeris_correction import correct_ephemeris_patch_points
-
-   result = correct_ephemeris_patch_points(
-       method="standard",      # 或 "two_level"、"homotopy"
-       dynamics=dynamics,
-       t_patch=t_patch,
-       state_patch=state_patch,
-       tolerance=1e-3,
-       max_iter=10,
-       verbose=False,
-       n_workers=1,
-       kernel_dir="/path/to/kernels",
-   )
-
-支持三种修正方法：
-
-- ``"standard"`` — 标准多重打靶
-- ``"two_level"`` — 两层多重打靶
-- ``"homotopy"`` — 同伦过渡修正（详见 :doc:`homotopy-correction`）
+星历模型下的 patch points 修正不再走 Python ``MultipleShooting``：设计链路
+统一走 Rust 多重打靶 ``e2m2e.integrators.multiple_shooting_correct_py``
+（segmented 与稳定轨道默认路径），速度残差经 ``vel_weight`` 加权与位置
+残差同尺度收敛。旧的 Python 分发器（``ephemeris_correction`` 包）与
+``TwoLevelMultipleShooting`` 已删除。
 
 参考
 ----

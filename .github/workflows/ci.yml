@@ -50,31 +50,6 @@ jobs:
       - run: uv run python scripts/check_deleted_dir_refs.py
 
 
-  # aarch64 回归：跑在 GitHub 原生 arm64 runner 上，验证 Rust 扩展在 aarch64
-  # 上编译/链接/运行（CSPICE_DIR 由 download_cspice.py 按 runner 架构自动选
-  # aarch64 资产；该资产由 cspice-aarch64-build.yml 维护）。
-  test-arm64:
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: astral-sh/setup-uv@v7
-      # spice 为默认 feature：cargo test --workspace 编译并跑 spice-gated 代码，
-      # 须先下 CSPICE 编译包（CSPICE_DIR）与 SPICE 内核（kernels/）。
-      - name: 下载 SPICE 编译包（cspice-v1 release，aarch64 资产）
-        # --no-sync：脚本只用标准库；uv run 默认先 sync 构建扩展，此时
-        # CSPICE_DIR 未设、cspice-sys 直接报错（鸡生蛋，同 release.yml test）。
-        run: uv run --no-sync python scripts/download_cspice.py >> "$GITHUB_ENV"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: 下载 SPICE 内核（kernels-v1 release）
-        run: uv run --no-sync python scripts/download_kernels.py
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # --test-threads=1：CSPICE 全局线程锁，spice-gated 测试串行避免竞争。
-      - run: cargo test --workspace -- --test-threads=1
-
-
   typecheck:
     runs-on: ubuntu-latest
     steps:

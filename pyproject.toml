@@ -67,8 +67,10 @@ module-name = "e2m2e._integrators"
 python-source = "."
 # spice 为必选 feature（ crates/*/Cargo.toml 的 default 已含 spice，此处显式
 # 再声明一次作双保险）：maturin build/develop 永远带 CSPICE，不产无 spice 子集。
+# extension-module：pyo3 的 cdylib 链接语义（不链接 libpython，宿主解释器提供
+# 符号），仅 maturin 构建时启用；cargo test 不启用、pyo3 自动链接 libpython。
 # 构建前需 export CSPICE_DIR（见 Makefile / scripts/download_cspice.py）。
-features = ["spice"]
+features = ["spice", "extension-module"]
 
 [tool.ruff]
 line-length = 100

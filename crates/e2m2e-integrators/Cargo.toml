@@ -17,6 +17,11 @@ crate-type = ["cdylib", "rlib"]
 # CSPICE 经 scripts/download_cspice.py 从 cspice-v1 release 取预编译包（设 CSPICE_DIR）；
 # 无 CSPICE_DIR 时构建直接报错（不启用 downloadcspice，杜绝走 NAIF 源码下载）。见 Makefile / README。
 default = ["spice"]
+# 仅 cdylib（maturin）构建启用：pyo3 的 extension-module 使产物不链接
+# libpython（宿主解释器提供符号）。cargo test 不启用该 feature，pyo3
+# 自动链接 libpython，测试二进制可独立运行。pyproject [tool.maturin]
+# features 显式传入。
+extension-module = ["pyo3/extension-module"]
 spice = ["dep:cspice", "dep:cspice-sys", "e2m2e-forces/spice", "e2m2e-spice/spice"]
 
 [dependencies]

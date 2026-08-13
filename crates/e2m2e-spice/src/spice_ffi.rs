@@ -21,8 +21,8 @@
 #[cfg(test)]
 use cspice_sys::bodn2c_c;
 use cspice_sys::{
-    boddef_c, bodvrd_c, erract_c, errdev_c, failed_c, getmsg_c, ktotal_c, pxform_c, qcktrc_c,
-    reset_c, spkezr_c, sxform_c, ConstSpiceChar, SpiceInt,
+    boddef_c, bodvrd_c, erract_c, errdev_c, et2utc_c, failed_c, getmsg_c, ktotal_c, pxform_c,
+    qcktrc_c, reset_c, spkezr_c, sxform_c, ConstSpiceChar, SpiceInt,
 };
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -354,6 +354,31 @@ pub fn bodvrd(body: &str, item: &str, maxn: usize) -> Result<(Vec<f64>, i32), Sp
     }
     values.truncate(dim as usize);
     Ok((values, dim))
+}
+
+/// et2utc_c 包装：ET → UTC ISO 字符串（"ISOC" 格式，prec 位小数秒）。
+///
+/// 等价于 Python spiceypy.et2utc(et, "ISOC", prec)。供批量 ET→UTC 转换
+/// （星历表组装）下沉 Rust 用。
+pub fn et2utc(et: f64, prec: i32) -> Result<String, SpiceFfiError> {
+    // 入口预检同 spkezr：内核池为空（leapsecond 缺失）时直接报项目语境错误。
+    if ktotal("ALL")? == 0 {
+        return Err(SpiceFfiError::Failed(NO_KERNEL_MSG.into()));
+    }
+    bump_ffi_calls();
+    let fmt_c = to_cstring("ISOC");
+    let mut buf = vec![0i8; 64];
+    unsafe {
+        et2utc_c(
+            et,
+            fmt_c.as_ptr() as *mut ConstSpiceChar,
+            prec as SpiceInt,
+            buf.len() as SpiceInt,
+            buf.as_mut_ptr() as *mut c_char,
+        );
+        check_spice_error()?;
+    }
+    Ok(c_chars_to_string(&buf))
 }
 
 /// 矩阵向量乘：3×3 矩阵 × 3 向量。

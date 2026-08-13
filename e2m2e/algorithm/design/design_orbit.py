@@ -33,7 +33,6 @@ import math
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -50,11 +49,7 @@ from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
 from ..coordinate.synodic_j2000 import SynodicJ2000System
-from ..dynamics import CR3BP_Dynamics, EphemerisDynamics, EphemerisSystem
-from ..ephemeris_correction import (
-    EphemerisCorrectionResult,
-    correct_ephemeris_patch_points,
-)
+from ..dynamics import CR3BP_Dynamics, EphemerisSystem
 from ..family.cr3bp_orbits import (
     design_axial,
     design_dpo,
@@ -68,7 +63,7 @@ from ..family.cr3bp_orbits import (
     design_triangular,
     earth_moon_system,
 )
-from ..results import ResultStatus, StageRecord
+from ..results import EphemerisCorrectionResult, ResultStatus, StageRecord
 from ..solver.multiple_shooting import sample_patch_points_perilune_clustered
 
 if TYPE_CHECKING:
@@ -603,18 +598,19 @@ def _build_ephemeris_table(
     synodic = syn_j2000.batch_j2000_to_synodic(states, t_syn, et0)[:, :3]
     synodic[:, 0] += syn_j2000.cr3bp_system.mu
 
-    n = len(et_grid)
-    year = np.empty(n, dtype=int)
-    month = np.empty(n, dtype=int)
-    day = np.empty(n, dtype=int)
-    hour = np.empty(n, dtype=int)
-    minute = np.empty(n, dtype=int)
-    second = np.empty(n, dtype=float)
-    for k in range(n):
-        dt = datetime.fromisoformat(spice.et_to_utc(float(et_grid[k])))
-        year[k], month[k], day[k] = dt.year, dt.month, dt.day
-        hour[k], minute[k] = dt.hour, dt.minute
-        second[k] = dt.second + dt.microsecond / 1e6
+    # ET→UTC 日历分量批量下沉 Rust（frame_convert.batch_et_to_utc_py）：
+    # 免去逐点 spiceypy.et2utc FFI + datetime.fromisoformat 字符串解析
+    # （一年 8766 点的逐点 Python 循环）。
+    from e2m2e.integrators import batch_et_to_utc_py, require_rust_extension
+
+    require_rust_extension("batch_et_to_utc_py")
+    y, mo, d, h, mi, s = batch_et_to_utc_py([float(x) for x in et_grid])
+    year = np.asarray(y, dtype=int)
+    month = np.asarray(mo, dtype=int)
+    day = np.asarray(d, dtype=int)
+    hour = np.asarray(h, dtype=int)
+    minute = np.asarray(mi, dtype=int)
+    second = np.asarray(s, dtype=float)
 
     return EphemerisTable(
         year=year,
@@ -643,11 +639,16 @@ def _design_apolune_segmented(
     var_time: bool = True,
     verbose: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    """分段打靶星历转换（朱彦伟 2026 多重打靶拼接）。
+    """分段打靶星历转换（朱彦伟 2026 多重打靶拼接，Rust 实现）。
 
     将 CR3BP 周期解转换到星历模型：整条 CR3BP tile 按 ``revs_per_group``
-    圈切段，每段独立多重打靶转星历；段数 >1 时分层两两合并（固定首末远月点、
-    内部 seam 自由连续化）直至整条连续。
+    圈切段，每段独立多重打靶转星历；段数 >1 时分层两两合并（合并段全节点
+    自由、最小范数更新，对齐文献）直至整条连续。
+
+    计算全部下沉 Rust ``segmented_shooting_correct``：切段、第 1 步各段
+    打靶（段间独立 rayon 并行）、分层合并（同层配对合并段 rayon 并行）。
+    本函数仅做参数装配与结果归一（此前分段/合并循环在 Python，逐段串行调
+    打靶——#400 性能修复下沉）。
 
     关键配置（实测 Halo/NRHO，对齐文献）：
 
@@ -655,6 +656,16 @@ def _design_apolune_segmented(
       长段节点密、段内约束强，单弧打靶即可收敛且各段不漂离真实动力学；
       1 圈短段各段独立修正后会漂走（seam 跳 ~1e5 km，合并层无法消除——
       STM 条件数分析见 Liu & Liu 2025 §3）。
+    - **合并层**：合并段全节点自由（``fixed_node_mask=None``），LM 最小范数
+      更新对齐文献。固定首末锚定曾致合并层不收敛（#400）：各段独立打靶后
+      seam 不连续，锚定把修正全压给内部节点，60 天合并层停在 7.5e-01 km；
+      去锚定后 60 天合并层收敛到 1.4e-03 km，180 天三层合并全程收敛
+      （5.8e-03 / 5.7e-04 / 1.4e-02 km）。
+
+      对照论文的合并层节点稀疏化（每圈仅 1 个远月点节点，约束更疏、矩阵
+      更良态，issue #400 需求②）：当前全节点合并 180 天 5 段 3 层已收敛到
+      1.4e-02 km，说明当前圈数下全节点矩阵病态未显现，不跟进；年量级
+      （50+ 圈）时矩阵规模与病态会放大，稀疏化留作该场景的前置评估。
     - **var_time**：Halo/NRHO 固定节点时刻（False，对齐杨洪伟 2015、
       刘刚 2017）；稳定轨道（DRO 等）保留自由时刻（True）吸收 CR3BP→星历
       的时间偏差。
@@ -675,134 +686,39 @@ def _design_apolune_segmented(
         ``(t_patch, state_patch, max_residual)`` （J2000），整条连续星历轨迹与
         全程各段/合并段的最大打靶残差（km）。
     """
-    from e2m2e.integrators import multiple_shooting_correct_py
+    from e2m2e.integrators import segmented_shooting_correct_py
 
-    n_total = len(t_patch_j2000)
-    n_rev = n_total // points_per_rev
-    # 全程最大残差（各段 + 各合并段打靶的最大值）
-    max_residual = 0.0
-
-    # --- 第 1 步：切段，每段独立打靶转星历 ---
-    seg_t: list[np.ndarray] = []
-    seg_s: list[np.ndarray] = []
-    k = 0
-    while k < n_rev:
-        end = min(k + revs_per_group, n_rev)
-        # 段节点区间 [k*P, end*P]（含末尾，供拼接；首段起于 0）
-        lo = k * points_per_rev
-        hi = end * points_per_rev
-        if hi >= n_total:
-            hi = n_total - 1
-        # 首段含第 0 节点；后续段跳过前一共享节点（段间 seam）
-        if seg_t:
-            lo += 1
-        t_seg = np.asarray(t_patch_j2000[lo : hi + 1], dtype=float)
-        s_seg = np.asarray(state_patch_j2000[lo : hi + 1], dtype=float)
-        if verbose:
-            print(f"  段 {len(seg_t) + 1}: {len(t_seg)} 节点 ({k}-{end} 圈)")
-        try:
-            result = multiple_shooting_correct_py(
-                forces_py,
-                observer,
-                list(t_seg),
-                [list(map(float, x)) for x in s_seg],
-                var_time=var_time,
-                fix_first_node=False,
-                fixed_node_mask=None,
-                max_iter=max_iter,
-                tolerance=tolerance,
-                rtol=1e-10,
-                vel_weight=vel_weight,
-            )
-        except RuntimeError as e:
-            raise DesignNotConvergedError(
-                f"分段打靶段 {len(seg_t) + 1} 积分失败: {e}",
-                cause=FailureCause.INTEGRATION_FAILED,
-            ) from e
-        if result.status is not ConvergenceState.CONVERGED:
-            raise DesignNotConvergedError(
-                f"分段打靶段 {len(seg_t) + 1} 未收敛"
-                f"（残差 {result.max_residual:.3e} km > 容差 {tolerance:.3e} km）",
-                status=result.status,
-                cause=result.cause,
-            )
-        sp = np.asarray(result.state_patch)
-        seg_t.append(np.asarray(result.t_patch, dtype=float))
-        seg_s.append(sp)
-        max_residual = max(max_residual, float(result.max_residual))
-        if verbose:
-            print(f"    残差 {result.max_residual:.2e} km, {result.iterations} 次迭代")
-        k = end
-
-    # --- 第 2 步：远月点分层两两合并 ---
-    # 合并段固定首末两端（远月点锚点），内部 seam 自由连续化。
-    layer = 1
-    while len(seg_t) > 1:
-        merged_t: list[np.ndarray] = []
-        merged_s: list[np.ndarray] = []
-        n_pairs = len(seg_t) // 2
-        if verbose:
-            print(f"  合并第 {layer} 层: {len(seg_t)} 段 -> {n_pairs + len(seg_t) % 2} 段")
-        i = 0
-        while i < len(seg_t):
-            if i + 1 >= len(seg_t):
-                # 奇数段：直接进位（不合并）
-                merged_t.append(seg_t[i])
-                merged_s.append(seg_s[i])
-                i += 1
-                continue
-            # 相邻两段拼接：段 i 全部 + 段 i+1 去首（共享 seam 远月点）
-            t_comb = np.concatenate([seg_t[i], seg_t[i + 1][1:]])
-            s_comb = np.concatenate([seg_s[i], seg_s[i + 1][1:]])
-            n = len(t_comb)
-            # 固定首末两端（远月点锚点）；中间节点自由
-            mask = [False] * n
-            mask[0] = True
-            mask[-1] = True
-            try:
-                result = multiple_shooting_correct_py(
-                    forces_py,
-                    observer,
-                    list(t_comb),
-                    [list(map(float, x)) for x in s_comb],
-                    var_time=var_time,
-                    fix_first_node=False,
-                    fixed_node_mask=mask,
-                    max_iter=max_iter,
-                    tolerance=tolerance,
-                    rtol=1e-10,
-                    vel_weight=vel_weight,
-                )
-            except RuntimeError as e:
-                # 合并段打靶失败：整条轨道在此无法拼接连续，明确报错而非
-                # 静默回退（回退保留两段会让 seam 处轨道不连续，产出错误结果）
-                raise DesignNotConvergedError(
-                    f"分层合并第 {layer} 层段打靶积分失败: {e}",
-                    cause=FailureCause.INTEGRATION_FAILED,
-                ) from e
-            if result.status is not ConvergenceState.CONVERGED:
-                raise DesignNotConvergedError(
-                    f"分层合并第 {layer} 层段未收敛"
-                    f"（残差 {result.max_residual:.3e} km > 容差 {tolerance:.3e} km）",
-                    status=result.status,
-                    cause=result.cause,
-                )
-            spm = np.asarray(result.state_patch)
-            merged_t.append(np.asarray(result.t_patch, dtype=float))
-            merged_s.append(spm)
-            max_residual = max(max_residual, float(result.max_residual))
-            if verbose:
-                print(
-                    f"    合并段 {n} 节点: 残差 {result.max_residual:.2e} km, "
-                    f"{result.iterations} 次迭代"
-                )
-            i += 2
-        seg_t, seg_s = merged_t, merged_s
-        layer += 1
-
-    all_t = seg_t[0]
-    all_s = seg_s[0]
-    return np.asarray(all_t, dtype=float), np.asarray(all_s, dtype=float), max_residual
+    try:
+        result = segmented_shooting_correct_py(
+            forces_py,
+            observer,
+            list(t_patch_j2000),
+            [list(map(float, x)) for x in state_patch_j2000],
+            revs_per_group=revs_per_group,
+            per_rev=points_per_rev,
+            var_time=var_time,
+            max_iter_per_segment=max_iter,
+            tolerance=tolerance,
+            rtol=1e-10,
+            vel_weight=vel_weight,
+            verbose=verbose,
+        )
+    except RuntimeError as e:
+        raise DesignNotConvergedError(
+            f"分段打靶拼接积分失败: {e}",
+            cause=FailureCause.INTEGRATION_FAILED,
+        ) from e
+    if result.status is not ConvergenceState.CONVERGED:
+        raise DesignNotConvergedError(
+            f"{result.message}（容差 {tolerance:.3e} km）",
+            status=result.status,
+            cause=result.cause,
+        )
+    return (
+        np.asarray(result.t_patch, dtype=float),
+        np.asarray(result.state_patch, dtype=float),
+        float(result.max_residual),
+    )
 
 
 def _design_elfo(
@@ -1001,8 +917,8 @@ def design_orbit(
     dyb = request.dyb
     correction_method = request.correction_method
     correction_revolutions = request.correction_revolutions
-    # Halo/NRHO 不稳定：two_level/standard 的"修正 1 圈 + 自由外推"必发散，
-    # homotopy 不支持 ForceModel。统一走 segmented（全程分段打靶），产出
+    # Halo/NRHO 不稳定：two_level/standard 的"修正 1 圈 + 自由外推"必发散。
+    # 统一走 segmented（全程分段打靶），产出
     # 不发散的标称参考轨道。圈间漂移是固有准周期特征，由 station_keeping
     # 处理（架构分工见 docs/architecture/architecture.md §总体定位）。
     if sel in ("HALO", "NRHO") and correction_method != "segmented":
@@ -1097,7 +1013,7 @@ def design_orbit(
         # --- segmented：论文式分段打靶拼接（默认方法）---
         # 整条 CR3BP 多圈 tile → 逐段独立转星历 → 远月点分层合并 → 逐段
         # 积分填满 et_grid。不再单点自由外推整个 duration（旧方法发散根因）。
-        from ..ephemeris_correction.types import EphemerisCorrectionResult
+        from ..results import EphemerisCorrectionResult
 
         # 收集 Rust force 序列。跳过 RelativisticCorrection（与
         # ForceModel._STM_UNSUPPORTED_TYPES 对齐）：相对论修正的 STM
@@ -1176,6 +1092,13 @@ def design_orbit(
             # seam 跳 ~1e5 km 合并不了）。Halo/NRHO 用多圈/段（上限 3 圈，试错）；
             # 稳定轨道（DRO 等）沿用 3 圈/段。配合下方 var_time 固定时刻族
             # （_FIXED_TIME_ORBIT_TYPES，含 Halo/NRHO 与拟周期族）。
+            #
+            # 对照论文的三项差异评估（issue #400 需求②）：论文每段 9 圈（对应
+            # 972 圈/15 年量级的 12→3→3 层级拼接），合并层节点稀疏化为每圈 1 个
+            # 远月点。当前 3 圈/段 + 全节点合并已覆盖 180 天站保基准（18 圈三层
+            # 合并全程收敛，5.8e-03/5.7e-04/1.4e-02 km），无需加长段；年量级
+            # （数十圈）若段数过多、全节点合并矩阵病态放大，再评估 9 圈/段与
+            # 远月点稀疏化。
             revs_per_group = min(n_rev, 3) if sel in ("HALO", "NRHO") else max(1, min(3, n_rev))
             t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
                 forces_py,
@@ -1190,12 +1113,20 @@ def design_orbit(
                 verbose=verbose,
             )
 
-            # 逐段积分填满 et_grid：每段从修正后节点初值积分到下一节点。
-            # 中间段 mask 用右开区间（seam 整点只归后段），相邻段 t_eval 无
-            # 重叠；最后一段闭区间、t_span 终点延伸到 et_grid 尾部——打靶节点
-            # 采样不含圈终点（endpoint=False），et_grid 尾部可能超出最后节点，
+            # 逐段积分填满 et_grid（下沉 Rust propagate_segments_py 并发积分，
+            # #400 性能修复）：每段从修正后节点初值积分到下一节点。中间段
+            # mask 用右开区间（seam 整点只归后段），相邻段 t_eval 无重叠；
+            # 最后一段闭区间、t_span 终点延伸到 et_grid 尾部——打靶节点采样
+            # 不含圈终点（endpoint=False），et_grid 尾部可能超出最后节点，
             # 右开会把尾部点排除在段外，星历缺尾段数据（长度断言报错）。
-            states_list: list[np.ndarray] = []
+            # Rust 侧输出逐点对应 t_eval（不追加段终点），无需截断——此前
+            # ForceModel._prepare_t_eval 追加 tf 使输出多 1 点（段终点状态，
+            # 不在 et_grid 上），截断丢掉才能保证 states_dense 与 et_grid
+            # 严格对齐（位置-时间错位回归 #398）。
+            seg_t0_list: list[float] = []
+            seg_t1_list: list[float] = []
+            seg_states_list: list[np.ndarray] = []
+            t_eval_list: list[np.ndarray] = []
             for i in range(len(t_patch_long) - 1):
                 seg_t0, seg_t1 = t_patch_long[i], t_patch_long[i + 1]
                 is_last = i == len(t_patch_long) - 2
@@ -1208,24 +1139,32 @@ def design_orbit(
                 t_eval_seg = et_grid[mask]
                 if len(t_eval_seg) == 0:
                     continue
-                out_seg = fm.propagate(
-                    s_patch_long[i],
-                    (float(seg_t0), float(seg_end)),
-                    t_eval=t_eval_seg,
-                    max_steps=500_000,
-                )
-                # ForceModel._prepare_t_eval 会在 t_eval 末尾自动追加段终点 tf，
-                # 输出比 t_eval 多 1 点（段终点状态，不在 et_grid 上）。截断丢掉，
-                # 保证 states_dense 与 et_grid 严格对齐——否则星历位置数组比时间
-                # 网格多出段数个点，batch_j2000_to_synodic 按索引配对位置与旋转
-                # 时刻，错位逐段累积，会合系曲线一圈一圈偏离 Halo 轨道。
-                states_list.append(np.asarray(out_seg["states"], dtype=float)[: len(t_eval_seg)])
-            if not states_list:
+                seg_t0_list.append(float(seg_t0))
+                seg_t1_list.append(float(seg_end))
+                seg_states_list.append(s_patch_long[i])
+                t_eval_list.append(t_eval_seg)
+            if not seg_t0_list:
                 raise DesignNotConvergedError(
                     "segmented 拼接未生成任何星历点",
                     cause=FailureCause.INTEGRATION_FAILED,
                 )
-            states_dense = np.concatenate(states_list, axis=0)
+            from e2m2e.integrators import propagate_segments_py
+
+            states_dense = np.concatenate(
+                [
+                    np.asarray(seg_states, dtype=float)
+                    for seg_states in propagate_segments_py(
+                        "EARTH",
+                        forces_py,
+                        seg_t0_list,
+                        seg_t1_list,
+                        [list(map(float, s)) for s in seg_states_list],
+                        [list(map(float, t)) for t in t_eval_list],
+                        rtol=fm.rtol,
+                    )
+                ],
+                axis=0,
+            )
             # 右开区间下段间无重叠，无需去重；去重反而会掩蔽 mask 回归（若改回
             # 闭区间，seam 重复点被删、长度恢复一致，长度断言失效）。
         finally:
@@ -1265,65 +1204,15 @@ def design_orbit(
     # 改走 Rust 打靶 + vel_weight（=pos_tol/vel_tol）：速度项加权后在容差尺度
     # 与位置可比，LM 真正压速度连续到 ≤0.01 m/s，修正解落在准周期轨道上，
     # 稳定轨道自由外推有界。同时全程预制星历表（cspice 缓存），不再逐步 FFI。
-    if correction_method == "homotopy":
-        # homotopy 同伦插值建立在质点 N 体语义上，不支持 ForceModel——保留旧 Python 路径
-        eph_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
-        eph_dynamics = EphemerisDynamics(system=eph_system)
-        eph_dynamics.rtol = 1e-12
-        eph_dynamics.atol = 1e-12
-        eph_dynamics.max_step = 600.0
-        correction = correct_ephemeris_patch_points(
-            method="homotopy",
-            dynamics=eph_dynamics,
-            t_patch=t_patch_j2000,
-            state_patch=state_patch_j2000,
-            tolerance=CORRECTION_TOL_KM,
-            max_iter=50,
-            verbose=verbose,
-            n_workers=1,
-            kernel_dir=kernel_dir,
-            base_bodies=["EARTH", "MOON"],
-        )
-        if correction.status is not ConvergenceState.CONVERGED:
-            raise DesignNotConvergedError(
-                f"{sel} 星历修正（homotopy）未收敛：迭代 {correction.iterations} 次，"
-                f"最大残差 {correction.max_residual:.3e} km",
-                status=correction.status,
-                cause=correction.cause,
-            )
-        t0_corr = float(correction.t_patch[0])
-        out = fm.propagate(
-            correction.state_patch[0],
-            (min(t0_corr, et0), float(et_grid[-1])),
-            t_eval=et_grid,
-            max_steps=2_000_000,
-        )
-        ephemeris = _build_ephemeris_table(
-            spice, syn_j2000, et0, et_grid, np.asarray(out["states"], dtype=float)
-        )
-        return OrbitDesignResult(
-            orbit_type=sel,
-            epoch_utc=epoch_iso,
-            duration_day=duration_day,
-            output_step_sec=float(output_step),
-            initial_state=np.asarray(correction.state_patch[0], dtype=float),
-            ephemeris=ephemeris,
-            cr3bp_orbit=cr3bp_orbit,
-            cr3bp_jacobi=jacobi,
-            correction=correction,
-            force_config=force_config,
-            stages=_design_stages(),
-        )
-
-    # 默认路径（稳定轨道）：Rust 多重打靶 + vel_weight
+    # --- 稳定轨道路径（DRO 等）：Rust 多重打靶（速度加权）+ 长期预报 ---
     if correction_method not in ("two_level", "standard", "rust"):
         raise ValueError(
-            "correction_method 需为 segmented / homotopy / two_level / standard / rust，"
+            "correction_method 需为 segmented / two_level / standard / rust，"
             f"当前 {correction_method!r}"
         )
     from e2m2e.integrators import multiple_shooting_correct_py as _msc
 
-    from ..ephemeris_correction.types import EphemerisCorrectionResult
+    from ..results import EphemerisCorrectionResult
 
     forces_py = []
     for entry in fm.list_forces():

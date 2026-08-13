@@ -10,6 +10,8 @@ use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyList};
 
 #[cfg(feature = "spice")]
+pub mod frame_convert;
+#[cfg(feature = "spice")]
 pub mod homotopy;
 #[cfg(feature = "spice")]
 pub mod multiple_shooting;
@@ -668,7 +670,7 @@ fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Ve
 /// 首次调用时经 Once 触发 Rust CSPICE 实例的行星名别名注册（对称 Python
 /// 侧 SPICEManager.load_kernel 的 boddef）。幂等。
 #[cfg(feature = "spice")]
-fn ensure_bodies_registered() {
+pub(crate) fn ensure_bodies_registered() {
     static REGISTERED: std::sync::Once = std::sync::Once::new();
     REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
 }
@@ -1165,6 +1167,109 @@ pub(crate) fn parse_force_tuple(
 #[cfg(feature = "spice")]
 type CompiledPropResult = (Vec<f64>, Vec<Vec<f64>>, usize, usize, usize);
 
+/// `propagate_compiled` 与 `propagate_segments` 共用的 6 维编译积分核心。
+///
+/// 无 Python 对象交互（力模型序列已解析为 [`CompiledForce`]），可安全置于
+/// `allow_threads` 区并 rayon 并发。输出语义：``t_eval`` 逐点对应输出
+/// （``t_eval[0]≈t0`` 时含初值；不追加 t_span 终点——追加是 Python 侧
+/// ``ForceModel._prepare_t_eval`` 的行为）。
+#[cfg(feature = "spice")]
+#[allow(clippy::too_many_arguments)]
+fn propagate_compiled_core(
+    method: RkMethod,
+    t0: f64,
+    y0: &[f64],
+    h_init: f64,
+    tol: f64,
+    t_eval: &[f64],
+    observer: &str,
+    forces: &[e2m2e_forces::forces::compiled::CompiledForce],
+    max_steps: usize,
+) -> Result<CompiledPropResult, String> {
+    use e2m2e_forces::forces::compiled::compute_total_acceleration;
+    let table = method.table();
+    let mut y = y0.to_vec();
+    let mut t = t0;
+    let mut h = h_init;
+    // 输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初始状态、eval_idx 从 1 起步；
+    // 当 t_eval[0]>t0（逐段积分常态：patch point 时刻非整数小时，et_grid 整数
+    // 小时点严格大于 t0）时不预设 t0 到输出，eval_idx 从 0 起步由循环匹配。
+    // 此前硬编码 vec![t0] + eval_idx=1 假设 t_eval[0]==t0，导致 t_eval[0]>t0
+    // 时首个输出点状态错置为初值、与后续点错位。
+    let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
+    let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
+    let mut eval_idx = 0usize;
+    if !t_eval.is_empty() && (t0 - t_eval[0]).abs() <= 1e-9 {
+        times.push(t0);
+        states.push(y.clone());
+        eval_idx = 1;
+    }
+    let mut n_steps = 0usize;
+    let mut n_rejected = 0usize;
+    let mut n_steps_capped = 0usize;
+
+    // 用 RefCell 包装 cspice 错误状态（不能直接通过 explicit_rk_step 的 E 传）
+    use std::cell::RefCell;
+    let last_error: RefCell<Option<String>> = RefCell::new(None);
+
+    while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
+        n_steps += 1;
+        // 限制步长不超过下一个评估点（提高 t_eval 命中率），且不超过
+        // h_init（作为最大步长：稀疏 t_eval 下自适应步长失控，实测
+        // 2 点 vs 31 点网格的 30 天结果差 22 万 km）
+        if eval_idx < t_eval.len() {
+            let t_next_eval = t_eval[eval_idx];
+            if t + h > t_next_eval {
+                h = t_next_eval - t;
+            }
+        }
+        if h > h_init {
+            n_steps_capped += 1;
+            h = h_init;
+        }
+
+        // RK 单步：用 Rust 闭包调 compute_total_acceleration
+        let forces_ref = &forces;
+        let observer_ref = observer;
+        let err_cell = &last_error;
+        let callback = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
+            let state6 = [yi[0], yi[1], yi[2], yi[3], yi[4], yi[5]];
+            compute_total_acceleration(forces_ref, ti, &state6, observer_ref)
+                .map(|a| vec![yi[3], yi[4], yi[5], a[0], a[1], a[2]])
+                .inspect_err(|e| {
+                    *err_cell.borrow_mut() = Some(e.clone());
+                })
+        };
+
+        let (y_new, error) = match explicit_rk_step(table, t, &y, h, callback, None) {
+            Ok(r) => r,
+            Err(msg) => return Err(format!("RK step force error: {}", msg)),
+        };
+
+        if error <= tol {
+            t += h;
+            y = y_new;
+            // 输出落在 t_eval 的点
+            while eval_idx < t_eval.len() && t >= t_eval[eval_idx] - 1e-9 {
+                times.push(t_eval[eval_idx]);
+                states.push(y.clone());
+                eval_idx += 1;
+            }
+            let h_next = suggest_next_step(h, error, tol, method.embedded_order());
+            h = h_next;
+        } else {
+            n_rejected += 1;
+            let h_next = suggest_next_step(h, error, tol, method.embedded_order());
+            h = h_next;
+            if h < 1e-12 * (t_eval[t_eval.len() - 1] - t0).abs() {
+                return Err("step size collapsed below minimum".to_string());
+            }
+        }
+    }
+
+    Ok((times, states, n_steps, n_rejected, n_steps_capped))
+}
+
 /// 全 Rust 力模型传播器（消除 Python↔Rust 跨界）。
 ///
 /// Python 侧把所有 force 序列化为元组列表，Rust 在内部循环里直接调
@@ -1197,7 +1302,7 @@ fn propagate_compiled(
     max_steps: usize,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
-    use e2m2e_forces::forces::compiled::{compute_total_acceleration, CompiledForce};
+    use e2m2e_forces::forces::compiled::CompiledForce;
 
     if y0.len() != 6 {
         return Err(pyo3::exceptions::PyValueError::new_err(format!(
@@ -1230,87 +1335,9 @@ fn propagate_compiled(
     // 闭包内不构造 PyErr（不借 Python 对象），仅回传 String，闭包外 map_err 转 PyErr。
     let (times, states, n_steps, n_rejected, n_steps_capped) = py
         .allow_threads(move || -> Result<CompiledPropResult, String> {
-            let table = method.table();
-            let mut y = y0;
-            let mut t = t0;
-            let mut h = h_init;
-            // 输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初始状态、eval_idx 从 1 起步；
-            // 当 t_eval[0]>t0（逐段积分常态：patch point 时刻非整数小时，et_grid 整数
-            // 小时点严格大于 t0）时不预设 t0 到输出，eval_idx 从 0 起步由循环匹配。
-            // 此前硬编码 vec![t0] + eval_idx=1 假设 t_eval[0]==t0，导致 t_eval[0]>t0
-            // 时首个输出点状态错置为初值、与后续点错位。
-            let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
-            let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
-            let mut eval_idx = 0usize;
-            if !t_eval.is_empty() && (t0 - t_eval[0]).abs() <= 1e-9 {
-                times.push(t0);
-                states.push(y.clone());
-                eval_idx = 1;
-            }
-            let mut n_steps = 0usize;
-            let mut n_rejected = 0usize;
-            let mut n_steps_capped = 0usize;
-
-            // 用 RefCell 包装 cspice 错误状态（不能直接通过 explicit_rk_step 的 E 传）
-            use std::cell::RefCell;
-            let last_error: RefCell<Option<String>> = RefCell::new(None);
-
-            while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
-                n_steps += 1;
-                // 限制步长不超过下一个评估点（提高 t_eval 命中率），且不超过
-                // h_init（作为最大步长：稀疏 t_eval 下自适应步长失控，实测
-                // 2 点 vs 31 点网格的 30 天结果差 22 万 km）
-                if eval_idx < t_eval.len() {
-                    let t_next_eval = t_eval[eval_idx];
-                    if t + h > t_next_eval {
-                        h = t_next_eval - t;
-                    }
-                }
-                if h > h_init {
-                    n_steps_capped += 1;
-                    h = h_init;
-                }
-
-                // RK 单步：用 Rust 闭包调 compute_total_acceleration
-                let forces_ref = &forces;
-                let observer_ref = observer;
-                let err_cell = &last_error;
-                let callback = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
-                    let state6 = [yi[0], yi[1], yi[2], yi[3], yi[4], yi[5]];
-                    compute_total_acceleration(forces_ref, ti, &state6, observer_ref)
-                        .map(|a| vec![yi[3], yi[4], yi[5], a[0], a[1], a[2]])
-                        .inspect_err(|e| {
-                            *err_cell.borrow_mut() = Some(e.clone());
-                        })
-                };
-
-                let (y_new, error) = match explicit_rk_step(table, t, &y, h, callback, None) {
-                    Ok(r) => r,
-                    Err(msg) => return Err(format!("RK step force error: {}", msg)),
-                };
-
-                if error <= tol {
-                    t += h;
-                    y = y_new;
-                    // 输出落在 t_eval 的点
-                    while eval_idx < t_eval.len() && t >= t_eval[eval_idx] - 1e-9 {
-                        times.push(t_eval[eval_idx]);
-                        states.push(y.clone());
-                        eval_idx += 1;
-                    }
-                    let h_next = suggest_next_step(h, error, tol, method.embedded_order());
-                    h = h_next;
-                } else {
-                    n_rejected += 1;
-                    let h_next = suggest_next_step(h, error, tol, method.embedded_order());
-                    h = h_next;
-                    if h < 1e-12 * (t_eval[t_eval.len() - 1] - t0).abs() {
-                        return Err("step size collapsed below minimum".to_string());
-                    }
-                }
-            }
-
-            Ok((times, states, n_steps, n_rejected, n_steps_capped))
+            propagate_compiled_core(
+                method, t0, &y0, h_init, tol, &t_eval, observer, &forces, max_steps,
+            )
         })
         .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
 
@@ -1322,6 +1349,103 @@ fn propagate_compiled(
     dict.set_item("n_rejected", n_rejected)?;
     dict.set_item("n_steps_capped", n_steps_capped)?;
     Ok(dict.into())
+}
+
+/// 多段并发积分（segmented 逐段积分填 et_grid 用，issue #400 性能下沉）。
+///
+/// 每段从 ``seg_states[i]`` 积分到 ``seg_t1[i]``，输出 ``t_eval_list[i]``
+/// 逐点对应的状态序列（不追加段终点，语义同 `propagate_compiled_core`）。
+/// 段间独立（只依赖本段输入），rayon 并发；并行前提与多重打靶段积分相同
+/// （strict + 预采样星历缓存，零 cspice FFI）。rayon 保序 collect + 各段
+/// 积分确定 → 并行与串行位级一致（``E2M2E_MS_PARALLEL=0`` 强制串行）。
+///
+/// 初值步长上限复刻 Python ``ForceModel._estimate_initial_step``（2πr/v/100），
+/// 与 ``fm.propagate`` 路径的步长控制语义一致。
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[pyo3(signature = (observer, forces, seg_t0, seg_t1, seg_states, t_eval_list, rtol, max_steps=500_000, method=RkMethod::Pd45))]
+#[allow(clippy::too_many_arguments)]
+fn propagate_segments_py(
+    observer: &str,
+    forces: Vec<PyObject>,
+    seg_t0: Vec<f64>,
+    seg_t1: Vec<f64>,
+    seg_states: Vec<Vec<f64>>,
+    t_eval_list: Vec<Vec<f64>>,
+    rtol: f64,
+    max_steps: usize,
+    method: RkMethod,
+    py: Python<'_>,
+) -> PyResult<Vec<Vec<Vec<f64>>>> {
+    use e2m2e_forces::forces::compiled::CompiledForce;
+
+    let n_seg = seg_t0.len();
+    if seg_t1.len() != n_seg || seg_states.len() != n_seg || t_eval_list.len() != n_seg {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "seg_t0/seg_t1/seg_states/t_eval_list 长度必须一致",
+        ));
+    }
+    if forces.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "forces must not be empty",
+        ));
+    }
+
+    // 解析 forces: Vec<PyObject> -> Vec<CompiledForce>
+    let mut compiled_forces: Vec<CompiledForce> = Vec::with_capacity(forces.len());
+    for item in &forces {
+        compiled_forces.push(parse_force_tuple(&item.bind(py).as_borrowed())?);
+    }
+    // 状态转 6 元组
+    let states6: Vec<[f64; 6]> = seg_states
+        .iter()
+        .map(|s| {
+            if s.len() != 6 {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "state must have 6 elements",
+                ));
+            }
+            Ok([s[0], s[1], s[2], s[3], s[4], s[5]])
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+
+    let parallel = std::env::var("E2M2E_MS_PARALLEL").map_or(true, |v| v != "0");
+    let run = |i: usize| -> Result<Vec<Vec<f64>>, String> {
+        let y0 = &states6[i];
+        let r = (y0[0] * y0[0] + y0[1] * y0[1] + y0[2] * y0[2]).sqrt();
+        let v = (y0[3] * y0[3] + y0[4] * y0[4] + y0[5] * y0[5]).sqrt();
+        let h_init = if r == 0.0 || v == 0.0 {
+            1e-6 * (seg_t1[i] - seg_t0[i]).abs()
+        } else {
+            2.0 * std::f64::consts::PI * r / v / 100.0
+        };
+        let (_, states, ..) = propagate_compiled_core(
+            method,
+            seg_t0[i],
+            y0,
+            h_init,
+            rtol,
+            &t_eval_list[i],
+            observer,
+            &compiled_forces,
+            max_steps,
+        )?;
+        Ok(states)
+    };
+    let results: Vec<Result<Vec<Vec<f64>>, String>> =
+        py.allow_threads(move || -> Vec<Result<Vec<Vec<f64>>, String>> {
+            if parallel {
+                use rayon::prelude::*;
+                (0..n_seg).into_par_iter().map(run).collect()
+            } else {
+                (0..n_seg).map(run).collect()
+            }
+        });
+    let mut all = Vec::with_capacity(n_seg);
+    for r in results {
+        all.push(r.map_err(pyo3::exceptions::PyRuntimeError::new_err)?);
+    }
+    Ok(all)
 }
 
 /// 7D 可变质量低推力传播：状态 `[x, y, z, vx, vy, vz, m]`。
@@ -2980,6 +3104,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solid_tide_step2, m)?)?;
     m.add_function(wrap_pyfunction!(pole_tide, m)?)?;
     m.add_function(wrap_pyfunction!(propagate_cr3bp_py, m)?)?;
+    m.add_function(wrap_pyfunction!(propagate_segments_py, m)?)?;
     m.add_function(wrap_pyfunction!(propagate_cr3bp_stm_py, m)?)?;
     m.add_function(wrap_pyfunction!(propagate_bcr4bp_py, m)?)?;
     m.add_function(wrap_pyfunction!(propagate_bcr4bp_stm_py, m)?)?;
@@ -3049,6 +3174,20 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     )?)?;
     #[cfg(feature = "spice")]
     m.add_class::<segmented_shooting::SegmentedShootingResult>()?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        frame_convert::batch_synodic_to_j2000_py,
+        m
+    )?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        frame_convert::batch_j2000_to_synodic_py,
+        m
+    )?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(frame_convert::batch_body_states_py, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(frame_convert::batch_et_to_utc_py, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;

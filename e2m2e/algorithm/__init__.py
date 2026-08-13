@@ -7,7 +7,7 @@ Python 算法层 = 一切"需要领域知识构造问题"的编排，不做数�
 solver/）：①构造问题（选轨道族、定约束、选流形方向）②调 Rust 迭代器 ③解释结果。
 
 子模块：
-- ``design/``：任务轨道设计（三段编排：family → ephemeris_correction → propagation）。
+- ``design/``：任务轨道设计（三段编排：family → 星历修正[Rust 打靶] → propagation）。
 - ``family/``：轨道族生成（种子/初猜/族行走/注册表）。
 - ``station_keeping/``：轨道保持（controller + 三控制律 + 误差模型 + 蒙特卡洛）。
 - ``transfer/``：转移设计（transfer_orbit 编排器 + 数学模块）。

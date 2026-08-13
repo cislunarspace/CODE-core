@@ -83,7 +83,9 @@ def test_unload_kernel_removes_rust_kernel(spice_kernel_path):
     load_kernel 双 furnsh（Python + Rust 双侧，见 #357），unload_kernel 也须
     双侧卸载：否则 Rust cspice 内核池残留已卸载文件，测试结果依赖同进程
     执行顺序（先跑过加载内核的测试会让后续测试的 Rust 查询侥幸成功）。
-    用子进程隔离 Rust 全局状态，验证 unload 后 Rust 侧 spkezr 报"无内核加载"。
+    用子进程隔离 Rust 全局状态，验证 unload 后 Rust 侧 spkezr 报 SPK 未加载
+    （闰秒内核常驻两侧实例，与 Python 侧 ``_ensure_leapseconds`` 对称，
+    不参与 unload——详见 manager.load_kernel 注释）。
     """
     code = (
         "from e2m2e.integrators import spice_spkezr\n"
@@ -110,4 +112,5 @@ def test_unload_kernel_removes_rust_kernel(spice_kernel_path):
     assert "LOADED_OK" in output, f"load 后 Rust 侧应可查询，实际: {output!r}"
     assert "UNLOADED_FAIL" in output, f"unload 后 Rust 侧应无内核，实际: {output!r}"
     assert "UNLOADED_STILL_OK" not in output, f"Rust 侧应已卸载，实际: {output!r}"
-    assert "无内核加载" in output, f"错误信息应含'无内核加载'，实际: {output!r}"
+    # SPK 已卸载的精确信号：只剩常驻闰秒内核时查询报 NOLOADEDFILES。
+    assert "NOLOADEDFILES" in output, f"错误应为 SPK 未加载，实际: {output!r}"

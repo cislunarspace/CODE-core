@@ -122,7 +122,7 @@ e2m2e/algorithm/
 关键设计：
 
 - **轨道族注册表 = 函数形态**：`_REGISTRY: dict[str, Callable]`，注册表值 = 设计函数 `design_xxx(params) -> Orbit`。`design_orbit` 查注册表按族分发。新族 = 写一个设计函数 + 注册。
-- **algorithm/design/ 持有三段编排**：family（初猜）→ ephemeris_correction（CR3BP→星历修正）→ propagation（高精度预报）。
+- **algorithm/design/ 持有三段编排**：family（初猜）→ 星历修正（Rust 多重打靶 `multiple_shooting_correct_py`，segmented 或稳定轨道默认路径）→ propagation（高精度预报）。
 - **algorithm/transfer/ 按数学类型组织**：脉冲（lambert/three_body_lambert/multi_impulse）、自然动力学（low_energy/manifold）、低推力（low_thrust/）、任务层（search/optimize/porkchop）。`transfer_design` 编排器按 transfer_type 组合。
 - **System + Dynamics 都归 algorithm/dynamics/**（一对，拆开割裂"动力学"概念）；标准参数数据归 data/templates/systems.py。
 - **最终形态留 Python 的领域知识模块**：family 种子、站保控制律、manifold 种子/截面、transfer 编排、design 编排、coordinate 转换、normal_form 约化、nominal_orbit。

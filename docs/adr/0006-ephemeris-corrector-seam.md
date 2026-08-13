@@ -80,3 +80,14 @@ ADR-0005 把 `TwoLevelMultipleShooting` 作为独立算法加入，但分发层�
 
 - Issue #8（MultipleShooting 并行内联）可复用同一 `PatchPointCorrector` 接缝。
 - 新增修正方法只需：写一个 `PatchPointCorrector` 实现 + 加一行 `_REGISTRY` 注册。
+
+## 修订（2026-08-13）
+
+`ephemeris_correction` 子包（standard/two_level/homotopy 三个 `PatchPointCorrector`
+实现 + 注册表分发）已整体删除：设计链路统一走 Rust 多重打靶
+（``multiple_shooting_correct_py``，segmented 与稳定轨道默认路径），不再有
+多个修正方法需要分发；`EphemerisCorrectionResult` 迁入
+``e2m2e/algorithm/results.py`` 作为 Rust 打靶结果的领域重包。本 ADR 的决策 1/2/3/4
+（接缝、注册表、延迟导入、错误类型）随之废止；决策 5 的
+`MultipleShooting.correct()` 接口不变（transfer/hohmann 等非设计链路仍使用）。
+关联 ADR 0005（同批删除 `TwoLevelMultipleShooting`）。

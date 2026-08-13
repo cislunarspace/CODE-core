@@ -626,7 +626,7 @@ pub fn multiple_shooting_correct(
                     alpha,
                 );
                 match try_residual(
-                    forces, observer, &t_try, &s_try, rtol, max_step, method, vel_weight,
+                    forces, observer, &t_try, &s_try, rtol, max_step, method, vel_weight, parallel,
                 ) {
                     Ok(trial_res) if trial_res < max_res => {
                         t_work = t_try;
@@ -715,6 +715,9 @@ fn apply_dx_t(
 
 /// 试算一组状态/时间节点下的最大残差（供回溯线搜索验收）。积分失败视为不下降。
 /// 速度加权与主循环一致，保证线搜索比较的是同一加权目标。
+/// `parallel` 与主循环段积分同开关：线搜索每次 α 试算都全段重积分，是每迭代
+/// 主要开销之一，段间独立、与主循环段积分同安全前提（strict + 预采样缓存），
+/// rayon 并行与串行位级一致。
 #[allow(clippy::too_many_arguments)]
 fn try_residual(
     forces: &[CompiledForce],
@@ -725,10 +728,10 @@ fn try_residual(
     max_step: Option<f64>,
     method: RkMethod,
     vel_weight: f64,
+    parallel: bool,
 ) -> Result<f64, String> {
     let n_seg = t_work.len() - 1;
-    let mut final_states = Vec::with_capacity(n_seg);
-    for i in 0..n_seg {
+    let integrate = |i: usize| -> Result<[f64; 6], String> {
         let result = propagate_compiled_stm(
             forces,
             observer,
@@ -741,7 +744,17 @@ fn try_residual(
             Some(500_000),
             method,
         )?;
-        final_states.push(*result.states.last().ok_or("empty propagation result")?);
+        Ok(*result.states.last().ok_or("empty propagation result")?)
+    };
+    let finals: Vec<Result<[f64; 6], String>> = if parallel {
+        use rayon::prelude::*;
+        (0..n_seg).into_par_iter().map(integrate).collect()
+    } else {
+        (0..n_seg).map(integrate).collect()
+    };
+    let mut final_states = Vec::with_capacity(n_seg);
+    for r in finals {
+        final_states.push(r?);
     }
     let f = build_residual(&final_states, state_work, n_seg, vel_weight);
     Ok(f.iter().map(|x| x.abs()).fold(0.0_f64, f64::max))

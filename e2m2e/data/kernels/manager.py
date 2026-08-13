@@ -200,6 +200,14 @@ class SPICEManager(EphemerisProvider):
             path = _find_leapseconds_kernel(search_paths)
             if path:
                 get_spiceypy().furnsh(path)
+                # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（内核池
+                # 不共享，见 load_kernel 注释）。下沉到 Rust 的批量 ET→UTC
+                # （frame_convert.batch_et_to_utc_py）在 Rust 实例查闰秒表，
+                # 缺 LSK 报 MISSINGTIMEINFO；此处双 furnsh 补齐。
+                from e2m2e.integrators import spice_furnsh
+
+                if spice_furnsh is not None:
+                    spice_furnsh(path)
                 SPICEManager._leapseconds_loaded = True
             else:
                 logging.getLogger(__name__).warning(

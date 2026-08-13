@@ -485,15 +485,6 @@ e2m2e.algorithm.solver.multiple_shooting module
    :show-inheritance:
 
 
-e2m2e.algorithm.solver.two_level_multiple_shooting module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: e2m2e.algorithm.solver.two_level_multiple_shooting
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-
 e2m2e.algorithm.family package
 ------------------------------
 
@@ -638,49 +629,6 @@ e2m2e.algorithm.family.strategies.spo module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.algorithm.family.strategies.spo
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-
-e2m2e.algorithm.ephemeris_correction package
---------------------------------------------
-
-.. automodule:: e2m2e.algorithm.ephemeris_correction
-   :no-index:
-
-
-e2m2e.algorithm.ephemeris_correction.types module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: e2m2e.algorithm.ephemeris_correction.types
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-
-e2m2e.algorithm.ephemeris_correction.standard module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: e2m2e.algorithm.ephemeris_correction.standard
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-
-e2m2e.algorithm.ephemeris_correction.two_level module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: e2m2e.algorithm.ephemeris_correction.two_level
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-
-e2m2e.algorithm.ephemeris_correction.homotopy module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: e2m2e.algorithm.ephemeris_correction.homotopy
    :members:
    :undoc-members:
    :show-inheritance:
