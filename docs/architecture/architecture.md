@@ -1,218 +1,64 @@
 # e2m2e 架构设计
 
-> 本文描述 e2m2e 的架构（五层已落地，旧包 core/algorithms/transfer/dfh/io/visualization/proximity 已删除）。逐项架构决策见 `docs/adr/`。
+## 从一条 NRHO 轨道说起
 
-## 总体定位
+以设计一条地月 L2 NRHO 轨道为例，看五个模块各自在哪个环节发挥作用。
 
-e2m2e 是一个**独立的地月空间轨道设计库**，不是任何现有软件的复刻品。它面向"LLM+Agent"自主任务规划范式：大模型负责理解任务意图、分解与编排，e2m2e 负责提供精确可靠的轨道计算工具，通过 MCP 协议被调用。
+**第一步，用户输入一个时刻：2024-01-01 00:00:00 UTC。** 这是人们约定的时间，但历表的自变量不是它——DE 历表用质心力学时 TDB。此刻 UTC 与 TDB 相差约 69 秒（37 秒闰秒 + 32.184 秒固定差）。若拿 UTC 直接当 TDB 查月球位置：月球以约 1 km/s 绕地球公转，位置错出约 70 km，近月制动窗口完全作废。何况 UTC 不定期跳秒、不连续，不能做动力学的自变量。所以 e2m2e 内部统一用 TDB，只在接口边界转 UTC——STK 也是这个做法：UTC 只用于输入输出，内部用 TAI/TDT。这是**时空系统与常量模块**里"时间尺度"存在的理由。
 
-五个核心能力，是 e2m2e 自己的领域能力，与外部软件无关：
+**接着要回答"在哪个坐标系里设计"。** CR3BP 初猜在地月会合系里给（会合系中平动点是定点），任务书参数在 J2000 惯性系，测控站坐标在 ITRF93 地固系。同一组 (x,y,z) 数字，换系不换数，就是另一个物理位置——地球一小时自转 15°，两个系的状态差一个随时间增长的旋转。1999 年 NASA 火星气候轨道器因单位混淆（磅力与牛顿）坠毁；坐标系混淆是同一类错误，且更隐蔽，编译器不会报错。参考系转换让每一个状态向量的"系"可追溯、可转换——这是同一模块里"参考系转换"存在的理由。
 
-1. **任务轨道设计**——从任务参数（轨道类型、高度、振幅、历元、力模型开关）产出标称轨道。
-2. **轨道保持**——沿标称轨道施加脉冲控制，仿真测定轨与控制误差，蒙特卡洛评估。
-3. **转移轨道设计**——从出发条件到目标轨道的转移路径（脉冲/小推力/低能量）。
-4. **轨道预报**——给定初值与力模型的高精度数值外推。
-5. **时空坐标转换**——TDT+GCRS ↔ TDB+EBCRS 等参考系与时间尺度转换。
+**然后要定"用哪套常数"。** 地球 GM 有 DE440 值、DE421 值、WGS-84 值；地月质量比 μ 有 1965 年值、DE421 值、归一化约定值。e2m2e 自己就栽在这里：Python 与 Rust 各抄一个 μ，同一个 crate 里两个值并存，轨道族算出来对不上文献。常量的麻烦不是"值太多"，而是"没人说清哪个值属于哪套、用在哪"。常量基准集（多套并存、每套内部自洽）就是为此而设——同一模块里"常量"的部分。
 
-## 总体分层
+**初猜到手，开始打靶。** 以 2 年 50 圈的星历修正为例：50 圈 × 每圈 8 节点 × 50 次迭代，约两万段轨道积分，每段数千步，每步算力模型、查星历——标量运算以十亿计。这一层必须快、必须能并行，而 cspice 内核是全局状态、不可并发——所以 **Rust 计算模块**不吃 SPICE 句柄，吃预采样注入的星历缓存表。
 
-按依赖方向由内向外，五层。**内层不感知外层**。
+**整条设计链是编排，不是算式。** 选 DRO 还是 Halo、初猜振幅给多大、修正容差多严、预报一年还是十年——这些是领域决策，天天在变，留 Python。这是**编排模块**的分工。
 
-| 层级 | 名称 | 职责 | 实现语言 |
-|:---|:---|:---|:---|
-| 第1层 | 数据层 `data/` | 星历数据管理、时空参考系数据、数据模板、通用数据类型 | Python（含 SPICE/r2s2 适配器） |
-| 第2层 | 数值计算层 `crates/` | 积分器、打靶、牛顿/延拓迭代、Lambert、STM/7D 传播 | Rust |
-| 第3层 | 算法层 `algorithm/` | 轨道族、站保控制律、流形、转移编排、名义轨道 | Python（调 Rust） |
-| 第4层 | 接口层 `api/` | Facade 门面、配置、Pydantic 模型、MCP、CLI | Python |
-| 第5层 | 工具层 `tools/` | 可视化、日志 | Python |
+**算完要交付。** 设计工程师的桌面是 Windows，仿真中心是麒麟，服务器是鲲鹏 ARM——三平台 wheel 是部署现实；国内访问 NAIF 官网不稳定，CSPICE 只能走 GitHub Release。这是**CI 模块**。
 
-**分层哲学**：
+**最后，数据要留下。** 星历文件几十到上百 MB，几年才更新一次；Halo 族种子是两个浮点数，每次改动都要审阅。体积差上百万倍、生命周期完全不同的东西，不能放在一个篮子里。这是**数据管理模块**。
 
-- **Rust = 一切"喂进数字就迭代"的数值方法**：积分、打靶、牛顿/延拓迭代、Lambert、STM/7D 传播。迭代的"问题定义"（约束、自由变量、目标）从 Python 传入，Rust 只管迭代到收敛。
-- **Python 算法层 = 一切"需要领域知识构造问题"的编排**：不做数值迭代，只做三件事——①构造问题（选轨道族、定约束、选流形方向）②调 Rust 迭代器 ③解释结果（转 Orbit、算物理量、判收敛）。
-- 牛顿/延拓迭代骨架**直接归 Rust**（最终形态）。
+软件有五个架构设计：
 
-## 顶层结构
+## 1. 时空系统与常量模块
 
-```
-e2m2e/
-├── data/          # 第1层 数据层
-├── algorithm/     # 第3层 算法层（单数，随设计草案）
-├── api/           # 第4层 接口层
-├── tools/         # 第5层 工具层
-├── integrators.py # 数值层对 Python 的门面（保留顶层）
-├── mbse/          # SysML 文档产物（保留独立顶层）
-└── _integrators/  # Rust 绑定（内部）
-```
+（1）时间尺度（UTC/TDB/TAI/TT，动力学统一用 TDB）；
+（2）参考系转换（J2000/ITRF93/IAU 2006、GCRS-EBCRS、动态轴）；
+（3）物理常量基准集（DE421/DE440/WGS84 多套并存，按场景选用，Python/Rust 同源防漂移）。
 
-`core` 拆散后顶层无 `core`。旧路径（`e2m2e.core`、`e2m2e.algorithms` 等）已删除。
+三者合起来构成自洽的时空基准，实际分开维护。
 
-## 第1层 数据层 `data/`
+## 2. Rust 计算模块
 
-```
-e2m2e/data/
-├── kernels/           # SPICE 内核管理
-│   ├── manager.py     # 加载/缓存/校验
-│   └── provider.py    # EphemerisProvider 抽象
-├── frames/            # 时空参考系【只留数据】
-│   ├── eop.py         # EOP 文件解析
-│   ├── leap_seconds.py# 闰秒表
-│   ├── r2s2.py        # r2s2 库适配器
-│   └── spice_frames.py# SPICE 帧查询
-├── templates/         # 数据模板
-│   ├── seed.py        # 轨道族种子参数
-│   ├── systems.py     # 地月系统标准参数
-│   ├── perturbations.py # 摄动开关默认
-│   ├── force_config.py# 力模型配置 schema
-│   └── enums.py       # 领域枚举
-└── types/             # 通用数据类型
-    ├── state.py       # 状态向量（类型别名）
-    ├── epoch.py       # 时间类型（类型别名）
-    ├── orbit.py       # Orbit 数据容器
-    ├── trajectory.py  # 轨迹容器、NominalOrbit
-    └── ephemeris.py   # EphemerisTable
-```
+四个 crate：
 
-关键设计：
+（1）spice（CSPICE FFI + 缓存）；
+（2）propagation（纯数学积分器）；
+（3）forces（力模型 + STM）；
+（4）integrators（pyo3 绑定 + 打靶等迭代求解器 + 并行）。
 
-- **EphemerisProvider 抽象**（`data/kernels/provider.py`）：对上层屏蔽数据来源。单点 + 批量两类方法；时间（utc_to_tdb/et_to_utc/utc_to_tai/tai_to_tt/tt_to_tdb/jd_tdb_to_et）、状态（body_position/body_state/body_rotation）、帧（pxform）三类。SPICE 和 r2s2 分别实现。Rust 侧"注入数据"（星历缓存样条表）从批量查询构建。
-- **frames 只留数据**（EOP、闰秒、历表句柄）；转换算法归 `algorithm/coordinate/`。时空转换**算法**不在数据层。
-- **TDB 作动力学统一时间**：算法层/数值层内部统一用 ET(TDB) 或 JD_TDB；只有接口边界（api/Pydantic/输出格式）才转 UTC。
-- **类型系统**：State/Epoch 是类型别名（`State = npt.NDArray[float64]` 形状 (6,)），Trajectory 是真容器类（EphemerisTable/NominalOrbit）。单值→别名，多字段/多列→类。算法层保持 numpy 不强制包装。
-- **Orbit** 归 `data/types/orbit.py`：states/times/metadata + 可选 system 绑定 + 手动设 period。
-- **NominalOrbit** 归 `data/types/trajectory.py`：FR1↔FR2 数据契约（等间距历元状态表 + Floquet 基 + 投影因子表 + 高次插值器）。
-- **领域枚举**归 `data/templates/enums.py`（OrbitFamilyType/ReferenceFrame 等）。
+迭代的"问题"由 Python 构造传入，Rust 只管迭代到收敛；Rust 不吃 SPICE 句柄，吃预采样注入的星历缓存表。
 
-## 第2层 数值计算层 `crates/`
+## 3. Python 编排模块
 
-```
-crates/
-├── propagation/       # 积分器族 + Lambert + solve_ivp
-├── forces/            # 力模型 + STM + 7D 增广
-├── integrators/       # pyo3 绑定 + 打靶 + 同伦 + solver/
-└── spice/             # CSPICE FFI + 缓存
-```
+只做三件事，不做数值迭代：
 
-关键设计：
+（1）构造问题；
+（2）调 Rust 迭代器；
+（3）解释结果。
 
-- **迭代求解器并入 `e2m2e-integrators` crate**，新增 `solver/` 子模块（newton.rs/continuation.rs），与现有 multiple_shooting/segmented_shooting/homotopy 同类集中。不新开 crate。
-- **力模型算法归 Rust**（`e2m2e-forces`），Python 侧 `algorithm/forces/` 保留同名类（参数验证 + to_rust_spec 序列化 + 无 Rust 时的兜底计算）。
-- **下沉 Rust 的算法，Python 侧保留同名薄封装**（DifferentialCorrection/Continuation/MultipleShooting 类名保留）：Python 类是"问题构造入口"，迭代循环/收敛判断在 Rust。
-- **Rust 不吃 SPICE 句柄**，只吃注入数据（星历缓存样条表）。
+任务级 Facade（MCP/CLI 同源派生）、任务轨道设计的算法链（族初猜 → Rust 修正 → 高精度预报三段）、子问题构造（族策略、控制律、流形种子）三层编排。
 
-## 第3层 算法层 `algorithm/`
+## 4. CI 模块
 
-```
-e2m2e/algorithm/
-├── design/            # 任务轨道设计（三段编排）
-├── family/            # 轨道族生成（含 halo_family、strategies、注册表）
-├── station_keeping/   # 轨道保持（controller + 三控制律 + 误差模型 + 蒙特卡洛）
-├── transfer/          # 转移设计（transfer_orbit 编排器 + 数学模块）
-├── dynamics/          # System + Dynamics
-├── forces/            # 力模型类
-├── propagation.py     # 轨道预报薄壳（单文件模块）
-├── coordinate/        # 坐标转换算法
-├── manifold/          # 不变流形 + 庞加莱截面
-├── proximity/         # 相对运动
-├── stability.py       # 稳定性
-├── normal_form/       # 正规化（可选依赖）
-└── nominal_orbit/     # 名义轨道
-```
+支持 Linux x64 AMD（Ubuntu、麒麟等操作系统）、Linux ARM（aarch64，鲲鹏/飞腾）、Windows 平台的软件编译。三平台 wheel 矩阵 + sdist + GitHub Release + PyPI；CSPICE 编译包（x86_64 转存 NAIF 官方包，aarch64 自建）走 GitHub Release；麒麟等国产系统靠 manylinux 2_28 的 glibc 基线覆盖。
 
-关键设计：
+## 5. 数据管理模块
 
-- **轨道族注册表 = 函数形态**：`_REGISTRY: dict[str, Callable]`，注册表值 = 设计函数 `design_xxx(params) -> Orbit`。`design_orbit` 查注册表按族分发。新族 = 写一个设计函数 + 注册。
-- **algorithm/design/ 持有三段编排**：family（初猜）→ 星历修正（Rust 多重打靶 `multiple_shooting_correct_py`，segmented 或稳定轨道默认路径）→ propagation（高精度预报）。
-- **algorithm/transfer/ 按数学类型组织**：脉冲（lambert/three_body_lambert/multi_impulse）、自然动力学（low_energy/manifold）、低推力（low_thrust/）、任务层（search/optimize/porkchop）。`transfer_design` 编排器按 transfer_type 组合。
-- **System + Dynamics 都归 algorithm/dynamics/**（一对，拆开割裂"动力学"概念）；标准参数数据归 data/templates/systems.py。
-- **最终形态留 Python 的领域知识模块**：family 种子、站保控制律、manifold 种子/截面、transfer 编排、design 编排、coordinate 转换、normal_form 约化、nominal_orbit。
+（1）GitHub Release 管理一些编译库、星历数据、CSPICE 编译库（按版本发布，脚本拉取）；
+（2）Git 跟踪一些轨道的初值（族种子参数）；
+（3）本地产物不入库。
 
-## 第4层 接口层 `api/`
+后续这一模块还会扩展支持智能博弈，作为大数据研究的数据基础。现在的基本数据用 npz 格式存储（无 schema、无版本号），后续需要详细进行设计：带版本与 schema 的序列化、以 EphemerisTable 为统一中间格式，引入与各种典型星历数据格式的转换（CCSDS OEM/ODM、SPICE BSP/PCK 等）。
 
-```
-e2m2e/api/
-├── facade.py          # Facade 门面：唯一公开顶级入口
-├── config.py          # 配置（只管运行环境）
-├── models.py          # 公开数据模型（Pydantic）
-├── mcp/               # MCP 服务
-│   ├── server.py      # MCP 服务器
-│   └── tools.py       # 工具注册
-└── cli/               # 命令行
-    └── main.py        # e2m2e 命令
-```
-
-关键设计：
-
-- **Facade 是唯一入口**，方法对应"任务级能力"（粗粒度）。算法层保留细粒度 API（专家用）。
-- **纯派生 + 元数据标记**：MCP 工具 = Facade 方法全集；Facade 方法带 `mcp_exposed: bool` 元数据（一档二档 True、三档/辅助 False）。
-- **Pydantic 模型全部手写**：输入/输出/错误模型精雕参数单位、默认值、取值域（如 perilune_height∈[100,10000]、duration∈(0,20]）。
-- **Facade 返回专属 Pydantic 模型**；MCP 传输层包统一信封（{status, data, error, meta}）。
-- **CLI 子命令 = Facade 方法**（mcp_exposed=True 的），参数从同一份 Pydantic 模型生成。CLI 与 MCP 完全对称。
-- **MCP 部署形态 = 进程内库为主体 + CLI 薄包装 mcp-serve**：`create_server(facade)` 函数 + `e2m2e mcp-serve` 子命令。一个 Facade 实例 = 一个 server。
-- **config.py 构造注入**：`Facade(config=Config(...))`，内部默认从环境变量读；SPICEManager 全局句柄、r2s2 进程单例作为已知限制用 Config 显式管理。
-
-### MCP 工具清单
-
-一档任务级（稳定骨架，会增）：`orbit_design` / `orbit_control` / `transfer_design` / `orbit_propagation` / `spacetime_transform`。
-
-二档子任务级（会增）：`orbit_family_generation` / `orbit_stability` / `transfer_search` / `low_thrust_design` / `manifold_analysis` / `low_energy_transfer` / `relative_motion`。
-
-三档辅助（不注册）：`porkchop` / `normal_form` / `safety` / `visualize` / 格式读写。
-
-## 第5层 工具层 `tools/`
-
-```
-e2m2e/tools/
-└── logging/           # 结构化日志
-```
-
-关键设计：
-
-- **标准 logging + 关键事件键值对、零新依赖**：算法层保持 `logger.info`，打靶/延拓迭代等关键数值事件用键值对；`tools/logging/` 提供配置工厂。
-- **日志 ≠ 结果**：算法最终结果在结果对象里，日志只记过程事件。
-
-## 依赖方向规则
-
-```
-api/ → algorithm/ + data/
-algorithm/ → data/ + _integrators
-data/ → 仅外部库（SPICE/r2s2/numpy）
-integrators.py → _integrators
-tools/ → 任意（辅助，核心不 import tools/）
-```
-
-**硬规则**：算法层不 import api/；数据层不 import algorithm/。Pydantic 只在 api/ 边界。CI 跑 import 检查强制。
-
-## 验证策略
-
-- **正确性由物理定义裁决**：解析解对照（二体传播闭合、圆轨道半径不变、Jacobi 常数守恒、STM 行列式=1 辛性质、霍曼转移 Δv 匹配理论值）+ 物理不变量。
-- **测试标准允许文献公式/解析值，不允许其他软件运行输出**。Vallado 公式、Richardson 系数是"轨道力学公理"；其他软件输出不是定义。
-- **不需要 golden 对照，不需要与其他软件强制对比**。
-- **按功能类目组织测试**（`theory`/`integrator`/`force`/`data`/`orchestration`/`interface`/`aux`，见 ADR 0021），正确性由物理定义裁决（ADR 0013）；CI 维持静态门，测试在 release 前跑全量。
-
-## 文档结构
-
-```
-docs/
-├── index.rst            # 总入口
-├── getting-started/     # 安装/快速开始/可视化
-├── data/                # 数据层文档
-├── algorithm/           # 算法层文档
-├── api/                 # 接口层文档
-├── tools/               # 工具层文档
-├── architecture/        # 架构说明（本文）
-├── reference/           # 术语表、ADRs
-└── adr/                 # ADR
-```
-
-README 加"能力与实现状态"表（每个能力标 已实现/部分/未实现）。占位函数 docstring 写清实现状态。
-
-## 迁移记录（已完成）
-
-迁移已于 2026-08 完成（ADR 0011）。旧包 core/algorithms/transfer/dfh/io/visualization/proximity 已删除，sys.modules 别名已移除。迁移时留作占位的能力（ECOM 光压、角动量管理、LGA/WSB/HMN 转移、低推力等）现已落地，见 README 能力表。
-
-## 依赖与 extras
-
-- 核心依赖轻量：numpy/scipy/pydantic/r2s2/spiceypy/pyerfa/tqdm。
-- `[normal-form]`：sympy/joblib（正规化）。
-- `[mcp]`：MCP 协议层（部署 MCP 服务器时）。
+其中，部分计算功能还由 Python 执行（延拓、Q-law、NLP、NSGA-II、低推力打靶等），正在逐步迁移至 Rust 计算核心。时空系统和常量模块还需要进一步审查（三条帧转换路径并存、时间转换责任链）。Python 编排模块架构还不够稳定（打靶双路径、transfer 目录数值残留），需要进一步审查和进行系统设计。
