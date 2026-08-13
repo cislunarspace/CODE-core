@@ -12,7 +12,8 @@ transfer_design/orbit_propagation/spacetime_transform），二档子任务已接
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
@@ -35,7 +36,7 @@ from .models import (
     TransferDesignResponse,
 )
 
-__all__ = ["Facade", "mcp_tools"]
+__all__ = ["Facade", "ToolInfo", "mcp_tools", "tool_inventory"]
 
 if TYPE_CHECKING:
     # 仅类型检查用：算法/数据层结果类型（运行时懒加载，见各 Facade 方法内 import）。
@@ -44,10 +45,31 @@ if TYPE_CHECKING:
     from e2m2e.data.types.trajectory import EphemerisTable
 
 
-def mcp_exposed(func):
-    """标记 Facade 方法对 MCP 暴露（纯派生 + 元数据标记，ADR 0014）。"""
-    func.mcp_exposed = True  # type: ignore[attr-defined]
-    return func
+@dataclasses.dataclass(frozen=True)
+class ToolInfo:
+    """Facade 工具的机器可读元数据。"""
+
+    name: str
+    mcp_exposed: bool
+    status: Literal["implemented", "placeholder"]
+    request_model: type[Any] | None = None
+
+
+def mcp_exposed(
+    func: Callable[..., Any] | None = None,
+    *,
+    status: Literal["implemented", "placeholder"] = "implemented",
+    request_model: type[Any] | None = None,
+) -> Callable[..., Any]:
+    """标记 Facade 方法对 MCP 暴露并记录其实现状态和请求模型。"""
+
+    def decorate(function: Callable[..., Any]) -> Callable[..., Any]:
+        function.mcp_exposed = True  # type: ignore[attr-defined]
+        function.tool_status = status  # type: ignore[attr-defined]
+        function.request_model = request_model  # type: ignore[attr-defined]
+        return function
+
+    return decorate(func) if func is not None else decorate
 
 
 def _result_triplet(result: Any) -> tuple[ConvergenceState, FailureCause, str]:
@@ -212,7 +234,7 @@ class Facade:
 
     # ---- 一档任务（mcp_exposed=True）----
 
-    @mcp_exposed
+    @mcp_exposed(request_model=DesignOrbitRequest)
     def design_orbit(self, **params) -> DesignOrbitResponse:
         """任务轨道设计（一档）。
 
@@ -238,7 +260,7 @@ class Facade:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("DESIGN_FAILED", message, status=status, cause=cause) from exc
 
-    @mcp_exposed
+    @mcp_exposed(request_model=ControlOrbitRequest)
     def control_orbit(self, **params) -> ControlOrbitResponse:
         """轨道保持（一档）。
 
@@ -301,7 +323,7 @@ class Facade:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("CONTROL_FAILED", message, status=status, cause=cause) from exc
 
-    @mcp_exposed
+    @mcp_exposed(request_model=TransferDesignRequest)
     def transfer_design(self, **params) -> TransferDesignResponse:
         """转移轨道设计（一档）。
 
@@ -362,7 +384,7 @@ class Facade:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("TRANSFER_FAILED", message, status=status, cause=cause) from exc
 
-    @mcp_exposed
+    @mcp_exposed(request_model=PropagationRequest)
     def orbit_propagation(self, **params) -> PropagationResponse:
         """轨道预报（一档）。
 
@@ -415,7 +437,7 @@ class Facade:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("PROPAGATION_FAILED", message, status=status, cause=cause) from exc
 
-    @mcp_exposed
+    @mcp_exposed(request_model=SpacetimeTransformRequest)
     def spacetime_transform(self, **params) -> SpacetimeTransformResponse:
         """时空坐标转换（一档）。
 
@@ -473,7 +495,7 @@ class Facade:
 
     # ---- 二档子任务（mcp_exposed=True）----
 
-    @mcp_exposed
+    @mcp_exposed(request_model=FamilyGenerationRequest)
     def orbit_family_generation(self, **params) -> Any:
         """轨道族生成（二档）。
 
@@ -522,7 +544,7 @@ class Facade:
             raise OrbitError("INVALID_PARAMS", "orbit 参数必填")
         return StabilityAnalysis(orbit=orbit, dynamics=dynamics).analyze()
 
-    @mcp_exposed
+    @mcp_exposed(status="placeholder")
     def transfer_search(self, **params) -> Any:
         """转移网格搜索（二档）。
 
@@ -530,7 +552,7 @@ class Facade:
         """
         raise NotImplementedError("Facade.transfer_search 待接入 algorithm/transfer/")
 
-    @mcp_exposed
+    @mcp_exposed(status="placeholder")
     def low_thrust_design(self, **params) -> Any:
         """小推力转移设计（二档）。
 
@@ -538,7 +560,7 @@ class Facade:
         """
         raise NotImplementedError("Facade.low_thrust_design 待接入 algorithm/transfer/")
 
-    @mcp_exposed
+    @mcp_exposed(status="placeholder")
     def manifold_analysis(self, **params) -> Any:
         """不变流形分析（二档）。
 
@@ -546,7 +568,7 @@ class Facade:
         """
         raise NotImplementedError("Facade.manifold_analysis 待接入 algorithm/manifold/")
 
-    @mcp_exposed
+    @mcp_exposed(status="placeholder")
     def low_energy_transfer(self, **params) -> Any:
         """低能转移（二档）。
 
@@ -554,7 +576,7 @@ class Facade:
         """
         raise NotImplementedError("Facade.low_energy_transfer 待接入 algorithm/transfer/")
 
-    @mcp_exposed
+    @mcp_exposed(status="placeholder")
     def relative_motion(self, **params) -> Any:
         """相对运动（二档）。
 
@@ -574,3 +596,19 @@ def mcp_tools(facade: Facade) -> list[str]:
         if callable(attr) and getattr(attr, "mcp_exposed", False):
             names.append(name)
     return names
+
+
+def tool_inventory(facade: Facade) -> list[ToolInfo]:
+    """返回对 MCP 暴露的 Facade 工具及其实现元数据。"""
+    inventory: list[ToolInfo] = []
+    for name in mcp_tools(facade):
+        method = getattr(facade, name)
+        inventory.append(
+            ToolInfo(
+                name=name,
+                mcp_exposed=True,
+                status=method.tool_status,
+                request_model=method.request_model,
+            )
+        )
+    return inventory

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from e2m2e.api import NumericRange
+from e2m2e.api import NumericRange, ToolInfo, tool_inventory
 from e2m2e.api.facade import Facade, mcp_tools
 from e2m2e.api.models import (
     ControlOrbitRequest,
@@ -529,6 +529,39 @@ class TestMcpTools:
         assert "orbit_propagation" in names
         assert "spacetime_transform" in names
         assert "orbit_family_generation" in names
+
+    def test_inventory_describes_exposed_tool_status_and_request_models(self):
+        inventory = tool_inventory(Facade())
+        by_name = {tool.name: tool for tool in inventory}
+
+        assert len(inventory) == 12
+        assert {tool.name for tool in inventory} == set(mcp_tools(Facade()))
+        assert all(isinstance(tool, ToolInfo) and tool.mcp_exposed for tool in inventory)
+
+        for name in {
+            "transfer_search",
+            "low_thrust_design",
+            "manifold_analysis",
+            "low_energy_transfer",
+            "relative_motion",
+        }:
+            assert by_name[name].status == "placeholder"
+            assert by_name[name].request_model is None
+
+        expected_request_models = {
+            "design_orbit": DesignOrbitRequest,
+            "control_orbit": ControlOrbitRequest,
+            "transfer_design": TransferDesignRequest,
+            "orbit_propagation": PropagationRequest,
+            "spacetime_transform": SpacetimeTransformRequest,
+            "orbit_family_generation": FamilyGenerationRequest,
+        }
+        for name, request_model in expected_request_models.items():
+            assert by_name[name].status == "implemented"
+            assert by_name[name].request_model is request_model
+
+        assert by_name["orbit_stability"].status == "implemented"
+        assert by_name["orbit_stability"].request_model is None
 
 
 class TestFacadeCallChain:
