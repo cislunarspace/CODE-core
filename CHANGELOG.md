@@ -1,5 +1,11 @@
 # 变更日志
 
+## [5.6.8] - 2026-08-13
+
+### Fixed
+- **segmented 星历位置与时间网格错位，GUI 中 Halo 轨道一圈一圈偏离**（#398）：`_prepare_t_eval` 在 `t_eval` 末尾自动追加段终点 `tf`，segmented 逐段积分把每段多出的 `tf` 端点状态拼进 `states_dense`，位置数组比时间网格多出段数个点，`batch_j2000_to_synodic` 按索引配对位置与旋转时刻后错位逐段累积。逐段积分 mask 改右开区间（seam 整点只归后段）、每段输出截断丢 `tf` 端点，`states_dense` 与 `et_grid` 严格逐点对齐；ELFO 路径同类问题（duration 非整小时时多出 1 点）按 `min` 截断对齐；`_build_ephemeris_table` 加长度一致性断言防回归。
+- **segmented 尾部窗口无段覆盖，长 duration 星历缺尾部数据**（#398 连带）：打靶节点采样不含圈终点（`endpoint=False`），右开 mask 只覆盖到最后打靶节点，`et_grid` 尾部（最后节点与 `n_rev` 圈终点之间）无段覆盖，状态点数少于时间网格（43 天 Halo 实测 1022 vs 1033，差 11 点），此前无断言时静默缺尾部数据。最后一段 mask 改闭区间、`t_span` 终点延伸到 `et_grid` 尾部；段间去重（右开后为死代码）删除；ELFO `min()` 静默截断改显式报错。新增 30 天 Halo 端到端与 43 天尾部窗口回归测试。
+
 ## [5.6.7] - 2026-08-12
 
 ### Fixed
