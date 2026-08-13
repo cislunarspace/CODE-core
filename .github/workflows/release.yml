@@ -13,9 +13,11 @@ permissions:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v7
       # lint 只需 ruff，不装项目本体：uv sync 构建 editable 会编译 cspice-sys，
       # 未设 CSPICE_DIR 直接报错（v5.6.6 起 CSPICE 只从 GitHub release 取
@@ -25,9 +27,11 @@ jobs:
       - run: uv run --no-sync ruff format --check .
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: astral-sh/setup-uv@v7
       # spice 为默认 feature：cargo test --workspace 编译并跑 spice-gated 代码，
@@ -42,6 +46,12 @@ jobs:
         run: uv run --no-sync python scripts/download_kernels.py
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # cargo 编译缓存：cargo test 全量 debug 编译约 40s → 增量。key 含 job id
+      # 与 OS/arch（rust-cache 默认），与 clippy 缓存天然隔离（check 产物对
+      # codegen 无用，混用无收益）。
+      - uses: Swatinem/rust-cache@v2
+        with:
+          env-vars: CSPICE_DIR
       # --test-threads=1：CSPICE 全局线程锁，spice-gated 测试串行避免竞争。
       # spice 默认开启后单趟 cargo test --workspace 即覆盖原 forces 单独 spice 趟。
       - run: cargo test --workspace -- --test-threads=1
@@ -51,11 +61,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-          - os: windows-latest
+          - os: windows-2025
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -63,6 +73,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
@@ -70,7 +81,7 @@ jobs:
       # 会抢先解析到 WindowsApps\python3.EXE，maturin 探 Python 解释器时撞
       # EACCES。锁定 setup-python 装到的真实解释器并前置到 PATH。
       - name: Pin real Python on PATH (windows MS Store stub workaround)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-2025'
         shell: pwsh
         run: |
           $realPy = (py -3 -c "import sys; print(sys.executable)")
@@ -101,6 +112,14 @@ jobs:
       - name: 下载 SPICE 编译包（cspice-v1 release）
         shell: bash
         run: python scripts/download_cspice.py >> "$GITHUB_ENV"
+      # cargo 编译缓存：wheel release 全量编译（linux 容器内 6min / windows 2min）
+      # → 增量。linux 经 maturin-action 容器构建，workspace（含 target/）同路径
+      # 挂载进容器，host 侧的缓存恢复/保存对容器内构建生效；key 默认含 OS/arch，
+      # x86_64、aarch64、windows 三平台天然隔离。容器内 $CARGO_HOME（registry）
+      # 与 host 不共享，依赖源码仍每次下载（约 20s，不重编）。
+      - uses: Swatinem/rust-cache@v2
+        with:
+          env-vars: CSPICE_DIR
       - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:
@@ -121,13 +140,13 @@ jobs:
             export CSPICE_DIR="$(python3 scripts/download_cspice.py --print-cspice-dir)"
             yum install -y openssl-devel clang-libs clang
       - name: Build sdist
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-24.04'
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
           args: --out dist
       - name: Ensure license files in sdist
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-24.04'
         shell: bash
         run: |
           # maturin sdist 不含仓库根目录的 LICENSE/NOTICE（cargo package 只打包
@@ -148,7 +167,7 @@ jobs:
 
   github-release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -164,7 +183,7 @@ jobs:
 
   publish-pypi:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: pypi
     permissions:
       id-token: write

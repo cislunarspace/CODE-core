@@ -1,6 +1,9 @@
 name: CI
 
 on:
+  # 不加 paths-ignore：lint 是 branch protection 的 required check，workflow
+  # 按路径过滤不触发时 check 永不出现，docs-only PR 会被永久 pending 阻塞。
+  # 提速靠缓存与 --no-install-project，不靠跳跑。
   push:
     branches: [master]
   pull_request:
@@ -15,9 +18,11 @@ permissions:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -39,26 +44,33 @@ jobs:
         run: uv run --no-sync python scripts/download_cspice.py >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # cargo 编译缓存：clippy 全量约 30s → 增量数秒。cspice-sys 声明了
+      # rerun-if-env-changed=CSPICE_DIR，CSPICE_DIR 入 key 防缓存串味。
+      - uses: Swatinem/rust-cache@v2
+        with:
+          env-vars: CSPICE_DIR
       - run: cargo clippy --workspace -- -D warnings
-      # Python 格式与风格
-      - run: uv sync --group dev
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
+      # ruff 与两个结构检查脚本均为静态扫描（脚本只用标准库 ast），不 import
+      # 项目本体：--no-install-project 跳过 Rust 扩展构建（此前每次白编 30s+），
+      # 后续 uv run 加 --no-sync 防触发重新同步（同 release.yml lint 模式）。
+      - run: uv sync --group dev --no-install-project
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync ruff format --check .
       # 五层依赖方向检查（ADR 0012）：data/algorithm/api 无越层 import
-      - run: uv run python scripts/check_layer_imports.py
+      - run: uv run --no-sync python scripts/check_layer_imports.py
       # 已删目录无引用检查（ADR 0021 迁移防漏，#372）
-      - run: uv run python scripts/check_deleted_dir_refs.py
+      - run: uv run --no-sync python scripts/check_deleted_dir_refs.py
 
 
   typecheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v7
-      # downloadcspice 已禁用（a80dbd8）：uv sync 构建扩展须先设 CSPICE_DIR
-      - name: 下载 SPICE 编译包（cspice-v1 release；缓存命中则跳过）
-        run: uv run --no-sync python scripts/download_cspice.py >> "$GITHUB_ENV"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: uv sync --group dev
-      - run: uv run mypy e2m2e/ --ignore-missing-imports
+      # mypy 静态解析源码、不执行代码，--ignore-missing-imports 已静默
+      # e2m2e._integrators 等 native 扩展：--no-install-project 跳过扩展构建
+      # （此前每次白编约 50s），连带无需下载 CSPICE 编译包。
+      - run: uv sync --group dev --no-install-project
+      - run: uv run --no-sync mypy e2m2e/ --ignore-missing-imports
