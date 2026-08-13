@@ -122,16 +122,24 @@ docs = [
 
 [tool.uv.sources]
 # calcephpy（r2s2 的传递依赖）PyPI 仅有 sdist，Windows 需 cmake+MSVC、Linux 需
-# cmake+gcc 现场编译。在 Windows/Linux 上按 Python 版本指向本仓库 calcephpy-v1
-# release 的预编译 wheel；其他平台不匹配 marker，回落到 PyPI sdist 现场编译。
+# cmake+gcc 现场编译。在 Windows/Linux（x86_64 与 aarch64）上按 Python 版本指向本
+# 仓库 calcephpy-v1 release 的预编译 wheel；其他平台不匹配 marker，回落到 PyPI
+# sdist 现场编译。aarch64 wheel 由 calcephpy-wheel.yml 在 arm64 runner 上构建
+# （auditwheel 对 aarch64 只打 manylinux_2_28 标签，无 manylinux2014 前缀）。
 # 重新生成 uv.lock 需 uv lock --upgrade-package calcephpy。
 calcephpy = [
   { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-win_amd64.whl", marker = "sys_platform == 'win32' and python_version == '3.10'" },
   { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-win_amd64.whl", marker = "sys_platform == 'win32' and python_version == '3.11'" },
   { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-win_amd64.whl", marker = "sys_platform == 'win32' and python_version == '3.12'" },
   { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-win_amd64.whl", marker = "sys_platform == 'win32' and python_version == '3.13'" },
-  { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.10'" },
-  { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.11'" },
-  { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.12'" },
-  { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.13'" },
+  { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.10' and platform_machine == 'x86_64'" },
+  { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.11' and platform_machine == 'x86_64'" },
+  { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.12' and platform_machine == 'x86_64'" },
+  { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.13' and platform_machine == 'x86_64'" },
+  # aarch64 wheel 尚未发布（calcephpy-wheel.yml 的 build-linux-aarch64 job 跑完
+  # 并上传 calcephpy-v1 后取消以下 4 条注释，再 uv lock --upgrade-package calcephpy）。
+  # { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux_2_28_aarch64.whl", marker = "sys_platform == 'linux' and python_version == '3.10' and platform_machine == 'aarch64'" },
+  # { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux_2_28_aarch64.whl", marker = "sys_platform == 'linux' and python_version == '3.11' and platform_machine == 'aarch64'" },
+  # { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux_2_28_aarch64.whl", marker = "sys_platform == 'linux' and python_version == '3.12' and platform_machine == 'aarch64'" },
+  # { url = "https://github.com/cislunarspace/e2m2e/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux_2_28_aarch64.whl", marker = "sys_platform == 'linux' and python_version == '3.13' and platform_machine == 'aarch64'" },
 ]

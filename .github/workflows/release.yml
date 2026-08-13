@@ -53,6 +53,8 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
           - os: windows-latest
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
@@ -91,8 +93,11 @@ jobs:
       # cspice-sys 1.0.4 的 downloadcspice 走 reqwest→native-tls→openssl-sys，
       # 找不到 pkg-config 文件而失败。manylinux_2_28 镜像自带 openssl 1.1.1
       # 与 openssl-devel（含 openssl.pc），加上 before-script 兜底安装。
-      # SPICE 编译包来自 cspice-v1 release（scripts/download_cspice.py），
-      # 设好 CSPICE_DIR 后 cspice-sys 跳过 NAIF 下载（国内网络常不可达）。
+      # SPICE 编译包来自 cspice-v1 release（scripts/download_cspice.py 按
+      # runner 架构自动选 x86_64/aarch64 资产），设好 CSPICE_DIR 后 cspice-sys
+      # 跳过 NAIF 下载（国内网络常不可达）。aarch64 条目跑在原生 arm64 runner
+      # （ubuntu-24.04-arm），maturin-action 自动用 manylinux_2_28_aarch64 容器，
+      # 无交叉工具链问题；CSPICE aarch64 库由 cspice-aarch64-build.yml 维护。
       - name: 下载 SPICE 编译包（cspice-v1 release）
         shell: bash
         run: python scripts/download_cspice.py >> "$GITHUB_ENV"

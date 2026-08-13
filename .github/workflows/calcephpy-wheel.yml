@@ -114,8 +114,61 @@ jobs:
           name: wheel-linux-${{ matrix.python }}
           path: /tmp/repaired/*.whl
 
+  # Linux aarch64 wheel：与 build-linux 同逻辑，但跑在 GitHub 原生 arm64
+  # runner + manylinux_2_28_aarch64 容器（quay.io/pypa 官方镜像，自带
+  # cmake+gcc+uv）。e2m2e 支持 aarch64 后，arm 用户经 [tool.uv.sources]
+  # 直接拉预编译 wheel，免现场编译。
+  build-linux-aarch64:
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    container:
+      image: quay.io/pypa/manylinux_2_28_aarch64
+    env:
+      # uv python install 装的完整 CPython 的 bin 目录（安装后取真实路径）
+      PY_VER: ${{ matrix.python }}
+    steps:
+      - name: Show toolchain
+        run: |
+          cmake --version
+          uv --version
+      - name: 安装完整版 CPython（含 libpython 开发文件）
+        run: |
+          set -eux
+          uv python install ${PY_VER}
+          # uv python find 返回的是 python 可执行文件完整路径（.../bin/python3.x）
+          echo "PY=$(uv python find ${PY_VER})" >> "$GITHUB_ENV"
+          echo "PYROOT=$(dirname "$(dirname "$(uv python find ${PY_VER})")")" >> "$GITHUB_ENV"
+      - name: Build wheel
+        run: |
+          set -eux
+          ${PY} -m venv /tmp/v
+          /tmp/v/bin/pip install --no-cache-dir setuptools cython wheel
+          # Python_EXECUTABLE + Python_ROOT_DIR：让 cmake 找到完整 CPython 的
+          # include/libpython（stripped 的 /opt/python 找不到）。
+          export Python_EXECUTABLE=$PY
+          export Python_ROOT_DIR=$PYROOT
+          /tmp/v/bin/pip wheel calcephpy==5.0.0 --no-deps --no-build-isolation -w /tmp/wheelhouse/
+      - name: auditwheel repair（打 manylinux 标签并校验合规性）
+        run: |
+          set -eux
+          auditwheel repair -w /tmp/repaired /tmp/wheelhouse/*.whl
+          ls -la /tmp/repaired/
+      - name: Smoke test（安装并 import）
+        run: |
+          set -eux
+          /tmp/v/bin/pip install numpy
+          /tmp/v/bin/pip install --no-deps --no-index --find-links /tmp/repaired/ calcephpy
+          /tmp/v/bin/python -c "import calcephpy; print('calcephpy import OK')"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheel-linux-aarch64-${{ matrix.python }}
+          path: /tmp/repaired/*.whl
+
   release:
-    needs: [build, build-linux]
+    needs: [build, build-linux, build-linux-aarch64]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8
@@ -133,8 +186,8 @@ jobs:
           gh release create calcephpy-v1 \
             --repo "$GITHUB_REPOSITORY" \
             --target master \
-            --title "calcephpy 预编译 wheel（Windows + Linux）" \
-            --notes "calcephpy 5.0.0 的预编译 wheel：Windows（cp310–cp313，win_amd64）+ Linux（cp310–cp313，manylinux_2_28_x86_64）。PyPI 仅有 sdist，Windows 需 MSVC、Linux 需 gcc 现场编译；此处提供预编译产物，供 e2m2e / transfer-orbit-design 的 uv sync 经 find-links 直接拉取。calcephpy 归 IMCCE/CNRS，CeCILL-C/B 或 CeCILL v2.1 许可。" \
+            --title "calcephpy 预编译 wheel（Windows + Linux x86_64 + Linux aarch64）" \
+            --notes "calcephpy 5.0.0 的预编译 wheel：Windows（cp310–cp313，win_amd64）+ Linux x86_64（cp310–cp313，manylinux_2_28_x86_64）+ Linux aarch64（cp310–cp313，manylinux_2_28_aarch64）。PyPI 仅有 sdist，Windows 需 MSVC、Linux 需 gcc 现场编译；此处提供预编译产物，供 e2m2e / transfer-orbit-design 的 uv sync 经 find-links 直接拉取。calcephpy 归 IMCCE/CNRS，CeCILL-C/B 或 CeCILL v2.1 许可。" \
             || true
           gh release upload calcephpy-v1 dist/*.whl --repo "$GITHUB_REPOSITORY" --clobber
 

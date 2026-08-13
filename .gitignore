@@ -99,7 +99,8 @@ examples/main_*.png
 # 下载方式：https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/
 kernels/*.bsp
 # 本地 CSPICE 库与下载缓存（scripts/download_cspice.py 生成）
-cspice/
+# 只忽略仓库根目录的 cspice/（手动解压的 CSPICE 源码包），不动 crates/cspice/
+/cspice/
 .cspice/
 # cspice 运行产生的 Fortran 临时输出
 fort.*

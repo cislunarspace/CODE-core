@@ -1,5 +1,10 @@
 # 变更日志
 
+## [Unreleased]
+
+### Added
+- **aarch64 Linux（arm64）构建与发布支持**：CSPICE 无官方 Linux ARM64 预编译包（NAIF 仅 x86_64，conda-forge 亦无），新增 `cspice-aarch64-build.yml` 在 GitHub 原生 arm64 runner 上从 NAIF 源码包（cspice-sys 同源 URL）编译静态库并发布到 `cspice-v1` release；`scripts/download_cspice.py` 按机器架构选择 x86_64/aarch64 资产（解压目录按架构隔离，避免缓存串用）；release 工作流构建矩阵增加 `ubuntu-24.04-arm`（maturin-action 自动用 manylinux_2_28_aarch64 容器）；calcephpy 增加 aarch64 预编译 wheel（calcephpy-wheel.yml 的 build-linux-aarch64 job）与 `[tool.uv.sources]` 条目，arm 用户免现场编译；CI 新增 arm64 回归 job（cargo test 全量跑在原生 arm64 runner）。
+
 ## [5.6.8] - 2026-08-13
 
 ### Fixed

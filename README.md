@@ -17,6 +17,8 @@ e2m2e 是面向地月空间任务规划的**算法工具集基础设施**。在�
 uv pip install e2m2e
 ```
 
+发布物覆盖 Windows x86_64、Linux x86_64 与 Linux aarch64（arm64，如鲲鹏/飞腾/树莓派）的 wheel；其余平台从源码构建。
+
 在自己的项目中使用：
 
 ```bash

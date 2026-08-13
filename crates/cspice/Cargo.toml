@@ -1,0 +1,28 @@
+# cspice 0.1.0 的仓库内 vendor（上游 jacob-pro/cspice-rs，LGPL-3.0）。
+#
+# 背景：上游 cspice 0.1.0 的 string.rs 在 aarch64 上编译失败（E0606）——
+# aarch64 的 C char 是 unsigned，cspice-sys bindgen 生成的 SpiceChar = u8，
+# `&[u8] as *const [i8]` 非法 cast；上游 master 至今未修（2026-08 确认）。
+# 经 [patch.crates-io]（根 Cargo.toml）以本目录替代 crates.io 的 cspice 0.1.0，
+# 修复见 src/string.rs 的 from_buffer（from_raw_parts 写法，架构无关）。
+# 其余代码与上游 0.1.0 逐字节一致；升级上游前先核对上游是否已修复该 cast。
+# LGPL-3.0 文本见 LICENSE；本目录不是 workspace member，不进 clippy/fmt 检查。
+
+[package]
+name = "cspice"
+version = "0.1.0"
+edition = "2021"
+description = "Safe wrapper around the NAIF CSPICE toolkit"
+license = "LGPL-3.0"
+authors = ["Jacob Halsey <jacob@jhalsey.com>", "Contributors"]
+homepage = "https://github.com/jacob-pro/cspice-rs/tree/master/cspice"
+repository = "https://github.com/jacob-pro/cspice-rs"
+
+[dependencies]
+chrono = { version = "0.4.19", optional = true }
+cspice-sys = "1.0"
+derive_more = "0.99.17"
+parking_lot = "0.12.1"
+serde = { version = "1.0.137", features = ["derive"] }
+serde_plain = "1.0.0"
+thiserror = "1.0.31"

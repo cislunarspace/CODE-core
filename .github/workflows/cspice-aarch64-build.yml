@@ -1,0 +1,83 @@
+# 在 GitHub arm64 runner 上从 NAIF 源码包编译 aarch64 的 CSPICE 静态库，
+# 打包 cspice-linux-aarch64.zip 发布到 cspice-v1 release，供 download_cspice.py
+# 在 aarch64 Linux 上构建 e2m2e 时下载。
+#
+# 背景：NAIF 官方只发布 x86_64 的 Linux 工具包（PC_Linux_GCC_64bit），conda-forge
+# 亦无 linux-aarch64 的 cspice。aarch64 库只能拿 NAIF 源码发行包（与 cspice-sys
+# 1.0.4 的 downloadcspice feature 同 URL）在 arm64 上 make。GitHub 原生 arm64
+# runner（ubuntu-24.04-arm）native 编译，产物 lib/cspice.a 重命名为 libcspice.a
+# （cspice-sys 用 rustc-link-lib=static=cspice 链接，cargo 找 libcspice.a），
+# 与现有 cspice-linux.zip 同样的 include/ + lib/ 目录结构，解压子目录名
+# mice_linux_aarch64（与 x86_64 的 mice_linux 区分，避免缓存目录互相覆盖）。
+#
+# 触发：手动（Actions → Run workflow），或修改本 workflow 时自动。
+
+name: Build CSPICE aarch64 static lib
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/cspice-aarch64-build.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - name: 安装编译工具（make/gcc/csh；csh 供 NAIF 个别构建脚本用）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make gcc csh zip
+      - name: 下载 CSPICE 源码包（NAIF 官网，runner 在海外可达）
+        run: |
+          curl -fL --retry 3 -o cspice.tar.Z \
+            "https://naif.jpl.nasa.gov/pub/naif/toolkit//C/PC_Linux_GCC_64bit/packages/cspice.tar.Z"
+          ls -la cspice.tar.Z
+      - name: 解压
+        run: |
+          gzip -d cspice.tar.Z
+          tar xf cspice.tar
+          ls cspice/
+      - name: 编译（aarch64 native）
+        run: |
+          cd cspice
+          make 2>&1 | tail -30
+          ls -la lib/
+      - name: 校验产物并整理目录结构
+        run: |
+          set -eux
+          # make 产物是 lib/cspice.a（NAIF makefile），cspice-sys 需要 libcspice.a
+          cp cspice/lib/cspice.a cspice/lib/libcspice.a
+          file cspice/lib/libcspice.a
+          # 必须为 aarch64 ELF 静态库，否则后续 wheel 构建链接必炸
+          file cspice/lib/libcspice.a | grep -q aarch64
+          mkdir -p mice_linux_aarch64/include mice_linux_aarch64/lib
+          cp -r cspice/include/* mice_linux_aarch64/include/
+          cp cspice/lib/libcspice.a mice_linux_aarch64/lib/
+          # 冒烟：编译并链接一个最小 C 程序（furnsh_c 来自 libcspice.a）
+          printf '#include "SpiceUsr.h"\nint main(void){ furnsh_c(""); return 0; }\n' > smoke.c
+          gcc smoke.c -I mice_linux_aarch64/include mice_linux_aarch64/lib/libcspice.a -lm -o smoke
+          ./smoke && echo "SMOKE OK"
+      - name: 打包 cspice-linux-aarch64.zip
+        run: |
+          zip -r cspice-linux-aarch64.zip mice_linux_aarch64
+          ls -la cspice-linux-aarch64.zip
+      - name: 上传 cspice-v1 release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # release 不存在则创建（tag 指向 master HEAD）；已存在则跳过创建。
+          # upload --clobber 覆盖同名 asset，保证重跑幂等。
+          gh release create cspice-v1 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target master \
+            --title "CSPICE 预编译包（x86_64 Linux / x86_64 Windows / aarch64 Linux）" \
+            --notes "e2m2e 构建用 CSPICE 预编译静态库：cspice-linux.zip（x86_64，NAIF MICE 包转存）、cspice-windows.zip（x86_64，NAIF MICE 包转存）、cspice-linux-aarch64.zip（本工作流在 arm64 runner 上从 NAIF 源码包编译）。cspice-sys 经 CSPICE_DIR 使用，无 CSPICE_DIR 时构建直接报错。" \
+            || true
+          gh release upload cspice-v1 cspice-linux-aarch64.zip \
+            --repo "$GITHUB_REPOSITORY" --clobber
