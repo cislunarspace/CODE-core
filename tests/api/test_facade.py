@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import inspect
+from typing import Any
+
 import numpy as np
 import pytest
 from pydantic import ValidationError
@@ -22,6 +25,19 @@ from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.trajectory import EphemerisTable
 
 pytestmark = pytest.mark.interface
+
+_CONTROL_RUNTIME_PARAMS = {"spice", "kernel_dir", "n_workers", "seed"}
+
+
+def _control_business_params() -> dict[str, inspect.Parameter]:
+    """返回 ControlOrbitRequest 应覆盖的算法层业务参数。"""
+    from e2m2e.algorithm.station_keeping import control_orbit
+
+    return {
+        name: param
+        for name, param in inspect.signature(control_orbit).parameters.items()
+        if name != "input_ephemeris" and name not in _CONTROL_RUNTIME_PARAMS
+    }
 
 
 class TestDesignOrbitRequest:
@@ -55,6 +71,66 @@ class TestControlOrbitRequest:
         # mode 4 在 API 层不报错（engine_layout 校验在算法层）
         req = ControlOrbitRequest(input_ephemeris="x", control_mode=4)
         assert req.control_mode == 4
+
+    def test_num_controls_upper_bound(self):
+        with pytest.raises(ValidationError):
+            ControlOrbitRequest(input_ephemeris="x", num_controls=10001)
+        assert ControlOrbitRequest(input_ephemeris="x", num_controls=10000).num_controls == 10000
+
+    def test_num_monte_carlo_upper_bound(self):
+        with pytest.raises(ValidationError):
+            ControlOrbitRequest(input_ephemeris="x", num_monte_carlo=1001)
+        assert (
+            ControlOrbitRequest(input_ephemeris="x", num_monte_carlo=1000).num_monte_carlo == 1000
+        )
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("dyb", [0.0] * 8),
+            ("real_dyb", [0.0] * 10),
+            ("srp_offset_m", [0.0] * 2),
+            ("srp_torque", [0.0] * 4),
+        ],
+    )
+    def test_vector_lengths(self, field, value):
+        with pytest.raises(ValidationError):
+            ControlOrbitRequest(input_ephemeris="x", **{field: value})
+
+    @pytest.mark.parametrize(
+        "perturbation",
+        [{"unknown": 1}, {"sun_body": 2}, {"solar_radiation": 3}],
+    )
+    def test_perturbation_switches(self, perturbation):
+        with pytest.raises(ValidationError):
+            ControlOrbitRequest(input_ephemeris="x", perturbation=perturbation)
+
+
+class TestControlOrbitAlignment:
+    """模型与算法层签名对齐契约（#408）：字段集、默认值、schema 约束不漂移。"""
+
+    def test_request_covers_algorithm_business_params(self):
+        """模型字段集 ⊇ 算法层业务参数集（#408 缺口①的防漂移契约）。"""
+        business = set(_control_business_params())
+        model = set(ControlOrbitRequest.model_fields)
+        missing = business - model
+        assert not missing, f"算法层参数未进模型：{sorted(missing)}"
+
+    def test_defaults_match_algorithm_signature(self):
+        """模型默认值逐项等于算法层签名默认值（#408 缺口①）。"""
+        req = ControlOrbitRequest(input_ephemeris="x")
+        for name, param in _control_business_params().items():
+            assert getattr(req, name) == param.default, f"{name} 默认值不一致"
+
+    def test_schema_exposes_range_metadata(self):
+        """JSON schema 带 range 元数据，GUI 据此生成范围提示（#408 缺口②）。"""
+        props = ControlOrbitRequest.model_json_schema()["properties"]
+        assert props["num_controls"]["maximum"] == 10000
+        assert props["num_monte_carlo"]["maximum"] == 1000
+        assert props["control_interval"]["exclusiveMinimum"] == 0
+        assert props["position_accuracy"]["exclusiveMinimum"] == 0
+        assert props["earth_degree"]["minimum"] == 2
+        assert props["special_damping_factor"]["maximum"] == 1.0
 
 
 class TestTransferDesignRequest:
@@ -153,6 +229,47 @@ class TestFacade:
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
             facade.control_orbit(control_mode=9)
 
+    def test_control_orbit_upper_bounds(self):
+        """拍板的上界在模型层拦截（#408）：10001/1001 拒绝，10000/1000 放行。"""
+        facade = Facade()
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade.control_orbit(input_ephemeris="x", num_controls=10001)
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade.control_orbit(input_ephemeris="x", num_monte_carlo=1001)
+
+    def test_control_orbit_passthrough_to_algorithm(self, monkeypatch):
+        """facade 把模型全部算法参数透传给算法层（#408 缺口①的防漂移契约）。"""
+        import e2m2e.algorithm.station_keeping as sk
+
+        # 先取真实签名，再 patch（patch 后签名变为 fake 的 **kwargs）
+        business = set(_control_business_params())
+
+        captured: dict[str, Any] = {}
+
+        def fake_control(input_ephemeris, **kwargs):
+            captured.update(kwargs)
+            return _fake_control_result()
+
+        monkeypatch.setattr(sk, "control_orbit", fake_control)
+        Facade().control_orbit(
+            input_ephemeris="x",
+            control_interval=45.0,
+            feedback_arc=20.0,
+            position_accuracy=123.0,
+            thrust_mean=8.0,
+            tight_tolerance_km=0.5,
+        )
+        # 键集：算法层业务参数 + Facade 注入的 kernel_dir，一个不少
+        assert set(captured) == business | {"kernel_dir"}
+        # 非默认值确实到达（值透传，非仅键透传）
+        assert captured["control_interval"] == 45.0
+        assert captured["feedback_arc"] == 20.0
+        assert captured["position_accuracy"] == 123.0
+        assert captured["thrust_mean"] == 8.0
+        assert captured["tight_tolerance_km"] == 0.5
+        # 未显式传的字段带模型默认值
+        assert captured["num_controls"] == 120
+
     def test_transfer_design_invalid_params(self):
         facade = Facade()
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
@@ -247,6 +364,21 @@ class TestFacadeCallChain:
 # 让下游（transfer-orbit-design）可退回 Facade、移除 algorithm 层直调。
 # 这些测试不依赖 SPICE：直接验证序列化助手 + 纯翻译函数 + Pydantic 模型。
 # ---------------------------------------------------------------------------
+
+
+def _fake_control_result():
+    """构造鸭子类型 ControlOrbitResult（不调算法层、不需 SPICE）。"""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        num_failed=0,
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
+        message="任务完成",
+        sk_statistic=SimpleNamespace(rows=np.zeros((2, 3)), num_failed=0),
+        maneuvers=SimpleNamespace(mjd_tdb=np.array([60000.0]), delta_v_mps=np.array([1.0])),
+        controlled_ephemeris=None,
+    )
 
 
 def _make_ephemeris(n: int = 3, with_jd: bool = False) -> EphemerisTable:
