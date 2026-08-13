@@ -62,9 +62,10 @@ jobs:
           set -eux
           # make 产物是 lib/cspice.a（NAIF makefile），cspice-sys 需要 libcspice.a
           cp cspice/lib/cspice.a cspice/lib/libcspice.a
-          file cspice/lib/libcspice.a
-          # 必须为 aarch64 ELF 静态库，否则后续 wheel 构建链接必炸
-          file cspice/lib/libcspice.a | grep -q aarch64
+          # 必须为 aarch64 ELF 静态库，否则后续 wheel 构建链接必炸。file 对 ar
+          # 归档只报 "current ar archive" 不带架构，须取归档第一个成员检查。
+          ar p cspice/lib/libcspice.a $(ar t cspice/lib/libcspice.a | head -1) \
+            | file - | grep -q aarch64
           mkdir -p mice_linux_aarch64/include mice_linux_aarch64/lib
           cp -r cspice/include/* mice_linux_aarch64/include/
           cp cspice/lib/libcspice.a mice_linux_aarch64/lib/
