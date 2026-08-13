@@ -49,6 +49,8 @@
 
 任务级 Facade（MCP/CLI 同源派生）、任务轨道设计的算法链（族初猜 → Rust 修正 → 高精度预报三段）、子问题构造（族策略、控制律、流形种子）三层编排。
 
+任务级 API 模型除执行输入校验外，还公开当前任务上下文下的参数元数据，供 GUI、CLI、MCP 生成控件及范围提示；条件取值域与校验器共用同一份规则定义，外部消费者不维护本地参数规则副本。
+
 ## 4. CI 模块
 
 支持 Linux x64 AMD（Ubuntu、麒麟等操作系统）、Linux ARM（aarch64，鲲鹏/飞腾）、Windows 平台的软件编译。三平台 wheel 矩阵 + sdist + GitHub Release + PyPI；CSPICE 编译包（x86_64 转存 NAIF 官方包，aarch64 自建）走 GitHub Release；麒麟等国产系统靠 manylinux 2_28 的 glibc 基线覆盖。

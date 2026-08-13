@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
+from e2m2e.api import NumericRange
 from e2m2e.api.facade import Facade, mcp_tools
 from e2m2e.api.models import (
     ControlOrbitRequest,
@@ -27,6 +28,21 @@ from e2m2e.data.types.trajectory import EphemerisTable
 pytestmark = pytest.mark.interface
 
 _CONTROL_RUNTIME_PARAMS = {"spice", "kernel_dir", "n_workers", "seed"}
+_CONDITIONAL_RANGE_CASES = [
+    ("DRO", "amplitude", 1737.0, 110000.0, True),
+    ("DPO", "amplitude", 1737.0, 110000.0, True),
+    ("HALO", "amplitude", -73000.0, 73000.0, True),
+    ("NRHO", "perilune_height", 100.0, 10000.0, True),
+    ("L4", "amplitude_out", 0.0, 76000.0, False),
+    ("L5", "amplitude_out", 0.0, 76000.0, False),
+    ("AXIAL", "amplitude", -60000.0, 60000.0, True),
+    ("L4_SPO", "amplitude", 1737.0, 200000.0, True),
+    ("L5_SPO", "amplitude", 1737.0, 200000.0, True),
+    ("L4_LPO", "amplitude", 1000.0, 200000.0, True),
+    ("L5_LPO", "amplitude", 1000.0, 200000.0, True),
+    ("L4_HORSESHOE", "amplitude", 50000.0, 200000.0, True),
+    ("L5_HORSESHOE", "amplitude", 50000.0, 200000.0, True),
+]
 
 
 def _control_business_params() -> dict[str, inspect.Parameter]:
@@ -61,6 +77,94 @@ class TestDesignOrbitRequest:
     def test_perilune_height_bounds(self):
         with pytest.raises(ValidationError):
             DesignOrbitRequest(orbit_type="NRHO", perilune_height=50.0)
+
+    def test_global_amplitude_out_bound_survives_lissajous_l3_extension(self):
+        with pytest.raises(ValidationError, match="amplitude_out"):
+            DesignOrbitRequest(orbit_type="DRO", amplitude_out=80000.0)
+        with pytest.raises(ValidationError, match="amplitude_out"):
+            DesignOrbitRequest(orbit_type="ELFO", semi_major_axis=3000.0, amplitude_out=80000.0)
+
+    def test_valid_ranges_exposes_conditional_amplitude_limits(self):
+        dro = DesignOrbitRequest.valid_ranges("dro")
+        halo = DesignOrbitRequest.valid_ranges("HALO")
+        axial = DesignOrbitRequest.valid_ranges("AXIAL")
+
+        assert dro["amplitude"].minimum == 1737.0
+        assert dro["amplitude"].maximum == 110000.0
+        assert dro["amplitude"].minimum_inclusive
+        assert dro["amplitude"].maximum_inclusive
+        assert halo["amplitude"].minimum == -73000.0
+        assert halo["amplitude"].maximum == 73000.0
+        assert axial["amplitude"].minimum == -60000.0
+        assert axial["amplitude"].maximum == 60000.0
+
+    @pytest.mark.parametrize(
+        ("orbit_type", "field", "minimum", "maximum", "minimum_inclusive"),
+        _CONDITIONAL_RANGE_CASES,
+    )
+    def test_valid_ranges_exposes_all_conditional_numeric_limits(
+        self, orbit_type, field, minimum, maximum, minimum_inclusive
+    ):
+        numeric_range = DesignOrbitRequest.valid_ranges(orbit_type)[field]
+
+        assert numeric_range.minimum == minimum
+        assert numeric_range.maximum == maximum
+        assert numeric_range.minimum_inclusive is minimum_inclusive
+        assert numeric_range.maximum_inclusive
+
+    @pytest.mark.parametrize(
+        ("orbit_type", "field", "minimum", "maximum", "minimum_inclusive"),
+        _CONDITIONAL_RANGE_CASES,
+    )
+    def test_conditional_range_boundaries_match_request_validation(
+        self, orbit_type, field, minimum, maximum, minimum_inclusive
+    ):
+        accepted = DesignOrbitRequest(orbit_type=orbit_type, **{field: maximum})
+        assert getattr(accepted, field) == maximum
+
+        with pytest.raises(ValidationError, match=field):
+            DesignOrbitRequest(orbit_type=orbit_type, **{field: maximum + 1.0})
+
+        if minimum_inclusive:
+            accepted = DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum})
+            assert getattr(accepted, field) == minimum
+            with pytest.raises(ValidationError, match=field):
+                DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum - 1.0})
+        else:
+            with pytest.raises(ValidationError, match=field):
+                DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum})
+            accepted = DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum + 1.0})
+            assert getattr(accepted, field) == minimum + 1.0
+
+    def test_valid_ranges_exposes_lissajous_limit_by_collinear_point(self):
+        default = DesignOrbitRequest.valid_ranges("LISSAJOUS")
+        l1 = DesignOrbitRequest.valid_ranges("LISSAJOUS", collinear_point=1)
+        l3 = DesignOrbitRequest.valid_ranges("LISSAJOUS", collinear_point=3)
+
+        assert default["amplitude_out"].maximum == 7600.0
+        assert l1["amplitude_in"].minimum == 0.0
+        assert not l1["amplitude_in"].minimum_inclusive
+        assert l1["amplitude_out"].maximum == 7600.0
+        assert l3["amplitude_in"].maximum == 100000.0
+        assert l3["amplitude_out"].maximum == 100000.0
+        assert isinstance(l3["amplitude_out"], NumericRange)
+
+        with pytest.raises(ValueError, match="collinear_point"):
+            DesignOrbitRequest.valid_ranges("LISSAJOUS", collinear_point=4)
+        with pytest.raises(ValueError, match="字符串"):
+            DesignOrbitRequest.valid_ranges(None)  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize("field", ["amplitude_in", "amplitude_out"])
+    def test_lissajous_boundaries_match_ranges(self, field):
+        l1 = DesignOrbitRequest(orbit_type="LISSAJOUS", collinear_point=1, **{field: 7600.0})
+        l3 = DesignOrbitRequest(orbit_type="LISSAJOUS", collinear_point=3, **{field: 80000.0})
+        assert getattr(l1, field) == 7600.0
+        assert getattr(l3, field) == 80000.0
+
+        with pytest.raises(ValidationError, match=field):
+            DesignOrbitRequest(orbit_type="LISSAJOUS", collinear_point=1, **{field: 0.0})
+        with pytest.raises(ValidationError, match=field):
+            DesignOrbitRequest(orbit_type="LISSAJOUS", collinear_point=1, **{field: 80000.0})
 
 
 class TestControlOrbitRequest:

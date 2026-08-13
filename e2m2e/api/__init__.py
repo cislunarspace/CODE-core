@@ -20,6 +20,7 @@ from .models import (
     ControlOrbitResponse,
     DesignOrbitRequest,
     DesignOrbitResponse,
+    NumericRange,
     OrbitError,
 )
 
@@ -27,6 +28,7 @@ __all__ = [
     "Facade",
     "mcp_tools",
     "OrbitError",
+    "NumericRange",
     "DesignOrbitRequest",
     "DesignOrbitResponse",
     "ControlOrbitRequest",

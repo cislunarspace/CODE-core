@@ -7,6 +7,9 @@ api/ 边界，算法层用 numpy/dataclass。每个 Facade 方法一个 Request/
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -18,6 +21,7 @@ from e2m2e.data.templates.perturbations import DEFAULT_PERTURBATION
 
 __all__ = [
     "OrbitError",
+    "NumericRange",
     "ResultResponse",
     "DesignOrbitRequest",
     "DesignOrbitResponse",
@@ -67,6 +71,86 @@ class _ApiModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+@dataclass(frozen=True)
+class NumericRange:
+    """数值参数的上下界及开闭区间语义。"""
+
+    minimum: float | None = None
+    maximum: float | None = None
+    minimum_inclusive: bool = True
+    maximum_inclusive: bool = True
+
+    def contains(self, value: float) -> bool:
+        """判断值是否落在此区间内。"""
+        if self.minimum is not None and (
+            value < self.minimum or (value == self.minimum and not self.minimum_inclusive)
+        ):
+            return False
+        return not (
+            self.maximum is not None
+            and (value > self.maximum or (value == self.maximum and not self.maximum_inclusive))
+        )
+
+    def format_interval(self) -> str:
+        """返回用于校验错误的紧凑区间表示。"""
+        left = "[" if self.minimum_inclusive else "("
+        right = "]" if self.maximum_inclusive else ")"
+        return f"{left}{self.minimum}, {self.maximum}{right}"
+
+
+def _range_map(**ranges: NumericRange) -> Mapping[str, NumericRange]:
+    """构造不可变的按字段索引范围表。"""
+    return MappingProxyType(ranges)
+
+
+_GLOBAL_AMPLITUDE_OUT_RANGE = NumericRange(0.0, 76000.0, minimum_inclusive=False)
+
+
+def _with_global_amplitude_out(
+    ranges: Mapping[str, NumericRange],
+) -> Mapping[str, NumericRange]:
+    """为各类型范围补上共享字段 amplitude_out 的 API 上限。"""
+    return MappingProxyType({"amplitude_out": _GLOBAL_AMPLITUDE_OUT_RANGE, **ranges})
+
+
+_GLOBAL_AMPLITUDE_OUT_RANGES = _with_global_amplitude_out(_range_map())
+_DRO_DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 110000.0)))
+_SPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
+_LPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1000.0, 200000.0)))
+_HORSESHOE_RANGES = _with_global_amplitude_out(
+    _range_map(amplitude=NumericRange(50000.0, 200000.0))
+)
+
+_ORBIT_TYPE_RANGES: Mapping[str, Mapping[str, NumericRange]] = MappingProxyType(
+    {
+        "DRO": _DRO_DPO_RANGES,
+        "DPO": _DRO_DPO_RANGES,
+        "HALO": _with_global_amplitude_out(_range_map(amplitude=NumericRange(-73000.0, 73000.0))),
+        "NRHO": _with_global_amplitude_out(
+            _range_map(perilune_height=NumericRange(100.0, 10000.0))
+        ),
+        "L4": _GLOBAL_AMPLITUDE_OUT_RANGES,
+        "L5": _GLOBAL_AMPLITUDE_OUT_RANGES,
+        "AXIAL": _with_global_amplitude_out(_range_map(amplitude=NumericRange(-60000.0, 60000.0))),
+        "L4_SPO": _SPO_RANGES,
+        "L5_SPO": _SPO_RANGES,
+        "L4_LPO": _LPO_RANGES,
+        "L5_LPO": _LPO_RANGES,
+        "L4_HORSESHOE": _HORSESHOE_RANGES,
+        "L5_HORSESHOE": _HORSESHOE_RANGES,
+        "ELFO": _GLOBAL_AMPLITUDE_OUT_RANGES,
+    }
+)
+_LISSAJOUS_L1_L2_RANGES = _range_map(
+    amplitude_in=NumericRange(0.0, 7600.0, minimum_inclusive=False),
+    amplitude_out=NumericRange(0.0, 7600.0, minimum_inclusive=False),
+)
+_LISSAJOUS_L3_RANGES = _range_map(
+    amplitude_in=NumericRange(0.0, 100000.0, minimum_inclusive=False),
+    amplitude_out=NumericRange(0.0, 100000.0, minimum_inclusive=False),
+)
+
+
 class DesignOrbitRequest(_ApiModel):
     """任务轨道设计输入。
 
@@ -82,7 +166,7 @@ class DesignOrbitRequest(_ApiModel):
     collinear_point: int | None = Field(default=None, ge=1, le=3)
     north_south: int | None = Field(default=None, ge=1, le=2)
     amplitude_in: float | None = Field(default=None, gt=0.0, le=100000.0)
-    amplitude_out: float | None = Field(default=None, gt=0.0, le=76000.0)
+    amplitude_out: float | None = Field(default=None, gt=0.0, le=100000.0)
     phase_in: float | None = Field(default=None, ge=0.0, le=1.0)
     phase_out: float | None = Field(default=None, ge=0.0, le=1.0)
     # 共享参数
@@ -117,6 +201,39 @@ class DesignOrbitRequest(_ApiModel):
     correction_revolutions: int = Field(default=1, ge=1)
     correction_velocity_tolerance: float = Field(default=0.1, gt=0.0)
 
+    @classmethod
+    def valid_ranges(
+        cls, orbit_type: str, *, collinear_point: int | None = None
+    ) -> dict[str, NumericRange]:
+        """返回指定轨道类型和上下文下适用的条件数值范围。"""
+        if not isinstance(orbit_type, str):
+            raise ValueError(f"orbit_type 必须为字符串，当前 {orbit_type!r}")
+        selection = orbit_type.upper()
+        if selection == "LISSAJOUS":
+            point = 2 if collinear_point is None else collinear_point
+            if point not in (1, 2, 3):
+                raise ValueError(
+                    f"LISSAJOUS collinear_point 必须为 1、2 或 3，当前 {collinear_point!r}"
+                )
+            ranges = _LISSAJOUS_L3_RANGES if point == 3 else _LISSAJOUS_L1_L2_RANGES
+        else:
+            try:
+                ranges = _ORBIT_TYPE_RANGES[selection]
+            except KeyError as exc:
+                raise ValueError(f"不支持的 orbit_type: {orbit_type!r}") from exc
+        return dict(ranges)
+
+    def _validate_conditional_ranges(self, selection: str) -> None:
+        """用公开范围接口校验已填充默认值的条件参数。"""
+        for field, numeric_range in self.valid_ranges(
+            selection, collinear_point=self.collinear_point
+        ).items():
+            value = getattr(self, field)
+            if value is not None and not numeric_range.contains(value):
+                raise ValueError(
+                    f"{selection} {field} 应在 {numeric_range.format_interval()} km，实际 {value}"
+                )
+
     @model_validator(mode="after")
     def _validate_orbit_type(self) -> DesignOrbitRequest:
         sel = self.orbit_type.upper()
@@ -133,6 +250,7 @@ class DesignOrbitRequest(_ApiModel):
                 self.arg_of_pericenter = 270.0
             if self.perilune_height is None:
                 self.perilune_height = 200.0
+            self._validate_conditional_ranges(sel)
             return self
 
         # CR3BP 类型：按类型填默认值
@@ -141,15 +259,11 @@ class DesignOrbitRequest(_ApiModel):
                 self.amplitude = 10000.0
             if self.phase is None:
                 self.phase = 0.5001
-            if not 1737.0 <= self.amplitude <= 110000.0:
-                raise ValueError(f"DRO amplitude 应在 1737~110000 km，实际 {self.amplitude}")
         elif sel == "DPO":
             if self.amplitude is None:
                 self.amplitude = 20000.0
             if self.phase is None:
                 self.phase = 0.5001
-            if not 1737.0 <= self.amplitude <= 110000.0:
-                raise ValueError(f"DPO amplitude 应在 1737~110000 km，实际 {self.amplitude}")
         elif sel == "HALO":
             if self.collinear_point is None:
                 self.collinear_point = 2
@@ -159,8 +273,6 @@ class DesignOrbitRequest(_ApiModel):
                 self.phase = 0.0
             if self.collinear_point not in (1, 2):
                 raise ValueError(f"HALO collinear_point 必须为 1 或 2，当前 {self.collinear_point}")
-            if abs(self.amplitude) > 73000.0:
-                raise ValueError(f"HALO amplitude 应在 ±73000 km，实际 {self.amplitude}")
         elif sel == "NRHO":
             if self.collinear_point is None:
                 self.collinear_point = 2
@@ -172,10 +284,6 @@ class DesignOrbitRequest(_ApiModel):
                 self.phase = 0.5
             if self.collinear_point not in (1, 2):
                 raise ValueError(f"NRHO collinear_point 必须为 1 或 2，当前 {self.collinear_point}")
-            if not 100.0 <= self.perilune_height <= 10000.0:
-                raise ValueError(
-                    f"NRHO perilune_height 应在 100~10000 km，实际 {self.perilune_height}"
-                )
         elif sel == "LISSAJOUS":
             if self.collinear_point is None:
                 self.collinear_point = 2
@@ -187,15 +295,6 @@ class DesignOrbitRequest(_ApiModel):
                 self.phase_in = 0.01
             if self.phase_out is None:
                 self.phase_out = 0.55
-            limit = 100000.0 if self.collinear_point == 3 else 7600.0
-            if not 0.0 < self.amplitude_in <= limit:
-                raise ValueError(
-                    f"LISSAJOUS amplitude_in 应在 (0, {limit}] km，实际 {self.amplitude_in}"
-                )
-            if not 0.0 < self.amplitude_out <= limit:
-                raise ValueError(
-                    f"LISSAJOUS amplitude_out 应在 (0, {limit}] km，实际 {self.amplitude_out}"
-                )
         elif sel in ("L4", "L5"):
             if self.amplitude_in is None:
                 self.amplitude_in = 8000.0
@@ -212,34 +311,27 @@ class DesignOrbitRequest(_ApiModel):
                 self.amplitude = 5000.0
             if self.phase is None:
                 self.phase = 0.0
-            if abs(self.amplitude) > 60000.0:
-                raise ValueError(f"AXIAL amplitude 应在 ±60000 km，实际 {self.amplitude}")
         elif sel in ("L4_SPO", "L5_SPO"):
             if self.amplitude is None:
                 self.amplitude = 10000.0
             if self.phase is None:
                 self.phase = 0.0
-            if not 1737.0 <= self.amplitude <= 200000.0:
-                raise ValueError(f"{sel} amplitude 应在 1737~200000 km，实际 {self.amplitude}")
         elif sel in ("L4_LPO", "L5_LPO"):
             if self.amplitude is None:
                 self.amplitude = 50000.0
             if self.phase is None:
                 self.phase = 0.0
-            if not 1000.0 <= self.amplitude <= 200000.0:
-                raise ValueError(f"{sel} amplitude 应在 1000~200000 km，实际 {self.amplitude}")
         elif sel in ("L4_HORSESHOE", "L5_HORSESHOE"):
             if self.amplitude is None:
                 self.amplitude = 150000.0
             if self.phase is None:
                 self.phase = 0.0
-            if not 50000.0 <= self.amplitude <= 200000.0:
-                raise ValueError(f"{sel} amplitude 应在 50000~200000 km，实际 {self.amplitude}")
         else:
             raise ValueError(
                 f"orbit_type 必须为 DRO/DPO/NRHO/HALO/LISSAJOUS/L4/L5/AXIAL"
                 f"/L4_SPO/L5_SPO/L4_LPO/L5_LPO/L4_HORSESHOE/L5_HORSESHOE/ELFO，当前 {sel!r}"
             )
+        self._validate_conditional_ranges(sel)
         return self
 
 
