@@ -591,6 +591,14 @@ def _build_ephemeris_table(
     """
     t_c = syn_j2000.cr3bp_system.characteristic_time
     assert t_c is not None
+    # 位置/速度与时间网格必须逐点对齐：segmented 逐段积分曾把 propagate
+    # 自动追加的段终点 tf 拼进 states（位置数组比时间网格多出段数个点），
+    # batch_j2000_to_synodic 按索引配对位置与旋转时刻，错位逐段累积导致
+    # 会合系曲线一圈一圈偏离周期轨道。此断言防未来回归。
+    if len(states) != len(et_grid):
+        raise ValueError(
+            f"星历状态点数 {len(states)} 与时间网格点数 {len(et_grid)} 不一致，位置与时间将错位"
+        )
     t_syn = (et_grid - et0) / t_c
     synodic = syn_j2000.batch_j2000_to_synodic(states, t_syn, et0)[:, :3]
     synodic[:, 0] += syn_j2000.cr3bp_system.mu
@@ -874,8 +882,18 @@ def _design_elfo(
     et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * output_step, output_step)
     out = fm.propagate(state0, (et0, et_end), t_eval=et_grid, max_steps=5_000_000)
     states = np.asarray(out["states"], dtype=float)
-    n_pts = len(states)
-    times = et_grid[:n_pts]
+    # ForceModel._prepare_t_eval 会在 t_eval 末尾自动追加 t_span 终点
+    # （duration 非整小时时 et_end 不在 et_grid 上，输出多 1 点）；截断到
+    # et_grid 长度，保证状态与时间网格逐点对齐（否则位置数组比时间字段
+    # 多 1 点，_build_ephemeris_table 的长度一致性断言会拒绝）。输出短于
+    # et_grid 说明积分提前终止（max_steps 撞上），显式报错而非静默出短星历。
+    if len(states) < len(et_grid):
+        raise DesignNotConvergedError(
+            "ELFO 传播输出点数少于时间网格（积分提前终止）",
+            cause=FailureCause.INTEGRATION_FAILED,
+        )
+    states = states[: len(et_grid)]
+    times = et_grid[: len(states)]
 
     # 月心根数提取与漂移统计
     moon_oe = _extract_moon_centric_elements(times, states, spice)
@@ -884,7 +902,7 @@ def _design_elfo(
     # 星历表（ELFO 仍输出地心惯性系 + 会合系，格式与 CR3BP 一致）
     system = earth_moon_system()
     syn_j2000 = SynodicJ2000System(cr3bp_system=system, spice=spice)
-    ephemeris = _build_ephemeris_table(spice, syn_j2000, et0, et_grid[:n_pts], states)
+    ephemeris = _build_ephemeris_table(spice, syn_j2000, et0, et_grid, states)
 
     return OrbitDesignResult(
         orbit_type="ELFO",
@@ -1172,33 +1190,44 @@ def design_orbit(
                 verbose=verbose,
             )
 
-            # 逐段积分填满 et_grid：每段从修正后节点初值积分到下一节点
+            # 逐段积分填满 et_grid：每段从修正后节点初值积分到下一节点。
+            # 中间段 mask 用右开区间（seam 整点只归后段），相邻段 t_eval 无
+            # 重叠；最后一段闭区间、t_span 终点延伸到 et_grid 尾部——打靶节点
+            # 采样不含圈终点（endpoint=False），et_grid 尾部可能超出最后节点，
+            # 右开会把尾部点排除在段外，星历缺尾段数据（长度断言报错）。
             states_list: list[np.ndarray] = []
             for i in range(len(t_patch_long) - 1):
                 seg_t0, seg_t1 = t_patch_long[i], t_patch_long[i + 1]
-                mask = (et_grid >= seg_t0 - 1e-6) & (et_grid <= seg_t1 + 1e-6)
+                is_last = i == len(t_patch_long) - 2
+                if is_last:
+                    mask = et_grid >= seg_t0 - 1e-6
+                    seg_end = et_grid[-1]
+                else:
+                    mask = (et_grid >= seg_t0 - 1e-6) & (et_grid < seg_t1 - 1e-6)
+                    seg_end = seg_t1
                 t_eval_seg = et_grid[mask]
                 if len(t_eval_seg) == 0:
                     continue
                 out_seg = fm.propagate(
                     s_patch_long[i],
-                    (float(seg_t0), float(seg_t1)),
+                    (float(seg_t0), float(seg_end)),
                     t_eval=t_eval_seg,
                     max_steps=500_000,
                 )
-                states_list.append(np.asarray(out_seg["states"], dtype=float))
+                # ForceModel._prepare_t_eval 会在 t_eval 末尾自动追加段终点 tf，
+                # 输出比 t_eval 多 1 点（段终点状态，不在 et_grid 上）。截断丢掉，
+                # 保证 states_dense 与 et_grid 严格对齐——否则星历位置数组比时间
+                # 网格多出段数个点，batch_j2000_to_synodic 按索引配对位置与旋转
+                # 时刻，错位逐段累积，会合系曲线一圈一圈偏离 Halo 轨道。
+                states_list.append(np.asarray(out_seg["states"], dtype=float)[: len(t_eval_seg)])
             if not states_list:
                 raise DesignNotConvergedError(
                     "segmented 拼接未生成任何星历点",
                     cause=FailureCause.INTEGRATION_FAILED,
                 )
             states_dense = np.concatenate(states_list, axis=0)
-            # 去重（段间共享端点）
-            if len(states_dense) > 1:
-                keep = np.concatenate(
-                    ([True], np.linalg.norm(np.diff(states_dense[:, :3], axis=0), axis=1) > 1e-9)
-                )
-                states_dense = states_dense[keep]
+            # 右开区间下段间无重叠，无需去重；去重反而会掩蔽 mask 回归（若改回
+            # 闭区间，seam 重复点被删、长度恢复一致，长度断言失效）。
         finally:
             spice.disable_ephem_cache()
 
