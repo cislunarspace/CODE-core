@@ -14,7 +14,7 @@
 MCP/CLI 依赖 [mcp] extra，保持占位。
 """
 
-from .facade import Facade, mcp_tools
+from .facade import Facade, ToolInfo, mcp_tools, tool_inventory
 from .models import (
     ControlOrbitRequest,
     ControlOrbitResponse,
@@ -26,7 +26,9 @@ from .models import (
 
 __all__ = [
     "Facade",
+    "ToolInfo",
     "mcp_tools",
+    "tool_inventory",
     "OrbitError",
     "NumericRange",
     "DesignOrbitRequest",
