@@ -199,7 +199,6 @@ class DesignOrbitRequest(_ApiModel):
         "对不稳定轨道必发散），传入值会被覆盖",
     )
     correction_revolutions: int = Field(default=1, ge=1)
-    correction_velocity_tolerance: float = Field(default=0.1, gt=0.0)
 
     @classmethod
     def valid_ranges(

@@ -78,6 +78,13 @@ class TestDesignOrbitRequest:
         with pytest.raises(ValidationError):
             DesignOrbitRequest(orbit_type="NRHO", perilune_height=50.0)
 
+    def test_dead_correction_velocity_tolerance_rejected(self):
+        """correction_velocity_tolerance 无消费方（#410），删除后按 extra=forbid 拒绝。"""
+        with pytest.raises(ValidationError, match="correction_velocity_tolerance"):
+            DesignOrbitRequest(orbit_type="DRO", correction_velocity_tolerance=0.5)
+        with pytest.raises(ValidationError, match="correction_velocity_tolerance"):
+            DesignOrbitRequest(orbit_type="NRHO", correction_velocity_tolerance=0.5)
+
     def test_global_amplitude_out_bound_survives_lissajous_l3_extension(self):
         with pytest.raises(ValidationError, match="amplitude_out"):
             DesignOrbitRequest(orbit_type="DRO", amplitude_out=80000.0)
