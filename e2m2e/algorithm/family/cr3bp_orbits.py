@@ -44,11 +44,11 @@ from ...data.templates.seed import (  # noqa: F401
     EARTH_MOON_MU,
     MOON_RADIUS_KM,
 )
-from ...data.types.orbit import Orbit
+from ...data.types.orbit import Orbit, OrbitFamily
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from ..solver.differential_correction import DifferentialCorrection
 from .axial_initial_guess import compute_axial_initial_guess
-from .halo_family import halo_pseudo_arclength_continuation
+from .halo_family import generate_halo_family, halo_pseudo_arclength_continuation
 from .halo_initial_guess import compute_halo_initial_guess
 from .lissajous_initial_guess import (
     compute_lissajous_bounded_trajectory,
@@ -489,6 +489,67 @@ def design_halo(
         tol=1e-6,
         seed_orbit=seed,
     )
+
+
+def design_halo_family(
+    libration_point: int,
+    max_amplitude_km: float,
+    *,
+    n_orbits: int = 50,
+    dynamics: CR3BP_Dynamics | None = None,
+) -> OrbitFamily:
+    """生成一族 Halo 周期轨道（从种子延拓到指定面外振幅上限）。
+
+    族从 Richardson 小振幅种子（``_HALO_SEED_Z0``）出发，自然参数
+    延拓（固定 ``z0`` 微分修正）覆盖 ``[0, |max_amplitude_km|]``，
+    至多 ``n_orbits`` 条（含种子）。振幅上限不得超过该平动点的族
+    折叠点（``seed._HALO_FOLD_Z0``），折叠点后固定 z0 延拓失效。
+
+    ``max_amplitude_km`` 带符号：正为北族、负为南族（与 ``design_halo``
+    约定一致）；符号只决定延拓方向，振幅上限取绝对值。
+
+    Args:
+        libration_point: 平动点编号（1=L1, 2=L2）。
+        max_amplitude_km: 族振幅上限（km），带符号区分北/南族。
+        n_orbits: 族成员数量上限（含种子），默认 50。
+        dynamics: CR3BP 动力学；缺省构造标准地月系统。
+
+    Returns:
+        含一族周期轨道的 :class:`OrbitFamily`。
+    """
+    if libration_point not in (1, 2):
+        raise ValueError(f"libration_point 必须为 1 或 2，当前为 {libration_point}")
+    if n_orbits < 1:
+        raise ValueError(f"n_orbits 必须大于 0，当前为 {n_orbits}")
+    if max_amplitude_km == 0:
+        raise ValueError("max_amplitude_km 不能为 0")
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    du = dynamics.system.characteristic_length
+    assert du is not None
+    z_sign = 1.0 if max_amplitude_km >= 0 else -1.0
+    z_max_du = abs(max_amplitude_km) / du
+
+    seed = _correct_halo(dynamics, float(np.copysign(_HALO_SEED_Z0, z_sign)), libration_point, None)
+    seed.family_type = "halo"
+    seed.parameters = {
+        "libration_point": libration_point,
+        "halo_class": 0 if z_sign > 0 else 1,
+        "amplitude_z": _HALO_SEED_Z0,
+    }
+
+    from ..solver.continuation import Continuation
+
+    continuation = Continuation(corrector=DifferentialCorrection(dynamics))
+    z_range = (0.0, z_max_du) if z_sign > 0 else (-z_max_du, 0.0)
+    family_orbits = generate_halo_family(
+        continuation,
+        seed_orbit=seed,
+        n_orbits=n_orbits,
+        z_range=z_range,
+        verbose=False,
+    )
+    return OrbitFamily(orbits=family_orbits, family_type="halo", system=dynamics.system)
 
 
 def _walk_pal_to_perilune(

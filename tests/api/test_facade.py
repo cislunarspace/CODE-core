@@ -16,6 +16,7 @@ from e2m2e.api.models import (
     ControlOrbitResponse,
     DesignOrbitRequest,
     DesignOrbitResponse,
+    FamilyGenerationRequest,
     OrbitError,
     PropagationRequest,
     SpacetimeTransformRequest,
@@ -304,6 +305,87 @@ class TestSpacetimeTransformRequest:
             )
 
 
+class TestFamilyGenerationRequest:
+    """FamilyGenerationRequest 校验与默认值契约（#411）。"""
+
+    def test_halo_defaults(self):
+        req = FamilyGenerationRequest(orbit_type="HALO")
+        assert req.libration_point == 2
+        assert req.max_amplitude_km == 30000.0
+        assert req.n_orbits == 50
+
+    def test_halo_accepts_signed_amplitude_and_libration_point(self):
+        req = FamilyGenerationRequest(
+            orbit_type="HALO", libration_point=1, max_amplitude_km=-20000.0, n_orbits=5
+        )
+        assert req.libration_point == 1
+        assert req.max_amplitude_km == -20000.0
+        assert req.n_orbits == 5
+
+    def test_halo_l1_default_amplitude_within_fold(self):
+        # L1 折叠点≈26908 km：默认振幅按平动点收紧，不得越界
+        req = FamilyGenerationRequest(orbit_type="HALO", libration_point=1)
+        assert req.max_amplitude_km == 25000.0
+        assert req.libration_point == 1
+
+    def test_halo_rejects_zero_amplitude(self):
+        with pytest.raises(ValidationError, match="max_amplitude_km"):
+            FamilyGenerationRequest(orbit_type="HALO", max_amplitude_km=0.0)
+
+    def test_halo_rejects_triangular_libration_point(self):
+        with pytest.raises(ValidationError, match="libration_point"):
+            FamilyGenerationRequest(orbit_type="HALO", libration_point=4)
+
+    def test_triangular_family_rejects_collinear_libration_point(self):
+        with pytest.raises(ValidationError, match="libration_point"):
+            FamilyGenerationRequest(orbit_type="SPO", libration_point=1)
+
+    def test_triangular_family_default_libration_point(self):
+        assert FamilyGenerationRequest(orbit_type="LPO").libration_point == 4
+        assert FamilyGenerationRequest(orbit_type="HORSESHOE").libration_point == 4
+
+    def test_libration_point_bounds(self):
+        with pytest.raises(ValidationError):
+            FamilyGenerationRequest(orbit_type="HALO", libration_point=0)
+        with pytest.raises(ValidationError):
+            FamilyGenerationRequest(orbit_type="HALO", libration_point=6)
+
+    def test_unknown_orbit_type(self):
+        with pytest.raises(ValidationError, match="orbit_type"):
+            FamilyGenerationRequest(orbit_type="NOPE")
+        # DRO/DPO 无平动点概念，不属于平动点族模型
+        with pytest.raises(ValidationError, match="orbit_type"):
+            FamilyGenerationRequest(orbit_type="DRO")
+
+    def test_halo_amplitude_range_by_libration_point(self):
+        # 固定 z0 延拓的上限是族折叠点：L2≈57660 km、L1≈26908 km
+        with pytest.raises(ValidationError, match="max_amplitude_km"):
+            FamilyGenerationRequest(orbit_type="HALO", libration_point=2, max_amplitude_km=60000.0)
+        with pytest.raises(ValidationError, match="max_amplitude_km"):
+            FamilyGenerationRequest(orbit_type="HALO", libration_point=1, max_amplitude_km=30000.0)
+        req = FamilyGenerationRequest(
+            orbit_type="HALO", libration_point=1, max_amplitude_km=25000.0
+        )
+        assert req.max_amplitude_km == 25000.0
+
+    def test_n_orbits_positive(self):
+        with pytest.raises(ValidationError):
+            FamilyGenerationRequest(orbit_type="HALO", n_orbits=0)
+
+    def test_valid_ranges_exposes_conditional_limits(self):
+        halo_l2 = FamilyGenerationRequest.valid_ranges("HALO")
+        halo_l1 = FamilyGenerationRequest.valid_ranges("HALO", libration_point=1)
+        spo = FamilyGenerationRequest.valid_ranges("SPO")
+        assert halo_l2["libration_point"].minimum == 1
+        assert halo_l2["libration_point"].maximum == 2
+        assert halo_l2["max_amplitude_km"].maximum == pytest.approx(57660.0)
+        assert halo_l1["max_amplitude_km"].maximum == pytest.approx(26908.0)
+        assert spo["libration_point"].minimum == 4
+        assert spo["libration_point"].maximum == 5
+        with pytest.raises(ValueError, match="orbit_type"):
+            FamilyGenerationRequest.valid_ranges("NOPE")
+
+
 class TestFacade:
     def test_construct(self):
         facade = Facade()
@@ -409,6 +491,32 @@ class TestFacade:
         facade = Facade()
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
             facade.orbit_family_generation(orbit_type="NOPE")
+
+    def test_orbit_family_generation_requires_orbit_type(self):
+        facade = Facade()
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade.orbit_family_generation()
+
+    def test_orbit_family_generation_invalid_libration_point(self):
+        facade = Facade()
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade.orbit_family_generation(orbit_type="HALO", libration_point=4)
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade.orbit_family_generation(orbit_type="HALO", libration_point="bad")
+
+    def test_orbit_family_generation_non_halo_not_implemented(self):
+        facade = Facade()
+        with pytest.raises(OrbitError, match="NOT_IMPLEMENTED"):
+            facade.orbit_family_generation(orbit_type="SPO", libration_point=4)
+
+    def test_orbit_family_generation_halo_success(self):
+        facade = Facade()
+        family = facade.orbit_family_generation(
+            orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=2
+        )
+        assert family.family_type == "halo"
+        assert len(family) >= 1
+        assert all(o.parameters.get("libration_point") == 1 for o in family)
 
 
 class TestMcpTools:

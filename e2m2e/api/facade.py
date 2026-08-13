@@ -25,6 +25,7 @@ from .models import (
     ControlOrbitResponse,
     DesignOrbitRequest,
     DesignOrbitResponse,
+    FamilyGenerationRequest,
     OrbitError,
     PropagationRequest,
     PropagationResponse,
@@ -474,14 +475,41 @@ class Facade:
 
     @mcp_exposed
     def orbit_family_generation(self, **params) -> Any:
-        """轨道族生成（二档）：薄封装 algorithm/family 六类初猜。"""
-        from e2m2e.algorithm.family import registry
+        """轨道族生成（二档）。
 
-        orbit_type = params.pop("orbit_type")
-        fn = registry.get(orbit_type)
-        if fn is None:
-            raise OrbitError("INVALID_PARAMS", f"未知轨道族类型: {orbit_type}")
-        return fn(**params)
+        Pydantic 模型校验（#411）→ 分发 → 结构化错误。第一版实现 Halo
+        族生成（复用 algorithm/family 延拓），其余平动点族模型预留。
+        """
+        try:
+            request = FamilyGenerationRequest(**params)
+            if request.orbit_type.upper() != "HALO":
+                raise OrbitError(
+                    "NOT_IMPLEMENTED",
+                    f"orbit_type={request.orbit_type} 族生成尚未实现（第一版仅 HALO）",
+                    status=ConvergenceState.FAILED,
+                    cause=FailureCause.BACKEND_FAILURE,
+                )
+            from e2m2e.algorithm.family import design_halo_family
+
+            return design_halo_family(
+                request.libration_point,
+                request.max_amplitude_km,
+                n_orbits=request.n_orbits,
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        except Exception as exc:
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError(
+                "FAMILY_GENERATION_FAILED", message, status=status, cause=cause
+            ) from exc
 
     @mcp_exposed
     def orbit_stability(self, **params) -> Any:

@@ -18,6 +18,7 @@ from e2m2e.algorithm.results import ResultStatus
 from e2m2e.data.constants import SECONDS_PER_DAY
 from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.templates.perturbations import DEFAULT_PERTURBATION
+from e2m2e.data.templates.seed import _HALO_FOLD_Z0, CHAR_LENGTH_KM
 
 __all__ = [
     "OrbitError",
@@ -33,6 +34,7 @@ __all__ = [
     "PropagationResponse",
     "SpacetimeTransformRequest",
     "SpacetimeTransformResponse",
+    "FamilyGenerationRequest",
 ]
 
 
@@ -613,3 +615,117 @@ class SpacetimeTransformResponse(ResultResponse):
     times: list[float]
     transform_type: str
     details: dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# 轨道族生成（#411）：公开平动点统一术语 libration_point（1=L1 … 5=L5）。
+# 各族允许的平动点取值域与默认值；Halo 族振幅上限为固定 z0 延拓的
+# 折叠点（同 seed._HALO_FOLD_Z0，按平动点区分）。
+# ---------------------------------------------------------------------------
+
+#: orbit_type → 允许的平动点取值域。DRO/DPO 等无平动点概念，不进本模型。
+_FAMILY_LIBRATION_POINT_RANGES: Mapping[str, tuple[int, ...]] = MappingProxyType(
+    {
+        "HALO": (1, 2),
+        "NRHO": (1, 2),
+        "AXIAL": (1, 2),
+        "LISSAJOUS": (1, 2, 3),
+        "SPO": (4, 5),
+        "LPO": (4, 5),
+        "HORSESHOE": (4, 5),
+    }
+)
+
+#: orbit_type → libration_point 默认值（共线族取 L2，三角族取 L4）。
+_FAMILY_DEFAULT_LIBRATION_POINT: Mapping[str, int] = MappingProxyType(
+    {
+        "HALO": 2,
+        "NRHO": 2,
+        "AXIAL": 2,
+        "LISSAJOUS": 2,
+        "SPO": 4,
+        "LPO": 4,
+        "HORSESHOE": 4,
+    }
+)
+
+#: Halo 固定 z0 延拓的折叠点（km），按平动点：L1≈26908、L2≈57660。
+_HALO_FOLD_KM: Mapping[int, float] = MappingProxyType(
+    {lp: _HALO_FOLD_Z0[lp] * CHAR_LENGTH_KM for lp in (1, 2)}
+)
+
+#: Halo 族振幅上限默认值（km），按平动点取折叠点内的标定值。
+_HALO_DEFAULT_MAX_AMPLITUDE_KM: Mapping[int, float] = MappingProxyType({1: 25000.0, 2: 30000.0})
+
+
+class FamilyGenerationRequest(_ApiModel):
+    """轨道族生成输入（二档 Facade.orbit_family_generation）。
+
+    公开参数用平动点统一术语（``libration_point``，1=L1 … 5=L5），由
+    Facade 映射到各族算法参数。按 ``orbit_type`` 分派校验取值域
+    （与 ``DesignOrbitRequest`` 同构）：共线族（Halo/NRHO/Axial）仅
+    L1/L2，Lissajous 支持 L1/L2/L3，三角族（SPO/LPO/Horseshoe）仅
+    L4/L5。第一版仅实现 Halo 族生成。
+    """
+
+    orbit_type: str = Field(
+        description="HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE；第一版仅 HALO 实现"
+    )
+    libration_point: int | None = Field(
+        default=None, ge=1, le=5, description="平动点编号：1=L1 … 5=L5；缺省按族填默认"
+    )
+    max_amplitude_km: float | None = Field(
+        default=None,
+        description="族振幅上限（km），带符号区分北/南族（Halo 用）",
+    )
+    n_orbits: int = Field(default=50, ge=1, description="族成员数量上限（含种子）")
+
+    @classmethod
+    def valid_ranges(
+        cls, orbit_type: str, *, libration_point: int | None = None
+    ) -> dict[str, NumericRange]:
+        """返回指定族和上下文下适用的条件数值范围。"""
+        if not isinstance(orbit_type, str):
+            raise ValueError(f"orbit_type 必须为字符串，当前 {orbit_type!r}")
+        selection = orbit_type.upper()
+        if selection not in _FAMILY_LIBRATION_POINT_RANGES:
+            raise ValueError(f"不支持的 orbit_type: {orbit_type!r}")
+        allowed = _FAMILY_LIBRATION_POINT_RANGES[selection]
+        ranges: dict[str, NumericRange] = {
+            "libration_point": NumericRange(min(allowed), max(allowed))
+        }
+        if selection == "HALO":
+            if libration_point is None:
+                point = _FAMILY_DEFAULT_LIBRATION_POINT[selection]
+            else:
+                point = libration_point
+            if point not in allowed:
+                raise ValueError(f"HALO libration_point 必须为 {sorted(allowed)}，当前 {point!r}")
+            fold_km = _HALO_FOLD_KM[point]
+            ranges["max_amplitude_km"] = NumericRange(-fold_km, fold_km)
+        return ranges
+
+    @model_validator(mode="after")
+    def _validate_orbit_type(self) -> FamilyGenerationRequest:
+        sel = self.orbit_type.upper()
+        if sel not in _FAMILY_LIBRATION_POINT_RANGES:
+            raise ValueError(
+                f"orbit_type 必须为 {'/'.join(_FAMILY_LIBRATION_POINT_RANGES)}，当前 {sel!r}"
+            )
+        if self.libration_point is None:
+            self.libration_point = _FAMILY_DEFAULT_LIBRATION_POINT[sel]
+        # 先经公开范围接口校验平动点取值域（HALO 越界在此被拒）
+        ranges = self.valid_ranges(sel, libration_point=self.libration_point)
+        if sel == "HALO":
+            if self.max_amplitude_km is None:
+                self.max_amplitude_km = _HALO_DEFAULT_MAX_AMPLITUDE_KM[self.libration_point]
+            if self.max_amplitude_km == 0:
+                raise ValueError("max_amplitude_km 不能为 0")
+        # 用公开范围接口校验取值（ADR 0014 决策 8：校验器与接口共用一份规则）
+        for field, numeric_range in ranges.items():
+            value = getattr(self, field)
+            if value is not None and not numeric_range.contains(value):
+                raise ValueError(
+                    f"{sel} {field} 应在 {numeric_range.format_interval()}，实际 {value}"
+                )
+        return self
