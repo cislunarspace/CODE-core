@@ -45,9 +45,16 @@ jobs:
           ls cspice/
       - name: 编译（aarch64 native）
         run: |
-          cd cspice
-          make 2>&1 | tail -30
-          ls -la lib/
+          set -euxo pipefail
+          # NAIF 包无顶层 makefile，编译入口是 src/cspice/mkprodct.csh（同本地
+          # 交叉编译验证过的路径）；默认 TKCOMPILEOPTIONS 含 -m64，aarch64 gcc
+          # 不接受，须显式覆盖；TKCOMPILER 默认 gcc 即可，但仍显式声明。
+          export TKCOMPILER=gcc
+          export TKCOMPILEOPTIONS="-c -ansi -O2 -fPIC -DNON_UNIX_STDIO"
+          cd cspice/src/cspice
+          chmod u+x mkprodct.csh
+          ./mkprodct.csh 2>&1 | tail -30
+          ls -la ../../lib/
       - name: 校验产物并整理目录结构
         run: |
           set -eux
@@ -59,10 +66,21 @@ jobs:
           mkdir -p mice_linux_aarch64/include mice_linux_aarch64/lib
           cp -r cspice/include/* mice_linux_aarch64/include/
           cp cspice/lib/libcspice.a mice_linux_aarch64/lib/
-          # 冒烟：编译并链接一个最小 C 程序（furnsh_c 来自 libcspice.a）
-          printf '#include "SpiceUsr.h"\nint main(void){ furnsh_c(""); return 0; }\n' > smoke.c
+          # 冒烟：编译链接调用多个代表性 SPICE API 的最小 C 程序——符号须全部从
+          # libcspice.a 解析（覆盖库不同部分，防部分编译失败时 ar 产出残缺库）。
+          # 不运行：furnsh_c("") 空串会触发 SPICE 错误处理器 exit(1)，运行验证由
+          # CI 的 test-arm64 承担（真实 SPICE 调用全链路）。
+          cat > smoke.c <<'EOF'
+          #include "SpiceUsr.h"
+          int main(void) {
+              furnsh_c("");
+              str2et_c("", 0);
+              spkezr_c("", 0, "", "", 0, 0, 0);
+              return 0;
+          }
+          EOF
           gcc smoke.c -I mice_linux_aarch64/include mice_linux_aarch64/lib/libcspice.a -lm -o smoke
-          ./smoke && echo "SMOKE OK"
+          file smoke | grep -q aarch64
       - name: 打包 cspice-linux-aarch64.zip
         run: |
           zip -r cspice-linux-aarch64.zip mice_linux_aarch64
