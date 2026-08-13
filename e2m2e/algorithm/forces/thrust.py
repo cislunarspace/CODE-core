@@ -133,7 +133,13 @@ def _resolve_thrust_direction(
 
 
 class FiniteBurn(PhysicalModel):
-    """连续推力加速度力模型。
+    """连续推力加速度力模型（实现状态：预留，见 issue #407）。
+
+    恒质量低推力从未有效接入传播：``compute_acceleration`` 已按 #378 删除，
+    ``to_rust_spec`` 尚未接入 Rust 侧已实现的 ``CompiledForce::LowThrust``
+    变体。方向帧解析逻辑（``_resolve_thrust_direction``）代码已就绪但无消费者。
+    需要推力传播请改用 :class:`VariableMassFiniteBurn`（变质量，7D 状态）。
+
     ``direction`` 给出方向向量（固定向量或随状态更新的可调用），
     内部归一化为单位向量。质量为常量（不支持推进剂消耗）。
 
@@ -218,15 +224,18 @@ class FiniteBurn(PhysicalModel):
         )
 
     def to_rust_spec(self, system: object) -> tuple | None:
-        """``FiniteBurn`` 不支持 Rust 编译路径，显式抛 ``NotImplementedError``。
+        """``FiniteBurn`` 尚未接入 Rust 编译路径，显式抛 ``NotImplementedError``。
 
-        质量恒定的连续推力没有对应的 Rust ``CompiledForce`` 变体（Rust 侧
-        只有可变质量 ``LowThrust``）。需要推力传播请改用
+        Rust 侧 ``CompiledForce::LowThrust`` 变体已实现（恒质量小推力，元组格式
+        ``("low_thrust", t_max, isp, throttle, direction)``），但 Python 侧
+        ``FiniteBurn`` 尚未接入——时变 ``thrust_profile`` 到固定 t_max/throttle
+        的映射、isp 来源等接口设计待定（issue #407）。需要推力传播请改用
         :class:`VariableMassFiniteBurn` （7D 状态，走
         ``propagate_compiled_lowthrust``）。issue #378：不允许静默回退 Python。
         """
         raise NotImplementedError(
-            "FiniteBurn 不支持 Rust 编译传播（无对应 CompiledForce 变体）；"
+            "FiniteBurn 恒质量低推力尚未接入 Rust 编译传播"
+            "（CompiledForce::LowThrust 变体已实现，Python 侧待接入，见 #407）；"
             "如需推力传播请改用 VariableMassFiniteBurn。"
         )
 

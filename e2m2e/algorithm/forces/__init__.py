@@ -5,7 +5,8 @@ Python 类是"力模型定义"（参数验证 + to_rust_spec 序列化），与 
 配置 schema 在 ``data/templates/force_config.py`` （纯数据）；大气密度模型
 （``atmosphere.py``）一并迁入（源 ``core/atmosphere/``）。
 
-未实现（对外承诺能力）：ECOM 光压（原 #253），占位抛 ``NotImplementedError``。
+实现状态：``FiniteBurn``（恒质量低推力）为预留，未接入 Rust
+``CompiledForce::LowThrust`` 变体（issue #407）；其余力模型均已接入。
 """
 
 from __future__ import annotations
