@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class NumpyArray(np.ndarray):
@@ -50,3 +50,19 @@ class OrbitProperties(_NumpyModel):
     center: np.ndarray | None = None
     is_periodic: bool = False
     periodicity_error: float | None = None
+
+    @field_validator("mean_state")
+    @classmethod
+    def validate_mean_state(cls, value: np.ndarray | None) -> np.ndarray | None:
+        """确保平均状态向量保持六维状态契约。"""
+        if value is not None and value.shape != (6,):
+            raise ValueError("mean_state 必须是形状 (6,) 的数组")
+        return value
+
+    @field_validator("center")
+    @classmethod
+    def validate_center(cls, value: np.ndarray | None) -> np.ndarray | None:
+        """确保轨道中心保持三维位置契约。"""
+        if value is not None and value.shape != (3,):
+            raise ValueError("center 必须是形状 (3,) 的数组")
+        return value

@@ -15,7 +15,7 @@ ALGORITHMS_REQUIREMENTS = [
         description="DifferentialCorrection 在默认容差 1e-12 下应在 50 次迭代内收敛。",
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.algorithms.differential_correction"],
+        linked_code=["e2m2e.algorithm.solver.differential_correction"],
         linked_tests=["tests/algorithm/correction/test_differential_correction.py"],
     ),
     Requirement(
@@ -25,7 +25,7 @@ ALGORITHMS_REQUIREMENTS = [
         description="DifferentialCorrection 默认容差为 1e-12。",
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
-        linked_code=["e2m2e.algorithms.differential_correction"],
+        linked_code=["e2m2e.algorithm.solver.differential_correction"],
         linked_tests=["tests/algorithm/correction/test_differential_correction.py"],
     ),
     Requirement(
@@ -38,7 +38,10 @@ ALGORITHMS_REQUIREMENTS = [
         ),
         priority=RequirementPriority.SHOULD,
         verification_method="inspection",
-        linked_code=["e2m2e.algorithms.strategies", "e2m2e.algorithms.differential_correction"],
+        linked_code=[
+            "e2m2e.algorithm.family.strategies",
+            "e2m2e.algorithm.solver.differential_correction",
+        ],
         linked_tests=["tests/algorithm/correction/test_differential_correction.py"],
     ),
     Requirement(
@@ -52,7 +55,7 @@ ALGORITHMS_REQUIREMENTS = [
         ),
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
-        linked_code=["e2m2e.algorithms.continuation"],
+        linked_code=["e2m2e.algorithm.solver.continuation"],
         linked_tests=["tests/algorithm/correction/test_continuation.py"],
     ),
     Requirement(
@@ -65,7 +68,7 @@ ALGORITHMS_REQUIREMENTS = [
         ),
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
-        linked_code=["e2m2e.algorithms.differential_correction"],
+        linked_code=["e2m2e.algorithm.solver.differential_correction"],
         linked_tests=["tests/algorithm/correction/test_differential_correction.py"],
     ),
     Requirement(
@@ -77,7 +80,7 @@ ALGORITHMS_REQUIREMENTS = [
         ),
         priority=RequirementPriority.SHOULD,
         verification_method="test",
-        linked_code=["e2m2e.algorithms.differential_correction"],
+        linked_code=["e2m2e.algorithm.solver.differential_correction"],
         linked_tests=["tests/algorithm/correction/test_differential_correction.py"],
     ),
     # ---- 稳定性分析 ----
@@ -88,7 +91,7 @@ ALGORITHMS_REQUIREMENTS = [
         description="对于保守系统 CR3BP，单周期轨道的 Floquet 乘子乘积 v1*v2 = 1（辛条件）。",
         priority=RequirementPriority.SHOULD,
         verification_method="test",
-        linked_code=["e2m2e.algorithms.stability"],
+        linked_code=["e2m2e.algorithm.stability"],
         linked_tests=["tests/algorithm/stability/test_stability.py"],
     ),
     # ---- 多点射击 ----
@@ -99,7 +102,7 @@ ALGORITHMS_REQUIREMENTS = [
         description="MultipleShooting 支持通过 n_workers 参数进行并行传播，结果与串行一致。",
         priority=RequirementPriority.SHOULD,
         verification_method="test",
-        linked_code=["e2m2e.algorithms.multiple_shooting"],
+        linked_code=["e2m2e.algorithm.solver.multiple_shooting"],
         linked_tests=["tests/algorithm/correction/test_multiple_shooting.py"],
     ),
     # ---- 延拓 ----
@@ -112,7 +115,7 @@ ALGORITHMS_REQUIREMENTS = [
         ),
         priority=RequirementPriority.SHOULD,
         verification_method="test",
-        linked_code=["e2m2e.algorithms.continuation"],
+        linked_code=["e2m2e.algorithm.solver.continuation"],
         linked_tests=["tests/algorithm/correction/test_continuation.py"],
     ),
     Requirement(
@@ -122,7 +125,7 @@ ALGORITHMS_REQUIREMENTS = [
         description="伪弧长延拓使用 SVD 计算 Jacobian 零空间作为切向量（预测方向）。",
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
-        linked_code=["e2m2e.algorithms.continuation"],
+        linked_code=["e2m2e.algorithm.solver.continuation"],
         linked_tests=["tests/algorithm/correction/test_continuation.py"],
     ),
 ]

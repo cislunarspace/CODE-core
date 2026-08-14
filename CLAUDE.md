@@ -47,7 +47,7 @@ builder（写/修代码）+ checker（跑全部检查）+ loop-go（驱动循环
 
 - Rust 扩展：`maturin develop` 构建 `e2m2e._integrators`，spice 现为默认 feature（crates `default = ["spice"]` + pyproject `features=["spice"]` 双保险），不再产无 spice 子集。debug 产物运行较慢（约 5 倍），性能基准/长期预报用 `make dev-release`（--release）。
 - 开发入口走 `Makefile`：`make dev`（= `maturin develop` debug，自动 `export CSPICE_DIR`/`LIBCLANG_PATH`）、`make dev-release`（= `maturin develop --release`）、`make test`、`make check`、`make setup`（拉 CSPICE 编译包 + SPICE 内核）。CSPICE 经 `scripts/download_cspice.py` 从 GitHub `cspice-v1` release 取预编译包（`make dev` 自动 `export CSPICE_DIR`）；`cspice-sys` 不启用 `downloadcspice` feature，无 `CSPICE_DIR` 时构建直接报错，不再静默走 NAIF 官网源码下载（国内 naif 常不可达）。
-- 测试：默认 `uv run pytest -n auto --dist loadscope` 运行统一测试套件，排除 `low_thrust`（`addopts` 已配；数学内核已实现、Facade 任务入口占位，默认仍排除）；按功能类选跑 `-m theory`/`-m orchestration`/`-m data` 等；需显式包含未完成功能时用 `uv run pytest -m "" -n auto --dist loadscope`。Python 测试默认使用 xdist 并行，`loadscope` 保持模块/类 fixture 的复用并降低全局状态竞争；只有明确依赖进程内全局状态的最小测试组才串行，并记录原因。spice 默认，需先 `make setup` 拉内核。
+- 测试：默认 `uv run pytest -n auto --dist loadscope` 运行统一测试套件，低推力计算与算法已完成并纳入默认集；按功能类选跑 `-m theory`/`-m orchestration`/`-m data`/`-m low_thrust` 等。Python 测试默认使用 xdist 并行，`loadscope` 保持模块/类 fixture 的复用并降低全局状态竞争；只有明确依赖进程内全局状态的最小测试组才串行，并记录原因。墙钟性能比较属于 `scripts/` 下的 benchmark，不作为 pytest 正确性断言。spice 默认，需先 `make setup` 拉内核。
 - 提交前检查：`uv run ruff check .`、`uv run ruff format --check .`、`uv run mypy e2m2e/ --ignore-missing-imports`、`cargo fmt --all -- --check`、`cargo clippy --workspace -- -D warnings`。
 
 ## 编码准则

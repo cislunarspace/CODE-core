@@ -6,91 +6,71 @@ title: e2m2e MBSE 模型总览
 
 ## 什么是 MBSE
 
-**MBSE（基于模型的系统工程，Model-Based Systems Engineering）** 是一种以形式化模型为核心、贯穿需求、设计、分析、验证与确认全生命周期的系统工程方法。与传统以文档为中心的系统工程不同，MBSE 把系统要素之间的关系做成模型元素间的显式关联，可自动检查、可追溯；建模语言通常用 SysML（需求、行为、结构、参数四个维度）。
+**MBSE（基于模型的系统工程，Model-Based Systems Engineering）** 是一种以形式化模型为核心、贯穿需求、设计、分析、验证与确认全生命周期的系统工程方法。e2m2e 不提供完整的系统工程流程，而是在仓库内借鉴其可追溯思路。
 
-e2m2e 不是面向完整系统工程流程的 MBSE 工具，而是**借鉴 MBSE 思路**，在仓库内用轻量方式做四件事：
+MBSE 模型有四项职责：
 
-- **组件登记**（`ComponentRegistry`）——汇总各模块的职责与依赖；
-- **需求追溯**（`RequirementRegistry`）——把需求连到代码与测试；
-- **数据模型**（Pydantic）——统一传播结果、轨道属性等数据结构；
-- **图表生成**（`DiagramGenerator`）——从上述模型生成 BDD、需求图、活动图、序列图、状态机的 Mermaid 文档。
+- **组件登记**（`ComponentRegistry`）记录组件、所属架构层和组件依赖；
+- **需求追溯**（`RequirementRegistry`）将需求连到代码模块和测试文件；
+- **数据模型**（Pydantic）表达 MBSE 自身的数据契约；
+- **图表生成**（`DiagramGenerator`）从已登记模型产生 Mermaid 图表和追溯矩阵。
 
-本页及 `docs/reference/mbse/` 下的各图，就是这套轻量 MBSE 模型的产物。
-
-## 系统描述
-
-e2m2e (Earth to Moon, Moon to Earth) 是用于地月空间轨道与转移轨道设计的 Python 库。它以 CR3BP 系统和星历系统为计算上下文，提供动力学传播、周期轨道生成、轨道转移设计和可视化能力。
+BDD、需求图和追溯矩阵是受管生成产物。运行 MBSE 文档生成脚本后，提交的产物必须保持不变；活动图、序列图和状态机是补充说明，不参与该生成校验。
 
 ## 架构层次
 
+运行时代码遵循 ADR 0011 的五层架构，MBSE 是独立顶层的架构元数据，不属于运行时依赖链：
+
 ```mermaid
 graph TD
-    Core["Core 层<br/>系统、动力学、轨道数据"]
-    Algorithms["Algorithms 层<br/>微分修正、延拓、稳定性、多重打靶"]
-    Transfer["Transfer 层<br/>转移轨迹设计"]
-    Visualization["Visualization 层<br/>绘图与可视化"]
-    MBSE["MBSE 层<br/>组件登记、需求追溯、图表生成"]
-    Core --> Algorithms
-    Core --> Transfer
-    Algorithms --> Transfer
-    Core --> Visualization
-    Transfer --> Visualization
-    Core --> MBSE
-    Algorithms --> MBSE
-    Transfer --> MBSE
+    Data["data<br/>常量、帧、内核、类型"]
+    Numerical["crates / integrators<br/>数值计算"]
+    Algorithm["algorithm<br/>问题构造与算法编排"]
+    Api["api<br/>Facade、MCP、CLI"]
+    Tools["tools<br/>辅助工具"]
+    Mbse["mbse<br/>组件登记、需求追溯、图表生成"]
+    Data --> Algorithm
+    Numerical --> Algorithm
+    Data --> Api
+    Algorithm --> Api
 ```
 
-| 层 | 模块 | 职责 |
-|----|------|------|
-| Core | system, dynamics, orbit, coordinate, spice | 物理模型、传播能力、轨道数据结构 |
-| Algorithms | differential_correction, continuation, stability, multiple_shooting, strategies | 数值求解与轨道族生成 |
-| Transfer | transfer_search, transfer_optimization, transfer | 转移轨迹搜索与优化 |
-| Visualization | config, base, family, transfer, stability | 绘图与可视化输出 |
-| MBSE | architecture, requirements, data, diagrams | 组件登记、需求追溯、数据模型、Mermaid 图表生成 |
+| 层 | 责任 |
+|----|------|
+| data | 时空基准、物理常量、SPICE 内核和数据容器 |
+| numerical | Rust 数值计算与 Python 绑定 |
+| algorithm | 动力学、修正、延拓、稳定性和任务问题构造 |
+| api | Facade、MCP、CLI 及边界模型 |
+| tools | 不被核心运行时代码依赖的辅助能力 |
+| mbse | 组件登记、需求追溯、Pydantic 数据模型和文档生成 |
 
 ## 当前接缝
 
-ADR-0001 撤销了装饰性的 Protocol 接缝。当前 MBSE 文档只描述真实存在的接口与实现关系：
+ADR 0001 已撤销装饰性的 Protocol 接缝。MBSE 通过两个登记表和一个生成器描述现有模块关系：
 
-| 接缝 | 接口 | 适配器 / 实现 | 用途 |
-|------|------|---------------|------|
-| 动力学传播 | `Dynamics` 基类 | `CR3BP_Dynamics`, `EphemerisDynamics` | 统一 `propagate()` 调用和方程钩子 |
-| 组件登记 | `ComponentRegistry` | core / algorithms 组件定义 | 汇总模块职责与依赖关系 |
-| 需求追溯 | `RequirementRegistry` | core / algorithms 需求定义 | 将需求连接到代码与测试 |
-| 图表生成 | `DiagramGenerator` | BDD、需求图、活动图、序列图、状态机图 | 从 MBSE 模型生成 Mermaid 文档 |
+| 接缝 | 接口 | 用途 |
+|------|------|------|
+| 默认模型装配 | `register_default_model` | 向调用方提供的注册表登记官方需求与组件目录 |
+| 组件登记 | `ComponentRegistry` | 汇总组件的模块位置、架构层和依赖关系 |
+| 需求追溯 | `RequirementRegistry` | 将需求连接到代码模块和测试文件 |
+| 文档生成 | `DiagramGenerator` | 从登记模型生成 BDD、需求图和追溯矩阵 |
 
 ## 数据模型
 
-基于 Pydantic 的统一数据结构：
-
 | 模型 | 用途 |
 |------|------|
-| `PropagationResult` | 传播结果（states, stm, jacobi） |
-| `OrbitProperties` | 轨道属性（周期、振幅、极值） |
-| `OrbitStability` | 稳定性分析结果（单值矩阵、特征值） |
-| `JacobiResult` | Jacobi 常数计算结果 |
-| `SystemConfig` | 系统配置参数 |
-| `TransferConfig` | 转移配置参数（含搜索阶段 ``search_*`` 字段） |
+| `OrbitProperties` | 轨道属性：周期、振幅、极值、平均状态、中心和周期性 |
 
-## 需求统计
+`OrbitProperties.mean_state` 是形状 `(6,)` 的状态向量，`center` 是形状 `(3,)` 的位置向量。模型在构造时验证这些公开契约。
 
-| 层 | 需求范围 | 数量 | 验证方法 |
-|----|----------|------|----------|
-| Core | REQ-001 ~ REQ-026 | 14 条 | test / analysis / inspection |
-| Algorithms | REQ-100 ~ REQ-113 | 10 条 | test / inspection |
-| **总计** | | **24 条** | **覆盖率 100%** |
+## 受管产物
 
-## SysML 图表索引
-
-| 图表类型 | 文件 | 内容 |
-|----------|------|------|
-| BDD | [bdd-core.md](bdd-core.md) | Core 层块定义图 |
-| BDD | [bdd-algorithms.md](bdd-algorithms.md) | Algorithms 层块定义图 |
-| 需求图 | [requirements.md](requirements.md) | 需求分解与追溯 |
-| 状态机 | [state-convergence.md](state-convergence.md) | 微分修正收敛状态 |
-| 状态机 | [state-orbit-lifecycle.md](state-orbit-lifecycle.md) | 轨道生命周期 |
-| 活动图 | [activity-orbit-design.md](activity-orbit-design.md) | 轨道设计工作流 |
-| 活动图 | [activity-differential-correction.md](activity-differential-correction.md) | 微分修正迭代流程 |
-| 序列图 | [sequence-propagation.md](sequence-propagation.md) | 传播交互序列 |
-| 序列图 | [sequence-correction.md](sequence-correction.md) | 微分修正交互序列 |
-| 追溯矩阵 | [traceability-matrix.md](traceability-matrix.md) | 需求-代码-测试追溯 |
+| 文档 | 内容 |
+|------|------|
+| [数据层 BDD](generated/bdd-data.md) | 数据容器与 SPICE 内核管理组件 |
+| [数值层 BDD](generated/bdd-numerical.md) | Rust 数值计算门面 |
+| [算法层 BDD](generated/bdd-algorithm.md) | 动力学、修正、延拓与稳定性组件 |
+| [接口层 BDD](generated/bdd-api.md) | Facade、CLI 与 MCP 接口 |
+| [工具层 BDD](generated/bdd-tools.md) | 日志等辅助工具 |
+| [功能需求](generated/requirements.md) | 需求图及代码满足关系 |
+| [追溯矩阵](generated/traceability-matrix.md) | 需求、代码模块和测试文件的关联 |

@@ -10,16 +10,19 @@ e2m2e 基于模型的系统工程（Model-Based Systems Engineering, MBSE）模�
 :hidden:
 
 system-overview
-bdd-core
-bdd-algorithms
-requirements
+generated/bdd-data
+generated/bdd-numerical
+generated/bdd-algorithm
+generated/bdd-api
+generated/bdd-tools
+generated/requirements
 activity-orbit-design
 activity-differential-correction
 sequence-propagation
 sequence-correction
 state-orbit-lifecycle
 state-convergence
-traceability-matrix
+generated/traceability-matrix
 ```
 
 ## 架构
@@ -27,9 +30,12 @@ traceability-matrix
 | 文档 | 说明 |
 |------|------|
 | [系统总览](system-overview) | 块定义图（BDD）与组件架构 |
-| [BDD：核心模块](bdd-core) | 核心模块块定义 — System, Dynamics, Orbit |
-| [BDD：算法模块](bdd-algorithms) | 算法模块块定义 — DifferentialCorrection, Continuation, Stability |
-| [功能需求](requirements) | 功能需求登记与追溯 |
+| [BDD：数据层](generated/bdd-data) | 数据容器与内核管理组件 |
+| [BDD：数值层](generated/bdd-numerical) | Rust 数值计算门面 |
+| [BDD：算法层](generated/bdd-algorithm) | 动力学、修正与延拓组件 |
+| [BDD：接口层](generated/bdd-api) | Facade、CLI 与 MCP 接口 |
+| [BDD：工具层](generated/bdd-tools) | 日志等辅助工具 |
+| [功能需求](generated/requirements) | 功能需求登记与代码追溯 |
 
 ## 活动图
 
@@ -56,4 +62,4 @@ traceability-matrix
 
 | 文档 | 说明 |
 |------|------|
-| [追溯矩阵](traceability-matrix) | 需求到组件的映射 |
+| [追溯矩阵](generated/traceability-matrix) | 需求到代码与测试的映射 |

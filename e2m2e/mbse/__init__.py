@@ -11,5 +11,6 @@
 """
 
 from . import architecture, data, diagrams, requirements
+from .default_model import register_default_model
 
-__all__ = ["architecture", "data", "diagrams", "requirements"]
+__all__ = ["architecture", "data", "diagrams", "requirements", "register_default_model"]

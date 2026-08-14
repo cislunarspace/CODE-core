@@ -8,7 +8,11 @@
 from __future__ import annotations
 
 import enum
+import re
 from dataclasses import dataclass, field
+
+REQUIREMENT_ID_PATTERN = re.compile(r"REQ-\d{3}")
+VALID_VERIFICATION_METHODS = frozenset({"test", "analysis", "inspection"})
 
 
 class RequirementCategory(enum.Enum):
@@ -57,22 +61,22 @@ class Requirement:
     linked_code: list[str] = field(default_factory=list)
     linked_tests: list[str] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        """校验需求目录的稳定标识与验证方法。"""
+        if REQUIREMENT_ID_PATTERN.fullmatch(self.id) is None:
+            raise ValueError("需求 ID 必须匹配 REQ-001 格式")
+        if self.verification_method not in VALID_VERIFICATION_METHODS:
+            raise ValueError("verification_method 必须是 test、analysis 或 inspection 之一")
+
 
 class RequirementRegistry:
-    """需求注册表（单例模式）
+    """需求注册表。
 
-    集中管理所有需求定义，支持按分类、层次、追溯关系查询。
+    调用方持有注册表生命周期，支持按分类、层次和追溯关系查询。
     """
 
-    _instance: RequirementRegistry | None = None
-    _requirements: dict[str, Requirement]
-
-    def __new__(cls) -> RequirementRegistry:
-        """单例模式：全局共享同一个注册表实例，确保需求注册全局一致"""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._requirements = {}
-        return cls._instance
+    def __init__(self) -> None:
+        self._requirements: dict[str, Requirement] = {}
 
     def register(self, requirement: Requirement) -> None:
         """注册一个需求"""

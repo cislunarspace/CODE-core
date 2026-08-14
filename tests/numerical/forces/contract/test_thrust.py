@@ -59,7 +59,7 @@ def test_finite_burn_constant_and_zero_thrust_propagation():
 
 
 def test_finite_burn_pulse_profile_switches_at_configured_epochs():
-    """pulse profile 只在闭区间内施加推力。"""
+    """pulse profile 只在半开区间 [t_start, t_end) 内施加推力。"""
     fm = ForceModel(
         FakeSystem(),
         [
@@ -73,9 +73,15 @@ def test_finite_burn_pulse_profile_switches_at_configured_epochs():
             )
         ],
     )
+    profile = fm._entries[0].force.thrust_profile
+    assert profile(0.999) == 0.0
+    assert profile(1.0) == 10.0
+    assert profile(1.999) == 10.0
+    assert profile(2.0) == 0.0
+
     y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
     result = fm.propagate(y0, (0.0, 3.0), t_eval=np.array([0.0, 1.0, 2.0, 3.0]))
-    # 端点包含在内，积分器在两个端点间只会对约 1 秒的有效区间累计推力。
+    # 两个端点间约 1 秒的有效区间累计推力。
     np.testing.assert_allclose(result["states"][-1, 3], 1e-5, rtol=1e-5, atol=1e-11)
 
 

@@ -49,19 +49,46 @@ e2m2e.mbse.architecture.components module
    :show-inheritance:
 
 
-e2m2e.mbse.architecture.core_components module
+e2m2e.mbse.architecture.data_components module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: e2m2e.mbse.architecture.core_components
+.. automodule:: e2m2e.mbse.architecture.data_components
    :members:
    :undoc-members:
    :show-inheritance:
 
 
-e2m2e.mbse.architecture.algorithms_components module
+e2m2e.mbse.architecture.algorithm_components module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: e2m2e.mbse.architecture.algorithms_components
+.. automodule:: e2m2e.mbse.architecture.algorithm_components
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+e2m2e.mbse.architecture.numerical_components module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.mbse.architecture.numerical_components
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+e2m2e.mbse.architecture.api_components module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.mbse.architecture.api_components
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+e2m2e.mbse.architecture.tools_components module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.mbse.architecture.tools_components
    :members:
    :undoc-members:
    :show-inheritance:

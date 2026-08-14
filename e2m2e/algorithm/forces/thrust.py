@@ -27,8 +27,8 @@ r"""推力与机动模型。
   :math:`B = V \\times N` (副法向)。
 - ``"LVLH"``：``direction`` 在 LVLH 坐标系下解释，其中
   :math:`R = r/\\|r\\|` (径向)，
-  :math:`V = v/\\|v\\|` (沿迹方向)，
-  :math:`N = R \\times V` (轨道面法向)。
+  :math:`N = (r \\times v)/\\|r \\times v\\|` (法向)，
+  :math:`T = N \\times R` (沿迹方向)。
 """
 
 from __future__ import annotations
@@ -39,7 +39,6 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
-from ..coordinate.standard_dynamic_axes import LVLHAxes, VNBAxes
 from .physical_model import PhysicalModel
 
 
@@ -69,76 +68,12 @@ class ImpulsiveBurn:
         object.__setattr__(self, "delta_v", np.asarray(self.delta_v, dtype=float).copy())
 
 
-def _resolve_thrust_direction(
-    t: float,
-    direction_local: npt.NDArray[np.floating],
-    state: npt.NDArray[np.floating],
-    direction_frame: str | None,
-    axes: LVLHAxes | VNBAxes | None,
-) -> npt.NDArray[np.floating]:
-    """把 direction_local 从 burn 坐标系转换到传播坐标系。
-
-    复用 :class:`~e2m2e.core.standard_dynamic_axes.VNBAxes` /
-    :class:`~e2m2e.core.standard_dynamic_axes.LVLHAxes` 构造旋转矩阵，
-    再用 ``rotation @ direction_local`` 完成变换。轴向定义沿用
-    ``standard_dynamic_axes`` （VNB/LVLH 按 GMAT 约定）。
-
-    动态坐标轴类本身不校验状态退化情形，这里保留边界检查（零速度/零
-    位置/共线 r-v），抛出含义清晰的 ``ValueError`` 并避免 ``LVLHAxes``
-    在角动量为零时产生 NaN。``FiniteBurn`` 与 ``VariableMassFiniteBurn``
-    共用此函数。
-
-    Args:
-        t: 当前历元（秒），透传给 ``axes.update``/``rotation_matrix``。
-        direction_local: 在 direction_frame 下的方向向量（未归一化）。
-        state: 状态向量（至少 6 维），在传播坐标系下。
-        direction_frame: 方向解释坐标系，``"VNB"`` / ``"LVLH"`` / ``None``。
-        axes: 与 direction_frame 配套的动态坐标轴实例，``None`` 时 frame
-            必须也为 ``None``。
-
-    Returns:
-        传播坐标系下的方向向量（未归一化）。
-    """
-    if direction_frame is None:
-        return direction_local
-
-    r = state[:3]
-    v = state[3:6]
-    r_norm = np.linalg.norm(r)
-    v_norm = np.linalg.norm(v)
-    h_norm = np.linalg.norm(np.cross(r, v))
-
-    if direction_frame == "VNB":
-        if v_norm < 1e-15:
-            raise ValueError("VNB frame requires non-zero velocity")
-        if h_norm < 1e-15:
-            raise ValueError("VNB frame requires non-zero angular momentum")
-    else:  # LVLH
-        if r_norm < 1e-15:
-            raise ValueError("LVLH frame requires non-zero position")
-        if v_norm < 1e-15:
-            raise ValueError("LVLH frame requires non-zero velocity")
-        if h_norm < 1e-15:
-            # 退化的径向（直线）轨道：r 与 v 共线，LVLHAxes 的 h_hat 未定义
-            # (h/|h| → NaN)。沿用原手搓逻辑在此情形下的稳健行为：
-            # N = R × V = 0，仅径向/沿迹分量有意义。
-            R = r / r_norm
-            V = v / v_norm
-            return direction_local[0] * R + direction_local[1] * V
-
-    assert axes is not None  # direction_frame validated in __init__
-    axes.update(t, state)
-    rotation = axes.rotation_matrix(t)
-    return rotation @ direction_local
-
-
 class FiniteBurn(PhysicalModel):
     """恒质量连续推力加速度力模型。
 
-    6D 状态传播由 Rust 编译路径执行。配置 DSL 构造的 ``constant`` / ``pulse``
-    profile 和固定方向可下沉；任意 Python callable 无法进入 Rust RK 内循环，
-    在传播入口会显式报能力错误。需要推进剂消耗时使用
-    :class:`VariableMassFiniteBurn`（变质量，7D 状态）。
+    6D 状态传播由 Rust 编译路径执行。配置 DSL 构造的常量或 pulse 推力曲线和
+    固定方向可下沉；任意 Python callable 无法进入 Rust RK 内循环，在传播入口会
+    显式报能力错误。需要推进剂消耗时使用 VariableMassFiniteBurn（变质量，7D 状态）。
 
     ``direction`` 给出方向向量（固定向量或随状态更新的可调用），
     内部归一化为单位向量。质量为常量（不支持推进剂消耗）。
@@ -146,14 +81,9 @@ class FiniteBurn(PhysicalModel):
     ``direction_frame`` 支持 ``"VNB"``、``"LVLH"`` 与 ``None``：
 
     - ``None``：``direction`` 直接在传播（惯性）坐标系内解释。
-    - ``"VNB"``：``direction`` 在 VNB 坐标系下解释，其中
-      :math:`V = v/\\|v\\|` (速度方向)，
-      :math:`N = (r \\times v)/\\|r \\times v\\|` (角动量方向)，
-      :math:`B = V \\times N` (副法向)。
-    - ``"LVLH"``：``direction`` 在 LVLH 坐标系下解释，其中
-      :math:`R = r/\\|r\\|` (径向)，
-      :math:`V = v/\\|v\\|` (沿迹方向)，
-      :math:`N = R \\times V` (轨道面法向)。
+    - ``"VNB"``：三个分量依次对应速度单位向量、角动量单位向量和副法向量。
+    - ``"LVLH"``：三个分量依次对应径向单位向量、沿迹单位向量和轨道面法向量；
+      沿迹单位向量由法向量叉径向量得到。
 
     Args:
         thrust_profile: ``t -> thrust`` （N，标量；``0`` 表示关机）。
@@ -179,12 +109,6 @@ class FiniteBurn(PhysicalModel):
                 f"direction_frame must be 'VNB', 'LVLH', or None, got {direction_frame!r}"
             )
         self._direction_frame = direction_frame
-        if direction_frame == "VNB":
-            self._axes: VNBAxes | LVLHAxes | None = VNBAxes()
-        elif direction_frame == "LVLH":
-            self._axes = LVLHAxes()
-        else:
-            self._axes = None
         if not callable(direction):
             direction_arr = np.asarray(direction, dtype=float)
             if np.linalg.norm(direction_arr) < 1e-15:
@@ -211,17 +135,6 @@ class FiniteBurn(PhysicalModel):
     def mass(self) -> float:
         """航天器质量（kg，常量）。"""
         return self._mass
-
-    def _resolve_direction_in_frame(
-        self,
-        t: float,
-        direction_local: npt.NDArray[np.floating],
-        state: npt.NDArray[np.floating],
-    ) -> npt.NDArray[np.floating]:
-        """把 direction_local 从 burn 坐标系转换到传播坐标系（委托模块函数）。"""
-        return _resolve_thrust_direction(
-            t, direction_local, state, self._direction_frame, self._axes
-        )
 
     def to_rust_spec(self, system: object) -> tuple | None:
         """序列化为恒质量 6D 编译传播接受的推力规格。
@@ -304,12 +217,6 @@ class VariableMassFiniteBurn(PhysicalModel):
         self._initial_mass = float(initial_mass)
         self._direction = direction
         self._direction_frame = direction_frame
-        if direction_frame == "VNB":
-            self._axes: VNBAxes | LVLHAxes | None = VNBAxes()
-        elif direction_frame == "LVLH":
-            self._axes = LVLHAxes()
-        else:
-            self._axes = None
         if not callable(direction):
             direction_arr = np.asarray(direction, dtype=float)
             if np.linalg.norm(direction_arr) < 1e-15:

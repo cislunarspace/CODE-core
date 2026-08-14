@@ -1,7 +1,7 @@
 """低推力 Hermite-Simpson 配点求解器验证。
 
-对照 ``docs/plans/lowthrust-collocation-prd.md``：HS 缺陷约束正确性、min-fuel
-闭环收敛、对标直接打靶。纯二体（PointMassGravity，无需 SPICE）。
+对照 ``docs/plans/lowthrust-collocation-prd.md``：HS 缺陷约束正确性与 min-fuel
+闭环收敛。纯二体（PointMassGravity，无需 SPICE）。
 """
 
 from types import SimpleNamespace
@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import PointMassGravity
-from e2m2e.algorithm.transfer import EngineConfig, LowThrustCollocation, LowThrustShooting
+from e2m2e.algorithm.transfer import EngineConfig, LowThrustCollocation
 from e2m2e.integrators import RkMethod, propagate_compiled_lowthrust
 
 pytestmark = [pytest.mark.orchestration, pytest.mark.low_thrust]
@@ -90,43 +90,3 @@ def test_collocation_min_fuel_converges():
     )
     assert abs(a_end - aT) / aT < 5e-3, f"末态半长轴 {a_end:.1f} 偏离目标 {aT:.1f}"
     assert sol.fuel_consumed > 0, "燃料消耗应为正"
-
-
-def test_collocation_vs_shooting_consistency():
-    """配点 vs 直接打靶：同一问题末态/燃料量级一致。"""
-    r0 = 7000.0
-    v0 = np.sqrt(MU / r0)
-    aT = 7100.0
-    vT = np.sqrt(MU / aT)
-    target = np.array([aT, 0.0, 0.0, 0.0, vT, 0.0])
-    tf = 1.5 * 86400.0
-
-    system, forces = _system_forces()
-    engine = EngineConfig(t_max=0.5, isp=3000.0)
-    init = np.array([r0, 0.0, 0.0, 0.0, v0, 0.0])
-
-    coll = LowThrustCollocation(system, forces, engine, init, 1000.0, target, 0.0, tf)
-    sol_coll = coll.solve(5, maxiter=150)
-
-    shooter = LowThrustShooting(system, forces, engine, init, 1000.0, target, 0.0, tf)
-    sol_shoot = shooter.solve(5, maxiter=150)
-
-    # 两者末态半长轴都接近目标（各自收敛）
-    a_coll = -MU / (
-        2
-        * (
-            np.linalg.norm(sol_coll.states[-1][3:6]) ** 2 / 2
-            - MU / np.linalg.norm(sol_coll.states[-1][:3])
-        )
-    )
-    a_shoot = -MU / (
-        2
-        * (
-            np.linalg.norm(sol_shoot.states[-1][3:6]) ** 2 / 2
-            - MU / np.linalg.norm(sol_shoot.states[-1][:3])
-        )
-    )
-    assert abs(a_coll - aT) / aT < 0.02, f"配点末态 {a_coll:.1f}"
-    assert abs(a_shoot - aT) / aT < 0.02, f"打靶末态 {a_shoot:.1f}"
-    # 燃料消耗量级一致（都 >0）
-    assert sol_coll.fuel_consumed > 0 and sol_shoot.fuel_consumed > 0

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+ARCHITECTURE_LAYERS = ("data", "numerical", "algorithm", "api", "tools", "mbse")
+
 
 @dataclass(frozen=True)
 class Component:
@@ -18,10 +20,10 @@ class Component:
 
     Attributes:
         name: 组件名称（如 "CR3BP_Dynamics"）
-        module_path: 源代码模块路径（如 "e2m2e.core.dynamics"）
+        module_path: 源代码模块路径（如 "e2m2e.algorithm.dynamics"）
         protocols: 预留字段（ADR 0001 后为空列表）
         dependencies: 该组件依赖的其他组件名称
-        layer: 所属架构层（core/algorithms/transfer/visualization）
+        layer: 所属架构层（data/numerical/algorithm/api/tools/mbse）
         description: 组件功能简述
     """
 
@@ -29,32 +31,23 @@ class Component:
     module_path: str
     protocols: list[str] = field(default_factory=list)
     dependencies: list[str] = field(default_factory=list)
-    layer: str = "core"
+    layer: str = "mbse"
     description: str = ""
 
     def __post_init__(self):
         """校验架构层合法性"""
-        # mbse 层用于 MBSE 自身的架构组件（ComponentRegistry 等），不属于运行时四层架构
-        valid_layers = {"core", "algorithms", "transfer", "visualization", "mbse"}
-        if self.layer not in valid_layers:
-            raise ValueError(f"无效的架构层: {self.layer}，应为 {valid_layers}")
+        if self.layer not in ARCHITECTURE_LAYERS:
+            raise ValueError(f"无效的架构层: {self.layer}，应为 {ARCHITECTURE_LAYERS}")
 
 
 class ComponentRegistry:
-    """组件注册表
+    """组件注册表。
 
-    集中管理所有组件定义，支持按层、按接口查询。
+    调用方持有注册表生命周期，避免模型装配和测试共享可变全局状态。
     """
 
-    _instance: ComponentRegistry | None = None
-    _components: dict[str, Component]
-
-    def __new__(cls) -> ComponentRegistry:
-        """单例模式：全局共享同一个注册表实例，避免多次注册丢失"""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._components = {}
-        return cls._instance
+    def __init__(self) -> None:
+        self._components: dict[str, Component] = {}
 
     def register(self, component: Component) -> None:
         """注册一个组件"""

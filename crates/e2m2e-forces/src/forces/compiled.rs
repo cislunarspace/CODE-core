@@ -71,7 +71,7 @@ pub enum CompiledForce {
     /// 恒质量连续推力模型。
     ///
     /// 推力加速度 = (T / m) * α。推力可常开，也可仅在时段
-    /// ``(t_start, t_end)`` 内开启；端点处关机以避免 RK stage 把单点开关
+    /// ``[t_start, t_end)`` 内开启；关机端点处关机以避免 RK stage 把单点开关
     /// 误算成有限冲量。方向在惯性、VNB 或 LVLH 系中给出。
     LowThrust {
         /// 航天器恒定质量（kg）
@@ -313,7 +313,7 @@ impl CompiledForce {
                     return Ok([0.0; 3]);
                 }
                 if let (Some(start), Some(end)) = (t_start, t_end) {
-                    if et <= *start || et >= *end {
+                    if et < *start || et >= *end {
                         return Ok([0.0; 3]);
                     }
                 }

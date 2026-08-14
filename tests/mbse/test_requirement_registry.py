@@ -117,3 +117,17 @@ def test_coverage_report_handles_empty_and_partially_covered_registry(registry):
         "coverage_rate": 0.5,
         "uncovered_ids": ["REQ-002"],
     }
+
+
+def test_requirement_rejects_invalid_id_and_verification_method():
+    """需求只接受统一 ID 格式和既定验证方法。"""
+    with pytest.raises(ValueError, match="REQ-001"):
+        make_requirement("requirement-1")
+    with pytest.raises(ValueError, match="verification_method"):
+        Requirement(
+            id="REQ-001",
+            title="验证方法",
+            category=RequirementCategory.FUNCTIONAL,
+            description="验证方法必须受限。",
+            verification_method="manual",
+        )

@@ -134,7 +134,7 @@ def _build_thrust_profile(config: dict[str, Any]) -> Callable[[float], float]:
             _t_end: float = t_end,
             _thrust: float = thrust,
         ) -> float:
-            return _thrust if _t_start <= t <= _t_end else 0.0
+            return _thrust if _t_start <= t < _t_end else 0.0
 
         cast(Any, pulse_profile)._e2m2e_config_kind = (
             "pulse",

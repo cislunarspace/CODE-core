@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 
-from ..architecture.components import ComponentRegistry
+from ..architecture.components import ARCHITECTURE_LAYERS, ComponentRegistry
 from ..requirements.base import RequirementCategory, RequirementRegistry
 
 
@@ -36,8 +36,8 @@ class DiagramGenerator:
             requirements: 需求注册表实例，默认使用全局单例
             components: 组件注册表实例，默认使用全局单例
         """
-        self.requirements = requirements or RequirementRegistry()
-        self.components = components or ComponentRegistry()
+        self.requirements = requirements if requirements is not None else RequirementRegistry()
+        self.components = components if components is not None else ComponentRegistry()
 
     def generate_bdd(self, layer: str | None = None) -> str:
         """生成 BDD (Block Definition Diagram) — Mermaid classDiagram
@@ -105,6 +105,23 @@ class DiagramGenerator:
                 safe_name = code_path.replace(".", "_").replace("/", "_")
                 lines.append(f"    {safe_name} -satisfies-> {req.id.replace('-', '_')}")
 
+        return "\n".join(lines)
+
+    def generate_traceability_matrix(self) -> str:
+        """生成需求到代码和测试的 Markdown 追溯矩阵。"""
+        lines = [
+            "| 需求 ID | 标题 | 类别 | 优先级 | 验证方法 | 关联代码 | 关联测试 |",
+            "|---------|------|------|--------|----------|----------|----------|",
+        ]
+        for requirement in self.requirements:
+            code = "<br>".join(requirement.linked_code)
+            tests = "<br>".join(requirement.linked_tests)
+            lines.append(
+                "| "
+                f"{requirement.id} | {requirement.title} | {requirement.category.value} | "
+                f"{requirement.priority.value} | {requirement.verification_method} | "
+                f"{code} | {tests} |"
+            )
         return "\n".join(lines)
 
     def generate_state_machine(
@@ -228,19 +245,18 @@ class DiagramGenerator:
 
         return "\n".join(lines)
 
-    def write_diagram(self, content: str, output_path: str) -> None:
-        """将 Mermaid 图表写入 Markdown 文件
-
-        Args:
-            content: Mermaid 语法字符串
-            output_path: 输出文件路径（.md）
-        """
+    def write_document(self, title: str, content: str, output_path: str) -> None:
+        """将受管 Markdown 文档写入指定位置。"""
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(f"```mermaid\n{content}\n```\n")
+        with open(output_path, "w", encoding="utf-8") as file:
+            file.write(f"---\ntitle: {title}\n---\n\n# {title}\n\n{content}\n")
+
+    def write_diagram(self, title: str, content: str, output_path: str) -> None:
+        """将 Mermaid 图表作为受管 Markdown 文档写入指定位置。"""
+        self.write_document(title, f"```mermaid\n{content}\n```", output_path)
 
     def generate_all(self, output_dir: str) -> list[str]:
-        """生成所有图表并写入文件
+        """生成默认模型的受管图表和追溯文档。
 
         Args:
             output_dir: 输出目录路径
@@ -249,20 +265,31 @@ class DiagramGenerator:
             生成的文件路径列表
         """
         generated = []
+        layer_titles = {
+            "data": "数据",
+            "numerical": "数值",
+            "algorithm": "算法",
+            "api": "接口",
+            "tools": "工具",
+        }
 
-        # BDD for each layer（不含 "mbse"，因为 MBSE 层是架构元数据，不生成独立 BDD）
-        for layer in ["core", "algorithms", "transfer", "visualization"]:
+        for layer in ARCHITECTURE_LAYERS:
+            if layer == "mbse":
+                continue
             bdd_content = self.generate_bdd(layer)
-            if bdd_content != "classDiagram":  # 非空
-                path = os.path.join(output_dir, f"bdd-{layer}.md")
-                self.write_diagram(bdd_content, path)
-                generated.append(path)
-
-        # Requirement diagram
-        if len(self.requirements) > 0:
-            req_content = self.generate_requirement_diagram()
-            path = os.path.join(output_dir, "requirements.md")
-            self.write_diagram(req_content, path)
+            if bdd_content == "classDiagram":
+                continue
+            path = os.path.join(output_dir, f"bdd-{layer}.md")
+            self.write_diagram(f"BDD：{layer_titles[layer]}层", bdd_content, path)
             generated.append(path)
+
+        if len(self.requirements) > 0:
+            requirement_path = os.path.join(output_dir, "requirements.md")
+            self.write_diagram("功能需求", self.generate_requirement_diagram(), requirement_path)
+            generated.append(requirement_path)
+
+            matrix_path = os.path.join(output_dir, "traceability-matrix.md")
+            self.write_document("需求追溯矩阵", self.generate_traceability_matrix(), matrix_path)
+            generated.append(matrix_path)
 
         return generated

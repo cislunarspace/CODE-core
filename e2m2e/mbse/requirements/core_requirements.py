@@ -139,7 +139,7 @@ CORE_REQUIREMENTS = [
         description="OrbitFamily 提供统一的聚合接口：states、periods 属性与 get_jacobi_constants() 方法。",  # noqa: E501
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.data.types.orbit_family"],
+        linked_code=["e2m2e.data.types.orbit"],
         linked_tests=["tests/data/types/test_orbit_family.py"],
     ),
     Requirement(

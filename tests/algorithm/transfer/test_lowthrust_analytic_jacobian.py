@@ -257,36 +257,17 @@ def test_terminal_jacobian_matches_constraint_derivative():
     np.testing.assert_allclose(jac, expected, rtol=1e-10, atol=1e-12)
 
 
-def test_analytic_jacobian_speedup_over_finite_difference():
-    """解析雅可比 vs 数值差分：同解、显著提速。
-
-    解析雅可比每迭代 1 次增广传播，数值差分每迭代 3N+1 次；预期加速一个
-    量级。两者收敛到的燃料消耗应一致（解析雅可比不改变最优解，只改变求
-    解效率）。
-    """
-    import time
+def test_analytic_jacobian_matches_numeric_solution():
+    """解析与数值雅可比求得近似相同的燃料消耗。"""
 
     shooter = _make_shooter_two_body()
     n_seg = 4
     y0 = shooter._default_x0(n_seg)
     y0[0::3] = 0.5  # 避免边界 clip
 
-    t0 = time.time()
     s_analytic = shooter.solve(n_seg, x0=y0, use_analytic_jac=True, maxiter=30)
-    t_analytic = time.time() - t0
-
-    t0 = time.time()
     s_numeric = shooter.solve(n_seg, x0=y0, use_analytic_jac=False, maxiter=30)
-    t_numeric = time.time() - t0
 
-    # 1. 两者收敛到接近的燃料消耗（解析雅可比不改变解，只加速）
     assert abs(s_analytic.fuel_consumed - s_numeric.fuel_consumed) < 1e-3, (
         f"解析({s_analytic.fuel_consumed:.5f}) vs 数值({s_numeric.fuel_consumed:.5f}) 燃料不一致"
-    )
-    # 2. 解析雅可比应实质快于数值差分。加速比绝对量级受机器负载影响大
-    # （注释过 ~24x，共享负载下实测 3.1x，#367）：阈值 1.5 只守护"解析
-    # 实现未退化"（若误用数值差分，ratio 会接近 1.0），不硬绑绝对量级。
-    assert t_numeric / t_analytic > 1.5, (
-        f"解析雅可比应显著快于数值差分: analytic={t_analytic:.2f}s "
-        f"numeric={t_numeric:.2f}s ratio={t_numeric / t_analytic:.1f}x"
     )

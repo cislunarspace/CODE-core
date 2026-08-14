@@ -3,7 +3,9 @@
 验证 OrbitProperties 提供合理的默认值。
 """
 
+import numpy as np
 import pytest
+from pydantic import ValidationError
 
 from e2m2e.mbse.data.core_models import OrbitProperties
 
@@ -38,3 +40,13 @@ class TestOrbitProperties:
         )
         assert props.period == 6.192
         assert props.is_periodic is True
+
+    def test_rejects_wrong_state_vector_shapes(self):
+        with pytest.raises(ValueError, match="mean_state"):
+            OrbitProperties(mean_state=np.zeros(5))
+        with pytest.raises(ValueError, match="center"):
+            OrbitProperties(center=np.zeros((3, 1)))
+
+    def test_rejects_non_array_state_vectors(self):
+        with pytest.raises(ValidationError):
+            OrbitProperties(mean_state="not an array")
