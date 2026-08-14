@@ -117,7 +117,8 @@ Atmosphere 1976 分段指数模型），``C_d`` 为阻力系数（默认 2.2）�
    \mathbf{a}_{\text{thrust}} = \frac{T(t)}{m} \, \hat{\mathbf{d}}
 
 其中 ``T(t)`` 为标量推力函数，``d̂`` 为归一化方向向量。配置往返支持固定
-推力/脉冲剖面与固定方向的封闭 DSL；任意 Python callable 可传播但无法序列化。
+推力/脉冲剖面与固定方向的封闭 DSL；只有该 DSL 控制可在 Rust 编译传播中执行，
+任意 Python callable 会在传播入口显式拒绝。
 
 **VariableMassFiniteBurn** — 可变质量连续推力，是低推力转移与月面动力下降等
 最优控制问题的受控动力学基座。与 ``FiniteBurn`` 的唯一区别：质量不是常量，

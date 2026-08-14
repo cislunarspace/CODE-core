@@ -139,29 +139,41 @@ def test_finite_burn_pulse_round_trip():
     assert ForceModel.to_config(fm) == config_dict
 
 
-def test_finite_burn_built_force_propagation_rejected():
-    """DSL 构造的 FiniteBurn 在传播入口明确拒绝未实现的 Rust 能力。"""
+def test_finite_burn_built_force_propagates_with_its_configured_mass():
+    """DSL 常量推力在 Rust 6D 路径传播，速度增量与质量成反比。"""
     system = FakeSystem()
-    config_dict = {
-        "version": 1,
-        "forces": [
+
+    def propagate_for_mass(mass: float) -> np.ndarray:
+        fm = ForceModel.from_config(
             {
-                "name": "engine",
-                "type": "FiniteBurn",
-                "enabled": True,
-                "params": {
-                    "mass": 1000.0,
-                    "thrust_profile": {"kind": "constant", "thrust": 10.0},
-                    "direction": {"kind": "fixed", "vector": [1.0, 0.0, 0.0]},
-                },
-            }
-        ],
-    }
+                "version": 1,
+                "forces": [
+                    {
+                        "name": "engine",
+                        "type": "FiniteBurn",
+                        "enabled": True,
+                        "params": {
+                            "mass": mass,
+                            "thrust_profile": {"kind": "constant", "thrust": 10.0},
+                            "direction": {"kind": "fixed", "vector": [1.0, 0.0, 0.0]},
+                        },
+                    }
+                ],
+            },
+            system,
+        )
+        result = fm.propagate(
+            np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]),
+            (0.0, 1.0),
+            t_eval=np.array([0.0, 1.0]),
+        )
+        return result["states"][-1]
 
-    fm = ForceModel.from_config(config_dict, system)
+    light = propagate_for_mass(1000.0)
+    heavy = propagate_for_mass(2000.0)
 
-    with pytest.raises(NotImplementedError, match="FiniteBurn.*Rust"):
-        fm.propagate(np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), (0.0, 1.0))
+    np.testing.assert_allclose(light[3] - 0.0, 1e-5, rtol=1e-8)
+    np.testing.assert_allclose(heavy[3] - 0.0, 5e-6, rtol=1e-8)
 
 
 def test_finite_burn_unknown_callable_not_serializable():
@@ -297,11 +309,12 @@ def test_finite_burn_vnb_direction_frame_round_trip():
 
     assert ForceModel.to_config(fm) == config_dict
 
-    with pytest.raises(NotImplementedError, match="FiniteBurn.*Rust"):
-        fm.propagate(
-            np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]),
-            (0.0, 1.0),
-        )
+    result = fm.propagate(
+        np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]),
+        (0.0, 1.0),
+        t_eval=np.array([0.0, 1.0]),
+    )
+    np.testing.assert_allclose(result["states"][-1, 4] - 7.5, 1e-5, atol=1e-11)
 
 
 def test_finite_burn_lvlh_direction_frame_round_trip():
@@ -328,11 +341,12 @@ def test_finite_burn_lvlh_direction_frame_round_trip():
 
     assert ForceModel.to_config(fm) == config_dict
 
-    with pytest.raises(NotImplementedError, match="FiniteBurn.*Rust"):
-        fm.propagate(
-            np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]),
-            (0.0, 1.0),
-        )
+    result = fm.propagate(
+        np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]),
+        (0.0, 1.0),
+        t_eval=np.array([0.0, 1.0]),
+    )
+    np.testing.assert_allclose(result["states"][-1, 5], 1e-5, atol=1e-11)
 
 
 def test_finite_burn_invalid_direction_frame_from_config_raises():

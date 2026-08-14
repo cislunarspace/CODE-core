@@ -133,12 +133,12 @@ def _resolve_thrust_direction(
 
 
 class FiniteBurn(PhysicalModel):
-    """连续推力加速度力模型（实现状态：预留，见 issue #407）。
+    """恒质量连续推力加速度力模型。
 
-    恒质量低推力从未有效接入传播：``compute_acceleration`` 已按 #378 删除，
-    ``to_rust_spec`` 尚未接入 Rust 侧已实现的 ``CompiledForce::LowThrust``
-    变体。方向帧解析逻辑（``_resolve_thrust_direction``）代码已就绪但无消费者。
-    需要推力传播请改用 :class:`VariableMassFiniteBurn`（变质量，7D 状态）。
+    6D 状态传播由 Rust 编译路径执行。配置 DSL 构造的 ``constant`` / ``pulse``
+    profile 和固定方向可下沉；任意 Python callable 无法进入 Rust RK 内循环，
+    在传播入口会显式报能力错误。需要推进剂消耗时使用
+    :class:`VariableMassFiniteBurn`（变质量，7D 状态）。
 
     ``direction`` 给出方向向量（固定向量或随状态更新的可调用），
     内部归一化为单位向量。质量为常量（不支持推进剂消耗）。
@@ -224,19 +224,35 @@ class FiniteBurn(PhysicalModel):
         )
 
     def to_rust_spec(self, system: object) -> tuple | None:
-        """``FiniteBurn`` 尚未接入 Rust 编译路径，显式抛 ``NotImplementedError``。
+        """序列化为恒质量 6D 编译传播接受的推力规格。
 
-        Rust 侧 ``CompiledForce::LowThrust`` 变体已实现（恒质量小推力，元组格式
-        ``("low_thrust", t_max, isp, throttle, direction)``），但 Python 侧
-        ``FiniteBurn`` 尚未接入——时变 ``thrust_profile`` 到固定 t_max/throttle
-        的映射、isp 来源等接口设计待定（issue #407）。需要推力传播请改用
-        :class:`VariableMassFiniteBurn` （7D 状态，走
-        ``propagate_compiled_lowthrust``）。issue #378：不允许静默回退 Python。
+        只有配置 DSL 构造的 constant/pulse 推力 profile 和固定方向可以下沉
+        到 Rust；任意 Python callable 无法在 Rust RK 内安全求值，返回 ``None``。
+        返回规格为 ``("low_thrust", mass, thrust, t_start, t_end, direction,
+        direction_frame)``，其中 constant profile 的起止时间为 ``None``。
         """
-        raise NotImplementedError(
-            "FiniteBurn 恒质量低推力尚未接入 Rust 编译传播"
-            "（CompiledForce::LowThrust 变体已实现，Python 侧待接入，见 #407）；"
-            "如需推力传播请改用 VariableMassFiniteBurn。"
+        profile_info = getattr(self._thrust_profile, "_e2m2e_config_kind", None)
+        if profile_info is None or callable(self._direction):
+            return None
+        _kind, profile = profile_info
+        kind = profile["kind"]
+        if kind == "constant":
+            t_start = None
+            t_end = None
+        elif kind == "pulse":
+            t_start = float(profile["t_start"])
+            t_end = float(profile["t_end"])
+        else:
+            raise NotImplementedError(f"FiniteBurn 不支持编译推力 profile: {kind!r}")
+        direction = np.asarray(self._direction, dtype=float)
+        return (
+            "low_thrust",
+            self._mass,
+            float(profile["thrust"]),
+            t_start,
+            t_end,
+            direction.tolist(),
+            self._direction_frame,
         )
 
 

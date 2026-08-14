@@ -1,329 +1,116 @@
-"""FiniteBurn direction_frame 测试（TDD）。
-
-验证 VNB/LVLH 坐标系转换、非法帧拒绝、
-callable 方向与零速度/零位置边界。
-
-低推力功能尚未开发完成，FiniteBurn 的 Rust 传播路径暂缺；本文件标记
-``low_thrust``，本轮检查排除在绿门外。
-"""
+"""FiniteBurn 编译传播的方向帧契约。"""
 
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.forces import FiniteBurn
+from e2m2e.algorithm.forces import ForceModel
+from e2m2e.algorithm.forces.force_config import build_force
+from e2m2e.algorithm.forces.thrust import FiniteBurn
 from tests.numerical.forces.conftest import FakeSystem
 
-pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
+pytestmark = pytest.mark.force
 
 
-# --- 构造辅助 ---
+def _propagate_delta_v(direction, direction_frame=None, *, thrust=10.0, state=None):
+    params = {
+        "mass": 1000.0,
+        "thrust_profile": {"kind": "constant", "thrust": thrust},
+        "direction": {"kind": "fixed", "vector": direction},
+    }
+    if direction_frame is not None:
+        params["direction_frame"] = direction_frame
+    burn = build_force("FiniteBurn", params)
+    y0 = (
+        np.asarray(state, dtype=float)
+        if state is not None
+        else np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+    )
+    result = ForceModel(FakeSystem(), [burn]).propagate(y0, (0.0, 1.0), t_eval=[0.0, 1.0])
+    return result["states"][-1, 3:6] - y0[3:6]
 
 
-def _make_state(r, v):
-    """构造 6 维状态向量。"""
-    return np.array([*r, *v], dtype=float)
-
-
-# --- direction_frame 参数校验 ---
+@pytest.mark.parametrize("direction_frame", ["VNB", "LVLH"])
+def test_finite_burn_direction_frame_is_validated(direction_frame):
+    """VNB/LVLH 是允许的编译方向帧。"""
+    burn = FiniteBurn(lambda _t: 10.0, [1.0, 0.0, 0.0], 1000.0, direction_frame)
+    assert burn.direction_frame == direction_frame
 
 
 def test_finite_burn_invalid_direction_frame_raises():
-    """非法 direction_frame 在构造时抛 ValueError。"""
+    """非法方向帧在构造时拒绝。"""
     with pytest.raises(ValueError, match="direction_frame"):
-        FiniteBurn(
-            thrust_profile=lambda t: 10.0,
-            direction=[1.0, 0.0, 0.0],
-            mass=1000.0,
-            direction_frame="INVALID",
-        )
+        FiniteBurn(lambda _t: 10.0, [1.0, 0.0, 0.0], 1000.0, "INVALID")
 
 
-def test_finite_burn_vnb_direction_frame_accepted():
-    """direction_frame='VNB' 合法。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[1.0, 0.0, 0.0],
-        mass=1000.0,
-        direction_frame="VNB",
+def test_finite_burn_lvlh_along_track_uses_orbital_axis():
+    """LVLH 沿迹轴垂直于径向，即使速度含径向分量也不随速度偏斜。"""
+    delta_v = _propagate_delta_v(
+        [0.0, 1.0, 0.0],
+        "LVLH",
+        state=[7000.0, 0.0, 0.0, 1.0, 7.5, 0.0],
     )
-    assert burn.direction_frame == "VNB"
+    assert abs(delta_v[0]) < 1e-8
+    assert delta_v[1] > 0.99e-5
 
 
-def test_finite_burn_lvlh_direction_frame_accepted():
-    """direction_frame='LVLH' 合法。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[0.0, 1.0, 0.0],
-        mass=1000.0,
-        direction_frame="LVLH",
+@pytest.mark.parametrize(
+    ("direction_frame", "direction", "expected"),
+    [
+        (None, [2.0, 0.0, 0.0], [1e-5, 0.0, 0.0]),
+        ("VNB", [1.0, 0.0, 0.0], [0.0, 1e-5, 0.0]),
+        ("VNB", [0.0, 1.0, 0.0], [0.0, 0.0, 1e-5]),
+        ("VNB", [0.0, 0.0, 1.0], [1e-5, 0.0, 0.0]),
+        ("LVLH", [1.0, 0.0, 0.0], [1e-5, 0.0, 0.0]),
+        ("LVLH", [0.0, 1.0, 0.0], [0.0, 1e-5, 0.0]),
+        ("LVLH", [0.0, 0.0, 1.0], [0.0, 0.0, 1e-5]),
+    ],
+)
+def test_finite_burn_compiled_direction_frames(direction_frame, direction, expected):
+    """固定推力方向在 Rust RHS 中按惯性/VNB/LVLH 正确解析。"""
+    np.testing.assert_allclose(_propagate_delta_v(direction, direction_frame), expected, atol=1e-8)
+
+
+def test_finite_burn_lvlh_collinear_state_normalizes_direction():
+    """LVLH 共线退化时，径向/沿迹分量仍归一化为单位方向。"""
+    delta_v = _propagate_delta_v(
+        [2.0, 0.0, 0.0],
+        "LVLH",
+        state=[7000.0, 0.0, 0.0, 7.5, 0.0, 0.0],
     )
-    assert burn.direction_frame == "LVLH"
+    np.testing.assert_allclose(delta_v, [1e-5, 0.0, 0.0], atol=1e-11)
 
 
-def test_finite_burn_none_direction_frame_default():
-    """direction_frame=None 为默认值，保持原有行为。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[1.0, 0.0, 0.0],
-        mass=1000.0,
+def test_finite_burn_zero_thrust_skips_degenerate_direction_frame():
+    """关机时不需要定义 VNB 方向。"""
+    delta_v = _propagate_delta_v(
+        [1.0, 0.0, 0.0], "VNB", thrust=0.0, state=[7000.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     )
-    assert burn.direction_frame is None
+    np.testing.assert_array_equal(delta_v, np.zeros(3))
 
 
-# --- direction_frame=None 时保持原有行为 ---
+@pytest.mark.parametrize(
+    ("direction_frame", "state", "error"),
+    [
+        ("VNB", [7000.0, 0.0, 0.0, 0.0, 0.0, 0.0], "non-zero velocity"),
+        ("LVLH", [0.0, 0.0, 0.0, 0.0, 7.5, 0.0], "non-zero position"),
+    ],
+)
+def test_finite_burn_degenerate_direction_frame_raises(direction_frame, state, error):
+    """开机时动态方向帧的退化状态明确失败。"""
+    with pytest.raises(RuntimeError, match=error):
+        _propagate_delta_v([1.0, 0.0, 0.0], direction_frame, state=state)
 
 
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_none_frame_fixed_direction():
-    """direction_frame=None 时，固定方向直接归一化使用。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[2.0, 0.0, 0.0],  # 非单位向量
-        mass=1000.0,
-    )
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    # 10N / 1000kg = 0.01 m/s² = 1e-5 km/s²，方向 [1,0,0]
-    np.testing.assert_allclose(acc, [1e-5, 0.0, 0.0])
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_none_frame_callable_direction():
-    """direction_frame=None 时，callable 返回值直接归一化使用。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=lambda t, state: [0.0, 3.0, 0.0],
-        mass=1000.0,
-    )
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0])
-
-
-# --- VNB 坐标系转换 ---
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_vnb_velocity_direction():
-    """VNB 下 direction=[1,0,0] 对应速度方向（V）。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[1.0, 0.0, 0.0],
-        mass=1000.0,
-        direction_frame="VNB",
-    )
-    # 状态：r=[7000,0,0], v=[0,7.5,0] → V 方向为 [0,1,0]
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    # 推力沿 V 方向 = [0,1,0]，大小 1e-5 km/s²
-    np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0], atol=1e-12)
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_vnb_normal_direction():
-    """VNB 下 direction=[0,1,0] 对应角动量方向（N = r × v / |r × v|）。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[0.0, 1.0, 0.0],
-        mass=1000.0,
-        direction_frame="VNB",
-    )
-    # r=[7000,0,0], v=[0,7.5,0] → r×v = [0,0,52500] → N = [0,0,1]
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    np.testing.assert_allclose(acc, [0.0, 0.0, 1e-5], atol=1e-12)
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_vnb_binormal_direction():
-    """VNB 下 direction=[0,0,1] 对应 B = V × N 方向。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[0.0, 0.0, 1.0],
-        mass=1000.0,
-        direction_frame="VNB",
-    )
-    # r=[7000,0,0], v=[0,7.5,0] → V=[0,1,0], N=[0,0,1], B=V×N=[1,0,0]
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    np.testing.assert_allclose(acc, [1e-5, 0.0, 0.0], atol=1e-12)
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_vnb_combined_direction():
-    """VNB 下 direction=[1,1,1] 产生混合方向。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[1.0, 1.0, 1.0],
-        mass=1000.0,
-        direction_frame="VNB",
-    )
-    # r=[7000,0,0], v=[0,7.5,0] → V=[0,1,0], N=[0,0,1], B=[1,0,0]
-    # direction=[1,1,1] 在 VNB 下 = V + N + B = [0,1,0] + [0,0,1] + [1,0,0] = [1,1,1]
-    # 归一化后 = [1,1,1]/sqrt(3)
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    expected_dir = np.array([1.0, 1.0, 1.0]) / np.sqrt(3.0)
-    expected = 1e-5 * expected_dir
-    np.testing.assert_allclose(acc, expected, atol=1e-12)
-
-
-# --- LVLH 坐标系转换 ---
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_lvlh_radial_direction():
-    """LVLH 下 direction=[1,0,0] 对应径向（R = r/|r|）。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[1.0, 0.0, 0.0],
-        mass=1000.0,
-        direction_frame="LVLH",
-    )
-    # r=[7000,0,0] → R=[1,0,0]
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    np.testing.assert_allclose(acc, [1e-5, 0.0, 0.0], atol=1e-12)
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_lvlh_velocity_direction():
-    """LVLH 下 direction=[0,1,0] 对应沿迹方向（V = v/|v|）。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[0.0, 1.0, 0.0],
-        mass=1000.0,
-        direction_frame="LVLH",
-    )
-    # v=[0,7.5,0] → V=[0,1,0]
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0], atol=1e-12)
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_lvlh_cross_track_direction():
-    """LVLH 下 direction=[0,0,1] 对应轨道面法向（N = R × V）。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[0.0, 0.0, 1.0],
-        mass=1000.0,
-        direction_frame="LVLH",
-    )
-    # r=[7000,0,0], v=[0,7.5,0] → R=[1,0,0], V=[0,1,0], N=R×V=[0,0,1]
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    np.testing.assert_allclose(acc, [0.0, 0.0, 1e-5], atol=1e-12)
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_lvlh_3d_position():
-    """LVLH 在三维非共面位置下正确。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[1.0, 0.0, 0.0],
-        mass=1000.0,
-        direction_frame="LVLH",
-    )
-    # r=[1000,2000,3000], v=[1,2,3]
-    state = _make_state([1000.0, 2000.0, 3000.0], [1.0, 2.0, 3.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    r = np.array([1000.0, 2000.0, 3000.0])
-    r_hat = r / np.linalg.norm(r)
-    expected = 1e-5 * r_hat
-    np.testing.assert_allclose(acc, expected, atol=1e-12)
-
-
-# --- callable direction + direction_frame ---
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_vnb_with_callable_direction():
-    """direction 为 callable 时，返回值在 direction_frame 下解释。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=lambda t, state: [1.0, 0.0, 0.0],  # VNB 下 = V 方向
-        mass=1000.0,
-        direction_frame="VNB",
-    )
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    # V 方向 = [0,1,0]
-    np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0], atol=1e-12)
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_lvlh_with_callable_direction():
-    """direction callable 在 LVLH 下解释。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=lambda t, state: [0.0, 0.0, 1.0],  # LVLH 下 = N 方向
-        mass=1000.0,
-        direction_frame="LVLH",
-    )
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    # N = R × V = [0,0,1]
-    np.testing.assert_allclose(acc, [0.0, 0.0, 1e-5], atol=1e-12)
-
-
-# --- 零速度/零位置边界 ---
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_vnb_zero_velocity_raises():
-    """VNB 下 |v|=0 时无法构造 V 方向，抛 ValueError。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[1.0, 0.0, 0.0],
-        mass=1000.0,
-        direction_frame="VNB",
-    )
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 0.0, 0.0])
-    with pytest.raises(ValueError, match="velocity"):
-        burn.compute_acceleration(0.0, state, FakeSystem())
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_lvlh_zero_position_raises():
-    """LVLH 下 |r|=0 时无法构造 R 方向，抛 ValueError。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 10.0,
-        direction=[1.0, 0.0, 0.0],
-        mass=1000.0,
-        direction_frame="LVLH",
-    )
-    state = _make_state([0.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    with pytest.raises(ValueError, match="position"):
-        burn.compute_acceleration(0.0, state, FakeSystem())
-
-
-# --- 关机时 direction_frame 不触发计算 ---
-
-
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_zero_thrust_skips_direction_frame():
-    """thrust=0 时直接返回零，不解析 direction_frame。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 0.0,
-        direction=[1.0, 0.0, 0.0],
-        mass=1000.0,
-        direction_frame="VNB",
-    )
-    # 即使 v=0（VNB 会抛），thrust=0 也应直接返回零
-    state = _make_state([7000.0, 0.0, 0.0], [0.0, 0.0, 0.0])
-    acc = burn.compute_acceleration(0.0, state, FakeSystem())
-
-    np.testing.assert_array_equal(acc, np.zeros(3))
+def test_finite_burn_callable_direction_is_not_compilable():
+    """可调用方向不能跨 Python/Rust 边界，传播入口明确拒绝。"""
+    profile = build_force(
+        "FiniteBurn",
+        {
+            "mass": 1000.0,
+            "thrust_profile": {"kind": "constant", "thrust": 10.0},
+            "direction": {"kind": "fixed", "vector": [1.0, 0.0, 0.0]},
+        },
+    ).thrust_profile
+    burn = FiniteBurn(profile, lambda _t, _state: [1.0, 0.0, 0.0], 1000.0)
+    with pytest.raises(NotImplementedError, match="无 Rust 实现"):
+        ForceModel(FakeSystem(), [burn]).propagate([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0], (0.0, 1.0))

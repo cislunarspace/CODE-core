@@ -83,10 +83,9 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 testpaths = ["tests"]
 # 让 tests/kernel_helpers.py 在 xdist worker 中可导入
 pythonpath = ["tests"]
-# 默认测试门排除尚未完成的低推力功能；测试按功能类目组织，不按运行速度分层。
-addopts = ["-m", "not low_thrust"]
+# 测试按功能类目组织，不按运行速度分层。
 markers = [
-    "low_thrust: 低推力——VariableMassFiniteBurn（变质量）Rust 7D 路径已实现；FiniteBurn（恒质量）从未有效实现（#407，20 个预留测试标记 xfail）；Facade 任务入口占位；默认绿门排除",
+    "low_thrust: 低推力——FiniteBurn 恒质量 6D 与 VariableMassFiniteBurn 变质量 7D 的 Rust 传播、物理与配置验收",
     "spice: 依赖 SPICE 内核的测试，内核缺失时跳过（正交于功能类）",
     "theory: 数理/物理理论——解析对照、守恒律、闭式解",
     "integrator: 积分器——传播器算法、步长控制、dense output",

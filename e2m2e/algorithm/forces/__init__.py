@@ -5,8 +5,8 @@ Python 类是"力模型定义"（参数验证 + to_rust_spec 序列化），与 
 配置 schema 在 ``data/templates/force_config.py`` （纯数据）；大气密度模型
 （``atmosphere.py``）一并迁入（源 ``core/atmosphere/``）。
 
-实现状态：``FiniteBurn``（恒质量低推力）为预留，未接入 Rust
-``CompiledForce::LowThrust`` 变体（issue #407）；其余力模型均已接入。
+``FiniteBurn``（恒质量 6D）与 ``VariableMassFiniteBurn``（变质量 7D）均通过
+Rust 编译传播执行；仅可序列化的固定控制可下沉，任意 Python callable 会显式拒绝。
 """
 
 from __future__ import annotations

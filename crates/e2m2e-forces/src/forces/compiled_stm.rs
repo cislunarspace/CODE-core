@@ -6,7 +6,9 @@
 //!
 //! 复用 `nbody_stm` 的 `stm_derivative`。
 
-use super::compiled::{compute_total_acceleration_and_jacobian, CompiledForce};
+use super::compiled::{
+    compute_total_acceleration_and_jacobian, next_force_discontinuity, CompiledForce,
+};
 use super::nbody_stm;
 use e2m2e_propagation::butcher::{explicit_rk_step, suggest_next_step};
 use e2m2e_propagation::rk_methods::RkMethod;
@@ -138,11 +140,16 @@ pub fn propagate_compiled_stm(
     while t < t_eval[t_eval.len() - 1] && n_steps < s_max {
         n_steps += 1;
 
-        if eval_idx < t_eval.len() {
-            let t_next_eval = t_eval[eval_idx];
-            if t + h > t_next_eval {
-                h = t_next_eval - t;
-            }
+        let mut t_next = if eval_idx < t_eval.len() {
+            t_eval[eval_idx]
+        } else {
+            t_span.1
+        };
+        if let Some(boundary) = next_force_discontinuity(forces, t, t_span.1) {
+            t_next = t_next.min(boundary);
+        }
+        if t + h > t_next {
+            h = t_next - t;
         }
         h = h.min(h_max);
         if h < MIN_STEP * (t_span.1 - t_span.0).abs() {

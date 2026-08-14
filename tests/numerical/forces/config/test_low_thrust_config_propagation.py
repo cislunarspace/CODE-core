@@ -4,7 +4,7 @@
 轨道，末态一致（< 1e-12）。这是配置保真的物理检查，与
 ``test_leo_config_propagation.py``（LEO 场景）同类。
 
-低推力功能尚未开发完成，本文件标记 ``low_thrust``，本轮检查排除在绿门外。
+本文件标记 ``low_thrust``，纳入默认测试门。
 """
 
 import numpy as np
@@ -17,7 +17,6 @@ pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 
 
 @pytest.mark.spice
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
 def test_low_thrust_config_round_trip(earth_icrf_system):
     """FiniteBurn 配置往返后，低推力传播结果一致。"""
     system = earth_icrf_system

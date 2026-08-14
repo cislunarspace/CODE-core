@@ -1,20 +1,16 @@
-"""ImpulsiveBurn / FiniteBurn 定义与 API 契约。
-
-覆盖冻结拷贝、零推力、常值推力、固定/可调用方向与归一化、构造校验。低推力
-传播物理见 ``physics/test_thrust.py``。
-
-低推力功能尚未开发完成（Facade 任务入口占位，Rust 传播路径已接入）；本文件标记
-``low_thrust``，本轮检查排除在绿门外。
-"""
+"""ImpulsiveBurn / FiniteBurn 定义与 API 契约。"""
 
 import dataclasses
 
 import numpy as np
 import pytest
 
+from e2m2e.algorithm.forces import ForceModel
+from e2m2e.algorithm.forces.force_config import build_force
 from e2m2e.algorithm.forces.thrust import FiniteBurn, ImpulsiveBurn
+from tests.numerical.forces.conftest import FakeSystem
 
-pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
+pytestmark = pytest.mark.force
 
 
 def test_impulsive_burn_stores_copied_delta_v_and_is_frozen():
@@ -34,74 +30,107 @@ def test_impulsive_burn_stores_copied_delta_v_and_is_frozen():
         burn.epoch = 2.0
 
 
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_zero_thrust_returns_zero_acceleration():
-    """thrust_profile 返回 0 → compute_acceleration 返回 zeros(3)。"""
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 0.0,
-        direction=np.array([1.0, 0.0, 0.0]),
-        mass=1000.0,
+def _compiled_burn(
+    *,
+    mass: float = 1000.0,
+    thrust_profile: dict[str, float | str] | None = None,
+    direction: list[float] | None = None,
+    direction_frame: str | None = None,
+) -> FiniteBurn:
+    params: dict[str, object] = {
+        "mass": mass,
+        "thrust_profile": thrust_profile or {"kind": "constant", "thrust": 10.0},
+        "direction": {"kind": "fixed", "vector": direction or [1.0, 0.0, 0.0]},
+    }
+    if direction_frame is not None:
+        params["direction_frame"] = direction_frame
+    return build_force("FiniteBurn", params)
+
+
+def test_finite_burn_constant_and_zero_thrust_propagation():
+    """恒定/零 DSL 推力通过公开传播接口给出正确的速度变化。"""
+    y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+    for thrust, expected_delta_v in ((10.0, 1e-5), (0.0, 0.0)):
+        burn = _compiled_burn(thrust_profile={"kind": "constant", "thrust": thrust})
+        result = ForceModel(FakeSystem(), [burn]).propagate(
+            y0, (0.0, 1.0), t_eval=np.array([0.0, 1.0])
+        )
+        np.testing.assert_allclose(result["states"][-1, 3] - y0[3], expected_delta_v, rtol=1e-8)
+
+
+def test_finite_burn_pulse_profile_switches_at_configured_epochs():
+    """pulse profile 只在闭区间内施加推力。"""
+    fm = ForceModel(
+        FakeSystem(),
+        [
+            _compiled_burn(
+                thrust_profile={
+                    "kind": "pulse",
+                    "t_start": 1.0,
+                    "t_end": 2.0,
+                    "thrust": 10.0,
+                }
+            )
+        ],
     )
-    state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, system=None)
-    np.testing.assert_allclose(acc, np.zeros(3), atol=1e-15)
+    y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+    result = fm.propagate(y0, (0.0, 3.0), t_eval=np.array([0.0, 1.0, 2.0, 3.0]))
+    # 端点包含在内，积分器在两个端点间只会对约 1 秒的有效区间累计推力。
+    np.testing.assert_allclose(result["states"][-1, 3], 1e-5, rtol=1e-5, atol=1e-11)
 
 
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_constant_thrust_fixed_direction():
-    """常值推力 + 固定方向 → a = thrust/mass/1000 · d̂（内部归一化方向）。"""
-    state = np.zeros(6)
-
-    # 轴对齐：方向 [3,0,0] 归一化为 [1,0,0]
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 500.0,
-        direction=np.array([3.0, 0.0, 0.0]),
-        mass=1000.0,
+def test_finite_burn_pulse_profile_honors_boundaries_outside_t_eval():
+    """pulse 边界不是输出点时，累计冲量仍只覆盖开机区间。"""
+    burn = _compiled_burn(
+        thrust_profile={"kind": "pulse", "t_start": 0.75, "t_end": 1.25, "thrust": 10.0}
     )
-    acc = burn.compute_acceleration(0.0, state, system=None)
-    # 500 N / 1000 kg = 0.5 m/s² → 5e-4 km/s²
-    np.testing.assert_allclose(acc, [5e-4, 0.0, 0.0], rtol=1e-12)
-
-    # 非轴对齐：验证归一化
-    burn2 = FiniteBurn(
-        thrust_profile=lambda t: 500.0,
-        direction=np.array([1.0, 1.0, 0.0]),
-        mass=1000.0,
+    y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+    sparse = ForceModel(FakeSystem(), [burn]).propagate(y0, (0.0, 3.0), t_eval=np.array([0.0, 3.0]))
+    dense = ForceModel(FakeSystem(), [burn]).propagate(
+        y0, (0.0, 3.0), t_eval=np.linspace(0.0, 3.0, 31)
     )
-    acc2 = burn2.compute_acceleration(0.0, state, system=None)
-    expected = 0.5 / 1000.0 * np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0)
-    np.testing.assert_allclose(acc2, expected, rtol=1e-12)
+    np.testing.assert_allclose(sparse["states"][-1, 3], 5e-6, rtol=2e-5, atol=1e-11)
+    np.testing.assert_allclose(sparse["states"][-1], dense["states"][-1], atol=1e-11)
 
 
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_callable_direction_normalized():
-    """可调用方向 (t, state) -> (3,) 被调用并归一化使用（如沿速度方向）。"""
-    velocity = np.array([0.0, 7.5, 0.0])
-    state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 500.0,
-        direction=lambda t, s: s[3:6],  # 返回速度向量（未归一化）
-        mass=1000.0,
+def test_finite_burn_constant_force_supports_stm():
+    """恒质量固定方向推力可通过公开接口传播 STM。"""
+    y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+    result = ForceModel(FakeSystem(), [_compiled_burn()]).propagate(
+        y0, (0.0, 1.0), t_eval=np.array([0.0, 1.0]), with_stm=True
     )
-    acc = burn.compute_acceleration(0.0, state, system=None)
-    expected = 0.5 / 1000.0 * velocity / np.linalg.norm(velocity)
-    np.testing.assert_allclose(acc, expected, rtol=1e-12)
+    assert result["stm"].shape == (2, 6, 6)
+    np.testing.assert_allclose(result["stm"][0], np.eye(6), atol=1e-12)
+    np.testing.assert_allclose(result["stm"][-1, 3:, 3:], np.eye(3), atol=1e-8)
 
 
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
-def test_finite_burn_validation():
-    """mass≤0 / 固定方向零向量 → 构造时 ValueError；thrust<0 → 求值时 ValueError。"""
-    # mass ≤ 0
-    with pytest.raises(ValueError, match="mass"):
-        FiniteBurn(lambda t: 1.0, np.array([1.0, 0.0, 0.0]), 0.0)
-    with pytest.raises(ValueError, match="mass"):
-        FiniteBurn(lambda t: 1.0, np.array([1.0, 0.0, 0.0]), -1.0)
+def test_finite_burn_vnb_stm_matches_initial_velocity_finite_difference():
+    """VNB 推力的公开 STM 与独立初态速度有限差分一致。"""
+    y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+    t_eval = np.array([0.0, 10.0])
+    fm = ForceModel(
+        FakeSystem(), [_compiled_burn(direction=[1.0, 0.0, 0.0], direction_frame="VNB")]
+    )
+    stm_result = fm.propagate(y0, (0.0, 10.0), t_eval=t_eval, with_stm=True)
+    perturbation = 1e-6
+    plus = y0.copy()
+    minus = y0.copy()
+    plus[3] += perturbation
+    minus[3] -= perturbation
+    final_plus = fm.propagate(plus, (0.0, 10.0), t_eval=t_eval)["states"][-1]
+    final_minus = fm.propagate(minus, (0.0, 10.0), t_eval=t_eval)["states"][-1]
+    finite_difference = (final_plus - final_minus) / (2.0 * perturbation)
 
-    # 固定方向零向量
-    with pytest.raises(ValueError, match="direction"):
-        FiniteBurn(lambda t: 1.0, np.zeros(3), 1000.0)
+    np.testing.assert_allclose(stm_result["stm"][-1, :, 3], finite_difference, rtol=1e-4, atol=1e-7)
 
-    # thrust < 0（求值时）
-    burn = FiniteBurn(lambda t: -5.0, np.array([1.0, 0.0, 0.0]), 1000.0)
-    with pytest.raises(ValueError, match="thrust"):
-        burn.compute_acceleration(0.0, np.zeros(6), system=None)
+
+def test_finite_burn_rejects_uncompiled_callables():
+    """任意 Python callable 不能在 Rust RK 内执行，传播必须明确拒绝。"""
+    y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+    callable_profile = FiniteBurn(lambda t: 10.0, [1.0, 0.0, 0.0], 1000.0)
+    compiled_profile = _compiled_burn().thrust_profile
+    callable_direction = FiniteBurn(compiled_profile, lambda _t, _state: [1.0, 0.0, 0.0], 1000.0)
+
+    for burn in (callable_profile, callable_direction):
+        with pytest.raises(NotImplementedError, match="无 Rust 实现"):
+            ForceModel(FakeSystem(), [burn]).propagate(y0, (0.0, 1.0))

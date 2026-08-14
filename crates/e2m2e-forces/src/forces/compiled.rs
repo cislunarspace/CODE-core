@@ -68,20 +68,24 @@ pub enum CompiledForce {
         body_radius_override: Option<f64>,
         gamma: f64,
     },
-    /// 小推力（电推进）模型。
+    /// 恒质量连续推力模型。
     ///
-    /// 推力加速度 = (T_max / m) * u * α
-    /// 其中 T_max 为最大推力（N），m 为航天器质量（kg），u ∈ [0, 1] 为推力幅值，
-    /// α 为单位推力方向向量。
+    /// 推力加速度 = (T / m) * α。推力可常开，也可仅在时段
+    /// ``(t_start, t_end)`` 内开启；端点处关机以避免 RK stage 把单点开关
+    /// 误算成有限冲量。方向在惯性、VNB 或 LVLH 系中给出。
     LowThrust {
-        /// 最大推力（N）
-        t_max: f64,
-        /// 比冲（s）
-        isp: f64,
-        /// 推力幅值 u ∈ [0, 1]（同伦参数）
-        throttle: f64,
-        /// 推力方向单位向量（惯性系）
+        /// 航天器恒定质量（kg）
+        mass: f64,
+        /// 推力幅值（N）
+        thrust: f64,
+        /// 开机时刻（SPICE et 秒）；None 表示常开
+        t_start: Option<f64>,
+        /// 关机时刻（SPICE et 秒）；None 表示常开
+        t_end: Option<f64>,
+        /// 推力方向（由 direction_frame 解释）
         direction: [f64; 3],
+        /// None / "VNB" / "LVLH"
+        direction_frame: Option<String>,
     },
     /// 大气阻力力模型。
     ///
@@ -97,6 +101,90 @@ pub enum CompiledForce {
         /// 传播系 frame（通常 "J2000"）
         propagation_frame: String,
     },
+}
+
+fn resolve_thrust_direction(
+    direction: &[f64; 3],
+    direction_frame: Option<&str>,
+    state: &[f64; 6],
+) -> Result<[f64; 3], String> {
+    let norm = |v: [f64; 3]| -> f64 { (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() };
+    let scale =
+        |v: [f64; 3], factor: f64| -> [f64; 3] { [v[0] * factor, v[1] * factor, v[2] * factor] };
+    let cross = |a: [f64; 3], b: [f64; 3]| -> [f64; 3] {
+        [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ]
+    };
+    let r = [state[0], state[1], state[2]];
+    let v = [state[3], state[4], state[5]];
+    let local_to_inertial = match direction_frame {
+        None => *direction,
+        Some("VNB") => {
+            let v_norm = norm(v);
+            let h = cross(r, v);
+            let h_norm = norm(h);
+            if v_norm < 1e-12 {
+                return Err("VNB frame requires non-zero velocity".to_string());
+            }
+            if h_norm < 1e-12 {
+                return Err("VNB frame requires non-zero angular momentum".to_string());
+            }
+            let v_hat = scale(v, 1.0 / v_norm);
+            let n_hat = scale(h, 1.0 / h_norm);
+            let b_hat = cross(v_hat, n_hat);
+            [
+                direction[0] * v_hat[0] + direction[1] * n_hat[0] + direction[2] * b_hat[0],
+                direction[0] * v_hat[1] + direction[1] * n_hat[1] + direction[2] * b_hat[1],
+                direction[0] * v_hat[2] + direction[1] * n_hat[2] + direction[2] * b_hat[2],
+            ]
+        }
+        Some("LVLH") => {
+            let r_norm = norm(r);
+            let v_norm = norm(v);
+            let h = cross(r, v);
+            let h_norm = norm(h);
+            if r_norm < 1e-12 {
+                return Err("LVLH frame requires non-zero position".to_string());
+            }
+            if v_norm < 1e-12 {
+                return Err("LVLH frame requires non-zero velocity".to_string());
+            }
+            let r_hat = scale(r, 1.0 / r_norm);
+            let v_hat = scale(v, 1.0 / v_norm);
+            if h_norm < 1e-12 {
+                [
+                    direction[0] * r_hat[0] + direction[1] * v_hat[0],
+                    direction[0] * r_hat[1] + direction[1] * v_hat[1],
+                    direction[0] * r_hat[2] + direction[1] * v_hat[2],
+                ]
+            } else {
+                let n_hat = scale(h, 1.0 / h_norm);
+                // 与 LVLHAxes 对齐：沿迹轴垂直于径向轴，而非一般椭圆轨道
+                // 中含径向分量的速度单位向量。
+                let along_track = cross(n_hat, r_hat);
+                [
+                    direction[0] * r_hat[0]
+                        + direction[1] * along_track[0]
+                        + direction[2] * n_hat[0],
+                    direction[0] * r_hat[1]
+                        + direction[1] * along_track[1]
+                        + direction[2] * n_hat[1],
+                    direction[0] * r_hat[2]
+                        + direction[1] * along_track[2]
+                        + direction[2] * n_hat[2],
+                ]
+            }
+        }
+        Some(frame) => return Err(format!("unsupported thrust direction frame {frame:?}")),
+    };
+    let direction_norm = norm(local_to_inertial);
+    if direction_norm < 1e-15 {
+        return Err("thrust direction must be non-zero".to_string());
+    }
+    Ok(scale(local_to_inertial, 1.0 / direction_norm))
 }
 
 impl CompiledForce {
@@ -214,18 +302,25 @@ impl CompiledForce {
                 .map_err(|e| format!("{:?}", e))
             }
             Self::LowThrust {
-                t_max,
-                isp: _,
-                throttle,
+                mass,
+                thrust,
+                t_start,
+                t_end,
                 direction,
+                direction_frame,
             } => {
-                // 小推力加速度 = (T_max / m) * u * α
-                // 注意：当前实现假设质量恒定，实际应用中需要扩展状态向量包含质量
-                let mass = 1000.0; // kg，默认质量，实际应从状态或参数获取
-                                   // T_max 单位为 N (kg·m/s²)，质量单位为 kg，加速度单位为 m/s²
-                                   // 需要转换为 km/s²（除以 1000）
-                let accel_mag_m_s2 = (*t_max / mass) * throttle;
-                let accel_mag_km_s2 = accel_mag_m_s2 / 1000.0;
+                if *thrust == 0.0 {
+                    return Ok([0.0; 3]);
+                }
+                if let (Some(start), Some(end)) = (t_start, t_end) {
+                    if et <= *start || et >= *end {
+                        return Ok([0.0; 3]);
+                    }
+                }
+                let direction =
+                    resolve_thrust_direction(direction, direction_frame.as_deref(), state)?;
+                // N / kg = m/s²，传播状态使用 km/s，故除以 1000。
+                let accel_mag_km_s2 = thrust / mass / 1000.0;
                 Ok([
                     accel_mag_km_s2 * direction[0],
                     accel_mag_km_s2 * direction[1],
@@ -243,6 +338,26 @@ impl CompiledForce {
                 .map_err(|e| format!("{:?}", e)),
         }
     }
+}
+
+/// 返回 `(t, tf]` 内最早的编译力不连续时刻。
+///
+/// 恒质量 pulse 推力在开机/关机边界处不连续。积分器必须将其作为步长终点，
+/// 否则一个 RK 步跨越边界会使累计冲量依赖输出网格。
+pub fn next_force_discontinuity(forces: &[CompiledForce], t: f64, tf: f64) -> Option<f64> {
+    forces
+        .iter()
+        .filter_map(|force| match force {
+            CompiledForce::LowThrust {
+                t_start: Some(start),
+                t_end: Some(end),
+                ..
+            } => Some([*start, *end]),
+            _ => None,
+        })
+        .flatten()
+        .filter(|boundary| *boundary > t && *boundary <= tf)
+        .min_by(|left, right| left.total_cmp(right))
 }
 
 /// 计算所有 force 的总加速度。
@@ -272,6 +387,7 @@ pub fn supports_jacobian(force: &CompiledForce) -> bool {
             | CompiledForce::IndirectTerm { .. }
             | CompiledForce::SRP { .. }
             | CompiledForce::EcomSrp { .. }
+            | CompiledForce::LowThrust { .. }
             | CompiledForce::Drag { .. }
     )
 }
@@ -410,6 +526,38 @@ pub fn acceleration_and_jacobian(
                 }
             }
             let dadv = [[0.0_f64; 3]; 3];
+            Ok((acc0, jac, dadv))
+        }
+        CompiledForce::LowThrust { .. } => {
+            // VNB/LVLH 方向取决于状态，统一在 Rust 内中心差分，避免 Python
+            // 回调并使 STM 与普通 RHS 使用同一方向定义。
+            let r_norm = (state[0] * state[0] + state[1] * state[1] + state[2] * state[2]).sqrt();
+            let v_norm = (state[3] * state[3] + state[4] * state[4] + state[5] * state[5]).sqrt();
+            let h_r = (f64::EPSILON.sqrt() * r_norm).max(1e-6);
+            let h_v = (f64::EPSILON.sqrt() * v_norm).max(1e-9);
+            let acc0 = force.acceleration(et, state, observer)?;
+            let mut jac = [[0.0_f64; 3]; 3];
+            let mut dadv = [[0.0_f64; 3]; 3];
+            for dim in 0..3 {
+                let mut plus = *state;
+                let mut minus = *state;
+                plus[dim] += h_r;
+                minus[dim] -= h_r;
+                let a_plus = force.acceleration(et, &plus, observer)?;
+                let a_minus = force.acceleration(et, &minus, observer)?;
+                for row in 0..3 {
+                    jac[row][dim] = (a_plus[row] - a_minus[row]) / (2.0 * h_r);
+                }
+                let mut plus_v = *state;
+                let mut minus_v = *state;
+                plus_v[dim + 3] += h_v;
+                minus_v[dim + 3] -= h_v;
+                let a_plus_v = force.acceleration(et, &plus_v, observer)?;
+                let a_minus_v = force.acceleration(et, &minus_v, observer)?;
+                for row in 0..3 {
+                    dadv[row][dim] = (a_plus_v[row] - a_minus_v[row]) / (2.0 * h_v);
+                }
+            }
             Ok((acc0, jac, dadv))
         }
         CompiledForce::Drag {

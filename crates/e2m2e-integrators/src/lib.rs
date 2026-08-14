@@ -1117,21 +1117,71 @@ pub(crate) fn parse_force_tuple(
             })
         }
         "low_thrust" => {
-            // 元组格式：("low_thrust", t_max, isp, throttle, direction)
-            let t_max: f64 = tuple.get_item(1)?.extract()?;
-            let isp: f64 = tuple.get_item(2)?.extract()?;
-            let throttle: f64 = tuple.get_item(3)?.extract()?;
-            let direction: Vec<f64> = tuple.get_item(4)?.extract()?;
+            // 元组格式：("low_thrust", mass, thrust, t_start, t_end, direction,
+            // direction_frame)。起止时间同时为 None 时表示常开。
+            let mass: f64 = tuple.get_item(1)?.extract()?;
+            let thrust: f64 = tuple.get_item(2)?.extract()?;
+            let start_obj = tuple.get_item(3)?;
+            let t_start: Option<f64> = if start_obj.is_none() {
+                None
+            } else {
+                Some(start_obj.extract()?)
+            };
+            let end_obj = tuple.get_item(4)?;
+            let t_end: Option<f64> = if end_obj.is_none() {
+                None
+            } else {
+                Some(end_obj.extract()?)
+            };
+            let direction: Vec<f64> = tuple.get_item(5)?.extract()?;
+            let frame_obj = tuple.get_item(6)?;
+            let direction_frame: Option<String> = if frame_obj.is_none() {
+                None
+            } else {
+                Some(frame_obj.extract()?)
+            };
+            if mass <= 0.0 {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "low_thrust mass must be positive",
+                ));
+            }
+            if thrust < 0.0 {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "low_thrust thrust must be non-negative",
+                ));
+            }
+            if t_start.is_some() != t_end.is_some() {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "low_thrust pulse requires both t_start and t_end",
+                ));
+            }
+            if let (Some(start), Some(end)) = (t_start, t_end) {
+                if end < start {
+                    return Err(pyo3::exceptions::PyValueError::new_err(
+                        "low_thrust t_end must be greater than or equal to t_start",
+                    ));
+                }
+            }
             if direction.len() != 3 {
                 return Err(pyo3::exceptions::PyValueError::new_err(
                     "low_thrust direction must have 3 elements",
                 ));
             }
+            if !matches!(
+                direction_frame.as_deref(),
+                None | Some("VNB") | Some("LVLH")
+            ) {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "low_thrust direction_frame must be None, 'VNB', or 'LVLH'",
+                ));
+            }
             Ok(CompiledForce::LowThrust {
-                t_max,
-                isp,
-                throttle,
+                mass,
+                thrust,
+                t_start,
+                t_end,
                 direction: [direction[0], direction[1], direction[2]],
+                direction_frame,
             })
         }
         "drag" => {
@@ -1186,7 +1236,7 @@ fn propagate_compiled_core(
     forces: &[e2m2e_forces::forces::compiled::CompiledForce],
     max_steps: usize,
 ) -> Result<CompiledPropResult, String> {
-    use e2m2e_forces::forces::compiled::compute_total_acceleration;
+    use e2m2e_forces::forces::compiled::{compute_total_acceleration, next_force_discontinuity};
     let table = method.table();
     let mut y = y0.to_vec();
     let mut t = t0;
@@ -1217,11 +1267,17 @@ fn propagate_compiled_core(
         // 限制步长不超过下一个评估点（提高 t_eval 命中率），且不超过
         // h_init（作为最大步长：稀疏 t_eval 下自适应步长失控，实测
         // 2 点 vs 31 点网格的 30 天结果差 22 万 km）
-        if eval_idx < t_eval.len() {
-            let t_next_eval = t_eval[eval_idx];
-            if t + h > t_next_eval {
-                h = t_next_eval - t;
-            }
+        let t_final = t_eval[t_eval.len() - 1];
+        let mut t_next = if eval_idx < t_eval.len() {
+            t_eval[eval_idx]
+        } else {
+            t_final
+        };
+        if let Some(boundary) = next_force_discontinuity(forces, t, t_final) {
+            t_next = t_next.min(boundary);
+        }
+        if t + h > t_next {
+            h = t_next - t;
         }
         if h > h_init {
             n_steps_capped += 1;

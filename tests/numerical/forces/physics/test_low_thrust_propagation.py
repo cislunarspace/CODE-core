@@ -7,18 +7,18 @@ FiniteBurn 配置 round-trip 见 ``config/test_low_thrust_config_propagation.py`
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.forces import FiniteBurn, ForceModel, GravityField
+from e2m2e.algorithm.forces import ForceModel, GravityField
+from e2m2e.algorithm.forces.force_config import build_force
 from tests.numerical.forces.conftest import (
     EARTH_RE,
     keplerian_to_cartesian,
     semi_major_axis,
 )
 
-pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
+pytestmark = pytest.mark.force
 
 
 @pytest.mark.spice
-@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
 def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_icrf_system):
     """低推力圆轨道提升：半长轴变化率与解析公式误差 < 5%。"""
     system = earth_icrf_system
@@ -32,14 +32,15 @@ def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_icrf_system):
     mass = 1000.0  # kg
     duration_s = 1.0 * 86400.0
 
-    def thrust_profile(_t: float) -> float:
-        return thrust
-
-    def direction(_t: float, state: np.ndarray) -> np.ndarray:
-        v = state[3:6]
-        return v / np.linalg.norm(v)
-
-    burn = FiniteBurn(thrust_profile=thrust_profile, direction=direction, mass=mass)
+    burn = build_force(
+        "FiniteBurn",
+        {
+            "mass": mass,
+            "thrust_profile": {"kind": "constant", "thrust": thrust},
+            "direction": {"kind": "fixed", "vector": [1.0, 0.0, 0.0]},
+            "direction_frame": "VNB",
+        },
+    )
     gravity = GravityField(body="EARTH", degree=2, order=0)
     fm = ForceModel(system, forces=[gravity, burn])
 
