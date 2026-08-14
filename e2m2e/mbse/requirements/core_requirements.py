@@ -1,41 +1,39 @@
-"""Core 层需求定义
+"""核心层需求定义。
 
-定义 e2m2e 核心层（core/）的系统需求，覆盖系统建模、动力学传播、轨道数据、
-坐标变换等基础功能。需求 ID 范围：REQ-001 ~ REQ-030。
+定义 e2m2e 的系统建模、动力学传播、轨道数据和坐标变换等基础需求。
+需求 ID 范围：REQ-001 ~ REQ-030。
 """
 
 from .base import Requirement, RequirementCategory, RequirementPriority
 
 CORE_REQUIREMENTS = [
-    # ---- 状态向量与数据格式 ----
     Requirement(
         id="REQ-001",
         title="状态向量顺序",
         category=RequirementCategory.INTERFACE,
-        description=(
-            "状态向量必须按 [x, y, z, vx, vy, vz] 顺序排列，即前 3 分量为位置，后 3 分量为速度。"
-        ),
+        description="状态向量必须按 [x, y, z, vx, vy, vz] 顺序排列，即前 3 分量为位置，后 3 分量为速度。",  # noqa: E501
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.core.orbit", "e2m2e.core.dynamics"],
+        linked_code=["e2m2e.data.types.orbit", "e2m2e.algorithm.dynamics.dynamics"],
         linked_tests=[
             "tests/data/types/test_orbit.py",
-            "tests/numerical/dynamics/test_dynamics.py",
+            "tests/algorithm/dynamics/test_dynamics_contract.py",
         ],
     ),
     Requirement(
         id="REQ-002",
         title="传播结果 states 形状",
         category=RequirementCategory.INTERFACE,
-        description=(
-            "所有 Dynamics 子类的 propagate() 方法返回的 states 必须为 (n_points, 6) 形状。"
-        ),
+        description="所有 Dynamics 子类的 propagate() 方法返回的 states 必须为 (n_points, 6) 形状。",  # noqa: E501
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.core.dynamics", "e2m2e.core.ephemeris_dynamics"],
+        linked_code=[
+            "e2m2e.algorithm.dynamics.dynamics",
+            "e2m2e.algorithm.dynamics.ephemeris_dynamics",
+        ],
         linked_tests=[
-            "tests/numerical/dynamics/test_dynamics.py",
-            "tests/numerical/dynamics/test_ephemeris_dynamics.py",
+            "tests/algorithm/dynamics/test_dynamics_contract.py",
+            "tests/algorithm/dynamics/test_ephemeris_dynamics_legacy.py",
         ],
     ),
     Requirement(
@@ -45,22 +43,22 @@ CORE_REQUIREMENTS = [
         description="沿一个轨道周期积分后，Jacobi 常数最大漂移不超过 1e-10。",
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.core.dynamics"],
-        linked_tests=["tests/numerical/dynamics/test_dynamics.py"],
+        linked_code=["e2m2e.algorithm.dynamics.dynamics"],
+        linked_tests=["tests/algorithm/dynamics/test_cr3bp_model.py"],
     ),
     Requirement(
         id="REQ-004",
         title="STM 解析 Jacobian",
         category=RequirementCategory.FUNCTIONAL,
         description=(
-            "状态转移矩阵必须通过解析 Jacobian（compute_jacobian_A）计算，不得使用有限差分。"
+            "状态转移矩阵必须通过解析 Jacobian（compute_jacobian_A）计算；"
+            "解析 Jacobian 应与运动方程的有限差分一致。"
         ),
         priority=RequirementPriority.SHALL,
-        verification_method="analysis",
-        linked_code=["e2m2e.core.dynamics"],
-        linked_tests=["tests/numerical/dynamics/test_dynamics.py"],
+        verification_method="test",
+        linked_code=["e2m2e.algorithm.dynamics.dynamics"],
+        linked_tests=["tests/algorithm/dynamics/test_cr3bp_variational.py"],
     ),
-    # ---- 继承与接口 ----
     Requirement(
         id="REQ-005",
         title="Dynamics 子类调用 super().__init__()",
@@ -68,8 +66,11 @@ CORE_REQUIREMENTS = [
         description="所有 Dynamics 子类必须调用 super().__init__()，确保基类属性正确初始化。",
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
-        linked_code=["e2m2e.core.dynamics", "e2m2e.core.ephemeris_dynamics"],
-        linked_tests=["tests/numerical/dynamics/test_ephemeris_dynamics.py"],
+        linked_code=[
+            "e2m2e.algorithm.dynamics.dynamics",
+            "e2m2e.algorithm.dynamics.ephemeris_dynamics",
+        ],
+        linked_tests=["tests/algorithm/dynamics/test_ephemeris_dynamics_legacy.py"],
     ),
     Requirement(
         id="REQ-006",
@@ -78,19 +79,18 @@ CORE_REQUIREMENTS = [
         description="坐标变换与其逆变换的组合必须恢复原始坐标（在数值精度范围内）。",
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.core.coordinate_system", "e2m2e.core.synodic_j2000"],
+        linked_code=["e2m2e.algorithm.coordinate.coordinate_system", "e2m2e.algorithm.coordinate"],
         linked_tests=["tests/algorithm/coordinate/test_synodic_j2000.py"],
     ),
-    # ---- 物理模型精度 ----
     Requirement(
         id="REQ-010",
         title="平动点位置精度",
         category=RequirementCategory.PERFORMANCE,
-        description="平动点 L1-L5 的位置计算与解析解的误差须小于 1e-12。",
+        description="平动点 L1-L5 必须满足对应的 CR3BP 平衡方程与三角几何关系。",
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.core.system"],
-        linked_tests=["tests/numerical/dynamics/test_system.py"],
+        linked_code=["e2m2e.algorithm.dynamics.cr3bp_system"],
+        linked_tests=["tests/algorithm/dynamics/test_cr3bp_system.py"],
     ),
     Requirement(
         id="REQ-011",
@@ -99,8 +99,8 @@ CORE_REQUIREMENTS = [
         description="在物理单位转换前必须调用 set_characteristic_scales() 设置特征尺度。",
         priority=RequirementPriority.SHOULD,
         verification_method="test",
-        linked_code=["e2m2e.core.system"],
-        linked_tests=["tests/numerical/dynamics/test_system.py"],
+        linked_code=["e2m2e.algorithm.dynamics.cr3bp_system"],
+        linked_tests=["tests/algorithm/dynamics/test_cr3bp_system.py"],
     ),
     Requirement(
         id="REQ-012",
@@ -109,10 +109,9 @@ CORE_REQUIREMENTS = [
         description="数值积分的相对容差和绝对容差默认值均为 1e-12（双精度机器精度量级）。",
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
-        linked_code=["e2m2e.core.dynamics"],
-        linked_tests=["tests/numerical/dynamics/test_dynamics.py"],
+        linked_code=["e2m2e.algorithm.dynamics.dynamics"],
+        linked_tests=["tests/algorithm/dynamics/test_dynamics_contract.py"],
     ),
-    # ---- 轨道数据 ----
     Requirement(
         id="REQ-020",
         title="Orbit 序列化兼容性",
@@ -120,7 +119,7 @@ CORE_REQUIREMENTS = [
         description="Orbit.save_to_file / load_from_file 必须兼容 v3 JSON 格式。",
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.core.orbit"],
+        linked_code=["e2m2e.data.types.orbit"],
         linked_tests=["tests/data/types/test_orbit_io.py"],
     ),
     Requirement(
@@ -130,24 +129,19 @@ CORE_REQUIREMENTS = [
         description="Orbit 在初始化时自动通过零交叉检测估计轨道周期。",
         priority=RequirementPriority.SHOULD,
         verification_method="test",
-        linked_code=["e2m2e.core.orbit"],
+        linked_code=["e2m2e.data.types.orbit"],
         linked_tests=["tests/data/types/test_orbit.py"],
     ),
     Requirement(
         id="REQ-022",
         title="OrbitFamily 聚合",
         category=RequirementCategory.FUNCTIONAL,
-        description=(
-            "OrbitFamily 提供统一的聚合接口：states、periods 属性与 get_jacobi_constants() 方法。"
-        ),
+        description="OrbitFamily 提供统一的聚合接口：states、periods 属性与 get_jacobi_constants() 方法。",  # noqa: E501
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.core.orbit"],
+        linked_code=["e2m2e.data.types.orbit_family"],
         linked_tests=["tests/data/types/test_orbit_family.py"],
     ),
-    # ---- 星历动力学 ----
-    # 注：EphemerisDynamics 已降级为遗留内部实现（仅供 multiple_shooting
-    # 内部使用，新代码用 ForceModel）。下列需求保留以维持遗留消费者的测试覆盖。
     Requirement(
         id="REQ-025",
         title="EphemerisDynamics 统一接口（遗留）",
@@ -158,20 +152,21 @@ CORE_REQUIREMENTS = [
         ),
         priority=RequirementPriority.SHALL,
         verification_method="test",
-        linked_code=["e2m2e.core.ephemeris_dynamics"],
-        linked_tests=["tests/numerical/dynamics/test_ephemeris_dynamics.py"],
+        linked_code=["e2m2e.algorithm.dynamics.ephemeris_dynamics"],
+        linked_tests=["tests/algorithm/dynamics/test_ephemeris_dynamics_legacy.py"],
     ),
     Requirement(
         id="REQ-026",
         title="EphemerisDynamics 自适应步长（遗留）",
         category=RequirementCategory.FUNCTIONAL,
         description=(
-            "EphemerisDynamics 根据传播时长自适应调整最大步长（max_step = min(60s, duration/10)）。"
+            "EphemerisDynamics 根据传播时长自适应调整最大步长"
+            "（max_step = min(60s, duration/10)）。"
             "（遗留实现，新代码用 ForceModel。）"
         ),
         priority=RequirementPriority.SHOULD,
         verification_method="test",
-        linked_code=["e2m2e.core.ephemeris_dynamics"],
-        linked_tests=["tests/numerical/dynamics/test_ephemeris_dynamics.py"],
+        linked_code=["e2m2e.algorithm.dynamics.ephemeris_dynamics"],
+        linked_tests=["tests/algorithm/dynamics/test_ephemeris_dynamics_legacy.py"],
     ),
 ]

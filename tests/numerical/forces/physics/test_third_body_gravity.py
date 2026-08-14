@@ -35,7 +35,7 @@ pytestmark = [
 
 @pytest.fixture
 def reference_et(spice_manager, reference_epoch):
-    """参考历元的 ET 秒数（与 test_ephemeris_dynamics.py 一致）。"""
+    """参考历元的 ET 秒数，与遗留星历动力学契约测试共用。"""
     return spice_manager.utc_to_et(reference_epoch)
 
 
@@ -43,7 +43,7 @@ def reference_et(spice_manager, reference_epoch):
 def dro_state():
     """月球距离附近的 cislunar 初值（J2000, km, km/s）。
 
-    与 ``test_ephemeris_dynamics.py::test_propagate_dro_like_orbit`` 一致。
+    用于验证第三体间接项的月球距离附近场景。
     """
     return np.array([384400.0, 0.0, 0.0, 0.0, -0.5, 0.0])
 

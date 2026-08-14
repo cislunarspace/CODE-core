@@ -319,16 +319,10 @@ class Dynamics:
         # result.y 形状为 (6, n_points)，转置为 (n_points, 6) — REQ-002
         states = result.y.T
 
-        # 显式 failure 标记（ADR 0020 决策 2）：步长塌缩/积分器未成功时返回
-        # DIVERGED 标记而非仅靠空 states 表达失败，下游不再用 len==0 嗅探。
+        # 直接传播失败必须上抛，不能以空 states 构造伪成功结果。搜索与优化
+        # 调用方在其自身语境中捕获并翻译为结构化状态（ADR 0020 决策 1、2）。
         if not result.success or states.shape[0] == 0:
-            return {
-                "time": np.array([]),
-                "states": np.empty((0, self.STATE_DIM)),
-                "status": ConvergenceState.DIVERGED,
-                "cause": FailureCause.DIVERGENCE_DETECTED,
-                "message": str(getattr(result, "message", "propagation failed")),
-            }
+            raise PropagationFailure(str(getattr(result, "message", "propagation failed")))
 
         self.last_trajectory = (result.t, states)
 
@@ -851,37 +845,27 @@ class CR3BP_Dynamics(Dynamics):
         else:
             t_eval_list = [float(t_span[0]), float(t_span[1])]
 
-        # 步长塌缩时 Rust 经 FFI 抛 PropagationFailure；这里 catch 后返回带
-        # failure 标记的空 states（ADR 0020 决策 2），下游读 status/cause 而非
-        # 嗅探空 states。仅 catch 步长塌缩；其他 RuntimeError（如截断）仍向上
-        # 抛——那是真实 bug，该暴露。
-        try:
-            result = propagate_cr3bp_py(
-                mu=mu,
-                t_span=(float(t_span[0]), float(t_span[1])),
-                t_eval=t_eval_list,
-                initial_state=[float(x) for x in initial_state[:6]],
-                rtol=self.rtol,
-                atol=self.atol,
-                max_step=float(max_step),
+        # 直接调用传播接口时，步长塌缩是确定性传播失败，必须按
+        # PropagationFailure 上抛。搜索/优化调用方在自己的语境中把异常翻译为
+        # 结构化 status，传播器不再用空 states 伪装失败结果（ADR 0020 决策 1、2）。
+        result = propagate_cr3bp_py(
+            mu=mu,
+            t_span=(float(t_span[0]), float(t_span[1])),
+            t_eval=t_eval_list,
+            initial_state=[float(x) for x in initial_state[:6]],
+            rtol=self.rtol,
+            atol=self.atol,
+            max_step=float(max_step),
+        )
+
+        states = np.array(result["states"])
+        time = np.array(result["time"])
+
+        if len(time) != len(t_eval_list):
+            raise RuntimeError(
+                f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
+                f"requested time points; the trajectory is truncated"
             )
-
-            states = np.array(result["states"])
-            time = np.array(result["time"])
-
-            if len(time) != len(t_eval_list):
-                raise RuntimeError(
-                    f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
-                    f"requested time points; the trajectory is truncated"
-                )
-        except PropagationFailure as exc:
-            return {
-                "time": np.array([]),
-                "states": np.empty((0, 6)),
-                "status": ConvergenceState.DIVERGED,
-                "cause": FailureCause.DIVERGENCE_DETECTED,
-                "message": str(exc),
-            }
 
         self.last_trajectory = (time, states)
 
@@ -934,17 +918,8 @@ class CR3BP_Dynamics(Dynamics):
         time = np.asarray(result["time"])
         states = np.asarray(result["states"])
 
-        # 事件积分失败（空输出）同样带显式 failure 标记（ADR 0020 决策 2）。
         if states.shape[0] == 0:
-            return {
-                "time": np.array([]),
-                "states": np.empty((0, self.STATE_DIM)),
-                "status": ConvergenceState.DIVERGED,
-                "cause": FailureCause.DIVERGENCE_DETECTED,
-                "message": "event propagation produced no output",
-                "t_events": [np.asarray([]) for _ in events],
-                "y_events": [np.asarray([]) for _ in events],
-            }
+            raise PropagationFailure("event propagation produced no output")
 
         self.last_trajectory = (time, states)
 

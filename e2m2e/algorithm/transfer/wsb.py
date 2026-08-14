@@ -30,9 +30,10 @@ import numpy as np
 from ...data.constants import SECONDS_PER_DAY
 from ...data.constants.bodies import MOON
 from ...data.templates import ConvergenceState, FailureCause
+from ...exceptions import PropagationFailure
 from ..dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
-from ..results import ResultStatus
+from ..results import CandidateSearchResult, ResultStatus
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +161,7 @@ def search_wsb_trajectories(
     target_state: np.ndarray,
     system: BCR4BPSystem,
     params: WsbSearchParams | None = None,
-) -> list[WsbCandidate]:
+) -> CandidateSearchResult[WsbCandidate]:
     """WSB 弹道并行网格搜索。
 
     搜索空间：sun_phase × departure_phase × tof 三维网格。
@@ -180,7 +181,7 @@ def search_wsb_trajectories(
         params: 搜索参数
 
     Returns:
-        按 total_dv 升序排列的候选列表
+        带最终状态的候选搜索结果；可按序列方式读取候选。
     """
     if params is None:
         params = WsbSearchParams()
@@ -222,6 +223,7 @@ def search_wsb_trajectories(
     tasks = [(float(sp), float(tof_sec)) for sp in sun_phase_grid for tof_sec in tof_grid_sec]
 
     all_candidates: list[WsbCandidate] = []
+    n_propagation_failures = 0
     # spawn 启动子进程（#367）：xdist 并行 worker 本身是多线程，fork 出的
     # 子进程继承父进程锁状态，multiprocessing 在 pytest-xdist 下实测会
     # futex 死锁；spawn 重新初始化解释器，无继承锁，安全。代价是 worker
@@ -251,10 +253,31 @@ def search_wsb_trajectories(
             for sun_phase, tof_sec in tasks
         ]
         for future in futures:
-            all_candidates.extend(future.result())
+            candidates, propagation_failures = future.result()
+            all_candidates.extend(candidates)
+            n_propagation_failures += propagation_failures
 
     all_candidates.sort(key=lambda c: c.total_dv)
-    return all_candidates
+    if all_candidates:
+        return CandidateSearchResult(
+            tuple(all_candidates),
+            ConvergenceState.CONVERGED,
+            FailureCause.NONE,
+            "找到 WSB 候选",
+        )
+    if n_propagation_failures == len(tasks) * params.n_departure_phase:
+        return CandidateSearchResult(
+            (),
+            ConvergenceState.DIVERGED,
+            FailureCause.DIVERGENCE_DETECTED,
+            "全部 WSB 网格点传播失败",
+        )
+    return CandidateSearchResult(
+        (),
+        ConvergenceState.INFEASIBLE,
+        FailureCause.NO_INTERSECTION,
+        "搜索未找到可行候选",
+    )
 
 
 def _wsb_worker(
@@ -272,7 +295,7 @@ def _wsb_worker(
     char_time: float,
     sun_phase0: float,
     tof_sec: float,
-) -> list[WsbCandidate]:
+) -> tuple[list[WsbCandidate], int]:
     """单个 (sun_phase, tof) 的 WSB 搜索工作函数。
 
     在 ProcessPoolExecutor 工作进程中运行。对给定的太阳相位角和
@@ -292,6 +315,7 @@ def _wsb_worker(
     n_samples = params.n_propagation_samples
     tof_dim = tof_sec / char_time
     candidates: list[WsbCandidate] = []
+    n_propagation_failures = 0
 
     for angle in angle_grid:
         cos_a, sin_a = math.cos(angle), math.sin(angle)
@@ -303,7 +327,8 @@ def _wsb_worker(
         try:
             t_eval = np.linspace(0.0, tof_dim, n_samples)
             result = dynamics.propagate(x0, (0.0, tof_dim), t_eval=t_eval)
-        except (RuntimeError, ValueError, np.linalg.LinAlgError):
+        except PropagationFailure:
+            n_propagation_failures += 1
             logger.debug(
                 "传播失败：sun_phase=%.3f, angle=%.3f, tof=%.2f",
                 sun_phase0,
@@ -374,7 +399,7 @@ def _wsb_worker(
             )
         )
 
-    return candidates
+    return candidates, n_propagation_failures
 
 
 def _refine_wsb_candidate(

@@ -22,6 +22,7 @@ import numpy as np
 from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.enums import TransferType
 from ...data.types.orbit import Orbit
+from ...exceptions import PropagationFailure
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from .config import TransferConfig, TransferOptimizationResult
 
@@ -353,26 +354,27 @@ class DROTRONLPOptimizer:
             n_steps = int((t_span[1] - t_span[0]) / step) + 1
             t_eval = np.linspace(t_span[0], t_span[1], n_steps)
 
-        result = self.dynamics.propagate(
-            initial_state=initial_state,
-            t_span=t_span,
-            t_eval=t_eval,
-            with_stm=False,
-            with_jacobi=False,
-        )
+        try:
+            result = self.dynamics.propagate(
+                initial_state=initial_state,
+                t_span=t_span,
+                t_eval=t_eval,
+                with_stm=False,
+                with_jacobi=False,
+            )
+        except PropagationFailure:
+            self._last_prop_status = ConvergenceState.DIVERGED
+            self._last_prop_cause = FailureCause.DIVERGENCE_DETECTED
+            times = np.array([])
+            states = np.empty((0, 6))
+            self._last_trajectory = (times, states)
+            return times, states
 
         times = result["time"]
         states = result["states"]
 
-        # 透传传播 failure 标记（ADR 0020 决策 2）：读 status/cause 而非下游
-        # len==0 嗅探。对未返回标记的传播实现做兜底：空 states 即视为 DIVERGED。
-        status = result.get("status", ConvergenceState.CONVERGED)
-        cause = result.get("cause", FailureCause.NONE)
-        if states.shape[0] == 0 and status is ConvergenceState.CONVERGED:
-            status = ConvergenceState.DIVERGED
-            cause = FailureCause.DIVERGENCE_DETECTED
-        self._last_prop_status = status
-        self._last_prop_cause = cause
+        self._last_prop_status = result.get("status", ConvergenceState.CONVERGED)
+        self._last_prop_cause = result.get("cause", FailureCause.NONE)
 
         self._last_trajectory = (times, states)
 

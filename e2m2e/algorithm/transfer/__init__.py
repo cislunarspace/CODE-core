@@ -23,7 +23,7 @@ from numpy.typing import NDArray
 from ...data.constants import SECONDS_PER_DAY
 from ...data.templates import ConvergenceState, FailureCause
 from ..forces import PointMassGravity
-from ..results import ResultStatus, StageRecord
+from ..results import CandidateSearchResult, ResultStatus, StageRecord
 from .config import (
     TransferArc,
     TransferConfig,
@@ -131,6 +131,7 @@ __all__ = [
     "LgaTransferDetails",
     "LgaSearchParams",
     "LgaCandidate",
+    "CandidateSearchResult",
     "WsbTransferDetails",
     "WsbSearchParams",
     "WsbCandidate",
@@ -498,9 +499,9 @@ def _transfer_orbit_lga(
             jacobi_arrival=0.0,
             n_candidates_searched=n_searched,
             n_candidates_feasible=0,
-            status=ConvergenceState.INFEASIBLE,
-            cause=FailureCause.NO_INTERSECTION,
-            message="搜索未找到可行候选",
+            status=candidates.status,
+            cause=candidates.cause,
+            message=candidates.message,
             search_params=params,
         )
         return TransferDesignResult(
@@ -516,8 +517,8 @@ def _transfer_orbit_lga(
                     "search",
                     applicable=True,
                     executed=True,
-                    result_status=ConvergenceState.INFEASIBLE,
-                    message="未找到可行候选",
+                    result_status=candidates.status,
+                    message=candidates.message,
                 ),
                 StageRecord("refinement", applicable=True, executed=False, result_status=None),
                 StageRecord("shooting", applicable=True, executed=False, result_status=None),
@@ -641,9 +642,9 @@ def _transfer_orbit_wsb(
             dv_arrival_km_s=float("inf"),
             n_candidates_searched=n_searched,
             n_candidates_feasible=0,
-            status=ConvergenceState.INFEASIBLE,
-            cause=FailureCause.NO_INTERSECTION,
-            message="搜索未找到可行候选",
+            status=candidates.status,
+            cause=candidates.cause,
+            message=candidates.message,
             search_params=params,
         )
         return TransferDesignResult(
@@ -659,8 +660,8 @@ def _transfer_orbit_wsb(
                     "search",
                     applicable=True,
                     executed=True,
-                    result_status=ConvergenceState.INFEASIBLE,
-                    message="未找到可行候选",
+                    result_status=candidates.status,
+                    message=candidates.message,
                 ),
                 StageRecord("refinement", applicable=True, executed=False, result_status=None),
                 StageRecord("shooting", applicable=True, executed=False, result_status=None),

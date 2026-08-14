@@ -2,16 +2,17 @@
 
 覆盖三组行为：
 
-1. ``_propagate_state_only`` 步塌缩时返回 failure 标记（``status``/``cause``），
-   不靠空 states 表达失败；
+1. 直接 ``propagate()`` 在步塌缩时抛 ``PropagationFailure``；
+   ``DROTRONLPOptimizer.forward_integrate()`` 在搜索语境将其翻译为
+   ``status``/``cause``，不把空 states 暴露为传播接口契约；
 2. ``DROTRONLPOptimizer._evaluate_all`` 对不可行候选读标记而非 ``len==0``
    嗅探，目标不被 1e10/2e10 惩罚污染，不可行由约束冲突 + ``INFEASIBLE`` 表达；
 3. SLSQP/COPT 共享同一组回调（``objective_function`` /
    ``constraint_position`` / ``constraint_velocity_parallel``），不可行语义
    在两后端一致（与 ``test_rust_backend_equivalence`` 同一对照精神）。
 
-测试构造：用极小 ``max_step`` 强制 CR3BP 步长塌缩，制造确定性的传播失败
-（Rust 路径经 ``PropagationFailure`` 转 ``DIVERGED`` 标记）。
+测试构造：用极小 ``max_step`` 强制 CR3BP 步长塌缩，制造确定性的传播失败；
+优化器在候选评估接缝捕获 ``PropagationFailure`` 并转 ``DIVERGED`` 标记。
 """
 
 from __future__ import annotations
@@ -57,37 +58,31 @@ def _make_optimizer(dynamics: CR3BP_Dynamics) -> DROTRONLPOptimizer:
     return DROTRONLPOptimizer.from_orbits(system, dynamics, dep, arr)
 
 
-class TestPropagateStateOnlyFailureMarker:
-    """``_propagate_state_only`` 带显式 failure 标记（ADR 0020 决策 2）。"""
+class TestOptimizerPropagationFailureTranslation:
+    """优化器在搜索语境翻译传播失败（ADR 0020 决策 1、2）。"""
 
-    def test_step_collapse_returns_divered_marker(self):
-        """步塌缩时返回 DIVERGED + cause，states 为空但携带标记。"""
-        dyn = _make_dynamics()
-        result = dyn.propagate(
+    def test_step_collapse_becomes_a_diverged_candidate(self):
+        optimizer = _make_optimizer(_make_dynamics())
+        times, states = optimizer.forward_integrate(
             np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
             (0.0, 5.0),
-            t_eval=[5.0],
-            with_stm=False,
-            with_jacobi=False,
+            t_eval=np.array([5.0]),
         )
-        assert result["states"].shape[0] == 0
-        assert result["status"] is ConvergenceState.DIVERGED
-        assert result["cause"] is FailureCause.DIVERGENCE_DETECTED
-        assert result["message"]  # 非空诊断信息
+        assert times.size == 0
+        assert states.shape == (0, 6)
+        assert optimizer._last_prop_status is ConvergenceState.DIVERGED
+        assert optimizer._last_prop_cause is FailureCause.DIVERGENCE_DETECTED
 
-    def test_success_returns_converged_marker(self):
-        """正常传播返回 CONVERGED + NONE。"""
-        dyn = CR3BP_Dynamics(system=_make_system())
-        result = dyn.propagate(
+    def test_successful_candidate_keeps_converged_status(self):
+        optimizer = _make_optimizer(CR3BP_Dynamics(system=_make_system()))
+        _, states = optimizer.forward_integrate(
             np.array([0.8, 0.0, 0.0, 0.0, 0.05, 0.0]),
             (0.0, 0.5),
-            t_eval=[0.5],
-            with_stm=False,
-            with_jacobi=False,
+            t_eval=np.array([0.5]),
         )
-        assert result["states"].shape[0] == 1
-        assert result["status"] is ConvergenceState.CONVERGED
-        assert result["cause"] is FailureCause.NONE
+        assert states.shape == (1, 6)
+        assert optimizer._last_prop_status is ConvergenceState.CONVERGED
+        assert optimizer._last_prop_cause is FailureCause.NONE
 
 
 class TestEvaluateAllInfeasibleCandidate:

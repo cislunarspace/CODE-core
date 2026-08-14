@@ -14,10 +14,10 @@ import pytest
 from e2m2e.algorithm.dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import WsbSearchParams, transfer_orbit
 from e2m2e.algorithm.transfer.hohmann import TliParams
-from e2m2e.algorithm.transfer.wsb import (
-    compute_kepler_energy_moon,
-)
+from e2m2e.algorithm.transfer.wsb import compute_kepler_energy_moon, search_wsb_trajectories
 from e2m2e.data.constants import Datum
+from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.exceptions import PropagationFailure
 
 pytestmark = pytest.mark.orchestration
 
@@ -62,9 +62,51 @@ def _make_target_state(system):
     return np.array([x_target, 0.0, 0.0, 0.0, v_circ_dim, 0.0])
 
 
-# ---------------------------------------------------------------------------
-# TestWsbSearchParams：搜索参数验证
-# ---------------------------------------------------------------------------
+class _SynchronousExecutor:
+    """供测试替换进程池的同步执行器。"""
+
+    def __init__(self, *args, **kwargs):  # noqa: ANN002, ANN003
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):  # noqa: ANN002
+        return None
+
+    def submit(self, function, *args):  # noqa: ANN001
+        class _Future:
+            def result(self):
+                return function(*args)
+
+        return _Future()
+
+
+def test_wsb_search_reports_propagation_failure(monkeypatch):
+    """公开 WSB 搜索把所有网格传播失败标记为 DIVERGED。"""
+    monkeypatch.setattr("e2m2e.algorithm.transfer.wsb.ProcessPoolExecutor", _SynchronousExecutor)
+    system = _make_bcr4bp_system()
+    departure = _make_departure_state(system)
+    target = _make_target_state(system)
+    params = WsbSearchParams(
+        n_sun_phase=1,
+        n_departure_phase=1,
+        n_tof=1,
+        n_propagation_samples=2,
+    )
+
+    class FailingDynamics:
+        def propagate(self, *args, **kwargs):  # noqa: ARG002
+            raise PropagationFailure("step size collapsed")
+
+    monkeypatch.setattr(
+        "e2m2e.algorithm.transfer.wsb.BCR4BP_Dynamics",
+        lambda system: FailingDynamics(),
+    )
+    result = search_wsb_trajectories(departure, target, system, params)
+    assert not result
+    assert result.status is ConvergenceState.DIVERGED
+    assert result.cause is FailureCause.DIVERGENCE_DETECTED
 
 
 class TestWsbSearchParams:

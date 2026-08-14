@@ -1,13 +1,14 @@
-"""Rust propagate_with_stm_py 对接测试。
+"""星历动力学 Rust 绑定的实现等价性测试。
 
-验证 EphemerisDynamics 的 Rust 快速路径与 SciPy 路径
-在 LEO 一个周期内的 STM 一致性。
+Rust/SciPy 对照只验证两个实现路径没有漂移，不承担动力学物理正确性的
+最终证明；后者由 tests/algorithm/dynamics 的定义性测试负责。
 """
 
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
+from e2m2e.data.constants import Datum
 from e2m2e.exceptions import RustExtensionUnavailableError
 
 pytestmark = [
@@ -19,8 +20,8 @@ pytestmark = [
 @pytest.fixture
 def leo_state():
     """近地轨道初始状态 (J2000, km, km/s)"""
-    r = 6778  # 地球半径 + 400 km
-    v = np.sqrt(398600.436 / r)  # 圆轨道速度
+    r = Datum.WGS84.earth_radius_km + 400.0
+    v = np.sqrt(Datum.DE440.earth_gm / r)
     return np.array([r, 0, 0, 0, v, 0])
 
 
@@ -73,7 +74,7 @@ class TestRustStmPropagation:
     def test_rust_vs_python_stm_leo_one_period(self, spice_eph_dynamics, reference_et, leo_state):
         """Rust 与 Python STM 在 LEO 一个周期内一致性"""
         # LEO 约 90 分钟
-        period = 2 * np.pi * np.sqrt(6778**3 / 398600.436)
+        period = 2.0 * np.pi * np.sqrt(leo_state[0] ** 3 / Datum.DE440.earth_gm)
         t_span = (reference_et, reference_et + period)
         t_eval = np.linspace(t_span[0], t_span[1], 20)
         max_step = spice_eph_dynamics._get_max_step(t_span)
@@ -192,30 +193,6 @@ class TestRustStatePropagation:
         assert result["time"][0] > result["time"][-1]
         # 首点应等于初值
         assert_allclose(result["states"][0], leo_state, atol=1e-9)
-
-    def test_events_not_implemented_with_stm(self, spice_eph_dynamics, reference_et, leo_state):
-        """with_stm=True + events 非 None 应 raise NotImplementedError（显式 backend）。"""
-
-        def event_fn(t, state):
-            return float(state[0])
-
-        t_span = (reference_et, reference_et + 3600)
-        with pytest.raises(NotImplementedError, match="事件检测"):
-            spice_eph_dynamics.propagate(
-                leo_state, t_span, events=event_fn, with_stm=True, backend="scipy"
-            )
-
-    def test_events_not_implemented_state_only(self, spice_eph_dynamics, reference_et, leo_state):
-        """with_stm=False + events 非 None 应 raise NotImplementedError（显式 backend）。"""
-
-        def event_fn(t, state):
-            return float(state[0])
-
-        t_span = (reference_et, reference_et + 3600)
-        with pytest.raises(NotImplementedError, match="事件检测"):
-            spice_eph_dynamics.propagate(
-                leo_state, t_span, events=event_fn, with_stm=False, backend="scipy"
-            )
 
 
 if __name__ == "__main__":

@@ -19,9 +19,10 @@ import numpy as np
 from ...data.constants import SECONDS_PER_DAY
 from ...data.constants.bodies import MOON
 from ...data.templates import ConvergenceState, FailureCause
+from ...exceptions import PropagationFailure
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
-from ..results import ResultStatus
+from ..results import CandidateSearchResult, ResultStatus
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,7 @@ def search_lga_trajectories(
     system: CR3BP_System,
     dynamics: CR3BP_Dynamics,
     params: LgaSearchParams | None = None,
-) -> list[LgaCandidate]:
+) -> CandidateSearchResult[LgaCandidate]:
     """LGA 弹道网格搜索。
 
     搜索空间：出发速度方向角 x 飞行时间（TOF）二维网格。
@@ -132,7 +133,7 @@ def search_lga_trajectories(
         params: 搜索参数
 
     Returns:
-        按 total_dv 升序排列的候选列表
+        带最终状态的候选搜索结果；可按序列方式读取候选。
     """
     if params is None:
         params = LgaSearchParams()
@@ -183,6 +184,7 @@ def search_lga_trajectories(
 
     n_samples = params.n_propagation_samples
     candidates: list[LgaCandidate] = []
+    n_propagation_failures = 0
 
     for angle in angle_grid:
         cos_a, sin_a = math.cos(angle), math.sin(angle)
@@ -196,7 +198,8 @@ def search_lga_trajectories(
             t_eval = np.linspace(0.0, tof_dim, n_samples)
             try:
                 result = dynamics.propagate(x0, (0.0, tof_dim), t_eval=t_eval)
-            except (RuntimeError, ValueError, np.linalg.LinAlgError):
+            except PropagationFailure:
+                n_propagation_failures += 1
                 logger.debug("传播失败：angle=%.3f rad, tof=%.2f", angle, tof_dim)
                 continue
 
@@ -267,7 +270,26 @@ def search_lga_trajectories(
             )
 
     candidates.sort(key=lambda c: c.total_dv)
-    return candidates
+    if candidates:
+        return CandidateSearchResult(
+            tuple(candidates),
+            ConvergenceState.CONVERGED,
+            FailureCause.NONE,
+            "找到 LGA 候选",
+        )
+    if n_propagation_failures == len(angle_grid) * len(tof_grid_dim):
+        return CandidateSearchResult(
+            (),
+            ConvergenceState.DIVERGED,
+            FailureCause.DIVERGENCE_DETECTED,
+            "全部 LGA 网格点传播失败",
+        )
+    return CandidateSearchResult(
+        (),
+        ConvergenceState.INFEASIBLE,
+        FailureCause.NO_INTERSECTION,
+        "搜索未找到可行候选",
+    )
 
 
 def _refine_lga_candidate(

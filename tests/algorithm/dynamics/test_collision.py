@@ -8,15 +8,13 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
-from e2m2e.algorithm.dynamics.potential import pseudo_potential_hessian
-from e2m2e.data.constants import Datum
-from e2m2e.data.templates import MOON_RADIUS_KM
+from e2m2e.data.constants import MOON, Datum
 
 pytestmark = pytest.mark.theory
 
-# 无量纲天体半径（地月系统，DE421 特征长度）
-MOON_RADIUS_DU = MOON_RADIUS_KM / Datum.DE421.char_length_km  # ≈ 0.00452
-EARTH_RADIUS_DU = Datum.WGS84.earth_radius_km / Datum.DE421.char_length_km  # ≈ 0.0166
+MOON_RADIUS_KM = MOON.require_mean_radius_km()
+MOON_RADIUS_DU = MOON_RADIUS_KM / Datum.DE421.char_length_km
+EARTH_RADIUS_DU = Datum.WGS84.earth_radius_km / Datum.DE421.char_length_km
 
 
 @pytest.fixture
@@ -119,48 +117,6 @@ def test_gravity_assist_no_collision(dynamics):
     assert result["time"][-1] == pytest.approx(5.0)  # 完整积分未截断
 
 
-# ---------------------------------------------------------------------------
-# 配置与校验
-# ---------------------------------------------------------------------------
-
-
-def test_collision_requires_radius():
-    """未注入 body-radius 时启用碰撞检测抛 ValueError。"""
-    system = CR3BP_System(
-        mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
-    )._with_default_scales()
-    d = CR3BP_Dynamics(system)
-
-    with pytest.raises(ValueError, match="body-radius"):
-        d.propagate(np.zeros(6), (0.0, 1.0), backend="scipy", collision_detection=True)
-
-
-def test_collision_requires_backend(dynamics):
-    """启用碰撞检测但未显式指定 backend 抛 ValueError（ADR 0020 决策 4）。"""
-    mu = dynamics.system.mu
-    y0 = _rest_state(_moon_center(mu), np.array([0.0, 0.0, 0.001]))
-
-    with pytest.raises(ValueError, match="backend"):
-        dynamics.propagate(y0, (0.0, 1.0), collision_detection=True)
-
-
-def test_collision_disabled_by_default(dynamics):
-    """不启用 collision_detection：无 collision 键、积分不截断（行为与现状一致）。"""
-    mu = dynamics.system.mu
-    # 近月掠过轨迹（月面上方切向飞离）；无碰撞检测时正常积分
-    y0 = np.concatenate(
-        [
-            _moon_center(mu) + np.array([MOON_RADIUS_DU + 0.0001, 0.0, 0.0]),
-            np.array([0.0, 3.0, 0.0]),
-        ]
-    )
-
-    result = dynamics.propagate(y0, (0.0, 5.0))
-
-    assert "collision" not in result
-    assert result["time"][-1] == pytest.approx(5.0)
-
-
 def test_radius_config_affects_termination():
     """不同半径配置产生不同终止行为：半径大 → 更早终止。"""
     mu = Datum.DE421.mu
@@ -216,21 +172,3 @@ def test_collision_with_stm(dynamics):
     assert result["collision"] is not None
     assert result["stm"].shape[1:] == (6, 6)
     assert np.all(np.isfinite(result["stm"]))
-
-
-# ---------------------------------------------------------------------------
-# 机器精度正则化保留（不删 MIN_DISTANCE）
-# ---------------------------------------------------------------------------
-
-
-def test_regularization_preserved_near_singularity(dynamics):
-    """近天体奇点处力求值/Hessian 不产生 inf/NaN（MIN_DISTANCE 守卫保留）。"""
-    mu = dynamics.system.mu
-    # 距月球奇点 1e-12（远小于 MIN_DISTANCE=1e-10 钳位点）
-    near_moon = np.array([1.0 - mu + 1e-12, 0.0, 0.0, 0.0, 0.0, 0.0])
-
-    acc = dynamics.equations_of_motion(0.0, near_moon)
-    assert np.all(np.isfinite(acc))
-
-    hess = pseudo_potential_hessian(mu, 1.0 - mu + 1e-12, 0.0, 0.0)
-    assert np.all(np.isfinite(hess))

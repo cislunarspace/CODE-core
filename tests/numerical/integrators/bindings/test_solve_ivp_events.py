@@ -2,7 +2,7 @@
 
 覆盖终止事件步内求精、非终止事件、方向过滤、多事件与空事件列表。
 事件语义与 scipy solve_ivp 对齐（ADR 0023 允许的差异除外）；
-经 Dynamics 编排层的事件测试见 tests/numerical/dynamics/test_dynamics_events.py。
+经 Dynamics 编排层的事件测试见 ``tests/algorithm/dynamics/test_events.py``。
 """
 
 import numpy as np

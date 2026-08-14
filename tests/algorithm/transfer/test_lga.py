@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.results import CandidateSearchResult
 from e2m2e.algorithm.transfer import (
     LgaSearchParams,
     LgaTransferDetails,
@@ -26,7 +27,8 @@ from e2m2e.algorithm.transfer.lga import (
     search_lga_trajectories,
 )
 from e2m2e.data.constants import Datum
-from e2m2e.data.templates import ConvergenceState
+from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.exceptions import PropagationFailure
 
 pytestmark = pytest.mark.orchestration
 
@@ -137,6 +139,19 @@ class TestLgaSearch:
         system, dynamics, dep_state, tgt_state = cr3bp_setup
         candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
         assert len(candidates) > 0, "LGA 搜索应返回至少一个候选"
+
+    def test_propagation_failure_skips_the_infeasible_grid_point(self, cr3bp_setup):
+        system, _, dep_state, tgt_state = cr3bp_setup
+
+        class FailingDynamics:
+            def propagate(self, *args, **kwargs):  # noqa: ARG002
+                raise PropagationFailure("step size collapsed")
+
+        params = LgaSearchParams(n_departure_phase=1, n_tof=1, n_propagation_samples=2)
+        result = search_lga_trajectories(dep_state, tgt_state, system, FailingDynamics(), params)
+        assert not result
+        assert result.status is ConvergenceState.DIVERGED
+        assert result.cause is FailureCause.DIVERGENCE_DETECTED
 
     def test_candidates_sorted_by_dv(self, cr3bp_setup):
         """候选按 total_dv 升序排列。"""
@@ -368,7 +383,15 @@ class TestLgaTransferOrbit:
     def test_search_failure_leaves_followup_stages_unexecuted(self):
         """搜索无候选时，精化和打靶不以失败原因占位。"""
         tli_params = TliParams(parking_alt_km=200.0, inclination_deg=0.0)
-        with patch("e2m2e.algorithm.transfer.search_lga_trajectories", return_value=[]):
+        with patch(
+            "e2m2e.algorithm.transfer.search_lga_trajectories",
+            return_value=CandidateSearchResult(
+                (),
+                ConvergenceState.INFEASIBLE,
+                FailureCause.NO_INTERSECTION,
+                "搜索未找到可行候选",
+            ),
+        ):
             result = transfer_orbit(
                 "LGA",
                 tli_params=tli_params,

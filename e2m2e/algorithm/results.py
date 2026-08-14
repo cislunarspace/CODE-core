@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 import numpy as np
 
@@ -11,6 +12,9 @@ from ..data.templates import ConvergenceState, FailureCause
 
 if TYPE_CHECKING:
     from ..data.types.orbit import Orbit, OrbitFamily
+
+
+CandidateT = TypeVar("CandidateT")
 
 
 CAUSE_STATUS: dict[FailureCause, ConvergenceState] = {
@@ -48,6 +52,38 @@ class ResultStatus:
                 f"状态与原因不一致：{self.status.value} 不对应 {self.cause.value}；"
                 f"应为 {expected.value}"
             )
+
+
+@dataclass(frozen=True)
+class CandidateSearchResult(Sequence[CandidateT], Generic[CandidateT]):
+    """候选网格搜索的最终结果。
+
+    保持序列读取接口，使既有调用方可继续迭代、索引和取长度；搜索是否
+    完成及空结果的原因则由统一状态三元组明确表达。
+    """
+
+    candidates: tuple[CandidateT, ...]
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
+
+    def __len__(self) -> int:
+        return len(self.candidates)
+
+    @overload
+    def __getitem__(self, index: int) -> CandidateT: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[CandidateT]: ...
+
+    def __getitem__(self, index: int | slice) -> CandidateT | Sequence[CandidateT]:
+        return self.candidates[index]
+
+    def __iter__(self) -> Iterator[CandidateT]:
+        return iter(self.candidates)
 
 
 def scipy_slsqp_status(success: bool, code: int) -> tuple[ConvergenceState, FailureCause]:

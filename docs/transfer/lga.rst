@@ -22,6 +22,7 @@ LGA 转移分为三段：
 .. code-block:: python
 
    from e2m2e.algorithm.transfer.lga import search_lga_trajectories, LgaSearchParams
+   from e2m2e.data.templates import ConvergenceState
 
    # departure_state / target_state：CR3BP 无量纲状态；system / dynamics：CR3BP 系统
    candidates = search_lga_trajectories(
@@ -34,6 +35,9 @@ LGA 转移分为三段：
            max_total_dv=4.0,         # 总 Δv 上限（km/s）
        ),
    )
+
+   if candidates.status is not ConvergenceState.CONVERGED:
+       print(f"搜索未完成：{candidates.status.value}, {candidates.cause.value}: {candidates.message}")
 
    for c in candidates:
        print(f"总 Δv: {c.total_dv:.4f} km/s, 飞行时间: {c.tof_sec / 86400:.2f} 天, "

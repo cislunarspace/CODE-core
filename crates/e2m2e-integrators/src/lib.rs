@@ -2077,34 +2077,19 @@ fn propagate_compiled_stm_py(
 
 /// 把 Rust 内部 [`e2m2e_forces::PropagateError`] 翻译成 Python 异常。
 ///
-/// 步长塌缩（``StepCollapsed``）→ ``e2m2e.exceptions.PropagationFailure``
-/// （``E2M2EError`` 子类）；其他传播错误（``Other``）→ ``RuntimeError``。
-/// 两者消息前缀都加 ``prefix`` （形如 "CR3BP propagation failed: ..."）。
-/// Python 侧据此按**类型** 捕获，不再依赖错误消息字符串前缀匹配——改 Rust
-/// 措辞不影响 ``except PropagationFailure`` （ADR 0020 决策 2）。
-///
-/// 若 ``e2m2e.exceptions`` 不可导入（环境异常，正常不会发生），退化为
-/// ``RuntimeError``，保证失败不至因构造异常本身而丢失。
-fn propagate_error_to_pyerr(
-    py: Python<'_>,
-    prefix: &str,
-    e: e2m2e_forces::PropagateError,
-) -> PyErr {
-    let msg = match &e {
-        e2m2e_forces::PropagateError::StepCollapsed(m) | e2m2e_forces::PropagateError::Other(m) => {
-            format!("{prefix}: {m}")
-        }
-    };
-    match e {
-        e2m2e_forces::PropagateError::StepCollapsed(_) => match py
-            .import("e2m2e.exceptions")
-            .and_then(|m| m.getattr("PropagationFailure"))
-            .and_then(|cls| cls.call1((msg.clone(),)))
-        {
-            Ok(instance) => PyErr::from_value(instance),
-            Err(_) => pyo3::exceptions::PyRuntimeError::new_err(msg),
-        },
-        e2m2e_forces::PropagateError::Other(_) => pyo3::exceptions::PyRuntimeError::new_err(msg),
+/// 所有内部 ``PropagateError`` → ``e2m2e.exceptions.PropagationFailure``
+/// （``E2M2EError`` 子类）。消息前缀都加 ``prefix``（形如
+/// "CR3BP propagation failed: ..."）。Python 侧据此按类型捕获，不再依赖
+/// 错误消息字符串前缀匹配——改 Rust 措辞不影响 ``except PropagationFailure``。
+fn propagate_error_to_pyerr(py: Python<'_>, prefix: &str, e: impl std::fmt::Display) -> PyErr {
+    let msg = format!("{prefix}: {e}");
+    match py
+        .import("e2m2e.exceptions")
+        .and_then(|m| m.getattr("PropagationFailure"))
+        .and_then(|cls| cls.call1((msg.clone(),)))
+    {
+        Ok(instance) => PyErr::from_value(instance),
+        Err(_) => pyo3::exceptions::PyRuntimeError::new_err(msg),
     }
 }
 
@@ -2227,9 +2212,8 @@ fn propagate_cr3bp_stm_py(
             propagate_cr3bp_stm(
                 mu, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
             )
-            .map_err(|e| format!("CR3BP STM propagation failed: {e}"))
         })
-        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
+        .map_err(|e| propagate_error_to_pyerr(py, "CR3BP STM propagation failed", e))?;
 
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
     let stm_list: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();
@@ -2319,9 +2303,8 @@ fn propagate_bcr4bp_py(
                 max_step,
                 max_steps,
             )
-            .map_err(|e| format!("BCR4BP propagation failed: {e}"))
         })
-        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
+        .map_err(|e| propagate_error_to_pyerr(py, "BCR4BP propagation failed", e))?;
 
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
 
@@ -2395,9 +2378,8 @@ fn propagate_bcr4bp_stm_py(
                 max_step,
                 max_steps,
             )
-            .map_err(|e| format!("BCR4BP STM propagation failed: {e}"))
         })
-        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
+        .map_err(|e| propagate_error_to_pyerr(py, "BCR4BP STM propagation failed", e))?;
 
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
     let stm_list: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();
