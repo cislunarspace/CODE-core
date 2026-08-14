@@ -19,7 +19,7 @@ def _kernel_path() -> str | None:
     """返回可用星历内核路径（与 tests/conftest 同优先级）。"""
     search_dir = os.environ.get(
         "SPICE_KERNEL_DIR",
-        str(Path(__file__).resolve().parents[2] / "kernels"),
+        str(Path(__file__).resolve().parents[3] / "kernels"),
     )
     for name in ("de440.bsp", "de440s.bsp", "de438.bsp", "de435.bsp"):
         path = Path(search_dir) / name

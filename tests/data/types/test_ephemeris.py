@@ -10,7 +10,7 @@ from e2m2e.data.types.trajectory import (
     write_ephemeris,
 )
 
-pytestmark = pytest.mark.aux
+pytestmark = pytest.mark.data
 
 
 class TestReadEphemeris:

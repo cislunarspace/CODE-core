@@ -8,7 +8,7 @@ import pytest
 
 from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 
-pytestmark = pytest.mark.data
+pytestmark = pytest.mark.force
 
 
 # USSA76 指数模型基准密度（kg/m³），用于验证误差 < 20%。

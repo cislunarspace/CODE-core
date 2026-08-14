@@ -65,6 +65,10 @@ Issues = "https://github.com/cislunarspace/e2m2e/issues"
 manifest-path = "crates/e2m2e-integrators/Cargo.toml"
 module-name = "e2m2e._integrators"
 python-source = "."
+include = [
+    { path = "e2m2e/data/frames/fixtures/gmat/*", format = "sdist" },
+    { path = "e2m2e/data/frames/fixtures/gmat/*", format = "wheel" },
+]
 # spice 为必选 feature（ crates/*/Cargo.toml 的 default 已含 spice，此处显式
 # 再声明一次作双保险）：maturin build/develop 永远带 CSPICE，不产无 spice 子集。
 # extension-module：pyo3 的 cdylib 链接语义（不链接 libpython，宿主解释器提供

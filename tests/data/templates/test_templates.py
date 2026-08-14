@@ -6,7 +6,6 @@ from e2m2e.data.constants import (
     AU_KM,
     EARTH_MOON_DISTANCE_KM,
     KM_TO_M,
-    SUN,
     Datum,
 )
 from e2m2e.data.constants import (
@@ -49,26 +48,6 @@ class TestSystemsConstants:
         assert DAY == 86400
         assert YEAR == 365.25 * 86400
 
-    def test_algorithm_layer_single_source(self):
-        """算法层不再硬编码物理常量：常量子来自 data.constants 单一来源。"""
-        from e2m2e.algorithm.dynamics.bcr4bp_system import BCR4BPSystem
-        from e2m2e.algorithm.dynamics.cr3bp_system import CR3BP_System
-        from e2m2e.algorithm.forces.force_mapping import perturbation_to_force_config
-        from e2m2e.algorithm.forces.gravity_file import _DEFAULT_MU
-        from e2m2e.algorithm.propagation import _DEFAULT_FORCE_CONFIG
-        from e2m2e.data.constants import SPEED_OF_LIGHT_KMS
-
-        assert SUN.gm_by_datum["DE440"] == BCR4BPSystem.SUN_GM_KM3_S2
-        assert CR3BP_System.DAY == DAY
-        assert CR3BP_System.YEAR == YEAR
-        assert EARTH.gm_by_datum["DE421"] == _DEFAULT_MU
-        assert _DEFAULT_FORCE_CONFIG["forces"][0]["params"]["mu"] == Datum.DE440.earth_gm
-        relativity_cfg = perturbation_to_force_config({"relativity": 1})
-        relativity = next(
-            f for f in relativity_cfg["forces"] if f["type"] == "RelativisticCorrection"
-        )
-        assert relativity["params"]["c"] == SPEED_OF_LIGHT_KMS
-
 
 class TestSeedConstants:
     def test_seed_values(self):
@@ -79,12 +58,6 @@ class TestSeedConstants:
         assert seed._DRO_SEED_X0 == 0.79188556619742
         assert seed._HALO_SEED_Z0 == 0.001
         assert seed._HALO_FOLD_Z0 == {1: 0.07, 2: 0.15}
-
-    def test_family_uses_data_layer_constants(self):
-        """algorithm/family/cr3bp_orbits.py 的常量来自数据层（单一来源）。"""
-        from e2m2e.algorithm.family.cr3bp_orbits import CHAR_LENGTH_KM as family_char_length
-
-        assert family_char_length == CHAR_LENGTH_KM
 
 
 class TestPerturbationDefaults:

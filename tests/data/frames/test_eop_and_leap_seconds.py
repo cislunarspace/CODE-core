@@ -1,7 +1,5 @@
 """data/frames/：EOP/闰秒解析与 SPICE 帧查询测试。"""
 
-from pathlib import Path
-
 import numpy as np
 import pytest
 
@@ -11,26 +9,33 @@ from e2m2e.data.frames import (
     EopFile,
     TaiUtcTable,
     frame_rotation,
+    gmat_fixture_path,
 )
 
 pytestmark = pytest.mark.data
 
 
-_FIXTURE_DIR = Path(__file__).resolve().parents[1] / "core" / "coordinate" / "fixtures" / "gmat"
-
-
 class TestEopFile:
     @pytest.fixture
     def eop_file(self):
-        path = _FIXTURE_DIR / "eopc04_08.62-now.trimmed"
-        if not path.is_file():
-            pytest.skip("GMAT EOP fixture not found")
-        return EopFile.from_file(path)
+        return EopFile.from_file(gmat_fixture_path("eopc04_08.62-now.trimmed"))
 
     def test_parse_and_query(self, eop_file):
         sample = eop_file.at_utc_mjd(61203.0)
-        assert sample.x_rad is not None
-        assert abs(sample.x_rad) < 1e-3
+        assert sample.x_rad == pytest.approx(0.193639 * ARCSEC_TO_RAD)
+        assert sample.y_rad == pytest.approx(0.433418 * ARCSEC_TO_RAD)
+        assert sample.ut1_utc == pytest.approx(0.0449320)
+        assert sample.lod == pytest.approx(-0.0000082)
+
+    def test_interpolates_xy_and_ut1_but_not_lod(self, eop_file):
+        left = eop_file.at_utc_mjd(61203.0)
+        right = eop_file.at_utc_mjd(61204.0)
+        mid = eop_file.at_utc_mjd(61203.5)
+
+        assert mid.x_rad == pytest.approx((left.x_rad + right.x_rad) / 2.0)
+        assert mid.y_rad == pytest.approx((left.y_rad + right.y_rad) / 2.0)
+        assert mid.ut1_utc == pytest.approx((left.ut1_utc + right.ut1_utc) / 2.0)
+        assert mid.lod == pytest.approx(left.lod)
 
     def test_fixture_gap_raises(self, eop_file):
         with pytest.raises(CoordinateDataError):
@@ -48,14 +53,12 @@ class TestEopFile:
 class TestTaiUtcTable:
     @pytest.fixture
     def tai_table(self):
-        path = _FIXTURE_DIR / "tai-utc.dat"
-        if not path.is_file():
-            pytest.skip("GMAT tai-utc fixture not found")
-        return TaiUtcTable.from_file(path)
+        return TaiUtcTable.from_file(gmat_fixture_path("tai-utc.dat"))
 
-    def test_known_leap_second(self, tai_table):
-        # 2017 起 TAI-UTC = 37 s（近两年 MJD 在 58000 附近）
-        assert tai_table.tai_minus_utc(58000.0) == pytest.approx(37.0, abs=0.5)
+    def test_known_leap_seconds(self, tai_table):
+        assert tai_table.tai_minus_utc(57754.0) == pytest.approx(37.0)
+        assert tai_table.tai_minus_utc(37665.0) == pytest.approx(1.8458580)
+        assert tai_table.tai_minus_utc(37666.0) == pytest.approx(1.8469812)
 
     def test_utc_tai_roundtrip(self, tai_table):
         utc_mjd = 59000.0

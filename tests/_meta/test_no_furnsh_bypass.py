@@ -21,12 +21,12 @@ import re
 
 import pytest
 
-pytestmark = pytest.mark.data
+pytestmark = pytest.mark.aux
 
-# 仓库根：tests/data/kernels/ → 上溯四级
-_REPO_ROOT = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
+# 本测试扫描生产代码，验证数据层的 SPICE 入口没有被旁路。
+
+# 仓库根：tests/_meta/ → 上溯两级
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _E2M2E_DIR = os.path.join(_REPO_ROOT, "e2m2e")
 
 # 合法的直接 furnsh/unload 调用点（相对 e2m2e/ 的 POSIX 路径）。

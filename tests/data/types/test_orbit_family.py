@@ -9,7 +9,6 @@ import tempfile
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.dynamics import CR3BP_System
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
 
 pytestmark = pytest.mark.data
@@ -194,35 +193,20 @@ class TestOrbitFamilyPersistence:
 class TestOrbitFamilyWithSystem:
     """测试带系统的轨道族"""
 
-    def test_jacobi_constants_with_system(self):
-        """测试Jacobi常数计算"""
-        system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
+    def test_jacobi_constants_delegate_to_bound_system(self):
+        """数据容器仅通过公开能力调用绑定系统，不依赖算法层具体类型。"""
 
-        # 创建轨道时关联系统
-        for i in range(3):
-            # 创建在L1附近的测试状态
-            state = np.array([0.8 - i * 0.01, 0, 0, 0, 0.1 + i * 0.01, 0])
-            states = np.tile(state, (20, 1))
-            times = np.linspace(0, 1, 20)
+        class SystemWithJacobi:
+            def get_jacobi_constant(self, state):
+                return float(np.sum(state))
 
-            orbit = Orbit(states, times, system=system)
-            orbit.period = 1.0 + i * 0.1
-
-        # 创建带系统的轨道族
+        system = SystemWithJacobi()
         family = OrbitFamily(family_type="halo", system=system)
-
-        # 重新创建轨道并添加到族中
+        expected = []
         for i in range(3):
-            state = np.array([0.8 - i * 0.01, 0, 0, 0, 0.1 + i * 0.01, 0])
-            states = np.tile(state, (20, 1))
-            times = np.linspace(0, 1, 20)
-            orbit = Orbit(states, times, system=system)
-            orbit.period = 1.0 + i * 0.1
+            state = np.array([0.8 - i * 0.01, 0.0, 0.0, 0.0, 0.1 + i * 0.01, 0.0])
+            orbit = Orbit(np.tile(state, (20, 1)), np.linspace(0, 1, 20), system=system)
             family.add_orbit(orbit)
+            expected.append(np.sum(state))
 
-        # 获取Jacobi常数
-        jacobi = family.get_jacobi_constants()
-
-        assert len(jacobi) == 3
-        # 所有值应该是有效的数值
-        assert not np.any(np.isnan(jacobi))
+        np.testing.assert_allclose(family.get_jacobi_constants(), expected)

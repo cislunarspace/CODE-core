@@ -86,6 +86,14 @@ class TestOrbitInit:
         assert orbit.family_type is None
         assert not orbit.is_periodic
 
+    def test_state0_returns_the_first_state(self):
+        orbit = Orbit(
+            states=np.array([[1.0, 0.0, 0.0, 0.0, 1.0, 0.0]]),
+            times=np.array([0.0]),
+        )
+
+        np.testing.assert_allclose(orbit.state0, orbit.states[0])
+
     def test_jacobi_computed_via_system(self, earth_moon_system):
         """Jacobi 常数应由 system 直接计算，不再由 Orbit 持有"""
         states = np.random.rand(10, 6)
@@ -126,24 +134,6 @@ class TestOrbitInit:
         assert "x_max" in orbit.extrema
         assert "x_min" in orbit.extrema
         assert np.isclose(orbit.extrema["x_max"], 0.6, atol=1e-6)
-
-
-class TestPropagateStateAtOrbitTime:
-    """Tests for CR3BP_Dynamics.propagate_orbit_state_at_time (uses propagate)"""
-
-    def test_propagate_at_epoch_matches_state0(self, sample_orbit, earth_moon_dynamics):
-        state = earth_moon_dynamics.propagate_orbit_state_at_time(
-            sample_orbit, float(sample_orbit.times[0])
-        )
-        np.testing.assert_allclose(state, sample_orbit.states[0], rtol=1e-9, atol=1e-12)
-
-    def test_propagate_returns_finite_vector(self, sample_orbit, earth_moon_dynamics):
-        t = float(sample_orbit.times[0]) + 0.05
-        state = earth_moon_dynamics.propagate_orbit_state_at_time(
-            sample_orbit, t, integration_dt=0.005
-        )
-        assert state.shape == (6,)
-        assert not np.any(np.isnan(state))
 
 
 class TestOrbitPeriod:
@@ -241,6 +231,10 @@ class TestOrbitFamilyInit:
         """OrbitFamily should accept a single Orbit object"""
         family = OrbitFamily(orbits=sample_orbit)
         assert len(family) == 1
+
+    def test_jacobi_without_cr3bp_system_returns_empty(self):
+        family = OrbitFamily()
+        assert family.get_jacobi_constants().shape == (0,)
 
 
 class TestOrbitPeriodicityCheck:

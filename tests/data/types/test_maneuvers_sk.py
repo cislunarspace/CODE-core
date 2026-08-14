@@ -6,7 +6,7 @@ import pytest
 from e2m2e.data.types.maneuver import parse_maneuvers, read_maneuvers
 from e2m2e.data.types.sk_statistic import parse_sk_statistic, read_sk_statistic
 
-pytestmark = pytest.mark.aux
+pytestmark = pytest.mark.data
 
 
 class TestManeuvers:

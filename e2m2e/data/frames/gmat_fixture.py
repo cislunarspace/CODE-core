@@ -1,9 +1,8 @@
-"""GMAT 裁剪 fixture 发现工具（开发期测试辅助）。
+"""GMAT 兼容 ITRF 所需的裁剪 EOP/闰秒数据资源。
 
-ADR 0011 迁移：自 ``core/coordinate/gmat_data.py`` 迁入数据层。GMAT
-数据文件（EOP/闰秒）作解析器测试**输入** （IERS 公布的物理事实），
-非对照标准（ADR 0013 禁其他软件输出做判据）。路径发现工具归数据层，
-供 ``algorithm/coordinate/`` 的 GMAT-compatible 坐标轴与测试使用。
+资源随 ``e2m2e.data.frames`` 发布，既供数据解析测试使用，也供
+``algorithm.coordinate`` 的显式 GMAT-compatible 坐标轴提供默认输入。
+这些文件是 IERS 公布物理数据的输入，不是其他软件的输出对照标准。
 """
 
 from __future__ import annotations
@@ -13,12 +12,11 @@ from pathlib import Path
 
 from .eop import CoordinateDataError
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_COMMITTED_GMAT_FIXTURE_DIR = _REPO_ROOT / "tests" / "data" / "frames" / "fixtures" / "gmat"
+_COMMITTED_GMAT_FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "gmat"
 
 
 def committed_gmat_fixture_dir() -> Path:
-    """返回仓库内提交的 GMAT 裁剪 fixture 目录。"""
+    """返回随数据层发布的 GMAT 裁剪数据目录。"""
     if not _COMMITTED_GMAT_FIXTURE_DIR.is_dir():
         raise CoordinateDataError(
             f"Committed GMAT fixture directory not found: {_COMMITTED_GMAT_FIXTURE_DIR}"
@@ -38,7 +36,7 @@ def gmat_data_dir() -> Path | None:
 
 
 def gmat_fixture_path(name: str) -> Path:
-    """返回提交的 GMAT 裁剪 fixture 文件路径。"""
+    """返回随数据层发布的 GMAT 裁剪数据文件路径。"""
     path = committed_gmat_fixture_dir() / name
     if not path.is_file():
         raise CoordinateDataError(f"Committed GMAT fixture file not found: {path}")
