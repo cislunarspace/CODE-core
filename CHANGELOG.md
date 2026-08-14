@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [5.6.10] - 2026-08-14
+
+### Fixed
+- **GMAT 参考数据未随包分发**（#423）：EOP/闰秒裁剪数据此前在 `tests/data/frames/fixtures/gmat`，加载器按仓库布局用 `parents[3]` 定位——wheel/sdist 不含该目录，安装后 GMAT-compatible 坐标轴（显式 EOP/闰秒输入）取数失败。数据迁入包内 `e2m2e/data/frames/fixtures/gmat` 并声明为包资源，仓库与安装布局下定位一致，wheel/sdist 自动分发。
+
+### Changed
+- **MBSE 活模型校验与文档产物生成**（#422）：五层组件清单（algorithm/api/core/data/numerical/tools）与隔离注册表，覆盖测试改为校验活模型而非文档快照；BDD 场景、需求与追溯矩阵改由生成器产出 `docs/reference/mbse/generated/` 并纳入测试校验。
+- **数据层测试按边界重组**（#423 连带）：`tests/data` 镜像数据层结构（atmosphere/frames/kernels/templates/types）；`test_no_furnsh_bypass` 迁 `tests/_meta`，新增数据常量依赖守门。
+- **API 测试按接口职责重组**（#424）：`test_facade.py` 拆分出 `test_models.py`（模型默认值、按类型范围边界、非法输入拒绝）与 `test_facade_responses.py`（响应契约），WSB 容器测试按契约归位。
+- **测试套件收敛**（#425，ADR 0025）：新增主功能类标记守恒守门员元测试（每测试恰 1 主类）；`tests/algorithm/correction` 更名 `solver` 镜像源码结构；family 纯 API 校验用例删除（#424 的 `test_models` 已等价覆盖）；design 集成改用 `make_design_request` 桩工厂，`tests/algorithm` 不再 import `e2m2e.api`；normal_form 清除外部软件参照——qiao .mat 逐项比对迁 `scripts/diagnose_hamiltonian_vs_qiao.py` 手工诊断，5 个 skip 守卫空回归占位删除（转 #426 跟踪）。
+- **测试套件层级澄清**（#432，ADR 0026）：coordinate 测试审查收尾与注释中文化，清理 `e2m2e.core`/`e2m2e.algorithms` 旧路径死引用，atmosphere 测试并入 numerical/forces 契约层。
+
 ## [5.6.9] - 2026-08-14
 
 ### Added
