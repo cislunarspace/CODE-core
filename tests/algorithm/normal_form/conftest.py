@@ -16,7 +16,7 @@ def earth_moon_cr3bp() -> CR3BP_System:
     """与 conftest.earth_moon_system 等价的 CR3BP 系统实例。
 
     本测试目录不复用根 conftest 的 fixture，避免与其他切片在 mu 默认值上
-    耦合（本切片以 qiao 的 mu 为权威值）。
+    耦合（mu 采用 constants.py 登记值）。
     """
     return CR3BP_System(mu=1.215058560962404e-2, primary="Earth", secondary="Moon")
 

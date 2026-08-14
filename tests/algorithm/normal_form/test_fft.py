@@ -8,12 +8,11 @@
 - :func:`reconstruct_signal` / :func:`reconstruct_derivative` 与
   解析值匹配；
 - :func:`frequency_match` 把检测频率匹配到基频表最近邻；
-- :func:`extract_frequencies` 在 NAFF 不可用时降级到 FFT 并发出警告。
+- :func:`extract_frequencies` 后端显式选择（ADR 0020 决策 4）：只收
+  ``naff``/``fft``，选定 NAFF 不可用即抛错，不静默降级。
 """
 
 from __future__ import annotations
-
-import warnings
 
 import numpy as np
 import pytest
@@ -57,36 +56,31 @@ def test_naff_available_does_not_raise():
     assert isinstance(result, bool)
 
 
-def test_extract_frequencies_falls_back_to_fft_when_naff_missing(
+def test_extract_frequencies_rejects_auto():
+    """``prefer="auto"`` 已被废除（ADR 0025 决策 5），抛 :class:`ValueError`。"""
+    t, y = _make_single_tone(1.0, 0.0, 1.0)
+    with pytest.raises(ValueError, match="prefer"):
+        extract_frequencies(t, y, prefer="auto")  # type: ignore[arg-type]
+
+
+def test_extract_frequencies_prefer_naff_raises_when_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """``extract_frequencies(prefer="auto")`` 在 NAFF 不可用时降级到 FFT 并警告。"""
+    """选定 ``naff`` 但 NAFF 二进制不可用时抛 :class:`RuntimeError`，不回退 FFT。"""
     monkeypatch.setattr(
         "e2m2e.algorithm.normal_form.fft._resolve_naff_binary",
         lambda: None,
     )
-    monkeypatch.setattr(
-        "e2m2e.algorithm.normal_form.fft.naff_available",
-        lambda: False,
-    )
 
-    omega = 1.7
-    t, y = _make_single_tone(omega, 0.4, 0.6)
-
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        comps, backend = extract_frequencies(t, y, n_components=5)
-
-    assert backend == "fft"
-    assert isinstance(comps[0], FFTComponent)
-    # 至少一条警告指出 NAFF 不可用
-    assert any("NAFF" in str(w.message) for w in caught), [str(w.message) for w in caught]
+    t, y = _make_single_tone(1.7, 0.4, 0.6)
+    with pytest.raises(RuntimeError, match="NAFF"):
+        extract_frequencies(t, y, n_components=5, prefer="naff")
 
 
-def test_extract_frequencies_prefer_naff_falls_back_on_runtime_error(
+def test_extract_frequencies_prefer_naff_propagates_runtime_error(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """``prefer="naff"`` 但 NAFF 调用失败时也降级到 FFT。"""
+    """选定 ``naff`` 而调用失败时异常上抛，不回退 FFT（ADR 0020 决策 4）。"""
 
     def _boom(*args, **kwargs):
         raise RuntimeError("simulated NAFF crash")
@@ -96,23 +90,13 @@ def test_extract_frequencies_prefer_naff_falls_back_on_runtime_error(
         lambda: "/bin/true",
     )
     monkeypatch.setattr(
-        "e2m2e.algorithm.normal_form.fft.naff_available",
-        lambda: True,
-    )
-    monkeypatch.setattr(
         "e2m2e.algorithm.normal_form.fft.detect_naff",
         _boom,
     )
 
-    omega = 1.7
-    t, y = _make_single_tone(omega, 0.4, 0.6)
-
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        comps, backend = extract_frequencies(t, y, n_components=5)
-
-    assert backend == "fft"
-    assert any("NAFF" in str(w.message) for w in caught)
+    t, y = _make_single_tone(1.7, 0.4, 0.6)
+    with pytest.raises(RuntimeError, match="simulated NAFF crash"):
+        extract_frequencies(t, y, n_components=5, prefer="naff")
 
 
 def test_extract_frequencies_prefer_fft_skips_naff():

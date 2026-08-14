@@ -7,12 +7,9 @@
 - 结果具备 ``substitute_orbit`` / ``W_poly`` / ``Wdot_poly`` /
   ``tlist`` / ``shooting_result`` 等切片 #171 要求字段；
 - 在零初值 / 较小窗口下烟测通过；
-- NAFF 不可用时降级到 FFT 并发出警告；
+- 选定 NAFF 后端而不可用时抛错（ADR 0020 决策 4，不静默降级）；
 - :func:`multiple_shooting_newton` 在玩具动力学上能收敛；
 - :func:`solve_block_tridiagonal` 数值正确性。
-
-完整 ``L1DynSubs.npz`` 回归留给后续切片（需要 SPICE 内核与完整
-``T_total = 0.1·2^16`` 窗口）。
 """
 
 from __future__ import annotations
@@ -62,32 +59,48 @@ def l1_context(earth_moon_system):
 
 
 @pytest.fixture
-def tiny_corrector(l1_context) -> DynamicalSubstituteCorrector:
+def l1_context_cr3bp(l1_context):
+    """显式纯 CR3BP 上下文（force_cr3bp=True，不探 SPICE）。
+
+    tiny/naff corrector 的烟测以纯 CR3BP 为前提；显式声明使结果与同
+    worker 内其他模块留下的内核池状态无关（ADR 0020：显式选择）。
+    """
+    from e2m2e.algorithm.normal_form import NormalFormContext
+
+    return NormalFormContext(
+        system=l1_context.system,
+        libration_point=l1_context.libration_point,
+        epoch=l1_context.epoch,
+        order=l1_context.order,
+        force_cr3bp=True,
+    )
+
+
+@pytest.fixture
+def tiny_corrector(l1_context_cr3bp) -> DynamicalSubstituteCorrector:
     """极小窗口 corrector，让 ``reduce`` 在 < 5 s 完成（不依赖 SPICE）。"""
     return DynamicalSubstituteCorrector(
-        context=l1_context,
+        context=l1_context_cr3bp,
         t_total=4.0,
         node_step=0.8,
         dense_step=0.2,
         max_iter=3,
         tolerance=1e-6,
         prefer="fft",
-        spice_optional=True,
     )
 
 
 @pytest.fixture
-def auto_corrector(l1_context) -> DynamicalSubstituteCorrector:
-    """``prefer='auto'`` 的 corrector，便于触发 NAFF → FFT 降级分支。"""
+def naff_corrector(l1_context_cr3bp) -> DynamicalSubstituteCorrector:
+    """显式选定 NAFF 后端的 corrector，用于验证资源缺失时的报错路径。"""
     return DynamicalSubstituteCorrector(
-        context=l1_context,
+        context=l1_context_cr3bp,
         t_total=4.0,
         node_step=0.8,
         dense_step=0.2,
         max_iter=3,
         tolerance=1e-6,
-        prefer="auto",
-        spice_optional=True,
+        prefer="naff",
     )
 
 
@@ -170,24 +183,16 @@ def test_reduce_metadata_records_window(tiny_corrector):
     assert result.metadata["n_segments"] >= 1
 
 
-def test_reduce_falls_back_to_fft_when_naff_missing(
-    auto_corrector, monkeypatch: pytest.MonkeyPatch
+def test_reduce_prefer_naff_raises_when_naff_unavailable(
+    naff_corrector, monkeypatch: pytest.MonkeyPatch
 ):
-    """``reduce`` 在 NAFF 不可用时降级到 FFT，并把后端记录到结果。"""
+    """显式选定 NAFF 后端而二进制不可用时，``reduce`` 抛错而非静默降级。"""
     monkeypatch.setattr(
         "e2m2e.algorithm.normal_form.fft._resolve_naff_binary",
         lambda: None,
     )
-    monkeypatch.setattr(
-        "e2m2e.algorithm.normal_form.fft.naff_available",
-        lambda: False,
-    )
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        result = auto_corrector.reduce()
-    assert result.backend == "fft"
-    # 至少一条 NAFF 警告
-    assert any("NAFF" in str(w.message) for w in caught)
+    with pytest.raises(RuntimeError, match="NAFF"):
+        naff_corrector.reduce()
 
 
 def test_reduce_result_residual_property(tiny_corrector):
@@ -354,8 +359,8 @@ def test_ode_substitute_solver_rejects_bad_shape():
 # ---------------------------------------------------------------------------
 
 
-def test_default_constants_match_qiao():
-    """默认窗口/间距与 qiao Code05 一致。"""
+def test_default_window_constants():
+    """默认窗口/间距与 constants 出处（Code05）的约定一致。"""
     assert pytest.approx(0.1 * (2**16)) == DEFAULT_TOTAL_TU
     assert pytest.approx(0.8) == DEFAULT_NODE_STEP
 
@@ -365,8 +370,22 @@ def test_default_constants_match_qiao():
 # ---------------------------------------------------------------------------
 
 
-def test_reduce_works_without_spice_kernels(tiny_corrector, monkeypatch):
-    """``spice_optional=True`` 时即使 SPICE 不可用也应跑出合理结果。"""
+def test_reduce_works_without_spice_kernels(l1_context, monkeypatch):
+    """``spice_optional=True`` 时即使 SPICE 不可用也应跑出合理结果。
+
+    与 tiny_corrector 的显式 CR3BP 上下文不同，本测试针对探测回退分支
+    本身，故用未设 force_cr3bp 的上下文。
+    """
+    tiny_corrector = DynamicalSubstituteCorrector(
+        context=l1_context,
+        t_total=4.0,
+        node_step=0.8,
+        dense_step=0.2,
+        max_iter=3,
+        tolerance=1e-6,
+        prefer="fft",
+        spice_optional=True,
+    )
     # 强行让 _ephemeris.eval_params 抛 RuntimeError 模拟 SPICE 缺失
     import e2m2e.algorithm.normal_form.dynamical_substitution as ds
 
@@ -387,33 +406,6 @@ def test_reduce_works_without_spice_kernels(tiny_corrector, monkeypatch):
     assert result.spice_available is False
     assert result.tlist.size > 0
     assert result.Xlist.size > 0
-
-
-# ---------------------------------------------------------------------------
-# 验收标准 #2：L1_Halo_Large 的 W_poly 与 qiao L1DynSubs.npz 回归一致
-# ---------------------------------------------------------------------------
-
-
-def test_W_poly_regression_against_qiao_L1DynSubs_npz():
-    """与 qiao ``L1DynSubs.npz`` 的逐系数回归。
-
-    该回归需要 qiao 参考数据（``L1DynSubs.npz``，体积大，本仓库未引入）
-    以及完整 ``T_total = 0.1·2^16`` 窗口的星历模型积分。两者在 CI 环境
-    均不可得，故以 ``pytest.skip`` 守卫占位。
-
-    解锁条件（任一）：
-    1. 将 qiao ``L1DynSubs.npz`` 放入 ``tests/algorithm/normal_form/data/``；
-    2. 提供 SPICE 内核（``.tls`` + ``.bsp``）并在长窗口下跑 reduce。
-
-    fixture 就绪后，本测试应加载 npz 中的 ``W_poly``，与
-    ``DynamicalSubstituteCorrector(...).reduce()`` 的 ``result.W_poly``
-    逐线性项做 ``np.testing.assert_allclose``。
-    """
-    import os
-
-    fixture = os.path.join(os.path.dirname(__file__), "data", "L1DynSubs.npz")
-    if not os.path.exists(fixture):
-        pytest.skip("qiao L1DynSubs.npz 未引入仓库；W_poly 逐系数回归待 fixture 就绪")
 
 
 # ---------------------------------------------------------------------------

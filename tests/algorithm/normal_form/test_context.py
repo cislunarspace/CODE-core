@@ -56,8 +56,8 @@ def test_context_constructs_for_all_libration_points(earth_moon_system, point):
 # ---------------------------------------------------------------------------
 
 
-def test_qiao_constants_are_carried(earth_moon_system):
-    """默认构造时 LU/TU/mu/mu_e/mu_m/mu_s/JD0 与 qiao 一致。"""
+def test_default_constants_are_carried(earth_moon_system):
+    """默认构造时 LU/TU/mu/mu_e/mu_m/mu_s/JD0 与 constants.py 登记值一致。"""
     ctx = NormalFormContext(
         system=earth_moon_system,
         libration_point=LibrationPoint.L1,
@@ -74,8 +74,8 @@ def test_qiao_constants_are_carried(earth_moon_system):
     assert ctx.jd0 == pytest.approx(JD0_J2000)
 
 
-def test_base_frequencies_match_qiao(earth_moon_system):
-    """基础频率四个分量与 qiao Global_File.py 完全一致。"""
+def test_base_frequencies_match_registered(earth_moon_system):
+    """基础频率四个分量与 constants.py 登记值一致。"""
     ctx = NormalFormContext(
         system=earth_moon_system,
         libration_point=LibrationPoint.L2,
@@ -114,7 +114,7 @@ def test_central_frequencies_vary_with_point(earth_moon_system):
 
 
 def test_characteristic_exponent_per_point(earth_moon_system):
-    """特征指数 λ 与 qiao 表格一致；L1 最大、L3 最小。"""
+    """特征指数 λ 与 constants.py 登记值一致；L1 最大、L3 最小。"""
     lambdas = {}
     for point in LibrationPoint:
         ctx = NormalFormContext(
@@ -148,7 +148,7 @@ def test_characteristic_exponent_per_point(earth_moon_system):
     ],
 )
 def test_collinear_libration_positions(earth_moon_system, point, expected_x):
-    """共线点位置用 qiao γ 值给出，符合 ``(1 ± γ, 0, 0)`` / ``(-γ, 0, 0)``。"""
+    """共线点位置用 constants.py 登记的 γ 值给出，符合 ``(1 ± γ, 0, 0)`` / ``(-γ, 0, 0)``。"""
     ctx = NormalFormContext(
         system=earth_moon_system,
         libration_point=point,
@@ -243,8 +243,8 @@ def test_explicit_overrides_take_effect(earth_moon_system):
 
 
 def test_context_system_mu_preferred_over_default(earth_moon_system):
-    """``System.mu``（若存在）应覆盖 qiao 默认 mu。"""
-    # earth_moon_system 默认 mu=1.215058560962404e-2，与 qiao MU 一致；
+    """``System.mu``（若存在）应覆盖 constants.py 默认 mu。"""
+    # earth_moon_system 默认 mu=1.215058560962404e-2，与 constants.py MU 一致；
     # 显式重设 system.mu 后构造 context，应拿到新 mu。
     earth_moon_system.mu = 0.0123
     ctx = NormalFormContext(

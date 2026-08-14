@@ -5,10 +5,9 @@
 - :class:`FFTComponent` —— 一个频域分量 ``s·sin(ωt) + c·cos(ωt)``；
 - :func:`naff_available` —— 通过 ``shutil.which`` 探测外部 ``naff_uv``
   Fortran 可执行文件；
-- :func:`detect_naff` —— 调用外部 NAFF；不可用时抛 :class:`RuntimeError`，
-  调用方应改用 :func:`fft_extract`；
-- :func:`fft_extract` —— 纯 NumPy FFT 实现的频率提取（NAFF 不可用时的
-  降级路径），返回按振幅排序的 ``FFTComponent`` 列表；
+- :func:`detect_naff` —— 调用外部 NAFF；不可用时抛 :class:`RuntimeError`；
+- :func:`fft_extract` —— 纯 NumPy FFT 实现的频率提取（默认后端），返回
+  按振幅排序的 ``FFTComponent`` 列表；
 - :func:`frequency_match` —— 把检测到的频率匹配到预计算基频表；
 - :func:`reconstruct_signal` / :func:`reconstruct_derivative` —— 从
   FFT 频域表示重构时域信号（或其导数）。
@@ -21,7 +20,6 @@ NAFF 检测只在调用方显式调用 :func:`detect_naff` 时触发；本模块
 from __future__ import annotations
 
 import shutil
-import warnings
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -507,7 +505,7 @@ def least_squares_sin_cos_fit(
 
 
 # ---------------------------------------------------------------------------
-# 便捷门面：在 NAFF 与 FFT 之间自动选择
+# 便捷门面：后端显式选择（ADR 0020 决策 4，不隐式降级）
 # ---------------------------------------------------------------------------
 
 
@@ -516,42 +514,30 @@ def extract_frequencies(
     data: npt.ArrayLike,
     *,
     n_components: int | None = None,
-    prefer: str = "auto",
+    prefer: str = "fft",
 ) -> tuple[list[FFTComponent], str]:
-    """NAFF/FFT 自动选择：NAFF 不可用时回退到 FFT 并发出警告。
+    """频率分析入口：后端显式选择，只收 ``"naff"`` / ``"fft"``。
 
     Args:
         times: ``(N,)`` 时间数组。
         data: ``(N,)`` 信号数组。
         n_components: NAFF/FFT 保留分量数；``None`` 时取 ``min(N // 2, 50)``。
-        prefer: ``"auto"`` / ``"naff"`` / ``"fft"`` 之一。
+        prefer: ``"naff"`` / ``"fft"`` 之一，默认 ``"fft"``。选定
+            ``"naff"`` 而二进制不可用或调用失败时抛 :class:`RuntimeError`
+            （ADR 0020 决策 4：资源缺失报错，不隐式降级；ADR 0025 废除
+            ``"auto"``）。
 
     Returns:
         ``(components, backend)`` —— ``components`` 是 :class:`FFTComponent`
         列表；``backend`` 是 ``"naff"`` 或 ``"fft"``，便于调用方记录诊断。
     """
-    if prefer not in {"auto", "naff", "fft"}:
-        raise ValueError(f"prefer 必须是 auto/naff/fft，得到 {prefer!r}")
+    if prefer not in {"naff", "fft"}:
+        raise ValueError(f"prefer 必须是 naff/fft，得到 {prefer!r}")
 
     if prefer == "fft":
         return fft_extract(times, data, n_components=n_components), "fft"
 
-    if prefer == "auto" and not naff_available():
-        warnings.warn(
-            "NAFF binary 未找到；降级到 FFT 实现。"
-            "频率估计精度约为 Δf/N，对受迫频率/中心流形频率分辨足够。",
-            stacklevel=2,
-        )
-        return fft_extract(times, data, n_components=n_components), "fft"
-
-    try:
-        return detect_naff(times, data, n_components=n_components or 10), "naff"
-    except (RuntimeError, FileNotFoundError, OSError) as exc:
-        warnings.warn(
-            f"NAFF 调用失败（{exc}）；降级到 FFT 实现。",
-            stacklevel=2,
-        )
-        return fft_extract(times, data, n_components=n_components), "fft"
+    return detect_naff(times, data, n_components=n_components or 10), "naff"
 
 
 __all__ = [

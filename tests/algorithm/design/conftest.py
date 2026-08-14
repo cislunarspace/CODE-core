@@ -13,6 +13,7 @@ continuation/multiple_shooting/ephemeris）测试复用。
 """
 
 import copy
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -27,6 +28,43 @@ from e2m2e.data.types.orbit import Orbit
 from tests.algorithm.design import seeds
 
 EARTH_MOON_MU = 0.01215058560962404
+
+
+def make_design_request(orbit_type: str, **overrides) -> SimpleNamespace:
+    """构造 ``design_orbit`` 的 duck-typed 设计请求。
+
+    ``e2m2e.algorithm.design.design_orbit`` 运行期只按属性读取请求（对
+    ``DesignOrbitRequest`` 的类型标注在 TYPE_CHECKING 下）；接口层模型的
+    校验与按类型默认值填充由 tests/api 覆盖。本工厂钉住算法入口实际读取
+    的字段集与公共默认值——字段或默认值语义变动时，本目录的集成测试会
+    立即暴露。形状参数默认 None，由调用方按场景显式给定。
+    """
+    fields = {
+        "orbit_type": orbit_type,
+        "amplitude": None,
+        "phase": None,
+        "collinear_point": None,
+        "north_south": None,
+        "amplitude_in": None,
+        "amplitude_out": None,
+        "phase_in": None,
+        "phase_out": None,
+        "perilune_height": None,
+        "inclination": None,
+        "arg_of_pericenter": None,
+        "semi_major_axis": None,
+        "epoch": (2024, 1, 1, 0, 0, 0.0),
+        "duration": None,
+        "output_step": 3600.0,
+        "perturbation": None,
+        "dyb": None,
+        "earth_degree": 10,
+        "moon_degree": 10,
+        "correction_method": "two_level",
+        "correction_revolutions": 1,
+    }
+    fields.update(overrides)
+    return SimpleNamespace(**fields)
 
 
 @pytest.fixture(scope="session")

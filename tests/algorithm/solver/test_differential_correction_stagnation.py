@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit
+
+pytestmark = pytest.mark.orchestration
 
 
 class StagnantDynamics:

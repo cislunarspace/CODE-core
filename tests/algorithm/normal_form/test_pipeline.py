@@ -11,10 +11,9 @@
 - 输入校验：非法 orbit 形状直接抛 :class:`ValueError`；
 - lazy export 经包顶层可导入。
 
-qiao ``L1_Halo_Large`` fixture 一致性回归用 ``pytest.skip`` 守卫——该
-``.npz`` 本仓库未引入，需 SPICE 内核 + 长窗口才能解锁。SPICE leapseconds
-不可用时底层自动降级到纯 CR3BP，smoke 测试在该降级下仍能通过（与
-``test_dynamical_substitution.py`` 一致）。
+SPICE leapseconds 不可用时，fixture 显式声明 ``spice_optional=True`` 走纯
+CR3BP 路径（ADR 0020 决策 4：显式选择，非隐式降级），smoke 测试在该路径下
+仍能通过（与 ``test_dynamical_substitution.py`` 一致）。
 """
 
 from __future__ import annotations
@@ -46,7 +45,12 @@ pytestmark = pytest.mark.theory
 
 @pytest.fixture
 def l1_context(earth_moon_system):
-    """L1 共线点上下文（与 test_catalog / test_dynamical_substitution 一致）。"""
+    """L1 共线点上下文，显式纯 CR3BP（不探 SPICE）。
+
+    本文件的流水线测试以纯 CR3BP 归一化模型为前提；显式 force_cr3bp
+    使结果与同 worker 内其他模块留下的内核池状态无关（ADR 0020：
+    显式选择，不靠环境巧合）。
+    """
     from e2m2e.algorithm.normal_form import NormalFormContext
     from e2m2e.algorithm.normal_form.constants import JD0_J2000
 
@@ -55,6 +59,7 @@ def l1_context(earth_moon_system):
         libration_point=LibrationPoint.L1,
         epoch=JD0_J2000,
         order=4,
+        force_cr3bp=True,
     )
 
 
@@ -80,9 +85,6 @@ def fast_pipeline(l1_context) -> NormalFormPipeline:
             "max_iter": 3,
             "tolerance": 1e-6,
             "prefer": "fft",
-            # 本切片用 CR3BP 归一化模型（不加载 SPICE 内核池），显式声明
-            # 允许降级（ADR 0020 决策 4：显式选择，非隐式）。
-            "spice_optional": True,
         },
     )
 
@@ -161,9 +163,15 @@ def test_catalog_transformer_roundtrip(fast_pipeline):
     np.testing.assert_allclose(back, x0, atol=1e-6)
 
 
-def test_reduce_works_without_spice_kernels(fast_pipeline, monkeypatch):
-    """SPICE 内核不可用时（CI 环境）流水线降级到纯 CR3BP 仍跑通。"""
+def test_reduce_works_without_spice_kernels(earth_moon_system, monkeypatch):
+    """显式 spice_optional 路径：SPICE 探测失败时回退纯 CR3BP 仍跑通。
+
+    与共享 fixture 的显式 CR3BP 上下文不同，本测试针对回退分支本身，
+    故构造未设 force_cr3bp 的上下文并以 monkeypatch 模拟内核缺失。
+    """
     import e2m2e.algorithm.normal_form.dynamical_substitution as ds
+    from e2m2e.algorithm.normal_form import NormalFormContext
+    from e2m2e.algorithm.normal_form.constants import JD0_J2000
 
     def _broken(*args, **kwargs):
         raise RuntimeError("simulated SPICE missing")
@@ -175,10 +183,31 @@ def test_reduce_works_without_spice_kernels(fast_pipeline, monkeypatch):
     )
     monkeypatch.setattr(ds, "_build_dynamics_rhs_spice", _broken)
 
+    context = NormalFormContext(
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L1,
+        epoch=JD0_J2000,
+        order=4,
+    )
+    pipeline = NormalFormPipeline(
+        context=context,
+        quasi_floquet_method="constant",
+        center_max_order=4,
+        dynamical_kwargs={
+            "t_total": 4.0,
+            "node_step": 0.8,
+            "dense_step": 0.2,
+            "max_iter": 3,
+            "tolerance": 1e-6,
+            "prefer": "fft",
+            "spice_optional": True,
+        },
+    )
+
     x0 = np.array([1e-3, 0.0, 0.0, 0.0, 0.0, 0.0])
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        result = fast_pipeline.reduce(x0)
+        result = pipeline.reduce(x0)
 
     assert result.status is ConvergenceState.CONVERGED
     assert result.ds_result.spice_available is False
@@ -234,8 +263,6 @@ def test_failure_records_completed_subresults(l1_context, monkeypatch):
             "max_iter": 2,
             "tolerance": 1e-6,
             "prefer": "fft",
-            # 显式声明 CR3BP 模型（本测试测失败路径编排，不测 SPICE）。
-            "spice_optional": True,
         },
     )
     x0 = np.array([1e-3, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -270,32 +297,3 @@ def test_metadata_records_pipeline_config(fast_pipeline):
     assert result.metadata["center_steps"] == ("invariant", "center")
     assert "qf_symplectic_error" in result.metadata
     assert "cm_hyperbolic_coupling" in result.metadata
-
-
-# ---------------------------------------------------------------------------
-# 验收标准 #3：L1_Halo_Large fixture 与 qiao 一致性回归（skip 守卫）
-# ---------------------------------------------------------------------------
-
-
-def test_qiao_L1_Halo_Large_regression_is_skipped_without_fixture():
-    """与 qiao ``L1_Halo_Large`` 输出的表征参数一致性回归。
-
-    该回归需要：
-
-    1. qiao ``L1_rho2param_data.npz``（或等价 fixture）放入
-       ``tests/algorithm/normal_form/data/``；
-    2. SPICE 内核（``.tls`` + ``.bsp``）+ 完整 ``T_total = 0.1·2^16`` 窗口，
-       使动力学替代走星历模型而非纯 CR3BP 退路。
-
-    两者在 CI 环境均不可得，故以 ``pytest.skip`` 守卫占位。fixture 就绪后，
-    本测试应加载 npz 中的 ``rho2param`` 参考输出，与
-    ``NormalFormPipeline(context).reduce(x0).catalog_transformer.rho_to_param``
-    的结果逐分量做 ``np.testing.assert_allclose``。
-    """
-    from pathlib import Path
-
-    fixture = Path(__file__).parent / "data" / "L1_rho2param_data.npz"
-    if not fixture.exists():
-        pytest.skip(
-            "qiao L1_Halo_Large fixture 未引入仓库；表征参数一致性回归待 fixture + SPICE 内核就绪"
-        )

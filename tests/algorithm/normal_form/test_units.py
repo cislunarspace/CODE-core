@@ -22,7 +22,7 @@ pytestmark = pytest.mark.theory
 
 @pytest.fixture
 def ctx(earth_moon_system) -> NormalFormContext:
-    """L1 上下文，使用 qiao 默认 LU/TU。"""
+    """L1 上下文，使用 constants.py 默认 LU/TU。"""
     return NormalFormContext(
         system=earth_moon_system,
         libration_point=LibrationPoint.L1,
@@ -160,10 +160,10 @@ def test_custom_LU_TU_change_scaling(earth_moon_system):
     assert abs(norm_custom[0]) > abs(norm_default[0])
 
 
-def test_qiao_constants_used_in_round_trip():
-    """不依赖 ``earth_moon_system``，直接验证 qiao LU/TU/VU 与 MU 数值。"""
-    # 这些断言把 qiao 常量与 NormalFormContext 默认值钉住，
-    # 防止后续误改常量而 round-trip 测试蒙混过关。
+def test_normalization_constants_used_in_round_trip():
+    """不依赖 ``earth_moon_system``，直接验证 LU/TU/VU 与 MU 数值。"""
+    # 这些断言把归一化常量（取值出处见 constants.py）与 NormalFormContext
+    # 默认值钉住，防止后续误改常量而 round-trip 测试蒙混过关。
     assert pytest.approx(384747.981) == LU_KM
     assert pytest.approx(375699.843898365) == TU_S
     assert pytest.approx(LU_KM / TU_S) == VU_KMS

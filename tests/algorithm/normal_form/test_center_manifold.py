@@ -9,8 +9,7 @@
 - **化简效果硬性断言**：注入双曲-中心交叉项后，``max_hyperbolic_coupling``
   显著低于化简前；化简后剩余 Hamiltonian 只含作用量项；
 - 单步可独立执行（``steps=("invariant",)`` / ``("center",)``）；
-- 频域 ODE 求解器、MAD 离群抑制、高阶数值微分单元测试；
-- qiao ``.npz`` 回归 fixture 用 ``pytest.skip`` 守卫（本仓库没有）。
+- 频域 ODE 求解器、MAD 离群抑制、高阶数值微分单元测试。
 
 输入 :class:`QuasiFloquetResult` 的构造沿用
 ``test_quasi_floquet.py`` 的范式：本切片的 reducer 只读 ``tlist``、
@@ -550,24 +549,3 @@ def test_keep_criteria_predicates():
     # invariant 保留的项未必满足 center（center 更严）
     assert _is_invariant_term((0, 3, 0, 0, 1, 0))  # pow1==pow4==0
     assert not _is_center_term((0, 3, 0, 0, 1, 0))  # 但 pow2=3≠pow5=1
-
-
-# ---------------------------------------------------------------------------
-# qiao .npz 回归 fixture（本仓库没有，skip 守卫）
-# ---------------------------------------------------------------------------
-
-
-def test_qiao_npz_regression_is_skipped_without_fixture():
-    """qiao ``L1_QF_Hamilton.npz`` fixture 在本仓库不存在，必须 skip。
-
-    本测试验证 skip 守卫生效；外部 fixture 引入后可替换为与 qiao
-    Code10/Code11 输出的真实数值比对（``L1_InvarManifold.npz`` /
-    ``L1_CenterManifold.npz``）。
-    """
-    from pathlib import Path
-
-    fixture = Path(__file__).parent / "data" / "L1_QF_Hamilton.npz"
-    if not fixture.exists():
-        pytest.skip(f"qiao .npz fixture 不存在：{fixture}")
-    data = np.load(fixture, allow_pickle=True)
-    assert "powers" in data and "coefficients" in data

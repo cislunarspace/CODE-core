@@ -2,10 +2,34 @@
 
 import os
 
+import pytest
+
 SPICE_KERNEL_DIR = os.environ.get(
     "SPICE_KERNEL_DIR",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "kernels"),
 )
+
+
+def spice_kernels_available() -> bool:
+    """通用 SPICE 内核（``.tls`` 闰秒 + ``.bsp`` 星历）是否齐备。
+
+    全套件唯一的通用可用性探测实现（ADR 0025 决策 4）；特定资源
+    （如 ``de440t.bsp`` 时间星历、ITRF93 二进制 PCK）的探测不归此处。
+    """
+    if not os.path.isdir(SPICE_KERNEL_DIR):
+        return False
+    names = os.listdir(SPICE_KERNEL_DIR)
+    has_tls = any(f.endswith(".tls") for f in names)
+    has_bsp = any(f.endswith(".bsp") for f in names)
+    return has_tls and has_bsp
+
+
+#: 通用 SPICE 可用性 skip 标记；与 ``pytest.mark.spice`` 搭配使用。
+requires_spice = pytest.mark.skipif(
+    not spice_kernels_available(),
+    reason="SPICE kernels (.tls + .bsp) not available",
+)
+
 
 # 定义 body-fixed 帧所需的 SPICE 内核文件名（issue #187）：
 # 地球 ITRF93 需要二进制 PCK（earth_latest_high_prec.bpc），

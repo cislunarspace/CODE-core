@@ -1,10 +1,13 @@
 """FiniteBurn 低推力传播物理验证。"""
 
 import numpy as np
+import pytest
 
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.force_config import build_force
 from tests.numerical.forces.conftest import FakeSystem
+
+pytestmark = pytest.mark.force
 
 
 def test_finite_burn_vnb_spiral_raises_semi_major_axis(point_mass_force):

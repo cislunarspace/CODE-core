@@ -8,7 +8,6 @@
   线性段（rho↔em、em↔ds、ds↔qf、cm↔param）接近机器精度（~1e-12），
   高阶 Lie 级数段（qf↔cm）允许稍宽（~1e-8），分开断言；
 - :class:`LibrationCatalogTransformer` 可绑定预计算系数表做 OO 入口；
-- qiao ``.npz`` fixture 不可用时 ``pytest.skip`` 守卫。
 
 输入三个子结果（DS / QF / CM）的构造沿用 ``test_center_manifold.py`` /
 ``test_quasi_floquet.py`` 的范式：本切片的变换链只读 ``W_poly``、
@@ -392,8 +391,8 @@ def test_w_series_interp_uses_real_tlist(l1_context):
     导致正向 ``rho_to_param`` 数值错误——而往返测试因正逆相消掩盖该错误。
     本测试注入一项随时间线性变化的 Hamiltonian 项，使化简后的 W_series
     含随时间变化的系数，在非采样点上断言插值值等于用真实 ``qf.tlist``
-    的解析值，且与 ``dt=0.1`` 兜底值明显不同。这是 issue #174 "rho_to_param
-    与 qiao fixture 一致" 的前提保障。
+    的解析值，且与 ``dt=0.1`` 兜底值明显不同。这是 issue #174 表征参数
+    一致性回归的前提保障。
     """
     from e2m2e.algorithm.normal_form.center_manifold import CenterManifoldReducer
     from e2m2e.algorithm.normal_form.coord_trans import _interp_W_series_at_t
@@ -648,23 +647,3 @@ def test_lazy_export_via_package(l1_context):
 
     assert LibrationCatalogData is not None
     assert LibrationCatalogTransformer is not None
-
-
-# ---------------------------------------------------------------------------
-# qiao .npz 回归 fixture（本仓库没有，skip 守卫）
-# ---------------------------------------------------------------------------
-
-
-def test_qiao_npz_regression_is_skipped_without_fixture():
-    """qiao ``data_array``/``W_series`` fixture 在本仓库不存在，必须 skip。
-
-    本测试验证 skip 守卫生效；外部 fixture 引入后可替换为与 qiao
-    ``rho2param``/``param2rho`` 输出的真实数值比对。
-    """
-    from pathlib import Path
-
-    fixture = Path(__file__).parent / "data" / "L1_rho2param_data.npz"
-    if not fixture.exists():
-        pytest.skip(f"qiao .npz fixture 不存在：{fixture}")
-    data = np.load(fixture, allow_pickle=True)
-    assert "data_array" in data

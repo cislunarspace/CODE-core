@@ -158,35 +158,7 @@ class TestPhysicalInvariants:
 
 
 class TestAxialDesignOrbit:
-    """DesignOrbitRequest 校验 AXIAL 参数。"""
-
-    def test_design_orbit_validates_axial_params(self):
-        """duration=0 应在模型层被拒。"""
-        from e2m2e.api.models import DesignOrbitRequest
-
-        with pytest.raises(ValueError):
-            DesignOrbitRequest(orbit_type="AXIAL", duration=0.0)
-
-    def test_design_orbit_rejects_bad_collinear_point(self):
-        """collinear_point=4 应抛 ValueError。"""
-        from e2m2e.api.models import DesignOrbitRequest
-
-        with pytest.raises(ValueError):
-            DesignOrbitRequest(orbit_type="AXIAL", collinear_point=4)
-
-    def test_design_orbit_rejects_amplitude_out_of_range(self):
-        """|amplitude| > 60000 km 应抛 ValueError。"""
-        from e2m2e.api.models import DesignOrbitRequest
-
-        with pytest.raises(ValueError, match="amplitude"):
-            DesignOrbitRequest(orbit_type="AXIAL", amplitude=80000.0)
-
-    def test_design_orbit_rejects_bad_phase(self):
-        """phase 超界应抛 ValueError。"""
-        from e2m2e.api.models import DesignOrbitRequest
-
-        with pytest.raises(ValueError):
-            DesignOrbitRequest(orbit_type="AXIAL", phase=1.5)
+    """design_orbit 的 AXIAL 参数规范化与端到端分派（请求模型校验见 tests/api）。"""
 
     def test_validate_params_axial_defaults(self):
         """_validate_params 对 AXIAL 填默认值（collinear_point=2, amplitude=5000, phase=0）。"""

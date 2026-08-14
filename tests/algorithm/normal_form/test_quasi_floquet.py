@@ -6,9 +6,8 @@
   :class:`QuasiFloquetResult`；
 - ``B(t)`` 在采样点上 ``Bᵀ J B = J`` 误差 ``< 1e-12``——矩阵法与
   李代数法各一个硬性数值断言；
-- 实标准形 ``D`` 与 qiao ``Global_File`` 频率一致；
-- sp(6) 基构造、往返 ``sp6_to_vector``/``vector_to_sp6`` 数值正确；
-- qiao ``.npz`` 回归 fixture 用 ``pytest.skip`` 守卫（本仓库没有）。
+- 实标准形 ``D`` 与登记的基础频率一致；
+- sp(6) 基构造、往返 ``sp6_to_vector``/``vector_to_sp6`` 数值正确。
 
 输入 :class:`DynamicalSubstituteResult` 的构造思路与
 ``test_dynamical_substitution.py`` 一致（复用其 ``NormalFormContext`` /
@@ -334,7 +333,7 @@ def test_cr3bp_hamiltonian_linearization_is_hamiltonian(l1_context):
 
     M_H = _cr3bp_hamiltonian_linearization(l1_context.libration_position, l1_context.mu)
     assert np.linalg.norm(M_H.T @ J6 + J6 @ M_H) < 1e-10
-    # 特征值与 qiao 权威频率一致（1% 内；γ/μ 数值舍入引起的小偏差）
+    # 特征值与登记的基础频率一致（1% 内；γ/μ 数值舍入引起的小偏差）
     ev = np.linalg.eigvals(M_H)
     lam_num = max(abs(e.real) for e in ev)
     om_num = sorted(abs(e.imag) for e in ev if abs(e.real) < 1e-8)
@@ -373,7 +372,7 @@ def test_real_normal_form_transform_is_symplectic_diagonalizing(l1_context):
     # 频率：λ > 0、ωp > ωv > 0（L1/L2 面内频率更大）
     assert D_check[0, 0] > 0
     assert D_check[1, 4] > D_check[2, 5] > 0
-    # 还原的 D 与 qiao 权威频率一致（1% 内）
+    # 还原的 D 与登记频率一致（1% 内）
     assert (
         abs(D_check[0, 0] - l1_context.characteristic_exponent)
         < 0.01 * l1_context.characteristic_exponent
@@ -449,26 +448,6 @@ def test_symplectic_project_handles_large_norm():
     B = B_exact + 1e-9 * np.linalg.norm(B_exact) * rng.normal(size=(6, 6))
     B_back = symplectic_project(B)
     assert float(np.max(np.abs(B_back.T @ J6 @ B_back - J6))) < 1e-12
-
-
-# ---------------------------------------------------------------------------
-# qiao .npz 回归 fixture（本仓库没有，skip 守卫）
-# ---------------------------------------------------------------------------
-
-
-def test_qiao_npz_regression_is_skipped_without_fixture():
-    """qiao ``L1_QFtrans.npz`` fixture 在本仓库不存在，必须 skip。
-
-    本测试仅验证 skip 守卫生效；一旦外部 fixture 引入，可在此替换为真实
-    数值比对。
-    """
-    from pathlib import Path
-
-    fixture = Path(__file__).parent / "data" / "L1_QFtrans.npz"
-    if not fixture.exists():
-        pytest.skip(f"qiao .npz fixture 不存在：{fixture}")
-    data = np.load(fixture, allow_pickle=True)
-    assert "tlist" in data and "QFtrans_mat" in data
 
 
 # ---------------------------------------------------------------------------

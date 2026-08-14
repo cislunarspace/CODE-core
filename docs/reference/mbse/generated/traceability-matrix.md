@@ -20,13 +20,13 @@ title: 需求追溯矩阵
 | REQ-022 | OrbitFamily 聚合 | functional | shall | test | e2m2e.data.types.orbit | tests/data/types/test_orbit_family.py |
 | REQ-025 | EphemerisDynamics 统一接口（遗留） | interface | shall | test | e2m2e.algorithm.dynamics.ephemeris_dynamics | tests/algorithm/dynamics/test_ephemeris_dynamics_legacy.py |
 | REQ-026 | EphemerisDynamics 自适应步长（遗留） | functional | should | test | e2m2e.algorithm.dynamics.ephemeris_dynamics | tests/algorithm/dynamics/test_ephemeris_dynamics_legacy.py |
-| REQ-100 | 微分修正 50 次迭代内收敛 | performance | shall | test | e2m2e.algorithm.solver.differential_correction | tests/algorithm/correction/test_differential_correction.py |
-| REQ-101 | 收敛容差默认 1e-12 | performance | shall | inspection | e2m2e.algorithm.solver.differential_correction | tests/algorithm/correction/test_differential_correction.py |
-| REQ-102 | 策略模式分离配置与迭代 | interface | should | inspection | e2m2e.algorithm.family.strategies<br>e2m2e.algorithm.solver.differential_correction | tests/algorithm/correction/test_differential_correction.py |
-| REQ-103 | Continuation 不重复 CR3BP 物理 | interface | shall | inspection | e2m2e.algorithm.solver.continuation | tests/algorithm/correction/test_continuation.py |
-| REQ-104 | 算法层 STM 解析计算 | functional | shall | inspection | e2m2e.algorithm.solver.differential_correction | tests/algorithm/correction/test_differential_correction.py |
-| REQ-105 | Richardson 三阶近似精度 | functional | should | test | e2m2e.algorithm.solver.differential_correction | tests/algorithm/correction/test_differential_correction.py |
+| REQ-100 | 微分修正 50 次迭代内收敛 | performance | shall | test | e2m2e.algorithm.solver.differential_correction | tests/algorithm/solver/test_differential_correction.py |
+| REQ-101 | 收敛容差默认 1e-12 | performance | shall | inspection | e2m2e.algorithm.solver.differential_correction | tests/algorithm/solver/test_differential_correction.py |
+| REQ-102 | 策略模式分离配置与迭代 | interface | should | inspection | e2m2e.algorithm.family.strategies<br>e2m2e.algorithm.solver.differential_correction | tests/algorithm/solver/test_differential_correction.py |
+| REQ-103 | Continuation 不重复 CR3BP 物理 | interface | shall | inspection | e2m2e.algorithm.solver.continuation | tests/algorithm/solver/test_continuation.py |
+| REQ-104 | 算法层 STM 解析计算 | functional | shall | inspection | e2m2e.algorithm.solver.differential_correction | tests/algorithm/solver/test_differential_correction.py |
+| REQ-105 | Richardson 三阶近似精度 | functional | should | test | e2m2e.algorithm.solver.differential_correction | tests/algorithm/solver/test_differential_correction.py |
 | REQ-110 | 稳定性指标满足 v1*v2 = 1 | performance | should | test | e2m2e.algorithm.stability | tests/algorithm/stability/test_stability.py |
-| REQ-111 | MultipleShooting 并行传播 | functional | should | test | e2m2e.algorithm.solver.multiple_shooting | tests/algorithm/correction/test_multiple_shooting.py |
-| REQ-112 | 延拓步长自适应 | functional | should | test | e2m2e.algorithm.solver.continuation | tests/algorithm/correction/test_continuation.py |
-| REQ-113 | 伪弧长延拓切向量计算 | functional | shall | inspection | e2m2e.algorithm.solver.continuation | tests/algorithm/correction/test_continuation.py |
+| REQ-111 | MultipleShooting 并行传播 | functional | should | test | e2m2e.algorithm.solver.multiple_shooting | tests/algorithm/solver/test_multiple_shooting.py |
+| REQ-112 | 延拓步长自适应 | functional | should | test | e2m2e.algorithm.solver.continuation | tests/algorithm/solver/test_continuation.py |
+| REQ-113 | 伪弧长延拓切向量计算 | functional | shall | inspection | e2m2e.algorithm.solver.continuation | tests/algorithm/solver/test_continuation.py |

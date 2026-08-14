@@ -508,7 +508,7 @@ class Continuation:
 
         # [FIX] directional_increment 的原始实现每步根据 Xdot 重新判定方向,在
         # 族流形折叠点(fold)处 Xdot 渐近过零变号,形成 2-周期环振荡(steps 65+
-        # 退回 z≈0.085,详见 tests/algorithm/correction/test_pal_stagnation.py 回归测试)。
+        # 退回 z≈0.085,详见 PAL 折叠点停滞回归测试)。
         #
         # 修复方案:directional_increment 在 PAL 折叠点本质上不稳定。PAL 的
         # 核心优势就是能沿弧长穿过折叠,此时目标变量(tv)会自然反转。

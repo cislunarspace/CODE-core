@@ -2,36 +2,14 @@
 
 from __future__ import annotations
 
-import os
-
 import numpy as np
 import pytest
-from kernel_helpers import SPICE_KERNEL_DIR
+from kernel_helpers import requires_spice
 
 from e2m2e.algorithm.propagation import _extract_bodies, propagate_orbit
 from e2m2e.data.templates import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.integrator
-
-
-# ---------------------------------------------------------------------------
-# SPICE 与 kernel 可用性检测
-# ---------------------------------------------------------------------------
-
-
-def _has_spice_kernels() -> bool:
-    """检查 SPICE .tls + .bsp 都可用。"""
-    if not os.path.isdir(SPICE_KERNEL_DIR):
-        return False
-    has_tls = any(f.endswith(".tls") for f in os.listdir(SPICE_KERNEL_DIR))
-    has_bsp = any(f.endswith(".bsp") for f in os.listdir(SPICE_KERNEL_DIR))
-    return has_tls and has_bsp
-
-
-_requires_spice = pytest.mark.skipif(
-    not _has_spice_kernels(),
-    reason="SPICE kernels (.tls + .bsp) not available",
-)
 
 
 class TestExtractBodies:
@@ -82,7 +60,8 @@ class TestExtractBodies:
         assert _extract_bodies({"version": 1, "forces": [{"params": {"mu": 1.0}}]}) == []
 
 
-@_requires_spice
+@pytest.mark.spice
+@requires_spice
 class TestPropagateOrbit:
     def test_default_three_body(self, spice_manager, reference_epoch):
         # 用默认三体配置（_DEFAULT_FORCE_CONFIG）：地球点质量 + 月球/太阳

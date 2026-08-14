@@ -21,7 +21,7 @@ Public API：
 实现策略：
 
 - 复用 :mod:`~e2m2e.algorithms.normal_form.multiple_shooting` 的块三对角消元；
-- 复用 :mod:`.fft` 的 NAFF/FFT 自动选择；
+- 复用 :mod:`.fft` 的 NAFF/FFT 后端显式选择；
 - 复用 :func:`.hamiltonian.evaluate_hamiltonian` / 星历参数（与
   slice 1 保持接口一致）；
 - 当外部 SPICE 内核不可用时（如 CI 环境），``reduce`` 走 ``Pure
@@ -144,7 +144,8 @@ class DynamicalSubstituteCorrector:
         dense_step: 稠密输出采样间距（TU）。
         max_iter: Newton 最大迭代轮数。
         tolerance: 收敛容差（最大连续性残差）。
-        prefer: 频率分析后端选择（``"auto"``/``"naff"``/``"fft"``）。
+        prefer: 频率分析后端选择（``"naff"``/``"fft"``），默认 ``"fft"``；
+            选定 ``"naff"`` 而二进制不可用时抛错（ADR 0020 决策 4）。
         spice_optional: SPICE 内核不可用时是否允许降级到纯 CR3BP。
             默认 ``False``：SPICE 不可用即抛（ADR 0020 决策 4，资源缺失
             不隐式降级）；显式传 ``True`` 才允许调用方显式接受降级。
@@ -156,7 +157,7 @@ class DynamicalSubstituteCorrector:
     dense_step: float = DEFAULT_DENSE_STEP
     max_iter: int = DEFAULT_MAX_ITER
     tolerance: float = DEFAULT_TOLERANCE
-    prefer: str = "auto"
+    prefer: str = "fft"
     spice_optional: bool = False
 
     # ------------------------------------------------------------------

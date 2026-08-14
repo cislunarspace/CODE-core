@@ -6,7 +6,7 @@ import os
 
 import numpy as np
 import pytest
-from kernel_helpers import SPICE_KERNEL_DIR
+from kernel_helpers import SPICE_KERNEL_DIR, requires_spice
 
 from e2m2e.algorithm.coordinate import spacetime_convert
 from e2m2e.data.templates import ConvergenceState, FailureCause
@@ -15,23 +15,8 @@ pytestmark = pytest.mark.data
 
 
 # ---------------------------------------------------------------------------
-# SPICE 与 kernel 可用性检测
+# 特定资源探测（通用可用性见 kernel_helpers.requires_spice）
 # ---------------------------------------------------------------------------
-
-
-def _has_spice_kernels() -> bool:
-    """检查 SPICE .tls + .bsp 都可用。"""
-    if not os.path.isdir(SPICE_KERNEL_DIR):
-        return False
-    has_tls = any(f.endswith(".tls") for f in os.listdir(SPICE_KERNEL_DIR))
-    has_bsp = any(f.endswith(".bsp") for f in os.listdir(SPICE_KERNEL_DIR))
-    return has_tls and has_bsp
-
-
-_requires_spice = pytest.mark.skipif(
-    not _has_spice_kernels(),
-    reason="SPICE kernels (.tls + .bsp) not available",
-)
 
 
 def _time_ephemeris_available() -> bool:
@@ -41,7 +26,8 @@ def _time_ephemeris_available() -> bool:
     return os.path.exists(os.path.join(SPICE_KERNEL_DIR, "de440t.bsp"))
 
 
-@_requires_spice
+@pytest.mark.spice
+@requires_spice
 class TestSpacetimeConvertSynodic:
     def test_j2000_to_synodic_and_back(self, spice_manager, earth_moon_system):
         et0_jd = 2459000.0
@@ -92,6 +78,7 @@ _time_ephemeris_available_mark = pytest.mark.skipif(
 )
 
 
+@pytest.mark.spice
 @_time_ephemeris_available_mark
 class TestSpacetimeConvertGcrsEbcrs:
     def test_gcrs_to_ebcrs_round_trip(self):

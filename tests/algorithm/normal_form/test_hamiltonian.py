@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import os
 import time
 
 import numpy as np
 import pytest
+from kernel_helpers import requires_spice
 
 # sympy 是 normal-form optional dep；未安装时整个文件 skip（不 error）。
 pytest.importorskip("sympy")
@@ -29,11 +29,6 @@ pytestmark = pytest.mark.theory
 # ---------------------------------------------------------------------------
 # 公共 fixture：可复用的上下文与 Legendre 展开
 # ---------------------------------------------------------------------------
-
-_QIAO_FIXTURE_L1 = os.path.join(
-    "/home/ouyangjiahong/codes/qiao",
-    "Results/Result_HamiltonFunc/1_Ephemeris_Model/L1_EM_Hamilton.mat",
-)
 
 
 @pytest.fixture
@@ -60,40 +55,7 @@ def l1_hamiltonian(l1_context, l1_legendre) -> Hamiltonian:
 
 
 # ---------------------------------------------------------------------------
-# SPICE 与 qiao fixture 可用性检测
-# ---------------------------------------------------------------------------
-
-_SPICE_KERNEL_DIR = os.environ.get(
-    "SPICE_KERNEL_DIR",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "kernels"),
-)
-
-
-def _has_spice_kernels() -> bool:
-    """检查 SPICE ``.tls`` + ``.bsp`` 都可用。"""
-    if not os.path.isdir(_SPICE_KERNEL_DIR):
-        return False
-    has_tls = any(f.endswith(".tls") for f in os.listdir(_SPICE_KERNEL_DIR))
-    has_bsp = any(f.endswith(".bsp") for f in os.listdir(_SPICE_KERNEL_DIR))
-    return has_tls and has_bsp
-
-
-_has_spice = _has_spice_kernels()
-_has_qiao_fixture = os.path.exists(_QIAO_FIXTURE_L1)
-
-requires_spice = pytest.mark.skipif(
-    not _has_spice,
-    reason="SPICE kernels (.tls + .bsp) not available",
-)
-
-requires_qiao = pytest.mark.skipif(
-    not (_has_spice and _has_qiao_fixture),
-    reason="SPICE kernels or qiao L1_EM_Hamilton.mat not available",
-)
-
-
-# ---------------------------------------------------------------------------
-# 构造烟测（纯符号，不需 SPICE）
+# 构造烟测（纯符号，不需 SPICE）；SPICE 通用可用性探测见 kernel_helpers
 # ---------------------------------------------------------------------------
 
 
@@ -187,6 +149,7 @@ def test_dynamic_param_names_cover_eval_params_keys():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.spice
 @requires_spice
 def test_evaluate_hamiltonian_runs(spice_manager, l1_hamiltonian, l1_context):
     """对一组时刻求值 Hamilton 量，运行无异常。"""
@@ -195,79 +158,48 @@ def test_evaluate_hamiltonian_runs(spice_manager, l1_hamiltonian, l1_context):
     assert evaled.is_evaluated
     assert isinstance(evaled.coefficients, np.ndarray)
     assert evaled.coefficients.shape == (len(times), evaled.n_terms)
-    # 常数项应在 J2000 附近 ≈ -862.5
+    # 常数项按定义为负（引力势主导）且有限
     target = (0, 0, 0, 0, 0, 0)
     for j in range(evaled.n_terms):
         if tuple(int(p) for p in evaled.powers[j]) == target:
-            assert evaled.coefficients[0, j] == pytest.approx(-862.5, abs=0.5)
+            col = evaled.coefficients[:, j]
+            assert np.all(np.isfinite(col))
+            assert np.all(col < 0)
             break
     else:
         pytest.fail("常数项 (0,0,0,0,0,0) 不在 evaled.powers 中")
 
 
+@pytest.mark.spice
 @requires_spice
-def test_hamiltonian_constant_term_matches_qiao_value(spice_manager, l1_hamiltonian, l1_context):
-    """L1 Hamilton 常数项与 qiao ``L1_EM_Hamilton.mat`` 在 t=0 一致。"""
-    times = np.array([0.0])
-    h0 = hamiltonian_constant_term(l1_hamiltonian, times, l1_context)
-    assert h0[0] == pytest.approx(-862.50648692, abs=1e-6)
+def test_hamiltonian_constant_term_matches_point_mass_definition(
+    spice_manager, l1_hamiltonian, l1_context
+):
+    """常值项 H_0 按定义等于三天体点质量势零阶项之和 ``-(μe/re0 + μm/rm0 + μs/rs0)``。
 
-
-@requires_qiao
-def test_evaluate_hamiltonian_against_qiao_fixture(spice_manager, l1_context, l1_legendre):
-    """与 qiao ``L1_EM_Hamilton.mat`` 在 t=0 处逐项比对。
-
-    qiao fixture 在 N=15 上有 687 项；本测试只用 order=4，因此 qiao 中
-    高阶项不在我们这边。匹配率衡量我们 order=4 内能重现的那部分。
+    Hamilton 定义中动能/科里奥利/离心项在 ``q=p=0`` 处为零，引力势
+    Legendre 展开的零阶项即 ``-μ/|r|``。参照值由 ``_ephemeris.eval_params``
+    的星历输入现场计算——输入共享、公式独立：构造装配错误（错号、错幂次
+    映射）会使两边分离。这是 ADR 0013 的定义级断言，替代原对外部软件
+    输出值的比对。
     """
-    import scipy.io as sio
+    from e2m2e.algorithm.normal_form._ephemeris import eval_params
 
-    qiao_data = sio.loadmat(_QIAO_FIXTURE_L1, squeeze_me=False)
-    qiao_h_poly = qiao_data["H_poly"]
-
-    qiao_lookup: dict[tuple[int, ...], float] = {}
-    for i in range(qiao_h_poly.shape[0]):
-        pv = qiao_h_poly[i, 0].ravel().astype(int)
-        col = qiao_h_poly[i, 1].ravel()
-        qiao_lookup[tuple(int(x) for x in pv)] = float(col[0])
-
-    h = build_hamiltonian(l1_context, l1_legendre, max_degree=4)
-    times = np.array([0.0])
-    evaled = evaluate_hamiltonian(h, times, l1_context)
-    arr = evaled.coefficients
-    our_lookup = {
-        tuple(int(x) for x in evaled.powers[j]): float(arr[0, j]) for j in range(evaled.n_terms)
-    }
-
-    n_match = 0
-    n_total = 0
-    for k, v in qiao_lookup.items():
-        ours = our_lookup.get(k)
-        if ours is None:
-            continue
-        n_total += 1
-        if abs(v) < 1e-12 and abs(ours) < 1e-12:
-            n_match += 1
-            continue
-        tol = max(1e-7, abs(v) * 1e-6)
-        if abs(ours - v) < tol:
-            n_match += 1
-
-    # order=4 至少匹配 30 项；qiao N=15 多出来的 600+ 项不在我们这边
-    assert n_total >= 30, f"我们的项数太少：{n_total}（qiao={len(qiao_lookup)}）"
-    assert n_match >= n_total - 5, f"匹配数 {n_match}/{n_total}"
-
-
-@requires_spice
-def test_evaluate_hamiltonian_time_series_bounded(spice_manager, l1_hamiltonian, l1_context):
-    """时间序列的常数项 H_0(t) 在 [0, 10] TU 内单调有界（不应发散）。"""
-    times = np.linspace(0.0, 10.0, 11)
+    times = np.linspace(0.0, 5.0, 6)
     h0 = hamiltonian_constant_term(l1_hamiltonian, times, l1_context)
-    assert h0.min() > -1100.0
-    assert h0.max() < -700.0
-    assert h0.std() < 50.0
+
+    t_to_jd = float(l1_context.TU) / 86400.0
+    for i, t in enumerate(times):
+        params = eval_params(float(l1_context.epoch) + float(t) * t_to_jd, l1_context)
+        expected = -(
+            params["mu_e"] / params["re0"]
+            + params["mu_m"] / params["rm0"]
+            + params["mu_s"] / params["rs0"]
+        )
+        assert h0[i] == pytest.approx(expected, rel=1e-9)
 
 
+@pytest.mark.spice
 @requires_spice
 def test_build_evaluate_l1_order4_within_timeout(spice_manager, l1_context):
     """构造 + 一次 evaluate 不应超过 30 s（SPICE 内核已加载）。"""

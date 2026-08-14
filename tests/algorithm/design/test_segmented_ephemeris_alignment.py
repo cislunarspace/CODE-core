@@ -24,26 +24,17 @@ ValueError。
 
 from __future__ import annotations
 
-import os
-
 import numpy as np
 import pytest
+from kernel_helpers import requires_spice
 
 from e2m2e.algorithm.design import design_orbit
-from e2m2e.api.models import DesignOrbitRequest
-
-_SPICE_KERNEL_DIR = os.environ.get(
-    "SPICE_KERNEL_DIR",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "kernels"),
-)
-_SPICE_AVAILABLE = os.path.isdir(_SPICE_KERNEL_DIR) and any(
-    f.endswith(".bsp") for f in os.listdir(_SPICE_KERNEL_DIR)
-)
+from tests.algorithm.design.conftest import make_design_request
 
 pytestmark = [
     pytest.mark.orchestration,
     pytest.mark.spice,
-    pytest.mark.skipif(not _SPICE_AVAILABLE, reason="SPICE kernels not available"),
+    requires_spice,
 ]
 
 DURATION_SEC = 30 * 86400.0
@@ -56,7 +47,7 @@ N_EXPECTED = int(DURATION_SEC / OUTPUT_STEP_SEC) + 1
 def halo_result():
     """GUI 默认参数的 30 天 Halo segmented 设计，模块内复用一次。"""
     return design_orbit(
-        DesignOrbitRequest(
+        make_design_request(
             orbit_type="HALO",
             collinear_point=2,
             amplitude=30000.0,
@@ -92,7 +83,7 @@ LONG_DURATION_SEC = 43 * 86400.0  # 3 圈（n_rev=3），但超出最后打靶�
 def halo_result_long():
     """43 天 Halo segmented 设计：et_grid 尾部落入无节点覆盖窗口。"""
     return design_orbit(
-        DesignOrbitRequest(
+        make_design_request(
             orbit_type="HALO",
             collinear_point=2,
             amplitude=30000.0,
@@ -124,7 +115,7 @@ MERGE_DURATION_SEC = 60 * 86400.0  # 5 圈（n_rev=5），2 段 + 1 合并层
 def halo_result_merge():
     """60 天 Halo segmented 设计：走合并层（#400 回归）。"""
     return design_orbit(
-        DesignOrbitRequest(
+        make_design_request(
             orbit_type="HALO",
             collinear_point=2,
             amplitude=30000.0,
@@ -164,7 +155,7 @@ def halo_result_multilayer():
     3 层合并（5 段 → 3 → 2 → 1）全程收敛，覆盖合并层 2/3 的深层路径。
     """
     return design_orbit(
-        DesignOrbitRequest(
+        make_design_request(
             orbit_type="HALO",
             collinear_point=2,
             amplitude=30000.0,

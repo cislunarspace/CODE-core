@@ -25,6 +25,7 @@ DELETED_DIRS: tuple[str, ...] = (
     "tests/numerical/dynamics",
     "tests/data/frames/fixtures",
     "tests/data/atmosphere",
+    "tests/algorithm/correction",
 )
 
 # 匹配 "tests/<dir>" 后跟 /、引号、空白或行尾；不匹配 tests/core_xxx 之类的延续

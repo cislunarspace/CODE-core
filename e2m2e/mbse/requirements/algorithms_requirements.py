@@ -16,7 +16,7 @@ ALGORITHMS_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="test",
         linked_code=["e2m2e.algorithm.solver.differential_correction"],
-        linked_tests=["tests/algorithm/correction/test_differential_correction.py"],
+        linked_tests=["tests/algorithm/solver/test_differential_correction.py"],
     ),
     Requirement(
         id="REQ-101",
@@ -26,7 +26,7 @@ ALGORITHMS_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
         linked_code=["e2m2e.algorithm.solver.differential_correction"],
-        linked_tests=["tests/algorithm/correction/test_differential_correction.py"],
+        linked_tests=["tests/algorithm/solver/test_differential_correction.py"],
     ),
     Requirement(
         id="REQ-102",
@@ -42,7 +42,7 @@ ALGORITHMS_REQUIREMENTS = [
             "e2m2e.algorithm.family.strategies",
             "e2m2e.algorithm.solver.differential_correction",
         ],
-        linked_tests=["tests/algorithm/correction/test_differential_correction.py"],
+        linked_tests=["tests/algorithm/solver/test_differential_correction.py"],
     ),
     Requirement(
         id="REQ-103",
@@ -56,7 +56,7 @@ ALGORITHMS_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
         linked_code=["e2m2e.algorithm.solver.continuation"],
-        linked_tests=["tests/algorithm/correction/test_continuation.py"],
+        linked_tests=["tests/algorithm/solver/test_continuation.py"],
     ),
     Requirement(
         id="REQ-104",
@@ -69,7 +69,7 @@ ALGORITHMS_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
         linked_code=["e2m2e.algorithm.solver.differential_correction"],
-        linked_tests=["tests/algorithm/correction/test_differential_correction.py"],
+        linked_tests=["tests/algorithm/solver/test_differential_correction.py"],
     ),
     Requirement(
         id="REQ-105",
@@ -81,7 +81,7 @@ ALGORITHMS_REQUIREMENTS = [
         priority=RequirementPriority.SHOULD,
         verification_method="test",
         linked_code=["e2m2e.algorithm.solver.differential_correction"],
-        linked_tests=["tests/algorithm/correction/test_differential_correction.py"],
+        linked_tests=["tests/algorithm/solver/test_differential_correction.py"],
     ),
     # ---- 稳定性分析 ----
     Requirement(
@@ -103,7 +103,7 @@ ALGORITHMS_REQUIREMENTS = [
         priority=RequirementPriority.SHOULD,
         verification_method="test",
         linked_code=["e2m2e.algorithm.solver.multiple_shooting"],
-        linked_tests=["tests/algorithm/correction/test_multiple_shooting.py"],
+        linked_tests=["tests/algorithm/solver/test_multiple_shooting.py"],
     ),
     # ---- 延拓 ----
     Requirement(
@@ -116,7 +116,7 @@ ALGORITHMS_REQUIREMENTS = [
         priority=RequirementPriority.SHOULD,
         verification_method="test",
         linked_code=["e2m2e.algorithm.solver.continuation"],
-        linked_tests=["tests/algorithm/correction/test_continuation.py"],
+        linked_tests=["tests/algorithm/solver/test_continuation.py"],
     ),
     Requirement(
         id="REQ-113",
@@ -126,6 +126,6 @@ ALGORITHMS_REQUIREMENTS = [
         priority=RequirementPriority.SHALL,
         verification_method="inspection",
         linked_code=["e2m2e.algorithm.solver.continuation"],
-        linked_tests=["tests/algorithm/correction/test_continuation.py"],
+        linked_tests=["tests/algorithm/solver/test_continuation.py"],
     ),
 ]
