@@ -2,16 +2,28 @@
 
 ## [Unreleased]
 
+## [5.6.9] - 2026-08-14
+
 ### Added
 - **aarch64 Linux（arm64）构建与发布支持**：CSPICE 无官方 Linux ARM64 预编译包（NAIF 仅 x86_64，conda-forge 亦无），新增 `cspice-aarch64-build.yml` 在 GitHub 原生 arm64 runner 上从 NAIF 源码包（cspice-sys 同源 URL）编译静态库并发布到 `cspice-v1` release；`scripts/download_cspice.py` 按机器架构选择 x86_64/aarch64 资产（解压目录按架构隔离，避免缓存串用）；release 工作流构建矩阵增加 `ubuntu-24.04-arm`（maturin-action 自动用 manylinux_2_28_aarch64 容器）；calcephpy 增加 aarch64 预编译 wheel（calcephpy-wheel.yml 的 build-linux-aarch64 job）与 `[tool.uv.sources]` 条目，arm 用户免现场编译；CI 新增 arm64 回归 job（cargo test 全量跑在原生 arm64 runner）。
+- **FiniteBurn 恒质量连续推力的 Rust 传播**（#407）：6D 编译传播支持 constant/pulse 推力、惯性/VNB/LVLH 方向帧和 STM；推力开关时刻作为积分边界，避免跨步累计冲量依赖输出网格。任意 Python callable 推力或方向仍显式报告 Rust 编译路径不可用；需推进剂消耗时继续使用 7D 的 `VariableMassFiniteBurn`。
+- **Facade 轨道族生成模型与工具清单**（#411/#412）：新增 `FamilyGenerationRequest`，按轨道族公开平动点和 Halo 振幅的条件范围，第一版实现 Halo 族延拓；新增 `ToolInfo` 与 `tool_inventory()`，供 MCP/CLI 查询工具的实现状态和请求模型。
+- **轨道设计条件范围 API**（#415）：`DesignOrbitRequest.valid_ranges()` 与 `NumericRange` 公开各轨道类型、平动点上下文下适用的参数范围，校验器与接口共用同一规则。
 
 ### Changed
 - **CI/release 提速**：ci.yml 的 lint/typecheck 改用 `uv sync --no-install-project`——ruff、结构检查脚本（标准库 ast 静态扫描）与 mypy（`--ignore-missing-imports`）均不 import 项目本体，此前两个 job 各白编一次 Rust 扩展（30s/50s），现跳过构建、typecheck 连带免下 CSPICE 编译包；cargo 编译产物接入 `Swatinem/rust-cache`（ci clippy、release test、三平台 wheel 构建与 docs 构建），全量编译改增量（`CSPICE_DIR` 入 key 防串味，key 默认含 job id 与 OS/arch，各 job、各平台天然隔离）。runner 固定版本（ubuntu-24.04 / windows-2025），checkout 加 `persist-credentials: false`。
 - **轨道设计剩余 Python 计算下沉 Rust**：synodic↔J2000 批量坐标转换、ET→UTC 日历分量（星历表组装，一年 8766 点的逐点循环）、ELFO 月心根数提取的月球状态查询改走 Rust 批量入口（`frame_convert`：`batch_synodic_to_j2000_py`/`batch_j2000_to_synodic_py`/`batch_et_to_utc_py`/`batch_body_states_py`）；leapseconds 内核双侧 furnsh（Rust 实例批量 ET→UTC 需闰秒表，原仅 Python 侧加载）。ELFO 经典根数换算向量化（`_cart2oe_batch`）。Rust 侧新增解析恒等式单测（往返对称性、尺度定义），Python 侧断言按 ADR 0013 用物理定义（月球位置、已知历元往返、退化分支）。
 - **cargo test 链接 libpython**：pyo3 `extension-module` feature 不再在 workspace 硬编码（该 feature 使 Linux 上含测试二进制在内的所有目标跳过链接 libpython，`cargo test` 报 undefined symbol），改由 e2m2e-integrators 的 `extension-module` feature 按目标启用、pyproject `[tool.maturin] features` 显式传入——cdylib 产物仍不链接 libpython（abi3 可移植性不变），测试二进制可独立链接运行。
+- **轨道保持 Facade 参数面收口**（#414）：`ControlOrbitRequest` 覆盖算法层全部业务参数并在 Facade 完整透传，补齐控制时间、误差、摄动、力模型、角动量管理和迭代配置的校验与 schema 元数据。
+
+### Fixed
+- **Halo/NRHO 长弧分段打靶合并不收敛**（#400）：移除合并层首末节点锚定，全部节点由 LM 最小范数更新；分段打靶、层级合并与逐段积分下沉 Rust 并行。60 天和 180 天 Halo 基准恢复收敛，180 天设计耗时从约 223 秒降至 63 秒。
+- **轨道保持 API 参数未透传**（#414）：此前模型已接收的多项控制、摄动与 TIGHT/SPECIAL 参数未传给算法层，现按模型字段完整传递。
+- **低能转移因单条流形弧步长塌缩而整体中止**：流形管生成现在捕获单个候选的 `PropagationFailure` 并跳过该弧，保留其余候选继续搜索；直接传播仍按 ADR 0020 显式抛出异常。
 
 ### Removed
 - **Python 星历修正分发（homotopy/two_level）**：删除 `e2m2e/algorithm/ephemeris_correction` 子包与 `TwoLevelMultipleShooting`，`design_orbit` 的 homotopy 修正分支移除——星历修正统一走 Rust 多重打靶（segmented 与稳定轨道默认路径），`EphemerisCorrectionResult` 迁入 `algorithm/results.py` 作 Rust 打靶结果的领域重包。ADR 0005/0006 追加修订小节，关联测试同步删除。
+- **`DesignOrbitRequest.correction_velocity_tolerance`**（#410）：该参数从未被算法层消费，现因 `extra="forbid"` 被明确拒绝，避免暴露无效配置。
 
 ## [5.6.8] - 2026-08-13
 

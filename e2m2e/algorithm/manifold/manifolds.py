@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 
 from ...data.types.orbit import Orbit
+from ...exceptions import PropagationFailure
 from ..dynamics import CR3BP_Dynamics
 
 if TYPE_CHECKING:
@@ -176,15 +177,18 @@ class InvariantManifold:
         seeds = self.seeds(self._default_seed_count())
         trajectories: list[Orbit] = []
         for x0 in seeds:
-            result = self.dynamics.propagate(x0, (0.0, t_final), t_eval=t_eval)
+            try:
+                result = self.dynamics.propagate(x0, (0.0, t_final), t_eval=t_eval)
+            except PropagationFailure:
+                # 流形管生成属于搜索语境：单个种子弧不可行不应中止其余候选。
+                logger.warning("流形弧积分失败，跳过该种子")
+                continue
             times = np.asarray(result["time"], dtype=float)
             states = np.asarray(result["states"], dtype=float)
             if section is not None:
                 times, states = self._truncate_at_first_crossing(times, states, section)
-            # 数值发散时 Rust 积分返回空 states（#246 语义：失败返回空、不 raise）；
-            # 空轨迹无法构成 Orbit（#379），跳过该种子弧，其余弧照常入管。
             if len(states) == 0:
-                logger.warning("流形弧积分失败（空轨迹），跳过该种子")
+                logger.warning("流形弧积分返回空轨迹，跳过该种子")
                 continue
             trajectories.append(Orbit(states=states, times=times, system=self.orbit.system))
 

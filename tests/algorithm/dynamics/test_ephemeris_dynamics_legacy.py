@@ -69,7 +69,7 @@ def test_legacy_propagation_supports_zero_and_backward_duration(
 
 
 def test_legacy_max_step_is_capped_by_short_propagation_duration(spice_eph_dynamics):
-    assert spice_eph_dynamics._get_max_step((0.0, 1_000.0)) == pytest.approx(60.0)
+    assert spice_eph_dynamics._get_max_step((0.0, 1_000.0)) == pytest.approx(100.0)
     assert spice_eph_dynamics._get_max_step((0.0, 100.0)) == pytest.approx(10.0)
     assert spice_eph_dynamics._get_max_step((100.0, 0.0)) == pytest.approx(10.0)
 
@@ -78,5 +78,12 @@ def test_legacy_dynamics_rejects_events_explicitly(spice_eph_dynamics, reference
     def event(time, state):  # noqa: ARG001
         return float(state[0])
 
-    with pytest.raises(NotImplementedError, match="事件检测"):
+    with pytest.raises(ValueError, match="必须显式指定 backend"):
         spice_eph_dynamics.propagate(leo_state, (reference_et, reference_et + 100.0), events=event)
+    with pytest.raises(NotImplementedError, match="事件检测"):
+        spice_eph_dynamics.propagate(
+            leo_state,
+            (reference_et, reference_et + 100.0),
+            events=event,
+            backend="scipy",
+        )

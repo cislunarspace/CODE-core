@@ -16,6 +16,7 @@ from e2m2e.algorithm.manifold import InvariantManifold, ManifoldKind, PoincareSe
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
+from e2m2e.exceptions import PropagationFailure
 
 pytestmark = pytest.mark.orchestration
 
@@ -156,6 +157,29 @@ class TestSeeds:
 
 class TestPropagate:
     """测试流形弧传播"""
+
+    def test_propagate_skips_seed_with_propagation_failure(self, stable_manifold, monkeypatch):
+        """单个种子传播失败时跳过该弧，保留其余搜索候选。"""
+        seeds = stable_manifold.seeds(2)
+        outcomes = iter(
+            [
+                PropagationFailure("step size collapsed"),
+                {"time": np.array([0.0, -1.0]), "states": np.vstack([seeds[1], seeds[1]])},
+            ]
+        )
+
+        def fail_then_succeed(*_args, **_kwargs):
+            outcome = next(outcomes)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        monkeypatch.setattr(stable_manifold.dynamics, "propagate", fail_then_succeed)
+
+        tube = stable_manifold.propagate(1.0)
+
+        assert len(tube.trajectories) == 1
+        np.testing.assert_allclose(tube.trajectories[0].states[0], seeds[1])
 
     def test_stable_manifold_approaches_primary(self, stable_manifold):
         """稳定流形反向积分后末端比种子更靠近主天体（定性基准）
