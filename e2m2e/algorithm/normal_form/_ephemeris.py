@@ -178,7 +178,7 @@ def _lp_state(
 def _ephemeris_states(jd_tdb: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """返回 (R_EM, V_EM, R_ES, V_ES)（J2000 系, km/km/s）。
 
-    复用 :class:`e2m2e.core.SPICEManager`；其内部已自动加载闰秒
+    复用 :class:`e2m2e.data.kernels.manager.SPICEManager`；其内部已自动加载闰秒
     内核，因此本函数无需关心 ``de430.bsp`` 等星历内核路径。
     """
     from ...data.kernels._spice_loader import get_spiceypy

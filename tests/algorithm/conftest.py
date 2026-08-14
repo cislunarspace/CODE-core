@@ -17,7 +17,7 @@ from e2m2e.algorithm.solver.differential_correction import DifferentialCorrectio
 from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
-# DRO seed parameters (Cui et al. 2025) — standardise the suite on this seed.
+# DRO 种子参数（Cui et al. 2025）——整个测试套件统一使用该种子。
 DRO_X0 = 0.79188556619742
 DRO_VY0 = 0.573665890385585
 DRO_PERIOD_GUESS = 6.307498
@@ -46,13 +46,13 @@ def cr3bp_dynamics(cr3bp_system):
 
 @pytest.fixture(scope="session")
 def dro_seed_state() -> np.ndarray:
-    """DRO seed state vector [x, y, z, vx, vy, vz] in dimensionless CR3BP units."""
+    """DRO 种子状态向量 [x, y, z, vx, vy, vz]，无量纲 CR3BP 单位。"""
     return np.array([DRO_X0, 0.0, 0.0, 0.0, DRO_VY0, 0.0])
 
 
 @pytest.fixture(scope="session")
 def dro_seed_orbit(dro_seed_state) -> Orbit:
-    """DRO seed Orbit object (1-point orbit) ready for differential correction."""
+    """DRO 种子 Orbit 对象（单点轨道），可直接用于微分修正。"""
     orbit = Orbit(states=[dro_seed_state], times=[0])
     orbit.period = DRO_PERIOD_GUESS
     return orbit
@@ -60,10 +60,10 @@ def dro_seed_orbit(dro_seed_state) -> Orbit:
 
 @pytest.fixture(scope="session")
 def _corrected_dro_cached(dro_seed_orbit) -> Orbit:
-    """Compute corrected DRO once per session; expensive (5–15 STM propagations).
+    """每会话计算一次修正后的 DRO；代价高（5–15 次 STM 传播）。
 
-    The corrector is built here (not via dro_corrector) so the cached result
-    doesn't depend on a function-scoped fixture.
+    在此处（而非经 dro_corrector）构造修正器，使缓存结果不依赖
+    function 作用域的 fixture。
     """
     system = _make_earth_moon_system()
     dynamics = CR3BP_Dynamics(system)
@@ -74,13 +74,13 @@ def _corrected_dro_cached(dro_seed_orbit) -> Orbit:
 
 @pytest.fixture
 def corrected_dro(_corrected_dro_cached) -> Orbit:
-    """Fresh deepcopy of the corrected DRO for each test (safe for mutation)."""
+    """每个测试都拿到修正后 DRO 的全新 deepcopy（可安全修改）。"""
     return copy.deepcopy(_corrected_dro_cached)
 
 
 @pytest.fixture
 def dro_corrector() -> DifferentialCorrection:
-    """Fresh DifferentialCorrection configured for the standard DRO correction."""
+    """按标准 DRO 修正配置的全新 DifferentialCorrection。"""
     system = _make_earth_moon_system()
     dynamics = CR3BP_Dynamics(system)
     corrector = DifferentialCorrection(dynamics)
@@ -90,23 +90,23 @@ def dro_corrector() -> DifferentialCorrection:
 
 @pytest.fixture
 def dro_dynamics() -> CR3BP_Dynamics:
-    """Earth-Moon CR3BP dynamics for DRO algorithm tests."""
+    """DRO 算法测试用的地月 CR3BP 动力学。"""
     system = _make_earth_moon_system()
     return CR3BP_Dynamics(system)
 
 
 @pytest.fixture
 def dro_continuation(dro_corrector) -> Continuation:
-    """Continuation instance configured for DRO family generation."""
+    """为 DRO 族生成配置的 Continuation 实例。"""
     return Continuation(corrector=dro_corrector, step=0.001)
 
 
 def _make_earth_moon_system():
-    """Build an Earth-Moon CR3BP system matching the existing test suite's construction.
+    """构造与现有测试套件一致的地月 CR3BP 系统。
 
-    The root conftest's `earth_moon_system` is function-scoped (so tests can
-    mutate it freely). Session-scoped fixtures here need a fresh system they
-    own; this helper is the single place that decision lives.
+    根 conftest 的 `earth_moon_system` 是 function 作用域的（测试可随意修改）。
+    这里的 session 作用域 fixture 需要一套自有的全新系统；
+    本辅助函数是这一决策的唯一落脚点。
     """
     from e2m2e.algorithm.dynamics import CR3BP_System
 

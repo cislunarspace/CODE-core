@@ -7,7 +7,7 @@
   ``Xf_i - X_Q_{i+1}``；
 - 在多次迭代中收敛，得到只含受迫频率的动力学替代轨道 ``b(t)``。
 
-与既有 :class:`e2m2e.algorithms.multiple_shooting.MultipleShooting` 不同，
+与既有 :class:`e2m2e.algorithm.solver.multiple_shooting.MultipleShooting` 不同，
 本模块：
 
 - 不引入可变时间节点；

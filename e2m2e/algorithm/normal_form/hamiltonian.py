@@ -141,7 +141,7 @@ def build_hamiltonian(
 
     Args:
         context: 归一化上下文。
-        legendre_result: :func:`e2m2e.algorithms.normal_form.legendre.expand_legendre_1_over_r`
+        legendre_result: :func:`e2m2e.algorithm.normal_form.legendre.expand_legendre_1_over_r`
             输出。标量场 ``Le`` 已被本函数乘上 ``-μ_e/μ_m/μ_s`` 后并入
             Hamilton 多项式。
         max_degree: 额外截断阶数；``None`` 时使用 ``context.order``。

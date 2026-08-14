@@ -356,7 +356,7 @@ class TestHaloInitialGuess:
 
 
 # =============================================================================
-# Backward compatibility: re-export from e2m2e.algorithms must keep working
+# Backward compatibility: differential_correction / family 的 re-export 保持可用
 # =============================================================================
 
 
@@ -380,8 +380,8 @@ class TestBackwardCompatibility:
         assert from_dc_guess is compute_halo_initial_guess
         assert from_dc_approx is halo_third_order_approximation
 
-    def test_algorithms_init_reexport(self):
-        """e2m2e.algorithms.__init__ 的导入应继续工作。"""
+    def test_family_init_reexport(self):
+        """e2m2e.algorithm.family 的导入应保持可用。"""
         from e2m2e.algorithm.family import compute_halo_coefficients
 
         # 结果应与直接导入一致

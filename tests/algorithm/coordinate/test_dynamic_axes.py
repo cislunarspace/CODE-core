@@ -40,7 +40,7 @@ STATE_ARBITRARY = np.array([1.0, 2.0, 3.0, -0.5, 1.5, 0.8])
 
 
 class TestVNBaxes:
-    """Tests for VNBAxes."""
+    """VNBAxes 测试。"""
 
     def test_vnb_directions_circular(self):
         """圆轨道：V 沿速度，N 沿角动量，B = V × N。"""
@@ -114,7 +114,7 @@ class TestVNBaxes:
 
 
 class TestLVLHaxes:
-    """Tests for LVLHAxes."""
+    """LVLHAxes 测试。"""
 
     def test_lvlh_directions_circular(self):
         """圆轨道：R 沿径向，V 沿速度，H 沿角动量。"""

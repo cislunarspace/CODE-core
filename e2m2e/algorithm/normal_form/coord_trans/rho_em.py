@@ -19,7 +19,7 @@ Hamilton 系的共轭动量 ``p``，**不做物理量换算**——``q``、``p``
 
 - qiao 的 ``rho2qpEM`` / ``qpEM2rho`` 同时做单位换算（输出 km/km/s）并
   平移平动点位置；本仓库按 PRD 约定**全程无量纲**，单位换算交给
-  :mod:`e2m2e.algorithms.normal_form.units` 的调用方；平动点平移在
+  :mod:`e2m2e.algorithm.normal_form.units` 的调用方；平动点平移在
   DS 段（``em_ds``）由生成函数 ``W`` 完成。
 - ``C``、``Cdot`` 不通过 qiao 的 ``globalparam.data_array`` 二进制表
   暴露，而由 :class:`NormalFormContext` + :mod:`._ephemeris` 在请求时刻

@@ -17,14 +17,14 @@
 端到端链式函数 :func:`rho_to_param` / :func:`param_to_rho` 依赖三个预计算
 结果句柄（切片 #171–#173 交付）：
 
-- :class:`~e2m2e.algorithms.normal_form.dynamical_substitution.DynamicalSubstituteResult`
+- :class:`~e2m2e.algorithm.normal_form.dynamical_substitution.DynamicalSubstituteResult`
   提供 ``W_poly`` （DS 平移，``{pow: coef_array}``）；
-- :class:`~e2m2e.algorithms.normal_form.quasi_floquet.QuasiFloquetResult`
+- :class:`~e2m2e.algorithm.normal_form.quasi_floquet.QuasiFloquetResult`
   提供 ``B_at(t)`` （QF 矩阵插值访问器）；
-- :class:`~e2m2e.algorithms.normal_form.center_manifold.CenterManifoldResult`
+- :class:`~e2m2e.algorithm.normal_form.center_manifold.CenterManifoldResult`
   提供 ``W_series`` （CM 高阶 Lie 级数，``{step: {order: {pow: coef_array}}}``）。
 
-调用方负责把这三个结果聚合（:class:`~e2m2e.algorithms.normal_form.catalog.LibrationCatalogData`
+调用方负责把这三个结果聚合（:class:`~e2m2e.algorithm.normal_form.catalog.LibrationCatalogData`
 是开箱即用的聚合器）；本模块只做纯函数，不在内部缓存。
 """
 

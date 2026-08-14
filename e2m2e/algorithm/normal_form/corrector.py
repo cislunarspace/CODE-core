@@ -180,10 +180,10 @@ class QPITCorrector:
         if seed_state is not None:
             return np.asarray(seed_state, dtype=float).ravel()
 
+        from e2m2e.algorithm.dynamics import CR3BP_System
         from e2m2e.algorithm.family.lissajous_initial_guess import (
             compute_lissajous_initial_guess,
         )
-        from e2m2e.core.dynamics import CR3BP_System
 
         point_num = self.context.libration_point.value
         system = self.context.system

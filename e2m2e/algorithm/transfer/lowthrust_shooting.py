@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 class EngineConfig:
     """推进配置：最大推力与比冲。
 
-    与 :class:`~e2m2e.core.forces.VariableMassFiniteBurn` 的常量推力语义对齐：
+    与 :class:`~e2m2e.algorithm.forces.VariableMassFiniteBurn` 的常量推力语义对齐：
     打靶求解器在各段用满油门或部分油门（``throttle ∈ [0,1]``）施加推力。
 
     Args:

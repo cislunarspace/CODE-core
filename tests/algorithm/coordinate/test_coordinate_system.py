@@ -15,7 +15,7 @@ pytestmark = pytest.mark.data
 
 
 class FixedAxes(Axes):
-    """Axes that rotates vectors by a fixed angle around the z-axis."""
+    """绕 z 轴将向量旋转固定角度的 Axes。"""
 
     def __init__(self, angle: float) -> None:
         self._angle = angle
@@ -36,7 +36,7 @@ class FixedAxes(Axes):
 
 
 class FixedOrigin(Origin):
-    """Origin with a constant offset state."""
+    """具有恒定偏移状态的 Origin。"""
 
     def __init__(self, state: np.ndarray) -> None:
         self._state = np.asarray(state, dtype=float)
@@ -46,29 +46,29 @@ class FixedOrigin(Origin):
 
 
 class TestAxesABC:
-    """Tests for the Axes abstract base class."""
+    """Axes 抽象基类测试。"""
 
     def test_axes_is_abstract(self):
-        """Axes cannot be instantiated directly."""
+        """Axes 不能直接实例化。"""
         with pytest.raises(TypeError):
             Axes()
 
     def test_fixed_axes_is_subclass(self):
-        """A concrete Axes subclass can be instantiated."""
+        """具体的 Axes 子类可以实例化。"""
         axes = FixedAxes(angle=np.pi / 4)
         assert isinstance(axes, Axes)
 
 
 class TestOriginABC:
-    """Tests for the Origin abstract base class."""
+    """Origin 抽象基类测试。"""
 
     def test_origin_is_abstract(self):
-        """Origin cannot be instantiated directly."""
+        """Origin 不能直接实例化。"""
         with pytest.raises(TypeError):
             Origin()
 
     def test_fixed_origin_returns_state(self):
-        """A concrete Origin returns its state."""
+        """具体的 Origin 返回其状态。"""
         origin = FixedOrigin(state=np.array([1.0, 2.0, 3.0, 0.1, 0.2, 0.3]))
         np.testing.assert_array_equal(
             origin.state(et=0.0), np.array([1.0, 2.0, 3.0, 0.1, 0.2, 0.3])
@@ -76,7 +76,7 @@ class TestOriginABC:
 
 
 class RotatingAxes(Axes):
-    """Axes rotating at a constant angular velocity around the z-axis."""
+    """绕 z 轴以恒定角速度旋转的 Axes。"""
 
     def __init__(self, omega: float) -> None:
         self._omega = omega
@@ -97,10 +97,10 @@ class RotatingAxes(Axes):
 
 
 class TestCoordinateSystemState:
-    """Tests for state transformation through CoordinateSystem."""
+    """CoordinateSystem 状态变换测试。"""
 
     def test_transform_state_identity(self):
-        """Transforming between identical coordinate systems leaves state unchanged."""
+        """相同坐标系之间变换，状态保持不变。"""
         axes = FixedAxes(angle=0.0)
         origin = FixedOrigin(state=np.zeros(6))
         cs = CoordinateSystem(axes=axes, origin=origin)
@@ -111,7 +111,7 @@ class TestCoordinateSystemState:
         np.testing.assert_allclose(result, state, atol=1e-14)
 
     def test_transform_state_origin_offset(self):
-        """Transforming between coordinate systems with different origins applies offset."""
+        """不同原点坐标系之间变换，应用偏移。"""
         axes = FixedAxes(angle=0.0)
         origin_a = FixedOrigin(state=np.zeros(6))
         origin_b = FixedOrigin(state=np.array([1.0, 0.0, 0.0, 0.5, 0.0, 0.0]))
@@ -125,7 +125,7 @@ class TestCoordinateSystemState:
         np.testing.assert_allclose(result, expected, atol=1e-14)
 
     def test_transform_state_rotating_relative_velocity(self):
-        """Transforming from inertial to rotating axes adds coriolis term."""
+        """从惯性轴变换到旋转轴，附加科里奥利项。"""
         axes_inertial = FixedAxes(angle=0.0)
         axes_rotating = RotatingAxes(omega=1.0)
         origin = FixedOrigin(state=np.zeros(6))
@@ -136,14 +136,14 @@ class TestCoordinateSystemState:
         state = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         result = cs_inertial.transform_state(state, from_cs=cs_inertial, to_cs=cs_rotating, et=et)
 
-        # At et=0, rotating frame coincides with inertial frame, so r is unchanged.
-        # v_rotating = v_inertial - omega x r = [0, 0, 0] - [0, 0, 1] x [1, 0, 0]
+        # 在 et=0 时旋转系与惯性系重合，故 r 不变。
+        # v_rotating = v_inertial - omega × r = [0, 0, 0] - [0, 0, 1] × [1, 0, 0]
         #            = -[0, 1, 0] = [0, -1, 0]
         np.testing.assert_allclose(result[:3], np.array([1.0, 0.0, 0.0]), atol=1e-14)
         np.testing.assert_allclose(result[3:], np.array([0.0, -1.0, 0.0]), atol=1e-14)
 
     def test_transform_state_rotating_target_at_nonzero_epoch(self):
-        """Rotating target axes subtract Rdot @ r_axes before projecting velocity."""
+        """旋转目标轴在投影速度前减去 Rdot @ r_axes。"""
         axes_inertial = FixedAxes(angle=0.0)
         axes_rotating = RotatingAxes(omega=1.0)
         origin = FixedOrigin(state=np.zeros(6))
@@ -159,7 +159,7 @@ class TestCoordinateSystemState:
         np.testing.assert_allclose(result[3:], np.array([-1.0, 0.0, 0.0]), atol=1e-14)
 
     def test_transform_state_round_trip(self):
-        """Transforming forward and backward returns the original state."""
+        """正向与反向变换回到原始状态。"""
         axes_a = FixedAxes(angle=np.pi / 6)
         axes_b = RotatingAxes(omega=0.5)
         origin_a = FixedOrigin(state=np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
@@ -174,7 +174,7 @@ class TestCoordinateSystemState:
 
         np.testing.assert_allclose(result, state, atol=1e-14)
 
-        """Transforming between identical axes leaves the vector unchanged."""
+        """相同轴之间变换，向量保持不变。"""
         axes = FixedAxes(angle=0.0)
         origin = FixedOrigin(state=np.zeros(6))
         cs = CoordinateSystem(axes=axes, origin=origin)
@@ -185,7 +185,7 @@ class TestCoordinateSystemState:
         np.testing.assert_allclose(result, vec, atol=1e-14)
 
     def test_transform_vector_rotation(self):
-        """Transforming between rotated axes applies the rotation."""
+        """旋转轴之间变换，应用旋转。"""
         axes_a = FixedAxes(angle=0.0)
         axes_b = FixedAxes(angle=np.pi / 2)
         origin = FixedOrigin(state=np.zeros(6))

@@ -47,7 +47,7 @@ class ImpulsiveBurn:
     """瞬时 Δv 机动事件。
 
     ``delta_v`` 在传播（惯性）坐标系内解释，由
-    :meth:`e2m2e.core.forces.force_model.ForceModel.propagate_maneuvers`
+    :meth:`e2m2e.algorithm.forces.force_model.ForceModel.propagate_maneuvers`
     在 ``epoch`` 处施加 ``state[3:6] += delta_v``。
 
     VNB/LVLH burn 坐标系暂不支持（届时加 ``frame`` 字段，转换走
@@ -176,7 +176,7 @@ class VariableMassFiniteBurn(PhysicalModel):
     ``state[6]``。低推力转移与月面动力下降等最优控制问题中，质量演化
     是燃耗最优的基本变量（``ṁ = −T/(Isp·g₀)``），必须纳入状态向量。
 
-    配套的 7D 传播在 :class:`~e2m2e.core.forces.force_model.ForceModel.propagate`
+    配套的 7D 传播在 :class:`~e2m2e.algorithm.forces.force_model.ForceModel.propagate`
     中走 Rust 快速路径 ``propagate_compiled_lowthrust``：状态
     ``[x, y, z, vx, vy, vz, m]``，受控动力学在 Rust 侧（``augmented_state``
     的 ``augmented_eom_7d``）。详见 ``docs/plans/lowthrust-foundation-prd.md``。

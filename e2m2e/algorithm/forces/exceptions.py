@@ -1,6 +1,6 @@
 """力模型子包异常。
 
-所有异常均继承 :class:`e2m2e.core.exceptions.E2M2EError`，并同时保留
+所有异常均继承 :class:`e2m2e.exceptions.E2M2EError`，并同时保留
 对原有 Python 内置异常的多重继承，使既有 ``except ValueError`` /
 ``except TypeError`` 等子句继续生效。
 """

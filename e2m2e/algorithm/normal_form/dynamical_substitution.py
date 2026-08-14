@@ -20,7 +20,7 @@ Public API：
 
 实现策略：
 
-- 复用 :mod:`~e2m2e.algorithms.normal_form.multiple_shooting` 的块三对角消元；
+- 复用 :mod:`~e2m2e.algorithm.normal_form.multiple_shooting` 的块三对角消元；
 - 复用 :mod:`.fft` 的 NAFF/FFT 后端显式选择；
 - 复用 :func:`.hamiltonian.evaluate_hamiltonian` / 星历参数（与
   slice 1 保持接口一致）；

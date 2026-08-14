@@ -13,7 +13,7 @@
   FFT 频域表示重构时域信号（或其导数）。
 
 NAFF 检测只在调用方显式调用 :func:`detect_naff` 时触发；本模块其余函数
-不强制依赖 NAFF 可用性，从而保证 ``import e2m2e.algorithms.normal_form``
+不强制依赖 NAFF 可用性，从而保证 ``import e2m2e.algorithm.normal_form``
 在任何环境都能正常工作。
 """
 

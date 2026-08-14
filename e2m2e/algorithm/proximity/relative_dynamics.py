@@ -8,7 +8,7 @@
 - :class:`RelativeDynamics`：RLM 线性化 + 相对状态/STM 传播
 
 坐标系约定：相对状态默认在**会合系（Synodic）** 下定义（与 CR3BP 动力学
-同系），LVLH 转换由调用方经 :class:`~e2m2e.core.coordinate.LVLHAxes` 完成。
+同系），LVLH 转换由调用方经 :class:`~e2m2e.algorithm.coordinate.LVLHAxes` 完成。
 """
 
 from __future__ import annotations

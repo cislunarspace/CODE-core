@@ -26,7 +26,7 @@ pytestmark = pytest.mark.data
 
 @pytest.fixture
 def spice_manager():
-    """Provide a SPICEManager with available ephemeris and PCK kernels loaded."""
+    """提供已加载可用星历与 PCK 内核的 SPICEManager。"""
     manager = SPICEManager()
     loaded: list[str] = []
     try:
@@ -64,7 +64,7 @@ def spice_manager():
 
 @pytest.fixture
 def requires_iau_earth(spice_manager):
-    """Skip tests that require the low-fidelity IAU_EARTH text-PCK frame."""
+    """跳过需要低精度 IAU_EARTH 文本 PCK 框架的测试。"""
     import spiceypy
 
     try:
@@ -75,7 +75,7 @@ def requires_iau_earth(spice_manager):
 
 @pytest.fixture
 def requires_itrf93(spice_manager):
-    """Skip tests that require an optional high-precision Earth BPC defining ITRF93."""
+    """跳过需要定义 ITRF93 的可选高精度地球 BPC 的测试。"""
     import spiceypy
 
     try:
@@ -324,8 +324,8 @@ class TestStandardIcrfPreset:
         assert isinstance(cs.axes, ICRSAxes)
         assert isinstance(cs.origin, InertialOrigin)
 
-    def test_standard_icrf_importable_from_core_top_level(self):
-        """standard_icrf 可从 e2m2e.core 顶层导入(与 standard_itrf 对齐)。"""
+    def test_standard_icrf_importable_from_algorithm_coordinate(self):
+        """standard_icrf 可从 e2m2e.algorithm.coordinate 顶层导入(与 standard_itrf 对齐)。"""
         from e2m2e.algorithm.coordinate import standard_icrf as imported
 
         assert imported is standard_icrf

@@ -61,7 +61,7 @@ class LibrationCatalogData:
     :class:`LibrationCatalogTransformer` 绑定使用。
 
     设计取舍见模块 docstring：本类是**坐标变换专用** 聚合器，不复用
-    :class:`~e2m2e.algorithms.normal_form.types.NormalFormResult` （后者是
+    :class:`~e2m2e.algorithm.normal_form.types.NormalFormResult` （后者是
     通用流水线结果容器）。#175 的最终 ``NormalFormResult`` 可暴露
     ``context``/``ds_result``/``qf_result``/``cm_result`` 四个属性后直接
     构造本类，或反过来把本类当字段嵌入。

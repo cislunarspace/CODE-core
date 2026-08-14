@@ -20,7 +20,7 @@ API：
 - :func:`expand_legendre_for_body` —— 给已构造好的 ``Le`` 标上 ``-μ``
   乘子，按幂次直接给到 ``hamiltonian.build_hamiltonian`` 使用。
 
-本切片中 ``sympy`` 仅在函数内部惰性导入，``e2m2e.algorithms.normal_form``
+本切片中 ``sympy`` 仅在函数内部惰性导入，``e2m2e.algorithm.normal_form``
 顶层导入不强制依赖。
 """
 
@@ -79,7 +79,7 @@ def expand_legendre_1_over_r(
     if max_degree < 1:
         raise ValueError(f"max_degree 必须 ≥ 1，得到 {max_degree}")
 
-    # 局部导入：保持 ``import e2m2e.algorithms.normal_form`` 不强制依赖 sympy。
+    # 局部导入：保持 ``import e2m2e.algorithm.normal_form`` 不强制依赖 sympy。
     from sympy import Integer, Matrix, expand, simplify, sqrt, symbols
 
     from .polynomial import expr2poly, trim_degree
