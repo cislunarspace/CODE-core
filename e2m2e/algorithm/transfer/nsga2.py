@@ -1,8 +1,9 @@
 """NSGA-II 多目标优化器（主题 8）。
 
 经典 NSGA-II（Deb et al. 2002）：非支配排序 + 拥挤度选择 + 精英保留。
-纯 Python 编排，适应度评估可选 ProcessPoolExecutor 并行（Windows spawn
-安全，对齐 ``search_parallel.py`` 模式）。
+演化算子默认使用 Rust 内核；Python 路径保留作对照与降级。适应度评估
+可选 ProcessPoolExecutor 并行（Windows spawn 安全，对齐 ``search_parallel.py``
+模式）。
 
 约束处理用 Deb 可行支配规则：可行解支配不可行解；都不可行时按约束
 违反量排序。无需罚因子。
@@ -35,6 +36,14 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+
+from e2m2e.integrators import (
+    nsga2_environmental_selection_py,
+    nsga2_sort_py,
+    nsga2_tournament_selection_py,
+    nsga2_variation_py,
+    require_rust_extension,
+)
 
 from .porkchop import _non_dominated_sort
 
@@ -78,6 +87,7 @@ def nsga2(
     seed: int | None = None,
     n_workers: int | None = None,
     verbose: bool = False,
+    backend: str = "rust",
 ) -> NSGA2Result:
     """NSGA-II 多目标优化。
 
@@ -96,6 +106,7 @@ def nsga2(
         n_workers: 并行进程数，None 时取 ``min(cpu_count(), 4)``；
             1 时退化为串行。
         verbose: 每代打印进度。
+        backend: 演化算子后端，``"rust"``（默认）或 ``"python"``。
 
     Returns:
         :class:`NSGA2Result` （Pareto 前沿 + 诊断信息）。
@@ -105,6 +116,8 @@ def nsga2(
     """
     if not bounds:
         raise ValueError("bounds 不能为空")
+    if backend not in ("rust", "python"):
+        raise ValueError(f"backend 须为 rust 或 python，当前为 {backend!r}")
     n_dim = len(bounds)
     if pop_size < 4:
         raise ValueError(f"pop_size ({pop_size}) 须 >= 4")
@@ -115,6 +128,13 @@ def nsga2(
     hi = np.array([b[1] for b in bounds], dtype=float)
     if np.any(lo >= hi):
         raise ValueError("bounds 下界须严格小于上界")
+    if backend == "rust":
+        require_rust_extension(
+            "nsga2_sort_py",
+            "nsga2_environmental_selection_py",
+            "nsga2_tournament_selection_py",
+            "nsga2_variation_py",
+        )
 
     rng = np.random.default_rng(seed)
     n_eval = 0
@@ -128,14 +148,27 @@ def nsga2(
 
     for gen in range(n_gen):
         # 非支配排序 + 拥挤度
-        rank, crowd = _constrained_non_dominated_sort(fit, viol)
+        if backend == "rust":
+            rank_list, crowd_list = nsga2_sort_py(fit.tolist(), viol.tolist())
+            rank = np.asarray(rank_list, dtype=int)
+            crowd = np.asarray(crowd_list, dtype=float)
+        else:
+            rank, crowd = _constrained_non_dominated_sort(fit, viol)
 
         # 选择（二元锦标赛）
-        mating_idx = _tournament_selection(rank, crowd, pop_size, rng)
+        if backend == "rust":
+            mating_idx = _rust_tournament_selection(rank, crowd, pop_size, rng)
+        else:
+            mating_idx = _tournament_selection(rank, crowd, pop_size, rng)
 
         # SBX 交叉 + 多项式变异
-        offspring = _sbx_crossover(pop[mating_idx], lo, hi, crossover_prob, eta_c, rng)
-        offspring = _polynomial_mutation(offspring, lo, hi, mutation_prob, eta_m, rng)
+        if backend == "rust":
+            offspring = _rust_variation(
+                pop[mating_idx], lo, hi, crossover_prob, eta_c, mutation_prob, eta_m, rng
+            )
+        else:
+            offspring = _sbx_crossover(pop[mating_idx], lo, hi, crossover_prob, eta_c, rng)
+            offspring = _polynomial_mutation(offspring, lo, hi, mutation_prob, eta_m, rng)
 
         # 评估子代
         off_fit, off_viol = _evaluate_population(offspring, objectives, n_workers)
@@ -146,10 +179,17 @@ def nsga2(
         combined_fit = np.vstack([fit, off_fit])
         combined_viol = np.concatenate([viol, off_viol])
 
-        rank_c, crowd_c = _constrained_non_dominated_sort(combined_fit, combined_viol)
-
-        # 精英保留：按 (rank, -crowd) 排序取前 pop_size
-        elite_idx = _environmental_selection(rank_c, crowd_c, pop_size)
+        if backend == "rust":
+            rank_list, crowd_list = nsga2_sort_py(combined_fit.tolist(), combined_viol.tolist())
+            rank_c = np.asarray(rank_list, dtype=int)
+            crowd_c = np.asarray(crowd_list, dtype=float)
+            elite_idx = np.asarray(
+                nsga2_environmental_selection_py(rank_c.tolist(), crowd_c.tolist(), pop_size),
+                dtype=int,
+            )
+        else:
+            rank_c, crowd_c = _constrained_non_dominated_sort(combined_fit, combined_viol)
+            elite_idx = _environmental_selection(rank_c, crowd_c, pop_size)
         pop = combined_pop[elite_idx]
         fit = combined_fit[elite_idx]
         viol = combined_viol[elite_idx]
@@ -161,7 +201,12 @@ def nsga2(
             print(f"gen {gen:4d}: front_size={front_size}, n_eval={n_eval}")
 
     # 最终前沿
-    rank, crowd = _constrained_non_dominated_sort(fit, viol)
+    if backend == "rust":
+        rank_list, crowd_list = nsga2_sort_py(fit.tolist(), viol.tolist())
+        rank = np.asarray(rank_list, dtype=int)
+        crowd = np.asarray(crowd_list, dtype=float)
+    else:
+        rank, crowd = _constrained_non_dominated_sort(fit, viol)
     front_mask = rank == 0
     return NSGA2Result(
         x=pop[front_mask],
@@ -307,6 +352,78 @@ def _crowding_distance(fit: np.ndarray, rank: np.ndarray) -> np.ndarray:
                 sub_crowd[order[i]] += (sub_fit[order[i + 1], m] - sub_fit[order[i - 1], m]) / span
         crowd[idx] = sub_crowd
     return crowd
+
+
+def _rust_tournament_selection(
+    rank: np.ndarray, crowd: np.ndarray, n_select: int, rng: np.random.Generator
+) -> np.ndarray:
+    """按 Python 参照路径的随机数消耗顺序调用 Rust 锦标赛选择。"""
+    draws: list[int] = []
+    for _ in range(n_select):
+        pair = rng.integers(0, rank.shape[0], size=2)
+        draws.extend((int(pair[0]), int(pair[1])))
+    return np.asarray(
+        nsga2_tournament_selection_py(rank.tolist(), crowd.tolist(), draws), dtype=int
+    )
+
+
+def _rust_variation(
+    parents: np.ndarray,
+    lo: np.ndarray,
+    hi: np.ndarray,
+    crossover_prob: float,
+    eta_c: float,
+    mutation_prob: float,
+    eta_m: float,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """以原 Python 分支顺序产生随机数，由 Rust 执行 SBX 与变异。"""
+    n, n_dim = parents.shape
+    n_pairs = n // 2
+    crossover_draws = np.empty(n_pairs)
+    gene_draws = np.full((n_pairs, n_dim), np.nan)
+    beta_draws = np.full((n_pairs, n_dim), np.nan)
+    swap_draws = np.full((n_pairs, n_dim), np.nan)
+
+    for pair in range(n_pairs):
+        crossover_draws[pair] = rng.random()
+        if crossover_draws[pair] > crossover_prob:
+            continue
+        first = 2 * pair
+        second = first + 1
+        for dimension in range(n_dim):
+            gene_draws[pair, dimension] = rng.random()
+            if (
+                gene_draws[pair, dimension] <= 0.5
+                and abs(parents[first, dimension] - parents[second, dimension]) > 1e-14
+            ):
+                beta_draws[pair, dimension] = rng.random()
+                swap_draws[pair, dimension] = rng.random()
+
+    mutation_draws = np.empty((n, n_dim))
+    mutation_value_draws = np.full((n, n_dim), np.nan)
+    for individual in range(n):
+        for dimension in range(n_dim):
+            mutation_draws[individual, dimension] = rng.random()
+            if mutation_draws[individual, dimension] <= mutation_prob:
+                mutation_value_draws[individual, dimension] = rng.random()
+
+    offspring = nsga2_variation_py(
+        parents.tolist(),
+        lo.tolist(),
+        hi.tolist(),
+        crossover_prob,
+        eta_c,
+        mutation_prob,
+        eta_m,
+        crossover_draws.tolist(),
+        gene_draws.ravel().tolist(),
+        beta_draws.ravel().tolist(),
+        swap_draws.ravel().tolist(),
+        mutation_draws.ravel().tolist(),
+        mutation_value_draws.ravel().tolist(),
+    )
+    return np.asarray(offspring, dtype=float)
 
 
 def _tournament_selection(

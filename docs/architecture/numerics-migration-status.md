@@ -27,6 +27,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/solver`（星历修正路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/solver/continuation.py`（PAL 数值内核） | Rust（`e2m2e-forces`） | #443 |
 | `algorithm/transfer/qlaw.py`（反馈积分与 Q 函数；Python 仅组装初猜） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #442 |
+| `algorithm/transfer/nsga2.py`（演化算子；Python 保留评估与编排） | Rust（`e2m2e-integrators`） | #444 |
 | `algorithm/design`（打靶/传播路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/coordinate/synodic_j2000.py`（批量转换） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/proximity/relative_dynamics.py`（传播） | Rust（`e2m2e-integrators`） | — |
@@ -38,7 +39,6 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
 | `algorithm/solver/differential_correction.py`、`MultipleShooting` 类 | Python | #441 |
-| `algorithm/transfer/nsga2.py` | Python | #444 |
 | `algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py` | Python（传播已 Rust） | #445 |
 | `algorithm/transfer/porkchop.py` | Python（Lambert 已 Rust） | #446 |
 | `algorithm/transfer/wsb.py`、`low_energy.py`（WSB/低能转移） | Python（传播已 Rust） | #447 |
@@ -103,6 +103,13 @@ Python 侧保留 `TransferSearch` 编排、后端分发与 6 个几何 thin-wrap
 注意 `MultipleShooting` 类（transfer/hohmann 仍使用）本身还是 Python
 实现，见迁移中 #441。
 
+**`algorithm/transfer/nsga2.py`。** 约束非支配排序、拥挤度距离、锦标赛和
+环境选择、SBX 交叉及多项式变异在 `e2m2e-integrators` 的 `nsga2` 模块，经
+`nsga2_*_py` 暴露。Python 保留目标函数回调、`ProcessPoolExecutor` 并行评估、
+NumPy 随机数生成、逐代评估与 `NSGA2Result` 组装；`backend="python"` 保留原
+实现作对照与降级。随机抽样由 Python 按既有条件分支顺序生成并交给 Rust，因此
+两后端同种子演化等价。工作项：#444。
+
 **`algorithm/solver/continuation.py`（PAL 数值内核）。** 伪弧长延拓的 XZ
 对称约束 F/dF 组装、切向量（零空间）与 PAL 牛顿迭代在 `e2m2e-forces`
 crate（`pal_continuation` 模块），经 `pal_f_df_tangent_py` /
@@ -142,9 +149,6 @@ ADR 0011 明示的过渡状态，每个条目有独立工作 issue。可复用 A
 单段微分修正与 `MultipleShooting` 类是纯 Python；星历修正路径已有 Rust 版
 （见上），单段修正可评估与 `multiple_shooting_correct_py` 共用基础设施。
 工作项：#441。
-
-**`algorithm/transfer/nsga2.py`。** 非支配排序、拥挤度、演化循环纯 Python。
-ADR 0017 边界明确 nsga2"后续单独迁移"。工作项：#444。
 
 **`algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py`。**
 低推力打靶/配点的迭代求解是 Python；底层 7D 可变质量传播已 Rust

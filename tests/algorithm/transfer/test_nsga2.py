@@ -3,7 +3,20 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.transfer.nsga2 import NSGA2Result, nsga2
+from e2m2e.algorithm.transfer.nsga2 import (
+    NSGA2Result,
+    _constrained_non_dominated_sort,
+    _environmental_selection,
+    _polynomial_mutation,
+    _rust_variation,
+    _sbx_crossover,
+    nsga2,
+)
+from e2m2e.integrators import (
+    nsga2_environmental_selection_py,
+    nsga2_sort_py,
+    nsga2_tournament_selection_py,
+)
 
 pytestmark = pytest.mark.orchestration
 
@@ -171,3 +184,87 @@ class TestNSGA2Parallel:
         r_serial = nsga2(schaffer, bounds=[(-5, 5)], pop_size=50, n_gen=20, seed=42, n_workers=1)
         r_parallel = nsga2(schaffer, bounds=[(-5, 5)], pop_size=50, n_gen=20, seed=42, n_workers=2)
         np.testing.assert_allclose(r_serial.f, r_parallel.f)
+
+
+class TestNSGA2RustBackend:
+    """Rust 演化算子与 Python 参照路径的等价性。"""
+
+    def test_deterministic_operators_match_python(self):
+        """约束排序、拥挤度与精英保留在固定输入下逐项一致。"""
+        fit = np.array(
+            [
+                [1.0, 4.0],
+                [2.0, 3.0],
+                [3.0, 2.0],
+                [4.0, 1.0],
+                [0.5, 0.5],
+                [1.0, 4.0],
+                [5.0, 5.0],
+            ]
+        )
+        viol = np.array([0.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.4])
+
+        py_rank, py_crowd = _constrained_non_dominated_sort(fit, viol)
+        rust_rank, rust_crowd = nsga2_sort_py(fit.tolist(), viol.tolist())
+        np.testing.assert_array_equal(rust_rank, py_rank)
+        np.testing.assert_allclose(rust_crowd, py_crowd)
+
+        expected = _environmental_selection(py_rank, py_crowd, 4)
+        actual = nsga2_environmental_selection_py(py_rank.tolist(), py_crowd.tolist(), 4)
+        np.testing.assert_array_equal(actual, expected)
+
+        nan_viol = np.array([0.0, np.nan, 0.2])
+        nan_fit = np.array([[1.0, 2.0], [0.0, 0.0], [3.0, 4.0]])
+        py_rank, py_crowd = _constrained_non_dominated_sort(nan_fit, nan_viol)
+        rust_rank, rust_crowd = nsga2_sort_py(nan_fit.tolist(), nan_viol.tolist())
+        np.testing.assert_array_equal(rust_rank, py_rank)
+        np.testing.assert_allclose(rust_crowd, py_crowd)
+
+        zero_fit = np.array([[-0.0, 1.0], [0.0, 1.0], [1.0, 0.0]])
+        zero_viol = np.zeros(3)
+        py_rank, py_crowd = _constrained_non_dominated_sort(zero_fit, zero_viol)
+        rust_rank, rust_crowd = nsga2_sort_py(zero_fit.tolist(), zero_viol.tolist())
+        np.testing.assert_array_equal(rust_rank, py_rank)
+        np.testing.assert_allclose(rust_crowd, py_crowd)
+
+    def test_tournament_and_variation_match_python(self):
+        """固定父代和种子下，Rust 锦标赛、SBX 与变异逐项对拍。"""
+        rank = [0, 1, 0, 1]
+        crowd = [0.1, 0.9, 0.3, 0.2]
+        draws = [0, 1, 2, 3, 1, 2, 3, 0]
+        assert nsga2_tournament_selection_py(rank, crowd, draws) == [0, 2, 2, 0]
+
+        parents = np.array([[0.1, 0.8], [0.7, 0.2], [0.4, 0.5], [0.6, 0.3]])
+        lo = np.zeros(2)
+        hi = np.ones(2)
+        python_rng = np.random.default_rng(7)
+        rust_rng = np.random.default_rng(7)
+        expected = _polynomial_mutation(
+            _sbx_crossover(parents, lo, hi, 0.9, 20.0, python_rng),
+            lo,
+            hi,
+            0.5,
+            20.0,
+            python_rng,
+        )
+        actual = _rust_variation(parents, lo, hi, 0.9, 20.0, 0.5, 20.0, rust_rng)
+        np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-14)
+
+    def test_full_evolution_matches_python_backend(self):
+        """同一随机种子和参数下，Rust 与 Python 演化结果相同。"""
+        kwargs = {
+            "bounds": [(-5.0, 5.0)],
+            "pop_size": 40,
+            "n_gen": 15,
+            "seed": 42,
+            "n_workers": 1,
+        }
+        python = nsga2(schaffer, backend="python", **kwargs)
+        rust = nsga2(schaffer, backend="rust", **kwargs)
+
+        np.testing.assert_allclose(rust.x, python.x, rtol=1e-12, atol=1e-14)
+        np.testing.assert_allclose(rust.f, python.f, rtol=1e-12, atol=1e-14)
+        np.testing.assert_array_equal(rust.rank, python.rank)
+        np.testing.assert_allclose(rust.crowding, python.crowding)
+        assert rust.n_eval == python.n_eval
+        assert rust.history == python.history

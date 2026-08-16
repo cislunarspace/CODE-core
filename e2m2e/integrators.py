@@ -33,6 +33,10 @@ if TYPE_CHECKING:
     hello_integrators: Any
     lambert_batch_py: Any
     lambert_izzo_py: Any
+    nsga2_environmental_selection_py: Any
+    nsga2_sort_py: Any
+    nsga2_tournament_selection_py: Any
+    nsga2_variation_py: Any
     pal_f_df_tangent_py: Any
     pal_newton_step_py: Any
     pole_tide: Any
@@ -100,6 +104,10 @@ _RUST_SYMBOLS = (
     "lambert_batch_py",
     "lambert_izzo_py",
     "multiple_shooting_correct_py",
+    "nsga2_environmental_selection_py",
+    "nsga2_sort_py",
+    "nsga2_tournament_selection_py",
+    "nsga2_variation_py",
     "pal_f_df_tangent_py",
     "pal_newton_step_py",
     "planar_full_period_pal_py",
@@ -285,6 +293,10 @@ __all__ = [
     "MultistepResult",
     "multistep_step",
     "multiple_shooting_correct_py",
+    "nsga2_environmental_selection_py",
+    "nsga2_sort_py",
+    "nsga2_tournament_selection_py",
+    "nsga2_variation_py",
     "pal_f_df_tangent_py",
     "pal_newton_step_py",
     "planar_full_period_pal_py",

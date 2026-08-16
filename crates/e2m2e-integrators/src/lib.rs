@@ -16,6 +16,7 @@ pub mod homotopy;
 #[cfg(feature = "spice")]
 pub mod multiple_shooting;
 pub mod normal_form;
+pub mod nsga2;
 pub mod planar_pal;
 #[cfg(feature = "spice")]
 pub mod segmented_shooting;
@@ -341,6 +342,8 @@ const fn parse_abi_version(s: &str) -> u32 {
 /// - **v9** （#442）：新增 ``qlaw_propagate_py`` 与
 ///   ``qlaw_segment_direction_py``（Q-law 低推力初猜的反馈积分与 Q 函数
 ///   评估内核）。
+/// - **v10** （#444）：新增 ``nsga2_*_py``（NSGA-II 约束排序、选择、
+///   SBX 交叉与多项式变异算子）。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -3394,6 +3397,13 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(check_collision_py, m)?)?;
     m.add_function(wrap_pyfunction!(qlaw_propagate_py, m)?)?;
     m.add_function(wrap_pyfunction!(qlaw_segment_direction_py, m)?)?;
+    m.add_function(wrap_pyfunction!(nsga2::nsga2_sort_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        nsga2::nsga2_environmental_selection_py,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(nsga2::nsga2_tournament_selection_py, m)?)?;
+    m.add_function(wrap_pyfunction!(nsga2::nsga2_variation_py, m)?)?;
     m.add_function(wrap_pyfunction!(pal_f_df_tangent_py, m)?)?;
     m.add_function(wrap_pyfunction!(pal_newton_step_py, m)?)?;
     m.add_function(wrap_pyfunction!(transfer_grid_search_serial_py, m)?)?;
