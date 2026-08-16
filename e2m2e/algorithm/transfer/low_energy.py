@@ -3,16 +3,20 @@
 低能转移初猜生成（郑越、赵敏 2023 流程的产品化）：
 
 1. 出发轨道不稳定流形与目标轨道稳定流形各自传播到同一庞加莱截面；
-2. :func:`patch_manifolds` 把两管穿越点两两配对，按加权拼接代价升序给出候选；
-3. :func:`design_low_energy_transfer` 取最优候选，以 :class:`ThreeBodyLambert`
-   打靶把拼接点之后的弧段闭合到目标轨道（CR3BP 微分修正）。
+2. :func:`patch_manifolds` 把两管穿越点交给默认 Rust 数值核完成两两配对、
+   位置/速度差和加权排序；
+3. :func:`design_low_energy_transfer` 以 :class:`ThreeBodyLambert` 打靶闭合弧段。
+
+Python 侧保留流形对象与高层编排；``backend="python"`` 只作显式等价性参照，
+Rust 不可用时不自动回退。
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 
@@ -49,30 +53,16 @@ class PatchCandidate:
     cost: float
 
 
-def patch_manifolds(
-    m_a: ManifoldTube,
-    m_b: ManifoldTube,
-    section: PoincareSection,
-    weights: tuple[float, float] = (1.0, 1.0),
+def _patch_manifold_states_python(
+    states_a: np.ndarray,
+    states_b: np.ndarray,
+    weights: tuple[float, float],
 ) -> list[PatchCandidate]:
-    """两流形管在同一截面的穿越点两两配对，按拼接代价升序输出。
-
-    Args:
-        m_a: 管 A（如出发轨道不稳定流形）
-        m_b: 管 B（如目标轨道稳定流形）
-        section: 庞加莱截面
-        weights: ``(w_r, w_v)`` 位置/速度差权重（无量纲量纲下的相对权重）
-
-    Returns:
-        按 ``cost`` 升序排列的候选列表；任一管无穿越时返回空列表
-    """
+    """Python 参照实现，仅由显式 ``backend='python'`` 调用。"""
     w_r, w_v = float(weights[0]), float(weights[1])
-    crossings_a = section.crossings(m_a)
-    crossings_b = section.crossings(m_b)
-
     candidates: list[PatchCandidate] = []
-    for i, state_a in enumerate(crossings_a.states):
-        for j, state_b in enumerate(crossings_b.states):
+    for i, state_a in enumerate(states_a):
+        for j, state_b in enumerate(states_b):
             delta_r = float(np.linalg.norm(state_a[:3] - state_b[:3]))
             delta_v = float(np.linalg.norm(state_a[3:] - state_b[3:]))
             candidates.append(
@@ -87,8 +77,71 @@ def patch_manifolds(
                 )
             )
 
-    candidates.sort(key=lambda c: c.cost)
+    candidates.sort(key=lambda candidate: candidate.cost)
     return candidates
+
+
+def patch_manifolds(
+    m_a: ManifoldTube,
+    m_b: ManifoldTube,
+    section: PoincareSection,
+    weights: tuple[float, float] = (1.0, 1.0),
+    *,
+    backend: Literal["rust", "python"] = "rust",
+    parallel: bool | None = None,
+    n_workers: int | None = None,
+    progress_callback: Callable[[int], Any] | None = None,
+) -> list[PatchCandidate]:
+    """两流形管在同一截面的穿越点两两配对，按拼接代价升序输出。
+
+    默认 ``backend='rust'``：配对、范数、代价和排序均由 Rust 执行；Rust
+    扩展缺失时直接报错。``backend='python'`` 仅保留作显式等价性对照，绝不
+    作为运行时回退。截面对象和流形管遍历仍由 Python 编排层负责。
+
+    Args:
+        m_a: 管 A（如出发轨道不稳定流形）
+        m_b: 管 B（如目标轨道稳定流形）
+        section: 庞加莱截面
+        weights: ``(w_r, w_v)`` 位置/速度差权重（无量纲量纲下的相对权重）
+        backend: ``'rust'``（默认）或显式参照 ``'python'``
+        parallel: Rust 路径是否使用 Rayon；``None`` 由环境变量决定
+        n_workers: Rust Rayon 线程数；``None`` 使用全局线程池
+        progress_callback: 每完成一个截面态配对调用，Rust 侧可合并增量
+
+    Returns:
+        按 ``cost`` 升序排列的候选列表；任一管无穿越时返回空列表
+    """
+    if backend not in ("rust", "python"):
+        raise ValueError("backend 须为 'rust' 或 'python'")
+
+    states_a = section.crossings(m_a).states
+    states_b = section.crossings(m_b).states
+    if len(states_a) == 0 or len(states_b) == 0:
+        return []
+    if backend == "python":
+        return _patch_manifold_states_python(states_a, states_b, weights)
+
+    from ...integrators import low_energy_patch_rust
+
+    return [
+        PatchCandidate(
+            i_a=int(candidate["i_a"]),
+            i_b=int(candidate["i_b"]),
+            state_a=candidate["state_a"],
+            state_b=candidate["state_b"],
+            delta_r=float(candidate["delta_r"]),
+            delta_v=float(candidate["delta_v"]),
+            cost=float(candidate["cost"]),
+        )
+        for candidate in low_energy_patch_rust(
+            states_a,
+            states_b,
+            weights,
+            parallel=parallel,
+            n_workers=n_workers,
+            progress_callback=progress_callback,
+        )
+    ]
 
 
 # 种子扰动幅度对应的物理长度 (km)，除以特征长度得无量纲 ε

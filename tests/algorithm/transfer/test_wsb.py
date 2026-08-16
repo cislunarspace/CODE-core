@@ -103,7 +103,7 @@ def test_wsb_search_reports_propagation_failure(monkeypatch):
         "e2m2e.algorithm.transfer.wsb.BCR4BP_Dynamics",
         lambda system: FailingDynamics(),
     )
-    result = search_wsb_trajectories(departure, target, system, params)
+    result = search_wsb_trajectories(departure, target, system, params, backend="python")
     assert not result
     assert result.status is ConvergenceState.DIVERGED
     assert result.cause is FailureCause.DIVERGENCE_DETECTED

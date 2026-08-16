@@ -62,8 +62,8 @@ fn transfer_grid_search_py(...) -> Vec<TransferPointResult> {
 - **编排留 Python**：`TransferSearch`（参数管理、`search`/`optimize` 入口、可行性过滤）、`dispatch_grid_search`（后端分发）、`set_parallel_backend`（backend 校验与路由）。
 - **NLP 优化留 Python**：SLSQP / COPT 串行迭代是 Python 强项（`architecture-design-discussion.md` 共识）；多候选解并行用 `ProcessPoolExecutor`，不在本 ADR 范围。
 - **几何方法 thin-wrapper 保留**：`TransferSearch` 上的 6 个 thin-wrapper（`_forward_integrate` / `_check_collision` / `_compute_distance_series` / `_detect_intersection` / `_detect_local_minimum` / `_compute_min_distance`）是 Python 端**唯一分发缝**，保留作 monkeypatch 兼容 + numpy 对照基准。
-- **CR3BP 路径无 ephem_cache**：纯数学，不涉及星历缓存。星历路径（`EphemerisDynamics` / BCR4BP 搜索）需 `ephem_cache` + `StrictGuard`（ADR 0016），另开设计。
-- **low-thrust / porkchop / nsga2 / wsb**：可复用本阶段基础设施（同模式 multiprocessing→rayon），后续单独迁移。
+- **CR3BP/BCR4BP 纯数学路径无 ephem_cache**：`transfer_grid_search` 与 WSB 的 BCR4BP 搜索直接调用 Rust 纯数学传播器，可安全使用 Rayon；星历路径（`EphemerisDynamics`）仍需 `ephem_cache` + `StrictGuard`（ADR 0016），另按其并发边界处理。
+- **low-thrust / porkchop / nsga2**：可复用本阶段基础设施（同模式 multiprocessing→rayon），后续单独迁移；WSB 已由 #447 下沉为独立 BCR4BP Rust/Rayon 数值核。
 
 ## 架构合规
 

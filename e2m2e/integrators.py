@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     hello_integrators: Any
     lambert_batch_py: Any
     lambert_izzo_py: Any
+    low_energy_patch_py: Any
     lowthrust_collocation_defects_py: Any
     lowthrust_shooting_evaluate_py: Any
     nsga2_environmental_selection_py: Any
@@ -67,12 +68,15 @@ if TYPE_CHECKING:
     third_body_acceleration: Any
     transfer_grid_search_py: Any
     transfer_grid_search_serial_py: Any
+    wsb_search_py: Any
     CowellResult: Any
     MultistepMethod: Any
     MultistepResult: Any
     PlanarPalRustResult: Any
     RkMethod: Any
+    LowEnergyPatchCandidate: Any
     TransferPointResult: Any
+    WsbCandidate: Any
     _cowell_step: Any
     _multistep_step: Any
     _rk_step: Any
@@ -83,7 +87,9 @@ _RUST_SYMBOLS = (
     "MultistepResult",
     "PlanarPalRustResult",
     "RkMethod",
+    "LowEnergyPatchCandidate",
     "TransferPointResult",
+    "WsbCandidate",
     "_cowell_step",
     "_multistep_step",
     "_rk_step",
@@ -105,6 +111,7 @@ _RUST_SYMBOLS = (
     "indirect_term_acceleration",
     "lambert_batch_py",
     "lambert_izzo_py",
+    "low_energy_patch_py",
     "lowthrust_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
     "multiple_shooting_correct_py",
@@ -144,6 +151,7 @@ _RUST_SYMBOLS = (
     "third_body_acceleration",
     "transfer_grid_search_py",
     "transfer_grid_search_serial_py",
+    "wsb_search_py",
 )
 
 try:
@@ -293,6 +301,7 @@ __all__ = [
     "initialize_cowell_history",
     "lambert_batch_py",
     "lambert_izzo_py",
+    "low_energy_patch_rust",
     "lowthrust_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
     "MultistepMethod",
@@ -337,6 +346,8 @@ __all__ = [
     "spherical_harmonic_accel",
     "srp_acceleration",
     "third_body_acceleration",
+    "wsb_search_rust",
+    "LowEnergyPatchCandidate",
     "TransferPointResult",
     "transfer_grid_search_py",
     "transfer_grid_search_serial_py",
@@ -565,6 +576,147 @@ def solve_ivp_events(
         max_steps,
         state_error_dim,
     )
+
+
+def wsb_search_rust(
+    departure_state: npt.ArrayLike,
+    target_state: npt.ArrayLike,
+    *,
+    mu: float,
+    mu_sun: float,
+    sun_distance: float,
+    sun_angular_rate: float,
+    sun_phase_range: tuple[float, float],
+    n_sun_phase: int,
+    departure_phase_range: tuple[float, float],
+    n_departure_phase: int,
+    tof_range_sec: tuple[float, float],
+    n_tof: int,
+    perilune_alt_range_km: tuple[float, float],
+    max_total_dv: float,
+    h2_energy_threshold: float,
+    n_propagation_samples: int,
+    rtol: float,
+    atol: float,
+    max_step: float,
+    secondary_radius_km: float,
+    characteristic_length_km: float,
+    characteristic_time_sec: float,
+    parallel: bool | None = None,
+    n_workers: int | None = None,
+    progress_callback: Callable[[int], Any] | None = None,
+) -> tuple[list[dict[str, Any]], int]:
+    """WSB 三维网格搜索的 Rust 后端。
+
+    参数全部是已无量纲化的 POD 数值；BCR4BP 传播、截面求精和候选筛选均在
+    Rust 内完成。``parallel=None`` 时由 ``E2M2E_WSB_PARALLEL`` 控制 Rayon。
+    """
+    require_rust_extension("wsb_search_py")
+    departure_arr = np.asarray(departure_state, dtype=float).reshape(-1)
+    target_arr = np.asarray(target_state, dtype=float).reshape(-1)
+    if departure_arr.shape != (6,) or target_arr.shape != (6,):
+        raise ValueError("departure_state 与 target_state 必须都是长度 6 的状态")
+
+    raw_candidates, n_propagation_failures = wsb_search_py(
+        departure_arr.tolist(),
+        target_arr.tolist(),
+        float(mu),
+        float(mu_sun),
+        float(sun_distance),
+        float(sun_angular_rate),
+        float(sun_phase_range[0]),
+        float(sun_phase_range[1]),
+        int(n_sun_phase),
+        float(departure_phase_range[0]),
+        float(departure_phase_range[1]),
+        int(n_departure_phase),
+        float(tof_range_sec[0]),
+        float(tof_range_sec[1]),
+        int(n_tof),
+        float(perilune_alt_range_km[0]),
+        float(perilune_alt_range_km[1]),
+        float(max_total_dv),
+        float(h2_energy_threshold),
+        int(n_propagation_samples),
+        float(rtol),
+        float(atol),
+        float(max_step),
+        float(secondary_radius_km),
+        float(characteristic_length_km),
+        float(characteristic_time_sec),
+        parallel=parallel,
+        n_workers=n_workers,
+        progress_callback=progress_callback,
+    )
+    return (
+        [
+            {
+                "sun_phase0": candidate.sun_phase0,
+                "departure_phase": candidate.departure_phase,
+                "tof_sec": candidate.tof_sec,
+                "departure_state": np.asarray(candidate.departure_state, dtype=float),
+                "perilune_state": np.asarray(candidate.perilune_state, dtype=float),
+                "perilune_alt_km": candidate.perilune_alt_km,
+                "perilune_time_dim": candidate.perilune_time_dim,
+                "arrival_state": np.asarray(candidate.arrival_state, dtype=float),
+                "h2_kepler": candidate.h2_kepler,
+                "dv_departure": candidate.dv_departure,
+                "dv_arrival": candidate.dv_arrival,
+                "total_dv": candidate.total_dv,
+                "arrival_time_dim": candidate.arrival_time_dim,
+            }
+            for candidate in raw_candidates
+        ],
+        int(n_propagation_failures),
+    )
+
+
+def low_energy_patch_rust(
+    states_a: npt.ArrayLike,
+    states_b: npt.ArrayLike,
+    weights: tuple[float, float],
+    *,
+    parallel: bool | None = None,
+    n_workers: int | None = None,
+    progress_callback: Callable[[int], Any] | None = None,
+) -> list[dict[str, Any]]:
+    """低能转移流形截面态配对的 Rust 后端。
+
+    输入为两组 ``(n, 6)`` 截面态，Rust 完成全部配对、位置/速度范数、
+    加权代价和稳定排序。``parallel=None`` 时由
+    ``E2M2E_LOW_ENERGY_PARALLEL`` 决定是否使用 Rayon；显式 ``n_workers``
+    为本次调用建立一次性线程池。
+    """
+    require_rust_extension("low_energy_patch_py")
+    states_a_arr = np.asarray(states_a, dtype=float)
+    states_b_arr = np.asarray(states_b, dtype=float)
+    if states_a_arr.ndim != 2 or states_a_arr.shape[1:] != (6,):
+        raise ValueError(f"states_a 须为 (n, 6)，得到 {states_a_arr.shape}")
+    if states_b_arr.ndim != 2 or states_b_arr.shape[1:] != (6,):
+        raise ValueError(f"states_b 须为 (n, 6)，得到 {states_b_arr.shape}")
+
+    weight_r, weight_v = (float(weights[0]), float(weights[1]))
+    raw_candidates = low_energy_patch_py(
+        states_a_arr.reshape(-1).tolist(),
+        states_b_arr.reshape(-1).tolist(),
+        weight_r,
+        weight_v,
+        parallel=parallel,
+        n_workers=n_workers,
+        progress_callback=progress_callback,
+    )
+    return [
+        {
+            "i_a": candidate.i_a,
+            "i_b": candidate.i_b,
+            "state_a": np.asarray(candidate.state_a, dtype=float),
+            "state_b": np.asarray(candidate.state_b, dtype=float),
+            "delta_r": candidate.delta_r,
+            "delta_v": candidate.delta_v,
+            "cost": candidate.cost,
+        }
+        for candidate in raw_candidates
+    ]
 
 
 def grid_search_rust_serial(

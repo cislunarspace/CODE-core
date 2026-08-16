@@ -24,6 +24,8 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/forces`（数值） | Rust（`e2m2e-forces`） | — |
 | `algorithm/transfer/lambert.py` | Rust（`e2m2e-propagation`） | — |
 | `algorithm/transfer/search_parallel.py`（网格搜索） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/transfer/wsb.py`（WSB 网格候选评估） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #447 |
+| `algorithm/transfer/low_energy.py`（流形截面态配对） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #447 |
 | `algorithm/solver`（星历修正路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/solver/continuation.py`（PAL 数值内核） | Rust（`e2m2e-forces`） | #443 |
 | `algorithm/transfer/qlaw.py`（反馈积分与 Q 函数；Python 仅组装初猜） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #442 |
@@ -42,7 +44,6 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/solver/differential_correction.py`、`MultipleShooting` 类 | Python | #441 |
 
 | `algorithm/transfer/porkchop.py` | Python（Lambert 已 Rust） | #446 |
-| `algorithm/transfer/wsb.py`、`low_energy.py`（WSB/低能转移） | Python（传播已 Rust） | #447 |
 | `algorithm/manifold/manifolds.py` | Python | #448 |
 | `algorithm/normal_form`（FFT/多项式/化简、多重打靶 Newton） | Python（积分已 Rust） | #449 |
 
@@ -92,6 +93,18 @@ to_rust_spec 序列化"配置面。`forces` 的层级归属（数值层配置面
 与网格分发在 `e2m2e-integrators`（`transfer_grid_search`，Rayon 并行）。
 Python 侧保留 `TransferSearch` 编排、后端分发与 6 个几何 thin-wrapper
 （monkeypatch 缝，见 ADR 0017）。
+
+**`algorithm/transfer/wsb.py`（WSB 网格候选评估）。** TLI 参数化、BCR4BP
+传播、近月点检测与插值、H2、到达态/Delta-v 计算和候选筛选在
+`e2m2e-forces` 的纯 Rust 核执行，经 `e2m2e-integrators` 用 Rayon 分发。
+Python 保留系统/参数校验和领域结果组装；默认 Rust，Python 仅作显式等价性
+对照，绝不自动回退。工作项：#447。
+
+**`algorithm/transfer/low_energy.py`（流形截面态配对）。** 两组截面态的
+笛卡尔积、位置/速度范数、加权拼接代价和稳定排序在 `e2m2e-forces` 的
+纯 Rust 核执行，经 `e2m2e-integrators` 暴露。流形管管理、四分支编排和
+ThreeBodyLambert 闭合仍在 Python；流形种子、STM 转运和管传播属于 #448。
+默认 Rust，Python 仅作显式等价性对照。工作项：#447。
 
 **`algorithm/transfer/qlaw.py`。** Q-law 反馈律积分、开普勒根数转换、Gauss
 方程、Q 函数与推力方向在 Rust 内核完成，经 `qlaw_propagate_py` 与
@@ -162,12 +175,6 @@ ADR 0011 明示的过渡状态，每个条目有独立工作 issue。可复用 A
 网格上的 Lambert 求解已 Rust（`lambert_batch_py`）。ADR 0017 边界列
 porkchop 后续迁移，可复用 `transfer_grid_search` 的 Rayon 分发范式。
 工作项：#446。
-
-**`algorithm/transfer/wsb.py`、`low_energy.py`（WSB/低能转移）。**
-`wsb.py` 的 BCR4BP 弹道搜索（sun_phase × departure_phase × tof 三维网格，
-ProcessPoolExecutor 并行）与 `low_energy.py` 的流形管配对、拼接代价评估
-是 Python；底层传播已 Rust。ADR 0017 边界列 wsb 后续迁移，可复用
-`transfer_grid_search` 的 Rayon 分发范式。工作项：#447。
 
 **`algorithm/manifold/manifolds.py`。** 单值矩阵特征分解、STM 转运、种子
 生成纯 Python（numpy）。ADR 0026 后续工作第三条点名的过渡状态之一。

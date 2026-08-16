@@ -5,8 +5,9 @@
 （弹道捕获判据——无需制动脉冲即被月球束缚），自然被月球捕获后可由
 小量圆化脉冲稳定。总 Δv 仅来自出发脉冲和到达脉冲。
 
-搜索空间：sun_phase × departure_phase × tof 三维网格。
-并行化：ProcessPoolExecutor，每个 (sun_phase, tof) 独立。
+搜索空间：sun_phase × departure_phase × tof 三维网格。默认 Rust 后端把
+候选参数化、BCR4BP 传播、截面检测和筛选交给 Rayon；Python 实现只在调用方
+显式指定 ``backend="python"`` 时作为等价性参照，绝不自动回退。
 
 BCR4BP 旋转系→惯性系速度修正（任务 #259 方案）：
 
@@ -22,8 +23,10 @@ import logging
 import math
 import multiprocessing
 import os
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
+from typing import Any, Literal
 
 import numpy as np
 
@@ -161,6 +164,132 @@ def search_wsb_trajectories(
     target_state: np.ndarray,
     system: BCR4BPSystem,
     params: WsbSearchParams | None = None,
+    *,
+    backend: Literal["rust", "python"] = "rust",
+    parallel: bool | None = None,
+    n_workers: int | None = None,
+    progress_callback: Callable[[int], Any] | None = None,
+) -> CandidateSearchResult[WsbCandidate]:
+    """WSB 弹道三维网格搜索。
+
+    默认 ``backend='rust'``：BCR4BP 传播、近月点检测、候选筛选和 Rayon
+    并行均在 Rust 内完成。``backend='python'`` 仅供显式等价性对照，绝不
+    在 Rust 扩展缺失或运行失败时自动回退。
+    """
+    if backend not in ("rust", "python"):
+        raise ValueError("backend 须为 'rust' 或 'python'")
+    if backend == "rust":
+        return _search_wsb_trajectories_rust(
+            departure_state,
+            target_state,
+            system,
+            params,
+            parallel=parallel,
+            n_workers=n_workers,
+            progress_callback=progress_callback,
+        )
+    return _search_wsb_trajectories_python(
+        departure_state,
+        target_state,
+        system,
+        params,
+        parallel=parallel,
+        n_workers=n_workers,
+        progress_callback=progress_callback,
+    )
+
+
+def _search_wsb_trajectories_rust(
+    departure_state: np.ndarray,
+    target_state: np.ndarray,
+    system: BCR4BPSystem,
+    params: WsbSearchParams | None,
+    *,
+    parallel: bool | None,
+    n_workers: int | None,
+    progress_callback: Callable[[int], Any] | None,
+) -> CandidateSearchResult[WsbCandidate]:
+    """把 WSB POD 输入交给 Rust 核，再恢复现有领域结果对象。"""
+    from ...integrators import wsb_search_rust
+
+    if params is None:
+        params = WsbSearchParams()
+    if system.characteristic_length is None or system.characteristic_time is None:
+        raise ValueError("system 必须设置 characteristic_length 与 characteristic_time")
+
+    # 只读取现有动力学对象的积分配置；实际传播由 Rust 核直接完成。
+    dynamics = BCR4BP_Dynamics(system)
+    candidates, n_propagation_failures = wsb_search_rust(
+        departure_state,
+        target_state,
+        mu=float(system.mu),
+        mu_sun=float(system.sun_mass),
+        sun_distance=float(system.sun_distance),
+        sun_angular_rate=float(system.sun_angular_rate),
+        sun_phase_range=params.sun_phase_range,
+        n_sun_phase=params.n_sun_phase,
+        departure_phase_range=params.departure_phase_range,
+        n_departure_phase=params.n_departure_phase,
+        tof_range_sec=(
+            params.tof_range[0] * SECONDS_PER_DAY,
+            params.tof_range[1] * SECONDS_PER_DAY,
+        ),
+        n_tof=params.n_tof,
+        perilune_alt_range_km=(params.perilune_alt_min, params.perilune_alt_max),
+        max_total_dv=params.max_total_dv,
+        h2_energy_threshold=params.h2_energy_threshold,
+        n_propagation_samples=params.n_propagation_samples,
+        rtol=float(dynamics.rtol),
+        atol=float(dynamics.atol),
+        max_step=float(dynamics.max_step),
+        secondary_radius_km=R_MOON_KM,
+        characteristic_length_km=float(system.characteristic_length),
+        characteristic_time_sec=float(system.characteristic_time),
+        parallel=parallel,
+        n_workers=n_workers,
+        progress_callback=progress_callback,
+    )
+    wrapped = tuple(
+        WsbCandidate(
+            **candidate,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="找到 WSB 候选",
+        )
+        for candidate in candidates
+    )
+    if wrapped:
+        return CandidateSearchResult(
+            wrapped,
+            ConvergenceState.CONVERGED,
+            FailureCause.NONE,
+            "找到 WSB 候选",
+        )
+    n_tasks = params.n_sun_phase * params.n_tof
+    if n_propagation_failures == n_tasks * params.n_departure_phase:
+        return CandidateSearchResult(
+            (),
+            ConvergenceState.DIVERGED,
+            FailureCause.DIVERGENCE_DETECTED,
+            "全部 WSB 网格点传播失败",
+        )
+    return CandidateSearchResult(
+        (),
+        ConvergenceState.INFEASIBLE,
+        FailureCause.NO_INTERSECTION,
+        "搜索未找到可行候选",
+    )
+
+
+def _search_wsb_trajectories_python(
+    departure_state: np.ndarray,
+    target_state: np.ndarray,
+    system: BCR4BPSystem,
+    params: WsbSearchParams | None = None,
+    *,
+    parallel: bool | None = None,
+    n_workers: int | None = None,
+    progress_callback: Callable[[int], Any] | None = None,
 ) -> CandidateSearchResult[WsbCandidate]:
     """WSB 弹道并行网格搜索。
 
@@ -222,40 +351,47 @@ def search_wsb_trajectories(
 
     tasks = [(float(sp), float(tof_sec)) for sp in sun_phase_grid for tof_sec in tof_grid_sec]
 
+    worker_args = [
+        (
+            params,
+            departure_state,
+            r0,
+            v_hat,
+            r_hat,
+            v_tli,
+            v_park,
+            target_state,
+            r_target,
+            mu,
+            du_km,
+            char_time,
+            float(system.sun_mass),
+            float(system.sun_distance),
+            float(system.sun_angular_rate),
+            sun_phase,
+            tof_sec,
+        )
+        for sun_phase, tof_sec in tasks
+    ]
     all_candidates: list[WsbCandidate] = []
     n_propagation_failures = 0
-    # spawn 启动子进程（#367）：xdist 并行 worker 本身是多线程，fork 出的
-    # 子进程继承父进程锁状态，multiprocessing 在 pytest-xdist 下实测会
-    # futex 死锁；spawn 重新初始化解释器，无继承锁，安全。代价是 worker
-    # 启动时重新 import（一次性，任务网格远大于 worker 数）。
-    with ProcessPoolExecutor(
-        max_workers=os.cpu_count(),
-        mp_context=multiprocessing.get_context("spawn"),
-    ) as executor:
-        futures = [
-            executor.submit(
-                _wsb_worker,
-                params,
-                departure_state,
-                r0,
-                v_hat,
-                r_hat,
-                v_tli,
-                v_park,
-                target_state,
-                r_target,
-                mu,
-                du_km,
-                char_time,
-                sun_phase,
-                tof_sec,
-            )
-            for sun_phase, tof_sec in tasks
-        ]
-        for future in futures:
-            candidates, propagation_failures = future.result()
-            all_candidates.extend(candidates)
-            n_propagation_failures += propagation_failures
+    if parallel is False or n_workers == 1:
+        worker_results = [_wsb_worker(*args) for args in worker_args]
+    else:
+        # spawn 启动子进程（#367）：xdist 并行 worker 本身是多线程，fork 出的
+        # 子进程继承父进程锁状态，multiprocessing 在 pytest-xdist 下实测会
+        # futex 死锁；spawn 重新初始化解释器，无继承锁，安全。
+        with ProcessPoolExecutor(
+            max_workers=n_workers if n_workers is not None else os.cpu_count(),
+            mp_context=multiprocessing.get_context("spawn"),
+        ) as executor:
+            futures = [executor.submit(_wsb_worker, *args) for args in worker_args]
+            worker_results = [future.result() for future in futures]
+    for candidates, propagation_failures in worker_results:
+        all_candidates.extend(candidates)
+        n_propagation_failures += propagation_failures
+        if progress_callback is not None:
+            progress_callback(1)
 
     all_candidates.sort(key=lambda c: c.total_dv)
     if all_candidates:
@@ -293,6 +429,9 @@ def _wsb_worker(
     mu: float,
     du_km: float,
     char_time: float,
+    sun_mass: float,
+    sun_distance: float,
+    sun_angular_rate: float,
     sun_phase0: float,
     tof_sec: float,
 ) -> tuple[list[WsbCandidate], int]:
@@ -301,7 +440,15 @@ def _wsb_worker(
     在 ProcessPoolExecutor 工作进程中运行。对给定的太阳相位角和
     飞行时间，遍历出发相位角网格，返回所有满足条件的候选。
     """
-    bcr4bp_system = BCR4BPSystem.earth_moon(sun_phase0=sun_phase0)
+    bcr4bp_system = BCR4BPSystem(
+        mu=mu,
+        primary="Earth",
+        secondary="Moon",
+        sun_mass=sun_mass,
+        sun_distance=sun_distance,
+        sun_angular_rate=sun_angular_rate,
+        sun_phase0=sun_phase0,
+    )
     dynamics = BCR4BP_Dynamics(bcr4bp_system)
     periapsis_section = PoincareSection.periapsis("moon", bcr4bp_system)
     moon_pos = np.array([1.0 - mu, 0.0, 0.0])
