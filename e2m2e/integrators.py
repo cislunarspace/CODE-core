@@ -33,6 +33,8 @@ if TYPE_CHECKING:
     hello_integrators: Any
     lambert_batch_py: Any
     lambert_izzo_py: Any
+    lowthrust_collocation_defects_py: Any
+    lowthrust_shooting_evaluate_py: Any
     nsga2_environmental_selection_py: Any
     nsga2_sort_py: Any
     nsga2_tournament_selection_py: Any
@@ -103,6 +105,8 @@ _RUST_SYMBOLS = (
     "indirect_term_acceleration",
     "lambert_batch_py",
     "lambert_izzo_py",
+    "lowthrust_collocation_defects_py",
+    "lowthrust_shooting_evaluate_py",
     "multiple_shooting_correct_py",
     "nsga2_environmental_selection_py",
     "nsga2_sort_py",
@@ -289,6 +293,8 @@ __all__ = [
     "initialize_cowell_history",
     "lambert_batch_py",
     "lambert_izzo_py",
+    "lowthrust_collocation_defects_py",
+    "lowthrust_shooting_evaluate_py",
     "MultistepMethod",
     "MultistepResult",
     "multistep_step",

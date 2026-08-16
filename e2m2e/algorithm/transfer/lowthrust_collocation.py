@@ -52,6 +52,8 @@ class LowThrustCollocation:
         initial_mass: 初始质量 kg。
         target_state: 目标末态 ``[r,v]``，``(6,)``。
         t0, tf: 起止时刻。
+        backend: 数值评估后端；默认 ``"rust"``，``"python"`` 保留原实现作
+            等价性对照与降级。
     """
 
     def __init__(
@@ -64,6 +66,8 @@ class LowThrustCollocation:
         target_state: npt.ArrayLike,
         t0: float,
         tf: float,
+        *,
+        backend: str = "rust",
     ) -> None:
         self._system = system
         self._engine = engine
@@ -71,6 +75,9 @@ class LowThrustCollocation:
         self._tf = float(tf)
         if self._tf <= self._t0:
             raise ValueError(f"tf ({self._tf}) must be > t0 ({self._t0})")
+        if backend not in {"rust", "python"}:
+            raise ValueError(f"backend must be 'rust' or 'python', got {backend!r}")
+        self._backend = backend
 
         self._initial_state = np.asarray(initial_state, dtype=float)
         self._initial_mass = float(initial_mass)
@@ -256,7 +263,7 @@ class LowThrustCollocation:
 
     # ---- 约束与目标 ----
 
-    def _defect_constraints(
+    def _defect_constraints_python(
         self, z: npt.NDArray[np.floating], n_segments: int
     ) -> npt.NDArray[np.floating]:
         """Hermite-Simpson 缺陷约束，形状 (7*n_segments,)。"""
@@ -279,6 +286,31 @@ class LowThrustCollocation:
             # Simpson 缺陷
             defects[i * 7 : (i + 1) * 7] = xip1 - xi - (dt / 6) * (fi + 4 * fc + fip1)
         return defects
+
+    def _defect_constraints(
+        self, z: npt.NDArray[np.floating], n_segments: int
+    ) -> npt.NDArray[np.floating]:
+        """按后端计算全部 Hermite-Simpson 缺陷。"""
+        if self._backend == "python":
+            return self._defect_constraints_python(z, n_segments)
+
+        from e2m2e.integrators import lowthrust_collocation_defects_py, require_rust_extension
+
+        require_rust_extension("lowthrust_collocation_defects_py")
+        states, controls = self._unpack(z, n_segments + 1)
+        return np.asarray(
+            lowthrust_collocation_defects_py(
+                states.tolist(),
+                controls.tolist(),
+                self._t0,
+                self._tf,
+                self._observer,
+                self._forces_py,
+                self._engine.t_max,
+                self._engine.isp,
+            ),
+            dtype=float,
+        )
 
     def _endpoint_constraints(
         self, z: npt.NDArray[np.floating], n_segments: int

@@ -14,6 +14,8 @@ pub mod frame_convert;
 #[cfg(feature = "spice")]
 pub mod homotopy;
 #[cfg(feature = "spice")]
+pub mod lowthrust;
+#[cfg(feature = "spice")]
 pub mod multiple_shooting;
 pub mod normal_form;
 pub mod nsga2;
@@ -344,6 +346,8 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   评估内核）。
 /// - **v10** （#444）：新增 ``nsga2_*_py``（NSGA-II 约束排序、选择、
 ///   SBX 交叉与多项式变异算子）。
+/// - **v11** （#445）：新增低推力打靶批量评估与配点缺陷批量评估入口，
+///   将低推力直接法的重复数值评估下沉 Rust。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -3397,6 +3401,16 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(check_collision_py, m)?)?;
     m.add_function(wrap_pyfunction!(qlaw_propagate_py, m)?)?;
     m.add_function(wrap_pyfunction!(qlaw_segment_direction_py, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        lowthrust::lowthrust_shooting_evaluate_py,
+        m
+    )?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        lowthrust::lowthrust_collocation_defects_py,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(nsga2::nsga2_sort_py, m)?)?;
     m.add_function(wrap_pyfunction!(
         nsga2::nsga2_environmental_selection_py,

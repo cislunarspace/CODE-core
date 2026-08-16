@@ -118,6 +118,8 @@ class LowThrustShooting:
         target_state: 目标末态 ``[r, v]``，``(6,)``，km / km/s。
         t0: 起始时刻（SPICE et 秒）。
         tf: 终止时刻（SPICE et 秒）。
+        backend: 数值评估后端；默认 ``"rust"``，``"python"`` 保留原实现作
+            等价性对照与降级。
     """
 
     def __init__(
@@ -130,6 +132,8 @@ class LowThrustShooting:
         target_state: npt.ArrayLike,
         t0: float,
         tf: float,
+        *,
+        backend: str = "rust",
     ) -> None:
         self._system = system
         self._engine = engine
@@ -137,6 +141,9 @@ class LowThrustShooting:
         self._tf = float(tf)
         if self._tf <= self._t0:
             raise ValueError(f"tf ({self._tf}) must be > t0 ({self._t0})")
+        if backend not in {"rust", "python"}:
+            raise ValueError(f"backend must be 'rust' or 'python', got {backend!r}")
+        self._backend = backend
 
         self._initial_state = np.asarray(initial_state, dtype=float)
         if self._initial_state.shape != (6,):
@@ -321,6 +328,14 @@ class LowThrustShooting:
     def _propagate_chain(
         self, y: npt.NDArray[np.floating]
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        """按后端接龙传播，返回合并时间序列与 7D 状态。"""
+        if self._backend == "rust":
+            return self._propagate_chain_rust(y)
+        return self._propagate_chain_python(y)
+
+    def _propagate_chain_python(
+        self, y: npt.NDArray[np.floating]
+    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """接龙传播：返回合并时间序列 (M,) 与 7D 状态序列 (M, 7)。
 
         用无灵敏度的 ``propagate_compiled_lowthrust`` （重建轨迹用）。
@@ -364,7 +379,7 @@ class LowThrustShooting:
 
         return np.asarray(times_list), np.asarray(states_list)
 
-    def _propagate_chain_with_jacobian(
+    def _propagate_chain_with_jacobian_python(
         self, y: npt.NDArray[np.floating]
     ) -> tuple[float, npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """带灵敏度的接龙传播，返回 (末态质量, 末态[r,v] 6D, 全雅可比 6×3N)。
@@ -418,6 +433,54 @@ class LowThrustShooting:
 
         final_mass = float(final_state7[6])
         return final_mass, final_state7[:6], jac
+
+    def _propagate_chain_rust(
+        self, y: npt.NDArray[np.floating]
+    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        """调用 Rust 批量入口执行整条控制链。"""
+        from e2m2e.integrators import lowthrust_shooting_evaluate_py, require_rust_extension
+
+        require_rust_extension("lowthrust_shooting_evaluate_py")
+        result = lowthrust_shooting_evaluate_py(
+            [list(segment) for segment in self._decode_segments(y)],
+            self._t0,
+            self._tf,
+            np.concatenate([self._initial_state, [self._initial_mass]]).tolist(),
+            self._observer,
+            self._forces_py,
+            self._engine.t_max,
+            self._engine.isp,
+            False,
+        )
+        return np.asarray(result["time"], dtype=float), np.asarray(result["states"], dtype=float)
+
+    def _propagate_chain_with_jacobian(
+        self, y: npt.NDArray[np.floating]
+    ) -> tuple[float, npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        """按后端取得末态与末端控制雅可比。"""
+        if self._backend == "python":
+            return self._propagate_chain_with_jacobian_python(y)
+
+        from e2m2e.integrators import lowthrust_shooting_evaluate_py, require_rust_extension
+
+        require_rust_extension("lowthrust_shooting_evaluate_py")
+        result = lowthrust_shooting_evaluate_py(
+            [list(segment) for segment in self._decode_segments(y)],
+            self._t0,
+            self._tf,
+            np.concatenate([self._initial_state, [self._initial_mass]]).tolist(),
+            self._observer,
+            self._forces_py,
+            self._engine.t_max,
+            self._engine.isp,
+            True,
+        )
+        final_state = np.asarray(result["states"][-1], dtype=float)
+        return (
+            float(final_state[6]),
+            final_state[:6],
+            np.asarray(result["terminal_jacobian"], dtype=float),
+        )
 
     def _estimate_h(self, state: npt.NDArray[np.floating], dt: float) -> float:
         """段内初始步长估计：取段长的 1/10，并夹到合理区间。"""

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- **低推力直接法数值内核下沉 Rust**（#445）：多段打靶的受控传播与灵敏度链式组装、Hermite-Simpson 配点缺陷批量求值进入 `e2m2e-integrators`；`LowThrustShooting` 与 `LowThrustCollocation` 新增 `backend` 参数，默认 `"rust"`，`"python"` 保留原实现作等价性对照和降级路径。公开 API 与求解结果契约保持不变，ABI 升至 v11。
 - **NSGA-II 演化算子下沉 Rust**（#444）：约束非支配排序、拥挤度距离、锦标赛和环境选择、SBX 交叉与多项式变异进入 `e2m2e-integrators` 的 `nsga2` 内核（新增 `nsga2_*_py` 绑定，ABI v10）。`nsga2` 默认走 Rust，`backend="python"` 保留 NumPy 参照与降级路径；目标函数回调、进程并行评估、NumPy 随机数生成和结果组装仍在 Python，同一种子两后端演化等价。
 - **Q-law 低推力初猜反馈内核下沉 Rust**（#442）：反馈积分、开普勒根数转换、Gauss 方程、Q 函数与推力方向评估统一进入 Rust；Python 侧只保留参数解析、轨迹重采样和 `LowThrustSegment` 初猜组装。新增 `qlaw_propagate_py` / `qlaw_segment_direction_py` 绑定（ABI v9），公开 `qlaw_guess` 行为保持不变。
 - **延拓数值内核下沉 Rust**（#443）：伪弧长延拓（PAL）的 XZ 对称约束 F/dF 组装、切向量（零空间）与 PAL 牛顿迭代下沉 `e2m2e-forces`（`pal_continuation` 模块），新增 `pal_f_df_tangent_py` / `pal_newton_step_py` 绑定（ABI v7）；切向量零空间用广义叉积替代 SVD，牛顿步用部分主元高斯消元（沿 `multiple_shooting` 手写小矩阵求解惯例）。`pseudo_arclength_continuation` 与 `halo_pseudo_arclength_continuation` 新增 `backend` 参数：默认 `"rust"`，`"python"` 走保留的 numpy 参照路径（对照与降级），等价性对照见 `tests/algorithm/design/continuation/test_halo_pal_rust_equivalence.py`。公开 API 与行为不变；初始切向量计算、外层逐轨编排与微分修正（#441）仍 Python。
