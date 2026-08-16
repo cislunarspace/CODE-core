@@ -154,6 +154,6 @@ def _build_registry() -> dict[str, Callable[..., Orbit]]:
         "L5_SPO": lambda amplitude, **kw: design_spo(5, amplitude, **kw),
         "L4_LPO": lambda amplitude, **kw: design_lpo(4, amplitude, **kw),
         "L5_LPO": lambda amplitude, **kw: design_lpo(5, amplitude, **kw),
-        "L4_HORSESHOE": lambda amplitude=150000.0, **kw: design_horseshoe(4, amplitude, **kw),
-        "L5_HORSESHOE": lambda amplitude=150000.0, **kw: design_horseshoe(5, amplitude, **kw),
+        "L4_HORSESHOE": lambda amplitude=100000.0, **kw: design_horseshoe(4, amplitude, **kw),
+        "L5_HORSESHOE": lambda amplitude=100000.0, **kw: design_horseshoe(5, amplitude, **kw),
     }

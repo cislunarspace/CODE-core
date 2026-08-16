@@ -39,8 +39,8 @@ _design_orbit_skip = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def l4_horseshoe():
-    """共享一条 design_horseshoe(4, 100000.0) 轨道。"""
-    return design_horseshoe(4, 100000.0)
+    """共享一条使用默认振幅的 L4 Horseshoe 轨道。"""
+    return design_horseshoe(4)
 
 
 @pytest.fixture(scope="module")
@@ -62,11 +62,15 @@ class TestRegistry:
     def test_l5_horseshoe_in_registry(self):
         assert "L5_HORSESHOE" in registry
 
-    def test_l4_horseshoe_callable(self):
-        assert callable(registry["L4_HORSESHOE"])
+    def test_l4_horseshoe_default_amplitude_converges(self):
+        orbit = registry["L4_HORSESHOE"]()
+        assert orbit is not None
+        assert orbit.period is not None
 
-    def test_l5_horseshoe_callable(self):
-        assert callable(registry["L5_HORSESHOE"])
+    def test_l5_horseshoe_default_amplitude_converges(self):
+        orbit = registry["L5_HORSESHOE"]()
+        assert orbit is not None
+        assert orbit.period is not None
 
 
 # =============================================================================
@@ -77,15 +81,37 @@ class TestRegistry:
 class TestDesignHorseshoe:
     """design_horseshoe 端到端收敛测试。"""
 
-    def test_converges_l4(self):
-        orbit = design_horseshoe(4, 100000.0)
+    def test_default_amplitude_converges_l4(self):
+        orbit = design_horseshoe(4)
         assert orbit is not None
         assert orbit.period is not None
 
-    def test_converges_l5(self):
-        orbit = design_horseshoe(5, 100000.0)
+    def test_default_amplitude_converges_l5(self):
+        orbit = design_horseshoe(5)
         assert orbit is not None
         assert orbit.period is not None
+
+    @pytest.mark.parametrize("libration_point", [4, 5])
+    def test_declared_upper_amplitude_converges(self, libration_point):
+        orbit = design_horseshoe(libration_point, 110000.0)
+        assert orbit is not None
+        assert orbit.period is not None
+        dynamics = CR3BP_Dynamics(orbit.system)
+        d_min, d_max = _l45_distance(dynamics, orbit, libration_point)
+        amplitude_km = 0.5 * (d_min + d_max) * CHAR_LENGTH_KM
+        assert abs(amplitude_km - 110000.0) < 1500.0
+
+    @pytest.mark.parametrize("amplitude", [49999.0, 110001.0])
+    def test_rejects_out_of_range_amplitude_before_search(self, amplitude, monkeypatch):
+        from e2m2e.algorithm.family import cr3bp_orbits
+
+        monkeypatch.setattr(
+            cr3bp_orbits,
+            "design_lpo",
+            lambda *args, **kwargs: pytest.fail("越界振幅不应进入 LPO 搜索"),
+        )
+        with pytest.raises(ValueError, match="amplitude"):
+            design_horseshoe(4, amplitude)
 
     def test_amplitude_matches(self, l4_horseshoe):
         """振幅应接近 100000 km（容差 1500 km，LPO 非单调区域精度有限）。"""
@@ -150,15 +176,16 @@ class TestHorseshoeDesignOrbit:
             phase_in=None,
             phase_out=None,
         )
-        assert params == {"amplitude": 150000.0, "phase": 0.0}
+        assert params == {"amplitude": 100000.0, "phase": 0.0}
 
-    def test_validate_params_rejects_small_amplitude(self):
+    @pytest.mark.parametrize("amplitude", [10000.0, 110001.0])
+    def test_validate_params_rejects_out_of_range_amplitude(self, amplitude):
         from e2m2e.algorithm.design.design_orbit import _validate_params
 
         with pytest.raises(ValueError, match="amplitude"):
             _validate_params(
                 "L4_HORSESHOE",
-                amplitude=10000.0,
+                amplitude=amplitude,
                 phase=None,
                 collinear_point=None,
                 north_south=None,

@@ -73,10 +73,10 @@ class TestDesignOrbitRequest:
             ("AXIAL", "amplitude", -60000.0, 60000.0, True),
             ("L4_SPO", "amplitude", 1737.0, 200000.0, True),
             ("L5_SPO", "amplitude", 1737.0, 200000.0, True),
-            ("L4_LPO", "amplitude", 1000.0, 200000.0, True),
-            ("L5_LPO", "amplitude", 1000.0, 200000.0, True),
-            ("L4_HORSESHOE", "amplitude", 50000.0, 200000.0, True),
-            ("L5_HORSESHOE", "amplitude", 50000.0, 200000.0, True),
+            ("L4_LPO", "amplitude", 1000.0, 110000.0, True),
+            ("L5_LPO", "amplitude", 1000.0, 110000.0, True),
+            ("L4_HORSESHOE", "amplitude", 50000.0, 110000.0, True),
+            ("L5_HORSESHOE", "amplitude", 50000.0, 110000.0, True),
         ],
     )
     def test_public_ranges_match_validation(
@@ -104,6 +104,18 @@ class TestDesignOrbitRequest:
                 DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum})
             accepted = DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum + 1.0})
             assert getattr(accepted, field) == minimum + 1.0
+
+    @pytest.mark.parametrize(
+        ("orbit_type", "amplitude"),
+        [
+            ("L4_LPO", 50000.0),
+            ("L5_LPO", 50000.0),
+            ("L4_HORSESHOE", 100000.0),
+            ("L5_HORSESHOE", 100000.0),
+        ],
+    )
+    def test_lpo_and_horseshoe_defaults(self, orbit_type, amplitude):
+        assert DesignOrbitRequest(orbit_type=orbit_type).amplitude == amplitude
 
     def test_lissajous_ranges_depend_on_collinear_point(self):
         default = DesignOrbitRequest.valid_ranges("LISSAJOUS")

@@ -118,9 +118,9 @@ def _with_global_amplitude_out(
 _GLOBAL_AMPLITUDE_OUT_RANGES = _with_global_amplitude_out(_range_map())
 _DRO_DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 110000.0)))
 _SPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
-_LPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1000.0, 200000.0)))
+_LPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1000.0, 110000.0)))
 _HORSESHOE_RANGES = _with_global_amplitude_out(
-    _range_map(amplitude=NumericRange(50000.0, 200000.0))
+    _range_map(amplitude=NumericRange(50000.0, 110000.0))
 )
 
 _ORBIT_TYPE_RANGES: Mapping[str, Mapping[str, NumericRange]] = MappingProxyType(
@@ -324,7 +324,7 @@ class DesignOrbitRequest(_ApiModel):
                 self.phase = 0.0
         elif sel in ("L4_HORSESHOE", "L5_HORSESHOE"):
             if self.amplitude is None:
-                self.amplitude = 150000.0
+                self.amplitude = 100000.0
             if self.phase is None:
                 self.phase = 0.0
         else:

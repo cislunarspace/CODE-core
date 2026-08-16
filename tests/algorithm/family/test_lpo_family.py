@@ -101,6 +101,28 @@ class TestDesignLpoConvergence:
         assert orbit.period is not None
         assert orbit.period > 0
 
+    @pytest.mark.parametrize("libration_point", [4, 5])
+    def test_declared_upper_amplitude_converges(self, libration_point):
+        orbit = design_lpo(libration_point, 110000.0)
+        assert orbit is not None
+        assert orbit.period is not None
+        dynamics = CR3BP_Dynamics(orbit.system)
+        d_min, d_max = _l45_distance(dynamics, orbit, libration_point)
+        amplitude_km = 0.5 * (d_min + d_max) * CHAR_LENGTH_KM
+        assert abs(amplitude_km - 110000.0) < 1500.0
+
+    @pytest.mark.parametrize("amplitude", [999.0, 110001.0])
+    def test_rejects_out_of_range_amplitude_before_search(self, amplitude, monkeypatch):
+        from e2m2e.algorithm.family import cr3bp_orbits
+
+        monkeypatch.setattr(
+            cr3bp_orbits,
+            "_correct_lpo",
+            lambda *args, **kwargs: pytest.fail("越界振幅不应进入 LPO 搜索"),
+        )
+        with pytest.raises(ValueError, match="amplitude"):
+            design_lpo(4, amplitude)
+
     def test_amplitude_matches_target(self, l4_orbit):
         """振幅（距 L4 径向距离均值）应接近 50000 km（容差 50 km）。"""
         dynamics = CR3BP_Dynamics(l4_orbit.system)
@@ -218,12 +240,14 @@ class TestLpoDesignOrbit:
         )
         assert params == {"amplitude": 50000.0, "phase": 0.0}
 
-    def test_cr3bp_orbit_for_l4_lpo_end_to_end(self):
+    @pytest.mark.parametrize("libration_point", [4, 5])
+    def test_default_amplitude_dispatch_converges(self, libration_point):
         from e2m2e.algorithm.design.design_orbit import _cr3bp_orbit_for, _validate_params
 
+        sel = f"L{libration_point}_LPO"
         params = _validate_params(
-            "L4_LPO",
-            amplitude=50000.0,
+            sel,
+            amplitude=None,
             phase=None,
             collinear_point=None,
             north_south=None,
@@ -234,7 +258,7 @@ class TestLpoDesignOrbit:
             phase_out=None,
         )
         dynamics = CR3BP_Dynamics(earth_moon_system())
-        orbit = _cr3bp_orbit_for("L4_LPO", params, dynamics)
+        orbit = _cr3bp_orbit_for(sel, params, dynamics)
         assert orbit is not None
         assert orbit.period is not None
         assert orbit.period > 0

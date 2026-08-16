@@ -432,18 +432,18 @@ def _validate_params(
     if sel in ("L4_LPO", "L5_LPO"):
         amplitude = 50000.0 if amplitude is None else float(amplitude)
         phase = 0.0 if phase is None else float(phase)
-        if not 1000.0 <= amplitude <= 200000.0:
-            raise ValueError(f"{sel} amplitude 应在 1000~200000 km 之间，实际为 {amplitude:.0f} km")
+        if not 1000.0 <= amplitude <= 110000.0:
+            raise ValueError(f"{sel} amplitude 应在 1000~110000 km 之间，实际为 {amplitude:.0f} km")
         if not 0.0 <= phase <= 1.0:
             raise ValueError(f"{sel} phase 应在 0~1 之间，实际为 {phase}")
         return {"amplitude": amplitude, "phase": phase}
 
     if sel in ("L4_HORSESHOE", "L5_HORSESHOE"):
-        amplitude = 150000.0 if amplitude is None else float(amplitude)
+        amplitude = 100000.0 if amplitude is None else float(amplitude)
         phase = 0.0 if phase is None else float(phase)
-        if not 50000.0 <= amplitude <= 200000.0:
+        if not 50000.0 <= amplitude <= 110000.0:
             raise ValueError(
-                f"{sel} amplitude 应在 50000~200000 km 之间，实际为 {amplitude:.0f} km"
+                f"{sel} amplitude 应在 50000~110000 km 之间，实际为 {amplitude:.0f} km"
             )
         if not 0.0 <= phase <= 1.0:
             raise ValueError(f"{sel} phase 应在 0~1 之间，实际为 {phase}")

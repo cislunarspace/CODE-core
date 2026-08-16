@@ -1099,7 +1099,7 @@ def design_lpo(
 
     Args:
         libration_point: 平动点编号（4=L4, 5=L5）。
-        amplitude_km: 目标振幅（km）。
+        amplitude_km: 目标振幅（km），范围 1,000~110,000。
         dynamics: CR3BP 动力学对象；缺省构造标准地月系统。
         tol_km: 振幅匹配容差（km），默认 20。
 
@@ -1111,6 +1111,8 @@ def design_lpo(
         Marchal (1990). The Three-Body Problem. Brown 猜想 C.2。
         Taylor (1981). A&A 103, 288. 马蹄周期轨道数值计算。
     """
+    if not 1000.0 <= amplitude_km <= 110000.0:
+        raise ValueError(f"LPO amplitude 应在 1000~110000 km 之间，实际为 {amplitude_km:.0f} km")
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
     du = dynamics.system.characteristic_length
@@ -1216,7 +1218,7 @@ def design_lpo(
 
 def design_horseshoe(
     libration_point: int,
-    amplitude_km: float = 150000.0,
+    amplitude_km: float = 100000.0,
     *,
     dynamics: CR3BP_Dynamics | None = None,
     tol_km: float = 50.0,
@@ -1226,12 +1228,12 @@ def design_horseshoe(
     Horseshoe 是 LPO 长周期族的大振幅成员，轨道形状呈马蹄形，
     跨越 L4-L1-L5（Marchal 1990, Brown 猜想 C.2, Taylor 1981）。
 
-    本函数是 design_lpo 的便捷封装，默认大振幅（150,000 km）。
+    本函数是 design_lpo 的便捷封装，默认振幅为 100,000 km。
     振幅定义同 LPO/SPO：距 L4/L5 径向距离均值（km）。
 
     Args:
         libration_point: 平动点编号（4=L4, 5=L5）。
-        amplitude_km: 目标振幅（km），默认 150,000。
+        amplitude_km: 目标振幅（km），范围 50,000~110,000，默认 100,000。
         dynamics: CR3BP 动力学对象；缺省构造标准地月系统。
         tol_km: 振幅匹配容差（km），默认 50（比 LPO 默认 20 宽松，
             因为大振幅族行走精度下降）。
@@ -1244,6 +1246,10 @@ def design_horseshoe(
         Marchal (1990). The Three-Body Problem. Brown C.2 证实。
         Murray & Dermott (1999). §3.9 Horseshoe 运动学描述。
     """
+    if not 50000.0 <= amplitude_km <= 110000.0:
+        raise ValueError(
+            f"Horseshoe amplitude 应在 50000~110000 km 之间，实际为 {amplitude_km:.0f} km"
+        )
     return design_lpo(
         libration_point,
         amplitude_km,
