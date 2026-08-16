@@ -320,6 +320,36 @@ def test_M_samples_are_hamiltonian(matrix_reducer, small_orbit_ds_result):
 # ---------------------------------------------------------------------------
 
 
+def test_constant_method_is_symplectic_and_diagonalizes_cr3bp(l1_context, small_orbit_ds_result):
+    """产品采用的 constant 方法应给出恒定辛变换，并满足 ``M B = B D``。"""
+    from e2m2e.algorithm.normal_form.quasi_floquet import (
+        _cr3bp_hamiltonian_linearization,
+    )
+
+    result = QuasiFloquetReducer(context=l1_context, method="constant").reduce(
+        small_orbit_ds_result
+    )
+    B = result.B_samples[0]
+    M = _cr3bp_hamiltonian_linearization(l1_context.libration_position, l1_context.mu)
+
+    assert result.method == "constant"
+    assert result.M_samples is not None
+    np.testing.assert_allclose(
+        result.B_samples, np.broadcast_to(B, result.B_samples.shape), atol=1e-14
+    )
+    np.testing.assert_allclose(
+        result.M_samples,
+        np.broadcast_to(M, result.M_samples.shape),
+        atol=1e-10,
+    )
+    np.testing.assert_allclose(B.T @ J6 @ B, J6, atol=1e-10)
+    np.testing.assert_allclose(
+        result.M_samples @ result.B_samples,
+        result.B_samples @ result.D,
+        atol=1e-10,
+    )
+
+
 def test_cr3bp_hamiltonian_linearization_is_hamiltonian(l1_context):
     """动量框架线性化 ``M_H`` 应为 Hamilton 矩阵（``MᵀJ + JM = 0``）。
 

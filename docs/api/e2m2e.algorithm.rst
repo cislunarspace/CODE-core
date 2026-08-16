@@ -758,15 +758,6 @@ e2m2e.algorithm.normal_form.center_manifold module
    :show-inheritance:
 
 
-e2m2e.algorithm.normal_form.corrector module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: e2m2e.algorithm.normal_form.corrector
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-
 e2m2e.algorithm.normal_form.propagation module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -979,37 +979,34 @@ class QuasiFloquetReducer:
         lam = float(self.context.characteristic_exponent)
         D = real_normal_form_matrix(lam, float(nu1), float(nu2))
 
-        # —— 时变线性化 M(t) ——
-        M_at, M_stack = _build_M_at(ds_result)
-
         # —— 求解 B(t) ——
         if self.method == "constant":
-            # CR3BP：M(t) 常数，QF 变换退化为常数实标准形变换 V
-            # （X = V·Y 使 Ẏ = D·Y）。B 不随 e^{λt} 增长，QF 坐标下的
-            # Hamiltonian 系数保持常数，同调方程退化为代数除法。
-            # D 用 V 还原的 V⁻¹MV（M 特征值），与 context 固化频率的
-            # 0.3% 级失谐不再进入同调方程。V 必须从 Hamiltonian 框架
-            # 的线性化构造（Hamilton 矩阵，基可同时辛归一化与对角化）。
+            # CR3BP 常数法在线性化平动点处冻结 M。返回的诊断样本也必须
+            # 使用同一矩阵；不能存入沿替代轨道变化的 M(t)，否则 B、D 与
+            # M_samples 不再满足同一个方程。
             r_lp = np.asarray(ds_result.context.libration_position, dtype=float).ravel()
             M_H = _cr3bp_hamiltonian_linearization(r_lp, float(ds_result.context.mu))
             V, D = real_normal_form_transform(M_H)
             B_samples = np.stack([V for _ in range(len(ds_result.tlist))])
-        elif self.method == "matrix":
-            B_samples = _solve_qf_matrix(
-                M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol, segment=self.segment
-            )
-            if self.project:
-                B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
-        elif self.method == "multipoint":
-            # 多点打靶（qiao Code08）：segment 作 node_step，默认 0.8。
-            node_step = 0.8 if self.segment is None else float(self.segment)
-            B_samples = _solve_qf_multipoint(
-                M_at, D, ds_result.tlist, node_step=node_step, rtol=self.rtol, atol=self.atol
-            )
-            if self.project:
-                B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
+            M_stack = np.broadcast_to(M_H, B_samples.shape).copy()
         else:
-            B_samples = _solve_qf_lie(M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol)
+            M_at, M_stack = _build_M_at(ds_result)
+            if self.method == "matrix":
+                B_samples = _solve_qf_matrix(
+                    M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol, segment=self.segment
+                )
+                if self.project:
+                    B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
+            elif self.method == "multipoint":
+                # 多点打靶（qiao Code08）：segment 作 node_step，默认 0.8。
+                node_step = 0.8 if self.segment is None else float(self.segment)
+                B_samples = _solve_qf_multipoint(
+                    M_at, D, ds_result.tlist, node_step=node_step, rtol=self.rtol, atol=self.atol
+                )
+                if self.project:
+                    B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
+            else:
+                B_samples = _solve_qf_lie(M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol)
 
         return QuasiFloquetResult(
             context=self.context,

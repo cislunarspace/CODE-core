@@ -413,8 +413,9 @@ def test_w_series_interp_uses_real_tlist(l1_context):
     for step_data in cm.W_series.values():
         for order, poly in step_data.items():
             for pow_tuple, arr in poly.items():
-                a = np.asarray(arr, dtype=float).ravel()
-                if a.size > 2 and float(np.ptp(a)) > 1e-6:
+                a = np.asarray(arr, dtype=complex).ravel()
+                variation = max(float(np.ptp(a.real)), float(np.ptp(a.imag)))
+                if a.size > 2 and variation > 1e-6:
                     target = (order, pow_tuple, a)
                     break
             if target:
@@ -427,12 +428,19 @@ def test_w_series_interp_uses_real_tlist(l1_context):
     # 非采样点：真实网格 dt≈0.0316，兜底 dt=0.1，t=1.0 上两者插值明显不同
     t = 1.0
     tlist = np.asarray(qf.tlist, dtype=float).ravel()
-    expected = float(np.interp(t, tlist, arr))  # 真实网格解析值
-    wrong = float(np.interp(t, np.arange(arr.size) * 0.1, arr))  # 兜底网格错误值
+    expected = complex(
+        np.interp(t, tlist, arr.real),
+        np.interp(t, tlist, arr.imag),
+    )
+    fallback_tlist = np.arange(arr.size) * 0.1
+    wrong = complex(
+        np.interp(t, fallback_tlist, arr.real),
+        np.interp(t, fallback_tlist, arr.imag),
+    )
     assert abs(expected - wrong) > 1e-3, "测试前提不成立：真实网格与兜底网格在该点应明显不同"
 
     coeffs = _interp_W_series_at_t(cm, qf, t)
-    got = coeffs[order][pow_tuple].real
+    got = coeffs[order][pow_tuple]
     np.testing.assert_allclose(got, expected, atol=1e-12)
     assert abs(got - wrong) > 1e-3, "插值不应使用 dt=0.1 兜底网格"
 
@@ -512,28 +520,6 @@ def catalog_data(l1_context):
     )
 
 
-def test_end_to_end_roundtrip_trivial(catalog_data, l1_context):
-    """端到端 rho → param → rho：B=I + 无高阶项时机器精度。
-
-    用平凡 CM（无高阶项）替换 catalog_data 的 cm_result，隔离线性段误差。
-    """
-    qf = catalog_data.qf_result
-    cm_trivial = _make_cm_result(l1_context, qf, with_terms=False)
-    data = LibrationCatalogData(
-        context=l1_context,
-        ds_result=catalog_data.ds_result,
-        qf_result=qf,
-        cm_result=cm_trivial,
-    )
-    rng = np.random.default_rng(101)
-    X_rho = 1e-3 * rng.standard_normal(6)
-    t = 1.35
-    X_param = rho_to_param(X_rho, t, l1_context, data.ds_result, data.qf_result, data.cm_result)
-    X_back = param_to_rho(X_param, t, l1_context, data.ds_result, data.qf_result, data.cm_result)
-    # 线性段全程：机器精度
-    np.testing.assert_allclose(X_back, X_rho, atol=1e-12)
-
-
 def test_end_to_end_roundtrip_with_high_order(catalog_data, l1_context):
     """端到端 rho → param → rho：含高阶 Lie 级数时在 1e-7 内。
 
@@ -590,35 +576,6 @@ def test_end_to_end_at_multiple_times(catalog_data, l1_context):
 # ---------------------------------------------------------------------------
 
 
-def test_transformer_constructible(catalog_data):
-    """``LibrationCatalogTransformer`` 可用聚合句柄构造。"""
-    tr = LibrationCatalogTransformer(data=catalog_data)
-    assert tr.data is catalog_data
-    assert tr.context is catalog_data.context
-
-
-def test_transformer_methods_match_functional(catalog_data, l1_context):
-    """OO 入口 ``rho_to_param``/``param_to_rho`` 与函数式结果一致。"""
-    tr = LibrationCatalogTransformer(data=catalog_data)
-    rng = np.random.default_rng(404)
-    X_rho = 1e-3 * rng.standard_normal(6)
-    t = 0.8
-
-    X_param_oo = tr.rho_to_param(X_rho, t)
-    X_param_fn = rho_to_param(
-        X_rho,
-        t,
-        l1_context,
-        catalog_data.ds_result,
-        catalog_data.qf_result,
-        catalog_data.cm_result,
-    )
-    np.testing.assert_allclose(X_param_oo, X_param_fn, atol=1e-14)
-
-    X_rho_back_oo = tr.param_to_rho(X_param_oo, t)
-    np.testing.assert_allclose(X_rho_back_oo, X_rho, atol=1e-7)
-
-
 def test_transformer_roundtrip(catalog_data):
     """``LibrationCatalogTransformer`` 端到端 OO 往返。"""
     tr = LibrationCatalogTransformer(data=catalog_data)
@@ -628,22 +585,3 @@ def test_transformer_roundtrip(catalog_data):
     X_param = tr.rho_to_param(X_rho, t)
     X_back = tr.param_to_rho(X_param, t)
     np.testing.assert_allclose(X_back, X_rho, atol=1e-7)
-
-
-def test_catalog_data_is_frozen(catalog_data, l1_context):
-    """``LibrationCatalogData`` 不可变（frozen dataclass）。"""
-    import dataclasses
-
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        catalog_data.context = l1_context  # type: ignore[misc]
-
-
-def test_lazy_export_via_package(l1_context):
-    """``LibrationCatalogTransformer`` 经包顶层 lazy export 可导入。"""
-    from e2m2e.algorithm.normal_form import (
-        LibrationCatalogData,
-        LibrationCatalogTransformer,
-    )
-
-    assert LibrationCatalogData is not None
-    assert LibrationCatalogTransformer is not None

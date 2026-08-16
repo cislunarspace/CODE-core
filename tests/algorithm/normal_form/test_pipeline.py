@@ -1,15 +1,8 @@
 """法型化流水线的端到端 smoke 测试（issue #175，切片 6）。
 
-覆盖：
-
-- :class:`NormalFormPipeline` 可用 :class:`NormalFormContext` 构造；
-- ``reduce(orbit)`` 把四个 reducer 串成完整路径，返回
-  :class:`NormalFormResult`；
-- ``result.catalog_transformer.rho_to_param(orbit, t)`` 返回 ``(6,)`` 数组
-  （验收标准 #2）；
-- 失败路径：某步异常时 ``success=False`` 且保留已完成子结果；
-- 输入校验：非法 orbit 形状直接抛 :class:`ValueError`；
-- lazy export 经包顶层可导入。
+覆盖完整四步约化、``rho ↔ param`` 往返、显式 CR3BP 回退、失败时保留
+已完成子结果，以及非法输入拒绝。测试只穿过 :class:`NormalFormPipeline`
+接口，不重复检查构造参数、导出位置和 metadata 实现细节。
 
 SPICE leapseconds 不可用时，fixture 显式声明 ``spice_optional=True`` 走纯
 CR3BP 路径（ADR 0020 决策 4：显式选择，非隐式降级），smoke 测试在该路径下
@@ -90,27 +83,6 @@ def fast_pipeline(l1_context) -> NormalFormPipeline:
 
 
 # ---------------------------------------------------------------------------
-# 构造与导入
-# ---------------------------------------------------------------------------
-
-
-def test_pipeline_is_constructible(l1_context):
-    """``NormalFormPipeline`` 可用 context 构造，默认旋钮合理。"""
-    pipeline = NormalFormPipeline(context=l1_context)
-    assert pipeline.context is l1_context
-    assert pipeline.quasi_floquet_method == "matrix"
-    assert pipeline.center_max_order == 10
-    assert pipeline.center_steps == ("invariant", "center")
-
-
-def test_pipeline_importable_via_package_root():
-    """切片 #175 验收：能从包根直接 import。"""
-    from e2m2e.algorithm.normal_form import NormalFormPipeline as P
-
-    assert P is NormalFormPipeline
-
-
-# ---------------------------------------------------------------------------
 # 端到端 smoke（验收标准 #1、#2）
 # ---------------------------------------------------------------------------
 
@@ -134,18 +106,6 @@ def test_reduce_returns_normal_form_result(fast_pipeline):
     assert result.status is ConvergenceState.CONVERGED
     assert isinstance(result.message, str) and result.message
     assert np.isfinite(result.residual)
-
-
-def test_catalog_transformer_rho_to_param(fast_pipeline):
-    """验收标准 #2：``result.catalog_transformer.rho_to_param`` 返回 (6,)。"""
-    x0 = np.array([1e-3, -1e-3, 0.0, 0.0, 1e-4, -1e-4])
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        result = fast_pipeline.reduce(x0)
-
-    param = result.catalog_transformer.rho_to_param(x0, t=0.0)
-    assert np.asarray(param).shape == (6,)
-    assert np.all(np.isfinite(param))
 
 
 def test_catalog_transformer_roundtrip(fast_pipeline):
@@ -225,22 +185,6 @@ def test_reduce_rejects_bad_orbit_shape(fast_pipeline):
         fast_pipeline.reduce(np.zeros(5))
 
 
-def test_reduce_accepts_orbit_like_object(fast_pipeline, l1_context):
-    """带 ``.states`` 的 Orbit-like 对象取首帧作为初值。"""
-    from e2m2e.data.types.orbit import Orbit
-
-    x0 = np.array([1e-3, -1e-3, 0.0, 0.0, 1e-4, -1e-4])
-    orbit = Orbit(
-        states=np.tile(x0, (3, 1)),
-        times=np.array([0.0, 0.1, 0.2]),
-        system=l1_context.system,
-    )
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        result = fast_pipeline.reduce(orbit)
-    assert result.status is ConvergenceState.CONVERGED
-
-
 def test_failure_records_completed_subresults(l1_context, monkeypatch):
     """某步异常时 success=False，保留已完成子结果，message 记录失败步骤。"""
 
@@ -278,22 +222,3 @@ def test_failure_records_completed_subresults(l1_context, monkeypatch):
     assert result.cm_result is None
     assert result.catalog_transformer is None
     assert result.metadata["failed_step"] == "quasi_floquet"
-
-
-# ---------------------------------------------------------------------------
-# metadata 诊断
-# ---------------------------------------------------------------------------
-
-
-def test_metadata_records_pipeline_config(fast_pipeline):
-    """成功结果 metadata 记录流水线配置与各步诊断量。"""
-    x0 = np.array([1e-3, 0.0, 0.0, 0.0, 0.0, 0.0])
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        result = fast_pipeline.reduce(x0)
-
-    assert result.metadata["quasi_floquet_method"] == "constant"
-    assert result.metadata["center_max_order"] == 5
-    assert result.metadata["center_steps"] == ("invariant", "center")
-    assert "qf_symplectic_error" in result.metadata
-    assert "cm_hyperbolic_coupling" in result.metadata

@@ -69,6 +69,20 @@ ADR 0021 把测试分类轴从速度换成"验证什么"，并定下目录镜像
    模块级 skipif（供 pytestmark 列表使用），fixture 在 collection 期不生效，
    无法满足该用法。规则补一句：凡带 `requires_spice` 的用例必须同时携带
    `spice` 正交标记，否则 `-m spice` 选择集漏测。
-2. `test_dynamical_substitution.py` 的完整窗口验收用例保留运行期探测
-   （试调 `eval_params` 判内核池是否已加载），与文件存在性探测语义不同，
-   不属于本次收敛对象；其解锁条件由 #426 跟踪。
+2. `test_dynamical_substitution.py` 的完整窗口验收用例曾保留运行期探测
+   （试调 `eval_params` 判内核池是否已加载），与文件存在性探测语义不同；
+   该安排已由下列 #426 修订取代。
+
+## 修订（2026-08-16，#426 范围决定）
+
+本修订取代决策 1 中 qiao/DFH 对拍迁入 `scripts/` 的要求，但不改变
+仅依赖 e2m2e 与其支持的 SPICE 内核的定义级验收。
+
+qiao normal-form 流水线及其 `.mat` / `.npz` 中间结果是独立研究工具，不属于
+e2m2e 的运行契约、发布契约或开发期维护范围。仓库不再维护 qiao 对拍脚本，
+也不把 qiao 中间结果作为 pytest 或其他项目检查的 oracle。SPICE 内核仍是项目
+支持的标准运行依赖。
+
+`test_dynamical_substitution.py` 的完整窗口频率压制验收只调用 e2m2e 自身与
+SPICE，不读取 qiao 数据，因此继续保留运行期内核池探测。它属于 e2m2e 星历
+动力学的定义级行为检查，不属于外部软件对拍。

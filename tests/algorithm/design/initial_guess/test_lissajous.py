@@ -122,16 +122,18 @@ class TestLissajousInitialGuess:
 
 
 class TestLissajousBoundedTrajectoryContract:
-    """compute_lissajous_bounded_trajectory 的返回结构契约。
+    """compute_lissajous_bounded_trajectory 的产品行为契约。
 
-    单组合跑一次中心流形约化（约 3 秒），断言三元组结构/形状/times 单调/
-    period>0——这些契约与 L、振幅取值无关，不需参数化重复。
+    单组合跑一次中心流形约化（约 3 秒），同时验证返回结构和三周期内的
+    有界性；这些契约与参数组合无关，不需参数化重复。
     """
 
     def test_bounded_trajectory_contract(self, earth_moon_system):
-        """返回 (states, times, period) 三元组，形状与单调性满足契约。"""
+        """轨迹结构正确，且相对平动点的距离保持在输入振幅量级。"""
+        amplitude_in = 500.0
+        amplitude_out = 2000.0
         result = compute_lissajous_bounded_trajectory(
-            earth_moon_system, 1, 500.0, 2000.0, 0.01, 0.55
+            earth_moon_system, 1, amplitude_in, amplitude_out, 0.01, 0.55
         )
         # 三元组 (states, times, period)
         assert isinstance(result, tuple) and len(result) == 3
@@ -150,5 +152,12 @@ class TestLissajousBoundedTrajectoryContract:
         assert np.all(times >= 0.0)
         assert np.all(np.diff(times) > 0.0)
 
-        # period > 0
         assert period > 0
+        assert np.all(np.isfinite(states))
+
+        lp = earth_moon_system.get_libration_point(LibrationPoint.L1)
+        distance_km = (
+            np.linalg.norm(states[:, :3] - lp, axis=1) * earth_moon_system.characteristic_length
+        )
+        amplitude_scale = np.hypot(amplitude_in, amplitude_out)
+        assert np.max(distance_km) < 2.5 * amplitude_scale

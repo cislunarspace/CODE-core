@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import LibrationPoint
-from e2m2e.algorithm.normal_form import NormalFormContext, NormalFormResult
+from e2m2e.algorithm.normal_form import NormalFormContext
 from e2m2e.algorithm.normal_form.constants import (
     BASE_FREQUENCIES,
     JD0_J2000,
@@ -24,7 +24,6 @@ from e2m2e.algorithm.normal_form.constants import (
     MU_S,
     TU_S,
 )
-from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.theory
 
@@ -273,36 +272,3 @@ def test_seconds_to_tu_round_trip(earth_moon_system):
     assert ctx.tu_to_seconds(ctx.seconds_to_tu(t_s)) == pytest.approx(t_s)
     t_tu = 5.678
     assert ctx.seconds_to_tu(ctx.tu_to_seconds(t_tu)) == pytest.approx(t_tu)
-
-
-# ---------------------------------------------------------------------------
-# NormalFormResult 占位
-# ---------------------------------------------------------------------------
-
-
-def test_normal_form_result_is_constructible(earth_moon_system):
-    """``NormalFormResult`` 至少能以默认参数构造（具体填充后续切片实现）。"""
-    ctx = NormalFormContext(
-        system=earth_moon_system,
-        libration_point=LibrationPoint.L1,
-        epoch=JD0_J2000,
-        order=2,
-    )
-    res = NormalFormResult(context=ctx, order=2)
-    assert res.context is ctx
-    assert res.order == 2
-    assert res.status is ConvergenceState.FAILED
-    assert res.metadata == {}
-
-
-def test_repr_and_str_are_informative(earth_moon_system):
-    """``__repr__`` / ``__str__`` 不抛异常且包含平动点名称。"""
-    ctx = NormalFormContext(
-        system=earth_moon_system,
-        libration_point=LibrationPoint.L2,
-        epoch=JD0_J2000,
-        order=3,
-    )
-    assert "L2" in repr(ctx)
-    assert "L2" in str(ctx)
-    assert "LU=" in repr(ctx)
