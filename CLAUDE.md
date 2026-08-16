@@ -47,7 +47,7 @@ builder（写/修代码）+ checker（跑全部检查）+ loop-go（驱动循环
 
 - Rust 扩展：`maturin develop` 构建 `e2m2e._integrators`，spice 现为默认 feature（crates `default = ["spice"]` + pyproject `features=["spice"]` 双保险），不再产无 spice 子集。debug 产物运行较慢（约 5 倍），性能基准/长期预报用 `make dev-release`（--release）。
 - 开发入口走 `Makefile`：`make dev`（= `maturin develop` debug，自动 `export CSPICE_DIR`/`LIBCLANG_PATH`）、`make dev-release`（= `maturin develop --release`）、`make test`、`make check`、`make setup`（拉 CSPICE 编译包 + SPICE 内核）。CSPICE 经 `scripts/download_cspice.py` 从 GitHub `cspice-v1` release 取预编译包（`make dev` 自动 `export CSPICE_DIR`）；`cspice-sys` 不启用 `downloadcspice` feature，无 `CSPICE_DIR` 时构建直接报错，不再静默走 NAIF 官网源码下载（国内 naif 常不可达）。
-- 测试：默认 `uv run pytest -n auto --dist loadscope` 运行统一测试套件，低推力计算与算法已完成并纳入默认集；按功能类选跑 `-m theory`/`-m orchestration`/`-m data`/`-m low_thrust` 等。Python 测试默认使用 xdist 并行，`loadscope` 保持模块/类 fixture 的复用并降低全局状态竞争；只有明确依赖进程内全局状态的最小测试组才串行，并记录原因。墙钟性能比较属于 `scripts/` 下的 benchmark，不作为 pytest 正确性断言。spice 默认，需先 `make setup` 拉内核。
+- 测试按改动范围分层执行：默认先跑受影响模块的 pytest 用例、对应 Rust crate 单测，再跑必要静态检查。跨模块公共契约、传播器/数据模型/FFI/构建配置、依赖升级、测试影响范围无法可靠判断，或用户明确要求时，必须扩大到相关集成测试或全量测试。`uv run pytest -n auto --dist loadscope` 是统一全量套件入口，供 CI、发布前验证和上述高风险变更使用，不是每个局部任务的默认前置条件。低推力计算与算法已纳入统一套件；按功能类可选跑 `-m theory`/`-m orchestration`/`-m data`/`-m low_thrust` 等。Python 测试默认使用 xdist 并行，`loadscope` 保持模块/类 fixture 的复用并降低全局状态竞争；只有明确依赖进程内全局状态的最小测试组才串行，并记录原因。未运行的全量测试必须说明原因和已完成的定向验证。墙钟性能比较属于 `scripts/` 下的 benchmark，不作为 pytest 正确性断言。spice 默认，需先 `make setup` 拉内核。
 - 提交前检查：`uv run ruff check .`、`uv run ruff format --check .`、`uv run mypy e2m2e/ --ignore-missing-imports`、`cargo fmt --all -- --check`、`cargo clippy --workspace -- -D warnings`。
 
 ## 编码准则
@@ -138,7 +138,7 @@ async def send_welcome_email(user):
 
 **修 bug 时先写测试。** 先写一个能复现 bug 的测试，看它挂，然后修 bug，看它过。这是唯一能证明你确实修好了、而不是让症状消失的办法。
 
-**按改动范围分层验证。** 先跑受影响模块的测试和必要静态检查；改前能跑的同范围检查改后也应通过。跨模块、共享契约、基础设施、依赖升级，或影响范围无法可靠判断时，再扩大到相关集成测试、全量测试或 CI 指定的回归套件。改前就失败的，说出来，别让你的改动替既存失败背锅。
+**按改动范围分层验证。** 先运行受影响模块的行为测试、对应 Rust crate 单测和必要静态检查；改前能跑的同范围检查改后也应通过。只有改动触及共享契约、跨模块行为、FFI/构建基础设施、依赖升级，或无法可靠界定影响范围时，才扩大到相关集成测试、全量测试或 CI 指定的回归套件。未运行的全量测试须说明原因和已完成的定向验证；改前就失败的，说明原因，别让当前改动替既存失败背锅。
 
 **测行为，不测实现。** 检查构造函数有没有设好属性的测试一文不值；检查校验是否真的拦住坏输入的测试才有价值。
 

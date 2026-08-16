@@ -3,7 +3,8 @@
 
 微分修正（Differential Correction）通过迭代调整初始条件，使轨道满足周期性约束。
 策略层将"配置逻辑"与"迭代求解器"分离：每种策略只负责生成不可变的 ``CorrectionConfig``，
-``DifferentialCorrection`` 负责执行牛顿迭代。
+``DifferentialCorrection`` 负责将配置交给 Rust CR3BP 微分修正内核执行 STM
+Newton 迭代，并在 Python 侧编排结果轨道。
 
 策略概览
 --------
@@ -251,8 +252,8 @@ Halo 轨道（固定 z 振幅）
                                                    └──────────────┘
 
 策略函数（如 ``halo_fixed_z0``）只负责生成配置，不直接操作状态；
-``DifferentialCorrection`` 接收配置后，使用 STM 牛顿法迭代求解。
-这种分离使得：
+``DifferentialCorrection`` 接收配置后，将 STM Newton 迭代交给 Rust CR3BP
+内核执行，Python 侧只保留问题构造、结果和 ``Orbit`` 编排。这种分离使得：
 
 - 新增策略无需修改迭代器代码
 - 同一策略可被不同修正器复用
@@ -297,7 +298,9 @@ Halo 轨道（固定 z 振幅）
    history = corrector.get_convergence_history()
    print(history["errors"])           # 各迭代步的残差范数
    print(history["iterations"])       # 总迭代次数
-   print(history["termination_reason"])  # 终止原因
+   print(history["status"])           # 最终状态
+   print(history["cause"])            # 终止原因码
+   print(history["message"])           # 人可读说明
 
 常见终止原因：
 

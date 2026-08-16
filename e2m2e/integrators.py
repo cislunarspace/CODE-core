@@ -102,6 +102,7 @@ _RUST_SYMBOLS = (
     "check_collision_py",
     "compute_distance_series_py",
     "compute_min_distance_py",
+    "differential_correction_cr3bp_py",
     "detect_intersection_py",
     "detect_local_minimum_py",
     "disable_ephem_cache",
@@ -178,9 +179,20 @@ class _ShootingResult:
         return getattr(self._raw, name)
 
 
+_differential_correction_cr3bp_py_raw: Any = globals()["differential_correction_cr3bp_py"]
 _multiple_shooting_correct_py_raw: Any = globals()["multiple_shooting_correct_py"]
 _planar_full_period_pal_py_raw: Any = globals()["planar_full_period_pal_py"]
 _segmented_shooting_correct_py_raw: Any = globals()["segmented_shooting_correct_py"]
+
+
+def differential_correction_cr3bp_py(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    """调用 Rust CR3BP 微分修正，并返回规范化字典。"""
+    require_rust_extension("differential_correction_cr3bp_py")
+    if _differential_correction_cr3bp_py_raw is None:
+        raise RustExtensionUnavailableError(
+            "e2m2e._integrators 缺少所需符号：differential_correction_cr3bp_py。请先重建：make dev"
+        )
+    return dict(_differential_correction_cr3bp_py_raw(*args, **kwargs))
 
 
 def multiple_shooting_correct_py(*args: Any, **kwargs: Any) -> _ShootingResult:
@@ -288,6 +300,7 @@ __all__ = [
     "cowell_step",
     "compute_distance_series_py",
     "compute_min_distance_py",
+    "differential_correction_cr3bp_py",
     "detect_intersection_py",
     "detect_local_minimum_py",
     "disable_ephem_cache",

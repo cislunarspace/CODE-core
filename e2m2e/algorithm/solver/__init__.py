@@ -1,10 +1,8 @@
-"""迭代求解器薄封装（问题构造入口）。
+"""迭代求解器的 Python 问题构造与编排入口。
 
-下沉 Rust 的算法（ADR 0011）：``DifferentialCorrection``/``Continuation``/
-``MultipleShooting`` 类名保留，Python 侧是"问题构造入口"（约束/自由变量/
-目标配置），迭代循环/收敛判断最终在 Rust ``solver/``。本期只迁移文件位置 +
-保持现有实现（源：``algorithms/`` 的 continuation/differential_correction/
-multiple_shooting），下沉 Rust 是后续独立工作。
+ADR 0011 的下沉边界：``DifferentialCorrection`` 的 CR3BP 数值内核已经在
+Rust，Python 侧保留对称性配置、问题构造、结果与 Orbit 编排；``Continuation``
+和 ``MultipleShooting`` 类仍保留 Python 编排或数值实现，按各自迁移工作项推进。
 
 星历 patch points 修正的旧 Python 求解器（``MultipleShooting``/`
 ``TwoLevelMultipleShooting`` 包装层 ``ephemeris_correction`` 子包）已删除：

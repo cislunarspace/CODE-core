@@ -10,6 +10,8 @@ use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyList};
 
 #[cfg(feature = "spice")]
+pub mod differential_correction;
+#[cfg(feature = "spice")]
 pub mod frame_convert;
 #[cfg(feature = "spice")]
 pub mod homotopy;
@@ -348,6 +350,9 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   SBX 交叉与多项式变异算子）。
 /// - **v11** （#445）：新增低推力打靶批量评估与配点缺陷批量评估入口，
 ///   将低推力直接法的重复数值评估下沉 Rust。
+/// - **v12** （#447）：新增 WSB 三维网格搜索与低能转移流形截面态配对入口。
+/// - **v13** （#441）：新增 ``differential_correction_cr3bp_py``，将 CR3BP
+///   单段微分修正的残差、雅可比、Newton 修正与收敛状态机下沉 Rust。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -3749,6 +3754,11 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_with_state_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        differential_correction::differential_correction_cr3bp_py,
+        m
+    )?)?;
     #[cfg(feature = "spice")]
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(
