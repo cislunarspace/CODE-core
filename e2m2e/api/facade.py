@@ -17,8 +17,10 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
+from e2m2e.algorithm.results import FamilyGenerationResult
 from e2m2e.data.constants import SECONDS_PER_DAY
 from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.data.types.orbit import OrbitFamily
 
 from .config import Config
 from .models import (
@@ -27,6 +29,7 @@ from .models import (
     DesignOrbitRequest,
     DesignOrbitResponse,
     FamilyGenerationRequest,
+    FamilyGenerationResponse,
     OrbitError,
     PropagationRequest,
     PropagationResponse,
@@ -87,6 +90,39 @@ def _result_triplet(result: Any) -> tuple[ConvergenceState, FailureCause, str]:
             cause=FailureCause.BACKEND_FAILURE,
         ) from exc
     return triplet
+
+
+def _family_generation_payload(
+    result: OrbitFamily | FamilyGenerationResult,
+    *,
+    requested_members: int | None = None,
+) -> FamilyGenerationResponse:
+    """把算法层成功或软失败统一投影为 Facade 专属响应。"""
+    if isinstance(result, FamilyGenerationResult):
+        family = result.family
+        status = result.status
+        cause = result.cause
+        message = result.message
+        requested_members = result.requested_members
+        generated_members = result.generated_members
+    else:
+        family = result
+        status = ConvergenceState.CONVERGED
+        cause = FailureCause.NONE
+        message = "轨道族生成完成"
+        requested_members = requested_members or len(family)
+        generated_members = len(family)
+    return FamilyGenerationResponse(
+        status=status,
+        cause=cause,
+        message=message,
+        orbits=family.orbits,
+        family_type=family.family_type,
+        system=family.system,
+        metadata=family.metadata,
+        requested_members=requested_members,
+        generated_members=generated_members,
+    )
 
 
 def _exception_triplet(exc: Exception) -> tuple[ConvergenceState, FailureCause, str]:
@@ -496,28 +532,98 @@ class Facade:
     # ---- 二档子任务（mcp_exposed=True）----
 
     @mcp_exposed(request_model=FamilyGenerationRequest)
-    def orbit_family_generation(self, **params) -> Any:
+    def orbit_family_generation(self, **params) -> FamilyGenerationResponse:
         """轨道族生成（二档）。
 
-        Pydantic 模型校验（#411）→ 分发 → 结构化错误。第一版实现 Halo
-        族生成（复用 algorithm/family 延拓），其余平动点族模型预留。
+        Pydantic 模型校验（#411）→ 按 orbit_type 分派到算法层族生成入
+        口（#428）→ 结构化错误。七族均已实现，成功返回统一容器
+        ``FamilyGenerationResponse``（兼容 ``OrbitFamily`` 读取接口）；
+        Lissajous 是拟周期参数采样，族上显式标注
+        ``periodicity=quasi-periodic``。软失败使用同一响应保留部分族。
         """
         try:
             request = FamilyGenerationRequest(**params)
-            if request.orbit_type.upper() != "HALO":
-                raise OrbitError(
-                    "NOT_IMPLEMENTED",
-                    f"orbit_type={request.orbit_type} 族生成尚未实现（第一版仅 HALO）",
-                    status=ConvergenceState.FAILED,
-                    cause=FailureCause.BACKEND_FAILURE,
-                )
-            from e2m2e.algorithm.family import design_halo_family
+            sel = request.orbit_type.upper()
+            if sel == "HALO":
+                from e2m2e.algorithm.family import design_halo_family
 
-            return design_halo_family(
+                result = design_halo_family(
+                    request.libration_point,
+                    request.max_amplitude_km,
+                    n_orbits=request.n_orbits,
+                )
+                return _family_generation_payload(
+                    result,
+                    requested_members=request.n_orbits,
+                )
+            if sel == "NRHO":
+                from e2m2e.algorithm.family import design_nrho_family
+
+                assert request.north_south is not None
+                assert request.perilune_height_max_km is not None
+                assert request.continuation_direction is not None
+                result = design_nrho_family(
+                    request.libration_point,
+                    request.north_south,
+                    request.perilune_height_max_km,
+                    n_orbits=request.n_orbits,
+                    continuation_direction=request.continuation_direction,
+                )
+                return _family_generation_payload(result)
+            if sel == "AXIAL":
+                from e2m2e.algorithm.family import design_axial_family
+
+                assert request.max_amplitude_km is not None
+                assert request.continuation_direction is not None
+                result = design_axial_family(
+                    request.libration_point,
+                    request.max_amplitude_km,
+                    n_orbits=request.n_orbits,
+                    continuation_direction=request.continuation_direction,
+                )
+                return _family_generation_payload(result)
+            if sel == "LISSAJOUS":
+                from e2m2e.algorithm.family import design_lissajous_family
+
+                assert request.amplitude_in_km is not None
+                assert request.amplitude_out_km is not None
+                assert request.phase_in is not None
+                assert request.phase_out is not None
+                assert request.sampling_mode is not None
+                result = design_lissajous_family(
+                    request.libration_point,
+                    request.amplitude_in_km,
+                    request.amplitude_out_km,
+                    request.phase_in,
+                    request.phase_out,
+                    n_orbits=request.n_orbits,
+                    sampling_mode=request.sampling_mode,
+                )
+                return _family_generation_payload(result)
+            from e2m2e.algorithm.family import (
+                design_horseshoe_family,
+                design_lpo_family,
+                design_spo_family,
+            )
+
+            triangular_entry = {
+                "SPO": design_spo_family,
+                "LPO": design_lpo_family,
+                "HORSESHOE": design_horseshoe_family,
+            }[sel]
+            assert request.min_amplitude_km is not None
+            assert request.max_amplitude_km is not None
+            assert request.continuation_direction is not None
+            assert request.match_tolerance_km is not None
+            result = triangular_entry(
                 request.libration_point,
+                request.min_amplitude_km,
                 request.max_amplitude_km,
                 n_orbits=request.n_orbits,
+                continuation_direction=request.continuation_direction,
+                match_tolerance_km=request.match_tolerance_km,
             )
+            return _family_generation_payload(result)
         except OrbitError:
             raise
         except (ValueError, TypeError) as exc:

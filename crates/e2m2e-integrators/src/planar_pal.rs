@@ -51,12 +51,12 @@ pub struct PlanarPalRustResult {
 }
 
 #[derive(Clone, Copy)]
-struct Options {
-    tolerance: f64,
-    max_iterations: usize,
-    rtol: f64,
-    atol: f64,
-    max_step: Option<f64>,
+pub(crate) struct Options {
+    pub(crate) tolerance: f64,
+    pub(crate) max_iterations: usize,
+    pub(crate) rtol: f64,
+    pub(crate) atol: f64,
+    pub(crate) max_step: Option<f64>,
 }
 
 #[derive(Clone, Copy)]
@@ -570,7 +570,7 @@ fn result(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn run_planar_pal(
+pub(crate) fn run_planar_pal(
     mu: f64,
     seed_state: [f64; 6],
     seed_period: f64,

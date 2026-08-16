@@ -21,10 +21,10 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.family.axial_initial_guess import compute_axial_initial_guess
 from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
-from e2m2e.algorithm.family.lissajous_initial_guess import _linear_modes
 from e2m2e.algorithm.family.spo_initial_guess import compute_spo_initial_guess
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.types.orbit import Orbit
+from e2m2e.integrators import collinear_center_modes_py
 from tests.algorithm.design import seeds
 
 EARTH_MOON_MU = 0.01215058560962404
@@ -107,17 +107,10 @@ def _lyapunov_l1_seed(dynamics: CR3BP_Dynamics) -> tuple[np.ndarray, float]:
     同构：相位 phi 使 y(0)=0，x0 = x_L1 − offset，vy0 由特征向量定出。
     """
     system = dynamics.system
-    omega_xy, v_xy, _, _, x_L = _linear_modes(system, seeds.LYAPUNOV_POINT)
+    x_l, omega_xy, _, y_ratio = collinear_center_modes_py(float(system.mu), seeds.LYAPUNOV_POINT)
     t_lin = 2.0 * np.pi / omega_xy
-    re_vy = float(np.real(v_xy[1]))
-    im_vy = float(np.imag(v_xy[1]))
-    phi = np.arctan2(re_vy, im_vy)
-    cos_phi, sin_phi = np.cos(phi), np.sin(phi)
-    x_factor = float(np.real(v_xy[0]) * cos_phi - np.imag(v_xy[0]) * sin_phi)
-    vy_factor = float(np.real(v_xy[4]) * cos_phi - np.imag(v_xy[4]) * sin_phi)
-    x0 = x_L - seeds.LYAPUNOV_OFFSET
-    alpha = (x0 - x_L) / x_factor
-    vy0 = alpha * vy_factor
+    x0 = x_l - seeds.LYAPUNOV_OFFSET
+    vy0 = (x0 - x_l) * (-omega_xy * y_ratio)
     state = np.array([x0, 0.0, 0.0, 0.0, vy0, 0.0])
     return state, t_lin
 

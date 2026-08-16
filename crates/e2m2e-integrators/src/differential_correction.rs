@@ -9,14 +9,14 @@ use nalgebra::{DMatrix, DVector};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-struct CorrectionRawResult {
-    solution_state: Option<[f64; 6]>,
-    solution_time: Option<f64>,
-    status: &'static str,
-    cause: &'static str,
-    message: String,
-    iterations: usize,
-    residual: Option<f64>,
+pub(crate) struct CorrectionRawResult {
+    pub(crate) solution_state: Option<[f64; 6]>,
+    pub(crate) solution_time: Option<f64>,
+    pub(crate) status: &'static str,
+    pub(crate) cause: &'static str,
+    pub(crate) message: String,
+    pub(crate) iterations: usize,
+    pub(crate) residual: Option<f64>,
     error_history: Vec<f64>,
     correction_history: Vec<f64>,
     state_history: Vec<Vec<f64>>,
@@ -100,7 +100,7 @@ fn linspace(start: f64, end: f64, count: usize) -> Vec<f64> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn run_correction(
+pub(crate) fn run_correction(
     mu: f64,
     initial_state: [f64; 6],
     initial_time: f64,

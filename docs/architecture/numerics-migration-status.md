@@ -29,6 +29,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/solver/differential_correction.py`（CR3BP 数值内核） | Rust（`e2m2e-integrators`） | #441 |
 | `algorithm/solver`（星历修正路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/solver/continuation.py`（PAL 数值内核） | Rust（`e2m2e-forces`） | #443 |
+| `algorithm/family`（#428 轨道族数值内核） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #428 |
 | `algorithm/transfer/qlaw.py`（反馈积分与 Q 函数；Python 仅组装初猜） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #442 |
 | `algorithm/transfer/nsga2.py`（演化算子；Python 保留评估与编排） | Rust（`e2m2e-integrators`） | #444 |
 | `algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py`（直接法数值评估） | Rust（`e2m2e-integrators`；SLSQP 编排留 Python） | #445 |
@@ -52,8 +53,8 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
 | `algorithm/transfer/nlp_*`、`transfer_optimization.py`（NLP 优化与编排） | Python | — |
-| `algorithm/family/*_initial_guess.py`、`strategies/`、`cr3bp_orbits.py`（初猜生成） | Python | — |
-| `algorithm/family/halo_family.py`（族延拓编排） | Python | — |
+| `algorithm/family/*_initial_guess.py`、`strategies/`、`cr3bp_orbits.py`（问题构造与族编排） | Python（数值已 Rust） | — |
+| `algorithm/family/halo_family.py`（族延拓编排） | Python（数值已 Rust） | — |
 | `algorithm/transfer` 二体/解析与编排模块 | Python（Lambert 已 Rust） | — |
 | `algorithm/transfer/search_geometry.py`、`search_progress.py`、`solution_database.py`（搜索辅助） | Python | — |
 | `algorithm/manifold/sections.py`（截面事件函数） | Python | — |
@@ -158,6 +159,16 @@ rust，`backend="python"` 走 numpy 参照路径（对照与降级；等价性�
 #441。`family/halo_family.py` 是纯编排，无独立数值内核，登记在有意留
 Python 节。
 
+**`algorithm/family`（#428 轨道族数值内核）。** 七族统一走
+`generate_cr3bp_family_py`：一次 Rust 调用完成种子构造、CR3BP 修正、PAL、
+步长控制、成员筛选、结构化终止和部分族保留。其内部复用
+`differential_correction_cr3bp_py` 与 `planar_full_period_pal_py` 背后的纯
+Rust 实现；共线点求根、线性中心模态、Lissajous 非线性中心约化多点轨迹，
+以及近月距、
+L4/L5 径向振幅与面外振幅扫描也在同一模块内执行。Python 不逐成员调用
+数值原子，不保留数值回退，只负责请求校验、领域分派和 `OrbitFamily` 重包。
+工作项：#428。
+
 **`algorithm/design`（打靶/传播路径）。** 分段修正、多重打靶、段传播、
 时间转换走 Rust（`segmented_shooting_correct_py`、
 `multiple_shooting_correct_py`、`propagate_segments_py`、
@@ -206,10 +217,10 @@ Python 强项（`architecture-design-discussion.md` 共识，ADR 0017 边界固�
 计算目标/约束），属 NLP 范畴。这是默认求解器所在，不是迁移目标。
 
 **`algorithm/family/*_initial_guess.py`、`strategies/`、`cr3bp_orbits.py`
-（初猜生成）。** 理由：初猜是领域决策，天天在变，属"编排模块"职责
-（architecture.md 第 3 节）；Richardson 三阶等解析近似、`cr3bp_orbits.py` 的
-族行走割线法都是设计链路初猜段的单次标量迭代，无热路径。族延拓（PAL
-数值内核）已下沉，见已下沉 #443。
+（问题构造与族编排）。** 理由：选择轨道族、校验固定方向/采样规则并把
+Rust 结果重包为领域对象属于编排模块职责（architecture.md 第 3 节）。
+#428 的种子、传播、修正、PAL、步长、筛选、中心模态、Lissajous 采样和族
+度量均已收进单次 Rust 调用；Python 不提供数值回退。
 
 **`algorithm/family/halo_family.py`（族延拓编排）。** 理由：种子生成、
 逐轨微分修正调用、方向反馈、停滞检测与族组装是编排职责

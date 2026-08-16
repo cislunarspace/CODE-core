@@ -11,6 +11,8 @@ from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.integrators import planar_full_period_pal_py
 
+pytestmark = pytest.mark.orchestration
+
 
 def _corrected_planar_seed(dynamics, family_type: str, point: int) -> Orbit:
     if family_type == "spo":

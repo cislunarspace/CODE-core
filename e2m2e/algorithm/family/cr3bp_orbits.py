@@ -24,6 +24,7 @@ from collections.abc import Callable
 
 import numpy as np
 
+from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.seed import (  # noqa: F401
     _AXIAL_SEED_VZ0,
     _DPO_SEED_PERIOD,
@@ -45,10 +46,12 @@ from ...data.templates.seed import (  # noqa: F401
     MOON_RADIUS_KM,
 )
 from ...data.types.orbit import Orbit, OrbitFamily
+from ...integrators import orbit_family_metric_py
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
+from ..results import FamilyGenerationResult, ResultStatus
 from ..solver.differential_correction import DifferentialCorrection
 from .axial_initial_guess import compute_axial_initial_guess
-from .halo_family import generate_halo_family, halo_pseudo_arclength_continuation
+from .halo_family import halo_pseudo_arclength_continuation
 from .halo_initial_guess import compute_halo_initial_guess
 from .lissajous_initial_guess import (
     compute_lissajous_bounded_trajectory,
@@ -60,7 +63,20 @@ from .triangular_initial_guess import compute_triangular_initial_guess
 
 
 class Cr3bpOrbitError(RuntimeError):
-    """CR3BP 周期轨道生成失败（微分修正不收敛或族行走未命中目标）。"""
+    """CR3BP 轨道生成硬失败，携带统一状态三元组。"""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status: ConvergenceState = ConvergenceState.FAILED,
+        cause: FailureCause = FailureCause.UNKNOWN,
+    ) -> None:
+        super().__init__(message)
+        ResultStatus(status, cause, message)
+        self.status = status
+        self.cause = cause
+        self.message = message
 
 
 def earth_moon_system() -> CR3BP_System:
@@ -82,13 +98,16 @@ def _moon_distance_minmax(
     数十 km；4000 点把采样噪声压到亚 km 级（实测 6000 km 高度 NRHO
     约 0.3 km），族行走与测试断言用同一函数测量才一致。
     """
-    mu = dynamics.system.mu
     assert orbit.period is not None  # 周期轨道必有 period
-    t_eval = np.linspace(0.0, orbit.period, n_points)
-    result = dynamics.propagate(orbit.states[0], (0.0, orbit.period), t_eval=t_eval)
-    states = result["states"]
-    dist = np.sqrt((states[:, 0] - (1.0 - mu)) ** 2 + states[:, 1] ** 2 + states[:, 2] ** 2)
-    return float(dist.min()), float(dist.max())
+    minimum, maximum = orbit_family_metric_py(
+        float(dynamics.system.mu),
+        "moon-distance",
+        0,
+        orbit.states[0],
+        float(orbit.period),
+        sample_count=n_points,
+    )
+    return float(minimum), float(maximum)
 
 
 def _correct_or_raise(corrector: DifferentialCorrection, guess: Orbit, label: str) -> Orbit:
@@ -497,7 +516,7 @@ def design_halo_family(
     *,
     n_orbits: int = 50,
     dynamics: CR3BP_Dynamics | None = None,
-) -> OrbitFamily:
+) -> OrbitFamily | FamilyGenerationResult:
     """生成一族 Halo 周期轨道（从种子延拓到指定面外振幅上限）。
 
     族从 Richardson 小振幅种子（``_HALO_SEED_Z0``）出发，自然参数
@@ -525,31 +544,18 @@ def design_halo_family(
         raise ValueError("max_amplitude_km 不能为 0")
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
-    du = dynamics.system.characteristic_length
-    assert du is not None
-    z_sign = 1.0 if max_amplitude_km >= 0 else -1.0
-    z_max_du = abs(max_amplitude_km) / du
+    from .rust_generation import generate_rust_family
 
-    seed = _correct_halo(dynamics, float(np.copysign(_HALO_SEED_Z0, z_sign)), libration_point, None)
-    seed.family_type = "halo"
-    seed.parameters = {
-        "libration_point": libration_point,
-        "halo_class": 0 if z_sign > 0 else 1,
-        "amplitude_z": _HALO_SEED_Z0,
-    }
-
-    from ..solver.continuation import Continuation
-
-    continuation = Continuation(corrector=DifferentialCorrection(dynamics))
-    z_range = (0.0, z_max_du) if z_sign > 0 else (-z_max_du, 0.0)
-    family_orbits = generate_halo_family(
-        continuation,
-        seed_orbit=seed,
-        n_orbits=n_orbits,
-        z_range=z_range,
-        verbose=False,
+    result = generate_rust_family(
+        "halo",
+        libration_point,
+        n_orbits,
+        dynamics,
+        max_amplitude_km=max_amplitude_km,
     )
-    return OrbitFamily(orbits=family_orbits, family_type="halo", system=dynamics.system)
+    if result.status is ConvergenceState.CONVERGED:
+        return result.family
+    return result
 
 
 def _walk_pal_to_perilune(
@@ -789,9 +795,15 @@ def design_triangular(
 def _z_amplitude_max(dynamics: CR3BP_Dynamics, orbit: Orbit, n_points: int = 1000) -> float:
     """传播一个周期，返回 |z| 的最大值（无量纲 DU）。"""
     assert orbit.period is not None
-    t_eval = np.linspace(0.0, orbit.period, n_points)
-    result = dynamics.propagate(orbit.states[0], (0.0, orbit.period), t_eval=t_eval)
-    return float(np.max(np.abs(result["states"][:, 2])))
+    _, maximum = orbit_family_metric_py(
+        float(dynamics.system.mu),
+        "z-amplitude",
+        0,
+        orbit.states[0],
+        float(orbit.period),
+        sample_count=n_points,
+    )
+    return float(maximum)
 
 
 def design_axial(
@@ -885,16 +897,16 @@ def _l45_distance(
     n_points: int = 2000,
 ) -> tuple[float, float]:
     """传播一个周期，返回距 L4/L5 径向距离的最小/最大值（无量纲）。"""
-    mu = dynamics.system.mu
-    lp_x = 0.5 - mu
-    lp_y = np.sqrt(3) / 2 if point == 4 else -np.sqrt(3) / 2
-
     assert orbit.period is not None
-    t_eval = np.linspace(0.0, orbit.period, n_points)
-    result = dynamics.propagate(orbit.states[0], (0.0, orbit.period), t_eval=t_eval)
-    states = result["states"]
-    dist = np.sqrt((states[:, 0] - lp_x) ** 2 + (states[:, 1] - lp_y) ** 2)
-    return float(dist.min()), float(dist.max())
+    minimum, maximum = orbit_family_metric_py(
+        float(dynamics.system.mu),
+        "l45-distance",
+        point,
+        orbit.states[0],
+        float(orbit.period),
+        sample_count=n_points,
+    )
+    return float(minimum), float(maximum)
 
 
 def design_spo(
@@ -1255,4 +1267,309 @@ def design_horseshoe(
         amplitude_km,
         dynamics=dynamics,
         tol_km=tol_km,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Facade 轨道族生成适配器。七族数值生成均经 generate_rust_family 单次调用；
+# 本节只保留参数守卫、领域分派和兼容返回投影。
+# ---------------------------------------------------------------------------
+
+
+def design_nrho_family(
+    libration_point: int,
+    north_south: int,
+    perilune_height_max_km: float,
+    *,
+    n_orbits: int = 50,
+    continuation_direction: str = "toward-moon",
+    dynamics: CR3BP_Dynamics | None = None,
+) -> FamilyGenerationResult:
+    """生成 NRHO 族：Halo 族折叠点后近月段中近月点高度达标的成员。
+
+    NRHO 不是独立的族，而是 Halo 族越过折叠点后的近直线段；族成员 =
+    近月点高度 ≤ ``perilune_height_max_km`` 的连续段，至多 ``n_orbits``
+    条。Rust 的 L1 路径从小振幅 Halo 种子做单次 PAL，L2 从 DE421 地月
+    模型标定的折叠后成员固定 x0 向月侧延拓；每个成员在加入结果前重新
+    修正并测量近月点。
+
+    Args:
+        libration_point: 平动点编号（1=L1, 2=L2）。
+        north_south: 1=北族，2=南族。
+        perilune_height_max_km: 族成员的近月点高度上限（km）。
+        n_orbits: 族成员数量上限。
+        dynamics: CR3BP 动力学；缺省构造标准地月系统。
+
+    Returns:
+        :class:`FamilyGenerationResult`；``family`` 是近月段成员组成的
+        ``OrbitFamily``（``family_type="nrho"``），软失败时保留部分成员。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    if libration_point not in (1, 2):
+        raise ValueError(f"libration_point 必须为 1 或 2，当前为 {libration_point}")
+    if north_south not in (1, 2):
+        raise ValueError(f"north_south 必须为 1 或 2，当前为 {north_south}")
+    if n_orbits < 1:
+        raise ValueError(f"n_orbits 必须大于 0，当前为 {n_orbits}")
+    if perilune_height_max_km <= 0.0:
+        raise ValueError("perilune_height_max_km 必须为正数")
+    if continuation_direction != "toward-moon":
+        raise ValueError("NRHO continuation_direction 仅支持 'toward-moon'")
+    from .rust_generation import generate_rust_family
+
+    return generate_rust_family(
+        "nrho",
+        libration_point,
+        n_orbits,
+        dynamics,
+        north_south=north_south,
+        perilune_height_max_km=perilune_height_max_km,
+    )
+
+
+def design_axial_family(
+    libration_point: int,
+    max_amplitude_km: float,
+    *,
+    n_orbits: int = 50,
+    continuation_direction: str = "increase-amplitude",
+    dynamics: CR3BP_Dynamics | None = None,
+) -> FamilyGenerationResult:
+    """生成 Axial 族（Gómez Type B 分岔族）成员。
+
+    以面外速度 ``vz0`` 为族参数，从 Lyapunov 分岔邻域的小振幅成员出
+    发等步行走（失败步长减半），收集 ``|z|`` 振幅不超过
+    ``|max_amplitude_km|`` 的成员，至多 ``n_orbits`` 条。
+    ``max_amplitude_km`` 带符号：正为上族、负为下族（与
+    ``design_axial`` 约定一致）。
+
+    Args:
+        libration_point: 平动点编号（1=L1, 2=L2）。
+        max_amplitude_km: 族振幅上限（km），带符号区分上/下族。
+        n_orbits: 族成员数量上限。
+        dynamics: CR3BP 动力学；缺省构造标准地月系统。
+
+    Returns:
+        :class:`FamilyGenerationResult`；``family`` 是 Axial 成员组成的
+        ``OrbitFamily``（``family_type="axial"``）。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    if libration_point not in (1, 2):
+        raise ValueError(f"libration_point 必须为 1 或 2，当前为 {libration_point}")
+    if n_orbits < 1:
+        raise ValueError(f"n_orbits 必须大于 0，当前为 {n_orbits}")
+    if max_amplitude_km == 0.0:
+        raise ValueError("max_amplitude_km 不能为 0")
+    if continuation_direction != "increase-amplitude":
+        raise ValueError("Axial continuation_direction 仅支持 'increase-amplitude'")
+    from .rust_generation import generate_rust_family
+
+    return generate_rust_family(
+        "axial",
+        libration_point,
+        n_orbits,
+        dynamics,
+        max_amplitude_km=max_amplitude_km,
+    )
+
+
+def design_lissajous_family(
+    libration_point: int,
+    amplitude_in_km: float,
+    amplitude_out_km: float,
+    phase_in: float,
+    phase_out: float,
+    *,
+    n_orbits: int = 50,
+    sampling_mode: str = "linear-amplitudes",
+    dynamics: CR3BP_Dynamics | None = None,
+    n_periods: int = 3,
+) -> FamilyGenerationResult:
+    """生成 Lissajous 拟周期轨迹采样族。
+
+    Lissajous 面内/面外频率不可约，不是周期族；族生成是参数采样而
+    非延拓：面内/面外振幅从请求值的 1/n 到 1 线性插值取
+    ``n_orbits`` 个样本，两相位固定。每个成员是 Rust 非线性中心约化流上的
+    有界多点轨迹（语义同 ``design_lissajous``），无周期闭合，不得
+    按严格周期族消费——族上显式标注
+    ``metadata["periodicity"] = "quasi-periodic"``。
+
+    Args:
+        libration_point: 共线点编号（1/2/3）。
+        amplitude_in_km / amplitude_out_km: 面内/面外振幅上限（km）。
+        phase_in / phase_out: 面内/面外初始相位（0~1，采样中固定）。
+        n_orbits: 采样成员数。
+        dynamics: CR3BP 动力学；缺省构造标准地月系统。
+        n_periods: 每条轨迹覆盖的名义周期数（默认 3）。
+
+    Returns:
+        :class:`FamilyGenerationResult`；``family`` 是拟周期成员组成的
+        ``OrbitFamily``（``family_type="lissajous"``，
+        ``is_quasi_periodic`` 为真）。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    if libration_point not in (1, 2, 3):
+        raise ValueError(f"libration_point 必须为 1、2 或 3，当前为 {libration_point}")
+    if n_orbits < 1:
+        raise ValueError(f"n_orbits 必须大于 0，当前为 {n_orbits}")
+    if n_periods < 1:
+        raise ValueError(f"n_periods 必须大于 0，当前为 {n_periods}")
+    if amplitude_in_km <= 0.0 or amplitude_out_km <= 0.0:
+        raise ValueError("Lissajous 振幅必须为正数")
+    if not 0.0 <= phase_in <= 1.0 or not 0.0 <= phase_out <= 1.0:
+        raise ValueError("Lissajous 相位必须在 [0, 1] 内")
+    if sampling_mode != "linear-amplitudes":
+        raise ValueError("Lissajous sampling_mode 仅支持 'linear-amplitudes'")
+    from .rust_generation import generate_rust_family
+
+    return generate_rust_family(
+        "lissajous",
+        libration_point,
+        n_orbits,
+        dynamics,
+        amplitude_in_km=amplitude_in_km,
+        amplitude_out_km=amplitude_out_km,
+        phase_in=phase_in,
+        phase_out=phase_out,
+        n_periods=n_periods,
+    )
+
+
+def _design_triangular_family(
+    family_type: str,
+    libration_point: int,
+    min_amplitude_km: float,
+    max_amplitude_km: float,
+    *,
+    n_orbits: int,
+    continuation_direction: str,
+    match_tolerance_km: float,
+    dynamics: CR3BP_Dynamics,
+) -> FamilyGenerationResult:
+    """三角平动点周期族（SPO/LPO）生成：小振幅种子 + 全周期 PAL 行走。
+
+    Rust 在 L4/L5 邻域构造并修正种子（SPO 短周期模态 / LPO 长周期模态），
+    按请求的 increase/decrease-x0 初始方向做平面全周期 PAL（ADR 0028）；
+    收集振幅（距 L4/L5
+    径向距离 min/max
+    均值，与 ``design_spo``/``design_lpo`` 同一定义）落入
+    ``[min_amplitude_km, max_amplitude_km]`` 的成员，至多 ``n_orbits``
+    条。PAL 只调用一次，方向只决定首步切向量；完整扫描该弧长链后再按
+    振幅范围和匹配容差筛选，因此不要求 x0、周期或振幅全局单调，也能
+    保留转向后重入范围的成员。PAL 链断裂或估算步数未覆盖请求上界时，
+    通过 :class:`FamilyGenerationResult` 返回部分族及状态。
+    """
+    if family_type not in ("spo", "lpo", "horseshoe"):
+        raise ValueError(f"family_type 必须为 spo、lpo 或 horseshoe，当前为 {family_type!r}")
+    if libration_point not in (4, 5):
+        raise ValueError(f"libration_point 必须为 4 或 5，当前为 {libration_point}")
+    if n_orbits < 1:
+        raise ValueError(f"n_orbits 必须大于 0，当前为 {n_orbits}")
+    if min_amplitude_km <= 0.0 or min_amplitude_km >= max_amplitude_km:
+        raise ValueError("振幅范围必须满足 0 < min_amplitude_km < max_amplitude_km")
+    if continuation_direction not in ("decrease-x0", "increase-x0"):
+        raise ValueError("三角族 continuation_direction 必须为 'decrease-x0' 或 'increase-x0'")
+    if match_tolerance_km <= 0.0:
+        raise ValueError("match_tolerance_km 必须为正数")
+    from .rust_generation import generate_rust_family
+
+    return generate_rust_family(
+        family_type,
+        libration_point,
+        n_orbits,
+        dynamics,
+        min_amplitude_km=min_amplitude_km,
+        max_amplitude_km=max_amplitude_km,
+        continuation_direction=continuation_direction,
+        match_tolerance_km=match_tolerance_km,
+    )
+
+
+def design_spo_family(
+    libration_point: int,
+    min_amplitude_km: float,
+    max_amplitude_km: float,
+    *,
+    n_orbits: int = 50,
+    continuation_direction: str = "decrease-x0",
+    match_tolerance_km: float = 20.0,
+    dynamics: CR3BP_Dynamics | None = None,
+) -> FamilyGenerationResult:
+    """生成 L4/L5 SPO 族：短周期族中振幅落入请求范围的成员。
+
+    振幅定义同 ``design_spo``（距 L4/L5 径向距离 min/max 均值，km）。
+    族生成方法见 ``_design_triangular_family``。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    return _design_triangular_family(
+        "spo",
+        libration_point,
+        min_amplitude_km,
+        max_amplitude_km,
+        n_orbits=n_orbits,
+        continuation_direction=continuation_direction,
+        match_tolerance_km=match_tolerance_km,
+        dynamics=dynamics,
+    )
+
+
+def design_lpo_family(
+    libration_point: int,
+    min_amplitude_km: float,
+    max_amplitude_km: float,
+    *,
+    n_orbits: int = 50,
+    continuation_direction: str = "decrease-x0",
+    match_tolerance_km: float = 20.0,
+    dynamics: CR3BP_Dynamics | None = None,
+) -> FamilyGenerationResult:
+    """生成 L4/L5 LPO 族：长周期族中振幅落入请求范围的成员。
+
+    振幅定义同 ``design_lpo``。族生成方法见 ``_design_triangular_family``。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    return _design_triangular_family(
+        "lpo",
+        libration_point,
+        min_amplitude_km,
+        max_amplitude_km,
+        n_orbits=n_orbits,
+        continuation_direction=continuation_direction,
+        match_tolerance_km=match_tolerance_km,
+        dynamics=dynamics,
+    )
+
+
+def design_horseshoe_family(
+    libration_point: int,
+    min_amplitude_km: float = 50000.0,
+    max_amplitude_km: float = 110000.0,
+    *,
+    n_orbits: int = 50,
+    continuation_direction: str = "decrease-x0",
+    match_tolerance_km: float = 50.0,
+    dynamics: CR3BP_Dynamics | None = None,
+) -> FamilyGenerationResult:
+    """生成 L4/L5 Horseshoe 族：LPO 长周期族的大振幅（马蹄形）成员。
+
+    Horseshoe 是 LPO 族的成员分类，不获第二套求解器（ADR 0028）：
+    沿 LPO 链行走到大振幅段，收集振幅落入请求范围的成员并标记为
+    ``horseshoe``。声明范围不得超出 #435 标定的可达包络。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    return _design_triangular_family(
+        "horseshoe",
+        libration_point,
+        min_amplitude_km,
+        max_amplitude_km,
+        n_orbits=n_orbits,
+        continuation_direction=continuation_direction,
+        match_tolerance_km=match_tolerance_km,
+        dynamics=dynamics,
     )

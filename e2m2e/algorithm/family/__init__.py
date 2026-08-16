@@ -10,8 +10,12 @@
 ``design_orbit`` 查注册表按族分发（新族 = 写一个设计函数 + 注册）。
 
 ``cr3bp_orbits`` （六类初猜）依赖 ``algorithm/solver``，而 solver 依赖本包
-的 ``halo_initial_guess``——为打破包级循环导入，初猜函数经 PEP 562
+的 ``halo_initial_guess``——为打破包级循环，初猜函数经 PEP 562
 ``__getattr__`` 惰性导出。
+
+``design_*_family`` 是面向 Facade 的多成员生成入口，返回带状态三元组的
+``FamilyGenerationResult``；成功结果中的 ``family`` 是 ``OrbitFamily``。
+单轨注册表与多成员生成入口保持两套明确契约。
 """
 
 from __future__ import annotations
@@ -53,15 +57,21 @@ from .triangular_initial_guess import compute_triangular_initial_guess
 
 __all__ = [
     "design_axial",
+    "design_axial_family",
     "design_dpo",
     "design_dro",
     "design_halo",
     "design_halo_family",
     "design_horseshoe",
+    "design_horseshoe_family",
     "design_lpo",
+    "design_lpo_family",
     "design_nrho",
+    "design_nrho_family",
     "design_lissajous",
+    "design_lissajous_family",
     "design_spo",
+    "design_spo_family",
     "design_triangular",
     "earth_moon_system",
     "Cr3bpOrbitError",
@@ -94,15 +104,21 @@ __all__ = [
 #: 依赖 ``algorithm/solver``，经 PEP 562 在首次访问时加载。
 _LAZY_EXPORTS = {
     "design_axial": "design_axial",
+    "design_axial_family": "design_axial_family",
     "design_dpo": "design_dpo",
     "design_dro": "design_dro",
     "design_halo": "design_halo",
     "design_halo_family": "design_halo_family",
     "design_horseshoe": "design_horseshoe",
+    "design_horseshoe_family": "design_horseshoe_family",
     "design_lpo": "design_lpo",
+    "design_lpo_family": "design_lpo_family",
     "design_nrho": "design_nrho",
+    "design_nrho_family": "design_nrho_family",
     "design_lissajous": "design_lissajous",
+    "design_lissajous_family": "design_lissajous_family",
     "design_spo": "design_spo",
+    "design_spo_family": "design_spo_family",
     "design_triangular": "design_triangular",
     "earth_moon_system": "earth_moon_system",
     "Cr3bpOrbitError": "Cr3bpOrbitError",

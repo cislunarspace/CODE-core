@@ -23,9 +23,11 @@ if TYPE_CHECKING:
     batch_synodic_to_j2000_py: Any
     build_cr3bp_hamiltonian_py: Any
     check_collision_py: Any
+    collinear_center_modes_py: Any
     compute_distance_series_py: Any
     compute_min_distance_py: Any
     detect_intersection_py: Any
+    generate_cr3bp_family_py: Any
     detect_local_minimum_py: Any
     disable_ephem_cache: Any
     enable_ephem_cache: Any
@@ -36,10 +38,12 @@ if TYPE_CHECKING:
     low_energy_patch_py: Any
     lowthrust_collocation_defects_py: Any
     lowthrust_shooting_evaluate_py: Any
+    lissajous_bounded_trajectory_py: Any
     nsga2_environmental_selection_py: Any
     nsga2_sort_py: Any
     nsga2_tournament_selection_py: Any
     nsga2_variation_py: Any
+    orbit_family_metric_py: Any
     pal_f_df_tangent_py: Any
     pal_newton_step_py: Any
     pole_tide: Any
@@ -102,9 +106,11 @@ _RUST_SYMBOLS = (
     "batch_synodic_to_j2000_py",
     "build_cr3bp_hamiltonian_py",
     "check_collision_py",
+    "collinear_center_modes_py",
     "compute_distance_series_py",
     "compute_min_distance_py",
     "differential_correction_cr3bp_py",
+    "generate_cr3bp_family_py",
     "detect_intersection_py",
     "detect_local_minimum_py",
     "disable_ephem_cache",
@@ -117,11 +123,13 @@ _RUST_SYMBOLS = (
     "low_energy_patch_py",
     "lowthrust_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
+    "lissajous_bounded_trajectory_py",
     "multiple_shooting_correct_py",
     "nsga2_environmental_selection_py",
     "nsga2_sort_py",
     "nsga2_tournament_selection_py",
     "nsga2_variation_py",
+    "orbit_family_metric_py",
     "pal_f_df_tangent_py",
     "pal_newton_step_py",
     "planar_full_period_pal_py",
@@ -300,11 +308,13 @@ __all__ = [
     "batch_synodic_to_j2000_py",
     "build_cr3bp_hamiltonian_py",
     "check_collision_py",
+    "collinear_center_modes_py",
     "CowellResult",
     "cowell_step",
     "compute_distance_series_py",
     "compute_min_distance_py",
     "differential_correction_cr3bp_py",
+    "generate_cr3bp_family_py",
     "detect_intersection_py",
     "detect_local_minimum_py",
     "disable_ephem_cache",
@@ -321,6 +331,7 @@ __all__ = [
     "low_energy_patch_rust",
     "lowthrust_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
+    "lissajous_bounded_trajectory_py",
     "MultistepMethod",
     "MultistepResult",
     "multistep_step",
@@ -329,6 +340,7 @@ __all__ = [
     "nsga2_sort_py",
     "nsga2_tournament_selection_py",
     "nsga2_variation_py",
+    "orbit_family_metric_py",
     "pal_f_df_tangent_py",
     "pal_newton_step_py",
     "planar_full_period_pal_py",

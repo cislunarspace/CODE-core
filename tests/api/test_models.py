@@ -12,6 +12,7 @@ from e2m2e.api.models import (
     DesignOrbitRequest,
     DesignOrbitResponse,
     FamilyGenerationRequest,
+    FamilyGenerationResponse,
     NumericRange,
     PropagationRequest,
     SpacetimeTransformRequest,
@@ -19,6 +20,7 @@ from e2m2e.api.models import (
 )
 from e2m2e.data.constants import Datum
 from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.data.types.orbit import OrbitFamily
 
 pytestmark = pytest.mark.interface
 
@@ -309,6 +311,109 @@ class TestFamilyGenerationRequest:
         with pytest.raises(ValueError, match="orbit_type"):
             FamilyGenerationRequest.valid_ranges("NOPE")
 
+    def test_schema_exposes_family_specific_fields(self):
+        schema = FamilyGenerationRequest.model_json_schema()
+        properties = schema["properties"]
+        for field in (
+            "max_amplitude_km",
+            "min_amplitude_km",
+            "north_south",
+            "perilune_height_max_km",
+            "amplitude_in_km",
+            "amplitude_out_km",
+            "phase_in",
+            "phase_out",
+            "continuation_direction",
+            "sampling_mode",
+            "match_tolerance_km",
+        ):
+            assert field in properties
+        assert "第一版仅" not in properties["orbit_type"]["description"]
+
+    def test_non_halo_defaults(self):
+        nrho = FamilyGenerationRequest(orbit_type="NRHO")
+        assert nrho.libration_point == 2
+        assert nrho.north_south == 2
+        assert nrho.perilune_height_max_km == 20000.0
+        assert nrho.continuation_direction == "toward-moon"
+        assert nrho.sampling_mode == "halo-segment"
+
+        axial = FamilyGenerationRequest(orbit_type="AXIAL")
+        assert axial.max_amplitude_km == 10000.0
+        assert axial.continuation_direction == "increase-amplitude"
+        assert axial.sampling_mode == "fixed-vz0"
+
+        lissajous = FamilyGenerationRequest(orbit_type="LISSAJOUS")
+        assert lissajous.amplitude_in_km == 2500.0
+        assert lissajous.amplitude_out_km == 7500.0
+        assert lissajous.phase_in == 0.01
+        assert lissajous.phase_out == 0.55
+        assert lissajous.sampling_mode == "linear-amplitudes"
+
+        spo = FamilyGenerationRequest(orbit_type="SPO")
+        assert (spo.min_amplitude_km, spo.max_amplitude_km) == (2000.0, 60000.0)
+        assert spo.continuation_direction == "decrease-x0"
+        assert spo.sampling_mode == "full-period-pal"
+        assert spo.match_tolerance_km == 20.0
+        lpo = FamilyGenerationRequest(orbit_type="LPO")
+        assert (lpo.min_amplitude_km, lpo.max_amplitude_km) == (2000.0, 110000.0)
+        horseshoe = FamilyGenerationRequest(orbit_type="HORSESHOE")
+        assert (horseshoe.min_amplitude_km, horseshoe.max_amplitude_km) == (50000.0, 110000.0)
+        assert horseshoe.match_tolerance_km == 50.0
+
+    def test_valid_ranges_are_family_specific(self):
+        nrho = FamilyGenerationRequest.valid_ranges("NRHO")
+        assert nrho["perilune_height_max_km"].format_interval() == "[1000.0, 40000.0]"
+        assert nrho["north_south"].contains(1)
+
+        axial = FamilyGenerationRequest.valid_ranges("AXIAL")
+        assert axial["max_amplitude_km"].format_interval() == "[-60000.0, 60000.0]"
+        assert not axial["max_amplitude_km"].contains(0.0)
+
+        l12 = FamilyGenerationRequest.valid_ranges("LISSAJOUS", libration_point=2)
+        assert l12["amplitude_in_km"].maximum == 7600.0
+        assert l12["phase_in"].format_interval() == "[0.0, 1.0]"
+        l3 = FamilyGenerationRequest.valid_ranges("LISSAJOUS", libration_point=3)
+        assert l3["amplitude_in_km"].maximum == 100000.0
+
+        horseshoe = FamilyGenerationRequest.valid_ranges("HORSESHOE")
+        assert horseshoe["min_amplitude_km"].minimum == 50000.0
+        assert horseshoe["match_tolerance_km"].minimum_inclusive is False
+
+        options = FamilyGenerationRequest.valid_options("LPO")
+        assert options["continuation_direction"] == ("decrease-x0", "increase-x0")
+        assert options["sampling_mode"] == ("full-period-pal",)
+
+    def test_rejects_invalid_family_specific_fields(self):
+        with pytest.raises(ValidationError, match="perilune_height_max_km"):
+            FamilyGenerationRequest(orbit_type="NRHO", perilune_height_max_km=500.0)
+        with pytest.raises(ValidationError, match="max_amplitude_km 不能为 0"):
+            FamilyGenerationRequest(orbit_type="AXIAL", max_amplitude_km=0.0)
+        with pytest.raises(ValidationError, match="max_amplitude_km"):
+            FamilyGenerationRequest(orbit_type="AXIAL", max_amplitude_km=70000.0)
+        with pytest.raises(ValidationError, match="amplitude_in_km"):
+            FamilyGenerationRequest(
+                orbit_type="LISSAJOUS", libration_point=2, amplitude_in_km=8000.0
+            )
+        with pytest.raises(ValidationError, match="min_amplitude_km"):
+            FamilyGenerationRequest(orbit_type="HORSESHOE", min_amplitude_km=30000.0)
+        with pytest.raises(ValidationError, match="min_amplitude_km 必须小于"):
+            FamilyGenerationRequest(
+                orbit_type="LPO", min_amplitude_km=60000.0, max_amplitude_km=30000.0
+            )
+        with pytest.raises(ValidationError, match="不适用字段"):
+            FamilyGenerationRequest(orbit_type="NRHO", max_amplitude_km=5000.0)
+        with pytest.raises(ValidationError, match="sampling_mode"):
+            FamilyGenerationRequest(orbit_type="LISSAJOUS", sampling_mode="grid")
+        with pytest.raises(ValidationError, match="continuation_direction"):
+            FamilyGenerationRequest(orbit_type="SPO", continuation_direction="sideways")
+        with pytest.raises(ValidationError, match="min_amplitude_km"):
+            FamilyGenerationRequest(orbit_type="SPO", min_amplitude_km=1000.0)
+        with pytest.raises(ValidationError, match="libration_point"):
+            FamilyGenerationRequest(orbit_type="LPO", libration_point=2)
+        with pytest.raises(ValidationError, match="match_tolerance_km"):
+            FamilyGenerationRequest(orbit_type="HORSESHOE", match_tolerance_km=0.0)
+
 
 class TestResponses:
     def test_design_response_serializes_public_geometry(self):
@@ -367,4 +472,35 @@ class TestResponses:
                 num_failed=0,
                 sk_statistic={"rows": [], "num_failed": 0},
                 maneuvers={"mjd_tdb": [], "delta_v_mps": []},
+            )
+
+
+class TestFamilyGenerationResponse:
+    def test_is_pydantic_response_and_orbit_family(self):
+        response = FamilyGenerationResponse(
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="轨道族生成完成",
+            orbits=[],
+            family_type="halo",
+            metadata={"periodicity": "periodic"},
+            requested_members=2,
+            generated_members=0,
+        )
+
+        assert isinstance(response, OrbitFamily)
+        assert response.periodicity == "periodic"
+        assert response.model_dump()["status"] is ConvergenceState.CONVERGED
+
+    def test_rejects_member_count_mismatch(self):
+        with pytest.raises(ValidationError):
+            FamilyGenerationResponse(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="轨道族生成完成",
+                orbits=[],
+                family_type="halo",
+                metadata={},
+                requested_members=2,
+                generated_members=1,
             )

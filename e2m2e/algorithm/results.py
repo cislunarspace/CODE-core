@@ -130,6 +130,26 @@ class ContinuationResult:
         ResultStatus(self.status, self.cause, self.message)
 
 
+@dataclass(frozen=True)
+class FamilyGenerationResult:
+    """多族生成结果；软失败时保留已生成的部分轨道族。"""
+
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+    family: OrbitFamily
+    requested_members: int
+    generated_members: int
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
+        if self.generated_members != len(self.family):
+            raise ValueError(
+                "generated_members 必须等于 family 成员数："
+                f"{self.generated_members} != {len(self.family)}"
+            )
+
+
 @dataclass
 class TransferCandidateResult:
     """转移搜索单格的类型化候选评估。

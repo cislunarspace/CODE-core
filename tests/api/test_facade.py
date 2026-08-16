@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from api.conftest import control_orbit_business_parameters
+from e2m2e.algorithm.results import FamilyGenerationResult
 from e2m2e.api.config import Config
 from e2m2e.api.facade import Facade, mcp_tools, tool_inventory
 from e2m2e.api.models import (
@@ -21,6 +22,7 @@ from e2m2e.api.models import (
     TransferDesignRequest,
 )
 from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.data.types.orbit import OrbitFamily
 
 pytestmark = pytest.mark.interface
 
@@ -155,12 +157,195 @@ class TestFacadeCallChains:
             orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=2
         )
         assert family.family_type == "halo"
+        assert family.status is ConvergenceState.CONVERGED
+        assert family.cause is FailureCause.NONE
         assert len(family) >= 1
         assert all(orbit.parameters.get("libration_point") == 1 for orbit in family)
 
-    def test_non_halo_family_reports_not_implemented(self):
-        with pytest.raises(OrbitError, match="NOT_IMPLEMENTED"):
-            Facade().orbit_family_generation(orbit_type="SPO", libration_point=4)
+    @pytest.mark.parametrize(
+        ("orbit_type", "entry_name", "params", "expected_args"),
+        [
+            (
+                "NRHO",
+                "design_nrho_family",
+                {"libration_point": 1, "north_south": 1, "perilune_height_max_km": 30000.0},
+                (1, 1, 30000.0),
+            ),
+            (
+                "AXIAL",
+                "design_axial_family",
+                {"libration_point": 1, "max_amplitude_km": -5000.0},
+                (1, -5000.0),
+            ),
+            (
+                "LISSAJOUS",
+                "design_lissajous_family",
+                {
+                    "libration_point": 3,
+                    "amplitude_in_km": 8000.0,
+                    "amplitude_out_km": 9000.0,
+                    "phase_in": 0.1,
+                    "phase_out": 0.6,
+                },
+                (3, 8000.0, 9000.0, 0.1, 0.6),
+            ),
+            (
+                "SPO",
+                "design_spo_family",
+                {"libration_point": 4, "min_amplitude_km": 5000.0, "max_amplitude_km": 20000.0},
+                (4, 5000.0, 20000.0),
+            ),
+            (
+                "LPO",
+                "design_lpo_family",
+                {"libration_point": 5, "min_amplitude_km": 5000.0, "max_amplitude_km": 30000.0},
+                (5, 5000.0, 30000.0),
+            ),
+            (
+                "HORSESHOE",
+                "design_horseshoe_family",
+                {"libration_point": 4, "min_amplitude_km": 50000.0, "max_amplitude_km": 100000.0},
+                (4, 50000.0, 100000.0),
+            ),
+        ],
+    )
+    def test_non_halo_family_dispatches_to_algorithm(
+        self, monkeypatch, orbit_type, entry_name, params, expected_args
+    ):
+        import e2m2e.algorithm.family as family_module
+
+        sentinel = OrbitFamily(family_type=orbit_type.lower())
+        calls = []
+
+        def fake_entry(*args, **kwargs):
+            calls.append((args, kwargs))
+            return FamilyGenerationResult(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="测试完成",
+                family=sentinel,
+                requested_members=2,
+                generated_members=0,
+            )
+
+        monkeypatch.setattr(family_module, entry_name, fake_entry)
+        result = Facade().orbit_family_generation(orbit_type=orbit_type, n_orbits=2, **params)
+
+        expected_kwargs = {"n_orbits": 2}
+        if orbit_type == "NRHO":
+            expected_kwargs["continuation_direction"] = "toward-moon"
+        elif orbit_type == "AXIAL":
+            expected_kwargs["continuation_direction"] = "increase-amplitude"
+        elif orbit_type == "LISSAJOUS":
+            expected_kwargs["sampling_mode"] = "linear-amplitudes"
+        else:
+            expected_kwargs.update(
+                continuation_direction="decrease-x0",
+                match_tolerance_km=50.0 if orbit_type == "HORSESHOE" else 20.0,
+            )
+        assert isinstance(result, OrbitFamily)
+        assert result.family_type == sentinel.family_type
+        assert result.status is ConvergenceState.CONVERGED
+        assert result.generated_members == 0
+        assert calls == [(expected_args, expected_kwargs)]
+
+    def test_soft_failure_preserves_partial_family_and_status(self, monkeypatch):
+        import e2m2e.algorithm.family as family_module
+
+        partial = OrbitFamily(family_type="spo")
+        soft_failure = FamilyGenerationResult(
+            status=ConvergenceState.STAGNATED,
+            cause=FailureCause.STAGNATION_DETECTED,
+            message="PAL 步长降至下限",
+            family=partial,
+            requested_members=5,
+            generated_members=0,
+        )
+        monkeypatch.setattr(
+            family_module, "design_spo_family", lambda *args, **kwargs: soft_failure
+        )
+
+        result = Facade().orbit_family_generation(
+            orbit_type="SPO",
+            libration_point=4,
+            min_amplitude_km=5000.0,
+            max_amplitude_km=20000.0,
+            n_orbits=5,
+        )
+
+        assert isinstance(result, OrbitFamily)
+        assert result.family_type == partial.family_type
+        assert result.orbits == partial.orbits
+        assert result.status is ConvergenceState.STAGNATED
+        assert result.cause is FailureCause.STAGNATION_DETECTED
+
+    @pytest.mark.parametrize(
+        ("expected_type", "params"),
+        [
+            (
+                "nrho",
+                {
+                    "orbit_type": "NRHO",
+                    "libration_point": 1,
+                    "north_south": 1,
+                    "perilune_height_max_km": 30000.0,
+                },
+            ),
+            (
+                "axial",
+                {
+                    "orbit_type": "AXIAL",
+                    "libration_point": 2,
+                    "max_amplitude_km": 1500.0,
+                },
+            ),
+            (
+                "lissajous",
+                {
+                    "orbit_type": "LISSAJOUS",
+                    "libration_point": 2,
+                    "amplitude_in_km": 2400.0,
+                    "amplitude_out_km": 7200.0,
+                    "phase_in": 0.01,
+                    "phase_out": 0.55,
+                },
+            ),
+            (
+                "spo",
+                {
+                    "orbit_type": "SPO",
+                    "libration_point": 4,
+                    "min_amplitude_km": 5000.0,
+                    "max_amplitude_km": 20000.0,
+                },
+            ),
+            (
+                "lpo",
+                {
+                    "orbit_type": "LPO",
+                    "libration_point": 5,
+                    "min_amplitude_km": 5000.0,
+                    "max_amplitude_km": 30000.0,
+                },
+            ),
+            (
+                "horseshoe",
+                {
+                    "orbit_type": "HORSESHOE",
+                    "libration_point": 4,
+                    "min_amplitude_km": 50000.0,
+                    "max_amplitude_km": 110000.0,
+                },
+            ),
+        ],
+    )
+    def test_non_halo_family_end_to_end_smoke(self, expected_type, params):
+        family = Facade().orbit_family_generation(n_orbits=1, **params)
+
+        assert family.family_type == expected_type
+        assert len(family) == 1
+        assert family.status is ConvergenceState.CONVERGED
+        assert family.cause is FailureCause.NONE
 
     @pytest.mark.parametrize(
         "params",

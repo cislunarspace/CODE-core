@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **多族统一轨道族生成**（#428）：`Facade.orbit_family_generation()` 在 Halo 之外新增 NRHO、Axial、Lissajous、SPO、LPO 与 Horseshoe 分派；请求模型按族公开近月点、振幅、相位、延拓方向、采样规则与匹配容差，并拒绝跨族字段。Facade 统一返回兼容 `OrbitFamily` 读取接口的 Pydantic `FamilyGenerationResponse`，状态三元组直接位于响应上，软失败保留部分族。Lissajous 以同一族容器承载 Rust 非线性中心约化流上的拟周期有界轨迹并显式标注 `periodicity="quasi-periodic"`。种子构造、CR3BP 修正、PAL、步长控制、成员筛选、共线点中心模态、轨迹采样和族几何度量均收进单次 Rust 调用，Python 只做请求校验、领域分派和结果重包；新增统一 `generate_cr3bp_family_py` 及三个数值原子入口，ABI 升至 v15。
+
 ### Changed
 - **低推力直接法数值内核下沉 Rust**（#445）：多段打靶的受控传播与灵敏度链式组装、Hermite-Simpson 配点缺陷批量求值进入 `e2m2e-integrators`；`LowThrustShooting` 与 `LowThrustCollocation` 新增 `backend` 参数，默认 `"rust"`，`"python"` 保留原实现作等价性对照和降级路径。公开 API 与求解结果契约保持不变，ABI 升至 v11。
 - **NSGA-II 演化算子下沉 Rust**（#444）：约束非支配排序、拥挤度距离、锦标赛和环境选择、SBX 交叉与多项式变异进入 `e2m2e-integrators` 的 `nsga2` 内核（新增 `nsga2_*_py` 绑定，ABI v10）。`nsga2` 默认走 Rust，`backend="python"` 保留 NumPy 参照与降级路径；目标函数回调、进程并行评估、NumPy 随机数生成和结果组装仍在 Python，同一种子两后端演化等价。

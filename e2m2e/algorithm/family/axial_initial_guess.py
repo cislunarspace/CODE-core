@@ -27,14 +27,10 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates.enums import LibrationPoint
 from ...data.types.orbit import Orbit
+from ...integrators import collinear_center_modes_py
 from ..dynamics import CR3BP_Dynamics
 from ..solver.differential_correction import DifferentialCorrection
-from .lissajous_initial_guess import _linear_modes
-
-#: 共线点编号 → LibrationPoint 枚举
-_COLLINEAR = {1: LibrationPoint.L1, 2: LibrationPoint.L2, 3: LibrationPoint.L3}
 
 #: Haapala & Howell (2016) Axial Jacobi 区间（用于筛选正确的分岔点）
 _AXIAL_C_RANGES: dict[int, tuple[float, float]] = {
@@ -138,17 +134,11 @@ def _find_axial_bifurcation_seed(
     if not system.has_L_points:
         system.compute_libration_points()
 
-    # 线性化参数
-    omega_xy, v_xy, _, _, x_L = _linear_modes(system, libration_point)
+    # Rust 返回解析中心模态；相位约定令 y(0)=xdot(0)=0。
+    x_L, omega_xy, _, y_ratio = collinear_center_modes_py(float(system.mu), libration_point)
     T_lin = 2.0 * np.pi / omega_xy
-
-    # 线性化种子：从面内特征向量导出 x₀-ẏ₀ 关系
-    re_vy = float(np.real(v_xy[1]))
-    im_vy = float(np.imag(v_xy[1]))
-    phi = np.arctan2(re_vy, im_vy)  # 使 y(0)=0 的相位
-    cos_phi, sin_phi = np.cos(phi), np.sin(phi)
-    x_factor = float(np.real(v_xy[0]) * cos_phi - np.imag(v_xy[0]) * sin_phi)
-    vy_factor = float(np.real(v_xy[4]) * cos_phi - np.imag(v_xy[4]) * sin_phi)
+    x_factor = 1.0
+    vy_factor = -omega_xy * y_ratio
 
     # Jacobi 筛选区间
     C_lo, C_hi = _AXIAL_C_RANGES.get(libration_point, (2.5, 3.5))

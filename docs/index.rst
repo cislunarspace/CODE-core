@@ -25,6 +25,7 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
    algorithms/differential-correction
    algorithms/strategies
    algorithms/continuation
+   algorithms/orbit-family-generation
    algorithms/halo
    algorithms/halo-family
    algorithms/halo-initial-guess

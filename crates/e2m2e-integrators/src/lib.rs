@@ -11,6 +11,8 @@ use pyo3::types::{PyDict, PyList};
 
 #[cfg(feature = "spice")]
 pub mod differential_correction;
+pub mod family;
+pub mod family_generation;
 #[cfg(feature = "spice")]
 pub mod frame_convert;
 #[cfg(feature = "spice")]
@@ -353,6 +355,11 @@ const fn parse_abi_version(s: &str) -> u32 {
 /// - **v12** （#447）：新增 WSB 三维网格搜索与低能转移流形截面态配对入口。
 /// - **v13** （#441）：新增 ``differential_correction_cr3bp_py``，将 CR3BP
 ///   单段微分修正的残差、雅可比、Newton 修正与收敛状态机下沉 Rust。
+/// - **v14** （#428）：新增 ``collinear_center_modes_py``、
+///   ``lissajous_bounded_trajectory_py`` 与 ``orbit_family_metric_py``，将
+///   Lissajous 中心模态轨迹和族几何度量下沉 Rust。
+/// - **v15** （#428）：新增 ``generate_cr3bp_family_py``，将七类轨道族的
+///   种子、延拓、筛选与结构化终止收进单次 Rust 调用。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -3982,6 +3989,16 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(frame_convert::batch_et_to_utc_py, m)?)?;
     m.add_function(wrap_pyfunction!(planar_pal::planar_full_period_pal_py, m)?)?;
     m.add_class::<planar_pal::PlanarPalRustResult>()?;
+    m.add_function(wrap_pyfunction!(family::collinear_center_modes_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        family::lissajous_bounded_trajectory_py,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(family::orbit_family_metric_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        family_generation::generate_cr3bp_family_py,
+        m
+    )?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;

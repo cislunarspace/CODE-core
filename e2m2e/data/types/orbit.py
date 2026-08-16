@@ -366,7 +366,7 @@ class OrbitFamily:
                 self.orbits = list(orbits)
         self.family_type = family_type
         self.system = system
-        self.metadata = {
+        self.metadata: dict[str, Any] = {
             "created": datetime.now().isoformat(),
             "source": "e2m2e library",
             "description": "",
@@ -380,6 +380,22 @@ class OrbitFamily:
     @property
     def periods(self) -> npt.NDArray[np.floating]:
         return self.get_periods()
+
+    @property
+    def periodicity(self) -> str:
+        """族成员的周期语义：``"periodic"`` 或 ``"quasi-periodic"``。
+
+        由族生成入口写入 ``metadata["periodicity"]``。``"quasi-periodic"``
+        表示成员是拟周期有界轨迹（如 Lissajous），无周期闭合语义，
+        不得按严格周期族消费（闭合误差、周期不变量等检查不适用）。
+        缺省 ``"periodic"``。
+        """
+        return self.metadata.get("periodicity", "periodic")
+
+    @property
+    def is_quasi_periodic(self) -> bool:
+        """族成员是否为拟周期有界轨迹（非严格周期轨道）。"""
+        return self.periodicity == "quasi-periodic"
 
     def __len__(self) -> int:
         return len(self.orbits)
