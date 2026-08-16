@@ -344,7 +344,7 @@ def halo_pseudo_arclength_continuation(
             target_direction=td,
             progress_callback=progress_callback,
         )
-        for o in sub.orbits[1:]:
+        for o in sub.family.orbits[1:]:
             tag(o)
             orbit_family.add_orbit(o)
 

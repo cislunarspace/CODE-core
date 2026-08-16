@@ -210,7 +210,8 @@ class Continuation:
             verbose: 是否打印信息
 
         Returns:
-            OrbitFamily: 包含轨道族的OrbitFamily对象
+            ContinuationResult: 结果状态三元组（status/cause/message）+
+            轨道族与延拓统计（族在 ``.family``，含种子与新生成成员）。
         """
         # 验证并限制步长
         if step_size > self.max_step_size:
@@ -459,7 +460,8 @@ class Continuation:
                 （0=rx, 1=rz, 2=vy, 3=T/2）。
 
         Returns:
-            OrbitFamily: 仅含种子与本支新轨道（不重复添加种子）。
+            ContinuationResult: 结果状态三元组（status/cause/message）+
+            轨道族与延拓统计（族在 ``.family``，仅含种子与本支新轨道）。
         """
         dynamics = self.dynamics
 
