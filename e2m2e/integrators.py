@@ -43,6 +43,8 @@ if TYPE_CHECKING:
     pal_f_df_tangent_py: Any
     pal_newton_step_py: Any
     pole_tide: Any
+    porkchop_grid_py: Any
+    porkchop_grid_states_py: Any
     project_hamiltonian_qf_py: Any
     qlaw_propagate_py: Any
     qlaw_segment_direction_py: Any
@@ -124,6 +126,8 @@ _RUST_SYMBOLS = (
     "pal_newton_step_py",
     "planar_full_period_pal_py",
     "pole_tide",
+    "porkchop_grid_py",
+    "porkchop_grid_states_py",
     "project_hamiltonian_qf_py",
     "qlaw_propagate_py",
     "qlaw_segment_direction_py",
@@ -329,6 +333,8 @@ __all__ = [
     "pal_newton_step_py",
     "planar_full_period_pal_py",
     "pole_tide",
+    "porkchop_grid_py",
+    "porkchop_grid_states_py",
     "project_hamiltonian_qf_py",
     "qlaw_propagate_py",
     "qlaw_segment_direction_py",

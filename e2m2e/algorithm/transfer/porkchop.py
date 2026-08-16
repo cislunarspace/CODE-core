@@ -24,13 +24,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from .lambert import solve_lambert_batch
-from .terminal import TerminalCondition
+from e2m2e import integrators
+
+from ..dynamics import CR3BP_Dynamics
+from .lambert import _parse_direction
+from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
-
-    from ..dynamics import CR3BP_Dynamics
 
 
 @dataclass
@@ -477,6 +478,22 @@ def porkchop(
     状态取 ``t_dep + tof`` 时刻，解二体 Lambert 得转移速度，脉冲为转移
     速度与终端轨道速度之差。
 
+    数值网格评估（终端传播 + Lambert + ΔV 组装 + 分发）全部在 Rust
+    （#446，ADR 0017 范式）；Python 只做问题构造与结果解释：
+
+    - **规格路径**：两端均为内置终端（``OrbitTerminal``/``StateTerminal``
+      且未被 monkeypatch）、涉及轨道终端时 dynamics 为未 patch 的
+      ``CR3BP_Dynamics``——终端规格直接交给 Rust，轨道终端的传播在
+      Rust 内逐点并行进行。
+    - **协议路径**：其余情况（自定义 ``TerminalCondition`` 子类、终端
+      方法被 patch、动力学不满足上条）由 Python 按 ``get_arrival_state``
+      协议逐点提取状态网格，再交给同一 Rust 评估核。patch 语义因此
+      保持有效。
+
+    两条路径共用同一 Rust Lambert/ΔV 核，无 Python 数值回退；扩展缺失
+    按 #378 抛 ``RustExtensionUnavailableError``。并行由 Rayon 执行，
+    ``E2M2E_PORKCHOP_PARALLEL=0`` 可强制串行（与并行逐位一致）。
+
     Args:
         dep: 出发终端（如 :class:`OrbitTerminal`）
         arr: 到达终端
@@ -494,24 +511,169 @@ def porkchop(
     tof = np.atleast_1d(np.asarray(tof_range, dtype=float))
     n, m = t_dep.shape[0], tof.shape[0]
 
-    # 出发端状态只依赖 t_dep，循环外取一次
-    r0_grid = np.empty((n, 3))
-    v_dep_grid = np.empty((n, 3))
-    for i, td in enumerate(t_dep):
-        r0_grid[i], v_dep_grid[i] = dep.get_arrival_state(float(td), dynamics)
+    integrators.require_rust_extension("porkchop_grid_py", "porkchop_grid_states_py")
 
-    dv1 = np.full((n, m), np.nan)
-    dv2 = np.full((n, m), np.nan)
-    # 同一 tof 下各出发时刻的几何组成一列，逐列批量求解
-    for j, t in enumerate(tof):
-        rf_col = np.empty((n, 3))
-        v_arr_col = np.empty((n, 3))
-        for i, td in enumerate(t_dep):
-            rf_col[i], v_arr_col[i] = arr.get_arrival_state(float(td + t), dynamics)
-        velocities = solve_lambert_batch(r0_grid, rf_col, [t], mu, direction=direction, revs=revs)
-        col = velocities[:, 0, :, :]  # (n, 2, 3)
-        valid = ~np.isnan(col[:, 0, 0])
-        dv1[valid, j] = np.linalg.norm(col[valid, 0, :] - v_dep_grid[valid], axis=1)
-        dv2[valid, j] = np.linalg.norm(v_arr_col[valid] - col[valid, 1, :], axis=1)
+    spec = _builtin_grid_spec(dep, arr, dynamics)
+    if spec is not None:
+        long_way = _parse_direction(direction)
+        dv1_flat, dv2_flat = integrators.porkchop_grid_py(
+            t_dep.tolist(),
+            tof.tolist(),
+            spec.dep.kind,
+            spec.dep.state.tolist(),
+            spec.dep.t0,
+            spec.dep.period,
+            spec.arr.kind,
+            spec.arr.state.tolist(),
+            spec.arr.t0,
+            spec.arr.period,
+            spec.mu_cr3bp,
+            spec.rtol,
+            spec.atol,
+            spec.max_step,
+            float(mu),
+            long_way,
+            int(revs),
+        )
+    else:
+        # 保持原路径的错误优先级：无效轨道/终端先在状态提取时上抛，
+        # direction 仅在即将调用 Lambert 前校验。
+        dep_states, arr_states = _extract_state_grids(dep, arr, t_dep, tof, dynamics)
+        long_way = _parse_direction(direction)
+        dv1_flat, dv2_flat = integrators.porkchop_grid_states_py(
+            dep_states.ravel().tolist(),
+            arr_states.ravel().tolist(),
+            tof.tolist(),
+            float(mu),
+            long_way,
+            int(revs),
+        )
 
+    dv1 = np.asarray(dv1_flat, dtype=float).reshape(n, m)
+    dv2 = np.asarray(dv2_flat, dtype=float).reshape(n, m)
     return PorkchopData(t_dep=t_dep, tof=tof, dv1=dv1, dv2=dv2, total=dv1 + dv2)
+
+
+@dataclass
+class _TerminalSpec:
+    """内置终端的展平规格（传给 Rust 规格路径）。"""
+
+    kind: str  # "orbit" | "state"
+    state: np.ndarray  # (6,)：orbit 为首点状态，state 为固定状态
+    t0: float
+    period: float
+
+
+@dataclass
+class _BuiltinGridSpec:
+    """规格路径的全部输入：两端内置终端规格 + CR3BP 传播配置。"""
+
+    dep: _TerminalSpec
+    arr: _TerminalSpec
+    # 两端均为 state 终端时全为 None（无需传播）。
+    mu_cr3bp: float | None
+    rtol: float | None
+    atol: float | None
+    max_step: float | None
+
+
+def _terminal_unpatched(term: TerminalCondition, cls: type) -> bool:
+    """检测终端的 ``get_arrival_state`` 是否保持类的原始实现。
+
+    Rust 规格路径不经过 Python 方法分发；若方法被 monkeypatch（类级或
+    实例级），必须走协议路径让 patch 生效。判定依据 ``__qualname__``
+    （类级 patch）与绑定方法的 ``__func__`` 身份（实例级 patch），
+    与 ``search_parallel._geometry_methods_monkeypatched`` 同范式。
+    """
+    method = getattr(cls, "get_arrival_state", None)
+    if getattr(method, "__qualname__", None) != f"{cls.__name__}.get_arrival_state":
+        return False
+    bound = getattr(term, "get_arrival_state", None)
+    return getattr(bound, "__func__", None) is method
+
+
+def _terminal_spec(term: TerminalCondition) -> _TerminalSpec | None:
+    """提取内置终端规格；非内置类型、被 patch 或规格无效时返回 None。
+
+    规格无效（如轨道无周期）返回 None 走协议路径，保留原
+    ``propagate_orbit_state_at_time`` 的 ValueError 语义。
+    """
+    if type(term) is OrbitTerminal and _terminal_unpatched(term, OrbitTerminal):
+        orbit = term.orbit
+        if orbit.states.shape[0] < 1 or orbit.period is None or orbit.period <= 0:
+            return None
+        state0 = np.asarray(orbit.states[0], dtype=float)
+        if state0.shape != (6,):
+            return None
+        return _TerminalSpec("orbit", state0, float(orbit.times[0]), float(orbit.period))
+    if type(term) is StateTerminal and _terminal_unpatched(term, StateTerminal):
+        state = np.asarray(term.state, dtype=float)
+        if state.shape != (6,):
+            return None
+        return _TerminalSpec("state", state, 0.0, 0.0)
+    return None
+
+
+def _builtin_grid_spec(
+    dep: TerminalCondition,
+    arr: TerminalCondition,
+    dynamics: CR3BP_Dynamics,
+) -> _BuiltinGridSpec | None:
+    """判断是否可走 Rust 规格路径；可以则返回全部输入规格。
+
+    条件：两端均为内置终端且未 patch；涉及轨道终端时 dynamics 是
+    未 patch 的 ``CR3BP_Dynamics``（星历/BCR4BP 动力学或自定义子类
+    一律走协议路径，行为与原 Python 路径一致）。检测缝限于终端的
+    ``get_arrival_state`` 与 dynamics 的 ``propagate_orbit_state_at_time``；
+    更深的 ``propagate`` 实现是该公开协议内部细节，不作为 monkeypatch 缝。
+    """
+    dep_spec = _terminal_spec(dep)
+    arr_spec = _terminal_spec(arr)
+    if dep_spec is None or arr_spec is None:
+        return None
+    if "orbit" not in (dep_spec.kind, arr_spec.kind):
+        return _BuiltinGridSpec(dep_spec, arr_spec, None, None, None, None)
+    if type(dynamics) is not CR3BP_Dynamics:
+        return None
+    method = CR3BP_Dynamics.propagate_orbit_state_at_time
+    if getattr(method, "__qualname__", None) != "CR3BP_Dynamics.propagate_orbit_state_at_time":
+        return None
+    bound = getattr(dynamics, "propagate_orbit_state_at_time", None)
+    if getattr(bound, "__func__", None) is not method:
+        return None
+    return _BuiltinGridSpec(
+        dep_spec,
+        arr_spec,
+        float(dynamics.system.mu),
+        float(dynamics.rtol),
+        float(dynamics.atol),
+        float(dynamics.max_step),
+    )
+
+
+def _extract_state_grids(
+    dep: TerminalCondition,
+    arr: TerminalCondition,
+    t_dep: np.ndarray,
+    tof: np.ndarray,
+    dynamics: CR3BP_Dynamics,
+) -> tuple[np.ndarray, np.ndarray]:
+    """按 ``get_arrival_state`` 协议提取出发/到达状态网格（协议路径）。
+
+    返回 ``(dep_states, arr_states)``：``dep_states[i]`` 为 ``t_dep[i]``
+    时刻出发状态，形状 ``(n, 6)``；``arr_states[i*m+j]`` 为
+    ``t_dep[i] + tof[j]`` 时刻到达状态，形状 ``(n*m, 6)``（行优先）。
+    """
+    n, m = t_dep.shape[0], tof.shape[0]
+    dep_states = np.empty((n, 6))
+    for i, td in enumerate(t_dep):
+        r, v = dep.get_arrival_state(float(td), dynamics)
+        dep_states[i, :3] = r
+        dep_states[i, 3:] = v
+    arr_states = np.empty((n * m, 6))
+    for i, td in enumerate(t_dep):
+        for j, t in enumerate(tof):
+            r, v = arr.get_arrival_state(float(td + t), dynamics)
+            arr_states[i * m + j, :3] = r
+            arr_states[i * m + j, 3:] = v
+    return dep_states, arr_states

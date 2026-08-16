@@ -32,6 +32,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/transfer/qlaw.py`（反馈积分与 Q 函数；Python 仅组装初猜） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #442 |
 | `algorithm/transfer/nsga2.py`（演化算子；Python 保留评估与编排） | Rust（`e2m2e-integrators`） | #444 |
 | `algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py`（直接法数值评估） | Rust（`e2m2e-integrators`；SLSQP 编排留 Python） | #445 |
+| `algorithm/transfer/porkchop.py`（网格评估：终端传播 + Lambert + ΔV） | Rust（`e2m2e-forces` + `e2m2e-integrators`；Python 仅问题构造与存档/查询） | #446 |
 | `algorithm/design`（打靶/传播路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/coordinate/synodic_j2000.py`（批量转换） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/proximity/relative_dynamics.py`（传播） | Rust（`e2m2e-integrators`） | — |
@@ -43,7 +44,6 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
 | `algorithm/solver/MultipleShooting` 类（transfer/hohmann） | Python | 待单独迁移 |
-| `algorithm/transfer/porkchop.py` | Python（Lambert 已 Rust） | #446 |
 | `algorithm/manifold/manifolds.py` | Python | #448 |
 | `algorithm/normal_form`（FFT/多项式/化简、多重打靶 Newton） | Python（积分已 Rust） | #449 |
 
@@ -119,6 +119,15 @@ SLSQP 外层编排、初猜与结果解释；`backend="python"` 提供原有实�
 对照和降级路径。对照测试见
 `tests/algorithm/transfer/test_lowthrust_rust_backend.py`。迁移完成于 #445。
 
+**`algorithm/transfer/porkchop.py`。** 网格评估（终端传播 + Lambert +
+ΔV 组装 + Rayon 分发）在 `e2m2e-forces` 的 Rust 核完成，经
+`e2m2e-integrators` 暴露。Python 只做问题构造与结果解释：内置终端
+（`OrbitTerminal`/`StateTerminal` + 未 patch 的 `CR3BP_Dynamics`）把终端
+规格直接交给 Rust（轨道终端传播同步下沉）；自定义终端或 patch 场景经
+`get_arrival_state` 协议提取状态网格后交同一 Rust 核，无 Python 数值
+回退（#378）。SQLite 存档、插值查询、Pareto 前沿留 Python。对照测试见
+`tests/algorithm/transfer/test_porkchop_rust_backend.py`。迁移完成于 #446。
+
 **`algorithm/solver`（星历修正路径）。** 多重打靶迭代
 `multiple_shooting_correct_py` 在 Rust，segmented 与稳定轨道修正默认走它。
 `MultipleShooting` 类（transfer/hohmann 仍使用）本身还是 Python 实现，见
@@ -174,11 +183,6 @@ ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShoot
 
 **`algorithm/solver/MultipleShooting` 类。** transfer/hohmann 使用的多重
 打靶类仍是泛型 Python 实现，后续需单独评估和迁移。
-
-**`algorithm/transfer/porkchop.py`。** 网格循环与几何评估是 Python；
-网格上的 Lambert 求解已 Rust（`lambert_batch_py`）。ADR 0017 边界列
-porkchop 后续迁移，可复用 `transfer_grid_search` 的 Rayon 分发范式。
-工作项：#446。
 
 **`algorithm/manifold/manifolds.py`。** 单值矩阵特征分解、STM 转运、种子
 生成纯 Python（numpy）。ADR 0026 后续工作第三条点名的过渡状态之一。

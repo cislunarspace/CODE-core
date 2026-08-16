@@ -2520,6 +2520,196 @@ fn lambert_izzo_py(
     Ok(dict.into())
 }
 
+/// 解析 porkchop 串/并开关：显式参数优先，否则读取环境变量。
+fn porkchop_parallel_enabled(parallel: Option<bool>) -> bool {
+    parallel.unwrap_or_else(|| std::env::var("E2M2E_PORKCHOP_PARALLEL").map_or(true, |v| v != "0"))
+}
+
+/// porkchop 网格扫描 Rust 后端（规格路径，#446）：终端传播 + Lambert + ΔV 组装。
+///
+/// 照搬 ``transfer_grid_search_py`` 的 ``py.allow_threads`` + Rayon + 环境变量
+/// 开关范式（对称 ``E2M2E_SEARCH_PARALLEL``）：默认并行，``parallel=False`` 或
+/// ``E2M2E_PORKCHOP_PARALLEL=0`` 强制串行，两者逐位一致。
+///
+/// **参数**
+///
+/// - ``t_dep`` / ``tof``：出发时刻与飞行时间网格。
+/// - ``dep_kind`` / ``arr_kind``：``"orbit"``（周期轨道终端：``*_state`` 为首点
+///   状态、``*_t0`` 时间原点、``*_period`` 周期）或 ``"state"``（固定状态终端，
+///   仅 ``*_state`` 有意义）。
+/// - ``mu_cr3bp`` / ``rtol`` / ``atol`` / ``max_step``：CR3BP 质量参数与终端
+///   传播积分器配置；两端均为 ``"state"`` 时均传 ``None``（无需传播）。
+/// - ``mu_central`` / ``long_way`` / ``revs``：Lambert 求解配置。
+///
+/// **返回**
+///
+/// ``(dv1, dv2)`` 展平列表，长度 ``len(t_dep) * len(tof)``，行优先（t_dep 主序）；
+/// 无解组合为 NaN。
+#[pyfunction]
+#[pyo3(signature = (t_dep, tof, dep_kind, dep_state, dep_t0, dep_period, arr_kind, arr_state, arr_t0, arr_period, mu_cr3bp, rtol, atol, max_step, mu_central, long_way, revs, *, parallel=None))]
+#[allow(clippy::too_many_arguments)]
+fn porkchop_grid_py(
+    t_dep: Vec<f64>,
+    tof: Vec<f64>,
+    dep_kind: &str,
+    dep_state: Vec<f64>,
+    dep_t0: f64,
+    dep_period: f64,
+    arr_kind: &str,
+    arr_state: Vec<f64>,
+    arr_t0: f64,
+    arr_period: f64,
+    mu_cr3bp: Option<f64>,
+    rtol: Option<f64>,
+    atol: Option<f64>,
+    max_step: Option<f64>,
+    mu_central: f64,
+    long_way: bool,
+    revs: u32,
+    parallel: Option<bool>,
+    py: Python<'_>,
+) -> PyResult<(Vec<f64>, Vec<f64>)> {
+    use e2m2e_forces::porkchop::{
+        porkchop_grid_parallel, porkchop_grid_serial, LambertParams, PropagationParams,
+        TerminalSpec,
+    };
+
+    let parse_terminal = |kind: &str, state: &[f64], t0: f64, period: f64| {
+        if state.len() != 6 {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "终端状态长度必须为 6，得到 {}",
+                state.len()
+            )));
+        }
+        let mut s = [0.0_f64; 6];
+        s.copy_from_slice(state);
+        match kind {
+            "orbit" => Ok(TerminalSpec::Orbit {
+                state0: s,
+                t0,
+                period,
+            }),
+            "state" => Ok(TerminalSpec::State { state: s }),
+            other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "终端类型必须是 'orbit' 或 'state'，得到 {other:?}"
+            ))),
+        }
+    };
+    let dep = parse_terminal(dep_kind, &dep_state, dep_t0, dep_period)?;
+    let arr = parse_terminal(arr_kind, &arr_state, arr_t0, arr_period)?;
+
+    let needs_propagation =
+        matches!(dep, TerminalSpec::Orbit { .. }) || matches!(arr, TerminalSpec::Orbit { .. });
+    let propagation = match (needs_propagation, mu_cr3bp, rtol, atol, max_step) {
+        (true, Some(mu), Some(rtol), Some(atol), Some(max_step)) => Some(PropagationParams {
+            mu,
+            rtol,
+            atol,
+            max_step,
+        }),
+        (true, _, _, _, _) => {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "含 orbit 终端时 mu_cr3bp、rtol、atol、max_step 均必填",
+            ));
+        }
+        (false, _, _, _, _) => None,
+    };
+    let lambert = LambertParams {
+        mu_central,
+        long_way,
+        revs,
+    };
+
+    let use_parallel = porkchop_parallel_enabled(parallel);
+
+    // 释放 GIL：终端传播与 Lambert 均为纯 Rust（不回调 Python），Rayon 真并行。
+    py.allow_threads(move || {
+        if use_parallel {
+            porkchop_grid_parallel(&t_dep, &tof, &dep, &arr, propagation.as_ref(), &lambert)
+        } else {
+            porkchop_grid_serial(&t_dep, &tof, &dep, &arr, propagation.as_ref(), &lambert)
+        }
+    })
+    .map_err(|e| propagate_error_to_pyerr(py, "CR3BP 轨道状态传播失败", e))
+}
+
+/// porkchop 网格扫描 Rust 后端（状态网格路径，#446）：终端状态已由 Python
+/// 按 `get_arrival_state` 协议预提取，本入口只做 Lambert + ΔV 组装。
+///
+/// **参数**
+///
+/// - ``dep_states``：展平 ``n*6``，``dep_states[i*6..]`` 为 ``t_dep[i]`` 时刻出发状态。
+/// - ``arr_states``：展平 ``n*m*6``，行优先（t_dep 主序），``arr_states[(i*m+j)*6..]``
+///   为 ``t_dep[i] + tof[j]`` 时刻到达状态。
+/// - ``tof`` / ``mu_central`` / ``long_way`` / ``revs`` / ``parallel``：同
+///   ``porkchop_grid_py``。
+///
+/// **返回** 同 ``porkchop_grid_py``。
+#[pyfunction]
+#[pyo3(signature = (dep_states, arr_states, tof, mu_central, long_way, revs, *, parallel=None))]
+#[allow(clippy::too_many_arguments)]
+fn porkchop_grid_states_py(
+    dep_states: Vec<f64>,
+    arr_states: Vec<f64>,
+    tof: Vec<f64>,
+    mu_central: f64,
+    long_way: bool,
+    revs: u32,
+    parallel: Option<bool>,
+    py: Python<'_>,
+) -> PyResult<(Vec<f64>, Vec<f64>)> {
+    use e2m2e_forces::porkchop::{
+        porkchop_grid_states_parallel, porkchop_grid_states_serial, LambertParams,
+    };
+
+    if !dep_states.len().is_multiple_of(6) {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "dep_states 长度必须为 6 的整数倍，得到 {}",
+            dep_states.len()
+        )));
+    }
+    let n = dep_states.len() / 6;
+    let m = tof.len();
+    if arr_states.len() != n * m * 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "arr_states 长度必须为 n*m*6 = {}，得到 {}",
+            n * m * 6,
+            arr_states.len()
+        )));
+    }
+    let dep_grid: Vec<[f64; 6]> = dep_states
+        .chunks_exact(6)
+        .map(|c| {
+            let mut s = [0.0_f64; 6];
+            s.copy_from_slice(c);
+            s
+        })
+        .collect();
+    let arr_grid: Vec<[f64; 6]> = arr_states
+        .chunks_exact(6)
+        .map(|c| {
+            let mut s = [0.0_f64; 6];
+            s.copy_from_slice(c);
+            s
+        })
+        .collect();
+    let lambert = LambertParams {
+        mu_central,
+        long_way,
+        revs,
+    };
+
+    let use_parallel = porkchop_parallel_enabled(parallel);
+
+    Ok(py.allow_threads(move || {
+        if use_parallel {
+            porkchop_grid_states_parallel(&dep_grid, &arr_grid, m, &tof, &lambert)
+        } else {
+            porkchop_grid_states_serial(&dep_grid, &arr_grid, m, &tof, &lambert)
+        }
+    }))
+}
+
 /// N×M 网格批量 Lambert 求解（porkchop 用）的 Python 接口。
 ///
 /// # 参数
@@ -3669,6 +3859,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(cowell_step, m)?)?;
     m.add_function(wrap_pyfunction!(lambert_izzo_py, m)?)?;
     m.add_function(wrap_pyfunction!(lambert_batch_py, m)?)?;
+    m.add_function(wrap_pyfunction!(porkchop_grid_py, m)?)?;
+    m.add_function(wrap_pyfunction!(porkchop_grid_states_py, m)?)?;
     m.add_function(wrap_pyfunction!(spherical_harmonic_accel, m)?)?;
     m.add_function(wrap_pyfunction!(solid_tide_step1, m)?)?;
     m.add_function(wrap_pyfunction!(solid_tide_step2, m)?)?;
