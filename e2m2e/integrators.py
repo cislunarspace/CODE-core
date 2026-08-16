@@ -37,6 +37,8 @@ if TYPE_CHECKING:
     pal_newton_step_py: Any
     pole_tide: Any
     project_hamiltonian_qf_py: Any
+    qlaw_propagate_py: Any
+    qlaw_segment_direction_py: Any
     propagate_bcr4bp_py: Any
     propagate_bcr4bp_stm_py: Any
     propagate_compiled: Any
@@ -103,6 +105,8 @@ _RUST_SYMBOLS = (
     "planar_full_period_pal_py",
     "pole_tide",
     "project_hamiltonian_qf_py",
+    "qlaw_propagate_py",
+    "qlaw_segment_direction_py",
     "propagate_bcr4bp_py",
     "propagate_bcr4bp_stm_py",
     "propagate_compiled",
@@ -286,6 +290,8 @@ __all__ = [
     "planar_full_period_pal_py",
     "pole_tide",
     "project_hamiltonian_qf_py",
+    "qlaw_propagate_py",
+    "qlaw_segment_direction_py",
     "propagate_compiled",
     "propagate_compiled_lowthrust",
     "propagate_compiled_lowthrust_sensitivity",

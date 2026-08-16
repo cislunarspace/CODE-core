@@ -11,6 +11,7 @@ pub mod atmosphere;
 pub mod bcr4bp;
 pub mod cr3bp;
 pub mod pal_continuation;
+pub mod qlaw;
 pub mod solid_tide;
 pub mod spherical_harmonic;
 pub mod transfer_geometry;

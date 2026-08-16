@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- **Q-law 低推力初猜反馈内核下沉 Rust**（#442）：反馈积分、开普勒根数转换、Gauss 方程、Q 函数与推力方向评估统一进入 Rust；Python 侧只保留参数解析、轨迹重采样和 `LowThrustSegment` 初猜组装。新增 `qlaw_propagate_py` / `qlaw_segment_direction_py` 绑定（ABI v9），公开 `qlaw_guess` 行为保持不变。
 - **延拓数值内核下沉 Rust**（#443）：伪弧长延拓（PAL）的 XZ 对称约束 F/dF 组装、切向量（零空间）与 PAL 牛顿迭代下沉 `e2m2e-forces`（`pal_continuation` 模块），新增 `pal_f_df_tangent_py` / `pal_newton_step_py` 绑定（ABI v7）；切向量零空间用广义叉积替代 SVD，牛顿步用部分主元高斯消元（沿 `multiple_shooting` 手写小矩阵求解惯例）。`pseudo_arclength_continuation` 与 `halo_pseudo_arclength_continuation` 新增 `backend` 参数：默认 `"rust"`，`"python"` 走保留的 numpy 参照路径（对照与降级），等价性对照见 `tests/algorithm/design/continuation/test_halo_pal_rust_equivalence.py`。公开 API 与行为不变；初始切向量计算、外层逐轨编排与微分修正（#441）仍 Python。
 
 ## [5.6.10] - 2026-08-14

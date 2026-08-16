@@ -338,6 +338,9 @@ const fn parse_abi_version(s: &str) -> u32 {
 /// - **v8** （#451）：新增 ``planar_full_period_pal_py`` 与
 ///   ``PlanarPalRustResult``，为 SPO/LPO 平面全周期伪弧长延拓提供 Rust
 ///   数值内核；与 #443 合并后统一递增 ABI。
+/// - **v9** （#442）：新增 ``qlaw_propagate_py`` 与
+///   ``qlaw_segment_direction_py``（Q-law 低推力初猜的反馈积分与 Q 函数
+///   评估内核）。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -2670,6 +2673,103 @@ fn check_collision_py(
     ))
 }
 
+/// Q-law 低推力反馈积分（完整热路径在 Rust，#442）。
+#[pyfunction]
+#[pyo3(signature = (t0, tf, y0, target_oe, mu, t_max, isp, h_init, tol, max_steps))]
+#[allow(clippy::too_many_arguments)]
+fn qlaw_propagate_py(
+    t0: f64,
+    tf: f64,
+    y0: Vec<f64>,
+    target_oe: Vec<f64>,
+    mu: f64,
+    t_max: f64,
+    isp: f64,
+    h_init: f64,
+    tol: f64,
+    max_steps: usize,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    if y0.len() != 7 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "y0 must have length 7, got {}",
+            y0.len()
+        )));
+    }
+    if target_oe.len() != 3 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "target_oe must have length 3, got {}",
+            target_oe.len()
+        )));
+    }
+    if h_init <= 0.0 || tol <= 0.0 || max_steps == 0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "h_init, tol and max_steps must be positive",
+        ));
+    }
+    let mut initial_state = [0.0; 7];
+    initial_state.copy_from_slice(&y0);
+    let mut target = [0.0; 3];
+    target.copy_from_slice(&target_oe);
+
+    let result = py.allow_threads(|| {
+        e2m2e_forces::qlaw::propagate(
+            t0,
+            tf,
+            initial_state,
+            target,
+            mu,
+            t_max,
+            isp,
+            h_init,
+            tol,
+            max_steps,
+        )
+    });
+    let (times, states) =
+        result.map_err(|error| propagate_error_to_pyerr(py, "Q-law propagation failed", error))?;
+    let output = PyDict::new(py);
+    output.set_item("time", times)?;
+    output.set_item("states", states)?;
+    Ok(output.into())
+}
+
+/// Q-law 段中点评估：Q 值、开普勒根数和惯性系推力方向。
+#[pyfunction]
+#[pyo3(signature = (state7, target_oe, mu, t_max))]
+fn qlaw_segment_direction_py(
+    state7: Vec<f64>,
+    target_oe: Vec<f64>,
+    mu: f64,
+    t_max: f64,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    if state7.len() != 7 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "state7 must have length 7, got {}",
+            state7.len()
+        )));
+    }
+    if target_oe.len() != 3 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "target_oe must have length 3, got {}",
+            target_oe.len()
+        )));
+    }
+    let mut state = [0.0; 7];
+    state.copy_from_slice(&state7);
+    let mut target = [0.0; 3];
+    target.copy_from_slice(&target_oe);
+    let result = e2m2e_forces::qlaw::evaluate_segment(&state, target, mu, t_max);
+    let output = PyDict::new(py);
+    output.set_item("a", result.a)?;
+    output.set_item("e", result.e)?;
+    output.set_item("i", result.inclination)?;
+    output.set_item("q_value", result.q_value)?;
+    output.set_item("u_inertial", result.inertial_direction.to_vec())?;
+    Ok(output.into())
+}
+
 /// PAL 延拓：XZ 平面对称约束的 F/dF/切向量单次计算（#443）。
 ///
 /// 对应 Python `continuation.compute_F_and_dF_symmetric_xz_plane` +
@@ -3292,6 +3392,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(detect_intersection_py, m)?)?;
     m.add_function(wrap_pyfunction!(detect_local_minimum_py, m)?)?;
     m.add_function(wrap_pyfunction!(check_collision_py, m)?)?;
+    m.add_function(wrap_pyfunction!(qlaw_propagate_py, m)?)?;
+    m.add_function(wrap_pyfunction!(qlaw_segment_direction_py, m)?)?;
     m.add_function(wrap_pyfunction!(pal_f_df_tangent_py, m)?)?;
     m.add_function(wrap_pyfunction!(pal_newton_step_py, m)?)?;
     m.add_function(wrap_pyfunction!(transfer_grid_search_serial_py, m)?)?;

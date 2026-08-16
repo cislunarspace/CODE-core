@@ -26,6 +26,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/transfer/search_parallel.py`（网格搜索） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/solver`（星历修正路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/solver/continuation.py`（PAL 数值内核） | Rust（`e2m2e-forces`） | #443 |
+| `algorithm/transfer/qlaw.py`（反馈积分与 Q 函数；Python 仅组装初猜） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #442 |
 | `algorithm/design`（打靶/传播路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/coordinate/synodic_j2000.py`（批量转换） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/proximity/relative_dynamics.py`（传播） | Rust（`e2m2e-integrators`） | — |
@@ -37,7 +38,6 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
 | `algorithm/solver/differential_correction.py`、`MultipleShooting` 类 | Python | #441 |
-| `algorithm/transfer/qlaw.py` | Python（步进已 Rust） | #442 |
 | `algorithm/transfer/nsga2.py` | Python | #444 |
 | `algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py` | Python（传播已 Rust） | #445 |
 | `algorithm/transfer/porkchop.py` | Python（Lambert 已 Rust） | #446 |
@@ -92,6 +92,12 @@ to_rust_spec 序列化"配置面。`forces` 的层级归属（数值层配置面
 Python 侧保留 `TransferSearch` 编排、后端分发与 6 个几何 thin-wrapper
 （monkeypatch 缝，见 ADR 0017）。
 
+**`algorithm/transfer/qlaw.py`。** Q-law 反馈律积分、开普勒根数转换、Gauss
+方程、Q 函数与推力方向在 Rust 内核完成，经 `qlaw_propagate_py` 与
+`qlaw_segment_direction_py` 暴露。Python 侧只解析动力学参数、从连续轨迹
+重采样并组装 `LowThrustSegment`；独立公开的 `rv_to_keplerian` 保持既有兼容
+行为，不构成反馈积分降级路径。
+
 **`algorithm/solver`（星历修正路径）。** 多重打靶迭代
 `multiple_shooting_correct_py` 在 Rust，segmented 与稳定轨道修正默认走它。
 注意 `MultipleShooting` 类（transfer/hohmann 仍使用）本身还是 Python
@@ -130,17 +136,12 @@ Rust（`solve_ivp_events`）。
 
 ## 迁移中
 
-ADR 0011 明示的过渡状态，每个条目有独立工作 issue，下沉方式照 ADR 0017
-先例（双后端共存 + 等价性对照，Python 路径保留作对照与降级）。
+ADR 0011 明示的过渡状态，每个条目有独立工作 issue。可复用 ADR 0017 的数值内核下沉与等价性验证原则；具体是否保留 Python 参照路径由各 issue 的接口契约决定。
 
 **`algorithm/solver/differential_correction.py` 与 `MultipleShooting` 类。**
 单段微分修正与 `MultipleShooting` 类是纯 Python；星历修正路径已有 Rust 版
 （见上），单段修正可评估与 `multiple_shooting_correct_py` 共用基础设施。
 工作项：#441。
-
-**`algorithm/transfer/qlaw.py`。** Q-law 反馈律的积分步进已 Rust
-（`rk_step`），Q 函数评估与反馈循环仍是 Python。ADR 0011 明示"Q-law"仍由
-Python 执行。工作项：#442。
 
 **`algorithm/transfer/nsga2.py`。** 非支配排序、拥挤度、演化循环纯 Python。
 ADR 0017 边界明确 nsga2"后续单独迁移"。工作项：#444。
