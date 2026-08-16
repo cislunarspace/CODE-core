@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [5.7.1] - 2026-08-17
+
 ### Added
 - **多族统一轨道族生成**（#428）：`Facade.orbit_family_generation()` 在 Halo 之外新增 NRHO、Axial、Lissajous、SPO、LPO 与 Horseshoe 分派；请求模型按族公开近月点、振幅、相位、延拓方向、采样规则与匹配容差，并拒绝跨族字段。Facade 统一返回兼容 `OrbitFamily` 读取接口的 Pydantic `FamilyGenerationResponse`，状态三元组直接位于响应上，软失败保留部分族。Lissajous 以同一族容器承载 Rust 非线性中心约化流上的拟周期有界轨迹并显式标注 `periodicity="quasi-periodic"`。种子构造、CR3BP 修正、PAL、步长控制、成员筛选、共线点中心模态、轨迹采样和族几何度量均收进单次 Rust 调用，Python 只做请求校验、领域分派和结果重包；新增统一 `generate_cr3bp_family_py` 及三个数值原子入口，ABI 升至 v15。
 
