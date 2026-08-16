@@ -60,6 +60,7 @@ if TYPE_CHECKING:
     CowellResult: Any
     MultistepMethod: Any
     MultistepResult: Any
+    PlanarPalRustResult: Any
     RkMethod: Any
     TransferPointResult: Any
     _cowell_step: Any
@@ -70,6 +71,7 @@ _RUST_SYMBOLS = (
     "CowellResult",
     "MultistepMethod",
     "MultistepResult",
+    "PlanarPalRustResult",
     "RkMethod",
     "TransferPointResult",
     "_cowell_step",
@@ -94,6 +96,7 @@ _RUST_SYMBOLS = (
     "lambert_batch_py",
     "lambert_izzo_py",
     "multiple_shooting_correct_py",
+    "planar_full_period_pal_py",
     "pole_tide",
     "project_hamiltonian_qf_py",
     "propagate_bcr4bp_py",
@@ -148,6 +151,7 @@ class _ShootingResult:
 
 
 _multiple_shooting_correct_py_raw: Any = globals()["multiple_shooting_correct_py"]
+_planar_full_period_pal_py_raw: Any = globals()["planar_full_period_pal_py"]
 _segmented_shooting_correct_py_raw: Any = globals()["segmented_shooting_correct_py"]
 
 
@@ -159,6 +163,16 @@ def multiple_shooting_correct_py(*args: Any, **kwargs: Any) -> _ShootingResult:
             "e2m2e._integrators 缺少所需符号：multiple_shooting_correct_py。请先重建：make dev"
         )
     return _ShootingResult(_multiple_shooting_correct_py_raw(*args, **kwargs))
+
+
+def planar_full_period_pal_py(*args: Any, **kwargs: Any) -> _ShootingResult:
+    """调用 Rust 平面全周期 PAL，并立即校验最终状态三元组。"""
+    require_rust_extension("planar_full_period_pal_py")
+    if _planar_full_period_pal_py_raw is None:
+        raise RustExtensionUnavailableError(
+            "e2m2e._integrators 缺少所需符号：planar_full_period_pal_py。请先重建：make dev"
+        )
+    return _ShootingResult(_planar_full_period_pal_py_raw(*args, **kwargs))
 
 
 def segmented_shooting_correct_py(*args: Any, **kwargs: Any) -> _ShootingResult:
@@ -263,6 +277,7 @@ __all__ = [
     "MultistepResult",
     "multistep_step",
     "multiple_shooting_correct_py",
+    "planar_full_period_pal_py",
     "pole_tide",
     "project_hamiltonian_qf_py",
     "propagate_compiled",

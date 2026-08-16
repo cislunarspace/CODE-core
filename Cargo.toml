@@ -31,6 +31,8 @@ rayon = "1.10"
 # drainer reacquire GIL 调 Python callable（Sender 为 Send+Sync，可被 rayon
 # 多 worker 共享引用；std::sync::mpsc::Sender 是 !Sync，做不到）。
 crossbeam-channel = "0.5"
+# 平面全周期 PAL 的秩揭示 SVD 与最小二乘；避免对秩亏问题使用正规方程。
+nalgebra = "0.35"
 
 # cspice 0.1.0 上游在 aarch64 上编译失败（E0606，string.rs 的 &[u8] as *const [i8]
 # 非法 cast，aarch64 的 C char 是 unsigned）；上游至今未修，仓库内 vendor 并修复，

@@ -35,3 +35,4 @@ cspice-sys = { workspace = true, optional = true }
 # 进度回调 drainer：FFI 创建 (tx, rx) 对，rx 由独立 OS 线程排空，
 # reacquire GIL 调 Python callable；tx 传给 e2m2e-forces 的并行内核。
 crossbeam-channel = { workspace = true }
+nalgebra = { workspace = true }

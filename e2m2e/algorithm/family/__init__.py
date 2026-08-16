@@ -34,6 +34,7 @@ from .halo_initial_guess import (
     halo_third_order_approximation,
 )
 from .lissajous_initial_guess import compute_lissajous_initial_guess
+from .planar_continuation import generate_planar_periodic_family
 from .strategies import (
     CorrectionConfig,
     axial_fixed_vz0,
@@ -73,6 +74,7 @@ __all__ = [
     "generate_halo_seed_orbit",
     "generate_halo_family",
     "halo_pseudo_arclength_continuation",
+    "generate_planar_periodic_family",
     "CorrectionConfig",
     "symmetric_2d_fixed_x0",
     "symmetric_2d_fixed_t",

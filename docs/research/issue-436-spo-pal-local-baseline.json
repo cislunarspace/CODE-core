@@ -1,0 +1,176 @@
+{
+  "issue": 436,
+  "commit": "14025914956faa90a1d3e24019db5ca6c33647af",
+  "family": "spo",
+  "libration_point": 4,
+  "formulation": {
+    "unknowns": [
+      "x0",
+      "y0",
+      "vx0",
+      "vy0",
+      "T"
+    ],
+    "closure": "phi_T(q_state) - q_state = 0 (planar 4D)",
+    "phase": "(q_state - q_state_ref) dot f(q_state_ref) / ||f(q_state_ref)|| = 0",
+    "arclength": "((q - q_ref) / scales) dot tangent - ds = 0",
+    "scales": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      10.0
+    ],
+    "rank_relative_tolerance": 1e-08
+  },
+  "settings": {
+    "family": "spo",
+    "point": 4,
+    "steps": 5,
+    "ds": 0.01,
+    "direction": "decrease-x0",
+    "tolerance": 1e-09,
+    "max_iterations": 12,
+    "output": "docs/research/issue-436-spo-pal-local-baseline.json"
+  },
+  "records": [
+    {
+      "step": 0,
+      "initial_state": [
+        0.48574314590485934,
+        0.8668687689006468,
+        0.0,
+        -2.799224216829477e-07,
+        0.001211546604057286,
+        0.0
+      ],
+      "period": 6.58269128490899,
+      "closure_inf_norm": 1.7819079545233762e-14,
+      "phase_residual": 0.0,
+      "arc_residual": 0.0,
+      "pal_iterations": 0,
+      "tangent_system_rank": 4,
+      "tangent_system_condition": 8454.381607232974,
+      "augmented_system_rank": 5,
+      "augmented_system_condition": 8454.381607232986,
+      "jacobi_constant": 2.987996003195455,
+      "jacobi_drift": 8.881784197001252e-16,
+      "libration_distance_mean_km": 668.786599244175
+    },
+    {
+      "step": 1,
+      "initial_state": [
+        0.4775283062575364,
+        0.8700589399308339,
+        0.0,
+        -0.0001285060343559204,
+        0.0059363796181351215,
+        0.0
+      ],
+      "period": 6.582671381061748,
+      "closure_inf_norm": 1.579606513949991e-11,
+      "phase_residual": -1.6980508178226598e-17,
+      "arc_residual": -5.204170427930421e-18,
+      "pal_iterations": 3,
+      "tangent_system_rank": 4,
+      "tangent_system_condition": 1733.8225268037486,
+      "augmented_system_rank": 5,
+      "augmented_system_condition": 1733.8225268037472,
+      "jacobi_constant": 2.987972187332048,
+      "jacobi_drift": 8.881784197001252e-16,
+      "libration_distance_mean_km": 3268.0694175779863
+    },
+    {
+      "step": 2,
+      "initial_state": [
+        0.4692749841853402,
+        0.8731575736046605,
+        0.0,
+        -0.0003784654857671024,
+        0.010650180485563359,
+        0.0
+      ],
+      "period": 6.5826256454197125,
+      "closure_inf_norm": 9.261480471423056e-12,
+      "phase_residual": -9.576610867589005e-18,
+      "arc_residual": -2.6020852139652106e-17,
+      "pal_iterations": 3,
+      "tangent_system_rank": 4,
+      "tangent_system_condition": 976.1288507671774,
+      "augmented_system_rank": 5,
+      "augmented_system_condition": 976.1288507671773,
+      "jacobi_constant": 2.9879174594662916,
+      "jacobi_drift": 8.881784197001252e-16,
+      "libration_distance_mean_km": 5865.454979132336
+    },
+    {
+      "step": 3,
+      "initial_state": [
+        0.46098412764857366,
+        0.8761875355267743,
+        0.0,
+        -0.0007122307286077956,
+        0.015337487664401872,
+        0.0
+      ],
+      "period": 6.582554632857314,
+      "closure_inf_norm": 6.867617585726293e-12,
+      "phase_residual": 9.074260620512197e-18,
+      "arc_residual": -1.214306433183765e-17,
+      "pal_iterations": 3,
+      "tangent_system_rank": 4,
+      "tangent_system_condition": 686.1251030192586,
+      "augmented_system_rank": 5,
+      "augmented_system_condition": 686.1251030192602,
+      "jacobi_constant": 2.9878324569733423,
+      "jacobi_drift": 8.881784197001252e-16,
+      "libration_distance_mean_km": 8460.64976743756
+    },
+    {
+      "step": 4,
+      "initial_state": [
+        0.45265633168500674,
+        0.8791575893355908,
+        0.0,
+        -0.0011140779828486998,
+        0.0199921932317955,
+        0.0
+      ],
+      "period": 6.5824588826277335,
+      "closure_inf_norm": 6.096567695124122e-12,
+      "phase_residual": -2.18394336623425e-17,
+      "arc_residual": 0.0,
+      "pal_iterations": 3,
+      "tangent_system_rank": 4,
+      "tangent_system_condition": 533.4924750277335,
+      "augmented_system_rank": 5,
+      "augmented_system_condition": 533.4924750277338,
+      "jacobi_constant": 2.987717792865182,
+      "jacobi_drift": 8.881784197001252e-16,
+      "libration_distance_mean_km": 11053.58394010014
+    },
+    {
+      "step": 5,
+      "initial_state": [
+        0.44429212350583724,
+        0.8820721525468447,
+        0.0,
+        -0.0015750718573512414,
+        0.024611060757691545,
+        0.0
+      ],
+      "period": 6.582338923265178,
+      "closure_inf_norm": 5.9403593155593626e-12,
+      "phase_residual": -2.5903900336704194e-17,
+      "arc_residual": -1.734723475976807e-18,
+      "pal_iterations": 3,
+      "tangent_system_rank": 4,
+      "tangent_system_condition": 439.57069897292627,
+      "augmented_system_rank": 5,
+      "augmented_system_condition": 439.5706989729259,
+      "jacobi_constant": 2.98757405611056,
+      "jacobi_drift": 1.3322676295501878e-15,
+      "libration_distance_mean_km": 13644.301283575507
+    }
+  ]
+}
