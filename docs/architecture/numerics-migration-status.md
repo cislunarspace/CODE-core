@@ -25,6 +25,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/transfer/lambert.py` | Rust（`e2m2e-propagation`） | — |
 | `algorithm/transfer/search_parallel.py`（网格搜索） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/solver`（星历修正路径） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/solver/continuation.py`（PAL 数值内核） | Rust（`e2m2e-forces`） | #443 |
 | `algorithm/design`（打靶/传播路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/coordinate/synodic_j2000.py`（批量转换） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/proximity/relative_dynamics.py`（传播） | Rust（`e2m2e-integrators`） | — |
@@ -35,7 +36,6 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
-| `algorithm/solver/continuation.py`、`family/halo_family.py`（延拓） | Python | #443 |
 | `algorithm/solver/differential_correction.py`、`MultipleShooting` 类 | Python | #441 |
 | `algorithm/transfer/qlaw.py` | Python（步进已 Rust） | #442 |
 | `algorithm/transfer/nsga2.py` | Python | #444 |
@@ -51,6 +51,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 |---|---|---|
 | `algorithm/transfer/nlp_*`、`transfer_optimization.py`（NLP 优化与编排） | Python | — |
 | `algorithm/family/*_initial_guess.py`、`strategies/`、`cr3bp_orbits.py`（初猜生成） | Python | — |
+| `algorithm/family/halo_family.py`（族延拓编排） | Python | — |
 | `algorithm/transfer` 二体/解析与编排模块 | Python（Lambert 已 Rust） | — |
 | `algorithm/transfer/search_geometry.py`、`search_progress.py`、`solution_database.py`（搜索辅助） | Python | — |
 | `algorithm/manifold/sections.py`（截面事件函数） | Python | — |
@@ -96,6 +97,19 @@ Python 侧保留 `TransferSearch` 编排、后端分发与 6 个几何 thin-wrap
 注意 `MultipleShooting` 类（transfer/hohmann 仍使用）本身还是 Python
 实现，见迁移中 #441。
 
+**`algorithm/solver/continuation.py`（PAL 数值内核）。** 伪弧长延拓的 XZ
+对称约束 F/dF 组装、切向量（零空间）与 PAL 牛顿迭代在 `e2m2e-forces`
+crate（`pal_continuation` 模块），经 `pal_f_df_tangent_py` /
+`pal_newton_step_py` 暴露。`pseudo_arclength_continuation` 双后端：默认
+rust，`backend="python"` 走 numpy 参照路径（对照与降级；等价性对照见
+`tests/algorithm/design/continuation/test_halo_pal_rust_equivalence.py`）。
+初始切向量两后端统一由 Python 参照计算（零空间符号约定在 SVD 与 Rust
+广义叉积间无保证，首步延拓方向须由同一实现锁定）。外层逐轨编排（微分
+修正、物理合理性检查、方向反馈、停滞检测）留 Python；自然参数延拓的
+步进循环本身是编排，其热路径为微分修正，见迁移中 #441。
+`family/halo_family.py` 是纯编排，无独立数值内核，登记在有意留
+Python 节。
+
 **`algorithm/design`（打靶/传播路径）。** 分段修正、多重打靶、段传播、
 时间转换走 Rust（`segmented_shooting_correct_py`、
 `multiple_shooting_correct_py`、`propagate_segments_py`、
@@ -118,10 +132,6 @@ Rust（`solve_ivp_events`）。
 
 ADR 0011 明示的过渡状态，每个条目有独立工作 issue，下沉方式照 ADR 0017
 先例（双后端共存 + 等价性对照，Python 路径保留作对照与降级）。
-
-**`algorithm/solver/continuation.py` 与 `family/halo_family.py`（延拓）。**
-自然参数延拓与伪弧长延拓（PAL）的迭代循环是纯 Python。ADR 0011 明示
-"延拓"仍由 Python 执行。工作项：#443。
 
 **`algorithm/solver/differential_correction.py` 与 `MultipleShooting` 类。**
 单段微分修正与 `MultipleShooting` 类是纯 Python；星历修正路径已有 Rust 版
@@ -176,8 +186,13 @@ Python 强项（`architecture-design-discussion.md` 共识，ADR 0017 边界固�
 **`algorithm/family/*_initial_guess.py`、`strategies/`、`cr3bp_orbits.py`
 （初猜生成）。** 理由：初猜是领域决策，天天在变，属"编排模块"职责
 （architecture.md 第 3 节）；Richardson 三阶等解析近似、`cr3bp_orbits.py` 的
-族行走割线法都是设计链路初猜段的单次标量迭代，无热路径。族延拓（数值
-迭代）见迁移中 #443。
+族行走割线法都是设计链路初猜段的单次标量迭代，无热路径。族延拓（PAL
+数值内核）已下沉，见已下沉 #443。
+
+**`algorithm/family/halo_family.py`（族延拓编排）。** 理由：种子生成、
+逐轨微分修正调用、方向反馈、停滞检测与族组装是编排职责
+（architecture.md 第 3 节）；调用的 PAL 数值内核经 `continuation.py`
+已下沉（见已下沉 #443），本文件自身无数值迭代。
 
 **`algorithm/transfer` 二体/解析与编排模块。** `hohmann.py`、`multi_impulse.py`、
 `lga.py`、`three_body_lambert.py`、`mission_assessment.py`、`cost.py`、

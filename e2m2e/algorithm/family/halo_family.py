@@ -280,6 +280,7 @@ def halo_pseudo_arclength_continuation(
     dc_scheme: str = "adaptive",
     directional_increment: bool = True,
     progress_callback=None,
+    backend: str = "rust",
 ) -> OrbitFamily:
     """Halo 轨道族伪弧长延拓（作为 ``Continuation`` 实例方法使用）"""
     libration_point = int(seed_orbit.parameters.get("libration_point", 1))
@@ -343,6 +344,7 @@ def halo_pseudo_arclength_continuation(
             target_vector=tv,
             target_direction=td,
             progress_callback=progress_callback,
+            backend=backend,
         )
         for o in sub.family.orbits[1:]:
             tag(o)

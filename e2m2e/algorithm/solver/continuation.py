@@ -9,6 +9,8 @@ import logging
 
 import numpy as np
 
+from e2m2e.integrators import pal_f_df_tangent_py, pal_newton_step_py, require_rust_extension
+
 from ...data.templates import ConvergenceState, FailureCause
 from ...data.types.orbit import Orbit, OrbitFamily
 from ..dynamics import CR3BP_Dynamics
@@ -113,6 +115,84 @@ def compute_tangent_vector(dF: np.ndarray) -> np.ndarray:
     if norm > 0:
         tangent = tangent / norm
     return tangent
+
+
+def _pal_newton_step_python(
+    x_start: np.ndarray,
+    x_ref: np.ndarray,
+    sv0: np.ndarray,
+    tangent_ref: np.ndarray,
+    ds: float,
+    tol: float,
+    iter_max: int,
+    dynamics: CR3BP_Dynamics,
+) -> dict:
+    """PAL 牛顿迭代（Python/numpy 参照路径）。
+
+    #443 双后端对照与降级路径，与 Rust 内核 ``pal_newton_step_py`` 同一
+    数值契约：从预测点 ``x_start`` 出发解
+    ``G = [F; (Xnew - x_ref)·tangent_ref - ds] = 0``，先判收敛再更新，
+    牛顿步按分量裁剪。返回 dict 字段与 Rust 侧同名（``x_new`` /
+    ``tangent`` / ``iterations`` / ``residual`` / ``converged`` /
+    ``singular``）。无论收敛与否都返回当前 ``x_new``（对应原内层循环
+    break/耗尽后继续使用最后值的行为）。
+    """
+    Xnew = np.asarray(x_start, dtype=float).copy()
+    X = np.asarray(x_ref, dtype=float)
+    Xdot = np.asarray(tangent_ref, dtype=float)
+    SV0i = np.asarray(sv0, dtype=float)
+
+    Xdot_new = Xdot
+    residual = float("nan")
+    converged = False
+    singular = False
+    iterations = 0
+    for iter_pal in range(iter_max):
+        iterations = iter_pal + 1
+        SV0_guess = SV0i.copy()
+        SV0_guess[0] = Xnew[0]
+        SV0_guess[2] = Xnew[1]
+        SV0_guess[4] = Xnew[2]
+
+        F, dF_new = compute_F_and_dF_symmetric_xz_plane(Xnew, SV0_guess, dynamics)
+        Xdot_new = compute_tangent_vector(dF_new)
+        # 切向量同向化(对 SVD 任意符号),确保 PAL 约束的 Newton 步稳定
+        if np.dot(Xdot_new, Xdot) < 0:
+            Xdot_new = -Xdot_new
+
+        G = np.zeros(4)
+        G[:3] = F
+        G[3] = np.dot(Xnew - X, Xdot) - ds
+
+        dG = np.zeros((4, 4))
+        dG[:3, :] = dF_new
+        dG[3, :] = Xdot
+
+        residual = float(np.linalg.norm(F))
+        # 与 MATLAB continuation_PAL_CR3BP 一致：先判收敛，再更新 Xnew
+        if residual < tol:
+            converged = True
+            break
+
+        try:
+            delta_X = np.linalg.solve(dG, G)
+        except np.linalg.LinAlgError:
+            singular = True
+            break
+
+        # 限制牛顿步，避免 PAL 收敛到 rx 极大的非 Halo 物理解（F=0 多根）
+        max_step = np.array([0.04, 0.12, 0.12, 0.08], dtype=float)
+        delta_X = np.clip(delta_X, -max_step, max_step)
+        Xnew = Xnew - delta_X
+
+    return {
+        "x_new": Xnew,
+        "tangent": Xdot_new,
+        "iterations": iterations,
+        "residual": residual,
+        "converged": converged,
+        "singular": singular,
+    }
 
 
 class Continuation:
@@ -442,6 +522,7 @@ class Continuation:
         target_vector: int = 0,
         target_direction: int = 1,
         progress_callback=None,
+        backend: str = "rust",
     ):
         """伪弧长延拓（对应 MATLAB ``continuation_PAL_CR3BP``，plane=13 / XZ 对称）
 
@@ -458,6 +539,11 @@ class Continuation:
             dc_scheme: 微分修正方案，见 Continuation 类文档字符串。
             target_vector: 与 MATLAB TargetVector 对应的 0 基下标
                 （0=rx, 1=rz, 2=vy, 3=T/2）。
+            backend: 数值内核后端。``"rust"``（默认）走 Rust PAL 内核
+                （``pal_newton_step_py`` / ``pal_f_df_tangent_py``）；
+                ``"python"`` 走 numpy 参照路径（对照与降级）。初始切向量
+                两后端统一由 Python 参照计算——零空间符号约定在 SVD 与
+                Rust 广义叉积间无保证，首步延拓方向须由同一实现锁定。
 
         Returns:
             ContinuationResult: 结果状态三元组（status/cause/message）+
@@ -469,6 +555,10 @@ class Continuation:
             raise ValueError(
                 "direction 须为 positive 或 negative（双侧请用 halo_pseudo_arclength_continuation）"
             )
+        if backend not in ("rust", "python"):
+            raise ValueError(f"backend 须为 rust 或 python，当前为 {backend!r}")
+        if backend == "rust":
+            require_rust_extension("pal_newton_step_py", "pal_f_df_tangent_py")
 
         step_sign = 1.0 if direction == "positive" else -1.0
 
@@ -579,48 +669,42 @@ class Continuation:
             # 仅欧拉预测时的自由变量（PAL 若跳入 F=0 的非物理根则回退到此）
             X_predictor_only = Xnew.copy()
 
-            Xdot_new = Xdot
-            for iter_pal in range(IterMax):
-                SV0_guess = SV0i.copy()
-                SV0_guess[0] = Xnew[0]
-                SV0_guess[2] = Xnew[1]
-                SV0_guess[4] = Xnew[2]
-
-                F, dF_new = compute_F_and_dF_symmetric_xz_plane(Xnew, SV0_guess, dynamics)
-                Xdot_new = compute_tangent_vector(dF_new)
-                # 切向量同向化(对 SVD 任意符号),确保 PAL 约束的 Newton 步稳定
-                if np.dot(Xdot_new, Xdot) < 0:
-                    Xdot_new = -Xdot_new
-
-                G = np.zeros(4)
-                G[:3] = F
-                G[3] = np.dot(Xnew - X, Xdot) - ds
-
-                dG = np.zeros((4, 4))
-                dG[:3, :] = dF_new
-                dG[3, :] = Xdot
-
-                # 与 MATLAB continuation_PAL_CR3BP 一致：先判收敛，再更新 Xnew
-                if np.linalg.norm(F) < TolPAL:
-                    if verbose:
-                        logger.debug(
-                            "  PAL迭代 %d: 收敛, ||F|| = %.2e",
-                            iter_pal + 1,
-                            np.linalg.norm(F),
-                        )
-                    break
-
-                try:
-                    delta_X = np.linalg.solve(dG, G)
-                except np.linalg.LinAlgError:
-                    if verbose:
-                        logger.warning("  PAL迭代 %d: 雅可比矩阵奇异", iter_pal + 1)
-                    break
-
-                # 限制牛顿步，避免 PAL 收敛到 rx 极大的非 Halo 物理解（F=0 多根）
-                max_step = np.array([0.04, 0.12, 0.12, 0.08], dtype=float)
-                delta_X = np.clip(delta_X, -max_step, max_step)
-                Xnew = Xnew - delta_X
+            if backend == "rust":
+                step = pal_newton_step_py(
+                    mu=float(dynamics.system.mu),
+                    x_start=[float(v) for v in Xnew],
+                    x_ref=[float(v) for v in X],
+                    sv0=[float(v) for v in SV0i],
+                    tangent_ref=[float(v) for v in Xdot],
+                    ds=ds,
+                    tol=TolPAL,
+                    iter_max=IterMax,
+                    rtol=dynamics.rtol,
+                    atol=dynamics.atol,
+                    max_step=dynamics.max_step,
+                )
+            else:
+                step = _pal_newton_step_python(
+                    x_start=Xnew,
+                    x_ref=X,
+                    sv0=SV0i,
+                    tangent_ref=Xdot,
+                    ds=ds,
+                    tol=TolPAL,
+                    iter_max=IterMax,
+                    dynamics=dynamics,
+                )
+            if verbose:
+                if step["converged"]:
+                    logger.debug(
+                        "  PAL迭代 %d: 收敛, ||F|| = %.2e",
+                        step["iterations"],
+                        step["residual"],
+                    )
+                if step["singular"]:
+                    logger.warning("  PAL迭代 %d: 雅可比矩阵奇异", step["iterations"])
+            Xnew = np.asarray(step["x_new"], dtype=float)
+            Xdot_new = np.asarray(step["tangent"], dtype=float)
 
             Xdot = Xdot_new
             X = Xnew.copy()
@@ -745,8 +829,19 @@ class Continuation:
                         orbit.period / 2,
                     ]
                 )
-                _, dF = compute_F_and_dF_symmetric_xz_plane(X, orbit.states[0].copy(), dynamics)
-                Xdot_new = compute_tangent_vector(dF)
+                if backend == "rust":
+                    refresh = pal_f_df_tangent_py(
+                        mu=float(dynamics.system.mu),
+                        x=[float(v) for v in X],
+                        sv0=[float(v) for v in orbit.states[0]],
+                        rtol=dynamics.rtol,
+                        atol=dynamics.atol,
+                        max_step=dynamics.max_step,
+                    )
+                    Xdot_new = np.asarray(refresh["tangent"], dtype=float)
+                else:
+                    _, dF = compute_F_and_dF_symmetric_xz_plane(X, orbit.states[0].copy(), dynamics)
+                    Xdot_new = compute_tangent_vector(dF)
                 # 切向量同向化(对 SVD 任意符号)
                 if np.dot(Xdot_new, Xdot) < 0:
                     Xdot_new = -Xdot_new

@@ -33,6 +33,8 @@ if TYPE_CHECKING:
     hello_integrators: Any
     lambert_batch_py: Any
     lambert_izzo_py: Any
+    pal_f_df_tangent_py: Any
+    pal_newton_step_py: Any
     pole_tide: Any
     project_hamiltonian_qf_py: Any
     propagate_bcr4bp_py: Any
@@ -96,6 +98,8 @@ _RUST_SYMBOLS = (
     "lambert_batch_py",
     "lambert_izzo_py",
     "multiple_shooting_correct_py",
+    "pal_f_df_tangent_py",
+    "pal_newton_step_py",
     "planar_full_period_pal_py",
     "pole_tide",
     "project_hamiltonian_qf_py",
@@ -277,6 +281,8 @@ __all__ = [
     "MultistepResult",
     "multistep_step",
     "multiple_shooting_correct_py",
+    "pal_f_df_tangent_py",
+    "pal_newton_step_py",
     "planar_full_period_pal_py",
     "pole_tide",
     "project_hamiltonian_qf_py",
