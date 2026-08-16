@@ -89,7 +89,8 @@ def _context_to_dict(ctx: Any) -> dict[str, Any]:
 
 def _context_from_dict(d: dict[str, Any]) -> Any:
     """扁平字典 → NormalFormContext。"""
-    from ..dynamics import CR3BP_System, LibrationPoint
+    from ...data.templates.enums import LibrationPoint
+    from ..dynamics import CR3BP_System
     from .context import NormalFormContext
 
     point_name = str(d["_ctx_point"])

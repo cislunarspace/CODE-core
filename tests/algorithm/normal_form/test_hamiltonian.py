@@ -11,7 +11,6 @@ from kernel_helpers import requires_spice
 # sympy 是 normal-form optional dep；未安装时整个文件 skip（不 error）。
 pytest.importorskip("sympy")
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form import NormalFormContext
 from e2m2e.algorithm.normal_form.constants import JD0_J2000
 from e2m2e.algorithm.normal_form.hamiltonian import (
@@ -22,6 +21,7 @@ from e2m2e.algorithm.normal_form.hamiltonian import (
     hamiltonian_constant_term,
 )
 from e2m2e.algorithm.normal_form.legendre import expand_legendre_1_over_r
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.theory
 

@@ -4,8 +4,12 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.dynamics import CR3BP_System
+from e2m2e.algorithm.dynamics import LibrationPoint as DynamicsLibrationPoint
+from e2m2e.algorithm.dynamics.cr3bp_system import LibrationPoint as ModuleLibrationPoint
 from e2m2e.data.constants import SECONDS_PER_DAY, Datum
+from e2m2e.data.templates import LibrationPoint as TemplateLibrationPoint
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.theory
 
@@ -13,6 +17,12 @@ pytestmark = pytest.mark.theory
 @pytest.fixture
 def system():
     return CR3BP_System(mu=Datum.DE421.mu, primary="Earth", secondary="Moon")._with_default_scales()
+
+
+def test_libration_point_legacy_exports_preserve_canonical_identity():
+    assert DynamicsLibrationPoint is LibrationPoint
+    assert ModuleLibrationPoint is LibrationPoint
+    assert TemplateLibrationPoint is LibrationPoint
 
 
 @pytest.mark.parametrize("mu", [0.0, -0.01, 0.5, 1.0])

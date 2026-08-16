@@ -14,7 +14,8 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from ..dynamics import CR3BP_System, LibrationPoint
+from ...data.templates.enums import LibrationPoint
+from ..dynamics import CR3BP_System
 from .triangular_initial_guess import _triangular_modes
 
 #: L4/L5 编号 → LibrationPoint 枚举

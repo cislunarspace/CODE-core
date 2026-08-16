@@ -14,9 +14,10 @@ System + Dynamics 都归 algorithm/dynamics/（ADR 0011 迁移，源：
 
 from __future__ import annotations
 
+from ...data.templates.enums import LibrationPoint
 from .bcr4bp_dynamics import BCR4BP_Dynamics
 from .bcr4bp_system import BCR4BPSystem
-from .cr3bp_system import CR3BP_System, LibrationPoint
+from .cr3bp_system import CR3BP_System
 from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
 from .ephemeris_dynamics import EphemerisDynamics
 from .ephemeris_system import EphemerisSystem

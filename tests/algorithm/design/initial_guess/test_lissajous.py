@@ -7,11 +7,11 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.family.lissajous_initial_guess import (
     compute_lissajous_bounded_trajectory,
     compute_lissajous_initial_guess,
 )
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.orchestration
 

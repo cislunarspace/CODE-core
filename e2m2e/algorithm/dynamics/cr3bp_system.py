@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import warnings
-from enum import Enum
 from typing import Any
 
 import numpy as np
@@ -32,19 +31,9 @@ from ...data.constants import (
 from ...data.constants import (
     Datum,
 )
-from ...data.templates.enums import ReferenceFrame, UnitSystem
+from ...data.templates.enums import LibrationPoint, ReferenceFrame, UnitSystem
 from .potential import pseudo_potential_hessian
 from .system import System
-
-
-class LibrationPoint(Enum):
-    """平动点枚举"""
-
-    L1 = 1
-    L2 = 2
-    L3 = 3
-    L4 = 4
-    L5 = 5
 
 
 class CR3BP_System(System):

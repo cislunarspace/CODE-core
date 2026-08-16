@@ -22,7 +22,8 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from ..dynamics import CR3BP_System, LibrationPoint
+from ...data.templates.enums import LibrationPoint
+from ..dynamics import CR3BP_System
 
 #: L4/L5 编号 → LibrationPoint 枚举
 _TRIANGULAR = {4: LibrationPoint.L4, 5: LibrationPoint.L5}

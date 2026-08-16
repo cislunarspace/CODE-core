@@ -17,7 +17,6 @@ import pytest
 
 pytest.importorskip("sympy")
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form.catalog import (
     LibrationCatalogData,
     LibrationCatalogTransformer,
@@ -27,6 +26,7 @@ from e2m2e.algorithm.normal_form.dynamical_substitution import DynamicalSubstitu
 from e2m2e.algorithm.normal_form.quasi_floquet import QuasiFloquetResult, real_normal_form_matrix
 from e2m2e.algorithm.normal_form.types import NormalFormResult
 from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.theory
 

@@ -12,7 +12,6 @@ import math
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form import NormalFormContext
 from e2m2e.algorithm.normal_form.constants import (
     BASE_FREQUENCIES,
@@ -24,6 +23,7 @@ from e2m2e.algorithm.normal_form.constants import (
     MU_S,
     TU_S,
 )
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.theory
 

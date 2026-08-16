@@ -29,6 +29,16 @@ class UnitSystem(enum.Enum):
     SI = "si"  # 国际单位制（km, s, km/s）
 
 
+class LibrationPoint(enum.Enum):
+    """CR3BP 模型的五个平动点。"""
+
+    L1 = 1
+    L2 = 2
+    L3 = 3
+    L4 = 4
+    L5 = 5
+
+
 class ProjectionPlane(enum.Enum):
     """投影平面"""
 

@@ -24,7 +24,8 @@ import numpy as np
 import numpy.typing as npt
 
 from ...data.templates import ConvergenceState
-from ..dynamics import CR3BP_System, LibrationPoint
+from ...data.templates.enums import LibrationPoint
+from ..dynamics import CR3BP_System
 
 #: 共线点编号 → LibrationPoint 枚举
 _COLLINEAR = {1: LibrationPoint.L1, 2: LibrationPoint.L2, 3: LibrationPoint.L3}
@@ -227,7 +228,6 @@ def compute_lissajous_bounded_trajectory(
     """
     # 惰性导入：normal_form 依赖较重，仅在真正生成有界轨迹时引入。
     from ..normal_form.constants import JD0_J2000
-    from ..normal_form.constants import LibrationPoint as NFLib
     from ..normal_form.context import NormalFormContext
     from ..normal_form.pipeline import NormalFormPipeline
     from ..normal_form.propagation import propagate_parametric
@@ -241,7 +241,7 @@ def compute_lissajous_bounded_trajectory(
 
     ctx = NormalFormContext(
         system=system,
-        libration_point=NFLib(collinear_point),
+        libration_point=LibrationPoint(collinear_point),
         epoch=JD0_J2000,
         order=_LISSAJOUS_NF_ORDER,
         force_cr3bp=True,

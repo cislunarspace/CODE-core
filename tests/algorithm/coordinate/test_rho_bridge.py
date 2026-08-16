@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form.context import NormalFormContext
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = [
     pytest.mark.data,

@@ -22,7 +22,6 @@ import pytest
 from scipy.integrate import solve_ivp
 from scipy.linalg import expm
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form.constants import JD0_J2000
 from e2m2e.algorithm.normal_form.dynamical_substitution import (
     DynamicalSubstituteResult,
@@ -37,6 +36,7 @@ from e2m2e.algorithm.normal_form.quasi_floquet import (
     symplectic_project,
     vector_to_sp6,
 )
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.theory
 

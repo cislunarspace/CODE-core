@@ -7,8 +7,8 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.family.axial_initial_guess import compute_axial_initial_guess
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.orchestration
 

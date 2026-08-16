@@ -16,7 +16,6 @@ import warnings
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form import (
     NormalFormPipeline,
     NormalFormResult,
@@ -27,6 +26,7 @@ from e2m2e.algorithm.normal_form.dynamical_substitution import (
 )
 from e2m2e.algorithm.normal_form.quasi_floquet import QuasiFloquetResult
 from e2m2e.data.templates import ConvergenceState
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.theory
 

@@ -26,7 +26,6 @@ import pytest
 # sympy 是 normal-form optional dep；未安装时整个文件 skip（不 error）。
 pytest.importorskip("sympy")
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form.center_manifold import (
     DEFAULT_MAX_ORDER,
     CenterManifoldReducer,
@@ -37,6 +36,7 @@ from e2m2e.algorithm.normal_form.quasi_floquet import (
     QuasiFloquetResult,
     real_normal_form_matrix,
 )
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.theory
 

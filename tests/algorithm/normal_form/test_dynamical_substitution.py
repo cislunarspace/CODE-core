@@ -19,7 +19,6 @@ import warnings
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form.constants import JD0_J2000
 from e2m2e.algorithm.normal_form.dynamical_substitution import (
     DEFAULT_DENSE_STEP,
@@ -36,6 +35,7 @@ from e2m2e.algorithm.normal_form.multiple_shooting import (
     solve_block_tridiagonal,
 )
 from e2m2e.data.templates import ConvergenceState
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.theory
 

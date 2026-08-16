@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.dynamics import CR3BP_System, LibrationPoint
+from e2m2e.algorithm.dynamics import CR3BP_System
 from e2m2e.algorithm.normal_form import NormalFormContext
 from e2m2e.algorithm.normal_form.quasi_floquet import (
     J6,
@@ -23,6 +23,7 @@ from e2m2e.algorithm.normal_form.quasi_floquet import (
     _solve_qf_matrix,
     real_normal_form_matrix,
 )
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.theory
 

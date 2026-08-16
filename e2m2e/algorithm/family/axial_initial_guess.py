@@ -27,8 +27,9 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
+from ...data.templates.enums import LibrationPoint
 from ...data.types.orbit import Orbit
-from ..dynamics import CR3BP_Dynamics, LibrationPoint
+from ..dynamics import CR3BP_Dynamics
 from ..solver.differential_correction import DifferentialCorrection
 from .lissajous_initial_guess import _linear_modes
 

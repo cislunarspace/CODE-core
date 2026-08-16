@@ -13,7 +13,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from ..dynamics import LibrationPoint, System
+from ...data.templates.enums import LibrationPoint
+from ..dynamics import System
 from .constants import (
     BASE_FREQUENCIES,
     JD0_J2000,

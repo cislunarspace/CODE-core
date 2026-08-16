@@ -21,7 +21,7 @@ import numpy as np
 import numpy.typing as npt
 
 from ...data.constants import SECONDS_PER_DAY
-from ..dynamics.cr3bp_system import LibrationPoint
+from ...data.templates.enums import LibrationPoint
 from .synodic_axes import SynodicAxes
 
 if TYPE_CHECKING:

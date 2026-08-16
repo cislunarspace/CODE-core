@@ -3,11 +3,11 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.family.triangular_initial_guess import (
     _triangular_modes,
     compute_triangular_initial_guess,
 )
+from e2m2e.data.templates.enums import LibrationPoint
 
 pytestmark = pytest.mark.orchestration
 

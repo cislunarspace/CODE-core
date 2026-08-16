@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from ..dynamics import LibrationPoint
+from ...data.templates.enums import LibrationPoint
 
 # ---------------------------------------------------------------------------
 # qiao 全局归一化常量（见 qiao Python/crtbp/Subfunction/Global_File.py）
