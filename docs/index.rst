@@ -50,6 +50,7 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
 
    architecture/architecture
    architecture/system-dynamics-dataflow
+   architecture/numerics-migration-status
 
    reference/mbse/index
    reference/glossary

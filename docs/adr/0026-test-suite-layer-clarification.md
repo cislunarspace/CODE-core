@@ -46,4 +46,4 @@
 
 - forces 源码层级归属：`e2m2e/algorithm/forces` 是 Rust `e2m2e-forces` 的 Python 配置面（自述"参数验证 + to_rust_spec 序列化"），与 `e2m2e/integrators.py` 地位相近，是否移出 algorithm 层需单独 ADR，且受"数值层 Python 代码形态"这个未决问题约束。见 #429。
 - dynamics 的 System/Dynamics 拆分：`CR3BP_System`（物理系统定义）与 `CR3BP_Dynamics`（构造积分问题）层级不同，属高风险大迁移。见 #430。
-- normal_form、solver、transfer、family、manifold 中的 Python 数值是 ADR 0011 明示的"正在逐步迁移 Rust"过渡状态，需在文档标注迁移进度，避免后续审计再次误判为放错层。见 #431。
+- normal_form、solver、transfer、family、manifold 中的 Python 数值是 ADR 0011 明示的"正在逐步迁移 Rust"过渡状态，需在文档标注迁移进度，避免后续审计再次误判为放错层。见 #431，进度清单落地于 `docs/architecture/numerics-migration-status.md`。

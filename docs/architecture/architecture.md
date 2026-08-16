@@ -42,6 +42,9 @@
 
 迭代的"问题"由 Python 构造传入，Rust 只管迭代到收敛；Rust 不吃 SPICE 句柄，吃预采样注入的星历缓存表。
 
+各算法模块的迁移进度（哪些数值已下沉、哪些还在 Python、各自理由）逐项登记在
+[numerics-migration-status](numerics-migration-status.md)，审计时先查清单再下结论。
+
 ## 3. Python 编排模块
 
 只做三件事，不做数值迭代：
