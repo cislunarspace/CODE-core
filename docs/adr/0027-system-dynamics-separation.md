@@ -1,0 +1,63 @@
+# ADR 0027：System/Dynamics 分离保留——dynamics 目录不拆分、两类不合并
+
+**状态**：已采纳
+**日期**：2026-08-16
+**关联 Issue**：#430（dynamics 拆分评估）、#438（LibrationPoint 层级评估）
+**关联**：ADR 0011（五层架构）、ADR 0012（依赖方向）、ADR 0026（决策 1 及其后续工作，本条由其审计而来）
+
+## 背景
+
+ADR 0026 审计测试套件时提出疑问：`e2m2e/algorithm/dynamics/` 里两类东西混放——System 一侧（`CR3BP_System`/`EphemerisSystem`，物理系统定义：μ、天体、特征尺度）看着接近 data 层，Dynamics 一侧（`CR3BP_Dynamics`/`EphemerisDynamics`，构造并积分运动方程）是地道的 algorithm 层。#430 把这个问题立案：System 是否应迁 data 层？
+
+分诊中维护者进一步质疑分离本身：System 与 Dynamics 当初是手动分开的，若两者总是一起构造，分开是否多余？候选路径因此有四条——System 迁 data、两类合并、只挪 `LibrationPoint` 枚举、维持现状。
+
+裁决前做了逐模块核实的数据流调研，产出 `docs/architecture/system-dynamics-dataflow.md`（下称"数据流文档"），逐模块核实了两棵类层次的构造、持有状态、消费面与一次传播的数据路径。本篇记录裁决，结构层事实的细节以数据流文档为准。
+
+## 决策
+
+1. **System 与 Dynamics 保持分离，同留 `e2m2e/algorithm/dynamics/`。** System 不迁 data 层，两类不合并。
+2. **数据流文档作为本决策的结构说明入库**（`docs/architecture/system-dynamics-dataflow.md`，已注册进 Sphinx toctree）。
+3. `LibrationPoint` 枚举的层级归属是独立的纯数据符号问题，转 #438 单独评估，不在本篇裁决。
+
+## 理由
+
+### 领域层：模型阶梯
+
+地月轨道设计的基本工作路径是动力学模型阶梯：先在 CR3BP（理想化模型）里设计周期轨道出初猜，再到 BCR4BP（叠加太阳摄动），最后在星历 N 体（真实力学环境）里以低精度结果为迭代初值做多重打靶修正，得高精度拟周期轨道。`design_orbit` 模块 docstring 的三段主链——CR3BP 设计、星历多重打靶修正、标称星历输出——就是这条路径的代码形态。
+
+每一级模型都是一对 System + Dynamics：System 是该模型的上下文（CR3BP 的 μ/特征尺度/平动点，BCR4BP 的太阳参数，星历的天体列表/SPICE/坐标系），Dynamics 是该模型下的方程与积分。System/Dynamics 之分不是目录洁癖，是这个领域结构在代码里的镜像。
+
+阶梯尚未走完：Hill 三体、椭圆限制性三体、拟双圆（QBCP）等模型尚未实现。两棵类层次与 `System` 基类构成的接缝，就是它们将来进库的扩展槽——每新一级模型是一对新的 System+Dynamics，坐标转换、打靶、轨道族等消费面的接法不变。
+
+### 结构层：三条实证
+
+以下结论的核实过程与出处见数据流文档。
+
+1. **System 有十余个不构造 Dynamics 的独立消费者**——力模型（ForceModel 持有 system、强制要求 `coordinate_system`）、低推力三件套、坐标转换（`SynodicJ2000System`、`rho_bridge`）、轨道保持与预报、normal_form、数据层的 `Orbit`（鸭子类型持有 system 引用做单位换算）。分离使这些"只要上下文"的代码不必依赖传播机器。
+2. **一个 System 实例服务多个 Dynamics 与多路消费者。** `design_orbit` 里同一个 CR3BP 实例同时喂动力学构造、Jacobi 计算、时间换算、坐标转换四路；稳定性分析与不变流形从 `orbit.system` 按需重建各自的 Dynamics。
+3. **生命周期差一个量级。** System 随数据长存（`Orbit` 持有引用，序列化再加载后仍在）；Dynamics 随任务生灭——构造、按任务覆写积分器配置、传播、读缓存、丢弃。合并会让共享 system 的消费者互踩积分器配置。
+
+### 澄清：名义多态目前很薄
+
+`System` 抽象基类承诺三个成员（`frame`/`unit_system`/`gravitational_parameter`），但真正跨 CR3BP 与星历两个实现兑现的多态只有 `gravitational_parameter` 一项；其余访问是对实现侧成员（`origin`/`coordinate_system`/`spice`/`mu`）的结构式鸭子类型（`getattr`/`hasattr` 兜底，低推力测试直接传 `SimpleNamespace`）。本篇按现状保留这条缝，不夸大它：分离的承重理由是上面三条实证，不是名义抽象。将来新模型进库时若鸭子类型不够用，再立新 ADR 加宽契约。
+
+### 反方案为何被排除
+
+**System 迁 data 层**：System 不是数据对象而是计算对象——平动点靠 `fsolve` 解非线性方程，稳定性分析做特征值分解，还有单位换算与信息打印。data 层五个子目录（constants/frames/kernels/templates/types）没有承载计算对象的先例。且 `compute_stability_index` 与 Dynamics 的 `compute_jacobian_A` 共用 `pseudo_potential_hessian`，迁 System 须连带 potential，制造新的归属问题。这与 ADR 0026 决策 1 对 coordinate 的裁决同源："系统定义像 data"是功能类直觉，功能类与代码层级是两个独立的轴。
+
+**两类合并**：结构层三条实证各自反转成代价——上下文消费者被迫依赖传播机器、多消费者共享同一对象时互踩配置、随数据长存的对象背上随任务生灭的缓存。继承关系也会变坏：`BCR4BPSystem` 继承 `CR3BP_System`，而 `BCR4BP_Dynamics` 直接继承 `Dynamics`（雅可比含时、无 Jacobi 积分、Rust 入口多四个太阳参数），两棵本不互为镜像的继承树焊成一棵，BCR4BP 要继承 CR3BP 的系统数据却换掉几乎全部动力学行为。
+
+## 结果
+
+### 新增
+
+- 本篇 ADR。
+- `docs/architecture/system-dynamics-dataflow.md`：System/Dynamics 数据流的结构说明，本决策结构层理由的材料源。
+
+### 不变
+
+- `e2m2e/algorithm/dynamics/` 目录结构与全部代码一行未动；System/Dynamics 的接口、实现、测试维持现状。
+
+### 代价
+
+- `System` 基类名义契约薄的现状被明文化保留，按抽象类型签名的函数仍靠 `getattr`/`hasattr` 探测实现侧成员。这是有意的取舍：加宽契约的收益不足以抵偿现在动它的风险，留给新模型进库时一并评估。
