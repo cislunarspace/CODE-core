@@ -58,9 +58,9 @@
 
 - **Halo**：近月点加密（
   :func:`~e2m2e.algorithm.solver.multiple_shooting.sample_patch_points_perilune_clustered`）
-- **NRHO**：删近月点附近节点（
-  :func:`~e2m2e.algorithm.solver.multiple_shooting.sample_patch_points_drop_near_perilune`，
-  #463；加密策略在 NRHO 上残差会卡在约 10² km）
+- **NRHO**：等时间（#473；第 1 步 ``revs_per_group=1``）。删近月点附近节点
+  （:func:`~e2m2e.algorithm.solver.multiple_shooting.sample_patch_points_drop_near_perilune`）
+  保留为工具函数，强制含历元 ``t=0``；不再作生产默认
 
 近月点加密——先积分一圈定位近月点，在其两侧窗口内加密节点：
 
@@ -76,7 +76,8 @@
        perilune_window=0.15,  # 加密窗口半宽，占周期比例
    )
 
-删近月点附近节点——节点全部落在近月点禁区之外的互补弧上：
+删近月点附近节点——非历元节点落在近月点禁区之外的互补弧上，并强制包含
+历元 ``t=0``（避免 segmented 星历网格前缀空洞）：
 
 .. code-block:: python
 
@@ -90,7 +91,7 @@
    )
 
 二者均返回按时间升序的 ``(t_patch, states)``。非 CR3BP 动力学（无 ``mu``
-属性）时退化为等时间间隔采样。
+属性）时退化为等时间间隔采样；``drop_near`` 去重后点数不足时同样回退等时间。
 
 星历修正
 --------

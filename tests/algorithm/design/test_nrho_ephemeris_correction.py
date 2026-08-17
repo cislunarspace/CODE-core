@@ -1,13 +1,16 @@
-"""NRHO 星历修正回归（#463）。
+"""NRHO 星历修正回归（#463 / #473）。
 
-根因是默认「近月点加密」离散策略：贴月 NRHO 上 LM 残差卡在约 10² km，
-或拼接点网格与积分输出长度不一致。对照实验表明「删近月点附近节点」可收敛。
+#463：默认近月点加密在贴月 NRHO 上残差卡约 10² km。
+#473：5.7.2 的删近月点默认在 GUI 量级（phase=0.5、约 1 个月）上
+仍有历元空洞（星历长度断言）与合并层不收敛；生产默认改为等时间 +
+``revs_per_group=1``。
 
-本文件只锁 ``design_orbit`` 对外行为，规模按 ADR 0021 收紧：
+本文件只锁 ``design_orbit`` 对外行为：
 
-- 单条贴月短弧（近月高 2000 km、约 1 个 NRHO 周期）——修复前必失败、
-  修复后收敛；足够覆盖采样策略接缝，不必再挂 30 天 GUI 全长。
-- GUI 默认量级与采样×段长矩阵见 ``scripts/nrho_ephemeris_correction_matrix.py``，
+- 贴月短弧（近月高 2000 km、约 8 天）——#463 场景不得回退。
+- GUI 默认量级（近月高 5000 km、phase=0.5、约 30 天、1 h 步长）——
+  #473 必锁：收敛 + 星历与时间网格等长。
+- 采样×段长矩阵见 ``scripts/nrho_ephemeris_correction_matrix.py``，
   不进默认 pytest。
 """
 
@@ -27,10 +30,18 @@ pytestmark = [
     requires_spice,
 ]
 
-# 贴月短弧：~1 个 NRHO 周期（2000 km 约 6.7 天）。修复前 clustered 在此
-# 规模即失败（残差 ~10² km 或星历长度不一致）。
-DURATION_SEC = 8 * 86400.0
-OUTPUT_STEP_SEC = 7200.0  # 2 h 步长，压低星历表规模，不影响打靶收敛判据
+# 贴月短弧：~1 个 NRHO 周期（2000 km 约 6.7 天）。相位 0.5 是新生产
+# 离散默认下稳定的贴月代表样本；原 0.0 旧删近月采样案例不再适用（#473）。
+TIGHT_DURATION_SEC = 8 * 86400.0
+TIGHT_OUTPUT_STEP_SEC = 7200.0  # 2 h，压低星历表规模
+
+# GUI 默认量级：L2 南、5000 km、phase=0.5、约 1 个月、1 h 输出。
+GUI_DURATION_SEC = 30 * 86400.0
+GUI_OUTPUT_STEP_SEC = 3600.0
+
+# phase=0 与请求模型的 [0, 1] 契约一致；取短弧只验证该相位的修正可用性。
+PHASE_ZERO_DURATION_SEC = 8 * 86400.0
+PHASE_ZERO_OUTPUT_STEP_SEC = 7200.0
 
 
 @pytest.fixture(scope="module")
@@ -42,16 +53,50 @@ def nrho_tight_short_result():
             collinear_point=2,
             north_south=2,
             perilune_height=2000.0,
+            phase=0.5,
+            duration=TIGHT_DURATION_SEC,
+            output_step=TIGHT_OUTPUT_STEP_SEC,
+            correction_method="segmented",
+        )
+    )
+
+
+@pytest.fixture(scope="module")
+def nrho_gui_default_result():
+    """GUI 默认量级 NRHO——#473 回归样本（等时间 + 1 圈/段）。"""
+    return design_orbit(
+        make_design_request(
+            orbit_type="NRHO",
+            collinear_point=2,
+            north_south=2,
+            perilune_height=5000.0,
+            phase=0.5,
+            duration=GUI_DURATION_SEC,
+            output_step=GUI_OUTPUT_STEP_SEC,
+            correction_method="segmented",
+        )
+    )
+
+
+@pytest.fixture(scope="module")
+def nrho_phase_zero_result():
+    """L2 南、5000 km、phase=0——请求模型允许的相位端点。"""
+    return design_orbit(
+        make_design_request(
+            orbit_type="NRHO",
+            collinear_point=2,
+            north_south=2,
+            perilune_height=5000.0,
             phase=0.0,
-            duration=DURATION_SEC,
-            output_step=OUTPUT_STEP_SEC,
+            duration=PHASE_ZERO_DURATION_SEC,
+            output_step=PHASE_ZERO_OUTPUT_STEP_SEC,
             correction_method="segmented",
         )
     )
 
 
 def test_tight_short_nrho_converges(nrho_tight_short_result):
-    """贴月短弧修正收敛：采样策略接缝的行为锁。"""
+    """贴月短弧修正收敛：#463 场景在新默认策略下仍可用。"""
     res = nrho_tight_short_result
     assert res.correction is not None
     assert res.correction.status is ConvergenceState.CONVERGED
@@ -59,9 +104,9 @@ def test_tight_short_nrho_converges(nrho_tight_short_result):
 
 
 def test_tight_short_nrho_ephemeris_aligned(nrho_tight_short_result):
-    """星历非空且位置/速度/会合系与时间网格等长。"""
+    """贴月短弧星历非空且与时间网格等长。"""
     eph = nrho_tight_short_result.ephemeris
-    n_expected = int(DURATION_SEC / OUTPUT_STEP_SEC) + 1
+    n_expected = int(TIGHT_DURATION_SEC / TIGHT_OUTPUT_STEP_SEC) + 1
     assert eph is not None
     assert len(eph) == n_expected
     assert len(eph.position_km) == n_expected
@@ -79,3 +124,31 @@ def test_tight_short_nrho_synodic_near_rectilinear(nrho_tight_short_result):
     assert abs(y).max() < (z.max() - z.min()), (
         f"非近直线: |y|_max={abs(y).max():.4f}, z_span={z.max() - z.min():.4f}"
     )
+
+
+def test_nrho_phase_zero_converges(nrho_phase_zero_result):
+    """phase=0 不被算法层拒绝，并能得到收敛的标称星历。"""
+    res = nrho_phase_zero_result
+    assert res.correction is not None
+    assert res.correction.status is ConvergenceState.CONVERGED
+    assert res.ephemeris is not None
+
+
+def test_gui_default_nrho_converges(nrho_gui_default_result):
+    """GUI 默认量级（phase=0.5、约 1 个月）收敛。"""
+    res = nrho_gui_default_result
+    assert res.correction is not None
+    assert res.correction.status is ConvergenceState.CONVERGED
+    assert res.correction.max_residual < 2e-2
+
+
+def test_gui_default_nrho_ephemeris_aligned(nrho_gui_default_result):
+    """星历非空且点数与时间网格严格一致（#473 历元洞回归）。"""
+    eph = nrho_gui_default_result.ephemeris
+    # et_grid = arange(0, duration + 0.5*step, step) → 30 天 / 1 h = 721 点
+    n_expected = int(GUI_DURATION_SEC / GUI_OUTPUT_STEP_SEC) + 1
+    assert eph is not None
+    assert len(eph) == n_expected
+    assert len(eph.position_km) == n_expected
+    assert len(eph.velocity_mps) == n_expected
+    assert len(eph.synodic_position) == n_expected

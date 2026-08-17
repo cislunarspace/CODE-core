@@ -121,10 +121,11 @@ CORRECTION_VEL_WEIGHT = CORRECTION_TOL_KM / VELOCITY_TOL_KMS
 _POINTS_PER_REV = 8
 
 #: 拼接点采样策略（按轨道族覆盖，不暴露到请求模型）：
-#: - uniform：等时间
+#: - uniform：等时间（NRHO 生产默认，#473；其余族默认）
 #: - perilune_clustered：近月点加密（Halo 长弧实测更稳）
-#: - drop_near_perilune：删近月点附近节点（NRHO 默认，#463；
-#:   加密策略在 NRHO 上残差卡在约 10² km）
+#: - drop_near_perilune：删近月点附近节点（工具函数/对照；
+#:   #463 曾作 NRHO 默认，#473 起不再作生产默认——phase=0.5
+#:   约 1 个月弧 + 3 圈/段合并层易卡，且未钉历元会出前缀空洞）
 _PATCH_SAMPLING_UNIFORM = "uniform"
 _PATCH_SAMPLING_PERILUNE_CLUSTERED = "perilune_clustered"
 _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
@@ -348,10 +349,9 @@ def _validate_params(
             raise ValueError(
                 f"NRHO perilune_height 应在 100~10000 km 之间，实际为 {perilune_height:.0f} km"
             )
-        # 说明文档 inputs-dac.txt 第 33 行：初始相位取值 0.01~0.99，
-        # 近月点高度较低时初始相位需明显大于 0
-        if not 0.01 <= phase <= 0.99:
-            raise ValueError(f"NRHO phase 应在 0.01~0.99 之间，实际为 {phase}")
+        # NRHO 的历元相位允许从 0 开始；API 模型同样定义为 [0, 1]。
+        if not 0.0 <= phase <= 1.0:
+            raise ValueError(f"NRHO phase 应在 0~1 之间，实际为 {phase}")
         return {
             "collinear_point": collinear_point,
             "north_south": north_south,
@@ -539,10 +539,9 @@ def _dense_orbit(
 def _patch_sampling_for(orbit_type: str) -> str:
     """按轨道族选择拼接点采样策略（内部策略，不进请求契约）。
 
-    NRHO 与 Halo 解耦（#463）：NRHO 用删近月点节点，Halo 保留近月点加密。
+    NRHO 与 Halo 解耦（#473）：NRHO 默认等时间；Halo 近月点加密。
+    删近月点采样保留在 ``_sample_patch_points`` 分派中供对照，不作生产默认。
     """
-    if orbit_type == "NRHO":
-        return _PATCH_SAMPLING_DROP_NEAR_PERILUNE
     if orbit_type == "HALO":
         return _PATCH_SAMPLING_PERILUNE_CLUSTERED
     return _PATCH_SAMPLING_UNIFORM
@@ -561,8 +560,8 @@ def _sample_patch_points(
     默认每圈 ``_POINTS_PER_REV`` 等时间点。``sampling`` 覆盖族相关策略：
 
     - ``perilune_clustered``：近月点加密（Halo）
-    - ``drop_near_perilune``：删近月点附近节点（NRHO，#463）
-    - ``uniform``：等时间
+    - ``drop_near_perilune``：删近月点附近节点（对照/研究；#473 起非生产默认）
+    - ``uniform``：等时间（NRHO 与其余族默认）
     """
     dense = _dense_orbit(dynamics, state0, period)
     if sampling == _PATCH_SAMPLING_PERILUNE_CLUSTERED:
@@ -1078,8 +1077,7 @@ def design_orbit(
             )
         else:
             # 按 n_rev 圈重采样整条 tile（初猜）。采样策略按族覆盖
-            # （见 _patch_sampling_for）：Halo 近月点加密，NRHO 删近月点
-            # 附近节点（#463），其余等时间。
+            # （见 _patch_sampling_for）：Halo 近月点加密，NRHO 与其余等时间（#473）。
             t_patch_syn_n, state_patch_syn_n = _sample_patch_points(
                 dynamics,
                 state0_syn,
@@ -1116,19 +1114,23 @@ def design_orbit(
             frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
         )
         try:
-            # 第 1 步段长（每组圈数）。对齐朱彦伟2026 多重打靶拼接：长段（多圈）
-            # 节点密、段内约束强，各段修到正确星历弧而非漂走（1 圈短段各段漂、
-            # seam 跳 ~1e5 km 合并不了）。Halo/NRHO 用多圈/段（上限 3 圈，试错）；
-            # 稳定轨道（DRO 等）沿用 3 圈/段。配合下方 var_time 固定时刻族
+            # 第 1 步段长（每组圈数）。Halo 与稳定轨道用多圈/段（上限 3）：
+            # 长段节点密、段内约束强，各段修到正确星历弧（对齐朱彦伟 2026）。
+            # NRHO 单独 1 圈/段（#473）：默认相位 0.5、约 1 个月弧上
+            # revs_per_group=3 合并层残差可卡在约 10² km；1 圈/段与等时间
+            # 采样组合下 GUI 默认量级收敛。配合下方 var_time 固定时刻族
             # （_FIXED_TIME_ORBIT_TYPES，含 Halo/NRHO 与拟周期族）。
             #
             # 对照论文的三项差异评估（issue #400 需求②）：论文每段 9 圈（对应
             # 972 圈/15 年量级的 12→3→3 层级拼接），合并层节点稀疏化为每圈 1 个
-            # 远月点。当前 3 圈/段 + 全节点合并已覆盖 180 天站保基准（18 圈三层
-            # 合并全程收敛，5.8e-03/5.7e-04/1.4e-02 km），无需加长段；年量级
-            # （数十圈）若段数过多、全节点合并矩阵病态放大，再评估 9 圈/段与
-            # 远月点稀疏化。
-            revs_per_group = min(n_rev, 3) if sel in ("HALO", "NRHO") else max(1, min(3, n_rev))
+            # 远月点。Halo 3 圈/段 + 全节点合并已覆盖 180 天站保基准；年量级
+            # 若段数过多、全节点合并矩阵病态放大，再评估 9 圈/段与远月点稀疏化。
+            if sel == "NRHO":
+                revs_per_group = 1
+            elif sel == "HALO":
+                revs_per_group = min(n_rev, 3)
+            else:
+                revs_per_group = max(1, min(3, n_rev))
             t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
                 forces_py,
                 "EARTH",

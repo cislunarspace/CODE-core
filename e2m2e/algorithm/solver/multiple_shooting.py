@@ -642,7 +642,7 @@ def sample_patch_points_drop_near_perilune(
     n_points: int = 8,
     drop_window: float = 0.12,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-    """等时间采样的对偶：节点全部落在近月点窗口之外。
+    """等时间采样的对偶：节点落在近月点窗口之外，并强制包含历元 ``t=0``。
 
     NRHO 近月点速度大、STM 条件数高。把节点加密到近月点附近（
     :func:`sample_patch_points_perilune_clustered`）或让节点落在近月点上，
@@ -650,17 +650,23 @@ def sample_patch_points_drop_near_perilune(
     是**删除**近月点附近的离散点，让节点落在条件数较好的弧段。
 
     实现：先积分一圈定位近月点，再在窗口 ``[t_p - w, t_p + w]`` 之外的
-    互补弧上均匀放置 ``n_points`` 个节点（``w = drop_window · period``）。
-    与近月点加密互补——加密往窗口内堆点，本函数把点全部放在窗口外。
+    互补弧上均匀放置 ``n_points - 1`` 个节点（``w = drop_window · period``），
+    并强制并入 ``t=0``。不钉历元时首节点常落在 ``t>0``，segmented 逐段
+    填充从 ``et0`` 起的时间网格会出现前缀空洞，星历长度断言失败（#473）。
+    去重后点数不足则回退等时间采样。与近月点加密互补——加密往窗口内堆点，
+    本函数把非历元节点放在窗口外。
+
+    注：自 #473 起 NRHO 生产默认改为等时间；本函数保留供对照与研究。
 
     Args:
         orbit: 周期轨道，需含 ``period``、``times``、``states``。
         dynamics: 动力学对象，用于积分定位近月点。
-        n_points: 窗口外节点数。
+        n_points: 目标节点数（含历元钉点）。
         drop_window: 近月点禁区半宽，占周期比例。
 
     Returns:
-        (t_patch, states)：时间节点与对应状态，按时间升序排列。
+        (t_patch, states)：时间节点与对应状态，按时间升序排列；
+        ``t_patch[0] == 0``（或回退等时间时同样从 0 起）。
     """
     if orbit.period is None or orbit.period <= 0:
         raise ValueError("orbit must have a positive period")
@@ -685,11 +691,16 @@ def sample_patch_points_drop_near_perilune(
     t_perilune = float(t_probe[int(np.argmin(dists))])
 
     half_w = drop_window * period
-    # 互补弧 [t_p + w, t_p - w + period)，在其上均匀放点
+    # 互补弧 [t_p + w, t_p - w + period)：放 n_points-1 个点，预留 t=0 钉点
     t_lo = t_perilune + half_w
     t_hi = t_perilune - half_w + period
-    t_all = np.linspace(t_lo, t_hi, n_points, endpoint=False) % period
-    t_all = np.sort(np.unique(np.round(t_all, 12)))
+    n_arc = n_points - 1
+    t_arc = np.linspace(t_lo, t_hi, n_arc, endpoint=False) % period
+    t_all = np.sort(np.unique(np.round(np.concatenate([[0.0], t_arc]), 12)))
+
+    # 去重后点数不足（0 与弧点重合等）→ 回退等时间，保证历元与节点数
+    if len(t_all) < n_points:
+        return sample_patch_points(orbit, n_points)
 
     states = np.empty((len(t_all), 6))
     for i in range(6):

@@ -3,6 +3,8 @@
 覆盖采样形状、时间对齐、J2000 转换与一致性。
 """
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -147,7 +149,10 @@ class TestSamplePatchPointsDropNearPerilune:
     """
 
     def test_nodes_outside_perilune_window(self, dro_orbit, cr3bp_dynamics):
-        """所有节点与近月点的圆周距离 > drop_window·period。"""
+        """非历元节点与近月点的圆周距离 > drop_window·period。
+
+        ``t=0`` 为历元钉点（#473），允许落在禁区内；其余节点仍在互补弧上。
+        """
         drop_window = 0.12
         t_patch, states = sample_patch_points_drop_near_perilune(
             dro_orbit, cr3bp_dynamics, n_points=8, drop_window=drop_window
@@ -169,16 +174,49 @@ class TestSamplePatchPointsDropNearPerilune:
         assert len(t_patch) == 8
         assert np.all(np.isfinite(states))
         for t in t_patch:
+            if abs(float(t)) < 1e-12:
+                continue  # 历元钉点
             assert circ_dist(float(t)) > half_w - 1e-12, (
                 f"节点 t={t:.4f} 落入近月点禁区（t_p={t_p:.4f}, half_w={half_w:.4f}）"
             )
+
+    def test_includes_epoch_t0(self, dro_orbit, cr3bp_dynamics):
+        """首节点钉历元 t=0，节点数符合请求（#473）。"""
+        t_patch, states = sample_patch_points_drop_near_perilune(
+            dro_orbit, cr3bp_dynamics, n_points=8
+        )
+        assert len(t_patch) == 8
+        assert abs(float(t_patch[0])) < 1e-12
+        assert states.shape == (8, 6)
+
+    def test_falls_back_to_uniform_when_epoch_deduplication_loses_points(self):
+        """钉历元后去重使节点不足时，回退等时间且保留请求点数。"""
+        period = 1e-13
+        orbit = SimpleNamespace(
+            period=period,
+            times=np.array([0.0, period]),
+            states=np.zeros((2, 6)),
+        )
+
+        class TinyPeriodDynamics:
+            system = SimpleNamespace(mu=0.01215)
+
+            @staticmethod
+            def propagate(state, t_span, t_eval):
+                return {"states": np.zeros((len(t_eval), 6))}
+
+        t_patch, states = sample_patch_points_drop_near_perilune(
+            orbit, TinyPeriodDynamics(), n_points=8
+        )
+        assert_allclose(t_patch, np.linspace(0.0, period, 8, endpoint=False))
+        assert states.shape == (8, 6)
 
     def test_times_sorted_within_period(self, dro_orbit, cr3bp_dynamics):
         """返回时间升序且落在 [0, period)。"""
         t_patch, _ = sample_patch_points_drop_near_perilune(dro_orbit, cr3bp_dynamics, n_points=8)
         period = float(dro_orbit.period)
         assert np.all(np.diff(t_patch) > 0)
-        assert t_patch[0] >= 0.0
+        assert abs(float(t_patch[0])) < 1e-12
         assert t_patch[-1] < period
 
 
