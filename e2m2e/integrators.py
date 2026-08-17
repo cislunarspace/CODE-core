@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     enable_ephem_cache: Any
     ephem_ffi_call_count: Any
     hello_integrators: Any
+    keys_by_order_py: Any
     lambert_batch_py: Any
     lambert_izzo_py: Any
     low_energy_patch_py: Any
@@ -49,10 +50,14 @@ if TYPE_CHECKING:
     pal_f_df_tangent_py: Any
     pal_newton_step_py: Any
     pole_tide: Any
+    poly_poisson_py: Any
+    poly_simplify_py: Any
+    polylist_simplify_py: Any
     porkchop_grid_py: Any
     porkchop_grid_states_py: Any
     project_hamiltonian_qf_py: Any
     qlaw_propagate_py: Any
+    trim_degree_py: Any
     qlaw_segment_direction_py: Any
     propagate_bcr4bp_py: Any
     propagate_bcr4bp_stm_py: Any
@@ -120,6 +125,7 @@ _RUST_SYMBOLS = (
     "ephem_ffi_call_count",
     "hello_integrators",
     "indirect_term_acceleration",
+    "keys_by_order_py",
     "lambert_batch_py",
     "lambert_izzo_py",
     "low_energy_patch_py",
@@ -138,11 +144,15 @@ _RUST_SYMBOLS = (
     "pal_newton_step_py",
     "planar_full_period_pal_py",
     "pole_tide",
+    "poly_poisson_py",
+    "poly_simplify_py",
+    "polylist_simplify_py",
     "porkchop_grid_py",
     "porkchop_grid_states_py",
     "project_hamiltonian_qf_py",
     "qlaw_propagate_py",
     "qlaw_segment_direction_py",
+    "trim_degree_py",
     "propagate_bcr4bp_py",
     "propagate_bcr4bp_stm_py",
     "propagate_compiled",
@@ -330,6 +340,7 @@ __all__ = [
     "indirect_term_acceleration",
     "initialize_abm_history",
     "initialize_cowell_history",
+    "keys_by_order_py",
     "lambert_batch_py",
     "lambert_izzo_py",
     "low_energy_patch_rust",
@@ -351,11 +362,15 @@ __all__ = [
     "pal_newton_step_py",
     "planar_full_period_pal_py",
     "pole_tide",
+    "poly_poisson_py",
+    "poly_simplify_py",
+    "polylist_simplify_py",
     "porkchop_grid_py",
     "porkchop_grid_states_py",
     "project_hamiltonian_qf_py",
     "qlaw_propagate_py",
     "qlaw_segment_direction_py",
+    "trim_degree_py",
     "propagate_compiled",
     "propagate_compiled_lowthrust",
     "propagate_compiled_lowthrust_sensitivity",

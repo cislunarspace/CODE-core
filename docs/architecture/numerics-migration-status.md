@@ -41,6 +41,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/normal_form`（积分路径） | Rust（`e2m2e-integrators`） | #336/#340 |
 | `algorithm/normal_form`（CR3BP Hamiltonian 数值构造） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/normal_form`（H→QF 标量多项式投影） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/normal_form`（数值多项式核） | Rust（`e2m2e-integrators`） | #464 |
 | `algorithm/manifold/manifolds.py`（种子生成与批量传播） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #448 |
 
 ### 迁移中
@@ -48,7 +49,6 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
 | `algorithm/solver/MultipleShooting` 类（transfer/hohmann） | Python | 待单独迁移 |
-| `algorithm/normal_form`（数值多项式核） | Python | #464 |
 | `algorithm/normal_form`（复值积分 + QF↔CM Lie 流） | Python（实值积分已 Rust） | #465 |
 | `algorithm/normal_form`（中心流形化简） | Python | #466 |
 
@@ -200,6 +200,13 @@ ms 级）；三角点无该输入语义，保留 sympy 符号路径。
 `project_hamiltonian_to_qf` 走 `project_hamiltonian_qf_py`（multinomial
 数值展开）；星历时间序列系数回退 sympy。
 
+**`algorithm/normal_form`（数值多项式核）。** `poly_poisson` /
+`poly_simplify` / `polylist_simplify` 及核内幂次工具（`keys_by_order` /
+`trim_degree`）走 `e2m2e-integrators` 的 `poly_*_py` 绑定；完整支持标量与
+一维时间序列、实/复系数。Python 侧为薄封装，默认 `backend='rust'`，
+`backend='python'` 仅作显式等价性对照（不静默回退）。sympy 符号系数路径
+仍留 Python。工作项：#464。
+
 **`algorithm/manifold/manifolds.py`（种子生成与批量传播）。** 单值矩阵特征
 分解、STM 转运、±ε 种子与批量弧传播调度在 `e2m2e-forces` 的 `manifold`
 模块，经 `manifold_seeds_py` / `manifold_propagate_py` 暴露。Python 只做
@@ -214,18 +221,14 @@ ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShoot
 **`algorithm/solver/MultipleShooting` 类。** transfer/hohmann 使用的多重
 打靶类仍是泛型 Python 实现，后续需单独评估和迁移。
 
-**`algorithm/normal_form`（数值多项式核）。** `poly_poisson` /
-`poly_simplify` / `polylist_simplify` 及核内幂次工具仍为 Python 数值实现；
-完整下沉 Rust（禁止简化子集合入）。工作项：#464（#449 拆包 P1）。
-
 **`algorithm/normal_form`（复值积分 + QF↔CM Lie 流）。** `qf_to_cm` /
 `cm_to_qf` 仍走 scipy 复值 `solve_ivp`（#336 例外）；完整下沉须先具备
 复值（或 12 实维等价）积分能力，再迁全阶 Lie 流与实↔复基底。工作项：
 #465（#449 拆包 P3）。
 
 **`algorithm/normal_form`（中心流形化简）。** `CenterManifoldReducer` 两步
-Lie 同调、两套频域 W 求解器、全阶 Poisson 链仍为 Python；完整下沉，
-逻辑前置 #464。工作项：#466（#449 拆包 P4）。
+Lie 同调、两套频域 W 求解器、全阶 Poisson 链编排仍为 Python；数值多项式核
+（#464）已下沉，本项消费之。工作项：#466（#449 拆包 P4）。
 
 后置未派发（#449 评估）：quasi-Floquet 全矩阵法（P5）、多重打靶 Newton
 壳（P6）；独立 FFT 产品化（P2）若 #466 内已覆盖特解所需 FFT 可不单开。

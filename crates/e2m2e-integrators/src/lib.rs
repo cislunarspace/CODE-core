@@ -362,6 +362,9 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   种子、延拓、筛选与结构化终止收进单次 Rust 调用。
 /// - **v16** （#448）：新增 ``manifold_seeds_py`` 与 ``manifold_propagate_py``，
 ///   将不变流形种子生成与批量传播调度下沉 Rust。
+/// - **v17** （#464）：新增 ``poly_poisson_py`` / ``poly_simplify_py`` /
+///   ``polylist_simplify_py`` / ``keys_by_order_py`` / ``trim_degree_py``，
+///   将 normal_form 数值多项式核完整下沉 Rust。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -4020,6 +4023,11 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
         normal_form::build_cr3bp_hamiltonian_py,
         m
     )?)?;
+    m.add_function(wrap_pyfunction!(normal_form::poly_poisson_py, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::poly_simplify_py, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::polylist_simplify_py, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::keys_by_order_py, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::trim_degree_py, m)?)?;
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_py, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_events_py, m)?)?;

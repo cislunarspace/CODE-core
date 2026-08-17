@@ -21,7 +21,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 
 # 对应 (q1, q2, q3, p1, p2, p3)，6 个正则坐标。
 N_VARIABLES: int = 6
+
+Backend = Literal["rust", "python"]
 
 
 # ---------------------------------------------------------------------------
@@ -48,12 +50,16 @@ def _is_zero(coef: object, tol: float = 0.0) -> bool:
     """判断系数是否在数值上为零。
 
     对 ``ndarray`` 而言，只要存在分量绝对值大于 ``tol`` 即视为非零；
-    对 sympy / Python 数值直接 ``== 0`` 比较。``tol`` 取 ``0`` 时即严格相等。
+    对 Python ``complex`` 按模长；对 sympy / 实数值直接比较。
+    ``tol`` 取 ``0`` 时即严格相等。
     """
     if isinstance(coef, np.ndarray):
         if tol <= 0:
             return not np.any(coef)
         return not np.any(np.abs(coef) > tol)
+    # 复标量：float(complex) 会抛 TypeError，须按模长，与 Rust 核一致
+    if isinstance(coef, (complex, np.complexfloating)):
+        return abs(complex(coef)) <= tol
     try:
         if tol <= 0:
             return bool(coef == 0)
@@ -81,8 +87,32 @@ def order(pow_tuple: tuple[int, ...]) -> int:
 
 def keys_by_order(
     poly: Mapping[tuple[int, ...], object],
+    *,
+    backend: Backend = "rust",
 ) -> dict[int, list[tuple[int, ...]]]:
-    """按总阶数分组返回幂次键。"""
+    """按总阶数分组返回幂次键。
+
+    默认 ``backend='rust'``；``backend='python'`` 仅作显式等价性对照。
+    """
+    if backend not in ("rust", "python"):
+        raise ValueError("backend 须为 'rust' 或 'python'")
+    if backend == "python":
+        return _keys_by_order_python(poly)
+
+    from e2m2e.integrators import keys_by_order_py, require_rust_extension
+
+    require_rust_extension("keys_by_order_py")
+    pows = [[int(p) for p in k] for k in poly]
+    grouped_list = keys_by_order_py(pows)
+    return {
+        int(deg): [tuple(int(x) for x in pow_t) for pow_t in keys] for deg, keys in grouped_list
+    }
+
+
+def _keys_by_order_python(
+    poly: Mapping[tuple[int, ...], object],
+) -> dict[int, list[tuple[int, ...]]]:
+    """Python 参照：按总阶数分组返回幂次键。"""
     grouped: dict[int, list[tuple[int, ...]]] = {}
     for k in poly:
         grouped.setdefault(order(k), []).append(tuple(k))
@@ -94,8 +124,36 @@ def keys_by_order(
 def trim_degree(
     poly: Mapping[tuple[int, ...], object],
     max_degree: int,
+    *,
+    backend: Backend = "rust",
 ) -> dict[tuple[int, ...], object]:
-    """截断总阶数大于 ``max_degree`` 的项。"""
+    """截断总阶数大于 ``max_degree`` 的项。
+
+    默认 ``backend='rust'``（数值系数）；含 sympy 符号系数时自动走 Python
+    参照路径。``backend='python'`` 仅作显式等价性对照。
+    """
+    if backend not in ("rust", "python"):
+        raise ValueError("backend 须为 'rust' 或 'python'")
+    if max_degree < 0:
+        raise ValueError(f"max_degree 必须非负，得到 {max_degree}")
+    if backend == "python" or not _is_numeric_poly(poly):
+        return _trim_degree_python(poly, max_degree)
+
+    from e2m2e.integrators import require_rust_extension, trim_degree_py
+
+    require_rust_extension("trim_degree_py")
+    pows, flat, series_len, meta = _pack_numeric_poly(poly)
+    if not pows:
+        return {(0,) * N_VARIABLES: 0}
+    out_pows, out_flat, out_len = trim_degree_py(pows, flat, series_len, int(max_degree))
+    return _unpack_numeric_poly(out_pows, out_flat, out_len, meta)
+
+
+def _trim_degree_python(
+    poly: Mapping[tuple[int, ...], object],
+    max_degree: int,
+) -> dict[tuple[int, ...], object]:
+    """Python 参照：截断总阶数大于 ``max_degree`` 的项。"""
     if max_degree < 0:
         raise ValueError(f"max_degree 必须非负，得到 {max_degree}")
     result: dict[tuple[int, ...], object] = {}
@@ -257,6 +315,8 @@ def poly_subs(
 def poly_poisson(
     poly1: Mapping[tuple[int, ...], object],
     poly2: Mapping[tuple[int, ...], object],
+    *,
+    backend: Backend = "rust",
 ) -> dict[tuple[int, ...], object]:
     """计算两个多项式 dict 的泊松括号 ``{poly1, poly2}``。
 
@@ -268,8 +328,36 @@ def poly_poisson(
 
         {f, g} = c₁ c₂ Σ_k (a_k b_{k+3} - b_k a_{k+3}) x^{a+b-e_k-e_{k+3}}
 
-    系数为 sympy 或 ndarray 时均适用。
+    默认 ``backend='rust'`` 走数值核（标量/时间序列、实/复）；含 sympy
+    符号系数时自动走 Python。``backend='python'`` 仅作显式等价性对照，
+    绝不作为运行时静默回退。
     """
+    if backend not in ("rust", "python"):
+        raise ValueError("backend 须为 'rust' 或 'python'")
+    if backend == "python" or not (_is_numeric_poly(poly1) and _is_numeric_poly(poly2)):
+        return _poly_poisson_python(poly1, poly2)
+
+    from e2m2e.integrators import poly_poisson_py, require_rust_extension
+
+    require_rust_extension("poly_poisson_py")
+    pows1, flat1, len1, meta1 = _pack_numeric_poly(poly1)
+    pows2, flat2, len2, meta2 = _pack_numeric_poly(poly2)
+    series_len = _align_series_len(len1, len2)
+    # 一侧标量一侧序列时广播重打包
+    if series_len != len1:
+        pows1, flat1, _, meta1 = _pack_numeric_poly(poly1, series_len=series_len)
+    if series_len != len2:
+        pows2, flat2, _, meta2 = _pack_numeric_poly(poly2, series_len=series_len)
+    out_meta = _merge_meta(meta1, meta2)
+    out_pows, out_flat, out_len = poly_poisson_py(pows1, flat1, pows2, flat2, series_len)
+    return _unpack_numeric_poly(out_pows, out_flat, out_len, out_meta)
+
+
+def _poly_poisson_python(
+    poly1: Mapping[tuple[int, ...], object],
+    poly2: Mapping[tuple[int, ...], object],
+) -> dict[tuple[int, ...], object]:
+    """Python 参照：6-DOF 辛 Poisson 括号。"""
     result: dict[tuple[int, ...], object] = {}
     for pow1, coef1 in poly1.items():
         if _is_zero(coef1):
@@ -308,8 +396,34 @@ def poly_poisson(
 def poly_simplify(
     poly: Mapping[tuple[int, ...], object],
     eps: float = 1e-12,
+    *,
+    backend: Backend = "rust",
 ) -> dict[tuple[int, ...], object]:
-    """合并同幂次项并剔除小于 ``eps`` 的近零项。"""
+    """合并同幂次项并剔除小于 ``eps`` 的近零项。
+
+    默认 ``backend='rust'``；含 sympy 符号系数时自动走 Python。
+    ``backend='python'`` 仅作显式等价性对照。
+    """
+    if backend not in ("rust", "python"):
+        raise ValueError("backend 须为 'rust' 或 'python'")
+    if backend == "python" or not _is_numeric_poly(poly):
+        return _poly_simplify_python(poly, eps=eps)
+
+    from e2m2e.integrators import poly_simplify_py, require_rust_extension
+
+    require_rust_extension("poly_simplify_py")
+    if not poly:
+        return {(0,) * N_VARIABLES: 0}
+    pows, flat, series_len, meta = _pack_numeric_poly(poly)
+    out_pows, out_flat, out_len = poly_simplify_py(pows, flat, series_len, float(eps))
+    return _unpack_numeric_poly(out_pows, out_flat, out_len, meta)
+
+
+def _poly_simplify_python(
+    poly: Mapping[tuple[int, ...], object],
+    eps: float = 1e-12,
+) -> dict[tuple[int, ...], object]:
+    """Python 参照：合并同幂次并剔除近零项。"""
     if not poly:
         return {(0,) * N_VARIABLES: 0}
 
@@ -332,12 +446,38 @@ def poly_simplify(
 def polylist_simplify(
     poly: Mapping[tuple[int, ...], Any],
     eps: float = 1e-15,
+    *,
+    backend: Backend = "rust",
 ) -> dict[tuple[int, ...], Any]:
     """数值版 ``poly_simplify``：合并同幂次项，剔除均幅值过小的时间序列。
 
     与 qiao ``polylist_simplify`` 等价，使用 ``mean abs`` 作为阈值。
     系数为时间序列 ``ndarray`` （实或复值皆可，仅做幅值阈值与逐项累加）。
+
+    默认 ``backend='rust'``；``backend='python'`` 仅作显式等价性对照。
     """
+    if backend not in ("rust", "python"):
+        raise ValueError("backend 须为 'rust' 或 'python'")
+    if backend == "python":
+        return _polylist_simplify_python(poly, eps=eps)
+
+    from e2m2e.integrators import polylist_simplify_py, require_rust_extension
+
+    require_rust_extension("polylist_simplify_py")
+    if not poly:
+        return {(0,) * N_VARIABLES: np.zeros(1)}
+    if not _is_numeric_poly(poly):
+        raise TypeError("polylist_simplify 的 Rust 路径只接受数值 ndarray 系数")
+    pows, flat, series_len, meta = _pack_numeric_poly(poly)
+    out_pows, out_flat, out_len = polylist_simplify_py(pows, flat, series_len, float(eps))
+    return _unpack_numeric_poly(out_pows, out_flat, out_len, meta)
+
+
+def _polylist_simplify_python(
+    poly: Mapping[tuple[int, ...], Any],
+    eps: float = 1e-15,
+) -> dict[tuple[int, ...], Any]:
+    """Python 参照：时间序列 mean-abs 阈值化简。"""
     if not poly:
         return {(0,) * N_VARIABLES: np.zeros(1)}
 
@@ -374,6 +514,142 @@ def _sample_coef(
         if poly:
             return next(iter(poly.values()))
     return 0
+
+
+def _is_numeric_coef(coef: object) -> bool:
+    """判断系数是否为 Rust 核可处理的数值（Python 数 / 复数 / ndarray）。"""
+    if isinstance(coef, np.ndarray):
+        return np.issubdtype(coef.dtype, np.number)
+    return isinstance(coef, (int, float, complex, np.floating, np.integer, np.complexfloating))
+
+
+def _is_numeric_poly(poly: Mapping[tuple[int, ...], object]) -> bool:
+    """多项式全部系数为数值时返回 True；空多项式视为数值。"""
+    if not poly:
+        return True
+    return all(_is_numeric_coef(c) for c in poly.values())
+
+
+def _pack_numeric_poly(
+    poly: Mapping[tuple[int, ...], object],
+    *,
+    series_len: int | None = None,
+) -> tuple[list[list[int]], list[float], int, dict[str, Any]]:
+    """把数值多项式打包为 Rust 核输入。
+
+    返回 ``(pows, flat_re_im, series_len, meta)``。``meta`` 记录输出形态：
+    ``kind`` ∈ {``scalar_real``, ``scalar_complex``, ``series_real``, ``series_complex``}。
+    """
+    if not poly:
+        return [], [], series_len or 1, {"kind": "scalar_real", "series_len": series_len or 1}
+
+    items = list(poly.items())
+    samples = [np.asarray(c) for _, c in items]
+    has_complex = any(np.iscomplexobj(s) for s in samples)
+    lengths = []
+    for s in samples:
+        sample_flat = s.ravel()
+        lengths.append(int(sample_flat.size) if sample_flat.size > 0 else 1)
+    inferred = max(lengths) if lengths else 1
+    # 标量（size=1）可与序列广播
+    if series_len is None:
+        series_len = inferred
+    if series_len < 1:
+        raise ValueError(f"series_len 必须 ≥ 1，得到 {series_len}")
+
+    is_series = series_len > 1 or any(length > 1 for length in lengths)
+    if has_complex:
+        kind = "series_complex" if is_series else "scalar_complex"
+    else:
+        kind = "series_real" if is_series else "scalar_real"
+
+    pows: list[list[int]] = []
+    flat: list[float] = []
+    for pow_tuple, coef in items:
+        pows.append([int(p) for p in pow_tuple])
+        arr = np.asarray(coef)
+        if arr.ndim == 0 or arr.size == 1:
+            val = complex(arr.ravel()[0]) if arr.size else 0j
+            re = float(val.real)
+            im = float(val.imag)
+            for _ in range(series_len):
+                flat.extend([re, im])
+        else:
+            vec = arr.ravel()
+            if vec.size != series_len:
+                raise ValueError(f"系数序列长度不一致：期望 {series_len}，得到 {vec.size}")
+            if np.iscomplexobj(vec):
+                for z in vec:
+                    flat.extend([float(np.real(z)), float(np.imag(z))])
+            else:
+                for x in vec:
+                    flat.extend([float(x), 0.0])
+    meta: dict[str, Any] = {"kind": kind, "series_len": series_len}
+    return pows, flat, series_len, meta
+
+
+def _unpack_numeric_poly(
+    pows: list[list[int]],
+    flat: list[float],
+    series_len: int,
+    meta: Mapping[str, Any],
+) -> dict[tuple[int, ...], object]:
+    """把 Rust 核输出还原为 Python 多项式 dict。"""
+    kind = str(meta.get("kind", "scalar_real"))
+    result: dict[tuple[int, ...], object] = {}
+    stride = series_len * 2
+    for i, p in enumerate(pows):
+        key = tuple(int(x) for x in p)
+        chunk = flat[i * stride : (i + 1) * stride]
+        if kind == "scalar_real":
+            result[key] = float(chunk[0])
+        elif kind == "scalar_complex":
+            result[key] = complex(chunk[0], chunk[1])
+        elif kind == "series_real":
+            result[key] = np.asarray([chunk[2 * j] for j in range(series_len)], dtype=float)
+        else:  # series_complex
+            result[key] = np.asarray(
+                [complex(chunk[2 * j], chunk[2 * j + 1]) for j in range(series_len)],
+                dtype=complex,
+            )
+    if not result:
+        if kind.startswith("series"):
+            dtype = complex if "complex" in kind else float
+            result[(0,) * N_VARIABLES] = np.zeros(series_len, dtype=dtype)
+        elif kind == "scalar_complex":
+            result[(0,) * N_VARIABLES] = 0j
+        else:
+            result[(0,) * N_VARIABLES] = 0.0
+    return result
+
+
+def _align_series_len(len1: int, len2: int) -> int:
+    """两侧 series_len 对齐：允许 1 与 N 广播，禁止 N≠M。"""
+    if len1 == len2:
+        return len1
+    if len1 == 1:
+        return len2
+    if len2 == 1:
+        return len1
+    raise ValueError(f"两侧时间序列长度不一致：{len1} vs {len2}")
+
+
+def _merge_meta(meta1: Mapping[str, Any], meta2: Mapping[str, Any]) -> dict[str, Any]:
+    """合并两侧输出形态：任一侧复/序列则输出复/序列。"""
+    k1 = str(meta1.get("kind", "scalar_real"))
+    k2 = str(meta2.get("kind", "scalar_real"))
+    series = "series" in k1 or "series" in k2
+    complex_ = "complex" in k1 or "complex" in k2
+    if series and complex_:
+        kind = "series_complex"
+    elif series:
+        kind = "series_real"
+    elif complex_:
+        kind = "scalar_complex"
+    else:
+        kind = "scalar_real"
+    series_len = max(int(meta1.get("series_len", 1)), int(meta2.get("series_len", 1)))
+    return {"kind": kind, "series_len": series_len}
 
 
 __all__ = [

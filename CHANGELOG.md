@@ -2,8 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+- **normal_form 数值多项式核下沉 Rust**（#464）：`poly_poisson` / `poly_simplify` / `polylist_simplify` 及 `keys_by_order` / `trim_degree` 进入 `e2m2e-integrators`（`poly_*_py` 绑定，ABI v17）；完整支持标量与一维时间序列、实/复系数。Python 侧为薄封装，默认 `backend='rust'`，`backend='python'` 仅作显式等价性对照；sympy 符号路径仍留 Python。
+
 ### Changed
 - **normal_form 迁移状态按 #449 拆包更新**：已下沉（积分、共线点 CR3BP Hamiltonian、H→QF 标量投影）登记补全；数值主链拆为完整实现工作项 #464（多项式核）、#465（复值积分+QF↔CM）、#466（中心流形化简）；符号 Legendre/星历 H、NAFF、pipeline 编排有意留 Python；P5/P6 后置未派发。更新 `docs/architecture/numerics-migration-status.md`。
+- **数值多项式核登记为已下沉**（#464）：`docs/architecture/numerics-migration-status.md` 将 `poly_poisson` 等从「迁移中」移入「已下沉」。
 
 ## [5.7.1] - 2026-08-17
 

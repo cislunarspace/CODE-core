@@ -1,18 +1,15 @@
-//! normal_form: 标准形计算的加速内核（H→QF 投影的数值多项式展开）。
+//! normal_form: 标准形计算的加速内核。
 //!
-//! 对应 qiao ``Code09`` 的 ``X = B·Y`` 线性替换：把平动点偏移坐标下的
-//! Hamiltonian 单项式逐项展开为 QF 坐标多项式，逐时刻代入 ``B(t)`` 数值。
-//! Python 侧 ``e2m2e/algorithms/normal_form/qf_projection.py`` 在
-//! ``e2m2e._integrators`` 可用时调用本模块（数值展开，O(ms)）；符号实现
-//! （sympy）保留作回退（星历路径的时间序列系数等）。
+//! 1. H→QF 投影的数值多项式展开（``project_hamiltonian_qf_py``）。
+//! 2. CR3BP Hamiltonian 数值构造（``build_cr3bp_hamiltonian_py``）。
+//! 3. 数值多项式核（#464）：``poly_poisson`` / ``poly_simplify`` /
+//!    ``polylist_simplify`` 及幂次工具，支持标量与时间序列、实/复系数。
 //!
-//! 展开算法：对每个采样时刻 ``t``、每个输入单项式 ``∏ x_i^{n_i}``，
-//! 逐变量展开 ``(Σ_j B[i,j]·y_j)^{n_i}``（multinomial 组合枚举），
-//! 合并同幂次项。不依赖符号运算，系数为 ``f64``。
+//! 符号（sympy）路径仍在 Python；本模块只处理数值系数。
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// 6 维幂次向量（q1, q2, q3, p1, p2, p3）。
 type Pow = [i64; 6];
@@ -298,4 +295,336 @@ pub fn build_cr3bp_hamiltonian_py(
         coefs.push(*c);
     }
     Ok((pows, coefs))
+}
+
+// ===========================================================================
+// 数值多项式核（#464）
+// ===========================================================================
+//
+// 系数编码：每个系数是长度 ``series_len`` 的 ``(re, im)`` 交错数组；
+// ``series_len == 1`` 表示标量。与 Python 侧实/复、标量/序列约定对齐。
+// 幂次固定 6 维 ``(q1,q2,q3,p1,p2,p3)``。
+
+/// 复数时间序列系数：``values`` 为交错 ``[re0, im0, re1, im1, ...]``。
+#[derive(Clone, Debug)]
+struct CSeries {
+    values: Vec<f64>,
+}
+
+impl CSeries {
+    fn zeros(len: usize) -> Self {
+        Self {
+            values: vec![0.0; len * 2],
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.values.len() / 2
+    }
+
+    fn is_all_zero(&self, tol: f64) -> bool {
+        if tol <= 0.0 {
+            self.values.iter().all(|v| *v == 0.0)
+        } else {
+            // 任一分量 |z| > tol 即非零；与 Python ``_is_zero`` 对 ndarray 一致
+            // （``np.any(np.abs(coef) > tol)``，对复数 ndarray 按模）。
+            for chunk in self.values.chunks_exact(2) {
+                let re = chunk[0];
+                let im = chunk[1];
+                if (re * re + im * im).sqrt() > tol {
+                    return false;
+                }
+            }
+            true
+        }
+    }
+
+    fn mean_abs(&self) -> f64 {
+        let n = self.len();
+        if n == 0 {
+            return 0.0;
+        }
+        let mut s = 0.0;
+        for chunk in self.values.chunks_exact(2) {
+            s += (chunk[0] * chunk[0] + chunk[1] * chunk[1]).sqrt();
+        }
+        s / n as f64
+    }
+
+    fn scale_add(&mut self, other: &CSeries, scale_re: f64, scale_im: f64) {
+        // self += other * (scale_re + i scale_im)
+        debug_assert_eq!(self.values.len(), other.values.len());
+        for (dst, src) in self
+            .values
+            .chunks_exact_mut(2)
+            .zip(other.values.chunks_exact(2))
+        {
+            let ar = src[0];
+            let ai = src[1];
+            dst[0] += ar * scale_re - ai * scale_im;
+            dst[1] += ar * scale_im + ai * scale_re;
+        }
+    }
+
+    fn add_assign(&mut self, other: &CSeries) {
+        debug_assert_eq!(self.values.len(), other.values.len());
+        for (d, s) in self.values.iter_mut().zip(other.values.iter()) {
+            *d += *s;
+        }
+    }
+
+    fn mul(&self, other: &CSeries) -> CSeries {
+        debug_assert_eq!(self.values.len(), other.values.len());
+        let mut out = vec![0.0; self.values.len()];
+        for ((dst, a), b) in out
+            .chunks_exact_mut(2)
+            .zip(self.values.chunks_exact(2))
+            .zip(other.values.chunks_exact(2))
+        {
+            // (ar+iai)(br+ibi) = (ar br - ai bi) + i(ar bi + ai br)
+            dst[0] = a[0] * b[0] - a[1] * b[1];
+            dst[1] = a[0] * b[1] + a[1] * b[0];
+        }
+        CSeries { values: out }
+    }
+}
+
+fn parse_pow(p: &[i64]) -> PyResult<Pow> {
+    if p.len() != 6 {
+        return Err(PyValueError::new_err(format!(
+            "幂次向量必须 6 维，得到 {}",
+            p.len()
+        )));
+    }
+    Ok([p[0], p[1], p[2], p[3], p[4], p[5]])
+}
+
+fn parse_poly(
+    pows: &[Vec<i64>],
+    coefs_flat: &[f64],
+    series_len: usize,
+) -> PyResult<Vec<(Pow, CSeries)>> {
+    if series_len == 0 {
+        return Err(PyValueError::new_err("series_len 必须 ≥ 1"));
+    }
+    let n = pows.len();
+    let expected = n * series_len * 2;
+    if coefs_flat.len() != expected {
+        return Err(PyValueError::new_err(format!(
+            "coefs_flat 长度应为 n*series_len*2={}，得到 {}",
+            expected,
+            coefs_flat.len()
+        )));
+    }
+    let mut out = Vec::with_capacity(n);
+    let stride = series_len * 2;
+    for (i, p) in pows.iter().enumerate() {
+        let pow = parse_pow(p)?;
+        let start = i * stride;
+        let values = coefs_flat[start..start + stride].to_vec();
+        out.push((pow, CSeries { values }));
+    }
+    Ok(out)
+}
+
+fn pack_poly(map: &BTreeMap<Pow, CSeries>) -> (Vec<Vec<i64>>, Vec<f64>, usize) {
+    if map.is_empty() {
+        return (vec![vec![0; 6]], vec![0.0, 0.0], 1);
+    }
+    let series_len = map.values().next().map(|c| c.len()).unwrap_or(1);
+    let mut pows = Vec::with_capacity(map.len());
+    let mut flat = Vec::with_capacity(map.len() * series_len * 2);
+    for (p, c) in map {
+        pows.push(p.to_vec());
+        flat.extend_from_slice(&c.values);
+    }
+    (pows, flat, series_len)
+}
+
+/// 6-DOF 辛 Poisson 括号 ``{poly1, poly2}``（标量或时间序列、实/复）。
+///
+/// 系数编码：``coefs_flat`` 为 ``n * series_len * 2`` 的交错 ``(re, im)``；
+/// ``series_len=1`` 表示标量。
+#[pyfunction]
+#[pyo3(signature = (pows1, coefs1_flat, pows2, coefs2_flat, series_len))]
+#[allow(clippy::type_complexity)]
+pub fn poly_poisson_py(
+    pows1: Vec<Vec<i64>>,
+    coefs1_flat: Vec<f64>,
+    pows2: Vec<Vec<i64>>,
+    coefs2_flat: Vec<f64>,
+    series_len: usize,
+) -> PyResult<(Vec<Vec<i64>>, Vec<f64>, usize)> {
+    let poly1 = parse_poly(&pows1, &coefs1_flat, series_len)?;
+    let poly2 = parse_poly(&pows2, &coefs2_flat, series_len)?;
+
+    let mut result: HashMap<Pow, CSeries> = HashMap::new();
+
+    for (pow1, coef1) in &poly1 {
+        if coef1.is_all_zero(0.0) {
+            continue;
+        }
+        for (pow2, coef2) in &poly2 {
+            if coef2.is_all_zero(0.0) {
+                continue;
+            }
+            let product = coef1.mul(coef2);
+            for k in 0..3 {
+                let a_k = pow1[k];
+                let a_pk = pow1[k + 3];
+                let b_k = pow2[k];
+                let b_pk = pow2[k + 3];
+                if !((a_k != 0 && b_pk != 0) || (a_pk != 0 && b_k != 0)) {
+                    continue;
+                }
+                let mut new_pow = [0i64; 6];
+                let mut neg = false;
+                for i in 0..6 {
+                    new_pow[i] = pow1[i] + pow2[i];
+                }
+                new_pow[k] -= 1;
+                new_pow[k + 3] -= 1;
+                for &p in &new_pow {
+                    if p < 0 {
+                        neg = true;
+                        break;
+                    }
+                }
+                if neg {
+                    continue;
+                }
+                // factor = a_k * b_pk - a_pk * b_k （整数，实）
+                let factor = (a_k * b_pk - a_pk * b_k) as f64;
+                if factor == 0.0 {
+                    continue;
+                }
+                let entry = result
+                    .entry(new_pow)
+                    .or_insert_with(|| CSeries::zeros(series_len));
+                entry.scale_add(&product, factor, 0.0);
+            }
+        }
+    }
+
+    // 剔除严格零项；空结果退回零多项式
+    result.retain(|_, c| !c.is_all_zero(0.0));
+    if result.is_empty() {
+        let mut zero = BTreeMap::new();
+        zero.insert([0i64; 6], CSeries::zeros(series_len));
+        return Ok(pack_poly(&zero));
+    }
+    let ordered: BTreeMap<Pow, CSeries> = result.into_iter().collect();
+    Ok(pack_poly(&ordered))
+}
+
+/// 标量系数 simplify：合并同幂次，剔除 |coef| ≤ eps 的项。
+///
+/// 与 Python ``poly_simplify`` 数值路径一致；``series_len`` 通常为 1，
+/// 但接口允许序列（按任一分量模阈值，同 ``_is_zero``）。
+#[pyfunction]
+#[pyo3(signature = (pows, coefs_flat, series_len, eps))]
+#[allow(clippy::type_complexity)]
+pub fn poly_simplify_py(
+    pows: Vec<Vec<i64>>,
+    coefs_flat: Vec<f64>,
+    series_len: usize,
+    eps: f64,
+) -> PyResult<(Vec<Vec<i64>>, Vec<f64>, usize)> {
+    let terms = parse_poly(&pows, &coefs_flat, series_len)?;
+    let mut merged: HashMap<Pow, CSeries> = HashMap::new();
+    for (p, c) in terms {
+        let entry = merged
+            .entry(p)
+            .or_insert_with(|| CSeries::zeros(series_len));
+        entry.add_assign(&c);
+    }
+    let mut result: BTreeMap<Pow, CSeries> = BTreeMap::new();
+    for (p, c) in merged {
+        if !c.is_all_zero(eps) {
+            result.insert(p, c);
+        }
+    }
+    if result.is_empty() {
+        result.insert([0i64; 6], CSeries::zeros(series_len));
+    }
+    Ok(pack_poly(&result))
+}
+
+/// 时间序列 simplify：合并同幂次，剔除 ``mean(|coef|) ≤ eps`` 的项。
+///
+/// 与 Python ``polylist_simplify`` 一致。
+#[pyfunction]
+#[pyo3(signature = (pows, coefs_flat, series_len, eps))]
+#[allow(clippy::type_complexity)]
+pub fn polylist_simplify_py(
+    pows: Vec<Vec<i64>>,
+    coefs_flat: Vec<f64>,
+    series_len: usize,
+    eps: f64,
+) -> PyResult<(Vec<Vec<i64>>, Vec<f64>, usize)> {
+    let terms = parse_poly(&pows, &coefs_flat, series_len)?;
+    let mut result: HashMap<Pow, CSeries> = HashMap::new();
+    for (p, c) in terms {
+        if c.mean_abs() <= eps {
+            continue;
+        }
+        let entry = result
+            .entry(p)
+            .or_insert_with(|| CSeries::zeros(series_len));
+        entry.add_assign(&c);
+    }
+    if result.is_empty() {
+        let mut zero = BTreeMap::new();
+        zero.insert([0i64; 6], CSeries::zeros(series_len));
+        return Ok(pack_poly(&zero));
+    }
+    let ordered: BTreeMap<Pow, CSeries> = result.into_iter().collect();
+    Ok(pack_poly(&ordered))
+}
+
+/// 按总阶数分组返回幂次键（每组内排序）。
+#[pyfunction]
+#[pyo3(signature = (pows))]
+pub fn keys_by_order_py(pows: Vec<Vec<i64>>) -> PyResult<Vec<(i64, Vec<Vec<i64>>)>> {
+    let mut grouped: BTreeMap<i64, Vec<Pow>> = BTreeMap::new();
+    for p in &pows {
+        let pow = parse_pow(p)?;
+        let deg = pow.iter().sum::<i64>();
+        grouped.entry(deg).or_default().push(pow);
+    }
+    let mut out = Vec::with_capacity(grouped.len());
+    for (deg, mut keys) in grouped {
+        keys.sort_unstable();
+        out.push((deg, keys.into_iter().map(|k| k.to_vec()).collect()));
+    }
+    Ok(out)
+}
+
+/// 截断总阶数大于 ``max_degree`` 的项；空结果退回零多项式。
+#[pyfunction]
+#[pyo3(signature = (pows, coefs_flat, series_len, max_degree))]
+#[allow(clippy::type_complexity)]
+pub fn trim_degree_py(
+    pows: Vec<Vec<i64>>,
+    coefs_flat: Vec<f64>,
+    series_len: usize,
+    max_degree: i64,
+) -> PyResult<(Vec<Vec<i64>>, Vec<f64>, usize)> {
+    if max_degree < 0 {
+        return Err(PyValueError::new_err(format!(
+            "max_degree 必须非负，得到 {max_degree}"
+        )));
+    }
+    let terms = parse_poly(&pows, &coefs_flat, series_len)?;
+    let mut result: BTreeMap<Pow, CSeries> = BTreeMap::new();
+    for (p, c) in terms {
+        let deg: i64 = p.iter().sum();
+        if deg <= max_degree {
+            result.insert(p, c);
+        }
+    }
+    if result.is_empty() {
+        result.insert([0i64; 6], CSeries::zeros(series_len.max(1)));
+    }
+    Ok(pack_poly(&result))
 }
