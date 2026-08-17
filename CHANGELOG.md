@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **normal_form 迁移状态按 #449 拆包更新**：已下沉（积分、共线点 CR3BP Hamiltonian、H→QF 标量投影）登记补全；数值主链拆为完整实现工作项 #464（多项式核）、#465（复值积分+QF↔CM）、#466（中心流形化简）；符号 Legendre/星历 H、NAFF、pipeline 编排有意留 Python；P5/P6 后置未派发。更新 `docs/architecture/numerics-migration-status.md`。
+
 ## [5.7.1] - 2026-08-17
 
 ### Added
