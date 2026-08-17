@@ -1,8 +1,7 @@
 """不变流形与庞加莱截面。
 
-流形种子/截面留 Python（领域知识，ADR 0011 迁移，源：
-``algorithms/manifolds.py`` + ``algorithms/sections.py``）：Floquet 模选取、
-种子生成、庞加莱截面定义。传播走 Rust STM。
+流形种子生成与批量传播数值在 Rust；Python 侧保留参数校验、领域对象组装
+与庞加莱截面定义（``sections.py`` 有意留 Python）。
 """
 
 from __future__ import annotations

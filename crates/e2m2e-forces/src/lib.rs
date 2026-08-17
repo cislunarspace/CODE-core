@@ -11,6 +11,7 @@ pub mod atmosphere;
 pub mod bcr4bp;
 pub mod cr3bp;
 pub mod low_energy_patch;
+pub mod manifold;
 pub mod pal_continuation;
 pub mod porkchop;
 pub mod qlaw;

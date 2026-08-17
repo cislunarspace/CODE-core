@@ -39,6 +39,8 @@ if TYPE_CHECKING:
     lowthrust_collocation_defects_py: Any
     lowthrust_shooting_evaluate_py: Any
     lissajous_bounded_trajectory_py: Any
+    manifold_propagate_py: Any
+    manifold_seeds_py: Any
     nsga2_environmental_selection_py: Any
     nsga2_sort_py: Any
     nsga2_tournament_selection_py: Any
@@ -124,6 +126,8 @@ _RUST_SYMBOLS = (
     "lowthrust_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
     "lissajous_bounded_trajectory_py",
+    "manifold_propagate_py",
+    "manifold_seeds_py",
     "multiple_shooting_correct_py",
     "nsga2_environmental_selection_py",
     "nsga2_sort_py",
@@ -332,6 +336,8 @@ __all__ = [
     "lowthrust_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
     "lissajous_bounded_trajectory_py",
+    "manifold_propagate_py",
+    "manifold_seeds_py",
     "MultistepMethod",
     "MultistepResult",
     "multistep_step",

@@ -10,6 +10,9 @@
 沿周期轨道取 n_points 个相位点，用从轨道首点到各相位的 STM 把特征向量
 转运到该相位，位置部分归一化后施加 ±ε 的无量纲扰动得到种子；
 稳定流形反向积分、不稳定流形正向积分得到流形管。
+
+数值内核在 Rust（特征分解、STM 转运、种子扰动、批量传播调度）；
+Python 侧只做参数校验、领域对象组装与可选的事后截面截断。
 """
 
 from __future__ import annotations
@@ -23,6 +26,11 @@ import numpy as np
 
 from ...data.types.orbit import Orbit
 from ...exceptions import PropagationFailure
+from ...integrators import (
+    manifold_propagate_py,
+    manifold_seeds_py,
+    require_rust_extension,
+)
 from ..dynamics import CR3BP_Dynamics
 
 if TYPE_CHECKING:
@@ -71,10 +79,6 @@ class InvariantManifold:
     # 传播采样步长（无量纲时间），密采样保证事后截面检测精度
     SAMPLE_DT = 0.005
 
-    # 实特征值判定容差与单位圆剔除裕度
-    _REAL_TOL = 1e-8
-    _UNIT_MARGIN = 1e-6
-
     def __init__(
         self,
         orbit: Orbit,
@@ -109,10 +113,8 @@ class InvariantManifold:
         self.epsilon = float(epsilon)
         self.dynamics = CR3BP_Dynamics(system)
 
-        # 相位扫掠缓存（seeds 首次调用时填充）
-        self._phase_states: np.ndarray | None = None
-        self._phase_stms: np.ndarray | None = None
-        self._eigvec0: np.ndarray | None = None
+        # 最近一次 seeds 的相位点数（供 propagate 默认 n_points）
+        self._cached_n_points: int | None = None
 
     def seeds(self, n_points: int) -> np.ndarray:
         """生成相位扫掠种子
@@ -128,19 +130,30 @@ class InvariantManifold:
         """
         if n_points < 1:
             raise ValueError(f"n_points 必须大于等于 1，当前为 {n_points}")
-        if self._phase_states is None or self._phase_states.shape[0] != n_points:
-            self._phase_sweep(n_points)
-        # _phase_sweep 填充全部三项缓存
-        assert self._phase_states is not None
-        assert self._phase_stms is not None
-        assert self._eigvec0 is not None
+        require_rust_extension("manifold_seeds_py")
 
-        sign = 1.0 if self.branch == "+" else -1.0
-        seeds = np.empty((n_points, 6))
-        for i in range(n_points):
-            v = self._phase_stms[i] @ self._eigvec0
-            v = v / np.linalg.norm(v[:3])
-            seeds[i] = self._phase_states[i] + sign * self.epsilon * v
+        assert self.orbit.period is not None
+        x0 = np.asarray(self.orbit.states[0], dtype=float).reshape(6)
+        branch_sign = 1.0 if self.branch == "+" else -1.0
+        max_step = self.dynamics.max_step
+        max_step_arg = None if not np.isfinite(max_step) or max_step <= 0 else float(max_step)
+
+        raw = manifold_seeds_py(
+            float(self.dynamics.system.mu),
+            x0.tolist(),
+            float(self.orbit.period),
+            self.kind.value,
+            branch_sign,
+            self.epsilon,
+            int(n_points),
+            float(self.dynamics.rtol),
+            float(self.dynamics.atol),
+            max_step_arg,
+        )
+        seeds = np.asarray(raw["seeds"], dtype=float)
+        if seeds.shape != (n_points, 6):
+            raise RuntimeError(f"Rust 种子形状异常: {seeds.shape}，期望 ({n_points}, 6)")
+        self._cached_n_points = n_points
         return seeds
 
     def propagate(
@@ -158,39 +171,53 @@ class InvariantManifold:
             t_span: 积分时长（无量纲时间，符号被忽略）
             section: 可选庞加莱截面；给定时每条弧在首次穿越截面处截断，
                 并把求精后的穿越态追加为弧的末点
-            n_workers: 并行 worker 数（预留参数，当前串行执行）
+            n_workers: 并行 worker 数（>1 启用 Rayon）
 
         Returns:
             ManifoldTube: 流形管，含全部流形弧
         """
-        if n_workers != 1:
-            logger.info("n_workers=%d 暂未启用并行，按串行执行", n_workers)
-
         duration = abs(float(t_span))
         if duration <= 0:
             raise ValueError(f"t_span 必须非零，当前为 {t_span}")
-        t_final = -duration if self.kind is ManifoldKind.STABLE else duration
-
-        n_samples = max(int(np.ceil(duration / self.SAMPLE_DT)) + 1, 2)
-        t_eval = np.linspace(0.0, t_final, n_samples)
 
         seeds = self.seeds(self._default_seed_count())
+
+        # 测试注入缝：若 dynamics.propagate 被 monkeypatch，走逐种子 Python
+        # 调度以保留失败跳过语义（ADR 0020 测试注入缝豁免）。生产路径不触发。
+        if self._dynamics_propagate_monkeypatched():
+            return self._propagate_via_dynamics(seeds, duration, section)
+
+        require_rust_extension("manifold_propagate_py")
+        max_step = self.dynamics.max_step
+        max_step_arg = None if not np.isfinite(max_step) or max_step <= 0 else float(max_step)
+
+        parallel = n_workers > 1
+        raw = manifold_propagate_py(
+            float(self.dynamics.system.mu),
+            seeds.reshape(-1).tolist(),
+            self.kind.value,
+            duration,
+            float(self.SAMPLE_DT),
+            float(self.dynamics.rtol),
+            float(self.dynamics.atol),
+            max_step_arg,
+            n_workers=int(n_workers) if parallel else None,
+            parallel=parallel,
+        )
+
         trajectories: list[Orbit] = []
-        for x0 in seeds:
-            try:
-                result = self.dynamics.propagate(x0, (0.0, t_final), t_eval=t_eval)
-            except PropagationFailure:
-                # 流形管生成属于搜索语境：单个种子弧不可行不应中止其余候选。
-                logger.warning("流形弧积分失败，跳过该种子")
-                continue
-            times = np.asarray(result["time"], dtype=float)
-            states = np.asarray(result["states"], dtype=float)
+        for arc in raw["arcs"]:
+            times = np.asarray(arc["times"], dtype=float)
+            states = np.asarray(arc["states"], dtype=float)
             if section is not None:
                 times, states = self._truncate_at_first_crossing(times, states, section)
             if len(states) == 0:
                 logger.warning("流形弧积分返回空轨迹，跳过该种子")
                 continue
             trajectories.append(Orbit(states=states, times=times, system=self.orbit.system))
+
+        if raw.get("n_failures", 0):
+            logger.warning("流形弧积分失败 %d 条，已跳过", int(raw["n_failures"]))
 
         return ManifoldTube(
             orbit=self.orbit,
@@ -202,55 +229,54 @@ class InvariantManifold:
 
     # ---- 内部实现 ----
 
-    # 默认相位点个数（未显式调用 seeds 时 propagate 使用）
     _DEFAULT_N_POINTS = 50
 
     def _default_seed_count(self) -> int:
         """propagate 使用的相位点个数：沿用已有 seeds 缓存的个数，否则取默认值"""
-        if self._phase_states is not None:
-            return self._phase_states.shape[0]
+        if self._cached_n_points is not None:
+            return self._cached_n_points
         return self._DEFAULT_N_POINTS
 
-    def _phase_sweep(self, n_points: int) -> None:
-        """沿周期轨道传播一周，缓存各相位状态与 STM，并提取首点处流形特征向量"""
-        # __init__ 已校验 period 非 None，此处断言仅为类型收窄
-        assert self.orbit.period is not None
-        period = float(self.orbit.period)
-        x0 = np.asarray(self.orbit.states[0], dtype=float)
-        t_eval = np.linspace(0.0, period, n_points + 1)
-        result = self.dynamics.propagate(x0, (0.0, period), t_eval=t_eval, with_stm=True)
+    def _dynamics_propagate_monkeypatched(self) -> bool:
+        """检测 ``dynamics.propagate`` 是否被测试 monkeypatch。
 
-        # 末端相位与首点重合，剔除；末端 STM 即单值矩阵
-        self._phase_states = result["states"][:-1]
-        self._phase_stms = result["stm"][:-1]
-        monodromy = result["stm"][-1]
-        self._eigvec0 = self._select_eigenvector(monodromy)
-
-    def _select_eigenvector(self, monodromy: np.ndarray) -> np.ndarray:
-        """从单值矩阵提取流形方向对应的实特征向量（轨道首点处）
-
-        稳定流形取 |λ|<1 的最小实特征值，不稳定流形取 |λ|>1 的最大实特征值；
-        单位圆上的特征值（含 λ=1 的周期方向）不构成双曲流形方向，予以剔除。
-
-        Raises:
-            ValueError: 单值矩阵不存在对应类型的双曲实特征值
+        ``monkeypatch.setattr(dynamics, "propagate", ...)`` 会在实例
+        ``__dict__`` 上留下属性；生产路径不会触发。
         """
-        eigenvalues, eigenvectors = np.linalg.eig(monodromy)
-        mags = np.abs(eigenvalues)
-        real_mask = np.abs(eigenvalues.imag) < self._REAL_TOL
+        return "propagate" in getattr(self.dynamics, "__dict__", {})
 
-        if self.kind is ManifoldKind.STABLE:
-            candidates = np.where(real_mask & (mags < 1.0 - self._UNIT_MARGIN))[0]
-            if len(candidates) == 0:
-                raise ValueError("单值矩阵无 |λ|<1 的实特征值，稳定流形不存在")
-            idx = candidates[np.argmin(mags[candidates])]
-        else:
-            candidates = np.where(real_mask & (mags > 1.0 + self._UNIT_MARGIN))[0]
-            if len(candidates) == 0:
-                raise ValueError("单值矩阵无 |λ|>1 的实特征值，不稳定流形不存在")
-            idx = candidates[np.argmax(mags[candidates])]
-
-        return np.real(eigenvectors[:, idx])
+    def _propagate_via_dynamics(
+        self,
+        seeds: np.ndarray,
+        duration: float,
+        section: PoincareSection | None,
+    ) -> ManifoldTube:
+        """测试注入路径：逐种子调 dynamics.propagate，保留失败跳过语义。"""
+        t_final = -duration if self.kind is ManifoldKind.STABLE else duration
+        n_samples = max(int(np.ceil(duration / self.SAMPLE_DT)) + 1, 2)
+        t_eval = np.linspace(0.0, t_final, n_samples)
+        trajectories: list[Orbit] = []
+        for x0 in seeds:
+            try:
+                result = self.dynamics.propagate(x0, (0.0, t_final), t_eval=t_eval)
+            except PropagationFailure:
+                logger.warning("流形弧积分失败，跳过该种子")
+                continue
+            times = np.asarray(result["time"], dtype=float)
+            states = np.asarray(result["states"], dtype=float)
+            if section is not None:
+                times, states = self._truncate_at_first_crossing(times, states, section)
+            if len(states) == 0:
+                logger.warning("流形弧积分返回空轨迹，跳过该种子")
+                continue
+            trajectories.append(Orbit(states=states, times=times, system=self.orbit.system))
+        return ManifoldTube(
+            orbit=self.orbit,
+            kind=self.kind,
+            branch=self.branch,
+            epsilon=self.epsilon,
+            trajectories=trajectories,
+        )
 
     def _truncate_at_first_crossing(
         self,

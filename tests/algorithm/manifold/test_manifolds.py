@@ -225,3 +225,14 @@ class TestPropagate:
         tube = stable_manifold.propagate(4.0, section=section)
         n_truncated = sum(1 for arc in tube.trajectories if abs(section(arc.states[-1])) < 1e-8)
         assert n_truncated > 0, "应至少有一条流形弧被截面截断"
+
+    def test_parallel_matches_serial(self, l1_lyapunov):
+        """n_workers>1 与串行路径弧序与数值一致"""
+        manifold = InvariantManifold(l1_lyapunov, ManifoldKind.UNSTABLE, "+", 50.0 / DU)
+        manifold.seeds(8)
+        serial = manifold.propagate(0.5, n_workers=1)
+        parallel = manifold.propagate(0.5, n_workers=4)
+        assert len(serial.trajectories) == len(parallel.trajectories) > 0
+        for a, b in zip(serial.trajectories, parallel.trajectories, strict=True):
+            np.testing.assert_allclose(a.states, b.states, rtol=1e-12, atol=1e-12)
+            np.testing.assert_allclose(a.times, b.times, rtol=1e-12, atol=1e-12)

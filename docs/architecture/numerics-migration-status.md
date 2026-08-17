@@ -41,13 +41,13 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/normal_form`（积分路径） | Rust（`e2m2e-integrators`） | #336/#340 |
 | `algorithm/normal_form`（CR3BP Hamiltonian 数值构造） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/normal_form`（H→QF 标量多项式投影） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/manifold/manifolds.py`（种子生成与批量传播） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #448 |
 
 ### 迁移中
 
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
 | `algorithm/solver/MultipleShooting` 类（transfer/hohmann） | Python | 待单独迁移 |
-| `algorithm/manifold/manifolds.py` | Python | #448 |
 | `algorithm/normal_form`（数值多项式核） | Python | #464 |
 | `algorithm/normal_form`（复值积分 + QF↔CM Lie 流） | Python（实值积分已 Rust） | #465 |
 | `algorithm/normal_form`（中心流形化简） | Python | #466 |
@@ -109,7 +109,7 @@ Python 保留系统/参数校验和领域结果组装；默认 Rust，Python 仅
 **`algorithm/transfer/low_energy.py`（流形截面态配对）。** 两组截面态的
 笛卡尔积、位置/速度范数、加权拼接代价和稳定排序在 `e2m2e-forces` 的
 纯 Rust 核执行，经 `e2m2e-integrators` 暴露。流形管管理、四分支编排和
-ThreeBodyLambert 闭合仍在 Python；流形种子、STM 转运和管传播属于 #448。
+ThreeBodyLambert 闭合仍在 Python；流形种子、STM 转运和管传播已由 #448 下沉。
 默认 Rust，Python 仅作显式等价性对照。工作项：#447。
 
 **`algorithm/transfer/qlaw.py`。** Q-law 反馈律积分、开普勒根数转换、Gauss
@@ -200,6 +200,12 @@ ms 级）；三角点无该输入语义，保留 sympy 符号路径。
 `project_hamiltonian_to_qf` 走 `project_hamiltonian_qf_py`（multinomial
 数值展开）；星历时间序列系数回退 sympy。
 
+**`algorithm/manifold/manifolds.py`（种子生成与批量传播）。** 单值矩阵特征
+分解、STM 转运、±ε 种子与批量弧传播调度在 `e2m2e-forces` 的 `manifold`
+模块，经 `manifold_seeds_py` / `manifold_propagate_py` 暴露。Python 只做
+参数校验、`ManifoldTube`/`Orbit` 组装与可选的事后截面截断；不保留 Python
+数值回退。工作项：#448。
+
 ## 迁移中
 
 ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShooting` 是支持多种
@@ -207,10 +213,6 @@ ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShoot
 
 **`algorithm/solver/MultipleShooting` 类。** transfer/hohmann 使用的多重
 打靶类仍是泛型 Python 实现，后续需单独评估和迁移。
-
-**`algorithm/manifold/manifolds.py`。** 单值矩阵特征分解、STM 转运、种子
-生成纯 Python（numpy）。ADR 0026 后续工作第三条点名的过渡状态之一。
-工作项：#448。
 
 **`algorithm/normal_form`（数值多项式核）。** `poly_poisson` /
 `poly_simplify` / `polylist_simplify` 及核内幂次工具仍为 Python 数值实现；

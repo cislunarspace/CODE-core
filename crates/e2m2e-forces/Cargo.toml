@@ -34,3 +34,5 @@ rayon = { workspace = true }
 # 进度回调：transfer_grid_search_{serial,parallel} 接收 Option<&Sender<usize>>，
 # 每完成一个出发点发一个完成信号；FFI 层 drainer 线程排空后回调 Python。
 crossbeam-channel = { workspace = true }
+# 不变流形单值矩阵幂法特征选取与矩阵运算；与 integrators 的平面 PAL 共用 nalgebra。
+nalgebra = { workspace = true }
