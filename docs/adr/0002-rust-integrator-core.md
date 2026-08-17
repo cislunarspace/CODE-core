@@ -98,7 +98,7 @@ spice 现为默认 feature：crates `default = ["spice"]` + pyproject `features=
 - **事件检测**（`CR3BP_Dynamics._propagate_with_stm(events=...)`）：Rust `solve_ivp_events_py` 已实现但事件检测语义与 scipy 不完全对齐，事件路径按显式 `backend="scipy"/"rust"` 二选一（ADR 0020 决策 4），不传报错、不允许 `auto`；`"scipy"` 走 scipy `solve_ivp`，`"rust"` 走 Rust `solve_ivp_events`（接受语义差异）。BCR4BP 同（#333 的 NotImplementedError 分歧已消除）。
 - **防御性回退**（`Dynamics` 基类 `_propagate_with_stm`/`_propagate_state_only`、`EphemerisDynamics._propagate`）：Rust 扩展不可用时不再回退 scipy——`require_rust_extension` 抛 `RustExtensionUnavailableError`（issue #378，ADR 0020 决策 4：资源缺失即报错）。
 - **NLP 优化**（`transfer/nlp_copt.py`）：COPT 不可用时默认报错（`fallback_to_scipy` 默认 `False`），显式传 `True` 才回退 SciPy SLSQP。ADR 0017 明确 NLP 留在 Python 层。
-- **Normal form 传播**（`normal_form/multiple_shooting.py`、`dynamical_substitution.py`、`propagation.py`、`quasi_floquet.py`）：已迁至 Rust `solve_ivp_py`（#336）。保留 scipy 的仅剩 `coord_trans/qf_cm.py` 的复值 Lie 级数流——Rust `solve_ivp_py` 仅支持实值。`scipy.linalg.expm`（矩阵指数）和 `scipy.optimize.fsolve` 暂无 Rust 替代，保留。
+- **Normal form 传播**（`normal_form/multiple_shooting.py`、`dynamical_substitution.py`、`propagation.py`、`quasi_floquet.py`）：已迁至 Rust `solve_ivp_py`（#336）。QF↔CM 高阶 Lie 流（`coord_trans/qf_cm.py`）已下沉 `qf_to_cm_py` / `cm_to_qf_py`（#465，12 实维分裂复积分）；`backend="python"` 仅作显式对照。`scipy.linalg.expm`（矩阵指数）和 `scipy.optimize.fsolve` 暂无 Rust 替代，保留。
 - **平动点解算与初值生成**（`scipy.optimize.fsolve`/`brentq`）：用于 L1/L2 位置解算、Halo 轨道初始猜测等。单次调用，迁移收益低。
 
 以上保留路径的上一次修订中"scipy 回退路径已移除""所有事情统一走 Rust"的措辞过于绝对，特此修正。

@@ -6,7 +6,9 @@
 
 不支持：
 - ``dense_output=True`` （Rust 侧无稠密输出插值器）→ 用密集 ``t_eval`` 替代
-- 复值 ODE（Rust 仅支持实值）→ ``qf_cm.py`` 的 Lie 级数流仍走 scipy
+
+复值 Lie 流（QF↔CM）不再经本适配器：issue #465 整链下沉到
+``qf_to_cm_py`` / ``cm_to_qf_py``（12 实维分裂）。
 """
 
 from __future__ import annotations

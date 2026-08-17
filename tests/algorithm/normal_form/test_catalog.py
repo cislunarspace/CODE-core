@@ -329,6 +329,58 @@ def test_qf_cm_re_basis_change_is_involution():
     np.testing.assert_allclose(_D_INV @ _D, np.eye(6), atol=1e-14)
 
 
+def test_qf_cm_rust_matches_python_multi_order(l1_context):
+    """多阶 W 下 Rust 与 Python 参照正反向分量一致（#465）。"""
+    qf = _make_qf_result(l1_context)
+    cm = _make_cm_result(l1_context, qf, with_terms=True, max_order=5)
+    W_at_t = _interp_W_series_at_t(cm, qf, 1.0)
+    rng = np.random.default_rng(17)
+    X_qf = 1e-3 * rng.standard_normal(6)
+
+    X_cm_rust = qf_to_cm(X_qf, W_at_t, backend="rust")
+    X_cm_py = qf_to_cm(X_qf, W_at_t, backend="python")
+    np.testing.assert_allclose(X_cm_rust, X_cm_py, atol=1e-9, rtol=1e-9)
+
+    X_back_rust = cm_to_qf(X_cm_rust, W_at_t, backend="rust")
+    X_back_py = cm_to_qf(X_cm_py, W_at_t, backend="python")
+    np.testing.assert_allclose(X_back_rust, X_back_py, atol=1e-9, rtol=1e-9)
+    np.testing.assert_allclose(X_back_rust, X_qf, atol=1e-8)
+
+
+def test_qf_cm_near_zero_monomial_and_empty_W():
+    """靠近零坐标的单项式与空 W 恒等：Rust/Python 一致。"""
+    # 空 W：恒等
+    X = np.array([1e-4, -2e-4, 3e-4, -4e-4, 5e-4, -6e-4])
+    np.testing.assert_allclose(qf_to_cm(X, {}, backend="rust"), X, atol=1e-14)
+    np.testing.assert_allclose(qf_to_cm(X, {}, backend="python"), X, atol=1e-14)
+
+    # 含在零坐标处 n_j=1 的项（0^0 边界）：不得产生 NaN
+    W = {
+        3: {
+            (0, 0, 0, 1, 0, 0): 1e-3 + 2e-4j,
+            (2, 0, 0, 0, 0, 0): -5e-4 + 1e-4j,
+        },
+        4: {
+            (1, 0, 0, 1, 0, 0): 2e-4 - 1e-4j,
+        },
+    }
+    X0 = np.zeros(6)
+    X0[0] = 1e-3  # 仅 q1 非零
+    rust = qf_to_cm(X0, W, backend="rust")
+    py = qf_to_cm(X0, W, backend="python")
+    assert np.all(np.isfinite(rust)) and np.all(np.isfinite(py))
+    np.testing.assert_allclose(rust, py, atol=1e-10)
+    # 小振幅 + 弱 W 时往返应可逆；系数相对状态不小，放宽到 1e-7
+    back = cm_to_qf(rust, W, backend="rust")
+    np.testing.assert_allclose(back, X0, atol=1e-7)
+
+
+def test_qf_cm_rejects_bad_backend():
+    """非法 backend 显式报错，禁止 auto。"""
+    with pytest.raises(ValueError, match="backend"):
+        qf_to_cm(np.zeros(6), {}, backend="auto")  # type: ignore[arg-type]
+
+
 def test_hamilton_flow_rhs_matches_termwise():
     """向量化 Hamilton 流右端与逐项 oracle 逐位一致（含 0^0=1 边界）。
 

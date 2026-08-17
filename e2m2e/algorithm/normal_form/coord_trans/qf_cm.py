@@ -33,14 +33,16 @@ Hamilton 流的右端 ``dX/dt = J·∇W`` 用向量化实现
 - qiao 依赖 ``globalparam.odeoptions`` （``scipy.solve_ivp`` 选项）；本模块
   显式传 ``DOP853`` 默认容差（``rtol=1e-11``、``atol=1e-13``），不引入
   全局可变状态。
-- **scipy 保留** （issue #336 例外）：``_apply_lie_series`` 积分复值 Lie 级数
-  Hamilton 流（``dX/dt = J·grad(W)``），Rust 侧 ``solve_ivp_py`` 仅支持实值，
-  故此处保留 ``scipy.integrate.solve_ivp``。其余 normal_form 积分路径均已迁至 Rust。
+
+默认后端为 Rust（issue #465）：复值 Lie 流用 12 实维分裂
+（``[Re X, Im X]``）走 ``e2m2e-integrators`` 的 DOP853，与 scipy 对复
+``y0`` 的内部分裂数学等价。``backend="python"`` 仅作显式对照，禁止 auto
+静默降级（ADR 0020）。
 """
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Literal, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -142,11 +144,11 @@ def _hamilton_flow_rhs(
 
 
 # ---------------------------------------------------------------------------
-# Lie 级数应用（逐阶 ODE 积分）
+# Lie 级数应用（逐阶 ODE 积分）——Python 参照后端
 # ---------------------------------------------------------------------------
 
 
-def _apply_lie_series(
+def _apply_lie_series_python(
     X0: npt.NDArray[np.complex128],
     W_series_at_t: dict[int, dict[tuple[int, ...], complex]],
     *,
@@ -154,23 +156,9 @@ def _apply_lie_series(
     rtol: float = 1e-11,
     atol: float = 1e-13,
 ) -> npt.NDArray[np.complex128]:
-    """逐阶应用 Hamilton 流 ``dX/dt = J·∇W_order``，从 ``t=0`` 积到 ``t=1``。
+    """Python/scipy 参照：逐阶 Hamilton 流，从 ``t=0`` 积到 ``t=1``。
 
-    迁移自 qiao ``qpQF2qpCM`` / ``qpCM2qpQF`` 的逐阶循环：
-
-    - ``forward=True`` （QF→CM）：``W`` 系数取反，阶序升序 ``2..N``；
-    - ``forward=False`` （CM→QF）：``W`` 系数不取反，阶序降序 ``N..2``。
-
-    每阶一次 ``scipy.solve_ivp`` （DOP853），末态作为下阶初值。
-
-    Args:
-        X0: ``(6,)`` 复初值。
-        W_series_at_t: ``{order: {pow_tuple: complex_scalar}}``，已插值。
-        forward: 方向标志（``True`` 为 QF→CM，``False`` 为 CM→QF，见上方 docstring）。
-        rtol, atol: ODE 容差。
-
-    Returns:
-        ``(6,)`` 复终值。
+    仅由显式 ``backend="python"`` 调用，不作默认路径。
     """
     from scipy.integrate import solve_ivp
 
@@ -205,6 +193,27 @@ def _apply_lie_series(
     return X
 
 
+def _pack_w_series_for_rust(
+    W_series_at_t: dict[int, dict[tuple[int, ...], complex]],
+) -> list[tuple[int, list[list[int]], list[float], list[float]]]:
+    """把 ``W_series_at_t`` 打包为 Rust FFI 元组列表。
+
+    每项 ``(order, exps, coefs_re, coefs_im)``；空阶跳过。
+    """
+    packed: list[tuple[int, list[list[int]], list[float], list[float]]] = []
+    for order, W_order in W_series_at_t.items():
+        if order < 2 or not W_order:
+            continue
+        pows = list(W_order.keys())
+        if not pows:
+            continue
+        exps = [[int(p) for p in pow_t] for pow_t in pows]
+        cre = [float(np.real(W_order[p])) for p in pows]
+        cim = [float(np.imag(W_order[p])) for p in pows]
+        packed.append((int(order), exps, cre, cim))
+    return packed
+
+
 # ---------------------------------------------------------------------------
 # 公开变换
 # ---------------------------------------------------------------------------
@@ -213,6 +222,10 @@ def _apply_lie_series(
 def qf_to_cm(
     X_qf: npt.ArrayLike,
     W_series_at_t: dict[int, dict[tuple[int, ...], complex]],
+    *,
+    backend: Literal["rust", "python"] = "rust",
+    rtol: float = 1e-11,
+    atol: float = 1e-13,
 ) -> npt.NDArray[np.floating]:
     """quasi-Floquet 坐标 → 中心流形坐标（高阶 Lie 级数）。
 
@@ -224,19 +237,39 @@ def qf_to_cm(
         W_series_at_t: ``{order: {pow_tuple: complex_scalar}}``——在时刻
             ``t`` 插值后的 :class:`CenterManifoldResult.W_series` （复值
             系数，跨 ``invariant``/``center`` 两步合并）。
+        backend: ``"rust"``（默认）或显式对照 ``"python"``。禁止 auto。
+        rtol, atol: ODE 容差（与历史 Python 默认一致）。
 
     Returns:
         ``(6,)`` CM 状态 ``[Q_cm, P_cm]``，无量纲实数。
     """
+    if backend not in ("rust", "python"):
+        raise ValueError(f"backend 须为 'rust' 或 'python'，得到 {backend!r}")
+
     X = np.asarray(X_qf, dtype=float).ravel()
-    X_im = _re_to_im(X)
-    X_im = _apply_lie_series(X_im, W_series_at_t, forward=True)
-    return _im_to_re(X_im)
+    if X.size != 6:
+        raise ValueError(f"X_qf 须为 6 维，得到 {X.size}")
+
+    if backend == "python":
+        X_im = _re_to_im(X)
+        X_im = _apply_lie_series_python(X_im, W_series_at_t, forward=True, rtol=rtol, atol=atol)
+        return _im_to_re(X_im)
+
+    from e2m2e.integrators import qf_to_cm_py, require_rust_extension
+
+    require_rust_extension("qf_to_cm_py")
+    packed = _pack_w_series_for_rust(W_series_at_t)
+    out = qf_to_cm_py(X.tolist(), packed, float(rtol), float(atol))
+    return np.asarray(out, dtype=float)
 
 
 def cm_to_qf(
     X_cm: npt.ArrayLike,
     W_series_at_t: dict[int, dict[tuple[int, ...], complex]],
+    *,
+    backend: Literal["rust", "python"] = "rust",
+    rtol: float = 1e-11,
+    atol: float = 1e-13,
 ) -> npt.NDArray[np.floating]:
     """中心流形坐标 → quasi-Floquet 坐标（高阶 Lie 级数，反向）。
 
@@ -246,14 +279,30 @@ def cm_to_qf(
     Args:
         X_cm: ``(6,)`` CM 状态 ``[Q_cm, P_cm]``，无量纲实数。
         W_series_at_t: 同 :func:`qf_to_cm`。
+        backend: ``"rust"``（默认）或显式对照 ``"python"``。禁止 auto。
+        rtol, atol: ODE 容差。
 
     Returns:
         ``(6,)`` QF 状态 ``[Q_qf, P_qf]``，无量纲实数。
     """
+    if backend not in ("rust", "python"):
+        raise ValueError(f"backend 须为 'rust' 或 'python'，得到 {backend!r}")
+
     X = np.asarray(X_cm, dtype=float).ravel()
-    X_im = _re_to_im(X)
-    X_im = _apply_lie_series(X_im, W_series_at_t, forward=False)
-    return _im_to_re(X_im)
+    if X.size != 6:
+        raise ValueError(f"X_cm 须为 6 维，得到 {X.size}")
+
+    if backend == "python":
+        X_im = _re_to_im(X)
+        X_im = _apply_lie_series_python(X_im, W_series_at_t, forward=False, rtol=rtol, atol=atol)
+        return _im_to_re(X_im)
+
+    from e2m2e.integrators import cm_to_qf_py, require_rust_extension
+
+    require_rust_extension("cm_to_qf_py")
+    packed = _pack_w_series_for_rust(W_series_at_t)
+    out = cm_to_qf_py(X.tolist(), packed, float(rtol), float(atol))
+    return np.asarray(out, dtype=float)
 
 
 __all__ = ["cm_to_qf", "qf_to_cm"]
