@@ -2,16 +2,22 @@
 
 ## [Unreleased]
 
+## [5.7.2] - 2026-08-17
+
 ### Added
 - **中心流形化简完整下沉 Rust**（#466）：`CenterManifoldReducer` 两步 Lie 同调（invariant / center）、实值与复值+MAD 两套频域 W 求解器、`list_deriv`、全阶 Poisson 链与虚/实基底变换进入 `e2m2e-integrators`（`center_manifold_reduce_py`，ABI v19）；路径内嵌 Poisson 链所用多项式核，并与 #464 包级 `poly_*` 并存。默认 `backend="rust"`，`backend="python"` 仅显式等价性对照，禁止静默降级。
 - **QF↔CM 高阶 Lie 流下沉 Rust**（#465）：复值 Hamilton 流以 12 实维分裂（`[Re X, Im X]`）走 DOP853；新增 `qf_to_cm_py` / `cm_to_qf_py`（ABI v18），完整保留实↔复基底、逐阶顺序、W 符号与容差默认值。Python `qf_to_cm` / `cm_to_qf` 默认 `backend="rust"`，`"python"` 仅作显式对照（关闭 #336 复值积分例外）。
 - **normal_form 数值多项式核下沉 Rust**（#464）：`poly_poisson` / `poly_simplify` / `polylist_simplify` 及 `keys_by_order` / `trim_degree` 进入 `e2m2e-integrators`（`poly_*_py` 绑定，ABI v17）；完整支持标量与一维时间序列、实/复系数。Python 侧为薄封装，默认 `backend='rust'`，`backend='python'` 仅作显式等价性对照；sympy 符号路径仍留 Python。
+- **不变流形种子生成与批量传播下沉 Rust**（#448）：单值矩阵双曲特征选取、STM 转运、±ε 种子与批量弧传播调度迁入 `e2m2e-forces`，经 `manifold_seeds_py` / `manifold_propagate_py` 暴露（ABI v16）；Python 只做参数校验、领域对象组装与事后截面截断，不保留 Python 数值回退；`n_workers>1` 走 Rayon。
 
 ### Changed
 - **normal_form 迁移状态按 #449 拆包更新**：已下沉（积分、共线点 CR3BP Hamiltonian、H→QF 标量投影、数值多项式核、QF↔CM、中心流形化简）登记补全；符号 Legendre/星历 H、NAFF、pipeline 编排有意留 Python；P5/P6 后置未派发。更新 `docs/architecture/numerics-migration-status.md`。
 
 ### Fixed
 - **NRHO 星历修正默认路径不收敛**（#463）：拼接点采样对 NRHO 改为「删近月点附近节点」（与 Halo 近月点加密解耦），固定容差下 segmented 路径在 GUI 默认量级（L2 南、近月高 5000 km、约 1 个月）与更贴月短弧（2000 km）上收敛；文档去掉「NRHO 星历修正暂不可用」。对照矩阵脚本 ``scripts/nrho_ephemeris_correction_matrix.py`` 保留为开发期反馈回路。
+
+### Docs
+- **forces 的 Python 层位置裁决**（#429，ADR 0030）：`algorithm/forces` 留在 algorithm 层作配置/编排面，数值在 `e2m2e-forces`；不新建 Python 数值目录、不搬家。
 
 ## [5.7.1] - 2026-08-17
 
