@@ -549,3 +549,100 @@ def test_keep_criteria_predicates():
     # invariant 保留的项未必满足 center（center 更严）
     assert _is_invariant_term((0, 3, 0, 0, 1, 0))  # pow1==pow4==0
     assert not _is_center_term((0, 3, 0, 0, 1, 0))  # 但 pow2=3≠pow5=1
+
+
+# ---------------------------------------------------------------------------
+# Rust 后端（#466）：默认路径与 Python 参照等价
+# ---------------------------------------------------------------------------
+
+
+def test_default_backend_is_rust(l1_context):
+    """默认 backend 为 rust；结果 metadata 记录实际后端。"""
+    reducer = CenterManifoldReducer(context=l1_context, max_order=5)
+    assert reducer.backend == "rust"
+    qf = _make_qf_result(l1_context)
+    result = reducer.reduce(qf, hamiltonian_terms=_hyper_center_terms(qf.tlist))
+    assert result.metadata.get("backend") == "rust"
+
+
+def test_rust_matches_python_reference(l1_context):
+    """同 H、同频率、同 max_order 下 Rust 与 Python 化简结果等价。
+
+    对照路径走显式 ``backend='python'``；默认 Rust 不得静默降级。
+    """
+    qf = _make_qf_result(l1_context, n=64)
+    terms = {}
+    terms.update(_hyper_center_terms(qf.tlist, scale=0.1))
+    terms.update(_center_cross_terms(qf.tlist, scale=0.08))
+
+    rust = CenterManifoldReducer(context=l1_context, max_order=6, backend="rust").reduce(
+        qf, hamiltonian_terms=terms
+    )
+    py = CenterManifoldReducer(context=l1_context, max_order=6, backend="python").reduce(
+        qf, hamiltonian_terms=terms
+    )
+
+    assert rust.steps_performed == py.steps_performed == ("invariant", "center")
+    assert set(rust.hamiltonian_terms) == set(py.hamiltonian_terms)
+    for k in rust.hamiltonian_terms:
+        np.testing.assert_allclose(
+            rust.hamiltonian_terms[k],
+            py.hamiltonian_terms[k],
+            atol=1e-10,
+            rtol=1e-10,
+            err_msg=f"H 项 {k} 两后端不一致",
+        )
+    assert rust.max_hyperbolic_coupling == pytest.approx(py.max_hyperbolic_coupling, abs=1e-12)
+    assert rust.metadata["pre_hyperbolic_center_coupling"] == pytest.approx(
+        py.metadata["pre_hyperbolic_center_coupling"]
+    )
+
+    # W：对两后端共有的 (step, order, pow) 比对复值系数
+    for step in rust.steps_performed:
+        for order, poly in rust.W_series[step].items():
+            poly_p = py.W_series[step].get(order, {})
+            for pow_t, v in poly.items():
+                if pow_t not in poly_p:
+                    # Python 会为零保留项记零 W；Rust 可省略零项
+                    assert np.max(np.abs(v)) <= 1e-12
+                    continue
+                np.testing.assert_allclose(
+                    v,
+                    poly_p[pow_t],
+                    atol=1e-10,
+                    rtol=1e-10,
+                    err_msg=f"W[{step}][{order}][{pow_t}] 两后端不一致",
+                )
+
+
+def test_rust_high_max_order_path(l1_context):
+    """高 max_order（默认 10）路径可跑通，且与 Python 参照一致。
+
+    拒绝 ``max_order≤4 当完成`` 的简化交付。
+    """
+    qf = _make_qf_result(l1_context, n=48)
+    terms = {}
+    terms.update(_hyper_center_terms(qf.tlist, scale=0.1))
+    terms.update(_center_cross_terms(qf.tlist, scale=0.08))
+
+    rust = CenterManifoldReducer(context=l1_context, max_order=10, backend="rust").reduce(
+        qf, hamiltonian_terms=terms
+    )
+    py = CenterManifoldReducer(context=l1_context, max_order=10, backend="python").reduce(
+        qf, hamiltonian_terms=terms
+    )
+    assert rust.order == 10
+    assert set(rust.hamiltonian_terms) == set(py.hamiltonian_terms)
+    for k in rust.hamiltonian_terms:
+        np.testing.assert_allclose(
+            rust.hamiltonian_terms[k], py.hamiltonian_terms[k], atol=1e-9, rtol=1e-9
+        )
+    _assert_action_form(rust.hamiltonian_terms)
+
+
+def test_invalid_backend_rejected(l1_context):
+    """非法 backend 在 reduce 时抛 ValueError。"""
+    reducer = CenterManifoldReducer(context=l1_context, max_order=4, backend="bogus")  # type: ignore[arg-type]
+    qf = _make_qf_result(l1_context)
+    with pytest.raises(ValueError, match="backend"):
+        reducer.reduce(qf)

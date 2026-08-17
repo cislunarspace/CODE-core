@@ -57,7 +57,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from math import comb, factorial
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -729,13 +729,18 @@ class CenterManifoldReducer:
     一步或两步 Lie 变换，消去双曲-中心耦合与中心方向间非共振耦合，
     输出 :class:`CenterManifoldResult`。
 
+    默认 ``backend="rust"`` 走完整 Rust 数值内核（#466）；
+    ``backend="python"`` 仅作显式等价性对照，绝不自动回退（ADR 0020）。
+
     Args:
         context: 归一化上下文（提供频率 ``ω_p``/``ω_v``、特征指数 λ）。
         max_order: Lie 变换截断阶数，默认 ``10`` （与 qiao 一致）。
+        backend: 数值后端，``"rust"``（默认）或 ``"python"``。
     """
 
     context: NormalFormContext
     max_order: int = DEFAULT_MAX_ORDER
+    backend: Literal["rust", "python"] = "rust"
 
     def reduce(
         self,
@@ -762,8 +767,11 @@ class CenterManifoldReducer:
 
         Raises:
             ValueError: ``steps`` 含非法名；``max_order`` 非正；
-                ``hamiltonian_terms`` 系数长度与 ``tlist`` 不一致。
+                ``hamiltonian_terms`` 系数长度与 ``tlist`` 不一致；
+                ``backend`` 非法。
         """
+        if self.backend not in ("rust", "python"):
+            raise ValueError(f"backend 须为 'rust' 或 'python'，得到 {self.backend!r}")
         valid_steps = {"invariant", "center"}
         steps_resolved = tuple(steps) if steps is not None else ("invariant", "center")
         bad = [s for s in steps_resolved if s not in valid_steps]
@@ -784,6 +792,114 @@ class CenterManifoldReducer:
         tlist = np.asarray(qf_result.tlist, dtype=float).ravel()
         N = tlist.size
 
+        if self.backend == "rust":
+            return self._reduce_rust(
+                qf_result,
+                hamiltonian_terms,
+                steps_resolved,
+                tlist,
+                N,
+                lam,
+                wp,
+                wv,
+            )
+        return self._reduce_python(
+            qf_result,
+            hamiltonian_terms,
+            steps_resolved,
+            tlist,
+            N,
+            lam,
+            wp,
+            wv,
+        )
+
+    def _reduce_rust(
+        self,
+        qf_result: QuasiFloquetResult,
+        hamiltonian_terms: Mapping[tuple[int, ...], npt.ArrayLike] | None,
+        steps_resolved: tuple[str, ...],
+        tlist: npt.NDArray[np.floating],
+        N: int,
+        lam: float,
+        wp: float,
+        wv: float,
+    ) -> CenterManifoldResult:
+        """Rust 完整 reduce 路径（#466）。"""
+        from e2m2e.integrators import center_manifold_reduce_py, require_rust_extension
+
+        require_rust_extension("center_manifold_reduce_py")
+
+        higher_pows: list[list[int]] = []
+        higher_coefs: list[list[float]] = []
+        if hamiltonian_terms:
+            for pow_tuple, coef in hamiltonian_terms.items():
+                pow_list = [int(p) for p in pow_tuple]
+                deg = sum(pow_list)
+                if deg < 1 or deg > self.max_order:
+                    continue
+                arr = np.asarray(coef, dtype=float).ravel()
+                if arr.size == 1:
+                    arr = np.full(N, float(arr[0]))
+                if arr.size != N:
+                    raise ValueError(
+                        f"hamiltonian_terms 系数长度 {arr.size} 与 tlist "
+                        f"长度 {N} 不一致（pow={tuple(pow_list)}）"
+                    )
+                higher_pows.append(pow_list)
+                higher_coefs.append(arr.tolist())
+
+        w_entries, h_pows, h_coefs, pre_coupling, steps_done = center_manifold_reduce_py(
+            tlist.tolist(),
+            lam,
+            wp,
+            wv,
+            int(self.max_order),
+            list(steps_resolved),
+            higher_pows,
+            higher_coefs,
+        )
+
+        W_all: dict[str, dict[int, dict[tuple[int, ...], npt.NDArray[np.complex128]]]] = {}
+        for step_name, order, pow_vec, re, im in w_entries:
+            pow_t = tuple(int(p) for p in pow_vec)
+            coef = np.asarray(re, dtype=np.float64) + 1j * np.asarray(im, dtype=np.float64)
+            W_all.setdefault(step_name, {}).setdefault(int(order), {})[pow_t] = coef
+
+        final_terms: dict[tuple[int, ...], npt.NDArray[np.floating]] = {}
+        for pow_vec, coef in zip(h_pows, h_coefs, strict=True):
+            pow_key: tuple[int, ...] = tuple(int(p) for p in pow_vec)
+            final_terms[pow_key] = np.asarray(coef, dtype=float)
+
+        return CenterManifoldResult(
+            context=self.context,
+            order=int(self.max_order),
+            W_series=W_all,
+            hamiltonian_terms=final_terms,
+            steps_performed=tuple(steps_done),
+            metadata={
+                "lambda": lam,
+                "wp": wp,
+                "wv": wv,
+                "n_samples": N,
+                "pre_hyperbolic_center_coupling": float(pre_coupling),
+                "max_order": int(self.max_order),
+                "backend": "rust",
+            },
+        )
+
+    def _reduce_python(
+        self,
+        qf_result: QuasiFloquetResult,
+        hamiltonian_terms: Mapping[tuple[int, ...], npt.ArrayLike] | None,
+        steps_resolved: tuple[str, ...],
+        tlist: npt.NDArray[np.floating],
+        N: int,
+        lam: float,
+        wp: float,
+        wv: float,
+    ) -> CenterManifoldResult:
+        """Python 参照路径（显式 ``backend='python'``）。"""
         # 组装初始 Hamiltonian 多项式表 {order: {pow: coef}}
         # 系数在化简循环中在实/复坐标间切换（虚变换 → 复，取实部 → 实），
         # 故此处用 Any（numpy dtype 跨域，静态类型无法追踪）。
@@ -866,6 +982,7 @@ class CenterManifoldReducer:
                 "n_samples": N,
                 "pre_hyperbolic_center_coupling": pre_coupling,
                 "max_order": int(self.max_order),
+                "backend": "python",
             },
         )
 

@@ -36,3 +36,6 @@ cspice-sys = { workspace = true, optional = true }
 # reacquire GIL 调 Python callable；tx 传给 e2m2e-forces 的并行内核。
 crossbeam-channel = { workspace = true }
 nalgebra = { workspace = true }
+# 中心流形频域 W 求解器（#466）：与 numpy.fft 同语义的特解 FFT。
+rustfft = "6.4"
+num-complex = "0.4"

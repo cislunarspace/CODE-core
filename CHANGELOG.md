@@ -3,13 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **中心流形化简完整下沉 Rust**（#466）：`CenterManifoldReducer` 两步 Lie 同调（invariant / center）、实值与复值+MAD 两套频域 W 求解器、`list_deriv`、全阶 Poisson 链与虚/实基底变换进入 `e2m2e-integrators`（`center_manifold_reduce_py`，ABI v19）；路径内嵌 Poisson 链所用多项式核，并与 #464 包级 `poly_*` 并存。默认 `backend="rust"`，`backend="python"` 仅显式等价性对照，禁止静默降级。
 - **QF↔CM 高阶 Lie 流下沉 Rust**（#465）：复值 Hamilton 流以 12 实维分裂（`[Re X, Im X]`）走 DOP853；新增 `qf_to_cm_py` / `cm_to_qf_py`（ABI v18），完整保留实↔复基底、逐阶顺序、W 符号与容差默认值。Python `qf_to_cm` / `cm_to_qf` 默认 `backend="rust"`，`"python"` 仅作显式对照（关闭 #336 复值积分例外）。
 - **normal_form 数值多项式核下沉 Rust**（#464）：`poly_poisson` / `poly_simplify` / `polylist_simplify` 及 `keys_by_order` / `trim_degree` 进入 `e2m2e-integrators`（`poly_*_py` 绑定，ABI v17）；完整支持标量与一维时间序列、实/复系数。Python 侧为薄封装，默认 `backend='rust'`，`backend='python'` 仅作显式等价性对照；sympy 符号路径仍留 Python。
 
 ### Changed
-- **normal_form 迁移状态按 #449 拆包更新**：已下沉（积分、共线点 CR3BP Hamiltonian、H→QF 标量投影）登记补全；数值主链拆为完整实现工作项 #464（多项式核）、#465（复值积分+QF↔CM）、#466（中心流形化简）；符号 Legendre/星历 H、NAFF、pipeline 编排有意留 Python；P5/P6 后置未派发。更新 `docs/architecture/numerics-migration-status.md`。
-- **#465 合入后**：`algorithm/normal_form`（复值积分 + QF↔CM Lie 流）由迁移中改为已下沉。
-- **数值多项式核登记为已下沉**（#464）：`docs/architecture/numerics-migration-status.md` 将 `poly_poisson` 等从「迁移中」移入「已下沉」。
+- **normal_form 迁移状态按 #449 拆包更新**：已下沉（积分、共线点 CR3BP Hamiltonian、H→QF 标量投影、数值多项式核、QF↔CM、中心流形化简）登记补全；符号 Legendre/星历 H、NAFF、pipeline 编排有意留 Python；P5/P6 后置未派发。更新 `docs/architecture/numerics-migration-status.md`。
 
 ## [5.7.1] - 2026-08-17
 
