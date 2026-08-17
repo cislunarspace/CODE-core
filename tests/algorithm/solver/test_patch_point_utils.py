@@ -7,7 +7,11 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.algorithm.solver.multiple_shooting import convert_to_j2000, sample_patch_points
+from e2m2e.algorithm.solver.multiple_shooting import (
+    convert_to_j2000,
+    sample_patch_points,
+    sample_patch_points_drop_near_perilune,
+)
 from e2m2e.data.constants import Datum
 from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
@@ -130,6 +134,52 @@ class TestSamplePatchPoints:
         assert_allclose(t8[0], t4[0])
         assert_allclose(t8[2], t4[1], rtol=1e-10)
         assert_allclose(s8[2], s4[1], atol=1e-8)
+
+
+# =============================================================================
+# Test: sample_patch_points_drop_near_perilune
+# =============================================================================
+class TestSamplePatchPointsDropNearPerilune:
+    """删近月点附近节点采样（#463）：节点全部落在近月点禁区外。
+
+    用已有 DRO 周期解作几何样本（CR3BP 可积、有明确近月点），不走
+    design_nrho / 星历修正——本类只验证采样几何契约。
+    """
+
+    def test_nodes_outside_perilune_window(self, dro_orbit, cr3bp_dynamics):
+        """所有节点与近月点的圆周距离 > drop_window·period。"""
+        drop_window = 0.12
+        t_patch, states = sample_patch_points_drop_near_perilune(
+            dro_orbit, cr3bp_dynamics, n_points=8, drop_window=drop_window
+        )
+        period = float(dro_orbit.period)
+        mu = cr3bp_dynamics.system.mu
+        moon_x = 1.0 - mu
+        # 与实现一致：密探定位近月点
+        t_probe = np.linspace(0.0, period, 200, endpoint=False)
+        probe = cr3bp_dynamics.propagate(dro_orbit.states[0], (0.0, period), t_eval=t_probe)
+        st = probe["states"]
+        dists = np.sqrt((st[:, 0] - moon_x) ** 2 + st[:, 1] ** 2 + st[:, 2] ** 2)
+        t_p = float(t_probe[int(np.argmin(dists))])
+        half_w = drop_window * period
+
+        def circ_dist(t: float) -> float:
+            return abs((t - t_p + period / 2.0) % period - period / 2.0)
+
+        assert len(t_patch) == 8
+        assert np.all(np.isfinite(states))
+        for t in t_patch:
+            assert circ_dist(float(t)) > half_w - 1e-12, (
+                f"节点 t={t:.4f} 落入近月点禁区（t_p={t_p:.4f}, half_w={half_w:.4f}）"
+            )
+
+    def test_times_sorted_within_period(self, dro_orbit, cr3bp_dynamics):
+        """返回时间升序且落在 [0, period)。"""
+        t_patch, _ = sample_patch_points_drop_near_perilune(dro_orbit, cr3bp_dynamics, n_points=8)
+        period = float(dro_orbit.period)
+        assert np.all(np.diff(t_patch) > 0)
+        assert t_patch[0] >= 0.0
+        assert t_patch[-1] < period
 
 
 # =============================================================================

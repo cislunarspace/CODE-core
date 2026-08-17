@@ -19,6 +19,7 @@ from .multiple_shooting import (
     MultipleShootingResult,
     convert_to_j2000,
     sample_patch_points,
+    sample_patch_points_drop_near_perilune,
     sample_patch_points_perilune_clustered,
 )
 
@@ -28,6 +29,7 @@ __all__ = [
     "MultipleShooting",
     "MultipleShootingResult",
     "sample_patch_points",
+    "sample_patch_points_drop_near_perilune",
     "sample_patch_points_perilune_clustered",
     "convert_to_j2000",
 ]

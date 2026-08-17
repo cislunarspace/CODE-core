@@ -636,6 +636,68 @@ def sample_patch_points_perilune_clustered(
     return t_all, states
 
 
+def sample_patch_points_drop_near_perilune(
+    orbit,
+    dynamics,
+    n_points: int = 8,
+    drop_window: float = 0.12,
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    """等时间采样的对偶：节点全部落在近月点窗口之外。
+
+    NRHO 近月点速度大、STM 条件数高。把节点加密到近月点附近（
+    :func:`sample_patch_points_perilune_clustered`）或让节点落在近月点上，
+    会让星历多重打靶残差卡在约 10² km。秦理民等 2024 的多点打靶离散策略
+    是**删除**近月点附近的离散点，让节点落在条件数较好的弧段。
+
+    实现：先积分一圈定位近月点，再在窗口 ``[t_p - w, t_p + w]`` 之外的
+    互补弧上均匀放置 ``n_points`` 个节点（``w = drop_window · period``）。
+    与近月点加密互补——加密往窗口内堆点，本函数把点全部放在窗口外。
+
+    Args:
+        orbit: 周期轨道，需含 ``period``、``times``、``states``。
+        dynamics: 动力学对象，用于积分定位近月点。
+        n_points: 窗口外节点数。
+        drop_window: 近月点禁区半宽，占周期比例。
+
+    Returns:
+        (t_patch, states)：时间节点与对应状态，按时间升序排列。
+    """
+    if orbit.period is None or orbit.period <= 0:
+        raise ValueError("orbit must have a positive period")
+    if n_points < 2:
+        raise ValueError(f"n_points 至少为 2，当前 {n_points}")
+    if not 0.0 < drop_window < 0.5:
+        raise ValueError(f"drop_window 应在 (0, 0.5) 内，当前 {drop_window}")
+    period = float(orbit.period)
+
+    mu = getattr(dynamics.system, "mu", None)
+    if mu is None:
+        return sample_patch_points(orbit, n_points)
+    moon_x = 1.0 - mu
+
+    n_probe = 200
+    t_probe = np.linspace(0, period, n_probe, endpoint=False)
+    probe_result = dynamics.propagate(orbit.states[0], (0, period), t_eval=t_probe)
+    states_probe = probe_result["states"]
+    dists = np.sqrt(
+        (states_probe[:, 0] - moon_x) ** 2 + states_probe[:, 1] ** 2 + states_probe[:, 2] ** 2
+    )
+    t_perilune = float(t_probe[int(np.argmin(dists))])
+
+    half_w = drop_window * period
+    # 互补弧 [t_p + w, t_p - w + period)，在其上均匀放点
+    t_lo = t_perilune + half_w
+    t_hi = t_perilune - half_w + period
+    t_all = np.linspace(t_lo, t_hi, n_points, endpoint=False) % period
+    t_all = np.sort(np.unique(np.round(t_all, 12)))
+
+    states = np.empty((len(t_all), 6))
+    for i in range(6):
+        states[:, i] = np.interp(t_all, orbit.times, orbit.states[:, i])
+
+    return t_all, states
+
+
 def convert_to_j2000(
     t_patch_syn: npt.ArrayLike,
     states_syn: npt.ArrayLike,

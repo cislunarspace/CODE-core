@@ -64,7 +64,10 @@ from ..family.cr3bp_orbits import (
     earth_moon_system,
 )
 from ..results import EphemerisCorrectionResult, ResultStatus, StageRecord
-from ..solver.multiple_shooting import sample_patch_points_perilune_clustered
+from ..solver.multiple_shooting import (
+    sample_patch_points_drop_near_perilune,
+    sample_patch_points_perilune_clustered,
+)
 
 if TYPE_CHECKING:
     from ...api.models import DesignOrbitRequest
@@ -114,8 +117,17 @@ VELOCITY_TOL_KMS = 1e-5
 #: 两者在容差尺度可比，LM 真正压速度连续（见 Rust ``build_residual`` 注释）。
 CORRECTION_VEL_WEIGHT = CORRECTION_TOL_KM / VELOCITY_TOL_KMS
 
-#: 每圈 patch 节点数（均匀采样）；NRHO 用近月点加密采样替代
+#: 每圈 patch 节点数（均匀采样基线；NRHO/Halo 按族覆盖）
 _POINTS_PER_REV = 8
+
+#: 拼接点采样策略（按轨道族覆盖，不暴露到请求模型）：
+#: - uniform：等时间
+#: - perilune_clustered：近月点加密（Halo 长弧实测更稳）
+#: - drop_near_perilune：删近月点附近节点（NRHO 默认，#463；
+#:   加密策略在 NRHO 上残差卡在约 10² km）
+_PATCH_SAMPLING_UNIFORM = "uniform"
+_PATCH_SAMPLING_PERILUNE_CLUSTERED = "perilune_clustered"
+_PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 
 #: 星历修正用固定时间打靶（var_time=False）的轨道族：Halo/NRHO（不稳定，
 #: 分段打靶全程固定时刻，对齐杨洪伟 2015）与拟周期/无周期闭合族
@@ -524,23 +536,41 @@ def _dense_orbit(
     return orbit
 
 
+def _patch_sampling_for(orbit_type: str) -> str:
+    """按轨道族选择拼接点采样策略（内部策略，不进请求契约）。
+
+    NRHO 与 Halo 解耦（#463）：NRHO 用删近月点节点，Halo 保留近月点加密。
+    """
+    if orbit_type == "NRHO":
+        return _PATCH_SAMPLING_DROP_NEAR_PERILUNE
+    if orbit_type == "HALO":
+        return _PATCH_SAMPLING_PERILUNE_CLUSTERED
+    return _PATCH_SAMPLING_UNIFORM
+
+
 def _sample_patch_points(
     dynamics: CR3BP_Dynamics,
     state0: np.ndarray,
     period: float,
     n_revolutions: int,
     *,
-    perilune_clustered: bool,
+    sampling: str = _PATCH_SAMPLING_UNIFORM,
 ) -> tuple[np.ndarray, np.ndarray]:
     """从历元状态出发，在 ``n_revolutions`` 圈上采样 patch points（synodic）。
 
-    均匀采样每圈 ``_POINTS_PER_REV`` 点；NRHO 改用近月点加密采样
-    （近月点速度大、STM 条件数高，等间隔采样欠约束，见
-    ``algorithms.multiple_shooting.sample_patch_points_perilune_clustered``）。
+    默认每圈 ``_POINTS_PER_REV`` 等时间点。``sampling`` 覆盖族相关策略：
+
+    - ``perilune_clustered``：近月点加密（Halo）
+    - ``drop_near_perilune``：删近月点附近节点（NRHO，#463）
+    - ``uniform``：等时间
     """
     dense = _dense_orbit(dynamics, state0, period)
-    if perilune_clustered:
+    if sampling == _PATCH_SAMPLING_PERILUNE_CLUSTERED:
         t_rel, states = sample_patch_points_perilune_clustered(dense, dynamics)
+    elif sampling == _PATCH_SAMPLING_DROP_NEAR_PERILUNE:
+        t_rel, states = sample_patch_points_drop_near_perilune(
+            dense, dynamics, n_points=_POINTS_PER_REV
+        )
     else:
         t_rel = np.linspace(0.0, period, _POINTS_PER_REV, endpoint=False)
         states = np.empty((len(t_rel), 6))
@@ -679,7 +709,7 @@ def _design_apolune_segmented(
         t_patch_j2000 / state_patch_j2000: 整条 CR3BP tile（J2000, km/km/s）。
         revs_per_group: 第 1 步每组圈数。短期（≤ 该圈数）单段即收敛；
             长期分段后由分层合并拼接。
-        points_per_rev: 每圈节点数（由采样 tile 推断，NRHO 近月加密时非整除）。
+        points_per_rev: 每圈节点数（由采样 tile 推断；族策略下可能非整除 8）。
         var_time: 节点时刻是否作为自由变量。Halo/NRHO 传 False（见上）。
 
     Returns:
@@ -965,7 +995,7 @@ def design_orbit(
             state0_syn,
             period,
             correction_revolutions,
-            perilune_clustered=(sel == "NRHO"),
+            sampling=_patch_sampling_for(sel),
         )
 
     epoch_iso = _epoch_to_iso(request.epoch)
@@ -1047,22 +1077,21 @@ def design_orbit(
                 cr3bp_orbit, period, n_rev
             )
         else:
-            # 按 n_rev 圈重采样整条 tile（初猜）。Halo/NRHO 都用近月点加密：
-            # 近月点速度大、STM 病态，等间隔采样让近月点落在节点之间而欠约束，
-            # 实测加密后打靶残差更低（8e-2 → 1.2e-2 km），长期保形更好。
-            perilune_clustered = sel in ("HALO", "NRHO")
+            # 按 n_rev 圈重采样整条 tile（初猜）。采样策略按族覆盖
+            # （见 _patch_sampling_for）：Halo 近月点加密，NRHO 删近月点
+            # 附近节点（#463），其余等时间。
             t_patch_syn_n, state_patch_syn_n = _sample_patch_points(
                 dynamics,
                 state0_syn,
                 period,
                 n_rev,
-                perilune_clustered=perilune_clustered,
+                sampling=_patch_sampling_for(sel),
             )
         t_patch_j2000_n = et0 + t_patch_syn_n * t_c
         state_patch_j2000_n = syn_j2000.batch_synodic_to_j2000(
             states_syn=state_patch_syn_n, t_syn_arr=t_patch_syn_n, et0=et0
         )
-        per_rev = len(t_patch_syn_n) // n_rev  # 每圈节点数（NRHO 加密时非 8）
+        per_rev = len(t_patch_syn_n) // n_rev  # 每圈节点数（族策略下可能非 8）
         # 预采样星历缓存：打靶 + 逐段积分全程查三次样条表，不逐次调 cspice。
         # 这是 2 年 50 圈 × 每圈 8 节点 × 50 迭代打靶能跑完的关键（否则
         # 每步每力跨界查 SPICE，量级不可接受，且并发下触发 DAFFRNOTFOUND）。

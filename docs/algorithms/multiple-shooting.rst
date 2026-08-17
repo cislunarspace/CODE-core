@@ -50,13 +50,19 @@
 - ``tolerance`` — 位置残差收敛容差
 - ``var_time`` — 是否允许调整时间节点（``True`` 时自由度更大）
 
-近月点加密采样
+近月点相关采样
 --------------
 
-NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月点落在节点之间
-而欠约束，导致多重打靶残差停滞。
-:func:`~e2m2e.algorithm.solver.multiple_shooting.sample_patch_points_perilune_clustered`
-先积分一圈定位近月点（离次天体最近的点），在其两侧窗口内加密节点：
+近月点速度大、STM 条件数高时，等时间采样可能不够。``design_orbit`` 按族
+选用不同策略（不暴露到请求模型）：
+
+- **Halo**：近月点加密（
+  :func:`~e2m2e.algorithm.solver.multiple_shooting.sample_patch_points_perilune_clustered`）
+- **NRHO**：删近月点附近节点（
+  :func:`~e2m2e.algorithm.solver.multiple_shooting.sample_patch_points_drop_near_perilune`，
+  #463；加密策略在 NRHO 上残差会卡在约 10² km）
+
+近月点加密——先积分一圈定位近月点，在其两侧窗口内加密节点：
 
 .. code-block:: python
 
@@ -70,9 +76,21 @@ NRHO 近月点速度大、STM 条件数高，等时间间隔采样会让近月�
        perilune_window=0.15,  # 加密窗口半宽，占周期比例
    )
 
-返回按时间升序排列的 ``(t_patch, states)``，可直接传给
-``MultipleShooting.correct``。非 CR3BP 动力学（无 ``mu`` 属性）时
-退化为等时间间隔采样。
+删近月点附近节点——节点全部落在近月点禁区之外的互补弧上：
+
+.. code-block:: python
+
+   from e2m2e.algorithm.solver import sample_patch_points_drop_near_perilune
+
+   t_patch, state_patch = sample_patch_points_drop_near_perilune(
+       orbit,
+       dynamics,
+       n_points=8,
+       drop_window=0.12,  # 近月点禁区半宽，占周期比例
+   )
+
+二者均返回按时间升序的 ``(t_patch, states)``。非 CR3BP 动力学（无 ``mu``
+属性）时退化为等时间间隔采样。
 
 星历修正
 --------
