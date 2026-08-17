@@ -79,3 +79,4 @@
 | 0027 | System/Dynamics 分离保留——dynamics 目录不拆分、两类不合并 | 已采纳 |
 | 0028 | 平面三角平动点族采用全周期伪弧长延拓 | 已采纳（#428 接缝经 ADR 0029 修订） |
 | 0029 | 轨道族生成采用统一 Rust 深模块 | 已采纳（已实施） |
+| 0030 | algorithm/forces 留在 algorithm 层——Python 配置/编排面，数值在 crates | 已采纳 |

@@ -82,9 +82,9 @@ Hessian 是 numpy 实现（供非传播路径共用），见有意留 Python 节
 
 **`algorithm/forces`（数值）。** 力模型数值（球谐、潮汐、SRP、三体、大气）
 在 `e2m2e-forces` crate；`force_model.py` 等 Python 文件是"参数验证 +
-to_rust_spec 序列化"配置面。`forces` 的层级归属（数值层配置面还是算法层
-力模型定义）由 #429 独立评估——那是层级议题，不改变"数值已下沉"的
-登记。
+to_rust_spec 序列化"配置面，源码留在 algorithm 层（ADR 0030）：Python 是
+编排侧配置面，不是数值核；不新建 Python 数值目录。层级裁决不改变
+"数值已下沉"的登记。
 
 **`algorithm/transfer/lambert.py`。** 二体 Lambert（Izzo）在
 `e2m2e-propagation` crate（`lambert.rs`），本文件是薄封装
