@@ -6,7 +6,7 @@
 
 用法::
 
-    from e2m2e.transfer.mission_assessment import MissionAssessment
+    from e2m2e.algorithm.transfer.mission_assessment import MissionAssessment
 
     ma = MissionAssessment()
     # 在 NSGA-II 前沿上评估

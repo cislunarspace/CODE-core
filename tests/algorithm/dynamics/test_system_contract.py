@@ -4,7 +4,7 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_System, EphemerisSystem, System
 from e2m2e.data.constants import Datum
-from e2m2e.mbse.data.enums import ReferenceFrame, UnitSystem
+from e2m2e.data.templates.enums import ReferenceFrame, UnitSystem
 
 pytestmark = pytest.mark.interface
 

@@ -240,8 +240,7 @@ class SPICEManager(EphemerisProvider):
         # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（静态链接，
         # 内核池不共享）。spice feature 启用时双 furnsh，让下沉到 Rust
         # 的力（ThirdBody/Indirect/...）也能查到。Rust 绑定是数值层，
-        # 此处为内核加载的跨层桥接（ADR 0012 的 data/ → 仅外部库例外，
-        # 迁移期保留，第 5 批评估归属）。
+        # 此处为内核加载的跨层桥接（ADR 0012 的 data/ → 仅外部库例外）。
         from e2m2e.integrators import spice_furnsh
 
         if spice_furnsh is not None:

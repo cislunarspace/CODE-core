@@ -26,9 +26,9 @@ class TransferConfig:
     """转移轨道统一配置。
 
     同时承载网格搜索阶段（``search_*`` 前缀，供
-    :class:`~e2m2e.transfer.transfer_search.TransferSearch` 使用）与 NLP 优化阶段
-    （``nlp_*`` 前缀，供 :class:`~e2m2e.transfer.transfer.Transfer` 与
-    :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer` 使用）的参数。
+    :class:`~e2m2e.algorithm.transfer.transfer_search.TransferSearch` 使用）与 NLP 优化阶段
+    （``nlp_*`` 前缀，供 :class:`~e2m2e.algorithm.transfer.transfer.Transfer` 与
+    :class:`~e2m2e.algorithm.transfer.transfer_optimization.DROTRONLPOptimizer` 使用）的参数。
 
     搜索阶段字段默认为 ``None``，运行 ``search()`` 前须显式赋值（或通过散装 kwargs /
     ``configure_search()`` 设置）；优化阶段字段提供工程默认值。

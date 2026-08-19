@@ -64,13 +64,13 @@ class _FakeSystemWithDynamicAxes:
 
     @property
     def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
+        from e2m2e.data.templates.enums import ReferenceFrame
 
         return ReferenceFrame.J2000
 
     @property
     def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
+        from e2m2e.data.templates.enums import UnitSystem
 
         return UnitSystem.SI
 
@@ -89,13 +89,13 @@ class _FakeSystemNoUpdate:
 
     @property
     def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
+        from e2m2e.data.templates.enums import ReferenceFrame
 
         return ReferenceFrame.J2000
 
     @property
     def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
+        from e2m2e.data.templates.enums import UnitSystem
 
         return UnitSystem.SI
 
@@ -154,13 +154,13 @@ def test_system_update_coordinate_systems_updates_dynamic_axes():
 
         @property
         def frame(self):
-            from e2m2e.mbse.data.enums import ReferenceFrame
+            from e2m2e.data.templates.enums import ReferenceFrame
 
             return ReferenceFrame.J2000
 
         @property
         def unit_system(self):
-            from e2m2e.mbse.data.enums import UnitSystem
+            from e2m2e.data.templates.enums import UnitSystem
 
             return UnitSystem.SI
 
@@ -203,13 +203,13 @@ def test_system_update_coordinate_systems_no_op_for_static_axes():
 
         @property
         def frame(self):
-            from e2m2e.mbse.data.enums import ReferenceFrame
+            from e2m2e.data.templates.enums import ReferenceFrame
 
             return ReferenceFrame.J2000
 
         @property
         def unit_system(self):
-            from e2m2e.mbse.data.enums import UnitSystem
+            from e2m2e.data.templates.enums import UnitSystem
 
             return UnitSystem.SI
 
@@ -236,13 +236,13 @@ def test_system_update_coordinate_systems_no_op_when_no_coordinate_system():
     class _MinimalSystem(System):
         @property
         def frame(self):
-            from e2m2e.mbse.data.enums import ReferenceFrame
+            from e2m2e.data.templates.enums import ReferenceFrame
 
             return ReferenceFrame.J2000
 
         @property
         def unit_system(self):
-            from e2m2e.mbse.data.enums import UnitSystem
+            from e2m2e.data.templates.enums import UnitSystem
 
             return UnitSystem.SI
 

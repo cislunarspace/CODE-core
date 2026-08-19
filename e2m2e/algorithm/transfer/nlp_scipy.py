@@ -1,6 +1,6 @@
 """SciPy SLSQP 后端。
 
-把原先嵌入 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer`
+把原先嵌入 :class:`~e2m2e.algorithm.transfer.transfer_optimization.DROTRONLPOptimizer`
 的 SciPy SLSQP 求解循环抽出为顶层函数 :func:`solve_with_scipy`，由
 ``DROTRONLPOptimizer.optimize`` 调用。SLSQP 是 DRO→RO 转移优化的默认求解器，
 无需额外依赖，仅依赖 ``scipy>=1.10``。

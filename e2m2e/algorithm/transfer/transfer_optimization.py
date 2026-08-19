@@ -8,7 +8,7 @@
 
 本模块只承载高层编排：构造优化器、计算目标/约束、组装结果。
 SciPy SLSQP 与 COPT 两种求解后端分别封装在
-:mod:`e2m2e.transfer.nlp_scipy` 与 :mod:`e2m2e.transfer.nlp_copt`，
+:mod:`e2m2e.algorithm.transfer.nlp_scipy` 与 :mod:`e2m2e.algorithm.transfer.nlp_copt`，
 由 :class:`DROTRONLPOptimizer` 调度。
 """
 
@@ -26,7 +26,7 @@ from ...exceptions import PropagationFailure
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from .config import TransferConfig, TransferOptimizationResult
 
-# 后端以模块级 re-export 形式暴露，保持 ``e2m2e.transfer.transfer_optimization.coptpy``
+# 后端以模块级 re-export 形式暴露，保持 ``e2m2e.algorithm.transfer.transfer_optimization.coptpy``
 # 等既有 API 兼容（外部模块通过 ``_HAVE_COPT = transfer_optimization.coptpy is not None`` 判定）。
 from .nlp_copt import coptpy, optimize_with_copt  # noqa: F401
 from .nlp_core import NLPOptimizationVariables
@@ -39,7 +39,7 @@ class DROTRONLPOptimizer:
 
     实现论文 Section III.B 的优化阶段算法。
     默认通过 SciPy SLSQP 求解；调用方可改走 COPT 后端
-    （见 :func:`~e2m2e.transfer.nlp_copt.optimize_with_copt`）。
+    （见 :func:`~e2m2e.algorithm.transfer.nlp_copt.optimize_with_copt`）。
 
     Attributes:
         system: CR3BP 系统对象
@@ -489,7 +489,7 @@ class DROTRONLPOptimizer:
     ) -> TransferOptimizationResult:
         """执行 SciPy 后端的 NLP 优化。
 
-        委托给 :func:`e2m2e.transfer.nlp_scipy.solve_with_scipy`。完整参数说明见该函数。
+        委托给 :func:`e2m2e.algorithm.transfer.nlp_scipy.solve_with_scipy`。完整参数说明见该函数。
         """
         from .nlp_scipy import solve_with_scipy
 

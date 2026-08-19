@@ -1,7 +1,7 @@
 """COPT NLP 后端。
 
 封装杉数科技商业优化求解器 COPT（Cardinal Optimizer）的非线性规划调用，
-供 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer` 选用。
+供 :class:`~e2m2e.algorithm.transfer.transfer_optimization.DROTRONLPOptimizer` 选用。
 
 未安装 ``coptpy`` 时：本模块仍可被导入（``coptpy`` 退化为 ``None``），
 :class:`COPTNLPSolver` 类不定义；:func:`optimize_with_copt` 默认直接报错
@@ -344,7 +344,7 @@ def optimize_with_copt(
     """使用 COPT 求解 NLP（与 ``data_processing_module`` 中用法一致：
     ``cp.Envr`` / ``createModel`` / ``COPT.Param`` / ``solve``）。
 
-    数学形式与 :func:`e2m2e.transfer.nlp_scipy.solve_with_scipy` 相同
+    数学形式与 :func:`e2m2e.algorithm.transfer.nlp_scipy.solve_with_scipy` 相同
     （等式约束 + 最小化 Δv）。
 
     Args:

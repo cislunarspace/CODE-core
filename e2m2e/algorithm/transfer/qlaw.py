@@ -1,7 +1,7 @@
 """Q-law 低推力初猜生成器（Lyapunov 反馈律）。
 
 用 Q-law（Petropoulos；Holt 2024 式 6-10）做低推力转移的初猜生成：前向反馈
-积分产出次优控制历史，喂 :class:`~e2m2e.transfer.lowthrust_shooting.LowThrustShooting`
+积分产出次优控制历史，喂 :class:`~e2m2e.algorithm.transfer.lowthrust_shooting.LowThrustShooting`
 做解析雅可比打磨。是 gap-analysis「Q-law 作初猜 → 打靶优化」两级流程的上半段。
 
 ## 最简版（控 a, e, i）

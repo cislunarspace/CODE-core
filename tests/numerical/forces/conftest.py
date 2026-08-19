@@ -51,13 +51,13 @@ class FakeSystem:
 
     @property
     def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
+        from e2m2e.data.templates.enums import ReferenceFrame
 
         return ReferenceFrame.J2000
 
     @property
     def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
+        from e2m2e.data.templates.enums import UnitSystem
 
         return UnitSystem.SI
 

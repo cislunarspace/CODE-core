@@ -2,7 +2,7 @@
 
 对出发时间 × 飞行时间网格逐点解 Lambert 问题，得到出发/到达脉冲
 及其总和的网格数据（porkchop 图的数据层）。终端（出发/到达天体或
-轨道）状态经 :class:`~e2m2e.transfer.terminal.TerminalCondition`
+轨道）状态经 :class:`~e2m2e.algorithm.transfer.terminal.TerminalCondition`
 接口提取，本模块不关心状态如何产生。
 
 除内存网格与绘图外，本模块还提供两项任务分析能力（主题 8）：

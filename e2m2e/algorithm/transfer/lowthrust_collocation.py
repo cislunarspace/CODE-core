@@ -1,6 +1,6 @@
 """低推力 Hermite-Simpson 配点求解器。
 
-与 :class:`~e2m2e.transfer.lowthrust_shooting.LowThrustShooting` （直接打靶）
+与 :class:`~e2m2e.algorithm.transfer.lowthrust_shooting.LowThrustShooting` （直接打靶）
 并列的直接法求解器。把节点状态与控制都作为决策变量，用 Hermite-Simpson 缺陷
 约束保证段间动力学连续——比单弧打靶更鲁棒、初猜要求低（Q-law 输出直接可用）。
 

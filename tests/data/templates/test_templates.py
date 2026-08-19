@@ -86,13 +86,6 @@ class TestEnums:
         assert OrbitFamilyType.DRO.value == "dro"
         assert OrbitFamilyType.NRHO.value == "nrho"
 
-    def test_old_paths_shim(self):
-        from e2m2e.data.templates.enums import ReferenceFrame as CoreReferenceFrame
-        from e2m2e.mbse.data.enums import OrbitFamilyType as MbseOrbitFamilyType
-
-        assert CoreReferenceFrame is ReferenceFrame
-        assert MbseOrbitFamilyType is OrbitFamilyType
-
 
 class TestForceConfigSchema:
     def test_schema_shape(self):

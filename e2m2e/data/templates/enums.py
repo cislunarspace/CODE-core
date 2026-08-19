@@ -1,8 +1,7 @@
 """领域枚举：轨道族类型、参考系、单位系统等。
 
 枚举是数据，归 data/templates/（ADR 0011 迁移，源：``core/enums.py`` +
-``mbse/data/enums.py``）。算法层/接口层引用此处，旧路径
-（``e2m2e.core.enums``、``e2m2e.mbse.data.enums``）经 shim 保持兼容。
+``mbse/data/enums.py``）。算法层/接口层引用此处；旧路径已删除。
 """
 
 from __future__ import annotations

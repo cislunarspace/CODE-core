@@ -7,7 +7,7 @@
 
 用法::
 
-    from e2m2e.transfer.solution_database import SolutionDatabase
+    from e2m2e.algorithm.transfer.solution_database import SolutionDatabase
 
     db = SolutionDatabase("porkchop.db")
     db.add_scan(data, orbit_pair="LEO->GEO", direction="short")

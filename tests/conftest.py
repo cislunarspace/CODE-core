@@ -74,7 +74,7 @@ def spice_manager(spice_kernel_path):
 def spice_eph_system(spice_manager):
     """J2000 下的地月日星历系统，原点在地球。"""
     from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
-    from e2m2e.mbse.data.enums import ReferenceFrame
+    from e2m2e.data.templates.enums import ReferenceFrame
 
     return EphemerisSystem(
         bodies=["EARTH", "MOON", "SUN"],

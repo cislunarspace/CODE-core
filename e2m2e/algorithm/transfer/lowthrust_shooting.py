@@ -72,7 +72,7 @@ class LowThrustSegment:
 class LowThrustShootingSolution:
     """低推力打靶求解结果。
 
-    对齐 :class:`~e2m2e.transfer.config.TransferSolution` 风格，额外携带控制
+    对齐 :class:`~e2m2e.algorithm.transfer.config.TransferSolution` 风格，额外携带控制
     历史与 7D 状态（含质量剖面）。
 
     Attributes:
@@ -184,7 +184,7 @@ class LowThrustShooting:
         """用 Q-law 生成初猜，再解析雅可比打磨。
 
         两级流程（gap-analysis）：Q-law 前向反馈积分产出次优控制历史
-        （:func:`~e2m2e.transfer.qlaw.qlaw_guess`），喂 :meth:`solve` 做
+        （:func:`~e2m2e.algorithm.transfer.qlaw.qlaw_guess`），喂 :meth:`solve` 做
         min-fuel 最优控制打磨。Q-law 解决「满推力初猜推过头」的发散问题。
 
         Args:

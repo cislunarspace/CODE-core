@@ -87,7 +87,7 @@ class ImpulsivePropulsion:
     ) -> TransferCost:
         """计算转移代价。
 
-        委托给 :func:`e2m2e.transfer.cost.compute_transfer_cost`。
+        委托给 :func:`e2m2e.algorithm.transfer.cost.compute_transfer_cost`。
 
         Args:
             departure_state: 出发点六维状态 ``[x, y, z, vx, vy, vz]``。
