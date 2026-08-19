@@ -24,7 +24,7 @@
 - **normal_form 迁移状态按 #449 拆包更新**：已下沉（积分、共线点 CR3BP Hamiltonian、H→QF 标量投影、数值多项式核、QF↔CM、中心流形化简）登记补全；符号 Legendre/星历 H、NAFF、pipeline 编排有意留 Python；P5/P6 后置未派发。更新 `docs/architecture/numerics-migration-status.md`。
 
 ### Fixed
-- **NRHO 星历修正默认路径不收敛**（#463）：拼接点采样对 NRHO 改为「删近月点附近节点」（与 Halo 近月点加密解耦），固定容差下 segmented 路径在 GUI 默认量级（L2 南、近月高 5000 km、约 1 个月）与更贴月短弧（2000 km）上收敛；文档去掉「NRHO 星历修正暂不可用」。对照矩阵脚本 ``scripts/nrho_ephemeris_correction_matrix.py`` 保留为开发期反馈回路。
+- **NRHO 星历修正默认路径不收敛**（#463）：拼接点采样对 NRHO 改为「删近月点附近节点」（与 Halo 近月点加密解耦），固定容差下 segmented 路径在 GUI 默认量级（L2 南、近月高 5000 km、约 1 个月）与更贴月短弧（2000 km）上收敛；文档去掉「NRHO 星历修正暂不可用」。
 
 ### Docs
 - **forces 的 Python 层位置裁决**（#429，ADR 0030）：`algorithm/forces` 留在 algorithm 层作配置/编排面，数值在 `e2m2e-forces`；不新建 Python 数值目录、不搬家。

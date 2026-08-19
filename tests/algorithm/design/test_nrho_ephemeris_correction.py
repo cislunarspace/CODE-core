@@ -10,8 +10,7 @@
 - 贴月短弧（近月高 2000 km、约 8 天）——#463 场景不得回退。
 - GUI 默认量级（近月高 5000 km、phase=0.5、约 30 天、1 h 步长）——
   #473 必锁：收敛 + 星历与时间网格等长。
-- 采样×段长矩阵见 ``scripts/nrho_ephemeris_correction_matrix.py``，
-  不进默认 pytest。
+- 采样×段长的开发期对照矩阵脚本已随 #472 收口移除（见 git 历史）。
 """
 
 from __future__ import annotations

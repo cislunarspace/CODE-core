@@ -74,7 +74,7 @@
 
 ## 数值实验结果（2026-08-16）
 
-在通过 `make setup && make dev` 配置 CSPICE、内核和 Rust 扩展后，使用新增的 [`scripts/research_issue_436_full_period_pal.py`](../../scripts/research_issue_436_full_period_pal.py) 做了可复现实验。实验固定提交 `14025914956faa90a1d3e24019db5ca6c33647af`、地月 CR3BP 质量比 `0.01215058560962404`、L4、小振幅线性化种子、归一化弧长步长 `0.01`，结果保存为：
+在通过 `make setup && make dev` 配置 CSPICE、内核和 Rust 扩展后，使用临时脚本 `scripts/research_issue_436_full_period_pal.py`（使命完成后已移除，可在下述固定提交 `14025914956faa90a1d3e24019db5ca6c33647af` 的 git 历史中取得）做了可复现实验。实验固定提交 `14025914956faa90a1d3e24019db5ca6c33647af`、地月 CR3BP 质量比 `0.01215058560962404`、L4、小振幅线性化种子、归一化弧长步长 `0.01`，结果保存为：
 
 - [`issue-436-spo-pal-local-baseline.json`](issue-436-spo-pal-local-baseline.json)：SPO 5 步，最大完整平面闭合误差 `1.58e-11`，最大 Jacobi 漂移 `1.33e-15`。
 - [`issue-436-lpo-pal-long.json`](issue-436-lpo-pal-long.json)：L4 LPO 60 步，几何振幅度量从 586 km 增至 238,833 km，最大完整平面闭合误差 `3.30e-10`，最大 Jacobi 漂移 `3.11e-15`。

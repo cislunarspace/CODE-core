@@ -13,7 +13,7 @@ SPO、LPO 与 Horseshoe 是 L4/L5 附近的平面周期轨道。它们没有 Hal
 
 ## 数值证据
 
-实验脚本为 `scripts/research_issue_436_full_period_pal.py`，固定提交 `14025914956faa90a1d3e24019db5ca6c33647af`、标准地月 CR3BP 质量比 `0.01215058560962404`、L4、小振幅线性化种子、归一化弧长步长 `0.01`。运行前通过 `make setup && make dev` 配置 CSPICE、内核和 Rust 扩展。
+实验脚本为 `scripts/research_issue_436_full_period_pal.py`（使命完成后已移除，可在下述固定提交的 git 历史中取得），固定提交 `14025914956faa90a1d3e24019db5ca6c33647af`、标准地月 CR3BP 质量比 `0.01215058560962404`、L4、小振幅线性化种子、归一化弧长步长 `0.01`。运行前通过 `make setup && make dev` 配置 CSPICE、内核和 Rust 扩展。
 
 - LPO 向 `x0` 减小方向走 60 步，记录在 `docs/research/issue-436-lpo-pal-long.json`。L4 的轨道几何振幅度量从 586 km 到 238,833 km；最大完整平面闭合无穷范数为 `3.30e-10`，最大 Jacobi 漂移为 `3.11e-15`。第 9 至 13 步周期先减后增，但链连续，未发生跳支或修正失败。
 - L5 LPO 同方向走 20 步，记录在 `docs/research/issue-436-l5-lpo-pal-extended.json`。其轨道几何振幅度量越过 110,000 km 到 138,526 km；最大完整平面闭合无穷范数为 `8.17e-10`，最大 Jacobi 漂移为 `1.78e-15`。

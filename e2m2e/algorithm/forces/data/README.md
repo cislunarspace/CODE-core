@@ -37,5 +37,5 @@ END
 To regenerate from a full EGM96 `.gfc` file, run:
 
 ```bash
-python scripts/prepare_egm96_to10.py --input egm96.gfc --output e2m2e/core/forces/data/egm96_to10.gfc --max-degree 10
+python scripts/prepare_egm96_to10.py --input egm96.gfc --output e2m2e/algorithm/forces/data/egm96_to10.gfc --max-degree 10
 ```
