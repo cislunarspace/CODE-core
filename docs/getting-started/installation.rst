@@ -58,26 +58,29 @@ pip 安装
 从源码安装
 ----------
 
+从源码安装需要 `Rust 工具链 <https://www.rust-lang.org/tools/install>`_，因为积分器核心
+由 Rust 实现（PyO3 绑定），通过 `maturin <https://www.maturin.rs/>`_ 构建。
+
+源码开发只有一条入口命令，它依次完成依赖同步、数据拉取与扩展构建（均幂等，
+可重复运行）：
+
 .. code-block:: bash
 
    git clone https://github.com/cislunarspace/e2m2e.git
    cd e2m2e
-   uv sync
-
-开发依赖：
-
-.. code-block:: bash
-
-   uv sync --group dev
-
-从源码安装需要 `Rust 工具链 <https://www.rust-lang.org/tools/install>`_，因为积分器核心
-由 Rust 实现（PyO3 绑定），通过 `maturin <https://www.maturin.rs/>`_ 构建。
-
-.. code-block:: bash
-
-   make setup       # 拉取 CSPICE 编译包 + SPICE 内核（cspice-v1 / kernels-v1 release，首次必跑）
-   make dev         # maturin develop 构建并安装 Rust 扩展（spice 默认开启，debug）
+   make dev         # 唯一入口：uv sync 装依赖（不构建扩展）+ 拉取 CSPICE 编译包与
+                    # SPICE 内核 + maturin develop 构建安装 Rust 扩展（spice 默认开启，debug）
    make dev-release # 同 dev 但 --release（性能基准 / 长期预报用）
+
+只需拉取数据、暂不构建时（如 CI 只跑 lint），可用 ``make setup``（CSPICE 编译包
++ SPICE 内核，幂等）。
+
+.. warning::
+
+   不要裸跑 ``uv sync``。e2m2e 在 ``uv.lock`` 中是 editable 包，裸 ``uv sync``
+   会当场以 maturin 构建 Rust 扩展：一方面构建需要 ``CSPICE_DIR``（未导出时
+   cspice-sys 直接报错 ``CSPICE_DIR environment variable was not provided``），
+   另一方面与 ``make dev`` 的构建重复。看到上述报错时，改用 ``make dev``。
 
 构建统一走 `Makefile`：它自动从 ``scripts/download_cspice.py`` 解析并
 ``export CSPICE_DIR``。CSPICE 一律取 GitHub release 预编译包；缺

@@ -5,6 +5,9 @@
 ### Added
 - **catalog_sweep 参数空间补全：能量网格与 Lissajous 二维网格**（#476）：扫描主参数维度增至三选一（同传结构化报错）——既有振幅/近月点高度网格之外，新增 `jacobi_windows` 能量（Jacobi）窗口网格与 `amplitude_ins_km` × `amplitude_outs_km` LISSAJOUS 面内×面外二维振幅网格。能量窗口经新增 Rust 入口 `generate_cr3bp_family_windows_py`（ABI v20）实现：同一（族、平动点）只走一次延拓 trace，各窗口分别筛选成员（窗口边界包含），记录 jacobi 包络落在窗口内，窗口零成员时该点无记录、结局逐点可查；LISSAJOUS 二维网格逐点采样入库（相位取请求默认值），不再被扫描排除。
 
+### Changed
+- **源码开发入口统一为 `make dev`**（#478）：一条命令完成依赖同步（`uv sync --group dev --no-install-project`，不再构建 editable 扩展）+ CSPICE 编译包/SPICE 内核拉取（幂等）+ `maturin develop`。此前 `uv sync` → `make setup` → `make dev` 三步顺序自相矛盾（裸 `uv sync` 缺 `CSPICE_DIR` 必败）且一次 `make dev` 实际触发三次 cargo 构建；现 Makefile 内所有 `uv run` 带 `--no-sync`，全过程仅一次 debug 构建。文档不再把 `uv sync` 列为源码开发步骤，并新增裸 `uv sync` 报错的故障排除说明。pip 安装路径（build backend、wheel/sdist、release 工作流）零改动。
+
 ## [5.8.0] - 2026-08-19
 
 ### Added
