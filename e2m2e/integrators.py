@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     compute_min_distance_py: Any
     detect_intersection_py: Any
     generate_cr3bp_family_py: Any
+    generate_cr3bp_family_windows_py: Any
     detect_local_minimum_py: Any
     disable_ephem_cache: Any
     enable_ephem_cache: Any
@@ -123,6 +124,7 @@ _RUST_SYMBOLS = (
     "compute_min_distance_py",
     "differential_correction_cr3bp_py",
     "generate_cr3bp_family_py",
+    "generate_cr3bp_family_windows_py",
     "detect_intersection_py",
     "detect_local_minimum_py",
     "disable_ephem_cache",
@@ -337,6 +339,7 @@ __all__ = [
     "compute_min_distance_py",
     "differential_correction_cr3bp_py",
     "generate_cr3bp_family_py",
+    "generate_cr3bp_family_windows_py",
     "detect_intersection_py",
     "detect_local_minimum_py",
     "disable_ephem_cache",

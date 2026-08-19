@@ -278,6 +278,17 @@ pub(crate) fn closure_error(context: Context, state: [f64; 6], period: f64) -> R
         .fold(0.0, f64::max))
 }
 
+/// CR3BP Jacobi 常数（Parker 约定，不含 ½μ(1−μ) 常数项）：C = 2U − v²。
+/// 与 Python 侧 ``CR3BPSystem.get_jacobi_constant`` 同一定义，保证能量
+/// 窗口筛选与库内 jacobi 包络逐位一致。
+pub(crate) fn jacobi_constant(mu: f64, state: [f64; 6]) -> f64 {
+    let (x, y, z, vx, vy, vz) = (state[0], state[1], state[2], state[3], state[4], state[5]);
+    let r1 = ((x + mu).powi(2) + y * y + z * z).sqrt();
+    let r2 = ((x - 1.0 + mu).powi(2) + y * y + z * z).sqrt();
+    let potential = (x * x + y * y) / 2.0 + (1.0 - mu) / r1 + mu / r2;
+    2.0 * potential - (vx * vx + vy * vy + vz * vz)
+}
+
 pub(crate) fn metric_minmax(
     context: Context,
     state: [f64; 6],

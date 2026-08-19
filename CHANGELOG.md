@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **catalog_sweep 参数空间补全：能量网格与 Lissajous 二维网格**（#476）：扫描主参数维度增至三选一（同传结构化报错）——既有振幅/近月点高度网格之外，新增 `jacobi_windows` 能量（Jacobi）窗口网格与 `amplitude_ins_km` × `amplitude_outs_km` LISSAJOUS 面内×面外二维振幅网格。能量窗口经新增 Rust 入口 `generate_cr3bp_family_windows_py`（ABI v20）实现：同一（族、平动点）只走一次延拓 trace，各窗口分别筛选成员（窗口边界包含），记录 jacobi 包络落在窗口内，窗口零成员时该点无记录、结局逐点可查；LISSAJOUS 二维网格逐点采样入库（相位取请求默认值），不再被扫描排除。
+
 ## [5.8.0] - 2026-08-19
 
 ### Added

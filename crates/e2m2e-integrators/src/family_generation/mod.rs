@@ -15,11 +15,19 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use types::{Context, Outcome, Spec};
+use common::jacobi_constant;
+use types::{Context, Member, Outcome, Spec};
 
 fn required<T>(value: Option<T>, name: &str, family_type: &str) -> Result<T, String> {
     value.ok_or_else(|| format!("{family_type} 缺少必需字段 {name}"))
 }
+
+/// 能量窗口扫描中共线族（Halo/NRHO/Axial）延拓 walk 的最小成员预算。
+/// 这些族的行走以振幅上限为终点、以成员数为步数上限；预算低于到达
+/// 族默认振幅上限所需步数时 trace 会在中途截断，窗口失去高能量段的
+/// 命中机会。三角族的 walk 步数公式已含按请求范围的步数估计，无需
+/// 下限。
+const MIN_TRACE_MEMBERS: usize = 200;
 
 #[allow(clippy::too_many_arguments)]
 fn build_spec(
@@ -160,7 +168,124 @@ fn generate(context: Context, spec: Spec) -> Result<Outcome, String> {
     }
 }
 
+/// 把 Python 传入的窗口列表翻成 (min, max) 对；空列表、长度不为 2、
+/// 非有限值或 min ≥ max 均为非法输入。
+fn parse_windows(raw: Vec<Vec<f64>>) -> Result<Vec<(f64, f64)>, String> {
+    if raw.is_empty() {
+        return Err("jacobi_windows 不能为空".to_string());
+    }
+    raw.into_iter()
+        .map(|window| {
+            if window.len() != 2 {
+                return Err(format!(
+                    "jacobi_windows 每项须为 [min, max]，当前长度 {}",
+                    window.len()
+                ));
+            }
+            let (lower, upper) = (window[0], window[1]);
+            if !lower.is_finite() || !upper.is_finite() || lower >= upper {
+                return Err(format!(
+                    "jacobi_windows 每项须为有限数且 min < max，当前 [{lower}, {upper}]"
+                ));
+            }
+            Ok((lower, upper))
+        })
+        .collect()
+}
+
+/// 能量窗口扫描的延拓 walk 成员预算：同组窗口共享一条 trace，预算须
+/// 同时覆盖成员需求（每窗口上限 × 窗口数）与（共线族）到达族默认振幅
+/// 上限所需步数。Lissajous 是参数采样而非延拓 trace，不参与能量窗口。
+fn walk_limit_for_windows(
+    family_type: &str,
+    per_window_limit: usize,
+    window_count: usize,
+) -> Result<usize, String> {
+    let demand = per_window_limit * window_count;
+    match family_type {
+        "spo" | "lpo" | "horseshoe" => Ok(demand),
+        "halo" | "nrho" | "axial" => Ok(demand.max(MIN_TRACE_MEMBERS)),
+        "lissajous" => {
+            Err("Lissajous 族是参数采样而非延拓 trace，不参与 Jacobi 能量窗口".to_string())
+        }
+        other => Err(format!("未知 orbit family {other}")),
+    }
+}
+
+/// 能量窗口批量生成：延拓 trace 只走一次（`spec` 的 member_limit 已按
+/// `walk_limit_for_windows` 放大），各窗口在 trace 上分别筛选成员
+/// （窗口边界包含），每窗口至多 `per_window_limit` 条、一条结果。
+/// 与 ADR 0029 决策 4 的公开振幅窗口同层：筛选留在单次调用内。
+fn generate_windowed(
+    context: Context,
+    spec: Spec,
+    windows: Vec<(f64, f64)>,
+    per_window_limit: usize,
+) -> Result<Vec<Outcome>, String> {
+    let full = generate(context, spec)?;
+    let jacobis: Vec<f64> = full
+        .members
+        .iter()
+        .map(|member| jacobi_constant(context.mu, member.states[0]))
+        .collect();
+    windows
+        .iter()
+        .map(|&(lower, upper)| {
+            let members: Vec<Member> = full
+                .members
+                .iter()
+                .zip(&jacobis)
+                .filter(|(_, jacobi)| lower <= **jacobi && **jacobi <= upper)
+                .map(|(member, _)| member.clone())
+                .take(per_window_limit)
+                .collect();
+            if !members.is_empty() || full.members.is_empty() {
+                // 命中成员：继承基线结局（含软失败但已有成员的 trace）；
+                // 基线 trace 零成员：窗口无从筛选，逐窗口保留基线原因。
+                return Ok(Outcome {
+                    family_type: full.family_type,
+                    periodicity: full.periodicity,
+                    status: full.status,
+                    cause: full.cause,
+                    message: full.message.clone(),
+                    requested_members: per_window_limit,
+                    members,
+                });
+            }
+            Ok(Outcome::soft_failure(
+                full.family_type,
+                full.periodicity,
+                per_window_limit,
+                Vec::new(),
+                "infeasible",
+                "constraint_violation",
+                format!("Jacobi 窗口 [{lower}, {upper}] 内零成员命中：族能量包络未覆盖该区间"),
+            ))
+        })
+        .collect()
+}
+
 /// 一次调用完成七类 CR3BP 轨道族生成。
+fn validate_context(
+    mu: f64,
+    characteristic_length_km: f64,
+    secondary_radius_km: f64,
+    rtol: f64,
+    atol: f64,
+    max_step: Option<f64>,
+) -> Result<(), String> {
+    if !(0.0..0.5).contains(&mu)
+        || characteristic_length_km <= 0.0
+        || secondary_radius_km <= 0.0
+        || rtol <= 0.0
+        || atol <= 0.0
+        || max_step.is_some_and(|step| step <= 0.0)
+    {
+        return Err("CR3BP 族生成上下文无效".to_string());
+    }
+    Ok(())
+}
+
 #[pyfunction]
 #[pyo3(signature = (
     family_type,
@@ -208,15 +333,15 @@ pub fn generate_cr3bp_family_py(
     max_step: Option<f64>,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
-    if !(0.0..0.5).contains(&mu)
-        || characteristic_length_km <= 0.0
-        || secondary_radius_km <= 0.0
-        || rtol <= 0.0
-        || atol <= 0.0
-        || max_step.is_some_and(|step| step <= 0.0)
-    {
-        return Err(PyValueError::new_err("CR3BP 族生成上下文无效"));
-    }
+    validate_context(
+        mu,
+        characteristic_length_km,
+        secondary_radius_km,
+        rtol,
+        atol,
+        max_step,
+    )
+    .map_err(PyValueError::new_err)?;
     let spec = build_spec(
         family_type,
         point,
@@ -246,6 +371,112 @@ pub fn generate_cr3bp_family_py(
         .allow_threads(|| generate(context, spec))
         .map_err(PyValueError::new_err)?;
     outcome_to_python(py, outcome)
+}
+
+/// 按 Jacobi 能量窗口批量生成轨道族：同一组生成参数下延拓 trace 只走
+/// 一次，返回与 ``jacobi_windows`` 同序的结果列表（每窗口一条，成员
+/// Jacobi 均落在窗口内，边界包含）。窗口成员超上限时按 trace 顺序取
+/// 前 ``n_orbits`` 条（与一维扫描的成员上限语义一致）。窗口零成员时
+/// 该窗口结果为零成员的结构化软失败；族生成参数与
+/// ``generate_cr3bp_family_py`` 同集（走能量窗口时族延拓范围取各族
+/// 默认振幅/近月点上限，由调用方给定）。
+#[pyfunction]
+#[pyo3(signature = (
+    family_type,
+    mu,
+    characteristic_length_km,
+    secondary_radius_km,
+    point,
+    n_orbits,
+    jacobi_windows,
+    max_amplitude_km=None,
+    min_amplitude_km=None,
+    perilune_height_max_km=None,
+    north_south=None,
+    amplitude_in_km=None,
+    amplitude_out_km=None,
+    phase_in=None,
+    phase_out=None,
+    continuation_direction=None,
+    match_tolerance_km=None,
+    n_periods=3,
+    rtol=1e-12,
+    atol=1e-12,
+    max_step=None
+))]
+#[allow(clippy::too_many_arguments)]
+pub fn generate_cr3bp_family_windows_py(
+    family_type: &str,
+    mu: f64,
+    characteristic_length_km: f64,
+    secondary_radius_km: f64,
+    point: u8,
+    n_orbits: usize,
+    jacobi_windows: Vec<Vec<f64>>,
+    max_amplitude_km: Option<f64>,
+    min_amplitude_km: Option<f64>,
+    perilune_height_max_km: Option<f64>,
+    north_south: Option<u8>,
+    amplitude_in_km: Option<f64>,
+    amplitude_out_km: Option<f64>,
+    phase_in: Option<f64>,
+    phase_out: Option<f64>,
+    continuation_direction: Option<&str>,
+    match_tolerance_km: Option<f64>,
+    n_periods: usize,
+    rtol: f64,
+    atol: f64,
+    max_step: Option<f64>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    validate_context(
+        mu,
+        characteristic_length_km,
+        secondary_radius_km,
+        rtol,
+        atol,
+        max_step,
+    )
+    .map_err(PyValueError::new_err)?;
+    if n_orbits == 0 {
+        return Err(PyValueError::new_err("n_orbits 必须大于 0"));
+    }
+    let windows = parse_windows(jacobi_windows).map_err(PyValueError::new_err)?;
+    let walk_limit = walk_limit_for_windows(family_type, n_orbits, windows.len())
+        .map_err(PyValueError::new_err)?;
+    let spec = build_spec(
+        family_type,
+        point,
+        walk_limit,
+        max_amplitude_km,
+        min_amplitude_km,
+        perilune_height_max_km,
+        north_south,
+        amplitude_in_km,
+        amplitude_out_km,
+        phase_in,
+        phase_out,
+        continuation_direction,
+        match_tolerance_km,
+        n_periods,
+    )
+    .map_err(PyValueError::new_err)?;
+    let context = Context {
+        mu,
+        characteristic_length_km,
+        secondary_radius_km,
+        rtol,
+        atol,
+        max_step,
+    };
+    let outcomes = py
+        .allow_threads(|| generate_windowed(context, spec, windows, n_orbits))
+        .map_err(PyValueError::new_err)?;
+    let list = PyList::empty(py);
+    for outcome in outcomes {
+        list.append(outcome_to_python(py, outcome)?)?;
+    }
+    Ok(list.into())
 }
 
 fn outcome_to_python(py: Python<'_>, outcome: Outcome) -> PyResult<PyObject> {
@@ -295,6 +526,172 @@ mod tests {
             rtol: 1e-12,
             atol: 1e-12,
             max_step: Some(0.01),
+        }
+    }
+
+    fn halo_spec(max_amplitude_km: f64, member_limit: usize) -> Spec {
+        Spec::Halo {
+            point: 1,
+            max_amplitude_km,
+            member_limit,
+        }
+    }
+
+    fn windowed_halo(
+        max_amplitude_km: f64,
+        windows: &[(f64, f64)],
+        per_window_limit: usize,
+    ) -> Vec<Outcome> {
+        let walk_limit = walk_limit_for_windows("halo", per_window_limit, windows.len()).unwrap();
+        generate_windowed(
+            context(),
+            halo_spec(max_amplitude_km, walk_limit),
+            windows.to_vec(),
+            per_window_limit,
+        )
+        .unwrap()
+    }
+
+    fn jacobis_of(members: &[Member]) -> Vec<f64> {
+        members
+            .iter()
+            .map(|member| jacobi_constant(context().mu, member.states[0]))
+            .collect()
+    }
+
+    fn jacobi_bounds(members: &[Member]) -> (f64, f64) {
+        let jacobis = jacobis_of(members);
+        (
+            jacobis.iter().cloned().fold(f64::INFINITY, f64::min),
+            jacobis.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+        )
+    }
+
+    #[test]
+    fn parse_windows_rejects_degenerate_entries() {
+        assert!(parse_windows(vec![]).is_err());
+        assert!(parse_windows(vec![vec![3.0]]).is_err());
+        assert!(parse_windows(vec![vec![3.0, 3.1, 3.2]]).is_err());
+        assert!(parse_windows(vec![vec![3.2, 3.0]]).is_err());
+        assert!(parse_windows(vec![vec![f64::NAN, 3.0]]).is_err());
+        assert_eq!(
+            parse_windows(vec![vec![3.0, 3.1]]).unwrap(),
+            vec![(3.0, 3.1)]
+        );
+    }
+
+    #[test]
+    fn walk_limit_for_windows_rejects_lissajous_and_floors_collinear_walks() {
+        assert!(walk_limit_for_windows("lissajous", 4, 2).is_err());
+        assert!(walk_limit_for_windows("dro", 4, 2).is_err());
+        assert_eq!(
+            walk_limit_for_windows("halo", 4, 2).unwrap(),
+            MIN_TRACE_MEMBERS
+        );
+        assert_eq!(
+            walk_limit_for_windows("nrho", 4, 2).unwrap(),
+            MIN_TRACE_MEMBERS
+        );
+        assert_eq!(
+            walk_limit_for_windows("axial", 4, 2).unwrap(),
+            MIN_TRACE_MEMBERS
+        );
+        // 三角族 walk 步数公式已含范围估计，按成员需求给预算即可
+        assert_eq!(walk_limit_for_windows("spo", 4, 2).unwrap(), 8);
+        assert_eq!(walk_limit_for_windows("horseshoe", 30, 3).unwrap(), 90);
+    }
+
+    #[test]
+    fn jacobi_windows_partition_members_into_bounds() {
+        let full = generate(context(), halo_spec(3000.0, 200)).unwrap();
+        assert_eq!(full.status, "converged");
+        let (c_min, c_max) = jacobi_bounds(&full.members);
+        let middle = 0.5 * (c_min + c_max);
+        let windows = [(c_min, middle), (middle, c_max)];
+        let outcomes = windowed_halo(3000.0, &windows, 50);
+
+        assert_eq!(outcomes.len(), 2);
+        let mut total = 0usize;
+        for (outcome, (lower, upper)) in outcomes.iter().zip(windows) {
+            assert_eq!(outcome.status, "converged");
+            assert!(!outcome.members.is_empty());
+            total += outcome.members.len();
+            for jacobi in jacobis_of(&outcome.members) {
+                assert!(
+                    (lower..=upper).contains(&jacobi),
+                    "成员 Jacobi {jacobi} 越出窗口 [{lower}, {upper}]"
+                );
+            }
+        }
+        // 窗口二分覆盖族能量包络时不丢成员（成员上限不生效）
+        assert_eq!(total, full.members.len());
+    }
+
+    #[test]
+    fn jacobi_window_bounds_are_inclusive() {
+        let full = generate(context(), halo_spec(3000.0, 200)).unwrap();
+        let first_jacobi = jacobis_of(&full.members)[0];
+        // 下界恰取首个成员的 Jacobi：边界包含意味着该成员必须命中
+        let outcomes = windowed_halo(3000.0, &[(first_jacobi, first_jacobi + 0.01)], 10);
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].status, "converged");
+        assert!(jacobis_of(&outcomes[0].members)
+            .iter()
+            .any(|jacobi| (*jacobi - first_jacobi).abs() < 1e-12));
+    }
+
+    #[test]
+    fn empty_jacobi_window_is_structured_soft_failure() {
+        let outcomes = windowed_halo(3000.0, &[(9.9, 9.95)], 10);
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].status, "infeasible");
+        assert_eq!(outcomes[0].cause, "constraint_violation");
+        assert!(outcomes[0].message.contains("零成员"));
+        assert!(outcomes[0].members.is_empty());
+        assert_eq!(outcomes[0].requested_members, 10);
+    }
+
+    #[test]
+    fn per_window_limit_caps_members_inside_window() {
+        let full = generate(context(), halo_spec(3000.0, 200)).unwrap();
+        let (c_min, c_max) = jacobi_bounds(&full.members);
+        let outcomes = windowed_halo(3000.0, &[(c_min, c_max)], 2);
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].members.len(), 2);
+        assert_eq!(outcomes[0].requested_members, 2);
+    }
+
+    #[test]
+    fn triangular_windows_filter_runs_parallel_to_amplitude_window() {
+        let make_spec = |member_limit: usize| Spec::Triangular {
+            family_type: "spo",
+            point: 4,
+            min_amplitude_km: 5000.0,
+            max_amplitude_km: 20_000.0,
+            member_limit,
+            direction: "decrease-x0",
+            match_tolerance_km: 20.0,
+        };
+        let full = generate(context(), make_spec(8)).unwrap();
+        assert_eq!(full.status, "converged");
+        let (c_min, c_max) = jacobi_bounds(&full.members);
+        let middle = 0.5 * (c_min + c_max);
+        let windows = [(c_min, middle), (middle, c_max)];
+        let walk_limit = walk_limit_for_windows("spo", 8, windows.len()).unwrap();
+        let outcomes =
+            generate_windowed(context(), make_spec(walk_limit), windows.to_vec(), 8).unwrap();
+
+        for (outcome, (lower, upper)) in outcomes.iter().zip(windows) {
+            assert!(!outcome.members.is_empty());
+            for jacobi in jacobis_of(&outcome.members) {
+                assert!((lower..=upper).contains(&jacobi));
+            }
+            for member in &outcome.members {
+                // 振幅窗口筛选不受能量窗口影响（两者并列生效）
+                assert!(member
+                    .amplitude_km
+                    .is_some_and(|amp| (5000.0..=20_000.0).contains(&amp)));
+            }
         }
     }
 

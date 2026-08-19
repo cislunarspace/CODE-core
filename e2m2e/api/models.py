@@ -7,6 +7,7 @@ api/ 边界，算法层用 numpy/dataclass。每个 Facade 方法一个 Request/
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -1229,17 +1230,41 @@ class CatalogExportResponse(ResultResponse):
     exported_count: int
 
 
+#: catalog_sweep 各族可作主参数维度的请求字段（条件取值域的单一来源，
+#: ADR 0014 决策 8）：LISSAJOUS 只走二维振幅网格（能量窗口不适用），
+#: 其余族一维振幅/近月点维度与能量窗口二选一。
+_SWEEP_GRID_DIMENSIONS: Mapping[str, frozenset[str]] = MappingProxyType(
+    {
+        "HALO": frozenset({"max_amplitudes_km", "jacobi_windows"}),
+        "NRHO": frozenset({"perilune_heights_max_km", "jacobi_windows"}),
+        "AXIAL": frozenset({"max_amplitudes_km", "jacobi_windows"}),
+        "LISSAJOUS": frozenset({"amplitude_ins_km", "amplitude_outs_km"}),
+        "SPO": frozenset({"max_amplitudes_km", "jacobi_windows"}),
+        "LPO": frozenset({"max_amplitudes_km", "jacobi_windows"}),
+        "HORSESHOE": frozenset({"max_amplitudes_km", "jacobi_windows"}),
+    }
+)
+
+
 class CatalogSweepRequest(_ApiModel):
     """参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
 
-    扫描网格 = 族 × 平动点 × 主延拓参数：HALO/AXIAL/SPO/LPO/HORSESHOE
-    扫 ``max_amplitudes_km``，NRHO 扫 ``perilune_heights_max_km``。
-    LISSAJOUS 的振幅是面内×面外二维，不支持一维扫描。部分参数点失败
-    时已产出的记录保留（ADR 0020 软失败语义）。
+    扫描网格 = 族 × 平动点 × 主参数维度。主参数维度三选一（同传报错）：
+
+    - 一维主参数：HALO/AXIAL/SPO/LPO/HORSESHOE 扫 ``max_amplitudes_km``，
+      NRHO 扫 ``perilune_heights_max_km``；
+    - 能量（Jacobi）窗口：``jacobi_windows``——同一（族、平动点）只走
+      一次延拓 trace（族延拓范围取各族默认），各窗口成员分别成记录，
+      记录 jacobi 包络落在窗口内；窗口零成员时该点无记录、结局可查；
+    - LISSAJOUS 二维振幅网格：``amplitude_ins_km`` × ``amplitude_outs_km``
+      笛卡尔积逐点采样（相位取请求默认值）；能量窗口不适用于 LISSAJOUS
+      （其族生成是参数采样而非延拓 trace）。
+
+    部分参数点失败时已产出的记录保留（ADR 0020 软失败语义）。
     """
 
     orbit_types: list[str] = Field(
-        min_length=1, description="族集合：HALO/NRHO/AXIAL/SPO/LPO/HORSESHOE"
+        min_length=1, description="族集合：HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE"
     )
     libration_points: list[int] | None = Field(
         default=None, description="平动点集合；缺省按各族默认（共线 L2、三角 L4）"
@@ -1252,7 +1277,70 @@ class CatalogSweepRequest(_ApiModel):
     perilune_heights_max_km: list[float] | None = Field(
         default=None, description="近月点高度上限网格（km），仅 NRHO 用"
     )
+    jacobi_windows: list[list[float]] | None = Field(
+        default=None,
+        min_length=1,
+        description="能量（Jacobi）窗口网格 [[min, max], ...]，边界包含；"
+        "与 max_amplitudes_km/perilune_heights_max_km 互斥；LISSAJOUS 不适用",
+    )
+    amplitude_ins_km: list[float] | None = Field(
+        default=None,
+        min_length=1,
+        description="LISSAJOUS 面内振幅网格（km）；须与 amplitude_outs_km 同给，与其他网格维度互斥",
+    )
+    amplitude_outs_km: list[float] | None = Field(
+        default=None,
+        min_length=1,
+        description="LISSAJOUS 面外振幅网格（km）；须与 amplitude_ins_km 同给",
+    )
     n_orbits: int = Field(default=20, ge=1, description="每点族成员数量上限")
+
+    @classmethod
+    def supported_grid_dimensions(cls, orbit_type: str) -> tuple[str, ...]:
+        """返回该族可作为扫描主参数维度的请求字段（条件取值域公开）。
+
+        GUI/CLI/MCP 不得解析错误文本或维护本地副本（ADR 0014 决策 8）；
+        Facade 的网格展开与校验共用本接口。LISSAJOUS 的两个振幅字段是
+        同一维度（须同给）；其余族的 ``jacobi_windows`` 与一维振幅字段
+        互斥，由请求级校验器拒绝同传。
+        """
+        if not isinstance(orbit_type, str):
+            raise ValueError(f"orbit_type 必须为字符串，当前 {orbit_type!r}")
+        try:
+            return tuple(sorted(_SWEEP_GRID_DIMENSIONS[orbit_type.upper()]))
+        except KeyError as exc:
+            raise ValueError(f"不支持的 orbit_type: {orbit_type!r}") from exc
+
+    @model_validator(mode="after")
+    def _validate_grid_dimensions(self) -> CatalogSweepRequest:
+        """主参数维度互斥与能量窗口取值域（ADR 0014 决策 8 同源规则）。"""
+        amplitude_grid = (
+            self.max_amplitudes_km is not None or self.perilune_heights_max_km is not None
+        )
+        lissajous_grid = self.amplitude_ins_km is not None or self.amplitude_outs_km is not None
+        given = [
+            name
+            for name, present in (
+                ("max_amplitudes_km/perilune_heights_max_km", amplitude_grid),
+                ("jacobi_windows", self.jacobi_windows is not None),
+                ("amplitude_ins_km/amplitude_outs_km", lissajous_grid),
+            )
+            if present
+        ]
+        if len(given) > 1:
+            raise ValueError(f"扫描主参数维度互斥：{' 与 '.join(given)} 同传；一次调用只选一个维度")
+        if (self.amplitude_ins_km is None) != (self.amplitude_outs_km is None):
+            raise ValueError(
+                "LISSAJOUS 二维振幅网格须同时给出 amplitude_ins_km 与 amplitude_outs_km"
+            )
+        for window in self.jacobi_windows or ():
+            valid_length = len(window) == 2
+            finite = all(math.isfinite(value) for value in window)
+            if not valid_length or not finite or not window[0] < window[1]:
+                raise ValueError(
+                    f"jacobi_windows 每项须为有限数对 [min, max] 且 min < max，当前 {window!r}"
+                )
+        return self
 
 
 class CatalogSweepPointOutcome(_ApiModel):
@@ -1260,7 +1348,16 @@ class CatalogSweepPointOutcome(_ApiModel):
 
     orbit_type: str
     libration_point: int
-    parameter_km: float = Field(description="网格点主参数值（振幅或近月点高度上限，km）")
+    parameter_km: float | None = Field(
+        default=None,
+        description="网格点主参数值（振幅或近月点高度上限，km）；能量窗口与二维振幅点为 None",
+    )
+    jacobi_window: list[float] | None = Field(
+        default=None, description="能量窗口点的 [min, max] Jacobi 窗口"
+    )
+    amplitudes_km: list[float] | None = Field(
+        default=None, description="LISSAJOUS 二维网格点的 [面内, 面外] 振幅（km）"
+    )
     status: ConvergenceState
     cause: FailureCause
     message: str

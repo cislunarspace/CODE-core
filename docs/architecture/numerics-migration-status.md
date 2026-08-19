@@ -172,7 +172,9 @@ Rust 实现；共线点求根、线性中心模态、Lissajous 非线性中心�
 以及近月距、
 L4/L5 径向振幅与面外振幅扫描也在同一模块内执行。Python 不逐成员调用
 数值原子，不保留数值回退，只负责请求校验、领域分派和 `OrbitFamily` 重包。
-工作项：#428。
+工作项：#428。catalog_sweep 的能量维度（#476）经
+`generate_cr3bp_family_windows_py` 批量入口：同一（族、平动点）的延拓
+trace 只走一次，Jacobi 窗口筛选留在 Rust 单次调用内（与振幅窗口同层）。
 
 **`algorithm/design`（打靶/传播路径）。** 分段修正、多重打靶、段传播、
 时间转换走 Rust（`segmented_shooting_correct_py`、

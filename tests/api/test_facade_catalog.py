@@ -353,9 +353,125 @@ class TestSweep:
         records = facade.catalog_query(orbit_family="halo").records
         assert len(records) == 2
 
-    def test_sweep_rejects_lissajous(self):
+    def test_sweep_rejects_lissajous_with_one_dimensional_grid(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
             Facade().catalog_sweep(orbit_types=["LISSAJOUS"], max_amplitudes_km=[5000.0])
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().catalog_sweep(orbit_types=["LISSAJOUS"], jacobi_windows=[[3.17, 3.18]])
+
+    def test_sweep_rejects_mutually_exclusive_grid_dimensions(self):
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().catalog_sweep(
+                orbit_types=["HALO"],
+                max_amplitudes_km=[2000.0],
+                jacobi_windows=[[3.17, 3.18]],
+            )
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().catalog_sweep(
+                orbit_types=["HALO"],
+                max_amplitudes_km=[2000.0],
+                amplitude_ins_km=[1000.0],
+                amplitude_outs_km=[3000.0],
+            )
+
+    def test_sweep_rejects_invalid_jacobi_windows(self):
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().catalog_sweep(orbit_types=["HALO"], jacobi_windows=[[3.18, 3.17]])
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().catalog_sweep(orbit_types=["HALO"], jacobi_windows=[[3.17, 3.18, 3.19]])
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().catalog_sweep(orbit_types=["HALO"], jacobi_windows=[[3.17]])
+
+    def test_sweep_lissajous_grid_requires_both_amplitude_lists(self):
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().catalog_sweep(orbit_types=["LISSAJOUS"], amplitude_ins_km=[1000.0])
+
+    def test_sweep_lissajous_grid_creates_records(self):
+        facade = Facade()
+        response = facade.catalog_sweep(
+            orbit_types=["LISSAJOUS"],
+            libration_points=[2],
+            amplitude_ins_km=[1000.0, 2000.0],
+            amplitude_outs_km=[3000.0],
+            n_orbits=2,
+        )
+
+        assert response.succeeded == 2
+        assert response.failed == 0
+        assert len(response.record_ids) == 2
+        assert {tuple(point.amplitudes_km) for point in response.points} == {
+            (1000.0, 3000.0),
+            (2000.0, 3000.0),
+        }
+        assert all(
+            point.parameter_km is None and point.jacobi_window is None for point in response.points
+        )
+        records = facade.catalog_query(orbit_family="lissajous", libration_point=2).records
+        assert len(records) == 2
+        assert all(record.member_count == 2 for record in records)
+
+    def test_sweep_jacobi_windows_create_layered_records(self):
+        facade = Facade()
+        # 自校准窗口：先探出族的真实能量范围，窗口取其内部分层
+        probe = facade.orbit_family_generation(
+            orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=5
+        )
+        jacobis = probe.get_jacobi_constants()
+        lower, upper = float(jacobis.min()), float(jacobis.max())
+        middle = 0.5 * (lower + upper)
+
+        response = facade.catalog_sweep(
+            orbit_types=["HALO"],
+            libration_points=[1],
+            jacobi_windows=[[lower, middle], [middle, upper], [9.9, 9.95]],
+            n_orbits=5,
+        )
+
+        assert response.succeeded == 2
+        assert response.failed == 0
+        assert "1 点软失败无成员产出" in response.message
+        windows = {tuple(point.jacobi_window) for point in response.points}
+        assert windows == {(lower, middle), (middle, upper), (9.9, 9.95)}
+        assert all(
+            point.parameter_km is None and point.amplitudes_km is None for point in response.points
+        )
+
+        for point in response.points[:2]:
+            assert point.status is ConvergenceState.CONVERGED
+            assert point.record_id is not None
+            record = facade.catalog_get(record_id=point.record_id)
+            window_lo, window_hi = point.jacobi_window
+            assert record.jacobi is not None
+            assert record.jacobi[0] >= window_lo
+            assert record.jacobi[1] <= window_hi
+
+        empty = response.points[2]
+        assert empty.status is ConvergenceState.INFEASIBLE
+        assert empty.cause is FailureCause.CONSTRAINT_VIOLATION
+        assert empty.record_id is None
+        assert empty.generated_members == 0
+
+    def test_sweep_request_model_declares_new_dimensions(self):
+        field_names = set(CatalogSweepRequest.model_fields)
+        assert {
+            "jacobi_windows",
+            "amplitude_ins_km",
+            "amplitude_outs_km",
+        } <= field_names
+        # 条件取值域公开且同源（ADR 0014 决策 8）：族 × 可用维度经公开接口给出
+        assert CatalogSweepRequest.supported_grid_dimensions("LISSAJOUS") == (
+            "amplitude_ins_km",
+            "amplitude_outs_km",
+        )
+        for family in ("HALO", "NRHO", "AXIAL", "SPO", "LPO", "HORSESHOE"):
+            dimensions = CatalogSweepRequest.supported_grid_dimensions(family)
+            assert "jacobi_windows" in dimensions
+            assert "amplitude_ins_km" not in dimensions
+        with pytest.raises(ValueError, match="不支持的 orbit_type"):
+            CatalogSweepRequest.supported_grid_dimensions("DRO")
+        # 新维度已由派生工具清单引用的请求模型携带（CLI/MCP 纯派生，ADR 0014）
+        by_name = {tool.name: tool for tool in tool_inventory(Facade())}
+        assert by_name["catalog_sweep"].request_model is CatalogSweepRequest
 
     def test_sweep_requires_grid_for_family(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):

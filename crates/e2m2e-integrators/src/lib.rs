@@ -371,6 +371,8 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   高阶 Lie 流（12 实维分裂复积分）下沉 Rust，关闭 #336 复值积分例外。
 /// - **v19** （#466）：新增 ``center_manifold_reduce_py``，将中心流形两步
 ///   Lie 同调化简（频域 W、Poisson 链、虚/实基底变换）完整下沉 Rust。
+/// - **v20** （#476）：新增 ``generate_cr3bp_family_windows_py``，按 Jacobi
+///   能量窗口批量生成轨道族（延拓 trace 只走一次，各窗口分别筛选成员）。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -4180,6 +4182,10 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(family::orbit_family_metric_py, m)?)?;
     m.add_function(wrap_pyfunction!(
         family_generation::generate_cr3bp_family_py,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        family_generation::generate_cr3bp_family_windows_py,
         m
     )?)?;
     m.add_class::<RkMethod>()?;

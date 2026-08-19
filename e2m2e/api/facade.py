@@ -388,8 +388,9 @@ def _record_to_response(record: Any) -> CatalogRecordResponse:
     )
 
 
-#: sweep 各族的主延拓参数字段（FamilyGenerationRequest 术语）。
-#: LISSAJOUS 不在表中：其振幅为面内×面外二维，不支持一维扫描。
+#: sweep 各族一维扫描的主延拓参数字段（FamilyGenerationRequest 术语）。
+#: LISSAJOUS 不在表中：其一维扫描不成立，走 amplitude_ins_km ×
+#: amplitude_outs_km 二维振幅网格（能量窗口扫描同理不适用）。
 _SWEEP_GRID_FIELD = {
     "HALO": "max_amplitude_km",
     "NRHO": "perilune_height_max_km",
@@ -400,22 +401,56 @@ _SWEEP_GRID_FIELD = {
 }
 
 
-def _expand_sweep_points(
-    request: CatalogSweepRequest,
-) -> list[tuple[FamilyGenerationRequest, float, int]]:
-    """把扫描参数空间展开为（族请求, 主参数值, 平动点）序列。
+@dataclasses.dataclass(frozen=True)
+class _SweepPlanPoint:
+    """展开后的扫描参数点：族请求（已校验、含默认值）与主参数标签。"""
 
-    网格 = 族 × 平动点 × 主延拓参数：NRHO 扫 perilune_heights_max_km，
-    其余扫 max_amplitudes_km。每点经 ``FamilyGenerationRequest`` 校验，
+    family_request: FamilyGenerationRequest
+    libration_point: int
+    parameter_km: float | None = None
+    jacobi_window: tuple[float, float] | None = None
+    amplitudes_km: tuple[float, float] | None = None
+
+
+def _sweep_grid_mode(request: CatalogSweepRequest, selection: str) -> str:
+    """按请求网格字段与族返回扫描主参数维度（维度互斥已在请求模型拒绝）。
+
+    族 × 可用维度的适用性只经 ``CatalogSweepRequest.supported_grid_dimensions``
+    判断（条件取值域公开且同源，ADR 0014 决策 8），本函数不另立规则。
+    """
+    dimensions = CatalogSweepRequest.supported_grid_dimensions(selection)
+    if request.amplitude_ins_km is not None:
+        if "amplitude_ins_km" not in dimensions:
+            raise ValueError("amplitude_ins_km/amplitude_outs_km 二维振幅网格仅 LISSAJOUS 用")
+        return "lissajous"
+    if "amplitude_ins_km" in dimensions:
+        raise ValueError(
+            "LISSAJOUS 振幅为面内/面外二维，只支持 amplitude_ins_km × "
+            "amplitude_outs_km 二维振幅网格（不支持一维振幅或能量窗口）"
+        )
+    if request.jacobi_windows is not None:
+        if "jacobi_windows" not in dimensions:
+            raise ValueError(f"{selection} 不支持 jacobi_windows 能量窗口扫描")
+        return "jacobi"
+    return "amplitude"
+
+
+def _expand_sweep_points(request: CatalogSweepRequest) -> list[_SweepPlanPoint]:
+    """把扫描参数空间展开为参数点序列（族请求 + 主参数标签）。
+
+    网格 = 族 × 平动点 × 主参数维度：NRHO 一维扫 perilune_heights_max_km，
+    其余共线/三角族扫 max_amplitudes_km；能量窗口维扫 jacobi_windows（族
+    延拓范围取各族默认值，不叠振幅网格）；LISSAJOUS 扫面内×面外二维振幅
+    笛卡尔积（相位取请求默认值）。每点经 ``FamilyGenerationRequest`` 校验，
     非法点在此拒绝（ValueError → Facade 翻译 INVALID_PARAMS）。
     """
-    points: list[tuple[FamilyGenerationRequest, float, int]] = []
+    points: list[_SweepPlanPoint] = []
     for orbit_type in request.orbit_types:
         selection = orbit_type.upper()
-        if selection == "LISSAJOUS":
-            raise ValueError("LISSAJOUS 的振幅为面内/面外二维，不支持一维扫描")
-        if selection not in _SWEEP_GRID_FIELD:
-            raise ValueError(f"catalog_sweep 不支持的 orbit_type: {orbit_type!r}")
+        try:
+            CatalogSweepRequest.supported_grid_dimensions(selection)
+        except ValueError as exc:
+            raise ValueError(f"catalog_sweep 不支持的 orbit_type: {orbit_type!r}") from exc
         allowed = _FAMILY_LIBRATION_POINT_RANGES[selection]
         libration_points = request.libration_points or [_FAMILY_DEFAULT_LIBRATION_POINT[selection]]
         for libration_point in libration_points:
@@ -424,21 +459,62 @@ def _expand_sweep_points(
                     f"{selection} libration_point 必须为 {sorted(allowed)}，"
                     f"当前 {libration_point!r}"
                 )
-        grid = request.perilune_heights_max_km if selection == "NRHO" else request.max_amplitudes_km
-        grid_name = "perilune_heights_max_km" if selection == "NRHO" else "max_amplitudes_km"
-        if not grid:
-            raise ValueError(f"{selection} 扫描需要 {grid_name} 网格")
-        field_name = _SWEEP_GRID_FIELD[selection]
+        mode = _sweep_grid_mode(request, selection)
         for libration_point in libration_points:
+            if mode == "jacobi":
+                for window in request.jacobi_windows or ():
+                    points.append(
+                        _SweepPlanPoint(
+                            family_request=FamilyGenerationRequest(
+                                orbit_type=selection,
+                                libration_point=libration_point,
+                                n_orbits=request.n_orbits,
+                            ),
+                            libration_point=libration_point,
+                            jacobi_window=(float(window[0]), float(window[1])),
+                        )
+                    )
+                continue
+            if mode == "lissajous":
+                for amplitude_in in request.amplitude_ins_km or ():
+                    for amplitude_out in request.amplitude_outs_km or ():
+                        points.append(
+                            _SweepPlanPoint(
+                                family_request=FamilyGenerationRequest(
+                                    orbit_type=selection,
+                                    libration_point=libration_point,
+                                    n_orbits=request.n_orbits,
+                                    amplitude_in_km=amplitude_in,
+                                    amplitude_out_km=amplitude_out,
+                                ),
+                                libration_point=libration_point,
+                                amplitudes_km=(float(amplitude_in), float(amplitude_out)),
+                            )
+                        )
+                continue
+            grid = (
+                request.perilune_heights_max_km
+                if selection == "NRHO"
+                else request.max_amplitudes_km
+            )
+            grid_name = "perilune_heights_max_km" if selection == "NRHO" else "max_amplitudes_km"
+            if not grid:
+                raise ValueError(f"{selection} 扫描需要 {grid_name} 网格")
+            field_name = _SWEEP_GRID_FIELD[selection]
             for value in grid:
                 overrides: dict[str, Any] = {field_name: value}
-                family_request = FamilyGenerationRequest(
-                    orbit_type=selection,
-                    libration_point=libration_point,
-                    n_orbits=request.n_orbits,
-                    **overrides,
+                points.append(
+                    _SweepPlanPoint(
+                        family_request=FamilyGenerationRequest(
+                            orbit_type=selection,
+                            libration_point=libration_point,
+                            n_orbits=request.n_orbits,
+                            **overrides,
+                        ),
+                        libration_point=libration_point,
+                        parameter_km=float(value),
+                    )
                 )
-                points.append((family_request, float(value), libration_point))
     return points
 
 
@@ -457,6 +533,13 @@ def _family_entry_kwargs(request: FamilyGenerationRequest) -> dict[str, Any]:
         return {
             "max_amplitude_km": request.max_amplitude_km,
             "continuation_direction": request.continuation_direction,
+        }
+    if selection == "LISSAJOUS":
+        return {
+            "amplitude_in_km": request.amplitude_in_km,
+            "amplitude_out_km": request.amplitude_out_km,
+            "phase_in": request.phase_in,
+            "phase_out": request.phase_out,
         }
     return {
         "min_amplitude_km": request.min_amplitude_km,
@@ -1127,7 +1210,8 @@ class Facade:
     def catalog_sweep(self, **params) -> CatalogSweepResponse:
         """参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
 
-        网格 = 族 × 平动点 × 主延拓参数；部分参数点失败时已产出的记录
+        网格 = 族 × 平动点 × 主参数维度（一维振幅/近月点高度、能量窗口、
+        LISSAJOUS 二维振幅，三选一）；部分参数点失败时已产出的记录
         保留，失败原因逐点可查（ADR 0020 软失败语义）。
         """
         try:
@@ -1144,31 +1228,40 @@ class Facade:
 
         sweep_points = [
             FamilySweepPoint(
-                orbit_type=family_request.orbit_type.upper(),
-                libration_point=libration_point,
-                n_orbits=family_request.n_orbits,
-                kwargs=_family_entry_kwargs(family_request),
+                orbit_type=plan.family_request.orbit_type.upper(),
+                libration_point=plan.libration_point,
+                n_orbits=plan.family_request.n_orbits,
+                kwargs=_family_entry_kwargs(plan.family_request),
+                jacobi_window=plan.jacobi_window,
             )
-            for family_request, _, libration_point in points
+            for plan in points
         ]
         raw_outcomes = run_family_sweep(sweep_points)
 
         outcomes: list[CatalogSweepPointOutcome] = []
         record_ids: list[str] = []
         failed = 0
-        for (family_request, parameter_km, libration_point), outcome in zip(
-            points, raw_outcomes, strict=True
-        ):
-            record_id = self._ingest_sweep_outcome(outcome, family_request)
+        for plan, outcome in zip(points, raw_outcomes, strict=True):
+            record_id = self._ingest_sweep_outcome(outcome, plan.family_request)
             if record_id is not None:
                 record_ids.append(record_id)
             if outcome.result is None:
                 failed += 1
             outcomes.append(
                 CatalogSweepPointOutcome(
-                    orbit_type=family_request.orbit_type.upper(),
-                    libration_point=libration_point,
-                    parameter_km=parameter_km,
+                    orbit_type=plan.family_request.orbit_type.upper(),
+                    libration_point=plan.libration_point,
+                    parameter_km=plan.parameter_km,
+                    jacobi_window=(
+                        [plan.jacobi_window[0], plan.jacobi_window[1]]
+                        if plan.jacobi_window is not None
+                        else None
+                    ),
+                    amplitudes_km=(
+                        [plan.amplitudes_km[0], plan.amplitudes_km[1]]
+                        if plan.amplitudes_km is not None
+                        else None
+                    ),
                     status=outcome.status,
                     cause=outcome.cause,
                     message=outcome.message,

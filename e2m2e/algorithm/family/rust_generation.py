@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
@@ -9,7 +10,7 @@ import numpy as np
 from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.seed import MOON_RADIUS_KM
 from ...data.types.orbit import Orbit, OrbitFamily
-from ...integrators import generate_cr3bp_family_py
+from ...integrators import generate_cr3bp_family_py, generate_cr3bp_family_windows_py
 from ..dynamics import CR3BP_Dynamics
 from ..results import FamilyGenerationResult
 
@@ -37,6 +38,57 @@ def generate_rust_family(
         max_step=dynamics.max_step,
         **parameters,
     )
+    return _wrap_outcome(family_type, libration_point, raw, dynamics, parameters)
+
+
+def generate_rust_family_windows(
+    family_type: str,
+    libration_point: int,
+    n_orbits: int,
+    jacobi_windows: Sequence[Sequence[float]],
+    dynamics: CR3BP_Dynamics | None = None,
+    **parameters: Any,
+) -> list[FamilyGenerationResult]:
+    """按 Jacobi 能量窗口单次调用 Rust 批量生成轨道族（trace 只走一次）。
+
+    同一组生成参数的延拓 trace 在 Rust 侧只生成一次，各窗口分别筛选
+    成员；返回与 ``jacobi_windows`` 同序的结果列表（每窗口一条）。窗口
+    零成员时该窗口结果为零成员的结构化软失败（状态可查）。
+    """
+    if dynamics is None:
+        from .cr3bp_orbits import earth_moon_system
+
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    characteristic_length = dynamics.system.characteristic_length
+    if characteristic_length is None:
+        raise ValueError("CR3BP system 尚未设置特征长度")
+    raw_outcomes = generate_cr3bp_family_windows_py(
+        family_type=family_type,
+        mu=float(dynamics.system.mu),
+        characteristic_length_km=float(characteristic_length),
+        secondary_radius_km=MOON_RADIUS_KM,
+        point=libration_point,
+        n_orbits=n_orbits,
+        jacobi_windows=[[float(lower), float(upper)] for lower, upper in jacobi_windows],
+        rtol=dynamics.rtol,
+        atol=dynamics.atol,
+        max_step=dynamics.max_step,
+        **parameters,
+    )
+    return [
+        _wrap_outcome(family_type, libration_point, raw, dynamics, parameters)
+        for raw in raw_outcomes
+    ]
+
+
+def _wrap_outcome(
+    family_type: str,
+    libration_point: int,
+    raw: dict[str, Any],
+    dynamics: CR3BP_Dynamics,
+    parameters: dict[str, Any],
+) -> FamilyGenerationResult:
+    """Rust 单条族生成结果 dict → 领域对象。"""
     periodic = raw["periodicity"] == "periodic"
     members = []
     for item in raw["members"]:
