@@ -38,6 +38,7 @@ def _make_design_result(*, with_system: bool = True):
         orbit_type="DRO",
         epoch_utc="2024-01-01T00:00:00.000",
         duration_day=365.25,
+        output_step_sec=3600.0,
         initial_state=np.zeros(6),
         ephemeris=_make_ephemeris(),
         cr3bp_orbit=SimpleNamespace(

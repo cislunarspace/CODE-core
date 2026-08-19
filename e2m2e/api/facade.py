@@ -18,12 +18,39 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 
 from e2m2e.algorithm.results import FamilyGenerationResult
+from e2m2e.data.catalog import (
+    CatalogError,
+    CatalogFilter,
+    CatalogStore,
+    RecordNotFoundError,
+    ephemeris_from_arrays,
+)
+from e2m2e.data.catalog import member_count as catalog_member_count
 from e2m2e.data.constants import SECONDS_PER_DAY
 from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import OrbitFamily
 
+from . import catalog_ingest
 from .config import Config
 from .models import (
+    _FAMILY_DEFAULT_LIBRATION_POINT,
+    _FAMILY_LIBRATION_POINT_RANGES,
+    CatalogDeleteRequest,
+    CatalogDeleteResponse,
+    CatalogExportRequest,
+    CatalogExportResponse,
+    CatalogGetRequest,
+    CatalogPromoteRequest,
+    CatalogPromoteResponse,
+    CatalogQueryRequest,
+    CatalogQueryResponse,
+    CatalogRecordResponse,
+    CatalogRecordSummary,
+    CatalogSweepPointOutcome,
+    CatalogSweepRequest,
+    CatalogSweepResponse,
+    CatalogTagRequest,
+    CatalogTagResponse,
     ControlOrbitRequest,
     ControlOrbitResponse,
     DesignOrbitRequest,
@@ -251,6 +278,194 @@ def _control_result_to_response(
     )
 
 
+# ---------------------------------------------------------------------------
+# 轨道库 catalog（ADR 0031）：记录 ↔ 响应翻译、过滤构造、sweep 网格展开
+# ---------------------------------------------------------------------------
+
+
+def _record_not_found(exc: RecordNotFoundError) -> OrbitError:
+    return OrbitError(
+        "RECORD_NOT_FOUND",
+        str(exc),
+        status=ConvergenceState.FAILED,
+        cause=FailureCause.INVALID_INPUT,
+    )
+
+
+def _catalog_read_failed(exc: Exception) -> OrbitError:
+    return OrbitError(
+        "CATALOG_READ_FAILED",
+        str(exc),
+        status=ConvergenceState.FAILED,
+        cause=FailureCause.BACKEND_FAILURE,
+    )
+
+
+def _catalog_write_failed(exc: Exception) -> OrbitError:
+    return OrbitError(
+        "CATALOG_WRITE_FAILED",
+        str(exc),
+        status=ConvergenceState.FAILED,
+        cause=FailureCause.BACKEND_FAILURE,
+    )
+
+
+def _to_catalog_filter(request: CatalogQueryRequest) -> CatalogFilter:
+    """把查询请求模型翻译为数据层过滤条件。"""
+    return CatalogFilter(
+        orbit_family=request.orbit_family,
+        libration_point=request.libration_point,
+        jacobi_min=request.jacobi_min,
+        jacobi_max=request.jacobi_max,
+        amplitude_min_km=request.amplitude_min_km,
+        amplitude_max_km=request.amplitude_max_km,
+        has_cr3bp=request.has_cr3bp,
+        has_ephemeris=request.has_ephemeris,
+        status=None if request.status is None else request.status.value,
+        tags=None if request.tags is None else tuple(request.tags),
+    )
+
+
+def _summary_kwargs(
+    *,
+    identity: dict[str, Any],
+    classification: dict[str, Any],
+    member_count: int,
+) -> dict[str, Any]:
+    """摘要公共字段（索引行与记录元数据两种来源共用）。"""
+    return {
+        "record_id": identity["record_id"],
+        "created_at": identity["created_at"],
+        "source_tool": identity["source_tool"],
+        "source_record_id": identity["source_record_id"],
+        "orbit_family": classification["orbit_family"],
+        "libration_point": classification["libration_point"],
+        "jacobi": classification["jacobi"],
+        "amplitude": classification["amplitude"],
+        "has_cr3bp": classification["has_cr3bp"],
+        "has_ephemeris": classification["has_ephemeris"],
+        "status": identity["status"],
+        "cause": identity["cause"],
+        "message": identity["message"],
+        "member_count": member_count,
+        "tags": identity["tags"],
+        "note": identity["note"],
+    }
+
+
+def _summary_from_index(summary: dict[str, Any]) -> CatalogRecordSummary:
+    """索引行摘要 → 响应模型。"""
+    return CatalogRecordSummary(
+        **_summary_kwargs(
+            identity=summary,
+            classification=summary["classification"],
+            member_count=summary["member_count"],
+        )
+    )
+
+
+def _summary_from_meta(meta: dict[str, Any]) -> CatalogRecordSummary:
+    """记录元数据 → 摘要响应模型（member_count 与索引用同一份推导）。"""
+    return CatalogRecordSummary(
+        **_summary_kwargs(
+            identity=meta,
+            classification=meta["classification"],
+            member_count=catalog_member_count(meta),
+        )
+    )
+
+
+def _record_to_response(record: Any) -> CatalogRecordResponse:
+    """完整记录 → 响应模型（含数组段，numpy 值）。"""
+    meta = record.meta
+    summary = _summary_from_meta(meta)
+    return CatalogRecordResponse(
+        **summary.model_dump(),
+        scalars=meta["scalars"],
+        request=meta["request"],
+        members=meta["members"],
+        arrays=record.arrays,
+    )
+
+
+#: sweep 各族的主延拓参数字段（FamilyGenerationRequest 术语）。
+#: LISSAJOUS 不在表中：其振幅为面内×面外二维，不支持一维扫描。
+_SWEEP_GRID_FIELD = {
+    "HALO": "max_amplitude_km",
+    "NRHO": "perilune_height_max_km",
+    "AXIAL": "max_amplitude_km",
+    "SPO": "max_amplitude_km",
+    "LPO": "max_amplitude_km",
+    "HORSESHOE": "max_amplitude_km",
+}
+
+
+def _expand_sweep_points(
+    request: CatalogSweepRequest,
+) -> list[tuple[FamilyGenerationRequest, float, int]]:
+    """把扫描参数空间展开为（族请求, 主参数值, 平动点）序列。
+
+    网格 = 族 × 平动点 × 主延拓参数：NRHO 扫 perilune_heights_max_km，
+    其余扫 max_amplitudes_km。每点经 ``FamilyGenerationRequest`` 校验，
+    非法点在此拒绝（ValueError → Facade 翻译 INVALID_PARAMS）。
+    """
+    points: list[tuple[FamilyGenerationRequest, float, int]] = []
+    for orbit_type in request.orbit_types:
+        selection = orbit_type.upper()
+        if selection == "LISSAJOUS":
+            raise ValueError("LISSAJOUS 的振幅为面内/面外二维，不支持一维扫描")
+        if selection not in _SWEEP_GRID_FIELD:
+            raise ValueError(f"catalog_sweep 不支持的 orbit_type: {orbit_type!r}")
+        allowed = _FAMILY_LIBRATION_POINT_RANGES[selection]
+        libration_points = request.libration_points or [_FAMILY_DEFAULT_LIBRATION_POINT[selection]]
+        for libration_point in libration_points:
+            if libration_point not in allowed:
+                raise ValueError(
+                    f"{selection} libration_point 必须为 {sorted(allowed)}，"
+                    f"当前 {libration_point!r}"
+                )
+        grid = request.perilune_heights_max_km if selection == "NRHO" else request.max_amplitudes_km
+        grid_name = "perilune_heights_max_km" if selection == "NRHO" else "max_amplitudes_km"
+        if not grid:
+            raise ValueError(f"{selection} 扫描需要 {grid_name} 网格")
+        field_name = _SWEEP_GRID_FIELD[selection]
+        for libration_point in libration_points:
+            for value in grid:
+                overrides: dict[str, Any] = {field_name: value}
+                family_request = FamilyGenerationRequest(
+                    orbit_type=selection,
+                    libration_point=libration_point,
+                    n_orbits=request.n_orbits,
+                    **overrides,
+                )
+                points.append((family_request, float(value), libration_point))
+    return points
+
+
+def _family_entry_kwargs(request: FamilyGenerationRequest) -> dict[str, Any]:
+    """族请求模型 → 算法层族生成入口的关键字参数。"""
+    selection = request.orbit_type.upper()
+    if selection == "HALO":
+        return {"max_amplitude_km": request.max_amplitude_km}
+    if selection == "NRHO":
+        return {
+            "north_south": request.north_south,
+            "perilune_height_max_km": request.perilune_height_max_km,
+            "continuation_direction": request.continuation_direction,
+        }
+    if selection == "AXIAL":
+        return {
+            "max_amplitude_km": request.max_amplitude_km,
+            "continuation_direction": request.continuation_direction,
+        }
+    return {
+        "min_amplitude_km": request.min_amplitude_km,
+        "max_amplitude_km": request.max_amplitude_km,
+        "continuation_direction": request.continuation_direction,
+        "match_tolerance_km": request.match_tolerance_km,
+    }
+
+
 class Facade:
     """e2m2e 唯一公开入口。
 
@@ -267,6 +482,58 @@ class Facade:
             config: 运行配置（api/config.py Config），缺省从环境变量读。
         """
         self._config = config or Config()
+        self._catalog_store: CatalogStore | None = None
+
+    # ---- 轨道库 catalog 私有设施（ADR 0031）----
+
+    def _open_catalog(self) -> CatalogStore:
+        """懒打开库目录（首次使用时才产生目录副作用）。"""
+        if self._catalog_store is None:
+            self._catalog_store = CatalogStore(self._config.catalog_dir)
+        return self._catalog_store
+
+    def _auto_catalog(
+        self, builder: Callable[[], tuple[dict, dict[str, np.ndarray]] | None]
+    ) -> str | None:
+        """产物自动入库（ADR 0031 决策 8）。
+
+        无产物（族零成员、站保星历缺失）返回 None；入库失败抛
+        ``CATALOG_WRITE_FAILED``，不静默降级、不冒名为计算失败（ADR 0020）。
+        """
+        if not self._config.catalog_enabled:
+            return None
+        try:
+            built = builder()
+            if built is None:
+                return None
+            meta, arrays = built
+            return self._open_catalog().put(meta, arrays)
+        except OrbitError:
+            raise
+        except Exception as exc:
+            raise _catalog_write_failed(exc) from exc
+
+    def _load_record_ephemeris(self, record_id: str) -> tuple[dict, EphemerisTable]:
+        """取库中记录的元数据与星历段（control_orbit 的 input_record_id 输入源）。"""
+        try:
+            record = self._open_catalog().get(record_id)
+        except RecordNotFoundError as exc:
+            raise OrbitError(
+                "RECORD_NOT_FOUND",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        try:
+            table = ephemeris_from_arrays(record.arrays)
+        except CatalogError as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                f"记录 {record_id} 无星历段，不能作为站保输入：{exc}",
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        return record.meta, table
 
     # ---- 一档任务（mcp_exposed=True）----
 
@@ -282,7 +549,7 @@ class Facade:
             from e2m2e.algorithm.design import design_orbit as _design
 
             result = _design(request, kernel_dir=self._config.kernel_dir)
-            return _design_result_to_response(result)
+            response = _design_result_to_response(result)
         except OrbitError:
             raise
         except (ValueError, TypeError) as exc:
@@ -295,6 +562,10 @@ class Facade:
         except Exception as exc:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("DESIGN_FAILED", message, status=status, cause=cause) from exc
+        response.record_id = self._auto_catalog(
+            lambda: catalog_ingest.build_design_record(request, result)
+        )
+        return response
 
     @mcp_exposed(request_model=ControlOrbitRequest)
     def control_orbit(self, **params) -> ControlOrbitResponse:
@@ -306,8 +577,13 @@ class Facade:
             request = ControlOrbitRequest(**params)
             from e2m2e.algorithm.station_keeping import control_orbit as _control
 
+            source_meta: dict[str, Any] | None = None
+            input_ephemeris = request.input_ephemeris
+            if request.input_record_id is not None:
+                source_meta, input_ephemeris = self._load_record_ephemeris(request.input_record_id)
+
             result = _control(
-                request.input_ephemeris,
+                input_ephemeris,
                 control_mode=request.control_mode,
                 is_nrho=request.is_nrho,
                 special_mode=request.special_mode,
@@ -345,7 +621,7 @@ class Facade:
                 tight_max_iter=request.tight_max_iter,
                 special_damping_factor=request.special_damping_factor,
             )
-            return _control_result_to_response(result, mu=request.mu)
+            response = _control_result_to_response(result, mu=request.mu)
         except OrbitError:
             raise
         except (ValueError, TypeError) as exc:
@@ -358,6 +634,10 @@ class Facade:
         except Exception as exc:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("CONTROL_FAILED", message, status=status, cause=cause) from exc
+        response.record_id = self._auto_catalog(
+            lambda: catalog_ingest.build_control_record(request, result, source_meta=source_meta)
+        )
+        return response
 
     @mcp_exposed(request_model=TransferDesignRequest)
     def transfer_design(self, **params) -> TransferDesignResponse:
@@ -552,11 +832,11 @@ class Facade:
                     request.max_amplitude_km,
                     n_orbits=request.n_orbits,
                 )
-                return _family_generation_payload(
+                response = _family_generation_payload(
                     result,
                     requested_members=request.n_orbits,
                 )
-            if sel == "NRHO":
+            elif sel == "NRHO":
                 from e2m2e.algorithm.family import design_nrho_family
 
                 assert request.north_south is not None
@@ -569,8 +849,8 @@ class Facade:
                     n_orbits=request.n_orbits,
                     continuation_direction=request.continuation_direction,
                 )
-                return _family_generation_payload(result)
-            if sel == "AXIAL":
+                response = _family_generation_payload(result)
+            elif sel == "AXIAL":
                 from e2m2e.algorithm.family import design_axial_family
 
                 assert request.max_amplitude_km is not None
@@ -581,8 +861,8 @@ class Facade:
                     n_orbits=request.n_orbits,
                     continuation_direction=request.continuation_direction,
                 )
-                return _family_generation_payload(result)
-            if sel == "LISSAJOUS":
+                response = _family_generation_payload(result)
+            elif sel == "LISSAJOUS":
                 from e2m2e.algorithm.family import design_lissajous_family
 
                 assert request.amplitude_in_km is not None
@@ -599,31 +879,32 @@ class Facade:
                     n_orbits=request.n_orbits,
                     sampling_mode=request.sampling_mode,
                 )
-                return _family_generation_payload(result)
-            from e2m2e.algorithm.family import (
-                design_horseshoe_family,
-                design_lpo_family,
-                design_spo_family,
-            )
+                response = _family_generation_payload(result)
+            else:
+                from e2m2e.algorithm.family import (
+                    design_horseshoe_family,
+                    design_lpo_family,
+                    design_spo_family,
+                )
 
-            triangular_entry = {
-                "SPO": design_spo_family,
-                "LPO": design_lpo_family,
-                "HORSESHOE": design_horseshoe_family,
-            }[sel]
-            assert request.min_amplitude_km is not None
-            assert request.max_amplitude_km is not None
-            assert request.continuation_direction is not None
-            assert request.match_tolerance_km is not None
-            result = triangular_entry(
-                request.libration_point,
-                request.min_amplitude_km,
-                request.max_amplitude_km,
-                n_orbits=request.n_orbits,
-                continuation_direction=request.continuation_direction,
-                match_tolerance_km=request.match_tolerance_km,
-            )
-            return _family_generation_payload(result)
+                triangular_entry = {
+                    "SPO": design_spo_family,
+                    "LPO": design_lpo_family,
+                    "HORSESHOE": design_horseshoe_family,
+                }[sel]
+                assert request.min_amplitude_km is not None
+                assert request.max_amplitude_km is not None
+                assert request.continuation_direction is not None
+                assert request.match_tolerance_km is not None
+                result = triangular_entry(
+                    request.libration_point,
+                    request.min_amplitude_km,
+                    request.max_amplitude_km,
+                    n_orbits=request.n_orbits,
+                    continuation_direction=request.continuation_direction,
+                    match_tolerance_km=request.match_tolerance_km,
+                )
+                response = _family_generation_payload(result)
         except OrbitError:
             raise
         except (ValueError, TypeError) as exc:
@@ -638,6 +919,18 @@ class Facade:
             raise OrbitError(
                 "FAMILY_GENERATION_FAILED", message, status=status, cause=cause
             ) from exc
+        response.record_id = self._auto_catalog(
+            lambda: catalog_ingest.build_family_record(
+                request,
+                family=response,
+                status=response.status,
+                cause=response.cause,
+                message=response.message,
+                requested_members=response.requested_members,
+                generated_members=response.generated_members,
+            )
+        )
+        return response
 
     @mcp_exposed
     def orbit_stability(self, **params) -> Any:
@@ -690,6 +983,246 @@ class Facade:
         chief/deputy 参数需映射为 TargetOrbit + dynamics 对象后接入。
         """
         raise NotImplementedError("Facade.relative_motion 待接入 algorithm/proximity/")
+
+    # ---- 轨道库 catalog（ADR 0031，mcp_exposed=True）----
+
+    @mcp_exposed(request_model=CatalogQueryRequest)
+    def catalog_query(self, **params) -> CatalogQueryResponse:
+        """多维过滤查询，返回摘要列表（不含数组段与请求快照）。"""
+        try:
+            request = CatalogQueryRequest(**params)
+        except (ValueError, TypeError) as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        try:
+            summaries = self._open_catalog().query(_to_catalog_filter(request))
+        except CatalogError as exc:
+            raise _catalog_read_failed(exc) from exc
+        records = [_summary_from_index(summary) for summary in summaries]
+        return CatalogQueryResponse(
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message=f"查询完成：{len(records)} 条记录",
+            records=records,
+        )
+
+    @mcp_exposed(request_model=CatalogGetRequest)
+    def catalog_get(self, **params) -> CatalogRecordResponse:
+        """按 record_id 取完整记录（含数组段）；不存在抛 ``RECORD_NOT_FOUND``。"""
+        try:
+            request = CatalogGetRequest(**params)
+        except (ValueError, TypeError) as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        record = self._get_record(request.record_id)
+        return _record_to_response(record)
+
+    @mcp_exposed(request_model=CatalogDeleteRequest)
+    def catalog_delete(self, **params) -> CatalogDeleteResponse:
+        """按 record_id 删除记录（文件与索引条目）；删除不可撤销。"""
+        try:
+            request = CatalogDeleteRequest(**params)
+            self._open_catalog().delete(request.record_id)
+        except RecordNotFoundError as exc:
+            raise _record_not_found(exc) from exc
+        except (CatalogError, OSError) as exc:
+            raise _catalog_write_failed(exc) from exc
+        except (ValueError, TypeError) as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        return CatalogDeleteResponse(
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message=f"记录已删除：{request.record_id}",
+            record_id=request.record_id,
+            deleted=True,
+        )
+
+    @mcp_exposed(request_model=CatalogTagRequest)
+    def catalog_tag(self, **params) -> CatalogTagResponse:
+        """写教学标注入 JSON 记录（随文件走）；tags 整体替换，note=None 保留。"""
+        try:
+            request = CatalogTagRequest(**params)
+            meta = self._open_catalog().tag(request.record_id, request.tags, request.note)
+        except RecordNotFoundError as exc:
+            raise _record_not_found(exc) from exc
+        except (CatalogError, OSError) as exc:
+            raise _catalog_write_failed(exc) from exc
+        except (ValueError, TypeError) as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        return CatalogTagResponse(
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message=f"标注已写入：{request.record_id}",
+            record=_summary_from_meta(meta),
+        )
+
+    @mcp_exposed(request_model=CatalogPromoteRequest)
+    def catalog_promote(self, **params) -> CatalogPromoteResponse:
+        """把族成员提升为独立记录（source_record_id 指向所属族）。"""
+        try:
+            request = CatalogPromoteRequest(**params)
+            record = self._open_catalog().promote_member(request.record_id, request.member_index)
+        except RecordNotFoundError as exc:
+            raise _record_not_found(exc) from exc
+        except (CatalogError, OSError) as exc:
+            raise _catalog_write_failed(exc) from exc
+        except (ValueError, TypeError) as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        return CatalogPromoteResponse(
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message=f"成员 {request.member_index} 已提升为独立记录",
+            record=_record_to_response(record),
+        )
+
+    @mcp_exposed(request_model=CatalogExportRequest)
+    def catalog_export(self, **params) -> CatalogExportResponse:
+        """把查询子集打包导出（标注随包）；包可直接作为库打开。"""
+        try:
+            request = CatalogExportRequest(**params)
+        except (ValueError, TypeError) as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        try:
+            record_ids = self._open_catalog().export(_to_catalog_filter(request), request.dest)
+        except (CatalogError, OSError) as exc:
+            raise _catalog_write_failed(exc) from exc
+        return CatalogExportResponse(
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message=f"导出完成：{len(record_ids)} 条记录 → {request.dest}",
+            dest=request.dest,
+            record_ids=record_ids,
+            exported_count=len(record_ids),
+        )
+
+    @mcp_exposed(request_model=CatalogSweepRequest)
+    def catalog_sweep(self, **params) -> CatalogSweepResponse:
+        """参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
+
+        网格 = 族 × 平动点 × 主延拓参数；部分参数点失败时已产出的记录
+        保留，失败原因逐点可查（ADR 0020 软失败语义）。
+        """
+        try:
+            request = CatalogSweepRequest(**params)
+            points = _expand_sweep_points(request)
+        except (ValueError, TypeError) as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        from e2m2e.algorithm.catalog_sweep import FamilySweepPoint, run_family_sweep
+
+        sweep_points = [
+            FamilySweepPoint(
+                orbit_type=family_request.orbit_type.upper(),
+                libration_point=libration_point,
+                n_orbits=family_request.n_orbits,
+                kwargs=_family_entry_kwargs(family_request),
+            )
+            for family_request, _, libration_point in points
+        ]
+        raw_outcomes = run_family_sweep(sweep_points)
+
+        outcomes: list[CatalogSweepPointOutcome] = []
+        record_ids: list[str] = []
+        failed = 0
+        for (family_request, parameter_km, libration_point), outcome in zip(
+            points, raw_outcomes, strict=True
+        ):
+            record_id = self._ingest_sweep_outcome(outcome, family_request)
+            if record_id is not None:
+                record_ids.append(record_id)
+            if outcome.result is None:
+                failed += 1
+            outcomes.append(
+                CatalogSweepPointOutcome(
+                    orbit_type=family_request.orbit_type.upper(),
+                    libration_point=libration_point,
+                    parameter_km=parameter_km,
+                    status=outcome.status,
+                    cause=outcome.cause,
+                    message=outcome.message,
+                    record_id=record_id,
+                    generated_members=(
+                        outcome.result.generated_members if outcome.result is not None else 0
+                    ),
+                )
+            )
+        succeeded = len(record_ids)
+        soft_empty = len(points) - succeeded - failed
+        message = f"扫描完成：{succeeded} 条记录入库，{failed} 点失败，共 {len(points)} 点"
+        if soft_empty:
+            message += f"（{soft_empty} 点软失败无成员产出）"
+        return CatalogSweepResponse(
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message=message,
+            points=outcomes,
+            record_ids=record_ids,
+            succeeded=succeeded,
+            failed=failed,
+        )
+
+    def _ingest_sweep_outcome(self, outcome: Any, family_request: Any) -> str | None:
+        """扫描单点结果入库；硬失败点（result=None）无记录。"""
+        result = outcome.result
+        if result is None:
+            return None
+        return self._auto_catalog(
+            lambda: catalog_ingest.build_family_record(
+                family_request,
+                family=result.family,
+                status=outcome.status,
+                cause=outcome.cause,
+                message=outcome.message,
+                requested_members=result.requested_members,
+                generated_members=result.generated_members,
+            )
+        )
+
+    def _get_record(self, record_id: str) -> Any:
+        """取完整记录；不存在抛 ``RECORD_NOT_FOUND``，记录损坏抛 ``CATALOG_READ_FAILED``。"""
+        try:
+            return self._open_catalog().get(record_id)
+        except RecordNotFoundError as exc:
+            raise _record_not_found(exc) from exc
+        except CatalogError as exc:
+            raise OrbitError(
+                "CATALOG_READ_FAILED",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.BACKEND_FAILURE,
+            ) from exc
 
 
 def mcp_tools(facade: Facade) -> list[str]:
