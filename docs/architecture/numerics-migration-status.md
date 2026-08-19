@@ -242,7 +242,7 @@ ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShoot
 
 **`algorithm/transfer/nlp_core.py`、`nlp_scipy.py`、`nlp_copt.py`、
 `transfer_optimization.py`（NLP 优化与编排）。** 理由：SLSQP/COPT 串行迭代是
-Python 强项（`architecture-design-discussion.md` 共识，ADR 0017 边界固化）；
+Python 强项（早期架构讨论共识，ADR 0017 边界固化）；
 `transfer_optimization.py` 是"搜索-优化"两步法优化阶段的高层编排（构造优化器、
 计算目标/约束），属 NLP 范畴。这是默认求解器所在，不是迁移目标。
 
