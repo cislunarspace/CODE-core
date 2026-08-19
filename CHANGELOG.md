@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [5.8.0] - 2026-08-19
+
 ### Added
 - **轨道库 catalog**（#475，ADR 0031）：`design_orbit` / `orbit_family_generation` / `control_orbit` 成功产出后自动入库（Config 可关闭）。记录 = JSON 元数据 + NPZ 数组段（`schema_version` 自 1 起），双段并存（CR3BP 段 + 星历段，各自可空），带多维分类（族、平动点、Jacobi、主振幅、段存在性）、状态三元组、请求快照与谱系指针；`catalog.db` SQLite 只做派生索引，删掉可扫描重建。Facade 新增 `catalog_query`（多维组合过滤，摘要列表）/ `catalog_get`（完整记录，未知 id 抛 `RECORD_NOT_FOUND`）/ `catalog_delete` / `catalog_tag`（标注随 JSON 走）/ `catalog_promote`（族成员提升为独立记录并指向所属族）/ `catalog_export`（子集打包，可直接作为库打开）/ `catalog_sweep`（参数空间扫描，复用统一 Rust 族生成，部分点失败保留已产记录），CLI/MCP 按纯派生自动获得。`control_orbit` 新增 `input_record_id` 输入源：取库中记录星历作标称轨道，站保产物自动以 `source_record_id` 指向它；三个产物响应新增 `record_id` 字段。
 
