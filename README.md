@@ -34,6 +34,18 @@ cd e2m2e
 make dev     # 唯一入口：同步依赖 + 拉取 CSPICE 编译包与 SPICE 内核 + 构建安装 Rust 扩展（spice 默认开启）
 ```
 
+#### Windows 安装 make
+
+Windows 默认不提供 `make`。可使用 [Scoop](https://scoop.sh/) 安装；在 PowerShell 中依次执行：
+
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+irm get.scoop.sh | iex
+scoop install make
+```
+
+安装完成后重开 PowerShell，回到仓库目录执行 `make dev`（唯一入口：同步依赖 + 拉取数据 + 构建安装，见上方）。若已安装 Scoop，只需执行 `scoop install make`。
+
 ### SPICE 内核
 
 星历动力学需要 NASA SPICE 内核文件。本项目测试所需的全部内核（行星星历、地球自转、月球姿态、闰秒与行星常数）已打包在 [GitHub Release](https://github.com/cislunarspace/e2m2e/releases) 的 `kernels-v1` 中。三种配置方式：
