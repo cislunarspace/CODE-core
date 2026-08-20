@@ -131,8 +131,8 @@ _PATCH_SAMPLING_PERILUNE_CLUSTERED = "perilune_clustered"
 _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 
 #: 星历修正用固定时间打靶（var_time=False）的轨道族：Halo/NRHO（不稳定，
-#: 分段打靶全程固定时刻，对齐杨洪伟 2015）与拟周期/无周期闭合族
-#: （Lissajous / 三角平动点 L4/L5）。
+#: 分段打靶全程固定时刻，对齐杨洪伟 2015）、拟周期/无周期闭合族
+#: （Lissajous / 三角平动点 L4/L5）与 Axial。
 #:
 #: 拟周期族用固定时间的机理（#366）：CR3BP 初猜无周期闭合（Lissajous
 #: 面内/面外频率不可约；L4/L5 短/长周期模态耦合），自由时间模式下时间
@@ -141,7 +141,13 @@ _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 #: 80 次上限不收敛）。固定时间下节点时刻保持 CR3BP 名义周期均匀采样，
 #: 位置/速度修正直接吸收星历偏差，Gauss-Newton 二次收敛（实测 4–6 迭代，
 #: 秒级到几十秒）。
-_FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "LISSAJOUS", "L4", "L5"})
+#:
+#: Axial 同属此病态：它从 Lyapunov 族 1:1 共振分岔（Gómez Type B）产生，
+#: 分岔邻域面内周期 = 面外周期，时间平移与面外相位平移近似简并，自由
+#: 时间打靶雅可比列病态——实测 L2/L1 默认参数 LM 停滞（
+#: STAGNATION_DETECTED，15/17 次迭代后位置残差停在 1.5e-01 / 1.1e+01 km）；
+#: 固定时间后两种修正方法均在约 10 s 内收敛到容差内。
+_FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "LISSAJOUS", "L4", "L5", "AXIAL"})
 
 #: body-fixed 帧（ITRF93 / MOON_PA）所需内核文件名，与 tests/kernel_helpers.py 一致
 _BODY_FIXED_KERNELS = [
@@ -1119,7 +1125,7 @@ def design_orbit(
             # NRHO 单独 1 圈/段（#473）：默认相位 0.5、约 1 个月弧上
             # revs_per_group=3 合并层残差可卡在约 10² km；1 圈/段与等时间
             # 采样组合下 GUI 默认量级收敛。配合下方 var_time 固定时刻族
-            # （_FIXED_TIME_ORBIT_TYPES，含 Halo/NRHO 与拟周期族）。
+            # （_FIXED_TIME_ORBIT_TYPES，含 Halo/NRHO、拟周期族与 Axial）。
             #
             # 对照论文的三项差异评估（issue #400 需求②）：论文每段 9 圈（对应
             # 972 圈/15 年量级的 12→3→3 层级拼接），合并层节点稀疏化为每圈 1 个

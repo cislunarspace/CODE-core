@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Axial 星历修正固定时刻打靶**（#485）：`AXIAL` 加入 `_FIXED_TIME_ORBIT_TYPES`。Axial 从 Lyapunov 族 1:1 共振分岔（Gómez Type B）产生，分岔邻域面内/面外周期相等，自由时间打靶的时间平移与面外相位平移近似简并，雅可比列病态，LM 停滞（STAGNATION_DETECTED；GUI 默认参数 L2/5000 km 下 15 次迭代后位置残差卡 1.5e-01 km，与 #366 的 Lissajous/L4/L5 同型）。固定时刻后约 10 s 收敛到容差内，two_level 与 segmented 两路径同时生效。新增 GUI 默认量级端到端回归（`test_axial_ephemeris_correction.py`）。建议下游固定到含本修复的版本。
+
 ### Added
 - **catalog_sweep 参数空间补全：能量网格与 Lissajous 二维网格**（#476）：扫描主参数维度增至三选一（同传结构化报错）——既有振幅/近月点高度网格之外，新增 `jacobi_windows` 能量（Jacobi）窗口网格与 `amplitude_ins_km` × `amplitude_outs_km` LISSAJOUS 面内×面外二维振幅网格。能量窗口经新增 Rust 入口 `generate_cr3bp_family_windows_py`（ABI v20）实现：同一（族、平动点）只走一次延拓 trace，各窗口分别筛选成员（窗口边界包含），记录 jacobi 包络落在窗口内，窗口零成员时该点无记录、结局逐点可查；LISSAJOUS 二维网格逐点采样入库（相位取请求默认值），不再被扫描排除。
 
