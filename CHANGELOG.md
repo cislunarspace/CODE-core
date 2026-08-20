@@ -2,8 +2,12 @@
 
 ## [Unreleased]
 
+## [5.8.1] - 2026-08-20
+
 ### Fixed
 - **Axial 星历修正固定时刻打靶**（#485）：`AXIAL` 加入 `_FIXED_TIME_ORBIT_TYPES`。Axial 从 Lyapunov 族 1:1 共振分岔（Gómez Type B）产生，分岔邻域面内/面外周期相等，自由时间打靶的时间平移与面外相位平移近似简并，雅可比列病态，LM 停滞（STAGNATION_DETECTED；GUI 默认参数 L2/5000 km 下 15 次迭代后位置残差卡 1.5e-01 km，与 #366 的 Lissajous/L4/L5 同型）。固定时刻后约 10 s 收敛到容差内，two_level 与 segmented 两路径同时生效。新增 GUI 默认量级端到端回归（`test_axial_ephemeris_correction.py`）。建议下游固定到含本修复的版本。
+- **DPO 列入不稳定轨道族，星历修正重定向 segmented**（#484）：DPO 族不稳定（vy0↔x0 映射非线性强），沿用 DRO 的单圈修正+自由外推在 GUI 默认参数下必发散（实测位置残差 1.31e+03 km）。现与 Halo/NRHO 同族对待，two_level/standard 入参自动重定向全程分段打靶；DPO 族策略为等时间 64 点/圈 + 最多 2 圈同组 + 固定节点时刻，GUI 默认量级收敛到 max_residual 6.1e-03 km。
+- **Windows 源码构建修复**（#487）：修复 Windows 下 CSPICE 与 LIBCLANG_PATH 环境配置；make 依赖链改用 `python`（官方 Windows Python 无 `python3` 命令），`make dev` 在 Windows 可一路跑通。
 
 ### Added
 - **catalog_sweep 参数空间补全：能量网格与 Lissajous 二维网格**（#476）：扫描主参数维度增至三选一（同传结构化报错）——既有振幅/近月点高度网格之外，新增 `jacobi_windows` 能量（Jacobi）窗口网格与 `amplitude_ins_km` × `amplitude_outs_km` LISSAJOUS 面内×面外二维振幅网格。能量窗口经新增 Rust 入口 `generate_cr3bp_family_windows_py`（ABI v20）实现：同一（族、平动点）只走一次延拓 trace，各窗口分别筛选成员（窗口边界包含），记录 jacobi 包络落在窗口内，窗口零成员时该点无记录、结局逐点可查；LISSAJOUS 二维网格逐点采样入库（相位取请求默认值），不再被扫描排除。
