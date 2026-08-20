@@ -16,13 +16,34 @@
 #
 # 用法：全部复制到 Colab 单元格运行。产物：<Drive>/e2m2e_JPL/（约 170MB）。
 
+import ipaddress
 import os
+import socket
+import urllib.parse
+from pathlib import Path
 
 import requests
 from google.colab import drive
 
 # 1. 挂载 Google Drive
 drive.mount("/content/drive")
+
+
+def assert_safe_url(url):
+    """服务端请求边界：仅 http/https，且解析后全部地址为公网。
+
+    拒绝 localhost、环回、私有与保留段（含云元数据端点）。校验通过
+    返回原 url，供调用点内联使用。
+    """
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme not in ("http", "https"):
+        raise ValueError(f"仅允许 http/https 协议：{url}")
+    host = parts.hostname or ""
+    for info in socket.getaddrinfo(host, None):
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            raise ValueError(f"禁止访问非公网地址：{host}（{ip}）")
+    return url
 
 
 def download_file(url, filename, save_dir):
@@ -34,9 +55,24 @@ def download_file(url, filename, save_dir):
         return
     print(f"🚀 下载: {filename} ({url})")
     try:
-        response = requests.get(url, stream=True, timeout=60)
+        # allow_redirects=False：重定向目标逐一过 assert_safe_url，防止
+        # 302 跳向内网/元数据端点（初始 URL 合法不代表跳转目标合法）。
+        response = requests.get(
+            assert_safe_url(url), stream=True, timeout=60, allow_redirects=False
+        )
+        hops = 0
+        while response.is_redirect or response.is_permanent_redirect:
+            hops += 1
+            if hops > 5:
+                raise ValueError(f"重定向次数过多：{url}")
+            response = requests.get(
+                assert_safe_url(response.headers["Location"]),
+                stream=True,
+                timeout=60,
+                allow_redirects=False,
+            )
         response.raise_for_status()
-        with open(tmp_path, "wb") as f:
+        with Path(tmp_path).open("wb") as f:
             for chunk in response.iter_content(chunk_size=1024 * 1024):
                 f.write(chunk)
         os.replace(tmp_path, save_path)

@@ -53,6 +53,7 @@ def test_gui_default_axial_converges(axial_gui_default_result):
     assert res.correction is not None
     assert res.correction.status is ConvergenceState.CONVERGED
     assert res.correction.max_residual < 2e-2
+    assert res.correction_method == "two_level"
 
 
 def test_gui_default_axial_ephemeris_aligned(axial_gui_default_result):

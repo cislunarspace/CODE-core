@@ -71,6 +71,7 @@ def _make_design_result(
         cr3bp_orbit=cr3bp_orbit,
         cr3bp_jacobi=jacobi if with_cr3bp else float("nan"),
         correction=SimpleNamespace(iterations=4) if with_cr3bp else None,
+        correction_method="two_level" if with_cr3bp else None,
         force_config={"sun_body": 1},
         status=ConvergenceState.CONVERGED,
         cause=FailureCause.NONE,
@@ -138,6 +139,7 @@ class TestAutoIngest:
         assert "cr3bp/states" in record.arrays
         assert "eph/position_km" in record.arrays
         assert record.request["orbit_type"] == "DRO"
+        assert record.scalars["correction_method"] == "two_level"
         assert record.status is ConvergenceState.CONVERGED
         assert record.cause is FailureCause.NONE
         # 主振幅 = 几何半极差最大值 × 特征长度（0.5 × 384400 km）

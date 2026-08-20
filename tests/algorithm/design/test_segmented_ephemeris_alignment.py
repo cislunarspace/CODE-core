@@ -136,6 +136,7 @@ def test_merge_layer_converges(halo_result_merge):
     res = halo_result_merge
     assert res.correction is not None
     assert res.correction.max_residual < 2e-2
+    assert res.correction_method == "segmented"
     n_expected = int(MERGE_DURATION_SEC / OUTPUT_STEP_SEC) + 1
     eph = res.ephemeris
     assert len(eph) == n_expected

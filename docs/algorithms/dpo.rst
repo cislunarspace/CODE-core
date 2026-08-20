@@ -48,8 +48,10 @@ DPO 轨道族通过 CR3BP 框架设计：
 --------
 
 DPO 属于不稳定轨道族，不能采用 DRO 的单圈修正后自由外推路径。
-当 ``correction_method`` 传入默认值 ``two_level`` 或别名 ``standard`` 时，
-设计入口会自动改用全程 ``segmented`` 多重打靶；圈间的准周期漂移仍由
+``DesignOrbitRequest`` 校验时按族分派 ``correction_method``：DPO 未显式
+指定时默认即为 ``segmented``（全程分段打靶）；显式传入 ``two_level`` /
+``standard`` 等冲突值时告警并改写为 ``segmented``，设计结果与响应的
+``correction_method`` 字段记录实际执行的方法。圈间的准周期漂移仍由
 ``station_keeping`` 处理。
 
 默认振幅 20000 km 的 DPO 周期约 23 天。为把不稳定方向的误差限制在每段

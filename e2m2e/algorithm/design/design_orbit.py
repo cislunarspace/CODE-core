@@ -43,6 +43,7 @@ from e2m2e.data.types.trajectory import EphemerisTable
 from ...data.constants import SECONDS_PER_DAY
 from ...data.kernels.manager import SPICEManager
 from ...data.templates import ConvergenceState, FailureCause
+from ...data.templates.design import SEGMENTED_CORRECTION_ORBIT_TYPES
 from ...data.templates.perturbations import DEFAULT_PERTURBATION
 from ...data.types.orbit import Orbit
 from ..coordinate.coordinate_system import CoordinateSystem
@@ -197,6 +198,8 @@ class OrbitDesignResult:
         cr3bp_jacobi: CR3BP 周期轨道的 Jacobi 常数；ELFO 场景为 nan。
         correction: 星历修正结果（收敛标志、迭代次数、残差历史、修正后
             patch points）；ELFO 场景为 None。
+        correction_method: 实际执行的星历修正方法（``"segmented"`` /
+            ``"two_level"`` 等）；ELFO 场景（无星历修正）为 None。
         force_config: 标称预报使用的力模型配置字典。
         drift_e: 传播弧段 Δe 首末差（仅 ELFO）。
         drift_aop_deg: 传播弧段 Δω 首末差（度，仅 ELFO）。
@@ -219,6 +222,7 @@ class OrbitDesignResult:
     cause: FailureCause = FailureCause.NONE
     message: str = "任务完成"
     stages: tuple[StageRecord, ...] = ()
+    correction_method: str | None = None
     drift_e: float | None = None
 
     def __post_init__(self) -> None:
@@ -880,6 +884,7 @@ def _design_elfo(
         cr3bp_orbit=None,
         cr3bp_jacobi=float("nan"),
         correction=None,
+        correction_method=None,
         force_config=force_config,
         stages=(
             StageRecord("initial_guess", applicable=False, executed=False, result_status=None),
@@ -967,13 +972,13 @@ def design_orbit(
     dyb = request.dyb
     correction_method = request.correction_method
     correction_revolutions = request.correction_revolutions
-    # Halo/NRHO/DPO 不稳定：two_level/standard 的"修正 1 圈 + 自由外推"必发散。
-    # 统一走 segmented（全程分段打靶），产出
-    # 不发散的标称参考轨道。圈间漂移是固有准周期特征，由 station_keeping
-    # 处理（架构分工见 docs/architecture/architecture.md §总体定位）。
-    # DPO 同此类（#484）：族行走 vy0↔x0 映射非线性强，属不稳定族。
-    if sel in ("HALO", "NRHO", "DPO") and correction_method != "segmented":
-        correction_method = "segmented"
+    # 修正方法已由请求校验层按族规范化（DesignOrbitRequest）；
+    # 此处只拦截绕过校验的请求，不再静默改写。
+    if sel in SEGMENTED_CORRECTION_ORBIT_TYPES and correction_method != "segmented":
+        raise ValueError(
+            f"{sel} 属不稳定轨道族，correction_method 必须为 'segmented'，"
+            f"当前 {correction_method!r}（请求未经校验层规范化）"
+        )
 
     system = earth_moon_system()
     dynamics = CR3BP_Dynamics(system)
@@ -1252,19 +1257,19 @@ def design_orbit(
             cr3bp_orbit=cr3bp_orbit,
             cr3bp_jacobi=jacobi,
             correction=correction,
+            correction_method=correction_method,
             force_config=force_config,
             stages=_design_stages(),
         )
 
     # --- 稳定轨道路径（DRO 等）：Rust 多重打靶（速度加权）+ 长期预报 ---
-    # Halo/NRHO 已在上方重定向到 segmented（自由外推对不稳定轨道必发散）。
+    # 不稳定族（HALO/NRHO/DPO）已由请求校验层规范化为 segmented，不会到达此路径。
     # 旧 two_level（Python）残差向量把位置 km 与速度 km/s 混在一起，cislunar 下
     # 位置项单边主导，Level 2 速度连续化不跑，修正产出是位置连续但速度跳变
     # ~50 m/s 的断弧——自由外推大幅 DRO 一两个月发散到 20 万 km（#324）。
     # 改走 Rust 打靶 + vel_weight（=pos_tol/vel_tol）：速度项加权后在容差尺度
     # 与位置可比，LM 真正压速度连续到 ≤0.01 m/s，修正解落在准周期轨道上，
     # 稳定轨道自由外推有界。同时全程预制星历表（cspice 缓存），不再逐步 FFI。
-    # --- 稳定轨道路径（DRO 等）：Rust 多重打靶（速度加权）+ 长期预报 ---
     if correction_method not in ("two_level", "standard", "rust"):
         raise ValueError(
             "correction_method 需为 segmented / two_level / standard / rust，"
@@ -1359,5 +1364,6 @@ def design_orbit(
         cr3bp_orbit=cr3bp_orbit,
         cr3bp_jacobi=jacobi,
         correction=correction,
+        correction_method=correction_method,
         force_config=force_config,
     )

@@ -99,6 +99,7 @@ def test_tight_short_nrho_converges(nrho_tight_short_result):
     res = nrho_tight_short_result
     assert res.correction is not None
     assert res.correction.status is ConvergenceState.CONVERGED
+    assert res.correction_method == "segmented"
     assert res.correction.max_residual < 2e-2
 
 

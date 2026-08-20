@@ -14,6 +14,7 @@
 import csv
 import os
 import time
+from pathlib import Path
 
 import requests
 from google.colab import drive
@@ -68,7 +69,7 @@ for i, row in enumerate(body):
         print(f"  {i + 1}/{len(body)}（成功 {ok}，失败 {failed}，用时 {el:.0f}s）")
     time.sleep(0.05)
 
-with open(OUT_CSV, "w", newline="") as f:
+with Path(OUT_CSV).open("w", newline="") as f:
     csv.writer(f).writerows([header] + body)
 
 total = sum(int(r[2]) for r in body if r[2].isdigit() and int(r[2]) > 0)

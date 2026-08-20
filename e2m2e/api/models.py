@@ -8,6 +8,7 @@ api/ 边界，算法层用 numpy/dataclass。每个 Facade 方法一个 Request/
 from __future__ import annotations
 
 import math
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -17,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from e2m2e.algorithm.results import ResultStatus
 from e2m2e.data.constants import SECONDS_PER_DAY
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.data.templates import SEGMENTED_CORRECTION_ORBIT_TYPES, ConvergenceState, FailureCause
 from e2m2e.data.templates.perturbations import DEFAULT_PERTURBATION
 from e2m2e.data.templates.seed import _HALO_FOLD_Z0, CHAR_LENGTH_KM
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
@@ -219,8 +220,9 @@ class DesignOrbitRequest(_ApiModel):
     correction_method: str = Field(
         default="two_level",
         description="星历修正方法：standard/two_level（稳定轨道，如 DRO）/segmented（"
-        "不稳定轨道，全程分段打靶）。Halo/NRHO/DPO 强制走 segmented（two_level 自由外推"
-        "对不稳定轨道必发散），传入值会被覆盖",
+        "不稳定轨道，全程分段打靶）。未显式指定时按族分派默认"
+        "（HALO/NRHO/DPO → segmented，其余 CR3BP 族 → two_level）；"
+        "显式传入与族冲突的值时告警并改写为 segmented",
     )
     correction_revolutions: int = Field(default=1, ge=1)
 
@@ -354,8 +356,30 @@ class DesignOrbitRequest(_ApiModel):
                 f"orbit_type 必须为 DRO/DPO/NRHO/HALO/LISSAJOUS/L4/L5/AXIAL"
                 f"/L4_SPO/L5_SPO/L4_LPO/L5_LPO/L4_HORSESHOE/L5_HORSESHOE/ELFO，当前 {sel!r}"
             )
+        self._dispatch_correction_method(sel)
         self._validate_conditional_ranges(sel)
         return self
+
+    def _dispatch_correction_method(self, selection: str) -> None:
+        """按族规范化星历修正方法：不稳定族强制 segmented。
+
+        未显式指定时静默分派默认值；显式传入与族冲突的值时告警后改写
+        （不拒绝，兼容既有调用方）。请求对象经此即为事实，算法层只做
+        防御检查、不再改写。
+        """
+        if selection not in SEGMENTED_CORRECTION_ORBIT_TYPES:
+            return
+        if self.correction_method == "segmented":
+            return
+        if "correction_method" in self.model_fields_set:
+            warnings.warn(
+                f"{selection} 属不稳定轨道族，星历修正只支持 segmented"
+                f"（two_level/standard 自由外推必发散）："
+                f"correction_method={self.correction_method!r} 已改写为 'segmented'",
+                UserWarning,
+                stacklevel=2,
+            )
+        self.correction_method = "segmented"
 
 
 class ResultResponse(_ApiModel):
@@ -425,6 +449,10 @@ class DesignOrbitResponse(ResultResponse):
     initial_state: list[float]
     cr3bp_jacobi: float
     correction_iterations: int
+    correction_method: str | None = Field(
+        default=None,
+        description="实际执行的星历修正方法；ELFO 场景（无星历修正）为 None",
+    )
     force_config: dict[str, Any]
     mu: float | None = Field(
         default=None,

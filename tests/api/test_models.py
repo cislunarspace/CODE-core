@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import pytest
 from pydantic import ValidationError
 
@@ -106,6 +108,44 @@ class TestDesignOrbitRequest:
                 DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum})
             accepted = DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum + 1.0})
             assert getattr(accepted, field) == minimum + 1.0
+
+    @pytest.mark.parametrize("orbit_type", ["HALO", "NRHO", "DPO"])
+    def test_unstable_family_defaults_to_segmented_silently(self, orbit_type):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            request = DesignOrbitRequest(orbit_type=orbit_type)
+        assert request.correction_method == "segmented"
+
+    @pytest.mark.parametrize("orbit_type", ["DRO", "LISSAJOUS", "L4", "AXIAL"])
+    def test_stable_families_default_to_two_level(self, orbit_type):
+        assert DesignOrbitRequest(orbit_type=orbit_type).correction_method == "two_level"
+
+    @pytest.mark.parametrize("orbit_type", ["HALO", "NRHO", "DPO"])
+    @pytest.mark.parametrize("method", ["two_level", "standard", "rust"])
+    def test_unstable_family_conflicting_method_warns_and_rewrites(self, orbit_type, method):
+        with pytest.warns(UserWarning, match=orbit_type):
+            request = DesignOrbitRequest(orbit_type=orbit_type, correction_method=method)
+        assert request.correction_method == "segmented"
+
+    def test_unstable_family_explicit_segmented_is_silent(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            request = DesignOrbitRequest(orbit_type="HALO", correction_method="segmented")
+        assert request.correction_method == "segmented"
+
+    def test_stable_family_keeps_any_explicit_method(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            for method in ("segmented", "two_level", "standard", "rust"):
+                request = DesignOrbitRequest(orbit_type="DRO", correction_method=method)
+                assert request.correction_method == method
+
+    def test_elfo_skips_correction_method_dispatch(self):
+        # ELFO 不经星历修正，不参与规范化：值保持默认原样
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            request = DesignOrbitRequest(orbit_type="ELFO", semi_major_axis=3000.0)
+        assert request.correction_method == "two_level"
 
     @pytest.mark.parametrize(
         ("orbit_type", "amplitude"),

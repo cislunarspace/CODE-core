@@ -6,12 +6,14 @@
 - ``systems.py``：物理常量与系统标准参数（源 ``core/constants.py`` +
   ``core/cr3bp_system.py`` 参数）。
 - ``perturbations.py``：摄动开关/DYB 默认（源 ``io/inputs_dac.py`` DEFAULT_*）。
+- ``design.py``：design_orbit 星历修正方法的族级分派表。
 - ``force_config.py``：力模型配置 schema（纯数据，源 ``core/forces/``）。
 - ``enums.py``：领域枚举（源 ``core/enums.py`` + ``mbse/data/enums.py``）。
 """
 
 from __future__ import annotations
 
+from .design import SEGMENTED_CORRECTION_ORBIT_TYPES
 from .enums import (
     BifurcationLabel,
     BoundaryMode,
@@ -41,6 +43,7 @@ __all__ = [
     "MOON_RADIUS_KM",
     "DEFAULT_DYB",
     "DEFAULT_PERTURBATION",
+    "SEGMENTED_CORRECTION_ORBIT_TYPES",
     "ReferenceFrame",
     "UnitSystem",
     "ProjectionPlane",

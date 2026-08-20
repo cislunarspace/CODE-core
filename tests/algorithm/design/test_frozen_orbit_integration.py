@@ -36,6 +36,7 @@ def test_single_candidate_structure():
     assert result.orbit_type == "ELFO"
     assert result.cr3bp_orbit is None
     assert result.correction is None
+    assert result.correction_method is None
     assert np.isnan(result.cr3bp_jacobi)
     assert result.drift_e is not None
     assert result.drift_rp_km is not None

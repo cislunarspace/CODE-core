@@ -101,6 +101,7 @@ def build_design_record(request: Any, result: Any) -> tuple[dict, dict[str, np.n
             "mu": mu,
             "char_length_km": char_length_km,
             "iterations": correction.iterations if correction is not None else 0,
+            "correction_method": result.correction_method,
         },
         request=_request_snapshot(request),
     )

@@ -48,6 +48,7 @@ def _make_design_result(*, with_system: bool = True):
         ),
         cr3bp_jacobi=3.16,
         correction=SimpleNamespace(iterations=4),
+        correction_method="two_level",
         force_config={"sun_body": 1},
         status="converged",
         cause="none",
@@ -176,6 +177,16 @@ class TestDesignResponse:
             design, "design_orbit", lambda *args, **kwargs: _make_design_result(with_system=False)
         )
         assert Facade().design_orbit(orbit_type="DRO").mu is None
+
+    def test_translates_correction_method(self, monkeypatch):
+        import e2m2e.algorithm.design as design
+
+        result = _make_design_result()
+        result.correction_method = "segmented"
+        monkeypatch.setattr(design, "design_orbit", lambda *args, **kwargs: result)
+        response = Facade().design_orbit(orbit_type="DRO")
+
+        assert response.correction_method == "segmented"
 
 
 class TestControlResponse:

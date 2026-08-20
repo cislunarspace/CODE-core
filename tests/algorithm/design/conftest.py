@@ -23,6 +23,7 @@ from e2m2e.algorithm.family.axial_initial_guess import compute_axial_initial_gue
 from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
 from e2m2e.algorithm.family.spo_initial_guess import compute_spo_initial_guess
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
+from e2m2e.data.templates import SEGMENTED_CORRECTION_ORBIT_TYPES
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.integrators import collinear_center_modes_py
 from tests.algorithm.design import seeds
@@ -38,6 +39,10 @@ def make_design_request(orbit_type: str, **overrides) -> SimpleNamespace:
     校验与按类型默认值填充由 tests/api 覆盖。本工厂钉住算法入口实际读取
     的字段集与公共默认值——字段或默认值语义变动时，本目录的集成测试会
     立即暴露。形状参数默认 None，由调用方按场景显式给定。
+
+    ``correction_method`` 默认镜像请求校验层的族级分派（HALO/NRHO/DPO →
+    segmented，其余 → two_level）：算法入口要求请求已按族规范化，未规范
+    化的不稳定族请求会被入口防御检查拒绝（test_correction_method_contract）。
     """
     fields = {
         "orbit_type": orbit_type,
@@ -60,7 +65,9 @@ def make_design_request(orbit_type: str, **overrides) -> SimpleNamespace:
         "dyb": None,
         "earth_degree": 10,
         "moon_degree": 10,
-        "correction_method": "two_level",
+        "correction_method": (
+            "segmented" if orbit_type.upper() in SEGMENTED_CORRECTION_ORBIT_TYPES else "two_level"
+        ),
         "correction_revolutions": 1,
     }
     fields.update(overrides)

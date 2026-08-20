@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from ..architecture.components import ARCHITECTURE_LAYERS, ComponentRegistry
 from ..requirements.base import RequirementCategory, RequirementRegistry
@@ -248,8 +249,9 @@ class DiagramGenerator:
     def write_document(self, title: str, content: str, output_path: str) -> None:
         """将受管 Markdown 文档写入指定位置。"""
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as file:
-            file.write(f"---\ntitle: {title}\n---\n\n# {title}\n\n{content}\n")
+        Path(output_path).write_text(
+            f"---\ntitle: {title}\n---\n\n# {title}\n\n{content}\n", encoding="utf-8"
+        )
 
     def write_diagram(self, title: str, content: str, output_path: str) -> None:
         """将 Mermaid 图表作为受管 Markdown 文档写入指定位置。"""

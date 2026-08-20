@@ -14,6 +14,7 @@ import csv
 import os
 import re
 import time
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
@@ -148,10 +149,9 @@ lines.append(
 )
 
 out_tree = os.path.join(OUT_DIR, "naif_tree.txt")
-with open(out_tree, "w") as f:
-    f.write("\n".join(lines) + "\n")
+Path(out_tree).write_text("\n".join(lines) + "\n")
 out_csv = os.path.join(OUT_DIR, "naif_files.csv")
-with open(out_csv, "w", newline="") as f:
+with Path(out_csv).open("w", newline="") as f:
     csv.writer(f).writerows([("path", "name", "bytes")] + csv_rows)
 print(f"清单已保存: {out_tree}")
 print(f"文件级清单: {out_csv}")

@@ -88,8 +88,7 @@ class CatalogStore:
         os.replace(npz_tmp, self.records_dir / f"{record_id}.npz")
 
         json_tmp = self.records_dir / f".{record_id}.json.tmp"
-        with open(json_tmp, "w", encoding="utf-8") as handle:
-            handle.write(meta_to_json(meta))
+        json_tmp.write_text(meta_to_json(meta), encoding="utf-8")
         os.replace(json_tmp, self.records_dir / f"{record_id}.json")
 
         self._index.upsert(meta)

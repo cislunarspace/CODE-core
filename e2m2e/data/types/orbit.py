@@ -244,8 +244,7 @@ class Orbit:
             "timestamp": timestamp,
         }
 
-        with open(filepath, "w") as f:
-            json.dump(data, f, indent=2)
+        filepath.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     @classmethod
     def load_from_file(
@@ -459,8 +458,7 @@ class OrbitFamily:
             "timestamp": timestamp,
         }
 
-        with open(filepath, "w") as f:
-            json.dump(data, f, indent=2)
+        filepath.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     @classmethod
     def load_from_file(cls, filename: str | Path, system: Any = None) -> OrbitFamily:

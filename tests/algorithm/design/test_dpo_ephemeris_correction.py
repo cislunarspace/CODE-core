@@ -1,8 +1,9 @@
 """DPO 星历修正回归（#484）。
 
-DPO 在星历模型下不稳定，不能沿用 DRO 的"修正一圈后自由外推"路径。
-本模块锁住 GUI 默认量级：传入 ``two_level`` 后算法自动改走全程分段打靶，
-并验证修正收敛、星历时间网格无缺口及轨迹仍保持月球附近有界。
+DPO 在星历模型下不稳定，不能沿用 DRO 的"修正一圈后自由外推"路径，
+请求校验层已按族把默认修正方法分派为 segmented（全程分段打靶，分派
+契约见 tests/api/test_models.py）。本模块锁住 GUI 默认量级：验证修正
+收敛、结果记录实际方法、星历时间网格无缺口及轨迹仍保持月球附近有界。
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ GUI_OUTPUT_STEP_SEC = 3600.0
 
 @pytest.fixture(scope="module")
 def dpo_gui_default_result():
-    """GUI 默认量级 DPO，two_level 入参应自动重定向为 segmented。"""
+    """GUI 默认量级 DPO（不稳定族，默认方法已由工厂分派为 segmented）。"""
     return design_orbit(
         make_design_request(
             orbit_type="DPO",
@@ -36,17 +37,17 @@ def dpo_gui_default_result():
             phase=0.5001,
             duration=GUI_DURATION_SEC,
             output_step=GUI_OUTPUT_STEP_SEC,
-            correction_method="two_level",
         )
     )
 
 
 def test_gui_default_dpo_converges(dpo_gui_default_result):
-    """GUI 默认量级 DPO 经自动重定向后收敛。"""
+    """GUI 默认量级 DPO 走 segmented 修正后收敛，结果记录实际方法。"""
     res = dpo_gui_default_result
     assert res.correction is not None
     assert res.correction.status is ConvergenceState.CONVERGED
     assert res.correction.max_residual < 2e-2
+    assert res.correction_method == "segmented"
 
 
 def test_gui_default_dpo_ephemeris_aligned(dpo_gui_default_result):

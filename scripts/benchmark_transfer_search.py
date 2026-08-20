@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -250,8 +251,7 @@ def main() -> None:
     if not args.no_report:
         report = build_report(results, args.workers, args.reps)
         os.makedirs(os.path.dirname(REPORT_PATH), exist_ok=True)
-        with open(REPORT_PATH, "w") as f:
-            f.write(report)
+        Path(REPORT_PATH).write_text(report, encoding="utf-8")
         print(f"报告已写入 {REPORT_PATH}")
 
 

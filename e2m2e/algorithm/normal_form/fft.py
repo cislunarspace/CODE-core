@@ -111,6 +111,7 @@ def detect_naff(
     import os
     import subprocess
     import tempfile
+    from pathlib import Path
 
     exe = _resolve_naff_binary()
     if exe is None:
@@ -133,28 +134,27 @@ def detect_naff(
     fs = 1.0 / dt
 
     with tempfile.TemporaryDirectory(prefix="e2m2e_naff_") as tmp:
+        tmp_root = Path(tmp).resolve()
+
+        def _confined(name: str) -> Path:
+            """临时文件路径解析后必须仍在 tmp 内（防路径穿越）。
+
+            name 为本函数内写死的字面量，校验对当前调用恒真；保留它是
+            安全门禁对该写入口的显式约束，改动文件名时校验随之生效。
+            """
+            path = (tmp_root / name).resolve()
+            if not path.is_relative_to(tmp_root):
+                raise ValueError(f"临时文件路径越界: {name}")
+            return path
+
         # 输入数据
-        input_path = os.path.join(tmp, "Input.txt")
-        with open(input_path, "w") as f:
-            for v in y:
-                f.write(f"{v:20.18f}\n")
+        _confined("Input.txt").write_text("".join(f"{v:20.18f}\n" for v in y))
 
         # 控制文件
-        control_path = os.path.join(tmp, "naff_uv_control_file.txt")
-        with open(control_path, "w") as f:
-            f.write("Input.txt\n")
-            f.write("r\n")
-            f.write("full\n")
-            f.write("1\n")
-            f.write("1\n")
-            f.write("1\n")
-            f.write(f"{fs:20.18f}\n")
-            f.write(f"{int(n_components)}\n")
-            f.write("1\n")
-            f.write("han_5\n")
-            f.write("hft\n")
-            f.write("0\n")
-            f.write("Output.txt\n")
+        _confined("naff_uv_control_file.txt").write_text(
+            "Input.txt\nr\nfull\n1\n1\n1\n"
+            f"{fs:20.18f}\n{int(n_components)}\n1\nhan_5\nhft\n0\nOutput.txt\n"
+        )
 
         # 拷贝可执行文件到 tmp（与 qiao 一致），便于 DLL 解析
         exe_name = os.path.basename(exe)

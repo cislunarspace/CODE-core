@@ -21,10 +21,13 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import pathlib
+import socket
 import sys
+import urllib.parse
 import urllib.request
 
 REPO = "cislunarspace/e2m2e"
@@ -33,6 +36,34 @@ RELEASE = "kernels-v1"
 EXTENSIONS = (".bsp", ".tls", ".tpc", ".bpc", ".tf")
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+
+
+def assert_safe_url(url: str) -> str:
+    """服务端请求边界：仅 http/https，且解析后全部地址为公网。
+
+    拒绝 localhost、环回、私有与保留段。校验通过返回原 url，
+    供调用点内联使用。
+    """
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme not in ("http", "https"):
+        raise ValueError(f"仅允许 http/https 协议：{url}")
+    host = parts.hostname or ""
+    for info in socket.getaddrinfo(host, None):
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            raise ValueError(f"禁止访问非公网地址：{host}（{ip}）")
+    return url
+
+
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """重定向目标逐一校验（初始 URL 合法不代表跳转目标合法）。"""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        assert_safe_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_safe_opener = urllib.request.build_opener(_SafeRedirectHandler)
 
 
 def _api_headers() -> dict[str, str]:
@@ -46,15 +77,15 @@ def _api_headers() -> dict[str, str]:
 def _list_release_assets() -> list[dict]:
     """列 ``kernels-v1`` release 的全部资产（name + browser_download_url）。"""
     url = f"https://api.github.com/repos/{REPO}/releases/tags/{RELEASE}"
-    req = urllib.request.Request(url, headers=_api_headers())
-    with urllib.request.urlopen(req) as resp:  # noqa: S310 — 固定 https API URL
+    req = urllib.request.Request(assert_safe_url(url), headers=_api_headers())
+    with _safe_opener.open(req) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     return data.get("assets", [])
 
 
 def _download(url: str, dest: pathlib.Path) -> None:
     print(f"下载 {url} → {dest}", file=sys.stderr)
-    with urllib.request.urlopen(url) as resp, dest.open("wb") as fh:  # noqa: S310 — 固定 https URL
+    with _safe_opener.open(assert_safe_url(url)) as resp, dest.open("wb") as fh:
         fh.write(resp.read())
 
 

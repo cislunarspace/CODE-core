@@ -240,6 +240,7 @@ def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse
         cause=result.cause,
         message=result.message,
         correction_iterations=correction.iterations if correction else 0,
+        correction_method=result.correction_method,
         force_config=result.force_config,
         mu=mu,
         states=states,

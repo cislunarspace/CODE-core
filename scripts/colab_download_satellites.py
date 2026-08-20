@@ -13,6 +13,7 @@
 import os
 import re
 import time
+from pathlib import Path
 from urllib.parse import quote
 
 import requests
@@ -96,7 +97,7 @@ def download(url, dest, expect_size):
     try:
         with session.get(url, stream=True, timeout=60) as r:
             r.raise_for_status()
-            with open(tmp, "wb") as f:
+            with Path(tmp).open("wb") as f:
                 for chunk in r.iter_content(chunk_size=1024 * 1024):
                     f.write(chunk)
         size = os.path.getsize(tmp)
