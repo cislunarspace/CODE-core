@@ -218,8 +218,8 @@ class DesignOrbitRequest(_ApiModel):
     # 修正参数
     correction_method: str = Field(
         default="two_level",
-        description="星历修正方法：standard/two_level（稳定轨道，DRO 等）/segmented（"
-        "不稳定轨道，全程分段打靶）。Halo/NRHO 强制走 segmented（two_level 自由外推"
+        description="星历修正方法：standard/two_level（稳定轨道，如 DRO）/segmented（"
+        "不稳定轨道，全程分段打靶）。Halo/NRHO/DPO 强制走 segmented（two_level 自由外推"
         "对不稳定轨道必发散），传入值会被覆盖",
     )
     correction_revolutions: int = Field(default=1, ge=1)

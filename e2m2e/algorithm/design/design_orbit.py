@@ -117,8 +117,14 @@ VELOCITY_TOL_KMS = 1e-5
 #: 两者在容差尺度可比，LM 真正压速度连续（见 Rust ``build_residual`` 注释）。
 CORRECTION_VEL_WEIGHT = CORRECTION_TOL_KM / VELOCITY_TOL_KMS
 
-#: 每圈 patch 节点数（均匀采样基线；NRHO/Halo 按族覆盖）
+#: 每圈 patch 节点数（均匀采样基线；DPO/Halo/NRHO 按族覆盖）
 _POINTS_PER_REV = 8
+
+#: DPO 的每圈 patch 节点数。默认振幅 20000 km 的 DPO 周期约 23 天，
+#: 8 个等时间节点会产生约 2.9 天的自由传播弧，CR3BP→星历模型的节点
+#: 跳变可达 4e4 km；64 个节点将弧段缩短至约 0.36 天，实测 GUI 默认场景
+#: 可收敛（#484）。
+_DPO_POINTS_PER_REV = 64
 
 #: 拼接点采样策略（按轨道族覆盖，不暴露到请求模型）：
 #: - uniform：等时间（NRHO 生产默认，#473；其余族默认）
@@ -130,7 +136,7 @@ _PATCH_SAMPLING_UNIFORM = "uniform"
 _PATCH_SAMPLING_PERILUNE_CLUSTERED = "perilune_clustered"
 _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 
-#: 星历修正用固定时间打靶（var_time=False）的轨道族：Halo/NRHO（不稳定，
+#: 星历修正用固定时间打靶（var_time=False）的轨道族：Halo/NRHO/DPO（不稳定，
 #: 分段打靶全程固定时刻，对齐杨洪伟 2015）、拟周期/无周期闭合族
 #: （Lissajous / 三角平动点 L4/L5）与 Axial。
 #:
@@ -147,7 +153,7 @@ _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 #: 时间打靶雅可比列病态——实测 L2/L1 默认参数 LM 停滞（
 #: STAGNATION_DETECTED，15/17 次迭代后位置残差停在 1.5e-01 / 1.1e+01 km）；
 #: 固定时间后两种修正方法均在约 10 s 内收敛到容差内。
-_FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "LISSAJOUS", "L4", "L5", "AXIAL"})
+_FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "DPO", "LISSAJOUS", "L4", "L5", "AXIAL"})
 
 #: body-fixed 帧（ITRF93 / MOON_PA）所需内核文件名，与 tests/kernel_helpers.py 一致
 _BODY_FIXED_KERNELS = [
@@ -546,11 +552,19 @@ def _patch_sampling_for(orbit_type: str) -> str:
     """按轨道族选择拼接点采样策略（内部策略，不进请求契约）。
 
     NRHO 与 Halo 解耦（#473）：NRHO 默认等时间；Halo 近月点加密。
+    DPO 使用等时间采样，并由 :func:`_points_per_rev_for` 提高节点密度。
     删近月点采样保留在 ``_sample_patch_points`` 分派中供对照，不作生产默认。
     """
     if orbit_type == "HALO":
         return _PATCH_SAMPLING_PERILUNE_CLUSTERED
     return _PATCH_SAMPLING_UNIFORM
+
+
+def _points_per_rev_for(orbit_type: str) -> int:
+    """返回轨道族的每圈拼接节点数。"""
+    if orbit_type == "DPO":
+        return _DPO_POINTS_PER_REV
+    return _POINTS_PER_REV
 
 
 def _sample_patch_points(
@@ -560,10 +574,11 @@ def _sample_patch_points(
     n_revolutions: int,
     *,
     sampling: str = _PATCH_SAMPLING_UNIFORM,
+    points_per_rev: int = _POINTS_PER_REV,
 ) -> tuple[np.ndarray, np.ndarray]:
     """从历元状态出发，在 ``n_revolutions`` 圈上采样 patch points（synodic）。
 
-    默认每圈 ``_POINTS_PER_REV`` 等时间点。``sampling`` 覆盖族相关策略：
+    默认每圈 ``points_per_rev`` 个等时间点。``sampling`` 覆盖族相关策略：
 
     - ``perilune_clustered``：近月点加密（Halo）
     - ``drop_near_perilune``：删近月点附近节点（对照/研究；#473 起非生产默认）
@@ -574,10 +589,10 @@ def _sample_patch_points(
         t_rel, states = sample_patch_points_perilune_clustered(dense, dynamics)
     elif sampling == _PATCH_SAMPLING_DROP_NEAR_PERILUNE:
         t_rel, states = sample_patch_points_drop_near_perilune(
-            dense, dynamics, n_points=_POINTS_PER_REV
+            dense, dynamics, n_points=points_per_rev
         )
     else:
-        t_rel = np.linspace(0.0, period, _POINTS_PER_REV, endpoint=False)
+        t_rel = np.linspace(0.0, period, points_per_rev, endpoint=False)
         states = np.empty((len(t_rel), 6))
         for i in range(6):
             states[:, i] = np.interp(t_rel, dense.times, dense.states[:, i])
@@ -952,11 +967,12 @@ def design_orbit(
     dyb = request.dyb
     correction_method = request.correction_method
     correction_revolutions = request.correction_revolutions
-    # Halo/NRHO 不稳定：two_level/standard 的"修正 1 圈 + 自由外推"必发散。
+    # Halo/NRHO/DPO 不稳定：two_level/standard 的"修正 1 圈 + 自由外推"必发散。
     # 统一走 segmented（全程分段打靶），产出
     # 不发散的标称参考轨道。圈间漂移是固有准周期特征，由 station_keeping
     # 处理（架构分工见 docs/architecture/architecture.md §总体定位）。
-    if sel in ("HALO", "NRHO") and correction_method != "segmented":
+    # DPO 同此类（#484）：族行走 vy0↔x0 映射非线性强，属不稳定族。
+    if sel in ("HALO", "NRHO", "DPO") and correction_method != "segmented":
         correction_method = "segmented"
 
     system = earth_moon_system()
@@ -1001,6 +1017,7 @@ def design_orbit(
             period,
             correction_revolutions,
             sampling=_patch_sampling_for(sel),
+            points_per_rev=_points_per_rev_for(sel),
         )
 
     epoch_iso = _epoch_to_iso(request.epoch)
@@ -1083,13 +1100,15 @@ def design_orbit(
             )
         else:
             # 按 n_rev 圈重采样整条 tile（初猜）。采样策略按族覆盖
-            # （见 _patch_sampling_for）：Halo 近月点加密，NRHO 与其余等时间（#473）。
+            # （见 _patch_sampling_for）：Halo 近月点加密；NRHO 与其余族等时间。
+            # DPO 周期长且不稳定，使用 64 点/圈缩短单弧（#484）。
             t_patch_syn_n, state_patch_syn_n = _sample_patch_points(
                 dynamics,
                 state0_syn,
                 period,
                 n_rev,
                 sampling=_patch_sampling_for(sel),
+                points_per_rev=_points_per_rev_for(sel),
             )
         t_patch_j2000_n = et0 + t_patch_syn_n * t_c
         state_patch_j2000_n = syn_j2000.batch_synodic_to_j2000(
@@ -1124,8 +1143,10 @@ def design_orbit(
             # 长段节点密、段内约束强，各段修到正确星历弧（对齐朱彦伟 2026）。
             # NRHO 单独 1 圈/段（#473）：默认相位 0.5、约 1 个月弧上
             # revs_per_group=3 合并层残差可卡在约 10² km；1 圈/段与等时间
-            # 采样组合下 GUI 默认量级收敛。配合下方 var_time 固定时刻族
-            # （_FIXED_TIME_ORBIT_TYPES，含 Halo/NRHO、拟周期族与 Axial）。
+            # 采样组合下 GUI 默认量级收敛。DPO 的一个周期约 23 天，使用 64
+            # 点/圈时两圈同组可避免逐圈独立修正后的 seam 残差（#484）。
+            # 配合下方 var_time 固定时刻族（_FIXED_TIME_ORBIT_TYPES，含
+            # Halo/NRHO/DPO、拟周期族与 Axial）。
             #
             # 对照论文的三项差异评估（issue #400 需求②）：论文每段 9 圈（对应
             # 972 圈/15 年量级的 12→3→3 层级拼接），合并层节点稀疏化为每圈 1 个
@@ -1133,6 +1154,8 @@ def design_orbit(
             # 若段数过多、全节点合并矩阵病态放大，再评估 9 圈/段与远月点稀疏化。
             if sel == "NRHO":
                 revs_per_group = 1
+            elif sel == "DPO":
+                revs_per_group = min(n_rev, 2)
             elif sel == "HALO":
                 revs_per_group = min(n_rev, 3)
             else:
