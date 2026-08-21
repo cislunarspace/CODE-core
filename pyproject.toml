@@ -52,9 +52,14 @@ normal-form = [
     "sympy>=1.12",
 ]
 # MCP 协议层（api/mcp）：部署 MCP 服务器时装。
+# anyio 显式声明（server 的线程池与 CLI 事件循环直接用它，不只是 mcp 传递依赖）。
 mcp = [
-    "mcp>=1.0",
+    "mcp>=2.0",
+    "anyio>=3",
 ]
+
+[project.scripts]
+e2m2e = "e2m2e.api.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/cislunarspace/e2m2e"
