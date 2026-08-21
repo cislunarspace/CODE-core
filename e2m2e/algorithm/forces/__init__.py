@@ -26,7 +26,7 @@ from .physical_model import PhysicalModel
 from .point_mass_gravity import PointMassGravity
 from .relativistic_correction import RelativisticCorrection
 from .shadow import ConicalShadowModel
-from .srp import SolarRadiationPressure
+from .srp import SolarRadiationPressure, VariableMassSolarRadiationPressure
 from .third_body_gravity import ThirdBodyGravity
 from .thrust import BurnApplication, FiniteBurn, ImpulsiveBurn, VariableMassFiniteBurn
 
@@ -40,6 +40,7 @@ __all__ = [
     "IndirectTerm",
     "DragModel",
     "SolarRadiationPressure",
+    "VariableMassSolarRadiationPressure",
     "EcomSolarRadiationPressure",
     "ConicalShadowModel",
     "ImpulsiveBurn",

@@ -17,7 +17,10 @@
 //! - m：航天器质量（kg）
 //! - û：推力方向单位向量
 
-use super::compiled::{compute_total_acceleration, CompiledForce};
+use super::compiled::{
+    compute_total_acceleration_and_jacobian_with_mass, compute_total_acceleration_with_mass,
+    compute_total_mass_derivative, CompiledForce,
+};
 
 /// 7D 增广状态：[r(3), v(3), m(1)]
 pub type AugmentedState7 = [f64; 7];
@@ -62,7 +65,7 @@ pub fn augmented_eom_7d(
 
     // 1. 计算重力加速度（6D）
     let state6 = [r[0], r[1], r[2], v[0], v[1], v[2]];
-    let a_gravity = compute_total_acceleration(forces, et, &state6, observer)?;
+    let a_gravity = compute_total_acceleration_with_mass(forces, et, &state6, m, observer)?;
 
     // 2. 计算推力加速度
     // T_max 单位为 N (kg·m/s²)，质量单位为 kg，加速度单位为 m/s²
@@ -130,7 +133,7 @@ pub fn augmented_eom_7d_with_stm(
     // 1. 计算重力加速度 + 雅可比（6D）
     let state6 = [r[0], r[1], r[2], v[0], v[1], v[2]];
     let (a_gravity, jac_da_dr, dadv) =
-        super::compiled::compute_total_acceleration_and_jacobian(forces, et, &state6, observer)?;
+        compute_total_acceleration_and_jacobian_with_mass(forces, et, &state6, m, observer)?;
 
     // 2. 计算推力加速度
     let a_thrust_mag_m_s2 = (thrust.t_max / m) * thrust.throttle;
@@ -213,7 +216,8 @@ pub fn augmented_eom_7d_with_sensitivity(
 
     // 1. 重力加速度 + 雅可比 ∂a_grav/∂r（3×3）
     let (a_gravity, jac_da_dr, dadv) =
-        super::compiled::compute_total_acceleration_and_jacobian(forces, et, &state6, observer)?;
+        compute_total_acceleration_and_jacobian_with_mass(forces, et, &state6, m, observer)?;
+    let da_dm_force = compute_total_mass_derivative(forces, et, &state6, m, observer)?;
 
     // 2. 推力加速度（与 augmented_eom_7d 一致）
     let t_max = thrust.t_max;
@@ -246,7 +250,7 @@ pub fn augmented_eom_7d_with_sensitivity(
         for j in 0..3 {
             a_mat[3 + i][j] = jac_da_dr[i][j]; // A[v_i, r_j] = ∂a/∂r
         }
-        a_mat[3 + i][6] = da_dm[i]; // A[v_i, m] = ∂a/∂m
+        a_mat[3 + i][6] = da_dm[i] + da_dm_force[i]; // A[v_i, m] = ∂a/∂m
     }
 
     // 4. 组装 7×3 控制雅可比 B（行优先），列序 [throttle, θ₁, θ₂]

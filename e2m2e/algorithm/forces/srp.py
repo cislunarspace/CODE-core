@@ -75,3 +75,47 @@ class SolarRadiationPressure(PhysicalModel):
         """序列化为 ``("srp", area, mass, cr, shadow_bodies)``。"""
         shadow_bodies = list(self._shadow.bodies) if self._shadow is not None else []
         return ("srp", self._area, self._mass, self._cr, shadow_bodies)
+
+
+class VariableMassSolarRadiationPressure(PhysicalModel):
+    """质量由增广状态提供的 cannonball 光压模型。
+
+    小推力任务质量在线衰减，固定质量的 :class:`SolarRadiationPressure` 会
+    在整个传播区间用同一初始质量。本类只存截面积 ``area``（m²）与 ``cr``，
+    质量在每个增广状态里取出，因此 ``a = flux·P·(1AU/r)²·cr·area/m`` 随
+    推进耗质量自动更新。
+
+    Args:
+        area: 航天器迎风截面积，单位 m²。
+        cr: 辐射反射系数，默认 1.5。
+        shadow: 阴影模型（注入）；``None`` 表示全光照。
+    """
+
+    def __init__(
+        self,
+        area: float,
+        cr: float = 1.5,
+        shadow: ConicalShadowModel | None = None,
+    ) -> None:
+        self._area = float(area)
+        self._cr = float(cr)
+        self._shadow = shadow
+        if self._area <= 0:
+            raise ValueError("area must be positive")
+
+    @property
+    def area(self) -> float:
+        return self._area
+
+    @property
+    def cr(self) -> float:
+        return self._cr
+
+    @property
+    def shadow(self) -> ConicalShadowModel | None:
+        return self._shadow
+
+    def to_rust_spec(self, system) -> tuple | None:
+        """序列化为 ``("srp_variable_mass", area, cr, shadow_bodies)``。"""
+        shadow_bodies = list(self._shadow.bodies) if self._shadow is not None else []
+        return ("srp_variable_mass", self._area, self._cr, shadow_bodies)

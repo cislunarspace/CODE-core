@@ -52,6 +52,12 @@ pub enum CompiledForce {
         cr: f64,
         shadow_bodies: Vec<String>,
     },
+    /// 随增广状态质量变化的 cannonball 光压模型。
+    SRPVariableMass {
+        area: f64,
+        cr: f64,
+        shadow_bodies: Vec<String>,
+    },
     EcomSrp {
         dyb: [f64; 9],
         shadow_bodies: Vec<String>,
@@ -267,6 +273,9 @@ impl CompiledForce {
                 srp::srp_acceleration(et, &sc_pos, *area, *mass, *cr, shadow_bodies, observer)
                     .map_err(|e| format!("{:?}", e))
             }
+            Self::SRPVariableMass { .. } => {
+                Err("SRPVariableMass requires acceleration_with_mass".to_string())
+            }
             Self::EcomSrp { dyb, shadow_bodies } => {
                 let sc_pos = [state[0], state[1], state[2]];
                 ecom::ecom_acceleration(et, &sc_pos, dyb, shadow_bodies, observer)
@@ -338,6 +347,55 @@ impl CompiledForce {
                 .map_err(|e| format!("{:?}", e)),
         }
     }
+
+    /// 计算含增广状态质量的力。固定质量力保持原有路径。
+    pub fn acceleration_with_mass(
+        &self,
+        et: f64,
+        state: &[f64; 6],
+        mass: f64,
+        observer: &str,
+    ) -> Result<[f64; 3], String> {
+        match self {
+            Self::SRPVariableMass {
+                area,
+                cr,
+                shadow_bodies,
+            } => {
+                if mass <= 0.0 {
+                    return Err(format!("spacecraft mass must be positive, got {mass}"));
+                }
+                let sc_pos = [state[0], state[1], state[2]];
+                srp::srp_acceleration(et, &sc_pos, *area, mass, *cr, shadow_bodies, observer)
+                    .map_err(|e| format!("{:?}", e))
+            }
+            _ => self.acceleration(et, state, observer),
+        }
+    }
+
+    /// 当前质量对该力加速度的偏导 `∂a/∂m`。
+    pub fn mass_derivative(
+        &self,
+        et: f64,
+        state: &[f64; 6],
+        mass: f64,
+        observer: &str,
+    ) -> Result<[f64; 3], String> {
+        if mass <= 0.0 {
+            return Err(format!("spacecraft mass must be positive, got {mass}"));
+        }
+        match self {
+            Self::SRPVariableMass { .. } => {
+                let acceleration = self.acceleration_with_mass(et, state, mass, observer)?;
+                Ok([
+                    -acceleration[0] / mass,
+                    -acceleration[1] / mass,
+                    -acceleration[2] / mass,
+                ])
+            }
+            _ => Ok([0.0; 3]),
+        }
+    }
 }
 
 /// 返回 `(t, tf]` 内最早的编译力不连续时刻。
@@ -377,6 +435,42 @@ pub fn compute_total_acceleration(
     Ok(total)
 }
 
+/// 计算总加速度，并把可变质量传给质量相关力（当前为 SRP）。
+pub fn compute_total_acceleration_with_mass(
+    forces: &[CompiledForce],
+    et: f64,
+    state: &[f64; 6],
+    mass: f64,
+    observer: &str,
+) -> Result<[f64; 3], String> {
+    let mut total = [0.0_f64; 3];
+    for force in forces {
+        let a = force.acceleration_with_mass(et, state, mass, observer)?;
+        total[0] += a[0];
+        total[1] += a[1];
+        total[2] += a[2];
+    }
+    Ok(total)
+}
+
+/// 计算所有质量相关力的 `∂a/∂m`。
+pub fn compute_total_mass_derivative(
+    forces: &[CompiledForce],
+    et: f64,
+    state: &[f64; 6],
+    mass: f64,
+    observer: &str,
+) -> Result<[f64; 3], String> {
+    let mut total = [0.0_f64; 3];
+    for force in forces {
+        let derivative = force.mass_derivative(et, state, mass, observer)?;
+        for i in 0..3 {
+            total[i] += derivative[i];
+        }
+    }
+    Ok(total)
+}
+
 /// 单个 force 是否支持解析/Rust FD 雅可比。
 pub fn supports_jacobian(force: &CompiledForce) -> bool {
     matches!(
@@ -386,6 +480,7 @@ pub fn supports_jacobian(force: &CompiledForce) -> bool {
             | CompiledForce::ThirdBody { .. }
             | CompiledForce::IndirectTerm { .. }
             | CompiledForce::SRP { .. }
+            | CompiledForce::SRPVariableMass { .. }
             | CompiledForce::EcomSrp { .. }
             | CompiledForce::LowThrust { .. }
             | CompiledForce::Drag { .. }
@@ -403,6 +498,26 @@ pub fn acceleration_and_jacobian(
     force: &CompiledForce,
     et: f64,
     state: &[f64; 6],
+    observer: &str,
+) -> AccelJacobiResult {
+    acceleration_and_jacobian_with_optional_mass(force, et, state, None, observer)
+}
+
+pub fn acceleration_and_jacobian_with_mass(
+    force: &CompiledForce,
+    et: f64,
+    state: &[f64; 6],
+    mass: f64,
+    observer: &str,
+) -> AccelJacobiResult {
+    acceleration_and_jacobian_with_optional_mass(force, et, state, Some(mass), observer)
+}
+
+fn acceleration_and_jacobian_with_optional_mass(
+    force: &CompiledForce,
+    et: f64,
+    state: &[f64; 6],
+    mass: Option<f64>,
     observer: &str,
 ) -> AccelJacobiResult {
     match force {
@@ -485,22 +600,55 @@ pub fn acceleration_and_jacobian(
             let dadv = [[0.0_f64; 3]; 3];
             Ok((acc, [[0.0; 3]; 3], dadv))
         }
-        CompiledForce::SRP { .. } => {
+        CompiledForce::SRP { .. } | CompiledForce::SRPVariableMass { .. } => {
             // 数值差分（与 GravityField::jacobian_fd 同模式，步长 sqrt(eps)*|r|）。
             // SRP 加速度含阴影几何（太阳/遮挡体位置随 et 变化但本步内固定），
             // 差分自动包含光照份额对位置的贡献；阴影边界处不连续引入的
             // 差分误差只影响边界点，对 STM 积分可接受。
             let r_norm = (state[0] * state[0] + state[1] * state[1] + state[2] * state[2]).sqrt();
             let h = (f64::EPSILON.sqrt() * r_norm).max(1e-6);
-            let acc0 = force.acceleration(et, state, observer)?;
+            let current_mass = mass;
+            let acc0 = match force {
+                CompiledForce::SRPVariableMass { .. } => force.acceleration_with_mass(
+                    et,
+                    state,
+                    current_mass.ok_or_else(|| {
+                        "SRPVariableMass requires acceleration_and_jacobian_with_mass".to_string()
+                    })?,
+                    observer,
+                )?,
+                _ => force.acceleration(et, state, observer)?,
+            };
             let mut jac = [[0.0_f64; 3]; 3];
             for dim in 0..3 {
                 let mut state_plus = *state;
                 let mut state_minus = *state;
                 state_plus[dim] += h;
                 state_minus[dim] -= h;
-                let a_plus = force.acceleration(et, &state_plus, observer)?;
-                let a_minus = force.acceleration(et, &state_minus, observer)?;
+                let a_plus = match force {
+                    CompiledForce::SRPVariableMass { .. } => force.acceleration_with_mass(
+                        et,
+                        &state_plus,
+                        current_mass.ok_or_else(|| {
+                            "SRPVariableMass requires acceleration_and_jacobian_with_mass"
+                                .to_string()
+                        })?,
+                        observer,
+                    )?,
+                    _ => force.acceleration(et, &state_plus, observer)?,
+                };
+                let a_minus = match force {
+                    CompiledForce::SRPVariableMass { .. } => force.acceleration_with_mass(
+                        et,
+                        &state_minus,
+                        current_mass.ok_or_else(|| {
+                            "SRPVariableMass requires acceleration_and_jacobian_with_mass"
+                                .to_string()
+                        })?,
+                        observer,
+                    )?,
+                    _ => force.acceleration(et, &state_minus, observer)?,
+                };
                 for i in 0..3 {
                     jac[i][dim] = (a_plus[i] - a_minus[i]) / (2.0 * h);
                 }
@@ -606,4 +754,82 @@ pub fn compute_total_acceleration_and_jacobian(
         }
     }
     Ok((total_acc, total_jac, total_dadv))
+}
+
+/// 计算总加速度和雅可比，并把当前质量传给质量相关力。
+pub fn compute_total_acceleration_and_jacobian_with_mass(
+    forces: &[CompiledForce],
+    et: f64,
+    state: &[f64; 6],
+    mass: f64,
+    observer: &str,
+) -> AccelJacobiResult {
+    let mut total_acc = [0.0_f64; 3];
+    let mut total_jac = [[0.0_f64; 3]; 3];
+    let mut total_dadv = [[0.0_f64; 3]; 3];
+    for force in forces {
+        let (acc, jac, dadv) =
+            acceleration_and_jacobian_with_mass(force, et, state, mass, observer)?;
+        for i in 0..3 {
+            total_acc[i] += acc[i];
+            for j in 0..3 {
+                total_jac[i][j] += jac[i][j];
+                total_dadv[i][j] += dadv[i][j];
+            }
+        }
+    }
+    Ok((total_acc, total_jac, total_dadv))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_state() -> [f64; 6] {
+        [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]
+    }
+
+    fn variable_mass_srp() -> CompiledForce {
+        CompiledForce::SRPVariableMass {
+            area: 20.0,
+            cr: 1.3,
+            shadow_bodies: vec![],
+        }
+    }
+
+    #[test]
+    fn srp_variable_mass_rejects_fixed_mass_path() {
+        // 固定质量路径对 SRPVariableMass 必须报明确错误，引导调用方走
+        // acceleration_with_mass（6D 传播误用变质量力时不能静默用错质量）。
+        let err = variable_mass_srp()
+            .acceleration(0.0, &sample_state(), "EARTH")
+            .unwrap_err();
+        assert!(err.contains("acceleration_with_mass"), "unexpected: {err}");
+    }
+
+    #[test]
+    fn srp_variable_mass_rejects_nonpositive_mass() {
+        let state = sample_state();
+        let err = variable_mass_srp()
+            .acceleration_with_mass(0.0, &state, 0.0, "EARTH")
+            .unwrap_err();
+        assert!(err.contains("mass must be positive"), "unexpected: {err}");
+        let err = variable_mass_srp()
+            .mass_derivative(0.0, &state, -1.0, "EARTH")
+            .unwrap_err();
+        assert!(err.contains("mass must be positive"), "unexpected: {err}");
+    }
+
+    #[test]
+    fn fixed_mass_forces_ignore_mass_channel() {
+        // 固定质量力在 with_mass 路径下与原路径逐位一致，质量导数为零。
+        let forces = vec![CompiledForce::PointMass { mu: 398600.4418 }];
+        let state = sample_state();
+        let plain = compute_total_acceleration(&forces, 0.0, &state, "EARTH").unwrap();
+        let with_mass =
+            compute_total_acceleration_with_mass(&forces, 0.0, &state, 1500.0, "EARTH").unwrap();
+        assert_eq!(plain, with_mass);
+        let dm = compute_total_mass_derivative(&forces, 0.0, &state, 1500.0, "EARTH").unwrap();
+        assert_eq!(dm, [0.0; 3]);
+    }
 }

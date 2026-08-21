@@ -133,6 +133,9 @@ pub(crate) fn body_position_cached(
     observer: &str,
     et: f64,
 ) -> Result<[f64; 3], SpiceFfiError> {
+    if target.eq_ignore_ascii_case(observer) {
+        return Ok([0.0; 3]);
+    }
     match e2m2e_spice::ephem_cache::lookup_body_position(target, observer, et) {
         Ok(Some(p)) => Ok(p),
         Ok(None) => {

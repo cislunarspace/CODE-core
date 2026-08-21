@@ -1094,6 +1094,16 @@ pub(crate) fn parse_force_tuple(
                 shadow_bodies,
             })
         }
+        "srp_variable_mass" => {
+            let area: f64 = tuple.get_item(1)?.extract()?;
+            let cr: f64 = tuple.get_item(2)?.extract()?;
+            let shadow_bodies: Vec<String> = tuple.get_item(3)?.extract()?;
+            Ok(CompiledForce::SRPVariableMass {
+                area,
+                cr,
+                shadow_bodies,
+            })
+        }
         "ecom_srp" => {
             let dyb_vec: Vec<f64> = tuple.get_item(1)?.extract().map_err(|_| {
                 pyo3::exceptions::PyTypeError::new_err("ecom_srp dyb must be a list of floats")
