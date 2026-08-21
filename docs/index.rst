@@ -52,6 +52,7 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
 
    architecture/architecture
    architecture/system-dynamics-dataflow
+   architecture/hjb-hamiltonian-dataflow
    architecture/numerics-migration-status
    architecture/hjb-subsystem
 
