@@ -64,6 +64,14 @@ from .qlaw import qlaw_guess, rv_to_keplerian
 from .solution_database import SolutionDatabase
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 from .three_body_lambert import ThreeBodyLambert
+from .thrust_arcs import (
+    DEFAULT_THRUST_LEVELS,
+    G0_MPS2,
+    ThrustArc,
+    ThrustArcSequence,
+    controls_from_sequence,
+    sequence_from_controls,
+)
 from .transfer import Transfer
 from .transfer_optimization import (
     DROTRONLPOptimizer,
@@ -119,6 +127,11 @@ __all__ = [
     "LowThrustShooting",
     "LowThrustShootingSolution",
     "LowThrustCollocation",
+    "ThrustArc",
+    "ThrustArcSequence",
+    "DEFAULT_THRUST_LEVELS",
+    "sequence_from_controls",
+    "controls_from_sequence",
     "qlaw_guess",
     "rv_to_keplerian",
     "TliParams",
@@ -141,7 +154,7 @@ __all__ = [
 
 
 _DEFAULT_TOF_GRID_POINTS: int = 50
-_G0: float = 9.81  # m/s², standard gravity (Tsiolkovsky equation)
+_G0: float = G0_MPS2  # m/s²，标准重力；以 thrust_arcs.G0_MPS2 为准
 
 
 @dataclass

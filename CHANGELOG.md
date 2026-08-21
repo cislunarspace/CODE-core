@@ -4,6 +4,8 @@
 
 ### Added
 - **HJB 子系统：地月会合系 CR3BP Hamiltonian 与通用求解绑定**（#497）：新增 crate `e2m2e-hjb-dynamics`（Apache-2.0，与 ToolboxLS 移植的 ACM 许可边界见 ADR 0032），实现平面四维 CR3BP 会合系无量纲 Hamiltonian（bang-bang 油门 + 燃料权重开关，构造参数 μ/max_accel/fuel_weight）与带漂移平面双积分器；零控向量场与 `propagate_cr3bp` 逐项对拍，含 L4/L5 平衡点与 2π 周期轨迹对照。e2m2e-integrators 新增通用入口 `solve_hjb_py`（动力学标识 + 参数表，ENO2 + GLF + odeCFL2，时间反转由绑定层处理，快照按内存上界自动抽稀）与 geo-nrho 既有签名的兼容包装 `solve_planar_lowthrust_hjb_py`（ABI v21）。架构文档 `docs/architecture/hjb-subsystem.md` 与 ADR 0032 随附。
+- **值函数网格高阶梯度查询接口**（#499）：`e2m2e.algorithm.levelset.value_function_gradient(axes, values, times, state, time)`——值函数离网点值/梯度查询。空间维张量积 not-a-knot 三次样条（逐轴求解组装 `NdBSpline`），梯度为样条解析导数（C² 连续，排除单元边界梯度跳变的局部模板路线）；时间维必选线性插值；维度无关；越界抛 `ValueFunctionQueryError`。架构口径见 ADR 0033 决策 4。
+- **连续油门到离散工况映射工具**（#501）：新增 `e2m2e.algorithm.transfer.thrust_arcs`——`ThrustArc`/`ThrustArcSequence` 数据模型自 geo-nrho 迁入，档位集合、最短弧、推力/比冲全部参数化；`sequence_from_controls` 收段边界时刻 `(N+1,)`（均匀/非均匀时间节点均可），贪心合并满足最短弧约束，配点段密不再报错；`controls_from_sequence` 展开回均匀段控制供重传播验证。端到端验收：LEO 两圈连续油门解映射后重传播，终端残差实测 0.35 km / 0.0004 m/s（断言收紧至 5 km / 0.005 m/s）。架构口径见 ADR 0033 决策 5。
 
 ## [5.8.1] - 2026-08-20
 
