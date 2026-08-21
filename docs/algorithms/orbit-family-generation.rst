@@ -2,8 +2,8 @@
 ==================
 
 ``Facade.orbit_family_generation()`` 统一生成 Halo、NRHO、Axial、
-Lissajous、SPO、LPO 和 Horseshoe 七类轨道族。Facade 返回专属 Pydantic
-响应 ``FamilyGenerationResponse``；它继承
+Lissajous、SPO、LPO、Horseshoe 和 DRO 八类轨道族。Facade 返回专属
+Pydantic 响应 ``FamilyGenerationResponse``；它继承
 :class:`e2m2e.data.types.orbit.OrbitFamily` 以保持既有读取接口，并直接携带
 ``status/cause/message`` 状态三元组。``n_orbits`` 表示成员数量上限，不保证
 一定生成满额；数值延拓软失败时同一响应保留已收敛成员。算法层入口仍使用
@@ -12,8 +12,9 @@ Lissajous、SPO、LPO 和 Horseshoe 七类轨道族。Facade 返回专属 Pydant
 参数契约
 --------
 
-公共参数是 ``orbit_type``、``libration_point`` 和 ``n_orbits``。其余字段
-按族解释：
+公共参数是 ``orbit_type``、``libration_point`` 和 ``n_orbits``；DRO 是
+月心族，请求不携带 ``libration_point``（显式携带即拒绝，与其余七族拒绝
+跨族字段的口径一致）。其余字段按族解释：
 
 .. list-table::
    :header-rows: 1
@@ -50,6 +51,10 @@ Lissajous、SPO、LPO 和 Horseshoe 七类轨道族。Facade 返回专属 Pydant
      - L4/L5
      - 振幅范围、``continuation_direction`` （increase/decrease-x0）、匹配容差
      - LPO 链的大振幅成员分类
+   * - DRO
+     - 无（月心族）
+     - 振幅范围、``sampling_mode=natural-x0``
+     - 从标准种子单次 x0 自然参数延拓（跨种子窗口双向行走）
 
 请求模型按轨道族填默认值并校验条件范围。调用方可在构造请求前查询范围：
 
@@ -64,10 +69,16 @@ Lissajous、SPO、LPO 和 Horseshoe 七类轨道族。Facade 返回专属 Pydant
    print(options["continuation_direction"])
    # ("decrease-x0", "increase-x0")
 
+DRO 的振幅沿用单轨 ``design_dro`` 的定义（一个周期内距月心距离
+min/max 均值，km），请求包络与单轨一致（1737~110000 km）。族成员
+由一次 x0 自然参数延拓产出：窗口位于标准种子振幅（约 90786 km）下方
+时向月侧行走、上方时向地侧行走、跨种子时双向行走，成员按振幅升序
+返回；成员参数只含 ``amplitude_km`` 等几何量，不含平动点。
+
 周期与拟周期语义
 ----------------
 
-Halo、NRHO、Axial、SPO、LPO 和 Horseshoe 成员是严格周期轨道，
+Halo、NRHO、Axial、SPO、LPO、Horseshoe 和 DRO 成员是严格周期轨道，
 ``family.periodicity == "periodic"``。Lissajous 面内/面外频率不可约，
 成员是 Rust 非线性中心约化流上的拟周期有界多点轨迹，不做周期闭合；统一容器
 通过以下标注明确区分：

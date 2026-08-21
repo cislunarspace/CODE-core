@@ -1,10 +1,11 @@
-//! 七类 CR3BP 轨道族的统一 Rust 生成模块。
+//! 八类 CR3BP 轨道族的统一 Rust 生成模块。
 //!
 //! 该模块的接口是一次请求、一次返回；种子、修正、延拓、步长、筛选和
 //! 结构化终止全部藏在接口后。PyO3 适配器只把已校验参数翻成内部 `Spec`。
 
 mod axial;
 mod common;
+mod dro;
 mod halo;
 mod lissajous;
 mod nrho;
@@ -101,6 +102,11 @@ fn build_spec(
                 )?,
             })
         }
+        "dro" => Ok(Spec::Dro {
+            min_amplitude_km: required(min_amplitude_km, "min_amplitude_km", family_type)?,
+            max_amplitude_km: required(max_amplitude_km, "max_amplitude_km", family_type)?,
+            member_limit: n_orbits,
+        }),
         _ => Err(format!("未知 orbit family {family_type}")),
     }
 }
@@ -165,6 +171,11 @@ fn generate(context: Context, spec: Spec) -> Result<Outcome, String> {
             direction,
             match_tolerance_km,
         ),
+        Spec::Dro {
+            min_amplitude_km,
+            max_amplitude_km,
+            member_limit,
+        } => dro::generate(context, min_amplitude_km, max_amplitude_km, member_limit),
     }
 }
 
@@ -265,7 +276,7 @@ fn generate_windowed(
         .collect()
 }
 
-/// 一次调用完成七类 CR3BP 轨道族生成。
+/// 一次调用完成八类 CR3BP 轨道族生成。
 fn validate_context(
     mu: f64,
     characteristic_length_km: f64,
@@ -731,6 +742,66 @@ mod tests {
     }
 
     #[test]
+    fn dro_members_stay_in_window_and_sorted_by_amplitude() {
+        // 窗口跨种子振幅（约 90,786 km）：双向行走后按振幅升序输出，
+        // 两侧成员都存在
+        let result = generate(
+            context(),
+            Spec::Dro {
+                min_amplitude_km: 85_000.0,
+                max_amplitude_km: 100_000.0,
+                member_limit: 4,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.status, "converged", "{}", result.message);
+        assert_eq!(result.members.len(), 4);
+        let amplitudes: Vec<f64> = result
+            .members
+            .iter()
+            .map(|member| member.amplitude_km.unwrap())
+            .collect();
+        assert!(amplitudes.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(amplitudes
+            .iter()
+            .all(|amp| (85_000.0..=100_000.0).contains(amp)));
+        // 双向覆盖：种子（≈90,786 km）两侧都有成员
+        assert!(amplitudes.first().unwrap() < &90_000.0);
+        assert!(amplitudes.last().unwrap() > &91_000.0);
+    }
+
+    #[test]
+    fn dro_rejects_degenerate_amplitude_window() {
+        assert!(generate(
+            context(),
+            Spec::Dro {
+                min_amplitude_km: 20_000.0,
+                max_amplitude_km: 20_000.0,
+                member_limit: 1,
+            }
+        )
+        .is_err());
+        assert!(generate(
+            context(),
+            Spec::Dro {
+                min_amplitude_km: 30_000.0,
+                max_amplitude_km: 20_000.0,
+                member_limit: 1,
+            }
+        )
+        .is_err());
+        assert!(generate(
+            context(),
+            Spec::Dro {
+                min_amplitude_km: 1000.0,
+                max_amplitude_km: 20_000.0,
+                member_limit: 0,
+            }
+        )
+        .is_err());
+    }
+
+    #[test]
     fn periodic_families_satisfy_unified_result_contract() {
         let specs = [
             Spec::Halo {
@@ -781,6 +852,11 @@ mod tests {
                 member_limit: 1,
                 direction: "decrease-x0",
                 match_tolerance_km: 50.0,
+            },
+            Spec::Dro {
+                min_amplitude_km: 5000.0,
+                max_amplitude_km: 20_000.0,
+                member_limit: 2,
             },
         ];
 

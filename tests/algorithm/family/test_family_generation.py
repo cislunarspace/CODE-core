@@ -3,7 +3,8 @@
 覆盖 design_{nrho,axial,lissajous,spo,lpo,horseshoe}_family：
 成员数量上限、状态/时间数组形状、周期闭合、Jacobi 守恒、族振幅语义，
 以及 Lissajous 拟周期族的显式标注（契约 A：OrbitFamily 统一容器 +
-periodicity 标注，不误称严格周期族）。
+periodicity 标注，不误称严格周期族）。DRO 族（#502）的专项契约见
+test_dro_family.py。
 """
 
 import numpy as np
@@ -12,6 +13,7 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.family import (
     design_axial_family,
+    design_dro_family,
     design_halo_family,
     design_horseshoe_family,
     design_lissajous_family,
@@ -84,11 +86,21 @@ class TestFamilyInputValidation:
             ),
             lambda: design_lpo_family(4, 30000.0, 20000.0, n_orbits=1),
             lambda: design_horseshoe_family(2, 50000.0, 100000.0, n_orbits=1),
+            lambda: design_dro_family(20000.0, 20000.0, n_orbits=1),
         ],
     )
     def test_rejects_invalid_parameters_before_numerical_work(self, call):
         with pytest.raises(ValueError):
             call()
+
+
+class TestDroFamilyCompatibility:
+    def test_dro_family_keeps_periodic_contract(self, dynamics):
+        result = design_dro_family(5000.0, 20000.0, n_orbits=2, dynamics=dynamics)
+        family = _converged_family(result)
+        assert family.family_type == "dro"
+        assert 1 <= len(family) <= 2
+        _assert_period_closure_and_jacobi(dynamics, family)
 
 
 class TestStructuredPartialResult:

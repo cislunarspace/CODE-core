@@ -207,6 +207,12 @@ class TestFacadeCallChains:
                 {"libration_point": 4, "min_amplitude_km": 50000.0, "max_amplitude_km": 100000.0},
                 (4, 50000.0, 100000.0),
             ),
+            (
+                "DRO",
+                "design_dro_family",
+                {"min_amplitude_km": 5000.0, "max_amplitude_km": 20000.0},
+                (5000.0, 20000.0),
+            ),
         ],
     )
     def test_non_halo_family_dispatches_to_algorithm(
@@ -238,7 +244,7 @@ class TestFacadeCallChains:
             expected_kwargs["continuation_direction"] = "increase-amplitude"
         elif orbit_type == "LISSAJOUS":
             expected_kwargs["sampling_mode"] = "linear-amplitudes"
-        else:
+        elif orbit_type in ("SPO", "LPO", "HORSESHOE"):
             expected_kwargs.update(
                 continuation_direction="decrease-x0",
                 match_tolerance_km=50.0 if orbit_type == "HORSESHOE" else 20.0,
@@ -335,6 +341,14 @@ class TestFacadeCallChains:
                     "libration_point": 4,
                     "min_amplitude_km": 50000.0,
                     "max_amplitude_km": 110000.0,
+                },
+            ),
+            (
+                "dro",
+                {
+                    "orbit_type": "DRO",
+                    "min_amplitude_km": 5000.0,
+                    "max_amplitude_km": 20000.0,
                 },
             ),
         ],

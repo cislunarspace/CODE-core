@@ -737,7 +737,8 @@ class SpacetimeTransformResponse(ResultResponse):
 # 折叠点（同 seed._HALO_FOLD_Z0，按平动点区分）。
 # ---------------------------------------------------------------------------
 
-#: orbit_type → 允许的平动点取值域。DRO/DPO 等无平动点概念，不进本模型。
+#: orbit_type → 允许的平动点取值域。DRO 是月心族不绑定平动点（空元组），
+#: DPO 等其余无平动点族不进本模型。
 _FAMILY_LIBRATION_POINT_RANGES: Mapping[str, tuple[int, ...]] = MappingProxyType(
     {
         "HALO": (1, 2),
@@ -747,6 +748,7 @@ _FAMILY_LIBRATION_POINT_RANGES: Mapping[str, tuple[int, ...]] = MappingProxyType
         "SPO": (4, 5),
         "LPO": (4, 5),
         "HORSESHOE": (4, 5),
+        "DRO": (),
     }
 )
 
@@ -820,6 +822,7 @@ _FAMILY_SPECIFIC_FIELDS: Mapping[str, frozenset[str]] = MappingProxyType(
                 "match_tolerance_km",
             }
         ),
+        "DRO": frozenset({"min_amplitude_km", "max_amplitude_km", "sampling_mode"}),
     }
 )
 _FAMILY_OPTION_VALUES: Mapping[str, Mapping[str, tuple[str, ...]]] = MappingProxyType(
@@ -856,6 +859,7 @@ _FAMILY_OPTION_VALUES: Mapping[str, Mapping[str, tuple[str, ...]]] = MappingProx
                 "sampling_mode": ("full-period-pal",),
             }
         ),
+        "DRO": MappingProxyType({"sampling_mode": ("natural-x0",)}),
     }
 )
 
@@ -867,7 +871,8 @@ class FamilyGenerationRequest(_ApiModel):
     Facade 映射到各族算法参数。按 ``orbit_type`` 分派校验取值域
     （与 ``DesignOrbitRequest`` 同构）：共线族（Halo/NRHO/Axial）仅
     L1/L2，Lissajous 支持 L1/L2/L3，三角族（SPO/LPO/Horseshoe）仅
-    L4/L5。七族均已实现（#428）：周期族返回严格周期成员，Lissajous
+    L4/L5，DRO 是月心族不绑定平动点（请求不得携带 ``libration_point``）。
+    八族均已实现（#428、#502）：周期族返回严格周期成员，Lissajous
     返回拟周期有界轨迹的参数采样（族上显式标注 quasi-periodic）。
 
     按族适用的字段：
@@ -876,23 +881,25 @@ class FamilyGenerationRequest(_ApiModel):
     - NRHO：``north_south``、``perilune_height_max_km``、``continuation_direction``
     - LISSAJOUS：``amplitude_in_km``、``amplitude_out_km``、``phase_in``、``phase_out``
     - SPO/LPO/HORSESHOE：振幅上下限、延拓方向与 ``match_tolerance_km``
+    - DRO：振幅上下限（距月心距离 min/max 均值，km）
 
     ``sampling_mode`` 显式登记各族固定的首版采样规则；传入其他规则会
     结构化拒绝，而不是静默改用默认算法。
     """
 
-    orbit_type: str = Field(description="HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE")
+    orbit_type: str = Field(description="HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO")
     libration_point: int | None = Field(
-        default=None, ge=1, le=5, description="平动点编号：1=L1 … 5=L5；缺省按族填默认"
+        default=None, ge=1, le=5, description="平动点编号：1=L1 … 5=L5；缺省按族填默认；DRO 不适用"
     )
     max_amplitude_km: float | None = Field(
         default=None,
         description="族振幅上限（km）；HALO/AXIAL 带符号区分北/南（上/下）族，"
-        "SPO/LPO/HORSESHOE 为正值（距 L4/L5 径向距离 min/max 均值）",
+        "SPO/LPO/HORSESHOE 为正值（距 L4/L5 径向距离 min/max 均值），"
+        "DRO 为距月心距离 min/max 均值",
     )
     min_amplitude_km: float | None = Field(
         default=None,
-        description="族振幅下限（km），仅 SPO/LPO/HORSESHOE 用",
+        description="族振幅下限（km），仅 SPO/LPO/HORSESHOE/DRO 用",
     )
     north_south: int | None = Field(
         default=None, ge=1, le=2, description="北/南族：1=北，2=南；仅 NRHO 用"
@@ -945,19 +952,24 @@ class FamilyGenerationRequest(_ApiModel):
         if selection not in _FAMILY_LIBRATION_POINT_RANGES:
             raise ValueError(f"不支持的 orbit_type: {orbit_type!r}")
         allowed = _FAMILY_LIBRATION_POINT_RANGES[selection]
-        ranges: dict[str, NumericRange] = {
-            "libration_point": NumericRange(min(allowed), max(allowed))
-        }
-        point = (
-            _FAMILY_DEFAULT_LIBRATION_POINT[selection]
-            if libration_point is None
-            else libration_point
-        )
-        if point not in allowed:
-            raise ValueError(
-                f"{selection} libration_point 必须为 {sorted(allowed)}，当前 {point!r}"
+        ranges: dict[str, NumericRange] = {}
+        point: int | None = None
+        if allowed:
+            ranges["libration_point"] = NumericRange(min(allowed), max(allowed))
+            point = (
+                _FAMILY_DEFAULT_LIBRATION_POINT[selection]
+                if libration_point is None
+                else libration_point
             )
+            if point not in allowed:
+                raise ValueError(
+                    f"{selection} libration_point 必须为 {sorted(allowed)}，当前 {point!r}"
+                )
+        elif libration_point is not None:
+            # 月心族（DRO）不绑定平动点，显式携带即为跨族字段
+            raise ValueError(f"{selection} 不绑定平动点，请求不得携带 libration_point")
         if selection == "HALO":
+            assert point is not None  # HALO 必有平动点
             fold_km = _HALO_FOLD_KM[point]
             ranges["max_amplitude_km"] = NumericRange(-fold_km, fold_km, excluded_values=(0.0,))
         elif selection == "NRHO":
@@ -976,6 +988,11 @@ class FamilyGenerationRequest(_ApiModel):
             ranges["amplitude_out_km"] = amp_range
             ranges["phase_in"] = NumericRange(0.0, 1.0)
             ranges["phase_out"] = NumericRange(0.0, 1.0)
+        elif selection == "DRO":
+            # 与 DesignOrbitRequest 的 DRO 振幅包络一致（月面以上）
+            amp_range = NumericRange(1737.0, 110000.0)
+            ranges["min_amplitude_km"] = amp_range
+            ranges["max_amplitude_km"] = amp_range
         else:  # SPO/LPO/HORSESHOE：声明范围不得超出可达包络（#435 标定）
             if selection == "SPO":
                 amp_range = NumericRange(1737.0, 75000.0)
@@ -1012,7 +1029,8 @@ class FamilyGenerationRequest(_ApiModel):
         if invalid_fields:
             names = ", ".join(sorted(invalid_fields))
             raise ValueError(f"{sel} 不适用字段：{names}")
-        if self.libration_point is None:
+        if _FAMILY_LIBRATION_POINT_RANGES[sel] and self.libration_point is None:
+            # 月心族（DRO）不填平动点默认值；显式携带由 valid_ranges 拒绝
             self.libration_point = _FAMILY_DEFAULT_LIBRATION_POINT[sel]
         # 先经公开范围接口校验平动点取值域（越界在此被拒）
         ranges = self.valid_ranges(sel, libration_point=self.libration_point)
@@ -1035,6 +1053,7 @@ class FamilyGenerationRequest(_ApiModel):
             )
         # 按族填默认值
         if sel == "HALO":
+            assert self.libration_point is not None  # HALO 必有平动点
             if self.max_amplitude_km is None:
                 self.max_amplitude_km = _HALO_DEFAULT_MAX_AMPLITUDE_KM[self.libration_point]
             if self.max_amplitude_km == 0:
@@ -1058,6 +1077,11 @@ class FamilyGenerationRequest(_ApiModel):
                 self.phase_in = 0.01
             if self.phase_out is None:
                 self.phase_out = 0.55
+        elif sel == "DRO":
+            if self.min_amplitude_km is None:
+                self.min_amplitude_km = 2000.0
+            if self.max_amplitude_km is None:
+                self.max_amplitude_km = 60000.0
         else:  # SPO/LPO/HORSESHOE
             if self.min_amplitude_km is None:
                 self.min_amplitude_km = 50000.0 if sel == "HORSESHOE" else 2000.0
@@ -1072,7 +1096,7 @@ class FamilyGenerationRequest(_ApiModel):
                 raise ValueError(
                     f"{sel} {field} 应在 {numeric_range.format_interval()}，实际 {value}"
                 )
-        if sel in ("SPO", "LPO", "HORSESHOE"):
+        if sel in ("SPO", "LPO", "HORSESHOE", "DRO"):
             assert self.min_amplitude_km is not None
             assert self.max_amplitude_km is not None
             if self.min_amplitude_km >= self.max_amplitude_km:

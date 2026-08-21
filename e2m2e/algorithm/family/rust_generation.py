@@ -134,7 +134,10 @@ def _member_parameters(
     item: dict[str, Any],
     request: dict[str, Any],
 ) -> dict[str, Any]:
-    result: dict[str, Any] = {"libration_point": libration_point}
+    if family_type == "dro":
+        result: dict[str, Any] = {}  # 月心族，不绑定平动点
+    else:
+        result = {"libration_point": libration_point}
     if family_type == "halo":
         result.update(
             halo_class=0 if request["max_amplitude_km"] > 0.0 else 1,
@@ -192,6 +195,11 @@ def _family_metadata(
         )
     elif family_type == "lissajous":
         metadata["sampling"] = "linear-amplitudes"
+    elif family_type == "dro":
+        metadata["amplitude_range_km"] = [
+            request["min_amplitude_km"],
+            request["max_amplitude_km"],
+        ]
     else:
         metadata.update(
             amplitude_range_km=[

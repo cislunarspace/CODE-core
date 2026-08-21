@@ -46,6 +46,11 @@ pub(crate) enum Spec {
         direction: &'static str,
         match_tolerance_km: f64,
     },
+    Dro {
+        min_amplitude_km: f64,
+        max_amplitude_km: f64,
+        member_limit: usize,
+    },
 }
 
 #[derive(Clone, Debug)]

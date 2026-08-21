@@ -8,6 +8,12 @@ use super::types::{Context, PeriodicOrbit};
 
 const SAMPLE_COUNT: usize = 1000;
 
+/// DRO 族标准种子（与 Python ``data/templates/seed.py`` 的 ``_DRO_SEED_*``
+/// 同源）：近侧 x 轴穿越点 x0、vy0 与名义周期，振幅约 90,786 km。
+pub(crate) const SEED_DRO_X0: f64 = 0.791_885_566_197_42;
+pub(crate) const SEED_DRO_VY0: f64 = 0.536_82;
+pub(crate) const SEED_DRO_PERIOD: f64 = 3.0;
+
 #[derive(Debug)]
 pub(crate) struct Failure {
     pub(crate) status: &'static str,
@@ -175,6 +181,56 @@ pub(crate) fn correct_axial_fixed_vz(
         });
     }
     Ok(orbit)
+}
+
+pub(crate) fn correct_dro_fixed_x(
+    context: Context,
+    x0: f64,
+    guess: Option<&PeriodicOrbit>,
+) -> Result<PeriodicOrbit, Failure> {
+    if x0 >= 1.0 - context.mu {
+        // 穿越点越过月球（对侧），已不在近侧 DRO 族参数域内
+        return Err(invalid_failure(format!(
+            "DRO x0={x0:.6} 越过月心位置，超出族参数域"
+        )));
+    }
+    let (mut state, period) = match guess {
+        Some(orbit) => (orbit.state, orbit.period),
+        None => ([x0, 0.0, 0.0, 0.0, SEED_DRO_VY0, 0.0], SEED_DRO_PERIOD),
+    };
+    state[0] = x0;
+    state[1] = 0.0;
+    state[3] = 0.0;
+    state[5] = 0.0;
+    let orbit = correct(
+        context,
+        state,
+        period / 2.0,
+        &[1, 3],
+        &[4, 6],
+        false,
+        false,
+        1e-12,
+        50,
+    )?;
+    if orbit.period > 1.2 * period {
+        // 大步长行走时修正器会跳到长周期伪解（多圈对称周期轨道），
+        // 周期相对初猜显著变长即判为伪解，交由族行走退半步重试
+        return Err(Failure {
+            status: "diverged",
+            cause: "divergence_detected",
+            message: format!("DRO(x0={x0:.6}) 修正跳到长周期伪解"),
+        });
+    }
+    Ok(orbit)
+}
+
+/// DRO 振幅（km）：一个周期内距月心距离最小/最大值的均值，与 Python
+/// ``design_dro`` 同一定义；4000 点采样保证与单轨入口的测量一致。
+pub(crate) fn dro_amplitude_km(context: Context, orbit: &PeriodicOrbit) -> Result<f64, Failure> {
+    let (minimum, maximum) =
+        metric_minmax(context, orbit.state, orbit.period, "moon-distance", 0, 4000)?;
+    Ok(0.5 * (minimum + maximum) * context.characteristic_length_km)
 }
 
 pub(crate) fn correct_planar_fixed_x(

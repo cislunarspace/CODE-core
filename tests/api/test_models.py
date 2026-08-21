@@ -326,7 +326,7 @@ class TestFamilyGenerationRequest:
 
     @pytest.mark.parametrize(
         ("orbit_type", "libration_point"),
-        [("HALO", 4), ("SPO", 1), ("DRO", None)],
+        [("HALO", 4), ("SPO", 1), ("DRO", 2)],
     )
     def test_rejects_inapplicable_family(self, orbit_type, libration_point):
         kwargs = {"orbit_type": orbit_type}
@@ -401,6 +401,11 @@ class TestFamilyGenerationRequest:
         assert (horseshoe.min_amplitude_km, horseshoe.max_amplitude_km) == (50000.0, 110000.0)
         assert horseshoe.match_tolerance_km == 50.0
 
+        dro = FamilyGenerationRequest(orbit_type="DRO")
+        assert dro.libration_point is None
+        assert (dro.min_amplitude_km, dro.max_amplitude_km) == (2000.0, 60000.0)
+        assert dro.sampling_mode == "natural-x0"
+
     def test_valid_ranges_are_family_specific(self):
         nrho = FamilyGenerationRequest.valid_ranges("NRHO")
         assert nrho["perilune_height_max_km"].format_interval() == "[1000.0, 40000.0]"
@@ -419,6 +424,14 @@ class TestFamilyGenerationRequest:
         horseshoe = FamilyGenerationRequest.valid_ranges("HORSESHOE")
         assert horseshoe["min_amplitude_km"].minimum == 50000.0
         assert horseshoe["match_tolerance_km"].minimum_inclusive is False
+
+        # DRO 是月心族：无平动点范围，振幅包络与单轨 DRO 一致
+        dro = FamilyGenerationRequest.valid_ranges("DRO")
+        assert "libration_point" not in dro
+        assert dro["min_amplitude_km"].format_interval() == "[1737.0, 110000.0]"
+        with pytest.raises(ValueError, match="不绑定平动点"):
+            FamilyGenerationRequest.valid_ranges("DRO", libration_point=2)
+        assert FamilyGenerationRequest.valid_options("DRO")["sampling_mode"] == ("natural-x0",)
 
         options = FamilyGenerationRequest.valid_options("LPO")
         assert options["continuation_direction"] == ("decrease-x0", "increase-x0")
@@ -453,6 +466,22 @@ class TestFamilyGenerationRequest:
             FamilyGenerationRequest(orbit_type="LPO", libration_point=2)
         with pytest.raises(ValidationError, match="match_tolerance_km"):
             FamilyGenerationRequest(orbit_type="HORSESHOE", match_tolerance_km=0.0)
+        with pytest.raises(ValidationError, match="不绑定平动点"):
+            FamilyGenerationRequest(orbit_type="DRO", libration_point=1)
+        with pytest.raises(ValidationError, match="不适用字段"):
+            FamilyGenerationRequest(orbit_type="DRO", north_south=1)
+        with pytest.raises(ValidationError, match="不适用字段"):
+            FamilyGenerationRequest(orbit_type="DRO", continuation_direction="decrease-x0")
+        with pytest.raises(ValidationError, match="min_amplitude_km"):
+            FamilyGenerationRequest(orbit_type="DRO", min_amplitude_km=1700.0)
+        with pytest.raises(ValidationError, match="max_amplitude_km"):
+            FamilyGenerationRequest(orbit_type="DRO", max_amplitude_km=120000.0)
+        with pytest.raises(ValidationError, match="min_amplitude_km 必须小于"):
+            FamilyGenerationRequest(
+                orbit_type="DRO", min_amplitude_km=30000.0, max_amplitude_km=20000.0
+            )
+        with pytest.raises(ValidationError, match="sampling_mode"):
+            FamilyGenerationRequest(orbit_type="DRO", sampling_mode="grid")
 
 
 class TestResponses:

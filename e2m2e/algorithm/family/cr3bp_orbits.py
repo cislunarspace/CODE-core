@@ -1271,9 +1271,53 @@ def design_horseshoe(
 
 
 # ---------------------------------------------------------------------------
-# Facade 轨道族生成适配器。七族数值生成均经 generate_rust_family 单次调用；
+# Facade 轨道族生成适配器。八族数值生成均经 generate_rust_family 单次调用；
 # 本节只保留参数守卫、领域分派和兼容返回投影。
 # ---------------------------------------------------------------------------
+
+
+def design_dro_family(
+    min_amplitude_km: float,
+    max_amplitude_km: float,
+    *,
+    n_orbits: int = 50,
+    dynamics: CR3BP_Dynamics | None = None,
+) -> FamilyGenerationResult:
+    """生成 DRO 族：月心逆行族中振幅落入请求范围的成员。
+
+    振幅定义同 ``design_dro``（一个周期内距月心距离 min/max 均值，km）。
+    DRO 不绑定平动点；族参数为近侧 x 轴穿越点 ``x0``，从标准种子出发
+    单次自然参数延拓（修正失败步长减半），按请求窗口与种子振幅的相对
+    位置选择行走方向（跨种子窗口双向行走），收集振幅落入
+    ``[min_amplitude_km, max_amplitude_km]`` 的成员，至多 ``n_orbits`` 条，
+    按振幅升序排列。
+
+    Args:
+        min_amplitude_km: 族振幅下限（km）。
+        max_amplitude_km: 族振幅上限（km）。
+        n_orbits: 族成员数量上限。
+        dynamics: CR3BP 动力学；缺省构造标准地月系统。
+
+    Returns:
+        :class:`FamilyGenerationResult`；``family`` 是 DRO 成员组成的
+        ``OrbitFamily``（``family_type="dro"``），软失败时保留部分成员。
+    """
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    if n_orbits < 1:
+        raise ValueError(f"n_orbits 必须大于 0，当前为 {n_orbits}")
+    if min_amplitude_km <= 0.0 or min_amplitude_km >= max_amplitude_km:
+        raise ValueError("振幅范围必须满足 0 < min_amplitude_km < max_amplitude_km")
+    from .rust_generation import generate_rust_family
+
+    return generate_rust_family(
+        "dro",
+        0,
+        n_orbits,
+        dynamics,
+        min_amplitude_km=min_amplitude_km,
+        max_amplitude_km=max_amplitude_km,
+    )
 
 
 def design_nrho_family(

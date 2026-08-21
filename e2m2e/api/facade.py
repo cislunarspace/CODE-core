@@ -900,7 +900,7 @@ class Facade:
         """轨道族生成（二档）。
 
         Pydantic 模型校验（#411）→ 按 orbit_type 分派到算法层族生成入
-        口（#428）→ 结构化错误。七族均已实现，成功返回统一容器
+        口（#428、#502）→ 结构化错误。八族均已实现，成功返回统一容器
         ``FamilyGenerationResponse``（兼容 ``OrbitFamily`` 读取接口）；
         Lissajous 是拟周期参数采样，族上显式标注
         ``periodicity=quasi-periodic``。软失败使用同一响应保留部分族。
@@ -962,6 +962,17 @@ class Facade:
                     request.phase_out,
                     n_orbits=request.n_orbits,
                     sampling_mode=request.sampling_mode,
+                )
+                response = _family_generation_payload(result)
+            elif sel == "DRO":
+                from e2m2e.algorithm.family import design_dro_family
+
+                assert request.min_amplitude_km is not None
+                assert request.max_amplitude_km is not None
+                result = design_dro_family(
+                    request.min_amplitude_km,
+                    request.max_amplitude_km,
+                    n_orbits=request.n_orbits,
                 )
                 response = _family_generation_payload(result)
             else:

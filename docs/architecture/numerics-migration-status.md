@@ -164,15 +164,17 @@ rust，`backend="python"` 走 numpy 参照路径（对照与降级；等价性�
 #441。`family/halo_family.py` 是纯编排，无独立数值内核，登记在有意留
 Python 节。
 
-**`algorithm/family`（#428 轨道族数值内核）。** 七族统一走
+**`algorithm/family`（#428 轨道族数值内核）。** 八族统一走
 `generate_cr3bp_family_py`：一次 Rust 调用完成种子构造、CR3BP 修正、PAL、
 步长控制、成员筛选、结构化终止和部分族保留。其内部复用
 `differential_correction_cr3bp_py` 与 `planar_full_period_pal_py` 背后的纯
 Rust 实现；共线点求根、线性中心模态、Lissajous 非线性中心约化多点轨迹，
 以及近月距、
-L4/L5 径向振幅与面外振幅扫描也在同一模块内执行。Python 不逐成员调用
+L4/L5 径向振幅与面外振幅扫描也在同一模块内执行；DRO 族（#502）是月心族，
+从标准种子做 x0 自然参数延拓（跨种子振幅窗口双向行走），距月心距离
+min/max 均值测量同在 Rust 侧。Python 不逐成员调用
 数值原子，不保留数值回退，只负责请求校验、领域分派和 `OrbitFamily` 重包。
-工作项：#428。catalog_sweep 的能量维度（#476）经
+工作项：#428、#502。catalog_sweep 的能量维度（#476）经
 `generate_cr3bp_family_windows_py` 批量入口：同一（族、平动点）的延拓
 trace 只走一次，Jacobi 窗口筛选留在 Rust 单次调用内（与振幅窗口同层）。
 
