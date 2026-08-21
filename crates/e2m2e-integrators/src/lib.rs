@@ -18,6 +18,8 @@ pub mod family_generation;
 pub mod frame_convert;
 #[cfg(feature = "spice")]
 pub mod homotopy;
+
+pub mod hjb;
 #[cfg(feature = "spice")]
 pub mod lowthrust;
 #[cfg(feature = "spice")]
@@ -373,6 +375,9 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   Lie 同调化简（频域 W、Poisson 链、虚/实基底变换）完整下沉 Rust。
 /// - **v20** （#476）：新增 ``generate_cr3bp_family_windows_py``，按 Jacobi
 ///   能量窗口批量生成轨道族（延拓 trace 只走一次，各窗口分别筛选成员）。
+/// - **v21** （#497）：新增 ``solve_hjb_py``（HJB 结构网格求解通用入口，
+///   动力学标识 + 参数表）与 ``solve_planar_lowthrust_hjb_py``（geo-nrho
+///   既有签名的兼容包装）。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -4192,6 +4197,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
         family_generation::generate_cr3bp_family_windows_py,
         m
     )?)?;
+    m.add_function(wrap_pyfunction!(hjb::solve_hjb_py, m)?)?;
+    m.add_function(wrap_pyfunction!(hjb::solve_planar_lowthrust_hjb_py, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;

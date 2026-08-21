@@ -77,6 +77,8 @@ if TYPE_CHECKING:
     solid_tide_step1: Any
     solid_tide_step2: Any
     solve_ivp_events_py: Any
+    solve_hjb_py: Any
+    solve_planar_lowthrust_hjb_py: Any
     spice_furnsh: Any
     spice_pxform: Any
     spice_spkezr: Any
@@ -177,6 +179,8 @@ _RUST_SYMBOLS = (
     "solid_tide_step1",
     "solid_tide_step2",
     "solve_ivp_events_py",
+    "solve_hjb_py",
+    "solve_planar_lowthrust_hjb_py",
     "spice_furnsh",
     "spice_pxform",
     "spice_spkezr",
@@ -403,6 +407,8 @@ __all__ = [
     "solid_tide_step2",
     "solve_ivp_events",
     "solve_ivp_events_py",
+    "solve_hjb_py",
+    "solve_planar_lowthrust_hjb_py",
     "spice_furnsh",
     "spice_pxform",
     "spice_spkezr",

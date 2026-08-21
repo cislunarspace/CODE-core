@@ -6,6 +6,7 @@ members = [
     "crates/e2m2e-forces",
     "crates/e2m2e-spice",
     "crates/e2m2e-levelset",
+    "crates/e2m2e-hjb-dynamics",
 ]
 
 [workspace.package]

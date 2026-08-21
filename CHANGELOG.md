@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **HJB 子系统：地月会合系 CR3BP Hamiltonian 与通用求解绑定**（#497）：新增 crate `e2m2e-hjb-dynamics`（Apache-2.0，与 ToolboxLS 移植的 ACM 许可边界见 ADR 0032），实现平面四维 CR3BP 会合系无量纲 Hamiltonian（bang-bang 油门 + 燃料权重开关，构造参数 μ/max_accel/fuel_weight）与带漂移平面双积分器；零控向量场与 `propagate_cr3bp` 逐项对拍，含 L4/L5 平衡点与 2π 周期轨迹对照。e2m2e-integrators 新增通用入口 `solve_hjb_py`（动力学标识 + 参数表，ENO2 + GLF + odeCFL2，时间反转由绑定层处理，快照按内存上界自动抽稀）与 geo-nrho 既有签名的兼容包装 `solve_planar_lowthrust_hjb_py`（ABI v21）。架构文档 `docs/architecture/hjb-subsystem.md` 与 ADR 0032 随附。
+
 ## [5.8.1] - 2026-08-20
 
 ### Fixed

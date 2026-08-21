@@ -1,0 +1,20 @@
+[package]
+name = "e2m2e-hjb-dynamics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "HJB 结构网格求解器的动力学 Hamiltonian 实现（地月会合系 CR3BP 等）"
+
+# 原创动力学层，Apache-2.0 随 workspace；求解器内核在 e2m2e-levelset
+# （ToolboxLS 移植，ACM 非商业许可）。两 crate 的归属与许可边界见 ADR 0032。
+
+[dependencies]
+e2m2e-levelset = { path = "../e2m2e-levelset" }
+ndarray = { workspace = true }
+
+[dev-dependencies]
+# 向量场对拍：CR3BP 解析右端项 cr3bp_eom 在 e2m2e-forces 顶层 cr3bp 模块
+# （非 feature 门控）。关闭默认 spice feature，避免测试引入 CSPICE 构建依赖。
+e2m2e-forces = { path = "../e2m2e-forces", default-features = false }
