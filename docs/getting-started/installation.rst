@@ -88,6 +88,16 @@ pip 安装
 杜绝走国内不可达的 NAIF 源码下载）。裸 ``cargo`` / ``maturin`` 命令需自行
 ``export CSPICE_DIR=$(python3 scripts/download_cspice.py --print-cspice-dir)``。
 
+.. note::
+
+   Windows 上运行 Rust 测试请使用 ``make test-rust``。测试二进制依赖
+   ``python3.dll``；该 DLL 位于 Python 安装根目录（``sys.base_prefix``），不在
+   虚拟环境 ``Scripts/``。Makefile 会自动探测并把该目录加入测试进程 PATH；
+   若自动探测失败，可显式执行 ``make test-rust PYTHON_DLL_DIR=<含 python*.dll 的目录>``。
+   手工排查 ``0xc0000135`` 时，先对失败测试 EXE 执行 ``dumpbin /DEPENDENTS``
+   或 ``dumpbin /IMPORTS`` 确认实际缺失的 DLL，不要把 CSPICE 的 ``lib/``（静态库
+   目录）加入 PATH。
+
 spice 是默认 feature（``crates/*/Cargo.toml default=["spice"]`` +
 ``pyproject features=["spice"]`` 双保险），不再产无 spice 子集；Rust 扩展
 不可用时显式报错，不静默降级到纯 Python 路径（ADR 0020）。

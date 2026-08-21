@@ -61,8 +61,22 @@ dev-release: setup  ## 同 dev，以 --release 构建（性能基准 / 长期预
 
 test: test-rust test-python  ## 全量测试（Rust 工作区 + Python）
 
-test-rust:  ## Rust 工作区测试（spice 默认；串行）
+# cargo test 不启用 extension-module，测试 EXE 需运行时加载 python3.dll
+#（issue #495）；虚拟环境 Scripts/ 没有该 DLL，必须由 Python 安装根目录提供。
+# 探测放在 recipe 中执行：仅在跑 Rust 测试时求值，失败即终止，不影响其他目标。
+# Windows 分支按 POSIX sh 编写（Git Bash/Scoop make）；PATH 采用 Windows 原生
+# 路径与分号，MSYS 会在启动原生 cargo 前转换为 Windows loader 可识别的形式。
+ifeq ($(OS),Windows_NT)
+TEST_RUST = set -e; \
+	PYTHON_DLL_DIR="$$($(PYTHON) scripts/python_dll_dir.py $(if $(PYTHON_DLL_DIR),--override '$(PYTHON_DLL_DIR)'))"; \
+	export PATH="$$PYTHON_DLL_DIR;$$PATH"; \
 	cargo test --workspace -- --test-threads=1
+else
+TEST_RUST = cargo test --workspace -- --test-threads=1
+endif
+
+test-rust:  ## Rust 工作区测试（spice 默认；串行）
+	$(TEST_RUST)
 
 test-python:  ## Python 测试（默认 xdist 并行；含 spice-gated，需先 make setup 拉内核）
 	$(UV) pytest tests/ -n $(PYTEST_WORKERS) --dist $(PYTEST_DIST)

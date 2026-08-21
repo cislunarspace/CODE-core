@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/e2m2e)](https://pypi.org/project/e2m2e/)
 [![CI](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml/badge.svg)](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml)
 [![GitHub stars](https://img.shields.io/github/stars/cislunarspace/e2m2e.svg)](https://github.com/cislunarspace/e2m2e/stargazers)
-[![Rust: stable](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
+[![Rust: 1.98.0](https://img.shields.io/badge/rust-1.98.0-orange.svg)](https://www.rust-lang.org/)
 
 e2m2e 是面向地月空间任务规划的**算法工具集基础设施**。在“LLM+Agent”式自主任务规划系统中，大模型负责理解任务意图、分解与编排子任务，e2m2e 负责提供精确可靠的轨道计算工具：建立地月空间的动力学模型，生成周期轨道族，设计轨道之间的转移路径，并把结果画出来检查。
 
@@ -26,7 +26,7 @@ uv init my-project && cd my-project
 uv add e2m2e
 ```
 
-从源码开发（需要 [Rust 工具链](https://www.rust-lang.org/tools/install)，用于构建积分器内核）：
+从源码开发（需要 [Rust 1.98.0 工具链](https://www.rust-lang.org/tools/install)，仓库通过 `rust-toolchain.toml` 固定版本，用于构建积分器内核）：
 
 ```bash
 git clone https://github.com/cislunarspace/e2m2e.git
@@ -45,6 +45,8 @@ scoop install make
 ```
 
 安装完成后重开 PowerShell，回到仓库目录执行 `make dev`（唯一入口：同步依赖 + 拉取数据 + 构建安装，见上方）。若已安装 Scoop，只需执行 `scoop install make`。
+
+Windows 上运行 Rust 测试请使用 `make test-rust`：测试二进制依赖 Python 的 `python3.dll`，该 DLL 在 Python 安装根目录而不在虚拟环境 `Scripts/`；Makefile 会自动探测并加入测试进程 PATH。若自动探测失败，可显式执行 `make test-rust PYTHON_DLL_DIR=<含 python*.dll 的目录>`。手工排查时先对失败的测试 EXE 执行 `dumpbin /DEPENDENTS` 或 `dumpbin /IMPORTS`，确认实际缺失的 DLL，不要把 CSPICE 的 `lib/`（静态库目录）加入 PATH。
 
 ### SPICE 内核
 

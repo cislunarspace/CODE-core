@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
       - uses: astral-sh/setup-uv@v7
       # spice 为默认 feature：cargo test --workspace 编译并跑 spice-gated 代码，
       # 须先下 CSPICE 编译包（CSPICE_DIR）与 SPICE 内核（kernels/）。
