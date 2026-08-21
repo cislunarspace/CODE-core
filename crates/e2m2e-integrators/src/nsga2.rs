@@ -216,8 +216,7 @@ pub fn nsga2_tournament_selection_py(
     }
     let n = rank.len();
     let mut selected = Vec::with_capacity(draws.len() / 2);
-    for pair in draws.chunks_exact(2) {
-        let (a, b) = (pair[0], pair[1]);
+    for &[a, b] in draws.as_chunks::<2>().0 {
         if a >= n || b >= n {
             return Err(PyValueError::new_err(
                 "tournament draw is outside population",

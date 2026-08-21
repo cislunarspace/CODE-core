@@ -1,0 +1,17 @@
+[package]
+name = "e2m2e-levelset"
+version.workspace = true
+edition.workspace = true
+# 不随 workspace 的 Apache-2.0：本 crate 派生自 ToolboxLS（Ian M. Mitchell，
+# ACM 非商业许可），原始条款全文随附于 LICENSE-ToolboxLS，分发时必须保留。
+license-file = "LICENSE-ToolboxLS"
+homepage.workspace = true
+repository.workspace = true
+description = "Level set / Hamilton-Jacobi reachability solver ported from ToolboxLS"
+
+[lib]
+name = "e2m2e_levelset"
+crate-type = ["rlib"]
+
+[dependencies]
+ndarray = { workspace = true }

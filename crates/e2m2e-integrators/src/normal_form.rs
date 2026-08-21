@@ -328,9 +328,7 @@ impl CSeries {
         } else {
             // 任一分量 |z| > tol 即非零；与 Python ``_is_zero`` 对 ndarray 一致
             // （``np.any(np.abs(coef) > tol)``，对复数 ndarray 按模）。
-            for chunk in self.values.chunks_exact(2) {
-                let re = chunk[0];
-                let im = chunk[1];
+            for &[re, im] in self.values.as_chunks::<2>().0 {
                 if (re * re + im * im).sqrt() > tol {
                     return false;
                 }
@@ -345,8 +343,8 @@ impl CSeries {
             return 0.0;
         }
         let mut s = 0.0;
-        for chunk in self.values.chunks_exact(2) {
-            s += (chunk[0] * chunk[0] + chunk[1] * chunk[1]).sqrt();
+        for &[re, im] in self.values.as_chunks::<2>().0 {
+            s += (re * re + im * im).sqrt();
         }
         s / n as f64
     }
@@ -354,13 +352,13 @@ impl CSeries {
     fn scale_add(&mut self, other: &CSeries, scale_re: f64, scale_im: f64) {
         // self += other * (scale_re + i scale_im)
         debug_assert_eq!(self.values.len(), other.values.len());
-        for (dst, src) in self
+        for (dst, &[ar, ai]) in self
             .values
-            .chunks_exact_mut(2)
-            .zip(other.values.chunks_exact(2))
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(other.values.as_chunks::<2>().0.iter())
         {
-            let ar = src[0];
-            let ai = src[1];
             dst[0] += ar * scale_re - ai * scale_im;
             dst[1] += ar * scale_im + ai * scale_re;
         }
@@ -376,14 +374,16 @@ impl CSeries {
     fn mul(&self, other: &CSeries) -> CSeries {
         debug_assert_eq!(self.values.len(), other.values.len());
         let mut out = vec![0.0; self.values.len()];
-        for ((dst, a), b) in out
-            .chunks_exact_mut(2)
-            .zip(self.values.chunks_exact(2))
-            .zip(other.values.chunks_exact(2))
+        for ((dst, &[ar, ai]), &[br, bi]) in out
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(self.values.as_chunks::<2>().0.iter())
+            .zip(other.values.as_chunks::<2>().0.iter())
         {
             // (ar+iai)(br+ibi) = (ar br - ai bi) + i(ar bi + ai br)
-            dst[0] = a[0] * b[0] - a[1] * b[1];
-            dst[1] = a[0] * b[1] + a[1] * b[0];
+            dst[0] = ar * br - ai * bi;
+            dst[1] = ar * bi + ai * br;
         }
         CSeries { values: out }
     }

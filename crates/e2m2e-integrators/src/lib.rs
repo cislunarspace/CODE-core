@@ -2698,7 +2698,9 @@ fn porkchop_grid_states_py(
         )));
     }
     let dep_grid: Vec<[f64; 6]> = dep_states
-        .chunks_exact(6)
+        .as_chunks::<6>()
+        .0
+        .iter()
         .map(|c| {
             let mut s = [0.0_f64; 6];
             s.copy_from_slice(c);
@@ -2706,7 +2708,9 @@ fn porkchop_grid_states_py(
         })
         .collect();
     let arr_grid: Vec<[f64; 6]> = arr_states
-        .chunks_exact(6)
+        .as_chunks::<6>()
+        .0
+        .iter()
         .map(|c| {
             let mut s = [0.0_f64; 6];
             s.copy_from_slice(c);
