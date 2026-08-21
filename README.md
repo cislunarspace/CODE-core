@@ -166,7 +166,7 @@ make check    # cargo fmt/clippy + ruff
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {5.8.1},
+  version = {5.8.2},
   year = {2026},
 }
 ```

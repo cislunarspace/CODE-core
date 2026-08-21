@@ -2,11 +2,23 @@
 
 ## [Unreleased]
 
+## [5.8.2] - 2026-08-21
+
 ### Added
+- **ToolboxLS 水平集/HJ 可达性求解器 crate**（#493）：自 Ian Mitchell 的 Toolbox of Level Set Methods 完整移植内核为 `e2m2e-levelset`（ACM 非商业许可，`LICENSE-ToolboxLS` 随附）：5 种鬼单元边界、一阶/ENO2/ENO3/WENO5 迎风格式、GLF/LLF/LLLF 耗散、odeCFL1/2/3 TVD Runge-Kutta、掩码/重初始化（含 Russo-Smereka 亚网格修正）与 TTR 后处理、隐式形状与集合运算、迭代法符号距离。验证 22 项全过：导数收敛阶实测 1/2/3/5、Burgers 方程与 Hopf-Lax 精确解对比 L∞ < 2e-2、重初始化误差 < 2.5 dx、双积分器 TTR 与解析解对照（LF 固有耗散误差随 51→101 网格收敛）。向量水平集与绘图动画不移植。
 - **HJB 子系统：地月会合系 CR3BP Hamiltonian 与通用求解绑定**（#497）：新增 crate `e2m2e-hjb-dynamics`（Apache-2.0，与 ToolboxLS 移植的 ACM 许可边界见 ADR 0032），实现平面四维 CR3BP 会合系无量纲 Hamiltonian（bang-bang 油门 + 燃料权重开关，构造参数 μ/max_accel/fuel_weight）与带漂移平面双积分器；零控向量场与 `propagate_cr3bp` 逐项对拍，含 L4/L5 平衡点与 2π 周期轨迹对照。e2m2e-integrators 新增通用入口 `solve_hjb_py`（动力学标识 + 参数表，ENO2 + GLF + odeCFL2，时间反转由绑定层处理，快照按内存上界自动抽稀）与 geo-nrho 既有签名的兼容包装 `solve_planar_lowthrust_hjb_py`（ABI v21）。架构文档 `docs/architecture/hjb-subsystem.md` 与 ADR 0032 随附。
 - **值函数网格高阶梯度查询接口**（#499）：`e2m2e.algorithm.levelset.value_function_gradient(axes, values, times, state, time)`——值函数离网点值/梯度查询。空间维张量积 not-a-knot 三次样条（逐轴求解组装 `NdBSpline`），梯度为样条解析导数（C² 连续，排除单元边界梯度跳变的局部模板路线）；时间维必选线性插值；维度无关；越界抛 `ValueFunctionQueryError`。架构口径见 ADR 0033 决策 4。
 - **连续油门到离散工况映射工具**（#501）：新增 `e2m2e.algorithm.transfer.thrust_arcs`——`ThrustArc`/`ThrustArcSequence` 数据模型自 geo-nrho 迁入，档位集合、最短弧、推力/比冲全部参数化；`sequence_from_controls` 收段边界时刻 `(N+1,)`（均匀/非均匀时间节点均可），贪心合并满足最短弧约束，配点段密不再报错；`controls_from_sequence` 展开回均匀段控制供重传播验证。端到端验收：LEO 两圈连续油门解映射后重传播，终端残差实测 0.35 km / 0.0004 m/s（断言收紧至 5 km / 0.005 m/s）。架构口径见 ADR 0033 决策 5。
 - **轨道族生成支持 DRO（远距逆行轨道族）**（#502）：`orbit_family_generation` 新增 `orbit_type="DRO"`（Rust 族生成 ABI v22）。DRO 是月心族不绑定平动点：请求不含 `libration_point`（显式携带即拒绝，跨族字段口径与其余七族一致），字段为 `min_amplitude_km`/`max_amplitude_km`（距月心距离 min/max 均值，默认 2000~60000，包络 1737~110000 km，与单轨 DRO 一致）与 `n_orbits`。算法层新增 `design_dro_family`：Rust 单次调用从标准种子做 x0 自然参数延拓（修正失败步长减半），按窗口与种子振幅（约 90,786 km）的相对位置自动选向、跨种子窗口双向行走，一次延拓覆盖振幅区间并按振幅升序返回成员，不以 Facade 循环调单轨 `design_dro` 凑数。
+- **变质量 SRP 契约——SRPVariableMass 与 acceleration_with_mass**（#506）：`CompiledForce` 新增 `SRPVariableMass` variant：不存质量，经 `acceleration_with_mass` 从增广状态取当前质量，固定质量路径对其报明确错误（6D 传播误用不静默）；新增 `mass_derivative`（∂a/∂m = −a/m）与 `compute_total_*_with_mass` 求和入口，固定质量力在 with_mass 路径下行为不变；`augmented_eom_7d` 及 STM/灵敏度变体改走 with_mass 路径，质量列雅可比含力模型贡献。Python 新增 `VariableMassSolarRadiationPressure`（`to_rust_spec` 为 `srp_variable_mass` 元组，`parse_force_tuple` 增加对应分支），无新增 PyO3 符号、ABI 戳不变；`srp.body_position_cached` 增加 target==observer 归零守卫。测试：Rust 契约单测 3 项、Python 序列化契约 4 项、7D 传播物理对照 2 项（零推力逐位一致、点火质量通道可分辨）。
+
+### Fixed
+- **修正方法按族分派上提至请求校验层**（#490）：`correction_method` 对不稳定轨道族（HALO/NRHO/DPO）不是真参数，原实现算法层静默改写为 segmented，请求对象与响应均不反映实际执行的方法。现分派表 `SEGMENTED_CORRECTION_ORBIT_TYPES` 落 `data/templates`（api 校验与算法层防御共用，唯一事实源）：`DesignOrbitRequest` 校验时按族分派默认（不稳定族 → segmented），显式冲突值 UserWarning 后改写（不拒绝，兼容既有调用方），ELFO 不参与；算法层删静默覆盖改为 fail-fast 防御检查；`OrbitDesignResult`/`DesignOrbitResponse`/`build_design_record` 记录实际执行的 `correction_method`（ELFO 为 None）。
+- **存量 SSRF 与路径穿越高危清零**（#491）：Mimosa 门禁扫出的 18 处 high 全为存量代码命中（相对 #490 改动零 diff），统一收敛——服务端请求边界（`download_kernels.py` 与 colab 下载脚本）仅允许 http/https，请求前校验 host，拒绝 localhost、环回、私有、链路本地与保留地址（`ip.is_global`），重定向目标逐一校验（防 302 跳向内网/云元数据端点）；路径写入口（`fft.py`/`store.py`/`orbit.py`/`generator.py`/benchmark 与 colab 脚本）统一 pathlib 显式安全写法，`fft.py` 临时文件解析后必须仍在临时目录内（resolve + `is_relative_to`）。Mimosa 复扫 findings 18 → 0。
+- **固定 Rust 1.98.0 并修复 Windows Rust 测试**（#494、#495）：`rust-toolchain.toml` 固定工具链版本；Windows 下 `cargo test` 因 pyo3 `extension-module` 链接需运行时加载 python3.dll，虚拟环境 Scripts/ 没有该 DLL（须由 Python 安装根目录提供），新增 `scripts/python_dll_dir.py` 探测并在跑 Rust 测试前把该目录前置到 PATH，`make test-rust` 在 Windows 可一路跑通。
+
+### Changed
+- **ADR 0034：星历力模型 Hamiltonian 的范围裁决**（#498）：#498 正文要求把星历 N 体全保真力模型（地月 10×10 球谐、太阳第三体、变质量光压）接入 levelset 网格求解器直接求解 HJB，与同日合并的 `hjb-subsystem.md` §3（网格层维度上限 5、无 z 轴，保真度天花板是“会合系内能平面表达的力”）结论相反。核实物理事实后裁决：任务三段（GEO/Halo/NRHO）在地月会合系里全大幅离面，截面投影（z=0 取面内分量）产物的控制律定义域盖不住真实轨迹，闭环回放跑不起来；网格层在两级架构里的职务是基准与训练数据，缺的是时间依赖性而非空间保真度——故 #498 范围为**平面全星历 Hamiltonian**（月球瞬时星历定义旋转 + 脉动会合系，两主星点质量 + 太阳第三体取星历位置的面内投影，5 维 `(x, y, vx, vy, m)` 非自治、时间显式入动力学），在时间保真度轴上升级网格层而非撞空间保真度轴的墙；球谐与光压降级为缓议实验项，不进 #498 验收。求解链数据流见 `docs/architecture/hjb-hamiltonian-dataflow.md`。
 
 ## [5.8.1] - 2026-08-20
 

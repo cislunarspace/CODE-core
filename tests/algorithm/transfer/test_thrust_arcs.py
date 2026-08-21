@@ -22,7 +22,7 @@ from e2m2e.algorithm.transfer.thrust_arcs import (
     sequence_from_controls,
 )
 
-pytestmark = [pytest.mark.low_thrust]
+pytestmark = [pytest.mark.low_thrust, pytest.mark.orchestration]
 
 DT = 900.0  # 段长，小于最短弧，强迫合并
 
