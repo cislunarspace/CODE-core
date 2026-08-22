@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from pydantic import BaseModel
 
 pytestmark = [pytest.mark.interface]
 
@@ -140,6 +141,27 @@ def test_create_server_binds_facade(facade):
     listing = anyio.run(run)
     listed = listing.tools if hasattr(listing, "tools") else listing
     assert [t.name for t in listed] == [t.name for t in handle_list_tools(facade)]
+
+
+def test_dispatch_tool_omits_unset_fields():
+    """issue #522：未提供的字段不得变成显式 None 传给工具方法。"""
+
+    class Req(BaseModel):
+        a: int
+        b: str | None = None
+
+    seen: dict = {}
+
+    class Tool:
+        request_model = Req
+
+        def __call__(self, **kwargs):
+            seen.update(kwargs)
+            return "ok"
+
+    result, err = envelope.dispatch_tool(Tool(), {"a": 1})
+    assert err is None and result == "ok"
+    assert seen == {"a": 1}
 
 
 def test_invoke_tool_internal_error():

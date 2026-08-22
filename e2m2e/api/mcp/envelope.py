@@ -54,7 +54,7 @@ def dispatch_tool(method: Any, arguments: dict[str, Any]) -> tuple[Any, Envelope
     try:
         if request_model is not None:
             request = request_model.model_validate(arguments)
-            result = method(**request.model_dump())
+            result = method(**request.model_dump(exclude_unset=True))
         else:
             result = method(**arguments)
     except OrbitError as exc:
