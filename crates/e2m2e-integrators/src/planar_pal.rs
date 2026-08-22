@@ -410,8 +410,10 @@ fn step_system(
 
 fn jacobi_constant(mu: f64, state: &[f64; 6]) -> f64 {
     let (x, y, z, vx, vy, vz) = (state[0], state[1], state[2], state[3], state[4], state[5]);
-    let r1 = ((x + mu).powi(2) + y * y + z * z).sqrt().max(1e-10);
-    let r2 = ((x - 1.0 + mu).powi(2) + y * y + z * z).sqrt().max(1e-10);
+    let x1 = x + mu;
+    let x2 = x - 1.0 + mu;
+    let r1 = (x1 * x1 + y * y + z * z).sqrt().max(1e-10);
+    let r2 = (x2 * x2 + y * y + z * z).sqrt().max(1e-10);
     x * x + y * y + 2.0 * (1.0 - mu) / r1 + 2.0 * mu / r2 - (vx * vx + vy * vy + vz * vz)
 }
 

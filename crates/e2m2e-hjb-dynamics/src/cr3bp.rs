@@ -55,11 +55,15 @@ impl Cr3bpSynodic {
     pub fn vector_field(&self, state: [f64; 4]) -> [f64; 4] {
         let [x, y, vx, vy] = state;
         let mu = self.mu;
-        let r1 = ((x + mu).powi(2) + y * y).sqrt().max(MIN_DISTANCE);
-        let r2 = ((x - 1.0 + mu).powi(2) + y * y).sqrt().max(MIN_DISTANCE);
-        let inv_r1_3 = 1.0 / r1.powi(3);
-        let inv_r2_3 = 1.0 / r2.powi(3);
-        let ax = 2.0 * vy + x - (1.0 - mu) * (x + mu) * inv_r1_3 - mu * (x - 1.0 + mu) * inv_r2_3;
+        let x1 = x + mu;
+        let x2 = x - 1.0 + mu;
+        let r1sq = x1 * x1 + y * y;
+        let r2sq = x2 * x2 + y * y;
+        let r1 = r1sq.sqrt().max(MIN_DISTANCE);
+        let r2 = r2sq.sqrt().max(MIN_DISTANCE);
+        let inv_r1_3 = 1.0 / (r1 * r1 * r1);
+        let inv_r2_3 = 1.0 / (r2 * r2 * r2);
+        let ax = 2.0 * vy + x - (1.0 - mu) * x1 * inv_r1_3 - mu * x2 * inv_r2_3;
         let ay = -2.0 * vx + y - (1.0 - mu) * y * inv_r1_3 - mu * y * inv_r2_3;
         [vx, vy, ax, ay]
     }

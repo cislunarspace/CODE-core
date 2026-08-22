@@ -380,7 +380,7 @@ impl EphemerisPlanar {
                     // 物理奇异，取 0 贡献保证 CFL 步长不塌（传播场景轨迹
                     // 不会精确穿过天心，与此正则化无交集）。
                     if r_norm >= MIN_DISTANCE {
-                        let inv_r3 = 1.0 / r_norm.powi(3);
+                        let inv_r3 = 1.0 / (r_norm * r_norm * r_norm);
                         for k in 0..3 {
                             acc[k] -= mu * r_vec[k] * inv_r3;
                         }
@@ -398,14 +398,15 @@ impl EphemerisPlanar {
                     // 直接项的物理极限是 0（保留 indirect 项）；
                     // `third_body_acceleration` 的 MIN_DISTANCE 截断在此处
                     // 会产生 ~μ/ε² 的伪加速度压垮 CFL，必须取极限而非截断。
+                    let b3 = b_norm * b_norm * b_norm;
                     if d_norm >= MIN_DISTANCE {
-                        let inv_d3 = 1.0 / d_norm.powi(3);
+                        let inv_d3 = 1.0 / (d_norm * d_norm * d_norm);
                         for k in 0..3 {
-                            acc[k] -= mu * (diff[k] * inv_d3 + rb[k] / b_norm.powi(3));
+                            acc[k] -= mu * (diff[k] * inv_d3 + rb[k] / b3);
                         }
                     } else {
                         for k in 0..3 {
-                            acc[k] -= mu * rb[k] / b_norm.powi(3);
+                            acc[k] -= mu * rb[k] / b3;
                         }
                     }
                 }
