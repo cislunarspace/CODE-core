@@ -25,9 +25,17 @@ from e2m2e.data.types.orbit import Orbit  # noqa: E402
 _ARGS = {"orbit_type": "HALO", "libration_point": 1}  # 能过 FamilyGenerationRequest 校验的最小参数
 
 
-def _orbit(seed: float, n: int = 3) -> Orbit:
+def _orbit(seed: float, n: int = 3, period: float | None = None) -> Orbit:
     states = np.arange(n * 6, dtype=float).reshape(n, 6) + seed
-    return Orbit(states=states, times=np.linspace(0.0, 1.0, n))
+    orbit = Orbit(states=states, times=np.linspace(0.0, 1.0, n))
+    orbit.period = period
+    return orbit
+
+
+class _System:
+    """鸭子类型 system：仅供 sidecar 映射读取 mu。"""
+
+    mu = 1.215e-2
 
 
 @pytest.fixture
@@ -41,8 +49,9 @@ def facade(tmp_path, monkeypatch) -> Facade:
                 status=ConvergenceState.CONVERGED,
                 cause=FailureCause.NONE,
                 message="ok",
-                orbits=[_orbit(0.0), _orbit(10.0)],
+                orbits=[_orbit(0.0, period=2.5), _orbit(10.0)],
                 family_type="halo",
+                system=_System(),
                 requested_members=2,
                 generated_members=2,
             )
@@ -81,6 +90,10 @@ def test_family_generation_binary_roundtrip(facade):
     orbits = line["data"]["orbits"]
     assert [o["states"] for o in orbits] == [None, None]
     assert len(orbits[0]["times"]) == 3  # 小数组留 JSON
+    # 周期原值透传（归一化单位，issue #525）：成员缺失或非有限时为 null
+    assert [o["period"] for o in orbits] == [2.5, None]
+    # 重采样方程需要 mu：响应级原值透传
+    assert line["data"]["mu"] == pytest.approx(1.215e-2)
     # 帧内容 = 成员状态数组，dtype 按请求方声明
     arr0, dtype0, _ = decode_frame(frames[0])
     assert dtype0 == "f32"

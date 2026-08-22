@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+from ..catalog_ingest import _finite_or_none
 from ..mcp import envelope, tools
 from .frames import FrameError, encode_frame
 
@@ -58,6 +59,8 @@ def _family_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], lis
 
     帧序 = ``data.orbits`` 成员序；每帧是该成员的 ``(n, 6)`` 状态数组。
     times 等小数组留在 JSON。``states`` 置 None 占位，帧是唯一真身。
+    成员级透传 ``period``、响应级透传 ``mu``（原值，归一化单位），供
+    消费端从 ``(1, 6)`` 初态重采样整条轨迹（issue #525）。
     """
     frames = [encode_frame(orbit.states, dtype) for orbit in result.orbits]
     data = {
@@ -65,11 +68,17 @@ def _family_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], lis
         "cause": result.cause.value,
         "message": result.message,
         "family_type": result.family_type,
+        "mu": _finite_or_none(getattr(result.system, "mu", None)),
         "requested_members": result.requested_members,
         "generated_members": result.generated_members,
         "record_id": result.record_id,
         "orbits": [
-            {"states": None, "times": [float(t) for t in orbit.times]} for orbit in result.orbits
+            {
+                "states": None,
+                "times": [float(t) for t in orbit.times],
+                "period": _finite_or_none(orbit.period),
+            }
+            for orbit in result.orbits
         ],
     }
     return data, frames
