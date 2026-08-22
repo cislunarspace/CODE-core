@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.package]
-version = "5.8.3"
+version = "5.8.4"
 edition = "2021"
 license = "Apache-2.0"
 homepage = "https://github.com/cislunarspace/e2m2e"

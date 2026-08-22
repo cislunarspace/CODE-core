@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [5.8.4] - 2026-08-22
+
+### Fixed
+- **MCP/sidecar 工具回传 exclude_unset**（#524）：`dispatch_tool` 原先 `model_dump()` 全字段往返，未提供的可选字段被输出为显式 None，导致所有带 request_model 的工具在 serve-stdio 与 MCP 路径上被拒（#522）。改为 `exclude_unset=True` 只传调用方实际提供的字段，并加回归测试。
+- **CI 星历内核 LFS 指针误判**：download_kernels 把未拉取的 LFS 指针文件（≤1 KiB 且以 `version https://git-lfs` 开头）视为不存在并重新下载。#517 起 kernels/*.bsp 由 git-lfs 跟踪，actions/checkout 未开 lfs 时按存在即跳过导致 CI 报 SPICE NOLOADEDFILES（v5.8.3 release test 4 项失败）。
+- **清零测试代码的编译与 clippy 警告**（#521）：solve_ivp 测试未用变量加下划线前缀、测试常数 3.14 改 2.5 避开 approx_constant、needless_range_loop 改迭代器写法；atmosphere.rs 常量表保留文献原值不动。
+
+### Changed
+- **HJB 动力学热路径 powi 改乘法链**（#523）：cr3bp/ephemeris/planar_pal 的距离平方与立方倒数由 `powi(2)`/`powi(3)` 改为乘法，逐位结果不变，vector_field 提速约 37%（50M 次调用 4.1→2.6 ns/次）。
+
 ## [5.8.3] - 2026-08-22
 
 ### Added
