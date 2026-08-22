@@ -4,9 +4,10 @@
 本脚本取星历/姿态/闰秒等内核（运行期）。来源同为项目 GitHub Release
 ``kernels-v1``，国内网络可达（NAIF 官方源常不可达）。
 
-仓库已提交体积小的内核（.tls/.tpc/.bpc/.tf），仅星历 ``.bsp``（百 MB 级、
-``.gitignore`` 忽略）需补。本脚本无差别按扩展名拉取 release 内的全部内核资产，
-已存在的文件跳过（幂等），故重复运行零下载。
+仓库已提交体积小的内核（.tls/.tpc/.bpc/.tf），星历 ``.bsp``（百 MB 级、
+由 git-lfs 跟踪）在无 LFS 的检出中仅为指针文件，本脚本识别并重下。脚本
+无差别按扩展名拉取 release 内的全部内核资产，已存在的真实文件跳过
+（幂等），故重复运行零下载。
 
 用法：
     python scripts/download_kernels.py [--kernel-dir DIR]
@@ -89,6 +90,18 @@ def _download(url: str, dest: pathlib.Path) -> None:
         fh.write(resp.read())
 
 
+def _is_lfs_pointer(path: pathlib.Path) -> bool:
+    """判断文件是否为未拉取的 git-lfs 指针（检出于无 LFS 的环境，如 CI）。
+
+    指针文件仅数百字节且以 "version https://git-lfs" 开头；真实内核
+    远大于 1 KiB。仓库自 #517 起 LFS 跟踪 .bsp，此类文件须重下。
+    """
+    if path.stat().st_size > 1024:
+        return False
+    with path.open("rb") as fh:
+        return fh.read(64).startswith(b"version https://git-lfs")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="从 kernels-v1 release 下载 SPICE 内核到 kernels/（幂等）"
@@ -108,7 +121,7 @@ def main() -> None:
     skipped = 0
     for asset in targets:
         dest = kernel_dir / asset["name"]
-        if dest.is_file():
+        if dest.is_file() and not _is_lfs_pointer(dest):
             skipped += 1
             continue
         _download(asset["browser_download_url"], dest)
