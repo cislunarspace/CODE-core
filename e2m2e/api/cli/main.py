@@ -1,6 +1,7 @@
 """e2m2e 命令入口。
 
-实现状态：``mcp-serve`` 子命令（MCP 部署薄包装，ADR 0014 §6，issue #510）。
+实现状态：``mcp-serve`` 子命令（MCP 部署薄包装，ADR 0014 §6，issue #510）、
+``serve-stdio`` 子命令（GUI sidecar 入口，ADR 0035，issue #518）。
 完整 CLI 子命令（= Facade 方法，参数从同一份 Pydantic 模型生成）另立 issue。
 """
 
@@ -23,6 +24,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "mcp-serve",
         help="启动 MCP 服务器（stdio 传输），把 Facade 工具暴露给 LLM Agent",
+    )
+    sub.add_parser(
+        "serve-stdio",
+        help="启动 GUI sidecar（stdio JSON 行 + 二进制帧，ADR 0035），供 Tauri 壳驱动",
     )
     return parser
 
@@ -55,10 +60,21 @@ def _run_mcp_serve() -> int:
     return 0
 
 
+def _run_serve_stdio() -> int:
+    from e2m2e.api.config import Config
+    from e2m2e.api.facade import Facade
+    from e2m2e.api.sidecar import run_loop
+
+    run_loop(Facade(config=Config()), sys.stdin.buffer, sys.stdout.buffer)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "mcp-serve":
         return _run_mcp_serve()
+    if args.command == "serve-stdio":
+        return _run_serve_stdio()
     raise AssertionError(f"未知子命令 {args.command!r}（应由 subparser 拦截）")
 
 

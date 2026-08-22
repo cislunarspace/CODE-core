@@ -15,7 +15,7 @@ from pydantic import BaseModel, ValidationError
 
 from ..models import OrbitError
 
-__all__ = ["Envelope", "ok_envelope", "error_envelope", "invoke_tool"]
+__all__ = ["Envelope", "ok_envelope", "error_envelope", "invoke_tool", "dispatch_tool"]
 
 # 信封的 JSON 形状（不是 Pydantic 模型：传输层只做序列化，不再校验自己）。
 Envelope = dict[str, Any]
@@ -43,12 +43,12 @@ def error_envelope(code: str, message: str, details: dict[str, Any] | None = Non
     }
 
 
-def invoke_tool(method: Any, arguments: dict[str, Any]) -> Envelope:
-    """执行一个 Facade 工具方法并包成信封。
+def dispatch_tool(method: Any, arguments: dict[str, Any]) -> tuple[Any, Envelope | None]:
+    """校验参数并执行工具方法，返回 ``(原始结果, None)`` 或 ``(None, 错误信封)``。
 
-    入参经 ``request_model`` 校验（ValidationError → ``INVALID_PARAMS``），
-    ``OrbitError`` 原样翻译，其余异常归为 ``INTERNAL_ERROR``（只保留异常类型
-    名，不泄漏 traceback）。
+    与 :func:`invoke_tool` 同一套校验与错误翻译，但不做结果的 JSON 化——
+    需要在转储前处理原始结果的传输层（如 sidecar 的二进制帧抽取，ADR 0035）
+    用这个。失败时返回错误信封，不抛异常。
     """
     request_model = getattr(method, "request_model", None)
     try:
@@ -58,17 +58,30 @@ def invoke_tool(method: Any, arguments: dict[str, Any]) -> Envelope:
         else:
             result = method(**arguments)
     except OrbitError as exc:
-        return error_envelope(exc.code, exc.message, exc.details)
+        return None, error_envelope(exc.code, exc.message, exc.details)
     except ValidationError as exc:
         # exc.json() 走 Pydantic 自己的序列化，避免 details 里残留不可 JSON 化对象。
-        return error_envelope(
+        return None, error_envelope(
             "INVALID_PARAMS",
             "输入参数校验失败",
             {"errors": json.loads(exc.json(include_url=False))},
         )
     except TypeError as exc:
         # 方法签名不匹配（如多余参数已由 forbid 校验拦下，此处兜底）。
-        return error_envelope("INVALID_PARAMS", f"参数与工具签名不匹配：{exc}")
+        return None, error_envelope("INVALID_PARAMS", f"参数与工具签名不匹配：{exc}")
     except Exception as exc:
-        return error_envelope("INTERNAL_ERROR", f"未预期的内部错误（{type(exc).__name__}）")
+        return None, error_envelope("INTERNAL_ERROR", f"未预期的内部错误（{type(exc).__name__}）")
+    return result, None
+
+
+def invoke_tool(method: Any, arguments: dict[str, Any]) -> Envelope:
+    """执行一个 Facade 工具方法并包成信封。
+
+    入参经 ``request_model`` 校验（ValidationError → ``INVALID_PARAMS``），
+    ``OrbitError`` 原样翻译，其余异常归为 ``INTERNAL_ERROR``（只保留异常类型
+    名，不泄漏 traceback）。校验与错误翻译见 :func:`dispatch_tool`。
+    """
+    result, err = dispatch_tool(method, arguments)
+    if err is not None:
+        return err
     return ok_envelope(result)
