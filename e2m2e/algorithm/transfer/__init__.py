@@ -350,7 +350,11 @@ def transfer_orbit(
     Args:
         transfer_type: "HMN"（直接）/ "LGA"（月球引力辅助）/ "WSB"（太阳引力辅助）/
             "low_thrust"（小推力）。
-        target_ephemeris: 目标轨道星历（FR1 产物）。
+        target_ephemeris: 目标轨道星历（FR1 产物）。坐标系契约按转移类型
+            区分（#516）：LGA/WSB 要求会合旋转系（synodic）物理单位
+            （km, km/s）状态，编排器直接无量纲化，不做惯性系→旋转系转换，
+            惯性星历须先经 ``j2000_to_synodic`` 转换；HMN/low_thrust 按地心
+            惯性系 km/km/s 状态解释（与 construct_departure_state 出发态同系）。
         tli_params: 地球停泊轨道参数（TLI 高度/倾角/航迹角）。
         tof_range: 飞行时间范围（天）。
         target_orbit_radius_km: 目标轨道半径 (km)，HMN 转移必需。
@@ -420,6 +424,11 @@ def transfer_orbit(
 
 def _extract_target_state(target_ephemeris: Any) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """从 target_ephemeris 提取目标位置和速度。
+
+    本函数只做格式提取，不解释坐标系；坐标系契约在调用方（#516）：
+    LGA/WSB 要求会合旋转系（synodic）物理单位，惯性星历须先经
+    ``spacetime_transform`` 的 ``j2000_to_synodic`` 转换；HMN/low_thrust
+    按地心惯性系 km/km/s 状态解释。
 
     支持三种输入格式：
 
@@ -769,15 +778,18 @@ def _transfer_orbit_low_thrust(
     Args:
         tli_params: 地球停泊轨道参数（TLI 高度/倾角/航迹角）。当 ``departure_state``
             未提供时用于构造出发状态。
-        target_ephemeris: 目标轨道星历。当 ``target_state`` 未提供时用于提取目标状态。
+        target_ephemeris: 目标轨道星历（地心惯性系 km/km/s 状态，#516）。
+            当 ``target_state`` 未提供时用于提取目标状态。
         engine_config: 推进配置（最大推力、比冲）。
         initial_mass: 初始质量 (kg)。
         n_segments: 求解器段数。
         target_oe: Q-law 目标 ``(a_T, e_T, i_T)``。默认从目标状态反推圆轨道。
         solver_method: 求解方法 ``"shooting"`` 或 ``"collocation"``。
         duration_days: 飞行时间 (天)。
-        departure_state: 出发状态 ``[r, v]`` (6,)，km / km/s。优先于 tli_params。
-        target_state: 目标末态 ``[r, v]`` (6,)，km / km/s。优先于 target_ephemeris。
+        departure_state: 出发状态 ``[r, v]`` (6,)，地心惯性系 km / km/s。
+            优先于 tli_params。
+        target_state: 目标末态 ``[r, v]`` (6,)，地心惯性系 km / km/s。
+            优先于 target_ephemeris。
         system: 动力学系统。默认纯二体 ``SimpleNamespace(origin="EARTH")``。
         forces: 非推力力模型列表。默认 ``[PointMassGravity("EARTH", mu=MU_EARTH)]``。
 

@@ -732,7 +732,7 @@ class Facade:
         """
         try:
             request = TransferDesignRequest(**params)
-            from e2m2e.algorithm.transfer import TliParams, transfer_orbit
+            from e2m2e.algorithm.transfer import EngineConfig, TliParams, transfer_orbit
 
             tli_params = TliParams(
                 epoch=request.tli_epoch,
@@ -745,6 +745,9 @@ class Facade:
                 if request.tof_range
                 else None
             )
+            engine_config = (
+                EngineConfig(**request.engine_config) if request.engine_config is not None else None
+            )
             result = transfer_orbit(
                 request.transfer_type,
                 target_ephemeris=request.target_ephemeris,
@@ -753,6 +756,26 @@ class Facade:
                 target_orbit_radius_km=request.target_orbit_radius_km,
                 lga_search_params=request.lga_search_params,
                 wsb_search_params=request.wsb_search_params,
+                engine_config=engine_config,
+                initial_mass=request.initial_mass,
+                n_segments=request.n_segments,
+                target_oe=(
+                    (request.target_oe[0], request.target_oe[1], request.target_oe[2])
+                    if request.target_oe is not None
+                    else None
+                ),
+                solver_method=request.solver_method,
+                duration_days=request.duration_days,
+                departure_state=(
+                    np.asarray(request.departure_state, dtype=np.float64)
+                    if request.departure_state is not None
+                    else None
+                ),
+                target_state=(
+                    np.asarray(request.target_state, dtype=np.float64)
+                    if request.target_state is not None
+                    else None
+                ),
             )
             trajectory = (
                 result.trajectory.tolist()

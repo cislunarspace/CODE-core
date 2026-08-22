@@ -80,6 +80,57 @@ class TestFacadeDelegation:
         assert exc_info.value.status is ConvergenceState.MAX_ITERATIONS
         assert exc_info.value.cause is FailureCause.MAX_ITERATIONS_REACHED
 
+    def test_low_thrust_passes_engine_and_solver_params_to_algorithm(self, monkeypatch):
+        import e2m2e.algorithm.transfer as transfer
+
+        captured: dict[str, Any] = {}
+
+        def fake_transfer(*args, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="任务完成",
+                transfer_type="low_thrust",
+                delta_v=1.0,
+                trajectory=None,
+                details={},
+            )
+
+        monkeypatch.setattr(transfer, "transfer_orbit", fake_transfer)
+        Facade().transfer_design(
+            transfer_type="low_thrust",
+            tli_epoch="2025-06-21T11:00:00",
+            engine_config={"t_max": 0.5, "isp": 3000.0},
+            initial_mass=1000.0,
+            n_segments=20,
+            solver_method="collocation",
+            duration_days=45.0,
+            target_oe=[7000.0, 0.1, 0.2],
+            departure_state=[7000.0, 0.0, 0.0, 0.0, 7.5, 0.0],
+            target_state=[8000.0, 0.0, 0.0, 0.0, 7.0, 0.0],
+        )
+
+        engine = captured["engine_config"]
+        assert isinstance(engine, transfer.EngineConfig)
+        assert engine.t_max == 0.5
+        assert engine.isp == 3000.0
+        assert captured["initial_mass"] == 1000.0
+        assert captured["n_segments"] == 20
+        assert captured["solver_method"] == "collocation"
+        assert captured["duration_days"] == 45.0
+        assert captured["target_oe"] == (7000.0, 0.1, 0.2)
+        assert np.allclose(captured["departure_state"], [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+        assert np.allclose(captured["target_state"], [8000.0, 0.0, 0.0, 0.0, 7.0, 0.0])
+
+    def test_low_thrust_missing_engine_config_is_invalid_params(self):
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().transfer_design(
+                transfer_type="low_thrust",
+                tli_epoch="2025-06-21T11:00:00",
+                initial_mass=1000.0,
+            )
+
     def test_control_passes_model_values_and_config_to_algorithm(self, monkeypatch):
         import e2m2e.algorithm.station_keeping as station_keeping
 

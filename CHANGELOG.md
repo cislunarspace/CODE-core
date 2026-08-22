@@ -2,7 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- **transfer_design 打通 low_thrust 分支**（#516）：`TransferDesignRequest` 补齐 `engine_config`（plain dict，facade 内构造 `EngineConfig`）、`initial_mass`、`n_segments`、`target_oe`、`solver_method`、`duration_days`、`departure_state`、`target_state` 字段，此前 facade 走 low_thrust 必然 ValueError。
+
 ### Fixed
+- **target_ephemeris 坐标系契约写入文档**（#516）：`TransferDesignRequest.target_ephemeris` 字段 description 与 `transfer_orbit`/`_extract_target_state` docstring 明确——目标态按会合旋转系（synodic）物理单位解释并直接无量纲化，惯性星历须先经 `spacetime_transform(j2000_to_synodic)` 转换；此前下游把惯性星历直接传入时无任何提示，目标态几何全错。
 - **LGA 搜索面外维度缺失与 Δv 单位语义**（#512）：`transfer_orbit("LGA")` 在发射倾角 ≥ 20° 时一律 INFEASIBLE——出发速度网格只有面内角，无面外自由度，候选在 dv 筛选前就被近月高度窗口筛光。`LgaSearchParams` 新增面外角网格（`out_of_plane_halfwidth_deg`/`n_out_of_plane`，中心随出发轨道面倾角缓慢负移，实测倾角 0°–90° 覆盖）；`LgaCandidate` 记录 `out_of_plane_angle`。同时修复 `max_total_dv` 语义：阈值 km/s 换算为无量纲后比较，`LgaTransferDetails` 与 `delta_v` 统一按特征速度换算回 km/s；ThreeBodyLambert 精化劣于网格候选时保留网格解（修复精化后 Δv 远超阈值仍报 CONVERGED）。
 
 ## [5.8.5] - 2026-08-22

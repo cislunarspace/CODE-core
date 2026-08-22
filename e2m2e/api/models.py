@@ -663,7 +663,15 @@ class TransferDesignRequest(_ApiModel):
     incl_deg: float = Field(default=28.5, ge=0.0, le=180.0, description="轨道倾角 (度)")
     flight_path_deg: float = Field(default=0.0, ge=0.0, le=0.0, description="航迹角 (度，仅支持 0)")
     target_ephemeris: Any = Field(
-        default=None, description="目标星历（EphemerisTable/NominalOrbit/ndarray）"
+        default=None,
+        description=(
+            "目标星历（EphemerisTable/NominalOrbit/ndarray），LGA/WSB 必需。"
+            "坐标系契约按转移类型区分：LGA/WSB 要求会合旋转系（synodic）物理单位"
+            "（km, km/s）状态，编排器直接无量纲化，不做惯性系→旋转系转换，"
+            "orbit_propagation/design_orbit 产出的惯性星历必须先经 "
+            "spacetime_transform(j2000_to_synodic) 转换后再传入，否则目标态几何全错；"
+            "HMN/low_thrust 按地心惯性系 km/km/s 状态解释。"
+        ),
     )
     target_orbit_radius_km: float | None = Field(
         default=None, gt=0.0, description="目标轨道半径 (km)，HMN 必需"
@@ -671,6 +679,38 @@ class TransferDesignRequest(_ApiModel):
     tof_range: list[float] | None = Field(default=None, description="飞行时间范围 [min, max]（天）")
     lga_search_params: Any = Field(default=None, description="LGA 搜索参数（LgaSearchParams 实例）")
     wsb_search_params: Any = Field(default=None, description="WSB 搜索参数（WsbSearchParams 实例）")
+    engine_config: dict[str, Any] | None = Field(
+        default=None,
+        description="推进配置（low_thrust 必需）：{'t_max': 最大推力 N, 'isp': 比冲 s}",
+    )
+    initial_mass: float | None = Field(
+        default=None, gt=0.0, description="初始质量 (kg)，low_thrust 必需"
+    )
+    n_segments: int = Field(default=10, gt=0, description="求解器段数（low_thrust，默认 10）")
+    target_oe: list[float] | None = Field(
+        default=None,
+        min_length=3,
+        max_length=3,
+        description="Q-law 目标 [a_T (km), e_T, i_T (弧度)]（low_thrust 可选）",
+    )
+    solver_method: str = Field(
+        default="shooting", description="求解方法 shooting/collocation（low_thrust）"
+    )
+    duration_days: float = Field(
+        default=30.0, gt=0.0, description="飞行时间（天）（low_thrust，默认 30.0）"
+    )
+    departure_state: list[float] | None = Field(
+        default=None,
+        min_length=6,
+        max_length=6,
+        description="出发状态 [x,y,z,vx,vy,vz]（地心惯性系，km, km/s）（low_thrust 可选）",
+    )
+    target_state: list[float] | None = Field(
+        default=None,
+        min_length=6,
+        max_length=6,
+        description="目标末态 [x,y,z,vx,vy,vz]（地心惯性系，km, km/s）（low_thrust 可选）",
+    )
 
 
 class TransferDesignResponse(ResultResponse):
