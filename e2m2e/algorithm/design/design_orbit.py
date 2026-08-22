@@ -1165,18 +1165,40 @@ def design_orbit(
                 revs_per_group = min(n_rev, 3)
             else:
                 revs_per_group = max(1, min(3, n_rev))
-            t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
-                forces_py,
-                "EARTH",
-                t_patch_j2000_n,
-                state_patch_j2000_n,
-                revs_per_group,
-                per_rev,
-                max_iter=50,
-                tolerance=CORRECTION_TOL_KM,
-                var_time=sel not in _FIXED_TIME_ORBIT_TYPES,
-                verbose=verbose,
-            )
+            try:
+                t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
+                    forces_py,
+                    "EARTH",
+                    t_patch_j2000_n,
+                    state_patch_j2000_n,
+                    revs_per_group,
+                    per_rev,
+                    max_iter=50,
+                    tolerance=CORRECTION_TOL_KM,
+                    var_time=sel not in _FIXED_TIME_ORBIT_TYPES,
+                    verbose=verbose,
+                )
+            except DesignNotConvergedError:
+                # NRHO n_rev=2 回退（#508）：9:2 贴月共振成员（近月高
+                # ~1500 km）在 phase=0.5 下两段独立打靶后 seam 失配
+                # ~10² km，合并层不收敛；改为单段 2 圈（无合并层）可收敛。
+                # 反之 phase=0 端点单段不收敛、原路径可收敛——两种策略
+                # 互补，按失败自动切换。仅限 n_rev=2（多圈单段长弧打靶
+                # 另有收敛风险，#473）。
+                if sel != "NRHO" or n_rev != 2 or revs_per_group >= n_rev:
+                    raise
+                t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
+                    forces_py,
+                    "EARTH",
+                    t_patch_j2000_n,
+                    state_patch_j2000_n,
+                    n_rev,
+                    per_rev,
+                    max_iter=50,
+                    tolerance=CORRECTION_TOL_KM,
+                    var_time=sel not in _FIXED_TIME_ORBIT_TYPES,
+                    verbose=verbose,
+                )
 
             # 逐段积分填满 et_grid（下沉 Rust propagate_segments_py 并发积分，
             # #400 性能修复）：每段从修正后节点初值积分到下一节点。中间段

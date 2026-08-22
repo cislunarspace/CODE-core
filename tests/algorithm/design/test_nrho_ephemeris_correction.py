@@ -42,6 +42,11 @@ GUI_OUTPUT_STEP_SEC = 3600.0
 PHASE_ZERO_DURATION_SEC = 8 * 86400.0
 PHASE_ZERO_OUTPUT_STEP_SEC = 7200.0
 
+# #508：9:2 贴月共振成员（近月高 1500 km）略超一圈的 8 天弧。主路径
+# （1 圈/段 + 合并层）对该成员不收敛，须回退单段 2 圈。
+RESONANT_DURATION_SEC = 8 * 86400.0
+RESONANT_OUTPUT_STEP_SEC = 7200.0
+
 
 @pytest.fixture(scope="module")
 def nrho_tight_short_result():
@@ -94,6 +99,23 @@ def nrho_phase_zero_result():
     )
 
 
+@pytest.fixture(scope="module")
+def nrho_resonant_result():
+    """9:2 贴月共振成员 8 天弧——#508 回退链回归样本。"""
+    return design_orbit(
+        make_design_request(
+            orbit_type="NRHO",
+            collinear_point=2,
+            north_south=2,
+            perilune_height=1500.0,
+            phase=0.5,
+            duration=RESONANT_DURATION_SEC,
+            output_step=RESONANT_OUTPUT_STEP_SEC,
+            correction_method="segmented",
+        )
+    )
+
+
 def test_tight_short_nrho_converges(nrho_tight_short_result):
     """贴月短弧修正收敛：#463 场景在新默认策略下仍可用。"""
     res = nrho_tight_short_result
@@ -132,6 +154,18 @@ def test_nrho_phase_zero_converges(nrho_phase_zero_result):
     assert res.correction is not None
     assert res.correction.status is ConvergenceState.CONVERGED
     assert res.ephemeris is not None
+
+
+def test_resonant_slightly_over_one_rev_converges(nrho_resonant_result):
+    """略超一圈的 9:2 贴月成员收敛（#508：主路径不收敛须回退单段）。"""
+    res = nrho_resonant_result
+    assert res.correction is not None
+    assert res.correction.status is ConvergenceState.CONVERGED
+    assert res.correction.max_residual < 2e-2
+    eph = res.ephemeris
+    n_expected = int(RESONANT_DURATION_SEC / RESONANT_OUTPUT_STEP_SEC) + 1
+    assert eph is not None
+    assert len(eph) == n_expected
 
 
 def test_gui_default_nrho_converges(nrho_gui_default_result):
