@@ -66,3 +66,4 @@ tests/ export-ignore
 docs/ export-ignore
 scripts/ export-ignore
 CHANGELOG.md export-ignore
+kernels/*.bsp filter=lfs diff=lfs merge=lfs -text

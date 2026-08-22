@@ -95,9 +95,8 @@ temp.py
 scripts/*.png
 examples/main_*.png
 
-# SPICE 内核大文件（超过 Gitee 100MB 限制）
-# 下载方式：https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/
-kernels/*.bsp
+# SPICE 行星星历内核大文件（de430.bsp 超 100MB，经 git-lfs 入库，见 .gitattributes）
+# 下载方式（不用 LFS 时可手动下载）：https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/
 # 本地 CSPICE 库与下载缓存（scripts/download_cspice.py 生成）
 # 只忽略仓库根目录的 cspice/（手动解压的 CSPICE 源码包），不动 crates/cspice/
 /cspice/
