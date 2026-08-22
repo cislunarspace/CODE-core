@@ -40,7 +40,8 @@ LGA 转移分为三段：
        print(f"搜索未完成：{candidates.status.value}, {candidates.cause.value}: {candidates.message}")
 
    for c in candidates:
-       print(f"总 Δv: {c.total_dv:.4f} km/s, 飞行时间: {c.tof_sec / 86400:.2f} 天, "
+       dv_km_s = c.total_dv * system.characteristic_velocity  # 无量纲 → km/s
+       print(f"总 Δv: {dv_km_s:.4f} km/s, 飞行时间: {c.tof_sec / 86400:.2f} 天, "
              f"近月点高度: {c.perilune_alt_km:.1f} km")
 
 参考文献

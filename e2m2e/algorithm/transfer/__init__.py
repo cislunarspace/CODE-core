@@ -494,8 +494,11 @@ def _transfer_orbit_lga(
     )
 
     params = search_params if search_params is not None else LgaSearchParams()
+    vu_km_s = system.characteristic_velocity
+    if vu_km_s is None or vu_km_s <= 0.0:
+        raise ValueError("system.characteristic_velocity must be set")
 
-    n_searched = params.n_departure_phase * params.n_tof
+    n_searched = params.n_departure_phase * params.n_tof * params.n_out_of_plane
     n_feasible = len(candidates)
 
     if not candidates:
@@ -556,8 +559,8 @@ def _transfer_orbit_lga(
         perilune_alt_km=refined.perilune_alt_km,
         perilune_vel_km_s=perilune_vel,
         perilune_state=perilune_phys,
-        dv_departure_km_s=refined.dv_departure,
-        dv_arrival_km_s=refined.dv_arrival,
+        dv_departure_km_s=refined.dv_departure * vu_km_s,
+        dv_arrival_km_s=refined.dv_arrival * vu_km_s,
         jacobi_departure=refined.jacobi_departure,
         jacobi_arrival=refined.jacobi_arrival,
         n_candidates_searched=n_searched,
@@ -570,7 +573,7 @@ def _transfer_orbit_lga(
 
     return TransferDesignResult(
         transfer_type="LGA",
-        delta_v=refined.total_dv,
+        delta_v=refined.total_dv * vu_km_s,
         trajectory=None,
         details=details,
         status=refined.status,

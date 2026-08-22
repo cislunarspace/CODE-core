@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **LGA 搜索面外维度缺失与 Δv 单位语义**（#512）：`transfer_orbit("LGA")` 在发射倾角 ≥ 20° 时一律 INFEASIBLE——出发速度网格只有面内角，无面外自由度，候选在 dv 筛选前就被近月高度窗口筛光。`LgaSearchParams` 新增面外角网格（`out_of_plane_halfwidth_deg`/`n_out_of_plane`，中心随出发轨道面倾角缓慢负移，实测倾角 0°–90° 覆盖）；`LgaCandidate` 记录 `out_of_plane_angle`。同时修复 `max_total_dv` 语义：阈值 km/s 换算为无量纲后比较，`LgaTransferDetails` 与 `delta_v` 统一按特征速度换算回 km/s；ThreeBodyLambert 精化劣于网格候选时保留网格解（修复精化后 Δv 远超阈值仍报 CONVERGED）。
+
 ## [5.8.5] - 2026-08-22
 
 ### Added
