@@ -84,4 +84,9 @@ def invoke_tool(method: Any, arguments: dict[str, Any]) -> Envelope:
     result, err = dispatch_tool(method, arguments)
     if err is not None:
         return err
-    return ok_envelope(result)
+    try:
+        return ok_envelope(result)
+    except Exception as exc:
+        # 结果含不可 JSON 化对象（如 ndarray，issue #526）：兑成结构化错误
+        # 而非炸穿传输层（MCP 与 sidecar 共用此处）。
+        return error_envelope("INTERNAL_ERROR", f"响应序列化失败（{type(exc).__name__}）")

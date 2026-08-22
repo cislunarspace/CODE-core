@@ -13,6 +13,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from ..catalog_ingest import _finite_or_none
 from ..mcp import envelope, tools
 from .frames import FrameError, encode_frame
@@ -27,33 +29,11 @@ __all__ = ["handle_request", "run_loop"]
 # 请求方可声明的二进制 dtype（ADR 0035 决策 1：渲染 f32，复算量 f64）。
 _BINARY_DTYPES = ("f32", "f64")
 
-# 大数组走二进制帧的工具→响应字段映射。首个落地的画布契约：族生成响应的
-# 成员状态数组（Orbit 对象不可 JSON 化，本就必须走帧）。其余工具等消费端
-# （tod 阶段 2）出现真实需求再补，不预先铺开。
-_BINARY_TOOLS = frozenset({"orbit_family_generation"})
 
-
-def _line(payload: Any) -> bytes:
-    """JSON 行（含换行符）。"""
-    return (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
-
-
-def _progress_line(job_id: Any, percent: float, message: str) -> bytes:
-    """进度行：可丢弃的信封 JSON 行（ADR 0035 决策 3）。
-
-    当前进度行只有任务开始事件（percent=0）：真进度需要算法层回调
-    通道，Facade 尚未提供；待消费端（tod）需要时再接，不在本层虚构。
-    """
-    return _line(
-        {
-            "status": "progress",
-            "data": None,
-            "error": None,
-            "meta": {"job_id": job_id, "percent": percent, "message": message},
-        }
-    )
-
-
+# 大数组走二进制帧的工具→响应帧抽取函数映射（issue #526：catalog_get 入列）。
+# 首个落地的画布契约：族生成响应的成员状态数组（Orbit 对象不可 JSON 化，
+# 本就必须走帧）；catalog_get 的记录数组段同理。其余工具等消费端（tod）
+# 出现真实需求再补，不预先铺开。
 def _family_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], list[bytes]]:
     """族生成响应的画布契约：成员状态数组出帧，JSON 行留占位。
 
@@ -82,6 +62,54 @@ def _family_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], lis
         ],
     }
     return data, frames
+
+
+def _catalog_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], list[bytes]]:
+    """catalog_get 响应的画布契约（issue #526）：数组段 ndarray 出帧。
+
+    帧序 = JSON 行 ``data.arrays`` 中 None 占位键的顺序；每帧是对应键的
+    数组。非数组值原样留 JSON。元数据、标量段、成员参数表不受影响。
+    #525 落地 period/mu 标量补齐后，本函数与族生成的帧抽取共用字段
+    抽取逻辑（当前各自独立，待第二个消费点出现再收拢）。
+    """
+    frames = []
+    arrays: dict[str, Any] = {}
+    for key, value in result.arrays.items():
+        if isinstance(value, np.ndarray):
+            frames.append(encode_frame(value, dtype))
+            arrays[key] = None
+        else:
+            arrays[key] = value
+    data = result.model_dump(mode="json", exclude={"arrays"})
+    data["arrays"] = arrays
+    return data, frames
+
+
+_BINARY_TOOLS: dict[str, Any] = {
+    "orbit_family_generation": _family_binary_payload,
+    "catalog_get": _catalog_binary_payload,
+}
+
+
+def _line(payload: Any) -> bytes:
+    """JSON 行（含换行符）。"""
+    return (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def _progress_line(job_id: Any, percent: float, message: str) -> bytes:
+    """进度行：可丢弃的信封 JSON 行（ADR 0035 决策 3）。
+
+    当前进度行只有任务开始事件（percent=0）：真进度需要算法层回调
+    通道，Facade 尚未提供；待消费端（tod）需要时再接，不在本层虚构。
+    """
+    return _line(
+        {
+            "status": "progress",
+            "data": None,
+            "error": None,
+            "meta": {"job_id": job_id, "percent": percent, "message": message},
+        }
+    )
 
 
 def handle_request(facade: Facade, request: Any) -> list[bytes]:
@@ -113,10 +141,11 @@ def handle_request(facade: Facade, request: Any) -> list[bytes]:
     started = _progress_line(job_id, 0.0, f"开始 {tool}")
     chunks = [started]
 
-    if tool in _BINARY_TOOLS:
+    payload_fn = _BINARY_TOOLS.get(tool)
+    if payload_fn is not None:
         if dtype is None:
-            # 协议约定（非参数校验）：响应含 Orbit 对象不可 JSON 化（MCP
-            # 传输层同此限制），该工具必须走帧，缺省 dtype 视为协议用法
+            # 协议约定（非参数校验）：响应含 ndarray/Orbit 对象不可 JSON 化
+            # （MCP 传输层同此限制），该工具必须走帧，缺省 dtype 视为协议用法
             # 错误，借用 INVALID_PARAMS 错误码。
             return [
                 _line(
@@ -130,7 +159,7 @@ def handle_request(facade: Facade, request: Any) -> list[bytes]:
         if err is not None:
             return [started, _line(err)]
         try:
-            data, frames = _family_binary_payload(result, dtype)
+            data, frames = payload_fn(result, dtype)
         except FrameError as exc:
             return [started, _line(envelope.error_envelope("INTERNAL_ERROR", f"帧编码失败：{exc}"))]
         response = envelope.ok_envelope(data)
@@ -143,7 +172,9 @@ def handle_request(facade: Facade, request: Any) -> list[bytes]:
 def run_loop(facade: Facade, stdin: BinaryIO, stdout: BinaryIO) -> None:
     """std io 主循环：逐行读请求 JSON，写出进度/响应行与二进制帧。
 
-    坏 JSON 行返回错误信封并继续，不中断循环。
+    坏 JSON 行返回错误信封并继续，不中断循环。请求处理的任何未预期
+    异常（含响应信封化失败，issue #526）同样兑成 INTERNAL_ERROR 信封：
+    字节块在 handle_request 返回前不落盘，故不存在半写出的帧污染流。
     """
     for raw in stdin:
         if not raw.strip():
@@ -153,7 +184,17 @@ def run_loop(facade: Facade, stdin: BinaryIO, stdout: BinaryIO) -> None:
         except (UnicodeDecodeError, json.JSONDecodeError):
             chunks = [_line(envelope.error_envelope("INVALID_PARAMS", "请求行不是合法 JSON"))]
         else:
-            chunks = handle_request(facade, request)
+            try:
+                chunks = handle_request(facade, request)
+            except Exception as exc:
+                chunks = [
+                    _line(
+                        envelope.error_envelope(
+                            "INTERNAL_ERROR",
+                            f"响应处理失败（{type(exc).__name__}）",
+                        )
+                    )
+                ]
         for chunk in chunks:
             stdout.write(chunk)
         stdout.flush()
