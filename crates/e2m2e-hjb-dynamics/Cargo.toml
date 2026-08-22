@@ -10,11 +10,27 @@ description = "HJB 结构网格求解器的动力学 Hamiltonian 实现（地月
 # 原创动力学层，Apache-2.0 随 workspace；求解器内核在 e2m2e-levelset
 # （ToolboxLS 移植，ACM 非商业许可）。两 crate 的归属与许可边界见 ADR 0032。
 
+[features]
+# ephemeris：星历力模型 Hamiltonian（#498）。依赖 e2m2e-forces 的
+# CompiledForce（其 forces 模块门控在 spice feature 下）与 e2m2e-spice 的
+# EphemCache，故引入 CSPICE 构建链；默认不开，纯解析动力学
+# （PlanarDoubleIntegrator / Cr3bpSynodic）保持无 spice 可独立构建。
+# e2m2e-integrators 的 spice feature 启用它。
+ephemeris = [
+    "dep:e2m2e-forces",
+    "dep:e2m2e-spice",
+    "e2m2e-forces/spice",
+    "e2m2e-spice/spice",
+]
+
 [dependencies]
 e2m2e-levelset = { path = "../e2m2e-levelset" }
 ndarray = { workspace = true }
+e2m2e-forces = { path = "../e2m2e-forces", optional = true, default-features = false }
+e2m2e-spice = { path = "../e2m2e-spice", optional = true }
 
 [dev-dependencies]
 # 向量场对拍：CR3BP 解析右端项 cr3bp_eom 在 e2m2e-forces 顶层 cr3bp 模块
-# （非 feature 门控）。关闭默认 spice feature，避免测试引入 CSPICE 构建依赖。
+# （非 feature 门控）。关闭默认 spice feature，避免测试引入 CSPICE 构建依赖；
+# ephemeris feature 开启时与正常依赖的 spice feature 合并（cargo feature 可加）。
 e2m2e-forces = { path = "../e2m2e-forces", default-features = false }

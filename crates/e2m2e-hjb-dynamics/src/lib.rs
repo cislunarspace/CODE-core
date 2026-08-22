@@ -25,8 +25,14 @@
 mod cr3bp;
 mod double_integrator;
 
+#[cfg(feature = "ephemeris")]
+mod ephemeris;
+
 pub use cr3bp::Cr3bpSynodic;
 pub use double_integrator::PlanarDoubleIntegrator;
+
+#[cfg(feature = "ephemeris")]
+pub use ephemeris::{EphemerisPlanar, FrameState, SyntheticEphemeris};
 
 /// bang-bang 控制对 Hamiltonian 的贡献：`min(0, w − a·‖p_v‖)`。
 ///

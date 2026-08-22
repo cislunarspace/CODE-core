@@ -22,6 +22,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+#[cfg(feature = "spice")]
+use e2m2e_hjb_dynamics::EphemerisPlanar;
 use e2m2e_hjb_dynamics::{Cr3bpSynodic, PlanarDoubleIntegrator};
 use e2m2e_levelset::derivative::UpwindFirstENO2;
 use e2m2e_levelset::dissipation::ArtificialDissipationGLF;
@@ -36,8 +38,11 @@ const MAX_SNAPSHOT_BYTES: usize = 4 << 30;
 /// 快照数上限。
 const MAX_SNAPSHOTS: usize = 64;
 
-/// 时间反转适配器：HJB 反向求解等价于以 −H\* 正向推进。
-struct NegHamiltonian<H>(H);
+/// 时间反转适配器：HJB 反向求解等价于以 τ = tf − t 正向推进 −H\*。
+///
+/// 非自治（时变）Hamiltonian 需同时做时间参数反转：积分器传进的 t
+/// 是 τ，物理时刻为 tf − τ。自治模型对 t 不敏感，该映射是无害恒等。
+struct NegHamiltonian<H>(H, f64);
 
 impl<H: Hamiltonian> Hamiltonian for NegHamiltonian<H> {
     fn hamiltonian(
@@ -47,7 +52,7 @@ impl<H: Hamiltonian> Hamiltonian for NegHamiltonian<H> {
         phi: &ArrayD<f64>,
         p: &[ArrayD<f64>],
     ) -> ArrayD<f64> {
-        -&self.0.hamiltonian(t, grid, phi, p)
+        -&self.0.hamiltonian(self.1 - t, grid, phi, p)
     }
 
     fn partial_bound(
@@ -158,7 +163,7 @@ fn solve_hjb<H: Hamiltonian>(
 
     let mut term = LaxFriedrichsTerm::new(
         grid.clone(),
-        NegHamiltonian(hamiltonian),
+        NegHamiltonian(hamiltonian, tf),
         UpwindFirstENO2,
         ArtificialDissipationGLF,
     );
@@ -295,13 +300,23 @@ fn build_result_dict<'py>(
 /// - ``"planar_double_integrator"``：平面双积分器，参数 drift_x、drift_y、
 ///   max_accel、fuel_weight；
 /// - ``"cr3bp_synodic"``：地月会合系无量纲平面 CR3BP，参数 mu、
-///   max_accel、fuel_weight。
+///   max_accel、fuel_weight；
+/// - ``"ephemeris_planar"``（需 spice）：平面全星历脉动会合系（#498，
+///   ADR 0034），参数 mu_earth、mu_moon、mu_sun（km³/s²）、et0（求解器
+///   t=0 对应的 SPICE et）、thrust（N）、isp（s）、g0（m/s²）、fuel_weight、
+///   mass_mode（0 = 4 维固定质量，需 fixed_mass；1 = 5 维含质量轴，
+///   单位 kg）。求解器 t 单位为秒；调用前须 ``enable_ephem_cache`` 覆盖
+///   [et0+t0, et0+tf]，求解阶段零 cspice。
 ///
 /// `terminal` 为终端代价 ψ 的扁平数组（C 序，长度等于网格节点数）。
 /// 返回字典：``times`` 升序时刻、``values`` 逐快照拼接的值函数
 /// （C 序，形状 (len(times), ×shape)）、``axes`` 各维节点坐标、
 /// ``steps`` 实际积分步数。快照按时间近似等距抽样，数量有上界，
 /// 高维网格不会返回完整时间序列。
+///
+/// 值函数产物落盘时，调用方须按 ADR 0033 决策 3 补足元数据：动力学
+/// 标识与参数表、状态维顺序、无量纲化口径、``times`` 语义
+/// （ephemeris_planar 为求解器秒，ET = et0 + times）、历元映射参数。
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 pub fn solve_hjb_py<'py>(
@@ -321,9 +336,29 @@ pub fn solve_hjb_py<'py>(
     // 动力学加入时只动自己的分支（ADR 0032 决策 3 的通用入口定位）。
     let expected_dim = match dynamics {
         "planar_double_integrator" | "cr3bp_synodic" => 4,
+        "ephemeris_planar" => {
+            #[cfg(feature = "spice")]
+            {
+                match params.get("mass_mode") {
+                    Some(v) if *v == 0.0 => 4,
+                    Some(v) if *v == 1.0 => 5,
+                    _ => {
+                        return Err(PyValueError::new_err(
+                            "动力学 ephemeris_planar 缺少或非法参数 mass_mode（0 = 4 维，1 = 5 维含质量）",
+                        ));
+                    }
+                }
+            }
+            #[cfg(not(feature = "spice"))]
+            {
+                return Err(PyValueError::new_err(
+                    "动力学 ephemeris_planar 需要 spice feature（默认构建已启用）",
+                ));
+            }
+        }
         other => {
             return Err(PyValueError::new_err(format!(
-                "未知动力学标识 {other}（支持：planar_double_integrator、cr3bp_synodic）"
+                "未知动力学标识 {other}（支持：planar_double_integrator、cr3bp_synodic、ephemeris_planar）"
             )));
         }
     };
@@ -369,6 +404,105 @@ pub fn solve_hjb_py<'py>(
                 return Err(PyValueError::new_err("mu 必须在 (0, 1) 内"));
             }
             let ham = Cr3bpSynodic::new(mu, params["max_accel"], params["fuel_weight"]);
+            py.allow_threads(|| solve_hjb(grid.clone(), terminal_arr, t0, tf, ham, cfl, max_step))
+        }
+        #[cfg(feature = "spice")]
+        "ephemeris_planar" => {
+            let required = [
+                "mu_earth",
+                "mu_moon",
+                "mu_sun",
+                "et0",
+                "thrust",
+                "isp",
+                "g0",
+                "fuel_weight",
+                "mass_mode",
+            ];
+            let with_mass = params["mass_mode"] == 1.0;
+            for key in required {
+                if !params.contains_key(key) {
+                    return Err(PyValueError::new_err(format!(
+                        "动力学 {dynamics} 缺少参数 {key}（需要：{required:?}）"
+                    )));
+                }
+            }
+            for key in params.keys() {
+                let ok = required.contains(&key.as_str()) || (!with_mass && key == "fixed_mass");
+                if !ok {
+                    return Err(PyValueError::new_err(format!(
+                        "动力学 {dynamics} 不接受参数 {key}"
+                    )));
+                }
+            }
+            if !with_mass && !params.contains_key("fixed_mass") {
+                return Err(PyValueError::new_err("mass_mode = 0 需要 fixed_mass（kg）"));
+            }
+            for key in ["mu_earth", "mu_moon"] {
+                let v = params[key];
+                if !v.is_finite() || v <= 0.0 {
+                    return Err(PyValueError::new_err(format!("{key} 必须为正的有限值")));
+                }
+            }
+            for key in ["mu_sun", "et0", "thrust", "isp", "g0"] {
+                let v = params[key];
+                if !v.is_finite() || v < 0.0 {
+                    return Err(PyValueError::new_err(format!("{key} 必须为非负有限值")));
+                }
+            }
+            if params["thrust"] <= 0.0 || params["isp"] <= 0.0 || params["g0"] <= 0.0 {
+                return Err(PyValueError::new_err("thrust/isp/g0 必须为正"));
+            }
+            let fw = params["fuel_weight"];
+            if !fw.is_finite() || fw < 0.0 {
+                return Err(PyValueError::new_err("fuel_weight 必须为非负有限值"));
+            }
+            let fixed_mass = if with_mass { 0.0 } else { params["fixed_mass"] };
+            if !with_mass && (!fixed_mass.is_finite() || fixed_mass <= 0.0) {
+                return Err(PyValueError::new_err("fixed_mass 必须为正的有限值"));
+            }
+            // 缓存前置校验：把求解热循环里的硬失败提前到入口。
+            let et0 = params["et0"];
+            match e2m2e_spice::ephem_cache::enabled_span() {
+                None => {
+                    return Err(PyValueError::new_err(
+                        "ephemeris_planar 需要先 enable_ephem_cache 且覆盖 [et0+t0, et0+tf]",
+                    ));
+                }
+                Some((start, end)) => {
+                    if !(start <= et0 + t0 && et0 + tf <= end) {
+                        return Err(PyValueError::new_err(format!(
+                            "EphemCache 覆盖 [{start}, {end}] 不含求解窗 [{}, {}]",
+                            et0 + t0,
+                            et0 + tf
+                        )));
+                    }
+                }
+            }
+            let forces = vec![
+                e2m2e_forces::forces::compiled::CompiledForce::PointMass {
+                    mu: params["mu_earth"],
+                },
+                e2m2e_forces::forces::compiled::CompiledForce::ThirdBody {
+                    body: "MOON".to_string(),
+                    mu: params["mu_moon"],
+                },
+                e2m2e_forces::forces::compiled::CompiledForce::ThirdBody {
+                    body: "SUN".to_string(),
+                    mu: params["mu_sun"],
+                },
+            ];
+            let ham = EphemerisPlanar::new(
+                forces,
+                et0,
+                (t0, tf),
+                params["thrust"],
+                params["isp"],
+                params["g0"],
+                fw,
+                with_mass,
+                fixed_mass,
+            );
             py.allow_threads(|| solve_hjb(grid.clone(), terminal_arr, t0, tf, ham, cfl, max_step))
         }
         other => {

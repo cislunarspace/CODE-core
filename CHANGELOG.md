@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **平面全星历脉动会合系 Hamiltonian**（#498，ADR 0034）：`e2m2e-hjb-dynamics` 新增 `EphemerisPlanar`（feature `ephemeris`，随 integrators 的 spice 启用）——真实月球星历定义的时变脉动会合系（地心系，月球钉在 (1,0)），力为两主星点质量 + 太阳第三体（面内投影），非自治、5 维含质量或 4 维固定质量。ω、ω̇、脉动项全部由缓存的月球位置/速度/加速度导出，每个 RK 子步查一次星历缓存全网格复用，求解阶段零 cspice；min-fuel 控制解析消去（开关函数含质量协态项）；天体中心邻域按物理极限正则化（网格必命中主星坐标，MIN_DISTANCE 截断会产生伪加速度压垮 CFL）。配套：`EphemCache` 新增二阶导查表（`lookup_body_acceleration`）与 `enabled_span()`；`solve_hjb_py` 注册 `ephemeris_planar` 动力学（历元映射 et = et0 + t，构造期校验缓存覆盖求解窗，无新 PyO3 符号、ABI 戳不变）；`NegHamiltonian` 补时间参数反转（非自治必需）。验收：圆化定常极限退化对拍 `Cr3bpSynodic`（含地心↔质心坐标平移）、与 `compute_total_acceleration` 逐点力一致、小网格粗细模型回归（量级一致、等值面相关 >0.96）、求解全程零 cspice FFI。
+
 ## [5.8.2] - 2026-08-21
 
 ### Added

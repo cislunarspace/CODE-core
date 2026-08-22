@@ -22,14 +22,14 @@ default = ["spice"]
 # 自动链接 libpython，测试二进制可独立运行。pyproject [tool.maturin]
 # features 显式传入。
 extension-module = ["pyo3/extension-module"]
-spice = ["dep:cspice", "dep:cspice-sys", "e2m2e-forces/spice", "e2m2e-spice/spice"]
+spice = ["dep:cspice", "dep:cspice-sys", "e2m2e-forces/spice", "e2m2e-spice/spice", "e2m2e-hjb-dynamics/ephemeris"]
 
 [dependencies]
 pyo3 = { workspace = true }
 rayon = { workspace = true }
 e2m2e-forces = { path = "../e2m2e-forces" }
 e2m2e-levelset = { path = "../e2m2e-levelset" }
-e2m2e-hjb-dynamics = { path = "../e2m2e-hjb-dynamics" }
+e2m2e-hjb-dynamics = { path = "../e2m2e-hjb-dynamics", default-features = false }
 ndarray = { workspace = true }
 e2m2e-propagation = { path = "../e2m2e-propagation", features = ["pyo3"] }
 e2m2e-spice = { path = "../e2m2e-spice" }

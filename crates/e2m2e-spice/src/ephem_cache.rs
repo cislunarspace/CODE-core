@@ -181,6 +181,36 @@ impl CubicSpline {
             + b * self.ys[i + 1]
             + ((a * a * a - a) * self.m[i] + (b * b * b - b) * self.m[i + 1]) * (h * h) / 6.0
     }
+
+    /// 在 t 处求二阶导数。二阶导数形式的样条里 y'' 在区间内是节点二阶
+    /// 导数 `m` 的线性插值（C¹ 连续）；端点越界钳位同 `eval`。
+    ///
+    /// 供需要天体加速度的使用方（如 HJB 时变会合系的 d̈、ω̇）从同一条
+    /// 位置样条取二阶导，避免另建查询路径。
+    fn eval_second(&self, t: f64) -> f64 {
+        let n = self.xs.len();
+        if t <= self.xs[0] {
+            return self.m[0];
+        }
+        if t >= self.xs[n - 1] {
+            return self.m[n - 1];
+        }
+        let mut lo = 0usize;
+        let mut hi = n - 1;
+        while hi - lo > 1 {
+            let mid = (lo + hi) / 2;
+            if self.xs[mid] <= t {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        let i = lo;
+        let h = self.xs[i + 1] - self.xs[i];
+        let a = (self.xs[i + 1] - t) / h;
+        let b = (t - self.xs[i]) / h;
+        a * self.m[i] + b * self.m[i + 1]
+    }
 }
 
 /// 单个 (target, observer) 对的位置/速度样条。
@@ -431,6 +461,21 @@ impl EphemCache {
         Some([bs.vel[0].eval(et), bs.vel[1].eval(et), bs.vel[2].eval(et)])
     }
 
+    /// 查 (target, observer) 在 et 的加速度——位置样条的二阶导数。
+    /// 未缓存或越界返回 None。
+    pub fn body_acceleration(&self, target: &str, observer: &str, et: f64) -> Option<[f64; 3]> {
+        let key = (target.to_string(), observer.to_string());
+        let bs = self.bodies.get(&key)?;
+        if !(self.et_start..=self.et_end).contains(&et) {
+            return None;
+        }
+        Some([
+            bs.pos[0].eval_second(et),
+            bs.pos[1].eval_second(et),
+            bs.pos[2].eval_second(et),
+        ])
+    }
+
     /// 查 (from, to) 帧旋转矩阵。未缓存或越界返回 None。
     pub fn frame_matrix(&self, from: &str, to: &str, et: f64) -> Option<[[f64; 3]; 3]> {
         let key = (from.to_string(), to.to_string());
@@ -516,6 +561,15 @@ pub fn enable(cache: EphemCache) {
 pub fn disable() {
     let mut g = CACHE.write().expect("ephem cache rwlock poisoned");
     *g = None;
+}
+
+/// 当前已启用缓存的覆盖区间（et 秒）。未启用返回 None。
+///
+/// 供构造方（如 HJB 星历 Hamiltonian 绑定层）在求解前校验求解窗被
+/// 缓存覆盖——越界查询在求解热循环里是硬失败，提前到构造时报错。
+pub fn enabled_span() -> Option<(f64, f64)> {
+    let g = CACHE.read().expect("ephem cache rwlock poisoned");
+    g.as_ref().map(|c| (c.et_start, c.et_end))
 }
 
 /// 缓存 key 归一化：NAIF ID 字符串（如 "301"）转名字（"MOON"）。
@@ -651,6 +705,35 @@ pub fn lookup_body_velocity(
     Err(CacheMissError::KeyMiss(format!("({target}, {observer})")))
 }
 
+/// 查天体加速度（位置样条二阶导数）。语义同 `lookup_body_position`。
+pub fn lookup_body_acceleration(
+    target: &str,
+    observer: &str,
+    et: f64,
+) -> Result<Option<[f64; 3]>, CacheMissError> {
+    let g = CACHE.read().expect("ephem cache rwlock poisoned");
+    let Some(cache) = g.as_ref() else {
+        return if strict() {
+            Err(CacheMissError::NotEnabled)
+        } else {
+            Ok(None)
+        };
+    };
+    let acc = cache.body_acceleration(normalize_body_name(target), observer, et);
+    if acc.is_some() {
+        return Ok(acc);
+    }
+    // 缓存已启用但 miss：一律硬失败（不再区分 strict/非 strict）。
+    if !(cache.et_start..=cache.et_end).contains(&et) {
+        return Err(CacheMissError::OutOfRange {
+            et,
+            start: cache.et_start,
+            end: cache.et_end,
+        });
+    }
+    Err(CacheMissError::KeyMiss(format!("({target}, {observer})")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -689,5 +772,25 @@ mod tests {
         // 内部点（远离边界）应明显更精确
         assert!((sp.eval(2.0) - 2.0_f64.sin()).abs() < 1e-4);
         let _ = max_err;
+    }
+
+    #[test]
+    fn test_cubic_spline_second_derivative() {
+        // 对 sin 采样建样条：二阶导应近似 -sin（同阶精度，容差与一阶导同量级）。
+        let n = 40;
+        let xs: Vec<f64> = (0..n).map(|i| i as f64 * 0.2).collect();
+        let ys: Vec<f64> = xs.iter().map(|x| x.sin()).collect();
+        let sp = CubicSpline::new(xs, ys);
+        // 远离自然边界（首末节点二阶导强制为 0，边界误差大）。
+        for x in [1.0_f64, 2.3, 3.7, 5.1, 6.4] {
+            let got = sp.eval_second(x);
+            let expected = -x.sin();
+            assert!(
+                (got - expected).abs() < 5e-3,
+                "at {x}: got {got} exp {expected}"
+            );
+        }
+        // 节点处二阶导应精确返回预解的 m。
+        assert!((sp.eval_second(2.0) - sp.m[10]).abs() < 1e-12);
     }
 }
