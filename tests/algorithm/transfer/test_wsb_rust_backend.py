@@ -57,6 +57,8 @@ def _params() -> WsbSearchParams:
         max_total_dv=1_000_000.0,
         h2_energy_threshold=1_000_000.0,
         n_propagation_samples=100,
+        rtol=1e-12,
+        atol=1e-12,
     )
 
 
