@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [5.8.5] - 2026-08-22
+
+### Added
+- **serve-stdio 族生成响应补 period 与 mu**（#525/#527）：orbit_family_generation 的二进制帧响应补充成员周期 period 与质量参数 mu，消费端无需再查内核即可从初态重采样。
+
+### Fixed
+- **catalog_get 进二进制帧映射**（#526/#528）：catalog_get 的响应含不可 JSON 化对象时改为走二进制帧路径，信封化失败不再炸进程。
+
 ## [5.8.4] - 2026-08-22
 
 ### Fixed
