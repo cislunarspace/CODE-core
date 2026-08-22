@@ -482,8 +482,8 @@ mod tests {
         let y0 = vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
         // 用 error_dim=None：STM 分量主导误差，步长很小，可能超时或步数耗尽
-        let sol_no_limit = solve_ivp_capped(
-            &f,
+        let _sol_no_limit = solve_ivp_capped(
+            f,
             (0.0, 5.0),
             &y0,
             &t_eval,
@@ -496,7 +496,7 @@ mod tests {
 
         // 用 error_dim=Some(2)：只统计前 2 维，步长正常
         let sol_with_dim = solve_ivp_capped(
-            &f,
+            f,
             (0.0, 5.0),
             &y0,
             &t_eval,

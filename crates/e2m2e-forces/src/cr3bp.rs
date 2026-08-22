@@ -660,13 +660,13 @@ mod tests {
         assert_eq!(bwd.states.len(), 2);
         assert!((bwd.times[0] - 1.0).abs() < 1e-12);
         assert!(bwd.times[1].abs() < 1e-12);
-        for i in 0..6 {
+        for (i, (got, &want)) in bwd.states[1].iter().zip(state0.iter()).enumerate() {
             assert!(
-                (bwd.states[1][i] - state0[i]).abs() < 1e-7,
+                (got - want).abs() < 1e-7,
                 "backward roundtrip state[{}] = {} vs {}",
                 i,
-                bwd.states[1][i],
-                state0[i]
+                got,
+                want
             );
         }
     }

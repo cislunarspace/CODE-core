@@ -121,7 +121,7 @@ mod tests {
         let (y1, error, new_history) = abm_step(0.0, &[1.0, 0.0], h, &history, f).unwrap();
 
         // Exact solution at t = h: [cos h, -sin h].
-        let exact = vec![h.cos(), -h.sin()];
+        let exact = [h.cos(), -h.sin()];
         let num_err = y1
             .iter()
             .zip(exact.iter())

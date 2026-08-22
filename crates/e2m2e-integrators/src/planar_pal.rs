@@ -809,15 +809,13 @@ mod tests {
         let stm = result.stms.last().unwrap();
         let flow = cr3bp_eom(MU, &final_state);
 
-        for row in 0..4 {
-            let component = PLANAR[row];
+        for (row, &component) in PLANAR.iter().enumerate() {
             assert!(
                 (evaluation.closure[row] - (final_state[component] - state_from_q(&q)[component]))
                     .abs()
                     < 1e-12
             );
-            for col in 0..4 {
-                let variable = PLANAR[col];
+            for (col, &variable) in PLANAR.iter().enumerate() {
                 let expected = (stm[component * 6 + variable] - f64::from(component == variable))
                     * SCALES[col];
                 assert!((evaluation.jacobian[(row, col)] - expected).abs() < 1e-8);

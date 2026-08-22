@@ -135,9 +135,9 @@ mod tests {
         let a0 = 1.0 * pressure * dyb[0] / KM_TO_M; // flux=1, u=0
         let d_comp = 1.0_f64; // dyb[1..9]=0, u=0
 
-        for i in 0..3 {
+        for (i, &dh) in d_hat.iter().enumerate() {
             assert!(
-                (a0 * d_comp * d_hat[i] - expected * d_hat[i]).abs() < 1e-30,
+                (a0 * d_comp * dh - expected * dh).abs() < 1e-30,
                 "ECOM degenerate mismatch at [{}]",
                 i
             );

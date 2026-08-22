@@ -488,11 +488,12 @@ mod tests {
         let d = d_matrix();
         let inv = d_inv_matrix();
         // inv · D ≈ I
-        for i in 0..6 {
+        for (i, inv_row) in inv.iter().enumerate() {
+            #[allow(clippy::needless_range_loop)] // j 同时用于索引与 i==j 判别，迭代器化反而绕
             for j in 0..6 {
                 let mut acc = C64::ZERO;
                 for k in 0..6 {
-                    acc = acc.add(inv[i][k].mul(d[k][j]));
+                    acc = acc.add(inv_row[k].mul(d[k][j]));
                 }
                 let expect = if i == j { 1.0 } else { 0.0 };
                 assert!(
@@ -532,8 +533,8 @@ mod tests {
         let dx = hamilton_flow_rhs(&x, &poly);
         assert!((dx[0].re - 0.7).abs() < 1e-14);
         assert!((dx[0].im + 0.4).abs() < 1e-14);
-        for i in 1..6 {
-            assert!(dx[i].re.abs() < 1e-14 && dx[i].im.abs() < 1e-14);
+        for dx_v in &dx[1..] {
+            assert!(dx_v.re.abs() < 1e-14 && dx_v.im.abs() < 1e-14);
         }
     }
 

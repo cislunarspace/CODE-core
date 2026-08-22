@@ -384,13 +384,14 @@ mod tests {
 
     /// Step1 在地球 + Sun/Moon 扰动下应非零。
     #[test]
+    #[allow(clippy::approx_constant)] // K22 = 0.30102 是真实 Love 数，碰巧接近 LOG10_2
     fn test_step1_earth_sun_moon() {
         // 地球 Love 数（只填 n=2,3 的前几项）
         let mut k_love_flat = vec![0.0_f64; 25];
-        k_love_flat[2 * 5 + 0] = 0.30190; // K20
+        k_love_flat[2 * 5] = 0.30190; // K20
         k_love_flat[2 * 5 + 1] = 0.29830; // K21
         k_love_flat[2 * 5 + 2] = 0.30102; // K22
-        k_love_flat[3 * 5 + 0] = 0.093;
+        k_love_flat[3 * 5] = 0.093;
         k_love_flat[3 * 5 + 1] = 0.093;
         k_love_flat[3 * 5 + 2] = 0.093;
         k_love_flat[3 * 5 + 3] = 0.094;
@@ -418,7 +419,7 @@ mod tests {
         );
         assert_eq!(out.len(), 50);
         // (2,0) 应该有显著值
-        assert!(out[2 * 5 + 0].abs() > 1e-9);
+        assert!(out[2 * 5].abs() > 1e-9);
         // 所有项有限
         assert!(out.iter().all(|v| v.is_finite()));
     }

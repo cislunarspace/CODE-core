@@ -457,11 +457,7 @@ mod tests {
         )
         .expect("easier_reader failed");
         let (state2, _lt2) = spkezr("MOON", et, "J2000", "NONE", "EARTH").expect("spkezr failed");
-        let expected_pos = [
-            state.position.x as f64,
-            state.position.y as f64,
-            state.position.z as f64,
-        ];
+        let expected_pos = [state.position.x, state.position.y, state.position.z];
         for k in 0..3 {
             let diff = (expected_pos[k] - state2[k]).abs();
             assert!(diff < 1e-9, "pos[{}] diff={}", k, diff);

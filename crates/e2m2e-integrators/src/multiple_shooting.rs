@@ -848,12 +848,12 @@ mod tests {
         let f = build_residual(&final_states, &state_work, 2, 1.0);
         assert_eq!(f.len(), 12);
         // 第一段残差：final_states[0] - state_work[1] = [0, 0, 0, 0, 0, 0]
-        for i in 0..6 {
-            assert!((f[i] - 0.0).abs() < 1e-15);
+        for &v in &f[..6] {
+            assert!((v - 0.0).abs() < 1e-15);
         }
         // 第二段残差：final_states[1] - state_work[2] = [0, 0, 0, 0, 0, 0]
-        for i in 6..12 {
-            assert!((f[i] - 0.0).abs() < 1e-15);
+        for &v in &f[6..] {
+            assert!((v - 0.0).abs() < 1e-15);
         }
     }
 

@@ -93,7 +93,7 @@ fn test_cubic_spline_exact_at_nodes() {
     let t_grid: Vec<f64> = (0..20).map(|i| i as f64 * 0.3).collect();
     let pos_fn = |t: f64| -> [f64; 3] { [t.sin(), t.cos(), t.powi(2)] };
     let vel_fn = |t: f64| -> [f64; 3] { [t.cos(), -t.sin(), 2.0 * t] };
-    let cache = build_body_cache(&t_grid, "ND", &pos_fn, &vel_fn);
+    let cache = build_body_cache(&t_grid, "ND", pos_fn, vel_fn);
     enable(cache);
 
     for &t in &t_grid {
@@ -121,7 +121,7 @@ fn test_cubic_spline_sin_interior_error_bound() {
     let t_grid: Vec<f64> = (0..=20).map(|i| i as f64 * 0.5).collect();
     let pos_fn = |t: f64| -> [f64; 3] { [t.sin(), 0.0, 0.0] };
     let vel_fn = |_t: f64| -> [f64; 3] { [0.0, 0.0, 0.0] };
-    let cache = build_body_cache(&t_grid, "SIN", &pos_fn, &vel_fn);
+    let cache = build_body_cache(&t_grid, "SIN", pos_fn, vel_fn);
     enable(cache);
 
     let h = 0.5;
@@ -147,7 +147,7 @@ fn test_cubic_spline_cos_interior_error_bound() {
     let t_grid: Vec<f64> = (0..=20).map(|i| i as f64 * 0.5).collect();
     let pos_fn = |t: f64| -> [f64; 3] { [0.0, t.cos(), 0.0] };
     let vel_fn = |_t: f64| -> [f64; 3] { [0.0, 0.0, 0.0] };
-    let cache = build_body_cache(&t_grid, "COS", &pos_fn, &vel_fn);
+    let cache = build_body_cache(&t_grid, "COS", pos_fn, vel_fn);
     enable(cache);
 
     let h = 0.5;
@@ -172,9 +172,9 @@ fn test_cubic_spline_cos_interior_error_bound() {
 fn test_cubic_spline_constant_exact() {
     let _guard = lock();
     let t_grid: Vec<f64> = (0..=20).map(|i| i as f64 * 0.5).collect();
-    let pos_fn = |_t: f64| -> [f64; 3] { [42.0, -7.0, 3.14] };
+    let pos_fn = |_t: f64| -> [f64; 3] { [42.0, -7.0, 2.5] };
     let vel_fn = |_t: f64| -> [f64; 3] { [0.0, 0.0, 0.0] };
-    let cache = build_body_cache(&t_grid, "CST", &pos_fn, &vel_fn);
+    let cache = build_body_cache(&t_grid, "CST", pos_fn, vel_fn);
     enable(cache);
 
     for &t in &t_grid {
@@ -183,7 +183,7 @@ fn test_cubic_spline_constant_exact() {
             .expect("cache miss");
         assert!((pos[0] - 42.0).abs() < 1e-14, "CST t={t}: x={}", pos[0]);
         assert!((pos[1] + 7.0).abs() < 1e-14, "CST t={t}: y={}", pos[1]);
-        assert!((pos[2] - 3.14).abs() < 1e-14, "CST t={t}: z={}", pos[2]);
+        assert!((pos[2] - 2.5).abs() < 1e-14, "CST t={t}: z={}", pos[2]);
     }
     disable();
 }
@@ -198,7 +198,7 @@ fn test_ephem_cache_position_roundtrip() {
     let t_grid: Vec<f64> = (0..50).map(|i| i as f64 * 100.0).collect();
     let pos_fn = |t: f64| -> [f64; 3] { [t * 1.5, t.sin() * 100.0, t.cos() * 100.0] };
     let vel_fn = |t: f64| -> [f64; 3] { [1.5, t.cos() * 100.0, -t.sin() * 100.0] };
-    let cache = build_body_cache(&t_grid, "RT", &pos_fn, &vel_fn);
+    let cache = build_body_cache(&t_grid, "RT", pos_fn, vel_fn);
     enable(cache);
 
     for &t in &t_grid {
@@ -224,7 +224,7 @@ fn test_ephem_cache_interpolation_accuracy() {
     let t_grid: Vec<f64> = (0..=20).map(|i| i as f64 * 0.5).collect();
     let pos_fn = |t: f64| -> [f64; 3] { [t.sin(), t.cos(), 0.0] };
     let vel_fn = |t: f64| -> [f64; 3] { [t.cos(), -t.sin(), 0.0] };
-    let cache = build_body_cache(&t_grid, "INT", &pos_fn, &vel_fn);
+    let cache = build_body_cache(&t_grid, "INT", pos_fn, vel_fn);
     enable(cache);
 
     let h = 0.5;
@@ -262,7 +262,7 @@ fn test_frame_orthogonality_at_nodes() {
             [0.0, 0.0, 1.0],
         ]
     };
-    let cache = build_frame_cache(&t_grid, &mat_fn);
+    let cache = build_frame_cache(&t_grid, mat_fn);
     enable(cache);
 
     for &t in &t_grid {
@@ -274,8 +274,8 @@ fn test_frame_orthogonality_at_nodes() {
         for i in 0..3 {
             for j in 0..3 {
                 let mut rtr = 0.0;
-                for k in 0..3 {
-                    rtr += r[k][i] * r[k][j];
+                for row in r {
+                    rtr += row[i] * row[j];
                 }
                 let expected = if i == j { 1.0 } else { 0.0 };
                 assert!(
@@ -310,7 +310,7 @@ fn test_frame_orthogonality_off_grid_bounded() {
             [0.0, 0.0, 1.0],
         ]
     };
-    let cache = build_frame_cache(&t_grid, &mat_fn);
+    let cache = build_frame_cache(&t_grid, mat_fn);
     enable(cache);
 
     // h=1，中间点处样条误差量级 ~h⁴ = 1 导致正交性偏离约 2e-2。
@@ -325,8 +325,8 @@ fn test_frame_orthogonality_off_grid_bounded() {
         for i in 0..3 {
             for j in 0..3 {
                 let mut rtr = 0.0;
-                for k in 0..3 {
-                    rtr += r[k][i] * r[k][j];
+                for row in r {
+                    rtr += row[i] * row[j];
                 }
                 let expected = if i == j { 1.0 } else { 0.0 };
                 assert!(
@@ -364,7 +364,7 @@ fn test_enabled_cache_miss_is_error() {
     let t_grid: Vec<f64> = (0..20).map(|i| i as f64 * 0.3).collect();
     let pos_fn = |t: f64| -> [f64; 3] { [t.sin(), t.cos(), t.powi(2)] };
     let vel_fn = |t: f64| -> [f64; 3] { [t.cos(), -t.sin(), 2.0 * t] };
-    let cache = build_body_cache(&t_grid, "ND", &pos_fn, &vel_fn);
+    let cache = build_body_cache(&t_grid, "ND", pos_fn, vel_fn);
     enable(cache);
 
     // 区间外 miss → Err

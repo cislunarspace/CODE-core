@@ -497,16 +497,6 @@ mod tests {
         has_spk
     }
 
-    /// 地月系配置：EARTH 为中心，MOON 为摄动体。
-    fn earth_moon_config() -> NBodyConfig {
-        NBodyConfig {
-            bodies: vec!["EARTH".to_string(), "MOON".to_string()],
-            origin: "EARTH".to_string(),
-            // GM 值（km³/s²）：JPL DE430
-            gm_values: vec![398600.435436, 4902.800066],
-        }
-    }
-
     /// 地月日配置。
     fn earth_moon_sun_config() -> NBodyConfig {
         NBodyConfig {

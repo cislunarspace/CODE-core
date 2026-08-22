@@ -106,7 +106,7 @@ mod tests {
         let (y1, error) = explicit_rk_step(&PD45_TABLE, 0.0, &y0, h, f, None).unwrap();
 
         // Analytic solution at t=h: cos(h), -sin(h).
-        let y_exact = vec![h.cos(), -h.sin()];
+        let y_exact = [h.cos(), -h.sin()];
         let num_err = y1
             .iter()
             .zip(y_exact.iter())
