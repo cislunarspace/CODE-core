@@ -2,8 +2,18 @@
 
 ## [Unreleased]
 
+## [5.8.3] - 2026-08-22
+
 ### Added
+- **MCP server 本体**（#510/#511，ADR 0014）：`e2m2e.api.mcp.create_server(facade)` 落地——统一信封 `{status, data, error, meta}`（OrbitError 原样翻译，ValidationError → INVALID_PARAMS，未预期异常归 INTERNAL_ERROR 不泄漏 traceback）；工具规格由 `tool_inventory()` 纯派生（清单单一来源，placeholder 不注册）；工具调用经线程池避免阻塞事件循环。CLI 新增 `e2m2e mcp-serve`（stdio 传输），`[mcp]` extra 收紧为 `mcp>=2.0`，`[project.scripts]` 注册 `e2m2e` 入口。
 - **平面全星历脉动会合系 Hamiltonian**（#498，ADR 0034）：`e2m2e-hjb-dynamics` 新增 `EphemerisPlanar`（feature `ephemeris`，随 integrators 的 spice 启用）——真实月球星历定义的时变脉动会合系（地心系，月球钉在 (1,0)），力为两主星点质量 + 太阳第三体（面内投影），非自治、5 维含质量或 4 维固定质量。ω、ω̇、脉动项全部由缓存的月球位置/速度/加速度导出，每个 RK 子步查一次星历缓存全网格复用，求解阶段零 cspice；min-fuel 控制解析消去（开关函数含质量协态项）；天体中心邻域按物理极限正则化（网格必命中主星坐标，MIN_DISTANCE 截断会产生伪加速度压垮 CFL）。配套：`EphemCache` 新增二阶导查表（`lookup_body_acceleration`）与 `enabled_span()`；`solve_hjb_py` 注册 `ephemeris_planar` 动力学（历元映射 et = et0 + t，构造期校验缓存覆盖求解窗，无新 PyO3 符号、ABI 戳不变）；`NegHamiltonian` 补时间参数反转（非自治必需）。验收：圆化定常极限退化对拍 `Cr3bpSynodic`（含地心↔质心坐标平移）、与 `compute_total_acceleration` 逐点力一致、小网格粗细模型回归（量级一致、等值面相关 >0.96）、求解全程零 cspice FFI。
+- **GUI sidecar stdio 协议入口 serve-stdio**（#518/#519，ADR 0035）：新增 `e2m2e/api/sidecar/`（帧编解码 + 主循环），帧契约 magic 0x324D3245 / u8 dtype / u8 ndim / u32 shape / 小端 C 连续字节；JSON 行复用统一信封，响应行带 binary_frames 计数，帧后恢复 JSON 行流，进度行为可丢弃信封行。首个画布契约：orbit_family_generation 成员状态数组出帧（Orbit 不可 JSON 化，须声明 binary_dtype）。CLI 注册 `serve-stdio` 子命令；mcp 的 server 导出改惰性，sidecar 不依赖 [mcp] extra。
+
+### Fixed
+- **NRHO n_rev=2 合并层不收敛时回退单段两圈**（#508/#514）：9:2 贴月共振成员（近月高 ~1500 km）在 phase=0.5 下，两段独立打靶各自收敛后 seam 失配 ~10² km，合并层 LM 跳不出残差盆地（残差卡 9.4e2 km，容差 2e-2 km）；phase=0 端点恰好相反——两种策略按相位互补，无单一策略通吃。主路径保持生产默认（1 圈/段 + 合并层，#473）；NRHO 且 n_rev=2 主路径 DesignNotConvergedError 时自动回退单段 2 圈（无合并层）重试，回退路径 1500 km × 8 天 30 次迭代收敛到 2e-2 km；作用域不外推到 n_rev>2。
+
+### Changed
+- **de430/de440s 行星星历内核纳入 git-lfs 跟踪**（#517）：de430.bsp（115MB）超过 GitHub 单文件 100MB 限制，普通 git 无法推送，改用 git-lfs 入库；.gitignore 不再忽略 kernels/*.bsp，由 .gitattributes 的 LFS 规则管理。
 
 ## [5.8.2] - 2026-08-21
 
