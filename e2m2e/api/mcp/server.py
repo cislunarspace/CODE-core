@@ -70,7 +70,7 @@ def create_server(facade: Facade) -> Server:
 
     一个 Facade 实例 = 一个 server；工具清单在每次 tools/list 时由 Facade
     纯派生，与 ``tool_inventory()`` 单一同源。注册走
-    ``add_request_handler``（mcp 1.x/2.x 兼容：2.0 移除了装饰器 API）。
+    ``add_request_handler`` （mcp 1.x/2.x 兼容：2.0 移除了装饰器 API）。
 
     Args:
         facade: Facade 实例。

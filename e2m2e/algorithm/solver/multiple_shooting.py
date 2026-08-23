@@ -37,7 +37,7 @@ _worker_dynamics = None  # 进程全局：仅在子进程中被 _worker_init 赋
 
 
 def _load_worker_kernels(spice: SPICEManager, kernel_dir: str) -> str:
-    """子进程内核加载：闰秒 + 星历，统一走 ``SPICEManager.load_kernel``。
+    """子进程内核加载：闰秒 + 星历，统一走 ``SPICEManager.load_kernel`` 。
 
     ``load_kernel`` 在 Python spiceypy 与 Rust cspice 两个独立 CSPICE 实例**双侧**
     furnsh，并对称注册行星名别名（类级 once）。多进程 worker 是新进程、内核池为空，
@@ -72,15 +72,15 @@ def _worker_init(
     """子进程初始化：经 ``SPICEManager`` 重载内核并构建 EphemerisDynamics。
 
     该函数由 ProcessPoolExecutor(initializer=...) 在每个工作进程启动时调用一次。
-    内核加载经 :func:`_load_worker_kernels` → ``SPICEManager.load_kernel``，在
+    内核加载经 :func:`_load_worker_kernels` → ``SPICEManager.load_kernel`` ，在
     Python spiceypy 与 Rust cspice 两侧 furnsh（不再直接调 ``spiceypy.furnsh``
-    或手篡内部 once 标志）。动力学对象保存在 ``_worker_dynamics``。
+    或手篡内部 once 标志）。动力学对象保存在 ``_worker_dynamics`` 。
 
     Args:
         kernel_dir: 包含 ``.bsp`` 和 ``.tls`` 内核文件的目录路径。
-        bodies: 引力天体名称列表，如 ``["EARTH", "MOON", "SUN"]``。
-        origin: 坐标原点天体，如 ``"EARTH"``。
-        frame: 参考坐标系，如 ``"J2000"``。
+        bodies: 引力天体名称列表，如 ``["EARTH", "MOON", "SUN"]`` 。
+        origin: 坐标原点天体，如 ``"EARTH"`` 。
+        frame: 参考坐标系，如 ``"J2000"`` 。
         rtol: ODE 积分相对容差。
         atol: ODE 积分绝对容差。
         max_step: ODE 最大步长（秒）。
@@ -107,13 +107,13 @@ def _worker_propagate(state: np.ndarray, t_span: tuple[float, float]) -> dict:
     """子进程 worker：使用进程本地的 EphemerisDynamics 积分单段弧段（含 STM）。
 
     Args:
-        state: 初始状态向量，形状 ``(6,)``，单位 km / km/s。
-        t_span: ``(t0, tf)``，SPICE ET（秒）。
+        state: 初始状态向量，形状 ``(6,)`` ，单位 km / km/s。
+        t_span: ``(t0, tf)`` ，SPICE ET（秒）。
 
     Returns:
         包含 ``"states"`` （6×n）、``"stm"`` （6×6×n）、``"time"`` （n,）的字典，
         但仅返回终端切片以减少 IPC 数据量：
-        ``{"final_state": (6,), "final_stm": (6,6), "t_end": float}``。
+        ``{"final_state": (6,), "final_stm": (6,6), "t_end": float}`` 。
     """
     result = _worker_dynamics.propagate(state, t_span, with_stm=True)  # type: ignore[union-attr]
     return {
@@ -579,9 +579,9 @@ def sample_patch_points_perilune_clustered(
     窗口外。
 
     Args:
-        orbit: 周期轨道，需含 ``period``、``times``、``states``。
+        orbit: 周期轨道，需含 ``period`` 、``times`` 、``states`` 。
         dynamics: 动力学对象，用于积分定位近月点（需提供
-            ``propagate_orbit_state_at_time``）。
+            ``propagate_orbit_state_at_time`` ）。
         n_base: 窗口外的等时间间隔节点数。
         n_perilune: 近月点窗口内的加密节点数（含近月点本身）。
         perilune_window: 加密窗口半宽，占周期比例（如 0.15 表示近月点
@@ -642,7 +642,7 @@ def sample_patch_points_drop_near_perilune(
     n_points: int = 8,
     drop_window: float = 0.12,
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-    """等时间采样的对偶：节点落在近月点窗口之外，并强制包含历元 ``t=0``。
+    """等时间采样的对偶：节点落在近月点窗口之外，并强制包含历元 ``t=0`` 。
 
     NRHO 近月点速度大、STM 条件数高。把节点加密到近月点附近（
     :func:`sample_patch_points_perilune_clustered`）或让节点落在近月点上，
@@ -650,8 +650,8 @@ def sample_patch_points_drop_near_perilune(
     是**删除**近月点附近的离散点，让节点落在条件数较好的弧段。
 
     实现：先积分一圈定位近月点，再在窗口 ``[t_p - w, t_p + w]`` 之外的
-    互补弧上均匀放置 ``n_points - 1`` 个节点（``w = drop_window · period``），
-    并强制并入 ``t=0``。不钉历元时首节点常落在 ``t>0``，segmented 逐段
+    互补弧上均匀放置 ``n_points - 1`` 个节点（``w = drop_window · period`` ），
+    并强制并入 ``t=0`` 。不钉历元时首节点常落在 ``t>0`` ，segmented 逐段
     填充从 ``et0`` 起的时间网格会出现前缀空洞，星历长度断言失败（#473）。
     去重后点数不足则回退等时间采样。与近月点加密互补——加密往窗口内堆点，
     本函数把非历元节点放在窗口外。
@@ -659,14 +659,14 @@ def sample_patch_points_drop_near_perilune(
     注：自 #473 起 NRHO 生产默认改为等时间；本函数保留供对照与研究。
 
     Args:
-        orbit: 周期轨道，需含 ``period``、``times``、``states``。
+        orbit: 周期轨道，需含 ``period`` 、``times`` 、``states`` 。
         dynamics: 动力学对象，用于积分定位近月点。
         n_points: 目标节点数（含历元钉点）。
         drop_window: 近月点禁区半宽，占周期比例。
 
     Returns:
         (t_patch, states)：时间节点与对应状态，按时间升序排列；
-        ``t_patch[0] == 0``（或回退等时间时同样从 0 起）。
+        ``t_patch[0] == 0`` （或回退等时间时同样从 0 起）。
     """
     if orbit.period is None or orbit.period <= 0:
         raise ValueError("orbit must have a positive period")

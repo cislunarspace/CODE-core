@@ -3,7 +3,7 @@
 
 ``Facade.orbit_family_generation()`` 统一生成 Halo、NRHO、Axial、
 Lissajous、SPO、LPO、Horseshoe 和 DRO 八类轨道族。Facade 返回专属
-Pydantic 响应 ``FamilyGenerationResponse``；它继承
+Pydantic 响应 ``FamilyGenerationResponse`` ；它继承
 :class:`e2m2e.data.types.orbit.OrbitFamily` 以保持既有读取接口，并直接携带
 ``status/cause/message`` 状态三元组。``n_orbits`` 表示成员数量上限，不保证
 一定生成满额；数值延拓软失败时同一响应保留已收敛成员。算法层入口仍使用
@@ -12,8 +12,8 @@ Pydantic 响应 ``FamilyGenerationResponse``；它继承
 参数契约
 --------
 
-公共参数是 ``orbit_type``、``libration_point`` 和 ``n_orbits``；DRO 是
-月心族，请求不携带 ``libration_point``（显式携带即拒绝，与其余七族拒绝
+公共参数是 ``orbit_type`` 、``libration_point`` 和 ``n_orbits`` ；DRO 是
+月心族，请求不携带 ``libration_point`` （显式携带即拒绝，与其余七族拒绝
 跨族字段的口径一致）。其余字段按族解释：
 
 .. list-table::
@@ -25,15 +25,15 @@ Pydantic 响应 ``FamilyGenerationResponse``；它继承
      - 生成方法
    * - Halo
      - L1/L2
-     - ``max_amplitude_km``、``sampling_mode=natural-z0`` （正北、负南）
+     - ``max_amplitude_km`` 、``sampling_mode=natural-z0`` （正北、负南）
      - 固定 z0 自然参数延拓
    * - NRHO
      - L1/L2
-     - ``north_south``、近月点高度、``continuation_direction=toward-moon``
+     - ``north_south`` 、近月点高度、``continuation_direction=toward-moon``
      - L1 单次 Rust 伪弧长延拓；L2 折叠后固定 x0 延拓
    * - Axial
      - L1/L2
-     - ``max_amplitude_km``、``continuation_direction=increase-amplitude``
+     - ``max_amplitude_km`` 、``continuation_direction=increase-amplitude``
      - 以 vz0 为 Type B 族参数行走
    * - Lissajous
      - L1/L2/L3
@@ -79,7 +79,7 @@ min/max 均值，km），请求包络与单轨一致（1737~110000 km）。族�
 ----------------
 
 Halo、NRHO、Axial、SPO、LPO、Horseshoe 和 DRO 成员是严格周期轨道，
-``family.periodicity == "periodic"``。Lissajous 面内/面外频率不可约，
+``family.periodicity == "periodic"`` 。Lissajous 面内/面外频率不可约，
 成员是 Rust 非线性中心约化流上的拟周期有界多点轨迹，不做周期闭合；统一容器
 通过以下标注明确区分：
 
@@ -131,4 +131,4 @@ normal-form 展开。
    for orbit in family:
        print(orbit.parameters["amplitude_km"], orbit.period)
 
-可运行版本见 ``examples/main_family_generation.py``。
+可运行版本见 ``examples/main_family_generation.py`` 。

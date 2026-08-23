@@ -38,7 +38,7 @@ export LIBCLANG_PATH
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup cspice kernels dev dev-release test test-rust test-python check fmt clean
+.PHONY: help setup cspice kernels dev dev-release test test-rust test-python catalog-baseline check fmt clean
 
 help:  ## 显示本帮助
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -50,6 +50,9 @@ kernels:  ## 下载 SPICE 内核
 	$(PYTHON) scripts/download_kernels.py
 
 setup: cspice kernels  ## 首次拉取：CSPICE 编译包 + SPICE 内核（kernels/）
+
+catalog-baseline:  ## 重新生成随包分发的 CR3BP 基线轨道族数据集（ADR 0036）
+	$(PYTHON) scripts/generate_catalog_baseline.py
 
 dev: setup  ## 唯一开发入口：同步依赖 + 拉数据 + 构建安装 Rust 扩展（debug）
 	uv sync --group dev --no-install-project

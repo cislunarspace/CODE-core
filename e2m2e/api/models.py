@@ -1245,7 +1245,7 @@ class CatalogRecordResponse(CatalogRecordSummary):
     )
 
     def to_ephemeris_table(self) -> Any | None:
-        """把星历段重建为 ``EphemerisTable``（供接续计算）；无星历段返回 None。"""
+        """把星历段重建为 ``EphemerisTable`` 实例（供接续计算）；无星历段返回 None。"""
         from e2m2e.data.catalog import ephemeris_from_arrays
 
         if not self.has_ephemeris:

@@ -24,6 +24,7 @@ from e2m2e.data.catalog import (
     CatalogStore,
     RecordNotFoundError,
     ephemeris_from_arrays,
+    import_baseline,
 )
 from e2m2e.data.catalog import member_count as catalog_member_count
 from e2m2e.data.constants import SECONDS_PER_DAY
@@ -571,9 +572,19 @@ class Facade:
     # ---- 轨道库 catalog 私有设施（ADR 0031）----
 
     def _open_catalog(self) -> CatalogStore:
-        """懒打开库目录（首次使用时才产生目录副作用）。"""
+        """懒打开库目录（首次使用时才产生目录副作用）。
+
+        首次打开时做基线首用导入（ADR 0036 决策 5）：用户库缺基线记录
+        或版本不一致时从包内复制并重建索引；``catalog_baseline_import``
+        可关闭。
+        """
         if self._catalog_store is None:
             self._catalog_store = CatalogStore(self._config.catalog_dir)
+            if self._config.catalog_baseline_import:
+                try:
+                    import_baseline(self._catalog_store)
+                except Exception as exc:
+                    raise _catalog_write_failed(exc) from exc
         return self._catalog_store
 
     def _auto_catalog(

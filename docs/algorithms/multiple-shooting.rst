@@ -58,9 +58,9 @@
 
 - **Halo**：近月点加密（
   :func:`~e2m2e.algorithm.solver.multiple_shooting.sample_patch_points_perilune_clustered`）
-- **NRHO**：等时间（#473；第 1 步 ``revs_per_group=1``）。删近月点附近节点
+- **NRHO**：等时间（#473；第 1 步 ``revs_per_group=1`` ）。删近月点附近节点
   （:func:`~e2m2e.algorithm.solver.multiple_shooting.sample_patch_points_drop_near_perilune`）
-  保留为工具函数，强制含历元 ``t=0``；不再作生产默认
+  保留为工具函数，强制含历元 ``t=0`` ；不再作生产默认
 
 近月点加密——先积分一圈定位近月点，在其两侧窗口内加密节点：
 
@@ -77,7 +77,7 @@
    )
 
 删近月点附近节点——非历元节点落在近月点禁区之外的互补弧上，并强制包含
-历元 ``t=0``（避免 segmented 星历网格前缀空洞）：
+历元 ``t=0`` （避免 segmented 星历网格前缀空洞）：
 
 .. code-block:: python
 
@@ -90,13 +90,13 @@
        drop_window=0.12,  # 近月点禁区半宽，占周期比例
    )
 
-二者均返回按时间升序的 ``(t_patch, states)``。非 CR3BP 动力学（无 ``mu``
+二者均返回按时间升序的 ``(t_patch, states)`` 。非 CR3BP 动力学（无 ``mu``
 属性）时退化为等时间间隔采样；``drop_near`` 去重后点数不足时同样回退等时间。
 
 星历修正
 --------
 
-星历模型下的 patch points 修正不再走 Python ``MultipleShooting``：设计链路
+星历模型下的 patch points 修正不再走 Python ``MultipleShooting`` ：设计链路
 统一走 Rust 多重打靶 ``e2m2e.integrators.multiple_shooting_correct_py``
 （segmented 与稳定轨道默认路径），速度残差经 ``vel_weight`` 加权与位置
 残差同尺度收敛。旧的 Python 分发器（``ephemeris_correction`` 包）与

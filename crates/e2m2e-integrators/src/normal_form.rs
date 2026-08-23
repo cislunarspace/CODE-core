@@ -30,8 +30,8 @@ fn binom(n: usize, k: usize) -> usize {
 /// 把 ``(Σ_j m_j·y_j)^n`` 的展开乘进 ``terms`` （合并同幂次）。
 ///
 /// ``row`` 是变换矩阵一行的非零 ``(列号 j, 系数 m_j)`` 列表；``terms``
-/// 是当前部分展开表 ``{pow: coef}``。枚举 ``n`` 个因子分配到 ``row``
-/// 各列的 multinomial 组合（``C(n; s_0..s_{k-1})·∏ m_j^{s_j}``）。
+/// 是当前部分展开表 ``{pow: coef}`` 。枚举 ``n`` 个因子分配到 ``row``
+/// 各列的 multinomial 组合（``C(n; s_0..s_{k-1})·∏ m_j^{s_j}`` ）。
 fn expand_row(terms: &mut HashMap<Pow, f64>, row: &[(usize, f64)], n: usize) {
     let k = row.len();
     if k == 0 || n == 0 {
@@ -101,7 +101,7 @@ fn enumerate_combos(
     }
 }
 
-/// H→QF 投影：``X = B·Y`` 单项式替换展开（对应 qiao ``Code09``）。
+/// H→QF 投影：``X = B·Y`` 单项式替换展开（对应 qiao ``Code09`` ）。
 ///
 /// Args:
 ///     pows: ``(N_in, 6)`` 输入单项式的幂次（平动点偏移坐标）。
@@ -109,7 +109,7 @@ fn enumerate_combos(
 ///     b_seq: ``(M, 36)`` 每个采样时刻的 6×6 变换矩阵 ``B(t)`` 展平。
 ///
 /// Returns:
-///     ``(out_pows, out_coefs)``：``out_pows`` 为 ``(K, 6)`` 展开后幂次
+///     ``(out_pows, out_coefs)`` ：``out_pows`` 为 ``(K, 6)`` 展开后幂次
 ///     并集（排序），``out_coefs`` 为 ``(M, K)`` 逐时刻系数矩阵。
 #[pyfunction]
 #[pyo3(signature = (pows, coefs, b_seq))]
@@ -222,8 +222,8 @@ pub fn project_hamiltonian_qf_py(
 ///
 /// **返回**
 ///
-/// ``(pows, coefs)``：``(K, 6)`` 幂次（后 3 位动量为 0）与 ``(K,)``
-/// 系数。动能与科里奥利项（``½‖p‖²``、``y·p_x − x·p_y``）已包含。
+/// ``(pows, coefs)`` ：``(K, 6)`` 幂次（后 3 位动量为 0）与 ``(K,)``
+/// 系数。动能与科里奥利项（``½‖p‖²`` 、``y·p_x − x·p_y`` ）已包含。
 #[pyfunction]
 #[pyo3(signature = (mu, gamma, rho_e_ratio, max_degree))]
 pub fn build_cr3bp_hamiltonian_py(
@@ -305,7 +305,7 @@ pub fn build_cr3bp_hamiltonian_py(
 // ``series_len == 1`` 表示标量。与 Python 侧实/复、标量/序列约定对齐。
 // 幂次固定 6 维 ``(q1,q2,q3,p1,p2,p3)``。
 
-/// 复数时间序列系数：``values`` 为交错 ``[re0, im0, re1, im1, ...]``。
+/// 复数时间序列系数：``values`` 为交错 ``[re0, im0, re1, im1, ...]`` 。
 #[derive(Clone, Debug)]
 struct CSeries {
     values: Vec<f64>,
@@ -441,9 +441,9 @@ fn pack_poly(map: &BTreeMap<Pow, CSeries>) -> (Vec<Vec<i64>>, Vec<f64>, usize) {
     (pows, flat, series_len)
 }
 
-/// 6-DOF 辛 Poisson 括号 ``{poly1, poly2}``（标量或时间序列、实/复）。
+/// 6-DOF 辛 Poisson 括号 ``{poly1, poly2}`` （标量或时间序列、实/复）。
 ///
-/// 系数编码：``coefs_flat`` 为 ``n * series_len * 2`` 的交错 ``(re, im)``；
+/// 系数编码：``coefs_flat`` 为 ``n * series_len * 2`` 的交错 ``(re, im)`` ；
 /// ``series_len=1`` 表示标量。
 #[pyfunction]
 #[pyo3(signature = (pows1, coefs1_flat, pows2, coefs2_flat, series_len))]
@@ -517,10 +517,10 @@ pub fn poly_poisson_py(
     Ok(pack_poly(&ordered))
 }
 
-/// 标量系数 simplify：合并同幂次，剔除 |coef| ≤ eps 的项。
+/// 标量系数 simplify：合并同幂次，剔除模长 ≤ eps 的项（``|coef| ≤ eps``）。
 ///
 /// 与 Python ``poly_simplify`` 数值路径一致；``series_len`` 通常为 1，
-/// 但接口允许序列（按任一分量模阈值，同 ``_is_zero``）。
+/// 但接口允许序列（按任一分量模阈值，同 ``_is_zero`` ）。
 #[pyfunction]
 #[pyo3(signature = (pows, coefs_flat, series_len, eps))]
 #[allow(clippy::type_complexity)]

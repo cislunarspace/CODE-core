@@ -1,17 +1,23 @@
 .. e2m2e documentation master file
 
-e2m2e: 地月转移轨道设计库
+e2m2e: 地月空间任务规划算法工具集
 ===================================
 
-e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 (CR3BP) 的
-地月转移轨道设计 Python 库。
+e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精确可靠的
+轨道计算工具：建立地月空间动力学模型，生成周期轨道族，设计轨道之间的转移
+路径，并把结果画出来检查。在"LLM+Agent"式自主任务规划系统中，大模型负责
+理解任务意图、分解与编排子任务，e2m2e 负责数值计算那一半。
 
 .. toctree::
    :maxdepth: 2
-   :caption: 目录
+   :caption: 快速开始
 
    getting-started/installation
    getting-started/quickstart
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 核心概念
 
    core/system
    core/dynamics
@@ -21,6 +27,10 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
    core/forces
    core/integrators
    core/atmosphere
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 周期轨道设计
 
    algorithms/differential-correction
    algorithms/strategies
@@ -37,6 +47,10 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
    algorithms/manifolds
    algorithms/normal-form
 
+.. toctree::
+   :maxdepth: 2
+   :caption: 转移轨道设计
+
    transfer/overview
    transfer/lambert
    transfer/hmn
@@ -48,13 +62,26 @@ e2m2e (Earth to Moon, Moon to Earth) 是一个基于圆型限制性三体问题 
    transfer/terminal
    transfer/propulsion
 
-   api/e2m2e
+.. toctree::
+   :maxdepth: 2
+   :caption: 架构
 
+   architecture/index
    architecture/architecture
    architecture/system-dynamics-dataflow
-   architecture/hjb-hamiltonian-dataflow
    architecture/numerics-migration-status
    architecture/hjb-subsystem
+   architecture/hjb-hamiltonian-dataflow
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API 参考
+
+   api/e2m2e
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 参考资料
 
    reference/mbse/index
    reference/glossary

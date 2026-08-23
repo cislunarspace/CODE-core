@@ -72,30 +72,30 @@ pip 安装
                     # SPICE 内核 + maturin develop 构建安装 Rust 扩展（spice 默认开启，debug）
    make dev-release # 同 dev 但 --release（性能基准 / 长期预报用）
 
-只需拉取数据、暂不构建时（如 CI 只跑 lint），可用 ``make setup``（CSPICE 编译包
+只需拉取数据、暂不构建时（如 CI 只跑 lint），可用 ``make setup`` （CSPICE 编译包
 + SPICE 内核，幂等）。
 
 .. warning::
 
-   不要裸跑 ``uv sync``。e2m2e 在 ``uv.lock`` 中是 editable 包，裸 ``uv sync``
-   会当场以 maturin 构建 Rust 扩展：一方面构建需要 ``CSPICE_DIR``（未导出时
-   cspice-sys 直接报错 ``CSPICE_DIR environment variable was not provided``），
-   另一方面与 ``make dev`` 的构建重复。看到上述报错时，改用 ``make dev``。
+   不要裸跑 ``uv sync`` 。e2m2e 在 ``uv.lock`` 中是 editable 包，裸 ``uv sync``
+   会当场以 maturin 构建 Rust 扩展：一方面构建需要 ``CSPICE_DIR`` （未导出时
+   cspice-sys 直接报错 ``CSPICE_DIR environment variable was not provided`` ），
+   另一方面与 ``make dev`` 的构建重复。看到上述报错时，改用 ``make dev`` 。
 
 构建统一走 `Makefile`：它自动从 ``scripts/download_cspice.py`` 解析并
-``export CSPICE_DIR``。CSPICE 一律取 GitHub release 预编译包；缺
-``CSPICE_DIR`` 时构建直接报错（不启用 ``cspice-sys`` 的 ``downloadcspice``，
+``export CSPICE_DIR`` 。CSPICE 一律取 GitHub release 预编译包；缺
+``CSPICE_DIR`` 时构建直接报错（不启用 ``cspice-sys`` 的 ``downloadcspice`` ，
 杜绝走国内不可达的 NAIF 源码下载）。裸 ``cargo`` / ``maturin`` 命令需自行
-``export CSPICE_DIR=$(python3 scripts/download_cspice.py --print-cspice-dir)``。
+``export CSPICE_DIR=$(python3 scripts/download_cspice.py --print-cspice-dir)`` 。
 
 .. note::
 
-   Windows 上运行 Rust 测试请使用 ``make test-rust``。测试二进制依赖
-   ``python3.dll``；该 DLL 位于 Python 安装根目录（``sys.base_prefix``），不在
-   虚拟环境 ``Scripts/``。Makefile 会自动探测并把该目录加入测试进程 PATH；
-   若自动探测失败，可显式执行 ``make test-rust PYTHON_DLL_DIR=<含 python*.dll 的目录>``。
+   Windows 上运行 Rust 测试请使用 ``make test-rust`` 。测试二进制依赖
+   ``python3.dll`` ；该 DLL 位于 Python 安装根目录（``sys.base_prefix`` ），不在
+   虚拟环境 ``Scripts/`` 。Makefile 会自动探测并把该目录加入测试进程 PATH；
+   若自动探测失败，可显式执行 ``make test-rust PYTHON_DLL_DIR=<含 python*.dll 的目录>`` 。
    手工排查 ``0xc0000135`` 时，先对失败测试 EXE 执行 ``dumpbin /DEPENDENTS``
-   或 ``dumpbin /IMPORTS`` 确认实际缺失的 DLL，不要把 CSPICE 的 ``lib/``（静态库
+   或 ``dumpbin /IMPORTS`` 确认实际缺失的 DLL，不要把 CSPICE 的 ``lib/`` （静态库
    目录）加入 PATH。
 
 spice 是默认 feature（``crates/*/Cargo.toml default=["spice"]`` +
@@ -111,10 +111,10 @@ SPICE 内核
 国内用户推荐从项目的 `GitHub Release <https://github.com/cislunarspace/e2m2e/releases>`_
 下载：``kernels-v1`` 中打包了全部必需内核，下载后放入 ``kernels/`` 目录即可：
 
-- ``de430.bsp``、``de440s.bsp`` — JPL 行星星历
-- ``earth_latest_high_prec.bpc``、``SPICEEarthPredictedKernel.bpc`` — 地球自转（ITRF93 高精度）
-- ``SPICELunaCurrentKernel.bpc``、``SPICELunaFrameKernel.tf`` — 月球姿态与坐标架（MOON_PA）
-- ``naif0011.tls``、``naif0012.tls`` — 闰秒
+- ``de430.bsp`` 、``de440s.bsp`` — JPL 行星星历
+- ``earth_latest_high_prec.bpc`` 、``SPICEEarthPredictedKernel.bpc`` — 地球自转（ITRF93 高精度）
+- ``SPICELunaCurrentKernel.bpc`` 、``SPICELunaFrameKernel.tf`` — 月球姿态与坐标架（MOON_PA）
+- ``naif0011.tls`` 、``naif0012.tls`` — 闰秒
 - ``pck00010.tpc`` — 行星常数
 
 官方来源（网络可达时）：`NASA NAIF <https://naif.jpl.nasa.gov/naif/data.html>`_

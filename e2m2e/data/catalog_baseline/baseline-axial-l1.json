@@ -1,0 +1,293 @@
+{
+  "source_tool": "orbit_family_generation",
+  "source_record_id": null,
+  "classification": {
+    "orbit_family": "axial",
+    "libration_point": 1,
+    "jacobi": [
+      3.0211114956813727,
+      3.021391912578082
+    ],
+    "amplitude": [
+      0.0,
+      0.0
+    ],
+    "has_cr3bp": true,
+    "has_ephemeris": false
+  },
+  "status": "converged",
+  "cause": "none",
+  "message": "轨道族生成完成",
+  "scalars": {
+    "member_count": 8,
+    "requested_members": 100,
+    "generated_members": 8,
+    "periodicity": "periodic",
+    "mu": 0.012150585350562453,
+    "char_length_km": 384400.0,
+    "baseline_version": "5.8.2",
+    "amplitude_envelope_km": [
+      249.8150497804224,
+      8989.991295171545
+    ]
+  },
+  "request": {
+    "orbit_type": "AXIAL",
+    "libration_point": 1,
+    "max_amplitude_km": 10000.0,
+    "min_amplitude_km": null,
+    "north_south": null,
+    "perilune_height_max_km": null,
+    "amplitude_in_km": null,
+    "amplitude_out_km": null,
+    "phase_in": null,
+    "phase_out": null,
+    "continuation_direction": "increase-amplitude",
+    "sampling_mode": "fixed-vz0",
+    "match_tolerance_km": null,
+    "n_orbits": 100
+  },
+  "members": [
+    {
+      "index": 0,
+      "period": 3.949999467153878,
+      "closure_error": 6.09097191087149e-14,
+      "jacobi": 3.021391912578082,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_z_km": 249.8150497804224
+      }
+    },
+    {
+      "index": 1,
+      "period": 3.9500271755748435,
+      "closure_error": 3.5689159960661243e-13,
+      "jacobi": 3.0213843283360107,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_z_km": 1498.875311880193
+      }
+    },
+    {
+      "index": 2,
+      "period": 3.9500944666597984,
+      "closure_error": 3.213632701962177e-13,
+      "jacobi": 3.021365910705912,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_z_km": 2747.8713002230024
+      }
+    },
+    {
+      "index": 3,
+      "period": 3.9502013384031893,
+      "closure_error": 3.243532829474982e-13,
+      "jacobi": 3.0213366628010343,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_z_km": 3996.7492673631596
+      }
+    },
+    {
+      "index": 4,
+      "period": 3.9503477875648167,
+      "closure_error": 6.573284668312529e-13,
+      "jacobi": 3.0212965895791,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_z_km": 5245.455137112774
+      }
+    },
+    {
+      "index": 5,
+      "period": 3.9505338095937184,
+      "closure_error": 2.3631205499363706e-13,
+      "jacobi": 3.021245697860351,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_z_km": 6493.934353884484
+      }
+    },
+    {
+      "index": 6,
+      "period": 3.950759398524329,
+      "closure_error": 3.645614626152094e-13,
+      "jacobi": 3.021183996352297,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_z_km": 7742.131730663573
+      }
+    },
+    {
+      "index": 7,
+      "period": 3.951024546843166,
+      "closure_error": 4.987130500233583e-13,
+      "jacobi": 3.0211114956813727,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_z_km": 8989.991295171545
+      }
+    }
+  ],
+  "tags": [
+    "baseline"
+  ],
+  "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
+  "record_id": "baseline-axial-l1",
+  "schema_version": 1,
+  "created_at": "2026-08-23T01:15:30.610965+00:00",
+  "arrays": {
+    "cr3bp/members/0000/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0000/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    }
+  }
+}
