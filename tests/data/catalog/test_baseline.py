@@ -74,6 +74,16 @@ class TestImportBaseline:
 
     def test_missing_source_dir_is_noop(self, store, tmp_path):
         assert import_baseline(store, tmp_path / "no-such-dir") == 0
+
+    def test_arrays_declared_but_npz_missing_raises(self, store, tmp_path):
+        source = tmp_path / "incomplete_baseline"
+        source.mkdir()
+        _write_baseline_source(source)
+        (source / "baseline-halo-l2.npz").unlink()
+        with pytest.raises(FileNotFoundError, match="缺少 baseline-halo-l2.npz"):
+            import_baseline(store, source)
+        # 残缺导入不落盘：JSON 也不应被复制
+        assert not (store.records_dir / "baseline-halo-l2.json").exists()
         assert store.query(CatalogFilter(tags=(BASELINE_TAG,))) == []
 
 

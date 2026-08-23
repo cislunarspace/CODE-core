@@ -87,6 +87,8 @@ docs/_build/
 *.npz
 *.pkl
 *.pickle
+# CR3BP 基线数据集（ADR 0036）：JSON + NPZ 均入仓库、随包分发
+!e2m2e/data/catalog_baseline/*.npz
 
 # 笔记本与脚本临时产物
 *.ipynb

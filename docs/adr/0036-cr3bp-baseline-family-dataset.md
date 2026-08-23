@@ -12,9 +12,15 @@
 
 ## 决策
 
-### 1. 随包分发，不进仓库 git、不做下载
+### 1. 随包分发，数据（JSON + NPZ）纳入仓库 git
 
-基线数据作为 package data 放在 `e2m2e/data/catalog_baseline/`，pip 安装即得。不把数据提交进仓库历史（算法一变即腐烂、污染 blame），也不做 Release 下载（体积仅百 KB 量级，不值得引入分发环节）。
+基线数据（JSON 元数据 + NPZ 段数组，共约 3.3 MB）提交进
+`e2m2e/data/catalog_baseline/`，作为 package data 随包分发，pip 安装即得。
+不依赖 Release 下载（体积小，不值得引入分发环节）。
+
+> 修订（2026-08-23）：初版决策是"不进仓库 git、发版前重生成"；实施时改为
+> 数据直接入 git。理由：JSON 与 NPZ 必须成对入库才能保证 fresh clone 构建出
+> 完整的包；且数据量小、变更频率低（仅算法调整时重算），git 历史成本可接受。
 
 ### 2. 内容：初态 + 周期 + 标量诊断，不存轨迹
 
@@ -46,7 +52,7 @@ HALO、NRHO、AXIAL、LISSAJOUS、DRO、DPO、SPO、HORSESHOE、LPO。Lyapunov �
 
 ## 理由
 
-1. **随包而非仓库/下载**：120 KB 进包无感知；进 git 则每次算法调整都制造大 diff；下载链接引入分发与校验环节，收益为零。
+1. **入 git 并随包**：JSON + NPZ 约 3.3 MB，进包无感知；成对入库保证任意 fresh clone 构建的包数据完整；下载链接引入分发与校验环节，收益为零。算法变更的重算走 `make catalog-baseline` 后提交新数据（见决策 6）。
 2. **不存轨迹**：体积从 ~120 KB 涨到 ~180 MB（float64 全采样），换来的只是 7 ms/条的现算延迟，不成比例。
 3. **首用导入而非多源查询**：catalog 的价值在统一查询接口；给存储引擎加只读第二源是深改动，而导入只需复制文件 + 重建索引（ADR 0031 已保证索引可全量重建）。
 4. **不设 CI 守门**：全量生成 <15 s，守门技术上便宜，但维护 CI 任务本身有成本；项目选择信任发版清单与用户报告（issue）回路。
@@ -55,7 +61,7 @@ HALO、NRHO、AXIAL、LISSAJOUS、DRO、DPO、SPO、HORSESHOE、LPO。Lyapunov �
 
 ### 新增
 
-- `e2m2e/data/catalog_baseline/`：基线记录文件（生成产物，随包分发）。
+- `e2m2e/data/catalog_baseline/`：基线记录文件（JSON + NPZ，入 git，随包分发）。
 - `scripts/`：基线生成脚本（内置校验断言，写出记录与覆盖元数据）。
 - catalog 首用导入逻辑：检测用户库基线缺失/版本不匹配时从包内导入。
 - Makefile 目标 `catalog-baseline`。

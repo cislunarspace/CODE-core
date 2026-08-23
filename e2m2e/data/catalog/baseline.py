@@ -32,9 +32,10 @@ def import_baseline(store: CatalogStore, source_dir: Traversable | None = None) 
 
     逐条对位 ``record_id``：库中无该记录、或库中基线版本与包内不一致
     （含版本落后于包内）时复制 JSON + NPZ 进 ``records/``；全部对位后
-    重建索引（ADR 0031 决策 5：索引是派生物，可全量重建）。包内无基线
-    数据（如开发环境未生成）时静默跳过。``source_dir`` 供测试注入合成
-    基线源。
+    重建索引（ADR 0031 决策 5：索引是派生物，可全量重建）。JSON 声明了
+    ``arrays`` 而包内缺少 NPZ 时抛错（数据集不完整，不导入残缺记录）。
+    包内无基线数据（如开发环境未生成）时静默跳过。``source_dir`` 供测试
+    注入合成基线源。
     """
     src = source_dir if source_dir is not None else baseline_source_dir()
     if not src.is_dir():
@@ -50,8 +51,15 @@ def import_baseline(store: CatalogStore, source_dir: Traversable | None = None) 
             existing = meta_from_json(target_json.read_text(encoding="utf-8"))
             if _baseline_version(existing) == _baseline_version(meta):
                 continue
-        target_json.write_bytes(item.read_bytes())
         npz_src = src / f"{record_id}.npz"
+        # JSON 声明了段数组时 NPZ 必须存在：静默跳过会造出查得到、
+        # 拿不到数据的残缺记录，且 baseline_version 对位后永不修复
+        if meta.get("arrays") and not npz_src.is_file():
+            raise FileNotFoundError(
+                f"基线记录 {record_id} 的 JSON 声明了 arrays 但包内缺少"
+                f" {record_id}.npz，数据集不完整（生成见 make catalog-baseline）"
+            )
+        target_json.write_bytes(item.read_bytes())
         if npz_src.is_file():
             (store.records_dir / f"{record_id}.npz").write_bytes(npz_src.read_bytes())
         imported += 1
