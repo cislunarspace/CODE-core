@@ -1,0 +1,3361 @@
+{
+  "source_tool": "orbit_family_generation",
+  "source_record_id": null,
+  "classification": {
+    "orbit_family": "lissajous",
+    "libration_point": 1,
+    "jacobi": [
+      3.1861772545805547,
+      3.18834090142482
+    ],
+    "amplitude": [
+      74.98834832459498,
+      7583.703192797949
+    ],
+    "has_cr3bp": true,
+    "has_ephemeris": false
+  },
+  "status": "converged",
+  "cause": "none",
+  "message": "轨道族生成完成",
+  "scalars": {
+    "member_count": 100,
+    "requested_members": 100,
+    "generated_members": 100,
+    "periodicity": "quasi-periodic",
+    "mu": 0.012150585350562453,
+    "char_length_km": 384400.0,
+    "baseline_version": "5.8.2",
+    "amplitude_envelope_km": [
+      75.0,
+      7500.0
+    ]
+  },
+  "request": {
+    "orbit_type": "LISSAJOUS",
+    "libration_point": 1,
+    "max_amplitude_km": null,
+    "min_amplitude_km": null,
+    "north_south": null,
+    "perilune_height_max_km": null,
+    "amplitude_in_km": 2500.0,
+    "amplitude_out_km": 7500.0,
+    "phase_in": 0.01,
+    "phase_out": 0.55,
+    "continuation_direction": null,
+    "sampling_mode": "linear-amplitudes",
+    "match_tolerance_km": null,
+    "n_orbits": 100
+  },
+  "members": [
+    {
+      "index": 0,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.18834090142482,
+      "amplitude_km": 74.98834832459498,
+      "amplitudes": {
+        "x": 1.75577470628574e-05,
+        "y": 6.301267972301289e-05,
+        "z": 0.00019507894985586622
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 25.0,
+        "amplitude_out_km": 75.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.01
+      }
+    },
+    {
+      "index": 1,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188340259465776,
+      "amplitude_km": 149.9863225908634,
+      "amplitudes": {
+        "x": 3.529772936283759e-05,
+        "y": 0.0001268096904313748,
+        "z": 0.0003901829411833075
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 50.0,
+        "amplitude_out_km": 150.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.02
+      }
+    },
+    {
+      "index": 2,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188339189256724,
+      "amplitude_km": 224.994212793518,
+      "amplitudes": {
+        "x": 5.322019664860678e-05,
+        "y": 0.0001913952436700491,
+        "z": 0.0005853127283910458
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 75.0,
+        "amplitude_out_km": 225.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.03
+      }
+    },
+    {
+      "index": 3,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188337690574343,
+      "amplitude_km": 300.01230895882486,
+      "amplitudes": {
+        "x": 7.132573373991313e-05,
+        "y": 0.0002568408470726317,
+        "z": 0.0007804690659698878
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 100.0,
+        "amplitude_out_km": 300.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.04
+      }
+    },
+    {
+      "index": 4,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188335763198462,
+      "amplitude_km": 375.04090022448975,
+      "amplitudes": {
+        "x": 8.96180593141227e-05,
+        "y": 0.0003232734256115652,
+        "z": 0.0009756527060990888
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 125.0,
+        "amplitude_out_km": 375.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.05
+      }
+    },
+    {
+      "index": 5,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1883334069120743,
+      "amplitude_km": 450.0802739084046,
+      "amplitudes": {
+        "x": 0.00010810509492309439,
+        "y": 0.00039060504400663225,
+        "z": 0.0011708643962237372
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 150.0,
+        "amplitude_out_km": 450.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.06
+      }
+    },
+    {
+      "index": 6,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1883306215013403,
+      "amplitude_km": 525.130714566281,
+      "amplitudes": {
+        "x": 0.00012678039921487638,
+        "y": 0.0004588410531401056,
+        "z": 0.0013661048766032283
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 175.00000000000003,
+        "amplitude_out_km": 525.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.07
+      }
+    },
+    {
+      "index": 7,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1883274067556,
+      "amplitude_km": 600.1925030382066,
+      "amplitudes": {
+        "x": 0.00014564417404633323,
+        "y": 0.0005279869884106958,
+        "z": 0.0015613748778309225
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 200.0,
+        "amplitude_out_km": 600.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.08
+      }
+    },
+    {
+      "index": 8,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1883237624673804,
+      "amplitude_km": 675.2659154841722,
+      "amplitudes": {
+        "x": 0.00016471756199726295,
+        "y": 0.0005980485765852601,
+        "z": 0.0017566751183251098
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 225.0,
+        "amplitude_out_km": 675.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.09
+      }
+    },
+    {
+      "index": 9,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1883196884324048,
+      "amplitude_km": 750.3512224086647,
+      "amplitudes": {
+        "x": 0.00018398615682774233,
+        "y": 0.0006690317427902217,
+        "z": 0.0019520063017915315
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 250.0,
+        "amplitude_out_km": 750.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.1
+      }
+    },
+    {
+      "index": 10,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188315184449599,
+      "amplitude_km": 825.4486876743694,
+      "amplitudes": {
+        "x": 0.0002034489711807419,
+        "y": 0.0007409426176449573,
+        "z": 0.0021473691146575687
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 275.0,
+        "amplitude_out_km": 825.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.11
+      }
+    },
+    {
+      "index": 11,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1883102503211034,
+      "amplitude_km": 900.5585675050745,
+      "amplitudes": {
+        "x": 0.00022310623902283,
+        "y": 0.0008137875445351976,
+        "z": 0.0023427642234783415
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 300.0,
+        "amplitude_out_km": 900.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.12
+      }
+    },
+    {
+      "index": 12,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188304885852277,
+      "amplitude_km": 975.6811094779124,
+      "amplitudes": {
+        "x": 0.00024295819416014774,
+        "y": 0.0008875730870284941,
+        "z": 0.002538192272315069
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 325.0,
+        "amplitude_out_km": 975.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.13
+      }
+    },
+    {
+      "index": 13,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188299090851707,
+      "amplitude_km": 1050.8165515050068,
+      "amplitudes": {
+        "x": 0.0002630050713429144,
+        "y": 0.0009623060364307254,
+        "z": 0.002733653880085866
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 350.00000000000006,
+        "amplitude_out_km": 1050.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.14
+      }
+    },
+    {
+      "index": 14,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188292865131219,
+      "amplitude_km": 1125.9651208046519,
+      "amplitudes": {
+        "x": 0.0002832471073742626,
+        "y": 0.0010379934194844867,
+        "z": 0.002929149637889313
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 375.0,
+        "amplitude_out_km": 1125.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.15
+      }
+    },
+    {
+      "index": 15,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1882862085058825,
+      "amplitude_km": 1201.1270328622115,
+      "amplitudes": {
+        "x": 0.00030368454222234886,
+        "y": 0.0011146425062104532,
+        "z": 0.003124680106301279
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 400.0,
+        "amplitude_out_km": 1200.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.16
+      }
+    },
+    {
+      "index": 16,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1882791207940184,
+      "amplitude_km": 1276.3024903807348,
+      "amplitudes": {
+        "x": 0.0003243176201340736,
+        "y": 0.0011922608178906017,
+        "z": 0.0033202458126449915
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 425.00000000000006,
+        "amplitude_out_km": 1275.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.17
+      }
+    },
+    {
+      "index": 17,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188271601817207,
+      "amplitude_km": 1351.4916822216405,
+      "amplitudes": {
+        "x": 0.00034514659074941223,
+        "y": 0.0012711024065092892,
+        "z": 0.003515847248235277
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 450.0,
+        "amplitude_out_km": 1350.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.18
+      }
+    },
+    {
+      "index": 18,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1882636514002973,
+      "amplitude_km": 1426.6947823353769,
+      "amplitudes": {
+        "x": 0.0003661717102158568,
+        "y": 0.0013511535902546094,
+        "z": 0.0037114848655967142
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 475.0,
+        "amplitude_out_km": 1425.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.19
+      }
+    },
+    {
+      "index": 19,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188255269371412,
+      "amplitude_km": 1501.9119486824409,
+      "amplitudes": {
+        "x": 0.00038739324230169236,
+        "y": 0.0014322405342527653,
+        "z": 0.003907159075656714
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 500.0,
+        "amplitude_out_km": 1500.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.2
+      }
+    },
+    {
+      "index": 20,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1882464555619543,
+      "amplitude_km": 1577.1433221447176,
+      "amplitudes": {
+        "x": 0.0004088114595062753,
+        "y": 0.0015143709398095684,
+        "z": 0.0041028702449134175
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 525.0,
+        "amplitude_out_km": 1575.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.21
+      }
+    },
+    {
+      "index": 21,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1882372098066183,
+      "amplitude_km": 1652.3890254274577,
+      "amplitudes": {
+        "x": 0.0004304266441671478,
+        "y": 0.0015975527922528156,
+        "z": 0.004298618692579234
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 550.0,
+        "amplitude_out_km": 1650.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.22
+      }
+    },
+    {
+      "index": 22,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1882275319433933,
+      "amplitude_km": 1727.649161951914,
+      "amplitudes": {
+        "x": 0.0004522390895621564,
+        "y": 0.0016817943697167547,
+        "z": 0.004494404687700088
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 575.0,
+        "amplitude_out_km": 1725.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.23
+      }
+    },
+    {
+      "index": 23,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188217421813571,
+      "amplitude_km": 1802.9238147389165,
+      "amplitudes": {
+        "x": 0.0004742491010068517,
+        "y": 0.0017671042520774841,
+        "z": 0.004690228446251083
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 600.0,
+        "amplitude_out_km": 1800.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.24
+      }
+    },
+    {
+      "index": 24,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1882068792617537,
+      "amplitude_km": 1878.2130452834242,
+      "amplitudes": {
+        "x": 0.0004964569969434507,
+        "y": 0.0018534913300379745,
+        "z": 0.0048860901282087
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 625.0,
+        "amplitude_out_km": 1875.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.25
+      }
+    },
+    {
+      "index": 25,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1881959041358594,
+      "amplitude_km": 1953.5168924202976,
+      "amplitudes": {
+        "x": 0.0005188631100233043,
+        "y": 0.0019409648143669219,
+        "z": 0.00508198983460015
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 650.0,
+        "amplitude_out_km": 1950.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.26
+      }
+    },
+    {
+      "index": 26,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1881844962871284,
+      "amplitude_km": 2028.8353711813916,
+      "amplitudes": {
+        "x": 0.0005414677881798724,
+        "y": 0.0020297254390435372,
+        "z": 0.005277927604530155
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 675.0,
+        "amplitude_out_km": 2025.0000000000002,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.27
+      }
+    },
+    {
+      "index": 27,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1881726555701326,
+      "amplitude_km": 2104.1684716440736,
+      "amplitudes": {
+        "x": 0.0005642713956915402,
+        "y": 0.002119973053381483,
+        "z": 0.005473903412185415
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 700.0000000000001,
+        "amplitude_out_km": 2100.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.28
+      }
+    },
+    {
+      "index": 28,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1881603818427764,
+      "amplitude_km": 2179.5161577713584,
+      "amplitudes": {
+        "x": 0.0005872743142336656,
+        "y": 0.002211387363199086,
+        "z": 0.00566991716381727
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 725.0,
+        "amplitude_out_km": 2175.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.29
+      }
+    },
+    {
+      "index": 29,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1881476749663085,
+      "amplitude_km": 2254.8783662436917,
+      "amplitudes": {
+        "x": 0.0006104769439184143,
+        "y": 0.0023039799335644933,
+        "z": 0.005865968694702632
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 750.0,
+        "amplitude_out_km": 2250.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.3
+      }
+    },
+    {
+      "index": 30,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1881345348053234,
+      "amplitude_km": 2330.2550052825245,
+      "amplitudes": {
+        "x": 0.0006338797043212718,
+        "y": 0.002397762679797454,
+        "z": 0.006062057766083571
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 775.0,
+        "amplitude_out_km": 2325.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.31
+      }
+    },
+    {
+      "index": 31,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1881209612277708,
+      "amplitude_km": 2405.6459534657683,
+      "amplitudes": {
+        "x": 0.0006574830354937888,
+        "y": 0.0024927478762572595,
+        "z": 0.006258184062085766
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 800.0,
+        "amplitude_out_km": 2400.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.32
+      }
+    },
+    {
+      "index": 32,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.18810695410496,
+      "amplitude_km": 2481.0510585350958,
+      "amplitudes": {
+        "x": 0.0006813153501325497,
+        "y": 0.0025889481652425195,
+        "z": 0.006454347186615754
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 825.0,
+        "amplitude_out_km": 2475.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.33
+      }
+    },
+    {
+      "index": 33,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1880925133115645,
+      "amplitude_km": 2556.4701361952557,
+      "amplitudes": {
+        "x": 0.0007054276714028029,
+        "y": 0.0026863765660012843,
+        "z": 0.006650546660237398
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 850.0000000000001,
+        "amplitude_out_km": 2550.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.34
+      }
+    },
+    {
+      "index": 34,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1880776387256295,
+      "amplitude_km": 2631.9029689052286,
+      "amplitudes": {
+        "x": 0.0007297869490942022,
+        "y": 0.0027850464838504365,
+        "z": 0.006846781917027129
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 875.0,
+        "amplitude_out_km": 2625.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.35
+      }
+    },
+    {
+      "index": 35,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1880623302285773,
+      "amplitude_km": 2707.3493046614267,
+      "amplitudes": {
+        "x": 0.000754406813147479,
+        "y": 0.0028849717194046353,
+        "z": 0.007043052301408498
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 900.0,
+        "amplitude_out_km": 2700.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.36
+      }
+    },
+    {
+      "index": 36,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.18804658770521,
+      "amplitude_km": 2782.8088557726296,
+      "amplitudes": {
+        "x": 0.0007792599651039178,
+        "y": 0.0029861664779117694,
+        "z": 0.007239357064965217
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 925.0,
+        "amplitude_out_km": 2775.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.37
+      }
+    },
+    {
+      "index": 37,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188030411043717,
+      "amplitude_km": 2858.2812976267865,
+      "amplitudes": {
+        "x": 0.0008043493882232133,
+        "y": 0.003088645378697048,
+        "z": 0.007435695363233056
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 950.0,
+        "amplitude_out_km": 2850.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.38
+      }
+    },
+    {
+      "index": 38,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.188013800135682,
+      "amplitude_km": 2933.766267449442,
+      "amplitudes": {
+        "x": 0.0008296782172576012,
+        "y": 0.0031924234647096707,
+        "z": 0.007632066252469932
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 975.0,
+        "amplitude_out_km": 2925.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.39
+      }
+    },
+    {
+      "index": 39,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1879967548760813,
+      "amplitude_km": 3009.263363053599,
+      "amplitudes": {
+        "x": 0.0008552497445479257,
+        "y": 0.0032975162121752387,
+        "z": 0.007828468686403743
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1000.0,
+        "amplitude_out_km": 3000.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.4
+      }
+    },
+    {
+      "index": 40,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187979275163297,
+      "amplitude_km": 3084.7721415808733,
+      "amplitudes": {
+        "x": 0.0008813091987446287,
+        "y": 0.0034039395403487006,
+        "z": 0.008024901512957526
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1025.0,
+        "amplitude_out_km": 3075.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.41
+      }
+    },
+    {
+      "index": 41,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1879613608991146,
+      "amplitude_km": 3160.292118233688,
+      "amplitudes": {
+        "x": 0.0009076925141787706,
+        "y": 0.003511709821367003,
+        "z": 0.008221363470951322
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1050.0,
+        "amplitude_out_km": 3150.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.42
+      }
+    },
+    {
+      "index": 42,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187943011988733,
+      "amplitude_km": 3235.8227649981013,
+      "amplitudes": {
+        "x": 0.000934355824810551,
+        "y": 0.003620843890198751,
+        "z": 0.00841785318677966
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1075.0,
+        "amplitude_out_km": 3225.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.43
+      }
+    },
+    {
+      "index": 43,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187924228340764,
+      "amplitude_km": 3311.4408403354582,
+      "amplitudes": {
+        "x": 0.0009613040650689464,
+        "y": 0.0037313590546880007,
+        "z": 0.00861457034426498
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1100.0,
+        "amplitude_out_km": 3300.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.44
+      }
+    },
+    {
+      "index": 44,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187905009867241,
+      "amplitude_km": 3387.0805340816732,
+      "amplitudes": {
+        "x": 0.000988604325323661,
+        "y": 0.003843273105688678,
+        "z": 0.008811343741107371
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1125.0,
+        "amplitude_out_km": 3375.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.45
+      }
+    },
+    {
+      "index": 45,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187885356483621,
+      "amplitude_km": 3462.7296009461093,
+      "amplitudes": {
+        "x": 0.0010162481275634017,
+        "y": 0.003956604327285356,
+        "z": 0.009008141521712042
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1150.0,
+        "amplitude_out_km": 3450.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.46
+      }
+    },
+    {
+      "index": 46,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1878652681087885,
+      "amplitude_km": 3538.386723661233,
+      "amplitudes": {
+        "x": 0.0010442047728397852,
+        "y": 0.004071371507097858,
+        "z": 0.009204960259264395
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1175.0,
+        "amplitude_out_km": 3525.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.47
+      }
+    },
+    {
+      "index": 47,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1878447446650595,
+      "amplitude_km": 3614.05049085297,
+      "amplitudes": {
+        "x": 0.0010724807427830996,
+        "y": 0.004187631362096638,
+        "z": 0.009401796282135718
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1200.0,
+        "amplitude_out_km": 3600.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.48
+      }
+    },
+    {
+      "index": 48,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1878237860781873,
+      "amplitude_km": 3689.719394298667,
+      "amplitudes": {
+        "x": 0.001101150076531554,
+        "y": 0.0043057677216343055,
+        "z": 0.009598645666749913
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1225.0,
+        "amplitude_out_km": 3675.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.49
+      }
+    },
+    {
+      "index": 49,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1878023922773635,
+      "amplitude_km": 3765.3918261370964,
+      "amplitudes": {
+        "x": 0.0011303131525099985,
+        "y": 0.004425399929264348,
+        "z": 0.009795504230325432
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1250.0,
+        "amplitude_out_km": 3750.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.5
+      }
+    },
+    {
+      "index": 50,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1877805631952225,
+      "amplitude_km": 3841.066076027534,
+      "amplitudes": {
+        "x": 0.0011598345123134401,
+        "y": 0.004546547765204415,
+        "z": 0.00999236752348474
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1275.0,
+        "amplitude_out_km": 3825.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.51
+      }
+    },
+    {
+      "index": 51,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187758298767845,
+      "amplitude_km": 3916.7403282542577,
+      "amplitudes": {
+        "x": 0.0011897221103549516,
+        "y": 0.00466923156086674,
+        "z": 0.010189230822721794
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1300.0,
+        "amplitude_out_km": 3900.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.52
+      }
+    },
+    {
+      "index": 52,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1877355989347627,
+      "amplitude_km": 3992.4126587731093,
+      "amplitudes": {
+        "x": 0.0012203079275641127,
+        "y": 0.004793472209692193,
+        "z": 0.010386089122718807
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1325.0,
+        "amplitude_out_km": 3975.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.53
+      }
+    },
+    {
+      "index": 53,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1877124636389578,
+      "amplitude_km": 4068.0810321961612,
+      "amplitudes": {
+        "x": 0.0012515040408416223,
+        "y": 0.004919291178020549,
+        "z": 0.01058293712850198
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1350.0,
+        "amplitude_out_km": 4050.0000000000005,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.54
+      }
+    },
+    {
+      "index": 54,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1876888928268707,
+      "amplitude_km": 4143.743298710241,
+      "amplitudes": {
+        "x": 0.0012831273324429016,
+        "y": 0.00504687749468038,
+        "z": 0.010779769247425184
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1375.0,
+        "amplitude_out_km": 4125.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.55
+      }
+    },
+    {
+      "index": 55,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187664886448399,
+      "amplitude_km": 4219.397190925068,
+      "amplitudes": {
+        "x": 0.001315187805992657,
+        "y": 0.005176989941919124,
+        "z": 0.010976579580970518
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1400.0000000000002,
+        "amplitude_out_km": 4200.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.56
+      }
+    },
+    {
+      "index": 56,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187640444456903,
+      "amplitude_km": 4295.04032064602,
+      "amplitudes": {
+        "x": 0.0013476957615974894,
+        "y": 0.005308787264980941,
+        "z": 0.011173361916352808
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1424.9999999999998,
+        "amplitude_out_km": 4275.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.57
+      }
+    },
+    {
+      "index": 57,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187615566809206,
+      "amplitude_km": 4370.819926575114,
+      "amplitudes": {
+        "x": 0.0013806618021439676,
+        "y": 0.005442292431385278,
+        "z": 0.011370499288696965
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1450.0,
+        "amplitude_out_km": 4350.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.58
+      }
+    },
+    {
+      "index": 58,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187590253465598,
+      "amplitude_km": 4446.611147368371,
+      "amplitudes": {
+        "x": 0.0014140968396374465,
+        "y": 0.005577528938714908,
+        "z": 0.011567666876608667
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1475.0,
+        "amplitude_out_km": 4425.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.59
+      }
+    },
+    {
+      "index": 59,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1875645043898397,
+      "amplitude_km": 4522.411282218468,
+      "amplitudes": {
+        "x": 0.0014480121015781888,
+        "y": 0.005714520821561616,
+        "z": 0.011764857654054287
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1500.0,
+        "amplitude_out_km": 4500.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.6
+      }
+    },
+    {
+      "index": 60,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187538319549161,
+      "amplitude_km": 4598.219576257627,
+      "amplitudes": {
+        "x": 0.0014824191373741247,
+        "y": 0.005853292658261618,
+        "z": 0.011962069657277904
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1525.0,
+        "amplitude_out_km": 4575.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.61
+      }
+    },
+    {
+      "index": 61,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1875116989142662,
+      "amplitude_km": 4674.03523426864,
+      "amplitudes": {
+        "x": 0.0015173298247855849,
+        "y": 0.005993869577390241,
+        "z": 0.012159300817556295
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1550.0,
+        "amplitude_out_km": 4650.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.62
+      }
+    },
+    {
+      "index": 62,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187484642459335,
+      "amplitude_km": 4750.009487179543,
+      "amplitudes": {
+        "x": 0.0015527563763993446,
+        "y": 0.0061362772639869684,
+        "z": 0.012356944555617956
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1575.0,
+        "amplitude_out_km": 4725.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.63
+      }
+    },
+    {
+      "index": 63,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187457150162025,
+      "amplitude_km": 4826.121619572635,
+      "amplitudes": {
+        "x": 0.0015892211455406646,
+        "y": 0.006280541965473922,
+        "z": 0.012554946981198321
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1600.0,
+        "amplitude_out_km": 4800.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.64
+      }
+    },
+    {
+      "index": 64,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.18742922200347,
+      "amplitude_km": 4902.260375001807,
+      "amplitudes": {
+        "x": 0.001626496979704184,
+        "y": 0.0064266904972344555,
+        "z": 0.012753018665457354
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1625.0,
+        "amplitude_out_km": 4875.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.65
+      }
+    },
+    {
+      "index": 65,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1874008579682895,
+      "amplitude_km": 4978.425824503202,
+      "amplitudes": {
+        "x": 0.001664368047275655,
+        "y": 0.006574750247808179,
+        "z": 0.012951159793192514
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1650.0,
+        "amplitude_out_km": 4950.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.66
+      }
+    },
+    {
+      "index": 66,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.18737205804458,
+      "amplitude_km": 5054.618029013818,
+      "amplitudes": {
+        "x": 0.0017028487787125735,
+        "y": 0.006724749183661817,
+        "z": 0.013149370522928767
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1675.0,
+        "amplitude_out_km": 5025.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.67
+      }
+    },
+    {
+      "index": 67,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1873428222239237,
+      "amplitude_km": 5130.8370392007355,
+      "amplitudes": {
+        "x": 0.0017419539689647046,
+        "y": 0.006876715853486823,
+        "z": 0.013347650986474337
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1700.0000000000002,
+        "amplitude_out_km": 5100.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.68
+      }
+    },
+    {
+      "index": 68,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1873131505013874,
+      "amplitude_km": 5207.0828952917445,
+      "amplitudes": {
+        "x": 0.0017816987833790265,
+        "y": 0.0070306793919739,
+        "z": 0.013546001288480084
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1724.9999999999998,
+        "amplitude_out_km": 5175.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.69
+      }
+    },
+    {
+      "index": 69,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187283042875521,
+      "amplitude_km": 5283.35562690744,
+      "amplitudes": {
+        "x": 0.0018220987635455543,
+        "y": 0.007186669523006936,
+        "z": 0.013744421506002705
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1750.0,
+        "amplitude_out_km": 5250.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.7
+      }
+    },
+    {
+      "index": 70,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1872524993483666,
+      "amplitude_km": 5359.655252894962,
+      "amplitudes": {
+        "x": 0.0018631698330657809,
+        "y": 0.007344716562220133,
+        "z": 0.013942911688072223
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1775.0,
+        "amplitude_out_km": 5325.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.71
+      }
+    },
+    {
+      "index": 71,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1872215199254468,
+      "amplitude_km": 5435.981781163075,
+      "amplitudes": {
+        "x": 0.0019049283032219755,
+        "y": 0.007504851418849688,
+        "z": 0.014141471855262941
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1800.0,
+        "amplitude_out_km": 5400.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.72
+      }
+    },
+    {
+      "index": 72,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1871901046157767,
+      "amplitude_km": 5512.335208518851,
+      "amplitudes": {
+        "x": 0.001947390878523747,
+        "y": 0.007667105596812352,
+        "z": 0.014340101999268603
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1825.0,
+        "amplitude_out_km": 5475.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.73
+      }
+    },
+    {
+      "index": 73,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1871582534318583,
+      "amplitude_km": 5588.715520505888,
+      "amplitudes": {
+        "x": 0.0019905746621065035,
+        "y": 0.007831511194936846,
+        "z": 0.014538802082481499
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1850.0,
+        "amplitude_out_km": 5550.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.74
+      }
+    },
+    {
+      "index": 74,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187125966389684,
+      "amplitude_km": 5665.1226912439215,
+      "amplitudes": {
+        "x": 0.0020344971609486673,
+        "y": 0.007998100906264207,
+        "z": 0.014737572037575239
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1875.0,
+        "amplitude_out_km": 5625.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.75
+      }
+    },
+    {
+      "index": 75,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1870932435087322,
+      "amplitude_km": 5741.556683269987,
+      "amplitudes": {
+        "x": 0.002080261225398561,
+        "y": 0.00816690801633294,
+        "z": 0.014936411767091536
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1900.0,
+        "amplitude_out_km": 5700.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.76
+      }
+    },
+    {
+      "index": 76,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1870600848119737,
+      "amplitude_km": 5818.017447381014,
+      "amplitudes": {
+        "x": 0.0021272742962032964,
+        "y": 0.008337966400354412,
+        "z": 0.015135321143030733
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1925.0,
+        "amplitude_out_km": 5775.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.77
+      }
+    },
+    {
+      "index": 77,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.187026490325868,
+      "amplitude_km": 5894.504922477807,
+      "amplitudes": {
+        "x": 0.0021751438404590817,
+        "y": 0.008511310519178278,
+        "z": 0.015334300006445908
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1950.0,
+        "amplitude_out_km": 5850.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.78
+      }
+    },
+    {
+      "index": 78,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1869924600803627,
+      "amplitude_km": 5971.019035410477,
+      "amplitudes": {
+        "x": 0.0022238893672328897,
+        "y": 0.008686975413941748,
+        "z": 0.015533348167040783
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 1975.0,
+        "amplitude_out_km": 5925.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.79
+      }
+    },
+    {
+      "index": 79,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.186957994108896,
+      "amplitude_km": 6047.559700825105,
+      "amplitudes": {
+        "x": 0.0022735307620017076,
+        "y": 0.00886499669928768,
+        "z": 0.015732465402770825
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2000.0,
+        "amplitude_out_km": 6000.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.8
+      }
+    },
+    {
+      "index": 80,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.186923092448392,
+      "amplitude_km": 6124.137051272983,
+      "amplitudes": {
+        "x": 0.0023240882882086256,
+        "y": 0.009045410555028216,
+        "z": 0.015931678073030652
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2025.0000000000002,
+        "amplitude_out_km": 6075.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.81
+      }
+    },
+    {
+      "index": 81,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1868877551392654,
+      "amplitude_km": 6200.761742950479,
+      "amplitudes": {
+        "x": 0.002375582588291625,
+        "y": 0.009228253716125649,
+        "z": 0.01613101389945494
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2050.0,
+        "amplitude_out_km": 6150.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.82
+      }
+    },
+    {
+      "index": 82,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1868519822254178,
+      "amplitude_km": 6277.48165291293,
+      "amplitudes": {
+        "x": 0.002428034684116287,
+        "y": 0.009413563460849034,
+        "z": 0.016330597432135614
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2075.0,
+        "amplitude_out_km": 6225.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.83
+      }
+    },
+    {
+      "index": 83,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.186815773754236,
+      "amplitude_km": 6354.201712555752,
+      "amplitudes": {
+        "x": 0.002481465976735986,
+        "y": 0.009601377596961669,
+        "z": 0.01653018135420331
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2100.0,
+        "amplitude_out_km": 6300.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.84
+      }
+    },
+    {
+      "index": 84,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.186779129776593,
+      "amplitude_km": 6430.946648430489,
+      "amplitudes": {
+        "x": 0.0025358982453962953,
+        "y": 0.009791734445779528,
+        "z": 0.01672982999071407
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2125.0,
+        "amplitude_out_km": 6375.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.85
+      }
+    },
+    {
+      "index": 85,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1867420503468478,
+      "amplitude_km": 6507.698927536294,
+      "amplitudes": {
+        "x": 0.0025913536456920183,
+        "y": 0.00998467282393698,
+        "z": 0.016929497730323345
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2150.0,
+        "amplitude_out_km": 6450.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.86
+      }
+    },
+    {
+      "index": 86,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.18670453552284,
+      "amplitude_km": 6584.456841437922,
+      "amplitudes": {
+        "x": 0.002647854706777919,
+        "y": 0.010180232022682343,
+        "z": 0.01712918012861062
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2175.0,
+        "amplitude_out_km": 6525.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.87
+      }
+    },
+    {
+      "index": 87,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.186666585365894,
+      "amplitude_km": 6661.218611932758,
+      "amplitudes": {
+        "x": 0.0027054243275225764,
+        "y": 0.010378451784518454,
+        "z": 0.01732887255965858
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2200.0,
+        "amplitude_out_km": 6600.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.88
+      }
+    },
+    {
+      "index": 88,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.186628199940814,
+      "amplitude_km": 6737.982389182122,
+      "amplitudes": {
+        "x": 0.0027640857714885114,
+        "y": 0.010579372276991496,
+        "z": 0.017528570211191783
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2225.0,
+        "amplitude_out_km": 6675.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.89
+      }
+    },
+    {
+      "index": 89,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.186589379315881,
+      "amplitude_km": 6814.74624975936,
+      "amplitudes": {
+        "x": 0.0028239067437413334,
+        "y": 0.010783034063421557,
+        "z": 0.017728268079498854
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2250.0,
+        "amplitude_out_km": 6750.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.9
+      }
+    },
+    {
+      "index": 90,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1865501235628564,
+      "amplitude_km": 6891.508194611243,
+      "amplitudes": {
+        "x": 0.0028858851510233374,
+        "y": 0.01098947807036062,
+        "z": 0.017927960964129144
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2275.0,
+        "amplitude_out_km": 6825.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.91
+      }
+    },
+    {
+      "index": 91,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1865104327569753,
+      "amplitude_km": 6968.26614692896,
+      "amplitudes": {
+        "x": 0.002949057881047712,
+        "y": 0.01119874555154744,
+        "z": 0.018127643462354213
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2300.0,
+        "amplitude_out_km": 6900.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.92
+      }
+    },
+    {
+      "index": 92,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1864703069769473,
+      "amplitude_km": 7045.017949924777,
+      "amplitudes": {
+        "x": 0.003013449282686431,
+        "y": 0.01141087804812475,
+        "z": 0.018327309963383914
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2325.0,
+        "amplitude_out_km": 6975.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.93
+      }
+    },
+    {
+      "index": 93,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1864297463049516,
+      "amplitude_km": 7121.838901278459,
+      "amplitudes": {
+        "x": 0.003079083974606156,
+        "y": 0.011625917344870427,
+        "z": 0.018527156350880487
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2350.0,
+        "amplitude_out_km": 7050.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.94
+      }
+    },
+    {
+      "index": 94,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1863887508266378,
+      "amplitude_km": 7198.7588565331325,
+      "amplitudes": {
+        "x": 0.0031459868280786507,
+        "y": 0.011843905422183054,
+        "z": 0.018727260292750084
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2375.0,
+        "amplitude_out_km": 7125.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.95
+      }
+    },
+    {
+      "index": 95,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.186347320631122,
+      "amplitude_km": 7275.702217827995,
+      "amplitudes": {
+        "x": 0.0032141829474262584,
+        "y": 0.012064884403557744,
+        "z": 0.018927425124422463
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2400.0,
+        "amplitude_out_km": 7200.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.96
+      }
+    },
+    {
+      "index": 96,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1863054558109853,
+      "amplitude_km": 7352.668669802246,
+      "amplitudes": {
+        "x": 0.0032836976478925473,
+        "y": 0.012288896498272393,
+        "z": 0.01912765002550012
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2425.0,
+        "amplitude_out_km": 7275.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.97
+      }
+    },
+    {
+      "index": 97,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.186263156462269,
+      "amplitude_km": 7429.657882260989,
+      "amplitudes": {
+        "x": 0.0033545564307124187,
+        "y": 0.012516223474439503,
+        "z": 0.019327934136995288
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2450.0,
+        "amplitude_out_km": 7350.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.98
+      }
+    },
+    {
+      "index": 98,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.186220422684473,
+      "amplitude_km": 7506.669510028158,
+      "amplitudes": {
+        "x": 0.0034268902951143376,
+        "y": 0.012747388899751919,
+        "z": 0.01952827656094734
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2475.0,
+        "amplitude_out_km": 7425.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 0.99
+      }
+    },
+    {
+      "index": 99,
+      "period": 2.6915795510765723,
+      "closure_error": null,
+      "jacobi": 3.1861772545805547,
+      "amplitude_km": 7583.703192797949,
+      "amplitudes": {
+        "x": 0.0035012591867593645,
+        "y": 0.012981770679573188,
+        "z": 0.019728676360036286
+      },
+      "parameters": {
+        "libration_point": 1,
+        "amplitude_in_km": 2500.0,
+        "amplitude_out_km": 7500.0,
+        "phase_in": 0.01,
+        "phase_out": 0.55,
+        "sampling_fraction": 1.0
+      }
+    }
+  ],
+  "tags": [
+    "baseline"
+  ],
+  "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
+  "record_id": "baseline-lissajous-l1",
+  "schema_version": 1,
+  "created_at": "2026-08-23T01:15:31.134255+00:00",
+  "arrays": {
+    "cr3bp/members/0000/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0000/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0014/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0014/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0015/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0015/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0016/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0016/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0017/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0017/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0018/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0018/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0019/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0019/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0020/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0020/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0021/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0021/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0022/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0022/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0023/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0023/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0024/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0024/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0025/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0025/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0026/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0026/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0027/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0027/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0028/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0028/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0029/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0029/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0030/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0030/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0031/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0031/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0032/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0032/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0033/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0033/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0034/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0034/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0035/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0035/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0036/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0036/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0037/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0037/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0038/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0038/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0039/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0039/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0040/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0040/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0041/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0041/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0042/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0042/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0043/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0043/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0044/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0044/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0045/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0045/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0046/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0046/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0047/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0047/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0048/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0048/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0049/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0049/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0050/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0050/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0051/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0051/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0052/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0052/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0053/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0053/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0054/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0054/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0055/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0055/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0056/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0056/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0057/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0057/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0058/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0058/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0059/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0059/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0060/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0060/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0061/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0061/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0062/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0062/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0063/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0063/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0064/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0064/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0065/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0065/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0066/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0066/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0067/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0067/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0068/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0068/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0069/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0069/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0070/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0070/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0071/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0071/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0072/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0072/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0073/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0073/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0074/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0074/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0075/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0075/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0076/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0076/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0077/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0077/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0078/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0078/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0079/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0079/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0080/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0080/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0081/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0081/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0082/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0082/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0083/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0083/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0084/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0084/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0085/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0085/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0086/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0086/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0087/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0087/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0088/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0088/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0089/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0089/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0090/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0090/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0091/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0091/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0092/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0092/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0093/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0093/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0094/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0094/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0095/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0095/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0096/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0096/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0097/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0097/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0098/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0098/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0099/states": {
+      "shape": [
+        180,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0099/times": {
+      "shape": [
+        180
+      ],
+      "dtype": "float64"
+    }
+  }
+}

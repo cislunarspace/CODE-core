@@ -1,0 +1,728 @@
+{
+  "source_tool": "orbit_family_generation",
+  "source_record_id": null,
+  "classification": {
+    "orbit_family": "axial",
+    "libration_point": 2,
+    "jacobi": [
+      3.0133146921679965,
+      3.0137674784232593
+    ],
+    "amplitude": [
+      0.0,
+      0.0
+    ],
+    "has_cr3bp": true,
+    "has_ephemeris": false
+  },
+  "status": "converged",
+  "cause": "none",
+  "message": "轨道族生成完成",
+  "scalars": {
+    "member_count": 23,
+    "requested_members": 100,
+    "generated_members": 23,
+    "periodicity": "periodic",
+    "mu": 0.012150585350562453,
+    "char_length_km": 384400.0,
+    "baseline_version": "5.8.2",
+    "amplitude_envelope_km": [
+      86.72552181634713,
+      9700.137574279684
+    ]
+  },
+  "request": {
+    "orbit_type": "AXIAL",
+    "libration_point": 2,
+    "max_amplitude_km": 10000.0,
+    "min_amplitude_km": null,
+    "north_south": null,
+    "perilune_height_max_km": null,
+    "amplitude_in_km": null,
+    "amplitude_out_km": null,
+    "phase_in": null,
+    "phase_out": null,
+    "continuation_direction": "increase-amplitude",
+    "sampling_mode": "fixed-vz0",
+    "match_tolerance_km": null,
+    "n_orbits": 100
+  },
+  "members": [
+    {
+      "index": 0,
+      "period": 4.310509217314086,
+      "closure_error": 6.525073190100095e-11,
+      "jacobi": 3.0137674784232593,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 86.72552181634713
+      }
+    },
+    {
+      "index": 1,
+      "period": 4.310511824798407,
+      "closure_error": 6.35708916063571e-11,
+      "jacobi": 3.0137662115878427,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 520.3642309813532
+      }
+    },
+    {
+      "index": 2,
+      "period": 4.310518158279621,
+      "closure_error": 7.839487392580224e-11,
+      "jacobi": 3.0137631345352673,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 954.0505205479208
+      }
+    },
+    {
+      "index": 3,
+      "period": 4.310528220307506,
+      "closure_error": 6.058280960230533e-11,
+      "jacobi": 3.013758246134282,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 1387.8240767568957
+      }
+    },
+    {
+      "index": 4,
+      "period": 4.310542014935791,
+      "closure_error": 8.37400322695192e-11,
+      "jacobi": 3.013751544586375,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 1821.7246493000403
+      }
+    },
+    {
+      "index": 5,
+      "period": 4.310559547727739,
+      "closure_error": 6.32585303583788e-11,
+      "jacobi": 3.0137430274234878,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 2255.7920803122797
+      }
+    },
+    {
+      "index": 6,
+      "period": 4.310580825763793,
+      "closure_error": 5.880290698812018e-11,
+      "jacobi": 3.013732691504611,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 2690.0663335764693
+      }
+    },
+    {
+      "index": 7,
+      "period": 4.310605857651688,
+      "closure_error": 7.241869950935786e-11,
+      "jacobi": 3.013720533011619,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 3124.5875239606403
+      }
+    },
+    {
+      "index": 8,
+      "period": 4.31063465353801,
+      "closure_error": 7.837444582214914e-11,
+      "jacobi": 3.0137065474441513,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 3559.395947167571
+      }
+    },
+    {
+      "index": 9,
+      "period": 4.310667225122528,
+      "closure_error": 3.869902315267737e-11,
+      "jacobi": 3.01369072961356,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 3994.532109843325
+      }
+    },
+    {
+      "index": 10,
+      "period": 4.310703585674565,
+      "closure_error": 3.669805431760764e-11,
+      "jacobi": 3.0136730736358164,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 4430.0367601503785
+      }
+    },
+    {
+      "index": 11,
+      "period": 4.310743750051604,
+      "closure_error": 4.616015902847437e-11,
+      "jacobi": 3.0136535729236207,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 4865.950918799685
+      }
+    },
+    {
+      "index": 12,
+      "period": 4.310787734729273,
+      "closure_error": 5.967932745210014e-11,
+      "jacobi": 3.01363222017654,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 5302.3159106499825
+      }
+    },
+    {
+      "index": 13,
+      "period": 4.31083555779639,
+      "closure_error": 9.748126958419867e-11,
+      "jacobi": 3.0136090073734514,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 5739.173397035163
+      }
+    },
+    {
+      "index": 14,
+      "period": 4.3108872390163935,
+      "closure_error": 8.35102299812096e-11,
+      "jacobi": 3.013583925758466,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 6176.565408610146
+      }
+    },
+    {
+      "index": 15,
+      "period": 4.310942799835633,
+      "closure_error": 8.183422342544766e-11,
+      "jacobi": 3.0135569658303485,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 6614.534379204944
+      }
+    },
+    {
+      "index": 16,
+      "period": 4.311002263418782,
+      "closure_error": 6.770882118867227e-11,
+      "jacobi": 3.013528117328951,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 7053.1231803419805
+      }
+    },
+    {
+      "index": 17,
+      "period": 4.311065654682982,
+      "closure_error": 7.543473137805456e-11,
+      "jacobi": 3.013497369220631,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 7492.375156845118
+      }
+    },
+    {
+      "index": 18,
+      "period": 4.311133000334233,
+      "closure_error": 6.652195808087846e-11,
+      "jacobi": 3.013464709682618,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 7932.334163373896
+      }
+    },
+    {
+      "index": 19,
+      "period": 4.311204328907423,
+      "closure_error": 6.448993075669485e-11,
+      "jacobi": 3.0134301260859684,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 8373.044602164224
+      }
+    },
+    {
+      "index": 20,
+      "period": 4.311279670809378,
+      "closure_error": 7.799426729460102e-11,
+      "jacobi": 3.0133936049772445,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 8814.551461913967
+      }
+    },
+    {
+      "index": 21,
+      "period": 4.311359058364357,
+      "closure_error": 6.391251070048121e-11,
+      "jacobi": 3.0133551320588974,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 9256.900358021807
+      }
+    },
+    {
+      "index": 22,
+      "period": 4.311442525864413,
+      "closure_error": 7.314858094242815e-11,
+      "jacobi": 3.0133146921679965,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 2,
+        "amplitude_z_km": 9700.137574279684
+      }
+    }
+  ],
+  "tags": [
+    "baseline"
+  ],
+  "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
+  "record_id": "baseline-axial-l2",
+  "schema_version": 1,
+  "created_at": "2026-08-23T01:15:31.109117+00:00",
+  "arrays": {
+    "cr3bp/members/0000/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0000/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0014/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0014/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0015/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0015/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0016/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0016/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0017/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0017/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0018/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0018/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0019/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0019/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0020/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0020/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0021/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0021/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0022/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0022/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    }
+  }
+}

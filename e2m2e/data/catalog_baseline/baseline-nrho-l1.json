@@ -1,0 +1,3061 @@
+{
+  "source_tool": "orbit_family_generation",
+  "source_record_id": null,
+  "classification": {
+    "orbit_family": "nrho",
+    "libration_point": 1,
+    "jacobi": [
+      2.997843460535935,
+      3.0030812766078094
+    ],
+    "amplitude": [
+      0.0,
+      0.0
+    ],
+    "has_cr3bp": true,
+    "has_ephemeris": false
+  },
+  "status": "converged",
+  "cause": "none",
+  "message": "轨道族生成完成",
+  "scalars": {
+    "member_count": 100,
+    "requested_members": 100,
+    "generated_members": 100,
+    "periodicity": "periodic",
+    "mu": 0.012150585350562453,
+    "char_length_km": 384400.0,
+    "baseline_version": "5.8.2",
+    "amplitude_envelope_km": [
+      8855.975510572676,
+      21683.846345017784
+    ]
+  },
+  "request": {
+    "orbit_type": "NRHO",
+    "libration_point": 1,
+    "max_amplitude_km": null,
+    "min_amplitude_km": null,
+    "north_south": 2,
+    "perilune_height_max_km": 20000.0,
+    "amplitude_in_km": null,
+    "amplitude_out_km": null,
+    "phase_in": null,
+    "phase_out": null,
+    "continuation_direction": "toward-moon",
+    "sampling_mode": "halo-segment",
+    "match_tolerance_km": null,
+    "n_orbits": 100
+  },
+  "members": [
+    {
+      "index": 0,
+      "period": 2.320357971811458,
+      "closure_error": 6.859903270428624e-13,
+      "jacobi": 2.9984106579237957,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 19966.12439306497
+      }
+    },
+    {
+      "index": 1,
+      "period": 2.3140070030968873,
+      "closure_error": 7.710845850716908e-13,
+      "jacobi": 2.998330439646532,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 19778.345862429178
+      }
+    },
+    {
+      "index": 2,
+      "period": 2.3076807610592645,
+      "closure_error": 1.0756846802184583e-12,
+      "jacobi": 2.998257085493634,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 19591.668955508663
+      }
+    },
+    {
+      "index": 3,
+      "period": 2.301380138953853,
+      "closure_error": 1.1666180174674246e-12,
+      "jacobi": 2.998190398014893,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 19406.097330048324
+      }
+    },
+    {
+      "index": 4,
+      "period": 2.295106019528999,
+      "closure_error": 1.354465151148787e-12,
+      "jacobi": 2.9981301838953245,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 19221.63494870863
+      }
+    },
+    {
+      "index": 5,
+      "period": 2.2888592749691967,
+      "closure_error": 1.455446874132349e-12,
+      "jacobi": 2.9980762537855328,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 19038.2860592652
+      }
+    },
+    {
+      "index": 6,
+      "period": 2.282640766789306,
+      "closure_error": 1.6160892069017052e-12,
+      "jacobi": 2.9980284221421645,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 18856.055174421916
+      }
+    },
+    {
+      "index": 7,
+      "period": 2.2764513456825144,
+      "closure_error": 1.4236112289012226e-12,
+      "jacobi": 2.9979865070781493,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 18674.947051278403
+      }
+    },
+    {
+      "index": 8,
+      "period": 2.2702918513247248,
+      "closure_error": 1.4426897176900155e-12,
+      "jacobi": 2.997950330222323,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 18494.966670473234
+      }
+    },
+    {
+      "index": 9,
+      "period": 2.2641631121381147,
+      "closure_error": 1.3723050473757326e-12,
+      "jacobi": 2.9979197165881946,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 18316.119215037957
+      }
+    },
+    {
+      "index": 10,
+      "period": 2.2580659450165275,
+      "closure_error": 1.4293288774780422e-12,
+      "jacobi": 2.9978944944514487,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 18138.410048976155
+      }
+    },
+    {
+      "index": 11,
+      "period": 2.2520011550155448,
+      "closure_error": 1.3557904798844334e-12,
+      "jacobi": 2.9978744952359286,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 17961.84469563
+      }
+    },
+    {
+      "index": 12,
+      "period": 2.2459695350100444,
+      "closure_error": 1.2042623842578593e-12,
+      "jacobi": 2.99785955340775,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 17786.428815842344
+      }
+    },
+    {
+      "index": 13,
+      "period": 2.2399718653221683,
+      "closure_error": 1.3256618025536682e-12,
+      "jacobi": 2.997849506377255,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 17612.168185966366
+      }
+    },
+    {
+      "index": 14,
+      "period": 2.2340089133225676,
+      "closure_error": 1.1432937929711784e-12,
+      "jacobi": 2.997844194408496,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 17439.06867575974
+      }
+    },
+    {
+      "index": 15,
+      "period": 2.228081433007956,
+      "closure_error": 1.5780085571570623e-12,
+      "jacobi": 2.997843460535935,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 17267.136226212846
+      }
+    },
+    {
+      "index": 16,
+      "period": 2.2221901645580195,
+      "closure_error": 1.0469264344337148e-12,
+      "jacobi": 2.9978471504880795,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 17096.37682734395
+      }
+    },
+    {
+      "index": 17,
+      "period": 2.216335833874706,
+      "closure_error": 6.138687648482577e-13,
+      "jacobi": 2.9978551126177018,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 16926.79649602286
+      }
+    },
+    {
+      "index": 18,
+      "period": 2.2105191521070195,
+      "closure_error": 3.3060013060470794e-13,
+      "jacobi": 2.9978671978384135,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 16758.401253856362
+      }
+    },
+    {
+      "index": 19,
+      "period": 2.204740815164464,
+      "closure_error": 4.7531353852825475e-12,
+      "jacobi": 2.9978832595672253,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 16591.197105206997
+      }
+    },
+    {
+      "index": 20,
+      "period": 2.1990015032222496,
+      "closure_error": 5.263268987309999e-12,
+      "jacobi": 2.997903153672826,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 16425.190015377306
+      }
+    },
+    {
+      "index": 21,
+      "period": 2.1933018802214614,
+      "closure_error": 6.235321287073603e-12,
+      "jacobi": 2.997926738429257,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 16260.385889028554
+      }
+    },
+    {
+      "index": 22,
+      "period": 2.18764259336733,
+      "closure_error": 6.799902654841539e-12,
+      "jacobi": 2.997953874474703,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 16096.790548881114
+      }
+    },
+    {
+      "index": 23,
+      "period": 2.1820242726286865,
+      "closure_error": 7.017809944276365e-12,
+      "jacobi": 2.9979844247750718,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 15934.409714752883
+      }
+    },
+    {
+      "index": 24,
+      "period": 2.1764475302417594,
+      "closure_error": 7.531034823538008e-12,
+      "jacobi": 2.9980182545920577,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 15773.24898299699
+      }
+    },
+    {
+      "index": 25,
+      "period": 2.1709129602213477,
+      "closure_error": 8.01807405192978e-12,
+      "jacobi": 2.998055231455415,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 15613.313806386557
+      }
+    },
+    {
+      "index": 26,
+      "period": 2.1654211378823423,
+      "closure_error": 7.583586536519249e-12,
+      "jacobi": 2.9980952251391035,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 15454.609474506628
+      }
+    },
+    {
+      "index": 27,
+      "period": 2.159972619374527,
+      "closure_error": 8.401709883365527e-12,
+      "jacobi": 2.998138107640993,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 15297.141094714067
+      }
+    },
+    {
+      "index": 28,
+      "period": 2.15456794123349,
+      "closure_error": 8.152849922948846e-12,
+      "jacobi": 2.998183753165911,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 15140.913573692245
+      }
+    },
+    {
+      "index": 29,
+      "period": 2.1492076199503214,
+      "closure_error": 8.651505293416628e-12,
+      "jacobi": 2.998232038111586,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 14985.931599697667
+      }
+    },
+    {
+      "index": 30,
+      "period": 2.14389215156274,
+      "closure_error": 8.565620435163623e-12,
+      "jacobi": 2.9982828410573577,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 14832.19962550183
+      }
+    },
+    {
+      "index": 31,
+      "period": 2.138622011270067,
+      "closure_error": 8.81017481191293e-12,
+      "jacobi": 2.9983360427552155,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 14679.721852104356
+      }
+    },
+    {
+      "index": 32,
+      "period": 2.1333976530743275,
+      "closure_error": 9.157773497858734e-12,
+      "jacobi": 2.99839152612299,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 14528.502213251419
+      }
+    },
+    {
+      "index": 33,
+      "period": 2.1282195094497265,
+      "closure_error": 9.007621471629479e-12,
+      "jacobi": 2.9984491762393386,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 14378.544360802713
+      }
+    },
+    {
+      "index": 34,
+      "period": 2.123087991042276,
+      "closure_error": 9.396698696928496e-12,
+      "jacobi": 2.9985088803402844,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 14229.851650985534
+      }
+    },
+    {
+      "index": 35,
+      "period": 2.1180034864015735,
+      "closure_error": 9.539011941450681e-12,
+      "jacobi": 2.9985705278170554,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 14082.427131568968
+      }
+    },
+    {
+      "index": 36,
+      "period": 2.1129663617460808,
+      "closure_error": 9.87257844919931e-12,
+      "jacobi": 2.998634010214918,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 13936.273529990418
+      }
+    },
+    {
+      "index": 37,
+      "period": 2.107976960763518,
+      "closure_error": 9.88882066510488e-12,
+      "jacobi": 2.9986992212327976,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 13791.393242458968
+      }
+    },
+    {
+      "index": 38,
+      "period": 2.103035604447323,
+      "closure_error": 1.0375637848891728e-11,
+      "jacobi": 2.998766056723418,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 13647.788324058873
+      }
+    },
+    {
+      "index": 39,
+      "period": 2.0981425909702596,
+      "closure_error": 1.0513090398234226e-11,
+      "jacobi": 2.998834414693766,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 13505.460479869822
+      }
+    },
+    {
+      "index": 40,
+      "period": 2.0932981955959034,
+      "closure_error": 1.0663584598669118e-11,
+      "jacobi": 2.9989041953055993,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 13364.411057117197
+      }
+    },
+    {
+      "index": 41,
+      "period": 2.088502670628436,
+      "closure_error": 1.0807466033213586e-11,
+      "jacobi": 2.9989753008758715,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 13224.64103836042
+      }
+    },
+    {
+      "index": 42,
+      "period": 2.0837562454011618,
+      "closure_error": 1.1152135638570204e-11,
+      "jacobi": 2.999047635876818,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 13086.151035722829
+      }
+    },
+    {
+      "index": 43,
+      "period": 2.079059126303749,
+      "closure_error": 1.135470190094523e-11,
+      "jacobi": 2.9991211069355557,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 12948.941286162168
+      }
+    },
+    {
+      "index": 44,
+      "period": 2.074411496848163,
+      "closure_error": 1.1287935863801835e-11,
+      "jacobi": 2.9991956228330254,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 12813.011647775891
+      }
+    },
+    {
+      "index": 45,
+      "period": 2.0698135177728028,
+      "closure_error": 1.1370227676055222e-11,
+      "jacobi": 2.9992710945021157,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 12678.36159713134
+      }
+    },
+    {
+      "index": 46,
+      "period": 2.065265327184526,
+      "closure_error": 1.1719802212040165e-11,
+      "jacobi": 2.999347435024847,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 12544.990227605489
+      }
+    },
+    {
+      "index": 47,
+      "period": 2.0607670407376713,
+      "closure_error": 1.1913978484323628e-11,
+      "jacobi": 2.999424559628487,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 12412.896248716519
+      }
+    },
+    {
+      "index": 48,
+      "period": 2.0563187518492794,
+      "closure_error": 1.2396484880272673e-11,
+      "jacobi": 2.9995023856804774,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 12282.077986423925
+      }
+    },
+    {
+      "index": 49,
+      "period": 2.051920531949468,
+      "closure_error": 1.234703832231343e-11,
+      "jacobi": 2.9995808326821143,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 12152.533384370772
+      }
+    },
+    {
+      "index": 50,
+      "period": 2.0475724307656473,
+      "closure_error": 1.2715613284530747e-11,
+      "jacobi": 2.999659822260843,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 12024.260006038532
+      }
+    },
+    {
+      "index": 51,
+      "period": 2.04327447663936,
+      "closure_error": 1.2961888506968222e-11,
+      "jacobi": 2.999739278161182,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 11897.255037780797
+      }
+    },
+    {
+      "index": 52,
+      "period": 2.0390266768741423,
+      "closure_error": 1.3130121989668453e-11,
+      "jacobi": 2.9998191262341516,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 11771.515292700386
+      }
+    },
+    {
+      "index": 53,
+      "period": 2.034829018112904,
+      "closure_error": 1.2705052288009e-11,
+      "jacobi": 2.9998992944252176,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 11647.03721533093
+      }
+    },
+    {
+      "index": 54,
+      "period": 2.0306814667430655,
+      "closure_error": 1.356683168585171e-11,
+      "jacobi": 2.999979712760693,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 11523.816887082054
+      }
+    },
+    {
+      "index": 55,
+      "period": 2.026583969327728,
+      "closure_error": 1.3257405589994775e-11,
+      "jacobi": 3.000060313332633,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 11401.850032405224
+      }
+    },
+    {
+      "index": 56,
+      "period": 2.022536453060988,
+      "closure_error": 1.3554932350168247e-11,
+      "jacobi": 3.0001410302821476,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 11281.132025636392
+      }
+    },
+    {
+      "index": 57,
+      "period": 2.018538826245538,
+      "closure_error": 1.3856751683583024e-11,
+      "jacobi": 3.0002217997812264,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 11161.657898468487
+      }
+    },
+    {
+      "index": 58,
+      "period": 2.014590978790561,
+      "closure_error": 1.4127331249280672e-11,
+      "jacobi": 3.0003025600130324,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 11043.42234800834
+      }
+    },
+    {
+      "index": 59,
+      "period": 2.010692782728049,
+      "closure_error": 1.4042815521531082e-11,
+      "jacobi": 3.000383251150718,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 10926.419745369902
+      }
+    },
+    {
+      "index": 60,
+      "period": 2.006844092745398,
+      "closure_error": 1.4805739967371778e-11,
+      "jacobi": 3.0004638153348098,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 10810.644144756308
+      }
+    },
+    {
+      "index": 61,
+      "period": 2.003044746732516,
+      "closure_error": 1.478931560550123e-11,
+      "jacobi": 3.000544196649212,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 10696.089292982864
+      }
+    },
+    {
+      "index": 62,
+      "period": 1.999294566341293,
+      "closure_error": 1.4683254612180008e-11,
+      "jacobi": 3.00062434109583,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 10582.748639393989
+      }
+    },
+    {
+      "index": 63,
+      "period": 1.9955933575556026,
+      "closure_error": 1.5022646321360966e-11,
+      "jacobi": 3.0007041965679604,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 10470.615346126298
+      }
+    },
+    {
+      "index": 64,
+      "period": 1.9919409112698816,
+      "closure_error": 1.58391841309502e-11,
+      "jacobi": 3.000783712822445,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 10359.682298672366
+      }
+    },
+    {
+      "index": 65,
+      "period": 1.988337003874453,
+      "closure_error": 1.5259460361960464e-11,
+      "jacobi": 3.00086284145068,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 10249.942116699256
+      }
+    },
+    {
+      "index": 66,
+      "period": 1.9847813978457067,
+      "closure_error": 1.5867075014996956e-11,
+      "jacobi": 3.0009415358485594,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 10141.387165078408
+      }
+    },
+    {
+      "index": 67,
+      "period": 1.981273842339568,
+      "closure_error": 1.547555660008637e-11,
+      "jacobi": 3.001019751185425,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 10034.009565083026
+      }
+    },
+    {
+      "index": 68,
+      "period": 1.9778140737862961,
+      "closure_error": 1.594754536760057e-11,
+      "jacobi": 3.0010974443721037,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 9927.801205713236
+      }
+    },
+    {
+      "index": 69,
+      "period": 1.9744018164853125,
+      "closure_error": 1.6055014089022546e-11,
+      "jacobi": 3.001174574028105,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 9822.753755107797
+      }
+    },
+    {
+      "index": 70,
+      "period": 1.9710367831982107,
+      "closure_error": 1.6354904409932036e-11,
+      "jacobi": 3.0012511004480804,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 9718.858672005928
+      }
+    },
+    {
+      "index": 71,
+      "period": 1.9677186757388316,
+      "closure_error": 1.6513807248735857e-11,
+      "jacobi": 3.0013269855676032,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 9616.107217222312
+      }
+    },
+    {
+      "index": 72,
+      "period": 1.9644471855587013,
+      "closure_error": 1.7263595934735587e-11,
+      "jacobi": 3.001402192928367,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 9514.490465102024
+      }
+    },
+    {
+      "index": 73,
+      "period": 1.9612219943268587,
+      "closure_error": 1.7450965368939753e-11,
+      "jacobi": 3.0014766876428927,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 9413.9993149227
+      }
+    },
+    {
+      "index": 74,
+      "period": 1.958042774502648,
+      "closure_error": 1.7783586018713105e-11,
+      "jacobi": 3.0015504363587904,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 9314.624502214763
+      }
+    },
+    {
+      "index": 75,
+      "period": 1.9549091899005042,
+      "closure_error": 1.692312761279735e-11,
+      "jacobi": 3.001623407222703,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 9216.356609971192
+      }
+    },
+    {
+      "index": 76,
+      "period": 1.9518208962457144,
+      "closure_error": 1.8137910444415706e-11,
+      "jacobi": 3.001695569843958,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 9119.186079721401
+      }
+    },
+    {
+      "index": 77,
+      "period": 1.9487775417201745,
+      "closure_error": 1.7400027165631604e-11,
+      "jacobi": 3.0017668952580783,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 9023.10322244527
+      }
+    },
+    {
+      "index": 78,
+      "period": 1.9457787674973426,
+      "closure_error": 1.821881144212223e-11,
+      "jacobi": 3.001837355890104,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8928.098229306177
+      }
+    },
+    {
+      "index": 79,
+      "period": 1.9428242082657055,
+      "closure_error": 1.880833423034689e-11,
+      "jacobi": 3.0019069255179467,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8834.161182182574
+      }
+    },
+    {
+      "index": 80,
+      "period": 1.9399134927399515,
+      "closure_error": 1.888813758177399e-11,
+      "jacobi": 3.001975579235708,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8741.2820639814
+      }
+    },
+    {
+      "index": 81,
+      "period": 1.9370462441593586,
+      "closure_error": 1.88327946987199e-11,
+      "jacobi": 3.0020432934171097,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8649.45076871681
+      }
+    },
+    {
+      "index": 82,
+      "period": 1.934222080772979,
+      "closure_error": 1.9260174184687617e-11,
+      "jacobi": 3.0021100456790633,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8558.657111340593
+      }
+    },
+    {
+      "index": 83,
+      "period": 1.931440616310987,
+      "closure_error": 1.961423731766665e-11,
+      "jacobi": 3.002175814845452,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8468.890837312412
+      }
+    },
+    {
+      "index": 84,
+      "period": 1.92870146044203,
+      "closure_error": 1.9758536820568828e-11,
+      "jacobi": 3.002240580911159,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8380.141631899247
+      }
+    },
+    {
+      "index": 85,
+      "period": 1.9260042192161808,
+      "closure_error": 2.0138102123368196e-11,
+      "jacobi": 3.0023043250064156,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8292.399129195535
+      }
+    },
+    {
+      "index": 86,
+      "period": 1.9233484954933189,
+      "closure_error": 1.9686596103296594e-11,
+      "jacobi": 3.0023670293614995,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8205.652920856488
+      }
+    },
+    {
+      "index": 87,
+      "period": 1.920733889356796,
+      "closure_error": 2.0076485612863237e-11,
+      "jacobi": 3.0024286772718303,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8119.892564539461
+      }
+    },
+    {
+      "index": 88,
+      "period": 1.9181599985122382,
+      "closure_error": 2.0317227067412347e-11,
+      "jacobi": 3.002489253063519,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 8035.107592048433
+      }
+    },
+    {
+      "index": 89,
+      "period": 1.9156264186714653,
+      "closure_error": 2.0890650320737336e-11,
+      "jacobi": 3.00254874205938,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7951.287517179289
+      }
+    },
+    {
+      "index": 90,
+      "period": 1.913132743921551,
+      "closure_error": 2.0822288337996042e-11,
+      "jacobi": 3.0026071305454614,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7868.42184326353
+      }
+    },
+    {
+      "index": 91,
+      "period": 1.9106785670790378,
+      "closure_error": 2.1344641332188274e-11,
+      "jacobi": 3.002664405738106,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7786.500070410153
+      }
+    },
+    {
+      "index": 92,
+      "period": 1.9082634800294083,
+      "closure_error": 2.2505698693553455e-11,
+      "jacobi": 3.002720555751604,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7705.511702445938
+      }
+    },
+    {
+      "index": 93,
+      "period": 1.9058870740519802,
+      "closure_error": 2.1331068855712232e-11,
+      "jacobi": 3.0027755695664142,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7625.4462535555285
+      }
+    },
+    {
+      "index": 94,
+      "period": 1.9035489401303127,
+      "closure_error": 2.1472844335956864e-11,
+      "jacobi": 3.0028294369979913,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7546.29325462367
+      }
+    },
+    {
+      "index": 95,
+      "period": 1.9012486692484327,
+      "closure_error": 2.211905658633384e-11,
+      "jacobi": 3.002882148666289,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7468.042259282223
+      }
+    },
+    {
+      "index": 96,
+      "period": 1.8989858526729892,
+      "closure_error": 2.294166459316507e-11,
+      "jacobi": 3.0029336959658526,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7390.68284966622
+      }
+    },
+    {
+      "index": 97,
+      "period": 1.896760082221694,
+      "closure_error": 2.324077388871082e-11,
+      "jacobi": 3.002984071036623,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7314.20464188308
+      }
+    },
+    {
+      "index": 98,
+      "period": 1.8945709505182668,
+      "closure_error": 2.284317353329346e-11,
+      "jacobi": 3.003033266735364,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7238.597291199951
+      }
+    },
+    {
+      "index": 99,
+      "period": 1.8924180512341333,
+      "closure_error": 2.2940730912135443e-11,
+      "jacobi": 3.0030812766078094,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 1,
+        "perilune_height_km": 7163.850496954743
+      }
+    }
+  ],
+  "tags": [
+    "baseline"
+  ],
+  "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
+  "record_id": "baseline-nrho-l1",
+  "schema_version": 1,
+  "created_at": "2026-08-23T01:15:13.063882+00:00",
+  "arrays": {
+    "cr3bp/members/0000/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0000/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0014/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0014/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0015/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0015/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0016/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0016/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0017/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0017/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0018/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0018/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0019/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0019/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0020/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0020/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0021/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0021/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0022/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0022/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0023/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0023/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0024/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0024/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0025/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0025/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0026/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0026/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0027/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0027/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0028/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0028/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0029/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0029/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0030/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0030/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0031/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0031/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0032/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0032/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0033/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0033/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0034/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0034/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0035/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0035/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0036/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0036/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0037/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0037/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0038/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0038/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0039/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0039/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0040/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0040/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0041/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0041/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0042/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0042/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0043/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0043/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0044/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0044/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0045/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0045/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0046/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0046/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0047/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0047/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0048/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0048/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0049/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0049/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0050/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0050/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0051/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0051/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0052/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0052/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0053/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0053/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0054/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0054/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0055/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0055/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0056/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0056/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0057/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0057/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0058/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0058/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0059/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0059/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0060/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0060/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0061/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0061/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0062/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0062/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0063/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0063/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0064/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0064/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0065/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0065/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0066/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0066/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0067/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0067/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0068/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0068/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0069/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0069/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0070/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0070/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0071/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0071/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0072/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0072/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0073/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0073/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0074/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0074/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0075/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0075/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0076/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0076/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0077/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0077/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0078/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0078/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0079/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0079/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0080/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0080/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0081/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0081/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0082/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0082/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0083/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0083/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0084/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0084/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0085/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0085/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0086/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0086/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0087/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0087/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0088/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0088/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0089/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0089/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0090/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0090/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0091/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0091/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0092/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0092/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0093/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0093/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0094/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0094/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0095/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0095/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0096/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0096/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0097/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0097/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0098/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0098/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0099/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0099/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    }
+  }
+}

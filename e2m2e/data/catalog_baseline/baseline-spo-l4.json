@@ -1,0 +1,889 @@
+{
+  "source_tool": "orbit_family_generation",
+  "source_record_id": null,
+  "classification": {
+    "orbit_family": "spo",
+    "libration_point": 4,
+    "jacobi": [
+      2.980564893457325,
+      2.9879721875846634
+    ],
+    "amplitude": [
+      0.0,
+      0.0
+    ],
+    "has_cr3bp": true,
+    "has_ephemeris": false
+  },
+  "status": "converged",
+  "cause": "none",
+  "message": "轨道族生成完成",
+  "scalars": {
+    "member_count": 23,
+    "requested_members": 100,
+    "generated_members": 23,
+    "periodicity": "periodic",
+    "mu": 0.012150585350562453,
+    "char_length_km": 384400.0,
+    "baseline_version": "5.8.2",
+    "amplitude_envelope_km": [
+      3268.0562992225355,
+      59784.69605623976
+    ]
+  },
+  "request": {
+    "orbit_type": "SPO",
+    "libration_point": 4,
+    "max_amplitude_km": 60000.0,
+    "min_amplitude_km": 2000.0,
+    "north_south": null,
+    "perilune_height_max_km": null,
+    "amplitude_in_km": null,
+    "amplitude_out_km": null,
+    "phase_in": null,
+    "phase_out": null,
+    "continuation_direction": "decrease-x0",
+    "sampling_mode": "full-period-pal",
+    "match_tolerance_km": 20.0,
+    "n_orbits": 100
+  },
+  "members": [
+    {
+      "index": 0,
+      "period": 6.582671373564672,
+      "closure_error": 1.5799272860047425e-11,
+      "jacobi": 2.9879721875846634,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 3268.0562992225355,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 1733.8225306307058,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 1733.822750601573,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 1,
+      "period": 6.582625637926638,
+      "closure_error": 9.285128221847572e-12,
+      "jacobi": 2.9879174597185774,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 5865.349341202801,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 976.1288532613336,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 976.1290675824714,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 2,
+      "period": 6.582554625363465,
+      "closure_error": 6.843081656882077e-12,
+      "jacobi": 2.9878324572251174,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 8460.510824227316,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 686.1251049726785,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 686.1253312914566,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 3,
+      "period": 6.582458875138718,
+      "closure_error": 6.153799692043549e-12,
+      "jacobi": 2.9877177931162673,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 11053.536126117493,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 533.4924766898779,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 533.4927181868736,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 4,
+      "period": 6.582338915779488,
+      "closure_error": 5.9521831907716205e-12,
+      "jacobi": 2.987574056360783,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 13644.182344913954,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 439.5707004594773,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 439.5709571353263,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 5,
+      "period": 6.582195264591534,
+      "closure_error": 5.8992255524970005e-12,
+      "jacobi": 2.987401812695927,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 16232.370350694113,
+        "jacobi_drift": 8.881784197001252e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 376.08670241076146,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 376.0869732942198,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 6,
+      "period": 6.582028427745976,
+      "closure_error": 5.996925178664014e-12,
+      "jacobi": 2.9872016055260024,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 18818.04126571752,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 330.3914620512512,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 330.39174586070766,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 7,
+      "period": 6.58183890046017,
+      "closure_error": 6.151412712540605e-12,
+      "jacobi": 2.9869739568218567,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 21401.149663297085,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 295.98239558770945,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 295.9826909746804,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 8,
+      "period": 6.5816271672022335,
+      "closure_error": 6.3754557189099614e-12,
+      "jacobi": 2.9867193679964545,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 23981.659631102797,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 269.1765939675958,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 269.17689961612894,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 9,
+      "period": 6.5813937019038375,
+      "closure_error": 6.5875638277645976e-12,
+      "jacobi": 2.986438320748575,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 26559.542304589955,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 247.73307776696035,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 247.73339243519663,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 10,
+      "period": 6.581138968175258,
+      "closure_error": 6.8676730968775246e-12,
+      "jacobi": 2.9861312778724605,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 29134.48460971378,
+        "jacobi_drift": 8.881784197001252e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 230.2106677969166,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 230.2109903330068,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 11,
+      "period": 6.580863419521745,
+      "closure_error": 7.186862216457257e-12,
+      "jacobi": 2.985798684033402,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 31705.901871066966,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 215.64079121901764,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 215.6411205649595,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 12,
+      "period": 6.5805674995579855,
+      "closure_error": 7.491840481321788e-12,
+      "jacobi": 2.9854409665101405,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 34274.41086598648,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 203.34868068385762,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 203.34901587348506,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 13,
+      "period": 6.580251642222829,
+      "closure_error": 7.881806318721374e-12,
+      "jacobi": 2.9850585359053032,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 36839.9965552614,
+        "jacobi_drift": 8.881784197001252e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 192.84998892017992,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 192.8503290743673,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 14,
+      "period": 6.579916271990892,
+      "closure_error": 8.274492202531292e-12,
+      "jacobi": 2.984651786825223,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 39402.64669518945,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 183.7881574900555,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 183.7885018106959,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 15,
+      "period": 6.579561804083345,
+      "closure_error": 8.676837026655448e-12,
+      "jacobi": 2.984221098530474,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 41962.35136529175,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 175.89495925235505,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 175.89530701594458,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 16,
+      "period": 6.57918864467536,
+      "closure_error": 9.055256544598933e-12,
+      "jacobi": 2.983766835558484,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 44519.102595804245,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 168.96479626754964,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 168.96514681881555,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 17,
+      "period": 6.578797191102202,
+      "closure_error": 9.467593375944716e-12,
+      "jacobi": 2.983289348319475,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 47072.55312486795,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 162.8374683658688,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 162.83782111166747,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 18,
+      "period": 6.578387832062148,
+      "closure_error": 9.926781618929681e-12,
+      "jacobi": 2.9827889736669713,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 49621.37678454909,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 157.38632669865441,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 157.38668110225726,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 19,
+      "period": 6.577960947816798,
+      "closure_error": 1.0381084880606295e-11,
+      "jacobi": 2.9822660354440393,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 52167.005399497095,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 152.50994729747202,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 152.51030287328066,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 20,
+      "period": 6.577516910388997,
+      "closure_error": 1.0896950008998374e-11,
+      "jacobi": 2.981720845006358,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 54709.43598905744,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 148.12616279410818,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 148.12651910281548,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 21,
+      "period": 6.577056083756519,
+      "closure_error": 1.1321887871673653e-11,
+      "jacobi": 2.9811537017232084,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 57248.666576787786,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 144.16770883572326,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 144.16806547990288,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 22,
+      "period": 6.576578824044654,
+      "closure_error": 1.1816103651085541e-11,
+      "jacobi": 2.980564893457325,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 59784.69605623976,
+        "jacobi_drift": 8.881784197001252e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 140.57899795634975,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 140.57935457645854,
+        "step_size": 0.01
+      }
+    }
+  ],
+  "tags": [
+    "baseline"
+  ],
+  "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
+  "record_id": "baseline-spo-l4",
+  "schema_version": 1,
+  "created_at": "2026-08-23T01:16:32.306490+00:00",
+  "arrays": {
+    "cr3bp/members/0000/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0000/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0014/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0014/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0015/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0015/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0016/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0016/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0017/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0017/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0018/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0018/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0019/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0019/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0020/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0020/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0021/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0021/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0022/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0022/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    }
+  }
+}

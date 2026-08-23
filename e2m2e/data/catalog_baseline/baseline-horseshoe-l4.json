@@ -1,0 +1,313 @@
+{
+  "source_tool": "orbit_family_generation",
+  "source_record_id": null,
+  "classification": {
+    "orbit_family": "horseshoe",
+    "libration_point": 4,
+    "jacobi": [
+      2.989269576012746,
+      2.9912499419514194
+    ],
+    "amplitude": [
+      0.0,
+      0.0
+    ],
+    "has_cr3bp": true,
+    "has_ephemeris": false
+  },
+  "status": "converged",
+  "cause": "none",
+  "message": "轨道族生成完成",
+  "scalars": {
+    "member_count": 7,
+    "requested_members": 100,
+    "generated_members": 7,
+    "periodicity": "periodic",
+    "mu": 0.012150585350562453,
+    "char_length_km": 384400.0,
+    "baseline_version": "5.8.2",
+    "amplitude_envelope_km": [
+      57130.08872398552,
+      106733.87263825479
+    ]
+  },
+  "request": {
+    "orbit_type": "HORSESHOE",
+    "libration_point": 4,
+    "max_amplitude_km": 110000.0,
+    "min_amplitude_km": 50000.0,
+    "north_south": null,
+    "perilune_height_max_km": null,
+    "amplitude_in_km": null,
+    "amplitude_out_km": null,
+    "phase_in": null,
+    "phase_out": null,
+    "continuation_direction": "decrease-x0",
+    "sampling_mode": "full-period-pal",
+    "match_tolerance_km": 50.0,
+    "n_orbits": 100
+  },
+  "members": [
+    {
+      "index": 0,
+      "period": 21.130460794908082,
+      "closure_error": 2.1194608568197992e-11,
+      "jacobi": 2.989269576012746,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 57130.08872398552,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 27.393899023542524,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 27.401062482621903,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 1,
+      "period": 21.13566199866222,
+      "closure_error": 4.54203688549093e-11,
+      "jacobi": 2.9896969857803684,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 67632.38908726997,
+        "jacobi_drift": 8.881784197001252e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 29.249112444931477,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 29.275251312243665,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 2,
+      "period": 21.1353535153718,
+      "closure_error": 3.469446951953614e-14,
+      "jacobi": 2.9901061730995457,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 77402.48598323276,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 4,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 38.18999058850716,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 38.21641549696755,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 3,
+      "period": 21.13210166169146,
+      "closure_error": 1.2351231148954867e-13,
+      "jacobi": 2.990460567514226,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 85976.98189474722,
+        "jacobi_drift": 8.881784197001252e-16,
+        "newton_iterations": 4,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 53.99820999770254,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 54.00495705932477,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 4,
+      "period": 21.12853455854283,
+      "closure_error": 3.2970615126970415e-10,
+      "jacobi": 2.990761496990668,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 93555.2873596864,
+        "jacobi_drift": 0.0,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 76.88684476340185,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 76.88784521721243,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 5,
+      "period": 21.126498210507958,
+      "closure_error": 2.9348218300029316e-10,
+      "jacobi": 2.9910207504231003,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 100405.51621298619,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 107.48844677803373,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 107.51386019949659,
+        "step_size": 0.01
+      }
+    },
+    {
+      "index": 6,
+      "period": 21.127420837554677,
+      "closure_error": 2.816944455474868e-10,
+      "jacobi": 2.9912499419514194,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 4,
+        "amplitude_km": 106733.87263825479,
+        "jacobi_drift": 4.440892098500626e-16,
+        "newton_iterations": 3,
+        "tangent_system_rank": 4,
+        "tangent_system_condition": 146.64121118305886,
+        "augmented_system_rank": 5,
+        "augmented_system_condition": 146.73880812668443,
+        "step_size": 0.01
+      }
+    }
+  ],
+  "tags": [
+    "baseline"
+  ],
+  "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
+  "record_id": "baseline-horseshoe-l4",
+  "schema_version": 1,
+  "created_at": "2026-08-23T01:17:08.660868+00:00",
+  "arrays": {
+    "cr3bp/members/0000/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0000/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    }
+  }
+}

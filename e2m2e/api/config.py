@@ -26,6 +26,8 @@ class Config:
         catalog_dir: 轨道库目录（默认 $E2M2E_CATALOG_DIR 或 ./catalog；ADR 0031）。
         catalog_enabled: 产物型方法成功后是否自动入库；测试场景可关闭以避免
             文件副作用。
+        catalog_baseline_import: 首次打开库时是否从包内导入基线数据集
+            （ADR 0036）；默认 $E2M2E_CATALOG_BASELINE_IMPORT 或开。
     """
 
     kernel_dir: str = field(default_factory=lambda: os.environ.get("SPICE_KERNEL_DIR", "kernels"))
@@ -34,3 +36,8 @@ class Config:
     atol: float = 1e-12
     catalog_dir: str = field(default_factory=lambda: os.environ.get("E2M2E_CATALOG_DIR", "catalog"))
     catalog_enabled: bool = True
+    catalog_baseline_import: bool = field(
+        default_factory=lambda: (
+            os.environ.get("E2M2E_CATALOG_BASELINE_IMPORT", "1").lower() not in ("0", "false", "no")
+        )
+    )

@@ -1,0 +1,360 @@
+{
+  "source_tool": "orbit_family_generation",
+  "source_record_id": null,
+  "classification": {
+    "orbit_family": "dpo",
+    "libration_point": null,
+    "jacobi": [
+      3.2313531082768763,
+      4.289259463124479
+    ],
+    "amplitude": [
+      3438.3489698652265,
+      21010.34247344452
+    ],
+    "has_cr3bp": true,
+    "has_ephemeris": false
+  },
+  "status": "converged",
+  "cause": "none",
+  "message": "DPO 振幅网格生成完成：11/20 条命中（跳过 9 个不可达振幅）",
+  "scalars": {
+    "member_count": 11,
+    "requested_members": 20,
+    "generated_members": 11,
+    "periodicity": "periodic",
+    "mu": 0.012150585350562453,
+    "char_length_km": 384400.0,
+    "baseline_version": "5.8.2",
+    "amplitude_envelope_km": [
+      3421.8397535985523,
+      20497.075781626
+    ]
+  },
+  "request": {
+    "orbit_type": "DPO",
+    "libration_point": null,
+    "n_orbits": 20,
+    "min_amplitude_km": 2000.0,
+    "max_amplitude_km": 60000.0
+  },
+  "members": [
+    {
+      "index": 0,
+      "period": 0.04784992604451064,
+      "closure_error": 7.331985518005539e-13,
+      "jacobi": 4.289259463124479,
+      "amplitude_km": 3438.3489698652265,
+      "amplitudes": {
+        "x": 0.008943690350937727,
+        "y": 0.008944716362812764,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 3421.8397535985523
+      }
+    },
+    {
+      "index": 1,
+      "period": 0.06164451373534826,
+      "closure_error": 7.780777239010348e-14,
+      "jacobi": 4.0746621108967656,
+      "amplitude_km": 4077.0556167261,
+      "amplitudes": {
+        "x": 0.010604278619157692,
+        "y": 0.010606284122596515,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 4092.6338446629707
+      }
+    },
+    {
+      "index": 2,
+      "period": 0.08106162058701707,
+      "closure_error": 2.0417470093226697e-13,
+      "jacobi": 3.87937113892451,
+      "amplitude_km": 4904.068262222064,
+      "amplitudes": {
+        "x": 0.012753576838075154,
+        "y": 0.01275772180598872,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 4894.9258272150755
+      }
+    },
+    {
+      "index": 3,
+      "period": 0.10504677436117012,
+      "closure_error": 1.0602700169777351e-12,
+      "jacobi": 3.7239415619862637,
+      "amplitude_km": 5844.697899623881,
+      "amplitudes": {
+        "x": 0.015196483122854931,
+        "y": 0.015204729187367018,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 5854.4936496537
+      }
+    },
+    {
+      "index": 4,
+      "period": 0.14343225598888518,
+      "closure_error": 1.7215482758023946e-13,
+      "jacobi": 3.648421044325049,
+      "amplitude_km": 7008.402980144742,
+      "amplitudes": {
+        "x": 0.018212754555169408,
+        "y": 0.018232057700688715,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 7002.168593295316
+      }
+    },
+    {
+      "index": 5,
+      "period": 0.18955318654789072,
+      "closure_error": 2.043707337063987e-13,
+      "jacobi": 3.540956435611502,
+      "amplitude_km": 8402.736986003552,
+      "amplitudes": {
+        "x": 0.02181862833093029,
+        "y": 0.021859357403755338,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 8374.825893240402
+      }
+    },
+    {
+      "index": 6,
+      "period": 0.24919410724361418,
+      "closure_error": 3.357721561258323e-13,
+      "jacobi": 3.454280778929464,
+      "amplitude_km": 10028.34796138745,
+      "amplitudes": {
+        "x": 0.02600345678909105,
+        "y": 0.02608831415553447,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 10016.569553787642
+      }
+    },
+    {
+      "index": 7,
+      "period": 0.33155075858162814,
+      "closure_error": 3.751741340806441e-13,
+      "jacobi": 3.3803731826574883,
+      "amplitude_km": 12043.836119634125,
+      "amplitudes": {
+        "x": 0.03114861636947719,
+        "y": 0.031331519562003446,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 11980.149426968594
+      }
+    },
+    {
+      "index": 8,
+      "period": 0.4395625539856723,
+      "closure_error": 7.524861236087019e-13,
+      "jacobi": 3.321266643500866,
+      "amplitude_km": 14407.975813991963,
+      "amplitudes": {
+        "x": 0.03709034825151947,
+        "y": 0.037481726883433826,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 14328.65608547827
+      }
+    },
+    {
+      "index": 9,
+      "period": 0.5913491054325873,
+      "closure_error": 5.685505512307875e-13,
+      "jacobi": 3.271480105896706,
+      "amplitude_km": 17368.327315734048,
+      "amplitudes": {
+        "x": 0.04430842904965088,
+        "y": 0.045182953474854445,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 17137.547946917748
+      }
+    },
+    {
+      "index": 10,
+      "period": 4.807359368484104,
+      "closure_error": 1.0935487193514754e-12,
+      "jacobi": 3.2313531082768763,
+      "amplitude_km": 21010.34247344452,
+      "amplitudes": {
+        "x": 0.05265513644325459,
+        "y": 0.054657498630188664,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 20497.075781626
+      }
+    }
+  ],
+  "tags": [
+    "baseline"
+  ],
+  "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
+  "record_id": "baseline-dpo",
+  "schema_version": 1,
+  "created_at": "2026-08-23T01:16:28.935383+00:00",
+  "arrays": {
+    "cr3bp/members/0000/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0000/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    }
+  }
+}

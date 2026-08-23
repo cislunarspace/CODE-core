@@ -8,6 +8,10 @@ from kernel_helpers import SPICE_KERNEL_DIR
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.data.constants import Datum
 
+# 单测的 catalog 目录是合成数据：关闭包内基线数据集的首用导入（ADR 0036），
+# 否则查询计数类断言会被基线记录污染。基线导入自身的测试显式注入合成源。
+os.environ.setdefault("E2M2E_CATALOG_BASELINE_IMPORT", "0")
+
 
 @pytest.fixture
 def earth_moon_system():

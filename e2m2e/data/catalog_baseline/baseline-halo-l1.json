@@ -1,0 +1,2041 @@
+{
+  "source_tool": "orbit_family_generation",
+  "source_record_id": null,
+  "classification": {
+    "orbit_family": "halo",
+    "libration_point": 1,
+    "jacobi": [
+      3.119900799554935,
+      3.174340629244653
+    ],
+    "amplitude": [
+      0.0,
+      0.0
+    ],
+    "has_cr3bp": true,
+    "has_ephemeris": false
+  },
+  "status": "converged",
+  "cause": "none",
+  "message": "轨道族生成完成",
+  "scalars": {
+    "member_count": 66,
+    "requested_members": 100,
+    "generated_members": 66,
+    "periodicity": "periodic",
+    "mu": 0.012150585350562453,
+    "char_length_km": 384400.0,
+    "baseline_version": "5.8.2",
+    "amplitude_envelope_km": [
+      384.40000000000003,
+      24999.999999999996
+    ]
+  },
+  "request": {
+    "orbit_type": "HALO",
+    "libration_point": 1,
+    "max_amplitude_km": 25000.0,
+    "min_amplitude_km": null,
+    "north_south": null,
+    "perilune_height_max_km": null,
+    "amplitude_in_km": null,
+    "amplitude_out_km": null,
+    "phase_in": null,
+    "phase_out": null,
+    "continuation_direction": null,
+    "sampling_mode": "natural-z0",
+    "match_tolerance_km": null,
+    "n_orbits": 100
+  },
+  "members": [
+    {
+      "index": 0,
+      "period": 2.7430031041508998,
+      "closure_error": 2.3803152916605785e-12,
+      "jacobi": 3.174340629244653,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.001
+      }
+    },
+    {
+      "index": 1,
+      "period": 2.7430302020836628,
+      "closure_error": 1.5866347406919001e-13,
+      "jacobi": 3.1743066577006283,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.002
+      }
+    },
+    {
+      "index": 2,
+      "period": 2.7430753680861755,
+      "closure_error": 1.0998171232241838e-13,
+      "jacobi": 3.174250026204061,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.003
+      }
+    },
+    {
+      "index": 3,
+      "period": 2.743138606293496,
+      "closure_error": 5.603053557148158e-13,
+      "jacobi": 3.1741707163725046,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.004
+      }
+    },
+    {
+      "index": 4,
+      "period": 2.7432199224211096,
+      "closure_error": 5.906074782881243e-13,
+      "jacobi": 3.1740687024748873,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.005
+      }
+    },
+    {
+      "index": 5,
+      "period": 2.7433193236914204,
+      "closure_error": 8.429117321663571e-13,
+      "jacobi": 3.173943951435154,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.006
+      }
+    },
+    {
+      "index": 6,
+      "period": 2.743436818739443,
+      "closure_error": 1.751420894164496e-12,
+      "jacobi": 3.1737964228359705,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.007
+      }
+    },
+    {
+      "index": 7,
+      "period": 2.7435724174976706,
+      "closure_error": 5.543987035942777e-13,
+      "jacobi": 3.1736260689217204,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.008
+      }
+    },
+    {
+      "index": 8,
+      "period": 2.7437261310602534,
+      "closure_error": 2.8029583320175744e-13,
+      "jacobi": 3.173432834599897,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.009000000000000001
+      }
+    },
+    {
+      "index": 9,
+      "period": 2.743897971526603,
+      "closure_error": 2.131634658283227e-12,
+      "jacobi": 3.1732166574399585,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.010000000000000002
+      }
+    },
+    {
+      "index": 10,
+      "period": 2.7440879518243415,
+      "closure_error": 4.6393797007229787e-14,
+      "jacobi": 3.172977467668338,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.011000000000000003
+      }
+    },
+    {
+      "index": 11,
+      "period": 2.744296085511621,
+      "closure_error": 1.0463543280523485e-12,
+      "jacobi": 3.1727151881584374,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.012000000000000004
+      }
+    },
+    {
+      "index": 12,
+      "period": 2.7445223865588164,
+      "closure_error": 2.130755261901124e-12,
+      "jacobi": 3.172429734414207,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.013000000000000005
+      }
+    },
+    {
+      "index": 13,
+      "period": 2.7447668691092297,
+      "closure_error": 3.9239707945622204e-13,
+      "jacobi": 3.172121014545716,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.014000000000000005
+      }
+    },
+    {
+      "index": 14,
+      "period": 2.745029547218706,
+      "closure_error": 1.3104606104690636e-12,
+      "jacobi": 3.1717889292351957,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.015000000000000006
+      }
+    },
+    {
+      "index": 15,
+      "period": 2.745310434573565,
+      "closure_error": 2.047078056111734e-13,
+      "jacobi": 3.171433371691804,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.016000000000000007
+      }
+    },
+    {
+      "index": 16,
+      "period": 2.7456095441864568,
+      "closure_error": 1.2970025444272726e-12,
+      "jacobi": 3.171054227593341,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.017000000000000008
+      }
+    },
+    {
+      "index": 17,
+      "period": 2.7459268880692003,
+      "closure_error": 3.1640422161645365e-12,
+      "jacobi": 3.1706513750129974,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.01800000000000001
+      }
+    },
+    {
+      "index": 18,
+      "period": 2.7462624768818746,
+      "closure_error": 1.1400138645589752e-12,
+      "jacobi": 3.1702246843292445,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.01900000000000001
+      }
+    },
+    {
+      "index": 19,
+      "period": 2.7466163195566446,
+      "closure_error": 2.667364593089694e-12,
+      "jacobi": 3.169774018116633,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.02000000000000001
+      }
+    },
+    {
+      "index": 20,
+      "period": 2.746988422895262,
+      "closure_error": 1.0128493638413005e-12,
+      "jacobi": 3.169299231015538,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.02100000000000001
+      }
+    },
+    {
+      "index": 21,
+      "period": 2.7473787911381358,
+      "closure_error": 3.409940515716747e-14,
+      "jacobi": 3.1688001695783727,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.022000000000000013
+      }
+    },
+    {
+      "index": 22,
+      "period": 2.7477874255031587,
+      "closure_error": 7.869237488196401e-13,
+      "jacobi": 3.1682766720900166,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.023000000000000013
+      }
+    },
+    {
+      "index": 23,
+      "period": 2.7482143236917507,
+      "closure_error": 2.018296499980282e-12,
+      "jacobi": 3.1677285683598324,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.024000000000000014
+      }
+    },
+    {
+      "index": 24,
+      "period": 2.7486594793592256,
+      "closure_error": 1.045167750089726e-12,
+      "jacobi": 3.167155679482556,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.025000000000000015
+      }
+    },
+    {
+      "index": 25,
+      "period": 2.7491228815463584,
+      "closure_error": 1.7199151174443483e-12,
+      "jacobi": 3.16655781756522,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.026000000000000016
+      }
+    },
+    {
+      "index": 26,
+      "period": 2.749604514068199,
+      "closure_error": 1.6792801958015469e-12,
+      "jacobi": 3.1659347854169497,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.027000000000000017
+      }
+    },
+    {
+      "index": 27,
+      "period": 2.750104354855908,
+      "closure_error": 5.152297164623008e-12,
+      "jacobi": 3.1652863761982744,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.028000000000000018
+      }
+    },
+    {
+      "index": 28,
+      "period": 2.750622375246618,
+      "closure_error": 2.904800877644772e-12,
+      "jacobi": 3.164612373026316,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.02900000000000002
+      }
+    },
+    {
+      "index": 29,
+      "period": 2.751158539215569,
+      "closure_error": 4.607474924050829e-12,
+      "jacobi": 3.163912548531761,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.03000000000000002
+      }
+    },
+    {
+      "index": 30,
+      "period": 2.751712802544192,
+      "closure_error": 5.7050173098019755e-12,
+      "jacobi": 3.163186664363323,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.03100000000000002
+      }
+    },
+    {
+      "index": 31,
+      "period": 2.752285111916659,
+      "closure_error": 6.752209468635639e-12,
+      "jacobi": 3.1624344706346816,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.03200000000000002
+      }
+    },
+    {
+      "index": 32,
+      "period": 2.7528754039366086,
+      "closure_error": 1.475881152316824e-11,
+      "jacobi": 3.1616557053085708,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.03300000000000002
+      }
+    },
+    {
+      "index": 33,
+      "period": 2.7534836040544426,
+      "closure_error": 1.56159488823044e-11,
+      "jacobi": 3.160850093511921,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.03400000000000002
+      }
+    },
+    {
+      "index": 34,
+      "period": 2.7541096253943635,
+      "closure_error": 1.7071439856360116e-11,
+      "jacobi": 3.1600173467752013,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.035000000000000024
+      }
+    },
+    {
+      "index": 35,
+      "period": 2.7547533674687394,
+      "closure_error": 2.1681722389699232e-11,
+      "jacobi": 3.159157162188423,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.036000000000000025
+      }
+    },
+    {
+      "index": 36,
+      "period": 2.7554147147656494,
+      "closure_error": 2.5214706299465928e-11,
+      "jacobi": 3.158269221465049,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.037000000000000026
+      }
+    },
+    {
+      "index": 37,
+      "period": 2.756093535193463,
+      "closure_error": 2.9192747611622716e-11,
+      "jacobi": 3.1573531899041103,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.03800000000000003
+      }
+    },
+    {
+      "index": 38,
+      "period": 2.7567896783638197,
+      "closure_error": 3.4936320438168356e-11,
+      "jacobi": 3.15640871523928,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.03900000000000003
+      }
+    },
+    {
+      "index": 39,
+      "period": 2.757502973691789,
+      "closure_error": 3.9615225488030814e-11,
+      "jacobi": 3.1554354263622955,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.04000000000000003
+      }
+    },
+    {
+      "index": 40,
+      "period": 2.75823322828862,
+      "closure_error": 4.0210045904910674e-11,
+      "jacobi": 3.1544329319060673,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.04100000000000003
+      }
+    },
+    {
+      "index": 41,
+      "period": 2.7589802246184143,
+      "closure_error": 1.358954181823746e-13,
+      "jacobi": 3.153400818671007,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.04200000000000003
+      }
+    },
+    {
+      "index": 42,
+      "period": 2.759743717888107,
+      "closure_error": 1.4502154902298892e-12,
+      "jacobi": 3.1523386498742356,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.04300000000000003
+      }
+    },
+    {
+      "index": 43,
+      "period": 2.7605234331279402,
+      "closure_error": 1.7966982339846088e-13,
+      "jacobi": 3.151245963202057,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.04400000000000003
+      }
+    },
+    {
+      "index": 44,
+      "period": 2.7613190619237775,
+      "closure_error": 2.3420932619526436e-13,
+      "jacobi": 3.1501222686364145,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.04500000000000003
+      }
+    },
+    {
+      "index": 45,
+      "period": 2.7621302587457777,
+      "closure_error": 1.0608465874414191e-12,
+      "jacobi": 3.148967046027911,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.046000000000000034
+      }
+    },
+    {
+      "index": 46,
+      "period": 2.762956636814103,
+      "closure_error": 1.8856937495856374e-13,
+      "jacobi": 3.1477797423793747,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.047000000000000035
+      }
+    },
+    {
+      "index": 47,
+      "period": 2.76379776342996,
+      "closure_error": 6.538522436157213e-13,
+      "jacobi": 3.146559768799028,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.048000000000000036
+      }
+    },
+    {
+      "index": 48,
+      "period": 2.76465315468772,
+      "closure_error": 5.023204074916521e-13,
+      "jacobi": 3.145306497075076,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.04900000000000004
+      }
+    },
+    {
+      "index": 49,
+      "period": 2.765522269467947,
+      "closure_error": 2.0441603596453584e-12,
+      "jacobi": 3.144019255814643,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.05000000000000004
+      }
+    },
+    {
+      "index": 50,
+      "period": 2.76640450259204,
+      "closure_error": 1.0474203969434992e-12,
+      "jacobi": 3.1426973260794435,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.05100000000000004
+      }
+    },
+    {
+      "index": 51,
+      "period": 2.7672991769957433,
+      "closure_error": 6.876693225271735e-14,
+      "jacobi": 3.141339936437662,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.05200000000000004
+      }
+    },
+    {
+      "index": 52,
+      "period": 2.768205534749745,
+      "closure_error": 4.925814530570838e-13,
+      "jacobi": 3.13994625733555,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.05300000000000004
+      }
+    },
+    {
+      "index": 53,
+      "period": 2.7691227267196497,
+      "closure_error": 1.3515631756139124e-12,
+      "jacobi": 3.1385153946726945,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.05400000000000004
+      }
+    },
+    {
+      "index": 54,
+      "period": 2.7700498006129766,
+      "closure_error": 5.756892265481217e-13,
+      "jacobi": 3.1370463824405723,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.05500000000000004
+      }
+    },
+    {
+      "index": 55,
+      "period": 2.770985687104412,
+      "closure_error": 7.266878478085978e-13,
+      "jacobi": 3.135538174253515,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.05600000000000004
+      }
+    },
+    {
+      "index": 56,
+      "period": 2.77192918365963,
+      "closure_error": 2.516518623259939e-13,
+      "jacobi": 3.1339896335629827,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.057000000000000044
+      }
+    },
+    {
+      "index": 57,
+      "period": 2.7728789355875523,
+      "closure_error": 5.588031122896742e-13,
+      "jacobi": 3.132399522297406,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.058000000000000045
+      }
+    },
+    {
+      "index": 58,
+      "period": 2.7738334137346885,
+      "closure_error": 4.0316177046112456e-13,
+      "jacobi": 3.1307664876078722,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.059000000000000045
+      }
+    },
+    {
+      "index": 59,
+      "period": 2.7747908880851773,
+      "closure_error": 6.035142004201521e-13,
+      "jacobi": 3.1290890463199204,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.060000000000000046
+      }
+    },
+    {
+      "index": 60,
+      "period": 2.775749396333843,
+      "closure_error": 9.660659858884424e-13,
+      "jacobi": 3.1273655665877547,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.06100000000000005
+      }
+    },
+    {
+      "index": 61,
+      "period": 2.776706706241237,
+      "closure_error": 1.5255608191641623e-12,
+      "jacobi": 3.125594246110718,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.06200000000000005
+      }
+    },
+    {
+      "index": 62,
+      "period": 2.7776602702351223,
+      "closure_error": 1.3289480193384717e-12,
+      "jacobi": 3.1237730860907984,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.06300000000000004
+      }
+    },
+    {
+      "index": 63,
+      "period": 2.7786071702590767,
+      "closure_error": 8.514202797654802e-13,
+      "jacobi": 3.1218998598670447,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.06400000000000004
+      }
+    },
+    {
+      "index": 64,
+      "period": 2.779544050236604,
+      "closure_error": 2.9780865273831836e-14,
+      "jacobi": 3.119972074833038,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.06500000000000004
+      }
+    },
+    {
+      "index": 65,
+      "period": 2.7795779347764116,
+      "closure_error": 1.0375749738555928e-13,
+      "jacobi": 3.119900799554935,
+      "amplitude_km": 0.0,
+      "amplitudes": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "parameters": {
+        "libration_point": 1,
+        "halo_class": 0,
+        "amplitude_z": 0.06503642039542143
+      }
+    }
+  ],
+  "tags": [
+    "baseline"
+  ],
+  "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
+  "record_id": "baseline-halo-l1",
+  "schema_version": 1,
+  "created_at": "2026-08-23T01:15:08.433954+00:00",
+  "arrays": {
+    "cr3bp/members/0000/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0000/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0001/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0002/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0003/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0004/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0005/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0006/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0007/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0008/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0009/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0010/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0014/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0014/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0015/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0015/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0016/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0016/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0017/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0017/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0018/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0018/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0019/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0019/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0020/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0020/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0021/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0021/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0022/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0022/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0023/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0023/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0024/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0024/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0025/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0025/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0026/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0026/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0027/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0027/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0028/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0028/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0029/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0029/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0030/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0030/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0031/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0031/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0032/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0032/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0033/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0033/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0034/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0034/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0035/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0035/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0036/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0036/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0037/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0037/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0038/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0038/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0039/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0039/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0040/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0040/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0041/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0041/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0042/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0042/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0043/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0043/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0044/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0044/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0045/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0045/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0046/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0046/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0047/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0047/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0048/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0048/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0049/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0049/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0050/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0050/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0051/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0051/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0052/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0052/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0053/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0053/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0054/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0054/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0055/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0055/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0056/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0056/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0057/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0057/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0058/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0058/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0059/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0059/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0060/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0060/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0061/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0061/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0062/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0062/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0063/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0063/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0064/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0064/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0065/states": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0065/times": {
+      "shape": [
+        1
+      ],
+      "dtype": "float64"
+    }
+  }
+}
