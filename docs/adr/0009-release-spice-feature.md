@@ -60,6 +60,21 @@ cspice-sys 用 cc 从源码编译 CSPICE，不依赖预编译库：
 2. 仓库根加 NOTICE 文件，注明 CSPICE 归属 NASA/JPL NAIF；sdist 一并打包。
 3. 安装文档补充说明：wheel 自带 Rust 快速路径；源码构建也默认带 spice（Cargo default feature，见 ADR 0002 2026-08 修订）。
 
+## 修订（2026-08，构建机制变更）
+
+上文构建可靠性、平台矩阵两节及结果第 1 条描述的 downloadcspice 机制已废弃：
+
+- cspice-sys 已去除 downloadcspice feature：缺 `CSPICE_DIR` 时构建直接报错，
+  不再从 naif.jpl.nasa.gov 下载源码就地编译。CSPICE 一律经
+  `scripts/download_cspice.py` 取 GitHub `cspice-v1` release 预编译包，
+  由 `CSPICE_DIR` 指向（根 Cargo.toml 与 release.yml 均有注释说明）。
+- aarch64 预编译包由 `cspice-aarch64-build.yml` 在原生 arm64 runner 上从
+  NAIF 源码编译并发布到 `cspice-v1`。
+- spice 已升为默认 feature（`crates/*/Cargo.toml default=["spice"]`，
+  pyproject `[tool.maturin]` 再声明一次），release.yml 的 maturin args
+  无需再显式传 `--features spice`。
+- 许可结论、NOTICE 署名（第 2 条）与 release 启用 spice 的决策不变。
+
 ## 修订（2026-08-12，ADR 0020 决策 4）
 
 release 已带 spice 后，Python 侧对缺失 spice 绑定的 try/except 静默降级机制已删除：

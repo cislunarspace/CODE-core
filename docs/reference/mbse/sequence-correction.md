@@ -7,15 +7,16 @@ title: 修正序列
 ```mermaid
 sequenceDiagram
     participant Client
-    participant DiffCorrection
-    participant Strategy
+    participant DifferentialCorrection
+    participant RustCore
     participant Dynamics
-    Client->>DiffCorrection: correct(initial_state, period)
-    DiffCorrection->>Strategy: get_free_variable_indices()
-    DiffCorrection->>Dynamics: propagate(state, T/2, with_stm=True)
-    Dynamics->>DiffCorrection: states, stm
-    DiffCorrection->>Strategy: compute_error(orbit, dynamics)
-    Strategy->>DiffCorrection: error_vector
-    DiffCorrection->>DiffCorrection: Newton update: dx = -J_inv * error
-    DiffCorrection->>Client: corrected Orbit
+    Client->>DifferentialCorrection: setup_*(...)
+    DifferentialCorrection->>DifferentialCorrection: _apply_config(config): free_variable_indices, constraint_indices
+    Client->>DifferentialCorrection: iterate_correction(initial_guess)
+    DifferentialCorrection->>RustCore: differential_correction_cr3bp_py(state, half_period, ...)
+    Note over RustCore: 残差、STM 雅可比、Newton 修正与收敛判定
+    RustCore->>DifferentialCorrection: solution_state, solution_time, error_history
+    DifferentialCorrection->>Dynamics: propagate(solution_state, (0, period))
+    Dynamics->>DifferentialCorrection: states
+    DifferentialCorrection->>Client: DifferentialCorrectionResult(orbit)
 ```

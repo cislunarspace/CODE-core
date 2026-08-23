@@ -6,12 +6,12 @@ Issue #495 报告的 `0xc0000135` 是 Windows NTSTATUS `STATUS_DLL_NOT_FOUND`。
 
 结合当前仓库的构建配置，本机诊断已确认缺失项是 Python DLL：测试 EXE 的直接导入表包含 `python3.dll`，默认 PATH 找不到它；把当前解释器的 base prefix 加入 PATH 后，同一测试 EXE 与 `cargo test -p e2m2e-integrators --lib -- normal_form nsga2` 均成功运行。Issue 中把 `.venv/Scripts` 加入 `PATH` 不能解决该问题，因为 Python DLL 位于 Python 安装根目录。CSPICE Windows 包中的 `cspice.lib` 是静态库，`CSPICE_DIR` 主要用于编译期链接和 bindgen；不能把 `lib/` 目录当成 DLL 目录来解决启动期加载问题。
 
-修复 `make test-rust` 前已经取得 PE 依赖清单和 loader 行为证据；其他 Windows 环境若再出现 `0xc0000135`，仍应按下面的诊断流程确认实际缺失 DLL。
+上述判断有 PE 依赖清单和 loader 行为证据支撑，`make test-rust` 已按此修复（见方案取舍第 2 条）；其他 Windows 环境若再出现 `0xc0000135`，仍应按下面的诊断流程确认实际缺失 DLL。
 
 ## 已确认事实
 
 - Issue 复现的是 `cargo test -p e2m2e-integrators --lib -- normal_form nsga2`：测试二进制编译成功，启动时报 `0xc0000135`；同环境 `cargo check` 通过。
-- 当前 `Makefile` 的 `test-rust` 直接执行 `cargo test --workspace -- --test-threads=1`，没有 Windows 专用的运行时 DLL 配置。
+- 当前 `Makefile` 的 `test-rust` 在 Windows 上先运行 `scripts/python_dll_dir.py`，从当前 Python 解释器探测 DLL 目录（支持 `PYTHON_DLL_DIR` 显式覆盖）并加入 PATH，再执行 `cargo test --workspace -- --test-threads=1`；其他平台直接执行 cargo test。
 - 当前 CI 的 `ci.yml` 只有 Ubuntu lint/typecheck，没有 Windows Rust 测试 job。
 - `Cargo.toml` 的 PyO3 workspace feature 只有 `abi3-py310`；`extension-module` 仅由 maturin 构建路径显式启用。`cargo test` 不应使用 `extension-module`，而是由 PyO3 配置链接 Python。
 - `cspice-sys` 从 `CSPICE_DIR/lib` 添加 native link search，并链接静态 `cspice` 库。静态库本身不是一个运行时 DLL。
@@ -63,7 +63,7 @@ dumpbin /DIRECTIVES .cspice\mice_windows\lib\cspice.lib | findstr /i "DEFAULTLIB
 
 ### 2. 修复 Makefile 入口
 
-若诊断确认缺失的是 Python DLL，可让 Windows `test-rust` 自动从当前 Python 解释器计算 base prefix，并把该目录加入当前命令的 PATH；同时保留 `PYTHON_DLL_DIR` 作为显式覆盖。不要把 CSPICE 的 `.lib` 目录加入 DLL PATH。该方案直接修复仓库规定的 `make test-rust` 入口，但必须覆盖 Git Bash、PowerShell、多个 Python 安装和路径含空格等情况。
+若诊断确认缺失的是 Python DLL，可让 Windows `test-rust` 自动从当前 Python 解释器计算 base prefix，并把该目录加入当前命令的 PATH；同时保留 `PYTHON_DLL_DIR` 作为显式覆盖。不要把 CSPICE 的 `.lib` 目录加入 DLL PATH。该方案直接修复仓库规定的 `make test-rust` 入口，但必须覆盖 Git Bash、PowerShell、多个 Python 安装和路径含空格等情况。此方案已落地，即当前 `Makefile` 与 `scripts/python_dll_dir.py` 的实现。
 
 ### 3. 增加 Windows CI 测试
 
@@ -88,6 +88,7 @@ dumpbin /DIRECTIVES .cspice\mice_windows\lib\cspice.lib | findstr /i "DEFAULTLIB
 仓库证据：
 
 - `Makefile`：Windows 环境变量与 `test-rust` 目标
+- `scripts/python_dll_dir.py`：Windows 下探测 Python DLL 目录
 - `Cargo.toml`：PyO3 workspace features 与 CSPICE 依赖
 - `crates/e2m2e-integrators/Cargo.toml`：`extension-module` 与 `spice` feature
 - `pyproject.toml`：maturin 专用 features

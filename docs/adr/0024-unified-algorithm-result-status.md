@@ -18,7 +18,7 @@ e2m2e 的算法结果曾以 `success`、`converged`、`correction_success`、`No
 
 `Orbit`、`OrbitFamily`、`TransferArc`、`EphemerisTable` 保持领域数据职责。`Orbit` 删除修正过程字段，保留轨道几何属性 `closure_error`。`safe`、`is_periodic`、`collision_found` 等领域事实布尔值不属于此次迁移，继续保留。
 
-硬失败继续使用领域异常阻断控制流，但异常也携带状态三元组和诊断。软失败返回带状态的结果对象。Facade 响应直接含状态三元组；请求已成功处理但科学任务不可行属于正常响应中的软失败。可选阶段用 `StageRecord` 表达适用性和执行情况，不将“不适用”或“未执行”编码为失败原因。
+硬失败继续使用领域异常阻断控制流，但异常也携带状态三元组和诊断。软失败返回带状态的结果对象。Facade 响应直接含状态三元组；请求已成功处理但科学任务不可行属于正常响应中的软失败。可选阶段用 `StageRecord` 表达适用性和执行情况，不将不适用或未执行编码为失败原因。
 
 移除 `success`、`converged`、`correction_success` 等算法结果布尔接口，不设运行时兼容层。新持久化格式只写状态三元组；旧格式读取失败并提示迁移。
 

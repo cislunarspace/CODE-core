@@ -10,7 +10,7 @@ Slice 12 需要支持 VNB（Velocity-Normal-Binormal）和 LVLH（Local Vertical
 1. `FiniteBurn` 的推力方向在 VNB/LVLH 系中指定；
 2. `ImpulsiveBurn` 的 Δv 在 VNB/LVLH 系中指定后转换到惯性系。
 
-动态坐标轴与静态坐标轴（ICRS、ITRF 等）的根本区别：它们的旋转矩阵不仅依赖历元 `et`，还依赖航天器状态 `state`（位置+速度）。例如 VNB 的 x 轴沿速度方向，z 轴沿角动量方向，y 轴由叉积补全——这些方向随 `state` 实时变化。
+动态坐标轴与静态坐标轴（ICRS、ITRF 等）的根本区别：它们的旋转矩阵不仅依赖历元 `et`，还依赖航天器状态 `state`（位置+速度）。例如 VNB 的 x 轴沿速度方向，z 轴沿角动量方向，y 轴由叉积补全，这些方向都随 `state` 实时变化。
 
 现有 `Axes` 接口只有 `rotation_matrix(et)` 和 `rotation_and_rate(et)`，签名中不含 `state`。需要决定：是改 `Axes` 接口，还是在保持现有签名的前提下另辟蹊径。
 
@@ -27,14 +27,14 @@ Slice 12 需要支持 VNB（Velocity-Normal-Binormal）和 LVLH（Local Vertical
 
 ### 方案 B：保持 `Axes` 签名，新增 `DynamicAxes.update` 方法
 
-不动 `Axes` 接口。新增 `DynamicAxes` 抽象基类，继承 `Axes`，增加 `update(et, state)` 方法。调用方在需要时先 `update` 再取矩阵。
+不动 `Axes` 接口。新增 `DynamicAxes` 抽象基类，继承 `Axes`，增加 `update(t, state)` 方法。调用方在需要时先 `update` 再取矩阵。
 
 ```python
 class DynamicAxes(Axes):
     """状态依赖的动态坐标轴。"""
 
     @abc.abstractmethod
-    def update(self, et: float, state: npt.NDArray[np.floating]) -> None:
+    def update(self, t: float, state: npt.NDArray[np.floating]) -> None:
         """用当前状态更新内部方向缓存。"""
         raise NotImplementedError
 
@@ -52,24 +52,29 @@ VNB、LVLH 作为 `DynamicAxes` 子类实现。静态坐标轴不受影响。
 
 1. **`Axes` 接口不变。** 静态坐标轴（ICRS、ITRF、IAU2000Eq 等）完全不受影响。`CoordinateSystem.transform_state` 等调用方无需改动。
 
-2. **新增 `DynamicAxes` 抽象基类。** 继承 `Axes`，增加 `update(et, state)` 抽象方法。子类在 `update` 中根据状态计算方向向量并缓存，`rotation_matrix` 返回缓存值。`rotation_and_rate` 同理。
+2. **新增 `DynamicAxes` 抽象基类。** 继承 `Axes`，增加 `update(t, state)` 抽象方法。子类在 `update` 中根据状态计算方向向量并缓存，`rotation_matrix` 返回缓存值。`rotation_and_rate` 同理。
 
 3. **状态注入点放在 `ForceModel.propagate` 和 `System.update_coordinate_systems`。**
    - `ForceModel.propagate` 在每一步积分前，若检测到 `DynamicAxes`，调用 `axes.update(t, y)` 更新方向。
    - `System.update_coordinate_systems` 作为系统级统一入口：在传播开始前、或在任何需要动态坐标轴的运算前，由系统负责把当前状态注入到所有已注册的动态坐标轴中。
    选择系统级入口而非力模型级入口，是因为动态坐标轴可能被多个力模型共享（如 VNB 同时用于阻力和推力方向），在系统层面统一更新避免重复计算和状态不一致。
 
-4. **VNB 轴向定义与 GMAT 对齐。**
+4. **VNB 轴向定义（修订，2026-08-23）。**
    - x 轴（Velocity）：沿速度方向 `v / |v|`。
-   - z 轴（Normal）：沿轨道角动量方向 `h = r × v`，`h / |h|`。
-   - y 轴（Binormal）：`z × x`，保证右手系。
-   这与 GMAT 的 `VNB` 定义一致（GMAT 源码 `CoordinateSystem.cpp` 中 `ComputeVelocityNormalBinormal`）。
+   - y 轴（Normal）：沿轨道角动量方向 `h = r × v`，`h / |h|`。
+   - z 轴（Binormal）：`x × y`，保证右手系。
+   原文把 Normal 写在 z 轴、Binormal 写作 `z × x`，与实现和测试不符，
+   此处按 `standard_dynamic_axes.py` 的 `VNBAxes` 勘正。不同文献对
+   VNB 的 y/z 命名有分歧，e2m2e 以本条定义为准。
 
-5. **LVLH 轴向定义与 GMAT 对齐。**
-   - z 轴（Radial/Local Vertical）：沿位置反方向 `-r / |r|`（从航天器指向地心）。
-   - y 轴（Cross-track）：沿负角动量方向 `-h / |h|`。
-   - x 轴（In-track/Local Horizontal）：`y × z`，保证右手系。
-   这与 GMAT 的 `LVLH` 定义一致（GMAT 源码 `CoordinateSystem.cpp` 中 `ComputeLocalVerticalLocalHorizontal`）。注意：不同文献对 LVLH 的 x/y 命名有分歧，e2m2e 采用 GMAT 约定。
+5. **LVLH 轴向定义（修订，2026-08-23）。**
+   - x 轴（Radial）：沿位置方向 `r / |r|`（径向向外）。
+   - z 轴（Cross-track）：沿轨道角动量方向 `h / |h|`。
+   - y 轴（In-track/Local Horizontal）：`z × x`，保证右手系。
+   原文写的是 z 轴指向地心（`-r`）、y 轴沿负角动量的另一套约定，
+   与实现和测试不符，此处按 `LVLHAxes` 勘正。LVLH 的轴向约定在
+   文献中不统一（有的 z 轴取 `-r` 指向地心），e2m2e 以本条定义
+   为准，即径向向外、沿迹、轨道面法向的 RSW 口径。
 
 6. **`ObjectReferencedAxes` 推迟实现。** `ObjectReferencedAxes`（以某天体为原点的相对坐标轴，如"以月球为中心的 VNB"）需要天体状态查询，依赖 `System` 的星历接口。当前 Slice 12 只支持以航天器自身状态为基准的 VNB/LVLH；`ObjectReferencedAxes` 留待后续 Slice 处理，届时需要扩展 `DynamicAxes.update` 签名以接受天体状态。
 
@@ -84,10 +89,10 @@ VNB、LVLH 作为 `DynamicAxes` 子类实现。静态坐标轴不受影响。
    - 若两个力模型对状态的解释不同（如一个用原始状态、一个用中间插值状态），方向不一致。
    在 `System.update_coordinate_systems` 或 `ForceModel.propagate` 的统一位置更新，保证同一步所有力模型看到同一方向。
 
-4. **为什么与 GMAT 对齐而非另起定义。** VNB/LVLH 的轴向定义在文献中并不统一（有些把 LVLH 的 z 轴定义为 `+r`，有些定义为 `-r`）。选择 GMAT 约定是因为：
-   - e2m2e 的力模型和坐标系设计以 GMAT 为兼容目标（ADR 0003）；
-   - 用户若从 GMAT 迁移任务，轴向定义一致可降低认知负担；
-   - 测试验证时可直接对比 GMAT 输出。
+4. **为什么固定书面定义而非沿用文献歧义。** VNB/LVLH 的轴向定义在文献中并不统一（有些把 LVLH 的 z 轴定义为 `+r`，有些定义为 `-r`）。决策 4、5 把定义写死在 ADR 里，是因为：
+   - 轴向定义不一致会直接改变机动的物理含义，必须有一处书面基准；
+   - 测试以决策 4、5 的定义为断言依据，实现、测试、文档三者锁死；
+   - 用户从其他软件迁移任务时，对照本条即可确认约定，无需猜。
 
 5. **为什么推迟 `ObjectReferencedAxes`。** 它涉及两个额外复杂度：
    - 需要查询天体在历元 `et` 的状态（`System.get_body_state`），引入星历依赖；
@@ -98,22 +103,21 @@ VNB、LVLH 作为 `DynamicAxes` 子类实现。静态坐标轴不受影响。
 
 ### 新增
 
-- `e2m2e/core/dynamic_axes.py`：`DynamicAxes` 抽象基类。
-- `e2m2e/core/vnb_axes.py`：`VNBAxes` 实现。
-- `e2m2e/core/lvlh_axes.py`：`LVLHAxes` 实现。
-- `tests/algorithm/coordinate/test_dynamic_axes.py`：VNB/LVLH 方向正确性测试（与 GMAT 对比）。
+- `e2m2e/algorithm/coordinate/dynamic_axes.py`：`DynamicAxes` 抽象基类。
+- `e2m2e/algorithm/coordinate/standard_dynamic_axes.py`：`VNBAxes` 与 `LVLHAxes` 实现。
+- `tests/algorithm/coordinate/test_dynamic_axes.py`：VNB/LVLH 方向正确性测试（按决策 4、5 的定义断言轴向）。
 
 ### 变更
 
-- `ForceModel.propagate`：在积分步循环中加入 `DynamicAxes.update` 调用（若 `system.coordinate_system.axes` 是 `DynamicAxes` 实例）。
-- `System` 基类：新增 `update_coordinate_systems(et, state)` 默认空实现；`EphemerisSystem` 覆盖以支持动态坐标轴更新。
+- `ForceModel.propagate`：传播改走 Rust 编译路径后，Python 侧不逐步回调 `DynamicAxes.update`；动态坐标轴的状态注入由系统层入口承担。
+- `EphemerisSystem`：新增 `update_coordinate_systems(t, state)`，当 `coordinate_system.axes` 为 `DynamicAxes` 实例时调用其 `update`。`System` 基类未定义该方法。
 
 ### 不变
 
 - `Axes` 接口签名（`rotation_matrix(et)`、`rotation_and_rate(et)`）。
 - 所有静态坐标轴实现（ICRS、ITRF、IAU2000Eq、GMATITRF）。
 - `CoordinateSystem.transform_state` / `transform_vector` 签名与行为。
-- `FiniteBurn` 和 `ImpulsiveBurn` 的现有行为（VNB/LVLH 支持通过新增 `direction_kind` 字段扩展，不破坏现有 API）。
+- `FiniteBurn` 和 `ImpulsiveBurn` 的现有行为（`FiniteBurn` 的 VNB/LVLH 支持通过新增 `direction_frame` 字段扩展，不破坏现有 API）。
 
 ### 后续工作
 

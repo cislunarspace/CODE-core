@@ -6,12 +6,12 @@
 
 ## 背景
 
-e2m2e 现有对外形态是散装 API（用户拼 `CR3BP_System → Dynamics → DifferentialCorrection`），无统一入口、无 MCP、无 CLI。README 愿景要求"大模型可以像调用 Lambert、C-W 工具一样调用地月轨道算法"。接口层（api/）是这一愿景的兑现点。
+e2m2e 现有对外形态是散装 API（用户拼 `CR3BP_System → Dynamics → DifferentialCorrection`），无统一入口、无 MCP、无 CLI。README 愿景要求大模型可以像调用 Lambert、C-W 工具一样调用地月轨道算法。接口层（api/）是这一愿景的兑现点。
 
 ## 决策
 
-1. **Facade 是唯一入口**，方法对应"任务级能力"（粗粒度）。算法层保留细粒度 API（专家用）。两层粒度。
-2. **纯派生 + 元数据标记**：MCP 工具 = Facade 方法全集；Facade 方法带 `mcp_exposed: bool` 元数据（一档二档 True、三档/辅助 False）。注册逻辑统一扫 Facade 方法，清单单一来源。一档也会增加。
+1. **Facade 是唯一入口**，方法对应任务级能力（粗粒度）。算法层保留细粒度 API（专家用）。两层粒度。
+2. **纯派生 + 元数据标记**：MCP 工具 = Facade 方法全集；Facade 方法带 `mcp_exposed: bool` 元数据（一档二档 True、三档/辅助 False）。注册逻辑统一扫 Facade 方法，清单单一来源。
 3. **Pydantic 模型全部手写**：输入/输出/错误模型精雕参数单位、默认值、取值域。只在 api/ 边界，不进算法层。
 4. **Facade 返回专属 Pydantic 模型**；MCP 传输层包统一信封（{status, data, error, meta}）。错误在 api/ 翻译：异常 → 结构化错误码（OrbitError 含 code/message/details）。
 5. **CLI 子命令 = Facade 方法**（mcp_exposed=True 的），参数从同一份 Pydantic 模型生成。CLI 与 MCP 完全对称。
@@ -21,7 +21,7 @@ e2m2e 现有对外形态是散装 API（用户拼 `CR3BP_System → Dynamics →
 
 ### MCP 工具清单
 
-- 一档任务级（稳定骨架，会增）：orbit_design / orbit_control / transfer_design / orbit_propagation / spacetime_transform。
+- 一档任务级（稳定骨架，会增）：design_orbit / control_orbit / transfer_design / orbit_propagation / spacetime_transform。
 - 二档子任务级（会增）：orbit_family_generation / orbit_stability / transfer_search / low_thrust_design / manifold_analysis / low_energy_transfer / relative_motion。
 - 三档辅助（不注册）：porkchop / normal_form / safety / visualize / 格式读写。
 

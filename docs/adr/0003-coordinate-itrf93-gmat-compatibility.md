@@ -6,7 +6,7 @@
 
 ## 背景
 
-Issue #62 引入 GMAT 风格的坐标系，由独立的坐标轴与原点组合而成。原始请求把一个简化的 IAU 2006 实现与 SPICE 在极紧容差下的验证混在一起。这对地固系而言不是一个稳定的契约：一个简化的原生模型既无法在 `1e-12` 量级上独立匹配 SPICE 高精度地球定向，同时又省略 EOP 数据。
+Issue #62 引入 GMAT 风格的坐标系，由独立的坐标轴与原点组合而成。原始请求把一个简化的 IAU 2006 实现与 SPICE 在极紧容差下的验证混在一起。这对地固系而言不是一个稳定的契约：一个简化的原生模型既无法在 `1e-12` 量级上独立匹配 SPICE 高精度地球定向，又省略了 EOP 数据。
 
 GMAT R2026a 用 `ITRF93` 作为高精度地球 SPICE 帧，把 `IAU_EARTH` 当作低精度。GMAT 的原生 ITRF 路径还有若干兼容性特有的行为：A1MJD 输入、C04 EOP 解析、`UT1-UTC` 与极移的线性插值、不插值的 `LOD`，以及在 EOP 覆盖范围之外可选的钳位（clamping）。
 
@@ -19,7 +19,7 @@ GMAT R2026a 用 `ITRF93` 作为高精度地球 SPICE 帧，把 `IAU_EARTH` 当�
 
 2. **GMAT 兼容的原生 ITRF 需显式选择。**
    - `GMATITRFAxes` 是一个独立的坐标轴实现。
-   - 第一阶段的原生归约使用基于 pyerfa/SOFA 的 `XysProvider` 提供 IAU 的 `X, Y, s`。
+   - 第一阶段的原生归约使用基于 pyerfa/SOFA 的 `ErfaXysProvider`（`XysProvider` 的实现）提供 IAU 的 `X, Y, s`。
    - 若日后要求与 GMAT 表格精确一致，可用一个 `GMATXysProvider` 替换该来源。
 
 3. **状态变换基于旋转率。**
@@ -49,11 +49,11 @@ GMAT R2026a 用 `ITRF93` 作为高精度地球 SPICE 帧，把 `IAU_EARTH` 当�
    - GMAT 风格的钳位只在显式兼容选项下可用。
 
 8. **系统集成不提供坐标转换快捷方式。**
-   - `System.coordinate_system` 存放一个可选的坐标系，供力模型查询"输入状态在哪个坐标系下"。
+   - `System.coordinate_system` 存放一个可选的坐标系，供力模型查询输入状态位于哪个坐标系。
    - 坐标转换入口在 `CoordinateSystem` 层：调用方直接用 `system.coordinate_system.transform_state()` / `transform_vector()`，或自行构造 `CoordinateSystem` 实例调用。
    - `System` **不**提供 `transform()` 快捷方式。
 
-   > **修订记录（2026-06-15，issue #79）**：原决策第 8 条写"`System.transform()` 薄委托给 `CoordinateSystem.transform_state()`"。落地后实际生产代码（阻力、重力、推力、光压模型）全部绕过 `System.transform()`，直接用 `system.coordinate_system.transform_*`。经重新讨论判定：薄委托层只是多余间接，快捷方式不必要。#79 移除 `System.transform()` 方法，本条同步修订。原 `System.transform()` 落地于 #90，未经深思熟虑的设计判断现已反转。
+   > **修订记录（2026-06-15，issue #79）**：原决策第 8 条写 `System.transform()` 薄委托给 `CoordinateSystem.transform_state()`。落地后实际生产代码（阻力、重力、推力、光压模型）全部绕过 `System.transform()`，直接用 `system.coordinate_system.transform_*`。经重新讨论判定：薄委托层只是多余间接，快捷方式不必要。#79 移除 `System.transform()` 方法，本条同步修订。原 `System.transform()` 落地于 #90，未经深思熟虑的设计判断现已反转。
 
 ## 结果
 

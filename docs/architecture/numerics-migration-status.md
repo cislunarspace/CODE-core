@@ -10,9 +10,9 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 
 状态词是固定的三个，全文可 grep：
 
-- `已下沉` — 数值内核在 Rust，Python 侧是薄封装或编排
-- `迁移中` — 有明确的下沉工作项，见对应 issue
-- `有意留 Python` — 有决策依据地保留在 Python
+- `已下沉`：数值内核在 Rust，Python 侧是薄封装或编排
+- `迁移中`：有明确的下沉工作项，见对应 issue
+- `有意留 Python`：有决策依据地保留在 Python
 
 ## 速查表
 
@@ -20,27 +20,27 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
-| `algorithm/dynamics`（传播） | Rust（`e2m2e-integrators`） | — |
-| `algorithm/forces`（数值） | Rust（`e2m2e-forces`） | — |
-| `algorithm/transfer/lambert.py` | Rust（`e2m2e-propagation`） | — |
-| `algorithm/transfer/search_parallel.py`（网格搜索） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/dynamics`（传播） | Rust（`e2m2e-integrators`） | 无 |
+| `algorithm/forces`（数值） | Rust（`e2m2e-forces`） | 无 |
+| `algorithm/transfer/lambert.py` | Rust（`e2m2e-propagation`） | 无 |
+| `algorithm/transfer/search_parallel.py`（网格搜索） | Rust（`e2m2e-integrators`） | 无 |
 | `algorithm/transfer/wsb.py`（WSB 网格候选评估） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #447 |
 | `algorithm/transfer/low_energy.py`（流形截面态配对） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #447 |
 | `algorithm/solver/differential_correction.py`（CR3BP 数值内核） | Rust（`e2m2e-integrators`） | #441 |
-| `algorithm/solver`（星历修正路径） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/solver`（星历修正路径） | Rust（`e2m2e-integrators`） | 无 |
 | `algorithm/solver/continuation.py`（PAL 数值内核） | Rust（`e2m2e-forces`） | #443 |
 | `algorithm/family`（#428 轨道族数值内核） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #428 |
 | `algorithm/transfer/qlaw.py`（反馈积分与 Q 函数；Python 仅组装初猜） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #442 |
 | `algorithm/transfer/nsga2.py`（演化算子；Python 保留评估与编排） | Rust（`e2m2e-integrators`） | #444 |
 | `algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py`（直接法数值评估） | Rust（`e2m2e-integrators`；SLSQP 编排留 Python） | #445 |
 | `algorithm/transfer/porkchop.py`（网格评估：终端传播 + Lambert + ΔV） | Rust（`e2m2e-forces` + `e2m2e-integrators`；Python 仅问题构造与存档/查询） | #446 |
-| `algorithm/design`（打靶/传播路径） | Rust（`e2m2e-integrators`） | — |
-| `algorithm/coordinate/synodic_j2000.py`（批量转换） | Rust（`e2m2e-integrators`） | — |
-| `algorithm/proximity/relative_dynamics.py`（传播） | Rust（`e2m2e-integrators`） | — |
-| `algorithm/station_keeping/monte_carlo.py`（传播） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/design`（打靶/传播路径） | Rust（`e2m2e-integrators`） | 无 |
+| `algorithm/coordinate/synodic_j2000.py`（批量转换） | Rust（`e2m2e-integrators`） | 无 |
+| `algorithm/proximity/relative_dynamics.py`（传播） | Rust（`e2m2e-integrators`） | 无 |
+| `algorithm/station_keeping/monte_carlo.py`（传播） | Rust（`e2m2e-integrators`） | 无 |
 | `algorithm/normal_form`（积分路径） | Rust（`e2m2e-integrators`） | #336/#340 |
-| `algorithm/normal_form`（CR3BP Hamiltonian 数值构造） | Rust（`e2m2e-integrators`） | — |
-| `algorithm/normal_form`（H→QF 标量多项式投影） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/normal_form`（CR3BP Hamiltonian 数值构造） | Rust（`e2m2e-integrators`） | 无 |
+| `algorithm/normal_form`（H→QF 标量多项式投影） | Rust（`e2m2e-integrators`） | 无 |
 | `algorithm/normal_form`（数值多项式核） | Rust（`e2m2e-integrators`） | #464 |
 | `algorithm/normal_form`（复值积分 + QF↔CM Lie 流） | Rust（`e2m2e-integrators`，12 实维分裂） | #465 |
 | `algorithm/normal_form`（中心流形化简） | Rust（`e2m2e-integrators`） | #466 |
@@ -56,22 +56,22 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
-| `algorithm/transfer/nlp_*`、`transfer_optimization.py`（NLP 优化与编排） | Python | — |
-| `algorithm/family/*_initial_guess.py`、`strategies/`、`cr3bp_orbits.py`（问题构造与族编排） | Python（数值已 Rust） | — |
-| `algorithm/family/halo_family.py`（族延拓编排） | Python（数值已 Rust） | — |
-| `algorithm/transfer` 二体/解析与编排模块 | Python（Lambert 已 Rust） | — |
-| `algorithm/transfer/search_geometry.py`、`search_progress.py`、`solution_database.py`（搜索辅助） | Python | — |
-| `algorithm/manifold/sections.py`（截面事件函数） | Python | — |
+| `algorithm/transfer/nlp_*`、`transfer_optimization.py`（NLP 优化与编排） | Python | 无 |
+| `algorithm/family/*_initial_guess.py`、`strategies/`、`cr3bp_orbits.py`（问题构造与族编排） | Python（数值已 Rust） | 无 |
+| `algorithm/family/halo_family.py`（族延拓编排） | Python（数值已 Rust） | 无 |
+| `algorithm/transfer` 二体/解析与编排模块 | Python（Lambert 已 Rust） | 无 |
+| `algorithm/transfer/search_geometry.py`、`search_progress.py`、`solution_database.py`（搜索辅助） | Python | 无 |
+| `algorithm/manifold/sections.py`（截面事件函数） | Python | 无 |
 | `algorithm/normal_form`（符号 Legendre/星历 H、NAFF、pipeline 编排） | Python | #449 |
-| `algorithm/stability.py` | Python | — |
-| `algorithm/station_keeping`（控制律） | Python（传播已 Rust） | — |
-| `algorithm/coordinate`（单次转换） | Python | — |
-| `algorithm/design`（编排） | Python（数值已 Rust） | — |
-| `algorithm/design/frozen_orbit.py`（ELFO 辅助） | Python | — |
-| `algorithm/dynamics/potential.py`（伪势能 Hessian） | Python | — |
-| `algorithm/propagation.py` | Python（传播已 Rust） | — |
-| `algorithm/proximity`（编排） | Python（传播已 Rust） | — |
-| `algorithm/nominal_orbit/` | Python（占位） | — |
+| `algorithm/stability.py` | Python | 无 |
+| `algorithm/station_keeping`（控制律） | Python（传播已 Rust） | 无 |
+| `algorithm/coordinate`（单次转换） | Python | 无 |
+| `algorithm/design`（编排） | Python（数值已 Rust） | 无 |
+| `algorithm/design/frozen_orbit.py`（ELFO 辅助） | Python | 无 |
+| `algorithm/dynamics/potential.py`（伪势能 Hessian） | Python | 无 |
+| `algorithm/propagation.py` | Python（传播已 Rust） | 无 |
+| `algorithm/proximity`（编排） | Python（传播已 Rust） | 无 |
+| `algorithm/nominal_orbit/` | Python（占位） | 无 |
 
 ## 已下沉
 
@@ -80,7 +80,7 @@ Python 文件里有数值循环，先查它是否只是薄封装。
 
 **`algorithm/dynamics`（传播）。** CR3BP/BCR4BP/星历路径的传播数值在
 `e2m2e-integrators` crate（`propagate_cr3bp_py`、`propagate_bcr4bp_py`、
-`propagate_compiled_py` 等）。无事件时 CR3BP 直接走 Rust 快速路径，
+`propagate_with_state_py` 等）。无事件时 CR3BP 直接走 Rust 快速路径，
 `dynamics.py` 只做问题构造与结果解释。同包 `potential.py` 的伪势能
 Hessian 是 numpy 实现（供非传播路径共用），见有意留 Python 节。
 依据 ADR 0002。
@@ -237,7 +237,7 @@ ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShoot
 打靶类仍是泛型 Python 实现，后续需单独评估和迁移。
 
 后置未派发（#449 评估）：quasi-Floquet 全矩阵法（P5）、多重打靶 Newton
-壳（P6）；独立 FFT 产品化（P2）——#466 已内嵌特解所需 FFT，可不单开。
+壳（P6）；独立 FFT 产品化（P2）：#466 已内嵌特解所需 FFT，可不单开。
 
 ## 有意留 Python
 
@@ -284,7 +284,7 @@ numpy 纯函数实现，ADR 0017 边界固化的 thin-wrapper / numpy 对照基�
 理由（#449 评估）：
 
 - **符号构造不是数值热路径。** sympy Legendre / 星历 `build_hamiltonian`
-  属 CAS；共线点 CR3BP 数值构造已 Rust。无对等「下沉收益」。
+  属 CAS；共线点 CR3BP 数值构造已 Rust。无对等下沉收益。
 - **NAFF** 是外部可执行文件封装，不进 Rust crate。
 - **pipeline / catalog 编排** 是串联与结果组装；多项式核、QF↔CM 与
   中心流形化简已下沉（#464/#465/#466），不单独迁编排层。

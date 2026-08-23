@@ -16,17 +16,18 @@ Python 侧把每个 force 序列化成元组（`to_rust_spec`），Rust 侧
 
 - 接口是逐点的 `acceleration(et, state6, observer)`
   （compiled.rs:195）与求和的 `compute_total_acceleration`
-  （compiled.rs:364）。批量不需要新接口——星历量只依赖 t 不依赖
+  （compiled.rs:364）。批量不需要新接口：星历量只依赖 t 不依赖
   节点，每个 RK 子步按 t 查一次缓存、全网格节点复用，即为
-  #498 要的"批量"语义。
+  #498 要的批量语义。
 - #498 的平面全星历口径只用到 `PointMass` 与 `ThirdBody` 两个
   variant。`ThirdBody` 的太阳位置经 spk_accel 查星历，缓存在内层
   生效（见下节）。
-- **变质量契约（未提交）**：`SRPVariableMass { area, cr,
+- **变质量契约**：`SRPVariableMass { area, cr,
   shadow_bodies }` 不存质量，配 `acceleration_with_mass(et, state,
   mass, observer)` 从增广状态取当前质量。ADR 0034 决策 2 之下它
-  不在 #498 范围，但 geo-nrho 的 `lowthrust_rs` 已调用该 variant，
-  须独立提交（ADR 0034 决策 5）。
+  不在 #498 范围；成文时仅存于未提交工作区，此后已按决策 5 独立
+  入库（#507，Python 侧对应 `VariableMassSolarRadiationPressure`），
+  geo-nrho 的 `lowthrust_rs` 调用该 variant。
 
 ## 星历侧：EphemCache 的现状事实
 
@@ -39,7 +40,7 @@ Python 侧把每个 force 序列化成元组（`to_rust_spec`），Rust 侧
 - **进程级单例**：`static CACHE: RwLock<Option<EphemCache>>`，
   `enable(cache)` 安装。选 `RwLock` 是明示意图：并行段多线程
   并发读纯数值样条，读锁互不阻塞（ephem_cache.rs:468 附近）。
-  ADR 0034 决策 4 沿用此单例，"构造时注入"（ADR 0033）落在配置
+  ADR 0034 决策 4 沿用此单例，构造时注入（ADR 0033）落在配置
   层面：力模型列表、时间范围、历元映射是 Hamiltonian 的构造参数。
 - **miss 语义分两档**（ADR 0020 决策 4）：未 enable 时查询返回
   `Ok(None)` 回退 cspice；enable 后 miss（区间外/缺目标）一律
@@ -83,7 +84,7 @@ Hamiltonian 实现。终端代价 ψ 经 shape 模块铺在网格上。
 
 **求解段（Rust 热循环，零 cspice）。** 积分器每个 TVD-RK 子步：
 先按历元映射把 t 换成 et，查一次缓存得月球位置/速度，导出
-ω(t)、ω̇(t)、脉动率——**每个 t 只查一次，全网格复用**；然后全
+ω(t)、ω̇(t)、脉动率，**每个 t 只查一次，全网格复用**；然后全
 网格逐节点：会合系坐标算两主星点质量引力与太阳第三体引力（面内
 分量），叠加系变换诱导的科氏、离心、ω̇ 与脉动修正项，按上面的
 开关函数对控制取 min 得 H*；`partial_bound` 给耗散包络，LF 项
@@ -100,8 +101,8 @@ Hamiltonian 实现。终端代价 ψ 经 shape 模块铺在网格上。
 ADR 0034 决策 6 的三级验收对应三处现成锚点：
 
 - **(a) 退化对拍**：把缓存替换为圆化定常合成星历（月距、ω 恒
-  定），星历版动力学必须逐项退化为 `Cr3bpSynodic`——锚在 #497
-  已与 `cr3bp_eom` 对拍过的实现上；
+  定），星历版动力学必须逐项退化为 `Cr3bpSynodic`。锚在 #497
+  已与 `cr3bp_eom` 对拍过的实现上。
 - **(b) 力一致性**：同一 (t, state) 下，Hamiltonian 内部经系变换
   后的合力与 `compute_total_acceleration` 直接调用的结果逐点
   一致；
@@ -118,11 +119,16 @@ z=0 截面取值、丢弃面内以外分量，不改接缝、不改网格。实�
 
 ## 现状缺口清单
 
-1. **星历版 Hamiltonian 未实现**——即 #498 本体。
-2. **变质量 SRP 契约未提交**（未提交本地工作区，全 git 历史
-   不存在）：`SRPVariableMass` + `acceleration_with_mass` +
-   Python 类。不在 #498 关键路径，但 `lowthrust_rs` 依赖它，
-   独立 PR 落地（ADR 0034 决策 5）。同工作区无关的
-   `lowthrust_collocation.py` 改动提交时需剥离。
-3. **验证阶梯第 3、4 级未建立**：粗细模型回归与闭环回放（后者
-   在 geo-nrho 侧手动）。
+本节为成文时（`c3af80f`）的缺口快照，三项此后均有进展，逐条标注。
+
+1. **星历版 Hamiltonian**：成文时未实现（#498 本体），已随 #515
+   落地：`e2m2e-hjb-dynamics` 的 `EphemerisPlanar`，`solve_hjb_py`
+   注册 `ephemeris_planar` 动力学。
+2. **变质量 SRP 契约**：成文时只在未提交本地工作区，已按
+   ADR 0034 决策 5 独立提交（#507）：`SRPVariableMass` +
+   `acceleration_with_mass` + Python 类
+   `VariableMassSolarRadiationPressure`。不在 #498 关键路径，但
+   `lowthrust_rs` 依赖它。
+3. **验证阶梯第 3、4 级**：第 3 级粗细模型回归已随 #498 验收
+   建立（`tests/numerical/integrators/bindings/test_hjb_solve.py`）；
+   第 4 级闭环回放仍在 geo-nrho 侧手动执行。

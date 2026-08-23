@@ -12,4 +12,4 @@ e2m2e 的 normal-form 主链服务于 CR3BP 平动点附近的有界 Lissajous �
 
 ## 过往请求
 
-- [#426](https://github.com/cislunarspace/e2m2e/issues/426) — normal_form 与 qiao 参考数据的数值回归
+- [#426](https://github.com/cislunarspace/e2m2e/issues/426)：normal_form 与 qiao 参考数据的数值回归

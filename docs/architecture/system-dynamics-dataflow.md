@@ -22,18 +22,18 @@ result = dynamics.propagate(state0, (0.0, 6.3))
 
 **第一段，构造 System。** `CR3BP_System.__init__` 只收质量参数 μ、两个天体名和
 可选的天体半径，特征长度、特征时间、五个平动点全部置为 None
-（e2m2e/algorithm/dynamics/cr3bp_system.py:82-139）。此时的系统还不能参与计算：
+（e2m2e/algorithm/dynamics/cr3bp_system.py:71-128）。此时的系统还不能参与计算：
 `DU`/`TU`/`VU` 属性在尺度未设时抛"系统未初始化"
-（cr3bp_system.py:205-223）。`_with_default_scales()` 按天体对补上特征尺度
-（cr3bp_system.py:141-166），平动点则推迟到首次需要时才解算——
+（cr3bp_system.py:194-212）。`_with_default_scales()` 按天体对补上特征尺度
+（cr3bp_system.py:130-160），平动点则推迟到首次需要时才解算：
 `get_libration_point` 发现没算过就先调 `compute_libration_points`
-（cr3bp_system.py:304-324）。System 的构造因而是两段式的：先定"哪个系统"，
+（cr3bp_system.py:293-317）。System 的构造因而是两段式的：先定"哪个系统"，
 再定"用什么尺度量化它"。
 
 **第二段，构造 Dynamics。** `CR3BP_Dynamics(system)` 做的事很轻：存下 system
 引用，填一套默认积分器配置（RK45、rtol/atol 1e-12、max_step 0.01），把结果缓存
 置空（e2m2e/algorithm/dynamics/dynamics.py:78-97、544-553）。它不复制系统的任何
-参数——μ 在每次算加速度时经 `self.system.mu` 现取（dynamics.py:593）。
+参数。μ 在每次算加速度时经 `self.system.mu` 现取（dynamics.py:593）。
 
 **第三段，propagate。** 无事件时 CR3BP 走 Rust 快速路径，Python 侧只把 `mu`、
 时间区间、初值和积分配置这组标量传过 FFI（dynamics.py:851-859）；轨迹在 Rust
@@ -42,9 +42,9 @@ result = dynamics.propagate(state0, (0.0, 6.3))
 
 **第四段，结果进数据容器。** 设计链路把返回字典装进 `Orbit`，并把 system 引用
 一并塞进去：`Orbit(states=result["states"], times=result["time"],
-system=dynamics.system)`（e2m2e/algorithm/design/design_orbit.py:522）。从此这组
+system=dynamics.system)`（e2m2e/algorithm/design/design_orbit.py:550）。从此这组
 浮点数带着自己的单位与坐标系解释者旅行；之后谁想再做计算，可以从
-`orbit.system` 重新长出一个 dynamics——`StabilityAnalysis` 正是这样按需重建的
+`orbit.system` 重新长出一个 dynamics，`StabilityAnalysis` 正是这样按需重建的
 （e2m2e/algorithm/stability.py:95-98）。
 
 四段路合起来就是两个家族的分工：System 是长期持有的模型上下文，Dynamics 是
@@ -59,7 +59,7 @@ system=dynamics.system)`（e2m2e/algorithm/design/design_orbit.py:522）。从�
 （e2m2e/algorithm/dynamics/system.py:15-51）。docstring 点名了什么刻意不进基类：
 `mu`、`body_state(body, t)`、`coordinate_system` 属于特定实现的概念
 （system.py:25-27）。基类另有一个非抽象的 `get_body_position`，默认抛
-NotImplementedError——星历专属能力，放在基类只是给一个明确的报错位置
+NotImplementedError：星历专属能力，放在基类只是给一个明确的报错位置
 （system.py:54-66）。
 
 接口薄是有后果的：想对两种系统多态的代码，只能依赖这三个成员，其余都得用
@@ -68,25 +68,25 @@ NotImplementedError——星历专属能力，放在基类只是给一个明确�
 ### CR3BP_System：无量纲、自治、两段式初始化
 
 构造注入五样东西：`mu`、主/次天体名、可选的主/次天体半径
-（cr3bp_system.py:82-97）。构造时做两道校验——半径若给必须为正
-（cr3bp_system.py:103-110），μ 必须落在 (0, 0.5)（cr3bp_system.py:113-117）。
+（cr3bp_system.py:71-80）。构造时做两道校验：半径若给必须为正
+（cr3bp_system.py:93-98），μ 必须落在 (0, 0.5)（cr3bp_system.py:102-106）。
 构造完成后还有两步初始化可选：`set_characteristic_scales(distance, period)` 由
-距离与周期推出特征长度/时间/速度并置 `is_initialized`（cr3bp_system.py:225-253）；
+距离与周期推出特征长度/时间/速度并置 `is_initialized`（cr3bp_system.py:214-235）；
 `compute_libration_points()` 用 `fsolve` 解三个共线点、解析给出两个三角点
-（cr3bp_system.py:248-302，其中 275-277 数值解、281-285 解析解）。
+（cr3bp_system.py:237-291，其中 264-266 数值解、268-274 解析解）。
 
 对基类三成员，它的回答是：会合（旋转）坐标系、无量纲单位、约定总质量为 1 时
-primary 的 GM 是 `1 - mu`、secondary 的是 `mu`（cr3bp_system.py:173-204）。
+primary 的 GM 是 `1 - mu`、secondary 的是 `mu`（cr3bp_system.py:163-191）。
 
 初始化之后，这个对象向外提供四类数据：
 
 - 特征尺度：`DU`（km）、`TU`（天）、`VU`（m/s）三个属性，外加
-  `characteristic_length/time/velocity` 原始字段（cr3bp_system.py:205-223）。
-- 平动点：`L1`–`L5` 与 `L_points` 字典（cr3bp_system.py:123-128）。
+  `characteristic_length/time/velocity` 原始字段（cr3bp_system.py:108-110、194-212）。
+- 平动点：`L1`–`L5` 与 `L_points` 字典（cr3bp_system.py:112-117）。
 - Jacobi 常数：`get_jacobi_constant(state)`，Parker 约定
-  （cr3bp_system.py:330-365）。
+  （cr3bp_system.py:319-354）。
 - 单位换算与稳定性：`dimensionless_to_physical` / `physical_to_dimensionless`
-  （cr3bp_system.py:367-407）、`compute_stability_index`（cr3bp_system.py:409-454）。
+  （cr3bp_system.py:356-396）、`compute_stability_index`（cr3bp_system.py:398-442）。
 
 半径字段（`primary_radius_km`/`secondary_radius_km`）本身不参与动力学，是碰撞
 检测的数据来源，流向见"事件与碰撞"小节。
@@ -97,7 +97,7 @@ primary 的 GM 是 `1 - mu`、secondary 的是 `mu`（cr3bp_system.py:173-204）
 （默认 "EARTH"）、坐标框架（默认 J2000）、可选的 `CoordinateSystem`
 （e2m2e/algorithm/dynamics/ephemeris_system.py:35-55）。对基类三成员，它的回答
 是：构造时给定的框架、物理单位、GM 直通 `spice.get_gm`
-（ephemeris_system.py:58-103）。
+（ephemeris_system.py:59-103）。
 
 与 CR3BP 的两段式初始化不同，这里的"第二步"是给 `coordinate_system` 赋值，且
 发生在构造之后、经 property setter 完成（ephemeris_system.py:69-75）。编排层
@@ -112,24 +112,24 @@ ForceModel 拒绝（e2m2e/algorithm/forces/force_model.py:57-58）。
 `update_coordinate_systems(t, state)` 用于推进动态坐标系
 （ephemeris_system.py:77-92）；ForceModel 传播下沉 Rust 后，逐步更新由 Rust
 内部完成，e2m2e/ 内已无调用点，仅测试保留
-（tests/numerical/forces/container/test_force_model_dynamic_axes.py:114-118）。
+（tests/numerical/forces/container/test_force_model_dynamic_axes.py:143-186）。
 
 ### BCR4BPSystem：继承 CR3BP_System，叠加太阳
 
 `BCR4BPSystem` 继承 `CR3BP_System`
 （e2m2e/algorithm/dynamics/bcr4bp_system.py:23），构造时多收四个太阳参数：
 `sun_mass`、`sun_distance`、`sun_angular_rate`、`sun_phase0`；前两个缺省时按
-DE440 常量和日地平均距离推导（bcr4bp_system.py:50-106，缺省推导在 88-91）。
+DE440 常量和日地平均距离推导（bcr4bp_system.py:50-106，缺省推导在 89-92）。
 `sun_angular_rate` 特殊：它依赖特征时间，直接构造不给时暂存 None，由
 `set_characteristic_scales` 覆写方法按儒略年公转推导（bcr4bp_system.py:148-161）；
 因此标准入口是类方法 `BCR4BPSystem.earth_moon()`，一步完成构造与尺度设置
 （bcr4bp_system.py:109-132）。
 
-太阳位置不查星历，是时间 t 的解析函数 `sun_position(t)`——会合系里的共面圆周
+太阳位置不查星历，是时间 t 的解析函数 `sun_position(t)`，即会合系里的共面圆周
 （bcr4bp_system.py:163-183）。`gravitational_parameter` 在 "primary"/"secondary"
 之外多接受 "sun"（bcr4bp_system.py:185-193）。注意 docstring 的提醒：BCR4BP 无
 Jacobi 积分，`compute_libration_points` 给出的是对应 CR3BP 的平动点，仅作参考
-位置（bcr4bp_system.py:42-45）。
+位置（bcr4bp_system.py:41-42）。
 
 ## Dynamics：传播编排者
 
@@ -140,10 +140,10 @@ Jacobi 积分，`compute_libration_points` 给出的是对应 CR3BP 的平动点
 
 1. **system 引用**：`self.system`，传播全程只读不写（dynamics.py:84）。
 2. **积分器配置**：`integrator`、`rtol`、`atol`、`max_step`，默认值挂在类常量上
-   （dynamics.py:86-91）。这些是公开字段，调用方构造后直接改——并行搜索按任务
+   （dynamics.py:86-91）。这些是公开字段，调用方构造后直接改：并行搜索按任务
    改容差与步长（e2m2e/algorithm/transfer/search_parallel.py:837-842），多重打靶
    构造后立刻覆写三项（e2m2e/algorithm/solver/multiple_shooting.py:97-101），测试
-   fixture 为提速放宽星历传播的容差（tests/conftest.py:92-96）。
+   fixture 为提速放宽星历传播的容差（tests/conftest.py:92-100）。
 3. **结果缓存**：`last_trajectory`、`last_stm`，每次传播结束时覆写
    （dynamics.py:93-94；写入点见后文）。`CR3BP_Dynamics` 再加
    `jacobi_history`/`jacobi_error` 两个 Jacobi 监测缓存（dynamics.py:552-553）。
@@ -155,7 +155,7 @@ dynamics.py:986-999）。
 ### 模板方法：propagate 是骨架，子类填钩子
 
 `propagate()` 是模板方法：基类定算法骨架（参数规范化 → 校验 → 分发 → 结果
-装配），子类经两组钩子参与——`_get_eom_func(with_stm)` 给出 ODE 右端，
+装配），子类经两组钩子参与：`_get_eom_func(with_stm)` 给出 ODE 右端，
 `_get_max_step(t_span)` 给步长上限（dynamics.py:100-125）。分发只有两支：
 `_propagate_with_stm`（42 维增广状态）与 `_propagate_state_only`（6 维）
 （dynamics.py:223-229）。基类的两支实现都走 scipy `solve_ivp`；三个子类各把
@@ -174,7 +174,7 @@ dynamics.py:986-999）。
 - Jacobi 语义反转：CR3BP_Dynamics 构造即带 Jacobi 监测缓存
   （dynamics.py:552-553），而 BCR4BP 是时间周期系统、无 Jacobi 积分，必须把
   `compute_jacobi_constant` 与 `_handle_jacobi` 都实现为抛 NotImplementedError
-  （bcr4bp_dynamics.py:457-463）——继承来的能力要逐个点掉。
+  （bcr4bp_dynamics.py:457-463），继承来的能力要逐个点掉。
 - STM 入口多一个参数：含时系统的 Φ 依赖起止时刻，
   `compute_state_transition_matrix` 多一个 `t0`（bcr4bp_dynamics.py:438-455）。
 - Rust 入口不同：BCR4BP 的传播函数要多带四个太阳参数
@@ -203,22 +203,22 @@ Dynamics，也明确不继承 Dynamics（force_model.py:30-38）。
 （e2m2e/algorithm/forces/physical_model.py:29-41）。`ConicalShadowModel.
 flux_factor(t, state, system)` 经 `require_inertial_frame` 从 system 取出
 coordinate_system、spice、原点三件事，再查太阳与遮挡体位置算光照份额
-（e2m2e/algorithm/forces/shadow.py:164-195；physical_model.py:69-84）。
+（e2m2e/algorithm/forces/shadow.py:166-197；physical_model.py:69-84）。
 
 ### 转移与求解侧：读 origin 与 gravitational_parameter
 
 低推力三件套都把 system 当参数包用。`qlaw_guess(system, ...)` 只从中解析中心体
 μ：先查力模型里的 PointMassGravity，查不到再
 `system.gravitational_parameter(origin)`，`origin` 本身用 `getattr` 兜底成
-"EARTH"（e2m2e/algorithm/transfer/qlaw.py:289、332、444-461）。
+"EARTH"（e2m2e/algorithm/transfer/qlaw.py:210、265-282）。
 `LowThrustShooting` 与 `LowThrustCollocation` 构造时各做两件事：把力模型
 `to_rust_spec(system)` 预序列化，把 `origin` 存为 observer
 （e2m2e/algorithm/transfer/lowthrust_shooting.py:125-162；
 e2m2e/algorithm/transfer/lowthrust_collocation.py:59-88）。
 
-`NormalFormContext` 从 system 只取 μ，且是 `getattr(system, "mu", None)` 探测
-——CR3BP_System 有就取，没有就回退固化常量
-（e2m2e/algorithm/normal_form/context.py:65、114、195-201）。
+`NormalFormContext` 从 system 只取 μ，且是 `getattr(system, "mu", None)` 探测：
+CR3BP_System 有就取，没有就回退固化常量
+（e2m2e/algorithm/normal_form/context.py:64、114、196-201）。
 
 ### 坐标转换侧：读 mu、特征尺度、spice
 
@@ -227,7 +227,7 @@ e2m2e/algorithm/transfer/lowthrust_collocation.py:59-88）。
 Rust（e2m2e/algorithm/coordinate/synodic_j2000.py:28-41、52、96-97）。
 `rho_bridge` 的一组函数以 `EphemerisSystem` 为参：读 `system.spice` 构造
 SynodicAxes、读 `system.get_body_state("MOON", et)` 取月球状态
-（e2m2e/algorithm/coordinate/rho_bridge.py:48-63、110）。
+（e2m2e/algorithm/coordinate/rho_bridge.py:47-63、110）。
 
 ### 轨道保持与预报：构造并配置 EphemerisSystem
 
@@ -245,24 +245,24 @@ SynodicAxes、读 `system.get_body_state("MOON", et)` 取月球状态
 （e2m2e/algorithm/manifold/sections.py:202-228）。`design_orbit` 里同一个 CR3BP
 system 实例同时喂给四路消费：构造 `CR3BP_Dynamics`、直接调
 `get_jacobi_constant`、读 `characteristic_time` 做时间换算、构造
-`SynodicJ2000System` 做坐标转换（design_orbit.py:927-931、968-972）。
+`SynodicJ2000System` 做坐标转换（design_orbit.py:983-987、1030-1032）。
 
 ### 按 System 抽象签名的多态函数
 
 签名标注 `system: System` 的入口有：`PhysicalModel._resolve_mu` /
-`to_rust_spec`（physical_model.py:29、43）、`ConicalShadowModel.flux_factor`
-（shadow.py:170）、`qlaw_guess` 与 `make_shooter_for_qlaw`（qlaw.py:289、470）、
+`to_rust_spec`（physical_model.py:29、45）、`ConicalShadowModel.flux_factor`
+（shadow.py:170）、`qlaw_guess` 与 `make_shooter_for_qlaw`（qlaw.py:210、290）、
 `LowThrustShooting.__init__` 与 `LowThrustCollocation.__init__`
 （lowthrust_shooting.py:125；lowthrust_collocation.py:59）、
-`NormalFormContext.__init__`（normal_form/context.py:65）。
+`NormalFormContext.__init__`（normal_form/context.py:64）。
 
 把这些入口实际读到的成员摊开看，真正对 CR3BP 与星历两种系统都成立的多态只
-剩基类那一项：`gravitational_parameter`——CR3BP 侧接受 "primary"/"secondary"
+剩基类那一项：`gravitational_parameter`，它在 CR3BP 侧接受 "primary"/"secondary"
 返回无量纲值，星历侧接受 SPICE 天体名返回 km³/s²（system.py:42-51 的 docstring
 把这个双语义写明）。其余入口虽标着 `System`，实际读的都是实现侧成员
 （`origin`、`coordinate_system`、`spice`、`mu`），靠 `getattr`/`hasattr` 兜底。
 契约测试把双系统同一接口这件事固定下来：同一组断言跑在 CR3BP_System 与
-EphemerisSystem 两个实现上（tests/algorithm/dynamics/test_system_contract.py:41-66）。
+EphemerisSystem 两个实现上（tests/algorithm/dynamics/test_system_contract.py:53-64）。
 
 ### 鸭子类型：名义 System，实际结构
 
@@ -270,7 +270,7 @@ EphemerisSystem 两个实现上（tests/algorithm/dynamics/test_system_contract.
 
 - 数据层的 `Orbit`/`OrbitFamily` 把 system 存为 `Any`，docstring 明说"数据层
   不依赖算法层"，只用 `hasattr(system, "get_jacobi_constant")` 判断能力
-  （e2m2e/data/types/orbit.py:8-12、50、412-414）。
+  （e2m2e/data/types/orbit.py:8-12、50、418-429）。
 - 低推力测试直接传 `SimpleNamespace(origin="EARTH")` 当 system 用
   （tests/algorithm/transfer/test_lowthrust_collocation.py:23；
   tests/algorithm/transfer/test_qlaw_failure.py:37）。
@@ -286,15 +286,15 @@ EphemerisSystem 两个实现上（tests/algorithm/dynamics/test_system_contract.
 
 1. `initial_state` 转 ndarray，`max_step` 经钩子取得（dynamics.py:199-200）。
 2. 事件规范化：单个 callable 包成列表；空列表等价于无事件，直接置 None
-   （dynamics.py:202-206）。
+   （dynamics.py:201-205）。
 3. 若开碰撞检测，先把碰撞事件造出来并入事件列表，同时检查初始状态是否已在
-   某天体半径内（dynamics.py:208-210）。
+   某天体半径内（dynamics.py:207-209）。
 4. `backend` 校验：只许 "scipy"/"rust"，有事件时必须显式给，否则报错
-   （dynamics.py:212-215）。
-5. 初始即在半径内的，短路返回单点轨迹加即时碰撞标记——scipy 事件不会对
+   （dynamics.py:211-214）。
+5. 初始即在半径内的，短路返回单点轨迹加即时碰撞标记：scipy 事件不会对
    g<0 的起点触发，必须显式处理（dynamics.py:217-221、474-493）。
 6. 按 `with_stm` 分发到两支（dynamics.py:223-229）。
-7. 若开碰撞检测，从结果的事件段提取碰撞信息（dynamics.py:231-232、495-513）。
+7. 若开碰撞检测，从结果的事件段提取碰撞信息（dynamics.py:231-232、495-510）。
 
 ### scipy 与 Rust 两条后端路径
 
@@ -302,7 +302,7 @@ EphemerisSystem 两个实现上（tests/algorithm/dynamics/test_system_contract.
 的 ODE 右端调 `solve_ivp`，`result.y` 转置成 (n, 6)；失败或空结果抛
 `PropagationFailure`，不允许拿空轨迹伪装成功（dynamics.py:291-325）。
 `_propagate_with_stm` 先把 6×6 单位阵展平拼成 42 维增广状态再积分，回来按
-前 6 维/后 36 维拆开（dynamics.py:248-271）。两条 scipy 路径都在返回前写
+前 6 维/后 36 维拆开（dynamics.py:254-271）。两条 scipy 路径都在返回前写
 `last_trajectory`（含 STM 时连 `last_stm`）（dynamics.py:273-274、327）。
 
 **Rust 路径**（子类覆写）：无事件时三个子类都要求 Rust 扩展可用，缺失即抛错、
@@ -313,7 +313,7 @@ EphemerisSystem 两个实现上（tests/algorithm/dynamics/test_system_contract.
 - BCR4BP：`mu` 加太阳四参数 `mu_sun`/`sun_distance`/`sun_angular_rate`/
   `sun_phase0`（bcr4bp_dynamics.py:360-370；STM 版 293-303）。
 - 星历：`bodies`、`origin`、`gm_values` 三个从 system 现取的序列
-  （ephemeris_dynamics.py:124-126、133-142）。天体位置不经过 Python 对象传递——
+  （ephemeris_dynamics.py:124-126、133-142）。天体位置不经过 Python 对象传递：
   Rust 侧在积分内环直接查进程内 SPICE（先查星历缓存，未命中回退 cspice）
   （crates/e2m2e-spice/src/spk_accel.rs:46-56）。在这条链上，EphemerisSystem
   的角色收敛为一个参数包。
@@ -322,7 +322,7 @@ Rust 路径回来后都做长度防御校验（返回点数不等于请求点数
 `last_trajectory`（dynamics.py:792-804、861-870）。
 
 **事件时的第三支**：有事件且 `backend="rust"` 时，CR3BP/BCR4BP 走通用 Rust
-积分器 `solve_ivp_events`——ODE 右端仍以 Python 回调形式传入，事件函数被
+积分器 `solve_ivp_events`，ODE 右端仍以 Python 回调形式传入，事件函数被
 折算成 `(g, terminal, direction)` 三元组（dynamics.py:700-756、721-723；
 bcr4bp_dynamics.py:225-271）。EphemerisDynamics 不支持事件：events 非 None
 直接 NotImplementedError（ephemeris_dynamics.py:85-113、162-189）。
@@ -332,7 +332,7 @@ bcr4bp_dynamics.py:225-271）。EphemerisDynamics 不支持事件：events 非 N
 `time`/`states` 恒有。其余键的出现条件：
 
 - `stm`：`with_stm=True` 时（dynamics.py:276-280）。
-- `status`/`cause`：只在纯状态路径出现——基类 scipy 版与 CR3BP 的两个 Rust
+- `status`/`cause`：只在纯状态路径出现：基类 scipy 版与 CR3BP 的两个 Rust
   纯状态分支（dynamics.py:329-334、872-877、926-931）。STM 路径、
   EphemerisDynamics 与 BCR4BP_Dynamics 的 Rust 分支都不带这两个键。
 - `jacobi`/`jacobi_error`：`with_jacobi=True` 且为 CR3BP 时。基类
@@ -342,7 +342,7 @@ bcr4bp_dynamics.py:225-271）。EphemerisDynamics 不支持事件：events 非 N
 - `t_events`/`y_events`：传了 events 时，逐事件的触发时刻与状态
   （dynamics.py:282-284、336-338）。
 - `collision`：`collision_detection=True` 时，未碰撞为 None，否则是
-  `{"body", "t", "state"}`（dynamics.py:231-232、507-510）。
+  `{"body", "t", "state"}`（dynamics.py:231-232、507-509）。
 
 ### 事件与碰撞检测
 
@@ -358,7 +358,7 @@ bcr4bp_dynamics.py:225-271）。EphemerisDynamics 不支持事件：events 非 N
 `g = |r - center| - R` 的 terminal 事件并追加到用户事件之后
 （dynamics.py:447-472）。碰撞事件在事件列表末尾这一顺序被
 `_extract_collision` 反向利用：按"列表尾部 n 个"索引回每个天体的触发记录
-（dynamics.py:500-510）。这就是碰撞数据流全程读 system 的三个字段：半径、mu、
+（dynamics.py:501-509）。这就是碰撞数据流全程读 system 的三个字段：半径、mu、
 DU。
 
 ### 三条传播链的差异
@@ -371,7 +371,7 @@ DU。
   偏导（bcr4bp_dynamics.py:123-159）。无 Jacobi 积分。
 - **星历**：物理单位（km、km/s、et 秒）、含时。EOM 对每个天体查 GM、对非原点
   天体查星历位置，原点天体出中心项、其余出第三体摄动加间接项
-  （ephemeris_dynamics.py:234-298、256-271）。`max_step` 默认 60 秒且按传播
+  （ephemeris_dynamics.py:235-293、256-291）。`max_step` 默认 60 秒且按传播
   时长自适应收紧（ephemeris_dynamics.py:65-83）。Python 侧单步算加速度要逐
   天体过 SPICE；Rust 快速路径把这个查询挪进 Rust 内环，Python 只递参数包。
 
@@ -384,9 +384,9 @@ System 实例被共享的实证在测试与生产两侧都有。测试侧，BCR4
 `CR3BP_Dynamics(spice_syn_j2000.cr3bp_system)`
 （tests/algorithm/dynamics/test_bcr4bp_model.py:168）。生产侧，design_orbit 里
 同一个 system 实例同时喂动力学、Jacobi 计算、时间换算、坐标转换四路
-（design_orbit.py:927-972）；`StabilityAnalysis` 与不变流形各自从 orbit 上挂的
+（design_orbit.py:983-1032）；`StabilityAnalysis` 与不变流形各自从 orbit 上挂的
 system 重建自己的 `CR3BP_Dynamics`（stability.py:95-98；
-e2m2e/algorithm/manifold/manifolds.py:110）。反向的共享同样成立：同一
+e2m2e/algorithm/manifold/manifolds.py:114）。反向的共享同样成立：同一
 `earth_moon_system` fixture 上既可以挂 `earth_moon_dynamics`
 （tests/conftest.py:13-25），也可以被任何只要系统参数的测试直接消费。
 
@@ -401,14 +401,14 @@ System 上，共享 system 的消费者之间会互相踩配置；分离让"模�
 （system.py:15-51）。消费面普查显示：真正跨缝多态的调用几乎都收敛到
 `gravitational_parameter` 一项，其余访问都是 getattr/hasattr 探测实现侧成员。
 两个契约测试文件把这个格局固定下来：`test_system_contract.py` 对两个实现跑
-同一组接口断言（tests/algorithm/dynamics/test_system_contract.py:41-66），
+同一组接口断言（tests/algorithm/dynamics/test_system_contract.py:53-64），
 `test_dynamics_contract.py` 对 propagate 的输出形状断言 (n, 6) 与 (n, 6, 6)
-（tests/algorithm/dynamics/test_dynamics_contract.py:27-36）。
+（tests/algorithm/dynamics/test_dynamics_contract.py:28-38）。
 
 ### 生命周期的差异
 
 System 的寿命跟着数据走：`Orbit` 持有 system 引用，序列化再加载后引用还在
-（orbit.py:50、254、276），稳定性分析、流形计算可以随时从它再长出 dynamics。
+（orbit.py:50、253、275），稳定性分析、流形计算可以随时从它再长出 dynamics。
 Dynamics 的寿命跟着任务走：构造、改配置、传播、读缓存，然后被丢弃；
 `_corrected_dro_cached` 与 `dro_corrector` 两个 fixture 各自建独立的
 system+dynamics 对，互不共享（tests/algorithm/conftest.py:62-88）。两类对象的
@@ -419,19 +419,19 @@ system+dynamics 对，互不共享（tests/algorithm/conftest.py:62-88）。两�
 分离并不彻底，有三处已知的重叠，各有来由：
 
 - **Jacobi 常数双入口**。`CR3BP_System.get_jacobi_constant` 是定义所在
-  （cr3bp_system.py:330-365）；`CR3BP_Dynamics.compute_jacobi_constant` 一行委托
+  （cr3bp_system.py:319-354）；`CR3BP_Dynamics.compute_jacobi_constant` 一行委托
   （dynamics.py:1001-1010），供 `_handle_jacobi` 在传播后逐点调用。只想要 Jacobi
-  值、不想碰传播的调用方走 system 侧（design_orbit.py:931；
-  e2m2e/algorithm/family/axial_initial_guess.py:175）。测试断言两入口数值一致
+  值、不想碰传播的调用方走 system 侧（design_orbit.py:987；
+  e2m2e/algorithm/family/axial_initial_guess.py:166）。测试断言两入口数值一致
   （tests/algorithm/dynamics/test_cr3bp_model.py:66-69）。
 - **A 矩阵两处构造**。`CR3BP_System.compute_stability_index` 内部拼一份 6×6
-  线性化矩阵用于平动点特征值分析（cr3bp_system.py:429-434）；
+  线性化矩阵用于平动点特征值分析（cr3bp_system.py:418-423）；
   `CR3BP_Dynamics.compute_jacobian_A` 拼同构矩阵供 STM 变分方程与延拓模块
   复用（dynamics.py:611-638）。两者共用 `pseudo_potential_hessian`
-  （e2m2e/algorithm/dynamics/potential.py:12-58），Hessian 只有一份，拼装各
+  （e2m2e/algorithm/dynamics/potential.py:14-58），Hessian 只有一份，拼装各
   归各的语境：一个在"系统性质"里，一个在"传播配套"里。
 - **碰撞半径与 DU 的跨层读取**。碰撞检测是 Dynamics 的职责，但半径存在
-  System 上、折无量纲要用 System 的 `DU`（dynamics.py:398-428、447-472）——
+  System 上、折无量纲要用 System 的 `DU`（dynamics.py:398-428、447-472）。
   半径是天体属性而非积分配置，故数据留在 system，事件构造留在 dynamics。
 
 ## 附：文件地图

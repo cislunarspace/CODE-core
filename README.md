@@ -1,4 +1,4 @@
-# e2m2e — Earth to Moon, Moon to Earth
+# e2m2e: Earth to Moon, Moon to Earth
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
@@ -7,7 +7,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/cislunarspace/e2m2e.svg)](https://github.com/cislunarspace/e2m2e/stargazers)
 [![Rust: 1.98.0](https://img.shields.io/badge/rust-1.98.0-orange.svg)](https://www.rust-lang.org/)
 
-e2m2e 是面向地月空间任务规划的**算法工具集基础设施**。在“LLM+Agent”式自主任务规划系统中，大模型负责理解任务意图、分解与编排子任务，e2m2e 负责提供精确可靠的轨道计算工具：建立地月空间的动力学模型，生成周期轨道族，设计轨道之间的转移路径，并把结果画出来检查。
+e2m2e 是面向地月空间任务规划的**算法工具集基础设施**。在 LLM+Agent 式自主任务规划系统中，大模型负责理解任务意图、分解与编排子任务，e2m2e 负责提供精确可靠的轨道计算工具：建立地月空间的动力学模型，生成周期轨道族，设计轨道之间的转移路径，并把结果画出来检查。
 
 ## 安装
 
@@ -60,7 +60,7 @@ Windows 上运行 Rust 测试请使用 `make test-rust`：测试二进制依赖 
 
 ## 快速开始
 
-设计一条地月 L2 Halo 轨道（需先完成上方「SPICE 内核」配置）：
+设计一条地月 L2 Halo 轨道（需先完成上方 SPICE 内核配置）：
 
 ```python
 from e2m2e.api import Facade
@@ -118,7 +118,7 @@ print(result.initial_state)
 **接口与工具**
 
 - Facade 任务级入口，统一对外调用面。
-- 未建成：MCP 服务化封装——Facade 方法的元数据与派生机制已就位，`create_server` / `e2m2e mcp-serve` 尚为占位（`[mcp]` extra）。
+- MCP 服务化封装：`create_server` 进程内服务器与 `e2m2e mcp-serve` 子命令，由 Facade 方法元数据派生工具清单（`[mcp]` extra）。
 
 ## 文档
 
@@ -138,17 +138,16 @@ make test     # Rust 测试 + Python xdist 并行测试（需先 make setup 拉�
 make check    # cargo fmt/clippy + ruff
 ```
 
-测试按“验证什么”分七类，目录镜像源码结构：
+测试按验证对象分六类，目录镜像源码结构：
 
-- `theory`：数学公式与物理理论（解析解、Jacobi 常数等守恒量、文献公式）
-- `integrator`：积分器对解析轨道的精度
-- `force`：力模型的加速度与雅可比
+- `algorithm`：坐标、动力学、设计、修正、转移等算法编排链路
+- `api`：Facade 与 MCP 接口的校验、响应与错误翻译
 - `data`：内核、参考帧、物理常数等数据层
-- `orchestration`：设计、修正、转移等算法编排链路
-- `interface`：Facade API 的校验、响应与错误翻译
-- `aux`：日志等辅助工具
+- `mbse`：MBSE 数据模型、需求注册与图生成
+- `numerical`：积分器对解析轨道的精度、力模型的加速度与雅可比
+- `tools`：日志、格式化、可视化等辅助工具
 
-断言来自解析解、守恒量与文献公式，不与其他软件对照。Rust 侧数值方法在 `crates/*/tests/` 对解析解。
+另有 `_meta` 目录约束测试基础设施自身。断言以解析解、守恒量与文献公式为主；坐标与时间链路另有 GMAT 参考数据对照。Rust 侧数值方法在 `crates/*/tests/` 对解析解。
 
 ## 贡献
 

@@ -14,15 +14,15 @@ e2m2e 是"LLM+Agent"任务规划系统中的**算法工具集基础设施**：�
 | CI | 三平台 wheel 矩阵（Linux x64/ARM、Windows）+ CSPICE 编译包分发 | ADR 0009 |
 | 数据管理 | GitHub Release 星历数据、Git 跟踪族种子、随包 CR3BP 基线族数据集、本地 catalog | ADR 0031、ADR 0036 |
 
-分工原则（ADR 0011 五层架构、ADR 0012 依赖方向）：**领域决策留 Python，热循环进 Rust**。Rust 不吃 SPICE 句柄，吃预采样注入的星历缓存表——cspice 内核是全局状态、不可并发，这一约束决定了接缝的位置。
+分工原则（ADR 0011 五层架构、ADR 0012 依赖方向）：**领域决策留 Python，热循环进 Rust**。Rust 不吃 SPICE 句柄，吃预采样注入的星历缓存表。cspice 内核是全局状态、不可并发，这一约束决定了接缝的位置。
 
 ## 章节阅读地图
 
-- [architecture](architecture.md) — 总览：从设计一条 L2 NRHO 的完整链路看五个模块各自在哪个环节发挥作用。先读这篇。
-- [system-dynamics-dataflow](system-dynamics-dataflow.md) — System 与 Dynamics 两棵类层次的深潜：构造、传播、结果缓存中数据逐段怎么走。
-- [numerics-migration-status](numerics-migration-status.md) — algorithm 层各子模块的数值内核迁移清单：已下沉 / 迁移中 / 有意留 Python，逐项附理由与 issue。
-- [hjb-subsystem](hjb-subsystem.md) — HJB 子系统目标形态：两级分工、Hamiltonian 接缝、维度上限、绑定入口、验证分层。
-- [hjb-hamiltonian-dataflow](hjb-hamiltonian-dataflow.md) — 星历力模型 Hamiltonian 的配套调研：力模型与 EphemCache 现状、一次求解的数据流。
+- [architecture](architecture.md)，总览：从设计一条 L2 NRHO 的完整链路看五个模块各自在哪个环节发挥作用。先读这篇。
+- [system-dynamics-dataflow](system-dynamics-dataflow.md)，System 与 Dynamics 两棵类层次的深潜：构造、传播、结果缓存中数据逐段怎么走。
+- [numerics-migration-status](numerics-migration-status.md)，algorithm 层各子模块的数值内核迁移清单：已下沉 / 迁移中 / 有意留 Python，逐项附理由与 issue。
+- [hjb-subsystem](hjb-subsystem.md)，HJB 子系统目标形态：两级分工、Hamiltonian 接缝、维度上限、绑定入口、验证分层。
+- [hjb-hamiltonian-dataflow](hjb-hamiltonian-dataflow.md)，星历力模型 Hamiltonian 的配套调研：力模型与 EphemCache 现状、一次求解的数据流。
 
 ## 架构决策记录（ADR）
 

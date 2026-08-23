@@ -6,8 +6,8 @@
 - **transfer_design 打通 low_thrust 分支**（#516）：`TransferDesignRequest` 补齐 `engine_config`（plain dict，facade 内构造 `EngineConfig`）、`initial_mass`、`n_segments`、`target_oe`、`solver_method`、`duration_days`、`departure_state`、`target_state` 字段，此前 facade 走 low_thrust 必然 ValueError。
 
 ### Fixed
-- **target_ephemeris 坐标系契约写入文档**（#516）：`TransferDesignRequest.target_ephemeris` 字段 description 与 `transfer_orbit`/`_extract_target_state` docstring 明确——目标态按会合旋转系（synodic）物理单位解释并直接无量纲化，惯性星历须先经 `spacetime_transform(j2000_to_synodic)` 转换；此前下游把惯性星历直接传入时无任何提示，目标态几何全错。
-- **LGA 搜索面外维度缺失与 Δv 单位语义**（#512）：`transfer_orbit("LGA")` 在发射倾角 ≥ 20° 时一律 INFEASIBLE——出发速度网格只有面内角，无面外自由度，候选在 dv 筛选前就被近月高度窗口筛光。`LgaSearchParams` 新增面外角网格（`out_of_plane_halfwidth_deg`/`n_out_of_plane`，中心随出发轨道面倾角缓慢负移，实测倾角 0°–90° 覆盖）；`LgaCandidate` 记录 `out_of_plane_angle`。同时修复 `max_total_dv` 语义：阈值 km/s 换算为无量纲后比较，`LgaTransferDetails` 与 `delta_v` 统一按特征速度换算回 km/s；ThreeBodyLambert 精化劣于网格候选时保留网格解（修复精化后 Δv 远超阈值仍报 CONVERGED）。
+- **target_ephemeris 坐标系契约写入文档**（#516）：`TransferDesignRequest.target_ephemeris` 字段 description 与 `transfer_orbit`/`_extract_target_state` docstring 明确：目标态按会合旋转系（synodic）物理单位解释并直接无量纲化，惯性星历须先经 `spacetime_transform(j2000_to_synodic)` 转换；此前下游把惯性星历直接传入时无任何提示，目标态几何全错。
+- **LGA 搜索面外维度缺失与 Δv 单位语义**（#512）：`transfer_orbit("LGA")` 在发射倾角 ≥ 20° 时一律 INFEASIBLE：出发速度网格只有面内角，无面外自由度，候选在 dv 筛选前就被近月高度窗口筛光。`LgaSearchParams` 新增面外角网格（`out_of_plane_halfwidth_deg`/`n_out_of_plane`，中心随出发轨道面倾角缓慢负移，实测倾角 0°–90° 覆盖）；`LgaCandidate` 记录 `out_of_plane_angle`。同时修复 `max_total_dv` 语义：阈值 km/s 换算为无量纲后比较，`LgaTransferDetails` 与 `delta_v` 统一按特征速度换算回 km/s；ThreeBodyLambert 精化劣于网格候选时保留网格解（修复精化后 Δv 远超阈值仍报 CONVERGED）。
 
 ## [5.8.5] - 2026-08-22
 
@@ -30,12 +30,12 @@
 ## [5.8.3] - 2026-08-22
 
 ### Added
-- **MCP server 本体**（#510/#511，ADR 0014）：`e2m2e.api.mcp.create_server(facade)` 落地——统一信封 `{status, data, error, meta}`（OrbitError 原样翻译，ValidationError → INVALID_PARAMS，未预期异常归 INTERNAL_ERROR 不泄漏 traceback）；工具规格由 `tool_inventory()` 纯派生（清单单一来源，placeholder 不注册）；工具调用经线程池避免阻塞事件循环。CLI 新增 `e2m2e mcp-serve`（stdio 传输），`[mcp]` extra 收紧为 `mcp>=2.0`，`[project.scripts]` 注册 `e2m2e` 入口。
-- **平面全星历脉动会合系 Hamiltonian**（#498，ADR 0034）：`e2m2e-hjb-dynamics` 新增 `EphemerisPlanar`（feature `ephemeris`，随 integrators 的 spice 启用）——真实月球星历定义的时变脉动会合系（地心系，月球钉在 (1,0)），力为两主星点质量 + 太阳第三体（面内投影），非自治、5 维含质量或 4 维固定质量。ω、ω̇、脉动项全部由缓存的月球位置/速度/加速度导出，每个 RK 子步查一次星历缓存全网格复用，求解阶段零 cspice；min-fuel 控制解析消去（开关函数含质量协态项）；天体中心邻域按物理极限正则化（网格必命中主星坐标，MIN_DISTANCE 截断会产生伪加速度压垮 CFL）。配套：`EphemCache` 新增二阶导查表（`lookup_body_acceleration`）与 `enabled_span()`；`solve_hjb_py` 注册 `ephemeris_planar` 动力学（历元映射 et = et0 + t，构造期校验缓存覆盖求解窗，无新 PyO3 符号、ABI 戳不变）；`NegHamiltonian` 补时间参数反转（非自治必需）。验收：圆化定常极限退化对拍 `Cr3bpSynodic`（含地心↔质心坐标平移）、与 `compute_total_acceleration` 逐点力一致、小网格粗细模型回归（量级一致、等值面相关 >0.96）、求解全程零 cspice FFI。
+- **MCP server 本体**（#510/#511，ADR 0014）：`e2m2e.api.mcp.create_server(facade)` 落地：统一信封 `{status, data, error, meta}`（OrbitError 原样翻译，ValidationError → INVALID_PARAMS，未预期异常归 INTERNAL_ERROR 不泄漏 traceback）；工具规格由 `tool_inventory()` 纯派生（清单单一来源，placeholder 不注册）；工具调用经线程池避免阻塞事件循环。CLI 新增 `e2m2e mcp-serve`（stdio 传输），`[mcp]` extra 收紧为 `mcp>=2.0`，`[project.scripts]` 注册 `e2m2e` 入口。
+- **平面全星历脉动会合系 Hamiltonian**（#498，ADR 0034）：`e2m2e-hjb-dynamics` 新增 `EphemerisPlanar`（feature `ephemeris`，随 integrators 的 spice 启用）：真实月球星历定义的时变脉动会合系（地心系，月球钉在 (1,0)），力为两主星点质量 + 太阳第三体（面内投影），非自治、5 维含质量或 4 维固定质量。ω、ω̇、脉动项全部由缓存的月球位置/速度/加速度导出，每个 RK 子步查一次星历缓存全网格复用，求解阶段零 cspice；min-fuel 控制解析消去（开关函数含质量协态项）；天体中心邻域按物理极限正则化（网格必命中主星坐标，MIN_DISTANCE 截断会产生伪加速度压垮 CFL）。配套：`EphemCache` 新增二阶导查表（`lookup_body_acceleration`）与 `enabled_span()`；`solve_hjb_py` 注册 `ephemeris_planar` 动力学（历元映射 et = et0 + t，构造期校验缓存覆盖求解窗，无新 PyO3 符号、ABI 戳不变）；`NegHamiltonian` 补时间参数反转（非自治必需）。验收：圆化定常极限退化对拍 `Cr3bpSynodic`（含地心↔质心坐标平移）、与 `compute_total_acceleration` 逐点力一致、小网格粗细模型回归（量级一致、等值面相关 >0.96）、求解全程零 cspice FFI。
 - **GUI sidecar stdio 协议入口 serve-stdio**（#518/#519，ADR 0035）：新增 `e2m2e/api/sidecar/`（帧编解码 + 主循环），帧契约 magic 0x324D3245 / u8 dtype / u8 ndim / u32 shape / 小端 C 连续字节；JSON 行复用统一信封，响应行带 binary_frames 计数，帧后恢复 JSON 行流，进度行为可丢弃信封行。首个画布契约：orbit_family_generation 成员状态数组出帧（Orbit 不可 JSON 化，须声明 binary_dtype）。CLI 注册 `serve-stdio` 子命令；mcp 的 server 导出改惰性，sidecar 不依赖 [mcp] extra。
 
 ### Fixed
-- **NRHO n_rev=2 合并层不收敛时回退单段两圈**（#508/#514）：9:2 贴月共振成员（近月高 ~1500 km）在 phase=0.5 下，两段独立打靶各自收敛后 seam 失配 ~10² km，合并层 LM 跳不出残差盆地（残差卡 9.4e2 km，容差 2e-2 km）；phase=0 端点恰好相反——两种策略按相位互补，无单一策略通吃。主路径保持生产默认（1 圈/段 + 合并层，#473）；NRHO 且 n_rev=2 主路径 DesignNotConvergedError 时自动回退单段 2 圈（无合并层）重试，回退路径 1500 km × 8 天 30 次迭代收敛到 2e-2 km；作用域不外推到 n_rev>2。
+- **NRHO n_rev=2 合并层不收敛时回退单段两圈**（#508/#514）：9:2 贴月共振成员（近月高 ~1500 km）在 phase=0.5 下，两段独立打靶各自收敛后 seam 失配 ~10² km，合并层 LM 跳不出残差盆地（残差卡 9.4e2 km，容差 2e-2 km）；phase=0 端点恰好相反。两种策略按相位互补，无单一策略通吃。主路径保持生产默认（1 圈/段 + 合并层，#473）；NRHO 且 n_rev=2 主路径 DesignNotConvergedError 时自动回退单段 2 圈（无合并层）重试，回退路径 1500 km × 8 天 30 次迭代收敛到 2e-2 km；作用域不外推到 n_rev>2。
 
 ### Changed
 - **de430/de440s 行星星历内核纳入 git-lfs 跟踪**（#517）：de430.bsp（115MB）超过 GitHub 单文件 100MB 限制，普通 git 无法推送，改用 git-lfs 入库；.gitignore 不再忽略 kernels/*.bsp，由 .gitattributes 的 LFS 规则管理。
@@ -45,18 +45,18 @@
 ### Added
 - **ToolboxLS 水平集/HJ 可达性求解器 crate**（#493）：自 Ian Mitchell 的 Toolbox of Level Set Methods 完整移植内核为 `e2m2e-levelset`（ACM 非商业许可，`LICENSE-ToolboxLS` 随附）：5 种鬼单元边界、一阶/ENO2/ENO3/WENO5 迎风格式、GLF/LLF/LLLF 耗散、odeCFL1/2/3 TVD Runge-Kutta、掩码/重初始化（含 Russo-Smereka 亚网格修正）与 TTR 后处理、隐式形状与集合运算、迭代法符号距离。验证 22 项全过：导数收敛阶实测 1/2/3/5、Burgers 方程与 Hopf-Lax 精确解对比 L∞ < 2e-2、重初始化误差 < 2.5 dx、双积分器 TTR 与解析解对照（LF 固有耗散误差随 51→101 网格收敛）。向量水平集与绘图动画不移植。
 - **HJB 子系统：地月会合系 CR3BP Hamiltonian 与通用求解绑定**（#497）：新增 crate `e2m2e-hjb-dynamics`（Apache-2.0，与 ToolboxLS 移植的 ACM 许可边界见 ADR 0032），实现平面四维 CR3BP 会合系无量纲 Hamiltonian（bang-bang 油门 + 燃料权重开关，构造参数 μ/max_accel/fuel_weight）与带漂移平面双积分器；零控向量场与 `propagate_cr3bp` 逐项对拍，含 L4/L5 平衡点与 2π 周期轨迹对照。e2m2e-integrators 新增通用入口 `solve_hjb_py`（动力学标识 + 参数表，ENO2 + GLF + odeCFL2，时间反转由绑定层处理，快照按内存上界自动抽稀）与 geo-nrho 既有签名的兼容包装 `solve_planar_lowthrust_hjb_py`（ABI v21）。架构文档 `docs/architecture/hjb-subsystem.md` 与 ADR 0032 随附。
-- **值函数网格高阶梯度查询接口**（#499）：`e2m2e.algorithm.levelset.value_function_gradient(axes, values, times, state, time)`——值函数离网点值/梯度查询。空间维张量积 not-a-knot 三次样条（逐轴求解组装 `NdBSpline`），梯度为样条解析导数（C² 连续，排除单元边界梯度跳变的局部模板路线）；时间维必选线性插值；维度无关；越界抛 `ValueFunctionQueryError`。架构口径见 ADR 0033 决策 4。
-- **连续油门到离散工况映射工具**（#501）：新增 `e2m2e.algorithm.transfer.thrust_arcs`——`ThrustArc`/`ThrustArcSequence` 数据模型自 geo-nrho 迁入，档位集合、最短弧、推力/比冲全部参数化；`sequence_from_controls` 收段边界时刻 `(N+1,)`（均匀/非均匀时间节点均可），贪心合并满足最短弧约束，配点段密不再报错；`controls_from_sequence` 展开回均匀段控制供重传播验证。端到端验收：LEO 两圈连续油门解映射后重传播，终端残差实测 0.35 km / 0.0004 m/s（断言收紧至 5 km / 0.005 m/s）。架构口径见 ADR 0033 决策 5。
+- **值函数网格高阶梯度查询接口**（#499）：`e2m2e.algorithm.levelset.value_function_gradient(axes, values, times, state, time)`：值函数离网点值/梯度查询。空间维张量积 not-a-knot 三次样条（逐轴求解组装 `NdBSpline`），梯度为样条解析导数（C² 连续，排除单元边界梯度跳变的局部模板路线）；时间维必选线性插值；维度无关；越界抛 `ValueFunctionQueryError`。架构口径见 ADR 0033 决策 4。
+- **连续油门到离散工况映射工具**（#501）：新增 `e2m2e.algorithm.transfer.thrust_arcs`：`ThrustArc`/`ThrustArcSequence` 数据模型自 geo-nrho 迁入，档位集合、最短弧、推力/比冲全部参数化；`sequence_from_controls` 收段边界时刻 `(N+1,)`（均匀/非均匀时间节点均可），贪心合并满足最短弧约束，配点段密不再报错；`controls_from_sequence` 展开回均匀段控制供重传播验证。端到端验收：LEO 两圈连续油门解映射后重传播，终端残差实测 0.35 km / 0.0004 m/s（断言收紧至 5 km / 0.005 m/s）。架构口径见 ADR 0033 决策 5。
 - **轨道族生成支持 DRO（远距逆行轨道族）**（#502）：`orbit_family_generation` 新增 `orbit_type="DRO"`（Rust 族生成 ABI v22）。DRO 是月心族不绑定平动点：请求不含 `libration_point`（显式携带即拒绝，跨族字段口径与其余七族一致），字段为 `min_amplitude_km`/`max_amplitude_km`（距月心距离 min/max 均值，默认 2000~60000，包络 1737~110000 km，与单轨 DRO 一致）与 `n_orbits`。算法层新增 `design_dro_family`：Rust 单次调用从标准种子做 x0 自然参数延拓（修正失败步长减半），按窗口与种子振幅（约 90,786 km）的相对位置自动选向、跨种子窗口双向行走，一次延拓覆盖振幅区间并按振幅升序返回成员，不以 Facade 循环调单轨 `design_dro` 凑数。
-- **变质量 SRP 契约——SRPVariableMass 与 acceleration_with_mass**（#506）：`CompiledForce` 新增 `SRPVariableMass` variant：不存质量，经 `acceleration_with_mass` 从增广状态取当前质量，固定质量路径对其报明确错误（6D 传播误用不静默）；新增 `mass_derivative`（∂a/∂m = −a/m）与 `compute_total_*_with_mass` 求和入口，固定质量力在 with_mass 路径下行为不变；`augmented_eom_7d` 及 STM/灵敏度变体改走 with_mass 路径，质量列雅可比含力模型贡献。Python 新增 `VariableMassSolarRadiationPressure`（`to_rust_spec` 为 `srp_variable_mass` 元组，`parse_force_tuple` 增加对应分支），无新增 PyO3 符号、ABI 戳不变；`srp.body_position_cached` 增加 target==observer 归零守卫。测试：Rust 契约单测 3 项、Python 序列化契约 4 项、7D 传播物理对照 2 项（零推力逐位一致、点火质量通道可分辨）。
+- **变质量 SRP 契约：SRPVariableMass 与 acceleration_with_mass**（#506）：`CompiledForce` 新增 `SRPVariableMass` variant：不存质量，经 `acceleration_with_mass` 从增广状态取当前质量，固定质量路径对其报明确错误（6D 传播误用不静默）；新增 `mass_derivative`（∂a/∂m = −a/m）与 `compute_total_*_with_mass` 求和入口，固定质量力在 with_mass 路径下行为不变；`augmented_eom_7d` 及 STM/灵敏度变体改走 with_mass 路径，质量列雅可比含力模型贡献。Python 新增 `VariableMassSolarRadiationPressure`（`to_rust_spec` 为 `srp_variable_mass` 元组，`parse_force_tuple` 增加对应分支），无新增 PyO3 符号、ABI 戳不变；`srp.body_position_cached` 增加 target==observer 归零守卫。测试：Rust 契约单测 3 项、Python 序列化契约 4 项、7D 传播物理对照 2 项（零推力逐位一致、点火质量通道可分辨）。
 
 ### Fixed
 - **修正方法按族分派上提至请求校验层**（#490）：`correction_method` 对不稳定轨道族（HALO/NRHO/DPO）不是真参数，原实现算法层静默改写为 segmented，请求对象与响应均不反映实际执行的方法。现分派表 `SEGMENTED_CORRECTION_ORBIT_TYPES` 落 `data/templates`（api 校验与算法层防御共用，唯一事实源）：`DesignOrbitRequest` 校验时按族分派默认（不稳定族 → segmented），显式冲突值 UserWarning 后改写（不拒绝，兼容既有调用方），ELFO 不参与；算法层删静默覆盖改为 fail-fast 防御检查；`OrbitDesignResult`/`DesignOrbitResponse`/`build_design_record` 记录实际执行的 `correction_method`（ELFO 为 None）。
-- **存量 SSRF 与路径穿越高危清零**（#491）：Mimosa 门禁扫出的 18 处 high 全为存量代码命中（相对 #490 改动零 diff），统一收敛——服务端请求边界（`download_kernels.py` 与 colab 下载脚本）仅允许 http/https，请求前校验 host，拒绝 localhost、环回、私有、链路本地与保留地址（`ip.is_global`），重定向目标逐一校验（防 302 跳向内网/云元数据端点）；路径写入口（`fft.py`/`store.py`/`orbit.py`/`generator.py`/benchmark 与 colab 脚本）统一 pathlib 显式安全写法，`fft.py` 临时文件解析后必须仍在临时目录内（resolve + `is_relative_to`）。Mimosa 复扫 findings 18 → 0。
+- **存量 SSRF 与路径穿越高危清零**（#491）：Mimosa 门禁扫出的 18 处 high 全为存量代码命中（相对 #490 改动零 diff），统一收敛：服务端请求边界（`download_kernels.py` 与 colab 下载脚本）仅允许 http/https，请求前校验 host，拒绝 localhost、环回、私有、链路本地与保留地址（`ip.is_global`），重定向目标逐一校验（防 302 跳向内网/云元数据端点）；路径写入口（`fft.py`/`store.py`/`orbit.py`/`generator.py`/benchmark 与 colab 脚本）统一 pathlib 显式安全写法，`fft.py` 临时文件解析后必须仍在临时目录内（resolve + `is_relative_to`）。Mimosa 复扫 findings 18 → 0。
 - **固定 Rust 1.98.0 并修复 Windows Rust 测试**（#494、#495）：`rust-toolchain.toml` 固定工具链版本；Windows 下 `cargo test` 因 pyo3 `extension-module` 链接需运行时加载 python3.dll，虚拟环境 Scripts/ 没有该 DLL（须由 Python 安装根目录提供），新增 `scripts/python_dll_dir.py` 探测并在跑 Rust 测试前把该目录前置到 PATH，`make test-rust` 在 Windows 可一路跑通。
 
 ### Changed
-- **ADR 0034：星历力模型 Hamiltonian 的范围裁决**（#498）：#498 正文要求把星历 N 体全保真力模型（地月 10×10 球谐、太阳第三体、变质量光压）接入 levelset 网格求解器直接求解 HJB，与同日合并的 `hjb-subsystem.md` §3（网格层维度上限 5、无 z 轴，保真度天花板是“会合系内能平面表达的力”）结论相反。核实物理事实后裁决：任务三段（GEO/Halo/NRHO）在地月会合系里全大幅离面，截面投影（z=0 取面内分量）产物的控制律定义域盖不住真实轨迹，闭环回放跑不起来；网格层在两级架构里的职务是基准与训练数据，缺的是时间依赖性而非空间保真度——故 #498 范围为**平面全星历 Hamiltonian**（月球瞬时星历定义旋转 + 脉动会合系，两主星点质量 + 太阳第三体取星历位置的面内投影，5 维 `(x, y, vx, vy, m)` 非自治、时间显式入动力学），在时间保真度轴上升级网格层而非撞空间保真度轴的墙；球谐与光压降级为缓议实验项，不进 #498 验收。求解链数据流见 `docs/architecture/hjb-hamiltonian-dataflow.md`。
+- **ADR 0034：星历力模型 Hamiltonian 的范围裁决**（#498）：#498 正文要求把星历 N 体全保真力模型（地月 10×10 球谐、太阳第三体、变质量光压）接入 levelset 网格求解器直接求解 HJB，与同日合并的 `hjb-subsystem.md` §3（网格层维度上限 5、无 z 轴，保真度天花板是会合系内能平面表达的力）结论相反。核实物理事实后裁决：任务三段（GEO/Halo/NRHO）在地月会合系里全大幅离面，截面投影（z=0 取面内分量）产物的控制律定义域盖不住真实轨迹，闭环回放跑不起来；网格层在两级架构里的职务是基准与训练数据，缺的是时间依赖性而非空间保真度，故 #498 范围为**平面全星历 Hamiltonian**（月球瞬时星历定义旋转 + 脉动会合系，两主星点质量 + 太阳第三体取星历位置的面内投影，5 维 `(x, y, vx, vy, m)` 非自治、时间显式入动力学），在时间保真度轴上升级网格层而非撞空间保真度轴的墙；球谐与光压降级为缓议实验项，不进 #498 验收。求解链数据流见 `docs/architecture/hjb-hamiltonian-dataflow.md`。
 
 ## [5.8.1] - 2026-08-20
 
@@ -66,7 +66,7 @@
 - **Windows 源码构建修复**（#487）：修复 Windows 下 CSPICE 与 LIBCLANG_PATH 环境配置；make 依赖链改用 `python`（官方 Windows Python 无 `python3` 命令），`make dev` 在 Windows 可一路跑通。
 
 ### Added
-- **catalog_sweep 参数空间补全：能量网格与 Lissajous 二维网格**（#476）：扫描主参数维度增至三选一（同传结构化报错）——既有振幅/近月点高度网格之外，新增 `jacobi_windows` 能量（Jacobi）窗口网格与 `amplitude_ins_km` × `amplitude_outs_km` LISSAJOUS 面内×面外二维振幅网格。能量窗口经新增 Rust 入口 `generate_cr3bp_family_windows_py`（ABI v20）实现：同一（族、平动点）只走一次延拓 trace，各窗口分别筛选成员（窗口边界包含），记录 jacobi 包络落在窗口内，窗口零成员时该点无记录、结局逐点可查；LISSAJOUS 二维网格逐点采样入库（相位取请求默认值），不再被扫描排除。
+- **catalog_sweep 参数空间补全：能量网格与 Lissajous 二维网格**（#476）：扫描主参数维度增至三选一（同传结构化报错）：既有振幅/近月点高度网格之外，新增 `jacobi_windows` 能量（Jacobi）窗口网格与 `amplitude_ins_km` × `amplitude_outs_km` LISSAJOUS 面内×面外二维振幅网格。能量窗口经新增 Rust 入口 `generate_cr3bp_family_windows_py`（ABI v20）实现：同一（族、平动点）只走一次延拓 trace，各窗口分别筛选成员（窗口边界包含），记录 jacobi 包络落在窗口内，窗口零成员时该点无记录、结局逐点可查；LISSAJOUS 二维网格逐点采样入库（相位取请求默认值），不再被扫描排除。
 
 ### Changed
 - **源码开发入口统一为 `make dev`**（#478）：一条命令完成依赖同步（`uv sync --group dev --no-install-project`，不再构建 editable 扩展）+ CSPICE 编译包/SPICE 内核拉取（幂等）+ `maturin develop`。此前 `uv sync` → `make setup` → `make dev` 三步顺序自相矛盾（裸 `uv sync` 缺 `CSPICE_DIR` 必败）且一次 `make dev` 实际触发三次 cargo 构建；现 Makefile 内所有 `uv run` 带 `--no-sync`，全过程仅一次 debug 构建。文档不再把 `uv sync` 列为源码开发步骤，并新增裸 `uv sync` 报错的故障排除说明。pip 安装路径（build backend、wheel/sdist、release 工作流）零改动。
@@ -79,7 +79,7 @@
 ## [5.7.3] - 2026-08-17
 
 ### Fixed
-- **NRHO 星历修正 5.7.2 后续**（#473）：生产默认由「删近月点附近节点 + 最长 3 圈/段」改为「等时间 + 1 圈/段」（与 Halo 解耦）；`sample_patch_points_drop_near_perilune` 强制含历元 `t=0`，点数不足回退等时间；算法层 NRHO 相位范围与请求模型统一为 `[0, 1]`。GUI 默认量级（L2 南、近月高 5000 km、`phase=0.5`、约 1 个月）收敛且星历与时间网格等长；贴月短弧（2000 km / 8 天）与 Halo 默认策略不回退。建议下游固定到含本修复的版本（5.7.3）。
+- **NRHO 星历修正 5.7.2 后续**（#473）：生产默认由删近月点附近节点 + 最长 3 圈/段改为等时间 + 1 圈/段（与 Halo 解耦）；`sample_patch_points_drop_near_perilune` 强制含历元 `t=0`，点数不足回退等时间；算法层 NRHO 相位范围与请求模型统一为 `[0, 1]`。GUI 默认量级（L2 南、近月高 5000 km、`phase=0.5`、约 1 个月）收敛且星历与时间网格等长；贴月短弧（2000 km / 8 天）与 Halo 默认策略不回退。建议下游固定到含本修复的版本（5.7.3）。
 
 ## [5.7.2] - 2026-08-17
 
@@ -93,7 +93,7 @@
 - **normal_form 迁移状态按 #449 拆包更新**：已下沉（积分、共线点 CR3BP Hamiltonian、H→QF 标量投影、数值多项式核、QF↔CM、中心流形化简）登记补全；符号 Legendre/星历 H、NAFF、pipeline 编排有意留 Python；P5/P6 后置未派发。更新 `docs/architecture/numerics-migration-status.md`。
 
 ### Fixed
-- **NRHO 星历修正默认路径不收敛**（#463）：拼接点采样对 NRHO 改为「删近月点附近节点」（与 Halo 近月点加密解耦），固定容差下 segmented 路径在 GUI 默认量级（L2 南、近月高 5000 km、约 1 个月）与更贴月短弧（2000 km）上收敛；文档去掉「NRHO 星历修正暂不可用」。
+- **NRHO 星历修正默认路径不收敛**（#463）：拼接点采样对 NRHO 改为删近月点附近节点（与 Halo 近月点加密解耦），固定容差下 segmented 路径在 GUI 默认量级（L2 南、近月高 5000 km、约 1 个月）与更贴月短弧（2000 km）上收敛；文档去掉 NRHO 星历修正暂不可用的表述。
 
 ### Docs
 - **forces 的 Python 层位置裁决**（#429，ADR 0030）：`algorithm/forces` 留在 algorithm 层作配置/编排面，数值在 `e2m2e-forces`；不新建 Python 数值目录、不搬家。
@@ -112,13 +112,13 @@
 ## [5.6.10] - 2026-08-14
 
 ### Fixed
-- **GMAT 参考数据未随包分发**（#423）：EOP/闰秒裁剪数据此前在 `tests/data/frames/fixtures/gmat`，加载器按仓库布局用 `parents[3]` 定位——wheel/sdist 不含该目录，安装后 GMAT-compatible 坐标轴（显式 EOP/闰秒输入）取数失败。数据迁入包内 `e2m2e/data/frames/fixtures/gmat` 并声明为包资源，仓库与安装布局下定位一致，wheel/sdist 自动分发。
+- **GMAT 参考数据未随包分发**（#423）：EOP/闰秒裁剪数据此前在 `tests/data/frames/fixtures/gmat`，加载器按仓库布局用 `parents[3]` 定位，wheel/sdist 不含该目录，安装后 GMAT-compatible 坐标轴（显式 EOP/闰秒输入）取数失败。数据迁入包内 `e2m2e/data/frames/fixtures/gmat` 并声明为包资源，仓库与安装布局下定位一致，wheel/sdist 自动分发。
 
 ### Changed
 - **MBSE 活模型校验与文档产物生成**（#422）：五层组件清单（algorithm/api/core/data/numerical/tools）与隔离注册表，覆盖测试改为校验活模型而非文档快照；BDD 场景、需求与追溯矩阵改由生成器产出 `docs/reference/mbse/generated/` 并纳入测试校验。
 - **数据层测试按边界重组**（#423 连带）：`tests/data` 镜像数据层结构（atmosphere/frames/kernels/templates/types）；`test_no_furnsh_bypass` 迁 `tests/_meta`，新增数据常量依赖守门。
 - **API 测试按接口职责重组**（#424）：`test_facade.py` 拆分出 `test_models.py`（模型默认值、按类型范围边界、非法输入拒绝）与 `test_facade_responses.py`（响应契约），WSB 容器测试按契约归位。
-- **测试套件收敛**（#425，ADR 0025）：新增主功能类标记守恒守门员元测试（每测试恰 1 主类）；`tests/algorithm/correction` 更名 `solver` 镜像源码结构；family 纯 API 校验用例删除（#424 的 `test_models` 已等价覆盖）；design 集成改用 `make_design_request` 桩工厂，`tests/algorithm` 不再 import `e2m2e.api`；normal_form 清除外部软件参照——qiao .mat 逐项比对迁 `scripts/diagnose_hamiltonian_vs_qiao.py` 手工诊断，5 个 skip 守卫空回归占位删除（转 #426 跟踪）。
+- **测试套件收敛**（#425，ADR 0025）：新增主功能类标记守恒守门员元测试（每测试恰 1 主类）；`tests/algorithm/correction` 更名 `solver` 镜像源码结构；family 纯 API 校验用例删除（#424 的 `test_models` 已等价覆盖）；design 集成改用 `make_design_request` 桩工厂，`tests/algorithm` 不再 import `e2m2e.api`；normal_form 清除外部软件参照：qiao .mat 逐项比对迁 `scripts/diagnose_hamiltonian_vs_qiao.py` 手工诊断，5 个 skip 守卫空回归占位删除（转 #426 跟踪）。
 - **测试套件层级澄清**（#432，ADR 0026）：coordinate 测试审查收尾与注释中文化，清理 `e2m2e.core`/`e2m2e.algorithms` 旧路径死引用，atmosphere 测试并入 numerical/forces 契约层。
 
 ## [5.6.9] - 2026-08-14
@@ -130,9 +130,9 @@
 - **轨道设计条件范围 API**（#415）：`DesignOrbitRequest.valid_ranges()` 与 `NumericRange` 公开各轨道类型、平动点上下文下适用的参数范围，校验器与接口共用同一规则。
 
 ### Changed
-- **CI/release 提速**：ci.yml 的 lint/typecheck 改用 `uv sync --no-install-project`——ruff、结构检查脚本（标准库 ast 静态扫描）与 mypy（`--ignore-missing-imports`）均不 import 项目本体，此前两个 job 各白编一次 Rust 扩展（30s/50s），现跳过构建、typecheck 连带免下 CSPICE 编译包；cargo 编译产物接入 `Swatinem/rust-cache`（ci clippy、release test、三平台 wheel 构建与 docs 构建），全量编译改增量（`CSPICE_DIR` 入 key 防串味，key 默认含 job id 与 OS/arch，各 job、各平台天然隔离）。runner 固定版本（ubuntu-24.04 / windows-2025），checkout 加 `persist-credentials: false`。
+- **CI/release 提速**：ci.yml 的 lint/typecheck 改用 `uv sync --no-install-project`：ruff、结构检查脚本（标准库 ast 静态扫描）与 mypy（`--ignore-missing-imports`）均不 import 项目本体，此前两个 job 各白编一次 Rust 扩展（30s/50s），现跳过构建、typecheck 连带免下 CSPICE 编译包；cargo 编译产物接入 `Swatinem/rust-cache`（ci clippy、release test、三平台 wheel 构建与 docs 构建），全量编译改增量（`CSPICE_DIR` 入 key 防串味，key 默认含 job id 与 OS/arch，各 job、各平台天然隔离）。runner 固定版本（ubuntu-24.04 / windows-2025），checkout 加 `persist-credentials: false`。
 - **轨道设计剩余 Python 计算下沉 Rust**：synodic↔J2000 批量坐标转换、ET→UTC 日历分量（星历表组装，一年 8766 点的逐点循环）、ELFO 月心根数提取的月球状态查询改走 Rust 批量入口（`frame_convert`：`batch_synodic_to_j2000_py`/`batch_j2000_to_synodic_py`/`batch_et_to_utc_py`/`batch_body_states_py`）；leapseconds 内核双侧 furnsh（Rust 实例批量 ET→UTC 需闰秒表，原仅 Python 侧加载）。ELFO 经典根数换算向量化（`_cart2oe_batch`）。Rust 侧新增解析恒等式单测（往返对称性、尺度定义），Python 侧断言按 ADR 0013 用物理定义（月球位置、已知历元往返、退化分支）。
-- **cargo test 链接 libpython**：pyo3 `extension-module` feature 不再在 workspace 硬编码（该 feature 使 Linux 上含测试二进制在内的所有目标跳过链接 libpython，`cargo test` 报 undefined symbol），改由 e2m2e-integrators 的 `extension-module` feature 按目标启用、pyproject `[tool.maturin] features` 显式传入——cdylib 产物仍不链接 libpython（abi3 可移植性不变），测试二进制可独立链接运行。
+- **cargo test 链接 libpython**：pyo3 `extension-module` feature 不再在 workspace 硬编码（该 feature 使 Linux 上含测试二进制在内的所有目标跳过链接 libpython，`cargo test` 报 undefined symbol），改由 e2m2e-integrators 的 `extension-module` feature 按目标启用、pyproject `[tool.maturin] features` 显式传入：cdylib 产物仍不链接 libpython（abi3 可移植性不变），测试二进制可独立链接运行。
 - **轨道保持 Facade 参数面收口**（#414）：`ControlOrbitRequest` 覆盖算法层全部业务参数并在 Facade 完整透传，补齐控制时间、误差、摄动、力模型、角动量管理和迭代配置的校验与 schema 元数据。
 
 ### Fixed
@@ -141,7 +141,7 @@
 - **低能转移因单条流形弧步长塌缩而整体中止**：流形管生成现在捕获单个候选的 `PropagationFailure` 并跳过该弧，保留其余候选继续搜索；直接传播仍按 ADR 0020 显式抛出异常。
 
 ### Removed
-- **Python 星历修正分发（homotopy/two_level）**：删除 `e2m2e/algorithm/ephemeris_correction` 子包与 `TwoLevelMultipleShooting`，`design_orbit` 的 homotopy 修正分支移除——星历修正统一走 Rust 多重打靶（segmented 与稳定轨道默认路径），`EphemerisCorrectionResult` 迁入 `algorithm/results.py` 作 Rust 打靶结果的领域重包。ADR 0005/0006 追加修订小节，关联测试同步删除。
+- **Python 星历修正分发（homotopy/two_level）**：删除 `e2m2e/algorithm/ephemeris_correction` 子包与 `TwoLevelMultipleShooting`，`design_orbit` 的 homotopy 修正分支移除：星历修正统一走 Rust 多重打靶（segmented 与稳定轨道默认路径），`EphemerisCorrectionResult` 迁入 `algorithm/results.py` 作 Rust 打靶结果的领域重包。ADR 0005/0006 追加修订小节，关联测试同步删除。
 - **`DesignOrbitRequest.correction_velocity_tolerance`**（#410）：该参数从未被算法层消费，现因 `extra="forbid"` 被明确拒绝，避免暴露无效配置。
 
 ## [5.6.8] - 2026-08-13
@@ -153,7 +153,7 @@
 ## [5.6.7] - 2026-08-12
 
 ### Fixed
-- **发布物漏打包 `constants.toml`，5.6.6 wheel/sdist 均不可用**（#377 后续）：5.6.6 把物理常数单一来源放在仓库根 `constants.toml`，Python 加载器按仓库布局用 `parents[3]` 定位——wheel 不含该文件，安装后 `import e2m2e` 即 `FileNotFoundError`；sdist 同样缺失，从源码构建在 `build.rs` 直接 panic。单一来源迁入包内 `e2m2e/data/constants/constants.toml`（随 wheel/sdist 自动分发，仓库与安装布局下定位一致），Rust `build.rs` 改指包内同一份文件，单一来源关系不变。
+- **发布物漏打包 `constants.toml`，5.6.6 wheel/sdist 均不可用**（#377 后续）：5.6.6 把物理常数单一来源放在仓库根 `constants.toml`，Python 加载器按仓库布局用 `parents[3]` 定位，wheel 不含该文件，安装后 `import e2m2e` 即 `FileNotFoundError`；sdist 同样缺失，从源码构建在 `build.rs` 直接 panic。单一来源迁入包内 `e2m2e/data/constants/constants.toml`（随 wheel/sdist 自动分发，仓库与安装布局下定位一致），Rust `build.rs` 改指包内同一份文件，单一来源关系不变。
 
 ## [5.6.6] - 2026-08-12
 
@@ -161,7 +161,7 @@
 - **碰撞终止 + 天体半径注入**（#355，ADR 0020 决策 5）：`Dynamics.propagate` 新增 `collision_detection` 开关，启用时以 `g = |r − r_body| − R_body` 构造碰撞事件，探测器与主/次天体表面接触即终止积分，结果附 `collision` 键（天体名、终止时刻、终止状态）；`CR3BP_System`/`BCR4BP_System` 新增 `primary_radius_km`/`secondary_radius_km` 半径配置注入，保留机器精度正则化。
 
 ### Fixed
-- **三脉冲优化对零脉冲初猜提前收敛**（#384）：`MultiImpulseTransfer.optimize` 的 SLSQP 对"零脉冲初猜"（双脉冲弧上的点，目标值恰为双脉冲成本）数值敏感——目标函数在该平坦走廊上梯度极小，收敛判据可能提前触发、一步即停，三脉冲对 ΔV 几乎无改善（`test_multi_impulse` 随主矢量检验采样密度约半数配置失败，issue 报的改善量 2.96e-11 即此现象）。首次优化相对初猜改善不足时，现自动从微扰初猜（时刻整体 ×0.5/1.5/2.0、位置 ×0.9/1.1）重试并取总 ΔV 最小者；实测该场景三脉冲确有 0.78 km/s（约 11%）改善空间，断言与阈值不变。新增 n_samples=200 回归测试。
+- **三脉冲优化对零脉冲初猜提前收敛**（#384）：`MultiImpulseTransfer.optimize` 的 SLSQP 对零脉冲初猜（双脉冲弧上的点，目标值恰为双脉冲成本）数值敏感：目标函数在该平坦走廊上梯度极小，收敛判据可能提前触发、一步即停，三脉冲对 ΔV 几乎无改善（`test_multi_impulse` 随主矢量检验采样密度约半数配置失败，issue 报的改善量 2.96e-11 即此现象）。首次优化相对初猜改善不足时，现自动从微扰初猜（时刻整体 ×0.5/1.5/2.0、位置 ×0.9/1.1）重试并取总 ΔV 最小者；实测该场景三脉冲确有 0.78 km/s（约 11%）改善空间，断言与阈值不变。新增 n_samples=200 回归测试。
 - **Lissajous/三角平动点星历修正不收敛**（#366）：`design_orbit` 对 LISSAJOUS-L2/L4/L5 在 Rust 多重打靶（容差 0.02 km）下迭代到 80 次上限仍不收敛（位置残差 0.16–174 km）。根因是拟周期族（面内/面外频率不可约、短/长周期模态耦合，无周期闭合）在自由时间打靶下时间自由度与沿流状态自由度近线性相关，雅可比列病态、LM 线性收敛卡死；固定时间（`var_time=False`，新增 `_FIXED_TIME_ORBIT_TYPES` 族集合）下节点时刻保持 CR3BP 名义周期均匀采样，位置/速度修正直接吸收星历偏差，实测 L1/L2/L3/L4/L5 全部 4–6 迭代收敛（秒级到 37 s）。`test_lissajous_triangular` 重启用 L2/L4/L5 参数化，Jacobi 漂移断言改相对判据（|ΔC|/|C| < 1e-3，约化误差随振幅增长是固有量级）。
 - **LPO 初猜网格搜索过慢**（#367）：`design_lpo` 网格搜索 45 点 × 微分修正 ~700 次 STM 传播，默认 `max_step=0.01 TU` 对长周期 LPO（~21 TU/圈）意味着每次传播 ≥2100 步，单次 `design_lpo` 112 s、`test_lpo_family` 全文件 12.7 分钟（默认套件 wall time 卡点）。`_correct_lpo` 搜索阶段临时放宽 `max_step` 到 0.1 TU（rtol=1e-12 自适应仍控精度，收敛产物一致），单次降至 46 s；`test_lpo_family` 收敛测试改吃共享 fixture，全文件降至 3.2 分钟。
 - **lowthrust 解析雅可比加速比断言 flaky**（#367）：`test_analytic_jacobian_speedup_over_finite_difference` 硬绑绝对加速比 >5.0，机器负载下实测 3.1x；改为 >1.5（只守护"解析实现未退化"，不硬绑绝对量级）。
@@ -174,7 +174,7 @@
 
 ### Changed
 - **显式事件的传播分派**（#378，ADR 0023）：CR3BP/BCR4BP 仅在调用者传入 `events` 时使用 SciPy 事件积分，该例外由输入触发，与 Rust 扩展可用性无关；未传事件时仍要求 Rust 路径，扩展缺失显式报错。ForceModel 事件传播明确未实现，Rust 事件细化由 `solve_ivp_events` 单独提供。
-- **物理常数独立管理，默认地月 μ 切到 DE421**（#377，ADR 0022）：新建 `data/constants/` 常数层（与 `data/templates/` 平级），作为全库物理常数唯一来源——通用物理常量（光速、G、AU、时间常量、太阳常数）全库一套，天体参数按"基准（datum）"组织成自洽集合（DE421 / DE440 / WGS-84），调用方按场景取 `Datum.DE421.mu` 等。Python 与 Rust 从仓库根 `constants.toml` 单一来源构建期生成，两边数值不再各自漂移。此前同一物理量多套值并存的不一致（地月 μ 三套、地球 GM 五值、太阳半径 695700/696000 分叉等 9 类）随收编消除；太阳半径统一为 696000 km（Vallado）。**行为变化：默认地月质量比 μ 从 1965 旧值 0.0121506683 切到 DE421 0.012150585350562453，CR3BP 轨道族/平动点的数值结果会变**；旧值不再支持（一刀切，无 legacy 复现选项）。BCR4BP 太阳无量纲参数（MU_SUN/SUN_DISTANCE/SUN_OMEGA）保留 Topputo 文献约定；normal-form 的 qiao μ（0.012150585609624）为独立模型约定，不并入基准集。
+- **物理常数独立管理，默认地月 μ 切到 DE421**（#377，ADR 0022）：新建 `data/constants/` 常数层（与 `data/templates/` 平级），作为全库物理常数唯一来源：通用物理常量（光速、G、AU、时间常量、太阳常数）全库一套，天体参数按基准（datum）组织成自洽集合（DE421 / DE440 / WGS-84），调用方按场景取 `Datum.DE421.mu` 等。Python 与 Rust 从仓库根 `constants.toml` 单一来源构建期生成，两边数值不再各自漂移。此前同一物理量多套值并存的不一致（地月 μ 三套、地球 GM 五值、太阳半径 695700/696000 分叉等 9 类）随收编消除；太阳半径统一为 696000 km（Vallado）。**行为变化：默认地月质量比 μ 从 1965 旧值 0.0121506683 切到 DE421 0.012150585350562453，CR3BP 轨道族/平动点的数值结果会变**；旧值不再支持（一刀切，无 legacy 复现选项）。BCR4BP 太阳无量纲参数（MU_SUN/SUN_DISTANCE/SUN_OMEGA）保留 Topputo 文献约定；normal-form 的 qiao μ（0.012150585609624）为独立模型约定，不并入基准集。
 - **移除隐式资源降级，能力缺失改显式报错**（#354/#388，ADR 0020 迁移第 5 步）：`Dynamics.propagate` 事件检测新增显式 `backend` 参数（不传报错、拒绝 auto；`events=[]` 等价无事件，走 Rust 快速路径）；`spice_optional` 默认改报错、QF method 显式选择；ephem cache enable 后 miss 一律报错（缓存 key 归一化，天体名↔NAIF ID 反查收敛）；COPT 不可用默认报错（`fallback_to_scipy` 默认 False）；`to_rust_spec` None 按资源/能力分流（`RustExtensionUnavailableError` vs `NotImplementedError`）；8 处 ADR 修订。
 - **cspice-sys 去除 downloadcspice feature**：缺 `CSPICE_DIR` 构建直接报错，不再静默走 NAIF 官网源码下载；CSPICE 一律经 `scripts/download_cspice.py` 取 GitHub `cspice-v1` release 预编译包。
 - **删除 slow 测试速度分层**：5.6.4 随 ADR 0021 引入的 slow 标记分层撤销（约 1040 行），测试组织回归功能类标记（`theory`/`orchestration`/`data` 等）。
@@ -184,7 +184,7 @@
 - 删除 `SECURITY.md`（GitHub 标准模板不再保留）。
 - `constants.toml` 注释中的特殊符号改用 LaTeX 记号。
 - CLAUDE.md 英文翻译为中文。
-- 同步过时文档——spice 默认构建、DE421 μ、#351 结果契约。
+- 同步过时文档：spice 默认构建、DE421 μ、#351 结果契约。
 - README 重写精简：删除使命叙述、配图与进度表格；能力按领域分组列写（时空系统/积分器与动力学/任务轨道设计/转移轨道设计/轨道控制/接口与工具）；安装只留 uv；快速开始缩为 Halo 最小示例；测试说明合并为七类边界清单；开头追加 stars 与 Rust stable 徽章。
 - `docs/adr/` 新增 README 索引（状态词汇、编号规则、模板与全量索引）；ADR 0020 与 0024 互加修订指针；12 篇状态词汇统一。
 - 删除 `archive/` 目录（20 篇已完成计划与讨论草案），任务跟踪归于 GitHub issue。
@@ -193,20 +193,20 @@
 ## [5.6.5] - 2026-08-10
 
 ### Fixed
-- **Halo/NRHO 星历修正多圈发散**（f70252c）：`design_orbit` 入口对 Halo/NRHO 自动重定向 segmented 修正——two_level/standard 的"修正 1 圈 + 自由外推"对不稳定轨道（STM ~1e7/圈）必发散（实测第二圈起圈间偏差 ~7 万 km、第三圈漂离 L2）；segmented 全程分段打靶拼接，第 1 步多圈长段（节点密、段内约束强）+ 固定节点时刻 `var_time=False`（对齐朱彦伟 2026、杨洪伟 2015、刘刚 2017），产出不发散的标称参考轨道。two_level/standard 仅留稳定轨道（DRO 等）。星历 Halo 的圈间漂移是固有准周期特征，由 `station_keeping` 处理，不在本转换范围。
+- **Halo/NRHO 星历修正多圈发散**（f70252c）：`design_orbit` 入口对 Halo/NRHO 自动重定向 segmented 修正：two_level/standard 的"修正 1 圈 + 自由外推"对不稳定轨道（STM ~1e7/圈）必发散（实测第二圈起圈间偏差 ~7 万 km、第三圈漂离 L2）；segmented 全程分段打靶拼接，第 1 步多圈长段（节点密、段内约束强）+ 固定节点时刻 `var_time=False`（对齐朱彦伟 2026、杨洪伟 2015、刘刚 2017），产出不发散的标称参考轨道。two_level/standard 仅留稳定轨道（DRO 等）。星历 Halo 的圈间漂移是固有准周期特征，由 `station_keeping` 处理，不在本转换范围。
 
 ## [5.6.4] - 2026-08-10
 
 ### Added
-- **ELFO 冻结轨道设计**（#350，closes #348）：`design_orbit` 统一入口新增 ELFO 分支——经典六根数构造初值 → 全摄动传播 → 月心根数漂移分析，复用 CR3BP 管线的力模型路径（GRGM900C 10×10 + EGM96 10×10 + 第三体 + 炮弹光压）。`OrbitDesignResult`/`DesignOrbitResponse` 新增 5 个月心漂移字段（`drift_e`、`drift_aop_deg`、`drift_rp_km`、`secular_aop_rate_deg_per_year`、`moon_centric_elements`），ELFO 场景下 CR3BP 字段留空。
-- **双 CSPICE 实例双侧同步**（#357，closes #334）：Python（spiceypy）与 Rust（cspice-sys）是两个独立 CSPICE 实例，内核池与名字表互不共享；本 PR 强制 `furnsh`+`boddef` 双侧同步，补齐 Rust 侧错误处理与诊断入口——新增 `spice_spkezr`/`spice_pxform` pyfunction 供 Python 直接查 Rust 实例做双侧对拍（`e2m2e-integrators` ABI v3→v4）。
+- **ELFO 冻结轨道设计**（#350，closes #348）：`design_orbit` 统一入口新增 ELFO 分支：经典六根数构造初值 → 全摄动传播 → 月心根数漂移分析，复用 CR3BP 管线的力模型路径（GRGM900C 10×10 + EGM96 10×10 + 第三体 + 炮弹光压）。`OrbitDesignResult`/`DesignOrbitResponse` 新增 5 个月心漂移字段（`drift_e`、`drift_aop_deg`、`drift_rp_km`、`secular_aop_rate_deg_per_year`、`moon_centric_elements`），ELFO 场景下 CR3BP 字段留空。
+- **双 CSPICE 实例双侧同步**（#357，closes #334）：Python（spiceypy）与 Rust（cspice-sys）是两个独立 CSPICE 实例，内核池与名字表互不共享；本 PR 强制 `furnsh`+`boddef` 双侧同步，补齐 Rust 侧错误处理与诊断入口：新增 `spice_spkezr`/`spice_pxform` pyfunction 供 Python 直接查 Rust 实例做双侧对拍（`e2m2e-integrators` ABI v3→v4）。
 - **测试套件按功能类目重组**（#359，ADR 0021）：7 类功能标记（`theory`/`integrator`/`force`/`data`/`orchestration`/`interface`/`aux`）+ `slow`/`spice` 正交标记，取代 L1–L4 速度分层；测试目录迁至镜像源包的 `tests/algorithm/`。CI 维持静态门，测试在 release 前跑全量。
 
 ### Changed
 - **`design_orbit` 签名重构**（#350）：散参改为 `DesignOrbitRequest` 模型入口，`duration` 单位从年改为秒（clean break），参数校验迁移到 Pydantic `model_validator`；Facade 直接透传 request 对象，不再逐字段解包。
 - **Rust SPICE 错误处理加固**（#357）：`erract`/`errdev` 显式设 RETURN/NULL，消除对上游 cspice crate 初始化顺序的依赖（默认 ABORT 出错即 exit）；错误信息由 SHORT 升级为 SHORT+LONG+traceback；`spkezr`/`pxform` 入口经 `ktotal` 预检内核池，空时报项目语境错误（ADR 0020，不走 FFI、不字符串匹配）。
 - **SPICEManager 收口 boddef**（#357）：`_BODY_ID_ALIASES` 单一归属 `SPICEManager`（`design_orbit` 不再自带表），`load_kernel` 首次调用在 spiceypy 侧 boddef 全部别名，对称 Rust 侧 `register_bodies`；多进程 `_worker_init` 改走 `SPICEManager.load_kernel` 双侧 furnsh，不再直接 `spiceypy.furnsh`。
-- **ADR 0013「测试分层」标注已被 ADR 0021 取代**（#359）：0013 其余不变。
+- **ADR 0013 的测试分层标注已被 ADR 0021 取代**（#359）：0013 其余不变。
 - **calcephpy Windows 免编译**（#362/#363/#364）：新增 `calcephpy-wheel.yml` 为 cp310–cp313 构建 win_amd64 wheel 发到 `calcephpy-v1` release；`pyproject.toml` 经 `[tool.uv.sources]` 在 Windows 直拉预编译 wheel，免去 cmake+MSVC 现场编译，其他平台回落 PyPI sdist。
 - **slow 测试 e2e 解散与契约下沉**（#361，ADR 0021）：A 类 e2e 按断言解散合并（lissajous + triangular 参数化、共享 fixture、新增 Jacobi 守恒漂移断言），B 类 fixture 共享收敛（pal_stagnation 延拓 24→2 次），字段形状契约下沉到零管线单元测试；homotopy/segmented 为开发中 feat，显式 `pytest.skip`。
 
@@ -267,7 +267,7 @@
 ## [5.6.0] - 2026-08-07
 
 ### Added
-- **转移网格搜索 Rust Rayon 化**（#316）：搜索路径全链路 Rust 化——5 个几何函数 Rust 化 → 6 步评估单元串行版 → Rayon 段间并行（`py.allow_threads` 释放 GIL）→ `TransferSearch` 接入（`set_parallel_backend='rust'` 路由）→ 基准对齐 + ADR 0017 + `parallel=True` → 进度回调 + n_workers 转发 + 轨迹过滤 → 默认后端切 rust
+- **转移网格搜索 Rust Rayon 化**（#316）：搜索路径全链路 Rust 化：5 个几何函数 Rust 化 → 6 步评估单元串行版 → Rayon 段间并行（`py.allow_threads` 释放 GIL）→ `TransferSearch` 接入（`set_parallel_backend='rust'` 路由）→ 基准对齐 + ADR 0017 + `parallel=True` → 进度回调 + n_workers 转发 + 轨迹过滤 → 默认后端切 rust
 - **Drag 力 Rust 传播**（#315）：Rust atmosphere 模块（USSA76 大气密度）+ CompiledForce 雅可比扩 ∂a/∂v（3×6）+ Drag 接入 Rust 传播（ITRF93 pxform 取风系大气速度）；drag 路径透传 f107/ap 到 density，消除与 Python 静默分歧
 - **动力学 Rust PD78 传播**：CR3BP_Dynamics（STM 路径透明加速）、BCR4BP_Dynamics（CR3BP + 太阳解析第三体）、EphemerisDynamics（新增 Rust 纯状态路径）接入 Rust PD78 步进器
 
@@ -315,7 +315,7 @@
 - LGA 精化到达段 TOF 计算修正（#258）
 - 低推力 h_init 步长上限 + #257 遗留回归测试（#279）
 - COF/GFC 文件读取增加 UTF-8 容错解码（#283）
-- phasing mypy 类型错误 — dynamics 参数类型从 CR3BP_Dynamics 改为 DynamicsLike（#266）
+- phasing mypy 类型错误：dynamics 参数类型从 CR3BP_Dynamics 改为 DynamicsLike（#266）
 - 打靶与长期预报共用同一全摄动 ForceModel
 - Rust 多重打靶治发散 + rayon 并行段积分
 - 收敛容差 2e-2 km（20m）+ 各段收敛检查 + 真实残差上报
@@ -339,7 +339,7 @@
   - porkchop 扫描（`e2m2e.algorithm.transfer.porkchop`）：出发时间 × 飞行时间网格的双脉冲 ΔV 扫描，终端状态经 `TerminalCondition` 接口提取
   - 多脉冲转移与主矢量检验（`e2m2e.algorithm.transfer.multi_impulse`）：`MultiImpulseTransfer` 以中途节点 `[t_i, r_i]` 为决策变量、弧段 Lambert 封闭、scipy SLSQP 最小化总 ΔV；`check_primer_vector` 实现 Lawden 必要条件检验与 Lion & Handelsman 中途脉冲插入准则
   - porkchop 持久化与 Pareto 前沿（`e2m2e.algorithm.transfer.porkchop`，主题 8）：`PorkchopData.to_sqlite`/`from_sqlite` 把 ΔV 网格落盘为 SQLite 解数据库（scans 元数据表 + design_points 展平表，NaN→NULL，stdlib sqlite3 零新增依赖，多 scan 自增累积）；`pareto_front` 用经典非支配排序（Deb 2002 O(MN²)）从网格提取 ΔV–TOF Pareto 前沿（Topputo 2013 双目标范式），支持自定义目标字段组合，产出 `ParetoFront` 带绘图。10 测试全过（SQLite 往返等价、多 scan 累积、已知支配关系、LEO→GEO 前沿形态）
-  - porkchop 插值代价查询（`e2m2e.algorithm.transfer.porkchop`，主题 8）：`PorkchopData.query(t_dep, tof)` 规则网格双线性插值查总 ΔV，NaN 格点传播 NaN；`PorkchopData.query_scan(path, scan_id, t_dep, tof)` 从 SQLite 解数据库读网格后插值（等价于 from_sqlite + query）。补 `(scan_id, t_dep, tof)` 索引。对应规划文档「宋亮俊数据库的在线查询」——预计算网格 + 双线性插值替代逐点重算 Lambert。6 测试全过（网格点精确值、双线性权重、NaN 传播、越界报错、SQLite 路径一致性、LEO→GEO 谷区平滑性）
+  - porkchop 插值代价查询（`e2m2e.algorithm.transfer.porkchop`，主题 8）：`PorkchopData.query(t_dep, tof)` 规则网格双线性插值查总 ΔV，NaN 格点传播 NaN；`PorkchopData.query_scan(path, scan_id, t_dep, tof)` 从 SQLite 解数据库读网格后插值（等价于 from_sqlite + query）。补 `(scan_id, t_dep, tof)` 索引。对应规划文档中的宋亮俊数据库在线查询：预计算网格 + 双线性插值替代逐点重算 Lambert。6 测试全过（网格点精确值、双线性权重、NaN 传播、越界报错、SQLite 路径一致性、LEO→GEO 谷区平滑性）
   - NSGA-II 多目标优化器（`e2m2e.algorithm.transfer.nsga2`，主题 8）：`nsga2(objectives, bounds, ...)` 经典 NSGA-II（Deb 2002），非支配排序 + 拥挤度选择 + 精英保留，SBX 交叉 + 多项式变异。约束用 Deb 可行支配规则（可行解支配不可行解，都不可行按违反量排序），无需罚因子。`ObjectiveFn` 签名 `fn(x) -> (objectives, violation)`，全部目标最小化。并行评估用 ProcessPoolExecutor（Windows spawn 安全，fn 须模块级可 pickle）。ZDT1 收敛验证（100 代平均误差 0.0013）、Schaffer N.1 收敛、约束问题前沿全可行、串行/并行一致性。11 测试全过
   - 任务综合评估与解数据库（`e2m2e.algorithm.transfer.mission_assessment`/`solution_database`，主题 8 收尾）：`MissionAssessment` 多指标静态加权（`evaluate`/`rank`/`best`，指标名自动推断或显式指定），在 Pareto 前沿上标量化辅助决策；`SolutionDatabase` 封装多 scan 聚合查询（`add_scan`/`get_scan`/`query`/`pareto_front`/`list_scans`/`filter`），`filter` 预留 Grossi 式主矢量筛选钩子。12 测试全过
 - **不变流形与低能转移**：
@@ -349,7 +349,7 @@
   - 可变质量低推力受控动力学基座（`e2m2e.core.forces.VariableMassFiniteBurn`）：质量作为状态量 `state[6]` 随推力消耗（`ṁ = −T/(Isp·g₀)`），`ForceModel.propagate` 自动把状态扩展为 7D `[r,v,m]` 并分流到 Rust `propagate_compiled_lowthrust`（复用 `augmented_state::augmented_eom_7d`）。本期支持常量推力与固定方向；半长轴变化率对标解析解误差 < 5%、质量消耗对标 < 1e-6。为后续最优控制求解层（直接法配点、间接法协态、月面动力下降）的共同基座
   - 低推力多段直接打靶求解器（`e2m2e.algorithm.transfer.lowthrust_shooting`）：`LowThrustShooting` 以各段常量控制（throttle + 方向）为决策变量、接龙传播复用 7D 地基、SLSQP 最小化燃料、归一化末端等式约束匹配目标。`LowThrustShootingSolution` 含控制历史与质量剖面。文献参数（Zhang 2025: T=20mN, Isp=3000s, m0=500kg）短弧 min-fuel 闭环验证
   - 低推力解析雅可比（灵敏度方程法）：`augmented_eom_7d_with_sensitivity`（Rust，64D 增广 `[x₇, Φ₆ₓ₆, S₇ₓ₃]`）一次传播同时产出末端状态、STM、状态对控制 (throttle,θ₁,θ₂) 的灵敏度；`propagate_compiled_lowthrust_sensitivity` PyO3 出口。`LowThrustShooting` 改角度参数化方向（Du 2024 式 5，决策变量 4N→3N），目标/约束提供解析雅可比喂 SLSQP。文献调研（Zhang 2015 式 21-24）。每迭代传播次数从 3N+1（数值差分）降到 1（增广积分），实测 24x 加速。有限差分对标（throttle/θ₁/θ₂ 单段 + 全链式雅可比）逐元素一致
-  - Q-law 低推力初猜生成器（`e2m2e.algorithm.transfer.qlaw`）：`qlaw_guess` 用 Lyapunov 反馈律（Holt 2024 式 6-10、Petropoulos Q-law）前向积分产出次优控制历史，治满推力初猜「推过头」的发散问题。`rv_to_keplerian` 自写 rv→经典根数（项目原无）。架构：rk_step 单步循环（每步重算 Q-law 方向跟随轨道）+ 重采样成分段常量控制喂求解器——不用 propagate_compiled_lowthrust（它段内固定惯性方向，长段不跟随速度）。`LowThrustShooting.solve_from_qlaw` 串联 Q-law 初猜 + 解析雅可比打磨，完成 gap-analysis「Q-law 作初猜→打靶优化」两级流程。最简版控 a,e,i；验证：Q 单调下降、a 朝目标收敛、初猜约束残差小于满推力
+  - Q-law 低推力初猜生成器（`e2m2e.algorithm.transfer.qlaw`）：`qlaw_guess` 用 Lyapunov 反馈律（Holt 2024 式 6-10、Petropoulos Q-law）前向积分产出次优控制历史，治满推力初猜推过头的发散问题。`rv_to_keplerian` 自写 rv→经典根数（项目原无）。架构：rk_step 单步循环（每步重算 Q-law 方向跟随轨道）+ 重采样成分段常量控制喂求解器，不用 propagate_compiled_lowthrust（它段内固定惯性方向，长段不跟随速度）。`LowThrustShooting.solve_from_qlaw` 串联 Q-law 初猜 + 解析雅可比打磨，完成 gap-analysis 的 Q-law 作初猜→打靶优化两级流程。最简版控 a,e,i；验证：Q 单调下降、a 朝目标收敛、初猜约束残差小于满推力
   - Hermite-Simpson 配点求解器（`e2m2e.algorithm.transfer.lowthrust_collocation`）：`LowThrustCollocation` 并列于直接打靶（`LowThrustShooting`），把节点状态+控制都作决策变量、HS 缺陷约束保证段间动力学连续，比单弧打靶更鲁棒。复用地基 Rust `augmented_eom_7d`（新增 `augmented_eom_7d_py` 单点 EOM PyO3 出口供配点频繁求值），Q-law 初猜可用（`solve_from_qlaw`）。决策变量 10(N+1)（节点状态7D+控制3D），Simpson 缺陷约束。验证：HS 缺陷在真实轨迹上随弧长 O(dt⁴) 下降（转录正确）、min-fuel 闭环收敛、对标直接打靶末态一致；3 测试全过。解析缺陷雅可比（块三对角）留后续性能优化
   - `PointMassGravity.to_rust_spec`：补齐 `("point_mass", mu)` 序列化，让点质量引力走 Rust 编译路径（与 GravityField degree=0 对齐但更轻量，不查星历）
 - **proximity 相对运动**：
@@ -374,14 +374,14 @@
 - `e2m2e.algorithms` 导出 `sample_patch_points_perilune_clustered`（multiple_shooting.py:551），与 `sample_patch_points` 并列，面向 NRHO 近月点欠约束场景；此前需从 `e2m2e.algorithms.multiple_shooting` 模块路径导入
 
 ### Fixed
-- `ForceModel` 类 docstring 仍自述「不支持 STM」，与 `propagate(with_stm=True)` 现状矛盾；改为以代码实际为准（支持 STM，不支持 Jacobi）
+- `ForceModel` 类 docstring 仍自述不支持 STM，与 `propagate(with_stm=True)` 现状矛盾；改为以代码实际为准（支持 STM，不支持 Jacobi）
 
 ### Changed
 - 发版前 GitHub Pages 文档全面审查与更新（PR #250）：50+ 处问题修复
   - 硬错误：quickstart 力模型组合三连错、stability 整节旧 API 重写、TransferConfig 9 个旧字段改 `nlp_*`、terminal/propulsion 虚构签名、visualization 两个不存在的绘图方法、orbit 的 `save/load`、dynamics/ephemeris 的 dict 属性访问、coordinate transform 参数序与 `UnitSystem.CR3BP`、halo 族编排四文件签名、两层打靶参数/字段名
   - 过时描述：Orbit 显式字段、System 基类三问题、halo_class 南北族（3 文件写反）、EphemerisDynamics 内部实现地位、ITRFSpiceAxes 标注、ReferenceFrame 枚举成员、内核下载指向 GitHub Release（kernels-v1）等
   - 新功能文档：ForceModel STM 与 propagate_compiled 快速路径、`rk_step` `state_error_dim`、SPICEManager 星历缓存、STM 截断抛错契约、`NormalFormResult.save/load`、近月点加密采样；API 页补 `indirect_term`/`relativistic_correction`/`ephemeris_correction`/`normal_form`/`two_level_multiple_shooting` 等模块
-  - 审查中追加：halo 种子示例 `amplitude_z` 由 0.01 改 0.001（Richardson 近似在 0.01 不收敛、与 `examples/halo_orbit_design.py` 一致）；stability 分岔判据措辞由「穿过」改为「接近」（与代码 `abs(lam±1.0) < tol` 一致）
+  - 审查中追加：halo 种子示例 `amplitude_z` 由 0.01 改 0.001（Richardson 近似在 0.01 不收敛、与 `examples/halo_orbit_design.py` 一致）；stability 分岔判据措辞由穿过改为接近（与代码 `abs(lam±1.0) < tol` 一致）
 - 源码 docstring RST 排版修复以支撑 Sphinx 构建零警告：normal_form 11 个模块、ephemeris_correction、physical_model、visualization/config、force_model 等 docstring 解析干净；`api/e2m2e.mbse.rst` 与 `api/e2m2e.visualization.rst` 用 `:exclude-members:` 消解 ProjectionPlane/PlotConfig 的重复对象描述与交叉引用歧义
 
 ## [5.3.0] - 2026-07-10
@@ -444,7 +444,7 @@
   - NAFF 频率分析（不可用时降级 FFT）、块三对角多重打靶、函数式坐标变换链 `coord_trans`
   - `[normal-form]` 可选依赖（sympy、joblib），惰性导入不阻塞基础包加载
   - 文档 `docs/algorithms/normal-form.rst`、示例 `examples/normal_form_example.py`
-  - `CONTEXT.md` 与 `docs/reference/glossary.rst` 新增「Hamiltonian 正规化」术语小节
+  - `CONTEXT.md` 与 `docs/reference/glossary.rst` 新增 Hamiltonian 正规化术语小节
 
 ### Fixed
 - 修正 quasi-Floquet Lie 代数法的 dexp 公式误差：原实现假设 `d/dt exp(ξ)=exp(ξ)·ξ̇`（仅 [ξ,ξ̇]=0 成立），改为 commutator-free 4 阶 Lie group RK4

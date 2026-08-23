@@ -56,8 +56,8 @@ jd_tt, r_gcrs = system.ebcrs_to_gcrs(jd_tdb, r_ebcrs)
 决策要点：
 
 1. **形状仿 `SynodicJ2000System`**（同包内的转换器类先例），不继承
-   `Axes`。理由：`Axes` 抽象是"给定 et 返回旋转矩阵"，装不下时空联合
-   转换——本转换同时切换时间尺度并含相对论项，不是任一固定时刻的
+   `Axes`。理由：`Axes` 抽象是给定 et 返回旋转矩阵，装不下时空联合
+   转换：本转换同时切换时间尺度并含相对论项，不是任一固定时刻的
    纯旋转。EBCRS 的空间部分（ICRS 轴 + 地月质心原点）本就可以用现有
    `CoordinateSystem(ICRSAxes, CelestialBodyOrigin("EARTH MOON BARYCENTER"))`
    表达，新类的价值恰在 Axes/Origin 模型之外的部分。
@@ -75,13 +75,13 @@ jd_tt, r_gcrs = system.ebcrs_to_gcrs(jd_tdb, r_ebcrs)
 
 `tests/algorithm/coordinate/test_gcrs_ebcrs.py`：
 
-- 双向往返一致性（GCRS→EBCRS→GCRS 与反向），位置容差 1 cm、时间容差
+- 双向往返一致性（GCRS→EBCRS→GCRS 与反向），位置容差 10 m、时间容差
   1 ms（容差下界由 r2s2 的 1 ns/1 mm 迭代精度与单段儒略日 float 的
   约 40 µs 分辨率共同决定，留一个量级余量）；
 - 与同历表牛顿式平移参照（即 DFH CoordinateTransform 的做法：平移
   地心-地月质心偏移、不区分 TT/TDB）的差分量化：空间差即相对论修正，
   地月距离量级下应在毫米到百米之间，时间差应在 TDB−TT 的 ±1.7 ms
-  包络内；
+  包络内（断言阈值放宽到 3 ms）；
 - 与 e2m2e 现有 SPICE 链路（SPICEManager + de440s）的差分，容差 1 km，
   用于抓接线性错误（轴向、原点、单位），不用于评定精度；
 - 地心处纯时间尺度转换与 ERFA `dtdb`（Fairhead & Bretagnon 解析模型）

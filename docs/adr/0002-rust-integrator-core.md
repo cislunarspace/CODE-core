@@ -8,7 +8,7 @@
 
 Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust 积分器内核 + Python 力模型 + 完整坐标支持。Issue #61 是这次迁移的第一个纵向切片。
 
-`e2m2e/core/dynamics.py` 中现有的 `Dynamics` 类已经提供稳定的模板方法 API：`propagate()` 编排整条轨迹的积分，子类覆写 `_get_eom_func()` 与 `_get_max_step()`。它目前把全部积分委托给 `scipy.integrate.solve_ivp`。
+`e2m2e/algorithm/dynamics/dynamics.py` 中现有的 `Dynamics` 类已经提供稳定的模板方法 API：`propagate()` 编排整条轨迹的积分，子类覆写 `_get_eom_func()` 与 `_get_max_step()`。它目前把全部积分委托给 `scipy.integrate.solve_ivp`。
 
 #61 的目标是引入一个基于 Rust 的单步 Runge-Kutta 引擎（从 Prince-Dormand 5(4)，即 "PD45" 起步），并暴露给 Python，同时不破坏现有 `Dynamics` API、也不强迫立刻重写轨迹级控制逻辑。
 
@@ -50,7 +50,7 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 - `crates/e2m2e-integrators/`，含 `Cargo.toml`、PyO3 绑定、PD45 系数与内联 Rust 单元测试。
 - `pyproject.toml` 中的 `[tool.maturin]` 配置。
 - `e2m2e/integrators.py` 公开薄封装，重新导出 `rk_step` 与 `RkMethod`。
-- `tests/integrators/test_rk_step.py`，Python 层正确性与一致性测试。
+- `tests/numerical/integrators/methods/test_rk_step.py`，Python 层正确性与一致性测试。
 
 ### 变更
 
@@ -71,7 +71,7 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 
 决策 2（"Rust crate 只负责单步积分"）描述的是**第一个切片**的范围，不是永久约束。积分器族 epic（#67）把 Rust crate 扩展为三个方法族：
 
-- **单步 RK**（`rk_step`）：`Pd45`、`Pd78`、`Rk89`——与原切片一致。
+- **单步 RK**（`rk_step`）：`Pd45`、`Pd78`、`Rk89`，与原切片一致。
 - **多步预测-校正**（`multistep_step`）：Adams-Bashforth-Moulton（`Abm`），定步长，携带一个导数采样的**历史缓冲**。
 - **二阶双积分**（`cowell_step`）：Störmer-Cowell，定步长，直接积 `x'' = a(t, x)`，从一个位置+加速度混合的历史缓冲出发；只输出位置。
 
@@ -85,7 +85,7 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 
 spice feature 的构建约定：`cspice-sys` 经 `downloadcspice` 在构建时从 NAIF 官网下载 CSPICE 源码，无需手工安装（也可用 `CSPICE_DIR` 指向本机安装）。`maturin develop` 默认不带 spice，`maturin develop --features spice` 才包含 STM 传播、打靶、第三体等 Rust 快速路径；无 spice 时 Python 侧全部静默降级到慢路径，对应测试以 `importorskip` 跳过。**release wheel 暂不带 spice**：带上意味着 wheel 内嵌 CSPICE 且构建依赖 NAIF 官网可达性，许可与发布稳定性需单独评估后再开。CI 以 `cargo clippy --workspace --features spice` 兜底 spice-gated 代码的编译。
 
-> 修订（2026-08，ADR 0020 决策 4）：spice 升为默认 feature 后本节过时——`maturin develop` 默认带 spice（见下节），无 spice 时的"静默降级到慢路径"改为报错（issue #378），对应测试的 `importorskip` 语义同步调整。
+> 修订（2026-08，ADR 0020 决策 4）：spice 升为默认 feature 后本节过时：`maturin develop` 默认带 spice（见下节），无 spice 时的"静默降级到慢路径"改为报错（issue #378），对应测试的 `importorskip` 语义同步调整。
 
 ## 修订（2026-08，spice 升为默认 feature）
 
@@ -96,9 +96,9 @@ spice 现为默认 feature：crates `default = ["spice"]` + pyproject `features=
 **以下场景保留 scipy 路径**（有意的设计选择，非临时遗漏）：
 
 - **事件检测**（`CR3BP_Dynamics._propagate_with_stm(events=...)`）：Rust `solve_ivp_events_py` 已实现但事件检测语义与 scipy 不完全对齐，事件路径按显式 `backend="scipy"/"rust"` 二选一（ADR 0020 决策 4），不传报错、不允许 `auto`；`"scipy"` 走 scipy `solve_ivp`，`"rust"` 走 Rust `solve_ivp_events`（接受语义差异）。BCR4BP 同（#333 的 NotImplementedError 分歧已消除）。
-- **防御性回退**（`Dynamics` 基类 `_propagate_with_stm`/`_propagate_state_only`、`EphemerisDynamics._propagate`）：Rust 扩展不可用时不再回退 scipy——`require_rust_extension` 抛 `RustExtensionUnavailableError`（issue #378，ADR 0020 决策 4：资源缺失即报错）。
+- **防御性回退**（`Dynamics` 基类与 `EphemerisDynamics` 的 `_propagate_with_stm`/`_propagate_state_only`）：Rust 扩展不可用时不再回退 scipy，改由 `require_rust_extension` 抛 `RustExtensionUnavailableError`（issue #378，ADR 0020 决策 4：资源缺失即报错）。
 - **NLP 优化**（`transfer/nlp_copt.py`）：COPT 不可用时默认报错（`fallback_to_scipy` 默认 `False`），显式传 `True` 才回退 SciPy SLSQP。ADR 0017 明确 NLP 留在 Python 层。
 - **Normal form 传播**（`normal_form/multiple_shooting.py`、`dynamical_substitution.py`、`propagation.py`、`quasi_floquet.py`）：已迁至 Rust `solve_ivp_py`（#336）。QF↔CM 高阶 Lie 流（`coord_trans/qf_cm.py`）已下沉 `qf_to_cm_py` / `cm_to_qf_py`（#465，12 实维分裂复积分）；`backend="python"` 仅作显式对照。`scipy.linalg.expm`（矩阵指数）和 `scipy.optimize.fsolve` 暂无 Rust 替代，保留。
 - **平动点解算与初值生成**（`scipy.optimize.fsolve`/`brentq`）：用于 L1/L2 位置解算、Halo 轨道初始猜测等。单次调用，迁移收益低。
 
-以上保留路径的上一次修订中"scipy 回退路径已移除""所有事情统一走 Rust"的措辞过于绝对，特此修正。
+上一次修订称"scipy 回退路径已移除""所有事情统一走 Rust"，措辞过于绝对，特此修正。
