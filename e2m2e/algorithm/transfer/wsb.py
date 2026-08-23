@@ -55,10 +55,19 @@ class WsbSearchParams:
     Attributes:
         sun_phase_range: 太阳相位角范围 (min, max)，弧度，[0, 2pi)
         n_sun_phase: 太阳相位角网格点数
-        departure_phase_range: 出发相位角范围 (min, max)，弧度，[0, 2pi)
+        departure_phase_range: 出发相位角范围 (min, max)，弧度，[0, 2pi)，
+            即出发点在停泊轨道上的滑行角（绕地球旋转，改变月地几何）
         n_departure_phase: 出发相位角网格点数
         tof_range: 飞行时间范围 (min, max)，天（WSB 典型 90-150 天）
         n_tof: TOF 网格点数
+        tli_speed_factor: TLI 脉冲速度与逃逸速度之比。典型值 < 1
+            （如 0.99，远地点略超月球轨道的奔月轨道）；= 1 为抛物线逃逸
+        rtol: 传播相对容差（网格筛选级，粗干精化；精化由 ThreeBodyLambert 打靶负责）
+        atol: 传播绝对容差（同上）
+        max_steps: 筛选阶段单条轨迹最大积分步数（仅 Rust 后端生效）。超过
+            即判为传播失败丢弃；真候选典型几百步，深混沌擦月轨迹需几十万步
+            且无筛选价值。Python 参照后端不截断，保持精确语义
+        n_propagation_samples: 传播采样点数
         perilune_alt_min: 近月点高度下限 (km)
         perilune_alt_max: 近月点高度上限 (km)
         max_total_dv: 最大总 Δv 筛选阈值 (km/s)
@@ -69,9 +78,13 @@ class WsbSearchParams:
     sun_phase_range: tuple[float, float] = (0.0, 2.0 * math.pi)
     n_sun_phase: int = 50
     departure_phase_range: tuple[float, float] = (0.0, 2.0 * math.pi)
-    n_departure_phase: int = 50
+    n_departure_phase: int = 180
     tof_range: tuple[float, float] = (90.0, 150.0)
     n_tof: int = 50
+    tli_speed_factor: float = 0.99
+    rtol: float = 1e-9
+    atol: float = 1e-9
+    max_steps: int = 20_000
     perilune_alt_min: float = 100.0
     perilune_alt_max: float = 10000.0
     max_total_dv: float = 5.0
@@ -89,6 +102,8 @@ class WsbSearchParams:
                 raise ValueError(f"{name} 必须在 [0, 2π) 内，得到 ({lo}, {hi})")
         if self.tof_range[0] >= self.tof_range[1]:
             raise ValueError(f"tof_range[0] < tof_range[1] 必须成立，得到 {self.tof_range}")
+        if self.tli_speed_factor <= 0.0:
+            raise ValueError(f"tli_speed_factor 必须 > 0，得到 {self.tli_speed_factor}")
         if self.perilune_alt_min >= self.perilune_alt_max:
             raise ValueError(
                 f"perilune_alt_min < perilune_alt_max 必须成立，"
@@ -217,9 +232,8 @@ def _search_wsb_trajectories_rust(
     if system.characteristic_length is None or system.characteristic_time is None:
         raise ValueError("system 必须设置 characteristic_length 与 characteristic_time")
 
-    # 只读取现有动力学对象的积分配置；实际传播由 Rust 核直接完成。
-    dynamics = BCR4BP_Dynamics(system)
-    candidates, n_propagation_failures = wsb_search_rust(
+    # 搜索级容差直接由 WsbSearchParams 提供；实际传播由 Rust 核完成。
+    candidates, n_propagation_failures, n_perilune_in_window = wsb_search_rust(
         departure_state,
         target_state,
         mu=float(system.mu),
@@ -238,10 +252,12 @@ def _search_wsb_trajectories_rust(
         perilune_alt_range_km=(params.perilune_alt_min, params.perilune_alt_max),
         max_total_dv=params.max_total_dv,
         h2_energy_threshold=params.h2_energy_threshold,
+        tli_speed_factor=params.tli_speed_factor,
         n_propagation_samples=params.n_propagation_samples,
-        rtol=float(dynamics.rtol),
-        atol=float(dynamics.atol),
-        max_step=float(dynamics.max_step),
+        rtol=params.rtol,
+        atol=params.atol,
+        max_step=math.inf,
+        max_steps=params.max_steps,
         secondary_radius_km=R_MOON_KM,
         characteristic_length_km=float(system.characteristic_length),
         characteristic_time_sec=float(system.characteristic_time),
@@ -265,19 +281,33 @@ def _search_wsb_trajectories_rust(
             FailureCause.NONE,
             "找到 WSB 候选",
         )
-    n_tasks = params.n_sun_phase * params.n_tof
-    if n_propagation_failures == n_tasks * params.n_departure_phase:
+    n_tasks = params.n_sun_phase * params.n_tof * params.n_departure_phase
+    if n_propagation_failures == n_tasks:
         return CandidateSearchResult(
             (),
             ConvergenceState.DIVERGED,
             FailureCause.DIVERGENCE_DETECTED,
             "全部 WSB 网格点传播失败",
         )
+    # 筛选漏斗诊断（#513）：零候选时报告卡在哪一环，而非笼统的
+    # "未找到可行候选"。近月点高度窗无命中是几何/参数化问题；
+    # 有命中但零候选则是 H₂/Δv 筛选拦截。
+    funnel = (
+        f"搜索未找到可行候选：传播失败 {n_propagation_failures}/{n_tasks}，"
+        f"近月点高度窗命中 {n_perilune_in_window}，"
+        f"最终候选 0（后续 H₂/Δv 筛选拦截）"
+        if n_perilune_in_window > 0
+        else (
+            f"搜索未找到可行候选：传播失败 {n_propagation_failures}/{n_tasks}，"
+            f"无轨迹的近月点进入 [{params.perilune_alt_min:.0f}, "
+            f"{params.perilune_alt_max:.0f}] km 高度窗"
+        )
+    )
     return CandidateSearchResult(
         (),
         ConvergenceState.INFEASIBLE,
         FailureCause.NO_INTERSECTION,
-        "搜索未找到可行候选",
+        funnel,
     )
 
 
@@ -319,16 +349,17 @@ def _search_wsb_trajectories_python(
     if du_km is None:
         raise ValueError("system.characteristic_length must be set")
 
-    # 出发态速度参数化
+    # 出发态速度参数化（#513 方案 A）：departure_phase 是出发点在停泊轨道上的
+    # 滑行角（绕地球旋转 r0 与 v_park，改变月地几何），TLI 脉冲沿切向施加，
+    # 速度大小 v_esc * tli_speed_factor。原参数化把 departure_phase 用作 TLI
+    # 方向角，切向发射的远地点背向月球，无法以低 Δv 命中低空近月点。
     r0 = departure_state[:3].copy()
     v_park = departure_state[3:].copy()
     r0_norm = np.linalg.norm(r0)
     v_esc = math.sqrt(2.0 * (1.0 - mu) / r0_norm)
-    v_tli = v_esc * 1.01  # 略高于逃逸速度
-
-    v_park_norm = np.linalg.norm(v_park)
-    v_hat = np.array([0.0, 1.0, 0.0]) if v_park_norm < 1e-12 else v_park / v_park_norm
-    r_hat = r0 / r0_norm if r0_norm > 1e-12 else np.array([1.0, 0.0, 0.0])
+    v_tli = v_esc * params.tli_speed_factor
+    if np.linalg.norm(v_park) < 1e-12:
+        raise ValueError("departure_state 速度分量接近零，无法确定切向 TLI 方向")
 
     # 目标轨道半径
     r_target = float(np.linalg.norm(target_state[:3]))
@@ -356,10 +387,8 @@ def _search_wsb_trajectories_python(
             params,
             departure_state,
             r0,
-            v_hat,
-            r_hat,
-            v_tli,
             v_park,
+            v_tli,
             target_state,
             r_target,
             mu,
@@ -420,10 +449,8 @@ def _wsb_worker(
     params: WsbSearchParams,
     departure_state: np.ndarray,
     r0: np.ndarray,
-    v_hat: np.ndarray,
-    r_hat: np.ndarray,
-    v_tli: float,
     v_park: np.ndarray,
+    v_tli: float,
     target_state: np.ndarray,
     r_target: float,
     mu: float,
@@ -439,7 +466,15 @@ def _wsb_worker(
 
     在 ProcessPoolExecutor 工作进程中运行。对给定的太阳相位角和
     飞行时间，遍历出发相位角网格，返回所有满足条件的候选。
+
+    出发参数化（#513 方案 A）：每个 departure_phase 把出发点（含停泊
+    速度）绕地球旋转该角，TLI 脉冲沿旋转后的切向施加。
     """
+
+    def _rot_z(vec: np.ndarray, angle: float) -> np.ndarray:
+        c, s = math.cos(angle), math.sin(angle)
+        return np.array([c * vec[0] - s * vec[1], s * vec[0] + c * vec[1], vec[2]])
+
     bcr4bp_system = BCR4BPSystem(
         mu=mu,
         primary="Earth",
@@ -450,6 +485,12 @@ def _wsb_worker(
         sun_phase0=sun_phase0,
     )
     dynamics = BCR4BP_Dynamics(bcr4bp_system)
+    # 网格筛选级容差（#513）：搜索只需初筛，精度由 _refine_wsb_candidate
+    # 的 ThreeBodyLambert 打靶保证；用动力学研究级默认容差会让失败组合
+    # 烧到 max_steps 才放弃（单组合秒级），全网格成本不可接受。
+    dynamics.rtol = params.rtol
+    dynamics.atol = params.atol
+    dynamics.max_step = math.inf
     periapsis_section = PoincareSection.periapsis("moon", bcr4bp_system)
     moon_pos = np.array([1.0 - mu, 0.0, 0.0])
 
@@ -465,11 +506,11 @@ def _wsb_worker(
     n_propagation_failures = 0
 
     for angle in angle_grid:
-        cos_a, sin_a = math.cos(angle), math.sin(angle)
-        v_dir = cos_a * v_hat + sin_a * r_hat
-        v_dep = v_dir * v_tli
-        x0 = np.concatenate([r0, v_dep])
-        dv_dep = float(np.linalg.norm(v_dep - v_park))
+        r_dep = _rot_z(r0, angle)
+        v_park_rot = _rot_z(v_park, angle)
+        v_dep = v_park_rot / np.linalg.norm(v_park_rot) * v_tli
+        x0 = np.concatenate([r_dep, v_dep])
+        dv_dep = float(np.linalg.norm(v_dep - v_park_rot))
 
         try:
             t_eval = np.linspace(0.0, tof_dim, n_samples)

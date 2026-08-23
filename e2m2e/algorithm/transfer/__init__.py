@@ -399,6 +399,7 @@ def transfer_orbit(
             tli_params=tli_params,
             target_ephemeris=target_ephemeris,
             search_params=wsb_search_params,
+            tof_range=tof_range,
         )
     if transfer_type == "low_thrust":
         if engine_config is None:
@@ -612,6 +613,7 @@ def _transfer_orbit_wsb(
     tli_params: TliParams | None,
     target_ephemeris: Any,
     search_params: WsbSearchParams | None,
+    tof_range: tuple[float, float] | None = None,
 ) -> TransferDesignResult:
     """WSB 太阳引力辅助转移编排。
 
@@ -632,6 +634,11 @@ def _transfer_orbit_wsb(
     from ..dynamics import CR3BP_Dynamics, CR3BP_System
     from ..dynamics.bcr4bp_system import BCR4BPSystem
     from .wsb import _refine_wsb_candidate
+
+    # tof_range 合并（#513）：facade 的 tof_range 覆盖 WsbSearchParams 默认
+    # tof 网格；显式传入 wsb_search_params 时其（专门的）tof 网格优先。
+    if tof_range is not None and search_params is None:
+        search_params = WsbSearchParams(tof_range=tof_range)
 
     # BCR4BP 系统（搜索用，sun_phase0 在 worker 中逐个构造）
     MU_EM = 1.21506683e-2

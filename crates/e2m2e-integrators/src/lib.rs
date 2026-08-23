@@ -3333,7 +3333,7 @@ fn spawn_progress_drainer(
 /// BCR4BP 传播、近月点检测、H₂、到达态插值与候选筛选全程在 Rust 执行；
 /// ``parallel``/``n_workers`` 只控制 Rust 内核，Rust worker 不回调 Python。
 #[pyfunction]
-#[pyo3(signature = (departure_state, target_state, mu, mu_sun, sun_distance, sun_angular_rate, sun_phase_min, sun_phase_max, n_sun_phase, departure_phase_min, departure_phase_max, n_departure_phase, tof_min_sec, tof_max_sec, n_tof, perilune_alt_min, perilune_alt_max, max_total_dv, h2_energy_threshold, n_propagation_samples, rtol, atol, max_step, secondary_radius_km, characteristic_length_km, characteristic_time_sec, *, parallel=None, n_workers=None, progress_callback=None))]
+#[pyo3(signature = (departure_state, target_state, mu, mu_sun, sun_distance, sun_angular_rate, sun_phase_min, sun_phase_max, n_sun_phase, departure_phase_min, departure_phase_max, n_departure_phase, tof_min_sec, tof_max_sec, n_tof, perilune_alt_min, perilune_alt_max, max_total_dv, h2_energy_threshold, tli_speed_factor, n_propagation_samples, rtol, atol, max_step, max_steps, secondary_radius_km, characteristic_length_km, characteristic_time_sec, *, parallel=None, n_workers=None, progress_callback=None))]
 #[allow(clippy::too_many_arguments)]
 fn wsb_search_py(
     departure_state: Vec<f64>,
@@ -3355,10 +3355,12 @@ fn wsb_search_py(
     perilune_alt_max: f64,
     max_total_dv: f64,
     h2_energy_threshold: f64,
+    tli_speed_factor: f64,
     n_propagation_samples: usize,
     rtol: f64,
     atol: f64,
     max_step: f64,
+    max_steps: usize,
     secondary_radius_km: f64,
     characteristic_length_km: f64,
     characteristic_time_sec: f64,
@@ -3366,7 +3368,7 @@ fn wsb_search_py(
     n_workers: Option<usize>,
     progress_callback: Option<PyObject>,
     py: Python<'_>,
-) -> PyResult<(Vec<WsbCandidate>, usize)> {
+) -> PyResult<(Vec<WsbCandidate>, usize, usize)> {
     if departure_state.len() != 6 || target_state.len() != 6 {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "departure_state 与 target_state 必须都是长度 6 的状态",
@@ -3396,10 +3398,12 @@ fn wsb_search_py(
         perilune_alt_max,
         max_total_dv,
         h2_energy_threshold,
+        tli_speed_factor,
         n_propagation_samples,
         rtol,
         atol,
         max_step,
+        max_steps,
         secondary_radius_km,
         characteristic_length_km,
         characteristic_time_sec,
@@ -3463,6 +3467,7 @@ fn wsb_search_py(
             .map(WsbCandidate::from)
             .collect(),
         result.n_propagation_failures,
+        result.n_perilune_in_window,
     ))
 }
 

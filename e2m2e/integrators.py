@@ -665,17 +665,19 @@ def wsb_search_rust(
     perilune_alt_range_km: tuple[float, float],
     max_total_dv: float,
     h2_energy_threshold: float,
+    tli_speed_factor: float,
     n_propagation_samples: int,
     rtol: float,
     atol: float,
     max_step: float,
+    max_steps: int,
     secondary_radius_km: float,
     characteristic_length_km: float,
     characteristic_time_sec: float,
     parallel: bool | None = None,
     n_workers: int | None = None,
     progress_callback: Callable[[int], Any] | None = None,
-) -> tuple[list[dict[str, Any]], int]:
+) -> tuple[list[dict[str, Any]], int, int]:
     """WSB 三维网格搜索的 Rust 后端。
 
     参数全部是已无量纲化的 POD 数值；BCR4BP 传播、截面求精和候选筛选均在
@@ -687,7 +689,7 @@ def wsb_search_rust(
     if departure_arr.shape != (6,) or target_arr.shape != (6,):
         raise ValueError("departure_state 与 target_state 必须都是长度 6 的状态")
 
-    raw_candidates, n_propagation_failures = wsb_search_py(
+    raw_candidates, n_propagation_failures, n_perilune_in_window = wsb_search_py(
         departure_arr.tolist(),
         target_arr.tolist(),
         float(mu),
@@ -707,10 +709,12 @@ def wsb_search_rust(
         float(perilune_alt_range_km[1]),
         float(max_total_dv),
         float(h2_energy_threshold),
+        float(tli_speed_factor),
         int(n_propagation_samples),
         float(rtol),
         float(atol),
         float(max_step),
+        int(max_steps),
         float(secondary_radius_km),
         float(characteristic_length_km),
         float(characteristic_time_sec),
@@ -738,6 +742,7 @@ def wsb_search_rust(
             for candidate in raw_candidates
         ],
         int(n_propagation_failures),
+        int(n_perilune_in_window),
     )
 
 

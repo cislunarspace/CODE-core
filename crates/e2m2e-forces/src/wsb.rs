@@ -29,9 +29,11 @@ pub struct WsbSearchParams {
     pub perilune_alt_max: f64,
     pub max_total_dv: f64,
     pub h2_energy_threshold: f64,
+    pub tli_speed_factor: f64,
     pub n_propagation_samples: usize,
     pub rtol: f64,
     pub atol: f64,
+    pub max_steps: usize,
     pub max_step: f64,
     pub secondary_radius_km: f64,
     pub characteristic_length_km: f64,
@@ -61,6 +63,8 @@ pub struct WsbCandidate {
 pub struct WsbSearchResult {
     pub candidates: Vec<WsbCandidate>,
     pub n_propagation_failures: usize,
+    /// 通过近月点高度筛选的组合数（筛选漏斗诊断）。
+    pub n_perilune_in_window: usize,
 }
 
 /// 单个 `(sun_phase, tof)` 任务共享的只读数值输入。
@@ -71,11 +75,7 @@ struct WsbTaskContext<'a> {
     sun_distance: f64,
     sun_angular_rate: f64,
     params: &'a WsbSearchParams,
-    r0: &'a [f64; 3],
-    v_park: &'a [f64; 3],
-    v_hat: &'a [f64; 3],
-    r_hat: &'a [f64; 3],
-    v_tli: f64,
+    departure: &'a DepartureParameterization,
     r_target: f64,
 }
 
@@ -202,18 +202,14 @@ fn evaluate_task(
     context: &WsbTaskContext<'_>,
     sun_phase0: f64,
     tof_sec: f64,
-) -> Result<(Vec<WsbCandidate>, usize), String> {
+) -> Result<(Vec<WsbCandidate>, usize, usize), String> {
     let target_state = context.target_state;
     let mu = context.mu;
     let mu_sun = context.mu_sun;
     let sun_distance = context.sun_distance;
     let sun_angular_rate = context.sun_angular_rate;
     let params = context.params;
-    let r0 = context.r0;
-    let v_park = context.v_park;
-    let v_hat = context.v_hat;
-    let r_hat = context.r_hat;
-    let v_tli = context.v_tli;
+    let departure = context.departure;
     let r_target = context.r_target;
     let angle_grid = linspace_exclusive(
         params.departure_phase_min,
@@ -225,17 +221,23 @@ fn evaluate_task(
     let moon_x = 1.0 - mu;
     let mut candidates = Vec::new();
     let mut n_propagation_failures = 0;
+    let mut n_perilune_in_window = 0;
 
     for angle in angle_grid {
-        let (cos_angle, sin_angle) = (angle.cos(), angle.sin());
-        let v_dir = [
-            cos_angle * v_hat[0] + sin_angle * r_hat[0],
-            cos_angle * v_hat[1] + sin_angle * r_hat[1],
-            cos_angle * v_hat[2] + sin_angle * r_hat[2],
+        // #513 方案 A：出发点绕地球旋转 angle，TLI 沿旋转后切向施加。
+        let r_dep = rot_z(&departure.r0, angle);
+        let v_park_rot = rot_z(&departure.v_park, angle);
+        let v_park_norm = norm3(&v_park_rot);
+        if v_park_norm < MIN_VELOCITY_NORM {
+            continue;
+        }
+        let v_dep = [
+            v_park_rot[0] / v_park_norm * departure.v_tli,
+            v_park_rot[1] / v_park_norm * departure.v_tli,
+            v_park_rot[2] / v_park_norm * departure.v_tli,
         ];
-        let v_dep = [v_dir[0] * v_tli, v_dir[1] * v_tli, v_dir[2] * v_tli];
-        let initial_state = [r0[0], r0[1], r0[2], v_dep[0], v_dep[1], v_dep[2]];
-        let dv_departure = distance3(&v_dep, v_park);
+        let initial_state = [r_dep[0], r_dep[1], r_dep[2], v_dep[0], v_dep[1], v_dep[2]];
+        let dv_departure = distance3(&v_dep, &v_park_rot);
 
         let propagated = propagate_bcr4bp(
             mu,
@@ -249,11 +251,16 @@ fn evaluate_task(
             params.rtol,
             params.atol,
             Some(params.max_step),
-            None,
+            Some(params.max_steps),
         );
         let propagated = match propagated {
             Ok(result) => result,
-            Err(error) if error.contains("step size collapsed") => {
+            Err(error)
+                if error.contains("step size collapsed")
+                    || error.contains("output length mismatch")
+                    || error.contains("RK step error")
+                    || error.contains("max_step") =>
+            {
                 n_propagation_failures += 1;
                 continue;
             }
@@ -272,6 +279,7 @@ fn evaluate_task(
         if perilune_alt_km < params.perilune_alt_min || perilune_alt_km > params.perilune_alt_max {
             continue;
         }
+        n_perilune_in_window += 1;
 
         let h2_kepler = compute_kepler_energy_moon(&perilune_state, mu);
         if h2_kepler >= params.h2_energy_threshold {
@@ -331,36 +339,38 @@ fn evaluate_task(
         });
     }
 
-    Ok((candidates, n_propagation_failures))
+    Ok((candidates, n_propagation_failures, n_perilune_in_window))
+}
+
+/// 出发参数化预算（#513 方案 A）：departure_phase 是出发点在停泊轨道上的
+/// 滑行角（绕地球旋转位置与停泊速度，改变月地几何），TLI 脉冲沿旋转后的
+/// 切向施加，速度大小 v_esc * tli_speed_factor。
+#[derive(Clone, Copy)]
+struct DepartureParameterization {
+    r0: [f64; 3],
+    v_park: [f64; 3],
+    v_tli: f64,
 }
 
 fn prepare_inputs(
     departure_state: &[f64; 6],
     target_state: &[f64; 6],
     mu: f64,
-) -> ([f64; 3], [f64; 3], [f64; 3], [f64; 3], f64, f64) {
+    tli_speed_factor: f64,
+) -> (DepartureParameterization, f64) {
     let r0 = [departure_state[0], departure_state[1], departure_state[2]];
     let v_park = [departure_state[3], departure_state[4], departure_state[5]];
     let r0_norm = norm3(&r0);
     let v_esc = (2.0 * (1.0 - mu) / r0_norm).sqrt();
-    let v_tli = v_esc * 1.01;
-    let v_park_norm = norm3(&v_park);
-    let v_hat = if v_park_norm < MIN_VELOCITY_NORM {
-        [0.0, 1.0, 0.0]
-    } else {
-        [
-            v_park[0] / v_park_norm,
-            v_park[1] / v_park_norm,
-            v_park[2] / v_park_norm,
-        ]
-    };
-    let r_hat = if r0_norm > MIN_VELOCITY_NORM {
-        [r0[0] / r0_norm, r0[1] / r0_norm, r0[2] / r0_norm]
-    } else {
-        [1.0, 0.0, 0.0]
-    };
+    let v_tli = v_esc * tli_speed_factor;
     let r_target = norm3(&target_state[..3]);
-    (r0, v_park, v_hat, r_hat, v_tli, r_target)
+    (DepartureParameterization { r0, v_park, v_tli }, r_target)
+}
+
+/// 绕 z 轴旋转向量。
+fn rot_z(v: &[f64; 3], angle: f64) -> [f64; 3] {
+    let (s, c) = angle.sin_cos();
+    [c * v[0] - s * v[1], s * v[0] + c * v[1], v[2]]
 }
 
 fn validate_params(params: &WsbSearchParams) {
@@ -394,8 +404,8 @@ pub fn wsb_search_serial(
     progress_tx: Option<&crossbeam_channel::Sender<usize>>,
 ) -> Result<WsbSearchResult, String> {
     validate_params(params);
-    let (r0, v_park, v_hat, r_hat, v_tli, r_target) =
-        prepare_inputs(departure_state, target_state, mu);
+    let (departure, r_target) =
+        prepare_inputs(departure_state, target_state, mu, params.tli_speed_factor);
     let sun_phase_grid = linspace_exclusive(
         params.sun_phase_min,
         params.sun_phase_max,
@@ -410,21 +420,19 @@ pub fn wsb_search_serial(
         sun_distance,
         sun_angular_rate,
         params,
-        r0: &r0,
-        v_park: &v_park,
-        v_hat: &v_hat,
-        r_hat: &r_hat,
-        v_tli,
+        departure: &departure,
         r_target,
     };
     let mut candidates = Vec::new();
     let mut n_propagation_failures = 0;
+    let mut n_perilune_in_window = 0;
     for sun_phase0 in sun_phase_grid {
         for &tof_sec in &tof_grid {
-            let (mut task_candidates, task_failures) =
+            let (mut task_candidates, task_failures, task_in_window) =
                 evaluate_task(&context, sun_phase0, tof_sec)?;
             candidates.append(&mut task_candidates);
             n_propagation_failures += task_failures;
+            n_perilune_in_window += task_in_window;
             if let Some(tx) = progress_tx {
                 let _ = tx.send(1);
             }
@@ -434,6 +442,7 @@ pub fn wsb_search_serial(
     Ok(WsbSearchResult {
         candidates,
         n_propagation_failures,
+        n_perilune_in_window,
     })
 }
 
@@ -452,8 +461,8 @@ pub fn wsb_search_parallel(
     use rayon::prelude::*;
 
     validate_params(params);
-    let (r0, v_park, v_hat, r_hat, v_tli, r_target) =
-        prepare_inputs(departure_state, target_state, mu);
+    let (departure, r_target) =
+        prepare_inputs(departure_state, target_state, mu, params.tli_speed_factor);
     let sun_phase_grid = linspace_exclusive(
         params.sun_phase_min,
         params.sun_phase_max,
@@ -471,11 +480,7 @@ pub fn wsb_search_parallel(
         sun_distance,
         sun_angular_rate,
         params,
-        r0: &r0,
-        v_park: &v_park,
-        v_hat: &v_hat,
-        r_hat: &r_hat,
-        v_tli,
+        departure: &departure,
         r_target,
     };
 
@@ -492,14 +497,17 @@ pub fn wsb_search_parallel(
 
     let mut candidates = Vec::new();
     let mut n_propagation_failures = 0;
-    for (mut task_candidates, task_failures) in task_results? {
+    let mut n_perilune_in_window = 0;
+    for (mut task_candidates, task_failures, task_in_window) in task_results? {
         candidates.append(&mut task_candidates);
         n_propagation_failures += task_failures;
+        n_perilune_in_window += task_in_window;
     }
     sort_candidates(&mut candidates);
     Ok(WsbSearchResult {
         candidates,
         n_propagation_failures,
+        n_perilune_in_window,
     })
 }
 
