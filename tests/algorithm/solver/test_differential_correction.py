@@ -143,6 +143,57 @@ class TestSetup:
 
 
 # ============================================================
+# 迭代内积分容差配置（#536）
+# ============================================================
+class TestIntegrationTolerance:
+    """迭代内 STM 传播容差与 dynamics 研究级容差解耦（#536）。"""
+
+    def test_default_is_correction_level(self, dro_dynamics):
+        """默认修正级 1e-10，不跟随 dynamics.rtol（研究级 1e-12）。"""
+        corrector = DifferentialCorrection(dro_dynamics)
+        assert corrector.integration_rtol == 1e-10
+        assert corrector.integration_atol == 1e-10
+        assert dro_dynamics.rtol == 1e-12
+
+    def test_explicit_override(self, dro_dynamics):
+        corrector = DifferentialCorrection(
+            dro_dynamics, integration_rtol=1e-9, integration_atol=1e-11
+        )
+        assert corrector.integration_rtol == 1e-9
+        assert corrector.integration_atol == 1e-11
+
+    def test_iterate_uses_integration_tolerance(self, dro_dynamics, monkeypatch):
+        """_iterate_rust 传给 Rust 内核的容差是修正级容差，而非 dynamics.rtol。"""
+        captured = {}
+
+        import e2m2e.algorithm.solver.differential_correction as dc_module
+
+        def fake_kernel(**kwargs):
+            captured.update(kwargs)
+            return {
+                "error_history": [],
+                "correction_history": [],
+                "iterations": 0,
+                "residual": None,
+                "state_history": [],
+                "time_history": [],
+                "final_state_history": [],
+                "status": "max_iterations",
+                "cause": "max_iterations_reached",
+                "message": "mock",
+            }
+
+        monkeypatch.setattr(dc_module, "differential_correction_cr3bp_py", fake_kernel)
+        corrector = DifferentialCorrection(dro_dynamics, integration_rtol=1e-9)
+        corrector.setup_2D_symmetric_x_fixed_t(t_half=2.5)
+        seed = np.zeros(6)
+        seed[0] = 0.8
+        corrector._iterate_rust(seed, 2.5, full_period=False, verbose=False, callback=None)
+        assert captured["rtol"] == 1e-9
+        assert captured["atol"] == 1e-9
+
+
+# ============================================================
 # 微分修正收敛测试
 # ============================================================
 class TestIterateCorrection:

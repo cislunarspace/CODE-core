@@ -629,11 +629,16 @@ class TestLgaInclinedEndToEnd:
 
     def test_search_high_inclination_iss_finds_candidates(self):
         """大倾角 51.6°（ISS 倾角）搜索层应找到可行候选（经验面外带覆盖 0°~90°）。"""
+        import dataclasses
+
         from e2m2e.algorithm.transfer.hohmann import construct_departure_state
 
         system, dynamics = _make_cr3bp_system()
         tgt_state = _make_target_state(system)
         r0, v0 = construct_departure_state(TliParams(parking_alt_km=200.0, inclination_deg=51.6))
         dep_state = system.physical_to_dimensionless(np.concatenate([r0, v0]))
-        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
+        # 大倾角候选的命中瓶颈在出发相位网格密度（面外加宽不补），
+        # 90 点漏检；120 点 + n_tof=2 实测 8 候选 / 7s（ADR 0037 预算内）
+        params = dataclasses.replace(_SEARCH_PARAMS, n_departure_phase=120, n_tof=2)
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, params)
         assert len(candidates) > 0, "倾角 51.6° 应找到可行候选（面外带覆盖 0°~90°）"

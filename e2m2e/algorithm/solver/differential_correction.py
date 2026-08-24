@@ -51,6 +51,11 @@ class DifferentialCorrection:
     DEFAULT_TOLERANCE = 1e-12
     DEFAULT_MAX_ITERATIONS = 50
     DEFAULT_DAMPING_FACTOR = 1.0
+    # Newton 迭代内增广状态（6+36 STM）传播的筛选级容差（#536）。修正
+    # 闭环只需中间精度（残差评估/雅可比），研究级 1e-12 使单次 STM
+    # 传播成本不可接受；1e-10 对 1e-6 级闭合判据精度足够。最终轨道
+    # 编排（_create_corrected_orbit）仍用 dynamics 的研究级容差。
+    DEFAULT_INTEGRATION_TOLERANCE = 1e-10
     VALID_SETUP_TYPES = [
         "2D_symmetric_x_fixed_x0",
         "2D_symmetric_x_fixed_t",
@@ -70,11 +75,24 @@ class DifferentialCorrection:
         dynamic: CR3BP_Dynamics,
         target: dict[str, Any] | None = None,
         free_vars: list[str] | None = None,
+        integration_rtol: float | None = None,
+        integration_atol: float | None = None,
     ) -> None:
         self.dynamics = dynamic
         self.target_conditions = target or {}
         self.free_variables = free_vars or []
         self.tolerance = self.DEFAULT_TOLERANCE
+        # 迭代内积分容差：默认修正级 1e-10（DEFAULT_INTEGRATION_TOLERANCE），
+        # 与 dynamics.rtol（研究级 1e-12，影响最终轨迹编排）解耦；显式传入
+        # 时覆盖。收敛判据 self.tolerance 低于 100×integration_rtol 时 Newton
+        # 可能因积分噪声停滞（由 stagnation_limit 兜底盘整为 MAX_ITERATIONS），
+        # 需要更紧闭合时应同步调紧 integration_rtol。
+        self.integration_rtol = (
+            integration_rtol if integration_rtol is not None else self.DEFAULT_INTEGRATION_TOLERANCE
+        )
+        self.integration_atol = (
+            integration_atol if integration_atol is not None else self.integration_rtol
+        )
         self.max_iterations = self.DEFAULT_MAX_ITERATIONS
         self.damping_factor = self.DEFAULT_DAMPING_FACTOR
         self.convergence_history: list[dict[str, Any]] = []
@@ -241,8 +259,8 @@ class DifferentialCorrection:
             tolerance=self.tolerance,
             stagnation_limit=self.stagnation_limit,
             divergence_limit=self.divergence_limit,
-            rtol=dynamics.rtol,
-            atol=dynamics.atol,
+            rtol=self.integration_rtol,
+            atol=self.integration_atol,
             max_step=dynamics.max_step,
             sample_count=1000,
         )
