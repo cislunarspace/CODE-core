@@ -1,6 +1,6 @@
 """tests/orbit_design 标准种子矩阵。
 
-集中登记各轨道族「类型 × 平动点 → 标准初猜参数」，供 correction/
+集中登记各轨道族的类型 × 平动点 → 标准初猜参数映射，供 correction/
 continuation/multiple_shooting/ephemeris 等后续阶段测试统一取用，避免
 标准参数散落各测试。
 

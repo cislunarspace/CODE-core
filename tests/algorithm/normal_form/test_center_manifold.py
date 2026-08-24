@@ -15,7 +15,7 @@
 ``test_quasi_floquet.py`` 的范式：本切片的 reducer 只读 ``tlist``、
 ``D``（频率）；高阶 Hamiltonian 项经 ``hamiltonian_terms`` 注入
 （对应 qiao Code09 的 ``L?_QF_Hamilton.npz``）。注入项刻意构造为
-物理上明确的「双曲-中心交叉项」，用以直接断言化简效果。
+物理上明确的双曲-中心交叉项，用以直接断言化简效果。
 """
 
 from __future__ import annotations
@@ -188,7 +188,7 @@ def test_invariant_step_reduces_hyperbolic_center_coupling(l1_context):
     """Step 1（invariant）消去双曲方向不平衡的交叉项。
 
     注入 ``q_1``/``p_1`` 与中心方向耦合的项后，化简结果中 3+ 阶不得含
-    双曲方向不平衡项（``pow(1)!=pow(4)``）——这是 qiao ``Code10`` 的
+    双曲方向不平衡项（``pow(1)!=pow(4)``）：这是 qiao ``Code10`` 的
     删除判据（只消双曲不平衡项）。双曲平衡但中心不平衡的项（如
     ``q1²·q2·q3·p1²``）是 Step 2（``center``）的目标，Step 1 保留。
     """
@@ -213,7 +213,7 @@ def test_center_step_leaves_only_action_terms(l1_context):
 
     两步完成后，把化简后的实坐标 Hamiltonian 虚变换回复坐标，所有
     ≥3 阶项必须满足三对共轭全部平衡（``pow1==pow4 && pow2==pow5 &&
-    pow3==pow6``）——即仅依赖作用量 ``I_1``、``I_2``、``I_3``。注意
+    pow3==pow6``）：即仅依赖作用量 ``I_1``、``I_2``、``I_3``。注意
     必须在**复坐标**断言：实坐标下作用量 ``I_2=(q2²+p2²)/2`` 的展开项
     （如 ``q2⁶``）本身不满足幂次平衡。
     """

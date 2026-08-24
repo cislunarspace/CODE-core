@@ -34,7 +34,7 @@ Python 侧把每个 force 序列化成元组（`to_rust_spec`），Rust 侧
 `crates/e2m2e-spice/src/ephem_cache.rs`（ADR 0016）：积分前把要用的
 天体状态、帧矩阵在均匀时间网格上经 cspice 预采样，建三次样条存
 内存；求解阶段查表，不碰 cspice。选三次样条是因为 C² 连续避免
-自适应积分器缩步长（文件头注释，实测 93 倍 RHS 调用差异）。
+自适应积分器缩步长。
 关键结构事实：
 
 - **进程级单例**：`static CACHE: RwLock<Option<EphemCache>>`，

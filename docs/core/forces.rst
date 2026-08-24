@@ -47,25 +47,25 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
      - ``FiniteBurn``
    * - VariableMassFiniteBurn
      - 可变质量连续推力（质量作为状态量随推力消耗，7D 受控动力学）
-     - —（不走配置注册表，直接构造）
+     - 无（不走配置注册表，直接构造）
    * - RelativisticCorrection
      - 后牛顿相对论修正（Schwarzschild / Lense-Thirring / de Sitter）
      - ``RelativisticCorrection``
 
 另有机动事件 ``ImpulsiveBurn``（瞬时 Δv，在指定 epoch 直接修改状态速度），
 它不是 ``PhysicalModel``，不参与加速度叠加，也不进配置注册表；施加方式见
-下文「传播接口」小节的 ``propagate_maneuvers``。
+下文传播接口小节的 ``propagate_maneuvers``。
 
 .. warning::
 
    用 ``GravityField`` 模拟月球（含 degree=0 中心项）时，必须单独补月球间接项
-   ``IndirectTerm("MOON")``，且不能再加 ``ThirdBodyGravity("MOON")``——后者会与
+   ``IndirectTerm("MOON")``，且不能再加 ``ThirdBodyGravity("MOON")``：后者会与
    ``GravityField`` 的中心项重复计算月球点质量。
 
 内置力模型公式
 --------------
 
-**PointMassGravity** — 中心天体点质量引力。适用于参考系原点天体自身的二体引力：
+**PointMassGravity**：中心天体点质量引力。适用于参考系原点天体自身的二体引力：
 
 .. math::
 
@@ -75,7 +75,7 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
 它不查任何第三体的位置，只能表达参考系原点天体自身的引力；其他天体的
 引力贡献用 ThirdBodyGravity。
 
-**ThirdBodyGravity** — 参考系原点之外的天体引力摄动。一个实例对应一个摄动
+**ThirdBodyGravity**：参考系原点之外的天体引力摄动。一个实例对应一个摄动
 天体（如 ``ThirdBodyGravity("MOON")``）。加速度由直接项与间接项合成：
 
 .. math::
@@ -85,7 +85,7 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
 其中 ``r`` 为航天器相对原点的位置，``r_i`` 为摄动天体相对原点的位置（由
 SPICE 查询）。间接项扣除摄动天体对原点的引力，保持坐标原点固定。
 
-**GravityField** — 完全正规化球谐重力场（Cnm/Snm），用 Pines 递推计算非球形
+**GravityField**：完全正规化球谐重力场（Cnm/Snm），用 Pines 递推计算非球形
 引力加速度。天体无关：地球（EGM96）、月球（GRGM900C）等共用同一个类，按
 ``body`` 参数自动切换 body-fixed 轴与系数文件。位势展开为：
 
@@ -97,7 +97,7 @@ SPICE 查询）。间接项扣除摄动天体对原点的引力，保持坐标�
 固体潮修正：地球支持 Step1（天体无关）+ Step2（频率相关）+ 极潮 + 永久潮；
 月球支持 k₂ = 0.024116 Love 数的固体潮。
 
-**DragModel** — 大气阻力。在 ITRF（地固系）中计算密度与相对速度，自动完成
+**DragModel**：大气阻力。在 ITRF（地固系）中计算密度与相对速度，自动完成
 参考系↔ITRF 坐标变换。大气在 ITRF 中静止，相对速度等于航天器 ITRF 速度：
 
 .. math::
@@ -108,7 +108,7 @@ SPICE 查询）。间接项扣除摄动天体对原点的引力，保持坐标�
 Atmosphere 1976 分段指数模型），``C_d`` 为阻力系数（默认 2.2），``A/m`` 为
 面积质量比。
 
-**FiniteBurn** — 连续推力加速度力模型。推力大小（``thrust_profile(t)`` →
+**FiniteBurn**：连续推力加速度力模型。推力大小（``thrust_profile(t)`` →
 标量 N）与方向（``direction``）解耦，方向支持传播惯性系、VNB、LVLH 三种
 坐标系：
 
@@ -120,7 +120,7 @@ Atmosphere 1976 分段指数模型），``C_d`` 为阻力系数（默认 2.2）�
 推力/脉冲剖面与固定方向的封闭 DSL；只有该 DSL 控制可在 Rust 编译传播中执行，
 任意 Python callable 会在传播入口显式拒绝。
 
-**VariableMassFiniteBurn** — 可变质量连续推力，是低推力转移与月面动力下降等
+**VariableMassFiniteBurn**：可变质量连续推力，是低推力转移与月面动力下降等
 最优控制问题的受控动力学基座。与 ``FiniteBurn`` 的唯一区别：质量不是常量，
 而是状态量 ``state[6]``，随推力按 ``ṁ = −T/(Isp·g₀)`` 消耗：
 
@@ -152,7 +152,7 @@ Rust ``propagate_compiled_lowthrust``（受控 EOM 复用
    result = fm.propagate(state0, (et0, et0 + 86400.0))
    # result["states"] 形状 (n, 7)，最后一列为质量剖面
 
-**RelativisticCorrection** — 后牛顿相对论修正，含三项，公式与 GMAT 对齐：
+**RelativisticCorrection**：后牛顿相对论修正，含三项，公式与 GMAT 对齐：
 
 - Schwarzschild 项（质量引起的时空弯曲）：
 
@@ -324,8 +324,7 @@ Rust 编译快速路径
 spice feature 启用、无 ``events``、不带 STM，且所有启用力模型的
 ``to_rust_spec()`` 都非 ``None`` 时，``propagate`` 自动分流到 Rust
 ``propagate_compiled``：力模型一次序列化后整个积分循环在 Rust 内完成，
-消除逐步 Python↔Rust 跨界；30 天 NRHO 传播约 9.6 s，Python 路径约 95 s。
-任一条件不满足时自动回退 Python 路径，返回格式一致，无需用户干预。
+消除逐步 Python↔Rust 跨界。任一条件不满足时自动回退 Python 路径，返回格式一致，无需用户干预。
 
 带 STM 时有对应的 Rust compiled STM 快速路径（``propagate_compiled_stm_py``），
 但 ``SolarRadiationPressure`` 与 ``RelativisticCorrection`` 无解析雅可比，
@@ -337,7 +336,7 @@ Rust 星历预采样缓存
 Rust 积分内循环里，``GravityField``/``ThirdBodyGravity``/``IndirectTerm``
 每个 RK 子步都跨界调 cspice FFI（``spkezr``/``pxform``），即便
 ``GravityField(degree=0)`` 也不例外。Python 侧的 ``EphemCache`` 只拦 Python
-层查询，对 Rust 积分内循环无效——Rust 直接走 ``spk_accel``/``gravity_field``
+层查询，对 Rust 积分内循环无效：Rust 直接走 ``spk_accel``/``gravity_field``
 → ``spice_ffi``，不回 Python。
 
 ``enable_ephem_cache`` 在积分前把要用到的天体状态与帧旋转矩阵在均匀网格上
@@ -438,7 +437,7 @@ origin→SSB 查询（该量在 ``r_body_icrf`` 短路分支未被使用）。
 
    # 6. 序列化回配置，再构建一次（验证 round-trip 契约）
    # 注意：to_config 输出是规范形式（如 GravityField 恒带 input_frame/gravity_file
-   # 两键），与手写 config 不一定逐键相等；契约是“再序列化一次字典相等”。
+   # 两键），与手写 config 不一定逐键相等；契约是再序列化一次字典相等。
    config_roundtrip = fm.to_config()
    fm2 = ForceModel.from_config(config_roundtrip, system)
    assert fm2.to_config() == config_roundtrip

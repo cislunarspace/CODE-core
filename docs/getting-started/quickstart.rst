@@ -188,9 +188,9 @@
 下一步
 ------
 
-- :doc:`../core/system` — 系统与平动点详解
-- :doc:`../core/dynamics` — 动力学与传播
-- :doc:`../core/forces` — 力模型组合
-- :doc:`../algorithms/differential-correction` — 微分修正策略
-- :doc:`../transfer/overview` — 转移轨道设计
+- :doc:`../core/system`：系统与平动点详解
+- :doc:`../core/dynamics`：动力学与传播
+- :doc:`../core/forces`：力模型组合
+- :doc:`../algorithms/differential-correction`：微分修正策略
+- :doc:`../transfer/overview`：转移轨道设计
 

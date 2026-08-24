@@ -9,7 +9,7 @@
 
 - **SQLite 存档**：:meth:`PorkchopData.to_sqlite` / :meth:`PorkchopData.from_sqlite`
   把网格落盘为关系表，多次扫描可累积、可查询（stdlib sqlite3，无新增依赖）。
-- **ΔV–TOF Pareto 前沿**：:func:`pareto_front` 用经典非支配排序（Deb 2002）
+- **ΔV-TOF Pareto 前沿**：:func:`pareto_front` 用经典非支配排序（Deb 2002）
   从网格中提取 Pareto 前沿（Topputo 2013 双目标范式）。
 """
 
@@ -211,10 +211,10 @@ class PorkchopData:
         """双线性插值查询转移代价（总 ΔV）。
 
         在规则网格上定位 ``(t_dep, tof)`` 所在的单元格，用四角点双线性
-        插值估计 ``total``。若四角点含 NaN（无解组合），返回 NaN——调用方
+        插值估计 ``total``。若四角点含 NaN（无解组合），返回 NaN，调用方
         应检查返回值或先用 :func:`pareto_front` 筛选有效区域。
 
-        对应规划文档「宋亮俊数据库的在线查询」（主题 8）：预计算网格 +
+        对应规划文档中宋亮俊数据库的在线查询一项（主题 8）：预计算网格 +
         双线性插值，替代逐点重算 Lambert。
 
         Args:
@@ -307,7 +307,7 @@ def _nan_to_none(x: float) -> float | None:
 
 
 # ----------------------------------------------------------------------
-# Pareto 前沿：ΔV–TOF 双目标非支配排序
+# Pareto 前沿：ΔV-TOF 双目标非支配排序
 # ----------------------------------------------------------------------
 
 
@@ -356,7 +356,7 @@ def pareto_front(
     *,
     objectives: tuple[str, str] = ("total", "tof"),
 ) -> ParetoFront:
-    """从 porkchop 网格提取 ΔV–TOF Pareto 前沿（经典非支配排序）。
+    """从 porkchop 网格提取 ΔV-TOF Pareto 前沿（经典非支配排序）。
 
     点 A 支配点 B 当且仅当 A 在两个目标上都不劣于 B、且至少一个目标
     严格更优。前沿（rank 0）即不被任何有效点支配的点集。仅对有效点
@@ -483,7 +483,7 @@ def porkchop(
 
     - **规格路径**：两端均为内置终端（``OrbitTerminal``/``StateTerminal``
       且未被 monkeypatch）、涉及轨道终端时 dynamics 为未 patch 的
-      ``CR3BP_Dynamics``——终端规格直接交给 Rust，轨道终端的传播在
+      ``CR3BP_Dynamics``：终端规格直接交给 Rust，轨道终端的传播在
       Rust 内逐点并行进行。
     - **协议路径**：其余情况（自定义 ``TerminalCondition`` 子类、终端
       方法被 patch、动力学不满足上条）由 Python 按 ``get_arrival_state``
@@ -536,7 +536,7 @@ def porkchop(
             int(revs),
         )
     else:
-        # 保持原路径的错误优先级：无效轨道/终端先在状态提取时上抛，
+        # 错误优先级：无效轨道/终端先在状态提取时上抛，
         # direction 仅在即将调用 Lambert 前校验。
         dep_states, arr_states = _extract_state_grids(dep, arr, t_dep, tof, dynamics)
         long_way = _parse_direction(direction)
@@ -595,7 +595,7 @@ def _terminal_unpatched(term: TerminalCondition, cls: type) -> bool:
 def _terminal_spec(term: TerminalCondition) -> _TerminalSpec | None:
     """提取内置终端规格；非内置类型、被 patch 或规格无效时返回 None。
 
-    规格无效（如轨道无周期）返回 None 走协议路径，保留原
+    规格无效（如轨道无周期）返回 None 走协议路径，保留
     ``propagate_orbit_state_at_time`` 的 ValueError 语义。
     """
     if type(term) is OrbitTerminal and _terminal_unpatched(term, OrbitTerminal):
@@ -623,7 +623,7 @@ def _builtin_grid_spec(
 
     条件：两端均为内置终端且未 patch；涉及轨道终端时 dynamics 是
     未 patch 的 ``CR3BP_Dynamics``（星历/BCR4BP 动力学或自定义子类
-    一律走协议路径，行为与原 Python 路径一致）。检测缝限于终端的
+    一律走协议路径，行为与 Python 逐点路径一致）。检测缝限于终端的
     ``get_arrival_state`` 与 dynamics 的 ``propagate_orbit_state_at_time``；
     更深的 ``propagate`` 实现是该公开协议内部细节，不作为 monkeypatch 缝。
     """

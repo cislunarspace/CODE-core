@@ -97,7 +97,7 @@ fn mat_vec(m: &Matrix6<f64>, v: &[f64; 6]) -> [f64; 6] {
 /// CR3BP 周期轨道的单值矩阵通常有一对实双曲乘子（|λ|>1 与 1/|λ|，互为
 /// 倒数）和单位圆上的中心乘子。病态条件下数 |λ| 可达 10³ 以上，全谱
 /// Schur/`eig` 易失败；幂法直接锁定模最大/最小的实方向，与 Python 原
-/// 实现「稳定取 |λ|<1 中最小、不稳定取 |λ|>1 中最大」在单双曲对情形
+/// 实现（稳定取 |λ|<1 中最小、不稳定取 |λ|>1 中最大）在单双曲对情形
 /// 下等价（CR3BP 周期轨道的标准结构）。
 pub fn select_eigenvector(monodromy: &[f64; 36], kind: ManifoldKind) -> Result<[f64; 6], String> {
     let m = stm_from_flat(monodromy);

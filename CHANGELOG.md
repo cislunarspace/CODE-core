@@ -7,7 +7,7 @@
 
 ### Fixed
 - **target_ephemeris 坐标系契约写入文档**（#516）：`TransferDesignRequest.target_ephemeris` 字段 description 与 `transfer_orbit`/`_extract_target_state` docstring 明确：目标态按会合旋转系（synodic）物理单位解释并直接无量纲化，惯性星历须先经 `spacetime_transform(j2000_to_synodic)` 转换；此前下游把惯性星历直接传入时无任何提示，目标态几何全错。
-- **LGA 搜索面外维度缺失与 Δv 单位语义**（#512）：`transfer_orbit("LGA")` 在发射倾角 ≥ 20° 时一律 INFEASIBLE：出发速度网格只有面内角，无面外自由度，候选在 dv 筛选前就被近月高度窗口筛光。`LgaSearchParams` 新增面外角网格（`out_of_plane_halfwidth_deg`/`n_out_of_plane`，中心随出发轨道面倾角缓慢负移，实测倾角 0°–90° 覆盖）；`LgaCandidate` 记录 `out_of_plane_angle`。同时修复 `max_total_dv` 语义：阈值 km/s 换算为无量纲后比较，`LgaTransferDetails` 与 `delta_v` 统一按特征速度换算回 km/s；ThreeBodyLambert 精化劣于网格候选时保留网格解（修复精化后 Δv 远超阈值仍报 CONVERGED）。
+- **LGA 搜索面外维度缺失与 Δv 单位语义**（#512）：`transfer_orbit("LGA")` 在发射倾角 ≥ 20° 时一律 INFEASIBLE：出发速度网格只有面内角，无面外自由度，候选在 dv 筛选前就被近月高度窗口筛光。`LgaSearchParams` 新增面外角网格（`out_of_plane_halfwidth_deg`/`n_out_of_plane`，中心随出发轨道面倾角缓慢负移，实测倾角 0°~90° 覆盖）；`LgaCandidate` 记录 `out_of_plane_angle`。同时修复 `max_total_dv` 语义：阈值 km/s 换算为无量纲后比较，`LgaTransferDetails` 与 `delta_v` 统一按特征速度换算回 km/s；ThreeBodyLambert 精化劣于网格候选时保留网格解（修复精化后 Δv 远超阈值仍报 CONVERGED）。
 
 ## [5.8.5] - 2026-08-22
 
@@ -162,9 +162,9 @@
 
 ### Fixed
 - **三脉冲优化对零脉冲初猜提前收敛**（#384）：`MultiImpulseTransfer.optimize` 的 SLSQP 对零脉冲初猜（双脉冲弧上的点，目标值恰为双脉冲成本）数值敏感：目标函数在该平坦走廊上梯度极小，收敛判据可能提前触发、一步即停，三脉冲对 ΔV 几乎无改善（`test_multi_impulse` 随主矢量检验采样密度约半数配置失败，issue 报的改善量 2.96e-11 即此现象）。首次优化相对初猜改善不足时，现自动从微扰初猜（时刻整体 ×0.5/1.5/2.0、位置 ×0.9/1.1）重试并取总 ΔV 最小者；实测该场景三脉冲确有 0.78 km/s（约 11%）改善空间，断言与阈值不变。新增 n_samples=200 回归测试。
-- **Lissajous/三角平动点星历修正不收敛**（#366）：`design_orbit` 对 LISSAJOUS-L2/L4/L5 在 Rust 多重打靶（容差 0.02 km）下迭代到 80 次上限仍不收敛（位置残差 0.16–174 km）。根因是拟周期族（面内/面外频率不可约、短/长周期模态耦合，无周期闭合）在自由时间打靶下时间自由度与沿流状态自由度近线性相关，雅可比列病态、LM 线性收敛卡死；固定时间（`var_time=False`，新增 `_FIXED_TIME_ORBIT_TYPES` 族集合）下节点时刻保持 CR3BP 名义周期均匀采样，位置/速度修正直接吸收星历偏差，实测 L1/L2/L3/L4/L5 全部 4–6 迭代收敛（秒级到 37 s）。`test_lissajous_triangular` 重启用 L2/L4/L5 参数化，Jacobi 漂移断言改相对判据（|ΔC|/|C| < 1e-3，约化误差随振幅增长是固有量级）。
+- **Lissajous/三角平动点星历修正不收敛**（#366）：`design_orbit` 对 LISSAJOUS-L2/L4/L5 在 Rust 多重打靶（容差 0.02 km）下迭代到 80 次上限仍不收敛（位置残差 0.16~174 km）。根因是拟周期族（面内/面外频率不可约、短/长周期模态耦合，无周期闭合）在自由时间打靶下时间自由度与沿流状态自由度近线性相关，雅可比列病态、LM 线性收敛卡死；固定时间（`var_time=False`，新增 `_FIXED_TIME_ORBIT_TYPES` 族集合）下节点时刻保持 CR3BP 名义周期均匀采样，位置/速度修正直接吸收星历偏差，实测 L1/L2/L3/L4/L5 全部 4~6 迭代收敛（秒级到 37 s）。`test_lissajous_triangular` 重启用 L2/L4/L5 参数化，Jacobi 漂移断言改相对判据（|ΔC|/|C| < 1e-3，约化误差随振幅增长是固有量级）。
 - **LPO 初猜网格搜索过慢**（#367）：`design_lpo` 网格搜索 45 点 × 微分修正 ~700 次 STM 传播，默认 `max_step=0.01 TU` 对长周期 LPO（~21 TU/圈）意味着每次传播 ≥2100 步，单次 `design_lpo` 112 s、`test_lpo_family` 全文件 12.7 分钟（默认套件 wall time 卡点）。`_correct_lpo` 搜索阶段临时放宽 `max_step` 到 0.1 TU（rtol=1e-12 自适应仍控精度，收敛产物一致），单次降至 46 s；`test_lpo_family` 收敛测试改吃共享 fixture，全文件降至 3.2 分钟。
-- **lowthrust 解析雅可比加速比断言 flaky**（#367）：`test_analytic_jacobian_speedup_over_finite_difference` 硬绑绝对加速比 >5.0，机器负载下实测 3.1x；改为 >1.5（只守护"解析实现未退化"，不硬绑绝对量级）。
+- **lowthrust 解析雅可比加速比断言 flaky**（#367）：`test_analytic_jacobian_speedup_over_finite_difference` 硬绑绝对加速比 >5.0，机器负载下实测 3.1x；改为 >1.5（只守护解析实现未退化，不硬绑绝对量级）。
 - **微分修正/延拓测试适配结果契约**（#367 连带）：#351 结果对象迁移后 `tests/algorithm/design` 的 12 个测试仍用已移除属性（`closure_error` 挂在结果对象、`correction_success`/`correction_iterations`/`ContinuationResult.orbits` 等改名），阻塞默认套件绿门；conftest 的 `_corrected_*_cached`/`corrected_*` fixture 改返回 `(orbit, result)`，correction/continuation 测试改用 `status`/`iterations`/`family.orbits` 新契约。
 - **低能转移流水线流形空轨迹崩溃**（#379）：出发/目标轨道某流形分支数值发散时，Rust 积分返回空 states（#246 语义），流形弧以空 `Orbit` 构造触发 `np.max` 崩溃；`InvariantManifold.propagate` 现跳过空轨迹弧，`test_pipeline_converges` 恢复断言（status API）并移除 skip。
 - **积分失败类型化**（#349）：新增 `PropagationFailure` 类型异常，消除步塌缩跨语言字符串匹配 catch。
@@ -193,21 +193,21 @@
 ## [5.6.5] - 2026-08-10
 
 ### Fixed
-- **Halo/NRHO 星历修正多圈发散**（f70252c）：`design_orbit` 入口对 Halo/NRHO 自动重定向 segmented 修正：two_level/standard 的"修正 1 圈 + 自由外推"对不稳定轨道（STM ~1e7/圈）必发散（实测第二圈起圈间偏差 ~7 万 km、第三圈漂离 L2）；segmented 全程分段打靶拼接，第 1 步多圈长段（节点密、段内约束强）+ 固定节点时刻 `var_time=False`（对齐朱彦伟 2026、杨洪伟 2015、刘刚 2017），产出不发散的标称参考轨道。two_level/standard 仅留稳定轨道（DRO 等）。星历 Halo 的圈间漂移是固有准周期特征，由 `station_keeping` 处理，不在本转换范围。
+- **Halo/NRHO 星历修正多圈发散**（f70252c）：`design_orbit` 入口对 Halo/NRHO 自动重定向 segmented 修正：two_level/standard 的修正 1 圈 + 自由外推对不稳定轨道（STM ~1e7/圈）必发散（实测第二圈起圈间偏差 ~7 万 km、第三圈漂离 L2）；segmented 全程分段打靶拼接，第 1 步多圈长段（节点密、段内约束强）+ 固定节点时刻 `var_time=False`（对齐朱彦伟 2026、杨洪伟 2015、刘刚 2017），产出不发散的标称参考轨道。two_level/standard 仅留稳定轨道（DRO 等）。星历 Halo 的圈间漂移是固有准周期特征，由 `station_keeping` 处理，不在本转换范围。
 
 ## [5.6.4] - 2026-08-10
 
 ### Added
 - **ELFO 冻结轨道设计**（#350，closes #348）：`design_orbit` 统一入口新增 ELFO 分支：经典六根数构造初值 → 全摄动传播 → 月心根数漂移分析，复用 CR3BP 管线的力模型路径（GRGM900C 10×10 + EGM96 10×10 + 第三体 + 炮弹光压）。`OrbitDesignResult`/`DesignOrbitResponse` 新增 5 个月心漂移字段（`drift_e`、`drift_aop_deg`、`drift_rp_km`、`secular_aop_rate_deg_per_year`、`moon_centric_elements`），ELFO 场景下 CR3BP 字段留空。
 - **双 CSPICE 实例双侧同步**（#357，closes #334）：Python（spiceypy）与 Rust（cspice-sys）是两个独立 CSPICE 实例，内核池与名字表互不共享；本 PR 强制 `furnsh`+`boddef` 双侧同步，补齐 Rust 侧错误处理与诊断入口：新增 `spice_spkezr`/`spice_pxform` pyfunction 供 Python 直接查 Rust 实例做双侧对拍（`e2m2e-integrators` ABI v3→v4）。
-- **测试套件按功能类目重组**（#359，ADR 0021）：7 类功能标记（`theory`/`integrator`/`force`/`data`/`orchestration`/`interface`/`aux`）+ `slow`/`spice` 正交标记，取代 L1–L4 速度分层；测试目录迁至镜像源包的 `tests/algorithm/`。CI 维持静态门，测试在 release 前跑全量。
+- **测试套件按功能类目重组**（#359，ADR 0021）：7 类功能标记（`theory`/`integrator`/`force`/`data`/`orchestration`/`interface`/`aux`）+ `slow`/`spice` 正交标记，取代 L1~L4 速度分层；测试目录迁至镜像源包的 `tests/algorithm/`。CI 维持静态门，测试在 release 前跑全量。
 
 ### Changed
 - **`design_orbit` 签名重构**（#350）：散参改为 `DesignOrbitRequest` 模型入口，`duration` 单位从年改为秒（clean break），参数校验迁移到 Pydantic `model_validator`；Facade 直接透传 request 对象，不再逐字段解包。
 - **Rust SPICE 错误处理加固**（#357）：`erract`/`errdev` 显式设 RETURN/NULL，消除对上游 cspice crate 初始化顺序的依赖（默认 ABORT 出错即 exit）；错误信息由 SHORT 升级为 SHORT+LONG+traceback；`spkezr`/`pxform` 入口经 `ktotal` 预检内核池，空时报项目语境错误（ADR 0020，不走 FFI、不字符串匹配）。
 - **SPICEManager 收口 boddef**（#357）：`_BODY_ID_ALIASES` 单一归属 `SPICEManager`（`design_orbit` 不再自带表），`load_kernel` 首次调用在 spiceypy 侧 boddef 全部别名，对称 Rust 侧 `register_bodies`；多进程 `_worker_init` 改走 `SPICEManager.load_kernel` 双侧 furnsh，不再直接 `spiceypy.furnsh`。
 - **ADR 0013 的测试分层标注已被 ADR 0021 取代**（#359）：0013 其余不变。
-- **calcephpy Windows 免编译**（#362/#363/#364）：新增 `calcephpy-wheel.yml` 为 cp310–cp313 构建 win_amd64 wheel 发到 `calcephpy-v1` release；`pyproject.toml` 经 `[tool.uv.sources]` 在 Windows 直拉预编译 wheel，免去 cmake+MSVC 现场编译，其他平台回落 PyPI sdist。
+- **calcephpy Windows 免编译**（#362/#363/#364）：新增 `calcephpy-wheel.yml` 为 cp310~cp313 构建 win_amd64 wheel 发到 `calcephpy-v1` release；`pyproject.toml` 经 `[tool.uv.sources]` 在 Windows 直拉预编译 wheel，免去 cmake+MSVC 现场编译，其他平台回落 PyPI sdist。
 - **slow 测试 e2e 解散与契约下沉**（#361，ADR 0021）：A 类 e2e 按断言解散合并（lissajous + triangular 参数化、共享 fixture、新增 Jacobi 守恒漂移断言），B 类 fixture 共享收敛（pal_stagnation 延拓 24→2 次），字段形状契约下沉到零管线单元测试；homotopy/segmented 为开发中 feat，显式 `pytest.skip`。
 
 ### Fixed
@@ -224,18 +224,18 @@
 - **测试分层标记 l1/l2/l3/l4**（#328）：按 ADR 0013 为 39 个测试文件打上分层标记，默认排除 l3/slow，支持 `-m l1`/`l2`/`l3`/`l4` 按层独立运行。
 
 ### Fixed
-- **大幅 DRO 星历发散**（#324）：Rust 多重打靶残差向量中位置残差（几百 km）单边主导速度残差（~0.04 km/s），LM 停在"位置连续/速度跳变 25-50 m/s"的局部极小。速度分量引入 `vel_weight` 加权使两者在容差尺度可比，大幅 DRO 从发散（20 万 km/月）修复到有界（~7 万 km/月）、速度残差归零。
+- **大幅 DRO 星历发散**（#324）：Rust 多重打靶残差向量中位置残差（几百 km）单边主导速度残差（~0.04 km/s），LM 停在位置连续/速度跳变 25-50 m/s的局部极小。速度分量引入 `vel_weight` 加权使两者在容差尺度可比，大幅 DRO 从发散（20 万 km/月）修复到有界（~7 万 km/月）、速度残差归零。
 - **BCR4BP 事件检测回退 scipy**（#333）：与 CR3BP_Dynamics 对齐，传入 events 时回退 scipy solve_ivp 并发出警告，不再抛出 NotImplementedError。
 - **normal_form 分段积分边界时刻对齐**（#340）：段末状态边界时刻对齐，消除短窗口不一致。
 
 ### Changed
 - **normal_form scipy → Rust 迁移**（#336）：新增 `_solve_ivp_rust.py` 适配器，中心流形 Hamilton 正则方程传播、段积分、稠密输出采样、QF 矩阵积分（36D/1296D）改走 Rust `solve_ivp_py`（DOP853），仅复值 Lie 级数流保留 scipy。
-- **`spice_poc_furnsh` 重命名为 `spice_furnsh`**（#332）：移除生产 API 的 "poc" 前缀。
+- **`spice_poc_furnsh` 重命名为 `spice_furnsh`**（#332）：移除生产 API 的 poc 前缀。
 - **DFH 对拍残留移除**（#338）：删 tests/dfh/ 对拍回归与 scripts/ 下黄金样本/临时诊断脚本，`tests/dfh_format/` 更名 `tests/format/`，`dfh_perturbation_to_force_config` 改名 `perturbation_to_force_config`。
 - **力模型 `compute_acceleration` 标注 DeprecationWarning**（#331）：8 个力模型类的 Python 加速度计算已被 Rust 编译路径取代，标注弃用提示。
 - **golden regression 测试移入 scripts/**（#326）：DFH 比对脚本从 CI 路径移出，需时手动运行。
 - **`tests/algorithm/` 归入 `tests/algorithms/`**（#327）：消除五层架构重命名后的目录并存。
-- **ADR 0002 修订 3 措辞修正**（#330）：逐项列出 scipy 回退路径的保留场景（事件检测、防御性回退、NLP、normal_form 传播、平动点解算），替代"已全部移除"的绝对表述。
+- **ADR 0002 修订 3 措辞修正**（#330）：逐项列出 scipy 回退路径的保留场景（事件检测、防御性回退、NLP、normal_form 传播、平动点解算），替代已全部移除的绝对表述。
 - **CLAUDE.md 入库**：项目级 Claude 指令随仓库版本化。
 - **CI lint 缓存 `.cspice` 目录**（#347）：用 `actions/cache@v4` 缓存预编译包，`download_cspice.py` 检测到 `SpiceUsr.h` 存在即跳过下载。
 
@@ -338,7 +338,7 @@
   - 二体 Lambert 求解器（`e2m2e.algorithm.transfer.lambert`）：Izzo 算法 Rust 内核（`e2m2e-propagation` crate），`solve_lambert`/`solve_lambert_batch` 支持短程/长程与多圈解，基准对齐 Vallado 文献值
   - porkchop 扫描（`e2m2e.algorithm.transfer.porkchop`）：出发时间 × 飞行时间网格的双脉冲 ΔV 扫描，终端状态经 `TerminalCondition` 接口提取
   - 多脉冲转移与主矢量检验（`e2m2e.algorithm.transfer.multi_impulse`）：`MultiImpulseTransfer` 以中途节点 `[t_i, r_i]` 为决策变量、弧段 Lambert 封闭、scipy SLSQP 最小化总 ΔV；`check_primer_vector` 实现 Lawden 必要条件检验与 Lion & Handelsman 中途脉冲插入准则
-  - porkchop 持久化与 Pareto 前沿（`e2m2e.algorithm.transfer.porkchop`，主题 8）：`PorkchopData.to_sqlite`/`from_sqlite` 把 ΔV 网格落盘为 SQLite 解数据库（scans 元数据表 + design_points 展平表，NaN→NULL，stdlib sqlite3 零新增依赖，多 scan 自增累积）；`pareto_front` 用经典非支配排序（Deb 2002 O(MN²)）从网格提取 ΔV–TOF Pareto 前沿（Topputo 2013 双目标范式），支持自定义目标字段组合，产出 `ParetoFront` 带绘图。10 测试全过（SQLite 往返等价、多 scan 累积、已知支配关系、LEO→GEO 前沿形态）
+  - porkchop 持久化与 Pareto 前沿（`e2m2e.algorithm.transfer.porkchop`，主题 8）：`PorkchopData.to_sqlite`/`from_sqlite` 把 ΔV 网格落盘为 SQLite 解数据库（scans 元数据表 + design_points 展平表，NaN→NULL，stdlib sqlite3 零新增依赖，多 scan 自增累积）；`pareto_front` 用经典非支配排序（Deb 2002 O(MN²)）从网格提取 ΔV/TOF Pareto 前沿（Topputo 2013 双目标范式），支持自定义目标字段组合，产出 `ParetoFront` 带绘图。10 测试全过（SQLite 往返等价、多 scan 累积、已知支配关系、LEO→GEO 前沿形态）
   - porkchop 插值代价查询（`e2m2e.algorithm.transfer.porkchop`，主题 8）：`PorkchopData.query(t_dep, tof)` 规则网格双线性插值查总 ΔV，NaN 格点传播 NaN；`PorkchopData.query_scan(path, scan_id, t_dep, tof)` 从 SQLite 解数据库读网格后插值（等价于 from_sqlite + query）。补 `(scan_id, t_dep, tof)` 索引。对应规划文档中的宋亮俊数据库在线查询：预计算网格 + 双线性插值替代逐点重算 Lambert。6 测试全过（网格点精确值、双线性权重、NaN 传播、越界报错、SQLite 路径一致性、LEO→GEO 谷区平滑性）
   - NSGA-II 多目标优化器（`e2m2e.algorithm.transfer.nsga2`，主题 8）：`nsga2(objectives, bounds, ...)` 经典 NSGA-II（Deb 2002），非支配排序 + 拥挤度选择 + 精英保留，SBX 交叉 + 多项式变异。约束用 Deb 可行支配规则（可行解支配不可行解，都不可行按违反量排序），无需罚因子。`ObjectiveFn` 签名 `fn(x) -> (objectives, violation)`，全部目标最小化。并行评估用 ProcessPoolExecutor（Windows spawn 安全，fn 须模块级可 pickle）。ZDT1 收敛验证（100 代平均误差 0.0013）、Schaffer N.1 收敛、约束问题前沿全可行、串行/并行一致性。11 测试全过
   - 任务综合评估与解数据库（`e2m2e.algorithm.transfer.mission_assessment`/`solution_database`，主题 8 收尾）：`MissionAssessment` 多指标静态加权（`evaluate`/`rank`/`best`，指标名自动推断或显式指定），在 Pareto 前沿上标量化辅助决策；`SolutionDatabase` 封装多 scan 聚合查询（`add_scan`/`get_scan`/`query`/`pareto_front`/`list_scans`/`filter`），`filter` 预留 Grossi 式主矢量筛选钩子。12 测试全过
@@ -414,13 +414,13 @@
 ## [5.2.0] - 2026-07-09
 
 ### Added
-- 第三体引力 `ThirdBodyGravity`（#181–#183）：力分解路径补上缺失的第三体点质量引力，使 `ForceModel` 能外推 cislunar 轨道。每个摄动天体一个实例，含直接项与间接项，与 `EphemerisDynamics` 的解析 N 体公式物理等价（自洽性测试 < 1 mm）
-- 月球非球形引力（#185–#189）：`GravityField` 改造为天体无关，支持任意天体的球谐引力场
+- 第三体引力 `ThirdBodyGravity`（#181~#183）：力分解路径补上缺失的第三体点质量引力，使 `ForceModel` 能外推 cislunar 轨道。每个摄动天体一个实例，含直接项与间接项，与 `EphemerisDynamics` 的解析 N 体公式物理等价（自洽性测试 < 1 mm）
+- 月球非球形引力（#185~#189）：`GravityField` 改造为天体无关，支持任意天体的球谐引力场
   - 按 `body` 自动切换 body-fixed 轴：地球 ITRF93、月球 MOON_PA（DE421 principal axes）
   - COF 格式引力场文件解析（移植 GMAT `LM_LoadCof`），引入月球 GRGM900C（360×360，GRAIL）
   - 固体潮 Step1 重构为天体无关（扰动体列表 + Love number），地球 Step2/极潮保留专用；月球固体潮（k₂=0.024116）
   - 引入完整 EGM96（360×360），替换此前只有 n≤2 的截断文件，地球引力场真正支持 10×10
-  - DFH "非球形-大天体耦合项"即固体潮，`tide_mode="solid"` 启用
+  - DFH 非球形-大天体耦合项即固体潮，`tide_mode="solid"` 启用
 - `PointMassGravity` 配置序列化（补历史欠账，#183）
 - SPICE 内核：地球 ITRF93（`earth_latest_high_prec.bpc` + `SPICEEarthPredictedKernel.bpc`）、月球 MOON_PA（`SPICELunaCurrentKernel.bpc` + `SPICELunaFrameKernel.tf`）
 
@@ -438,7 +438,7 @@
 ## [5.1.0] - 2026-07-08
 
 ### Added
-- Hamiltonian 正规化流水线 `e2m2e.algorithms.normal_form`（#168–#176）：把 CR3BP 平动点附近的非线性动力学逐层化简为少数表征参数
+- Hamiltonian 正规化流水线 `e2m2e.algorithms.normal_form`（#168~#176）：把 CR3BP 平动点附近的非线性动力学逐层化简为少数表征参数
   - `NormalFormPipeline` 一键式流水线：动力学替代 → quasi-Floquet 变换 → 中心流形化简 → rho↔param 坐标变换
   - `NormalFormContext`/`NormalFormResult`、`DynamicalSubstituteCorrector`、`QuasiFloquetReducer`、`CenterManifoldReducer`、`LibrationCatalogTransformer`
   - NAFF 频率分析（不可用时降级 FFT）、块三对角多重打靶、函数式坐标变换链 `coord_trans`

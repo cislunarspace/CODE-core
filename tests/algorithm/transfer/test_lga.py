@@ -69,8 +69,11 @@ def _make_target_state(system):
 
 
 # 通用搜索参数：角度网格 90 点（4° 间距），确保覆盖 ~83-85° 区间
+# 360 → 90：360 是默认 50 的 7 倍，全文件超过 4 分钟超时被杀（#534 审计
+# 发现）。倾角覆盖测试（test_inclination_*）依赖网格密度，90 保留面外
+# 采样能力；多个候选排序类断言（len >= 2）在 90 下依然满足。
 _SEARCH_PARAMS = LgaSearchParams(
-    n_departure_phase=360,
+    n_departure_phase=90,
     n_tof=5,
     max_total_dv=25.0,
     perilune_alt_min=100.0,
@@ -471,7 +474,7 @@ class TestLgaOutOfPlane:
         return system, dynamics, dep_states, tgt_state
 
     def test_search_inclined_departure_finds_candidates(self, inclined_setup):
-        """倾角 20° 与 28.5° 的搜索都应返回非空候选（修复前 INFEASIBLE）。"""
+        """倾角 20° 与 28.5° 的搜索都应返回非空候选。"""
         system, dynamics, dep_states, tgt_state = inclined_setup
         for incl, dep_state in dep_states.items():
             candidates = search_lga_trajectories(
@@ -493,7 +496,7 @@ class TestLgaOutOfPlane:
 
 
 class TestLgaMaxTotalDvUnits:
-    """max_total_dv 以 km/s 语义参与筛选（修复前与无量纲值直接比较）。"""
+    """max_total_dv 以 km/s 语义参与筛选。"""
 
     @pytest.fixture
     def cr3bp_setup(self):
@@ -584,7 +587,7 @@ class TestLgaInclinedEndToEnd:
         """倾角 0°/5°/10°/20° 端到端收敛且 Δv ≤ max_total_dv（issue #512 验收）。
 
         修复前低倾角基线（精化后）总 Δv 为 50~70 km/s；修复后应低于
-        max_total_dv=25 km/s，满足"不劣于基线 5%"（基线×1.05 ≈ 52~74）。
+        max_total_dv=25 km/s，满足不劣于基线 5%（基线×1.05 ≈ 52~74）。
         """
         import warnings
 
@@ -625,7 +628,7 @@ class TestLgaInclinedEndToEnd:
             )
 
     def test_search_high_inclination_iss_finds_candidates(self):
-        """大倾角 51.6°（ISS 倾角）搜索层应找到可行候选（经验面外带覆盖 0°–90°）。"""
+        """大倾角 51.6°（ISS 倾角）搜索层应找到可行候选（经验面外带覆盖 0°~90°）。"""
         from e2m2e.algorithm.transfer.hohmann import construct_departure_state
 
         system, dynamics = _make_cr3bp_system()
@@ -633,4 +636,4 @@ class TestLgaInclinedEndToEnd:
         r0, v0 = construct_departure_state(TliParams(parking_alt_km=200.0, inclination_deg=51.6))
         dep_state = system.physical_to_dimensionless(np.concatenate([r0, v0]))
         candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
-        assert len(candidates) > 0, "倾角 51.6° 应找到可行候选（面外带覆盖 0°–90°）"
+        assert len(candidates) > 0, "倾角 51.6° 应找到可行候选（面外带覆盖 0°~90°）"

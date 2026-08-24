@@ -6,10 +6,10 @@ e2m2e 的坐标系层负责位置、速度等矢量在不同参考框架之间�
 核心概念
 --------
 
-- **Axes（坐标轴）** — 坐标系的"朝向"部分。给定历元 ``et``，返回旋转矩阵 ``R``，
+- **Axes（坐标轴）**：坐标系的朝向部分。给定历元 ``et``，返回旋转矩阵 ``R``，
   使得 ``r_icrf = R @ r_axes``。
-- **Origin（原点）** — 坐标系的"位置"部分。``state(et)`` 返回原点在 ICRF/J2000 中的绝对状态。
-- **CoordinateSystem（坐标系）** — 一个 Axes 加一个 Origin 拼成的完整数学参考框架。
+- **Origin（原点）**：坐标系的位置部分。``state(et)`` 返回原点在 ICRF/J2000 中的绝对状态。
+- **CoordinateSystem（坐标系）**：一个 Axes 加一个 Origin 拼成的完整数学参考框架。
 
 .. code-block:: python
 
@@ -53,7 +53,7 @@ e2m2e 提供多种坐标轴实现：
 动态坐标轴
 ----------
 
-VNBAxes 和 LVLHAxes 是动态坐标轴——旋转矩阵不仅依赖历元，还依赖航天器瞬时状态。
+VNBAxes 和 LVLHAxes 是动态坐标轴：旋转矩阵不仅依赖历元，还依赖航天器瞬时状态。
 使用前必须先调用 ``update(et, state)`` 刷新内部方向缓存。
 
 状态转换
@@ -76,8 +76,8 @@ VNBAxes 和 LVLHAxes 是动态坐标轴——旋转矩阵不仅依赖历元，�
 
 同一坐标系中的状态可用不同单位系统表示。``UnitSystem`` 枚举标识数值的量纲：
 
-- ``DIMENSIONLESS`` — 无量纲单位（DU, TU, VU）
-- ``SI`` — 国际单位制（km, s, km/s）
+- ``DIMENSIONLESS``：无量纲单位（DU, TU, VU）
+- ``SI``：国际单位制（km, s, km/s）
 
 ``Orbit`` 状态由绑定的 ``System`` 解释：``frame`` 与 ``unit_system`` 由
 ``System`` 基类定义，分别标识参考系与量纲；坐标变换由 ``CoordinateSystem``

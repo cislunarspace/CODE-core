@@ -6,6 +6,7 @@ BCR4BP 纯数值测试不需要 SPICE，用 BCR4BPSystem.earth_moon() 构造。
 
 from __future__ import annotations
 
+import functools
 import math
 
 import numpy as np
@@ -391,27 +392,30 @@ class TestWsbAcceptance:
     """
 
     @staticmethod
-    def _run_small_search(
-        n_sun_phase: int = 3,
-        n_departure_phase: int = 10,
-        n_tof: int = 5,
-    ):
-        """运行小规模 BCR4BP 网格搜索，返回候选列表。"""
+    @functools.cache
+    def _cached_small_search() -> tuple:
+        """小网格搜索结果缓存（ADR 0021 #420：消除重复计算）。"""
+        from e2m2e.algorithm.transfer.wsb import search_wsb_trajectories
+
         system = _make_bcr4bp_system()
         dep_state = _make_departure_state(system)
         target_state = _make_target_state(system)
 
         params = WsbSearchParams(
-            n_sun_phase=n_sun_phase,
-            n_departure_phase=n_departure_phase,
-            n_tof=n_tof,
+            n_sun_phase=3,
+            n_departure_phase=10,
+            n_tof=5,
             tof_range=(1.0, 10.0),
             max_total_dv=100.0,
         )
 
-        from e2m2e.algorithm.transfer.wsb import search_wsb_trajectories
+        result = search_wsb_trajectories(dep_state, target_state, system, params)
+        return tuple(result)
 
-        return search_wsb_trajectories(dep_state, target_state, system, params)
+    @classmethod
+    def _run_small_search(cls) -> tuple:
+        """运行小规模 BCR4BP 网格搜索，返回候选列表。"""
+        return cls._cached_small_search()
 
     def test_ballistic_capture_h2_negative(self):
         """SI1: 验证 WSB 候选的 H₂ < 0（弹道捕获判据）。"""

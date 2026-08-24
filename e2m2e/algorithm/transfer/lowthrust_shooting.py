@@ -11,7 +11,7 @@
 为接龙：段 i 在段内常量控制下积分，段末 7D 状态作段 i+1 初态，串行到末态。
 目标为最大化末态质量（min-fuel）；约束为末态位置速度匹配目标（6 条等式）。
 
-这是航天界低推力「先打靶后配点」的标准入门路线。详见
+这是航天界低推力先打靶后配点的标准入门路线。详见
 ``docs/plans/lowthrust-shooting-prd.md``。
 """
 
@@ -185,7 +185,7 @@ class LowThrustShooting:
 
         两级流程（gap-analysis）：Q-law 前向反馈积分产出次优控制历史
         （:func:`~e2m2e.algorithm.transfer.qlaw.qlaw_guess`），喂 :meth:`solve` 做
-        min-fuel 最优控制打磨。Q-law 解决「满推力初猜推过头」的发散问题。
+        min-fuel 最优控制打磨。Q-law 解决满推力初猜推过头的发散问题。
 
         Args:
              n_segments: 段数 N（Q-law 重采样 + 求解器决策变量数 = 3N）。

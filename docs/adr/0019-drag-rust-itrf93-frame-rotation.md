@@ -63,7 +63,7 @@ drag Rust 移植（issue #315 系列）把 ``DragModel`` 纳入 compiled 力模�
 
 ### 取舍
 
-- **双路径精度分歧。** Rust（``ITRF93``）与 Python（``ITRFApproxAxes``）drag 加速度在有 SPICE 时理论上略有差异。实测在 LEO 教学量级可忽略（``ITRFApproxAxes`` 的旋转误差对阻力量级是高阶小量）；且现状下两者不并存（有 SPICE 必走 Rust）。若未来需要 Python 路径也达 ``ITRF93`` 精度，再开单独改动。
+- **双路径精度分歧。** Rust（``ITRF93``）与 Python（``ITRFApproxAxes``）drag 加速度在有 SPICE 时理论上略有差异。在 LEO 量级可忽略（``ITRFApproxAxes`` 的旋转误差对阻力量级是高阶小量）；且现状下两者不并存（有 SPICE 必走 Rust）。若未来需要 Python 路径也达 ``ITRF93`` 精度，再开单独改动。
 
 ## 修订（2026-08-12，ADR 0020 决策 4）
 

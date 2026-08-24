@@ -22,7 +22,7 @@ import numpy.typing as npt
 from e2m2e.integrators import RkMethod, solve_ivp_events
 
 if TYPE_CHECKING:
-    from ..core.orbit import Orbit
+    from ...data.types.orbit import Orbit
 
 
 @dataclass

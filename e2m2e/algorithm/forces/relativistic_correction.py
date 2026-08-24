@@ -99,7 +99,7 @@ class RelativisticCorrection(PhysicalModel):
     def to_rust_spec(self, system) -> tuple | None:
         """序列化为 ``("relativistic", ...)`` 元组。
 
-        - LT 项需要 sxform + body-fixed frame；本仓库已实测 NRHO 上 LT 量级 < 1m
+        - LT 项需要 sxform + body-fixed frame；NRHO 上 LT 量级 < 1m
           （#343 排查），但完整移植已实现（含 sxform via cspice-sys FFI）。
         - 如果 LT 启用但 angular_momentum_vector 未传，Rust 侧会每步 sxform
           自动算（与 Python 一致）；如需避免 sxform 开销，可在 Python 侧

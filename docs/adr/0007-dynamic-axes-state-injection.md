@@ -23,7 +23,7 @@ Slice 12 需要支持 VNB（Velocity-Normal-Binormal）和 LVLH（Local Vertical
 问题：
 1. **静态坐标轴被迫接受无关参数。** ICRS 永远是单位阵，给它传 `state` 是噪音。
 2. **破坏现有调用方。** `CoordinateSystem.transform_state`、所有测试、所有力模型中的坐标变换调用，都需要改签名或做分支判断。
-3. **混淆两种概念。** 静态坐标轴是"纯时间函数"，动态坐标轴是"状态+时间的函数"，硬塞进同一接口会模糊这一区别。
+3. **混淆两种概念。** 静态坐标轴是纯时间函数，动态坐标轴是状态+时间的函数，硬塞进同一接口会模糊这一区别。
 
 ### 方案 B：保持 `Axes` 签名，新增 `DynamicAxes.update` 方法
 
@@ -76,13 +76,13 @@ VNB、LVLH 作为 `DynamicAxes` 子类实现。静态坐标轴不受影响。
    文献中不统一（有的 z 轴取 `-r` 指向地心），e2m2e 以本条定义
    为准，即径向向外、沿迹、轨道面法向的 RSW 口径。
 
-6. **`ObjectReferencedAxes` 推迟实现。** `ObjectReferencedAxes`（以某天体为原点的相对坐标轴，如"以月球为中心的 VNB"）需要天体状态查询，依赖 `System` 的星历接口。当前 Slice 12 只支持以航天器自身状态为基准的 VNB/LVLH；`ObjectReferencedAxes` 留待后续 Slice 处理，届时需要扩展 `DynamicAxes.update` 签名以接受天体状态。
+6. **`ObjectReferencedAxes` 推迟实现。** `ObjectReferencedAxes`（以某天体为原点的相对坐标轴，如以月球为中心的 VNB）需要天体状态查询，依赖 `System` 的星历接口。当前 Slice 12 只支持以航天器自身状态为基准的 VNB/LVLH；`ObjectReferencedAxes` 留待后续 Slice 处理，届时需要扩展 `DynamicAxes.update` 签名以接受天体状态。
 
 ## 理由
 
-1. **为什么不动 `Axes` 接口。** 静态坐标轴是绝大多数。为少数动态坐标轴改动所有静态坐标轴和所有调用方，是"用普遍改特殊"，代价远大于收益。`DynamicAxes` 作为子类，是"用特殊扩展普遍"，符合开闭原则。
+1. **为什么不动 `Axes` 接口。** 静态坐标轴是绝大多数。为少数动态坐标轴改动所有静态坐标轴和所有调用方，是用普遍改特殊，代价远大于收益。`DynamicAxes` 作为子类，是用特殊扩展普遍，符合开闭原则。
 
-2. **为什么用 `update` 缓存而非每次重新计算。** `rotation_matrix` 可能在同一状态被多次调用（如 `transform_vector` 和 `transform_state` 各调一次）。`update` 把状态到方向的计算集中在一点，后续取矩阵是 O(1) 查缓存。`update` 语义也明确："我要用这个状态了，请准备好"。
+2. **为什么用 `update` 缓存而非每次重新计算。** `rotation_matrix` 可能在同一状态被多次调用（如 `transform_vector` 和 `transform_state` 各调一次）。`update` 把状态到方向的计算集中在一点，后续取矩阵是 O(1) 查缓存。`update` 语义也明确，即我要用这个状态了，请准备好。
 
 3. **为什么状态注入点在系统层。** 动态坐标轴是坐标系层面的概念，不是某个力模型的私有属性。如果 `DragModel` 和 `FiniteBurn` 都使用 VNB，各自在 `compute_acceleration` 里调用 `update` 会导致：
    - 同一积分步内重复计算方向向量；
@@ -96,7 +96,7 @@ VNB、LVLH 作为 `DynamicAxes` 子类实现。静态坐标轴不受影响。
 
 5. **为什么推迟 `ObjectReferencedAxes`。** 它涉及两个额外复杂度：
    - 需要查询天体在历元 `et` 的状态（`System.get_body_state`），引入星历依赖；
-   - 需要定义"相对状态"的语义（航天器状态减天体状态，再算 VNB/LVLH）。
+   - 需要定义相对状态的语义（航天器状态减天体状态，再算 VNB/LVLH）。
    当前 Slice 12 的用例（航天器自身 VNB/LVLH 机动）不需要这些。推迟避免过早泛化。
 
 ## 结果

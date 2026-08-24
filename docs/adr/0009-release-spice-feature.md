@@ -16,11 +16,11 @@ Python 侧对缺失的 spice 绑定全部 try/except 静默降级到 Python 慢�
 
 ### 许可
 
-NAIF 对 CSPICE 的再分发条款（Toolkit 页面 "Toolkit Redistribution"）：
+NAIF 对 CSPICE 的再分发条款（Toolkit 页面的 Toolkit Redistribution 条款）：
 
 - 简单镜像转发整个 Toolkit：需 NAIF 事先书面许可，禁止擅自做。
 - **把 SPICE Toolkit 库模块作为支持自建 SPICE 工具的软件包的一部分发布：
-  完全合适（"entirely appropriate"）。** JPL Document Review 已发
+  完全合适（entirely appropriate）。** JPL Document Review 已发
   Clearance CL05-2438 准许 SPICE 产品经 NAIF 服务器分发。
 
 e2m2e wheel 内嵌静态链接的 CSPICE 属于第二种情形（wheel 是自建 SPICE

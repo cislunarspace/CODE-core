@@ -34,7 +34,7 @@ use crate::transfer_geometry;
 /// 积分发散时的 dv 惩罚（与设计文档 transfer-grid-search-rust.md:88 一致）。
 ///
 /// Python `search_single_departure` 失败分支保留真实 `dv_departure`，本下沉
-/// 按设计文档统一走 1e10 惩罚——等价性测试网格选得足够温和（小 α 范围、
+/// 按设计文档统一走 1e10 惩罚，等价性测试网格选得足够温和（小 α 范围、
 /// 短 transfer_time），不触发该分支；触发时该字段不参与等价对照。
 pub const DV_PENALTY: f64 = 1e10;
 
@@ -305,7 +305,7 @@ pub fn evaluate_point(
 ///
 /// 遍历 `0..n_dep*n_alpha`，`idx → (i_dep = idx/n_alpha, i_alpha = idx%n_alpha)`，
 /// 调 [`evaluate_point`]，`collect` 成 `Vec`。顺序与 Python
-/// `grid_search_sequential` 一致（外层 departure、内层 alpha）——这是
+/// `grid_search_sequential` 一致（外层 departure、内层 alpha），这是
 /// 阶段 B 等价性测试能逐候选对照的前提。
 ///
 /// 输入展平约定：`dep_states`/`arrival_states` 为 n×6 行优先，`dep_times`/
@@ -375,15 +375,15 @@ pub fn transfer_grid_search_serial(
 /// [`crate::cr3bp::propagate_cr3bp`]，CR3BP 纯数学无 SPICE FFI、无线程
 /// 不安全状态），故并行与串行结果逐位相同。
 ///
-/// `progress_tx` 传入时，用 per-departure 原子计数实现「某 departure 的
-/// 最后一个 α 完成时 send 一次」——每个 departure 恰好 send 一次，与
+/// `progress_tx` 传入时，用 per-departure 原子计数实现某 departure 的
+/// 最后一个 α 完成时 send 一次，每个 departure 恰好 send 一次，与
 /// [`transfer_grid_search_serial`] 出发粒度语义一致；`None` 不发。
 ///
 /// # 并行安全前提
 ///
 /// [`evaluate_point`] 调 [`crate::cr3bp::propagate_cr3bp`]（纯数学积分器，
 /// 无全局可变状态、无 SPICE FFI）与 [`crate::transfer_geometry`]（纯函数
-/// 几何核），均 `Send + Sync`。这与多重打靶段积分的 rayon 路径不同——后者
+/// 几何核），均 `Send + Sync`。这与多重打靶段积分的 rayon 路径不同，后者
 /// 段积分内调 cspice 需 `StrictGuard` + 星历预采样；本函数零 cspice，rayon
 /// 安全前提更简单（见 `multiple_shooting.rs:347-359` 对比）。
 pub fn transfer_grid_search_parallel(
@@ -422,7 +422,7 @@ pub fn transfer_grid_search_parallel(
     let total = n_dep.checked_mul(n_alpha).expect("n_dep * n_alpha 溢出");
 
     // per-departure 完成计数：第 i_dep 个 departure 的 α 全部完成时 send 一次。
-    // fetch_add 返回值达到 n_alpha-1 的那个 worker 独占 send 职责——每个 departure
+    // fetch_add 返回值达到 n_alpha-1 的那个 worker 独占 send 职责，每个 departure
     // 恰好触发一次（与 serial 的 i_alpha+1==n_alpha 语义一致）。Relaxed 序足够：
     // 只读本 departure 的计数，无需跨 departure 同步。
     let done: Vec<AtomicUsize> = (0..n_dep).map(|_| AtomicUsize::new(0)).collect();

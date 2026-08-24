@@ -32,9 +32,9 @@
 
 参数说明：
 
-- ``seed_orbit`` — 种子轨道（已收敛的周期轨道）
-- ``param_range`` — 参数扫描范围（如 x0 范围）
-- ``step_size`` — 每步步长
+- ``seed_orbit``：种子轨道（已收敛的周期轨道）
+- ``param_range``：参数扫描范围（如 x0 范围）
+- ``step_size``：每步步长
 
 伪弧长延拓
 ----------
@@ -82,6 +82,6 @@ Halo 轨道有专用的延拓编排，结合 Richardson 三阶解析近似和延
 
 延拓结束后，可通过 ``Continuation`` 实例上的两个属性诊断：
 
-- ``continuation.termination_reason`` — 终止原因（如“步长过小，延拓终止”）
-- ``continuation.continuation_stats`` — 成功/失败步数等统计信息
+- ``continuation.termination_reason``：终止原因（如步长过小，延拓终止）
+- ``continuation.continuation_stats``：成功/失败步数等统计信息
 

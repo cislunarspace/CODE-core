@@ -4,7 +4,7 @@
 continuation/multiple_shooting/ephemeris）测试复用。
 
 注意：本目录的 ``earth_moon_system``/``earth_moon_dynamics`` 覆盖
-``tests/conftest.py`` 的函数级同名 fixture——orbit_design 测试统一采用
+``tests/conftest.py`` 的函数级同名 fixture：orbit_design 测试统一采用
 更精确的地月质量比 μ=0.01215058560962404 与默认特征尺度（地月距
 384405 km、周期 27.32 d），与 lissajous/axial 初猜的历史取值一致。
 
@@ -37,7 +37,7 @@ def make_design_request(orbit_type: str, **overrides) -> SimpleNamespace:
     ``e2m2e.algorithm.design.design_orbit`` 运行期只按属性读取请求（对
     ``DesignOrbitRequest`` 的类型标注在 TYPE_CHECKING 下）；接口层模型的
     校验与按类型默认值填充由 tests/api 覆盖。本工厂钉住算法入口实际读取
-    的字段集与公共默认值——字段或默认值语义变动时，本目录的集成测试会
+    的字段集与公共默认值：字段或默认值语义变动时，本目录的集成测试会
     立即暴露。形状参数默认 None，由调用方按场景显式给定。
 
     ``correction_method`` 默认镜像请求校验层的族级分派（HALO/NRHO/DPO →
@@ -225,7 +225,7 @@ def _corrected_triangular_l4_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbi
     """三角平动点区域周期轨道：SPO L4（短周期族），全周期闭合修正。
 
     三模态 Triangular 初猜是拟周期的（无周期修正 setup）；L4/L5 区域可用
-    全周期闭合修正的周期族是 SPO，故以此代表「Triangular L4」的修正行为。
+    全周期闭合修正的周期族是 SPO，故以此代表 Triangular L4 的修正行为。
     """
     dynamics = earth_moon_dynamics
     state, period = compute_spo_initial_guess(

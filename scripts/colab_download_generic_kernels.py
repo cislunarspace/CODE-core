@@ -1,4 +1,4 @@
-# 在 Google Colab 中运行的下载脚本：按「方案 B」口径下载 NAIF 通用内核全集。
+# 在 Google Colab 中运行的下载脚本：按方案 B 口径下载 NAIF 通用内核全集。
 #
 # 方案 B：当前版本全集，除卫星星历（spk/satellites 是大头 29.7GB，多为外行星卫星）
 #         与历史版本（a_old_versions）。预期 220 文件、9.80 GB，塞进 15GB Drive。

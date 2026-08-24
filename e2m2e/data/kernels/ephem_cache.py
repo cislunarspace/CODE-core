@@ -1,15 +1,15 @@
-"""预插值星历缓存 — 积分前批量预采样天体位置，避免逐步调 SPICE。
+"""预插值星历缓存：积分前批量预采样天体位置，避免逐步调 SPICE。
 
 ForceModel 满配直推的性能瓶颈在于每步每力调
-``SPICEManager.get_body_position`` / ``get_body_state``——无缓存、每次跨
+``SPICEManager.get_body_position`` / ``get_body_state``：无缓存、每次跨
 Python↔C 边界查 SPICE。本模块在积分前用 SPICE 在均匀网格上预采样所有
 相关天体的 (R, V)，建 ``scipy.interpolate.CubicSpline`` （C² 连续），之后
 查询走样条插值（纯数值）。源：``core/ephem_cache.py`` （ADR 0011 迁移，
 数据层自足）。
 
 为什么用三次样条而不是线性插值：线性插值 C⁰ 连续，网格点处导数不连续，
-会让自适应积分器的误差估计器不断缩步长（实测 93 倍 RHS 调用）。三次样条
-C² 连续消除此问题（经验来自 qiao 仓库
+会让自适应积分器的误差估计器不断缩步长。三次样条
+C² 连续消除此问题（参考 qiao 仓库
 ``Python/crtbp/subfunction/ephfunc/ephem_table.py:10-12``）。
 """
 

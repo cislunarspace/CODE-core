@@ -48,7 +48,9 @@ def _iter_python_files(root: str):
         for name in filenames:
             if name.endswith(".py"):
                 abs_path = os.path.join(dirpath, name)
-                yield os.path.relpath(abs_path, root)
+                # 统一为 POSIX 分隔符：白名单按 POSIX 路径登记，Windows 的
+                # os.path.relpath 产出反斜杠，直接比对永不命中。
+                yield os.path.relpath(abs_path, root).replace(os.sep, "/")
 
 
 def test_no_furnsh_unload_bypass_in_production_code():

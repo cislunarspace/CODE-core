@@ -7,7 +7,7 @@ e2m2e 的 GitHub Release 下载预编译的 MICE 工具包（release ``cspice-v1
 ``mice_{platform}`` 目录作为 ``CSPICE_DIR`` 输出。``cspice-sys`` 的 build.rs 检测到
 ``CSPICE_DIR`` 即使用之；缺 ``CSPICE_DIR`` 时构建直接报错（见 cspice-sys build.rs 第 21-33 行）。
 
-资产按「操作系统 × 架构」选择：x86_64 Linux 与 aarch64 Linux 各自独立的 zip
+资产按操作系统 × 架构选择：x86_64 Linux 与 aarch64 Linux 各自独立的 zip
 （``cspice-linux.zip`` / ``cspice-linux-aarch64.zip``），aarch64 库由
 ``.github/workflows/cspice-aarch64-build.yml`` 在 GitHub arm64 runner 上从 NAIF 源码包
 编译后发到 ``cspice-v1`` release（NAIF 官方无 Linux ARM64 预编译包）。解压子目录
@@ -18,7 +18,7 @@ e2m2e 的 GitHub Release 下载预编译的 MICE 工具包（release ``cspice-v1
     python scripts/download_cspice.py [--cache-dir DIR]
     python scripts/download_cspice.py --print-cspice-dir
 
-不传参数：下载（若未缓存）+ 解压到缓存，在 stdout 打印 ``CSPICE_DIR=<dir>``——
+不传参数：下载（若未缓存）+ 解压到缓存，在 stdout 打印 ``CSPICE_DIR=<dir>``
 正是 GitHub Actions ``>> "$GITHUB_ENV"`` 的变量文件格式（CI 用），也兼容
 ``eval "$(python3 scripts/download_cspice.py)"`` 的 shell 赋值。
 ``--print-cspice-dir``：仅打印已解压的 ``CSPICE_DIR`` 纯路径（供 shell ``$(...)`` 捕获）。
@@ -89,7 +89,7 @@ def _ensure_extracted(cache_dir: pathlib.Path) -> pathlib.Path:
     if not zip_path.is_file():
         url = _asset_url(asset)
         print(f"下载 {url} → {zip_path}", file=sys.stderr)
-        urllib.request.urlretrieve(url, zip_path)  # noqa: S310 — 固定 https URL
+        urllib.request.urlretrieve(url, zip_path)  # noqa: S310：固定 https URL
     print(f"解压 {zip_path} → {cache_dir}", file=sys.stderr)
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(cache_dir)

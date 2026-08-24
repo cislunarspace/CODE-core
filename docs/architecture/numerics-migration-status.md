@@ -2,7 +2,7 @@
 
 ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Rust 计算核心。
 本文按 `e2m2e/algorithm/` 的子模块逐项登记迁移状态，供审计直接引用，避免把
-"过渡状态"误读成"放错层"（误判先例与裁决见 ADR 0026）。
+过渡状态误读成放错层（误判先例与裁决见 ADR 0026）。
 
 每个登记项回答三个问题：**数值内核在哪**（Rust crate / Python）、**迁移状态**
 （已下沉 / 迁移中 / 有意留 Python）、**为什么**（有意留 Python 必写理由；
@@ -86,10 +86,10 @@ Hessian 是 numpy 实现（供非传播路径共用），见有意留 Python 节
 依据 ADR 0002。
 
 **`algorithm/forces`（数值）。** 力模型数值（球谐、潮汐、SRP、三体、大气）
-在 `e2m2e-forces` crate；`force_model.py` 等 Python 文件是"参数验证 +
-to_rust_spec 序列化"配置面，源码留在 algorithm 层（ADR 0030）：Python 是
+在 `e2m2e-forces` crate；`force_model.py` 等 Python 文件是做参数验证与
+to_rust_spec 序列化的配置面，源码留在 algorithm 层（ADR 0030）：Python 是
 编排侧配置面，不是数值核；不新建 Python 数值目录。层级裁决不改变
-"数值已下沉"的登记。
+数值已下沉的登记。
 
 **`algorithm/transfer/lambert.py`。** 二体 Lambert（Izzo）在
 `e2m2e-propagation` crate（`lambert.rs`），本文件是薄封装
@@ -242,12 +242,12 @@ ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShoot
 ## 有意留 Python
 
 有决策依据地保留在 Python，不是技术债。审计时看到这些模块的 Python 数值，
-按对应理由判定，不误报"放错层"。
+按对应理由判定，不误报放错层。
 
 **`algorithm/transfer/nlp_core.py`、`nlp_scipy.py`、`nlp_copt.py`、
 `transfer_optimization.py`（NLP 优化与编排）。** 理由：SLSQP/COPT 串行迭代是
 Python 强项（早期架构讨论共识，ADR 0017 边界固化）；
-`transfer_optimization.py` 是"搜索-优化"两步法优化阶段的高层编排（构造优化器、
+`transfer_optimization.py` 是搜索-优化两步法优化阶段的高层编排（构造优化器、
 计算目标/约束），属 NLP 范畴。这是默认求解器所在，不是迁移目标。
 
 **`algorithm/family/*_initial_guess.py`、`strategies/`、`cr3bp_orbits.py`
@@ -264,7 +264,7 @@ Rust 结果重包为领域对象属于编排模块职责（architecture.md 第 3
 **`algorithm/transfer` 二体/解析与编排模块。** `hohmann.py`、`multi_impulse.py`、
 `lga.py`、`three_body_lambert.py`、`mission_assessment.py`、`cost.py`、
 `propulsion.py`、`terminal.py`、`transfer.py`（NLP 编排）、`config.py`。
-理由：解析公式或编排，无"喂进数字就迭代"的热路径；其中 Lambert 求解已
+理由：解析公式或编排，无喂进数字就迭代的热路径；其中 Lambert 求解已
 Rust。多脉冲 NLP 的节点优化属 NLP 范畴，见上。
 
 **`algorithm/transfer/search_geometry.py`、`search_progress.py`、
@@ -321,7 +321,7 @@ Rust，见上。
 
 ## 维护说明
 
-- **状态词固定**：新登记项只能用"已下沉 / 迁移中 / 有意留 Python"三词，
+- **状态词固定**：新登记项只能用已下沉 / 迁移中 / 有意留 Python三词，
   保证全文 grep 可枚举。
 - **粒度**：登记粒度到文件/路径。同一模块可拆多条（如 `algorithm/design`：
   打靶/传播路径已下沉、编排有意留 Python；`algorithm/normal_form`：积分/
@@ -330,7 +330,7 @@ Rust，见上。
 - **迁移中条目**：issue 关闭（下沉完成或改判）时，把条目移到对应状态节，
   保留 issue 编号作为历史指针。
 - **有意留 Python 条目**：必须带理由，理由应引用 ADR 或文档决策，不写
-  "暂时不迁"这类临时话。
+  暂时不迁这类临时话。
 - **新模块**：`e2m2e/algorithm/` 下出现含数值实现的新子模块时，在本清单
   登记后再合入。
 - 关联 ADR：0011（五层架构）、0017（网格搜索下沉 Rayon）、0026（测试

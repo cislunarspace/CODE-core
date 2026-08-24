@@ -111,19 +111,19 @@ def _call_rust_or_compat_error(
     required_kwargs: tuple[str, ...],
     **kwargs,
 ):
-    """调用 Rust pyfunction，把"编译产物过期"导致的签名漂移转成可操作错误。
+    """调用 Rust pyfunction，把编译产物过期导致的签名漂移转成可操作错误。
 
     ``.pyd``/``.so`` 落后于源码时，PyO3 在参数绑定阶段抛 ``TypeError`` （如
     ``got an unexpected keyword argument 'sxform_pairs'``），错误信息毫无指向、
     栈顶远离调用点。本函数先用 :func:`inspect.signature` 主动比对所需
-    keyword-only 参数，缺失即抛带"请重建"提示的 :class:`RuntimeError`；无法
+    keyword-only 参数，缺失即抛带请重建提示的 :class:`RuntimeError`；无法
     内省（无 ``__text_signature__``）时退化为在调用点捕获 ``TypeError``，锚定
-    PyO3 漂移模板（"unexpected keyword argument"）并按参数名命中重映射——仅
+    PyO3 漂移模板（"unexpected keyword argument"）并按参数名命中重映射：仅
     漂移型错误被重映射，余者原样上抛，避免掩盖真实 bug（如 dt 参数类型错误）。
 
     与 :meth:`SPICEManager.enable_ephem_cache` 外层的 ``except ImportError``
-    （覆盖"扩展未编译/未开 spice feature"）互补，共同覆盖"扩展存在但过期"
-    这一此前会以裸 ``TypeError`` 冒泡的情形。属靶向加固，非 ABI 版本戳（见
+    （覆盖扩展未编译/未开 spice feature）互补，共同覆盖扩展存在但过期
+    这一会以裸 ``TypeError`` 冒泡的情形。属靶向加固，非 ABI 版本戳（见
     ``docs/plans`` 下 #3 计划）。
     """
     # 主路径：签名内省预检。

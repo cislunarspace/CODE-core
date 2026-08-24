@@ -26,7 +26,7 @@ tod（transfer-orbit-design）正把 UI 迁移到 Tauri 架构（Rust 壳 + Web 
 {"status": "progress", "data": null, "error": null, "meta": {"job_id": "...", "percent": 0.42, "message": "..."}}
 ```
 
-`percent` 为 0–1 浮点；消费端对 `status` 未知的行必须跳过不报错。
+`percent` 为 0~1 浮点；消费端对 `status` 未知的行必须跳过不报错。
 
 ### 3. 二进制帧：跨仓库持久契约
 
@@ -38,7 +38,7 @@ JSON 行末尾带 `"binary_frames": N` 字段（N 缺省为 0）时，该行换�
 4     1    u8    dtype：0 = float32，1 = float64
 5     1    u8    ndim：数组维度数，≥ 1
 6     4·ndim  u32[]  shape：各维元素数（不是字节数），小端
-6+4·ndim  —   —    原始数组字节：C 连续（行主序）、小端，长度 = prod(shape) · 元素宽度
+6+4·ndim  可变  可变    原始数组字节：C 连续（行主序）、小端，长度 = prod(shape) · 元素宽度
 ```
 
 - f32 与 f64 都支持，由请求方在请求参数中声明 dtype。tod 画布渲染用 f32（Three.js `BufferAttribute` 本就是 f32，f64 进浏览器也得截断）；计算中间量、要落盘复算的量保持 f64。

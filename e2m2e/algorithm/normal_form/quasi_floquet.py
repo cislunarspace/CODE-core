@@ -1,4 +1,4 @@
-"""quasi-Floquet 变换矩阵 ``B(t)`` （Code7–Code9）。
+"""quasi-Floquet 变换矩阵 ``B(t)`` （Code7~Code9）。
 
 对应 qiao ``Code08_QuasiFloquet.py`` （矩阵法）与
 ``Code08_QuasiFloquet_LA.py`` （李代数法）：从动力学替代轨道出发，求解
@@ -22,7 +22,7 @@
 - **常数法** （``method="constant"``）：CR3BP 下 ``M`` 是常数矩阵，
   方程 ``Ḃ = M·B − B·D`` 有常数解 ``B = V`` （把 ``M`` 化到实标准形
   ``D`` 的变换矩阵）。``V`` 的元素 O(1)、不随 ``e^{λt}`` 增长，投影到
-  QF 坐标的 Hamiltonian 系数保持常数——中心流形化简的同调方程退化为
+  QF 坐标的 Hamiltonian 系数保持常数，中心流形化简的同调方程退化为
   代数除法（Gómez vol III §2.7.1），无需 FFT 频域求解。矩阵法/多点
   打靶在 CR3BP 下解出的时变解（``B(0)=I`` 前向或 ``B(T)=I`` 末端）使
   系数随窗口变化，短窗口下 FFT 求解器因频率分辨率不足产生系统偏差。
@@ -34,8 +34,8 @@
 
 Public API：
 
-- :class:`QuasiFloquetResult` —— 结果句柄；
-- :class:`QuasiFloquetReducer` —— 上下文绑定的 reducer，通过
+- :class:`QuasiFloquetResult`：结果句柄；
+- :class:`QuasiFloquetReducer`：上下文绑定的 reducer，通过
   :meth:`reduce` 给出 :class:`QuasiFloquetResult`。
 
 单位约定：``M(t)``、``D``、``B(t)`` 全部在 qiao 归一化单位（TU）下
@@ -72,7 +72,7 @@ def real_normal_form_matrix(lam: float, wp: float, wv: float) -> npt.NDArray[np.
 
     对应 qiao ``Global_File`` 中固化的 ``Mat_D``：一双曲方向 ``±λ``、
     平面内中心方向 ``±i ω_p``、垂直中心方向 ``±i ω_v``。基底顺序与
-    qiao 一致：``[p₁, q₁, q₂, p₂, ...]``——指数 0 双曲、指数 1/4 平面
+    qiao 一致：``[p₁, q₁, q₂, p₂, ...]``，指数 0 双曲、指数 1/4 平面
     中心对、指数 2/5 垂直中心对。
 
     Args:
@@ -99,7 +99,7 @@ def real_normal_form_transform(
     """CR3BP 常数 QF 变换矩阵 ``V``：``X = V·Y`` 把常数 ``M`` 化为实标准形。
 
     ``M`` 必须是**常数 Hamilton 矩阵** （``MᵀJ + JM = 0``，如
-    :func:`_cr3bp_hamiltonian_linearization` 的输出）——Hamilton 矩阵的
+    :func:`_cr3bp_hamiltonian_linearization` 的输出）：Hamilton 矩阵的
     特征向量满足 J 正交性，实标准形基 ``V`` 才能同时辛归一化与对角化
     （速度框架 ``[[0,I],[S,−2Ω×]]`` 不是 Hamilton 矩阵，其基无法辛
     归一化，``symplectic_project`` 会破坏对角化）。特征值为一对实
@@ -361,7 +361,6 @@ def _cr3bp_hessian_symmetric(r: npt.NDArray[np.floating], mu: float) -> npt.NDAr
     d2i5 = 1.0 / d2**5
 
     # 离心仅 x-y 平面（z 方向无离心）+ 引力 Hessian。
-    # 此前用质心系（地球 −μ）并把离心误加到 z，导致与 constants 频率不自洽。
     c2 = mu1 * d1i3 + mu * d2i3
     S = np.diag([1.0 - c2, 1.0 - c2, -c2]).astype(float)
     S += mu1 * 3.0 * d1i5 * np.outer(r1, r1)
@@ -392,8 +391,8 @@ def _build_M_at(
 
     关键：返回的求值器 ``M_at(t)`` 在任意 ``t`` 上**重新解析地** 计算
     ``S_grav`` （先对轨道位置线性插值，再算对称 Hessian），因此在 ODE 的
-    每个自适应步上 ``M(t)`` 都是精确的 Hamilton 矩阵。这避免了「预计算
-    ``M`` 再线性插值」会让 ``MᵀJ+JM=0`` 在节点之间失效、从而破坏辛
+    每个自适应步上 ``M(t)`` 都是精确的 Hamilton 矩阵。这避免了先预计算
+    ``M`` 再线性插值导致 ``MᵀJ+JM=0`` 在节点之间失效、从而破坏辛
     守恒的问题。
 
     返回 ``(M_at, M_stack)``：``M_at`` 为连续求值器，``M_stack`` 为
@@ -502,8 +501,8 @@ def _solve_qf_matrix(
         segment: 分段辛重投影的段长（归一化 TU）。``None`` 时单次积分到底
             （仅适合 ``λT < 10`` 的小窗口）。非 ``None`` 时把积分区间按
             ``segment`` 分短段，每段末用 :func:`symplectic_project` 把 ``B``
-            拉回辛群——抑制双曲方向 ``e^(λt)`` 增长导致的辛误差累积。
-            段长取 ``0.4``–``0.8`` （与 qiao ``node_step`` 一致，使单段
+            拉回辛群，抑制双曲方向 ``e^(λt)`` 增长导致的辛误差累积。
+            段长取 ``0.4``~``0.8`` （与 qiao ``node_step`` 一致，使单段
             ``e^(λ·segment)`` 有限）。这避免长窗口的 overflow，但 ``B`` 的
             双曲分量仍按 ``e^(λt)`` 物理增长（中心流形约化本就如此）。
 
@@ -639,7 +638,7 @@ def _solve_qf_multipoint(
     与单次积分 (:func:`_solve_qf_matrix`) 的根本区别：长窗口下 ``B(t)`` 的
     双曲分量 ``e^(λt)`` 物理增长不可避免，但单次积分在 ``e^(λt)`` 大时浮点
     精度累积丢失（辛性破坏）；多点打靶把长积分换成短弧 STM 的代数连锁，
-    每段 STM 精度保持，连锁求解是纯线性代数——辛误差不随窗口增长。
+    每段 STM 精度保持，连锁求解是纯线性代数，辛误差不随窗口增长。
 
     对 CR3BP（``M`` 常数），所有段 STM 相同，连续性方程有显式解
     ``B_i = Φ^{-(N-i)}·B_N`` （反向递推）；对时变 ``M``，逐段算 STM 后用
@@ -972,14 +971,14 @@ class QuasiFloquetReducer:
         if ds_result.Xlist.shape[0] < 2:
             raise ValueError(f"ds_result 至少需要 2 个采样点，得到 {ds_result.Xlist.shape[0]}")
 
-        # —— 实标准形 D ——
+        # 实标准形 D
         # 非 constant 方法用 qiao Global_File 固化频率；constant 方法（CR3BP）
         # 在下方用 V 还原的 V⁻¹MV（M 特征值），保证 D 与 B 严格自洽。
         nu1, nu2 = self.context.central_frequencies
         lam = float(self.context.characteristic_exponent)
         D = real_normal_form_matrix(lam, float(nu1), float(nu2))
 
-        # —— 求解 B(t) ——
+        # 求解 B(t)
         if self.method == "constant":
             # CR3BP 常数法在线性化平动点处冻结 M。返回的诊断样本也必须
             # 使用同一矩阵；不能存入沿替代轨道变化的 M(t)，否则 B、D 与

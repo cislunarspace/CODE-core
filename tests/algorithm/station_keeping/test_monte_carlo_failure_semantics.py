@@ -100,7 +100,7 @@ def _build_sim(law) -> SingleSampleSimulation:
 
 class TestNoManeuverSampleIsFailure:
     def test_control_law_none_flags_sample_failed(self):
-        """控制律返回 None（未产出机动）→ 样本标记失败（修复前被当作成功）。"""
+        """控制律返回 None（未产出机动）→ 样本标记失败。"""
         result = _build_sim(NoManeuverLaw()).run()
         assert result.failed is True
 

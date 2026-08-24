@@ -17,7 +17,7 @@ import numpy as np
 from ...data.constants import SECONDS_PER_JULIAN_YEAR
 
 if TYPE_CHECKING:
-    from ..data.kernels.manager import SPICEManager
+    from ...data.kernels.manager import SPICEManager
 
 # GRGM900C 月球引力场模型常数
 R_MOON = 1738.0  # km（参考半径）

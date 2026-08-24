@@ -32,7 +32,7 @@
 | 字段 | 含义 |
 |---|---|
 | `orbit_family` | dro / halo / nrho / lyapunov / lissajous / dpo / axial / ro / spo / lpo / horseshoe 等 |
-| `libration_point` | 1–5 |
+| `libration_point` | 1~5 |
 | `jacobi` | CR3BP 段 Jacobi 常数 |
 | `amplitude` | 主振幅（km） |
 | `has_cr3bp` / `has_ephemeris` | 段存在性 |
@@ -78,7 +78,7 @@ Facade 的产物型计算方法（design_orbit、orbit_family_generation、contr
 ## 理由
 
 1. **双段并存，不统一转 EphemerisTable**：CR3BP 初猜与星历是两种动力学模型下的产物，单向强转丢失初猜的可修正性（微分修正消费无量纲状态）；并存也与 transfer-orbit-design ADR 0013 的四槽位可视化契约一致，GUI 消费方式不变。
-2. **多维字段，不单值 orbit_type**：分类的价值在过滤组合（含星历段、L2、Jacobi 3.0–3.1 的 NRHO 这类条件），单值类型表达不了。字段由算法层填而不是事后猜：生成时信息最全，事后推断正是现状乱源。
+2. **多维字段，不单值 orbit_type**：分类的价值在过滤组合（含星历段、L2、Jacobi 3.0~3.1 的 NRHO 这类条件），单值类型表达不了。字段由算法层填而不是事后猜：生成时信息最全，事后推断正是现状乱源。
 3. **SQLite 作派生索引而非事实来源**：文件为源保留了可手动复制、备份、分享、CLI 与 GUI 共享的优点；索引只是查询加速，损坏或格式升级时删掉重建，查询维度变更不动记录文件。
 4. **扁平目录**：路径编码分类是现状痼疾：改名即丢类型、正则失配即丢产物。分类收归索引后，目录组织自由。
 5. **族一条记录**：族成员动辄数十上百，各自成记录会淹没查询结果；族的语义（延拓参数、振幅序列）也无处安放。

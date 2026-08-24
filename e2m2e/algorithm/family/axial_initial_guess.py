@@ -3,8 +3,8 @@
 Axial 轨道从 planar Lyapunov 轨道通过 pitchfork 分岔产生（Gómez Type B），
 关于 x 轴对称。与 Halo（Type A, xz 平面对称）的区别：
 
-- Halo: 初始 (x₀, 0, z₀, 0, ẏ₀, 0) — 从 xz 平面出发，ż₀=0
-- Axial: 初始 (x₀, 0, 0, 0, ẏ₀, ż₀) — 从 xy 平面出发，z₀=0，ż₀≠0
+- Halo: 初始 (x₀, 0, z₀, 0, ẏ₀, 0)：从 xz 平面出发，ż₀=0
+- Axial: 初始 (x₀, 0, 0, 0, ẏ₀, ż₀)：从 xy 平面出发，z₀=0，ż₀≠0
 
 分岔机制：沿 planar Lyapunov 族行走，在垂直临界轨道处（monodromy 的
 z-vz 块半迹 vt = +1），Lyapunov 轨道的面内振幅不再为零。Axial 族从此
@@ -185,8 +185,8 @@ def _find_axial_bifurcation_seed(
         C = system.get_jacobi_constant(orbit.states[0])
 
         # 跳支检测：vt 突变（远大于平滑延拓的每步变化）说明修正器收敛到了
-        # 另一条轨道支——L2 平面 Lyapunov 族大振幅处与近月轨道族交互，
-        # 实测 0.02 步长一步 vt 0.97→0.14、C 3.17→2.92（跳到近月支）；
+        # 另一条轨道支：L2 平面 Lyapunov 族大振幅处与近月轨道族交互，
+        # 0.02 步长一步 vt 0.97→0.14、C 3.17→2.92（跳到近月支）；
         # 平滑延拓下 0.02 步 vt 变化 ~5e-3，阈值 0.3 远高于正常波动，
         # 对 L1（平滑）无影响。跳变时丢弃该轨道、减小步长从 prev 重试。
         prev_vt = scan[-1][2]

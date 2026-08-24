@@ -1,6 +1,6 @@
 # 架构
 
-e2m2e 是"LLM+Agent"任务规划系统中的**算法工具集基础设施**：大模型负责理解意图与编排，e2m2e 负责精确可靠的轨道计算。本文是架构章节的阅读地图。
+e2m2e 是 LLM+Agent 任务规划系统中的**算法工具集基础设施**：大模型负责理解意图与编排，e2m2e 负责精确可靠的轨道计算。本文是架构章节的阅读地图。
 
 ## 五个架构设计
 
@@ -35,7 +35,7 @@ e2m2e 是"LLM+Agent"任务规划系统中的**算法工具集基础设施**：�
 | [0011](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0011-five-layer-architecture.md) | 五层架构与全量重命名 | 分层词汇的来源 |
 | [0012](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0012-dependency-direction.md) | 依赖方向规则与 CI 检查 | 模块间允许谁依赖谁 |
 | [0002](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0002-rust-integrator-core.md) | Rust 积分器内核 | Python/Rust 接缝的起点 |
-| [0016](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0016-ephem-cache-architecture.md) | EphemCache 星历缓存 | "Rust 不碰 cspice" 的落法 |
+| [0016](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0016-ephem-cache-architecture.md) | EphemCache 星历缓存 | Rust 不碰 cspice 的落法 |
 | [0014](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0014-api-facade-mcp-cli.md) | Facade / MCP / CLI 同源 | 任务级接口模型 |
 | [0024](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0024-unified-algorithm-result-status.md) | 统一算法结果状态契约 | 结果解释层的统一词汇 |
 | [0031](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0031-orbit-catalog.md) | 轨道库 catalog | 数据管理模块的落法 |

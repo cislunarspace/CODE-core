@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import functools
+
 import pytest
 
 from e2m2e.algorithm.catalog_sweep import (
@@ -37,9 +39,14 @@ def _windowed_halo_point(window: tuple[float, float]) -> FamilySweepPoint:
     )
 
 
+@functools.cache
 def _halo_jacobi_bounds() -> tuple[float, float]:
-    """探出 L1 Halo（3000 km）族的真实 Jacobi 包络，供测试自校准窗口。"""
-    probe = run_family_sweep([_halo_point(3000.0, n_orbits=10)])[0]
+    """探出 L1 Halo（3000 km）族的真实 Jacobi 包络，供测试自校准窗口。
+
+    模块级缓存：确定性探测只跑一次，多个窗口测试共享（ADR 0021 #420
+    消除重复计算；探测本身是一次 n_orbits=6 的族生成）。
+    """
+    probe = run_family_sweep([_halo_point(3000.0, n_orbits=6)])[0]
     assert probe.result is not None
     jacobis = probe.result.family.get_jacobi_constants()
     return float(jacobis.min()), float(jacobis.max())

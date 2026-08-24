@@ -32,7 +32,7 @@ ADR 0013 定下正确性由物理定义裁决，并附一句测试分层：Rust 
 ## 结果
 
 - `pyproject.toml` markers 换 7 类 + `spice`；`addopts` 只排除 `low_thrust`；测试不再按速度分层，release 前跑全量。
-- 迁移分三 PR：①`git mv` 纯移动（保历史、不改逻辑、不换标记）；②逐文件打功能类标记、去 l1–l4/e2e；③清理结构债（私有符号测试、golden/gmat/dfh 术语、#358 归类）。
+- 迁移分三 PR：①`git mv` 纯移动（保历史、不改逻辑、不换标记）；②逐文件打功能类标记、去 l1~l4/e2e；③清理结构债（私有符号测试、golden/gmat/dfh 术语、#358 归类）。
 
 ## 迁移 checklist（防引用遗留）
 

@@ -1,7 +1,7 @@
 //! GravityField 完整 Rust 移植（仅 `spice` feature 下编译）。
 //!
 //! 1:1 移植自 Python ``gravity_field.py:GravityField.compute_acceleration``，
-//! 把"坐标变换（pxform）+ 有效系数（潮汐）+ 球谐加速度 + 反向坐标变换"
+//! 把坐标变换（pxform）+ 有效系数（潮汐）+ 球谐加速度 + 反向坐标变换
 //! 全部合并到一次 Rust 调用。
 //!
 //! # 当前简化
@@ -90,9 +90,9 @@ fn perturbers_for_body(body: &str) -> &'static [&'static str] {
 /// propagation frame 是 origin=propagation_origin 的惯性系（如地心 J2000）。
 /// input frame 是 origin=body 的 body-fixed 系（如月心 MOON_PA）。
 /// 变换步骤：
-///   1. `r_ssb = r_sc + state_ssb(propagation_origin)` —— 从 propagation origin 平移到 SSB
-///   2. `r_body_icrf = r_ssb - state_ssb(body)` —— 从 SSB 平移到 body（仍在 J2000 轴下）
-///   3. `r_input = R_j2000_to_input^T @ r_body_icrf` —— 旋转到 input_frame 轴
+///   1. `r_ssb = r_sc + state_ssb(propagation_origin)`：从 propagation origin 平移到 SSB
+///   2. `r_body_icrf = r_ssb - state_ssb(body)`：从 SSB 平移到 body（仍在 J2000 轴下）
+///   3. `r_input = R_j2000_to_input^T @ r_body_icrf`：旋转到 input_frame 轴
 ///      其中 `R_j2000_to_input = pxform(J2000, input_frame)`，T 反转方向
 ///      等价于 `R_input_to_j2000 = pxform(input_frame, J2000)` 的转置 × r_body_icrf
 #[allow(clippy::too_many_arguments)]
@@ -114,7 +114,7 @@ pub fn gravity_field_acceleration(
     // Step 1: 坐标变换 propagation → input_frame
     //
     // body == propagation_origin（地心系地球重力场等常见场景）时，origin 与
-    // body 重合，r_body_icrf = r_sc，无需查 origin/body 在 SSB 的位置——
+    // body 重合，r_body_icrf = r_sc，无需查 origin/body 在 SSB 的位置，
     // 既省两次 spkezr FFI，又避免对 SSB 大级坐标（~1.5e8 km）做插值引入误差。
     // 仅 body != origin 时才需要查 SSB 位置做平移。
     let r_body_icrf: [f64; 3] = if body == propagation_origin {
@@ -372,7 +372,7 @@ impl GravityFieldContext {
         tide: &TideConfig,
     ) -> Result<Self, SpiceFfiError> {
         // 1. 查天体位置（平移偏移）。优先走星历缓存（三次样条查表），未覆盖
-        //    回退 spkezr——与 gravity_field_acceleration L118-171 同模式。
+        //    回退 spkezr，与 gravity_field_acceleration L118-171 同模式。
         //    body == propagation_origin（地心系地球重力场常见场景）时 origin
         //    与 body 重合，无需查 SSB 平移。
         let origin_offset: [f64; 3] = if body == propagation_origin {

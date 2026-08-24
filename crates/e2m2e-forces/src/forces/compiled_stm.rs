@@ -109,9 +109,6 @@ pub fn propagate_compiled_stm(
     // 输出起点跟随 t_eval：当 t_eval[0]==t_span.0 时记录初始状态/STM、eval_idx
     // 从 1 起步；否则（如逐段积分 patch point 时刻非整数小时、t_eval 整数小时
     // 点严格大于 t0）不预设 t_span.0 到输出、eval_idx 从 0 起步由循环匹配。
-    // 此前硬编码 vec![t_span.0] + eval_idx=1 假设 t_eval[0]==t_span.0，导致
-    // t_eval[0]>t_span.0 时首个输出点状态/STM 错置为初值、与后续点错位
-    // （与 propagate_compiled 同源 bug）。
     let mut eval_idx = 0usize;
     let mut n_steps = 0usize;
     let mut n_rejected = 0usize;

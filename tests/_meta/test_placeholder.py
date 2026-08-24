@@ -121,6 +121,10 @@ def test_facade_placeholder():
 
 def test_mcp_server_placeholder():
     """MCP create_server 占位。"""
+    pytest.importorskip(
+        "anyio",
+        reason="MCP 协议层为可选依赖 [mcp]，未安装时跳过（ADR 0014）",
+    )
     from e2m2e.api.mcp.server import create_server
 
     with pytest.raises(NotImplementedError, match="MCP"):

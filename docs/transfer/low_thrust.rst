@@ -101,23 +101,23 @@
 
 - ``t_max``: 最大推力（N）。典型值域：
 
-  - 电推进（Hall thruster）: 0.01 – 1.0 N
-  - 电推进（ion thruster）: 0.0001 – 0.1 N
-  - 化学低推力: 1 – 100 N
+  - 电推进（Hall thruster）: 0.01~1.0 N
+  - 电推进（ion thruster）: 0.0001~0.1 N
+  - 化学低推力: 1~100 N
 
 - ``isp``: 比冲（s）。典型值域：
 
-  - 电推进（Hall thruster）: 1500 – 3000 s
-  - 电推进（ion thruster）: 2000 – 5000 s
-  - 化学推进: 300 – 450 s
+  - 电推进（Hall thruster）: 1500~3000 s
+  - 电推进（ion thruster）: 2000~5000 s
+  - 化学推进: 300~450 s
 
 其他关键参数：
 
 - ``initial_mass``: 航天器初始质量（kg）
-- ``n_segments``: 求解器段数。越多精度越高但计算越慢。典型值 5 – 50
+- ``n_segments``: 求解器段数。越多精度越高但计算越慢。典型值 5~50
 - ``solver_method``: ``"shooting"`` （直接打靶，解析雅可比快 5-24x）或
   ``"collocation"`` （Hermite-Simpson 配点，大规模更鲁棒）
-- ``duration_days``: 飞行时间（天）。LEO→GEO 约 100–300 天；LEO→月球约 3–180 天
+- ``duration_days``: 飞行时间（天）。LEO→GEO 约 100~300 天；LEO→月球约 3~180 天
 - ``target_oe``: Q-law 目标 ``(a_T, e_T, i_T)`` （km, 无量纲, 无量纲）
 
 质量演化与推力历史

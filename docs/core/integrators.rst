@@ -121,11 +121,11 @@ PD45 是低阶、低开销的默认选择；PD78 和 RK89 在相同容差下步�
 
 关键参数说明：
 
-- ``tol`` — 相对容差。实际接受阈值是 ``tol * max(1, ||y||)``，保证在归一化单位（~O(1)）和物理单位（km/s，~O(7000)）下行为一致。
-- ``h0`` — 初始试探步长。自适应控制器会在几步内收敛到合适步长，``h0`` 只需大致量级正确即可。
-- ``result.error`` — 高阶解与嵌入解的 L2 范数差，即局部截断误差估计。
-- ``result.h_next`` — 控制器建议的下一步长：``h_next = h * clamp(0.9 * (tol/error)^(1/(p+1)), 0.1, 5)``，其中 ``p`` 为嵌入阶数。
-- ``state_error_dim`` — 可选参数，``rk_step`` 与 ``solve_ivp_events`` 均支持。步长误差控制只统计前 N 维状态（``None`` 时统计全部）；STM 增广传播时传 6，让 36 个 STM 分量不主导步长。
+- ``tol``：相对容差。实际接受阈值是 ``tol * max(1, ||y||)``，保证在归一化单位（~O(1)）和物理单位（km/s，~O(7000)）下行为一致。
+- ``h0``：初始试探步长。自适应控制器会在几步内收敛到合适步长，``h0`` 只需大致量级正确即可。
+- ``result.error``：高阶解与嵌入解的 L2 范数差，即局部截断误差估计。
+- ``result.h_next``：控制器建议的下一步长：``h_next = h * clamp(0.9 * (tol/error)^(1/(p+1)), 0.1, 5)``，其中 ``p`` 为嵌入阶数。
+- ``state_error_dim``：可选参数，``rk_step`` 与 ``solve_ivp_events`` 均支持。步长误差控制只统计前 N 维状态（``None`` 时统计全部）；STM 增广传播时传 6，让 36 个 STM 分量不主导步长。
 
 
 Adams-Bashforth-Moulton（固定步长多步）
@@ -337,8 +337,8 @@ spice feature 启用时，扩展模块还提供 ``propagate_compiled`` 与
 之后整个积分循环（含 SPICE 查询与 STM 变分方程）在 Rust 内完成，消除逐步
 Python↔Rust 跨界。这两个入口不直接面向用户，由
 :class:`~e2m2e.algorithm.forces.force_model.ForceModel` 的 ``propagate`` 按条件
-自动分流，30 天直推约 9.7× 加速；触发条件与回退行为见 :doc:`forces` 的
-「Rust 编译快速路径」小节。
+自动分流；触发条件与回退行为见 :doc:`forces` 的
+Rust 编译快速路径小节。
 
 
 轨道传播示例

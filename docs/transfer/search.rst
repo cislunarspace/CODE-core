@@ -1,7 +1,7 @@
 转移窗口搜索
 ============
 
-:class:`~e2m2e.algorithm.transfer.transfer_search.TransferSearch` 实现转移轨道的参数空间搜索，是"搜索-优化"两步法中的第一步。
+:class:`~e2m2e.algorithm.transfer.transfer_search.TransferSearch` 实现转移轨道的参数空间搜索，是搜索-优化两步法中的第一步。
 
 搜索算法
 --------

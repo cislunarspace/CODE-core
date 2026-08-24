@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 from .physical_model import PhysicalModel
 
 if TYPE_CHECKING:
-    from ..system import System
+    from ..dynamics.system import System
     from .shadow import ConicalShadowModel
 
 

@@ -42,12 +42,12 @@ Floquet 理论
 
 ``analyze()`` 返回 frozen 数据类 ``OrbitStability``，字段包括：
 
-- ``monodromy_matrix`` — 单值矩阵，形状 (6, 6)
-- ``eigenvalues`` — 单值矩阵特征值（Floquet 乘子）
-- ``stability_indices`` — 稳定性指数字典，键为 ``nu1``/``nu2``/``nu3``/``broucke``
-- ``classification`` — 稳定性分类结果（含 ``stability_type``、``is_stable`` 等）
-- ``bifurcation`` — 分岔分析结果
-- ``numerical_errors`` — 数值误差估计
+- ``monodromy_matrix``：单值矩阵，形状 (6, 6)
+- ``eigenvalues``：单值矩阵特征值（Floquet 乘子）
+- ``stability_indices``：稳定性指数字典，键为 ``nu1``/``nu2``/``nu3``/``broucke``
+- ``classification``：稳定性分类结果（含 ``stability_type``、``is_stable`` 等）
+- ``bifurcation``：分岔分析结果
+- ``numerical_errors``：数值误差估计
 
 稳定性指标
 ----------
@@ -115,8 +115,8 @@ Floquet 理论
 单值矩阵由数值积分得到，``numerical_errors`` 字段给出两项残差，
 用于校验积分精度是否足够：
 
-- ``determinant_error`` — \|det(M) − 1\|，辛矩阵行列式应恒为 1
-- ``symplectic_error`` — ‖MᵀJM − J‖ 的范数，辛性质残差
+- ``determinant_error``：\|det(M) − 1\|，辛矩阵行列式应恒为 1
+- ``symplectic_error``：‖MᵀJM − J‖ 的范数，辛性质残差
 
 残差显著偏大时，应收紧积分容差后重新分析。
 

@@ -1,7 +1,7 @@
 """``normal_form.polynomial`` 测试。
 
 重点覆盖 ``poly_subs``（H→QF 映射的变量替换，对应 qiao Code09 的
-``X = B·Y`` 符号代换）。该函数的「新变量命名约定」是易错边界，单独
+``X = B·Y`` 符号代换）。该函数的新变量命名约定是易错边界，单独
 用一组用例钉死。
 """
 
@@ -20,7 +20,7 @@ from e2m2e.algorithm.normal_form.polynomial import (
 pytestmark = pytest.mark.theory
 
 
-# 标准正则坐标（替换后的「新变量」约定用这套命名）。
+# 标准正则坐标（替换后的新变量命名约定用这套命名）。
 Q1, Q2, Q3, P1, P2, P3 = sp.symbols("q1 q2 q3 p1 p2 p3", real=True)
 NEW_VARS = (Q1, Q2, Q3, P1, P2, P3)
 
@@ -127,7 +127,7 @@ class TestPolySubs:
         """约定：替换后的新变量必须命名为 q1..p3。
 
         若调用方用其他名字（如 y1..y6），expr2poly 会把它们误当常数。
-        此测试钉死该约定——用错误命名的 subs_map 应让 poly_subs 抛出
+        此测试钉死该约定：用错误命名的 subs_map 应让 poly_subs 抛出
         明确错误，而非静默返回错误结果。
         """
         x1 = sp.symbols("x1", real=True)

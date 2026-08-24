@@ -5,16 +5,16 @@
 
 公开接口：
 
-- :class:`Hamiltonian` —— 不可变结果容器，封装符号 dict
+- :class:`Hamiltonian`：不可变结果容器，封装符号 dict
   ``{pow_tuple: coefficient}``、依赖的动态参数名，以及数值化方法
   ``evaluated_coefficients(times, context)``。``coefficient`` 字段
   可以是 sympy 符号（``build_hamiltonian`` 之后），也可以是 numpy 数组
   （``evaluate_hamiltonian`` 之后）；两者互斥，分别服务于静/动态两种
   消费路径。
-- :func:`build_hamiltonian` —— 接受 :class:`NormalFormContext` 与
+- :func:`build_hamiltonian`：接受 :class:`NormalFormContext` 与
   :class:`LegendreExpansionResult`，构造包含动能 / Coriolis-pq / 离心-qq
   / 强制项 f·q / 地球+月球+太阳引力势的 Hamilton 多项式（sympy 系数）。
-- :func:`evaluate_hamiltonian` —— 在 :class:`Hamiltonian` 上批量求数值
+- :func:`evaluate_hamiltonian`：在 :class:`Hamiltonian` 上批量求数值
   时间序列，返回 ``ndarray`` 形状 ``(len(times), n_terms)``；幂次向量
   同步保留在 :class:`Hamiltonian` 中。
 
@@ -382,7 +382,7 @@ def _eval_coef(coef: object, params: dict[str, float]) -> float:
 
     ``coef = 0`` 直接返回 0（稀疏多项式缺项）；数值转换失败或出现非
     ``params`` 键的符号时抛 ``ValueError`` （#352）：求不出就该报错，不静默
-    用 0 填——0 会让下游误以为该项不存在，污染哈密顿量。
+    用 0 填；0 会让下游误以为该项不存在，污染哈密顿量。
     """
     if coef == 0:
         return 0.0
@@ -467,7 +467,7 @@ def build_cr3bp_hamiltonian(
         可直接广播成时间序列供 :class:`CenterManifoldReducer` 注入。
 
     Notes:
-        与 :func:`evaluate_hamiltonian` 不同，本函数**不** 产出时间序列——
+        与 :func:`evaluate_hamiltonian` 不同，本函数**不** 产出时间序列：
         CR3BP 自治，系数恒定。调用方（如 pipeline）若需与 ``qf_result.tlist``
         对齐的时间序列，自行 ``np.full(N, coef)`` 广播即可。
     """
@@ -525,7 +525,6 @@ def build_cr3bp_hamiltonian(
     # Gómez vol I 标准形）。离心效应已通过 H = ½‖ṙ‖² − Ω 的 Legendre 变换
     # 被吸收进 ½‖p‖² + yp_x − xp_y，不作为独立项出现。引力势的完整 Legendre
     # 展开（build_hamiltonian 的 -μ/|r-q|）已包含全部二阶信息。
-    # （此前误加 ±½(x²+y²) 离心项，导致 H 的 q-q 块符号错、与 QF 的 S 不自洽。）
     cpq = np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
     cqq = np.zeros((3, 3))
 
@@ -533,7 +532,7 @@ def build_cr3bp_hamiltonian(
     re = np.array([-x_lp, 0.0, 0.0])
     rm = np.array([1.0 - x_lp, 0.0, 0.0])
 
-    # 力项 f：星历模型里 f 是「受迫频率」（使平动点保持拟周期运动的额外力）。
+    # 力项 f：星历模型里 f 是受迫频率（使平动点保持拟周期运动的额外力）。
     # CR3BP 自治、平动点是真实平衡点，故 f 应令 q=0 处 Hamilton 方程的 ṗ=0，
     # 即 f 恰好抵消引力势在原点的一阶梯度。这里先置 0，数值化后删一阶项
     # （等价于令 f = -∂(引力势)/∂q|₀，强制平衡条件）。
@@ -566,7 +565,7 @@ def build_cr3bp_hamiltonian(
     # 把平动点当原点的约定一致。
     numeric = {k: v for k, v in numeric.items() if sum(k) != 1}
 
-    # —— γ 缩放坐标下的引力势（Jorba-Masdemont c_n 形式）——
+    # γ 缩放坐标下的引力势（Jorba-Masdemont c_n 形式）
     # 标准 expand_legendre 展开的 -μ/|r-q| 在月球附近 (r=γ) 使 (q/r)^n 急剧放大
     # （阶6 达 3.6e4）。改用 JM 的 c_n·ρ^n·P_n(x/ρ) 形式：c_n 含 (γ/r)^{n+1}
     # 因子，月球 r=γ 使其=1，系数降到 O(1)~O(10)。

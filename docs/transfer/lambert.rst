@@ -172,7 +172,7 @@ n=2 时无自由变量、直接封闭单弧；``x0`` 给出中途节点的初猜
 :meth:`~e2m2e.algorithm.transfer.multi_impulse.MultiImpulseTransfer.check_primer_vector`
 对给定解做 Lawden 主矢量检验：由端点横截条件
 p(t0) = Δv̂₀、p(tf) = Δv̂_f 确定主矢量初值，协态经 STM 携载得到 p(t) 曲线
-（公式出处为 Prussing《Optimal Spacecraft Trajectories》第 3–4 章）。
+（公式出处为 Prussing《Optimal Spacecraft Trajectories》第 3~4 章）。
 最优性的必要条件是全程 ``|p(t)| ≤ 1`` 且脉冲点 ``|p| = 1``、方向与 p 共线；
 弧内 ``|p| > 1`` 时在峰值处插入中途脉冲可降低总 ΔV（Lion & Handelsman 1968）。
 霍曼转移满足 Lawden 条件；同一端点但飞行时间取 0.5 倍霍曼时间的双脉冲解

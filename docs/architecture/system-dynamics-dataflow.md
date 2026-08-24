@@ -1,9 +1,9 @@
 # System 与 Dynamics：两棵类层次的数据流
 
-`e2m2e/algorithm/dynamics/` 下有两棵类层次：System 一侧描述"这是什么系统"
-（μ、特征尺度、平动点、星历、单位、坐标系），Dynamics 一侧描述"怎么把它积分
-出来"（积分器、容差、STM、事件、结果缓存）。包 docstring 概括为"System（数据
-上下文）+ Dynamics（传播编排）"（e2m2e/algorithm/dynamics/\_\_init\_\_.py:1）。
+`e2m2e/algorithm/dynamics/` 下有两棵类层次：System 一侧描述这是什么系统
+（μ、特征尺度、平动点、星历、单位、坐标系），Dynamics 一侧描述怎么把它积分
+出来（积分器、容差、STM、事件、结果缓存）。包 docstring 概括为 System（数据
+上下文）+ Dynamics（传播编排）（e2m2e/algorithm/dynamics/\_\_init\_\_.py:1）。
 本文按数据流动的方向，把这两个家族各自是什么、谁读它们的什么成员、一次传播里
 数据走哪条路，逐一讲清楚。文中所有行号以当前代码为准。
 
@@ -23,12 +23,12 @@ result = dynamics.propagate(state0, (0.0, 6.3))
 **第一段，构造 System。** `CR3BP_System.__init__` 只收质量参数 μ、两个天体名和
 可选的天体半径，特征长度、特征时间、五个平动点全部置为 None
 （e2m2e/algorithm/dynamics/cr3bp_system.py:71-128）。此时的系统还不能参与计算：
-`DU`/`TU`/`VU` 属性在尺度未设时抛"系统未初始化"
+`DU`/`TU`/`VU` 属性在尺度未设时抛系统未初始化
 （cr3bp_system.py:194-212）。`_with_default_scales()` 按天体对补上特征尺度
 （cr3bp_system.py:130-160），平动点则推迟到首次需要时才解算：
 `get_libration_point` 发现没算过就先调 `compute_libration_points`
-（cr3bp_system.py:293-317）。System 的构造因而是两段式的：先定"哪个系统"，
-再定"用什么尺度量化它"。
+（cr3bp_system.py:293-317）。System 的构造因而是两段式的：先定哪个系统，
+再定用什么尺度量化它。
 
 **第二段，构造 Dynamics。** `CR3BP_Dynamics(system)` 做的事很轻：存下 system
 引用，填一套默认积分器配置（RK45、rtol/atol 1e-12、max_step 0.01），把结果缓存
@@ -38,7 +38,7 @@ result = dynamics.propagate(state0, (0.0, 6.3))
 **第三段，propagate。** 无事件时 CR3BP 走 Rust 快速路径，Python 侧只把 `mu`、
 时间区间、初值和积分配置这组标量传过 FFI（dynamics.py:851-859）；轨迹在 Rust
 侧算完，以 `{"time", "states"}` 字典回来，同时写进 `self.last_trajectory` 缓存
-（dynamics.py:861-870）。这一段的细节见后文"propagate 内部"一节。
+（dynamics.py:861-870）。这一段的细节见后文propagate 内部一节。
 
 **第四段，结果进数据容器。** 设计链路把返回字典装进 `Orbit`，并把 system 引用
 一并塞进去：`Orbit(states=result["states"], times=result["time"],
@@ -63,7 +63,7 @@ NotImplementedError：星历专属能力，放在基类只是给一个明确的�
 （system.py:54-66）。
 
 接口薄是有后果的：想对两种系统多态的代码，只能依赖这三个成员，其余都得用
-`getattr`/`hasattr` 现探。下文"消费面"一节会看到这是真实发生的模式。
+`getattr`/`hasattr` 现探。下文消费面一节会看到这是真实发生的模式。
 
 ### CR3BP_System：无量纲、自治、两段式初始化
 
@@ -82,14 +82,14 @@ primary 的 GM 是 `1 - mu`、secondary 的是 `mu`（cr3bp_system.py:163-191）
 
 - 特征尺度：`DU`（km）、`TU`（天）、`VU`（m/s）三个属性，外加
   `characteristic_length/time/velocity` 原始字段（cr3bp_system.py:108-110、194-212）。
-- 平动点：`L1`–`L5` 与 `L_points` 字典（cr3bp_system.py:112-117）。
+- 平动点：`L1`~`L5` 与 `L_points` 字典（cr3bp_system.py:112-117）。
 - Jacobi 常数：`get_jacobi_constant(state)`，Parker 约定
   （cr3bp_system.py:319-354）。
 - 单位换算与稳定性：`dimensionless_to_physical` / `physical_to_dimensionless`
   （cr3bp_system.py:356-396）、`compute_stability_index`（cr3bp_system.py:398-442）。
 
 半径字段（`primary_radius_km`/`secondary_radius_km`）本身不参与动力学，是碰撞
-检测的数据来源，流向见"事件与碰撞"小节。
+检测的数据来源，流向见事件与碰撞小节。
 
 ### EphemerisSystem：SPICE 查询的统一入口
 
@@ -99,7 +99,7 @@ primary 的 GM 是 `1 - mu`、secondary 的是 `mu`（cr3bp_system.py:163-191）
 是：构造时给定的框架、物理单位、GM 直通 `spice.get_gm`
 （ephemeris_system.py:59-103）。
 
-与 CR3BP 的两段式初始化不同，这里的"第二步"是给 `coordinate_system` 赋值，且
+与 CR3BP 的两段式初始化不同，这里的第二步是给 `coordinate_system` 赋值，且
 发生在构造之后、经 property setter 完成（ephemeris_system.py:69-75）。编排层
 的标准写法是先构造再补：`system = EphemerisSystem(...)` 接着
 `system.coordinate_system = CoordinateSystem(...)`
@@ -195,7 +195,7 @@ dynamics.py:986-999）。
 `system.coordinate_system` 已设置（force_model.py:45-58）；传播时把每个力模型
 序列化为 Rust 元组（`force.to_rust_spec(self.system)`），并读 `system.origin`
 作为 observer 传入（force_model.py:281-293）；`system.spice` 是否存在被用作
-"资源缺失还是能力缺失"的分流依据（force_model.py:226-233）。它从不构造
+资源缺失还是能力缺失的分流依据（force_model.py:226-233）。它从不构造
 Dynamics，也明确不继承 Dynamics（force_model.py:30-38）。
 
 `PhysicalModel._resolve_mu(system)` 是力模型侧对 System 最直接的消费：显式 μ
@@ -268,8 +268,8 @@ EphemerisSystem 两个实现上（tests/algorithm/dynamics/test_system_contract.
 
 类型标注之下，真实契约比注解更薄，三处实证：
 
-- 数据层的 `Orbit`/`OrbitFamily` 把 system 存为 `Any`，docstring 明说"数据层
-  不依赖算法层"，只用 `hasattr(system, "get_jacobi_constant")` 判断能力
+- 数据层的 `Orbit`/`OrbitFamily` 把 system 存为 `Any`，docstring 明说数据层
+  不依赖算法层，只用 `hasattr(system, "get_jacobi_constant")` 判断能力
   （e2m2e/data/types/orbit.py:8-12、50、418-429）。
 - 低推力测试直接传 `SimpleNamespace(origin="EARTH")` 当 system 用
   （tests/algorithm/transfer/test_lowthrust_collocation.py:23；
@@ -351,13 +351,13 @@ bcr4bp_dynamics.py:225-271）。EphemerisDynamics 不支持事件：events 非 N
 （tests/algorithm/dynamics/test_events.py:21-26）。`with_stm=True` 时事件函数
 收到的是 42 维增广状态（test_events.py:86-97）。
 
-碰撞检测把"撞天体"翻译成终端事件：`_collision_specs` 从 system 读
+碰撞检测把撞天体翻译成终端事件：`_collision_specs` 从 system 读
 `primary_radius_km`/`secondary_radius_km`（都没注入则报错）、读 `mu` 定两天体
 在会合系的固定位置 [-μ,0,0] 与 [1-μ,0,0]（dynamics.py:398-428）；
 `_setup_collision_detection` 再读 `DU` 把半径从 km 折成无量纲，构造
 `g = |r - center| - R` 的 terminal 事件并追加到用户事件之后
 （dynamics.py:447-472）。碰撞事件在事件列表末尾这一顺序被
-`_extract_collision` 反向利用：按"列表尾部 n 个"索引回每个天体的触发记录
+`_extract_collision` 反向利用：按列表尾部 n 个索引回每个天体的触发记录
 （dynamics.py:501-509）。这就是碰撞数据流全程读 system 的三个字段：半径、mu、
 DU。
 
@@ -392,8 +392,8 @@ e2m2e/algorithm/manifold/manifolds.py:114）。反向的共享同样成立：同
 
 与之对照，Dynamics 的配置是按任务改的：同一个搜索任务族内，dynamics 构造后
 被覆写 integrator/rtol/atol/max_step（search_parallel.py:837-842）。若配置留在
-System 上，共享 system 的消费者之间会互相踩配置；分离让"模型参数"与"这一次
-怎么积"各有其主。
+System 上，共享 system 的消费者之间会互相踩配置；分离让模型参数与本次积分
+配置各有其主。
 
 ### 多态缝与契约测试
 
@@ -429,7 +429,7 @@ system+dynamics 对，互不共享（tests/algorithm/conftest.py:62-88）。两�
   `CR3BP_Dynamics.compute_jacobian_A` 拼同构矩阵供 STM 变分方程与延拓模块
   复用（dynamics.py:611-638）。两者共用 `pseudo_potential_hessian`
   （e2m2e/algorithm/dynamics/potential.py:14-58），Hessian 只有一份，拼装各
-  归各的语境：一个在"系统性质"里，一个在"传播配套"里。
+  归各的语境：一个在系统性质里，一个在传播配套里。
 - **碰撞半径与 DU 的跨层读取**。碰撞检测是 Dynamics 的职责，但半径存在
   System 上、折无量纲要用 System 的 `DU`（dynamics.py:398-428、447-472）。
   半径是天体属性而非积分配置，故数据留在 system，事件构造留在 dynamics。

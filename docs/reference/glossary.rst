@@ -13,7 +13,7 @@ CR3BP 相关术语
       μ = m₂/(m₁+m₂)，较小天体质量与总质量之比
 
    平动点
-      旋转坐标系中的五个平衡点 (L1-L5)，仅属于 CR3BP 模型。L1、L2、L3 为共线平动点，L4、L5 为三角平动点。在 e2m2e 中用"平动点"而非"拉格朗日点"。
+      旋转坐标系中的五个平衡点 (L1-L5)，仅属于 CR3BP 模型。L1、L2、L3 为共线平动点，L4、L5 为三角平动点。在 e2m2e 中用平动点而非拉格朗日点。
 
    Jacobi 常数
       CR3BP 中唯一的运动积分
@@ -45,10 +45,10 @@ CR3BP 相关术语
       由坐标轴与原点拼成的数学参考框架（``CoordinateSystem``），描述位置、速度等矢量。被选作运动基准时称参考系，被选作积分框架时称计算系。
 
    参考系
-      被选作"描述运动参数基准"的坐标系。在 e2m2e 中即状态存放与传播的坐标系（``system.coordinate_system``）。
+      被选作描述运动参数基准的坐标系。在 e2m2e 中即状态存放与传播的坐标系（``system.coordinate_system``）。
 
    计算系
-      积分所发生的坐标系。回答"积分在哪个坐标系里执行"。在 e2m2e 中与参考系重合。
+      积分所发生的坐标系。回答积分在哪个坐标系里执行。在 e2m2e 中与参考系重合。
 
    参考系的名称
       ``ReferenceFrame`` 枚举（J2000、INERTIAL、ROTATING、SYNODIC 等），命名一个参考坐标系；只标识不做变换。
@@ -107,7 +107,7 @@ CR3BP 相关术语
       以平动点为原点的 6 维无量纲相对坐标系，状态 ``[ρ, ρ̇]``；标准形化简各步在此系内进行。
 
    动力学替代轨道
-      受摄（星历）系统里"最接近周期"的轨线，由多重打靶在时间窗口内修正到首尾闭合。``DynamicalSubstituteCorrector`` 产出，见 ``DynamicalSubstituteResult.substitute_orbit``。
+      受摄（星历）系统里最接近周期的轨线，由多重打靶在时间窗口内修正到首尾闭合。``DynamicalSubstituteCorrector`` 产出，见 ``DynamicalSubstituteResult.substitute_orbit``。
 
    生成函数 W
       连接 rho 坐标与 quasi-Floquet 坐标的近恒等变换的母函数，见 ``DynamicalSubstituteResult.W_poly``。

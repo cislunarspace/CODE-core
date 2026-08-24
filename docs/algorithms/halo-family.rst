@@ -22,10 +22,10 @@ Halo 专用逻辑：种子生成、自然参数族延拓、伪弧长延拓。
 
 参数说明：
 
-- ``continuation`` — ``Continuation`` 实例
-- ``libration_point`` — 平动点编号（1 或 2）
-- ``amplitude_z`` — z 方向振幅
-- ``halo_class`` — Halo 族分支（0=北族，1=南族）
+- ``continuation``：``Continuation`` 实例
+- ``libration_point``：平动点编号（1 或 2）
+- ``amplitude_z``：z 方向振幅
+- ``halo_class``：Halo 族分支（0=北族，1=南族）
 
 轨道族生成
 ----------

@@ -82,7 +82,7 @@
    event = section.event(direction=-1, terminal=True)
    result = dynamics.propagate(y0, (0.0, 10.0), events=[event])
 
-详见 :doc:`../core/dynamics` 的「事件检测」一节。
+详见 :doc:`../core/dynamics` 的事件检测一节。
 
 流形拼接与低能转移
 ------------------

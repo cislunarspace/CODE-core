@@ -122,7 +122,7 @@ impl MultipleShootingRustResult {
 ///
 /// **速度加权**：位置分量（j=0..2，km）原值，速度分量（j=3..5，km/s）× vel_weight。
 /// 不加权时位置残差（cislunar 量级几百 km）主导 LM 的 ‖F‖²，速度残差（~0.04 km/s）
-/// 被忽略，求解器停在"位置连续 / 速度跳变数十 m/s"的局部极小——轨迹实质是需脉冲
+/// 被忽略，求解器停在位置连续但速度跳变数十 m/s 的局部极小，轨迹实质是需脉冲
 /// 拼接的断弧而非光滑轨道。vel_weight = pos_tol/vel_tol 使两者在容差尺度可比，
 /// LM 真正压速度连续（如 pos_tol=2e-2 km、vel_tol=1e-5 km/s → vel_weight=2000）。
 fn build_residual(
@@ -262,7 +262,7 @@ fn build_jacobian_variable_time(
 /// - 恰定/过定系统 λ≈0 退化为 Gauss-Newton 最小二乘；
 /// - 欠定系统（节点全自由，6N 变量 > 6(N-1) 约束，论文式13 语义）
 ///   D^T D 半正定奇异，加 λI 正定化后解是
-///   min ‖D dX + F‖² + λ‖dX‖²，即最小范数偏好——解停留在初猜附近，
+///   min ‖D dX + F‖² + λ‖dX‖²，即最小范数偏好，解停留在初猜附近，
 ///   这正是"保形"的数学来源（论文 `C_{k+1}=C_k-D^T(DD^T)^{-1}F`）。
 ///   λ 随线搜索失败增大（见 `multiple_shooting_correct`），成功时趋小。
 fn least_squares_solve(
@@ -452,7 +452,7 @@ pub fn multiple_shooting_correct(
 
     // Levenberg-Marquardt 阻尼初值：相对 D^T D 对角元量级，欠定系统保 min-norm。
     // **跨迭代保留**（成功迭代减小、失败增大）：标准 LM 做法。若不保留而每次
-    // 重置，残差在局部极小处反复尝试同一条失败路径（实测停滞 8e-2 km 压不下，
+    // 重置，残差在局部极小处反复尝试同一条失败路径（停滞 8e-2 km 压不下，
     // 保留阻尼可到 1.6e-2）。见 multiple_shooting_correct 主循环。
     let lam0 = 1e-6;
     let mut lam = lam0;
@@ -463,13 +463,13 @@ pub fn multiple_shooting_correct(
     // 静默回退 cspice（并行段积分的 cspice 是内核池损坏/panic 的根源）。
     let _strict = e2m2e_spice::ephem_cache::StrictGuard::new();
     // 并行开关：E2M2E_MS_PARALLEL=0 强制串行（验证并行/串行位级一致性用）。
-    // 默认并行——前提是缓存已启用且 strict（段积分内零 cspice）。
+    // 默认并行，前提是缓存已启用且 strict（段积分内零 cspice）。
     let parallel = std::env::var("E2M2E_MS_PARALLEL").map_or(true, |v| v != "0");
 
     for iteration in 0..max_iter {
         // 第一步：逐段积分，收集 STM、终端状态。
         // 段间相互独立（只依赖本段起始状态），rayon 并行段积分线性加速。
-        // 并行安全前提：星历预采样缓存已启用 + strict 模式——段积分内力
+        // 并行安全前提：星历预采样缓存已启用 + strict 模式，段积分内力
         // 模型查内存三次样条，零 cspice FFI（cspice 并发会让多线程同时调
         // easier_reader 触发全局锁损坏，报 SPICE(DAFFRNOTFOUND) 或 panic）。
         // par_iter 保序 + 各段积分确定 → 并行与串行位级一致。
@@ -568,7 +568,7 @@ pub fn multiple_shooting_correct(
 
         // 停滞检测：连续迭代残差相对改善极小即提前停。阈值取 0.05%（比
         // Gauss-Newton 停滞点更严），避免在 LM 阻尼还能探索的方向上过早截断
-        // ——跨迭代 LM 阻尼（成功减、失败增）可越过浅局部极小继续收敛。
+        // 跨迭代 LM 阻尼（成功减、失败增）可越过浅局部极小继续收敛。
         if let Some(prev) = residual_history.iter().rev().nth(1) {
             let improvement = 1.0 - max_res / *prev;
             if improvement < 5e-4 {

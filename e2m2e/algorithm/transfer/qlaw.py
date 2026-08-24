@@ -2,7 +2,7 @@
 
 用 Q-law（Petropoulos；Holt 2024 式 6-10）做低推力转移的初猜生成：前向反馈
 积分产出次优控制历史，喂 :class:`~e2m2e.algorithm.transfer.lowthrust_shooting.LowThrustShooting`
-做解析雅可比打磨。是 gap-analysis「Q-law 作初猜 → 打靶优化」两级流程的上半段。
+做解析雅可比打磨。是 gap-analysis 中 Q-law 作初猜、打靶优化两级流程的上半段。
 
 ## 最简版（控 a, e, i）
 
@@ -265,8 +265,7 @@ def qlaw_guess(
 def _resolve_mu(system: object, forces: Sequence[PhysicalModel]) -> float:
     """从 PointMassGravity 或系统查中心体 μ；解析失败时抛异常。
 
-    此前查询失败静默回退地球 μ（``Datum.DE440.earth_gm``），非地球系统会被
-    用错动力学参数（#352）：μ 是动力学核心参数，查不到就该报错，不猜。
+    μ 是动力学核心参数，查不到即报错，不默认回退（#352）。
     """
     from ..forces import PointMassGravity
 

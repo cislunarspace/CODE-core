@@ -21,7 +21,7 @@ from ...data.constants.bodies import EARTH, MOON, SUN
 from .physical_model import require_inertial_frame
 
 if TYPE_CHECKING:
-    from ..system import System
+    from ..dynamics.system import System
 
 # 默认遮挡体赤道半径（km），取 GMAT PCK / IAU 2015 值。可通过 radii 覆盖参数扩展。
 _BODY_RADII_KM: dict[str, float] = {

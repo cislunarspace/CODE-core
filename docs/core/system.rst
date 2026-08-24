@@ -125,7 +125,7 @@ BCR4BP 系统
 **与 CR3BP 的区别：** BCR4BP 无 Jacobi 积分（太阳项显式含时）；
 ``compute_libration_points`` 给出的是对应 CR3BP 的平动点，仅作参考
 位置。配套动力学为 :class:`~e2m2e.algorithm.dynamics.BCR4BP_Dynamics`，
-见 :doc:`dynamics` 的「BCR4BP 动力学」一节。精度上，双圆近似与星历
+见 :doc:`dynamics` 的 BCR4BP 动力学一节。精度上，双圆近似与星历
 （地+月+日点质量）对比 1 天外推位置误差在 1e3 km 量级，主误差来自
 月球圆轨道近似。
 
@@ -170,7 +170,7 @@ CR3BP 与星历系统的区别
      - 2 个主天体
      - N 个天体（可配置）
    * - 平动点
-     - 有（L1–L5）
+     - 有（L1~L5）
      - 无
    * - 自治性
      - 自治（不依赖时间）

@@ -52,8 +52,7 @@ fn load_kernels() {
 /// 在非退化几何下（`r_sun ≠ r_sc`）必为非零。本测试在 J2000 时刻采样一个
 /// 明确不在阴影中的航天器位置，验证雅可比矩阵不为零矩阵。
 ///
-/// 回归目标：issue #279 确认 SRP 已纳入 STM 传播雅可比（此前
-/// `supports_jacobian(SRP) = true` 但无独立测试覆盖）。
+/// 回归目标：issue #279 确认 SRP 已纳入 STM 传播雅可比。
 #[test]
 fn test_srp_jacobian_nonzero() {
     load_kernels();

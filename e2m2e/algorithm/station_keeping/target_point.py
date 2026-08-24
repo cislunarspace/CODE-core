@@ -5,7 +5,7 @@
 
 - **严格控制** （§1.3，式 5.35）：受控轨道外推至目标节点时刻的位置与
   标称轨道节点严格重合，微分修正式迭代求解。目标节点取控制时刻后
-  ``feedback_arc`` 天处的标称轨道节点（"1 月内距当前最远的节点"的
+  ``feedback_arc`` 天处的标称轨道节点（1 月内距当前最远的节点的
   DFH 参数化）。
 - **宽松控制** （§1.4，式 5.36）：不要求重合，最小化
   ``J = ΔvᵀQΔv + ΣpᵢᵀRᵢpᵢ + ΣvᵢᵀSᵢvᵢ`` （位置/速度偏差加权），
@@ -44,7 +44,7 @@ class StrictTargetPointLaw:
 
     Attributes:
         feedback_arc_days: 反馈弧段长度（天），即目标节点相对控制时刻的
-            时间偏移（DFH 默认 28 天，即"1 月内最远节点"）
+            时间偏移（DFH 默认 28 天，即1 月内最远节点）
         tolerance_km: 位置重合容差（km）
         max_iter: 微分修正迭代上限
     """
@@ -77,7 +77,7 @@ class StrictTargetPointLaw:
         r_target = nominal.state_at(t_j)[:3]
 
         # 用 STM 一次传播取线性初值 Δv₀ = -B⁻¹·dr_free（自由外推偏差），省去
-        # 从 Δv=0 起的多轮冷启动传播（实测 NRHO 上 6 次 → 2-3 次收敛）
+        # 从 Δv=0 起的多轮冷启动传播（NRHO 上 2-3 次收敛）
         res = propagator.propagate_with_stm(state0, t0, np.array([t_j]))
         stm = np.asarray(res["stm"])[0]
         b = stm[:3, 3:]  # B 块：∂r(t_j)/∂v₀

@@ -4,7 +4,7 @@
 
 - :class:`QuasiFloquetReducer` 可用，``reduce`` 返回
   :class:`QuasiFloquetResult`；
-- ``B(t)`` 在采样点上 ``Bᵀ J B = J`` 误差 ``< 1e-12``——矩阵法与
+- ``B(t)`` 在采样点上 ``Bᵀ J B = J`` 误差 ``< 1e-12``：矩阵法与
   李代数法各一个硬性数值断言；
 - 实标准形 ``D`` 与登记的基础频率一致；
 - sp(6) 基构造、往返 ``sp6_to_vector``/``vector_to_sp6`` 数值正确。
@@ -12,9 +12,9 @@
 输入 :class:`DynamicalSubstituteResult` 的构造思路与
 ``test_dynamical_substitution.py`` 一致（复用其 ``NormalFormContext`` /
 ``earth_moon_system`` fixture、纯 CR3BP 退路），但 quasi-Floquet 对输入
-轨道的「良态性」敏感：发散轨道会让 ``B(t)`` 沿双曲方向 ``exp(λT)`` 爆
+轨道的良态性敏感：发散轨道会让 ``B(t)`` 沿双曲方向 ``exp(λT)`` 爆
 炸，辛投影退化。因此这里用 **L1 线性化复特征向量** 构造一条物理意义
-明确的小 Lyapunov 轨道作为输入——这正是 quasi-Floquet 变换的设计场景。
+明确的小 Lyapunov 轨道作为输入：这正是 quasi-Floquet 变换的设计场景。
 """
 
 import numpy as np
@@ -256,7 +256,7 @@ def test_both_methods_share_same_normal_form(l1_context, small_orbit_ds_result):
 def test_both_methods_agree_on_B(l1_context, small_orbit_ds_result):
     """矩阵法与李代数法应解同一个方程 ``Ḃ = M·B − B·D``，给出一致的 ``B(t)``。
 
-    这是 issue #172「可共用一套测试」的实质要求：两条入口都是对
+    这是 issue #172 可共用一套测试的实质要求：两条入口都是对
     ``Ḃ = M·B − B·D`` 的等价数值实现（矩阵法 36 维直接积分 + 辛投影，
     李代数法 commutator-free Lie group RK4、自动保辛），故 ``B(t)`` 在
     采样点上须数值一致。容差放宽到 ``1e-4``：李代数法用固定子步 4 阶

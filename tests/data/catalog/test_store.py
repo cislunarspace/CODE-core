@@ -288,6 +288,7 @@ class TestIndexRebuild:
         store.put(*make_record(orbit_family="halo", libration_point=1, with_ephemeris=False))
         before = store.query(CatalogFilter())
 
+        store.close()
         store.db_path.unlink()
         rebuilt = CatalogStore(store.root)
         after = rebuilt.query(CatalogFilter())
@@ -327,7 +328,7 @@ class TestTag:
         record_id = store.put(*make_record())
         store.tag(record_id, ["期中案例"], note="注意近月点高度")
 
-        with open(store.records_dir / f"{record_id}.json") as f:
+        with open(store.records_dir / f"{record_id}.json", encoding="utf-8") as f:
             on_disk = json.load(f)
         assert on_disk["tags"] == ["期中案例"]
         assert on_disk["note"] == "注意近月点高度"
@@ -358,7 +359,7 @@ class TestExport:
         assert (dest / "records" / f"{kept_id}.json").exists()
         assert (dest / "records" / f"{kept_id}.npz").exists()
         # 标注随包走
-        with open(dest / "records" / f"{kept_id}.json") as f:
+        with open(dest / "records" / f"{kept_id}.json", encoding="utf-8") as f:
             assert json.load(f)["tags"] == ["教学"]
         # 导出包可直接作为库打开（索引派生重建）
         reopened = CatalogStore(dest)

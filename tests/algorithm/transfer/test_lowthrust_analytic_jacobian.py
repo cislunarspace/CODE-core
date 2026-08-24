@@ -248,7 +248,7 @@ def test_terminal_jacobian_matches_constraint_derivative():
     y = shooter._default_x0(n_seg)
 
     jac = shooter._terminal_jacobian(y)
-    # 与「未归一化链式雅可比 / 参考量」对比
+    # 与未归一化链式雅可比 / 参考量对比
     r_ref = np.linalg.norm(shooter._initial_state[:3])
     v_ref = np.linalg.norm(shooter._initial_state[3:6])
     _, _, raw_jac = shooter._propagate_chain_with_jacobian(y)

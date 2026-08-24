@@ -25,7 +25,7 @@ from ...data.templates.enums import LibrationPoint
 from .synodic_axes import SynodicAxes
 
 if TYPE_CHECKING:
-    from .ephemeris_system import EphemerisSystem
+    from ..dynamics.ephemeris_system import EphemerisSystem
 
 
 @runtime_checkable

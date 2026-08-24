@@ -119,7 +119,7 @@ def test_lowthrust_shooting_zero_thrust_constraint_violation(earth_ephemeris_sys
     r0 = 6378.137 + 300.0
     v0 = np.sqrt(mu / r0)
     init = np.array([r0, 0.0, 0.0, 0.0, v0, 0.0])
-    # 目标：回到初始位置但速度反向（逆行）——零推力圆轨道永远达不到
+    # 目标：回到初始位置但速度反向（逆行）：零推力圆轨道永远达不到
     target = np.array([r0, 0.0, 0.0, 0.0, -v0, 0.0])
     shooter = _make_shooter(system, init, target, 2 * np.pi * r0 / v0)
 
@@ -202,7 +202,7 @@ def test_lowthrust_shooting_min_fuel_throttle_reduction(earth_ephemeris_system):
 
     用 Zhang 2025 的推进参数量级（T=0.02N/20mN, Isp=3000s, m0=500kg，与
     SMART-1、Caillau 0.3N/1500kg 同加速度量级 ~4e-5 m/s²）。短弧下目标设为
-    「略低于满推力可达」的末态，验证 min-fuel 解的油门低于满推力。
+    略低于满推力可达的末态，验证 min-fuel 解的油门低于满推力。
     """
     system = earth_ephemeris_system
     mu = system.gravitational_parameter("EARTH")

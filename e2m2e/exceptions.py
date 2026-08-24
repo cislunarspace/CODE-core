@@ -33,9 +33,9 @@ class PropagationFailure(E2M2EError):
     """传播失败（ADR 0020 决策 2，取代字符串前缀匹配契约）。
 
     步长塌缩到机器精度地板等确定性传播失败，在 Rust→Python FFI 边界
-    翻译成本异常，供下游 ``except PropagationFailure`` 精确捕获；此前依赖
-    ``"step size collapsed"`` 错误消息前缀匹配（issue #317 第 3.1 项），
-    现已废弃。改写 Rust 侧错误消息措辞不再影响捕获。
+    翻译成本异常，供下游 ``except PropagationFailure`` 精确捕获；取代对
+    ``"step size collapsed"`` 错误消息前缀匹配的依赖（issue #317 第
+    3.1 项），改写 Rust 侧错误消息措辞不影响捕获。
 
     继承 :class:`E2M2EError` （统一捕获契约），但不继承 :class:`RuntimeError`
     （与通用运行时错误区分；既有裸 ``except RuntimeError`` 不再兜住它）。

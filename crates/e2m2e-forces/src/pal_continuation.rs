@@ -1,15 +1,15 @@
 //! 伪弧长延拓（PAL）数值内核（纯 Rust，无 pyo3）。
 //!
-//! 从 Python `e2m2e/algorithm/solver/continuation.py` 下沉的「喂进数字就
-//! 迭代」部分：XZ 平面对称约束的 F/dF 组装、约束雅可比零空间切向量、
+//! 从 Python `e2m2e/algorithm/solver/continuation.py` 下沉的数值迭代部分：
+//! XZ 平面对称约束的 F/dF 组装、约束雅可比零空间切向量、
 //! PAL 牛顿迭代。轨道族编排（微分修正、方向反馈、停滞检测、物理合理性
 //! 检查）留 Python 侧。
 //!
 //! 与 numpy 参照实现的对应关系：
 //!
 //! - 零空间用**广义叉积**（3×4 矩阵行向量的 4 维叉积，各 3×3 余子式）
-//!   而非 SVD——满秩 3×4 矩阵的零空间一维，两者同向（符号约定各自
-//!   任意，由调用方「与上一步同向化」吸收，与 numpy 路径一致）。
+//!   而非 SVD：满秩 3×4 矩阵的零空间一维，两者同向（符号约定各自
+//!   任意，由调用方在与上一步同向化时吸收，与 numpy 路径一致）。
 //! - 4×4 牛顿步用部分主元高斯消元（同 `multiple_shooting` 的手写小
 //!   矩阵求解惯例），主元精确为零判奇异，对应 LAPACK `dgesv` 的
 //!   `info > 0`（numpy `LinAlgError`）。
@@ -108,7 +108,7 @@ pub fn f_df_symmetric_xz_plane(
 ///
 /// 用广义叉积：`n_i = (-1)^i · det(删去第 i 列的 3×3 余子阵)`，与各行
 /// 正交（行列式含重复行必为零）。秩亏（< 3）时所有余子式为零，返回零
-/// 向量——与 Python `if norm > 0` 保护同义（实际流形上 dF 满秩）。
+/// 向量，与 Python `if norm > 0` 保护同义（实际流形上 dF 满秩）。
 pub fn tangent_null_vector(df: &[[f64; 4]; 3]) -> [f64; 4] {
     let mut n = [0.0_f64; 4];
     for (i, nv) in n.iter_mut().enumerate() {

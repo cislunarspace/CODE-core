@@ -10,11 +10,11 @@ Orbit 类
 
 **核心属性：**
 
-- ``states`` — 状态序列 ``[x, y, z, vx, vy, vz]``，形状 ``(n_points, 6)``
-- ``times`` — 时间序列，形状 ``(n_points,)``
-- ``system`` — 关联的系统对象（``CR3BP_System`` 或 ``EphemerisSystem``）
-- ``family_type`` / ``parameters`` — 轨道族类型与连续参数（由延拓等外部算法填充）
-- ``metadata`` — 元数据字典（创建时间、来源、描述、标签）
+- ``states``：状态序列 ``[x, y, z, vx, vy, vz]``，形状 ``(n_points, 6)``
+- ``times``：时间序列，形状 ``(n_points,)``
+- ``system``：关联的系统对象（``CR3BP_System`` 或 ``EphemerisSystem``）
+- ``family_type`` / ``parameters``：轨道族类型与连续参数（由延拓等外部算法填充）
+- ``metadata``：元数据字典（创建时间、来源、描述、标签）
 
 .. code-block:: python
 
@@ -32,7 +32,7 @@ Orbit 类
 
 ``Orbit.__init__`` 末尾调用 ``compute_basic_properties()``，构造时即自动估计
 ``period``（x 方向零交叉检测），并计算 ``amplitudes``、``extrema``、
-``mean_state``、``center``、``is_periodic``、``periodicity_error``——这些字段
+``mean_state``、``center``、``is_periodic``、``periodicity_error``：这些字段
 在 ``__init__`` 中显式声明，经 property 代理访问。微分修正的结果写入预声明的
 ``correction_*`` 字段（默认 ``None``）。Jacobi 常数、稳定性仍由外部算法按需计算。
 
@@ -84,7 +84,7 @@ CR3BP 周期轨道族类型
      - L1, L2
      - 三维周期轨道
    * - Vertical
-     - L1–L5
+     - L1~L5
      - 垂直方向振荡
    * - Butterfly
      - L1, L2

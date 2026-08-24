@@ -10,7 +10,7 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 
 `e2m2e/algorithm/dynamics/dynamics.py` 中现有的 `Dynamics` 类已经提供稳定的模板方法 API：`propagate()` 编排整条轨迹的积分，子类覆写 `_get_eom_func()` 与 `_get_max_step()`。它目前把全部积分委托给 `scipy.integrate.solve_ivp`。
 
-#61 的目标是引入一个基于 Rust 的单步 Runge-Kutta 引擎（从 Prince-Dormand 5(4)，即 "PD45" 起步），并暴露给 Python，同时不破坏现有 `Dynamics` API、也不强迫立刻重写轨迹级控制逻辑。
+#61 的目标是引入一个基于 Rust 的单步 Runge-Kutta 引擎（从 Prince-Dormand 5(4)，即 PD45 起步），并暴露给 Python，同时不破坏现有 `Dynamics` API、也不强迫立刻重写轨迹级控制逻辑。
 
 ## 决策
 
@@ -69,7 +69,7 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 
 ## 修订（2026-06-14，issue #67）
 
-决策 2（"Rust crate 只负责单步积分"）描述的是**第一个切片**的范围，不是永久约束。积分器族 epic（#67）把 Rust crate 扩展为三个方法族：
+决策 2（Rust crate 只负责单步积分）描述的是**第一个切片**的范围，不是永久约束。积分器族 epic（#67）把 Rust crate 扩展为三个方法族：
 
 - **单步 RK**（`rk_step`）：`Pd45`、`Pd78`、`Rk89`，与原切片一致。
 - **多步预测-校正**（`multistep_step`）：Adams-Bashforth-Moulton（`Abm`），定步长，携带一个导数采样的**历史缓冲**。
@@ -77,7 +77,7 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 
 决策 1（工作空间 + maturin）、4（公开的 `e2m2e.integrators` 薄封装）仍然成立。新增的多步/二阶族遵守同样的边界：推进一步、返回误差估计与步长建议；不做事件检测、稠密输出或完整传播控制。
 
-关于决策 3 的说明：`CR3BP_Dynamics` 与 `EphemerisDynamics`（系统类）仍用 `scipy.solve_ivp`；只有 `ForceModel`（力分解类）从 Python 驱动 Rust 步进器。原先的"后续工作"各项现已落实：`ForceModel` 从 Python 编排 `rk_step`（自适应步长 + 简单事件检测），crate 也增加了多步与二阶族。
+关于决策 3 的说明：`CR3BP_Dynamics` 与 `EphemerisDynamics`（系统类）仍用 `scipy.solve_ivp`；只有 `ForceModel`（力分解类）从 Python 驱动 Rust 步进器。原先的后续工作各项现已落实：`ForceModel` 从 Python 编排 `rk_step`（自适应步长 + 简单事件检测），crate 也增加了多步与二阶族。
 
 ## 修订（2026-07，crate 拆分与 spice 构建约定）
 
@@ -85,7 +85,7 @@ Issue #60 计划把传播与力模型能力从 GMAT 迁到 e2m2e，采用 Rust �
 
 spice feature 的构建约定：`cspice-sys` 经 `downloadcspice` 在构建时从 NAIF 官网下载 CSPICE 源码，无需手工安装（也可用 `CSPICE_DIR` 指向本机安装）。`maturin develop` 默认不带 spice，`maturin develop --features spice` 才包含 STM 传播、打靶、第三体等 Rust 快速路径；无 spice 时 Python 侧全部静默降级到慢路径，对应测试以 `importorskip` 跳过。**release wheel 暂不带 spice**：带上意味着 wheel 内嵌 CSPICE 且构建依赖 NAIF 官网可达性，许可与发布稳定性需单独评估后再开。CI 以 `cargo clippy --workspace --features spice` 兜底 spice-gated 代码的编译。
 
-> 修订（2026-08，ADR 0020 决策 4）：spice 升为默认 feature 后本节过时：`maturin develop` 默认带 spice（见下节），无 spice 时的"静默降级到慢路径"改为报错（issue #378），对应测试的 `importorskip` 语义同步调整。
+> 修订（2026-08，ADR 0020 决策 4）：spice 升为默认 feature 后本节过时：`maturin develop` 默认带 spice（见下节），无 spice 时的静默降级到慢路径改为报错（issue #378），对应测试的 `importorskip` 语义同步调整。
 
 ## 修订（2026-08，spice 升为默认 feature）
 
@@ -101,4 +101,3 @@ spice 现为默认 feature：crates `default = ["spice"]` + pyproject `features=
 - **Normal form 传播**（`normal_form/multiple_shooting.py`、`dynamical_substitution.py`、`propagation.py`、`quasi_floquet.py`）：已迁至 Rust `solve_ivp_py`（#336）。QF↔CM 高阶 Lie 流（`coord_trans/qf_cm.py`）已下沉 `qf_to_cm_py` / `cm_to_qf_py`（#465，12 实维分裂复积分）；`backend="python"` 仅作显式对照。`scipy.linalg.expm`（矩阵指数）和 `scipy.optimize.fsolve` 暂无 Rust 替代，保留。
 - **平动点解算与初值生成**（`scipy.optimize.fsolve`/`brentq`）：用于 L1/L2 位置解算、Halo 轨道初始猜测等。单次调用，迁移收益低。
 
-上一次修订称"scipy 回退路径已移除""所有事情统一走 Rust"，措辞过于绝对，特此修正。

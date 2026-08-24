@@ -111,11 +111,11 @@ SPICE 内核
 国内用户推荐从项目的 `GitHub Release <https://github.com/cislunarspace/e2m2e/releases>`_
 下载：``kernels-v1`` 中打包了全部必需内核，下载后放入 ``kernels/`` 目录即可：
 
-- ``de430.bsp`` 、``de440s.bsp`` — JPL 行星星历
-- ``earth_latest_high_prec.bpc`` 、``SPICEEarthPredictedKernel.bpc`` — 地球自转（ITRF93 高精度）
-- ``SPICELunaCurrentKernel.bpc`` 、``SPICELunaFrameKernel.tf`` — 月球姿态与坐标架（MOON_PA）
-- ``naif0011.tls`` 、``naif0012.tls`` — 闰秒
-- ``pck00010.tpc`` — 行星常数
+- ``de430.bsp`` 、``de440s.bsp``：JPL 行星星历
+- ``earth_latest_high_prec.bpc`` 、``SPICEEarthPredictedKernel.bpc``：地球自转（ITRF93 高精度）
+- ``SPICELunaCurrentKernel.bpc`` 、``SPICELunaFrameKernel.tf``：月球姿态与坐标架（MOON_PA）
+- ``naif0011.tls`` 、``naif0012.tls``：闰秒
+- ``pck00010.tpc``：行星常数
 
 官方来源（网络可达时）：`NASA NAIF <https://naif.jpl.nasa.gov/naif/data.html>`_
 

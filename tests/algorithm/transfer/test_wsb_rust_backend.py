@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import math
 
 import numpy as np
@@ -57,8 +58,11 @@ def _params() -> WsbSearchParams:
         max_total_dv=1_000_000.0,
         h2_energy_threshold=1_000_000.0,
         n_propagation_samples=100,
-        rtol=1e-12,
-        atol=1e-12,
+        # 网格筛选级容差（ADR 0021 修订 #420：默认测试时间上界靠缩小问题
+        # 规模保证）。Python 参照无步数截断，研究级 1e-12 会让擦月组合
+        # 烧到积分器自适应上限，单组合秒级；1e-10 对 1e-8 断言精度足够。
+        rtol=1e-10,
+        atol=1e-10,
     )
 
 
@@ -82,7 +86,7 @@ def _assert_results_equal(expected, actual) -> None:
             assert_allclose(
                 getattr(actual_candidate, name),
                 getattr(expected_candidate, name),
-                rtol=1e-9,
+                rtol=1e-8,
                 atol=1e-12,
                 err_msg=name,
             )
@@ -98,14 +102,6 @@ def test_wsb_rust_serial_matches_explicit_python_reference() -> None:
     target = _target_state(system)
     params = _params()
 
-    python_result = search_wsb_trajectories(
-        departure,
-        target,
-        system,
-        params,
-        backend="python",
-        parallel=False,
-    )
     rust_result = search_wsb_trajectories(
         departure,
         target,
@@ -115,7 +111,21 @@ def test_wsb_rust_serial_matches_explicit_python_reference() -> None:
         parallel=False,
     )
 
-    _assert_results_equal(python_result, rust_result)
+    _assert_results_equal(_python_reference_result(), rust_result)
+
+
+@functools.cache
+def _python_reference_result():
+    """标准太阳参数下的 Python 参照结果（module 级缓存，消除重复计算）。"""
+    system = BCR4BPSystem.earth_moon(mu=Datum.DE421.mu)
+    return search_wsb_trajectories(
+        _departure_state(system),
+        _target_state(system),
+        system,
+        _params(),
+        backend="python",
+        parallel=False,
+    )
 
 
 def test_wsb_rust_matches_python_with_custom_solar_parameters() -> None:

@@ -8,14 +8,14 @@ Dynamics 基类
 
 :class:`~e2m2e.algorithm.dynamics.dynamics.Dynamics` 采用模板方法模式：
 
-- ``propagate()`` — 编排整条轨迹的积分（算法骨架）
-- ``_get_eom_func()`` — 钩子方法，子类提供具体的 ODE 右端函数
-- ``_get_max_step()`` — 钩子方法，子类提供最大步长
+- ``propagate()``：编排整条轨迹的积分（算法骨架）
+- ``_get_eom_func()``：钩子方法，子类提供具体的 ODE 右端函数
+- ``_get_max_step()``：钩子方法，子类提供最大步长
 
 **传播结果：**
 
-- ``states`` — 状态序列，形状 ``(n_points, 6)``
-- ``stm``（可选）— 状态转移矩阵，形状 ``(n_points, 6, 6)``
+- ``states``：状态序列，形状 ``(n_points, 6)``
+- ``stm``（可选）：状态转移矩阵，形状 ``(n_points, 6, 6)``
 
 CR3BP 动力学
 -------------
@@ -110,7 +110,7 @@ BCR4BP 无 Jacobi 积分（太阳项显式含时），``with_jacobi=True`` 抛
 ``NotImplementedError``。双圆近似与星历（地+月+日点质量 ForceModel）
 对比，1 天外推位置误差在 1e3 km 量级，主误差来自月球圆轨道近似；
 2 天时 BCR4BP 比 CR3BP 更接近含太阳的星历。系统定义与太阳参数见
-:doc:`system` 的「BCR4BP 系统」一节。
+:doc:`system` 的 BCR4BP 系统一节。
 
 星历动力学
 ----------
