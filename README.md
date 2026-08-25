@@ -81,6 +81,53 @@ print(result.initial_state)
 
 参数含义、返回字段与其他轨道类型见[在线文档](https://cislunarspace.github.io/e2m2e/)；可运行示例见 [`examples/`](examples/) 目录。
 
+## MCP
+
+e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 13 个任务级工具（轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成、轨道库查询/标注/导出/扫描）暴露给 LLM Agent，stdio 传输，不监听端口。工具清单由 Facade 方法元数据派生，产物自动入库、`record_id` 跨工具链式调用；用法与工具速查见文档「[通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)」。
+
+安装 MCP extra（在已有 e2m2e 的环境里）：
+
+```bash
+uv pip install "e2m2e[mcp]"   # 或 pip install "e2m2e[mcp]"
+```
+
+在 MCP 客户端配置中注册服务器。Claude Desktop / Cursor 等通用格式（`command` 指向安装了 e2m2e 的环境里的可执行文件）：
+
+```json
+{
+  "mcpServers": {
+    "e2m2e": {
+      "command": "/path/to/venv/bin/e2m2e",
+      "args": ["mcp-serve"],
+      "cwd": "/path/to/e2m2e-repo"
+    }
+  }
+}
+```
+
+ZCode 工作区配置（`<仓库>/.zcode/config.json`，键为嵌套的 `mcp.servers`，会话启动时自动连接）：
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "e2m2e": {
+        "type": "stdio",
+        "command": "C:\\path\\to\\.venv\\Scripts\\e2m2e.exe",
+        "args": ["mcp-serve"],
+        "cwd": "C:\\path\\to\\e2m2e-repo"
+      }
+    }
+  }
+}
+```
+
+`cwd` 建议钉在含 `kernels/`（SPICE 内核）与 `catalog/`（轨道库）的目录；两目录也可分别用环境变量 `SPICE_KERNEL_DIR` / `E2M2E_CATALOG_DIR` 指定绝对路径。
+
+配置完成后在客户端直接用自然语言驱动，例如：
+
+> 设计一条 L2 南族 NRHO，近月点高度 3000 km，然后对它做 100 次蒙特卡洛站保仿真，结果打上「候选」标签。
+
 ## 能力
 
 已建成与未建成的部分按领域列出。详细的能力清单与 API 文档见[在线文档](https://cislunarspace.github.io/e2m2e/)；逐版本变更见 [CHANGELOG.md](CHANGELOG.md)。
@@ -165,7 +212,7 @@ make check    # cargo fmt/clippy + ruff
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {5.8.5},
+  version = {5.8.6},
   year = {2026},
 }
 ```
