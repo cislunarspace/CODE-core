@@ -178,6 +178,100 @@ def test_invoke_tool_internal_error():
     assert "RuntimeError" in env["error"]["message"]
 
 
+def test_family_response_serializes_orbit_members():
+    """族生成响应（Orbit 成员）不再兑成 INTERNAL_ERROR（issue #526 补全）。
+
+    降级契约与 sidecar 帧契约同款：成员留 states/times/period/family_type，
+    System 鸭子类型透传 mu。
+    """
+    import numpy as np
+
+    from e2m2e.api.models import FamilyGenerationResponse
+    from e2m2e.data.templates import ConvergenceState, FailureCause
+    from e2m2e.data.types.orbit import Orbit
+
+    orbit = Orbit(states=np.eye(6, 6), times=np.linspace(0.0, 1.0, 6))
+
+    class SystemStub:
+        mu = 1.21506683e-2
+
+    class FamTool:
+        request_model = None
+
+        def __call__(self, **kwargs):
+            return FamilyGenerationResponse(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="族生成完成",
+                orbits=[orbit],
+                system=SystemStub(),
+                requested_members=1,
+                generated_members=1,
+            )
+
+    env = envelope.invoke_tool(FamTool(), {})
+    assert env["status"] == "ok"
+    json.dumps(env)  # MCP 传输层直接 dumps 信封（server._to_result）
+    member = env["data"]["orbits"][0]
+    assert member["states"][0] == [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    assert member["times"][0] == 0.0
+    assert member["period"] is None  # eye(6) 非周期轨迹，x 零交叉检测不到周期
+    assert env["data"]["system"] == {"mu": pytest.approx(1.21506683e-2)}
+
+
+def test_catalog_record_response_serializes_arrays():
+    """catalog_get/promote 响应的数组段（ndarray）内联为嵌套 list。"""
+    import numpy as np
+
+    from e2m2e.api.models import CatalogRecordResponse
+    from e2m2e.data.templates import ConvergenceState, FailureCause
+
+    record = CatalogRecordResponse(
+        record_id="r1",
+        created_at="2026-08-25T00:00:00+00:00",
+        source_tool="design_orbit",
+        source_record_id=None,
+        orbit_family="dro",
+        libration_point=None,
+        jacobi=None,
+        amplitude=None,
+        has_cr3bp=True,
+        has_ephemeris=False,
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
+        message="ok",
+        member_count=1,
+        tags=[],
+        note="",
+        scalars={"mu": 1.21506683e-2},
+        request={},
+        members=[],
+        arrays={"cr3bp/states": np.zeros((2, 6)), "cr3bp/times": np.array([0.0, 1.0])},
+    )
+    env = envelope.ok_envelope(record)
+    assert env["status"] == "ok"
+    json.dumps(env)
+    assert env["data"]["arrays"]["cr3bp/states"] == [[0.0] * 6, [0.0] * 6]
+    assert env["data"]["arrays"]["cr3bp/times"] == [0.0, 1.0]
+
+
+def test_orbit_stability_placeholder_not_registered(facade):
+    """orbit_stability 需 Orbit 对象入参，无法经 JSON 信封表达：不注册（回归）。"""
+    assert "orbit_stability" not in {s.name for s in tool_specs(facade)}
+    result = handle_call_tool(facade, "orbit_stability", {})
+    env = json.loads(result.content[0].text)
+    assert env["error"]["code"] == "TOOL_NOT_FOUND"
+
+
+def test_spacetime_times_description_states_dual_units():
+    """times 字段描述须写明双单位契约（会合系是 t_syn 而非 JD_TDB）。"""
+    from e2m2e.api.models import SpacetimeTransformRequest
+
+    desc = SpacetimeTransformRequest.model_json_schema()["properties"]["times"]["description"]
+    assert "JD_TDB" in desc
+    assert "t_syn" in desc
+
+
 def test_cli_parser_has_mcp_serve():
     from e2m2e.api.cli.main import build_parser
 

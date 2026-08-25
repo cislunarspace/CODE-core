@@ -1061,9 +1061,14 @@ class Facade:
         )
         return response
 
-    @mcp_exposed
+    @mcp_exposed(status="placeholder")
     def orbit_stability(self, **params) -> Any:
-        """稳定性分析（二档）：薄封装 algorithm/stability。"""
+        """稳定性分析（二档）：薄封装 algorithm/stability。
+
+        需要带 period/system 绑定的 Orbit 对象入参，无法经 JSON 信封表达
+        （空参 schema 注册后 Agent 必然调用失败）；按 issue #510 决策不
+        注册，待记录引用式入参（如 input_record_id）落地后放开。
+        """
         from e2m2e.algorithm.stability import StabilityAnalysis
 
         orbit = params.get("orbit")

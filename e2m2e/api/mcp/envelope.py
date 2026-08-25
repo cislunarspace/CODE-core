@@ -11,8 +11,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import numpy as np
 from pydantic import BaseModel, ValidationError
 
+from e2m2e.data.types.orbit import Orbit
+
+from ..catalog_ingest import _finite_or_none
 from ..models import OrbitError
 
 __all__ = ["Envelope", "ok_envelope", "error_envelope", "invoke_tool", "dispatch_tool"]
@@ -21,10 +25,50 @@ __all__ = ["Envelope", "ok_envelope", "error_envelope", "invoke_tool", "dispatch
 Envelope = dict[str, Any]
 
 
+def _to_jsonable(value: Any) -> Any:
+    """把 ``model_dump(mode="python")`` 输出里的不可 JSON 化值降级转换。
+
+    MCP 是纯文本通道（sidecar 的大数组走二进制帧，ADR 0035）：Any/
+    任意类型字段携带的 ndarray 转嵌套 list；Orbit 成员取画布契约字段
+    （states/times/period/family_type，与 sidecar 帧契约同款）；System
+    鸭子类型只透传 ``mu`` 标量；其余未知对象以 ``<类型名>`` 占位。总线
+    保证结果可 JSON 序列化，不向传输层抛异常。
+    """
+    if isinstance(value, BaseModel):
+        return _jsonify(value)
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, Orbit):
+        return {
+            "states": _to_jsonable(value.states),
+            "times": _to_jsonable(value.times),
+            "period": _finite_or_none(value.period),
+            "family_type": value.family_type,
+        }
+    if isinstance(value, dict):
+        return {k: _to_jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_jsonable(v) for v in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    mu = getattr(value, "mu", None)
+    if mu is not None:
+        return {"mu": _finite_or_none(mu)}
+    return f"<{type(value).__name__}>"
+
+
 def _jsonify(data: Any) -> Any:
     """把 Response 模型/普通对象转成可 JSON 序列化的结构。"""
     if isinstance(data, BaseModel):
-        return data.model_dump(mode="json")
+        try:
+            return data.model_dump(mode="json")
+        except Exception:
+            # issue #526 补全：Any/任意类型字段携带 ndarray/Orbit/System
+            # （族生成、catalog_get/promote）时 mode="json" 失败，降级为
+            # python 模式转储 + 逐值转换。
+            return _to_jsonable(data.model_dump(mode="python"))
     return data
 
 

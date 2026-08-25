@@ -279,8 +279,10 @@ def test_run_loop_survives_envelope_serialization_failure(facade):
         facade._broken_response = False
 
 
-def test_invoke_tool_serialization_failure_translated():
-    """issue #526：结果含不可 JSON 化对象时兑成 INTERNAL_ERROR 信封，不炸传输层。"""
+def test_invoke_tool_serializes_ndarray_inline():
+    """issue #526 演进：结果含 ndarray 时信封层降级内联为嵌套 list，
+    不再兑成 INTERNAL_ERROR（sidecar 大数组仍首选二进制帧，见帧映射）。
+    """
     from e2m2e.api.models import CatalogRecordResponse
     from e2m2e.data.templates import ConvergenceState, FailureCause
 
@@ -314,10 +316,9 @@ def test_invoke_tool_serialization_failure_translated():
             return record
 
     env = envelope.invoke_tool(_Method(), {})
-    assert env["status"] == "error"
-    assert env["error"]["code"] == "INTERNAL_ERROR"
-    assert "序列化" in env["error"]["message"]
-    assert "Traceback" not in env["error"]["message"]
+    assert env["status"] == "ok"
+    assert env["data"]["arrays"]["cr3bp/states"] == [[0.0] * 6] * 3
+    assert "Traceback" not in json.dumps(env)
 
 
 def test_catalog_query_unchanged_by_binary_mapping(facade):

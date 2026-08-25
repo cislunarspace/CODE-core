@@ -144,9 +144,9 @@ def handle_request(facade: Facade, request: Any) -> list[bytes]:
     payload_fn = _BINARY_TOOLS.get(tool)
     if payload_fn is not None:
         if dtype is None:
-            # 协议约定（非参数校验）：响应含 ndarray/Orbit 对象不可 JSON 化
-            # （MCP 传输层同此限制），该工具必须走帧，缺省 dtype 视为协议用法
-            # 错误，借用 INVALID_PARAMS 错误码。
+            # 协议约定（非参数校验）：响应含 ndarray/Orbit 对象，本协议要求
+            # 走帧（MCP 传输层由 envelope 降级内联 JSON，帧仍是首选通道），
+            # 缺省 dtype 视为协议用法错误，借用 INVALID_PARAMS 错误码。
             return [
                 _line(
                     envelope.error_envelope(

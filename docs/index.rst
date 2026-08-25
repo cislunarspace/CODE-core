@@ -14,6 +14,7 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
    getting-started/installation
    getting-started/quickstart
+   getting-started/mcp
 
 .. toctree::
    :maxdepth: 2

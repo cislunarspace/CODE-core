@@ -445,6 +445,8 @@ class TestFacadeToolInventory:
             "orbit_family_generation": FamilyGenerationRequest,
         }
         placeholders = {
+            # 需 Orbit 对象入参，无法经 JSON 信封表达；记录引用式入参落地前不注册
+            "orbit_stability",
             "transfer_search",
             "low_thrust_design",
             "manifold_analysis",
@@ -455,5 +457,3 @@ class TestFacadeToolInventory:
         assert all(by_name[name].request_model is model for name, model in implemented.items())
         assert all(by_name[name].status == "placeholder" for name in placeholders)
         assert all(by_name[name].request_model is None for name in placeholders)
-        assert by_name["orbit_stability"].status == "implemented"
-        assert by_name["orbit_stability"].request_model is None

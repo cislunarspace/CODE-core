@@ -118,7 +118,7 @@ print(result.initial_state)
 **接口与工具**
 
 - Facade 任务级入口，统一对外调用面。
-- MCP 服务化封装：`create_server` 进程内服务器与 `e2m2e mcp-serve` 子命令，由 Facade 方法元数据派生工具清单（`[mcp]` extra）。
+- MCP 服务化封装：`create_server` 进程内服务器与 `e2m2e mcp-serve` 子命令（stdio 传输，`[mcp]` extra），由 Facade 方法元数据派生工具清单——轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成与 7 个轨道库工具，产物自动入库、`record_id` 跨工具链式调用。接入配置与工具用法见文档「[通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)」。
 
 ## 文档
 

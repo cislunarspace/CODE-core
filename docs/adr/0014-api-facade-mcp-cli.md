@@ -1,6 +1,6 @@
 # ADR 0014：接口层 Facade/MCP/CLI
 
-**状态**：已采纳（部分实施：Facade 已落地，MCP/CLI 占位）
+**状态**：已采纳（Facade 与 MCP 已落地；CLI 完整子命令仍占位）
 **日期**：2026-07-31
 **关联**：ADR 0011（五层架构）、README 愿景（LLM+Agent 可调用）
 

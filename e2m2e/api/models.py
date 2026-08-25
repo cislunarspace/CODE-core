@@ -754,7 +754,10 @@ class SpacetimeTransformRequest(_ApiModel):
     """时空坐标转换输入。"""
 
     states: list[list[float]] = Field(description="状态列表，每项 [x,y,z,vx,vy,vz]")
-    times: list[float] = Field(description="每个状态的 JD_TDB 时间值")
+    times: list[float] = Field(
+        description="每个状态的时间值：GCRS↔EBCRS 用 JD_TDB；会合系转换用"
+        "无量纲会合时间 t_syn（0 = et0_jd 参考历元）"
+    )
     transform_type: str = Field(
         description="synodic_to_j2000/j2000_to_synodic/gcrs_to_ebcrs/ebcrs_to_gcrs"
     )
