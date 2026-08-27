@@ -160,7 +160,8 @@ pub fn flux_factor(
     }
     // 查太阳 + 各遮挡体相对 observer 的 J2000 位置
     let sun_pos = body_position_cached("SUN", observer, et)?;
-    let sun_radius = body_radius("SUN").unwrap();
+    // SUN 在半径表中是静态常量项，直接引用常量，不做 Option 解包。
+    let sun_radius = SUN_MEAN_RADIUS_KM;
 
     let mut factors: Vec<f64> = Vec::with_capacity(shadow_bodies.len());
     let mut angular_radii: Vec<f64> = Vec::with_capacity(shadow_bodies.len());
