@@ -18,8 +18,6 @@ pub mod family;
 pub mod family_generation;
 #[cfg(feature = "spice")]
 pub mod frame_convert;
-#[cfg(feature = "spice")]
-pub mod homotopy;
 
 pub mod hjb;
 #[cfg(feature = "spice")]
