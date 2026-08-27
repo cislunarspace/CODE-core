@@ -1,10 +1,5 @@
-Transfer Window Search / 转移窗口搜索
-=====================================
-
-[English](#transfer-window-search) | [简体中文](#中文)
-
-English
--------
+Transfer Window Search
+======================
 
 :class:`~e2m2e.algorithm.transfer.transfer_search.TransferSearch` scans transfer
 parameter space — step one of the search-optimize two-step method.
@@ -78,17 +73,3 @@ Running a search
    )
 
    print(f"Total candidates: {len(results)}")
-
-中文
-----
-
-:class:`~e2m2e.algorithm.transfer.transfer_search.TransferSearch` 实现转移轨道的参数空间搜索，是搜索-优化两步法中的第一步。
-
-搜索算法采用网格策略：设定出发/到达轨道 → 出发轨道等时间采样出发点 → 每个
-出发点在 α 范围内均匀采样 → 计算注入速度并前向积分 → 碰撞/相交/距离约束筛选，
-记录可行解。搜索变量为 α（切向速度比）与出发点位置（``n_departure`` 控制）。
-
-参数经 :class:`~e2m2e.algorithm.transfer.config.TransferConfig` 的 ``search_*``
-字段集中管理（属性代理向后兼容）；``search()`` 一次传入全部参数执行。
-配置与执行代码见上方英文节；数值内核已下沉 Rust（ADR 0017），
-默认后端 ``rust`` 。

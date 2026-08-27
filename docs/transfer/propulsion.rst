@@ -1,10 +1,5 @@
-Impulsive Propulsion Model / 脉冲推进模型
-==========================================
-
-[English](#impulsive-propulsion-model) | [简体中文](#中文)
-
-English
--------
+Impulsive Propulsion Model
+==========================
 
 :class:`~e2m2e.algorithm.transfer.propulsion.ImpulsivePropulsion` computes
 departure injection velocities and costs for transfers.
@@ -62,13 +57,3 @@ Internally delegates to
        insertion_velocity=insertion_velocity,
    )
    print(f"Δv1 = {cost.dv1:.6f}, Δv2 = {cost.dv2:.6f}, total = {cost.total:.6f}")
-
-中文
-----
-
-:class:`~e2m2e.algorithm.transfer.propulsion.ImpulsivePropulsion` 用于计算转移轨道的出发注入速度与代价。
-
-基本原理：出发速度分解为切向与法向分量（α 切向速度比 + β 法向速度比，
-β 默认 0）。参数 ``normal`` 为轨道面法向量，默认 [0, 0, 1]。
-Δv 分解由 :func:`~e2m2e.algorithm.transfer.cost.compute_transfer_cost`
-完成。接口与示例见上方英文节。

@@ -1,19 +1,21 @@
 e2m2e.data package
 ==================
 
-数据层：物理常数、坐标系与星历内核、DFH 模板与轨道类型。
+Data layer: physical constants, coordinate frames and ephemeris kernels, DFH
+templates and orbit types.
 
 .. automodule:: e2m2e.data
    :no-index:
 
-
 e2m2e.data.catalog package
 --------------------------
 
-轨道库 catalog（ADR 0031）：记录文件是事实来源，SQLite 索引是可全量
-重建的派生物。子模块分工：record 定义记录格式与段数组键约定，store
-提供存储引擎 ``CatalogStore`` ，index 维护派生索引，baseline 负责随包
-基线数据集的首用导入（ADR 0036）。导出面统一由包 __init__ 再输出。
+Orbit catalog (ADR 0031): record files are the source of truth; the SQLite
+index is a derived artifact that can be rebuilt wholesale. Submodule split:
+record defines the record format and segment-array key conventions, store
+provides the ``CatalogStore`` engine, index maintains the derived index, and
+baseline handles first-use import of the bundled baseline dataset (ADR 0036).
+The export surface is re-exported uniformly by the package ``__init__``.
 
 
 e2m2e.data.catalog.record module
@@ -38,9 +40,11 @@ e2m2e.data.catalog.store module
 e2m2e.data.catalog.index module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-基于 SQLite 的派生索引：只存过滤维度与文件指针，记录文件仍是唯一事实
-来源，删除后可由 store 全量重建。表结构为实现细节，不作为外部契约；
-查询入口走 ``CatalogStore`` ，不直接使用本模块。
+SQLite-based derived index: stores only filter dimensions and file pointers;
+record files remain the single source of truth, and the index can be rebuilt
+wholesale from the store after deletion. The table schema is an implementation
+detail, not an external contract; queries go through ``CatalogStore``, not
+this module directly.
 
 
 e2m2e.data.catalog.baseline module
@@ -55,9 +59,11 @@ e2m2e.data.catalog.baseline module
 e2m2e.data.catalog_baseline package
 -----------------------------------
 
-随包分发的预生成基线数据集目录（JSON 元数据 + npz 数组段），覆盖各族、
-各平动点的默认样本；首用由 ``e2m2e.data.catalog.baseline`` 导入到用户库
-（ADR 0036），本包自身不含 Python 接口。
+Precomputed baseline dataset bundled with the package (JSON metadata + npz
+array segments), covering default samples for every family and libration
+point; imported into the user catalog on first use by
+``e2m2e.data.catalog.baseline`` (ADR 0036). This package itself exposes no
+Python interface.
 
 .. automodule:: e2m2e.data.catalog_baseline
    :no-index:

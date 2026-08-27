@@ -1,10 +1,5 @@
-Lambert Solver & Porkchop Scan / Lambert 求解与 porkchop 扫描
-==============================================================
-
-[English](#lambert-solver-porkchop-scan) | [简体中文](#中文)
-
-English
--------
+Lambert Solver & Porkchop Scan
+==============================
 
 The Lambert problem: given endpoint positions and flight time, find the
 two-body arc joining them. This page covers the two-body Lambert solver (Rust
@@ -202,64 +197,3 @@ lowers total ΔV:
        sol3 = transfer.optimize(3, x0=x0)   # three impulses beat two
 
 Full cases in ``tests/algorithm/transfer/test_multi_impulse.py``.
-
-中文
-----
-
-Lambert 问题给定两端位置与飞行时间，求连接两点的二体轨道。本页介绍三部分：
-二体 Lambert 求解器（Rust Izzo 内核）、porkchop 扫描，以及以二体解为初猜的
-CR3BP 三体打靶。
-
-**二体 Lambert 求解器**：Izzo (2015) 算法，Rust 内核，Python 只做类型转换与结果封装。
-``direction="short"/"long"`` 选择转移角方向；``revs`` 指定多圈数（返回右分支低能解）。
-:solve_lambert_batch 对 N 组几何 × M 个飞行时间的网格批量求解，一次调用进 Rust；
-无解组合填 NaN 不影响其余。
-
-**porkchop 扫描**：出发时间 × 飞行时间网格逐点解 Lambert，得双脉冲 ΔV 网格。
-终端经 ``TerminalCondition`` 接口提取状态；解析终端可传 ``dynamics=None`` 。
-返回 ``PorkchopData`` 含三个网格与时间轴，``plot()`` 直接画等值线。
-
-``shooter.solve(...)`` 返回单弧 ``TransferSolution`` ，物理单位；未收敛时在
-``message`` 说明残余误差。典型场景收敛行为见
-``tests/algorithm/transfer/test_three_body_lambert.py`` 。
-
-多脉冲转移与主矢量检验
-~~~~~~~~~~~~~~~~~~~~~~~
-
-双脉冲解只在特定几何下最优。
-:class:`~e2m2e.algorithm.transfer.multi_impulse.MultiImpulseTransfer` 在固定端点
-（``StateTerminal`` ，位置、速度、时刻均固定）之间规划 n 脉冲转移：决策变量为各中途脉冲节点的时刻与位置，相邻节点间的弧段由 Lambert 封闭（默认二体，可切 ThreeBodyLambert 打靶精修），scipy SLSQP 最小化总 ΔV。LEO→GEO 示例（霍曼基准 3.7708 km/s）、
-决策变量口径与 ``optimize(n, x0=...)`` 用法见英文节代码。
-
-主矢量检验：由端点横截条件定 p(t0)、p(tf)，协态经 STM 携载得 p(t) 曲线；最优性必要条件是全程 ``|p(t)| ≤ 1`` 且脉冲点 ``|p| = 1`` 共线；弧内 ``|p| > 1`` 时插入中途脉冲可降总 ΔV（Lion & Handelsman 1968）。霍曼转移满足 Lawden 条件；同一端点飞行时间取 0.5 倍时弧内 ``|p| > 1`` ，检验给出插入建议，三脉冲优化随之降低总 ΔV。
-
-完整算例见 ``tests/algorithm/transfer/test_multi_impulse.py`` 。
-
-.. automodule:: e2m2e.algorithm.transfer.lambert
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :no-index:
-
-.. automodule:: e2m2e.algorithm.transfer.porkchop
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :no-index:
-
-.. automodule:: e2m2e.algorithm.transfer.three_body_lambert
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :no-index:
-
-.. automodule:: e2m2e.algorithm.transfer.multi_impulse
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :no-index:
-
-参考模块
-~~~~~~~~~
-
-- ``algorithm.transfer.lambert`` / ``porkchop`` / ``three_body_lambert`` / ``multi_impulse`` （autodoc 见下方 API 节）

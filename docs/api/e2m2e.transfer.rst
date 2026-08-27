@@ -4,7 +4,6 @@ e2m2e.algorithm.transfer package
 .. automodule:: e2m2e.algorithm.transfer
    :no-index:
 
-
 e2m2e.algorithm.transfer.config module
 --------------------------------------
 

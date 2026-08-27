@@ -1,10 +1,5 @@
-Transfer Optimization / 转移轨道优化
-=====================================
-
-[English](#transfer-optimization) | [简体中文](#中文)
-
-English
--------
+Transfer Optimization
+=====================
 
 NLP (nonlinear programming) optimization of transfer orbits — the optimize stage
 of the search-optimize two-step method, refining feasible candidates into
@@ -142,18 +137,3 @@ extraction:
        use_relaxed_velocity=True,
        velocity_angle_tol=0.05,
    )
-
-中文
-----
-
-转移轨道的 NLP（非线性规划）优化，实现搜索-优化两步法的优化阶段。
-对搜索阶段得到的可行候选解进行精化，求解满足约束的最小脉冲转移轨道。
-
-**优化变量** y = {α, T, t_ins}；目标最小化总脉冲 Δv₁+Δv₂；约束含位置连续、
-速度平行（可松弛为角度不等式，``nlp_use_relaxed_velocity`` 默认经 ``Transfer``
-路径启用）、碰撞避免。
-
-求解器两种：SciPy SLSQP（默认）与 COPT 商业优化器（需 ``coptpy`` ），
-由 ``nlp_use_copt`` 控制、失败回退由 ``nlp_fallback_to_scipy`` 控制。
-配置字段与高层链式接口示例见上方英文节；公式细节（位置连续、速度平行/
-松弛不等式）同样见英文节。

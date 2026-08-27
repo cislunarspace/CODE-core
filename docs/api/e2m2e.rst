@@ -6,8 +6,8 @@ e2m2e package
    :undoc-members:
    :show-inheritance:
 
-Subpackages / 子包
---------------------
+Subpackages
+-----------
 
 .. toctree::
    :maxdepth: 2
@@ -18,8 +18,8 @@ Subpackages / 子包
    e2m2e.api
    e2m2e.mbse
 
-Submodules / 子模块
-----------------------
+Submodules
+----------
 
 e2m2e.integrators module
 ------------------------

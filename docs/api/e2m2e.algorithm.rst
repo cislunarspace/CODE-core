@@ -4,10 +4,8 @@ e2m2e.algorithm package
 .. automodule:: e2m2e.algorithm
    :no-index:
 
-
-Top-level modules / 顶层模块
-----------------------------
-
+Top-level modules
+-----------------
 
 e2m2e.algorithm.catalog_sweep module
 ------------------------------------
@@ -867,8 +865,9 @@ e2m2e.algorithm.normal_form.coord_trans.cm_param module
 e2m2e.algorithm.levelset package
 --------------------------------
 
-levelset 值函数的 Python 侧工具（ADR 0032 决策 4）。Rust 侧求解器内核
-在 e2m2e-levelset crate（ToolboxLS 移植，ACM 非商业许可）。
+Python-side utilities for the level-set value function (ADR 0032, decision 4).
+The Rust solver kernel lives in the e2m2e-levelset crate (ToolboxLS port, ACM
+non-commercial license).
 
 .. automodule:: e2m2e.algorithm.levelset
    :no-index:

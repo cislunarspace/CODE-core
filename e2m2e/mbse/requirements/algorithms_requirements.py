@@ -10,7 +10,7 @@ ALGORITHMS_REQUIREMENTS = [
     # ---- 微分修正 ----
     Requirement(
         id="REQ-100",
-        title="微分修正 50 次迭代内收敛",
+        title="Differential correction converges within 50 iterations",
         category=RequirementCategory.PERFORMANCE,
         description="DifferentialCorrection 在默认容差 1e-12 下应在 50 次迭代内收敛。",
         priority=RequirementPriority.SHALL,
@@ -20,7 +20,7 @@ ALGORITHMS_REQUIREMENTS = [
     ),
     Requirement(
         id="REQ-101",
-        title="收敛容差默认 1e-12",
+        title="Convergence tolerance defaults to 1e-12",
         category=RequirementCategory.PERFORMANCE,
         description="DifferentialCorrection 默认容差为 1e-12。",
         priority=RequirementPriority.SHALL,
@@ -30,7 +30,7 @@ ALGORITHMS_REQUIREMENTS = [
     ),
     Requirement(
         id="REQ-102",
-        title="策略模式分离配置与迭代",
+        title="Strategy pattern separates configuration from iteration",
         category=RequirementCategory.INTERFACE,
         description=(
             "DifferentialCorrection 使用 CorrectionConfig 策略对象"
@@ -46,7 +46,7 @@ ALGORITHMS_REQUIREMENTS = [
     ),
     Requirement(
         id="REQ-103",
-        title="Continuation 不重复 CR3BP 物理",
+        title="Continuation does not duplicate CR3BP physics",
         category=RequirementCategory.INTERFACE,
         description=(
             "Continuation 模块的 compute_F_and_dF_symmetric_xz_plane"
@@ -60,7 +60,7 @@ ALGORITHMS_REQUIREMENTS = [
     ),
     Requirement(
         id="REQ-104",
-        title="算法层 STM 解析计算",
+        title="Analytic STM computation at the algorithm layer",
         category=RequirementCategory.FUNCTIONAL,
         description=(
             "DifferentialCorrection 的 iterate_correction 必须使用解析 STM"
@@ -73,7 +73,7 @@ ALGORITHMS_REQUIREMENTS = [
     ),
     Requirement(
         id="REQ-105",
-        title="Richardson 三阶近似精度",
+        title="Richardson third-order approximation accuracy",
         category=RequirementCategory.FUNCTIONAL,
         description=(
             "compute_halo_initial_guess 生成的初始猜测经过微分修正后能收敛到 Halo 周期轨道。"
@@ -86,7 +86,7 @@ ALGORITHMS_REQUIREMENTS = [
     # ---- 稳定性分析 ----
     Requirement(
         id="REQ-110",
-        title="稳定性指标满足 v1*v2 = 1",
+        title="Stability indices satisfy v1*v2 = 1",
         category=RequirementCategory.PERFORMANCE,
         description="对于保守系统 CR3BP，单周期轨道的 Floquet 乘子乘积 v1*v2 = 1（辛条件）。",
         priority=RequirementPriority.SHOULD,
@@ -97,7 +97,7 @@ ALGORITHMS_REQUIREMENTS = [
     # ---- 多点射击 ----
     Requirement(
         id="REQ-111",
-        title="MultipleShooting 并行传播",
+        title="MultipleShooting parallel propagation",
         category=RequirementCategory.FUNCTIONAL,
         description="MultipleShooting 支持通过 n_workers 参数进行并行传播，结果与串行一致。",
         priority=RequirementPriority.SHOULD,
@@ -108,7 +108,7 @@ ALGORITHMS_REQUIREMENTS = [
     # ---- 延拓 ----
     Requirement(
         id="REQ-112",
-        title="延拓步长自适应",
+        title="Adaptive continuation step size",
         category=RequirementCategory.FUNCTIONAL,
         description=(
             "Continuation 在修正成功时增大步长、失败时减小步长，步长范围 [min_step, max_step]。"
@@ -120,7 +120,7 @@ ALGORITHMS_REQUIREMENTS = [
     ),
     Requirement(
         id="REQ-113",
-        title="伪弧长延拓切向量计算",
+        title="Pseudo-arclength continuation tangent computation",
         category=RequirementCategory.FUNCTIONAL,
         description="伪弧长延拓使用 SVD 计算 Jacobian 零空间作为切向量（预测方向）。",
         priority=RequirementPriority.SHALL,

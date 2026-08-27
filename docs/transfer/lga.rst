@@ -1,10 +1,5 @@
-LGA Lunar Gravity Assist / LGA 月球引力辅助转移
-================================================
-
-[English](#lga-lunar-gravity-assist) | [简体中文](#中文)
-
-English
--------
+LGA Lunar Gravity Assist
+========================
 
 The LGA module designs lunar-gravity-assist indirect transfers via conic
 patching: lunar flybys rotate the spacecraft's velocity vector in magnitude and
@@ -49,22 +44,5 @@ Usage
 
 References
 ~~~~~~~~~~
-
-- Cui, H. et al. (2025). Transfer orbit design for cislunar space missions.
-
-中文
-----
-
-LGA（Lunar Gravity Assist）模块实现月球引力辅助间接转移设计，
-基于圆锥曲线拼接法（conic patching）计算经过月球引力辅助的转移轨道。
-
-月球引力辅助是地月转移中的重要技术，利用月球引力改变航天器的速度大小和方向，
-从而以较小的燃料消耗实现轨道转移。
-
-设计方法：三段式——出发段（双曲线脱离）、引力辅助段（月球影响球内改速度矢量）、
-到达段（双曲线插入）。使用方式与返回字段见上方英文节代码示例。
-
-参考文献
-~~~~~~~~
 
 - Cui, H. et al. (2025). Transfer orbit design for cislunar space missions.

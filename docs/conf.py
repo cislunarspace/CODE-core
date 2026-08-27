@@ -19,7 +19,7 @@ extensions = [
 ]
 
 # 中文支持
-language = "zh_CN"
+language = "en"
 locale_dirs = ["locale/"]
 
 # MBSE 参考文档（.md）以 YAML frontmatter 的 title 作为页面标题

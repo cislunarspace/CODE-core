@@ -1,10 +1,5 @@
-Terminal Conditions / 端点条件
-==============================
-
-[English](#terminal-conditions) | [简体中文](#中文)
-
-English
--------
+Terminal Conditions
+===================
 
 Terminal conditions define what departure and arrival must satisfy in transfer
 design.
@@ -75,12 +70,3 @@ Inject terminals via ``Transfer.set_orbit()``:
    transfer.set_orbit(start=dro_orbit, end=ro_orbit)
 
    # Internally creates OrbitTerminals for both ends
-
-中文
-----
-
-端点条件定义转移设计中出发和到达必须满足的条件。
-
-TerminalCondition 抽象基类定义出发/到达状态的获取契约；OrbitTerminal 位于某条
-``Orbit`` 上（出发取首点、到达经传播），StateTerminal 固定状态与时间。端点条件
-通过 ``Transfer.set_orbit()`` 注入优化器。完整接口与示例见上方英文节。

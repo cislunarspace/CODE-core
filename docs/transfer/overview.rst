@@ -1,10 +1,5 @@
-Transfer Design Overview / 转移轨道设计概述
-============================================
-
-[English](#transfer-design-overview) | [简体中文](#中文)
-
-English
--------
+Transfer Design Overview
+========================
 
 e2m2e provides multiple transfer-design methods, from simple coplanar transfers
 (Hohmann) to complex gravity-assist transfers (LGA).
@@ -175,33 +170,3 @@ The full flow — search, optimize, cost analysis:
    ax.set_title("DRO-RO Transfer Trajectory")
    plt.tight_layout()
    plt.show()
-
-中文
-----
-
-e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍曼转移）到复杂引力辅助转移（LGA）的各类场景。
-
-转移设计模块
-~~~~~~~~~~~~
-
-- :doc:`lambert`：Lambert 二体求解器，支持短程/长程与多圈解
-- :doc:`hmn`：霍曼直接转移（HMN），适用于共面圆轨道间的最小能量转移
-- :doc:`lga`：月球引力辅助间接转移（LGA），基于圆锥曲线拼接法
-- :doc:`wsb`：太阳引力辅助低能间接转移（WSB），H₂<0 弹道捕获
-- :doc:`low_thrust`：小推力转移，Q-law 初猜 + 打靶/配点
-- :doc:`search`：网格搜索，参数空间扫描可行转移窗口
-- :doc:`optimization`：NLP 优化，以搜索结果为初值精化转移轨道
-- :doc:`terminal`：终端条件抽象
-- :doc:`propulsion`：推进系统建模
-
-搜索-优化两步法（DRO-RO）
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-基于 Cui et al. (2025) 的搜索-优化两步法，用于 DRO 到 RO 的转移轨道设计。
-
-设计方法：先在参数空间搜索可行窗口，再对结果做 NLP 精化。转移类型分
-DIRECT / LGA / EXTERNAL。核心变量为 α（切向速度比）、T（转移时间）、
-t_ins（远地点到插入点时间）；目标是最小化总脉冲，约束含位置连续、速度平行
-与碰撞避免。
-
-端到端示例与代码见上方英文节（同一套 API，中英注释）。

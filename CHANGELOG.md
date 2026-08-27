@@ -1,24 +1,12 @@
-# 变更日志 / Changelog
+# Changelog
 
-[English]
-
-This changelog is written in Chinese by convention: release notes record exact code references (`module/function`, issue numbers, numeric details) whose authoritative wording lives in this file; paraphrasing them into English in place would invite drift between the two versions with each release.
-
-Per this repo's own documentation policy (see `docs/adr/README.md`: decision snapshots are never rewritten), released entries below are immutable history and stay as written. **From the next release onward, new entries should follow a bilingual convention**: section headings use both languages (`### Added / 新增`, `### Fixed / 修复`, `### Changed / 变更`), each entry begins with an English one-sentence summary followed by the detailed Chinese note. Unreleased content may be edited freely before release.
-
-For an English overview of what changed recently, read the [README](README.md#documentation), the [online docs](https://cislunarspace.github.io/e2m2e/), or ask in a GitHub discussion.
-
-[简体中文]
-
-本变更日志按惯例以中文书写：发布说明里的代码引用（模块/函数名、issue 编号、数值细节）以中文原文为权威表述，就地改写英文会随每次发布产生双版本漂移。
-
-按仓库自身的文档策略（见 `docs/adr/README.md`：决策快照不改写原文），已发布的历史条目视为不可变记录、保持原样。**自下个发布起，新条目遵循双语规范**：小节标题用双语（`### Added / 新增`、`### Fixed / 修复`、`### Changed / 变更`），每条先给一句英文摘要，再接中文详注。Unreleased 段内的内容在发布前可自由编辑。
+Release entries record exact code references (`module/function`, issue numbers, numeric details). Released entries below are immutable history (see `docs/adr/README.md`: decision snapshots are never rewritten) and stay in the Chinese they were written in. **From the next release onward, new entries are written in English**, per the repo's English-only documentation policy. Unreleased content may be edited freely before release.
 
 ## [Unreleased]
 
-### Changed / 变更
-- Repository navigation story now lives at the entry points: README and the Sphinx landing page open with the map and the one-orbit-task journey; package and crate docstrings point back with a one-line reference. README.md / README.zh-CN.md 在引言后新增 How to read this repository / 仓库怎么读小节：运行时四块地图（api 唯一入口 → algorithm 构造问题 → crates Rust 数值层 → data 星历/坐标/常数），一条任务轨道的旅程（api → family 选族给初猜 → crates 打靶与算力 → catalog 落库 → cli/mcp 交付），并点名依赖链外的顶层目录；完整叙事仍指向 docs/architecture/architecture.md。docs/index.rst 双语开头各加一段简版指回 README；5 个包 `__init__.py` 与 6 个 crate `lib.rs` 头注末尾各加一行入口行（仓库全貌与一条任务链的走读见 README 的仓库怎么读一节）。
-- Corner quotation marks 「」 removed repo-wide per project convention. 全库清除直角引号「」共 19 处：新增的 12 处统一改为无引号表述；既有的 7 处（CHANGELOG 5.8.6 段 2 处、installation.rst 1 处、README.zh-CN.md 3 处、polynomial.py 1 处）按语境改写。其中 5.8.6 已发布段内的 2 处属标点级例外（已发布条目不可改写策略），在此记录备案。
+### Changed
+- Repository navigation story now lives at the entry points: README and the Sphinx landing page open with the map and the one-orbit-task journey; package and crate docstrings point back with a one-line reference.
+- Corner quotation marks 「」 removed repo-wide per project convention.
 
 ## [5.8.6] - 2026-08-25
 

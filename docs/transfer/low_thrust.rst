@@ -1,10 +1,5 @@
-Low-Thrust Transfers / 小推力转移
-=================================
-
-[English](#low-thrust-transfers) | [简体中文](#中文)
-
-English
--------
+Low-Thrust Transfers
+====================
 
 Optimal-control low-thrust transfer design over the 7-D augmented state
 ``[r, v, m]``, routed via :func:`~e2m2e.algorithm.transfer.transfer_orbit`,
@@ -108,23 +103,3 @@ Other keys:
 - ``solver_method``: ``"shooting"`` (analytic Jacobians, 5–24× faster) or
   ``"collocation"`` (Hermite-Simpson, robust at scale)
 - ``duration_days``: flight time (days). LEO→GEO ≈ 100–300 d; LEO→Moon ≈ 3–180 d
-
-中文
-----
-
-基于 7D 增广状态 ``[r, v, m]`` 的小推力最优控制转移设计。通过
-:func:`~e2m2e.algorithm.transfer.transfer_orbit` 编排器路由，内部调用
-:class:`~e2m2e.algorithm.transfer.lowthrust_shooting.LowThrustShooting` 或
-:class:`~e2m2e.algorithm.transfer.lowthrust_collocation.LowThrustCollocation`
-完成 Q-law 初猜 + SLSQP 打磨闭环。
-
-基本原理与两级求解流程（Q-law 初猜 → SLSQP 打磨）见上方英文节公式；
-使用方法、配点求解器调用与脉冲 Δv 对比口径同样见英文节代码示例。
-
-推进参数说明：
-
-- ``t_max`` ：最大推力（N）。电推进 Hall 0.01~1.0 N；ion 0.0001~0.1 N；化学低推力 1~100 N
-- ``isp`` ：比冲（s）。Hall 1500~3000 s；ion 2000~5000 s；化学 300~450 s
-- ``initial_mass`` ：初始质量（kg）；``n_segments`` 段数（典型 5~50）
-- ``solver_method`` ：``"shooting"`` （解析雅可比快 5-24x）或 ``"collocation"`` （大规模更鲁棒）
-- ``duration_days`` ：飞行时间（天）。LEO→GEO 约 100~300 天；LEO→月球约 3~180 天

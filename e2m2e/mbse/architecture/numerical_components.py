@@ -7,6 +7,6 @@ NUMERICAL_COMPONENTS = [
         name="Integrators",
         module_path="e2m2e.integrators",
         layer="numerical",
-        description="Rust 数值积分与求解器的 Python 门面",
+        description="Python facade for Rust numerical integration and solvers",
     ),
 ]

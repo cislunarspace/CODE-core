@@ -1,9 +1,7 @@
 .. e2m2e documentation master file
 
-e2m2e: Cislunar Mission Planning Algorithm Toolset / 地月空间任务规划算法工具集
-===============================================================================
-
-**English**
+e2m2e: Cislunar Mission Planning Algorithm Toolset
+==================================================
 
 e2m2e (Earth to Moon, Moon to Earth) targets cislunar mission planning with
 precise and reliable orbit computation tools: building dynamical models of
@@ -18,20 +16,9 @@ CLI/MCP); ``e2m2e/algorithm`` constructs problems with domain knowledge;
 caches, frame data, and constant baselines. The journey of one orbit task
 through these layers is told in the README's "How to read this repository".
 
-**简体中文**
-
-e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精确可靠的
-轨道计算工具：建立地月空间动力学模型，生成周期轨道族，设计轨道之间的转移
-路径，并把结果画出来检查。在 LLM+Agent 式自主任务规划系统中，大模型负责
-理解任务意图、分解与编排子任务，e2m2e 负责数值计算那一半。
-
-仓库怎么读：``e2m2e/api`` 唯一入口（Facade → CLI/MCP）；``e2m2e/algorithm``
-用领域知识构造问题；``crates/`` 是 Rust 数值层；``e2m2e/data`` 供星历缓存、
-坐标数据与常数基准。一条任务轨道如何穿过这些层，见 README 的仓库怎么读一节。
-
 .. toctree::
    :maxdepth: 2
-   :caption: Quick Start / 快速开始
+   :caption: Quick Start
 
    getting-started/installation
    getting-started/quickstart
@@ -39,7 +26,7 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: Core Concepts / 核心概念
+   :caption: Core Concepts
 
    core/system
    core/dynamics
@@ -52,7 +39,7 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: Periodic Orbit Design / 周期轨道设计
+   :caption: Periodic Orbit Design
 
    algorithms/differential-correction
    algorithms/strategies
@@ -71,7 +58,7 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: Transfer Design / 转移轨道设计
+   :caption: Transfer Design
 
    transfer/overview
    transfer/lambert
@@ -86,7 +73,7 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: Architecture / 架构
+   :caption: Architecture
 
    architecture/index
    architecture/architecture
@@ -97,20 +84,20 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: API Reference / API 参考
+   :caption: API Reference
 
    api/e2m2e
 
 .. toctree::
    :maxdepth: 2
-   :caption: Reference / 参考资料
+   :caption: Reference
 
    reference/mbse/index
    reference/glossary
 
 
-Indices and tables / 索引与表格
-===============================
+Indices and tables
+==================
 
 * :ref:`genindex`
 * :ref:`modindex`

@@ -1,18 +1,18 @@
 e2m2e.api package
 =================
 
-任务级一档接口（ADR 0014）：把 CR3BP 初猜、星历修正、长期预报、转移设计、
-时空转换等能力封装为 Facade 方法，供上层规划系统（CLI / MCP 工具）调用。
+Task-level tier-1 interface (ADR 0014): CR3BP initial guesses, ephemeris
+correction, long-arc propagation, transfer design and spacetime transforms
+are exposed as Facade methods for upper-level planning systems (CLI / MCP tools).
 
 .. automodule:: e2m2e.api
    :no-index:
 
-
 e2m2e.api.catalog_ingest module
 -------------------------------
 
-产物型 Facade 结果到 catalog 记录的构建纯函数（ADR 0031）。无产物时
-不建记录，返回 ``None`` 。
+Pure builders from artifact-bearing Facade results to catalog records
+(ADR 0031). With no artifact, no record is created and ``None`` is returned.
 
 .. automodule:: e2m2e.api.catalog_ingest
    :members:
@@ -92,9 +92,10 @@ e2m2e.api.mcp.tools module
 e2m2e.api.sidecar package
 -------------------------
 
-GUI sidecar stdio 协议（ADR 0035）：请求/响应/进度为 JSON 文本行，复用
-MCP 统一信封，大数组经二进制帧附加传输。工具面即 Facade 上 mcp_exposed
-的方法。
+GUI sidecar stdio protocol (ADR 0035): request/response/progress are JSON
+text lines reusing the MCP unified envelope, with large arrays attached as
+binary frames. The tool surface is exactly the ``mcp_exposed`` methods on
+the Facade.
 
 .. automodule:: e2m2e.api.sidecar
    :no-index:

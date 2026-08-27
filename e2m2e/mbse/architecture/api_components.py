@@ -7,18 +7,18 @@ API_COMPONENTS = [
         name="OrbitDesignFacade",
         module_path="e2m2e.api.facade",
         layer="api",
-        description="任务级轨道设计门面",
+        description="Task-level orbit design facade",
     ),
     Component(
         name="CLI",
         module_path="e2m2e.api.cli",
         layer="api",
-        description="命令行接口",
+        description="Command-line interface",
     ),
     Component(
         name="MCPServer",
         module_path="e2m2e.api.mcp",
         layer="api",
-        description="MCP 服务接口",
+        description="MCP server interface",
     ),
 ]

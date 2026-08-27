@@ -50,7 +50,7 @@ def test_default_model_generates_documented_artifacts(mbse_model, tmp_path):
         assert "\n# " in content
     assert "classDiagram" in (tmp_path / "bdd-data.md").read_text(encoding="utf-8")
     assert "requirementDiagram" in (tmp_path / "requirements.md").read_text(encoding="utf-8")
-    assert "| 需求 ID |" in (tmp_path / "traceability-matrix.md").read_text(encoding="utf-8")
+    assert "| Requirement ID |" in (tmp_path / "traceability-matrix.md").read_text(encoding="utf-8")
 
 
 def test_committed_generated_documents_match_the_default_model(mbse_model, tmp_path):

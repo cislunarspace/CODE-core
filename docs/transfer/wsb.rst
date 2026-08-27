@@ -1,10 +1,5 @@
-WSB Low-Energy Solar-Assisted Transfer / WSB 太阳引力辅助低能转移
-==================================================================
-
-[English](#wsb-low-energy-solar-assisted-transfer) | [简体中文](#中文)
-
-English
--------
+WSB Low-Energy Solar-Assisted Transfer
+======================================
 
 The WSB (Weak Stability Boundary) module implements low-energy indirect lunar
 transfers under solar gravity assist, dispatched as ``"WSB"`` by the
@@ -66,24 +61,3 @@ Use cases
 - Low-energy Earth-Moon transfers: lunar capture at minimal Δv for fuel-limited missions
 - Economical options for landers & orbital inserters
 - Low-fuel backup channel for emergency orbit recovery
-
-中文
-----
-
-WSB（Weak Stability Boundary）模块实现太阳引力辅助下的低能间接月球转移，
-由 :func:`~e2m2e.algorithm.transfer.transfer_orbit` 编排器以
-``"WSB"`` 路由，内部经弹道网格搜索 + ThreeBodyLambert 到达段精化闭环。
-
-基本原理
-~~~~~~~~
-
-WSB 转移利用日地系统中的弱稳定边界区域：航天器先飞离月球影响球、进入
-太阳摄动下的远端日心弧，在远地点附近太阳引力做功使其相对月球的速度
-降到捕获阈值之下，从而以接近零的 Δv 被月球弹道捕获（Belbruno & Miller 1993）。
-
-捕获判据采用 Belbruno 约定的二体 Kepler 能量 :math:`H_2`（公式见英文节）：
-近月点处 :math:`H_2 < 0` 表示航天器处于月球束缚态（弹道捕获）。
-
-求解流程分两步：弹道网格搜索（默认 Rust 后端 Rayon 并行）+ 到达段精化。
-使用方法与结果读取见英文节代码；应用场景包括低能地月转移、经济型着陆器
-转移方案与应急低燃料救援通道。

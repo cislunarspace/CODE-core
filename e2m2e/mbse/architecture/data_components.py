@@ -7,19 +7,19 @@ DATA_COMPONENTS = [
         name="Orbit",
         module_path="e2m2e.data.types.orbit",
         layer="data",
-        description="轨道数据容器",
+        description="Orbit data container",
     ),
     Component(
         name="OrbitFamily",
         module_path="e2m2e.data.types.orbit",
         dependencies=["Orbit"],
         layer="data",
-        description="轨道族容器",
+        description="Orbit family container",
     ),
     Component(
         name="SPICEManager",
         module_path="e2m2e.data.kernels.manager",
         layer="data",
-        description="SPICE 内核管理",
+        description="SPICE kernel management",
     ),
 ]

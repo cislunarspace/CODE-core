@@ -4,13 +4,11 @@ e2m2e.mbse package
 .. automodule:: e2m2e.mbse
    :no-index:
 
-
 e2m2e.mbse.data package
 -----------------------
 
 .. automodule:: e2m2e.mbse.data
    :no-index:
-
 
 e2m2e.mbse.data.core_models module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
