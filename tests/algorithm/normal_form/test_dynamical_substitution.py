@@ -5,7 +5,7 @@
 - :class:`DynamicalSubstituteCorrector` 可构造，``reduce`` 返回
   :class:`DynamicalSubstituteResult`；
 - 结果具备 ``substitute_orbit`` / ``W_poly`` / ``Wdot_poly`` /
-  ``tlist`` / ``shooting_result`` 等切片 #171 要求字段；
+  ``tlist`` / ``shooting_result`` 等契约要求字段；
 - 在零初值 / 较小窗口下烟测通过；
 - 选定 NAFF 后端而不可用时抛错（ADR 0020 决策 4，不静默降级）；
 - :func:`multiple_shooting_newton` 在玩具动力学上能收敛；
@@ -115,7 +115,7 @@ def test_reduce_returns_dataclass_with_required_fields(tiny_corrector):
     assert isinstance(result, DynamicalSubstituteResult)
     assert result.context is tiny_corrector.context
     assert result.order == int(tiny_corrector.context.order)
-    # 切片 #171 验收字段：substitute_orbit / W_poly / Wdot_poly
+    # 契约验收字段：substitute_orbit / W_poly / Wdot_poly
     assert result.substitute_orbit is not None
     assert isinstance(result.W_poly, dict)
     assert isinstance(result.Wdot_poly, dict)

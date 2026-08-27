@@ -1,8 +1,8 @@
 """ForceModel 速度依赖力（阻尼型）的 Rust STM 能力边界测试。
 
-issue #378：Python 侧自定义力（无 Rust spec）不再支持传播；``with_stm=True``
+Python 侧自定义力（无 Rust spec）不支持传播；``with_stm=True``
 对无 spec 的力显式报能力错误。阻尼力的 ∂a/∂v 行为由 Rust drag 力的
-``drag_accel_and_jacobian`` 在编译路径内处理，Python 不再保留 FD 兜底路径。
+``drag_accel_and_jacobian`` 在编译路径内处理，Python 不保留 FD 兜底路径。
 """
 
 from __future__ import annotations

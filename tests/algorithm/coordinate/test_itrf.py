@@ -202,8 +202,7 @@ class TestITRFApproxAxes:
     def test_angular_velocity_z_is_positive_earth_rotation(self, spice_manager):
         """角速度 z 分量应为正（地球东向自转，ω_z ≈ +7.292e-5 rad/s）。
 
-        回归测试：GAST 旋转方向曾经符号错误（_rotation3(-gast)），导致
-        角速度为负、大气阻力相对速度计算错误。此测试防止该 bug 再现。
+        角速度符号错误会连带大气阻力相对速度计算错误，本测试守护方向正确。
         """
         axes = ITRFApproxAxes()
         et = spice_manager.utc_to_et("2024-01-01T00:00:00")
@@ -217,8 +216,8 @@ class TestITRFApproxAxes:
 class TestICRFITRFIntegrationWithSpice:
     """ICRF↔ITRF 端到端集成测试,SPICE pxform 作参考源。
 
-    issue #78 验收第 5 条"ICRF↔ITRF 旋转矩阵元素误差 < 1e-12"与
-    第 6 条"所有矩阵满足正交性 < 1e-14"。把 standard_icrf() 与
+    验收口径:ICRF↔ITRF 旋转矩阵元素误差 < 1e-12,
+    所有矩阵满足正交性 < 1e-14。把 standard_icrf() 与
     ITRFSpiceAxes + CelestialBodyOrigin('EARTH') 组合,验证 CoordinateSystem
     走出的转换与 SPICE pxform 直接对比。
     """
@@ -267,10 +266,9 @@ class TestICRFITRFIntegrationWithSpice:
 class TestITRFApproxAxesConsistencyWithITRF93:
     """ITRFApproxAxes 与 SPICE-backed ITRF93 的方向一致性验证。
 
-    issue #78 验收第 2 条"ITRFApproxAxes 实现并通过一致性测试"——
     近似实现(忽略极移 + 简化章动 + GMST 公式)与 ITRF93 不完全吻合:
     主要差异来自被忽略的极移(量级 ~0.3-1 角秒/轴 → 累计可达 ~1000 角秒,
-    ~5e-3 rad)。因此本测试不再断言"亚角秒一致",而是验证方向正确:
+    ~5e-3 rad)。因此本测试不断言亚角秒一致,而是验证方向正确:
     二者均为正交旋转,且近似旋转是精确旋转的小扰动(R^T R' ≈ I)。
     """
 
@@ -296,7 +294,7 @@ class TestStandardCoordinateSystems:
         from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 
         icrf = CoordinateSystem(axes=ICRSAxes(), origin=InertialOrigin())
-        # EOP 越界策略显式选择（#352 移除 compatibility 隐式切换后）
+        # EOP 越界策略显式选择
         itrf = CoordinateSystem(
             axes=GMATITRFAxes(eop_extrapolation="clamp"), origin=InertialOrigin()
         )
@@ -311,8 +309,7 @@ class TestStandardCoordinateSystems:
 class TestStandardIcrfPreset:
     """standard_icrf() 工厂:返回 ICRF 标准坐标系预设(CoordinateSystem)。
 
-    issue #78 验收第 4 条"ICRF 与 ITRF 标准坐标系预设可用"——ICRF 侧的
-    字面落实。ICRF = ICRSAxes(恒等旋转)+ InertialOrigin(SSB 无平移)。
+    ICRF = ICRSAxes(恒等旋转)+ InertialOrigin(SSB 无平移)。
     """
 
     def test_standard_icrf_returns_coordinate_system(self):

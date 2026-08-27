@@ -1,45 +1,52 @@
-Lambert 求解与 porkchop 扫描
-============================
+Lambert Solver & Porkchop Scan / Lambert 求解与 porkchop 扫描
+==============================================================
 
-Lambert 问题给定两端位置与飞行时间，求连接两点的二体轨道。本页介绍三部分：
-二体 Lambert 求解器（Rust Izzo 内核）、porkchop 扫描，以及以二体解为初猜的
-CR3BP 三体打靶。
+[English](#lambert-solver-porkchop-scan) | [简体中文](#中文)
 
-二体 Lambert 求解器
--------------------
+English
+-------
 
-:func:`~e2m2e.algorithm.transfer.lambert.solve_lambert` 解单次二体 Lambert 问题，
-算法为 Izzo (2015)，内核用 Rust 实现（``e2m2e-propagation`` crate），
-经 ``e2m2e._integrators`` 暴露，Python 侧只做类型转换与结果封装。
+The Lambert problem: given endpoint positions and flight time, find the
+two-body arc joining them. This page covers the two-body Lambert solver (Rust
+Izzo kernel), porkchop scans, and CR3BP three-body shooting seeded by two-body
+solutions.
+
+Two-body Lambert solver
+~~~~~~~~~~~~~~~~~~~~~~~
+
+:func:`~e2m2e.algorithm.transfer.lambert.solve_lambert` solves one two-body
+Lambert problem via Izzo (2015) with a Rust kernel (``e2m2e-propagation`` crate)
+exposed through ``e2m2e._integrators``; Python only converts types and wraps
+results.
 
 .. code-block:: python
 
    from e2m2e.algorithm.transfer import solve_lambert
 
-   # Vallado 经典算例
+   # Vallado's classic case
    r0 = [5000.0, 10000.0, 2100.0]      # km
    rf = [-14600.0, 2500.0, 7000.0]     # km
    tof = 3600.0                        # s
-   mu = 398600.4418                    # 地球 GM，km³/s²
+   mu = 398600.4418                    # Earth GM, km³/s²
 
    sol = solve_lambert(r0, rf, tof, mu)
-   print(f"出发速度: {sol.v0}")        # km/s
-   print(f"到达速度: {sol.vf}")
-   print(f"迭代次数: {sol.n_iter}")
+   print(f"Departure velocity: {sol.v0}")        # km/s
+   print(f"Arrival velocity: {sol.vf}")
+   print(f"Iterations: {sol.n_iter}")
 
-``direction`` 选择转移角方向：``"short"`` 表示转移角 < π（默认），``"long"`` 表示 > π。
-``revs`` 指定完整圈数，多圈时返回右分支（低能）解；飞行时间低于该圈数
-最小转移时间时抛 ``ValueError``。
+``direction`` picks transfer-angle direction: ``"short"`` < π (default),
+``"long"`` > π. ``revs`` sets full revolutions — multi-rev returns the right
+(low-energy) branch; TOF below that revolution count's minimum raises
+``ValueError``.
 
-返回的 :class:`~e2m2e.algorithm.transfer.lambert.LambertSolution` 含出发速度 ``v0`` 与
-到达速度 ``vf``，均为 ``(3,)`` 向量，单位 km/s；另有迭代次数 ``n_iter``
-与圈数 ``revs``。
+The returned :class:`~e2m2e.algorithm.transfer.lambert.LambertSolution` carries
+``v0``/``vf`` as ``(3,)`` km/s vectors plus ``n_iter`` and ``revs``.
 
-批量求解
---------
+Batch solving
+~~~~~~~~~~~~~
 
-:func:`~e2m2e.algorithm.transfer.lambert.solve_lambert_batch` 对 N 组几何 × M 个飞行时间
-的网格批量求解，一次调用进入 Rust 内核：
+:func:`~e2m2e.algorithm.transfer.lambert.solve_lambert_batch` solves an N-geometry
+× M-TOF grid in one Rust call:
 
 .. code-block:: python
 
@@ -51,92 +58,96 @@ CR3BP 三体打靶。
    tofs = [3600.0, 7200.0, 10800.0]    # (M,)
 
    out = solve_lambert_batch(r0_list, rf_list, tofs, mu)
-   # out 形状 (N, M, 2, 3)：[..., 0, :] 为 v0，[..., 1, :] 为 vf
+   # out shape (N, M, 2, 3): [..., 0, :] = v0; [..., 1, :] = vf
 
-无解的组合（如弦长为零）对应位置填 NaN，不影响其余组合。
+Infeasible combos (zero chord etc.) get NaN at their slots without affecting
+others.
 
-porkchop 扫描
--------------
+Porkchop scan
+~~~~~~~~~~~~~
 
-:func:`~e2m2e.algorithm.transfer.porkchop.porkchop` 在出发时间 × 飞行时间网格上逐点解
-Lambert 问题，得到双脉冲 ΔV 网格，即 porkchop 图的数据层。出发与到达终端
-经 :class:`~e2m2e.algorithm.transfer.terminal.TerminalCondition` 接口提取状态
-（如 :class:`~e2m2e.algorithm.transfer.terminal.OrbitTerminal`，或自定义实现），
-本函数不关心状态如何产生。
+:func:`~e2m2e.algorithm.transfer.porkchop.porkchop` solves Lambert pointwise over a
+departure-time × TOF grid producing the two-impulse ΔV mesh behind porkchop
+plots. Endpoints come from :class:`~e2m2e.algorithm.transfer.terminal.TerminalCondition`
+implementations (e.g., ``OrbitTerminal``, or custom ones); this function doesn't
+care how states arise.
 
-对网格点 ``(t_dep, tof)``：出发终端状态取 ``t_dep`` 时刻，到达终端状态取
-``t_dep + tof`` 时刻，脉冲为转移速度与终端轨道速度之差。
+At grid point ``(t_dep, tof)``: departure state sampled at ``t_dep``, arrival at
+``t_dep + tof``; impulses = transfer velocity minus terminal-orbit velocities.
 
 .. code-block:: python
 
    import numpy as np
    from e2m2e.algorithm.transfer import porkchop
 
-   t_dep = np.linspace(0.0, 3600.0, 20)        # 出发时间网格，s
-   tof = np.linspace(900.0, 5 * 3600.0, 30)    # 飞行时间网格，s
+   t_dep = np.linspace(0.0, 3600.0, 20)        # departure-time grid, s
+   tof = np.linspace(900.0, 5 * 3600.0, 30)    # TOF grid, s
 
    data = porkchop(dep, arr, t_dep, tof, mu=398600.4418, dynamics=None)
 
-   print(data.dv1.shape)     # (20, 30)，出发脉冲，km/s
-   print(data.dv2.shape)     # 到达脉冲
-   print(data.total.shape)   # 总脉冲 dv1 + dv2
+   print(data.dv1.shape)     # (20, 30) departure impulses, km/s
+   print(data.dv2.shape)     # arrival impulses
+   print(data.total.shape)   # totals dv1 + dv2
 
-   # 画总 ΔV 等值线图
-   ax = data.plot()
+   ax = data.plot()          # total ΔV contours
 
-其中 ``dep`` / ``arr`` 是实现 ``TerminalCondition`` 的终端对象；
-解析终端（如圆轨道）不依赖动力学传播时 ``dynamics`` 可传 ``None``。
-返回的 :class:`~e2m2e.algorithm.transfer.porkchop.PorkchopData` 携带三个网格与时间轴，
-``plot()`` 直接用 matplotlib 画等值线。
+``dep``/``arr`` are TerminalCondition implementations; pass ``dynamics=None``
+for analytic terminals not requiring propagation.
+:class:`~e2m2e.algorithm.transfer.porkchop.PorkchopData` carries grids + time axes;
+``plot()`` draws matplotlib contours directly.
 
-三体打靶 ThreeBodyLambert
--------------------------
+Three-body shooting: ThreeBodyLambert
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-二体 Lambert 解忽略第三体引力，在地月空间只是初猜。
-:class:`~e2m2e.algorithm.transfer.three_body_lambert.ThreeBodyLambert` 以二体解为初猜，
-在 CR3BP 动力学下用阻尼 Newton 打靶修正出发速度，使给定飞行时间后的末端
-位置命中目标：
+Two-body Lambert ignores third-body gravity — in cislunar space it's only an
+initial guess. :class:`~e2m2e.algorithm.transfer.three_body_lambert.ThreeBodyLambert`
+uses the two-body solution to seed damped-Newton shooting under CR3BP dynamics,
+correcting departure velocity until the end position hits the target:
 
-1. 两端物理状态 (km, km/s) 经 ``CR3BP_System.physical_to_dimensionless`` 无量纲化
-2. 无量纲几何上以 μ = 1 调 ``solve_lambert`` 得初猜出发速度
-3. Newton 迭代：传播 ``with_stm=True``，取末端 STM 的 Φ_rv 块（``Φ[0:3, 3:6]``）
-   解修正量；整步增大误差时步长减半；收敛判据为末端位置误差 < 1e-8（无量纲）
+1. Both physical endpoints (km, km/s) nondimensionalized via
+   ``CR3BP_System.physical_to_dimensionless``
+2. Two-body guess from ``solve_lambert`` with μ = 1 on nondimensional geometry
+3. Newton iteration: propagate ``with_stm=True``; solve corrections from the end
+   STM's Φ_rv block (``Φ[0:3, 3:6]``); halve steps when full steps grow the error;
+   converged when terminal position error < 1e-8 (nondimensional)
 
 .. code-block:: python
 
    from e2m2e.algorithm.transfer import StateTerminal, ThreeBodyLambert
    from e2m2e.data.templates import ConvergenceState
 
-   shooter = ThreeBodyLambert(dynamics)   # system 须已初始化特征尺度
+   shooter = ThreeBodyLambert(dynamics)   # system must have scales initialized
 
-   # 终端状态为物理单位 (km, km/s)；到达端仅位置为约束，速度用于算到达脉冲
+   # Terminal states in physical units (km, km/s); arrival position constrained, velocity for the arrival impulse
    sol = shooter.solve(
        StateTerminal(s0, 0.0),
        StateTerminal(s1, tof),
-       tof,                    # 飞行时间，s
-       guess="lambert",        # 初猜来源；"orbit" 直接用出发速度
+       tof,                    # flight time, s
+       guess="lambert",        # guess source; "orbit" uses departure velocity directly
    )
 
    if sol.status == ConvergenceState.CONVERGED:
-       print(f"出发脉冲: {sol.arcs[0].delta_v:.6f} km/s")
-       print(f"到达脉冲: {sol.arrival_delta_v:.6f} km/s")
-       print(f"总脉冲: {sol.total_delta_v:.6f} km/s")
+       print(f"Departure impulse: {sol.arcs[0].delta_v:.6f} km/s")
+       print(f"Arrival impulse: {sol.arrival_delta_v:.6f} km/s")
+       print(f"Total impulse: {sol.total_delta_v:.6f} km/s")
 
-返回 :class:`~e2m2e.algorithm.transfer.config.TransferSolution`，单弧，物理单位；
-未收敛时 ``converged=False`` 且 ``message`` 说明残余误差。典型场景（同一周期
-轨道上两相位点间转移、Lyapunov → Halo 交会）的收敛行为见
-``tests/algorithm/transfer/test_three_body_lambert.py``。
+Returns a single-arc :class:`~e2m2e.algorithm.transfer.config.TransferSolution`
+in physical units; non-convergence reports residual error in ``message``.
+Convergence behavior for typical scenarios (two-phase transfers on one periodic
+orbit; Lyapunov → Halo rendezvous) in
+``tests/algorithm/transfer/test_three_body_lambert.py``.
 
-多脉冲转移与主矢量检验
-----------------------
+Multi-impulse transfers & primer-vector check
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-双脉冲解只在特定几何下最优。
-:class:`~e2m2e.algorithm.transfer.multi_impulse.MultiImpulseTransfer` 在固定端点
-（:class:`~e2m2e.algorithm.transfer.terminal.StateTerminal`，位置、速度、时刻均固定）
-之间规划 n 脉冲转移：决策变量为各中途脉冲节点的时刻与位置 ``[t_i, r_i]``，
-相邻节点间的弧段由 Lambert 封闭（默认二体 ``solve_lambert``，可切
-``ThreeBodyLambert`` 打靶精修），脉冲是封闭结果的进出弧速度差，由 scipy
-SLSQP 最小化总 ΔV。
+Two-impulse solutions are optimal only in specific geometries.
+:class:`~e2m2e.algorithm.transfer.multi_impulse.MultiImpulseTransfer` plans n-impulse
+transfers between fixed endpoints
+(:class:`~e2m2e.algorithm.transfer.terminal.StateTerminal` — position, velocity,
+time all pinned): decision variables are mid-course nodes' times & positions
+``[t_i, r_i]``, arcs between neighbors closed by Lambert (default two-body
+``solve_lambert``; switchable to ``ThreeBodyLambert`` refinement); impulses are
+difference of closed legs' entry/exit velocities; scipy SLSQP minimizes total ΔV.
 
 .. code-block:: python
 
@@ -144,11 +155,11 @@ SLSQP 最小化总 ΔV。
    from e2m2e.algorithm.transfer import MultiImpulseTransfer, StateTerminal
 
    MU_EARTH = 398600.4418  # km³/s²
-   R1, R2 = 7000.0, 42164.0  # LEO → GEO，km
+   R1, R2 = 7000.0, 42164.0  # LEO → GEO, km
    TOF_HOHMANN = np.pi * np.sqrt(((R1 + R2) / 2) ** 3 / MU_EARTH)
 
    def circular(r, angle=0.0):
-       """半径 r、相位角 angle 的圆轨道状态（逆时针）。"""
+       """Circular state of radius r at phase angle angle (counterclockwise)."""
        v = np.sqrt(MU_EARTH / r)
        return np.array(
            [r * np.cos(angle), r * np.sin(angle), 0.0,
@@ -161,36 +172,68 @@ SLSQP 最小化总 ΔV。
        mu=MU_EARTH,
    )
    sol = transfer.optimize(2)
-   print(f"总脉冲: {sol.total_delta_v:.4f} km/s")   # 霍曼基准 3.7708
+   print(f"Total impulse: {sol.total_delta_v:.4f} km/s")   # Hohmann baseline 3.7708
 
-``optimize(n_impulses, x0=...)`` 的决策变量只含中途节点（m = n − 2 个），
-n=2 时无自由变量、直接封闭单弧；``x0`` 给出中途节点的初猜
-``[t_1, r_1, ...]``。优化后 ``transfer.legs`` 刷新为
-:class:`~e2m2e.algorithm.transfer.multi_impulse.Impulse` 与
-:class:`~e2m2e.algorithm.transfer.multi_impulse.CoastArc` 交替的序列。
+``optimize(n_impulses, x0=...)`` decision variables cover only mid-course nodes
+(m = n − 2); n=2 has no free variables (single arc closed directly); ``x0`` seeds
+mid-node values ``[t_1, r_1, ...]``. After optimization ``transfer.legs`` refreshes
+to an alternating sequence of :class:`~e2m2e.algorithm.transfer.multi_impulse.Impulse`
+and :class:`~e2m2e.algorithm.transfer.multi_impulse.CoastArc`.
 
 :meth:`~e2m2e.algorithm.transfer.multi_impulse.MultiImpulseTransfer.check_primer_vector`
-对给定解做 Lawden 主矢量检验：由端点横截条件
-p(t0) = Δv̂₀、p(tf) = Δv̂_f 确定主矢量初值，协态经 STM 携载得到 p(t) 曲线
-（公式出处为 Prussing《Optimal Spacecraft Trajectories》第 3~4 章）。
-最优性的必要条件是全程 ``|p(t)| ≤ 1`` 且脉冲点 ``|p| = 1``、方向与 p 共线；
-弧内 ``|p| > 1`` 时在峰值处插入中途脉冲可降低总 ΔV（Lion & Handelsman 1968）。
-霍曼转移满足 Lawden 条件；同一端点但飞行时间取 0.5 倍霍曼时间的双脉冲解
-弧内 ``|p| > 1``，检验会给出插入建议，以建议点为零脉冲初猜做三脉冲优化，
-总 ΔV 随之下降：
+performs Lawden's primer-vector test: transversality conditions set p(t0) = Δv̂₀,
+p(tf) = Δv̂_f; costate carried via STMs yields p(t) curves (Prussing, *Optimal Spacecraft
+Trajectories*, ch. 3–4). Necessary optimality: ``|p(t)| ≤ 1`` throughout with
+``|p| = 1`` at impulses aligned with them; ``|p| > 1`` inside arcs means an inserted
+mid-course impulse can cut total ΔV (Lion & Handelsman 1968). Hohmann satisfies
+Lawden's conditions; a two-impulse solution over 0.5× Hohmann time violates it —
+the test suggests insertion points, and three-impulse optimization seeded there
+lowers total ΔV:
 
 .. code-block:: python
 
    report = transfer.check_primer_vector(sol, n_samples=300)
-   print(f"Lawden 条件满足: {report.lawden_satisfied}")
+   print(f"Lawden satisfied: {report.lawden_satisfied}")
    if not report.lawden_satisfied:
        x0 = np.concatenate(
            [[report.suggested_insertion_time],
             report.suggested_insertion_position]
        )
-       sol3 = transfer.optimize(3, x0=x0)   # 三脉冲总 ΔV 低于双脉冲
+       sol3 = transfer.optimize(3, x0=x0)   # three impulses beat two
 
-完整算例见 ``tests/algorithm/transfer/test_multi_impulse.py``。
+Full cases in ``tests/algorithm/transfer/test_multi_impulse.py``.
+
+中文
+----
+
+Lambert 问题给定两端位置与飞行时间，求连接两点的二体轨道。本页介绍三部分：
+二体 Lambert 求解器（Rust Izzo 内核）、porkchop 扫描，以及以二体解为初猜的
+CR3BP 三体打靶。
+
+**二体 Lambert 求解器**：Izzo (2015) 算法，Rust 内核，Python 只做类型转换与结果封装。
+``direction="short"/"long"`` 选择转移角方向；``revs`` 指定多圈数（返回右分支低能解）。
+:solve_lambert_batch 对 N 组几何 × M 个飞行时间的网格批量求解，一次调用进 Rust；
+无解组合填 NaN 不影响其余。
+
+**porkchop 扫描**：出发时间 × 飞行时间网格逐点解 Lambert，得双脉冲 ΔV 网格。
+终端经 ``TerminalCondition`` 接口提取状态；解析终端可传 ``dynamics=None`` 。
+返回 ``PorkchopData`` 含三个网格与时间轴，``plot()`` 直接画等值线。
+
+``shooter.solve(...)`` 返回单弧 ``TransferSolution`` ，物理单位；未收敛时在
+``message`` 说明残余误差。典型场景收敛行为见
+``tests/algorithm/transfer/test_three_body_lambert.py`` 。
+
+多脉冲转移与主矢量检验
+~~~~~~~~~~~~~~~~~~~~~~~
+
+双脉冲解只在特定几何下最优。
+:class:`~e2m2e.algorithm.transfer.multi_impulse.MultiImpulseTransfer` 在固定端点
+（``StateTerminal`` ，位置、速度、时刻均固定）之间规划 n 脉冲转移：决策变量为各中途脉冲节点的时刻与位置，相邻节点间的弧段由 Lambert 封闭（默认二体，可切 ThreeBodyLambert 打靶精修），scipy SLSQP 最小化总 ΔV。LEO→GEO 示例（霍曼基准 3.7708 km/s）、
+决策变量口径与 ``optimize(n, x0=...)`` 用法见英文节代码。
+
+主矢量检验：由端点横截条件定 p(t0)、p(tf)，协态经 STM 携载得 p(t) 曲线；最优性必要条件是全程 ``|p(t)| ≤ 1`` 且脉冲点 ``|p| = 1`` 共线；弧内 ``|p| > 1`` 时插入中途脉冲可降总 ΔV（Lion & Handelsman 1968）。霍曼转移满足 Lawden 条件；同一端点飞行时间取 0.5 倍时弧内 ``|p| > 1`` ，检验给出插入建议，三脉冲优化随之降低总 ΔV。
+
+完整算例见 ``tests/algorithm/transfer/test_multi_impulse.py`` 。
 
 .. automodule:: e2m2e.algorithm.transfer.lambert
    :members:
@@ -215,3 +258,8 @@ p(t0) = Δv̂₀、p(tf) = Δv̂_f 确定主矢量初值，协态经 STM 携载�
    :undoc-members:
    :show-inheritance:
    :no-index:
+
+参考模块
+~~~~~~~~~
+
+- ``algorithm.transfer.lambert`` / ``porkchop`` / ``three_body_lambert`` / ``multi_impulse`` （autodoc 见下方 API 节）

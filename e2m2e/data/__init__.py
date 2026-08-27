@@ -7,8 +7,6 @@
   ``algorithm/coordinate/``。
 - ``templates/``：数据模板（轨道族种子、系统参数、摄动开关、力模型配置 schema、领域枚举）。
 - ``types/``：通用数据类型（State/Epoch 类型别名；Orbit/EphemerisTable/NominalOrbit 容器类）。
-
-实现状态：迁移完成（ADR 0011），自 core/io 迁入；旧包已在第 5 批清理中删除。
 """
 
 __all__: list[str] = []

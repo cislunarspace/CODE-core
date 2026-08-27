@@ -1,16 +1,16 @@
-"""NRHO 星历修正回归（#463 / #473）。
+"""NRHO 星历修正回归。
 
-#463：默认近月点加密在贴月 NRHO 上残差卡约 10² km。
-#473：5.7.2 的删近月点默认在 GUI 量级（phase=0.5、约 1 个月）上
-仍有历元空洞（星历长度断言）与合并层不收敛；生产默认改为等时间 +
-``revs_per_group=1``。
+两组失效场景：
+- 贴月 NRHO 上默认近月点加密的残差可能停在约 10² km。
+- GUI 量级（phase=0.5、约 1 个月）非等时间采样可能产生历元空洞
+  （星历长度断言）与合并层不收敛；生产默认因此采用等时间 +
+  ``revs_per_group=1``。
 
 本文件只锁 ``design_orbit`` 对外行为：
 
-- 贴月短弧（近月高 2000 km、约 8 天）——#463 场景不得回退。
-- GUI 默认量级（近月高 5000 km、phase=0.5、约 30 天、1 h 步长）——
-  #473 必锁：收敛 + 星历与时间网格等长。
-- 采样×段长的开发期对照矩阵脚本已随 #472 收口移除（见 git 历史）。
+- 贴月短弧（近月高 2000 km、约 8 天）场景不得回退。
+- GUI 默认量级（近月高 5000 km、phase=0.5、约 30 天、1 h 步长）
+  必锁：收敛 + 星历与时间网格等长。
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ pytestmark = [
     requires_spice,
 ]
 
-# 贴月短弧：~1 个 NRHO 周期（2000 km 约 6.7 天）。相位 0.5 是新生产
-# 离散默认下稳定的贴月代表样本；原 0.0 旧删近月采样案例不再适用（#473）。
+# 贴月短弧：~1 个 NRHO 周期（2000 km 约 6.7 天）。相位 0.5 是生产
+# 离散默认下稳定的贴月代表样本。
 TIGHT_DURATION_SEC = 8 * 86400.0
 TIGHT_OUTPUT_STEP_SEC = 7200.0  # 2 h，压低星历表规模
 
@@ -42,7 +42,7 @@ GUI_OUTPUT_STEP_SEC = 3600.0
 PHASE_ZERO_DURATION_SEC = 8 * 86400.0
 PHASE_ZERO_OUTPUT_STEP_SEC = 7200.0
 
-# #508：9:2 贴月共振成员（近月高 1500 km）略超一圈的 8 天弧。主路径
+# 9:2 贴月共振成员（近月高 1500 km）略超一圈的 8 天弧。主路径
 # （1 圈/段 + 合并层）对该成员不收敛，须回退单段 2 圈。
 RESONANT_DURATION_SEC = 8 * 86400.0
 RESONANT_OUTPUT_STEP_SEC = 7200.0
@@ -50,7 +50,7 @@ RESONANT_OUTPUT_STEP_SEC = 7200.0
 
 @pytest.fixture(scope="module")
 def nrho_tight_short_result():
-    """L2 南族、近月高 2000 km、8 天 segmented——#463 最小回归样本。"""
+    """L2 南族、近月高 2000 km、8 天 segmented 最小回归样本。"""
     return design_orbit(
         make_design_request(
             orbit_type="NRHO",
@@ -67,7 +67,7 @@ def nrho_tight_short_result():
 
 @pytest.fixture(scope="module")
 def nrho_gui_default_result():
-    """GUI 默认量级 NRHO——#473 回归样本（等时间 + 1 圈/段）。"""
+    """GUI 默认量级 NRHO 回归样本（等时间 + 1 圈/段）。"""
     return design_orbit(
         make_design_request(
             orbit_type="NRHO",
@@ -101,7 +101,7 @@ def nrho_phase_zero_result():
 
 @pytest.fixture(scope="module")
 def nrho_resonant_result():
-    """9:2 贴月共振成员 8 天弧——#508 回退链回归样本。"""
+    """9:2 贴月共振成员 8 天弧，回退链回归样本。"""
     return design_orbit(
         make_design_request(
             orbit_type="NRHO",
@@ -117,7 +117,7 @@ def nrho_resonant_result():
 
 
 def test_tight_short_nrho_converges(nrho_tight_short_result):
-    """贴月短弧修正收敛：#463 场景在新默认策略下仍可用。"""
+    """贴月短弧修正收敛：该场景在新默认策略下仍可用。"""
     res = nrho_tight_short_result
     assert res.correction is not None
     assert res.correction.status is ConvergenceState.CONVERGED
@@ -157,7 +157,7 @@ def test_nrho_phase_zero_converges(nrho_phase_zero_result):
 
 
 def test_resonant_slightly_over_one_rev_converges(nrho_resonant_result):
-    """略超一圈的 9:2 贴月成员收敛（#508：主路径不收敛须回退单段）。"""
+    """略超一圈的 9:2 贴月成员收敛（主路径不收敛须回退单段）。"""
     res = nrho_resonant_result
     assert res.correction is not None
     assert res.correction.status is ConvergenceState.CONVERGED
@@ -177,7 +177,7 @@ def test_gui_default_nrho_converges(nrho_gui_default_result):
 
 
 def test_gui_default_nrho_ephemeris_aligned(nrho_gui_default_result):
-    """星历非空且点数与时间网格严格一致（#473 历元洞回归）。"""
+    """星历非空且点数与时间网格严格一致（历元洞回归）。"""
     eph = nrho_gui_default_result.ephemeris
     # et_grid = arange(0, duration + 0.5*step, step) → 30 天 / 1 h = 721 点
     n_expected = int(GUI_DURATION_SEC / GUI_OUTPUT_STEP_SEC) + 1

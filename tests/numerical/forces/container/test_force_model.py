@@ -1,8 +1,8 @@
 """ForceModel 容器测试。
 
 覆盖坐标系要求、力聚合、增删、启用禁用、自动命名与重复名检测。
-Python 侧 ``_compute_total_acceleration`` / ``equations_of_motion`` 已按
-issue #378 删除；聚合对传播的影响通过 Rust 端到端传播验证。
+Python 侧 ``_compute_total_acceleration`` / ``equations_of_motion`` 已
+删除；聚合对传播的影响通过 Rust 端到端传播验证。
 """
 
 import numpy as np
@@ -104,7 +104,7 @@ def test_disabled_force_skipped_but_kept_in_forces():
     # forces 与 list_forces 仍含两个
     assert len(fm.forces) == 2
     assert len(fm.list_forces()) == 2
-    # 禁用无 Rust spec 的力后，传播不再因它报能力错误；剩下的 b 仍报错
+    # 禁用无 Rust spec 的力后，传播不因它报能力错误；剩下的 b 仍报错
     with pytest.raises(NotImplementedError, match="无 Rust 实现"):
         fm.propagate(np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]), (0.0, 1.0))
 
@@ -136,7 +136,7 @@ def test_auto_name_disambiguates_same_type():
 
 
 def test_auto_name_skips_occupied_suffix():
-    """显式占用 Foo_2 后，自动命名不再回退到 Foo，而是取 Foo_3。"""
+    """显式占用 Foo_2 后，自动命名不回退到 Foo，而是取 Foo_3。"""
     system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(ConstantForce([1.0, 0.0, 0.0]), name="ConstantForce_2")

@@ -21,7 +21,7 @@ from ..models import OrbitError
 
 __all__ = ["Envelope", "ok_envelope", "error_envelope", "invoke_tool", "dispatch_tool"]
 
-# 信封的 JSON 形状（不是 Pydantic 模型：传输层只做序列化，不再校验自己）。
+# 信封的 JSON 形状（不是 Pydantic 模型：传输层只做序列化，不做自校验）。
 Envelope = dict[str, Any]
 
 
@@ -65,8 +65,8 @@ def _jsonify(data: Any) -> Any:
         try:
             return data.model_dump(mode="json")
         except Exception:
-            # issue #526 补全：Any/任意类型字段携带 ndarray/Orbit/System
-            # （族生成、catalog_get/promote）时 mode="json" 失败，降级为
+            # Any/任意类型字段携带 ndarray/Orbit/System（族生成、
+            # catalog_get/promote）时 mode="json" 序列化失败，回落为
             # python 模式转储 + 逐值转换。
             return _to_jsonable(data.model_dump(mode="python"))
     return data
@@ -131,6 +131,6 @@ def invoke_tool(method: Any, arguments: dict[str, Any]) -> Envelope:
     try:
         return ok_envelope(result)
     except Exception as exc:
-        # 结果含不可 JSON 化对象（如 ndarray，issue #526）：兑成结构化错误
-        # 而非炸穿传输层（MCP 与 sidecar 共用此处）。
+        # 结果含不可 JSON 化对象（如 ndarray）：兑成结构化错误而非炸穿
+        # 传输层（MCP 与 sidecar 共用此处）。
         return error_envelope("INTERNAL_ERROR", f"响应序列化失败（{type(exc).__name__}）")

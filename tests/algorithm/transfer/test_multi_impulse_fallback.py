@@ -1,4 +1,4 @@
-"""multi_impulse 初猜回退的失败语义测试（#352）。
+"""multi_impulse 初猜回退的失败语义测试。
 
 ``_default_x0`` 的双脉冲封闭初猜失败时，回退端点线性插值必须带标记
 （logger.warning），不静默；编程错误（非预期的 Lambert/打靶/传播失败）
@@ -40,7 +40,7 @@ def _make_transfer() -> MultiImpulseTransfer:
 
 class TestDefaultX0FallbackNotSilent:
     def test_closure_failure_falls_back_with_warning(self, caplog):
-        """双脉冲封闭失败 → 回退线性插值初猜并记录警告（#352：不静默退化）。"""
+        """双脉冲封闭失败 → 回退线性插值初猜并记录警告（不静默退化）。"""
         transfer = _make_transfer()
 
         def _boom_close_velocities(y, closure):
@@ -58,7 +58,7 @@ class TestDefaultX0FallbackNotSilent:
         np.testing.assert_allclose(x0, expected, atol=1e-12)
 
     def test_programming_error_not_swallowed(self):
-        """编程错误（TypeError）不再被 ``except Exception`` 吞掉（#352：收窄）。"""
+        """编程错误（TypeError）不被 ``except Exception`` 吞掉（收窄）。"""
         transfer = _make_transfer()
 
         def _boom_close_velocities(y, closure):

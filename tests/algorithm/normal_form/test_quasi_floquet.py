@@ -1,6 +1,6 @@
 """``normal_form.quasi_floquet`` 测试。
 
-覆盖（issue #172）：
+覆盖：
 
 - :class:`QuasiFloquetReducer` 可用，``reduce`` 返回
   :class:`QuasiFloquetResult`；
@@ -256,7 +256,7 @@ def test_both_methods_share_same_normal_form(l1_context, small_orbit_ds_result):
 def test_both_methods_agree_on_B(l1_context, small_orbit_ds_result):
     """矩阵法与李代数法应解同一个方程 ``Ḃ = M·B − B·D``，给出一致的 ``B(t)``。
 
-    这是 issue #172 可共用一套测试的实质要求：两条入口都是对
+    两条入口可共用一套测试的实质要求：两条入口都是对
     ``Ḃ = M·B − B·D`` 的等价数值实现（矩阵法 36 维直接积分 + 辛投影，
     李代数法 commutator-free Lie group RK4、自动保辛），故 ``B(t)`` 在
     采样点上须数值一致。容差放宽到 ``1e-4``：李代数法用固定子步 4 阶

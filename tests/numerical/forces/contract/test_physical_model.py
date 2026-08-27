@@ -1,7 +1,7 @@
 """PhysicalModel ABC 子类化契约测试。
 
 验证抽象基类不能直接实例化、子类可继承；Python 单点 ``compute_acceleration``
-已按 issue #378 删除，子类只需实现 ``to_rust_spec`` 即可接入传播。
+已删除，子类只需实现 ``to_rust_spec`` 即可接入传播。
 """
 
 import numpy as np

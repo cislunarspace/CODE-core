@@ -1,7 +1,7 @@
-"""表征参数目录变换器（issue #174，切片 5）。
+"""表征参数目录变换器。
 
-把切片 #171–#173 的三个预计算结果（动力学替代 ``W_poly``、quasi-Floquet
-``B(t)``、中心流形 ``W_series``）绑定到一个**不可变聚合句柄**
+把动力学替代（``W_poly``）、quasi-Floquet 变换（``B(t)``）、中心流形
+（``W_series``）三个预计算结果绑定到一个**不可变聚合句柄**
 :class:`LibrationCatalogData`，并提供面向对象的访问入口
 :class:`LibrationCatalogTransformer`，实现 qiao ``rho2param`` /
 ``param2rho`` 的完整坐标变换链 ``rho ↔ param``。
@@ -16,19 +16,10 @@
    ``B`` / ``W_series`` 做时刻 ``t`` 的插值（由叶子函数完成），调用方只
    传状态和时间。
 
-与 #175（``pipeline.py`` 最终 ``NormalFormResult``）的衔接取舍：
-
-- :mod:`.types.NormalFormResult` （切片 0）是一个**通用流水线结果容器**
-  （Hamiltonian 系数、变换矩阵、残差等），字段语义偏"化简结果"，不适合
-  直接当坐标变换的系数聚合器；
-- 本切片定义独立的 :class:`LibrationCatalogData` 作为**坐标变换专用聚合
-  句柄**（只持有三个子结果 + context），命名上避开 ``NormalFormResult``
-  以免与 #175 冲突；
-- **#175 可以直接复用本类**：``LibrationCatalogTransformer`` 的构造只
-  依赖 ``context`` / ``ds_result`` / ``qf_result`` / ``cm_result`` 四个
-  访问器，#175 的 ``NormalFormResult`` 只需暴露这四个属性即可无缝构造
-  ``LibrationCatalogData`` （或直接传 ``LibrationCatalogData`` 当字段）。
-  本切片不在 ``types.NormalFormResult`` 上加字段，保持切片 0 容器稳定。
+与最终 ``NormalFormResult`` 的衔接取舍：``LibrationCatalogTransformer``
+的构造只依赖 ``context`` / ``ds_result`` / ``qf_result`` / ``cm_result``
+四个访问器，因此 :mod:`.types.NormalFormResult` 只需暴露这四个属性即可直接
+构造 ``LibrationCatalogData``；坐标变换专用聚合不往通用结果容器上加字段。
 """
 
 from __future__ import annotations
@@ -57,13 +48,13 @@ if TYPE_CHECKING:
 class LibrationCatalogData:
     """表征参数目录变换所需的预计算系数聚合句柄。
 
-    不可变：把切片 #171–#173 的三个结果 + 上下文打包，供
-    :class:`LibrationCatalogTransformer` 绑定使用。
+    不可变：把动力学替代、quasi-Floquet、中心流形三个结果 + 上下文打包，
+    供 :class:`LibrationCatalogTransformer` 绑定使用。
 
     设计取舍见模块 docstring：本类是**坐标变换专用** 聚合器，不复用
     :class:`~e2m2e.algorithm.normal_form.types.NormalFormResult` （后者是
-    通用流水线结果容器）。#175 的最终 ``NormalFormResult`` 可暴露
-    ``context``/``ds_result``/``qf_result``/``cm_result`` 四个属性后直接
+    通用流水线结果容器）。外部最终结果的类只需暴露
+    ``context``/``ds_result``/``qf_result``/``cm_result`` 四个属性即可直接
     构造本类，或反过来把本类当字段嵌入。
 
     Attributes:

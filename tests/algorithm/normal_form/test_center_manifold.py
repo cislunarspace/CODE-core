@@ -1,6 +1,6 @@
 """``normal_form.center_manifold`` 测试。
 
-覆盖（issue #173，切片 4）：
+覆盖：
 
 - :class:`CenterManifoldReducer` 可用，``reduce`` 返回
   :class:`CenterManifoldResult`；
@@ -298,10 +298,10 @@ def test_center_step_produces_nonzero_complex_W(l1_context):
     （``pow2!=pow5``）的纯中心项，Step 2 必须对它们求解同调方程、产出
     非零 W。中心方向特征频率为纯虚 ``iω``，故 W 为纯虚（实部≈0）。
 
-    此前曾存在两个互相叠加的退化：(1) ``_limit_fft_outliers_mad`` 在
-    ``MAD=0``（常系数输入）时把唯一非零的零频当离群点缩到 0，使 W 归零；
-    (2) ``reduce`` 对 W 取实部，丢弃 Step 2 纯虚 W 的全部内容。任一退化
-    复发，本测试的 ``nonzero_W`` 断言即失败。
+    已知退化模式都会让本测试失败：``_limit_fft_outliers_mad`` 在
+    ``MAD=0``（常系数输入）时会把唯一非零的零频当离群点缩到 0，使 W 归零；
+    对 W 取实部会丢弃 Step 2 纯虚 W 的全部内容。任一退化出现，
+    本测试的 ``nonzero_W`` 断言即失败。
     """
     reducer = CenterManifoldReducer(context=l1_context, max_order=6)
     qf = _make_qf_result(l1_context)
@@ -332,8 +332,7 @@ def test_center_step_reduces_center_coupling(l1_context):
     回归守卫：注入纯中心非共振项后，Step 2 化简结果（虚变换回复坐标
     后）中 ≥3 阶项必须全部满足三对共轭平衡（``pow1==pow4 &&
     pow2==pow5 && pow3==pow6``），即仅依赖作用量 ``I_2``/``I_3``。
-    此前 Step 2 因 W 归零退化而是 no-op，本测试直接断言化简效果，
-    不依赖正逆相消。
+    本测试直接断言化简效果本身，不依赖正逆相消。
     """
     reducer = CenterManifoldReducer(context=l1_context, max_order=6)
     qf = _make_qf_result(l1_context)
@@ -475,8 +474,8 @@ def test_homological_equation_residual(l1_context):
 
     在复对角形 ``H₂c = λ·y1·y4 + i·ω_p·y2·y5 + i·ω_v·y3·y6`` 下，
     对常数系数 ``H_elim`` 用频域求解器解 ``W``，泊松括号必须精确抵消
-    ``H_elim``。此前在实正规形下用复值 ``k`` 求解，残差高达 O(h)（残留
-    耦合 max=48 的根因）。
+    ``H_elim``。在实正规形下用复值 ``k`` 直接求解会留下 O(h) 量级
+    残留耦合，必须走复对角坐标下的谱公式路径。
     """
     from e2m2e.algorithm.normal_form.center_manifold import (
         _characteristic_freq,
@@ -552,7 +551,7 @@ def test_keep_criteria_predicates():
 
 
 # ---------------------------------------------------------------------------
-# Rust 后端（#466）：默认路径与 Python 参照等价
+# Rust 后端：默认路径与 Python 参照等价
 # ---------------------------------------------------------------------------
 
 

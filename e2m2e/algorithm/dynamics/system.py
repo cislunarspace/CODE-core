@@ -13,7 +13,7 @@ from ...data.templates.enums import ReferenceFrame, UnitSystem
 
 
 class System(abc.ABC):
-    """动力学系统抽象基类。
+    """Abstract base of dynamical systems. / 动力学系统抽象基类。
 
     描述天体的几何、引力与运动学模型，是后续一切计算的上下文。
     所有具体系统（CR3BP、星历）都应实现以下最小接口：

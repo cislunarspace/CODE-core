@@ -87,8 +87,8 @@ class TestSolveQfMatrixStability:
 
         单次积分在 ``λT≈20`` 时辛误差 ~1e-2（辛性已破坏）；
         分段 + 每段投影把辛误差控制在 ~1e-2 以下（受 symplectic_project
-        精度与 ``e^(λt)`` 增长双重限制）。这是完整多点打靶（issue #328）
-        落地前的最小可行修复——端到端 Lissajous 有界性的实际效果由
+        精度与 ``e^(λt)`` 增长双重限制），是完整多点打靶方案下的
+        最小可行修复，端到端 Lissajous 有界性的实际效果由
         ``test_pipeline_lissajous`` 验证。
         """
         M_at, D, lam = l2_M_D

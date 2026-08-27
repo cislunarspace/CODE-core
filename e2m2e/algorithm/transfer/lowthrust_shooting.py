@@ -312,7 +312,7 @@ class LowThrustShooting:
     def _decode_segments(self, y: npt.NDArray[np.floating]) -> list[tuple[float, float, float]]:
         """决策向量 -> 各段 (throttle, θ₁, θ₂) 列表。
 
-        油门越出物理范围 [0, 1] 时抛 ``ValueError`` （#352）：SLSQP 受 bounds
+        油门越出物理范围 [0, 1] 时抛 ``ValueError``：SLSQP 受 bounds
         约束输出本不应越界，越界说明约束未生效或决策非法；静默 clip 会掩盖
         问题，且让传播用的油门与决策变量不一致。
         """

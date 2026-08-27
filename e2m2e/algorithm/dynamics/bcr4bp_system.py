@@ -21,7 +21,9 @@ from .cr3bp_system import CR3BP_System
 
 
 class BCR4BPSystem(CR3BP_System):
-    """双圆限制性四体问题（Bicircular Restricted Four-Body Problem）系统
+    """Bicircular Restricted Four-Body Problem system.
+
+    双圆限制性四体问题（Bicircular Restricted Four-Body Problem）系统。
 
     地月会合旋转系 + 太阳质点摄动。太阳在会合系中作共面圆周运动：
 

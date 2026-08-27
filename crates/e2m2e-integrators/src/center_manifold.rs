@@ -1,12 +1,11 @@
-//! 中心流形化简数值内核（#466）：两步 Lie 同调 + 频域 W + Poisson 链。
+//! 中心流形化简数值内核：两步 Lie 同调 + 频域 W + Poisson 链。
 //!
 //! 完整下沉 `CenterManifoldReducer.reduce` 的数值语义：
 //! - Step 1 `"invariant"`：消去双曲方向不平衡项（实值 W 求解器）；
 //! - Step 2 `"center"`：消去中心非共振耦合（复值 + MAD W 求解器）；
 //! - 虚/实基底变换、特征频率、`list_deriv`、`ad_W^n/n!` 与 Python 一致。
 //!
-//! 多项式核（`poly_poisson` / `polylist_simplify`）一并内嵌，满足 #464
-//! 逻辑前置；#464 未合入时本模块自带等价核。
+//! 多项式核（`poly_poisson` / `polylist_simplify`）在本模块内嵌。
 
 use num_complex::Complex64;
 use pyo3::exceptions::PyValueError;

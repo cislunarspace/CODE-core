@@ -41,7 +41,7 @@ def _default_parallel_backend() -> str:
     """默认使用 Rust 后端；无扩展时在使用处报告扩展不可用。
 
     ``processes`` 和 ``threads`` 仅在调用方显式选择时保留。不能因 Rust 扩展
-    缺失而悄然改变默认算法与并行模型（issue #378）。
+    缺失而悄然改变默认算法与并行模型。
     """
     return "rust"
 
@@ -129,8 +129,8 @@ class TransferSearch:
         """设置并行后端：``rust`` （默认）、``processes`` 或 ``threads``。
 
         默认恒为 ``rust`` （:func:`_default_parallel_backend` 固定返回）：
-        Rust 扩展缺失时在使用处直接报错（issue #378，不静默回退
-        ``processes``）。``rust`` 走 Rust+Rayon 内核；几何方法被 monkeypatch
+        Rust 扩展缺失时在使用处直接报错，不静默回退
+        ``processes``。``rust`` 走 Rust+Rayon 内核；几何方法被 monkeypatch
         （测试注入缝）时回退 Python 路径，生产路径不触发。
         ``processes``/``threads`` 行为不变。
         """

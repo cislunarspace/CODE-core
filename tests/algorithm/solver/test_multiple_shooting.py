@@ -169,7 +169,7 @@ class TestMultipleShootingCorrection:
             tolerance=1e-6,
         )
 
-        # 不收敛应直接失败而非 skip，否则算法回归会被绿色报告掩盖（issue #218）
+        # 不收敛应直接失败而非 skip，否则算法回归会被绿色报告掩盖
         assert result.status is ConvergenceState.CONVERGED, (
             f"多重打靶未收敛 (residual={result.max_residual:.2e})"
         )
@@ -224,7 +224,7 @@ class TestMultipleShootingTimeOptions:
             var_time=False,
             max_iter=20,
         )
-        # 固定时间修正在 simple_patch_points 上应能收敛；不收敛是回归（issue #218）
+        # 固定时间修正在 simple_patch_points 上应能收敛；不收敛是回归
         assert result.status is ConvergenceState.CONVERGED, (
             f"多重打靶未收敛 (residual={result.max_residual:.2e})"
         )
@@ -239,7 +239,7 @@ class TestMultipleShootingTimeOptions:
             var_time=True,
             max_iter=20,
         )
-        # 可变时间修正在 simple_patch_points 上应能收敛；不收敛是回归（issue #218）
+        # 可变时间修正在 simple_patch_points 上应能收敛；不收敛是回归
         assert result.status is ConvergenceState.CONVERGED, (
             f"多重打靶未收敛 (residual={result.max_residual:.2e})"
         )
@@ -315,7 +315,7 @@ class TestMultipleShootingVerbose:
         assert sig.parameters["verbose"].default is False
 
     def test_backward_compatible(self, ms_corrector, simple_patch_points):
-        """不传 verbose 时行为与之前完全一致"""
+        """不传 verbose 时保持默认行为"""
         t_patch, state_patch = simple_patch_points
         result = ms_corrector.correct(
             t_patch=t_patch,
@@ -448,7 +448,7 @@ class TestMultipleShootingMultiprocess:
     ``_load_worker_kernels`` → ``SPICEManager.load_kernel`` 须在 Python
     spiceypy 与 Rust cspice 两侧 furnsh，下沉到 Rust 的力模型查询（经
     ``EphemerisDynamics.propagate`` → ``propagate_with_stm_py``）才能查到
-    天体状态。本测试守护这一加载链不被绕过（issue #334）。
+    天体状态。本测试守护这一加载链不被绕过。
     """
 
     def test_multiprocess_worker_loads_rust_kernels(

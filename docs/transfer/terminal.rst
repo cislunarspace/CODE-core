@@ -1,12 +1,19 @@
-端点条件
-========
+Terminal Conditions / 端点条件
+==============================
 
-端点条件定义转移设计中出发和到达必须满足的条件。
+[English](#terminal-conditions) | [简体中文](#中文)
+
+English
+-------
+
+Terminal conditions define what departure and arrival must satisfy in transfer
+design.
 
 TerminalCondition
------------------
+~~~~~~~~~~~~~~~~~
 
-:class:`~e2m2e.algorithm.transfer.terminal.TerminalCondition` 是抽象基类，定义出发状态与到达状态的获取契约：
+:class:`~e2m2e.algorithm.transfer.terminal.TerminalCondition` is the abstract
+base defining how departure/arrival states are obtained:
 
 .. code-block:: python
 
@@ -14,24 +21,25 @@ TerminalCondition
 
    class TerminalCondition(ABC):
        def get_initial_state(self) -> np.ndarray:
-           """返回出发状态 [x, y, z, vx, vy, vz]"""
+           """Return departure state [x, y, z, vx, vy, vz]"""
            ...
 
        def get_arrival_state(
            self, t_ins: float, dynamics: CR3BP_Dynamics
        ) -> tuple[np.ndarray, np.ndarray]:
-           """返回到达时刻的位置与速度，两个 (3,) 数组"""
+           """Return arrival position & velocity, two (3,) arrays"""
            ...
 
 OrbitTerminal
--------------
+~~~~~~~~~~~~~
 
-:class:`~e2m2e.algorithm.transfer.terminal.OrbitTerminal` 位于某条 ``Orbit`` 上：
+:class:`~e2m2e.algorithm.transfer.terminal.OrbitTerminal` sits on an ``Orbit``:
 
-- 出发状态取轨道首点
-- 到达状态通过动力学传播获取（``dynamics`` 在调用 ``get_arrival_state`` 时传入）
+- Departure state = orbit's first point
+- Arrival state obtained by propagation (``dynamics`` passed at call time)
 
-构造函数只接收轨道对象；终端充当出发端还是到达端，由优化器装配时的位置决定。
+Constructor takes only the orbit; whether it serves as departure or arrival is
+decided by its position at optimizer assembly.
 
 .. code-block:: python
 
@@ -41,12 +49,12 @@ OrbitTerminal
    arrival = OrbitTerminal(ro_orbit)
 
 StateTerminal
--------------
+~~~~~~~~~~~~~
 
-:class:`~e2m2e.algorithm.transfer.terminal.StateTerminal` 固定状态与时间：
+:class:`~e2m2e.algorithm.transfer.terminal.StateTerminal` pins state & time:
 
-- 出发状态与到达状态均为固定值
-- 不依赖动力学传播
+- Both departure & arrival are fixed values
+- No dependence on propagation
 
 .. code-block:: python
 
@@ -54,10 +62,10 @@ StateTerminal
 
    departure = StateTerminal(state=np.array([r, 0, 0, 0, v, 0]), time=0.0)
 
-与优化器的配合
---------------
+Integration with optimizers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-端点条件通过 ``Transfer.set_orbit()`` 注入优化器：
+Inject terminals via ``Transfer.set_orbit()``:
 
 .. code-block:: python
 
@@ -66,4 +74,13 @@ StateTerminal
    transfer = Transfer(dynamics)
    transfer.set_orbit(start=dro_orbit, end=ro_orbit)
 
-   # 内部创建 OrbitTerminal 作为出发和到达条件
+   # Internally creates OrbitTerminals for both ends
+
+中文
+----
+
+端点条件定义转移设计中出发和到达必须满足的条件。
+
+TerminalCondition 抽象基类定义出发/到达状态的获取契约；OrbitTerminal 位于某条
+``Orbit`` 上（出发取首点、到达经传播），StateTerminal 固定状态与时间。端点条件
+通过 ``Transfer.set_orbit()`` 注入优化器。完整接口与示例见上方英文节。

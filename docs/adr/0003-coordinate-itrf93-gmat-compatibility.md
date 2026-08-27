@@ -1,16 +1,131 @@
-# ADR 0003：坐标轴、ITRF93 默认值与 GMAT 兼容的地球定向
+# ADR 0003: Axes, ITRF93 defaults, GMAT-compatible Earth orientation / 坐标轴、ITRF93 默认值与 GMAT 兼容的地球定向
+
+[English](#adr-0003-axes-itrf93-defaults-gmat-compatible-earth-orientation) | [简体中文](#中文)
+
+## English
+
+**Status**: Adopted
+**Date**: 2026-06-12
+**Related Issues**: #62, #80
+
+### Context
+
+Issue #62 introduces GMAT-style coordinate systems, composed from independent
+axes and origins. The original request mixes a simplified IAU 2006
+implementation with SPICE validation at extremely tight tolerances. That is
+not a stable contract for the Earth-fixed frame: a simplified native model can
+neither independently match SPICE's high-precision Earth orientation at
+`1e-12` nor account for EOP data.
+
+GMAT R2026a uses `ITRF93` as its high-precision Earth SPICE frame and treats
+`IAU_EARTH` as low precision. GMAT's native ITRF path also has several
+compatibility-specific behaviors: A1MJD inputs, C04 EOP parsing, linear
+interpolation of `UT1-UTC` and polar motion, non-interpolated `LOD`, and
+optional clamping outside EOP coverage.
+
+### Decision
+
+1. **The default high-precision ITRF is SPICE-backed `ITRF93`.**
+   - Public/default ITRF factories and compatibility `ITRFAxes` point to
+     `ITRFSpiceAxes(frame="ITRF93")`.
+   - `IAU_EARTH` never acts as a silent fallback for high-precision ITRF.
+   - `ITRFApproxAxes` remains low-precision/educational only.
+
+2. **GMAT-compatible native ITRF is opt-in.**
+   - `GMATITRFAxes` is an independent axes implementation.
+   - First-phase native reduction uses a pyerfa/SOFA-based `ErfaXysProvider`
+     (an implementation of `XysProvider`) supplying IAU `X, Y, s`.
+   - If exact table-level agreement with GMAT is later required, a
+     `GMATXysProvider` can replace that source.
+
+3. **State transformation is rotation-rate based.**
+   - `Axes.rotation_matrix(et)` returns `R`, with the convention
+     `r_icrf = R @ r_axes`.
+   - `Axes.rotation_and_rate(et)` returns `(R, Rdot)`, with
+     `v_icrf = R @ v_axes + Rdot @ r_axes`.
+   - `Axes.state_transform_matrix(et)` derives from `(R, Rdot)`.
+   - `CoordinateSystem.transform_state()` prefers `(R, Rdot)` before falling
+     back to any angular-velocity compatible path.
+
+4. **Public coordinate epoch inputs remain ET seconds.**
+   - Public axes and coordinate-system APIs take SPICE ET seconds.
+   - GMAT A1MJD support is lower-level and test-facing, used only for
+     consistency checks.
+
+5. **Verification is two-tiered.**
+   - `ITRFSpiceAxes("ITRF93")` verifies against `spiceypy.pxform/sxform` to
+     `<1e-12` when high-precision kernels are available.
+   - `GMATITRFAxes` initially sanity-checks against SPICE `ITRF93` at about
+     `1e-7`; main native-chain verification is carried by parser/time/EOP/
+     per-stage tests.
+
+6. **Test fixtures and data strategy are explicit.**
+   - Committed slim text fixtures cover J2000, the 2017 leap-second boundary,
+     and a 2026-06-12 window.
+   - Full GMAT data is opt-in via `GMAT_DATA_DIR`.
+   - Optional high-precision Earth BPC checks skip explicitly when
+     unavailable.
+   - Missing required committed fixtures or kernels raise clear errors.
+
+7. **Errors are explicit; precision never silently degrades.**
+   - A missing `ITRF93` kernel raises a coordinate error with actionable hints.
+   - Missing GMAT native data raises a data error at construction or query
+     time.
+   - Out-of-range EOP raises by default.
+   - GMAT-style clamping exists only behind an explicit compatibility option.
+
+8. **System integration offers no frame-conversion shortcuts.**
+   - `System.coordinate_system` holds an optional coordinate system so force
+     models can query which frame input states are in.
+   - Conversion entry points live at the `CoordinateSystem` layer: callers use
+     `system.coordinate_system.transform_state()` / `transform_vector()`
+     directly or construct their own `CoordinateSystem`.
+   - `System` does **not** provide a `transform()` shortcut.
+
+   > **Revision note (2026-06-15, issue #79)**: original decision 8 specified
+   > `System.transform()` as a thin delegate over
+   > `CoordinateSystem.transform_state()`. After landing, real production code
+   > (drag, gravity, thrust, SRP models) all bypassed `System.transform()` and
+   > used `system.coordinate_system.transform_*` directly. Re-discussion
+   > concluded the thin delegation was needless indirection; the shortcut is
+   > unnecessary. #79 removed `System.transform()` and this clause was revised
+   > accordingly. The original `System.transform()` landed in #90 on an
+   > under-considered design call now reversed.
+
+### Consequences
+
+#### Added
+
+- A stable contract covering SPICE-backed defaults, GMAT-compatible native
+  behaviors, fixtures, and tolerances.
+- A rotation-rate-based axes abstraction serving both SPICE `sxform` and GMAT
+  native `Rdot`.
+
+#### Unchanged
+
+- Public coordinate APIs keep taking ET seconds.
+- Approximate ITRF remains explicitly labeled low-precision.
+
+#### Follow-up work
+
+- If exact agreement with GMAT XYS interpolation is required later, implement
+  a GMAT-table-backed `XysProvider`.
+- Tighten native-vs-SPICE tolerances only after equivalence of data sources,
+  interpolation, and model versions is proven.
+
+## 中文
 
 **状态**：已采纳
 **日期**：2026-06-12
 **关联 Issue**：#62, #80
 
-## 背景
+### 背景
 
 Issue #62 引入 GMAT 风格的坐标系，由独立的坐标轴与原点组合而成。原始请求把一个简化的 IAU 2006 实现与 SPICE 在极紧容差下的验证混在一起。这对地固系而言不是一个稳定的契约：一个简化的原生模型既无法在 `1e-12` 量级上独立匹配 SPICE 高精度地球定向，又省略了 EOP 数据。
 
 GMAT R2026a 用 `ITRF93` 作为高精度地球 SPICE 帧，把 `IAU_EARTH` 当作低精度。GMAT 的原生 ITRF 路径还有若干兼容性特有的行为：A1MJD 输入、C04 EOP 解析、`UT1-UTC` 与极移的线性插值、不插值的 `LOD`，以及在 EOP 覆盖范围之外可选的钳位（clamping）。
 
-## 决策
+### 决策
 
 1. **默认的高精度 ITRF 采用 SPICE 支撑的 `ITRF93`。**
    - 公开/默认的 ITRF 工厂与兼容性 `ITRFAxes` 指向 `ITRFSpiceAxes(frame="ITRF93")`。
@@ -55,7 +170,7 @@ GMAT R2026a 用 `ITRF93` 作为高精度地球 SPICE 帧，把 `IAU_EARTH` 当�
 
    > **修订记录（2026-06-15，issue #79）**：原决策第 8 条写 `System.transform()` 薄委托给 `CoordinateSystem.transform_state()`。落地后实际生产代码（阻力、重力、推力、光压模型）全部绕过 `System.transform()`，直接用 `system.coordinate_system.transform_*`。经重新讨论判定：薄委托层只是多余间接，快捷方式不必要。#79 移除 `System.transform()` 方法，本条同步修订。原 `System.transform()` 落地于 #90，未经深思熟虑的设计判断现已反转。
 
-## 结果
+### 结果
 
 ### 新增
 

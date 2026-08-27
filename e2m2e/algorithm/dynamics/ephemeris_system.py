@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 class EphemerisSystem(System):
-    """星历系统，管理一组天体的星历查询。
+    """Ephemeris system: unified SPICE ephemeris-query entry. / 星历系统，管理一组天体的星历查询。
 
     封装 SPICE 工具包，为轨道设计流程提供统一的天体数据访问层。
     支持自定义参考原点和坐标框架。

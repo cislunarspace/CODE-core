@@ -4,8 +4,8 @@
 ``mcp_exposed=True`` 的方法都注册。清单单一来源是 ``tool_inventory()``，
 本模块只消费它，不维护第二份清单。
 
-placeholder 状态的工具**不注册**（issue #510 决策）：Agent 不应调到空实现；
-待其落地为 implemented 后由清单单一来源自动出现在 server 上。
+placeholder 状态的工具**不注册**：Agent 不应调到空实现；待其落地为
+implemented 后由清单单一来源自动出现在 server 上。
 """
 
 from __future__ import annotations

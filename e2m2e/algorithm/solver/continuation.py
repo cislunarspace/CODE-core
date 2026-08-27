@@ -129,7 +129,7 @@ def _pal_newton_step_python(
 ) -> dict:
     """PAL 牛顿迭代（Python/numpy 参照路径）。
 
-    #443 双后端对照与降级路径，与 Rust 内核 ``pal_newton_step_py`` 同一
+    双后端对照与降级路径，与 Rust 内核 ``pal_newton_step_py`` 同一
     数值契约：从预测点 ``x_start`` 出发解
     ``G = [F; (Xnew - x_ref)·tangent_ref - ds] = 0``，先判收敛再更新，
     牛顿步按分量裁剪。返回 dict 字段与 Rust 侧同名（``x_new`` /
@@ -196,7 +196,7 @@ def _pal_newton_step_python(
 
 
 class Continuation:
-    """轨道族延拓
+    """Orbit-family continuation (natural-parameter and pseudo-arclength). / 轨道族延拓
 
     通过延拓算法生成一族周期轨道，支持自然参数延拓和伪弧长延拓。
 
@@ -403,8 +403,7 @@ class Continuation:
         """沿参数方向单向延拓（``natural_continuation`` 内部使用）
 
         ``direction_sign=+1`` 表示正向（参数增大），``-1`` 表示反向（参数减小）。
-        由 ``natural_continuation`` 在正向、反向各调用一次，消除原先两块几乎
-        完全重复的 forward/backward 代码。
+        由 ``natural_continuation`` 在正向、反向各调用一次。
 
         Args:
             seed_orbit: 起始轨道（不会被原地修改；内部 ``.copy()``）。
@@ -598,8 +597,8 @@ class Continuation:
         tv = target_vector
         td = target_direction
 
-        # [FIX] directional_increment 的原始实现每步根据 Xdot 重新判定方向,在
-        # 族流形折叠点(fold)处 Xdot 渐近过零变号,形成 2-周期环振荡(steps 65+
+        # [FIX] 每步根据 Xdot 重新判定方向的做法在族流形折叠点(fold)处
+        # 不稳定:Xdot 渐近过零变号,形成 2-周期环振荡(steps 65+
         # 退回 z≈0.085,详见 PAL 折叠点停滞回归测试)。
         #
         # 修复方案:directional_increment 在 PAL 折叠点本质上不稳定。PAL 的
@@ -716,9 +715,8 @@ class Continuation:
             #  - T/2 ∈ (0.35, π/2) : 周期下界 0.7(短周期近似),上界
             #    π ≈ 3.14 即 T/2 < π/2 ≈ 1.57(物理上 2:1 共振周期,实际
             #    L1 halo T/2 ≤ 1.38)
-            # 旧版 T/2 < 1.35 把所有 L1 halo 折叠点附近的轨道误判
-            # 触发回退,导致 158/160 步错误地"回退为欧拉预测初值",用户
-            # 看到的"延拓到某范围不再继续"实际是回退后流形推进能力丧失。
+            # 过紧的 T/2 上界（如 1.35）会把折叠点附近的合法轨道误判触发
+            # 回退，表现为"延拓到某范围不再继续"。
             # **不要**再检查与欧拉预测的距离:PAL Newton 解是物理正解,
             # 欧拉预测只是切线一步,不能用作回退判据。
             _x, _z, _tf2 = X[0], X[1], X[3]

@@ -2,7 +2,7 @@
 
 两个实例相互独立（静态链接、内核池/名字表互不共享）。``SPICEManager.load_kernel``
 是唯一在两侧同时 furnsh + boddef 的入口；本测试经诊断 API ``spice_spkezr``
-从 Python 直接查询 Rust 实例，对比两侧结果，守护同步不被破坏（issue #334）。
+从 Python 直接查询 Rust 实例，对比两侧结果，守护同步不被破坏。
 
 - ``test_spkezr_dual_consistency_by_id``：用 NAIF ID 查询，守内核**数据**同步。
 - ``test_spkezr_dual_consistency_by_name``：用名字查询，守 **boddef** 同步
@@ -73,14 +73,14 @@ def test_rust_query_no_kernel_clear_error():
     output = result.stdout + result.stderr
     assert "ERROR:" in output, f"期望 RuntimeError（项目语境错误），实际输出: {output!r}"
     assert "无内核加载" in output, f"错误信息应含'无内核加载'，实际: {output!r}"
-    # 不含裸 CSPICE 内部错误码（ADR 0020：项目语境错误优先于内部码翻译）
+    # 不含裸 CSPICE 内部错误码（项目语境错误优先于内部码翻译）
     assert "SPKINSUFFDATA" not in output, f"不应含裸 CSPICE 码，实际: {output!r}"
 
 
 def test_unload_kernel_removes_rust_kernel(spice_kernel_path):
-    """SPICEManager.unload_kernel 应对称卸载 Rust 侧内核（issue #387）。
+    """SPICEManager.unload_kernel 应对称卸载 Rust 侧内核。
 
-    load_kernel 双 furnsh（Python + Rust 双侧，见 #357），unload_kernel 也须
+    load_kernel 双 furnsh（Python + Rust 双侧），unload_kernel 也须
     双侧卸载：否则 Rust cspice 内核池残留已卸载文件，测试结果依赖同进程
     执行顺序（先跑过加载内核的测试会让后续测试的 Rust 查询侥幸成功）。
     用子进程隔离 Rust 全局状态，验证 unload 后 Rust 侧 spkezr 报 SPK 未加载

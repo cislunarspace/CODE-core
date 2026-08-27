@@ -3,7 +3,7 @@
 //! 对应 Python ``e2m2e.algorithm.normal_form.coord_trans.qf_cm`` 与 qiao
 //! ``qpQF2qpCM`` / ``qpCM2qpQF``。复值 Hamilton 流 ``dX/dt = J·∇W`` 用
 //! **12 实维分裂**（``[Re X, Im X]``）走现有实值 DOP853 ``solve_ivp``，
-//! 语义与 scipy 对复 ``y0`` 的内部分裂等价（issue #465，关闭 #336 例外）。
+//! 语义与 scipy 对复 ``y0`` 的内部分裂等价。
 //!
 //! 完整链：实→复基底 ``D⁻¹`` → 逐阶 Lie 流（正向 W 取反升序；反向不取反降序）
 //! → 复→实基底 ``D`` 取实部。阶集合由输入决定，不硬编码截断。

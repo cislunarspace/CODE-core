@@ -1,7 +1,7 @@
 """GravityField 测试。
 
-Python 单点 ``compute_acceleration`` 与 ``_effective_coefficients`` 已按
-issue #378 删除；加速度与潮汐由 Rust ``propagate_compiled`` /
+Python 单点 ``compute_acceleration`` 与 ``_effective_coefficients`` 已删除；
+加速度与潮汐由 Rust ``propagate_compiled`` /
 ``gravity_field_acceleration`` 承载。本文件保留构造校验、配置属性与
 ``to_rust_spec`` 序列化契约。
 """
@@ -88,7 +88,7 @@ def test_gravity_field_to_rust_spec_solid_and_pole_returns_none():
 
 
 # ----------------------------------------------------------------------------
-# 天体无关改造(issue #187):按 body 切换 body-fixed frame 与默认重力文件
+# 天体无关改造:按 body 切换 body-fixed frame 与默认重力文件
 # ----------------------------------------------------------------------------
 
 _KERNELS_DIR = os.path.join(
@@ -149,7 +149,7 @@ def body_frame_spice():
 
 
 class TestBodyAgnosticGravityField:
-    """issue #187:GravityField 按 body 切换 body-fixed frame 与默认文件。"""
+    """GravityField 按 body 切换 body-fixed frame 与默认文件。"""
 
     def test_earth_default_input_frame_is_itrf93(self):
         """``body='EARTH'`` 默认 input_frame 为 ITRF93。"""

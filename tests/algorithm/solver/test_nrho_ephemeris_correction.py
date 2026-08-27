@@ -7,7 +7,7 @@ NRHO（Near Rectilinear Halo Orbit）是三维轨道（z ≠ 0），
 比 DRO 更难处理：对初始参数敏感、容易发散。
 
 当前状态：标准多重打靶对 NRHO 不收敛（残差从 ~8000 km 降到 ~80 km 后停滞），
-验证了 issue #212 中描述的敏感性问题。修正相关的测试标记为 xfail，
+这体现了 NRHO 对初始参数的敏感性问题。修正相关的测试标记为 xfail，
 待实现同伦过渡或滚动时域方法后再启用。
 """
 
@@ -256,12 +256,12 @@ class TestStep4MultipleShootingCorrection:
     """测试在星历模型下进行 Multiple Shooting 修正。
 
     当前状态：标准多重打靶对 NRHO 不收敛，残差从 ~8000 km 降到 ~80 km 后停滞。
-    这验证了 issue #212 中描述的 NRHO 敏感性问题。
+    这体现了 NRHO 对初始参数的敏感性问题。
     待实现同伦过渡或滚动时域方法后再启用这些测试。
     """
 
     @pytest.mark.xfail(
-        reason="标准多重打靶对 NRHO 不收敛（issue #212），待实现同伦过渡方法",
+        reason="标准多重打靶对 NRHO 不收敛，待实现同伦过渡方法",
         strict=False,
     )
     def test_correction_converges(
@@ -356,7 +356,7 @@ class TestStep5Validation:
         return result
 
     @pytest.mark.xfail(
-        reason="标准多重打靶对 NRHO 不收敛（issue #212），待实现同伦过渡方法",
+        reason="标准多重打靶对 NRHO 不收敛，待实现同伦过渡方法",
         strict=False,
     )
     def test_position_continuity(self, correction_result):
@@ -368,7 +368,7 @@ class TestStep5Validation:
         )
 
     @pytest.mark.xfail(
-        reason="标准多重打靶对 NRHO 不收敛（issue #212），待实现同伦过渡方法",
+        reason="标准多重打靶对 NRHO 不收敛，待实现同伦过渡方法",
         strict=False,
     )
     def test_orbit_shape_preserved(self, correction_result):
@@ -436,7 +436,7 @@ class TestNRHOEphemerisPipeline:
         return result
 
     @pytest.mark.xfail(
-        reason="标准多重打靶对 NRHO 不收敛（issue #212），待实现同伦过渡方法",
+        reason="标准多重打靶对 NRHO 不收敛，待实现同伦过渡方法",
         strict=False,
     )
     def test_full_pipeline(self, correction_result):

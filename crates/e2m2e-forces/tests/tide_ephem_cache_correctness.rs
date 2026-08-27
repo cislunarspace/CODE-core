@@ -2,9 +2,9 @@
 
 //! 潮汐缓存物理正确性测试（ADR 0013：按定义验证，不用 golden file）。
 //!
-//! PR #271 把 `gravity_field.rs` 的潮汐扰动体位置查询从裸调 spkezr
-//! 改为走 EphemCache（`lookup_body_position` + `lookup_frame_matrix`）。
-//! 本文件按物理定义补三项正确性测试：
+//! `gravity_field.rs` 的潮汐扰动体位置查询走 EphemCache
+//! （`lookup_body_position` + `lookup_frame_matrix`），
+//! 本文件按物理定义验证三项正确性：
 //!
 //! 1. `test_tide_delta_zero_when_k_love_zero`：k_love=0 时 ΔC/ΔS 全零
 //!    （解析边界条件：Love 数为零等价于无潮汐）

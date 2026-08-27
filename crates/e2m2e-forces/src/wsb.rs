@@ -224,7 +224,7 @@ fn evaluate_task(
     let mut n_perilune_in_window = 0;
 
     for angle in angle_grid {
-        // #513 方案 A：出发点绕地球旋转 angle，TLI 沿旋转后切向施加。
+        // 出发点绕地球旋转 angle，TLI 沿旋转后切向施加。
         let r_dep = rot_z(&departure.r0, angle);
         let v_park_rot = rot_z(&departure.v_park, angle);
         let v_park_norm = norm3(&v_park_rot);
@@ -342,7 +342,7 @@ fn evaluate_task(
     Ok((candidates, n_propagation_failures, n_perilune_in_window))
 }
 
-/// 出发参数化预算（#513 方案 A）：departure_phase 是出发点在停泊轨道上的
+/// 出发参数化预算：departure_phase 是出发点在停泊轨道上的
 /// 滑行角（绕地球旋转位置与停泊速度，改变月地几何），TLI 脉冲沿旋转后的
 /// 切向施加，速度大小 v_esc * tli_speed_factor。
 #[derive(Clone, Copy)]

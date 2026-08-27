@@ -3,11 +3,6 @@
     这是**代码风格**层面的静态守门员:防止作者在坐标模块主动写
 ``cs.axes = X`` / ``system.origin = Y`` 这类赋值。它不提供运行时偷换防护
 (那本就不在应用层职责内),与 ``CoordinateSystem`` 是否 ``frozen`` 无关。
-
-历史背景:#76 曾把 ``CoordinateSystem`` 冻结为 ``@dataclass(frozen=True)``,
-后经重新讨论判定冻结不必要(篡改防护由 GitHub 代码来源验证承担,YAGNI),
-冻结已回退,#121/#122 关闭 wontfix。本守门员保留——它防的是"作者写 mutate"
-而非"运行时偷换",与冻结无关。
 """
 
 from __future__ import annotations

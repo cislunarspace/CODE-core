@@ -1,6 +1,6 @@
 """DragModel 大气阻力力模型测试。
 
-Python 单点 ``compute_acceleration`` 已按 issue #378 删除；阻力物理行为由
+Python 单点 ``compute_acceleration`` 已删除；阻力物理行为由
 Rust ``drag_accel_in_body_fixed`` 单元测试与 Rust ``propagate_compiled``
 端到端传播覆盖。本文件保留构造校验、弹道系数与 ``to_rust_spec`` 序列化契约。
 """
@@ -57,7 +57,7 @@ def test_drag_ballistic_coefficient():
 
 
 def test_to_rust_spec_carries_f107_ap():
-    """#315：to_rust_spec 必须把大气模型的 f107/ap 带进元组。
+    """to_rust_spec 必须把大气模型的 f107/ap 带进元组。
 
     Rust 路径从元组取这两项传给 density；若缺项，Rust 会用硬编码默认值，
     与用户配置静默分歧（f107=200 时 ~17% 偏移）。

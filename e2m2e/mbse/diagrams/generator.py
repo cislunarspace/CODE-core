@@ -19,6 +19,11 @@ from pathlib import Path
 from ..architecture.components import ARCHITECTURE_LAYERS, ComponentRegistry
 from ..requirements.base import RequirementCategory, RequirementRegistry
 
+_EN_TITLES = {
+    "功能需求": "Functional Requirements",
+    "需求追溯矩阵": "Requirement Traceability Matrix",
+}
+
 
 class DiagramGenerator:
     """MBSE 图表生成编排器
@@ -60,7 +65,7 @@ class DiagramGenerator:
             lines.append(f"        {comp.description}" if comp.description else "")
             lines.append("    }")
 
-            # ADR 0001 后 protocols 默认为空；仅保留对历史元数据的兼容渲染
+            # ADR 0001 起 protocols 默认为空；仅当组件显式携带 protocols 时才有输出
             for proto in comp.protocols:
                 lines.append(f"    {comp.name} ..|> {proto} : implements")
 
@@ -111,7 +116,10 @@ class DiagramGenerator:
     def generate_traceability_matrix(self) -> str:
         """生成需求到代码和测试的 Markdown 追溯矩阵。"""
         lines = [
-            "| 需求 ID | 标题 | 类别 | 优先级 | 验证方法 | 关联代码 | 关联测试 |",
+            # 表头中英并列；列宽见下一行分隔行。/ Bilingual header row.
+            "| 需求 ID /"
+            " Requirement ID | 标题 / Title | 类别 / Category | 优先级 / Priority |"
+            " 验证方法 / Verification | 关联代码 / Linked code | 关联测试 / Linked tests |",
             "|---------|------|------|--------|----------|----------|----------|",
         ]
         for requirement in self.requirements:
@@ -246,16 +254,43 @@ class DiagramGenerator:
 
         return "\n".join(lines)
 
-    def write_document(self, title: str, content: str, output_path: str) -> None:
-        """将受管 Markdown 文档写入指定位置。"""
+    def write_document(
+        self,
+        title: str,
+        content: str,
+        output_path: str,
+        title_en: str | None = None,
+        intro_en: str | None = None,
+    ) -> None:
+        """将受管 Markdown 文档写入指定位置（中英双语）。"""
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        Path(output_path).write_text(
-            f"---\ntitle: {title}\n---\n\n# {title}\n\n{content}\n", encoding="utf-8"
+        en_title = title_en if title_en is not None else _EN_TITLES.get(title, "")
+        heading = f"# {title} / {en_title}" if en_title else f"# {title}"
+        intro = (
+            "[English] "
+            + (intro_en or "")
+            + "\n\n"
+            + "[简体中文] 受管产物：由 scripts/generate_mbse_diagrams.py 重新生成，请勿手改。\n\n"
+            if intro_en
+            else ""
         )
+        Path(output_path).write_text(
+            f"---\ntitle: {title} / {en_title}" if en_title else f"---\ntitle: {title}",
+            encoding="utf-8",
+        )
+        with Path(output_path).open("a", encoding="utf-8") as fh:
+            fh.write(f"\n---\n\n{heading}\n\n{intro}{content}\n")
 
-    def write_diagram(self, title: str, content: str, output_path: str) -> None:
+    def write_diagram(
+        self,
+        title: str,
+        content: str,
+        output_path: str,
+        title_en: str | None = None,
+        intro_en: str | None = None,
+    ) -> None:
         """将 Mermaid 图表作为受管 Markdown 文档写入指定位置。"""
-        self.write_document(title, f"```mermaid\n{content}\n```", output_path)
+        self.write_document(title, f"```mermaid\n{content}\n```", output_path, title_en, intro_en)
 
     def generate_all(self, output_dir: str) -> list[str]:
         """生成默认模型的受管图表和追溯文档。
@@ -268,11 +303,32 @@ class DiagramGenerator:
         """
         generated = []
         layer_titles = {
-            "data": "数据",
-            "numerical": "数值",
-            "algorithm": "算法",
-            "api": "接口",
-            "tools": "工具",
+            "data": (
+                "BDD：数据层",
+                "BDD: Data Layer",
+                "Block definition diagram of data-layer components:"
+                " containers, kernels and constants.",
+            ),
+            "numerical": (
+                "BDD：数值层",
+                "BDD: Numerical Layer",
+                "Block definition diagram of the Rust numerical computation facade.",
+            ),
+            "algorithm": (
+                "BDD：算法层",
+                "BDD: Algorithm Layer",
+                "Block definition diagram of dynamics, correction and continuation components.",
+            ),
+            "api": (
+                "BDD：接口层",
+                "BDD: Interface Layer",
+                "Block definition diagram of Facade, CLI and MCP interfaces.",
+            ),
+            "tools": (
+                "BDD：工具层",
+                "BDD: Tools Layer",
+                "Block definition diagram of auxiliary tools such as logging.",
+            ),
         }
 
         for layer in ARCHITECTURE_LAYERS:
@@ -282,16 +338,31 @@ class DiagramGenerator:
             if bdd_content == "classDiagram":
                 continue
             path = os.path.join(output_dir, f"bdd-{layer}.md")
-            self.write_diagram(f"BDD：{layer_titles[layer]}层", bdd_content, path)
+            title_zh, title_en, intro_en = layer_titles[layer]
+            self.write_diagram(title_zh, bdd_content, path, title_en, intro_en)
             generated.append(path)
 
         if len(self.requirements) > 0:
             requirement_path = os.path.join(output_dir, "requirements.md")
-            self.write_diagram("功能需求", self.generate_requirement_diagram(), requirement_path)
+            self.write_diagram(
+                "功能需求",
+                self.generate_requirement_diagram(),
+                requirement_path,
+                "Functional Requirements",
+                "Requirement diagram of the registered functional"
+                " requirements and their code trace links.",
+            )
             generated.append(requirement_path)
 
             matrix_path = os.path.join(output_dir, "traceability-matrix.md")
-            self.write_document("需求追溯矩阵", self.generate_traceability_matrix(), matrix_path)
+            self.write_document(
+                "需求追溯矩阵",
+                self.generate_traceability_matrix(),
+                matrix_path,
+                "Requirement Traceability Matrix",
+                "Mapping from requirements to code modules and test files."
+                " Column headers are bilingual (中文 / English).",
+            )
             generated.append(matrix_path)
 
         return generated

@@ -299,7 +299,7 @@ pub fn propagate_with_stm(
     }
 
     // 预检：初值处右端项必须可求值。SPICE 内核缺失时第三体位置查询
-    // 在此处确定性失败，避免积分静默返回截断结果（issue #246）。
+    // 在此处确定性失败，避免积分静默返回截断结果。
     augmented_eom(config, t_span.0, &augmented0)
         .map_err(|e| format!("initial RHS evaluation failed at t={}: {}", t_span.0, e))?;
 
@@ -325,7 +325,7 @@ pub fn propagate_with_stm(
     );
 
     // 完整性校验：solve_ivp_capped 在力模型失败/步长塌缩时会提前退出，
-    // 输出点数不足即视为传播失败，不允许静默截断（issue #246）。
+    // 输出点数不足即视为传播失败，不允许静默截断。
     if sol.len() != t_eval.len() {
         return Err(format!(
             "propagation truncated: got {} of {} time points (t_span=({:.3}, {:.3})); \
@@ -397,7 +397,7 @@ pub struct StatePropagationResult {
 ///
 /// # 错误
 /// - 初值处右端项求值失败（如 SPICE 内核缺失）；
-/// - 积分提前退出导致输出点数少于 `t_eval.len()`（不允许静默截断，issue #246）。
+/// - 积分提前退出导致输出点数少于 `t_eval.len()`（不允许静默截断）。
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_with_state(
     config: &NBodyConfig,
@@ -411,7 +411,7 @@ pub fn propagate_with_state(
 ) -> Result<StatePropagationResult, String> {
     use e2m2e_propagation::solve_ivp::solve_ivp_capped;
 
-    // 预检：初值处右端项必须可求值（issue #246，与 propagate_with_stm 一致）。
+    // 预检：初值处右端项必须可求值（与 propagate_with_stm 一致）。
     state_eom(config, t_span.0, initial_state)?;
 
     let h_max = max_step.unwrap_or(f64::INFINITY);
@@ -434,7 +434,7 @@ pub fn propagate_with_state(
         Some(6), // 全 6 维统计误差，与 propagate_with_stm 的前 6 维语义一致
     );
 
-    // 完整性校验（issue #246，与 propagate_with_stm 一致）。
+    // 完整性校验（与 propagate_with_stm 一致）。
     if sol.len() != t_eval.len() {
         return Err(format!(
             "propagation truncated: got {} of {} time points (t_span=({:.3}, {:.3})); \
@@ -935,7 +935,7 @@ mod tests {
     }
 
     // =========================================================
-    // 测试 7：无星历天体必须返回 Err，不允许静默截断（issue #246）
+    // 测试 7：无星历天体必须返回 Err，不允许静默截断
     // =========================================================
 
     /// 第三体无星历数据时，propagate_with_stm 必须返回带上下文的 Err，

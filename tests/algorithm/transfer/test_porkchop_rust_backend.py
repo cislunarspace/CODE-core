@@ -1,4 +1,4 @@
-"""porkchop Rust 后端（#446）：规格路径等价性、串/并位级一致、路由与错误语义。
+"""porkchop Rust 后端：规格路径等价性、串/并位级一致、路由与错误语义。
 
 porkchop 的数值网格评估（Lambert + ΔV + 分发）全部在 Rust；Python 只做
 问题构造：内置终端（``OrbitTerminal``/``StateTerminal``）+ CR3BP 动力学时
@@ -10,7 +10,7 @@ porkchop 的数值网格评估（Lambert + ΔV + 分发）全部在 Rust；Pytho
   两条路径共用同一 Rust Lambert/ΔV 核。
 - ``E2M2E_PORKCHOP_PARALLEL=0`` 强制串行，与并行执行逐位一致。
 - monkeypatch / 自定义子类路由到协议路径，patch 语义生效。
-- 扩展符号缺失抛 ``RustExtensionUnavailableError``（#378，无静默回退）。
+- 扩展符号缺失抛 ``RustExtensionUnavailableError``（无静默回退）。
 - 无效轨道（无周期）保留原 ``ValueError``。
 """
 
@@ -199,7 +199,7 @@ class TestRouting:
 
 
 class TestExtensionMissing:
-    """扩展符号缺失即抛 RustExtensionUnavailableError（#378），无静默回退。"""
+    """扩展符号缺失即抛 RustExtensionUnavailableError，无静默回退。"""
 
     @pytest.mark.parametrize("symbol", ["porkchop_grid_py", "porkchop_grid_states_py"])
     def test_missing_symbol_raises(self, orbit_terminals, porkchop_dynamics, monkeypatch, symbol):

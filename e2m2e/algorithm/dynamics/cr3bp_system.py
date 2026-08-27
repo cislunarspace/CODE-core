@@ -37,7 +37,7 @@ from .system import System
 
 
 class CR3BP_System(System):
-    """圆型限制性三体问题系统
+    """Circular Restricted Three-Body Problem system. / 圆型限制性三体问题系统
 
     Attributes:
         mu: 质量参数 μ = m2/(m1+m2)

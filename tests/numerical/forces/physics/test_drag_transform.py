@@ -1,6 +1,6 @@
 """DragModel 的 Rust 端到端传播验证（需 SPICE 内核）。
 
-Python 单点 ``compute_acceleration`` 已按 issue #378 删除；阻力物理行为由
+Python 单点 ``compute_acceleration`` 已删除；阻力物理行为由
 Rust ``propagate_compiled`` 承载。本文件用真实 Rust 传播验证：
 
 - 阻力导致轨道能量与半长轴下降；

@@ -1,7 +1,7 @@
-"""物理常数层：全库物理常数的唯一来源（阶段 1 骨架）。
+"""物理常数层：全库物理常数的唯一来源。
 
 本层与 ``e2m2e.data.templates`` 平级，职责分开：``templates`` 管任务/算法默认
-参数，``constants`` 管物理量真值表。阶段 1 只建骨架，不迁移任何现有文件。
+参数，``constants`` 管物理量真值表。
 """
 
 from __future__ import annotations

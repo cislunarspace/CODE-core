@@ -1,9 +1,8 @@
 """``propagate_compiled`` 绑定契约与回归测试。
 
-合并原 test_propagate_compiled_gil.py（#318：主积分循环释 GIL）、
-test_propagate_compiled_teval.py（c3685e7 同源 bug：``t_eval[0] > t0`` 首点错置）
-与 test_h_init_step_cap.py（#279：h_init 步长上限缺失导致稀疏 t_eval 漂移），
-并补充绑定层参数校验（y0 长度、h_init、空 t_eval）。
+覆盖主积分循环释放 GIL、``t_eval[0] > t0`` 首点错置防护、h_init 步长
+上限（稀疏 t_eval 一致性）三组回归，并补充绑定层参数校验（y0 长度、
+h_init、空 t_eval）。
 
 GIL 测试用纯二体 ``point_mass`` 力模型（无 SPICE 内核依赖），经 Rust
 ``propagate_compiled`` 直连快路径；teval / h_init 测试经 ``ForceModel.propagate``
@@ -95,22 +94,22 @@ def test_propagate_compiled_rejects_invalid_inputs():
 
 
 # ---------------------------------------------------------------------------
-# 回归 #318：主积分循环释放 GIL
+# 主积分循环释放 GIL
 # ---------------------------------------------------------------------------
 
 
 def test_propagate_compiled_releases_gil():
     """主线程长期预报期间，心跳线程持续打点 → propagate_compiled 已释放 GIL。
 
-    回归 #318：主积分循环漏包 ``py.allow_threads``，全程持 GIL 使心跳饿死
-    （ticks ≈ 0）。修复后释 GIL，ticks 随 dt 线性增长。
+    主积分循环必须包 ``py.allow_threads``；若漏包则全程持 GIL 使心跳饿死
+    （ticks ≈ 0），正确释 GIL 时 ticks 随 dt 线性增长。
 
     判别原理：心跳线程循环 ``ticks += 1; time.sleep(0.005)``。``time.sleep``
     释放 GIL，醒来后要执行 ``ticks += 1`` 必须重新获取 GIL——
 
     - 主线程已用 ``py.allow_threads`` 释放 GIL：心跳线程 reacquire 立即成功，
       按 ~5 ms 节奏持续打点，dt 秒内打点 ~dt/0.005 次。
-    - 主线程持 GIL（回归）：心跳线程 reacquire 阻塞到主线程返回，期间打点 ≈ 0。
+    - 主线程持 GIL：心跳线程 reacquire 阻塞到主线程返回，期间打点 ≈ 0。
 
     两者相差 1~2 个数量级，阈值取 3（远低于释 GIL 的 ~48 次/0.24 s，远高于
     持 GIL 的 0~1 次），判别稳健。传播段太短（dt < 0.15 s）信号不足则 skip，
@@ -164,12 +163,12 @@ def test_propagate_compiled_releases_gil():
     assert ticks_during >= 3, (
         f"heartbeat ticked only {ticks_during} times during {dt:.2f}s propagation "
         f"(expected ~{dt / 0.005:.0f} if GIL released); "
-        "propagate_compiled may be holding the GIL — 主循环漏了 py.allow_threads (#318)"
+        "propagate_compiled may be holding the GIL — 主循环漏了 py.allow_threads"
     )
 
 
 # ---------------------------------------------------------------------------
-# 回归 c3685e7 同源：t_eval[0] > t0 首点错置
+# t_eval[0] > t0 首点错置
 # ---------------------------------------------------------------------------
 
 
@@ -177,8 +176,8 @@ def test_propagate_compiled_releases_gil():
 def test_propagate_compiled_teval0_greater_than_t0():
     """``t_eval[0] > t0`` 时首个输出点跟随 ``t_eval[0]``，而非错置为初值。
 
-    回归 bug：硬编码 ``vec![t0] + eval_idx=1`` 假设 ``t_eval[0]==t0``，
-    ``t_eval[0]>t0`` 时首个输出点状态错置为初值（位置停滞），后续点错位。
+    若实现硬编码 ``vec![t0] + eval_idx=1`` 假设 ``t_eval[0]==t0``，
+    ``t_eval[0]>t0`` 时首个输出点状态会被错置为初值（位置停滞），后续点错位。
     segmented 分段打靶逐段积分时，每段 ``seg_t0``（patch point 时刻，非整数
     小时）与 ``t_eval_seg[0]``（et_grid 整数小时点）不严格相等，即此场景。
     """
@@ -236,7 +235,7 @@ def test_propagate_compiled_teval_first_equals_t0():
 
 
 # ---------------------------------------------------------------------------
-# 回归 #279：h_init 步长上限
+# h_init 步长上限
 # ---------------------------------------------------------------------------
 
 
@@ -244,10 +243,10 @@ def test_propagate_compiled_teval_first_equals_t0():
 def test_sparse_vs_dense_t_eval_consistency():
     """稀疏 vs 密集 t_eval 的 LEO 传播终态差 < 1 km。
 
-    回归目标：h_init 步长上限缺失时，稀疏 t_eval 下自适应步长失控，
-    导致终态差 22 万 km（实测，30 天）。加 h_init 上限后两者应一致。
+    h_init 步长上限缺失时，稀疏 t_eval 下自适应步长失控会使终态大幅漂移；
+    加 h_init 上限后两者应一致。
     注：tol=1e-12 下有效步长 ~1.6s，1 天需 ~55k 步，受默认 max_steps
-    限制，此处用 1 天验证回归（差值与持续时间成正比，1 天已足够暴露 bug）。
+    限制，故用 1 天验证（差值与持续时间成正比，1 天已足够暴露缺失）。
     """
     system = _FakeSystem()
     pm = PointMassGravity("EARTH", mu=EARTH_MU)
@@ -275,8 +274,8 @@ def test_sparse_vs_dense_t_eval_consistency():
     final_sparse = np.asarray(result_sparse["states"][-1])
     final_dense = np.asarray(result_dense["states"][-1])
 
-    # 终态位置差 < 1 km（回归阈值：无 h_init 上限时差 22 万 km/30天，
-    # 1 天约为 1/30，仍远超 1 km）
+    # 阈值裕量：无 h_init 上限时差可达 22 万 km/30 天，
+    # 1 天约为其 1/30，仍远超 1 km
     pos_diff_km = np.linalg.norm(final_sparse[:3] - final_dense[:3])
     assert pos_diff_km < 1.0, (
         f"Sparse vs dense t_eval position drift: {pos_diff_km:.1f} km > 1 km; "

@@ -95,7 +95,7 @@ class GMATITRFAxes(Axes):
         eop_extrapolation: str = "raise",
     ) -> None:
         # EOP 越界策略显式由调用方选择："raise"（越界报错）或 "clamp"（夹取）。
-        # 不再由兼容性开关隐式改写（#352：静默切换改显式）。
+        # 兼容性开关不得隐式改写。
         if eop_extrapolation not in {"raise", "clamp"}:
             raise ValueError("eop_extrapolation must be 'raise' or 'clamp'")
         tai_path = (

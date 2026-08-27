@@ -1,6 +1,6 @@
 """高阶中心流形化简（qiao Code10~Code11）。
 
-在 quasi-Floquet 坐标（切片 #172）基础上，用逐阶 Lie 变换消去
+在 quasi-Floquet 坐标基础上，用逐阶 Lie 变换消去
 Hamiltonian 的双曲-中心耦合项，把非线性 Hamiltonian 化简为仅依赖
 作用量的函数：
 
@@ -729,7 +729,7 @@ class CenterManifoldReducer:
     一步或两步 Lie 变换，消去双曲-中心耦合与中心方向间非共振耦合，
     输出 :class:`CenterManifoldResult`。
 
-    默认 ``backend="rust"`` 走完整 Rust 数值内核（#466）；
+    默认 ``backend="rust"`` 走完整 Rust 数值内核；
     ``backend="python"`` 仅作显式等价性对照，绝不自动回退（ADR 0020）。
 
     Args:
@@ -751,7 +751,7 @@ class CenterManifoldReducer:
         """对 ``qf_result`` 执行中心流形化简。
 
         Args:
-            qf_result: quasi-Floquet 变换结果（切片 #172），提供实标准形
+            qf_result: quasi-Floquet 变换结果，提供实标准形
                 ``D`` （频率 ``λ``/``ω_p``/``ω_v``）与采样时间 ``tlist``。
             hamiltonian_terms: 高阶 Hamiltonian 系数表
                 ``{pow_tuple: coef_array}`` （对应 qiao ``Code09`` 的
@@ -825,7 +825,7 @@ class CenterManifoldReducer:
         wp: float,
         wv: float,
     ) -> CenterManifoldResult:
-        """Rust 完整 reduce 路径（#466）。"""
+        """Rust 完整 reduce 路径。"""
         from e2m2e.integrators import center_manifold_reduce_py, require_rust_extension
 
         require_rust_extension("center_manifold_reduce_py")

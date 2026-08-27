@@ -90,8 +90,8 @@ class SpecialPointLaw:
     window_days: float = 1.0
     horizon_sec: float | None = None
     synodic: SynodicView | None = None
-    damping_factor: float = 1.0  # #280: <1 时启用 Armijo 回溯防振荡（默认不阻尼）
-    v_c: float | None = None  # #280: 特征速度 l_c/t_c (km/s)，用于雅可比无量纲化
+    damping_factor: float = 1.0  # <1 时启用 Armijo 回溯防振荡（默认不阻尼）
+    v_c: float | None = None  # 特征速度 l_c/t_c (km/s)，用于雅可比无量纲化
 
     def __post_init__(self) -> None:
         if self.special_mode not in (1, 2):

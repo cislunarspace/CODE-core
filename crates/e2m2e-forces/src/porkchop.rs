@@ -1,7 +1,7 @@
 //! porkchop 网格扫描评估单元（Rust 实现，纯数学，不依赖 SPICE）。
 //!
-//! 从 Python `e2m2e/algorithm/transfer/porkchop.py` 的网格循环下沉（#446，
-//! ADR 0017 边界条目）：终端状态传播 + Lambert 求解 + ΔV 组装 + 网格分发
+//! 从 Python `e2m2e/algorithm/transfer/porkchop.py` 的网格循环下沉
+//! （ADR 0017 边界条目）：终端状态传播 + Lambert 求解 + ΔV 组装 + 网格分发
 //! 全部在 Rust 完成，Python 只做问题构造与结果解释（架构设计文档 §2/§3）。
 //!
 //! 两条入口对应 Python 侧的两种问题构造方式：

@@ -1,7 +1,8 @@
-"""transfer_optimization 空传播假分类回归测试（#352）。
+"""transfer_optimization 空传播假分类回归测试。
 
-``_classify_transfer`` 空轨迹不再假装 DIRECT（改 UNKNOWN）；``check_collision``
-空轨迹不再假装无碰撞（抛 ``PropagationFailure``，让调用方计为不可行）。
+``_classify_transfer`` 对空轨迹返回 UNKNOWN 而非 DIRECT；
+``check_collision`` 对空轨迹抛 ``PropagationFailure``，让调用方计为不可行
+（不假装无碰撞）。
 """
 
 from __future__ import annotations
@@ -53,7 +54,7 @@ def optimizer(dynamics, dummy_orbit):
 
 class TestClassifyTransferEmptyTrajectory:
     def test_empty_states_not_direct(self, optimizer):
-        """空轨迹返回 UNKNOWN（修复前假装 DIRECT，下游按直达转移处理）。"""
+        """空轨迹返回 UNKNOWN，而非假装 DIRECT 让下游按直达转移处理。"""
         ttype = optimizer._classify_transfer(
             transfer_time=10.0,
             times=np.empty(0),
@@ -77,7 +78,7 @@ class TestClassifyTransferEmptyTrajectory:
 
 class TestCheckCollisionEmptyTrajectory:
     def test_empty_states_raises(self, optimizer):
-        """空轨迹（传播失败）抛 PropagationFailure，不假装无碰撞（#352）。"""
+        """空轨迹（传播失败）抛 PropagationFailure，不假装无碰撞。"""
         y = np.array([1.0, 10.0, 0.0])
 
         def _empty_integrate(initial_state, t_span):

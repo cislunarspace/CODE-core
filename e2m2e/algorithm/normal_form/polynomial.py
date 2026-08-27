@@ -1,7 +1,7 @@
 """多项式 dict 工具：``{pow_tuple: coefficient}`` 的内部表示与运算。
 
 对应 qiao 仓库的 ``poly_operator`` （符号 / 混合系数）和
-``list_operator`` （数值时间系列系数）两组辅助函数，但只取本切片需要的
+``list_operator`` （数值时间系列系数）两组辅助函数，但只取需要的
 子集——``expr2poly``、``poly2expr``、``poly_poisson``、
 ``poly_simplify`` 与对应的 ``polylist_*`` 数值版本。
 
@@ -14,7 +14,7 @@
 - 零多项式统一表示为 ``{(0, 0, 0, 0, 0, 0): 0}`` （或长度 ``M`` 的零数组）。
 
 本模块属于 ``normal_form`` 包内部基础设施，只被同包的
-``legendre`` / ``hamiltonian`` / 后续 ``reducer`` 调用，不对用户
+``legendre`` / ``hamiltonian`` / ``reducer`` 调用，不对用户
 直接暴露——上游接口请走 ``legendre`` 与 ``hamiltonian``。
 """
 

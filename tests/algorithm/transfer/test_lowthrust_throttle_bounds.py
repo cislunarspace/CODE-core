@@ -1,6 +1,6 @@
-"""lowthrust_shooting 油门越界报错测试（#352）。
+"""lowthrust_shooting 油门越界报错测试。
 
-``_decode_segments`` 不再静默 clip 油门到 [0,1]：SLSQP 受 bounds 约束输出
+``_decode_segments`` 不静默 clip 油门到 [0,1]：SLSQP 受 bounds 约束输出
 本不应越界，越界说明约束未生效或决策非法，应报约束违反而不是用被改过的
 油门传播（传播用的油门与决策变量不一致，掩盖问题）。
 """
@@ -46,11 +46,11 @@ class TestDecodeSegmentsThrottleBounds:
         assert segs[1][0] == pytest.approx(1.0)
 
     def test_throttle_above_one_raises(self, shooter):
-        """油门 > 1（超过满推）报约束违反，不静默 clip 到 1（#352）。"""
+        """油门 > 1（超过满推）报约束违反，不静默 clip 到 1。"""
         with pytest.raises(ValueError, match="油门越出"):
             shooter._decode_segments(np.array([[1.5, 0.0, 0.0]]))
 
     def test_negative_throttle_raises(self, shooter):
-        """负油门（反向推）报约束违反，不静默 clip 到 0（#352）。"""
+        """负油门（反向推）报约束违反，不静默 clip 到 0。"""
         with pytest.raises(ValueError, match="油门越出"):
             shooter._decode_segments(np.array([[-0.1, 0.0, 0.0]]))

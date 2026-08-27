@@ -19,7 +19,7 @@ __all__ = [
     "NormalFormResult",
 ]
 
-# 切片 2 公共符号从子模块惰性导入（同旧 ``algorithms/normal_form``）。
+# 公共符号从子模块惰性导出，避免顶层导入强制加载 sympy 等重依赖。
 _LAZY_EXPORTS = {
     "DynamicalSubstituteCorrector": "dynamical_substitution",
     "DynamicalSubstituteResult": "dynamical_substitution",

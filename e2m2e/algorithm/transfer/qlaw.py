@@ -265,7 +265,7 @@ def qlaw_guess(
 def _resolve_mu(system: object, forces: Sequence[PhysicalModel]) -> float:
     """从 PointMassGravity 或系统查中心体 μ；解析失败时抛异常。
 
-    μ 是动力学核心参数，查不到即报错，不默认回退（#352）。
+    μ 是动力学核心参数，查不到即报错，不默认回退。
     """
     from ..forces import PointMassGravity
 

@@ -142,7 +142,7 @@ class TestSamplePatchPoints:
 # Test: sample_patch_points_drop_near_perilune
 # =============================================================================
 class TestSamplePatchPointsDropNearPerilune:
-    """删近月点附近节点采样（#463）：节点全部落在近月点禁区外。
+    """删近月点附近节点采样：节点全部落在近月点禁区外。
 
     用已有 DRO 周期解作几何样本（CR3BP 可积、有明确近月点），不走
     design_nrho / 星历修正——本类只验证采样几何契约。
@@ -151,7 +151,7 @@ class TestSamplePatchPointsDropNearPerilune:
     def test_nodes_outside_perilune_window(self, dro_orbit, cr3bp_dynamics):
         """非历元节点与近月点的圆周距离 > drop_window·period。
 
-        ``t=0`` 为历元钉点（#473），允许落在禁区内；其余节点仍在互补弧上。
+        ``t=0`` 为历元钉点，允许落在禁区内；其余节点仍在互补弧上。
         """
         drop_window = 0.12
         t_patch, states = sample_patch_points_drop_near_perilune(
@@ -181,7 +181,7 @@ class TestSamplePatchPointsDropNearPerilune:
             )
 
     def test_includes_epoch_t0(self, dro_orbit, cr3bp_dynamics):
-        """首节点钉历元 t=0，节点数符合请求（#473）。"""
+        """首节点钉历元 t=0，节点数符合请求。"""
         t_patch, states = sample_patch_points_drop_near_perilune(
             dro_orbit, cr3bp_dynamics, n_points=8
         )

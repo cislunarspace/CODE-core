@@ -305,7 +305,7 @@ pub fn propagate_cr3bp(
 /// 与 `propagate_cr3bp` 一致，保证两条路径的 states 逐位相同。
 ///
 /// # 错误
-/// `t_eval` 为空、步长塌缩、或输出点数不足（不允许静默截断，issue #246）。
+/// `t_eval` 为空、步长塌缩、或输出点数不足（不允许静默截断）。
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_cr3bp_stm(
     mu: f64,

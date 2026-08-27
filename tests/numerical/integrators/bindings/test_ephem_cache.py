@@ -1,11 +1,11 @@
-"""Rust 星历预采样缓存绑定契约测试（ADR 0016）。
+"""Rust 星历预采样缓存绑定契约测试。
 
 验证 ``e2m2e.integrators`` 的 ``enable_ephem_cache`` / ``disable_ephem_cache``
 绑定 API：
 - 激活缓存 vs 未激活，传播末态数值一致
 - 未激活时零回归（与现有行为逐字一致）
 - 缓存对含第三体、固体潮、相对论力的传播同样有效
-- 相对论力传播全程零 cspice FFI（#268）
+- 相对论力传播全程零 cspice FFI
 
 归位说明：本文件验证的是星历缓存基础设施（pyo3 绑定层），力模型只是
 传播载体，故位于 integrators/bindings/ 而非 forces/。
@@ -183,7 +183,7 @@ def test_ephem_cache_tide_solid_consistency(earth_system):
 
 @pytest.mark.spice
 def test_ephem_cache_relativistic_zero_ffi_and_consistency(earth_system):
-    """#268 验收 1+2（缓存路径）：relativity=1 传播全程零 cspice FFI，且与无缓存一致。
+    """relativity=1 传播全程零 cspice FFI，且与无缓存一致（缓存路径）。
 
     - 启用星历缓存（含 de Sitter 的 EARTH/SUN 相对 SSB + LT 的 ITRF93→J2000 sxform）
     - ``propagate_compiled`` 走纯 Rust 相对论力，``ephem_ffi_call_count()`` 应为 0
@@ -254,7 +254,7 @@ def test_ephem_cache_relativistic_zero_ffi_and_consistency(earth_system):
         reset_ephem_ffi_call_count()
         res_cached = run()
         ffi_during_prop = ephem_ffi_call_count()
-        # #268 验收标准 1：relativity=1 下传播全程零 cspice FFI
+        # 验收标准：relativity=1 下传播全程零 cspice FFI
         assert ffi_during_prop == 0, (
             f"传播期间 cspice FFI 调用 {ffi_during_prop} 次，应为 0（LT sxform / de Sitter "
             "spkezr 均应走缓存）"

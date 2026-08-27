@@ -2,8 +2,8 @@
 
 族→方法的规范化在请求校验层完成（``DesignOrbitRequest``，tests/api 覆盖）；
 算法入口只做防御：不稳定族（HALO/NRHO/DPO）携带非 segmented 方法时
-fail fast，不再静默改写。本模块用 duck-typed 请求绕过校验层直达算法
-入口，专测该防御检查——无需 SPICE（检查先于任何内核使用）。
+fail fast，绝不静默改写。本模块用 duck-typed 请求绕过校验层直达算法
+入口，专测该防御检查，无需 SPICE（检查先于任何内核使用）。
 """
 
 from __future__ import annotations

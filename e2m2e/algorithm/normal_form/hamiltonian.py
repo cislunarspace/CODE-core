@@ -381,7 +381,7 @@ def _eval_coef(coef: object, params: dict[str, float]) -> float:
     """对单个 sympy 系数用 ``params`` 替换后求 float。
 
     ``coef = 0`` 直接返回 0（稀疏多项式缺项）；数值转换失败或出现非
-    ``params`` 键的符号时抛 ``ValueError`` （#352）：求不出就该报错，不静默
+    ``params`` 键的符号时抛 ``ValueError``：求不出就该报错，不静默
     用 0 填；0 会让下游误以为该项不存在，污染哈密顿量。
     """
     if coef == 0:

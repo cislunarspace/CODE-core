@@ -1,10 +1,9 @@
-"""主功能类标记守恒守门员（ADR 0021 决策 1、ADR 0025 决策 2）。
+"""主功能类标记守恒守门员。
 
 每个已收集用例必须恰好携带一个主功能类标记（theory / integrator / force /
 data / orchestration / interface / aux）；``spice``、``low_thrust`` 是正交
-标记，不计入主类。ADR 0021 把"每测试恰好 1 主类"写成文字规则后，仍出现
-整文件漏标（`test_differential_correction_stagnation.py`）——规则没有
-守门员就会漏。本测试即守门员：发现违例即列出 nodeid，倒逼补齐或拆细标记。
+标记，不计入主类。每测试恰好 1 主类的规则没有守门员就会漏，
+本测试即守门员：发现违例即列出 nodeid，倒逼补齐或拆细标记。
 
 注意判读方式：本测试检查的是**本次运行收集到的用例**（session.items）。
 完整回归（``make test`` / release 前全量）中它看到全部用例，发挥守门作用；
@@ -15,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-#: ADR 0021 决策 1 的封闭主功能类集合。
+#: 封闭的主功能类集合（按功能分类约定）。
 PRIMARY_MARKERS = (
     "theory",
     "integrator",

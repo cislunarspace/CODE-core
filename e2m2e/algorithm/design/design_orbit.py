@@ -15,11 +15,11 @@
 DRO 振幅+初始相位；Halo 共线点编号+带符号面外振幅+初始相位；
 NRHO 共线点编号+北/南+近月点高度+初始相位。初始相位为周期份额
 （0~1），历元时刻的状态 = 周期轨道参考状态沿轨道推进 ``phase × T``；
-相位零点按历史标定——Halo/NRHO 在 y=0 穿越点，DRO 在远侧
+相位零点约定：Halo/NRHO 在 y=0 穿越点，DRO 在远侧
 x 轴穿越点（e2m2e 的 DRO 参考状态为近侧穿越点，内部偏移半周期）。
-DRO 振幅取一个周期内距月距离最小/最大值的均值（同按历史标定）。
+DRO 振幅取一个周期内距月距离最小/最大值的均值。
 
-已知系统差（历史标定值）：
+已知系统差：
 
 - 参考输出 GCRS，e2m2e 在 ICRF（J2000）下传播，frame bias（~23 mas）
   在月距量级约 0.04 km，计入对比容差；
@@ -82,7 +82,7 @@ __all__ = [
 ]
 
 #: 设计链路的默认摄动开关：光压用炮弹模型（``solar_radiation=1``）、关耦合项。
-#: ECOM 光压与地球非球形×大天体耦合项未实现（#253），显式开启时抛
+#: ECOM 光压与地球非球形×大天体耦合项未实现，显式开启时抛
 #: ``NotImplementedError``；约定同 ``control_orbit._DEFAULT_CTRL_PERTURBATION``。
 DEFAULT_DESIGN_PERTURBATION: dict[str, int] = {
     **DEFAULT_PERTURBATION,
@@ -93,17 +93,11 @@ DEFAULT_DESIGN_PERTURBATION: dict[str, int] = {
 #: 星历修正的默认收敛容差（km，6 维状态 max 范数：位置 km + 速度 km/s）。
 #:
 #: 取 2e-2（20 m）。地月尺度（特征长度 3.84e5 km）下 10 m 已属高精度、
-#: 1 km 都不错，0.1 m（原 1e-4）对轨道保形无实质增益，却超出星历模型与
-#: CR3BP 初猜的物理可收敛底线（紧凑近月轨道 ~5.7e-5 km，见下），导致
-#: 求解器停在 ~1.2e-2 km 永远报 not converged。容差 2e-2 给 solver 留裕度
-#: （实测单圈收敛残差 1.7e-2、3 圈段 1.5e-2，均 < 2e-2 明确收敛），迭代数
-#: 大减（10→4），保形不受影响（实测 30 天 |r| 首 480967→末 476884 km，
-#: 会合系 x∈[1.08,1.19] 紧邻 L2）。
-#:
-#: 历史依据：原 1e-4 的注释——紧凑近月 DRO（amplitude=10000，月距~1 万 km）
-#: 因月球引力梯度强，CR3BP 几何与真实星历 N 体动力学存在 ~5.7e-5 km 的
-#: 物理收敛底线；1e-4 相对底线留约 1.7 倍裕度。该底线说明 0.1 m 级收敛对
-#: 部分轨道本就不可达，进一步佐证 2e-2 是更贴合物理的默认。
+#: 1 km 都不错；更紧的容差超出星历模型与 CR3BP 初猜的物理可收敛底线
+#: （紧凑近月 DRO 因月球引力梯度强，底线约 ~5.7e-5 km），会导致求解器
+#: 停在 ~1.2e-2 km 永远报 not converged。容差 2e-2 给 solver 留裕度
+#: （实测单圈收敛残差 1.7e-2、3 圈段 1.5e-2，均 < 2e-2 明确收敛），
+#: 迭代数大减，保形不受影响。
 CORRECTION_TOL_KM = 2e-2
 
 #: 星历修正的速度连续目标（km/s）。0.01 m/s——patch point 速度跳变小于此即视为
@@ -124,15 +118,14 @@ _POINTS_PER_REV = 8
 #: DPO 的每圈 patch 节点数。默认振幅 20000 km 的 DPO 周期约 23 天，
 #: 8 个等时间节点会产生约 2.9 天的自由传播弧，CR3BP→星历模型的节点
 #: 跳变可达 4e4 km；64 个节点将弧段缩短至约 0.36 天，实测 GUI 默认场景
-#: 可收敛（#484）。
+#: 可收敛。
 _DPO_POINTS_PER_REV = 64
 
 #: 拼接点采样策略（按轨道族覆盖，不暴露到请求模型）：
-#: - uniform：等时间（NRHO 生产默认，#473；其余族默认）
+#: - uniform：等时间（NRHO 生产默认；其余族默认）
 #: - perilune_clustered：近月点加密（Halo 长弧实测更稳）
-#: - drop_near_perilune：删近月点附近节点（工具函数/对照；
-#:   #463 曾作 NRHO 默认，#473 起不再作生产默认——phase=0.5
-#:   约 1 个月弧 + 3 圈/段合并层易卡，且未钉历元会出前缀空洞）
+#: - drop_near_perilune：删近月点附近节点（工具函数/对照，非生产默认：
+#:   phase=0.5 约 1 个月弧 + 3 圈/段合并层易卡，且未钉历元会出前缀空洞）
 _PATCH_SAMPLING_UNIFORM = "uniform"
 _PATCH_SAMPLING_PERILUNE_CLUSTERED = "perilune_clustered"
 _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
@@ -141,7 +134,7 @@ _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 #: 分段打靶全程固定时刻，对齐杨洪伟 2015）、拟周期/无周期闭合族
 #: （Lissajous / 三角平动点 L4/L5）与 Axial。
 #:
-#: 拟周期族用固定时间的机理（#366）：CR3BP 初猜无周期闭合（Lissajous
+#: 拟周期族用固定时间的机理：CR3BP 初猜无周期闭合（Lissajous
 #: 面内/面外频率不可约；L4/L5 短/长周期模态耦合），自由时间模式下时间
 #: 自由度与沿流状态自由度近似线性相关（时间平移 δt ≈ 沿轨道移动 δt·f），
 #: 雅可比列病态，LM 陷入线性收敛卡在 0.5–174 km（实测 L2/L4/L5 迭代到
@@ -555,7 +548,7 @@ def _dense_orbit(
 def _patch_sampling_for(orbit_type: str) -> str:
     """按轨道族选择拼接点采样策略（内部策略，不进请求契约）。
 
-    NRHO 与 Halo 解耦（#473）：NRHO 默认等时间；Halo 近月点加密。
+    NRHO 与 Halo 解耦：NRHO 默认等时间；Halo 近月点加密。
     DPO 使用等时间采样，并由 :func:`_points_per_rev_for` 提高节点密度。
     删近月点采样保留在 ``_sample_patch_points`` 分派中供对照，不作生产默认。
     """
@@ -585,7 +578,7 @@ def _sample_patch_points(
     默认每圈 ``points_per_rev`` 个等时间点。``sampling`` 覆盖族相关策略：
 
     - ``perilune_clustered``：近月点加密（Halo）
-    - ``drop_near_perilune``：删近月点附近节点（对照/研究；#473 起非生产默认）
+    - ``drop_near_perilune``：删近月点附近节点（对照/研究，非生产默认）
     - ``uniform``：等时间（NRHO 与其余族默认）
     """
     dense = _dense_orbit(dynamics, state0, period)
@@ -612,7 +605,7 @@ def _sample_patch_points_from_trajectory(
     """从轨道自带稠密轨迹插值 patch points（准周期 Lissajous 用）。
 
     准周期 Lissajous 不能用 :func:`_sample_patch_points`——它原生 CR3BP
-    重传播 ``states[0]``，会重新激发不稳定方向而发散（issue #323 根因）。
+    重传播 ``states[0]``，会重新激发不稳定方向而发散。
     改从 ``orbit`` 的中心流形有界轨迹跨 ``n_revolutions`` 圈均匀采样
     ``_POINTS_PER_REV`` 点/圈、逐分量线性插值。调用方须保证
     ``orbit.times`` 覆盖 ``[0, n_revolutions·period]``。
@@ -634,14 +627,14 @@ def _build_ephemeris_table(
 ) -> EphemerisTable:
     """把传播结果组装成文本格式星历表（UTC + GCRS + 地月会合系）。
 
-    地月会合系为地心归一（月球在 +x 单位距离处；依据：历史标定样本中
-    DRO 轨道在该约定下关于 x=1 近似对称）；内部转换器输出质心归一（月球在
+    地月会合系为地心归一（月球在 +x 单位距离处；DRO 轨道在该约定下
+    关于 x=1 近似对称）；内部转换器输出质心归一（月球在
     1-mu），x 分量加 mu 平移对齐。
     """
     t_c = syn_j2000.cr3bp_system.characteristic_time
     assert t_c is not None
-    # 位置/速度与时间网格必须逐点对齐：segmented 逐段积分曾把 propagate
-    # 自动追加的段终点 tf 拼进 states（位置数组比时间网格多出段数个点），
+    # 位置/速度与时间网格必须逐点对齐：若把 propagate 自动追加的段终点
+    # tf 拼进 states（位置数组比时间网格多出段数个点），
     # batch_j2000_to_synodic 按索引配对位置与旋转时刻，错位逐段累积导致
     # 会合系曲线一圈一圈偏离周期轨道。此断言防未来回归。
     if len(states) != len(et_grid):
@@ -701,8 +694,7 @@ def _design_apolune_segmented(
 
     计算全部下沉 Rust ``segmented_shooting_correct``：切段、第 1 步各段
     打靶（段间独立 rayon 并行）、分层合并（同层配对合并段 rayon 并行）。
-    本函数仅做参数装配与结果归一（此前分段/合并循环在 Python，逐段串行调
-    打靶——#400 性能修复下沉）。
+    本函数仅做参数装配与结果归一。
 
     关键配置（实测 Halo/NRHO，对齐文献）：
 
@@ -711,13 +703,13 @@ def _design_apolune_segmented(
       1 圈短段各段独立修正后会漂走（seam 跳 ~1e5 km，合并层无法消除——
       STM 条件数分析见 Liu & Liu 2025 §3）。
     - **合并层**：合并段全节点自由（``fixed_node_mask=None``），LM 最小范数
-      更新对齐文献。固定首末锚定曾致合并层不收敛（#400）：各段独立打靶后
-      seam 不连续，锚定把修正全压给内部节点，60 天合并层停在 7.5e-01 km；
+      更新对齐文献。固定首末锚定会使合并层不收敛：各段独立打靶后
+      seam 不连续，锚定把修正全压给内部节点（60 天合并层停在 7.5e-01 km）；
       去锚定后 60 天合并层收敛到 1.4e-03 km，180 天三层合并全程收敛
       （5.8e-03 / 5.7e-04 / 1.4e-02 km）。
 
       对照论文的合并层节点稀疏化（每圈仅 1 个远月点节点，约束更疏、矩阵
-      更良态，issue #400 需求②）：当前全节点合并 180 天 5 段 3 层已收敛到
+      更良态）：当前全节点合并 180 天 5 段 3 层已收敛到
       1.4e-02 km，说明当前圈数下全节点矩阵病态未显现，不跟进；年量级
       （50+ 圈）时矩阵规模与病态会放大，稀疏化留作该场景的前置评估。
     - **var_time**：Halo/NRHO 固定节点时刻（False，对齐杨洪伟 2015、
@@ -932,7 +924,7 @@ def design_orbit(
 
     Raises:
         ValueError: 形状参数/任务参数超界。
-        NotImplementedError: 摄动开关含 ECOM 光压或耦合项（#253）。
+        NotImplementedError: 摄动开关含 ECOM 光压或耦合项。
         DesignNotConvergedError: 星历修正未收敛。
     """
     sel = request.orbit_type.upper()
@@ -973,7 +965,7 @@ def design_orbit(
     correction_method = request.correction_method
     correction_revolutions = request.correction_revolutions
     # 修正方法已由请求校验层按族规范化（DesignOrbitRequest）；
-    # 此处只拦截绕过校验的请求，不再静默改写。
+    # 此处只拦截绕过校验的请求并抛 ValueError，不静默改写。
     if sel in SEGMENTED_CORRECTION_ORBIT_TYPES and correction_method != "segmented":
         raise ValueError(
             f"{sel} 属不稳定轨道族，correction_method 必须为 'segmented'，"
@@ -1069,13 +1061,13 @@ def design_orbit(
     if correction_method == "segmented":
         # --- segmented：论文式分段打靶拼接（默认方法）---
         # 整条 CR3BP 多圈 tile → 逐段独立转星历 → 远月点分层合并 → 逐段
-        # 积分填满 et_grid。不再单点自由外推整个 duration（旧方法发散根因）。
+        # 积分填满 et_grid。单点自由外推整个 duration 会发散，不可采用。
         from ..results import EphemerisCorrectionResult
 
         # 收集 Rust force 序列。跳过 RelativisticCorrection（与
         # ForceModel._STM_UNSUPPORTED_TYPES 对齐）：相对论修正的 STM
         # 雅可比尚未实现（compiled.rs `_ => Err`），放进打靶并行区无法
-        # 积分 STM。注：sxform/spkezr 已走星历缓存（#268），若未来补
+        # 积分 STM。注：sxform/spkezr 已走星历缓存，若未来补
         # 雅可比，需同步注册 body/sxform 缓存键方可并入打靶。
         forces_py = []
         for entry in fm.list_forces():
@@ -1106,7 +1098,7 @@ def design_orbit(
         else:
             # 按 n_rev 圈重采样整条 tile（初猜）。采样策略按族覆盖
             # （见 _patch_sampling_for）：Halo 近月点加密；NRHO 与其余族等时间。
-            # DPO 周期长且不稳定，使用 64 点/圈缩短单弧（#484）。
+            # DPO 周期长且不稳定，使用 64 点/圈缩短单弧。
             t_patch_syn_n, state_patch_syn_n = _sample_patch_points(
                 dynamics,
                 state0_syn,
@@ -1146,14 +1138,14 @@ def design_orbit(
         try:
             # 第 1 步段长（每组圈数）。Halo 与稳定轨道用多圈/段（上限 3）：
             # 长段节点密、段内约束强，各段修到正确星历弧（对齐朱彦伟 2026）。
-            # NRHO 单独 1 圈/段（#473）：默认相位 0.5、约 1 个月弧上
+            # NRHO 单独 1 圈/段：默认相位 0.5、约 1 个月弧上
             # revs_per_group=3 合并层残差可卡在约 10² km；1 圈/段与等时间
             # 采样组合下 GUI 默认量级收敛。DPO 的一个周期约 23 天，使用 64
-            # 点/圈时两圈同组可避免逐圈独立修正后的 seam 残差（#484）。
+            # 点/圈时两圈同组可避免逐圈独立修正后的 seam 残差。
             # 配合下方 var_time 固定时刻族（_FIXED_TIME_ORBIT_TYPES，含
             # Halo/NRHO/DPO、拟周期族与 Axial）。
             #
-            # 对照论文的三项差异评估（issue #400 需求②）：论文每段 9 圈（对应
+            # 对照论文方案：每段 9 圈（对应
             # 972 圈/15 年量级的 12→3→3 层级拼接），合并层节点稀疏化为每圈 1 个
             # 远月点。Halo 3 圈/段 + 全节点合并已覆盖 180 天站保基准；年量级
             # 若段数过多、全节点合并矩阵病态放大，再评估 9 圈/段与远月点稀疏化。
@@ -1179,12 +1171,12 @@ def design_orbit(
                     verbose=verbose,
                 )
             except DesignNotConvergedError:
-                # NRHO n_rev=2 回退（#508）：9:2 贴月共振成员（近月高
+                # NRHO n_rev=2 回退：9:2 贴月共振成员（近月高
                 # ~1500 km）在 phase=0.5 下两段独立打靶后 seam 失配
                 # ~10² km，合并层不收敛；改为单段 2 圈（无合并层）可收敛。
-                # 反之 phase=0 端点单段不收敛、原路径可收敛——两种策略
+                # 反之 phase=0 端点单段不收敛、原路径可收敛，两种策略
                 # 互补，按失败自动切换。仅限 n_rev=2（多圈单段长弧打靶
-                # 另有收敛风险，#473）。
+                # 另有收敛风险）。
                 if sel != "NRHO" or n_rev != 2 or revs_per_group >= n_rev:
                     raise
                 t_patch_long, s_patch_long, max_residual = _design_apolune_segmented(
@@ -1200,16 +1192,14 @@ def design_orbit(
                     verbose=verbose,
                 )
 
-            # 逐段积分填满 et_grid（下沉 Rust propagate_segments_py 并发积分，
-            # #400 性能修复）：每段从修正后节点初值积分到下一节点。中间段
+            # 逐段积分填满 et_grid（下沉 Rust propagate_segments_py 并发积分）：
+            # 每段从修正后节点初值积分到下一节点。中间段
             # mask 用右开区间（seam 整点只归后段），相邻段 t_eval 无重叠；
             # 最后一段闭区间、t_span 终点延伸到 et_grid 尾部——打靶节点采样
             # 不含圈终点（endpoint=False），et_grid 尾部可能超出最后节点，
             # 右开会把尾部点排除在段外，星历缺尾段数据（长度断言报错）。
-            # Rust 侧输出逐点对应 t_eval（不追加段终点），无需截断——此前
-            # ForceModel._prepare_t_eval 追加 tf 使输出多 1 点（段终点状态，
-            # 不在 et_grid 上），截断丢掉才能保证 states_dense 与 et_grid
-            # 严格对齐（位置-时间错位回归 #398）。
+            # Rust 侧输出逐点对应 t_eval（不追加段终点），无需截断即可保证
+            # states_dense 与 et_grid 严格对齐。
             seg_t0_list: list[float] = []
             seg_t1_list: list[float] = []
             seg_states_list: list[np.ndarray] = []
@@ -1286,12 +1276,10 @@ def design_orbit(
 
     # --- 稳定轨道路径（DRO 等）：Rust 多重打靶（速度加权）+ 长期预报 ---
     # 不稳定族（HALO/NRHO/DPO）已由请求校验层规范化为 segmented，不会到达此路径。
-    # 旧 two_level（Python）残差向量把位置 km 与速度 km/s 混在一起，cislunar 下
-    # 位置项单边主导，Level 2 速度连续化不跑，修正产出是位置连续但速度跳变
-    # ~50 m/s 的断弧——自由外推大幅 DRO 一两个月发散到 20 万 km（#324）。
-    # 改走 Rust 打靶 + vel_weight（=pos_tol/vel_tol）：速度项加权后在容差尺度
+    # Rust 打靶 + vel_weight（=pos_tol/vel_tol）：速度项加权后在容差尺度
     # 与位置可比，LM 真正压速度连续到 ≤0.01 m/s，修正解落在准周期轨道上，
-    # 稳定轨道自由外推有界。同时全程预制星历表（cspice 缓存），不再逐步 FFI。
+    # 稳定轨道自由外推有界（不加权则位置项单边主导，产出速度跳变数十 m/s
+    # 的断弧）。同时全程预制星历表（cspice 缓存）代替逐次 FFI。
     if correction_method not in ("two_level", "standard", "rust"):
         raise ValueError(
             "correction_method 需为 segmented / two_level / standard / rust，"

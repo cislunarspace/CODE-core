@@ -1,7 +1,18 @@
 .. e2m2e documentation master file
 
-e2m2e: 地月空间任务规划算法工具集
-===================================
+e2m2e: Cislunar Mission Planning Algorithm Toolset / 地月空间任务规划算法工具集
+===============================================================================
+
+**English**
+
+e2m2e (Earth to Moon, Moon to Earth) targets cislunar mission planning with
+precise and reliable orbit computation tools: building dynamical models of
+cislunar space, generating periodic orbit families, designing transfer paths
+between orbits, and visualizing results for inspection. In an LLM+Agent-style
+autonomous mission planning system, the large model understands intent and
+orchestrates subtasks; e2m2e handles the numerical half.
+
+**简体中文**
 
 e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精确可靠的
 轨道计算工具：建立地月空间动力学模型，生成周期轨道族，设计轨道之间的转移
@@ -10,7 +21,7 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: 快速开始
+   :caption: Quick Start / 快速开始
 
    getting-started/installation
    getting-started/quickstart
@@ -18,7 +29,7 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: 核心概念
+   :caption: Core Concepts / 核心概念
 
    core/system
    core/dynamics
@@ -31,7 +42,7 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: 周期轨道设计
+   :caption: Periodic Orbit Design / 周期轨道设计
 
    algorithms/differential-correction
    algorithms/strategies
@@ -50,7 +61,7 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: 转移轨道设计
+   :caption: Transfer Design / 转移轨道设计
 
    transfer/overview
    transfer/lambert
@@ -65,7 +76,7 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: 架构
+   :caption: Architecture / 架构
 
    architecture/index
    architecture/architecture
@@ -76,20 +87,20 @@ e2m2e (Earth to Moon, Moon to Earth) 面向地月空间任务规划，提供精�
 
 .. toctree::
    :maxdepth: 2
-   :caption: API 参考
+   :caption: API Reference / API 参考
 
    api/e2m2e
 
 .. toctree::
    :maxdepth: 2
-   :caption: 参考资料
+   :caption: Reference / 参考资料
 
    reference/mbse/index
    reference/glossary
 
 
-Indices and tables
-==================
+Indices and tables / 索引与表格
+===============================
 
 * :ref:`genindex`
 * :ref:`modindex`

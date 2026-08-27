@@ -54,7 +54,7 @@ _NAIF_IDS: dict[str, int] = {
 
 # 闰秒内核（.tls 文件）的搜索路径列表。
 # 按优先级依次搜索：项目内置 kernels 目录 → 环境变量 SPICE_KERNEL_DIR。
-# 注意：data/kernels/ 比旧 core/ 深一级，仓库根用 parents[3]。
+# 注意：data/kernels/ 距仓库根三级，仓库根用 parents[3]。
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _LEAPSECOND_SEARCH_PATHS: list[str] = [
     str(_REPO_ROOT / "kernels"),
@@ -67,8 +67,8 @@ _LEAPSECOND_SEARCH_PATHS: list[str] = [
 #: 质心/本体 ID，使 Python spiceypy 实例与 Rust cspice 实例（那边在
 #: ``spice_ffi::register_bodies`` 注册同一份表）解析一致。
 #:
-#: 单一归属 SPICEManager 模块；design_orbit 不再自带表。两份表（Python 这里 +
-#: Rust ``BODY_ALIASES``）保持一致，不做跨语言单源（issue #334 显式 out of scope）。
+#: 单一归属 SPICEManager 模块。两份表（Python 这里 +
+#: Rust ``BODY_ALIASES``）保持一致，不做跨语言单源。
 _BODY_ID_ALIASES: list[tuple[str, int]] = [
     ("MERCURY", 1),
     ("VENUS", 2),
@@ -151,7 +151,12 @@ def _call_rust_or_compat_error(
 
 
 class SPICEManager(EphemerisProvider):
-    """SPICE 内核管理器：SPICE 星历数据提供者实现。
+    """Wrapper around the NASA SPICE toolkit
+    (ephemeris queries, time conversion, kernel management).
+
+    SPICE 内核管理器：SPICE 星历数据提供者实现。
+
+    SPICE 内核管理器：SPICE 星历数据提供者实现。
 
     统一管理内核加载与天体状态查询：自动加载闰秒内核、提供星历查询接口
     （位置/状态）、时间格式转换（UTC ↔ ET）以及天体引力参数查询。
@@ -251,7 +256,7 @@ class SPICEManager(EphemerisProvider):
         get_spiceypy().unload(path)
         # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（静态链接，
         # 内核池不共享）。load_kernel 双 furnsh，此处对称卸载 Rust 侧，
-        # 避免 Rust 内核池残留导致测试结果依赖执行顺序（issue #387）。
+        # 避免 Rust 内核池残留导致测试结果依赖执行顺序。
         # Rust 侧只卸载确经 spice_furnsh 加载过的文件，未加载时静默跳过
         # （保持重复 unload 幂等）。
         from e2m2e.integrators import spice_unload

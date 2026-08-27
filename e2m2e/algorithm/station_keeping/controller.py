@@ -8,8 +8,8 @@
 
 参数与 MATLAB ``control_orbit.m`` 对齐（关键字参数 + dataclass 结果）。
 角动量管理模式（control_mode 4-6）通过 ``engine_layout`` 参数激活，
-对应 MATLAB ControlMode 4-6。两处能力边界差异（e2m2e 尚未实现，见
-#253）：光压默认用炮弹模型（``solar_radiation=1``，MATLAB 默认 ECOM=2）；
+对应 MATLAB ControlMode 4-6。两处能力边界差异（e2m2e 尚未实现）：
+光压默认用炮弹模型（``solar_radiation=1``，MATLAB 默认 ECOM=2）；
 耦合项默认关闭（``coupling=0``，MATLAB 默认开）。
 """
 
@@ -46,7 +46,7 @@ __all__ = ["ControlOrbitResult", "control_orbit"]
 _EPHEMERIS_NAMES = {1: "EPHEMERIDES_LOOSE", 2: "EPHEMERIDES_TIGHT", 3: "EPHEMERIDES_SPECIAL"}
 
 #: e2m2e 能力边界内的默认摄动开关：球模型光压、关耦合项（MATLAB 默认
-#: 分别为 ECOM 与开，e2m2e 未实现，#253）
+#: 分别为 ECOM 与开，e2m2e 未实现）
 _DEFAULT_CTRL_PERTURBATION: dict[str, int] = {
     **DEFAULT_PERTURBATION,
     "solar_radiation": 1,
@@ -186,7 +186,7 @@ def control_orbit(
 
     Raises:
         ValueError: 参数超界（控制模式、误差参数等）
-        NotImplementedError: 摄动开关含 ECOM 光压或耦合项（#253）
+        NotImplementedError: 摄动开关含 ECOM 光压或耦合项
     """
     if control_mode not in (1, 2, 3, 4, 5, 6):
         raise ValueError(f"control_mode 必须为 1-6，当前 {control_mode}")

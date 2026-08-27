@@ -42,8 +42,8 @@ class ThirdBodyGravity(PhysicalModel):
 
         优先用 spiceypy.bods2c（识别 boddef 注册过的天体）；未注册（spiceypy
         抛 ``SpiceyError``）则原样返回（DE430 内置名 MOON/EARTH/SUN 等仍
-        可用）。只 catch spiceypy 错误（``SpiceyError``），不吞编程错误
-        （#352）：bods2c 的意外错误需原样上抛，不被 ``except Exception`` 吞掉。
+        可用）。只 catch spiceypy 错误（``SpiceyError``），不吞编程错误：
+        bods2c 的意外错误需原样上抛，不被 ``except Exception`` 吞掉。
         """
         try:
             import spiceypy as _spiceypy

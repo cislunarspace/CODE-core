@@ -1,4 +1,4 @@
-"""GUI sidecar stdio 协议（issue #518 / ADR 0035）。
+"""GUI sidecar stdio 协议（ADR 0035）。
 
 tod 的 Tauri 壳以常驻子进程驱动 e2m2e：请求/响应/进度是 JSON 文本行，
 复用 MCP 方向的统一信封（``{status, data, error, meta}``，单一来源在
@@ -30,17 +30,17 @@ __all__ = ["handle_request", "run_loop"]
 _BINARY_DTYPES = ("f32", "f64")
 
 
-# 大数组走二进制帧的工具→响应帧抽取函数映射（issue #526：catalog_get 入列）。
-# 首个落地的画布契约：族生成响应的成员状态数组（Orbit 对象不可 JSON 化，
-# 本就必须走帧）；catalog_get 的记录数组段同理。其余工具等消费端（tod）
-# 出现真实需求再补，不预先铺开。
+# 大数组走二进制帧的工具→响应帧抽取函数映射。
+# 族生成响应的成员状态数组出帧（Orbit 对象不可 JSON 化，本就必须走帧）；
+# catalog_get 的记录数组段同理。其余工具等消费端（tod）出现真实需求再补，
+# 不预先铺开。
 def _family_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], list[bytes]]:
     """族生成响应的画布契约：成员状态数组出帧，JSON 行留占位。
 
     帧序 = ``data.orbits`` 成员序；每帧是该成员的 ``(n, 6)`` 状态数组。
     times 等小数组留在 JSON。``states`` 置 None 占位，帧是唯一真身。
     成员级透传 ``period``、响应级透传 ``mu``（原值，归一化单位），供
-    消费端从 ``(1, 6)`` 初态重采样整条轨迹（issue #525）。
+    消费端从 ``(1, 6)`` 初态重采样整条轨迹。
     """
     frames = [encode_frame(orbit.states, dtype) for orbit in result.orbits]
     data = {
@@ -65,12 +65,12 @@ def _family_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], lis
 
 
 def _catalog_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], list[bytes]]:
-    """catalog_get 响应的画布契约（issue #526）：数组段 ndarray 出帧。
+    """catalog_get 响应的画布契约：数组段 ndarray 出帧。
 
     帧序 = JSON 行 ``data.arrays`` 中 None 占位键的顺序；每帧是对应键的
     数组。非数组值原样留 JSON。元数据、标量段、成员参数表不受影响。
-    #525 落地 period/mu 标量补齐后，本函数与族生成的帧抽取共用字段
-    抽取逻辑（当前各自独立，待第二个消费点出现再收拢）。
+    本函数与族生成的帧抽取共用 states/times/period/mu 同一套画布契约
+    字段（当前各自独立实现，待第二个消费点出现再收拢）。
     """
     frames = []
     arrays: dict[str, Any] = {}
@@ -173,7 +173,7 @@ def run_loop(facade: Facade, stdin: BinaryIO, stdout: BinaryIO) -> None:
     """std io 主循环：逐行读请求 JSON，写出进度/响应行与二进制帧。
 
     坏 JSON 行返回错误信封并继续，不中断循环。请求处理的任何未预期
-    异常（含响应信封化失败，issue #526）同样兑成 INTERNAL_ERROR 信封：
+    异常（含响应信封化失败）同样兑成 INTERNAL_ERROR 信封：
     字节块在 handle_request 返回前不落盘，故不存在半写出的帧污染流。
     """
     for raw in stdin:

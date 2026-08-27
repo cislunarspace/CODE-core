@@ -73,7 +73,7 @@ def _worker_init(
 
     该函数由 ProcessPoolExecutor(initializer=...) 在每个工作进程启动时调用一次。
     内核加载经 :func:`_load_worker_kernels` → ``SPICEManager.load_kernel`` ，在
-    Python spiceypy 与 Rust cspice 两侧 furnsh（不再直接调 ``spiceypy.furnsh``
+    Python spiceypy 与 Rust cspice 两侧 furnsh（不直接调 ``spiceypy.furnsh``
     或手篡内部 once 标志）。动力学对象保存在 ``_worker_dynamics`` 。
 
     Args:
@@ -157,7 +157,9 @@ class MultipleShootingResult:
 
 
 class MultipleShooting:
-    """多重打靶法（Multiple Shooting）修正器。
+    """Standard multiple-shooting corrector over patch points.
+
+    多重打靶法（Multiple Shooting）修正器。
 
     将一条轨迹分为 N 个节点、n_seg = N-1 段弧段，对每段独立积分后，
     通过匹配相邻段端点状态来构建残差向量，再利用雅可比矩阵（含 STM）
@@ -652,11 +654,11 @@ def sample_patch_points_drop_near_perilune(
     实现：先积分一圈定位近月点，再在窗口 ``[t_p - w, t_p + w]`` 之外的
     互补弧上均匀放置 ``n_points - 1`` 个节点（``w = drop_window · period`` ），
     并强制并入 ``t=0`` 。不钉历元时首节点常落在 ``t>0`` ，segmented 逐段
-    填充从 ``et0`` 起的时间网格会出现前缀空洞，星历长度断言失败（#473）。
+    填充从 ``et0`` 起的时间网格会出现前缀空洞，星历长度断言失败。
     去重后点数不足则回退等时间采样。与近月点加密互补——加密往窗口内堆点，
     本函数把非历元节点放在窗口外。
 
-    注：自 #473 起 NRHO 生产默认改为等时间；本函数保留供对照与研究。
+    注：NRHO 生产默认等时间采样；本函数保留供对照与研究。
 
     Args:
         orbit: 周期轨道，需含 ``period`` 、``times`` 、``states`` 。

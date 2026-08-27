@@ -10,12 +10,12 @@
 //! 3. 分层两两合并相邻段（同层配对合并段独立，rayon 并行），继续修正
 //! 4. 重复直到所有段合并为一条完整轨迹
 //!
-//! ## 约束形式（#400）
+//! ## 约束形式
 //!
 //! 第 1 步与合并层的打靶均不固定节点（``fix_first_node=False``、
-//! ``fixed_node_mask=None``），LM 最小范数更新对齐文献。固定首末锚定曾致
-//! 合并层不收敛（#400）：各段独立打靶后 seam 不连续，锚定把修正全压给
-//! 内部节点，60 天合并层停在 7.5e-01 km；去锚定后 60 天合并层收敛到
+//! ``fixed_node_mask=None``），LM 最小范数更新对齐文献。首末锚定会破坏
+//! 合并层收敛：各段独立打靶后 seam 不连续，锚定把修正全压给内部节点
+//! （60 天合并层残差停在 7.5e-01 km）；去锚定后同工况收敛到
 //! 1.4e-03 km，180 天三层合并全程收敛。
 
 use crate::multiple_shooting::{
@@ -93,8 +93,7 @@ impl SegmentedShootingResult {
 ///
 /// 每段 ``revs_per_group`` 圈；相邻段共享 seam 节点（段 i 末节点 = 段 i+1
 /// 首节点，同一时刻的同一 tile 节点），这是分层合并连续性的基础。切段
-/// 语义与 Python 侧 ``_design_apolune_segmented`` 对齐（#400 修复前该逻辑
-/// 在 Python，现下沉 Rust）。
+/// 语义与 Python 侧 ``_design_apolune_segmented`` 对齐。
 fn segment_trajectory(
     t_patch: &[f64],
     state_patch: &[[f64; 6]],
@@ -125,8 +124,8 @@ fn segment_trajectory(
 /// 对单段进行多重打靶修正。
 ///
 /// 不固定任何节点（``fix_first_node=False``、``fixed_node_mask=None``）：
-/// 第 1 步与合并层统一走最小范数更新（对齐文献）。首末锚定曾致合并层
-/// 不收敛（#400），见模块注释。
+/// 第 1 步与合并层统一走最小范数更新（对齐文献）。首末锚定会破坏合并层
+/// 收敛，见模块注释。
 #[allow(clippy::too_many_arguments)]
 fn correct_segment(
     forces: &[CompiledForce],
@@ -148,7 +147,7 @@ fn correct_segment(
         state_patch,
         var_time,
         false, // fix_first_node：第 1 步/合并层均不固定节点
-        None,  // fixed_node_mask：无锚定（#400 根因修复）
+        None,  // fixed_node_mask：无锚定
         max_iter,
         tolerance,
         rtol,

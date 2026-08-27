@@ -1,12 +1,7 @@
-"""地月系统标准参数（已迁移至 ``e2m2e.data.constants``）。
+"""空模块壳：物理常数真值的单一来源是 e2m2e.data.constants（ADR 0022）。
 
-本文件原为物理常量真值持有者，ADR 0022 阶段 3 已将其中的物理常数收编到
-``e2m2e/data/constants/`` （单一来源）。为便于追溯，保留文件壳，不再定义
-任何物理常量真值，也不再做 re-export shim。
-
-历史说明：原 ``MU_EARTH``、``R_EARTH``、``AU``、``KM_TO_M``、
-``EARTH_MOON_DISTANCE_KM``、``G``、``DAY``、``YEAR`` 等常量已迁移。
-具体映射见 ADR 0022 或 ``e2m2e.data.constants`` 的导出表。
+本文件不定义任何物理常数，也不做 re-export；需要常数请直接从
+e2m2e.data.constants 导入。
 """
 
 from __future__ import annotations

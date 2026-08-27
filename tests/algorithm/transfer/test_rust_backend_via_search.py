@@ -252,7 +252,7 @@ def test_search_default_backend_is_rust_when_built(
     arr_orbit: Orbit,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """扩展已构建时默认 backend = rust（#316 item ④）。
+    """扩展已构建时默认 backend = rust（item ④）。
 
     TransferSearch() 构造后 ``_parallel_backend`` 由 :func:`_default_parallel_backend`
     决定；扩展已构建（本测试被 importorskip 守卫）→ ``"rust"``。``search()`` 不传
@@ -287,8 +287,9 @@ def test_set_parallel_backend_then_search_routes_to_it(
 ) -> None:
     """set_parallel_backend('processes') 后 search() 不传 backend → 走 processes。
 
-    验证 search() 的 ``parallel_backend=None`` sentinel 确实回落到实例属性（此前
-    search() 参数默认是 ``"processes"`` 字面量，set_parallel_backend 对它不生效）。
+    验证 search() 的 ``parallel_backend=None`` sentinel 确实回落到实例属性
+    （若 search() 参数默认是 ``"processes"`` 字面量，set_parallel_backend
+    对它就不生效）。
     走 processes 时 dispatch 不应碰 grid_search_rust_dispatch。
     """
     searcher.set_parallel_backend("processes")

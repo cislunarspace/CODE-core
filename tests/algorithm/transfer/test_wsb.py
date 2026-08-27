@@ -359,7 +359,7 @@ class TestWsbTransferOrbit:
         return result.details
 
     def test_facade_tof_range_overrides_wsb_default_grid(self, monkeypatch):
-        """facade 的 tof_range 应覆盖 WsbSearchParams 默认 tof 网格（#513）。"""
+        """facade 的 tof_range 应覆盖 WsbSearchParams 默认 tof 网格。"""
         details = self._run_wsb_with_stubbed_search(monkeypatch, None, tof_range=(30.0, 120.0))
         assert details.search_params.tof_range == (30.0, 120.0)
         assert details.n_candidates_searched > 0
@@ -394,7 +394,7 @@ class TestWsbAcceptance:
     @staticmethod
     @functools.cache
     def _cached_small_search() -> tuple:
-        """小网格搜索结果缓存（ADR 0021 #420：消除重复计算）。"""
+        """小网格搜索结果缓存（消除重复计算）。"""
         from e2m2e.algorithm.transfer.wsb import search_wsb_trajectories
 
         system = _make_bcr4bp_system()

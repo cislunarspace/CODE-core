@@ -180,7 +180,7 @@ class TestRustStatePropagation:
     def test_state_rust_backward(self, spice_eph_dynamics, reference_et, leo_state):
         """纯状态 Rust 应支持双向积分（t_span.1 < t_span.0）。
 
-        回归 test_propagate_backward_time：覆写 _propagate_state_only 后，
+        与 ``test_propagate_backward_time`` 同链路：覆写 _propagate_state_only 后，
         backward 传播走 Rust 纯状态路径（solve_ivp_capped 的 dir 逻辑）。
         """
         t_span = (reference_et, reference_et - 3600)

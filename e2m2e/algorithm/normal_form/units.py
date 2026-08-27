@@ -10,7 +10,7 @@
   / ``tu_to_seconds`` 完成。
 
 ``to_normalized`` 与 ``from_normalized`` 互为精确逆运算（数值精度内
-无截断），后续切片中的所有归一化 Hamilton 量都基于此接口之上。
+无截断），包内所有归一化 Hamilton 量都基于此接口之上。
 """
 
 from __future__ import annotations

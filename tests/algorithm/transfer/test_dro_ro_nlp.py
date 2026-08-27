@@ -160,7 +160,7 @@ def test_module_exports():
 
 
 # =============================================================================
-# issue #161 — TerminalCondition 接口接入
+# TerminalCondition 接口接入
 # =============================================================================
 
 
@@ -182,7 +182,7 @@ class TestTerminalConditionInterface:
         assert opt.arrival_orbit is optimizer.arrival_orbit
 
     def test_state_terminal_at_arrival(self, dynamics, dummy_orbit):
-        """``StateTerminal`` 应能作为到达端接入（issue #161 验收点）。"""
+        """``StateTerminal`` 应能作为到达端接入。"""
         fixed_state = np.array([0.95, 0.05, 0.0, 0.0, 0.3, 0.0])
         opt = DROTRONLPOptimizer(
             system=dynamics.system,

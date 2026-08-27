@@ -389,10 +389,10 @@ def design_dro(
 ) -> Orbit:
     """生成指定振幅的 DRO 周期轨道。
 
-    振幅定义：一个周期内距月心距离最小/最大值的均值（km）。历史标定：
-    amplitude=10000 的 DRO 距月范围约
-    4825~15290 km，(min+max)/2≈10058 km，比最大距离或 y 半宽更贴近
-    输入值。以近侧 x 轴穿越点 ``x0`` 为族参数行走，命中 ``tol_km`` 内即停。
+    振幅定义：一个周期内距月心距离最小/最大值的均值（km），比最大距离
+    或 y 半宽更贴近输入值（如 amplitude=10000 的 DRO 距月范围约
+    4825~15290 km，(min+max)/2≈10058 km）。以近侧 x 轴穿越点 ``x0``
+    为族参数行走，命中 ``tol_km`` 内即停。
     """
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
@@ -1052,7 +1052,7 @@ def _correct_lpo(
         assert guess.period is not None
         period = guess.period
 
-    # 搜索阶段放宽积分步长上限（#367）：默认 0.01 TU 对长周期 LPO
+    # 搜索阶段放宽积分步长上限：默认 0.01 TU 对长周期 LPO
     # （~21 TU/圈）意味着每次 STM 传播 ≥2100 步，网格搜索 45 点 × 修正
     # 迭代 ~700 次传播共 ~110s。rtol=1e-12 自适应仍控制积分精度，max_step
     # 只是上限：0.1 TU 下实测 2.5x 加速、收敛产物一致（振幅 49994 vs
@@ -1603,7 +1603,7 @@ def design_horseshoe_family(
 
     Horseshoe 是 LPO 族的成员分类，不获第二套求解器（ADR 0028）：
     沿 LPO 链行走到大振幅段，收集振幅落入请求范围的成员并标记为
-    ``horseshoe``。声明范围不得超出 #435 标定的可达包络。
+    ``horseshoe``。声明范围不得超出已标定的可达包络。
     """
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())

@@ -100,7 +100,7 @@ class TestNonOptimalGeometry:
         assert sol3.total_delta_v < sol2.total_delta_v - 0.05
 
     def test_three_impulse_retries_stalled_initial_guess(self):
-        """零脉冲初猜使 SLSQP 提前收敛时，微扰重试仍应找到三脉冲降本（#384）。
+        """零脉冲初猜使 SLSQP 提前收敛时，微扰重试仍应找到三脉冲降本。
 
         建议插入点落在双脉冲弧上的位置随主矢量检验采样密度而变；n_samples=200
         的建议点处于目标函数平坦走廊，SLSQP 一步即停（单次优化改善 ≈ 0）。

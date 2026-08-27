@@ -67,7 +67,7 @@ def test_leo_drag_semi_major_axis_decays(earth_icrf_system):
 
 @pytest.mark.spice
 def test_drag_rust_path_respects_configured_f107_ap(earth_icrf_system):
-    """#315 端到端：Rust 路径必须响应用户配置的 f107/ap。
+    """Rust 路径必须响应用户配置的 f107/ap（端到端）。
 
     全链验证：``DragModel.to_rust_spec``（带 f107/ap）→ lib.rs 解析 7 元组 →
     ``CompiledForce::Drag`` → ``drag_accel`` → ``density(h, f107, ap)``。
@@ -75,12 +75,12 @@ def test_drag_rust_path_respects_configured_f107_ap(earth_icrf_system):
     隔离手法：两轮都用 Rust 路径（``propagate_compiled``），仅改大气模型 f107/ap。
     Rust 内部 ITRF93 pxform 帧旋转在两轮间完全相同、相消，残差纯来自密度差。
 
-    判据：bug 修复前 Rust 硬编码 150/15，改 f107/ap 不影响结果 → 两轮末态相同
-    （diff≈0）；修复后两轮末态应有可测差异（~10 m 量级）。
+    判据：若 Rust 硬编码 150/15、忽略配置的 f107/ap，则两轮末态相同
+    （diff≈0）；正确透传时两轮末态应有可测差异（~10 m 量级）。
 
     注：不能直接比 Rust vs Python 末态——Rust 用 SPICE ITRF93 pxform、Python 用
     ITRFApproxAxes 近似旋转，固有 ~7 m 基线分歧（drag.rs 决策 1b），且该基线随
-    密度放大，会淹没 f107/ap 信号。帧旋转一致性是独立议题，不在 #315 范围。
+    密度放大，会淹没 f107/ap 信号。帧旋转一致性是独立议题，不在本测试范围。
     """
     system = earth_icrf_system
     mu = EARTH_MU
@@ -103,7 +103,7 @@ def test_drag_rust_path_respects_configured_f107_ap(earth_icrf_system):
         gravity = GravityField(body="EARTH", degree=2, order=0)
         fm = ForceModel(system, forces=[gravity, drag])
         fm.rtol = 1e-10
-        # issue #385：#378 后 Rust 为唯一传播路径（无 Python 回退），propagate 成功即证明走 Rust
+        # Rust 为唯一传播路径（无 Python 回退），propagate 成功即证明走 Rust
         result = fm.propagate(y0, (et0, et0 + dt), t_eval=t_eval, max_steps=200_000)
         return np.asarray(result["states"][-1])
 
@@ -111,10 +111,9 @@ def test_drag_rust_path_respects_configured_f107_ap(earth_icrf_system):
     state_hot = propagate_rust(200.0, 50.0)
 
     diff = np.linalg.norm(state_hot - state_default)
-    # 修复前 diff≈0（Rust 忽略 f107/ap）；修复后密度因子 1.44 → drag 差 ~44%，
+    # 若 Rust 忽略 f107/ap 则 diff≈0；正确透传时密度因子 1.44 → drag 差 ~44%，
     # 5400s 短弧末态差约 1e-2 km（~10 m）。下界 1e-3 km（1 m）留一个数量级余量，
-    # 远高于 0，可靠区分 bug 是否回归。
+    # 远高于 0，可靠区分是否回归。
     assert diff > 1e-3, (
-        f"Rust 路径改 f107/ap 后末态几乎不变（diff={diff:.3e} km），"
-        "f107/ap 未透传到 density（#315 回归）"
+        f"Rust 路径改 f107/ap 后末态几乎不变（diff={diff:.3e} km），f107/ap 未透传到 density"
     )

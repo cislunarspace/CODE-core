@@ -57,7 +57,7 @@ def _natural_continuation_5(seed, dynamics, setup_corrector, param_name, step):
 
     seed_param = float(seed.states[0, _param_index(param_name or _inferred_param(corrector))])
     # param_range 给一个宽上界，保证不因触界提前停；步数由 max_orbits 限到 5。
-    # natural_continuation 返回 ContinuationResult（#351 结果契约），
+    # natural_continuation 返回 ContinuationResult 结果契约，
     # 轨道族在 result.family。
     result = continuation.natural_continuation(
         seed,

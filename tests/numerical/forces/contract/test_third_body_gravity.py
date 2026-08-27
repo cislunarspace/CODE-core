@@ -1,7 +1,7 @@
 """ThirdBodyGravity 定义与序列化契约。
 
 覆盖构造接口（body 大写、无 origin 参数）、``to_rust_spec`` 序列化、
-``_name_or_id`` 异常收窄（#352）与 PhysicalModel 子类关系。物理对照见
+``_name_or_id`` 异常收窄与 PhysicalModel 子类关系。物理对照见
 ``physics/test_third_body_gravity.py``。
 """
 
@@ -49,11 +49,11 @@ class TestThirdBodyGravityInterface:
 
 
 class TestNameOrIdNarrowedExcept:
-    """``_name_or_id`` 异常收窄（#352）。
+    """``_name_or_id`` 异常收窄。
 
-    修复前 ``bods2c`` 的 ``except Exception`` 把编程错误（TypeError 等）一并
-    吞掉并静默返回原名——真正的 bug 被藏进"名字未注册"的合理路径。收窄后
-    只 catch spiceypy 错误（``SpiceyError``），编程错误上抛。
+    若对 ``bods2c`` 用宽泛的 ``except Exception``，编程错误（TypeError 等）会
+    被一并吞掉并静默返回原名，真正的 bug 被藏进"名字未注册"的合理路径。
+    收窄为只 catch spiceypy 错误（``SpiceyError``），编程错误上抛。
     """
 
     def test_registered_body_returns_naif_id(self):
@@ -65,7 +65,7 @@ class TestNameOrIdNarrowedExcept:
         assert ThirdBodyGravity._name_or_id("NOT_A_REAL_BODY_XYZ") == "NOT_A_REAL_BODY_XYZ"
 
     def test_programming_error_not_swallowed(self, monkeypatch):
-        """编程错误（非 spiceypy 异常）不再被吞（#352：收窄 except）。"""
+        """编程错误（非 spiceypy 异常）不被吞（收窄 except）。"""
         import spiceypy
 
         def boom(name):

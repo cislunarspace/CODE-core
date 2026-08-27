@@ -1,9 +1,9 @@
-"""Q-law 失败语义测试（#352）。
+"""Q-law 失败语义测试。
 
-两条红线（ADR 0020 决策 1）：
+两条红线：
 
 1. **步长塌缩**：积分步长缩到机器精度地板时抛 ``PropagationFailure``，
-   不再重置回原步长空转 200 万步后用未验收的中间态拼控制律返回（统计/结果
+   不重置回原步长空转、也不用未验收的中间态拼控制律返回（统计/结果
    谎报成功）。
 2. **``_resolve_mu``**：中心体 μ 查询失败时抛异常，不静默替换为地球 μ
    （非地球系统会被用错动力学参数）。
@@ -30,9 +30,9 @@ class TestStepCollapseRaisesPropagationFailure:
     def test_extreme_initial_state_raises_propagation_failure(self):
         """初态贴地心（重力加速度 1/r² 发散）→ 步长塌缩 → 抛 PropagationFailure。
 
-        修复前（#352）：``if h < 1e-6: h = step`` 把步长地板重置回原步长，
-        空转到 200 万步几乎不推进 t，最后用未经验收的中间态拼控制律返回，
-        无失败标志。修复后：步长缩到地板立即抛 ``PropagationFailure``。
+        步长地板若重置回原步长会空转而不推进 t，最后用未经验收的中间态
+        拼控制律返回且无失败标志；正确行为是步长缩到地板立即抛
+        ``PropagationFailure``。
         """
         system = SimpleNamespace(origin="EARTH")
         forces = [PointMassGravity("EARTH", mu=MU)]
@@ -60,8 +60,7 @@ class TestResolveMuDoesNotSilentlyFallback:
     def test_no_mu_source_raises(self):
         """forces 无 PointMassGravity、system 无 gravitational_parameter → 抛异常。
 
-        修复前（#352）：静默返回 ``Datum.DE440.earth_gm``，非地球系统会被
-        用错 μ。
+        静默返回地球 μ 会让非地球系统被用错动力学参数。
         """
         with pytest.raises(RuntimeError):
             _resolve_mu(SimpleNamespace(origin="MARS"), [])

@@ -1,4 +1,19 @@
-"""Facade 门面：唯一公开顶级入口，粗粒度任务方法。
+"""Facade 门面：唯一公开顶级入口，粗粒度任务方法。/ Facade: the sole public
+top-level entry with coarse-grained task methods.
+
+[English]
+
+Two granularity tiers (ADR 0014): the Facade exposes coarse-grained task
+methods for humans and Agents, while the algorithm layer keeps fine-grained
+APIs for experts. MCP tools derive purely from Facade methods; each method
+marks whether it is exposed to MCP via its ``mcp_exposed`` metadata.
+
+Implementation status: tier-1 tasks wire into algorithm/ orchestrators
+(design_orbit / control_orbit / transfer_design / orbit_propagation /
+spacetime_transform); tier-2 subtasks wire into existing algorithms
+(family / stability / proximity).
+
+[简体中文]
 
 两层粒度（ADR 0014）：Facade 暴露粗粒度任务方法（人类/Agent 常用），算法层
 保留细粒度 API（专家用）。MCP 工具 = Facade 方法全集（纯派生），方法带
@@ -214,7 +229,7 @@ def _ephemeris_to_dict(ephemeris: EphemerisTable | None) -> dict[str, Any] | Non
 
 
 def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse:
-    """把 ``OrbitDesignResult`` 翻译为 ``DesignOrbitResponse`` （含几何字段，#312）。
+    """把 ``OrbitDesignResult`` 翻译为 ``DesignOrbitResponse``（含几何字段）。
 
     纯翻译、无副作用、不依赖 SPICE。ELFO 场景下 ``cr3bp_orbit`` /
     ``correction`` 为 None，对应字段输出默认值（mu=None、states/times 空、
@@ -257,7 +272,7 @@ def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse
 def _control_result_to_response(
     result: ControlOrbitResult, *, mu: float | None
 ) -> ControlOrbitResponse:
-    """把 ``ControlOrbitResult`` 翻译为 ``ControlOrbitResponse`` （含几何字段，#312）。
+    """把 ``ControlOrbitResult`` 翻译为 ``ControlOrbitResponse``（含几何字段）。
 
     ``controlled_ephemeris`` 来自最后一次蒙特卡洛样本（全失败时 None）；
     ``mu`` 由请求透传——算法层不产 mu，design→control 链式时由调用方注入。
@@ -634,7 +649,7 @@ class Facade:
 
     @mcp_exposed(request_model=DesignOrbitRequest)
     def design_orbit(self, **params) -> DesignOrbitResponse:
-        """任务轨道设计（一档）。
+        """Mission orbit design (tier 1). / 任务轨道设计（一档）。
 
         薄封装 ``algorithm/design/design_orbit``：Pydantic 校验 → 编排 → 结果
         翻译为 Response。算法层异常翻译为 ``OrbitError``。
@@ -664,7 +679,7 @@ class Facade:
 
     @mcp_exposed(request_model=ControlOrbitRequest)
     def control_orbit(self, **params) -> ControlOrbitResponse:
-        """轨道保持（一档）。
+        """Station-keeping Monte Carlo simulation (tier 1). / 轨道保持（一档）。
 
         薄封装 ``algorithm/station_keeping/control_orbit``。
         """
@@ -736,7 +751,7 @@ class Facade:
 
     @mcp_exposed(request_model=TransferDesignRequest)
     def transfer_design(self, **params) -> TransferDesignResponse:
-        """转移轨道设计（一档）。
+        """Transfer design (tier 1). / 转移轨道设计（一档）。
 
         薄封装 ``algorithm/transfer/transfer_orbit``：Pydantic 校验 → 编排 →
         结果翻译为 Response。
@@ -820,7 +835,7 @@ class Facade:
 
     @mcp_exposed(request_model=PropagationRequest)
     def orbit_propagation(self, **params) -> PropagationResponse:
-        """轨道预报（一档）。
+        """Orbit prediction (tier 1). / 轨道预报（一档）。
 
         薄封装 ``algorithm/propagation/propagate_orbit``：Pydantic 校验 →
         传播 → EphemerisTable 翻译为 Response。
@@ -873,7 +888,7 @@ class Facade:
 
     @mcp_exposed(request_model=SpacetimeTransformRequest)
     def spacetime_transform(self, **params) -> SpacetimeTransformResponse:
-        """时空坐标转换（一档）。
+        """Spacetime coordinate conversion (tier 1). / 时空坐标转换（一档）。
 
         薄封装 ``algorithm/coordinate/spacetime_convert``：Pydantic 校验 →
         逐条转换 → 结果翻译为 Response。
@@ -931,10 +946,10 @@ class Facade:
 
     @mcp_exposed(request_model=FamilyGenerationRequest)
     def orbit_family_generation(self, **params) -> FamilyGenerationResponse:
-        """轨道族生成（二档）。
+        """Orbit family generation (tier 2). / 轨道族生成（二档）。
 
-        Pydantic 模型校验（#411）→ 按 orbit_type 分派到算法层族生成入
-        口（#428、#502）→ 结构化错误。八族均已实现，成功返回统一容器
+        Pydantic 模型校验 → 按 orbit_type 分派到算法层族生成入口 →
+        结构化错误。八族均已实现，成功返回统一容器
         ``FamilyGenerationResponse``（兼容 ``OrbitFamily`` 读取接口）；
         Lissajous 是拟周期参数采样，族上显式标注
         ``periodicity=quasi-periodic``。软失败使用同一响应保留部分族。
@@ -1066,8 +1081,8 @@ class Facade:
         """稳定性分析（二档）：薄封装 algorithm/stability。
 
         需要带 period/system 绑定的 Orbit 对象入参，无法经 JSON 信封表达
-        （空参 schema 注册后 Agent 必然调用失败）；按 issue #510 决策不
-        注册，待记录引用式入参（如 input_record_id）落地后放开。
+        （空参 schema 注册后 Agent 必然调用失败），故不注册 MCP 工具；
+        待记录引用式入参（如 input_record_id）落地后放开。
         """
         from e2m2e.algorithm.stability import StabilityAnalysis
 
@@ -1122,7 +1137,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogQueryRequest)
     def catalog_query(self, **params) -> CatalogQueryResponse:
-        """多维过滤查询，返回摘要列表（不含数组段与请求快照）。"""
+        """Multi-dimensional catalog query returning record summaries..
+
+        多维过滤查询，返回摘要列表（不含数组段与请求快照）。"""
         try:
             request = CatalogQueryRequest(**params)
         except (ValueError, TypeError) as exc:
@@ -1146,7 +1163,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogGetRequest)
     def catalog_get(self, **params) -> CatalogRecordResponse:
-        """按 record_id 取完整记录（含数组段）；不存在抛 ``RECORD_NOT_FOUND``。"""
+        """Fetch a full record by ``record_id``..
+
+        按 record_id 取完整记录（含数组段）；不存在抛 ``RECORD_NOT_FOUND``。"""
         try:
             request = CatalogGetRequest(**params)
         except (ValueError, TypeError) as exc:
@@ -1161,7 +1180,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogDeleteRequest)
     def catalog_delete(self, **params) -> CatalogDeleteResponse:
-        """按 record_id 删除记录（文件与索引条目）；删除不可撤销。"""
+        """Delete a record by ``record_id`` — irreversible..
+
+        按 record_id 删除记录（文件与索引条目）；删除不可撤销。"""
         try:
             request = CatalogDeleteRequest(**params)
             self._open_catalog().delete(request.record_id)
@@ -1186,7 +1207,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogTagRequest)
     def catalog_tag(self, **params) -> CatalogTagResponse:
-        """写教学标注入 JSON 记录（随文件走）；tags 整体替换，note=None 保留。"""
+        """Write teaching annotations to the JSON record..
+
+        写教学标注入 JSON 记录（随文件走）；tags 整体替换，note=None 保留。"""
         try:
             request = CatalogTagRequest(**params)
             meta = self._open_catalog().tag(request.record_id, request.tags, request.note)
@@ -1210,7 +1233,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogPromoteRequest)
     def catalog_promote(self, **params) -> CatalogPromoteResponse:
-        """把族成员提升为独立记录（source_record_id 指向所属族）。"""
+        """Lift a family member into a standalone record..
+
+        把族成员提升为独立记录（source_record_id 指向所属族）。"""
         try:
             request = CatalogPromoteRequest(**params)
             record = self._open_catalog().promote_member(request.record_id, request.member_index)
@@ -1234,7 +1259,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogExportRequest)
     def catalog_export(self, **params) -> CatalogExportResponse:
-        """把查询子集打包导出（标注随包）；包可直接作为库打开。"""
+        """Package the query result subset for distribution..
+
+        把查询子集打包导出（标注随包）；包可直接作为库打开。"""
         try:
             request = CatalogExportRequest(**params)
         except (ValueError, TypeError) as exc:
@@ -1259,11 +1286,13 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogSweepRequest)
     def catalog_sweep(self, **params) -> CatalogSweepResponse:
-        """参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
+        """Parameter-space sweep batch-generating into the catalog.
 
-        网格 = 族 × 平动点 × 主参数维度（一维振幅/近月点高度、能量窗口、
-        LISSAJOUS 二维振幅，三选一）；部分参数点失败时已产出的记录
-        保留，失败原因逐点可查（ADR 0020 软失败语义）。
+        参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
+
+            网格 = 族 × 平动点 × 主参数维度（一维振幅/近月点高度、能量窗口、
+            LISSAJOUS 二维振幅，三选一）；部分参数点失败时已产出的记录
+            保留，失败原因逐点可查（ADR 0020 软失败语义）。
         """
         try:
             request = CatalogSweepRequest(**params)

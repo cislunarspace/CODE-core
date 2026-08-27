@@ -1,5 +1,5 @@
 //! 星历 Hamiltonian 内部合力与 `compute_total_acceleration` 的逐点对拍
-//! （issue #498 验收 b，ADR 0034 决策 6）。
+//! （ADR 0034 决策 6）。
 //!
 //! 同一 (et, state) 下，`EphemerisPlanar::inertial_accel` 经系变换后的
 //! 惯性合力应与直接调用 `compute_total_acceleration` 一致。星历用解析

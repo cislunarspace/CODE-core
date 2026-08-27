@@ -1,6 +1,6 @@
 """``normal_form.coord_trans`` + ``catalog`` 测试。
 
-覆盖（issue #174，切片 5）：
+覆盖：
 
 - :mod:`coord_trans` 5 段叶子函数各自的往返（``rho↔em``、``em↔ds``、
   ``ds↔qf``、``qf↔cm``、``cm↔param``）；
@@ -168,7 +168,7 @@ def _interp_W_series_at_t(cm_result, qf_result, t):
     """测试用镜像：在 t 处插值 CM 的 W_series（与 coord_trans.__init__ 一致）。
 
     时间网格用 ``qf_result.tlist``（与 ``CenterManifoldReducer.reduce`` 生成
-    W_series 的时间轴一致），而非任意兜底网格——这是 issue #174 的正向数值
+    W_series 的时间轴一致），而非任意兜底网格：这是正向数值
     正确性关键（往返测试因正逆相消掩盖不了正向错误）。
     """
     t_arr = np.asarray(qf_result.tlist, dtype=float).ravel()
@@ -330,7 +330,7 @@ def test_qf_cm_re_basis_change_is_involution():
 
 
 def test_qf_cm_rust_matches_python_multi_order(l1_context):
-    """多阶 W 下 Rust 与 Python 参照正反向分量一致（#465）。"""
+    """多阶 W 下 Rust 与 Python 参照正反向分量一致。"""
     qf = _make_qf_result(l1_context)
     cm = _make_cm_result(l1_context, qf, with_terms=True, max_order=5)
     W_at_t = _interp_W_series_at_t(cm, qf, 1.0)
@@ -440,11 +440,10 @@ def test_w_series_interp_uses_real_tlist(l1_context):
 
     回归守卫：``CenterManifoldResult`` 不存 tlist，``_interp_W_series_at_t``
     若退回 ``dt=0.1`` 兜底网格，会在非采样点上给出错误系数（差异可达 ~1），
-    导致正向 ``rho_to_param`` 数值错误——而往返测试因正逆相消掩盖该错误。
+    导致正向 ``rho_to_param`` 数值错误，且往返测试因正逆相消掩盖该错误。
     本测试注入一项随时间线性变化的 Hamiltonian 项，使化简后的 W_series
     含随时间变化的系数，在非采样点上断言插值值等于用真实 ``qf.tlist``
-    的解析值，且与 ``dt=0.1`` 兜底值明显不同。这是 issue #174 表征参数
-    一致性回归的前提保障。
+    的解析值，且与 ``dt=0.1`` 兜底值明显不同。
     """
     from e2m2e.algorithm.normal_form.center_manifold import CenterManifoldReducer
     from e2m2e.algorithm.normal_form.coord_trans import _interp_W_series_at_t

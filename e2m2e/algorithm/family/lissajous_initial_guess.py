@@ -105,7 +105,7 @@ def compute_lissajous_bounded_trajectory(
 ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating], float]:
     """生成非线性 CR3BP 下有界的 Lissajous 轨迹（中心流形约化流）。
 
-    该单轨设计入口保留原有高阶 normal-form 语义；#428 的统一轨道族参数
+    该单轨设计入口保留原有高阶 normal-form 语义；统一轨道族参数
     采样由独立 Rust family_generation 模块完成，不经过本函数。
 
     Args:

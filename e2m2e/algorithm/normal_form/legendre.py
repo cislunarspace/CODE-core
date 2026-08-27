@@ -20,7 +20,7 @@ API：
 - :func:`expand_legendre_for_body` —— 给已构造好的 ``Le`` 标上 ``-μ``
   乘子，按幂次直接给到 ``hamiltonian.build_hamiltonian`` 使用。
 
-本切片中 ``sympy`` 仅在函数内部惰性导入，``e2m2e.algorithm.normal_form``
+本模块中 ``sympy`` 仅在函数内部惰性导入，``e2m2e.algorithm.normal_form``
 顶层导入不强制依赖。
 """
 

@@ -15,7 +15,7 @@
 - **CM ↔ param** (:mod:`.cm_param`)：复→极坐标（作用量-角变量）。
 
 端到端链式函数 :func:`rho_to_param` / :func:`param_to_rho` 依赖三个预计算
-结果句柄（切片 #171–#173 交付）：
+结果句柄：
 
 - :class:`~e2m2e.algorithm.normal_form.dynamical_substitution.DynamicalSubstituteResult`
   提供 ``W_poly`` （DS 平移，``{pow: coef_array}``）；

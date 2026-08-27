@@ -1,7 +1,7 @@
-"""sidecar 二进制帧编解码测试（issue #518 / ADR 0035）。
+"""sidecar 二进制帧编解码测试。
 
-帧契约的字节级黄金断言在本文件：magic/dtype/ndim/shape/数据逐字段对照
-ADR 0035 §3，实现漂移会在这里被抓住。
+帧契约的字节级黄金断言在本文件：magic/dtype/ndim/shape/数据逐字段
+逐项对照，实现漂移会在这里被抓住。
 """
 
 from __future__ import annotations

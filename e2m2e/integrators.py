@@ -278,8 +278,8 @@ def _check_rust_abi() -> None:
     """校验 Rust 扩展 ABI 版本；过期或缺失即报，结果进程级缓存。
 
     在首次使用 Rust 扩展符号时调用（惰性）。扩展不存在时抛
-    :class:`RustExtensionUnavailableError` （带 ``make dev`` 指引）——
-    不再静默降级（issue #378）。过期二进制抛 ``RuntimeError``。
+    :class:`RustExtensionUnavailableError` （带 ``make dev`` 指引），
+    不静默降级。过期二进制抛 ``RuntimeError``。
     """
     global _abi_ok
     if _abi_ok:
@@ -309,8 +309,8 @@ def require_rust_extension(*required_symbols: str) -> None:
 
     在使用 Rust 扩展符号的每个入口调用。扩展未构建、构建不含 spice
     feature、或符号缺失时，抛带 ``make dev`` 指引的
-    :class:`RustExtensionUnavailableError`——不允许静默回退到 Python/scipy
-    （issue #378）。``required_symbols`` 是 ``e2m2e.integrators`` 模块级
+    :class:`RustExtensionUnavailableError`，不允许静默回退到 Python/scipy。
+    ``required_symbols`` 是 ``e2m2e.integrators`` 模块级
     符号名；扩展缺失时符号为 ``None``。
 
     Example:

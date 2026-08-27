@@ -74,7 +74,7 @@ def test_rust_ffi_rejects_out_of_range_free_variable():
 
 
 def test_python_backend_parameter_is_not_available(dro_dynamics, dro_seed_orbit):
-    """Python 数值后端已移除，公开迭代接口不再接受 backend 参数。"""
+    """Python 数值后端已移除，公开迭代接口不接受 backend 参数。"""
     corrector = DifferentialCorrection(dro_dynamics)
     corrector.setup_2D_symmetric_x_fixed_x0(x0=float(dro_seed_orbit.states[0, 0]))
 

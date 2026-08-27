@@ -95,7 +95,7 @@ class TestOrbitInit:
         np.testing.assert_allclose(orbit.state0, orbit.states[0])
 
     def test_jacobi_computed_via_system(self, earth_moon_system):
-        """Jacobi 常数应由 system 直接计算，不再由 Orbit 持有"""
+        """Jacobi 常数应由 system 直接计算，Orbit 不持有"""
         states = np.random.rand(10, 6)
         for state in states:
             c = earth_moon_system.get_jacobi_constant(state)

@@ -1,6 +1,19 @@
 """
 e2m2e - Earth to Moon, Moon to Earth Transfer Orbit Design Library
 
+[English]
+
+A Python library for designing and analyzing cislunar transfer orbits,
+focused on orbit dynamics in the Circular Restricted Three-Body Problem
+(CR3BP). Five-layer architecture (ADR 0011): data/ (data layer), crates/
+(numerical layer), algorithm/ (algorithm layer), api/ (interface layer),
+tools/ (tools layer).
+
+Key capabilities: mission orbit design, station keeping, transfer design,
+orbit prediction, spacetime coordinate conversion.
+
+[简体中文]
+
 一个用于设计和分析地月空间转移轨道的Python库，专注于圆型限制性三体问题
 （CR3BP）中的轨道动力学。五层架构（ADR 0011）：data/（数据层）、crates/
 （数值层）、algorithm/（算法层）、api/（接口层）、tools/（工具层）。
@@ -44,10 +57,14 @@ __all__ = [
     "integrators",
 ]
 
-# ---- Import-time Rust ABI 校验 ----
+# ---- Import-time Rust ABI 校验 / Import-time Rust ABI check ----
 # 若 Rust 扩展已在进程内加载（如用户直引 e2m2e._integrators），立即校验版本，
 # 避免过期二进制静默产生错误结果。扩展未加载时静默跳过（惰性，首次 Rust 使用
 # 时由 integrators._check_rust_abi() 接管）。
+# (If the Rust extension is already loaded in-process, e.g. via direct import of
+# e2m2e._integrators, verify its version immediately so stale binaries cannot
+# silently produce wrong results. If not loaded, skip quietly — lazy checking is
+# then handled by integrators._check_rust_abi() at first Rust use.)
 import sys as _sys
 
 if "e2m2e._integrators" in _sys.modules:

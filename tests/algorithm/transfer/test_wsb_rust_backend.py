@@ -58,8 +58,8 @@ def _params() -> WsbSearchParams:
         max_total_dv=1_000_000.0,
         h2_energy_threshold=1_000_000.0,
         n_propagation_samples=100,
-        # 网格筛选级容差（ADR 0021 修订 #420：默认测试时间上界靠缩小问题
-        # 规模保证）。Python 参照无步数截断，研究级 1e-12 会让擦月组合
+        # 网格筛选级容差（默认测试时间上界靠缩小问题规模保证）。
+        # Python 参照无步数截断，研究级 1e-12 会让擦月组合
         # 烧到积分器自适应上限，单组合秒级；1e-10 对 1e-8 断言精度足够。
         rtol=1e-10,
         atol=1e-10,

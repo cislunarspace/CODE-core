@@ -87,7 +87,7 @@ class TestStrictTargetPointLaw:
         np.testing.assert_allclose(dv, expected, atol=1e-9)
 
     def test_default_tolerance_and_max_iter(self):
-        """默认 tolerance_km=0.1、max_iter=6（#280 修复值）。"""
+        """默认 tolerance_km=0.1、max_iter=6。"""
         law = StrictTargetPointLaw()
         assert law.tolerance_km == 0.1
         assert law.max_iter == 6

@@ -201,10 +201,8 @@ class TestCoordinateSystemState:
 class TestCoordinateSystemOrthogonality:
     """CoordinateSystem 中使用的 Axes 旋转矩阵满足正交性。
 
-    issue #76 验收第 4 条"所有转换矩阵满足正交性(R @ R.T = I 误差 < 1e-14)"
-    的字面落实——在新框架的 test_coordinate_system.py 里显式覆盖,因
-    test_standard_axes.py 覆盖的是具体类,本文件覆盖"框架内的任何 Axes
-    子类"契约。
+    契约:所有转换矩阵满足 R @ R.T = I,误差 < 1e-14。本文件覆盖
+    框架内的任何 Axes 子类;具体类由 test_standard_axes.py 单独覆盖。
     """
 
     @pytest.mark.parametrize("et", [0.0, 1.0, 100.0, 86400.0, -86400.0])

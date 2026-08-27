@@ -1,18 +1,18 @@
-"""``propagate_cr3bp_stm_py`` 释放 GIL 回归测试（#313）。
+"""``propagate_cr3bp_stm_py`` 释放 GIL 回归测试。
 
 CR3BP 修正段（``design_dro`` / ``design_halo`` / ``design_lissajous`` 共用
-``_propagate_with_stm``）切到 Rust ``propagate_cr3bp_stm_py`` 后，积分循环仍持
-GIL，下游 worker 线程跑 ``design_orbit`` 时主线程（GUI / QTimer tick）被冻结
-66s+。本测试守住"积分循环包进 ``py.allow_threads``"：主线程积分期间，另一个
-Python 线程应能持续推进（心跳打点）。
+``_propagate_with_stm``）走 Rust ``propagate_cr3bp_stm_py``：若积分循环仍持
+GIL，下游 worker 线程跑 ``design_orbit`` 时主线程（GUI / QTimer tick）会被
+长时间冻结。本测试守住"积分循环包进 ``py.allow_threads``"：主线程积分期间，
+另一个 Python 线程应能持续推进（心跳打点）。
 
-判别原理同 ``integrators/bindings/test_propagate_compiled.py`` 中的 GIL 测试（#318）：心跳线程循环
+判别原理同 ``integrators/bindings/test_propagate_compiled.py`` 中的 GIL 测试：心跳线程循环
 ``ticks += 1; time.sleep(0.005)``。``time.sleep`` 释 GIL，醒来执行 ``ticks += 1``
 必须重新获取 GIL——
 
 - 主循环已用 ``py.allow_threads`` 释 GIL：心跳 reacquire 立即成功，按 ~5 ms 节奏
   持续打点，dt 秒内 ~dt/0.005 次。
-- 主循环持 GIL（回归）：心跳 reacquire 阻塞到积分返回，期间打点 ≈ 0。
+- 主循环持 GIL：心跳 reacquire 阻塞到积分返回，期间打点 ≈ 0。
 
 两者相差 1~2 个数量级，阈值取 3，判别稳健。传播段太短（dt < 0.10 s）信号不足
 则 skip。
@@ -55,8 +55,8 @@ def _l4_state() -> list[float]:
 def test_propagate_cr3bp_stm_releases_gil():
     """主线程 STM 积分期间，心跳线程持续打点 → propagate_cr3bp_stm_py 已释放 GIL。
 
-    回归 #313：积分循环漏包 ``py.allow_threads``，全程持 GIL 使心跳饿死
-    （ticks ≈ 0）。修复后释 GIL，ticks 随 dt 线性增长。
+    积分循环必须包 ``py.allow_threads``；若漏包则全程持 GIL 使心跳饿死
+    （ticks ≈ 0），正确释 GIL 时 ticks 随 dt 线性增长。
     """
     y0 = _l4_state()
     # max_step=1e-3 钳位 → ≥ 1e5 步（rtol 1e-12 下自适应步长远大于 1e-3 被钳），
@@ -104,5 +104,5 @@ def test_propagate_cr3bp_stm_releases_gil():
     assert ticks_during >= 3, (
         f"heartbeat ticked only {ticks_during} times during {dt:.2f}s STM propagation "
         f"(expected ~{dt / 0.005:.0f} if GIL released); "
-        "propagate_cr3bp_stm_py may be holding the GIL — 积分循环漏了 py.allow_threads (#313)"
+        "propagate_cr3bp_stm_py may be holding the GIL — 积分循环漏了 py.allow_threads"
     )

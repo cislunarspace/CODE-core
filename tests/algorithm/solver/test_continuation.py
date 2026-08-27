@@ -36,7 +36,7 @@ class TestContinuationParameterRemoval:
 
     def test_continuation_initialization_without_param(self, dro_corrector):
         """Continuation 初始化不应需要 param 参数"""
-        # 这应该成功（旧版本需要传 param 参数）
+        # 这应该成功
         cont = Continuation(corrector=dro_corrector)
         assert cont is not None
         assert cont.continuation_parameter is not None

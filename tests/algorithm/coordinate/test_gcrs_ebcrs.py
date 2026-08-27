@@ -1,4 +1,4 @@
-"""TDT+GCRS ↔ TDB+EBCRS 时空坐标转换测试（issue #252，FR5）。
+"""TDT+GCRS ↔ TDB+EBCRS 时空坐标转换测试。
 
 覆盖 ``GCRSEBCRSSystem``（r2s2 后端）：
 

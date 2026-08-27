@@ -1,8 +1,12 @@
 ---
-title: BDD：算法层
+title: BDD：算法层 / BDD: Algorithm Layer
 ---
 
-# BDD：算法层
+# BDD：算法层 / BDD: Algorithm Layer
+
+[English] Block definition diagram of dynamics, correction and continuation components.
+
+[简体中文] 受管产物：由 scripts/generate_mbse_diagrams.py 重新生成，请勿手改。
 
 ```mermaid
 classDiagram

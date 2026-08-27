@@ -1,7 +1,7 @@
 """QF ↔ CM：quasi-Floquet 坐标 ↔ 中心流形坐标（高阶 Lie 级数）。
 
 迁移自 qiao ``Subfunction/coord_trans/qpQF2qpCM.py`` /
-``qpCM2qpQF.py``——变换链中最复杂的一段。对应切片 #173 中心流形化简
+``qpCM2qpQF.py``——变换链中最复杂的一段。是中心流形化简
 （Code10/Code11）的**坐标层面** 应用：把 quasi-Floquet 坐标通过生成函数
 ``W`` 的高阶 Lie 级数映射到中心流形坐标。
 
@@ -34,7 +34,7 @@ Hamilton 流的右端 ``dX/dt = J·∇W`` 用向量化实现
   显式传 ``DOP853`` 默认容差（``rtol=1e-11``、``atol=1e-13``），不引入
   全局可变状态。
 
-默认后端为 Rust（issue #465）：复值 Lie 流用 12 实维分裂
+默认后端为 Rust：复值 Lie 流用 12 实维分裂
 （``[Re X, Im X]``）走 ``e2m2e-integrators`` 的 DOP853，与 scipy 对复
 ``y0`` 的内部分裂数学等价。``backend="python"`` 仅作显式对照，禁止 auto
 静默降级（ADR 0020）。
@@ -238,7 +238,7 @@ def qf_to_cm(
             ``t`` 插值后的 :class:`CenterManifoldResult.W_series` （复值
             系数，跨 ``invariant``/``center`` 两步合并）。
         backend: ``"rust"``（默认）或显式对照 ``"python"``。禁止 auto。
-        rtol, atol: ODE 容差（与历史 Python 默认一致）。
+        rtol, atol: ODE 容差（与 Python 参考实现默认一致）。
 
     Returns:
         ``(6,)`` CM 状态 ``[Q_cm, P_cm]``，无量纲实数。

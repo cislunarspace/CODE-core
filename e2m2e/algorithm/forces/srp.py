@@ -8,7 +8,7 @@
 处的太阳光压常数。``flux_factor ∈ [0, 1]`` 由阴影模型给出（全光照=1，本影=0）。
 
 加速度计算全部由 Rust 编译路径承载（``("srp", ...)`` 力元组，
-``crates/e2m2e-forces/src/forces/srp.rs``），Python 侧不保留参考实现（issue #378）。
+``crates/e2m2e-forces/src/forces/srp.rs``），Python 侧不保留参考实现。
 
 References:
     - Montenbruck & Gill, *Satellite Orbits*, eq. 3.75

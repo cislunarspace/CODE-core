@@ -509,7 +509,7 @@ def _solve_qf_matrix(
             .. note::
                分段 + 投影是 ``qiao`` 完整多点打靶（块三对角 Newton）的最小
                替代。对 ``λT ≳ 40`` （如 L2 的 30 天窗口）仍可能精度不足，
-               需完整多点打靶（见 issue #328）。
+               需完整多点打靶。
     """
     from ._solve_ivp_rust import solve_ivp_rust
 
@@ -954,7 +954,7 @@ class QuasiFloquetReducer:
         """对 ``ds_result`` 执行 quasi-Floquet 变换。
 
         Args:
-            ds_result: 切片 #171 的动力学替代结果，至少提供 ``tlist``、
+            ds_result: 动力学替代结果，至少提供 ``tlist``、
                 ``Xlist`` 与 ``context``。
 
         Returns:

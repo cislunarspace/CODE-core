@@ -1,4 +1,18 @@
-# 变更日志
+# 变更日志 / Changelog
+
+[English]
+
+This changelog is written in Chinese by convention: release notes record exact code references (`module/function`, issue numbers, numeric details) whose authoritative wording lives in this file; paraphrasing them into English in place would invite drift between the two versions with each release.
+
+Per this repo's own documentation policy (see `docs/adr/README.md`: decision snapshots are never rewritten), released entries below are immutable history and stay as written. **From the next release onward, new entries should follow a bilingual convention**: section headings use both languages (`### Added / 新增`, `### Fixed / 修复`, `### Changed / 变更`), each entry begins with an English one-sentence summary followed by the detailed Chinese note. Unreleased content may be edited freely before release.
+
+For an English overview of what changed recently, read the [README](README.md#documentation), the [online docs](https://cislunarspace.github.io/e2m2e/), or ask in a GitHub discussion.
+
+[简体中文]
+
+本变更日志按惯例以中文书写：发布说明里的代码引用（模块/函数名、issue 编号、数值细节）以中文原文为权威表述，就地改写英文会随每次发布产生双版本漂移。
+
+按仓库自身的文档策略（见 `docs/adr/README.md`：决策快照不改写原文），已发布的历史条目视为不可变记录、保持原样。**自下个发布起，新条目遵循双语规范**：小节标题用双语（`### Added / 新增`、`### Fixed / 修复`、`### Changed / 变更`），每条先给一句英文摘要，再接中文详注。Unreleased 段内的内容在发布前可自由编辑。
 
 ## [Unreleased]
 

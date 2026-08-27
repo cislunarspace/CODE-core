@@ -1,7 +1,7 @@
 """Normal-form 流水线的结果类型。
 
-``NormalFormResult`` 是 :class:`NormalFormPipeline` （issue #175）输出的统一
-载体：把前四个切片（动力学替代 / quasi-Floquet / 中心流形 / 表征参数目录）
+``NormalFormResult`` 是 :class:`NormalFormPipeline` 输出的统一
+载体：把动力学替代 / quasi-Floquet / 中心流形 / 表征参数目录四个子步的
 的结果聚合到一个不可变句柄里。通用化简诊断字段（Hamiltonian 系数、变换
 矩阵、残差）与各子结果句柄并存——前者供算法诊断，后者让外部用户一行代码
 拿到 ``catalog_transformer`` 完成坐标变换。
@@ -35,10 +35,10 @@ class NormalFormResult:
     字段分两组：
 
     - **通用化简诊断** （``substitute_residual``、``success``、``message``、
-      ``metadata``）：跨切片稳定，描述整条流水线的收敛情况。保留给仅关心
+      ``metadata``）：跨阶段稳定，描述整条流水线的收敛情况。保留给仅关心
       "是否收敛、残差多大"的诊断调用方。
     - **子结果句柄** （``ds_result`` / ``qf_result`` / ``cm_result`` /
-      ``catalog_transformer``）：issue #175 新增。指向四个子 reducer 的产物；
+      ``catalog_transformer``）：指向四个子 reducer 的产物；
       ``catalog_transformer`` 一等公民字段使外部用户能直接
       ``result.catalog_transformer.rho_to_param(X_rho, t)`` 完成完整坐标变换，
       无需自己重组装 :class:`LibrationCatalogData`。
@@ -55,11 +55,11 @@ class NormalFormResult:
             ``residual`` 是其向后兼容别名。
         success: 流水线是否在容差内收敛。
         message: 人类可读的终止原因。
-        metadata: 自由扩展字段；保留供后续切片写入诊断数据。
-        ds_result: 动力学替代结果（切片 #171）；流水线未跑到该步时为 ``None``。
-        qf_result: quasi-Floquet 结果（切片 #172）；同上。
-        cm_result: 中心流形化简结果（切片 #173）；同上。
-        catalog_transformer: 表征参数目录变换器（切片 #174），
+        metadata: 自由扩展字段；保留供流水线写入诊断数据。
+        ds_result: 动力学替代结果；流水线未跑到该步时为 ``None``。
+        qf_result: quasi-Floquet 结果；同上。
+        cm_result: 中心流形化简结果；同上。
+        catalog_transformer: 表征参数目录变换器，
             绑定 ds_result、qf_result、cm_result 三个子
             结果与 context；流水线跑完四步后非 ``None``，是外部用户做
             ``rho ↔ param`` 坐标变换的入口。
@@ -84,9 +84,9 @@ class NormalFormResult:
     def residual(self) -> float:
         """``substitute_residual`` 的向后兼容别名。
 
-        早期版本该字段名 ``residual``，但 docstring 描述的"截断残差"与实际
-        写入的"动力学替代连续性残差"语义不符（见 #224）。新代码应用
-        ``substitute_residual``；本 property 仅为不破坏既有消费者保留。
+        字段名 ``residual`` 与其实际语义（动力学替代段间连续性残差，
+        而非 Lie 变换截断残差）不符，已改用 ``substitute_residual``；
+        本 property 仅为不破坏既有消费者保留。
         """
         return self.substitute_residual
 

@@ -1,8 +1,7 @@
 """Halo PAL 编排函数 halo_pseudo_arclength_continuation 冒烟测试。
 
-#434 回归测试：#351 结果契约迁移后，编排层曾读取延拓结果的旧属性名
-（``.orbits``，现契约下族在 ``ContinuationResult.family``），任何调用
-必然 AttributeError——而套件对此零覆盖。此处以 session 缓存的 L1 Halo
+编排层读取延拓结果契约字段（现契约下族在 ``ContinuationResult.family``），
+套件早期对该链路零覆盖。此处以 session 缓存的 L1 Halo
 种子直接驱动编排函数，小步数验证它返回带标签的 Halo 族。
 """
 

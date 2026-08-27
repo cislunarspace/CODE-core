@@ -1,8 +1,12 @@
 ---
-title: 功能需求
+title: 功能需求 / Functional Requirements
 ---
 
-# 功能需求
+# 功能需求 / Functional Requirements
+
+[English] Requirement diagram of the registered functional requirements and their code trace links.
+
+[简体中文] 受管产物：由 scripts/generate_mbse_diagrams.py 重新生成，请勿手改。
 
 ```mermaid
 requirementDiagram

@@ -1,4 +1,4 @@
-"""HJB 结构网格求解绑定的契约测试（issue #497）。
+"""HJB 结构网格求解绑定的契约测试。
 
 覆盖 solve_hjb_py 通用入口与 solve_planar_lowthrust_hjb_py 兼容包装：
 返回结构、时间方向、值函数的物理单调性与耗散收敛、参数校验。
@@ -181,7 +181,7 @@ class TestParameterValidation:
 
 
 class TestEphemerisPlanar:
-    """ephemeris_planar 动力学（#498，ADR 0034 平面全星历）。
+    """ephemeris_planar 动力学（平面全星历）。
 
     参数校验与入口契约不依赖内核；求解正确性（粗细模型回归、零 cspice）
     需要 SPICE 内核与星历缓存，标 ``spice`` 在内核缺失时跳过。
@@ -269,7 +269,7 @@ class TestEphemerisPlanar:
 
 @pytest.mark.spice
 class TestEphemerisPlanarSolve:
-    """ephemeris_planar 求解（#498 验收 c/d）：零 cspice 与粗细模型回归。"""
+    """ephemeris_planar 求解：零 cspice 与粗细模型回归对照。"""
 
     MU_EARTH = 398600.435436
     MU_MOON = 4902.800066
@@ -372,7 +372,7 @@ class TestEphemerisPlanarSolve:
         assert times[0] == pytest.approx(0.0, abs=1e-6 * tf_s)
         assert times[-1] == pytest.approx(tf_s)
 
-        # 验收 c：粗细模型回归——星历版与 CR3BP 版值函数量级与等值面
+        # 粗细模型回归：星历版与 CR3BP 版值函数量级与等值面
         # 结构一致。剩余差异是物理性的（真实月距 370000 km vs 标称
         # 384400 km、瞬时 ω vs 标称 ω、太阳第三体），随窗长增长；实现
         # 错误由退化对拍（Rust）与力一致性（逐点）锤死，不靠此断言。

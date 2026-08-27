@@ -51,7 +51,7 @@ def test_explicit_gmat_itrf_runs_with_committed_fixtures():
 
 def test_coordinate_smoke_with_explicit_gmat_axes_round_trips_vector():
     icrf = CoordinateSystem(ICRSAxes(), InertialOrigin())
-    # EOP 越界策略显式选择（#352 移除 compatibility 隐式切换后）
+    # EOP 越界策略显式选择
     gmat_itrf = CoordinateSystem(GMATITRFAxes(eop_extrapolation="clamp"), InertialOrigin())
     vector = np.array([1.0, 2.0, 3.0])
 

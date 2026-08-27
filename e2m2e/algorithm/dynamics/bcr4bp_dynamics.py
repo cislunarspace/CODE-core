@@ -198,8 +198,8 @@ class BCR4BP_Dynamics(Dynamics):
         ``"scipy"`` 走 scipy ``solve_ivp``；``"rust"`` 走 Rust
         ``solve_ivp_events`` （事件语义与 scipy 未完全对齐，由调用方显式
         选择并接受差异）。``backend`` 由 :meth:`propagate` 校验（不传报错、
-        不允许 ``auto``）。无 events 时要求 Rust 扩展可用（issue #378：
-        缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
+        不允许 ``auto``）。无 events 时要求 Rust 扩展可用（缺失即抛
+        RustExtensionUnavailableError，不静默降级 scipy）。
         """
         if events is not None:
             if backend == "scipy":
@@ -309,7 +309,7 @@ class BCR4BP_Dynamics(Dynamics):
         time = np.array(result["time"])
 
         # 防御性校验：Rust 侧任何提前退出都必须在这里暴露，不允许把截断
-        # 结果当完整轨迹返回（issue #246，照抄 cr3bp 的 _propagate_with_stm_rust）。
+        # 结果当完整轨迹返回（照抄 cr3bp 的 _propagate_with_stm_rust）。
         if len(time) != len(t_eval_list):
             raise RuntimeError(
                 f"Rust STM propagation returned {len(time)} of {len(t_eval_list)} "
@@ -338,8 +338,7 @@ class BCR4BP_Dynamics(Dynamics):
 
         events 时按显式 ``backend`` 选择事件积分路径（ADR 0020 决策 4），
         语义同 :meth:`_propagate_with_stm`。无 events 时要求 Rust 扩展可用
-        （issue #378：缺失即抛 RustExtensionUnavailableError，不静默降级
-        scipy）。
+        （缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
         """
         if events is not None:
             if backend == "scipy":

@@ -1,71 +1,73 @@
-转移轨道设计概述
-================
+Transfer Design Overview / 转移轨道设计概述
+============================================
 
-e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍曼转移）到复杂引力辅助转移（LGA）的各类场景。
+[English](#transfer-design-overview) | [简体中文](#中文)
 
-转移设计模块
-------------
+English
+-------
 
-- :doc:`lambert`：Lambert 二体求解器，支持短程/长程与多圈解
-- :doc:`hmn`：霍曼直接转移（HMN），适用于共面圆轨道间的最小能量转移
-- :doc:`lga`：月球引力辅助间接转移（LGA），基于圆锥曲线拼接法
-- :doc:`wsb`：太阳引力辅助低能间接转移（WSB），H₂<0 弹道捕获
-- :doc:`low_thrust`：小推力转移，Q-law 初猜 + 打靶/配点
-- :doc:`search`：网格搜索，参数空间扫描可行转移窗口
-- :doc:`optimization`：NLP 优化，以搜索结果为初值精化转移轨道
-- :doc:`terminal`：终端条件抽象
-- :doc:`propulsion`：推进系统建模
+e2m2e provides multiple transfer-design methods, from simple coplanar transfers
+(Hohmann) to complex gravity-assist transfers (LGA).
 
-搜索-优化两步法（DRO-RO）
---------------------------
+Transfer modules
+~~~~~~~~~~~~~~~~
 
-基于 Cui et al. (2025) 的搜索-优化两步法，用于 DRO（Distant Retrograde Orbit）到 RO（共振轨道）的转移轨道设计。
+- :doc:`lambert`: two-body Lambert solver with short/long-way and multi-rev solutions
+- :doc:`hmn`: direct Hohmann transfer (HMN) — minimum energy between coplanar circular orbits
+- :doc:`lga`: lunar gravity assist (LGA), conic patching
+- :doc:`wsb`: solar-gravity-assisted low-energy transfer (WSB), H₂<0 ballistic capture
+- :doc:`low_thrust`: low thrust — Q-law guess + shooting/collocation
+- :doc:`search`: grid search scanning feasible windows in parameter space
+- :doc:`optimization`: NLP optimization refining transfers from search results
+- :doc:`terminal`: terminal-condition abstractions
+- :doc:`propulsion`: propulsion modeling
 
-设计方法
---------
+Search–optimize two-step method (DRO→RO)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-两步法流程：
+Based on Cui et al. (2025)'s search-plus-optimize scheme for DRO→RO transfer
+design.
 
-1. **搜索阶段**：在参数空间中搜索可行的转移窗口
-2. **优化阶段**：对搜索结果进行 NLP 精化优化
+Pipeline:
 
-**转移类型：**
+1. **Search**: scan parameter space for feasible windows
+2. **Optimize**: NLP refinement on the best candidates
 
-- ``DIRECT``: 直接转移
-- ``LGA``: 月球引力辅助转移
-- ``EXTERNAL``: 外部转移
+**Transfer types:**
 
-设计变量
---------
+- ``DIRECT``: direct transfer
+- ``LGA``: lunar gravity assist
+- ``EXTERNAL``: external transfer
 
-搜索和优化的核心变量：
+Design variables
+~~~~~~~~~~~~~~~~
 
-- **α (alpha)**: 切向速度比，控制出发速度方向
-- **T**: 转移时间
-- **t_ins**: 从轨道远地点到插入点的时间
+- **α (alpha)**: tangential velocity ratio, steering departure direction
+- **T**: transfer time
+- **t_ins**: apogee-to-insertion time
 
-目标函数
---------
+Objective
+~~~~~~~~~
 
-最小化总脉冲：
+Minimize total impulse:
 
 .. math::
 
    J = \Delta v_1 + \Delta v_2
 
-其中 :math:`\Delta v_1` 为出发脉冲，:math:`\Delta v_2` 为插入脉冲。
+with :math:`\Delta v_1` departure and :math:`\Delta v_2` insertion impulses.
 
-约束条件
---------
+Constraints
+~~~~~~~~~~~
 
-- 位置连续性：转移轨道与目标轨道在插入点位置匹配
-- 速度平行性：转移轨道速度方向与目标轨道速度方向平行
-- 碰撞避免：避免与地球和月球碰撞
+- Position continuity at insertion
+- Velocity parallelism with target velocity direction
+- Collision avoidance against Earth & Moon
 
-端到端示例
-----------
+End-to-end example
+~~~~~~~~~~~~~~~~~~
 
-以下示例展示从搜索到优化再到成本分析的 DRO-RO 转移设计流程：
+The full flow — search, optimize, cost analysis:
 
 .. code-block:: python
 
@@ -81,18 +83,18 @@ e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍�
        load_orbit_from_json,
    )
 
-   # 1. 建立动力学（μ 取 DE421 基准，ADR 0022）
+   # 1. Dynamics (μ from DE421, ADR 0022)
    system = CR3BP_System(
        mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
    )._with_default_scales()
    system.compute_libration_points()
    dynamics = CR3BP_Dynamics(system)
 
-   # 2. 加载出发轨道（DRO）和目标轨道（RO）
+   # 2. Load departure (DRO) & target (RO)
    dro_orbit = load_orbit_from_json("data/dro_orbit.json")
    ro_orbit = load_orbit_from_json("data/ro_orbit.json")
 
-   # ========== 路径 A：高层接口（搜索 + 优化一键完成）==========
+   # ========== Path A: high-level (search + optimize in one call) ==========
    transfer = Transfer(dynamics)
    transfer.set_orbit(start=dro_orbit, end=ro_orbit)
 
@@ -104,48 +106,37 @@ e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍�
    )
 
    if result.success:
-       print(f"总脉冲: {result.total_delta_v:.6f} DU")
-       print(f"转移时间: {result.transfer_time:.2f} TU")
+       print(f"Total Δv: {result.total_delta_v:.6f} DU")
+       print(f"Transfer time: {result.transfer_time:.2f} TU")
 
-   # ========== 路径 B：底层接口（搜索与优化分步控制）==========
-   # 2.1 搜索阶段：网格搜索可行转移窗口
+   # ========== Path B: lower-level (search & optimize separately) ==========
    searcher = TransferSearch(dynamics)
 
    results = searcher.search(
-       alpha_min=0.5,
-       alpha_max=2.5,
-       n_alpha=101,
-       n_departure=200,
-       max_transfer_time=30.0,
-       intersection_threshold=1e-3,
+       alpha_min=0.5, alpha_max=2.5, n_alpha=101, n_departure=200,
+       max_transfer_time=30.0, intersection_threshold=1e-3,
        min_distance_threshold=1e-3,
        collision_earth_radius=200.0 / 384405.0,
        collision_moon_radius=100.0 / 384405.0,
        integration_dt=0.01,
-       departure_orbit=dro_orbit,
-       arrival_orbit=ro_orbit,
+       departure_orbit=dro_orbit, arrival_orbit=ro_orbit,
        verbose=True,
    )
 
-   # 筛选可行解
    feasible = searcher.get_feasible_results()
-   print(f"可行解数量: {len(feasible)}")
+   print(f"Feasible candidates: {len(feasible)}")
 
-   # 2.2 优化阶段：以最佳可行解为初值进行 NLP 精化
    best = min(feasible, key=lambda r: r["dv_departure"] + r["dv_insertion"])
 
    optimizer = DROTRONLPOptimizer(
-       system=system,
-       dynamics=dynamics,
-       departure_orbit=dro_orbit,
-       arrival_orbit=ro_orbit,
+       system=system, dynamics=dynamics,
+       departure_orbit=dro_orbit, arrival_orbit=ro_orbit,
        departure_state=best["departure_state"],
    )
 
    nlp_result = optimizer.optimize(
        initial_guess=NLPOptimizationVariables(
-           alpha=best["alpha"],
-           transfer_time=best["transfer_time"],
+           alpha=best["alpha"], transfer_time=best["transfer_time"],
            t_ins=best.get("t_ins", 5.0),
        ),
        alpha_range=(0.5, 2.5),
@@ -156,10 +147,9 @@ e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍�
    )
 
    if nlp_result.success:
-       print(f"优化后总脉冲: {nlp_result.total_delta_v:.6f} DU")
-       print(f"优化后转移时间: {nlp_result.transfer_time:.2f} TU")
+       print(f"Optimized total Δv: {nlp_result.total_delta_v:.6f} DU")
+       print(f"Optimized time: {nlp_result.transfer_time:.2f} TU")
 
-   # 2.3 成本分析
    from e2m2e.algorithm.transfer.cost import compute_transfer_cost
 
    cost = compute_transfer_cost(
@@ -168,9 +158,8 @@ e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍�
        final_velocity=nlp_result.final_state[3:],
        insertion_velocity=nlp_result.insertion_state[3:],
    )
-   print(f"成本分解: Δv1={cost.dv1:.6f}, Δv2={cost.dv2:.6f}, 总计={cost.total:.6f}")
+   print(f"Cost split: Δv1={cost.dv1:.6f}, Δv2={cost.dv2:.6f}, total={cost.total:.6f}")
 
-   # 2.4 可视化转移轨迹
    import matplotlib.pyplot as plt
 
    traj = nlp_result.transfer_trajectory
@@ -186,3 +175,33 @@ e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍�
    ax.set_title("DRO-RO Transfer Trajectory")
    plt.tight_layout()
    plt.show()
+
+中文
+----
+
+e2m2e 提供多种转移轨道设计方法，覆盖从简单共面转移（霍曼转移）到复杂引力辅助转移（LGA）的各类场景。
+
+转移设计模块
+~~~~~~~~~~~~
+
+- :doc:`lambert`：Lambert 二体求解器，支持短程/长程与多圈解
+- :doc:`hmn`：霍曼直接转移（HMN），适用于共面圆轨道间的最小能量转移
+- :doc:`lga`：月球引力辅助间接转移（LGA），基于圆锥曲线拼接法
+- :doc:`wsb`：太阳引力辅助低能间接转移（WSB），H₂<0 弹道捕获
+- :doc:`low_thrust`：小推力转移，Q-law 初猜 + 打靶/配点
+- :doc:`search`：网格搜索，参数空间扫描可行转移窗口
+- :doc:`optimization`：NLP 优化，以搜索结果为初值精化转移轨道
+- :doc:`terminal`：终端条件抽象
+- :doc:`propulsion`：推进系统建模
+
+搜索-优化两步法（DRO-RO）
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+基于 Cui et al. (2025) 的搜索-优化两步法，用于 DRO 到 RO 的转移轨道设计。
+
+设计方法：先在参数空间搜索可行窗口，再对结果做 NLP 精化。转移类型分
+DIRECT / LGA / EXTERNAL。核心变量为 α（切向速度比）、T（转移时间）、
+t_ins（远地点到插入点时间）；目标是最小化总脉冲，约束含位置连续、速度平行
+与碰撞避免。
+
+端到端示例与代码见上方英文节（同一套 API，中英注释）。

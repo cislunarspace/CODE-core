@@ -52,7 +52,7 @@ class TestCouplingMapping:
         assert gf["params"]["tide_mode"] == "solid"
 
     def test_default_perturbation_no_error(self):
-        """默认配置（coupling=1, tide=1）不再抛 NotImplementedError。"""
+        """默认配置（coupling=1, tide=1）不抛 NotImplementedError。"""
         from e2m2e.data.templates.perturbations import DEFAULT_PERTURBATION
 
         # 应正常返回，不抛异常

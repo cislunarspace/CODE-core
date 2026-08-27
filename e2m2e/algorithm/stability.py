@@ -67,7 +67,7 @@ class OrbitStability:
 
 
 class StabilityAnalysis:
-    """轨道稳定性分析
+    """Monodromy-based stability analysis of a single periodic orbit. / 轨道稳定性分析
 
     计算轨道的单值矩阵、Floquet乘子、稳定性指数等，
     并进行稳定性分类和分岔检测。

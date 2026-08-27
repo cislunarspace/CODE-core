@@ -1,10 +1,14 @@
 ---
-title: 需求追溯矩阵
+title: 需求追溯矩阵 / Requirement Traceability Matrix
 ---
 
-# 需求追溯矩阵
+# 需求追溯矩阵 / Requirement Traceability Matrix
 
-| 需求 ID | 标题 | 类别 | 优先级 | 验证方法 | 关联代码 | 关联测试 |
+[English] Mapping from requirements to code modules and test files. Column headers are bilingual (中文 / English).
+
+[简体中文] 受管产物：由 scripts/generate_mbse_diagrams.py 重新生成，请勿手改。
+
+| 需求 ID / Requirement ID | 标题 / Title | 类别 / Category | 优先级 / Priority | 验证方法 / Verification | 关联代码 / Linked code | 关联测试 / Linked tests |
 |---------|------|------|--------|----------|----------|----------|
 | REQ-001 | 状态向量顺序 | interface | shall | test | e2m2e.data.types.orbit<br>e2m2e.algorithm.dynamics.dynamics | tests/data/types/test_orbit.py<br>tests/algorithm/dynamics/test_dynamics_contract.py |
 | REQ-002 | 传播结果 states 形状 | interface | shall | test | e2m2e.algorithm.dynamics.dynamics<br>e2m2e.algorithm.dynamics.ephemeris_dynamics | tests/algorithm/dynamics/test_dynamics_contract.py<br>tests/algorithm/dynamics/test_ephemeris_dynamics_legacy.py |

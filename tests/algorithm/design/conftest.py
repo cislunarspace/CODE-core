@@ -6,7 +6,7 @@ continuation/multiple_shooting/ephemeris）测试复用。
 注意：本目录的 ``earth_moon_system``/``earth_moon_dynamics`` 覆盖
 ``tests/conftest.py`` 的函数级同名 fixture：orbit_design 测试统一采用
 更精确的地月质量比 μ=0.01215058560962404 与默认特征尺度（地月距
-384405 km、周期 27.32 d），与 lissajous/axial 初猜的历史取值一致。
+384405 km、周期 27.32 d），与 lissajous/axial 初猜的既有取值一致。
 
 阶段 2 追加 7 条代表轨道的 session 缓存（``_corrected_*_cached``，session
 内只修正一次）+ 函数级 deepcopy 包装（``corrected_*``，供单测安全改写）。

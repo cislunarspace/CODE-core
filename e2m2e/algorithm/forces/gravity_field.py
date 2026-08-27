@@ -42,7 +42,7 @@ class GravityField(PhysicalModel):
     在指定的固连坐标系（默认 ITRF93）中展开球谐级数，计算引力加速度。
     加速度计算全部由 Rust 编译路径承载（``("gravity", ...)`` 力元组，
     ``crates/e2m2e-forces/src/forces/gravity_field.rs``，含潮汐），Python 侧
-    不保留参考实现（issue #378）。
+    不保留参考实现。
     """
 
     def __init__(

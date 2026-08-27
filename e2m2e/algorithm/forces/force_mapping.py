@@ -24,7 +24,7 @@ inputs-dac.txt（第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月球�
 - ``solar_radiation=1`` （炮弹模型）：``SolarRadiationPressure``，
   ``area=等效面质比, mass=1, cr=1``——输入侧"等效面质比"（dyb[0]）已把
   Cr 折进去，故 cr 取 1；无阴影模型（阴影行为未确认）。
-- ``solar_radiation=2`` （ECOM）：未实现，``NotImplementedError`` （#253）。
+- ``solar_radiation=2`` （ECOM）：未实现，``NotImplementedError``。
 - ``atmosphere=1``：``DragModel`` （ExponentialAtmosphere 默认 f107/ap，
   cd=2.2，面积同取等效面质比；输入侧 Cd/大气模型参数不可见）。
 - ``relativity=1``：``RelativisticCorrection(EARTH)``，仅 Schwarzschild
@@ -118,7 +118,7 @@ def perturbation_to_force_config(
         ``dump_force_config`` 链路。
 
     Raises:
-        NotImplementedError: ``solar_radiation=2`` （ECOM，#253）。
+        NotImplementedError: ``solar_radiation=2`` （ECOM）。
         ValueError: 开关取值非法；``tide=1`` 或 ``coupling=1`` 而
             ``earth_nonspherical=0``；``dyb`` 非 9 分量。
     """

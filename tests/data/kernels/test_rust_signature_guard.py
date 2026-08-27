@@ -1,6 +1,6 @@
 """SPICEManager Rust 扩展签名漂移守卫的单元测试。
 
-回归背景：``e2m2e._integrators`` 的编译产物（.pyd/.so）落后于源码时，PyO3
+当 ``e2m2e._integrators`` 的编译产物（.pyd/.so）落后于源码时，PyO3
 在参数绑定阶段抛出毫无指向的 ``TypeError``（如 "got an unexpected keyword
 argument 'sxform_pairs'"），栈顶远离调用点，用户无从得知只需重建。``SPICEManager``
 经 ``_call_rust_or_compat_error`` 把这类签名漂移转成带"请重建"提示的
@@ -29,7 +29,7 @@ class TestRustExtensionAvailability:
     """扩展缺失与 ABI 过期时的失败契约。"""
 
     def test_absent_extension_raises_unavailable_error(self, monkeypatch):
-        """扩展缺失不再静默降级。"""
+        """扩展缺失不得静默降级。"""
         monkeypatch.setitem(sys.modules, "e2m2e._integrators", None)
         monkeypatch.setattr(gw, "_abi_ok", False)
 

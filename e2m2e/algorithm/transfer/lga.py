@@ -37,9 +37,8 @@ class LgaSearchParams:
     出发速度大小固定为略超逃逸速度，方向由两个角度参数化：面内角
     （departure_phase，在停泊轨道切向 × 径向平面内）与面外角
     （out-of-plane，绕出发轨道面法向）。面外角网格覆盖经验可行带：
-    其中心随倾角缓慢负移（约 -0.08·δ，实测倾角 0°–90°），修复了
-    共面网格下发射倾角 ≥ 20° 时全部候选被近月高度筛掉的问题
-    （issue #512）。
+    其中心随倾角缓慢负移（约 -0.08·δ，实测倾角 0°–90°），否则共面
+    网格下发射倾角 ≥ 20° 时全部候选会被近月高度筛掉。
 
     近月点高度由传播自然决定，不作为独立搜索变量，
     仅用于筛选可行候选（Parker & Anderson 2014 §3.4）。
@@ -141,7 +140,7 @@ def search_lga_trajectories(
     departure_phase_range 控制出发速度面内方向角范围（弧度）：
     0 = 纯切向（沿停泊轨道切向），pi/2 = 径向向外。
     面外角网格覆盖经验可行带（中心约 -0.08·出发轨道面倾角，
-    ±out_of_plane_halfwidth_deg 对称展开，issue #512 实测倾角 0°–90°）。
+    ±out_of_plane_halfwidth_deg 对称展开，实测倾角 0°–90°）。
     共面出发态（倾角 0）的网格对称于 0，纯共面行为是共面候选的子集。
 
     Args:
@@ -203,7 +202,7 @@ def search_lga_trajectories(
 
     # 面外角网格：以出发轨道面与月球平面的夹角 δ 为中心对称展开。
     # 出发轨道面法向 = r_hat × v_hat（v_hat 取停泊轨道切向）；δ = acos(|n_z|)。
-    # 可行面外角带的经验中心（issue #512 实测，倾角 0°–90°）：
+    # 可行面外角带的经验中心（实测倾角 0°–90°）：
     # b ≈ -0.08·δ，带宽约 2°–3°。可行解的出发方向近径向（沿地月连线），
     # 所需面外角由到达几何决定，随倾角缓慢负移，而非把转移面转回月球平面。
     n_hat = np.cross(r_hat, v_hat)
@@ -386,7 +385,7 @@ def _refine_lga_candidate(
             dv_arr = float(np.linalg.norm(v_arrival_shot - v_target_phys)) / vu_km_s
 
             # 精化未带来改进时保留网格候选（打靶解可能劣于网格解，
-            # 此时采纳会让结果超出 max_total_dv，issue #512）
+            # 此时采纳会让结果超出 max_total_dv）
             if candidate.dv_departure + dv_arr > candidate.total_dv:
                 logger.debug(
                     "ThreeBodyLambert 精化未改进 Δv（%.4f → %.4f），保留网格候选",

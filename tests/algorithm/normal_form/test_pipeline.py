@@ -1,11 +1,11 @@
-"""法型化流水线的端到端 smoke 测试（issue #175，切片 6）。
+"""法型化流水线的端到端 smoke 测试。
 
 覆盖完整四步约化、``rho ↔ param`` 往返、显式 CR3BP 回退、失败时保留
 已完成子结果，以及非法输入拒绝。测试只穿过 :class:`NormalFormPipeline`
 接口，不重复检查构造参数、导出位置和 metadata 实现细节。
 
 SPICE leapseconds 不可用时，fixture 显式声明 ``spice_optional=True`` 走纯
-CR3BP 路径（ADR 0020 决策 4：显式选择，非隐式降级），smoke 测试在该路径下
+CR3BP 路径（显式选择，非隐式降级），smoke 测试在该路径下
 仍能通过（与 ``test_dynamical_substitution.py`` 一致）。
 """
 

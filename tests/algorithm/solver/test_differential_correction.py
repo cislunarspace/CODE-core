@@ -143,10 +143,10 @@ class TestSetup:
 
 
 # ============================================================
-# 迭代内积分容差配置（#536）
+# 迭代内积分容差配置
 # ============================================================
 class TestIntegrationTolerance:
-    """迭代内 STM 传播容差与 dynamics 研究级容差解耦（#536）。"""
+    """迭代内 STM 传播容差与 dynamics 研究级容差解耦。"""
 
     def test_default_is_correction_level(self, dro_dynamics):
         """默认修正级 1e-10，不跟随 dynamics.rtol（研究级 1e-12）。"""

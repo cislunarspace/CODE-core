@@ -1,9 +1,9 @@
-"""normal_form 静默退化改抛回归测试（#352）。
+"""normal_form 静默退化改抛回归测试。
 
 - ``_eval_coef`` 求不出（数值转换失败 / 含未提供符号）抛 ``ValueError``，
   不静默用 0 填（0 会让下游误以为该项不存在，污染哈密顿量）。
 - ``_bdot2a`` 的 ``use_cr3bp`` 显式化：True 走纯 CR3BP 矩阵（不探 SPICE），
-  False 走 SPICE 星历、失败改抛（不再静默退化为纯 CR3BP）。
+  False 走 SPICE 星历、失败改抛（不静默退化为纯 CR3BP）。
 """
 
 from __future__ import annotations
@@ -31,12 +31,12 @@ class TestEvalCoefRaisesNotZero:
         assert _eval_coef(1.5, {}) == 1.5
 
     def test_numeric_conversion_failure_raises(self):
-        """数值转换失败抛 ValueError（修复前静默返回 0）。"""
+        """数值转换失败抛 ValueError，而非静默返回 0。"""
         with pytest.raises(ValueError, match="无法求值"):
             _eval_coef(object(), {})
 
     def test_missing_symbol_raises(self):
-        """sympy 系数含未提供参数时抛 ValueError（修复前静默返回 0）。"""
+        """sympy 系数含未提供参数时抛 ValueError，而非静默返回 0。"""
         sympy = pytest.importorskip("sympy")
         coef = sympy.Symbol("mystery_symbol")
         with pytest.raises(ValueError, match="未提供参数"):

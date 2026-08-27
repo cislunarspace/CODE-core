@@ -1,6 +1,6 @@
-"""离散推力工况数据模型与连续油门映射工具测试（#501）。
+"""离散推力工况数据模型与连续油门映射工具测试。
 
-契约见 ADR 0032 决策 5：数据模型自 geo-nrho 迁入、档位集合参数化、
+契约要点：数据模型自 geo-nrho 迁入、档位集合参数化、
 最短弧约束经合并/切分满足（段密不报错）、与低推力求解器共享
 (throttle, θ₁, θ₂) 控制口径。
 """
@@ -282,7 +282,7 @@ class TestEndToEndMapping:
 
         pos_residual = float(np.linalg.norm(discrete_states[-1][:3] - solution.states[-1][:3]))
         vel_residual = float(np.linalg.norm(discrete_states[-1][3:6] - solution.states[-1][3:6]))
-        # L1 量级门槛（384 km / 1 m/s，issue #499 验收口径）是任务级上界；
+        # L1 量级门槛（384 km / 1 m/s）是任务级上界；
         # 本算例实测残差约 0.35 km / 0.0004 m/s，阈值按实测十余倍收紧防回归
         print(f"\n终端残差: {pos_residual:.2f} km, {vel_residual:.4f} m/s")
         assert pos_residual < 5.0, f"位置残差 {pos_residual:.1f} km 超收紧阈值（L1 口径 384 km）"

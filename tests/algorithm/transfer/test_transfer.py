@@ -82,7 +82,7 @@ def test_transfer_dispatches_to_copt_when_enabled(dynamics, dummy_orbit):
 
 
 def test_transfer_uses_config_to_initialize_optimizer(dynamics, dummy_orbit):
-    """Transfer.optimize 应通过 config 构造优化器，不再 poke 属性。"""
+    """Transfer.optimize 应通过 config 构造优化器，不 poke 属性。"""
     transfer = Transfer(dynamics).set_orbit(dummy_orbit, dummy_orbit)
     expected_result = TransferOptimizationResult(
         status=ConvergenceState.CONVERGED,

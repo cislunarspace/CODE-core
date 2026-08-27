@@ -65,9 +65,9 @@ class TestExtractBodies:
 class TestPropagateOrbit:
     def test_default_three_body(self, spice_manager, reference_epoch):
         # 用默认三体配置（_DEFAULT_FORCE_CONFIG）：地球点质量 + 月球/太阳
-        # ThirdBodyGravity。历史 bug：该配置曾把 MOON/SUN 配成朝向地心的
-        # PointMassGravity，太阳 mu 主导使任何合理初值都步长坍缩；现已修复，
-        # 本测试即其回归保护。
+        # ThirdBodyGravity。若第三方天体被误配成朝向地心的
+        # PointMassGravity，太阳 mu 主导会使任何合理初值步长坍缩，
+        # 本测试即对该失效模式的回归保护。
         initial_state = np.array(
             [
                 7000.0,  # km

@@ -1,8 +1,122 @@
-# 架构决策记录（ADR）
+# Architecture Decision Records (ADR) / 架构决策记录（ADR）
+
+[English](#english) | [简体中文](#简体中文)
+
+## English
+
+This directory records e2m2e's architecture decisions. Each ADR is a decision
+snapshot: it captures the context, decision, rationale, and consequences at
+the time of writing. When a decision later changes, do not rewrite the
+original text; instead append a revision subsection at the end, or write a new
+ADR and mark the supersession in the old one.
+
+### Status vocabulary
+
+- **Adopted**: the decision is in effect. Parenthetical notes may indicate
+  implementation progress or partial revision, e.g.: Adopted (partially
+  implemented: …), Adopted (decision 3 revised by ADR 0024).
+- **Rejected**: the proposal was not adopted. The body keeps the proposal and
+  the rejection rationale.
+- **Superseded**: the decision was wholly overturned by a later ADR; the
+  status line names the successor, e.g.: Superseded (see ADR 0024). The
+  original entry is kept, never deleted.
+
+Status describes the fate of the decision itself. When the decision's object
+is to veto some mechanism (e.g. ADR 0008 vetoes runtime freezing), the status
+is still Adopted, with the vetoed object noted in parentheses.
+
+When a decision is partially revised by a later ADR, both entries keep mutual
+pointers: the new ADR states in its "Related" section and relevant clauses
+which clauses were revised; the old ADR gets revision notes at the revised
+spots. Silent overrides without pointers violate the ADR conflict-annotation
+convention.
+
+### Numbering rules
+
+- Numbers are four digits, increasing, never reused; normally in time order.
+- Back-filled historical decisions occupy vacated numbers of their era, with
+  the actual decision date noted at the top (see ADR 0005).
+
+### Template
+
+```markdown
+# ADR XXXX: Title
+
+**Status**: see vocabulary above
+**Date**: YYYY-MM-DD
+**Related Issue**: #nnn
+**Related**: ADR YYYY (relationship to this entry)
+
+## Context
+
+Why this decision must be made now. State facts and constraints clearly,
+without piling up detail.
+
+## Decision
+
+Itemized list; each item actionable and verifiable.
+
+## Rationale
+
+For each decision item, why this shape and not another. Where alternatives
+exist, state why they were excluded.
+
+## Consequences
+
+Added / changed / unchanged. Where there is a cost, state it.
+```
+
+Optional subsections: `Alternatives compared`, `Trade-offs`,
+`Revision (date, reference)`. Revision subsections are appended at the end;
+original text untouched. ADRs leave no TODOs: to-dos move to issues or new
+ADRs.
+
+### Index
+
+| No. | Title | Status |
+|---|---|---|
+| 0001 | Withdraw Protocol seams | Adopted |
+| 0002 | Rust integrator core, Python-controlled dynamics | Adopted (with multiple revisions) |
+| 0003 | Axes, ITRF93 defaults, GMAT-compatible Earth orientation | Adopted |
+| 0004 | ForceModel config-driven | Adopted |
+| 0005 | TwoLevelMultipleShooting as an independent algorithm | Adopted (revoked 2026-08-13: implementation deleted, see revision at end) |
+| 0006 | Unified ephemeris-correction seam with registry dispatch | Adopted (revoked 2026-08-13: implementation deleted, see revision at end) |
+| 0007 | Dynamic-axes state injection scheme | Adopted |
+| 0008 | Revoke runtime freezing of Axes / Origin / CoordinateSystem | Adopted (freezing mechanism rejected and reverted) |
+| 0009 | Enable spice feature for release wheels | Adopted (implemented) |
+| 0010 | r2s2 integration and TDT+GCRS ↔ TDB+EBCRS spacetime conversion | Adopted (implemented) |
+| 0011 | Five-layer architecture and radical full renaming | Adopted (implemented) |
+| 0012 | Dependency-direction rules with CI import checks | Adopted (implemented) |
+| 0013 | Verification strategy: complete tasks by definition | Adopted (test-tiering clause superseded by ADR 0021) |
+| 0014 | Interface layer Facade/MCP/CLI | Adopted (partially implemented: Facade done, MCP/CLI placeholders) |
+| 0015 | NominalOrbit contract and coordinate-conversion abstraction | Adopted (implemented) |
+| 0016 | EphemCache ephemeris cache architecture | Adopted |
+| 0017 | Transfer grid search: purely numerical kernel pushed down to Rayon | Adopted |
+| 0018 | Jacobian interface extended with ∂a/∂v; STM covers velocity dependence | Adopted |
+| 0019 | Drag Rust port uses ITRF93 pxform frame rotation (replacing ITRFApproxAxes) | Adopted |
+| 0020 | Failure policy: deterministic failures raise, infeasible searches return flags, no implicit degradation | Adopted (decision 3 revised by ADR 0024) |
+| 0021 | Test suite organized by functional categories; speed tiering abolished | Adopted |
+| 0022 | Independent physical constants management | Adopted |
+| 0023 | SciPy propagation exception for explicit event inputs | Adopted |
+| 0024 | Unified algorithm result status contract | Adopted |
+| 0025 | Test suite convergence: external references removed, primary marker invariant, explicit backend selection | Adopted |
+| 0026 | Test suite layer clarification: coordinate ownership, forces test merge, dead-reference cleanup | Adopted |
+| 0027 | System/Dynamics separation retained: dynamics directory unsplit, two classes unmerged | Adopted |
+| 0028 | Planar triangular libration point family via full-period pseudo-arclength continuation | Adopted (#428 seam revised by ADR 0029) |
+| 0029 | Orbit family generation via unified Rust deep module | Adopted (implemented) |
+| 0030 | algorithm/forces stays at algorithm layer: Python config/orchestration surface, numerics in crates | Adopted |
+| 0031 | Orbit catalog: record format, storage layout, query interface | Adopted |
+| 0032 | HJB dynamics in a new crate plus binding-layer generic entry | Adopted |
+| 0033 | HJB low-thrust toolchain: value-function product contract and online query interface | Adopted |
+| 0034 | Scope of the ephemeris force-model Hamiltonian | Adopted |
+| 0035 | GUI sidecar stdio protocol: shared Facade envelope, large arrays over binary frames | Adopted |
+| 0036 | CR3BP baseline orbit-family dataset: precomputed full-family data shipped with the package | Adopted |
+
+## 简体中文
 
 本目录记录 e2m2e 的架构决策。每篇 ADR 是一个决策快照：写下当时的背景、决策、理由与结果。决策后来变化时，不改写原文，而是在文末追加修订小节，或另写新 ADR 并在旧篇标注取代关系。
 
-## 状态词汇
+### 状态词汇
 
 - **已采纳**：决策生效。可用括号注明落实进度或局部修订，如：已采纳（部分实施：……）、已采纳（决策 3 经 ADR 0024 修订）。
 - **已拒绝**：提议未被采纳。正文保留提议内容与拒绝理由。
@@ -12,12 +126,12 @@
 
 决策被后续 ADR 局部修订时，两篇互留指针：新篇在关联一节与相关条款处写明修订了哪条；旧篇在被修订处加修订注记。不写指针的静默覆盖视为违反 ADR 冲突标注约定。
 
-## 编号规则
+### 编号规则
 
 - 编号四位、递增、不复用，一般与时间序一致。
 - 后补的历史决策占用当时空出的编号，篇首以编号说明注明实际决策时间（见 ADR 0005）。
 
-## 模板
+### 模板
 
 ```markdown
 # ADR XXXX：标题
@@ -46,7 +160,7 @@
 
 可选小节：`方案对比`、`取舍`、`修订（日期，关联）`。修订小节追加在文末，原文不动。ADR 不留 TODO：待办事项转 issue 或新 ADR。
 
-## 索引
+### 索引
 
 | 编号 | 标题 | 状态 |
 |---|---|---|

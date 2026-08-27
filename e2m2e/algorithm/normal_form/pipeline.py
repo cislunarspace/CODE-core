@@ -1,20 +1,20 @@
-"""标准形化简一键式流水线（issue #175）。
+"""标准形化简一键式流水线。
 
-把前面四个切片的 reducer 串成一条完整路径：
+把四个阶段的 reducer 串成一条完整路径：
 
 .. code-block:: text
 
     星历轨道初值
-        │  DynamicalSubstituteCorrector  （切片 #171）
+        │  DynamicalSubstituteCorrector
         ▼
     动力学替代轨道 + 生成函数 W
-        │  QuasiFloquetReducer           （切片 #172）
+        │  QuasiFloquetReducer
         ▼
     quasi-Floquet 变换 B(t) + 实标准形 D
-        │  CenterManifoldReducer         （切片 #173）
+        │  CenterManifoldReducer
         ▼
     中心流形化简 W_series
-        │  LibrationCatalogTransformer   （切片 #174）
+        │  LibrationCatalogTransformer
         ▼
     表征参数目录变换器（rho ↔ param）
 

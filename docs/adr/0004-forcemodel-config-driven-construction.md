@@ -1,16 +1,156 @@
-# ADR 0004：ForceModel 配置驱动
+# ADR 0004: ForceModel config-driven construction / ForceModel 配置驱动
+
+[English](#adr-0004-forcemodel-config-driven-construction) | [简体中文](#中文)
+
+## English
+
+**Status**: Adopted
+**Date**: 2026-06-15
+**Related Issue**: #69
+
+### Context
+
+Issue #69 wants users to write one config (JSON or dict) that builds a force
+model set (J2 + drag + SRP + finite burn), persist it, read it back, and
+rebuild forces identical to the original. The existing container already
+aggregates multiple `PhysicalModel`s and propagates via Rust `rk_step` steppers
+(ADR 0002); each force model already performs its own frame conversion
+(ADR 0003). Two things remain: lookup of individual forces by name — needed by
+`get_force`/`remove_force`/`enable`/`disable` and by config round-trips — and
+expressing each force's parameters as data, including those holding other
+instances or Python functions.
+
+Two spots are awkward. `DragModel` takes an `AtmosphereModel`,
+`SolarRadiationPressure` a `ShadowModel`; both are instances, not a few
+numbers. `FiniteBurn` takes a `thrust_profile` function, and its `direction`
+may also be a function; in general neither can be stored to JSON and restored
+faithfully.
+
+### Decision
+
+1. **Force identity (`name`) and toggle state (`enabled`) live on the
+   container, not on `PhysicalModel` instances.** `ForceModel` maintains an
+   ordered registry of `ForceEntry(name, force, enabled)`.
+   `add_force(force, name=None)` auto-names via `type(force).__name__` when
+   omitted, disambiguating same-type collisions automatically (`Foo`, `Foo_2`,
+   `Foo_3`…); an explicit collision raises `ValueError`.
+   `get_force`/`remove_force`/`enable`/`disable` operate by name;
+   `list_forces()` returns the entries. The existing `forces` property stays
+   (still returning `tuple[PhysicalModel, ...]`) for backward compatibility.
+   Disabling a force skips it during propagation but keeps it in the container
+   and in `to_config` output (`enabled: false`).
+
+2. **The config schema is a versioned manifest of named entries.** Top level:
+   `{"version": 1, "forces": [...]}`. Each entry is
+   `{"name", "type", "enabled", "params"}` where `type` is the Python class
+   name (also the registry key) and `params` holds constructor arguments.
+   Injected dependencies (`DragModel`'s `atmosphere`, `SolarRadiationPressure`'s
+   `shadow`) are nested entries shaped `{type, params}`, handled recursively;
+   `null` means not injected (e.g. SRP under full sunlight). `to_config` emits
+   resolved actual values — values after constructor defaults took effect — so
+   `GravityField(degree=2)` and `GravityField(degree=2, order=2)` yield the
+   same config.
+
+3. **`FiniteBurn` builds from config only through a closed DSL (fixed set of
+   forms).** `thrust_profile` accepts `{"kind": "constant", "thrust": N}` or
+   `{"kind": "pulse", "t_start", "t_end", "thrust"}`; `direction` accepts
+   `{"kind": "fixed", "vector": [x, y, z]}`. `from_config` builds closures and
+   tags them (`_e2m2e_config_kind`) so `to_config` can invert. If a
+   `FiniteBurn`'s callables didn't come from this DSL (e.g. user-written
+   `lambda t: ...`), `to_config` raises `NotSerializableError`. It still
+   propagates fine; it just cannot be serialized.
+
+4. **Round-trip acceptance = config dict equality.**
+   `to_config(from_config(config)) == config` is the round-trip acceptance
+   property: exact Python dict equality, no tolerance. Trajectory equality is a
+   separate physical check owned by LEO end-to-end tests.
+
+Only one existing class is touched: `GravityField.__init__` stores the raw
+`gravity_file` argument (`self._gravity_file_arg`) so custom `.gfc` paths round-
+trip. This is the only intrusion into a `PhysicalModel` subclass; everything
+else goes into new module `e2m2e/algorithm/forces/force_config.py`.
+
+### Rationale
+
+1. **Why `name`/`enabled` on the container rather than instances.**
+   `PhysicalModel` instances flow through many modules (`FiniteBurn` referenced
+   by thrust handling, `GravityField` by gravity paths). A `name` attribute on
+   the base class drags a container-specific label into every module; and
+   `enabled` would imply disabling is a property of the force itself, which it
+   is not: a force can always compute acceleration, only the container decides
+   whether to call it. The registry keeps labels where they are used.
+
+2. **Why a closed DSL instead of excluding `FiniteBurn` or accepting arbitrary
+   callables.** Excluding `FiniteBurn` breaks the acceptance criterion's
+   coverage claim: `ImpulsiveBurn` is not a `PhysicalModel` and isn't in the
+   container. A registry of named callables leaks user code into configs,
+   breaking cross-session round-trips. A closed DSL covers realistic cases
+   (constant thrust, pulsed burn, fixed direction) and fails loudly otherwise,
+   never silently producing an unloadable config.
+
+3. **Why class names as the type discriminator.** Only four force types exist
+   today with no need yet for public stable identifiers; class names serve
+   directly as registry keys without a translation layer. Aliases can be added
+   later as fallback keys without breaking existing configs.
+
+4. **Why serialize resolved values.** Two instances built differently but with
+   identical effective parameters are the same force. Serializing resolved
+   values makes round-trips independent of how users happened to invoke
+   constructors; read-only properties already expose them.
+
+5. **Why config-dict equality as the round-trip criterion.** Exact and cheap to
+   assert. Trajectory equality depends on integrators and floats and can only be
+   checked with tolerances — useful as a separate sanity check but wrong as the
+   definition of round-trip success.
+
+### Consequences
+
+#### Added
+
+- `e2m2e/algorithm/forces/force_config.py`: type→builder and type→serializer
+  dispatch, DSL builders for `FiniteBurn`, recursive atmosphere/shadow
+  builders, JSON `load_force_config`/`dump_force_config`.
+- `ForceModel`: `ForceEntry` registry, `add_force(name=)`,
+  `remove_force(name | index)`, `get_force`, `list_forces`, `enable`,
+  `disable`, `from_config` classmethod, `to_config` method.
+- `GravityField._gravity_file_arg` (stores raw path).
+
+#### Changed
+
+- `ForceModel._forces` becomes tuple `_entries` of `ForceEntry`; the `forces`
+  property still returns `PhysicalModel`s for compatibility.
+- Propagation paths (`_propagate_via_rust` etc.) skip `enabled=False` entries.
+
+#### Unchanged
+
+- Physics and `compute_acceleration` signatures of the four `PhysicalModel`
+  subclasses (aside from `GravityField` storing raw `gravity_file`).
+- `propagate`/`propagate_maneuvers` behavior (propagation reads enabled
+  entries only, so disabled forces are naturally excluded).
+- Frame conversion responsibility: each force model converts itself; see
+  ADR 0003.
+
+#### Follow-up work
+
+- Extend the `FiniteBurn` DSL with new `kind` values (VNB/LVLH direction
+  alignment, time-varying thrust curves), backward-compatibly.
+- If public stable identifiers become necessary later, add force-type aliases
+  as fallback registry keys.
+- Versioned schema migration when `version` exceeds 1.
+
+## 中文
 
 **状态**：已采纳
 **日期**：2026-06-15
 **关联 Issue**：#69
 
-## 背景
+### 背景
 
 Issue #69 想让用户写一份配置（JSON 或 dict）就能建出一套力模型（J2 + 阻力 + 光压 + 有限推力），还能存盘再读回，读回再建出的力与原先一样。现有容器已经能聚合多个 `PhysicalModel` 并通过 Rust `rk_step` 步进器传播（ADR 0002），每个力模型也已经各自完成坐标变换（ADR 0003）。还差两件事：一是按名字找到单个力：`get_force`/`remove_force`/`enable`/`disable` 与配置往返都要用它；二是把每种力的参数写成数据，包括那些本身持有别的实例、或持有 Python 函数的力。
 
 有两处比较难办。`DragModel` 收一个 `AtmosphereModel`，`SolarRadiationPressure` 收一个 `ShadowModel`，这俩都是实例，不是几个数。`FiniteBurn` 收一个 `thrust_profile` 函数，它的 `direction` 也可能是个函数，一般情况下这俩都没法存进 JSON 再原样读回来。
 
-## 决策
+### 决策
 
 1. **力的身份（`name`）与开关状态（`enabled`）放在容器里，不放在 `PhysicalModel` 实例上。** `ForceModel` 内部维护一个有序的 `ForceEntry(name, force, enabled)` 注册表。`add_force(force, name=None)` 在省略名字时自动取 `type(force).__name__`，遇同类自动消歧（`Foo`、`Foo_2`、`Foo_3`…）；显式给出且与已有名字冲突时抛 `ValueError`。`get_force`/`remove_force`/`enable`/`disable` 按名字操作；`list_forces()` 返回这些条目。现有的 `forces` 属性不变（仍返回 `tuple[PhysicalModel, ...]`）以保持向后兼容。禁用一个力会让传播时跳过它，但仍把它留在容器里、留在 `to_config` 输出里（`enabled: false`）。
 
@@ -22,7 +162,7 @@ Issue #69 想让用户写一份配置（JSON 或 dict）就能建出一套力模
 
 只动了一个现有类：`GravityField.__init__` 把原始的 `gravity_file` 参数存下来（`self._gravity_file_arg`），使自定义的 `.gfc` 路径能往返。这是对 `PhysicalModel` 子类的唯一侵入；其余全部放进新模块 `e2m2e/algorithm/forces/force_config.py`。
 
-## 理由
+### 理由
 
 1. **为什么 `name`/`enabled` 放在容器而不是实例上。** `PhysicalModel` 实例会流经多个模块（`FiniteBurn` 被推力处理引用，`GravityField` 被引力路径引用）。在基类上放一个 `name` 属性，会把容器专用的标签带进每一个模块；而 `enabled` 会暗示关掉是力本身的属性，并非如此：一个力永远能算加速度，只是容器决定是否调用它。注册表把标签留在它被使用的地方。
 
@@ -34,7 +174,7 @@ Issue #69 想让用户写一份配置（JSON 或 dict）就能建出一套力模
 
 5. **为什么用配置字典相等作为往返验收标准。** 它精确、断言成本低。轨迹相等依赖积分器与浮点，只能带容差检查，作为单独的合理性核对有用，但不适合作为往返通过的定义。
 
-## 结果
+### 结果
 
 ### 新增
 

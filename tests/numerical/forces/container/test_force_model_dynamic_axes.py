@@ -113,8 +113,8 @@ class ConstantForce(PhysicalModel):
 def test_propagate_calls_update_before_loop_and_each_step():
     """传播应在循环开始前和每个 rk_step 前调用 update_coordinate_systems。
 
-    issue #378：ForceModel 传播改走 Rust compiled 路径后，坐标系更新由
-    Rust 内部按步完成，Python 侧不再逐回调 ``update_coordinate_systems``。
+    ForceModel 传播走 Rust compiled 路径后，坐标系更新由
+    Rust 内部按步完成，Python 侧不逐回调 ``update_coordinate_systems``。
     本测试转为验证：无 Rust spec 的力在传播入口显式报错，不进入任何
     Python 坐标系更新循环。
     """

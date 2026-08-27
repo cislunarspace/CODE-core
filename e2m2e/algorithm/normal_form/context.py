@@ -2,8 +2,8 @@
 
 集中存放一条标准形化简流水线所需的全部静态/派生数据：
 归一化常量、平动点几何、基础频率、中心流形频率、特征指数、用户传入的
-历元与展开阶数。本切片只交付构造与读取；后续切片在该对象上调用具体
-化简器（DynamicalSubstituteCorrector、QuasiFloquetReducer 等）。
+历元与展开阶数。流水线的各化简器
+（DynamicalSubstituteCorrector、QuasiFloquetReducer 等）在该对象上工作。
 """
 
 from __future__ import annotations

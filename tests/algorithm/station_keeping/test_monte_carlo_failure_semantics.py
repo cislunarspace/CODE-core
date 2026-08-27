@@ -1,9 +1,8 @@
-"""蒙特卡洛控制律失败样本语义测试（#352）。
+"""蒙特卡洛控制律失败样本语义测试。
 
 控制律未产出机动（``compute_maneuver`` 返回 None）时，样本必须计为
-失败：此前代码把 ``failed_k`` 置 False 当成功处理，失败样本的 Δv 不进
-统计、失败率被系统性压低（ADR 0020 决策 1 红线：禁止把失败藏进成功
-统计）。
+失败、其 Δv 不进统计：不得把失败样本当成功处理而压低失败率，
+禁止把失败藏进成功统计。
 
 用确定性假组件（返回 None 的控制律、自由运动假传播器、假工厂/标称视
 图）跑 ``SingleSampleSimulation.run()``，不依赖 SPICE 与 Rust 扩展。
@@ -133,11 +132,11 @@ class TestNormalManeuverNotAffected:
         assert result.failed is False
 
     def test_orbital_maneuver_delta_v_accumulated_without_momentum_management(self):
-        """回归（#261 引入）：无角动量管理时机动 Δv 必须累计并记录。
+        """回归：无角动量管理时机动 Δv 必须累计并记录。
 
-        ``is_orbital`` 在 ``has_mm=False`` 时恒为 False 是 #261 的回归：
-        机动 Δv 既不进统计也不施加于真实轨道（实测 10 m/s 输出统计为 0），
-        统计系统性偏低。修复后机动进入机动表、累计进总 Δv。
+        无角动量管理（``has_mm=False``）时若 ``is_orbital`` 恒为 False，
+        机动 Δv 会既不进统计也不施加于真实轨道（10 m/s 输入下输出统计
+        为 0），统计系统性偏低。本测试锁定机动进入机动表、累计进总 Δv。
         """
         result = _build_sim(FixedManeuverLaw()).run()
         assert result.failed is False

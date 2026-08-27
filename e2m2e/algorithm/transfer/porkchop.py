@@ -479,7 +479,7 @@ def porkchop(
     速度与终端轨道速度之差。
 
     数值网格评估（终端传播 + Lambert + ΔV 组装 + 分发）全部在 Rust
-    （#446，ADR 0017 范式）；Python 只做问题构造与结果解释：
+    （ADR 0017 范式）；Python 只做问题构造与结果解释：
 
     - **规格路径**：两端均为内置终端（``OrbitTerminal``/``StateTerminal``
       且未被 monkeypatch）、涉及轨道终端时 dynamics 为未 patch 的
@@ -491,7 +491,7 @@ def porkchop(
       保持有效。
 
     两条路径共用同一 Rust Lambert/ΔV 核，无 Python 数值回退；扩展缺失
-    按 #378 抛 ``RustExtensionUnavailableError``。并行由 Rayon 执行，
+    抛 ``RustExtensionUnavailableError``。并行由 Rayon 执行，
     ``E2M2E_PORKCHOP_PARALLEL=0`` 可强制串行（与并行逐位一致）。
 
     Args:

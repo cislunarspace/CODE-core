@@ -42,7 +42,9 @@ _HALO_TIME_RECOVERY_SETUPS = {
 
 
 class DifferentialCorrection:
-    """周期轨道微分修正的问题构造入口。
+    """Differential correction: iterative refinement of periodic-orbit initial guesses.
+
+    周期轨道微分修正的问题构造入口。
 
     对称性配置、自由变量和结果编排保留在 Python；残差、STM 雅可比、Newton
     修正与收敛判定只由 Rust CR3BP 内核执行。
@@ -51,7 +53,7 @@ class DifferentialCorrection:
     DEFAULT_TOLERANCE = 1e-12
     DEFAULT_MAX_ITERATIONS = 50
     DEFAULT_DAMPING_FACTOR = 1.0
-    # Newton 迭代内增广状态（6+36 STM）传播的筛选级容差（#536）。修正
+    # Newton 迭代内增广状态（6+36 STM）传播的筛选级容差。修正
     # 闭环只需中间精度（残差评估/雅可比），研究级 1e-12 使单次 STM
     # 传播成本不可接受；1e-10 对 1e-6 级闭合判据精度足够。最终轨道
     # 编排（_create_corrected_orbit）仍用 dynamics 的研究级容差。
@@ -405,7 +407,7 @@ class DifferentialCorrection:
         final_state = prop_result["states"][-1]
         closure_error = float(np.linalg.norm(final_state - initial_state))
 
-        # 历史行为：非 Halo/Axial/SPO 的轨道可用一次速度微调消除积分截断误差。
+        # 非 Halo/Axial/SPO 的轨道可用一次速度微调消除积分截断误差。
         if closure_error > 1e-10 and self.setup_type not in {
             "halo_orbit_fixed_x0",
             "halo_orbit_fixed_z0",

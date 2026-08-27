@@ -1,4 +1,4 @@
-"""Halo PAL 延拓 Rust 后端 vs Python 后端等价性对照（#443）。
+"""Halo PAL 延拓 Rust 后端 vs Python 后端等价性对照。
 
 对照权威基准是 Python 参照路径（``backend="python"``，numpy 实现），
 验证 Rust 数值内核（``pal_newton_step_py`` / ``pal_f_df_tangent_py``）

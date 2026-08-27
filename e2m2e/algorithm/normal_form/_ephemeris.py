@@ -53,7 +53,7 @@ def _derive_moon_param(
 
     与 qiao ``Calc_MoonParam._derive_moon_param`` 等价。
     本函数刻意保持与 qiao 源 1:1 对齐（包括形式上相同的中间变量名），
-    以便后续切片能够简单叉验差异。
+    便于对照叉验差异。
     """
     gm_e = mu_e * lu**3 / tu**2
     gm_m = mu_m * lu**3 / tu**2

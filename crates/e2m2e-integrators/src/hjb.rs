@@ -1,4 +1,4 @@
-//! HJB 结构网格求解的 Python 绑定（issue #497）。
+//! HJB 结构网格求解的 Python 绑定。
 //!
 //! 通用入口 [`solve_hjb_py`]：动力学标识 + 参数表，不为每种动力学各写
 //! 一个绑定函数（ADR 0032 决策 3）。兼容包装
@@ -301,8 +301,8 @@ fn build_result_dict<'py>(
 ///   max_accel、fuel_weight；
 /// - ``"cr3bp_synodic"``：地月会合系无量纲平面 CR3BP，参数 mu、
 ///   max_accel、fuel_weight；
-/// - ``"ephemeris_planar"``（需 spice）：平面全星历脉动会合系（#498，
-///   ADR 0034），参数 mu_earth、mu_moon、mu_sun（km³/s²）、et0（求解器
+/// - ``"ephemeris_planar"``（需 spice）：平面全星历脉动会合系
+///   （ADR 0034），参数 mu_earth、mu_moon、mu_sun（km³/s²）、et0（求解器
 ///   t=0 对应的 SPICE et）、thrust（N）、isp（s）、g0（m/s²）、fuel_weight、
 ///   mass_mode（0 = 4 维固定质量，需 fixed_mass；1 = 5 维含质量轴，
 ///   单位 kg）。求解器 t 单位为秒；调用前须 ``enable_ephem_cache`` 覆盖

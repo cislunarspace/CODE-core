@@ -197,7 +197,7 @@ class RelativeDynamics:
         times = np.asarray(result["time"], dtype=float)
         rhos = np.asarray(result["states"], dtype=float)
         # 防御性校验：Rust 侧提前退出（如 max_steps 耗尽）须暴露，不允许把
-        # 截断结果当完整轨迹返回（issue #246，照抄 dynamics.py）。
+        # 截断结果当完整轨迹返回（照抄 dynamics.py）。
         if len(times) != n:
             raise RuntimeError(f"相对传播返回 {len(times)} / {n} 个时间点，轨迹被截断")
         return times, rhos

@@ -147,7 +147,7 @@ class EphemerisDynamics(Dynamics):
         time = np.array(result["time"])
 
         # 防御性校验：Rust 侧任何提前退出都必须在这里暴露，
-        # 不允许把截断结果当完整轨迹返回（issue #246）。
+        # 不允许把截断结果当完整轨迹返回。
         if len(time) != len(t_eval_list):
             raise RuntimeError(
                 f"Rust STM propagation returned {len(time)} of {len(t_eval_list)} "
@@ -221,7 +221,7 @@ class EphemerisDynamics(Dynamics):
         states = np.array(result["states"])
         time = np.array(result["time"])
 
-        # 防御性校验（issue #246，与 _propagate_with_stm_rust 一致）。
+        # 防御性校验（与 _propagate_with_stm_rust 一致）。
         if len(time) != len(t_eval_list):
             raise RuntimeError(
                 f"Rust propagation returned {len(time)} of {len(t_eval_list)} "

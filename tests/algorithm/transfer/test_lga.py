@@ -68,9 +68,9 @@ def _make_target_state(system):
     return np.array([x_target, 0.0, 0.0, 0.0, v_circ_dim, 0.0])
 
 
-# 通用搜索参数：角度网格 90 点（4° 间距），确保覆盖 ~83-85° 区间
-# 360 → 90：360 是默认 50 的 7 倍，全文件超过 4 分钟超时被杀（#534 审计
-# 发现）。倾角覆盖测试（test_inclination_*）依赖网格密度，90 保留面外
+# 通用搜索参数：角度网格 90 点（4° 间距），确保覆盖 ~83-85° 区间。
+# 网格再加密（如 360 点）会让全文件超过超时上限。倾角覆盖测试
+# （test_inclination_*）依赖网格密度，90 保留面外
 # 采样能力；多个候选排序类断言（len >= 2）在 90 下依然满足。
 _SEARCH_PARAMS = LgaSearchParams(
     n_departure_phase=90,
@@ -451,12 +451,12 @@ class TestLgaTransferOrbit:
 
 
 # ---------------------------------------------------------------------------
-# TestLgaOutOfPlane：面外搜索维度（issue #512）
+# TestLgaOutOfPlane：面外搜索维度
 # ---------------------------------------------------------------------------
 
 
 class TestLgaOutOfPlane:
-    """非零出发倾角下 LGA 搜索应通过面外角维度找到可行候选（issue #512）。"""
+    """非零出发倾角下 LGA 搜索应通过面外角维度找到可行候选。"""
 
     @pytest.fixture
     def inclined_setup(self):
@@ -480,7 +480,7 @@ class TestLgaOutOfPlane:
             candidates = search_lga_trajectories(
                 dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS
             )
-            assert len(candidates) > 0, f"倾角 {incl}° 应找到可行候选（issue #512）"
+            assert len(candidates) > 0, f"倾角 {incl}° 应找到可行候选"
 
     def test_out_of_plane_grid_centered_keeps_coplanar_candidates(self, inclined_setup):
         """共面出发态（倾角 0）在默认面外网格下仍找到候选，且不劣于纯共面网格。"""
@@ -491,7 +491,7 @@ class TestLgaOutOfPlane:
 
 
 # ---------------------------------------------------------------------------
-# TestLgaMaxTotalDvUnits：max_total_dv 的 km/s 语义（issue #512）
+# TestLgaMaxTotalDvUnits：max_total_dv 的 km/s 语义
 # ---------------------------------------------------------------------------
 
 
@@ -538,12 +538,12 @@ class TestLgaMaxTotalDvUnits:
 
 
 # ---------------------------------------------------------------------------
-# TestLgaInclinedEndToEnd：transfer_orbit("LGA") 非零倾角端到端（issue #512）
+# TestLgaInclinedEndToEnd：transfer_orbit("LGA") 非零倾角端到端
 # ---------------------------------------------------------------------------
 
 
 class TestLgaInclinedEndToEnd:
-    """issue #512 复现场景：发射倾角 28.5°（文昌纬度）端到端收敛。"""
+    """发射倾角 28.5°（文昌纬度）端到端收敛复现场景。"""
 
     def test_transfer_orbit_inclination_28_5_converges(self):
         """incl=28.5° 时 transfer_orbit("LGA") 应 CONVERGED 且候选 > 0。"""
@@ -578,16 +578,16 @@ class TestLgaInclinedEndToEnd:
                 lga_search_params=params,
             )
         assert result.status is ConvergenceState.CONVERGED, (
-            f"28.5° 倾角应收敛（issue #512），实际 {result.status}: {result.message}"
+            f"28.5° 倾角应收敛，实际 {result.status}: {result.message}"
         )
         assert result.details.n_candidates_feasible > 0
         assert result.delta_v <= params.max_total_dv + 1e-6
 
     def test_low_inclination_dv_not_degraded(self):
-        """倾角 0°/5°/10°/20° 端到端收敛且 Δv ≤ max_total_dv（issue #512 验收）。
+        """倾角 0°/5°/10°/20° 端到端收敛且 Δv ≤ max_total_dv。
 
-        修复前低倾角基线（精化后）总 Δv 为 50~70 km/s；修复后应低于
-        max_total_dv=25 km/s，满足不劣于基线 5%（基线×1.05 ≈ 52~74）。
+        端到端总 Δv 应低于 max_total_dv=25 km/s，满足不劣于基线 5%
+        （低倾角基线约 50~70 km/s，基线×1.05 ≈ 52~74）。
         """
         import warnings
 

@@ -186,9 +186,6 @@ class TestPhysicalPlausibility:
     def test_stationary_at_libration_point_has_v_lp_velocity(self, system, context):
         """rho=0、rhodot=0（航天器"停在"平动点）时，ECI 速度应等于平动点的
         J2000 速度 v_LP，而非 v_LP 经旋转后的 C@v_LP。
-
-        防回归：v_eci 公式末项曾误写 C@v_LP（v_LP 已是 J2000，不该再旋转），
-        导致 72h 跨验证发散 12 万 km。
         """
         from e2m2e.algorithm.coordinate.rho_bridge import (
             _compute_lp_state_j2000,

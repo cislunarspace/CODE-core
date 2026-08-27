@@ -1,4 +1,33 @@
-# ADR 0005：TwoLevelMultipleShooting 作为独立算法
+# ADR 0005: TwoLevelMultipleShooting as an independent algorithm / TwoLevelMultipleShooting 作为独立算法
+
+[English](#adr-0005-twolevelmultipleshooting-as-an-independent-algorithm) | [简体中文](#中文)
+
+## English
+
+**Status**: Adopted
+**Date**: 2026-05-13
+**Numbering note**: back-filled historical decision; actual decision time falls
+between ADR 0001 and 0002.
+
+Add `TwoLevelMultipleShooting` to `e2m2e.algorithms` as an independent
+algorithm rather than extending or subclassing the existing
+`MultipleShooting`. The two-level correction differs from the existing
+full-state multiple-shooting solver in free variables, residuals, Jacobian
+structure, and result diagnostics; keeping it separate preserves the general
+solver's simpler API while giving transfer-design code a stable set of APIs
+carrying the original two-level ephemeris correction semantics.
+
+### Revision (2026-08-13, related: ADR 0006 revision)
+
+`TwoLevelMultipleShooting` along with the `ephemeris_correction` dispatch
+subpackage was deleted: the design chain unified on Rust multiple shooting
+(``multiple_shooting_correct_py``, the default path for segmented and stable
+orbits), with velocity continuity converged Rust-side via ``vel_weight``
+weighting. This ADR's independent-algorithm arrangement has no consumers left;
+its decision object is withdrawn. `MultipleShooting` itself is retained
+(still used by transfer/hohmann and other non-design chains).
+
+## 中文
 
 **状态**：已采纳
 **日期**：2026-05-13
@@ -6,7 +35,7 @@
 
 把 `TwoLevelMultipleShooting` 作为 `e2m2e.algorithms` 中的一个独立算法加入，而不是扩展或继承现有的 `MultipleShooting`。两层修正与现有的全状态多重打靶求解器在自由变量、残差、雅可比结构和结果诊断上都不同；把它分开，既保住了通用求解器更简单的 API，又给转移设计代码提供了一组稳定的 API，用来承载原有的两层星历修正语义。
 
-## 修订（2026-08-13，关联 ADR 0006 修订）
+### 修订（2026-08-13，关联 ADR 0006 修订）
 
 `TwoLevelMultipleShooting` 连同 `ephemeris_correction` 分发子包已删除：设计链路
 统一走 Rust 多重打靶（``multiple_shooting_correct_py``，segmented 与稳定轨道

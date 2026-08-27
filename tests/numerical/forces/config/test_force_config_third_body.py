@@ -1,4 +1,4 @@
-"""ThirdBodyGravity / PointMassGravity 配置序列化往返测试（issue #183）。
+"""ThirdBodyGravity / PointMassGravity 配置序列化往返测试。
 
 验证两种力模型的 to_config / from_config 往返，以及 mu=None 的原样保留。
 完整 ForceModel 往返通过单点加速度一致性验证（需 SPICE 系统）。

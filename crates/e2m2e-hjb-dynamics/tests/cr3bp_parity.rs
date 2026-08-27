@@ -1,4 +1,4 @@
-//! CR3BP Hamiltonian 与 e2m2e-forces 解析动力学的对拍（issue #497 验收：
+//! CR3BP Hamiltonian 与 e2m2e-forces 解析动力学的对拍（验收：
 //! 零控向量场与 propagate_cr3bp_py 所用 CR3BP 动力学逐点一致）。
 //!
 //! propagate_cr3bp_py 的动力学内核是 e2m2e-forces 的 `cr3bp_eom`
@@ -54,7 +54,7 @@ fn vector_field_parity_across_mu() {
     }
 }
 
-/// 无控轨迹对拍（issue #497 验收：轨道周期对照）。同一初值传播一个会合
+/// 无控轨迹对拍（验收：轨道周期对照）。同一初值传播一个会合
 /// 周期 2π：本 crate 四维向量场用固定步长 RK4 积分，参考为
 /// propagate_cr3bp（PD78 自适应，传播器实际使用的动力学路径），
 /// 末态应一致。
@@ -148,7 +148,7 @@ fn to_x_axis_crossing(
     None
 }
 
-/// 真周期轨道的周期对照（issue #497 验收）。镜像对称打靶：x 轴初值
+/// 真周期轨道的周期对照。镜像对称打靶：x 轴初值
 /// (x0, 0, 0, vy0)，扫描加二分调整 vy0 使下一次过 x 轴时 vx = 0，
 /// 得周期 T = 2τ（镜像定理）。随后以同初值用 propagate_cr3bp（PD78）
 /// 传播 T，应回到初态——同时验证本 crate 动力学的轨道周期与传播器一致。

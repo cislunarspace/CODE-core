@@ -351,7 +351,7 @@ def transfer_orbit(
         transfer_type: "HMN"（直接）/ "LGA"（月球引力辅助）/ "WSB"（太阳引力辅助）/
             "low_thrust"（小推力）。
         target_ephemeris: 目标轨道星历（FR1 产物）。坐标系契约按转移类型
-            区分（#516）：LGA/WSB 要求会合旋转系（synodic）物理单位
+            区分：LGA/WSB 要求会合旋转系（synodic）物理单位
             （km, km/s）状态，编排器直接无量纲化，不做惯性系→旋转系转换，
             惯性星历须先经 ``j2000_to_synodic`` 转换；HMN/low_thrust 按地心
             惯性系 km/km/s 状态解释（与 construct_departure_state 出发态同系）。
@@ -426,7 +426,7 @@ def transfer_orbit(
 def _extract_target_state(target_ephemeris: Any) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """从 target_ephemeris 提取目标位置和速度。
 
-    本函数只做格式提取，不解释坐标系；坐标系契约在调用方（#516）：
+    本函数只做格式提取，不解释坐标系；坐标系契约在调用方：
     LGA/WSB 要求会合旋转系（synodic）物理单位，惯性星历须先经
     ``spacetime_transform`` 的 ``j2000_to_synodic`` 转换；HMN/low_thrust
     按地心惯性系 km/km/s 状态解释。
@@ -635,7 +635,7 @@ def _transfer_orbit_wsb(
     from ..dynamics.bcr4bp_system import BCR4BPSystem
     from .wsb import _refine_wsb_candidate
 
-    # tof_range 合并（#513）：facade 的 tof_range 覆盖 WsbSearchParams 默认
+    # tof_range 合并：facade 的 tof_range 覆盖 WsbSearchParams 默认
     # tof 网格；显式传入 wsb_search_params 时其（专门的）tof 网格优先。
     if tof_range is not None and search_params is None:
         search_params = WsbSearchParams(tof_range=tof_range)
@@ -785,7 +785,7 @@ def _transfer_orbit_low_thrust(
     Args:
         tli_params: 地球停泊轨道参数（TLI 高度/倾角/航迹角）。当 ``departure_state``
             未提供时用于构造出发状态。
-        target_ephemeris: 目标轨道星历（地心惯性系 km/km/s 状态，#516）。
+        target_ephemeris: 目标轨道星历（地心惯性系 km/km/s 状态）。
             当 ``target_state`` 未提供时用于提取目标状态。
         engine_config: 推进配置（最大推力、比冲）。
         initial_mass: 初始质量 (kg)。

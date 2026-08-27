@@ -1,12 +1,173 @@
-不变流形与庞加莱截面
-====================
+Invariant Manifolds & Poincaré Sections / 不变流形与庞加莱截面
+==============================================================
+
+[English](#invariant-manifolds-poincare-sections) | [简体中文](#中文)
+
+English
+-------
+
+Invariant manifolds (stable/unstable) are asymptotic orbit families around
+periodic orbits — the fundamental building blocks of low-energy transfers. This
+page covers manifold computation, Poincaré-section tooling, and the
+manifold-stitching low-energy transfer pipeline.
+
+Manifold computation
+~~~~~~~~~~~~~~~~~~~~
+
+Seed-generation principle: real eigenvalues of a periodic orbit's monodromy
+matrix M (one-period STM) give manifold directions — stable takes eigenvectors
+with abs(λ) < 1, unstable abs(λ) > 1; unit-circle eigenvalues (including the
+periodic direction λ=1) aren't hyperbolic and are dropped. Sample n_points
+phases uniformly along the orbit, ferry eigenvectors there via STMs from first
+point to each phase, normalize position parts, apply ±ε nondimensional offsets:
+those are seeds; integrate stable backwards, unstable forwards to grow tubes.
+
+Usage of :class:`~e2m2e.algorithm.manifold.manifolds.InvariantManifold`:
+
+.. code-block:: python
+
+   from e2m2e.algorithm.manifold import InvariantManifold, ManifoldKind
+
+   # orbit is periodic: bound to system with known period (first point suffices)
+   epsilon = 50.0 / 384405.0   # nondimensional offset, typically 50 km / DU
+   manifold = InvariantManifold(orbit, ManifoldKind.STABLE, "-", epsilon)
+
+   # Phase-swept seeds, shape (n_points, 6)
+   seeds = manifold.seeds(12)
+
+   # Batch-propagate arcs (stable integrates backwards; t_span in absolute value)
+   tube = manifold.propagate(4.0)
+   print(f"Arcs: {len(tube.trajectories)}")
+
+``branch`` ∈ ``"+"``/``"-"`` — the two perturbation directions toward either side
+of the orbit. The returned
+:class:`~e2m2e.algorithm.manifold.manifolds.ManifoldTube` carries the orbit
+reference, manifold kind, branch, ε; ``trajectories`` lists arcs (nondimensional
+CR3BP states).
+
+Passing ``section`` to ``propagate`` truncates each arc at its first section
+crossing, appending the refined crossing state as arc endpoint:
+
+.. code-block:: python
+
+   from e2m2e.algorithm.manifold import PoincareSection
+
+   section = PoincareSection.periapsis("earth", orbit.system)
+   tube = manifold.propagate(4.0, section=section)
+
+Poincaré sections
+~~~~~~~~~~~~~~~~~
+
+:class:`~e2m2e.algorithm.manifold.sections.PoincareSection` is defined by the
+zero level-set of s(state); two constructors:
+
+- ``PoincareSection.plane(axis, value)``: planar section s = state[axis] − value;
+  ``axis`` indexes state components (0=x…5=vz)
+- ``PoincareSection.periapsis(center, system)``: perilune/periapsis section
+  s = r·v with r relative to center body (primary/secondary names,
+  case-insensitive)
+
+Crossing detection is post-hoc: dense sampling during propagation (manifold
+default step 0.005 nondimensional time), evaluating the section per sample,
+Brent-refining within sign-change intervals over linearly-interpolated states.
+Planar residuals reach below 1e-10.
+
+``crossings()`` detects crossings across all tube arcs, returning
+:class:`~e2m2e.algorithm.manifold.sections.SectionCrossings`:
+
+.. code-block:: python
+
+   crossings = section.crossings(tube)
+   print(crossings.states.shape)          # (k, 6), refined crossing states
+   print(crossings.times.shape)           # (k,), crossing times
+   print(crossings.trajectory_index)      # (k,), owning-arc index per crossing
+
+``crossings()`` is post-hoc (propagate first, then find crossings on samples).
+For in-integration detection (e.g., stop at first section arrival), generate
+scipy-semantic events via
+:meth:`~e2m2e.algorithm.manifold.sections.PoincareSection.event` for
+``Dynamics.propagate(events=...)``:
+
+.. code-block:: python
+
+   event = section.event(direction=-1, terminal=True)
+   result = dynamics.propagate(y0, (0.0, 10.0), events=[event])
+
+See :doc:`../core/dynamics`, event detection.
+
+Stitching & low-energy transfer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pairing crossing points of two tubes on one section yields transfer guesses.
+:func:`~e2m2e.algorithm.transfer.low_energy.patch_manifolds` outputs candidates
+ascending by weighted cost ``w_r·|Δr| + w_v·|Δv|``
+(:class:`~e2m2e.algorithm.transfer.low_energy.PatchCandidate`):
+
+.. code-block:: python
+
+   from e2m2e.algorithm.transfer import patch_manifolds
+
+   # Departure unstable + arrival stable manifolds, same section
+   candidates = patch_manifolds(tube_a, tube_b, section, weights=(1.0, 1.0))
+   best = candidates[0]
+   print(f"|Δr|={best.delta_r:.4e}, |Δv|={best.delta_v:.4e}")
+
+:func:`~e2m2e.algorithm.transfer.low_energy.design_low_energy_transfer` chains the
+pipeline: departure-unstable × arrival-stable (globally best over ± branch
+combinations) propagate to the secondary's periapsis section; pick the best
+candidate; departure leg uses the manifold arc directly; beyond the stitch point
+:class:`~e2m2e.algorithm.transfer.three_body_lambert.ThreeBodyLambert` shoots closure
+onto the target. Impulses: departure (onto departing manifold), stitching (at
+section), arrival (onto target manifold).
+
+.. code-block:: python
+
+   from e2m2e.algorithm.transfer import OrbitTerminal, design_low_energy_transfer
+   from e2m2e.data.templates import ConvergenceState
+
+   sol = design_low_energy_transfer(OrbitTerminal(departure_orbit), target_orbit)
+
+   if sol.status == ConvergenceState.CONVERGED:
+       print(f"Arcs: {len(sol.arcs)}")           # 2
+       print(f"Departure: {sol.arcs[0].delta_v:.6f} km/s")
+       print(f"Stitching: {sol.arcs[1].delta_v:.6f} km/s")
+       print(f"Arrival: {sol.arrival_delta_v:.6f} km/s")
+       print(f"Total: {sol.total_delta_v:.6f} km/s")
+       print(f"Transfer time: {sol.transfer_time:.1f} s")
+
+Returns a two-arc :class:`~e2m2e.algorithm.transfer.config.TransferSolution` in
+physical units. CR3BP-only today; ephemeris conversion (CR3BP closed solution →
+ephemeris model) isn't wired yet — ``epoch`` is reserved for it. End-to-end
+benchmark: ``tests/algorithm/transfer/test_low_energy.py``, an intra-family L1
+Lyapunov mid-to-large-amplitude case with tens-of-m/s stitches.
+
+.. automodule:: e2m2e.algorithm.manifold.manifolds
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
+
+.. automodule:: e2m2e.algorithm.manifold.sections
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
+
+.. automodule:: e2m2e.algorithm.transfer.low_energy
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
+
+中文
+----
 
 不变流形（稳定/不稳定）是周期轨道附近的渐近轨道族，是低能量转移设计的
 基本构件。本页介绍流形计算、庞加莱截面工具，以及基于流形拼接的低能
 转移流水线。
 
 不变流形计算
-------------
+~~~~~~~~~~~~
 
 种子生成原理：周期轨道单值矩阵 M（沿轨道传播一周的 STM）的实特征值给出
 流形方向，稳定流形取 abs(λ) < 1 的实特征向量，不稳定流形取 abs(λ) > 1 的
@@ -33,7 +194,7 @@
    tube = manifold.propagate(4.0)
    print(f"流形弧数: {len(tube.trajectories)}")
 
-``branch`` 取 ``"+"`` 或 ``"-"``，对应扰动的两个方向，分别走向轨道两侧。
+``branch`` 取 ``"+"`` 或 ``"-"`` ，对应扰动的两个方向，分别走向轨道两侧。
 返回的 :class:`~e2m2e.algorithm.manifold.manifolds.ManifoldTube` 携带轨道引用、
 流形类型、分支与 ε，``trajectories`` 为流形弧列表（无量纲 CR3BP 态）。
 
@@ -48,14 +209,14 @@
    tube = manifold.propagate(4.0, section=section)
 
 庞加莱截面
-----------
+~~~~~~~~~~
 
 :class:`~e2m2e.algorithm.manifold.sections.PoincareSection` 由标量函数 s(state) 的
 零等值面定义，提供两类构造：
 
-- ``PoincareSection.plane(axis, value)``：平面截面 s = state[axis] − value，
+- ``PoincareSection.plane(axis, value)`` ：平面截面 s = state[axis] − value，
   ``axis`` 为状态分量索引（0=x, 1=y, 2=z, 3=vx, 4=vy, 5=vz）
-- ``PoincareSection.periapsis(center, system)``：近拱点截面 s = r·v，
+- ``PoincareSection.periapsis(center, system)`` ：近拱点截面 s = r·v，
   r 为相对 center 天体（主/次天体名称，不区分大小写）的位置
 
 穿越检测采用事后方案：传播时密采样（流形传播默认步长 0.005 无量纲时间），
@@ -75,7 +236,7 @@
 ``crossings()`` 是事后检测（先传播、再在采样点上找穿越）。若要在积分
 过程中检测穿越（例如首次到达截面即停），用
 :meth:`~e2m2e.algorithm.manifold.sections.PoincareSection.event` 生成 scipy 语义的
-事件函数传给 ``Dynamics.propagate(events=...)``：
+事件函数传给 ``Dynamics.propagate(events=...)`` ：
 
 .. code-block:: python
 
@@ -85,7 +246,7 @@
 详见 :doc:`../core/dynamics` 的事件检测一节。
 
 流形拼接与低能转移
-------------------
+~~~~~~~~~~~~~~~~~~
 
 两条流形管在同一截面上的穿越点两两配对，可拼接成转移初猜。
 :func:`~e2m2e.algorithm.transfer.low_energy.patch_manifolds` 按加权拼接代价
@@ -124,7 +285,7 @@
 
 返回两段弧的 :class:`~e2m2e.algorithm.transfer.config.TransferSolution`，物理单位。
 当前仅支持 CR3BP 模型；星历转换（CR3BP 闭合解 → 星历模型）尚未接入，
-``epoch`` 参数为其预留入口。端到端基准见 ``tests/algorithm/transfer/test_low_energy.py``：
+``epoch`` 参数为其预留入口。端到端基准见 ``tests/algorithm/transfer/test_low_energy.py`` ：
 L1 Lyapunov 族内中间轨道到大幅值轨道，拼接脉冲在几十 m/s 量级。
 
 .. automodule:: e2m2e.algorithm.manifold.manifolds

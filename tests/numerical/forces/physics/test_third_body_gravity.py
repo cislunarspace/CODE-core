@@ -1,4 +1,4 @@
-"""ThirdBodyGravity 物理规律验证（issue #182）。
+"""ThirdBodyGravity 物理规律验证。
 
 验证第三体引力摄动模型：
   A. Rust 单点 ``third_body_acceleration`` 与 EphemerisDynamics 第三体分支一致；
@@ -167,7 +167,7 @@ class TestCislunarForceDecomposition:
         # 的物理模型逐字等价，差异仅来自不同积分器（scipy DOP853 vs Rust
         # rk_step PD45）的数值积分误差。判据设为 1e-3 km（1 m），约为实测
         # 值的 3 个数量级余量，足以抵御不同 SPICE 内核版本（DE440/DE440s）
-        # 带来的极小星历差异，同时远严于 issue #182 的 1 km 上界。
+        # 带来的极小星历差异，同时远严于任务级 1 km 上界。
         assert pos_diff_km < 1e-3, (
             f"cislunar force-decomposition path diverged from EphemerisDynamics: "
             f"|Δr|={pos_diff_km:.4e} km (threshold 1e-3 km)"

@@ -1,11 +1,9 @@
 """轨道族注册表契约测试。
 
-原各族的端到端收敛/物理不变量测试（axial/dpo/spo/lpo/horseshoe/nrho，
-直接调 design_* 生成真轨道）因耗时过长从 pytest 移除（ADR 0021 修订
-#420：默认测试时间上界靠缩小问题规模保证，端到端验证由实际使用反馈）。
-本文件保留快速注册表契约：条目存在、可调用、指向正确的 design_* 函数。
-
-关联：#534（测试耗时排查）、#536（修正器容差根因）。
+各族耗时的端到端收敛/物理不变量验证（axial/dpo/spo/lpo/horseshoe/nrho，
+直接调 design_* 生成真轨道）受默认测试时间上界约束，不在 pytest 中展开，
+由实际使用反馈保证。本文件保留快速注册表契约：条目存在、可调用、指向
+正确的 design_* 函数。
 """
 
 from __future__ import annotations
@@ -29,8 +27,8 @@ _DIRECT_CASES = [
     ("NRHO", design_nrho),
 ]
 
-#: 绑定平动点的 lambda 包装条目（只验存在与可调用；原各族的
-#: 端到端行为验证随重计算测试移除，见文件 docstring）
+#: 绑定平动点的 lambda 包装条目（只验存在与可调用；各族
+#: 端到端行为验证不在 pytest 展开，见文件 docstring）
 _LAMBDA_KEYS = [
     "L4_SPO",
     "L5_SPO",

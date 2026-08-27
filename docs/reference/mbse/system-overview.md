@@ -1,10 +1,101 @@
 ---
-title: e2m2e MBSE 模型总览
+title: e2m2e MBSE Model Overview / e2m2e MBSE 模型总览
 ---
 
-# e2m2e MBSE 模型总览
+# e2m2e MBSE Model Overview / e2m2e MBSE 模型总览
 
-## 什么是 MBSE
+[English](#english) | [简体中文](#中文)
+
+## English
+
+### What MBSE is
+
+**MBSE (Model-Based Systems Engineering)** is a systems-engineering approach
+centered on formal models spanning requirements, design, analysis, verification,
+and validation across the whole lifecycle. e2m2e doesn't provide a full
+systems-engineering process; it borrows the traceability mindset inside this
+repo.
+
+The MBSE model carries four duties:
+
+- **Component registration** (`ComponentRegistry`) records components, their
+  architecture layers, and component dependencies;
+- **Requirement traceability** (`RequirementRegistry`) links requirements to code
+  modules and test files;
+- **Data models** (Pydantic) express MBSE's own data contracts;
+- **Diagram generation** (`DiagramGenerator`) produces Mermaid diagrams and the
+  traceability matrix from registered models.
+
+BDDs, the requirements diagram, and the traceability matrix are managed,
+generated artifacts. After re-running the MBSE documentation generation script,
+committed artifacts must remain unchanged; activity/sequence/state diagrams are
+supplementary narrative outside that generation check.
+
+### Architecture layers
+
+Runtime code follows ADR 0011's five-layer architecture; MBSE is an independent
+top-level architecture-metadata subsystem outside the runtime dependency chain:
+
+```mermaid
+graph TD
+    Data["data<br/>constants, frames, kernels, types"]
+    Numerical["crates / integrators<br/>numerical computation"]
+    Algorithm["algorithm<br/>problem construction & algorithm orchestration"]
+    Api["api<br/>Facade, MCP, CLI"]
+    Tools["tools<br/>auxiliary tools"]
+    Mbse["mbse<br/>component registry, requirement traceability, diagram generation"]
+    Data --> Algorithm
+    Numerical --> Algorithm
+    Data --> Api
+    Algorithm --> Api
+```
+
+| Layer | Responsibility |
+|----|------|
+| data | spacetime references, physical constants, SPICE kernels, data containers |
+| numerical | Rust numerical computation + Python bindings |
+| algorithm | dynamics, correction, continuation, stability, mission problem construction |
+| api | Facade, MCP, CLI & boundary models |
+| tools | auxiliary capabilities not depended on by core runtime code |
+| mbse | component registry, requirement traceability, Pydantic models, doc generation |
+
+### Current seams
+
+ADR 0001 withdrew decorative Protocol seams. MBSE describes existing module
+relations via two registries plus one generator:
+
+| Seam | Interface | Purpose |
+|------|------|------|
+| Default model assembly | `register_default_model` | Registers official requirements & component catalog into caller-provided registries |
+| Component registration | `ComponentRegistry` | Aggregates components' module locations, architecture layers, dependencies |
+| Requirement traceability | `RequirementRegistry` | Connects requirements to code modules & test files |
+| Documentation generation | `DiagramGenerator` | Generates BDDs, requirement diagrams, traceability matrix from registered models |
+
+### Data models
+
+| Model | Purpose |
+|------|------|
+| `OrbitProperties` | Orbit properties: period, amplitude, extremes, mean state, center & periodicity |
+
+`OrbitProperties.mean_state` is a shape-`(6,)` state vector; `center` a shape-
+`(3,)` position vector. The model validates these public contracts at
+construction.
+
+### Managed artifacts
+
+| Document | Content |
+|------|------|
+| [Data-layer BDD](generated/bdd-data.md) | Data containers & SPICE kernel management components |
+| [Numerical-layer BDD](generated/bdd-numerical.md) | Rust numerical-computation facade |
+| [Algorithm-layer BDD](generated/bdd-algorithm.md) | Dynamics, correction, continuation & stability components |
+| [Interface-layer BDD](generated/bdd-api.md) | Facade, CLI & MCP interfaces |
+| [Tools-layer BDD](generated/bdd-tools.md) | Auxiliary tools such as logging |
+| [Functional requirements](generated/requirements.md) | Requirement diagram & code satisfaction relations |
+| [Traceability matrix](generated/traceability-matrix.md) | Requirements ↔ code modules ↔ test files |
+
+## 中文
+
+### 什么是 MBSE
 
 **MBSE（基于模型的系统工程，Model-Based Systems Engineering）** 是一种以形式化模型为核心、贯穿需求、设计、分析、验证与确认全生命周期的系统工程方法。e2m2e 不提供完整的系统工程流程，而是在仓库内借鉴其可追溯思路。
 
@@ -17,7 +108,7 @@ MBSE 模型有四项职责：
 
 BDD、需求图和追溯矩阵是受管生成产物。重新运行 MBSE 文档生成脚本后，已提交的产物必须保持不变；活动图、序列图和状态机是补充说明，不参与该生成校验。
 
-## 架构层次
+### 架构层次
 
 运行时代码遵循 ADR 0011 的五层架构，MBSE 是独立顶层的架构元数据，不属于运行时依赖链：
 
@@ -44,7 +135,7 @@ graph TD
 | tools | 不被核心运行时代码依赖的辅助能力 |
 | mbse | 组件登记、需求追溯、Pydantic 数据模型和文档生成 |
 
-## 当前接缝
+### 当前接缝
 
 ADR 0001 已撤销装饰性的 Protocol 接缝。MBSE 通过两个登记表和一个生成器描述现有模块关系：
 
@@ -55,7 +146,7 @@ ADR 0001 已撤销装饰性的 Protocol 接缝。MBSE 通过两个登记表和�
 | 需求追溯 | `RequirementRegistry` | 将需求连接到代码模块和测试文件 |
 | 文档生成 | `DiagramGenerator` | 从登记模型生成 BDD、需求图和追溯矩阵 |
 
-## 数据模型
+### 数据模型
 
 | 模型 | 用途 |
 |------|------|
@@ -63,7 +154,7 @@ ADR 0001 已撤销装饰性的 Protocol 接缝。MBSE 通过两个登记表和�
 
 `OrbitProperties.mean_state` 是形状 `(6,)` 的状态向量，`center` 是形状 `(3,)` 的位置向量。模型在构造时验证这些公开契约。
 
-## 受管产物
+### 受管产物
 
 | 文档 | 内容 |
 |------|------|

@@ -1,8 +1,8 @@
 """e2m2e 命令入口。
 
-实现状态：``mcp-serve`` 子命令（MCP 部署薄包装，ADR 0014 §6，issue #510）、
-``serve-stdio`` 子命令（GUI sidecar 入口，ADR 0035，issue #518）。
-完整 CLI 子命令（= Facade 方法，参数从同一份 Pydantic 模型生成）另立 issue。
+已实现子命令：mcp-serve（MCP 部署薄包装，ADR 0014 第 6 节）、
+serve-stdio（GUI sidecar 入口，ADR 0035）。
+完整 CLI 子命令（= Facade 方法，参数从同一份 Pydantic 模型生成）暂未提供。
 """
 
 from __future__ import annotations

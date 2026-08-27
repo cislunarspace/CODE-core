@@ -24,7 +24,9 @@ from .state import State
 
 
 class Orbit:
-    """单条轨道的数据容器与处理工具
+    """Orbit data container: state & time series plus derived orbital properties.
+
+    单条轨道的数据容器与处理工具。
 
     Orbit 是 e2m2e 中最基本的轨道数据结构，用于存储、计算和持久化
     一条 CR3BP 轨道的全部信息。
@@ -328,7 +330,7 @@ class Orbit:
 
 
 class OrbitFamily:
-    """轨道族容器
+    """Container for a family of same-type orbits indexed by a continuation parameter. / 轨道族容器
 
     用于存储和管理多个 Orbit 对象组成的轨道族。
 

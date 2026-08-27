@@ -1,4 +1,4 @@
-"""ADR 0020 决策 2（#353）：传播失败显式标记 + NLP 去目标惩罚。
+"""传播失败显式标记 + NLP 去目标惩罚。
 
 覆盖三组行为：
 
@@ -59,7 +59,7 @@ def _make_optimizer(dynamics: CR3BP_Dynamics) -> DROTRONLPOptimizer:
 
 
 class TestOptimizerPropagationFailureTranslation:
-    """优化器在搜索语境翻译传播失败（ADR 0020 决策 1、2）。"""
+    """优化器在搜索语境翻译传播失败。"""
 
     def test_step_collapse_becomes_a_diverged_candidate(self):
         optimizer = _make_optimizer(_make_dynamics())
@@ -86,7 +86,7 @@ class TestOptimizerPropagationFailureTranslation:
 
 
 class TestEvaluateAllInfeasibleCandidate:
-    """``_evaluate_all`` 读标记、去目标惩罚、留约束冲突（#353）。"""
+    """``_evaluate_all`` 读标记、去目标惩罚、留约束冲突。"""
 
     def test_infeasible_candidate_markers(self):
         """传播失败候选：INFEASIBLE + inf 目标 + 1e6 约束冲突，无 1e10 惩罚。"""
@@ -97,14 +97,14 @@ class TestEvaluateAllInfeasibleCandidate:
         assert cache["empty"] is True
         assert cache["status"] is ConvergenceState.INFEASIBLE
         assert cache["cause"] is FailureCause.DIVERGENCE_DETECTED
-        # 目标不被惩罚值污染（ADR 0020 决策 2）
+        # 目标不被惩罚值污染
         assert cache["objective"] == float("inf")
         assert not np.isfinite(cache["dv1"])
         assert not np.isfinite(cache["dv2"])
         # 约束冲突保留有限大值作为不可行信号
         assert cache["pos_violation"] == 1e6
         assert cache["vel_constraint"] == 1e6
-        # 魔法惩罚值不再出现
+        # 魔法惩罚值不得出现
         assert cache["objective"] != 2e10
         assert cache["dv1"] != 1e10
 

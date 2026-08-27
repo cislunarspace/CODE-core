@@ -343,7 +343,7 @@ def grid_search_rust_dispatch(
 
     几何方法被 monkeypatch 时，Rust 内核不经过 Python 分发，故保留 Python
     路径以维持测试注入语义。除此之外 Rust 扩展或符号缺失必须直接报告，不能
-    默认改用进程后端（issue #378）。
+    默认改用进程后端。
     Rust 总是走 Rayon 多核并行（``parallel=True``）——网格搜索的目标是快速完成。
     ``n_workers`` 直接转发给 Rust 端 ``ThreadPoolBuilder.num_threads`` 限定线程数，
     覆盖 ``RAYON_NUM_THREADS`` （该环境变量仅在 :func:`grid_search_rust` 的

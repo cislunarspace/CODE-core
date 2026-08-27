@@ -31,7 +31,7 @@ requires_spice = pytest.mark.skipif(
 )
 
 
-# 定义 body-fixed 帧所需的 SPICE 内核文件名（issue #187）：
+# 定义 body-fixed 帧所需的 SPICE 内核文件名：
 # 地球 ITRF93 需要二进制 PCK（earth_latest_high_prec.bpc），
 # 月球 MOON_PA 需要文本 PCK（pck00010.tpc）、二进制 PCK（SPICELunaCurrentKernel.bpc）
 # 与帧内核（SPICELunaFrameKernel.tf）。

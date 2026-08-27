@@ -1,10 +1,221 @@
-# ADR 0031：轨道库 catalog 的记录格式、存储布局与查询接口
+# ADR 0031: Orbit catalog — record format, storage layout, query interface / 轨道库 catalog：记录格式、存储布局与查询接口
+
+[English](#adr-0031-orbit-catalog--record-format-storage-layout-query-interface) | [简体中文](#中文)
+
+## English
+
+**Status**: Adopted
+**Date**: 2026-08-19
+**Related**: `docs/architecture/architecture.md` (§5 data management), ADR 0014
+(interface Facade/MCP/CLI), ADR 0024 (unified result status contract),
+ADR 0029 (unified Rust family generation); transfer-orbit-design ADR 0008
+(output/ persistence — its scope revised by this entry); ADR 0013 (ephemeris
+visualization's four-slot contract)
+
+### Context
+
+Orbits keep accumulating while artifacts pile up chaotically. Status quo:
+results dumped under output/ with timestamp filenames; classification guessed
+after the fact from subdirectory names plus filename regexes; a single orbit_type
+field for all dimensions; lineage like "this orbit fed station keeping" lives
+only in GUI memory and dies at process exit. Such file heaps can't serve two use
+cases: data analysis (filter/statistics by family, energy, geometry) and teaching
+(curated cases, annotations, packaged subset distribution).
+
+Architecture doc §5 filed this long ago: the data management module will later
+extend toward intelligent game-theoretic research as big-data foundation, noting
+current npz artifacts have no schema, no versioning, needing detailed design.
+This entry delivers that design. Timing is also right: ADR 0024 is executing a
+breaking migration of persistence formats — legacy artifact conventions deleted
+wholesale with no migration — so the new format carries no compatibility burden.
+
+The classification system references Hu Jiaxin et al., "Intelligent Simulation
+System Architecture and Implementation for Cislunar Space Awareness Mission
+Design and Analysis" (Journal of Image and Graphics, 2025)'s orbital dynamics
+model library: it organizes 4 classes / 27 kinds of three-body orbits along
+dynamics-model × orbit-type dimensions. Its core idea — one orbit simultaneously
+belonging to multiple independently filterable dimensions — is this entry's
+classification prototype.
+
+### Decision
+
+#### 1. Record = JSON metadata + NPZ arrays, dual segments
+
+A catalog record = one JSON (full metadata) + same-named NPZ (array segments).
+Orbit data keeps both:
+
+- `cr3bp_segment`: Orbit-native types (nondimensional states/times);
+- `ephemeris_segment`: EphemerisTable (GCRS, synodic, times_et).
+
+Either segment may be null: station-keeping products carry only ephemeris;
+periodic family members only CR3BP (initial state + period). Records carry
+`schema_version`, starting at 1.
+
+Implementation note (2026-08-19): beyond dual segments, station-keeping records
+additionally carry a small `result/` array segment (maneuver sequences,
+sk_rows statistics) — part of the station-keeping product without which records
+are incomplete; tiny, not a third orbit-data segment.
+
+#### 2. Classification is a multi-dimensional field set, not a single-valued type
+
+Each record's dimensions, filled by the algorithm layer at generation time,
+each independently filterable:
+
+| Field | Meaning |
+|---|---|
+| `orbit_family` | dro / halo / nrho / lyapunov / lissajous / dpo / axial / ro / spo / lpo / horseshoe etc. |
+| `libration_point` | 1–5 |
+| `jacobi` | CR3BP-segment Jacobi constant |
+| `amplitude` | principal amplitude (km) |
+| `has_cr3bp` / `has_ephemeris` | segment presence |
+
+No single-valued dynamics-model field: dual segments make every record naturally
+cross-model; filtering semantics express via segment-presence boolean combos.
+Result status follows ADR 0024's triple (status/cause/message). Raw request models
+are saved as JSON snapshots with records (`request`) — traceable, recomputable;
+mission scalars (epoch, duration, mu, iteration counts…) save alongside result
+segments. Classification fields come from the algorithm layer, never inferred
+afterwards: during shooting/continuation, family type, libration point, energy are
+all known quantities.
+
+Implementation note (2026-08-19): the record builder (`api/catalog_ingest.py`)
+actually lands at the interface-layer Facade seam: request snapshots depend on api
+request models whose ownership (ADR 0012) forbids algorithm-layer holding;
+"filled at generation time" means filled synchronously when computation completes,
+distinct from after-the-fact inference from filenames/paths — decision intent
+unchanged. Also: amplitude is defined differently per family (Halo's z0, SPO's
+radial distance, NRHO doesn't use amplitude directly); the classification field
+`amplitude` unifies as **geometric principal amplitude** (max half-range of CR3BP-
+segment position components × characteristic length, km), measured from known
+geometry at generation; request-level parameter amplitudes stay in the `request`
+snapshot.
+
+#### 3. Lineage written at generation time
+
+`source_record_id` (nullable) written by the algorithm layer when producing
+results: station-keeping products point at controlled orbits; lifted members point
+at their families. Lineage no longer depends on caller memory.
+
+#### 4. Family granularity: one record per family
+
+An entire OrbitFamily is one record; member parameters & arrays inside. Members
+may lift into standalone records (`source_record_id` → family) for downstream
+consumption such as station keeping.
+
+#### 5. Storage layout: flat record files + SQLite derived index
+
+```
+catalog/
+├── records/<record_id>.json + <record_id>.npz   # source of truth
+└── catalog.db                                    # SQLite index, derived
+```
+
+Record files are the source of truth; catalog.db stores only filter dimensions +
+file pointers, deletable and fully rebuilt by scanning records/. Directories bear
+no classification duty: no family subdirectories; filename = record_id. Storage dir
+injects via Config (ADR 0014 decision 7).
+
+#### 6. Teaching annotations travel with JSON
+
+`tags` (string list) + `note` (free text) live in the JSON record. Subset exports
+carry annotations in files, independent of local db.
+
+#### 7. Query & batch generation enter Facade
+
+New Facade methods: `catalog_query` (multi-dimensional filters → summary list),
+`catalog_get`, `catalog_delete`, `catalog_tag`, `catalog_export` (subset
+packaging), `catalog_sweep` (parameter-space scan batch generation + ingestion;
+orchestration reuses ADR 0029's Rust family generation). CLI and MCP derive
+automatically per ADR 0014 pure derivation.
+
+#### 8. Automatic ingestion
+
+Facade's artifact-producing methods (design_orbit, orbit_family_generation,
+control_orbit etc.) auto-ingest on success — callers never explicitly request.
+Config can disable (testing).
+
+#### 9. No migration of legacy artifacts
+
+All old-format products under output/ get deleted — no migration tool, no
+compatibility reads.
+
+### Rationale
+
+1. **Dual segments, not forced EphemerisTable unification**: CR3BP initial guesses
+   vs ephemerides are products of different dynamical models; one-way coercion
+   loses guesses' correctability (differential correction consumes nondimensional
+   states). Coexistence also matches transfer-orbit-design ADR 0013's four-slot
+   visualization contract — GUI consumption unchanged.
+2. **Multi-dimensional fields, not single-valued orbit_type**: classification's
+   value lies in filter combinations (has-ephemeris AND L2 AND Jacobi 3.0–3.1
+   NRHO-type conditions) that single values can't express. Fields from the
+   algorithm layer rather than retro-guesses: generation time has maximal
+   information; after-the-fact inference is precisely today's chaos source.
+3. **SQLite as derived index, not source of truth**: files-as-source keep manual
+   copy/backup/sharing and CLI+GUI sharing; index is query acceleration only —
+   corrupted or format-upgraded, delete and rebuild; query-dimension changes never
+   touch record files.
+4. **Flat directories**: path-encoded classification is today's chronic disease:
+   renames lose types; regex misses lose products. With classification moved into
+   the index, directory organization goes free.
+5. **One record per family**: families hold tens-to-hundreds of members —
+   individual records would flood query results; family semantics (continuation
+   parameter, amplitude sequence) would otherwise have nowhere to live.
+6. **Automatic ingestion**: catalog value = everything computed is there;
+   explicit ingestion is the step callers forget.
+7. **Annotations with JSON**: teaching distribution units are file subsets;
+   annotations must travel with data.
+8. **No migration**: few legacy products, low retention value; tool cost exceeds
+   product value. ADR 0024 already established fail-on-read + hint-migration for
+   old formats; this entry goes further — not even migration hints.
+
+### Consequences
+
+#### Added
+
+- `data/catalog/`: record types, storage engine (write/read/index rebuild),
+  SQLite index.
+- `algorithm/`: catalog_sweep parameter-scan orchestration.
+- `api/`: Facade catalog methods & Pydantic models; record builder
+  (`catalog_ingest.py`, see decision 2 implementation note); CLI/MCP auto-derived.
+
+#### Changed
+
+- Architecture doc §5's planned design lands; artifact formats enter schema'd,
+  versioned state.
+- Facade artifact methods gain auto-ingest side effects.
+
+#### Unchanged
+
+- Orbit/OrbitFamily/EphemerisTable domain-data duties (ADR 0024); catalog records
+  reference them, never replace them.
+- `algorithm/normal_form/catalog.py` (libration-point parameter-catalog
+  transformer) and this orbit catalog are different concepts; original name kept;
+  docs reserve "orbit catalog" for this entry's catalog.
+
+#### Handover
+
+- transfer-orbit-design's output/ scanning (discovery.py) deprecated; its ADR 0008
+  revised: artifact lists now come via Facade catalog queries — files-as-source-of-
+  truth unchanged.
+
+### Trade-offs
+
+- Dual segments roughly double each design-product record's size (two
+  representations of one orbit) for lossless information and zero-conversion
+  consumers; station-keeping products already had ephemeris-only segments —
+  unaffected.
+- Auto-ingest gives pure computation calls file-I/O side effects; Config-injected
+  directory + disable switch keep testing unaffected.
+- SQLite adds a binary file — but derived, never format lock-in.
+
+## 中文
 
 **状态**：已采纳
 **日期**：2026-08-19
 **关联**：`docs/architecture/architecture.md`（§5 数据管理模块）、ADR 0014（接口层 Facade/MCP/CLI）、ADR 0024（统一算法结果状态契约）、ADR 0029（统一 Rust 族生成）；transfer-orbit-design ADR 0008（output/ 持久化，本篇修订其适用面）、ADR 0013（星历可视化四槽位契约）
 
-## 背景
+### 背景
 
 轨道越算越多，产物却越堆越乱。现状是：计算结果按时间戳文件名堆在 output/ 下，分类靠子目录名加文件名正则事后猜测，维度只有 orbit_type 一个字段；哪条轨道喂给了轨道保持这类谱系关系只存在 GUI 内存里，进程退出即断。这样的文件堆撑不起两类使用：数据分析（按族、能量、几何参数过滤与统计）与教学（精选案例、加标注、打包子集分发）。
 
@@ -12,7 +223,7 @@
 
 分类体系参照胡佳鑫等《面向地月空间感知任务设计与分析的智能仿真系统架构与实现》（中国图象图形学报，2025）的轨道动力学模型库：该库按动力学模型 × 轨道类型两个维度组织 4 类 27 种三体轨道。其核心思想，即同一条轨道同时属于多个可独立过滤的维度，是本篇分类设计的原型。
 
-## 决策
+### 决策
 
 ### 1. 记录 = JSON 元数据 + NPZ 数组，双段并存
 
@@ -75,7 +286,7 @@ Facade 的产物型计算方法（design_orbit、orbit_family_generation、contr
 
 现有 output/ 下旧格式产物全部删除，不写迁移工具，不做兼容读取。
 
-## 理由
+### 理由
 
 1. **双段并存，不统一转 EphemerisTable**：CR3BP 初猜与星历是两种动力学模型下的产物，单向强转丢失初猜的可修正性（微分修正消费无量纲状态）；并存也与 transfer-orbit-design ADR 0013 的四槽位可视化契约一致，GUI 消费方式不变。
 2. **多维字段，不单值 orbit_type**：分类的价值在过滤组合（含星历段、L2、Jacobi 3.0~3.1 的 NRHO 这类条件），单值类型表达不了。字段由算法层填而不是事后猜：生成时信息最全，事后推断正是现状乱源。
@@ -86,7 +297,7 @@ Facade 的产物型计算方法（design_orbit、orbit_family_generation、contr
 7. **标注随 JSON**：教学分发的单位是文件子集，标注必须跟数据走。
 8. **不迁移**：旧产物数量少、保留价值低，迁移工具的成本高于产物价值；ADR 0024 已确立旧格式读取失败并提示迁移的先例，本篇更进一步，连提示迁移也不做。
 
-## 结果
+### 结果
 
 ### 新增
 
@@ -108,7 +319,7 @@ Facade 的产物型计算方法（design_orbit、orbit_family_generation、contr
 
 - transfer-orbit-design 的 output/ 扫描（discovery.py）废弃；其 ADR 0008 经修订：产物清单改经 Facade catalog 查询获得，文件为事实来源这一点不变。
 
-## 取舍
+### 取舍
 
 - 双段并存使设计产物的单条记录体积约增一倍（同一轨道两套表示），换取信息无损与消费方零转换；站保产物本就只有星历段，不受影响。
 - 自动入库使纯计算调用产生文件 I/O 副作用；以 Config 注入目录并可关闭，测试场景不受影响。

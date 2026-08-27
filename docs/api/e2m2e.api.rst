@@ -8,6 +8,19 @@ e2m2e.api package
    :no-index:
 
 
+e2m2e.api.catalog_ingest module
+-------------------------------
+
+产物型 Facade 结果到 catalog 记录的构建纯函数（ADR 0031）。无产物时
+不建记录，返回 ``None`` 。
+
+.. automodule:: e2m2e.api.catalog_ingest
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :exclude-members: build_design_record, build_family_record
+
+
 e2m2e.api.config module
 -----------------------
 
@@ -71,6 +84,26 @@ e2m2e.api.mcp.tools module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.api.mcp.tools
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+e2m2e.api.sidecar package
+-------------------------
+
+GUI sidecar stdio 协议（ADR 0035）：请求/响应/进度为 JSON 文本行，复用
+MCP 统一信封，大数组经二进制帧附加传输。工具面即 Facade 上 mcp_exposed
+的方法。
+
+.. automodule:: e2m2e.api.sidecar
+   :no-index:
+
+
+e2m2e.api.sidecar.frames module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.api.sidecar.frames
    :members:
    :undoc-members:
    :show-inheritance:

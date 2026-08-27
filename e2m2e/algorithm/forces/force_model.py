@@ -27,7 +27,9 @@ class ForceEntry:
 
 
 class ForceModel:
-    """聚合多个 PhysicalModel 并完成传播的动力学容器。
+    """Composition of force models driving one propagation via Rust integrators.
+
+    聚合多个 PhysicalModel 并完成传播的动力学容器。
 
     不继承 ``Dynamics``：``Dynamics`` 是 CR3BP/Ephemeris 的基类，其
     ``propagate()`` 基于 ``scipy.solve_ivp`` 与 STM 模板方法；ForceModel 用
@@ -237,11 +239,11 @@ class ForceModel:
     def _require_rust_capability(self, *, stm: bool) -> None:
         """校验 Rust 扩展可用且所有启用力模型支持 Rust 编译；不满足即显式报错。
 
-        issue #378：核心传播一律走编译 Rust，扩展不可用（抛
+        核心传播一律走编译 Rust：扩展不可用（抛
         :class:`RustExtensionUnavailableError`）或某 force 无 ``to_rust_spec``
         （按原因分流：无 spice → ``RustExtensionUnavailableError``；能力缺失
-        → ``NotImplementedError``，ADR 0020 决策 4）时不再静默回退
-        Python/scipy。
+        → ``NotImplementedError``，ADR 0020 决策 4）时显式报错，
+        不允许静默回退到 Python/scipy。
 
         Args:
             stm: 目标路径是否含 STM（``propagate_compiled_stm_py``）。
@@ -258,7 +260,7 @@ class ForceModel:
                 raise NotImplementedError(
                     f"force {type(force).__name__}（name={entry.name!r}）不支持 STM "
                     "传播（Rust acceleration_and_jacobian 对该力返回 Err）。"
-                    "issue #378：不再回退 Python FD 路径。"
+                    "不允许回退 Python FD 路径。"
                 )
             if force.to_rust_spec(self.system) is None:
                 self._raise_to_rust_spec_none(type(force).__name__)
@@ -484,10 +486,10 @@ class ForceModel:
     ) -> dict[str, Any]:
         """使用 Rust 编译传播轨迹（零跨界）。
 
-        issue #378：默认传播一律走编译 Rust（``propagate_compiled`` /
+        默认传播一律走编译 Rust（``propagate_compiled`` /
         ``propagate_compiled_stm_py`` / ``propagate_compiled_lowthrust``）。
         扩展不可用（``RustExtensionUnavailableError``）或力模型无 Rust spec
-        （``NotImplementedError`` 能力错误）时显式报错，不再静默回退
+        （``NotImplementedError`` 能力错误）时显式报错，不允许静默回退
         Python/scipy。
 
         Args:
@@ -500,7 +502,7 @@ class ForceModel:
             initial_step: 初始步长，默认从初始状态估算。
             events: 不支持。ForceModel 事件传播需要 compiled-forces Rust API，
                 当前未提供，传 events 抛 NotImplementedError（不能回退 Python
-                RHS，issue #378）。
+                RHS）。
             max_steps: 最大积分步数，默认 100_000。
             method: Runge-Kutta 积分器方法，默认 PD45。
 
@@ -525,7 +527,7 @@ class ForceModel:
             raise NotImplementedError(
                 "ForceModel 事件传播需要 compiled-forces Rust API（事件检测与"
                 "力求值都在 Rust 内循环完成）；当前未提供，传 events 不支持。"
-                "issue #378：不再回退 Python RHS。"
+                "不允许回退 Python RHS。"
             )
 
         # ── 可变质量低推力 7D 路径 ──
@@ -549,7 +551,7 @@ class ForceModel:
         else:
             h = self._estimate_initial_step(y0, t0, tf)
 
-        # ── 零时长：先检查扩展/spec，防绕过（issue #378）──
+        # ── 零时长：先检查扩展/spec，防绕过 ──
         if tf == t0:
             self._require_rust_capability(stm=with_stm)
             self.last_trajectory = (np.array([t0]), y0.reshape(1, -1))

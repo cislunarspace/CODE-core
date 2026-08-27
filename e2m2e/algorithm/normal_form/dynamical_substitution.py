@@ -16,14 +16,14 @@ Public API：
   通过 :meth:`reduce` 给出 :class:`DynamicalSubstituteResult`；
 - :class:`DynamicalSubstituteResult` —— 不透明结果句柄；
 - :func:`_build_dynamics_rhs` —— 把 ``NormalFormContext`` 翻译为
-  ODE 右端项的内部辅助（也供 slice 3 测试 / 复用）。
+  ODE 右端项的内部辅助（也供测试 / 复用）。
 
 实现策略：
 
 - 复用 :mod:`~e2m2e.algorithm.normal_form.multiple_shooting` 的块三对角消元；
 - 复用 :mod:`.fft` 的 NAFF/FFT 后端显式选择；
-- 复用 :func:`.hamiltonian.evaluate_hamiltonian` / 星历参数（与
-  slice 1 保持接口一致）；
+- 复用 :func:`.hamiltonian.evaluate_hamiltonian` / 星历参数（与其
+  接口保持一致）；
 - 当外部 SPICE 内核不可用时（如 CI 环境），``reduce`` 走 ``Pure
   CR3BP`` 退路：忽略太阳与三体摄动，使用旋转系下的 Hill 方程；
   该退路仅供烟雾测试，不用于生产数据。
@@ -324,7 +324,7 @@ class DynamicalSubstituteCorrector:
                 atol=1e-12,
             )
             if not sol.success:
-                # 稠密输出失败不再用 2 点线性近似顶替（#352）：2 点线性会
+                # 稠密输出失败即抛错，不用 2 点线性近似顶替：线性近似会
                 # 污染下游 FFT 频率分析；改由 pipeline 统一降级为 FAILED 结果。
                 raise RuntimeError(
                     f"稠密输出积分失败（段 {i}: t∈[{t_lo:.6g}, {t_hi:.6g}]）：{sol.message}"
@@ -378,8 +378,8 @@ class DynamicalSubstituteCorrector:
         """由 ``Xlist`` 数值微分得 ``W_poly`` / ``Wdot_poly``。
 
         ``use_cr3bp`` 为 True（显式 force_cr3bp 或 SPICE 不可用降级）时
-        ``_bdot2a`` 走纯 CR3BP 旋转矩阵，不探 SPICE（#352：SPICE 可用时星历
-        失败不再静默退化为纯 CR3BP）。
+        ``_bdot2a`` 走纯 CR3BP 旋转矩阵，不探 SPICE（SPICE 可用时星历
+        失败抛错，不静默退化为纯 CR3BP）。
         """
         """由 ``Xlist`` 数值微分得 ``W_poly`` / ``Wdot_poly``。"""
         if tlist.size < 2:
@@ -433,8 +433,8 @@ def _second_derivative(y: npt.NDArray[np.floating], dt: float) -> npt.NDArray[np
     """等距采样的二阶中心差分；首末端用一阶差分。
 
     对应 qiao ``list_deriv`` 的两遍应用：``ddot = deriv(deriv(y))``。
-    本切片刻意走更简洁的中心差分（足以满足烟雾测试），slice 3 可
-    再换成 qiao 风格的高阶 Vandermonde 系数。
+    刻意用更简洁的中心差分（足以满足当前用途）；需要更高精度时可
+    换成 qiao 风格的高阶 Vandermonde 系数。
     """
     y = np.asarray(y, dtype=float)
     out = np.zeros_like(y)
@@ -469,8 +469,8 @@ def _bdot2a(
     星历）取。``use_cr3bp=True`` （显式 ``force_cr3bp`` 或 SPICE 不可用降级）
     时走纯 CR3BP（自治）：``C_pq`` 恒为旋转矩阵系数 ``[[0,1,0],[-1,0,0],
     [0,0,0]]``、``dC_pq = 0``，不探 SPICE——这是 CR3BP 中心流形约化的正路，
-    不是降级。SPICE 可用（``use_cr3bp=False``）时星历失败抛异常（#352），
-    不再静默退化为纯 CR3BP（那会丢星历摄动）。
+    不是降级。SPICE 可用（``use_cr3bp=False``）时星历失败抛异常，
+    不静默退化为纯 CR3BP（那会丢星历摄动）。
     """
     B = np.asarray(B, dtype=float)
     Bdot = np.asarray(Bdot, dtype=float)
@@ -517,8 +517,8 @@ def _bdot2a(
                 Cpq_seq.append(cpq)
                 dCpq_seq.append(dcpq)
         except Exception as exc:
-            # SPICE 可用但星历参数解析失败：不再静默退化为纯 CR3BP 旋转矩阵
-            # （#352）——退化会用错 C_pq 污染 A/Adot、静默丢星历摄动。纯 CR3BP
+            # SPICE 可用但星历参数解析失败：不静默退化为纯 CR3BP 旋转矩阵，
+            # 退化会用错 C_pq 污染 A/Adot、静默丢星历摄动。纯 CR3BP
             # 应显式走 use_cr3bp=True（该路径不探 SPICE）。
             raise RuntimeError(
                 f"_ephemeris.eval_params 失败：{exc}；不退化到纯 CR3BP 旋转矩阵"

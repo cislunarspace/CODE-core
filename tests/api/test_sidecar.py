@@ -1,4 +1,4 @@
-"""sidecar stdio 协议层测试（issue #518 / ADR 0035）。
+"""sidecar stdio 协议层测试。
 
 进程内驱动 ``handle_request`` / ``run_loop``，不起真进程：输出字节块序列
 （JSON 行 + 原始帧）即协议流，端到端断言帧流后 JSON 行正确恢复。
@@ -85,7 +85,7 @@ def facade(tmp_path, monkeypatch) -> Facade:
 
 
 def _record() -> CatalogRecordResponse:
-    """含 ndarray 数组段的族记录（catalog_get 响应形状，issue #526）。"""
+    """含 ndarray 数组段的族记录（catalog_get 响应形状）。"""
     return CatalogRecordResponse(
         record_id="r1",
         created_at="2026-01-01T00:00:00Z",
@@ -144,7 +144,7 @@ def test_family_generation_binary_roundtrip(facade):
     orbits = line["data"]["orbits"]
     assert [o["states"] for o in orbits] == [None, None]
     assert len(orbits[0]["times"]) == 3  # 小数组留 JSON
-    # 周期原值透传（归一化单位，issue #525）：成员缺失或非有限时为 null
+    # 周期原值透传（归一化单位）：成员缺失或非有限时为 null
     assert [o["period"] for o in orbits] == [2.5, None]
     # 重采样方程需要 mu：响应级原值透传
     assert line["data"]["mu"] == pytest.approx(1.215e-2)
@@ -231,7 +231,7 @@ def test_cli_serve_stdio_registered(capsys):
 
 
 def test_catalog_get_binary_roundtrip(facade):
-    """issue #526：记录数组段的 ndarray 出帧，JSON 行 null 占位，帧序=占位序。"""
+    """记录数组段的 ndarray 出帧，JSON 行 null 占位，帧序=占位序。"""
     chunks = handle_request(
         facade,
         {"tool": "catalog_get", "arguments": {"record_id": "r1"}, "binary_dtype": "f32"},
@@ -257,7 +257,7 @@ def test_catalog_get_requires_binary_dtype(facade):
 
 
 def test_run_loop_survives_envelope_serialization_failure(facade):
-    """issue #526：信封化异常不得炸进程——返回 INTERNAL_ERROR 信封并继续循环。"""
+    """信封化异常不得炸进程，返回 INTERNAL_ERROR 信封并继续循环。"""
     facade._broken_response = True
     try:
         requests = (
@@ -280,8 +280,8 @@ def test_run_loop_survives_envelope_serialization_failure(facade):
 
 
 def test_invoke_tool_serializes_ndarray_inline():
-    """issue #526 演进：结果含 ndarray 时信封层降级内联为嵌套 list，
-    不再兑成 INTERNAL_ERROR（sidecar 大数组仍首选二进制帧，见帧映射）。
+    """结果含 ndarray 时信封层降级内联为嵌套 list 而非 INTERNAL_ERROR
+    （sidecar 大数组仍首选二进制帧，见帧映射）。
     """
     from e2m2e.api.models import CatalogRecordResponse
     from e2m2e.data.templates import ConvergenceState, FailureCause
@@ -322,7 +322,7 @@ def test_invoke_tool_serializes_ndarray_inline():
 
 
 def test_catalog_query_unchanged_by_binary_mapping(facade):
-    """issue #526 验收：不进帧映射的工具走原信封化路径，无帧、无 binary_frames。"""
+    """不进帧映射的工具走原信封化路径，无帧、无 binary_frames。"""
     chunks = handle_request(facade, {"tool": "catalog_query", "arguments": {}})
     lines = [json.loads(c) for c in chunks]
     assert len(lines) == 2  # 进度行 + 响应行，无帧

@@ -365,7 +365,7 @@ class DesignOrbitRequest(_ApiModel):
 
         未显式指定时静默分派默认值；显式传入与族冲突的值时告警后改写
         （不拒绝，兼容既有调用方）。请求对象经此即为事实，算法层只做
-        防御检查、不再改写。
+        防御检查。
         """
         if selection not in SEGMENTED_CORRECTION_ORBIT_TYPES:
             return
@@ -436,7 +436,7 @@ class FamilyGenerationResponse(_ApiModel, OrbitFamily):
 class DesignOrbitResponse(ResultResponse):
     """任务轨道设计输出。
 
-    几何字段（``mu`` / ``states`` / ``times`` / ``ephemeris``，#312）让下游
+    几何字段（``mu`` / ``states`` / ``times`` / ``ephemeris``）让下游
     （画图 / 落盘 / design→control 链式）可仅依赖 Facade，不必穿透 algorithm
     层。``states`` / ``times`` 为 CR3BP 参考周期轨道（无量纲会合系），
     ``ephemeris`` 为标称星历（GCRS km / 速度 m/s + 会合系，``EphemerisTable``
@@ -632,7 +632,7 @@ class ControlOrbitRequest(_ApiModel):
 class ControlOrbitResponse(ResultResponse):
     """轨道保持输出。
 
-    几何字段（``controlled_ephemeris`` / ``mu``，#312）：``controlled_ephemeris``
+    几何字段（``controlled_ephemeris`` / ``mu``）：``controlled_ephemeris``
     为最后一次蒙特卡洛样本的受控真实轨道星历（``EphemerisTable`` 全字段；
     全失败时 ``None``）；``mu`` 由请求透传（算法层不产 mu）。
     """
@@ -775,7 +775,7 @@ class SpacetimeTransformResponse(ResultResponse):
 
 
 # ---------------------------------------------------------------------------
-# 轨道族生成（#411）：公开平动点统一术语 libration_point（1=L1 … 5=L5）。
+# 轨道族生成：公开平动点统一术语 libration_point（1=L1 … 5=L5）。
 # 各族允许的平动点取值域与默认值；Halo 族振幅上限为固定 z0 延拓的
 # 折叠点（同 seed._HALO_FOLD_Z0，按平动点区分）。
 # ---------------------------------------------------------------------------
@@ -915,7 +915,7 @@ class FamilyGenerationRequest(_ApiModel):
     （与 ``DesignOrbitRequest`` 同构）：共线族（Halo/NRHO/Axial）仅
     L1/L2，Lissajous 支持 L1/L2/L3，三角族（SPO/LPO/Horseshoe）仅
     L4/L5，DRO 是月心族不绑定平动点（请求不得携带 ``libration_point``）。
-    八族均已实现（#428、#502）：周期族返回严格周期成员，Lissajous
+    八族均已实现：周期族返回严格周期成员，Lissajous
     返回拟周期有界轨迹的参数采样（族上显式标注 quasi-periodic）。
 
     按族适用的字段：
@@ -1036,7 +1036,7 @@ class FamilyGenerationRequest(_ApiModel):
             amp_range = NumericRange(1737.0, 110000.0)
             ranges["min_amplitude_km"] = amp_range
             ranges["max_amplitude_km"] = amp_range
-        else:  # SPO/LPO/HORSESHOE：声明范围不得超出可达包络（#435 标定）
+        else:  # SPO/LPO/HORSESHOE：声明范围不得超出可达包络
             if selection == "SPO":
                 amp_range = NumericRange(1737.0, 75000.0)
             elif selection == "LPO":

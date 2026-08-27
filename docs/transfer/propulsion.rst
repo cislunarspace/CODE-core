@@ -1,26 +1,32 @@
-脉冲推进模型
-============
+Impulsive Propulsion Model / 脉冲推进模型
+==========================================
 
-:class:`~e2m2e.algorithm.transfer.propulsion.ImpulsivePropulsion` 用于计算转移轨道的出发注入速度与代价。
+[English](#impulsive-propulsion-model) | [简体中文](#中文)
 
-基本原理
---------
+English
+-------
 
-脉冲推进将出发速度分解为切向与法向分量：
+:class:`~e2m2e.algorithm.transfer.propulsion.ImpulsivePropulsion` computes
+departure injection velocities and costs for transfers.
+
+Principle
+~~~~~~~~~
+
+Departure velocity decomposes into tangential & normal components:
 
 .. math::
 
    \mathbf{v} = \alpha \, |\mathbf{v}| \, \hat{\mathbf{t}} + \beta \, |\mathbf{v}| \, \hat{\mathbf{n}}
 
-其中：
+with:
 
-- α（alpha）为切向速度比，控制出发速度沿原始速度方向的分量
-- β（beta）为法向速度比（默认 0.0，即纯切向）
-- :math:`\hat{\mathbf{t}}` 为原始速度方向单位向量
-- :math:`\hat{\mathbf{n}}` 为轨道面法向单位向量
+- α: tangential velocity ratio along original velocity direction
+- β: normal ratio (default 0.0 — purely tangential)
+- :math:`\hat{\mathbf{t}}`: original-velocity unit vector
+- :math:`\hat{\mathbf{n}}`: orbit-normal unit vector
 
-使用方法
---------
+Usage
+~~~~~
 
 .. code-block:: python
 
@@ -28,25 +34,22 @@
 
    propulsion = ImpulsivePropulsion()
 
-   # 计算出发注入速度
+   # Departure injection velocity
    v_inj = propulsion.compute_departure_velocity(
        dro_orbit.states[0],
        alpha=1.2,
        beta=0.0,
    )
 
-   # 转移代价（Δv 分解）由 compute_cost 计算，见下文示例
+Parameters:
 
-参数说明
---------
+- ``normal``: orbit normal, default [0, 0, 1] (z axis)
 
-- ``normal``：轨道面法向量，默认 [0, 0, 1]（z 轴）
+Cost decomposition
+~~~~~~~~~~~~~~~~~~
 
-与转移代价的配合
-----------------
-
-``ImpulsivePropulsion`` 内部调用 :func:`~e2m2e.algorithm.transfer.cost.compute_transfer_cost`
-计算 Δv 分解：
+Internally delegates to
+:func:`~e2m2e.algorithm.transfer.cost.compute_transfer_cost`:
 
 .. code-block:: python
 
@@ -58,4 +61,14 @@
        final_velocity=final_velocity,
        insertion_velocity=insertion_velocity,
    )
-   print(f"Δv1 = {cost.dv1:.6f}, Δv2 = {cost.dv2:.6f}, 总计 = {cost.total:.6f}")
+   print(f"Δv1 = {cost.dv1:.6f}, Δv2 = {cost.dv2:.6f}, total = {cost.total:.6f}")
+
+中文
+----
+
+:class:`~e2m2e.algorithm.transfer.propulsion.ImpulsivePropulsion` 用于计算转移轨道的出发注入速度与代价。
+
+基本原理：出发速度分解为切向与法向分量（α 切向速度比 + β 法向速度比，
+β 默认 0）。参数 ``normal`` 为轨道面法向量，默认 [0, 0, 1]。
+Δv 分解由 :func:`~e2m2e.algorithm.transfer.cost.compute_transfer_cost`
+完成。接口与示例见上方英文节。

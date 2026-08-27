@@ -1,8 +1,87 @@
-# 架构
+# Architecture / 架构
+
+[English](#english) | [简体中文](#简体中文)
+
+## English
+
+e2m2e is the **algorithm toolset infrastructure** in an LLM+Agent mission
+planning system: the large model handles intent understanding and
+orchestration; e2m2e handles precise and reliable orbit computation. This page
+is the reading map for the architecture chapter.
+
+### The five architectural designs
+
+Full narrative in [architecture](architecture.md); summary:
+
+| Module | Responsibility | Key decisions |
+|---|---|---|
+| Spacetime systems and constants | UTC/TDB/TAI/TT time scales, J2000/ITRF93/GCRS frame conversion, multiple physical constant baselines | ADR 0010, ADR 0022 |
+| Rust computation | Four core crates (spice / propagation / forces / integrators), plus two HJB solver crates (levelset / hjb-dynamics, see [hjb-subsystem](hjb-subsystem.md)) | ADR 0002, ADR 0016, ADR 0032 |
+| Python orchestration | Construct problem → call Rust iterators → interpret results; task-level Facade | ADR 0014, ADR 0029 |
+| CI | Three-platform wheel matrix (Linux x64/ARM, Windows) + CSPICE build package distribution | ADR 0009 |
+| Data management | GitHub Release ephemeris data, Git-tracked family seeds, packaged CR3BP baseline family dataset, local catalog | ADR 0031, ADR 0036 |
+
+Division-of-labor principle (ADR 0011 five-layer architecture, ADR 0012
+dependency direction): **domain decisions stay in Python, hot loops go to
+Rust**. Rust never touches SPICE handles; it consumes pre-sampled injected
+ephemeris cache tables. The cspice kernel is global state and cannot be used
+concurrently — this constraint determines where the seam sits.
+
+### Chapter reading map
+
+- [architecture](architecture.md), overview: walk through the full chain of
+  designing an L2 NRHO to see where each of the five modules participates.
+  Read this first.
+- [system-dynamics-dataflow](system-dynamics-dataflow.md), deep dive into the
+  System and Dynamics class hierarchies: how data flows piece by piece through
+  construction, propagation, and result caching.
+- [numerics-migration-status](numerics-migration-status.md), migration ledger
+  for numerical kernels across algorithm-layer submodules: sunk / migrating /
+  intentionally kept in Python, each with reasons and issues.
+- [hjb-subsystem](hjb-subsystem.md), target shape of the HJB subsystem:
+  two-level division of labor, Hamiltonian seam, dimension ceiling, binding
+  entry, verification tiering.
+- [hjb-hamiltonian-dataflow](hjb-hamiltonian-dataflow.md), supporting research
+  for the ephemeris force-model Hamiltonian: force-model and EphemCache
+  status quo, and the data flow of one solve.
+
+### Architecture decision records (ADR)
+
+Each ADR is a decision snapshot recording context, decision, rationale, and
+consequences; when decisions change, originals are not rewritten — revisions
+are appended or a new entry written. ADRs live in `docs/adr/`, aimed at
+development collaboration, not the user documentation site. For the index and
+status vocabulary see [`docs/adr/README.md`](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/README.md).
+
+The highest-impact entries worth reading first:
+
+| ADR | Topic | Relation to this page |
+|---|---|---|
+| [0011](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0011-five-layer-architecture.md) | Five-layer architecture and full renaming | Source of the layering vocabulary |
+| [0012](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0012-dependency-direction.md) | Dependency-direction rules and CI checks | Who may depend on whom between modules |
+| [0002](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0002-rust-integrator-core.md) | Rust integrator core | Origin of the Python/Rust seam |
+| [0016](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0016-ephem-cache-architecture.md) | EphemCache ephemeris cache | How Rust avoids touching cspice |
+| [0014](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0014-api-facade-mcp-cli.md) | Facade / MCP / CLI same source | Task-level interface model |
+| [0024](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0024-unified-algorithm-result-status.md) | Unified algorithm result status contract | Shared vocabulary of the result-interpretation layer |
+| [0031](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0031-orbit-catalog.md) | Orbit catalog | Realization of the data-management module |
+
+### Known open items
+
+Architecture is not finished work. Currently registered review items:
+
+- Three coexisting frame-conversion paths in the spacetime system; time
+  conversion responsibility chain needs clarification.
+- Dual shooting paths in the Python orchestration layer; numerical residue in
+  `algorithm/transfer` to be consolidated.
+- Optimization kernels such as NLP and NSGA-II remain in Python and sink to
+  Rust gradually per the cadence in
+  [numerics-migration-status](numerics-migration-status.md).
+
+## 简体中文
 
 e2m2e 是 LLM+Agent 任务规划系统中的**算法工具集基础设施**：大模型负责理解意图与编排，e2m2e 负责精确可靠的轨道计算。本文是架构章节的阅读地图。
 
-## 五个架构设计
+### 五个架构设计
 
 完整叙述见 [architecture](architecture.md)，摘要如下：
 
@@ -16,7 +95,7 @@ e2m2e 是 LLM+Agent 任务规划系统中的**算法工具集基础设施**：�
 
 分工原则（ADR 0011 五层架构、ADR 0012 依赖方向）：**领域决策留 Python，热循环进 Rust**。Rust 不吃 SPICE 句柄，吃预采样注入的星历缓存表。cspice 内核是全局状态、不可并发，这一约束决定了接缝的位置。
 
-## 章节阅读地图
+### 章节阅读地图
 
 - [architecture](architecture.md)，总览：从设计一条 L2 NRHO 的完整链路看五个模块各自在哪个环节发挥作用。先读这篇。
 - [system-dynamics-dataflow](system-dynamics-dataflow.md)，System 与 Dynamics 两棵类层次的深潜：构造、传播、结果缓存中数据逐段怎么走。
@@ -24,7 +103,7 @@ e2m2e 是 LLM+Agent 任务规划系统中的**算法工具集基础设施**：�
 - [hjb-subsystem](hjb-subsystem.md)，HJB 子系统目标形态：两级分工、Hamiltonian 接缝、维度上限、绑定入口、验证分层。
 - [hjb-hamiltonian-dataflow](hjb-hamiltonian-dataflow.md)，星历力模型 Hamiltonian 的配套调研：力模型与 EphemCache 现状、一次求解的数据流。
 
-## 架构决策记录（ADR）
+### 架构决策记录（ADR）
 
 每篇 ADR 是一个决策快照，记录背景、决策、理由与结果；决策变化时不改写原文，而是追加修订或另写新篇。ADR 存于仓库 `docs/adr/`，面向开发协作，不进用户文档站点。索引与状态词汇表见 [`docs/adr/README.md`](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/README.md)。
 
@@ -40,7 +119,7 @@ e2m2e 是 LLM+Agent 任务规划系统中的**算法工具集基础设施**：�
 | [0024](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0024-unified-algorithm-result-status.md) | 统一算法结果状态契约 | 结果解释层的统一词汇 |
 | [0031](https://github.com/cislunarspace/e2m2e/blob/main/docs/adr/0031-orbit-catalog.md) | 轨道库 catalog | 数据管理模块的落法 |
 
-## 已知待整事项
+### 已知待整事项
 
 架构不是完成时。当前登记在册的审查项：
 

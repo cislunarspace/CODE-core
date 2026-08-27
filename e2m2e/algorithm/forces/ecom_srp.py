@@ -12,8 +12,7 @@ DFH 的 DYB 9 系数含义：
 当仅 dyb[0] 非零时，模型退化为标准 cannonball SRP。
 
 加速度计算全部由 Rust 编译路径承载（``("ecom_srp", dyb, shadow_bodies)``
-力元组，``crates/e2m2e-forces/src/forces/ecom.rs``），Python 侧不保留参考实现
-（issue #378）。
+力元组，``crates/e2m2e-forces/src/forces/ecom.rs``），Python 侧不保留参考实现。
 """
 
 from __future__ import annotations

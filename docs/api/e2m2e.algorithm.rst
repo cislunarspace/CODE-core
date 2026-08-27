@@ -5,8 +5,17 @@ e2m2e.algorithm package
    :no-index:
 
 
-顶层模块
---------
+Top-level modules / 顶层模块
+----------------------------
+
+
+e2m2e.algorithm.catalog_sweep module
+------------------------------------
+
+.. automodule:: e2m2e.algorithm.catalog_sweep
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 
 e2m2e.algorithm.propagation module
@@ -555,6 +564,24 @@ e2m2e.algorithm.family.spo_initial_guess module
    :show-inheritance:
 
 
+e2m2e.algorithm.family.planar_continuation module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.algorithm.family.planar_continuation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+e2m2e.algorithm.family.rust_generation module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.algorithm.family.rust_generation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
 e2m2e.algorithm.family.triangular_initial_guess module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -832,6 +859,25 @@ e2m2e.algorithm.normal_form.coord_trans.cm_param module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.algorithm.normal_form.coord_trans.cm_param
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+e2m2e.algorithm.levelset package
+--------------------------------
+
+levelset 值函数的 Python 侧工具（ADR 0032 决策 4）。Rust 侧求解器内核
+在 e2m2e-levelset crate（ToolboxLS 移植，ACM 非商业许可）。
+
+.. automodule:: e2m2e.algorithm.levelset
+   :no-index:
+
+
+e2m2e.algorithm.levelset.value_function module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.algorithm.levelset.value_function
    :members:
    :undoc-members:
    :show-inheritance:

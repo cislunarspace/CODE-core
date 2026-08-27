@@ -43,12 +43,12 @@ class TestBaseModel:
         assert earth["params"] == {"body": "EARTH", "mu": None}
         assert moon["params"] == {"body": "MOON", "mu": None}
         # 地心传播下月球质点不能用 PointMassGravity（状态不以月心为原点）；
-        # ThirdBodyGravity 自带间接项，不应再出现 IndirectTerm
+        # ThirdBodyGravity 自带间接项，不应出现 IndirectTerm
         assert "IndirectTerm" not in _types(cfg)
         assert [f["name"] for f in cfg["forces"]] == ["PointMassGravity", "ThirdBodyGravity"]
 
     def test_default_perturbation_no_error(self):
-        """DEFAULT_PERTURBATION（coupling=1）不再抛 NotImplementedError。"""
+        """DEFAULT_PERTURBATION（coupling=1）不抛 NotImplementedError。"""
         cfg = perturbation_to_force_config()
         assert "forces" in cfg
         assert len(cfg["forces"]) > 0

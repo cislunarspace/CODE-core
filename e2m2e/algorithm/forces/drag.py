@@ -15,8 +15,8 @@ class DragModel(PhysicalModel):
     参考系。大气在 ITRF 中静止，因此相对速度等于航天器 ITRF 速度。
 
     加速度计算全部由 Rust 编译路径承载（``("drag", ...)`` 力元组，
-    ``crates/e2m2e-forces/src/forces/drag.rs``），Python 侧不保留参考实现
-    （issue #378）。``to_rust_spec`` 需 system 提供 SPICE（ITRF93 pxform
+    ``crates/e2m2e-forces/src/forces/drag.rs``），Python 侧不保留参考实现。
+    ``to_rust_spec`` 需 system 提供 SPICE（ITRF93 pxform
     帧旋转）；不满足时返回 ``None``，``ForceModel.propagate`` 据此显式报
     能力错误（不静默回退）。
 
@@ -82,7 +82,7 @@ class DragModel(PhysicalModel):
         """序列化为 Rust ``("drag", area, mass, cd, propagation_frame, f107, ap)`` 元组。
 
         f107/ap 从注入的大气模型取出，确保 Rust 路径与配置用同一组太阳活动
-        参数（issue #315 的 drag 静默分歧先例，Rust 与配置同源）。
+        参数（Rust 与配置同源，避免两侧分歧）。
 
         需要 system 提供 SPICE 以做 ITRF93 pxform 帧旋转。若 system 未暴露
         spice 属性、或中心天体非 EARTH，返回 None——由 ``ForceModel.propagate``

@@ -1,7 +1,7 @@
 """SolarRadiationPressure 力模型测试。
 
-Python 单点 ``compute_acceleration`` 与 ``_compute_srp_acceleration`` 已按
-issue #378 删除；SRP 物理行为由 Rust ``propagate_compiled`` 与
+Python 单点 ``compute_acceleration`` 与 ``_compute_srp_acceleration`` 已删除；
+SRP 物理行为由 Rust ``propagate_compiled`` 与
 ``srp_acceleration`` 绑定承载。本文件保留构造校验与 ``to_rust_spec``
 序列化契约。
 """

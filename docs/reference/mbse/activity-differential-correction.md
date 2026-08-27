@@ -1,8 +1,32 @@
 ---
-title: 微分修正活动图
+title: Differential Correction Activity Diagram / 微分修正活动图
 ---
 
-# 微分修正活动图
+# Differential Correction Activity Diagram / 微分修正活动图
+
+[English](#differential-correction-activity-diagram) | [简体中文](#微分修正活动图)
+
+## English
+
+```mermaid
+flowchart TD
+    start([Start correction])
+    config[Load CorrectionConfig strategy]
+    propagate[Propagate half period (with_stm=True)]
+    error[Compute constraint error vector]
+    check[Converged?]
+    update[Newton-update free variables]
+    end([Return converged orbit])
+    start --> config
+    config --> propagate
+    propagate --> error
+    error --> check
+    update --> propagate
+    check -->|Yes (error < tol)| end
+    check -->|No| update
+```
+
+## 微分修正活动图
 
 ```mermaid
 flowchart TD
@@ -17,9 +41,7 @@ flowchart TD
     config --> propagate
     propagate --> error
     error --> check
-    check --> update
-    update --> end
-    check{收敛?}
+    update --> propagate
     check -->|是 (error < tol)| end
     check -->|否| update
 ```

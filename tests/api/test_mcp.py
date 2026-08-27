@@ -1,4 +1,4 @@
-"""MCP 协议层测试（issue #510 / ADR 0014）：纯派生注册、schema、统一信封。
+"""MCP 协议层测试：纯派生注册、schema、统一信封。
 
 只测进程内逻辑（tool_specs / handle_call_tool / envelope），不需要真实
 stdio 传输；handler 纯函数与 create_server 注册的是同一批。
@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 pytestmark = [pytest.mark.interface]
 
-pytest.importorskip("mcp")  # [mcp] extra 未装时整文件跳过（协议层依赖，ADR 0014）
+pytest.importorskip("mcp")  # [mcp] extra 未装时整文件跳过（协议层依赖）
 
 from e2m2e.api.config import Config  # noqa: E402
 from e2m2e.api.facade import Facade, tool_inventory  # noqa: E402
@@ -37,7 +37,7 @@ def test_registered_tools_match_inventory(facade):
     specs = tool_specs(facade)
     expected = [i.name for i in tool_inventory(facade) if i.status == "implemented"]
     assert [s.name for s in specs] == expected
-    # placeholder 不注册（issue #510 决策）
+    # placeholder 不注册
     placeholders = {i.name for i in tool_inventory(facade) if i.status == "placeholder"}
     assert placeholders, "前提：Facade 至少有一个 placeholder 工具"
     assert not placeholders & {s.name for s in specs}
@@ -144,7 +144,7 @@ def test_create_server_binds_facade(facade):
 
 
 def test_dispatch_tool_omits_unset_fields():
-    """issue #522：未提供的字段不得变成显式 None 传给工具方法。"""
+    """未提供的字段不得变成显式 None 传给工具方法。"""
 
     class Req(BaseModel):
         a: int
@@ -179,7 +179,7 @@ def test_invoke_tool_internal_error():
 
 
 def test_family_response_serializes_orbit_members():
-    """族生成响应（Orbit 成员）不再兑成 INTERNAL_ERROR（issue #526 补全）。
+    """族生成响应（Orbit 成员）序列化为 JSON 数据，而非 INTERNAL_ERROR。
 
     降级契约与 sidecar 帧契约同款：成员留 states/times/period/family_type，
     System 鸭子类型透传 mu。

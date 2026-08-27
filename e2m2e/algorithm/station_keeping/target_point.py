@@ -50,8 +50,8 @@ class StrictTargetPointLaw:
     """
 
     feedback_arc_days: float = 28.0
-    tolerance_km: float = 0.1  # #280: 比测定轨精度（1.5 km 1σ）小一个量级
-    max_iter: int = 6  # #280: NRHO 非线性效应需多次迭代（原值 2 不足）
+    tolerance_km: float = 0.1  # 比测定轨精度（1.5 km 1σ）小一个量级
+    max_iter: int = 6  # NRHO 非线性效应需多次迭代
 
     def compute_maneuver(
         self,
@@ -114,7 +114,7 @@ class LooseTargetPointLaw:
     Δv* = -(Q + BᵀRB + DᵀSD)⁻¹·[(BᵀRB + DᵀSD)·v₀ + (BᵀRA + DᵀSC)·p₀]
 
     对 NRHO 这类强不稳定轨道，A 块（位置-位置）放大巨大，BᵀRA·p₀ 项
-    主导控制量（实测 p₀~90 km 时 Δv 达 m/s 量级，与历史标定样本一致）。
+    主导控制量（实测 p₀~90 km 时 Δv 达 m/s 量级）。
 
     Attributes:
         feedback_arc_days: 反馈弧段长度（天），目标节点时间偏移

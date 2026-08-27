@@ -77,7 +77,7 @@ class DROTRONLPOptimizer:
         config: TransferConfig | None = None,
         propulsion: ImpulsivePropulsion | None = None,
     ):
-        """初始化 NLP 优化器（issue #161）。
+        """初始化 NLP 优化器。
 
         支持两种构造路径（不可混用）：
 
@@ -270,7 +270,7 @@ class DROTRONLPOptimizer:
             dv1 = cost.dv1
             dv2 = cost.dv2
         else:
-            # 传播失败无 Δv 值：不再用 1e10 惩罚污染目标（ADR 0020 决策 2），
+            # 传播失败无 Δv 值：不用 1e10 惩罚污染目标（ADR 0020 决策 2），
             # 不可行由约束冲突（pos_violation/vel_constraint）与 INFEASIBLE 表达。
             dv1 = float("nan")
             dv2 = float("nan")
@@ -298,7 +298,7 @@ class DROTRONLPOptimizer:
             "insertion_state": insertion_state,
             "dv1": dv1,
             "dv2": dv2,
-            # 传播失败目标为 inf（不可行域），不再用 2e10 惩罚值污染目标。
+            # 传播失败目标为 inf（不可行域），不用 2e10 惩罚值污染目标。
             "objective": cost.total if cost is not None else float("inf"),
             # 约束冲突保留有限大值 1e6：不可行信号，供优化器识别；非目标惩罚。
             "pos_violation": pos_violation if not empty else 1e6,
@@ -402,7 +402,7 @@ class DROTRONLPOptimizer:
         """
         cache = self._evaluate_all(y)
         if cache["empty"]:
-            # 传播失败目标为 inf（ADR 0020 决策 2），不再用 1e10 惩罚污染目标；
+            # 传播失败目标为 inf（ADR 0020 决策 2），不用惩罚值污染目标；
             # 不可行由约束冲突识别。
             return float("inf")
         return cache["objective"]
@@ -455,7 +455,7 @@ class DROTRONLPOptimizer:
         )
 
         if len(states) == 0:
-            # 传播失败（轨迹为空）无法判断是否碰撞：不再谎报无碰撞（#352），
+            # 传播失败（轨迹为空）无法判断是否碰撞：不谎报无碰撞，
             # 让调用方把该候选计为不可行。
             from ...exceptions import PropagationFailure
 
@@ -593,8 +593,8 @@ class DROTRONLPOptimizer:
         - ``max(x) > 3.0``：轨迹绕到地月系统外侧，外部转移 ``TransferType.EXTERNAL``
         - 其余情况：含月球引力辅助的转移 ``TransferType.LGA``
 
-        积分失败或轨迹为空时返回 :class:`TransferType.UNKNOWN` （#352：
-        不再假装 DIRECT——空轨迹无法分类）。
+        积分失败或轨迹为空时返回 :class:`TransferType.UNKNOWN`：
+        不假装 DIRECT，空轨迹无法分类。
 
         该结果会写入 :class:`TransferOptimizationResult.transfer_type`，
         可视化层（``plot_solution_plane(..., color_by="transfer_type")``）

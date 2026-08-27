@@ -211,9 +211,8 @@ class RustPropagator:
 class PropagatorFactory:
     """力模型配置 → 传播器工厂（真实力模型的光压乘子每弧段可换）。
 
-    容差/步长取站保统计量级够用的默认（1e-10、3600 s）：历史标定对比的
-    对象是统计特征（±30% 量级），1e-12 容差只增加耗时（实测 4 控制 × 2
-    样本 156 s → 约 3 倍提速空间）。
+    容差/步长取站保统计量级够用的默认（1e-10、3600 s）：评估对象是统计
+    特征（±30% 量级），更紧的容差只增加耗时。
     """
 
     def __init__(
@@ -321,7 +320,7 @@ class MonteCarloResult:
         无角动量管理时 3 列（仿真序号/总 Δv/最大 Δv，序号在写出时追加）；
         含角动量管理时 5 列（追加姿态总 Δv、姿态独立 Δv）。
 
-        对齐外部工具口径：失败样本不写统计行（历史标定样本中失败行缺失）。
+        对齐外部工具口径：失败样本不写统计行。
         """
         keep = ~self.failed_mask
         if self.attitude_delta_v.size > 0:
@@ -538,7 +537,7 @@ class SingleSampleSimulation:
                 dv_c = self.law.compute_maneuver(x_meas, t_k, propagator=prop_ctrl, nominal=nominal)
                 if dv_c is None:
                     # 控制律未产出机动（不收敛/未找到穿越点）：计为失败样本，
-                    # 不把失败藏进成功统计（#352）
+                    # 不把失败藏进成功统计
                     failed = True
                     break
                 dv_r_orbital, failed_k = self.thrust_error.apply(dv_c * 1000.0, self.sampler)
@@ -715,7 +714,9 @@ def _make_law(
             damping_factor=special_damping_factor,
             v_c=syn_system.cr3bp_system.characteristic_velocity,
         )
-    raise ValueError(f"control_mode 必须为 1/2/3（角动量管理 4-6 归属 #261），当前 {control_mode}")
+    raise ValueError(
+        f"control_mode 必须为 1/2/3（角动量管理 4-6 暂不支持蒙特卡洛仿真），当前 {control_mode}"
+    )
 
 
 def _build_simulation(

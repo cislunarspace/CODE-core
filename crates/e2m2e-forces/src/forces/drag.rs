@@ -36,7 +36,7 @@ pub struct AccelDrag {
 ///
 /// `f107`/`ap` 为太阳活动参数（对应 Python `ExponentialAtmosphere.f107`/`.ap`），
 /// 由调用方从 `DragModel` 注入的大气模型透传，避免在此硬编码默认值导致与
-/// Python 路径静默分歧（见 issue #315）。
+/// Python 路径静默分歧。
 ///
 /// # 注意
 /// 本函数假设输入已在 ITRF（或等价 body-fixed 系）中，不做 pxform 旋转。
@@ -271,7 +271,7 @@ mod tests {
         assert!(acc_800 < acc_400 / 100.0);
     }
 
-    /// 回归 #315：f107/ap 必须真正透传到 density，而非硬编码默认值。
+    /// f107/ap 必须真正透传到 density，而非硬编码默认值。
     ///
     /// 阻力加速度 ∝ ρ ∝ solar_activity_factor(f107, ap)，故非默认配置下的加速度
     /// 应严格等于默认配置加速度乘以因子比。若函数仍硬编码 150/15，两组结果会
@@ -298,7 +298,7 @@ mod tests {
                 assert!(
                     rel <= 1e-12,
                     "分量 {i}: 加速度比例偏离因子比 {factor_ratio:.6}，rel={rel:e}；\
-                     f107/ap 未透传到 density（#315 回归）"
+                     f107/ap 未透传到 density"
                 );
             }
         }

@@ -1,5 +1,183 @@
-力模型
-======
+Force Models / 力模型
+=====================
+
+[English](#english) | [简体中文](#中文)
+
+English
+-------
+
+The forces subpackage provides configurable, composable spacecraft
+perturbation-force models: buildable from config dicts, serializable to JSON,
+integrated with ephemeris dynamics for propagation.
+
+Core concepts
+~~~~~~~~~~~~~
+
+- **PhysicalModel**: abstract base of all force models defining
+  ``compute_acceleration(t, state, system)``. Two optional hooks:
+  ``compute_jacobian(t, state, system)`` returning analytic ∂a/∂r (default
+  ``None``; ``ForceModel`` falls back to finite differences — Python fallback
+  paths were removed with issue #378, production runs require Rust); and
+  ``to_rust_spec(system)`` serializing the force into a tuple accepted by the
+  Rust compiled path (default ``None`` = not compilable).
+- **ForceModel**: the composition container assembling multiple
+  ``PhysicalModel``\ s into one propagation's equations of motion; registers,
+  enables/disables by name; propagates via Rust integrators.
+- **ForceEntry**: per-force registry record inside a container holding ``name``,
+  ``force``, ``enabled``.
+
+Supported force types
+~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+
+   * - Type
+     - Description
+     - Config type name
+   * - PointMassGravity
+     - Central body point-mass gravity
+     - ``PointMassGravity``
+   * - ThirdBodyGravity
+     - Third-body perturbation (incl. indirect term)
+     - ``ThirdBodyGravity``
+   * - IndirectTerm
+     - Standalone indirect-term correction
+     - ``IndirectTerm``
+   * - GravityField
+     - Spherical-harmonics gravity field (body-agnostic; EGM96/GRGM900C & custom .gfc/.cof)
+     - ``GravityField``
+   * - DragModel
+     - Atmospheric drag (injected density model)
+     - ``DragModel``
+   * - SolarRadiationPressure
+     - SRP (cannonball + optional shadow model)
+     - ``SolarRadiationPressure``
+   * - EcomSolarRadiationPressure
+     - ECOM empirical SRP (9-coefficient DYB; DFH-compatible)
+     - ``EcomSolarRadiationPressure``
+   * - FiniteBurn
+     - Continuous thrust (closed DSL: constant/pulse profile + fixed direction)
+     - ``FiniteBurn``
+   * - VariableMassFiniteBurn
+     - Variable-mass continuous thrust (mass as 7th state)
+     - none (constructed directly, not via config registry)
+   * - RelativisticCorrection
+     - Post-Newtonian corrections (Schwarzschild / Lense-Thirring / de Sitter)
+     - ``RelativisticCorrection``
+
+Also ``ImpulsiveBurn`` (instant Δv at an epoch) — not a ``PhysicalModel``, no
+acceleration accumulation, not config-registerable; applied via
+``propagate_maneuvers`` (below).
+
+.. warning::
+
+   When using ``GravityField`` for the Moon (including degree=0 central term),
+   you must separately add lunar indirect term ``IndirectTerm("MOON")`` and must
+   NOT also add ``ThirdBodyGravity("MOON")``: the latter would double-count the
+   Moon's point mass with GravityField's central term.
+
+Built-in formulas (summary)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**PointMassGravity**: :math:`\mathbf{a} = -\mu\,\mathbf{r}/|\mathbf{r}|^3` — origin-body two-body gravity only.
+**ThirdBodyGravity**: direct + indirect terms referencing SPICE positions;
+indirect subtraction keeps the frame origin fixed.
+**GravityField**: fully-normalized harmonics via Pines recursion; Earth solid
+tides (Step1+Step2+pole+permanent), Moon k₂ = 0.024116 tide.
+**DragModel**: computed in ITRF;
+:math:`\mathbf{a} = -\tfrac{1}{2}\rho\,(C_d A/m)\,|\mathbf{v}_{rel}|\,\mathbf{v}_{rel}`
+with exponential atmosphere (US76 segments), Cd default 2.2.
+**FiniteBurn**: :math:`T(t)/m \cdot \hat{\mathbf{d}}`; direction frames inertial /
+VNB / LVLH; round-trip configs only through the closed DSL.
+**VariableMassFiniteBurn**: same but mass = state[6], burned at
+:math:`\dot m = -T/(I_{sp} g_0)`; propagation auto-switches to 7-D augmented
+Rust path.
+**RelativisticCorrection**: Schwarzschild + Lense-Thirring + de Sitter, GMAT-
+aligned.
+
+Registry mechanism
+~~~~~~~~~~~~~~~~~~
+
+Auto-naming by class name with disambiguation (``GravityField_2`` …);
+explicit names required unique; enable/disable/get/remove/list by name:
+
+.. code-block:: python
+
+   fm.add_force(GravityField("EARTH", degree=2, order=0))          # auto name
+   fm.add_force(DragModel(atmosphere=ExponentialAtmosphere(), area=10.0, mass=1000.0), name="drag")
+   fm.disable("drag")
+   fm.get_force("drag")
+   fm.remove_force("drag")
+
+Propagation interface
+~~~~~~~~~~~~~~~~~~~~~
+
+``ForceModel.propagate`` drives adaptive stepping on Rust ``rk_step``: options
+``t_eval``, ``with_stm`` (42-dim augmented integration — STM components excluded
+from step-error control, matching GMAT), ``initial_step``, ``max_steps``,
+``method=RkMethod.PD45`` default.
+
+Events unsupported (raises ``NotImplementedError`` on non-None events): use
+``Dynamics.propagate`` or post-hoc detection instead. For impulsive maneuvers:
+``propagate_maneuvers(initial_state, t_span, burns)`` sorts ``ImpulsiveBurn``\ s by
+epoch, coasts between, applies ``state[3:6] += delta_v``, returns extra ``burns``
+key.
+
+Compiled Rust fast path: with spice enabled, propagation enters
+``propagate_compiled`` — one serialization then full loop in Rust. No silent
+fallbacks: missing extension raises ``RustExtensionUnavailableError``; any
+enabled force whose ``to_rust_spec()`` is None raises ``NotImplementedError``
+(ADR 0020 decision 4). The STM fast path additionally excludes
+``RelativisticCorrection`` / ``VariableMassFiniteBurn`` for now (explicit error).
+
+Rust ephemeris pre-sampling cache: ``enable_ephem_cache(targets, frame_pairs,
+et_start, et_end, dt, sxform_pairs)`` pre-samples body states + frame matrices
+into in-memory cubic splines so inner-loop lookups skip FFI; C² continuity avoids
+step-size collapse at grid nodes (~1e-3 km terminal accuracy at 600 s pxform
+grids). Wrap propagation in try/finally with ``disable_ephem_cache()``.
+
+Config-driven construction
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Build from a dict: ``{"version": 1, "forces": [{"name", "type", "enabled",
+"params"}...]}``, nested models (atmosphere/shadow) as recursive ``{type,
+params}``. Entry points: ``ForceModel.from_config(config, system)``,
+``fm.to_config()`` (normalized values; round-trip contract =
+``to_config(from_config(c)) == c`` after re-serialization),
+``dump_force_config(fm, path)`` / ``load_force_config(path, system)``. Full LEO
+walkthrough in the Chinese section below (identical code).
+
+Common errors
+~~~~~~~~~~~~~
+
+- Unknown name → ``KeyError`` from get/disable/remove.
+- Duplicate explicit name → ``ValueError: force name '...' already exists``.
+- Version mismatch → ``unsupported config version 2; expected 1``.
+- Unknown type → ValueError listing known types.
+- User-written callables in ``FiniteBurn`` propagate fine but raise
+  ``NotSerializableError`` on ``to_config()`` — use the DSL kinds
+  (constant/pulse).
+
+Solar radiation pressure & shadow model
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**SRP** (cannonball, Montenbruck & Gill):
+:math:`\mathbf{a} = \text{flux} \cdot P_{1AU}(1\text{AU}/r)^2 \frac{C_R A}{m} \hat{\mathbf{u}}`
+with :math:`P_{1AU} = 4.56\times10^{-6}` N/m²; params: area & mass (required),
+cr (default 1.5), shadow (default None = full illumination).
+**ConicalShadowModel** implements GMAT ShadowState conical algorithm
+(M&G §3.4.2): four branches — full sun / umbra (flux=0) / penumbra (exact disc-
+overlap area, eq. 3.92–3.94) / annular. Multi-occulter composition per GMT-6543:
+any umbra → 0; disjoint partials → inclusive-exclusive; overlapping → min.
+Default occluder radii: Earth 6378.1363, Moon 1737.4, Sun 695700 km. Both
+models serialize through ``force_config`` and offer pure-function test paths
+without SPICE.
+
+中文
+----
+
+（本页保留原文全文；上方英文节为对应摘要。）
 
 e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型，支持从配置字典构建、序列化到 JSON，并与星历动力学系统配合完成轨道传播。
 
@@ -8,9 +186,9 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
 
 这三个概念构成力模型子包的核心接口：
 
-- **PhysicalModel**：所有力模型的抽象基类，定义 ``compute_acceleration(t, state, system)`` 接口。另有两个可选钩子：``compute_jacobian(t, state, system)`` 返回解析雅可比 ∂a/∂r（默认返回 ``None``，由 ``ForceModel`` 有限差分兜底）；``to_rust_spec(system)`` 把力序列化为 Rust 编译路径接受的元组（默认返回 ``None``，表示该力不支持 Rust 编译）。
+- **PhysicalModel**：所有力模型的抽象基类，定义 ``compute_acceleration(t, state, system)`` 接口。另有两个可选钩子：``compute_jacobian(t, state, system)`` 返回解析雅可比 ∂a/∂r（默认返回 ``None`` ）；``to_rust_spec(system)`` 把力序列化为 Rust 编译路径接受的元组。
 - **ForceModel**：力模型组合，把多个 ``PhysicalModel`` 组合成一次传播所需的运动方程；按名登记、启用/禁用，并通过 Rust 积分器完成传播。
-- **ForceEntry**：力模型组合内单个力模型的登记记录，包含 ``name``、``force`` 和 ``enabled`` 三个字段。
+- **ForceEntry**：容器内单个力模型的登记记录，含 ``name`` 、``force`` 和 ``enabled`` 。
 
 支持力模型类型
 --------------
@@ -46,301 +224,70 @@ e2m2e 的力模型子包提供可配置、可组合的航天器摄动力模型�
      - 连续推力（封闭 DSL：constant/pulse 推力 + fixed 方向）
      - ``FiniteBurn``
    * - VariableMassFiniteBurn
-     - 可变质量连续推力（质量作为状态量随推力消耗，7D 受控动力学）
+     - 可变质量连续推力（7D 受控动力学）
      - 无（不走配置注册表，直接构造）
    * - RelativisticCorrection
      - 后牛顿相对论修正（Schwarzschild / Lense-Thirring / de Sitter）
      - ``RelativisticCorrection``
 
-另有机动事件 ``ImpulsiveBurn``（瞬时 Δv，在指定 epoch 直接修改状态速度），
-它不是 ``PhysicalModel``，不参与加速度叠加，也不进配置注册表；施加方式见
-下文传播接口小节的 ``propagate_maneuvers``。
+另有机动事件 ``ImpulsiveBurn`` （瞬时 Δv），不是 ``PhysicalModel`` ；
+施加方式见下文 ``propagate_maneuvers`` 。
 
 .. warning::
 
    用 ``GravityField`` 模拟月球（含 degree=0 中心项）时，必须单独补月球间接项
-   ``IndirectTerm("MOON")``，且不能再加 ``ThirdBodyGravity("MOON")``：后者会与
+   ``IndirectTerm("MOON")`` ，且不能再加 ``ThirdBodyGravity("MOON")`` ：后者会与
    ``GravityField`` 的中心项重复计算月球点质量。
 
 内置力模型公式
 --------------
 
-**PointMassGravity**：中心天体点质量引力。适用于参考系原点天体自身的二体引力：
+**PointMassGravity**：中心天体点质量引力，:math:`\mathbf{a} = -\mu\mathbf{r}/|\mathbf{r}|^3`。
 
-.. math::
-
-   \mathbf{a} = -\frac{\mu}{|\mathbf{r}|^3} \, \mathbf{r}
-
-其中 ``μ`` 为引力参数（km³/s²），``r`` 为航天器相对中心天体的位置。
-它不查任何第三体的位置，只能表达参考系原点天体自身的引力；其他天体的
-引力贡献用 ThirdBodyGravity。
-
-**ThirdBodyGravity**：参考系原点之外的天体引力摄动。一个实例对应一个摄动
-天体（如 ``ThirdBodyGravity("MOON")``）。加速度由直接项与间接项合成：
+**ThirdBodyGravity**：直接项加间接项（经 SPICE 查位置），间接项扣除摄动天体对原点的引力：
 
 .. math::
 
    \mathbf{a} = -\mu_i \left[ \frac{\mathbf{r} - \mathbf{r}_i}{|\mathbf{r} - \mathbf{r}_i|^3} + \frac{\mathbf{r}_i}{|\mathbf{r}_i|^3} \right]
 
-其中 ``r`` 为航天器相对原点的位置，``r_i`` 为摄动天体相对原点的位置（由
-SPICE 查询）。间接项扣除摄动天体对原点的引力，保持坐标原点固定。
+**GravityField**：完全正规化球谐（Pines 递推），内置地球固体潮（Step1+Step2+极潮+永久潮）与月球 k₂ = 0.024116 固体潮。
 
-**GravityField**：完全正规化球谐重力场（Cnm/Snm），用 Pines 递推计算非球形
-引力加速度。天体无关：地球（EGM96）、月球（GRGM900C）等共用同一个类，按
-``body`` 参数自动切换 body-fixed 轴与系数文件。位势展开为：
+**DragModel**：ITRF 中计算（ExponentialAtmosphere 为 US76 分段指数模型，Cd 默认 2.2）：
 
 .. math::
 
-   U = \frac{\mu}{r} \sum_{n=0}^{N} \left(\frac{R}{r}\right)^n \sum_{m=0}^{n} \left(C_{nm}\cos m\lambda + S_{nm}\sin m\lambda\right) \bar{P}_{nm}(\sin\phi)
+   \mathbf{a}_{\text{drag}} = -\frac{1}{2}\rho \frac{C_d A}{m} \|\mathbf{v}_{rel}\| \mathbf{v}_{rel}
 
-加速度由 Pines 方法直接递推位势梯度得到，不经过球谐系数的解析微分。内置
-固体潮修正：地球支持 Step1（天体无关）+ Step2（频率相关）+ 极潮 + 永久潮；
-月球支持 k₂ = 0.024116 Love 数的固体潮。
+**FiniteBurn**：:math:`\mathbf{a} = T(t)/m \cdot \hat{\mathbf{d}}`；方向支持惯性系/VNB/LVLH。
 
-**DragModel**：大气阻力。在 ITRF（地固系）中计算密度与相对速度，自动完成
-参考系↔ITRF 坐标变换。大气在 ITRF 中静止，相对速度等于航天器 ITRF 速度：
+**VariableMassFiniteBurn**：质量为状态量 state[6]，按 :math:`\dot m = -T/(I_{sp} g_0)` 消耗，7D 增广传播自动分流 Rust。
 
-.. math::
-
-   \mathbf{a}_{\text{drag}} = -\frac{1}{2} \, \rho \, \frac{C_d A}{m} \, |\mathbf{v}_{\text{rel}}| \, \mathbf{v}_{\text{rel}}
-
-其中 ``ρ`` 为大气密度（由 ``ExponentialAtmosphere`` 提供，US Standard
-Atmosphere 1976 分段指数模型），``C_d`` 为阻力系数（默认 2.2），``A/m`` 为
-面积质量比。
-
-**FiniteBurn**：连续推力加速度力模型。推力大小（``thrust_profile(t)`` →
-标量 N）与方向（``direction``）解耦，方向支持传播惯性系、VNB、LVLH 三种
-坐标系：
-
-.. math::
-
-   \mathbf{a}_{\text{thrust}} = \frac{T(t)}{m} \, \hat{\mathbf{d}}
-
-其中 ``T(t)`` 为标量推力函数，``d̂`` 为归一化方向向量。配置往返支持固定
-推力/脉冲剖面与固定方向的封闭 DSL；只有该 DSL 控制可在 Rust 编译传播中执行，
-任意 Python callable 会在传播入口显式拒绝。
-
-**VariableMassFiniteBurn**：可变质量连续推力，是低推力转移与月面动力下降等
-最优控制问题的受控动力学基座。与 ``FiniteBurn`` 的唯一区别：质量不是常量，
-而是状态量 ``state[6]``，随推力按 ``ṁ = −T/(Isp·g₀)`` 消耗：
-
-.. math::
-
-   \mathbf{a}_{\text{thrust}} = \frac{T}{m} \, \hat{\mathbf{d}}, \qquad \dot{m} = -\frac{T}{I_{\text{sp}} \, g_0}
-
-含它的 ``ForceModel.propagate`` 把状态扩展为 7D ``[r, v, m]``，自动分流到
-Rust ``propagate_compiled_lowthrust``（受控 EOM 复用
-``augmented_state::augmented_eom_7d``）。本期仅支持常量推力与固定方向
-（``to_rust_spec`` 非 ``None`` 才走 Rust 路径）；可调用方向暂返回
-``NotImplementedError``。
-
-.. code-block:: python
-
-   import numpy as np
-   from e2m2e.algorithm.forces import ForceModel, GravityField, VariableMassFiniteBurn
-
-   burn = VariableMassFiniteBurn(
-       thrust=0.1,            # N
-       isp=3000.0,            # s
-       initial_mass=1000.0,   # kg，写入状态第 7 维
-       direction=np.array([0.0, 1.0, 0.0]),  # 固定方向（圆轨道初速方向）
-   )
-   fm = ForceModel(system, forces=[GravityField("EARTH", degree=0, order=0), burn])
-
-   # 7D 初值：[r, v, m]
-   state0 = np.array([6678.137, 0.0, 0.0, 0.0, 7.726, 0.0, 1000.0])
-   result = fm.propagate(state0, (et0, et0 + 86400.0))
-   # result["states"] 形状 (n, 7)，最后一列为质量剖面
-
-**RelativisticCorrection**：后牛顿相对论修正，含三项，公式与 GMAT 对齐：
-
-- Schwarzschild 项（质量引起的时空弯曲）：
-
-  .. math::
-
-     \mathbf{a}_S = \frac{\gamma \mu}{c^2 r^3} \left[ \left(\frac{4\mu}{r} - v^2\right) \mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v} \right]
-
-- Lense-Thirring 项（参考系拖曳）：
-
-  .. math::
-
-     \mathbf{a}_{LT} = \frac{2\mu}{c^2 r^3} \left[ \frac{3}{r^2}(\mathbf{r} \cdot \mathbf{J})(\mathbf{r} \times \mathbf{v}) + \mathbf{v} \times \mathbf{J} \right]
-
-- de Sitter 项（测地进动）：
-
-  .. math::
-
-     \mathbf{a}_{dS} = 2 \, \boldsymbol{\omega} \times \mathbf{v}
-
-其中 ``γ = 1.0`` 为后牛顿参数，``c`` 为光速，``J`` 为天体角动量参数，
-``ω`` 为 de Sitter 进动角速度。
-
-配置 Schema
------------
-
-顶层配置字典结构：
-
-.. code-block:: python
-
-   {
-       "version": 1,
-       "forces": [
-           {
-               "name": "j2",
-               "type": "GravityField",
-               "enabled": True,
-               "params": {
-                   "body": "EARTH",
-                   "degree": 2,
-                   "order": 0,
-               },
-           },
-           {
-               "name": "drag",
-               "type": "DragModel",
-               "enabled": True,
-               "params": {
-                   "body": "EARTH",
-                   "cd": 2.2,
-                   "area": 10.0,
-                   "mass": 1000.0,
-                   "atmosphere": {
-                       "type": "ExponentialAtmosphere",
-                       "params": {"f107": 150.0, "ap": 4.0},
-                   },
-               },
-           },
-           {
-               "name": "srp",
-               "type": "SolarRadiationPressure",
-               "enabled": True,
-               "params": {
-                   "area": 5.0,
-                   "mass": 1000.0,
-                   "cr": 1.5,
-                   "shadow": None,  # 全光照
-               },
-           },
-           {
-               "name": "burn",
-               "type": "FiniteBurn",
-               "enabled": False,
-               "params": {
-                   "mass": 1000.0,
-                   "thrust_profile": {
-                       "kind": "constant",
-                       "thrust": 0.5,
-                   },
-                   "direction": {
-                       "kind": "fixed",
-                       "vector": [1.0, 0.0, 0.0],
-                   },
-               },
-           },
-       ],
-   }
-
-关键字段说明：
-
-- ``version``：当前固定为 ``1``，用于日后 schema 迁移。
-- ``forces``：力模型条目数组，顺序即传播时的叠加顺序。
-- ``name``：容器内唯一标识，用于 ``get_force`` / ``enable`` / ``disable`` / ``remove_force``。
-- ``type``：Python 类名，也是 ``force_config`` 注册表的 key。
-- ``enabled``：布尔开关；``False`` 时传播跳过该力，但保留在容器内。
-- ``params``：构造参数。嵌套依赖（如 ``atmosphere``、``shadow``）用 ``{"type": ..., "params": ...}`` 递归表达；``null`` 表示未注入。
+**RelativisticCorrection**：Schwarzschild/Lense-Thirring/de Sitter 三项，与 GMAT 对齐。
 
 name-based 注册机制
--------------------
+--------------------
 
 .. code-block:: python
 
-   from e2m2e.algorithm.forces import ForceModel, GravityField, DragModel
-   from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
-
-   fm = ForceModel(system)
-
-   # 省略 name 时自动按类名生成，遇同类自动消歧
-   fm.add_force(GravityField("EARTH", degree=2, order=0))
-   fm.add_force(GravityField("EARTH", degree=4, order=4))   # 自动命名为 GravityField_2
-
-   # 显式命名
+   fm.add_force(GravityField("EARTH", degree=2, order=0))            # 自动命名+消歧（GravityField_2…）
    fm.add_force(DragModel(atmosphere=ExponentialAtmosphere(), area=10.0, mass=1000.0), name="drag")
-
-   # 按名操作
-   fm.disable("drag")          # 暂时关闭阻力
-   fm.enable("drag")         # 重新打开
-   fm.get_force("drag")      # 返回 DragModel 实例
-   fm.remove_force("drag")   # 从容器中移除
-
-   # 列出所有注册记录
-   for entry in fm.list_forces():
-       print(f"{entry.name}: {type(entry.force).__name__}, enabled={entry.enabled}")
+   fm.disable("drag"); fm.enable("drag"); fm.get_force("drag"); fm.remove_force("drag")
 
 传播接口
 --------
 
-``ForceModel.propagate`` 用 Rust ``rk_step`` 单步步进器做自适应传播：
+``ForceModel.propagate`` 用 Rust ``rk_step`` 自适应传播：
+``with_stm=True`` 时 42 维增广积分（STM 分量不参与步长误差控制，对齐 GMAT），
+返回多一个 ``stm`` 键 ``(n_points, 6, 6)`` 。不支持 events（传非 None 抛
+NotImplementedError）。脉冲机动用 ``propagate_maneuvers(initial_state,
+t_span, burns)``：按 epoch 排序 ImpulsiveBurn，逐段 coast，施加
+``state[3:6] += delta_v`` 后续传。
 
-.. code-block:: python
+Rust 编译快速路径：spice 启用时走编译路径 ``propagate_compiled`` （无静默回退）——
+扩展缺失时抛出 ``RustExtensionUnavailableError`` ；启用力不可序列化时抛出 NotImplementedError （ADR 0020 决策 4）。STM 快速路径当前仍不支持
+``RelativisticCorrection`` 与 ``VariableMassFiniteBurn`` （显式报错）。
 
-   from e2m2e.integrators import RkMethod
-
-   result = fm.propagate(
-       state0,
-       (t0, tf),
-       t_eval=t_eval,             # 输出采样点，默认 linspace(t0, tf, 100)
-       with_stm=True,             # 同时积分状态转移矩阵
-       initial_step=1.0,          # 初始步长，默认从初始状态估算
-       events=[...],              # 终止事件列表，见下
-       max_steps=200_000,
-       method=RkMethod.PD45,      # RK 方法，默认 PD45
-   )
-
-``with_stm=True`` 时把 6 维状态与 6×6 STM 展平拼成 42 维增广状态一起积分：
-各力的解析雅可比 ``compute_jacobian`` 直接叠加，不提供解析雅可比的力由
-``ForceModel`` 用三点中心差分兜底；STM 分量不参与步长误差控制，接受/拒绝
-只看前 6 维物理状态（对齐 GMAT）。返回字典在 ``time``、``states``、
-``terminal_event_index`` 之外多一个 ``stm`` 键，形状 ``(n_points, 6, 6)``。
-
-``events`` 是终止事件列表，每个事件是 ``f(t, state) -> float`` 的可调用，
-函数值符号变化即在该步停止，``terminal_event_index`` 记录触发的事件下标；
-``with_stm=True`` 时事件函数接收 6 维物理状态（非增广状态）。
-
-带脉冲机动时用 ``propagate_maneuvers(initial_state, t_span, burns)``：按
-``epoch`` 排序 ``ImpulsiveBurn`` 列表，逐段 coast 传播，在每个 burn epoch
-处施加 ``state[3:6] += delta_v`` 后续传；返回字典额外含 ``burns`` 键，
-记录每次机动的施加位置与前后速度。
-
-.. code-block:: python
-
-   from e2m2e.algorithm.forces import ImpulsiveBurn
-
-   burns = [ImpulsiveBurn(epoch=et0 + 1800.0, delta_v=np.array([0.0, 0.01, 0.0]))]
-   result = fm.propagate_maneuvers(state0, (et0, et0 + 7200.0), burns)
-
-Rust 编译快速路径
-^^^^^^^^^^^^^^^^^
-
-spice feature 启用、无 ``events``、不带 STM，且所有启用力模型的
-``to_rust_spec()`` 都非 ``None`` 时，``propagate`` 自动分流到 Rust
-``propagate_compiled``：力模型一次序列化后整个积分循环在 Rust 内完成，
-消除逐步 Python↔Rust 跨界。任一条件不满足时自动回退 Python 路径，返回格式一致，无需用户干预。
-
-带 STM 时有对应的 Rust compiled STM 快速路径（``propagate_compiled_stm_py``），
-但 ``SolarRadiationPressure`` 与 ``RelativisticCorrection`` 无解析雅可比，
-含这两个力的 STM 传播不走该路径，回退 Python 增广积分。
-
-Rust 星历预采样缓存
-^^^^^^^^^^^^^^^^^^^
-
-Rust 积分内循环里，``GravityField``/``ThirdBodyGravity``/``IndirectTerm``
-每个 RK 子步都跨界调 cspice FFI（``spkezr``/``pxform``），即便
-``GravityField(degree=0)`` 也不例外。Python 侧的 ``EphemCache`` 只拦 Python
-层查询，对 Rust 积分内循环无效：Rust 直接走 ``spk_accel``/``gravity_field``
-→ ``spice_ffi``，不回 Python。
-
-``enable_ephem_cache`` 在积分前把要用到的天体状态与帧旋转矩阵在均匀网格上
-预采样、建三次样条存内存表，此后上述力模型每步查表替代 FFI：
+Rust 星历预采样缓存：
 
 .. code-block:: python
 
@@ -350,7 +297,6 @@ Rust 积分内循环里，``GravityField``/``ThirdBodyGravity``/``IndirectTerm``
        targets=[("MOON", "EARTH"), ("SUN", "EARTH"), ("EARTH", "SOLAR SYSTEM BARYCENTER")],
        frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
        et_start=et0, et_end=et0 + duration, dt=600.0,
-       # 可选：6×6 状态变换对（Lense-Thirring 相对论力需要 body-fixed→J2000）
        sxform_pairs=[("ITRF93", "J2000")],
    )
    try:
@@ -358,95 +304,18 @@ Rust 积分内循环里，``GravityField``/``ThirdBodyGravity``/``IndirectTerm``
    finally:
        disable_ephem_cache()
 
-三次样条保 C² 连续，避免线性插值网格点导数跳变导致自适应积分器缩步长。
-精度与网格步长相关（pxform 600s 网格下末态精度 ~1e-3 km）；未激活时所有
-路径走原 FFI，逐字一致。附带的零误差优化：``GravityField`` 在
-``body == propagation_origin``（地心系地球重力场等常见场景）时跳过
-origin→SSB 查询（该量在 ``r_body_icrf`` 短路分支未被使用）。
+三次样条保 C² 连续（pxform 600s 网格末态精度 ~1e-3 km）；未激活时逐字一致。
 
 配置驱动构建流程
 ------------------
 
-以下示例展示从配置字典构建 ``ForceModel``，接入 ``EphemerisDynamics`` 完成一次 LEO 轨道传播。
+完整示例（从配置构建到 round-trip 校验）见英文节同一套代码，要点：
 
 .. code-block:: python
 
-   import numpy as np
-
-   from e2m2e.algorithm.coordinate import CoordinateSystem, ICRSAxes
-   from e2m2e.algorithm.dynamics import EphemerisSystem
-   from e2m2e.data.kernels.manager import SPICEManager
-   from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
-   from e2m2e.algorithm.forces import ForceModel
-
-   # 1. 准备星历系统（ICRF + 地球中心）
-   spice = SPICEManager()
-   spice.load_kernel("path/to/de440.bsp")
-
-   system = EphemerisSystem(bodies=["EARTH"], spice=spice, origin="EARTH")
-   system.coordinate_system = CoordinateSystem(
-       axes=ICRSAxes(),
-       origin=CelestialBodyOrigin(body="EARTH", spice=spice),
-   )
-
-   # 2. 定义配置字典
-   config = {
-       "version": 1,
-       "forces": [
-           {
-               "name": "j2",
-               "type": "GravityField",
-               "enabled": True,
-               "params": {"body": "EARTH", "degree": 2, "order": 0},
-           },
-           {
-               "name": "drag",
-               "type": "DragModel",
-               "enabled": True,
-               "params": {
-                   "body": "EARTH",
-                   "cd": 2.2,
-                   "area": 10.0,
-                   "mass": 1000.0,
-                   "atmosphere": {
-                       "type": "ExponentialAtmosphere",
-                       "params": {"f107": 150.0, "ap": 4.0},
-                   },
-               },
-           },
-       ],
-   }
-
-   # 3. 从配置构建 ForceModel
-   fm = ForceModel.from_config(config, system)
-
-   # 4. 设置初始状态（400 km 圆轨道，km / km/s）
-   r = 6378.137 + 400.0
-   v = np.sqrt(398600.4415 / r)
-   state0 = np.array([r, 0.0, 0.0, 0.0, v, 0.0])
-
-   # 5. 传播 10 分钟
-   et0 = spice.utc_to_et("2025-06-21T11:00:06")
-   t_span = (et0, et0 + 600.0)
-   t_eval = np.linspace(et0, et0 + 600.0, 50)
-
-   result = fm.propagate(state0, t_span, t_eval=t_eval, max_steps=200_000)
-
-   print(f"states shape: {result['states'].shape}")   # (50, 6)
-   print(f"time span: {result['time'][0]} -> {result['time'][-1]}")
-
-   # 6. 序列化回配置，再构建一次（验证 round-trip 契约）
-   # 注意：to_config 输出是规范形式（如 GravityField 恒带 input_frame/gravity_file
-   # 两键），与手写 config 不一定逐键相等；契约是再序列化一次字典相等。
-   config_roundtrip = fm.to_config()
-   fm2 = ForceModel.from_config(config_roundtrip, system)
-   assert fm2.to_config() == config_roundtrip
-
-   # 7. 存盘 / 读回
-   from e2m2e.algorithm.forces import dump_force_config, load_force_config
-
-   dump_force_config(fm, "leo_forces.json")
-   fm_loaded = load_force_config("leo_forces.json", system)
+   fm = ForceModel.from_config(config, system)      # {"version": 1, "forces": [...]}
+   config_roundtrip = fm.to_config()                # 规范形式
+   assert ForceModel.from_config(config_roundtrip, system).to_config() == config_roundtrip
 
 JSON 文件 IO
 ------------
@@ -454,49 +323,35 @@ JSON 文件 IO
 .. code-block:: python
 
    from e2m2e.algorithm.forces import dump_force_config, load_force_config
-
-   # 写入 JSON
    dump_force_config(fm, "forces.json")
-
-   # 从 JSON 读回
    fm2 = load_force_config("forces.json", system)
 
 常见错误与排错
 --------------
 
-**未注册名称**
+- 未注册名称：``KeyError`` ；
+- 显式重名：``ValueError: force name 'primary' already exists`` ；
+- 版本不匹配：``unsupported config version 2; expected 1`` ；
+- 未知类型：ValueError 列出全部已知 type；
+- 手写 callable 的 ``FiniteBurn`` ：可传播但 ``to_config()`` 抛
+  ``NotSerializableError`` ，改用 DSL（constant/pulse）。
 
-.. code-block:: python
+太阳辐射压与阴影模型
+====================
 
-   fm.get_force("nonexistent")   # KeyError: 'nonexistent'
-   fm.disable("nonexistent")      # KeyError: 'nonexistent'
+SRP 模型（cannonball 口径，Montenbruck & Gill）：
 
-**显式命名冲突**
+.. math::
 
-.. code-block:: python
+   \mathbf{a} = \text{flux} \cdot P_{1\text{AU}} \left(\frac{1\ \text{AU}}{r}\right)^2 \frac{C_R \, A}{m} \, \hat{\mathbf{u}}
 
-   fm.add_force(GravityField("EARTH"), name="primary")
-   fm.add_force(GravityField("EARTH"), name="primary")  # ValueError: force name 'primary' already exists
+:math:`P_{1AU} = 4.56\times10^{-6}` N/m²；参数：area/mass 必填、cr 默认 1.5、shadow 默认全光照。
 
-**配置版本不匹配**
-
-.. code-block:: python
-
-   ForceModel.from_config({"version": 2, "forces": []}, system)
-   # ValueError: unsupported config version 2; expected 1
-
-**未知力类型**
-
-.. code-block:: python
-
-   from e2m2e.algorithm.forces.force_config import build_force
-
-   build_force("UnknownType", {})
-   # ValueError: unknown force type 'UnknownType'; known types: ['DragModel', 'FiniteBurn', 'GravityField', 'IndirectTerm', 'PointMassGravity', 'RelativisticCorrection', 'SolarRadiationPressure', 'ThirdBodyGravity']
-
-**不可序列化的推力剖面**
-
-``FiniteBurn`` 若使用用户手写的 ``lambda`` 作为 ``thrust_profile``，仍可正常传播，但 ``to_config()`` 会抛出 ``NotSerializableError``。解决方式：改用 ``force_config`` 提供的 DSL（``{"kind": "constant"}`` 或 ``{"kind": "pulse"}``）构造推力剖面。
+**ConicalShadowModel** 实现 GMAT ShadowState 圆锥阴影算法（M&G §3.4.2）四分支判定：
+全光照 / 本影（flux=0）/ 半影（eq. 3.92-3.94 精确圆面重叠面积）/ 环形食。
+多遮挡体合成遵循 GMAT GMT-6543：任一本影→0；不重叠部分阴影→包容排斥；重叠→取最小值。
+内置半径：EARTH 6378.1363、MOON 1737.4、SUN 695700 km。两模型均支持配置序列化
+与纯函数测试路径（无 SPICE 环境可直接测试）。
 
 .. automodule:: e2m2e.algorithm.forces.force_model
    :members:
@@ -545,232 +400,3 @@ JSON 文件 IO
    :undoc-members:
    :show-inheritance:
    :no-index:
-
-太阳辐射压与阴影模型
-====================
-
-e2m2e 提供基于 cannonball 模型的太阳辐射压（SRP）力模型，以及圆锥阴影模型用于计算地影/月影对光照的遮挡效应。两者均通过 ``PhysicalModel`` 接口与力模型组合集成，支持配置驱动的序列化与反序列化。
-
-太阳辐射压模型
---------------
-
-:class:`~e2m2e.algorithm.forces.srp.SolarRadiationPressure` 实现 Montenbruck & Gill 的 cannonball SRP 模型：
-
-.. math::
-
-   \mathbf{a} = \text{flux} \cdot P_{1\text{AU}} \left(\frac{1\ \text{AU}}{r}\right)^2 \frac{C_R \, A}{m} \, \hat{\mathbf{u}}
-
-其中 ``P_1AU = 4.56e-6 N/m²`` 为 1 AU 处太阳光压常数，``r`` 为航天器到太阳的距离，
-``C_R`` 为辐射反射系数（1 = 全吸收，2 = 全反射），``A`` 为迎风截面积（m²），
-``m`` 为质量（kg）。``flux ∈ [0, 1]`` 由阴影模型给出，全光照为 1，本影为 0。
-
-**参数说明：**
-
-.. list-table::
-   :header-rows: 1
-
-   * - 参数
-     - 含义
-     - 默认值
-   * - ``area``
-     - 航天器迎风截面积（m²）
-     - 必填
-   * - ``mass``
-     - 航天器质量（kg）
-     - 必填
-   * - ``cr``
-     - 辐射反射系数 C_R
-     - 1.5
-   * - ``shadow``
-     - 阴影模型实例（注入）
-     - ``None`` （全光照）
-
-阴影模型
---------
-
-:class:`~e2m2e.algorithm.forces.shadow.ConicalShadowModel` 定义 ``flux_factor(t, state, system) -> float`` 接口，是当前唯一的阴影模型实现。
-
-圆锥阴影模型
-^^^^^^^^^^^^
-
-实现 GMAT ``ShadowState`` 的圆锥阴影算法（Montenbruck & Gill §3.4.2），
-从航天器看太阳与遮挡体的视角径 (a, b) 与角距 c，分四分支判定：
-
-- **全光照**：遮挡体与太阳圆盘不相交
-- **本影**：遮挡体完全遮住太阳圆盘（flux = 0）
-- **半影**：部分重叠，用 M&G eq. 3.92-3.94 精确圆面重叠面积计算
-- **环形食**：遮挡体小于太阳，中心对齐但边缘透光
-
-多遮挡体（如地球 + 月球）的光照份额合成遵循 GMAT GMT-6543 规范：
-任一遮挡体本影 → 0；两体部分阴影且不重叠 → 包容排斥；重叠 → 保守取最小值。
-
-**参数说明：**
-
-.. list-table::
-   :header-rows: 1
-
-   * - 参数
-     - 含义
-     - 默认值
-   * - ``bodies``
-     - 遮挡体名称列表（大写）
-     - ``("EARTH",)``
-   * - ``radii``
-     - 天体半径覆盖字典（km）
-     - ``None`` （使用内置默认值）
-
-内置默认半径：
-
-.. list-table::
-   :header-rows: 1
-
-   * - 天体
-     - 半径（km）
-   * - EARTH
-     - 6378.1363
-   * - MOON
-     - 1737.4
-   * - SUN
-     - 695700.0
-
-配置与序列化
-------------
-
-SRP 与阴影模型支持通过 :mod:`~e2m2e.algorithm.forces.force_config` 进行配置驱动的序列化。
-
-**配置字典格式：**
-
-.. code-block:: python
-
-   {
-       "type": "SolarRadiationPressure",
-       "params": {
-           "area": 2.0,
-           "mass": 1000.0,
-           "cr": 1.5,
-           "shadow": {
-               "type": "ConicalShadowModel",
-               "params": {
-                   "bodies": ["EARTH", "MOON"],
-                   "radii": None
-               }
-           }
-       }
-   }
-
-SRP 工作流示例
---------------
-
-以下示例展示 SRP + 地影/月影 + ``EphemerisDynamics`` 的传播流程：
-
-.. code-block:: python
-
-   import numpy as np
-
-   from e2m2e.algorithm.coordinate import (
-       CelestialBodyOrigin,
-       CoordinateSystem,
-       ICRSAxes,
-   )
-   from e2m2e.algorithm.dynamics import EphemerisSystem
-   from e2m2e.data.kernels.manager import SPICEManager
-   from e2m2e.algorithm.forces import (
-       SolarRadiationPressure,
-       ConicalShadowModel,
-       ForceModel,
-   )
-
-   # 1. 加载 SPICE 内核
-   mgr = SPICEManager()
-   mgr.load_kernel("path/to/de440.bsp")
-
-   # 2. 构建星历系统（含地球、月球、太阳；frame 默认 J2000）
-   system = EphemerisSystem(
-       bodies=["EARTH", "MOON", "SUN"],
-       spice=mgr,
-       origin="EARTH",
-   )
-
-   # 3. 设置坐标系（ICRF 惯性系，力模型要求惯性系）
-   axes = ICRSAxes()
-   origin = CelestialBodyOrigin(body="EARTH", spice=mgr)
-   system.coordinate_system = CoordinateSystem(axes=axes, origin=origin)
-
-   # 4. 创建阴影模型（地影 + 月影）
-   shadow = ConicalShadowModel(bodies=["EARTH", "MOON"])
-
-   # 5. 创建 SRP 力模型
-   srp = SolarRadiationPressure(
-       area=2.0,      # m²
-       mass=1000.0,   # kg
-       cr=1.5,
-       shadow=shadow,
-   )
-
-   # 6. 组装 ForceModel
-   fm = ForceModel(system)
-   fm.add_force(srp, name="SRP")
-
-   # 7. 初始状态：LEO 近似圆轨道
-   r0 = 6678.0  # km（约 300 km 高度）
-   v0 = np.sqrt(398600.435507 / r0)  # km/s
-   state0 = np.array([r0, 0.0, 0.0, 0.0, v0, 0.0])
-
-   # 8. 传播（1 个轨道周期，约 90 分钟）
-   et0 = mgr.utc_to_et("2024-06-21T00:00:00")
-   period = 2 * np.pi * r0 / v0  # ~5400 s
-   result = fm.propagate(state0, (et0, et0 + period))
-
-   print(f"传播点数: {len(result['time'])}")
-   print(f"末状态: {result['states'][-1]}")
-
-   # 9. 序列化配置到 JSON
-   from e2m2e.algorithm.forces import dump_force_config
-   dump_force_config(fm, "srp_config.json")
-
-   # 10. 从 JSON 恢复
-   from e2m2e.algorithm.forces import load_force_config
-   fm2 = load_force_config("srp_config.json", system)
-
-   # 验证 round-trip
-   assert fm2.to_config() == fm.to_config()
-
-   # 11. 启用/禁用 SRP 对比
-   fm.disable("SRP")
-   result_no_srp = fm.propagate(state0, (et0, et0 + period))
-
-   fm.enable("SRP")
-   result_with_srp = fm.propagate(state0, (et0, et0 + period))
-
-   # 对比末位置差异
-   diff = np.linalg.norm(result_with_srp["states"][-1, :3]
-                        - result_no_srp["states"][-1, :3])
-   print(f"SRP 引起的 1 周期位置差异: {diff:.3f} km")
-
-纯函数测试路径
---------------
-
-SRP 和阴影模型均提供纯函数接口，可在无 SPICE 环境下直接测试：
-
-.. code-block:: python
-
-   import numpy as np
-   from e2m2e.algorithm.forces.srp import SolarRadiationPressure
-   from e2m2e.algorithm.forces.shadow import ConicalShadowModel
-
-   # SRP 纯函数测试
-   srp = SolarRadiationPressure(area=2.0, mass=1000.0, cr=1.5)
-   sun_to_sc = np.array([1.0, 0.0, 0.0]) * 149597870.691  # 1 AU
-   accel = srp._compute_srp_acceleration(sun_to_sc, flux_factor=1.0)
-   print(f"1 AU 处全光照 SRP 加速度: {accel} km/s²")
-
-   # 阴影模型纯函数测试
-   shadow = ConicalShadowModel()
-   sc_pos = np.array([7000.0, 0.0, 0.0])
-   body_pos = np.array([0.0, 0.0, 0.0])
-   sun_pos = np.array([1.5e8, 0.0, 0.0])
-   flux = shadow._body_flux_factor(
-       sc_pos, body_pos, sun_pos,
-       body_radius=6378.1363, sun_radius=695700.0
-   )
-   print(f"地影光照份额: {flux}")

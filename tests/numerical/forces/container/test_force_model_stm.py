@@ -4,7 +4,7 @@
 得到的 STM，与物理等价的 EphemerisDynamics（解析 N 体 STM）逐元素一致。
 这保证雅可比叠加正确性——两者加速度公式相同，STM 必须一致。
 
-issue #378：Python 侧自定义力（无 Rust spec）不再支持传播；``with_stm=True``
+Python 侧自定义力（无 Rust spec）不支持传播；``with_stm=True``
 对无 spec 的力显式报能力错误。
 """
 

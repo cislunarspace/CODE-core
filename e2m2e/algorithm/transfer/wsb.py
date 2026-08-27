@@ -9,7 +9,7 @@
 候选参数化、BCR4BP 传播、截面检测和筛选交给 Rayon；Python 实现只在调用方
 显式指定 ``backend="python"`` 时作为等价性参照，绝不自动回退。
 
-BCR4BP 旋转系→惯性系速度修正（任务 #259 方案）：
+BCR4BP 旋转系→惯性系速度修正：
 
     ``v_rel_moon = (vx - y, vy + x - (1-μ), vz)``
 
@@ -289,7 +289,7 @@ def _search_wsb_trajectories_rust(
             FailureCause.DIVERGENCE_DETECTED,
             "全部 WSB 网格点传播失败",
         )
-    # 筛选漏斗诊断（#513）：零候选时报告卡在哪一环，而非笼统的
+    # 筛选漏斗诊断：零候选时报告卡在哪一环，而非笼统的
     # "未找到可行候选"。近月点高度窗无命中是几何/参数化问题；
     # 有命中但零候选则是 H₂/Δv 筛选拦截。
     funnel = (
@@ -349,9 +349,9 @@ def _search_wsb_trajectories_python(
     if du_km is None:
         raise ValueError("system.characteristic_length must be set")
 
-    # 出发态速度参数化（#513 方案 A）：departure_phase 是出发点在停泊轨道上的
+    # 出发态速度参数化：departure_phase 是出发点在停泊轨道上的
     # 滑行角（绕地球旋转 r0 与 v_park，改变月地几何），TLI 脉冲沿切向施加，
-    # 速度大小 v_esc * tli_speed_factor。原参数化把 departure_phase 用作 TLI
+    # 速度大小 v_esc * tli_speed_factor。若把 departure_phase 用作 TLI
     # 方向角，切向发射的远地点背向月球，无法以低 Δv 命中低空近月点。
     r0 = departure_state[:3].copy()
     v_park = departure_state[3:].copy()
@@ -407,7 +407,7 @@ def _search_wsb_trajectories_python(
     if parallel is False or n_workers == 1:
         worker_results = [_wsb_worker(*args) for args in worker_args]
     else:
-        # spawn 启动子进程（#367）：xdist 并行 worker 本身是多线程，fork 出的
+        # spawn 启动子进程：xdist 并行 worker 本身是多线程，fork 出的
         # 子进程继承父进程锁状态，multiprocessing 在 pytest-xdist 下实测会
         # futex 死锁；spawn 重新初始化解释器，无继承锁，安全。
         with ProcessPoolExecutor(
@@ -467,7 +467,7 @@ def _wsb_worker(
     在 ProcessPoolExecutor 工作进程中运行。对给定的太阳相位角和
     飞行时间，遍历出发相位角网格，返回所有满足条件的候选。
 
-    出发参数化（#513 方案 A）：每个 departure_phase 把出发点（含停泊
+    出发参数化：每个 departure_phase 把出发点（含停泊
     速度）绕地球旋转该角，TLI 脉冲沿旋转后的切向施加。
     """
 
@@ -485,7 +485,7 @@ def _wsb_worker(
         sun_phase0=sun_phase0,
     )
     dynamics = BCR4BP_Dynamics(bcr4bp_system)
-    # 网格筛选级容差（#513）：搜索只需初筛，精度由 _refine_wsb_candidate
+    # 网格筛选级容差：搜索只需初筛，精度由 _refine_wsb_candidate
     # 的 ThreeBodyLambert 打靶保证；用动力学研究级默认容差会让失败组合
     # 烧到 max_steps 才放弃（单组合秒级），全网格成本不可接受。
     dynamics.rtol = params.rtol

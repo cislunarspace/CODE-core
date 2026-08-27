@@ -1,10 +1,78 @@
-# ADR 0011：五层架构与激进式全量重命名
+# ADR 0011: Five-layer architecture and radical full renaming / 五层架构与激进式全量重命名
+
+[English](#adr-0011-five-layer-architecture-and-radical-full-renaming) | [简体中文](#中文)
+
+## English
+
+**Status**: Adopted (implemented)
+**Date**: 2026-07-31
+**Related**: `docs/architecture/architecture.md`
+
+### Context
+
+e2m2e's current top-level layout is a product of historical evolution: `core`
+(systems/frames/force models), `algorithms` (numerical algorithms),
+`transfer` (transfers), `dfh` (DFH alignment layer), `io` (DFH formats),
+`visualization`, `mbse`, `proximity`, `integrators`. Functionality landed
+(FR1–FR5) but responsibility boundaries rest on convention, not structure:
+
+- `dfh/` is the DFH-alignment layer, organized by provenance instead of
+  domain; one functional layer straddles data, algorithm, and numerical tiers.
+- `io/` sits awkwardly between the data layer and DFH specifics; its role is
+  vague.
+- No unified entry point (Facade): users assemble
+  `CR3BP_System → Dynamics → DifferentialCorrection` themselves.
+- No MCP; README's LLM+Agent-callable vision unfulfilled.
+
+Requirement: design the final-form software architecture, leave code templates
+for later implementation, and document not-yet-implemented features in docs
+and README.
+
+### Decision
+
+**Five-layer architecture**: data layer `data/` → numerical layer `crates/`
+→ algorithm layer `algorithm/` → interface layer `api/` → tools layer
+`tools/`. Inner layers never sense outer layers.
+
+**Radical full renaming**: existing `core/algorithms/transfer/dfh/io/
+visualization` all migrate into the new five layers with no legacy packages
+kept. `dfh/` is dismantled (five capabilities return to their domains), `core`
+is dismantled (no top-level core), `algorithms` → `algorithm` (singular),
+`io/` stays out of e2m2e entirely (DFH format interop is temporary scripts).
+
+**Transition strategy**: keep old paths alive via `sys.modules` aliases;
+rename in batches along dependency order (data first → numerical/algorithm →
+api/tools); one commit per batch with tests green before the next. Current
+HEAD is the product baseline.
+
+### Rationale
+
+1. **Structure-enforced replaces convention-enforced**: layering enforced by
+   directory structure + dependency rules (ADR 0012), not good intentions.
+2. **`dfh/` dismantled**: orbit design/station keeping/transfers/prediction/
+   spacetime conversion are e2m2e's own domain capabilities, not things that
+   exist to align with DFH. DFH was only a development-time reference
+   (ADR 0013).
+3. **`io/` kept out of e2m2e**: DFH-format interoperability was a
+   development-time stopgap; final e2m2e is an independent library
+   (ADR 0013).
+4. **Facade/MCP/CLI**: turning the library into a toolset callable by LLMs and
+   humans alike delivers on README's vision.
+
+### Consequences
+
+- New `docs/architecture/architecture.md` describing final form.
+- Top-level layout: data/algorithm/api/tools + integrators.py + mbse +
+  _integrators.
+- Migration proceeds in dependency-order batches, each batch regression-tested.
+
+## 中文
 
 **状态**：已采纳（已实施）
 **日期**：2026-07-31
 **关联**：`docs/architecture/architecture.md`
 
-## 背景
+### 背景
 
 e2m2e 现有顶层结构是历史演进的结果：`core`（系统/坐标系/力模型）、`algorithms`（数值算法）、`transfer`（转移）、`dfh`（DFH 对齐层）、`io`（DFH 格式）、`visualization`、`mbse`、`proximity`、`integrators`。功能已落地（FR1-FR5），但职责边界靠约定不靠结构：
 
@@ -15,7 +83,7 @@ e2m2e 现有顶层结构是历史演进的结果：`core`（系统/坐标系/力
 
 需求：设计最终形态的软件系统架构，代码留模板供后续实现，未实现功能在文档和 README 说明。
 
-## 决策
+### 决策
 
 **五层架构**：数据层 `data/` → 数值层 `crates/` → 算法层 `algorithm/` → 接口层 `api/` → 工具层 `tools/`。依赖方向内层不感知外层。
 
@@ -23,14 +91,14 @@ e2m2e 现有顶层结构是历史演进的结果：`core`（系统/坐标系/力
 
 **过渡策略**：`sys.modules` 别名保留旧路径；按依赖序分批重命名（先 data → 数值/算法 → api/tools），每批一 commit、跑通测试再动下一批。现有 HEAD 是产品基线。
 
-## 理由
+### 理由
 
 1. **结构强制取代约定**：分层靠目录结构 + 依赖规则（ADR 0012）强制，不靠自觉。
 2. **dfh/ 拆散**：轨道设计/保持/转移/预报/时空转换是 e2m2e 自己的领域能力，不是为了对齐 DFH 而存在。DFH 只是开发期参考（ADR 0013）。
 3. **io/ 不进 e2m2e**：DFH 格式互操作是开发期临时脚本，最终形态 e2m2e 是独立库（ADR 0013）。
 4. **Facade/MCP/CLI**：把库变成可被 LLM 和人类同时调用的工具集，兑现 README 愿景。
 
-## 结果
+### 结果
 
 - 新建 `docs/architecture/architecture.md` 描述最终形态。
 - 顶层结构：data/algorithm/api/tools + integrators.py + mbse + _integrators。

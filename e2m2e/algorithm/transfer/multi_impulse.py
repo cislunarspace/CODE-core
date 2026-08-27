@@ -52,7 +52,7 @@ _CLOSURE_PENALTY = 1e3
 
 # SLSQP 单次优化相对初猜的改善低于该值（km/s）视为"卡住"：目标函数在
 # 零脉冲初猜（双脉冲弧上的点，目标值恰为双脉冲成本）附近梯度极小，SLSQP
-# 收敛判据可能提前触发、一步即停（#384）。触发后从微扰初猜重试；正常收敛
+# 收敛判据可能提前触发、一步即停。触发后从微扰初猜重试；正常收敛
 # 的改善为 0.1 量级。
 _STALLED_IMPROVEMENT = 1e-6
 
@@ -253,7 +253,7 @@ class MultiImpulseTransfer:
 
         Note:
             SLSQP 对零脉冲初猜（目标值恰为双脉冲成本的弧上点）数值敏感：目标函数
-            在该平坦走廊上梯度极小，收敛判据可能提前触发、一步即停（#384）。首次
+            在该平坦走廊上梯度极小，收敛判据可能提前触发、一步即停。首次
             优化相对初猜改善不足时，自动从微扰初猜重试，取总 ΔV 最小者。
         """
         if backend != "scipy":
@@ -296,12 +296,12 @@ class MultiImpulseTransfer:
             status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
             return result, status, cause
 
-        # SLSQP 对零脉冲初猜数值敏感（#384）：目标函数在双脉冲弧附近梯度极小，
+        # SLSQP 对零脉冲初猜数值敏感：目标函数在双脉冲弧附近梯度极小，
         # 收敛判据可能提前触发、一步即停。首次优化改善不足时从微扰初猜重试，
         # 取总 ΔV 最小者。
         candidates = [_solve(y0)]
         if self._total_dv(y0, closure) - candidates[0][0].fun < _STALLED_IMPROVEMENT:
-            logger.info("多脉冲优化相对初猜无改善（#384 零脉冲平坦区），微扰初猜重试")
+            logger.info("多脉冲优化相对初猜无改善（零脉冲平坦区），微扰初猜重试")
             for start in self._stalled_retries(y0, n_mid):
                 candidates.append(_solve(start))
         result, status, cause = min(candidates, key=lambda c: c[0].fun)
@@ -481,7 +481,7 @@ class MultiImpulseTransfer:
         该初猜对应零中途脉冲解（目标值即双脉冲成本），SLSQP 从可行邻域
         出发只降不升；比端点直线插值（可能穿过中心天体附近的退化几何）
         稳健。封闭/传播失败（Lambert 无解、打靶未收敛、传播失败）时回退
-        为端点线性插值，并记录警告（#352：不静默退化）。
+        为端点线性插值，并记录警告，不静默退化。
         """
         fracs = (np.arange(n_mid) + 1.0) / (n_mid + 1.0)
         try:
@@ -499,7 +499,7 @@ class MultiImpulseTransfer:
         return np.concatenate([fracs * self._tof, positions.ravel()])
 
     def _stalled_retries(self, y0: np.ndarray, n_mid: int) -> list[np.ndarray]:
-        """SLSQP 卡在零脉冲平坦区（#384）时的微扰重试初猜。
+        """SLSQP 卡在零脉冲平坦区时的微扰重试初猜。
 
         时刻分量整体缩放（保持递增顺序）、位置分量小幅缩放，扰动后的起点
         脱离双脉冲弧上的平坦走廊，通常能找到下降方向。
