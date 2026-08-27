@@ -1,6 +1,8 @@
 //! e2m2e-spice: SPICE FFI bindings.
 //!
 //! 从 e2m2e-integrators 拆分，只包含 SPICE 相关功能。
+//!
+//! 仓库全貌与一条任务链的走读见 README 的仓库怎么读一节。
 
 #[cfg(feature = "spice")]
 pub mod ephem_cache;

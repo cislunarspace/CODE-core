@@ -21,6 +21,8 @@
 //! - 绘图与动画（Helper/Visualization 及 Examples 各 animate*）不移植，
 //!   可视化在 Python 侧完成；
 //! - MATLAB 的 1-based 维编号在本文一律为 0-based。
+//!
+//! 仓库全貌与一条任务链的走读见 README 的仓库怎么读一节。
 
 pub mod boundary;
 pub mod derivative;

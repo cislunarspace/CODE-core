@@ -7,6 +7,8 @@
   ``algorithm/coordinate/``。
 - ``templates/``：数据模板（轨道族种子、系统参数、摄动开关、力模型配置 schema、领域枚举）。
 - ``types/``：通用数据类型（State/Epoch 类型别名；Orbit/EphemerisTable/NominalOrbit 容器类）。
+
+仓库全貌与一条任务链的走读见 README 的仓库怎么读一节。
 """
 
 __all__: list[str] = []

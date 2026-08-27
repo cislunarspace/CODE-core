@@ -11,6 +11,14 @@
 
 e2m2e 是面向地月空间任务规划的**算法工具集基础设施**。在 LLM+Agent 式自主任务规划系统中，大模型负责理解任务意图、分解与编排子任务，e2m2e 负责提供精确可靠的轨道计算工具：建立地月空间的动力学模型，生成周期轨道族，设计轨道之间的转移路径，并把结果画出来检查。
 
+## 仓库怎么读
+
+运行时架构只有四块：`e2m2e/api/` 是唯一对外入口（Facade，派生 CLI 与 MCP）；`e2m2e/algorithm/` 用领域知识构造问题（选轨道族、定约束、配初猜）；`crates/` 是 Rust 数值层，打靶迭代等重计算在这里收敛；`e2m2e/data/` 供星历缓存、坐标数据与常数基准。`e2m2e/tools/` 为日志/可视化辅助，`e2m2e/mbse/` 在依赖链之外。
+
+一条任务轨道的旅程：`api` 收到请求 → `algorithm/family` 选族给初猜（种子来自 `catalog/records` 或 `algorithm/normal_form`）→ 打靶下沉 `crates/e2m2e-integrators`，每步算力在 `crates/e2m2e-forces`（星历不吃 SPICE 句柄，吃 `data/frames` 预采样缓存表；常数出自 `data/constants`）→ 结果落 `catalog/`，经 `api/cli` 与 `api/mcp` 交付。
+
+仓库其余顶层目录（`tests/`、`examples/`、`docs/`、`scripts/`、`kernels/` 等）是测试、文档、脚本与数据资产，不在运行时依赖链上。完整设计叙事见 [docs/architecture/architecture.md](docs/architecture/architecture.md)。
+
 ## 安装
 
 用 [uv](https://docs.astral.sh/uv/) 安装：
@@ -85,7 +93,7 @@ print(result.initial_state)
 
 ## MCP
 
-e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 13 个任务级工具（轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成与 7 个轨道库工具）暴露给 LLM Agent，stdio 传输，不监听端口。工具清单由 Facade 方法元数据派生，产物自动入库、`record_id` 跨工具链式调用；用法与工具速查见文档「[通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)」。
+e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 13 个任务级工具（轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成与 7 个轨道库工具）暴露给 LLM Agent，stdio 传输，不监听端口。工具清单由 Facade 方法元数据派生，产物自动入库、`record_id` 跨工具链式调用；用法与工具速查见文档 [通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)。
 
 安装 MCP extra（在已有 e2m2e 的环境里）：
 
@@ -128,7 +136,7 @@ ZCode 工作区配置（`<仓库>/.zcode/config.json`，键为嵌套的 `mcp.ser
 
 配置完成后在客户端直接用自然语言驱动，例如：
 
-> 设计一条 L2 南族 NRHO，近月点高度 3000 km，然后对它做 100 次蒙特卡洛站保仿真，结果打上「候选」标签。
+> 设计一条 L2 南族 NRHO，近月点高度 3000 km，然后对它做 100 次蒙特卡洛站保仿真，结果打上候选标签。
 
 ## 能力
 
@@ -167,7 +175,7 @@ ZCode 工作区配置（`<仓库>/.zcode/config.json`，键为嵌套的 `mcp.ser
 **接口与工具**
 
 - Facade 任务级入口，统一对外调用面。
-- MCP 服务化封装：`create_server` 进程内服务器与 `e2m2e mcp-serve` 子命令（stdio 传输，`[mcp]` extra），由 Facade 方法元数据派生工具清单——轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成与 7 个轨道库工具，产物自动入库、`record_id` 跨工具链式调用。接入配置与工具用法见文档「[通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)」。
+- MCP 服务化封装：`create_server` 进程内服务器与 `e2m2e mcp-serve` 子命令（stdio 传输，`[mcp]` extra），由 Facade 方法元数据派生工具清单——轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成与 7 个轨道库工具，产物自动入库、`record_id` 跨工具链式调用。接入配置与工具用法见文档 [通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)。
 
 ## 文档
 

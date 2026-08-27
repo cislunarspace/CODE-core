@@ -11,6 +11,14 @@
 
 e2m2e is an **algorithm toolset infrastructure** for cislunar space mission planning. In an LLM+Agent-style autonomous mission planning system, the large language model understands mission intent and decomposes/orchestrates subtasks, while e2m2e provides precise and reliable orbit computation tools: it builds dynamical models of cislunar space, generates periodic orbit families, designs transfer paths between orbits, and visualizes results for inspection.
 
+## How to read this repository
+
+The runtime architecture is just four pieces: `e2m2e/api/` is the sole external entry (the Facade, from which the CLI and MCP derive); `e2m2e/algorithm/` constructs problems with domain knowledge (choosing orbit families, constraints, initial guesses); `crates/` is the Rust numerical layer where heavy iterations converge; `e2m2e/data/` supplies ephemeris caches, frame data, and constant baselines. `e2m2e/tools/` is logging/visualization support, and `e2m2e/mbse/` sits outside the dependency chain.
+
+The journey of one orbit task: `api` receives the request → `algorithm/family` picks a family and initial guess (seeds from `catalog/records` or `algorithm/normal_form`) → shooting sinks into `crates/e2m2e-integrators`, with per-step forces in `crates/e2m2e-forces` (ephemerides come from the pre-sampled cache tables of `data/frames`, never live SPICE handles; constants from `data/constants`) → the result lands in `catalog/` and is delivered through `api/cli` and `api/mcp`.
+
+The remaining top-level directories (`tests/`, `examples/`, `docs/`, `scripts/`, `kernels/`, ...) are tests, docs, scripts, and data assets — off the runtime dependency chain. For the full design narrative see [docs/architecture/architecture.md](docs/architecture/architecture.md).
+
 ## Installation
 
 Install with [uv](https://docs.astral.sh/uv/):

@@ -281,7 +281,7 @@ def poly_subs(
     import sympy as sp
 
     # 校验：替换后表达式的自由符号只能含 q1..p3（其余符号当作系数，
-    # 如 B 矩阵元素 b_ij）。若出现其他「坐标名」（如 y1），说明调用方
+    # 如 B 矩阵元素 b_ij）。若出现其他坐标名（如 y1），说明调用方
     # 用错了命名——expr2poly 会把它误当常数，静默返回错误结果。
     allowed_coord_names = {"q1", "q2", "q3", "p1", "p2", "p3"}
     disallowed_coord_names = {

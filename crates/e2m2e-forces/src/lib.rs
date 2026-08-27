@@ -1,6 +1,8 @@
 //! e2m2e-forces: Force models (N-body, gravity field, STM).
 //!
 //! 从 e2m2e-integrators 拆分，包含力模型和 STM 变分方程。
+//!
+//! 仓库全貌与一条任务链的走读见 README 的仓库怎么读一节。
 
 #[cfg(feature = "spice")]
 pub mod forces;

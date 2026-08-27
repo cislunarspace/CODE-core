@@ -12,6 +12,8 @@
 实现状态：一档任务（design/control）与二档子任务（family/stability/proximity）
 已接入 algorithm/；transfer_design/orbit_propagation/spacetime_transform 及
 MCP/CLI 依赖 [mcp] extra，保持占位。
+
+仓库全貌与一条任务链的走读见 README 的仓库怎么读一节。
 """
 
 from .facade import Facade, ToolInfo, mcp_tools, tool_inventory

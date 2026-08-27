@@ -3,6 +3,8 @@
 //! 纯数学积分器（Butcher 表、RK/ABM/Cowell、solve_ivp）在
 //! `e2m2e-propagation` crate，力模型在 `e2m2e-forces`，SPICE FFI 在
 //! `e2m2e-spice`；本 crate 只做 PyO3 绑定与 shooting 算法。
+//!
+//! 仓库全貌与一条任务链的走读见 README 的仓库怎么读一节。
 
 use pyo3::prelude::*;
 #[cfg(feature = "spice")]

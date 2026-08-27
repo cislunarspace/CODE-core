@@ -182,7 +182,7 @@ pip 安装：
 .. code-block:: bash
 
    pip install e2m2e[normal-form]   # 标准形化简
-   pip install "e2m2e[mcp]"         # MCP 服务器（e2m2e mcp-serve，见「通过 MCP 使用 e2m2e」）
+   pip install "e2m2e[mcp]"         # MCP 服务器（e2m2e mcp-serve，见通过 MCP 使用 e2m2e一节）
 
 发布的 wheel 内嵌 CSPICE（静态链接，署名见仓库 NOTICE），STM 传播、打靶、
 第三体引力等 Rust 快速路径开箱即用。

@@ -21,6 +21,8 @@
 //! （−V_t = H\*，V(tf) = ψ）须从 tf 向 t0 反向求解，时间反转
 //! （τ = tf − t，即把 −H\* 交给求解器正向推进）由调用侧负责，
 //! 见 e2m2e-integrators 的 HJB 绑定层。
+//!
+//! 仓库全貌与一条任务链的走读见 README 的仓库怎么读一节。
 
 mod cr3bp;
 mod double_integrator;

@@ -16,18 +16,22 @@ For an English overview of what changed recently, read the [README](README.md#do
 
 ## [Unreleased]
 
+### Changed / 变更
+- Repository navigation story now lives at the entry points: README and the Sphinx landing page open with the map and the one-orbit-task journey; package and crate docstrings point back with a one-line reference. README.md / README.zh-CN.md 在引言后新增 How to read this repository / 仓库怎么读小节：运行时四块地图（api 唯一入口 → algorithm 构造问题 → crates Rust 数值层 → data 星历/坐标/常数），一条任务轨道的旅程（api → family 选族给初猜 → crates 打靶与算力 → catalog 落库 → cli/mcp 交付），并点名依赖链外的顶层目录；完整叙事仍指向 docs/architecture/architecture.md。docs/index.rst 双语开头各加一段简版指回 README；5 个包 `__init__.py` 与 6 个 crate `lib.rs` 头注末尾各加一行入口行（仓库全貌与一条任务链的走读见 README 的仓库怎么读一节）。
+- Corner quotation marks 「」 removed repo-wide per project convention. 全库清除直角引号「」共 19 处：新增的 12 处统一改为无引号表述；既有的 7 处（CHANGELOG 5.8.6 段 2 处、installation.rst 1 处、README.zh-CN.md 3 处、polynomial.py 1 处）按语境改写。其中 5.8.6 已发布段内的 2 处属标点级例外（已发布条目不可改写策略），在此记录备案。
+
 ## [5.8.6] - 2026-08-25
 
 ### Added
 - **transfer_design 打通 low_thrust 分支**（#516）：`TransferDesignRequest` 补齐 `engine_config`（plain dict，facade 内构造 `EngineConfig`）、`initial_mass`、`n_segments`、`target_oe`、`solver_method`、`duration_days`、`departure_state`、`target_state` 字段，此前 facade 走 low_thrust 必然 ValueError。
-- **「通过 MCP 使用 e2m2e」用户指南**（#540）：新增 `docs/getting-started/mcp.rst` 并挂入快速开始导航——接入配置（通用 `mcpServers` / ZCode 工作区两种格式）、统一信封、13 工具速查表、典型工作流与注意事项（`target_ephemeris` 坐标系契约、单位约定、`catalog_delete` 不可撤销）；README 增设 MCP 章节给出配置示例，ADR 0014 状态行与 installation 可选依赖清单同步勘正。
+- **通过 MCP 使用 e2m2e 用户指南**（#540）：新增 `docs/getting-started/mcp.rst` 并挂入快速开始导航——接入配置（通用 `mcpServers` / ZCode 工作区两种格式）、统一信封、13 工具速查表、典型工作流与注意事项（`target_ephemeris` 坐标系契约、单位约定、`catalog_delete` 不可撤销）；README 增设 MCP 章节给出配置示例，ADR 0014 状态行与 installation 可选依赖清单同步勘正。
 
 ### Fixed
 - **target_ephemeris 坐标系契约写入文档**（#516）：`TransferDesignRequest.target_ephemeris` 字段 description 与 `transfer_orbit`/`_extract_target_state` docstring 明确：目标态按会合旋转系（synodic）物理单位解释并直接无量纲化，惯性星历须先经 `spacetime_transform(j2000_to_synodic)` 转换；此前下游把惯性星历直接传入时无任何提示，目标态几何全错。
 - **LGA 搜索面外维度缺失与 Δv 单位语义**（#512）：`transfer_orbit("LGA")` 在发射倾角 ≥ 20° 时一律 INFEASIBLE：出发速度网格只有面内角，无面外自由度，候选在 dv 筛选前就被近月高度窗口筛光。`LgaSearchParams` 新增面外角网格（`out_of_plane_halfwidth_deg`/`n_out_of_plane`，中心随出发轨道面倾角缓慢负移，实测倾角 0°~90° 覆盖）；`LgaCandidate` 记录 `out_of_plane_angle`。同时修复 `max_total_dv` 语义：阈值 km/s 换算为无量纲后比较，`LgaTransferDetails` 与 `delta_v` 统一按特征速度换算回 km/s；ThreeBodyLambert 精化劣于网格候选时保留网格解（修复精化后 Δv 远超阈值仍报 CONVERGED）。
 - **MCP 信封层降级序列化**（#526 补全，#540）：orbit_family_generation / catalog_get / catalog_promote 的响应含 ndarray/Orbit 对象，`model_dump(mode="json")` 抛 `PydanticSerializationError` 被兜底成 `INTERNAL_ERROR`，调用方拿不到任何结果（计算本身成功、记录已入库）。信封层 `_jsonify` 失败时降级为 python 模式转储 + numpy/Orbit 感知递归转换：ndarray 转嵌套 list，Orbit 取画布契约字段（states/times/period/family_type，与 sidecar 帧契约同款），System 鸭子类型透传 mu，未知对象以 `<类型名>` 占位。sidecar 二进制帧通道不受影响（共用 `dispatch_tool`）。
 - **orbit_stability 标回 placeholder**（#510 决策，#540）：空参 schema 注册但处理函数要求 Orbit 对象入参，Agent 必然调用失败；按 placeholder 不注册的既定决策下架（tools/list 由 14 个变为 13 个），待记录引用式入参（`input_record_id`）落地后放开。
-- **spacetime_transform 的 times 字段描述改为双单位契约**（#540）：原描述「JD_TDB 时间值」对会合系转换是误导——实际要求无量纲会合时间 t_syn（0 = `et0_jd` 参考历元），误传 JD 会把换算历元推后上万年致 SPICE 星历越界（`SPKINSUFFDATA`）；现描述明确 GCRS↔EBCRS 用 JD_TDB、会合系转换用 t_syn。
+- **spacetime_transform 的 times 字段描述改为双单位契约**（#540）：原描述为 JD_TDB 时间值，对会合系转换是误导——实际要求无量纲会合时间 t_syn（0 = `et0_jd` 参考历元），误传 JD 会把换算历元推后上万年致 SPICE 星历越界（`SPKINSUFFDATA`）；现描述明确 GCRS↔EBCRS 用 JD_TDB、会合系转换用 t_syn。
 
 ## [5.8.5] - 2026-08-22
 

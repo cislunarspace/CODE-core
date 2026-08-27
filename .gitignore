@@ -90,6 +90,10 @@ docs/_build/
 # CR3BP 基线数据集（ADR 0036）：JSON + NPZ 均入仓库、随包分发
 !e2m2e/data/catalog_baseline/*.npz
 
+# 本地轨道库运行数据（默认 catalog_dir = ./catalog，ADR 0031）
+# catalog.db 为派生索引、records/ 为本地运行产物；需入库的基线走 e2m2e/data/catalog_baseline/
+/catalog/
+
 # 笔记本与脚本临时产物
 *.ipynb
 .ipynb_checkpoints/

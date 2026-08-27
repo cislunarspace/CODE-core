@@ -12,6 +12,9 @@ tools/ (tools layer).
 Key capabilities: mission orbit design, station keeping, transfer design,
 orbit prediction, spacetime coordinate conversion.
 
+Repo-wide map and the journey of one orbit task: see the README section
+"How to read this repository".
+
 [简体中文]
 
 一个用于设计和分析地月空间转移轨道的Python库，专注于圆型限制性三体问题
@@ -19,6 +22,8 @@ orbit prediction, spacetime coordinate conversion.
 （数值层）、algorithm/（算法层）、api/（接口层）、tools/（工具层）。
 
 主要能力：任务轨道设计、轨道保持、转移轨道设计、轨道预报、时空坐标转换。
+
+仓库全貌与一条任务链的走读见 README 的仓库怎么读一节。
 
 作者: 天疆说
 """
