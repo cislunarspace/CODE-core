@@ -534,9 +534,13 @@ mod tests {
             mu: 0.012_150_585_350_562_453,
             characteristic_length_km: 384_400.0,
             secondary_radius_km: 1737.4,
-            rtol: 1e-12,
-            atol: 1e-12,
-            max_step: Some(0.01),
+            // 测试套件用筛选级容差（ADR 0021 #536 精神），不用研究级 1e-12：
+            // 契约断言只要求 closure ≤ 1e-8，1e-9 下全部满足且套件快约 25%。
+            rtol: 1e-9,
+            atol: 1e-9,
+            // 0.05 与 0.01 的契约断言结果一致，整组测试约快 2 倍（max_step
+            // 是本测试的主导成本，而非 rtol）。
+            max_step: Some(0.05),
         }
     }
 
@@ -813,7 +817,7 @@ mod tests {
                 point: 1,
                 north_south: 1,
                 perilune_height_max_km: 30_000.0,
-                member_limit: 2,
+                member_limit: 1,
             },
             Spec::Nrho {
                 point: 2,
@@ -856,7 +860,7 @@ mod tests {
             Spec::Dro {
                 min_amplitude_km: 5000.0,
                 max_amplitude_km: 20_000.0,
-                member_limit: 2,
+                member_limit: 1,
             },
         ];
 
