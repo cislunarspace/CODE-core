@@ -118,6 +118,10 @@ fn solar_activity_factor(f107: f64, ap: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    // 黄金值表由 Python `%.17e` 全精度打印生成：18 位有效数字中末位超出
+    // f64 精度、解析值不变，但保留它可使重新生成的表与原表逐字节可比对。
+    // 属有意为之，豁免 excessive_precision。
+    #![allow(clippy::excessive_precision)]
     use super::*;
 
     /// 密度跨 15 个数量级（1.2 到 1e-15），纯 atol 对 <1e-12 的密度失效
