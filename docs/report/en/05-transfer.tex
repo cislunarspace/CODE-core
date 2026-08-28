@@ -1,0 +1,198 @@
+\section{Transfer Orbit Design}
+\label{sec:transfer}
+
+Transfer design in e2m2e covers impulsive, low-energy, and low-thrust
+propulsion modes. The core methodology is a two-step ``search then optimize''
+scheme: ballistic propagation on a coarse grid first filters the feasible
+solution families, then the best candidates are handed to nonlinear
+programming (NLP) for refinement. The unified design variables are the
+tangential velocity ratio $\alpha$ (controlling the departure direction), the
+transfer time $T$, and the time $t_{\mathrm{ins}}$ from apoapsis to the
+insertion point, with the total objective
+\begin{equation}
+  J = \Delta v_1 + \Delta v_2 ,
+\end{equation}
+subject to position continuity at the insertion point, velocity-direction
+parallelism with the target, and collision avoidance with the Earth and the
+Moon. The dynamical baseline is the CR3BP, with $\mu$ taken from the DE421
+constant baseline.
+
+\subsection{Impulsive Transfers}
+
+\subsubsection{Lambert Solving and Porkchop Scans}
+
+The Lambert solver implements the Izzo (2015) algorithm with a Rust kernel
+(Python only converts and wraps): it supports short-/long-way directions and
+multi-revolution solutions (returning the low-energy right branch), and
+provides a batch interface---a grid of $N$ geometries $\times\,M$ times of
+flight enters Rust in one call, with infeasible combinations filled with NaN
+without affecting the rest. The solver is verified against Vallado's classic
+test case.
+
+Solving Lambert point by point over a departure-epoch $\times$ time-of-flight
+grid yields the porkchop two-impulse $\Delta V$ map; terminal states are
+extracted through the terminal-condition abstraction
+(\texttt{TerminalCondition}), and analytic terminals need no dynamics
+propagation.
+
+\subsubsection{Three-Body Targeting}
+
+A two-body Lambert solution only qualifies as an initial guess in cislunar
+space. The three-body Lambert targeter seeds a damped Newton iteration in the
+CR3BP with the two-body solution: propagating with the state transition
+matrix $\stm(t, t_0)$, each correction is solved from the $\stm_{rv}$ block
+of the terminal STM; the step is halved whenever a full step increases the
+error; convergence is declared when the terminal position error falls below
+$10^{-8}$ (dimensionless).
+
+\subsubsection{Multi-Impulse Optimization and the Lawden Primer-Vector Test}
+
+For an $n$-impulse transfer between fixed endpoints, the decision variables
+are only the intermediate nodes $[t_i, \vect{r}_i]$; arcs between adjacent
+nodes are closed by Lambert solutions (optionally refined by three-body
+targeting), and SLSQP minimizes the total $\Delta V$. Whether a two-impulse
+solution can still be improved is answered by the Lawden primer-vector test:
+from the transversality conditions $\vect{p}(t_0) = \hat{\Delta v}_0$ and
+$\vect{p}(t_f) = \hat{\Delta v}_f$, the costate is carried by the STM to give
+the $\vect{p}(t)$ curve, with the necessary optimality condition
+\begin{equation}
+  \norm{\vect{p}(t)} \le 1 \quad \text{throughout},
+  \qquad \norm{\vect{p}} = 1 \text{ at impulses, aligned with them}.
+\end{equation}
+If $\norm{\vect{p}} > 1$ within an arc, inserting an intermediate impulse
+reduces the total $\Delta V$ (Lion \& Handelsman, 1968); the test also
+reports the suggested insertion time and position, directly seeding a
+three-impulse optimization. A LEO$\to$GEO example reproduces the Hohmann
+benchmark of $3.7708$ km/s.
+
+The classical Hohmann two-impulse minimum-energy transfer
+\begin{equation}
+  \Delta v_1 = \sqrt{\frac{\mu}{r_1}}\left(\sqrt{\frac{2 r_2}{r_1+r_2}} - 1\right),
+  \qquad
+  \Delta v_2 = \sqrt{\frac{\mu}{r_2}}\left(1 - \sqrt{\frac{2 r_1}{r_1+r_2}}\right)
+\end{equation}
+is provided as an analytic benchmark and a source of initial guesses.
+
+\subsection{Low-Energy Transfers}
+
+\subsubsection{Lunar Gravity Assist (LGA)}
+
+A three-leg conic-patching design: hyperbolic departure from the initial
+orbit $\to$ a gravity assist inside the lunar sphere of influence that
+rotates the velocity vector $\to$ hyperbolic insertion into the target orbit.
+The search interface works in dimensionless CR3BP states; a typical search
+domain is 15--45 days of flight time with a total $\Delta v$ cap of
+4.0 km/s, and results report total cost, flight time, and perilune altitude.
+
+\subsubsection{WSB Ballistic Capture}
+
+The weak stability boundary (WSB) route exploits the Sun--Earth weakly stable
+region: the spacecraft leaves the lunar sphere of influence onto a distant
+Sun-perturbed arc, where solar gravity does work near apoapsis so that the
+Moon-relative velocity drops below the capture threshold, yielding ballistic
+capture at near-zero $\Delta v$ (Belbruno \& Miller, 1993). The capture
+criterion is a negative two-body Kepler energy at perilune:
+\begin{equation}
+  H_2 = \frac{\norm{\vect{v}}^2}{2} - \frac{\mu_{\mathrm{moon}}}{r} < 0 .
+\end{equation}
+The solution proceeds in two steps: a \textbf{ballistic grid search}
+propagates forward in the BCR4BP over a Sun-phase $\times$ departure-phase
+$\times$ flight-time grid, filtering by perilune altitude and the $H_2$
+criterion---propagation, section detection, and filtering all run in Rust
+with Rayon parallelism (the Python reference implementation runs only when
+explicitly requested, never as an automatic fallback); an \textbf{arrival-leg
+refinement} then closes the best candidate's Moon-centered arrival arc with
+three-body Lambert targeting. A typical search domain is 90--150 days.
+
+\subsubsection{Invariant-Manifold Stitching}
+
+A third low-energy route exploits the invariant manifold tubes of periodic
+orbits themselves: crossings of the departure orbit's unstable manifold and
+the target orbit's stable manifold on the same Poincar\'e section (a planar
+section, or a periapsis section $s = \vect r \cdot \vect v = 0$) are paired
+and ranked by the weighted patching cost
+\begin{equation}
+  w_r \norm{\Delta \vect r} + w_v \norm{\Delta \vect v}.
+\end{equation}
+The end-to-end pipeline: propagate the departure unstable manifold $\times$
+target stable manifold (all four $\pm$ branch combinations, globally best
+taken) to the secondary's periapsis section, pick the best patch, then close
+onto the target orbit after the patch point with three-body Lambert
+targeting; impulses accordingly split into departure, patch, and arrival
+segments. In the benchmark case (medium-to-large-amplitude members of the L1
+Lyapunov family), the patch impulse is on the order of tens of m/s. The route
+is currently CR3BP-based, with an ephemeris interface reserved.
+
+The value of low-energy routes: trading time for propellant, enabling
+economical lander/orbiter scenarios and even emergency low-fuel rescue
+corridors.
+
+\subsection{Low-Thrust Transfers}
+
+The low-thrust leg uses the 7-dimensional augmented state
+$[\vect{r}, \vect{v}, m]$:
+\begin{equation}
+  \dot{\vect r} = \vect v, \qquad
+  \dot{\vect v} = \vect a_{\mathrm{grav}} + \frac{T\,\delta}{m}\,\hat{\vect u}, \qquad
+  \dot m = -\frac{T\,\delta}{I_{sp}\, g_0},
+\end{equation}
+with throttle $\delta \in [0,1]$ and thrust direction $\hat{\vect u}$
+parameterized by spherical angles $(\theta_1, \theta_2)$. Solving is a
+two-level loop: a \textbf{Q-law initial guess} integrates a Lyapunov feedback
+law forward to produce a suboptimal control history; an \textbf{SLSQP
+polish} then minimizes propellant over piecewise-constant controls
+$(\delta, \theta_1, \theta_2)$ per segment, matching the terminal position
+and velocity. Two solvers are available: shooting (analytic Jacobians,
+5--24$\times$ faster) and Hermite--Simpson collocation (more robust at large
+scale).
+
+Impulsive and low-thrust costs are distinguished via the equivalent
+$\Delta v$: impulsive uses $\Delta v = \sum_i \norm{\Delta \vect v_i}$, while
+low-thrust inverts the Tsiolkovsky equation,
+$\Delta v_{\mathrm{eq}} = I_{sp}\, g_0 \ln(m_0/m_f)$; due to gravity losses,
+$\Delta v_{\mathrm{eq}} \ge$ the impulsive $\Delta V$, with significant
+differences on high-energy transfers.
+
+\subsection{The Grid-Search + NLP Two-Step Optimization Framework}
+
+Step one, \textbf{grid search}: departure points are sampled equally in time
+along the departure orbit (typically 200), each with $\alpha$ uniformly
+sampled in $[0.5, 2.5]$ (typically 101); transfer arcs are integrated forward
+and filtered by collision (200 km at Earth / 100 km at the Moon),
+intersection, and minimum-distance ($10^{-3}$) constraints; the numerical
+kernel has sunk to Rust and runs in parallel.
+
+Step two, \textbf{NLP refinement}: decision variables
+$\vect{y} = \{\alpha, T, t_{\mathrm{ins}}\}$, objective
+$J(\vect y) = \Delta v_1 + \Delta v_2$, constraints of insertion-point
+position continuity (equality) and velocity parallelism (equality, or relaxed
+to an inequality with an angular tolerance of 0.05 rad). The solver defaults
+to SciPy SLSQP, with the COPT commercial optimizer as an option and fallback
+on failure.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Transfer design capabilities at a glance}
+\label{tab:transfer}
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\textbf{Category} & \textbf{Method} & \textbf{Notes} \\
+\midrule
+Impulsive & Lambert (Izzo) & Rust kernel, batch grid solving, short/long
+way and multi-revolution \\
+Impulsive & Three-body targeting & Damped Newton + STM, position error
+$< 10^{-8}$ at convergence \\
+Impulsive & Multi-impulse & SLSQP + Lawden primer-vector test, automatic
+impulse-insertion suggestions \\
+Impulsive & Hohmann & Analytic benchmark and initial guesses \\
+Low-energy & LGA & Three-leg conic patching, TOF 15--45 days \\
+Low-energy & WSB & BCR4BP + $H_2<0$ criterion, Rust Rayon parallel search \\
+Low-energy & Manifold stitching & Poincar\'e section pairing + three-body
+closure, patch impulses at m/s scale \\
+Low-thrust & Q-law + NLP & Shooting (analytic Jacobian, 5--24$\times$) or
+collocation \\
+Framework & Search--optimize & Grid search (Rust parallel) $\to$ SLSQP/COPT
+refinement \\
+\bottomrule
+\end{tabularx}
+\end{table}

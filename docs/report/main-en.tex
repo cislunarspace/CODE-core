@@ -1,0 +1,56 @@
+% e2m2e White Paper (English version)
+% Build: xelatex (recommended: latexmk -xelatex main-en.tex)
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+\newcommand{\eEmTitle}{e2m2e White Paper}
+\newcommand{\eEmVersion}{v5.8.6 \quad August 2026}
+
+\input{preamble}
+
+\hypersetup{pdftitle={e2m2e White Paper: An Algorithm Toolset for Cislunar Mission Planning}}
+
+\title{\color{e2blue}\textbf{e2m2e White Paper}\\[4pt]
+  \large An Algorithm Toolset for Cislunar Mission Planning:\\
+  Architecture, Algorithms, and Verification}
+\author{The e2m2e Project Team \\ \small \url{https://github.com/cislunarspace/e2m2e}}
+\date{\eEmVersion}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+e2m2e (Earth to Moon, Moon to Earth) is an open-source algorithm toolset for
+cislunar mission planning. In an LLM+Agent-style autonomous mission planning
+system, the large language model understands mission intent and
+decomposes/orchestrates subtasks, while e2m2e provides precise and reliable
+orbit computation: it builds dynamical models of cislunar space, generates
+periodic orbit families, designs transfer paths between orbits, and visualizes
+results for inspection. This white paper presents the system architecture
+(a layered Python-orchestration + Rust-numerics design), the core algorithms
+(differential correction, multiple shooting, continuation, invariant-manifold
+stitching, Lambert/low-energy/low-thrust transfers), the spacetime reference
+and verification framework, and the three calling interfaces (Facade, CLI,
+and MCP).
+\end{abstract}
+
+\vspace{1em}
+\tableofcontents
+\newpage
+
+\input{en/01-introduction}
+\input{en/02-architecture}
+\input{en/03-dynamics}
+\input{en/04-orbit-design}
+\input{en/05-transfer}
+\input{en/06-control}
+\input{en/07-interfaces}
+\input{en/08-comparison}
+\input{en/09-verification}
+
+\end{document}

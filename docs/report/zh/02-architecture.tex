@@ -1,0 +1,128 @@
+\section{系统架构}
+\label{sec:architecture}
+
+\subsection{从一条 NRHO 轨道说起}
+
+架构决策很少是凭空做出的。以“设计一条地月 L2 的 NRHO 轨道”为例，
+一条任务请求穿过系统的每个环节，恰好暴露了每层存在的理由：
+
+\begin{itemize}
+  \item \textbf{时间。} 用户输入 2024-01-01 00:00:00 UTC，但 DE 历表的
+        自变量是质心力学时 TDB，两者此刻相差约 69 秒。月球以约 1 km/s
+        绕地球公转，拿 UTC 当 TDB 查位置会错出约 70 km，近月制动窗口
+        完全作废。因此 e2m2e 内部统一 TDB，只在接口边界转 UTC——与
+        STK 的做法一致。
+  \item \textbf{坐标。} CR3BP 初猜在地月会合系给出，任务书参数在 J2000
+        惯性系，测控站在 ITRF93 地固系。换系不换数就是另一个物理位置，
+        且这类错误编译器不会报错（1999 年火星气候轨道器的单位混淆是
+        同类教训）。
+  \item \textbf{常数。} 地球 GM 有 DE440/DE421/WGS-84 多个值，地月质量
+        比 $\mu$ 亦然。e2m2e 自身曾在此出错：Python 与 Rust 各抄一个
+        $\mu$，算出的轨道族对不上文献。常量基准集（多套并存、每套内部
+        自洽、双语言同源）为此而设。
+  \item \textbf{计算规模。} 一次 2 年 50 圈的星历修正约需两万段轨道
+        积分，每段数千步、每步评估力模型并查询星历，标量运算以十亿计。
+        这一层必须快且可并行；而 CSPICE 内核是全局状态、不可并发——
+        所以 Rust 层不持有 SPICE 句柄，只吃预采样注入的星历缓存表。
+  \item \textbf{编排。} 选 DRO 还是 Halo、初猜振幅多大、容差多严、预报
+        多久，这些是天天在变的领域决策，留在 Python。
+\end{itemize}
+
+\subsection{运行时分层}
+
+运行时架构只有四块，外加两块支撑（图~\ref{fig:layers}）：
+
+\begin{itemize}
+  \item \texttt{e2m2e/api}：唯一对外入口。任务级 Facade，CLI 与 MCP
+        服务均由 Facade 方法元数据同源派生；
+  \item \texttt{e2m2e/algorithm}：用领域知识构造问题——选轨道族、定
+        约束、给初猜（种子来自轨道库记录或 normal\_form 模块）；只做
+        三件事：构造问题、调 Rust 迭代器、解释结果，不做数值迭代；
+  \item \texttt{crates/}：Rust 数值层，重迭代在此收敛。六个 crate：
+        spice（CSPICE FFI + 缓存）、propagation（纯数学积分器）、
+        forces（力模型 + STM）、integrators（pyo3 绑定 + 打靶等迭代
+        求解器 + 并行）、levelset（水平集/HJB 求解内核）、hjb-dynamics
+        （HJB 的 Hamiltonian 动力学实现）；
+  \item \texttt{e2m2e/data}：星历缓存表、坐标数据（EOP/闰秒）、常量
+        基准集；
+  \item \texttt{e2m2e/tools}：日志与可视化支撑；\texttt{e2m2e/mbse}：
+        MBSE 数据模型与图生成，在依赖链之外。
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  layer/.style={draw=e2blue, thick, rounded corners=2mm, fill=e2light,
+    minimum width=11.5cm, minimum height=1.05cm, align=center},
+  sub/.style={draw=e2gray, rounded corners=1mm, fill=white,
+    minimum height=0.7cm, align=center, font=\footnotesize},
+  arr/.style={-{Stealth[length=2.5mm]}, thick, e2blue},
+  lbl/.style={font=\footnotesize\itshape, text=e2gray},
+]
+\node[layer] (api) at (0,0) {\textbf{接口层}\quad \texttt{e2m2e/api}：Facade 任务级入口};
+\node[sub, right=2.2cm of api.east, anchor=west] (cli) {CLI};
+\node[sub, above=0.12cm of cli] (mcp) {MCP};
+\node[sub, below=0.12cm of cli] (gui) {GUI/脚本};
+\draw[arr] (api.east) -- (cli.west);
+\draw[arr] (api.east) ++(0.4,0) |- (mcp.west);
+\draw[arr] (api.east) ++(0.4,0) |- (gui.west);
+
+\node[layer, below=0.55cm of api] (algo) {\textbf{编排层}\quad \texttt{e2m2e/algorithm}：构造问题 · 调用迭代 · 解释结果};
+\node[layer, below=0.55cm of algo] (rust) {\textbf{数值层}\quad \texttt{crates/}（Rust）：积分 · 力模型 · 打靶 · 并行};
+\node[layer, below=0.55cm of rust] (data) {\textbf{数据层}\quad \texttt{e2m2e/data}：星历缓存 · 坐标数据 · 常量基准};
+
+\draw[arr] (api.south) -- (algo.north) node[midway, right, lbl] {任务请求};
+\draw[arr] (algo.south) -- (rust.north) node[midway, right, lbl] {初猜 + 问题定义};
+\draw[arr] (rust.south) -- (data.north) node[midway, right, lbl] {预采样星历表（非 SPICE 句柄）};
+
+\node[sub, right=2.2cm of data.east, anchor=west] (tools) {\texttt{e2m2e/tools}\\日志/可视化};
+\node[sub, below=0.15cm of tools] (mbse) {\texttt{e2m2e/mbse}\\（依赖链之外）};
+\end{tikzpicture}
+\caption{e2m2e 运行时分层。依赖单向向下：接口层同源派生 CLI/MCP；编排层
+只构造问题不做迭代；Rust 数值层不持有 SPICE 句柄，星历以预采样缓存表注入。}
+\label{fig:layers}
+\end{figure}
+
+一条轨道任务的旅程：\texttt{api} 接收请求 $\to$ \texttt{algorithm/family}
+选族与初猜 $\to$ 打靶下沉至 \texttt{crates} 积分器，逐步受力由 forces
+crate 评估（星历来自 \texttt{data/frames} 的预采样缓存表，常数来自
+\texttt{data/constants}）$\to$ 结果落入 \texttt{catalog/} 轨道库，经
+CLI/MCP 交付。
+
+\subsection{五个架构模块}
+
+在运行时分层之上，工程组织划分为五个架构模块（表~\ref{tab:modules}）。
+运行时与模块是两个视角：前者描述计算如何流动，后者描述工程如何维护。
+
+\begin{table}[htbp]
+\centering\small
+\caption{五个架构模块}
+\label{tab:modules}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{模块} & \textbf{职责} \\
+\midrule
+时空系统与常量 & 时间尺度（UTC/TDB/TAI/TT，动力学统一 TDB）；参考系转换
+（J2000/ITRF93/IAU\,2006、GCRS--EBCRS、动态轴）；物理常量基准集
+（DE421/DE440/WGS84 多套并存，Python/Rust 同源防漂移） \\
+Rust 计算 & 六个 crate（见上）；迭代问题由 Python 构造传入，Rust 只迭代到
+收敛；星历以缓存表注入，可并行 \\
+Python 编排 & 构造问题、调 Rust 迭代器、解释结果；任务级 Facade、算法链
+（族初猜 $\to$ Rust 修正 $\to$ 高保真传播）、子问题构造三层编排 \\
+CI & 三平台 wheel 矩阵（Windows x64、Linux x86\_64、Linux aarch64）+ sdist +
+GitHub Release + PyPI；CSPICE 编译包经 GitHub Release 分发；
+manylinux 2\_28 基线覆盖麒麟等国产系统 \\
+数据管理 & GitHub Release 管编译库与星历数据；Git 管轨道族种子参数；本地
+计算产物入轨道库 catalog（JSON 元数据 + NPZ 数组段，SQLite 仅作派生索引） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{keybox}{设计要点}
+数值下沉的边界由“迭代的密度”决定：打靶、延拓、NSGA-II 演化算子、低推力
+直接法等重迭代内核已在 Rust 侧；Python 保留外层编排与参照路径。Rust 层
+不持有 SPICE 句柄这一约束，使整个数值内核天然线程安全，可以 Rayon 并行。
+各算法模块的迁移进度逐项登记在
+\texttt{docs/architecture/numerics-migration-status.md}。
+\end{keybox}

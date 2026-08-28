@@ -1,0 +1,52 @@
+\section{验证体系与结语}
+\label{sec:verification}
+
+\subsection{按定义验证}
+
+e2m2e 的验证哲学是“按定义验证”（ADR 0013）：断言主要落在解析解、
+守恒量与文献公式上，而不是“与自身上一次输出一致”的回归对比。
+测试套件按验证目标分为六类，目录与源码镜像对应：
+
+\begin{itemize}
+  \item \texttt{algorithm}：坐标、动力学、设计、修正、转移的算法
+        编排链；
+  \item \texttt{api}：Facade 与 MCP 接口的响应与错误翻译；
+  \item \texttt{data}：数据层——内核、参考系、物理常数；
+  \item \texttt{mbse}：MBSE 数据模型、需求注册与图生成；
+  \item \texttt{numerical}：积分器精度对解析轨道、力模型加速度与
+        雅可比；
+  \item \texttt{tools}：日志、格式化、可视化等辅助工具。
+\end{itemize}
+
+坐标与时间链额外与 GMAT 参考数据交叉比对；Rust 侧数值方法在
+\texttt{crates/*/tests/} 中对解析解验证。高保真传播的精度对齐 GMAT
+与 DFH（东方红系列平台工具）至亚百米量级。Lambert 求解器经 Vallado
+经典算例验证；多脉冲优化复现 LEO$\to$GEO 霍曼基准 3.7708 km/s；
+微分修正、延拓与稳定性分析经 Broucke、Richardson、Gómez 等文献
+公式校核。
+
+\subsection{结语与展望}
+
+e2m2e 把地月空间任务轨道设计的完整链条——时空基准、多保真度动力学、
+周期轨道族生成、三类转移设计、轨道保持仿真——收敛到一个任务级
+Facade 之下，用 Rust 数值内核保证重迭代的性能与并行安全，用 MCP
+接口把整条链条开放给 LLM Agent。它不做通用工具的全面覆盖，而是在
+“地月空间”这个足够深的领域里，把从初猜到验证的每一步做成可组合、
+可追溯、可审计的工程组件。
+
+路线图上的方向包括：星历序列化的统一中间格式 EphemerisTable 与
+CCSDS OEM/ODM、SPICE BSP/PCK 等格式的互转；剩余 Python 数值（如 NLP
+优化）向 Rust 内核的进一步迁移；以及以轨道库为数据基础、面向智能
+博弈研究的扩展。
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{项目地址} & \url{https://github.com/cislunarspace/e2m2e} \\
+\textbf{在线文档} & \url{https://cislunarspace.github.io/e2m2e/} \\
+\textbf{许可证} & Apache 2.0 \\
+\textbf{安装} & \texttt{uv pip install e2m2e} \\
+\bottomrule
+\end{tabular}
+\end{center}

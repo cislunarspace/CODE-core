@@ -1,0 +1,99 @@
+\section{接口、数据与生态}
+\label{sec:interfaces}
+
+\subsection{Facade：唯一的任务级入口}
+
+所有能力收敛到 \texttt{Facade} 一个类（ADR 0014），CLI 与 MCP 服务由
+Facade 方法元数据同源派生——任务级 API 模型除执行输入校验外，还公开
+当前任务上下文下的参数元数据（条件取值域与校验器共用同一份规则定义），
+供 GUI、CLI、MCP 生成控件与范围提示，外部消费者不维护本地参数规则
+副本。任务级方法分三档：
+
+\begin{itemize}
+  \item \textbf{一档任务}：\texttt{design\_orbit}（任务轨道设计：
+        CR3BP 初猜 $\to$ 星历修正 $\to$ 高精度预报）、
+        \texttt{control\_orbit}（轨道保持 Monte Carlo 仿真）、
+        \texttt{transfer\_design}（HMN/LGA/WSB/低推力）、
+        \texttt{orbit\_propagation}（轨道预报），以及
+        \texttt{spacetime\_transform}（会合系与 J2000、GCRS 与
+        EBCRS 的时空互转）；
+  \item \textbf{二档子任务}：\texttt{orbit\_family\_generation}
+        （八族延拓生成，族记录自动入库）等；
+  \item \textbf{轨道库}：7 个 catalog 方法（见下）。
+\end{itemize}
+
+\begin{lstlisting}[caption={设计一条地月 L2 Halo 轨道（examples/main\_design.py）},label=lst:quickstart]
+from e2m2e.api import Facade
+
+facade = Facade()
+
+result = facade.design_orbit(
+    orbit_type="Halo",
+    collinear_point=2,
+    amplitude=30000.0,          # km
+    epoch=[2024, 1, 1, 0, 0, 0.0],
+    duration=365.25 * 86400.0,  # s
+)
+
+print(result.orbit_type)
+print(result.initial_state)
+\end{lstlisting}
+
+\subsection{MCP：Agent 原生接口}
+
+e2m2e 可作为 MCP 服务器（\texttt{e2m2e mcp-serve}，stdio 传输，不监听
+端口）向 LLM Agent 暴露 13 个任务级工具：6 个任务方法（一档 5 个 +
+族生成）与 7 个轨道库工具。工具清单由 Facade 方法元数据纯派生，无需
+另行维护。所有响应走统一信封 \texttt{\{status, data, error, meta\}}：
+错误以错误码表达（\texttt{INVALID\_PARAMS}、\texttt{RECORD\_NOT\_FOUND}、
+\texttt{PROPAGATION\_FAILED} 等），不泄漏 traceback；数值工具以
+\texttt{data.status} 报告 converged / diverged / stagnated /
+max\_iterations 软失败语义（ADR 0020）——Agent 可以把“未收敛”当作
+正常信息来处理，而不是一次异常。
+
+配置方式是在 MCP 客户端注册一条命令；建议把 \texttt{cwd} 钉在含
+\texttt{kernels/}（SPICE 内核）与 \texttt{catalog/}（轨道库）的目录，
+或以 \texttt{SPICE\_KERNEL\_DIR} / \texttt{E2M2E\_CATALOG\_DIR} 指定
+绝对路径。配置完成后即可用自然语言驱动，例如：
+
+\begin{quote}\itshape
+设计一条近月点高度 3000 km 的 L2 南族 NRHO，然后对它做 100 次
+Monte Carlo 轨道保持仿真，结果打上 ``candidate'' 标签。
+\end{quote}
+
+\subsection{轨道库 catalog}
+
+计算产物自动归档（ADR 0031）：记录 = JSON 元数据 + NPZ 数组段（带
+schema 版本号），SQLite 仅作派生索引。产物型工具成功后返回
+\texttt{record\_id}，可跨工具链式引用（例如 \texttt{control\_orbit}
+以 \texttt{input\_record\_id} 引用 \texttt{design\_orbit} 的产物）。
+7 个库工具覆盖完整生命周期：\texttt{catalog\_query}（按族 / 平动点 /
+Jacobi 区间 / 振幅 / 标签 / 收敛状态多维过滤）、\texttt{catalog\_get}、
+\texttt{catalog\_delete}、\texttt{catalog\_tag}（教学标注）、
+\texttt{catalog\_promote}（族成员提升为独立记录）、
+\texttt{catalog\_export}（打包导出）、\texttt{catalog\_sweep}
+（参数空间批量扫描入库）。
+
+\subsection{安装与部署}
+
+\begin{lstlisting}[style=e2bash,caption={安装与 SPICE 内核配置},label=lst:install]
+uv pip install e2m2e            # 发布 wheel 内嵌 CSPICE，开箱即用
+uv pip install "e2m2e[mcp]"     # MCP 服务
+
+# 源码开发（需 Rust 工具链）：
+git clone https://github.com/cislunarspace/e2m2e.git
+cd e2m2e
+make dev      # 同步依赖 + 拉取 CSPICE 编译包与 SPICE 内核 + 构建 Rust 扩展
+\end{lstlisting}
+
+发布 wheel 覆盖 Windows x86\_64、Linux x86\_64 与 Linux aarch64
+（鲲鹏 / 飞腾 / 树莓派），内嵌静态链接的 CSPICE，Rust 快速路径
+（STM 传播、打靶、第三体引力等）开箱即用；扩展不可用时显式报错而非
+静默降级。SPICE 内核打包为 GitHub Release 资产 \texttt{kernels-v1}
+（\texttt{make setup} 自动下载），包含 DE 行星星历、地球自转、月球
+姿态、闰秒与行星常数内核；r2s2 时空转换另需含 TT$-$TDB 时间星历的
+历表。官方来源为 NASA NAIF。
+
+\texttt{examples/} 目录提供六个可运行示例：端到端轨道设计、轨道保持
+Monte Carlo、高保真传播、Lambert 转移、环月轨道四层对比（LLO/ELFO/
+DRO/Halo，全量运行不到 1 分钟）、轨道族生成。

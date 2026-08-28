@@ -1,0 +1,224 @@
+\section{Periodic Orbit Design}
+\label{sec:orbit}
+
+\subsection{An Overview of Orbit Families}
+
+Usable cislunar orbits fall into four layers by distance from the Moon, with
+scale as the main thread: the farther from the Moon, the larger Earth's share
+of the gravity field, the dynamics transition from two-body Keplerian to
+three-body, and orbits turn from stable to unstable
+(Table~\ref{tab:families}). e2m2e provides a unified family-generation entry,
+\texttt{orbit\_family\_generation()}, covering eight orbit families; Lyapunov
+and resonant orbits (RO) are additionally supported at the differential
+correction strategy layer.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Periodic orbit families}
+\label{tab:families}
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\textbf{Family} & \textbf{Location} & \textbf{Characteristics and uses} \\
+\midrule
+DRO & Moon-centered & Distant retrograde orbit; neutrally stable with low
+maintenance cost; candidate for lunar orbital stations \\
+DPO & near L2 & Distant prograde orbit; unstable; usable for far-side
+communication relay \\
+Halo / NRHO & L1/L2 & Three-dimensional periodic orbits; NRHOs are the
+high-amplitude near-rectilinear form ($A_z > 0.1$ dimensionless), adopted by
+Gateway \\
+Axial & L1/L2 & G\'omez Type B bifurcation; axial motion, coverage
+complementary to Halo \\
+Lyapunov & L1/L2/L3 & Planar periodic orbits \\
+Lissajous & L1/L2/L3 & Quasi-periodic (incommensurate in-plane/out-of-plane
+frequencies), generated on the nonlinear center-reduced flow \\
+SPO / LPO & L4/L5 & Short-/long-period orbits; large-amplitude LPOs take a
+horseshoe shape \\
+Horseshoe & L4/L5 & Large-amplitude members of the LPO chain \\
+RO & --- & Resonant orbits, departing from the $y$-axis symmetry \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Periodicity semantics are strictly distinguished: Halo, NRHO, Axial, SPO,
+LPO, Horseshoe, and DRO members are strictly periodic; Lissajous members are
+quasi-periodic bounded trajectories and are not forced into periodic closure.
+
+\subsection{Initial Guesses: Starting from Analytic Approximations}
+
+The first building block of periodic orbit design is the initial guess, for
+which e2m2e has three sources:
+
+\begin{itemize}
+  \item \textbf{Richardson third-order analytic approximation} (1980): a
+        third-order analytic solution for Halo orbits near the collinear
+        libration points. The internal pipeline: solve the libration-point
+        distance parameter $\gamma$ (quintic equation, Brent's method) $\to$
+        compute the in-plane frequency $\omega_p$ $\to$ assemble the
+        third-order coefficients and solution. Small-amplitude seeds (e.g.
+        dimensionless $z_0 = 0.001$) are the most accurate and are then
+        amplified by continuation;
+  \item \textbf{Seed orbits}: the DRO family starts from a standard seed
+        (amplitude $\approx 90786$ km), differentially corrected with the
+        $x$-axis crossing fixed and continued bidirectionally, covering an
+        envelope of 1737--110000 km;
+  \item \textbf{Normal-form characteristic parameters}: the dynamics near a
+        libration point are reduced to action--angle characteristic
+        parameters $[q_1, p_1, I_2, \theta_2, I_3, \theta_3]$, describing
+        with a few constants an orbit that would otherwise need six state
+        components evolving in time. The pipeline: ephemeris initial state
+        $\to$ dynamical substitute orbit $\to$ quasi-Floquet transformation
+        $\to$ center-manifold reduction $\to$ characteristic parameters. The
+        quasi-Floquet reduction offers a 36-dimensional matrix method or a
+        21-dimensional $\mathfrak{sp}(6)$ Lie-algebra parameterization
+        (symplectic by construction); the center-manifold Lie transformation
+        is truncated at order 10 by default.
+\end{itemize}
+
+\subsection{Differential Correction: STM Newton Iteration via Symmetries}
+
+Differential correction iteratively adjusts the initial conditions so that
+the orbit satisfies periodicity constraints, at its core an STM-based Newton
+iteration. e2m2e exploits the three mirror symmetries of the CR3BP to shrink
+the problem---for example, XZ-plane symmetry means that if
+$(x, y, z, \dot x, \dot y, \dot z)$ is a solution, so is
+$(x, -y, z, -\dot x, \dot y, -\dot z)$; a Halo orbit therefore only needs to
+depart perpendicularly from the XZ plane ($y = 0$) and be corrected to cross
+it perpendicularly again half a period later.
+
+Different combinations of symmetry and fixed parameters form 11 correction
+strategies (Lyapunov/DRO with fixed $x_0$, fixed-period orbits with fixed
+$T_{1/2}$, RO with fixed $y_0$, Halo with fixed $z_0$ or $x_0$, Axial with
+fixed $v_{z0}$, SPO/LPO at L4/L5 without symmetry and full-period closure,
+etc.). Architecturally, the strategy layer is strictly separated from the
+solver: strategy functions only produce immutable configuration objects, and
+execution sinks to the Rust CR3BP correction kernel.
+
+Convergence failures are diagnosable: the history records per-step errors and
+the termination cause (converged / correction below machine precision /
+diverged / singular Jacobian / stagnated / converged to a parasitic root with
+$T \approx 0$); a singular Jacobian indicates linearly dependent constraints
+and calls for a different strategy.
+
+\subsection{Multiple Shooting: Ephemeris Correction of Long Arcs}
+
+Differential correction is sensitive to the initial guess, increasingly so
+for longer arcs. Multiple shooting splits the orbit into $N$ independently
+integrated segments and imposes continuity constraints at the patch points:
+\begin{equation}
+  \vect{x}_i(t_{i+1}) = \vect{x}_{i+1}(t_{i+1}),
+\end{equation}
+adjusting all segment initial states (optionally including time nodes)
+simultaneously---turning ``long-arc sensitivity'' into ``many small
+corrections''. The standard implementation reaches a tolerance of $10^{-10}$.
+
+Patch-point correction under the ephemeris model uniformly goes through the
+Rust multiple-shooting kernel, dispatched by orbit stability along two paths:
+
+\begin{itemize}
+  \item \textbf{Stable orbits} (DRO): a velocity-weighted two-level
+        path---after correcting one revolution, free extrapolation remains
+        bounded;
+  \item \textbf{Unstable orbits} (Halo/NRHO/DPO): segmented full-arc
+        shooting, integrating segment by segment to fill the ephemeris grid;
+        NRHO fixes 1 revolution per segment, Halo at most 3, and DPO uses 64
+        equally-spaced patch points per revolution.
+\end{itemize}
+
+Node sampling is likewise tailored to orbital physics: Halo uses
+perilune-clustered sampling (5 nodes inside the perilune window plus 8
+outside), because the STM is ill-conditioned where the velocity is large
+near perilune; NRHO uses equal-time sampling.
+
+\subsection{Continuation: From One Orbit to a Family}
+
+Given a converged seed orbit, a family is generated by stepping along a
+family parameter (Jacobi constant, amplitude, etc.), reconverging with
+differential correction at each step. Two continuation schemes are provided:
+
+\begin{itemize}
+  \item \textbf{Natural-parameter continuation}: advances along a single
+        parameter, each step seeded by the current solution;
+  \item \textbf{Pseudo-arclength continuation (PAL)}: adds an arclength
+        constraint and can pass turning points, suitable for families with
+        non-monotonic parameter--amplitude relations (e.g. the Halo
+        amplitude--period curve).
+\end{itemize}
+
+Failure handling is engineered: a non-converged step retries with a reduced
+step size; if convergence still fails at the lower bound, that direction
+terminates; only converged members are appended to the family, with
+diagnostics reporting total/successful/failed steps. The L2 NRHO family uses
+a dedicated ``fold then continue with fixed $x_0$'' arrangement; the Halo
+family uses natural continuation with fixed $z_0$, positive and negative
+$z_0$ giving the northern and southern families.
+
+\subsection{Stability Analysis and Invariant Manifolds}
+
+The stability of a periodic orbit is determined by its monodromy matrix (the
+STM over one period):
+\begin{equation}
+  \mat{M} = \stm(T, 0).
+\end{equation}
+By the symplectic structure of Hamiltonian systems, eigenvalues appear in
+reciprocal pairs $(\lambda, 1/\lambda)$. The Broucke stability index sums
+each reciprocal pair:
+\begin{equation}
+  \nu = \lambda + \frac{1}{\lambda},
+\end{equation}
+with $|\nu| < 2$ stable and $|\nu| > 2$ unstable (the larger, the more
+unstable). The relation of eigenvalues to $+1$, $-1$, and the unit circle
+identifies bifurcation types (saddle-node / period-doubling / torus), with
+family-level bifurcation detection supported. Numerical trustworthiness is
+self-checked via symplectic residuals: if $|\det \mat{M} - 1|$ or
+$\norm{\mat{M}^\top \mat{J} \mat{M} - \mat{J}}$ is significantly large, the
+integration tolerance should be tightened and the analysis redone.
+
+The real eigenvectors of the monodromy matrix also give the invariant
+manifold directions: the stable manifold takes the $|\lambda| < 1$ direction
+and the unstable manifold the $|\lambda| > 1$ direction. Transporting the
+eigenvectors along the orbit by the STM and applying a $\pm\varepsilon$
+perturbation (typically 50 km/DU) yields manifold seeds; integrating
+backward/forward produces the manifold tubes used for low-energy transfer
+stitching (Section~\ref{sec:transfer}).
+
+\subsection{The Design Pipeline}
+
+Chaining these algorithms together, the complete pipeline of one mission
+orbit is:
+
+\begin{center}
+\begin{tikzpicture}[
+  font=\footnotesize,
+  stage/.style={draw=e2blue, thick, rounded corners=1.5mm, fill=e2light,
+    minimum height=0.85cm, align=center, inner sep=4pt},
+  arr/.style={-{Stealth[length=2mm]}, thick, e2blue},
+]
+\node[stage] (s1) {initial guess\\Richardson/seed};
+\node[stage, right=0.24cm of s1] (s2) {differential\\correction};
+\node[stage, right=0.24cm of s2] (s3) {continuation\\family};
+\node[stage, right=0.24cm of s3] (s4) {phasing\\+ nodes};
+\node[stage, right=0.24cm of s4] (s5) {batch frame\\conversion};
+\node[stage, right=0.24cm of s5] (s6) {ephemeris\\correction};
+\node[stage, right=0.24cm of s6] (s7) {high-fidelity\\propagation};
+\draw[arr] (s1) -- (s2);
+\draw[arr] (s2) -- (s3);
+\draw[arr] (s3) -- (s4);
+\draw[arr] (s4) -- (s5);
+\draw[arr] (s5) -- (s6);
+\draw[arr] (s6) -- (s7);
+\end{tikzpicture}
+\end{center}
+
+All numerical heavy lifting (propagation, shooting, batch frame conversion,
+batch ephemeris queries) runs on the Rust side, with Python only
+orchestrating; the end-to-end generation of four typical orbits (LLO, ELFO,
+DRO, Halo) takes under one minute in total with a release build.
+
+\begin{keybox}{NominalOrbit: The Contract Between Design and Control}
+A designed nominal orbit is delivered as a NominalOrbit structure: an
+equally-spaced state table + a Floquet basis + projection factors.
+Station-keeping algorithms consume this structure directly---the Floquet
+analysis produced during design does not need to be recomputed during
+control; the two stages are decoupled through a single data contract.
+\end{keybox}

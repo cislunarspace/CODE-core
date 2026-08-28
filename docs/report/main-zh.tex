@@ -1,0 +1,47 @@
+% e2m2e 技术白皮书（中文版）
+% 编译：xelatex（推荐 latexmk -xelatex main-zh.tex）
+\documentclass[UTF8,11pt]{ctexart}
+
+\newcommand{\eEmTitle}{e2m2e 技术白皮书}
+\newcommand{\eEmVersion}{v5.8.6 \quad 2026 年 8 月}
+
+\input{preamble}
+
+\hypersetup{pdftitle={e2m2e 技术白皮书：地月空间任务规划算法工具集}}
+
+\title{\color{e2blue}\textbf{e2m2e 技术白皮书}\\[4pt]
+  \large 地月空间任务规划算法工具集：架构、算法与验证}
+\author{e2m2e 项目团队 \\ \small \url{https://github.com/cislunarspace/e2m2e}}
+\date{\eEmVersion}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+e2m2e（Earth to Moon, Moon to Earth）是面向地月空间任务规划的开源算法工具集。
+在“LLM + Agent”式自主任务规划系统中，大语言模型负责理解任务意图并分解、
+编排子任务，e2m2e 则提供精确可靠的轨道计算能力：构建地月空间动力学模型，
+生成周期轨道族，设计轨道间的转移路径，并对结果进行可视化检验。本白皮书介绍
+e2m2e 的系统架构（Python 编排 + Rust 数值内核的分层设计）、核心算法
+（微分修正、多重打靶、延拓、不变流形拼接、Lambert/低能量/低推力转移）、
+时空基准与验证体系，以及 Facade/CLI/MCP 三种调用接口。
+\end{abstract}
+
+\vspace{1em}
+\tableofcontents
+\newpage
+
+\input{zh/01-introduction}
+\input{zh/02-architecture}
+\input{zh/03-dynamics}
+\input{zh/04-orbit-design}
+\input{zh/05-transfer}
+\input{zh/06-control}
+\input{zh/07-interfaces}
+\input{zh/08-comparison}
+\input{zh/09-verification}
+
+\end{document}

@@ -1,0 +1,111 @@
+% e2m2e 白皮书共享导言区 / Shared preamble for the e2m2e white paper
+% 语言相关的字体设置在各自的 main 文件中完成。
+% Language-specific font setup lives in each main file.
+
+\usepackage[a4paper,top=2.6cm,bottom=2.8cm,left=2.6cm,right=2.6cm]{geometry}
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs,array,multirow,tabularx}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{microtype}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds,calc}
+\usepackage[most]{tcolorbox}
+\usepackage{listings}
+\usepackage{hyperref}
+
+% ---------------------------------------------------------------- 配色
+\definecolor{e2blue}{HTML}{1B4F8A}   % 主色：深航天蓝
+\definecolor{e2light}{HTML}{E8F0F8}  % 浅蓝底
+\definecolor{e2gray}{HTML}{5A6570}
+\definecolor{codebg}{HTML}{F5F7FA}
+\definecolor{codeframe}{HTML}{D5DDE6}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=e2blue,
+  urlcolor=e2blue,
+  citecolor=e2blue,
+  pdftitle={e2m2e White Paper},
+  pdfauthor={cislunarspace},
+}
+
+% ---------------------------------------------------------------- 标题样式
+\titleformat{\section}
+  {\Large\bfseries\color{e2blue}}{\thesection}{0.8em}{}
+  [{\color{e2blue}\titlerule[0.6pt]}]
+\titleformat{\subsection}
+  {\large\bfseries\color{e2blue!85!black}}{\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{e2gray}}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{2.2ex plus 1ex}{1.4ex}
+\titlespacing*{\subsection}{0pt}{1.8ex plus 0.8ex}{1.0ex}
+
+% ---------------------------------------------------------------- 页眉页脚
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{e2gray}\eEmTitle}
+\fancyhead[R]{\small\color{e2gray}\thepage}
+\fancyfoot[C]{\small\color{e2gray}\eEmVersion}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\color{e2blue!40}\hrule width\headwidth height 0.4pt}
+
+% ---------------------------------------------------------------- 代码
+\lstdefinestyle{e2python}{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{e2blue}\bfseries,
+  stringstyle=\color{green!45!black},
+  commentstyle=\color{e2gray}\itshape,
+  numbers=left,
+  numberstyle=\tiny\color{e2gray},
+  numbersep=8pt,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  framesep=6pt,
+  xleftmargin=18pt,
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=4,
+}
+\lstdefinestyle{e2bash}{
+  language=bash,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{e2blue},
+  commentstyle=\color{e2gray}\itshape,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  framesep=6pt,
+  xleftmargin=10pt,
+  breaklines=true,
+  showstringspaces=false,
+}
+\lstset{style=e2python}
+
+% ---------------------------------------------------------------- 要点框
+\newtcolorbox{keybox}[1]{
+  enhanced, colback=e2light, colframe=e2blue, boxrule=0.6pt,
+  arc=2mm, left=8pt, right=8pt, top=6pt, bottom=6pt,
+  title={#1}, fonttitle=\bfseries\small,
+  coltitle=white, colbacktitle=e2blue,
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={arc=1mm, boxrule=0pt},
+}
+
+% ---------------------------------------------------------------- 常用数学宏
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\vect}[1]{\bm{#1}}
+\newcommand{\mat}[1]{\bm{#1}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\stm}{\mat{\Phi}}
+\newcommand{\dV}{\Delta V}
+
+\captionsetup{font={small},labelfont={bf,color=e2blue}}
+\setlist{itemsep=2pt,topsep=4pt,parsep=0pt}
+\setlength{\parskip}{3pt plus 1pt}

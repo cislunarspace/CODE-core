@@ -1,0 +1,65 @@
+\section{Verification and Conclusion}
+\label{sec:verification}
+
+\subsection{Verification by Definition}
+
+e2m2e's verification philosophy is \emph{verification by definition}
+(ADR 0013): assertions land mainly on analytic solutions, conserved
+quantities, and literature formulas, rather than on regression comparisons
+``consistent with its own previous output''. The test suite is divided into
+six categories by verification target, with directories mirroring the source
+layout:
+
+\begin{itemize}
+  \item \texttt{algorithm}: orchestration chains of coordinates, dynamics,
+        design, correction, and transfer;
+  \item \texttt{api}: Facade and MCP interface responses and error
+        translation;
+  \item \texttt{data}: the data layer---kernels, reference frames, physical
+        constants;
+  \item \texttt{mbse}: MBSE data models, requirement registration, and
+        diagram generation;
+  \item \texttt{numerical}: integrator accuracy against analytic orbits;
+        force-model accelerations and Jacobians;
+  \item \texttt{tools}: auxiliary utilities---logging, formatting,
+        visualization.
+\end{itemize}
+
+The coordinate and time chains are additionally cross-compared against GMAT
+reference data; Rust-side numerical methods are verified against analytic
+solutions in \texttt{crates/*/tests/}. High-fidelity propagation accuracy
+aligns with GMAT and DFH to the sub-100\,m level. The Lambert solver is
+verified against Vallado's classic test case; multi-impulse optimization
+reproduces the LEO$\to$GEO Hohmann benchmark of 3.7708 km/s; differential
+correction, continuation, and stability analysis are checked against formulas
+from Broucke, Richardson, G\'omez, and others.
+
+\subsection{Conclusion and Outlook}
+
+e2m2e converges the complete chain of cislunar mission orbit design---the
+spacetime reference, multi-fidelity dynamics, periodic orbit family
+generation, three classes of transfer design, and station-keeping
+simulation---under a single task-level Facade, guarantees the performance and
+parallel safety of heavy iteration with a Rust numerical kernel, and opens
+the entire chain to LLM agents through the MCP interface. It does not pursue
+the full coverage of general-purpose tools; instead, in the sufficiently deep
+domain of cislunar space, it makes every step from initial guess to
+verification a composable, traceable, and auditable engineering component.
+
+On the roadmap: the unified ephemeris-serialization intermediate format
+EphemerisTable with converters to/from CCSDS OEM/ODM, SPICE BSP/PCK, and
+other typical formats; further migration of remaining Python numerics (such
+as NLP optimization) into the Rust kernel; and, building on the orbit catalog
+as a data foundation, extensions toward intelligent game-theoretic research.
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Repository} & \url{https://github.com/cislunarspace/e2m2e} \\
+\textbf{Documentation} & \url{https://cislunarspace.github.io/e2m2e/} \\
+\textbf{License} & Apache 2.0 \\
+\textbf{Install} & \texttt{uv pip install e2m2e} \\
+\bottomrule
+\end{tabular}
+\end{center}

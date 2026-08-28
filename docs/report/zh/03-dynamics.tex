@@ -1,0 +1,143 @@
+\section{时空基准与动力学内核}
+\label{sec:dynamics}
+
+\subsection{时空基准：时间、坐标、常数}
+
+轨道计算的误差常常不出在算法，而出在基准。e2m2e 把时空基准作为独立
+模块维护：
+
+\textbf{时间。} 动力学内部统一使用质心力学时 TDB（SPICE ET 秒或
+JD\_TDB），UTC 只出现在接口边界；转换链覆盖 UTC / TAI / TT / TDB，
+闰秒内核自动加载。
+
+\textbf{坐标。} 坐标系被分解为 \textbf{Axes（轴向）+ Origin（原点）}：
+给定历元，Axes 返回旋转矩阵、Origin 给出绝对状态，二者拼成完整的
+数学参考框架。轴向类型覆盖 ICRS 惯性系、SPICE 高精度 ITRF93
+（对 \texttt{pxform/sxform} 验证至 $10^{-12}$）、GMAT 兼容 ITRF、
+IAU 2006 简化地球定向（无 SPICE 场景），以及依赖航天器瞬时状态的
+动态轴 VNB 与 LVLH（推力方向与轨道保持的常用系）。会合系与 J2000
+之间的批量转换已下沉 Rust，含质心$\to$地心平移修正。
+
+\textbf{联合时空变换。} 依托中科院 r2s2 库实现
+TDT+GCRS $\leftrightarrow$ TDB+EBCRS 的联合时空变换，含 IAU 决议要求
+的相对论项；e2m2e 补齐了 EBCRS 原点平移（
+$\vect x_{\mathrm{ebcrs}} = \vect x_s - \vect x_{\mathrm{emb}}(t)$）。
+双向往返验证：位置差 $< 0.001$ mm、时间差 $< 1\,\mu$s；相对论修正量级
+在 LEO 处约 0.20 m、月球距离处约 10.1 m。
+
+\textbf{常数。} 物理常量按基准集管理（DE421 / DE440 / WGS-84 多套并存、
+每套内部自洽、按场景选用），Python 与 Rust 同源生成，杜绝两侧漂移。
+地月 CR3BP 基准取 DE421 自洽值：$\mu = 0.01215058535$，特征长度
+DU $= 384400$ km，特征时间 TU $\approx 375190$ s（约 4.34 天）。
+
+\subsection{三层动力学模型}
+
+e2m2e 按保真度提供三层动力学，并支持三者间的状态转换
+（表~\ref{tab:dynamics}）。
+
+\begin{table}[htbp]
+\centering\small
+\caption{三层动力学模型}
+\label{tab:dynamics}
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\textbf{模型} & \textbf{保真度} & \textbf{用途与性质} \\
+\midrule
+CR3BP & 概念设计 & 会合系无量纲自治系统，有 Jacobi 积分与五个平动点；
+周期轨道族设计的载体 \\
+BCR4BP & 中间 & 叠加太阳解析摄动（位置为时间解析函数，无需星历）；
+系统具时间周期性，WSB 搜索的载体 \\
+星历 $N$ 体 & 高保真 & J2000 惯性系物理单位，SPICE 星历查询 $N$ 个可配置天体；
+任务级精确外推 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+圆型限制性三体问题（CR3BP）在会合旋转系中是无量纲自治系统，运动方程为
+\begin{equation}
+  \ddot{x} - 2\dot{y} = \frac{\partial\Omega}{\partial x}, \qquad
+  \ddot{y} + 2\dot{x} = \frac{\partial\Omega}{\partial y}, \qquad
+  \ddot{z} = \frac{\partial\Omega}{\partial z},
+\end{equation}
+伪势能与两个引力距离为
+\begin{equation}
+  \Omega = \frac{1}{2}(x^2 + y^2) + \frac{1-\mu}{r_1} + \frac{\mu}{r_2}, \qquad
+  r_1 = \sqrt{(x+\mu)^2 + y^2 + z^2}, \quad
+  r_2 = \sqrt{(x-1+\mu)^2 + y^2 + z^2},
+\end{equation}
+唯一运动积分为 Jacobi 常数 $C_J = 2\Omega - v^2$。
+
+双圆限制性四体问题（BCR4BP）在 CR3BP 上叠加太阳质点摄动（直接项 +
+间接项），太阳位置为时间解析函数 $\vect r_s(t) = a_s(\cos\theta,
+\sin\theta, 0)$，$\theta = \theta_0 + \omega_s t$，在会合系中逆行。
+系统不再自治但保持时间周期性，是 WSB 弹道捕获搜索的工作介质：与星历
+模型对比，1 天外推偏差约 $10^3$ km，2 天内优于 CR3BP。
+
+星历 $N$ 体模型以中心体点质量加第三体摄动为基本形式：
+\begin{equation}
+  \vect a = -\frac{\mu_0\,\vect r}{\norm{\vect r}^3}
+  - \sum_i \mu_i \left[
+    \frac{\vect r - \vect r_i}{\norm{\vect r - \vect r_i}^3}
+    + \frac{\vect r_i}{\norm{\vect r_i}^3}
+  \right],
+\end{equation}
+天体状态来自 SPICE 星历，非自治、无平动点与 Jacobi 积分，用于任务级
+精确设计。三层模型均支持 42 维增广的 STM 传播
+（$\delta\vect x(t) = \stm(t, t_0)\,\delta\vect x(t_0)$）。
+
+\subsection{高保真力模型}
+
+星历层之上，力模型以“注册—启停”的组合容器管理，各力分量提供解析
+雅可比与 Rust 序列化钩子：
+
+\begin{itemize}
+  \item \textbf{引力}：中心体点质量；第三体直接 + 间接项；完全正规化
+        球谐引力场（Pines 递推，支持 EGM96 / GRGM900C 与自定义系数文件，
+        内置地球固体潮与月球 $k_2 = 0.024116$ 固体潮）；
+  \item \textbf{光压}：炮弹模型（$P_{1\mathrm{AU}} = 4.56\times10^{-6}$
+        N/m$^2$，可选圆锥阴影模型，多遮挡体合成与 GMAT 对齐）与
+        ECOM 9 参数经验模型（DFH 兼容）；
+  \item \textbf{大气阻力}：ITRF 中计算，$C_d$ 默认 2.2；密度模型取
+        USSA76 分段指数大气，带 F10.7 / Ap 一阶修正；
+  \item \textbf{推力}：连续推力（方向系可选惯性 / VNB / LVLH）与变质量
+        连续推力（质量为第 7 状态量，7 维增广 Rust 路径）；脉冲机动经
+        分段施加；
+  \item \textbf{相对论修正}：后牛顿 Schwarzschild + Lense--Thirring +
+        de Sitter 项，与 GMAT 对齐。
+\end{itemize}
+
+精度验证：满配力模型传播与 GMAT、DFH 对齐至亚百米量级；对 DFH 满配
+算例，Halo 7 天偏差 88 m、Lissajous 7 天偏差 201 m，残余差异的 97\%
+来自 ECOM 与炮弹光压模型本身的不同。按 ADR 0013 的原则，GMAT/DFH 仅作
+开发期交叉参考，正确性由物理定义裁决。
+
+\subsection{Rust 积分器内核}
+
+重迭代计算全部在 Rust 侧完成，提供三族积分器（表~\ref{tab:integrators}）。
+自适应 RK 的误差控制取 $\mathrm{tol}\cdot\max(1, \norm{y})$ 阈值，
+STM 增广分量不参与步长控制（与 GMAT 一致）。基准对比（归一化
+LEO+J2、1 天、tol $=10^{-13}$）：PD45 约 5000 步 $\times$ 7 次求值，
+RK89 约 800 步 $\times$ 16 次，ABM 约 500 步 $\times$ 2 次——高阶与
+多步方法显著降低右端函数求值总数。
+
+\begin{table}[htbp]
+\centering\small
+\caption{Rust 积分器三族}
+\label{tab:integrators}
+\begin{tabularx}{\textwidth}{@{}lllX@{}}
+\toprule
+\textbf{族} & \textbf{方法} & \textbf{阶数} & \textbf{典型场景} \\
+\midrule
+RK 自适应单步 & PD45 / PD78 / RK89 & 5 / 8 / 9 & 通用传播与精度基准 \\
+Adams 多步 & ABM（PECE） & 4 & 光滑右端长弧段，每步仅 2 次右端求值 \\
+Cowell 双积分 & Störmer--Cowell & 8 & 纯引力轨道，状态维度减半 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+两个性能关键设计：其一，\textbf{星历缓存}——SPICE 查询以均匀网格
+预采样 + 三次样条（$C^2$ 连续）注入 Rust 侧，满配力模型传播加速
+10 倍以上，同时解除了 CSPICE 全局状态对并行的限制；其二，
+\textbf{编译路径}——力模型一次序列化后整个积分循环在 Rust 内完成，
+无 Python 往返。事件检测遵循 scipy 语义（\texttt{terminal} /
+\texttt{direction}），Poincaré 截面可直接生成事件函数供积分内检测。
