@@ -82,7 +82,7 @@ ADRs.
 | 0009 | Enable spice feature for release wheels | Adopted (implemented) |
 | 0010 | r2s2 integration and TDT+GCRS ↔ TDB+EBCRS spacetime conversion | Adopted (implemented) |
 | 0011 | Five-layer architecture and radical full renaming | Adopted (implemented) |
-| 0012 | Dependency-direction rules with CI import checks | Adopted (implemented) |
+| 0012 | Dependency-direction rules with CI import checks | Adopted (implemented; dependency table and enforcement scope revised by ADR 0039) |
 | 0013 | Verification strategy: complete tasks by definition | Adopted (test-tiering clause superseded by ADR 0021) |
 | 0014 | Interface layer Facade/MCP/CLI | Adopted (partially implemented: Facade done, MCP/CLI placeholders) |
 | 0015 | NominalOrbit contract and coordinate-conversion abstraction | Adopted (implemented) |
@@ -107,4 +107,6 @@ ADRs.
 | 0034 | Scope of the ephemeris force-model Hamiltonian | Adopted |
 | 0035 | GUI sidecar stdio protocol: shared Facade envelope, large arrays over binary frames | Adopted |
 | 0036 | CR3BP baseline orbit-family dataset: precomputed full-family data shipped with the package | Adopted |
+| 0037 | Test suite time budget, minimal real-call coverage, and e2e test boundaries | Adopted |
 | 0038 | IAS15 integrator and force-model parametric variational equations (ASSIST-derived); MERCURIUS not adopted | Adopted |
+| 0039 | Shared-kernel leaf modules at the package root | Adopted (implemented) |
