@@ -2,11 +2,17 @@
 
 枚举是数据，归 data/templates/（ADR 0011 迁移，源：``core/enums.py`` +
 ``mbse/data/enums.py``）。算法层/接口层引用此处；旧路径已删除。
+
+状态契约两枚举（``ConvergenceState``/``FailureCause``）已上移包根共享内核叶
+``e2m2e.status``（ADR 0039）——数值层门面与数据层都要消费，data 层内已无处安放；
+此处 re-export 保持旧路径与对象身份不变。
 """
 
 from __future__ import annotations
 
 import enum
+
+from e2m2e.status import ConvergenceState, FailureCause  # noqa: F401
 
 
 class ReferenceFrame(enum.Enum):
@@ -60,38 +66,6 @@ class BoundaryMode(enum.Enum):
     """两层多重打靶的边界条件。"""
 
     FIXED_ENDPOINTS = "fixed_endpoints"
-
-
-class ConvergenceState(enum.Enum):
-    """算法最终状态。"""
-
-    ITERATING = "iterating"
-    CONVERGED = "converged"
-    DIVERGED = "diverged"
-    STAGNATED = "stagnated"
-    MAX_ITERATIONS = "max_iterations"
-    INFEASIBLE = "infeasible"
-    COLLISION = "collision"
-    FAILED = "failed"
-
-
-class FailureCause(enum.Enum):
-    """算法最终结局的稳定原因码。"""
-
-    NONE = "none"
-    INTEGRATION_FAILED = "integration_failed"
-    SINGULAR_JACOBIAN = "singular_jacobian"
-    INVALID_PERIOD = "invalid_period"
-    MAX_ITERATIONS_REACHED = "max_iterations_reached"
-    STAGNATION_DETECTED = "stagnation_detected"
-    DIVERGENCE_DETECTED = "divergence_detected"
-    NO_INTERSECTION = "no_intersection"
-    CONSTRAINT_VIOLATION = "constraint_violation"
-    BODY_COLLISION = "body_collision"
-    LEVEL1_CORRECTION_FAILED = "level1_correction_failed"
-    BACKEND_FAILURE = "backend_failure"
-    INVALID_INPUT = "invalid_input"
-    UNKNOWN = "unknown"
 
 
 class OrbitFamilyType(enum.Enum):

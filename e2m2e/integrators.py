@@ -10,9 +10,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e.algorithm.results import ResultStatus
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.exceptions import RustExtensionUnavailableError
+from e2m2e.status import ConvergenceState, FailureCause, ResultStatus
 
 # 扩展符号在运行时逐个装载；静态类型检查将其视为动态对象。
 if TYPE_CHECKING:

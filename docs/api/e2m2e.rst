@@ -37,6 +37,14 @@ e2m2e.exceptions module
    :undoc-members:
    :show-inheritance:
 
+e2m2e.status module
+-------------------
+
+.. automodule:: e2m2e.status
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 e2m2e.tools.logging module
 --------------------------
 
