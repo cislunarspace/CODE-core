@@ -72,6 +72,41 @@ Collocation (more robust at scale):
        target_state=target_6d,
    )
 
+Discrete gears and variable-duration arcs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`~e2m2e.algorithm.transfer.lowthrust_collocation.LowThrustCollocation`
+adds two collocation modes for engines that only fire at discrete throttle
+gears, alongside the continuous-throttle solve:
+
+- ``solve_discrete(levels)``: each time interval's throttle is pinned to one of
+  the gears ``{0, 60, 100}`` (%). The time grid is uniform, each segment's
+  midpoint takes its interval gear (no interpolated throttle), and every arc
+  must last at least 1 h (``(tf - t0) / n_segments >= 3600`` s). NLP variables
+  are node states and thrust directions only.
+- ``solve_variable_time(levels)``: same gear set, but interior node times
+  become NLP decision variables (``t0``/``tf`` pinned; per-node decision vector
+  ``[state (7), control (3), time (1)]``), with the 1 h minimum arc duration
+  enforced as an inequality constraint. Suited to coast/burn arcs of unequal
+  length.
+
+Both maximize final mass (objective ``-m_N``) and return the same
+:class:`~e2m2e.algorithm.transfer.lowthrust_shooting.LowThrustShootingSolution`
+container as the shooting solver, sharing
+:class:`~e2m2e.algorithm.transfer.lowthrust_shooting.EngineConfig`:
+
+.. code-block:: python
+
+   from e2m2e.algorithm.transfer.lowthrust_collocation import LowThrustCollocation
+
+   solver = LowThrustCollocation(
+       system, forces, engine, initial_state, initial_mass,
+       target_state, t0, tf,
+   )
+   sol = solver.solve_discrete([0, 60, 100, 100, 60, 0])   # one gear per arc
+   sol = solver.solve_variable_time([0, 60, 100, 100, 0])  # node times adapt
+   print(f"Final mass = {sol.final_mass:.2f} kg, status = {sol.status}")
+
 Δv semantics vs impulsive
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 

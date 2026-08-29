@@ -1,11 +1,12 @@
 Integrator Families & Configuration
 ===================================
 
-e2m2e's integrators come in three families — adaptive single-step Runge-Kutta,
-fixed-step multistep Adams, fixed-step second-order Cowell — for first-order
+e2m2e's integrators come in four families — adaptive single-step Runge-Kutta,
+adaptive high-order Gauss-Radau (IAS15), fixed-step multistep Adams,
+fixed-step second-order Cowell — for first-order
 :math:`\dot{y}=f(t,y)` systems or direct second-order :math:`\ddot{x}=a(t,x)`.
 The Rust side is a workspace of six crates: ``e2m2e-propagation`` (pure-math
-integrators: Butcher tables, RK/ABM/Cowell, solve_ivp), ``e2m2e-forces``
+integrators: Butcher tables, RK/IAS15/ABM/Cowell, solve_ivp), ``e2m2e-forces``
 (N-body & STM variational equations, compiled force models), ``e2m2e-spice``
 (CSPICE FFI; embeds CSPICE when spice feature is on), ``e2m2e-integrators``
 (PyO3 bindings; maturin's sole packaging target producing the
@@ -43,6 +44,12 @@ Overview
      - fixed
      - second-order :math:`\ddot{x}=a(t,x)`
      - gravity-only orbits; avoids state doubling
+   * - IAS15 (Gauss-Radau)
+     - IAS15
+     - 15
+     - adaptive
+     - first-order :math:`\dot{y}=f(t,y)`
+     - high-precision long arcs; close encounters; STM + parameter sensitivity
 
 Runge-Kutta family
 ~~~~~~~~~~~~~~~~~~
@@ -88,6 +95,36 @@ Key parameters:
 - ``state_error_dim``: restrict step-error accounting to first N dims
   (e.g., 6 during STM-augmented propagation so 36 STM entries don't dominate).
 
+IAS15 (adaptive Gauss-Radau)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+15th-order implicit Gauss-Radau predictor-corrector with compensated
+summation, implemented from the published algorithms (Rein & Spiegel 2015;
+Everhart 1985 — REBOUND/ASSIST are GPL, no code referenced). Built for
+high-precision long-arc extrapolation: round-off accumulates per Brouwer's law
+(:math:`\sqrt{n}`) instead of linearly, and the step shrinks automatically near
+close encounters. Selected via ``ForceModel.propagate(integrator="ias15")``;
+STM propagation and force-model parameter sensitivity are supported.
+
+Key parameters (differ from the RK family):
+
+- ``tol``: single relative tolerance with IAS15 paper semantics (sampled
+  relative-acceleration error magnitude), not the RK rtol/atol pair;
+  ``initial_step`` is ignored (built-in start heuristic); ``method=`` is
+  RK-only.
+- ``with_stm``: state-transition-matrix augmentation along the trajectory.
+- ``sens_params``: first-order variational columns for force-model parameters
+  (``"srp_cr"``, ``"drag_cd"``); requires ``with_stm=True`` and each label must
+  uniquely match one enabled force; results appear as ``sensitivity`` with
+  shape ``(n_points, 6, n_params)``.
+
+Ephemeris noise floor: under ephemeris force models (SPICE sampling) the
+acceleration's effective smoothness is ~1e-11 relative, so the 7th-order
+divided-difference error estimate stops shrinking with step size. The engine
+detects this stagnation and raises the effective tolerance instead of
+rejecting steps indefinitely. Purely analytic force models follow ``tol``
+strictly.
+
 ABM (fixed-step multistep)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -110,10 +147,11 @@ Decision tree
 .. code-block:: text
 
    RHS contains velocity terms (drag, thrust direction)?
-   ├── yes → first-order methods only (RK or ABM)
-   │        adaptive/unknown steps?
-   │        ├── yes → RK (PD45/PD78/RK89)
-   │        └── no → ABM (fixed step, low call cost)
+   ├── yes → first-order methods only (RK, ABM, or IAS15)
+   │        max long-arc precision / close encounters / parameter sensitivity?
+   │        ├── yes → IAS15 (15th-order Gauss-Radau)
+   │        ├── adaptive/unknown steps → RK (PD45/PD78/RK89)
+   │        └── fixed known steps → ABM (low call cost)
    └── no → gravity-only
             fewest states / highest position accuracy?
             ├── yes → Cowell (8th-order double integration)
@@ -124,4 +162,6 @@ Accuracy & efficiency
 
 Normalized LEO+J2 benchmark (1-day arc, tol 1e-13): PD45 ≈ 5000 steps × 7 evals;
 PD78 ≈ 800 × 13; RK89 ≈ 800 × 16; ABM(h=0.002) ≈ 500 steps at 2 evals. Higher
-orders cut total evaluations ~3×.
+orders cut total evaluations ~3×. IAS15 (tol 1e-13, analytic force model)
+closes a 10-rev circular orbit to <1e-7 km and holds 100-rev relative energy
+drift <1e-9 (Brouwer-law round-off).

@@ -617,16 +617,16 @@ class ForceModel:
             max_steps: 最大积分步数，默认 100_000。
             method: Runge-Kutta 积分器方法，默认 PD45。仅 ``integrator="rk"``
                 时有效。
-            integrator: 积分器选择：``"rk"``（默认，嵌入 RK 家族）或
-                ``"ias15"``（15 阶 Gauss-Radau 预测-校正 + 补偿求和，
-                适合高精度长弧段外推与近距交会）。IAS15 路径的容差取
+            integrator: 积分器选择：``"rk"`` 为默认（嵌入 RK 家族），
+                ``"ias15"`` 为 15 阶 Gauss-Radau 预测-校正 + 补偿求和，
+                适合高精度长弧段外推与近距交会。IAS15 路径的容差取
                 ``self.rtol``，是相对加速度采样量级的单参数容差，
                 与 RK 的 rtol/atol 语义不同。
             sens_params: 力模型参数敏感列标签列表（ASSIST 式一阶变分方程），
-                可选 ``"srp_cr"``（cannonball SRP 的 Cr）与 ``"drag_cd"``
-                （阻力的 Cd）。需要 ``with_stm=True``；返回字典额外含
-                ``sensitivity``（形状 (n_points, 6, n_params)）与
-                ``sens_params``（标签回显）。
+                可选 ``"srp_cr"`` 对应 cannonball SRP 的 Cr，``"drag_cd"``
+                对应阻力的 Cd。需要 ``with_stm=True``；返回字典额外含
+                ``sensitivity`` 列（形状 (n_points, 6, n_params)）与
+                ``sens_params`` 标签回显。
 
         Returns:
             包含 ``time``、``states`` 和 ``terminal_event_index`` 的字典；
