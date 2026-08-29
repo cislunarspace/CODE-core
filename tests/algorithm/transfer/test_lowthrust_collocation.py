@@ -90,3 +90,23 @@ def test_collocation_min_fuel_converges():
     )
     assert abs(a_end - aT) / aT < 5e-3, f"末态半长轴 {a_end:.1f} 偏离目标 {aT:.1f}"
     assert sol.fuel_consumed > 0, "燃料消耗应为正"
+
+
+def test_variable_time_objective_is_final_mass():
+    """变时长目标函数 = 负末态质量（回归：曾误读占位油门列 z[7n+6]）。
+
+    与本文件 ``_defect_constraints`` 测试同一接缝惯例：直接回调 NLP 目标
+    函数。哨兵构造——末节点质量槽（``states[-1][6]``，扁平 z 的
+    ``7*n_nodes-1``）填 500，控制块（含“会被忽略”的占位油门列）填 0.3，
+    时刻块任意。只有目标函数读对末态质量槽才返回 -500.0；误读控制列
+    则返回 -0.3。NLP 级行为测试因 SLSQP 在该尺度收敛不稳（各场景实测
+    FAILED/INFEASIBLE）暂缺，本测试锁定目标函数语义本身。
+    """
+    coll, _forces = _make_collocation(np.zeros(6), tf=4 * 3600.0)
+    n_nodes = 3
+    states = np.zeros((n_nodes, 7))
+    states[-1, 6] = 500.0
+    controls = np.full((n_nodes, 3), 0.3)
+    times = np.array([0.0, 3600.0, 7200.0])
+    z = np.concatenate([states.ravel(), controls.ravel(), times])
+    assert coll._fuel_objective_vt(z, n_nodes) == -500.0

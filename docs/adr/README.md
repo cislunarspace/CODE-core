@@ -107,3 +107,4 @@ ADRs.
 | 0034 | Scope of the ephemeris force-model Hamiltonian | Adopted |
 | 0035 | GUI sidecar stdio protocol: shared Facade envelope, large arrays over binary frames | Adopted |
 | 0036 | CR3BP baseline orbit-family dataset: precomputed full-family data shipped with the package | Adopted |
+| 0038 | IAS15 integrator and force-model parametric variational equations (ASSIST-derived); MERCURIUS not adopted | Adopted |

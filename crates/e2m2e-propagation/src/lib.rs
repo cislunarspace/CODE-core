@@ -8,6 +8,7 @@
 pub mod abm;
 pub mod butcher;
 pub mod cowell;
+pub mod ias15;
 pub mod lambert;
 pub mod multistep_methods;
 pub mod pd45;

@@ -4,6 +4,8 @@ Release entries record exact code references (`module/function`, issue numbers, 
 
 ## [Unreleased]
 
+### Added
+- **IAS15 integrator and force-model parametric variational equations** (ADR 0038): adopts two algorithms from ASSIST (Holman et al. 2023). IAS15 (15th-order Gauss-Radau predictor-corrector with compensated summation) is implemented from the published algorithms (REBOUND/ASSIST are GPL; no code referenced); over long arcs round-off accumulates per Brouwer's law (n^1/2), with automatic step shrinkage near close encounters. Available via `ForceModel.propagate(integrator="ias15")`, with `with_stm` support. The STM augmented system gains force-model parameter sensitivity columns (`sens_params=["srp_cr", "drag_cd"]`, requires `with_stm=True`) - ASSIST-style first-order variational equations for the Cr/Cd partials - for orbit determination and covariance propagation. New Rust binding `propagate_compiled_ias15_py`; `propagate_compiled_stm_py` takes an optional `sens_params` (ABI v22). Under ephemeris force models IAS15's effective accuracy is limited by ephemeris sampling smoothness (~1e-11 relative); the engine detects this noise floor and raises the effective tolerance instead of rejecting steps indefinitely. MERCURIUS (Rein et al. 2019), the hybrid symplectic integrator, was evaluated and does not match this repo's problem domain; not adopted (rationale in ADR 0038).
 ### Changed
 - Repository navigation story now lives at the entry points: README and the Sphinx landing page open with the map and the one-orbit-task journey; package and crate docstrings point back with a one-line reference.
 - Corner quotation marks 「」 removed repo-wide per project convention.

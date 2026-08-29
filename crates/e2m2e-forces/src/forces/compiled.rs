@@ -756,6 +756,96 @@ pub fn compute_total_acceleration_and_jacobian(
     Ok((total_acc, total_jac, total_dadv))
 }
 
+/// 变分方程参数敏感列的种类（ASSIST 式一阶变分方程对力模型参数的偏导）。
+///
+/// 每条敏感列 `S_p = ∂[r,v]/∂p` 满足 `Ṡ_p = A·S_p + [0; ∂a/∂p]`。
+/// 当前只收与加速度严格线性的参数（∂a/∂p = a/p 解析给出）：
+/// SRP 的 `Cr`、大气阻力的 `Cd`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SensParam {
+    /// cannonball SRP 反射系数（`a ∝ Cr`）
+    Cr,
+    /// 大气阻力系数（`a ∝ Cd`）
+    Cd,
+}
+
+impl SensParam {
+    /// 从 pyo3 边界传入的字符串解析（"cr" / "cd"）。
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "cr" => Some(Self::Cr),
+            "cd" => Some(Self::Cd),
+            _ => None,
+        }
+    }
+}
+
+/// 单个力对指定参数的 `∂a/∂p`（加速度对参数线性，故 `∂a/∂p = a/p`）。
+///
+/// 参数恰为 0 时改用参数 = 1 求值（线性力的极限值）。不支持参数敏感列的
+/// 力/参数组合返回 `Err`（如 ``PointMass`` 无对应参数）。
+pub fn param_accel_derivative(
+    force: &CompiledForce,
+    param: SensParam,
+    et: f64,
+    state: &[f64; 6],
+    observer: &str,
+) -> Result<[f64; 3], String> {
+    match (force, param) {
+        (
+            CompiledForce::SRP {
+                area,
+                mass,
+                cr,
+                shadow_bodies,
+            },
+            SensParam::Cr,
+        ) => {
+            if *cr != 0.0 {
+                let a = force.acceleration(et, state, observer)?;
+                Ok([a[0] / cr, a[1] / cr, a[2] / cr])
+            } else {
+                CompiledForce::SRP {
+                    area: *area,
+                    mass: *mass,
+                    cr: 1.0,
+                    shadow_bodies: shadow_bodies.clone(),
+                }
+                .acceleration(et, state, observer)
+            }
+        }
+        (
+            CompiledForce::Drag {
+                area,
+                mass,
+                cd,
+                f107,
+                ap,
+                propagation_frame,
+            },
+            SensParam::Cd,
+        ) => {
+            if *cd != 0.0 {
+                let a = force.acceleration(et, state, observer)?;
+                Ok([a[0] / cd, a[1] / cd, a[2] / cd])
+            } else {
+                CompiledForce::Drag {
+                    area: *area,
+                    mass: *mass,
+                    cd: 1.0,
+                    f107: *f107,
+                    ap: *ap,
+                    propagation_frame: propagation_frame.clone(),
+                }
+                .acceleration(et, state, observer)
+            }
+        }
+        _ => Err(format!(
+            "force does not support sensitivity parameter {param:?}"
+        )),
+    }
+}
+
 /// 计算总加速度和雅可比，并把当前质量传给质量相关力。
 pub fn compute_total_acceleration_and_jacobian_with_mass(
     forces: &[CompiledForce],

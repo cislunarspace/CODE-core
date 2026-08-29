@@ -2121,13 +2121,18 @@ fn propagate_with_state_py(
 /// - ``rtol``, ``atol``: 积分容差
 /// - ``max_step``: 最大步长（秒），``None`` 则不限制
 /// - ``max_steps``: 最大步数，``None`` 则用默认上限
+/// - ``sens_params``: 可选，``[(force_index, "cr"|"cd"), ...]`` 参数敏感列。
+///   ``force_index`` 是 ``forces_py`` 中的下标；每条参数追加
+///   ``∂[r,v]/∂p`` 敏感列（ASSIST 式一阶变分方程）。
 ///
 /// **返回**
 ///
-/// Python dict：``{"states": [[6], ...], "stm": [[36], ...], "time": [...], "n_steps": int, "n_rejected": int}``
+/// Python dict：``{"states": [[6], ...], "stm": [[36], ...], "time": [...],
+/// "n_steps": int, "n_rejected": int}``；带 ``sens_params`` 时额外含
+/// ``"sensitivity": [[6·n_params], ...]``（列序同 ``sens_params``）。
 #[cfg(feature = "spice")]
 #[pyfunction]
-#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None, method=RkMethod::Pd78))]
+#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None, method=RkMethod::Pd78, sens_params=None))]
 #[allow(clippy::too_many_arguments)]
 fn propagate_compiled_stm_py(
     observer: &str,
@@ -2140,10 +2145,11 @@ fn propagate_compiled_stm_py(
     max_step: Option<f64>,
     max_steps: Option<usize>,
     method: RkMethod,
+    sens_params: Option<Vec<(usize, String)>>,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
     use e2m2e_forces::forces::compiled::CompiledForce;
-    use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm;
+    use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm_sens;
 
     if initial_state.len() != 6 {
         return Err(pyo3::exceptions::PyValueError::new_err(format!(
@@ -2161,12 +2167,13 @@ fn propagate_compiled_stm_py(
     for item in forces_py.iter() {
         forces.push(parse_force_tuple(&item)?);
     }
+    let sens = parse_sens_params(sens_params, forces.len())?;
 
     let mut state0 = [0.0_f64; 6];
     state0.copy_from_slice(&initial_state);
 
-    let result = propagate_compiled_stm(
-        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps, method,
+    let result = propagate_compiled_stm_sens(
+        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps, method, &sens,
     )
     .map_err(|e| {
         pyo3::exceptions::PyRuntimeError::new_err(format!("STM propagation failed: {}", e))
@@ -2181,6 +2188,122 @@ fn propagate_compiled_stm_py(
     dict.set_item("time", result.times)?;
     dict.set_item("n_steps", result.n_steps)?;
     dict.set_item("n_rejected", result.n_rejected)?;
+    if !sens.is_empty() {
+        dict.set_item("sensitivity", result.sensitivities)?;
+    }
+    Ok(dict.into())
+}
+
+/// 解析 ``sens_params`` 为 ``(force_index, SensParam)`` 列表。
+#[cfg(feature = "spice")]
+fn parse_sens_params(
+    sens_params: Option<Vec<(usize, String)>>,
+    n_forces: usize,
+) -> PyResult<Vec<(usize, e2m2e_forces::forces::compiled::SensParam)>> {
+    use e2m2e_forces::forces::compiled::SensParam;
+    let mut out = Vec::new();
+    for (force_idx, kind) in sens_params.unwrap_or_default() {
+        if force_idx >= n_forces {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "sens_params force index {force_idx} out of range ({n_forces} forces)"
+            )));
+        }
+        let param = SensParam::parse(&kind).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "unknown sensitivity parameter {kind:?} (valid: \"cr\", \"cd\")"
+            ))
+        })?;
+        out.push((force_idx, param));
+    }
+    Ok(out)
+}
+
+/// 编译型力模型的 IAS15 传播（15 阶 Gauss-Radau，补偿求和）。
+///
+/// 与 RK 路径的差异：变阶预测-校正、容差 ``tol`` 为相对加速度采样量级
+/// （单参数，无 rtol/atol 之分）、长弧段误差按 Brouwer 律 n^(1/2) 增长。
+/// 适合高精度长弧段外推与近距交会（步长自动收缩）。
+///
+/// **参数**
+///
+/// - ``observer``, ``forces_py``, ``t_span``, ``t_eval``, ``initial_state``:
+///   同 ``propagate_compiled_stm_py``
+/// - ``tol``: 相对容差（建议 1e-12 ~ 1e-14）
+/// - ``max_step``, ``max_steps``: 同 ``propagate_compiled_stm_py``
+/// - ``with_stm``: 是否同时积分 6×6 STM（初值单位阵）
+/// - ``sens_params``: 可选参数敏感列，格式同 ``propagate_compiled_stm_py``
+///
+/// **返回**
+///
+/// Python dict：``{"states": [[6], ...], "time": [...], "n_steps": int,
+/// "n_rejected": int}``；``with_stm=True`` 时含 ``"stm"``，带
+/// ``sens_params`` 时含 ``"sensitivity"``。
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, tol, max_step=None, max_steps=None, with_stm=false, sens_params=None))]
+#[allow(clippy::too_many_arguments)]
+fn propagate_compiled_ias15_py(
+    observer: &str,
+    forces_py: &Bound<'_, PyList>,
+    t_span: (f64, f64),
+    t_eval: Vec<f64>,
+    initial_state: Vec<f64>,
+    tol: f64,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    with_stm: bool,
+    sens_params: Option<Vec<(usize, String)>>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::forces::compiled::CompiledForce;
+    use e2m2e_forces::forces::compiled_ias15::propagate_compiled_ias15;
+
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+
+    let mut forces: Vec<CompiledForce> = Vec::with_capacity(forces_py.len());
+    for item in forces_py.iter() {
+        forces.push(parse_force_tuple(&item)?);
+    }
+    let sens = parse_sens_params(sens_params, forces.len())?;
+
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    let result = py
+        .allow_threads(|| {
+            propagate_compiled_ias15(
+                &forces, observer, t_span, &t_eval, &state0, tol, max_step, max_steps, with_stm,
+                &sens,
+            )
+        })
+        .map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("IAS15 propagation failed: {}", e))
+        })?;
+
+    let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
+
+    let dict = PyDict::new(py);
+    dict.set_item("states", states_list)?;
+    dict.set_item("time", result.times)?;
+    dict.set_item("n_steps", result.n_steps)?;
+    dict.set_item("n_rejected", result.n_rejected)?;
+    if with_stm {
+        let stm_list: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();
+        dict.set_item("stm", stm_list)?;
+    }
+    if !sens.is_empty() {
+        dict.set_item("sensitivity", result.sensitivities)?;
+    }
     Ok(dict.into())
 }
 
@@ -4096,6 +4219,16 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
         lowthrust::lowthrust_collocation_defects_py,
         m
     )?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        lowthrust::lowthrust_discrete_collocation_defects_py,
+        m
+    )?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        lowthrust::lowthrust_variable_time_collocation_defects_py,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(nsga2::nsga2_sort_py, m)?)?;
     m.add_function(wrap_pyfunction!(
         nsga2::nsga2_environmental_selection_py,
@@ -4157,6 +4290,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_with_state_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(propagate_compiled_ias15_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(
         differential_correction::differential_correction_cr3bp_py,

@@ -269,6 +269,167 @@ pub fn lowthrust_shooting_evaluate_py(
     Ok(output.into())
 }
 
+/// 固定离散工况的 Hermite-Simpson 配点缺陷。
+///
+/// `levels[i]` 是第 i 条区间的推力百分比，只允许 0、60、100；
+/// `controls` 仍为每个节点的方向角 `(unused_throttle, theta1, theta2)`，
+/// 其中第一列会被忽略，避免把连续油门混入离散弧段模型。
+#[allow(clippy::too_many_arguments)]
+fn discrete_collocation_defects(
+    states: &[Vec<f64>],
+    controls: &[Vec<f64>],
+    levels: &[i32],
+    t_nodes: &[f64],
+    observer: &str,
+    forces: &[e2m2e_forces::forces::compiled::CompiledForce],
+    t_max: f64,
+    isp: f64,
+) -> Result<Vec<f64>, String> {
+    let n_segments = states.len() - 1;
+    let mut defects = Vec::with_capacity(7 * n_segments);
+    for index in 0..n_segments {
+        if states[index].len() != 7 || states[index + 1].len() != 7 {
+            return Err("every state must have length 7".into());
+        }
+        if controls[index].len() != 3 || controls[index + 1].len() != 3 {
+            return Err("every control must have length 3".into());
+        }
+        let xi: [f64; 7] = states[index].clone().try_into().expect("validated length");
+        let xip1: [f64; 7] = states[index + 1]
+            .clone()
+            .try_into()
+            .expect("validated length");
+        let level = levels[index] as f64 / 100.0;
+        let pi = &controls[index];
+        let pip1 = &controls[index + 1];
+        let dt = t_nodes[index + 1] - t_nodes[index];
+        let et = t_nodes[index];
+        let thrust_i = ThrustParams {
+            t_max,
+            isp,
+            throttle: level,
+            direction: direction(pi[1], pi[2]),
+        };
+        let thrust_ip1 = ThrustParams {
+            t_max,
+            isp,
+            throttle: level,
+            direction: direction(pip1[1], pip1[2]),
+        };
+        let fi =
+            augmented_eom_7d(forces, observer, et, &xi, &thrust_i).map_err(|e| e.to_string())?;
+        let fip1 = augmented_eom_7d(forces, observer, et + dt, &xip1, &thrust_ip1)
+            .map_err(|e| e.to_string())?;
+        let mut midpoint_state = [0.0; 7];
+        for component in 0..7 {
+            midpoint_state[component] = (xi[component] + xip1[component]) / 2.0
+                + dt / 8.0 * (fi[component] - fip1[component]);
+        }
+        let midpoint_thrust = ThrustParams {
+            t_max,
+            isp,
+            throttle: level,
+            direction: direction((pi[1] + pip1[1]) / 2.0, (pi[2] + pip1[2]) / 2.0),
+        };
+        let midpoint = augmented_eom_7d(
+            forces,
+            observer,
+            et + dt / 2.0,
+            &midpoint_state,
+            &midpoint_thrust,
+        )
+        .map_err(|e| e.to_string())?;
+        for component in 0..7 {
+            defects.push(
+                xip1[component]
+                    - xi[component]
+                    - dt / 6.0 * (fi[component] + 4.0 * midpoint[component] + fip1[component]),
+            );
+        }
+    }
+    Ok(defects)
+}
+
+#[pyfunction]
+#[pyo3(signature = (states, controls, levels, t0, tf, observer, forces_py, t_max, isp))]
+#[allow(clippy::too_many_arguments)]
+pub fn lowthrust_discrete_collocation_defects_py(
+    states: Vec<Vec<f64>>,
+    controls: Vec<Vec<f64>>,
+    levels: Vec<i32>,
+    t0: f64,
+    tf: f64,
+    observer: &str,
+    forces_py: &Bound<'_, PyList>,
+    t_max: f64,
+    isp: f64,
+) -> PyResult<Vec<f64>> {
+    if states.len() < 2 || controls.len() != states.len() || levels.len() + 1 != states.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "states/controls/levels lengths must be N+1/N+1/N",
+        ));
+    }
+    if tf <= t0 {
+        return Err(pyo3::exceptions::PyValueError::new_err("tf must exceed t0"));
+    }
+    if levels.iter().any(|level| !matches!(level, 0 | 60 | 100)) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "discrete thrust levels must be 0, 60, or 100",
+        ));
+    }
+    let forces = parse_forces(forces_py)?;
+    let n_segments = states.len() - 1;
+    let dt = (tf - t0) / n_segments as f64;
+    let t_nodes: Vec<f64> = (0..=n_segments).map(|i| t0 + i as f64 * dt).collect();
+    discrete_collocation_defects(
+        &states, &controls, &levels, &t_nodes, observer, &forces, t_max, isp,
+    )
+    .map_err(pyo3::exceptions::PyRuntimeError::new_err)
+}
+
+/// 变时长离散工况的 Hermite-Simpson 配点缺陷。
+///
+/// 与 `lowthrust_discrete_collocation_defects_py` 的唯一区别是 `t_nodes`
+/// 显式给出，供把弧起止时刻作为 NLP 决策变量时使用。
+#[pyfunction]
+#[pyo3(signature = (states, controls, levels, t_nodes, observer, forces_py, t_max, isp))]
+#[allow(clippy::too_many_arguments)]
+pub fn lowthrust_variable_time_collocation_defects_py(
+    states: Vec<Vec<f64>>,
+    controls: Vec<Vec<f64>>,
+    levels: Vec<i32>,
+    t_nodes: Vec<f64>,
+    observer: &str,
+    forces_py: &Bound<'_, PyList>,
+    t_max: f64,
+    isp: f64,
+) -> PyResult<Vec<f64>> {
+    if states.len() < 2
+        || controls.len() != states.len()
+        || levels.len() + 1 != states.len()
+        || t_nodes.len() != states.len()
+    {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "states/controls/levels/t_nodes lengths must be N+1/N+1/N/N+1",
+        ));
+    }
+    if levels.iter().any(|level| !matches!(level, 0 | 60 | 100)) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "discrete thrust levels must be 0, 60, or 100",
+        ));
+    }
+    if t_nodes.windows(2).any(|w| w[1] <= w[0]) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_nodes must be strictly increasing",
+        ));
+    }
+    let forces = parse_forces(forces_py)?;
+    discrete_collocation_defects(
+        &states, &controls, &levels, &t_nodes, observer, &forces, t_max, isp,
+    )
+    .map_err(pyo3::exceptions::PyRuntimeError::new_err)
+}
+
 /// Hermite-Simpson 配点缺陷的批量求值。
 #[pyfunction]
 #[pyo3(signature = (states, controls, t0, tf, observer, forces_py, t_max, isp))]

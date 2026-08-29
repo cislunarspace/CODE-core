@@ -218,6 +218,40 @@ class ForceModel:
     # 其余力（含 SRP）都有解析或 Rust 内有限差分雅可比。
     _STM_UNSUPPORTED_TYPES = ("RelativisticCorrection", "VariableMassFiniteBurn")
 
+    # 参数敏感列标签 → (力模型类名, Rust 参数名)。敏感列是 ASSIST 式一阶
+    # 变分方程对力模型参数的偏导，当前只收与加速度严格线性的参数。
+    _SENS_PARAM_FORCE_TYPES = {
+        "srp_cr": ("SolarRadiationPressure", "cr"),
+        "drag_cd": ("DragModel", "cd"),
+    }
+
+    def _resolve_sens_params(self, sens_params: list[str] | None) -> list[tuple[str, int, str]]:
+        """把参数标签解析为 ``(标签, compiled force 下标, Rust 参数名)``。
+
+        下标按启用 force 的顺序编号（与 ``forces_py`` 序列化顺序一致）。
+        同类力出现多次时无法唯一定位，显式报错。
+        """
+        if not sens_params:
+            return []
+        resolved: list[tuple[str, int, str]] = []
+        for label in sens_params:
+            if label not in self._SENS_PARAM_FORCE_TYPES:
+                raise ValueError(
+                    f"未知敏感参数 {label!r}（可选：{sorted(self._SENS_PARAM_FORCE_TYPES)}）"
+                )
+            type_name, rust_kind = self._SENS_PARAM_FORCE_TYPES[label]
+            matches = [
+                idx
+                for idx, entry in enumerate(e for e in self._entries if e.enabled)
+                if type(entry.force).__name__ == type_name
+            ]
+            if not matches:
+                raise ValueError(f"敏感参数 {label!r} 需要启用 {type_name} 力模型")
+            if len(matches) > 1:
+                raise ValueError(f"敏感参数 {label!r} 匹配到多个 {type_name} 力，无法唯一定位")
+            resolved.append((label, matches[0], rust_kind))
+        return resolved
+
     def _raise_to_rust_spec_none(self, force_name: str) -> NoReturn:
         """``to_rust_spec`` 返回 None 时按原因分流报错（ADR 0020 决策 4）。
 
@@ -426,14 +460,17 @@ class ForceModel:
         t_eval: npt.ArrayLike,
         tol: float,
         max_steps: int,
+        sens: list[tuple[str, int, str]] | None = None,
     ) -> dict[str, Any]:
         """走 Rust propagate_compiled_stm_py（含 STM，消除 cspice 隔离）。
 
         自动序列化所有 force，调 Rust STM 入口。返回格式与 Python propagate 一致。
+        ``sens`` 非空时追加参数敏感列（见 ``_resolve_sens_params``）。
         """
         require_rust_extension("propagate_compiled_stm_py")
         from e2m2e.integrators import propagate_compiled_stm_py
 
+        sens = sens or []
         forces_py = []
         for entry in self._entries:
             if not entry.enabled:
@@ -456,13 +493,14 @@ class ForceModel:
             float(tol),
             float(self.max_step),
             int(max_steps),
+            sens_params=[(idx, kind) for _, idx, kind in sens] or None,
         )
 
         states = np.asarray(result["states"])
         stm_flat = np.asarray(result["stm"])
         stm = stm_flat.reshape(-1, 6, 6)
         self.last_trajectory = (np.asarray(result["time"]), states)
-        return {
+        out = {
             "time": np.asarray(result["time"]),
             "states": states,
             "stm": stm,
@@ -470,6 +508,76 @@ class ForceModel:
             "n_steps": result["n_steps"],
             "n_rejected": result["n_rejected"],
         }
+        if sens:
+            n_pts = len(out["time"])
+            out["sensitivity"] = np.asarray(result["sensitivity"]).reshape(
+                n_pts, self.STATE_DIM, len(sens)
+            )
+            out["sens_params"] = [label for label, _, _ in sens]
+        return out
+
+    def _propagate_via_rust_ias15(
+        self,
+        y0: npt.NDArray[np.floating],
+        t0: float,
+        tf: float,
+        t_eval: npt.ArrayLike,
+        tol: float,
+        max_steps: int,
+        with_stm: bool,
+        sens: list[tuple[str, int, str]] | None = None,
+    ) -> dict[str, Any]:
+        """走 Rust propagate_compiled_ias15_py（15 阶 Gauss-Radau）。
+
+        容差语义与 RK 路径不同：``tol`` 取 ``self.rtol``，是相对加速度
+        采样量级的单参数容差（IAS15 论文语义）。
+        """
+        require_rust_extension("propagate_compiled_ias15_py")
+        from e2m2e.integrators import propagate_compiled_ias15_py
+
+        sens = sens or []
+        forces_py = []
+        for entry in self._entries:
+            if not entry.enabled:
+                continue
+            spec = entry.force.to_rust_spec(self.system)
+            if spec is None:
+                self._raise_to_rust_spec_none(entry.force.__class__.__name__)
+            forces_py.append(spec)
+
+        observer = getattr(self.system, "origin", "EARTH")
+        t_eval_list = [float(x) for x in np.asarray(t_eval).flat]
+
+        result = propagate_compiled_ias15_py(
+            observer,
+            forces_py,
+            (float(t0), float(tf)),
+            t_eval_list,
+            [float(x) for x in y0],
+            float(tol),
+            float(self.max_step),
+            int(max_steps),
+            with_stm,
+            sens_params=[(idx, kind) for _, idx, kind in sens] or None,
+        )
+
+        states = np.asarray(result["states"])
+        self.last_trajectory = (np.asarray(result["time"]), states)
+        out: dict[str, Any] = {
+            "time": np.asarray(result["time"]),
+            "states": states,
+            "terminal_event_index": None,
+            "n_steps": result["n_steps"],
+            "n_rejected": result["n_rejected"],
+        }
+        if with_stm:
+            out["stm"] = np.asarray(result["stm"]).reshape(-1, 6, 6)
+        if sens:
+            out["sensitivity"] = np.asarray(result["sensitivity"]).reshape(
+                len(out["time"]), self.STATE_DIM, len(sens)
+            )
+            out["sens_params"] = [label for label, _, _ in sens]
+        return out
 
     def propagate(
         self,
@@ -483,6 +591,8 @@ class ForceModel:
         events: list[Callable[[float, npt.NDArray[np.floating]], float]] | None = None,
         max_steps: int = 100_000,
         method: RkMethod | None = None,
+        integrator: str = "rk",
+        sens_params: list[str] | None = None,
     ) -> dict[str, Any]:
         """使用 Rust 编译传播轨迹（零跨界）。
 
@@ -499,12 +609,24 @@ class ForceModel:
             with_stm: 是否同时积分状态转移矩阵。返回字典额外含 ``stm`` 键，
                 形状 (n_points, 6, 6)。STM 不参与步长误差控制（对齐 GMAT）。
             with_jacobi: 不支持，传 True 抛 NotImplementedError。
-            initial_step: 初始步长，默认从初始状态估算。
+            initial_step: 初始步长，默认从初始状态估算。IAS15 路径忽略
+                （自带起步启发式）。
             events: 不支持。ForceModel 事件传播需要 compiled-forces Rust API，
                 当前未提供，传 events 抛 NotImplementedError（不能回退 Python
                 RHS）。
             max_steps: 最大积分步数，默认 100_000。
-            method: Runge-Kutta 积分器方法，默认 PD45。
+            method: Runge-Kutta 积分器方法，默认 PD45。仅 ``integrator="rk"``
+                时有效。
+            integrator: 积分器选择：``"rk"``（默认，嵌入 RK 家族）或
+                ``"ias15"``（15 阶 Gauss-Radau 预测-校正 + 补偿求和，
+                适合高精度长弧段外推与近距交会）。IAS15 路径的容差取
+                ``self.rtol``，是相对加速度采样量级的单参数容差，
+                与 RK 的 rtol/atol 语义不同。
+            sens_params: 力模型参数敏感列标签列表（ASSIST 式一阶变分方程），
+                可选 ``"srp_cr"``（cannonball SRP 的 Cr）与 ``"drag_cd"``
+                （阻力的 Cd）。需要 ``with_stm=True``；返回字典额外含
+                ``sensitivity``（形状 (n_points, 6, n_params)）与
+                ``sens_params``（标签回显）。
 
         Returns:
             包含 ``time``、``states`` 和 ``terminal_event_index`` 的字典；
@@ -513,6 +635,12 @@ class ForceModel:
         if method is None:
             method = RkMethod.PD45
         self._raise_for_unsupported(with_stm, with_jacobi)
+
+        if integrator not in ("rk", "ias15"):
+            raise ValueError(f"未知 integrator {integrator!r}（可选 'rk' / 'ias15'）")
+        if sens_params and not with_stm:
+            raise ValueError("sens_params 需要 with_stm=True（敏感列与 STM 共用增广变分方程）")
+        resolved_sens = self._resolve_sens_params(sens_params)
 
         if len(t_span) != 2:
             raise ValueError("t_span must be a tuple of (t0, tf)")
@@ -535,6 +663,10 @@ class ForceModel:
         # 随推力消耗，走 Rust propagate_compiled_lowthrust。与 6D 主路径隔离，
         # 不参与 STM/事件分派。详见 docs/plans/lowthrust-foundation-prd.md。
         if self._has_variable_mass_thrust():
+            if integrator == "ias15" or resolved_sens:
+                raise NotImplementedError(
+                    "VariableMassFiniteBurn 7D 路径不支持 integrator='ias15' 或 sens_params"
+                )
             return self._propagate_lowthrust(initial_state, t0, tf, t_eval, with_stm, max_steps)
 
         y0 = np.asarray(initial_state, dtype=float)
@@ -562,12 +694,22 @@ class ForceModel:
             }
             if with_stm:
                 out["stm"] = np.eye(self.STATE_DIM).reshape(1, self.STATE_DIM, self.STATE_DIM)
+            if resolved_sens:
+                out["sensitivity"] = np.zeros((1, self.STATE_DIM, len(resolved_sens)))
+                out["sens_params"] = [label for label, _, _ in resolved_sens]
             return out
+
+        # ── IAS15 路径（15 阶 Gauss-Radau）──
+        if integrator == "ias15":
+            self._require_rust_capability(stm=with_stm)
+            return self._propagate_via_rust_ias15(
+                y0, t0, tf, t_eval, tol, max_steps, with_stm, resolved_sens
+            )
 
         # ── Rust compiled STM 路径 ──
         if with_stm:
             self._require_rust_capability(stm=True)
-            return self._propagate_via_rust_stm(y0, t0, tf, t_eval, tol, max_steps)
+            return self._propagate_via_rust_stm(y0, t0, tf, t_eval, tol, max_steps, resolved_sens)
 
         # ── Rust propagate_compiled 快速路径 ──
         self._require_rust_capability(stm=False)

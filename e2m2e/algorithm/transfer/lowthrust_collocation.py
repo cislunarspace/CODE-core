@@ -152,6 +152,142 @@ class LowThrustCollocation:
             n_iter=int(result.nit),
         )
 
+    def solve_discrete(
+        self,
+        levels: Sequence[int],
+        *,
+        z0: npt.ArrayLike | None = None,
+        ftol: float = 1e-9,
+        maxiter: int = 300,
+        verbose: bool = False,
+    ) -> LowThrustShootingSolution:
+        """在固定离散工况下求解 Hermite-Simpson 配点 NLP。
+
+        ``levels[i]`` 固定第 i 个时间区间为 0%、60% 或 100%。连续优化变量
+        只保留节点状态和推力方向；中点推力档位始终取区间档位，不产生非法
+        的连续油门。当前时间网格等间隔，因此每条弧的最短时长由总时长和段数
+        直接检查，后续可再把弧时刻提升为 NLP 变量。
+        """
+        levels = tuple(int(level) for level in levels)
+        n_segments = len(levels)
+        if n_segments < 1:
+            raise ValueError("levels must contain at least one segment")
+        if any(level not in {0, 60, 100} for level in levels):
+            raise ValueError("levels must contain only 0, 60, or 100")
+        dt = (self._tf - self._t0) / n_segments
+        if dt < 3600.0:
+            raise ValueError(f"each discrete arc must last at least 1 h, got {dt:.3f}s")
+        n_nodes = n_segments + 1
+        n_var = 10 * n_nodes
+        z_init = self._default_z0(n_segments) if z0 is None else np.asarray(z0, dtype=float)
+        if z_init.shape != (n_var,):
+            raise ValueError(f"z0 must have shape ({n_var},), got {z_init.shape}")
+        lb, ub = self._bounds(n_segments)
+        constraints = [
+            {
+                "type": "eq",
+                "fun": self._discrete_defect_constraints,
+                "args": (n_segments, levels),
+            },
+            {"type": "eq", "fun": self._endpoint_constraints, "args": (n_segments,)},
+        ]
+        result = minimize(
+            self._fuel_objective,
+            z_init,
+            args=(n_nodes,),
+            method="SLSQP",
+            bounds=Bounds(lb, ub),
+            constraints=constraints,
+            options={"ftol": ftol, "maxiter": maxiter, "disp": verbose},
+        )
+        status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
+        solution = self._build_solution(
+            result.x,
+            n_segments,
+            status=status,
+            cause=cause,
+            message=str(result.message),
+            n_iter=int(result.nit),
+        )
+        # 离散工况下，segment 的油门必须来自区间档位，而不是初值里被忽略的
+        # 占位油门列。节点 i 属于区间 min(i, N-1)。
+        solution.segments = tuple(
+            LowThrustSegment(
+                throttle=levels[min(index, n_segments - 1)] / 100.0,
+                direction=segment.direction,
+            )
+            for index, segment in enumerate(solution.segments)
+        )
+        return solution
+
+    def solve_variable_time(
+        self,
+        levels: Sequence[int],
+        *,
+        z0: npt.ArrayLike | None = None,
+        ftol: float = 1e-9,
+        maxiter: int = 300,
+        verbose: bool = False,
+    ) -> LowThrustShootingSolution:
+        """固定工况 + 变时长弧段的 Hermite-Simpson 配点。
+
+        除节点状态和方向外，把中间节点时刻也作为决策变量；`t0` 与 `tf` 固定，
+        每段满足 `t_{i+1} - t_i >= 3600`。工况仍由 ``levels`` 固定，中点不
+        插值油门。这对应两阶段法的第二阶段。
+        """
+        levels = tuple(int(level) for level in levels)
+        n_segments = len(levels)
+        if n_segments < 1:
+            raise ValueError("levels must contain at least one segment")
+        if any(level not in {0, 60, 100} for level in levels):
+            raise ValueError("levels must contain only 0, 60, or 100")
+        if (self._tf - self._t0) < 3600.0 * n_segments:
+            raise ValueError("total duration too short for minimum 1 h arcs")
+        n_nodes = n_segments + 1
+        n_var = 11 * n_nodes
+        if z0 is None:
+            state_ctrl = self._default_z0(n_segments)
+            times = self._t0 + np.arange(n_nodes) * (self._tf - self._t0) / n_segments
+            z_init = np.concatenate([state_ctrl, times])
+        else:
+            z_init = np.asarray(z0, dtype=float)
+        if z_init.shape != (n_var,):
+            raise ValueError(f"z0 must have shape ({n_var},), got {z_init.shape}")
+
+        lb, ub = self._variable_time_bounds(n_segments)
+        constraints = [
+            {
+                "type": "eq",
+                "fun": self._variable_time_defect_constraints,
+                "args": (n_segments, levels),
+            },
+            {
+                "type": "eq",
+                "fun": self._variable_time_endpoint_constraints,
+                "args": (n_segments,),
+            },
+            {"type": "ineq", "fun": self._min_duration_constraints, "args": (n_segments,)},
+        ]
+        result = minimize(
+            self._fuel_objective_vt,
+            z_init,
+            args=(n_nodes,),
+            method="SLSQP",
+            bounds=Bounds(lb, ub),
+            constraints=constraints,
+            options={"ftol": ftol, "maxiter": maxiter, "disp": verbose},
+        )
+        status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
+        return self._build_solution_vt(
+            result.x,
+            n_segments,
+            levels=levels,
+            status=status,
+            cause=cause,
+            message=str(result.message),
+            n_iter=int(result.nit),
+        )
+
     def solve_from_qlaw(
         self,
         n_segments: int,
@@ -286,6 +422,146 @@ class LowThrustCollocation:
             # Simpson 缺陷
             defects[i * 7 : (i + 1) * 7] = xip1 - xi - (dt / 6) * (fi + 4 * fc + fip1)
         return defects
+
+    def _discrete_defect_constraints(
+        self,
+        z: npt.NDArray[np.floating],
+        n_segments: int,
+        levels: Sequence[int],
+    ) -> npt.NDArray[np.floating]:
+        """固定区间工况的 Rust Hermite-Simpson 缺陷。"""
+        from e2m2e.integrators import (
+            lowthrust_discrete_collocation_defects_py,
+            require_rust_extension,
+        )
+
+        require_rust_extension("lowthrust_discrete_collocation_defects_py")
+        states, controls = self._unpack(z, n_segments + 1)
+        return np.asarray(
+            lowthrust_discrete_collocation_defects_py(
+                states.tolist(),
+                controls.tolist(),
+                list(levels),
+                self._t0,
+                self._tf,
+                self._observer,
+                self._forces_py,
+                self._engine.t_max,
+                self._engine.isp,
+            ),
+            dtype=float,
+        )
+
+    def _unpack_vt(
+        self, z: npt.NDArray[np.floating], n_nodes: int
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """变时长决策向量 → (状态, 控制, 节点时刻)。"""
+        n_state = 7 * n_nodes
+        n_ctrl = 3 * n_nodes
+        states = z[:n_state].reshape(n_nodes, 7)
+        controls = z[n_state : n_state + n_ctrl].reshape(n_nodes, 3)
+        times = z[n_state + n_ctrl :].reshape(n_nodes)
+        return states, controls, times
+
+    def _variable_time_bounds(self, n_segments: int) -> tuple[np.ndarray, np.ndarray]:
+        """变时长边界：状态/控制同连续版，节点时刻 t0/tf 固定、中间自由。"""
+        n_nodes = n_segments + 1
+        state_lb, state_ub = self._bounds(n_segments)
+        # 剥出连续版的 state+ctrl 边界，再拼时间边界
+        time_lb = np.full(n_nodes, self._t0)
+        time_ub = np.full(n_nodes, self._tf)
+        time_lb[0] = time_ub[0] = self._t0
+        time_lb[-1] = time_ub[-1] = self._tf
+        lb = np.concatenate([state_lb, time_lb])
+        ub = np.concatenate([state_ub, time_ub])
+        return lb, ub
+
+    def _variable_time_defect_constraints(
+        self,
+        z: npt.NDArray[np.floating],
+        n_segments: int,
+        levels: Sequence[int],
+    ) -> npt.NDArray[np.floating]:
+        """变时长固定工况的 Rust Hermite-Simpson 缺陷。"""
+        from e2m2e.integrators import (
+            lowthrust_variable_time_collocation_defects_py,
+            require_rust_extension,
+        )
+
+        require_rust_extension("lowthrust_variable_time_collocation_defects_py")
+        states, controls, times = self._unpack_vt(z, n_segments + 1)
+        return np.asarray(
+            lowthrust_variable_time_collocation_defects_py(
+                states.tolist(),
+                controls.tolist(),
+                list(levels),
+                times.tolist(),
+                self._observer,
+                self._forces_py,
+                self._engine.t_max,
+                self._engine.isp,
+            ),
+            dtype=float,
+        )
+
+    def _variable_time_endpoint_constraints(
+        self, z: npt.NDArray[np.floating], n_segments: int
+    ) -> npt.NDArray[np.floating]:
+        """端点约束（同连续版，状态列在前）。"""
+        n_nodes = n_segments + 1
+        states, _controls, _times = self._unpack_vt(z, n_nodes)
+        x0_fixed = states[0] - np.concatenate([self._initial_state, [self._initial_mass]])
+        xN_rv = states[-1][:6] - self._target_state
+        return np.concatenate([x0_fixed, xN_rv])
+
+    def _min_duration_constraints(
+        self, z: npt.NDArray[np.floating], n_segments: int
+    ) -> npt.NDArray[np.floating]:
+        """每段最短时长约束：t_{i+1} - t_i - 3600 >= 0。"""
+        n_nodes = n_segments + 1
+        _states, _controls, times = self._unpack_vt(z, n_nodes)
+        return np.diff(times) - 3600.0
+
+    def _fuel_objective_vt(self, z: npt.NDArray[np.floating], n_nodes: int) -> float:
+        """目标：最小化 -m_N（最大化末态质量）。"""
+        states, _controls, _times = self._unpack_vt(z, n_nodes)
+        return -float(states[-1][6])
+
+    def _build_solution_vt(
+        self,
+        z: npt.NDArray[np.floating],
+        n_segments: int,
+        *,
+        levels: Sequence[int],
+        status: ConvergenceState,
+        cause: FailureCause,
+        message: str,
+        n_iter: int,
+    ) -> LowThrustShootingSolution:
+        """从变时长决策向量构造解，油门由区间档位重建。"""
+        n_nodes = n_segments + 1
+        states, controls, times = self._unpack_vt(z, n_nodes)
+        segments = tuple(
+            LowThrustSegment(
+                throttle=levels[min(index, n_segments - 1)] / 100.0,
+                direction=np.array(
+                    [np.cos(c[1]) * np.cos(c[2]), np.sin(c[1]) * np.cos(c[2]), np.sin(c[2])]
+                ),
+            )
+            for index, c in enumerate(controls)
+        )
+        final_mass = float(states[-1][6])
+        return LowThrustShootingSolution(
+            time=times,
+            states=states,
+            segments=segments,
+            final_mass=final_mass,
+            fuel_consumed=self._initial_mass - final_mass,
+            status=status,
+            cause=cause,
+            message=message,
+            n_iter=n_iter,
+        )
 
     def _defect_constraints(
         self, z: npt.NDArray[np.floating], n_segments: int

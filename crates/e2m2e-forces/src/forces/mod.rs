@@ -4,6 +4,7 @@
 
 pub mod augmented_state;
 pub mod compiled;
+pub mod compiled_ias15;
 pub mod compiled_stm;
 pub mod drag;
 pub mod ecom;

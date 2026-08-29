@@ -41,7 +41,9 @@ if TYPE_CHECKING:
     lambert_izzo_py: Any
     low_energy_patch_py: Any
     lowthrust_collocation_defects_py: Any
+    lowthrust_discrete_collocation_defects_py: Any
     lowthrust_shooting_evaluate_py: Any
+    lowthrust_variable_time_collocation_defects_py: Any
     lissajous_bounded_trajectory_py: Any
     manifold_propagate_py: Any
     manifold_seeds_py: Any
@@ -66,6 +68,7 @@ if TYPE_CHECKING:
     propagate_bcr4bp_py: Any
     propagate_bcr4bp_stm_py: Any
     propagate_compiled: Any
+    propagate_compiled_ias15_py: Any
     propagate_compiled_lowthrust: Any
     propagate_compiled_lowthrust_sensitivity: Any
     propagate_compiled_stm_py: Any
@@ -139,7 +142,9 @@ _RUST_SYMBOLS = (
     "lambert_izzo_py",
     "low_energy_patch_py",
     "lowthrust_collocation_defects_py",
+    "lowthrust_discrete_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
+    "lowthrust_variable_time_collocation_defects_py",
     "lissajous_bounded_trajectory_py",
     "manifold_propagate_py",
     "manifold_seeds_py",
@@ -166,6 +171,7 @@ _RUST_SYMBOLS = (
     "propagate_bcr4bp_py",
     "propagate_bcr4bp_stm_py",
     "propagate_compiled",
+    "propagate_compiled_ias15_py",
     "propagate_compiled_lowthrust",
     "propagate_compiled_lowthrust_sensitivity",
     "propagate_compiled_stm_py",
@@ -360,7 +366,9 @@ __all__ = [
     "lambert_izzo_py",
     "low_energy_patch_rust",
     "lowthrust_collocation_defects_py",
+    "lowthrust_discrete_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
+    "lowthrust_variable_time_collocation_defects_py",
     "lissajous_bounded_trajectory_py",
     "manifold_propagate_py",
     "manifold_seeds_py",
@@ -388,6 +396,7 @@ __all__ = [
     "qlaw_segment_direction_py",
     "trim_degree_py",
     "propagate_compiled",
+    "propagate_compiled_ias15_py",
     "propagate_compiled_lowthrust",
     "propagate_compiled_lowthrust_sensitivity",
     "propagate_compiled_stm_py",
