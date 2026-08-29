@@ -9,6 +9,7 @@ from __future__ import annotations
 import functools
 import json
 import sqlite3
+import threading
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -56,12 +57,21 @@ def _guard(method: Any) -> Any:
 
 
 class CatalogIndex:
-    """catalog.db 的封装： upsert / delete / query / rebuild。"""
+    """catalog.db 的封装： upsert / delete / query / rebuild。
+
+    线程契约：mcp-serve 把每个 ``tools/call`` 丢进 anyio 线程池，调用之间
+    不保证同线程，而连接由 CatalogStore 惰性创建、跨调用复用（#559）——
+    因此连接不绑定创建线程（``check_same_thread=False``），全部访问由
+    ``RLock`` 串行化（SQLite C 层本身线程安全，外部串行即可；锁须可重入，
+    ``rebuild`` 内部复调 ``upsert``）。retain 线程池并发收益：长计算与快速
+    查询可在不同线程重叠，只有落到本索引的操作互斥。
+    """
 
     @_guard
     def __init__(self, db_path: Path) -> None:
         self._db_path = db_path
-        self._conn = sqlite3.connect(str(db_path))
+        self._lock = threading.RLock()
+        self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         if not self._has_table():
             self._conn.execute(_SCHEMA)
@@ -74,7 +84,8 @@ class CatalogIndex:
         return row is not None
 
     def close(self) -> None:
-        self._conn.close()
+        with self._lock:
+            self._conn.close()
 
     @_guard
     def upsert(self, meta: dict[str, Any]) -> None:
@@ -83,51 +94,54 @@ class CatalogIndex:
         jacobi = classification["jacobi"]
         amplitude = classification["amplitude"]
         member_count = _member_count(meta)
-        self._conn.execute(
-            """
-            INSERT OR REPLACE INTO records (
-                record_id, created_at, source_tool, source_record_id,
-                orbit_family, libration_point, jacobi_min, jacobi_max,
-                amplitude_min, amplitude_max, has_cr3bp, has_ephemeris,
-                status, cause, message, member_count, tags, note
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                meta["record_id"],
-                meta["created_at"],
-                meta["source_tool"],
-                meta["source_record_id"],
-                classification["orbit_family"],
-                classification["libration_point"],
-                None if jacobi is None else float(jacobi[0]),
-                None if jacobi is None else float(jacobi[1]),
-                None if amplitude is None else float(amplitude[0]),
-                None if amplitude is None else float(amplitude[1]),
-                1 if classification["has_cr3bp"] else 0,
-                1 if classification["has_ephemeris"] else 0,
-                meta["status"],
-                meta["cause"],
-                meta["message"],
-                member_count,
-                json.dumps(list(meta["tags"]), ensure_ascii=False),
-                meta["note"],
-            ),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO records (
+                    record_id, created_at, source_tool, source_record_id,
+                    orbit_family, libration_point, jacobi_min, jacobi_max,
+                    amplitude_min, amplitude_max, has_cr3bp, has_ephemeris,
+                    status, cause, message, member_count, tags, note
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    meta["record_id"],
+                    meta["created_at"],
+                    meta["source_tool"],
+                    meta["source_record_id"],
+                    classification["orbit_family"],
+                    classification["libration_point"],
+                    None if jacobi is None else float(jacobi[0]),
+                    None if jacobi is None else float(jacobi[1]),
+                    None if amplitude is None else float(amplitude[0]),
+                    None if amplitude is None else float(amplitude[1]),
+                    1 if classification["has_cr3bp"] else 0,
+                    1 if classification["has_ephemeris"] else 0,
+                    meta["status"],
+                    meta["cause"],
+                    meta["message"],
+                    member_count,
+                    json.dumps(list(meta["tags"]), ensure_ascii=False),
+                    meta["note"],
+                ),
+            )
+            self._conn.commit()
 
     @_guard
     def delete(self, record_id: str) -> None:
-        self._conn.execute("DELETE FROM records WHERE record_id = ?", (record_id,))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute("DELETE FROM records WHERE record_id = ?", (record_id,))
+            self._conn.commit()
 
     @_guard
     def rebuild(self, metas: Iterable[dict[str, Any]]) -> None:
         """清空并全量重建索引。"""
-        self._conn.execute("DROP TABLE IF EXISTS records")
-        self._conn.execute(_SCHEMA)
-        for meta in metas:
-            self.upsert(meta)
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute("DROP TABLE IF EXISTS records")
+            self._conn.execute(_SCHEMA)
+            for meta in metas:
+                self.upsert(meta)
+            self._conn.commit()
 
     @_guard
     def query(self, catalog_filter: CatalogFilter) -> list[dict[str, Any]]:
@@ -167,9 +181,10 @@ class CatalogIndex:
             params.append(catalog_filter.status)
 
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-        rows = self._conn.execute(
-            f"SELECT * FROM records{where} ORDER BY created_at, record_id", params
-        ).fetchall()
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT * FROM records{where} ORDER BY created_at, record_id", params
+            ).fetchall()
 
         summaries = [self._row_to_summary(row) for row in rows]
         if catalog_filter.tags:

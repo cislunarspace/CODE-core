@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import threading
 from types import SimpleNamespace
 
 import numpy as np
@@ -258,6 +259,28 @@ class TestQuery:
         records = facade_with_records.catalog_query().records
         assert len(records) == 3
         assert all(not hasattr(record, "arrays") for record in records)
+
+    def test_query_across_threads_after_lazy_open(self, tmp_path):
+        """mcp-serve 逐 tools/call 换线程池线程（#559）：惰性 catalog 连接
+        绑定首用线程后，其他线程查询不得报 SQLite 跨线程错误。"""
+        facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
+        expected = len(facade.catalog_query().records)  # 首用线程惰性建库 + 基线导入
+        counts: list[int] = []
+        errors: list[Exception] = []
+
+        def query_from_pool_thread() -> None:
+            try:
+                counts.append(len(facade.catalog_query().records))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        for _ in range(2):
+            thread = threading.Thread(target=query_from_pool_thread)
+            thread.start()
+            thread.join()
+
+        assert errors == []
+        assert counts == [expected, expected]
 
 
 class TestGetDelete:

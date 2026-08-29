@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import threading
 
 import numpy as np
 import pytest
@@ -364,3 +365,39 @@ class TestExport:
         # 导出包可直接作为库打开（索引派生重建）
         reopened = CatalogStore(dest)
         assert [s["record_id"] for s in reopened.query(CatalogFilter())] == [kept_id]
+
+
+class TestThreadSafety:
+    """跨线程复用（#559）：mcp-serve 逐 tools/call 换线程池线程，索引连接
+    由首用线程创建、后续调用线程复用——不得报 SQLite 跨线程错误。"""
+
+    def test_query_from_other_thread_after_first_touch(self, store):
+        store.put(*make_record())
+
+        results: list[int] = []
+        errors: list[Exception] = []
+
+        def query_from_other_thread() -> None:
+            try:
+                results.append(len(store.query(CatalogFilter())))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        thread = threading.Thread(target=query_from_other_thread)
+        thread.start()
+        thread.join()
+
+        assert errors == []
+        assert results == [1]
+
+    def test_concurrent_puts_are_serialized(self, store):
+        """并发 put：RLock 串行化索引访问，全部记录可见。"""
+        threads = [
+            threading.Thread(target=store.put, args=make_record(tags=[f"t{i}"])) for i in range(8)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert len(store.query(CatalogFilter())) == 8
