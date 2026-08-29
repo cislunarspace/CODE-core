@@ -413,7 +413,9 @@ def _refine_lga_candidate(
                 cause=FailureCause.NONE,
                 message="找到 LGA 候选",
             )
-    except (RuntimeError, ValueError, np.linalg.LinAlgError):
+    except (RuntimeError, ValueError, np.linalg.LinAlgError, PropagationFailure):
+        # PropagationFailure：打靶内部传播失败（退化候选几何可触发），
+        # 与其他打靶失败同义——保留原始候选，不让编排器崩（#566）。
         logger.debug("ThreeBodyLambert 打靶失败，保留原始候选", exc_info=True)
 
     # 打靶失败，返回原始候选

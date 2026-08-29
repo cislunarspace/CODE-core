@@ -709,6 +709,18 @@ def _transfer_orbit_wsb(
     refined = _refine_wsb_candidate(best, cr3bp_system, cr3bp_dynamics, target_dim)
 
     # 6. 物理单位换算
+    # WsbCandidate dv 字段全无量纲（#566）：dv_departure 恒产自 BCR4BP 搜索，
+    # dv_arrival 在精化成功时产自 CR3BP 打靶、回退时产自 BCR4BP 搜索——按
+    # 来源乘各自特征速度（两 vu 相差约 0.13%）。精化回退分支的 status 不是
+    # CONVERGED（见 _refine_wsb_candidate）。
+    vu_bcr4 = bcr4bp_system.characteristic_velocity
+    vu_cr3 = cr3bp_system.characteristic_velocity
+    if vu_bcr4 is None or vu_cr3 is None:
+        raise ValueError("两个系统都必须设置 characteristic_velocity")
+    dv_departure_km_s = refined.dv_departure * vu_bcr4
+    dv_arrival_km_s = refined.dv_arrival * (
+        vu_cr3 if refined.status is ConvergenceState.CONVERGED else vu_bcr4
+    )
     perilune_phys = bcr4bp_system.dimensionless_to_physical(refined.perilune_state)
     perilune_vel = float(np.linalg.norm(perilune_phys[3:]))
 
@@ -719,8 +731,8 @@ def _transfer_orbit_wsb(
         perilune_vel_km_s=perilune_vel,
         perilune_state=perilune_phys,
         h2_kepler=refined.h2_kepler,
-        dv_departure_km_s=refined.dv_departure,
-        dv_arrival_km_s=refined.dv_arrival,
+        dv_departure_km_s=dv_departure_km_s,
+        dv_arrival_km_s=dv_arrival_km_s,
         n_candidates_searched=n_searched,
         n_candidates_feasible=n_feasible,
         status=refined.status,
@@ -731,7 +743,7 @@ def _transfer_orbit_wsb(
 
     return TransferDesignResult(
         transfer_type="WSB",
-        delta_v=refined.total_dv,
+        delta_v=dv_departure_km_s + dv_arrival_km_s,
         trajectory=None,
         details=details,
         status=refined.status,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import functools
 import math
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -499,8 +500,11 @@ class TestWsbAcceptance:
         dv_hmn1, dv_hmn2 = hohmann_delta_v(r1, r2)
         dv_hohmann = dv_hmn1 + dv_hmn2
 
-        assert best.total_dv < dv_hohmann, (
-            f"WSB 总 Δv ({best.total_dv:.3f}) 应 < Hohmann Δv ({dv_hohmann:.3f})"
+        # 单位对齐（#566）：候选 total_dv 为无量纲，× 特征速度后与
+        # km/s 语义的 Hohmann Δv 比较。
+        best_dv_km_s = best.total_dv * _make_bcr4bp_system().characteristic_velocity
+        assert best_dv_km_s < dv_hohmann, (
+            f"WSB 总 Δv ({best_dv_km_s:.3f} km/s) 应 < Hohmann Δv ({dv_hohmann:.3f} km/s)"
         )
 
     def test_perilune_detection_precision(self):
@@ -546,3 +550,157 @@ class TestWsbAcceptance:
                 assert normalized_rv < 1e-6, (
                     f"近月点检测 r·v 归一化残差应 < 1e-6，得到 {normalized_rv}"
                 )
+
+
+class TestWsbDvUnits:
+    """#566 单位一致性回归：候选 Δv 全程无量纲，阈值与汇总按特征速度换算 km/s。
+
+    两处验证都打桩避免真实网格搜索（快，且不依赖参数空间有解）：
+    - 阈值域：stub 传播器给 _wsb_worker 喂一条确定轨迹，直接验证换算比较；
+    - 汇总：stub 搜索与精化，验证编排器 delta_v 与 details 分量的换算来源。
+    """
+
+    @staticmethod
+    def _synthetic_candidate(system):
+        """手造候选（几何数值只为通过流程，无物理意义）；dv 无量纲 2.0/1.0。"""
+        from e2m2e.algorithm.transfer import WsbCandidate
+
+        return WsbCandidate(
+            sun_phase0=0.0,
+            departure_phase=0.0,
+            tof_sec=1.0e6,
+            departure_state=np.zeros(6),
+            perilune_state=np.zeros(6),
+            perilune_alt_km=100.0,
+            perilune_time_dim=1.0,
+            arrival_state=np.zeros(6),
+            h2_kepler=-1.0,
+            dv_departure=2.0,
+            dv_arrival=1.0,
+            total_dv=3.0,
+            arrival_time_dim=2.0,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="synthetic",
+        )
+
+    def test_worker_max_total_dv_threshold_in_km_s_domain(self, monkeypatch):
+        """max_total_dv 是 km/s 语义：阈值取候选物理总 Δv 的 99% 应过滤，
+        修复前按无量纲比较（有效阈值偏松 × 特征速度）会漏过。"""
+        from e2m2e.algorithm.transfer import wsb as wsb_module
+
+        system = _make_bcr4bp_system()
+
+        # 直线匀速轨迹：在月球近旁过拱点（r·v 变号），半径先降后升穿 r_target
+        n = 40
+        s = np.linspace(0.0, 1.0, n)
+        p0 = np.array([0.05, 0.06, 0.0])
+        d = np.array([1.2, 0.12, 0.0])
+        pos = p0[None, :] + s[:, None] * d[None, :]
+        vel = np.tile(d * 0.5, (n, 1))
+        states = np.hstack([pos, vel])
+        tof_sec = 10.0 * 86400.0
+        times = s * (tof_sec / system.characteristic_time)
+
+        class _StubDynamics:  # noqa: ANN204 -- 打桩 propagate，忽略动力学构造
+            def __init__(self, *args, **kwargs):
+                pass
+
+            rtol = 1.0
+            atol = 1.0
+            max_step = 1.0
+
+            def propagate(self, x0, t_span, t_eval=None):
+                return {"time": times, "states": states}
+
+        monkeypatch.setattr(wsb_module, "BCR4BP_Dynamics", _StubDynamics)
+
+        r0 = np.array([0.05, 0.06, 0.0])
+        v_park = np.array([0.0, 0.5, 0.0])
+        v_tli = 1.1
+        target_state = _make_target_state(system)
+        r_target = float(np.linalg.norm(target_state[:3]))
+        kwargs = dict(
+            departure_state=np.concatenate([r0, v_park]),
+            r0=r0,
+            v_park=v_park,
+            v_tli=v_tli,
+            target_state=target_state,
+            r_target=r_target,
+            mu=system.mu,
+            du_km=system.characteristic_length,
+            char_time=system.characteristic_time,
+            sun_mass=system.sun_mass,
+            sun_distance=system.sun_distance,
+            sun_angular_rate=system.sun_angular_rate,
+            sun_phase0=0.0,
+            tof_sec=tof_sec,
+        )
+        loose = WsbSearchParams(
+            n_departure_phase=2,
+            perilune_alt_min=-1_000_000.0,
+            perilune_alt_max=1_000_000.0,
+            max_total_dv=1_000_000.0,
+            h2_energy_threshold=1_000_000.0,
+        )
+        candidates, _ = wsb_module._wsb_worker(loose, **kwargs)
+        assert len(candidates) == 2, "stub 轨迹应在每个出发相位各产生一个候选"
+        best_physical_km_s = candidates[0].total_dv * system.characteristic_velocity
+
+        tight = replace(loose, max_total_dv=0.99 * best_physical_km_s)
+        candidates_tight, _ = wsb_module._wsb_worker(tight, **kwargs)
+        assert candidates_tight == [], (
+            f"阈值 0.99×物理 Δv（{0.99 * best_physical_km_s:.3f} km/s）应过滤该候选"
+        )
+
+    @pytest.mark.parametrize(
+        ("refine_status", "refine_cause"),
+        [
+            (ConvergenceState.CONVERGED, FailureCause.NONE),
+            (ConvergenceState.MAX_ITERATIONS, FailureCause.MAX_ITERATIONS_REACHED),
+        ],
+        ids=["refined", "refine-fallback"],
+    )
+    def test_transfer_orbit_delta_v_matches_details_km_s_components(
+        self, monkeypatch, refine_status, refine_cause
+    ):
+        """编排器汇总一致性：delta_v ≈ dv_departure_km_s + dv_arrival_km_s。
+        dv_departure 恒 ×BCR4BP 特征速度；dv_arrival 按精化来源取 CR3BP
+        （成功）或 BCR4BP（回退）特征速度。修复前是无量纲混合值。"""
+        import e2m2e.algorithm.transfer as transfer_pkg
+
+        system = _make_bcr4bp_system()
+        cr3bp_system, _ = _make_cr3bp_system()
+        vu_bcr4 = system.characteristic_velocity
+        vu_cr3 = cr3bp_system.characteristic_velocity
+
+        candidate = self._synthetic_candidate(system)
+        refined = replace(candidate, status=refine_status, cause=refine_cause)
+
+        monkeypatch.setattr(
+            transfer_pkg,
+            "search_wsb_trajectories",
+            lambda *args, **kwargs: CandidateSearchResult(
+                (candidate,), ConvergenceState.CONVERGED, FailureCause.NONE, "synthetic"
+            ),
+        )
+        monkeypatch.setattr(
+            "e2m2e.algorithm.transfer.wsb._refine_wsb_candidate",
+            lambda *args, **kwargs: refined,
+        )
+
+        target_phys = system.dimensionless_to_physical(_make_target_state(system))
+        result = transfer_orbit(
+            "WSB",
+            tli_params=TliParams(parking_alt_km=200.0, inclination_deg=0.0),
+            target_ephemeris=target_phys.reshape(1, 6),
+        )
+        details = result.details
+        expected_arrival_km_s = refined.dv_arrival * (
+            vu_cr3 if refine_status is ConvergenceState.CONVERGED else vu_bcr4
+        )
+        assert details.dv_departure_km_s == pytest.approx(refined.dv_departure * vu_bcr4, rel=1e-12)
+        assert details.dv_arrival_km_s == pytest.approx(expected_arrival_km_s, rel=1e-12)
+        assert result.delta_v == pytest.approx(
+            details.dv_departure_km_s + details.dv_arrival_km_s, rel=1e-12
+        )

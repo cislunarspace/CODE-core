@@ -116,6 +116,8 @@ class WsbCandidate:
     """单个 WSB 候选解（无动力月球飞越 + BCR4BP 太阳摄动）。
 
     飞越段 Δv = 0，总 Δv = 出发脉冲 + 到达脉冲。
+    ``dv_departure`` / ``dv_arrival`` / ``total_dv`` 均为无量纲
+    （× 系统特征速度得 km/s；产自 BCR4BP 搜索）。
     """
 
     sun_phase0: float
@@ -502,6 +504,9 @@ def _wsb_worker(
     )
     n_samples = params.n_propagation_samples
     tof_dim = tof_sec / char_time
+    # max_total_dv 语义为 km/s（WsbSearchParams 文档）：候选 Δv 为无量纲，
+    # 阈值按特征速度换算到无量纲域再比较（对齐 LGA，lga._search 的做法）。
+    max_total_dv_dim = params.max_total_dv / (du_km / char_time)
     candidates: list[WsbCandidate] = []
     n_propagation_failures = 0
 
@@ -563,7 +568,7 @@ def _wsb_worker(
         dv_arr = float(np.linalg.norm(arrival_state[3:] - target_state[3:]))
         total_dv = dv_dep + dv_arr
 
-        if total_dv > params.max_total_dv:
+        if total_dv > max_total_dv_dim:
             continue
 
         candidates.append(
@@ -631,7 +636,12 @@ def _refine_wsb_candidate(
         if arrival_leg.status is ConvergenceState.CONVERGED:
             v_arrival_shot = arrival_leg.arcs[-1].states[-1][3:]
             v_target_phys = target_phys[3:]
-            dv_arr = float(np.linalg.norm(v_arrival_shot - v_target_phys))
+            # ThreeBodyLambert 解为物理单位 (km/s)：换算回无量纲，
+            # 保持 WsbCandidate dv 字段全无量纲语义（对齐 LGA 精化）。
+            vu_km_s = system.characteristic_velocity
+            if vu_km_s is None or vu_km_s <= 0.0:
+                raise ValueError("system.characteristic_velocity must be set")
+            dv_arr = float(np.linalg.norm(v_arrival_shot - v_target_phys)) / vu_km_s
 
             return WsbCandidate(
                 sun_phase0=candidate.sun_phase0,
@@ -651,7 +661,9 @@ def _refine_wsb_candidate(
                 cause=FailureCause.NONE,
                 message="找到 WSB 候选",
             )
-    except (RuntimeError, ValueError, np.linalg.LinAlgError):
+    except (RuntimeError, ValueError, np.linalg.LinAlgError, PropagationFailure):
+        # PropagationFailure：打靶内部传播失败（退化候选几何可触发），
+        # 与其他打靶失败同义——保留原始候选，不让编排器崩（#566）。
         logger.debug("ThreeBodyLambert 打靶失败，保留原始候选", exc_info=True)
 
     return WsbCandidate(

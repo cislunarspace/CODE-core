@@ -219,6 +219,10 @@ fn evaluate_task(
     let tof_dim = tof_sec / params.characteristic_time_sec;
     let t_eval = linspace_inclusive(0.0, tof_dim, params.n_propagation_samples);
     let moon_x = 1.0 - mu;
+    // max_total_dv 语义为 km/s（Python 侧 WsbSearchParams 文档）：候选 Δv 为
+    // 无量纲，阈值按特征速度换算到无量纲域再比较（与 Python 参照后端对齐，#566）。
+    let max_total_dv_dim =
+        params.max_total_dv * params.characteristic_time_sec / params.characteristic_length_km;
     let mut candidates = Vec::new();
     let mut n_propagation_failures = 0;
     let mut n_perilune_in_window = 0;
@@ -318,7 +322,7 @@ fn evaluate_task(
         let tof_sec_actual = arrival_time_dim * params.characteristic_time_sec;
         let dv_arrival = distance3(&arrival_state[3..], &target_state[3..]);
         let total_dv = dv_departure + dv_arrival;
-        if total_dv > params.max_total_dv {
+        if total_dv > max_total_dv_dim {
             continue;
         }
 
