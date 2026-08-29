@@ -250,6 +250,75 @@ def scan_lambert_delta_v(
     )
 
 
+def hohmann_transfer_states(
+    r0: NDArray[np.float64],
+    v0_dep: NDArray[np.float64],
+    tof_sec: float,
+    mu: float = MU_EARTH,
+    n_samples: int = 200,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """沿两体转移弧采样状态（HMN 轨迹合成，ADR 0040）。
+
+    用 :func:`~e2m2e.algorithm.transfer.multi_impulse.propagate_two_body`
+    从 TLI 后出发态 ``(r0, v0_dep)`` 在 ``[0, tof_sec]`` 均匀采样。
+
+    Args:
+        r0: 出发位置 (3,) km（地心惯性系）。
+        v0_dep: 出发速度 (3,) km/s（TLI 脉冲后）。
+        tof_sec: 飞行时间（秒）。
+        mu: 中心天体引力参数 (km³/s²)。
+        n_samples: 采样点数。
+
+    Returns:
+        ((n, 6) 状态, (n,) 时刻秒)，地心惯性系。
+    """
+    from .multi_impulse import propagate_two_body
+
+    state0 = np.concatenate([np.asarray(r0, dtype=float), np.asarray(v0_dep, dtype=float)])
+    t_eval = np.linspace(0.0, float(tof_sec), int(n_samples))
+    out = propagate_two_body(state0, t_eval, mu)
+    return np.asarray(out["states"], dtype=float), np.asarray(out["time"], dtype=float)
+
+
+def eci_to_synodic_display(
+    states_eci: NDArray[np.float64],
+    r_ref_eci: NDArray[np.float64],
+    *,
+    mu_em: float = 1.21506683e-2,
+    du_km: float = 384400.0,
+) -> NDArray[np.float64]:
+    """ECI 两体几何 → 会合系显示坐标（HMN 轨迹显示约定，ADR 0040）。
+
+    相位对齐：绕 z 轴旋转 −θ（θ 为参考方向经度）使参考方向（转移弧
+    到达点）落入 +x 半平面（z 分量保留，倾斜转移的展宽不抹平）；随后
+    位置平移 −[μ·DU, 0, 0]（地心 → 地月质心）。速度同旋转、不受平移
+    影响，不加 ω×r 牵连项——真星历一致的转换需要真实历元语义，HMN
+    简化路径（几何搜索，epoch 仅记录）不支持，此处只是显示约定。
+
+    Args:
+        states_eci: (n, 6) 地心惯性系 km / km/s。
+        r_ref_eci: (3,) 相位对齐参考方向（取转移弧末行位置）。
+        mu_em: 地月质量比 μ。
+        du_km: 特征长度 (km)。
+
+    Returns:
+        (n, 6) 会合系显示坐标（地月质心原点，km / km/s）。
+    """
+    arr = np.asarray(states_eci, dtype=float)
+    ref = np.asarray(r_ref_eci, dtype=float)
+    theta = math.atan2(float(ref[1]), float(ref[0]))
+    c, s = math.cos(-theta), math.sin(-theta)
+    rot = np.array(
+        [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
+        dtype=float,
+    )
+    out = arr.copy()
+    out[:, :3] = arr[:, :3] @ rot.T
+    out[:, 3:] = arr[:, 3:] @ rot.T
+    out[:, 0] -= mu_em * du_km
+    return out
+
+
 def ephemeris_shoot_transfer(
     dynamics: Any,
     t0: float,

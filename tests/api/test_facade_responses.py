@@ -84,6 +84,7 @@ class TestTransferResponse:
                 transfer_type="HMN",
                 delta_v=3.1,
                 trajectory=np.array([[1.0] * 6]),
+                trajectory_times=np.array([0.0]),
                 details={
                     "array": np.array([1.0, 2.0]),
                     "nested": {"tuple": (np.array([3.0]), 4.0)},
@@ -98,6 +99,7 @@ class TestTransferResponse:
         )
 
         assert response.trajectory == [[1.0] * 6]
+        assert response.trajectory_times == [0.0]
         assert response.details == {"array": [1.0, 2.0], "nested": {"tuple": [[3.0], 4.0]}}
 
     def test_serializes_dataclass_details(self, monkeypatch):
@@ -111,6 +113,7 @@ class TestTransferResponse:
                 transfer_type="HMN",
                 delta_v=3.1,
                 trajectory=None,
+                trajectory_times=None,
                 details=ManeuverTable(mjd_tdb=np.array([60000.0]), delta_v_mps=np.array([1.0])),
             )
 

@@ -210,11 +210,18 @@ class TestLgaRefine:
             pytest.skip("无可行候选，跳过精化测试")
 
         best = candidates[0]
-        refined = _refine_lga_candidate(best, system, dynamics, tgt_state)
+        refined, arrival_arc = _refine_lga_candidate(best, system, dynamics, tgt_state)
         tof_arr = (best.arrival_time_dim - best.perilune_time_dim) * system.characteristic_time
         assert refined.status is ConvergenceState.CONVERGED, (
             f"精化应收敛：best.total_dv={best.total_dv:.4f}, tof_arrival={tof_arr:.2f}s"
         )
+        # ADR 0040 契约：精化成功伴随到达段弧（(200, 6) 会合系 km + 秒，
+        # 时刻从 0 起算、末值 ≈ (arrival−perilune)×TU）；未带来改进的回退
+        # 允许弧为 None（此时轨迹由编排器整段重传播）。
+        if arrival_arc is not None:
+            assert arrival_arc.states.shape == (200, 6)
+            assert arrival_arc.times[0] == 0.0
+            assert arrival_arc.times[-1] == pytest.approx(tof_arr, rel=0.01)
 
     def test_refine_tof_arrival_correct(self, cr3bp_setup):
         """精化使用的 tof_arrival = (arrival - perilune) * char_time，而非总 TOF。"""
@@ -371,6 +378,17 @@ class TestLgaTransferOrbit:
 
         assert isinstance(result, TransferDesignResult)
         assert result.transfer_type == "LGA"
+        # ADR 0040：收敛时轨迹（会合系物理 km）与时刻（TLI 起算秒）逐行
+        # 对齐下发，时刻从 0 起单调，总时长与 details.tof_sec 一致量级
+        if result.status is ConvergenceState.CONVERGED:
+            assert result.trajectory is not None
+            traj = np.asarray(result.trajectory)
+            times = np.asarray(result.trajectory_times)
+            assert traj.ndim == 2 and traj.shape[1] == 6
+            assert times.shape == (traj.shape[0],)
+            assert times[0] == 0.0
+            assert np.all(np.diff(times) > 0)
+            assert 0.0 < times[-1] <= result.details.tof_sec * 1.3
         assert [stage.name for stage in result.stages] == ["search", "refinement", "shooting"]
         assert result.stages[0].applicable and result.stages[0].executed
         assert result.stages[0].result_status in (
@@ -642,3 +660,43 @@ class TestLgaInclinedEndToEnd:
         params = dataclasses.replace(_SEARCH_PARAMS, n_departure_phase=120, n_tof=2)
         candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, params)
         assert len(candidates) > 0, "倾角 51.6° 应找到可行候选（面外带覆盖 0°~90°）"
+
+
+class TestTransferLegHelpers:
+    """_propagate_synodic_leg + _join_transfer_legs（ADR 0040 拼接契约）。"""
+
+    def test_leg_units_and_join_continuity(self):
+        """弧段输出为会合系物理 km + 秒；拼接去重衔接点、时刻偏移、位置连续。"""
+        from e2m2e.algorithm.transfer import _join_transfer_legs, _propagate_synodic_leg
+
+        system, dynamics = _make_cr3bp_system()
+        du = system.characteristic_length
+        vu = system.characteristic_velocity
+        tu = system.characteristic_time
+        x0 = _make_target_state(system)
+
+        t_dep = 0.25
+        dep_states, dep_times = _propagate_synodic_leg(dynamics, system, x0, t_dep, n_samples=50)
+        # 出发段终点的真值状态（无量纲）作为到达段初值，模拟拼接语义
+        full = dynamics.propagate(x0, (0.0, t_dep), t_eval=np.array([t_dep]))
+        x_mid = np.asarray(full["states"][-1], dtype=float)
+        arr_states, arr_times = _propagate_synodic_leg(dynamics, system, x_mid, 0.5, n_samples=100)
+
+        # 单位换算：位置 ×DU、时刻 ×TU，从 0 起算
+        assert dep_states.shape == (50, 6)
+        assert np.allclose(dep_states[0, :3], x0[:3] * du, rtol=1e-9)
+        assert np.allclose(dep_states[0, 3:], x0[3:] * vu, rtol=1e-9)
+        assert dep_times[0] == 0.0
+        assert dep_times[-1] == pytest.approx(t_dep * tu, rel=1e-9)
+
+        joined, joined_times = _join_transfer_legs(dep_states, dep_times, arr_states, arr_times)
+        assert joined.shape == (50 + 100 - 1, 6)
+        assert joined_times.shape == (joined.shape[0],)
+        # 到达段整体偏移到出发段时间轴，衔接点无重复时刻
+        assert joined_times[49] == pytest.approx(dep_times[-1])
+        assert joined_times[50] > joined_times[49]
+        assert joined_times[50] == pytest.approx(dep_times[-1] + arr_times[1])
+        # 拼接处位置连续：出发段末行与被去重的到达段首行是同一时刻的
+        # 同一状态（出发段 t_eval 采样 vs dense 输出重传播），差在容差内
+        seam_km = float(np.linalg.norm(dep_states[-1, :3] - arr_states[0, :3]))
+        assert seam_km < 10.0, f"拼接位置跳变 {seam_km:.3f} km 超过 10 km"

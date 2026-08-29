@@ -37,6 +37,7 @@ from ...exceptions import PropagationFailure
 from ..dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
 from ..results import CandidateSearchResult, ResultStatus
+from .config import TransferArc
 
 logger = logging.getLogger(__name__)
 
@@ -600,11 +601,15 @@ def _refine_wsb_candidate(
     system: CR3BP_System,
     dynamics: CR3BP_Dynamics,
     target_state: np.ndarray,
-) -> WsbCandidate:
+) -> tuple[WsbCandidate, TransferArc | None]:
     """用 ThreeBodyLambert 打靶精化 WSB 候选。
 
     到达段（perilune → target）用 ThreeBodyLambert 修正到达速度。
-    打靶未达到收敛状态时返回原始候选。
+
+    Returns:
+        (精化候选, 到达段弧)。精化成功时弧为打靶重传播的整段
+        (200, 6) 会合系物理 km / km/s + 秒（ADR 0040 轨迹契约）；
+        打靶未收敛时弧为 None。
     """
     from .terminal import StateTerminal
     from .three_body_lambert import ThreeBodyLambert
@@ -643,44 +648,50 @@ def _refine_wsb_candidate(
                 raise ValueError("system.characteristic_velocity must be set")
             dv_arr = float(np.linalg.norm(v_arrival_shot - v_target_phys)) / vu_km_s
 
-            return WsbCandidate(
-                sun_phase0=candidate.sun_phase0,
-                departure_phase=candidate.departure_phase,
-                tof_sec=candidate.tof_sec,
-                departure_state=candidate.departure_state,
-                perilune_state=candidate.perilune_state,
-                perilune_alt_km=candidate.perilune_alt_km,
-                perilune_time_dim=candidate.perilune_time_dim,
-                arrival_state=candidate.arrival_state,
-                h2_kepler=candidate.h2_kepler,
-                dv_departure=candidate.dv_departure,
-                dv_arrival=dv_arr,
-                total_dv=candidate.dv_departure + dv_arr,
-                arrival_time_dim=candidate.arrival_time_dim,
-                status=ConvergenceState.CONVERGED,
-                cause=FailureCause.NONE,
-                message="找到 WSB 候选",
+            return (
+                WsbCandidate(
+                    sun_phase0=candidate.sun_phase0,
+                    departure_phase=candidate.departure_phase,
+                    tof_sec=candidate.tof_sec,
+                    departure_state=candidate.departure_state,
+                    perilune_state=candidate.perilune_state,
+                    perilune_alt_km=candidate.perilune_alt_km,
+                    perilune_time_dim=candidate.perilune_time_dim,
+                    arrival_state=candidate.arrival_state,
+                    h2_kepler=candidate.h2_kepler,
+                    dv_departure=candidate.dv_departure,
+                    dv_arrival=dv_arr,
+                    total_dv=candidate.dv_departure + dv_arr,
+                    arrival_time_dim=candidate.arrival_time_dim,
+                    status=ConvergenceState.CONVERGED,
+                    cause=FailureCause.NONE,
+                    message="找到 WSB 候选",
+                ),
+                arrival_leg.arcs[0],
             )
     except (RuntimeError, ValueError, np.linalg.LinAlgError, PropagationFailure):
         # PropagationFailure：打靶内部传播失败（退化候选几何可触发），
         # 与其他打靶失败同义——保留原始候选，不让编排器崩（#566）。
         logger.debug("ThreeBodyLambert 打靶失败，保留原始候选", exc_info=True)
 
-    return WsbCandidate(
-        sun_phase0=candidate.sun_phase0,
-        departure_phase=candidate.departure_phase,
-        tof_sec=candidate.tof_sec,
-        departure_state=candidate.departure_state,
-        perilune_state=candidate.perilune_state,
-        perilune_alt_km=candidate.perilune_alt_km,
-        perilune_time_dim=candidate.perilune_time_dim,
-        arrival_state=candidate.arrival_state,
-        h2_kepler=candidate.h2_kepler,
-        dv_departure=candidate.dv_departure,
-        dv_arrival=candidate.dv_arrival,
-        total_dv=candidate.total_dv,
-        arrival_time_dim=candidate.arrival_time_dim,
-        status=ConvergenceState.MAX_ITERATIONS,
-        cause=FailureCause.MAX_ITERATIONS_REACHED,
-        message="WSB 候选精化未收敛",
+    return (
+        WsbCandidate(
+            sun_phase0=candidate.sun_phase0,
+            departure_phase=candidate.departure_phase,
+            tof_sec=candidate.tof_sec,
+            departure_state=candidate.departure_state,
+            perilune_state=candidate.perilune_state,
+            perilune_alt_km=candidate.perilune_alt_km,
+            perilune_time_dim=candidate.perilune_time_dim,
+            arrival_state=candidate.arrival_state,
+            h2_kepler=candidate.h2_kepler,
+            dv_departure=candidate.dv_departure,
+            dv_arrival=candidate.dv_arrival,
+            total_dv=candidate.total_dv,
+            arrival_time_dim=candidate.arrival_time_dim,
+            status=ConvergenceState.MAX_ITERATIONS,
+            cause=FailureCause.MAX_ITERATIONS_REACHED,
+            message="WSB 候选精化未收敛",
+        ),
+        None,
     )

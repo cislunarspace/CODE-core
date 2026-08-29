@@ -94,6 +94,7 @@ class TestFacadeDelegation:
                 transfer_type="low_thrust",
                 delta_v=1.0,
                 trajectory=None,
+                trajectory_times=None,
                 details={},
             )
 
@@ -176,6 +177,11 @@ class TestFacadeCallChains:
         assert response.status is ConvergenceState.CONVERGED
         assert response.cause is FailureCause.NONE
         assert response.message == "霍曼转移完成"
+        # ADR 0040：收敛轨迹与会合系时刻随响应下发
+        assert response.trajectory is not None
+        assert len(response.trajectory[0]) == 6
+        assert response.trajectory_times is not None
+        assert len(response.trajectory_times) == len(response.trajectory)
 
     def test_unknown_transfer_type_is_not_implemented_error(self):
         with pytest.raises(OrbitError, match="NOT_IMPLEMENTED"):

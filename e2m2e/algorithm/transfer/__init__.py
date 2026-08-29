@@ -22,6 +22,7 @@ from numpy.typing import NDArray
 
 from ...data.constants import SECONDS_PER_DAY
 from ...data.templates import ConvergenceState, FailureCause
+from ...exceptions import PropagationFailure
 from ..forces import PointMassGravity
 from ..results import CandidateSearchResult, ResultStatus, StageRecord
 from .config import (
@@ -35,9 +36,11 @@ from .hohmann import (
     R_EARTH,
     TliParams,
     construct_departure_state,
+    eci_to_synodic_display,
     ephemeris_shoot_transfer,
     hohmann_delta_v,
     hohmann_tof,
+    hohmann_transfer_states,
     scan_lambert_delta_v,
 )
 from .lambert import LambertSolution, solve_lambert, solve_lambert_batch
@@ -164,7 +167,11 @@ class TransferDesignResult:
     Attributes:
         transfer_type: 转移类型（"HMN"/"LGA"/"WSB"/"low_thrust"）。
         delta_v: 总 Δv（km/s）。
-        trajectory: 转移轨迹。
+        trajectory: 转移轨迹 (n, 6)，地月会合旋转系、质心原点、物理单位
+            km / km/s（ADR 0040；HMN 为两体几何的相位对齐显示约定，
+            low_thrust 暂为力模型状态系的已知不一致）。
+        trajectory_times: 轨迹时刻 (n,) 秒，TLI 起算（t=0 为出发脉冲），
+            与 trajectory 逐行对齐。
         details: 设计细节（弹道参数汇总）。
         stages: 搜索、精化和打靶等可选阶段的执行记录。
         status: 任务最终状态。
@@ -175,6 +182,7 @@ class TransferDesignResult:
     transfer_type: str
     delta_v: float
     trajectory: Any
+    trajectory_times: Any = None
     details: (
         HmnTransferDetails
         | LgaTransferDetails
@@ -459,6 +467,59 @@ def _extract_target_state(target_ephemeris: Any) -> tuple[NDArray[np.float64], N
     )
 
 
+def _propagate_synodic_leg(
+    dynamics: Any,
+    system: Any,
+    x0_dim: np.ndarray,
+    t_end_dim: float,
+    n_samples: int = 200,
+) -> tuple[np.ndarray, np.ndarray]:
+    """会合系无量纲传播一段弧 → 物理单位 + 秒（ADR 0040 轨迹契约）。
+
+    LGA/WSB 拼接轨迹的出发段采样：``dynamics.propagate`` 在无量纲会合
+    系积分，输出经特征量换算（位置 ×DU、速度 ×VU、时间 ×TU），时刻
+    从 0 起算。
+
+    Args:
+        dynamics: 会合系动力学（CR3BP 或 BCR4BP）。
+        system: 对应系统（提供特征尺度）。
+        x0_dim: 出发状态 (6,)，无量纲会合系。
+        t_end_dim: 弧段时长（无量纲时间）。
+        n_samples: 采样点数。
+
+    Returns:
+        ((n, 6) 状态 km / km/s，(n,) 时刻秒)。
+    """
+    du = system.characteristic_length
+    tu = system.characteristic_time
+    vu = system.characteristic_velocity
+    if du is None or tu is None or vu is None:
+        raise ValueError("system 必须设置特征尺度（长度/时间/速度）")
+    t_end = float(t_end_dim)
+    t_eval = np.linspace(0.0, t_end, int(n_samples))
+    result = dynamics.propagate(np.asarray(x0_dim, dtype=float), (0.0, t_end), t_eval=t_eval)
+    states = np.asarray(result["states"], dtype=float)
+    times = np.asarray(result["time"], dtype=float)
+    states_km = np.column_stack([states[:, :3] * du, states[:, 3:] * vu])
+    return states_km, times * tu
+
+
+def _join_transfer_legs(
+    dep_states: np.ndarray,
+    dep_times: np.ndarray,
+    arr_states: np.ndarray,
+    arr_times: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """拼接出发段与到达段（去重衔接点），到达段时刻偏移到出发段时间轴。"""
+    dep_states = np.asarray(dep_states, dtype=float)
+    arr_states = np.asarray(arr_states, dtype=float)
+    dep_times = np.asarray(dep_times, dtype=float)
+    arr_times = np.asarray(arr_times, dtype=float)
+    states = np.vstack([dep_states, arr_states[1:]])
+    times = np.concatenate([dep_times, arr_times[1:] + dep_times[-1]])
+    return states, times
+
+
 def _transfer_orbit_lga(
     tli_params: TliParams | None,
     target_ephemeris: Any,
@@ -557,7 +618,28 @@ def _transfer_orbit_lga(
     # 5. ThreeBodyLambert 打靶精化
     from .lga import _refine_lga_candidate
 
-    refined = _refine_lga_candidate(best, system, cr3bp_dynamics, target_dim)
+    refined, arrival_arc = _refine_lga_candidate(best, system, cr3bp_dynamics, target_dim)
+
+    # 轨迹组装（ADR 0040）：出发段（LEO→perilune）CR3BP 重传播 + 精化
+    # 到达弧拼接（近月点速度折点是精化的隐式修正脉冲，位置连续由测试
+    # 守护）；精化回退时网格候选是单条自由飞行解，整段重传播即可。
+    trajectory: Any = None
+    trajectory_times: Any = None
+    try:
+        if arrival_arc is not None:
+            dep_states, dep_times = _propagate_synodic_leg(
+                cr3bp_dynamics, system, refined.departure_state, refined.perilune_time_dim
+            )
+            trajectory, trajectory_times = _join_transfer_legs(
+                dep_states, dep_times, arrival_arc.states, arrival_arc.times
+            )
+        else:
+            trajectory, trajectory_times = _propagate_synodic_leg(
+                cr3bp_dynamics, system, refined.departure_state, refined.arrival_time_dim
+            )
+    except PropagationFailure:
+        warnings.warn("LGA 轨迹组装传播失败，返回无轨迹结果", stacklevel=2)
+        trajectory, trajectory_times = None, None
 
     # 6. 物理单位换算
     perilune_phys = system.dimensionless_to_physical(refined.perilune_state)
@@ -584,7 +666,8 @@ def _transfer_orbit_lga(
     return TransferDesignResult(
         transfer_type="LGA",
         delta_v=refined.total_dv * vu_km_s,
-        trajectory=None,
+        trajectory=trajectory,
+        trajectory_times=trajectory_times,
         details=details,
         status=refined.status,
         cause=refined.cause,
@@ -631,7 +714,7 @@ def _transfer_orbit_wsb(
     if target_ephemeris is None:
         raise ValueError("WSB 转移需要 target_ephemeris")
 
-    from ..dynamics import CR3BP_Dynamics, CR3BP_System
+    from ..dynamics import BCR4BP_Dynamics, CR3BP_Dynamics, CR3BP_System
     from ..dynamics.bcr4bp_system import BCR4BPSystem
     from .wsb import _refine_wsb_candidate
 
@@ -706,7 +789,32 @@ def _transfer_orbit_wsb(
     # 5. ThreeBodyLambert 打靶精化（CR3BP 到达段）
     cr3bp_system = CR3BP_System(mu=MU_EM, primary="Earth", secondary="Moon")._with_default_scales()
     cr3bp_dynamics = CR3BP_Dynamics(cr3bp_system)
-    refined = _refine_wsb_candidate(best, cr3bp_system, cr3bp_dynamics, target_dim)
+    refined, arrival_arc = _refine_wsb_candidate(best, cr3bp_system, cr3bp_dynamics, target_dim)
+
+    # 轨迹组装（ADR 0040）：出发段必须用 BCR4BP 重传播（太阳摄动是 WSB
+    # 本体，sun_phase0 对齐候选；研究级默认容差，只为取轨迹），到达段用
+    # CR3BP 精化弧拼接；精化回退时候选整段都是 BCR4BP 搜索解，整段重传播。
+    # 两段特征尺度分属 BCR4BP（DU=384405 km）与 CR3BP（DU=384400 km），
+    # 差 1.3e-5 DU 在画布不可见，不修。
+    trajectory: Any = None
+    trajectory_times: Any = None
+    try:
+        dep_system = BCR4BPSystem.earth_moon(sun_phase0=refined.sun_phase0)
+        dep_dynamics = BCR4BP_Dynamics(dep_system)
+        if arrival_arc is not None:
+            dep_states, dep_times = _propagate_synodic_leg(
+                dep_dynamics, dep_system, refined.departure_state, refined.perilune_time_dim
+            )
+            trajectory, trajectory_times = _join_transfer_legs(
+                dep_states, dep_times, arrival_arc.states, arrival_arc.times
+            )
+        else:
+            trajectory, trajectory_times = _propagate_synodic_leg(
+                dep_dynamics, dep_system, refined.departure_state, refined.arrival_time_dim
+            )
+    except PropagationFailure:
+        warnings.warn("WSB 轨迹组装传播失败，返回无轨迹结果", stacklevel=2)
+        trajectory, trajectory_times = None, None
 
     # 6. 物理单位换算
     # WsbCandidate dv 字段全无量纲（#566）：dv_departure 恒产自 BCR4BP 搜索，
@@ -744,7 +852,8 @@ def _transfer_orbit_wsb(
     return TransferDesignResult(
         transfer_type="WSB",
         delta_v=dv_departure_km_s + dv_arrival_km_s,
-        trajectory=None,
+        trajectory=trajectory,
+        trajectory_times=trajectory_times,
         details=details,
         status=refined.status,
         cause=refined.cause,
@@ -994,6 +1103,7 @@ def _transfer_orbit_hmn(
 
     # 当 dynamics 提供时，用 ephemeris 打靶修正 Lambert 初猜
     trajectory: Any = None
+    trajectory_times: Any = None
     if dynamics is not None:
         t0 = 0.0  # 动力学模型的时间基准（秒）
         shoot_result = ephemeris_shoot_transfer(
@@ -1009,15 +1119,26 @@ def _transfer_orbit_hmn(
             dv1 = float(np.linalg.norm(v0_shot - v0))
             departure_state = shoot_result.state_patch[0].copy()
             trajectory = shoot_result.state_patch
+            trajectory_times = np.linspace(0.0, float(tof), int(shoot_result.state_patch.shape[0]))
         else:
             warnings.warn(
                 "ephemeris_shoot_transfer 未收敛，回退到 Lambert 解",
                 stacklevel=2,
             )
             departure_state = np.concatenate([r0, v0])
-            trajectory = None
     else:
         departure_state = np.concatenate([r0, v0])
+
+    if trajectory is None:
+        # 两体弧采样（dynamics 缺省，或打靶未收敛回退到 Lambert/霍曼解，
+        # ADR 0040）：出发速度取 Lambert 解（tof_range 路径）或停泊速度的
+        # 霍曼切向缩放（纯霍曼路径），方向不变。
+        v_dep = v0_lambert if tof_range is not None else v0 * np.sqrt(2.0 * r2 / (r1 + r2))
+        trajectory, trajectory_times = hohmann_transfer_states(r0, v_dep, tof)
+
+    # 统一显示契约（ADR 0040）：ECI 两体几何 → 会合系相位对齐显示坐标；
+    # 参考方向取转移弧末行位置（到达点落入 +x 半平面，即画布月球方向）
+    trajectory = eci_to_synodic_display(trajectory, np.asarray(trajectory, dtype=float)[-1, :3])
 
     details = HmnTransferDetails(
         tli_epoch=tli_params.epoch,
@@ -1043,6 +1164,7 @@ def _transfer_orbit_hmn(
         transfer_type="HMN",
         delta_v=dv1 + dv2,
         trajectory=trajectory,
+        trajectory_times=trajectory_times,
         details=details,
         status=status,
         cause=cause,

@@ -23,6 +23,7 @@ from ...exceptions import PropagationFailure
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
 from ..results import CandidateSearchResult, ResultStatus
+from .config import TransferArc
 
 logger = logging.getLogger(__name__)
 
@@ -338,14 +339,18 @@ def _refine_lga_candidate(
     system: CR3BP_System,
     dynamics: CR3BP_Dynamics,
     target_state: np.ndarray,
-) -> LgaCandidate:
+) -> tuple[LgaCandidate, TransferArc | None]:
     """用 ThreeBodyLambert 打靶精化 LGA 候选。
 
     分两段打靶：
     1. 到达段：perilune → target（ThreeBodyLambert 打靶修正到达速度）
     2. 打靶后的到达速度更新 Δv 计算。
 
-    如果打靶未收敛、或打靶解的总 Δv 劣于网格候选，返回原始候选。
+    Returns:
+        (精化候选, 到达段弧)。精化成功时弧为打靶重传播的整段
+        (200, 6) 会合系物理 km / km/s + 秒（ADR 0040 轨迹契约）；
+        打靶未收敛或未带来改进时弧为 None（此时轨迹应由网格候选
+        的自由飞行解整段重传播得到）。
     """
     from .terminal import StateTerminal
     from .three_body_lambert import ThreeBodyLambert
@@ -392,26 +397,29 @@ def _refine_lga_candidate(
                     candidate.total_dv,
                     candidate.dv_departure + dv_arr,
                 )
-                return candidate
+                return candidate, None
 
-            return LgaCandidate(
-                departure_phase=candidate.departure_phase,
-                out_of_plane_angle=candidate.out_of_plane_angle,
-                tof_sec=candidate.tof_sec,
-                departure_state=candidate.departure_state,
-                perilune_state=candidate.perilune_state,
-                perilune_alt_km=candidate.perilune_alt_km,
-                perilune_time_dim=candidate.perilune_time_dim,
-                arrival_state=candidate.arrival_state,
-                dv_departure=candidate.dv_departure,
-                dv_arrival=dv_arr,
-                total_dv=candidate.dv_departure + dv_arr,
-                jacobi_departure=candidate.jacobi_departure,
-                jacobi_arrival=candidate.jacobi_arrival,
-                arrival_time_dim=candidate.arrival_time_dim,
-                status=ConvergenceState.CONVERGED,
-                cause=FailureCause.NONE,
-                message="找到 LGA 候选",
+            return (
+                LgaCandidate(
+                    departure_phase=candidate.departure_phase,
+                    out_of_plane_angle=candidate.out_of_plane_angle,
+                    tof_sec=candidate.tof_sec,
+                    departure_state=candidate.departure_state,
+                    perilune_state=candidate.perilune_state,
+                    perilune_alt_km=candidate.perilune_alt_km,
+                    perilune_time_dim=candidate.perilune_time_dim,
+                    arrival_state=candidate.arrival_state,
+                    dv_departure=candidate.dv_departure,
+                    dv_arrival=dv_arr,
+                    total_dv=candidate.dv_departure + dv_arr,
+                    jacobi_departure=candidate.jacobi_departure,
+                    jacobi_arrival=candidate.jacobi_arrival,
+                    arrival_time_dim=candidate.arrival_time_dim,
+                    status=ConvergenceState.CONVERGED,
+                    cause=FailureCause.NONE,
+                    message="找到 LGA 候选",
+                ),
+                arrival_leg.arcs[0],
             )
     except (RuntimeError, ValueError, np.linalg.LinAlgError, PropagationFailure):
         # PropagationFailure：打靶内部传播失败（退化候选几何可触发），
@@ -419,22 +427,25 @@ def _refine_lga_candidate(
         logger.debug("ThreeBodyLambert 打靶失败，保留原始候选", exc_info=True)
 
     # 打靶失败，返回原始候选
-    return LgaCandidate(
-        departure_phase=candidate.departure_phase,
-        out_of_plane_angle=candidate.out_of_plane_angle,
-        tof_sec=candidate.tof_sec,
-        departure_state=candidate.departure_state,
-        perilune_state=candidate.perilune_state,
-        perilune_alt_km=candidate.perilune_alt_km,
-        perilune_time_dim=candidate.perilune_time_dim,
-        arrival_state=candidate.arrival_state,
-        dv_departure=candidate.dv_departure,
-        dv_arrival=candidate.dv_arrival,
-        total_dv=candidate.total_dv,
-        jacobi_departure=candidate.jacobi_departure,
-        jacobi_arrival=candidate.jacobi_arrival,
-        arrival_time_dim=candidate.arrival_time_dim,
-        status=ConvergenceState.MAX_ITERATIONS,
-        cause=FailureCause.MAX_ITERATIONS_REACHED,
-        message="LGA 候选精化未收敛",
+    return (
+        LgaCandidate(
+            departure_phase=candidate.departure_phase,
+            out_of_plane_angle=candidate.out_of_plane_angle,
+            tof_sec=candidate.tof_sec,
+            departure_state=candidate.departure_state,
+            perilune_state=candidate.perilune_state,
+            perilune_alt_km=candidate.perilune_alt_km,
+            perilune_time_dim=candidate.perilune_time_dim,
+            arrival_state=candidate.arrival_state,
+            dv_departure=candidate.dv_departure,
+            dv_arrival=candidate.dv_arrival,
+            total_dv=candidate.total_dv,
+            jacobi_departure=candidate.jacobi_departure,
+            jacobi_arrival=candidate.jacobi_arrival,
+            arrival_time_dim=candidate.arrival_time_dim,
+            status=ConvergenceState.MAX_ITERATIONS,
+            cause=FailureCause.MAX_ITERATIONS_REACHED,
+            message="LGA 候选精化未收敛",
+        ),
+        None,
     )

@@ -808,6 +808,12 @@ class Facade:
                 if result.trajectory is not None and isinstance(result.trajectory, np.ndarray)
                 else result.trajectory
             )
+            trajectory_times = (
+                result.trajectory_times.tolist()
+                if result.trajectory_times is not None
+                and isinstance(result.trajectory_times, np.ndarray)
+                else result.trajectory_times
+            )
             status, cause, message = _result_triplet(result)
             return TransferDesignResponse(
                 status=status,
@@ -816,6 +822,7 @@ class Facade:
                 transfer_type=result.transfer_type,
                 delta_v=result.delta_v,
                 trajectory=trajectory,
+                trajectory_times=trajectory_times,
                 details=_details_to_dict(result.details),
             )
         except OrbitError:

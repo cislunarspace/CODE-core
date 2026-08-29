@@ -18,9 +18,11 @@ from e2m2e.algorithm.transfer.hohmann import (
     TliParams,
     _rotation_matrix,
     construct_departure_state,
+    eci_to_synodic_display,
     ephemeris_shoot_transfer,
     hohmann_delta_v,
     hohmann_tof,
+    hohmann_transfer_states,
     keplerian_to_cartesian,
     scan_lambert_delta_v,
 )
@@ -217,6 +219,47 @@ class TestTransferOrbitHmn:
         expected_tof = hohmann_tof(r1, r2)
         assert isinstance(result.details, HmnTransferDetails)
         assert abs(result.details.tof_sec - expected_tof) < 1e-10
+
+    def test_trajectory_pure_hohmann(self):
+        """纯霍曼路径（无 tof_range）返回会合系显示轨迹（ADR 0040）。"""
+        params = TliParams(parking_alt_km=200.0, inclination_deg=28.5)
+        r2 = 384400.0
+        result = transfer_orbit("HMN", tli_params=params, target_orbit_radius_km=r2)
+        assert result.trajectory is not None
+        traj = np.asarray(result.trajectory)
+        times = np.asarray(result.trajectory_times)
+        assert traj.shape == (200, 6)
+        assert times.shape == (200,)
+        assert times[0] == 0.0
+        r1 = R_EARTH + 200.0
+        assert times[-1] == pytest.approx(hohmann_tof(r1, r2), rel=1e-9)
+        assert np.all(np.diff(times) > 0)
+        # 相位对齐（显示约定）：到达点落在 +x 半平面，端点距地球显示
+        # 位置（−μ·DU）分别为 r1（LEO）与 r2（目标半径）
+        earth = np.array([-1.21506683e-2 * 384400.0, 0.0, 0.0])
+        departure = traj[0, :3] - earth
+        arrival = traj[-1, :3] - earth
+        assert arrival[0] > 0
+        assert np.linalg.norm(departure) == pytest.approx(r1, rel=1e-5)
+        assert np.linalg.norm(arrival) == pytest.approx(r2, rel=1e-5)
+
+    def test_trajectory_lambert_scan_path(self):
+        """tof_range Lambert 路径同样返回轨迹与时刻，端点距地球 ≈ r2。"""
+        params = TliParams(parking_alt_km=200.0, inclination_deg=0.0)
+        r2 = 42164.0  # GEO；霍曼 tof≈0.22 天，扫描范围须覆盖
+        result = transfer_orbit(
+            "HMN", tli_params=params, target_orbit_radius_km=r2, tof_range=(0.1, 0.5)
+        )
+        assert result.trajectory is not None
+        traj = np.asarray(result.trajectory)
+        times = np.asarray(result.trajectory_times)
+        assert traj.ndim == 2 and traj.shape[1] == 6
+        assert times.shape == (traj.shape[0],)
+        assert np.all(np.diff(times) > 0)
+        earth = np.array([-1.21506683e-2 * 384400.0, 0.0, 0.0])
+        arrival = traj[-1, :3] - earth
+        assert arrival[0] > 0
+        assert np.linalg.norm(arrival) == pytest.approx(r2, rel=1e-3)
 
     def test_unsupported_type_raises(self):
         """transfer_orbit("low_thrust") without engine_config 抛出 ValueError。"""
@@ -518,3 +561,64 @@ class TestEphemerisShooting:
         assert result.trajectory is not None
         assert result.trajectory.ndim == 2
         assert result.trajectory.shape[1] == 6
+        assert result.trajectory_times is not None
+        assert len(result.trajectory_times) == result.trajectory.shape[0]
+
+
+class TestHohmannTransferStates:
+    """hohmann_transfer_states + eci_to_synodic_display（ADR 0040）。"""
+
+    def test_arc_endpoint_and_times(self):
+        """两体弧采样：端点半径 r1→r2、时刻 0..tof 单调。"""
+        r1 = R_EARTH + 200.0
+        r2 = 384405.0
+        r0 = np.array([r1, 0.0, 0.0])
+        v_park = math.sqrt(MU_EARTH / r1)
+        v_dep = np.array([0.0, v_park * math.sqrt(2.0 * r2 / (r1 + r2)), 0.0])
+        tof = hohmann_tof(r1, r2)
+        states, times = hohmann_transfer_states(r0, v_dep, tof)
+        assert states.shape == (200, 6)
+        assert times.shape == (200,)
+        assert times[0] == 0.0
+        assert times[-1] == pytest.approx(tof)
+        assert np.all(np.diff(times) > 0)
+        radii = np.linalg.norm(states[:, :3], axis=1)
+        assert radii[0] == pytest.approx(r1, rel=1e-6)
+        assert radii[-1] == pytest.approx(r2, rel=1e-6)
+
+    def test_display_invariants(self):
+        """显示转换不变量：|r|/|v|/z 不变，参考方向入 +x 半平面。"""
+        mu_em, du_km = 1.21506683e-2, 384400.0
+        shift = np.array([mu_em * du_km, 0.0, 0.0])
+        states = np.array(
+            [
+                [7000.0, 0.0, 500.0, 0.0, 7.0, 1.0],
+                [-20000.0, 30000.0, -500.0, 1.0, -6.0, 0.5],
+            ]
+        )
+        ref = states[-1, :3].copy()
+        out = eci_to_synodic_display(states, ref, mu_em=mu_em, du_km=du_km)
+        # 旋转+平移不改模长与速度大小；z 不变
+        assert np.allclose(
+            np.linalg.norm(out[:, :3] + shift, axis=1),
+            np.linalg.norm(states[:, :3], axis=1),
+            rtol=1e-12,
+        )
+        assert np.allclose(
+            np.linalg.norm(out[:, 3:], axis=1),
+            np.linalg.norm(states[:, 3:], axis=1),
+            rtol=1e-12,
+        )
+        assert np.allclose(out[:, 2], states[:, 2])
+        # 参考方向（末行位置，平移前）映射到 +x 半平面且 y=0
+        ref_out = out[-1, :3] + shift
+        assert ref_out[0] > 0
+        assert ref_out[1] == pytest.approx(0.0, abs=1e-9)
+
+    def test_earth_mapped_to_minus_mu_du(self):
+        """地心（ECI 原点）映射到会合系 (−μ·DU, 0, 0)。"""
+        states = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]])
+        out = eci_to_synodic_display(states, np.array([1.0, 0.0, 0.0]))
+        assert out[0, 0] == pytest.approx(-1.21506683e-2 * 384400.0)
+        assert out[0, 1] == 0.0
+        assert out[0, 2] == 0.0

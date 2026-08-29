@@ -183,6 +183,24 @@ def _propagate_two_body(
     return out
 
 
+def propagate_two_body(
+    state0: npt.ArrayLike,
+    t_eval: npt.ArrayLike,
+    mu: float,
+) -> dict[str, np.ndarray]:
+    """二体数值传播（公开封装，HMN 转移弧采样用）。
+
+    Args:
+        state0: 出发状态 (6,)，km / km/s，与中心天体固连的惯性系。
+        t_eval: 采样时刻（秒，单调）；首末时刻定义积分区间。
+        mu: 中心天体 GM，km³/s²。
+
+    Returns:
+        ``{"time": (n,), "states": (n, 6)}``（DOP853，同内部精度常量）。
+    """
+    return _propagate_two_body(state0, t_eval, mu, with_stm=False)
+
+
 class MultiImpulseTransfer:
     """固定端点间的多脉冲转移规划器。
 

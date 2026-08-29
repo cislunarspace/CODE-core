@@ -110,3 +110,4 @@ ADRs.
 | 0037 | Test suite time budget, minimal real-call coverage, and e2e test boundaries | Adopted |
 | 0038 | IAS15 integrator and force-model parametric variational equations (ASSIST-derived); MERCURIUS not adopted | Adopted |
 | 0039 | Shared-kernel leaf modules at the package root | Adopted (implemented) |
+| 0040 | transfer_design converged trajectory: unified synodic-frame contract with trajectory_times | Adopted (implemented) |

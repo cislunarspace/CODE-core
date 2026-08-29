@@ -674,7 +674,12 @@ class TransferDesignRequest(_ApiModel):
         ),
     )
     target_orbit_radius_km: float | None = Field(
-        default=None, gt=0.0, description="目标轨道半径 (km)，HMN 必需"
+        default=None,
+        gt=0.0,
+        description=(
+            "目标轨道半径 (km)，HMN 必需；地心距——从地心量起的圆轨道半径，"
+            "非月心高度（环月取 ≈384400）"
+        ),
     )
     tof_range: list[float] | None = Field(default=None, description="飞行时间范围 [min, max]（天）")
     lga_search_params: Any = Field(default=None, description="LGA 搜索参数（LgaSearchParams 实例）")
@@ -718,7 +723,18 @@ class TransferDesignResponse(ResultResponse):
 
     transfer_type: str
     delta_v: float
-    trajectory: list[list[float]] | None
+    trajectory: list[list[float]] | None = Field(
+        default=None,
+        description=(
+            "转移轨迹 (n, 6)：地月会合旋转系、质心原点、物理单位 km / km/s"
+            "（ADR 0040；HMN 为两体几何的相位对齐显示约定，low_thrust 暂为"
+            "力模型状态系的已知不一致）"
+        ),
+    )
+    trajectory_times: list[float] | None = Field(
+        default=None,
+        description="轨迹时刻 (n,) 秒，TLI 起算（t=0 为出发脉冲），与 trajectory 逐行对齐",
+    )
     details: dict[str, Any]
 
 

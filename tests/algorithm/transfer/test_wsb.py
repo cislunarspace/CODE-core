@@ -686,7 +686,7 @@ class TestWsbDvUnits:
         )
         monkeypatch.setattr(
             "e2m2e.algorithm.transfer.wsb._refine_wsb_candidate",
-            lambda *args, **kwargs: refined,
+            lambda *args, **kwargs: (refined, None),
         )
 
         target_phys = system.dimensionless_to_physical(_make_target_state(system))
