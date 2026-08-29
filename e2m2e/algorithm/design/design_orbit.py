@@ -34,7 +34,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import numpy as np
 
@@ -71,7 +71,38 @@ from ..solver.multiple_shooting import (
 )
 
 if TYPE_CHECKING:
-    from ...api.models import DesignOrbitRequest
+
+    class _DesignRequest(Protocol):
+        """design_orbit 请求的最小结构契约（镜像 api.DesignOrbitRequest）。
+
+        算法层不 import api/（ADR 0012 硬边界①）；此处按实际消费字段
+        声明协议，api.DesignOrbitRequest 结构性满足。新增消费字段须
+        同步本协议。
+        """
+
+        orbit_type: str
+        amplitude: float | None
+        phase: float | None
+        collinear_point: int | None
+        north_south: int | None
+        amplitude_in: float | None
+        amplitude_out: float | None
+        phase_in: float | None
+        phase_out: float | None
+        perilune_height: float | None
+        inclination: float | None
+        arg_of_pericenter: float | None
+        semi_major_axis: float | None
+        epoch: Any
+        duration: float | None
+        output_step: float
+        perturbation: dict[str, int] | None
+        dyb: list[float] | None
+        earth_degree: int
+        moon_degree: int
+        correction_method: str
+        correction_revolutions: int
+
 
 __all__ = [
     "DesignNotConvergedError",
@@ -772,7 +803,7 @@ def _design_apolune_segmented(
 
 
 def _design_elfo(
-    request: DesignOrbitRequest,
+    request: _DesignRequest,
     spice: SPICEManager,
     kernel_dir: str,
     verbose: bool,  # noqa: ARG001
@@ -903,7 +934,7 @@ def _design_elfo(
 
 
 def design_orbit(
-    request: DesignOrbitRequest,
+    request: _DesignRequest,
     *,
     spice: SPICEManager | None = None,
     kernel_dir: str | None = None,
@@ -918,7 +949,8 @@ def design_orbit(
     - **ELFO**：经典开普勒根数构造初值 → 全摄动传播 → 月心根数漂移分析。
 
     Args:
-        request: ``DesignOrbitRequest``，经 model_validator 校验并填充默认值。
+        request: 请求对象——``api.DesignOrbitRequest``（经 model_validator
+            校验并填充默认值）或其他结构性满足 ``_DesignRequest`` 协议的对象。
         spice: 已加载内核的 ``SPICEManager``；缺省自动创建并加载。
         kernel_dir: SPICE 内核目录。
         verbose: 修正过程显示进度条。
