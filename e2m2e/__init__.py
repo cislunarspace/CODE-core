@@ -65,14 +65,14 @@ __all__ = [
 # ---- Import-time Rust ABI 校验 / Import-time Rust ABI check ----
 # 若 Rust 扩展已在进程内加载（如用户直引 e2m2e._integrators），立即校验版本，
 # 避免过期二进制静默产生错误结果。扩展未加载时静默跳过（惰性，首次 Rust 使用
-# 时由 integrators._check_rust_abi() 接管）。
+# 时由 spice_ext._check_rust_abi() 接管）。
 # (If the Rust extension is already loaded in-process, e.g. via direct import of
 # e2m2e._integrators, verify its version immediately so stale binaries cannot
 # silently produce wrong results. If not loaded, skip quietly — lazy checking is
-# then handled by integrators._check_rust_abi() at first Rust use.)
+# then handled by spice_ext._check_rust_abi() at first Rust use.)
 import sys as _sys
 
 if "e2m2e._integrators" in _sys.modules:
-    from .integrators import _check_rust_abi as _check_abi
+    from .spice_ext import _check_rust_abi as _check_abi
 
     _check_abi()

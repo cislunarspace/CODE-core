@@ -14,7 +14,9 @@ SPICE 内核文件说明：
    需要手动加载，可通过 :meth:`SPICEManager.find_ephemeris_kernel` 搜索或
    :meth:`SPICEManager.load_kernel` 加载。
 
-依赖方向：数据层只依赖外部库（numpy/spiceypy/scipy），不依赖 e2m2e 其他层。
+依赖方向：数据层只依赖外部库（numpy/spiceypy/scipy）与包根共享内核叶
+（exceptions/spice_ext，ADR 0039）——SPICE 双实例桥接经 spice_ext 直达
+Rust 扩展，不穿数值层门面。
 """
 
 from __future__ import annotations
@@ -209,7 +211,7 @@ class SPICEManager(EphemerisProvider):
                 # 不共享，见 load_kernel 注释）。下沉到 Rust 的批量 ET→UTC
                 # （frame_convert.batch_et_to_utc_py）在 Rust 实例查闰秒表，
                 # 缺 LSK 报 MISSINGTIMEINFO；此处双 furnsh 补齐。
-                from e2m2e.integrators import spice_furnsh
+                from e2m2e.spice_ext import spice_furnsh
 
                 if spice_furnsh is not None:
                     spice_furnsh(path)
@@ -244,9 +246,9 @@ class SPICEManager(EphemerisProvider):
         get_spiceypy().furnsh(path)
         # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（静态链接，
         # 内核池不共享）。spice feature 启用时双 furnsh，让下沉到 Rust
-        # 的力（ThirdBody/Indirect/...）也能查到。Rust 绑定是数值层，
-        # 此处为内核加载的跨层桥接（ADR 0012 的 data/ → 仅外部库例外）。
-        from e2m2e.integrators import spice_furnsh
+        # 的力（ThirdBody/Indirect/...）也能查到。桥接经共享内核叶
+        # spice_ext 直达 Rust 扩展（ADR 0039）。
+        from e2m2e.spice_ext import spice_furnsh
 
         if spice_furnsh is not None:
             spice_furnsh(path)
@@ -259,7 +261,7 @@ class SPICEManager(EphemerisProvider):
         # 避免 Rust 内核池残留导致测试结果依赖执行顺序。
         # Rust 侧只卸载确经 spice_furnsh 加载过的文件，未加载时静默跳过
         # （保持重复 unload 幂等）。
-        from e2m2e.integrators import spice_unload
+        from e2m2e.spice_ext import spice_unload
 
         if spice_unload is not None:
             spice_unload(path)
@@ -317,8 +319,8 @@ class SPICEManager(EphemerisProvider):
         # body 同时注册名字与 NAIF-ID 两种键，保证 ThirdBody 查询（用 ID）
         # 与 GravityField 查询（用名字）都命中。Rust 采样同样走 cspice，
         # 之后积分查表。
-        from e2m2e.integrators import enable_ephem_cache as _rust_enable
-        from e2m2e.integrators import require_rust_extension
+        from e2m2e.spice_ext import enable_ephem_cache as _rust_enable
+        from e2m2e.spice_ext import require_rust_extension
 
         require_rust_extension("enable_ephem_cache")
         # 天体名 → NAIF-ID 字符串（与 third_body_gravity.py 的
@@ -357,8 +359,8 @@ class SPICEManager(EphemerisProvider):
     def disable_ephem_cache(self) -> None:
         """关闭预插值星历缓存（Python 层 + Rust 层），回退到逐步 SPICE 查询。"""
         self._ephem_cache = None
-        from e2m2e.integrators import disable_ephem_cache as _rust_disable
-        from e2m2e.integrators import require_rust_extension
+        from e2m2e.spice_ext import disable_ephem_cache as _rust_disable
+        from e2m2e.spice_ext import require_rust_extension
 
         require_rust_extension("disable_ephem_cache")
         _rust_disable()

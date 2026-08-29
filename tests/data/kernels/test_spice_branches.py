@@ -84,7 +84,7 @@ class TestLoadKernelAutoLoadsLeapseconds:
         with (
             patch("e2m2e.data.kernels.manager.get_spiceypy", return_value=fake_spice),
             # 屏蔽 Rust cspice furnsh：假 bsp 进 cspice 会报错，且与闰秒逻辑无关。
-            patch("e2m2e.integrators.spice_furnsh", None),
+            patch("e2m2e.spice_ext.spice_furnsh", None),
         ):
             mgr = SPICEManager()
             mgr.load_kernel(str(bsp_path))
@@ -106,7 +106,7 @@ class TestLoadKernelAutoLoadsLeapseconds:
         fake_spice = MagicMock()
         with (
             patch("e2m2e.data.kernels.manager.get_spiceypy", return_value=fake_spice),
-            patch("e2m2e.integrators.spice_furnsh", None),
+            patch("e2m2e.spice_ext.spice_furnsh", None),
         ):
             mgr = SPICEManager()
             with caplog.at_level(logging.WARNING, logger="e2m2e.data.kernels.manager"):
