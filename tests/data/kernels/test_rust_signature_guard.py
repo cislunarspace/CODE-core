@@ -18,7 +18,7 @@ import types
 
 import pytest
 
-from e2m2e import integrators as gw
+from e2m2e import spice_ext as gw
 from e2m2e.data.kernels.manager import SPICEManager, _call_rust_or_compat_error
 from e2m2e.exceptions import RustExtensionUnavailableError
 
@@ -215,7 +215,7 @@ class TestEnableEphemCacheWiring:
         def _stale_enable(targets, frame_pairs, et_start, et_end, dt=3600.0):
             raise AssertionError("过期函数不应被调用")
 
-        monkeypatch.setattr("e2m2e.integrators.enable_ephem_cache", _stale_enable)
+        monkeypatch.setattr("e2m2e.spice_ext.enable_ephem_cache", _stale_enable)
 
         spice = SPICEManager()
         with pytest.raises(RuntimeError, match="maturin"):
@@ -223,7 +223,7 @@ class TestEnableEphemCacheWiring:
 
     def test_absent_extension_raises_unavailable_error(self, monkeypatch):
         """扩展缺失时，不得仅保留 Python 缓存而继续运行。"""
-        monkeypatch.setattr("e2m2e.integrators.enable_ephem_cache", None)
+        monkeypatch.setattr("e2m2e.spice_ext.enable_ephem_cache", None)
 
         spice = SPICEManager()
         with pytest.raises(RustExtensionUnavailableError, match="make dev"):

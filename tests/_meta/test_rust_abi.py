@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from e2m2e import integrators as gw
+from e2m2e import spice_ext as gw
 
 pytestmark = [pytest.mark.aux, pytest.mark.spice]
 

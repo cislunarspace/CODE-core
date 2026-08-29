@@ -39,7 +39,7 @@ class TestRustStmAvailability:
         import e2m2e.integrators as integrators
 
         monkeypatch.setattr(integrators, "_rust_extension", None)
-        monkeypatch.setattr(integrators, "_abi_ok", False)
+        monkeypatch.setattr("e2m2e.spice_ext._abi_ok", False)
         monkeypatch.setattr(integrators, "propagate_with_stm_py", None)
 
         with pytest.raises(RustExtensionUnavailableError, match="make dev"):

@@ -1,4 +1,10 @@
-"""算法结果的统一最终状态契约。"""
+"""算法结果的统一最终状态契约。
+
+状态契约四件套（``ConvergenceState``/``FailureCause``/``ResultStatus``/
+``CAUSE_STATUS``）已上移包根共享内核叶 ``e2m2e.status``（ADR 0039）——数值层
+门面与数据层也要消费，算法层内已无处安放；此处 re-export 保持旧路径与对象
+身份不变。
+"""
 
 from __future__ import annotations
 
@@ -8,50 +14,13 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 import numpy as np
 
-from ..data.templates import ConvergenceState, FailureCause
+from ..status import CAUSE_STATUS, ConvergenceState, FailureCause, ResultStatus  # noqa: F401
 
 if TYPE_CHECKING:
     from ..data.types.orbit import Orbit, OrbitFamily
 
 
 CandidateT = TypeVar("CandidateT")
-
-
-CAUSE_STATUS: dict[FailureCause, ConvergenceState] = {
-    FailureCause.NONE: ConvergenceState.CONVERGED,
-    FailureCause.INTEGRATION_FAILED: ConvergenceState.FAILED,
-    FailureCause.SINGULAR_JACOBIAN: ConvergenceState.FAILED,
-    FailureCause.INVALID_PERIOD: ConvergenceState.INFEASIBLE,
-    FailureCause.MAX_ITERATIONS_REACHED: ConvergenceState.MAX_ITERATIONS,
-    FailureCause.STAGNATION_DETECTED: ConvergenceState.STAGNATED,
-    FailureCause.DIVERGENCE_DETECTED: ConvergenceState.DIVERGED,
-    FailureCause.NO_INTERSECTION: ConvergenceState.INFEASIBLE,
-    FailureCause.CONSTRAINT_VIOLATION: ConvergenceState.INFEASIBLE,
-    FailureCause.BODY_COLLISION: ConvergenceState.COLLISION,
-    FailureCause.LEVEL1_CORRECTION_FAILED: ConvergenceState.FAILED,
-    FailureCause.BACKEND_FAILURE: ConvergenceState.FAILED,
-    FailureCause.INVALID_INPUT: ConvergenceState.FAILED,
-    FailureCause.UNKNOWN: ConvergenceState.FAILED,
-}
-
-
-@dataclass(frozen=True)
-class ResultStatus:
-    """同步算法结果共享的最终状态三元组。"""
-
-    status: ConvergenceState
-    cause: FailureCause
-    message: str
-
-    def __post_init__(self) -> None:
-        if self.status is ConvergenceState.ITERATING:
-            raise ValueError("同步算法结果不能以 ITERATING 结束")
-        expected = CAUSE_STATUS[self.cause]
-        if self.status is not expected:
-            raise ValueError(
-                f"状态与原因不一致：{self.status.value} 不对应 {self.cause.value}；"
-                f"应为 {expected.value}"
-            )
 
 
 @dataclass(frozen=True)

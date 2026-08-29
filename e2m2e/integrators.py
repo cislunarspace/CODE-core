@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e.algorithm.results import ResultStatus
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.exceptions import RustExtensionUnavailableError
+from e2m2e.spice_ext import _check_rust_abi, _ensure_symbols
+from e2m2e.status import ConvergenceState, FailureCause, ResultStatus
 
 # 扩展符号在运行时逐个装载；静态类型检查将其视为动态对象。
 if TYPE_CHECKING:
@@ -269,45 +269,9 @@ def segmented_shooting_correct_py(*args: Any, **kwargs: Any) -> _ShootingResult:
     return _ShootingResult(_segmented_shooting_correct_py_raw(*args, **kwargs))
 
 
-# ---- Python↔Rust ABI 版本校验 ----
-# 单一来源：crates/e2m2e-integrators/abi-version.txt
-# build.rs 在 maturin develop 时生成 e2m2e/_rust_abi.py；未构建时回落到硬编码默认值。
-try:
-    from e2m2e._rust_abi import _ABI_VERSION as _MIN_REQUIRED_RUST_ABI
-except ImportError:
-    _MIN_REQUIRED_RUST_ABI: int = 1  # type: ignore[no-redef]  # 构建前/无扩展时的安全默认值
-
-_abi_ok: bool = False  # 进程级一次性缓存
-
-
-def _check_rust_abi() -> None:
-    """校验 Rust 扩展 ABI 版本；过期或缺失即报，结果进程级缓存。
-
-    在首次使用 Rust 扩展符号时调用（惰性）。扩展不存在时抛
-    :class:`RustExtensionUnavailableError` （带 ``make dev`` 指引），
-    不静默降级。过期二进制抛 ``RuntimeError``。
-    """
-    global _abi_ok
-    if _abi_ok:
-        return
-    try:
-        rust_extension = importlib.import_module("e2m2e._integrators")
-    except ImportError as exc:
-        raise RustExtensionUnavailableError(
-            "e2m2e._integrators 不可用（Rust 扩展未构建）。请先构建：make dev"
-        ) from exc
-    _py_abi_version = getattr(rust_extension, "_py_abi_version", None)
-    if _py_abi_version is None:
-        raise RustExtensionUnavailableError(
-            "e2m2e._integrators 缺少所需符号：_py_abi_version。请先构建：make dev"
-        )
-    actual = _py_abi_version()
-    if actual < _MIN_REQUIRED_RUST_ABI:
-        raise RuntimeError(
-            f"e2m2e._integrators 编译产物过期（ABI v{actual} < 所需 v{_MIN_REQUIRED_RUST_ABI}）。"
-            "请重建 Rust 扩展：make dev"
-        )
-    _abi_ok = True
+# ---- Python↔Rust ABI 版本校验：核心在共享内核叶 spice_ext（ADR 0039）----
+# 门面与 data 层各留一道符号门（符号检查查各自模块的 globals），
+# 共享 spice_ext._check_rust_abi 的进程级 ABI 缓存与 _ensure_symbols 的报错文案。
 
 
 def require_rust_extension(*required_symbols: str) -> None:
@@ -323,13 +287,7 @@ def require_rust_extension(*required_symbols: str) -> None:
         >>> require_rust_extension("propagate_compiled", "spice_furnsh")
     """
     _check_rust_abi()
-    missing = [name for name in required_symbols if globals().get(name) is None]
-    if missing:
-        raise RustExtensionUnavailableError(
-            "e2m2e._integrators 缺少所需符号："
-            + ", ".join(missing)
-            + "。spice 是默认且唯一支持的 feature；请用 make dev 重建扩展。"
-        )
+    _ensure_symbols(globals(), required_symbols)
 
 
 __all__ = [
