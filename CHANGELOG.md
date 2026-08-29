@@ -4,6 +4,13 @@ Release entries record exact code references (`module/function`, issue numbers, 
 
 ## [Unreleased]
 
+## [5.8.9] - 2026-08-29
+
+### Added
+- **`transfer_design` returns the converged transfer trajectory and `trajectory_times`** (#568, ADR 0040): HMN/LGA/WSB previously returned `trajectory=None` even on convergence - the contract existed but no producer populated it. Unified contract (ADR 0040): `trajectory` is `(n,6)` in the Earth-Moon synodic rotating frame, barycenter origin, physical km/km/s; `trajectory_times` is `(n,)` seconds from TLI. HMN samples 200 points along the two-body/Lambert arc (`multi_impulse.propagate_two_body` public wrapper) and applies a phase-aligned display transform (`eci_to_synodic_display` - arrival direction into the +x half-plane, geocenter->barycenter shift; a two-body-geometry display convention, not ephemeris-consistent, documented in the ADR). LGA/WSB no longer discard the arrival-leg arc already re-propagated inside refinement (`_refine_lga_candidate`/`_refine_wsb_candidate` now return `(candidate, arrival_arc|None)`); the departure leg is re-propagated in CR3BP (LGA) / BCR4BP (WSB) and joined (`_propagate_synodic_leg`, `_join_transfer_legs`). Assembly propagation failure degrades to a warning with `trajectory=None`. `TransferDesignResult`/`TransferDesignResponse`/Facade gain `trajectory_times`; the MCP/sidecar path inlines it in JSON (no `_BINARY_TOOLS` change). `low_thrust` is unchanged (force-model state frame, known inconsistency recorded in ADR 0040).
+### Fixed
+- **WSB delta-v unit mixing** (#566): `_wsb_worker` compared a dimensionless `total_dv` against the km/s-semantics `max_total_dv` threshold, and `_refine_wsb_candidate` produced `dv_departure`/`dv_arrival` in km/s on the success branch while the failure branch kept them dimensionless - the reported `delta_v` mixed the two unit systems. Threshold comparison now divides by the characteristic velocity (`max_total_dv / vu`, mirroring `lga.py`), the refine success branch is normalized back to dimensionless, and `_transfer_orbit_wsb` multiplies the departure/arrival burns by the respective CR3BP/BCR4BP characteristic velocities to report a consistent km/s total. Rust and Python backends kept in sync.
+
 ## [5.8.8] - 2026-08-29
 
 ### Added
