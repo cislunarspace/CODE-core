@@ -153,7 +153,7 @@ Completed and uncompleted parts are listed by domain. For a detailed capability 
 - Rust integrator kernel: single-step RK (PD45 / PD78 / RK89), Adams multistep, Störmer–Cowell second-order integration, IAS15 (15th-order Gauss-Radau predictor-corrector with compensated summation for high-accuracy long arcs); state transition matrix (STM) propagation; event detection (terminal / direction semantics).
 - Variational equations: STM of the state with respect to the initial state, plus first-order sensitivity columns with respect to force-model parameters (Cr / Cd) for orbit determination and covariance propagation.
 - Dynamical models: CR3BP (fast design), ephemeris N-body (SPICE, accurate extrapolation), BCR4BP with analytic solar perturbation, plus conversions among the three.
-- High-fidelity force models: point-mass and third-body gravity, spherical-harmonics gravity field (with solid tides), ECOM 9-parameter solar radiation pressure, atmospheric drag, SRP, continuous thrust; propagation accuracy aligned with GMAT and DFH to sub-100 m level.
+- High-fidelity force models: point-mass and third-body gravity, spherical-harmonics gravity field (with solid tides), ECOM 9-parameter solar radiation pressure, atmospheric drag, SRP, continuous thrust.
 
 **Mission orbit design**
 
