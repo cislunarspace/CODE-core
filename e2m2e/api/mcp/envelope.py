@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import enum
 import json
 from typing import Any
 
@@ -51,6 +52,11 @@ def _to_jsonable(value: Any) -> Any:
         return {k: _to_jsonable(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_to_jsonable(v) for v in value]
+    # 纯 Enum（ConvergenceState/FailureCause 等）须显式取值，否则落入
+    # ``<类型名>`` 占位——族生成/catalog_get 响应走本降级路径，枚举值
+    # （converged 等）是软失败语义（ADR 0020）对外契约的一部分。
+    if isinstance(value, enum.Enum):
+        return _to_jsonable(value.value)
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     mu = getattr(value, "mu", None)

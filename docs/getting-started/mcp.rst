@@ -45,6 +45,15 @@ nested key ``mcp.servers``::
      }
    }
 
+Claude Code registers the same binary with a one-liner::
+
+   claude mcp add e2m2e --cwd "C:\path\to\e2m2e-repo" -- .venv/Scripts/e2m2e.exe mcp-serve
+
+For wire-level debugging (list tools, inspect schemas, replay single calls),
+the MCP Inspector drives the server interactively::
+
+   npx @modelcontextprotocol/inspector .venv/Scripts/e2m2e.exe mcp-serve
+
 .. note::
 
    Pin ``cwd`` at the repo root: the SPICE kernel directory (``kernels``) and
@@ -162,6 +171,95 @@ Natural-language example (say this inside your MCP client)::
    2026-01-01, then run 100 Monte Carlo station-keeping simulations on it, and
    tag it "candidate".
 
+Interactive mission design (human-in-the-loop)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The intended operating mode is a reviewed conversation, not a fire-and-forget
+script: you state mission intent in natural language, the agent assembles tool
+calls from each tool's schema (units, defaults, value domains), and every
+result comes back as a unified envelope for you to check before the next step.
+Artifacts are auto-ingested into the orbit catalog, so the whole session is
+reproducible — each product carries a ``record_id`` and links back to its
+inputs via ``source_record_id``.
+
+A reviewed loop looks like this:
+
+1. **State intent** — e.g. "Design an L2 southern NRHO with 2000 km perilune
+   starting 2026-01-01."
+2. **Agent calls** ``design_orbit(...)`` → envelope ``status="ok"`` with
+   ``data.status="converged"`` and ``data.record_id=…`` (auto-ingested).
+3. **Review the envelope** — there are two status layers: the transport layer
+   (``status``: ok/error with structured ``error.code``) and the numerical
+   layer (``data.status``: converged / diverged / stagnated / …). Per the
+   soft-failure semantics (ADR 0020) a diverged run is a valid, inspectable
+   result — never chain downstream steps on a ``status="ok"`` envelope whose
+   ``data.status`` is not ``converged``.
+4. **Chain by reference** — "run station-keeping Monte Carlo on it" → the
+   agent passes the previous ``record_id`` as ``input_record_id``; the product
+   record points back automatically.
+5. **Annotate and package** — ``catalog_tag`` attaches review notes;
+   ``catalog_export`` bundles a tagged subset into a zip for handover.
+
+Verified end-to-end session (13 calls, ~1 minute on a release build)::
+
+   catalog_query({})                                  # 13 baseline records
+   design_orbit(orbit_type="NRHO", north_south=2, perilune_height=2000,
+                phase=0.5, epoch=[2026,1,1,0,0,0.0],
+                duration=691200.0, output_step=7200.0)    # converged, ~22 s
+   catalog_tag(record_id=…, tags=["candidate"], note="…")
+   orbit_family_generation(orbit_type="HALO", libration_point=2, n_orbits=5)
+   catalog_query(orbit_family="halo")
+   catalog_promote(record_id=…, member_index=2)        # member → standalone
+   design_orbit(orbit_type="DRO", amplitude=15000, phase=0.5001,
+                epoch=[2026,1,1,0,0,0.0],
+                duration=7776000.0, output_step=7200.0)   # converged, ~17 s
+   catalog_tag(record_id=…, tags=["evader"], note="…")
+   design_orbit(orbit_type="HALO", collinear_point=2, amplitude=30000,
+                phase=0.0, epoch=[2026,1,1,0,0,0.0], duration=3155760.0,
+                output_step=3600.0, perturbation={…})     # SK nominal
+   control_orbit(input_record_id=…, control_mode=1, control_interval=10.0,
+                 num_controls=2, num_monte_carlo=2, perturbation={…})
+   catalog_export(tags=["candidate"], dest="case.zip")
+
+Parameter cookbook (verified recipes)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Convergence is parameter- and epoch-sensitive. Prefer these measured recipes
+(release build, kernels as shipped) over ad-hoc scaling:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 42 12 28
+
+   * - Tool
+     - Recipe
+     - Runtime
+     - Notes
+   * - ``design_orbit`` NRHO
+     - L2 south, ``perilune_height=2000``, ``phase=0.5``, 8-day arc
+       (``duration=691200``, ``output_step=7200``)
+     - ~20–100 s
+     - Converges at epochs 2024 and 2026. A 30-day / 5000 km arc converges
+       at 2024 but not at 2026 (segmented shooting residual ~2e4 km), and
+       year-scale arcs do not converge either — do not scale ``duration``
+       blindly.
+   * - ``design_orbit`` DRO
+     - ``amplitude=15000``, ``phase=0.5001``, 90-day arc
+     - ~17 s
+     - The default ``amplitude=10000`` stalls the initial-guess differential
+       correction (80 iterations, 29 m residual). Pick amplitudes near
+       baseline-catalog members (``catalog_query(orbit_family="dro")``).
+   * - ``control_orbit``
+     - HALO L2 30000 km nominal (36.5-day arc) with the same perturbation
+       switches as the design; ``control_mode=1``, ``control_interval=10``,
+       ``num_controls=2``
+     - seconds
+     - Contract: control horizon + ``feedback_arc`` must fit inside the
+       nominal ephemeris span (the nominal view interpolates, it does not
+       extrapolate). Long-horizon station-keeping needs its own tuning —
+       a 9 × 7-day DRO setup was observed to diverge (per-burn Δv
+       0 → 3.5 → 6.0 → 86.5 m/s, breaching ``thrust_max``).
+
 Caveats
 ~~~~~~~
 
@@ -179,6 +277,36 @@ Caveats
    expressible through the JSON envelope yet, so unregistered; revisit once
    record-reference inputs land. Use the algorithm-layer API meanwhile
    (:doc:`../algorithms/stability`).
+5. ``control_orbit`` reads the referenced record's ephemeris segment as the
+   nominal and only interpolates within its span: the control horizon
+   ``(num_controls-1) * control_interval`` plus ``feedback_arc`` must fit
+   inside the designed arc, so design the nominal with enough ``duration``
+   headroom.
+6. Long-arc CR3BP ephemeris correction is parameter- and epoch-sensitive
+   (see the cookbook above); a request that converges at one epoch may fail
+   at another. Failed corrections surface as ``DESIGN_FAILED`` with the
+   residual in the message — not as a crash.
+
+Troubleshooting
+~~~~~~~~~~~~~~~
+
+- ``DESIGN_FAILED … SPICE(FRAMEDATANOTFOUND)`` (ITRF93) at future epochs:
+  the body-fixed kernel list must load the predictive PCK
+  ``SPICEEarthPredictedKernel.bpc`` *before* the historical
+  ``earth_latest_high_prec.bpc`` (overlap prefers the later-loaded,
+  higher-accuracy historical data; the predictive file extends coverage to
+  ~2037). Fixed in the current tree (issue #556); on older checkouts keep
+  epochs inside the historical file's coverage.
+- ``data.status`` renders as ``"<ConvergenceState>"`` instead of a value like
+  ``"converged"``: envelope enum degradation on the fallback serialization
+  path (family / catalog_get / catalog_promote responses), fixed in the
+  current tree (issue #557).
+- A fresh catalog answers ``catalog_query({})`` with 13 records: the packaged
+  CR3BP baseline dataset auto-imports on first open (ADR 0036) — that is
+  intentional, not leftover state.
+- ``pytest tests/api/test_mcp.py`` reports the whole file as skipped: the
+  ``[mcp]`` extra is missing (the module uses ``importorskip``). Install with
+  ``uv sync --extra mcp`` and re-run.
 
 Next steps
 ~~~~~~~~~~

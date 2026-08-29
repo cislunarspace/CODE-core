@@ -616,9 +616,13 @@ def _kernel_paths(kernel_dir: str | None = None) -> list[str]:
         "SPICE_KERNEL_DIR", str(Path(__file__).resolve().parents[3] / "kernels")
     )
     paths = []
+    # SPICEEarthPredictedKernel.bpc 在 earth_latest_high_prec.bpc 之前加载：
+    # 历史 PCK 覆盖终点之外的时段（未来历元）由预测数据补齐，重叠段仍取
+    # 后加载的历史高精度数据（对齐 design_orbit._BODY_FIXED_KERNELS）。
     for name in [
         "de440s.bsp",
         "de430.bsp",
+        "SPICEEarthPredictedKernel.bpc",
         "earth_latest_high_prec.bpc",
         "pck00010.tpc",
         "SPICELunaCurrentKernel.bpc",

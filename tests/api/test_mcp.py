@@ -212,6 +212,9 @@ def test_family_response_serializes_orbit_members():
     env = envelope.invoke_tool(FamTool(), {})
     assert env["status"] == "ok"
     json.dumps(env)  # MCP 传输层直接 dumps 信封（server._to_result）
+    # 降级序列化路径（Orbit/ndarray 触发）枚举须取值而非 <ConvergenceState> 占位
+    assert env["data"]["status"] == "converged"
+    assert env["data"]["cause"] == "none"
     member = env["data"]["orbits"][0]
     assert member["states"][0] == [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     assert member["times"][0] == 0.0

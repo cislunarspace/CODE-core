@@ -149,8 +149,12 @@ _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 #: 固定时间后两种修正方法均在约 10 s 内收敛到容差内。
 _FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "DPO", "LISSAJOUS", "L4", "L5", "AXIAL"})
 
-#: body-fixed 帧（ITRF93 / MOON_PA）所需内核文件名，与 tests/kernel_helpers.py 一致
+#: body-fixed 帧（ITRF93 / MOON_PA）所需内核文件名，与 tests/kernel_helpers.py 一致。
+#: 预测 PCK 必须先于历史 PCK 加载：SPICE 对重叠覆盖段取后加载者，历史
+#: 重构数据（高精度）因此在过去时段优先，未来时段由预测数据补齐
+#: （历史文件覆盖有终点，超出即 FRAMEDATANOTFOUND）。
 _BODY_FIXED_KERNELS = [
+    "SPICEEarthPredictedKernel.bpc",
     "earth_latest_high_prec.bpc",
     "pck00010.tpc",
     "SPICELunaCurrentKernel.bpc",
