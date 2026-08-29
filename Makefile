@@ -5,20 +5,24 @@
 # 切勿裸跑 `uv sync`：e2m2e 在 uv.lock 中是 editable 包，uv sync 会当场以 maturin
 # 构建扩展（需要 CSPICE_DIR），且与 make dev 形成重复构建（issue #478）。
 
-# Windows 官方 Python 只装 python.exe（无 python3 命令），Linux 惯例为 python3。
+# ---------- Python / uv ----------
+
+# Windows 官方 Python 只装 python.exe（无 python3 命令），Linux 惯例为 python3；
 # 均可用命令行 `make PYTHON=...` 覆盖。
 ifeq ($(OS),Windows_NT)
 PYTHON ?= python
 else
 PYTHON ?= python3
 endif
-# --no-sync：uv run 默认先同步环境（触发 editable 构建），与 maturin develop 重复。
+# --no-sync：uv run 默认先同步环境（触发 editable 构建），与 maturin develop 重复；
 # 依赖由 make dev 显式同步，此处一律跳过（与 CI 的 uv run --no-sync 模式一致）。
+# 注：mypy/pytest 一律经 `python -m` 调用——Windows 上 uv 的 console-script 垫片
+# 可能报 "trampoline failed to canonicalize script path"；ruff 为原生 exe 不受影响。
 UV     := uv run --no-sync
-PYTEST_WORKERS ?= auto
-PYTEST_DIST ?= loadscope
 
-# 解析并导出 CSPICE_DIR（未缓存时自动下载）。
+# ---------- 环境导出：CSPICE_DIR / LIBCLANG_PATH（cspice-sys 构建依赖） ----------
+
+# CSPICE_DIR：解析编译包目录（未缓存时自动下载）。
 ifeq ($(OS),Windows_NT)
 CSPICE_DIR := $(CURDIR)/.cspice/mice_windows
 else
@@ -26,9 +30,9 @@ CSPICE_DIR := $(shell $(PYTHON) scripts/download_cspice.py --print-cspice-dir 2>
 endif
 export CSPICE_DIR
 
-# 探测并导出 LIBCLANG_PATH（cspice-sys 的 bindgen 需要）。
+# LIBCLANG_PATH：bindgen 需要。Windows 取 LLVM 官方安装器默认路径（可覆盖），
+# Linux 由 llvm-config / 文件系统探测。
 ifeq ($(OS),Windows_NT)
-# LLVM 官方 Windows 安装器默认路径；可用环境变量或命令行 make 覆盖。
 LIBCLANG_PATH ?= C:/Program Files/LLVM/bin
 else
 LLVM_CONFIG   := $(shell command -v llvm-config 2>/dev/null || ls /usr/bin/llvm-config-* 2>/dev/null | head -1)
@@ -36,9 +40,16 @@ LIBCLANG_PATH := $(or $(shell $(LLVM_CONFIG) --libdir 2>/dev/null),$(shell find 
 endif
 export LIBCLANG_PATH
 
+# ---------- 测试参数与共用命令 ----------
+
+PYTEST_WORKERS ?= auto
+PYTEST_DIST ?= loadscope
+# dev / dev-release 共用的依赖同步（--no-install-project 理由见文件头，issue #478）。
+DEV_SYNC := uv sync --group dev --no-install-project
+
 .DEFAULT_GOAL := help
 
-.PHONY: help setup cspice kernels dev dev-release test test-rust test-python catalog-baseline check fmt clean
+.PHONY: help setup cspice kernels dev dev-release test test-rust test-python docs check fmt clean
 
 help:  ## 显示本帮助
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -55,11 +66,11 @@ catalog-baseline:  ## 重新生成随包分发的 CR3BP 基线轨道族数据集
 	$(PYTHON) scripts/generate_catalog_baseline.py
 
 dev: setup  ## 唯一开发入口：同步依赖 + 拉数据 + 构建安装 Rust 扩展（debug）
-	uv sync --group dev --no-install-project
+	$(DEV_SYNC)
 	$(UV) maturin develop
 
 dev-release: setup  ## 同 dev，以 --release 构建（性能基准 / 长期预报用）
-	uv sync --group dev --no-install-project
+	$(DEV_SYNC)
 	$(UV) maturin develop --release
 
 test: test-rust test-python  ## 全量测试（Rust 工作区 + Python）
@@ -82,13 +93,21 @@ test-rust:  ## Rust 工作区测试（spice 默认；串行）
 	$(TEST_RUST)
 
 test-python:  ## Python 测试（默认 xdist 并行；含 spice-gated，需先 make setup 拉内核）
-	$(UV) pytest tests/ -n $(PYTEST_WORKERS) --dist $(PYTEST_DIST)
+	$(UV) python -m pytest tests/ -n $(PYTEST_WORKERS) --dist $(PYTEST_DIST)
 
-check:  ## 格式 + lint（Rust + Python）
+docs:  ## 构建 Sphinx 文档到 docs/_build/html（独立 docs 依赖组；需先 make dev）
+	uv sync --group docs --no-install-project
+	$(UV) sphinx-build -b html docs docs/_build/html
+
+# 命令集须与 ci.yml 保持对齐（CI 不调用 make）；改动任一边时同步另一边。
+check:  ## 格式 + lint + 类型/层级检查（Rust + Python，与 ci.yml 对齐）
 	cargo fmt --all -- --check
 	cargo clippy --workspace -- -D warnings
 	$(UV) ruff check .
 	$(UV) ruff format --check .
+	$(UV) python scripts/check_layer_imports.py
+	$(UV) python scripts/check_deleted_dir_refs.py
+	$(UV) python -m mypy e2m2e/ --ignore-missing-imports
 
 fmt:  ## 就地格式化（Rust + Python）
 	cargo fmt --all
