@@ -189,6 +189,10 @@ class TestFacadeCallChains:
         assert len(response.trajectory_times) == len(response.trajectory)
         # ADR 0040 增补：数据系标签随响应下发
         assert response.state_frame == "synodic_barycentric_km"
+        # #584：惯性几何段随响应下发，与会合几何同行对齐
+        assert response.trajectory_gcrs_km is not None
+        assert len(response.trajectory_gcrs_km) == len(response.trajectory)
+        assert len(response.trajectory_gcrs_km[0]) == 6
 
     def test_unknown_transfer_type_is_not_implemented_error(self):
         with pytest.raises(OrbitError, match="NOT_IMPLEMENTED"):

@@ -155,6 +155,7 @@ __all__ = [
     "ManeuverEvent",
     "STATE_FRAME_SYNODIC_BARYCENTRIC_KM",
     "STATE_FRAME_FORCE_MODEL_STATE",
+    "STATE_FRAME_GCRS_KM",
     "transfer_orbit",
 ]
 
@@ -162,10 +163,13 @@ __all__ = [
 _DEFAULT_TOF_GRID_POINTS: int = 50
 _G0: float = G0_MPS2  # m/s²，标准重力；以 thrust_arcs.G0_MPS2 为准
 
-# ADR 0040 增补：state_frame 数据系标签的转移管线取值。语义全集后续由其他
-# 响应（propagation/design）扩充 gcrs_km / synodic_barycentric_nd。
+# ADR 0040 增补：state_frame 数据系标签的转移管线取值。gcrs_km（#584）
+# 标注并行惯性段 trajectory_gcrs_km（字段自带数据系，顶层 state_frame
+# 仍指 trajectory 主段）；synodic_barycentric_nd 待其他响应
+# （propagation/design）批次接入。
 STATE_FRAME_SYNODIC_BARYCENTRIC_KM = "synodic_barycentric_km"
 STATE_FRAME_FORCE_MODEL_STATE = "force_model_state"
+STATE_FRAME_GCRS_KM = "gcrs_km"
 
 _STATE_FRAME_BY_TRANSFER_TYPE: dict[str, str] = {
     "HMN": STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
@@ -204,6 +208,13 @@ class TransferDesignResult:
             low_thrust 暂为力模型状态系的已知不一致）。
         trajectory_times: 轨迹时刻 (n,) 秒，TLI 起算（t=0 为出发脉冲），
             与 trajectory 逐行对齐。
+        trajectory_gcrs_km: 惯性几何段 (n, 6)（#584，ADR 0040 增补）：
+            地心原点、不旋转轴（GCRS 约定）物理 km / km/s，与
+            trajectory / trajectory_times 逐行对齐，共享时刻数组（时刻
+            不双份）。HMN 为两体弧构造系原样；LGA/WSB 为会合系几何旋回
+            惯性（速度含 ω×r 牵连项；θ₀=0 约定 TLI 时刻地月连线与惯性
+            x 轴重合——理想化方位，无星历语义）；low_thrust 与搜索零
+            结果为 None。
         state_frame: trajectory 的数据系标签（ADR 0040 增补）。缺省按
             transfer_type 派生，显式传值可覆盖。
         maneuver_events: 结构化机动事件列表（#575）。HMN 为
@@ -222,6 +233,7 @@ class TransferDesignResult:
     delta_v: float
     trajectory: Any
     trajectory_times: Any = None
+    trajectory_gcrs_km: Any = None
     state_frame: str = ""
     maneuver_events: tuple[ManeuverEvent, ...] = ()
     details: (
@@ -587,6 +599,45 @@ def _join_transfer_legs(
     return states, times
 
 
+def _synodic_to_gcrs(states_syn: np.ndarray, times_sec: np.ndarray, system: Any) -> np.ndarray:
+    """会合系质心物理 km → 地心惯性（GCRS 约定）km（#584，ADR 0040 增补）。
+
+    LGA/WSB 惯性段的换算内核：位置先平移 +[μ·DU, 0, 0]（地月质心 →
+    地心，会合系中地球位于 [−μ, 0, 0]），随后按 θ(t) = ω·t 绕 z 旋回
+    惯性（ω = 会合平均角速度；θ₀=0 约定 TLI 时刻地月连线与惯性 x 轴
+    重合）；速度同旋转并加 ω×r 牵连项——真实系间变换，区别于 HMN 显示
+    约定（``eci_to_synodic_display``）的无牵连旋转。
+
+    Args:
+        states_syn: (n, 6) 会合系质心物理 km / km/s（ADR 0040 §1 契约）。
+        times_sec: (n,) 秒，TLI 起算（θ 的时轴）。
+        system: 会合系统（需 mu / characteristic_length / mean_motion）。
+
+    Returns:
+        (n, 6) 地心惯性 km / km/s，与输入逐行对齐。
+    """
+    arr = np.asarray(states_syn, dtype=float)
+    times = np.asarray(times_sec, dtype=float)
+    mu = getattr(system, "mu", None)
+    du = getattr(system, "characteristic_length", None)
+    omega = getattr(system, "mean_motion", None)
+    if mu is None or du is None or omega is None:
+        raise ValueError("system 必须提供 mu / characteristic_length / mean_motion（特征尺度）")
+    theta = omega * times
+    c, s = np.cos(theta), np.sin(theta)
+    r_geo = arr[:, :3].copy()
+    r_geo[:, 0] += mu * du  # 质心原点 → 地心
+    v_syn = arr[:, 3:]
+    # Rz(+θ) 旋回惯性；ω×r = (−ω·r_y, ω·r_x, 0) 在惯性分量上叠加
+    r_x = c * r_geo[:, 0] - s * r_geo[:, 1]
+    r_y = s * r_geo[:, 0] + c * r_geo[:, 1]
+    r_z = r_geo[:, 2]
+    v_x = c * v_syn[:, 0] - s * v_syn[:, 1] - omega * r_y
+    v_y = s * v_syn[:, 0] + c * v_syn[:, 1] + omega * r_x
+    v_z = v_syn[:, 2]
+    return np.column_stack([r_x, r_y, r_z, v_x, v_y, v_z])
+
+
 def _transfer_orbit_lga(
     tli_params: TliParams | None,
     target_ephemeris: Any,
@@ -708,6 +759,12 @@ def _transfer_orbit_lga(
         warnings.warn("LGA 轨迹组装传播失败，返回无轨迹结果", stacklevel=2)
         trajectory, trajectory_times = None, None
 
+    # 惯性段（#584，ADR 0040 增补）：会合弧旋回地心惯性，与主几何共享
+    # 时刻数组；组装失败（无轨迹）时同样缺位。
+    trajectory_gcrs: Any = None
+    if trajectory is not None and trajectory_times is not None:
+        trajectory_gcrs = _synodic_to_gcrs(trajectory, trajectory_times, system)
+
     # 6. 物理单位换算
     perilune_phys = system.dimensionless_to_physical(refined.perilune_state)
     perilune_vel = float(np.linalg.norm(perilune_phys[3:]))
@@ -751,6 +808,7 @@ def _transfer_orbit_lga(
         delta_v=refined.total_dv * vu_km_s,
         trajectory=trajectory,
         trajectory_times=trajectory_times,
+        trajectory_gcrs_km=trajectory_gcrs,
         maneuver_events=maneuver_events,
         details=details,
         status=refined.status,
@@ -908,6 +966,13 @@ def _transfer_orbit_wsb(
         warnings.warn("WSB 轨迹组装传播失败，返回无轨迹结果", stacklevel=2)
         trajectory, trajectory_times = None, None
 
+    # 惯性段（#584）：拼接后的会合弧统一用 CR3BP 特征尺度旋回惯性——
+    # BCR4BP 出发段与 CR3BP 到达段的 DU/TU 相差 ~1e-5（ADR 0040 §4 既有
+    # 尺度差），惯性方位本身是 θ₀=0 理想化，该差不另立双系换算。
+    trajectory_gcrs: Any = None
+    if trajectory is not None and trajectory_times is not None:
+        trajectory_gcrs = _synodic_to_gcrs(trajectory, trajectory_times, cr3bp_system)
+
     # 6. 物理单位换算
     # WsbCandidate dv 字段全无量纲（#566）：dv_departure 恒产自 BCR4BP 搜索，
     # dv_arrival 在精化成功时产自 CR3BP 打靶、回退时产自 BCR4BP 搜索——按
@@ -957,6 +1022,7 @@ def _transfer_orbit_wsb(
         delta_v=dv_departure_km_s + dv_arrival_km_s,
         trajectory=trajectory,
         trajectory_times=trajectory_times,
+        trajectory_gcrs_km=trajectory_gcrs,
         maneuver_events=maneuver_events,
         details=details,
         status=refined.status,
@@ -1241,8 +1307,11 @@ def _transfer_orbit_hmn(
         trajectory, trajectory_times = hohmann_transfer_states(r0, v_dep, tof)
 
     # 统一显示契约（ADR 0040）：ECI 两体几何 → 会合系相位对齐显示坐标；
-    # 参考方向取转移弧末行位置（到达点落入 +x 半平面，即画布月球方向）
-    trajectory = eci_to_synodic_display(trajectory, np.asarray(trajectory, dtype=float)[-1, :3])
+    # 参考方向取转移弧末行位置（到达点落入 +x 半平面，即画布月球方向）。
+    # 惯性段（#584）：显示变换前的地心两体弧原样入契约（ECI 构造系与
+    # GCRS 同为地心不旋转轴系；无星历方位语义，同显示约定的理想化）。
+    trajectory_gcrs: Any = np.asarray(trajectory, dtype=float).copy()
+    trajectory = eci_to_synodic_display(trajectory_gcrs, trajectory_gcrs[-1, :3])
 
     details = HmnTransferDetails(
         tli_epoch=tli_params.epoch,
@@ -1275,6 +1344,7 @@ def _transfer_orbit_hmn(
         delta_v=dv1 + dv2,
         trajectory=trajectory,
         trajectory_times=trajectory_times,
+        trajectory_gcrs_km=trajectory_gcrs,
         maneuver_events=maneuver_events,
         details=details,
         status=status,

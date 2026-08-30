@@ -925,6 +925,11 @@ class Facade:
                 and isinstance(result.trajectory_times, np.ndarray)
                 else result.trajectory_times
             )
+            # 惯性段（#584）：旧结果对象（含测试替身）无该字段时视为缺位
+            gcrs_segment = getattr(result, "trajectory_gcrs_km", None)
+            trajectory_gcrs_km = (
+                gcrs_segment.tolist() if isinstance(gcrs_segment, np.ndarray) else gcrs_segment
+            )
             status, cause, message = _result_triplet(result)
             response = TransferDesignResponse(
                 status=status,
@@ -934,6 +939,7 @@ class Facade:
                 delta_v=result.delta_v,
                 trajectory=trajectory,
                 trajectory_times=trajectory_times,
+                trajectory_gcrs_km=trajectory_gcrs_km,
                 # __post_init__ 派生保证取值在 Literal 集内；显式覆盖属 ADR 0040
                 # 扩展路径，越界值由响应构造期的 pydantic 校验兜底。
                 state_frame=cast(

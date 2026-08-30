@@ -106,7 +106,8 @@ add `gcrs_km` and `synodic_barycentric_nd` when other responses (propagation,
 design) adopt the field. `state_frame` is data-side and travels with the
 numbers; tod's `view_frame` (ADR 0013) stays user-side — the two must not be
 conflated. This branch is unreleased, so the field is mandatory (no `None`
-default).
+default). (`gcrs_km` landed in the #584 amendment below — as the label of the
+parallel inertial segment, not a new value of this field.)
 
 ### Consequences
 
@@ -184,3 +185,74 @@ index as NULL (exact value still readable from the record).
 - HMN visuals are textbook-style demos (arrival on the +x/Moon side); anyone
   needing ephemeris-grade transfers should use the LGA/WSB paths or wire
   `dynamics`.
+
+## Amendment (2026-08-30): `gcrs_km` inertial segment (#584)
+
+### Context
+
+tod #428 (inertial view — ADR 0013 `view_frame` through the double-layer
+canvas) needs the transfer arc's GCRS inertial geometry. The contract carried
+only synodic-frame geometry (`synodic_barycentric_km`), so the inertial view
+had nothing to draw, and every consumer would have had to ship its own
+synodic→inertial transform.
+
+### Decision
+
+**Vocabulary.** The `state_frame` vocabulary gains `gcrs_km`: geocentric
+origin, non-rotating axes (GCRS convention), physical km / km/s.
+
+**Parallel segment, direct representation.** `TransferDesignResult` /
+`TransferDesignResponse` gain `trajectory_gcrs_km` — an (n, 6) inertial
+trajectory row-aligned with `trajectory` and **sharing `trajectory_times`**
+(no second time array). The top-level `state_frame` keeps labeling the
+primary synodic `trajectory`; the inertial segment's data frame is the
+vocabulary value embedded in its own name (`gcrs_km`). The rejected
+alternative — shipping synodic→GCRS transform parameters instead — saves
+storage but scatters transform code to every consumer; the accepted cost is
+double geometry in the response and record.
+
+**Producers per transfer type.**
+
+- **HMN**: the geocentric two-body arc as constructed (the ECI states before
+  the §3 display rotation). Its construction axes are an idealized inertial
+  convention with no ephemeris orientation semantics — same idealization as
+  §3, named honestly as GCRS-convention km.
+- **LGA/WSB**: the joined synodic arc rotated back to inertial — translate
+  barycentric → geocentric (`+[μ·DU, 0, 0]`), rotate Rz(θ(t)) with
+  θ(t) = ω·t (ω = synodic mean motion), and **add the ω×r transport term to
+  velocities**. Unlike §3's display rotation (which deliberately omits the
+  transport term), this is a real frame change: without it the states are not
+  inertial and velocity-bearing consumers would be wrong.
+- **WSB scale note**: the joined arc already mixes BCR4BP (departure) and
+  CR3BP (arrival) characteristic quantities (§4's 1.3e-5 DU split); the
+  conversion applies the canonical CR3BP scales uniformly rather than a
+  two-system scheme — the residual is invisible next to the θ₀ idealization.
+- **low_thrust / zero-result runs**: `trajectory_gcrs_km=None` (no synodic
+  geometry to mirror; the force-model states stay out of the contract).
+
+**Orientation convention (θ₀ = 0).** At TLI the synodic +x axis (Earth→Moon
+line) coincides with the GCRS x axis. This is the only non-arbitrary choice:
+LGA/WSB's synodic geometry has no ephemeris orientation semantics (the
+constructed ECI departure state is *interpreted* as synodic at ingestion, not
+transformed by epoch), so attaching a real Moon angle would fabricate
+precision. Ephemeris-consistent orientation requires `spacetime_transform`
+with real epochs — out of scope, as in §3. Time basis: TLI seconds, shared.
+
+**Catalog.** `build_transfer_record` stores the inertial geometry as a
+`transfer/states_gcrs_km` array segment (present only when the segment
+exists); `transfer/times` is shared by both geometries. The segment key embeds
+the vocabulary value — the key *is* the frame annotation, mirroring how
+`scalars.state_frame` annotates `transfer/states`. `SCHEMA_VERSION` stays 1;
+no new index columns or filters.
+
+### Consequences
+
+- tod's inertial view draws `trajectory_gcrs_km` directly — zero transform
+  code in the consumer; the synodic view is untouched (zero breakage for
+  existing consumers).
+- MCP/sidecar: transfer tools remain outside the sidecar `_BINARY_TOOLS` frame
+  map; the inertial array serializes inline JSON like `trajectory` (payload
+  roughly doubles for converged impulse transfers — the accepted cost).
+- Round-trip guarantee (test-guarded): applying the inverse rotation
+  (translate −[μ·DU, 0, 0], Rz(−θ), subtract ω×r) to `trajectory_gcrs_km`
+  recovers the synodic `trajectory` row-for-row.

@@ -195,17 +195,27 @@ def cr3bp_segment_arrays(states: np.ndarray, times: np.ndarray) -> dict[str, np.
     }
 
 
-def transfer_segment_arrays(trajectory: np.ndarray, times: np.ndarray) -> dict[str, np.ndarray]:
-    """转移轨迹段数组（#574）。
+def transfer_segment_arrays(
+    trajectory: np.ndarray,
+    times: np.ndarray,
+    gcrs_trajectory: np.ndarray | None = None,
+) -> dict[str, np.ndarray]:
+    """转移轨迹段数组（#574；#584 增 gcrs_km 惯性段）。
 
     ``states`` 为 ADR 0040 契约下的轨迹数据：HMN/LGA/WSB 为会合系物理
     km/km/s (n, 6)，low_thrust 暂为力模型状态 (M, 7)（state_frame 标量
     注明数据系）；``times`` 为 TLI 起算秒 (n,)，与 states 逐行对齐。
+    ``gcrs_trajectory`` 非空时另存 ``states_gcrs_km``——地心惯性（GCRS
+    约定）km/km/s (n, 6)，与 states 同行、共享 times（时刻不双份）；
+    段键内嵌数据系词汇值 gcrs_km，即该段的 frame 标注。
     """
-    return {
+    arrays = {
         f"{TRANSFER_PREFIX}/states": np.asarray(trajectory, dtype=float),
         f"{TRANSFER_PREFIX}/times": np.asarray(times, dtype=float),
     }
+    if gcrs_trajectory is not None:
+        arrays[f"{TRANSFER_PREFIX}/states_gcrs_km"] = np.asarray(gcrs_trajectory, dtype=float)
+    return arrays
 
 
 def numeric_or_none(value: Any) -> float | None:

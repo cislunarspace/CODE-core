@@ -140,6 +140,7 @@ def _make_transfer_result(
     transfer_type: str = "WSB",
     delta_v: float = 3.9,
     with_trajectory: bool = True,
+    with_gcrs: bool = True,
 ) -> SimpleNamespace:
     from e2m2e.algorithm.transfer import ManeuverEvent
 
@@ -151,6 +152,11 @@ def _make_transfer_result(
         delta_v=delta_v,
         trajectory=np.arange(12, dtype=float).reshape(2, 6) if with_trajectory else None,
         trajectory_times=np.array([0.0, 100.0]) if with_trajectory else None,
+        trajectory_gcrs_km=(
+            np.arange(12, dtype=float).reshape(2, 6) + 100.0
+            if with_trajectory and with_gcrs
+            else None
+        ),
         state_frame="synodic_barycentric_km",
         maneuver_events=(
             ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=3.5),
@@ -212,6 +218,40 @@ class TestTransferRecord:
         # request 快照可追溯
         assert record.request["transfer_type"] == "WSB"
 
+    def test_transfer_record_carries_gcrs_segment(self, monkeypatch, tmp_path):
+        """惯性段入 transfer/ 段（#584）：gcrs 键自带数据系标注，时刻共用不双份。"""
+        _fake_transfer(monkeypatch, _make_transfer_result(with_gcrs=True))
+        facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
+
+        response = facade.transfer_design(
+            transfer_type="WSB", tli_epoch=2460800.5, target_ephemeris=[[1.0] * 6]
+        )
+
+        assert response.record_id is not None
+        record = facade.catalog_get(record_id=response.record_id)
+        # 惯性段：键名内嵌词汇值 gcrs_km（该段的 frame 标注）
+        gcrs = record.arrays["transfer/states_gcrs_km"]
+        assert gcrs.shape == (2, 6)
+        assert np.allclose(gcrs, np.arange(12, dtype=float).reshape(2, 6) + 100.0)
+        # 时刻数组共用：全段唯一 times 键，与两份几何同行对齐
+        times_keys = {key for key in record.arrays if key.endswith("/times")}
+        assert times_keys == {"transfer/times"}
+        # 主几何的 state_frame 标注不受并行段影响（仍指 synodic 主段）
+        assert record.scalars["state_frame"] == "synodic_barycentric_km"
+
+    def test_transfer_record_without_gcrs_omits_segment(self, monkeypatch, tmp_path):
+        """无惯性段（low_thrust/零结果）不落 gcrs 键，旧消费方零感知。"""
+        _fake_transfer(monkeypatch, _make_transfer_result(with_gcrs=False))
+        facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
+
+        response = facade.transfer_design(
+            transfer_type="WSB", tli_epoch=2460800.5, target_ephemeris=[[1.0] * 6]
+        )
+
+        record = facade.catalog_get(record_id=response.record_id)
+        assert "transfer/states_gcrs_km" not in record.arrays
+        assert set(record.arrays) == {"transfer/states", "transfer/times"}
+
     def test_transfer_without_trajectory_makes_no_record(self, monkeypatch, tmp_path):
         _fake_transfer(monkeypatch, _make_transfer_result(with_trajectory=False))
         facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
@@ -240,7 +280,7 @@ class TestTransferRecord:
         """low_thrust details 无 tof_sec：tof 标量为 None，记录照常落库。"""
         from e2m2e.algorithm.transfer import ManeuverEvent
 
-        result = _make_transfer_result(transfer_type="low_thrust")
+        result = _make_transfer_result(transfer_type="low_thrust", with_gcrs=False)
         result.state_frame = "force_model_state"
         result.details = _FakeLowThrustDetails(equivalent_delta_v=2.2)  # 无 tof_sec
         result.maneuver_events = (ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=2.2),)

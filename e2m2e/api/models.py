@@ -765,6 +765,16 @@ class TransferDesignResponse(ResultResponse):
         default=None,
         description="轨迹时刻 (n,) 秒，TLI 起算（t=0 为出发脉冲），与 trajectory 逐行对齐",
     )
+    trajectory_gcrs_km: list[list[float]] | None = Field(
+        default=None,
+        description=(
+            "惯性几何段 (n, 6)（#584，ADR 0040 增补）：地心原点、不旋转轴"
+            "（GCRS 约定）物理 km / km/s，与 trajectory 逐行对齐、共享"
+            " trajectory_times（时刻不双份）；HMN 为两体弧构造系原样，"
+            "LGA/WSB 为会合几何旋回惯性（θ₀=0 理想化方位，无星历语义），"
+            "low_thrust 与零结果为 None。段的数据系即词汇值 gcrs_km"
+        ),
+    )
     # 字面量与 e2m2e/algorithm/transfer 的 STATE_FRAME_* 常量同源，改动须两侧同步；
     # 此处不导入以保持 models 层轻依赖（schema 出口）。
     state_frame: Literal["synodic_barycentric_km", "force_model_state"] = Field(
@@ -772,7 +782,8 @@ class TransferDesignResponse(ResultResponse):
             "trajectory 的数据系标签（ADR 0040 增补）：synodic_barycentric_km"
             " = 地月会合旋转系质心原点物理 km/km/s（HMN/LGA/WSB）；"
             "force_model_state = 力模型状态系（low_thrust，已知不一致）。"
-            "语义全集后续批次扩充 gcrs_km / synodic_barycentric_nd"
+            "词汇 gcrs_km 已由并行惯性段 trajectory_gcrs_km 启用（#584），"
+            "synodic_barycentric_nd 待后续批次接入"
         ),
     )
     maneuver_events: list[ManeuverEvent] = Field(

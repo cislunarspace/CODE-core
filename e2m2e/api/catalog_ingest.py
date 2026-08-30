@@ -356,7 +356,9 @@ def build_transfer_record(request: Any, result: Any) -> tuple[dict, dict[str, np
     transfer 专属元数据（transfer_type/delta_v/tli_epoch/tof_sec/
     state_frame）放 ``scalars``，轨道分类 6 键置 None/False——
     SCHEMA_VERSION 保持 1，零破坏。轨迹大数据走 ``transfer/`` 二进制段
-    （states + times，ADR 0040 契约数据系由 ``state_frame`` 标量注明）。
+    （states + times，ADR 0040 契约数据系由 ``state_frame`` 标量注明；
+    惯性几何另存 ``states_gcrs_km``，#584——时刻共用 times，段键自带
+    数据系标注）。
     ``tli_epoch`` 原样存（UTC 字符串或 JD_TDB 浮点）；数值历元才入
     索引区间列（UTC 字符串历元不作区间过滤）。``details`` 块原样存
     （后端 details 字段 + #575 结构化机动事件，共用契约）。无轨迹
@@ -370,7 +372,9 @@ def build_transfer_record(request: Any, result: Any) -> tuple[dict, dict[str, np
     trajectory_times = getattr(result, "trajectory_times", None)
     if trajectory is None or trajectory_times is None:
         return None
-    arrays = transfer_segment_arrays(trajectory, trajectory_times)
+    # 惯性段（#584）：与主几何同行对齐；缺位（low_thrust/零结果）不落段
+    gcrs_trajectory = getattr(result, "trajectory_gcrs_km", None)
+    arrays = transfer_segment_arrays(trajectory, trajectory_times, gcrs_trajectory)
     tof_sec = _details_tof_sec(result.details)
 
     meta = _base_meta(

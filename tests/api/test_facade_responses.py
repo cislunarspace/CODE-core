@@ -86,6 +86,7 @@ class TestTransferResponse:
             delta_v=3.1,
             trajectory=np.array([[1.0] * 6]),
             trajectory_times=np.array([0.0]),
+            trajectory_gcrs_km=np.array([[2.0] * 6]),
             state_frame="synodic_barycentric_km",
             maneuver_events=(
                 ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=3.1),
@@ -115,6 +116,40 @@ class TestTransferResponse:
         assert response.trajectory_times == [0.0]
         assert response.state_frame == "synodic_barycentric_km"
         assert response.details == {"array": [1.0, 2.0], "nested": {"tuple": [[3.0], 4.0]}}
+
+    def test_maps_gcrs_segment_to_response(self, monkeypatch):
+        """惯性段 ndarray → 响应 list（#584）；信封序列化无 ndarray 残留。"""
+        import e2m2e.algorithm.transfer as transfer
+
+        fake_result = self._fake_transfer_result(
+            trajectory_gcrs_km=np.array([[7.0] * 6, [8.0] * 6]),
+        )
+        monkeypatch.setattr(transfer, "transfer_orbit", lambda *args, **kwargs: fake_result)
+        response = Facade().transfer_design(
+            transfer_type="LGA",
+            tli_epoch="2025-06-21T11:00:00",
+            target_ephemeris=[[1.0] * 6],
+        )
+
+        assert response.trajectory_gcrs_km == [[7.0] * 6, [8.0] * 6]
+        # MCP/sidecar 信封透传：model_dump(mode="json") 直接可序列化
+        dumped = response.model_dump(mode="json")
+        assert dumped["trajectory_gcrs_km"] == [[7.0] * 6, [8.0] * 6]
+        assert dumped["state_frame"] == "synodic_barycentric_km"
+
+    def test_gcrs_segment_absent_maps_to_none(self, monkeypatch):
+        """算法层结果无惯性段（low_thrust/零结果）时响应字段为 None。"""
+        import e2m2e.algorithm.transfer as transfer
+
+        fake_result = self._fake_transfer_result(trajectory_gcrs_km=None)
+        monkeypatch.setattr(transfer, "transfer_orbit", lambda *args, **kwargs: fake_result)
+        response = Facade().transfer_design(
+            transfer_type="LGA",
+            tli_epoch="2025-06-21T11:00:00",
+            target_ephemeris=[[1.0] * 6],
+        )
+
+        assert response.trajectory_gcrs_km is None
 
     def test_maps_maneuver_events_to_response(self, monkeypatch):
         """算法层 ManeuverEvent 元组 → 响应 maneuver_events（#575 契约）。"""
