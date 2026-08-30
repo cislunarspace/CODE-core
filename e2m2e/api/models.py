@@ -736,6 +736,16 @@ class TransferDesignRequest(_ApiModel):
         max_length=6,
         description="目标末态 [x,y,z,vx,vy,vz]（地心惯性系，km, km/s）（low_thrust 可选）",
     )
+    top_n: int | None = Field(
+        default=None,
+        ge=1,
+        le=50,
+        description=(
+            "top-N 可行解契约（#583，ADR 0040 增补；可选）：返回至多 N 个"
+            "可行候选（按上报 Δv 升序，选中解标记），推荐值 DEFAULT_TOP_N"
+            "=5。缺省 None 不开启，行为与单解契约逐字段一致"
+        ),
+    )
 
 
 class ManeuverEvent(_ApiModel):
@@ -750,6 +760,49 @@ class ManeuverEvent(_ApiModel):
     t_sec: float = Field(ge=0.0, description="TLI 起算秒（t=0 为出发脉冲）")
     dv_km_s: float = Field(ge=0.0, description="该次机动脉冲大小；非脉冲事件为 0.0")
     note: str | None = Field(default=None, description="可选人类可读注记")
+
+
+class TransferCandidate(_ApiModel):
+    """top-N 可行解契约的单个候选（#583，ADR 0040 增补）。"""
+
+    delta_v_km_s: float = Field(
+        description=(
+            "该候选的总 Δv (km/s)。选中解与顶层 delta_v 同口径；"
+            "未精化候选（refined=False）为搜索网格估计（精化前）"
+        )
+    )
+    tli_epoch: float | str | None = Field(
+        description="出发历元（UTC 字符串或 JD_TDB 浮点）；low_thrust 出发态直传路径为 None"
+    )
+    tof_sec: float = Field(description="飞行时间 (秒)，TLI 起算")
+    trajectory: list[list[float]] | None = Field(
+        default=None,
+        description=(
+            "轨迹快照 (n, 6)，数据系由 state_frame 标注（LGA/WSB 未精化"
+            "候选为候选自由飞行弧，选中解与顶层 trajectory 同一条）；"
+            "快照组装失败为 None"
+        ),
+    )
+    trajectory_times: list[float] | None = Field(
+        default=None,
+        description=(
+            "快照时刻 (n,) 秒，TLI 起算，与 trajectory 逐行对齐；无时刻（low_thrust）为 None"
+        ),
+    )
+    # 字面量与 e2m2e/algorithm/transfer 的 STATE_FRAME_* 常量同源（同顶层
+    # state_frame 字段，改动须两侧同步；此处不导入以保持 models 层轻依赖）
+    state_frame: Literal["synodic_barycentric_km", "force_model_state"] = Field(
+        description="快照的数据系标签（ADR 0040 state_frame 词汇，同顶层字段）"
+    )
+    selected: bool = Field(
+        description=("是否为选中解（与默认路径最优解一致的那一个）；恰有一个候选为 True")
+    )
+    refined: bool = Field(
+        description=(
+            "Δv 口径：True 为打靶精化后数值（与顶层同口径），False 为搜索"
+            "网格估计（精化前）；HMN/low_thrust 无搜索-精化两级，恒为 True"
+        )
+    )
 
 
 class TransferDesignResponse(ResultResponse):
@@ -797,6 +850,15 @@ class TransferDesignResponse(ResultResponse):
             "arrival 两条（到达点即近月点）；LGA/WSB 含 perilune 旗标"
             "（dv_km_s=0）；low_thrust 连续推进恒为空；搜索零结果恒为空。"
             "旧 details Δv 字段保留一个版本后废弃"
+        ),
+    )
+    candidates: list[TransferCandidate] | None = Field(
+        default=None,
+        description=(
+            "top-N 可行解候选（#583，ADR 0040 增补；opt-in 参数 top_n 开启时"
+            "才下发）：按上报 Δv 升序，恰一个 selected=True 且与顶层结果同"
+            "口径；未精化候选的 Δv 为网格估计（refined=False）。默认（不开）"
+            "为 None；搜索零结果不携带"
         ),
     )
     details: dict[str, Any]

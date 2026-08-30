@@ -23,6 +23,7 @@ from e2m2e.api.models import (
     SpatiographyClassifyRequest,
     SpatiographyScalesRequest,
     TransferDesignRequest,
+    TransferDesignResponse,
 )
 from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import OrbitFamily
@@ -401,3 +402,128 @@ class TestFacadeToolInventory:
         assert all(by_name[name].request_model is model for name, model in implemented.items())
         assert all(by_name[name].status == "placeholder" for name in placeholders)
         assert all(by_name[name].request_model is None for name in placeholders)
+
+
+class TestFacadeTransferTopN:
+    """top-N 可行解契约（#583，ADR 0040 增补）：opt-in 翻译与默认零变化。"""
+
+    @staticmethod
+    def _fake_result_with_candidates(monkeypatch):
+        import e2m2e.algorithm.transfer as transfer
+
+        captured: dict[str, Any] = {}
+
+        def fake_transfer(*args, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="任务完成",
+                transfer_type="low_thrust",
+                delta_v=1.0,
+                trajectory=np.arange(6, dtype=float).reshape(1, 6),
+                trajectory_times=np.array([0.0]),
+                state_frame="force_model_state",
+                maneuver_events=(),
+                candidates=(
+                    transfer.TransferCandidate(
+                        delta_v_km_s=1.0,
+                        tli_epoch=2460800.5,
+                        tof_sec=86400.0,
+                        trajectory=np.arange(6, dtype=float).reshape(1, 6),
+                        trajectory_times=np.array([0.0]),
+                        state_frame="force_model_state",
+                        selected=True,
+                        refined=True,
+                    ),
+                    transfer.TransferCandidate(
+                        delta_v_km_s=1.4,
+                        tli_epoch=2460800.5,
+                        tof_sec=90000.0,
+                        trajectory=None,
+                        trajectory_times=None,
+                        state_frame="force_model_state",
+                        selected=False,
+                        refined=False,
+                    ),
+                ),
+                details={},
+            )
+
+        monkeypatch.setattr(transfer, "transfer_orbit", fake_transfer)
+        return captured
+
+    def test_top_n_passed_through_and_candidates_translated(self, monkeypatch):
+        captured = self._fake_result_with_candidates(monkeypatch)
+        response = Facade().transfer_design(
+            transfer_type="low_thrust",
+            tli_epoch="2025-06-21T11:00:00",
+            engine_config={"t_max": 0.5, "isp": 3000.0},
+            initial_mass=1000.0,
+            top_n=5,
+        )
+        # opt-in 参数透传算法层
+        assert captured["top_n"] == 5
+        # 候选翻译为响应模型，ndarray → list，标记原样
+        assert response.candidates is not None
+        assert len(response.candidates) == 2
+        selected, unrefined = response.candidates
+        assert selected.selected is True and selected.refined is True
+        assert selected.delta_v_km_s == pytest.approx(1.0)
+        assert selected.trajectory == [[0.0, 1.0, 2.0, 3.0, 4.0, 5.0]]
+        assert unrefined.selected is False and unrefined.refined is False
+        assert unrefined.trajectory is None and unrefined.trajectory_times is None
+
+    def test_default_response_carries_no_candidates(self, monkeypatch):
+        import e2m2e.algorithm.transfer as transfer
+
+        captured: dict[str, Any] = {}
+
+        def fake_transfer(*args, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="任务完成",
+                transfer_type="low_thrust",
+                delta_v=1.0,
+                trajectory=None,
+                trajectory_times=None,
+                state_frame="force_model_state",
+                maneuver_events=(),
+                details={},
+            )
+
+        monkeypatch.setattr(transfer, "transfer_orbit", fake_transfer)
+        response = Facade().transfer_design(
+            transfer_type="low_thrust",
+            tli_epoch="2025-06-21T11:00:00",
+            engine_config={"t_max": 0.5, "isp": 3000.0},
+            initial_mass=1000.0,
+        )
+        # 未开启时：不向算法层传 top_n（保持 None），响应无候选字段语义
+        assert captured["top_n"] is None
+        assert response.candidates is None
+
+    @pytest.mark.parametrize("bad_top_n", [0, -3])
+    def test_non_positive_top_n_is_invalid_params(self, bad_top_n):
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().transfer_design(
+                transfer_type="HMN",
+                tli_epoch="2025-06-21T11:00:00",
+                target_orbit_radius_km=42164.0,
+                top_n=bad_top_n,
+            )
+
+    def test_candidates_survive_json_round_trip(self, monkeypatch):
+        self._fake_result_with_candidates(monkeypatch)
+        response = Facade().transfer_design(
+            transfer_type="low_thrust",
+            tli_epoch="2025-06-21T11:00:00",
+            engine_config={"t_max": 0.5, "isp": 3000.0},
+            initial_mass=1000.0,
+            top_n=5,
+        )
+        # MCP/JSON 序列化下新字段完整可读（模型往返逐字段相等）
+        revived = TransferDesignResponse.model_validate_json(response.model_dump_json())
+        assert revived.candidates == response.candidates

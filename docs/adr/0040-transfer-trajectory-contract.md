@@ -256,3 +256,86 @@ no new index columns or filters.
 - Round-trip guarantee (test-guarded): applying the inverse rotation
   (translate −[μ·DU, 0, 0], Rz(−θ), subtract ω×r) to `trajectory_gcrs_km`
   recovers the synodic `trajectory` row-for-row.
+
+## Amendment (2026-08-30): top-N feasible candidates (#583)
+
+### Context
+
+`transfer_design` exposed a single best solution while the search stage
+already collected every feasible candidate sorted by Δv — LGA sorts the grid
+candidates (`total_dv` ascending) and WSB sorts `all_candidates` before the
+orchestrator keeps only `[0]`. tod #430 (方案对比 on the dual-layer canvas —
+current solution in the result layer, alternatives in the fixed layer, Δv
+chips per solution) needs multiple solutions in one response; the canvas is
+ready upstream, only the contract lacks a channel. Today consumers must
+re-run narrowed searches to see alternatives.
+
+### Decision
+
+**Opt-in parameter, zero default change.** `TransferDesignRequest` /
+`transfer_orbit` gain `top_n: int | None` (validated 1–50). `None` (the
+default): results carry no candidates (`candidates=()` on the result,
+`candidates=None` on the response) and every other field is untouched — the
+single-solution contract above is field-identical. The contract never
+self-activates; the recommended candidate count is `DEFAULT_TOP_N = 5`
+(tod's initial proposal for #430), exported for consumers.
+
+**Candidate shape.** Each `TransferCandidate` carries `delta_v_km_s`,
+`tli_epoch`, `tof_sec`, a `trajectory` + `trajectory_times` snapshot
+annotated with this ADR's `state_frame` vocabulary, and two markers:
+`selected` — exactly one candidate, the same solution the default path
+picks, with Δv and trajectory identical to the top-level fields — and
+`refined` — Δv provenance (True: shooting-refined, top-level grade; False:
+grid estimate, pre-refinement). The provenance marker is the honest-labeling
+requirement: mixed calibers coexist in one list only if each entry declares
+its own.
+
+**Decision 1 — refinement policy: refine only the selected.** The N−1
+non-selected candidates return exactly as the search produced them (grid
+Δv, `refined=False`). Refining all N would multiply ThreeBodyLambert
+shooting cost by N; consumers comparing alternatives need ranked raw
+solutions, not N fully-refined trajectories, and the selected solution
+remains refinement-grade.
+
+**Decision 2 — snapshots: free-flight arcs, labeled honestly.** An
+unrefined candidate snapshots its own search solution: LGA re-propagates
+the CR3BP free-flight arc to the candidate's arrival time; WSB re-propagates
+BCR4BP with the candidate's `sun_phase0`. Both are labeled
+`synodic_barycentric_km` (WSB carries §4's 1.3e-5 DU scale note as before).
+The selected candidate's snapshot IS the top-level geometry (refined join
+for LGA/WSB, §3 display arc for HMN, `force_model_state` for low_thrust).
+Snapshot propagation failure degrades *that candidate* to
+`trajectory=None` — never the result, never another candidate.
+
+**Decision 3 — catalog: selected only.** `build_transfer_record` is
+untouched: a top-N run ingests exactly the selected solution's record from
+the top-level result. Candidate snapshots and grid estimates never enter
+the catalog; `SCHEMA_VERSION` stays 1, no new index columns or filters.
+
+**Emission order is reported-Δv ascending; selection is a marker, not a
+position.** Refinement changes the selected solution's Δv, so grid order
+does not guarantee reported order; the emitted list is sorted by
+`delta_v_km_s`. Truncation to N always keeps the selected solution; fewer
+feasible candidates emit the actual count; a zero-result search emits no
+candidates regardless of `top_n` (the status triplet already says why).
+
+**Backends without a candidate set.** `low_thrust` is a single optimization:
+with `top_n` it returns exactly one candidate (selected, `refined=True`, its
+`force_model_state` trajectory, no `trajectory_times`, `tli_epoch=None` on
+the direct-`departure_state` path). HMN likewise returns one candidate; its
+`tof_range` Lambert sweep already scans multiple TOFs, but surfacing
+per-TOF candidates is deliberately deferred — it needs its own Δv
+accounting decision (each TOF changes dv1/dv2) and is not required by
+tod #430.
+
+### Consequences
+
+- tod #430 renders 方案对比 from one `transfer_design` call: selected into
+  the result layer, the rest into the fixed layer, per-candidate Δv chips
+  driven by `delta_v_km_s` + `selected`/`refined`.
+- Response payload grows by ≤N snapshots (~200×6 floats each); transfer
+  tools remain inline-JSON outside the sidecar `_BINARY_TOOLS` frame map
+  (ADR 0035), as with §#584's parallel segment.
+- The candidate vocabulary (`TransferCandidate` + provenance markers) is
+  the reuse seam for future multi-solution surfaces (e.g. porkchop-style
+  scans) — they extend the vocabulary instead of inventing response shapes.

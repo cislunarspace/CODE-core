@@ -91,6 +91,7 @@ from .models import (
     SpatiographyMapResponse,
     SpatiographyScalesRequest,
     SpatiographyScalesResponse,
+    TransferCandidate,
     TransferDesignRequest,
     TransferDesignResponse,
 )
@@ -917,6 +918,7 @@ class Facade:
                     else None
                 ),
                 progress_callback=_wsb_search_progress(progress_callback, request),
+                top_n=request.top_n,
             )
             trajectory = (
                 result.trajectory.tolist()
@@ -959,6 +961,28 @@ class Facade:
                     )
                     for event in result.maneuver_events
                 ],
+                candidates=[
+                    TransferCandidate(
+                        delta_v_km_s=cand.delta_v_km_s,
+                        tli_epoch=cand.tli_epoch,
+                        tof_sec=cand.tof_sec,
+                        trajectory=(
+                            cand.trajectory.tolist()
+                            if isinstance(cand.trajectory, np.ndarray)
+                            else cand.trajectory
+                        ),
+                        trajectory_times=(
+                            cand.trajectory_times.tolist()
+                            if isinstance(cand.trajectory_times, np.ndarray)
+                            else cand.trajectory_times
+                        ),
+                        state_frame=cand.state_frame,
+                        selected=cand.selected,
+                        refined=cand.refined,
+                    )
+                    for cand in (getattr(result, "candidates", ()) or ())
+                ]
+                or None,
                 details=_details_to_dict(result.details),
             )
         except OrbitError:

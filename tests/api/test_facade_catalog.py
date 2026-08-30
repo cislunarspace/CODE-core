@@ -141,8 +141,36 @@ def _make_transfer_result(
     delta_v: float = 3.9,
     with_trajectory: bool = True,
     with_gcrs: bool = True,
+    with_candidates: bool = False,
 ) -> SimpleNamespace:
-    from e2m2e.algorithm.transfer import ManeuverEvent
+    from e2m2e.algorithm.transfer import ManeuverEvent, TransferCandidate
+
+    candidates = None
+    if with_candidates:
+        # top-N 候选（#583）：选中解与顶层同口径，另带一个网格估计候选——
+        # 两者 Δv 均不同于顶层值，入库守护据此区分“只 ingest 选中解”
+        candidates = (
+            TransferCandidate(
+                delta_v_km_s=delta_v,
+                tli_epoch=2460800.5,
+                tof_sec=100.0,
+                trajectory=np.arange(12, dtype=float).reshape(2, 6),
+                trajectory_times=np.array([0.0, 100.0]),
+                state_frame="synodic_barycentric_km",
+                selected=True,
+                refined=True,
+            ),
+            TransferCandidate(
+                delta_v_km_s=9.9,
+                tli_epoch=2460800.5,
+                tof_sec=200.0,
+                trajectory=np.arange(6, dtype=float).reshape(1, 6),
+                trajectory_times=np.array([0.0]),
+                state_frame="synodic_barycentric_km",
+                selected=False,
+                refined=False,
+            ),
+        )
 
     return SimpleNamespace(
         status=ConvergenceState.CONVERGED,
@@ -164,6 +192,7 @@ def _make_transfer_result(
             ManeuverEvent(kind="arrival", t_sec=100.0, dv_km_s=0.4),
         ),
         details=_FakeImpulsiveDetails(tli_epoch=2460800.5, tof_sec=100.0),
+        candidates=candidates if candidates is not None else (),
     )
 
 
@@ -849,3 +878,22 @@ class TestToolInventory:
         for name, model in request_models.items():
             assert by_name[name].status == "implemented"
             assert by_name[name].request_model is model
+
+    def test_top_n_run_ingests_selected_solution_only(self, monkeypatch, tmp_path):
+        """top-N 运行（#583）入库的仍是选中解单条记录：Δv 为顶层口径，
+        候选快照不产生额外段或记录。"""
+        _fake_transfer(monkeypatch, _make_transfer_result(with_candidates=True))
+        facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
+
+        response = facade.transfer_design(
+            transfer_type="WSB", tli_epoch=2460800.5, target_ephemeris=[[1.0] * 6]
+        )
+
+        assert response.record_id is not None
+        record = facade.catalog_get(record_id=response.record_id)
+        # 选中解口径（顶层 delta_v=3.9），非候选网格估计 9.9
+        assert record.scalars["delta_v_km_s"] == pytest.approx(3.9)
+        assert record.scalars["tof_sec"] == pytest.approx(100.0)
+        # 段只有选中解的几何（与默认路径同形状），无候选衍生段
+        assert record.arrays["transfer/states"].shape == (2, 6)
+        assert not any("candidate" in key for key in record.arrays)

@@ -153,6 +153,8 @@ __all__ = [
     "WsbCandidate",
     "LowThrustTransferDetails",
     "ManeuverEvent",
+    "TransferCandidate",
+    "DEFAULT_TOP_N",
     "STATE_FRAME_SYNODIC_BARYCENTRIC_KM",
     "STATE_FRAME_FORCE_MODEL_STATE",
     "STATE_FRAME_GCRS_KM",
@@ -162,6 +164,11 @@ __all__ = [
 
 _DEFAULT_TOF_GRID_POINTS: int = 50
 _G0: float = G0_MPS2  # m/s²，标准重力；以 thrust_arcs.G0_MPS2 为准
+
+# top-N 可行解契约（#583，ADR 0040 增补）：opt-in 参数不设隐式开启——
+# 契约的推荐候选数为消费方（tod 画布方案对比，tod #430）初值提案 5；
+# 调用方显式传 top_n 才启用，默认行为与单解契约逐字段一致。
+DEFAULT_TOP_N: int = 5
 
 # ADR 0040 增补：state_frame 数据系标签的转移管线取值。gcrs_km（#584）
 # 标注并行惯性段 trajectory_gcrs_km（字段自带数据系，顶层 state_frame
@@ -194,6 +201,40 @@ class ManeuverEvent:
     t_sec: float
     dv_km_s: float
     note: str | None = None
+
+
+@dataclass(frozen=True)
+class TransferCandidate:
+    """top-N 可行解契约的单个候选（#583，ADR 0040 增补）。
+
+    Attributes:
+        delta_v_km_s: 该候选的总 Δv (km/s)。选中解与顶层
+            ``TransferDesignResult.delta_v`` 同口径；未精化候选为搜索
+            网格估计（精化前口径）。
+        tli_epoch: 出发历元（UTC 字符串或 JD_TDB 浮点，原样透传）；
+            low_thrust 的出发态直传路径无历元语义，为 None。
+        tof_sec: 飞行时间 (秒)。
+        trajectory: 轨迹快照 (n, 6)，数据系由 ``state_frame`` 标注；
+            快照组装（传播）失败时为 None，不影响其余候选。
+        trajectory_times: 快照时刻 (n,) 秒，TLI 起算，与 trajectory
+            逐行对齐；trajectory 为 None 或后端不提供时刻
+            （low_thrust）时为 None。
+        state_frame: 快照的数据系标签（ADR 0040 ``state_frame`` 词汇）。
+        selected: 是否为选中解（与默认路径最优解一致的那一个）；
+            恰有一个候选为 True。
+        refined: Δv 口径标记——True 为打靶精化后数值（与顶层同口径），
+            False 为搜索网格估计（精化前）。LGA/WSB 的未精化候选恒为
+            False；HMN/low_thrust 无搜索-精化两级，单候选恒为 True。
+    """
+
+    delta_v_km_s: float
+    tli_epoch: float | str | None
+    tof_sec: float
+    trajectory: Any
+    trajectory_times: Any
+    state_frame: str
+    selected: bool
+    refined: bool
 
 
 @dataclass
@@ -236,6 +277,7 @@ class TransferDesignResult:
     trajectory_gcrs_km: Any = None
     state_frame: str = ""
     maneuver_events: tuple[ManeuverEvent, ...] = ()
+    candidates: tuple[TransferCandidate, ...] = ()
     details: (
         HmnTransferDetails
         | LgaTransferDetails
@@ -425,6 +467,7 @@ def transfer_orbit(
     system: Any = None,
     forces: Any = None,
     progress_callback: Any = None,
+    top_n: int | None = None,
     **kwargs,
 ) -> TransferDesignResult:
     """端到端转移轨道设计（编排器）。
@@ -457,14 +500,20 @@ def transfer_orbit(
             ``cb(delta: int)``——当前仅 WSB 后端消费：每完成一个
             ``(sun_phase, tof)`` 网格任务发一次 delta；其余后端无搜索
             进度通道，传值被忽略。
+        top_n: top-N 可行解契约（#583，ADR 0040 增补，可选）。None
+            （默认）行为与单解契约逐字段一致，结果不带候选；传正整数
+            N 时收敛结果携带至多 N 个可行候选（按上报 Δv 升序，选中解
+            标记），推荐值 ``DEFAULT_TOP_N``。搜索零结果时不携带候选。
 
     Returns:
         TransferDesignResult: 转移轨道设计结果。
 
     Raises:
         NotImplementedError: 编排器实现未完成（未知的 transfer_type）。
-        ValueError: 转移类型缺少必要参数。
+        ValueError: 转移类型缺少必要参数，或 top_n 非正。
     """
+    if top_n is not None and top_n < 1:
+        raise ValueError(f"top_n 须为正整数，收到 {top_n}")
     if transfer_type == "HMN":
         return _transfer_orbit_hmn(
             tli_params,
@@ -472,6 +521,7 @@ def transfer_orbit(
             tof_range,
             dynamics=dynamics,
             target_ephemeris=target_ephemeris,
+            top_n=top_n,
         )
     if transfer_type == "LGA":
         return _transfer_orbit_lga(
@@ -479,6 +529,7 @@ def transfer_orbit(
             target_ephemeris=target_ephemeris,
             search_params=lga_search_params,
             dynamics=dynamics,
+            top_n=top_n,
         )
     if transfer_type == "WSB":
         return _transfer_orbit_wsb(
@@ -487,6 +538,7 @@ def transfer_orbit(
             search_params=wsb_search_params,
             tof_range=tof_range,
             progress_callback=progress_callback,
+            top_n=top_n,
         )
     if transfer_type == "low_thrust":
         if engine_config is None:
@@ -506,6 +558,7 @@ def transfer_orbit(
             target_state=target_state,
             system=system,
             forces=forces,
+            top_n=top_n,
         )
     raise NotImplementedError(f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）")
 
@@ -643,6 +696,7 @@ def _transfer_orbit_lga(
     target_ephemeris: Any,
     search_params: LgaSearchParams | None,
     dynamics: Any = None,
+    top_n: int | None = None,
 ) -> TransferDesignResult:
     """LGA 月球引力辅助转移编排。
 
@@ -803,6 +857,52 @@ def _transfer_orbit_lga(
         ManeuverEvent(kind="arrival", t_sec=refined.tof_sec, dv_km_s=refined.dv_arrival * vu_km_s),
     )
 
+    # top-N 候选（#583，ADR 0040 增补）：选中解 = 精化后的顶层结果
+    # （同 Δv、同轨迹）；其余候选 = 网格解原样——Δv 为精化前估计，
+    # 快照为候选自由飞行弧（组装失败降级为无轨迹，不影响其余）。
+    # 发射按上报 Δv 升序：精化会改变选中解的 Δv，网格序不保证上报序，
+    # 选中靠标记不靠位置。
+    top_n_candidates: tuple[TransferCandidate, ...] = ()
+    if top_n is not None:
+        entries: list[TransferCandidate] = [
+            TransferCandidate(
+                delta_v_km_s=refined.total_dv * vu_km_s,
+                tli_epoch=tli_params.epoch,
+                tof_sec=refined.tof_sec,
+                trajectory=trajectory,
+                trajectory_times=trajectory_times,
+                state_frame=STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+                selected=True,
+                refined=arrival_arc is not None,
+            )
+        ]
+        for cand in candidates:
+            if len(entries) >= top_n:
+                break
+            if cand is best:
+                continue
+            try:
+                snap_states, snap_times = _propagate_synodic_leg(
+                    cr3bp_dynamics, system, cand.departure_state, cand.arrival_time_dim
+                )
+            except PropagationFailure:
+                warnings.warn("top-N 候选快照组装传播失败，该候选无轨迹", stacklevel=2)
+                snap_states, snap_times = None, None
+            entries.append(
+                TransferCandidate(
+                    delta_v_km_s=cand.total_dv * vu_km_s,
+                    tli_epoch=tli_params.epoch,
+                    tof_sec=cand.tof_sec,
+                    trajectory=snap_states,
+                    trajectory_times=snap_times,
+                    state_frame=STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+                    selected=False,
+                    refined=False,
+                )
+            )
+        entries.sort(key=lambda entry: entry.delta_v_km_s)
+        top_n_candidates = tuple(entries)
+
     return TransferDesignResult(
         transfer_type="LGA",
         delta_v=refined.total_dv * vu_km_s,
@@ -810,6 +910,7 @@ def _transfer_orbit_lga(
         trajectory_times=trajectory_times,
         trajectory_gcrs_km=trajectory_gcrs,
         maneuver_events=maneuver_events,
+        candidates=top_n_candidates,
         details=details,
         status=refined.status,
         cause=refined.cause,
@@ -840,6 +941,7 @@ def _transfer_orbit_wsb(
     search_params: WsbSearchParams | None,
     tof_range: tuple[float, float] | None = None,
     progress_callback: Any = None,
+    top_n: int | None = None,
 ) -> TransferDesignResult:
     """WSB 太阳引力辅助转移编排。
 
@@ -1017,6 +1119,55 @@ def _transfer_orbit_wsb(
         ManeuverEvent(kind="arrival", t_sec=refined.tof_sec, dv_km_s=dv_arrival_km_s),
     )
 
+    # top-N 候选（#583，ADR 0040 增补）：与 LGA 同契约——选中解 = 顶层
+    # 精化结果；其余候选 = 网格解原样（Δv 为 BCR4BP 网格估计，#566 口径），
+    # 快照为候选 sun_phase0 下的 BCR4BP 自由飞行弧（组装失败降级无轨迹）。
+    # 发射按上报 Δv 升序，选中靠标记不靠位置。
+    top_n_candidates: tuple[TransferCandidate, ...] = ()
+    if top_n is not None:
+        entries: list[TransferCandidate] = [
+            TransferCandidate(
+                delta_v_km_s=dv_departure_km_s + dv_arrival_km_s,
+                tli_epoch=tli_params.epoch,
+                tof_sec=refined.tof_sec,
+                trajectory=trajectory,
+                trajectory_times=trajectory_times,
+                state_frame=STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+                selected=True,
+                refined=arrival_arc is not None,
+            )
+        ]
+        for cand in candidates:
+            if len(entries) >= top_n:
+                break
+            if cand is best:
+                continue
+            try:
+                snap_system = BCR4BPSystem.earth_moon(sun_phase0=cand.sun_phase0)
+                snap_states, snap_times = _propagate_synodic_leg(
+                    BCR4BP_Dynamics(snap_system),
+                    snap_system,
+                    cand.departure_state,
+                    cand.arrival_time_dim,
+                )
+            except PropagationFailure:
+                warnings.warn("top-N 候选快照组装传播失败，该候选无轨迹", stacklevel=2)
+                snap_states, snap_times = None, None
+            entries.append(
+                TransferCandidate(
+                    delta_v_km_s=cand.total_dv * vu_bcr4,
+                    tli_epoch=tli_params.epoch,
+                    tof_sec=cand.tof_sec,
+                    trajectory=snap_states,
+                    trajectory_times=snap_times,
+                    state_frame=STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+                    selected=False,
+                    refined=False,
+                )
+            )
+        entries.sort(key=lambda entry: entry.delta_v_km_s)
+        top_n_candidates = tuple(entries)
+
     return TransferDesignResult(
         transfer_type="WSB",
         delta_v=dv_departure_km_s + dv_arrival_km_s,
@@ -1024,6 +1175,7 @@ def _transfer_orbit_wsb(
         trajectory_times=trajectory_times,
         trajectory_gcrs_km=trajectory_gcrs,
         maneuver_events=maneuver_events,
+        candidates=top_n_candidates,
         details=details,
         status=refined.status,
         cause=refined.cause,
@@ -1062,6 +1214,7 @@ def _transfer_orbit_low_thrust(
     target_state: np.ndarray | None = None,
     system: Any = None,
     forces: Any = None,
+    top_n: int | None = None,
 ) -> TransferDesignResult:
     """小推力转移编排。
 
@@ -1204,6 +1357,22 @@ def _transfer_orbit_low_thrust(
         transfer_type="low_thrust",
         delta_v=equiv_dv,
         trajectory=sol.states,
+        candidates=(
+            (
+                TransferCandidate(
+                    delta_v_km_s=equiv_dv,
+                    tli_epoch=tli_params.epoch if tli_params is not None else None,
+                    tof_sec=duration_days * SECONDS_PER_DAY,
+                    trajectory=sol.states,
+                    trajectory_times=None,
+                    state_frame=STATE_FRAME_FORCE_MODEL_STATE,
+                    selected=True,
+                    refined=True,
+                ),
+            )
+            if top_n is not None
+            else ()
+        ),
         details=details,
         status=sol.status,
         cause=sol.cause,
@@ -1228,6 +1397,7 @@ def _transfer_orbit_hmn(
     tof_range: tuple[float, float] | None = None,
     dynamics: Any = None,
     target_ephemeris: Any = None,
+    top_n: int | None = None,
 ) -> TransferDesignResult:
     """HMN 霍曼转移编排：解析解 + 出发状态构造。
 
@@ -1339,6 +1509,24 @@ def _transfer_orbit_hmn(
         cause = shoot_result.cause
         message = shoot_result.message
 
+    # top-N 候选（#583，ADR 0040 增补）：HMN 无搜索-精化两级——单候选，
+    # 即权威解数值（refined=True 口径）。tof 扫描的多解浮出另行推迟
+    # （见 ADR 增补）。
+    top_n_candidates: tuple[TransferCandidate, ...] = ()
+    if top_n is not None:
+        top_n_candidates = (
+            TransferCandidate(
+                delta_v_km_s=dv1 + dv2,
+                tli_epoch=tli_params.epoch,
+                tof_sec=tof,
+                trajectory=trajectory,
+                trajectory_times=trajectory_times,
+                state_frame=STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+                selected=True,
+                refined=True,
+            ),
+        )
+
     return TransferDesignResult(
         transfer_type="HMN",
         delta_v=dv1 + dv2,
@@ -1346,6 +1534,7 @@ def _transfer_orbit_hmn(
         trajectory_times=trajectory_times,
         trajectory_gcrs_km=trajectory_gcrs,
         maneuver_events=maneuver_events,
+        candidates=top_n_candidates,
         details=details,
         status=status,
         cause=cause,
