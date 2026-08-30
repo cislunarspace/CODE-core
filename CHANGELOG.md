@@ -4,6 +4,11 @@ Release entries record exact code references (`module/function`, issue numbers, 
 
 ## [Unreleased]
 
+## [5.8.10] - 2026-08-30
+
+### Added
+- **`transfer_design` responses carry a `state_frame` data-frame label** (#572, ADR 0040 amendment): the converged-transfer trajectory contract (5.8.9) declared the frame in prose only, so LLM/GUI consumers had to guess which coordinate system the data uses. `TransferDesignResult.state_frame` is now derived in `__post_init__` from the transfer type — HMN/LGA/WSB → `synodic_barycentric_km` (Earth-Moon synodic rotating frame, barycenter origin, physical km/km/s per the ADR 0040 contract), `low_thrust` → `force_model_state` (the force-model state system, i.e. the known inconsistency recorded in ADR 0040). Transfer types without a derivation rule raise `ValueError` unless the field is set explicitly — the documented extension path for future vocabulary (e.g. `gcrs_km`, `synodic_barycentric_nd`); the six existing construction sites are unchanged. `TransferDesignResponse.state_frame` is `Literal["synodic_barycentric_km", "force_model_state"]`, kept string-identical to the algorithm constants (the models schema surface stays light-dependency and does not import the transfer package); the Facade passes it through via `cast` (an out-of-vocabulary explicit override would additionally be caught by pydantic validation at response construction), and the MCP/sidecar schema gains the field automatically. ADR 0040 gained an amendment section; the field lands directly in the version that merges it, no deprecation window.
+
 ## [5.8.9] - 2026-08-29
 
 ### Added
