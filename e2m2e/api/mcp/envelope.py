@@ -21,7 +21,14 @@ from e2m2e.data.types.orbit import Orbit
 from ..catalog_ingest import _finite_or_none
 from ..models import OrbitError
 
-__all__ = ["Envelope", "ok_envelope", "error_envelope", "invoke_tool", "dispatch_tool"]
+__all__ = [
+    "Envelope",
+    "error_envelope",
+    "invoke_tool",
+    "ok_envelope",
+    "dispatch_tool",
+    "tool_not_found",
+]
 
 # 信封的 JSON 形状（不是 Pydantic 模型：传输层只做序列化，不做自校验）。
 Envelope = dict[str, Any]
@@ -92,6 +99,16 @@ def error_envelope(code: str, message: str, details: dict[str, Any] | None = Non
         "error": {"code": code, "message": message, "details": details or {}},
         "meta": {},
     }
+
+
+def tool_not_found(name: str) -> Envelope:
+    """未知工具（placeholder 或未暴露的方法不注册）的失败信封。
+
+    进程内（handle_call_tool）与 worker 子进程（run_request）同名同义：
+    消息单一来源，两边不漂移。"""
+    return error_envelope(
+        "TOOL_NOT_FOUND", f"未知工具 {name!r}（placeholder 或未暴露的方法不注册）"
+    )
 
 
 def _accepted_extras(method: Any, extra_kwargs: dict[str, Any] | None) -> dict[str, Any]:

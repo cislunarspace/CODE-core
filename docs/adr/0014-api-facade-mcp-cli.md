@@ -36,6 +36,10 @@ is where that vision gets delivered.
 6. **MCP deployment = in-process library as the main body + thin CLI wrapper
    `mcp-serve`**: `create_server(facade)` function + `e2m2e mcp-serve`
    subcommand. One Facade instance = one server.
+   *(Revision note 2026-08-30, #588: the two long-running tools now execute
+   in worker subprocesses — each call constructs its own worker Facade via
+   environment inheritance; see the amendment at the end of this ADR.
+   Everything else keeps the in-process path.)*
 7. **config.py constructor injection**: `Facade(config=Config(...))`,
    covering only runtime environment (kernel paths/precision thresholds/
    logging); physical constants belong to data/templates/. SPICEManager's
@@ -76,3 +80,55 @@ is where that vision gets delivered.
   (deprecating tod/generates algorithm script layers, superseded by e2m2e
   CLI); GUI parameter forms are generated from e2m2e Pydantic models and their
   conditional-domain public interfaces.
+
+## Amendment (2026-08-30): long-running tools execute in worker subprocesses (#588, #576 Phase 2)
+
+### Context
+
+Long-running tools (`transfer_design`, `orbit_family_generation` — minutes at
+production scales) run to completion with no way to abort: `notifications/
+cancelled` and client disconnects were unobserved. The python mcp SDK 2.x
+delivers both as cancellation of the handler's task scope (interrupt mode
+resp. task-group teardown on EOF) — but the handler's `anyio.to_thread.
+run_sync` thread cannot be killed, and cooperative checkpoints fail inside
+GIL-released Rust sections (family generation is a single Rust call). A
+process is the only reliable interruption unit.
+
+### Decisions
+
+1. **Execution-strategy table at the transport layer**: `LONG_RUNNING_TOOLS`
+   in `api/mcp/server.py` routes `tools/call` for the two long-running tools
+   to a one-shot worker subprocess; every other tool keeps the thread-pool
+   path unchanged. Routing is a transport concern (spawn cost vs.
+   computation cost), not Facade metadata — the Facade signatures stay as
+   they are.
+2. **Worker protocol**: `python -m e2m2e.api.mcp.worker` reads one JSON
+   request line from stdin (`{"tool", "arguments"}`), writes throttled
+   progress lines and one final result line (the unified envelope) to
+   stdout, exits 0. The worker imports no mcp SDK (envelope/tools/facade
+   only — same dependency constraint as the sidecar). Errors translate
+   inside the worker; stderr passes through to the server's logs.
+3. **Cancellation = kill**: the server-side await is fully cancellable; on
+   cancellation (peer cancel notification or EOF) the worker is killed and
+   reaped inside a shielded scope, then the cancellation propagates. The
+   cancelled request is never answered (the SDK drops its result).
+4. **Data safety**: catalog persistence is one atomic write per record
+   (tmp + `os.replace`, ADR 0031) at the end of the tool method — a kill
+   loses at most the current task's record, never corrupts committed ones.
+5. **Environment via inheritance**: the worker constructs its own
+   `Facade(Config())`; env vars (`E2M2E_CATALOG_DIR`, …) carry the
+   environment. Records a worker commits are visible to the parent
+   (SQLite index, no in-process caching).
+6. **Failure envelope**: a worker exiting without a result line surfaces as
+   `WORKER_CRASHED` (structured error; exit code in the message).
+
+### Consequences
+
+- Progress forwarding survives the process boundary: the worker emits
+  progress lines; the parent forwards them from inside the event loop (the
+  thread-path reporter would deadlock if driven on the loop thread).
+- Windows spawn cost is ~1.3 s per worker roundtrip (interpreter boot +
+  imports; measured 2026-08-30 on the dev machine) — noise against
+  minutes-long computations; short tools never pay it.
+- One worker process per call: no state reuse; a killed worker never
+  serves another request.

@@ -88,9 +88,28 @@ Long-running tools report MCP progress while they work. Include a
 Requests without a ``progressToken`` are unaffected — no notifications, no
 overhead. Intermediate notifications are throttled server-side to at most one
 per 100 ms (the final fraction-1.0 notification is never throttled), and a
-failed delivery never affects the computation. Tool cancellation is **not**
-supported yet: a running tool always runs to completion (planned as a
-separate follow-up with process-level isolation).
+failed delivery never affects the computation.
+
+Tool cancellation
+~~~~~~~~~~~~~~~~~~
+
+Long-running tools (``transfer_design``, ``orbit_family_generation``)
+execute in one-shot **worker subprocesses** (ADR 0014 amendment), which
+makes two protocol events effective:
+
+* ``notifications/cancelled`` for an in-flight request: the worker process
+  is terminated and the request is never answered (the cancelled result is
+  dropped, not turned into an error).
+* client disconnect (stdio EOF): the same propagation — the server tears
+  down its handlers and each one kills its worker.
+
+Progress notifications keep flowing while the computation runs (the worker
+streams them back to the server). Killing loses only the current task: the
+catalog persists records atomically at the end of each tool method, so
+committed records are never corrupted by a kill. A worker that dies without
+returning a result surfaces as a structured ``WORKER_CRASHED`` error. All
+other tools run in-process in the thread pool as before and cannot be
+cancelled.
 
 Tool inventory
 ~~~~~~~~~~~~~~

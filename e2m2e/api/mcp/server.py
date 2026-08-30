@@ -14,6 +14,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import subprocess
+import sys
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -31,13 +33,19 @@ from mcp.types import (
 from . import envelope, tools
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from anyio.abc import ByteReceiveStream
+
     from ..facade import Facade
 
 __all__ = [
+    "LONG_RUNNING_TOOLS",
     "create_server",
     "handle_list_tools",
     "handle_call_tool",
     "make_progress_reporter",
+    "run_tool_in_worker",
 ]
 
 # 中间通知的最小发送间隔（秒）：高粒度回调（WSB 网格搜索可达数千次）
@@ -46,6 +54,20 @@ _PROGRESS_MIN_INTERVAL_SEC = 0.1
 # 单次投递等待事件循环的上限（秒）：事件循环停摆/已关时不无限阻塞
 # worker 线程；超时按投递失败处理（静默降级为无进度）。
 _PROGRESS_SEND_TIMEOUT_SEC = 5.0
+
+# 长任务工具（#588 / #576 Phase 2，子进程隔离架构）：分钟级计算改跑
+# worker 子进程（见 worker.py），使 MCP 取消（notifications/cancelled，
+# interrupt 模式取消 handler 作用域）与客户端断连（EOF 取消任务组）都能
+# 可靠传播为进程 kill。其余工具线程池直跑，行为不变。执行策略是传输层
+# 关注点，放这里而不入 Facade 元数据。
+LONG_RUNNING_TOOLS = frozenset({"transfer_design", "orbit_family_generation"})
+
+# worker 子进程命令（模块常量：测试注入 fake worker 用，同
+# _PROGRESS_MIN_INTERVAL_SEC 的 monkeypatch 先例）。
+_WORKER_ARGV = [sys.executable, "-m", "e2m2e.api.mcp.worker"]
+# 取消后 kill+收尸的时限（秒）：Windows TerminateProcess 即时生效，此为
+# 病理情形兜底，超时也不再阻塞取消收尾。
+_KILL_REAP_TIMEOUT_SEC = 10.0
 
 
 def make_progress_reporter(context: Any) -> Any:
@@ -103,6 +125,78 @@ def _to_result(env: envelope.Envelope) -> CallToolResult:
     )
 
 
+async def _iter_lines(stream: ByteReceiveStream) -> AsyncIterator[bytes]:
+    """从字节流逐行产出（不含换行符）；EOF（EndOfStream）自然结束。"""
+    buffer = bytearray()
+    while True:
+        try:
+            chunk = await stream.receive()
+        except anyio.EndOfStream:
+            return
+        buffer += chunk
+        while (newline := buffer.find(b"\n")) >= 0:
+            line = bytes(buffer[:newline])
+            del buffer[: newline + 1]
+            yield line
+
+
+async def run_tool_in_worker(
+    tool_name: str, arguments: dict[str, Any], context: Any
+) -> CallToolResult:
+    """在 worker 子进程中执行长任务工具（#588 子进程隔离）。
+
+    请求经 stdin 一行 JSON 下发，进度/结果行经 stdout 回流（协议见
+    worker.py）。等待全部走可取消的 await：MCP 请求取消（interrupt 模式
+    取消 handler 作用域）与客户端断连（EOF 取消任务组）在此汇成同一
+    处理——kill 子进程、shield 内收尸、重抛取消。kill 只丢当前任务：
+    catalog 落盘是一次性原子写（tmp + os.replace），已入库记录不受影响。
+    worker 异常退出（无结果行）译为 WORKER_CRASHED 结构化错误。
+    """
+    proc = await anyio.open_process(
+        _WORKER_ARGV, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None
+    )
+    assert proc.stdin is not None and proc.stdout is not None  # PIPE 已请求
+    request = json.dumps({"tool": tool_name, "arguments": arguments}, ensure_ascii=True)
+    await proc.stdin.send(request.encode("ascii") + b"\n")
+    await proc.stdin.aclose()
+
+    meta = getattr(context, "meta", None)
+    token = getattr(meta, "progress_token", None)
+    session = getattr(context, "session", None)
+    result_env: envelope.Envelope | None = None
+    try:
+        async for line in _iter_lines(proc.stdout):
+            try:
+                message: dict[str, Any] = json.loads(line)
+            except ValueError:
+                continue  # 非法行（非 JSON）忽略：worker 崩溃即无结果行
+            if message.get("type") == "progress" and token is not None and session is not None:
+                # 事件循环内直投（与线程路径的 make_progress_reporter 互斥：
+                # 那个经 run_coroutine_threadsafe，在循环线程内会死锁）；
+                # worker 侧已节流，收到即转发。
+                with contextlib.suppress(Exception):
+                    await session.report_progress(
+                        message.get("fraction", 0.0), 1.0, message.get("message")
+                    )
+            elif message.get("type") == "result":
+                result_env = message.get("envelope")
+        await proc.wait()
+    except BaseException:
+        # 取消（或传输层异常）：kill + 受限时收尸后重抛。shield 保证外层
+        # 取消不打断收尾；kill 是唯一可靠打断长计算的手段（线程不可杀）。
+        with anyio.CancelScope(shield=True):
+            with contextlib.suppress(TimeoutError):
+                with anyio.fail_after(_KILL_REAP_TIMEOUT_SEC):
+                    proc.kill()
+                    await proc.wait()
+        raise
+    if result_env is None:
+        result_env = envelope.error_envelope(
+            "WORKER_CRASHED", f"worker 进程未返回结果（exit={proc.returncode}）"
+        )
+    return _to_result(result_env)
+
+
 def handle_call_tool(
     facade: Facade, name: str, arguments: dict[str, Any], extra_kwargs: dict[str, Any] | None = None
 ) -> CallToolResult:
@@ -113,9 +207,7 @@ def handle_call_tool(
     """
     spec = next((s for s in tools.tool_specs(facade) if s.name == name), None)
     if spec is None:
-        env = envelope.error_envelope(
-            "TOOL_NOT_FOUND", f"未知工具 {name!r}（placeholder 或未暴露的方法不注册）"
-        )
+        env = envelope.tool_not_found(name)
     else:
         env = envelope.invoke_tool(spec.method, arguments, extra_kwargs=extra_kwargs)
     return _to_result(env)
@@ -143,8 +235,11 @@ def create_server(facade: Facade) -> Server:
     async def _call_tool(context: Any, params: Any) -> CallToolResult:
         # Facade 方法是同步长计算，放线程池避免阻塞事件循环；客户端
         # 请求进度时把线程安全回调作为额外协作者注入（未请求时 None，
-        # 注入层按方法签名过滤，其余工具零影响）。
+        # 注入层按方法签名过滤，其余工具零影响）。长任务工具例外：改跑
+        # worker 子进程，使取消/断连可靠传播为进程 kill（#588）。
         arguments = dict(params.arguments or {})
+        if params.name in LONG_RUNNING_TOOLS:
+            return await run_tool_in_worker(params.name, arguments, context)
         reporter = make_progress_reporter(context)
         extra = {"progress_callback": reporter} if reporter is not None else None
         return await anyio.to_thread.run_sync(

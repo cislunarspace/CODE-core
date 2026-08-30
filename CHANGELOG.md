@@ -4,6 +4,9 @@ Release entries record exact code references (`module/function`, issue numbers, 
 
 ## [Unreleased]
 
+### Added
+- **Long-running tool cancellation via worker subprocess isolation** (#588, #576 Phase 2, ADR 0014 amendment): `tools/call` for `transfer_design` and `orbit_family_generation` now executes in a one-shot worker subprocess — `python -m e2m2e.api.mcp.worker` reads one JSON request line on stdin (`{"tool", "arguments"}`), writes throttled progress lines plus one final result line (the unified envelope) on stdout, and exits 0; it imports no mcp SDK (envelope/tools/facade only, same dependency constraint as the sidecar). MCP `notifications/cancelled` (the SDK's interrupt mode cancels the handler scope) and client disconnect (EOF tears down the dispatcher task group) both propagate to a kill: `run_tool_in_worker` awaits the worker on fully cancellable streams and on cancellation kills the process and reaps it inside a shielded scope before re-raising — the cancelled request is never answered. Data safety rests on the existing one-shot atomic catalog write (tmp + `os.replace`): a kill loses at most the current task, never committed records. Progress forwarding survives the process boundary (worker lines forwarded from inside the event loop; the thread-path `run_coroutine_threadsafe` reporter would deadlock on the loop thread); a worker dying without a result line surfaces as a structured `WORKER_CRASHED` error with the exit code. Windows spawn overhead measured at ~1.3 s per roundtrip (interpreter boot + imports) against minutes-level computations. Other tools keep the thread-pool path unchanged. Documented in `docs/getting-started/mcp.rst` (Tool cancellation) and `docs/adr/0014` (amendment).
+
 ## [5.9.0] - 2026-08-30
 
 ### Added
