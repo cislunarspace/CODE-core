@@ -64,6 +64,12 @@ through these layers is told in the README's "How to read this repository".
 
 .. toctree::
    :maxdepth: 2
+   :caption: Station Keeping
+
+   algorithms/station-keeping
+
+.. toctree::
+   :maxdepth: 2
    :caption: Transfer Design
 
    transfer/overview
