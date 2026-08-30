@@ -43,7 +43,7 @@ EXPECTED_FAMILY_LABELS = {
     "halo-l2": {"halo_l2_northern"},
     "lpo-l4": {"longperiod_l4"},
     "nrho-l1": {"halo_l1_southern"},
-    "nrho-l2": {"halo_l2_northern"},
+    "nrho-l2": {"halo_l2_southern"},
     "spo-l4": {"shortperiod_l4"},
 }
 
@@ -94,8 +94,8 @@ def test_baseline_halo_hemisphere_matches_halo_class():
             state = bundle[f"cr3bp/members/{i:04d}/states"][0]
             result = classify_orbit(state[None, :], period=member["period"])
             assert result.primary is not None, (family, i, result.diagnostics)
-            # nrho-l2 记录的 halo_class 与其种子几何（z0>0、vy<0）不一致，
-            # 分类器以轨迹几何为准（ADR 0042 南北约定）；此处断言几何侧。
+            # 南北判定以轨迹几何为准（ADR 0042 约定：vy<0 穿越点 z 符号）；
+            # #586 修复后几何与记录参数 halo_class 一致，两侧同时断言。
             seed_z, seed_vy = float(state[2]), float(state[4])
             geometric_expected = (
                 f"halo_l{point}_northern" if seed_z * seed_vy < 0 else f"halo_l{point}_southern"
@@ -106,6 +106,12 @@ def test_baseline_halo_hemisphere_matches_halo_class():
                 member["parameters"]["halo_class"],
                 result.diagnostics,
             )
+            class_expected = (
+                f"halo_l{point}_northern"
+                if member["parameters"]["halo_class"] == 0
+                else f"halo_l{point}_southern"
+            )
+            assert geometric_expected == class_expected, (family, i)
 
 
 def test_baseline_lissajous_quasi_periodic():

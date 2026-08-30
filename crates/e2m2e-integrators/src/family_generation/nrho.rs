@@ -7,10 +7,13 @@ use super::common::{
 };
 use super::types::{Context, Member, Outcome, PeriodicOrbit};
 
+// 基准种子是 **北族**（vy<0 穿越点 z0>0，ADR 0042 几何约定）的折叠后
+// L2 Halo 成员；`state[2] *= z_sign` 在此语义下成立——z_sign=+1 保持
+// 北族，−1 镜像到南族。种子曾以南族入库导致南北双向反号（issue #586）。
 const L2_SEED_STATE: [f64; 6] = [
     1.128103754424342,
     0.0,
-    -0.17883236940616654,
+    0.17883236940616654,
     0.0,
     -0.22553424464298827,
     0.0,

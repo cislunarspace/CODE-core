@@ -15,7 +15,7 @@
     "has_cr3bp": true,
     "has_ephemeris": false,
     "taxonomy_labels": [
-      "halo_l2_northern"
+      "halo_l2_southern"
     ]
   },
   "status": "converged",
@@ -28,7 +28,7 @@
     "periodicity": "periodic",
     "mu": 0.012150585350562453,
     "char_length_km": 384400.0,
-    "baseline_version": "5.8.2",
+    "baseline_version": "5.9.0",
     "amplitude_envelope_km": [
       68903.3466195199,
       77769.15525949508
@@ -67,7 +67,7 @@
         "halo_class": 1,
         "perilune_height_km": 18721.949753967274
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 1,
@@ -85,7 +85,7 @@
         "halo_class": 1,
         "perilune_height_km": 17207.0879272359
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 2,
@@ -103,12 +103,12 @@
         "halo_class": 1,
         "perilune_height_km": 15723.719234039245
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 3,
       "period": 2.310158603957257,
-      "closure_error": 2.4802349844060823e-13,
+      "closure_error": 2.492201323783805e-13,
       "jacobi": 3.0154114751697225,
       "amplitude_km": 0.0,
       "amplitudes": {
@@ -121,7 +121,7 @@
         "halo_class": 1,
         "perilune_height_km": 14276.020902151873
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 4,
@@ -139,7 +139,7 @@
         "halo_class": 1,
         "perilune_height_km": 12867.771095920072
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 5,
@@ -157,7 +157,7 @@
         "halo_class": 1,
         "perilune_height_km": 11502.450482323138
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 6,
@@ -175,7 +175,7 @@
         "halo_class": 1,
         "perilune_height_km": 10183.356455169616
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 7,
@@ -193,7 +193,7 @@
         "halo_class": 1,
         "perilune_height_km": 8913.70958020247
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 8,
@@ -211,7 +211,7 @@
         "halo_class": 1,
         "perilune_height_km": 7696.7409878370145
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 9,
@@ -229,7 +229,7 @@
         "halo_class": 1,
         "perilune_height_km": 6535.756868308792
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 10,
@@ -247,7 +247,7 @@
         "halo_class": 1,
         "perilune_height_km": 5434.182072858479
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 11,
@@ -265,7 +265,7 @@
         "halo_class": 1,
         "perilune_height_km": 4395.590362387369
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 12,
@@ -283,7 +283,7 @@
         "halo_class": 1,
         "perilune_height_km": 3423.7366271776295
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 13,
@@ -301,7 +301,7 @@
         "halo_class": 1,
         "perilune_height_km": 2522.622015409785
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 14,
@@ -319,7 +319,7 @@
         "halo_class": 1,
         "perilune_height_km": 1696.6610953661598
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     },
     {
       "index": 15,
@@ -337,7 +337,7 @@
         "halo_class": 1,
         "perilune_height_km": 951.1255604625399
       },
-      "taxonomy_label": "halo_l2_northern"
+      "taxonomy_label": "halo_l2_southern"
     }
   ],
   "tags": [
@@ -346,7 +346,7 @@
   "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
   "record_id": "baseline-nrho-l2",
   "schema_version": 1,
-  "created_at": "2026-08-23T01:15:30.446308+00:00",
+  "created_at": "2026-08-30T12:50:20.600991+00:00",
   "arrays": {
     "cr3bp/members/0000/states": {
       "shape": [

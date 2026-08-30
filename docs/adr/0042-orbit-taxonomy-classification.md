@@ -132,10 +132,14 @@ halo (same family, high-amplitude near-rectilinear arc).
   lunar orbits → `distant_retrograde`, and the backfill logs four conflicts
   against the prograde expectation. Measured labels win; design labels stay
   as provenance.
-- **nrho-l2's record class disagrees with its geometry.** The baseline
-  records `halo_class=1` (south) while every seed has z0 > 0 at the vy < 0
-  crossing → the taxonomy says `halo_l2_northern`. The taxonomy follows
-  trajectory geometry; the design-side label is preserved unchanged.
+- **nrho-l2's record class used to disagree with its geometry (fixed, #586).**
+  The packaged baseline recorded `halo_class=1` (south) while every seed had
+  z0 > 0 at the vy < 0 crossing → the taxonomy said `halo_l2_northern`. The
+  cause was not a mirror-phase storage issue: the Rust L2 NRHO kernel's
+  hardcoded seed was itself a southern orbit, so its north/south mirroring
+  inverted both requested families. The seed was re-based to the northern
+  fold member and the baseline regenerated; geometry, `halo_class`, and
+  measured labels now agree (anchored by the baseline hemisphere test).
 - **The horseshoe family overlaps lpo.** Its endpoint members are identical
   to lpo-l4's largest (large-amplitude tadpoles, libration ≲ 50°). Per the
   mapping they ingest as empty labels, but a bare classifier call on such a
