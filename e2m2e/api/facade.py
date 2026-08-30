@@ -149,7 +149,13 @@ def _family_generation_payload(
     *,
     requested_members: int | None = None,
 ) -> FamilyGenerationResponse:
-    """把算法层成功或软失败统一投影为 Facade 专属响应。"""
+    """把算法层成功或软失败统一投影为 Facade 专属响应。
+
+    分类学标签（#581，ADR 0042）对全体成员实测打标后去重；拟周期
+    （lissajous）与不在分类学内的族按映射表为空表。
+    """
+    from .catalog_ingest import stamp_taxonomy_labels
+
     if isinstance(result, FamilyGenerationResult):
         family = result.family
         status = result.status
@@ -164,6 +170,12 @@ def _family_generation_payload(
         message = "轨道族生成完成"
         requested_members = requested_members or len(family)
         generated_members = len(family)
+    taxonomy_labels, _ = stamp_taxonomy_labels(
+        family.family_type,
+        family.orbits,
+        periodicity=family.metadata.get("periodicity", "periodic"),
+        context="orbit_family_generation",
+    )
     return FamilyGenerationResponse(
         status=status,
         cause=cause,
@@ -172,6 +184,7 @@ def _family_generation_payload(
         family_type=family.family_type,
         system=family.system,
         metadata=family.metadata,
+        taxonomy_labels=taxonomy_labels,
         requested_members=requested_members,
         generated_members=generated_members,
     )
@@ -294,14 +307,21 @@ def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse
     纯翻译、无副作用、不依赖 SPICE。ELFO 场景下 ``cr3bp_orbit`` /
     ``correction`` 为 None，对应字段输出默认值（mu=None、states/times 空、
     correction_iterations=0）。CR3BP 场景下从 ``cr3bp_orbit`` 提取
-    ``states`` / ``times`` / ``mu``。
+    ``states`` / ``times`` / ``mu``，并对参考周期轨道做分类学实测打标
+    （#581，ADR 0042；整条轨迹消费，无额外传播）。
     """
+    from e2m2e.algorithm.orbit_taxonomy import classify_orbit
+
     cr3bp_orbit = result.cr3bp_orbit
     correction = result.correction
+    taxonomy_labels: list[str] = []
     if cr3bp_orbit is not None:
         mu = getattr(cr3bp_orbit.system, "mu", None)
         states = cr3bp_orbit.states.tolist()
         times = cr3bp_orbit.times.tolist()
+        taxonomy_labels = list(
+            classify_orbit(cr3bp_orbit.states, cr3bp_orbit.times, mu=mu).canonical_labels
+        )
     else:
         mu = None
         states = []
@@ -321,6 +341,7 @@ def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse
         mu=mu,
         states=states,
         times=times,
+        taxonomy_labels=taxonomy_labels,
         ephemeris=_ephemeris_to_dict(result.ephemeris),
         drift_e=result.drift_e,
         drift_aop_deg=result.drift_aop_deg,
@@ -418,6 +439,7 @@ def _summary_kwargs(
 
     transfer 维度（#574）两种来源都归一在 identity 顶层：索引行直接带
     列值；记录元数据经 ``_summary_from_meta`` 从 ``scalars`` 提取后合入。
+    分类学标签（#581）随 ``classification`` 走，未打标记录为 None。
     """
     return {
         "record_id": identity["record_id"],
@@ -430,6 +452,7 @@ def _summary_kwargs(
         "amplitude": classification["amplitude"],
         "has_cr3bp": classification["has_cr3bp"],
         "has_ephemeris": classification["has_ephemeris"],
+        "taxonomy_labels": classification.get("taxonomy_labels"),
         "transfer_type": identity.get("transfer_type"),
         "delta_v_km_s": identity.get("delta_v_km_s"),
         "tli_epoch": identity.get("tli_epoch"),

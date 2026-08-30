@@ -13,7 +13,10 @@
       0.0
     ],
     "has_cr3bp": true,
-    "has_ephemeris": false
+    "has_ephemeris": false,
+    "taxonomy_labels": [
+      "halo_l2_northern"
+    ]
   },
   "status": "converged",
   "cause": "none",
@@ -63,7 +66,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 18721.949753967274
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 1,
@@ -80,7 +84,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 17207.0879272359
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 2,
@@ -97,7 +102,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 15723.719234039245
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 3,
@@ -114,7 +120,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 14276.020902151873
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 4,
@@ -131,7 +138,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 12867.771095920072
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 5,
@@ -148,7 +156,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 11502.450482323138
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 6,
@@ -165,7 +174,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 10183.356455169616
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 7,
@@ -182,7 +192,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 8913.70958020247
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 8,
@@ -199,7 +210,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 7696.7409878370145
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 9,
@@ -216,7 +228,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 6535.756868308792
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 10,
@@ -233,7 +246,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 5434.182072858479
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 11,
@@ -250,7 +264,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 4395.590362387369
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 12,
@@ -267,7 +282,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 3423.7366271776295
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 13,
@@ -284,7 +300,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 2522.622015409785
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 14,
@@ -301,7 +318,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 1696.6610953661598
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     },
     {
       "index": 15,
@@ -318,7 +336,8 @@
         "libration_point": 2,
         "halo_class": 1,
         "perilune_height_km": 951.1255604625399
-      }
+      },
+      "taxonomy_label": "halo_l2_northern"
     }
   ],
   "tags": [

@@ -5,6 +5,11 @@
 （CR3BP 段位置三分量半极差最大值 × 特征长度，km）；各族定义不一的
 参数振幅保留在 ``request`` 快照中，不进分类字段。
 
+分类学标签（ADR 0042）是**实测**：``taxonomy_labels`` 由分类器对轨迹
+判定写入，设计侧族标签保留为 provenance；两者冲突记 warning 不失败。
+不在分类学内的族（拟周期 lissajous、horseshoe、星历冻结 elfo）按映射
+表置空标签，不跑分类器。
+
 无产物时不建记录（返回 ``None``）：族零成员、站保全样本失败（受控
 星历缺失）、转移无轨迹（组装失败或搜索零结果）都不产生记录。
 """
@@ -12,11 +17,14 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import math
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from e2m2e.algorithm.orbit_taxonomy import classify_orbit
 from e2m2e.data.catalog import (
     cr3bp_segment_arrays,
     ephemeris_segment_arrays,
@@ -36,7 +44,10 @@ __all__ = [
     "build_design_record",
     "build_family_record",
     "build_transfer_record",
+    "stamp_taxonomy_labels",
 ]
+
+_LOGGER = logging.getLogger(__name__)
 
 #: design_orbit 的 orbit_type → (orbit_family, libration_point)。
 #: HALO/NRHO/LISSAJOUS/AXIAL 的平动点取请求的 collinear_point，不在此表。
@@ -53,6 +64,85 @@ _DESIGN_FAMILY_POINT: dict[str, tuple[str, int | None]] = {
     "L5_HORSESHOE": ("horseshoe", 5),
     "ELFO": ("elfo", None),
 }
+
+#: 设计侧 orbit_family → 分类学期望标签（ADR 0042 映射表）。NRHO 折叠
+#: 进 halo（同族高振幅近直线段）；空集 = 该族不在分类学内（拟周期
+#: lissajous、horseshoe、星历冻结 elfo、tadpole），入库直接置空标签。
+#: dpo 期望不含 distant_retrograde——baseline dpo 前 4 成员实测逆行
+#: （设计侧族行走的另一支，ADR 0042 复现注记），会触发冲突告警并按
+#: 实测值入库。
+_DESIGN_TAXONOMY_EXPECTATIONS: dict[str, set[str]] = {
+    "halo": {
+        "halo_l1_northern",
+        "halo_l1_southern",
+        "halo_l2_northern",
+        "halo_l2_southern",
+        "halo_l3_northern",
+        "halo_l3_southern",
+    },
+    "nrho": {
+        "halo_l1_northern",
+        "halo_l1_southern",
+        "halo_l2_northern",
+        "halo_l2_southern",
+    },
+    "axial": {"axial_l1", "axial_l2", "axial_l3", "axial_l4", "axial_l5"},
+    "dro": {"distant_retrograde"},
+    "dpo": {"distant_prograde", "low_prograde_eastern", "low_prograde_western"},
+    "spo": {"shortperiod_l4", "shortperiod_l5"},
+    "lpo": {"longperiod_l4", "longperiod_l5"},
+    "lissajous": set(),
+    "horseshoe": set(),
+    "elfo": set(),
+    "tadpole": set(),
+}
+
+
+def stamp_taxonomy_labels(
+    orbit_family: str | None,
+    orbits: Sequence[Any],
+    *,
+    periodicity: str = "periodic",
+    context: str = "",
+) -> tuple[list[str], list[str | None]]:
+    """对轨道成员做分类学实测打标（ADR 0042 决策 4）。
+
+    期望集为空的族不跑分类器、全体置空；成员 states 为单点时按最小
+    形态（须有 period）传播一个周期后分类。实测 primary 不在期望集 →
+    记 warning 不失败（两边都保留，设计侧标签是 provenance）。
+
+    Returns:
+        （记录级去重排序标签列表，成员级 primary 标签列表——无标签
+        成员为 ``None``）。
+    """
+    expected = _DESIGN_TAXONOMY_EXPECTATIONS.get(orbit_family or "")
+    if expected is not None and not expected:
+        return [], [None] * len(orbits)
+    record_labels: set[str] = set()
+    member_labels: list[str | None] = []
+    for index, orbit in enumerate(orbits):
+        mu = getattr(getattr(orbit, "system", None), "mu", None)
+        result = classify_orbit(
+            orbit.states,
+            orbit.times,
+            period=getattr(orbit, "period", None),
+            mu=mu,
+            periodicity=periodicity,
+        )
+        label = None if result.primary is None else result.primary.canonical
+        if label is not None:
+            record_labels.add(label)
+            if expected is not None and label not in expected:
+                _LOGGER.warning(
+                    "分类学冲突（%s 成员 %d）：设计侧族 %r 期望 %s，实测 %s",
+                    context or orbit_family or "?",
+                    index,
+                    orbit_family,
+                    sorted(expected),
+                    label,
+                )
+        member_labels.append(label)
+    return sorted(record_labels), member_labels
 
 
 def build_design_record(request: Any, result: Any) -> tuple[dict, dict[str, np.ndarray]] | None:
@@ -86,6 +176,11 @@ def build_design_record(request: Any, result: Any) -> tuple[dict, dict[str, np.n
 
     jacobi = _finite_or_none(result.cr3bp_jacobi)
     correction = result.correction
+    taxonomy_labels: list[str] = []
+    if cr3bp_orbit is not None:
+        taxonomy_labels, _ = stamp_taxonomy_labels(
+            orbit_family, [cr3bp_orbit], context="design_orbit"
+        )
     meta = _base_meta(
         source_tool="design_orbit",
         source_record_id=None,
@@ -96,6 +191,7 @@ def build_design_record(request: Any, result: Any) -> tuple[dict, dict[str, np.n
             "amplitude": amplitude,
             "has_cr3bp": cr3bp_orbit is not None,
             "has_ephemeris": result.ephemeris is not None,
+            "taxonomy_labels": taxonomy_labels,
         },
         status=result.status,
         cause=result.cause,
@@ -141,6 +237,10 @@ def build_family_record(
     system = family.system
     char_length_km = getattr(system, "characteristic_length", None)
     mu = getattr(system, "mu", None)
+    periodicity = family.metadata.get("periodicity", "periodic")
+    taxonomy_labels, member_labels = stamp_taxonomy_labels(
+        family.family_type, members, periodicity=periodicity, context="orbit_family_generation"
+    )
 
     arrays: dict[str, np.ndarray] = {}
     member_metas: list[dict[str, Any]] = []
@@ -164,6 +264,7 @@ def build_family_record(
                 "amplitude_km": amplitude_km,
                 "amplitudes": _sanitize_value(getattr(orbit, "amplitudes", {})),
                 "parameters": _sanitize_value(getattr(orbit, "parameters", {})),
+                "taxonomy_label": member_labels[index],
             }
         )
 
@@ -177,6 +278,7 @@ def build_family_record(
             "amplitude": _envelope(amplitudes),
             "has_cr3bp": True,
             "has_ephemeris": False,
+            "taxonomy_labels": taxonomy_labels,
         },
         status=status,
         cause=cause,
@@ -185,7 +287,7 @@ def build_family_record(
             "member_count": len(members),
             "requested_members": requested_members,
             "generated_members": generated_members,
-            "periodicity": family.metadata.get("periodicity", "periodic"),
+            "periodicity": periodicity,
             "mu": mu,
             "char_length_km": char_length_km,
         },

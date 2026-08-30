@@ -179,6 +179,7 @@ class CatalogStore:
         char_length = family.meta["scalars"].get("char_length_km")
         jacobi = member.get("jacobi")
         family_classification = family.meta["classification"]
+        taxonomy_label = member.get("taxonomy_label")
         classification = {
             "orbit_family": family_classification["orbit_family"],
             "libration_point": family_classification["libration_point"],
@@ -186,6 +187,8 @@ class CatalogStore:
             "amplitude": point_interval(geometric_amplitude_km(states, char_length)),
             "has_cr3bp": True,
             "has_ephemeris": False,
+            # 分类学标签继承成员实测标签（数据层不 import 算法层分类器）
+            "taxonomy_labels": [taxonomy_label] if taxonomy_label else [],
         }
         meta: dict[str, Any] = {
             "source_tool": "catalog_promote",

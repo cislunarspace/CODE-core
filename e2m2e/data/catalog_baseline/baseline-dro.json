@@ -13,7 +13,10 @@
       0.0
     ],
     "has_cr3bp": true,
-    "has_ephemeris": false
+    "has_ephemeris": false,
+    "taxonomy_labels": [
+      "distant_retrograde"
+    ]
   },
   "status": "converged",
   "cause": "none",
@@ -61,7 +64,8 @@
       },
       "parameters": {
         "amplitude_km": 2052.2991743752677
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 1,
@@ -76,7 +80,8 @@
       },
       "parameters": {
         "amplitude_km": 2172.43497529402
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 2,
@@ -91,7 +96,8 @@
       },
       "parameters": {
         "amplitude_km": 2292.5725424469633
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 3,
@@ -106,7 +112,8 @@
       },
       "parameters": {
         "amplitude_km": 3253.7591555169056
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 4,
@@ -121,7 +128,8 @@
       },
       "parameters": {
         "amplitude_km": 3494.0873437317837
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 5,
@@ -136,7 +144,8 @@
       },
       "parameters": {
         "amplitude_km": 3734.431813647434
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 6,
@@ -151,7 +160,8 @@
       },
       "parameters": {
         "amplitude_km": 3974.7945739877596
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 7,
@@ -166,7 +176,8 @@
       },
       "parameters": {
         "amplitude_km": 4215.17772860281
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 8,
@@ -181,7 +192,8 @@
       },
       "parameters": {
         "amplitude_km": 4455.583472875093
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 9,
@@ -196,7 +208,8 @@
       },
       "parameters": {
         "amplitude_km": 4936.471957220186
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 10,
@@ -211,7 +224,8 @@
       },
       "parameters": {
         "amplitude_km": 5898.626151472615
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 11,
@@ -226,7 +240,8 @@
       },
       "parameters": {
         "amplitude_km": 7825.060322026189
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 12,
@@ -241,7 +256,8 @@
       },
       "parameters": {
         "amplitude_km": 8066.122478895534
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 13,
@@ -256,7 +272,8 @@
       },
       "parameters": {
         "amplitude_km": 8548.454202802193
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 14,
@@ -271,7 +288,8 @@
       },
       "parameters": {
         "amplitude_km": 9514.042958257725
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 15,
@@ -286,7 +304,8 @@
       },
       "parameters": {
         "amplitude_km": 10481.05406223705
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 16,
@@ -301,7 +320,8 @@
       },
       "parameters": {
         "amplitude_km": 11449.72239974983
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 17,
@@ -316,7 +336,8 @@
       },
       "parameters": {
         "amplitude_km": 12420.291187376804
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 18,
@@ -331,7 +352,8 @@
       },
       "parameters": {
         "amplitude_km": 13393.010482472473
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 19,
@@ -346,7 +368,8 @@
       },
       "parameters": {
         "amplitude_km": 13880.256230528039
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 20,
@@ -361,7 +384,8 @@
       },
       "parameters": {
         "amplitude_km": 14368.135799169002
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 21,
@@ -376,7 +400,8 @@
       },
       "parameters": {
         "amplitude_km": 14856.681805546963
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 22,
@@ -391,7 +416,8 @@
       },
       "parameters": {
         "amplitude_km": 15835.904577829531
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 23,
@@ -406,7 +432,8 @@
       },
       "parameters": {
         "amplitude_km": 17803.8016569041
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 24,
@@ -421,7 +448,8 @@
       },
       "parameters": {
         "amplitude_km": 19786.082551575935
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 25,
@@ -436,7 +464,8 @@
       },
       "parameters": {
         "amplitude_km": 21784.890777298482
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 26,
@@ -451,7 +480,8 @@
       },
       "parameters": {
         "amplitude_km": 23802.35943272533
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 27,
@@ -466,7 +496,8 @@
       },
       "parameters": {
         "amplitude_km": 25840.595687354944
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 28,
@@ -481,7 +512,8 @@
       },
       "parameters": {
         "amplitude_km": 27901.66655919834
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 29,
@@ -496,7 +528,8 @@
       },
       "parameters": {
         "amplitude_km": 29987.588903663105
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 30,
@@ -511,7 +544,8 @@
       },
       "parameters": {
         "amplitude_km": 32100.31568673152
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 31,
@@ -526,7 +560,8 @@
       },
       "parameters": {
         "amplitude_km": 34241.727118165865
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 32,
@@ -541,7 +576,8 @@
       },
       "parameters": {
         "amplitude_km": 36413.62001304373
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 33,
@@ -556,7 +592,8 @@
       },
       "parameters": {
         "amplitude_km": 38617.69551570995
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 34,
@@ -571,7 +608,8 @@
       },
       "parameters": {
         "amplitude_km": 40855.54778837567
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 35,
@@ -586,7 +624,8 @@
       },
       "parameters": {
         "amplitude_km": 43128.655745113625
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 36,
@@ -601,7 +640,8 @@
       },
       "parameters": {
         "amplitude_km": 45438.36689837621
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 37,
@@ -616,7 +656,8 @@
       },
       "parameters": {
         "amplitude_km": 47785.887370355864
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 38,
@@ -631,7 +672,8 @@
       },
       "parameters": {
         "amplitude_km": 50172.27174590672
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 39,
@@ -646,7 +688,8 @@
       },
       "parameters": {
         "amplitude_km": 52598.41069485299
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 40,
@@ -661,7 +704,8 @@
       },
       "parameters": {
         "amplitude_km": 55065.02083054533
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 41,
@@ -676,7 +720,8 @@
       },
       "parameters": {
         "amplitude_km": 57572.63360806718
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     }
   ],
   "tags": [

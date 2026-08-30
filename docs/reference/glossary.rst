@@ -213,3 +213,35 @@ Spatiography terms
       Adjacent partition zones intentionally overlap near their edges
       (Primer Table 4 note); classifiers therefore return ordered
       multi-labels instead of one exclusive zone.
+
+Orbit taxonomy terms
+~~~~~~~~~~~~~~~~~~~~
+
+.. glossary::
+
+   Orbit taxonomy
+      The 42-label classification of CR3BP periodic orbits (ADR 0042):
+      27 libration-point + 4 moon-centered + 11 resonant labels, adopted
+      verbatim from the unreleased STK CODE (Cislunar Orbit Designer)
+      component. Criteria are e2m2e's own analytic definitions.
+
+   Taxonomy label
+      Structured label (category / family / libration point / hemisphere /
+      resonance) with a snake_case canonical string such as
+      ``halo_l2_northern`` as the serialization key. Classification is
+      measured from the trajectory — never copied from design-side family
+      names, which remain as provenance.
+
+   Unclassified
+      A legal converged classification outcome (empty label list + reason:
+      non-periodic, quasi-periodic, or no matching label) — not an error.
+
+   Resonance ratio p:q
+      p satellite revolutions per q lunar revolutions, T/T☾ = q/p (2:1 is
+      interior) — the same orientation as the spatiography resonance
+      ladders' k:k_b.
+
+   Measured stamping
+      Catalog ingest runs the classifier on member trajectories and stores
+      ``taxonomy_labels`` alongside the design-side family label; a mismatch
+      logs a warning and never fails (ADR 0042 decision 5).

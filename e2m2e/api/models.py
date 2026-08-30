@@ -417,6 +417,11 @@ class FamilyGenerationResponse(_ApiModel, OrbitFamily):
     family_type: str | None = None
     system: Any = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    taxonomy_labels: list[str] = Field(
+        default_factory=list,
+        description="分类学标签（ADR 0042）：全体成员实测 primary 标签的去重集合"
+        "（规范字符串）；lissajous 等不在分类学内的族为空表",
+    )
     requested_members: int
     generated_members: int
     record_id: str | None = Field(
@@ -467,6 +472,11 @@ class DesignOrbitResponse(ResultResponse):
     states: list[list[float]] = Field(
         default_factory=list,
         description="CR3BP 参考周期轨道状态序列 (n,6)，无量纲会合系",
+    )
+    taxonomy_labels: list[str] = Field(
+        default_factory=list,
+        description="分类学标签（ADR 0042）：对 CR3BP 参考轨道的实测多标签"
+        "（规范字符串，如 halo_l2_northern）；ELFO 等无 CR3BP 场景为空表",
     )
     times: list[float] = Field(
         default_factory=list,
@@ -1311,6 +1321,10 @@ class CatalogRecordSummary(_ApiModel):
     )
     has_cr3bp: bool
     has_ephemeris: bool
+    taxonomy_labels: list[str] | None = Field(
+        default=None,
+        description="分类学标签（ADR 0042，多标签规范字符串）；未打标为 None",
+    )
     transfer_type: str | None = Field(
         default=None, description="转移类型（HMN/LGA/WSB/low_thrust）；非 transfer 记录为 None"
     )

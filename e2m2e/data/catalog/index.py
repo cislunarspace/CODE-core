@@ -33,6 +33,7 @@ CREATE TABLE records (
     amplitude_max REAL,
     has_cr3bp INTEGER NOT NULL,
     has_ephemeris INTEGER NOT NULL,
+    taxonomy_labels TEXT,
     transfer_type TEXT,
     delta_v REAL,
     tli_epoch REAL,
@@ -45,9 +46,10 @@ CREATE TABLE records (
 )
 """
 
-#: 表结构完备性检查列集：存量库缺任一列（如 #574 新增 transfer 维度）
-#: 时整个表废弃重建——索引是派生物（ADR 0031 决策 5），重建由
-#: ``CatalogStore`` 依据 :attr:`CatalogIndex.schema_reset` 标记触发。
+#: 表结构完备性检查列集：存量库缺任一列（如 #574 新增 transfer 维度、
+#: #581 新增分类学标签维度）时整个表废弃重建——索引是派生物（ADR 0031
+#: 决策 5），重建由 ``CatalogStore`` 依据 :attr:`CatalogIndex.schema_reset`
+#: 标记触发。
 _REQUIRED_COLUMNS = frozenset(
     {
         "record_id",
@@ -62,6 +64,7 @@ _REQUIRED_COLUMNS = frozenset(
         "amplitude_max",
         "has_cr3bp",
         "has_ephemeris",
+        "taxonomy_labels",
         "transfer_type",
         "delta_v",
         "tli_epoch",
@@ -143,6 +146,7 @@ class CatalogIndex:
         transfer_type = scalars.get("transfer_type")
         delta_v = numeric_or_none(scalars.get("delta_v_km_s"))
         tli_epoch = numeric_or_none(scalars.get("tli_epoch"))
+        taxonomy_labels = classification.get("taxonomy_labels")
         with self._lock:
             self._conn.execute(
                 """
@@ -150,9 +154,9 @@ class CatalogIndex:
                     record_id, created_at, source_tool, source_record_id,
                     orbit_family, libration_point, jacobi_min, jacobi_max,
                     amplitude_min, amplitude_max, has_cr3bp, has_ephemeris,
-                    transfer_type, delta_v, tli_epoch,
+                    taxonomy_labels, transfer_type, delta_v, tli_epoch,
                     status, cause, message, member_count, tags, note
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     meta["record_id"],
@@ -167,6 +171,7 @@ class CatalogIndex:
                     None if amplitude is None else float(amplitude[1]),
                     1 if classification["has_cr3bp"] else 0,
                     1 if classification["has_ephemeris"] else 0,
+                    None if not taxonomy_labels else ",".join(taxonomy_labels),
                     transfer_type,
                     delta_v,
                     tli_epoch,
@@ -266,6 +271,7 @@ class CatalogIndex:
         amplitude = (
             None if row["amplitude_min"] is None else [row["amplitude_min"], row["amplitude_max"]]
         )
+        taxonomy_text = row["taxonomy_labels"]
         return {
             "record_id": row["record_id"],
             "created_at": row["created_at"],
@@ -278,6 +284,7 @@ class CatalogIndex:
                 "amplitude": amplitude,
                 "has_cr3bp": bool(row["has_cr3bp"]),
                 "has_ephemeris": bool(row["has_ephemeris"]),
+                "taxonomy_labels": None if not taxonomy_text else taxonomy_text.split(","),
             },
             "transfer_type": row["transfer_type"],
             "delta_v_km_s": row["delta_v"],

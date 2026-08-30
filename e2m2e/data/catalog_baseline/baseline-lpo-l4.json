@@ -13,7 +13,10 @@
       0.0
     ],
     "has_cr3bp": true,
-    "has_ephemeris": false
+    "has_ephemeris": false,
+    "taxonomy_labels": [
+      "longperiod_l4"
+    ]
   },
   "status": "converged",
   "cause": "none",
@@ -69,7 +72,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 1188.2148840216582,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 1,
@@ -92,7 +96,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 293.1105252134052,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 2,
@@ -115,7 +120,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 151.50478493096443,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 3,
@@ -138,7 +144,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 95.01572099675319,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 4,
@@ -161,7 +168,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 63.91951593435452,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 5,
@@ -184,7 +192,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 44.49782575347792,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 6,
@@ -207,7 +216,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 32.59612446794477,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 7,
@@ -230,7 +240,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 27.401062482621903,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 8,
@@ -253,7 +264,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 29.275251312243665,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 9,
@@ -276,7 +288,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 38.21641549696755,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 10,
@@ -299,7 +312,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 54.00495705932477,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 11,
@@ -322,7 +336,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 76.88784521721243,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 12,
@@ -345,7 +360,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 107.51386019949659,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     },
     {
       "index": 13,
@@ -368,7 +384,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 146.73880812668443,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "longperiod_l4"
     }
   ],
   "tags": [

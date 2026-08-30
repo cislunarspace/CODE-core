@@ -13,7 +13,10 @@
       0.0
     ],
     "has_cr3bp": true,
-    "has_ephemeris": false
+    "has_ephemeris": false,
+    "taxonomy_labels": [
+      "axial_l1"
+    ]
   },
   "status": "converged",
   "cause": "none",
@@ -62,7 +65,8 @@
       "parameters": {
         "libration_point": 1,
         "amplitude_z_km": 249.8150497804224
-      }
+      },
+      "taxonomy_label": "axial_l1"
     },
     {
       "index": 1,
@@ -78,7 +82,8 @@
       "parameters": {
         "libration_point": 1,
         "amplitude_z_km": 1498.875311880193
-      }
+      },
+      "taxonomy_label": "axial_l1"
     },
     {
       "index": 2,
@@ -94,7 +99,8 @@
       "parameters": {
         "libration_point": 1,
         "amplitude_z_km": 2747.8713002230024
-      }
+      },
+      "taxonomy_label": "axial_l1"
     },
     {
       "index": 3,
@@ -110,7 +116,8 @@
       "parameters": {
         "libration_point": 1,
         "amplitude_z_km": 3996.7492673631596
-      }
+      },
+      "taxonomy_label": "axial_l1"
     },
     {
       "index": 4,
@@ -126,7 +133,8 @@
       "parameters": {
         "libration_point": 1,
         "amplitude_z_km": 5245.455137112774
-      }
+      },
+      "taxonomy_label": "axial_l1"
     },
     {
       "index": 5,
@@ -142,7 +150,8 @@
       "parameters": {
         "libration_point": 1,
         "amplitude_z_km": 6493.934353884484
-      }
+      },
+      "taxonomy_label": "axial_l1"
     },
     {
       "index": 6,
@@ -158,7 +167,8 @@
       "parameters": {
         "libration_point": 1,
         "amplitude_z_km": 7742.131730663573
-      }
+      },
+      "taxonomy_label": "axial_l1"
     },
     {
       "index": 7,
@@ -174,7 +184,8 @@
       "parameters": {
         "libration_point": 1,
         "amplitude_z_km": 8989.991295171545
-      }
+      },
+      "taxonomy_label": "axial_l1"
     }
   ],
   "tags": [

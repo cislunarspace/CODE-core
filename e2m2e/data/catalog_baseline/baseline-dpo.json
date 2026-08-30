@@ -13,7 +13,13 @@
       21010.34247344452
     ],
     "has_cr3bp": true,
-    "has_ephemeris": false
+    "has_ephemeris": false,
+    "taxonomy_labels": [
+      "distant_prograde",
+      "distant_retrograde",
+      "low_prograde_eastern",
+      "low_prograde_western"
+    ]
   },
   "status": "converged",
   "cause": "none",
@@ -52,7 +58,8 @@
       },
       "parameters": {
         "amplitude_target_km": 3421.8397535985523
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 1,
@@ -67,7 +74,8 @@
       },
       "parameters": {
         "amplitude_target_km": 4092.6338446629707
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 2,
@@ -82,7 +90,8 @@
       },
       "parameters": {
         "amplitude_target_km": 4894.9258272150755
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 3,
@@ -97,7 +106,8 @@
       },
       "parameters": {
         "amplitude_target_km": 5854.4936496537
-      }
+      },
+      "taxonomy_label": "distant_retrograde"
     },
     {
       "index": 4,
@@ -112,7 +122,8 @@
       },
       "parameters": {
         "amplitude_target_km": 7002.168593295316
-      }
+      },
+      "taxonomy_label": "low_prograde_western"
     },
     {
       "index": 5,
@@ -127,7 +138,8 @@
       },
       "parameters": {
         "amplitude_target_km": 8374.825893240402
-      }
+      },
+      "taxonomy_label": "low_prograde_eastern"
     },
     {
       "index": 6,
@@ -142,7 +154,8 @@
       },
       "parameters": {
         "amplitude_target_km": 10016.569553787642
-      }
+      },
+      "taxonomy_label": "low_prograde_eastern"
     },
     {
       "index": 7,
@@ -157,7 +170,8 @@
       },
       "parameters": {
         "amplitude_target_km": 11980.149426968594
-      }
+      },
+      "taxonomy_label": "distant_prograde"
     },
     {
       "index": 8,
@@ -172,7 +186,8 @@
       },
       "parameters": {
         "amplitude_target_km": 14328.65608547827
-      }
+      },
+      "taxonomy_label": "distant_prograde"
     },
     {
       "index": 9,
@@ -187,7 +202,8 @@
       },
       "parameters": {
         "amplitude_target_km": 17137.547946917748
-      }
+      },
+      "taxonomy_label": "distant_prograde"
     },
     {
       "index": 10,
@@ -202,7 +218,8 @@
       },
       "parameters": {
         "amplitude_target_km": 20497.075781626
-      }
+      },
+      "taxonomy_label": "distant_prograde"
     }
   ],
   "tags": [

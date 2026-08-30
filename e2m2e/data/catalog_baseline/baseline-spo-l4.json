@@ -13,7 +13,10 @@
       0.0
     ],
     "has_cr3bp": true,
-    "has_ephemeris": false
+    "has_ephemeris": false,
+    "taxonomy_labels": [
+      "shortperiod_l4"
+    ]
   },
   "status": "converged",
   "cause": "none",
@@ -69,7 +72,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 1733.822750601573,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 1,
@@ -92,7 +96,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 976.1290675824714,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 2,
@@ -115,7 +120,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 686.1253312914566,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 3,
@@ -138,7 +144,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 533.4927181868736,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 4,
@@ -161,7 +168,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 439.5709571353263,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 5,
@@ -184,7 +192,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 376.0869732942198,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 6,
@@ -207,7 +216,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 330.39174586070766,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 7,
@@ -230,7 +240,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 295.9826909746804,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 8,
@@ -253,7 +264,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 269.17689961612894,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 9,
@@ -276,7 +288,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 247.73339243519663,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 10,
@@ -299,7 +312,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 230.2109903330068,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 11,
@@ -322,7 +336,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 215.6411205649595,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 12,
@@ -345,7 +360,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 203.34901587348506,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 13,
@@ -368,7 +384,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 192.8503290743673,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 14,
@@ -391,7 +408,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 183.7885018106959,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 15,
@@ -414,7 +432,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 175.89530701594458,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 16,
@@ -437,7 +456,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 168.96514681881555,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 17,
@@ -460,7 +480,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 162.83782111166747,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 18,
@@ -483,7 +504,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 157.38668110225726,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 19,
@@ -506,7 +528,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 152.51030287328066,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 20,
@@ -529,7 +552,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 148.12651910281548,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 21,
@@ -552,7 +576,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 144.16806547990288,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     },
     {
       "index": 22,
@@ -575,7 +600,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 140.57935457645854,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": "shortperiod_l4"
     }
   ],
   "tags": [

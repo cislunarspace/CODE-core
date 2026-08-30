@@ -13,7 +13,8 @@
       0.0
     ],
     "has_cr3bp": true,
-    "has_ephemeris": false
+    "has_ephemeris": false,
+    "taxonomy_labels": []
   },
   "status": "converged",
   "cause": "none",
@@ -69,7 +70,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 27.401062482621903,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": null
     },
     {
       "index": 1,
@@ -92,7 +94,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 29.275251312243665,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": null
     },
     {
       "index": 2,
@@ -115,7 +118,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 38.21641549696755,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": null
     },
     {
       "index": 3,
@@ -138,7 +142,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 54.00495705932477,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": null
     },
     {
       "index": 4,
@@ -161,7 +166,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 76.88784521721243,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": null
     },
     {
       "index": 5,
@@ -184,7 +190,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 107.51386019949659,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": null
     },
     {
       "index": 6,
@@ -207,7 +214,8 @@
         "augmented_system_rank": 5,
         "augmented_system_condition": 146.73880812668443,
         "step_size": 0.01
-      }
+      },
+      "taxonomy_label": null
     }
   ],
   "tags": [
