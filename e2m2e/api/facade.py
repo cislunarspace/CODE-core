@@ -78,6 +78,12 @@ from .models import (
     PropagationResponse,
     SpacetimeTransformRequest,
     SpacetimeTransformResponse,
+    SpatiographyBoundariesRequest,
+    SpatiographyBoundariesResponse,
+    SpatiographyClassifyRequest,
+    SpatiographyClassifyResponse,
+    SpatiographyScalesRequest,
+    SpatiographyScalesResponse,
     TransferDesignRequest,
     TransferDesignResponse,
 )
@@ -1409,6 +1415,161 @@ class Facade:
                 status=ConvergenceState.FAILED,
                 cause=FailureCause.BACKEND_FAILURE,
             ) from exc
+
+    @mcp_exposed(request_model=SpatiographyScalesRequest)
+    def spatiography_scales(self, **params) -> SpatiographyScalesResponse:
+        """分区解析尺度计算（spatiography，二档）。/ Spatiography analytic scales (tier 2).
+
+        计算地月空间分区（Rosengren et al. 2026 Primer §5）的全部闭式边界
+        尺度：Laplace 半径（地心/月心）、影响球族（Hill / Laplace-Tisserand /
+        Chebotarev / Battin）、tidal parity、共振梯（Table 1/2）、平动点精确
+        解与 Jacobi 临界值。Primer 常数口径（SPICE GM + Simon 1994 月根数）。
+        """
+        try:
+            request = SpatiographyScalesRequest(**params)
+            from e2m2e.algorithm import spatiography as sp
+
+            c = sp.PRIMER_DEFAULTS
+            system = sp.primer_cr3bp_system(c)
+            system.compute_libration_points()
+            import math
+
+            scales: dict[str, float] = {
+                "laplace_radius_geolunar_km": sp.laplace_radius_geolunar(c),
+                "laplace_radius_selenocentric_km": sp.laplace_radius_selenocentric(c),
+                "hill_radius_moon_km": sp.hill_radius_moon(c),
+                "hill_radius_earth_km": sp.hill_radius_earth(c),
+                "soi_laplace_moon_km": sp.soi_laplace_moon(c),
+                "soi_chebotarev_moon_km": sp.chebotarev_radius_moon(c),
+                "battin_moon_anti_earthward_km": sp.battin_soi_moon(0.0, c),
+                "battin_moon_earthward_km": sp.battin_soi_moon(math.pi, c),
+                "soi_laplace_earth_km": sp.soi_laplace_earth(c),
+                "soi_chebotarev_earth_km": sp.chebotarev_radius_earth(c),
+                "tidal_parity_radius_km": sp.tidal_parity_radius(c),
+                "geo_radius_km": sp.geo_radius_km(c),
+                "moon_period_days": c.moon_period_days,
+            }
+            unknown = set(request.elements) - set(scales)
+            if unknown:
+                raise ValueError(f"未知的尺度名：{sorted(unknown)}")
+            if request.elements:
+                scales = {k: v for k, v in scales.items() if k in set(request.elements)}
+            for key in (
+                "laplace_radius_geolunar_km",
+                "tidal_parity_radius_km",
+                "hill_radius_earth_km",
+                "soi_laplace_earth_km",
+            ):
+                if key in scales:
+                    scales[key.replace("_km", "_over_a_moon")] = scales[key] / c.moon_a_km
+
+            libration_points_km = {
+                name: (getattr(system, name) * c.moon_a_km).tolist()
+                for name in ("L1", "L2", "L3", "L4", "L5")
+            }
+            ladder = sp.resonance_centers("all", c)
+            return SpatiographyScalesResponse(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="ok",
+                scales=scales,
+                libration_points_km=libration_points_km,
+                jacobi_criticals=sp.jacobi_critical_values(system, c),
+                resonance_ladder=[dataclasses.asdict(center) for center in ladder],
+                constants_used=dataclasses.asdict(c),
+                citation=sp.PRIMER_CITATION,
+                details={"moon_a_km": c.moon_a_km},
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except Exception as exc:
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
+
+    @mcp_exposed(request_model=SpatiographyClassifyRequest)
+    def spatiography_classify(self, **params) -> SpatiographyClassifyResponse:
+        """分区区域分类（spatiography，二档）。/ Spatiography region classification (tier 2).
+
+        对会合系状态逐点判定五省分区（terrestrial / cislunar 内带 / cislunar
+        外带 / circumlunar / translunar / heliocentric，论文 Table 1 或附录 B
+        Table 4 口径），重叠带返回多标签；附 osculating a、Jacobi 值与 Hill
+        五拓扑 Case 诊断。
+        """
+        try:
+            request = SpatiographyClassifyRequest(**params)
+            from e2m2e.algorithm import spatiography as sp
+
+            system = sp.primer_cr3bp_system()
+            zone_ids: list[list[int]] = []
+            diagnostics: list[dict[str, Any]] = []
+            for state in request.states:
+                diag = sp.classify_state(
+                    state,
+                    frame=request.frame,
+                    reference=request.reference,
+                    include_overlaps=request.include_overlaps,
+                    system=system,
+                )
+                zone_ids.append(list(diag.zone_ids))
+                diagnostics.append(_serialize_value(dataclasses.asdict(diag)))
+            return SpatiographyClassifyResponse(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="ok",
+                zone_ids=zone_ids,
+                legend={str(k): v for k, v in sp.REGION_LEGEND.items()},
+                diagnostics=diagnostics,
+                details={"n_states": len(request.states), "reference": request.reference},
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except Exception as exc:
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
+
+    @mcp_exposed(request_model=SpatiographyBoundariesRequest)
+    def spatiography_boundaries(self, **params) -> SpatiographyBoundariesResponse:
+        """分区边界几何（spatiography，二档）。/ Spatiography boundary geometry (tier 2).
+
+        输出可视化用边界几何数据：会合系（质心原点，z=0）的 r_L / tidal
+        parity / 双系 Hill 与 SOI 圆族、Battin 非对称闭合曲线、L1–L5，或
+        (a,e) 根数平面走廊曲线族。前端只做单位归一与绘制，不在界面重算。
+        """
+        try:
+            request = SpatiographyBoundariesRequest(**params)
+            from e2m2e.algorithm import spatiography as sp
+
+            state_frame: Literal["synodic_barycentric_km", "element_space_ae"]
+            if request.kind == "synodic_planar":
+                result = sp.synodic_planar_elements(
+                    resolution=request.resolution, boundary_set=request.boundary_set
+                )
+                state_frame = "synodic_barycentric_km"
+            else:
+                result = sp.ae_curves(
+                    n_points=request.resolution, boundary_set=request.boundary_set
+                )
+                state_frame = "element_space_ae"
+            elements = [_serialize_value(dataclasses.asdict(e)) for e in result.elements]
+            return SpatiographyBoundariesResponse(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="ok",
+                elements=elements,
+                state_frame=state_frame,
+                details={"count": len(elements), "kind": request.kind},
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except Exception as exc:
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
 
 
 def mcp_tools(facade: Facade) -> list[str]:

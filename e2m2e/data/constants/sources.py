@@ -27,3 +27,6 @@ class ConstantSource(str, Enum):
     SI = "SI"
     Vallado = "Vallado"
     Cui2025 = "Cui2025"
+    SIMON1994 = "SIMON1994"
+    GGM02 = "GGM02"
+    LEGNARO2024 = "LEGNARO2024"

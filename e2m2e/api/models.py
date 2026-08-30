@@ -55,6 +55,12 @@ __all__ = [
     "CatalogSweepRequest",
     "CatalogSweepPointOutcome",
     "CatalogSweepResponse",
+    "SpatiographyScalesRequest",
+    "SpatiographyScalesResponse",
+    "SpatiographyClassifyRequest",
+    "SpatiographyClassifyResponse",
+    "SpatiographyBoundariesRequest",
+    "SpatiographyBoundariesResponse",
 ]
 
 
@@ -1498,3 +1504,118 @@ class CatalogSweepResponse(ResultResponse):
     record_ids: list[str]
     succeeded: int
     failed: int
+
+
+class SpatiographyScalesRequest(_ApiModel):
+    """分区解析尺度计算输入（spatiography，ADR 0041）。"""
+
+    system: Literal["earth_moon"] = Field(
+        default="earth_moon",
+        description="天体系统；当前仅支持地月（Primer §5 口径，Simon 1994 月根数）",
+    )
+    elements: list[str] = Field(
+        default_factory=list,
+        description="要计算的量（scales 键名）子集；空 = 全部。含 laplace_radius_geolunar、"
+        "hill_radius_moon、soi_laplace_moon、battin_moon_earthward_km 等",
+    )
+
+
+class SpatiographyScalesResponse(ResultResponse):
+    """分区解析尺度输出（Rosengren et al. 2026 §5 闭式边界，物理单位 km）。"""
+
+    scales: dict[str, float]
+    libration_points_km: dict[str, list[float]] = Field(
+        description="L1–L5 精确解位置（会合系质心原点，km，z=0）；精确求根口径"
+        "（论文表值 57868/64347 km 为级数近似注记）"
+    )
+    jacobi_criticals: dict[str, float] = Field(
+        description="平动点处临界 Jacobi 值 C1..C5（Parker 约定，无量纲）"
+    )
+    resonance_ladder: list[dict[str, Any]] = Field(
+        description="共振名义中心阶梯（Table 1/2 全表）：label/k/k_body/a_km/"
+        "a_over_a_moon 或 rho_over_moon_radius/period_days/secondary"
+    )
+    constants_used: dict[str, float] = Field(description="Primer 常数集（数值）")
+    citation: str = Field(description="常数集出处")
+    details: dict[str, Any]
+
+
+class SpatiographyClassifyRequest(_ApiModel):
+    """分区区域分类输入。"""
+
+    states: list[list[float]] = Field(
+        min_length=1,
+        description="状态列表，每项 [x,y,z,vx,vy,vz]；坐标系与单位由 frame 声明",
+    )
+    frame: Literal["synodic_barycentric_km", "synodic_barycentric_nd"] = Field(
+        description="状态的数据系标签（ADR 0040 state_frame 词汇，本工具首批启用"
+        " synodic_barycentric_nd）：synodic_barycentric_km = 地月会合旋转系、质心原点、"
+        "物理单位 km/km/s；synodic_barycentric_nd = 同系无量纲（长度 a☾、速度 a☾·n，"
+        "Primer 常数口径）"
+    )
+    reference: Literal["table1", "table4"] = Field(
+        default="table1",
+        description="分区口径：table1 = 论文 Table 1 五省语义；table4 = 附录 B 六"
+        "制图带（deliberate-overlap，相邻区端部有意重叠）",
+    )
+    include_overlaps: bool = Field(
+        default=True,
+        description="重叠带返回多标签（False 时按优先序取主标签）",
+    )
+
+
+class SpatiographyClassifyResponse(ResultResponse):
+    """分区区域分类输出。"""
+
+    zone_ids: list[list[int]] = Field(
+        description="逐状态区域 id 列表（重叠带多值、升序），名称见 legend"
+    )
+    legend: dict[str, str] = Field(
+        description="区域 id → 名称（terrestrial / cislunar_inner_secular /"
+        " cislunar_outer_resonant / circumlunar / translunar / heliocentric；"
+        "cislunar 为狭义带级名，非伞式）"
+    )
+    diagnostics: list[dict[str, Any]] = Field(
+        description="逐状态诊断：r_geocentric_km / rho_selenocentric_km /"
+        " a_geocentric_km / a_over_a_moon / jacobi_constant / topology_case /"
+        " open_necks"
+    )
+    details: dict[str, Any]
+
+
+class SpatiographyBoundariesRequest(_ApiModel):
+    """分区边界几何输入（可视化数据层）。"""
+
+    kind: Literal["synodic_planar", "ae_curves"] = Field(
+        default="synodic_planar",
+        description="synodic_planar = 地月会合旋转系（质心原点、z=0 平面）边界圆族"
+        "与 Battin 非对称曲线、L1–L5；ae_curves = 地心 osculating (a,e) 根数平面"
+        "走廊曲线族（掠地线/Hill 远点线/月 Hill 相遇走廊/GEO 穿越线/共振竖线/"
+        "Tisserand 等值线；crossing diagnostics 而非物理面）",
+    )
+    boundary_set: list[str] | None = Field(
+        default=None,
+        description="元素/曲线族名子集；空 = 全部（名称见 kind 对应支持清单）",
+    )
+    resolution: int = Field(
+        default=720,
+        ge=8,
+        le=4096,
+        description="曲线离散点数（synodic_planar 为闭合曲线点数；ae_curves 为每条曲线采样点数）",
+    )
+
+
+class SpatiographyBoundariesResponse(ResultResponse):
+    """分区边界几何输出（前端只做归一与绘制，不做数值计算）。"""
+
+    elements: list[dict[str, Any]] = Field(
+        description="边界元素：kind=circle（center_km/radius_km/points_km）|"
+        " polyline（center_km/points_km）| point（center_km，会合系质心原点 km）|"
+        " curve_ae（points_ae=[a_km,e]）| vertical_ae（a_km）"
+    )
+    state_frame: Literal["synodic_barycentric_km", "element_space_ae"] = Field(
+        description="几何的数据系标签：synodic_planar 输出为 synodic_barycentric_km"
+        "（地月会合旋转系、质心原点、物理 km）；ae_curves 输出在根数空间，标签为"
+        " element_space_ae（横轴 a 单位 km、纵轴 e 无量纲，ADR 0041 登记的新词汇）"
+    )
+    details: dict[str, Any]

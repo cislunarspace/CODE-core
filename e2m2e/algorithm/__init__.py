@@ -17,6 +17,7 @@ solver/）：①构造问题（选轨道族、定约束、选流形方向）②�
 - ``coordinate/``：坐标转换算法。
 - ``manifold/``：不变流形 + 庞加莱截面。
 - ``proximity/``：相对运动。
+- ``spatiography/``：地月空间分区（Laplace 半径、影响球族、共振梯、区域分类；ADR 0041）。
 - ``stability.py``：稳定性。
 - ``normal_form/``：正规化（可选依赖）。
 - ``nominal_orbit/``：名义轨道。

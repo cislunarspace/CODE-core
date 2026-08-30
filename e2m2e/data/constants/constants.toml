@@ -141,3 +141,28 @@ naif_id = { value = 999, source = "NAIF" }
 
 [body.PLUTO.gm]
 DE440 = { value = 975.500000, source = "DE440" }
+
+# -----------------------------------------------------------------------------
+# Primer 常数集（spatiography 专用）。
+#
+# Rosengren et al. 2026《The Astrodynamics Primer on Cislunar and Translunar
+# Space》§5 采用的自洽常数集（GM 取 JPL/NAIF SPICE，月球平均根数取 Simon et al.
+# 1994，J2/R⊕ 取 GGM02 归一）。论文全部黄金值（Laplace 半径、Hill 球、SOI 族、
+# 共振梯、tidal parity）以这一套数复现——**不得与 [datum.*] 的 GM 或
+# [universal] 的地月距离混搭**，否则分区尺度系统性漂移（月球平均半长轴
+# 383397.7725 km 是太阳视轨道意义下的月球轨道根数，与 DE421 特征长度
+# 384400 km 是不同量）。见 ADR 0041。
+# -----------------------------------------------------------------------------
+[primer]
+earth_j2 = { value = 1.08263552549e-3, source = "GGM02" }
+moon_j2 = { value = 2.0322e-4, source = "LEGNARO2024" }
+moon_a_km = { value = 383397.7725, source = "SIMON1994" }
+moon_ecc = { value = 0.055545526, source = "SIMON1994" }
+moon_inc_deg = { value = 5.15668983, source = "SIMON1994" }
+sun_a_au = { value = 1.0000010178, source = "SIMON1994" }
+sun_ecc = { value = 0.0167086342, source = "SIMON1994" }
+earth_gm = { value = 398600.4354360959, source = "NAIF" }
+moon_gm = { value = 4902.800066163796, source = "NAIF" }
+sun_gm = { value = 132712440041.9393, source = "NAIF" }
+earth_ref_radius_km = { value = 6378.1363, source = "GGM02" }
+earth_sidereal_day_s = { value = 86164.0905, source = "IERS" }

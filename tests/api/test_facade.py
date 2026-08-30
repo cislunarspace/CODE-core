@@ -19,6 +19,9 @@ from e2m2e.api.models import (
     OrbitError,
     PropagationRequest,
     SpacetimeTransformRequest,
+    SpatiographyBoundariesRequest,
+    SpatiographyClassifyRequest,
+    SpatiographyScalesRequest,
     TransferDesignRequest,
 )
 from e2m2e.data.templates import ConvergenceState, FailureCause
@@ -440,7 +443,7 @@ class TestFacadeToolInventory:
         names = set(mcp_tools(facade))
         inventory = tool_inventory(facade)
         assert names == {tool.name for tool in inventory}
-        assert len(inventory) == 19
+        assert len(inventory) == 22
         assert all(tool.mcp_exposed for tool in inventory)
 
     def test_inventory_distinguishes_implemented_and_placeholder_tools(self):
@@ -452,6 +455,9 @@ class TestFacadeToolInventory:
             "orbit_propagation": PropagationRequest,
             "spacetime_transform": SpacetimeTransformRequest,
             "orbit_family_generation": FamilyGenerationRequest,
+            "spatiography_scales": SpatiographyScalesRequest,
+            "spatiography_classify": SpatiographyClassifyRequest,
+            "spatiography_boundaries": SpatiographyBoundariesRequest,
         }
         placeholders = {
             # 需 Orbit 对象入参，无法经 JSON 信封表达；记录引用式入参落地前不注册

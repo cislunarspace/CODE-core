@@ -167,3 +167,49 @@ MBSE
       traceable. e2m2e borrows the mindset for component registration,
       requirement traceability, data models, and diagram generation — see
       ``docs/reference/mbse/``.
+
+Spatiography terms
+~~~~~~~~~~~~~~~~~~
+
+.. glossary::
+
+   Spatiography
+      A "geography of space" (Strughold 1958): dynamical partition of the
+      Earth–Moon environment into provinces. Implemented in
+      ``e2m2e/algorithm/spatiography/`` per Rosengren et al. 2026 (the
+      "Primer"), ADR 0041.
+
+   Five provinces
+      terrestrial → cislunar (inner secular / outer resonant) → circumlunar
+      → translunar → heliocentric. ``cislunar`` is a band-level name only —
+      never an umbrella for the whole Earth–Moon domain; the system-level
+      umbrella is "geolunar space" / Earth–Moon system space (Primer §2.6).
+
+   Laplace radius
+      Distance where lunisolar secular torques equal Earth's oblateness
+      precession — the terrestrial/cislunar onset (Primer Eq. 98,
+      r_L ≈ 48812 km). The selenocentric analogue ρ_L ≈ 3846 km bounds the
+      lunar-figure-dominated zone (Eq. 124).
+
+   Spheres of influence
+      Mutually non-equivalent radial proxies around a secondary (Primer
+      §5.4.2): Hill (gateway stability), Laplace–Tisserand (patched-conic
+      switching), Chebotarev (direct-force parity), Battin (first-order
+      asymmetric). e2m2e implements all four plus the angle-dependent
+      activity surface.
+
+   Tidal parity
+      Lunisolar tidal parity a_TP ≈ 1.17 a☾ (Primer Eq. 127): orbit-averaged
+      quadrupole crossover from lunar-internal to solar-external secular
+      dominance. A secular marker, not a gateway or a switching surface.
+
+   Resonance ladder
+      Nominal centers of low-order (|k−k_b| ≤ 4) mean-motion commensurabilities:
+      interior/exterior lunar and solar sets in geocentric (a, e) space
+      (Primer Table 1), exterior-terrestrial set in selenocentric distance
+      (Primer Table 2).
+
+   Deliberate overlap
+      Adjacent partition zones intentionally overlap near their edges
+      (Primer Table 4 note); classifiers therefore return ordered
+      multi-labels instead of one exclusive zone.

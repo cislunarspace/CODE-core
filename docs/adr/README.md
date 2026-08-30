@@ -111,3 +111,4 @@ ADRs.
 | 0038 | IAS15 integrator and force-model parametric variational equations (ASSIST-derived); MERCURIUS not adopted | Adopted |
 | 0039 | Shared-kernel leaf modules at the package root | Adopted (implemented) |
 | 0040 | transfer_design converged trajectory: unified synodic-frame contract with trajectory_times | Adopted (implemented) |
+| 0041 | spatiography — cislunar partition (Primer) analytic core: five-province taxonomy, [primer] constants, scales/classify/boundaries tools | Adopted (implemented) |
