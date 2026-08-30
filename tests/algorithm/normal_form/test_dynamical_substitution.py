@@ -26,6 +26,7 @@ from e2m2e.algorithm.normal_form.dynamical_substitution import (
     DEFAULT_TOTAL_TU,
     DynamicalSubstituteCorrector,
     DynamicalSubstituteResult,
+    _second_derivative,
 )
 from e2m2e.algorithm.normal_form.multiple_shooting import (
     MultipleShootingResult,
@@ -407,3 +408,49 @@ def test_substitute_orbit_suppresses_center_manifold_frequencies(l1_context, mon
                 f"{label} 方向中心流形频率 ν={nu:.4f} 处幅值 "
                 f"{nearest.amp:.3e} 超过阈值 {threshold * max_amp:.3e}"
             )
+
+
+# ---------------------------------------------------------------------------
+# 二阶导：高阶 Vandermonde 微分系数（#544）
+# ---------------------------------------------------------------------------
+
+
+def test_second_derivative_matches_analytic_including_endpoints():
+    """二阶导在全样本（含首末点）逼近解析值。
+
+    旧中心差分实现端点返回一阶导数值（O(1) 错误 ~2.7e1，不随 dt 收敛）；
+    高阶 Vandermonde 系数下端点误差应降到数值噪声量级。
+    """
+    for dt in (0.05, 0.02):
+        t = np.arange(0.0, 10.0, dt)
+        y = np.sin(3.0 * t) + 0.5 * np.cos(7.0 * t)
+        d2_exact = -9.0 * np.sin(3.0 * t) - 24.5 * np.cos(7.0 * t)
+        err = np.abs(_second_derivative(y, dt) - d2_exact)
+        np.testing.assert_allclose(err, 0.0, atol=1e-2, err_msg=f"dt={dt}")
+
+
+def test_second_derivative_error_converges_as_dt_shrinks():
+    """误差随 dt 减小收敛（旧中心差分端点误差不收敛，判据失效）。"""
+    errors = []
+    for dt in (0.05, 0.02):
+        t = np.arange(0.0, 10.0, dt)
+        y = np.sin(3.0 * t) + 0.5 * np.cos(7.0 * t)
+        d2_exact = -9.0 * np.sin(3.0 * t) - 24.5 * np.cos(7.0 * t)
+        errors.append(float(np.max(np.abs(_second_derivative(y, dt) - d2_exact))))
+    assert errors[1] < errors[0], f"dt 减小后误差未收敛：{errors}"
+
+
+def test_second_derivative_preserves_shape_contract():
+    """接口契约：1-D 入 1-D；2-D 逐列处理；样本数不足 2 返回全零。"""
+    rng = np.random.default_rng(42)
+    y1 = rng.standard_normal(50)
+    out1 = _second_derivative(y1, 0.1)
+    assert out1.shape == y1.shape
+
+    y2 = rng.standard_normal((50, 3))
+    out2 = _second_derivative(y2, 0.1)
+    assert out2.shape == y2.shape
+    np.testing.assert_allclose(out2[:, 0], _second_derivative(y2[:, 0], 0.1))
+
+    np.testing.assert_array_equal(_second_derivative(np.zeros(1), 0.1), 0.0)
+    np.testing.assert_array_equal(_second_derivative(np.zeros((1, 3)), 0.1), 0.0)

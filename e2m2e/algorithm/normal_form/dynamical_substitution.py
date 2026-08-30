@@ -389,7 +389,7 @@ class DynamicalSubstituteCorrector:
         dt = float(np.mean(np.diff(tlist)))
         B = Xlist[:, :3]
         Bdot = Xlist[:, 3:6]
-        # 二阶导：用中心差分，避免引入额外依赖
+        # 二阶导：qiao 风格高阶 Vandermonde 微分系数（#544）
         Bddot = _second_derivative(Bdot, dt)
 
         A, Adot = _bdot2a(self.context, B, Bdot, Bddot, tlist, use_cr3bp=use_cr3bp)
@@ -430,25 +430,25 @@ def _ode_rhs_via_solver(
 
 
 def _second_derivative(y: npt.NDArray[np.floating], dt: float) -> npt.NDArray[np.floating]:
-    """等距采样的二阶中心差分；首末端用一阶差分。
+    """等距采样的高阶数值二阶导（qiao 风格 Vandermonde 微分系数）。
 
     对应 qiao ``list_deriv`` 的两遍应用：``ddot = deriv(deriv(y))``。
-    刻意用更简洁的中心差分（足以满足当前用途）；需要更高精度时可
-    换成 qiao 风格的高阶 Vandermonde 系数。
+    内部高阶中心差分、端点高阶前/后向差分，全样本（含首末点）均为
+    二阶导的高阶近似；样本数不足 2 时返回全零。复用 center manifold
+    模块迁移的同一套 Vandermonde 权重机制（单一实现来源）。
     """
+    # 惰性导入：center_manifold -> quasi_floquet -> 本模块，模块级导入成环
+    from .center_manifold import list_deriv
+
     y = np.asarray(y, dtype=float)
-    out = np.zeros_like(y)
-    if y.shape[0] < 3:
-        # 全一阶差分兜底
-        if y.shape[0] >= 2:
-            out[1:-1] = (y[2:] - 2 * y[1:-1] + y[:-2]) / (dt * dt)
-            out[0] = (y[1] - y[0]) / dt
-            out[-1] = (y[-1] - y[-2]) / dt
-        return out
-    out[1:-1] = (y[2:] - 2 * y[1:-1] + y[:-2]) / (dt * dt)
-    out[0] = (y[1] - y[0]) / dt
-    out[-1] = (y[-1] - y[-2]) / dt
-    return out
+    if y.shape[0] < 2:
+        return np.zeros_like(y)
+    if y.ndim == 1:
+        return list_deriv(list_deriv(y, dt), dt)
+    return np.stack(
+        [list_deriv(list_deriv(y[:, j], dt), dt) for j in range(y.shape[1])],
+        axis=1,
+    )
 
 
 def _bdot2a(
