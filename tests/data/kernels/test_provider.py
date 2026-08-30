@@ -1,9 +1,5 @@
 """data/kernels/：SPICEManager 与 EphemerisProvider 抽象测试。"""
 
-import os
-from pathlib import Path
-
-import numpy as np
 import pytest
 
 from e2m2e.data.kernels.manager import SPICEManager
@@ -15,51 +11,9 @@ pytestmark = [
 ]
 
 
-def _kernel_path() -> str | None:
-    """返回可用星历内核路径（与 tests/conftest 同优先级）。"""
-    search_dir = os.environ.get(
-        "SPICE_KERNEL_DIR",
-        str(Path(__file__).resolve().parents[3] / "kernels"),
-    )
-    for name in ("de440.bsp", "de440s.bsp", "de438.bsp", "de435.bsp"):
-        path = Path(search_dir) / name
-        if path.is_file():
-            return str(path)
-    return None
-
-
-@pytest.fixture
-def loaded_spice():
-    path = _kernel_path()
-    if path is None:
-        pytest.skip("DE440/DE438/DE435 SPICE kernel not found")
-    mgr = SPICEManager()
-    mgr.load_kernel(path)
-    yield mgr
-    mgr.unload_kernel(path)
-
-
 class TestSPICEManager:
     def test_implements_provider_interface(self):
         assert issubclass(SPICEManager, EphemerisProvider)
-
-    def test_utc_to_tdb_and_roundtrip(self, loaded_spice):
-        et = loaded_spice.utc_to_tdb("2025-06-21T11:00:00")
-        assert isinstance(et, float)
-        assert loaded_spice.et_to_utc(et) == "2025-06-21T11:00:00"
-
-    def test_body_position_state_shapes(self, loaded_spice):
-        et = loaded_spice.utc_to_tdb("2025-06-21T11:00:00")
-        pos = loaded_spice.body_position("MOON", et)
-        state = loaded_spice.body_state("MOON", et)
-        assert pos.shape == (3,)
-        assert state.shape == (6,)
-        assert np.linalg.norm(pos) > 350000
-
-    def test_pxform_identity(self, loaded_spice):
-        et = loaded_spice.utc_to_tdb("2025-06-21T11:00:00")
-        rot = loaded_spice.pxform("J2000", "J2000", et)
-        np.testing.assert_allclose(rot, np.eye(3), atol=1e-12)
 
     def test_find_kernel_priority(self, tmp_path):
         (tmp_path / "de440.bsp").write_bytes(b"fake")

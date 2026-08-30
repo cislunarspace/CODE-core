@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -38,6 +39,8 @@ __all__ = [
     "member_count",
     "cr3bp_segment_arrays",
     "ephemeris_segment_arrays",
+    "transfer_segment_arrays",
+    "numeric_or_none",
     "ephemeris_from_arrays",
 ]
 
@@ -69,6 +72,7 @@ SCHEMA_VERSION = 1
 CR3BP_PREFIX = "cr3bp"
 EPHEMERIS_PREFIX = "eph"
 RESULT_PREFIX = "result"
+TRANSFER_PREFIX = "transfer"
 
 _META_REQUIRED_KEYS = (
     "schema_version",
@@ -104,7 +108,9 @@ class CatalogFilter:
 
     ``jacobi_min/max`` 与 ``amplitude_min/max`` 与记录的 [min, max] 区间
     做相交匹配；记录对应维度为 ``None``（无该段数据）时不匹配区间过滤。
-    ``tags`` 命中任一即匹配。
+    ``tags`` 命中任一即匹配。transfer 维度（#574）：``transfer_type``
+    等值；``delta_v``/``tli_epoch`` 区间——仅数值历元（JD_TDB）可作
+    区间过滤，UTC 字符串历元不入索引列。
     """
 
     orbit_family: str | None = None
@@ -117,6 +123,11 @@ class CatalogFilter:
     has_ephemeris: bool | None = None
     status: str | None = None
     tags: tuple[str, ...] | None = None
+    transfer_type: str | None = None
+    delta_v_min_km_s: float | None = None
+    delta_v_max_km_s: float | None = None
+    tli_epoch_min: float | None = None
+    tli_epoch_max: float | None = None
 
 
 @dataclass
@@ -182,6 +193,31 @@ def cr3bp_segment_arrays(states: np.ndarray, times: np.ndarray) -> dict[str, np.
         f"{CR3BP_PREFIX}/states": np.asarray(states, dtype=float),
         f"{CR3BP_PREFIX}/times": np.asarray(times, dtype=float),
     }
+
+
+def transfer_segment_arrays(trajectory: np.ndarray, times: np.ndarray) -> dict[str, np.ndarray]:
+    """转移轨迹段数组（#574）。
+
+    ``states`` 为 ADR 0040 契约下的轨迹数据：HMN/LGA/WSB 为会合系物理
+    km/km/s (n, 6)，low_thrust 暂为力模型状态 (M, 7)（state_frame 标量
+    注明数据系）；``times`` 为 TLI 起算秒 (n,)，与 states 逐行对齐。
+    """
+    return {
+        f"{TRANSFER_PREFIX}/states": np.asarray(trajectory, dtype=float),
+        f"{TRANSFER_PREFIX}/times": np.asarray(times, dtype=float),
+    }
+
+
+def numeric_or_none(value: Any) -> float | None:
+    """数值安全转换：int/float（非 bool）且有限 → float，否则 None。
+
+    索引列与摘要共用：``tli_epoch`` 可为 UTC 字符串（不落数值列）、
+    ``delta_v`` 零结果为 inf（不入索引），均归一为 None。
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    value = float(value)
+    return value if math.isfinite(value) else None
 
 
 def ephemeris_segment_arrays(ephemeris: EphemerisTable) -> dict[str, np.ndarray]:

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from types import SimpleNamespace
 
 import numpy as np
@@ -111,6 +112,230 @@ def _fake_control(monkeypatch, captured: dict | None = None):
         return _make_control_result()
 
     monkeypatch.setattr(station_keeping, "control_orbit", fake_control)
+
+
+def _fake_transfer(monkeypatch, result):
+    import e2m2e.algorithm.transfer as transfer
+
+    monkeypatch.setattr(transfer, "transfer_orbit", lambda *args, **kwargs: result)
+
+
+@dataclass
+class _FakeImpulsiveDetails:
+    """脉冲转移 details 形状（HMN/LGA/WSB dataclass 的 tof_sec 字段）。"""
+
+    tli_epoch: float
+    tof_sec: float
+
+
+@dataclass
+class _FakeLowThrustDetails:
+    """low_thrust details 形状：无 tof_sec 字段。"""
+
+    equivalent_delta_v: float
+
+
+def _make_transfer_result(
+    *,
+    transfer_type: str = "WSB",
+    delta_v: float = 3.9,
+    with_trajectory: bool = True,
+) -> SimpleNamespace:
+    from e2m2e.algorithm.transfer import ManeuverEvent
+
+    return SimpleNamespace(
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
+        message="任务完成",
+        transfer_type=transfer_type,
+        delta_v=delta_v,
+        trajectory=np.arange(12, dtype=float).reshape(2, 6) if with_trajectory else None,
+        trajectory_times=np.array([0.0, 100.0]) if with_trajectory else None,
+        state_frame="synodic_barycentric_km",
+        maneuver_events=(
+            ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=3.5),
+            ManeuverEvent(kind="perilune", t_sec=50.0, dv_km_s=0.0),
+            ManeuverEvent(kind="arrival", t_sec=100.0, dv_km_s=0.4),
+        ),
+        details=_FakeImpulsiveDetails(tli_epoch=2460800.5, tof_sec=100.0),
+    )
+
+
+class TestTransferRecord:
+    """transfer_design 产物入库（#574）：transfer record type。"""
+
+    def test_transfer_record_lands_in_catalog(self, monkeypatch, tmp_path):
+        _fake_transfer(monkeypatch, _make_transfer_result())
+        facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
+
+        response = facade.transfer_design(
+            transfer_type="WSB", tli_epoch=2460800.5, target_ephemeris=[[1.0] * 6]
+        )
+
+        assert response.record_id is not None
+        record = facade.catalog_get(record_id=response.record_id)
+        assert record.source_tool == "transfer_design"
+        # 元数据：transfer 专属标量走 scalars，SCHEMA_VERSION 不动
+        assert record.scalars["transfer_type"] == "WSB"
+        assert record.scalars["delta_v_km_s"] == pytest.approx(3.9)
+        assert record.scalars["tli_epoch"] == pytest.approx(2460800.5)
+        assert record.scalars["tof_sec"] == pytest.approx(100.0)
+        assert record.scalars["state_frame"] == "synodic_barycentric_km"
+        # 轨道分类 6 键置 None/False（validate_meta 允许）
+        assert record.orbit_family is None
+        assert record.libration_point is None
+        assert record.jacobi is None
+        assert record.amplitude is None
+        assert record.has_cr3bp is False
+        assert record.has_ephemeris is False
+        assert record.member_count == 0
+        # 二进制段：trajectory (n,6) + trajectory_times (n,) 行数一致
+        states = record.arrays["transfer/states"]
+        times = record.arrays["transfer/times"]
+        assert states.shape == (2, 6)
+        assert times.shape == (2,)
+        assert np.allclose(times, [0.0, 100.0])
+        # details 原样存 + 结构化机动事件随块入 record（catalog_get 露出）
+        assert record.details["tof_sec"] == pytest.approx(100.0)
+        assert record.details["tli_epoch"] == pytest.approx(2460800.5)
+        assert [e["kind"] for e in record.details["maneuver_events"]] == [
+            "departure",
+            "perilune",
+            "arrival",
+        ]
+        assert record.details["maneuver_events"][1] == {
+            "kind": "perilune",
+            "t_sec": 50.0,
+            "dv_km_s": 0.0,
+            "note": None,
+        }
+        # request 快照可追溯
+        assert record.request["transfer_type"] == "WSB"
+
+    def test_transfer_without_trajectory_makes_no_record(self, monkeypatch, tmp_path):
+        _fake_transfer(monkeypatch, _make_transfer_result(with_trajectory=False))
+        facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
+
+        response = facade.transfer_design(
+            transfer_type="WSB", tli_epoch=2460800.5, target_ephemeris=[[1.0] * 6]
+        )
+
+        assert response.record_id is None
+        summaries = facade.catalog_query().records
+        assert all(s.source_tool != "transfer_design" for s in summaries)
+
+    def test_catalog_disabled_transfer_record(self, monkeypatch, tmp_path):
+        _fake_transfer(monkeypatch, _make_transfer_result())
+        catalog_dir = tmp_path / "catalog"
+        facade = Facade(Config(catalog_dir=str(catalog_dir), catalog_enabled=False))
+
+        response = facade.transfer_design(
+            transfer_type="WSB", tli_epoch=2460800.5, target_ephemeris=[[1.0] * 6]
+        )
+
+        assert response.record_id is None
+        assert not catalog_dir.exists()
+
+    def test_low_thrust_record_with_null_tof(self, monkeypatch, tmp_path):
+        """low_thrust details 无 tof_sec：tof 标量为 None，记录照常落库。"""
+        from e2m2e.algorithm.transfer import ManeuverEvent
+
+        result = _make_transfer_result(transfer_type="low_thrust")
+        result.state_frame = "force_model_state"
+        result.details = _FakeLowThrustDetails(equivalent_delta_v=2.2)  # 无 tof_sec
+        result.maneuver_events = (ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=2.2),)
+        _fake_transfer(monkeypatch, result)
+        facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
+
+        response = facade.transfer_design(
+            transfer_type="low_thrust", tli_epoch="2025-06-21T11:00:00"
+        )
+
+        assert response.record_id is not None
+        record = facade.catalog_get(record_id=response.record_id)
+        assert record.scalars["transfer_type"] == "low_thrust"
+        assert record.scalars["tof_sec"] is None
+        assert record.scalars["tli_epoch"] == "2025-06-21T11:00:00"  # 原样存档
+        assert record.scalars["state_frame"] == "force_model_state"
+
+
+class TestTransferQuery:
+    """catalog_query 的 transfer 过滤维度（#574）。"""
+
+    @pytest.fixture
+    def facade_with_transfer(self, monkeypatch, tmp_path):
+        facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
+        _fake_transfer(monkeypatch, _make_transfer_result())
+        facade.transfer_design(
+            transfer_type="WSB", tli_epoch=2460800.5, target_ephemeris=[[1.0] * 6]
+        )
+        _fake_design(monkeypatch, _make_design_result(orbit_type="DRO"))
+        facade.design_orbit(orbit_type="DRO")
+        return facade
+
+    def test_filter_by_transfer_type(self, facade_with_transfer):
+        records = facade_with_transfer.catalog_query(transfer_type="WSB").records
+        assert len(records) == 1
+        assert records[0].transfer_type == "WSB"
+        assert len(facade_with_transfer.catalog_query(transfer_type="LGA").records) == 0
+
+    def test_filter_by_delta_v_range(self, facade_with_transfer):
+        assert (
+            len(
+                facade_with_transfer.catalog_query(
+                    delta_v_min_km_s=3.0, delta_v_max_km_s=4.0
+                ).records
+            )
+            == 1
+        )
+        assert (
+            len(
+                facade_with_transfer.catalog_query(
+                    delta_v_min_km_s=5.0, delta_v_max_km_s=6.0
+                ).records
+            )
+            == 0
+        )
+
+    def test_filter_by_tli_epoch_range(self, facade_with_transfer):
+        hits = facade_with_transfer.catalog_query(
+            tli_epoch_min=2460800.0, tli_epoch_max=2460801.0
+        ).records
+        assert len(hits) == 1
+        assert hits[0].tli_epoch == pytest.approx(2460800.5)
+        assert (
+            len(
+                facade_with_transfer.catalog_query(
+                    tli_epoch_min=2461000.0, tli_epoch_max=2461001.0
+                ).records
+            )
+            == 0
+        )
+
+    def test_transfer_summary_fields_present_orbit_records_none(self, facade_with_transfer):
+        summaries = {s.source_tool: s for s in facade_with_transfer.catalog_query().records}
+        assert summaries["transfer_design"].transfer_type == "WSB"
+        assert summaries["transfer_design"].delta_v_km_s == pytest.approx(3.9)
+        assert summaries["transfer_design"].tli_epoch == pytest.approx(2460800.5)
+        assert summaries["design_orbit"].transfer_type is None
+        assert summaries["design_orbit"].delta_v_km_s is None
+        assert summaries["design_orbit"].tli_epoch is None
+
+    def test_invalid_transfer_ranges_rejected(self, facade_with_transfer):
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade_with_transfer.catalog_query(delta_v_min_km_s=4.0, delta_v_max_km_s=3.0)
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade_with_transfer.catalog_query(tli_epoch_min=2460801.0, tli_epoch_max=2460800.0)
+
+    def test_combined_transfer_filters(self, facade_with_transfer):
+        records = facade_with_transfer.catalog_query(
+            transfer_type="WSB", delta_v_min_km_s=3.0, tli_epoch_max=2460900.0
+        ).records
+        assert len(records) == 1
+        records = facade_with_transfer.catalog_query(
+            transfer_type="WSB", delta_v_max_km_s=1.0
+        ).records
+        assert len(records) == 0
 
 
 class TestAutoIngest:
@@ -435,46 +660,10 @@ class TestSweep:
         assert len(records) == 2
         assert all(record.member_count == 2 for record in records)
 
-    def test_sweep_jacobi_windows_create_layered_records(self):
-        facade = Facade()
-        # 自校准窗口：先探出族的真实能量范围，窗口取其内部分层
-        probe = facade.orbit_family_generation(
-            orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=5
-        )
-        jacobis = probe.get_jacobi_constants()
-        lower, upper = float(jacobis.min()), float(jacobis.max())
-        middle = 0.5 * (lower + upper)
-
-        response = facade.catalog_sweep(
-            orbit_types=["HALO"],
-            libration_points=[1],
-            jacobi_windows=[[lower, middle], [middle, upper], [9.9, 9.95]],
-            n_orbits=5,
-        )
-
-        assert response.succeeded == 2
-        assert response.failed == 0
-        assert "1 点软失败无成员产出" in response.message
-        windows = {tuple(point.jacobi_window) for point in response.points}
-        assert windows == {(lower, middle), (middle, upper), (9.9, 9.95)}
-        assert all(
-            point.parameter_km is None and point.amplitudes_km is None for point in response.points
-        )
-
-        for point in response.points[:2]:
-            assert point.status is ConvergenceState.CONVERGED
-            assert point.record_id is not None
-            record = facade.catalog_get(record_id=point.record_id)
-            window_lo, window_hi = point.jacobi_window
-            assert record.jacobi is not None
-            assert record.jacobi[0] >= window_lo
-            assert record.jacobi[1] <= window_hi
-
-        empty = response.points[2]
-        assert empty.status is ConvergenceState.INFEASIBLE
-        assert empty.cause is FailureCause.CONSTRAINT_VIOLATION
-        assert empty.record_id is None
-        assert empty.generated_members == 0
+    # jacobi 窗口 sweep 的 Facade 集成用例已移出默认套件（ADR 0037：窗口
+    # 模式共享的 Rust trace 有 200 成员兜底，单次 ≥30s；窗口编排便过语义
+    # 由 tests/algorithm/test_catalog_sweep.py 的小规模真实扫描覆盖，
+    # Facade 落库粘合由 test_sweep_generates_records_for_grid 覆盖）。
 
     def test_sweep_request_model_declares_new_dimensions(self):
         field_names = set(CatalogSweepRequest.model_fields)

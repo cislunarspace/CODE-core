@@ -1,6 +1,8 @@
-"""Transfer 优化接口需求定义与测试。
+"""Transfer 创建与配置契约测试。
 
-覆盖 Transfer 创建、轨道设置、optimize 调用与结果字段。
+测试策略：只保留 Transfer 实例化、轨道设置与配置字段契约。
+optimize() 全链 NLP 测试（rtol=1e-12 研究级容差）已按维护决策移除
+（全量预算超 ADR 0037 上限）。
 """
 
 import json
@@ -8,8 +10,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
-from e2m2e.data.templates import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 
@@ -48,185 +48,6 @@ class TestTransferCreation:
         assert isinstance(transfer.config, TransferConfig)
         assert transfer.config.nlp_alpha_min == 0.5
         assert transfer.config.nlp_alpha_max == 2.5
-
-
-class TestTransferOptimization:
-    """Test Transfer.optimize() method."""
-
-    def test_optimize_with_auto_departure_sampling(self, dynamics, dro_orbit, ro_orbit):
-        """optimize() should work without explicit departure_state (auto-sample)."""
-        from e2m2e.algorithm.transfer import Transfer
-
-        transfer = Transfer(dynamics)
-        transfer.set_orbit(start=dro_orbit, end=ro_orbit)
-
-        result = transfer.optimize(
-            initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
-            alpha_range=(0.5, 2.5),
-            use_relaxed_velocity=True,
-            velocity_angle_tol=0.05,
-        )
-
-        assert result is not None
-        assert isinstance(result.status, ConvergenceState)
-        assert hasattr(result, "total_delta_v")
-        assert hasattr(result, "departure_state")
-        assert hasattr(result, "insertion_state")
-
-    def test_optimize_with_manual_departure_state(
-        self, dynamics, dro_orbit, ro_orbit, dro_departure_state
-    ):
-        """optimize() should accept manual departure_state parameter."""
-        from e2m2e.algorithm.transfer import Transfer
-
-        transfer = Transfer(dynamics)
-        transfer.set_orbit(start=dro_orbit, end=ro_orbit)
-
-        result = transfer.optimize(
-            initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
-            alpha_range=(0.5, 2.5),
-            departure_state=dro_departure_state,
-            use_relaxed_velocity=True,
-            velocity_angle_tol=0.05,
-        )
-
-        assert result is not None
-        np.testing.assert_array_almost_equal(result.departure_state, dro_departure_state)
-
-    def test_optimize_with_t_ins_range(self, dynamics, dro_orbit, ro_orbit, dro_departure_state):
-        """optimize() should accept t_ins_range parameter."""
-        from e2m2e.algorithm.transfer import Transfer
-
-        transfer = Transfer(dynamics)
-        transfer.set_orbit(start=dro_orbit, end=ro_orbit)
-
-        t0 = ro_orbit.times[0]
-        t_ins_range = (t0, t0 + ro_orbit.period)
-
-        result = transfer.optimize(
-            initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
-            alpha_range=(0.5, 2.5),
-            departure_state=dro_departure_state,
-            t_ins_range=t_ins_range,
-            use_relaxed_velocity=True,
-            velocity_angle_tol=0.05,
-        )
-
-        assert result is not None
-        assert t_ins_range[0] <= result.t_ins <= t_ins_range[1]
-
-    def test_optimize_default_t_ins_range_full_period(
-        self, dynamics, dro_orbit, ro_orbit, dro_departure_state
-    ):
-        """When t_ins_range is not specified, default to full RO period."""
-        from e2m2e.algorithm.transfer import Transfer
-
-        transfer = Transfer(dynamics)
-        transfer.set_orbit(start=dro_orbit, end=ro_orbit)
-
-        result = transfer.optimize(
-            initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
-            alpha_range=(0.5, 2.5),
-            departure_state=dro_departure_state,
-            use_relaxed_velocity=True,
-            velocity_angle_tol=0.05,
-        )
-
-        t0 = ro_orbit.times[0]
-        t_ins_range_default = (t0, t0 + ro_orbit.period)
-        assert t_ins_range_default[0] <= result.t_ins <= t_ins_range_default[1]
-
-
-class TestTransferOptimizationResult:
-    """Test TransferOptimizationResult contains all expected fields."""
-
-    def test_result_contains_departure_info(
-        self, dynamics, dro_orbit, ro_orbit, dro_departure_state
-    ):
-        """Result should contain departure position and velocity information."""
-        from e2m2e.algorithm.transfer import Transfer
-
-        transfer = Transfer(dynamics)
-        transfer.set_orbit(start=dro_orbit, end=ro_orbit)
-
-        result = transfer.optimize(
-            initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
-            alpha_range=(0.5, 2.5),
-            departure_state=dro_departure_state,
-            use_relaxed_velocity=True,
-            velocity_angle_tol=0.05,
-        )
-
-        assert result.departure_state is not None
-        assert result.departure_state.shape == (6,)
-        assert hasattr(result, "departure_alpha")
-        assert hasattr(result, "departure_beta")
-        assert hasattr(result, "delta_v1")
-
-    def test_result_contains_insertion_info(
-        self, dynamics, dro_orbit, ro_orbit, dro_departure_state
-    ):
-        """Result should contain arrival/insertion position and velocity change."""
-        from e2m2e.algorithm.transfer import Transfer
-
-        transfer = Transfer(dynamics)
-        transfer.set_orbit(start=dro_orbit, end=ro_orbit)
-
-        result = transfer.optimize(
-            initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
-            alpha_range=(0.5, 2.5),
-            departure_state=dro_departure_state,
-            use_relaxed_velocity=True,
-            velocity_angle_tol=0.05,
-        )
-
-        assert result.insertion_state is not None
-        assert result.insertion_state.shape == (6,)
-        assert hasattr(result, "final_state")
-        assert hasattr(result, "delta_v2")
-        assert hasattr(result, "t_ins")
-
-    def test_result_contains_transfer_trajectory(
-        self, dynamics, dro_orbit, ro_orbit, dro_departure_state
-    ):
-        """Result should contain full transfer trajectory."""
-        from e2m2e.algorithm.transfer import Transfer
-
-        transfer = Transfer(dynamics)
-        transfer.set_orbit(start=dro_orbit, end=ro_orbit)
-
-        result = transfer.optimize(
-            initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
-            alpha_range=(0.5, 2.5),
-            departure_state=dro_departure_state,
-            use_relaxed_velocity=True,
-            velocity_angle_tol=0.05,
-        )
-
-        assert result.transfer_trajectory is not None
-        assert result.transfer_trajectory.ndim == 2
-        assert result.transfer_trajectory.shape[1] == 6
-        assert hasattr(result, "transfer_trajectory_times")
-        assert len(result.transfer_trajectory_times) == len(result.transfer_trajectory)
-
-    def test_result_total_delta_v_equals_sum(
-        self, dynamics, dro_orbit, ro_orbit, dro_departure_state
-    ):
-        """total_delta_v should equal delta_v1 + delta_v2."""
-        from e2m2e.algorithm.transfer import Transfer
-
-        transfer = Transfer(dynamics)
-        transfer.set_orbit(start=dro_orbit, end=ro_orbit)
-
-        result = transfer.optimize(
-            initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
-            alpha_range=(0.5, 2.5),
-            departure_state=dro_departure_state,
-            use_relaxed_velocity=True,
-            velocity_angle_tol=0.05,
-        )
-
-        np.testing.assert_almost_equal(result.total_delta_v, result.delta_v1 + result.delta_v2)
 
 
 # =============================================================================
@@ -286,17 +107,3 @@ def dynamics():
     dyn.atol = 1e-12
     dyn.max_step = 1.0 / (24.0 * 384405.0 / 26970.0 * 2.0 * np.pi / 27.321661)
     return dyn
-
-
-@pytest.fixture
-def dro_departure_state():
-    return np.array(
-        [
-            -0.8748418222113017,
-            0.0,
-            0.0,
-            0.0,
-            -0.07906694836916197,
-            0.0,
-        ]
-    )

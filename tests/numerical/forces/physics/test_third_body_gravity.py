@@ -1,9 +1,9 @@
 """ThirdBodyGravity 物理规律验证。
 
-验证第三体引力摄动模型：
-  A. Rust 单点 ``third_body_acceleration`` 与 EphemerisDynamics 第三体分支一致；
-  B. 力分解路径 (ForceModel) 与 EphemerisDynamics 传播同一条 cislunar
-     轨道，末状态位置差自洽。
+Rust 单点 ``third_body_acceleration`` / ``indirect_term_acceleration``
+与 EphemerisDynamics 第三体分支及解析公式逐点一致（单点求值，毫秒级）。
+力分解路径与 EphemerisDynamics 的长弧传播自洽性验证属重度真实计算，
+已随端到端测试裁剪移除。
 
 定义与序列化契约见 ``contract/test_third_body_gravity.py``。
 """
@@ -13,14 +13,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
-from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
-from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
-from e2m2e.algorithm.forces import (
-    ForceModel,
-    PointMassGravity,
-    ThirdBodyGravity,
-)
 from e2m2e.integrators import indirect_term_acceleration, third_body_acceleration
 
 pytestmark = [
@@ -105,73 +97,6 @@ class TestThirdBodyAccelMatchesEphemeris:
 
         acc = indirect_term_acceleration(reference_et, "MOON", "EARTH", mu)
         np.testing.assert_allclose(acc, expected, rtol=1e-10)
-
-
-# =============================================================================
-# B. 自洽性主验收测试：力分解路径 vs EphemerisDynamics
-# =============================================================================
-class TestCislunarForceDecomposition:
-    """力分解路径与 EphemerisDynamics 传播同一条 cislunar 轨道的自洽性。"""
-
-    def test_cislunar_force_model_matches_ephemeris_dynamics(
-        self,
-        spice_eph_system,
-        spice_eph_dynamics,
-        spice_manager,
-        reference_et,
-        dro_state,
-    ):
-        """传播 ~9 天 DRO 类轨道，两条路径末状态位置差应在积分容差内一致。
-
-        路径 1：``EphemerisDynamics.propagate``（scipy DOP853）。
-        路径 2：``ForceModel``（Rust rk_step PD45）+ PointMass(EARTH)
-                + ThirdBody(MOON) + ThirdBody(SUN)。
-
-        二者积分器与步长策略不同，但物理模型应等价；末状态位置差
-        反映的是数值积分差异，应远小于 1 km。
-        """
-        system = spice_eph_system
-        # ForceModel 需要带 coordinate_system 的 system；spice_eph_system 默认未设。
-        if getattr(system, "coordinate_system", None) is None:
-            system.coordinate_system = CoordinateSystem(
-                axes=ICRSAxes(),
-                origin=CelestialBodyOrigin(body="EARTH", spice=spice_manager),
-            )
-
-        t_span = (reference_et, reference_et + 9.11 * 86400.0)
-
-        # 路径 1：EphemerisDynamics（与 test_propagate_dro_like_orbit 同配置）
-        result_eph = spice_eph_dynamics.propagate(dro_state, t_span)
-        final_eph = np.asarray(result_eph["states"][-1], dtype=float)
-
-        # 路径 2：力分解
-        fm = ForceModel(
-            system,
-            forces=[
-                PointMassGravity("EARTH"),
-                ThirdBodyGravity("MOON"),
-                ThirdBodyGravity("SUN"),
-            ],
-        )
-        # 与 EphemerisDynamics 宽松测试配置对齐：rtol/atol=1e-10, max_step=600s
-        fm.rtol = spice_eph_dynamics.rtol
-        fm.atol = spice_eph_dynamics.atol
-        fm.max_step = spice_eph_dynamics.max_step
-
-        result_fm = fm.propagate(dro_state, t_span, max_steps=1_000_000)
-        final_fm = np.asarray(result_fm["states"][-1], dtype=float)
-
-        pos_diff_km = float(np.linalg.norm(final_eph[:3] - final_fm[:3]))
-
-        # 实测：两条路径末状态位置差 ~1e-6 km（亚毫米级）。这是因为两条路径
-        # 的物理模型逐字等价，差异仅来自不同积分器（scipy DOP853 vs Rust
-        # rk_step PD45）的数值积分误差。判据设为 1e-3 km（1 m），约为实测
-        # 值的 3 个数量级余量，足以抵御不同 SPICE 内核版本（DE440/DE440s）
-        # 带来的极小星历差异，同时远严于任务级 1 km 上界。
-        assert pos_diff_km < 1e-3, (
-            f"cislunar force-decomposition path diverged from EphemerisDynamics: "
-            f"|Δr|={pos_diff_km:.4e} km (threshold 1e-3 km)"
-        )
 
 
 if __name__ == "__main__":

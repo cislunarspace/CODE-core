@@ -116,6 +116,64 @@ default).
 - low_thrust's inconsistency becomes machine-readable: a future unification
   changes the enum value, not the contract shape.
 
+## Amendment (2026-08-30): maneuver events + catalog transfer record (#575, #574)
+
+### Context
+
+Two follow-ups to §4's deliberately-deferred items. (a) Consumers needed the
+Δv events *structured* — tod rendered "2 maneuvers" as prose because the
+response carried only a scalar total; the perilune time was buried in
+backend-specific `details`. (b) Transfer products still bypassed the catalog
+(ADR 0031 scoped auto-ingestion to orbit products), so designed transfers were
+not queryable/lineage-tracked.
+
+### Decisions
+
+**Maneuver events (#575).** `TransferDesignResult` /
+`TransferDesignResponse` gain `maneuver_events` — a list of
+`{kind, t_sec, dv_km_s, note?}` with `t_sec` in seconds since TLI (the §1
+time basis) and `kind` an open enum (`departure` / `perilune` / `arrival`).
+Per backend:
+
+- **HMN**: `departure` (t=0) + `arrival` (t=tof); arrival *is* perilune, no
+  separate event.
+- **LGA/WSB**: departure + perilune (t = refinement's `perilune_time_dim` ×
+  that leg's characteristic time — the same quantity the trajectory join uses,
+  so event time and geometry stay consistent by construction) + arrival.
+  Perilune `dv_km_s=0.0`: the velocity kink there is refinement's implicit
+  correction (§4), not part of the Δv accounting — recorded honestly as a
+  zero-Δv waypoint rather than papered over.
+- **low_thrust**: empty list. Its burn schedule lives on SPICE ET, a different
+  time basis than TLI-seconds; converting without a shared epoch would
+  fabricate precision. Revisit when low_thrust adopts the contract.
+
+**Catalog transfer record (#574).** Converged `transfer_design` responses with
+a trajectory auto-ingest (the ADR 0031 `_auto_catalog` seam, now type-aware):
+a record with `source_tool="transfer_design"`, the six classification keys
+`None`/`False` (no orbit family semantics — do not force transfer metadata
+into orbit-shaped fields), transfer metadata in `scalars`
+(`transfer_type`, `delta_v_km_s`, `tli_epoch` raw as given, `tof_sec`,
+`state_frame`, `n_points`), the backend `details` block stored as-is under a
+`details` meta key with the #575 `maneuver_events` appended (the shared
+contract), arrays under a `transfer/` segment prefix
+(`transfer/states`, `transfer/times`). `SCHEMA_VERSION` stays 1: record shape
+is JSON-schema-compatible, only the derived SQLite index grows columns
+(`transfer_type`, `delta_v`, `tli_epoch`) plus five `CatalogFilter` fields.
+Diverged runs and low_thrust-style responses without a trajectory ingest
+nothing. Legacy index tables missing the new columns are detected on open and
+rebuilt from the record files (ADR 0031 decision 5: the index is derived).
+`tli_epoch` range filtering applies only to numeric epochs; string epochs
+index as NULL (exact value still readable from the record).
+
+### Consequences
+
+- tod renders maneuvers structurally (timeline markers at `t_sec`) instead of
+  parsing prose; total Δv remains the scalar sum of nonzero events.
+- `catalog_query(transfer_type="WSB", delta_v_min_km_s=…)` works alongside
+  orbit filters; summaries expose `transfer_type`/`delta_v_km_s`/`tli_epoch`.
+- Zero breaking change: new response fields default empty/None; old catalogs
+  self-heal their index on first open after upgrade.
+
 ## Consequences
 
 - MCP and sidecar consumers get the trajectory inline as JSON (transfer tools

@@ -179,10 +179,14 @@ class TestNSGA2Parallel:
 
     @pytest.mark.skipif(not hasattr(pytest, "importorskip"), reason="dummy skip for parallel test")
     def test_parallel_consistent_with_serial(self):
-        """同种子下串行与并行结果一致（评估顺序不影响）。"""
+        """同种子下串行与并行结果一致（评估顺序不影响）。
+
+        耗时大头是 Windows spawn 子进程的导入成本（ADR 0037 预算内尽量压
+        到最小种群/代数，只保留触发并行路径的最小规模）。
+        """
         # 注意：并行要求 fn 是模块级可导入函数
-        r_serial = nsga2(schaffer, bounds=[(-5, 5)], pop_size=50, n_gen=20, seed=42, n_workers=1)
-        r_parallel = nsga2(schaffer, bounds=[(-5, 5)], pop_size=50, n_gen=20, seed=42, n_workers=2)
+        r_serial = nsga2(schaffer, bounds=[(-5, 5)], pop_size=10, n_gen=5, seed=42, n_workers=1)
+        r_parallel = nsga2(schaffer, bounds=[(-5, 5)], pop_size=10, n_gen=5, seed=42, n_workers=2)
         np.testing.assert_allclose(r_serial.f, r_parallel.f)
 
 

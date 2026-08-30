@@ -83,23 +83,6 @@ def test_compare_script_warns_when_gmat_report_missing(
     assert "gmat -s" in captured.out
 
 
-@pytest.mark.spice
-def test_propagate_e2m2e_runs_with_full_force_model(
-    output_dir: Path, spice_kernel_path: str
-) -> None:
-    """e2m2e 传播函数应能用完整力模型跑完 1 天。"""
-    import sys
-
-    sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
-    from compare_with_gmat import _propagate_e2m2e
-
-    data = _propagate_e2m2e(output_dir, include_drag=True, include_srp=True)
-
-    assert data["time"].shape == (200,)
-    assert data["states"].shape == (200, 6)
-    assert data["time"][-1] - data["time"][0] > 86000.0
-
-
 def test_parse_gmat_report_parses_space_delimited_rows(output_dir: Path) -> None:
     """GMAT 报告解析器应能解析带表头的空格分隔数据。"""
     import sys

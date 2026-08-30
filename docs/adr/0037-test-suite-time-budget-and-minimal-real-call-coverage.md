@@ -81,3 +81,72 @@ generation straight into pytest.
 3. **Phase 3 (targeted optimization)**: shrink `tests/api/test_facade.py` smoke
    parameters (drop horseshoe/nrho long arcs for small-amplitude samples);
    evaluate sinking `test_lga.py` onto Rust search kernels (WSB pattern).
+
+## Amendment (2026-08-30): end-to-end purge to the API + math-derivation core
+
+The suite had re-accumulated end-to-end debt past the Phase 1–3 scope: real
+family generation, ephemeris-correction, force-model propagation, and
+production-scale grid searches had crept into the default gate. This amendment
+records a purge wave that returns the default suite to the API-contract +
+math-derivation core this ADR intends.
+
+**Outcome**: `2164 passed / 29 min` → `1981 passed / 31 skipped / ~37 s`
+(xdist `-n auto --dist loadscope`); 49 files changed (19 deleted, 30
+surgically shrunk), net −5304 lines. After the wave, **no default-suite test
+exceeds the 10 s per-test ceiling** (slowest: NSGA-II parallel-consistency at
+~9.6 s, dominated by Windows `ProcessPoolExecutor` spawn — irreducible without
+dropping the parallel path the test exists to exercise).
+
+**What was deleted outright** (end-to-end / heavy real computation with the
+contract already covered elsewhere): the remaining `design/` ephemeris-
+correction and frozen-orbit integration files, whole-force-model propagation
+files under `numerical/forces/physics/` and `numerical/forces/container/`
+(STM/config), GIL/cache integration-binding probes, and the `tools/` GMAT
+full-force-model comparison. Each deletion kept the registry/API contract
+tests in the same directories.
+
+**Shrink techniques applied** (reusable for future over-budget tests):
+
+- **Pick the cheap point on a production walk, not a smaller problem.** A
+  periodic-orbit design via `_walk_family` converges in one `correct_at` step
+  near the family seed and walks many steps far from it — `design_dpo` is
+  ~0.3 s at 25000 km (the seed neighborhood) but ~10 s at 20000 km and ~37 s
+  at 8000 km. The REQ-003 Jacobi-conservation test moved to the seed-side
+  amplitude (the conservation semantics are amplitude-independent) rather than
+  shrinking the orbit.
+- **Hoist loop-invariant reference computations.** The value-function gradient
+  accuracy test recomputed `np.gradient` over the full 4-D grid inside its
+  sampling loop; hoisting it out (it does not depend on the sample point) plus
+  a coarser grid — which *widens* the spline-vs-central-difference gap the
+  test asserts — cut 15.5 s to 0.2 s.
+- **Stub the batch boundary, keep the glue assertion.** The Jacobi-window
+  grouping test only needs to prove "same-(family, point, params) windows
+  share one batch generation call"; it now stubs `generate_rust_family_windows`
+  with synthetic results instead of paying a real trace, while the window
+  *membership* behavior tests keep real generation.
+
+**Production-side floors found (flagged, deliberately NOT changed — out of
+test-surgery scope)**: `MIN_TRACE_MEMBERS = 200` and the 25000 km / 1e-12
+defaults in the Rust family-generation path force ≥200-member traces, giving
+every catalog window/sweep test a ~5–6 s floor regardless of how few members
+the test requests. If the per-test budget tightens further, these knobs (not
+the tests) are the lever — they need a maintainer decision on whether tests
+may request smaller traces.
+
+**Edge items kept pending adjudication**: `test_dual_instance_sync` (sole
+double-CSPICE-instance guard), `test_kernel_future_coverage` pxform regression
+(#556), and the seconds-scale minimal real solves (three-body Lambert,
+low-thrust shooting, multi-impulse, WSB Rust backend) retained as the ADR 0021
+rationale-4 minimal real-call anchors.
+
+**Post-review corrections** (the pre-merge review caught two over-deletions,
+restored): (1) the `design_orbit` orchestrator's decision-2 minimal real call
+had been removed with the heavy ephemeris-correction files — restored as a
+~1.6 s ELFO smoke (`tests/algorithm/design/test_design_orbit_smoke.py`; ELFO is
+the cheapest real path — no ephemeris correction, `correction=None`); (2)
+`test_low_thrust_variable_mass.py` had lost its only fast analytic comparisons
+(mass-consumption / semi-major-axis-rate / Rust-7D-path / zero-thrust guard,
+all <2 s) along with the two over-budget SRP cases — the four fast math-derivation
+tests are restored, the two SRP cases (17 s / 10 s) stay removed. The
+transfer-side anchors listed above never covered `design_orbit`; each
+orchestrator entry needs its own minimal real call, which this restores.

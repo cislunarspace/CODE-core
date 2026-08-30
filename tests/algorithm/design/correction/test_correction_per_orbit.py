@@ -1,8 +1,12 @@
 """每类轨道的微分修正收敛测试（阶段 2）。
 
-7 类代表轨道各对应一个 session 缓存 fixture（见 conftest._corrected_*_cached），
+代表轨道各对应一个 session 缓存 fixture（见 conftest._corrected_*_cached），
 本文件只验证收敛行为——闭合误差、周期性、成功标志、迭代次数合理；
 不测类型/属性（那是阶段 1 已清掉的废话）。
+
+axial_l1 修正超预算移出默认套件（ADR 0037）：axial 族单次微分修正
+固有 ~2 min（长周期 × 多次 STM 传播，缩参/放宽容差均无法压回单测
+预算，见 continuation/test_continuation_per_family.py docstring）。
 """
 
 import pytest
@@ -20,7 +24,6 @@ CORRECTION_CASES = [
     ("halo_l1", "corrected_halo_l1"),
     ("halo_l2", "corrected_halo_l2"),
     ("lyapunov_l1", "corrected_lyapunov_l1"),
-    ("axial_l1", "corrected_axial_l1"),
     ("dpo", "corrected_dpo"),
     ("triangular_l4", "corrected_triangular_l4"),
 ]

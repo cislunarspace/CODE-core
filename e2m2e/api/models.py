@@ -724,6 +724,20 @@ class TransferDesignRequest(_ApiModel):
     )
 
 
+class ManeuverEvent(_ApiModel):
+    """单次机动事件（#575 契约；与 transfer catalog record 的 details 块共用 schema）。
+
+    ``kind`` 为开放枚举（departure/perilune/arrival/…）；``t_sec`` 为 TLI
+    起算秒（与 trajectory_times 同基准）；非脉冲事件（perilune 旗标）的
+    ``dv_km_s`` 为 0.0。
+    """
+
+    kind: str = Field(description="事件类别：departure/perilune/arrival/…（开放枚举）")
+    t_sec: float = Field(ge=0.0, description="TLI 起算秒（t=0 为出发脉冲）")
+    dv_km_s: float = Field(ge=0.0, description="该次机动脉冲大小；非脉冲事件为 0.0")
+    note: str | None = Field(default=None, description="可选人类可读注记")
+
+
 class TransferDesignResponse(ResultResponse):
     """转移轨道设计输出。"""
 
@@ -751,7 +765,20 @@ class TransferDesignResponse(ResultResponse):
             "语义全集后续批次扩充 gcrs_km / synodic_barycentric_nd"
         ),
     )
+    maneuver_events: list[ManeuverEvent] = Field(
+        default_factory=list,
+        description=(
+            "结构化机动事件列表（#575，按 t_sec 升序）：HMN 为 departure/"
+            "arrival 两条（到达点即近月点）；LGA/WSB 含 perilune 旗标"
+            "（dv_km_s=0）；low_thrust 连续推进恒为空；搜索零结果恒为空。"
+            "旧 details Δv 字段保留一个版本后废弃"
+        ),
+    )
     details: dict[str, Any]
+    record_id: str | None = Field(
+        default=None,
+        description="产物自动入库的记录 id（ADR 0031，#574）；库关闭或无轨迹产物时为 None",
+    )
 
 
 class PropagationRequest(_ApiModel):
@@ -1207,6 +1234,26 @@ class CatalogQueryRequest(_ApiModel):
         default=None, description="按结果状态筛（如筛掉软失败产物）"
     )
     tags: list[str] | None = Field(default=None, description="按标签筛，命中任一即匹配")
+    transfer_type: str | None = Field(
+        default=None,
+        description="转移类型等值过滤（HMN/LGA/WSB/low_thrust；#574 transfer record）",
+    )
+    delta_v_min_km_s: float | None = Field(
+        default=None, ge=0.0, description="转移总 Δv 区间下界（km/s）"
+    )
+    delta_v_max_km_s: float | None = Field(
+        default=None, ge=0.0, description="转移总 Δv 区间上界（km/s）"
+    )
+    tli_epoch_min: float | None = Field(
+        default=None,
+        description=(
+            "TLI 历元区间下界（JD_TDB 数值）。仅数值历元入索引；UTC 字符串历元记录不匹配区间过滤"
+        ),
+    )
+    tli_epoch_max: float | None = Field(
+        default=None,
+        description="TLI 历元区间上界（JD_TDB 数值）",
+    )
 
     @model_validator(mode="after")
     def _validate_ranges(self) -> CatalogQueryRequest:
@@ -1226,6 +1273,23 @@ class CatalogQueryRequest(_ApiModel):
             raise ValueError(
                 f"amplitude_min_km 不得大于 amplitude_max_km："
                 f"{self.amplitude_min_km} > {self.amplitude_max_km}"
+            )
+        if (
+            self.delta_v_min_km_s is not None
+            and self.delta_v_max_km_s is not None
+            and self.delta_v_min_km_s > self.delta_v_max_km_s
+        ):
+            raise ValueError(
+                f"delta_v_min_km_s 不得大于 delta_v_max_km_s："
+                f"{self.delta_v_min_km_s} > {self.delta_v_max_km_s}"
+            )
+        if (
+            self.tli_epoch_min is not None
+            and self.tli_epoch_max is not None
+            and self.tli_epoch_min > self.tli_epoch_max
+        ):
+            raise ValueError(
+                f"tli_epoch_min 不得大于 tli_epoch_max：{self.tli_epoch_min} > {self.tli_epoch_max}"
             )
         return self
 
@@ -1247,10 +1311,19 @@ class CatalogRecordSummary(_ApiModel):
     )
     has_cr3bp: bool
     has_ephemeris: bool
+    transfer_type: str | None = Field(
+        default=None, description="转移类型（HMN/LGA/WSB/low_thrust）；非 transfer 记录为 None"
+    )
+    delta_v_km_s: float | None = Field(
+        default=None, description="转移总 Δv（km/s）；非 transfer 记录为 None"
+    )
+    tli_epoch: float | None = Field(
+        default=None, description="TLI 历元（JD_TDB 数值）；UTC 字符串历元或非 transfer 记录为 None"
+    )
     status: ConvergenceState
     cause: FailureCause
     message: str
-    member_count: int = Field(description="族成员数；单轨道记录为 1，纯星历记录为 0")
+    member_count: int = Field(description="族成员数；单轨道记录为 1，纯星历/转移记录为 0")
     tags: list[str]
     note: str
 
@@ -1275,6 +1348,10 @@ class CatalogRecordResponse(CatalogRecordSummary):
     scalars: dict[str, Any] = Field(description="任务标量（历元、时长、mu、迭代次数等）")
     request: dict[str, Any] = Field(description="原始请求快照")
     members: list[dict[str, Any]] = Field(description="族成员参数表；非族记录为空")
+    details: dict[str, Any] | None = Field(
+        default=None,
+        description="设计细节块（transfer 记录：后端 details + maneuver_events；其余为 None）",
+    )
     arrays: dict[str, Any] = Field(
         description="数组段：cr3bp/ 与 eph/ 前缀的 numpy 数组（含族成员 cr3bp/members/）"
     )

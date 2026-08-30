@@ -48,14 +48,18 @@ class CatalogStore:
     """一个库目录的读写入口。"""
 
     def __init__(self, root: str | Path) -> None:
-        """打开（必要时创建）库目录；catalog.db 缺失时全量重建索引。"""
+        """打开（必要时创建）库目录；catalog.db 缺失时全量重建索引。
+
+        存量库索引表缺列（schema 演进，如 #574 transfer 维度）时索引
+        表废弃并全量重建——记录文件是事实来源，重建后查询结果不变。
+        """
         self.root = Path(root)
         self.records_dir = self.root / "records"
         self.db_path = self.root / "catalog.db"
         self.records_dir.mkdir(parents=True, exist_ok=True)
         rebuild = not self.db_path.exists()
         self._index = CatalogIndex(self.db_path)
-        if rebuild:
+        if rebuild or self._index.schema_reset:
             self.rebuild_index()
 
     # ---- 写入 ----

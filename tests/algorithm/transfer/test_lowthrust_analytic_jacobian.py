@@ -258,15 +258,19 @@ def test_terminal_jacobian_matches_constraint_derivative():
 
 
 def test_analytic_jacobian_matches_numeric_solution():
-    """解析与数值雅可比求得近似相同的燃料消耗。"""
+    """解析与数值雅可比求得近似相同的燃料消耗。
+
+    ADR 0037 预算内：二体点质量 + 自会合二次收敛，maxiter 30→12 足够；
+    n_seg 4→3 使数值差分决策变量 12→9，每次牛顿迭代的 FD 传播更少。
+    """
 
     shooter = _make_shooter_two_body()
-    n_seg = 4
+    n_seg = 3
     y0 = shooter._default_x0(n_seg)
     y0[0::3] = 0.5  # 避免边界 clip
 
-    s_analytic = shooter.solve(n_seg, x0=y0, use_analytic_jac=True, maxiter=30)
-    s_numeric = shooter.solve(n_seg, x0=y0, use_analytic_jac=False, maxiter=30)
+    s_analytic = shooter.solve(n_seg, x0=y0, use_analytic_jac=True, maxiter=12)
+    s_numeric = shooter.solve(n_seg, x0=y0, use_analytic_jac=False, maxiter=12)
 
     assert abs(s_analytic.fuel_consumed - s_numeric.fuel_consumed) < 1e-3, (
         f"解析({s_analytic.fuel_consumed:.5f}) vs 数值({s_numeric.fuel_consumed:.5f}) 燃料不一致"

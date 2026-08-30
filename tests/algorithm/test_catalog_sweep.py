@@ -188,17 +188,31 @@ class TestJacobiWindows:
 
     def test_windowed_group_shares_single_generation_call(self, monkeypatch):
         import e2m2e.algorithm.catalog_sweep as sweep_module
+        from e2m2e.algorithm.results import FamilyGenerationResult
+        from e2m2e.data.types.orbit import OrbitFamily
 
         calls: list[tuple[str, int, list]] = []
-        real = sweep_module.generate_rust_family_windows
 
-        def spy(family_type, libration_point, n_orbits, windows, **kwargs):
+        # ADR 0037 预算内：批量生成打桩为合成结果。本测试只验证"同组窗口点共享
+        # 一次批量调用"的编排契约，与真实生成内容无关；真实窗口筛选行为由
+        # test_windowed_points_keep_members_inside_window 等承担。
+        def stub(family_type, libration_point, n_orbits, windows, **kwargs):
             calls.append((family_type, libration_point, list(windows)))
-            return real(family_type, libration_point, n_orbits, windows, **kwargs)
+            return [
+                FamilyGenerationResult(
+                    status=ConvergenceState.CONVERGED,
+                    cause=FailureCause.NONE,
+                    message="测试完成",
+                    family=OrbitFamily(family_type=family_type),
+                    requested_members=n_orbits,
+                    generated_members=0,
+                )
+                for _ in windows
+            ]
 
-        monkeypatch.setattr(sweep_module, "generate_rust_family_windows", spy)
-        lower, upper = _halo_jacobi_bounds()
-        middle = 0.5 * (lower + upper)
+        monkeypatch.setattr(sweep_module, "generate_rust_family_windows", stub)
+        # 自包含的任意窗口（不依赖 _halo_jacobi_bounds 真实探测）。
+        lower, middle, upper = 3.0, 3.1, 3.2
 
         outcomes = run_family_sweep(
             [

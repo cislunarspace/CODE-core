@@ -300,6 +300,33 @@ class TestIndexRebuild:
             == (before[1]["record_id"])
         )
 
+    def test_legacy_index_schema_is_rebuilt_on_open(self, store):
+        """存量库索引表缺列（如 #574 前的旧 schema）时，打开即废弃重建。
+
+        记录文件是事实来源：索引表结构演进不丢记录、查询结果不变。"""
+        import sqlite3
+
+        store.put(*make_record(orbit_family="nrho", libration_point=2))
+        record_id = store.put(*make_record(orbit_family="halo", libration_point=1))
+        before = store.query(CatalogFilter())
+
+        store.close()
+        conn = sqlite3.connect(store.db_path)
+        conn.execute("DROP TABLE records")
+        # 伪造旧 schema：只有 #574 之前的列
+        conn.execute(
+            "CREATE TABLE records ("
+            "record_id TEXT PRIMARY KEY, created_at TEXT NOT NULL, source_tool TEXT NOT NULL)"
+        )
+        conn.commit()
+        conn.close()
+
+        reopened = CatalogStore(store.root)
+        after = reopened.query(CatalogFilter())
+
+        assert [s["record_id"] for s in after] == [s["record_id"] for s in before]
+        assert reopened.query(CatalogFilter(orbit_family="halo"))[0]["record_id"] == record_id
+
     def test_corrupted_db_raises_structured_catalog_error(self, tmp_path):
         root = tmp_path / "catalog"
         (root / "records").mkdir(parents=True)

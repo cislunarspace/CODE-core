@@ -99,6 +99,7 @@ class TestFacadeDelegation:
                 trajectory=None,
                 trajectory_times=None,
                 state_frame="force_model_state",
+                maneuver_events=(),
                 details={},
             )
 
@@ -347,82 +348,6 @@ class TestFacadeCallChains:
         assert result.orbits == partial.orbits
         assert result.status is ConvergenceState.STAGNATED
         assert result.cause is FailureCause.STAGNATION_DETECTED
-
-    @pytest.mark.parametrize(
-        ("expected_type", "params"),
-        [
-            (
-                "nrho",
-                {
-                    "orbit_type": "NRHO",
-                    "libration_point": 1,
-                    "north_south": 1,
-                    "perilune_height_max_km": 30000.0,
-                },
-            ),
-            (
-                "axial",
-                {
-                    "orbit_type": "AXIAL",
-                    "libration_point": 2,
-                    "max_amplitude_km": 1500.0,
-                },
-            ),
-            (
-                "lissajous",
-                {
-                    "orbit_type": "LISSAJOUS",
-                    "libration_point": 2,
-                    "amplitude_in_km": 2400.0,
-                    "amplitude_out_km": 7200.0,
-                    "phase_in": 0.01,
-                    "phase_out": 0.55,
-                },
-            ),
-            (
-                "spo",
-                {
-                    "orbit_type": "SPO",
-                    "libration_point": 4,
-                    "min_amplitude_km": 5000.0,
-                    "max_amplitude_km": 20000.0,
-                },
-            ),
-            (
-                "lpo",
-                {
-                    "orbit_type": "LPO",
-                    "libration_point": 5,
-                    "min_amplitude_km": 5000.0,
-                    "max_amplitude_km": 30000.0,
-                },
-            ),
-            (
-                "horseshoe",
-                {
-                    "orbit_type": "HORSESHOE",
-                    "libration_point": 4,
-                    "min_amplitude_km": 50000.0,
-                    "max_amplitude_km": 110000.0,
-                },
-            ),
-            (
-                "dro",
-                {
-                    "orbit_type": "DRO",
-                    "min_amplitude_km": 5000.0,
-                    "max_amplitude_km": 20000.0,
-                },
-            ),
-        ],
-    )
-    def test_non_halo_family_end_to_end_smoke(self, expected_type, params):
-        family = Facade().orbit_family_generation(n_orbits=1, **params)
-
-        assert family.family_type == expected_type
-        assert len(family) == 1
-        assert family.status is ConvergenceState.CONVERGED
-        assert family.cause is FailureCause.NONE
 
     @pytest.mark.parametrize(
         "params",

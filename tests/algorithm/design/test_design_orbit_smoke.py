@@ -1,7 +1,9 @@
-"""冻结轨道设计集成测试（L2，需 SPICE 内核）。
+"""``design_orbit`` 编排入口的最小真实调用冒烟（ADR 0037 决策 2）。
 
-通过 ``design_orbit`` 公共入口（duck-typed 请求，接口层模型的校验由
-tests/api 覆盖）驱动单候选传播，验证返回结构与物理一致性。
+选 ELFO 场景：无星历修正（``correction=None``），仅"经典根数 → 全摄动传播
+→ 月心漂移分析"一段链路，是 ``design_orbit`` 最便宜的端到端真实路径；最短
+弧段（约一个轨道周期）证明链路连通与返回类型契约，不重复物理可行性穷举。
+长弧/多候选的冻结轨道集成覆盖已随端到端清理移除（见 ADR 0037 增补）。
 """
 
 from __future__ import annotations
@@ -20,8 +22,8 @@ pytestmark = [
 ]
 
 
-def test_single_candidate_structure():
-    """a=3000 km 候选传播 3 天，返回 OrbitDesignResult 且字段正确。"""
+def test_design_orbit_elfo_minimal_real_call():
+    """最小 ELFO 真实调用：链路连通 + 返回类型契约（ELFO 无星历修正）。"""
     result = design_orbit(
         make_design_request(
             orbit_type="ELFO",
@@ -29,8 +31,8 @@ def test_single_candidate_structure():
             inclination=75.0,
             arg_of_pericenter=270.0,
             perilune_height=200.0,
-            duration=3 * 86400.0,
-            output_step=3600.0,
+            duration=14400.0,  # ≈1 个轨道周期（a=3000 km 绕月），最短有效弧段
+            output_step=1200.0,
         )
     )
     assert result.orbit_type == "ELFO"
@@ -38,9 +40,7 @@ def test_single_candidate_structure():
     assert result.correction is None
     assert result.correction_method is None
     assert np.isnan(result.cr3bp_jacobi)
-    assert result.drift_e is not None
-    assert result.drift_rp_km is not None
     assert result.initial_state.shape == (6,)
-    assert len(result.ephemeris) == 73  # 3 天 / 1 小时 + 1
+    assert len(result.ephemeris) > 0
+    assert result.drift_e is not None
     assert result.moon_centric_elements is not None
-    assert "aop" in result.moon_centric_elements

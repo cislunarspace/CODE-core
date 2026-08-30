@@ -52,6 +52,8 @@ HALO_SEED_CLASS = 0
 HALO_SEED_POINTS = (1, 2)  # L1、L2
 
 # Axial 族种子面外速度（无量纲 DU/TU；与 _AXIAL_SEED_VZ0 一致）
+# axial 修正/延拓测试已按 ADR 0037 移出默认套件（单次修正 ~2 min 超预算），
+# 种子登记保留供回归测试取用。
 AXIAL_SEED_VZ0 = 0.001
 AXIAL_SEED_POINT = 1  # L1
 

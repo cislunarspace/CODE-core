@@ -68,7 +68,10 @@ class TestSmoothFunctionAccuracy:
     """非多项式光滑函数：接口梯度误差应低于中心差分至少一个量级。"""
 
     def test_gradient_beats_central_difference(self) -> None:
-        shape = (41, 43, 39, 37)
+        # ADR 0037 预算内：网格从 (41,43,39,37) 缩到 (21,23,19,17)。样条梯度为三阶、
+        # 中心差分为二阶，此网格密度下前者仍保有一个量级以上优势（变粗会收窄
+        # 裕度，故网格不宜再粗）。
+        shape = (21, 23, 19, 17)
         axes = _grid(((-1.0, 1.0),) * 4, shape)
         mesh = np.meshgrid(*axes, indexing="ij")
 
@@ -82,7 +85,9 @@ class TestSmoothFunctionAccuracy:
         errors_spline: list[float] = []
         errors_central: list[float] = []
         spacing = [float(a[1] - a[0]) for a in axes]
-        for _ in range(20):
+        # 对照组节点梯度与采样点无关（循环不变量），提出循环只算一次。
+        node_grads = np.gradient(values[0], *spacing, edge_order=2)
+        for _ in range(5):
             state = rng.uniform(-0.8, 0.8, size=4)
             x0, x1, x2, x3 = state
             exact = np.array(
@@ -98,7 +103,6 @@ class TestSmoothFunctionAccuracy:
             errors_spline.append(float(np.linalg.norm(gradient - exact)))
 
             # 对照组：geo-nrho 现状——np.gradient 中心差分 + 多重线性插值
-            node_grads = np.gradient(values[0], *spacing, edge_order=2)
             central = np.array([_multilinear(axes, g, state) for g in node_grads])
             errors_central.append(float(np.linalg.norm(central - exact)))
 

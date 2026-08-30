@@ -69,14 +69,14 @@ class TestDoubleIntegratorSolve:
         assert -0.2 - 1e-6 <= values[0][center] <= -0.05
 
     def test_dissipation_error_halves_with_refinement(self):
-        """网格加密一倍，中心处耗散误差应明显下降（9 节点 0.099，21 节点 0.048）。"""
-        raw9, shape9, _ = _solve_double_integrator(9)
-        raw21, shape21, _ = _solve_double_integrator(21)
-        v9 = np.asarray(raw9["values"]).reshape((-1, *shape9))[0][(4, 4, 4, 4)]
-        v21 = np.asarray(raw21["values"]).reshape((-1, *shape21))[0][(10, 10, 10, 10)]
-        err9 = abs(v9 + 0.2)
-        err21 = abs(v21 + 0.2)
-        assert err21 < 0.6 * err9
+        """网格加密，中心处耗散误差应明显下降（5 节点 0.133，15 节点 0.067）。"""
+        raw5, shape5, _ = _solve_double_integrator(5)
+        raw15, shape15, _ = _solve_double_integrator(15)
+        v5 = np.asarray(raw5["values"]).reshape((-1, *shape5))[0][(2, 2, 2, 2)]
+        v15 = np.asarray(raw15["values"]).reshape((-1, *shape15))[0][(7, 7, 7, 7)]
+        err5 = abs(v5 + 0.2)
+        err15 = abs(v15 + 0.2)
+        assert err15 < 0.6 * err5
 
     def test_generic_entry_matches_compat_wrapper(self):
         """通用入口与兼容包装走同一条求解路径，输出逐位一致。"""
@@ -101,7 +101,9 @@ class TestDoubleIntegratorSolve:
 
 class TestCr3bpSolve:
     def _solve(self):
-        shape, axes = _grid([0.5, -0.5, -1.0, -1.0], [1.5, 0.5, 1.0, 1.0], 9)
+        # 5 节点即可表达结构契约（有限值/单调时刻/快照上界），且内部步数
+        # 仍超快照上限使降采样真实生效（ADR 0037 最小规模要求）。
+        shape, axes = _grid([0.5, -0.5, -1.0, -1.0], [1.5, 0.5, 1.0, 1.0], 5)
         terminal = _terminal_ball(axes, np.array([1.0, 0.0, 0.0, 0.0]), 0.2)
         raw = integrators.solve_hjb_py(
             terminal,
@@ -285,7 +287,7 @@ class TestEphemerisPlanarSolve:
         omega = float(np.linalg.norm(np.cross(r, v))) / length**2
         return et0, length, omega
 
-    def _solve_ephemeris(self, spice, tf_nondim=0.5, n=9):
+    def _solve_ephemeris(self, spice, tf_nondim=0.5, n=6):
         et0, length, omega = self._moon_scale(spice)
         tf_s = tf_nondim / omega
         # 与 CR3BP 基准同物理量级：a_nd = T/(1000·m0)（km/s²）↔ 无量纲 0.5。
@@ -325,7 +327,7 @@ class TestEphemerisPlanarSolve:
         ffi_after = integrators.ephem_ffi_call_count()
         return raw, shape, axes, (ffi_before, ffi_after), omega
 
-    def _solve_cr3bp_baseline(self, tf_nondim=0.5, n=9):
+    def _solve_cr3bp_baseline(self, tf_nondim=0.5, n=6):
         minimum = [0.5, -0.5, -1.0, -1.0]
         maximum = [1.5, 0.5, 1.0, 1.0]
         shape, axes = _grid(minimum, maximum, n)
@@ -379,8 +381,9 @@ class TestEphemerisPlanarSolve:
         raw_c, shape_c = self._solve_cr3bp_baseline()
         v_e = values[0].ravel()
         v_c = np.asarray(raw_c["values"]).reshape((-1, *shape_c))[0].ravel()
-        # 剔除月球邻域节点：会合系把月球钉在 (1, 0)，网格必命中；两模型
-        # 在天体中心均无物理意义（CR3BP 截断垃圾 / 星历版取物理极限）。
+        # 剔除月球邻域节点：会合系把月球钉在 (1, 0)（奇数网格的单元中心
+        # 恰命中钉住点，此处防护任何网格）；两模型在天体中心邻域均无物理
+        # 意义（CR3BP 截断垃圾 / 星历版取物理极限）。
         x_ax, y_ax = np.meshgrid(raw["axes"][0], raw["axes"][1], indexing="ij")
         dist = np.broadcast_to(np.hypot(x_ax - 1.0, y_ax)[..., None, None], tuple(shape)).ravel()
         keep = dist > 0.1

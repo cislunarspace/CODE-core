@@ -73,26 +73,38 @@ def _make_control_result(*, controlled: bool):
 
 
 class TestTransferResponse:
+    @staticmethod
+    def _fake_transfer_result(**overrides):
+        """带机动事件的算法层结果替身（SimpleNamespace，字段随契约演进）。"""
+        from e2m2e.algorithm.transfer import ManeuverEvent
+
+        base = dict(
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="任务完成",
+            transfer_type="LGA",
+            delta_v=3.1,
+            trajectory=np.array([[1.0] * 6]),
+            trajectory_times=np.array([0.0]),
+            state_frame="synodic_barycentric_km",
+            maneuver_events=(
+                ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=3.1),
+                ManeuverEvent(kind="perilune", t_sec=100.0, dv_km_s=0.0),
+                ManeuverEvent(kind="arrival", t_sec=200.0, dv_km_s=0.4),
+            ),
+            details={
+                "array": np.array([1.0, 2.0]),
+                "nested": {"tuple": (np.array([3.0]), 4.0)},
+            },
+        )
+        base.update(overrides)
+        return SimpleNamespace(**base)
+
     def test_serializes_nested_numpy_details(self, monkeypatch):
         import e2m2e.algorithm.transfer as transfer
 
-        def fake_transfer(*args, **kwargs):
-            return SimpleNamespace(
-                status=ConvergenceState.CONVERGED,
-                cause=FailureCause.NONE,
-                message="任务完成",
-                transfer_type="HMN",
-                delta_v=3.1,
-                trajectory=np.array([[1.0] * 6]),
-                trajectory_times=np.array([0.0]),
-                state_frame="synodic_barycentric_km",
-                details={
-                    "array": np.array([1.0, 2.0]),
-                    "nested": {"tuple": (np.array([3.0]), 4.0)},
-                },
-            )
-
-        monkeypatch.setattr(transfer, "transfer_orbit", fake_transfer)
+        fake_result = self._fake_transfer_result()
+        monkeypatch.setattr(transfer, "transfer_orbit", lambda *args, **kwargs: fake_result)
         response = Facade().transfer_design(
             transfer_type="HMN",
             tli_epoch="2025-06-21T11:00:00",
@@ -104,23 +116,53 @@ class TestTransferResponse:
         assert response.state_frame == "synodic_barycentric_km"
         assert response.details == {"array": [1.0, 2.0], "nested": {"tuple": [[3.0], 4.0]}}
 
+    def test_maps_maneuver_events_to_response(self, monkeypatch):
+        """算法层 ManeuverEvent 元组 → 响应 maneuver_events（#575 契约）。"""
+        import e2m2e.algorithm.transfer as transfer
+
+        fake_result = self._fake_transfer_result()
+        monkeypatch.setattr(transfer, "transfer_orbit", lambda *args, **kwargs: fake_result)
+        response = Facade().transfer_design(
+            transfer_type="LGA",
+            tli_epoch="2025-06-21T11:00:00",
+            target_ephemeris=[[1.0] * 6],
+        )
+
+        assert [(e.kind, e.t_sec, e.dv_km_s) for e in response.maneuver_events] == [
+            ("departure", 0.0, 3.1),
+            ("perilune", 100.0, 0.0),
+            ("arrival", 200.0, 0.4),
+        ]
+        assert all(e.note is None for e in response.maneuver_events)
+        # JSON 序列化（MCP 信封）携带事件列表
+        dumped = response.model_dump(mode="json")
+        assert dumped["maneuver_events"][1] == {
+            "kind": "perilune",
+            "t_sec": 100.0,
+            "dv_km_s": 0.0,
+            "note": None,
+        }
+
+    def test_maneuver_events_default_empty(self, monkeypatch):
+        """算法层未填事件时（旧结果对象），响应为空列表而非缺字段。"""
+        import e2m2e.algorithm.transfer as transfer
+
+        fake_result = self._fake_transfer_result(maneuver_events=())
+        monkeypatch.setattr(transfer, "transfer_orbit", lambda *args, **kwargs: fake_result)
+        response = Facade().transfer_design(
+            transfer_type="HMN",
+            tli_epoch="2025-06-21T11:00:00",
+            target_orbit_radius_km=42164.0,
+        )
+        assert response.maneuver_events == []
+
     def test_serializes_dataclass_details(self, monkeypatch):
         import e2m2e.algorithm.transfer as transfer
 
-        def fake_transfer(*args, **kwargs):
-            return SimpleNamespace(
-                status=ConvergenceState.CONVERGED,
-                cause=FailureCause.NONE,
-                message="任务完成",
-                transfer_type="HMN",
-                delta_v=3.1,
-                trajectory=None,
-                trajectory_times=None,
-                state_frame="synodic_barycentric_km",
-                details=ManeuverTable(mjd_tdb=np.array([60000.0]), delta_v_mps=np.array([1.0])),
-            )
-
-        monkeypatch.setattr(transfer, "transfer_orbit", fake_transfer)
+        fake_result = self._fake_transfer_result(
+            details=ManeuverTable(mjd_tdb=np.array([60000.0]), delta_v_mps=np.array([1.0])),
+        )
+        monkeypatch.setattr(transfer, "transfer_orbit", lambda *args, **kwargs: fake_result)
         response = Facade().transfer_design(
             transfer_type="HMN",
             tli_epoch="2025-06-21T11:00:00",

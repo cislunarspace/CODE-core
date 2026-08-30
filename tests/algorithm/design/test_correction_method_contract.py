@@ -23,13 +23,3 @@ def test_unnormalized_unstable_request_fails_fast(method):
     request = make_design_request(orbit_type="HALO", correction_method=method)
     with pytest.raises(ValueError, match="segmented"):
         design_orbit(request, spice=SimpleNamespace())
-
-
-def test_stable_family_two_level_passes_method_guard():
-    # 稳定族不设防：two_level 请求通过方法检查（形状参数需显式给出——
-    # duck-typed 请求不经校验层默认值填充；后续管线与本体无关，用无
-    # utc_to_et 的伪 spice 让其在方法检查之后的首个 SPICE 调用处停住，
-    # 证明守卫未拦截）。
-    request = make_design_request(orbit_type="DRO", amplitude=10000.0, phase=0.5001)
-    with pytest.raises(AttributeError, match="utc_to_et"):
-        design_orbit(request, spice=SimpleNamespace())

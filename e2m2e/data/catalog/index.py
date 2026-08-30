@@ -14,7 +14,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from .record import CatalogError, CatalogFilter
+from .record import CatalogError, CatalogFilter, numeric_or_none
 from .record import member_count as _member_count
 
 __all__ = ["CatalogIndex"]
@@ -33,6 +33,9 @@ CREATE TABLE records (
     amplitude_max REAL,
     has_cr3bp INTEGER NOT NULL,
     has_ephemeris INTEGER NOT NULL,
+    transfer_type TEXT,
+    delta_v REAL,
+    tli_epoch REAL,
     status TEXT NOT NULL,
     cause TEXT NOT NULL,
     message TEXT NOT NULL,
@@ -41,6 +44,35 @@ CREATE TABLE records (
     note TEXT NOT NULL
 )
 """
+
+#: 表结构完备性检查列集：存量库缺任一列（如 #574 新增 transfer 维度）
+#: 时整个表废弃重建——索引是派生物（ADR 0031 决策 5），重建由
+#: ``CatalogStore`` 依据 :attr:`CatalogIndex.schema_reset` 标记触发。
+_REQUIRED_COLUMNS = frozenset(
+    {
+        "record_id",
+        "created_at",
+        "source_tool",
+        "source_record_id",
+        "orbit_family",
+        "libration_point",
+        "jacobi_min",
+        "jacobi_max",
+        "amplitude_min",
+        "amplitude_max",
+        "has_cr3bp",
+        "has_ephemeris",
+        "transfer_type",
+        "delta_v",
+        "tli_epoch",
+        "status",
+        "cause",
+        "message",
+        "member_count",
+        "tags",
+        "note",
+    }
+)
 
 
 def _guard(method: Any) -> Any:
@@ -73,9 +105,21 @@ class CatalogIndex:
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self.schema_reset = False
         if not self._has_table():
             self._conn.execute(_SCHEMA)
             self._conn.commit()
+        elif self._missing_columns():
+            self._conn.execute("DROP TABLE records")
+            self._conn.execute(_SCHEMA)
+            self._conn.commit()
+            self.schema_reset = True
+
+    def _missing_columns(self) -> list[str]:
+        """现有表缺失的必备列（存量库 schema 演进检测）。"""
+        rows = self._conn.execute("PRAGMA table_info(records)").fetchall()
+        names = {row["name"] for row in rows}
+        return sorted(_REQUIRED_COLUMNS - names)
 
     def _has_table(self) -> bool:
         row = self._conn.execute(
@@ -94,6 +138,11 @@ class CatalogIndex:
         jacobi = classification["jacobi"]
         amplitude = classification["amplitude"]
         member_count = _member_count(meta)
+        # transfer 维度（#574）取自 scalars；数值历元才入区间列
+        scalars = meta.get("scalars", {})
+        transfer_type = scalars.get("transfer_type")
+        delta_v = numeric_or_none(scalars.get("delta_v_km_s"))
+        tli_epoch = numeric_or_none(scalars.get("tli_epoch"))
         with self._lock:
             self._conn.execute(
                 """
@@ -101,8 +150,9 @@ class CatalogIndex:
                     record_id, created_at, source_tool, source_record_id,
                     orbit_family, libration_point, jacobi_min, jacobi_max,
                     amplitude_min, amplitude_max, has_cr3bp, has_ephemeris,
+                    transfer_type, delta_v, tli_epoch,
                     status, cause, message, member_count, tags, note
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     meta["record_id"],
@@ -117,6 +167,9 @@ class CatalogIndex:
                     None if amplitude is None else float(amplitude[1]),
                     1 if classification["has_cr3bp"] else 0,
                     1 if classification["has_ephemeris"] else 0,
+                    transfer_type,
+                    delta_v,
+                    tli_epoch,
                     meta["status"],
                     meta["cause"],
                     meta["message"],
@@ -176,6 +229,21 @@ class CatalogIndex:
         if catalog_filter.has_ephemeris is not None:
             clauses.append("has_ephemeris = ?")
             params.append(1 if catalog_filter.has_ephemeris else 0)
+        if catalog_filter.transfer_type is not None:
+            clauses.append("transfer_type = ?")
+            params.append(catalog_filter.transfer_type)
+        if catalog_filter.delta_v_min_km_s is not None:
+            clauses.append("delta_v >= ?")
+            params.append(catalog_filter.delta_v_min_km_s)
+        if catalog_filter.delta_v_max_km_s is not None:
+            clauses.append("delta_v <= ?")
+            params.append(catalog_filter.delta_v_max_km_s)
+        if catalog_filter.tli_epoch_min is not None:
+            clauses.append("tli_epoch >= ?")
+            params.append(catalog_filter.tli_epoch_min)
+        if catalog_filter.tli_epoch_max is not None:
+            clauses.append("tli_epoch <= ?")
+            params.append(catalog_filter.tli_epoch_max)
         if catalog_filter.status is not None:
             clauses.append("status = ?")
             params.append(catalog_filter.status)
@@ -211,6 +279,9 @@ class CatalogIndex:
                 "has_cr3bp": bool(row["has_cr3bp"]),
                 "has_ephemeris": bool(row["has_ephemeris"]),
             },
+            "transfer_type": row["transfer_type"],
+            "delta_v_km_s": row["delta_v"],
+            "tli_epoch": row["tli_epoch"],
             "status": row["status"],
             "cause": row["cause"],
             "message": row["message"],

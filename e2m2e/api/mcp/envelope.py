@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import enum
+import inspect
 import json
 from typing import Any
 
@@ -93,20 +94,39 @@ def error_envelope(code: str, message: str, details: dict[str, Any] | None = Non
     }
 
 
-def dispatch_tool(method: Any, arguments: dict[str, Any]) -> tuple[Any, Envelope | None]:
+def _accepted_extras(method: Any, extra_kwargs: dict[str, Any] | None) -> dict[str, Any]:
+    """按方法签名过滤注入形参：未接受对应形参的键静默丢弃。
+
+    传输层向工具方法注入额外协作者（如进度回调，#576），但只有声明了
+    形参的方法接得住——按 ``inspect.signature`` 过滤，不接的方法零影响。
+    """
+    if not extra_kwargs:
+        return {}
+    try:
+        params = inspect.signature(method).parameters
+    except (TypeError, ValueError):
+        return {}
+    return {key: value for key, value in extra_kwargs.items() if key in params}
+
+
+def dispatch_tool(
+    method: Any, arguments: dict[str, Any], *, extra_kwargs: dict[str, Any] | None = None
+) -> tuple[Any, Envelope | None]:
     """校验参数并执行工具方法，返回 ``(原始结果, None)`` 或 ``(None, 错误信封)``。
 
     与 :func:`invoke_tool` 同一套校验与错误翻译，但不做结果的 JSON 化——
     需要在转储前处理原始结果的传输层（如 sidecar 的二进制帧抽取，ADR 0035）
-    用这个。失败时返回错误信封，不抛异常。
+    用这个。失败时返回错误信封，不抛异常。``extra_kwargs`` 是传输层注入的
+    额外协作者（如进度回调），按方法签名过滤后并入调用关键字。
     """
     request_model = getattr(method, "request_model", None)
+    accepted = _accepted_extras(method, extra_kwargs)
     try:
         if request_model is not None:
             request = request_model.model_validate(arguments)
-            result = method(**request.model_dump(exclude_unset=True))
+            result = method(**request.model_dump(exclude_unset=True), **accepted)
         else:
-            result = method(**arguments)
+            result = method(**arguments, **accepted)
     except OrbitError as exc:
         return None, error_envelope(exc.code, exc.message, exc.details)
     except ValidationError as exc:
@@ -124,14 +144,16 @@ def dispatch_tool(method: Any, arguments: dict[str, Any]) -> tuple[Any, Envelope
     return result, None
 
 
-def invoke_tool(method: Any, arguments: dict[str, Any]) -> Envelope:
+def invoke_tool(
+    method: Any, arguments: dict[str, Any], *, extra_kwargs: dict[str, Any] | None = None
+) -> Envelope:
     """执行一个 Facade 工具方法并包成信封。
 
     入参经 ``request_model`` 校验（ValidationError → ``INVALID_PARAMS``），
     ``OrbitError`` 原样翻译，其余异常归为 ``INTERNAL_ERROR``（只保留异常类型
     名，不泄漏 traceback）。校验与错误翻译见 :func:`dispatch_tool`。
     """
-    result, err = dispatch_tool(method, arguments)
+    result, err = dispatch_tool(method, arguments, extra_kwargs=extra_kwargs)
     if err is not None:
         return err
     try:

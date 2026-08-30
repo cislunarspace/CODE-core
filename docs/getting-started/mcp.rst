@@ -71,6 +71,27 @@ traceback leakage. Numerical tools additionally report algorithm convergence in
 ``data.status`` (converged / diverged / stagnated / max_iterations / …; ADR 0020's
 soft-failure semantics: divergence is a valid result too).
 
+Progress notifications
+~~~~~~~~~~~~~~~~~~~~~
+
+Long-running tools report MCP progress while they work. Include a
+``progressToken`` in the request ``_meta`` and the server emits
+``notifications/progress`` with ``progress`` as a monotone fraction in [0, 1]
+(``total`` is always 1), plus a human-readable ``message``:
+
+* ``transfer_design`` reports 0 at entry and 1 at completion; the WSB backend
+  additionally maps its grid-search task counter into the (0.1, 0.9) window,
+  so a large ``n_sun_phase × n_tof`` sweep produces visible intermediate ticks.
+* ``orbit_family_generation`` reports stage-level start/end only (a single
+  Rust call; no per-member channel yet).
+
+Requests without a ``progressToken`` are unaffected — no notifications, no
+overhead. Intermediate notifications are throttled server-side to at most one
+per 100 ms (the final fraction-1.0 notification is never throttled), and a
+failed delivery never affects the computation. Tool cancellation is **not**
+supported yet: a running tool always runs to completion (planned as a
+separate follow-up with process-level isolation).
+
 Tool inventory
 ~~~~~~~~~~~~~~
 

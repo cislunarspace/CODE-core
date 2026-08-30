@@ -281,3 +281,116 @@ def test_cli_parser_has_mcp_serve():
     parser = build_parser()
     args = parser.parse_args(["mcp-serve"])
     assert args.command == "mcp-serve"
+
+
+# ---------------------------------------------------------------------------
+# 长任务进度桥接（#576 Phase 1）
+# ---------------------------------------------------------------------------
+
+
+def _bridge_session_recorder(calls):
+    """带 report_progress 录制的 Session 替身。"""
+
+    class _Session:
+        async def report_progress(self, progress, total=None, message=None):
+            calls.append((progress, total, message))
+
+    return _Session()
+
+
+class TestProgressBridge:
+    def test_make_reporter_none_without_token(self):
+        """客户端未带 progressToken：返回 None（零开销直通）。"""
+        from e2m2e.api.mcp import server as mcp_server
+
+        class _Ctx:
+            meta = None
+            session = None
+
+        assert mcp_server.make_progress_reporter(_Ctx()) is None
+
+    def test_reporter_forwards_to_session_from_worker_thread(self):
+        """worker 线程里的回调经捕获的事件循环切回发通知（工厂须在 loop 上调用）。"""
+        import anyio
+
+        from e2m2e.api.mcp import server as mcp_server
+
+        calls: list = []
+
+        class _Meta:
+            progress_token = "tok"
+
+        class _Ctx:
+            meta = _Meta()
+            session = _bridge_session_recorder(calls)
+
+        async def scenario():
+            reporter = mcp_server.make_progress_reporter(_Ctx())
+            assert reporter is not None
+            await anyio.to_thread.run_sync(lambda: reporter(0.5, "half"))
+            await anyio.to_thread.run_sync(lambda: reporter(1.0))
+
+        anyio.run(scenario)
+        assert calls == [(0.5, 1.0, "half"), (1.0, 1.0, None)]
+
+    def test_reporter_throttles_burst_but_not_final(self, monkeypatch):
+        """节流：窗口内的中间通知丢弃；fraction=1.0 收尾永不节流。"""
+        import anyio
+
+        from e2m2e.api.mcp import server as mcp_server
+
+        monkeypatch.setattr(mcp_server, "_PROGRESS_MIN_INTERVAL_SEC", 60.0)
+        calls: list = []
+
+        class _Meta:
+            progress_token = "tok"
+
+        class _Ctx:
+            meta = _Meta()
+            session = _bridge_session_recorder(calls)
+
+        async def scenario():
+            reporter = mcp_server.make_progress_reporter(_Ctx())
+            await anyio.to_thread.run_sync(lambda: reporter(0.2))
+            await anyio.to_thread.run_sync(lambda: reporter(0.4))
+            await anyio.to_thread.run_sync(lambda: reporter(1.0))
+
+        anyio.run(scenario)
+        assert [progress for progress, _, _ in calls] == [0.2, 1.0]
+
+    def test_tools_call_route_passes_extra_without_breaking_fast_tools(self, facade):
+        """extra 注入路径对不接进度回调的工具零影响（catalog_query 真调用）。"""
+        env = json.loads(
+            handle_call_tool(
+                facade,
+                "catalog_query",
+                {},
+                extra_kwargs={"progress_callback": lambda f, m=None: None},
+            )
+            .content[0]
+            .text
+        )
+        assert env["status"] == "ok"
+
+
+def test_invoke_tool_injects_extra_kwargs_only_when_accepted():
+    """dispatch/invoke 注入 extra 时按方法签名过滤，未接受形参静默丢弃。"""
+    from e2m2e.api.mcp import envelope
+
+    def method_with_cb(value, progress_callback=None):
+        return [value, progress_callback]
+
+    env = envelope.invoke_tool(
+        method_with_cb, {"value": 1}, extra_kwargs={"progress_callback": "CB"}
+    )
+    assert env["status"] == "ok"
+    assert env["data"] == [1, "CB"]
+
+    def method_without_cb(value):
+        return value
+
+    env = envelope.invoke_tool(
+        method_without_cb, {"value": 2}, extra_kwargs={"progress_callback": "CB"}
+    )
+    assert env["status"] == "ok"
+    assert env["data"] == 2

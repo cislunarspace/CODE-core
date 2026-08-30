@@ -152,6 +152,7 @@ __all__ = [
     "WsbSearchParams",
     "WsbCandidate",
     "LowThrustTransferDetails",
+    "ManeuverEvent",
     "STATE_FRAME_SYNODIC_BARYCENTRIC_KM",
     "STATE_FRAME_FORCE_MODEL_STATE",
     "transfer_orbit",
@@ -174,6 +175,23 @@ _STATE_FRAME_BY_TRANSFER_TYPE: dict[str, str] = {
 }
 
 
+@dataclass(frozen=True)
+class ManeuverEvent:
+    """单次机动事件（#575 契约，与 transfer catalog record 共用 schema）。
+
+    Attributes:
+        kind: 事件类别（"departure" / "arrival" / "perilune" / …，开放枚举）。
+        t_sec: TLI 起算秒（t=0 为出发脉冲），与 trajectory_times 同基准。
+        dv_km_s: 该次机动脉冲大小；非脉冲事件（perilune 旗标）为 0.0。
+        note: 可选人类可读注记。
+    """
+
+    kind: str
+    t_sec: float
+    dv_km_s: float
+    note: str | None = None
+
+
 @dataclass
 class TransferDesignResult:
     """转移轨道设计结果。
@@ -188,6 +206,11 @@ class TransferDesignResult:
             与 trajectory 逐行对齐。
         state_frame: trajectory 的数据系标签（ADR 0040 增补）。缺省按
             transfer_type 派生，显式传值可覆盖。
+        maneuver_events: 结构化机动事件列表（#575）。HMN 为
+            departure/arrival 两条（到达点即近月点，不另发 perilune）；
+            LGA/WSB 为 departure/perilune/arrival 三条（perilune 的
+            dv_km_s=0，飞越段无脉冲）；low_thrust 连续推进无脉冲语义，
+            恒为空；搜索零结果恒为空。
         details: 设计细节（弹道参数汇总）。
         stages: 搜索、精化和打靶等可选阶段的执行记录。
         status: 任务最终状态。
@@ -200,6 +223,7 @@ class TransferDesignResult:
     trajectory: Any
     trajectory_times: Any = None
     state_frame: str = ""
+    maneuver_events: tuple[ManeuverEvent, ...] = ()
     details: (
         HmnTransferDetails
         | LgaTransferDetails
@@ -232,8 +256,11 @@ class HmnTransferDetails:
         tof_sec: 飞行时间 (秒)。
         r1_km: 出发轨道半径 (km)。
         r2_km: 目标轨道半径 (km)。
-        dv1_km_s: 出发 Δv (km/s)。
-        dv2_km_s: 到达 Δv (km/s)。
+        dv1_km_s: 出发 Δv (km/s)。Deprecated: 改用
+            ``TransferDesignResult.maneuver_events`` 的 departure 事件（#575）；
+            本字段保留一个版本不变。
+        dv2_km_s: 到达 Δv (km/s)。Deprecated: 改用 maneuver_events 的
+            arrival 事件（#575）；本字段保留一个版本不变。
         departure_state: ECI 出发状态 (6,)。
         delta_v_theory: 理论 Δv (dv1, dv2)。
     """
@@ -250,7 +277,12 @@ class HmnTransferDetails:
 
 @dataclass
 class LgaTransferDetails:
-    """LGA 月球引力辅助转移设计细节。"""
+    """LGA 月球引力辅助转移设计细节。
+
+    Deprecated 字段：``dv_departure_km_s`` / ``dv_arrival_km_s`` 改用
+    ``TransferDesignResult.maneuver_events`` 的 departure/arrival 事件
+    （#575）；本字段保留一个版本不变。
+    """
 
     tli_epoch: float | str
     tof_sec: float
@@ -274,7 +306,12 @@ class LgaTransferDetails:
 
 @dataclass
 class WsbTransferDetails:
-    """WSB 太阳引力辅助转移设计细节。"""
+    """WSB 太阳引力辅助转移设计细节。
+
+    Deprecated 字段：``dv_departure_km_s`` / ``dv_arrival_km_s`` 改用
+    ``TransferDesignResult.maneuver_events`` 的 departure/arrival 事件
+    （#575）；本字段保留一个版本不变。
+    """
 
     tli_epoch: float | str
     tof_sec: float
@@ -375,6 +412,7 @@ def transfer_orbit(
     target_state: NDArray[np.float64] | None = None,
     system: Any = None,
     forces: Any = None,
+    progress_callback: Any = None,
     **kwargs,
 ) -> TransferDesignResult:
     """端到端转移轨道设计（编排器）。
@@ -403,6 +441,10 @@ def transfer_orbit(
         target_state: 小推力目标末态 ``[r, v]`` (6,)，km / km/s（小推力可选）。
         system: 动力学系统（小推力可选，默认纯二体）。
         forces: 非推力力模型列表（小推力可选）。
+        progress_callback: 搜索进度回调（#576 Phase 1，可选）。形状
+            ``cb(delta: int)``——当前仅 WSB 后端消费：每完成一个
+            ``(sun_phase, tof)`` 网格任务发一次 delta；其余后端无搜索
+            进度通道，传值被忽略。
 
     Returns:
         TransferDesignResult: 转移轨道设计结果。
@@ -432,6 +474,7 @@ def transfer_orbit(
             target_ephemeris=target_ephemeris,
             search_params=wsb_search_params,
             tof_range=tof_range,
+            progress_callback=progress_callback,
         )
     if transfer_type == "low_thrust":
         if engine_config is None:
@@ -687,11 +730,28 @@ def _transfer_orbit_lga(
         search_params=params,
     )
 
+    # 机动事件（#575）：perilune 时刻取候选已有字段 × 特征时间（与轨迹
+    # 拼接点同源）；飞越段无脉冲，dv_km_s=0（速度折点是精化的隐式修正，
+    # ADR 0040 不计入 Δv 收账）。
+    tu_sec = system.characteristic_time
+    if tu_sec is None or tu_sec <= 0.0:
+        raise ValueError("system.characteristic_time must be set")
+    maneuver_events = (
+        ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=refined.dv_departure * vu_km_s),
+        ManeuverEvent(
+            kind="perilune",
+            t_sec=refined.perilune_time_dim * tu_sec,
+            dv_km_s=0.0,
+        ),
+        ManeuverEvent(kind="arrival", t_sec=refined.tof_sec, dv_km_s=refined.dv_arrival * vu_km_s),
+    )
+
     return TransferDesignResult(
         transfer_type="LGA",
         delta_v=refined.total_dv * vu_km_s,
         trajectory=trajectory,
         trajectory_times=trajectory_times,
+        maneuver_events=maneuver_events,
         details=details,
         status=refined.status,
         cause=refined.cause,
@@ -721,6 +781,7 @@ def _transfer_orbit_wsb(
     target_ephemeris: Any,
     search_params: WsbSearchParams | None,
     tof_range: tuple[float, float] | None = None,
+    progress_callback: Any = None,
 ) -> TransferDesignResult:
     """WSB 太阳引力辅助转移编排。
 
@@ -761,8 +822,15 @@ def _transfer_orbit_wsb(
     target_phys = np.concatenate([r_target, v_target])
     target_dim = bcr4bp_system.physical_to_dimensionless(target_phys)
 
-    # 3. WSB 搜索（并行）
-    candidates = search_wsb_trajectories(departure_dim, target_dim, bcr4bp_system, search_params)
+    # 3. WSB 搜索（并行；每完成一个 (sun_phase, tof) 网格任务回调一次
+    # delta，#576 Phase 1）
+    candidates = search_wsb_trajectories(
+        departure_dim,
+        target_dim,
+        bcr4bp_system,
+        search_params,
+        progress_callback=progress_callback,
+    )
 
     params = search_params if search_params is not None else WsbSearchParams()
     n_searched = params.n_sun_phase * params.n_departure_phase * params.n_tof
@@ -873,11 +941,23 @@ def _transfer_orbit_wsb(
         search_params=params,
     )
 
+    # 机动事件（#575）：候选与出发段均产自 BCR4BP（乘 BCR4BP 特征时间，
+    # 与轨迹拼接点同源）；到达 Δv 按 #566 收账约定；perilune 无脉冲。
+    tu_bcr4 = bcr4bp_system.characteristic_time
+    if tu_bcr4 is None or tu_bcr4 <= 0.0:
+        raise ValueError("BCR4BP system 必须设置特征时间")
+    maneuver_events = (
+        ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=dv_departure_km_s),
+        ManeuverEvent(kind="perilune", t_sec=refined.perilune_time_dim * tu_bcr4, dv_km_s=0.0),
+        ManeuverEvent(kind="arrival", t_sec=refined.tof_sec, dv_km_s=dv_arrival_km_s),
+    )
+
     return TransferDesignResult(
         transfer_type="WSB",
         delta_v=dv_departure_km_s + dv_arrival_km_s,
         trajectory=trajectory,
         trajectory_times=trajectory_times,
+        maneuver_events=maneuver_events,
         details=details,
         status=refined.status,
         cause=refined.cause,
@@ -1175,6 +1255,12 @@ def _transfer_orbit_hmn(
         delta_v_theory=(dv1, dv2),
     )
 
+    # 机动事件（#575）：HMN 到达点即近月点，不另发 perilune 事件
+    maneuver_events = (
+        ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=dv1),
+        ManeuverEvent(kind="arrival", t_sec=float(tof), dv_km_s=dv2),
+    )
+
     if dynamics is None:
         status = ConvergenceState.CONVERGED
         cause = FailureCause.NONE
@@ -1189,6 +1275,7 @@ def _transfer_orbit_hmn(
         delta_v=dv1 + dv2,
         trajectory=trajectory,
         trajectory_times=trajectory_times,
+        maneuver_events=maneuver_events,
         details=details,
         status=status,
         cause=cause,

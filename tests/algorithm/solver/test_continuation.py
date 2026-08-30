@@ -1,16 +1,15 @@
-"""Continuation 延拓算法测试。
+"""Continuation 延拓算法测试——契约层。
 
-验证参数自动推断、进度显示、双向延拓、步长控制与边界情况。
+只保留不驱动真实 CR3BP 修正+延拓的轻量覆盖：延拓参数自动推断、步长
+配置契约、参数索引推断与统计初始化。真实延拓行为（双向延拓、步长控制、
+端到端 pipeline）已按 ADR 0037 预算决策移出默认套件，由
+tests/algorithm/design/continuation/test_continuation_per_family.py 的
+5 族延拓链承担最小覆盖。
 """
-
-import contextlib
-import logging
 
 import pytest
 
-from e2m2e.algorithm.results import ContinuationResult
 from e2m2e.algorithm.solver.continuation import Continuation
-from e2m2e.data.types.orbit import OrbitFamily
 
 pytestmark = pytest.mark.orchestration
 
@@ -57,43 +56,10 @@ class TestContinuationParameterRemoval:
 
 
 # ============================================================
-# 进度显示测试
+# 统计信息契约
 # ============================================================
-class TestProgressDisplay:
-    """测试进度显示逻辑"""
-
-    def test_verbose_mode_output(self, dro_continuation, corrected_dro, caplog):
-        """verbose 模式应该输出详细信息
-
-        生产代码用 logging（非 print），故用 caplog 而非 capsys 捕获。
-        """
-        with (
-            caplog.at_level(logging.INFO, logger="e2m2e.algorithm.solver.continuation"),
-            contextlib.suppress(Exception),
-        ):
-            dro_continuation.natural_continuation(
-                seed_orbit=corrected_dro,
-                param_range=(0.791, 0.792),
-                step_size=0.0001,
-                verbose=True,
-            )
-
-        # verbose 模式应产出延拓相关日志
-        assert "延拓" in caplog.text
-
-    def test_non_verbose_mode_minimal_output(self, dro_continuation, corrected_dro, capsys):
-        """非 verbose 模式应该只有最小输出"""
-        with contextlib.suppress(Exception):
-            dro_continuation.natural_continuation(
-                seed_orbit=corrected_dro,
-                param_range=(0.791, 0.792),
-                step_size=0.0001,
-                verbose=False,
-            )
-
-        capsys.readouterr()
-        # 非 verbose 模式可能输出进度信息
-        # 注意：改进后的版本即使非 verbose 也会显示基本进度
+class TestContinuationStats:
+    """测试统计信息初始化"""
 
     def test_continuation_stats_initialization(self, dro_continuation):
         """统计信息应该正确初始化"""
@@ -101,103 +67,6 @@ class TestProgressDisplay:
         assert stats["total_steps"] == 0
         assert stats["successful_steps"] == 0
         assert stats["failed_steps"] == 0
-
-
-# ============================================================
-# 双向延拓测试
-# ============================================================
-class TestBidirectionalContinuation:
-    """测试双向延拓功能"""
-
-    def test_forward_continuation(self, dro_continuation, corrected_dro):
-        """测试正向延拓（参数增大方向）"""
-        # 正向延拓范围
-        result = dro_continuation.natural_continuation(
-            seed_orbit=corrected_dro,
-            param_range=(0.791, 0.795),
-            step_size=0.0005,
-            verbose=False,
-        )
-
-        assert result is not None
-        assert isinstance(result, ContinuationResult)
-        assert isinstance(result.family, OrbitFamily)
-
-    def test_backward_continuation(self, dro_continuation, corrected_dro):
-        """测试反向延拓（参数减小方向）"""
-        # 反向延拓范围
-        result = dro_continuation.natural_continuation(
-            seed_orbit=corrected_dro,
-            param_range=(0.788, 0.792),
-            step_size=0.0005,
-            verbose=False,
-        )
-
-        assert result is not None
-        assert isinstance(result, ContinuationResult)
-        assert isinstance(result.family, OrbitFamily)
-
-    def test_bidirectional_continuation(self, dro_continuation, corrected_dro):
-        """测试双向延拓"""
-        # 种子参数在范围中间，应该双向延拓
-        result = dro_continuation.natural_continuation(
-            seed_orbit=corrected_dro,
-            param_range=(0.788, 0.795),
-            step_size=0.0005,
-            verbose=False,
-        )
-
-        assert result is not None
-        assert isinstance(result, ContinuationResult)
-        assert isinstance(result.family, OrbitFamily)
-        # 双向延拓后，轨道数量应该大于 1
-        assert len(result.family) >= 1
-
-
-# ============================================================
-# 步长控制测试
-# ============================================================
-class TestStepSizeControl:
-    """测试步长控制功能"""
-
-    def test_step_size_history_recorded(self, dro_continuation, corrected_dro, capsys):
-        """步长历史应该被记录"""
-        with contextlib.suppress(Exception):
-            dro_continuation.natural_continuation(
-                seed_orbit=corrected_dro,
-                param_range=(0.791, 0.793),
-                step_size=0.0005,
-                verbose=False,
-            )
-
-    def test_step_reduction_on_failure(self, dro_continuation, corrected_dro):
-        """修正失败时步长应该减小"""
-        # 设置较大的初始步长
-        dro_continuation.step_size = 0.01
-        dro_continuation.min_step_size = 0.0001
-
-        # 使用一个可能失败的参数范围
-        with contextlib.suppress(Exception):
-            dro_continuation.natural_continuation(
-                seed_orbit=corrected_dro,
-                param_range=(0.791, 0.792),
-                step_size=0.005,  # 较大的步长
-                verbose=False,
-            )
-
-    def test_continuation_stats_updated(self, dro_continuation, corrected_dro):
-        """延拓统计应该被更新"""
-        with contextlib.suppress(Exception):
-            dro_continuation.natural_continuation(
-                seed_orbit=corrected_dro,
-                param_range=(0.791, 0.792),
-                step_size=0.0003,
-                verbose=False,
-            )
-
-        # 至少 total_steps 应该增加
-        # 注意：即使延拓失败，total_steps 也会增加
-        assert dro_continuation.continuation_stats["total_steps"] >= 0
 
 
 # ============================================================
@@ -216,175 +85,3 @@ class TestParamIndexInference:
         """延拓参数应该与修正器的固定参数一致"""
         expected_param = next(iter(dro_corrector.fixed_parameters))
         assert dro_continuation.continuation_parameter == expected_param
-
-
-# ============================================================
-# 终止条件测试
-# ============================================================
-class TestTerminationConditions:
-    """测试延拓终止条件"""
-
-    def test_max_orbits_limit(self, dro_continuation, corrected_dro):
-        """测试最大轨道数量限制属性"""
-        # max_orbits是存储属性，实际限制在迭代中生效
-        dro_continuation.max_orbits = 3
-        assert dro_continuation.max_orbits == 3
-
-        # 验证可以正常完成延拓（max_orbits不会导致提前终止）
-        result = dro_continuation.natural_continuation(
-            seed_orbit=corrected_dro,
-            param_range=(0.78, 0.80),  # 缩小范围加快测试
-            step_size=0.002,
-            verbose=False,
-        )
-        # 延拓正常完成
-        assert result is not None
-
-    def test_termination_reason_set(self, dro_continuation, corrected_dro):
-        """终止原因应该被设置"""
-        # 使用一个会导致终止的范围
-        dro_continuation.max_orbits = 2
-        result = None
-        with contextlib.suppress(Exception):
-            result = dro_continuation.natural_continuation(
-                seed_orbit=corrected_dro,
-                param_range=(0.78, 0.85),
-                step_size=0.001,
-                verbose=False,
-            )
-
-        # 如果延拓达到最大轨道数，应该设置终止原因
-        if len(dro_continuation.family_orbits) >= dro_continuation.max_orbits:
-            assert result.message
-
-
-# ============================================================
-# 轨道族属性测试
-# ============================================================
-class TestOrbitFamilyAttributes:
-    """测试延拓生成的轨道族属性"""
-
-    def test_family_orbits_list(self, dro_continuation, corrected_dro):
-        """family_orbits 列表应该被填充"""
-        result = dro_continuation.natural_continuation(
-            seed_orbit=corrected_dro,
-            param_range=(0.791, 0.793),
-            step_size=0.0005,
-            verbose=False,
-        )
-
-        if result is not None:
-            assert len(dro_continuation.family_orbits) >= 0
-
-    def test_family_parameters_list(self, dro_continuation, corrected_dro):
-        """family_parameters 列表应该被填充"""
-        with contextlib.suppress(Exception):
-            dro_continuation.natural_continuation(
-                seed_orbit=corrected_dro,
-                param_range=(0.791, 0.7925),
-                step_size=0.0003,
-                verbose=False,
-            )
-
-    def test_current_previous_orbit_tracking(self, dro_continuation, corrected_dro):
-        """当前和历史轨道应该被跟踪"""
-        with contextlib.suppress(Exception):
-            dro_continuation.natural_continuation(
-                seed_orbit=corrected_dro,
-                param_range=(0.791, 0.792),
-                step_size=0.0002,
-                verbose=False,
-            )
-
-
-# ============================================================
-# 边界情况测试
-# ============================================================
-class TestBoundaryCases:
-    """测试边界情况"""
-
-    def test_empty_param_range(self, dro_continuation, corrected_dro):
-        """空参数范围应该处理得当"""
-        # 当 min == max 时，应该至少返回种子轨道
-        dro_continuation.max_orbits = 5
-        result = dro_continuation.natural_continuation(
-            seed_orbit=corrected_dro,
-            param_range=(0.792, 0.792),  # 相同值
-            step_size=0.001,
-            verbose=False,
-        )
-
-        # 应该返回 OrbitFamily 对象
-        assert isinstance(result, ContinuationResult)
-        assert isinstance(result.family, OrbitFamily)
-
-    def test_invalid_step_size(self, dro_continuation, corrected_dro):
-        """无效步长应该被处理"""
-        dro_continuation.step_size = -0.001  # 负步长
-        dro_continuation.initial_step_size = -0.001
-
-        # 不应崩溃
-        with contextlib.suppress(ValueError, RuntimeError):
-            dro_continuation.natural_continuation(
-                seed_orbit=corrected_dro,
-                param_range=(0.791, 0.792),
-                step_size=-0.001,
-                verbose=False,
-            )
-
-    def test_very_large_step_size(self, dro_continuation, corrected_dro):
-        """极大步长应该被限制或处理"""
-        dro_continuation.max_step_size = 0.1
-        result = dro_continuation.natural_continuation(
-            seed_orbit=corrected_dro,
-            param_range=(0.791, 0.8),
-            step_size=0.5,  # 过大的步长
-            verbose=False,
-        )
-
-        # 应该返回结果或优雅地处理
-        assert isinstance(result, ContinuationResult)
-        assert isinstance(result.family, OrbitFamily)
-
-
-# ============================================================
-# 端到端 pipeline: 修正 + 双向延拓
-# ============================================================
-class TestEndToEndPipeline:
-    """修正 → 延拓 端到端集成测试。
-
-    与 test_differential_correction 关注单次修正的细节不同，
-    这里验证整个 pipeline 在 DRO 场景下能跑通并产生合理结果。
-    """
-
-    def test_full_pipeline_forward_continuation(self, dro_corrector, corrected_dro):
-        """完整流程: 修正 → 正向延拓"""
-        from tests.algorithm.conftest import DRO_X0
-
-        continuation = Continuation(corrector=dro_corrector, step=0.01)
-        family_result = continuation.natural_continuation(
-            corrected_dro,
-            param_range=(DRO_X0, DRO_X0 + 0.03),
-            step_size=0.01,
-            verbose=False,
-        )
-
-        assert family_result is not None
-        assert len(family_result.family) > 0
-        for orbit in family_result.family:
-            if orbit is not None:
-                assert orbit.period > 0
-
-    def test_full_pipeline_backward_continuation(self, dro_corrector, corrected_dro):
-        """完整流程: 修正 → 反向延拓"""
-        from tests.algorithm.conftest import DRO_X0
-
-        continuation = Continuation(corrector=dro_corrector, step=0.01)
-        result_family = continuation.natural_continuation(
-            corrected_dro,
-            param_range=(DRO_X0 - 0.02, DRO_X0),
-            step_size=0.01,
-            verbose=False,
-        )
-        if result_family is not None:
-            assert len(result_family.family) >= 0

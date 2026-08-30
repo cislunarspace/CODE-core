@@ -26,6 +26,7 @@ transfer_design/orbit_propagation/spacetime_transform），二档子任务已接
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -40,6 +41,7 @@ from e2m2e.data.catalog import (
     RecordNotFoundError,
     ephemeris_from_arrays,
     import_baseline,
+    numeric_or_none,
 )
 from e2m2e.data.catalog import member_count as catalog_member_count
 from e2m2e.data.constants import SECONDS_PER_DAY
@@ -73,6 +75,7 @@ from .models import (
     DesignOrbitResponse,
     FamilyGenerationRequest,
     FamilyGenerationResponse,
+    ManeuverEvent,
     OrbitError,
     PropagationRequest,
     PropagationResponse,
@@ -216,6 +219,57 @@ def _serialize_value(value: Any) -> Any:
     return value
 
 
+# ---- 长任务进度（#576 Phase 1）----
+
+#: 长任务 Facade 进度回调形状：``cb(fraction, message=None)``，fraction ∈
+#: [0, 1] 单调不减（0.0 = 开始，1.0 = 完成）。MCP 层经 progressToken 把
+#: 它桥接到 ``notifications/progress``；进度语义按任务定义：转移搜索按
+#: 网格任务（仅 WSB 后端当前暴露 delta 回调），族生成为阶段级（单次
+#: Rust 调用，逐成员进度待 Rust 侧通道，见 #576 Phase 2 记录）。
+ProgressCallback = Callable[[float, str | None], None]
+
+
+def _emit_progress(
+    callback: ProgressCallback | None, fraction: float, message: str | None = None
+) -> None:
+    """进度上报安全垫：无回调直通；回调异常吞掉（进度失败不中断计算）。"""
+    if callback is None:
+        return
+    with contextlib.suppress(Exception):
+        callback(fraction, message)
+
+
+def _wsb_search_progress(
+    callback: ProgressCallback | None, request: TransferDesignRequest
+) -> Callable[[int], None] | None:
+    """WSB 网格搜索 delta 回调 → fraction 适配器（#576）。
+
+    WSB 是当前唯一暴露搜索进度回调的转移路径（Rust 侧每完成一个
+    ``(sun_phase, tof)`` 网格任务发一次 delta）；映射到 (0.1, 0.9) 区间，
+    起止两端由调用方上报。非 WSB 或无回调返回 None（零开销直通）。
+    """
+    if callback is None or request.transfer_type != "WSB":
+        return None
+    params = request.wsb_search_params
+    if params is None:
+        from e2m2e.algorithm.transfer import WsbSearchParams
+
+        params = WsbSearchParams()
+    total = max(params.n_sun_phase * params.n_tof, 1)
+    seen = [0]
+
+    def on_delta(delta: int) -> None:
+        seen[0] += delta
+        done = min(seen[0], total)
+        _emit_progress(
+            callback,
+            0.1 + 0.8 * done / total,
+            f"WSB 网格搜索 {done}/{total}",
+        )
+
+    return on_delta
+
+
 def _ephemeris_to_dict(ephemeris: EphemerisTable | None) -> dict[str, Any] | None:
     """把 ``EphemerisTable`` 序列化为 JSON 兼容 dict（ndarray → list）。
 
@@ -346,6 +400,11 @@ def _to_catalog_filter(request: CatalogQueryRequest) -> CatalogFilter:
         has_ephemeris=request.has_ephemeris,
         status=None if request.status is None else request.status.value,
         tags=None if request.tags is None else tuple(request.tags),
+        transfer_type=request.transfer_type,
+        delta_v_min_km_s=request.delta_v_min_km_s,
+        delta_v_max_km_s=request.delta_v_max_km_s,
+        tli_epoch_min=request.tli_epoch_min,
+        tli_epoch_max=request.tli_epoch_max,
     )
 
 
@@ -355,7 +414,11 @@ def _summary_kwargs(
     classification: dict[str, Any],
     member_count: int,
 ) -> dict[str, Any]:
-    """摘要公共字段（索引行与记录元数据两种来源共用）。"""
+    """摘要公共字段（索引行与记录元数据两种来源共用）。
+
+    transfer 维度（#574）两种来源都归一在 identity 顶层：索引行直接带
+    列值；记录元数据经 ``_summary_from_meta`` 从 ``scalars`` 提取后合入。
+    """
     return {
         "record_id": identity["record_id"],
         "created_at": identity["created_at"],
@@ -367,6 +430,9 @@ def _summary_kwargs(
         "amplitude": classification["amplitude"],
         "has_cr3bp": classification["has_cr3bp"],
         "has_ephemeris": classification["has_ephemeris"],
+        "transfer_type": identity.get("transfer_type"),
+        "delta_v_km_s": identity.get("delta_v_km_s"),
+        "tli_epoch": identity.get("tli_epoch"),
         "status": identity["status"],
         "cause": identity["cause"],
         "message": identity["message"],
@@ -388,10 +454,20 @@ def _summary_from_index(summary: dict[str, Any]) -> CatalogRecordSummary:
 
 
 def _summary_from_meta(meta: dict[str, Any]) -> CatalogRecordSummary:
-    """记录元数据 → 摘要响应模型（member_count 与索引用同一份推导）。"""
+    """记录元数据 → 摘要响应模型（member_count 与索引用同一份推导）。
+
+    transfer 维度从 ``scalars`` 提取归一到 identity 顶层（与索引行同形）。
+    """
+    scalars = meta.get("scalars", {})
+    identity = {
+        **meta,
+        "transfer_type": scalars.get("transfer_type"),
+        "delta_v_km_s": numeric_or_none(scalars.get("delta_v_km_s")),
+        "tli_epoch": numeric_or_none(scalars.get("tli_epoch")),
+    }
     return CatalogRecordSummary(
         **_summary_kwargs(
-            identity=meta,
+            identity=identity,
             classification=meta["classification"],
             member_count=catalog_member_count(meta),
         )
@@ -407,6 +483,7 @@ def _record_to_response(record: Any) -> CatalogRecordResponse:
         scalars=meta["scalars"],
         request=meta["request"],
         members=meta["members"],
+        details=meta.get("details"),
         arrays=record.arrays,
     )
 
@@ -756,11 +833,14 @@ class Facade:
         return response
 
     @mcp_exposed(request_model=TransferDesignRequest)
-    def transfer_design(self, **params) -> TransferDesignResponse:
+    def transfer_design(
+        self, progress_callback: ProgressCallback | None = None, **params
+    ) -> TransferDesignResponse:
         """Transfer design (tier 1). / 转移轨道设计（一档）。
 
         薄封装 ``algorithm/transfer/transfer_orbit``：Pydantic 校验 → 编排 →
-        结果翻译为 Response。
+        结果翻译为 Response。``progress_callback(fraction, message)`` 上报
+        长任务进度（#576 Phase 1：WSB 后端映射网格任务，其余后端仅起止）。
         """
         try:
             request = TransferDesignRequest(**params)
@@ -780,6 +860,7 @@ class Facade:
             engine_config = (
                 EngineConfig(**request.engine_config) if request.engine_config is not None else None
             )
+            _emit_progress(progress_callback, 0.0, f"转移设计开始：{request.transfer_type}")
             result = transfer_orbit(
                 request.transfer_type,
                 target_ephemeris=request.target_ephemeris,
@@ -808,6 +889,7 @@ class Facade:
                     if request.target_state is not None
                     else None
                 ),
+                progress_callback=_wsb_search_progress(progress_callback, request),
             )
             trajectory = (
                 result.trajectory.tolist()
@@ -821,7 +903,7 @@ class Facade:
                 else result.trajectory_times
             )
             status, cause, message = _result_triplet(result)
-            return TransferDesignResponse(
+            response = TransferDesignResponse(
                 status=status,
                 cause=cause,
                 message=message,
@@ -835,6 +917,15 @@ class Facade:
                     Literal["synodic_barycentric_km", "force_model_state"],
                     result.state_frame,
                 ),
+                maneuver_events=[
+                    ManeuverEvent(
+                        kind=event.kind,
+                        t_sec=event.t_sec,
+                        dv_km_s=event.dv_km_s,
+                        note=event.note,
+                    )
+                    for event in result.maneuver_events
+                ],
                 details=_details_to_dict(result.details),
             )
         except OrbitError:
@@ -851,6 +942,11 @@ class Facade:
         except Exception as exc:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("TRANSFER_FAILED", message, status=status, cause=cause) from exc
+        _emit_progress(progress_callback, 1.0, "转移设计完成")
+        response.record_id = self._auto_catalog(
+            lambda: catalog_ingest.build_transfer_record(request, result)
+        )
+        return response
 
     @mcp_exposed(request_model=PropagationRequest)
     def orbit_propagation(self, **params) -> PropagationResponse:
@@ -964,7 +1060,9 @@ class Facade:
     # ---- 二档子任务（mcp_exposed=True）----
 
     @mcp_exposed(request_model=FamilyGenerationRequest)
-    def orbit_family_generation(self, **params) -> FamilyGenerationResponse:
+    def orbit_family_generation(
+        self, progress_callback: ProgressCallback | None = None, **params
+    ) -> FamilyGenerationResponse:
         """Orbit family generation (tier 2). / 轨道族生成（二档）。
 
         Pydantic 模型校验 → 按 orbit_type 分派到算法层族生成入口 →
@@ -972,9 +1070,12 @@ class Facade:
         ``FamilyGenerationResponse``（兼容 ``OrbitFamily`` 读取接口）；
         Lissajous 是拟周期参数采样，族上显式标注
         ``periodicity=quasi-periodic``。软失败使用同一响应保留部分族。
+        ``progress_callback(fraction, message)`` 上报阶段级进度（族生成
+        是单次 Rust 调用，仅起止两端；逐成员进度待 Rust 侧通道）。
         """
         try:
             request = FamilyGenerationRequest(**params)
+            _emit_progress(progress_callback, 0.0, f"轨道族生成开始：{request.orbit_type}")
             sel = request.orbit_type.upper()
             if sel == "HALO":
                 from e2m2e.algorithm.family import design_halo_family
@@ -1082,6 +1183,7 @@ class Facade:
             raise OrbitError(
                 "FAMILY_GENERATION_FAILED", message, status=status, cause=cause
             ) from exc
+        _emit_progress(progress_callback, 1.0, "轨道族生成完成")
         response.record_id = self._auto_catalog(
             lambda: catalog_ingest.build_family_record(
                 request,

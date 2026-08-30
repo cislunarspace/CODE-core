@@ -8,8 +8,11 @@ continuation/multiple_shooting/ephemeris）测试复用。
 更精确的地月质量比 μ=0.01215058560962404 与默认特征尺度（地月距
 384405 km、周期 27.32 d），与 lissajous/axial 初猜的既有取值一致。
 
-阶段 2 追加 7 条代表轨道的 session 缓存（``_corrected_*_cached``，session
+阶段 2 追加代表轨道的 session 缓存（``_corrected_*_cached``，session
 内只修正一次）+ 函数级 deepcopy 包装（``corrected_*``，供单测安全改写）。
+
+axial_l1 代表轨道已按 ADR 0037 移出默认套件：单次微分修正固有
+~2 min，超出单测预算（见 continuation/test_continuation_per_family.py）。
 """
 
 import copy
@@ -19,7 +22,6 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
-from e2m2e.algorithm.family.axial_initial_guess import compute_axial_initial_guess
 from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
 from e2m2e.algorithm.family.spo_initial_guess import compute_spo_initial_guess
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
@@ -191,22 +193,6 @@ def _corrected_lyapunov_l1_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
 
 
 @pytest.fixture(scope="session")
-def _corrected_axial_l1_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
-    """Axial L1（Gómez Type B）：固定 vz0，自由 x0/vy0/半周期；分岔种子。"""
-    dynamics = earth_moon_dynamics
-    state, period = compute_axial_initial_guess(
-        dynamics, collinear_point=seeds.AXIAL_SEED_POINT, vz0=seeds.AXIAL_SEED_VZ0
-    )
-    seed = _seed_orbit(dynamics, state, period)
-    corrector = DifferentialCorrection(dynamics)
-    corrector.setup_axial_orbit_fixed_vz0(seeds.AXIAL_SEED_VZ0, seeds.AXIAL_SEED_POINT)
-    result = corrector.iterate_correction(seed, verbose=False)
-    orbit = result.orbit
-    assert orbit is not None, "Axial L1 修正未收敛"
-    return orbit, result
-
-
-@pytest.fixture(scope="session")
 def _corrected_dpo_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     """DPO 地月（顺行）：固定 x0，自由 vy0 与半周期；标准种子。"""
     dynamics = earth_moon_dynamics
@@ -264,12 +250,6 @@ def corrected_halo_l2(_corrected_halo_l2_cached):
 @pytest.fixture
 def corrected_lyapunov_l1(_corrected_lyapunov_l1_cached):
     orbit, result = _corrected_lyapunov_l1_cached
-    return copy.deepcopy(orbit), result
-
-
-@pytest.fixture
-def corrected_axial_l1(_corrected_axial_l1_cached):
-    orbit, result = _corrected_axial_l1_cached
     return copy.deepcopy(orbit), result
 
 

@@ -6,11 +6,12 @@
 参数振幅保留在 ``request`` 快照中，不进分类字段。
 
 无产物时不建记录（返回 ``None``）：族零成员、站保全样本失败（受控
-星历缺失）都不产生记录。
+星历缺失）、转移无轨迹（组装失败或搜索零结果）都不产生记录。
 """
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from typing import TYPE_CHECKING, Any
 
@@ -21,14 +22,21 @@ from e2m2e.data.catalog import (
     ephemeris_segment_arrays,
     geometric_amplitude_km,
     member_array_key,
+    numeric_or_none,
     point_interval,
+    transfer_segment_arrays,
 )
 from e2m2e.data.templates import ConvergenceState, FailureCause
 
 if TYPE_CHECKING:
     from e2m2e.data.types.trajectory import EphemerisTable
 
-__all__ = ["build_design_record", "build_family_record", "build_control_record"]
+__all__ = [
+    "build_control_record",
+    "build_design_record",
+    "build_family_record",
+    "build_transfer_record",
+]
 
 #: design_orbit 的 orbit_type → (orbit_family, libration_point)。
 #: HALO/NRHO/LISSAJOUS/AXIAL 的平动点取请求的 collinear_point，不在此表。
@@ -238,6 +246,95 @@ def build_control_record(
         request=_request_snapshot(request),
     )
     return meta, arrays
+
+
+def build_transfer_record(request: Any, result: Any) -> tuple[dict, dict[str, np.ndarray]] | None:
+    """从 transfer_design 的请求与结果构建记录（#574 transfer record type）。
+
+    transfer 专属元数据（transfer_type/delta_v/tli_epoch/tof_sec/
+    state_frame）放 ``scalars``，轨道分类 6 键置 None/False——
+    SCHEMA_VERSION 保持 1，零破坏。轨迹大数据走 ``transfer/`` 二进制段
+    （states + times，ADR 0040 契约数据系由 ``state_frame`` 标量注明）。
+    ``tli_epoch`` 原样存（UTC 字符串或 JD_TDB 浮点）；数值历元才入
+    索引区间列（UTC 字符串历元不作区间过滤）。``details`` 块原样存
+    （后端 details 字段 + #575 结构化机动事件，共用契约）。无轨迹
+    （组装失败或搜索零结果）不建记录。
+
+    Args:
+        request: ``TransferDesignRequest``（已校验、含默认值）。
+        result: ``TransferDesignResult``。
+    """
+    trajectory = getattr(result, "trajectory", None)
+    trajectory_times = getattr(result, "trajectory_times", None)
+    if trajectory is None or trajectory_times is None:
+        return None
+    arrays = transfer_segment_arrays(trajectory, trajectory_times)
+    tof_sec = _details_tof_sec(result.details)
+
+    meta = _base_meta(
+        source_tool="transfer_design",
+        source_record_id=None,
+        classification={
+            "orbit_family": None,
+            "libration_point": None,
+            "jacobi": None,
+            "amplitude": None,
+            "has_cr3bp": False,
+            "has_ephemeris": False,
+        },
+        status=result.status,
+        cause=result.cause,
+        message=result.message,
+        scalars={
+            "member_count": 0,
+            "transfer_type": result.transfer_type,
+            "delta_v_km_s": numeric_or_none(result.delta_v),
+            "tli_epoch": _sanitize_value(request.tli_epoch),
+            "tof_sec": tof_sec,
+            "state_frame": result.state_frame,
+            "n_points": int(np.asarray(trajectory).shape[0]),
+        },
+        request=_request_snapshot(request),
+    )
+    meta["details"] = _details_block(result)
+    return meta, arrays
+
+
+def _details_block(result: Any) -> dict[str, Any]:
+    """record 的 details 块：后端 details 字段原样 + 结构化机动事件（#575）。
+
+    dataclass/dict 字段逐个 JSON 化（ndarray → list）；``maneuver_events``
+    取结果顶层契约字段（元组 of ``ManeuverEvent``），空列表原样保留。
+    """
+    details = getattr(result, "details", None)
+    if dataclasses.is_dataclass(details) and not isinstance(details, type):
+        block = {
+            field.name: _sanitize_value(getattr(details, field.name))
+            for field in dataclasses.fields(details)
+        }
+    elif isinstance(details, dict):
+        block = {key: _sanitize_value(value) for key, value in details.items()}
+    else:
+        block = {}
+    block["maneuver_events"] = [
+        {
+            "kind": event.kind,
+            "t_sec": event.t_sec,
+            "dv_km_s": event.dv_km_s,
+            "note": event.note,
+        }
+        for event in getattr(result, "maneuver_events", ()) or ()
+    ]
+    return block
+
+
+def _details_tof_sec(details: Any) -> float | None:
+    """details 里的飞行时间秒；HMN/LGA/WSB 有、low_thrust 无 → None。"""
+    if dataclasses.is_dataclass(details) and not isinstance(details, type):
+        return numeric_or_none(getattr(details, "tof_sec", None))
+    if isinstance(details, dict):
+        return numeric_or_none(details.get("tof_sec"))
+    return None
 
 
 def _base_meta(

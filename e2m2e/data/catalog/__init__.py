@@ -22,7 +22,9 @@ from .record import (
     member_array_key,
     member_count,
     new_record_id,
+    numeric_or_none,
     point_interval,
+    transfer_segment_arrays,
     validate_meta,
 )
 from .store import CatalogStore
@@ -44,6 +46,8 @@ __all__ = [
     "member_array_key",
     "member_count",
     "new_record_id",
+    "numeric_or_none",
     "point_interval",
+    "transfer_segment_arrays",
     "validate_meta",
 ]

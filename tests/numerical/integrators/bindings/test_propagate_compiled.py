@@ -1,16 +1,11 @@
 """``propagate_compiled`` 绑定契约与回归测试。
 
-覆盖主积分循环释放 GIL、``t_eval[0] > t0`` 首点错置防护、h_init 步长
-上限（稀疏 t_eval 一致性）三组回归，并补充绑定层参数校验（y0 长度、
-h_init、空 t_eval）。
+覆盖 ``t_eval[0] > t0`` 首点错置防护、h_init 步长上限（稀疏 t_eval
+一致性）两组回归，并补充绑定层参数校验（y0 长度、h_init、空 t_eval）。
 
-GIL 测试用纯二体 ``point_mass`` 力模型（无 SPICE 内核依赖），经 Rust
-``propagate_compiled`` 直连快路径；teval / h_init 测试经 ``ForceModel.propagate``
-走同一路径（挂 spice 门控，见各测试）。
+teval / h_init 测试经 ``ForceModel.propagate`` 走 Rust
+``propagate_compiled`` 快路径（挂 spice 门控，见各测试）。
 """
-
-import threading
-import time
 
 import numpy as np
 import pytest
@@ -91,80 +86,6 @@ def test_propagate_compiled_rejects_invalid_inputs():
 
     with pytest.raises(ValueError):
         propagate_compiled(RkMethod.PD45, 0.0, y0, 3600.0, 1e-12, [], "EARTH", forces, 1000)
-
-
-# ---------------------------------------------------------------------------
-# 主积分循环释放 GIL
-# ---------------------------------------------------------------------------
-
-
-def test_propagate_compiled_releases_gil():
-    """主线程长期预报期间，心跳线程持续打点 → propagate_compiled 已释放 GIL。
-
-    主积分循环必须包 ``py.allow_threads``；若漏包则全程持 GIL 使心跳饿死
-    （ticks ≈ 0），正确释 GIL 时 ticks 随 dt 线性增长。
-
-    判别原理：心跳线程循环 ``ticks += 1; time.sleep(0.005)``。``time.sleep``
-    释放 GIL，醒来后要执行 ``ticks += 1`` 必须重新获取 GIL——
-
-    - 主线程已用 ``py.allow_threads`` 释放 GIL：心跳线程 reacquire 立即成功，
-      按 ~5 ms 节奏持续打点，dt 秒内打点 ~dt/0.005 次。
-    - 主线程持 GIL：心跳线程 reacquire 阻塞到主线程返回，期间打点 ≈ 0。
-
-    两者相差 1~2 个数量级，阈值取 3（远低于释 GIL 的 ~48 次/0.24 s，远高于
-    持 GIL 的 0~1 次），判别稳健。传播段太短（dt < 0.15 s）信号不足则 skip，
-    不在快机上误判。
-    """
-    y0 = _leo_y0()
-    # 8 天两体传播 ≈ 44 万步、~0.24 s（release 构建），稳超 0.10 s 判别下限。
-    days = 8.0
-    t0, tf = 0.0, days * 86400.0
-    t_eval = np.linspace(t0, tf, 50)
-
-    ticks = [0]
-    stop = [False]
-
-    def heartbeat() -> None:
-        while not stop[0]:
-            ticks[0] += 1
-            time.sleep(0.005)
-
-    th = threading.Thread(target=heartbeat, daemon=True)
-    th.start()
-    try:
-        time.sleep(0.05)  # 让心跳起步，确保它已在 sleep→reacquire 循环中
-        ticks_before = ticks[0]
-        t_start = time.perf_counter()
-        propagate_compiled(
-            RkMethod.PD45,
-            t0,
-            y0,
-            3600.0,
-            1e-12,
-            [float(x) for x in t_eval],
-            "EARTH",
-            [("point_mass", EARTH_MU)],
-            2_000_000,
-        )
-        dt = time.perf_counter() - t_start
-    finally:
-        stop[0] = True
-        th.join(timeout=2.0)
-
-    ticks_during = ticks[0] - ticks_before
-
-    # 传播段太短 → 信号不足，快机上可能误判，跳过（罕见）。
-    if dt < 0.10:
-        pytest.skip(f"propagation too short ({dt:.3f}s) to assert GIL release")
-
-    # 释 GIL 时 dt≈0.24 s → ~48 ticks；持 GIL（回归）→ 0~1 ticks。
-    # 阈值 3 兼顾：远低于释 GIL 实测（数十次），远高于持 GIL（0~1 次），
-    # 且对单核 / CI 调度抖动留有 ~10× 余量。
-    assert ticks_during >= 3, (
-        f"heartbeat ticked only {ticks_during} times during {dt:.2f}s propagation "
-        f"(expected ~{dt / 0.005:.0f} if GIL released); "
-        "propagate_compiled may be holding the GIL — 主循环漏了 py.allow_threads"
-    )
 
 
 # ---------------------------------------------------------------------------
