@@ -389,6 +389,7 @@ class TestLgaTransferOrbit:
             assert times[0] == 0.0
             assert np.all(np.diff(times) > 0)
             assert 0.0 < times[-1] <= result.details.tof_sec * 1.3
+            assert result.state_frame == "synodic_barycentric_km"
         assert [stage.name for stage in result.stages] == ["search", "refinement", "shooting"]
         assert result.stages[0].applicable and result.stages[0].executed
         assert result.stages[0].result_status in (

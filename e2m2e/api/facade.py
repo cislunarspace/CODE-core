@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
@@ -823,6 +823,12 @@ class Facade:
                 delta_v=result.delta_v,
                 trajectory=trajectory,
                 trajectory_times=trajectory_times,
+                # __post_init__ 派生保证取值在 Literal 集内；显式覆盖属 ADR 0040
+                # 扩展路径，越界值由响应构造期的 pydantic 校验兜底。
+                state_frame=cast(
+                    Literal["synodic_barycentric_km", "force_model_state"],
+                    result.state_frame,
+                ),
                 details=_details_to_dict(result.details),
             )
         except OrbitError:

@@ -95,6 +95,7 @@ class TestFacadeDelegation:
                 delta_v=1.0,
                 trajectory=None,
                 trajectory_times=None,
+                state_frame="force_model_state",
                 details={},
             )
 
@@ -182,6 +183,8 @@ class TestFacadeCallChains:
         assert len(response.trajectory[0]) == 6
         assert response.trajectory_times is not None
         assert len(response.trajectory_times) == len(response.trajectory)
+        # ADR 0040 增补：数据系标签随响应下发
+        assert response.state_frame == "synodic_barycentric_km"
 
     def test_unknown_transfer_type_is_not_implemented_error(self):
         with pytest.raises(OrbitError, match="NOT_IMPLEMENTED"):

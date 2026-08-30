@@ -152,12 +152,26 @@ __all__ = [
     "WsbSearchParams",
     "WsbCandidate",
     "LowThrustTransferDetails",
+    "STATE_FRAME_SYNODIC_BARYCENTRIC_KM",
+    "STATE_FRAME_FORCE_MODEL_STATE",
     "transfer_orbit",
 ]
 
 
 _DEFAULT_TOF_GRID_POINTS: int = 50
 _G0: float = G0_MPS2  # m/s²，标准重力；以 thrust_arcs.G0_MPS2 为准
+
+# ADR 0040 增补：state_frame 数据系标签的转移管线取值。语义全集后续由其他
+# 响应（propagation/design）扩充 gcrs_km / synodic_barycentric_nd。
+STATE_FRAME_SYNODIC_BARYCENTRIC_KM = "synodic_barycentric_km"
+STATE_FRAME_FORCE_MODEL_STATE = "force_model_state"
+
+_STATE_FRAME_BY_TRANSFER_TYPE: dict[str, str] = {
+    "HMN": STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+    "LGA": STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+    "WSB": STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+    "low_thrust": STATE_FRAME_FORCE_MODEL_STATE,
+}
 
 
 @dataclass
@@ -172,6 +186,8 @@ class TransferDesignResult:
             low_thrust 暂为力模型状态系的已知不一致）。
         trajectory_times: 轨迹时刻 (n,) 秒，TLI 起算（t=0 为出发脉冲），
             与 trajectory 逐行对齐。
+        state_frame: trajectory 的数据系标签（ADR 0040 增补）。缺省按
+            transfer_type 派生，显式传值可覆盖。
         details: 设计细节（弹道参数汇总）。
         stages: 搜索、精化和打靶等可选阶段的执行记录。
         status: 任务最终状态。
@@ -183,6 +199,7 @@ class TransferDesignResult:
     delta_v: float
     trajectory: Any
     trajectory_times: Any = None
+    state_frame: str = ""
     details: (
         HmnTransferDetails
         | LgaTransferDetails
@@ -197,6 +214,13 @@ class TransferDesignResult:
 
     def __post_init__(self) -> None:
         ResultStatus(self.status, self.cause, self.message)
+        if not self.state_frame:
+            derived = _STATE_FRAME_BY_TRANSFER_TYPE.get(self.transfer_type)
+            if derived is None:
+                raise ValueError(
+                    f"transfer_type {self.transfer_type!r} 无 state_frame 派生规则，须显式指定"
+                )
+            self.state_frame = derived
 
 
 @dataclass

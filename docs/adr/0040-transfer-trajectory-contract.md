@@ -82,6 +82,40 @@ requires `spacetime_transform` with real epochs — out of scope by design.
 - `_refine_lga_candidate` / `_refine_wsb_candidate` now return
   `(candidate, arrival_arc | None)`; tests calling them unpack accordingly.
 
+## Amendment (2026-08-30): `state_frame` data-frame label
+
+### Context
+
+Consumers drawing trajectories had to *guess* which frame the numbers live
+in — the root cause of tod #421 (GCRS-km propagation output drawn as
+dimensionless). No response self-describes its frame. tod's ADR 0013 already
+uses "frame" for the *view* frame (the user's synodic/inertial display
+choice), so the data-side label needs its own name.
+
+### Decision
+
+`TransferDesignResult` / `TransferDesignResponse` gains a top-level
+`state_frame` field (string enum), emitted on every converged response:
+
+- `synodic_barycentric_km` — the §1 contract (HMN/LGA/WSB trajectories).
+- `force_model_state` — low_thrust trajectories (the §2 known inconsistency,
+  named honestly rather than papered over).
+
+The vocabulary is the canonical data-frame enum going forward; later batches
+add `gcrs_km` and `synodic_barycentric_nd` when other responses (propagation,
+design) adopt the field. `state_frame` is data-side and travels with the
+numbers; tod's `view_frame` (ADR 0013) stays user-side — the two must not be
+conflated. This branch is unreleased, so the field is mandatory (no `None`
+default).
+
+### Consequences
+
+- tod renders by label instead of per-tool hardcoding; the interim hardcoded
+  fix for propagation stays until that response adopts the field.
+- MCP consumers (LLM agents) get frame semantics machine-readably.
+- low_thrust's inconsistency becomes machine-readable: a future unification
+  changes the enum value, not the contract shape.
+
 ## Consequences
 
 - MCP and sidecar consumers get the trajectory inline as JSON (transfer tools

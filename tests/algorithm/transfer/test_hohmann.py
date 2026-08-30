@@ -8,6 +8,8 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.transfer import (
+    STATE_FRAME_FORCE_MODEL_STATE,
+    STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
     HmnTransferDetails,
     TransferDesignResult,
     transfer_orbit,
@@ -226,6 +228,7 @@ class TestTransferOrbitHmn:
         r2 = 384400.0
         result = transfer_orbit("HMN", tli_params=params, target_orbit_radius_km=r2)
         assert result.trajectory is not None
+        assert result.state_frame == STATE_FRAME_SYNODIC_BARYCENTRIC_KM
         traj = np.asarray(result.trajectory)
         times = np.asarray(result.trajectory_times)
         assert traj.shape == (200, 6)
@@ -265,6 +268,38 @@ class TestTransferOrbitHmn:
         """transfer_orbit("low_thrust") without engine_config 抛出 ValueError。"""
         with pytest.raises(ValueError, match="low_thrust"):
             transfer_orbit("low_thrust")
+
+    def test_state_frame_derivation(self):
+        """state_frame 按 transfer_type 派生（ADR 0040 增补），可显式覆盖。"""
+        assert (
+            TransferDesignResult(transfer_type="HMN", delta_v=1.0, trajectory=None).state_frame
+            == STATE_FRAME_SYNODIC_BARYCENTRIC_KM
+        )
+        assert (
+            TransferDesignResult(transfer_type="LGA", delta_v=1.0, trajectory=None).state_frame
+            == STATE_FRAME_SYNODIC_BARYCENTRIC_KM
+        )
+        assert (
+            TransferDesignResult(transfer_type="WSB", delta_v=1.0, trajectory=None).state_frame
+            == STATE_FRAME_SYNODIC_BARYCENTRIC_KM
+        )
+        assert (
+            TransferDesignResult(
+                transfer_type="low_thrust", delta_v=1.0, trajectory=None
+            ).state_frame
+            == STATE_FRAME_FORCE_MODEL_STATE
+        )
+        assert (
+            TransferDesignResult(
+                transfer_type="HMN",
+                delta_v=1.0,
+                trajectory=None,
+                state_frame="gcrs_km",
+            ).state_frame
+            == "gcrs_km"
+        )
+        with pytest.raises(ValueError, match="state_frame"):
+            TransferDesignResult(transfer_type="bogus", delta_v=1.0, trajectory=None)
 
 
 class TestHmnTransferPhysics:

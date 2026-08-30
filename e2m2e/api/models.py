@@ -12,7 +12,7 @@ import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -734,6 +734,16 @@ class TransferDesignResponse(ResultResponse):
     trajectory_times: list[float] | None = Field(
         default=None,
         description="轨迹时刻 (n,) 秒，TLI 起算（t=0 为出发脉冲），与 trajectory 逐行对齐",
+    )
+    # 字面量与 e2m2e/algorithm/transfer 的 STATE_FRAME_* 常量同源，改动须两侧同步；
+    # 此处不导入以保持 models 层轻依赖（schema 出口）。
+    state_frame: Literal["synodic_barycentric_km", "force_model_state"] = Field(
+        description=(
+            "trajectory 的数据系标签（ADR 0040 增补）：synodic_barycentric_km"
+            " = 地月会合旋转系质心原点物理 km/km/s（HMN/LGA/WSB）；"
+            "force_model_state = 力模型状态系（low_thrust，已知不一致）。"
+            "语义全集后续批次扩充 gcrs_km / synodic_barycentric_nd"
+        ),
     )
     details: dict[str, Any]
 
