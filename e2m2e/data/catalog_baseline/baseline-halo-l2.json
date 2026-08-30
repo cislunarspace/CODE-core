@@ -28,7 +28,7 @@
     "periodicity": "periodic",
     "mu": 0.012150585350562453,
     "char_length_km": 384400.0,
-    "baseline_version": "5.8.2",
+    "baseline_version": "5.9.0",
     "amplitude_envelope_km": [
       384.40000000000003,
       29999.999999999996
@@ -1480,7 +1480,7 @@
   "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
   "record_id": "baseline-halo-l2",
   "schema_version": 1,
-  "created_at": "2026-08-23T01:15:10.077131+00:00",
+  "created_at": "2026-08-30T15:15:16.269764+00:00",
   "arrays": {
     "cr3bp/members/0000/states": {
       "shape": [

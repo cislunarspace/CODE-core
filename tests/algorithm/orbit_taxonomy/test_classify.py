@@ -26,9 +26,8 @@ BASELINE_DIR = Path(__file__).resolve().parents[3] / "e2m2e" / "data" / "catalog
 #: baseline 族 → 预期标签集合（成员 primary 必须落在集合内）。
 #: lissajous 是拟周期采样（成员不闭合）；horseshoe 不在分类学内
 #: （ADR 0042 映射表：入库按设计侧覆写为空标签）——两者不进本表。
-#: dpo 的前 4 个成员几何上是逆行小月心轨道（设计侧族行走的另一支，
-#: ADR 0042 复现注记）：按分类学判 distant_retrograde，入库时走
-#: 冲突告警路径。
+#: dpo 全体成员应为顺行（#587 修复后族行走不落在逆行支）；小振幅
+#: 近月成员按 ρ_max 分入 low_prograde_*，大振幅成员为 distant_prograde。
 EXPECTED_FAMILY_LABELS = {
     "axial-l1": {"axial_l1"},
     "axial-l2": {"axial_l2"},
@@ -36,7 +35,6 @@ EXPECTED_FAMILY_LABELS = {
         "distant_prograde",
         "low_prograde_eastern",
         "low_prograde_western",
-        "distant_retrograde",
     },
     "dro": {"distant_retrograde"},
     "halo-l1": {"halo_l1_northern"},

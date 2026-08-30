@@ -6,34 +6,33 @@
     "libration_point": null,
     "jacobi": [
       3.2313531082768763,
-      4.289259463124479
+      5.289789712697823
     ],
     "amplitude": [
-      3438.3489698652265,
+      2011.279002978602,
       21010.34247344452
     ],
     "has_cr3bp": true,
     "has_ephemeris": false,
     "taxonomy_labels": [
       "distant_prograde",
-      "distant_retrograde",
       "low_prograde_eastern",
       "low_prograde_western"
     ]
   },
   "status": "converged",
   "cause": "none",
-  "message": "DPO 振幅网格生成完成：11/20 条命中（跳过 9 个不可达振幅）",
+  "message": "DPO 振幅网格生成完成：14/20 条命中（跳过 6 个不可达振幅）",
   "scalars": {
-    "member_count": 11,
+    "member_count": 14,
     "requested_members": 20,
-    "generated_members": 11,
+    "generated_members": 14,
     "periodicity": "periodic",
     "mu": 0.012150585350562453,
     "char_length_km": 384400.0,
-    "baseline_version": "5.8.2",
+    "baseline_version": "5.9.0",
     "amplitude_envelope_km": [
-      3421.8397535985523,
+      2000.0,
       20497.075781626
     ]
   },
@@ -47,109 +46,157 @@
   "members": [
     {
       "index": 0,
-      "period": 0.04784992604451064,
-      "closure_error": 7.331985518005539e-13,
-      "jacobi": 4.289259463124479,
-      "amplitude_km": 3438.3489698652265,
+      "period": 0.021647250915927698,
+      "closure_error": 1.2345215972854489e-12,
+      "jacobi": 5.289789712697823,
+      "amplitude_km": 2011.279002978602,
       "amplitudes": {
-        "x": 0.008943690350937727,
-        "y": 0.008944716362812764,
+        "x": 0.0052321256660112225,
+        "y": 0.0052322554708080175,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 2000.0
+      },
+      "taxonomy_label": "low_prograde_eastern"
+    },
+    {
+      "index": 1,
+      "period": 0.028010537919634128,
+      "closure_error": 2.276972544924368e-12,
+      "jacobi": 4.925964382742729,
+      "amplitude_km": 2386.687821050626,
+      "amplitudes": {
+        "x": 0.006208612308706618,
+        "y": 0.006208865299299236,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 2392.0663382082594
+      },
+      "taxonomy_label": "low_prograde_western"
+    },
+    {
+      "index": 2,
+      "period": 0.03708018304356648,
+      "closure_error": 2.460457901099748e-12,
+      "jacobi": 4.595451256977087,
+      "amplitude_km": 2874.742079763889,
+      "amplitudes": {
+        "x": 0.007477989504083349,
+        "y": 0.007478517377117297,
+        "z": 0.0
+      },
+      "parameters": {
+        "amplitude_target_km": 2860.990683194538
+      },
+      "taxonomy_label": "low_prograde_eastern"
+    },
+    {
+      "index": 3,
+      "period": 0.04858086238669589,
+      "closure_error": 5.146054492227896e-13,
+      "jacobi": 4.331126070739121,
+      "amplitude_km": 3437.9312843142498,
+      "amplitudes": {
+        "x": 0.008942551909673802,
+        "y": 0.008943629771889307,
         "z": 0.0
       },
       "parameters": {
         "amplitude_target_km": 3421.8397535985523
       },
-      "taxonomy_label": "distant_retrograde"
+      "taxonomy_label": "low_prograde_western"
     },
     {
-      "index": 1,
-      "period": 0.06164451373534826,
-      "closure_error": 7.780777239010348e-14,
-      "jacobi": 4.0746621108967656,
-      "amplitude_km": 4077.0556167261,
+      "index": 4,
+      "period": 0.06286031109967831,
+      "closure_error": 2.0081636813315255e-12,
+      "jacobi": 4.120282118335758,
+      "amplitude_km": 4076.3108702648196,
       "amplitudes": {
-        "x": 0.010604278619157692,
-        "y": 0.010606284122596515,
+        "x": 0.010602210417093694,
+        "y": 0.010604346696838761,
         "z": 0.0
       },
       "parameters": {
         "amplitude_target_km": 4092.6338446629707
       },
-      "taxonomy_label": "distant_retrograde"
+      "taxonomy_label": "low_prograde_western"
     },
     {
-      "index": 2,
-      "period": 0.08106162058701707,
-      "closure_error": 2.0417470093226697e-13,
-      "jacobi": 3.87937113892451,
-      "amplitude_km": 4904.068262222064,
+      "index": 5,
+      "period": 0.08317118307349318,
+      "closure_error": 1.985949978065449e-13,
+      "jacobi": 3.929445191171041,
+      "amplitude_km": 4902.686308296064,
       "amplitudes": {
-        "x": 0.012753576838075154,
-        "y": 0.01275772180598872,
+        "x": 0.012749624283788563,
+        "y": 0.012754126712528784,
         "z": 0.0
       },
       "parameters": {
         "amplitude_target_km": 4894.9258272150755
       },
-      "taxonomy_label": "distant_retrograde"
+      "taxonomy_label": "low_prograde_western"
     },
     {
-      "index": 3,
-      "period": 0.10504677436117012,
-      "closure_error": 1.0602700169777351e-12,
-      "jacobi": 3.7239415619862637,
-      "amplitude_km": 5844.697899623881,
+      "index": 6,
+      "period": 0.10860593358730422,
+      "closure_error": 2.157936284578382e-13,
+      "jacobi": 3.7786534618313374,
+      "amplitude_km": 5842.241927687935,
       "amplitudes": {
-        "x": 0.015196483122854931,
-        "y": 0.015204729187367018,
+        "x": 0.015189163200738709,
+        "y": 0.015198340082434793,
         "z": 0.0
       },
       "parameters": {
         "amplitude_target_km": 5854.4936496537
       },
-      "taxonomy_label": "distant_retrograde"
+      "taxonomy_label": "low_prograde_western"
     },
     {
-      "index": 4,
-      "period": 0.14343225598888518,
-      "closure_error": 1.7215482758023946e-13,
-      "jacobi": 3.648421044325049,
-      "amplitude_km": 7008.402980144742,
+      "index": 7,
+      "period": 0.14343225598852608,
+      "closure_error": 8.001218877130281e-14,
+      "jacobi": 3.648421044326054,
+      "amplitude_km": 7008.402980133436,
       "amplitudes": {
-        "x": 0.018212754555169408,
-        "y": 0.018232057700688715,
+        "x": 0.018212754555139377,
+        "y": 0.018232057700659304,
         "z": 0.0
       },
       "parameters": {
         "amplitude_target_km": 7002.168593295316
       },
-      "taxonomy_label": "low_prograde_western"
+      "taxonomy_label": "low_prograde_eastern"
     },
     {
-      "index": 5,
-      "period": 0.18955318654789072,
-      "closure_error": 2.043707337063987e-13,
-      "jacobi": 3.540956435611502,
-      "amplitude_km": 8402.736986003552,
+      "index": 8,
+      "period": 0.18955318654797632,
+      "closure_error": 4.613777189377614e-13,
+      "jacobi": 3.5409564356113425,
+      "amplitude_km": 8402.736986006548,
       "amplitudes": {
-        "x": 0.02181862833093029,
-        "y": 0.021859357403755338,
+        "x": 0.021818628330937173,
+        "y": 0.021859357403763133,
         "z": 0.0
       },
       "parameters": {
         "amplitude_target_km": 8374.825893240402
       },
-      "taxonomy_label": "low_prograde_eastern"
+      "taxonomy_label": "low_prograde_western"
     },
     {
-      "index": 6,
-      "period": 0.24919410724361418,
-      "closure_error": 3.357721561258323e-13,
-      "jacobi": 3.454280778929464,
-      "amplitude_km": 10028.34796138745,
+      "index": 9,
+      "period": 0.24919410724352997,
+      "closure_error": 2.8506480509284243e-13,
+      "jacobi": 3.454280778929561,
+      "amplitude_km": 10028.347961386162,
       "amplitudes": {
-        "x": 0.02600345678909105,
-        "y": 0.02608831415553447,
+        "x": 0.026003456789087998,
+        "y": 0.026088314155531117,
         "z": 0.0
       },
       "parameters": {
@@ -158,14 +205,14 @@
       "taxonomy_label": "low_prograde_eastern"
     },
     {
-      "index": 7,
-      "period": 0.33155075858162814,
-      "closure_error": 3.751741340806441e-13,
-      "jacobi": 3.3803731826574883,
-      "amplitude_km": 12043.836119634125,
+      "index": 10,
+      "period": 0.33155075858146676,
+      "closure_error": 1.4496469898415835e-13,
+      "jacobi": 3.3803731826575842,
+      "amplitude_km": 12043.836119630956,
       "amplitudes": {
-        "x": 0.03114861636947719,
-        "y": 0.031331519562003446,
+        "x": 0.031148616369468418,
+        "y": 0.0313315195619952,
         "z": 0.0
       },
       "parameters": {
@@ -174,14 +221,14 @@
       "taxonomy_label": "distant_prograde"
     },
     {
-      "index": 8,
-      "period": 0.4395625539856723,
-      "closure_error": 7.524861236087019e-13,
-      "jacobi": 3.321266643500866,
-      "amplitude_km": 14407.975813991963,
+      "index": 11,
+      "period": 0.4395625539858111,
+      "closure_error": 6.612563018367562e-13,
+      "jacobi": 3.321266643500815,
+      "amplitude_km": 14407.975813995188,
       "amplitudes": {
-        "x": 0.03709034825151947,
-        "y": 0.037481726883433826,
+        "x": 0.03709034825152657,
+        "y": 0.037481726883442215,
         "z": 0.0
       },
       "parameters": {
@@ -190,14 +237,14 @@
       "taxonomy_label": "distant_prograde"
     },
     {
-      "index": 9,
-      "period": 0.5913491054325873,
-      "closure_error": 5.685505512307875e-13,
-      "jacobi": 3.271480105896706,
-      "amplitude_km": 17368.327315734048,
+      "index": 12,
+      "period": 0.5913491054323936,
+      "closure_error": 6.011802604920434e-14,
+      "jacobi": 3.2714801058967504,
+      "amplitude_km": 17368.327315732735,
       "amplitudes": {
-        "x": 0.04430842904965088,
-        "y": 0.045182953474854445,
+        "x": 0.044308429049647435,
+        "y": 0.04518295347485103,
         "z": 0.0
       },
       "parameters": {
@@ -206,7 +253,7 @@
       "taxonomy_label": "distant_prograde"
     },
     {
-      "index": 10,
+      "index": 13,
       "period": 4.807359368484104,
       "closure_error": 1.0935487193514754e-12,
       "jacobi": 3.2313531082768763,
@@ -228,7 +275,7 @@
   "note": "CR3BP 基线轨道族（ADR 0036，地月 DE421 默认参数整族）",
   "record_id": "baseline-dpo",
   "schema_version": 1,
-  "created_at": "2026-08-23T01:16:28.935383+00:00",
+  "created_at": "2026-08-30T15:16:49.123964+00:00",
   "arrays": {
     "cr3bp/members/0000/states": {
       "shape": [
@@ -368,6 +415,45 @@
       "dtype": "float64"
     },
     "cr3bp/members/0010/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0011/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0012/times": {
+      "shape": [
+        1000
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/states": {
+      "shape": [
+        1000,
+        6
+      ],
+      "dtype": "float64"
+    },
+    "cr3bp/members/0013/times": {
       "shape": [
         1000
       ],

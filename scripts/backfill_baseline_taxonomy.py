@@ -6,8 +6,8 @@
 ``members[].taxonomy_label``（成员级 primary）写回 JSON。NPZ 数组不动。
 
 期望集为空的族（lissajous 拟周期、horseshoe 不在分类学内）直接置空
-标签。dpo 前 4 成员实测逆行（设计侧族行走的另一支，ADR 0042 复现
-注记）会触发冲突告警并按实测值入库——脚本输出可见。
+标签。设计侧族名与实测不符的成员（如 #587 修复前的 dpo 逆行成员）
+会触发冲突告警并按实测值入库——脚本输出可见。
 
 用法（直接用 venv 解释器，同 generate_catalog_baseline）::
 

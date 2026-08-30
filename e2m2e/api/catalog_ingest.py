@@ -68,9 +68,8 @@ _DESIGN_FAMILY_POINT: dict[str, tuple[str, int | None]] = {
 #: 设计侧 orbit_family → 分类学期望标签（ADR 0042 映射表）。NRHO 折叠
 #: 进 halo（同族高振幅近直线段）；空集 = 该族不在分类学内（拟周期
 #: lissajous、horseshoe、星历冻结 elfo、tadpole），入库直接置空标签。
-#: dpo 期望不含 distant_retrograde——baseline dpo 前 4 成员实测逆行
-#: （设计侧族行走的另一支，ADR 0042 复现注记），会触发冲突告警并按
-#: 实测值入库。
+#: dpo 期望不含 distant_retrograde——逆行解与 DPO 语义不符（#587 修复
+#: 后族行走不再落在逆行支）；若仍出现实测逆行，冲突告警路径接手。
 _DESIGN_TAXONOMY_EXPECTATIONS: dict[str, set[str]] = {
     "halo": {
         "halo_l1_northern",

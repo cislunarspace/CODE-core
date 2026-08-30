@@ -251,7 +251,12 @@ def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
 
     DPO 族不稳定，族行走时 vy0 与 x0 的映射关系比 DRO 更非线性。
     首次调用（guess=None）使用种子常量；后续调用保留已收敛轨道的完整
-    状态作为初猜（不仅覆盖 x0），避免在不稳定族上跳支。
+    状态作为初猜（不仅覆盖 x0），减少不稳定族上的跳支。
+
+    固定 x0 的对称修正对同一 x0 同时存在顺行与逆行两支解，初猜落在
+    逆行支会收敛到逆行解；保留完整状态作初猜并不能杜绝（#587，打包
+    baseline dpo 前 4 成员曾因此为逆行）。收敛后校验月心角动量顺行
+    （h_z > 0），不满足按伪解同路径拒绝，交由族行走退半步重试。
     """
     if guess is None:
         state = np.array([x0, 0.0, 0.0, 0.0, _DPO_SEED_VY0, 0.0])
@@ -272,6 +277,15 @@ def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
     if orbit.period > 2.0 * period:
         raise Cr3bpOrbitError(
             f"DPO(x0={x0:.6f}) 修正跳到长周期伪解（T={orbit.period:.3f}，初猜 {period:.3f}）"
+        )
+    # 顺行分支校验（#587）：穿越点月心角动量 h_z = (x − x_moon)·vy 必须
+    # 顺行（近侧 x0 < x_moon 即 vy0 < 0）；逆行支按伪解同路径拒绝
+    x_moon = 1.0 - dynamics.system.mu
+    h_z = (float(orbit.states[0, 0]) - x_moon) * float(orbit.states[0, 4])
+    if h_z <= 0.0:
+        raise Cr3bpOrbitError(
+            f"DPO(x0={x0:.6f}) 修正收敛到逆行支"
+            f"（vy0={float(orbit.states[0, 4]):+.4f}，h_z={h_z:+.5f}）"
         )
     return orbit
 

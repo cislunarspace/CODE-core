@@ -127,11 +127,15 @@ halo (same family, high-amplitude near-rectilinear arc).
 
 ## Reproduction notes
 
-- **dpo baseline members 0–3 are retrograde.** The design-side family walk
-  started on the retrograde branch; geometrically they are small retrograde
-  lunar orbits → `distant_retrograde`, and the backfill logs four conflicts
-  against the prograde expectation. Measured labels win; design labels stay
-  as provenance.
+- **dpo baseline members 0–3 were retrograde (fixed, #587).** The
+  design-side family walk had hopped onto the retrograde branch of the
+  fixed-x0 symmetric correction; geometrically they were small retrograde
+  lunar orbits → `distant_retrograde`, and the backfill logged four
+  conflicts against the prograde expectation. `_correct_dpo` now validates
+  prograde moon-centered angular momentum after convergence and rejects
+  retrograde-branch solutions like spurious ones (#587); the baseline was
+  regenerated — all members are prograde and the small-amplitude grid
+  points the old walk could not reach now resolve (11 → 14 members).
 - **nrho-l2's record class used to disagree with its geometry (fixed, #586).**
   The packaged baseline recorded `halo_class=1` (south) while every seed had
   z0 > 0 at the vy < 0 crossing → the taxonomy said `halo_l2_northern`. The
