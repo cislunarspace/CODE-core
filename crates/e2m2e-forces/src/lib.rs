@@ -11,9 +11,11 @@ pub mod forces;
 // 也直接复用本 crate 的这两个模块。
 pub mod atmosphere;
 pub mod bcr4bp;
+pub mod cartography;
 pub mod cr3bp;
 pub mod low_energy_patch;
 pub mod manifold;
+pub mod megno;
 pub mod pal_continuation;
 pub mod porkchop;
 pub mod qlaw;

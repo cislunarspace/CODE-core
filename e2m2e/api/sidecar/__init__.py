@@ -85,9 +85,47 @@ def _catalog_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], li
     return data, frames
 
 
+def _map_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], list[bytes]]:
+    """spatiography_dynamical_map 响应的画布契约：五个场出帧，JSON 留占位。
+
+    帧序 = ``ybar_field`` / ``fate_ids``（类 id 以 f32 编码）/ ``t_escape_years_field``
+    / ``min_r_sel_km_field`` / ``min_r_geo_km_field``，均为 (n_a, n_e)，
+    行序 = a 轴；NaN 帧内保留（终端短路格无变分值）。两轴、图例、阈值、
+    场景与详情留 JSON。
+    """
+    import numpy as _np
+
+    frames = [
+        encode_frame(_np.asarray(result.ybar_field, dtype=float), dtype),
+        encode_frame(_np.asarray(result.fate_ids, dtype=float), dtype),
+        encode_frame(_np.asarray(result.t_escape_years_field, dtype=float), dtype),
+        encode_frame(_np.asarray(result.min_r_sel_km_field, dtype=float), dtype),
+        encode_frame(_np.asarray(result.min_r_geo_km_field, dtype=float), dtype),
+    ]
+    data = {
+        "status": result.status.value,
+        "cause": result.cause.value,
+        "message": result.message,
+        "zone": result.zone,
+        "model": result.model,
+        "span_years": result.span_years,
+        "a_over_a_moon": [float(v) for v in result.a_over_a_moon],
+        "e_grid": [float(v) for v in result.e_grid],
+        "ybar_field": None,
+        "fate_ids": None,
+        "t_escape_years_field": None,
+        "min_r_sel_km_field": None,
+        "min_r_geo_km_field": None,
+        "diagnostic_focus": result.diagnostic_focus,
+        "thresholds": dict(result.thresholds),
+    }
+    return data, frames
+
+
 _BINARY_TOOLS: dict[str, Any] = {
     "orbit_family_generation": _family_binary_payload,
     "catalog_get": _catalog_binary_payload,
+    "spatiography_dynamical_map": _map_binary_payload,
 }
 
 

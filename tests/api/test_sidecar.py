@@ -330,3 +330,40 @@ def test_catalog_query_unchanged_by_binary_mapping(facade):
     assert lines[1]["status"] == "ok"
     assert "binary_frames" not in lines[1]
     assert lines[1]["data"]["message"] == "查询完成：0 条记录"
+
+
+def test_spatiography_dynamical_map_binary_roundtrip(facade):
+    """画布契约：五个场走二进制帧（E2M2 帧），JSON 行留占位与两轴。"""
+    chunks = handle_request(
+        facade,
+        {
+            "tool": "spatiography_dynamical_map",
+            "arguments": {"zone": "SC", "n_a": 3, "n_e": 2, "span_years": 0.3},
+            "binary_dtype": "f64",
+        },
+    )
+    (progress, _), (line, frames) = _lines_and_frames(chunks)
+    assert progress["status"] == "progress"
+    assert line["status"] == "ok"
+    assert line["binary_frames"] == 5
+    data = line["data"]
+    assert data["ybar_field"] is None and data["fate_ids"] is None
+    assert len(data["a_over_a_moon"]) == 3 and len(data["e_grid"]) == 2
+    # 帧 1 = Ȳ 场 (n_a, n_e)；终端短路格 NaN 保留。
+    ybar, dtype, _ = decode_frame(frames[0])
+    assert dtype == "f64" and ybar.shape == (3, 2)
+    assert np.any(np.isfinite(ybar))
+    # 帧 2 = 命运类 id 场（f64 编码的整数 id）。
+    fate, _, _ = decode_frame(frames[1])
+    assert fate.shape == (3, 2)
+    assert np.allclose(fate, np.round(fate), atol=1e-9)
+
+
+def test_spatiography_dynamical_map_requires_binary_dtype(facade):
+    chunks = handle_request(
+        facade,
+        {"tool": "spatiography_dynamical_map", "arguments": {"zone": "SC", "n_a": 2, "n_e": 2}},
+    )
+    [line] = [json.loads(c) for c in chunks]
+    assert line["status"] == "error"
+    assert line["error"]["code"] == "INVALID_PARAMS"

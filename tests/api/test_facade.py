@@ -372,7 +372,7 @@ class TestFacadeToolInventory:
         names = set(mcp_tools(facade))
         inventory = tool_inventory(facade)
         assert names == {tool.name for tool in inventory}
-        assert len(inventory) == 22
+        assert len(inventory) == 24
         assert all(tool.mcp_exposed for tool in inventory)
 
     def test_inventory_distinguishes_implemented_and_placeholder_tools(self):

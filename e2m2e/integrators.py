@@ -73,8 +73,11 @@ if TYPE_CHECKING:
     propagate_compiled_lowthrust_sensitivity: Any
     propagate_compiled_stm_py: Any
     propagate_cr3bp_py: Any
-    propagate_segments_py: Any
     propagate_cr3bp_stm_py: Any
+    propagate_cr3bp_megno_py: Any
+    propagate_bcr4bp_megno_py: Any
+    propagate_geocentric_fate_map_py: Any
+    propagate_segments_py: Any
     propagate_with_state_py: Any
     propagate_with_stm_py: Any
     solid_tide_step1: Any
@@ -177,6 +180,9 @@ _RUST_SYMBOLS = (
     "propagate_compiled_stm_py",
     "propagate_cr3bp_py",
     "propagate_cr3bp_stm_py",
+    "propagate_cr3bp_megno_py",
+    "propagate_bcr4bp_megno_py",
+    "propagate_geocentric_fate_map_py",
     "propagate_segments_py",
     "propagate_with_state_py",
     "propagate_with_stm_py",
@@ -362,6 +368,9 @@ __all__ = [
     "propagate_bcr4bp_stm_py",
     "propagate_cr3bp_py",
     "propagate_cr3bp_stm_py",
+    "propagate_cr3bp_megno_py",
+    "propagate_bcr4bp_megno_py",
+    "propagate_geocentric_fate_map_py",
     "propagate_segments_py",
     "propagate_with_state_py",
     "propagate_with_stm_py",
