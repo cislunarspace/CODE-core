@@ -93,7 +93,7 @@ For parameter meanings, returned fields, and other orbit types see the [online d
 
 ## MCP
 
-e2m2e can act as an [MCP](https://modelcontextprotocol.io/) server exposing 13 task-level tools (orbit design, station-keeping simulation, transfer design, orbit propagation, spacetime conversion, orbit family generation, and 7 catalog tools) to LLM Agents over stdio transport without listening on any port. The tool list is derived from Facade method metadata; artifacts are automatically archived and `record_id`s chain across tools. For usage and a tool cheat sheet, see the documentation "[Using e2m2e through MCP](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)".
+e2m2e can act as an [MCP](https://modelcontextprotocol.io/) server exposing 18 task-level tools (orbit design, station-keeping simulation, transfer design, orbit propagation, spacetime conversion, orbit family generation, 5 spatiography tools, and 7 catalog tools) to LLM Agents over stdio transport without listening on any port. The tool list is derived from Facade method metadata; artifacts are automatically archived and `record_id`s chain across tools. For usage and a tool cheat sheet, see the documentation "[Using e2m2e through MCP](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)".
 
 Install the MCP extra (in an environment that already has e2m2e):
 
@@ -101,7 +101,7 @@ Install the MCP extra (in an environment that already has e2m2e):
 uv pip install "e2m2e[mcp]"   # or pip install "e2m2e[mcp]"
 ```
 
-Register the server in your MCP client configuration. Generic format for Claude Desktop / Cursor etc. (`command` points to the executable in the environment where e2m2e is installed):
+Register the server in your MCP client configuration (`command` points to the executable in the environment where e2m2e is installed; most MCP clients follow this `mcpServers` format):
 
 ```json
 {
@@ -110,23 +110,6 @@ Register the server in your MCP client configuration. Generic format for Claude 
       "command": "/path/to/venv/bin/e2m2e",
       "args": ["mcp-serve"],
       "cwd": "/path/to/e2m2e-repo"
-    }
-  }
-}
-```
-
-ZCode workspace configuration (`<repo>/.zcode/config.json`, nested under `mcp.servers`, connected automatically at session start):
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "e2m2e": {
-        "type": "stdio",
-        "command": "C:\\path\\to\\.venv\\Scripts\\e2m2e.exe",
-        "args": ["mcp-serve"],
-        "cwd": "C:\\path\\to\\e2m2e-repo"
-      }
     }
   }
 }
@@ -176,7 +159,7 @@ Completed and uncompleted parts are listed by domain. For a detailed capability 
 **Interfaces and tools**
 
 - Facade task-level entry point providing a unified calling surface.
-- MCP service wrapper: in-process `create_server` and the `e2m2e mcp-serve` subcommand (stdio transport, `[mcp]` extra); tool list derived from Facade method metadata — orbit design, station-keeping simulation, transfer design, orbit propagation, spacetime conversion, orbit family generation, and 7 catalog tools; artifacts automatically archived, `record_id`s chain across tools. For integration config and tool usage see the documentation "[Using e2m2e through MCP](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)".
+- MCP service wrapper: in-process `create_server` and the `e2m2e mcp-serve` subcommand (stdio transport, `[mcp]` extra); tool list derived from Facade method metadata — orbit design, station-keeping simulation, transfer design, orbit propagation, spacetime conversion, orbit family generation, 5 spatiography tools, and 7 catalog tools; artifacts automatically archived, `record_id`s chain across tools. For integration config and tool usage see the documentation "[Using e2m2e through MCP](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)".
 
 ## Documentation
 

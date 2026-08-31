@@ -93,7 +93,7 @@ print(result.initial_state)
 
 ## MCP
 
-e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 13 个任务级工具（轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成与 7 个轨道库工具）暴露给 LLM Agent，stdio 传输，不监听端口。工具清单由 Facade 方法元数据派生，产物自动入库、`record_id` 跨工具链式调用；用法与工具速查见文档 [通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)。
+e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 18 个任务级工具（轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成、5 个分区解析工具与 7 个轨道库工具）暴露给 LLM Agent，stdio 传输，不监听端口。工具清单由 Facade 方法元数据派生，产物自动入库、`record_id` 跨工具链式调用；用法与工具速查见文档 [通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)。
 
 安装 MCP extra（在已有 e2m2e 的环境里）：
 
@@ -101,7 +101,7 @@ e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 13 个任�
 uv pip install "e2m2e[mcp]"   # 或 pip install "e2m2e[mcp]"
 ```
 
-在 MCP 客户端配置中注册服务器。Claude Desktop / Cursor 等通用格式（`command` 指向安装了 e2m2e 的环境里的可执行文件）：
+在 MCP 客户端配置中注册服务器（`command` 指向安装了 e2m2e 的环境里的可执行文件，多数 MCP 客户端都采用这一 `mcpServers` 格式）：
 
 ```json
 {
@@ -110,23 +110,6 @@ uv pip install "e2m2e[mcp]"   # 或 pip install "e2m2e[mcp]"
       "command": "/path/to/venv/bin/e2m2e",
       "args": ["mcp-serve"],
       "cwd": "/path/to/e2m2e-repo"
-    }
-  }
-}
-```
-
-ZCode 工作区配置（`<仓库>/.zcode/config.json`，键为嵌套的 `mcp.servers`，会话启动时自动连接）：
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "e2m2e": {
-        "type": "stdio",
-        "command": "C:\\path\\to\\.venv\\Scripts\\e2m2e.exe",
-        "args": ["mcp-serve"],
-        "cwd": "C:\\path\\to\\e2m2e-repo"
-      }
     }
   }
 }
@@ -175,7 +158,7 @@ ZCode 工作区配置（`<仓库>/.zcode/config.json`，键为嵌套的 `mcp.ser
 **接口与工具**
 
 - Facade 任务级入口，统一对外调用面。
-- MCP 服务化封装：`create_server` 进程内服务器与 `e2m2e mcp-serve` 子命令（stdio 传输，`[mcp]` extra），由 Facade 方法元数据派生工具清单——轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成与 7 个轨道库工具，产物自动入库、`record_id` 跨工具链式调用。接入配置与工具用法见文档 [通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)。
+- MCP 服务化封装：`create_server` 进程内服务器与 `e2m2e mcp-serve` 子命令（stdio 传输，`[mcp]` extra），由 Facade 方法元数据派生工具清单——轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成、5 个分区解析工具与 7 个轨道库工具，产物自动入库、`record_id` 跨工具链式调用。接入配置与工具用法见文档 [通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)。
 
 ## 文档
 
