@@ -28,6 +28,7 @@ import numpy as np
 import numpy.typing as npt
 
 from e2m2e.integrators import (
+    RustEomKernel,
     propagate_bcr4bp_py,
     propagate_bcr4bp_stm_py,
     require_rust_extension,
@@ -222,18 +223,28 @@ class BCR4BP_Dynamics(Dynamics):
         with_jacobi: bool,
         events: list[Callable[[float, np.ndarray], float]],
     ) -> dict[str, Any]:
-        """Rust 事件积分路径（``solve_ivp_events``）——增广状态（含 STM）。
+        """Rust 事件积分路径——增广状态（含 STM），EOM 在 Rust 内核（#594）。
 
         BCR4BP 专用传播（``propagate_bcr4bp_stm_py``）不支持事件检测，事件
-        路径走通用 Rust 积分器 ``solve_ivp_events``。事件时刻由步内二分求精
-        （无稠密输出），与 scipy 语义未完全对齐——由调用方显式选择
-        （ADR 0020 决策 4）。输出格式对齐 scipy：``t_events``/``y_events``
-        为逐事件的 ndarray 列表。
+        路径走 ``solve_ivp_events`` 的内核分派（``bcr4bp-with-stm``）：每步
+        RHS 求值留在 Rust 内（复用 ``e2m2e-forces`` 的 BCR4BP EOM/STM 实现），
+        事件函数仍为 Python 回调。事件时刻由步内二分求精（无稠密输出），
+        与 scipy 语义未完全对齐——由调用方显式选择（ADR 0020 决策 4）。
+        输出格式对齐 scipy：``t_events``/``y_events`` 为逐事件的 ndarray 列表。
         """
-        require_rust_extension("solve_ivp_events_py")
+        require_rust_extension("solve_ivp_events_kernel_py")
         initial_stm = np.eye(self.STATE_DIM).flatten()
         augmented_state = np.concatenate([initial_state, initial_stm])
-        eom_func = self._get_eom_func(with_stm=True)
+        kernel = RustEomKernel(
+            "bcr4bp-with-stm",
+            {
+                "mu": float(self.system.mu),
+                "mu_sun": float(self.system.sun_mass),
+                "sun_distance": float(self.system.sun_distance),
+                "sun_angular_rate": float(self.system.sun_angular_rate),
+                "sun_phase0": float(self.system.sun_phase0),
+            },
+        )
         event_specs = [
             (g, bool(getattr(g, "terminal", False)), float(getattr(g, "direction", 0)))
             for g in events
@@ -249,7 +260,7 @@ class BCR4BP_Dynamics(Dynamics):
             t_eval_arr,
             self.rtol,
             self.atol,
-            eom_func,
+            kernel,
             event_specs,
             max_step=float(max_step),
             state_error_dim=self.STATE_DIM,
@@ -395,13 +406,23 @@ class BCR4BP_Dynamics(Dynamics):
         with_jacobi: bool,
         events: list[Callable[[float, np.ndarray], float]],
     ) -> dict[str, Any]:
-        """Rust 事件积分路径（``solve_ivp_events``）——纯状态（不含 STM）。
+        """Rust 事件积分路径——纯状态（不含 STM），EOM 在 Rust 内核（#594）。
 
-        语义同 :meth:`_propagate_with_stm_rust_events`：BCR4BP 专用传播不
-        支持事件检测，事件路径走通用 Rust 积分器，由调用方显式选择。
+        语义同 :meth:`_propagate_with_stm_rust_events`：事件路径走
+        ``solve_ivp_events`` 的内核分派（``bcr4bp``），每步 RHS 求值留在
+        Rust 内，由调用方显式选择。
         """
-        require_rust_extension("solve_ivp_events_py")
-        eom_func = self._get_eom_func(with_stm=False)
+        require_rust_extension("solve_ivp_events_kernel_py")
+        kernel = RustEomKernel(
+            "bcr4bp",
+            {
+                "mu": float(self.system.mu),
+                "mu_sun": float(self.system.sun_mass),
+                "sun_distance": float(self.system.sun_distance),
+                "sun_angular_rate": float(self.system.sun_angular_rate),
+                "sun_phase0": float(self.system.sun_phase0),
+            },
+        )
         event_specs = [
             (g, bool(getattr(g, "terminal", False)), float(getattr(g, "direction", 0)))
             for g in events
@@ -417,7 +438,7 @@ class BCR4BP_Dynamics(Dynamics):
             t_eval_arr,
             self.rtol,
             self.atol,
-            eom_func,
+            kernel,
             event_specs,
             max_step=float(max_step),
         )

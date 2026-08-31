@@ -115,7 +115,11 @@ pub fn cr3bp_jacobian_6x6(mu: f64, state: &[f64; 6]) -> [[f64; 6]; 6] {
 ///
 /// `stm` 为 6×6 行优先展平（36 维）。返回 `dΦ/dt` 展平。不复用
 /// `nbody_stm::stm_derivative`，因为它硬编码无科氏块，对 CR3BP 会出错。
-fn stm_derivative(a: &[[f64; 6]; 6], stm: &[f64; 36]) -> [f64; 36] {
+///
+/// 公开给 `e2m2e-integrators` 的事件路径内核分派复用（issue #594）：
+/// `cr3bp-with-stm` / `bcr4bp-with-stm` 内核的 A·Φ 与本实现是同一段代码，
+/// 不引入第二份矩阵乘。
+pub fn stm_derivative(a: &[[f64; 6]; 6], stm: &[f64; 36]) -> [f64; 36] {
     let mut dstm = [0.0_f64; 36];
     for i in 0..6 {
         for j in 0..6 {

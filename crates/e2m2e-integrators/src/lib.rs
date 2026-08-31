@@ -10,6 +10,7 @@ use pyo3::prelude::*;
 #[cfg(feature = "spice")]
 use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyList};
+use std::collections::HashMap;
 
 pub mod center_manifold;
 #[cfg(feature = "spice")]
@@ -378,6 +379,12 @@ const fn parse_abi_version(s: &str) -> u32 {
 /// - **v21**：新增 ``solve_hjb_py`` （HJB 结构网格求解通用入口，
 ///   动力学标识 + 参数表）与 ``solve_planar_lowthrust_hjb_py`` （geo-nrho
 ///   既有签名的兼容包装）。
+/// - **v22**：新增 ``propagate_compiled_ias15_py`` ，
+///   ``propagate_compiled_stm_py`` 增可选 ``sens_params`` （力模型参数
+///   敏感度变分方程，5.8.8；当时未在此补行，此处补记）。
+/// - **v23**：新增 ``solve_ivp_events_kernel_py`` （事件路径 EOM 内核分派：
+///   动力学标识 + 参数表，复用 e2m2e-forces 的 CR3BP/BCR4BP EOM/STM 内核，
+///   issue #594）。
 ///
 /// 1→3 跳号实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -537,6 +544,218 @@ pub fn solve_ivp_events_py<'py>(
     let rhs = |ti: f64, yi: &[f64]| -> Result<Vec<f64>, String> {
         call_python_rhs(f, n, ti, yi).map_err(|e| e.to_string())
     };
+
+    type PyEvent<'a> = Box<dyn Fn(f64, &[f64]) -> Result<f64, String> + 'a>;
+    let specs: Vec<EventSpec<PyEvent<'py>>> = events
+        .into_iter()
+        .map(|(g, terminal, direction)| {
+            let closure: PyEvent<'py> =
+                Box::new(move |ti: f64, yi: &[f64]| -> Result<f64, String> {
+                    let yi_list = PyList::new(g.py(), yi).map_err(|e| e.to_string())?;
+                    let value = g.call1((ti, yi_list)).map_err(|e| e.to_string())?;
+                    value.extract::<f64>().map_err(|e| e.to_string())
+                });
+            EventSpec::new(closure, terminal, direction)
+        })
+        .collect();
+
+    let table = method.unwrap_or(RkMethod::Pd78).table();
+    let h_max = max_step.unwrap_or(f64::INFINITY);
+    let s_max = max_steps.unwrap_or(MAX_ADAPTIVE_STEPS);
+
+    let result = solve_ivp_events_impl(
+        table,
+        rhs,
+        t_span,
+        &y0,
+        &t_eval,
+        rtol,
+        atol,
+        h_max,
+        s_max,
+        state_error_dim,
+        &specs,
+    );
+
+    let dict = PyDict::new(py);
+    dict.set_item("states", result.states)?;
+    dict.set_item("time", result.t)?;
+    dict.set_item("n_steps", result.n_steps)?;
+    dict.set_item("t_events", result.t_events)?;
+    dict.set_item("y_events", result.y_events)?;
+    dict.set_item("terminal_event", result.terminal_event)?;
+    Ok(dict.into())
+}
+
+/// 事件路径内核 RHS 闭包类型：`(t, y) -> Result<dy/dt, String>`。纯 Rust 闭包
+/// 不会失败，`Err` 分支不可达；错误类型取 `String` 与 Python 事件回调闭包在
+/// `solve_ivp_events_impl` 的统一 `E` 上对齐。
+type KernelRhs = Box<dyn Fn(f64, &[f64]) -> Result<Vec<f64>, String> + Send>;
+
+/// 事件路径内核分派：由动力学标识 + 参数表构造纯 Rust RHS 闭包（issue #594）。
+///
+/// EOM/STM 复用 `e2m2e-forces` 的 CR3BP/BCR4BP 实现（与 `propagate_cr3bp_stm`
+/// / `propagate_bcr4bp_stm` 背后同一内核），不引入第二份 EOM；`A·Φ` 矩阵乘
+/// 复用 `e2m2e_forces::cr3bp::stm_derivative`。
+///
+/// 返回 `(增广状态维数, RHS 闭包)`；维数供调用方校验 `y0` 长度。
+pub(crate) fn build_event_kernel_rhs(
+    kernel: &str,
+    params: &HashMap<String, f64>,
+) -> Result<(usize, KernelRhs), String> {
+    let required = |key: &str| {
+        params
+            .get(key)
+            .copied()
+            .ok_or_else(|| format!("kernel {kernel} missing required param `{key}`"))
+    };
+    match kernel {
+        "cr3bp" => {
+            let mu = required("mu")?;
+            let rhs = move |_t: f64, y: &[f64]| -> Result<Vec<f64>, String> {
+                let mut state = [0.0_f64; 6];
+                state.copy_from_slice(y);
+                Ok(e2m2e_forces::cr3bp::cr3bp_eom(mu, &state).to_vec())
+            };
+            Ok((6, Box::new(rhs)))
+        }
+        "cr3bp-with-stm" => {
+            let mu = required("mu")?;
+            let rhs = move |_t: f64, y: &[f64]| -> Result<Vec<f64>, String> {
+                let mut state = [0.0_f64; 6];
+                state.copy_from_slice(&y[..6]);
+                let mut stm = [0.0_f64; 36];
+                stm.copy_from_slice(&y[6..]);
+                let a = e2m2e_forces::cr3bp::cr3bp_jacobian_6x6(mu, &state);
+                let mut out = Vec::with_capacity(42);
+                out.extend_from_slice(&e2m2e_forces::cr3bp::cr3bp_eom(mu, &state));
+                out.extend_from_slice(&e2m2e_forces::cr3bp::stm_derivative(&a, &stm));
+                Ok(out)
+            };
+            Ok((42, Box::new(rhs)))
+        }
+        "bcr4bp" => {
+            let mu = required("mu")?;
+            let mu_sun = required("mu_sun")?;
+            let sun_distance = required("sun_distance")?;
+            let sun_angular_rate = required("sun_angular_rate")?;
+            let sun_phase0 = required("sun_phase0")?;
+            let rhs = move |t: f64, y: &[f64]| -> Result<Vec<f64>, String> {
+                let mut state = [0.0_f64; 6];
+                state.copy_from_slice(y);
+                Ok(e2m2e_forces::bcr4bp::bcr4bp_eom(
+                    mu,
+                    mu_sun,
+                    sun_distance,
+                    sun_angular_rate,
+                    sun_phase0,
+                    &state,
+                    t,
+                )
+                .to_vec())
+            };
+            Ok((6, Box::new(rhs)))
+        }
+        "bcr4bp-with-stm" => {
+            let mu = required("mu")?;
+            let mu_sun = required("mu_sun")?;
+            let sun_distance = required("sun_distance")?;
+            let sun_angular_rate = required("sun_angular_rate")?;
+            let sun_phase0 = required("sun_phase0")?;
+            let rhs = move |t: f64, y: &[f64]| -> Result<Vec<f64>, String> {
+                let mut state = [0.0_f64; 6];
+                state.copy_from_slice(&y[..6]);
+                let mut stm = [0.0_f64; 36];
+                stm.copy_from_slice(&y[6..]);
+                let a = e2m2e_forces::bcr4bp::bcr4bp_jacobian_6x6(
+                    mu,
+                    mu_sun,
+                    sun_distance,
+                    sun_angular_rate,
+                    sun_phase0,
+                    &state,
+                    t,
+                );
+                let mut out = Vec::with_capacity(42);
+                out.extend_from_slice(&e2m2e_forces::bcr4bp::bcr4bp_eom(
+                    mu,
+                    mu_sun,
+                    sun_distance,
+                    sun_angular_rate,
+                    sun_phase0,
+                    &state,
+                    t,
+                ));
+                out.extend_from_slice(&e2m2e_forces::cr3bp::stm_derivative(&a, &stm));
+                Ok(out)
+            };
+            Ok((42, Box::new(rhs)))
+        }
+        other => Err(format!(
+            "unknown EOM kernel `{other}` (supported: cr3bp, cr3bp-with-stm, bcr4bp, bcr4bp-with-stm)"
+        )),
+    }
+}
+
+/// Python 接口：带事件检测的自适应步长积分器，EOM 走 Rust 内置内核。
+///
+/// 与 [`solve_ivp_events_py`] 唯一的差别在力模型一侧：RHS 不再是 Python
+/// 回调，而是由 `kernel`（动力学标识）+ `params`（参数表）分派到
+/// `e2m2e-forces` 的 CR3BP/BCR4BP EOM/STM 内核，积分全程每步 RHS 求值
+/// 留在 Rust 内（issue #594）。事件函数仍为 Python 回调，语义与返回
+/// dict 同 [`solve_ivp_events_py`]。
+///
+/// **参数**
+///
+/// - `kernel`: 动力学标识，`"cr3bp"` / `"cr3bp-with-stm"` /
+///   `"bcr4bp"` / `"bcr4bp-with-stm"`（with-stm 变体要求 42 维增广初值）
+/// - `params`: 该动力学的无量纲参数表；`cr3bp` 需 `mu`，`bcr4bp` 另需
+///   `mu_sun` / `sun_distance` / `sun_angular_rate` / `sun_phase0`
+/// - 其余参数同 [`solve_ivp_events_py`]
+#[pyfunction]
+#[pyo3(signature = (t_span, y0, t_eval, rtol, atol, kernel, params, events, method=None, max_step=None, max_steps=None, state_error_dim=None))]
+#[allow(clippy::too_many_arguments)]
+pub fn solve_ivp_events_kernel_py<'py>(
+    t_span: (f64, f64),
+    y0: Vec<f64>,
+    t_eval: Vec<f64>,
+    rtol: f64,
+    atol: f64,
+    kernel: &str,
+    params: HashMap<String, f64>,
+    events: Vec<(Bound<'py, PyAny>, bool, f64)>,
+    method: Option<RkMethod>,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    state_error_dim: Option<usize>,
+    py: Python<'py>,
+) -> PyResult<PyObject> {
+    use e2m2e_propagation::solve_ivp::{solve_ivp_events_impl, EventSpec, MAX_ADAPTIVE_STEPS};
+
+    if y0.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "y0 must not be empty",
+        ));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+    if rtol <= 0.0 || atol <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "rtol and atol must be positive",
+        ));
+    }
+
+    let (expected_dim, rhs) =
+        build_event_kernel_rhs(kernel, &params).map_err(pyo3::exceptions::PyValueError::new_err)?;
+    if y0.len() != expected_dim {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "y0 must have length {expected_dim} for kernel `{kernel}`, got {}",
+            y0.len()
+        )));
+    }
 
     type PyEvent<'a> = Box<dyn Fn(f64, &[f64]) -> Result<f64, String> + 'a>;
     let specs: Vec<EventSpec<PyEvent<'py>>> = events
@@ -4461,6 +4680,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_py, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_events_py, m)?)?;
+    m.add_function(wrap_pyfunction!(solve_ivp_events_kernel_py, m)?)?;
     m.add_function(wrap_pyfunction!(multistep_step, m)?)?;
     m.add_function(wrap_pyfunction!(cowell_step, m)?)?;
     m.add_function(wrap_pyfunction!(lambert_izzo_py, m)?)?;
@@ -4635,4 +4855,93 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     )?)?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod event_kernel_tests {
+    //! 事件路径内核分派（`build_event_kernel_rhs`）的单测：内核 RHS 与
+    //! `e2m2e-forces` 的 EOM/STM 内核逐位一致、参数与标识校验生效。
+
+    use super::build_event_kernel_rhs;
+    use std::collections::HashMap;
+
+    fn params(items: &[(&str, f64)]) -> HashMap<String, f64> {
+        items
+            .iter()
+            .map(|(k, v)| (k.to_string(), *v))
+            .collect::<HashMap<_, _>>()
+    }
+
+    const MU: f64 = 0.012_150_585_609_624_04;
+    const Y: [f64; 6] = [0.8, 0.05, 0.01, 0.02, -0.1, 0.03];
+
+    #[test]
+    fn cr3bp_kernel_is_exactly_the_forces_eom() {
+        let (dim, rhs) = build_event_kernel_rhs("cr3bp", &params(&[("mu", MU)])).unwrap();
+        assert_eq!(dim, 6);
+        assert_eq!(
+            rhs(0.0, &Y).unwrap(),
+            e2m2e_forces::cr3bp::cr3bp_eom(MU, &Y).to_vec()
+        );
+    }
+
+    #[test]
+    fn cr3bp_with_stm_kernel_is_eom_with_a_times_phi() {
+        let (dim, rhs) = build_event_kernel_rhs("cr3bp-with-stm", &params(&[("mu", MU)])).unwrap();
+        assert_eq!(dim, 42);
+        let mut stm = [0.0_f64; 36];
+        for (i, v) in stm.iter_mut().enumerate() {
+            *v = ((i * 7 + 3) % 11) as f64 * 0.1 - 0.5;
+        }
+        let mut y = Y.to_vec();
+        y.extend_from_slice(&stm);
+        let out = rhs(0.0, &y).unwrap();
+        assert_eq!(out.len(), 42);
+        assert_eq!(
+            &out[..6],
+            &e2m2e_forces::cr3bp::cr3bp_eom(MU, &Y).to_vec()[..]
+        );
+        let a = e2m2e_forces::cr3bp::cr3bp_jacobian_6x6(MU, &Y);
+        assert_eq!(
+            &out[6..],
+            &e2m2e_forces::cr3bp::stm_derivative(&a, &stm).to_vec()[..]
+        );
+    }
+
+    #[test]
+    fn bcr4bp_kernel_is_exactly_the_forces_eom_including_time_dependence() {
+        let p = params(&[
+            ("mu", MU),
+            ("mu_sun", 328900.5614),
+            ("sun_distance", 389.17),
+            ("sun_angular_rate", -0.925_195_966_551_2),
+            ("sun_phase0", 0.3),
+        ]);
+        let (dim, rhs) = build_event_kernel_rhs("bcr4bp", &p).unwrap();
+        assert_eq!(dim, 6);
+        for t in [0.0_f64, 1.5, -2.25] {
+            assert_eq!(
+                rhs(t, &Y).unwrap(),
+                e2m2e_forces::bcr4bp::bcr4bp_eom(
+                    MU,
+                    328900.5614,
+                    389.17,
+                    -0.925_195_966_551_2,
+                    0.3,
+                    &Y,
+                    t
+                )
+                .to_vec()
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_kernel_and_missing_params_are_rejected() {
+        assert!(build_event_kernel_rhs("ephemeris", &params(&[])).is_err());
+        assert!(build_event_kernel_rhs("cr3bp", &params(&[])).is_err());
+        assert!(build_event_kernel_rhs("cr3bp-with-stm", &params(&[])).is_err());
+        assert!(build_event_kernel_rhs("bcr4bp", &params(&[("mu", MU)])).is_err());
+        assert!(build_event_kernel_rhs("bcr4bp-with-stm", &params(&[("mu", MU)])).is_err());
+    }
 }

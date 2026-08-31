@@ -4,6 +4,9 @@ Release entries record exact code references (`module/function`, issue numbers, 
 
 ## [Unreleased]
 
+### Changed
+- **CR3BP/BCR4BP rust event path EOM sunk into Rust** (#594, #546 disposition 2): `backend="rust"` event propagation no longer pays a cross-language callback per RHS evaluation. `solve_ivp_events` (`e2m2e/integrators`) gains a kernel-dispatch form for its EOM argument: passing a `RustEomKernel(kernel, params)` identifier (`cr3bp`/`cr3bp-with-stm`/`bcr4bp`/`bcr4bp-with-stm` + dimensionless params table) routes the RHS to a new `solve_ivp_events_kernel_py` binding that evaluates every step's RHS inside Rust, reusing the exact `e2m2e-forces` CR3BP/BCR4BP EOM/STM kernels behind `propagate_cr3bp_stm`/`propagate_bcr4bp_stm` (`cr3bp::stm_derivative` made `pub` so the `A·Φ` multiply is not duplicated); user-defined event functions keep the existing Python callback spec mechanism, and event semantics stay as-is (in-step bisection, no dense output, ADR 0020 decision 4). `CR3BP_Dynamics`/`BCR4BP_Dynamics` dispatch `_propagate_with_stm_rust_events`/`_propagate_state_only_rust_events` to the kernel identifiers; result contract unchanged (`t_events`/`y_events` per-event ndarray lists, states (n,6), stm (n,6,6), `last_trajectory`/`last_stm` side effects); `backend="scipy"` untouched, and the generic `solve_ivp_events` + Python-callback route remains for other dynamics classes (ephemeris etc.) and as the equivalence reference — states/STM/event times verified to match it within tolerance in `tests/numerical/integrators/bindings/test_solve_ivp_events_kernel.py` and `tests/algorithm/dynamics/test_rust_events_kernel.py`. Rust↔Python ABI bumped to v23 (new pyfunction; the v22 line the history comment was missing is recorded back).
+
 ## [5.9.1] - 2026-08-31
 
 ### Changed

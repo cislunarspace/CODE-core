@@ -363,10 +363,14 @@ class:
 All Rust returns get defensive length validation (returned-count ≠ requested-count
 raises) before writing `last_trajectory` (`dynamics.py:792-804`, `861-870`).
 
-**Events' third branch**: with events and `backend="rust"`, CR3BP/BCR4BP take the
-generic Rust integrator `solve_ivp_events`, ODE RHS still passing as Python
-callback, event functions translated into `(g, terminal, direction)` triples
-(`dynamics.py:700-756`, `721-723`; `bcr4bp_dynamics.py:225-271`). Ephemeris
+**Events' third branch**: with events and `backend="rust"`, CR3BP/BCR4BP take
+the Rust event integrator `solve_ivp_events` with the RHS sunk into Rust: the
+RHS is dispatched by a `RustEomKernel` identifier (`cr3bp`/`cr3bp-with-stm`/
+`bcr4bp`/`bcr4bp-with-stm` + params) to the `e2m2e-forces` CR3BP/BCR4BP EOM/STM
+kernels, so per-step RHS evaluation stays inside Rust; user-defined event
+functions remain Python callbacks translated into `(g, terminal, direction)`
+triples (`dynamics.py` `_propagate_with_stm_rust_events`/
+`_propagate_state_only_rust_events`; `bcr4bp_dynamics.py` same names). Ephemeris
 doesn't support events: events non-None → immediate NotImplementedError
 (`ephemeris_dynamics.py:85-113`, `162-189`).
 

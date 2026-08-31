@@ -83,6 +83,7 @@ if TYPE_CHECKING:
     solid_tide_step1: Any
     solid_tide_step2: Any
     solve_ivp_events_py: Any
+    solve_ivp_events_kernel_py: Any
     solve_hjb_py: Any
     solve_planar_lowthrust_hjb_py: Any
     spice_furnsh: Any
@@ -191,6 +192,7 @@ _RUST_SYMBOLS = (
     "solid_tide_step1",
     "solid_tide_step2",
     "solve_ivp_events_py",
+    "solve_ivp_events_kernel_py",
     "solve_hjb_py",
     "solve_planar_lowthrust_hjb_py",
     "spice_furnsh",
@@ -377,12 +379,14 @@ __all__ = [
     "reset_ephem_ffi_call_count",
     "rk_step",
     "RkMethod",
+    "RustEomKernel",
     "require_rust_extension",
     "segmented_shooting_correct_py",
     "solid_tide_step1",
     "solid_tide_step2",
     "solve_ivp_events",
     "solve_ivp_events_py",
+    "solve_ivp_events_kernel_py",
     "solve_hjb_py",
     "solve_planar_lowthrust_hjb_py",
     "spice_furnsh",
@@ -398,6 +402,55 @@ __all__ = [
     "transfer_grid_search_py",
     "transfer_grid_search_serial_py",
 ]
+
+# 事件路径内核分派（issue #594）支持的动力学标识；与 Rust 侧
+# ``build_event_kernel_rhs`` 的 match 分支保持一致（Rust 侧为权威校验）。
+_EOM_KERNELS = (
+    "cr3bp",
+    "cr3bp-with-stm",
+    "bcr4bp",
+    "bcr4bp-with-stm",
+)
+
+
+class RustEomKernel:
+    """Rust 内置 EOM 内核标识，替代 Python RHS 回调传入 :func:`solve_ivp_events`。
+
+    携带动力学标识 ``kernel`` 与无量纲参数表 ``params``；积分器据此把每步
+    RHS 求值留在 Rust 内（复用 ``e2m2e-forces`` 的 CR3BP/BCR4BP EOM/STM
+    实现，issue #594），事件函数仍为 Python 回调。
+
+    标识与所需参数：
+
+    - ``"cr3bp"``：``{"mu": ...}``，6 维右端
+    - ``"cr3bp-with-stm"``：``{"mu": ...}``，42 维增广右端（状态 + STM）
+    - ``"bcr4bp"``：``{"mu", "mu_sun", "sun_distance", "sun_angular_rate",
+      "sun_phase0"}``，6 维右端（显式含时）
+    - ``"bcr4bp-with-stm"``：同 ``"bcr4bp"`` 参数，42 维增广右端
+
+    Args:
+        kernel: 动力学标识（上表之一，未知标识在构造时报错）。
+        params: 参数表；值经 ``float()`` 强制转换。
+    """
+
+    __slots__ = ("kernel", "params")
+
+    kernel: str
+    params: dict[str, float]
+
+    def __init__(self, kernel: str, params: dict[str, float]) -> None:
+        if kernel not in _EOM_KERNELS:
+            raise ValueError(
+                f"unknown EOM kernel {kernel!r} (supported: {', '.join(_EOM_KERNELS)})"
+            )
+        object.__setattr__(self, "kernel", kernel)
+        object.__setattr__(self, "params", {str(k): float(v) for k, v in params.items()})
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        raise AttributeError("RustEomKernel is immutable")
+
+    def __repr__(self) -> str:
+        return f"RustEomKernel(kernel={self.kernel!r}, params={self.params!r})"
 
 
 def rk_step(
@@ -559,7 +612,7 @@ def solve_ivp_events(
     t_eval: npt.ArrayLike,
     rtol: float,
     atol: float,
-    f: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
+    f: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]] | RustEomKernel,
     events: list[tuple[Callable[[float, npt.NDArray[np.floating]], float], bool, float]],
     method: RkMethod | None = None,
     max_step: float | None = None,
@@ -577,7 +630,11 @@ def solve_ivp_events(
         t_eval: 输出时间点数组。
         rtol: 相对容差。
         atol: 绝对容差。
-        f: ODE 右端函数 ``f(t, y) -> dy/dt``。
+        f: ODE 右端，两种形态二选一：Python callable
+            ``f(t, y) -> dy/dt``（每步求值跨语言回调），或
+            :class:`RustEomKernel` 内核标识（每步 RHS 求值留在 Rust 内，
+            复用 ``e2m2e-forces`` 的 EOM/STM 内核，issue #594；事件函数
+            仍为 Python 回调）。
         events: ``[(g, terminal, direction), ...]``，``g(t, y) -> float``，
             零点即事件面；``terminal=True`` 触发即停；``direction`` > 0 只记
             上行穿越（g 由负到正）、< 0 只记下行、0 双向。
@@ -592,11 +649,7 @@ def solve_ivp_events(
         事件点）、``t_events``/``y_events`` （逐事件的触发时刻与状态列表）、
         ``terminal_event`` （触发终止的事件索引或 None）、``n_steps``。
     """
-    require_rust_extension("solve_ivp_events_py")
     y0_arr = np.asarray(y0, dtype=float)
-
-    def _adapt_rhs(t_i: float, y_i: list[float]) -> list[float]:
-        return np.asarray(f(t_i, np.asarray(y_i, dtype=float)), dtype=float).tolist()
 
     def _adapt_event(
         g: Callable[[float, npt.NDArray[np.floating]], float],
@@ -609,12 +662,35 @@ def solve_ivp_events(
     event_specs = [
         (_adapt_event(g), terminal, float(direction)) for g, terminal, direction in events
     ]
-    return solve_ivp_events_py(
+
+    args = (
         (float(t_span[0]), float(t_span[1])),
         y0_arr.tolist(),
         [float(t) for t in np.asarray(t_eval, dtype=float).flat],
         float(rtol),
         float(atol),
+    )
+    if isinstance(f, RustEomKernel):
+        # 内核分派：每步 RHS 求值留在 Rust 内（issue #594）。
+        require_rust_extension("solve_ivp_events_kernel_py")
+        return solve_ivp_events_kernel_py(
+            *args,
+            f.kernel,
+            f.params,
+            event_specs,
+            method,
+            max_step,
+            max_steps,
+            state_error_dim,
+        )
+
+    require_rust_extension("solve_ivp_events_py")
+
+    def _adapt_rhs(t_i: float, y_i: list[float]) -> list[float]:
+        return np.asarray(f(t_i, np.asarray(y_i, dtype=float)), dtype=float).tolist()
+
+    return solve_ivp_events_py(
+        *args,
         _adapt_rhs,
         event_specs,
         method,

@@ -23,6 +23,7 @@ Status vocabulary is fixed at three greppable terms:
 | Module | Numeric kernel | Work issue |
 |---|---|---|
 | `algorithm/dynamics` (non-event propagation) | Rust (`e2m2e-integrators`) | — |
+| `algorithm/dynamics` (rust event path EOM: CR3BP/BCR4BP, `backend="rust"` events) | Rust (`e2m2e-forces` EOM/STM kernels dispatched inside `solve_ivp_events`) | #594 |
 | `algorithm/forces` (numerics) | Rust (`e2m2e-forces`) | — |
 | `algorithm/transfer/lambert.py` | Rust (`e2m2e-propagation`) | — |
 | `algorithm/transfer/search_parallel.py` (grid search) | Rust (`e2m2e-integrators`) | — |
@@ -53,7 +54,6 @@ Status vocabulary is fixed at three greppable terms:
 | Module | Numeric kernel | Work issue |
 |---|---|---|
 | `algorithm/solver/MultipleShooting` class (transfer/hohmann) | Python | pending separate migration |
-| `algorithm/dynamics` CR3BP/BCR4BP rust event path (`solve_ivp_events` RHS via Python callback) | Python callback into Rust integrator; event-path EOM to sink | #594 |
 
 ### INTENTIONALLY IN PYTHON
 
@@ -102,13 +102,16 @@ interprets results. Three boundaries registered honestly:
   `spatiography/fate.py` relies on them; the Rust event path's
   semantics (in-step bisection, no dense output) remain an accepted divergence,
   and converging would require semantic alignment first. See Intentionally-in-Python.
-- **BCR4BP rust event path**: integration in Rust but RHS fed as Python callback
-  into `solve_ivp_events` — cross-language callback overhead exists. **Ruled
-  migrating (#546, 2026-08-30)**: the same Python-callback pattern exists on the
-  CR3BP rust event path; both event-path EOMs sink into Rust (reusing the
-  `e2m2e-forces` CR3BP/BCR4BP kernels) so `backend="rust"` event propagation
-  stops paying per-RHS-evaluation callbacks; user-defined event functions keep
-  the Python callback spec mechanism. See Migrating.
+- **BCR4BP rust event path**: **sunk (#594, executing #546's 2026-08-30
+  migrating ruling)** — CR3BP and BCR4BP rust event paths dispatch the RHS to
+  the `e2m2e-forces` CR3BP/BCR4BP EOM/STM kernels via the `solve_ivp_events`
+  kernel entry (`RustEomKernel` identifier + params), so per-step RHS evaluation
+  no longer crosses the language boundary; user-defined event functions keep
+  the Python callback spec mechanism. Integration itself was already Rust; the
+  generic `solve_ivp_events` + Python-callback route remains for other dynamics
+  classes (ephemeris etc.) and as the equivalence reference
+  (`tests/algorithm/dynamics/test_rust_events_kernel.py`,
+  `tests/numerical/integrators/bindings/test_solve_ivp_events_kernel.py`).
 - **Ephemeris N-body Jacobian kernel**: full numpy implementation of accelerations
   + analytic Jacobians retained in `ephemeris_dynamics.py`, produced/consumed by
   `proximity/relative_dynamics.py` (`compute_jacobian_A(t, state)` duck-typed
