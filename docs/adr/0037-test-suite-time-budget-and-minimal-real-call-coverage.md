@@ -150,3 +150,38 @@ all <2 s) along with the two over-budget SRP cases — the four fast math-deriva
 tests are restored, the two SRP cases (17 s / 10 s) stay removed. The
 transfer-side anchors listed above never covered `design_orbit`; each
 orchestrator entry needs its own minimal real call, which this restores.
+
+## Amendment (2026-08-30): machine-enforced time-budget gate (#548)
+
+Decision 1's budgets relied on manual discipline: no pytest-timeout in the dev
+group, no duration guard under `tests/_meta`, and no CI check (ci.yml runs no
+test job at all). The budget is now enforced by the suite itself
+(`tests/time_budget.py`; hooks re-exported by the tests-root conftest):
+
+- At session finish, every test's call-phase wall-clock is audited against its
+  budget — the **10 s default** or an explicit `@pytest.mark.time_budget(<seconds>)`
+  override. Any violation fails the run with a non-zero exit and a remedy
+  report (shrink problem scale into budget, or move the test to `scripts/`
+  manual diagnostics or benchmarks). Phase semantics match `--durations`: call
+  only; module-scoped fixture setup is not charged to the first test (Decision
+  4's computation-sharing invariant stays the sanctioned way to amortize cost).
+- Overrides are part of the contract but must carry an inline comment citing
+  the reason. First use: the NSGA-II parallel-consistency test
+  (`time_budget(30)`; Windows `ProcessPoolExecutor` spawn, irreducible per the
+  amendment above; 30 s ≥ 2× its worst observed run). Overrides without a
+  usable seconds argument fail usage checks at collection.
+- The audit aggregates across xdist workers (per-test durations ride the
+  serialized test reports; the controller-side session finish evaluates once
+  and raises the failure). Single-process runs take the same path.
+
+**Wall-clock is concurrency-sensitive** (measured on a 16-core Linux box):
+each xdist worker used to spawn full-core rayon and BLAS pools, and `-n auto`
+inflated an isolated 6.5 s test to 19 s. The tests-root conftest therefore
+pins worker thread pools to 1 (`RAYON_NUM_THREADS`, `OMP_NUM_THREADS`,
+`OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, via `setdefault` — explicit
+overrides still win), restoring single-process fidelity (6.5 s at `-n 2`).
+Ceiling-adjacent tests can still straddle 10 s at high worker counts from pure
+scheduling noise. Reference invocation for budget calibration is a modest
+worker count (green at `-n 4`: 2213 passed / 34 skipped / ~31 s). Whether the
+gate should gain a contention allowance for high-worker runs is flagged for a
+future decision, not decided here.

@@ -106,6 +106,9 @@ markers = [
     "orchestration: 算法编排（层3）——族/转移/设计/校正/站保/流形",
     "interface: 接口（层4）——Facade/MCP/CLI/Pydantic 模型",
     "aux: 工具/辅助——logging/format/MBSE/架构元测试",
+    # ADR 0037 时间预算门禁的 per-test 覆盖：@pytest.mark.time_budget(<seconds>)，
+    # 审计逻辑见 tests/time_budget.py。仅在用例确实不可再压时使用，并注释依据。
+    "time_budget: 单用例时长预算覆盖（秒）——ADR 0037 门禁的显式豁免/收紧",
 ]
 
 [tool.coverage.run]

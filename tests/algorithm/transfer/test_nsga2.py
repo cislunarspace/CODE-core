@@ -178,6 +178,9 @@ class TestNSGA2Parallel:
     """并行评估一致性。"""
 
     @pytest.mark.skipif(not hasattr(pytest, "importorskip"), reason="dummy skip for parallel test")
+    # ADR 0037 增补（2026-08-30）：最坏实测 ~9.6s，大头是 Windows spawn 导入成本，
+    # 判定不可再压；30s 为最坏实测的 ≥2 倍余量。
+    @pytest.mark.time_budget(30)
     def test_parallel_consistent_with_serial(self):
         """同种子下串行与并行结果一致（评估顺序不影响）。
 
