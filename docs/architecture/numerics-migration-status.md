@@ -53,6 +53,7 @@ Status vocabulary is fixed at three greppable terms:
 | Module | Numeric kernel | Work issue |
 |---|---|---|
 | `algorithm/solver/MultipleShooting` class (transfer/hohmann) | Python | pending separate migration |
+| `algorithm/dynamics` CR3BP/BCR4BP rust event path (`solve_ivp_events` RHS via Python callback) | Python callback into Rust integrator; event-path EOM to sink | #594 |
 
 ### INTENTIONALLY IN PYTHON
 
@@ -71,6 +72,8 @@ Status vocabulary is fixed at three greppable terms:
 | `algorithm/design` (orchestration) | Python (numerics already Rust) | — |
 | `algorithm/design/frozen_orbit.py` (ELFO helper) | Python | — |
 | `algorithm/dynamics/potential.py` (pseudo-potential Hessian) | Python | — |
+| `algorithm/dynamics` event integration `backend="scipy"` path (scipy event semantics kept as production contract) | Python (scipy `solve_ivp`; Rust path only under explicit `backend="rust"`) | — |
+| `algorithm/dynamics/ephemeris_dynamics.py` (acceleration + analytic Jacobian kernel) | Python | — |
 | `algorithm/propagation.py` | Python (propagation already Rust) | — |
 | `algorithm/proximity` (orchestration) | Python (propagation already Rust) | — |
 | `algorithm/proximity/relative_dynamics.py` (ephemeris-target A(t) evaluation) | Python (reuses `ephemeris_dynamics`'s numpy Jacobian kernel) | — |
@@ -93,12 +96,27 @@ interprets results. Three boundaries registered honestly:
 - **Event integration**: Rust event path activates only under explicit
   `backend="rust"`; `backend="scipy"`'s and base-class events' RHS are Python
   equations of motion via scipy `solve_ivp` (explicit backend choice — not silent
-  fallback per ADR 0020 decision 4).
+  fallback per ADR 0020 decision 4). **Ruled intentionally dual-backend (#546,
+  2026-08-30)**: scipy event semantics (event attributes, dense output,
+  `t_events`/`y_events` contract) are the production contract —
+  `spatiography/fate.py` relies on them; the Rust event path's
+  semantics (in-step bisection, no dense output) remain an accepted divergence,
+  and converging would require semantic alignment first. See Intentionally-in-Python.
 - **BCR4BP rust event path**: integration in Rust but RHS fed as Python callback
-  into `solve_ivp_events` — cross-language callback overhead exists.
+  into `solve_ivp_events` — cross-language callback overhead exists. **Ruled
+  migrating (#546, 2026-08-30)**: the same Python-callback pattern exists on the
+  CR3BP rust event path; both event-path EOMs sink into Rust (reusing the
+  `e2m2e-forces` CR3BP/BCR4BP kernels) so `backend="rust"` event propagation
+  stops paying per-RHS-evaluation callbacks; user-defined event functions keep
+  the Python callback spec mechanism. See Migrating.
 - **Ephemeris N-body Jacobian kernel**: full numpy implementation of accelerations
   + analytic Jacobians retained in `ephemeris_dynamics.py`, produced/consumed by
-  `proximity/relative_dynamics.py` (`compute_jacobian_A(t, state)` duck-typed seam).
+  `proximity/relative_dynamics.py` (`compute_jacobian_A(t, state)` duck-typed
+  seam). **Ruled intentionally Python (#546, 2026-08-30)**: sinking would require
+  Rust-side SPICE ephemeris access plus a full analytic-Jacobian port — the
+  largest scope of the three boundaries; the sole production consumer is
+  proximity's A(t) seam. Revisit on demonstrated hot-path need. See
+  Intentionally-in-Python.
 
 Same package's `potential.py` pseudo-potential Hessian is numpy (shared by
 non-propagation paths); see Intentionally-in-Python. Per ADR 0002.
@@ -357,6 +375,23 @@ propagation already Rust (queries hit sunk Rust instances).
 derivative formulas in numpy, shared by non-propagation paths like dynamics
 equations & stability analysis; no hot path per call; propagation-path
 acceleration computation already Rust.
+
+**`algorithm/dynamics` event integration `backend="scipy"` path.** Why (#546
+ruling, 2026-08-30): scipy's event semantics (event-function attributes, dense
+output, `t_events`/`y_events` result contract) are the de-facto public contract
+production consumers rely on (`spatiography/fate.py`);
+the Rust event path (`solve_ivp_events`) locates events by in-step bisection
+without dense output — an accepted divergence per ADR 0020 decision 4 — and
+converging to a Rust-only event path would require aligning semantics first.
+Dual backend stays explicit-choice, never silent.
+
+**`algorithm/dynamics/ephemeris_dynamics.py` (acceleration + analytic Jacobian
+kernel).** Why (#546 ruling, 2026-08-30): the full numpy kernel is consumed only
+by `proximity/relative_dynamics.py`'s A(t) duck-typed seam; sinking it would
+need Rust-side SPICE ephemeris access plus a port of the analytic Jacobians —
+the largest scope among the dynamics-layer boundaries — with no other hot
+consumer today. Revisit if relative-dynamics propagation becomes a demonstrated
+production hot path.
 
 **`algorithm/station_keeping` (control laws).** `controller.py`,
 `momentum_management.py`, `special_point.py`, `target_point.py`,
