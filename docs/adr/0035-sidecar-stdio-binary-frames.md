@@ -86,3 +86,14 @@ Offset Length Type      Meaning
   from transport, unit-testable).
 - tod's Rust shell implements peer decoding per this ADR §3; frame-format changes
   require a new ADR.
+
+## Revision (2026-09-01, #601)
+
+The sidecar delegates execution to the transport-neutral core
+(`e2m2e/api/execution.py`, see ADR 0014 amendment): validation, error
+translation, and canvas frame extraction live there; this module keeps only
+wire framing (JSON lines, job_id progress lines, `binary_frames` count and
+frame ordering). The frame codec moved from `api/sidecar/frames.py` to
+`api/frames.py` — byte format and magic unchanged, so the cross-repo
+contract is unaffected. The unknown-tool response code is `TOOL_NOT_FOUND`
+(previously `UNKNOWN_TOOL` here), unified with the MCP transport.

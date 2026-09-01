@@ -18,7 +18,7 @@ from pydantic import BaseModel, ValidationError
 
 from e2m2e.data.types.orbit import Orbit
 
-from ..catalog_ingest import _finite_or_none
+from ..catalog_ingest import finite_or_none
 from ..models import OrbitError
 
 __all__ = [
@@ -53,7 +53,7 @@ def _to_jsonable(value: Any) -> Any:
         return {
             "states": _to_jsonable(value.states),
             "times": _to_jsonable(value.times),
-            "period": _finite_or_none(value.period),
+            "period": finite_or_none(value.period),
             "family_type": value.family_type,
         }
     if isinstance(value, dict):
@@ -69,7 +69,7 @@ def _to_jsonable(value: Any) -> Any:
         return value
     mu = getattr(value, "mu", None)
     if mu is not None:
-        return {"mu": _finite_or_none(mu)}
+        return {"mu": finite_or_none(mu)}
     return f"<{type(value).__name__}>"
 
 

@@ -1,4 +1,4 @@
-"""sidecar 二进制帧编解码测试。
+"""二进制帧编解码测试（sidecar/MCP 画布契约共用，e2m2e.api.frames）。
 
 帧契约的字节级黄金断言在本文件：magic/dtype/ndim/shape/数据逐字段
 逐项对照，实现漂移会在这里被抓住。
@@ -11,7 +11,7 @@ import pytest
 
 pytestmark = [pytest.mark.interface]
 
-from e2m2e.api.sidecar.frames import (  # noqa: E402
+from e2m2e.api.frames import (  # noqa: E402
     MAGIC,
     FrameError,
     decode_frame,

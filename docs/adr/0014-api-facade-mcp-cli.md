@@ -132,3 +132,57 @@ process is the only reliable interruption unit.
   minutes-long computations; short tools never pay it.
 - One worker process per call: no state reuse; a killed worker never
   serves another request.
+
+## Amendment (2026-09-01): transport-neutral execution core (#601)
+
+### Context
+
+The two transports (MCP server, GUI sidecar) each re-derived the tool
+surface and drifted: different unknown-tool error codes (TOOL_NOT_FOUND vs
+UNKNOWN_TOOL), duplicated canvas-contract frame extraction, per-call
+rebuild of every tool's JSON schema, and — a correctness bug — worker
+subprocesses rebuilt `Config()` from the environment, silently discarding
+the caller's constructor-injected Config on long-running tools.
+
+### Decisions
+
+1. **One execution entry**: `e2m2e/api/execution.py` owns tool-spec lookup,
+   validation, error translation, and canvas frame extraction.
+   `execute_tool(facade, tool, arguments, *, progress_callback, binary_dtype)
+   -> (envelope, frames)` is the only execution path; the MCP server wraps
+   `CallToolResult`, the sidecar wraps JSON lines + frames, the worker
+   subprocess calls the same core. `preflight()` centralizes the
+   unknown-tool and dtype checks so adapters can short-circuit before
+   protocol framing.
+2. **`LONG_RUNNING_TOOLS` moves to the execution core** (no `[mcp]` extra
+   dependency): one routing list consumed by both transports. The MCP
+   server keeps the async worker pump; a sidecar worker route is deferred
+   until tod asks for it (needs a worker-protocol frames extension and a
+   wire-level cancel message — protocol extensions belong with their
+   consumer).
+3. **Injected Config crosses the process boundary**: the worker request
+   carries `{"tool", "arguments", "config"}`; the worker rebuilds its
+   Facade from `Config.from_payload`. `from_payload` rejects unknown
+   fields and non-object payloads with `INVALID_PARAMS` — no silent
+   fallback to environment defaults when a config was supplied.
+   **The `Config` field set is now a cross-process contract** (the
+   docstring's "骨架，字段待定稿" caveat ends here): adding or removing a
+   field is a protocol change and must update `to_payload`/`from_payload`
+   together.
+4. **Error codes unified**: unknown tool is `TOOL_NOT_FOUND` everywhere
+   (sidecar's `UNKNOWN_TOOL` retired); no new codes introduced.
+5. **Frame codec relocates** from `api/sidecar/frames.py` to
+   `api/frames.py`: the execution core's canvas extraction encodes frames,
+   so the codec must sit at core level. Byte format, magic, and the
+   ADR 0035 contract are untouched.
+6. **Spec lookup is on-demand**: `tools.tool_spec(facade, name)` builds one
+   schema; per-call cost no longer grows with the tool count.
+
+### Consequences
+
+- Adding a Facade tool remains a one-place registration; both transports
+  and the worker inherit it.
+- `Facade` gains a read-only `config` property (the worker-request builder
+  serializes it).
+- `_finite_or_none` is public (`finite_or_none` in `api/catalog_ingest.py`);
+  three consumers no longer import a private name across modules.

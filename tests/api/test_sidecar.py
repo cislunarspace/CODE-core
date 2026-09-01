@@ -16,6 +16,7 @@ pytestmark = [pytest.mark.interface]
 
 from e2m2e.api.config import Config  # noqa: E402
 from e2m2e.api.facade import Facade, mcp_exposed  # noqa: E402
+from e2m2e.api.frames import decode_frame  # noqa: E402
 from e2m2e.api.mcp import envelope  # noqa: E402
 from e2m2e.api.models import (  # noqa: E402
     CatalogGetRequest,
@@ -26,7 +27,6 @@ from e2m2e.api.models import (  # noqa: E402
     FamilyGenerationResponse,
 )
 from e2m2e.api.sidecar import handle_request, run_loop  # noqa: E402
-from e2m2e.api.sidecar.frames import decode_frame  # noqa: E402
 from e2m2e.data.templates import ConvergenceState, FailureCause  # noqa: E402
 from e2m2e.data.types.orbit import Orbit  # noqa: E402
 
@@ -163,16 +163,23 @@ def test_family_generation_requires_binary_dtype(facade):
 
 
 def test_error_envelope_for_unknown_tool_and_bad_dtype(facade):
-    for request in (
-        {"tool": "no_such_tool", "arguments": {}},
-        {"tool": "orbit_family_generation", "arguments": _ARGS, "binary_dtype": "f16"},
-        {"tool": "orbit_family_generation", "arguments": _ARGS, "binary_dtype": 0},
+    # 未知工具与 TOOL_NOT_FOUND 统一编码（#601：两个传输层单一来源）
+    for request, expected in (
+        ({"tool": "no_such_tool", "arguments": {}}, "TOOL_NOT_FOUND"),
+        (
+            {"tool": "orbit_family_generation", "arguments": _ARGS, "binary_dtype": "f16"},
+            "INVALID_PARAMS",
+        ),
+        (
+            {"tool": "orbit_family_generation", "arguments": _ARGS, "binary_dtype": 0},
+            "INVALID_PARAMS",
+        ),
     ):
         chunks = handle_request(facade, request)
         assert len(chunks) == 1
         line = json.loads(chunks[0])
         assert line["status"] == "error"
-        assert line["error"]["code"] in ("UNKNOWN_TOOL", "INVALID_PARAMS")
+        assert line["error"]["code"] == expected
 
 
 def test_progress_line_then_response(facade):

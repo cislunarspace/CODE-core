@@ -9,8 +9,10 @@ r2s2 进程单例作为已知限制用 Config 显式管理。
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from dataclasses import dataclass, field
+from typing import Any
 
 __all__ = ["Config"]
 
@@ -41,3 +43,26 @@ class Config:
             os.environ.get("E2M2E_CATALOG_BASELINE_IMPORT", "1").lower() not in ("0", "false", "no")
         )
     )
+
+    def to_payload(self) -> dict[str, Any]:
+        """序列化为可跨进程传递的字典（worker 子进程请求的 config 字段）。
+
+        字段集合自此是对外契约（#601）：增删字段是协议变更，须同步
+        :meth:`from_payload` 并在 ADR 记录。
+        """
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_payload(cls, data: Any) -> Config:
+        """从 :meth:`to_payload` 的字典还原。
+
+        非字典、未知字段均抛 ``ValueError``——跨进程配置不静默降级：
+        调用方看到的配置必须是它给的那份（#601）。
+        """
+        if not isinstance(data, dict):
+            raise ValueError(f"config 载荷必须是对象，得到 {type(data).__name__}")
+        known = {f.name for f in dataclasses.fields(cls)}
+        unknown = set(data) - known
+        if unknown:
+            raise ValueError(f"未知配置字段：{sorted(unknown)}")
+        return cls(**data)
