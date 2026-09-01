@@ -115,7 +115,7 @@ Tool inventory
 ~~~~~~~~~~~~~~
 
 The list derives purely from Facade method metadata; ``placeholder`` entries are
-not registered (they go live automatically once implemented). Currently 13:
+not registered (they go live automatically once implemented). Currently 18:
 
 .. list-table::
    :header-rows: 1
@@ -177,6 +177,23 @@ not registered (they go live automatically once implemented). Currently 13:
    * - ``catalog_delete``
      - Catalog
      - Delete a record by ``record_id`` (file + index entry), irreversible.
+   * - ``spatiography_scales``
+     - 2
+     - Analytic scales per region: Laplace/Hill radii, resonance ladder, libration-point distances.
+   * - ``spatiography_classify``
+     - 2
+     - Region classification for a state sample (``zone_ids`` + ``legend``; synodic nondimensional frame).
+   * - ``spatiography_boundaries``
+     - 2
+     - Boundary geometry: synodic-planar boundary circles + Battin asymmetric curves + L1–L5, or
+       osculating (a, e) curves.
+   * - ``spatiography_resonance_atlas``
+     - 2
+     - Resonance atlas at an element point: Gallardo half-widths, secular loci, vZLK phase portrait.
+   * - ``spatiography_dynamical_map``
+     - 2
+     - Six-region dynamical map over an (a, e) grid: MEGNO Ȳ field, eight-class fate ids,
+       escape/impact diagnostics; large arrays via the sidecar frame contract.
 
 Every artifact-producing tool auto-writes to the orbit catalog on success
 (ADR 0031), returning ``record_id`` — the handle for chained cross-tool calls.

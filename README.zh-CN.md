@@ -93,7 +93,7 @@ print(result.initial_state)
 
 ## MCP
 
-e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 18 个任务级工具（轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成、5 个分区解析工具与 7 个轨道库工具）暴露给 LLM Agent，stdio 传输，不监听端口。工具清单由 Facade 方法元数据派生，产物自动入库、`record_id` 跨工具链式调用；用法与工具速查见文档 [通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)。
+e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 18 个任务级工具（轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成、5 个分区解析工具与 7 个轨道库工具）暴露给 LLM Agent，stdio 传输，不监听端口。工具清单由 Facade 方法元数据派生，产物自动入库、`record_id` 跨工具链式调用；用法与工具速查见文档 [通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)。CLI 子命令与 MCP 工具面同源对称（`e2m2e design-orbit --help` 即用）；GUI 可经 `serve-stdio` sidecar 驱动同一工具面，长任务支持线级取消。
 
 安装 MCP extra（在已有 e2m2e 的环境里）：
 
@@ -159,6 +159,7 @@ uv pip install "e2m2e[mcp]"   # 或 pip install "e2m2e[mcp]"
 
 - Facade 任务级入口，统一对外调用面。
 - MCP 服务化封装：`create_server` 进程内服务器与 `e2m2e mcp-serve` 子命令（stdio 传输，`[mcp]` extra），由 Facade 方法元数据派生工具清单——轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成、5 个分区解析工具与 7 个轨道库工具，产物自动入库、`record_id` 跨工具链式调用。接入配置与工具用法见文档 [通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)。
+- CLI 子命令：与 MCP 工具面同源派生，参数从同一份 Pydantic 模型生成（`--help` 带类型与默认值）；`serve-stdio` sidecar 供 GUI 常驻驱动，长任务可经 `{"cancel": job_id}` 行中途取消。
 
 ## 文档
 

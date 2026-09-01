@@ -93,7 +93,7 @@ For parameter meanings, returned fields, and other orbit types see the [online d
 
 ## MCP
 
-e2m2e can act as an [MCP](https://modelcontextprotocol.io/) server exposing 18 task-level tools (orbit design, station-keeping simulation, transfer design, orbit propagation, spacetime conversion, orbit family generation, 5 spatiography tools, and 7 catalog tools) to LLM Agents over stdio transport without listening on any port. The tool list is derived from Facade method metadata; artifacts are automatically archived and `record_id`s chain across tools. For usage and a tool cheat sheet, see the documentation "[Using e2m2e through MCP](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)".
+e2m2e can act as an [MCP](https://modelcontextprotocol.io/) server exposing 18 task-level tools (orbit design, station-keeping simulation, transfer design, orbit propagation, spacetime conversion, orbit family generation, 5 spatiography tools, and 7 catalog tools) to LLM Agents over stdio transport without listening on any port. The tool list is derived from Facade method metadata; artifacts are automatically archived and `record_id`s chain across tools. For usage and a tool cheat sheet, see the documentation "[Using e2m2e through MCP](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)". CLI subcommands mirror the MCP tool surface one-to-one (`e2m2e design-orbit --help`); a GUI can drive the same surface through the `serve-stdio` sidecar, with mid-flight cancellation for long-running tools.
 
 Install the MCP extra (in an environment that already has e2m2e):
 
@@ -160,6 +160,7 @@ Completed and uncompleted parts are listed by domain. For a detailed capability 
 
 - Facade task-level entry point providing a unified calling surface.
 - MCP service wrapper: in-process `create_server` and the `e2m2e mcp-serve` subcommand (stdio transport, `[mcp]` extra); tool list derived from Facade method metadata — orbit design, station-keeping simulation, transfer design, orbit propagation, spacetime conversion, orbit family generation, 5 spatiography tools, and 7 catalog tools; artifacts automatically archived, `record_id`s chain across tools. For integration config and tool usage see the documentation "[Using e2m2e through MCP](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)".
+- CLI subcommands: derived from the same `tool_inventory` as the MCP surface, with arguments generated from the same Pydantic models (`--help` carries types and defaults); the `serve-stdio` sidecar serves resident GUI drivers, and long-running tools can be cancelled mid-flight via a `{"cancel": job_id}` line.
 
 ## Documentation
 

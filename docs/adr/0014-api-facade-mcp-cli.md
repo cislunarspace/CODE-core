@@ -1,7 +1,7 @@
 # ADR 0014: Interface layer — Facade / MCP / CLI
 
-**Status**: Adopted (Facade and MCP landed; full CLI subcommands still a
-placeholder)
+**Status**: Adopted (implemented — Facade, MCP, sidecar, and the CLI↔MCP
+symmetric subcommands, #602)
 **Date**: 2026-07-31
 **Related**: ADR 0011 (five-layer architecture), README vision
 (LLM+Agent-callable)
