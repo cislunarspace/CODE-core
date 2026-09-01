@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from kernel_helpers import requires_native_symbols
 
 from e2m2e.api.facade import Facade
 from e2m2e.api.models import (
@@ -131,6 +132,9 @@ class TestSpatiographyResonanceAtlas:
 
 
 class TestSpatiographyDynamicalMap:
+    # 制图单格传播依赖 Rust 扩展符号（propagate_geocentric_fate_map_py），
+    # 缺符号时跳过而非硬失败（#603）；同类的纯校验用例不需守卫。
+    @requires_native_symbols("propagate_geocentric_fate_map_py")
     def test_map_smoke_with_gateway_note(self):
         response = Facade().spatiography_dynamical_map(zone="SC", n_a=3, n_e=2, span_years=0.5)
         assert response.status.value == "converged"
@@ -149,6 +153,7 @@ class TestSpatiographyDynamicalMap:
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
             Facade().spatiography_dynamical_map(zone="SC", model="bogus")
 
+    @requires_native_symbols("propagate_geocentric_fate_map_py")
     def test_ems_model_routes_through_facade(self):
         response = Facade().spatiography_dynamical_map(
             zone="CG", n_a=2, n_e=2, model="ems", span_years=0.2

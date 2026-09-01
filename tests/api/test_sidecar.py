@@ -14,6 +14,8 @@ import pytest
 
 pytestmark = [pytest.mark.interface]
 
+from kernel_helpers import requires_native_symbols  # noqa: E402
+
 from e2m2e.api.config import Config  # noqa: E402
 from e2m2e.api.facade import Facade, mcp_exposed  # noqa: E402
 from e2m2e.api.frames import decode_frame  # noqa: E402
@@ -339,6 +341,7 @@ def test_catalog_query_unchanged_by_binary_mapping(facade):
     assert lines[1]["data"]["message"] == "查询完成：0 条记录"
 
 
+@requires_native_symbols("propagate_geocentric_fate_map_py")
 def test_spatiography_dynamical_map_binary_roundtrip(facade):
     """画布契约：五个场走二进制帧（E2M2 帧），JSON 行留占位与两轴。"""
     chunks = handle_request(
