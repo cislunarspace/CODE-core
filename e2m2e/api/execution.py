@@ -11,6 +11,7 @@ worker 子进程本体（mcp/worker.py）同样经 :func:`execute_tool` 执行�
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -27,6 +28,7 @@ __all__ = [
     "BINARY_DTYPES",
     "BINARY_FRAME_TOOLS",
     "LONG_RUNNING_TOOLS",
+    "WORKER_ARGV",
     "execute_tool",
     "preflight",
     "worker_request_payload",
@@ -39,6 +41,10 @@ LONG_RUNNING_TOOLS = frozenset({"transfer_design", "orbit_family_generation"})
 
 # 请求方可声明的二进制 dtype（ADR 0035 决策 1：渲染 f32，复算量 f64）。
 BINARY_DTYPES = ("f32", "f64")
+
+# worker 子进程命令（#607 起两个传输层共用；测试注入 fake worker 时
+# monkeypatch 此常量）。
+WORKER_ARGV = [sys.executable, "-m", "e2m2e.api.mcp.worker"]
 
 
 # 大数组走二进制帧的工具→响应帧抽取函数映射。

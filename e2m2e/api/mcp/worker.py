@@ -3,13 +3,16 @@
 ``python -m e2m2e.api.mcp.worker`` 一次性执行一个工具调用，供传输层把
 分钟级长计算（转移搜索、族生成）隔离到可 kill 的子进程：
 
-- stdin 读一行 JSON 请求 ``{"tool": name, "arguments": {...}, "config": {...}}``
-  （config 缺省时从环境变量重建，见 config.py；存在时经
-  ``Config.from_payload`` 还原——注入的配置穿透子进程，未知字段报错
-  而非静默降级，#601）
-- stdout 按行输出 ``{"type": "progress", "fraction": ..., "message": ...}``
-  （节流，见 ``_PROGRESS_MIN_INTERVAL_SEC``）与最终一行
-  ``{"type": "result", "envelope": {...}}``（统一信封，见 envelope.py）
+- stdin 读一行 JSON 请求 ``{"tool": name, "arguments": {...}, "config":
+  {...}, "binary_dtype": "f32"|"f64"}``——config 缺省时从环境变量重建
+  （见 config.py），存在时经 ``Config.from_payload`` 还原：注入的配置
+  穿透子进程，未知字段报错而非静默降级（#601）；声明 binary_dtype 且
+  工具在帧清单内时画布数组出帧（#607）
+- stdout 按行输出 ``{"type": "progress", "fraction": ..., "message":
+  ...}``（节流，见 ``_PROGRESS_MIN_INTERVAL_SEC``）与最终一行
+  ``{"type": "result", "envelope": {...}, "binary_frames": N}``（统一
+  信封，见 envelope.py；N>0 时行后紧跟 N 个原始帧字节，帧格式同
+  ADR 0035 §3）
 - stderr 原样透传到父进程日志；正常路径退出码 0（工具失败以信封表达）
 
 取消 = 父进程 kill 本进程：Rust 族生成在 GIL 释放下整段运行，协作式
@@ -38,15 +41,36 @@ __all__ = ["run_request", "main"]
 _PROGRESS_MIN_INTERVAL_SEC = 0.1
 
 
-def run_request(request: dict[str, Any], emit_line: Callable[[str], None]) -> None:
+def restore_config(request: dict[str, Any]) -> tuple[Any, Any]:
+    """请求 config 载荷 → Config；缺省从环境重建，坏载荷给错误信封。"""
+    from ..config import Config
+    from . import envelope
+
+    payload = request.get("config")
+    if payload is None:
+        return Config(), None
+    try:
+        return Config.from_payload(payload), None
+    except (TypeError, ValueError) as exc:
+        return None, envelope.error_envelope("INVALID_PARAMS", f"worker 配置还原失败：{exc}")
+
+
+def run_request(
+    request: dict[str, Any],
+    emit_line: Callable[[bytes], None],
+    facade: Any = None,
+) -> None:
     """执行一个工具请求，进度行与结果行经 ``emit_line`` 输出。
 
-    纯进程内逻辑（可测）：``emit_line`` 收到不含换行符的完整 JSON 行。
-    进度回调可能从算法层线程触发（Rust drainer），输出以锁串行化；
-    结果行始终在进度行之后。任何失败都翻译成错误信封，不向 stderr
+    纯进程内逻辑（可测）：``emit_line`` 收到不含换行符的完整 JSON 行
+    （字节）；结果行后按声明追加原始帧字节。进度回调可能从算法层线程
+    触发（Rust drainer），输出以锁串行化；结果行与帧始终在进度行之后，
+    且彼此原子（同一锁内写出）。任何失败都翻译成错误信封，不向 stderr
     抛 traceback、不泄漏细节（api/ 边界契约）。
+
+    ``facade`` 是测试注入缝：缺省自建 ``Facade(Config())``（与生产路径
+    一致）。
     """
-    from ..config import Config
     from ..execution import execute_tool
     from ..facade import Facade
     from . import envelope
@@ -64,40 +88,46 @@ def run_request(request: dict[str, Any], emit_line: Callable[[str], None]) -> No
             {"type": "progress", "fraction": fraction, "message": message}, ensure_ascii=True
         )
         with lock:
-            emit_line(line)
+            emit_line((line + "\n").encode("ascii"))
 
-    def restore_config() -> tuple[Config | None, envelope.Envelope | None]:
-        """请求 config 载荷 → Config；缺省从环境重建，坏载荷给错误信封。"""
-        payload = request.get("config")
-        if payload is None:
-            return Config(), None
-        try:
-            return Config.from_payload(payload), None
-        except (TypeError, ValueError) as exc:
-            return None, envelope.error_envelope("INVALID_PARAMS", f"worker 配置还原失败：{exc}")
+    def emit_result(env: envelope.Envelope, frames: list[bytes]) -> None:
+        payload: dict[str, Any] = {"type": "result", "envelope": env}
+        if frames:
+            payload["binary_frames"] = len(frames)
+        with lock:
+            emit_line((json.dumps(payload, ensure_ascii=True) + "\n").encode("ascii"))
+            for frame in frames:
+                emit_line(frame)
 
     tool = request.get("tool")
     arguments = request.get("arguments") or {}
     if not isinstance(tool, str) or not isinstance(arguments, dict):
-        env = envelope.error_envelope("INVALID_PARAMS", "worker 请求形状错误（tool/arguments）")
-    else:
-        config, err = restore_config()
-        if err is not None:
-            env = err
-        else:
-            facade = Facade(config=config)
-            env, _frames = execute_tool(facade, tool, arguments, progress_callback=emit_progress)
-    line = json.dumps({"type": "result", "envelope": env}, ensure_ascii=True)
-    with lock:
-        emit_line(line)
+        emit_result(
+            envelope.error_envelope("INVALID_PARAMS", "worker 请求形状错误（tool/arguments）"),
+            [],
+        )
+        return
+    config, err = restore_config(request)
+    if err is not None:
+        emit_result(err, [])
+        return
+    facade = facade if facade is not None else Facade(config=config)
+    env, frames = execute_tool(
+        facade,
+        tool,
+        arguments,
+        progress_callback=emit_progress,
+        binary_dtype=request.get("binary_dtype"),
+    )
+    emit_result(env, frames)
 
 
 def main() -> int:
-    """stdin 一行请求 → stdout 进度/结果行 → 退出。"""
+    """stdin 一行请求 → stdout 进度/结果行（+ 帧）→ 退出。"""
 
-    def emit_line(line: str) -> None:
-        sys.stdout.write(line + "\n")
-        sys.stdout.flush()
+    def emit_line(line: bytes) -> None:
+        sys.stdout.buffer.write(line)
+        sys.stdout.buffer.flush()
 
     try:
         request: Any = json.loads(sys.stdin.readline())

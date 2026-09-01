@@ -22,16 +22,13 @@ import typing
 from collections.abc import Sequence
 from typing import Any
 
+from e2m2e.api import execution
 from e2m2e.api.config import Config
 from e2m2e.api.execution import LONG_RUNNING_TOOLS, execute_tool, worker_request_payload
 from e2m2e.api.facade import Facade, ToolInfo, tool_inventory
 from e2m2e.api.mcp import envelope
 
 __all__ = ["main", "build_parser", "tool_subcommands"]
-
-# worker 子进程命令：与 mcp/server.py 的 _WORKER_ARGV 同一 worker 模块
-# （worker 不依赖 [mcp] extra，CLI 也不依赖）。
-_WORKER_ARGV = [sys.executable, "-m", "e2m2e.api.mcp.worker"]
 
 
 def tool_subcommands(facade: Facade) -> dict[str, ToolInfo]:
@@ -159,7 +156,7 @@ def _run_via_worker(
     进程 kill 是打断 GIL 释放下 Rust 长计算的唯一可靠手段。
     """
     proc = subprocess.Popen(
-        _WORKER_ARGV, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None, text=True
+        execution.WORKER_ARGV, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None, text=True
     )
     assert proc.stdin is not None and proc.stdout is not None  # PIPE 已请求
     request = worker_request_payload(tool_name, arguments, facade.config)

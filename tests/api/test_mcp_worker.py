@@ -31,6 +31,7 @@ pytestmark = [
 
 pytest.importorskip("mcp")  # [mcp] extra 未装时整文件跳过（协议层依赖）
 
+from e2m2e.api import execution  # noqa: E402
 from e2m2e.api.config import Config  # noqa: E402
 from e2m2e.api.facade import Facade  # noqa: E402
 from e2m2e.api.mcp import server as mcp_server  # noqa: E402
@@ -98,7 +99,7 @@ def fake_worker(monkeypatch, tmp_path):
     def use(mode: str) -> None:
         monkeypatch.setenv("FAKE_WORKER_MODE", mode)
         monkeypatch.setenv("FAKE_WORKER_PIDFILE", str(pidfile))
-        monkeypatch.setattr(mcp_server, "_WORKER_ARGV", [sys.executable, "-c", _FAKE_WORKER_SCRIPT])
+        monkeypatch.setattr(execution, "WORKER_ARGV", [sys.executable, "-c", _FAKE_WORKER_SCRIPT])
 
     use("ok")
     return SimpleNamespace(pidfile=pidfile, use=use)

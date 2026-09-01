@@ -88,3 +88,31 @@ def decode_frame(buf: bytes | memoryview) -> tuple[np.ndarray, str, int]:
         raise FrameError(f"数据段不完整：{len(view) - shape_end} 字节 < 声明 {data_len}")
     arr = np.frombuffer(view[shape_end:data_end], dtype=_NUMPY_DTYPES[dtype]).reshape(shape)
     return arr, dtype, data_end
+
+
+def read_raw_frame(stream) -> bytes:
+    """从二进制流读取一帧完整字节（含帧头），原样返回。
+
+    供 worker stdout 泵转发帧字节用（#607）：父进程不需要解码数组，
+    只需按契约切出完整帧。magic 与长度校验失败抛 :class:`FrameError`。
+    """
+    header = stream.read(_HEADER.size)
+    if len(header) < _HEADER.size:
+        raise FrameError(f"帧头不完整：{len(header)} 字节 < {_HEADER.size}")
+    magic, dtype_code, ndim = _HEADER.unpack(header)
+    if magic != MAGIC:
+        raise FrameError(f"帧 magic 不符：0x{magic:08X}（期望 0x{MAGIC:08X}）")
+    if ndim < 1:
+        raise FrameError(f"ndim 必须 ≥ 1，帧内为 {ndim}")
+    shape_bytes = stream.read(4 * ndim)
+    if len(shape_bytes) < 4 * ndim:
+        raise FrameError("shape 段不完整")
+    shape = _U32.unpack_from(shape_bytes)
+    n_elements = 1
+    for dim in shape:
+        n_elements *= dim
+    data_len = n_elements * (4 if dtype_code == 0 else 8)
+    payload = stream.read(data_len)
+    if len(payload) < data_len:
+        raise FrameError(f"数据段不完整：{len(payload)} 字节 < 声明 {data_len}")
+    return header + shape_bytes + payload

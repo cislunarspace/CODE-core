@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import sys
+import threading
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -16,6 +20,7 @@ pytestmark = [pytest.mark.interface]
 
 from kernel_helpers import requires_native_symbols  # noqa: E402
 
+from e2m2e.api import execution  # noqa: E402
 from e2m2e.api.config import Config  # noqa: E402
 from e2m2e.api.facade import Facade, mcp_exposed  # noqa: E402
 from e2m2e.api.frames import decode_frame  # noqa: E402
@@ -204,10 +209,14 @@ def test_progress_line_then_response(facade):
 
 
 def test_run_loop_end_to_end(facade):
-    """run_loop：请求行→(进度行+响应行+帧)，坏 JSON 行得错误信封不中断。"""
+    """run_loop：短工具请求行→(进度行+响应行+帧)，坏 JSON 行得错误信封不中断。
+
+    长任务（族生成等）在 #607 起走 worker 子进程线程，由取消端到端
+    测试覆盖；本测试用短工具保持字节顺序确定性。
+    """
     requests = (
-        b'{"tool": "orbit_family_generation", "arguments": {"orbit_type": "HALO", '
-        b'"libration_point": 1}, "binary_dtype": "f64", "job_id": "j"}\n'
+        b'{"tool": "catalog_get", "arguments": {"record_id": "r1"}, '
+        b'"binary_dtype": "f64"}\n'
         b"this is not json\n"
     )
     stdout = io.BytesIO()
@@ -272,8 +281,7 @@ def test_run_loop_survives_envelope_serialization_failure(facade):
         requests = (
             b'{"tool": "catalog_get", "arguments": {"record_id": "r1"}, '
             b'"binary_dtype": "f32"}\n'
-            b'{"tool": "orbit_family_generation", "arguments": {"orbit_type": "HALO", '
-            b'"libration_point": 1}, "binary_dtype": "f32"}\n'
+            b'{"tool": "catalog_query", "arguments": {}}\n'
         )
         stdout = io.BytesIO()
         run_loop(facade, io.BytesIO(requests), stdout)  # 不应抛异常
@@ -281,9 +289,9 @@ def test_run_loop_survives_envelope_serialization_failure(facade):
         # 坏请求兑成 INTERNAL_ERROR 信封（进度行随失败丢弃），循环存活
         assert lines[0][0]["status"] == "error"
         assert lines[0][0]["error"]["code"] == "INTERNAL_ERROR"
-        # 第二个请求正常处理：进度行 + ok 响应 + 帧
+        # 第二个请求正常处理：进度行 + ok 响应
         assert lines[1][0]["status"] == "progress"
-        assert lines[2][0]["status"] == "ok" and lines[2][0]["binary_frames"] == 2
+        assert lines[2][0]["status"] == "ok"
     finally:
         facade._broken_response = False
 
@@ -377,3 +385,216 @@ def test_spatiography_dynamical_map_requires_binary_dtype(facade):
     [line] = [json.loads(c) for c in chunks]
     assert line["status"] == "error"
     assert line["error"]["code"] == "INVALID_PARAMS"
+
+
+# ---------------------------------------------------------------------------
+# 长任务 worker 路由与线级取消（#607）
+# ---------------------------------------------------------------------------
+
+_SIDECAKE_FAKE_WORKER = """
+import json, os, struct, sys, time
+pidfile = os.environ.get("SIDECAKE_PIDFILE")
+if pidfile:
+    with open(pidfile, "w") as f:
+        f.write(str(os.getpid()))
+mode = os.environ.get("SIDECAKE_MODE", "progress-ok")
+out = sys.stdout.buffer
+def emit(obj):
+    out.write((json.dumps(obj) + "\\n").encode()); out.flush()
+emit({"type": "progress", "fraction": 0.5, "message": "half"})
+if mode == "sleep":
+    time.sleep(60)
+if mode == "crash":
+    sys.exit(3)
+if mode == "frame":
+    frame = struct.pack("<IBB", 0x324D3245, 0, 1) + struct.pack("<I", 2)
+    frame += struct.pack("<2f", 1.0, 2.0)
+    emit({"type": "result", "envelope": {"status": "ok", "data": {}, "error": None,
+          "meta": {}}, "binary_frames": 1})
+    out.write(frame); out.flush()
+    sys.exit(0)
+emit({"type": "result", "envelope": {"status": "ok", "data": {"mode": mode},
+      "error": None, "meta": {}}})
+"""
+
+
+@pytest.fixture
+def sidecar_worker(monkeypatch, tmp_path):
+    """sidecar 的 worker 命令换成 fake 脚本，可切模式（#607）。"""
+    pidfile = tmp_path / "sidecar-worker.pid"
+
+    def use(mode: str) -> None:
+        monkeypatch.setenv("SIDECAKE_MODE", mode)
+        monkeypatch.setenv("SIDECAKE_PIDFILE", str(pidfile))
+        monkeypatch.setattr(execution, "WORKER_ARGV", [sys.executable, "-c", _SIDECAKE_FAKE_WORKER])
+
+    use("progress-ok")
+    return SimpleNamespace(pidfile=pidfile, use=use)
+
+
+def _pid_alive(pid: int) -> bool:
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return False
+        try:
+            code = wintypes.DWORD()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == 259
+        finally:
+            kernel32.CloseHandle(handle)
+    import errno
+    import os
+
+    try:
+        os.kill(pid, 0)
+    except OSError as exc:
+        return exc.errno == errno.EPERM
+    return True
+
+
+def test_long_tool_streams_progress_and_result(sidecar_worker, facade):
+    """长任务经 worker：真实进度行（fraction）与结果行依次流出。"""
+    stdin_r, stdin_w = os.pipe()
+    stdout_r, stdout_w = os.pipe()
+    worker = threading.Thread(
+        target=run_loop,
+        args=(facade, os.fdopen(stdin_r, "rb"), os.fdopen(stdout_w, "wb")),
+        daemon=True,
+    )
+    worker.start()
+    os.write(
+        stdin_w,
+        b'{"tool": "orbit_family_generation", "arguments": {"orbit_type": "HALO", '
+        b'"libration_point": 1}, "binary_dtype": "f32", "job_id": "j1"}\n',
+    )
+    import time as _time
+
+    deadline = _time.monotonic() + 15
+    collected = bytearray()
+    collector = threading.Thread(
+        target=lambda: [collected.extend(os.read(stdout_r, 4096)) for _ in iter(int, 1)],
+        daemon=True,
+    )
+    collector.start()
+    while _time.monotonic() < deadline and b'"mode"' not in bytes(collected):
+        _time.sleep(0.05)
+    os.close(stdin_w)
+    worker.join(timeout=10)
+    text = collected.decode("utf-8", errors="replace")
+    assert '"status": "progress"' in text and "half" in text, "worker 进度应带真实 fraction 转发"
+    assert '"status": "ok"' in text
+
+
+def test_cancel_line_kills_worker_and_emits_cancelled(sidecar_worker, facade):
+    """取消行 → 子进程被 kill + cancelled 状态行；循环存活可继续服务。"""
+    sidecar_worker.use("sleep")
+    stdin_r, stdin_w = os.pipe()
+    stdout_r, stdout_w = os.pipe()
+    worker = threading.Thread(
+        target=run_loop,
+        args=(facade, os.fdopen(stdin_r, "rb"), os.fdopen(stdout_w, "wb")),
+        daemon=True,
+    )
+    worker.start()
+    os.write(
+        stdin_w,
+        b'{"tool": "orbit_family_generation", "arguments": {"orbit_type": "HALO", '
+        b'"libration_point": 1}, "binary_dtype": "f32", "job_id": "j1"}\n',
+    )
+    import time as _time
+
+    deadline = _time.monotonic() + 15
+    while _time.monotonic() < deadline and not sidecar_worker.pidfile.exists():
+        _time.sleep(0.05)
+    pid = int(sidecar_worker.pidfile.read_text(encoding="ascii").strip())
+    os.write(stdin_w, b'{"cancel": "j1"}\n')
+    collected = bytearray()
+    collector = threading.Thread(
+        target=lambda: [collected.extend(os.read(stdout_r, 4096)) for _ in iter(int, 1)],
+        daemon=True,
+    )
+    collector.start()
+    deadline = _time.monotonic() + 15
+    while _time.monotonic() < deadline and b'"cancelled"' not in bytes(collected):
+        _time.sleep(0.05)
+    assert b'"cancelled"' in bytes(collected), "取消后必须回 cancelled 状态行"
+    deadline = _time.monotonic() + 15
+    while _time.monotonic() < deadline and _pid_alive(pid):
+        _time.sleep(0.1)
+    assert not _pid_alive(pid), "取消后 worker 子进程应已被终止"
+    # 循环存活：后续请求照常处理
+    os.write(stdin_w, b'{"tool": "catalog_query", "arguments": {}}\n')
+    deadline = _time.monotonic() + 15
+    while _time.monotonic() < deadline and b'"records"' not in bytes(collected):
+        _time.sleep(0.05)
+    os.close(stdin_w)
+    assert b'"cancelled"' in bytes(collected)
+
+
+def test_cancel_unknown_job_is_idempotent(sidecar_worker, facade):
+    """对未知 job 的取消：幂等回 cancelled 行，不崩溃。"""
+    stdin_r, stdin_w = os.pipe()
+    stdout_r, stdout_w = os.pipe()
+    worker = threading.Thread(
+        target=run_loop,
+        args=(facade, os.fdopen(stdin_r, "rb"), os.fdopen(stdout_w, "wb")),
+        daemon=True,
+    )
+    worker.start()
+    os.write(stdin_w, b'{"cancel": "no-such-job"}\n')
+    import time as _time
+
+    collected = bytearray()
+    deadline = _time.monotonic() + 15
+    while _time.monotonic() < deadline and b'"cancelled"' not in bytes(collected):
+        chunk = os.read(stdout_r, 4096)
+        if chunk:
+            collected.extend(chunk)
+        else:
+            _time.sleep(0.05)
+    os.close(stdin_w)
+    line = json.loads(bytes(collected).splitlines()[0])
+    assert line["status"] == "cancelled"
+    assert line["meta"]["job_id"] == "no-such-job"
+
+
+def test_worker_frames_pass_through(sidecar_worker, facade):
+    """worker 结果行声明的二进制帧原样透传（帧序 = 声明序）。"""
+    sidecar_worker.use("frame")
+    stdin_r, stdin_w = os.pipe()
+    stdout_r, stdout_w = os.pipe()
+    worker = threading.Thread(
+        target=run_loop,
+        args=(facade, os.fdopen(stdin_r, "rb"), os.fdopen(stdout_w, "wb")),
+        daemon=True,
+    )
+    worker.start()
+    os.write(
+        stdin_w,
+        b'{"tool": "orbit_family_generation", "arguments": {"orbit_type": "HALO", '
+        b'"libration_point": 1}, "binary_dtype": "f32", "job_id": "j2"}\n',
+    )
+    import time as _time
+
+    collected = bytearray()
+    deadline = _time.monotonic() + 15
+    while _time.monotonic() < deadline and len(bytes(collected)) < 120:
+        chunk = os.read(stdout_r, 4096)
+        if chunk:
+            collected.extend(chunk)
+        else:
+            _time.sleep(0.05)
+    os.close(stdin_w)
+    worker.join(timeout=10)
+    lines = _lines_and_frames([bytes(collected)])
+    result_line, frames = next(line for line in lines if line[0].get("binary_frames"))
+    assert result_line["status"] == "ok" and result_line["binary_frames"] == 1
+    arr, dtype, _ = decode_frame(frames[0])
+    assert dtype == "f32"
+    np.testing.assert_allclose(arr, np.array([1.0, 2.0], dtype=np.float32))

@@ -16,7 +16,6 @@ import asyncio
 import contextlib
 import json
 import subprocess
-import sys
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -59,9 +58,8 @@ _PROGRESS_SEND_TIMEOUT_SEC = 5.0
 # 长任务工具清单（LONG_RUNNING_TOOLS）在执行核心 e2m2e.api.execution：
 # 两个传输层共同消费的单一来源（#601）。本模块只负责“何时 spawn”。
 
-# worker 子进程命令（模块常量：测试注入 fake worker 用，同
-# _PROGRESS_MIN_INTERVAL_SEC 的 monkeypatch 先例）。
-_WORKER_ARGV = [sys.executable, "-m", "e2m2e.api.mcp.worker"]
+# worker 子进程命令常量在执行核心 execution.WORKER_ARGV（#607 起
+# sidecar 同为 spawn 方，单一来源）；测试注入 fake worker 时 patch 它。
 # 取消后 kill+收尸的时限（秒）：Windows TerminateProcess 即时生效，此为
 # 病理情形兜底，超时也不再阻塞取消收尾。
 _KILL_REAP_TIMEOUT_SEC = 10.0
@@ -152,7 +150,7 @@ async def run_tool_in_worker(
     结构化错误。
     """
     proc = await anyio.open_process(
-        _WORKER_ARGV, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None
+        execution.WORKER_ARGV, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None
     )
     assert proc.stdin is not None and proc.stdout is not None  # PIPE 已请求
     request = execution.worker_request_payload(tool_name, arguments, facade.config)
