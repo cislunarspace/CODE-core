@@ -1,6 +1,8 @@
 """测试用的 SPICE 内核加载/卸载辅助模块。"""
 
+import importlib
 import os
+import sys
 
 import pytest
 
@@ -73,3 +75,45 @@ def unload_kernels(spice, paths: list[str]) -> None:
     """逆序卸载 ``load_body_fixed_kernels`` 之类返回的内核路径列表。"""
     for path in reversed(paths):
         spice.unload_kernel(path)
+
+
+# =============================================================================
+# Rust 扩展符号守卫（#603）：native 符号缺失时跳过而非硬失败
+#
+# 判据口径对齐 e2m2e/spice_ext.py 的 _ensure_symbols 报错文案（被现存
+# match="make dev" 测试钉住，勿另造表述）；与 requires_spice 同款先例：
+# 环境能力不足统一表达为 skip，读日志的人据此分清环境问题与代码问题。
+# =============================================================================
+
+
+def native_symbols_available(*symbols: str) -> bool:
+    """Rust 扩展可导入且指定符号在 integrators 门面命名空间非 None。
+
+    门面（``e2m2e.integrators``）在导入时从 ``e2m2e._integrators`` 装载
+    扩展符号，缺失的符号为 ``None``——与本套件其他可用性探测一样做
+    存在性检查，不触发真实计算。查 sys.modules 优先于 import 语句：
+    ``import a.b as x`` 绑定时父包属性优先，会拿到测试替换不掉的真模块。
+    """
+    module = sys.modules.get("e2m2e.integrators")
+    if module is None:
+        try:
+            module = importlib.import_module("e2m2e.integrators")
+        except ImportError:
+            return False
+    return all(getattr(module, symbol, None) is not None for symbol in symbols)
+
+
+def requires_native_symbols(*symbols: str):
+    """native 符号守卫：缺符号的用例跳过并说明重建指引（#603）。
+
+    用法与 :data:`requires_spice` 相同：``@requires_native_symbols("foo_py")``
+    叠加在测试或类上。reason 口径与 spice_ext 的报错一致。
+    """
+    return pytest.mark.skipif(
+        not native_symbols_available(*symbols),
+        reason=(
+            "e2m2e._integrators 缺少所需符号："
+            + ", ".join(symbols)
+            + "。spice 是默认且唯一支持的 feature；请用 make dev 重建扩展"
+        ),
+    )

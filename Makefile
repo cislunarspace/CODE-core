@@ -49,7 +49,7 @@ DEV_SYNC := uv sync --group dev --no-install-project
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup cspice kernels dev dev-release test test-rust test-python docs check fmt clean
+.PHONY: help setup cspice kernels dev dev-release test test-rust test-python docs check fmt clean clean-tests
 
 help:  ## 显示本帮助
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -116,3 +116,6 @@ fmt:  ## 就地格式化（Rust + Python）
 
 clean:  ## 清理 Rust 构建产物（保留 .cspice / kernels 缓存）
 	cargo clean
+
+clean-tests:  ## 清理 tests/ 幽灵目录与 __pycache__（#603；配套门禁在 tests/_meta）
+	$(PYTHON) scripts/clean_test_residue.py --fix
