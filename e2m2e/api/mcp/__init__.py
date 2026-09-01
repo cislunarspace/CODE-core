@@ -5,6 +5,11 @@
 - ``worker``：长任务 worker 子进程（JSON 行协议，不依赖 ``[mcp]`` extra）。
 - ``server``：``create_server(facade)``（依赖 ``[mcp]`` extra）。
 
+工具面派生、执行策略（``LONG_RUNNING_TOOLS``）、帧契约的单一来源在执行核心
+``e2m2e.api.execution``（#601）：不依赖 ``[mcp]`` extra 的消费方（sidecar、
+worker）直接从那里导入，不经本包转口——本包的惰性导出会拽起 server 的
+SDK 依赖。
+
 ``server`` 惰性导出：sidecar（ADR 0035）复用 envelope/tools 但不依赖
 ``[mcp]`` extra，本包在缺 ``mcp`` 库时仍可导入。
 """
@@ -14,10 +19,9 @@ from __future__ import annotations
 from typing import Any
 
 from .envelope import error_envelope, invoke_tool, ok_envelope
-from .tools import ToolSpec, tool_specs
+from .tools import ToolSpec, tool_spec, tool_specs
 
 __all__ = [
-    "LONG_RUNNING_TOOLS",
     "ToolSpec",
     "create_server",
     "error_envelope",
@@ -26,11 +30,11 @@ __all__ = [
     "invoke_tool",
     "ok_envelope",
     "run_tool_in_worker",
+    "tool_spec",
     "tool_specs",
 ]
 
 _LAZY = (
-    "LONG_RUNNING_TOOLS",
     "create_server",
     "handle_call_tool",
     "handle_list_tools",

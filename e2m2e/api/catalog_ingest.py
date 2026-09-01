@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "build_control_record",
+    "finite_or_none",
     "build_design_record",
     "build_family_record",
     "build_transfer_record",
@@ -173,7 +174,7 @@ def build_design_record(request: Any, result: Any) -> tuple[dict, dict[str, np.n
     else:
         orbit_family, libration_point = selection.lower(), request.collinear_point
 
-    jacobi = _finite_or_none(result.cr3bp_jacobi)
+    jacobi = finite_or_none(result.cr3bp_jacobi)
     correction = result.correction
     taxonomy_labels: list[str] = []
     if cr3bp_orbit is not None:
@@ -257,8 +258,8 @@ def build_family_record(
         member_metas.append(
             {
                 "index": index,
-                "period": _finite_or_none(orbit.period),
-                "closure_error": _finite_or_none(getattr(orbit, "closure_error", None)),
+                "period": finite_or_none(orbit.period),
+                "closure_error": finite_or_none(getattr(orbit, "closure_error", None)),
                 "jacobi": jacobi,
                 "amplitude_km": amplitude_km,
                 "amplitudes": _sanitize_value(getattr(orbit, "amplitudes", {})),
@@ -500,10 +501,10 @@ def _member_jacobi(system: Any, orbit: Any) -> float | None:
     """成员初态 Jacobi 常数；系统不具备该能力时为 None。"""
     if system is None or not hasattr(system, "get_jacobi_constant"):
         return None
-    return _finite_or_none(system.get_jacobi_constant(orbit.states[0]))
+    return finite_or_none(system.get_jacobi_constant(orbit.states[0]))
 
 
-def _finite_or_none(value: Any) -> float | None:
+def finite_or_none(value: Any) -> float | None:
     if value is None:
         return None
     value = float(value)

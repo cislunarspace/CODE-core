@@ -19,7 +19,7 @@ from ..facade import tool_inventory
 if TYPE_CHECKING:
     from ..facade import Facade
 
-__all__ = ["ToolSpec", "tool_specs"]
+__all__ = ["ToolSpec", "tool_spec", "tool_specs"]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -32,23 +32,34 @@ class ToolSpec:
     method: Callable[..., Any]
 
 
+def tool_spec(facade: Facade, name: str) -> ToolSpec | None:
+    """单个工具的规格：按需构造 schema，不重建全量清单（#601）。
+
+    未知工具或 placeholder 返回 None——placeholder 不注册，调用未知
+    工具同义。
+    """
+    for info in tool_inventory(facade):
+        if info.name == name and info.status == "implemented":
+            return _build_spec(facade, info)
+    return None
+
+
 def tool_specs(facade: Facade) -> list[ToolSpec]:
     """由 Facade 纯派生工具规格（placeholder 不注册）。"""
-    specs: list[ToolSpec] = []
-    for info in tool_inventory(facade):
-        if info.status != "implemented":
-            continue
-        method = getattr(facade, info.name)
-        if info.request_model is not None:
-            schema = info.request_model.model_json_schema()
-        else:
-            schema = {"type": "object", "properties": {}, "additionalProperties": False}
-        specs.append(
-            ToolSpec(
-                name=info.name,
-                description=(method.__doc__ or info.name).strip().splitlines()[0],
-                input_schema=schema,
-                method=method,
-            )
-        )
-    return specs
+    return [
+        _build_spec(facade, info) for info in tool_inventory(facade) if info.status == "implemented"
+    ]
+
+
+def _build_spec(facade: Facade, info: Any) -> ToolSpec:
+    method = getattr(facade, info.name)
+    if info.request_model is not None:
+        schema = info.request_model.model_json_schema()
+    else:
+        schema = {"type": "object", "properties": {}, "additionalProperties": False}
+    return ToolSpec(
+        name=info.name,
+        description=(method.__doc__ or info.name).strip().splitlines()[0],
+        input_schema=schema,
+        method=method,
+    )

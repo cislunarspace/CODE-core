@@ -1,9 +1,10 @@
-"""MCP 服务：LLM 工具入口。
+"""MCP 服务：LLM 工具入口（ADR 0014）。
 
-进程内库为主体 + CLI 薄包装 mcp-serve（ADR 0014）：``create_server(facade)``
-函数（进程内、可测试）+ ``e2m2e mcp-serve`` 子命令。一个 Facade 实例 = 一个
-server。MCP 工具 = facade 上 mcp_exposed=True 的方法（纯派生，见 tools.py），
-传输层包统一信封（见 envelope.py）。
+进程内库为主体 + CLI 薄包装 mcp-serve：``create_server(facade)`` 函数
+（进程内、可测试）+ ``e2m2e mcp-serve`` 子命令。一个 Facade 实例 = 一个
+server。本模块是薄适配器：工具面、执行策略、帧契约的单一来源在执行核心
+``e2m2e.api.execution``（#601），这里只做 MCP 形状转换（信封 →
+``CallToolResult``）与 worker 子进程的异步泵。
 
 依赖 ``[mcp]`` extra：本模块在缺 ``mcp`` 库时导入即失败，调用方（CLI）负责
 给出安装提示。
@@ -30,6 +31,7 @@ from mcp.types import (
     Tool,
 )
 
+from .. import execution
 from . import envelope, tools
 
 if TYPE_CHECKING:
@@ -40,7 +42,6 @@ if TYPE_CHECKING:
     from ..facade import Facade
 
 __all__ = [
-    "LONG_RUNNING_TOOLS",
     "create_server",
     "handle_list_tools",
     "handle_call_tool",
@@ -55,12 +56,8 @@ _PROGRESS_MIN_INTERVAL_SEC = 0.1
 # worker 线程；超时按投递失败处理（静默降级为无进度）。
 _PROGRESS_SEND_TIMEOUT_SEC = 5.0
 
-# 长任务工具（#588 / #576 Phase 2，子进程隔离架构）：分钟级计算改跑
-# worker 子进程（见 worker.py），使 MCP 取消（notifications/cancelled，
-# interrupt 模式取消 handler 作用域）与客户端断连（EOF 取消任务组）都能
-# 可靠传播为进程 kill。其余工具线程池直跑，行为不变。执行策略是传输层
-# 关注点，放这里而不入 Facade 元数据。
-LONG_RUNNING_TOOLS = frozenset({"transfer_design", "orbit_family_generation"})
+# 长任务工具清单（LONG_RUNNING_TOOLS）在执行核心 e2m2e.api.execution：
+# 两个传输层共同消费的单一来源（#601）。本模块只负责“何时 spawn”。
 
 # worker 子进程命令（模块常量：测试注入 fake worker 用，同
 # _PROGRESS_MIN_INTERVAL_SEC 的 monkeypatch 先例）。
@@ -141,23 +138,25 @@ async def _iter_lines(stream: ByteReceiveStream) -> AsyncIterator[bytes]:
 
 
 async def run_tool_in_worker(
-    tool_name: str, arguments: dict[str, Any], context: Any
+    facade: Facade, tool_name: str, arguments: dict[str, Any], context: Any
 ) -> CallToolResult:
     """在 worker 子进程中执行长任务工具（#588 子进程隔离）。
 
     请求经 stdin 一行 JSON 下发，进度/结果行经 stdout 回流（协议见
-    worker.py）。等待全部走可取消的 await：MCP 请求取消（interrupt 模式
-    取消 handler 作用域）与客户端断连（EOF 取消任务组）在此汇成同一
-    处理——kill 子进程、shield 内收尸、重抛取消。kill 只丢当前任务：
-    catalog 落盘是一次性原子写（tmp + os.replace），已入库记录不受影响。
-    worker 异常退出（无结果行）译为 WORKER_CRASHED 结构化错误。
+    worker.py）；注入的 Config 经 :func:`execution.worker_request_payload`
+    随请求下发（#601），子进程用它重建 Facade。等待全部走可取消的 await：
+    MCP 请求取消（interrupt 模式取消 handler 作用域）与客户端断连（EOF
+    取消任务组）在此汇成同一处理——kill 子进程、shield 内收尸、重抛取消。
+    kill 只丢当前任务：catalog 落盘是一次性原子写（tmp + os.replace），
+    已入库记录不受影响。worker 异常退出（无结果行）译为 WORKER_CRASHED
+    结构化错误。
     """
     proc = await anyio.open_process(
         _WORKER_ARGV, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None
     )
     assert proc.stdin is not None and proc.stdout is not None  # PIPE 已请求
-    request = json.dumps({"tool": tool_name, "arguments": arguments}, ensure_ascii=True)
-    await proc.stdin.send(request.encode("ascii") + b"\n")
+    request = execution.worker_request_payload(tool_name, arguments, facade.config)
+    await proc.stdin.send(json.dumps(request, ensure_ascii=True).encode("ascii") + b"\n")
     await proc.stdin.aclose()
 
     meta = getattr(context, "meta", None)
@@ -202,14 +201,13 @@ def handle_call_tool(
 ) -> CallToolResult:
     """调用工具并包信封（纯函数，便于测试）。
 
-    ``extra_kwargs`` 是传输层注入的额外协作者（如进度回调），信封层按
-    方法签名过滤（见 :func:`envelope.dispatch_tool`），未接受的工具零影响。
+    执行委托执行核心（#601）；``extra_kwargs`` 是传输层注入的额外协作者
+    （如进度回调），核心按方法签名过滤，未接受的工具零影响。
     """
-    spec = next((s for s in tools.tool_specs(facade) if s.name == name), None)
-    if spec is None:
-        env = envelope.tool_not_found(name)
-    else:
-        env = envelope.invoke_tool(spec.method, arguments, extra_kwargs=extra_kwargs)
+    progress_callback = (extra_kwargs or {}).get("progress_callback")
+    env, _frames = execution.execute_tool(
+        facade, name, arguments, progress_callback=progress_callback
+    )
     return _to_result(env)
 
 
@@ -234,12 +232,12 @@ def create_server(facade: Facade) -> Server:
 
     async def _call_tool(context: Any, params: Any) -> CallToolResult:
         # Facade 方法是同步长计算，放线程池避免阻塞事件循环；客户端
-        # 请求进度时把线程安全回调作为额外协作者注入（未请求时 None，
-        # 注入层按方法签名过滤，其余工具零影响）。长任务工具例外：改跑
-        # worker 子进程，使取消/断连可靠传播为进程 kill（#588）。
+        # 请求进度时把线程安全回调作为额外协作者注入（未请求时 None）。
+        # 长任务工具例外：改跑 worker 子进程（路由清单在执行核心），
+        # 使取消/断连可靠传播为进程 kill（#588）。
         arguments = dict(params.arguments or {})
-        if params.name in LONG_RUNNING_TOOLS:
-            return await run_tool_in_worker(params.name, arguments, context)
+        if params.name in execution.LONG_RUNNING_TOOLS:
+            return await run_tool_in_worker(facade, params.name, arguments, context)
         reporter = make_progress_reporter(context)
         extra = {"progress_callback": reporter} if reporter is not None else None
         return await anyio.to_thread.run_sync(

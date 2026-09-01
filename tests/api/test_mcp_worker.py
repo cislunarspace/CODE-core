@@ -7,8 +7,9 @@
 3. 协议端到端：真实 dispatcher（内存流）驱动 ``notifications/cancelled``
    与客户端断连（EOF）两条取消路径。
 
-worker 是通用执行器（任意工具名），路由决策（哪些工具走子进程）在
-server 层的 LONG_RUNNING_TOOLS——测试用便宜工具直接打 worker。
+worker 是通用执行器（任意工具名），路由决策（哪些工具走子进程）在执行核心
+LONG_RUNNING_TOOLS（e2m2e.api.execution，#601）——测试用便宜工具直接打 worker。
+注入的 Config 随请求下发（#601）：worker 用它构造 Facade，不从环境重建。
 """
 
 from __future__ import annotations
@@ -146,26 +147,26 @@ def facade() -> Facade:
 # ---------------------------------------------------------------------------
 
 
-def test_real_worker_roundtrip_ok():
+def test_real_worker_roundtrip_ok(facade):
     """真实子进程：便宜工具经 worker 往返，信封 status=ok。"""
     import anyio
 
     from e2m2e.api.mcp import run_tool_in_worker
 
-    result = anyio.run(run_tool_in_worker, "catalog_query", {}, _Ctx())
+    result = anyio.run(run_tool_in_worker, facade, "catalog_query", {}, _Ctx())
     assert not result.is_error
     env = json.loads(result.content[0].text)
     assert env["status"] == "ok"
     assert set(env) == {"status", "data", "error", "meta"}
 
 
-def test_real_worker_translates_validation_errors():
+def test_real_worker_translates_validation_errors(facade):
     """worker 侧错误翻译照旧：非法参数 → INVALID_PARAMS（无 traceback 泄漏）。"""
     import anyio
 
     from e2m2e.api.mcp import run_tool_in_worker
 
-    result = anyio.run(run_tool_in_worker, "catalog_query", {"libration_point": 99}, _Ctx())
+    result = anyio.run(run_tool_in_worker, facade, "catalog_query", {"libration_point": 99}, _Ctx())
     assert result.is_error
     env = json.loads(result.content[0].text)
     assert env["status"] == "error"
@@ -173,12 +174,12 @@ def test_real_worker_translates_validation_errors():
     assert "Traceback" not in result.content[0].text
 
 
-def test_real_worker_unknown_tool():
+def test_real_worker_unknown_tool(facade):
     import anyio
 
     from e2m2e.api.mcp import run_tool_in_worker
 
-    result = anyio.run(run_tool_in_worker, "no_such_tool", {}, _Ctx())
+    result = anyio.run(run_tool_in_worker, facade, "no_such_tool", {}, _Ctx())
     env = json.loads(result.content[0].text)
     assert env["error"]["code"] == "TOOL_NOT_FOUND"
 
@@ -188,7 +189,7 @@ def test_real_worker_unknown_tool():
 # ---------------------------------------------------------------------------
 
 
-def test_progress_forwarded_with_token(fake_worker):
+def test_progress_forwarded_with_token(fake_worker, facade):
     """worker 进度行 → session.report_progress（带 token 时转发，保序）。"""
     import anyio
 
@@ -197,7 +198,7 @@ def test_progress_forwarded_with_token(fake_worker):
 
     async def scenario():
         session.progress_seen = anyio.Event()
-        return await mcp_server.run_tool_in_worker("transfer_design", {}, ctx)
+        return await mcp_server.run_tool_in_worker(facade, "transfer_design", {}, ctx)
 
     result = anyio.run(scenario)
     assert [(p, t, m) for p, t, m in session.calls] == [(0.5, 1.0, "half")]
@@ -206,7 +207,7 @@ def test_progress_forwarded_with_token(fake_worker):
     assert env["data"]["mode"] == "ok"
 
 
-def test_progress_gated_without_token(fake_worker):
+def test_progress_gated_without_token(fake_worker, facade):
     """客户端未带 progressToken：进度行不转发（零开销直通），结果照常。"""
     import anyio
 
@@ -214,7 +215,7 @@ def test_progress_gated_without_token(fake_worker):
 
     async def scenario():
         return await mcp_server.run_tool_in_worker(
-            "transfer_design", {}, _Ctx(token=None, session=session)
+            facade, "transfer_design", {}, _Ctx(token=None, session=session)
         )
 
     result = anyio.run(scenario)
@@ -222,7 +223,7 @@ def test_progress_gated_without_token(fake_worker):
     assert not result.is_error
 
 
-def test_cancellation_kills_worker(fake_worker):
+def test_cancellation_kills_worker(fake_worker, facade):
     """取消传播：handler 被取消 → kill 子进程并收尸，快速收尾而非等满 60s。"""
     import anyio
 
@@ -243,7 +244,7 @@ def test_cancellation_kills_worker(fake_worker):
 
                 tg.start_soon(cancel_on_progress)
                 completed["result"] = await mcp_server.run_tool_in_worker(
-                    "transfer_design", {}, ctx
+                    facade, "transfer_design", {}, ctx
                 )
         return time.monotonic() - started
 
@@ -257,16 +258,68 @@ def test_cancellation_kills_worker(fake_worker):
     assert not _pid_alive(pid), "worker 子进程应已被终止"
 
 
-def test_worker_crash_yields_error_envelope(fake_worker):
+def test_worker_crash_yields_error_envelope(fake_worker, facade):
     """worker 异常退出（无结果行）→ WORKER_CRASHED 结构化错误，不炸穿 handler。"""
     import anyio
 
     fake_worker.use("crash")
-    result = anyio.run(mcp_server.run_tool_in_worker, "transfer_design", {}, _Ctx())
+    result = anyio.run(mcp_server.run_tool_in_worker, facade, "transfer_design", {}, _Ctx())
     assert result.is_error
     env = json.loads(result.content[0].text)
     assert env["status"] == "error"
     assert env["error"]["code"] == "WORKER_CRASHED"
+
+
+def test_injected_config_crosses_worker_boundary(monkeypatch, tmp_path):
+    """#601 钉子：构造注入的 Config（禁用环境变量表达）穿过 worker 子进程。
+
+    改动前 worker 自行 ``Config()``（从环境重建），注入被静默丢弃：
+    本测试在改动前必须失败——环境里放的诱饵目录是空的，worker 若读环境
+    就查不到注入目录里播种的记录。
+    """
+    import anyio
+
+    from e2m2e.api.mcp import run_tool_in_worker
+    from tests.api.test_facade_catalog import _fake_design, _make_design_result
+
+    injected_dir = tmp_path / "injected-catalog"
+    env_dir = tmp_path / "env-catalog"  # 诱饵：注入的 Config 必须赢过环境变量
+    monkeypatch.setenv("E2M2E_CATALOG_DIR", str(env_dir))
+
+    facade = Facade(config=Config(catalog_dir=str(injected_dir)))
+    with pytest.MonkeyPatch.context() as mp:
+        _fake_design(mp, _make_design_result(orbit_type="DRO"))
+        facade.design_orbit(orbit_type="DRO")
+    # 前提：记录确实落在注入目录（同 facade 进程内可查）
+    assert facade.catalog_query(orbit_family="dro").records
+
+    result = anyio.run(run_tool_in_worker, facade, "catalog_query", {}, _Ctx())
+    env = json.loads(result.content[0].text)
+    assert env["status"] == "ok"
+    assert env["data"]["records"], "worker 必须读到注入目录里的记录——注入的 Config 未穿透子进程？"
+
+
+def test_worker_rejects_unknown_config_field():
+    """配置载荷含未知字段：明确的错误信封，不静默降级到默认配置（#601）。"""
+    from types import SimpleNamespace
+
+    import anyio
+
+    from e2m2e.api.mcp import run_tool_in_worker
+
+    bad_config = SimpleNamespace(to_payload=lambda: {"bogus_field": 1})
+    facade = SimpleNamespace(config=bad_config)
+
+    result = anyio.run(
+        run_tool_in_worker,
+        facade,  # type: ignore[arg-type]
+        "catalog_query",
+        {},
+        _Ctx(),
+    )
+    env = json.loads(result.content[0].text)
+    assert env["status"] == "error"
+    assert env["error"]["code"] == "INVALID_PARAMS"
 
 
 def test_catalog_records_survive_worker_kill():
@@ -288,7 +341,7 @@ def test_catalog_records_survive_worker_kill():
         # 真实 worker（catalog_query）在任意阶段被取消（多半还在 import 期）：
         # kill 不应波及已入库记录
         with anyio.move_on_after(0.15):
-            await mcp_server.run_tool_in_worker("catalog_query", {}, _Ctx())
+            await mcp_server.run_tool_in_worker(seed_facade, "catalog_query", {}, _Ctx())
 
     anyio.run(scenario)
     assert time.monotonic() - started < 20, "取消后须快速收尾"

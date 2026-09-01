@@ -695,6 +695,16 @@ class Facade:
         self._config = config or Config()
         self._catalog_store: CatalogStore | None = None
 
+    @property
+    def config(self) -> Config:
+        """运行配置（只读视图）。
+
+        长任务工具经 worker 子进程执行时，配置经
+        :meth:`Config.to_payload` 随请求下发（#601），子进程用它重建
+        Facade——构造注入对全部工具生效，不再从环境变量静默重建。
+        """
+        return self._config
+
     # ---- 轨道库 catalog 私有设施（ADR 0031）----
 
     def _open_catalog(self) -> CatalogStore:

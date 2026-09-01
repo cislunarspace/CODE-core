@@ -1,4 +1,4 @@
-"""sidecar 二进制帧编解码（ADR 0035 §3）。
+"""二进制帧编解码（ADR 0035 §3）。
 
 帧格式是 tod ↔ e2m2e 的跨仓库持久契约，逐字段定义（多字节整数一律小端）：
 
@@ -10,7 +10,9 @@
     6+4·ndim  —   —         原始数组字节：C 连续、小端，长度 = prod(shape) × 元素宽度
 
 没有 version 字段：magic 兼职版本锚点，不兼容改动时换 magic（须走新 ADR）。
-本模块是帧契约的唯一实现点，不得引入 ADR 之外的字段。
+本模块是帧契约的唯一实现点，不得引入 ADR 之外的字段。位于 api/ 包根而
+非 sidecar 子包：执行核心的画布帧抽取（execution.py）与 sidecar 协议共
+用同一编解码（#601）。
 """
 
 from __future__ import annotations
