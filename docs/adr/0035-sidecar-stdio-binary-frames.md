@@ -97,3 +97,46 @@ frame ordering). The frame codec moved from `api/sidecar/frames.py` to
 `api/frames.py` — byte format and magic unchanged, so the cross-repo
 contract is unaffected. The unknown-tool response code is `TOOL_NOT_FOUND`
 (previously `UNKNOWN_TOOL` here), unified with the MCP transport.
+
+## Amendment (2026-09-01): job cancellation and live progress (#607)
+
+### Context
+
+The synchronous run_loop could not observe a cancel intent: while a tool
+executed, stdin went unread, and minutes-long family generation ran to
+completion regardless. The deferral recorded in ADR 0014's amendment (#601)
+is superseded by a maintainer decision: e2m2e is a foundational toolset —
+its wire contract should be complete ahead of a concrete consumer.
+
+### Decisions
+
+1. **Cancel request line**: a request of the shape `{"cancel": "<job_id>"}`
+   kills the in-flight long-running job (worker subprocess kill) and emits
+   `{"status": "cancelled", "data": null, "error": null, "meta":
+   {"job_id": ...}}`. Semantics are idempotent — cancelling an unknown or
+   finished job still emits the cancelled line and changes nothing else.
+   The cancelled request itself gets no result line (mirrors MCP
+   semantics). Consumers already tolerate unknown `status` values
+   (§2), so the extension is backward compatible.
+2. **Concurrent run_loop**: long-running tools (execution core
+   `LONG_RUNNING_TOOLS`) execute in a worker subprocess on a background
+   thread; the reader keeps consuming stdin during computation. Short
+   tools stay inline. Cancel registration happens synchronously in the
+   reader (event + process slot), so a cancel line racing job startup is
+   deterministic. Each job's output bytes (line + frames) are written
+   atomically under a lock — frames never interleave.
+3. **Live progress**: long-tool progress lines now forward the algorithm
+   layer's real fractions via the worker, superseding the single fake
+   percent=0 start line for those tools; short tools keep the start line.
+4. **Worker subprocess protocol** (internal to e2m2e, not the cross-repo
+   contract): the request may carry `binary_dtype`; the result line may
+   declare `binary_frames: N` followed by N raw frames in the §3 format.
+5. Multiple concurrent long jobs are allowed (keyed by `job_id`); jobs
+   without `job_id` run uncancellable. No queueing policy is defined.
+
+### Consequences
+
+- tod gains stop-button support: send a cancel line, tolerate the
+  `cancelled` status, correlate by `job_id`.
+- `handle_request` remains the single-request inline seam (uncancellable);
+  cancellation is a run_loop (process) feature.

@@ -15,6 +15,7 @@ import pytest
 
 pytestmark = pytest.mark.interface
 
+from e2m2e.api import execution  # noqa: E402
 from e2m2e.api.cli import main as cli_main  # noqa: E402
 from e2m2e.api.cli.main import main, tool_subcommands  # noqa: E402
 from e2m2e.api.config import Config  # noqa: E402
@@ -139,7 +140,7 @@ def fake_worker(monkeypatch, tmp_path):
     def use(mode: str) -> None:
         monkeypatch.setenv("FAKE_WORKER_MODE", mode)
         monkeypatch.setenv("FAKE_WORKER_PIDFILE", str(pidfile))
-        monkeypatch.setattr(cli_main, "_WORKER_ARGV", [sys.executable, "-c", _FAKE_WORKER_SCRIPT])
+        monkeypatch.setattr(execution, "WORKER_ARGV", [sys.executable, "-c", _FAKE_WORKER_SCRIPT])
 
     use("ok")
     return SimpleNamespace(pidfile=pidfile, use=use)
