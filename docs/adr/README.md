@@ -84,7 +84,7 @@ ADRs.
 | 0011 | Five-layer architecture and radical full renaming | Adopted (implemented) |
 | 0012 | Dependency-direction rules with CI import checks | Adopted (implemented; dependency table and enforcement scope revised by ADR 0039) |
 | 0013 | Verification strategy: complete tasks by definition | Adopted (test-tiering clause superseded by ADR 0021) |
-| 0014 | Interface layer Facade/MCP/CLI | Adopted (partially implemented: Facade done, MCP/CLI placeholders) |
+| 0014 | Interface layer Facade/MCP/CLI | Adopted (implemented; decisions 2 and 5 revised by ADR 0043, decision 8 completed for catalog value sets by ADR 0044) |
 | 0015 | NominalOrbit contract and coordinate-conversion abstraction | Adopted (implemented) |
 | 0016 | EphemCache ephemeris cache architecture | Adopted |
 | 0017 | Transfer grid search: purely numerical kernel pushed down to Rayon | Adopted |
@@ -101,7 +101,7 @@ ADRs.
 | 0028 | Planar triangular libration point family via full-period pseudo-arclength continuation | Adopted (#428 seam revised by ADR 0029) |
 | 0029 | Orbit family generation via unified Rust deep module | Adopted (implemented) |
 | 0030 | algorithm/forces stays at algorithm layer: Python config/orchestration surface, numerics in crates | Adopted |
-| 0031 | Orbit catalog: record format, storage layout, query interface | Adopted |
+| 0031 | Orbit catalog: record format, storage layout, query interface | Adopted (decision 4 overturned by ADR 0045; decisions 1, 2, 5 revised by ADR 0045; decision 7 revised by ADR 0043) |
 | 0032 | HJB dynamics in a new crate plus binding-layer generic entry | Adopted |
 | 0033 | HJB low-thrust toolchain: value-function product contract and online query interface | Adopted |
 | 0034 | Scope of the ephemeris force-model Hamiltonian | Adopted |
@@ -112,4 +112,7 @@ ADRs.
 | 0039 | Shared-kernel leaf modules at the package root | Adopted (implemented) |
 | 0040 | transfer_design converged trajectory: unified synodic-frame contract with trajectory_times | Adopted (implemented) |
 | 0041 | spatiography — cislunar partition (Primer) analytic core: five-province taxonomy, [primer] constants, scales/classify/boundaries tools | Adopted (implemented) |
-| 0042 | orbit taxonomy — 42-label classification of CR3BP periodic orbits: STK CODE vocabulary, self-defined analytic criteria, ingest stamping and response enrichment | Adopted (implemented) |
+| 0042 | orbit taxonomy — 42-label classification of CR3BP periodic orbits: STK CODE vocabulary, self-defined analytic criteria, ingest stamping and response enrichment | Adopted (implemented; decision 5 tool-count clause superseded by ADR 0043/0044; label table relocated by ADR 0044) |
+| 0043 | Interface class split — Facade keeps task-level methods, catalog and spatiography become their own classes | Adopted (implemented) |
+| 0044 | Terminology list exposure — closed value sets leave the repository through one registered tool | Adopted |
+| 0045 | Orbit record granularity — one record per trajectory, family as label | Adopted |

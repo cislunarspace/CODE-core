@@ -1,6 +1,7 @@
 # ADR 0031: Orbit catalog — record format, storage layout, query interface
 
-**Status**: Adopted
+**Status**: Adopted (decision 4 overturned by ADR 0045; decisions 1, 2, 5
+revised by ADR 0045; decision 7 revised by ADR 0043)
 **Date**: 2026-08-19
 **Related**: `docs/architecture/architecture.md` (§5 data management), ADR 0014
 (interface Facade/MCP/CLI), ADR 0024 (unified result status contract),
@@ -98,6 +99,15 @@ An entire OrbitFamily is one record; member parameters & arrays inside. Members
 may lift into standalone records (`source_record_id` → family) for downstream
 consumption such as station keeping.
 
+*(Revision note 2026-09-01, #611: overturned by ADR 0045 decisions 1 and 2 —
+one record carries exactly one trajectory, and a family becomes a label
+(`orbit_family` + `family_id` + `member_index`) queried by filter. `member_count`
+and `members[]` are removed at schema version 2, and `catalog_promote` — the
+member-lifting method this decision motivated — is removed with it. The two
+reasons recorded here, flooded query results and homeless family-level
+quantities, are answered there by index filters and by per-member run
+provenance.)*
+
 ### 5. Storage layout: flat record files + SQLite derived index
 
 ```
@@ -123,6 +133,11 @@ New Facade methods: `catalog_query` (multi-dimensional filters → summary list)
 packaging), `catalog_sweep` (parameter-space scan batch generation + ingestion;
 orchestration reuses ADR 0029's Rust family generation). CLI and MCP derive
 automatically per ADR 0014 pure derivation.
+
+*(Revision note 2026-09-01, #610: these methods move off `Facade` onto the
+catalog interface class of ADR 0043 decision 2, joined there by
+`orbit_family_generation` and by `catalog_terminology` (ADR 0044). Tool names,
+schemas and pure derivation are unchanged; only the holding class changes.)*
 
 ### 8. Automatic ingestion
 
