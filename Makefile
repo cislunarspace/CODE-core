@@ -49,7 +49,7 @@ DEV_SYNC := uv sync --group dev --no-install-project
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup cspice kernels dev dev-release test test-rust test-python docs check fmt clean clean-tests
+.PHONY: help setup cspice kernels dev dev-release test test-rust test-python check fmt clean clean-tests
 
 help:  ## 显示本帮助
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
