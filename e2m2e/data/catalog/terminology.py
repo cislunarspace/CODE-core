@@ -1,10 +1,28 @@
-"""轨道分类学 42 标签词汇（orbit taxonomy labels）。
+"""轨道库术语清单（ADR 0044）：调用方渲染结果所需的全部闭值集。
 
-三层分类学（issue #581，ADR 0042）：平动点轨道 27 + 月心轨道 4 + 共振
-轨道 11，标签措辞逐字采自 STK 未发布 CODE（Cislunar Orbit Designer）
-组件；判定判据无公开出处，为 e2m2e 自定解析判据（见 classify 模块）。
+[English]
 
-命名约定：
+Three closed value sets live here as static reference data: the 42-label
+taxonomy table (moved from ``algorithm/orbit_taxonomy``; the classifier keeps
+its criteria there and reads this table — the permitted dependency
+direction), the record-side ``orbit_family`` names, and the ``transfer_type``
+values. One registered tool serves all three (``catalog_terminology``,
+ADR 0043 decision 6 second clause: the content is referenced by response
+fields and no other tool supplies it). The package version is the
+terminology version: lists are frozen per release; callers fetch once per
+session and refresh after upgrading (ADR 0044 decision 4).
+
+[简体中文]
+
+三份闭值集作为静态参考数据住在这里：42 标签分类学表（自
+``algorithm/orbit_taxonomy`` 迁入；分类器判据留在算法层、向上读本表，
+依赖方向合法）、记录侧 ``orbit_family`` 族名、``transfer_type`` 转移
+类型。三者经一个注册工具出库（``catalog_terminology``，ADR 0043 决策 6
+第二款准入的首例执行：内容被响应字段引用且无既有工具可供给）。
+包版本即术语版本：清单随发布冻结，调用方每会话取一次、升级后刷新
+（ADR 0044 决策 4）。
+
+命名约定（自 ADR 0042 随表迁入）：
 
 - 规范字符串为 snake_case，如 ``halo_l2_northern``、``low_prograde_eastern``；
   它是序列化键（MCP 响应、catalog 记录），结构化字段是语义载荷。
@@ -25,6 +43,8 @@ __all__ = [
     "Hemisphere",
     "TaxonomyCategory",
     "TaxonomyLabel",
+    "RECORD_ORBIT_FAMILIES",
+    "TRANSFER_TYPES",
     "label_legend",
     "parse_taxonomy_label",
 ]
@@ -150,7 +170,7 @@ def parse_taxonomy_label(canonical: str) -> TaxonomyLabel:
 
 
 def label_legend() -> dict[str, dict[str, object]]:
-    """规范字符串 → 结构化字段的图例（MCP legend / 文档用）。"""
+    """规范字符串 → 结构化字段的图例（``catalog_terminology`` 的载荷源）。"""
     legend: dict[str, dict[str, object]] = {}
     for label in TAXONOMY:
         legend[label.canonical] = {
@@ -162,3 +182,25 @@ def label_legend() -> dict[str, dict[str, object]]:
             "resonance_q": None if label.resonance is None else label.resonance[1],
         }
     return legend
+
+
+#: 记录侧 orbit_family 闭值集（ADR 0044 决策 2）：ingest 能盖到库记录上的
+#: 全部族名 = 映射表像 ∪ 小写生成器类型。与 api/catalog_ingest 的同步由
+#: tests/api/test_catalog_terminology.py 双向锁定（清单漂移即测试失败）。
+RECORD_ORBIT_FAMILIES: tuple[str, ...] = (
+    "axial",
+    "dpo",
+    "dro",
+    "elfo",
+    "halo",
+    "horseshoe",
+    "lissajous",
+    "lpo",
+    "nrho",
+    "spo",
+)
+
+
+#: 转移类型闭值集：算法层 state_frame 派生键的同源镜像
+#:（同步同样由测试锁定）。
+TRANSFER_TYPES: tuple[str, ...] = ("HMN", "LGA", "WSB", "low_thrust")

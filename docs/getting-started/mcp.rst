@@ -162,6 +162,12 @@ not registered (they go live automatically once implemented). Currently 18:
    * - ``catalog_tag``
      - Catalog
      - Teaching annotations: ``tags`` replaces wholesale; ``note`` free text.
+   * - ``catalog_terminology``
+     - Catalog
+     - Closed value sets for rendering results: taxonomy label legend
+       (canonical → category/family/point/hemisphere/resonance),
+       ``orbit_family`` names, ``transfer_type`` values. No parameters; the
+       package version is the terminology version (ADR 0044).
    * - ``catalog_export``
      - Catalog
      - Package-and-export by query: ``dest`` ending in ``.zip`` produces an

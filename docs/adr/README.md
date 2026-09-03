@@ -114,5 +114,5 @@ ADRs.
 | 0041 | spatiography — cislunar partition (Primer) analytic core: five-province taxonomy, [primer] constants, scales/classify/boundaries tools | Adopted (implemented) |
 | 0042 | orbit taxonomy — 42-label classification of CR3BP periodic orbits: STK CODE vocabulary, self-defined analytic criteria, ingest stamping and response enrichment | Adopted (implemented; decision 5 tool-count clause superseded by ADR 0043/0044; label table relocated by ADR 0044) |
 | 0043 | Interface class split — Facade keeps task-level methods, catalog and spatiography become their own classes | Adopted (implemented) |
-| 0044 | Terminology list exposure — closed value sets leave the repository through one registered tool | Adopted |
+| 0044 | Terminology list exposure — closed value sets leave the repository through one registered tool | Adopted (implemented) |
 | 0045 | Orbit record granularity — one record per trajectory, family as label | Adopted (implemented) |

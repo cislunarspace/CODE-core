@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from e2m2e.algorithm.orbit_taxonomy.labels import (
+from e2m2e.data.catalog.terminology import (  # ADR 0044：词表已迁数据层
     TAXONOMY,
     TAXONOMY_BY_CANONICAL,
     Hemisphere,

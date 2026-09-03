@@ -48,6 +48,7 @@ __all__ = [
     "CatalogDeleteResponse",
     "CatalogTagRequest",
     "CatalogTagResponse",
+    "CatalogTerminologyResponse",
     "CatalogExportRequest",
     "CatalogExportResponse",
     "CatalogSweepRequest",
@@ -1502,6 +1503,21 @@ class CatalogTagResponse(ResultResponse):
     """catalog_tag 输出：更新后的记录摘要。"""
 
     record: CatalogRecordSummary
+
+
+class CatalogTerminologyResponse(ResultResponse):
+    """catalog_terminology 输出：调用方渲染结果所需的全部闭值集（ADR 0044）。
+
+    无参数；包版本即术语版本（清单随发布冻结，调用方每会话取一次、
+    升级后刷新，未知标签按可读规范串原样渲染）。
+    """
+
+    taxonomy_labels: dict[str, dict[str, Any]] = Field(
+        description="分类学标签图例：规范字符串 → 结构化字段"
+        "（category/family/libration_point/hemisphere/resonance_p/resonance_q，ADR 0042）"
+    )
+    orbit_families: list[str] = Field(description="记录侧 orbit_family 闭值集（族名清单）")
+    transfer_types: list[str] = Field(description="转移类型闭值集（HMN/LGA/WSB/low_thrust）")
 
 
 class CatalogExportRequest(CatalogQueryRequest):

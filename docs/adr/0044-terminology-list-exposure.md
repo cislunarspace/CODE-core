@@ -1,6 +1,8 @@
 # ADR 0044: Terminology list exposure — closed value sets leave the repository through one registered tool
 
-**Status**: Adopted
+**Status**: Adopted (implemented — constants at the data layer, single tool
+registered, cross-layer sync locked by tests; the request-side `valid_ranges`
+outlet remains the open half of ADR 0014 decision 8)
 **Date**: 2026-09-01
 **Related Issue**: #609
 **Related**: ADR 0011 (five-layer architecture), ADR 0012 (dependency

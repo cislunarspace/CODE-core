@@ -59,6 +59,7 @@ from .models import (
     CatalogSweepResponse,
     CatalogTagRequest,
     CatalogTagResponse,
+    CatalogTerminologyResponse,
     FamilyGenerationRequest,
     FamilyGenerationResponse,
     OrbitError,
@@ -812,6 +813,32 @@ class Catalog:
             dest=request.dest,
             record_ids=record_ids,
             exported_count=len(record_ids),
+        )
+
+    @mcp_exposed
+    def catalog_terminology(self) -> CatalogTerminologyResponse:
+        """Closed value sets callers need to render catalog results..
+
+        术语清单（ADR 0044）：分类学标签图例 + orbit_family 闭值集 +
+        transfer_type 闭值集，无参数。包版本即术语版本：调用方每会话取
+        一次、升级后刷新，未知标签按可读规范串原样渲染。"""
+        from e2m2e.data.catalog.terminology import (
+            RECORD_ORBIT_FAMILIES,
+            TRANSFER_TYPES,
+            label_legend,
+        )
+
+        legend = label_legend()
+        return CatalogTerminologyResponse(
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message=(
+                f"术语清单：{len(legend)} 标签 / "
+                f"{len(RECORD_ORBIT_FAMILIES)} 族名 / {len(TRANSFER_TYPES)} 转移类型"
+            ),
+            taxonomy_labels=legend,
+            orbit_families=list(RECORD_ORBIT_FAMILIES),
+            transfer_types=list(TRANSFER_TYPES),
         )
 
     @mcp_exposed(request_model=CatalogSweepRequest)
