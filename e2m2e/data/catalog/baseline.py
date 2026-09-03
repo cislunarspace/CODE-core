@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 from importlib.resources.abc import Traversable
 
@@ -66,7 +67,8 @@ def import_baseline(store: CatalogStore, source_dir: Traversable | None = None) 
                 f"基线束 {family_id} 的 JSON 声明了 arrays 但包内缺少"
                 f" {family_id}.npz，数据集不完整（生成见 make catalog-baseline）"
             )
-        with np.load(npz_src) as npz:
+        # Traversable 无路径语义（包资源可能是 zip 内成员），经字节流加载
+        with np.load(io.BytesIO(npz_src.read_bytes())) as npz:
             bundle_arrays = {key: npz[key] for key in npz.files}
         for meta, arrays in expand_bundle(bundle_meta, bundle_arrays):
             store.put(meta, arrays)
