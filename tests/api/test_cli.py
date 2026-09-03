@@ -34,14 +34,11 @@ def facade() -> Facade:
 
 
 def test_tool_subcommands_match_inventory(facade):
-    """子命令集合 = tool_inventory 中 implemented 的连字符命名；placeholder 不出现。"""
+    """子命令集合 = tool_inventory 中 implemented 的连字符命名（单一来源）。"""
     expected = {
         i.name.replace("_", "-") for i in tool_inventory(facade) if i.status == "implemented"
     }
     assert set(tool_subcommands(facade)) == expected
-    placeholders = {i.name.replace("_", "-") for i in tool_inventory(facade)} - expected
-    assert placeholders, "前提：Facade 至少有一个 placeholder 工具"
-    assert not placeholders & set(tool_subcommands(facade))
 
 
 def test_top_help_lists_tools_and_deployments(capsys):

@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics.cr3bp_system import CR3BP_System
+from e2m2e.api.catalog import _family_generation_payload
 from e2m2e.api.catalog_ingest import build_family_record
-from e2m2e.api.facade import _family_generation_payload
 from e2m2e.api.models import FamilyGenerationRequest
 from e2m2e.data.catalog import CatalogFilter, CatalogStore
 from e2m2e.data.constants import Datum

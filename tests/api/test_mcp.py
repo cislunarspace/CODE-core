@@ -37,10 +37,26 @@ def test_registered_tools_match_inventory(facade):
     specs = tool_specs(facade)
     expected = [i.name for i in tool_inventory(facade) if i.status == "implemented"]
     assert [s.name for s in specs] == expected
-    # placeholder 不注册
-    placeholders = {i.name for i in tool_inventory(facade) if i.status == "placeholder"}
-    assert placeholders, "前提：Facade 至少有一个 placeholder 工具"
-    assert not placeholders & {s.name for s in specs}
+
+
+def test_placeholder_mechanism_filters_stub_tools():
+    """placeholder 元数据机制：标记占位的方法不注册（ADR 0014）。
+
+    ADR 0043 决策 4 后 Facade 不再持有占位声明，用桩对象验证机制本身，
+    待未来二档方法在领域类落地时仍走同一过滤。
+    """
+    from e2m2e.api.facade import mcp_exposed
+
+    class _Stub:
+        @mcp_exposed(request_model=DesignOrbitRequest)
+        def real_tool(self, **params):
+            return {}
+
+        @mcp_exposed(status="placeholder")
+        def placeholder_tool(self, **params):
+            raise NotImplementedError
+
+    assert [s.name for s in tool_specs(_Stub())] == ["real_tool"]
 
 
 def test_input_schema_derived_from_request_model(facade):
@@ -111,14 +127,6 @@ def test_unknown_tool_envelope(facade):
     assert result.is_error
     env = json.loads(result.content[0].text)
     assert env["error"]["code"] == "TOOL_NOT_FOUND"
-
-
-def test_placeholder_tool_not_registered(facade):
-    placeholders = [i.name for i in tool_inventory(facade) if i.status == "placeholder"]
-    for name in placeholders:
-        result = handle_call_tool(facade, name, {})
-        env = json.loads(result.content[0].text)
-        assert env["error"]["code"] == "TOOL_NOT_FOUND"
 
 
 def test_create_server_binds_facade(facade):
@@ -256,14 +264,6 @@ def test_catalog_record_response_serializes_arrays():
     json.dumps(env)
     assert env["data"]["arrays"]["cr3bp/states"] == [[0.0] * 6, [0.0] * 6]
     assert env["data"]["arrays"]["cr3bp/times"] == [0.0, 1.0]
-
-
-def test_orbit_stability_placeholder_not_registered(facade):
-    """orbit_stability 需 Orbit 对象入参，无法经 JSON 信封表达：不注册（回归）。"""
-    assert "orbit_stability" not in {s.name for s in tool_specs(facade)}
-    result = handle_call_tool(facade, "orbit_stability", {})
-    env = json.loads(result.content[0].text)
-    assert env["error"]["code"] == "TOOL_NOT_FOUND"
 
 
 def test_spacetime_times_description_states_dual_units():

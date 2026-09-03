@@ -20,7 +20,7 @@ def main() -> None:
 
     print("生成 L4 SPO 周期族（振幅 5,000~20,000 km）")
     started = time.perf_counter()
-    spo = facade.orbit_family_generation(
+    spo = facade.catalog.orbit_family_generation(
         orbit_type="SPO",
         libration_point=4,
         min_amplitude_km=5000.0,
@@ -37,7 +37,7 @@ def main() -> None:
 
     print("\n生成 L2 Lissajous 拟周期采样族")
     started = time.perf_counter()
-    lissajous = facade.orbit_family_generation(
+    lissajous = facade.catalog.orbit_family_generation(
         orbit_type="LISSAJOUS",
         libration_point=2,
         amplitude_in_km=2400.0,

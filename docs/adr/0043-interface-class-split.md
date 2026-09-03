@@ -121,3 +121,15 @@ are reported by running the inventory, never quoted from documents.
 
 - One breaking change for in-process callers, with no behavioural benefit to
   them — the benefit is comprehension for readers of the interface layer.
+
+## Implementation note (2026-09-01, #610)
+
+Decision 5's letter says the inventory "takes the set of exposed instances";
+the implementation takes the composition root and derives the set
+(``Facade.exposed_apis``), for two reasons: every existing construction and
+ dispatch seam (CLI, sidecar, MCP worker, tests) passes one root object, and
+ the execution/sidecar test seams inject single-object stubs that carry no
+ ``exposed_apis`` — the resolver falls back to scanning the object itself
+ (:func:`e2m2e.api.facade.resolve_tool_method` is the single owner-resolution
+ entry). The scan root is still the set of exposed instances; only how it is
+ obtained changed.
