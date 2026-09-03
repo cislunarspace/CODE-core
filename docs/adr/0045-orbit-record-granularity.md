@@ -1,6 +1,9 @@
 # ADR 0045: Orbit record granularity — one record per trajectory, family as label
 
-**Status**: Adopted
+**Status**: Adopted (implemented — schema v2 with per-member records,
+family_id/member_index labels, family_id filtering, promote removal, and the
+bundle-expanding first-use baseline import; measured: 592 members expand in
+~7 s once, idempotent re-opens skip)
 **Date**: 2026-09-01
 **Related Issue**: #611
 **Related**: ADR 0024 (result status contract), ADR 0031 (decision 4 overturned
@@ -152,3 +155,13 @@ still holds exactly one record shape. Shipping 592 expanded records — about
   single `catalog_sweep` may write several hundred files.
 - The packaged baseline must be regenerated, and the expansion step is new code
   on the read path.
+
+## Implementation note (2026-09-01, #611)
+
+Decision 3's "legacy records deleted wholesale" lands as fail-on-open, not
+auto-deletion: a v1 record encountered during index rebuild raises with the
+standing instruction ("旧产物不兼容读取，请删除后重算"), and the user deletes
+their catalog directory manually. Silently deleting user data on upgrade was
+rejected. The bundled v1 family files themselves are untouched — they are the
+frozen transport format of decision 8, read structurally (no v2 validation)
+and expanded by `data/catalog/bundle.py`.

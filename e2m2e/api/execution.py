@@ -68,7 +68,7 @@ def _family_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], lis
         "mu": finite_or_none(getattr(result.system, "mu", None)),
         "requested_members": result.requested_members,
         "generated_members": result.generated_members,
-        "record_id": result.record_id,
+        "family_id": result.family_id,
         "orbits": [
             {
                 "states": None,
@@ -85,7 +85,7 @@ def _catalog_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], li
     """catalog_get 响应的画布契约：数组段 ndarray 出帧。
 
     帧序 = JSON 行 ``data.arrays`` 中 None 占位键的顺序；每帧是对应键的
-    数组。非数组值原样留 JSON。元数据、标量段、成员参数表不受影响。
+    数组。非数组值原样留 JSON。元数据、标量段不受影响。
     本函数与族生成的帧抽取共用 states/times/period/mu 同一套画布契约
     字段（当前各自独立实现，待第二个消费点出现再收拢）。
     """

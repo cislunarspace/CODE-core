@@ -162,10 +162,6 @@ not registered (they go live automatically once implemented). Currently 18:
    * - ``catalog_tag``
      - Catalog
      - Teaching annotations: ``tags`` replaces wholesale; ``note`` free text.
-   * - ``catalog_promote``
-     - Catalog
-     - Lift a family member (``member_index``) into a standalone record;
-       ``source_record_id`` points at its family.
    * - ``catalog_export``
      - Catalog
      - Package-and-export by query: ``dest`` ending in ``.zip`` produces an
@@ -210,12 +206,12 @@ Design → station keep → annotate::
    catalog_tag(record_id=…, tags=["teaching"], note="…")
    catalog_export(orbit_family="nrho", dest="nrho.zip")
 
-Family → pick member → station keep::
+Family → pick member → station keep (one record per orbit, ADR 0045; the
+family is a queryable label, not a container)::
 
    orbit_family_generation(orbit_type="HALO", libration_point=2, n_orbits=10)
-   catalog_query(orbit_family="halo")          # browse family records
-   catalog_promote(record_id=…, member_index=3)  # lift member to standalone
-   control_orbit(input_record_id=<promoted>)
+   catalog_query(family_id=…)                    # the run's member records
+   control_orbit(input_record_id=<member record>)
 
 Bulk-fill the catalog::
 
@@ -259,14 +255,13 @@ A reviewed loop looks like this:
 
 Verified end-to-end session (13 calls, ~1 minute on a release build)::
 
-   catalog_query({})                                  # 13 baseline records
+   catalog_query({})                                  # baseline member records
    design_orbit(orbit_type="NRHO", north_south=2, perilune_height=2000,
                 phase=0.5, epoch=[2026,1,1,0,0,0.0],
                 duration=691200.0, output_step=7200.0)    # converged, ~22 s
    catalog_tag(record_id=…, tags=["candidate"], note="…")
    orbit_family_generation(orbit_type="HALO", libration_point=2, n_orbits=5)
-   catalog_query(orbit_family="halo")
-   catalog_promote(record_id=…, member_index=2)        # member → standalone
+   catalog_query(family_id=…)                  # member records of the run
    design_orbit(orbit_type="DRO", amplitude=15000, phase=0.5001,
                 epoch=[2026,1,1,0,0,0.0],
                 duration=7776000.0, output_step=7200.0)   # converged, ~17 s
@@ -356,11 +351,12 @@ Troubleshooting
   epochs inside the historical file's coverage.
 - ``data.status`` renders as ``"<ConvergenceState>"`` instead of a value like
   ``"converged"``: envelope enum degradation on the fallback serialization
-  path (family / catalog_get / catalog_promote responses), fixed in the
-  current tree (issue #557).
-- A fresh catalog answers ``catalog_query({})`` with 13 records: the packaged
-  CR3BP baseline dataset auto-imports on first open (ADR 0036) — that is
-  intentional, not leftover state.
+  path (family / catalog_get responses), fixed in the current tree (issue
+  #557).
+- A fresh catalog answers ``catalog_query({})`` with the packaged CR3BP
+  baseline's member records (592 at the time of writing): the baseline
+  distribution bundles expand into per-member records on first open
+  (ADR 0036 / ADR 0045) — that is intentional, not leftover state.
 - ``pytest tests/api/test_mcp.py`` reports the whole file as skipped: the
   ``[mcp]`` extra is missing (the module uses ``importorskip``). Install with
   ``uv sync --extra mcp`` and re-run.

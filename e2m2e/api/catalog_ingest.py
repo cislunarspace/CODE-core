@@ -19,6 +19,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import math
+import uuid
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -43,7 +44,8 @@ __all__ = [
     "build_control_record",
     "finite_or_none",
     "build_design_record",
-    "build_family_record",
+    "build_family_bundle",
+    "build_family_records",
     "build_transfer_record",
     "stamp_taxonomy_labels",
 ]
@@ -197,7 +199,6 @@ def build_design_record(request: Any, result: Any) -> tuple[dict, dict[str, np.n
         cause=result.cause,
         message=result.message,
         scalars={
-            "member_count": 1 if cr3bp_orbit is not None else 0,
             "orbit_type": selection,
             "epoch_utc": result.epoch_utc,
             "duration_day": result.duration_day,
@@ -212,7 +213,38 @@ def build_design_record(request: Any, result: Any) -> tuple[dict, dict[str, np.n
     return meta, arrays
 
 
-def build_family_record(
+def _family_member_rows(
+    family: Any, members: list[Any], *, periodicity: str, context: str
+) -> tuple[list[str], list[dict[str, Any]]]:
+    """逐成员事实：实测标签（去重集合 + 逐成员 primary）与参数表。
+
+    成员表字段与 v1 族束 / v2 成员记录共用：``index``/``period``/
+    ``closure_error``/``jacobi``/``amplitude_km``（几何主振幅，km）/
+    ``amplitudes``/``parameters``/``taxonomy_label``。
+    """
+    taxonomy_labels, member_labels = stamp_taxonomy_labels(
+        family.family_type, members, periodicity=periodicity, context=context
+    )
+    system = family.system
+    char_length_km = getattr(system, "characteristic_length", None)
+    rows: list[dict[str, Any]] = []
+    for index, orbit in enumerate(members):
+        rows.append(
+            {
+                "index": index,
+                "period": finite_or_none(orbit.period),
+                "closure_error": finite_or_none(getattr(orbit, "closure_error", None)),
+                "jacobi": _member_jacobi(system, orbit),
+                "amplitude_km": geometric_amplitude_km(orbit.states, char_length_km),
+                "amplitudes": _sanitize_value(getattr(orbit, "amplitudes", {})),
+                "parameters": _sanitize_value(getattr(orbit, "parameters", {})),
+                "taxonomy_label": member_labels[index],
+            }
+        )
+    return taxonomy_labels, rows
+
+
+def build_family_records(
     request: Any,
     *,
     family: Any,
@@ -221,11 +253,14 @@ def build_family_record(
     message: str,
     requested_members: int,
     generated_members: int,
-) -> tuple[dict, dict[str, np.ndarray]] | None:
-    """从 orbit_family_generation 的请求与族结果构建记录（一族一条）。
+) -> tuple[str, list[tuple[dict[str, Any], dict[str, np.ndarray]]]] | None:
+    """从族结果构建逐成员记录列表（ADR 0045：一轨一记录，绝不打捆）。
 
-    成员参数（周期、闭合误差、Jacobi、参数表）在元数据 ``members`` 内，
-    成员数组（states/times）在 ``cr3bp/members/`` 段。零成员时不建记录。
+    返回 ``(family_id, [(meta, arrays), …])``；零成员返回 None。
+    每条成员记录：族标签三件套（orbit_family + family_id +
+    member_index）、CR3BP 段（states/times）、单点 jacobi 包络、几何
+    主振幅、成员 primary 实测标签；运行级溯源（请求快照、
+    requested/generated、mu、特征长度、periodicity）随每条成员走。
 
     Args:
         request: ``FamilyGenerationRequest``（已校验、含默认值）。
@@ -238,35 +273,95 @@ def build_family_record(
     char_length_km = getattr(system, "characteristic_length", None)
     mu = getattr(system, "mu", None)
     periodicity = family.metadata.get("periodicity", "periodic")
-    taxonomy_labels, member_labels = stamp_taxonomy_labels(
-        family.family_type, members, periodicity=periodicity, context="orbit_family_generation"
+    _, rows = _family_member_rows(
+        family, members, periodicity=periodicity, context="orbit_family_generation"
+    )
+    family_id = uuid.uuid4().hex[:12]
+    records: list[tuple[dict[str, Any], dict[str, np.ndarray]]] = []
+    for row in rows:
+        index = row["index"]
+        label = row["taxonomy_label"]
+        meta = _base_meta(
+            source_tool="orbit_family_generation",
+            source_record_id=None,
+            classification={
+                "orbit_family": family.family_type,
+                "libration_point": request.libration_point,
+                "jacobi": point_interval(row["jacobi"]),
+                "amplitude": point_interval(row["amplitude_km"]),
+                "has_cr3bp": True,
+                "has_ephemeris": False,
+                "taxonomy_labels": [label] if label else None,
+            },
+            status=status,
+            cause=cause,
+            message=message,
+            scalars={
+                "requested_members": requested_members,
+                "generated_members": generated_members,
+                "periodicity": periodicity,
+                "mu": mu,
+                "char_length_km": char_length_km,
+                "period": row["period"],
+                "closure_error": row["closure_error"],
+                "amplitude_km": row["amplitude_km"],
+                "amplitudes": row["amplitudes"],
+                "parameters": row["parameters"],
+            },
+            request=_request_snapshot(request),
+            family_id=family_id,
+            member_index=index,
+        )
+        arrays = {
+            "cr3bp/states": np.asarray(members[index].states, dtype=float),
+            "cr3bp/times": np.asarray(members[index].times, dtype=float),
+        }
+        records.append((meta, arrays))
+    return family_id, records
+
+
+def build_family_bundle(
+    request: Any,
+    *,
+    family: Any,
+    status: ConvergenceState,
+    cause: FailureCause,
+    message: str,
+    requested_members: int,
+    generated_members: int,
+) -> tuple[dict, dict[str, np.ndarray]] | None:
+    """从族结果构建 v1 族束（基线分发包，ADR 0045 决策 8）。
+
+    仅供 ``scripts/generate_catalog_baseline.py`` 打包分发；库内记录
+    一律经 :func:`build_family_records` 逐成员写入。成员参数在元数据
+    ``members`` 内，成员数组在 ``cr3bp/members/`` 段（传输格式冻结
+    在 v1 布局，首用导入经 ``data/catalog/bundle.py`` 展开）。
+
+    Args:
+        request: ``FamilyGenerationRequest``（已校验、含默认值）。
+        family: ``OrbitFamily``（或读取接口兼容的响应对象）。
+    """
+    members = list(family.orbits)
+    if not members:
+        return None
+    system = family.system
+    char_length_km = getattr(system, "characteristic_length", None)
+    mu = getattr(system, "mu", None)
+    periodicity = family.metadata.get("periodicity", "periodic")
+    taxonomy_labels, rows = _family_member_rows(
+        family, members, periodicity=periodicity, context="orbit_family_generation"
     )
 
     arrays: dict[str, np.ndarray] = {}
-    member_metas: list[dict[str, Any]] = []
     jacobis: list[float] = []
     amplitudes: list[float] = []
     for index, orbit in enumerate(members):
         arrays[member_array_key(index, "states")] = np.asarray(orbit.states, dtype=float)
         arrays[member_array_key(index, "times")] = np.asarray(orbit.times, dtype=float)
-        jacobi = _member_jacobi(system, orbit)
-        amplitude_km = geometric_amplitude_km(orbit.states, char_length_km)
-        if jacobi is not None:
-            jacobis.append(jacobi)
-        if amplitude_km is not None:
-            amplitudes.append(amplitude_km)
-        member_metas.append(
-            {
-                "index": index,
-                "period": finite_or_none(orbit.period),
-                "closure_error": finite_or_none(getattr(orbit, "closure_error", None)),
-                "jacobi": jacobi,
-                "amplitude_km": amplitude_km,
-                "amplitudes": _sanitize_value(getattr(orbit, "amplitudes", {})),
-                "parameters": _sanitize_value(getattr(orbit, "parameters", {})),
-                "taxonomy_label": member_labels[index],
-            }
-        )
+        if rows[index]["jacobi"] is not None:
+            jacobis.append(rows[index]["jacobi"])
+        if rows[index]["amplitude_km"] is not None:
+            amplitudes.append(rows[index]["amplitude_km"])
 
     meta = _base_meta(
         source_tool="orbit_family_generation",
@@ -293,7 +388,8 @@ def build_family_record(
         },
         request=_request_snapshot(request),
     )
-    meta["members"] = member_metas
+    # v1 传输格式专用键（库内 v2 记录无 members）
+    meta["members"] = rows
     return meta, arrays
 
 
@@ -339,7 +435,6 @@ def build_control_record(
         cause=result.cause,
         message=result.message,
         scalars={
-            "member_count": 0,
             "control_mode": request.control_mode,
             "num_failed": result.num_failed,
             "mu": request.mu,
@@ -392,7 +487,6 @@ def build_transfer_record(request: Any, result: Any) -> tuple[dict, dict[str, np
         cause=result.cause,
         message=result.message,
         scalars={
-            "member_count": 0,
             "transfer_type": result.transfer_type,
             "delta_v_km_s": numeric_or_none(result.delta_v),
             "tli_epoch": _sanitize_value(request.tli_epoch),
@@ -453,19 +547,23 @@ def _base_meta(
     message: str,
     scalars: dict[str, Any],
     request: dict[str, Any],
+    family_id: str | None = None,
+    member_index: int | None = None,
 ) -> dict[str, Any]:
     """记录元数据的公共骨架；schema_version/record_id/created_at/arrays
-    指针由存储引擎在写入时填写。"""
+    指针由存储引擎在写入时填写。族维度（ADR 0045）默认非族记录
+    （``family_id``/``member_index`` 均为 None）。"""
     return {
         "source_tool": source_tool,
         "source_record_id": source_record_id,
+        "family_id": family_id,
+        "member_index": member_index,
         "classification": classification,
         "status": ConvergenceState(status).value,
         "cause": FailureCause(cause).value,
         "message": message,
         "scalars": scalars,
         "request": request,
-        "members": [],
         "tags": [],
         "note": "",
     }

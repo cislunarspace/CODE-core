@@ -36,7 +36,6 @@ from e2m2e.data.catalog import (
     import_baseline,
     numeric_or_none,
 )
-from e2m2e.data.catalog import member_count as catalog_member_count
 from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import OrbitFamily
 
@@ -51,8 +50,6 @@ from .models import (
     CatalogExportRequest,
     CatalogExportResponse,
     CatalogGetRequest,
-    CatalogPromoteRequest,
-    CatalogPromoteResponse,
     CatalogQueryRequest,
     CatalogQueryResponse,
     CatalogRecordResponse,
@@ -110,6 +107,7 @@ def _to_catalog_filter(request: CatalogQueryRequest) -> CatalogFilter:
     """把查询请求模型翻译为数据层过滤条件。"""
     return CatalogFilter(
         orbit_family=request.orbit_family,
+        family_id=request.family_id,
         libration_point=request.libration_point,
         jacobi_min=request.jacobi_min,
         jacobi_max=request.jacobi_max,
@@ -131,19 +129,21 @@ def _summary_kwargs(
     *,
     identity: dict[str, Any],
     classification: dict[str, Any],
-    member_count: int,
 ) -> dict[str, Any]:
     """摘要公共字段（索引行与记录元数据两种来源共用）。
 
     transfer 维度（#574）两种来源都归一在 identity 顶层：索引行直接带
     列值；记录元数据经 ``_summary_from_meta`` 从 ``scalars`` 提取后合入。
     分类学标签（#581）随 ``classification`` 走，未打标记录为 None。
+    族维度（ADR 0045）：``family_id``/``member_index`` 随 identity 顶层走。
     """
     return {
         "record_id": identity["record_id"],
         "created_at": identity["created_at"],
         "source_tool": identity["source_tool"],
         "source_record_id": identity["source_record_id"],
+        "family_id": identity.get("family_id"),
+        "member_index": identity.get("member_index"),
         "orbit_family": classification["orbit_family"],
         "libration_point": classification["libration_point"],
         "jacobi": classification["jacobi"],
@@ -157,7 +157,6 @@ def _summary_kwargs(
         "status": identity["status"],
         "cause": identity["cause"],
         "message": identity["message"],
-        "member_count": member_count,
         "tags": identity["tags"],
         "note": identity["note"],
     }
@@ -169,13 +168,12 @@ def _summary_from_index(summary: dict[str, Any]) -> CatalogRecordSummary:
         **_summary_kwargs(
             identity=summary,
             classification=summary["classification"],
-            member_count=summary["member_count"],
         )
     )
 
 
 def _summary_from_meta(meta: dict[str, Any]) -> CatalogRecordSummary:
-    """记录元数据 → 摘要响应模型（member_count 与索引用同一份推导）。
+    """记录元数据 → 摘要响应模型（族维度与索引用同一份顶层推导）。
 
     transfer 维度从 ``scalars`` 提取归一到 identity 顶层（与索引行同形）。
     """
@@ -190,7 +188,6 @@ def _summary_from_meta(meta: dict[str, Any]) -> CatalogRecordSummary:
         **_summary_kwargs(
             identity=identity,
             classification=meta["classification"],
-            member_count=catalog_member_count(meta),
         )
     )
 
@@ -203,7 +200,6 @@ def _record_to_response(record: Any) -> CatalogRecordResponse:
         **summary.model_dump(),
         scalars=meta["scalars"],
         request=meta["request"],
-        members=meta["members"],
         details=meta.get("details"),
         arrays=record.arrays,
     )
@@ -458,9 +454,9 @@ class Catalog:
         return self._catalog_store
 
     def auto_ingest(self, builder: Callable[[], tuple[dict, dict[str, Any]] | None]) -> str | None:
-        """产物自动入库（ADR 0031 决策 8；Facade 任务方法经此接缝入库）。
+        """单条产物自动入库（ADR 0031 决策 8；Facade 任务方法经此接缝入库）。
 
-        无产物（族零成员、站保星历缺失）返回 None；入库失败抛
+        无产物（站保星历缺失）返回 None；入库失败抛
         ``CATALOG_WRITE_FAILED``，不静默降级、不冒名为计算失败（ADR 0020）。
         """
         if not self._config.catalog_enabled:
@@ -471,6 +467,32 @@ class Catalog:
                 return None
             meta, arrays = built
             return self._open_catalog().put(meta, arrays)
+        except OrbitError:
+            raise
+        except Exception as exc:
+            raise _catalog_write_failed(exc) from exc
+
+    def auto_ingest_family(
+        self,
+        builder: Callable[[], tuple[str, list[tuple[dict, dict[str, Any]]]] | None],
+    ) -> str | None:
+        """族产物逐成员自动入库（ADR 0045：一轨一记录），返回 family_id。
+
+        无产物（零成员）返回 None。逐条写入、无跨记录事务（决策 7）：
+        中途失败时已写成员保留（诚实的部分结果）并抛
+        ``CATALOG_WRITE_FAILED``；运行级溯源随每条成员走，同一 builder
+        单点写入，不会漂移（决策 2）。
+        """
+        if not self._config.catalog_enabled:
+            return None
+        try:
+            built = builder()
+            if built is None:
+                return None
+            family_id, records = built
+            for meta, arrays in records:
+                self._open_catalog().put(meta, arrays)
+            return family_id
         except OrbitError:
             raise
         except Exception as exc:
@@ -513,12 +535,12 @@ class Catalog:
             ) from exc
 
     def _ingest_sweep_outcome(self, outcome: Any, family_request: Any) -> str | None:
-        """扫描单点结果入库；硬失败点（result=None）无记录。"""
+        """扫描单点结果逐成员入库，返回 family_id；硬失败点（result=None）无记录。"""
         result = outcome.result
         if result is None:
             return None
-        return self.auto_ingest(
-            lambda: catalog_ingest.build_family_record(
+        return self.auto_ingest_family(
+            lambda: catalog_ingest.build_family_records(
                 family_request,
                 family=result.family,
                 status=outcome.status,
@@ -656,8 +678,8 @@ class Catalog:
                 "FAMILY_GENERATION_FAILED", message, status=status, cause=cause
             ) from exc
         _emit_progress(progress_callback, 1.0, "轨道族生成完成")
-        response.record_id = self.auto_ingest(
-            lambda: catalog_ingest.build_family_record(
+        response.family_id = self.auto_ingest_family(
+            lambda: catalog_ingest.build_family_records(
                 request,
                 family=response,
                 status=response.status,
@@ -765,32 +787,6 @@ class Catalog:
             record=_summary_from_meta(meta),
         )
 
-    @mcp_exposed(request_model=CatalogPromoteRequest)
-    def catalog_promote(self, **params) -> CatalogPromoteResponse:
-        """Lift a family member into a standalone record..
-
-        把族成员提升为独立记录（source_record_id 指向所属族）。"""
-        try:
-            request = CatalogPromoteRequest(**params)
-            record = self._open_catalog().promote_member(request.record_id, request.member_index)
-        except RecordNotFoundError as exc:
-            raise _record_not_found(exc) from exc
-        except (CatalogError, OSError) as exc:
-            raise _catalog_write_failed(exc) from exc
-        except (ValueError, TypeError) as exc:
-            raise OrbitError(
-                "INVALID_PARAMS",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        return CatalogPromoteResponse(
-            status=ConvergenceState.CONVERGED,
-            cause=FailureCause.NONE,
-            message=f"成员 {request.member_index} 已提升为独立记录",
-            record=_record_to_response(record),
-        )
-
     @mcp_exposed(request_model=CatalogExportRequest)
     def catalog_export(self, **params) -> CatalogExportResponse:
         """Package the query result subset for distribution..
@@ -853,12 +849,12 @@ class Catalog:
         raw_outcomes = run_family_sweep(sweep_points)
 
         outcomes: list[CatalogSweepPointOutcome] = []
-        record_ids: list[str] = []
+        family_ids: list[str] = []
         failed = 0
         for plan, outcome in zip(points, raw_outcomes, strict=True):
-            record_id = self._ingest_sweep_outcome(outcome, plan.family_request)
-            if record_id is not None:
-                record_ids.append(record_id)
+            family_id = self._ingest_sweep_outcome(outcome, plan.family_request)
+            if family_id is not None:
+                family_ids.append(family_id)
             if outcome.result is None:
                 failed += 1
             outcomes.append(
@@ -879,15 +875,18 @@ class Catalog:
                     status=outcome.status,
                     cause=outcome.cause,
                     message=outcome.message,
-                    record_id=record_id,
+                    family_id=family_id,
                     generated_members=(
                         outcome.result.generated_members if outcome.result is not None else 0
                     ),
                 )
             )
-        succeeded = len(record_ids)
+        succeeded = len(family_ids)
         soft_empty = len(points) - succeeded - failed
-        message = f"扫描完成：{succeeded} 条记录入库，{failed} 点失败，共 {len(points)} 点"
+        message = (
+            f"扫描完成：{succeeded} 个参数点入库（逐成员记录，ADR 0045），"
+            f"{failed} 点失败，共 {len(points)} 点"
+        )
         if soft_empty:
             message += f"（{soft_empty} 点软失败无成员产出）"
         return CatalogSweepResponse(
@@ -895,7 +894,7 @@ class Catalog:
             cause=FailureCause.NONE,
             message=message,
             points=outcomes,
-            record_ids=record_ids,
+            family_ids=family_ids,
             succeeded=succeeded,
             failed=failed,
         )

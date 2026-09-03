@@ -20,25 +20,21 @@ def make_record(
     message: str = "任务完成",
     source_tool: str = "design_orbit",
     source_record_id: str | None = None,
-    members: list[dict[str, Any]] | None = None,
+    family_id: str | None = None,
+    member_index: int | None = None,
     tags: list[str] | None = None,
     note: str = "",
 ) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
-    """构造一条合成记录（meta + arrays），供存储引擎测试。
+    """构造一条合成轨道记录（meta + arrays），供存储引擎测试。
 
-    默认形态为设计产物：CR3BP 段与星历段双段并存。``with_cr3bp=False``
-    得到站保产物形态（仅星历段）；``members`` 给出时为族记录（成员
-    数组写入 NPZ）。
+    默认形态为设计产物：CR3BP 段与星历段双段并存（一轨一记录，
+    ADR 0045）。``with_cr3bp=False`` 得到站保产物形态（仅星历段）；
+    ``family_id``/``member_index`` 给出时为族成员记录。
     """
     arrays: dict[str, np.ndarray] = {}
-    members = members or []
-    if with_cr3bp and not members:
+    if with_cr3bp:
         arrays["cr3bp/states"] = np.tile(np.arange(6, dtype=float), (10, 1))
         arrays["cr3bp/times"] = np.linspace(0.0, 1.0, 10)
-    for index, _member in enumerate(members):
-        n = 4 + index
-        arrays[f"cr3bp/members/{index:04d}/states"] = np.full((n, 6), float(index))
-        arrays[f"cr3bp/members/{index:04d}/times"] = np.linspace(0.0, 1.0, n)
     if with_ephemeris:
         n = 5
         arrays.update(
@@ -57,6 +53,8 @@ def make_record(
     meta: dict[str, Any] = {
         "source_tool": source_tool,
         "source_record_id": source_record_id,
+        "family_id": family_id,
+        "member_index": member_index,
         "classification": {
             "orbit_family": orbit_family,
             "libration_point": libration_point,
@@ -68,9 +66,8 @@ def make_record(
         "status": status,
         "cause": cause,
         "message": message,
-        "scalars": {"member_count": max(len(members), 1 if with_cr3bp else 0)},
+        "scalars": {},
         "request": {"orbit_type": "NRHO"},
-        "members": members,
         "tags": list(tags) if tags else [],
         "note": note,
     }

@@ -1,35 +1,70 @@
-"""基线数据集（ADR 0036）：首用导入逻辑与生成脚本校验断言。
+"""基线数据集（ADR 0036/0045）：分发包展开导入与生成脚本校验断言。
 
-不真跑九族全量生成：导入测试用合成记录充当包内基线源目录（扁平
-json+npz），校验断言直接喂构造的记录元数据。
+不真跑九族全量生成：导入测试用合成族束充当包内基线源目录（v1 传输
+格式 json+npz），校验断言直接喂构造的束元数据。
 """
 
 from __future__ import annotations
 
+import json
+
+import numpy as np
 import pytest
 
-from data.catalog.conftest import make_record
 from e2m2e.data.catalog import BASELINE_TAG, CatalogFilter, CatalogStore, import_baseline
 
 pytestmark = pytest.mark.data
 
 
-def _write_baseline_source(source, *, version: str = "1.0.0") -> None:
-    """往扁平源目录写一条合成基线记录（复用存储引擎做序列化）。"""
-    stage = CatalogStore(source.parent / "stage")
-    meta, arrays = make_record(
-        orbit_family="halo",
-        libration_point=2,
-        with_ephemeris=False,
-        members=[{"index": 0, "period": 6.0}, {"index": 1, "period": 6.5}],
-        tags=[BASELINE_TAG],
+def _write_baseline_source(source, *, version: str = "1.0.0", n_members: int = 2) -> None:
+    """往扁平源目录写一个合成族束（v1 传输格式，手写不做 v2 校验）。"""
+    members = [
+        {
+            "index": i,
+            "period": 6.0 + i,
+            "jacobi": 3.15 - 0.01 * i,
+            "taxonomy_label": "halo_l2_northern",
+        }
+        for i in range(n_members)
+    ]
+    bundle = {
+        "record_id": "baseline-halo-l2",
+        "schema_version": 1,
+        "source_tool": "orbit_family_generation",
+        "source_record_id": None,
+        "classification": {
+            "orbit_family": "halo",
+            "libration_point": 2,
+            "jacobi": [3.14, 3.15],
+            "amplitude": [0.0, 0.0],
+            "has_cr3bp": True,
+            "has_ephemeris": False,
+            "taxonomy_labels": ["halo_l2_northern"],
+        },
+        "status": "converged",
+        "cause": "none",
+        "message": "轨道族生成完成",
+        "scalars": {
+            "member_count": n_members,
+            "requested_members": 100,
+            "generated_members": n_members,
+            "mu": 0.01215,
+            "char_length_km": 384400.0,
+            "baseline_version": version,
+        },
+        "request": {"orbit_type": "HALO", "libration_point": 2},
+        "members": members,
+        "tags": [BASELINE_TAG],
+        "note": "",
+        "arrays": {"cr3bp/members/0000/states": {"shape": [1, 6], "dtype": "float64"}},
+    }
+    arrays = {
+        f"cr3bp/members/{i:04d}/states": np.full((1, 6), float(i)) for i in range(n_members)
+    } | {f"cr3bp/members/{i:04d}/times": np.zeros(1) for i in range(n_members)}
+    (source / "baseline-halo-l2.json").write_text(
+        json.dumps(bundle, ensure_ascii=False), encoding="utf-8"
     )
-    meta["record_id"] = "baseline-halo-l2"
-    meta["scalars"]["baseline_version"] = version
-    record_id = stage.put(meta, arrays)
-    for suffix in (".json", ".npz"):
-        content = (stage.records_dir / f"{record_id}{suffix}").read_bytes()
-        (source / f"baseline-halo-l2{suffix}").write_bytes(content)
+    np.savez(source / "baseline-halo-l2.npz", **arrays)
 
 
 @pytest.fixture
@@ -46,104 +81,50 @@ def store(tmp_path):
 
 
 class TestImportBaseline:
-    def test_empty_catalog_imports_baseline(self, store, baseline_source):
-        assert import_baseline(store, baseline_source) == 1
-        summaries = store.query(CatalogFilter(tags=(BASELINE_TAG,)))
-        assert [s["record_id"] for s in summaries] == ["baseline-halo-l2"]
-        record = store.get("baseline-halo-l2")
+    def test_empty_catalog_expands_bundle_into_member_records(self, store, baseline_source):
+        """首用导入：束展开为逐成员 v2 记录（ADR 0045 决策 8）。"""
+        assert import_baseline(store, baseline_source) == 2
+        summaries = store.query(CatalogFilter(family_id="baseline-halo-l2"))
+        assert [s["member_index"] for s in summaries] == [0, 1]
+        record = store.get("baseline-halo-l2-m0000")
         assert record.meta["scalars"]["baseline_version"] == "1.0.0"
-        assert "cr3bp/members/0000/states" in record.arrays
+        assert record.meta["classification"]["taxonomy_labels"] == ["halo_l2_northern"]
+        assert "cr3bp/states" in record.arrays
+        # 库内不落束形态：无 members 键、无打捆段
+        assert "members" not in record.meta
 
     def test_same_version_not_reimported(self, store, baseline_source):
+        """同版本幂等：跳过——用户对基线成员的删除得到尊重（不回补）。"""
         import_baseline(store, baseline_source)
-        before = (store.records_dir / "baseline-halo-l2.json").read_bytes()
+        store.delete("baseline-halo-l2-m0000")
         assert import_baseline(store, baseline_source) == 0
-        assert (store.records_dir / "baseline-halo-l2.json").read_bytes() == before
+        summaries = store.query(CatalogFilter(family_id="baseline-halo-l2"))
+        assert [s["member_index"] for s in summaries] == [1]
 
-    def test_version_mismatch_reimports(self, store, tmp_path):
-        old_source = tmp_path / "old"
-        old_source.mkdir()
-        _write_baseline_source(old_source, version="1.0.0")
-        import_baseline(store, old_source)
+    def test_version_mismatch_replaces_family(self, store, tmp_path):
+        """版本不一致：先删旧成员再全量展开，不留陈旧尾巴。"""
+        source_v1 = tmp_path / "v1"
+        source_v1.mkdir()
+        _write_baseline_source(source_v1, version="1.0.0", n_members=3)
+        import_baseline(store, source_v1)
+        assert len(store.query(CatalogFilter(family_id="baseline-halo-l2"))) == 3
 
-        upgraded = tmp_path / "upgraded"
-        upgraded.mkdir()
-        _write_baseline_source(upgraded, version="2.0.0")
-        assert import_baseline(store, upgraded) == 1
-        assert store.get("baseline-halo-l2").meta["scalars"]["baseline_version"] == "2.0.0"
+        source_v2 = tmp_path / "v2"
+        source_v2.mkdir()
+        _write_baseline_source(source_v2, version="2.0.0", n_members=2)
+        assert import_baseline(store, source_v2) == 2
+        summaries = store.query(CatalogFilter(family_id="baseline-halo-l2"))
+        assert [s["member_index"] for s in summaries] == [0, 1]
+        assert store.get_meta("baseline-halo-l2-m0000")["scalars"]["baseline_version"] == "2.0.0"
+        # 旧版本多出的成员（m0002）不残留
+        assert not (store.records_dir / "baseline-halo-l2-m0002.json").exists()
 
-    def test_missing_source_dir_is_noop(self, store, tmp_path):
-        assert import_baseline(store, tmp_path / "no-such-dir") == 0
+    def test_missing_npz_raises(self, store, baseline_source):
+        (baseline_source / "baseline-halo-l2.npz").unlink()
+        with pytest.raises(FileNotFoundError, match="数据集不完整"):
+            import_baseline(store, baseline_source)
 
-    def test_arrays_declared_but_npz_missing_raises(self, store, tmp_path):
-        source = tmp_path / "incomplete_baseline"
-        source.mkdir()
-        _write_baseline_source(source)
-        (source / "baseline-halo-l2.npz").unlink()
-        with pytest.raises(FileNotFoundError, match="缺少 baseline-halo-l2.npz"):
-            import_baseline(store, source)
-        # 残缺导入不落盘：JSON 也不应被复制
-        assert not (store.records_dir / "baseline-halo-l2.json").exists()
-        assert store.query(CatalogFilter(tags=(BASELINE_TAG,))) == []
-
-
-class TestValidateBaselineRecord:
-    @staticmethod
-    def _meta(**overrides):
-        meta, _arrays = make_record(
-            members=[{"index": 0, "period": 6.0}], with_ephemeris=False, tags=[BASELINE_TAG]
-        )
-        meta["record_id"] = "baseline-test"
-        meta["scalars"].update(
-            member_count=1,
-            requested_members=100,
-            generated_members=1,
-            baseline_version="1.0.0",
-            amplitude_envelope_km=[1000.0, 50000.0],
-        )
-        meta.update(overrides)
-        return meta
-
-    def test_valid_record_passes(self):
-        from scripts.generate_catalog_baseline import validate_baseline_record
-
-        validate_baseline_record(self._meta())
-
-    @pytest.mark.parametrize(
-        ("overrides", "reason"),
-        [
-            ({"status": "failed"}, "status"),
-            ({"members": []}, "零成员"),
-            ({"tags": []}, "baseline 标签"),
-            ({"message": ""}, "message"),
-            (
-                {"classification": {**make_record()[0]["classification"], "amplitude": None}},
-                "振幅",
-            ),
-        ],
-    )
-    def test_invalid_record_raises(self, overrides, reason):
-        from scripts.generate_catalog_baseline import validate_baseline_record
-
-        with pytest.raises(ValueError, match=reason):
-            validate_baseline_record(self._meta(**overrides))
-
-    def test_missing_baseline_version_raises(self):
-        from scripts.generate_catalog_baseline import validate_baseline_record
-
-        meta = self._meta()
-        del meta["scalars"]["baseline_version"]
-        with pytest.raises(ValueError, match="基线版本号"):
-            validate_baseline_record(meta)
-
-    @pytest.mark.parametrize("envelope", [None, [0.0, 0.0], [50000.0, 1000.0]])
-    def test_degenerate_amplitude_envelope_raises(self, envelope):
-        from scripts.generate_catalog_baseline import validate_baseline_record
-
-        meta = self._meta()
-        if envelope is None:
-            del meta["scalars"]["amplitude_envelope_km"]
-        else:
-            meta["scalars"]["amplitude_envelope_km"] = envelope
-        with pytest.raises(ValueError, match="参数振幅"):
-            validate_baseline_record(meta)
+    def test_empty_source_dir_is_noop(self, store, tmp_path):
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        assert import_baseline(store, empty) == 0

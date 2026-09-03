@@ -251,12 +251,12 @@ def test_catalog_record_response_serializes_arrays():
         status=ConvergenceState.CONVERGED,
         cause=FailureCause.NONE,
         message="ok",
-        member_count=1,
+        family_id=None,
+        member_index=None,
         tags=[],
         note="",
         scalars={"mu": 1.21506683e-2},
         request={},
-        members=[],
         arrays={"cr3bp/states": np.zeros((2, 6)), "cr3bp/times": np.array([0.0, 1.0])},
     )
     env = envelope.ok_envelope(record)

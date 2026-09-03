@@ -375,7 +375,7 @@ class TestFacadeToolInventory:
     def test_inventory_covers_all_exposed_classes(self):
         facade = Facade()
         inventory = tool_inventory(facade)
-        assert len(inventory) == 18
+        assert len(inventory) == 17
         assert all(tool.mcp_exposed for tool in inventory)
         assert all(tool.status == "implemented" for tool in inventory)
         # 各暴露类的 mcp_tools 并集 = 组合根清单（单一来源，跨类不漂移）
@@ -402,7 +402,6 @@ class TestFacadeToolInventory:
             "catalog_get",
             "catalog_delete",
             "catalog_tag",
-            "catalog_promote",
             "catalog_export",
             "catalog_sweep",
             "orbit_family_generation",

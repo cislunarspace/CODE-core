@@ -1,4 +1,4 @@
-"""轨道库存储引擎测试：读写往返、双段、族粒度、索引重建、删除、标注、导出。
+"""轨道库存储引擎测试：读写往返、双段、族标签、索引重建、删除、标注、导出。
 
 只断外部行为（库中出现了什么记录、查询返回什么），不断实现细节
 （SQLite 表结构、JSON 内部布局、索引列）。
@@ -40,9 +40,17 @@ class TestRoundTrip:
         np.testing.assert_array_equal(record.arrays["cr3bp/states"], arrays["cr3bp/states"])
         np.testing.assert_array_equal(record.arrays["eph/position_km"], arrays["eph/position_km"])
 
-    def test_schema_version_is_one(self, store):
+    def test_schema_version_is_two(self, store):
+        """schema v2（ADR 0045：一轨一记录）。"""
         record_id = store.put(*make_record())
-        assert store.get(record_id).meta["schema_version"] == 1
+        assert store.get(record_id).meta["schema_version"] == 2
+
+    def test_one_record_carries_one_trajectory(self, store):
+        """粒度契约（ADR 0045 决策 1）：记录无 members 键、无打捆段。"""
+        record_id = store.put(*make_record())
+        meta = store.get(record_id).meta
+        assert "members" not in meta
+        assert not any(key.startswith("cr3bp/members/") for key in meta["arrays"])
 
     def test_record_files_exist_on_disk(self, store):
         record_id = store.put(*make_record())
@@ -97,94 +105,36 @@ class TestSegments:
         assert "eph/position_km" in record.arrays
 
 
-class TestFamilyGranularity:
-    def test_family_is_one_record_with_members_inside(self, store):
-        members = [
-            {"index": 0, "period": 3.0, "jacobi": 3.1, "parameters": {"libration_point": 2}},
-            {"index": 1, "period": 2.9, "jacobi": 3.0, "parameters": {"libration_point": 2}},
-        ]
-        meta, arrays = make_record(
-            orbit_family="halo",
-            jacobi=(3.0, 3.1),
-            amplitude=(1000.0, 3000.0),
-            with_ephemeris=False,
-            source_tool="orbit_family_generation",
-            members=members,
-        )
-        record_id = store.put(meta, arrays)
+class TestFamilyLabels:
+    """族是标签而非容器（ADR 0045 决策 2）：成员各自成记录，整族按
+    family_id 过滤查询。"""
 
-        summaries = store.query(CatalogFilter())
-        assert len(summaries) == 1
-        assert summaries[0]["member_count"] == 2
+    def test_family_members_are_individual_records(self, store):
+        for index in range(2):
+            store.put(
+                *make_record(
+                    orbit_family="halo",
+                    jacobi=(3.1 - 0.1 * index, 3.1 - 0.1 * index),
+                    with_ephemeris=False,
+                    source_tool="orbit_family_generation",
+                    family_id="run-42",
+                    member_index=index,
+                )
+            )
 
-        record = store.get(record_id)
-        assert len(record.meta["members"]) == 2
-        np.testing.assert_array_equal(
-            record.arrays["cr3bp/members/0001/states"], arrays["cr3bp/members/0001/states"]
-        )
-
-    def test_promoted_member_points_to_family(self, store):
-        members = [
-            {
-                "index": 0,
-                "period": 3.0,
-                "jacobi": 3.1,
-                "amplitudes": {"x": 0.01, "y": 0.02, "z": 0.03},
-                "parameters": {"libration_point": 2},
-            },
-            {
-                "index": 1,
-                "period": 2.9,
-                "jacobi": 3.0,
-                "amplitudes": {"x": 0.02, "y": 0.03, "z": 0.04},
-                "parameters": {"libration_point": 2},
-            },
-        ]
-        meta, arrays = make_record(
-            orbit_family="halo",
-            with_ephemeris=False,
-            source_tool="orbit_family_generation",
-            members=members,
-        )
-        meta["scalars"]["char_length_km"] = 384400.0
-        family_id = store.put(meta, arrays)
-
-        promoted = store.promote_member(family_id, 1)
-
-        assert promoted.meta["source_record_id"] == family_id
-        assert promoted.meta["source_tool"] == "catalog_promote"
-        assert promoted.meta["classification"]["orbit_family"] == "halo"
-        assert promoted.meta["classification"]["jacobi"] == [3.0, 3.0]
-        assert promoted.meta["classification"]["has_cr3bp"] is True
-        np.testing.assert_array_equal(
-            promoted.arrays["cr3bp/states"], arrays["cr3bp/members/0001/states"]
-        )
-        # 提升后库中两条记录
+        summaries = store.query(CatalogFilter(family_id="run-42"))
+        assert len(summaries) == 2
+        assert sorted(s["member_index"] for s in summaries) == [0, 1]
+        assert all(s["classification"]["orbit_family"] == "halo" for s in summaries)
+        # 族标签不溢出到其他维度：不过滤时也只这两条，无打捆记录
         assert len(store.query(CatalogFilter())) == 2
 
-    def test_promote_rejects_bad_member_index(self, store):
-        members = [{"index": 0, "period": 3.0, "jacobi": 3.1, "parameters": {}}]
-        family_id = store.put(*make_record(with_ephemeris=False, members=members))
-        with pytest.raises(RecordNotFoundError):
-            store.promote_member(family_id, 5)
-
-    def test_promoted_member_inherits_family_status(self, store):
-        """软失败族的成员提升后不粉饰：状态三元组继承族记录。"""
-        members = [{"index": 0, "period": 3.0, "jacobi": 3.1, "parameters": {}}]
-        family_id = store.put(
-            *make_record(
-                with_ephemeris=False,
-                source_tool="orbit_family_generation",
-                members=members,
-                status="stagnated",
-                cause="stagnation_detected",
-                message="PAL 步长降至下限",
-            )
-        )
-        promoted = store.promote_member(family_id, 0)
-        assert promoted.meta["status"] == "stagnated"
-        assert promoted.meta["cause"] == "stagnation_detected"
-        assert promoted.meta["message"] == "PAL 步长降至下限"
+    def test_single_records_carry_no_family_labels(self, store):
+        record_id = store.put(*make_record())
+        summary = store.query(CatalogFilter())[0]
+        assert summary["family_id"] is None
+        assert summary["member_index"] is None
+        assert store.get(record_id).meta["family_id"] is None
 
 
 class TestQuery:
@@ -202,11 +152,12 @@ class TestQuery:
             *make_record(
                 orbit_family="halo",
                 libration_point=1,
-                jacobi=(3.10, 3.20),
+                jacobi=(3.10, 3.10),
                 amplitude=(1000.0, 3000.0),
                 with_ephemeris=False,
                 source_tool="orbit_family_generation",
-                members=[{"index": 0, "parameters": {}}, {"index": 1, "parameters": {}}],
+                family_id="run-1",
+                member_index=0,
             )
         )
         store.put(
@@ -236,7 +187,8 @@ class TestQuery:
 
     def test_filter_by_jacobi_range_overlap(self, populated):
         assert len(populated.query(CatalogFilter(jacobi_min=3.0, jacobi_max=3.12))) == 2
-        assert len(populated.query(CatalogFilter(jacobi_min=3.15, jacobi_max=3.18))) == 1
+        # v2 成员 jacobi 是单点包络：边界等值命中（ADR 0045）
+        assert len(populated.query(CatalogFilter(jacobi_min=3.10, jacobi_max=3.10))) == 1
         assert len(populated.query(CatalogFilter(jacobi_min=2.0, jacobi_max=2.5))) == 0
 
     def test_filter_by_amplitude_range_overlap(self, populated):

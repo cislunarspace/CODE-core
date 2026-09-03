@@ -20,7 +20,6 @@ from e2m2e.api.models import (
     CatalogDeleteRequest,
     CatalogExportRequest,
     CatalogGetRequest,
-    CatalogPromoteRequest,
     CatalogQueryRequest,
     CatalogSweepRequest,
     CatalogTagRequest,
@@ -223,7 +222,7 @@ class TestTransferRecord:
         assert record.amplitude is None
         assert record.has_cr3bp is False
         assert record.has_ephemeris is False
-        assert record.member_count == 0
+        assert record.family_id is None  # 受控产物非族成员（ADR 0045）
         # 二进制段：trajectory (n,6) + trajectory_times (n,) 行数一致
         states = record.arrays["transfer/states"]
         times = record.arrays["transfer/times"]
@@ -445,25 +444,26 @@ class TestAutoIngest:
         assert table is not None and len(table) == 3
         assert record.to_orbit() is not None
 
-    def test_family_generation_record_is_one_record_with_members(self):
+    def test_family_generation_members_are_individual_records(self):
+        """族 = 标签（ADR 0045）：成员逐条入库，整族经 family_id 查询。"""
         facade = Facade()
         response = facade.catalog.orbit_family_generation(
             orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=2
         )
 
-        assert response.record_id is not None
-        summaries = facade.catalog.catalog_query().records
-        assert len(summaries) == 1
+        assert response.family_id is not None
+        summaries = facade.catalog.catalog_query(family_id=response.family_id).records
+        assert len(summaries) == len(response.orbits)
         assert summaries[0].orbit_family == "halo"
         assert summaries[0].libration_point == 1
-        assert summaries[0].member_count == len(response.orbits)
-        assert summaries[0].has_cr3bp is True
-        assert summaries[0].has_ephemeris is False
+        assert sorted(s.member_index for s in summaries) == list(range(len(response.orbits)))
+        assert all(s.has_cr3bp and not s.has_ephemeris for s in summaries)
+        assert all(s.family_id == response.family_id for s in summaries)
 
-        record = facade.catalog.catalog_get(record_id=response.record_id)
-        assert len(record.members) == len(response.orbits)
-        assert "cr3bp/members/0000/states" in record.arrays
+        record = facade.catalog.catalog_get(record_id=summaries[0].record_id)
+        assert "cr3bp/states" in record.arrays
         assert record.jacobi is not None
+        assert record.family_id == response.family_id
 
     def test_control_record_points_to_source_record(self, monkeypatch):
         _fake_design(monkeypatch, _make_design_result())
@@ -641,34 +641,6 @@ class TestTagExport:
         assert (dest / "manifest.json").exists()
 
 
-class TestPromote:
-    def test_promoted_member_points_to_family(self):
-        facade = Facade()
-        family_response = facade.catalog.orbit_family_generation(
-            orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=2
-        )
-
-        promoted = facade.catalog.catalog_promote(
-            record_id=family_response.record_id, member_index=1
-        )
-
-        record = promoted.record
-        assert record.source_record_id == family_response.record_id
-        assert record.source_tool == "catalog_promote"
-        assert record.orbit_family == "halo"
-        assert record.has_cr3bp is True
-        assert "cr3bp/states" in record.arrays
-        assert len(facade.catalog.catalog_query().records) == 2
-
-    def test_promote_bad_member_index_raises_structured_error(self):
-        facade = Facade()
-        family_response = facade.catalog.orbit_family_generation(
-            orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=2
-        )
-        with pytest.raises(OrbitError, match="RECORD_NOT_FOUND"):
-            facade.catalog.catalog_promote(record_id=family_response.record_id, member_index=99)
-
-
 class TestSweep:
     def test_sweep_generates_records_for_grid(self):
         facade = Facade()
@@ -681,11 +653,13 @@ class TestSweep:
 
         assert response.succeeded == 2
         assert response.failed == 0
-        assert len(response.record_ids) == 2
-        assert all(point.record_id is not None for point in response.points)
+        assert len(response.family_ids) == 2
+        assert all(point.family_id is not None for point in response.points)
         assert {point.parameter_km for point in response.points} == {2000.0, 3000.0}
+        # 每点一族（n_orbits=1），成员逐条入库（ADR 0045）
         records = facade.catalog.catalog_query(orbit_family="halo").records
         assert len(records) == 2
+        assert all(r.family_id in set(response.family_ids) for r in records)
 
     def test_sweep_rejects_lissajous_with_one_dimensional_grid(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
@@ -734,7 +708,7 @@ class TestSweep:
 
         assert response.succeeded == 2
         assert response.failed == 0
-        assert len(response.record_ids) == 2
+        assert len(response.family_ids) == 2
         assert {tuple(point.amplitudes_km) for point in response.points} == {
             (1000.0, 3000.0),
             (2000.0, 3000.0),
@@ -743,8 +717,8 @@ class TestSweep:
             point.parameter_km is None and point.jacobi_window is None for point in response.points
         )
         records = facade.catalog.catalog_query(orbit_family="lissajous", libration_point=2).records
-        assert len(records) == 2
-        assert all(record.member_count == 2 for record in records)
+        assert len(records) == 4  # 2 点 × 2 成员，逐条入库（ADR 0045）
+        assert all(r.family_id is not None for r in records)
 
     # jacobi 窗口 sweep 的 Facade 集成用例已移出默认套件（ADR 0037：窗口
     # 模式共享的 Rust trace 有 200 成员兜底，单次 ≥30s；窗口编排便过语义
@@ -842,9 +816,9 @@ class TestSweep:
 
         assert response.succeeded == 1
         assert response.failed == 1
-        assert len(response.record_ids) == 1
+        assert len(response.family_ids) == 1
         assert "1 点软失败无成员产出" in response.message
-        assert response.points[1].record_id is None
+        assert response.points[1].family_id is None
         assert response.points[1].message == "爆炸"
         assert response.points[2].status is ConvergenceState.STAGNATED
 
@@ -877,11 +851,12 @@ class TestToolInventory:
             "catalog_get",
             "catalog_delete",
             "catalog_tag",
-            "catalog_promote",
             "catalog_export",
             "catalog_sweep",
         }
         assert expected <= names
+        # catalog_promote 已随一轨一记录移除（ADR 0045 决策 5）
+        assert "catalog_promote" not in names
 
         by_name = {tool.name: tool for tool in tool_inventory(facade)}
         request_models = {
@@ -889,7 +864,6 @@ class TestToolInventory:
             "catalog_get": CatalogGetRequest,
             "catalog_delete": CatalogDeleteRequest,
             "catalog_tag": CatalogTagRequest,
-            "catalog_promote": CatalogPromoteRequest,
             "catalog_export": CatalogExportRequest,
             "catalog_sweep": CatalogSweepRequest,
         }
