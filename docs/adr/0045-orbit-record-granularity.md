@@ -1,167 +1,139 @@
-# ADR 0045: Orbit record granularity — one record per trajectory, family as label
+# ADR 0045: 轨道记录粒度——一轨一记录，族为标签
 
-**Status**: Adopted (implemented — schema v2 with per-member records,
-family_id/member_index labels, family_id filtering, promote removal, and the
-bundle-expanding first-use baseline import; measured: 592 members expand in
-~7 s once, idempotent re-opens skip)
-**Date**: 2026-09-01
-**Related Issue**: #611
-**Related**: ADR 0024 (result status contract), ADR 0031 (decision 4 overturned
-here; decisions 1, 2, 5 revised), ADR 0036 (baseline dataset), ADR 0037 (test
-budget), ADR 0040 (transfer trajectory contract), ADR 0042 (taxonomy stamping),
-ADR 0043 (interface class split), ADR 0044 (terminology list).
+**状态**：已采纳（已实现——schema v2 逐成员记录、family_id/member_index
+标签、family_id 过滤、promote 移除、束展开式基线首用导入；实测：592
+个成员首开约 7 秒展开一次，幂等重开跳过）
+**日期**：2026-09-01
+**相关 issue**：#611
+**相关**：ADR 0024（结果状态契约）、ADR 0031（决策 4 在此推翻；决策 1、
+2、5 在此修订）、ADR 0036（基线数据集）、ADR 0037（测试预算）、ADR 0040
+（转移轨迹契约）、ADR 0042（分类学打标）、ADR 0043（接口类分家）、
+ADR 0044（术语清单）。
 
-## Context
+## 背景
 
-ADR 0031 decision 4 made an entire orbit family one record, with member
-parameters and arrays inside. The catalog therefore holds two container shapes —
-a bundle and a single trajectory — and nothing states how to tell them apart.
+ADR 0031 决策 4 让一整个轨道族作一条记录，成员参数与数组收在记录里。
+轨道库因此存在两种容器形态——一捆与一条——而没有任何地方写明如何区分。
 
-Four symptoms follow. `member_count` carries three meanings (0 for
-transfer and station-keeping products, 1 for a single orbit, ≥2 for a family),
-written down only in a field description. Callers reconstruct the container rule
-themselves: transfer-orbit-design keeps it in TypeScript and in Python, kept in
-step by shared JSON cases. `catalog_promote` exists only to lift a member out of
-its bundle so downstream tools can consume it. And transfer records report
-`has_cr3bp=False, has_ephemeris=False` while their trajectory sits in a
-`transfer/` segment, so a generic reader that trusts the flags concludes there is
-no trajectory data.
+四个症状随之而来。`member_count` 承载三义（转移与站保产物为 0、单轨为
+1、族为 ≥2），只写在字段描述的散文里。调用方自行重构容器规则：
+transfer-orbit-design 用 TypeScript 和 Python 各写了一份，靠共享 JSON
+用例锁同步。`catalog_promote` 的存在只为把成员从捆里提出来给下游用。
+转移记录报 `has_cr3bp=False, has_ephemeris=False`，轨迹却躺在
+`transfer/` 段里——信标志位的通用读取函数会得出"没有轨迹数据"的结论。
 
-The bundle was chosen to keep query results small and to give family-level
-quantities a home. Both needs have since been met by other means: the SQLite
-index filters records, and a generation run can stamp its identity on every
-member it writes.
+打捆当初是为了查询结果不泛滥、族级量有处安放。这两个需要如今都有了
+别的答案：SQLite 索引过滤记录；一次生成运行可以把它的标识盖在每个
+成员身上。
 
-## Decision
+## 决策
 
-### 1. One record carries exactly one trajectory
+### 1. 一条记录只载一条轨迹
 
-A catalog record is an **orbit record**: one mission orbit or one transfer
-orbit (CONTEXT.md, catalog data model). No record contains a collection of
-trajectories.
+轨道库记录是**轨道记录**：一条任务轨道或一条转移轨道（CONTEXT.md，
+轨道库数据模型）。任何记录都不含轨迹集合。
 
-### 2. A family is a label, not a container
+### 2. 族是标签，不是容器
 
-Family membership is stamped on each orbit record as three fields:
-`orbit_family` (the family name, already present), `family_id` (identity of the
-generation run) and `member_index` (position in the continuation walk).
-Retrieving a family is a query by `family_id`; grouping for display is the
-caller's presentation step. Run-level provenance — the request snapshot,
-requested and generated counts, run scalars — is replicated on every member
-record of that run: one writer per run, so the copies cannot drift.
+族成员身份以三个字段盖在每条轨道记录上：`orbit_family`（族名，已有）、
+`family_id`（生成批次的标识）、`member_index`（延续走行中的位置）。取回
+一个族就是按 `family_id` 查询；分组展示是调用方的表示层事务。运行级
+溯源——请求快照、请求与实际成员数、运行标量——随该运行的每条成员记录
+走：一次运行单一写入者，拷贝不会漂移。
 
-`orbit_family` alone is insufficient, since two independent runs of the same
-family would be indistinguishable; `family_id` carries run identity.
+单有 `orbit_family` 不够：同一族两次独立生成无法区分，批次身份由
+`family_id` 承载。
 
-### 3. `member_count` and `members[]` are removed; schema version 2
+### 3. `member_count` 与 `members[]` 删除；schema 版本 2
 
-Both fields disappear from records, summaries and the index. `SCHEMA_VERSION`
-becomes 2. Legacy records are not migrated and not read — deleted wholesale,
-following ADR 0031 decision 9.
+两个字段从记录、摘要与索引中消失。`SCHEMA_VERSION` 升为 2。旧记录不
+迁移、不读取——整体废弃，沿 ADR 0031 决策 9 的先例。
 
-### 4. Content discrimination reduces to one rule
+### 4. 内容判别收敛为一条
 
-`transfer_type` non-null means the record is a transfer orbit; otherwise it is a
-mission orbit. This is the only derivation a caller needs, and it is specified
-here rather than left to be reconstructed.
+`transfer_type` 非空即转移轨道；否则是任务轨道。这是调用方唯一需要的
+推导，在此规格化，不再留给各方自行重构。
 
-### 5. `catalog_promote` is removed
+### 5. `catalog_promote` 移除
 
-With every member already a record, member promotion has no meaning. Its
-removal lands with this ADR, not with ADR 0043, so that in-process callers keep
-working until the granularity change ships. Annotation needs are served by
-`catalog_tag`.
+每个成员本身就是记录，成员提升失去意义。移除随本 ADR 落地而非
+ADR 0043，进程内调用方在粒度变更上线前保持可用。标注需求由
+`catalog_tag` 承担。
 
-### 6. Field and segment specification
+### 6. 字段与段规格
 
-The record specification states, for every summary field, its meaning, unit and
-null semantics; for every closed-value field, the terminology module of ADR 0044
-as its source; and for every array segment, its key prefix and when it is
-present:
+记录规格逐字段写明：摘要各字段的意义、单位与空值语义；封闭取值字段
+以 ADR 0044 的术语模块为源；各数组段的键前缀与出现条件：
 
-- `cr3bp/` — nondimensional state and period of a mission orbit;
-- `eph/` — an EphemerisTable (GCRS, synodic, times_et);
-- `transfer/` — a transfer trajectory (states, times, and optionally
-  `states_gcrs_km`), per ADR 0040;
-- `result/` — station-keeping maneuver sequences and statistics.
+- `cr3bp/`——任务轨道的无量纲状态与周期；
+- `eph/`——EphemerisTable（GCRS、会合系、times_et）；
+- `transfer/`——转移轨迹（states、times，可选 `states_gcrs_km`），
+  按 ADR 0040；
+- `result/`——站保机动序列与统计。
 
-`has_cr3bp` and `has_ephemeris` describe the `cr3bp/` and `eph/` segments only.
-They must not be read as "this record carries no trajectory data": a transfer
-orbit has both flags false and a populated `transfer/` segment.
+`has_cr3bp` 与 `has_ephemeris` 只描述 `cr3bp/` 与 `eph/` 两段。不得读作
+"本记录没有轨迹数据"：转移轨道两个标志位均为 False 而 `transfer/` 段
+有内容。
 
-### 7. Write policy
+### 7. 写入策略
 
-Each orbit record is written atomically (temporary file, then rename). There is
-no cross-record transaction: a continuation walk that fails midway leaves its
-converged members as records, which is the honest partial result. The SQLite
-index is rebuilt by scanning `records/`, so a partial write leaves no
-inconsistency that a rebuild cannot repair.
+每条轨道记录原子写（临时文件 + 改名）。没有跨记录事务：延续走行中途
+失败时，已收敛成员各自成记录——这是诚实的部分结果。SQLite 索引扫描
+`records/` 重建，部分写不会留下重建修不了的裂口。
 
-### 8. The baseline dataset ships as a distribution bundle
+### 8. 基线数据集按分发包分发
 
-The packaged baseline (13 bundled files, 592 members, 3.5 MB today) stays
-bundled for distribution and is expanded into 592 orbit records on first use.
-The bundle is a transport and compression unit, not an orbit record; the library
-still holds exactly one record shape. Shipping 592 expanded records — about
-1 184 files — inside the wheel is rejected.
+包内基线（当前 13 个束文件、592 个成员、3.5 MB）保持打捆分发，首用时
+展开为 592 条轨道记录。束是传输与压缩单元，不是轨道记录；库内仍只有
+一种记录形态。把 592 条展开记录（约 1184 个文件）打进 wheel 的方案
+否决。
 
-## Rationale
+## 理由
 
-1. **The two reasons behind decision 4 now have better answers.** Flooded query
-   results are a display concern, answered by index filters and `family_id`
-   grouping. Family-level quantities are answered by stamping run identity and
-   provenance on each member.
-2. **Uniformity removes three debts at once**: the three meanings of
-   `member_count`, the container rule copied into two languages downstream, and
-   the existence of `catalog_promote`.
-3. **Station-keeping consumption gets simpler**: a controlled run points at a
-   member record directly, with no promotion step in between.
-4. **Distribution and storage are different problems.** Keeping them separate
-   preserves both a small wheel and a single in-library record shape.
-5. **Partial results are preferable to all-or-nothing.** A 79-member walk that
-   fails at member 40 currently yields one record describing a partial family;
-   it will yield 40 records, each individually valid.
+1. **决策 4 背后的两条理由如今有了更好的答案。** 查询泛滥是显示问题，
+   由索引过滤与 `family_id` 分组回答；族级量由"批次标识 + 溯源随成员"
+   回答。
+2. **均一性一次还掉三笔债**：`member_count` 三义、下游两种语言各一份
+   容器规则、`catalog_promote` 的存在。
+3. **站保消费变简单**：受控运行直接指向成员记录，中间没有提升步骤。
+4. **分发与存储是两个问题。** 分开处理，wheel 体积与库内单一记录形态
+   两全。
+5. **部分结果好过全有全无。** 79 成员的走行在第 40 个失败，今天是"一条
+   描述半族的记录"；改后是 40 条各自有效的记录。
 
-## Consequences
+## 后果
 
-### Added
+### 新增
 
-- `family_id` and `member_index` on records, summaries and the index; a baseline
-  expansion step; a granularity contract test asserting that a record carries
-  one trajectory.
+- 记录、摘要与索引上的 `family_id` 与 `member_index`；基线展开步骤。
 
-### Changed
+### 变更
 
-- ADR 0031 decision 4 is overturned; decision 1 (record contents), decision 2
-  (classification fields) and decision 5 (index columns) are revised
-  accordingly.
-- Ingest builders write one record per converged member instead of one bundle.
-- `catalog_query` results grow by roughly the family member count; callers
-  filter by `family_id`.
-- transfer-orbit-design rewrites its catalog data model handling: container
-  discrimination, member-count display and the promote path.
-- Baseline-related tests move to small subsets to stay inside the ADR 0037
-  budget of 10 s per case and 60 s per file.
+- ADR 0031 决策 4 被推翻；决策 1（记录内容）、决策 2（分类字段）、
+  决策 5（索引列）随之修订。
+- ingest 构建器从一捆一记录改为每个收敛成员一条记录。
+- `catalog_query` 结果按族成员数增长；调用方按 `family_id` 过滤。
+- transfer-orbit-design 重写其轨道库数据模型处理：容器判别、成员数
+  显示与提升路径。
+- 基线相关测试改用小样本，遵守 ADR 0037 的单用例 10 秒、单文件 60 秒
+  预算。
 
-### Unchanged
+### 不变
 
-- Record files as the source of truth, SQLite as a derived and rebuildable
-  index, storage layout, auto-ingest (ADR 0031 decisions 5, 8), the result
-  status contract (ADR 0024), and per-record taxonomy stamping (ADR 0042).
+- 记录文件作为事实来源、SQLite 作为派生可重建索引、存储布局、自动入库
+  （ADR 0031 决策 5、8）、结果状态契约（ADR 0024）、逐记录分类学打标
+  （ADR 0042）。
 
-### Cost
+### 代价
 
-- File count in a working catalog grows by roughly the average family size; a
-  single `catalog_sweep` may write several hundred files.
-- The packaged baseline must be regenerated, and the expansion step is new code
-  on the read path.
+- 工作库的文件数按平均族规模增长；一次 `catalog_sweep` 可能写几百个
+  文件。
+- 包内基线需重新生成，展开步骤是读取路径上的新代码。
 
-## Implementation note (2026-09-01, #611)
+## 实现注（2026-09-01，#611）
 
-Decision 3's "legacy records deleted wholesale" lands as fail-on-open, not
-auto-deletion: a v1 record encountered during index rebuild raises with the
-standing instruction ("旧产物不兼容读取，请删除后重算"), and the user deletes
-their catalog directory manually. Silently deleting user data on upgrade was
-rejected. The bundled v1 family files themselves are untouched — they are the
-frozen transport format of decision 8, read structurally (no v2 validation)
-and expanded by `data/catalog/bundle.py`.
+决策 3 的"旧记录整体废弃"落地为**打开即失败**而非自动删除：索引重建
+遇到 v1 记录时按既有措辞报错（"旧产物不兼容读取，请删除后重算"），由
+用户自行删除库目录。升级时静默删用户数据被否决。包内 v1 族束文件本身
+不动——它们是决策 8 冻结的传输格式，由 `data/catalog/bundle.py`
+结构化读取（不走 v2 校验）并展开。

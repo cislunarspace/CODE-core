@@ -1,15 +1,5 @@
 """空间分区接口类：spatiography 五省分区分析（ADR 0043 决策 3）。
 
-[English]
-
-``Spatiography`` is the interface-layer class holding the five partition-analysis
-tools (scales / classify / boundaries / resonance atlas / dynamical map,
-ADR 0041). MCP tools, CLI subcommands and the sidecar reach these methods
-through the single tool inventory; in-process callers obtain the instance from
-``Facade().spatiography`` or construct it directly (ADR 0043, the class split
-of ADR 0014 decision 2).
-
-[简体中文]
 
 ``Spatiography`` 是接口层的空间分区类：五个分区分析工具（scales /
 classify / boundaries / resonance atlas / dynamical map，ADR 0041）。

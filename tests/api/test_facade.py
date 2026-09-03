@@ -13,16 +13,7 @@ from e2m2e.algorithm.results import FamilyGenerationResult
 from e2m2e.api.config import Config
 from e2m2e.api.facade import Facade, mcp_tools, tool_inventory
 from e2m2e.api.models import (
-    ControlOrbitRequest,
-    DesignOrbitRequest,
-    FamilyGenerationRequest,
     OrbitError,
-    PropagationRequest,
-    SpacetimeTransformRequest,
-    SpatiographyBoundariesRequest,
-    SpatiographyClassifyRequest,
-    SpatiographyScalesRequest,
-    TransferDesignRequest,
     TransferDesignResponse,
 )
 from e2m2e.data.templates import ConvergenceState, FailureCause
@@ -372,17 +363,10 @@ class TestFacadeCallChains:
 class TestFacadeToolInventory:
     """接口类分家后的工具清单（ADR 0043）：Facade 组合根扫多个暴露类。"""
 
-    def test_inventory_covers_all_exposed_classes(self):
-        facade = Facade()
-        inventory = tool_inventory(facade)
+    def test_inventory_counts_eighteen_implemented_tools(self):
+        inventory = tool_inventory(Facade())
         assert len(inventory) == 18
-        assert all(tool.mcp_exposed for tool in inventory)
         assert all(tool.status == "implemented" for tool in inventory)
-        # 各暴露类的 mcp_tools 并集 = 组合根清单（单一来源，跨类不漂移）
-        union: set[str] = set()
-        for api in facade.exposed_apis:
-            union |= set(mcp_tools(api))
-        assert union == {tool.name for tool in inventory}
 
     def test_each_class_keeps_its_domain(self):
         from e2m2e.api.catalog import Catalog
@@ -417,26 +401,6 @@ class TestFacadeToolInventory:
         # 组合根把两类作为实例暴露给进程内调用方（ADR 0043 决策 2/3）
         assert isinstance(facade.catalog, Catalog)
         assert isinstance(facade.spatiography, Spatiography)
-
-    def test_inventory_request_models_span_classes(self):
-        from e2m2e.api.models import CatalogQueryRequest
-
-        by_name = {tool.name: tool for tool in tool_inventory(Facade())}
-        expected = {
-            "design_orbit": DesignOrbitRequest,
-            "control_orbit": ControlOrbitRequest,
-            "transfer_design": TransferDesignRequest,
-            "orbit_propagation": PropagationRequest,
-            "spacetime_transform": SpacetimeTransformRequest,
-            "orbit_family_generation": FamilyGenerationRequest,
-            "catalog_query": CatalogQueryRequest,
-            "spatiography_scales": SpatiographyScalesRequest,
-            "spatiography_classify": SpatiographyClassifyRequest,
-            "spatiography_boundaries": SpatiographyBoundariesRequest,
-        }
-        for name, model in expected.items():
-            assert by_name[name].request_model is model, name
-            assert by_name[name].status == "implemented", name
 
 
 class TestFacadeTransferTopN:

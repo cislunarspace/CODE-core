@@ -101,13 +101,11 @@ the crossing/winding geometry criteria, not dynamical solutions.
 The maintainer's principle: expose only the highest-level Facade; the tool
 count stays 22.
 
-*(Revision note 2026-09-01, #609: this clause is superseded — `catalog_terminology`
-is registered per ADR 0044, admitted under the rule of ADR 0043 decision 6
-(its content is referenced by response fields and no existing tool supplies it).
-The count "22" quoted here was stale at the time of writing: the implemented
-face is 18. Counts are now reported by running the inventory, never quoted from
-documents. `label_legend()` — referenced above as "MCP legend / 文档用" but never
-wired — moves to the data layer and gains its outlet there.)*
+*（修订注 2026-09-01，#609：本条款作废——`catalog_terminology` 按
+ADR 0044 注册，准入依据 ADR 0043 决策 6（内容被响应字段引用且无既有
+工具供给）。此处引用的"22"在写下时就已失真：实际工具面为 18。工具数
+今后靠跑清单报告，不从文档引用。上文提到"MCP legend / 文档用"却从未
+接线的 `label_legend()` 迁入数据层并在那里获得出口。）*
 
 - **Ingest stamps measured labels**: `classification.taxonomy_labels`
   (record-level deduplicated set) and `members[].taxonomy_label` (member

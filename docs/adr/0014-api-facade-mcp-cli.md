@@ -24,10 +24,9 @@ is where that vision gets delivered.
    Facade methods; Facade methods carry `mcp_exposed: bool` metadata (tier-1/
    tier-2 True; tier-3/auxiliary False). Registration scans Facade methods;
    the list has one source of truth.
-   *(Revision note 2026-09-01, #610: ADR 0043 decision 5 widens the scan root —
-   MCP tools = the union of `mcp_exposed` methods over the exposed interface
-   classes (Facade, catalog, spatiography). The single-source mechanism itself
-   is unchanged.)*
+   *（修订注 2026-09-01，#610：ADR 0043 决策 5 拓宽扫描根——MCP 工具 =
+   各暴露接口类（Facade、轨道库、spatiography）上 `mcp_exposed` 方法的
+   并集。单一来源机制本身不变。）*
 3. **Pydantic models all hand-written**: input/output/error models carefully
    specify parameter units, defaults, value domains. They stay at the `api/`
    boundary, never entering the algorithm layer.
@@ -38,8 +37,8 @@ is where that vision gets delivered.
 5. **CLI subcommands = Facade methods** (those with mcp_exposed=True),
    parameters generated from the same Pydantic models. CLI and MCP are fully
    symmetric.
-   *(Revision note 2026-09-01, #610: subcommands derive from the same union as
-   decision 2, see ADR 0043 decision 5.)*
+   *（修订注 2026-09-01，#610：子命令与决策 2 的同一并集派生，见
+   ADR 0043 决策 5。）*
 6. **MCP deployment = in-process library as the main body + thin CLI wrapper
    `mcp-serve`**: `create_server(facade)` function + `e2m2e mcp-serve`
    subcommand. One Facade instance = one server.
@@ -57,10 +56,9 @@ is where that vision gets delivered.
    machine-readable public interfaces; validators and those interfaces share
    one rule definition. GUIs, CLIs, and MCP must not parse error text, read
    validator source, or maintain local copies of ranges.
-   *(Revision note 2026-09-01, #609: ADR 0044 builds the outlet for the catalog
-   closed value sets (taxonomy labels, family names, transfer types) through
-   `catalog_terminology`. The request-side conditional ranges (`valid_ranges`)
-   still have no registered outlet — the remaining half of this decision.)*
+   *（修订注 2026-09-01，#609：ADR 0044 经 `catalog_terminology` 修通轨道库
+   闭值集（分类学标签、族名、转移类型）的出口。请求侧条件数值范围
+   （`valid_ranges`）仍无注册出口——本决策余下的一半。）*
 
 ## MCP tool list
 

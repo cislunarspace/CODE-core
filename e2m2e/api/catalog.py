@@ -1,19 +1,8 @@
 """轨道库接口类：catalog 数据管理与批量生成（ADR 0043 决策 2）。
 
-[English]
-
-``Catalog`` is the interface-layer class holding catalog data management
-(query/get/delete/tag/promote/export/sweep) plus family generation
-(``orbit_family_generation`` — ``catalog_sweep`` is its batch orchestration;
-both call the same Rust family kernel). MCP tools, CLI subcommands and the
-sidecar reach these methods through the single tool inventory; in-process
-callers obtain the instance from ``Facade().catalog`` or construct it
-directly (ADR 0043; the class split of ADR 0014 decision 2).
-
-[简体中文]
 
 ``Catalog`` 是接口层的轨道库类：catalog 数据管理（query/get/delete/tag/
-promote/export/sweep）与族生成（``orbit_family_generation``——
+export/sweep/terminology）与族生成（``orbit_family_generation``——
 ``catalog_sweep`` 是它的批量编排，两者共用同一个 Rust 族生成内核）。
 MCP/CLI/sidecar 经单一工具清单到达这些方法；进程内调用方从
 ``Facade().catalog`` 取实例或直接构造（ADR 0043，ADR 0014 决策 2 的
@@ -558,7 +547,7 @@ class Catalog:
     def orbit_family_generation(
         self, progress_callback: ProgressCallback | None = None, **params
     ) -> FamilyGenerationResponse:
-        """Orbit family generation (tier 2). / 轨道族生成（二档）.
+        """轨道族生成（二档）。
 
         Pydantic 模型校验 → 按 orbit_type 分派到算法层族生成入口 →
         结构化错误。八族均已实现，成功返回统一容器
@@ -694,9 +683,7 @@ class Catalog:
 
     @mcp_exposed(request_model=CatalogQueryRequest)
     def catalog_query(self, **params) -> CatalogQueryResponse:
-        """Multi-dimensional catalog query returning record summaries..
-
-        多维过滤查询，返回摘要列表（不含数组段与请求快照）。"""
+        """多维过滤查询，返回摘要列表（不含数组段与请求快照）。"""
         try:
             request = CatalogQueryRequest(**params)
         except (ValueError, TypeError) as exc:
@@ -720,9 +707,7 @@ class Catalog:
 
     @mcp_exposed(request_model=CatalogGetRequest)
     def catalog_get(self, **params) -> CatalogRecordResponse:
-        """Fetch a full record by ``record_id``..
-
-        按 record_id 取完整记录（含数组段）；不存在抛 ``RECORD_NOT_FOUND``。"""
+        """按 record_id 取完整记录（含数组段）；不存在抛 ``RECORD_NOT_FOUND``。"""
         try:
             request = CatalogGetRequest(**params)
         except (ValueError, TypeError) as exc:
@@ -737,9 +722,7 @@ class Catalog:
 
     @mcp_exposed(request_model=CatalogDeleteRequest)
     def catalog_delete(self, **params) -> CatalogDeleteResponse:
-        """Delete a record by ``record_id`` — irreversible..
-
-        按 record_id 删除记录（文件与索引条目）；删除不可撤销。"""
+        """按 record_id 删除记录（文件与索引条目）；删除不可撤销。"""
         try:
             request = CatalogDeleteRequest(**params)
             self._open_catalog().delete(request.record_id)
@@ -764,9 +747,7 @@ class Catalog:
 
     @mcp_exposed(request_model=CatalogTagRequest)
     def catalog_tag(self, **params) -> CatalogTagResponse:
-        """Write teaching annotations to the JSON record..
-
-        写教学标注入 JSON 记录（随文件走）；tags 整体替换，note=None 保留。"""
+        """写教学标注入 JSON 记录（随文件走）；tags 整体替换，note=None 保留。"""
         try:
             request = CatalogTagRequest(**params)
             meta = self._open_catalog().tag(request.record_id, request.tags, request.note)
@@ -790,9 +771,7 @@ class Catalog:
 
     @mcp_exposed(request_model=CatalogExportRequest)
     def catalog_export(self, **params) -> CatalogExportResponse:
-        """Package the query result subset for distribution..
-
-        把查询子集打包导出（标注随包）；包可直接作为库打开。"""
+        """把查询子集打包导出（标注随包）；包可直接作为库打开。"""
         try:
             request = CatalogExportRequest(**params)
         except (ValueError, TypeError) as exc:
@@ -817,9 +796,7 @@ class Catalog:
 
     @mcp_exposed
     def catalog_terminology(self) -> CatalogTerminologyResponse:
-        """Closed value sets callers need to render catalog results..
-
-        术语清单（ADR 0044）：分类学标签图例 + orbit_family 闭值集 +
+        """术语清单（ADR 0044）：分类学标签图例 + orbit_family 闭值集 +
         transfer_type 闭值集，无参数。包版本即术语版本：调用方每会话取
         一次、升级后刷新，未知标签按可读规范串原样渲染。"""
         from e2m2e.data.catalog.terminology import (
@@ -843,13 +820,11 @@ class Catalog:
 
     @mcp_exposed(request_model=CatalogSweepRequest)
     def catalog_sweep(self, **params) -> CatalogSweepResponse:
-        """Parameter-space sweep batch-generating into the catalog.
+        """参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
 
-        参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
-
-            网格 = 族 × 平动点 × 主参数维度（一维振幅/近月点高度、能量窗口、
-            LISSAJOUS 二维振幅，三选一）；部分参数点失败时已产出的记录
-            保留，失败原因逐点可查（ADR 0020 软失败语义）。
+        网格 = 族 × 平动点 × 主参数维度（一维振幅/近月点高度、能量窗口、
+        LISSAJOUS 二维振幅，三选一）；部分参数点失败时已产出的记录
+        保留，失败原因逐点可查（ADR 0020 软失败语义）。
         """
         try:
             request = CatalogSweepRequest(**params)

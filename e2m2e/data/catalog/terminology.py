@@ -1,18 +1,5 @@
 """轨道库术语清单（ADR 0044）：调用方渲染结果所需的全部闭值集。
 
-[English]
-
-Three closed value sets live here as static reference data: the 42-label
-taxonomy table (moved from ``algorithm/orbit_taxonomy``; the classifier keeps
-its criteria there and reads this table — the permitted dependency
-direction), the record-side ``orbit_family`` names, and the ``transfer_type``
-values. One registered tool serves all three (``catalog_terminology``,
-ADR 0043 decision 6 second clause: the content is referenced by response
-fields and no other tool supplies it). The package version is the
-terminology version: lists are frozen per release; callers fetch once per
-session and refresh after upgrading (ADR 0044 decision 4).
-
-[简体中文]
 
 三份闭值集作为静态参考数据住在这里：42 标签分类学表（自
 ``algorithm/orbit_taxonomy`` 迁入；分类器判据留在算法层、向上读本表，

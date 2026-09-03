@@ -1,75 +1,35 @@
-# Architecture Decision Records (ADR)
+# 架构决策记录（ADR）
 
-This directory records e2m2e's architecture decisions. Each ADR is a decision
-snapshot: it captures the context, decision, rationale, and consequences at
-the time of writing. When a decision later changes, do not rewrite the
-original text; instead append a revision subsection at the end, or write a new
-ADR and mark the supersession in the old one.
+本目录记录 e2m2e 的架构决策。每篇 ADR 是决策快照：写下当时的背景、
+决策、理由与后果。决策日后变更时，不改写原文，而是在文末追加修订小节
+或新开 ADR 并在旧文中标注取代关系。
 
-## Status vocabulary
+> 语言说明：ADR 0043 起以中文书写。0001–0042 为英文历史存档——不再
+> 翻译、不再维护，git 历史即全文。
 
-- **Adopted**: the decision is in effect. Parenthetical notes may indicate
-  implementation progress or partial revision, e.g.: Adopted (partially
-  implemented: …), Adopted (decision 3 revised by ADR 0024).
-- **Rejected**: the proposal was not adopted. The body keeps the proposal and
-  the rejection rationale.
-- **Superseded**: the decision was wholly overturned by a later ADR; the
-  status line names the successor, e.g.: Superseded (see ADR 0024). The
-  original entry is kept, never deleted.
+## 状态词汇
 
-Status describes the fate of the decision itself. When the decision's object
-is to veto some mechanism (e.g. ADR 0008 vetoes runtime freezing), the status
-is still Adopted, with the vetoed object noted in parentheses.
+- **已采纳**：决策生效。括号内可注明实现进度或部分修订，如
+  已采纳（部分实现：…）、已采纳（决策 3 经 ADR 0024 修订）。
+- **否决**：提案未获采纳。正文保留提案与否决理由。
+- **被取代**：决策被后续 ADR 整体推翻；状态行注明后继（如
+  被取代（见 ADR 0024））。原文保留，永不删除。
 
-When a decision is partially revised by a later ADR, both entries keep mutual
-pointers: the new ADR states in its "Related" section and relevant clauses
-which clauses were revised; the old ADR gets revision notes at the revised
-spots. Silent overrides without pointers violate the ADR conflict-annotation
-convention.
+状态描述的是决策本身的命运。决策对象是"否决某机制"的条目（如
+ADR 0008 否决运行时冻结），状态仍是已采纳，括注被否决的对象。
 
-## Numbering rules
+后续 ADR 部分修订早前决策时，两篇互指：新 ADR 在"相关"与相应条款写明
+修订了哪些条款；旧 ADR 在被修订处加修订注。无指针的静默覆盖违反本目录
+的冲突标注惯例。
 
-- Numbers are four digits, increasing, never reused; normally in time order.
-- Back-filled historical decisions occupy vacated numbers of their era, with
-  the actual decision date noted at the top (see ADR 0005).
+## 编号规则
 
-## Template
+- 编号四位、递增、永不复用；一般按时间顺序。
+- 回填的历史决策占用其年代的空号，文首注明实际决策日期（见 ADR 0005）。
 
-```markdown
-# ADR XXXX: Title
+## 索引
 
-**Status**: see vocabulary above
-**Date**: YYYY-MM-DD
-**Related Issue**: #nnn
-**Related**: ADR YYYY (relationship to this entry)
-
-## Context
-
-Why this decision must be made now. State facts and constraints clearly,
-without piling up detail.
-
-## Decision
-
-Itemized list; each item actionable and verifiable.
-
-## Rationale
-
-For each decision item, why this shape and not another. Where alternatives
-exist, state why they were excluded.
-
-## Consequences
-
-Added / changed / unchanged. Where there is a cost, state it.
-```
-
-Optional subsections: `Alternatives compared`, `Trade-offs`,
-`Revision (date, reference)`. Revision subsections are appended at the end;
-original text untouched. ADRs leave no TODOs: to-dos move to issues or new
-ADRs.
-
-## Index
-
-| No. | Title | Status |
+| 编号 | 标题 | 状态 |
 |---|---|---|
 | 0001 | Withdraw Protocol seams | Adopted |
 | 0002 | Rust integrator core, Python-controlled dynamics | Adopted (with multiple revisions) |
@@ -113,6 +73,6 @@ ADRs.
 | 0040 | transfer_design converged trajectory: unified synodic-frame contract with trajectory_times | Adopted (implemented) |
 | 0041 | spatiography — cislunar partition (Primer) analytic core: five-province taxonomy, [primer] constants, scales/classify/boundaries tools | Adopted (implemented) |
 | 0042 | orbit taxonomy — 42-label classification of CR3BP periodic orbits: STK CODE vocabulary, self-defined analytic criteria, ingest stamping and response enrichment | Adopted (implemented; decision 5 tool-count clause superseded by ADR 0043/0044; label table relocated by ADR 0044) |
-| 0043 | Interface class split — Facade keeps task-level methods, catalog and spatiography become their own classes | Adopted (implemented) |
-| 0044 | Terminology list exposure — closed value sets leave the repository through one registered tool | Adopted (implemented) |
-| 0045 | Orbit record granularity — one record per trajectory, family as label | Adopted (implemented) |
+| 0043 | 接口类分家——Facade 只留任务级方法，轨道库与 spatiography 各自成类 | 已采纳（已实现） |
+| 0044 | 术语清单暴露——闭值集经单一注册工具出库 | 已采纳（已实现） |
+| 0045 | 轨道记录粒度——一轨一记录，族为标签 | 已采纳（已实现） |

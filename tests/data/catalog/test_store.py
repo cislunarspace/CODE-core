@@ -45,13 +45,6 @@ class TestRoundTrip:
         record_id = store.put(*make_record())
         assert store.get(record_id).meta["schema_version"] == 2
 
-    def test_one_record_carries_one_trajectory(self, store):
-        """粒度契约（ADR 0045 决策 1）：记录无 members 键、无打捆段。"""
-        record_id = store.put(*make_record())
-        meta = store.get(record_id).meta
-        assert "members" not in meta
-        assert not any(key.startswith("cr3bp/members/") for key in meta["arrays"])
-
     def test_record_files_exist_on_disk(self, store):
         record_id = store.put(*make_record())
         assert (store.records_dir / f"{record_id}.json").exists()

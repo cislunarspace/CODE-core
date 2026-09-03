@@ -99,14 +99,12 @@ An entire OrbitFamily is one record; member parameters & arrays inside. Members
 may lift into standalone records (`source_record_id` → family) for downstream
 consumption such as station keeping.
 
-*(Revision note 2026-09-01, #611: overturned by ADR 0045 decisions 1 and 2 —
-one record carries exactly one trajectory, and a family becomes a label
-(`orbit_family` + `family_id` + `member_index`) queried by filter. `member_count`
-and `members[]` are removed at schema version 2, and `catalog_promote` — the
-member-lifting method this decision motivated — is removed with it. The two
-reasons recorded here, flooded query results and homeless family-level
-quantities, are answered there by index filters and by per-member run
-provenance.)*
+*（修订注 2026-09-01，#611：被 ADR 0045 决策 1、2 推翻——一条记录只载
+一条轨迹，族成为可过滤查询的标签（`orbit_family` + `family_id` +
+`member_index`）。`member_count` 与 `members[]` 随 schema 版本 2 删除，
+本决策催生的成员提升方法 `catalog_promote` 一并移除。此处记录的两条
+理由——查询结果泛滥与族级量无处安放——在那里分别由索引过滤与"溯源
+随成员"回答。）*
 
 ### 5. Storage layout: flat record files + SQLite derived index
 
@@ -134,10 +132,9 @@ packaging), `catalog_sweep` (parameter-space scan batch generation + ingestion;
 orchestration reuses ADR 0029's Rust family generation). CLI and MCP derive
 automatically per ADR 0014 pure derivation.
 
-*(Revision note 2026-09-01, #610: these methods move off `Facade` onto the
-catalog interface class of ADR 0043 decision 2, joined there by
-`orbit_family_generation` and by `catalog_terminology` (ADR 0044). Tool names,
-schemas and pure derivation are unchanged; only the holding class changes.)*
+*（修订注 2026-09-01，#610：这些方法从 `Facade` 迁入 ADR 0043 决策 2
+的轨道库接口类，与 `orbit_family_generation`、`catalog_terminology`
+（ADR 0044）同住。工具名、schema 与纯派生不变，变的只是承载类。）*
 
 ### 8. Automatic ingestion
 

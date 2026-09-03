@@ -1,6 +1,4 @@
-# e2m2e: Earth to Moon, Moon to Earth
-
-**English** | [简体中文](README.zh-CN.md)
+# e2m2e: Earth to Moon, Moon to Earth（地月往返）
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
@@ -9,44 +7,44 @@
 [![GitHub stars](https://img.shields.io/github/stars/cislunarspace/e2m2e.svg)](https://github.com/cislunarspace/e2m2e/stargazers)
 [![Rust: 1.98.0](https://img.shields.io/badge/rust-1.98.0-orange.svg)](https://www.rust-lang.org/)
 
-e2m2e is an **algorithm toolset infrastructure** for cislunar space mission planning. In an LLM+Agent-style autonomous mission planning system, the large language model understands mission intent and decomposes/orchestrates subtasks, while e2m2e provides precise and reliable orbit computation tools: it builds dynamical models of cislunar space, generates periodic orbit families, designs transfer paths between orbits, and visualizes results for inspection.
+e2m2e 是面向地月空间任务规划的**算法工具集基础设施**。在 LLM+Agent 式自主任务规划系统中，大模型负责理解任务意图、分解与编排子任务，e2m2e 负责提供精确可靠的轨道计算工具：建立地月空间的动力学模型，生成周期轨道族，设计轨道之间的转移路径，并把结果画出来检查。
 
-## How to read this repository
+## 仓库怎么读
 
-The runtime architecture is just four pieces: `e2m2e/api/` is the sole external entry (the Facade, from which the CLI and MCP derive); `e2m2e/algorithm/` constructs problems with domain knowledge (choosing orbit families, constraints, initial guesses); `crates/` is the Rust numerical layer where heavy iterations converge; `e2m2e/data/` supplies ephemeris caches, frame data, and constant baselines. `e2m2e/tools/` is logging/visualization support, and `e2m2e/mbse/` sits outside the dependency chain.
+运行时架构只有四块：`e2m2e/api/` 是对外接口层，暴露三个类——`Facade` 承载五个任务级方法（轨道设计、站保、转移、预报、时空转换），`Catalog` 承载轨道库读写与族生成，`Spatiography` 承载空间分区分析；`Facade` 是组合根，`facade.catalog` / `facade.spatiography` 交出另外两类，CLI 与 MCP 从同一份工具清单派生。`e2m2e/algorithm/` 用领域知识构造问题（选轨道族、定约束、配初猜）；`crates/` 是 Rust 数值层，打靶迭代等重计算在这里收敛；`e2m2e/data/` 供星历缓存、坐标数据与常数基准。`e2m2e/tools/` 为日志/可视化辅助，`e2m2e/mbse/` 在依赖链之外。
 
-The journey of one orbit task: `api` receives the request → `algorithm/family` picks a family and initial guess (seeds from `catalog/records` or `algorithm/normal_form`) → shooting sinks into `crates/e2m2e-integrators`, with per-step forces in `crates/e2m2e-forces` (ephemerides come from the pre-sampled cache tables of `data/frames`, never live SPICE handles; constants from `data/constants`) → the result lands in `catalog/` and is delivered through `api/cli` and `api/mcp`.
+一条任务轨道的旅程：`api` 收到请求 → `algorithm/family` 选族给初猜（种子来自 `catalog/records` 或 `algorithm/normal_form`）→ 打靶下沉 `crates/e2m2e-integrators`，每步算力在 `crates/e2m2e-forces`（星历不吃 SPICE 句柄，吃 `data/frames` 预采样缓存表；常数出自 `data/constants`）→ 结果落 `catalog/`，经 `api/cli` 与 `api/mcp` 交付。
 
-The remaining top-level directories (`tests/`, `examples/`, `docs/`, `scripts/`, `kernels/`, ...) are tests, docs, scripts, and data assets — off the runtime dependency chain. For the full design narrative see [docs/architecture/architecture.md](docs/architecture/architecture.md).
+仓库其余顶层目录（`tests/`、`examples/`、`docs/`、`scripts/`、`kernels/` 等）是测试、文档、脚本与数据资产，不在运行时依赖链上。设计决策记录见 [docs/adr/](docs/adr/)（ADR 0043 起以中文书写，更早条目为英文历史存档）。
 
-## Installation
+## 安装
 
-Install with [uv](https://docs.astral.sh/uv/):
+用 [uv](https://docs.astral.sh/uv/) 安装：
 
 ```bash
 uv pip install e2m2e
 ```
 
-Release wheels cover Windows x86_64, Linux x86_64, and Linux aarch64 (arm64, e.g. Kunpeng / Phytium / Raspberry Pi); other platforms build from source.
+发布物覆盖 Windows x86_64、Linux x86_64 与 Linux aarch64（arm64，如鲲鹏/飞腾/树莓派）的 wheel；其余平台从源码构建。
 
-To use it in your own project:
+在自己的项目中使用：
 
 ```bash
 uv init my-project && cd my-project
 uv add e2m2e
 ```
 
-To develop from source (requires the [Rust 1.98.0 toolchain](https://www.rust-lang.org/tools/install); the repo pins the version via `rust-toolchain.toml`, used to build the integrator kernel):
+从源码开发（需要 [Rust 1.98.0 工具链](https://www.rust-lang.org/tools/install)，仓库通过 `rust-toolchain.toml` 固定版本，用于构建积分器内核）：
 
 ```bash
 git clone https://github.com/cislunarspace/e2m2e.git
 cd e2m2e
-make dev     # Single entry point: sync deps + fetch CSPICE build package & SPICE kernels + build/install the Rust extension (spice enabled by default)
+make dev     # 唯一入口：同步依赖 + 拉取 CSPICE 编译包与 SPICE 内核 + 构建安装 Rust 扩展（spice 默认开启）
 ```
 
-#### Installing make on Windows
+#### Windows 安装 make
 
-Windows does not ship with `make`. You can install it with [Scoop](https://scoop.sh/); run these commands in PowerShell:
+Windows 默认不提供 `make`。可使用 [Scoop](https://scoop.sh/) 安装；在 PowerShell 中依次执行：
 
 ```powershell
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -54,23 +52,23 @@ irm get.scoop.sh | iex
 scoop install make
 ```
 
-After installation, reopen PowerShell, return to the repository directory and run `make dev` (single entry point: sync deps + fetch data + build/install; see above). If you already have Scoop, just run `scoop install make`.
+安装完成后重开 PowerShell，回到仓库目录执行 `make dev`（唯一入口：同步依赖 + 拉取数据 + 构建安装，见上方）。若已安装 Scoop，只需执行 `scoop install make`。
 
-To run Rust tests on Windows use `make test-rust`: the test binary depends on Python's `python3.dll`, which lives in the Python installation root rather than in the venv's `Scripts/`; the Makefile auto-detects and adds it to the test process PATH. If auto-detection fails, run `make test-rust PYTHON_DLL_DIR=<directory containing python*.dll>` explicitly. When troubleshooting manually, first run `dumpbin /DEPENDENTS` or `dumpbin /IMPORTS` on the failing test EXE to identify the actually missing DLL; do not add CSPICE's `lib/` (the static library directory) to PATH.
+Windows 上运行 Rust 测试请使用 `make test-rust`：测试二进制依赖 Python 的 `python3.dll`，该 DLL 在 Python 安装根目录而不在虚拟环境 `Scripts/`；Makefile 会自动探测并加入测试进程 PATH。若自动探测失败，可显式执行 `make test-rust PYTHON_DLL_DIR=<含 python*.dll 的目录>`。手工排查时先对失败的测试 EXE 执行 `dumpbin /DEPENDENTS` 或 `dumpbin /IMPORTS`，确认实际缺失的 DLL，不要把 CSPICE 的 `lib/`（静态库目录）加入 PATH。
 
-### SPICE kernels
+### SPICE 内核
 
-Ephemeris dynamics require NASA SPICE kernel files. All kernels needed by this project's tests (planetary ephemerides, Earth rotation, Moon attitude, leap seconds, and planetary constants) are packaged as `kernels-v1` in a [GitHub Release](https://github.com/cislunarspace/e2m2e/releases). Three ways to configure:
+星历动力学需要 NASA SPICE 内核文件。本项目测试所需的全部内核（行星星历、地球自转、月球姿态、闰秒与行星常数）已打包在 [GitHub Release](https://github.com/cislunarspace/e2m2e/releases) 的 `kernels-v1` 中。三种配置方式：
 
-- **Automatic setup (recommended)**: `make setup` downloads them into `kernels/` (see `scripts/download_kernels.py`).
-- **Manual download**: download `kernels-v1` from the Release page and extract into `kernels/`.
-- **Bring your own data**: use your own kernel files placed in `kernels/`, or point `$SPICE_KERNEL_DIR` at their location.
+- **自动配置（推荐）**：`make setup` 下载并放入 `kernels/`（见 `scripts/download_kernels.py`）。
+- **手动下载**：从 Release 下载 `kernels-v1`，解压到 `kernels/` 目录。
+- **自备数据**：使用自己的内核文件，放入 `kernels/` 目录，或将 `$SPICE_KERNEL_DIR` 指向其所在路径。
 
-Official source: [NASA NAIF](https://naif.jpl.nasa.gov/naif/data.html).
+官方来源：[NASA NAIF](https://naif.jpl.nasa.gov/naif/data.html)。
 
-## Quick start
+## 快速开始
 
-Design an Earth–Moon L2 Halo orbit (complete the SPICE kernel setup above first):
+设计一条地月 L2 Halo 轨道（需先完成上方 SPICE 内核配置）：
 
 ```python
 from e2m2e.api import Facade
@@ -89,19 +87,19 @@ print(result.orbit_type)
 print(result.initial_state)
 ```
 
-For parameter meanings, returned fields, and other orbit types see the [online documentation](https://cislunarspace.github.io/e2m2e/); runnable examples are in the [`examples/`](examples/) directory.
+参数含义与返回字段以请求/响应模型的字段描述为准（`--help` 与 MCP schema 同源）；可运行示例见 [`examples/`](examples/) 目录。
 
 ## MCP
 
-e2m2e can act as an [MCP](https://modelcontextprotocol.io/) server exposing 18 task-level tools (orbit design, station-keeping simulation, transfer design, orbit propagation, spacetime conversion, orbit family generation, 5 spatiography tools, and 7 catalog tools) to LLM Agents over stdio transport without listening on any port. The tool list is derived from Facade method metadata; artifacts are automatically archived and `record_id`s chain across tools. For usage and a tool cheat sheet, see the documentation "[Using e2m2e through MCP](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)". CLI subcommands mirror the MCP tool surface one-to-one (`e2m2e design-orbit --help`); a GUI can drive the same surface through the `serve-stdio` sidecar, with mid-flight cancellation for long-running tools.
+e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 18 个任务级工具（5 个任务工具、5 个分区解析工具与 8 个轨道库工具——含族生成与术语清单 `catalog_terminology`）暴露给 LLM Agent，stdio 传输，不监听端口。工具清单由各暴露类的方法元数据派生（单一来源），产物自动入库：单条产物响应带 `record_id`，族生成带 `family_id`（整族查询的句柄，`catalog_query(family_id=…)` 取回全部成员记录）。CLI 子命令与 MCP 工具面同源对称（`e2m2e design-orbit --help` 即用）；GUI 可经 `serve-stdio` sidecar 驱动同一工具面，长任务支持线级取消。
 
-Install the MCP extra (in an environment that already has e2m2e):
+安装 MCP extra（在已有 e2m2e 的环境里）：
 
 ```bash
-uv pip install "e2m2e[mcp]"   # or pip install "e2m2e[mcp]"
+uv pip install "e2m2e[mcp]"   # 或 pip install "e2m2e[mcp]"
 ```
 
-Register the server in your MCP client configuration (`command` points to the executable in the environment where e2m2e is installed; most MCP clients follow this `mcpServers` format):
+在 MCP 客户端配置中注册服务器（`command` 指向安装了 e2m2e 的环境里的可执行文件，多数 MCP 客户端都采用这一 `mcpServers` 格式）：
 
 ```json
 {
@@ -115,91 +113,83 @@ Register the server in your MCP client configuration (`command` points to the ex
 }
 ```
 
-It is recommended to pin `cwd` to the directory containing `kernels/` (SPICE kernels) and `catalog/` (orbit catalog); either directory can also be given as absolute paths via the environment variables `SPICE_KERNEL_DIR` / `E2M2E_CATALOG_DIR`.
+`cwd` 建议钉在含 `kernels/`（SPICE 内核）与 `catalog/`（轨道库）的目录；两目录也可分别用环境变量 `SPICE_KERNEL_DIR` / `E2M2E_CATALOG_DIR` 指定绝对路径。
 
-Once configured, drive it directly in natural language from your client, e.g.:
+配置完成后在客户端直接用自然语言驱动，例如：
 
-> Design an L2 southern NRHO with 3000 km perilune altitude, then run 100 Monte Carlo station-keeping simulations on it and tag the results "candidate".
+> 设计一条 L2 南族 NRHO，近月点高度 3000 km，然后对它做 100 次蒙特卡洛站保仿真，结果打上候选标签。
 
-## Capabilities
+## 能力
 
-Completed and uncompleted parts are listed by domain. For a detailed capability matrix and API documentation see the [online documentation](https://cislunarspace.github.io/e2m2e/); version-by-version changes are in [CHANGELOG.md](CHANGELOG.md).
+已建成与未建成的部分按领域列出。逐版本变更见 [CHANGELOG.md](CHANGELOG.md)；接口字段的权威描述在请求/响应模型（Pydantic Field 描述，CLI `--help` 与 MCP schema 均由此派生）。
 
-**Spacetime systems**
+**时空系统**
 
-- Coordinate frame conversion: J2000 / ITRF93 (high-precision SPICE) / IAU 2006, GMAT-compatible native ITRF, dynamic frames VNB / LVLH.
-- Joint spacetime transformation: TDT+GCRS ↔ TDB+EBCRS (r2s2 backend, including relativistic terms).
-- SPICE ephemeris and time management: kernel loading, UTC / TDB / TAI time scales, body state and frame rotation queries.
+- 坐标系转换：J2000 / ITRF93（SPICE 高精度）/ IAU 2006，GMAT 兼容的原生 ITRF，动态坐标轴 VNB / LVLH。
+- 时空联合转换：TDT+GCRS ↔ TDB+EBCRS（r2s2 后端，含相对论项）。
+- SPICE 星历与时间管理：内核加载、UTC / TDB / TAI 时间尺度、天体状态与帧旋转查询。
 
-**Integrators and dynamics**
+**积分器与动力学**
 
-- Rust integrator kernel: single-step RK (PD45 / PD78 / RK89), Adams multistep, Störmer–Cowell second-order integration, IAS15 (15th-order Gauss-Radau predictor-corrector with compensated summation for high-accuracy long arcs); state transition matrix (STM) propagation; event detection (terminal / direction semantics).
-- Variational equations: STM of the state with respect to the initial state, plus first-order sensitivity columns with respect to force-model parameters (Cr / Cd) for orbit determination and covariance propagation.
-- Dynamical models: CR3BP (fast design), ephemeris N-body (SPICE, accurate extrapolation), BCR4BP with analytic solar perturbation, plus conversions among the three.
-- High-fidelity force models: point-mass and third-body gravity, spherical-harmonics gravity field (with solid tides), ECOM 9-parameter solar radiation pressure, atmospheric drag, SRP, continuous thrust.
+- Rust 积分器内核：单步 RK（PD45 / PD78 / RK89）、Adams 多步、Störmer–Cowell 二阶积分；状态转移矩阵（STM）传播；事件检测（terminal / direction 语义）。
+- 动力学模型：CR3BP（快速设计）、星历 N 体（SPICE，精确外推）、含太阳解析摄动的 BCR4BP，以及三者之间的转换。
+- 高精度力模型：点质量与第三体引力、球谐重力场（含固体潮）、ECOM 9 系数光压、大气阻力、太阳光压、连续推力。
 
-**Mission orbit design**
+**任务轨道设计**
 
-- Periodic orbit families: DRO, Halo, Lyapunov, Lissajous, resonant orbits (RO), DPO, Axial, triangular-libration-point SPO / LPO, Horseshoe.
-- Numerical algorithms: differential correction, multiple shooting, continuation; full-pipeline CR3BP initial guess → ephemeris correction → high-fidelity propagation.
-- Nominal orbit contract (NominalOrbit): equally-spaced state table + Floquet basis + projection factor, consumed directly by station keeping.
+- 周期轨道族：DRO、Halo、Lyapunov、Lissajous、共振轨道（RO）、DPO、Axial、三角平动点 SPO / LPO、Horseshoe。
+- 数值算法：微分修正、多重打靶、延拓；全链路 CR3BP 初猜 → 星历修正 → 高精度预报。
+- 名义轨道契约（NominalOrbit）：等间距状态表 + Floquet 基 + 投影因子，供轨道保持直接消费。
 
-**Transfer design**
+**转移轨道设计**
 
-- Impulsive transfers: Lambert solver and porkchop scans, multi-impulse optimization (Lawden primer-vector test), direct Hohmann transfers (HMN).
-- Low-energy transfers: lunar gravity assist (LGA), WSB ballistic capture via solar gravity assist, invariant manifolds stitched with Poincaré sections.
-- Low-thrust transfers: Q-law initial guess + shooting / collocation.
-- Two-step grid search + nonlinear programming (parallelized with Rust Rayon).
+- 脉冲转移：Lambert 求解与 porkchop 扫描、多脉冲优化（Lawden 主矢量检验）、霍曼直接转移（HMN）。
+- 低能量转移：月球引力辅助（LGA）、WSB 太阳引力辅助弹道捕获、不变流形与庞加莱截面拼接。
+- 低推力转移：Q-law 初猜 + 打靶 / 配点。
+- 网格搜索 + 非线性规划两步法（Rust Rayon 并行）。
 
-**Orbit control**
+**轨道控制**
 
-- Three control laws: feature point, strict target point, relaxed target point; Monte Carlo navigation-error and thrust-error simulation.
-- Angular momentum management: joint attitude/thruster control.
+- 三种控制律：特征点、目标点严格、目标点宽松；蒙特卡洛测定轨与推力误差仿真。
+- 角动量管理：姿态发动机联合控制。
 
-**Interfaces and tools**
+**接口与工具**
 
-- Facade task-level entry point providing a unified calling surface.
-- MCP service wrapper: in-process `create_server` and the `e2m2e mcp-serve` subcommand (stdio transport, `[mcp]` extra); tool list derived from Facade method metadata — orbit design, station-keeping simulation, transfer design, orbit propagation, spacetime conversion, orbit family generation, 5 spatiography tools, and 7 catalog tools; artifacts automatically archived, `record_id`s chain across tools. For integration config and tool usage see the documentation "[Using e2m2e through MCP](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)".
-- CLI subcommands: derived from the same `tool_inventory` as the MCP surface, with arguments generated from the same Pydantic models (`--help` carries types and defaults); the `serve-stdio` sidecar serves resident GUI drivers, and long-running tools can be cancelled mid-flight via a `{"cancel": job_id}` line.
+- 接口层三个类：`Facade` 任务级入口（五个任务方法，组合根）；`Catalog` 轨道库（查询/读取/删除/标注/导出/批量扫描/族生成/术语清单）；`Spatiography` 空间分区分析（五个工具）。
+- MCP 服务化封装：`create_server` 进程内服务器与 `e2m2e mcp-serve` 子命令（stdio 传输，`[mcp]` extra），工具清单由各暴露类方法元数据派生；产物自动入库，单条产物带 `record_id`、族生成带 `family_id`。
+- CLI 子命令：与 MCP 工具面同源派生，参数从同一份 Pydantic 模型生成（`--help` 带类型与默认值）；`serve-stdio` sidecar 供 GUI 常驻驱动，长任务可经 `{"cancel": job_id}` 行中途取消。
 
-## Documentation
+## 文档
 
-Online docs: <https://cislunarspace.github.io/e2m2e/>
+设计决策记录（ADR）见 [docs/adr/](docs/adr/)：ADR 0043 起以中文书写；0001–0042 为英文历史存档，不再翻译。接口字段说明见请求/响应模型描述与 `--help`。
 
-Local build:
-
-```bash
-uv sync --group docs
-uv run sphinx-build -b html docs docs/_build/html
-```
-
-## Tests and code style
+## 测试与代码规范
 
 ```bash
-make test     # Rust tests + Python tests in parallel via xdist (run make setup to fetch kernels first)
+make test     # Rust 测试 + Python xdist 并行测试（需先 make setup 拉内核）
 make check    # cargo fmt/clippy + ruff
 ```
 
-Tests are grouped into six categories by verification target, with directories mirroring source layout:
+测试按验证对象分六类，目录镜像源码结构：
 
-- `algorithm`: coordinate, dynamics, design, correction, transfer algorithm orchestration chains
-- `api`: Facade and MCP interface validation, responses, and error translation
-- `data`: data layer — kernels, reference frames, physical constants
-- `mbse`: MBSE data models, requirement registration, and diagram generation
-- `numerical`: integrator accuracy against analytic orbits; force-model accelerations and Jacobians
-- `tools`: auxiliary utilities — logging, formatting, visualization
+- `algorithm`：坐标、动力学、设计、修正、转移等算法编排链路
+- `api`：接口类的校验、响应与错误翻译
+- `data`：内核、参考帧、物理常数等数据层
+- `mbse`：MBSE 数据模型、需求注册与图生成
+- `numerical`：积分器对解析轨道的精度、力模型的加速度与雅可比
+- `tools`：日志、格式化、可视化等辅助工具
 
-An additional `_meta` directory constrains the test infrastructure itself. Assertions rely mainly on analytic solutions, conserved quantities, and literature formulas; the coordinate and time chains additionally compare against GMAT reference data. Rust-side numerical methods are verified against analytic solutions in `crates/*/tests/`.
+另有 `_meta` 目录约束测试基础设施自身。断言以解析解、守恒量与文献公式为主；坐标与时间链路另有 GMAT 参考数据对照。Rust 侧数值方法在 `crates/*/tests/` 对解析解。
 
-## Contributing
+## 贡献
 
-1. Fork this repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork 本仓库
+2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 开启 Pull Request
 
-## Citation
+## 引用
 
 ```bibtex
 @software{e2m2e,
@@ -212,6 +202,6 @@ An additional `_meta` directory constrains the test infrastructure itself. Asser
 }
 ```
 
-## License
+## 许可证
 
 [Apache 2.0](LICENSE)

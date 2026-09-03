@@ -1,21 +1,4 @@
-"""Facade 门面：任务级入口与暴露类组合根（ADR 0043）。/ Facade: the
-task-level entry class and composition root of the exposed classes.
-
-[English]
-
-The interface layer exposes three classes (ADR 0043): ``Facade`` keeps the
-five task-level capabilities (design_orbit / control_orbit / transfer_design /
-orbit_propagation / spacetime_transform); ``e2m2e.api.catalog.Catalog`` holds
-catalog data management and family generation; ``e2m2e.api.spatiography.
-Spatiography`` holds the partition-analysis tools. ``Facade`` is the
-composition root: ``Facade().catalog`` / ``Facade().spatiography`` hand
-in-process callers the other classes, and the single tool inventory scans
-``Facade().exposed_apis`` — MCP tools, CLI subcommands and the sidecar all
-derive from that one list (ADR 0014 decision 2, scan root widened by
-ADR 0043). Methods carry ``mcp_exposed`` metadata; the algorithm layer keeps
-fine-grained APIs for experts.
-
-[简体中文]
+"""Facade 门面：任务级入口与暴露类组合根（ADR 0043）。
 
 接口层暴露三个类（ADR 0043）：``Facade`` 只留五个任务级能力
 （design_orbit/control_orbit/transfer_design/orbit_propagation/

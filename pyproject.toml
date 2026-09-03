@@ -128,14 +128,6 @@ dev = [
     "mypy",
     "maturin>=1.8",
 ]
-docs = [
-    "sphinx>=7",
-    "sphinx-rtd-theme>=2",
-    "sphinxcontrib-mermaid>=0.9",
-    "sphinx-copybutton>=0.5",
-    "myst-parser>=2",
-]
-
 [tool.uv.sources]
 # calcephpy（r2s2 的传递依赖）PyPI 仅有 sdist，Windows 需 cmake+MSVC、Linux 需
 # cmake+gcc 现场编译。在 Windows/Linux（x86_64 与 aarch64）上按 Python 版本指向本

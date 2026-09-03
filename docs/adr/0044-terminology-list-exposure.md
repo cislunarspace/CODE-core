@@ -1,139 +1,114 @@
-# ADR 0044: Terminology list exposure — closed value sets leave the repository through one registered tool
+# ADR 0044: 术语清单暴露——闭值集经单一注册工具出库
 
-**Status**: Adopted (implemented — constants at the data layer, single tool
-registered, cross-layer sync locked by tests; the request-side `valid_ranges`
-outlet remains the open half of ADR 0014 decision 8)
-**Date**: 2026-09-01
-**Related Issue**: #609
-**Related**: ADR 0011 (five-layer architecture), ADR 0012 (dependency
-direction), ADR 0014 (decision 8 — conditional value domains are public and
-single-sourced; completed here), ADR 0031 (catalog records), ADR 0035 (sidecar
-protocol), ADR 0042 (decisions 1 and 5 — the label table and the no-new-tool
-clause), ADR 0043 (interface class split), ADR 0045 (record granularity).
+**状态**：已采纳（已实现——常量在数据层、单工具已注册；请求侧
+`valid_ranges` 的出口仍是 ADR 0014 决策 8 未完成的另一半）
+**日期**：2026-09-01
+**相关 issue**：#609
+**相关**：ADR 0011（五层架构）、ADR 0012（依赖方向）、ADR 0014（决策 8——
+条件值域公开且单源，在此补完）、ADR 0031（轨道库记录）、ADR 0035
+（sidecar 协议）、ADR 0042（决策 1 与决策 5——标签表与不新增工具条款）、
+ADR 0043（接口类分家）、ADR 0045（记录粒度）。
 
-## Context
+## 背景
 
-ADR 0042 defined 42 taxonomy labels and stamped measured labels onto records and
-responses, but decided against a new tool: the structured form of each label
-stayed inside `label_legend()` in the algorithm layer, and nothing in the
-repository calls it. A caller receiving `taxonomy_labels: ["halo_l2_northern"]`
-has no way to ask which category, libration point or hemisphere that label
-denotes.
+ADR 0042 定义了 42 个分类学标签，把实测标签盖章到记录与响应上，但决定
+不新增工具：标签的结构化形式留在算法层的 `label_legend()` 里，仓内无人
+调用它。调用方拿到 `taxonomy_labels: ["halo_l2_northern"]`，无处询问这个
+标签指代哪个类别、哪个平动点、哪个半球。
 
-The consequence is already visible downstream. transfer-orbit-design hardcodes
-the category rule (a `resonant_` prefix plus four moon-centered labels) in its
-frontend and keeps a family-name list of its own, re-checked by hand on every
-e2m2e upgrade. The record-side `orbit_family` names have no single closed set in
-this repository either: they are the image of the ingest mapping plus the
-lower-cased generator types, spread over three places.
+后果已经在下游显现。transfer-orbit-design 在前端硬编码类别规则
+（`resonant_` 前缀加四个月心标签），自持一份族名清单，每次升级 e2m2e
+靠人工核对。记录侧 `orbit_family` 的名字在仓内也没有单一封闭集：它们是
+ingest 映射的像加上生成器类型的小写，散在三处。
 
-ADR 0014 decision 8 already forbids exactly this: value domains must be exposed
-through machine-readable public interfaces, and callers must not keep local
-copies. The promise was made; the outlet was never built. Labels are also
-expected to grow, so a hand-copied list drifts by construction.
+ADR 0014 决策 8 早就禁止了这类事：值域必须经机器可读的公开接口暴露，
+调用方不得维护本地副本。承诺立了，出口没修。而且标签预期还会增长，手抄
+的清单天然漂移。
 
-## Decision
+## 决策
 
-### 1. Scope: the closed value sets callers need to render results
+### 1. 范围：调用方渲染结果所需的闭值集
 
-The terminology list covers the taxonomy labels in structured form (canonical
-string, category, family, libration point, hemisphere, resonance), the
-record-side `orbit_family` names, and the `transfer_type` values. Free text
-(`note`), open identifiers (`record_id`, `source_tool`) and numeric envelopes
-are not terminology and stay out.
+术语清单覆盖分类学标签的结构化形式（规范字符串、类别、族、平动点、
+半球、共振比）、记录侧 `orbit_family` 名单、`transfer_type` 值。自由文本
+（`note`）、开放标识（`record_id`、`source_tool`）与数值包络不是术语，
+不收。
 
-### 2. The constants live at the data layer
+### 2. 常量住数据层
 
-The 42-label table and its structured forms move from
-`algorithm/orbit_taxonomy/labels.py` to the data layer as static reference
-data, joined there by the `orbit_family` closed set and the `transfer_type`
-values. The classifier keeps its criteria cascade and stays in the algorithm
-layer (ADR 0042 decisions 2 and 3 unchanged); it reads the table from the data
-layer, which is the permitted dependency direction. The ingest expectation map
-derives its family names from the same constant instead of restating them.
+42 标签表及其结构化形式从 `algorithm/orbit_taxonomy/labels.py` 迁到数据
+层作为静态参考数据，`orbit_family` 封闭集与 `transfer_type` 值与之同住
+（`e2m2e/data/catalog/terminology.py`）。分类器保留判据级联、留在算法层
+（ADR 0042 决策 2、3 不变），向上读数据层的表——这是合法的依赖方向。
+ingest 的期望映射从同一常量取名，不再重述。
 
-### 3. One registered method on the catalog class
+### 3. 轨道库类上的单一注册方法
 
-The catalog class of ADR 0043 gains `catalog_terminology`, an
-`mcp_exposed` method returning the three lists in one response. It is
-registered like any other tool, so all call chains reach it: MCP, CLI,
-sidecar, and in-process. It is admitted under ADR 0043 decision 6 second
-clause — its content is referenced by the `taxonomy_labels` field of existing
-responses and no other tool can supply it.
+ADR 0043 的轨道库类增加 `catalog_terminology`，一个 `mcp_exposed` 方法
+一次返回三份清单。它像其他工具一样注册，全部调用链都够得着：MCP、CLI、
+sidecar、进程内。准入依据是 ADR 0043 决策 6 的第二款——其内容被既有
+响应的 `taxonomy_labels` 字段引用，且没有既有工具能供给。
 
-Named `catalog_terminology`, not `catalog_vocabulary` as proposed in #609:
-CONTEXT.md's language conventions fix "terminology list" as the term and list
-"vocabulary" under avoid.
+命名 `catalog_terminology` 而非 #609 提案里的 `catalog_vocabulary`：
+CONTEXT.md 语言约定固定用"术语清单"，"词表/vocabulary"列入避免。
 
-### 4. The package version is the terminology version
+### 4. 包版本即术语版本
 
-The response carries no version field. A terminology list is frozen per package
-release; a caller fetches it once per session and refreshes after upgrading
-e2m2e. Callers render an unrecognised label as its canonical string, which is
-self-describing by ADR 0042 decision 1.
+响应不带版本字段。术语清单随包发布冻结；调用方每会话取一次，升级
+e2m2e 后刷新。调用方遇到不认识的标签按规范字符串原样渲染——按
+ADR 0042 决策 1，规范字符串本身可读。
 
-### 5. Exposure through data files or algorithm-layer imports is not sanctioned
+### 5. 包数据文件与算法层导入不是许可的取用方式
 
-Callers must not read package data files or import the algorithm-layer table to
-obtain terminology. Those routes serve only in-process Python and would leave
-the GUI's sidecar call chain, MCP agents and the CLI to keep copies.
+调用方不得读包内数据文件、也不得导入算法层词表来获取术语。那两条路只
+服务进程内 Python，会把 GUI 的 sidecar 调用链、MCP Agent 与 CLI 留在
+各自维护副本的状态。
 
-## Rationale
+## 理由
 
-1. **A registered tool, because the call chain decides.** The sidecar admits
-   only registered tools, and the GUI's catalog access is moving there
-   (ADR 0035). A data-layer class or a package JSON file is unreachable from a
-   separate process; response metadata would ship 42 entries with every query
-   and give no way to refresh without a dummy query.
-2. **Constants at the data layer, criteria at the algorithm layer.** The label
-   table is a static table — reference data by nature. The classification
-   criteria are analysis. Splitting them lets both the classifier and the
-   interface read one table without an upward dependency.
-3. **One method, not four.** Separate tools for labels, families and transfer
-   types would fragment one question — what values may appear — into three
-   round trips and three tools.
-4. **No version field.** Package version already pins the table, and CHANGELOG
-   plus this ADR's amendments already announce changes. A second version
-   mechanism would need its own maintenance without answering a question the
-   package version leaves open.
+1. **注册工具，因为调用链说了算。** sidecar 只放行注册工具，而 GUI 的
+   轨道库访问正走向 sidecar（ADR 0035）。数据层类或包内 JSON 文件在独立
+   进程里够不着；挂响应元数据则每次查询都拖 42 条、且没有不查询就能
+   刷新的办法。
+2. **常量在数据层、判据在算法层。** 标签表是静态表——天然的参考数据；
+   分类判据是分析。拆开后分类器与接口层读同一张表，不产生向上的依赖。
+3. **一个方法，不是四个。** 标签、族名、转移类型各开一个工具，会把
+   "值域里允许出现什么"这一个问题拆成三次往返、三个工具。
+4. **不带版本字段。** 包版本已经钉住清单，CHANGELOG 加本 ADR 的修订
+   已经宣告变更。第二套版本机制要多养一个号，却不回答包版本回答不了
+   的问题。
 
-## Alternatives compared
+## 备选方案对比
 
-- **A derived `record_kind` field** (proposal 1 of #609) was rejected. The
-  single-record model of ADR 0045 removes the container ambiguity that made a
-  product-kind field attractive: with one trajectory per record, the only
-  content question left is mission orbit versus transfer orbit, answered by
-  `transfer_type`. Field semantics and segment conventions are specified there
-  instead.
-- **Legend attached to `catalog_query` responses**: rejected, see rationale 1.
-- **Static JSON shipped in the package**: rejected, see decision 5 — and it
-  would be a second copy of a table the repository already holds.
+- **派生 `record_kind` 字段**（#609 提案 1）被否决。ADR 0045 的单记录
+  模型消除了让"产品形态"字段变得诱人的容器歧义：一轨一记录后剩下的
+  内容问题只有任务轨道对转移轨道，由 `transfer_type` 回答。字段语义与
+  段约定改在那里规格化。
+- **图例挂 `catalog_query` 响应**：否决，见理由 1。
+- **包内静态 JSON**：否决，见决策 5——而且那是仓内已有清单之外的第二
+  份拷贝。
 
-## Consequences
+## 后果
 
-### Added
+### 新增
 
-- A data-layer terminology module; `catalog_terminology` on the catalog class,
-  hence one more registered tool, one more CLI subcommand.
+- 数据层术语模块；轨道库类上的 `catalog_terminology`，随之多一个注册
+  工具、多一个 CLI 子命令。
 
-### Changed
+### 变更
 
-- ADR 0014 decision 8 is satisfied for the catalog value sets.
-- ADR 0042 decision 5's no-new-tool clause is superseded for this case by
-  ADR 0043 decision 6.
-- `algorithm/orbit_taxonomy` imports its label table from the data layer;
-  `label_legend()` becomes the data layer's function.
-- transfer-orbit-design deletes its hardcoded category rule and family list.
+- ADR 0014 决策 8 对轨道库值集而言落地。
+- ADR 0042 决策 5 的不新增工具条款，就本案例由 ADR 0043 决策 6 取代。
+- `algorithm/orbit_taxonomy` 改从数据层读标签表；`label_legend()` 成为
+  数据层的函数。
+- transfer-orbit-design 删除其硬编码类别规则与族名清单。
 
-### Unchanged
+### 不变
 
-- Classification criteria, stamping at ingest, response enrichment, canonical
-  strings as serialization keys (ADR 0042).
-- The request-side conditional ranges (`valid_ranges`) keep having no Facade
-  outlet; that is the remaining half of ADR 0014 decision 8 and belongs to its
-  own issue.
+- 分类判据、入库打标、响应加富、规范字符串作为序列化键（ADR 0042）。
+- 请求侧条件值域（`valid_ranges`）仍无接口层出口；那是 ADR 0014
+  决策 8 的另一半，属于它自己的 issue。
 
-### Cost
+### 代价
 
-- One more tool on the face, justified under the admission rule rather than by
-  count.
+- 工具面上多一个工具——依据准入判据而非数字来接受。
