@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import io
+
 import numpy as np
 import pytest
 
@@ -16,6 +18,7 @@ from e2m2e.api.frames import (  # noqa: E402
     FrameError,
     decode_frame,
     encode_frame,
+    read_raw_frame,
 )
 
 
@@ -103,3 +106,27 @@ def test_encode_normalizes_dtype_and_order():
     arr = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=">f8")
     assert encode_frame(arr, "f64") == encode_frame(np.ascontiguousarray(arr.astype("<f8")), "f64")
     assert MAGIC == 0x324D3245
+
+
+def test_read_raw_frame_multidim_consumes_full_frame():
+    """（#622）read_raw_frame 必须按全部 ndim 个 shape 维计算帧长。
+
+    只解首维会让 (1,6) 帧被当成 1 个元素读 4 字节数据（应 24），worker
+    帧流自此失步——worker stdout 泵转发时表现为后续帧 magic 校验失败。
+    帧后尾随字节（下一 JSON 行）必须原样留在流里。
+    """
+    frame = encode_frame(np.ones((1, 6), dtype=np.float32), "f32")
+    tail = b'\n{"type": "result"}'
+    stream = io.BytesIO(frame + tail)
+    assert read_raw_frame(stream) == frame
+    assert stream.read() == tail
+
+
+def test_read_raw_frame_1d_and_truncated():
+    """一维帧整帧读回；头/数据段不完整按契约抛 FrameError。"""
+    frame = encode_frame(np.array([1.0, 2.0], dtype=np.float32), "f32")
+    assert read_raw_frame(io.BytesIO(frame)) == frame
+    with pytest.raises(FrameError, match="帧头不完整"):
+        read_raw_frame(io.BytesIO(frame[:3]))
+    with pytest.raises(FrameError, match="数据段不完整"):
+        read_raw_frame(io.BytesIO(frame[:-4]))

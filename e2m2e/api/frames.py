@@ -107,7 +107,9 @@ def read_raw_frame(stream) -> bytes:
     shape_bytes = stream.read(4 * ndim)
     if len(shape_bytes) < 4 * ndim:
         raise FrameError("shape 段不完整")
-    shape = _U32.unpack_from(shape_bytes)
+    # 解全部 ndim 个 u32（#622）：unpack_from 只取首维，多维帧数据段会
+    # 少读，worker 帧流自此失步
+    shape = struct.unpack(f"<{ndim}I", shape_bytes)
     n_elements = 1
     for dim in shape:
         n_elements *= dim
