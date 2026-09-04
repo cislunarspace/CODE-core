@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### Changed
+- **轨道库出默认态：库不维护数据库，提供建库基础设施**：三处默认行为移除——计算产物（design/control/transfer/族生成/sweep）默认只随响应返回、不再自动入库，`catalog_enabled` 默认关（`$E2M2E_CATALOG_ENABLED` 显式开启）；`catalog_dir` 无隐式默认（`Config(catalog_dir=...)` 或 `$E2M2E_CATALOG_DIR` 显式指定），未指定时一切库操作报 `CATALOG_NOT_CONFIGURED`、不建目录，不再"跑哪建哪"地创建 `./catalog`；基线数据集移出 wheel（瘦身约 3.5 MB），改 GitHub Release 资产分发，`import_baseline(store, source_dir)` 源必填、显式导入建库。持有 v1 旧库的 schema 弃用语义不变（ADR 0045）。(#632)
+
+### 升级注意
+- **依赖自动入库的调用方**：升级后默认 `record_id`/`family_id` 为 `None`；设 `$E2M2E_CATALOG_ENABLED=1` 或 `Config(catalog_enabled=True, catalog_dir=...)` 恢复，库目录必须显式指定。design→control（`input_record_id`）链路要求先开启入库。
+- **基线数据集**：不再随包分发、不再首用自动导入；从 GitHub Release（资产 `baseline-cr3bp-<version>.zip`）下载解压后经 `import_baseline` 导入。
+- **Config 载荷（worker 协议）**：删 `catalog_baseline_import` 字段；旧版序列化载荷会被 `from_payload` 以未知字段拒绝，worker 双端需同步升级。
+
 ### Fixed
 - **v1 旧轨道库记录的报错可定位、可处置**：持有 ADR 0045 之前库产物的用户，任何轨道库操作原先在索引重建处裸报“记录元数据缺少必备键：[…]”，既不带文件名也无处置指引。现在 schema 版本先于必备键检查——旧版本记录按“不支持的记录 schema 版本：…；旧产物不兼容读取，请删除后重算”报错；索引重建逐文件包装异常，消息携带违规记录文件名。打开即失败语义不变。(#625)
 
