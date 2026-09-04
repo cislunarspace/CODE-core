@@ -194,10 +194,17 @@ class CatalogStore:
     # ---- 维护 ----
 
     def rebuild_index(self) -> None:
-        """扫描记录文件全量重建索引；重建后查询结果不变。"""
+        """扫描记录文件全量重建索引；重建后查询结果不变。
+
+        不合规记录（如 ADR 0045 前的 v1 旧产物）打开即失败；报错按
+        文件包装，带文件名与处置指引，用户可定位到具体文件删除重算。
+        """
         metas = []
         for json_path in sorted(self.records_dir.glob("*.json")):
-            metas.append(meta_from_json(json_path.read_text(encoding="utf-8")))
+            try:
+                metas.append(meta_from_json(json_path.read_text(encoding="utf-8")))
+            except CatalogError as exc:
+                raise CatalogError(f"记录 {json_path.name} 无法索引：{exc}") from exc
         self._index.rebuild(metas)
 
     def close(self) -> None:
