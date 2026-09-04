@@ -215,7 +215,7 @@ def _generate_dpo_family(request: _DpoFamilyRequest) -> tuple[Any, ...]:
 
 
 def baseline_record_id(family_type: str, libration_point: int | None) -> str:
-    """确定性 record_id：文件名与记录 id 对位，首用导入按 id 命中。"""
+    """确定性 record_id：文件名与记录 id 对位，显式导入按 id 命中。"""
     suffix = "" if libration_point is None else f"-l{libration_point}"
     return f"baseline-{family_type}{suffix}"
 

@@ -591,11 +591,14 @@ class TestQuery:
         assert len(records) == 3
         assert all(not hasattr(record, "arrays") for record in records)
 
-    def test_query_across_threads_after_lazy_open(self, tmp_path):
+    def test_query_across_threads_after_lazy_open(self, monkeypatch, tmp_path):
         """mcp-serve 逐 tools/call 换线程池线程（#559）：惰性 catalog 连接
         绑定首用线程后，其他线程查询不得报 SQLite 跨线程错误。"""
+        _fake_design(monkeypatch, _make_design_result())
         facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
+        facade.design_orbit(orbit_type="DRO")  # 种一条记录：跨线程有一致可见的数据
         expected = len(facade.catalog.catalog_query().records)  # 首用线程惰性建库
+        assert expected == 1
         counts: list[int] = []
         errors: list[Exception] = []
 
@@ -610,6 +613,7 @@ class TestQuery:
             thread.start()
             thread.join()
 
+        assert errors == []
         assert counts == [expected, expected]
 
 
