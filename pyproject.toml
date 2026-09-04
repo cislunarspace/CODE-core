@@ -55,7 +55,7 @@ normal-form = [
 # anyio 显式声明（server 的线程池与 CLI 事件循环直接用它，不只是 mcp 传递依赖）。
 mcp = [
     "mcp>=2.0",
-    "anyio>=3",
+    "anyio>=4.14.2",
 ]
 
 [project.scripts]
