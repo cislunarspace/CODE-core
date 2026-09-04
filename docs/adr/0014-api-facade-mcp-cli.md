@@ -59,6 +59,10 @@ is where that vision gets delivered.
    *（修订注 2026-09-01，#609：ADR 0044 经 `catalog_terminology` 修通轨道库
    闭值集（分类学标签、族名、转移类型）的出口。请求侧条件数值范围
    （`valid_ranges`）仍无注册出口——本决策余下的一半。）*
+   *（修订注 2026-09-04，#620：请求侧条件数值范围与族生成离散选项经
+   Facade 无参注册工具 `valid_ranges` 全量出库，直接消费请求模型既有的
+   `valid_ranges`/`valid_options` 类方法（#415），不另存副本；决策 8
+   完成。）*
 
 ## MCP tool list
 

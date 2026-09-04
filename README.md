@@ -63,7 +63,7 @@ print(result.initial_state)
 
 ### MCP
 
-e2m2e 为 18 个工具设计了 MCP 接口。
+e2m2e 为 19 个工具设计了 MCP 接口。
 
 安装 MCP：
 

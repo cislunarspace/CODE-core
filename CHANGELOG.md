@@ -1,8 +1,11 @@
 # Changelog
 
-Release entries record exact code references (`module/function`, issue numbers, numeric details). Released entries below are immutable history (see `docs/adr/README.md`: decision snapshots are never rewritten) and stay in the Chinese they were written in. **From the next release onward, new entries are written in English**, per the repo's English-only documentation policy. Unreleased content may be edited freely before release.
+发布条目面向调用方：写变化、用法与数值细节，issue 引用置段尾括号；内部实现路径与决策沿革不进本文件（住 ADR 与 issue）。已发布条目是不可变历史，保持写成时的语言。
 
 ## [Unreleased]
+
+### Added
+- **请求侧条件值域出口 `valid_ranges`**：调用方此前拿不到"设计某个族时各参数能填多少"的机器可读答案，只能试错撞校验报错或自抄一份范围。新增无参工具 `valid_ranges`：一次调用返回 `design_orbit` 的条件区间（17 键，LISSAJOUS 逐平动点拆 L1/L2/L3，L3 包络独立放宽到 100000 km）、族生成的条件区间（16 组，键为 `族_Ln`，含 `libration_point` 允许集；DRO 不带后缀）与族生成离散选项（8 族：延拓方向、采样规则）。区间与校验器同源，不另存副本；逐字段携带单位（如 km，缺省为无量纲或计数值）、开闭语义与区间内排除值（如 HALO 振幅排除 0）。MCP 工具、CLI 子命令 `valid-ranges` 与 Python 的 `Facade().valid_ranges()` 三面同源派生，工具面 18→19。(#620)
 
 ## [5.9.2] - 2026-09-01
 
