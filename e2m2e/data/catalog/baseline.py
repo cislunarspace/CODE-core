@@ -1,11 +1,9 @@
-"""CR3BP 基线数据集首用导入（ADR 0036 决策 5；ADR 0045 决策 8）。
+"""基线数据集显式导入（ADR 0036 数据集；ADR 0047 决策 4 出包）。
 
-包内 ``e2m2e/data/catalog_baseline/`` 是一批 v1 族束（分发包，见
-``bundle.py``），``tags=["baseline"]``、``scalars.baseline_version`` 标
-基线版本、束 id 确定性命名如 ``baseline-halo-l2``。首用导入把每束
-展开为逐成员的 v2 轨道记录（束 id 即 ``family_id``，成员
-``record_id`` 确定性命名），经存储引擎逐条写入；之后一切走既有
-``catalog_query``（整族按 ``family_id`` 过滤）。
+基线分发包不再随 wheel 分发：数据集以 GitHub Release 资产（束文件
+zip）提供，调用方下载解压后经 :func:`import_baseline` 展开为逐成员的
+v2 轨道记录（束 id 即 ``family_id``，成员 ``record_id`` 确定性命名）
+写入自己显式创建的库。束是 v1 传输格式，结构化读取，不经 v2 校验。
 """
 
 from __future__ import annotations
@@ -20,34 +18,29 @@ from .bundle import expand_bundle
 from .record import CatalogFilter, validate_record_id
 from .store import CatalogStore
 
-__all__ = ["BASELINE_TAG", "baseline_source_dir", "import_baseline"]
+__all__ = ["BASELINE_TAG", "import_baseline"]
 
 #: 基线记录统一携带的标签
 BASELINE_TAG = "baseline"
 
 
-def baseline_source_dir() -> Traversable:
-    """包内基线数据目录（importlib.resources 定位，不猜安装路径）。"""
-    from importlib.resources import files
+def import_baseline(store: CatalogStore, source_dir: Traversable) -> int:
+    """把基线分发包目录展开为成员记录写入库，返回实际写入的记录数。
 
-    return files("e2m2e.data").joinpath("catalog_baseline")
-
-
-def import_baseline(store: CatalogStore, source_dir: Traversable | None = None) -> int:
-    """把包内基线分发包展开为成员记录写入用户库，返回实际写入的记录数。
-
-    逐束对位 ``family_id``：库中已有该族且基线版本一致时跳过（用户对
-    基线成员的删除得到尊重）；版本不一致时先删该族旧成员再全量展开
-    （成员数变化不留陈旧尾巴）。束是 v1 传输格式，结构化读取，不经
-    v2 校验。JSON 声明了 ``arrays`` 而包内缺少 NPZ 时抛错（数据集不
-    完整，不导入残缺束）。包内无基线数据（如开发环境未生成）时静默
-    跳过。``source_dir`` 供测试注入合成基线源。
+    ``source_dir`` 必填：Release 资产解压后的束目录（JSON + NPZ），
+    不再有包内默认源（ADR 0047）。逐束对位 ``family_id``：库中已有
+    该族且基线版本一致时跳过（用户对基线成员的删除得到尊重）；版本
+    不一致时先删该族旧成员再全量展开（成员数变化不留陈旧尾巴）。
+    JSON 声明了 ``arrays`` 而目录内缺少 NPZ 时抛错（数据集不完整，
+    不导入残缺束）。
     """
-    src = source_dir if source_dir is not None else baseline_source_dir()
-    if not src.is_dir():
-        return 0
+    if not source_dir.is_dir():
+        raise FileNotFoundError(
+            f"基线源目录不存在：{source_dir!s}；请从 GitHub Release 下载基线"
+            "数据集资产并解压后传入（ADR 0047）"
+        )
     imported = 0
-    for item in src.iterdir():
+    for item in source_dir.iterdir():
         if not item.name.endswith(".json"):
             continue
         bundle_meta = json.loads(item.read_text(encoding="utf-8"))
@@ -59,15 +52,15 @@ def import_baseline(store: CatalogStore, source_dir: Traversable | None = None) 
             continue
         for summary in existing:
             store.delete(summary["record_id"])
-        npz_src = src / f"{family_id}.npz"
+        npz_src = source_dir / f"{family_id}.npz"
         # JSON 声明了段数组时 NPZ 必须存在：静默跳过会造出查得到、
         # 拿不到数据的残缺记录，且 baseline_version 对位后永不修复
         if bundle_meta.get("arrays") and not npz_src.is_file():
             raise FileNotFoundError(
-                f"基线束 {family_id} 的 JSON 声明了 arrays 但包内缺少"
+                f"基线束 {family_id} 的 JSON 声明了 arrays 但源目录缺少"
                 f" {family_id}.npz，数据集不完整（生成见 make catalog-baseline）"
             )
-        # Traversable 无路径语义（包资源可能是 zip 内成员），经字节流加载
+        # Traversable 无路径语义（源可能是 zip 内成员），经字节流加载
         with np.load(io.BytesIO(npz_src.read_bytes())) as npz:
             bundle_arrays = {key: npz[key] for key in npz.files}
         for meta, arrays in expand_bundle(bundle_meta, bundle_arrays):

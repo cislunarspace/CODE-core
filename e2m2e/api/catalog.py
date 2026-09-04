@@ -22,7 +22,6 @@ from e2m2e.data.catalog import (
     CatalogStore,
     RecordNotFoundError,
     ephemeris_from_arrays,
-    import_baseline,
     numeric_or_none,
 )
 from e2m2e.data.templates import ConvergenceState, FailureCause
@@ -425,22 +424,24 @@ class Catalog:
         """运行配置（只读视图）。"""
         return self._config
 
-    # ---- 库目录与自动入库（ADR 0031；Facade 任务方法的接缝）----
+    # ---- 库目录与自动入库（ADR 0031、ADR 0047；Facade 任务方法的接缝）----
 
     def _open_catalog(self) -> CatalogStore:
         """懒打开库目录（首次使用时才产生目录副作用）。
 
-        首次打开时做基线首用导入（ADR 0036 决策 5）：用户库缺基线记录
-        或版本不一致时从包内复制并重建索引；``catalog_baseline_import``
-        可关闭。
+        未显式指定目录（``Config(catalog_dir=...)`` 或 $E2M2E_CATALOG_DIR）
+        时报 ``CATALOG_NOT_CONFIGURED``，不建目录、不猜路径（ADR 0047）。
         """
+        if self._config.catalog_dir is None:
+            raise OrbitError(
+                "CATALOG_NOT_CONFIGURED",
+                "未指定轨道库目录：请以 Config(catalog_dir=...) 构造注入，"
+                "或设环境变量 E2M2E_CATALOG_DIR（ADR 0047：库不维护默认数据库）",
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            )
         if self._catalog_store is None:
             self._catalog_store = CatalogStore(self._config.catalog_dir)
-            if self._config.catalog_baseline_import:
-                try:
-                    import_baseline(self._catalog_store)
-                except Exception as exc:
-                    raise _catalog_write_failed(exc) from exc
         return self._catalog_store
 
     def auto_ingest(self, builder: Callable[[], tuple[dict, dict[str, Any]] | None]) -> str | None:

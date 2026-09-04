@@ -506,6 +506,32 @@ class TestAutoIngest:
         assert not catalog_dir.exists()
 
 
+class TestNoImplicitCatalog:
+    """ADR 0047：库不维护数据库——默认不入库、无隐式库目录。"""
+
+    def test_default_config_ingests_nothing(self, monkeypatch):
+        monkeypatch.delenv("E2M2E_CATALOG_DIR", raising=False)
+        monkeypatch.delenv("E2M2E_CATALOG_ENABLED", raising=False)
+        _fake_design(monkeypatch, _make_design_result())
+        facade = Facade()
+
+        response = facade.design_orbit(orbit_type="DRO")
+
+        assert response.record_id is None
+        with pytest.raises(OrbitError, match="CATALOG_NOT_CONFIGURED"):
+            facade.catalog.catalog_query()
+
+    def test_catalog_operation_without_dir_raises_not_configured(self, monkeypatch):
+        monkeypatch.delenv("E2M2E_CATALOG_DIR", raising=False)
+        facade = Facade(Config(catalog_enabled=True))
+
+        with pytest.raises(OrbitError) as exc_info:
+            facade.catalog.catalog_query()
+
+        assert exc_info.value.code == "CATALOG_NOT_CONFIGURED"
+        assert "E2M2E_CATALOG_DIR" in str(exc_info.value)
+
+
 class TestQuery:
     @pytest.fixture
     def facade_with_records(self, monkeypatch):
@@ -569,7 +595,7 @@ class TestQuery:
         """mcp-serve 逐 tools/call 换线程池线程（#559）：惰性 catalog 连接
         绑定首用线程后，其他线程查询不得报 SQLite 跨线程错误。"""
         facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
-        expected = len(facade.catalog.catalog_query().records)  # 首用线程惰性建库 + 基线导入
+        expected = len(facade.catalog.catalog_query().records)  # 首用线程惰性建库
         counts: list[int] = []
         errors: list[Exception] = []
 
@@ -584,7 +610,6 @@ class TestQuery:
             thread.start()
             thread.join()
 
-        assert errors == []
         assert counts == [expected, expected]
 
 

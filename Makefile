@@ -62,7 +62,7 @@ kernels:  ## 下载 SPICE 内核
 
 setup: cspice kernels  ## 首次拉取：CSPICE 编译包 + SPICE 内核（kernels/）
 
-catalog-baseline:  ## 重新生成随包分发的 CR3BP 基线轨道族数据集（ADR 0036）
+catalog-baseline:  ## 重新生成 CR3BP 基线数据集（仓库回归夹具；Release 资产源，ADR 0047）
 	$(PYTHON) scripts/generate_catalog_baseline.py
 
 dev: setup  ## 唯一开发入口：同步依赖 + 拉数据 + 构建安装 Rust 扩展（debug）
