@@ -1,18 +1,12 @@
-## Description
+<!-- 写 Fixes #NN 表示解决并自动关闭；写 Related to #NN 仅关联。 -->
+<!-- 进评审的 PR 至少关联一个同仓库 Issue，纯文档小修除外。 -->
 
-Brief description of the changes.
+关联 Issue：
 
-## Type of Change
+<details>
+<summary>变更与验证</summary>
 
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Refactoring
-- [ ] Documentation update
-- [ ] CI/CD change
+- 变更：
+- 验证（`make test` / `make check`）：
 
-## Checklist
-
-- [ ] Tests pass locally (`pytest tests/`)
-- [ ] Lint passes (`ruff check .` and `ruff format --check .`)
-- [ ] New code has test coverage
-- [ ] Documentation updated (if applicable)
+</details>
