@@ -84,7 +84,11 @@ def main() -> None:
     print(f"   耗时 {elapsed:.1f} s")
     print(f"   Jacobi 常数 = {result.cr3bp_jacobi:.6f}")
     conv = result.correction
-    print(f"   星历修正收敛 = {conv.converged}（{conv.iterations} 次迭代）")
+    from e2m2e.status import ConvergenceState
+
+    print(
+        f"   星历修正收敛 = {conv.status is ConvergenceState.CONVERGED}（{conv.iterations} 次迭代）"
+    )
     print(f"   星历行数 = {len(result.ephemeris)}")
 
     # 2. 取 CR3BP 周期轨道周期（用作参考量）
