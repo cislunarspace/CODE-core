@@ -54,7 +54,7 @@ normal-form = [
 # MCP 协议层（api/mcp）：部署 MCP 服务器时装。
 # anyio 显式声明（server 的线程池与 CLI 事件循环直接用它，不只是 mcp 传递依赖）。
 mcp = [
-    "mcp>=2.0",
+    "mcp>=2.1.1",
     "anyio>=4.14.2",
 ]
 
