@@ -39,7 +39,7 @@ dependencies = [
     "scipy>=1.10",
     "tqdm>=4.66",
     "spiceypy>=8.1.0",
-    "pydantic>=2.0",
+    "pydantic>=2.13.5",
     "pyerfa>=2.0.1.5",
     "r2s2>=0.1.0",
     "calcephpy==5.0.0",  # 经 r2s2 传递依赖；显式声明以使 [tool.uv.sources] 生效
@@ -55,7 +55,7 @@ normal-form = [
 # anyio 显式声明（server 的线程池与 CLI 事件循环直接用它，不只是 mcp 传递依赖）。
 mcp = [
     "mcp>=2.0",
-    "anyio>=3",
+    "anyio>=4.14.2",
 ]
 
 [project.scripts]
@@ -122,7 +122,7 @@ fail_under = 55
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
-    "pytest-cov>=4.0",
+    "pytest-cov>=7.1.0",
     "pytest-xdist>=3.0",
     "ruff>=0.1",
     "mypy",
