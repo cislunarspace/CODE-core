@@ -30,15 +30,18 @@ from .models import (
     ControlOrbitResponse,
     DesignOrbitRequest,
     DesignOrbitResponse,
+    FamilyGenerationRequest,
     ManeuverEvent,
     OrbitError,
     PropagationRequest,
     PropagationResponse,
+    RangeSpec,
     SpacetimeTransformRequest,
     SpacetimeTransformResponse,
     TransferCandidate,
     TransferDesignRequest,
     TransferDesignResponse,
+    ValidRangesResponse,
 )
 
 __all__ = ["Facade", "ToolInfo", "mcp_tools", "tool_inventory"]
@@ -678,6 +681,56 @@ class Facade:
         except Exception as exc:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("TRANSFORM_FAILED", message, status=status, cause=cause) from exc
+
+    @mcp_exposed
+    def valid_ranges(self) -> ValidRangesResponse:
+        """请求侧条件值域清单（ADR 0014 决策 8）：design_orbit 与族生成的
+        合法参数区间及族生成离散选项，无参数。包版本即值域版本：调用方每
+        会话取一次、升级后刷新；区间与校验器同源（直接消费请求模型的
+        valid_ranges/valid_options，不另存副本）。键为 orbit_type 或 族_Ln
+        （LISSAJOUS 按平动点拆分，DRO 不带后缀）。"""
+
+        def context_key(orbit_type: str, point: int | None) -> str:
+            return orbit_type if point is None else f"{orbit_type}_L{point}"
+
+        design_orbit = {
+            context_key(orbit_type, point): {
+                field: RangeSpec.from_numeric_range(numeric_range)
+                for field, numeric_range in DesignOrbitRequest.valid_ranges(
+                    orbit_type, collinear_point=point
+                ).items()
+            }
+            for orbit_type, point in DesignOrbitRequest.valid_range_contexts()
+        }
+        family_contexts = FamilyGenerationRequest.valid_range_contexts()
+        family_generation_ranges = {
+            context_key(orbit_type, point): {
+                field: RangeSpec.from_numeric_range(numeric_range)
+                for field, numeric_range in FamilyGenerationRequest.valid_ranges(
+                    orbit_type, libration_point=point
+                ).items()
+            }
+            for orbit_type, point in family_contexts
+        }
+        family_generation_options = {
+            orbit_type: {
+                field: list(values)
+                for field, values in FamilyGenerationRequest.valid_options(orbit_type).items()
+            }
+            for orbit_type, _ in family_contexts
+        }
+        return ValidRangesResponse(
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message=(
+                f"条件值域：design_orbit {len(design_orbit)} 类 / "
+                f"族生成 {len(family_generation_ranges)} 组 / "
+                f"离散选项 {len(family_generation_options)} 族"
+            ),
+            design_orbit=design_orbit,
+            family_generation_ranges=family_generation_ranges,
+            family_generation_options=family_generation_options,
+        )
 
 
 def mcp_tools(facade: Any) -> list[str]:

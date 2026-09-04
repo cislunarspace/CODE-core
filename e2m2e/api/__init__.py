@@ -27,6 +27,8 @@ from .models import (
     DesignOrbitResponse,
     NumericRange,
     OrbitError,
+    RangeSpec,
+    ValidRangesResponse,
 )
 from .spatiography import Spatiography
 
@@ -39,6 +41,8 @@ __all__ = [
     "tool_inventory",
     "OrbitError",
     "NumericRange",
+    "RangeSpec",
+    "ValidRangesResponse",
     "DesignOrbitRequest",
     "DesignOrbitResponse",
     "ControlOrbitRequest",
