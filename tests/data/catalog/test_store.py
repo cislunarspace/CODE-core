@@ -272,6 +272,28 @@ class TestIndexRebuild:
         assert [s["record_id"] for s in after] == [s["record_id"] for s in before]
         assert reopened.query(CatalogFilter(orbit_family="halo"))[0]["record_id"] == record_id
 
+    def test_stale_v1_record_error_names_file_and_remedy(self, store):
+        """v1 旧记录（ADR 0045 前的库产物）打开即失败，报错带文件名与
+        删除重算指引（ADR 0045 实现注承诺的措辞）。"""
+        store.put(*make_record())
+        stale = {
+            "schema_version": 1,
+            "record_id": "stale-v1",
+            "classification": {"orbit_family": "halo", "libration_point": 2},
+        }
+        (store.records_dir / "stale-v1.json").write_text(
+            json.dumps(stale, ensure_ascii=False), encoding="utf-8"
+        )
+        store.close()
+        store.db_path.unlink()
+
+        with pytest.raises(CatalogError) as excinfo:
+            CatalogStore(store.root)
+
+        message = str(excinfo.value)
+        assert "stale-v1.json" in message
+        assert "删除后重算" in message
+
     def test_corrupted_db_raises_structured_catalog_error(self, tmp_path):
         root = tmp_path / "catalog"
         (root / "records").mkdir(parents=True)

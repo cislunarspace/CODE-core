@@ -73,9 +73,7 @@ python-source = "."
 include = [
     { path = "e2m2e/data/frames/fixtures/gmat/*", format = "sdist" },
     { path = "e2m2e/data/frames/fixtures/gmat/*", format = "wheel" },
-    # CR3BP 基线轨道族数据集（ADR 0036），随包分发的 catalog 记录
-    { path = "e2m2e/data/catalog_baseline/*", format = "sdist" },
-    { path = "e2m2e/data/catalog_baseline/*", format = "wheel" },
+    # 基线数据集不随包分发（ADR 0047）：GitHub Release 资产 + 显式导入
 ]
 # spice 为必选 feature（ crates/*/Cargo.toml 的 default 已含 spice，此处显式
 # 再声明一次作双保险）：maturin build/develop 永远带 CSPICE，不产无 spice 子集。

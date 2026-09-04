@@ -1,7 +1,8 @@
 """基线数据集（ADR 0036/0045）：分发包展开导入与生成脚本校验断言。
 
-不真跑九族全量生成：导入测试用合成族束充当包内基线源目录（v1 传输
-格式 json+npz），校验断言直接喂构造的束元数据。
+不真跑九族全量生成：导入测试用合成族束充当基线源目录（v1 传输格式
+json+npz，Release 资产解压后的形态，ADR 0047），校验断言直接喂构造
+的束元数据。
 """
 
 from __future__ import annotations
@@ -128,3 +129,8 @@ class TestImportBaseline:
         empty = tmp_path / "empty"
         empty.mkdir()
         assert import_baseline(store, empty) == 0
+
+    def test_missing_source_dir_raises(self, store, tmp_path):
+        """源目录必填（ADR 0047）：路径不存在报错，不静默当空源跳过。"""
+        with pytest.raises(FileNotFoundError, match="基线源目录不存在"):
+            import_baseline(store, tmp_path / "no-such-release-asset")

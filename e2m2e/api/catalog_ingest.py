@@ -330,12 +330,12 @@ def build_family_bundle(
     requested_members: int,
     generated_members: int,
 ) -> tuple[dict, dict[str, np.ndarray]] | None:
-    """从族结果构建 v1 族束（基线分发包，ADR 0045 决策 8）。
+    """从族结果构建 v1 族束（基线分发包，ADR 0045 决策 8；ADR 0047 出包）。
 
-    仅供 ``scripts/generate_catalog_baseline.py`` 打包分发；库内记录
+    仅供 ``scripts/generate_catalog_baseline.py`` 打 Release 资产；库内记录
     一律经 :func:`build_family_records` 逐成员写入。成员参数在元数据
     ``members`` 内，成员数组在 ``cr3bp/members/`` 段（传输格式冻结
-    在 v1 布局，首用导入经 ``data/catalog/bundle.py`` 展开）。
+    在 v1 布局，显式导入经 ``data/catalog/bundle.py`` 展开）。
 
     Args:
         request: ``FamilyGenerationRequest``（已校验、含默认值）。

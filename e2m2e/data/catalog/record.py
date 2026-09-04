@@ -154,16 +154,20 @@ def new_record_id() -> str:
 
 
 def validate_meta(meta: dict[str, Any]) -> None:
-    """校验记录元数据的必备键与 schema 版本；不合格抛 :class:`CatalogError`。"""
-    missing = [key for key in _META_REQUIRED_KEYS if key not in meta]
-    if missing:
-        raise CatalogError(f"记录元数据缺少必备键：{missing}")
-    version = meta["schema_version"]
+    """校验记录元数据的 schema 版本与必备键；不合格抛 :class:`CatalogError`。
+
+    schema 版本先于必备键检查：旧版本产物优先按版本废弃报错，让
+    "删除后重算"的处置指引（ADR 0045 实现注）先于裸缺键清单到达用户。
+    """
+    version = meta.get("schema_version")
     if version != SCHEMA_VERSION:
         raise CatalogError(
             f"不支持的记录 schema 版本：{version!r}（当前支持 {SCHEMA_VERSION}）；"
             "旧产物不兼容读取，请删除后重算"
         )
+    missing = [key for key in _META_REQUIRED_KEYS if key not in meta]
+    if missing:
+        raise CatalogError(f"记录元数据缺少必备键：{missing}")
     classification = meta["classification"]
     missing = [key for key in _CLASSIFICATION_KEYS if key not in classification]
     if missing:
