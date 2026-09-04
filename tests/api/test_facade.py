@@ -13,16 +13,7 @@ from e2m2e.algorithm.results import FamilyGenerationResult
 from e2m2e.api.config import Config
 from e2m2e.api.facade import Facade, mcp_tools, tool_inventory
 from e2m2e.api.models import (
-    ControlOrbitRequest,
-    DesignOrbitRequest,
-    FamilyGenerationRequest,
     OrbitError,
-    PropagationRequest,
-    SpacetimeTransformRequest,
-    SpatiographyBoundariesRequest,
-    SpatiographyClassifyRequest,
-    SpatiographyScalesRequest,
-    TransferDesignRequest,
     TransferDesignResponse,
 )
 from e2m2e.data.templates import ConvergenceState, FailureCause
@@ -52,7 +43,7 @@ class TestFacadeValidation:
             lambda facade: facade.transfer_design(transfer_type="HMN"),
             lambda facade: facade.orbit_propagation(),
             lambda facade: facade.spacetime_transform(),
-            lambda facade: facade.orbit_family_generation(),
+            lambda facade: facade.catalog.orbit_family_generation(),
         ],
     )
     def test_invalid_input_is_translated_to_orbit_error(self, call):
@@ -222,7 +213,7 @@ class TestFacadeCallChains:
             )
 
     def test_halo_family_delegates_to_algorithm(self):
-        family = Facade().orbit_family_generation(
+        family = Facade().catalog.orbit_family_generation(
             orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=2
         )
         assert family.family_type == "halo"
@@ -304,7 +295,9 @@ class TestFacadeCallChains:
             )
 
         monkeypatch.setattr(family_module, entry_name, fake_entry)
-        result = Facade().orbit_family_generation(orbit_type=orbit_type, n_orbits=2, **params)
+        result = Facade().catalog.orbit_family_generation(
+            orbit_type=orbit_type, n_orbits=2, **params
+        )
 
         expected_kwargs = {"n_orbits": 2}
         if orbit_type == "NRHO":
@@ -340,7 +333,7 @@ class TestFacadeCallChains:
             family_module, "design_spo_family", lambda *args, **kwargs: soft_failure
         )
 
-        result = Facade().orbit_family_generation(
+        result = Facade().catalog.orbit_family_generation(
             orbit_type="SPO",
             libration_point=4,
             min_amplitude_km=5000.0,
@@ -360,48 +353,54 @@ class TestFacadeCallChains:
     )
     def test_invalid_family_input_is_translated_to_orbit_error(self, params):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().orbit_family_generation(**params)
+            Facade().catalog.orbit_family_generation(**params)
 
     def test_invalid_family_libration_point_type_is_translated_to_orbit_error(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().orbit_family_generation(orbit_type="HALO", libration_point="bad")
+            Facade().catalog.orbit_family_generation(orbit_type="HALO", libration_point="bad")
 
 
 class TestFacadeToolInventory:
-    def test_inventory_is_derived_from_exposed_methods(self):
-        facade = Facade()
-        names = set(mcp_tools(facade))
-        inventory = tool_inventory(facade)
-        assert names == {tool.name for tool in inventory}
-        assert len(inventory) == 24
-        assert all(tool.mcp_exposed for tool in inventory)
+    """接口类分家后的工具清单（ADR 0043）：Facade 组合根扫多个暴露类。"""
 
-    def test_inventory_distinguishes_implemented_and_placeholder_tools(self):
-        by_name = {tool.name: tool for tool in tool_inventory(Facade())}
-        implemented = {
-            "design_orbit": DesignOrbitRequest,
-            "control_orbit": ControlOrbitRequest,
-            "transfer_design": TransferDesignRequest,
-            "orbit_propagation": PropagationRequest,
-            "spacetime_transform": SpacetimeTransformRequest,
-            "orbit_family_generation": FamilyGenerationRequest,
-            "spatiography_scales": SpatiographyScalesRequest,
-            "spatiography_classify": SpatiographyClassifyRequest,
-            "spatiography_boundaries": SpatiographyBoundariesRequest,
+    def test_inventory_counts_eighteen_implemented_tools(self):
+        inventory = tool_inventory(Facade())
+        assert len(inventory) == 18
+        assert all(tool.status == "implemented" for tool in inventory)
+
+    def test_each_class_keeps_its_domain(self):
+        from e2m2e.api.catalog import Catalog
+        from e2m2e.api.spatiography import Spatiography
+
+        facade = Facade()
+        # Facade 只留任务级五方法（ADR 0043 决策 1）
+        assert set(mcp_tools(facade)) == {
+            "design_orbit",
+            "control_orbit",
+            "transfer_design",
+            "orbit_propagation",
+            "spacetime_transform",
         }
-        placeholders = {
-            # 需 Orbit 对象入参，无法经 JSON 信封表达；记录引用式入参落地前不注册
-            "orbit_stability",
-            "transfer_search",
-            "low_thrust_design",
-            "manifold_analysis",
-            "low_energy_transfer",
-            "relative_motion",
+        assert set(mcp_tools(Catalog())) == {
+            "catalog_query",
+            "catalog_get",
+            "catalog_delete",
+            "catalog_tag",
+            "catalog_terminology",
+            "catalog_export",
+            "catalog_sweep",
+            "orbit_family_generation",
         }
-        assert all(by_name[name].status == "implemented" for name in implemented)
-        assert all(by_name[name].request_model is model for name, model in implemented.items())
-        assert all(by_name[name].status == "placeholder" for name in placeholders)
-        assert all(by_name[name].request_model is None for name in placeholders)
+        assert set(mcp_tools(Spatiography())) == {
+            "spatiography_scales",
+            "spatiography_classify",
+            "spatiography_boundaries",
+            "spatiography_resonance_atlas",
+            "spatiography_dynamical_map",
+        }
+        # 组合根把两类作为实例暴露给进程内调用方（ADR 0043 决策 2/3）
+        assert isinstance(facade.catalog, Catalog)
+        assert isinstance(facade.spatiography, Spatiography)
 
 
 class TestFacadeTransferTopN:

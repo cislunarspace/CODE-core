@@ -292,7 +292,7 @@ def test_injected_config_crosses_worker_boundary(monkeypatch, tmp_path):
         _fake_design(mp, _make_design_result(orbit_type="DRO"))
         facade.design_orbit(orbit_type="DRO")
     # 前提：记录确实落在注入目录（同 facade 进程内可查）
-    assert facade.catalog_query(orbit_family="dro").records
+    assert facade.catalog.catalog_query(orbit_family="dro").records
 
     result = anyio.run(run_tool_in_worker, facade, "catalog_query", {}, _Ctx())
     env = json.loads(result.content[0].text)
@@ -348,7 +348,7 @@ def test_catalog_records_survive_worker_kill():
     assert time.monotonic() - started < 20, "取消后须快速收尾"
 
     # kill 后重新打开库：播种记录仍在、可查（store 无跨进程内存缓存）
-    env = Facade(Config()).catalog_query(orbit_family="dro")
+    env = Facade(Config()).catalog.catalog_query(orbit_family="dro")
     assert env.records, "kill 后已入库记录应完好可查"
 
 

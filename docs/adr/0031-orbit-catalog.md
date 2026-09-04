@@ -1,6 +1,7 @@
 # ADR 0031: Orbit catalog — record format, storage layout, query interface
 
-**Status**: Adopted
+**Status**: Adopted (decision 4 overturned by ADR 0045; decisions 1, 2, 5
+revised by ADR 0045; decision 7 revised by ADR 0043)
 **Date**: 2026-08-19
 **Related**: `docs/architecture/architecture.md` (§5 data management), ADR 0014
 (interface Facade/MCP/CLI), ADR 0024 (unified result status contract),
@@ -98,6 +99,13 @@ An entire OrbitFamily is one record; member parameters & arrays inside. Members
 may lift into standalone records (`source_record_id` → family) for downstream
 consumption such as station keeping.
 
+*（修订注 2026-09-01，#611：被 ADR 0045 决策 1、2 推翻——一条记录只载
+一条轨迹，族成为可过滤查询的标签（`orbit_family` + `family_id` +
+`member_index`）。`member_count` 与 `members[]` 随 schema 版本 2 删除，
+本决策催生的成员提升方法 `catalog_promote` 一并移除。此处记录的两条
+理由——查询结果泛滥与族级量无处安放——在那里分别由索引过滤与"溯源
+随成员"回答。）*
+
 ### 5. Storage layout: flat record files + SQLite derived index
 
 ```
@@ -123,6 +131,10 @@ New Facade methods: `catalog_query` (multi-dimensional filters → summary list)
 packaging), `catalog_sweep` (parameter-space scan batch generation + ingestion;
 orchestration reuses ADR 0029's Rust family generation). CLI and MCP derive
 automatically per ADR 0014 pure derivation.
+
+*（修订注 2026-09-01，#610：这些方法从 `Facade` 迁入 ADR 0043 决策 2
+的轨道库接口类，与 `orbit_family_generation`、`catalog_terminology`
+（ADR 0044）同住。工具名、schema 与纯派生不变，变的只是承载类。）*
 
 ### 8. Automatic ingestion
 

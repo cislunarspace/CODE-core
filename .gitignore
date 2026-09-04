@@ -115,9 +115,6 @@ fort.*
 .zcode/
 .pi/
 *.pdb
-AGENTS.md
-CONTEXT.md
-CONTEXT-MAP.md
 docs/agents/
 
 # 注：.python-version 故意被跟踪（uv 与 CI 用它钉住 Python 3.13）

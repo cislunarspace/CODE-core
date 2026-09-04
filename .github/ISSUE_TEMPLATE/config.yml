@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 提问与讨论
+    url: https://github.com/cislunarspace/e2m2e/discussions
+    about: 使用问题、想法探讨与一般性讨论，不占用 Issue。

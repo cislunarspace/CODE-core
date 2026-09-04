@@ -44,7 +44,7 @@ from e2m2e.algorithm.family import (
     design_spo_family,
 )
 from e2m2e.algorithm.results import FamilyGenerationResult
-from e2m2e.api.catalog_ingest import build_family_record
+from e2m2e.api.catalog_ingest import build_family_bundle
 from e2m2e.api.models import FamilyGenerationRequest
 from e2m2e.data.catalog import CatalogStore
 from e2m2e.data.templates import ConvergenceState, FailureCause
@@ -267,7 +267,7 @@ def build_baseline_record(
 ) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
     """族结果 → 基线 catalog 记录（tags/baseline_version/确定性 record_id）。"""
     family, status, cause, message, requested, generated_members = generated
-    built = build_family_record(
+    built = build_family_bundle(
         request,
         family=family,
         status=status,

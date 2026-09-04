@@ -152,7 +152,7 @@ class TestFamilyGenerationProgress:
         )
         seen: list[float] = []
 
-        Facade().orbit_family_generation(
+        Facade().catalog.orbit_family_generation(
             orbit_type="DRO",
             n_orbits=2,
             progress_callback=lambda fraction, message=None: seen.append(fraction),
@@ -169,6 +169,6 @@ class TestFamilyGenerationProgress:
             lambda *args, **kwargs: _FakeFamily(),
         )
 
-        response = Facade().orbit_family_generation(orbit_type="DRO", n_orbits=2)
+        response = Facade().catalog.orbit_family_generation(orbit_type="DRO", n_orbits=2)
 
         assert response.status is ConvergenceState.CONVERGED

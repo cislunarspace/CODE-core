@@ -49,7 +49,7 @@ DEV_SYNC := uv sync --group dev --no-install-project
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup cspice kernels dev dev-release test test-rust test-python docs check fmt clean clean-tests
+.PHONY: help setup cspice kernels dev dev-release test test-rust test-python check fmt clean clean-tests
 
 help:  ## 显示本帮助
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -94,10 +94,6 @@ test-rust:  ## Rust 工作区测试（spice 默认；串行）
 
 test-python:  ## Python 测试（默认 xdist 并行；含 spice-gated，需先 make setup 拉内核）
 	$(UV) python -m pytest tests/ -n $(PYTEST_WORKERS) --dist $(PYTEST_DIST)
-
-docs:  ## 构建 Sphinx 文档到 docs/_build/html（独立 docs 依赖组；需先 make dev）
-	uv sync --group docs --no-install-project
-	$(UV) sphinx-build -b html docs docs/_build/html
 
 # 命令集须与 ci.yml 保持对齐（CI 不调用 make）；改动任一边时同步另一边。
 check:  ## 格式 + lint + 类型/层级检查（Rust + Python，与 ci.yml 对齐）

@@ -1,6 +1,8 @@
 # ADR 0042: orbit taxonomy — 42-label classification of CR3BP periodic orbits
 
-**Status**: Adopted (implemented)
+**Status**: Adopted (implemented; decision 5's no-new-tool clause superseded
+by ADR 0043 decision 6 and ADR 0044; the label table relocates to the data
+layer per ADR 0044 decision 2)
 **Date**: 2026-08-30
 **Related**: ADR 0012 (layering), ADR 0014 (facade tiers), ADR 0031 (catalog
 records), ADR 0036 (baseline dataset), ADR 0040 (state_frame), ADR 0041
@@ -98,6 +100,12 @@ the crossing/winding geometry criteria, not dynamical solutions.
 
 The maintainer's principle: expose only the highest-level Facade; the tool
 count stays 22.
+
+*（修订注 2026-09-01，#609：本条款作废——`catalog_terminology` 按
+ADR 0044 注册，准入依据 ADR 0043 决策 6（内容被响应字段引用且无既有
+工具供给）。此处引用的"22"在写下时就已失真：实际工具面为 18。工具数
+今后靠跑清单报告，不从文档引用。上文提到"MCP legend / 文档用"却从未
+接线的 `label_legend()` 迁入数据层并在那里获得出口。）*
 
 - **Ingest stamps measured labels**: `classification.taxonomy_labels`
   (record-level deduplicated set) and `members[].taxonomy_label` (member

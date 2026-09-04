@@ -51,11 +51,11 @@ from functools import lru_cache
 
 import numpy as np
 
+from ...data.catalog.terminology import TAXONOMY_BY_CANONICAL, Hemisphere, TaxonomyLabel
 from ...data.constants import Datum
 from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..dynamics import CR3BP_Dynamics
 from ..dynamics.cr3bp_system import CR3BP_System
-from .labels import TAXONOMY_BY_CANONICAL, Hemisphere, TaxonomyLabel
 
 __all__ = ["TaxonomyResult", "classify_orbit"]
 

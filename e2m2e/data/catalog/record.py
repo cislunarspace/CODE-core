@@ -1,11 +1,17 @@
 """轨道库记录格式：schema 常量、段数组键约定、记录校验与段序列化。
 
 一条 catalog 记录 = JSON 元数据 + 同名 NPZ 数组段（ADR 0031 决策 1）。
-轨道数据双段并存：``cr3bp`` 段（Orbit 原生，无量纲 states/times）与
-``eph`` 段（EphemerisTable：GCRS、会合系、times_et），各自可空。族记录
-的成员数组在 ``cr3bp/members/`` 下按序号存放。站保等结果附带的小数组
-（机动序列、统计表）在 ``result`` 段。
+schema v2（ADR 0045）：一条记录只载一条轨迹——任务轨道或转移轨道，
+绝不打捆（内容判别：``transfer_type`` 非空即转移轨道，否则任务轨道）；
+族是记录上的标签（``orbit_family`` + ``family_id`` +
+``member_index``），整族经 ``family_id`` 过滤查询。轨道数据双段并存：
+``cr3bp`` 段（Orbit 原生，无量纲 states/times）与 ``eph`` 段
+（EphemerisTable），各自可空；转移轨迹在 ``transfer`` 段（ADR 0040）；
+站保等结果附带的小数组（机动序列、统计表）在 ``result`` 段。
+``has_cr3bp``/``has_ephemeris`` 只描述双段存在性，不描述 ``transfer``/
+``result`` 段（转移记录两标志位均 False 而轨迹在 ``transfer`` 段）。
 
+分发包（v1 族束传输格式，ADR 0045 决策 8）的展开见 ``bundle.py``。
 记录文件是事实来源；本模块只定义格式，存储引擎见 ``store.py``。
 """
 
@@ -36,7 +42,6 @@ __all__ = [
     "member_array_key",
     "geometric_amplitude_km",
     "point_interval",
-    "member_count",
     "cr3bp_segment_arrays",
     "ephemeris_segment_arrays",
     "transfer_segment_arrays",
@@ -50,7 +55,7 @@ class CatalogError(E2M2EError):
 
 
 class RecordNotFoundError(CatalogError, KeyError):
-    """按 record_id（或族成员序号）查找的记录不存在。"""
+    """按 record_id 查找的记录不存在。"""
 
 
 #: record_id 合法形态：字母数字开头，只含字母数字、点、下划线、连字符，
@@ -65,8 +70,9 @@ def validate_record_id(record_id: str) -> str:
     return record_id
 
 
-#: 记录 schema 版本号，自 1 起（ADR 0031 决策 1）；不兼容读取其他版本。
-SCHEMA_VERSION = 1
+#: 记录 schema 版本（ADR 0031 决策 1 自 1 起；v2 = 一轨一记录，ADR 0045）；
+#: 不兼容读取其他版本。
+SCHEMA_VERSION = 2
 
 #: NPZ 段前缀
 CR3BP_PREFIX = "cr3bp"
@@ -80,13 +86,14 @@ _META_REQUIRED_KEYS = (
     "created_at",
     "source_tool",
     "source_record_id",
+    "family_id",
+    "member_index",
     "classification",
     "status",
     "cause",
     "message",
     "scalars",
     "request",
-    "members",
     "arrays",
     "tags",
     "note",
@@ -110,10 +117,12 @@ class CatalogFilter:
     做相交匹配；记录对应维度为 ``None``（无该段数据）时不匹配区间过滤。
     ``tags`` 命中任一即匹配。transfer 维度（#574）：``transfer_type``
     等值；``delta_v``/``tli_epoch`` 区间——仅数值历元（JD_TDB）可作
-    区间过滤，UTC 字符串历元不入索引列。
+    区间过滤，UTC 字符串历元不入索引列。族维度（ADR 0045）：
+    ``family_id`` 等值——整族查询的句柄。
     """
 
     orbit_family: str | None = None
+    family_id: str | None = None
     libration_point: int | None = None
     jacobi_min: float | None = None
     jacobi_max: float | None = None
@@ -162,7 +171,7 @@ def validate_meta(meta: dict[str, Any]) -> None:
 
 
 def member_array_key(index: int, name: str) -> str:
-    """族成员数组键（``cr3bp/members/0003/states``）。"""
+    """族成员数组键（``cr3bp/members/0003/states``；分发包段约定）。"""
     return f"{CR3BP_PREFIX}/members/{index:04d}/{name}"
 
 
@@ -177,14 +186,6 @@ def geometric_amplitude_km(states: np.ndarray, char_length_km: float | None) -> 
 def point_interval(value: float | None) -> list[float] | None:
     """单值包络：非 None 值退化为 [v, v]。"""
     return None if value is None else [value, value]
-
-
-def member_count(meta: dict[str, Any]) -> int:
-    """记录的成员数：族记录为成员数，单轨道记录为 1，纯星历记录为 0。"""
-    members = meta["members"]
-    if members:
-        return len(members)
-    return 1 if meta["classification"]["has_cr3bp"] else 0
 
 
 def cr3bp_segment_arrays(states: np.ndarray, times: np.ndarray) -> dict[str, np.ndarray]:

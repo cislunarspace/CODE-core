@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics.cr3bp_system import CR3BP_System
-from e2m2e.api.catalog_ingest import build_family_record
-from e2m2e.api.facade import _family_generation_payload
+from e2m2e.api.catalog import _family_generation_payload
+from e2m2e.api.catalog_ingest import build_family_records
 from e2m2e.api.models import FamilyGenerationRequest
 from e2m2e.data.catalog import CatalogFilter, CatalogStore
 from e2m2e.data.constants import Datum
@@ -47,7 +47,7 @@ def _family_from_baseline(
 
 
 def _record(family: OrbitFamily, request: FamilyGenerationRequest):
-    built = build_family_record(
+    built = build_family_records(
         request,
         family=family,
         status=ConvergenceState.CONVERGED,
@@ -62,24 +62,28 @@ def _record(family: OrbitFamily, request: FamilyGenerationRequest):
 
 def test_family_record_stamps_dro():
     family, request = _family_from_baseline("dro", "dro")
-    meta, _ = _record(family, request)
-    assert meta["classification"]["taxonomy_labels"] == ["distant_retrograde"]
-    assert all(m["taxonomy_label"] == "distant_retrograde" for m in meta["members"])
+    _, records = _record(family, request)
+    assert all(
+        meta["classification"]["taxonomy_labels"] == ["distant_retrograde"]
+        for meta, _arrays in records
+    )
 
 
 def test_family_record_quasi_periodic_family_gets_empty_labels():
     family, request = _family_from_baseline("lissajous-l1", "lissajous")
-    meta, _ = _record(family, request)
-    assert meta["classification"]["taxonomy_labels"] == []
-    assert all(m["taxonomy_label"] is None for m in meta["members"])
+    _, records = _record(family, request)
+    assert all(meta["classification"]["taxonomy_labels"] is None for meta, _arrays in records)
 
 
 def test_family_record_conflict_warns_and_keeps_measured(caplog):
     """设计侧族与实测不符：记 warning，按实测值入库（两边都保留）。"""
     family, request = _family_from_baseline("halo-l1", "dro")  # 谎报族：期望 distant_retrograde
     with caplog.at_level(logging.WARNING, logger="e2m2e.api.catalog_ingest"):
-        meta, _ = _record(family, request)
-    assert meta["classification"]["taxonomy_labels"] == ["halo_l1_northern"]
+        _, records = _record(family, request)
+    assert all(
+        meta["classification"]["taxonomy_labels"] == ["halo_l1_northern"]
+        for meta, _arrays in records
+    )
     assert any("分类学冲突" in record.message for record in caplog.records)
 
 
@@ -89,25 +93,24 @@ def test_family_payload_enrichment():
     assert response.taxonomy_labels == ["shortperiod_l4"]
 
 
-def test_store_roundtrip_and_promote(tmp_path):
-    """入库 → 索引摘要带标签；成员提升继承成员级标签。"""
+def test_store_roundtrip_members_carry_labels(tmp_path):
+    """入库 → 索引摘要带标签；族成员逐条入库（ADR 0045）。"""
     family, request = _family_from_baseline("dro", "dro")
-    meta, arrays = _record(family, request)
+    _, records = _record(family, request)
     store = CatalogStore(tmp_path / "catalog")
-    record_id = store.put(meta, arrays)
+    for meta, arrays in records:
+        store.put(meta, arrays)
     summaries = store.query(CatalogFilter())
-    assert len(summaries) == 1
-    assert summaries[0]["classification"]["taxonomy_labels"] == ["distant_retrograde"]
-
-    promoted = store.promote_member(record_id, 0)
-    assert promoted.meta["classification"]["taxonomy_labels"] == ["distant_retrograde"]
+    assert len(summaries) == len(records)
+    assert all(s["classification"]["taxonomy_labels"] == ["distant_retrograde"] for s in summaries)
     store.close()
 
 
 def test_summary_without_taxonomy_key_reads_as_none(tmp_path):
     """未打标的旧记录（classification 缺 taxonomy_labels 键）可读且摘要为 None。"""
     family, request = _family_from_baseline("dro", "dro")
-    meta, arrays = _record(family, request)
+    _, records = _record(family, request)
+    meta, arrays = records[0]
     del meta["classification"]["taxonomy_labels"]  # 模拟旧 schema 记录
     store = CatalogStore(tmp_path / "catalog")
     store.put(meta, arrays)

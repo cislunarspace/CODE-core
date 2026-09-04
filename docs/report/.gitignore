@@ -1,8 +1,0 @@
-# LaTeX intermediate files (PDFs are kept)
-*.aux
-*.fdb_latexmk
-*.fls
-*.log
-*.out
-*.toc
-*.xdv

@@ -1,7 +1,8 @@
 # ADR 0014: Interface layer — Facade / MCP / CLI
 
 **Status**: Adopted (implemented — Facade, MCP, sidecar, and the CLI↔MCP
-symmetric subcommands, #602)
+symmetric subcommands, #602; decisions 2 and 5 revised by ADR 0043, decision 8
+completed for catalog value sets by ADR 0044)
 **Date**: 2026-07-31
 **Related**: ADR 0011 (five-layer architecture), README vision
 (LLM+Agent-callable)
@@ -23,6 +24,9 @@ is where that vision gets delivered.
    Facade methods; Facade methods carry `mcp_exposed: bool` metadata (tier-1/
    tier-2 True; tier-3/auxiliary False). Registration scans Facade methods;
    the list has one source of truth.
+   *（修订注 2026-09-01，#610：ADR 0043 决策 5 拓宽扫描根——MCP 工具 =
+   各暴露接口类（Facade、轨道库、spatiography）上 `mcp_exposed` 方法的
+   并集。单一来源机制本身不变。）*
 3. **Pydantic models all hand-written**: input/output/error models carefully
    specify parameter units, defaults, value domains. They stay at the `api/`
    boundary, never entering the algorithm layer.
@@ -33,6 +37,8 @@ is where that vision gets delivered.
 5. **CLI subcommands = Facade methods** (those with mcp_exposed=True),
    parameters generated from the same Pydantic models. CLI and MCP are fully
    symmetric.
+   *（修订注 2026-09-01，#610：子命令与决策 2 的同一并集派生，见
+   ADR 0043 决策 5。）*
 6. **MCP deployment = in-process library as the main body + thin CLI wrapper
    `mcp-serve`**: `create_server(facade)` function + `e2m2e mcp-serve`
    subcommand. One Facade instance = one server.
@@ -50,6 +56,9 @@ is where that vision gets delivered.
    machine-readable public interfaces; validators and those interfaces share
    one rule definition. GUIs, CLIs, and MCP must not parse error text, read
    validator source, or maintain local copies of ranges.
+   *（修订注 2026-09-01，#609：ADR 0044 经 `catalog_terminology` 修通轨道库
+   闭值集（分类学标签、族名、转移类型）的出口。请求侧条件数值范围
+   （`valid_ranges`）仍无注册出口——本决策余下的一半。）*
 
 ## MCP tool list
 

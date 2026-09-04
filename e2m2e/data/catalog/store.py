@@ -1,4 +1,4 @@
-"""轨道库存储引擎：记录文件读写、删除、标注、导出、成员提升与索引重建。
+"""轨道库存储引擎：记录文件读写、删除、标注、导出与索引重建。
 
 存储布局（ADR 0031 决策 5）::
 
@@ -6,6 +6,8 @@
     ├── records/<record_id>.json + <record_id>.npz   # 事实来源
     └── catalog.db                                    # SQLite 索引，派生物
 
+写入策略（ADR 0045 决策 7）：每条记录原子写（临时文件 + 改名），无跨
+记录事务——族生成中途失败时已收敛成员各自成记录，是诚实的部分结果。
 库目录经 Config 注入。catalog.db 缺失时（新库、被删除、导出包首次打开）
 扫描 records/ 全量重建。
 """
@@ -30,13 +32,9 @@ from .record import (
     CatalogFilter,
     CatalogRecord,
     RecordNotFoundError,
-    cr3bp_segment_arrays,
-    geometric_amplitude_km,
-    member_array_key,
     meta_from_json,
     meta_to_json,
     new_record_id,
-    point_interval,
     validate_meta,
     validate_record_id,
 )
@@ -152,71 +150,6 @@ class CatalogStore:
         json_path.write_text(meta_to_json(meta), encoding="utf-8")
         self._index.upsert(meta)
         return meta
-
-    # ---- 族成员提升 ----
-
-    def promote_member(self, record_id: str, member_index: int) -> CatalogRecord:
-        """把族成员提升为独立记录（``source_record_id`` 指向所属族）。
-
-        提升记录只含该成员的 CR3BP 段；分类继承族记录，jacobi 取成员
-        值，主振幅按成员状态与族特征长度重算（km）。
-        """
-        family = self.get(record_id)
-        members = family.meta["members"]
-        if member_index < 0 or member_index >= len(members):
-            raise RecordNotFoundError(
-                f"族记录 {record_id} 没有成员 {member_index}（共 {len(members)} 个）"
-            )
-        member = members[member_index]
-        try:
-            states = family.arrays[member_array_key(member_index, "states")]
-            times = family.arrays[member_array_key(member_index, "times")]
-        except KeyError as exc:
-            raise CatalogError(
-                f"族记录 {record_id} 缺少成员 {member_index} 的数组段：{exc}"
-            ) from exc
-
-        char_length = family.meta["scalars"].get("char_length_km")
-        jacobi = member.get("jacobi")
-        family_classification = family.meta["classification"]
-        taxonomy_label = member.get("taxonomy_label")
-        classification = {
-            "orbit_family": family_classification["orbit_family"],
-            "libration_point": family_classification["libration_point"],
-            "jacobi": None if jacobi is None else [float(jacobi), float(jacobi)],
-            "amplitude": point_interval(geometric_amplitude_km(states, char_length)),
-            "has_cr3bp": True,
-            "has_ephemeris": False,
-            # 分类学标签继承成员实测标签（数据层不 import 算法层分类器）
-            "taxonomy_labels": [taxonomy_label] if taxonomy_label else [],
-        }
-        meta: dict[str, Any] = {
-            "source_tool": "catalog_promote",
-            "source_record_id": record_id,
-            "classification": classification,
-            # 状态三元组继承族记录：成员的来历（含软失败的族）不粉饰。
-            "status": family.meta["status"],
-            "cause": family.meta["cause"],
-            "message": family.meta["message"],
-            "scalars": {
-                "member_count": 1,
-                "member_index": member_index,
-                "family_record_id": record_id,
-                "char_length_km": char_length,
-            },
-            "request": {
-                "source": "catalog_promote",
-                "family_record_id": record_id,
-                "member_index": member_index,
-                "parameters": member.get("parameters", {}),
-            },
-            "members": [],
-            "tags": [],
-            "note": "",
-        }
-        arrays = cr3bp_segment_arrays(states, times)
-        new_id = self.put(meta, arrays)
-        return self.get(new_id)
 
     # ---- 导出 ----
 

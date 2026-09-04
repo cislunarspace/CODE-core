@@ -20,7 +20,6 @@ from e2m2e.api.models import (
     CatalogDeleteRequest,
     CatalogExportRequest,
     CatalogGetRequest,
-    CatalogPromoteRequest,
     CatalogQueryRequest,
     CatalogSweepRequest,
     CatalogTagRequest,
@@ -208,7 +207,7 @@ class TestTransferRecord:
         )
 
         assert response.record_id is not None
-        record = facade.catalog_get(record_id=response.record_id)
+        record = facade.catalog.catalog_get(record_id=response.record_id)
         assert record.source_tool == "transfer_design"
         # 元数据：transfer 专属标量走 scalars，SCHEMA_VERSION 不动
         assert record.scalars["transfer_type"] == "WSB"
@@ -223,7 +222,7 @@ class TestTransferRecord:
         assert record.amplitude is None
         assert record.has_cr3bp is False
         assert record.has_ephemeris is False
-        assert record.member_count == 0
+        assert record.family_id is None  # 受控产物非族成员（ADR 0045）
         # 二进制段：trajectory (n,6) + trajectory_times (n,) 行数一致
         states = record.arrays["transfer/states"]
         times = record.arrays["transfer/times"]
@@ -257,7 +256,7 @@ class TestTransferRecord:
         )
 
         assert response.record_id is not None
-        record = facade.catalog_get(record_id=response.record_id)
+        record = facade.catalog.catalog_get(record_id=response.record_id)
         # 惯性段：键名内嵌词汇值 gcrs_km（该段的 frame 标注）
         gcrs = record.arrays["transfer/states_gcrs_km"]
         assert gcrs.shape == (2, 6)
@@ -277,7 +276,7 @@ class TestTransferRecord:
             transfer_type="WSB", tli_epoch=2460800.5, target_ephemeris=[[1.0] * 6]
         )
 
-        record = facade.catalog_get(record_id=response.record_id)
+        record = facade.catalog.catalog_get(record_id=response.record_id)
         assert "transfer/states_gcrs_km" not in record.arrays
         assert set(record.arrays) == {"transfer/states", "transfer/times"}
 
@@ -290,7 +289,7 @@ class TestTransferRecord:
         )
 
         assert response.record_id is None
-        summaries = facade.catalog_query().records
+        summaries = facade.catalog.catalog_query().records
         assert all(s.source_tool != "transfer_design" for s in summaries)
 
     def test_catalog_disabled_transfer_record(self, monkeypatch, tmp_path):
@@ -321,7 +320,7 @@ class TestTransferRecord:
         )
 
         assert response.record_id is not None
-        record = facade.catalog_get(record_id=response.record_id)
+        record = facade.catalog.catalog_get(record_id=response.record_id)
         assert record.scalars["transfer_type"] == "low_thrust"
         assert record.scalars["tof_sec"] is None
         assert record.scalars["tli_epoch"] == "2025-06-21T11:00:00"  # 原样存档
@@ -343,15 +342,15 @@ class TestTransferQuery:
         return facade
 
     def test_filter_by_transfer_type(self, facade_with_transfer):
-        records = facade_with_transfer.catalog_query(transfer_type="WSB").records
+        records = facade_with_transfer.catalog.catalog_query(transfer_type="WSB").records
         assert len(records) == 1
         assert records[0].transfer_type == "WSB"
-        assert len(facade_with_transfer.catalog_query(transfer_type="LGA").records) == 0
+        assert len(facade_with_transfer.catalog.catalog_query(transfer_type="LGA").records) == 0
 
     def test_filter_by_delta_v_range(self, facade_with_transfer):
         assert (
             len(
-                facade_with_transfer.catalog_query(
+                facade_with_transfer.catalog.catalog_query(
                     delta_v_min_km_s=3.0, delta_v_max_km_s=4.0
                 ).records
             )
@@ -359,7 +358,7 @@ class TestTransferQuery:
         )
         assert (
             len(
-                facade_with_transfer.catalog_query(
+                facade_with_transfer.catalog.catalog_query(
                     delta_v_min_km_s=5.0, delta_v_max_km_s=6.0
                 ).records
             )
@@ -367,14 +366,14 @@ class TestTransferQuery:
         )
 
     def test_filter_by_tli_epoch_range(self, facade_with_transfer):
-        hits = facade_with_transfer.catalog_query(
+        hits = facade_with_transfer.catalog.catalog_query(
             tli_epoch_min=2460800.0, tli_epoch_max=2460801.0
         ).records
         assert len(hits) == 1
         assert hits[0].tli_epoch == pytest.approx(2460800.5)
         assert (
             len(
-                facade_with_transfer.catalog_query(
+                facade_with_transfer.catalog.catalog_query(
                     tli_epoch_min=2461000.0, tli_epoch_max=2461001.0
                 ).records
             )
@@ -382,7 +381,7 @@ class TestTransferQuery:
         )
 
     def test_transfer_summary_fields_present_orbit_records_none(self, facade_with_transfer):
-        summaries = {s.source_tool: s for s in facade_with_transfer.catalog_query().records}
+        summaries = {s.source_tool: s for s in facade_with_transfer.catalog.catalog_query().records}
         assert summaries["transfer_design"].transfer_type == "WSB"
         assert summaries["transfer_design"].delta_v_km_s == pytest.approx(3.9)
         assert summaries["transfer_design"].tli_epoch == pytest.approx(2460800.5)
@@ -392,16 +391,18 @@ class TestTransferQuery:
 
     def test_invalid_transfer_ranges_rejected(self, facade_with_transfer):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            facade_with_transfer.catalog_query(delta_v_min_km_s=4.0, delta_v_max_km_s=3.0)
+            facade_with_transfer.catalog.catalog_query(delta_v_min_km_s=4.0, delta_v_max_km_s=3.0)
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            facade_with_transfer.catalog_query(tli_epoch_min=2460801.0, tli_epoch_max=2460800.0)
+            facade_with_transfer.catalog.catalog_query(
+                tli_epoch_min=2460801.0, tli_epoch_max=2460800.0
+            )
 
     def test_combined_transfer_filters(self, facade_with_transfer):
-        records = facade_with_transfer.catalog_query(
+        records = facade_with_transfer.catalog.catalog_query(
             transfer_type="WSB", delta_v_min_km_s=3.0, tli_epoch_max=2460900.0
         ).records
         assert len(records) == 1
-        records = facade_with_transfer.catalog_query(
+        records = facade_with_transfer.catalog.catalog_query(
             transfer_type="WSB", delta_v_max_km_s=1.0
         ).records
         assert len(records) == 0
@@ -414,7 +415,7 @@ class TestAutoIngest:
         response = facade.design_orbit(orbit_type="NRHO")
 
         assert response.record_id is not None
-        summaries = facade.catalog_query().records
+        summaries = facade.catalog.catalog_query().records
         assert len(summaries) == 1
         summary = summaries[0]
         assert summary.record_id == response.record_id
@@ -430,7 +431,7 @@ class TestAutoIngest:
         facade = Facade()
         response = facade.design_orbit(orbit_type="DRO")
 
-        record = facade.catalog_get(record_id=response.record_id)
+        record = facade.catalog.catalog_get(record_id=response.record_id)
         assert "cr3bp/states" in record.arrays
         assert "eph/position_km" in record.arrays
         assert record.request["orbit_type"] == "DRO"
@@ -443,25 +444,26 @@ class TestAutoIngest:
         assert table is not None and len(table) == 3
         assert record.to_orbit() is not None
 
-    def test_family_generation_record_is_one_record_with_members(self):
+    def test_family_generation_members_are_individual_records(self):
+        """族 = 标签（ADR 0045）：成员逐条入库，整族经 family_id 查询。"""
         facade = Facade()
-        response = facade.orbit_family_generation(
+        response = facade.catalog.orbit_family_generation(
             orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=2
         )
 
-        assert response.record_id is not None
-        summaries = facade.catalog_query().records
-        assert len(summaries) == 1
+        assert response.family_id is not None
+        summaries = facade.catalog.catalog_query(family_id=response.family_id).records
+        assert len(summaries) == len(response.orbits)
         assert summaries[0].orbit_family == "halo"
         assert summaries[0].libration_point == 1
-        assert summaries[0].member_count == len(response.orbits)
-        assert summaries[0].has_cr3bp is True
-        assert summaries[0].has_ephemeris is False
+        assert sorted(s.member_index for s in summaries) == list(range(len(response.orbits)))
+        assert all(s.has_cr3bp and not s.has_ephemeris for s in summaries)
+        assert all(s.family_id == response.family_id for s in summaries)
 
-        record = facade.catalog_get(record_id=response.record_id)
-        assert len(record.members) == len(response.orbits)
-        assert "cr3bp/members/0000/states" in record.arrays
+        record = facade.catalog.catalog_get(record_id=summaries[0].record_id)
+        assert "cr3bp/states" in record.arrays
         assert record.jacobi is not None
+        assert record.family_id == response.family_id
 
     def test_control_record_points_to_source_record(self, monkeypatch):
         _fake_design(monkeypatch, _make_design_result())
@@ -475,7 +477,7 @@ class TestAutoIngest:
         # 输入星历经库记录解析
         assert isinstance(captured["input_ephemeris"], EphemerisTable)
         assert control_response.record_id is not None
-        record = facade.catalog_get(record_id=control_response.record_id)
+        record = facade.catalog.catalog_get(record_id=control_response.record_id)
         assert record.source_record_id == design_response.record_id
         assert record.source_tool == "control_orbit"
         # 站保产物只含星历段，并继承被控轨道的族分类
@@ -517,26 +519,35 @@ class TestQuery:
         return facade
 
     def test_filter_by_orbit_family(self, facade_with_records):
-        records = facade_with_records.catalog_query(orbit_family="nrho").records
+        records = facade_with_records.catalog.catalog_query(orbit_family="nrho").records
         assert len(records) == 1
         assert records[0].orbit_family == "nrho"
 
     def test_filter_by_libration_point(self, facade_with_records):
-        records = facade_with_records.catalog_query(libration_point=2).records
+        records = facade_with_records.catalog.catalog_query(libration_point=2).records
         assert len(records) == 1
         assert records[0].orbit_family == "nrho"
 
     def test_filter_by_jacobi_range(self, facade_with_records):
-        assert len(facade_with_records.catalog_query(jacobi_min=3.1, jacobi_max=3.2).records) == 1
-        assert len(facade_with_records.catalog_query(jacobi_min=3.0, jacobi_max=3.1).records) == 1
-        assert len(facade_with_records.catalog_query(jacobi_min=2.0, jacobi_max=2.5).records) == 0
+        assert (
+            len(facade_with_records.catalog.catalog_query(jacobi_min=3.1, jacobi_max=3.2).records)
+            == 1
+        )
+        assert (
+            len(facade_with_records.catalog.catalog_query(jacobi_min=3.0, jacobi_max=3.1).records)
+            == 1
+        )
+        assert (
+            len(facade_with_records.catalog.catalog_query(jacobi_min=2.0, jacobi_max=2.5).records)
+            == 0
+        )
 
     def test_filter_by_segment_presence(self, facade_with_records):
-        assert len(facade_with_records.catalog_query(has_ephemeris=True).records) == 3
-        assert len(facade_with_records.catalog_query(has_cr3bp=True).records) == 2
+        assert len(facade_with_records.catalog.catalog_query(has_ephemeris=True).records) == 3
+        assert len(facade_with_records.catalog.catalog_query(has_cr3bp=True).records) == 2
 
     def test_combined_filter(self, facade_with_records):
-        records = facade_with_records.catalog_query(
+        records = facade_with_records.catalog.catalog_query(
             orbit_family="nrho",
             libration_point=2,
             jacobi_min=3.0,
@@ -547,10 +558,10 @@ class TestQuery:
 
     def test_invalid_range_is_rejected(self, facade_with_records):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            facade_with_records.catalog_query(jacobi_min=3.2, jacobi_max=3.0)
+            facade_with_records.catalog.catalog_query(jacobi_min=3.2, jacobi_max=3.0)
 
     def test_summaries_carry_no_arrays(self, facade_with_records):
-        records = facade_with_records.catalog_query().records
+        records = facade_with_records.catalog.catalog_query().records
         assert len(records) == 3
         assert all(not hasattr(record, "arrays") for record in records)
 
@@ -558,13 +569,13 @@ class TestQuery:
         """mcp-serve 逐 tools/call 换线程池线程（#559）：惰性 catalog 连接
         绑定首用线程后，其他线程查询不得报 SQLite 跨线程错误。"""
         facade = Facade(Config(catalog_dir=str(tmp_path / "catalog")))
-        expected = len(facade.catalog_query().records)  # 首用线程惰性建库 + 基线导入
+        expected = len(facade.catalog.catalog_query().records)  # 首用线程惰性建库 + 基线导入
         counts: list[int] = []
         errors: list[Exception] = []
 
         def query_from_pool_thread() -> None:
             try:
-                counts.append(len(facade.catalog_query().records))
+                counts.append(len(facade.catalog.catalog_query().records))
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
 
@@ -580,7 +591,7 @@ class TestQuery:
 class TestGetDelete:
     def test_get_unknown_record_id_raises_structured_error(self):
         with pytest.raises(OrbitError) as exc_info:
-            Facade().catalog_get(record_id="no-such-record")
+            Facade().catalog.catalog_get(record_id="no-such-record")
         assert exc_info.value.code == "RECORD_NOT_FOUND"
         assert exc_info.value.status is ConvergenceState.FAILED
 
@@ -589,12 +600,12 @@ class TestGetDelete:
         facade = Facade()
         record_id = facade.design_orbit(orbit_type="DRO").record_id
 
-        response = facade.catalog_delete(record_id=record_id)
+        response = facade.catalog.catalog_delete(record_id=record_id)
 
         assert response.deleted is True
-        assert facade.catalog_query().records == []
+        assert facade.catalog.catalog_query().records == []
         with pytest.raises(OrbitError, match="RECORD_NOT_FOUND"):
-            facade.catalog_get(record_id=record_id)
+            facade.catalog.catalog_get(record_id=record_id)
 
 
 class TestTagExport:
@@ -603,10 +614,12 @@ class TestTagExport:
         facade = Facade()
         record_id = facade.design_orbit(orbit_type="DRO").record_id
 
-        response = facade.catalog_tag(record_id=record_id, tags=["期中案例"], note="注意近月点高度")
+        response = facade.catalog.catalog_tag(
+            record_id=record_id, tags=["期中案例"], note="注意近月点高度"
+        )
 
         assert response.record.tags == ["期中案例"]
-        record = facade.catalog_get(record_id=record_id)
+        record = facade.catalog.catalog_get(record_id=record_id)
         assert record.tags == ["期中案例"]
         assert record.note == "注意近月点高度"
 
@@ -614,50 +627,24 @@ class TestTagExport:
         _fake_design(monkeypatch, _make_design_result())
         facade = Facade()
         record_id = facade.design_orbit(orbit_type="DRO").record_id
-        facade.catalog_tag(record_id=record_id, tags=["教学"])
+        facade.catalog.catalog_tag(record_id=record_id, tags=["教学"])
         facade.design_orbit(orbit_type="DRO")
         dest = tmp_path / "案例包"
 
-        response = facade.catalog_export(tags=["教学"], dest=str(dest))
+        response = facade.catalog.catalog_export(tags=["教学"], dest=str(dest))
 
         assert response.exported_count == 1
         assert response.record_ids == [record_id]
-        exported = facade.catalog_get(record_id=record_id)
+        exported = facade.catalog.catalog_get(record_id=record_id)
         assert exported.tags == ["教学"]
         assert (dest / "records" / f"{record_id}.json").exists()
         assert (dest / "manifest.json").exists()
 
 
-class TestPromote:
-    def test_promoted_member_points_to_family(self):
-        facade = Facade()
-        family_response = facade.orbit_family_generation(
-            orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=2
-        )
-
-        promoted = facade.catalog_promote(record_id=family_response.record_id, member_index=1)
-
-        record = promoted.record
-        assert record.source_record_id == family_response.record_id
-        assert record.source_tool == "catalog_promote"
-        assert record.orbit_family == "halo"
-        assert record.has_cr3bp is True
-        assert "cr3bp/states" in record.arrays
-        assert len(facade.catalog_query().records) == 2
-
-    def test_promote_bad_member_index_raises_structured_error(self):
-        facade = Facade()
-        family_response = facade.orbit_family_generation(
-            orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=2
-        )
-        with pytest.raises(OrbitError, match="RECORD_NOT_FOUND"):
-            facade.catalog_promote(record_id=family_response.record_id, member_index=99)
-
-
 class TestSweep:
     def test_sweep_generates_records_for_grid(self):
         facade = Facade()
-        response = facade.catalog_sweep(
+        response = facade.catalog.catalog_sweep(
             orbit_types=["HALO"],
             libration_points=[1],
             max_amplitudes_km=[2000.0, 3000.0],
@@ -666,27 +653,29 @@ class TestSweep:
 
         assert response.succeeded == 2
         assert response.failed == 0
-        assert len(response.record_ids) == 2
-        assert all(point.record_id is not None for point in response.points)
+        assert len(response.family_ids) == 2
+        assert all(point.family_id is not None for point in response.points)
         assert {point.parameter_km for point in response.points} == {2000.0, 3000.0}
-        records = facade.catalog_query(orbit_family="halo").records
+        # 每点一族（n_orbits=1），成员逐条入库（ADR 0045）
+        records = facade.catalog.catalog_query(orbit_family="halo").records
         assert len(records) == 2
+        assert all(r.family_id in set(response.family_ids) for r in records)
 
     def test_sweep_rejects_lissajous_with_one_dimensional_grid(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().catalog_sweep(orbit_types=["LISSAJOUS"], max_amplitudes_km=[5000.0])
+            Facade().catalog.catalog_sweep(orbit_types=["LISSAJOUS"], max_amplitudes_km=[5000.0])
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().catalog_sweep(orbit_types=["LISSAJOUS"], jacobi_windows=[[3.17, 3.18]])
+            Facade().catalog.catalog_sweep(orbit_types=["LISSAJOUS"], jacobi_windows=[[3.17, 3.18]])
 
     def test_sweep_rejects_mutually_exclusive_grid_dimensions(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().catalog_sweep(
+            Facade().catalog.catalog_sweep(
                 orbit_types=["HALO"],
                 max_amplitudes_km=[2000.0],
                 jacobi_windows=[[3.17, 3.18]],
             )
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().catalog_sweep(
+            Facade().catalog.catalog_sweep(
                 orbit_types=["HALO"],
                 max_amplitudes_km=[2000.0],
                 amplitude_ins_km=[1000.0],
@@ -695,19 +684,21 @@ class TestSweep:
 
     def test_sweep_rejects_invalid_jacobi_windows(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().catalog_sweep(orbit_types=["HALO"], jacobi_windows=[[3.18, 3.17]])
+            Facade().catalog.catalog_sweep(orbit_types=["HALO"], jacobi_windows=[[3.18, 3.17]])
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().catalog_sweep(orbit_types=["HALO"], jacobi_windows=[[3.17, 3.18, 3.19]])
+            Facade().catalog.catalog_sweep(
+                orbit_types=["HALO"], jacobi_windows=[[3.17, 3.18, 3.19]]
+            )
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().catalog_sweep(orbit_types=["HALO"], jacobi_windows=[[3.17]])
+            Facade().catalog.catalog_sweep(orbit_types=["HALO"], jacobi_windows=[[3.17]])
 
     def test_sweep_lissajous_grid_requires_both_amplitude_lists(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().catalog_sweep(orbit_types=["LISSAJOUS"], amplitude_ins_km=[1000.0])
+            Facade().catalog.catalog_sweep(orbit_types=["LISSAJOUS"], amplitude_ins_km=[1000.0])
 
     def test_sweep_lissajous_grid_creates_records(self):
         facade = Facade()
-        response = facade.catalog_sweep(
+        response = facade.catalog.catalog_sweep(
             orbit_types=["LISSAJOUS"],
             libration_points=[2],
             amplitude_ins_km=[1000.0, 2000.0],
@@ -717,7 +708,7 @@ class TestSweep:
 
         assert response.succeeded == 2
         assert response.failed == 0
-        assert len(response.record_ids) == 2
+        assert len(response.family_ids) == 2
         assert {tuple(point.amplitudes_km) for point in response.points} == {
             (1000.0, 3000.0),
             (2000.0, 3000.0),
@@ -725,9 +716,9 @@ class TestSweep:
         assert all(
             point.parameter_km is None and point.jacobi_window is None for point in response.points
         )
-        records = facade.catalog_query(orbit_family="lissajous", libration_point=2).records
-        assert len(records) == 2
-        assert all(record.member_count == 2 for record in records)
+        records = facade.catalog.catalog_query(orbit_family="lissajous", libration_point=2).records
+        assert len(records) == 4  # 2 点 × 2 成员，逐条入库（ADR 0045）
+        assert all(r.family_id is not None for r in records)
 
     # jacobi 窗口 sweep 的 Facade 集成用例已移出默认套件（ADR 0037：窗口
     # 模式共享的 Rust trace 有 200 成员兜底，单次 ≥30s；窗口编排便过语义
@@ -758,7 +749,7 @@ class TestSweep:
 
     def test_sweep_requires_grid_for_family(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().catalog_sweep(orbit_types=["NRHO"], max_amplitudes_km=[5000.0])
+            Facade().catalog.catalog_sweep(orbit_types=["NRHO"], max_amplitudes_km=[5000.0])
 
     def test_sweep_counts_records_and_failures(self, monkeypatch):
         import e2m2e.algorithm.catalog_sweep as sweep_module
@@ -816,7 +807,7 @@ class TestSweep:
         ]
         monkeypatch.setattr(sweep_module, "run_family_sweep", lambda points: outcomes)
 
-        response = Facade().catalog_sweep(
+        response = Facade().catalog.catalog_sweep(
             orbit_types=["HALO"],
             libration_points=[1],
             max_amplitudes_km=[2000.0, 3000.0, 4000.0],
@@ -825,9 +816,9 @@ class TestSweep:
 
         assert response.succeeded == 1
         assert response.failed == 1
-        assert len(response.record_ids) == 1
+        assert len(response.family_ids) == 1
         assert "1 点软失败无成员产出" in response.message
-        assert response.points[1].record_id is None
+        assert response.points[1].family_id is None
         assert response.points[1].message == "爆炸"
         assert response.points[2].status is ConvergenceState.STAGNATED
 
@@ -839,31 +830,33 @@ class TestCatalogErrors:
         (catalog_dir / "catalog.db").write_bytes(b"not a sqlite database")
         facade = Facade(Config(catalog_dir=str(catalog_dir)))
         with pytest.raises(OrbitError, match="CATALOG_READ_FAILED"):
-            facade.catalog_query()
+            facade.catalog.catalog_query()
 
     def test_path_traversal_record_id_is_record_not_found(self):
         """record_id 拼路径前的形态校验：路径穿越一律 RECORD_NOT_FOUND。"""
         facade = Facade()
         with pytest.raises(OrbitError, match="RECORD_NOT_FOUND"):
-            facade.catalog_get(record_id="../../etc/passwd")
+            facade.catalog.catalog_get(record_id="../../etc/passwd")
         with pytest.raises(OrbitError, match="RECORD_NOT_FOUND"):
-            facade.catalog_delete(record_id="../../etc/passwd")
+            facade.catalog.catalog_delete(record_id="../../etc/passwd")
 
 
 class TestToolInventory:
     def test_catalog_methods_are_in_derived_inventory(self):
         facade = Facade()
-        names = set(mcp_tools(facade))
+        # 类分家后轨道库方法住在 Catalog 类上，但仍在组合根清单内（ADR 0043）
+        names = set(mcp_tools(facade.catalog))
         expected = {
             "catalog_query",
             "catalog_get",
             "catalog_delete",
             "catalog_tag",
-            "catalog_promote",
             "catalog_export",
             "catalog_sweep",
         }
         assert expected <= names
+        # catalog_promote 已随一轨一记录移除（ADR 0045 决策 5）
+        assert "catalog_promote" not in names
 
         by_name = {tool.name: tool for tool in tool_inventory(facade)}
         request_models = {
@@ -871,7 +864,6 @@ class TestToolInventory:
             "catalog_get": CatalogGetRequest,
             "catalog_delete": CatalogDeleteRequest,
             "catalog_tag": CatalogTagRequest,
-            "catalog_promote": CatalogPromoteRequest,
             "catalog_export": CatalogExportRequest,
             "catalog_sweep": CatalogSweepRequest,
         }
@@ -890,7 +882,7 @@ class TestToolInventory:
         )
 
         assert response.record_id is not None
-        record = facade.catalog_get(record_id=response.record_id)
+        record = facade.catalog.catalog_get(record_id=response.record_id)
         # 选中解口径（顶层 delta_v=3.9），非候选网格估计 9.9
         assert record.scalars["delta_v_km_s"] == pytest.approx(3.9)
         assert record.scalars["tof_sec"] == pytest.approx(100.0)

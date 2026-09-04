@@ -1,14 +1,19 @@
-"""轨道库 catalog：记录格式、存储引擎与派生索引（ADR 0031）。
+"""轨道库 catalog：记录格式、分发包、存储引擎与派生索引（ADR 0031/0045）。
 
-- ``record.py``：记录格式（schema 版本、段数组键约定、校验、段序列化）。
-- ``store.py``：存储引擎（写入/读取/删除/标注/导出/成员提升/索引重建）。
+- ``record.py``：记录格式（schema v2：一轨一记录；段数组键约定、校验、
+  段序列化）。
+- ``bundle.py``：基线分发包（v1 族束传输格式）→ v2 成员记录的展开。
+- ``store.py``：存储引擎（写入/读取/删除/标注/导出/索引重建）。
 - ``index.py``：SQLite 派生索引（只存过滤维度与文件指针，可全量重建）。
-- ``baseline.py``：随包基线数据集的首用导入（ADR 0036）。
+- ``baseline.py``：随包基线数据集的首用展开导入（ADR 0036/0045）。
+- ``terminology.py``：术语清单（42 标签表 + 族名/转移类型闭值集，
+  ADR 0044）。
 
 记录文件（records/*.json + .npz）是事实来源；catalog.db 是派生物。
 """
 
 from .baseline import BASELINE_TAG, baseline_source_dir, import_baseline
+from .bundle import expand_bundle
 from .record import (
     SCHEMA_VERSION,
     CatalogError,
@@ -20,7 +25,6 @@ from .record import (
     ephemeris_segment_arrays,
     geometric_amplitude_km,
     member_array_key,
-    member_count,
     new_record_id,
     numeric_or_none,
     point_interval,
@@ -28,6 +32,17 @@ from .record import (
     validate_meta,
 )
 from .store import CatalogStore
+from .terminology import (
+    RECORD_ORBIT_FAMILIES,
+    TAXONOMY,
+    TAXONOMY_BY_CANONICAL,
+    TRANSFER_TYPES,
+    Hemisphere,
+    TaxonomyCategory,
+    TaxonomyLabel,
+    label_legend,
+    parse_taxonomy_label,
+)
 
 __all__ = [
     "BASELINE_TAG",
@@ -41,13 +56,22 @@ __all__ = [
     "cr3bp_segment_arrays",
     "ephemeris_from_arrays",
     "ephemeris_segment_arrays",
+    "expand_bundle",
     "geometric_amplitude_km",
     "import_baseline",
+    "label_legend",
     "member_array_key",
-    "member_count",
     "new_record_id",
     "numeric_or_none",
+    "parse_taxonomy_label",
     "point_interval",
+    "RECORD_ORBIT_FAMILIES",
+    "TAXONOMY",
+    "TAXONOMY_BY_CANONICAL",
+    "TRANSFER_TYPES",
+    "Hemisphere",
+    "TaxonomyCategory",
+    "TaxonomyLabel",
     "transfer_segment_arrays",
     "validate_meta",
 ]

@@ -25,7 +25,7 @@ from typing import Any
 from e2m2e.api import execution
 from e2m2e.api.config import Config
 from e2m2e.api.execution import LONG_RUNNING_TOOLS, execute_tool, worker_request_payload
-from e2m2e.api.facade import Facade, ToolInfo, tool_inventory
+from e2m2e.api.facade import Facade, ToolInfo, resolve_tool_method, tool_inventory
 from e2m2e.api.mcp import envelope
 
 __all__ = ["main", "build_parser", "tool_subcommands"]
@@ -102,7 +102,10 @@ def _add_field_option(parser: argparse.ArgumentParser, name: str, field: Any) ->
 def _build_tool_subparser(
     sub: argparse._SubParsersAction, facade: Facade, command: str, info: ToolInfo
 ) -> None:
-    method = getattr(facade, info.name)
+    # 属主解析跨暴露类（ADR 0043）：方法可能住在 catalog/spatiography 类上。
+    method = resolve_tool_method(facade, info.name)
+    if method is None:  # pragma: no cover - 清单与方法同源，防御分支
+        raise LookupError(f"工具清单条目无属主：{info.name}")
     help_text = (method.__doc__ or info.name).strip().splitlines()[0]
     tool_parser = sub.add_parser(command, help=help_text, description=help_text)
     if info.request_model is not None:

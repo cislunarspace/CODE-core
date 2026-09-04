@@ -19,7 +19,7 @@ pytestmark = pytest.mark.interface
 
 class TestSpatiographyScales:
     def test_golden_values_travel_through_facade(self):
-        response = Facade().spatiography_scales()
+        response = Facade().spatiography.spatiography_scales()
         assert response.status.value == "converged"
         assert response.scales["laplace_radius_geolunar_km"] == pytest.approx(48812.40, rel=1e-4)
         assert response.scales["hill_radius_moon_km"] == pytest.approx(61364.0, rel=1e-4)
@@ -29,19 +29,19 @@ class TestSpatiographyScales:
 
     def test_element_filter_and_unknown_name(self):
         facade = Facade()
-        filtered = facade.spatiography_scales(elements=["hill_radius_moon_km"])
+        filtered = facade.spatiography.spatiography_scales(elements=["hill_radius_moon_km"])
         assert set(filtered.scales) == {"hill_radius_moon_km"}
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            facade.spatiography_scales(elements=["bogus_scale"])
+            facade.spatiography.spatiography_scales(elements=["bogus_scale"])
 
     def test_over_a_moon_derived_keys(self):
-        scales = Facade().spatiography_scales().scales
+        scales = Facade().spatiography.spatiography_scales().scales
         assert scales["laplace_radius_geolunar_over_a_moon"] == pytest.approx(0.12732, rel=1e-3)
 
 
 class TestSpatiographyClassify:
     def test_classify_states_with_legend(self):
-        response = Facade().spatiography_classify(
+        response = Facade().spatiography.spatiography_classify(
             states=[[0.5, 0.1, 0.0, 0.0, 1.0, 0.0]],
             frame="synodic_barycentric_nd",
         )
@@ -53,7 +53,9 @@ class TestSpatiographyClassify:
 
     def test_invalid_state_shape_translated(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().spatiography_classify(states=[[1.0, 2.0, 3.0]], frame="synodic_barycentric_nd")
+            Facade().spatiography.spatiography_classify(
+                states=[[1.0, 2.0, 3.0]], frame="synodic_barycentric_nd"
+            )
 
     def test_frame_description_locks_state_frame_vocabulary(self):
         """frame 字段 description 须声明 ADR 0040 state_frame 词汇与双口径。"""
@@ -65,7 +67,7 @@ class TestSpatiographyClassify:
 
 class TestSpatiographyBoundaries:
     def test_synodic_planar_payload_structure(self):
-        response = Facade().spatiography_boundaries(resolution=32)
+        response = Facade().spatiography.spatiography_boundaries(resolution=32)
         assert response.state_frame == "synodic_barycentric_km"
         assert len(response.elements) == 13
         circle = next(e for e in response.elements if e["kind"] == "circle")
@@ -73,7 +75,7 @@ class TestSpatiographyBoundaries:
         assert len(circle["points_km"]) == 32
 
     def test_ae_curves_payload_uses_element_space_label(self):
-        response = Facade().spatiography_boundaries(
+        response = Facade().spatiography.spatiography_boundaries(
             kind="ae_curves", boundary_set=["resonance_verticals"]
         )
         assert response.state_frame == "element_space_ae"
@@ -81,7 +83,7 @@ class TestSpatiographyBoundaries:
 
     def test_unknown_boundary_set_translated(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().spatiography_boundaries(boundary_set=["bogus"])
+            Facade().spatiography.spatiography_boundaries(boundary_set=["bogus"])
 
     def test_state_frame_description_documents_new_vocabulary(self):
         desc = SpatiographyBoundariesResponse.model_json_schema()["properties"]["state_frame"][
@@ -101,7 +103,7 @@ class TestSpatiographyBoundaries:
 
 class TestSpatiographyResonanceAtlas:
     def test_atlas_products_and_state_frames(self):
-        response = Facade().spatiography_resonance_atlas(
+        response = Facade().spatiography.spatiography_resonance_atlas(
             products=["gallardo_widths", "secular_loci", "vzlk_portrait"],
             resonance_pairs=[[2, 1]],
             n_e=4,
@@ -116,7 +118,7 @@ class TestSpatiographyResonanceAtlas:
         assert response.vzlk["t_vzlk_days_at_a_moon"] > 100.0
 
     def test_widths_carry_fig8_caveat(self):
-        response = Facade().spatiography_resonance_atlas(
+        response = Facade().spatiography.spatiography_resonance_atlas(
             products=["gallardo_widths"], resonance_pairs=[[1, 1]], n_e=3
         )
         notes = [
@@ -126,9 +128,9 @@ class TestSpatiographyResonanceAtlas:
 
     def test_unknown_product_rejected(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().spatiography_resonance_atlas(products=["bogus"])
+            Facade().spatiography.spatiography_resonance_atlas(products=["bogus"])
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().spatiography_resonance_atlas(e_min=0.5, e_max=0.2)
+            Facade().spatiography.spatiography_resonance_atlas(e_min=0.5, e_max=0.2)
 
 
 class TestSpatiographyDynamicalMap:
@@ -136,7 +138,9 @@ class TestSpatiographyDynamicalMap:
     # 缺符号时跳过而非硬失败（#603）；同类的纯校验用例不需守卫。
     @requires_native_symbols("propagate_geocentric_fate_map_py")
     def test_map_smoke_with_gateway_note(self):
-        response = Facade().spatiography_dynamical_map(zone="SC", n_a=3, n_e=2, span_years=0.5)
+        response = Facade().spatiography.spatiography_dynamical_map(
+            zone="SC", n_a=3, n_e=2, span_years=0.5
+        )
         assert response.status.value == "converged"
         assert response.zone == "SC" and response.model == "em"
         assert len(response.a_over_a_moon) == 3 and len(response.e_grid) == 2
@@ -149,13 +153,13 @@ class TestSpatiographyDynamicalMap:
 
     def test_invalid_zone_and_model_rejected(self):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().spatiography_dynamical_map(zone="XX")
+            Facade().spatiography.spatiography_dynamical_map(zone="XX")
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
-            Facade().spatiography_dynamical_map(zone="SC", model="bogus")
+            Facade().spatiography.spatiography_dynamical_map(zone="SC", model="bogus")
 
     @requires_native_symbols("propagate_geocentric_fate_map_py")
     def test_ems_model_routes_through_facade(self):
-        response = Facade().spatiography_dynamical_map(
+        response = Facade().spatiography.spatiography_dynamical_map(
             zone="CG", n_a=2, n_e=2, model="ems", span_years=0.2
         )
         assert response.model == "ems"

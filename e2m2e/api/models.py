@@ -48,8 +48,7 @@ __all__ = [
     "CatalogDeleteResponse",
     "CatalogTagRequest",
     "CatalogTagResponse",
-    "CatalogPromoteRequest",
-    "CatalogPromoteResponse",
+    "CatalogTerminologyResponse",
     "CatalogExportRequest",
     "CatalogExportResponse",
     "CatalogSweepRequest",
@@ -428,9 +427,10 @@ class FamilyGenerationResponse(_ApiModel, OrbitFamily):
     )
     requested_members: int
     generated_members: int
-    record_id: str | None = Field(
+    family_id: str | None = Field(
         default=None,
-        description="产物自动入库的记录 id（ADR 0031）；库关闭或无成员产出时为 None",
+        description="生成批次标识（ADR 0045）：成员已逐条入库，整族经"
+        " catalog_query(family_id=…) 查询；库关闭或无成员产出时为 None",
     )
 
     def __iter__(self):
@@ -1310,6 +1310,10 @@ class CatalogQueryRequest(_ApiModel):
         default=None,
         description="轨道族（dro/halo/nrho/lissajous/dpo/axial/spo/lpo/horseshoe/elfo 等）",
     )
+    family_id: str | None = Field(
+        default=None,
+        description="生成批次标识（ADR 0045）：整族查询的句柄——返回该次生成的全部成员记录",
+    )
     libration_point: int | None = Field(default=None, ge=1, le=5, description="平动点编号 1–5")
     jacobi_min: float | None = Field(default=None, description="Jacobi 常数区间下界")
     jacobi_max: float | None = Field(default=None, description="Jacobi 常数区间上界")
@@ -1414,7 +1418,14 @@ class CatalogRecordSummary(_ApiModel):
     status: ConvergenceState
     cause: FailureCause
     message: str
-    member_count: int = Field(description="族成员数；单轨道记录为 1，纯星历/转移记录为 0")
+    family_id: str | None = Field(
+        default=None,
+        description="生成批次标识（ADR 0045，族标签之一）；整族经 catalog_query(family_id=…) 查询；"
+        "单条设计/受控/转移记录为 None",
+    )
+    member_index: int | None = Field(
+        default=None, description="族内成员序号（自 0 起，延续走行顺序）；非族成员记录为 None"
+    )
     tags: list[str]
     note: str
 
@@ -1437,14 +1448,13 @@ class CatalogRecordResponse(CatalogRecordSummary):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     scalars: dict[str, Any] = Field(description="任务标量（历元、时长、mu、迭代次数等）")
-    request: dict[str, Any] = Field(description="原始请求快照")
-    members: list[dict[str, Any]] = Field(description="族成员参数表；非族记录为空")
+    request: dict[str, Any] = Field(description="原始请求快照（族成员各自携带同一份生成请求）")
     details: dict[str, Any] | None = Field(
         default=None,
         description="设计细节块（transfer 记录：后端 details + maneuver_events；其余为 None）",
     )
     arrays: dict[str, Any] = Field(
-        description="数组段：cr3bp/ 与 eph/ 前缀的 numpy 数组（含族成员 cr3bp/members/）"
+        description="数组段：cr3bp/ 与 eph/ 前缀的 numpy 数组；一条记录只载一条轨迹（ADR 0045）"
     )
 
     def to_ephemeris_table(self) -> Any | None:
@@ -1456,7 +1466,7 @@ class CatalogRecordResponse(CatalogRecordSummary):
         return ephemeris_from_arrays(self.arrays)
 
     def to_orbit(self) -> Any | None:
-        """把单轨道 CR3BP 段重建为 ``Orbit``；族记录与纯星历记录返回 None。"""
+        """把单轨道 CR3BP 段重建为 ``Orbit``；纯星历/转移记录返回 None。"""
         import numpy as np
 
         from e2m2e.data.types.orbit import Orbit
@@ -1495,17 +1505,19 @@ class CatalogTagResponse(ResultResponse):
     record: CatalogRecordSummary
 
 
-class CatalogPromoteRequest(_ApiModel):
-    """把族成员提升为独立记录（``source_record_id`` 指向所属族）。"""
+class CatalogTerminologyResponse(ResultResponse):
+    """catalog_terminology 输出：调用方渲染结果所需的全部闭值集（ADR 0044）。
 
-    record_id: str = Field(min_length=1, description="族记录 id")
-    member_index: int = Field(ge=0, description="族内成员序号（自 0 起）")
+    无参数；包版本即术语版本（清单随发布冻结，调用方每会话取一次、
+    升级后刷新，未知标签按可读规范串原样渲染）。
+    """
 
-
-class CatalogPromoteResponse(ResultResponse):
-    """catalog_promote 输出：提升出的独立记录。"""
-
-    record: CatalogRecordResponse
+    taxonomy_labels: dict[str, dict[str, Any]] = Field(
+        description="分类学标签图例：规范字符串 → 结构化字段"
+        "（category/family/libration_point/hemisphere/resonance_p/resonance_q，ADR 0042）"
+    )
+    orbit_families: list[str] = Field(description="记录侧 orbit_family 闭值集（族名清单）")
+    transfer_types: list[str] = Field(description="转移类型闭值集（HMN/LGA/WSB/low_thrust）")
 
 
 class CatalogExportRequest(CatalogQueryRequest):
@@ -1639,7 +1651,7 @@ class CatalogSweepRequest(_ApiModel):
 
 
 class CatalogSweepPointOutcome(_ApiModel):
-    """扫描单参数点的结局：成功（含软失败）保留 record_id，硬失败保留原因。"""
+    """扫描单参数点的结局：成功（含软失败）保留 family_id，硬失败保留原因。"""
 
     orbit_type: str
     libration_point: int
@@ -1656,7 +1668,7 @@ class CatalogSweepPointOutcome(_ApiModel):
     status: ConvergenceState
     cause: FailureCause
     message: str
-    record_id: str | None
+    family_id: str | None
     generated_members: int
 
 
@@ -1669,7 +1681,9 @@ class CatalogSweepResponse(ResultResponse):
     """
 
     points: list[CatalogSweepPointOutcome]
-    record_ids: list[str]
+    family_ids: list[str] = Field(
+        description="成功参数点的生成批次标识列表（成员记录逐条入库，ADR 0045）"
+    )
     succeeded: int
     failed: int
 

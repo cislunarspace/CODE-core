@@ -1,27 +1,14 @@
-"""Facade 门面：唯一公开顶级入口，粗粒度任务方法。/ Facade: the sole public
-top-level entry with coarse-grained task methods.
+"""Facade 门面：任务级入口与暴露类组合根（ADR 0043）。
 
-[English]
-
-Two granularity tiers (ADR 0014): the Facade exposes coarse-grained task
-methods for humans and Agents, while the algorithm layer keeps fine-grained
-APIs for experts. MCP tools derive purely from Facade methods; each method
-marks whether it is exposed to MCP via its ``mcp_exposed`` metadata.
-
-Implementation status: tier-1 tasks wire into algorithm/ orchestrators
-(design_orbit / control_orbit / transfer_design / orbit_propagation /
-spacetime_transform); tier-2 subtasks wire into existing algorithms
-(family / stability / proximity).
-
-[简体中文]
-
-两层粒度（ADR 0014）：Facade 暴露粗粒度任务方法（人类/Agent 常用），算法层
-保留细粒度 API（专家用）。MCP 工具 = Facade 方法全集（纯派生），方法带
-``mcp_exposed`` 元数据控制是否对 MCP 暴露。
-
-实现状态：一档任务已接入 algorithm/ 编排器（design_orbit/control_orbit/
-transfer_design/orbit_propagation/spacetime_transform），二档子任务已接入
-已有算法（family/stability/proximity）。
+接口层暴露三个类（ADR 0043）：``Facade`` 只留五个任务级能力
+（design_orbit/control_orbit/transfer_design/orbit_propagation/
+spacetime_transform）；``e2m2e.api.catalog.Catalog`` 承担轨道库数据管理与
+族生成；``e2m2e.api.spatiography.Spatiography`` 承担分区分析。
+``Facade`` 是组合根：``Facade().catalog`` / ``Facade().spatiography``
+向进程内调用方交出另外两类；唯一工具清单扫描 ``Facade().exposed_apis``
+——MCP/CLI/sidecar 都从这一份清单派生（ADR 0014 决策 2，扫描根由
+ADR 0043 拓宽）。方法带 ``mcp_exposed`` 元数据；算法层保留细粒度 API
+（专家用）。
 """
 
 from __future__ import annotations
@@ -33,64 +20,22 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
-from e2m2e.algorithm.results import FamilyGenerationResult
-from e2m2e.data.catalog import (
-    CatalogError,
-    CatalogFilter,
-    CatalogStore,
-    RecordNotFoundError,
-    ephemeris_from_arrays,
-    import_baseline,
-    numeric_or_none,
-)
-from e2m2e.data.catalog import member_count as catalog_member_count
 from e2m2e.data.constants import SECONDS_PER_DAY
 from e2m2e.data.templates import ConvergenceState, FailureCause
-from e2m2e.data.types.orbit import OrbitFamily
 
 from . import catalog_ingest
 from .config import Config
 from .models import (
-    _FAMILY_DEFAULT_LIBRATION_POINT,
-    _FAMILY_LIBRATION_POINT_RANGES,
-    CatalogDeleteRequest,
-    CatalogDeleteResponse,
-    CatalogExportRequest,
-    CatalogExportResponse,
-    CatalogGetRequest,
-    CatalogPromoteRequest,
-    CatalogPromoteResponse,
-    CatalogQueryRequest,
-    CatalogQueryResponse,
-    CatalogRecordResponse,
-    CatalogRecordSummary,
-    CatalogSweepPointOutcome,
-    CatalogSweepRequest,
-    CatalogSweepResponse,
-    CatalogTagRequest,
-    CatalogTagResponse,
     ControlOrbitRequest,
     ControlOrbitResponse,
     DesignOrbitRequest,
     DesignOrbitResponse,
-    FamilyGenerationRequest,
-    FamilyGenerationResponse,
     ManeuverEvent,
     OrbitError,
     PropagationRequest,
     PropagationResponse,
     SpacetimeTransformRequest,
     SpacetimeTransformResponse,
-    SpatiographyAtlasRequest,
-    SpatiographyAtlasResponse,
-    SpatiographyBoundariesRequest,
-    SpatiographyBoundariesResponse,
-    SpatiographyClassifyRequest,
-    SpatiographyClassifyResponse,
-    SpatiographyMapRequest,
-    SpatiographyMapResponse,
-    SpatiographyScalesRequest,
-    SpatiographyScalesResponse,
     TransferCandidate,
     TransferDesignRequest,
     TransferDesignResponse,
@@ -147,52 +92,6 @@ def _result_triplet(result: Any) -> tuple[ConvergenceState, FailureCause, str]:
             cause=FailureCause.BACKEND_FAILURE,
         ) from exc
     return triplet
-
-
-def _family_generation_payload(
-    result: OrbitFamily | FamilyGenerationResult,
-    *,
-    requested_members: int | None = None,
-) -> FamilyGenerationResponse:
-    """把算法层成功或软失败统一投影为 Facade 专属响应。
-
-    分类学标签（#581，ADR 0042）对全体成员实测打标后去重；拟周期
-    （lissajous）与不在分类学内的族按映射表为空表。
-    """
-    from .catalog_ingest import stamp_taxonomy_labels
-
-    if isinstance(result, FamilyGenerationResult):
-        family = result.family
-        status = result.status
-        cause = result.cause
-        message = result.message
-        requested_members = result.requested_members
-        generated_members = result.generated_members
-    else:
-        family = result
-        status = ConvergenceState.CONVERGED
-        cause = FailureCause.NONE
-        message = "轨道族生成完成"
-        requested_members = requested_members or len(family)
-        generated_members = len(family)
-    taxonomy_labels, _ = stamp_taxonomy_labels(
-        family.family_type,
-        family.orbits,
-        periodicity=family.metadata.get("periodicity", "periodic"),
-        context="orbit_family_generation",
-    )
-    return FamilyGenerationResponse(
-        status=status,
-        cause=cause,
-        message=message,
-        orbits=family.orbits,
-        family_type=family.family_type,
-        system=family.system,
-        metadata=family.metadata,
-        taxonomy_labels=taxonomy_labels,
-        requested_members=requested_members,
-        generated_members=generated_members,
-    )
 
 
 def _exception_triplet(exc: Exception) -> tuple[ConvergenceState, FailureCause, str]:
@@ -381,309 +280,13 @@ def _control_result_to_response(
     )
 
 
-# ---------------------------------------------------------------------------
-# 轨道库 catalog（ADR 0031）：记录 ↔ 响应翻译、过滤构造、sweep 网格展开
-# ---------------------------------------------------------------------------
-
-
-def _record_not_found(exc: RecordNotFoundError) -> OrbitError:
-    return OrbitError(
-        "RECORD_NOT_FOUND",
-        str(exc),
-        status=ConvergenceState.FAILED,
-        cause=FailureCause.INVALID_INPUT,
-    )
-
-
-def _catalog_read_failed(exc: Exception) -> OrbitError:
-    return OrbitError(
-        "CATALOG_READ_FAILED",
-        str(exc),
-        status=ConvergenceState.FAILED,
-        cause=FailureCause.BACKEND_FAILURE,
-    )
-
-
-def _catalog_write_failed(exc: Exception) -> OrbitError:
-    return OrbitError(
-        "CATALOG_WRITE_FAILED",
-        str(exc),
-        status=ConvergenceState.FAILED,
-        cause=FailureCause.BACKEND_FAILURE,
-    )
-
-
-def _to_catalog_filter(request: CatalogQueryRequest) -> CatalogFilter:
-    """把查询请求模型翻译为数据层过滤条件。"""
-    return CatalogFilter(
-        orbit_family=request.orbit_family,
-        libration_point=request.libration_point,
-        jacobi_min=request.jacobi_min,
-        jacobi_max=request.jacobi_max,
-        amplitude_min_km=request.amplitude_min_km,
-        amplitude_max_km=request.amplitude_max_km,
-        has_cr3bp=request.has_cr3bp,
-        has_ephemeris=request.has_ephemeris,
-        status=None if request.status is None else request.status.value,
-        tags=None if request.tags is None else tuple(request.tags),
-        transfer_type=request.transfer_type,
-        delta_v_min_km_s=request.delta_v_min_km_s,
-        delta_v_max_km_s=request.delta_v_max_km_s,
-        tli_epoch_min=request.tli_epoch_min,
-        tli_epoch_max=request.tli_epoch_max,
-    )
-
-
-def _summary_kwargs(
-    *,
-    identity: dict[str, Any],
-    classification: dict[str, Any],
-    member_count: int,
-) -> dict[str, Any]:
-    """摘要公共字段（索引行与记录元数据两种来源共用）。
-
-    transfer 维度（#574）两种来源都归一在 identity 顶层：索引行直接带
-    列值；记录元数据经 ``_summary_from_meta`` 从 ``scalars`` 提取后合入。
-    分类学标签（#581）随 ``classification`` 走，未打标记录为 None。
-    """
-    return {
-        "record_id": identity["record_id"],
-        "created_at": identity["created_at"],
-        "source_tool": identity["source_tool"],
-        "source_record_id": identity["source_record_id"],
-        "orbit_family": classification["orbit_family"],
-        "libration_point": classification["libration_point"],
-        "jacobi": classification["jacobi"],
-        "amplitude": classification["amplitude"],
-        "has_cr3bp": classification["has_cr3bp"],
-        "has_ephemeris": classification["has_ephemeris"],
-        "taxonomy_labels": classification.get("taxonomy_labels"),
-        "transfer_type": identity.get("transfer_type"),
-        "delta_v_km_s": identity.get("delta_v_km_s"),
-        "tli_epoch": identity.get("tli_epoch"),
-        "status": identity["status"],
-        "cause": identity["cause"],
-        "message": identity["message"],
-        "member_count": member_count,
-        "tags": identity["tags"],
-        "note": identity["note"],
-    }
-
-
-def _summary_from_index(summary: dict[str, Any]) -> CatalogRecordSummary:
-    """索引行摘要 → 响应模型。"""
-    return CatalogRecordSummary(
-        **_summary_kwargs(
-            identity=summary,
-            classification=summary["classification"],
-            member_count=summary["member_count"],
-        )
-    )
-
-
-def _summary_from_meta(meta: dict[str, Any]) -> CatalogRecordSummary:
-    """记录元数据 → 摘要响应模型（member_count 与索引用同一份推导）。
-
-    transfer 维度从 ``scalars`` 提取归一到 identity 顶层（与索引行同形）。
-    """
-    scalars = meta.get("scalars", {})
-    identity = {
-        **meta,
-        "transfer_type": scalars.get("transfer_type"),
-        "delta_v_km_s": numeric_or_none(scalars.get("delta_v_km_s")),
-        "tli_epoch": numeric_or_none(scalars.get("tli_epoch")),
-    }
-    return CatalogRecordSummary(
-        **_summary_kwargs(
-            identity=identity,
-            classification=meta["classification"],
-            member_count=catalog_member_count(meta),
-        )
-    )
-
-
-def _record_to_response(record: Any) -> CatalogRecordResponse:
-    """完整记录 → 响应模型（含数组段，numpy 值）。"""
-    meta = record.meta
-    summary = _summary_from_meta(meta)
-    return CatalogRecordResponse(
-        **summary.model_dump(),
-        scalars=meta["scalars"],
-        request=meta["request"],
-        members=meta["members"],
-        details=meta.get("details"),
-        arrays=record.arrays,
-    )
-
-
-#: sweep 各族一维扫描的主延拓参数字段（FamilyGenerationRequest 术语）。
-#: LISSAJOUS 不在表中：其一维扫描不成立，走 amplitude_ins_km ×
-#: amplitude_outs_km 二维振幅网格（能量窗口扫描同理不适用）。
-_SWEEP_GRID_FIELD = {
-    "HALO": "max_amplitude_km",
-    "NRHO": "perilune_height_max_km",
-    "AXIAL": "max_amplitude_km",
-    "SPO": "max_amplitude_km",
-    "LPO": "max_amplitude_km",
-    "HORSESHOE": "max_amplitude_km",
-}
-
-
-@dataclasses.dataclass(frozen=True)
-class _SweepPlanPoint:
-    """展开后的扫描参数点：族请求（已校验、含默认值）与主参数标签。"""
-
-    family_request: FamilyGenerationRequest
-    libration_point: int
-    parameter_km: float | None = None
-    jacobi_window: tuple[float, float] | None = None
-    amplitudes_km: tuple[float, float] | None = None
-
-
-def _sweep_grid_mode(request: CatalogSweepRequest, selection: str) -> str:
-    """按请求网格字段与族返回扫描主参数维度（维度互斥已在请求模型拒绝）。
-
-    族 × 可用维度的适用性只经 ``CatalogSweepRequest.supported_grid_dimensions``
-    判断（条件取值域公开且同源，ADR 0014 决策 8），本函数不另立规则。
-    """
-    dimensions = CatalogSweepRequest.supported_grid_dimensions(selection)
-    if request.amplitude_ins_km is not None:
-        if "amplitude_ins_km" not in dimensions:
-            raise ValueError("amplitude_ins_km/amplitude_outs_km 二维振幅网格仅 LISSAJOUS 用")
-        return "lissajous"
-    if "amplitude_ins_km" in dimensions:
-        raise ValueError(
-            "LISSAJOUS 振幅为面内/面外二维，只支持 amplitude_ins_km × "
-            "amplitude_outs_km 二维振幅网格（不支持一维振幅或能量窗口）"
-        )
-    if request.jacobi_windows is not None:
-        if "jacobi_windows" not in dimensions:
-            raise ValueError(f"{selection} 不支持 jacobi_windows 能量窗口扫描")
-        return "jacobi"
-    return "amplitude"
-
-
-def _expand_sweep_points(request: CatalogSweepRequest) -> list[_SweepPlanPoint]:
-    """把扫描参数空间展开为参数点序列（族请求 + 主参数标签）。
-
-    网格 = 族 × 平动点 × 主参数维度：NRHO 一维扫 perilune_heights_max_km，
-    其余共线/三角族扫 max_amplitudes_km；能量窗口维扫 jacobi_windows（族
-    延拓范围取各族默认值，不叠振幅网格）；LISSAJOUS 扫面内×面外二维振幅
-    笛卡尔积（相位取请求默认值）。每点经 ``FamilyGenerationRequest`` 校验，
-    非法点在此拒绝（ValueError → Facade 翻译 INVALID_PARAMS）。
-    """
-    points: list[_SweepPlanPoint] = []
-    for orbit_type in request.orbit_types:
-        selection = orbit_type.upper()
-        try:
-            CatalogSweepRequest.supported_grid_dimensions(selection)
-        except ValueError as exc:
-            raise ValueError(f"catalog_sweep 不支持的 orbit_type: {orbit_type!r}") from exc
-        allowed = _FAMILY_LIBRATION_POINT_RANGES[selection]
-        libration_points = request.libration_points or [_FAMILY_DEFAULT_LIBRATION_POINT[selection]]
-        for libration_point in libration_points:
-            if libration_point not in allowed:
-                raise ValueError(
-                    f"{selection} libration_point 必须为 {sorted(allowed)}，"
-                    f"当前 {libration_point!r}"
-                )
-        mode = _sweep_grid_mode(request, selection)
-        for libration_point in libration_points:
-            if mode == "jacobi":
-                for window in request.jacobi_windows or ():
-                    points.append(
-                        _SweepPlanPoint(
-                            family_request=FamilyGenerationRequest(
-                                orbit_type=selection,
-                                libration_point=libration_point,
-                                n_orbits=request.n_orbits,
-                            ),
-                            libration_point=libration_point,
-                            jacobi_window=(float(window[0]), float(window[1])),
-                        )
-                    )
-                continue
-            if mode == "lissajous":
-                for amplitude_in in request.amplitude_ins_km or ():
-                    for amplitude_out in request.amplitude_outs_km or ():
-                        points.append(
-                            _SweepPlanPoint(
-                                family_request=FamilyGenerationRequest(
-                                    orbit_type=selection,
-                                    libration_point=libration_point,
-                                    n_orbits=request.n_orbits,
-                                    amplitude_in_km=amplitude_in,
-                                    amplitude_out_km=amplitude_out,
-                                ),
-                                libration_point=libration_point,
-                                amplitudes_km=(float(amplitude_in), float(amplitude_out)),
-                            )
-                        )
-                continue
-            grid = (
-                request.perilune_heights_max_km
-                if selection == "NRHO"
-                else request.max_amplitudes_km
-            )
-            grid_name = "perilune_heights_max_km" if selection == "NRHO" else "max_amplitudes_km"
-            if not grid:
-                raise ValueError(f"{selection} 扫描需要 {grid_name} 网格")
-            field_name = _SWEEP_GRID_FIELD[selection]
-            for value in grid:
-                overrides: dict[str, Any] = {field_name: value}
-                points.append(
-                    _SweepPlanPoint(
-                        family_request=FamilyGenerationRequest(
-                            orbit_type=selection,
-                            libration_point=libration_point,
-                            n_orbits=request.n_orbits,
-                            **overrides,
-                        ),
-                        libration_point=libration_point,
-                        parameter_km=float(value),
-                    )
-                )
-    return points
-
-
-def _family_entry_kwargs(request: FamilyGenerationRequest) -> dict[str, Any]:
-    """族请求模型 → 算法层族生成入口的关键字参数。"""
-    selection = request.orbit_type.upper()
-    if selection == "HALO":
-        return {"max_amplitude_km": request.max_amplitude_km}
-    if selection == "NRHO":
-        return {
-            "north_south": request.north_south,
-            "perilune_height_max_km": request.perilune_height_max_km,
-            "continuation_direction": request.continuation_direction,
-        }
-    if selection == "AXIAL":
-        return {
-            "max_amplitude_km": request.max_amplitude_km,
-            "continuation_direction": request.continuation_direction,
-        }
-    if selection == "LISSAJOUS":
-        return {
-            "amplitude_in_km": request.amplitude_in_km,
-            "amplitude_out_km": request.amplitude_out_km,
-            "phase_in": request.phase_in,
-            "phase_out": request.phase_out,
-        }
-    return {
-        "min_amplitude_km": request.min_amplitude_km,
-        "max_amplitude_km": request.max_amplitude_km,
-        "continuation_direction": request.continuation_direction,
-        "match_tolerance_km": request.match_tolerance_km,
-    }
-
-
 class Facade:
-    """e2m2e 唯一公开入口。
+    """任务级入口与暴露类组合根（ADR 0043 决策 1）。
 
-    ``Facade(config=Config(...))`` 构造注入配置（ADR 0014）。方法对应任务级
-    能力，一档任务（稳定骨架，会增）：orbit_design / orbit_control /
-    transfer_design / orbit_propagation / spacetime_transform。二档子任务
-    （会增）标 ``mcp_exposed=True``，三档辅助标 ``False``。
+    ``Facade(config=Config(...))`` 构造注入配置（ADR 0014），只承载五个
+    任务级方法；轨道库与分区分析分别经 ``self.catalog`` /
+    ``self.spatiography`` 暴露（决策 2/3），工具清单经 ``exposed_apis``
+    跨类扫描（决策 5）。
     """
 
     def __init__(self, config: Config | None = None) -> None:
@@ -693,7 +296,13 @@ class Facade:
             config: 运行配置（api/config.py Config），缺省从环境变量读。
         """
         self._config = config or Config()
-        self._catalog_store: CatalogStore | None = None
+        # 懒导入避免 facade ↔ catalog/spatiography 模块级循环
+        # （两类从本模块取 mcp_exposed 与共享翻译小件）。
+        from .catalog import Catalog
+        from .spatiography import Spatiography
+
+        self.catalog = Catalog(self._config)
+        self.spatiography = Spatiography()
 
     @property
     def config(self) -> Config:
@@ -705,66 +314,10 @@ class Facade:
         """
         return self._config
 
-    # ---- 轨道库 catalog 私有设施（ADR 0031）----
-
-    def _open_catalog(self) -> CatalogStore:
-        """懒打开库目录（首次使用时才产生目录副作用）。
-
-        首次打开时做基线首用导入（ADR 0036 决策 5）：用户库缺基线记录
-        或版本不一致时从包内复制并重建索引；``catalog_baseline_import``
-        可关闭。
-        """
-        if self._catalog_store is None:
-            self._catalog_store = CatalogStore(self._config.catalog_dir)
-            if self._config.catalog_baseline_import:
-                try:
-                    import_baseline(self._catalog_store)
-                except Exception as exc:
-                    raise _catalog_write_failed(exc) from exc
-        return self._catalog_store
-
-    def _auto_catalog(
-        self, builder: Callable[[], tuple[dict, dict[str, np.ndarray]] | None]
-    ) -> str | None:
-        """产物自动入库（ADR 0031 决策 8）。
-
-        无产物（族零成员、站保星历缺失）返回 None；入库失败抛
-        ``CATALOG_WRITE_FAILED``，不静默降级、不冒名为计算失败（ADR 0020）。
-        """
-        if not self._config.catalog_enabled:
-            return None
-        try:
-            built = builder()
-            if built is None:
-                return None
-            meta, arrays = built
-            return self._open_catalog().put(meta, arrays)
-        except OrbitError:
-            raise
-        except Exception as exc:
-            raise _catalog_write_failed(exc) from exc
-
-    def _load_record_ephemeris(self, record_id: str) -> tuple[dict, EphemerisTable]:
-        """取库中记录的元数据与星历段（control_orbit 的 input_record_id 输入源）。"""
-        try:
-            record = self._open_catalog().get(record_id)
-        except RecordNotFoundError as exc:
-            raise OrbitError(
-                "RECORD_NOT_FOUND",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        try:
-            table = ephemeris_from_arrays(record.arrays)
-        except CatalogError as exc:
-            raise OrbitError(
-                "INVALID_PARAMS",
-                f"记录 {record_id} 无星历段，不能作为站保输入：{exc}",
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        return record.meta, table
+    @property
+    def exposed_apis(self) -> tuple[Any, ...]:
+        """暴露类实例全集（ADR 0043 决策 5；``tool_inventory`` 的扫描根）。"""
+        return (self, self.catalog, self.spatiography)
 
     # ---- 一档任务（mcp_exposed=True）----
 
@@ -793,7 +346,7 @@ class Facade:
         except Exception as exc:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("DESIGN_FAILED", message, status=status, cause=cause) from exc
-        response.record_id = self._auto_catalog(
+        response.record_id = self.catalog.auto_ingest(
             lambda: catalog_ingest.build_design_record(request, result)
         )
         return response
@@ -811,7 +364,9 @@ class Facade:
             source_meta: dict[str, Any] | None = None
             input_ephemeris = request.input_ephemeris
             if request.input_record_id is not None:
-                source_meta, input_ephemeris = self._load_record_ephemeris(request.input_record_id)
+                source_meta, input_ephemeris = self.catalog.load_record_ephemeris(
+                    request.input_record_id
+                )
 
             result = _control(
                 input_ephemeris,
@@ -865,7 +420,7 @@ class Facade:
         except Exception as exc:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("CONTROL_FAILED", message, status=status, cause=cause) from exc
-        response.record_id = self._auto_catalog(
+        response.record_id = self.catalog.auto_ingest(
             lambda: catalog_ingest.build_control_record(request, result, source_meta=source_meta)
         )
         return response
@@ -1010,7 +565,7 @@ class Facade:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("TRANSFER_FAILED", message, status=status, cause=cause) from exc
         _emit_progress(progress_callback, 1.0, "转移设计完成")
-        response.record_id = self._auto_catalog(
+        response.record_id = self.catalog.auto_ingest(
             lambda: catalog_ingest.build_transfer_record(request, result)
         )
         return response
@@ -1124,885 +679,9 @@ class Facade:
             status, cause, message = _exception_triplet(exc)
             raise OrbitError("TRANSFORM_FAILED", message, status=status, cause=cause) from exc
 
-    # ---- 二档子任务（mcp_exposed=True）----
 
-    @mcp_exposed(request_model=FamilyGenerationRequest)
-    def orbit_family_generation(
-        self, progress_callback: ProgressCallback | None = None, **params
-    ) -> FamilyGenerationResponse:
-        """Orbit family generation (tier 2). / 轨道族生成（二档）。
-
-        Pydantic 模型校验 → 按 orbit_type 分派到算法层族生成入口 →
-        结构化错误。八族均已实现，成功返回统一容器
-        ``FamilyGenerationResponse``（兼容 ``OrbitFamily`` 读取接口）；
-        Lissajous 是拟周期参数采样，族上显式标注
-        ``periodicity=quasi-periodic``。软失败使用同一响应保留部分族。
-        ``progress_callback(fraction, message)`` 上报阶段级进度（族生成
-        是单次 Rust 调用，仅起止两端；逐成员进度待 Rust 侧通道）。
-        """
-        try:
-            request = FamilyGenerationRequest(**params)
-            _emit_progress(progress_callback, 0.0, f"轨道族生成开始：{request.orbit_type}")
-            sel = request.orbit_type.upper()
-            if sel == "HALO":
-                from e2m2e.algorithm.family import design_halo_family
-
-                result = design_halo_family(
-                    request.libration_point,
-                    request.max_amplitude_km,
-                    n_orbits=request.n_orbits,
-                )
-                response = _family_generation_payload(
-                    result,
-                    requested_members=request.n_orbits,
-                )
-            elif sel == "NRHO":
-                from e2m2e.algorithm.family import design_nrho_family
-
-                assert request.north_south is not None
-                assert request.perilune_height_max_km is not None
-                assert request.continuation_direction is not None
-                result = design_nrho_family(
-                    request.libration_point,
-                    request.north_south,
-                    request.perilune_height_max_km,
-                    n_orbits=request.n_orbits,
-                    continuation_direction=request.continuation_direction,
-                )
-                response = _family_generation_payload(result)
-            elif sel == "AXIAL":
-                from e2m2e.algorithm.family import design_axial_family
-
-                assert request.max_amplitude_km is not None
-                assert request.continuation_direction is not None
-                result = design_axial_family(
-                    request.libration_point,
-                    request.max_amplitude_km,
-                    n_orbits=request.n_orbits,
-                    continuation_direction=request.continuation_direction,
-                )
-                response = _family_generation_payload(result)
-            elif sel == "LISSAJOUS":
-                from e2m2e.algorithm.family import design_lissajous_family
-
-                assert request.amplitude_in_km is not None
-                assert request.amplitude_out_km is not None
-                assert request.phase_in is not None
-                assert request.phase_out is not None
-                assert request.sampling_mode is not None
-                result = design_lissajous_family(
-                    request.libration_point,
-                    request.amplitude_in_km,
-                    request.amplitude_out_km,
-                    request.phase_in,
-                    request.phase_out,
-                    n_orbits=request.n_orbits,
-                    sampling_mode=request.sampling_mode,
-                )
-                response = _family_generation_payload(result)
-            elif sel == "DRO":
-                from e2m2e.algorithm.family import design_dro_family
-
-                assert request.min_amplitude_km is not None
-                assert request.max_amplitude_km is not None
-                result = design_dro_family(
-                    request.min_amplitude_km,
-                    request.max_amplitude_km,
-                    n_orbits=request.n_orbits,
-                )
-                response = _family_generation_payload(result)
-            else:
-                from e2m2e.algorithm.family import (
-                    design_horseshoe_family,
-                    design_lpo_family,
-                    design_spo_family,
-                )
-
-                triangular_entry = {
-                    "SPO": design_spo_family,
-                    "LPO": design_lpo_family,
-                    "HORSESHOE": design_horseshoe_family,
-                }[sel]
-                assert request.min_amplitude_km is not None
-                assert request.max_amplitude_km is not None
-                assert request.continuation_direction is not None
-                assert request.match_tolerance_km is not None
-                result = triangular_entry(
-                    request.libration_point,
-                    request.min_amplitude_km,
-                    request.max_amplitude_km,
-                    n_orbits=request.n_orbits,
-                    continuation_direction=request.continuation_direction,
-                    match_tolerance_km=request.match_tolerance_km,
-                )
-                response = _family_generation_payload(result)
-        except OrbitError:
-            raise
-        except (ValueError, TypeError) as exc:
-            raise OrbitError(
-                "INVALID_PARAMS",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
-            raise OrbitError(
-                "FAMILY_GENERATION_FAILED", message, status=status, cause=cause
-            ) from exc
-        _emit_progress(progress_callback, 1.0, "轨道族生成完成")
-        response.record_id = self._auto_catalog(
-            lambda: catalog_ingest.build_family_record(
-                request,
-                family=response,
-                status=response.status,
-                cause=response.cause,
-                message=response.message,
-                requested_members=response.requested_members,
-                generated_members=response.generated_members,
-            )
-        )
-        return response
-
-    @mcp_exposed(status="placeholder")
-    def orbit_stability(self, **params) -> Any:
-        """稳定性分析（二档）：薄封装 algorithm/stability。
-
-        需要带 period/system 绑定的 Orbit 对象入参，无法经 JSON 信封表达
-        （空参 schema 注册后 Agent 必然调用失败），故不注册 MCP 工具；
-        待记录引用式入参（如 input_record_id）落地后放开。
-        """
-        from e2m2e.algorithm.stability import StabilityAnalysis
-
-        orbit = params.get("orbit")
-        dynamics = params.get("dynamics")
-        if orbit is None:
-            raise OrbitError("INVALID_PARAMS", "orbit 参数必填")
-        return StabilityAnalysis(orbit=orbit, dynamics=dynamics).analyze()
-
-    @mcp_exposed(status="placeholder")
-    def transfer_search(self, **params) -> Any:
-        """转移网格搜索（二档）。
-
-        实现状态：占位。
-        """
-        raise NotImplementedError("Facade.transfer_search 待接入 algorithm/transfer/")
-
-    @mcp_exposed(status="placeholder")
-    def low_thrust_design(self, **params) -> Any:
-        """小推力转移设计（二档）。
-
-        实现状态：占位。
-        """
-        raise NotImplementedError("Facade.low_thrust_design 待接入 algorithm/transfer/")
-
-    @mcp_exposed(status="placeholder")
-    def manifold_analysis(self, **params) -> Any:
-        """不变流形分析（二档）。
-
-        实现状态：占位。
-        """
-        raise NotImplementedError("Facade.manifold_analysis 待接入 algorithm/manifold/")
-
-    @mcp_exposed(status="placeholder")
-    def low_energy_transfer(self, **params) -> Any:
-        """低能转移（二档）。
-
-        实现状态：占位。
-        """
-        raise NotImplementedError("Facade.low_energy_transfer 待接入 algorithm/transfer/")
-
-    @mcp_exposed(status="placeholder")
-    def relative_motion(self, **params) -> Any:
-        """相对运动（二档）。
-
-        实现状态：占位。待接入 algorithm/proximity 的 RelativeDynamics。
-        chief/deputy 参数需映射为 TargetOrbit + dynamics 对象后接入。
-        """
-        raise NotImplementedError("Facade.relative_motion 待接入 algorithm/proximity/")
-
-    # ---- 轨道库 catalog（ADR 0031，mcp_exposed=True）----
-
-    @mcp_exposed(request_model=CatalogQueryRequest)
-    def catalog_query(self, **params) -> CatalogQueryResponse:
-        """Multi-dimensional catalog query returning record summaries..
-
-        多维过滤查询，返回摘要列表（不含数组段与请求快照）。"""
-        try:
-            request = CatalogQueryRequest(**params)
-        except (ValueError, TypeError) as exc:
-            raise OrbitError(
-                "INVALID_PARAMS",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        try:
-            summaries = self._open_catalog().query(_to_catalog_filter(request))
-        except CatalogError as exc:
-            raise _catalog_read_failed(exc) from exc
-        records = [_summary_from_index(summary) for summary in summaries]
-        return CatalogQueryResponse(
-            status=ConvergenceState.CONVERGED,
-            cause=FailureCause.NONE,
-            message=f"查询完成：{len(records)} 条记录",
-            records=records,
-        )
-
-    @mcp_exposed(request_model=CatalogGetRequest)
-    def catalog_get(self, **params) -> CatalogRecordResponse:
-        """Fetch a full record by ``record_id``..
-
-        按 record_id 取完整记录（含数组段）；不存在抛 ``RECORD_NOT_FOUND``。"""
-        try:
-            request = CatalogGetRequest(**params)
-        except (ValueError, TypeError) as exc:
-            raise OrbitError(
-                "INVALID_PARAMS",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        record = self._get_record(request.record_id)
-        return _record_to_response(record)
-
-    @mcp_exposed(request_model=CatalogDeleteRequest)
-    def catalog_delete(self, **params) -> CatalogDeleteResponse:
-        """Delete a record by ``record_id`` — irreversible..
-
-        按 record_id 删除记录（文件与索引条目）；删除不可撤销。"""
-        try:
-            request = CatalogDeleteRequest(**params)
-            self._open_catalog().delete(request.record_id)
-        except RecordNotFoundError as exc:
-            raise _record_not_found(exc) from exc
-        except (CatalogError, OSError) as exc:
-            raise _catalog_write_failed(exc) from exc
-        except (ValueError, TypeError) as exc:
-            raise OrbitError(
-                "INVALID_PARAMS",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        return CatalogDeleteResponse(
-            status=ConvergenceState.CONVERGED,
-            cause=FailureCause.NONE,
-            message=f"记录已删除：{request.record_id}",
-            record_id=request.record_id,
-            deleted=True,
-        )
-
-    @mcp_exposed(request_model=CatalogTagRequest)
-    def catalog_tag(self, **params) -> CatalogTagResponse:
-        """Write teaching annotations to the JSON record..
-
-        写教学标注入 JSON 记录（随文件走）；tags 整体替换，note=None 保留。"""
-        try:
-            request = CatalogTagRequest(**params)
-            meta = self._open_catalog().tag(request.record_id, request.tags, request.note)
-        except RecordNotFoundError as exc:
-            raise _record_not_found(exc) from exc
-        except (CatalogError, OSError) as exc:
-            raise _catalog_write_failed(exc) from exc
-        except (ValueError, TypeError) as exc:
-            raise OrbitError(
-                "INVALID_PARAMS",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        return CatalogTagResponse(
-            status=ConvergenceState.CONVERGED,
-            cause=FailureCause.NONE,
-            message=f"标注已写入：{request.record_id}",
-            record=_summary_from_meta(meta),
-        )
-
-    @mcp_exposed(request_model=CatalogPromoteRequest)
-    def catalog_promote(self, **params) -> CatalogPromoteResponse:
-        """Lift a family member into a standalone record..
-
-        把族成员提升为独立记录（source_record_id 指向所属族）。"""
-        try:
-            request = CatalogPromoteRequest(**params)
-            record = self._open_catalog().promote_member(request.record_id, request.member_index)
-        except RecordNotFoundError as exc:
-            raise _record_not_found(exc) from exc
-        except (CatalogError, OSError) as exc:
-            raise _catalog_write_failed(exc) from exc
-        except (ValueError, TypeError) as exc:
-            raise OrbitError(
-                "INVALID_PARAMS",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        return CatalogPromoteResponse(
-            status=ConvergenceState.CONVERGED,
-            cause=FailureCause.NONE,
-            message=f"成员 {request.member_index} 已提升为独立记录",
-            record=_record_to_response(record),
-        )
-
-    @mcp_exposed(request_model=CatalogExportRequest)
-    def catalog_export(self, **params) -> CatalogExportResponse:
-        """Package the query result subset for distribution..
-
-        把查询子集打包导出（标注随包）；包可直接作为库打开。"""
-        try:
-            request = CatalogExportRequest(**params)
-        except (ValueError, TypeError) as exc:
-            raise OrbitError(
-                "INVALID_PARAMS",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        try:
-            record_ids = self._open_catalog().export(_to_catalog_filter(request), request.dest)
-        except (CatalogError, OSError) as exc:
-            raise _catalog_write_failed(exc) from exc
-        return CatalogExportResponse(
-            status=ConvergenceState.CONVERGED,
-            cause=FailureCause.NONE,
-            message=f"导出完成：{len(record_ids)} 条记录 → {request.dest}",
-            dest=request.dest,
-            record_ids=record_ids,
-            exported_count=len(record_ids),
-        )
-
-    @mcp_exposed(request_model=CatalogSweepRequest)
-    def catalog_sweep(self, **params) -> CatalogSweepResponse:
-        """Parameter-space sweep batch-generating into the catalog.
-
-        参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
-
-            网格 = 族 × 平动点 × 主参数维度（一维振幅/近月点高度、能量窗口、
-            LISSAJOUS 二维振幅，三选一）；部分参数点失败时已产出的记录
-            保留，失败原因逐点可查（ADR 0020 软失败语义）。
-        """
-        try:
-            request = CatalogSweepRequest(**params)
-            points = _expand_sweep_points(request)
-        except (ValueError, TypeError) as exc:
-            raise OrbitError(
-                "INVALID_PARAMS",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.INVALID_INPUT,
-            ) from exc
-        from e2m2e.algorithm.catalog_sweep import FamilySweepPoint, run_family_sweep
-
-        sweep_points = [
-            FamilySweepPoint(
-                orbit_type=plan.family_request.orbit_type.upper(),
-                libration_point=plan.libration_point,
-                n_orbits=plan.family_request.n_orbits,
-                kwargs=_family_entry_kwargs(plan.family_request),
-                jacobi_window=plan.jacobi_window,
-            )
-            for plan in points
-        ]
-        raw_outcomes = run_family_sweep(sweep_points)
-
-        outcomes: list[CatalogSweepPointOutcome] = []
-        record_ids: list[str] = []
-        failed = 0
-        for plan, outcome in zip(points, raw_outcomes, strict=True):
-            record_id = self._ingest_sweep_outcome(outcome, plan.family_request)
-            if record_id is not None:
-                record_ids.append(record_id)
-            if outcome.result is None:
-                failed += 1
-            outcomes.append(
-                CatalogSweepPointOutcome(
-                    orbit_type=plan.family_request.orbit_type.upper(),
-                    libration_point=plan.libration_point,
-                    parameter_km=plan.parameter_km,
-                    jacobi_window=(
-                        [plan.jacobi_window[0], plan.jacobi_window[1]]
-                        if plan.jacobi_window is not None
-                        else None
-                    ),
-                    amplitudes_km=(
-                        [plan.amplitudes_km[0], plan.amplitudes_km[1]]
-                        if plan.amplitudes_km is not None
-                        else None
-                    ),
-                    status=outcome.status,
-                    cause=outcome.cause,
-                    message=outcome.message,
-                    record_id=record_id,
-                    generated_members=(
-                        outcome.result.generated_members if outcome.result is not None else 0
-                    ),
-                )
-            )
-        succeeded = len(record_ids)
-        soft_empty = len(points) - succeeded - failed
-        message = f"扫描完成：{succeeded} 条记录入库，{failed} 点失败，共 {len(points)} 点"
-        if soft_empty:
-            message += f"（{soft_empty} 点软失败无成员产出）"
-        return CatalogSweepResponse(
-            status=ConvergenceState.CONVERGED,
-            cause=FailureCause.NONE,
-            message=message,
-            points=outcomes,
-            record_ids=record_ids,
-            succeeded=succeeded,
-            failed=failed,
-        )
-
-    def _ingest_sweep_outcome(self, outcome: Any, family_request: Any) -> str | None:
-        """扫描单点结果入库；硬失败点（result=None）无记录。"""
-        result = outcome.result
-        if result is None:
-            return None
-        return self._auto_catalog(
-            lambda: catalog_ingest.build_family_record(
-                family_request,
-                family=result.family,
-                status=outcome.status,
-                cause=outcome.cause,
-                message=outcome.message,
-                requested_members=result.requested_members,
-                generated_members=result.generated_members,
-            )
-        )
-
-    def _get_record(self, record_id: str) -> Any:
-        """取完整记录；不存在抛 ``RECORD_NOT_FOUND``，记录损坏抛 ``CATALOG_READ_FAILED``。"""
-        try:
-            return self._open_catalog().get(record_id)
-        except RecordNotFoundError as exc:
-            raise _record_not_found(exc) from exc
-        except CatalogError as exc:
-            raise OrbitError(
-                "CATALOG_READ_FAILED",
-                str(exc),
-                status=ConvergenceState.FAILED,
-                cause=FailureCause.BACKEND_FAILURE,
-            ) from exc
-
-    @mcp_exposed(request_model=SpatiographyScalesRequest)
-    def spatiography_scales(self, **params) -> SpatiographyScalesResponse:
-        """分区解析尺度计算（spatiography，二档）。/ Spatiography analytic scales (tier 2).
-
-        计算地月空间分区（Rosengren et al. 2026 Primer §5）的全部闭式边界
-        尺度：Laplace 半径（地心/月心）、影响球族（Hill / Laplace-Tisserand /
-        Chebotarev / Battin）、tidal parity、共振梯（Table 1/2）、平动点精确
-        解与 Jacobi 临界值。Primer 常数口径（SPICE GM + Simon 1994 月根数）。
-        """
-        try:
-            request = SpatiographyScalesRequest(**params)
-            from e2m2e.algorithm import spatiography as sp
-
-            c = sp.PRIMER_DEFAULTS
-            system = sp.primer_cr3bp_system(c)
-            system.compute_libration_points()
-            import math
-
-            scales: dict[str, float] = {
-                "laplace_radius_geolunar_km": sp.laplace_radius_geolunar(c),
-                "laplace_radius_selenocentric_km": sp.laplace_radius_selenocentric(c),
-                "hill_radius_moon_km": sp.hill_radius_moon(c),
-                "hill_radius_earth_km": sp.hill_radius_earth(c),
-                "soi_laplace_moon_km": sp.soi_laplace_moon(c),
-                "soi_chebotarev_moon_km": sp.chebotarev_radius_moon(c),
-                "battin_moon_anti_earthward_km": sp.battin_soi_moon(0.0, c),
-                "battin_moon_earthward_km": sp.battin_soi_moon(math.pi, c),
-                "soi_laplace_earth_km": sp.soi_laplace_earth(c),
-                "soi_chebotarev_earth_km": sp.chebotarev_radius_earth(c),
-                "tidal_parity_radius_km": sp.tidal_parity_radius(c),
-                "geo_radius_km": sp.geo_radius_km(c),
-                "moon_period_days": c.moon_period_days,
-            }
-            unknown = set(request.elements) - set(scales)
-            if unknown:
-                raise ValueError(f"未知的尺度名：{sorted(unknown)}")
-            if request.elements:
-                scales = {k: v for k, v in scales.items() if k in set(request.elements)}
-            for key in (
-                "laplace_radius_geolunar_km",
-                "tidal_parity_radius_km",
-                "hill_radius_earth_km",
-                "soi_laplace_earth_km",
-            ):
-                if key in scales:
-                    scales[key.replace("_km", "_over_a_moon")] = scales[key] / c.moon_a_km
-
-            libration_points_km = {
-                name: (getattr(system, name) * c.moon_a_km).tolist()
-                for name in ("L1", "L2", "L3", "L4", "L5")
-            }
-            ladder = sp.resonance_centers("all", c)
-            return SpatiographyScalesResponse(
-                status=ConvergenceState.CONVERGED,
-                cause=FailureCause.NONE,
-                message="ok",
-                scales=scales,
-                libration_points_km=libration_points_km,
-                jacobi_criticals=sp.jacobi_critical_values(system, c),
-                resonance_ladder=[dataclasses.asdict(center) for center in ladder],
-                constants_used=dataclasses.asdict(c),
-                citation=sp.PRIMER_CITATION,
-                details={"moon_a_km": c.moon_a_km},
-            )
-        except OrbitError:
-            raise
-        except (ValueError, TypeError) as exc:
-            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
-        except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
-            raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
-
-    @mcp_exposed(request_model=SpatiographyClassifyRequest)
-    def spatiography_classify(self, **params) -> SpatiographyClassifyResponse:
-        """分区区域分类（spatiography，二档）。/ Spatiography region classification (tier 2).
-
-        对会合系状态逐点判定五省分区（terrestrial / cislunar 内带 / cislunar
-        外带 / circumlunar / translunar / heliocentric，论文 Table 1 或附录 B
-        Table 4 口径），重叠带返回多标签；附 osculating a、Jacobi 值与 Hill
-        五拓扑 Case 诊断。
-        """
-        try:
-            request = SpatiographyClassifyRequest(**params)
-            from e2m2e.algorithm import spatiography as sp
-
-            system = sp.primer_cr3bp_system()
-            zone_ids: list[list[int]] = []
-            diagnostics: list[dict[str, Any]] = []
-            for state in request.states:
-                diag = sp.classify_state(
-                    state,
-                    frame=request.frame,
-                    reference=request.reference,
-                    include_overlaps=request.include_overlaps,
-                    system=system,
-                )
-                zone_ids.append(list(diag.zone_ids))
-                diagnostics.append(_serialize_value(dataclasses.asdict(diag)))
-            return SpatiographyClassifyResponse(
-                status=ConvergenceState.CONVERGED,
-                cause=FailureCause.NONE,
-                message="ok",
-                zone_ids=zone_ids,
-                legend={str(k): v for k, v in sp.REGION_LEGEND.items()},
-                diagnostics=diagnostics,
-                details={"n_states": len(request.states), "reference": request.reference},
-            )
-        except OrbitError:
-            raise
-        except (ValueError, TypeError) as exc:
-            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
-        except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
-            raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
-
-    @mcp_exposed(request_model=SpatiographyBoundariesRequest)
-    def spatiography_boundaries(self, **params) -> SpatiographyBoundariesResponse:
-        """分区边界几何（spatiography，二档）。/ Spatiography boundary geometry (tier 2).
-
-        输出可视化用边界几何数据：会合系（质心原点，z=0）的 r_L / tidal
-        parity / 双系 Hill 与 SOI 圆族、Battin 非对称闭合曲线、L1–L5，或
-        (a,e) 根数平面走廊曲线族。前端只做单位归一与绘制，不在界面重算。
-        """
-        try:
-            request = SpatiographyBoundariesRequest(**params)
-            from e2m2e.algorithm import spatiography as sp
-
-            state_frame: Literal["synodic_barycentric_km", "element_space_ae"]
-            if request.kind == "synodic_planar":
-                result = sp.synodic_planar_elements(
-                    resolution=request.resolution, boundary_set=request.boundary_set
-                )
-                state_frame = "synodic_barycentric_km"
-            else:
-                result = sp.ae_curves(
-                    n_points=request.resolution, boundary_set=request.boundary_set
-                )
-                state_frame = "element_space_ae"
-            elements = [_serialize_value(dataclasses.asdict(e)) for e in result.elements]
-            return SpatiographyBoundariesResponse(
-                status=ConvergenceState.CONVERGED,
-                cause=FailureCause.NONE,
-                message="ok",
-                elements=elements,
-                state_frame=state_frame,
-                details={"count": len(elements), "kind": request.kind},
-            )
-        except OrbitError:
-            raise
-        except (ValueError, TypeError) as exc:
-            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
-        except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
-            raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
-
-    @mcp_exposed(request_model=SpatiographyAtlasRequest)
-    def spatiography_resonance_atlas(self, **params) -> SpatiographyAtlasResponse:
-        """共振图集（spatiography，二档）。/ Resonance atlas (tier 2).
-
-        Primer §4.2–§4.4 / §5.3 的共振与长期解析骨架：Gallardo 半解析
-        共振半宽包络（式 100–104，计算设置对齐 Fig. 8：共面切片、
-        Simon 1994 月根数、2ρ_H 近遇截断）、拱线驻定 loci（式 75–78）、
-        vZLK 相图与时间尺度（式 64–71）。1:1 共振带宽系统性高估
-        （论文 §5.3 声明），不得当 gateway 边界用。
-        """
-        try:
-            request = SpatiographyAtlasRequest(**params)
-            from e2m2e.algorithm import spatiography as sp
-
-            products = set(request.products)
-            unknown = products - {"gallardo_widths", "secular_loci", "vzlk_portrait"}
-            if unknown:
-                raise ValueError(f"未知产品名：{sorted(unknown)}")
-            if request.e_max <= request.e_min:
-                raise ValueError("e_max 必须大于 e_min")
-            elements: list[dict[str, Any]] = []
-
-            if "gallardo_widths" in products:
-                pairs = (
-                    None
-                    if request.resonance_pairs is None
-                    else [(int(p[0]), int(p[1])) for p in request.resonance_pairs]
-                )
-                e_grid = [
-                    request.e_min + (request.e_max - request.e_min) * i / (request.n_e - 1)
-                    for i in range(request.n_e)
-                ]
-                result = sp.gallardo_width_envelopes(
-                    pairs=pairs,
-                    e_grid=e_grid,
-                    varpi_offset_deg=request.varpi_offset_deg,
-                    n_sigma=request.n_sigma,
-                    n_lambda=request.n_lambda,
-                )
-                caveat = (
-                    "Gallardo 半解析包络（式 100–104），共面切片 + 2ρ_H 近遇截断；"
-                    "crossing diagnostic 而非物理边界。1:1 带系统性高估（论文 §5.3）"
-                )
-                for env in result.envelopes:
-                    note_extra = "；1:1 高估 caveat 适用" if env.k == env.k_body else ""
-                    elements.append(
-                        {
-                            "kind": "envelope_ae",
-                            "label": f"{env.label} lower",
-                            "formula_id": "Eq.100-104",
-                            "points": _serialize_value(
-                                np.stack([env.lower_a_km, env.eccentricities], axis=1)
-                            ),
-                            "note": caveat + note_extra,
-                        }
-                    )
-                    elements.append(
-                        {
-                            "kind": "envelope_ae",
-                            "label": f"{env.label} upper",
-                            "formula_id": "Eq.100-104",
-                            "points": _serialize_value(
-                                np.stack([env.upper_a_km, env.eccentricities], axis=1)
-                            ),
-                            "note": caveat + note_extra,
-                        }
-                    )
-                    elements.append(
-                        {
-                            "kind": "vertical_ae",
-                            "label": env.label,
-                            "formula_id": "Eq.87",
-                            "a_km": env.a_center_km,
-                            "note": f"名义中心（式 87）；k={env.k}, k_body={env.k_body}",
-                        }
-                    )
-
-            if "secular_loci" in products:
-                c = sp.PRIMER_DEFAULTS
-                grid = np.linspace(
-                    request.a_over_a_moon_min * c.moon_a_km,
-                    request.a_over_a_moon_max * c.moon_a_km,
-                    request.n_locus,
-                )
-                curves = sp.secular_loci_curves(
-                    a_grid_km=grid,
-                    e_slices=request.locus_e_slices,
-                    branches=("cislunar", "translunar"),
-                )
-                for curve in curves:
-                    elements.append(
-                        {
-                            "kind": "locus_ai",
-                            "label": f"apsidal-stationary {curve.branch} e={curve.eccentricity:g}",
-                            "formula_id": curve.formula_id,
-                            "points": _serialize_value(
-                                np.stack([curve.a_km, np.degrees(curve.inclination_rad)], axis=1)
-                            ),
-                            "note": "最低阶 spatiographic 骨架（式 75–78），非月距附近"
-                            "精确局部共振位置",
-                        }
-                    )
-
-            vzlk_scalars: dict[str, float] = {}
-            if "vzlk_portrait" in products:
-                portrait = sp.vzlk_phase_portrait(request.vzlk_c1)
-                for level, pts in portrait.curves:
-                    elements.append(
-                        {
-                            "kind": "portrait_curve",
-                            "label": f"c2={level:g}",
-                            "formula_id": "Eq.68",
-                            "c2": float(level),
-                            "points": _serialize_value(pts),
-                            "note": "vZLK 相图 c2 等值线（式 65–68）；c1 < 0.6 时 c2=0 为分离线",
-                        }
-                    )
-                c = sp.PRIMER_DEFAULTS
-                vzlk_scalars = {
-                    "critical_inclination_deg": sp.VZLK_CRITICAL_INCLINATION_DEG,
-                    "critical_inclination_retro_deg": 180.0 - sp.VZLK_CRITICAL_INCLINATION_DEG,
-                    "c1": request.vzlk_c1,
-                    "e_max_separatrix": (
-                        float("nan") if not portrait.has_separatrix else portrait.e_max
-                    ),
-                    "nu_vzlk_rad_s_at_a_moon": sp.vzlk_frequency_rad_s(c.moon_a_km),
-                    "t_vzlk_days_at_a_moon": sp.vzlk_timescale_days(c.moon_a_km),
-                    "tidal_sum_inv_s2": sp.vzlk_tidal_sum(c),
-                }
-                validity = sp.vzlk_validity(c.moon_a_km)
-                vzlk_scalars.update(
-                    {
-                        "validity_j2_suppressed_at_a_moon": float(validity.j2_suppressed),
-                        "validity_double_averaging_warning_at_a_moon": float(
-                            validity.double_averaging_warning
-                        ),
-                    }
-                )
-
-            return SpatiographyAtlasResponse(
-                status=ConvergenceState.CONVERGED,
-                cause=FailureCause.NONE,
-                message="ok",
-                elements=elements,
-                state_frames={
-                    "envelope_ae": "element_space_ae",
-                    "vertical_ae": "element_space_ae",
-                    "locus_ai": "element_space_ai",
-                    "portrait_curve": "vzlk_phase_plane",
-                },
-                vzlk=vzlk_scalars,
-                details={
-                    "count": len(elements),
-                    "products": sorted(products),
-                    "varpi_offset_deg": request.varpi_offset_deg,
-                },
-            )
-        except OrbitError:
-            raise
-        except (ValueError, TypeError) as exc:
-            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
-        except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
-            raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
-
-    @mcp_exposed(request_model=SpatiographyMapRequest)
-    def spatiography_dynamical_map(self, **params) -> SpatiographyMapResponse:
-        """六域两层天图（spatiography，二档）。/ Spatiographic dynamical map (tier 2).
-
-        Primer §7.3 (a, e) 天图管线：Table 4 六制图域网格 × 命名场景
-        （2027-08-02 日全食历元统一初值切片），逐格传播 EM/EMS 点质量
-        模型，输出 MEGNO Ȳ 场与八类命运场 + 诊断量。大数组建议走
-        sidecar 二进制帧（E2M2 帧，ADR 0035）。
-        """
-        try:
-            request = SpatiographyMapRequest(**params)
-            from e2m2e.algorithm.spatiography import cartography as cart
-            from e2m2e.algorithm.spatiography.fate import FATE_CLASSES, FateThresholds
-
-            result = cart.dynamical_map(
-                request.zone,
-                model=request.model,
-                n_a=request.n_a,
-                n_e=request.n_e,
-                e_min=request.e_min,
-                e_max=request.e_max,
-                span_years=request.span_years,
-                thresholds=FateThresholds(
-                    ybar_ordered_band=request.ybar_ordered_band,
-                    ybar_chaotic_excess=request.ybar_chaotic_excess,
-                ),
-                rtol=request.rtol,
-                max_step_hours=request.max_step_hours,
-                stop_on_terminal=request.stop_on_terminal,
-            )
-
-            def _field(array):
-                return [[None if not np.isfinite(v) else float(v) for v in row] for row in array]
-
-            c = cart.PRIMER_DEFAULTS
-            from e2m2e.algorithm.spatiography import regions as sp_regions
-            from e2m2e.algorithm.spatiography import scales as sp_scales
-
-            system = sp_regions.primer_cr3bp_system(c)
-            system.compute_libration_points()
-            crit = sp_regions.jacobi_critical_values(system, c)
-            t_moon = sp_scales.tisserand_parameter(c.moon_a_km, 0.0, 0.0, c)
-            return SpatiographyMapResponse(
-                status=result.status,
-                cause=result.cause,
-                message=result.message,
-                zone=result.zone,
-                model=result.model,
-                span_years=result.span_years,
-                a_over_a_moon=[float(v) for v in result.a_over_a_moon],
-                e_grid=[float(v) for v in result.e_grid],
-                ybar_field=_field(result.ybar_field),
-                fate_ids=result.fate_ids.astype(int).tolist(),
-                t_escape_years_field=_field(result.t_escape_years_field),
-                min_r_sel_km_field=_field(result.min_r_sel_km_field),
-                min_r_geo_km_field=_field(result.min_r_geo_km_field),
-                fate_legend={str(i): name for i, name in enumerate(FATE_CLASSES)},
-                thresholds={
-                    "ybar_ordered_band": result.thresholds.ybar_ordered_band,
-                    "ybar_chaotic_excess": result.thresholds.ybar_chaotic_excess,
-                },
-                scenario={
-                    "epoch_utc": result.scenario.epoch_utc,
-                    "raan_deg": result.scenario.raan_deg,
-                    "argp_deg": result.scenario.argp_deg,
-                    "mean_anom_deg": result.scenario.mean_anom_deg,
-                    "inclination_is_moon_plane": result.scenario.inclination_is_moon_plane,
-                    "provenance": result.scenario.provenance,
-                },
-                diagnostic_focus=result.diagnostic_focus,
-                details={
-                    "cells": result.cells,
-                    "zone_bands_a_over_a_moon": [
-                        [lo, hi]
-                        for lo, hi in zip(
-                            sp_regions.table4_bands(c).lower,
-                            sp_regions.table4_bands(c).upper,
-                            strict=True,
-                        )
-                    ],
-                    "gateway_tisserand_note": (
-                        f"共面 T☾(a=a☾, e=0) = {t_moon:.3f}，低于第一颈口阈值 "
-                        f"C1 = {crit['C1']:.3f}（精确求根口径）：CG 域为开放"
-                        " gateway 拓扑（论文 §7.3）"
-                    ),
-                },
-            )
-        except OrbitError:
-            raise
-        except (ValueError, TypeError) as exc:
-            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
-        except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
-            raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
-
-
-def mcp_tools(facade: Facade) -> list[str]:
-    """返回对 MCP 暴露的 Facade 方法名（纯派生，ADR 0014）。"""
+def mcp_tools(facade: Any) -> list[str]:
+    """返回单个接口类实例上对 MCP 暴露的方法名（纯派生，ADR 0014）。"""
     names: list[str] = []
     for name in dir(facade):
         if name.startswith("_"):
@@ -2013,17 +692,37 @@ def mcp_tools(facade: Facade) -> list[str]:
     return names
 
 
-def tool_inventory(facade: Facade) -> list[ToolInfo]:
-    """返回对 MCP 暴露的 Facade 工具及其实现元数据。"""
+def tool_inventory(facade: Any) -> list[ToolInfo]:
+    """返回对 MCP 暴露的工具及其元数据（多类扫描，ADR 0043 决策 5）。
+
+    扫描根是暴露类实例全集：组合根（``Facade``）经 ``exposed_apis`` 给出
+    三类；无该属性的单一对象（测试桩、单独构造的领域类）按自身扫描。
+    清单仍单一来源，MCP/CLI/sidecar 消费不变。
+    """
+    apis = getattr(facade, "exposed_apis", None) or (facade,)
     inventory: list[ToolInfo] = []
-    for name in mcp_tools(facade):
-        method = getattr(facade, name)
-        inventory.append(
-            ToolInfo(
-                name=name,
-                mcp_exposed=True,
-                status=method.tool_status,
-                request_model=method.request_model,
+    for api in apis:
+        for name in mcp_tools(api):
+            method = getattr(api, name)
+            inventory.append(
+                ToolInfo(
+                    name=name,
+                    mcp_exposed=True,
+                    status=method.tool_status,
+                    request_model=method.request_model,
+                )
             )
-        )
     return inventory
+
+
+def resolve_tool_method(api_root: Any, name: str) -> Any | None:
+    """工具名 → 属主实例上的绑定方法（扫描根与 ``tool_inventory`` 同规则）。
+
+    跨暴露类解析（ADR 0043 决策 5）的唯一入口：MCP 规格、CLI 子命令派生
+    都经它找方法，不各自再写一份属主搜索。无属主返回 None。
+    """
+    for api in getattr(api_root, "exposed_apis", None) or (api_root,):
+        attr = getattr(api, name, None)
+        if attr is not None and getattr(attr, "mcp_exposed", False):
+            return attr
+    return None

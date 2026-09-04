@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 from .record import CatalogError, CatalogFilter, numeric_or_none
-from .record import member_count as _member_count
 
 __all__ = ["CatalogIndex"]
 
@@ -40,7 +39,8 @@ CREATE TABLE records (
     status TEXT NOT NULL,
     cause TEXT NOT NULL,
     message TEXT NOT NULL,
-    member_count INTEGER NOT NULL,
+    family_id TEXT,
+    member_index INTEGER,
     tags TEXT NOT NULL,
     note TEXT NOT NULL
 )
@@ -71,7 +71,8 @@ _REQUIRED_COLUMNS = frozenset(
         "status",
         "cause",
         "message",
-        "member_count",
+        "family_id",
+        "member_index",
         "tags",
         "note",
     }
@@ -140,8 +141,9 @@ class CatalogIndex:
         classification = meta["classification"]
         jacobi = classification["jacobi"]
         amplitude = classification["amplitude"]
-        member_count = _member_count(meta)
-        # transfer 维度（#574）取自 scalars；数值历元才入区间列
+        # transfer 维度（#574）取自 scalars；数值历元才入区间列。
+        # 族维度（ADR 0045）取自元数据顶层：family_id 等值可过滤，
+        # member_index 随行存供摘要回读（不作过滤维度）。
         scalars = meta.get("scalars", {})
         transfer_type = scalars.get("transfer_type")
         delta_v = numeric_or_none(scalars.get("delta_v_km_s"))
@@ -155,8 +157,8 @@ class CatalogIndex:
                     orbit_family, libration_point, jacobi_min, jacobi_max,
                     amplitude_min, amplitude_max, has_cr3bp, has_ephemeris,
                     taxonomy_labels, transfer_type, delta_v, tli_epoch,
-                    status, cause, message, member_count, tags, note
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    status, cause, message, family_id, member_index, tags, note
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     meta["record_id"],
@@ -178,7 +180,8 @@ class CatalogIndex:
                     meta["status"],
                     meta["cause"],
                     meta["message"],
-                    member_count,
+                    meta.get("family_id"),
+                    meta.get("member_index"),
                     json.dumps(list(meta["tags"]), ensure_ascii=False),
                     meta["note"],
                 ),
@@ -213,6 +216,9 @@ class CatalogIndex:
         if catalog_filter.orbit_family is not None:
             clauses.append("orbit_family = ?")
             params.append(catalog_filter.orbit_family)
+        if catalog_filter.family_id is not None:
+            clauses.append("family_id = ?")
+            params.append(catalog_filter.family_id)
         if catalog_filter.libration_point is not None:
             clauses.append("libration_point = ?")
             params.append(catalog_filter.libration_point)
@@ -292,7 +298,8 @@ class CatalogIndex:
             "status": row["status"],
             "cause": row["cause"],
             "message": row["message"],
-            "member_count": row["member_count"],
+            "family_id": row["family_id"],
+            "member_index": row["member_index"],
             "tags": json.loads(row["tags"]),
             "note": row["note"],
         }

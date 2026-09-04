@@ -94,7 +94,7 @@ def test_ecom_srp_implemented():
 
 
 def test_facade_placeholder():
-    """Facade：已实现方法接入真实编排，未实现方法保持占位。"""
+    """Facade：五个任务方法接入真实编排（占位声明已随类分家移除，ADR 0043）。"""
     from e2m2e.api.facade import Facade
 
     facade = Facade()
@@ -111,17 +111,6 @@ def test_facade_placeholder():
         facade.orbit_propagation()
     with pytest.raises(OrbitError, match="INVALID_PARAMS"):
         facade.spacetime_transform()
-    # 未实现：保持占位
-    with pytest.raises(NotImplementedError, match="transfer_search"):
-        facade.transfer_search()
-    with pytest.raises(NotImplementedError, match="low_thrust_design"):
-        facade.low_thrust_design()
-    with pytest.raises(NotImplementedError, match="manifold_analysis"):
-        facade.manifold_analysis()
-    with pytest.raises(NotImplementedError, match="low_energy_transfer"):
-        facade.low_energy_transfer()
-    with pytest.raises(NotImplementedError, match="relative_motion"):
-        facade.relative_motion()
 
 
 def test_mcp_server_implemented():
