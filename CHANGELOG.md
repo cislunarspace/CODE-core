@@ -4,8 +4,24 @@
 
 ## [Unreleased]
 
+## [5.9.3] - 2026-09-04
+
 ### Added
 - **请求侧条件值域出口 `valid_ranges`**：调用方此前拿不到"设计某个族时各参数能填多少"的机器可读答案，只能试错撞校验报错或自抄一份范围。新增无参工具 `valid_ranges`：一次调用返回 `design_orbit` 的条件区间（17 键，LISSAJOUS 逐平动点拆 L1/L2/L3，L3 包络独立放宽到 100000 km）、族生成的条件区间（16 组，键为 `族_Ln`，含 `libration_point` 允许集；DRO 不带后缀）与族生成离散选项（8 族：延拓方向、采样规则）。区间与校验器同源，不另存副本；逐字段携带单位（如 km，缺省为无量纲或计数值）、开闭语义与区间内排除值（如 HALO 振幅排除 0）。MCP 工具、CLI 子命令 `valid-ranges` 与 Python 的 `Facade().valid_ranges()` 三面同源派生，工具面 18→19。(#620)
+- **术语清单出口 `catalog_terminology`**：分类学标签图例（42 个，含类别、族、平动点、半球与共振比）、记录侧族名闭值集与转移类型清单，一次调用取回；包版本即术语版本，未知标签按可读规范串原样渲染。(#609)
+
+### Changed
+- **MCP 接口按属主分三类**：任务级方法留在 `Facade`，轨道库与族生成归 `Catalog`，空间分区解析归 `Spatiography`。MCP 工具名与 CLI 子命令不变；Python 调用方经 `facade.catalog` / `facade.spatiography` 访问库与分区方法。(#610)
+- **族生成一轨一记录**：族生成不再落聚合记录，每个成员一条记录、族名降为标签；响应以 `family_id` 为族句柄，成员携带 `member_index`，`catalog_query(family_id=…)` 取回整族。(#611)
+- **文档全面中文化**：README、注释与 docstring（含 MCP 工具描述和 CLI 帮助）统一中文，英文文档面撤销；接口字段的权威描述仍在请求/响应模型描述里，`--help` 与 MCP schema 与之同源。
+
+### Internal
+- 测试套件精简：删除元测试（契约、同步锁、派生对照类），保留行为级断言；pytest-xdist 升级（#615）。
+
+### 升级注意
+- **Python 调用方**：`facade.catalog_query` 等库方法改经 `facade.catalog.…`，分区解析改经 `facade.spatiography.…`；MCP/CLI 工具名不变。
+- **族生成响应字段更名**：`record_id` → `family_id`，`member_count` → `member_index`，随帧载荷字段一并更名，下游数据模型需同步。
+- **AI 贡献规约**：AI 生成的 issue 与 PR 标题前加 `[AI Generated]` 标记并带类型标签（`[FEAT]`/`[BUG]` 等），未正确标记不予受理；细则见 CONTRIBUTING.md。
 
 ## [5.9.2] - 2026-09-01
 

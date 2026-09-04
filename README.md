@@ -142,7 +142,7 @@ make check
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {5.8.7},
+  version = {5.9.3},
   year = {2026},
 }
 ```
