@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [5.9.4] - 2026-09-04
+
+### Fixed
+- **`read_raw_frame` 多维帧整帧读齐**：sidecar 读循环解帧时 shape 只解了首维，ndim≥2 的画布帧数据段读取不足、帧流自此失步，后续帧报 magic 不符，`transfer_design` 与 `orbit_family_generation` 经 MCP/sidecar 的带帧调用全部失败；一维帧不受影响。现按全部 ndim 个 u32 解包，多维帧与一维帧同样整帧读回，帧后尾随字节原样留在流里。(#622)
+
 ## [5.9.3] - 2026-09-04
 
 ### Added
