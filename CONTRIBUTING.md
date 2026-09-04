@@ -54,7 +54,7 @@ Issue 不用 kind 标签：GitHub 的原生 Issue Type 是组织仓库功能，�
 
 ## Project 流水线
 
-所有 Issue 进入 Project「[e2m2e Issue Management](https://github.com/users/cislunarspace/projects/1)」，按状态推进：
+所有 Issue 进入 Project「[cislunarspace Issue Management](https://github.com/users/cislunarspace/projects/1)」，按状态推进。该面板与 [transfer-orbit-design](https://github.com/cislunarspace/transfer-orbit-design) 共用，Repository 字段区分来源：
 
 | 状态 | 含义 |
 |---|---|

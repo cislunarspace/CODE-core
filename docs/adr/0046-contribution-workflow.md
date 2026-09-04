@@ -89,3 +89,10 @@ deepseek-harness 用策略脚本与 workflow 硬校验上述规则，另配专�
 
 - 规则无强制力：标签与 Project 状态靠维护者手工维护，外部 PR 不合规时
   只能人工指出。这是决策 5 的直接后果，也是重新评估自动化的触发条件。
+
+## 修订
+
+- 2026-09-04：决策 4 的 Project「e2m2e Issue Management」更名为
+  「cislunarspace Issue Management」，并与 transfer-orbit-design 共用
+  （七态、字段与自动化沿用，Repository 字段区分来源）。决策背景与取舍
+  见 transfer-orbit-design ADR 0029。
