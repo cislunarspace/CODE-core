@@ -1,12 +1,12 @@
 ---
 name: Task
 about: 明确的非 Feature、非 Bug 工作
-title: ''
+title: '[TASK] '
 labels: [type/task]
 assignees: ''
 ---
 
-<!-- 标题写一句中文行动或结果句。 -->
+<!-- 标题以 [TASK] 开头（已预填），AI 生成的前面加 [AI Generated]；写一句中文结果句。 -->
 一句话说明要完成的工作。
 
 <details>

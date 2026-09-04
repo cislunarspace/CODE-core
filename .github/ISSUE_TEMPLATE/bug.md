@@ -1,12 +1,12 @@
 ---
 name: Bug
 about: 记录现有预期行为的失效
-title: ''
+title: '[BUG] '
 labels: [type/bug]
 assignees: ''
 ---
 
-<!-- 标题写一句中文行动或结果句，说明哪里出了什么错。 -->
+<!-- 标题以 [BUG] 开头（已预填），AI 生成的前面加 [AI Generated]；写一句中文结果句。 -->
 一句话说明错误结果。
 
 <details>

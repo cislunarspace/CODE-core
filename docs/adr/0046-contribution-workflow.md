@@ -96,3 +96,8 @@ deepseek-harness 用策略脚本与 workflow 硬校验上述规则，另配专�
   「cislunarspace Issue Management」，并与 transfer-orbit-design 共用
   （七态、字段与自动化沿用，Repository 字段区分来源）。决策背景与取舍
   见 transfer-orbit-design ADR 0029。
+- 2026-09-04：决策 2 的「元信息不进标题」废止——Issue/PR 标题改回带
+  标签前缀：Issue 用 [FEAT]/[BUG]/[IDEA]/[RESEARCH]/[TASK]（模板预填），
+  PR 用 [FEAT]/[FIX]/[DOC]/[TEST]/[CLEANUP]/[DEP]；type/* 标签与两轴
+  体系不变。另立新规：AI 生成的 issue 与 PR 标题最前面加 [AI Generated]
+  标记，正文首行注明工具；未正确标记的不予受理。

@@ -1,12 +1,12 @@
 ---
 name: Idea
 about: 记录尚未承诺实施、但具有行动可能的想法
-title: ''
+title: '[IDEA] '
 labels: [type/idea]
 assignees: ''
 ---
 
-<!-- 标题写一句中文行动或结果句，说明想法指向什么。 -->
+<!-- 标题以 [IDEA] 开头（已预填），AI 生成的前面加 [AI Generated]；写一句中文结果句。 -->
 一句话说明价值假设。
 
 <details>

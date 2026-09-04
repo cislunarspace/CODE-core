@@ -2,7 +2,7 @@
 
 感谢关注 e2m2e。本仓库接受贡献：报告 Bug、提出功能建议、改进文档与测试、提交代码，都欢迎。
 
-参与前请读完本指南：它说明 Issue 怎么提、PR 怎么交、贡献如何被分类和推进。技术讨论就事论事，对事不对人；提交即表示你同意以 Apache 2.0 许可（与仓库一致）授权你的贡献。
+参与前请读完本指南：它说明 Issue 怎么提、PR 怎么交、贡献如何被分类和推进。技术讨论就事论事，对事不对人；提交即表示你同意以 Apache 2.0 许可（与仓库一致）授权你的贡献。AI 生成的 issue 与 PR：标题最前面加 `[AI Generated]` 标记（位于类型标签之前），正文首行注明工具。**未正确标记的，不予受理，不开展进一步工作和实施。**
 
 ## 提 Issue
 
@@ -18,7 +18,7 @@
 
 写法上有两条约定：
 
-- **标题写一句中文行动或结果句**，说明要修复或达成什么。不要带类型、优先级等前缀——类型由你选的模板自动打的 `type/*` 标签承载，推进状态由 Project 字段承载。
+- **标题以类型标签开头，后接一句中文行动或结果句**。Issue 用 `[FEAT]` / `[BUG]` / `[IDEA]` / `[RESEARCH]` / `[TASK]`（与所选模板对应）；PR 用意图标签 `[FEAT]` / `[FIX]` / `[DOC]` / `[TEST]` / `[CLEANUP]` / `[DEP]`（与 kind 对应）。优先级、状态等其余元信息不进标题，由 Project 字段承载。
 - **正文一句话说清核心，细节收进模板自带的折叠区**（复现步骤、验收条件等），保持正文一眼可读。
 
 使用问题、想法探讨与一般性讨论走 [Discussions](https://github.com/cislunarspace/e2m2e/discussions)，不占用 Issue。维护者会尽快给 Issue 归型并排入 Project（见下）；需要补充信息时会打上 `needs-info` 标签。
@@ -28,7 +28,7 @@
 1. **先开 Issue**：修复与功能类 PR 必须关联一个同仓库 Issue，在描述中写 `Fixes #NN`（合并即自动关闭对应 Issue），仅关联不关闭写 `Related to #NN`；纯文档小修可不挂。
 2. **Fork 并建分支**，分支名建议 `fix/<简述>` 或 `feat/<简述>`。
 3. **本地验证**：`make test` 与 `make check` 通过；新增或改变行为要有对应测试。
-4. **开 PR 指向 `master`**，按模板填写。一个 PR 只做一件事；commit message 用中文 conventional commits（如 `fix(catalog): 修正……`）。
+4. **开 PR 指向 `master`**，标题带意图标签（见上方标题约定），按模板填写。一个 PR 只做一件事；commit message 用中文 conventional commits（如 `fix(catalog): 修正……`）。
 5. **CI 必须绿**：lint 与 test 是必过检查。评审通过后由维护者合并。
 
 ## 标签体系

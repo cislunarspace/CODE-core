@@ -9,7 +9,7 @@
 - 原 Sphinx 英文文档站已整体删除（含部署工作流与 docs 依赖组）；
 - 注释与 docstring 一律中文（含 MCP 工具描述与 CLI 帮助——它们取自 docstring 首行）；存量英文代码注释随触碰渐进中文化，不做一次性回改。
 
-commit message 维持中文（conventional commits 前缀 + 中文描述）；PR 描述与 issue 文本用中文。commit 标题不用破折号（——）：标题分隔用冒号或逗号。
+commit message 维持中文（conventional commits 前缀 + 中文描述）；PR 描述与 issue 文本用中文。commit 标题不用破折号（——）：标题分隔用冒号或逗号。AI 生成的 issue 与 PR 标题最前面加 [AI Generated] 标记（位于类型标签之前），正文首行注明工具；未正确标记的不予受理。
 
 ## 写作要求
 

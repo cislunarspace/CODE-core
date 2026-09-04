@@ -1,12 +1,12 @@
 ---
 name: Research
 about: 形成结论、证据或决策
-title: ''
+title: '[RESEARCH] '
 labels: [type/research]
 assignees: ''
 ---
 
-<!-- 标题写一句中文行动或结果句，提出待回答的问题。 -->
+<!-- 标题以 [RESEARCH] 开头（已预填），AI 生成的前面加 [AI Generated]；写一句中文结果句。 -->
 一句话说明待回答的问题。
 
 <details>
