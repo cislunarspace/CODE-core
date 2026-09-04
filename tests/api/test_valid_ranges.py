@@ -40,6 +40,18 @@ class TestValidRangesResponse:
         assert global_out.minimum == 0.0
         assert global_out.minimum_inclusive is False
 
+    def test_units_are_attached_per_field(self):
+        response = Facade().valid_ranges()
+        # 单位属于字段：长度量 km，无量纲/计数值缺省
+        assert response.design_orbit["DRO"]["amplitude"].unit == "km"
+        assert response.design_orbit["LISSAJOUS_L3"]["amplitude_in"].unit == "km"
+        assert response.family_generation_ranges["HALO_L1"]["max_amplitude_km"].unit == "km"
+        assert response.family_generation_ranges["HALO_L1"]["libration_point"].unit is None
+        # 族生成侧所有 _km 后缀字段的单位一律 km（不靠命名约定猜）
+        for section in response.family_generation_ranges.values():
+            for field, spec in section.items():
+                assert spec.unit == ("km" if field.endswith("_km") else None), field
+
     def test_family_generation_ranges_cover_every_family_and_point(self):
         response = Facade().valid_ranges()
         expected_keys = {

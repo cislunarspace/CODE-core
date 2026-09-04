@@ -184,6 +184,16 @@ _LISSAJOUS_L3_RANGES = _range_map(
     amplitude_out=NumericRange(0.0, 100000.0, minimum_inclusive=False),
 )
 
+#: design_orbit 条件字段的单位（与范围表同住；未列出的字段为无量纲或计数值）。
+_DESIGN_ORBIT_FIELD_UNITS: Mapping[str, str] = MappingProxyType(
+    {
+        "amplitude": "km",
+        "amplitude_in": "km",
+        "amplitude_out": "km",
+        "perilune_height": "km",
+    }
+)
+
 
 class DesignOrbitRequest(_ApiModel):
     """任务轨道设计输入。
@@ -265,6 +275,11 @@ class DesignOrbitRequest(_ApiModel):
         """
         contexts = [(orbit_type, None) for orbit_type in _ORBIT_TYPE_RANGES]
         return (*contexts, ("LISSAJOUS", 1), ("LISSAJOUS", 2), ("LISSAJOUS", 3))
+
+    @classmethod
+    def field_units(cls) -> Mapping[str, str]:
+        """design_orbit 条件字段的单位表；未列出者为无量纲或计数值。"""
+        return _DESIGN_ORBIT_FIELD_UNITS
 
     def _validate_conditional_ranges(self, selection: str) -> None:
         """用公开范围接口校验已填充默认值的条件参数。"""
@@ -950,6 +965,18 @@ _FAMILY_LIBRATION_POINT_RANGES: Mapping[str, tuple[int, ...]] = MappingProxyType
     }
 )
 
+#: 族生成条件字段的单位（与范围表同住；未列出的字段为无量纲或计数值）。
+_FAMILY_FIELD_UNITS: Mapping[str, str] = MappingProxyType(
+    {
+        "min_amplitude_km": "km",
+        "max_amplitude_km": "km",
+        "perilune_height_max_km": "km",
+        "match_tolerance_km": "km",
+        "amplitude_in_km": "km",
+        "amplitude_out_km": "km",
+    }
+)
+
 #: orbit_type → libration_point 默认值（共线族取 L2，三角族取 L4）。
 _FAMILY_DEFAULT_LIBRATION_POINT: Mapping[str, int] = MappingProxyType(
     {
@@ -1227,6 +1254,11 @@ class FamilyGenerationRequest(_ApiModel):
             else:
                 contexts.append((family, None))
         return tuple(contexts)
+
+    @classmethod
+    def field_units(cls) -> Mapping[str, str]:
+        """族生成条件字段的单位表；未列出者为无量纲或计数值。"""
+        return _FAMILY_FIELD_UNITS
 
     @model_validator(mode="after")
     def _validate_orbit_type(self) -> FamilyGenerationRequest:
@@ -1544,16 +1576,21 @@ class CatalogTerminologyResponse(ResultResponse):
 
 
 class RangeSpec(_ApiModel):
-    """NumericRange 的序列化形式（机器可读，ADR 0014 决策 8 请求侧）。"""
+    """NumericRange 的序列化形式（机器可读，ADR 0014 决策 8 请求侧）。
+
+    unit 携带字段单位（如 km）；缺省为 None 表示无量纲量或计数值。
+    单位属于字段而非区间，同一字段在各类型下的 unit 一致。
+    """
 
     minimum: float | None = Field(default=None, description="下界；None 表示无下界")
     maximum: float | None = Field(default=None, description="上界；None 表示无上界")
     minimum_inclusive: bool = Field(default=True, description="下界是否闭区间")
     maximum_inclusive: bool = Field(default=True, description="上界是否闭区间")
     excluded_values: list[float] = Field(default_factory=list, description="区间内的离散排除值")
+    unit: str | None = Field(default=None, description="数值单位（如 km）；缺省为无量纲或计数值")
 
     @classmethod
-    def from_numeric_range(cls, numeric_range: NumericRange) -> RangeSpec:
+    def from_numeric_range(cls, numeric_range: NumericRange, unit: str | None = None) -> RangeSpec:
         """由校验侧 NumericRange 构造；只搬运数值，不复制判定逻辑。"""
         return cls(
             minimum=numeric_range.minimum,
@@ -1561,6 +1598,7 @@ class RangeSpec(_ApiModel):
             minimum_inclusive=numeric_range.minimum_inclusive,
             maximum_inclusive=numeric_range.maximum_inclusive,
             excluded_values=list(numeric_range.excluded_values),
+            unit=unit,
         )
 
 

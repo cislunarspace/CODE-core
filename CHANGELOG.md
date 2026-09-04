@@ -5,7 +5,7 @@ Release entries record exact code references (`module/function`, issue numbers, 
 ## [Unreleased]
 
 ### Added
-- **请求侧条件值域注册出口 `valid_ranges`**（#620，ADR 0014 决策 8 请求侧；ADR 0043 决策 1 修订：五方法清单扩为六）：`Facade` 新增无参 MCP 工具 `valid_ranges`，全量导出 `design_orbit` 的条件数值区间（键为 orbit_type，LISSAJOUS 逐平动点拆 `LISSAJOUS_L1/L2/L3`）、族生成的条件数值区间（键为 `族_Ln`，含 `libration_point` 允许集；DRO 不带后缀）与族生成离散选项（延拓方向、采样规则）。区间直接消费请求模型既有的 `valid_ranges`/`valid_options` 类方法（#415 落地的与校验器同源的范围表），不另存副本；键集枚举经两个请求模型新增的 `valid_range_contexts()` 类方法与范围表同源。新增序列化模型 `RangeSpec`/`ValidRangesResponse`（`e2m2e.api` 导出）；CLI 子命令与 MCP schema 照常从 `tool_inventory` 单源派生，工具面 18→19（`tests/api/test_facade.py` 计数与类域断言同步）。行为测试 `tests/api/test_valid_ranges.py`：键集完整性、LISSAJOUS_L3 独立包络、与校验器同源（含开闭语义）、HALO 折叠振幅排除值、离散选项、注册与包络。
+- **请求侧条件值域注册出口 `valid_ranges`**（#620，ADR 0014 决策 8 请求侧；ADR 0043 决策 1 修订：五方法清单扩为六）：`Facade` 新增无参 MCP 工具 `valid_ranges`，全量导出 `design_orbit` 的条件数值区间（键为 orbit_type，LISSAJOUS 逐平动点拆 `LISSAJOUS_L1/L2/L3`）、族生成的条件数值区间（键为 `族_Ln`，含 `libration_point` 允许集；DRO 不带后缀）与族生成离散选项（延拓方向、采样规则）。区间直接消费请求模型既有的 `valid_ranges`/`valid_options` 类方法（#415 落地的与校验器同源的范围表），不另存副本；键集枚举经两个请求模型新增的 `valid_range_contexts()` 类方法与范围表同源。区间携带字段单位（`RangeSpec.unit`，如 km；缺省为无量纲或计数值），单位表与范围表同住 `models.py` 并经两个请求模型的 `field_units()` 公开——单位此前只活在人读的校验错误消息里，此番随机器读出口一并补齐。新增序列化模型 `RangeSpec`/`ValidRangesResponse`（`e2m2e.api` 导出）；CLI 子命令与 MCP schema 照常从 `tool_inventory` 单源派生，工具面 18→19（`tests/api/test_facade.py` 计数与类域断言同步）。行为测试 `tests/api/test_valid_ranges.py`：键集完整性、LISSAJOUS_L3 独立包络、与校验器同源（含开闭语义）、HALO 折叠振幅排除值、离散选项、注册与包络。
 
 ## [5.9.2] - 2026-09-01
 

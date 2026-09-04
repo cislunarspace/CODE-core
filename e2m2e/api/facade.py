@@ -688,14 +688,16 @@ class Facade:
         合法参数区间及族生成离散选项，无参数。包版本即值域版本：调用方每
         会话取一次、升级后刷新；区间与校验器同源（直接消费请求模型的
         valid_ranges/valid_options，不另存副本）。键为 orbit_type 或 族_Ln
-        （LISSAJOUS 按平动点拆分，DRO 不带后缀）。"""
+        （LISSAJOUS 按平动点拆分，DRO 不带后缀）；区间携带字段单位
+        （unit，如 km；缺省为无量纲或计数值）。"""
 
         def context_key(orbit_type: str, point: int | None) -> str:
             return orbit_type if point is None else f"{orbit_type}_L{point}"
 
+        design_units = DesignOrbitRequest.field_units()
         design_orbit = {
             context_key(orbit_type, point): {
-                field: RangeSpec.from_numeric_range(numeric_range)
+                field: RangeSpec.from_numeric_range(numeric_range, unit=design_units.get(field))
                 for field, numeric_range in DesignOrbitRequest.valid_ranges(
                     orbit_type, collinear_point=point
                 ).items()
@@ -703,9 +705,10 @@ class Facade:
             for orbit_type, point in DesignOrbitRequest.valid_range_contexts()
         }
         family_contexts = FamilyGenerationRequest.valid_range_contexts()
+        family_units = FamilyGenerationRequest.field_units()
         family_generation_ranges = {
             context_key(orbit_type, point): {
-                field: RangeSpec.from_numeric_range(numeric_range)
+                field: RangeSpec.from_numeric_range(numeric_range, unit=family_units.get(field))
                 for field, numeric_range in FamilyGenerationRequest.valid_ranges(
                     orbit_type, libration_point=point
                 ).items()
