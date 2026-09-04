@@ -39,7 +39,7 @@ dependencies = [
     "scipy>=1.10",
     "tqdm>=4.66",
     "spiceypy>=8.1.0",
-    "pydantic>=2.0",
+    "pydantic>=2.13.5",
     "pyerfa>=2.0.1.5",
     "r2s2>=0.1.0",
     "calcephpy==5.0.0",  # 经 r2s2 传递依赖；显式声明以使 [tool.uv.sources] 生效
