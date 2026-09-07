@@ -65,6 +65,11 @@ class TestFacadeValidation:
                 perilune_height=40000.1,
             )
 
+    def test_design_moon_tide_mode_enum_is_validated_at_boundary(self):
+        """moon_tide_mode 非法枚举值在 Facade 边界翻译为 INVALID_PARAMS。"""
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().design_orbit(orbit_type="DRO", moon_tide_mode="bogus")
+
 
 class TestFacadeDelegation:
     def test_control_upper_bounds_are_translated_to_orbit_error(self):

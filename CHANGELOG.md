@@ -2,6 +2,11 @@
 
 发布条目面向调用方：写变化、用法与数值细节，issue 引用置段尾括号；内部实现路径与决策沿革不进本文件（住 ADR 与 issue）。已发布条目是不可变历史，保持写成时的语言。
 
+## [5.9.6] - 2026-09-07
+
+### Added
+- **`design_orbit` 新增 `moon_tide_mode` 字段（none/solid，默认 none）**：月球球谐引力场的潮汐模式首次可在 Facade 边界显式控制；星历修正与标称星历使用同一个月球潮汐设置（`perturbation_to_force_config` 同名 keyword 参数）。地球潮汐语义不变（仍由 `perturbation['tide']`/`['coupling']` 控制）；非法枚举值由 `Facade.design_orbit` 以 `INVALID_PARAMS` 拒绝。满配月球固体潮真值（如 qiao 的 NRHO 验证链）不再需要穿透算法层。
+
 ## [5.9.5] - 2026-09-07
 
 ### Changed

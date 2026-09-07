@@ -31,7 +31,9 @@ inputs-dac.txt（第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月球�
   主项（修正项构成未确认，待 P0 对齐实验核实）。
 - ``tide=1``：地球固体潮，挂在地球 ``GravityField`` 的
   ``tide_mode="solid"`` 上——因此要求 ``earth_nonspherical=1``，
-  否则抛 ``ValueError``。月球引力场不带潮（开关写明"地球的潮汐"）。
+  否则抛 ``ValueError``。月球球谐引力场的潮汐不受开关控制，由独立的
+  ``moon_tide_mode`` 参数（none/solid）给定，默认 none（inputs-dac 侧
+  无月球潮汐开关，历史行为即不带潮）。
 - ``coupling=1`` （地球非球形×大天体耦合项）：强制启用固体潮
   ``tide_mode="solid"`` （与 ``tide=1`` 共用 IERS TN32 固体潮公式）。
 
@@ -42,7 +44,7 @@ inputs-dac.txt（第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月球�
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 from ...data.constants import SPEED_OF_LIGHT_KMS
 from ...data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
@@ -98,6 +100,7 @@ def perturbation_to_force_config(
     *,
     earth_degree: int = 10,
     moon_degree: int = 10,
+    moon_tide_mode: Literal["none", "solid"] = "none",
     dyb: Sequence[float] | None = None,
     area_to_mass: float | None = None,
 ) -> dict[str, Any]:
@@ -108,6 +111,9 @@ def perturbation_to_force_config(
             ``DEFAULT_PERTURBATION``）；缺省项取默认值。
         earth_degree: 地球非球形引力位阶次数（degree=order）。
         moon_degree: 月球非球形引力位阶次数（degree=order）。
+        moon_tide_mode: 月球球谐引力场的潮汐模式（none/solid）。inputs-dac
+            侧没有对应的月球潮汐开关（``tide`` 只管地球），故独立成参数；
+            默认 none 保持既有行为。
         dyb: DYB 面质比系数 9 分量；``dyb[0]`` 为等效面质比（m²/kg），
             炮弹光压与大气阻力共用；其余分量在炮弹档忽略。
         area_to_mass: 显式等效面质比（m²/kg），给出时覆盖 ``dyb[0]``。
@@ -119,9 +125,12 @@ def perturbation_to_force_config(
 
     Raises:
         NotImplementedError: ``solar_radiation=2`` （ECOM）。
-        ValueError: 开关取值非法；``tide=1`` 或 ``coupling=1`` 而
-            ``earth_nonspherical=0``；``dyb`` 非 9 分量。
+        ValueError: 开关取值非法；``moon_tide_mode`` 非 none/solid；
+            ``tide=1`` 或 ``coupling=1`` 而 ``earth_nonspherical=0``；
+            ``dyb`` 非 9 分量。
     """
+    if moon_tide_mode not in ("none", "solid"):
+        raise ValueError(f"moon_tide_mode 必须为 none 或 solid，当前 {moon_tide_mode!r}")
     sw = _resolve_switches(perturbation)
 
     # coupling=1 强制启用固体潮（无论 tide 开关值）。
@@ -168,7 +177,7 @@ def perturbation_to_force_config(
                 "order": int(moon_degree),
                 "input_frame": _DEFAULT_FRAME_BY_BODY["MOON"],
                 "gravity_file": None,
-                "tide_mode": "none",
+                "tide_mode": moon_tide_mode,
                 "tide_convention": "tide_free",
             },
         )
