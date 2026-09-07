@@ -70,8 +70,8 @@ class TestDesignOrbitRequest:
         [
             ("DRO", "amplitude", 1737.0, 110000.0, True),
             ("DPO", "amplitude", 1737.0, 110000.0, True),
-            ("HALO", "amplitude", -73000.0, 73000.0, True),
-            ("NRHO", "perilune_height", 100.0, 10000.0, True),
+            ("HALO", "amplitude", -77000.0, 77000.0, True),  # 无点默认 L2
+            ("NRHO", "perilune_height", 100.0, 40000.0, True),
             ("L4", "amplitude_out", 0.0, 76000.0, False),
             ("L5", "amplitude_out", 0.0, 76000.0, False),
             ("AXIAL", "amplitude", -60000.0, 60000.0, True),
@@ -108,6 +108,15 @@ class TestDesignOrbitRequest:
                 DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum})
             accepted = DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum + 1.0})
             assert getattr(accepted, field) == minimum + 1.0
+
+    def test_halo_l1_domain_tightened_to_family_fold(self):
+        """#643：HALO 振幅域逐平动点分档——L1 止于族折叠常量 26 908 km。"""
+        numeric_range = DesignOrbitRequest.valid_ranges("HALO", collinear_point=1)["amplitude"]
+        assert (numeric_range.minimum, numeric_range.maximum) == (-26908.0, 26908.0)
+        accepted = DesignOrbitRequest(orbit_type="HALO", collinear_point=1, amplitude=26908.0)
+        assert accepted.amplitude == 26908.0
+        with pytest.raises(ValidationError, match="amplitude"):
+            DesignOrbitRequest(orbit_type="HALO", collinear_point=1, amplitude=26908.0 + 1.0)
 
     @pytest.mark.parametrize("orbit_type", ["HALO", "NRHO", "DPO"])
     def test_unstable_family_defaults_to_segmented_silently(self, orbit_type):

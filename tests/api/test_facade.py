@@ -50,6 +50,21 @@ class TestFacadeValidation:
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
             call(Facade())
 
+    def test_design_domain_upper_bounds_report_new_limits(self):
+        """#643：NRHO 近月高 40000 / HALO 振幅 ±77000 是设计侧新上限。"""
+        facade = Facade()
+        with pytest.raises(OrbitError, match=r"(?s)INVALID_PARAMS.*77000"):
+            facade.design_orbit(orbit_type="HALO", collinear_point=2, amplitude=77500.0)
+        with pytest.raises(OrbitError, match=r"(?s)INVALID_PARAMS.*26908"):
+            facade.design_orbit(orbit_type="HALO", collinear_point=1, amplitude=30000.0)
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            facade.design_orbit(
+                orbit_type="NRHO",
+                collinear_point=2,
+                north_south=1,
+                perilune_height=40000.1,
+            )
+
 
 class TestFacadeDelegation:
     def test_control_upper_bounds_are_translated_to_orbit_error(self):

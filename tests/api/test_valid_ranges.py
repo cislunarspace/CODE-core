@@ -31,14 +31,30 @@ class TestValidRangesResponse:
 
     def test_design_orbit_ranges_match_validator_source(self):
         response = Facade().valid_ranges()
-        expected = DesignOrbitRequest.valid_ranges("HALO")["amplitude"]
-        got = response.design_orbit["HALO"]["amplitude"]
+        expected = DesignOrbitRequest.valid_ranges("HALO", collinear_point=2)["amplitude"]
+        got = response.design_orbit["HALO_L2"]["amplitude"]
         assert isinstance(got, RangeSpec)
         assert (got.minimum, got.maximum) == (expected.minimum, expected.maximum)
         # 开闭语义随源携带：amplitude_out 全局下界为开区间
         global_out = response.design_orbit["DRO"]["amplitude_out"]
         assert global_out.minimum == 0.0
         assert global_out.minimum_inclusive is False
+
+    def test_nrho_perilune_and_halo_amplitude_domains(self):
+        response = Facade().valid_ranges()
+        # design_orbit 侧：NRHO 近月高上限对齐族生成 40000 km；HALO 振幅逐平动点
+        # 分档——L1 止于族折叠常量 26908 km、L2 放宽到 ±77000 km（#643 探测边界）
+        nrho = response.design_orbit["NRHO"]["perilune_height"]
+        assert (nrho.minimum, nrho.maximum) == (100.0, 40000.0)
+        halo_l1 = response.design_orbit["HALO_L1"]["amplitude"]
+        assert (halo_l1.minimum, halo_l1.maximum) == (-26908.0, 26908.0)
+        halo_l2 = response.design_orbit["HALO_L2"]["amplitude"]
+        assert (halo_l2.minimum, halo_l2.maximum) == (-77000.0, 77000.0)
+        # 族生成侧能力边界不动：HALO 按平动点折叠点收紧（L2=57660），NRHO 上限 40000
+        family_halo = response.family_generation_ranges["HALO_L2"]["max_amplitude_km"]
+        assert (family_halo.minimum, family_halo.maximum) == (-57660.0, 57660.0)
+        family_nrho = response.family_generation_ranges["NRHO_L2"]["perilune_height_max_km"]
+        assert (family_nrho.minimum, family_nrho.maximum) == (1000.0, 40000.0)
 
     def test_units_are_attached_per_field(self):
         response = Facade().valid_ranges()
