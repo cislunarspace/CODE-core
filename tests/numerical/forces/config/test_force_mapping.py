@@ -245,3 +245,35 @@ class TestBuildAndRoundTrip:
         dump_force_config(fm, path)
         fm2 = load_force_config(path, system)
         assert fm2.to_config() == cfg
+
+        cfg = perturbation_to_force_config(_on(moon_nonspherical=1))
+        (gf,) = [
+            f
+            for f in cfg["forces"]
+            if f["type"] == "GravityField" and f["params"]["body"] == "MOON"
+        ]
+        assert gf["params"]["tide_mode"] == "none"
+
+    def test_solid_only_affects_moon(self):
+        """moon_tide_mode=solid 只改月球条目，地球潮汐仍由 tide 开关控制。"""
+        cfg = perturbation_to_force_config(
+            _on(earth_nonspherical=1, moon_nonspherical=1, tide=1),
+            moon_tide_mode="solid",
+        )
+        gf_by_body = {f["params"]["body"]: f for f in cfg["forces"] if f["type"] == "GravityField"}
+        assert gf_by_body["EARTH"]["params"]["tide_mode"] == "solid"
+        assert gf_by_body["MOON"]["params"]["tide_mode"] == "solid"
+
+        cfg_off = perturbation_to_force_config(
+            _on(earth_nonspherical=1, moon_nonspherical=1, tide=0, coupling=0),
+            moon_tide_mode="solid",
+        )
+        gf_by_body_off = {
+            f["params"]["body"]: f for f in cfg_off["forces"] if f["type"] == "GravityField"
+        }
+        assert gf_by_body_off["EARTH"]["params"]["tide_mode"] == "none"
+        assert gf_by_body_off["MOON"]["params"]["tide_mode"] == "solid"
+
+    def test_invalid_mode_raises(self):
+        with pytest.raises(ValueError, match="moon_tide_mode"):
+            perturbation_to_force_config(_on(moon_nonspherical=1), moon_tide_mode="bogus")

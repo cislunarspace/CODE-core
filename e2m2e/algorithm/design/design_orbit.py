@@ -34,7 +34,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import numpy as np
 
@@ -100,6 +100,7 @@ if TYPE_CHECKING:
         dyb: list[float] | None
         earth_degree: int
         moon_degree: int
+        moon_tide_mode: Literal["none", "solid"]
         correction_method: str
         correction_revolutions: int
 
@@ -862,6 +863,7 @@ def _design_elfo(
         perturbation,
         earth_degree=request.earth_degree,
         moon_degree=request.moon_degree,
+        moon_tide_mode=request.moon_tide_mode,
         dyb=request.dyb,
     )
     fm = ForceModel.from_config(force_config, full_system)
@@ -1002,6 +1004,7 @@ def design_orbit(
     perturbation = request.perturbation
     earth_degree = request.earth_degree
     moon_degree = request.moon_degree
+    moon_tide_mode = request.moon_tide_mode
     dyb = request.dyb
     correction_method = request.correction_method
     correction_revolutions = request.correction_revolutions
@@ -1087,7 +1090,11 @@ def design_orbit(
         origin=CelestialBodyOrigin(body="EARTH", spice=spice),
     )
     force_config = perturbation_to_force_config(
-        perturbation, earth_degree=earth_degree, moon_degree=moon_degree, dyb=dyb
+        perturbation,
+        earth_degree=earth_degree,
+        moon_degree=moon_degree,
+        moon_tide_mode=moon_tide_mode,
+        dyb=dyb,
     )
     fm = ForceModel.from_config(force_config, full_system)
     fm.rtol = 1e-12

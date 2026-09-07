@@ -243,6 +243,11 @@ class DesignOrbitRequest(_ApiModel):
         "显式传入与族冲突的值时告警并改写为 segmented",
     )
     correction_revolutions: int = Field(default=1, ge=1)
+    moon_tide_mode: Literal["none", "solid"] = Field(
+        default="none",
+        description="月球球谐引力场的潮汐模式（none/solid）。地球潮汐仍由"
+        " perturbation['tide']/'coupling' 控制，本字段不影响",
+    )
 
     @classmethod
     def valid_ranges(
