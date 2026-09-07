@@ -2,7 +2,7 @@
 
 发布条目面向调用方：写变化、用法与数值细节，issue 引用置段尾括号；内部实现路径与决策沿革不进本文件（住 ADR 与 issue）。已发布条目是不可变历史，保持写成时的语言。
 
-## [Unreleased]
+## [5.9.5] - 2026-09-07
 
 ### Changed
 - **轨道库出默认态：库不维护数据库，提供建库基础设施**：三处默认行为移除——计算产物（design/control/transfer/族生成/sweep）默认只随响应返回、不再自动入库，`catalog_enabled` 默认关（`$E2M2E_CATALOG_ENABLED` 显式开启）；`catalog_dir` 无隐式默认（`Config(catalog_dir=...)` 或 `$E2M2E_CATALOG_DIR` 显式指定），未指定时一切库操作报 `CATALOG_NOT_CONFIGURED`、不建目录，不再"跑哪建哪"地创建 `./catalog`；基线数据集移出 wheel（瘦身约 3.5 MB），改 GitHub Release 资产分发，`import_baseline(store, source_dir)` 源必填、显式导入建库。持有 v1 旧库的 schema 弃用语义不变（ADR 0045）。(#632)
