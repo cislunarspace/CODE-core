@@ -370,8 +370,13 @@ def _validate_params(
         phase = 0.0 if phase is None else float(phase)
         if collinear_point not in (1, 2):
             raise ValueError(f"Halo collinear_point 必须为 1 或 2，当前 {collinear_point}")
-        if not abs(amplitude) <= 73000.0:
-            raise ValueError(f"Halo amplitude 应在 -73000~73000 km 之间，实际为 {amplitude:.0f} km")
+        # L1 设计域止于族折叠常量 26 908 km（#643 探测确认）；L2 放宽到 77 000 km
+        limit = 26_908.0 if collinear_point == 1 else 77_000.0
+        if not abs(amplitude) <= limit:
+            raise ValueError(
+                f"Halo L{collinear_point} amplitude 应在 -{limit:.0f}~{limit:.0f} km 之间，"
+                f"实际为 {amplitude:.0f} km"
+            )
         if not 0.0 <= phase <= 1.0:
             raise ValueError(f"Halo phase 应在 0~1 之间，实际为 {phase}")
         return {
@@ -389,9 +394,9 @@ def _validate_params(
             raise ValueError(f"NRHO collinear_point 必须为 1 或 2，当前 {collinear_point}")
         if north_south not in (1, 2):
             raise ValueError(f"NRHO north_south 必须为 1（北）或 2（南），当前 {north_south}")
-        if not 100.0 <= perilune_height <= 10000.0:
+        if not 100.0 <= perilune_height <= 40000.0:
             raise ValueError(
-                f"NRHO perilune_height 应在 100~10000 km 之间，实际为 {perilune_height:.0f} km"
+                f"NRHO perilune_height 应在 100~40000 km 之间，实际为 {perilune_height:.0f} km"
             )
         # NRHO 的历元相位允许从 0 开始；API 模型同样定义为 [0, 1]。
         if not 0.0 <= phase <= 1.0:

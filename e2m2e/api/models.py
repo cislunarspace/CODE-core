@@ -159,9 +159,8 @@ _ORBIT_TYPE_RANGES: Mapping[str, Mapping[str, NumericRange]] = MappingProxyType(
     {
         "DRO": _DRO_DPO_RANGES,
         "DPO": _DRO_DPO_RANGES,
-        "HALO": _with_global_amplitude_out(_range_map(amplitude=NumericRange(-73000.0, 73000.0))),
         "NRHO": _with_global_amplitude_out(
-            _range_map(perilune_height=NumericRange(100.0, 10000.0))
+            _range_map(perilune_height=NumericRange(100.0, 40000.0))
         ),
         "L4": _GLOBAL_AMPLITUDE_OUT_RANGES,
         "L5": _GLOBAL_AMPLITUDE_OUT_RANGES,
@@ -214,7 +213,7 @@ class DesignOrbitRequest(_ApiModel):
     phase_in: float | None = Field(default=None, ge=0.0, le=1.0)
     phase_out: float | None = Field(default=None, ge=0.0, le=1.0)
     # 共享参数
-    perilune_height: float | None = Field(default=None, gt=0.0, le=10000.0)
+    perilune_height: float | None = Field(default=None, gt=0.0, le=40000.0)
     # ELFO 形状参数
     inclination: float | None = Field(
         default=None, ge=0.0, le=180.0, description="倾角（度），ELFO 用"
@@ -253,13 +252,22 @@ class DesignOrbitRequest(_ApiModel):
         if not isinstance(orbit_type, str):
             raise ValueError(f"orbit_type 必须为字符串，当前 {orbit_type!r}")
         selection = orbit_type.upper()
-        if selection == "LISSAJOUS":
+        if selection in ("LISSAJOUS", "HALO"):
             point = 2 if collinear_point is None else collinear_point
-            if point not in (1, 2, 3):
+            if point not in (1, 2, 3) or (selection == "HALO" and point == 3):
+                allowed = "1、2 或 3" if selection == "LISSAJOUS" else "1 或 2"
                 raise ValueError(
-                    f"LISSAJOUS collinear_point 必须为 1、2 或 3，当前 {collinear_point!r}"
+                    f"{selection} collinear_point 必须为 {allowed}，当前 {collinear_point!r}"
                 )
-            ranges = _LISSAJOUS_L3_RANGES if point == 3 else _LISSAJOUS_L1_L2_RANGES
+            if selection == "LISSAJOUS":
+                ranges = _LISSAJOUS_L3_RANGES if point == 3 else _LISSAJOUS_L1_L2_RANGES
+            else:
+                # L1 设计域止于族折叠常量 26 908 km（设计路径上限，与族生成折叠点
+                # 一致，#643 探测确认）；L2 放宽到 z0 折叠顶 ≈77 787 km 内的 77 000 km
+                limit = 26_908.0 if point == 1 else 77_000.0
+                ranges = _with_global_amplitude_out(
+                    _range_map(amplitude=NumericRange(-limit, limit))
+                )
         else:
             try:
                 ranges = _ORBIT_TYPE_RANGES[selection]
@@ -271,10 +279,18 @@ class DesignOrbitRequest(_ApiModel):
     def valid_range_contexts(cls) -> tuple[tuple[str, int | None], ...]:
         """全量导出条件值域用的 (orbit_type, collinear_point) 键集。
 
-        无平动点条件的族 point 为 None；LISSAJOUS 逐点展开（1/2 同表、3 独立）。
+        无平动点条件的族 point 为 None；HALO 与 LISSAJOUS 逐点展开
+        （HALO 为 L1/L2 两档独立域，LISSAJOUS 1/2 同表、3 独立）。
         """
         contexts = [(orbit_type, None) for orbit_type in _ORBIT_TYPE_RANGES]
-        return (*contexts, ("LISSAJOUS", 1), ("LISSAJOUS", 2), ("LISSAJOUS", 3))
+        return (
+            *contexts,
+            ("HALO", 1),
+            ("HALO", 2),
+            ("LISSAJOUS", 1),
+            ("LISSAJOUS", 2),
+            ("LISSAJOUS", 3),
+        )
 
     @classmethod
     def field_units(cls) -> Mapping[str, str]:
