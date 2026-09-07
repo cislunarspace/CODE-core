@@ -6,6 +6,7 @@
 
 ### Changed
 - **轨道库出默认态：库不维护数据库，提供建库基础设施**：三处默认行为移除——计算产物（design/control/transfer/族生成/sweep）默认只随响应返回、不再自动入库，`catalog_enabled` 默认关（`$E2M2E_CATALOG_ENABLED` 显式开启）；`catalog_dir` 无隐式默认（`Config(catalog_dir=...)` 或 `$E2M2E_CATALOG_DIR` 显式指定），未指定时一切库操作报 `CATALOG_NOT_CONFIGURED`、不建目录，不再"跑哪建哪"地创建 `./catalog`；基线数据集移出 wheel（瘦身约 3.5 MB），改 GitHub Release 资产分发，`import_baseline(store, source_dir)` 源必填、显式导入建库。持有 v1 旧库的 schema 弃用语义不变（ADR 0045）。(#632)
+- **design_orbit 的 NRHO/HALO 取值域放宽（HALO 逐平动点分档）**：NRHO `perilune_height` 上限 10 000 → 40 000 km（与族生成 NRHO 上限对齐）；HALO `amplitude` 按平动点分档——L1 止于族折叠常量 ±26 908 km（统一 ±73 000 对 L1 是谎报），L2 放宽到 ±77 000 km（L2 族 z0 折叠顶 ≈77 787 km 内留余量）。9:2 量级大振幅北族 Halo（近月高 ≈14 870 km）自此可完全经 `design_orbit` 设计生成（含星历修正与标称星历）。族生成域不变（HALO 按平动点折叠点、NRHO 1 000–40 000），`valid_ranges` 与校验器同源随之更新（design_orbit HALO 键拆为 `HALO_L1`/`HALO_L2`）。(#643)
 
 ### 升级注意
 - **依赖自动入库的调用方**：升级后默认 `record_id`/`family_id` 为 `None`；设 `$E2M2E_CATALOG_ENABLED=1` 或 `Config(catalog_enabled=True, catalog_dir=...)` 恢复，库目录必须显式指定。design→control（`input_record_id`）链路要求先开启入库。
