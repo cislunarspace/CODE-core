@@ -36,7 +36,7 @@ import sys
 import urllib.request
 import zipfile
 
-REPO = "cislunarspace/e2m2e"
+REPO = "cislunarspace/CODE-core"
 RELEASE = "cspice-v1"
 # (操作系统, 架构) → (release 资产名, 解压后 CSPICE 子目录名)
 ASSET_BY_PLATFORM = {

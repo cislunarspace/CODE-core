@@ -31,7 +31,7 @@ import sys
 import urllib.parse
 import urllib.request
 
-REPO = "cislunarspace/e2m2e"
+REPO = "cislunarspace/CODE-core"
 RELEASE = "kernels-v1"
 # release.yml 同款 pattern：星历/闰秒/常数/姿态/帧
 EXTENSIONS = (".bsp", ".tls", ".tpc", ".bpc", ".tf")

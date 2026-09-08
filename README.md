@@ -3,8 +3,8 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![PyPI](https://img.shields.io/pypi/v/e2m2e)](https://pypi.org/project/e2m2e/)
-[![CI](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml/badge.svg)](https://github.com/cislunarspace/e2m2e/actions/workflows/ci.yml)
-[![GitHub stars](https://img.shields.io/github/stars/cislunarspace/e2m2e.svg)](https://github.com/cislunarspace/e2m2e/stargazers)
+[![CI](https://github.com/cislunarspace/CODE-core/actions/workflows/ci.yml/badge.svg)](https://github.com/cislunarspace/CODE-core/actions/workflows/ci.yml)
+[![GitHub stars](https://img.shields.io/github/stars/cislunarspace/CODE-core.svg)](https://github.com/cislunarspace/CODE-core/stargazers)
 [![Rust: 1.98.0](https://img.shields.io/badge/rust-1.98.0-orange.svg)](https://www.rust-lang.org/)
 
 e2m2e 是地月空间**算法工具集**。
@@ -20,7 +20,7 @@ uv pip install e2m2e
 从源码开发：
 
 ```bash
-git clone https://github.com/cislunarspace/e2m2e.git
+git clone https://github.com/cislunarspace/CODE-core.git
 cd e2m2e
 make dev
 ```
@@ -36,7 +36,7 @@ make dev
   ```
 </details>
 
-e2m2e 所需的全部星历数据已打包在 [GitHub Release](https://github.com/cislunarspace/e2m2e/releases) 的 `kernels-v1` 中，`make dev` 会自动下载到 `kernels/`；也可手动下载解压到该目录。
+e2m2e 所需的全部星历数据已打包在 [GitHub Release](https://github.com/cislunarspace/CODE-core/releases) 的 `kernels-v1` 中，`make dev` 会自动下载到 `kernels/`；也可手动下载解压到该目录。
 
 ## 快速开始
 
@@ -141,7 +141,7 @@ make check
   title = {e2m2e: Earth to Moon, Moon to Earth Transfer Orbit Design Library},
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
-  url = {https://github.com/cislunarspace/e2m2e},
+  url = {https://github.com/cislunarspace/CODE-core},
   version = {5.9.4},
   year = {2026},
 }
