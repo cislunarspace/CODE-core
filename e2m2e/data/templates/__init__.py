@@ -3,14 +3,14 @@
 - ``seed.py``：轨道族种子参数。
 - ``systems.py``：空模块壳，物理常数真值在 ``e2m2e.data.constants``。
 - ``perturbations.py``：摄动开关/DYB 默认。
-- ``design.py``：design_orbit 星历修正方法的族级分派表。
+- ``design.py``：design_orbit 星历修正方法的族级分派表、RO 共振比支持集。
 - ``force_config.py``：力模型配置 schema（纯数据）。
 - ``enums.py``：领域枚举。
 """
 
 from __future__ import annotations
 
-from .design import SEGMENTED_CORRECTION_ORBIT_TYPES
+from .design import RO_SUPPORTED_RESONANCES, SEGMENTED_CORRECTION_ORBIT_TYPES
 from .enums import (
     BifurcationLabel,
     BoundaryMode,
@@ -40,6 +40,7 @@ __all__ = [
     "MOON_RADIUS_KM",
     "DEFAULT_DYB",
     "DEFAULT_PERTURBATION",
+    "RO_SUPPORTED_RESONANCES",
     "SEGMENTED_CORRECTION_ORBIT_TYPES",
     "ReferenceFrame",
     "UnitSystem",

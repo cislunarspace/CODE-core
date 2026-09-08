@@ -29,6 +29,19 @@ class TestValidRangesResponse:
         assert response.design_orbit["LISSAJOUS_L2"]["amplitude_in"].maximum == 7600.0
         assert response.design_orbit["LISSAJOUS_L3"]["amplitude_in"].maximum == 100000.0
 
+    def test_ro_resonance_domains(self):
+        """#627：RO 键存在且共振比/振幅域与设计校验器同源。"""
+        response = Facade().valid_ranges()
+        ro = response.design_orbit["RO"]
+        assert (ro["amplitude"].minimum, ro["amplitude"].maximum) == (118000.0, 200000.0)
+        assert (ro["resonance_p"].minimum, ro["resonance_p"].maximum) == (2, 4)
+        assert ro["resonance_p"].unit is None  # 计数值，无单位
+        # 族生成侧：RO 不带平动点，窗口包络与设计侧一致
+        family_ro = response.family_generation_ranges["RO"]
+        assert "libration_point" not in family_ro
+        assert family_ro["min_amplitude_km"].minimum == 118000.0
+        assert response.family_generation_options["RO"] == {"sampling_mode": ["natural-x0"]}
+
     def test_design_orbit_ranges_match_validator_source(self):
         response = Facade().valid_ranges()
         expected = DesignOrbitRequest.valid_ranges("HALO", collinear_point=2)["amplitude"]

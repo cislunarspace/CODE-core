@@ -385,6 +385,10 @@ const fn parse_abi_version(s: &str) -> u32 {
 /// - **v23**：新增 ``solve_ivp_events_kernel_py`` （事件路径 EOM 内核分派：
 ///   动力学标识 + 参数表，复用 e2m2e-forces 的 CR3BP/BCR4BP EOM/STM 内核，
 ///   issue #594）。
+/// - **v24**：RO（共振轨道族）加入 ``generate_cr3bp_family_py`` /
+///   ``generate_cr3bp_family_windows_py`` 的族分派（两入口各增可选关键字
+///   参数 ``resonance_p`` / ``resonance_q``），``orbit_family_metric_py``
+///   增 ``earth-distance`` 度量（issue #627）。
 ///
 /// 1→3 跳号实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
