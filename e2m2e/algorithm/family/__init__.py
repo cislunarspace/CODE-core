@@ -69,6 +69,8 @@ __all__ = [
     "design_lpo_family",
     "design_nrho",
     "design_nrho_family",
+    "design_ro",
+    "design_ro_family",
     "design_lissajous",
     "design_lissajous_family",
     "design_spo",
@@ -117,6 +119,8 @@ _LAZY_EXPORTS = {
     "design_lpo_family": "design_lpo_family",
     "design_nrho": "design_nrho",
     "design_nrho_family": "design_nrho_family",
+    "design_ro": "design_ro",
+    "design_ro_family": "design_ro_family",
     "design_lissajous": "design_lissajous",
     "design_lissajous_family": "design_lissajous_family",
     "design_spo": "design_spo",
@@ -153,6 +157,7 @@ def _build_registry() -> dict[str, Callable[..., Orbit]]:
         design_lissajous,
         design_lpo,
         design_nrho,
+        design_ro,
         design_spo,
         design_triangular,
     )
@@ -162,6 +167,9 @@ def _build_registry() -> dict[str, Callable[..., Orbit]]:
         "DPO": design_dpo,
         "HALO": design_halo,
         "NRHO": design_nrho,
+        "RO": lambda resonance_p, resonance_q, amplitude=None, **kw: design_ro(
+            int(resonance_p), int(resonance_q), amplitude, **kw
+        ),
         "LISSAJOUS": design_lissajous,
         "AXIAL": design_axial,
         "L4": lambda amplitude_in, amplitude_out, phase_in=0.0, phase_out=0.0, **kw: (

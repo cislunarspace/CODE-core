@@ -54,7 +54,11 @@ def symmetric_2d_fixed_t(t_half: float) -> CorrectionConfig:
 def symmetric_2d_fixed_y0(y0: float = 0.0) -> CorrectionConfig:
     """固定 y0 的 y 轴对称修正：自由变量为 x_dot0 和 T_half。
 
-    适用于从 y 轴出发的共振轨道（RO）等周期轨道。
+    注意：y 轴半周期条件（x=0 且 x_dot=0 于 T_half）本身不构成闭合
+    条件——CR3BP 对 μ≠1/2 没有 y 轴镜面定理，收敛解一般不在 2·T_half
+    闭合（#627 实测）。RO 设计走 x 轴固定半周期策略（
+    ``symmetric_2d_fixed_t``，见 ``cr3bp_orbits.design_ro``），本策略
+    仅保留给研究用。
 
     Args:
         y0: 固定的初始 y 坐标。

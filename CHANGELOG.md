@@ -2,6 +2,15 @@
 
 发布条目面向调用方：写变化、用法与数值细节，issue 引用置段尾括号；内部实现路径与决策沿革不进本文件（住 ADR 与 issue）。已发布条目是不可变历史，保持写成时的语言。
 
+
+## [Unreleased]
+
+### Added
+- **共振轨道（RO）设计与族生成落地**：`design_orbit(orbit_type="RO")` 与 `orbit_family_generation(orbit_type="RO")` 自此可用——按共振比 `resonance_p:resonance_q`（卫星:月球，支持 2:1/3:1/3:2/4:1/4:3 五档顺行内共振，缺省 3:1）生成绕地质心的顺行近圆周期轨道。design_orbit 缺省返回精确通约成员（旋转系周期恰为 (q/p)·T☾，如 3:1 的 T ≈ 9.1 天），可选 `amplitude`（距地心距离 min/max 均值，118,000–200,000 km）沿族行走命中目标（周期随振幅漂移）；族生成按振幅窗口收集成员。`valid_ranges` 同步导出 RO 的振幅与共振比值域。DRO→RO 转移测试改用 `design_ro` 生成的 3:1 RO，不再依赖外部数据文件。(#627)
+
+### Fixed
+- **CR3BP 传播退化弧段少点报错**：`propagate_cr3bp` 对宽度 < 1e-12 的弧段（如周期轨道相位取模绕回 ~0 的重传播）时间界判据一步不走、末点不发射，报 "output length mismatch"；现循环推进到全部请求点发射完毕。(#627)
+
 ## [5.9.5] - 2026-09-07
 
 ### Changed

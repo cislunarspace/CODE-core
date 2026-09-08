@@ -57,6 +57,8 @@ def make_design_request(orbit_type: str, **overrides) -> SimpleNamespace:
         "phase_in": None,
         "phase_out": None,
         "perilune_height": None,
+        "resonance_p": None,
+        "resonance_q": None,
         "inclination": None,
         "arg_of_pericenter": None,
         "semi_major_axis": None,
@@ -226,6 +228,23 @@ def _corrected_triangular_l4_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbi
     return orbit, result
 
 
+@pytest.fixture(scope="session")
+def _corrected_ro_31_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
+    """RO 3:1（共振轨道）：固定半周期（精确通约 T = T☾/3），自由 x0/vy0；
+    共振周期条件的 Kepler 圆轨道初猜（与 design_ro 种子同一路径）。"""
+    from e2m2e.algorithm.family.cr3bp_orbits import _ro_kepler_guess
+
+    dynamics = earth_moon_dynamics
+    state, period = _ro_kepler_guess(dynamics, 3, 1)
+    seed = _seed_orbit(dynamics, state, period)
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_2D_symmetric_x_fixed_t(period / 2.0)
+    result = corrector.iterate_correction(seed, verbose=False)
+    orbit = result.orbit
+    assert orbit is not None, "RO 3:1 修正未收敛"
+    return orbit, result
+
+
 # ---- 函数级 deepcopy 包装：单测可安全改写，session 缓存不受影响 ----
 
 
@@ -262,4 +281,10 @@ def corrected_dpo(_corrected_dpo_cached):
 @pytest.fixture
 def corrected_triangular_l4(_corrected_triangular_l4_cached):
     orbit, result = _corrected_triangular_l4_cached
+    return copy.deepcopy(orbit), result
+
+
+@pytest.fixture
+def corrected_ro_31(_corrected_ro_31_cached):
+    orbit, result = _corrected_ro_31_cached
     return copy.deepcopy(orbit), result

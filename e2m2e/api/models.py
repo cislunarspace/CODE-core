@@ -18,7 +18,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from e2m2e.algorithm.results import ResultStatus
 from e2m2e.data.constants import SECONDS_PER_DAY
-from e2m2e.data.templates import SEGMENTED_CORRECTION_ORBIT_TYPES, ConvergenceState, FailureCause
+from e2m2e.data.templates import (
+    RO_SUPPORTED_RESONANCES,
+    SEGMENTED_CORRECTION_ORBIT_TYPES,
+    ConvergenceState,
+    FailureCause,
+)
 from e2m2e.data.templates.perturbations import DEFAULT_PERTURBATION
 from e2m2e.data.templates.seed import _HALO_FOLD_Z0, CHAR_LENGTH_KM
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
@@ -151,6 +156,18 @@ _GLOBAL_AMPLITUDE_OUT_RANGES = _with_global_amplitude_out(_range_map())
 _DRO_DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 110000.0)))
 _SPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
 _LPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1000.0, 110000.0)))
+#: RO（共振轨道）：同一顺行近圆族贯穿五档共振（各档精确成员是该族上的
+#: 点），五个锚点的实测可达包络一致（约 117,000–222,000 km）；值域
+#: [118,000, 200,000] km 取包络内缩与 amplitude 字段上限的交集，对全比例
+#: 诚实可达。resonance_p/q 为包围盒粗筛，合法对
+#: （RO_SUPPORTED_RESONANCES）由校验器裁决。
+_RO_RANGES = _with_global_amplitude_out(
+    _range_map(
+        amplitude=NumericRange(118000.0, 200000.0),
+        resonance_p=NumericRange(2, 4),
+        resonance_q=NumericRange(1, 3),
+    )
+)
 _HORSESHOE_RANGES = _with_global_amplitude_out(
     _range_map(amplitude=NumericRange(50000.0, 110000.0))
 )
@@ -162,6 +179,7 @@ _ORBIT_TYPE_RANGES: Mapping[str, Mapping[str, NumericRange]] = MappingProxyType(
         "NRHO": _with_global_amplitude_out(
             _range_map(perilune_height=NumericRange(100.0, 40000.0))
         ),
+        "RO": _RO_RANGES,
         "L4": _GLOBAL_AMPLITUDE_OUT_RANGES,
         "L5": _GLOBAL_AMPLITUDE_OUT_RANGES,
         "AXIAL": _with_global_amplitude_out(_range_map(amplitude=NumericRange(-60000.0, 60000.0))),
@@ -202,9 +220,13 @@ class DesignOrbitRequest(_ApiModel):
     duration 统一用秒。
     """
 
-    orbit_type: str = Field(description="DRO/DPO/NRHO/HALO/LISSAJOUS/L4/L5/AXIAL/.../ELFO")
+    orbit_type: str = Field(description="DRO/DPO/NRHO/HALO/LISSAJOUS/L4/L5/AXIAL/RO/.../ELFO")
     # CR3BP 形状参数（字段约束为跨类型全局上下限；model_validator 内按类型收紧）
     amplitude: float | None = Field(default=None, ge=-110000.0, le=200000.0)
+    resonance_p: int | None = Field(
+        default=None, ge=1, description="共振比卫星侧整数（p:q = 卫星:月球），仅 RO 用"
+    )
+    resonance_q: int | None = Field(default=None, ge=1, description="共振比月球侧整数，仅 RO 用")
     phase: float | None = Field(default=None, ge=0.0, le=1.0)
     collinear_point: int | None = Field(default=None, ge=1, le=3)
     north_south: int | None = Field(default=None, ge=1, le=2)
@@ -400,9 +422,23 @@ class DesignOrbitRequest(_ApiModel):
                 self.amplitude = 100000.0
             if self.phase is None:
                 self.phase = 0.0
+        elif sel == "RO":
+            if self.resonance_p is None:
+                self.resonance_p = 3
+            if self.resonance_q is None:
+                self.resonance_q = 1
+            if (self.resonance_p, self.resonance_q) not in RO_SUPPORTED_RESONANCES:
+                raise ValueError(
+                    f"RO 共振比 {self.resonance_p}:{self.resonance_q} 不支持；"
+                    f"支持 {'/'.join(f'{p}:{q}' for p, q in sorted(RO_SUPPORTED_RESONANCES))}"
+                    "（顺行内共振，p:q = 卫星:月球）"
+                )
+            # amplitude 缺省保持 None：返回精确通约成员（周期恰为 (q/p)·T☾）
+            if self.phase is None:
+                self.phase = 0.0
         else:
             raise ValueError(
-                f"orbit_type 必须为 DRO/DPO/NRHO/HALO/LISSAJOUS/L4/L5/AXIAL"
+                f"orbit_type 必须为 DRO/DPO/NRHO/HALO/LISSAJOUS/L4/L5/AXIAL/RO"
                 f"/L4_SPO/L5_SPO/L4_LPO/L5_LPO/L4_HORSESHOE/L5_HORSESHOE/ELFO，当前 {sel!r}"
             )
         self._dispatch_correction_method(sel)
@@ -966,8 +1002,8 @@ class SpacetimeTransformResponse(ResultResponse):
 # 折叠点（同 seed._HALO_FOLD_Z0，按平动点区分）。
 # ---------------------------------------------------------------------------
 
-#: orbit_type → 允许的平动点取值域。DRO 是月心族不绑定平动点（空元组），
-#: DPO 等其余无平动点族不进本模型。
+#: orbit_type → 允许的平动点取值域。DRO（月心族）与 RO（地心族）不绑定
+#: 平动点（空元组），DPO 等其余无平动点族不进本模型。
 _FAMILY_LIBRATION_POINT_RANGES: Mapping[str, tuple[int, ...]] = MappingProxyType(
     {
         "HALO": (1, 2),
@@ -978,6 +1014,7 @@ _FAMILY_LIBRATION_POINT_RANGES: Mapping[str, tuple[int, ...]] = MappingProxyType
         "LPO": (4, 5),
         "HORSESHOE": (4, 5),
         "DRO": (),
+        "RO": (),
     }
 )
 
@@ -1064,6 +1101,15 @@ _FAMILY_SPECIFIC_FIELDS: Mapping[str, frozenset[str]] = MappingProxyType(
             }
         ),
         "DRO": frozenset({"min_amplitude_km", "max_amplitude_km", "sampling_mode"}),
+        "RO": frozenset(
+            {
+                "resonance_p",
+                "resonance_q",
+                "min_amplitude_km",
+                "max_amplitude_km",
+                "sampling_mode",
+            }
+        ),
     }
 )
 _FAMILY_OPTION_VALUES: Mapping[str, Mapping[str, tuple[str, ...]]] = MappingProxyType(
@@ -1101,6 +1147,7 @@ _FAMILY_OPTION_VALUES: Mapping[str, Mapping[str, tuple[str, ...]]] = MappingProx
             }
         ),
         "DRO": MappingProxyType({"sampling_mode": ("natural-x0",)}),
+        "RO": MappingProxyType({"sampling_mode": ("natural-x0",)}),
     }
 )
 
@@ -1112,9 +1159,9 @@ class FamilyGenerationRequest(_ApiModel):
     Facade 映射到各族算法参数。按 ``orbit_type`` 分派校验取值域
     （与 ``DesignOrbitRequest`` 同构）：共线族（Halo/NRHO/Axial）仅
     L1/L2，Lissajous 支持 L1/L2/L3，三角族（SPO/LPO/Horseshoe）仅
-    L4/L5，DRO 是月心族不绑定平动点（请求不得携带 ``libration_point``）。
-    八族均已实现：周期族返回严格周期成员，Lissajous
-    返回拟周期有界轨迹的参数采样（族上显式标注 quasi-periodic）。
+    L4/L5，DRO 是月心族、RO 是地心族，均不绑定平动点（请求不得携带
+    ``libration_point``）。九族均已实现：周期族返回严格周期成员，
+    Lissajous 返回拟周期有界轨迹的参数采样（族上显式标注 quasi-periodic）。
 
     按族适用的字段：
 
@@ -1123,14 +1170,16 @@ class FamilyGenerationRequest(_ApiModel):
     - LISSAJOUS：``amplitude_in_km``、``amplitude_out_km``、``phase_in``、``phase_out``
     - SPO/LPO/HORSESHOE：振幅上下限、延拓方向与 ``match_tolerance_km``
     - DRO：振幅上下限（距月心距离 min/max 均值，km）
+    - RO：``resonance_p``/``resonance_q`` + 振幅上下限（距地心距离
+      min/max 均值，km）
 
     ``sampling_mode`` 显式登记各族固定的首版采样规则；传入其他规则会
     结构化拒绝，而不是静默改用默认算法。
     """
 
-    orbit_type: str = Field(description="HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO")
+    orbit_type: str = Field(description="HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO/RO")
     libration_point: int | None = Field(
-        default=None, ge=1, le=5, description="平动点编号：1=L1 … 5=L5；缺省按族填默认；DRO 不适用"
+        default=None, ge=1, le=5, description="平动点编号：1=L1 … 5=L5；缺省按族填默认；DRO/RO 不用"
     )
     max_amplitude_km: float | None = Field(
         default=None,
@@ -1140,8 +1189,12 @@ class FamilyGenerationRequest(_ApiModel):
     )
     min_amplitude_km: float | None = Field(
         default=None,
-        description="族振幅下限（km），仅 SPO/LPO/HORSESHOE/DRO 用",
+        description="族振幅下限（km），仅 SPO/LPO/HORSESHOE/DRO/RO 用",
     )
+    resonance_p: int | None = Field(
+        default=None, ge=1, description="共振比卫星侧整数（p:q = 卫星:月球），仅 RO 用"
+    )
+    resonance_q: int | None = Field(default=None, ge=1, description="共振比月球侧整数，仅 RO 用")
     north_south: int | None = Field(
         default=None, ge=1, le=2, description="北/南族：1=北，2=南；仅 NRHO 用"
     )
@@ -1234,6 +1287,14 @@ class FamilyGenerationRequest(_ApiModel):
             amp_range = NumericRange(1737.0, 110000.0)
             ranges["min_amplitude_km"] = amp_range
             ranges["max_amplitude_km"] = amp_range
+        elif selection == "RO":
+            # 与 DesignOrbitRequest 的 RO 包络同源（_RO_RANGES 注释：
+            # 五档共振同一顺行近圆族，可达包络一致）
+            amp_range = NumericRange(118000.0, 200000.0)
+            ranges["min_amplitude_km"] = amp_range
+            ranges["max_amplitude_km"] = amp_range
+            ranges["resonance_p"] = NumericRange(2, 4)
+            ranges["resonance_q"] = NumericRange(1, 3)
         else:  # SPO/LPO/HORSESHOE：声明范围不得超出可达包络
             if selection == "SPO":
                 amp_range = NumericRange(1737.0, 75000.0)
@@ -1342,6 +1403,21 @@ class FamilyGenerationRequest(_ApiModel):
                 self.min_amplitude_km = 2000.0
             if self.max_amplitude_km is None:
                 self.max_amplitude_km = 60000.0
+        elif sel == "RO":
+            if self.resonance_p is None:
+                self.resonance_p = 3
+            if self.resonance_q is None:
+                self.resonance_q = 1
+            if (self.resonance_p, self.resonance_q) not in RO_SUPPORTED_RESONANCES:
+                raise ValueError(
+                    f"RO 共振比 {self.resonance_p}:{self.resonance_q} 不支持；"
+                    f"支持 {'/'.join(f'{p}:{q}' for p, q in sorted(RO_SUPPORTED_RESONANCES))}"
+                    "（顺行内共振，p:q = 卫星:月球）"
+                )
+            if self.min_amplitude_km is None:
+                self.min_amplitude_km = 120000.0
+            if self.max_amplitude_km is None:
+                self.max_amplitude_km = 180000.0
         else:  # SPO/LPO/HORSESHOE
             if self.min_amplitude_km is None:
                 self.min_amplitude_km = 50000.0 if sel == "HORSESHOE" else 2000.0
@@ -1356,7 +1432,7 @@ class FamilyGenerationRequest(_ApiModel):
                 raise ValueError(
                     f"{sel} {field} 应在 {numeric_range.format_interval()}，实际 {value}"
                 )
-        if sel in ("SPO", "LPO", "HORSESHOE", "DRO"):
+        if sel in ("SPO", "LPO", "HORSESHOE", "DRO", "RO"):
             assert self.min_amplitude_km is not None
             assert self.max_amplitude_km is not None
             if self.min_amplitude_km >= self.max_amplitude_km:

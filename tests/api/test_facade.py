@@ -90,6 +90,53 @@ class TestFacadeDelegation:
         assert exc_info.value.status is ConvergenceState.MAX_ITERATIONS
         assert exc_info.value.cause is FailureCause.MAX_ITERATIONS_REACHED
 
+    def test_design_ro_dispatch_and_taxonomy_labels(self, monkeypatch):
+        """RO：校验层放行并把共振比传给算法层；响应对参考轨道实测打标（#627）。"""
+        import e2m2e.algorithm.design as design_module
+        from e2m2e.algorithm.design.design_orbit import OrbitDesignResult
+        from e2m2e.algorithm.family.cr3bp_orbits import design_ro
+        from e2m2e.data.types.trajectory import EphemerisTable
+
+        ro_orbit = design_ro(3, 1)
+        captured: dict[str, Any] = {}
+
+        def fake_design(request, **kwargs):
+            captured["request"] = request
+            n = 1
+            return OrbitDesignResult(
+                orbit_type="RO",
+                epoch_utc="2024-01-01T00:00:00",
+                duration_day=1.0,
+                output_step_sec=3600.0,
+                initial_state=np.zeros(6),
+                ephemeris=EphemerisTable(
+                    year=np.zeros(n, dtype=int),
+                    month=np.zeros(n, dtype=int),
+                    day=np.zeros(n, dtype=int),
+                    hour=np.zeros(n, dtype=int),
+                    minute=np.zeros(n, dtype=int),
+                    second=np.zeros(n),
+                    position_km=np.zeros((n, 3)),
+                    velocity_mps=np.zeros((n, 3)),
+                    synodic_position=np.zeros((n, 3)),
+                ),
+                cr3bp_orbit=ro_orbit,
+                cr3bp_jacobi=float("nan"),
+                correction=None,
+                correction_method="two_level",
+                force_config={},
+            )
+
+        monkeypatch.setattr(design_module, "design_orbit", fake_design)
+        response = Facade().design_orbit(orbit_type="RO")
+
+        request = captured["request"]
+        assert (request.resonance_p, request.resonance_q) == (3, 1)
+        assert request.amplitude is None
+        assert response.status is ConvergenceState.CONVERGED
+        # 3:1 RO（T = T☾/3）实测分类命中共振标签
+        assert "resonant_3_1" in response.taxonomy_labels
+
     def test_low_thrust_passes_engine_and_solver_params_to_algorithm(self, monkeypatch):
         import e2m2e.algorithm.transfer as transfer
 
@@ -287,6 +334,17 @@ class TestFacadeCallChains:
                 "design_dro_family",
                 {"min_amplitude_km": 5000.0, "max_amplitude_km": 20000.0},
                 (5000.0, 20000.0),
+            ),
+            (
+                "RO",
+                "design_ro_family",
+                {
+                    "resonance_p": 3,
+                    "resonance_q": 1,
+                    "min_amplitude_km": 148000.0,
+                    "max_amplitude_km": 156000.0,
+                },
+                (3, 1, 148000.0, 156000.0),
             ),
         ],
     )

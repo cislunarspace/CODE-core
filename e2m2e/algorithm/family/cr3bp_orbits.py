@@ -24,7 +24,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from ...data.templates import ConvergenceState, FailureCause
+from ...data.templates import RO_SUPPORTED_RESONANCES, ConvergenceState, FailureCause
 from ...data.templates.seed import (  # noqa: F401
     _AXIAL_SEED_VZ0,
     _DPO_SEED_PERIOD,
@@ -290,6 +290,81 @@ def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
     return orbit
 
 
+def _ro_kepler_guess(dynamics: CR3BP_Dynamics, p: int, q: int) -> tuple[np.ndarray, float]:
+    """p:q 共振的 Kepler 圆轨道初猜：+x 轴穿越点状态与旋转系周期。
+
+    旋转系周期 T = (q/p)·T☾（p:q = 卫星:月球，与分类学 resonant_p_q
+    一致）；惯性频率 n = 1 + p/q（顺行内共振，每个旋转系周期绕质心
+    恰一圈）。轨道近圆，初猜取 +x 轴上的圆轨道点（近地点在 +x）。
+    """
+    mu = float(dynamics.system.mu)
+    n = 1.0 + p / q
+    a = ((1.0 - mu) / n**2) ** (1.0 / 3.0)
+    x0 = a - mu  # 地心距 a 的 +x 穿越点（地心在 x = -mu）
+    vy0 = float(np.sqrt((1.0 - mu) / a)) - x0  # 顺行圆轨道的旋转系 y 速度
+    period = (q / p) * 2.0 * np.pi
+    return np.array([x0, 0.0, 0.0, 0.0, vy0, 0.0]), period
+
+
+def _correct_ro_exact(dynamics: CR3BP_Dynamics, p: int, q: int) -> Orbit:
+    """修正精确共振成员：固定半周期 T = (q/p)·T☾，自由 x0 与 vy0。
+
+    固定周期的 x 轴对称修正把 Kepler 初猜压到精确通约的周期轨道上
+    （镜面定理保证闭合）；成员在族上的位置由周期锚定，振幅随 CR3BP
+    修正略有移动。
+    """
+    state, period = _ro_kepler_guess(dynamics, p, q)
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_2D_symmetric_x_fixed_t(period / 2.0)
+    seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
+    seed.period = period
+    return _correct_or_raise(corrector, seed, f"RO({p}:{q})")
+
+
+def _correct_ro(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit) -> Orbit:
+    """在 +x 轴穿越点 ``x0`` 处修正 RO 族成员（固定 x0，自由 vy0 与半周期）。
+
+    族行走沿共振族离开精确通约点时周期随之漂移；伪解判定对照初猜
+    （上一步成员）周期：跳变超过 ±20% 即视为多圈伪解，交由族行走退
+    半步重试（RO 族周期随 x0 双向变化，故双侧判定，与 DRO 单侧不同）。
+    """
+    state = guess.states[0].copy()
+    state[0] = x0
+    assert guess.period is not None
+    period = guess.period
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_2D_symmetric_x_fixed_x0(x0=x0)
+    seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
+    seed.period = period
+    orbit = _correct_or_raise(corrector, seed, f"RO(x0={x0:.6f})")
+    assert orbit.period is not None
+    if abs(orbit.period - period) > 0.2 * period:
+        raise Cr3bpOrbitError(
+            f"RO(x0={x0:.6f}) 修正跳到异周期伪解（T={orbit.period:.3f}，初猜 {period:.3f}）"
+        )
+    return orbit
+
+
+def _earth_distance_minmax(
+    dynamics: CR3BP_Dynamics, orbit: Orbit, n_points: int = 4000
+) -> tuple[float, float]:
+    """传播一个周期，返回距地心距离的最小/最大值（无量纲）。
+
+    与 ``_moon_distance_minmax`` 同一测量路径（4000 点采样压制近点
+    采样噪声），族行走与测试断言共用。
+    """
+    assert orbit.period is not None  # 周期轨道必有 period
+    minimum, maximum = orbit_family_metric_py(
+        float(dynamics.system.mu),
+        "earth-distance",
+        0,
+        orbit.states[0],
+        float(orbit.period),
+        sample_count=n_points,
+    )
+    return float(minimum), float(maximum)
+
+
 def _correct_halo(
     dynamics: CR3BP_Dynamics, z0: float, libration_point: int, guess: Orbit | None
 ) -> Orbit:
@@ -467,6 +542,64 @@ def design_dpo(
         dp_init=0.02,
         max_step=0.05,
         tol=tol_km / du,
+    )
+
+
+def design_ro(
+    p: int,
+    q: int,
+    amplitude_km: float | None = None,
+    *,
+    dynamics: CR3BP_Dynamics | None = None,
+    tol_km: float = 20.0,
+) -> Orbit:
+    """生成 p:q 共振轨道（RO）：绕地质心的顺行近圆周期轨道。
+
+    p:q = 卫星:月球，旋转系周期 T = (q/p)·T☾（与分类学 resonant_p_q
+    一致）。不指定 ``amplitude_km`` 时返回精确共振成员：从共振周期
+    条件的 Kepler 圆轨道初猜出发，固定半周期修正到精确通约。指定
+    振幅时以 +x 轴穿越点 ``x0`` 为族参数，从精确成员出发沿族行走
+    命中目标（命中 ``tol_km`` 内即停）；行走离开精确通约点，周期
+    随振幅漂移。
+
+    振幅定义：一个周期内距地心距离最小/最大值的均值（km），与
+    ``design_dro`` 的月心距定义同构。
+
+    支持 ``RO_SUPPORTED_RESONANCES`` 五档顺行内共振（2:1/3:1/3:2/4:1/
+    4:3）；其余比值的初猜不可靠，明确拒绝。
+
+    References:
+        Vaquero & Howell (2014). Design of transfer trajectories between
+        resonant orbits in the Earth–Moon restricted problem. Acta
+        Astronautica 94(1).
+    """
+    if (p, q) not in RO_SUPPORTED_RESONANCES:
+        raise ValueError(
+            f"不支持的共振比 {p}:{q}；RO 支持 "
+            f"{'/'.join(f'{pp}:{qq}' for pp, qq in sorted(RO_SUPPORTED_RESONANCES))}"
+            "（顺行内共振，p:q = 卫星:月球）"
+        )
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    seed = _correct_ro_exact(dynamics, p, q)
+    if amplitude_km is None:
+        return seed
+    du = dynamics.system.characteristic_length
+    assert du is not None
+
+    def measure(orbit: Orbit) -> float:
+        d_min, d_max = _earth_distance_minmax(dynamics, orbit)
+        return 0.5 * (d_min + d_max)
+
+    return _walk_family(
+        correct_at=lambda x0, guess: _correct_ro(dynamics, x0, _require_orbit(guess)),
+        measure=measure,
+        target=amplitude_km / du,
+        p_seed=float(seed.states[0, 0]),
+        dp_init=0.005,
+        max_step=0.01,
+        tol=tol_km / du,
+        seed_orbit=seed,
     )
 
 
@@ -1285,7 +1418,7 @@ def design_horseshoe(
 
 
 # ---------------------------------------------------------------------------
-# Facade 轨道族生成适配器。八族数值生成均经 generate_rust_family 单次调用；
+# Facade 轨道族生成适配器。九族数值生成均经 generate_rust_family 单次调用；
 # 本节只保留参数守卫、领域分派和兼容返回投影。
 # ---------------------------------------------------------------------------
 
@@ -1329,6 +1462,63 @@ def design_dro_family(
         0,
         n_orbits,
         dynamics,
+        min_amplitude_km=min_amplitude_km,
+        max_amplitude_km=max_amplitude_km,
+    )
+
+
+def design_ro_family(
+    p: int,
+    q: int,
+    min_amplitude_km: float,
+    max_amplitude_km: float,
+    *,
+    n_orbits: int = 50,
+    dynamics: CR3BP_Dynamics | None = None,
+) -> FamilyGenerationResult:
+    """生成 RO 族：p:q 共振族中振幅落入请求范围的成员。
+
+    振幅定义同 ``design_ro``（一个周期内距地心距离 min/max 均值，km）。
+    RO 不绑定平动点；种子 = 精确共振成员（固定半周期修正），族参数为
+    +x 轴穿越点 ``x0``，单次自然参数延拓双向行走（修正失败步长减半），
+    收集振幅落入 ``[min_amplitude_km, max_amplitude_km]`` 的成员，至多
+    ``n_orbits`` 条，按振幅升序排列。行走离开精确通约点，成员周期随
+    振幅漂移。
+
+    Args:
+        p: 共振比卫星侧整数（p:q = 卫星:月球，支持集见
+            ``RO_SUPPORTED_RESONANCES``）。
+        q: 共振比月球侧整数。
+        min_amplitude_km: 族振幅下限（km）。
+        max_amplitude_km: 族振幅上限（km）。
+        n_orbits: 族成员数量上限。
+        dynamics: CR3BP 动力学；缺省构造标准地月系统。
+
+    Returns:
+        :class:`FamilyGenerationResult`；``family`` 是 RO 成员组成的
+        ``OrbitFamily``（``family_type="ro"``），软失败时保留部分成员。
+    """
+    if (p, q) not in RO_SUPPORTED_RESONANCES:
+        raise ValueError(
+            f"不支持的共振比 {p}:{q}；RO 支持 "
+            f"{'/'.join(f'{pp}:{qq}' for pp, qq in sorted(RO_SUPPORTED_RESONANCES))}"
+            "（顺行内共振，p:q = 卫星:月球）"
+        )
+    if dynamics is None:
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+    if n_orbits < 1:
+        raise ValueError(f"n_orbits 必须大于 0，当前为 {n_orbits}")
+    if min_amplitude_km <= 0.0 or min_amplitude_km >= max_amplitude_km:
+        raise ValueError("振幅范围必须满足 0 < min_amplitude_km < max_amplitude_km")
+    from .rust_generation import generate_rust_family
+
+    return generate_rust_family(
+        "ro",
+        0,
+        n_orbits,
+        dynamics,
+        resonance_p=p,
+        resonance_q=q,
         min_amplitude_km=min_amplitude_km,
         max_amplitude_km=max_amplitude_km,
     )

@@ -1,4 +1,4 @@
-//! 八类 CR3BP 轨道族的统一 Rust 生成模块。
+//! 九类 CR3BP 轨道族的统一 Rust 生成模块。
 //!
 //! 该模块的接口是一次请求、一次返回；种子、修正、延拓、步长、筛选和
 //! 结构化终止全部藏在接口后。PyO3 适配器只把已校验参数翻成内部 `Spec`。
@@ -9,6 +9,7 @@ mod dro;
 mod halo;
 mod lissajous;
 mod nrho;
+mod ro;
 mod triangular;
 mod types;
 
@@ -45,6 +46,8 @@ fn build_spec(
     phase_out: Option<f64>,
     continuation_direction: Option<&str>,
     match_tolerance_km: Option<f64>,
+    resonance_p: Option<u32>,
+    resonance_q: Option<u32>,
     n_periods: usize,
 ) -> Result<Spec, String> {
     match family_type {
@@ -103,6 +106,13 @@ fn build_spec(
             })
         }
         "dro" => Ok(Spec::Dro {
+            min_amplitude_km: required(min_amplitude_km, "min_amplitude_km", family_type)?,
+            max_amplitude_km: required(max_amplitude_km, "max_amplitude_km", family_type)?,
+            member_limit: n_orbits,
+        }),
+        "ro" => Ok(Spec::Ro {
+            resonance_p: required(resonance_p, "resonance_p", family_type)?,
+            resonance_q: required(resonance_q, "resonance_q", family_type)?,
             min_amplitude_km: required(min_amplitude_km, "min_amplitude_km", family_type)?,
             max_amplitude_km: required(max_amplitude_km, "max_amplitude_km", family_type)?,
             member_limit: n_orbits,
@@ -176,6 +186,20 @@ fn generate(context: Context, spec: Spec) -> Result<Outcome, String> {
             max_amplitude_km,
             member_limit,
         } => dro::generate(context, min_amplitude_km, max_amplitude_km, member_limit),
+        Spec::Ro {
+            resonance_p,
+            resonance_q,
+            min_amplitude_km,
+            max_amplitude_km,
+            member_limit,
+        } => ro::generate(
+            context,
+            resonance_p,
+            resonance_q,
+            min_amplitude_km,
+            max_amplitude_km,
+            member_limit,
+        ),
     }
 }
 
@@ -276,7 +300,7 @@ fn generate_windowed(
         .collect()
 }
 
-/// 一次调用完成八类 CR3BP 轨道族生成。
+/// 一次调用完成九类 CR3BP 轨道族生成。
 fn validate_context(
     mu: f64,
     characteristic_length_km: f64,
@@ -315,6 +339,8 @@ fn validate_context(
     phase_out=None,
     continuation_direction=None,
     match_tolerance_km=None,
+    resonance_p=None,
+    resonance_q=None,
     n_periods=3,
     rtol=1e-12,
     atol=1e-12,
@@ -338,6 +364,8 @@ pub fn generate_cr3bp_family_py(
     phase_out: Option<f64>,
     continuation_direction: Option<&str>,
     match_tolerance_km: Option<f64>,
+    resonance_p: Option<u32>,
+    resonance_q: Option<u32>,
     n_periods: usize,
     rtol: f64,
     atol: f64,
@@ -367,6 +395,8 @@ pub fn generate_cr3bp_family_py(
         phase_out,
         continuation_direction,
         match_tolerance_km,
+        resonance_p,
+        resonance_q,
         n_periods,
     )
     .map_err(PyValueError::new_err)?;
@@ -410,6 +440,8 @@ pub fn generate_cr3bp_family_py(
     phase_out=None,
     continuation_direction=None,
     match_tolerance_km=None,
+    resonance_p=None,
+    resonance_q=None,
     n_periods=3,
     rtol=1e-12,
     atol=1e-12,
@@ -434,6 +466,8 @@ pub fn generate_cr3bp_family_windows_py(
     phase_out: Option<f64>,
     continuation_direction: Option<&str>,
     match_tolerance_km: Option<f64>,
+    resonance_p: Option<u32>,
+    resonance_q: Option<u32>,
     n_periods: usize,
     rtol: f64,
     atol: f64,
@@ -469,6 +503,8 @@ pub fn generate_cr3bp_family_windows_py(
         phase_out,
         continuation_direction,
         match_tolerance_km,
+        resonance_p,
+        resonance_q,
         n_periods,
     )
     .map_err(PyValueError::new_err)?;
@@ -772,6 +808,104 @@ mod tests {
         // 双向覆盖：种子（≈90,786 km）两侧都有成员
         assert!(amplitudes.first().unwrap() < &90_000.0);
         assert!(amplitudes.last().unwrap() > &91_000.0);
+    }
+
+    #[test]
+    fn ro_members_stay_in_window_and_sorted_by_amplitude() {
+        // 3:1 精确共振种子的振幅约 151,800 km：窗口跨种子，双向行走后
+        // 按振幅升序输出，两侧成员都存在
+        let result = generate(
+            context(),
+            Spec::Ro {
+                resonance_p: 3,
+                resonance_q: 1,
+                min_amplitude_km: 145_000.0,
+                max_amplitude_km: 158_000.0,
+                member_limit: 6,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.status, "converged", "{}", result.message);
+        assert_eq!(result.members.len(), 6);
+        let amplitudes: Vec<f64> = result
+            .members
+            .iter()
+            .map(|member| member.amplitude_km.unwrap())
+            .collect();
+        assert!(amplitudes.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(amplitudes
+            .iter()
+            .all(|amp| (145_000.0..=158_000.0).contains(amp)));
+        // 双向覆盖：种子两侧都有成员
+        assert!(amplitudes.first().unwrap() < &151_000.0);
+        assert!(amplitudes.last().unwrap() > &152_000.0);
+        // 全部成员周期轨道闭合
+        for member in &result.members {
+            assert!(member.closure_error.is_some_and(|closure| closure <= 1e-8));
+        }
+    }
+
+    #[test]
+    fn ro_seed_period_is_exactly_commensurate() {
+        // 精确共振成员：旋转系周期 T = (q/p)·2π
+        let result = generate(
+            context(),
+            Spec::Ro {
+                resonance_p: 2,
+                resonance_q: 1,
+                min_amplitude_km: 180_000.0,
+                max_amplitude_km: 190_000.0,
+                member_limit: 2,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.status, "converged", "{}", result.message);
+        let seed_period = std::f64::consts::PI; // 2:1 → T = π
+        assert!(result.members.iter().any(|member| member
+            .period
+            .is_some_and(|period| { (period - seed_period).abs() / seed_period < 1e-6 })));
+    }
+
+    #[test]
+    fn ro_rejects_unsupported_resonance_and_degenerate_window() {
+        // 不支持的共振比 → 结构化软失败（invalid_input）
+        let result = generate(
+            context(),
+            Spec::Ro {
+                resonance_p: 1,
+                resonance_q: 2,
+                min_amplitude_km: 145_000.0,
+                max_amplitude_km: 158_000.0,
+                member_limit: 2,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.status, "failed");
+        assert_eq!(result.cause, "invalid_input");
+        assert!(result.members.is_empty());
+        // 退化窗口 / 零成员上限 → 硬错误（同 DRO 语义）
+        assert!(generate(
+            context(),
+            Spec::Ro {
+                resonance_p: 3,
+                resonance_q: 1,
+                min_amplitude_km: 158_000.0,
+                max_amplitude_km: 145_000.0,
+                member_limit: 1,
+            }
+        )
+        .is_err());
+        assert!(generate(
+            context(),
+            Spec::Ro {
+                resonance_p: 3,
+                resonance_q: 1,
+                min_amplitude_km: 145_000.0,
+                max_amplitude_km: 158_000.0,
+                member_limit: 0,
+            }
+        )
+        .is_err());
     }
 
     #[test]

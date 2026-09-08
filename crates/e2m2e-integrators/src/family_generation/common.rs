@@ -1,4 +1,5 @@
-//! 七类轨道族共享的传播、修正、模态和度量实现。
+//! 八类轨道族（Axial/DRO/Halo/NRHO/RO/SPO/LPO/Horseshoe）共享的传播、修正、
+//! 模态和度量实现。
 
 use crate::differential_correction::{run_correction, CorrectionRawResult};
 use crate::family::collinear_center_modes;
@@ -251,6 +252,88 @@ pub(crate) fn correct_planar_fixed_x(
     )
 }
 
+/// 支持生成的共振比 (p, q)：顺行内共振五档（与 Python 侧
+/// ``RO_SUPPORTED_RESONANCES`` 同源）；其余比值的初猜不可靠。
+pub(crate) const RO_SUPPORTED_RESONANCES: &[(u32, u32)] = &[(2, 1), (3, 1), (3, 2), (4, 1), (4, 3)];
+
+/// RO 精确共振种子：p:q 共振（旋转系周期 T = (q/p)·T☾，p:q = 卫星:月球）
+/// 的 Kepler 圆轨道初猜 + 固定半周期修正（自由 x0、vy0；镜面定理闭合）。
+pub(crate) fn correct_ro_seed(
+    context: Context,
+    resonance_p: u32,
+    resonance_q: u32,
+) -> Result<PeriodicOrbit, Failure> {
+    if !RO_SUPPORTED_RESONANCES.contains(&(resonance_p, resonance_q)) {
+        return Err(invalid_failure(format!(
+            "不支持的共振比 {resonance_p}:{resonance_q}（RO 支持 2:1/3:1/3:2/4:1/4:3）"
+        )));
+    }
+    let n = 1.0 + resonance_p as f64 / resonance_q as f64;
+    let a = ((1.0 - context.mu) / (n * n)).cbrt();
+    let x0 = a - context.mu;
+    let vy0 = ((1.0 - context.mu) / a).sqrt() - x0;
+    let period = (resonance_q as f64 / resonance_p as f64) * 2.0 * std::f64::consts::PI;
+    correct(
+        context,
+        [x0, 0.0, 0.0, 0.0, vy0, 0.0],
+        period / 2.0,
+        &[1, 3],
+        &[0, 4],
+        false,
+        false,
+        1e-12,
+        50,
+    )
+}
+
+/// RO 族成员修正：固定 +x 穿越点 x0，自由 vy0 与半周期。周期跳变超
+/// ±20% 判为异周期伪解，交由族行走退半步重试（RO 族周期随 x0 双向
+/// 变化，双侧判定，与 DRO 单侧不同）。
+pub(crate) fn correct_ro_fixed_x(
+    context: Context,
+    x0: f64,
+    guess: &PeriodicOrbit,
+) -> Result<PeriodicOrbit, Failure> {
+    let mut state = guess.state;
+    state[0] = x0;
+    state[1] = 0.0;
+    state[3] = 0.0;
+    state[5] = 0.0;
+    let orbit = correct(
+        context,
+        state,
+        guess.period / 2.0,
+        &[1, 3],
+        &[4, 6],
+        false,
+        false,
+        1e-12,
+        50,
+    )?;
+    if (orbit.period - guess.period).abs() > 0.2 * guess.period {
+        return Err(Failure {
+            status: "diverged",
+            cause: "divergence_detected",
+            message: format!("RO(x0={x0:.6}) 修正跳到异周期伪解"),
+        });
+    }
+    Ok(orbit)
+}
+
+/// RO 振幅（km）：一个周期内距地心距离最小/最大值的均值，与 Python
+/// ``design_ro`` 同一定义；4000 点采样保证与单轨入口的测量一致。
+pub(crate) fn ro_amplitude_km(context: Context, orbit: &PeriodicOrbit) -> Result<f64, Failure> {
+    let (minimum, maximum) = metric_minmax(
+        context,
+        orbit.state,
+        orbit.period,
+        "earth-distance",
+        0,
+        4000,
+    )?;
+    Ok(0.5 * (minimum + maximum) * context.characteristic_length_km)
+}
+
 fn halo_initial_guess(mu: f64, point: u8, z0: f64) -> Result<([f64; 6], f64), Failure> {
     let (x_l, omega_xy, _, _) = collinear_center_modes(mu, point).map_err(invalid_failure)?;
     let (k, delta) = match point {
@@ -378,6 +461,10 @@ pub(crate) fn metric_minmax(
         let value = match metric {
             "moon-distance" => {
                 let dx = sample[0] - (1.0 - context.mu);
+                (dx * dx + sample[1] * sample[1] + sample[2] * sample[2]).sqrt()
+            }
+            "earth-distance" => {
+                let dx = sample[0] + context.mu;
                 (dx * dx + sample[1] * sample[1] + sample[2] * sample[2]).sqrt()
             }
             "l45-distance" => {
