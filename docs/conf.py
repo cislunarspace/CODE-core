@@ -35,6 +35,9 @@ language = "zh_CN"
 # 主题：shibuya（明暗双模式、中文排版友好）。构建机只装文档工具链，
 # 不 import 包本体。
 html_theme = "shibuya"
+# 组织 logo 与站点图标（docs/_static/，Sphinx 默认静态目录）
+html_logo = "_static/logo.png"
+html_favicon = "_static/favicon.ico"
 
 # autoapi 的静态导入解析无法解析 Rust 扩展符号（e2m2e.integrators.*），
 # 告警属预期而非文档缺陷；[docutils] 告警全部来自 autoapi 对 Google 风格
