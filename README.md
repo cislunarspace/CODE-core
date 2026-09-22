@@ -6,6 +6,7 @@
 [![CI](https://github.com/cislunarspace/CODE-core/actions/workflows/ci.yml/badge.svg)](https://github.com/cislunarspace/CODE-core/actions/workflows/ci.yml)
 [![GitHub stars](https://img.shields.io/github/stars/cislunarspace/CODE-core.svg)](https://github.com/cislunarspace/CODE-core/stargazers)
 [![Rust: 1.98.0](https://img.shields.io/badge/rust-1.98.0-orange.svg)](https://www.rust-lang.org/)
+[![Docs](https://img.shields.io/badge/docs-在线文档-blue)](https://cislunarspace.github.io/CODE-core/)
 
 e2m2e 是地月空间**算法工具集**。
 
@@ -120,6 +121,13 @@ uv pip install "e2m2e[mcp]"
 - 角动量管理：姿态发动机联合控制。
 
 ## 文档
+
+在线文档（教程 / 示例 / API 参考）见 <https://cislunarspace.github.io/CODE-core/>。本地构建：
+
+```bash
+uv pip install sphinx myst-parser sphinx-autoapi
+make docs   # 产物在 docs/_build/html/
+```
 
 设计决策记录（ADR）见 [docs/adr/](docs/adr/)，ADR 0043 起以中文书写，更早条目为英文历史存档。接口字段的权威描述在请求/响应模型的字段描述中，CLI `--help` 与 MCP schema 与之同源。
 
