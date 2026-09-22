@@ -18,7 +18,7 @@ e2m2e（Earth to Moon, Moon to Earth）仓库的开发导则。给 AI 助手与�
 
 `e2m2e/mbse/` 是独立顶层子系统（系统工程模型与需求追溯），在依赖链之外。包根 `exceptions.py` / `status.py` / `spice_ext.py` / `integrators.py` 是共享内核叶，不得 import 任何层。
 
-接口面（ADR 0043）：三个暴露类承载 `@mcp_exposed` 元数据——`Facade`（任务级：design_orbit / control_orbit / transfer_design / orbit_propagation / spacetime_transform / valid_ranges）、`Catalog`（轨道库 + 族生成，8 方法）、`Spatiography`（分区分析，5 方法）。`tool_inventory(Facade())` 是工具面唯一清单，MCP（`api/mcp/tools.py`）、CLI（`api/cli/main.py`）、sidecar 全部纯派生自它，无生成文件。工具 description 取 docstring 首行。
+接口面（ADR 0043）：三个暴露类承载 `@mcp_exposed` 元数据——`Facade`（任务级：design_orbit / control_orbit / transfer_design / orbit_propagation / spacetime_transform / valid_ranges）、`Catalog`（轨道库 + 族生成）、`Spatiography`（分区分析）。`tool_inventory(Facade())` 是工具面唯一清单，MCP（`api/mcp/tools.py`）、CLI（`api/cli/main.py`）、sidecar 全部纯派生自它，无生成文件。工具 description 取 docstring 首行。
 
 ```mermaid
 flowchart TD
@@ -83,7 +83,7 @@ make setup          # 首次拉取 CSPICE 编译包 + SPICE 内核
 - 入口：`e2m2e/api/cli/main.py`（CLI，console script `e2m2e`）、`e2m2e/api/mcp/server.py::create_server`、`e2m2e/api/mcp/worker.py`（长任务子进程）、`e2m2e/api/sidecar/__init__.py::run_loop`、`crates/e2m2e-integrators/src/lib.rs` 的 `#[pymodule] _integrators`
 - 配置：`pyproject.toml`（构建/lint/pytest/coverage/依赖全在此）、`Cargo.toml`（workspace）、`Makefile`、`rust-toolchain.toml`（Rust 1.98.0）、`.python-version`（3.13）、`uv.lock`
 - 契约与关键模块：`e2m2e/api/facade.py`（`mcp_exposed`、`tool_inventory`、组合根）、`e2m2e/api/execution.py`、`e2m2e/api/models.py`、`e2m2e/api/frames.py`、`e2m2e/status.py`、`e2m2e/exceptions.py`、`e2m2e/spice_ext.py`、`e2m2e/integrators.py`（数值层门面）
-- 流程文档：`CONTEXT.md`（术语表，唯一 glossary）、`CONTRIBUTING.md`、`docs/adr/`（架构决策权威）、`CHANGELOG.md`（面向调用方，已发布条目不可变）
+- 流程文档：`CONTEXT.md`（术语表，唯一 glossary）、`CONTRIBUTING.md`、`docs/adr/`（架构决策记录）、`CHANGELOG.md`（面向调用方，已发布条目不可变）
 
 ## Runtime & Tooling Preferences
 
