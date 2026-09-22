@@ -111,8 +111,8 @@ fmt:  ## 就地格式化（Rust + Python）
 	$(UV) ruff check --fix .
 
 # 在线文档站（issue #651）：一次性依赖安装 `uv pip install sphinx myst-parser
-# sphinx-autoapi`（或 `uv sync --extra docs`，会触发项目 Rust 构建，不装项目则
-# 用前者）。
+# sphinx-autoapi shibuya`（或 `uv sync --extra docs`，会触发项目 Rust 构建，不装
+# 项目则用前者）。
 docs:  ## 构建在线文档站（Sphinx，零告警；产物 docs/_build/html）
 	$(UV) python -m sphinx -W --keep-going -b html docs docs/_build/html
 
