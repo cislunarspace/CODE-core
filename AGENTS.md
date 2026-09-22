@@ -1,207 +1,134 @@
 # AGENTS.md
 
-## 交流语言
+e2m2e（Earth to Moon, Moon to Earth）仓库的开发导则。给 AI 助手与贡献者：先看 “Architecture & Data Flow” 与 “Development Commands”，改动前遵守 “Code Conventions” 与 “Testing & QA”。
 
-与用户交流、Agent 回复，始终用中文。仓库文档一律中文，不再维护英文文档（决定于 2026-09：精力有限，英文面无受众；历史英文版在 git 历史中可查）：
+## Project Overview
 
-- README.md 即中文（原 README.zh-CN.md 已并入，不另设镜像）；
-- ADR 自 0043 起中文书写，0001–0042 为英文历史存档，不再翻译、不再维护；
-- 原 Sphinx 英文文档站已整体删除（含部署工作流与 docs 依赖组）；
-- 注释与 docstring 一律中文（含 MCP 工具描述与 CLI 帮助——它们取自 docstring 首行）；存量英文代码注释随触碰渐进中文化，不做一次性回改。
+地月空间算法工具集：CR3BP 转移轨道设计、任务轨道设计与保持、轨道预报、时空坐标转换、轨道库与地月空间分区分析。Python 包 `e2m2e`（v5.9.5，Apache-2.0）+ Rust 数值内核（PyO3/maturin 单扩展 `e2m2e._integrators`）。对外三条调用链：进程内 import、MCP（`e2m2e mcp-serve`）、CLI（`e2m2e`），GUI 经 sidecar stdio 协议（`e2m2e serve-stdio`）。
 
-commit message 维持中文（conventional commits 前缀 + 中文描述）；PR 描述与 issue 文本用中文。commit 标题不用破折号（——）：标题分隔用冒号或逗号。AI 生成的 issue 与 PR 标题最前面加 [AI Generated] 标记（位于类型标签之前），正文首行注明工具；未正确标记的不予受理。
+## Architecture & Data Flow
+
+五层架构（ADR 0011/0012/0039），自底向上严格单向依赖，由 `scripts/check_layer_imports.py`（`make check` 一步）硬门禁：
+
+1. `e2m2e/data/`：常数、星历、坐标系数据、类型与模板、轨道库存储
+2. `crates/`（Rust）：数值层——积分器、力模型、SPICE FFI、水平集/HJB
+3. `e2m2e/algorithm/`：动力学与力模型编排、轨道族、微分修正、转移、spatiography
+4. `e2m2e/api/`：Facade / Catalog / Spatiography 暴露类 + MCP/CLI/sidecar
+5. `e2m2e/tools/`：日志等辅助
+
+`e2m2e/mbse/` 是独立顶层子系统（系统工程模型与需求追溯），在依赖链之外。包根 `exceptions.py` / `status.py` / `spice_ext.py` / `integrators.py` 是共享内核叶，不得 import 任何层。
+
+接口面（ADR 0043）：三个暴露类承载 `@mcp_exposed` 元数据——`Facade`（任务级：design_orbit / control_orbit / transfer_design / orbit_propagation / spacetime_transform / valid_ranges）、`Catalog`（轨道库 + 族生成）、`Spatiography`（分区分析）。`tool_inventory(Facade())` 是工具面唯一清单，MCP（`api/mcp/tools.py`）、CLI（`api/cli/main.py`）、sidecar 全部纯派生自它，无生成文件。工具 description 取 docstring 首行。
+
+```mermaid
+flowchart TD
+    CLI[cli/main.py] --> EX[execution.execute_tool]
+    MCP[mcp/server.py] --> EX
+    SC[sidecar run_loop] --> EX
+    EX --> EN[envelope.dispatch_tool<br/>Pydantic 校验 + 异常翻译]
+    EN --> F[Facade / Catalog / Spatiography]
+    F --> A[algorithm/ 编排器]
+    A --> I[e2m2e.integrators 门面 / spice_ext]
+    I --> R[e2m2e._integrators pyo3<br/>allow_threads + rayon]
+```
+
+- 执行核心 `e2m2e/api/execution.py::execute_tool` 是唯一执行入口（#601），传输层只是薄适配器。长任务（`transfer_design`、`orbit_family_generation`）走 `python -m e2m2e.api.mcp.worker` 子进程，取消 = kill。
+- 跨模块契约集中在：统一信封 `{status,data,error,meta}`（`api/mcp/envelope.py`）、每工具一对 `*Request/*Response`（`api/models.py`，`extra="forbid"` 全手写）、状态三元组 `(ConvergenceState, FailureCause, message)`（`e2m2e/status.py`）、二进制帧（`api/frames.py` 唯一实现，magic `E2M2`）、跨进程 `Config.to_payload/from_payload`、Python↔Rust ABI（`crates/e2m2e-integrators/abi-version.txt` ↔ `_py_abi_version()`）。
+- SPICE 双实例桥（ADR 0016）：Python spiceypy 与 Rust cspice 各持内核池，桥接只经 `e2m2e/spice_ext.py`。
+
+## Key Directories
+
+| 路径 | 用途 |
+|---|---|
+| `e2m2e/data/` | constants（`constants.toml` 单一来源）、kernels、frames、types、templates、catalog |
+| `e2m2e/algorithm/` | 编排层：design、family、transfer、station_keeping、dynamics、forces、solver、spatiography、normal_form、coordinate 等 |
+| `e2m2e/api/` | 接口层：facade、catalog、spatiography、models、execution、config、frames、mcp/、cli/、sidecar/ |
+| `crates/` | Rust workspace：e2m2e-integrators（绑定）、-propagation、-forces、-spice、-levelset、-hjb-dynamics；`crates/cspice` 为 vendor patch（非 member） |
+| `tests/` | 镜像源码分层：data / numerical / algorithm / api / tools / mbse / `_meta`（架构守门） |
+| `scripts/` | 开发辅助：数据下载、门禁检查、数据集生成、基准、Colab 搬运 |
+| `docs/adr/` | 架构决策记录 0001–0047（0043 起中文） |
+| `kernels/`、`e2m2e/data/catalog_baseline/` | 数据资产：SPICE 内核（`make kernels` 拉取）、CR3BP 基线数据集（不随包分发，ADR 0047） |
+
+## Development Commands
+
+```bash
+make dev            # 唯一开发入口：setup + uv sync + maturin develop（debug）
+make test           # 全量：Rust 工作区 + Python
+make test-python    # pytest tests/ -n auto --dist loadscope
+make test-rust      # cargo test --workspace -- --test-threads=1
+make check          # 格式 + lint + 类型/层级检查（与 ci.yml 逐条对齐）
+make fmt            # 就地格式化（cargo fmt + ruff format + ruff check --fix）
+make setup          # 首次拉取 CSPICE 编译包 + SPICE 内核
+```
+
+- **切勿裸跑 `uv sync`**（editable 触发扩展构建、与 make dev 重复，#478）；`uv run` 一律带 `--no-sync`。
+- 单跑示例：`uv run --no-sync python -m pytest tests/api/test_cli.py::TestWorker::test_cancel`、`uv run --no-sync python -m pytest tests/algorithm -m "not spice"`、`cargo test -p e2m2e-forces srp_jacobian -- --test-threads=1`。
+- `scripts/generate_catalog_baseline.py` / `backfill_baseline_taxonomy.py` 用 `.venv/bin/python` 直跑，不用 `uv run`（docstring 明示）。
+- `make check` 与 `.github/workflows/ci.yml` 命令须保持对齐：CI 不调 make，改任一边同步另一边。
+
+## Code Conventions & Common Patterns
+
+- **格式**：ruff（`line-length = 100`，`target-version = "py310"`，select `E,F,W,I,UP,B,SIM`）+ `cargo fmt`（默认风格）+ `cargo clippy -D warnings` + `mypy e2m2e/ --ignore-missing-imports`。别引入它们之外的格式化风格。
+- **命名**：Python 模块/函数 `snake_case`、类 PascalCase（`CR3BP_System` 为例外保留名）、模块显式 `__all__`、私有 `_` 前缀；每工具 `*Request`/`*Response` 成对；错误码 SCREAMING_SNAKE 字符串（`INVALID_PARAMS` / `TOOL_NOT_FOUND` / `WORKER_CRASHED` / `INTERNAL_ERROR`）。Rust FFI 入口 `*_py` 后缀（`propagate_cr3bp_py`）、SPICE 包装 `spice_*` 前缀、结果 pyclass `*Result`（`#[pyclass(frozen, get_all)]`）。
+- **错误处理**（ADR 0020/0024）：确定性失败抛异常（`E2M2EError` 层次，`exceptions.py`）；不可行搜索不抛异常，返回状态三元组（`status.py`）；禁止隐式降级——Rust 扩展缺失抛 `RustExtensionUnavailableError`，绝不静默回退 Python/scipy。api 边界统一翻译：`OrbitError` → 原 code，Pydantic `ValidationError` → `INVALID_PARAMS`，其余 → `INTERNAL_ERROR` 且不泄 traceback。
+- **异步**：核心全同步；async 只在 MCP 传输层（anyio，短任务 `to_thread.run_sync`，长任务 `open_process`）。Rust 长计算 `py.allow_threads` 释放 GIL + rayon 并行，环境开关 `E2M2E_*_PARALLEL`。进度回调形状 `cb(fraction, message)`，回调异常吞掉不中断计算。
+- **依赖注入 / 状态**：`Config`（`api/config.py`）构造注入 Facade，环境变量取默认（`SPICE_KERNEL_DIR`、`E2M2E_CATALOG_DIR`、`E2M2E_CATALOG_ENABLED` 等）；无全局单例。轨道库 `records/*.json+*.npz` 为事实来源、`catalog.db` SQLite 为派生索引，逐记录原子写；catalog 默认关，入库是调用方显式决定（ADR 0045/0047）。
+- **Pydantic 边界**：Pydantic 只出现在 `e2m2e/api/`；算法层用 numpy/dataclass，保留细粒度 API。
+- **新增 MCP 工具**：algorithm 层实现 → 暴露类方法加 `@mcp_exposed(request_model=…)` → 工具清单自动派生（MCP/CLI/sidecar 同步）→ 钉工具数的 `tests/api/test_facade.py` 更新 → `make check`。工具面数量以跑 `tool_inventory()` 报告为准，不从文档引用（ADR 0043）。
+- **物理常量**：单一来源 `e2m2e/data/constants/constants.toml`（build.rs 生成 Rust const，`constant_value_py` 同源核对）。容差分两档：研究级 `1e-12`（动力学基准）vs 筛选级 `1e-9~1e-10`（网格筛选、测试套件）。
+- 注释、docstring、commit message、issue/PR 一律中文（详见下文 “交流语言”）。
+
+## Important Files
+
+- 入口：`e2m2e/api/cli/main.py`（CLI，console script `e2m2e`）、`e2m2e/api/mcp/server.py::create_server`、`e2m2e/api/mcp/worker.py`（长任务子进程）、`e2m2e/api/sidecar/__init__.py::run_loop`、`crates/e2m2e-integrators/src/lib.rs` 的 `#[pymodule] _integrators`
+- 配置：`pyproject.toml`（构建/lint/pytest/coverage/依赖全在此）、`Cargo.toml`（workspace）、`Makefile`、`rust-toolchain.toml`（Rust 1.98.0）、`.python-version`（3.13）、`uv.lock`
+- 契约与关键模块：`e2m2e/api/facade.py`（`mcp_exposed`、`tool_inventory`、组合根）、`e2m2e/api/execution.py`、`e2m2e/api/models.py`、`e2m2e/api/frames.py`、`e2m2e/status.py`、`e2m2e/exceptions.py`、`e2m2e/spice_ext.py`、`e2m2e/integrators.py`（数值层门面）
+- 流程文档：`CONTEXT.md`（术语表，唯一 glossary）、`CONTRIBUTING.md`、`docs/adr/`（架构决策记录）、`CHANGELOG.md`（面向调用方，已发布条目不可变）
+
+## Runtime & Tooling Preferences
+
+- **运行时**：Python `>=3.10`（开发/CI 用 3.13）；Rust 钉死 1.98.0（`rust-toolchain.toml`）。无 Node/Bun/Docker。
+- **包管理**：uv（`uv.lock` 入库为锁真理；`Cargo.lock` 不入库）。Python-Rust 构建用 maturin（`features = ["spice", "extension-module"]`，后者仅 cdylib 构建启用、`cargo test` 不启用）。
+- **构建前置**：`CSPICE_DIR`（`scripts/download_cspice.py` 供预编译包，禁走 NAIF 官网下载）、`LIBCLANG_PATH`（bindgen）。Makefile 自动导出。
+- **Windows 一等公民**：`make PYTHON=python` 覆盖解释器；mypy/pytest 一律 `python -m` 调用（uv 垫片 trampoline 问题）；`cargo test` 需 `python3.dll` 在 PATH（Makefile 内置处理）。
+- **加依赖**：先问现有库/标准库能否做；Python 运行时依赖进 `[project].dependencies`，可重依赖拆 optional 组惰性导入（`normal-form`/`mcp` 模式）；Rust 依赖版本统一进 `[workspace.dependencies]`；变更须说明理由。
+- **CI**：`ci.yml` = lint + typecheck（PR 门禁）；测试不进 CI——`release.yml`（tag `v*`）跑 `cargo test`，Python 全量套件本地跑、发布前人工全量回归（ADR 0021/0037）。
+
+## Testing & QA
+
+- **框架**：pytest 9 + pytest-xdist + pytest-cov（无 pytest-timeout/hypothesis/pytest-mock；mock 用内置 `monkeypatch`）；Rust 用 `cargo test`（内联 `#[cfg(test)]` + `crates/*/tests/`）。
+- **组织**：`tests/` 镜像源码分层；每个用例**恰好一个**功能类主标记（`theory`/`integrator`/`force`/`data`/`orchestration`/`interface`/`aux`），`spice`/`low_thrust` 正交叠加；`tests/_meta/test_functional_marker_conservation.py` 守门。不按速度快慢分层（无 slow/e2e）。
+- **时间预算**（ADR 0037）：单用例 ≤10s（call 阶段，`tests/time_budget.py` 机器强制，`@pytest.mark.time_budget(<秒>)` 豁免须注释依据）、单文件 ≤60s（人工纪律）。超预算压规模（小振幅/短弧/粗网格/筛选用容差），不可压的移出 pytest 到 `scripts/`。
+- **断言口径**（ADR 0013）：按物理定义验收（解析解、守恒量、对称性、文献公式）；禁 golden-file 对比、禁与外部软件运行时输出对拍。mock 只用于批边界胶水、失败语义钉子（如 Rust 符号缺失须上抛不回退）、进程生命周期（fake worker）。
+- **惯例**：环境能力缺失 → skip（`requires_spice`、`requires_native_symbols`），代码错误 → fail；昂贵计算用 module-scope fixture / `functools.cache` 共享，禁止测试体内重复生成；临时文件用 `tmp_path`；容差用筛选级。
+- **覆盖**：`coverage fail_under=55`（branch coverage）；无 make/CI 入口，手动 `uv run --no-sync python -m pytest --cov`。
+- **验证分层**：先跑受影响模块测试 + `make check`；跨模块、共享契约、影响不明 → `make test` 全量。修 bug 先写复现测试（红→修→绿）并保留为回归测试。
+
+---
+
+以下为写作与编码的存量约定，全部适用。
 
 ## 写作要求
 
-所有面向人读的文本（注释与 docstring、CONTEXT.md、ADR、issue 评论、PR 描述、agent brief、triage notes、Agent 回复），无论英文还是中文，都遵守以下原则。中文文本不用直角引号「」，用弯引号（#550 惯例）。
+所有面向人读的文本（注释、CONTEXT.md、ADR、issue 评论、PR 描述、agent brief、triage notes、Sphinx 文档、Agent 回复）应当：
 
-- **善于总结材料**：材料弄全弄准，去粗取精、去伪存真、由此及彼、由表及里，反映事物本质；不堆砌细节、不拼凑清单。
-- **真懂才能写好**：反复改都写不清楚，往往是因为对所写的内容还不大懂；真懂了，才有高屋建瓴、势如破竹之势。
-- **逻辑清晰**：整篇文章前后次序有逻辑，交代清楚。
-- **用词准确**：相邻概念划清界限，不混用、不模糊。概念要抓住事物的本质、全体和内部联系，而非现象、片面和外部联系。
-- **观点鲜明**：不堆砌凑数、聚沙成堆。不用夸大的修饰词（”权威””强大””完整””单一事实来源”之类），它们减损力量。
-- **废话应当尽量除去**。
-- **读得下去是基本要求**：文字通顺，让人读得下去、读后脑中有印象；读完脑中无印象，是极差的文章。
-- **通俗、亲切，由小讲到大，由近讲到远，引人入胜**：先讲读者已知／当前的事物，再推到陌生／抽象的；忌一上来就宏大叙事或先搬死人、外国人。
-- **与读者完全平等**：靠分析说服，不要装腔作势来吓人；老老实实办事。
-- **动笔前想受众**：这篇东西给谁看？谁受益？怎样让更多人受益？
+- 准确、清楚、简洁；先理解材料，再提炼结论。
+- 按逻辑组织，区分相近概念；不用空泛、夸大的修饰语。
+- 面向实际读者，从已知事实推到陌生结论；用分析说服，不装腔或堆砌。
+- 全仓库文档不得使用直角引号「」，引号用弯引号（“”）。
 
 ## 编码准则
 
-LLM 写代码时会犯一些可以预见的错误，同样几个，一遍又一遍。以下是规则，需要严格遵守。
-
-### 1. 写代码前先读懂
-
-LLM 产出烂代码最大的根源，就是写新代码之前没有读懂现有代码库。你看到一个任务，匹配到训练数据里的某个模式，就开始生成。这通常导致代码不贴合项目实际。
-
-写任何东西之前：
-
-- 把你要改的文件读一遍。不是略读，是读。
-- 看看项目里别处是怎么做类似事情的。有范式就照着来；有工具函数已经做了一半你需要的事，就用它。
-- 看文件顶部的 import，它们告诉你这个项目实际在用什么库。numpy 能做的就别为此引 scipy 的对应函数，标准库 `math`/`datetime` 够用的就别加第三方库。
-- 看测试文件，它们告诉你预期行为到底是什么。
-
-如果你不是 100% 确定某个方法以这个确切签名存在，查文档或看项目里的真实源码。自信地用一个不存在的 API 或已移除的参数，是典型的知识幻觉。
-
-如果你不确定这个项目里某件事是怎么做的，就说出来。“我在代码库里没看到 X 的范式，是该照 Y 的做法来，还是另起炉灶？”永远比瞎猜强。
-
-### 2. 动手前先想清楚
-
-没想清楚到底要做什么之前，别开始写代码。
-
-**把假设说出来。** 用户说“加个鉴权”，可能指 session cookie、JWT、OAuth、basic auth，或其他五种东西。别默默选一个。说“我假设你要的是基于 JWT 的鉴权，带 refresh token，存在 httpOnly cookie 里。如果你想要别的，告诉我。”
-
-**点明取舍。** 几乎每个实现选择都有代价。加缓存就拿内存换速度，还引入了缓存失效这件此后得操心的事。写之前说清楚，用户可能说“其实我不要这个复杂度”。
-
-**做了架构决策，要标出来。** 这些选择难以撤销，用户应当知道。
-
-**存在多种做法时，简要地列出来。** 两种，顶多三种，带上推荐。“A 更简单，但处理不了边界情况 X。B 全 cover，但引入对 Z 的依赖。除非你预期 X 真会发生，否则我选 A。”
-
-**有搞不懂的地方，停下。** 别用听起来像那么回事的代码去填糊涂。直接说哪里搞不懂，问。
-
-### 3. 避免过度工程
-
-写解决问题所需的最少代码，不是理论上能解决问题的最少代码，而是此刻真正解决这个具体问题的最少代码。
-
-过度工程的冲动很强。抵制它。典型表现：
-
-**过早抽象。** 用户要的只是 `sendWelcomeEmail(user)`，你却写了一个带策略模式、支持多家供应商的 EmailService。以后真需要更多，他们会开口。
-
-```python
-# 差
-class EmailService:
-    def __init__(self, provider: EmailProvider, template_engine: TemplateEngine):
-        self.provider = provider
-        self.template_engine = template_engine
-
-    async def send(self, template: str, context: dict, recipient: str, **kwargs):
-        rendered = self.template_engine.render(template, context)
-        await self.provider.send(recipient, rendered, **kwargs)
-
-# 好
-async def send_welcome_email(user):
-    body = f"Welcome {user.name}! Your account is ready."
-    await send_email(to=user.email, subject="Welcome", body=body)
-```
-
-重复远比错误的抽象便宜。先 copy-paste 两次，再谈抽象。
-
-**投机式的错误处理。** 为不可能发生的错误包 try/catch，对永远不为 null 的值加 null 检查，每一行都是别人得读懂的一行。只处理真正会发生的错误。
-
-**没必要的可配置性。** 你把 batch size 做成参数，把重试次数做成可配置，为永远不会变的东西加环境变量。每个配置项都是某人要做的一个决定、要设对的一个值。在有真正的理由之前，硬编码。
-
-**死灵活性。** 只有一个实现的接口、只有一个子类的抽象基类，有成本（认知开销、间接层），在第二个实现真正出现之前零收益。
-
-检验：不熟项目的人问“这干嘛要这么抽象？”，而答案是“万一我们需要……”，那就是过度工程了。“万一我们需要”不是需求，是对未来的猜测，而对未来的猜测通常是错的。
-
-### 4. 精准改动
-
-改现有代码时，diff 越小越好。你改的每一行都可能引入 bug、都得有人 review、还会永远留在 git blame 里。
-
-**别动没让你动的东西。** 修函数 A 的 bug，注意到函数 B 的变量名很怪，别管。函数 C 的注释有个错别字，别管。import 顺序不合你意，别管。你的活是修函数 A 的 bug。
-
-**贴合现有风格。** 文件用单引号你就用单引号，用 `snake_case` 你就用 `snake_case`。文件内的一致性胜过你的个人偏好。
-
-**收拾自己留下的，不收拾别人的。** 你的改动让某个 import 没用了，就删掉。但仅限你的改动导致的，既存的死代码不归你管。
-
-**别重新格式化。** Python 侧交给 ruff format、Rust 侧交给 rustfmt，别引入它们之外的格式化风格，别把原本不按字母序的 import 重排。重新格式化制造海量 diff，淹没你真正的改动。
-
-检验：diff 里每一行改动都能直接对应到被要求的事上。有“既然都进来了，顺手……”的，撤掉。
-
-### 5. 验证
-
-“能跑的代码”和“你以为能跑的代码”之间，差的就是测试。
-
-**修 bug 时先写测试。** 先写一个能复现 bug 的测试，看它挂，然后修 bug，看它过。这是唯一能证明你确实修好了、而不是让症状消失的办法。
-
-**按改动范围分层验证。** 先跑受影响模块的测试和必要静态检查（`make test-python` / `make test-rust` 与 `make check` 是现成入口）；改前能跑的同范围检查改后也应通过。跨模块、共享契约、基础设施、依赖升级，或影响范围无法可靠判断时，再扩大到相关集成测试、全量测试或 CI 指定的回归套件。改前就失败的，说出来，别让你的改动替既存失败背锅。
-
-**测行为，不测实现。** 检查构造函数有没有设好属性的测试一文不值；检查校验是否真的拦住坏输入的测试才有价值。
-
-**想想 happy path 之外的情况。** API 返回 500 时怎样？文件不存在时？用户提交空表单时？
-
-**写不了测试，就说明原因。** “数据库调用跟业务逻辑紧耦合，没法轻松测”，这是个可能需要重构的信号。别默默跳过测试然后指望没事。
-
-### 6. 目标驱动
-
-每个任务在动手前都该有清晰的成功标准。标准模糊，就把它变具体；变不出具体的，就问。
-
-把模糊任务转成可验证的：
-
-- “加校验” → “拦掉邮箱缺失或非法的输入，返回 400 并说明哪里错了，为这两种情况都加测试”
-- “修 bug” → “写一个复现上报行为的测试，让它通过，确认现有测试仍通过”
-- “提升性能” → “先 profile，定位瓶颈，修那一个具体问题，再测一次”
-
-超过一步的活，执行前先说出计划：
-
-```
-计划：
-1. 在 algorithm 层实现新算法函数，docstring 用中文
-2. 接入对应暴露类的方法（Facade 任务方法 / Catalog 轨道库 / Spatiography 分区分析，ADR 0043），声明 mcp_exposed 元数据
-3. MCP 工具清单随之派生更新
-4. 为新行为写测试：恰好一个功能类标记，遵守单用例 10 秒 / 单文件 60 秒预算
-5. 跑受影响模块的测试和静态检查；若改动跨模块或影响范围不清，再扩大回归范围
-```
-
-这让用户能在你浪费时间之前逮到思路失误，也逼你自己把步骤想过一遍。
-
-### 7. 调试
-
-出了问题不工作时，别猜。调查。
-
-**把错误信息读完。** 整条，包括 stack trace。看到错误就立刻基于类型生成“修复”，根本不读它说了什么，这是常见的坏毛病。一个 TypeError 可能指一百种情况，信息和 stack trace 告诉你是哪一种。
-
-**先复现。** 复现不了就没法验证修复。“我觉得这应该能修好”不是调试，是赌博。
-
-**一次只改一处。** 改了三处然后 bug 没了，你不知道是哪一处修好的，也不知道另外两处有没有引入新 bug。改一处，测。再改一处，测。
-
-**没搞懂根因之前，别加 workaround。** 一个值意外为 null，搞清楚它为什么是 null。null 检查也许能防崩溃，但底下的 bug 还在，以后会换个样子冒出来。
-
-**卡住了就说。** “我试了 X 和 Y 都没用，我看到的是这些，觉得问题可能在 Z 但没把握。”这比默默瞎试 20 轮有用得多。
-
-### 8. 依赖
-
-加依赖之前先想想。你加的每一个依赖都是一段你不掌控的代码，却要永久成为项目的一部分，得维护、更新、审计安全问题。代价几乎总比看上去高。
-
-加包之前：
-
-- 项目已有的东西能不能做？numpy/scipy 能算的就别再加功能重复的数值库；Rust workspace 里已有的 crate 就别再加重复的。
-- 标准库能不能做？`math` 有的函数就别为此引 numpy，`datetime` 能处理的就别加第三方库。
-- 看最近提交日期和 issue 情况，判断它是否还在维护。
-- 它多大？为了格式化日期加个 500KB 的包，多半不值。
-
-真要加时说明原因。默默往 pyproject.toml 或 Cargo.toml 塞依赖，不行。
-
-### 9. 沟通
-
-你怎么就代码沟通，跟代码本身一样重要。
-
-**说你做了什么、为什么。** “我把校验逻辑抽到单独的函数里，因为它在三个 endpoint 里重复了。这也让它能独立测试。”用户不用逐行读就懂了这次改动。
-
-**标出顾虑。** “这个能跑，但对列表里每一项都打一次数据库，列表一大就会慢。要不要我改成批量？”这种主动沟通能在以后省下几个小时。
-
-**精确说出你不确定的是什么。** “我不确定这个库支不支持流式响应”，有用。“我觉得这应该能行”，没用。差别在于前者让用户清楚该去验证什么。
-
-**别解释用户已经知道的事。** 把解释的层次对齐到用户展现出来的知识水平。
-
-**commit message 要具体。** “Fix bug”毫无用处。“修好用户查询里的空指针，当邮箱含大写字符时”才能让下一个人清楚发生了什么。
-
-### 10. 常见失败模式
-
-这些是我最常看到的模式。如果你逮住自己在干其中任何一件，停下来重新想想。
-
-**厨房水槽。** 让你加一个功能，你“顺手”重构半个代码库。别。做那一件事。
-
-**错误的抽象。** 你为一个只在一处存在的问题，造了一个漂亮的通用方案。先 copy-paste 两次，再谈抽象。
-
-**隐形决策。** 你做了架构选择，却没有把它作为一项决策标出来。用户应当知道你做了它。
-
-**乐观路径。** 你写的代码把 happy path 处理得完美，对其他一切要么忽略要么崩溃。想想 API 返回 500 时会怎样。文件不存在时。用户提交空表单时。
-
-**知识幻觉。** 你自信地用一个并不存在的 API、一个两个版本前就被移除的参数、或一个想象出来的库特性。如果你不是 100% 确定某个方法以这个确切签名存在，就说出来。查文档。看项目里的真实源码。
-
-**风格漂移。** 你用自己”偏好”的风格写代码，而不是贴合项目。在 numpy 向量化的模块里写 Python 标量循环；在 Rust 热路径里频繁跨界调 Python；在中文注释的文件里夹英文段落。贴合代码库，不是贴合你的偏好。
-
-**失控重构。** 你开始修一处。它碰到另一处。那处又碰到另一处。二十分钟后你改了 15 个文件，不确定自己最初要干什么。如果修复开始级联，停下。告诉用户发生了什么。继续之前先取得同意。
-
-这些准则起作用的标志是：diff 里不必要改动更少、因过度复杂而返工更少、澄清问题发生在实现之前而不是犯错之后。
+- **先理解再改动**：完整阅读目标文件、相似实现和相关测试；不确定 API 或惯例时查源码或文档，不猜。
+- **明确目标与决策**：需求或验收条件不明确时先澄清；架构选择、假设和关键取舍要说明。
+- **保持简单**：只实现当前需求。复用已有模式；不为单一用例过早抽象、配置化或引入依赖。
+- **精准修改**：只改与任务直接相关的代码，贴合既有风格；删掉本次修改产生的废弃代码，不重格式化无关内容。
+- **完整迁移**：变更接口或行为时更新所有调用方、测试和文档；不保留无需求的兼容层。
+- **按根因修复**：先复现并读完整错误信息；一次处理一个原因，不用吞异常或特判掩盖问题。
+- **验证行为**：按影响范围运行相关检查；测试可观察行为、边界和错误路径，不测试实现细节。无法测试时说明原因并做可行的烟雾验证。
+- **审慎依赖**：优先现有依赖和标准库；新增依赖前确认必要性、维护状态和成本，并说明理由。
+- **清楚沟通**：说明做了什么、为什么、验证结果和已知风险；对不确定性给出具体事实，提交信息描述实际改动。
+
+## 交流语言
+
+始终使用中文与用户交流。代码、commit message、PR 描述等技术输出也用中文。
