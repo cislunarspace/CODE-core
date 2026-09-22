@@ -57,6 +57,13 @@ mcp = [
     "mcp>=2.1.1",
     "anyio>=4.14.2",
 ]
+# 在线文档（Sphinx）站构建工具：仅构建文档时装，运行时不需要。
+# sphinx 钉 <9：autoapi 生成页的 rst 渲染口径以 8.x 验证通过，避免大版本漂移。
+docs = [
+    "sphinx>=8,<9",
+    "myst-parser>=4",
+    "sphinx-autoapi>=3.6",
+]
 
 [project.scripts]
 e2m2e = "e2m2e.api.cli.main:main"
