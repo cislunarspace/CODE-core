@@ -125,7 +125,7 @@ uv pip install "e2m2e[mcp]"
 在线文档（教程 / 示例 / API 参考）见 <https://cislunarspace.github.io/CODE-core/>。本地构建：
 
 ```bash
-uv pip install sphinx myst-parser sphinx-autoapi
+uv pip install sphinx myst-parser sphinx-autoapi shibuya
 make docs   # 产物在 docs/_build/html/
 ```
 
