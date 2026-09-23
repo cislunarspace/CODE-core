@@ -53,7 +53,11 @@ def test_symmetric_correction_reports_stagnation_when_update_is_too_small(
 ):
     dro_corrector.stagnation_limit = np.finfo(float).max
 
-    result = dro_corrector.iterate_correction(dro_seed_orbit)
+    # 种子即周期解（1 次迭代直接收敛，不触发修正量判断）；扰动 vy0 5%
+    # 使首次迭代必须给出修正量，才能覆盖“修正量过小”分支
+    orbit = dro_seed_orbit.copy()
+    orbit.states[0, 4] *= 0.95
+    result = dro_corrector.iterate_correction(orbit)
 
     assert result.status is ConvergenceState.STAGNATED
     assert result.cause is FailureCause.STAGNATION_DETECTED
@@ -66,7 +70,11 @@ def test_full_period_correction_reports_stagnation_when_update_is_too_small(
     dro_corrector.setup_spo_fixed_x0(float(dro_seed_orbit.states[0, 0]))
     dro_corrector.stagnation_limit = np.finfo(float).max
 
-    result = dro_corrector.iterate_full_period_correction(dro_seed_orbit)
+    # 种子即周期解（1 次迭代直接收敛，不触发修正量判断）；扰动 vy0 5%
+    # 使首次迭代必须给出修正量，才能覆盖“修正量过小”分支
+    orbit = dro_seed_orbit.copy()
+    orbit.states[0, 4] *= 0.95
+    result = dro_corrector.iterate_full_period_correction(orbit)
 
     assert result.status is ConvergenceState.STAGNATED
     assert result.cause is FailureCause.STAGNATION_DETECTED

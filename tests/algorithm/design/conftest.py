@@ -126,7 +126,7 @@ def _lyapunov_l1_seed(dynamics: CR3BP_Dynamics) -> tuple[np.ndarray, float]:
 
 @pytest.fixture(scope="session")
 def _corrected_dro_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
-    """DRO 地月（Cui 2025）：固定 x0，自由 vy0 与半周期。"""
+    """DRO 地月：固定 x0，自由 vy0 与半周期（种子为周期轨道真值）。"""
     dynamics = earth_moon_dynamics
     state = np.array([seeds.DRO_X0, 0.0, 0.0, 0.0, seeds.DRO_VY0, 0.0])
     seed = _seed_orbit(dynamics, state, seeds.DRO_PERIOD)

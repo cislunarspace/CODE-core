@@ -40,10 +40,11 @@ TRIANGULAR: dict[int, dict[str, float]] = {
 
 # --- 阶段 2：修正/延拓标准种子（来源标注于各条）---
 
-# DRO 地月（Cui et al. 2025 单圈 DRO，与 tests/algorithm/conftest 一致）
+# DRO 地月（x0=0.79188556619742 处修正收敛的周期轨道真值，与 tests/algorithm/conftest 一致；
+# 本目录 μ=0.01215058560962404 下仅作初猜，实测 2 次迭代收敛到本 μ 真解）
 DRO_X0 = 0.79188556619742
-DRO_VY0 = 0.573665890385585
-DRO_PERIOD = 6.307498
+DRO_VY0 = 0.536819842572739
+DRO_PERIOD = 3.472535773770595
 
 # Halo 族种子面外振幅（无量纲，Richardson 三阶近似在小振幅下精度高；
 # 与 data/templates/seed._HALO_SEED_Z0 一致）。北族 halo_class=0。

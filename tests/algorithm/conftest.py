@@ -17,10 +17,10 @@ from e2m2e.algorithm.solver.differential_correction import DifferentialCorrectio
 from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
-# DRO 种子参数（Cui et al. 2025）——整个测试套件统一使用该种子。
+# DRO 种子参数（x0=0.79188556619742 处修正收敛的周期轨道真值）——整个测试套件统一使用该种子。
 DRO_X0 = 0.79188556619742
-DRO_VY0 = 0.573665890385585
-DRO_PERIOD_GUESS = 6.307498
+DRO_VY0 = 0.536819842572739
+DRO_PERIOD_GUESS = 3.472535773770595
 
 
 # =============================================================================
@@ -60,7 +60,7 @@ def dro_seed_orbit(dro_seed_state) -> Orbit:
 
 @pytest.fixture(scope="session")
 def _corrected_dro_cached(dro_seed_orbit) -> Orbit:
-    """每会话计算一次修正后的 DRO；代价高（5–15 次 STM 传播）。
+    """每会话计算一次修正后的 DRO；种子即周期解，1 次迭代收敛。
 
     在此处（而非经 dro_corrector）构造修正器，使缓存结果不依赖
     function 作用域的 fixture。
