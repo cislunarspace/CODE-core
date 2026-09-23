@@ -21,7 +21,7 @@
 - **标题以类型标签开头，后接一句中文行动或结果句**。Issue 用 `[FEAT]` / `[BUG]` / `[IDEA]` / `[RESEARCH]` / `[TASK]`（与所选模板对应）；PR 用意图标签 `[FEAT]` / `[FIX]` / `[DOC]` / `[TEST]` / `[CLEANUP]` / `[DEP]`（与 kind 对应）。优先级、状态等其余元信息不进标题，由 Project 字段承载。
 - **正文一句话说清核心，细节收进模板自带的折叠区**（复现步骤、验收条件等），保持正文一眼可读。
 
-使用问题、想法探讨与一般性讨论走 [Discussions](https://github.com/cislunarspace/e2m2e/discussions)，不占用 Issue。维护者会尽快给 Issue 归型并排入 Project（见下）；需要补充信息时会打上 `needs-info` 标签。
+使用问题、想法探讨与一般性讨论走 [Discussions](https://github.com/cislunarspace/CODE-core/discussions)，不占用 Issue。维护者会尽快给 Issue 归型并排入 Project（见下）；需要补充信息时会打上 `needs-info` 标签。
 
 ## 提 Pull Request
 
@@ -54,7 +54,7 @@ Issue 不用 kind 标签：GitHub 的原生 Issue Type 是组织仓库功能，�
 
 ## Project 流水线
 
-所有 Issue 进入 Project「[cislunarspace Issue Management](https://github.com/users/cislunarspace/projects/1)」，按状态推进。该面板与 [transfer-orbit-design](https://github.com/cislunarspace/transfer-orbit-design) 共用，Repository 字段区分来源：
+所有 Issue 进入 Project「[cislunarspace Issue Management](https://github.com/users/ouyangjiahong26/projects/1)」，按状态推进。该面板与 [transfer-orbit-design](https://github.com/cislunarspace/transfer-orbit-design) 共用，Repository 字段区分来源：
 
 | 状态 | 含义 |
 |---|---|

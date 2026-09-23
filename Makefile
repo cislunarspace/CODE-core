@@ -49,7 +49,7 @@ DEV_SYNC := uv sync --group dev --no-install-project
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup cspice kernels dev dev-release test test-rust test-python check fmt clean clean-tests
+.PHONY: help setup cspice kernels dev dev-release test test-rust test-python check fmt clean clean-tests docs
 
 help:  ## 显示本帮助
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -109,6 +109,12 @@ fmt:  ## 就地格式化（Rust + Python）
 	cargo fmt --all
 	$(UV) ruff format .
 	$(UV) ruff check --fix .
+
+# 在线文档站（issue #651）：一次性依赖安装 `uv pip install sphinx myst-parser
+# sphinx-autoapi shibuya`（或 `uv sync --extra docs`，会触发项目 Rust 构建，不装
+# 项目则用前者）。
+docs:  ## 构建在线文档站（Sphinx，零告警；产物 docs/_build/html）
+	$(UV) python -m sphinx -W --keep-going -b html docs docs/_build/html
 
 clean:  ## 清理 Rust 构建产物（保留 .cspice / kernels 缓存）
 	cargo clean
