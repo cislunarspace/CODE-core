@@ -4,6 +4,7 @@
 状态数组独立性与边界情况。
 """
 
+import numpy as np
 import pytest
 
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
@@ -14,7 +15,7 @@ pytestmark = pytest.mark.orchestration
 
 # 公共 fixtures 从 tests/algorithm/conftest.py 导入：
 #   dro_dynamics, dro_corrector, dro_seed_orbit, corrected_dro
-# 种子 x0=0.79188556619742, vy0=0.573665890385585, period=6.307498 来自 conftest。
+# 种子 x0=0.79188556619742, vy0=0.536819842572739, period=3.472535773770595 来自 conftest。
 # 注：corrected_dro 每次返回深拷贝，可安全 mutate。
 
 
@@ -30,6 +31,23 @@ class TestClosureErrorAttribute:
         assert corrected_dro.closure_error < 1e-6, (
             f"closure_error should be small after correction, got {corrected_dro.closure_error}"
         )
+
+
+# ============================================================
+# 种子数据完整性（#656 回归）
+# ============================================================
+class TestDroSeedIntegrity:
+    """DRO 种子常量对必须本身是周期轨道（历史曾把 1:1 共振轨道周期张冠李戴为 DRO 周期）。"""
+
+    def test_seed_state_closes_after_one_period(self, dro_dynamics, dro_seed_orbit):
+        """种子状态传播 DRO_PERIOD_GUESS 后应闭合到自身。"""
+        state0 = np.asarray(dro_seed_orbit.states[0], dtype=float)
+        result = dro_dynamics.propagate(
+            state0,
+            (0.0, float(dro_seed_orbit.period)),
+            t_eval=np.array([float(dro_seed_orbit.period)]),
+        )
+        np.testing.assert_allclose(result["states"][-1], state0, atol=1e-9)
 
 
 # ============================================================

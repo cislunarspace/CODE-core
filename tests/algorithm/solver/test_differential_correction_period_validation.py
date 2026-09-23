@@ -13,7 +13,7 @@ pytestmark = pytest.mark.orchestration
 
 # 公共 fixtures 从 tests/algorithm/conftest.py 导入：
 #   dro_dynamics, dro_corrector, dro_seed_orbit, corrected_dro
-# 种子 x0=0.79188556619742, vy0=0.573665890385585, period=6.307498 来自 conftest。
+# 种子 x0=0.79188556619742, vy0=0.536819842572739, period=3.472535773770595 来自 conftest。
 
 
 class TestPeriodValidation:
@@ -24,10 +24,10 @@ class TestPeriodValidation:
         # 创建一个有效的DRO轨道初始猜测
         x0 = 0.79188556619742
         valid_orbit = Orbit(
-            states=[[x0, 0.0, 0.0, 0.0, 0.573665890385585, 0.0]],
+            states=[[x0, 0.0, 0.0, 0.0, 0.536819842572739, 0.0]],
             times=[0],
         )
-        valid_orbit.period = 6.307498  # 有效周期
+        valid_orbit.period = 3.472535773770595  # 有效周期
 
         result = dro_corrector.iterate_correction(valid_orbit, verbose=False)
 
@@ -48,7 +48,7 @@ class TestPeriodValidation:
         """测试能收敛到有效周期轨道"""
         x0 = 0.79188556619742
         orbit = Orbit(
-            states=[[x0, 0.0, 0.0, 0.0, 0.573665890385585, 0.0]],
+            states=[[x0, 0.0, 0.0, 0.0, 0.536819842572739, 0.0]],
             times=[0],
         )
         orbit.period = 3.0  # 合理的初始周期猜测
@@ -70,7 +70,7 @@ class TestPeriodValidationEdgeCases:
         """测试非常小的初始周期（接近1e-6）"""
         x0 = 0.79188556619742
         orbit = Orbit(
-            states=[[x0, 0.0, 0.0, 0.0, 0.573665890385585, 0.0]],
+            states=[[x0, 0.0, 0.0, 0.0, 0.536819842572739, 0.0]],
             times=[0],
         )
         orbit.period = 1e-5  # 非常小但可能有效的周期
@@ -85,10 +85,10 @@ class TestPeriodValidationEdgeCases:
         """测试修正器能记录终止原因"""
         x0 = 0.79188556619742
         orbit = Orbit(
-            states=[[x0, 0.0, 0.0, 0.0, 0.573665890385585, 0.0]],
+            states=[[x0, 0.0, 0.0, 0.0, 0.536819842572739, 0.0]],
             times=[0],
         )
-        orbit.period = 6.307498
+        orbit.period = 3.472535773770595
 
         result = dro_corrector.iterate_correction(orbit, verbose=False)
 
@@ -127,10 +127,10 @@ class TestCorrectionNormTermination:
         """测试当修正量过小但误差也已足够小时能正常收敛"""
         x0 = 0.79188556619742
         orbit = Orbit(
-            states=[[x0, 0.0, 0.0, 0.0, 0.573665890385585, 0.0]],
+            states=[[x0, 0.0, 0.0, 0.0, 0.536819842572739, 0.0]],
             times=[0],
         )
-        orbit.period = 6.307498
+        orbit.period = 3.472535773770595
 
         result = dro_corrector.iterate_correction(orbit, verbose=False)
 
@@ -144,11 +144,13 @@ class TestCorrectionNormTermination:
     def test_correction_history_tracked(self, dro_corrector):
         """测试修正量历史被正确追踪"""
         x0 = 0.79188556619742
+        # 种子即周期解（1 次迭代收敛，无修正量记录）；扰动 vy0 5% 使牛顿法
+        # 走多步，才有修正量历史可追踪
         orbit = Orbit(
-            states=[[x0, 0.0, 0.0, 0.0, 0.573665890385585, 0.0]],
+            states=[[x0, 0.0, 0.0, 0.0, 0.536819842572739 * 0.95, 0.0]],
             times=[0],
         )
-        orbit.period = 6.307498
+        orbit.period = 3.472535773770595
 
         dro_corrector.iterate_correction(orbit, verbose=False)
 
