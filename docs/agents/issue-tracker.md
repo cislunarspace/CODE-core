@@ -37,7 +37,7 @@ GitHub 的 issue 和 PR 共享编号空间，所以 `#42` 可能是其中任一�
 ## GitHub Project
 
 - Issue 和 PR 都加入仓库约定的 GitHub Project；Project 是工作状态的来源，label 只表达分类、领域或分诊角色。
-- 使用 `gh project item-list <number> --owner <owner> --format json` 查询项目项，使用 `gh project item-edit --id <item-id> --project-id <project-id> --field-id <field-id> --single-select-option-id <option-id>` 更新字段。
+- 使用 `gh project item-list <number> --owner <owner> --format json --limit 1000` 查询项目项，使用 `gh project item-edit --id <item-id> --project-id <project-id> --field-id <field-id> --single-select-option-id <option-id>` 更新字段。
 - 默认状态流转：`Inbox` → `Backlog` → `Ready` → `In progress` → `In review` → `Done` / `No action`。
 - `Done` 对应 Issue 以 `Completed` 关闭；`No action` 对应 Issue 以 `Not planned` 关闭；重开的 Issue 回到 `Inbox`。
 - `Priority` 使用 `P0`–`P3`，`Start Date` 由维护者维护。具体 Project、字段 ID 和选项 ID 记录在下节。
