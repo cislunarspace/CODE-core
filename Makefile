@@ -94,7 +94,11 @@ else
 # 探测在 recipe 中求值：仅在跑 Rust 测试时执行，失败即终止，不影响其他目标。
 TEST_RUST = set -e; \
 	LIBDIR="$$("$(CURDIR)/.venv/bin/python" -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR") or "")')"; \
-	PYO3_PYTHON="$(CURDIR)/.venv/bin/python" LD_LIBRARY_PATH="$$LIBDIR$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
+    if [ -z "$$LIBDIR" ]; then \
+        echo "无法从项目 Python 获取 LIBDIR，无法准备 Rust 测试的 libpython 加载路径。" >&2; \
+        exit 1; \
+    fi; \
+    PYO3_PYTHON="$(CURDIR)/.venv/bin/python" LD_LIBRARY_PATH="$$LIBDIR$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
 	cargo test --workspace -- --test-threads=1
 endif
 
