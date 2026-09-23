@@ -14,10 +14,10 @@ from e2m2e.data.types.orbit import Orbit
 pytestmark = pytest.mark.orchestration
 
 
-# 3:1 DRO 种子（与 tests/conftest.py 一致），用于绕月弧的近拱点检测
+# DRO 种子（与 tests/algorithm/conftest.py 一致），用于绕月弧的近拱点检测
 DRO_X0 = 0.79188556619742
-DRO_VY0 = 0.573665890385585
-DRO_PERIOD = 6.307498
+DRO_VY0 = 0.536819842572739
+DRO_PERIOD = 3.472535773770595
 
 
 def _make_tube(states, times, system) -> ManifoldTube:
@@ -53,7 +53,7 @@ class TestPlaneCrossings:
     def test_plane_crossing_residual(self, cr3bp_system, cr3bp_dynamics):
         """平面截面穿越态坐标残差 < 1e-10
 
-        用 3:1 DRO 传播一个周期，检测 y=0 平面穿越。
+        用 DRO 种子轨道传播一个周期，检测 y=0 平面穿越。
         """
         x0 = np.array([DRO_X0, 0, 0, 0, DRO_VY0, 0])
         t_eval = np.linspace(0, DRO_PERIOD, 4000)
@@ -100,7 +100,7 @@ class TestPeriapsisCrossings:
     def test_periapsis_crossing_residual(self, cr3bp_system, cr3bp_dynamics):
         """近拱点穿越态 r·v 残差 < 1e-8
 
-        3:1 DRO 绕月一周有近月点与远月点，r·v = 0 穿越至少两次。
+        DRO 绕月一周有近月点与远月点，r·v = 0 穿越至少两次。
         """
         x0 = np.array([DRO_X0, 0, 0, 0, DRO_VY0, 0])
         t_eval = np.linspace(0, DRO_PERIOD, 4000)
@@ -127,4 +127,5 @@ class TestPeriapsisCrossings:
 
         moon_pos = np.array([1.0 - cr3bp_system.mu, 0.0, 0.0])
         distances = np.linalg.norm(crossings.states[:, :3] - moon_pos, axis=1)
-        assert distances.max() / distances.min() > 1.5, "应同时检出近月点与远月点"
+        # 种子 DRO 距月范围 75,328~106,244 km，近/远月点距离比实测 ≈1.41；阈值留余量
+        assert distances.max() / distances.min() > 1.2, "应同时检出近月点与远月点"

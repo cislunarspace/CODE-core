@@ -223,7 +223,11 @@ class TestIterateCorrection:
 
     def test_error_monotonically_decreasing_near_convergence(self, dro_corrector, dro_seed_orbit):
         """收敛阶段误差应大致递减"""
-        dro_corrector.iterate_correction(dro_seed_orbit)
+        # 种子即周期解（实测 1 次迭代收敛），无递减区间可断；扰动 vy0 5%
+        # 使修正走多步牛顿迭代（实测 5 次），再断言末 3 次误差递减
+        orbit = dro_seed_orbit.copy()
+        orbit.states[0, 4] *= 0.95
+        dro_corrector.iterate_correction(orbit)
 
         errors = dro_corrector.error_history
         # 至少最后3次迭代误差递减
@@ -397,7 +401,10 @@ class TestCallback:
         def on_iteration(iteration, error, converged):
             calls.append(error)
 
-        dro_corrector.iterate_correction(dro_seed_orbit, callback=on_iteration)
+        # 种子即周期解（实测 1 次迭代收敛），扰动 vy0 5% 以获得多步递减区间
+        orbit = dro_seed_orbit.copy()
+        orbit.states[0, 4] *= 0.95
+        dro_corrector.iterate_correction(orbit, callback=on_iteration)
 
         errors = calls
         for i in range(-3, -1):

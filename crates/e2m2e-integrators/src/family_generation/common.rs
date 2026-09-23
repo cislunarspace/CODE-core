@@ -10,10 +10,10 @@ use super::types::{Context, PeriodicOrbit};
 const SAMPLE_COUNT: usize = 1000;
 
 /// DRO 族标准种子（与 Python ``data/templates/seed.py`` 的 ``_DRO_SEED_*``
-/// 同源）：近侧 x 轴穿越点 x0、vy0 与名义周期，振幅约 90,786 km。
+/// 同源）：近侧 x 轴穿越点 x0、vy0 与周期，振幅约 90,786 km。
 pub(crate) const SEED_DRO_X0: f64 = 0.791_885_566_197_42;
-pub(crate) const SEED_DRO_VY0: f64 = 0.536_82;
-pub(crate) const SEED_DRO_PERIOD: f64 = 3.0;
+pub(crate) const SEED_DRO_VY0: f64 = 0.536_819_842_572_739;
+pub(crate) const SEED_DRO_PERIOD: f64 = 3.472_535_773_770_595;
 
 #[derive(Debug)]
 pub(crate) struct Failure {

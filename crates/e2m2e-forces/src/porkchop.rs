@@ -285,9 +285,10 @@ mod tests {
 
     /// 地月质量参数（DE421，与 Python 测试套件一致）。
     const MU_EM: f64 = 0.012150585609624;
-    /// DRO 种子状态（Cui et al. 2025，与 tests/algorithm/conftest.py 一致）。
-    const DRO_SEED: [f64; 6] = [0.79188556619742, 0.0, 0.0, 0.0, 0.573665890385585, 0.0];
-    const DRO_PERIOD: f64 = 6.307498;
+    /// DRO 种子状态（x0=0.79188556619742 处的周期轨道修正收敛值，与
+    /// tests/algorithm/conftest.py 一致）。
+    const DRO_SEED: [f64; 6] = [0.79188556619742, 0.0, 0.0, 0.0, 0.536819842572739, 0.0];
+    const DRO_PERIOD: f64 = 3.472535773770595;
 
     fn prop_params() -> PropagationParams {
         PropagationParams {
