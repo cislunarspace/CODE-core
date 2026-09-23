@@ -18,10 +18,10 @@ CHAR_PERIOD_SEC = 2 * 3.141592653589793 * Datum.DE421.char_time_s
 #: 月球平均半径（km），NRHO 近月点高度的起算面
 MOON_RADIUS_KM: float = MOON.mean_radius_km  # type: ignore[assignment]
 
-#: DRO 族标准种子（examples/main_design.py 等验证过的初值）
+#: DRO 族标准种子（x0=0.79188556619742 处修正收敛的周期轨道真值，闭合 ~1e-14）
 _DRO_SEED_X0 = 0.79188556619742
-_DRO_SEED_VY0 = 0.53682
-_DRO_SEED_PERIOD = 3.0
+_DRO_SEED_VY0 = 0.536819842572739
+_DRO_SEED_PERIOD = 3.472535773770595
 
 #: Halo 族种子面外振幅（无量纲，小振幅下 Richardson 近似精度高）
 _HALO_SEED_Z0 = 0.001
