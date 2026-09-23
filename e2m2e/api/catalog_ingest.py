@@ -90,6 +90,7 @@ _DESIGN_TAXONOMY_EXPECTATIONS: dict[str, set[str]] = {
         "halo_l2_southern",
     },
     "axial": {"axial_l1", "axial_l2", "axial_l3", "axial_l4", "axial_l5"},
+    "lyapunov": {"lyapunov_l1", "lyapunov_l2", "lyapunov_l3"},
     "dro": {"distant_retrograde"},
     # RO 的期望标签随请求的共振比走（resonant_p_q），静态表取 11 个
     # 共振标签的全集；成员周期随振幅漂移出通约容差时实测与期望不符，
