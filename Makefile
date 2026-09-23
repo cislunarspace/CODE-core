@@ -86,7 +86,20 @@ TEST_RUST = set -e; \
 	export PATH="$$PYTHON_DLL_DIR;$$PATH"; \
 	cargo test --workspace -- --test-threads=1
 else
-TEST_RUST = cargo test --workspace -- --test-threads=1
+# Linux 分支（#495 同理）：cargo test 不经 maturin，pyo3 直接链接 libpython。
+# 一要钉住项目 venv 解释器（PYO3_PYTHON，与 maturin develop 同源）：PATH 上的
+# python3 与 venv 版本不符时会发出 -lpythonX.Y 链接失败（发行版 Python 甚至
+# 无共享库）；二要把解释器 LIBDIR 注入 loader 路径（LD_LIBRARY_PATH）：测试
+# EXE 运行时加载 libpythonX.Y.so，uv 管理的 CPython 不在默认 loader 路径。
+# 探测在 recipe 中求值：仅在跑 Rust 测试时执行，失败即终止，不影响其他目标。
+TEST_RUST = set -e; \
+	LIBDIR="$$("$(CURDIR)/.venv/bin/python" -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR") or "")')"; \
+    if [ -z "$$LIBDIR" ]; then \
+        echo "无法从项目 Python 获取 LIBDIR，无法准备 Rust 测试的 libpython 加载路径。" >&2; \
+        exit 1; \
+    fi; \
+    PYO3_PYTHON="$(CURDIR)/.venv/bin/python" LD_LIBRARY_PATH="$$LIBDIR$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
+	cargo test --workspace -- --test-threads=1
 endif
 
 test-rust:  ## Rust 工作区测试（spice 默认；串行）
