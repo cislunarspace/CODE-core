@@ -21,7 +21,7 @@ ADR 0042，测试以随包 baseline 数据集为回归锚点。
    逆行 → distant_retrograde；顺行按 ρ_max 分 distant_prograde /
    low_prograde（东西 = 月心会合系近月点方向半平面，+y 朝月球公转
    方向为东）。
-3. **L4/L5 分支**：平面轨道绕 L4 或 L5 净卷绕 ≈ ±2π：T/T☾ > 2 →
+3. **L4/L5 分支**：平面轨道绕 L4 或 L5 净卷绕 ≈ ±2π：T/T_moon > 2 →
    longperiod_l{4,5}，否则 shortperiod_l{4,5}。
 4. **共线平动点分支**：绕某共线 L 净卷绕，或（深近月端成员不卷绕
    任何 L 的回退路径）三维且有 x-z 面垂直穿越、距共线 L 足够近。
@@ -34,13 +34,15 @@ ADR 0042，测试以随包 baseline 数据集为回归锚点。
    - 三维、无垂直 x-z 穿越但有垂直 z=0 面穿越 → vertical；
    - 平面且垂直穿越 → lyapunov。
 
-5. **共振分支**：绕质心净卷绕 ≈ ±2π 且 T/T☾ 与 11 个比值的 q/p
-   通约（容差 0.01）→ resonant_p_q。
+5. **共振分支**：绕质心净卷绕 ≈ ±2π，结合带符号净卷绕圈数与
+   ``T/T_moon`` 推出惯性圈数比；11 个比值通约时返回 resonant_p_q。
 6. 其余 → unclassified("no_matching_label")。
 
 多标签：月心/L4/L5 命中且周期同时通约 → 追加 resonant 标签
-（primary 取月心/L4/L5 族）。设计侧族 ↔ 分类标签的映射与入库
-冲突策略见 ADR 0042 映射表，落在 catalog_ingest 模块。
+（primary 取月心/L4/L5 族）。月心/L4/L5 的辅助标签仍使用原
+``T/T_moon`` 通约语义；绕质心主分支使用卷绕感知的惯性圈数比。设计侧族
+↔ 分类标签的映射与入库冲突策略见 ADR 0042 映射表，落在
+catalog_ingest 模块。
 """
 
 from __future__ import annotations
@@ -69,7 +71,7 @@ _SOI_EXPONENT = 0.4
 #: 参数域（近月高度 ≤10000 km）上缘加月半径的量级。
 _LOW_PROGRADE_RHO_MAX = 0.031
 
-#: L4/L5 长短周期分界：T/T☾ > 2 为长周期（baseline：spo≈1.05、lpo≈3.36）。
+#: L4/L5 长短周期分界：T/T_moon > 2 为长周期（baseline：spo≈1.05、lpo≈3.36）。
 _LONGPERIOD_T_RATIO = 2.0
 
 #: 平面判据：全程 |z| 最大值（平面族是会合系不变流形，传播后严格为 0；
@@ -80,7 +82,7 @@ _PLANAR_Z_MAX = 1e-7
 #: （z=0 面）。halo/lyapunov 穿越处理论为 0；axial 族种子 vz ≥ 1e-3。
 _PERP_V_GATE = 5e-4
 
-#: 共振通约容差：|T/T☾ − q/p| < 0.01。
+#: 共振通约容差：主分支按惯性圈数比比较，辅助分支为 T/T_moon = q/p。
 _RESONANCE_TOL = 0.01
 
 #: L1/L3 侧别闸：时间平均 x < -0.5 归 L3（L1 族 x̄ ≥ -0.15）。
@@ -89,9 +91,11 @@ _L3_MEAN_X_GATE = -0.5
 #: L4/L5 分支的局域化闸：轨道到三角平动点的最小距离（spo/lpo 实测
 #: ≤0.095；远距绕地圆虽把 L4 圈在内但距离 ≥0.6，不得误入）。
 _TRIANGULAR_EXTENT_GATE = 0.15
-
+#: 三角族还必须保持在三角平动点邻域的质心尺度内；大振幅偏心 RO
+#: 可能瞬时掠过 L4/L5，但不应因此覆盖其主共振标签。
+_TRIANGULAR_BARYCENTRIC_GATE = 1.5
 #: 共线分支的轨道-共线 L 最小距离闸（卷绕与回退路径共用；深近月
-#: NRHO 端 ≈0.17，远距绕地圆 ≥0.6 不得误入）。
+#: NRHO 端约 0.17，远距绕地圆大于 0.6 不得误入）。
 _COLLINEAR_EXTENT_GATE = 0.25
 
 #: 最小形态内部传播的每周期采样点数。
@@ -100,7 +104,6 @@ _N_SAMPLES = 720
 #: 轨迹闭合判据（首末状态差的相对范数）。
 _CLOSURE_TOL = 1e-5
 
-#: 11 个共振比 (p, q)，p:q = 卫星:月球，T/T☾ = q/p。
 _RESONANCES: tuple[tuple[int, int], ...] = (
     (1, 1),
     (1, 2),
@@ -159,11 +162,32 @@ def _libration_points(mu: float) -> dict[int, np.ndarray]:
     return {int(point.name[1]): np.asarray(pos, dtype=float) for point, pos in points.items()}
 
 
-def _resonance_label(t_ratio: float) -> TaxonomyLabel | None:
-    """T/T☾ 与 11 个比值通约时返回 resonant 标签（取最近者）。"""
+def _auxiliary_resonance_label(t_ratio: float) -> TaxonomyLabel | None:
+    """为月心/L4/L5 多标签保留原 ``T/T_moon = q/p`` 语义。"""
     best: tuple[float, tuple[int, int]] | None = None
     for p, q in _RESONANCES:
         gap = abs(t_ratio - q / p)
+        if gap < _RESONANCE_TOL and (best is None or gap < best[0]):
+            best = (gap, (p, q))
+    if best is None:
+        return None
+    return TAXONOMY_BY_CANONICAL[f"resonant_{best[1][0]}_{best[1][1]}"]
+
+
+def _resonance_label(t_ratio: float, winding: float) -> TaxonomyLabel | None:
+    """按质心净卷绕推断恒星共振标签。
+
+    ``w = round(winding / (2π))`` 为带符号净卷绕圈数；惯性航天器与
+    月球的圈数比为 ``n = 1 + w / (T/T_moon)``。月心/L4/L5 的辅助
+    多标签不调用本函数，以保留其共转小环周期的旧语义。
+    """
+    winding_count = round(winding / (2.0 * math.pi))
+    if winding_count == 0:
+        return None
+    inertial_ratio = 1.0 + winding_count / t_ratio
+    best: tuple[float, tuple[int, int]] | None = None
+    for p, q in _RESONANCES:
+        gap = abs(inertial_ratio - p / q)
         if gap < _RESONANCE_TOL and (best is None or gap < best[0]):
             best = (gap, (p, q))
     if best is None:
@@ -310,7 +334,7 @@ def _classify_features(f: _Features, mu: float) -> TaxonomyResult:
                         "low_prograde_eastern" if east else "low_prograde_western"
                     ]
                 )
-        resonance = _resonance_label(f.t_ratio)
+        resonance = _auxiliary_resonance_label(f.t_ratio)
         if resonance is not None:
             labels.append(resonance)
         return _ok(labels, f, mu)
@@ -321,13 +345,24 @@ def _classify_features(f: _Features, mu: float) -> TaxonomyResult:
             if (
                 abs(f.windings_l[point]) >= _WINDING_GATE
                 and f.min_triangular_dist <= _TRIANGULAR_EXTENT_GATE
+                and f.rho_max <= _TRIANGULAR_BARYCENTRIC_GATE
             ):
                 family = "longperiod" if f.t_ratio > _LONGPERIOD_T_RATIO else "shortperiod"
                 labels = [TAXONOMY_BY_CANONICAL[f"{family}_l{point}"]]
-                resonance = _resonance_label(f.t_ratio)
+                resonance = _auxiliary_resonance_label(f.t_ratio)
                 if resonance is not None:
                     labels.append(resonance)
                 return _ok(labels, f, mu)
+    # 大振幅平面 RO 可能同时掠过 L3/L4/L5 邻域；局域三角族已在上面
+    # 返回，非局域轨道应先按质心卷绕识别主共振，避免落入 Lyapunov。
+    if (
+        planar
+        and f.rho_max > _TRIANGULAR_BARYCENTRIC_GATE
+        and abs(f.winding_earth) >= _WINDING_GATE
+    ):
+        resonance = _resonance_label(f.t_ratio, f.winding_earth)
+        if resonance is not None:
+            return _ok([resonance], f, mu)
 
     # 4. 共线平动点分支：卷绕或（三维垂直穿越形态的）回退路径，都要求
     # 轨道局域在共线点邻域内（远距绕地圆把共线点圈在内也不得误入）。
@@ -343,7 +378,7 @@ def _classify_features(f: _Features, mu: float) -> TaxonomyResult:
 
     # 5. 共振分支：绕质心环绕且周期通约。
     if abs(f.winding_earth) >= _WINDING_GATE:
-        resonance = _resonance_label(f.t_ratio)
+        resonance = _resonance_label(f.t_ratio, f.winding_earth)
         if resonance is not None:
             return _ok([resonance], f, mu)
 

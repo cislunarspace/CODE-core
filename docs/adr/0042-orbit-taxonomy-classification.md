@@ -67,7 +67,7 @@ synodic)
    `low_prograde_{eastern,western}` (east = perilune direction in the +y
    half-plane, the direction of lunar orbital motion).
 3. **L4/L5**: planar, winding about L4 or L5, localization ≤ 0.15;
-   T/T☾ > 2 → `longperiod_l{4,5}`, else `shortperiod_l{4,5}`.
+   T/T_moon > 2 → `longperiod_l{4,5}`, else `shortperiod_l{4,5}`.
 4. **Collinear points**: winding about an L, or (the no-winding fallback for
    deep-perilune members) 3D with perpendicular x-z-plane crossings and
    orbit-to-point distance ≤ 0.25. Side: time-mean x relative to the Moon —
@@ -78,13 +78,18 @@ synodic)
    y = 0 crossings → axial (the axial seed carries vz ≠ 0); 3D with
    perpendicular z = 0 crossings only → vertical; planar with perpendicular
    crossings → lyapunov.
-5. **Resonant**: net winding about the barycenter ≥ 1.5π and
-   |T/T☾ − q/p| < 0.01 → `resonant_p_q` (p:q = satellite:moon,
-   T/T☾ = q/p — same orientation as the ADR 0041 resonance ladders).
+5. **Resonant**: net winding about the barycenter is at least 1.5π and
+   the signed net winding ``w = round(Δθ / 2π)`` is non-zero. Define the
+   inertial revolution ratio ``n = 1 + w·T_moon/T``; if ``n`` is within
+   0.01 of one of the 11 p:q ratios, return `resonant_p_q` (p:q = satellite
+   inertial revolutions: lunar revolutions, as in Vaquero & Howell 2014
+   Eq. (7)/(13)).
 6. Otherwise `no_matching_label`.
 
 Multi-label: a moon-centered or L4/L5 hit whose period is also commensurate
-appends the resonant label (primary stays the moon/libration family).
+appends the resonant label (primary stays the moon/libration family). These
+auxiliary labels retain the original ``T/T_moon = q/p`` semantics; only the
+barycentric primary branch uses winding-aware inertial revolution counting.
 
 ### 4. Verification status per label
 
@@ -106,6 +111,10 @@ ADR 0044 注册，准入依据 ADR 0043 决策 6（内容被响应字段引用�
 工具供给）。此处引用的"22"在写下时就已失真：实际工具面为 18。工具数
 今后靠跑清单报告，不从文档引用。上文提到"MCP legend / 文档用"却从未
 接线的 `label_legend()` 迁入数据层并在那里获得出口。）*
+（修订注 2026-09-24，#646：旧共振判据只比较旋转系周期 ``T/T_moon``，
+把 2:1/3:1/4:1 文献偏心族压成 `resonant_1_1`。现按质心带符号净卷绕
+推导惯性圈数比，并与 RO 的恒星约定统一；月心/L4/L5 多标签保留旧辅助
+语义。）*
 
 - **Ingest stamps measured labels**: `classification.taxonomy_labels`
   (record-level deduplicated set) and `members[].taxonomy_label` (member
@@ -127,11 +136,13 @@ ADR 0044 注册，准入依据 ADR 0043 决策 6（内容被响应字段引用�
 
 ### 6. Conventions
 
-p:q counts satellite revolutions per lunar revolution (T/T☾ = q/p; 2:1 is
-interior). Northern/southern = sign of z at the vy < 0 crossing (the same
-geometry the design side encodes as `halo_class`). Eastern/western =
-perilune half-plane in the moon-centered synodic frame. NRHO folds into
-halo (same family, high-amplitude near-rectilinear arc).
+p:q counts satellite inertial revolutions per lunar revolution
+(``n_sc/n_moon = p/q``; equivalently ``T/T_moon = 1/(p/q - 1)`` for
+the barycentric closed period; 2:1 is interior). Northern/southern = sign
+of z at the vy < 0 crossing (the same geometry the design side encodes as
+`halo_class`). Eastern/western = perilune half-plane in the moon-centered
+synodic frame. NRHO folds into halo (same family, high-amplitude
+near-rectilinear arc).
 
 ## Reproduction notes
 

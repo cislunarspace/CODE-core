@@ -13,8 +13,10 @@
 
 - 规范字符串为 snake_case，如 ``halo_l2_northern``、``low_prograde_eastern``；
   它是序列化键（MCP 响应、catalog 记录），结构化字段是语义载荷。
-- 共振比 p:q = 卫星:月球：卫星 p 圈 per 月球 q 圈，T/T☾ = q/p
-  （2:1 内共振、1:2 外共振），与 spatiography 共振梯子的 k:k_b 同向。
+- 共振比 p:q = 航天器惯性圈数:月球圈数：主分支满足
+  ``n_sc/n_moon = p/q``，会合系闭合周期满足 ``T/T_moon = q/(p−q)``
+  （2:1 内共振、1:2 外共振）；月心/L4/L5 辅助标签另保留其共转小环
+  周期语义（ADR 0042）。
 - 南北（northern/southern）由轨迹 z 极值符号定义，东西
   （eastern/western）由月心会合系近月点方向定义（ADR 0042 判据）。
 """
