@@ -256,8 +256,277 @@ pub(crate) fn correct_planar_fixed_x(
 /// ``RO_SUPPORTED_RESONANCES`` 同源）；其余比值的初猜不可靠。
 pub(crate) const RO_SUPPORTED_RESONANCES: &[(u32, u32)] = &[(2, 1), (3, 1), (3, 2), (4, 1), (4, 3)];
 
-/// RO 精确共振种子：p:q 共振（旋转系周期 T = (q/p)·T☾，p:q = 卫星:月球）
-/// 的 Kepler 圆轨道初猜 + 固定半周期修正（自由 x0、vy0；镜面定理闭合）。
+fn ro_period(resonance_p: u32, resonance_q: u32) -> f64 {
+    std::f64::consts::TAU * resonance_q as f64 / (resonance_p - resonance_q) as f64
+}
+
+fn ro_kepler_a(mu: f64, resonance_p: u32, resonance_q: u32) -> f64 {
+    ((1.0 - mu) * (resonance_q as f64 / resonance_p as f64).powi(2)).cbrt()
+}
+
+fn ro_circle_seed(context: Context, resonance_p: u32, resonance_q: u32) -> ([f64; 6], f64) {
+    let n = resonance_p as f64 / resonance_q as f64;
+    let a = ((1.0 - context.mu) / (n * n)).cbrt();
+    let x0 = a - context.mu;
+    let vy0 = ((1.0 - context.mu) / a).sqrt() - x0;
+    (
+        [x0, 0.0, 0.0, 0.0, vy0, 0.0],
+        ro_period(resonance_p, resonance_q),
+    )
+}
+
+fn ro_eccentric_seed(
+    context: Context,
+    resonance_p: u32,
+    resonance_q: u32,
+    eccentricity: f64,
+    apoapsis: bool,
+) -> ([f64; 6], f64, f64) {
+    let a = ro_kepler_a(context.mu, resonance_p, resonance_q);
+    let radius = a * if apoapsis {
+        1.0 + eccentricity
+    } else {
+        1.0 - eccentricity
+    };
+    let x0 = radius - context.mu;
+    let inertial_speed = ((1.0 - context.mu) * (2.0 / radius - 1.0 / a)).sqrt();
+    let vy0 = if apoapsis {
+        x0 - inertial_speed
+    } else {
+        inertial_speed - x0
+    };
+    (
+        [x0, 0.0, 0.0, 0.0, vy0, 0.0],
+        ro_period(resonance_p, resonance_q),
+        a,
+    )
+}
+
+fn check_ro_member(
+    context: Context,
+    resonance_p: u32,
+    resonance_q: u32,
+    orbit: PeriodicOrbit,
+    a_kepler: f64,
+) -> Result<PeriodicOrbit, Failure> {
+    if orbit.closure_error >= 1e-6 {
+        return Err(Failure {
+            status: "failed",
+            cause: "closure_error",
+            message: format!(
+                "RO({resonance_p}:{resonance_q}) 精确成员闭合误差超限：{:.3e}",
+                orbit.closure_error
+            ),
+        });
+    }
+    let amplitude = ro_amplitude_km(context, &orbit)? / context.characteristic_length_km;
+    let relative_error = (amplitude - a_kepler).abs() / a_kepler;
+    if relative_error > 0.1 {
+        return Err(Failure {
+            status: "failed",
+            cause: "constraint_violation",
+            message: format!(
+                "RO({resonance_p}:{resonance_q}) 偏离 Kepler 半长轴过大：均值={amplitude:.6} DU、a={a_kepler:.6} DU、相对偏差={relative_error:.2}%"
+            ),
+        });
+    }
+    Ok(orbit)
+}
+
+fn pin_ro_period_secant(
+    context: Context,
+    resonance_p: u32,
+    resonance_q: u32,
+    seed: PeriodicOrbit,
+    a_kepler: f64,
+    dx: f64,
+) -> Result<PeriodicOrbit, Failure> {
+    let target = ro_period(resonance_p, resonance_q);
+    let tolerance = 1e-9 * target;
+    let mut left = check_ro_member(context, resonance_p, resonance_q, seed, a_kepler)?;
+    let mut x_left = left.state[0];
+    let mut right = check_ro_member(
+        context,
+        resonance_p,
+        resonance_q,
+        correct_ro_fixed_x(context, x_left + dx, &left)?,
+        a_kepler,
+    )?;
+    let mut x_right = x_left + dx;
+    for _ in 0..8 {
+        let denominator = right.period - left.period;
+        if denominator == 0.0 {
+            break;
+        }
+        let x_try = x_left + (target - left.period) / denominator * (x_right - x_left);
+        let guess = if (x_try - x_left).abs() <= (x_try - x_right).abs() {
+            &left
+        } else {
+            &right
+        };
+        let candidate = check_ro_member(
+            context,
+            resonance_p,
+            resonance_q,
+            correct_ro_fixed_x(context, x_try, guess)?,
+            a_kepler,
+        )?;
+        if (candidate.period - target).abs() <= tolerance {
+            return Ok(candidate);
+        }
+        if (candidate.period - target) * (left.period - target) <= 0.0 {
+            right = candidate;
+            x_right = x_try;
+        } else {
+            left = candidate;
+            x_left = x_try;
+        }
+    }
+    Err(invalid_failure(format!(
+        "RO({resonance_p}:{resonance_q}) 割线周期钉定未命中目标"
+    )))
+}
+
+fn correct_ro_fast_21_seed(
+    context: Context,
+    resonance_p: u32,
+    resonance_q: u32,
+) -> Result<PeriodicOrbit, Failure> {
+    let (mut state, period, a_kepler) = ro_eccentric_seed(context, 2, 1, 0.75, false);
+    state[0] += 0.0008;
+    state[4] -= 0.025;
+    let initial = PeriodicOrbit {
+        state,
+        period,
+        closure_error: f64::INFINITY,
+    };
+    let seed = check_ro_member(
+        context,
+        resonance_p,
+        resonance_q,
+        correct_ro_fixed_x(context, state[0], &initial)?,
+        a_kepler,
+    )?;
+    pin_ro_period_secant(context, resonance_p, resonance_q, seed, a_kepler, 0.0002)
+}
+
+fn correct_ro_eccentric_seed(
+    context: Context,
+    resonance_p: u32,
+    resonance_q: u32,
+    eccentricity: f64,
+    apoapsis: bool,
+) -> Result<PeriodicOrbit, Failure> {
+    let (state, period, a_kepler) =
+        ro_eccentric_seed(context, resonance_p, resonance_q, eccentricity, apoapsis);
+    let initial = PeriodicOrbit {
+        state,
+        period,
+        closure_error: f64::INFINITY,
+    };
+    let upper = correct_ro_fixed_x(context, state[0], &initial)?;
+    walk_ro_period(context, resonance_p, resonance_q, upper, a_kepler)
+}
+
+fn walk_ro_period(
+    context: Context,
+    resonance_p: u32,
+    resonance_q: u32,
+    seed: PeriodicOrbit,
+    a_kepler: f64,
+) -> Result<PeriodicOrbit, Failure> {
+    let target = ro_period(resonance_p, resonance_q);
+    let tolerance = 1e-9 * target;
+    let current = check_ro_member(context, resonance_p, resonance_q, seed, a_kepler)?;
+    let p = current.state[0];
+    let measure = current.period;
+    if (measure - target).abs() <= tolerance {
+        return Ok(current);
+    }
+
+    let dp_init = 0.0025;
+    let probe = correct_ro_fixed_x(context, p + dp_init, &current)
+        .and_then(|orbit| check_ro_member(context, resonance_p, resonance_q, orbit, a_kepler))?;
+    let slope = (probe.period - measure) / dp_init;
+    if slope == 0.0 {
+        return Err(invalid_failure(
+            "RO 族行走停滞：周期不随参数变化".to_string(),
+        ));
+    }
+    let direction = if (target - measure) / slope > 0.0 {
+        1.0
+    } else {
+        -1.0
+    };
+    let mut step = dp_init;
+    let mut p_prev = p;
+    let mut m_prev = measure;
+    let mut orbit_prev = current;
+    let mut bracket: Option<(f64, f64, PeriodicOrbit, PeriodicOrbit)> = None;
+    for _ in 0..600 {
+        let p_try = p_prev + direction * step;
+        let orbit_new = match correct_ro_fixed_x(context, p_try, &orbit_prev)
+            .and_then(|orbit| check_ro_member(context, resonance_p, resonance_q, orbit, a_kepler))
+        {
+            Ok(orbit) => orbit,
+            Err(_) => {
+                step *= 0.5;
+                if step < 1e-5 {
+                    return Err(invalid_failure(
+                        "RO 族行走步长已减至最小仍未跨过目标周期".to_string(),
+                    ));
+                }
+                continue;
+            }
+        };
+        let m_new = orbit_new.period;
+        if (m_new - target).abs() <= tolerance {
+            return Ok(orbit_new);
+        }
+        if (m_new - target) * (m_prev - target) <= 0.0 {
+            bracket = Some((p_prev, p_try, orbit_prev, orbit_new));
+            break;
+        }
+        p_prev = p_try;
+        m_prev = m_new;
+        orbit_prev = orbit_new;
+    }
+    let (mut p_lo, mut p_hi, mut orbit_lo, mut orbit_hi) = bracket
+        .ok_or_else(|| invalid_failure(format!("RO 族行走未在预算内跨过目标周期 {target:.12}")))?;
+    let mut m_lo = orbit_lo.period;
+    for _ in 0..600 {
+        let p_mid = 0.5 * (p_lo + p_hi);
+        let orbit_mid = correct_ro_fixed_x(
+            context,
+            p_mid,
+            if (p_mid - p_lo).abs() <= (p_mid - p_hi).abs() {
+                &orbit_lo
+            } else {
+                &orbit_hi
+            },
+        )
+        .and_then(|orbit| check_ro_member(context, resonance_p, resonance_q, orbit, a_kepler))?;
+        let m_mid = orbit_mid.period;
+        if (m_mid - target).abs() <= tolerance {
+            return Ok(orbit_mid);
+        }
+        if (m_mid - target) * (m_lo - target) > 0.0 {
+            p_lo = p_mid;
+            m_lo = m_mid;
+            orbit_lo = orbit_mid;
+        } else {
+            p_hi = p_mid;
+            orbit_hi = orbit_mid;
+        }
+    }
+    Err(invalid_failure(format!(
+        "RO 族行走二分未命中目标周期 {target:.12}"
+    )))
+}
+
+/// RO 精确共振种子：p:q 为航天器惯性圈数:月球圈数，闭合周期为
+/// ``T = 2πq/(p-q)``。3:1/4:1 使用近圆种子；2:1/3:2/4:3 使用
+/// 偏心近心/远心点种子，沿固定 x0 族行走把周期钉到目标值。
 pub(crate) fn correct_ro_seed(
     context: Context,
     resonance_p: u32,
@@ -268,21 +537,32 @@ pub(crate) fn correct_ro_seed(
             "不支持的共振比 {resonance_p}:{resonance_q}（RO 支持 2:1/3:1/3:2/4:1/4:3）"
         )));
     }
-    let n = 1.0 + resonance_p as f64 / resonance_q as f64;
-    let a = ((1.0 - context.mu) / (n * n)).cbrt();
-    let x0 = a - context.mu;
-    let vy0 = ((1.0 - context.mu) / a).sqrt() - x0;
-    let period = (resonance_q as f64 / resonance_p as f64) * 2.0 * std::f64::consts::PI;
-    correct(
+    let orbit = match (resonance_p, resonance_q) {
+        (3, 1) | (4, 1) => {
+            let (state, period) = ro_circle_seed(context, resonance_p, resonance_q);
+            correct(
+                context,
+                state,
+                period / 2.0,
+                &[1, 3],
+                &[0, 4],
+                false,
+                false,
+                1e-12,
+                50,
+            )?
+        }
+        (2, 1) => correct_ro_fast_21_seed(context, resonance_p, resonance_q)?,
+        (3, 2) => correct_ro_eccentric_seed(context, resonance_p, resonance_q, 0.5, false)?,
+        (4, 3) => correct_ro_eccentric_seed(context, resonance_p, resonance_q, 0.6, true)?,
+        _ => unreachable!(),
+    };
+    check_ro_member(
         context,
-        [x0, 0.0, 0.0, 0.0, vy0, 0.0],
-        period / 2.0,
-        &[1, 3],
-        &[0, 4],
-        false,
-        false,
-        1e-12,
-        50,
+        resonance_p,
+        resonance_q,
+        orbit,
+        ro_kepler_a(context.mu, resonance_p, resonance_q),
     )
 }
 

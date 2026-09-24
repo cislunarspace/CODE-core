@@ -145,13 +145,13 @@ class TestDesignOrbitRequest:
             DesignOrbitRequest(orbit_type="RO", resonance_p=5, resonance_q=1)
 
     def test_ro_amplitude_range_matches_validation(self):
-        """RO 振幅值域与校验器同源（ADR 0014 决策 8）。"""
+        """RO 振幅包络值域与校验器同源（ADR 0014 决策 8）。"""
         numeric_range = DesignOrbitRequest.valid_ranges("RO")["amplitude"]
-        assert (numeric_range.minimum, numeric_range.maximum) == (118000.0, 200000.0)
-        accepted = DesignOrbitRequest(orbit_type="RO", amplitude=200000.0)
-        assert accepted.amplitude == 200000.0
+        assert (numeric_range.minimum, numeric_range.maximum) == (145000.0, 340000.0)
+        accepted = DesignOrbitRequest(orbit_type="RO", amplitude=340000.0)
+        assert accepted.amplitude == 340000.0
         with pytest.raises(ValidationError, match="amplitude"):
-            DesignOrbitRequest(orbit_type="RO", amplitude=117999.0)
+            DesignOrbitRequest(orbit_type="RO", amplitude=144999.0)
         # 整数值域（包围盒粗筛）：p/q 的合法对由上面的成对校验裁决
         ranges = DesignOrbitRequest.valid_ranges("RO")
         assert ranges["resonance_p"].format_interval() == "[2, 4]"
@@ -446,7 +446,7 @@ class TestFamilyGenerationRequest:
         ro = FamilyGenerationRequest(orbit_type="RO")
         assert ro.libration_point is None
         assert (ro.resonance_p, ro.resonance_q) == (3, 1)
-        assert (ro.min_amplitude_km, ro.max_amplitude_km) == (120000.0, 180000.0)
+        assert (ro.min_amplitude_km, ro.max_amplitude_km) == (145000.0, 340000.0)
         assert ro.sampling_mode == "natural-x0"
 
     def test_valid_ranges_are_family_specific(self):
@@ -479,7 +479,7 @@ class TestFamilyGenerationRequest:
         # RO 是地心族：无平动点范围，振幅包络与单轨 RO 一致
         ro = FamilyGenerationRequest.valid_ranges("RO")
         assert "libration_point" not in ro
-        assert ro["min_amplitude_km"].format_interval() == "[118000.0, 200000.0]"
+        assert ro["min_amplitude_km"].format_interval() == "[145000.0, 340000.0]"
         assert ro["resonance_p"].format_interval() == "[2, 4]"
         with pytest.raises(ValueError, match="不绑定平动点"):
             FamilyGenerationRequest.valid_ranges("RO", libration_point=2)
@@ -544,7 +544,7 @@ class TestFamilyGenerationRequest:
             FamilyGenerationRequest(orbit_type="RO", min_amplitude_km=110000.0)
         with pytest.raises(ValidationError, match="min_amplitude_km 必须小于"):
             FamilyGenerationRequest(
-                orbit_type="RO", min_amplitude_km=160000.0, max_amplitude_km=140000.0
+                orbit_type="RO", min_amplitude_km=160000.0, max_amplitude_km=150000.0
             )
         with pytest.raises(ValidationError, match="sampling_mode"):
             FamilyGenerationRequest(orbit_type="RO", sampling_mode="grid")

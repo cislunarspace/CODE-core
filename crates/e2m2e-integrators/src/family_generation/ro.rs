@@ -1,17 +1,17 @@
 //! RO（共振轨道族）的单次 Rust 生成。
 //!
-//! 族锚定 p:q 共振（p:q = 卫星:月球，旋转系周期 T = (q/p)·T☾，与分类学
-//! resonant_p_q 一致）：种子 = 精确通约成员（Kepler 圆轨道初猜 + 固定
-//! 半周期修正）；族行走以 +x 轴穿越点 x0 为参数（固定 x0、自由 vy0 与
-//! 半周期），振幅 = 一个周期内距地心距离 min/max 均值（km），随 x0
-//! 单调递增。行走离开精确通约点，周期随振幅漂移。
+//! 族锚定恒星 p:q 共振（p:q = 航天器惯性圈数:月球圈数）：会合系闭合
+//! 周期为 ``T = 2πq/(p-q)``。3:1/4:1 以近圆成员锚定；2:1/3:2/4:3
+//! 以偏心成员锚定并钉定目标周期。族行走以 +x 轴穿越点 x0 为参数，
+//! 振幅 = 一个周期内距地心距离 min/max 均值（km），离开精确成员后
+//! 周期随振幅漂移。
 
 use super::common::{correct_ro_fixed_x, correct_ro_seed, ro_amplitude_km, Failure};
 use super::types::{Context, Member, Outcome, PeriodicOrbit};
 
 /// 名义延拓步长（x0 方向）。修正失败时步长减半重试，成功后恢复名义
 /// 步长（与 DRO 行走同一策略）。
-const STEP_X0: f64 = 0.005;
+const STEP_X0: f64 = 0.004;
 const MIN_STEP_X0: f64 = 1e-4;
 /// 单方向行走的步数预算（兜底；正常在成员满额或越过窗口边界处停止）。
 const STEP_BUDGET: usize = 600;

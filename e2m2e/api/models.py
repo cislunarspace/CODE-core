@@ -156,14 +156,13 @@ _GLOBAL_AMPLITUDE_OUT_RANGES = _with_global_amplitude_out(_range_map())
 _DRO_DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 110000.0)))
 _SPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
 _LPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1000.0, 110000.0)))
-#: RO（共振轨道）：同一顺行近圆族贯穿五档共振（各档精确成员是该族上的
-#: 点），五个锚点的实测可达包络一致（约 117,000–222,000 km）；值域
-#: [118,000, 200,000] km 取包络内缩与 amplitude 字段上限的交集，对全比例
-#: 诚实可达。resonance_p/q 为包围盒粗筛，合法对
-#: （RO_SUPPORTED_RESONANCES）由校验器裁决。
+#: RO（共振轨道）：五档精确成员分布在不同偏心族上，不能再用全比例
+#: 交集表达共同可达域。当前范围采用五个锚点实测振幅的包络并留 5% 余量，
+#: 设计时若指定振幅而族行走无法命中则诚实报错；resonance_p/q 为包围盒
+#: 粗筛，合法对（RO_SUPPORTED_RESONANCES）由校验器裁决。
 _RO_RANGES = _with_global_amplitude_out(
     _range_map(
-        amplitude=NumericRange(118000.0, 200000.0),
+        amplitude=NumericRange(145000.0, 340000.0),
         resonance_p=NumericRange(2, 4),
         resonance_q=NumericRange(1, 3),
     )
@@ -222,7 +221,7 @@ class DesignOrbitRequest(_ApiModel):
 
     orbit_type: str = Field(description="DRO/DPO/NRHO/HALO/LISSAJOUS/L4/L5/AXIAL/RO/.../ELFO")
     # CR3BP 形状参数（字段约束为跨类型全局上下限；model_validator 内按类型收紧）
-    amplitude: float | None = Field(default=None, ge=-110000.0, le=200000.0)
+    amplitude: float | None = Field(default=None, ge=-110000.0, le=350000.0)
     resonance_p: int | None = Field(
         default=None, ge=1, description="共振比卫星侧整数（p:q = 卫星:月球），仅 RO 用"
     )
@@ -433,7 +432,8 @@ class DesignOrbitRequest(_ApiModel):
                     f"支持 {'/'.join(f'{p}:{q}' for p, q in sorted(RO_SUPPORTED_RESONANCES))}"
                     "（顺行内共振，p:q = 卫星:月球）"
                 )
-            # amplitude 缺省保持 None：返回精确通约成员（周期恰为 (q/p)·T☾）
+            # amplitude 缺省保持 None：返回精确通约成员（会合系周期恰为
+            # 2πq/(p−q)，对应惯性圈数比 p:q）。
             if self.phase is None:
                 self.phase = 0.0
         else:
@@ -1288,9 +1288,9 @@ class FamilyGenerationRequest(_ApiModel):
             ranges["min_amplitude_km"] = amp_range
             ranges["max_amplitude_km"] = amp_range
         elif selection == "RO":
-            # 与 DesignOrbitRequest 的 RO 包络同源（_RO_RANGES 注释：
-            # 五档共振同一顺行近圆族，可达包络一致）
-            amp_range = NumericRange(118000.0, 200000.0)
+            # 与 DesignOrbitRequest 的 RO 包络同源；不同共振比的锚点
+            # 分布不再取交集，设计者对不可达窗口收到结构化失败。
+            amp_range = NumericRange(145000.0, 340000.0)
             ranges["min_amplitude_km"] = amp_range
             ranges["max_amplitude_km"] = amp_range
             ranges["resonance_p"] = NumericRange(2, 4)
@@ -1415,9 +1415,9 @@ class FamilyGenerationRequest(_ApiModel):
                     "（顺行内共振，p:q = 卫星:月球）"
                 )
             if self.min_amplitude_km is None:
-                self.min_amplitude_km = 120000.0
+                self.min_amplitude_km = 145000.0
             if self.max_amplitude_km is None:
-                self.max_amplitude_km = 180000.0
+                self.max_amplitude_km = 340000.0
         else:  # SPO/LPO/HORSESHOE
             if self.min_amplitude_km is None:
                 self.min_amplitude_km = 50000.0 if sel == "HORSESHOE" else 2000.0

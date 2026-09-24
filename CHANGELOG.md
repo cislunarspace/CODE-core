@@ -6,7 +6,7 @@
 ## [Unreleased]
 
 ### Added
-- **共振轨道（RO）设计与族生成落地**：`design_orbit(orbit_type="RO")` 与 `orbit_family_generation(orbit_type="RO")` 自此可用——按共振比 `resonance_p:resonance_q`（卫星:月球，支持 2:1/3:1/3:2/4:1/4:3 五档顺行内共振，缺省 3:1）生成绕地质心的顺行近圆周期轨道。design_orbit 缺省返回精确通约成员（旋转系周期恰为 (q/p)·T☾，如 3:1 的 T ≈ 9.1 天），可选 `amplitude`（距地心距离 min/max 均值，118,000–200,000 km）沿族行走命中目标（周期随振幅漂移）；族生成按振幅窗口收集成员。`valid_ranges` 同步导出 RO 的振幅与共振比值域。DRO→RO 转移测试改用 `design_ro` 生成的 3:1 RO，不再依赖外部数据文件。(#627)
+- **共振轨道（RO）设计与族生成落地**：`design_orbit(orbit_type="RO")` 与 `orbit_family_generation(orbit_type="RO")` 自此可用——按共振比 `resonance_p:resonance_q`（航天器惯性圈数:月球圈数，支持 2:1/3:1/3:2/4:1/4:3 五档恒星顺行内共振，缺省 3:1）生成绕地质心的顺行平面周期轨道。精确成员的会合系周期为 `2πq/(p−q)`：例如 3:1 约 13.66 天，即半个恒星月内航天器绕地 3 圈；3:1/4:1 以近圆成员锚定，2:1/3:2/4:3 以偏心族成员锚定并钉定周期。可选 `amplitude`（距地心距离 min/max 均值，约 145,000–340,000 km 包络）沿族行走命中目标，族生成按振幅窗口收集成员；无法命中的窗口诚实报错。`valid_ranges` 同步导出 RO 的振幅包络与共振比值域。DRO→RO 转移测试改用 `design_ro` 生成的 3:1 RO，不再依赖外部数据文件。(#627)
 
 ### Fixed
 - **CR3BP 传播退化弧段少点报错**：`propagate_cr3bp` 对宽度 < 1e-12 的弧段（如周期轨道相位取模绕回 ~0 的重传播）时间界判据一步不走、末点不发射，报 "output length mismatch"；现循环推进到全部请求点发射完毕。(#627)

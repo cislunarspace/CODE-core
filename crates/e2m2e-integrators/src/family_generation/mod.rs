@@ -812,15 +812,15 @@ mod tests {
 
     #[test]
     fn ro_members_stay_in_window_and_sorted_by_amplitude() {
-        // 3:1 精确共振种子的振幅约 151,800 km：窗口跨种子，双向行走后
+        // 3:1 精确共振种子的振幅约 183,800 km：窗口跨种子，双向行走后
         // 按振幅升序输出，两侧成员都存在
         let result = generate(
             context(),
             Spec::Ro {
                 resonance_p: 3,
                 resonance_q: 1,
-                min_amplitude_km: 145_000.0,
-                max_amplitude_km: 158_000.0,
+                min_amplitude_km: 180_000.0,
+                max_amplitude_km: 190_000.0,
                 member_limit: 6,
             },
         )
@@ -835,10 +835,10 @@ mod tests {
         assert!(amplitudes.windows(2).all(|pair| pair[0] < pair[1]));
         assert!(amplitudes
             .iter()
-            .all(|amp| (145_000.0..=158_000.0).contains(amp)));
+            .all(|amp| (180_000.0..=190_000.0).contains(amp)));
         // 双向覆盖：种子两侧都有成员
-        assert!(amplitudes.first().unwrap() < &151_000.0);
-        assert!(amplitudes.last().unwrap() > &152_000.0);
+        assert!(amplitudes.first().unwrap() < &183_000.0);
+        assert!(amplitudes.last().unwrap() > &184_000.0);
         // 全部成员周期轨道闭合
         for member in &result.members {
             assert!(member.closure_error.is_some_and(|closure| closure <= 1e-8));
@@ -847,20 +847,20 @@ mod tests {
 
     #[test]
     fn ro_seed_period_is_exactly_commensurate() {
-        // 精确共振成员：旋转系周期 T = (q/p)·2π
+        // 精确共振成员：恒星 p:q 约定下会合系周期 T = 2πq/(p-q)
         let result = generate(
             context(),
             Spec::Ro {
                 resonance_p: 2,
                 resonance_q: 1,
-                min_amplitude_km: 180_000.0,
-                max_amplitude_km: 190_000.0,
+                min_amplitude_km: 235_000.0,
+                max_amplitude_km: 250_000.0,
                 member_limit: 2,
             },
         )
         .unwrap();
         assert_eq!(result.status, "converged", "{}", result.message);
-        let seed_period = std::f64::consts::PI; // 2:1 → T = π
+        let seed_period = std::f64::consts::TAU; // 2:1 → T = 2π
         assert!(result.members.iter().any(|member| member
             .period
             .is_some_and(|period| { (period - seed_period).abs() / seed_period < 1e-6 })));

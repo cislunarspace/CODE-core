@@ -290,35 +290,265 @@ def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
     return orbit
 
 
-def _ro_kepler_guess(dynamics: CR3BP_Dynamics, p: int, q: int) -> tuple[np.ndarray, float]:
-    """p:q 共振的 Kepler 圆轨道初猜：+x 轴穿越点状态与旋转系周期。
+_RO_EXACT_SEEDS: dict[tuple[int, int], tuple[str, float | None]] = {
+    (3, 1): ("circle", None),
+    (4, 1): ("circle", None),
+    (2, 1): ("peri", 0.5),
+    (3, 2): ("peri", 0.5),
+    (4, 3): ("apo", 0.6),
+}
 
-    旋转系周期 T = (q/p)·T☾（p:q = 卫星:月球，与分类学 resonant_p_q
-    一致）；惯性频率 n = 1 + p/q（顺行内共振，每个旋转系周期绕质心
-    恰一圈）。轨道近圆，初猜取 +x 轴上的圆轨道点（近地点在 +x）。
+
+def _ro_kepler_guess(dynamics: CR3BP_Dynamics, p: int, q: int) -> tuple[np.ndarray, float]:
+    """按恒星共振约定构造 p:q Kepler 圆轨道初猜。
+
+    p:q 中 p 为航天器、q 为月球在惯性系中的绕行圈数，
+    ``p / q = n_sc / n_moon = T_moon / T_sc``；这是 Vaquero & Howell
+    (2014) 式（7）、（13）的约定。会合系闭合周期为
+    ``T = 2πq / (p-q)``，惯性航天器周期为 ``(q/p)·T_moon``。
+    初猜取 +x 轴上的顺行圆轨道点。
     """
     mu = float(dynamics.system.mu)
-    n = 1.0 + p / q
+    n = p / q
     a = ((1.0 - mu) / n**2) ** (1.0 / 3.0)
     x0 = a - mu  # 地心距 a 的 +x 穿越点（地心在 x = -mu）
-    vy0 = float(np.sqrt((1.0 - mu) / a)) - x0  # 顺行圆轨道的旋转系 y 速度
-    period = (q / p) * 2.0 * np.pi
+    vy0 = float(np.sqrt((1.0 - mu) / a)) - x0  # 顺行圆轨道的会合系 y 速度
+    period = 2.0 * np.pi * q / (p - q)
     return np.array([x0, 0.0, 0.0, 0.0, vy0, 0.0]), period
 
 
-def _correct_ro_exact(dynamics: CR3BP_Dynamics, p: int, q: int) -> Orbit:
-    """修正精确共振成员：固定半周期 T = (q/p)·T☾，自由 x0 与 vy0。
+def _ro_eccentric_seed(
+    dynamics: CR3BP_Dynamics,
+    p: int,
+    q: int,
+    e: float,
+    apsis: str,
+) -> tuple[np.ndarray, float, float]:
+    """构造恒星 p:q 共振的偏心 Kepler 种子（状态、周期、半长轴）。
 
-    固定周期的 x 轴对称修正把 Kepler 初猜压到精确通约的周期轨道上
-    （镜面定理保证闭合）；成员在族上的位置由周期锚定，振幅随 CR3BP
-    修正略有移动。
+    ``apsis`` 为 ``"peri"`` 时取 +x 近心点，为 ``"apo"`` 时取 +x
+    远心点。状态速度先按地心二体问题计算，再减去会合系旋转速度；远
+    心点路径采用上族的正 ``vy0`` 符号。
     """
-    state, period = _ro_kepler_guess(dynamics, p, q)
-    corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_t(period / 2.0)
+    if not 0.0 <= e < 1.0:
+        raise ValueError(f"偏心率必须满足 0 <= e < 1，当前为 {e}")
+    if apsis not in ("peri", "apo"):
+        raise ValueError(f"apsis 必须为 peri 或 apo，当前为 {apsis!r}")
+    mu = float(dynamics.system.mu)
+    a = ((1.0 - mu) * (q / p) ** 2) ** (1.0 / 3.0)
+    r = a * (1.0 - e if apsis == "peri" else 1.0 + e)
+    x0 = r - mu
+    inertial_speed = float(np.sqrt((1.0 - mu) * (2.0 / r - 1.0 / a)))
+    vy0 = inertial_speed - x0 if apsis == "peri" else x0 - inertial_speed
+    period = 2.0 * np.pi * q / (p - q)
+    return np.array([x0, 0.0, 0.0, 0.0, vy0, 0.0]), period, a
+
+
+def _validate_ro_exact(
+    dynamics: CR3BP_Dynamics,
+    p: int,
+    q: int,
+    orbit: Orbit,
+) -> Orbit:
+    """校验精确 RO 成员闭合性及其 Kepler 半长轴量级。"""
+    if orbit.closure_error is None or orbit.closure_error >= 1e-6:
+        raise Cr3bpOrbitError(f"RO({p}:{q}) 精确成员闭合误差超限：{orbit.closure_error}")
+    # 周期行走的最终闭合容差为 1e-9·T，可能略宽于 Orbit 构造器的
+    # 研究级 is_periodic 阈值；这里按 RO 的公开闭合契约统一标记。
+    orbit.is_periodic = True
+    mu = float(dynamics.system.mu)
+    a_kepler = ((1.0 - mu) * (q / p) ** 2) ** (1.0 / 3.0)
+    d_min, d_max = _earth_distance_minmax(dynamics, orbit)
+    amplitude = 0.5 * (d_min + d_max)
+    relative_error = abs(amplitude - a_kepler) / a_kepler
+    if relative_error > 0.1:
+        raise Cr3bpOrbitError(
+            f"RO({p}:{q}) 精确成员偏离 Kepler 半长轴过大："
+            f"均值={amplitude:.6f} DU、a={a_kepler:.6f} DU、"
+            f"相对偏差={relative_error:.2%}"
+        )
+    return orbit
+
+
+def _guard_ro_branch(
+    dynamics: CR3BP_Dynamics,
+    orbit: Orbit,
+    a_kepler: float,
+    *,
+    n_points: int = 100,
+) -> Orbit:
+    """用低成本地心距包络拒绝偏心 RO 行走的伪支。"""
+    d_min, d_max = _earth_distance_minmax(dynamics, orbit, n_points=n_points)
+    amplitude = 0.5 * (d_min + d_max)
+    if abs(amplitude - a_kepler) / a_kepler > 0.1:
+        raise Cr3bpOrbitError(
+            f"偏心 RO 跳到错误振幅支：均值={amplitude:.6f} DU、a={a_kepler:.6f} DU"
+        )
+    return orbit
+
+
+def _ro_fast_21_seed(dynamics: CR3BP_Dynamics, period: float, a_kepler: float) -> Orbit:
+    """构造 2:1 数值折返点附近的局部偏心种子。
+
+    2:1 偏心族从 e=0.5 近心点种子沿固定 x0 行走会在折返点附近
+    需要数百次小步修正。这里仍以同一 Kepler 半长轴和目标周期为约束，
+    从折返点附近的局部近心点初猜扫描一个很小的状态窗口，找到同一
+    偏心支后再用周期行走钉定；不接受振幅偏离 Kepler 半长轴 10% 的支。
+    """
+    state, _, _ = _ro_eccentric_seed(dynamics, 2, 1, 0.75, "peri")
+    for x_offset in (0.0008, 0.0010, 0.0011, 0.0012, 0.0014):
+        for vy_offset in (-0.04, -0.03, -0.025, -0.02, -0.01, 0.0):
+            candidate_state = state.copy()
+            candidate_state[0] += x_offset
+            candidate_state[4] += vy_offset
+            candidate = Orbit(
+                states=candidate_state.reshape(1, -1),
+                times=np.array([0.0]),
+                system=dynamics.system,
+            )
+            candidate.period = period
+            try:
+                orbit = _correct_ro(dynamics, float(candidate_state[0]), candidate)
+            except Cr3bpOrbitError:
+                continue
+            try:
+                return _guard_ro_branch(dynamics, orbit, a_kepler)
+            except Cr3bpOrbitError:
+                continue
+    raise Cr3bpOrbitError("RO(2:1) 局部偏心种子未找到正确振幅支")
+
+
+def _ro_fast_32_seed(dynamics: CR3BP_Dynamics, period: float, a_kepler: float) -> Orbit:
+    """构造 3:2 近心点上族的局部启动成员。"""
+    state, _, _ = _ro_eccentric_seed(dynamics, 3, 2, 0.46, "peri")
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = period
-    return _correct_or_raise(corrector, seed, f"RO({p}:{q})")
+    orbit = _correct_ro(dynamics, float(state[0]), seed)
+    return _guard_ro_branch(dynamics, orbit, a_kepler)
+
+
+def _ro_fast_43_seed(dynamics: CR3BP_Dynamics, period: float, a_kepler: float) -> Orbit:
+    """构造 4:3 远心点上族的局部启动成员。"""
+    state, _, _ = _ro_eccentric_seed(dynamics, 4, 3, 0.76, "apo")
+    state[4] = -1.125
+    seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
+    seed.period = period
+    orbit = _correct_ro(dynamics, float(state[0]), seed)
+    return _guard_ro_branch(dynamics, orbit, a_kepler)
+
+
+def _ro_pin_period_secant(
+    dynamics: CR3BP_Dynamics,
+    p: int,
+    q: int,
+    seed: Orbit,
+    a_kepler: float,
+    dx: float,
+) -> Orbit:
+    """在局部偏心上族用割线法钉定目标周期。"""
+    target = 2.0 * np.pi * q / (p - q)
+    tolerance = 1e-9 * target
+    left = _guard_ro_branch(dynamics, seed, a_kepler)
+    assert left.period is not None
+    x_left = float(left.states[0, 0])
+    right = _guard_ro_branch(
+        dynamics,
+        _correct_ro(dynamics, x_left + dx, left),
+        a_kepler,
+    )
+    assert right.period is not None
+    x_right = float(right.states[0, 0])
+    for _ in range(8):
+        denominator = right.period - left.period
+        if denominator == 0.0:
+            break
+        x_try = x_left + (target - left.period) / denominator * (x_right - x_left)
+        guess = left if abs(x_try - x_left) <= abs(x_try - x_right) else right
+        candidate = _guard_ro_branch(
+            dynamics,
+            _correct_ro(dynamics, x_try, guess),
+            a_kepler,
+        )
+        assert candidate.period is not None
+        if abs(candidate.period - target) <= tolerance:
+            return candidate
+        if (candidate.period - target) * (left.period - target) <= 0.0:
+            right, x_right = candidate, x_try
+        else:
+            left, x_left = candidate, x_try
+    raise Cr3bpOrbitError(f"RO({p}:{q}) 割线周期钉定未命中目标")
+
+
+def _correct_ro_exact(dynamics: CR3BP_Dynamics, p: int, q: int) -> Orbit:
+    """按恒星 p:q 约定修正精确共振成员。
+
+    3:1、4:1 走近圆种子的固定半周期修正；2:1、3:2、4:3 走偏心
+    近心/远心点种子，先固定 ``x0`` 上族，再沿族行走把会合系周期钉到
+    ``T = 2πq/(p-q)``。两条路径统一检查闭合误差和 Kepler 半长轴量级，
+    防止固定周期漂移或倍周期伪解静默返回。
+    """
+    seed_kind, eccentricity = _RO_EXACT_SEEDS[(p, q)]
+    target_period = 2.0 * np.pi * q / (p - q)
+
+    if seed_kind == "circle":
+        state, period = _ro_kepler_guess(dynamics, p, q)
+        corrector = DifferentialCorrection(dynamics)
+        corrector.setup_2D_symmetric_x_fixed_t(period / 2.0)
+        seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
+        seed.period = period
+        orbit = _correct_or_raise(corrector, seed, f"RO({p}:{q})")
+    else:
+        assert eccentricity is not None
+        state, period, a_kepler = _ro_eccentric_seed(dynamics, p, q, eccentricity, seed_kind)
+        if (p, q) == (2, 1):
+            orbit = _ro_pin_period_secant(
+                dynamics,
+                p,
+                q,
+                _ro_fast_21_seed(dynamics, period, a_kepler),
+                a_kepler,
+                dx=0.0002,
+            )
+        elif (p, q) in ((3, 2), (4, 3)):
+            fast_seed = (
+                _ro_fast_32_seed(dynamics, period, a_kepler)
+                if (p, q) == (3, 2)
+                else _ro_fast_43_seed(dynamics, period, a_kepler)
+            )
+            orbit = _ro_pin_period_secant(
+                dynamics,
+                p,
+                q,
+                fast_seed,
+                a_kepler,
+                dx=0.0002 if (p, q) == (3, 2) else 0.0003,
+            )
+        else:
+            seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
+            seed.period = period
+            upper_orbit = _correct_ro(dynamics, float(state[0]), seed)
+
+            def correct_eccentric(x0: float, guess: Orbit | None) -> Orbit:
+                """固定 x0 修正并拒绝跳离目标偏心族的伪支。"""
+                orbit = _correct_ro(dynamics, x0, _require_orbit(guess))
+                return _guard_ro_branch(dynamics, orbit, a_kepler)
+
+            def period_measure(candidate: Orbit) -> float:
+                assert candidate.period is not None
+                return float(candidate.period)
+
+            orbit = _walk_family(
+                correct_at=correct_eccentric,
+                measure=period_measure,
+                target=target_period,
+                p_seed=float(state[0]),
+                dp_init=0.0025,
+                max_step=0.0025,
+                tol=1e-9 * target_period,
+                seed_orbit=upper_orbit,
+                max_iter=600,
+            )
+    return _validate_ro_exact(dynamics, p, q, orbit)
 
 
 def _correct_ro(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit) -> Orbit:
@@ -334,6 +564,9 @@ def _correct_ro(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit) -> Orbit:
     period = guess.period
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_2D_symmetric_x_fixed_x0(x0=x0)
+    # 族折返点附近的 STM 修正量可小于默认停滞阈值，但残差仍能继续
+    # 降到收敛容差；过早判停会把真实共振支误报为不可达。
+    corrector.stagnation_limit = 1e-16
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = period
     orbit = _correct_or_raise(corrector, seed, f"RO(x0={x0:.6f})")
@@ -553,14 +786,18 @@ def design_ro(
     dynamics: CR3BP_Dynamics | None = None,
     tol_km: float = 20.0,
 ) -> Orbit:
-    """生成 p:q 共振轨道（RO）：绕地质心的顺行近圆周期轨道。
+    """生成 p:q 恒星共振轨道（RO）：绕地质心的顺行平面周期轨道。
 
-    p:q = 卫星:月球，旋转系周期 T = (q/p)·T☾（与分类学 resonant_p_q
-    一致）。不指定 ``amplitude_km`` 时返回精确共振成员：从共振周期
-    条件的 Kepler 圆轨道初猜出发，固定半周期修正到精确通约。指定
-    振幅时以 +x 轴穿越点 ``x0`` 为族参数，从精确成员出发沿族行走
-    命中目标（命中 ``tol_km`` 内即停）；行走离开精确通约点，周期
-    随振幅漂移。
+    p:q = 航天器惯性圈数:月球圈数，满足
+    ``p/q = n_sc/n_moon = T_moon/T_sc``（Vaquero & Howell 2014
+    式（7）、（13））。会合系闭合周期为
+    ``T = 2πq/(p-q)``；例如 3:1 的惯性周期为半个恒星月（约 13.66
+    天），一个会合系周期内相对月球闭合一圈。不指定 ``amplitude_km``
+    时返回精确共振成员：3:1/4:1 从近圆 Kepler 种子固定半周期修正，
+    2:1/3:2/4:3 从偏心近心或远心点种子沿族行走并把周期钉到目标值。
+    指定振幅时以 +x 轴穿越点 ``x0`` 为族参数，从精确成员出发沿族行走
+    命中目标（命中 ``tol_km`` 内即停）；行走离开精确通约点，周期随振幅
+    漂移。
 
     振幅定义：一个周期内距地心距离最小/最大值的均值（km），与
     ``design_dro`` 的月心距定义同构。
@@ -1476,14 +1713,15 @@ def design_ro_family(
     n_orbits: int = 50,
     dynamics: CR3BP_Dynamics | None = None,
 ) -> FamilyGenerationResult:
-    """生成 RO 族：p:q 共振族中振幅落入请求范围的成员。
+    """生成恒星 p:q RO 共振族中振幅落入请求范围的成员。
 
-    振幅定义同 ``design_ro``（一个周期内距地心距离 min/max 均值，km）。
-    RO 不绑定平动点；种子 = 精确共振成员（固定半周期修正），族参数为
-    +x 轴穿越点 ``x0``，单次自然参数延拓双向行走（修正失败步长减半），
-    收集振幅落入 ``[min_amplitude_km, max_amplitude_km]`` 的成员，至多
-    ``n_orbits`` 条，按振幅升序排列。行走离开精确通约点，成员周期随
-    振幅漂移。
+    p:q = 航天器惯性圈数:月球圈数，精确成员的会合系周期为
+    ``2πq/(p-q)``。振幅定义同 ``design_ro``（一个周期内距地心距离
+    min/max 均值，km）。RO 不绑定平动点；3:1/4:1 以近圆成员锚定，
+    2:1/3:2/4:3 以偏心族成员锚定。族参数为 +x 轴穿越点 ``x0``，单次
+    自然参数延拓双向行走（修正失败步长减半），收集振幅落入
+    ``[min_amplitude_km, max_amplitude_km]`` 的成员，至多 ``n_orbits``
+    条，按振幅升序排列。行走离开精确通约点，成员周期随振幅漂移。
 
     Args:
         p: 共振比卫星侧整数（p:q = 卫星:月球，支持集见
