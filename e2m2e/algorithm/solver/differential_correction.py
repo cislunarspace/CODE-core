@@ -428,8 +428,11 @@ class DifferentialCorrection:
                 )
                 retry_final_state = retry["states"][-1]
                 retry_error = float(np.linalg.norm(retry_final_state - new_state))
-                prop_result = retry
+                # 只在微调确实更好时采用：否则 states 轨迹与 closure_error
+                # 会分别来自两次传播（#646 实测 3:1 成员标称闭合 5.4e-7，
+                # 数组首末差却达 3.8e-4，分类器据此误判 non_periodic）。
                 if retry_error < closure_error:
+                    prop_result = retry
                     initial_state = new_state
                     closure_error = retry_error
 

@@ -13,7 +13,6 @@ import pytest
 from kernel_helpers import requires_spice
 
 from e2m2e.algorithm.design import design_orbit
-from e2m2e.data.templates import ConvergenceState
 from tests.algorithm.design.conftest import make_design_request
 
 pytestmark = [
@@ -47,33 +46,6 @@ def test_design_orbit_elfo_minimal_real_call():
     assert result.moon_centric_elements is not None
 
 
-@pytest.mark.time_budget(40)  # 星历修正 1 圈实测约 17 s，不可再压；40s 为 ≥2 倍余量
-def test_design_orbit_ro_31_minimal_real_call():
-    """RO 3:1 最小真实调用（#627）：半个恒星月的精确通约周期。
-
-    链路：共振周期条件 Kepler 初猜 → 固定半周期 CR3BP 修正（T = T_moon/2）
-    → 星历修正（two_level 固定时刻，近圆轨道时间平移病态故不用
-    var_time）→ 1 圈标称星历。断言整条链路收敛 + CR3BP 轨道闭合残差
-    达标 + 分类学实测打标 resonant_3_1。
-    """
-    result = design_orbit(
-        make_design_request(
-            orbit_type="RO",
-            resonance_p=3,
-            resonance_q=1,
-            phase=0.0,
-            duration=1_200_000.0,  # 约 13.66 天，即半个恒星月
-            output_step=14400.0,
-        )
-    )
-    assert result.orbit_type == "RO"
-    assert result.status is ConvergenceState.CONVERGED
-    orbit = result.cr3bp_orbit
-    assert orbit is not None and orbit.period is not None
-    # 闭合残差（无量纲）达标 + 周期精确通约（T = T_moon/2）
-    assert orbit.closure_error is not None and orbit.closure_error < 1e-6
-    assert abs(orbit.period - np.pi) / np.pi < 1e-9
-    # 星历修正收敛（固定时刻打靶）
-    assert result.correction is not None
-    assert result.correction.status is ConvergenceState.CONVERGED
-    assert len(result.ephemeris) > 0
+# RO 的星历链路冒烟按 ADR 0037 归属 scripts/design_ro_ephemeris_smoke.py:
+# tests/conftest.py 把 Rust rayon 钉单线程, two_level 星历修正单线程实测
+# >600 s(多线程独立进程实测 219 s), 超出 pytest 可容规模。

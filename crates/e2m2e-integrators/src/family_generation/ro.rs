@@ -1,10 +1,10 @@
 //! RO（共振轨道族）的单次 Rust 生成。
 //!
-//! 族锚定恒星 p:q 共振（p:q = 航天器惯性圈数:月球圈数）：会合系闭合
-//! 周期为 ``T = 2πq/(p-q)``。3:1/4:1 以近圆成员锚定；2:1/3:2/4:3
-//! 以偏心成员锚定并钉定目标周期。族行走以 +x 轴穿越点 x0 为参数，
-//! 振幅 = 一个周期内距地心距离 min/max 均值（km），离开精确成员后
-//! 周期随振幅漂移。
+//! 族锚定恒星 p:q 共振（p:q = 航天器惯性圈数:月球圈数）：闭合条件为
+//! q 个恒星月内绕地 p 圈，会合系周期 ``T = 2πq``、净卷绕 ``w = p−q``
+//! （与 resonant.csv 目录各族的精确成员同支）。五档均从偏心族入口
+//! 割线钉定精确周期。族行走以 +x 轴穿越点 x0 为参数，振幅 = 一个
+//! 周期内距地心距离 min/max 均值（km），离开精确成员后周期随振幅漂移。
 
 use super::common::{correct_ro_fixed_x, correct_ro_seed, ro_amplitude_km, Failure};
 use super::types::{Context, Member, Outcome, PeriodicOrbit};

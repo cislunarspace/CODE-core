@@ -432,8 +432,8 @@ class DesignOrbitRequest(_ApiModel):
                     f"支持 {'/'.join(f'{p}:{q}' for p, q in sorted(RO_SUPPORTED_RESONANCES))}"
                     "（顺行内共振，p:q = 卫星:月球）"
                 )
-            # amplitude 缺省保持 None：返回精确通约成员（会合系周期恰为
-            # 2πq/(p−q)，对应惯性圈数比 p:q）。
+            # amplitude 缺省保持 None：返回精确成员（会合系周期恰为
+            # 2πq，即 q 个恒星月内惯性绕地 p 圈）。
             if self.phase is None:
                 self.phase = 0.0
         else:

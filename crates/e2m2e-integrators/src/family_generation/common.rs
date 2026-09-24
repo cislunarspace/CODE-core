@@ -46,15 +46,35 @@ fn finish_correction(
         None => return Err(result.into()),
     };
     let period = solution_time * full_period_multiplier;
-    let closure_error = closure_error(context, state, period).map_err(|message| Failure {
+    let mut final_state = state;
+    let mut closure = closure_error(context, final_state, period).map_err(|message| Failure {
         status: "failed",
         cause: "integration_failed",
         message,
     })?;
+    // 与 Python `_create_corrected_orbit` 同款 vy 半步微调（仅在更好时
+    // 采用）：高偏心 RO 成员的闭合误差由积分噪声主导，该抛光可压到
+    // 1e-9 量级；否则 3:1 等成员的原始闭合约 1.9e-6，越过公共契约 1e-6。
+    if closure > 1e-10 {
+        if let Ok(diff) = closure_diff(context, final_state, period) {
+            if diff[..3].iter().any(|value| value.abs() > 1e-14)
+                && diff[3..].iter().any(|value| value.abs() > 1e-14)
+            {
+                let mut polished = final_state;
+                polished[4] -= 0.5 * diff[4];
+                if let Ok(polished_closure) = closure_error(context, polished, period) {
+                    if polished_closure < closure {
+                        final_state = polished;
+                        closure = polished_closure;
+                    }
+                }
+            }
+        }
+    }
     Ok(PeriodicOrbit {
-        state,
+        state: final_state,
         period,
-        closure_error,
+        closure_error: closure,
     })
 }
 
@@ -256,23 +276,13 @@ pub(crate) fn correct_planar_fixed_x(
 /// ``RO_SUPPORTED_RESONANCES`` 同源）；其余比值的初猜不可靠。
 pub(crate) const RO_SUPPORTED_RESONANCES: &[(u32, u32)] = &[(2, 1), (3, 1), (3, 2), (4, 1), (4, 3)];
 
-fn ro_period(resonance_p: u32, resonance_q: u32) -> f64 {
-    std::f64::consts::TAU * resonance_q as f64 / (resonance_p - resonance_q) as f64
+/// 恒星 p:q 共振的会合系闭合周期：q 个恒星月（``T = 2πq``）。
+fn ro_period(_resonance_p: u32, resonance_q: u32) -> f64 {
+    std::f64::consts::TAU * resonance_q as f64
 }
 
 fn ro_kepler_a(mu: f64, resonance_p: u32, resonance_q: u32) -> f64 {
     ((1.0 - mu) * (resonance_q as f64 / resonance_p as f64).powi(2)).cbrt()
-}
-
-fn ro_circle_seed(context: Context, resonance_p: u32, resonance_q: u32) -> ([f64; 6], f64) {
-    let n = resonance_p as f64 / resonance_q as f64;
-    let a = ((1.0 - context.mu) / (n * n)).cbrt();
-    let x0 = a - context.mu;
-    let vy0 = ((1.0 - context.mu) / a).sqrt() - x0;
-    (
-        [x0, 0.0, 0.0, 0.0, vy0, 0.0],
-        ro_period(resonance_p, resonance_q),
-    )
 }
 
 fn ro_eccentric_seed(
@@ -302,6 +312,55 @@ fn ro_eccentric_seed(
     )
 }
 
+/// 一次传播测出 RO 形状特征：净卷绕数（绕质心，单位 2π）与地心距包络。
+fn ro_shape(context: Context, orbit: &PeriodicOrbit) -> Result<(f64, f64, f64), Failure> {
+    let count = 2000usize;
+    let dt = orbit.period / (count - 1) as f64;
+    let mut times: Vec<f64> = (0..count).map(|index| index as f64 * dt).collect();
+    times[count - 1] = orbit.period;
+    let propagation = propagate_cr3bp(
+        context.mu,
+        (0.0, orbit.period),
+        &times,
+        &orbit.state,
+        context.rtol,
+        context.atol,
+        context.max_step,
+        Some(500_000),
+    )
+    .map_err(|error| Failure {
+        status: "failed",
+        cause: "integration_failed",
+        message: error.to_string(),
+    })?;
+    let mut r_min = f64::INFINITY;
+    let mut r_max = 0.0_f64;
+    let mut winding = 0.0_f64;
+    let mut previous_angle: Option<f64> = None;
+    for sample in &propagation.states {
+        let dx = sample[0] + context.mu;
+        let radius = (dx * dx + sample[1] * sample[1] + sample[2] * sample[2]).sqrt();
+        r_min = r_min.min(radius);
+        r_max = r_max.max(radius);
+        let angle = sample[1].atan2(sample[0]);
+        if let Some(previous) = previous_angle {
+            let mut delta = angle - previous;
+            while delta > std::f64::consts::PI {
+                delta -= std::f64::consts::TAU;
+            }
+            while delta < -std::f64::consts::PI {
+                delta += std::f64::consts::TAU;
+            }
+            winding += delta;
+        }
+        previous_angle = Some(angle);
+    }
+    Ok((winding / std::f64::consts::TAU, r_min, r_max))
+}
+
+/// RO 伪支守卫：Kepler 半长轴量级、偏心形态与卷绕数。闭合契约只在
+/// 最终成员处验收（陡峭支的中间试探含不可抛光的积分噪声，逐点验收
+/// 会把合法族成员拒之门外；与 Python `_guard_ro_branch` 同口径）。
 fn check_ro_member(
     context: Context,
     resonance_p: u32,
@@ -309,17 +368,8 @@ fn check_ro_member(
     orbit: PeriodicOrbit,
     a_kepler: f64,
 ) -> Result<PeriodicOrbit, Failure> {
-    if orbit.closure_error >= 1e-6 {
-        return Err(Failure {
-            status: "failed",
-            cause: "closure_error",
-            message: format!(
-                "RO({resonance_p}:{resonance_q}) 精确成员闭合误差超限：{:.3e}",
-                orbit.closure_error
-            ),
-        });
-    }
-    let amplitude = ro_amplitude_km(context, &orbit)? / context.characteristic_length_km;
+    let (winding, r_min, r_max) = ro_shape(context, &orbit)?;
+    let amplitude = 0.5 * (r_min + r_max);
     let relative_error = (amplitude - a_kepler).abs() / a_kepler;
     if relative_error > 0.1 {
         return Err(Failure {
@@ -330,7 +380,58 @@ fn check_ro_member(
             ),
         });
     }
+    if r_max / r_min < 1.2 {
+        return Err(Failure {
+            status: "failed",
+            cause: "constraint_violation",
+            message: format!(
+                "RO({resonance_p}:{resonance_q}) 跳到近圆伪支：r_max/r_min={:.3} < 1.2",
+                r_max / r_min
+            ),
+        });
+    }
+    let target_winding = (resonance_p - resonance_q) as f64;
+    if (winding - target_winding).abs() > 0.01 {
+        return Err(Failure {
+            status: "failed",
+            cause: "constraint_violation",
+            message: format!(
+                "RO({resonance_p}:{resonance_q}) 卷绕数 {winding:+.4} 不等于目标 {target_winding:+}"
+            ),
+        });
+    }
     Ok(orbit)
+}
+
+/// 修正族参数 x_try 处的 RO 成员（族行走与割线钉定共用）。
+/// 3:1/4:1 的 x0–vy0 映射在目标邻域很陡，邻点续猜会跳支；这两档按
+/// x_try 重建近心点 Kepler 种子（逐点收敛已实证），其余三档沿用邻点
+/// 续猜。
+pub(crate) fn correct_ro_trial(
+    context: Context,
+    resonance_p: u32,
+    resonance_q: u32,
+    x_try: f64,
+    guess: &PeriodicOrbit,
+) -> Result<PeriodicOrbit, Failure> {
+    if !matches!((resonance_p, resonance_q), (3, 1) | (4, 1)) {
+        return correct_ro_fixed_x(context, x_try, guess);
+    }
+    let a_kepler = ro_kepler_a(context.mu, resonance_p, resonance_q);
+    let eccentricity = 1.0 - (x_try + context.mu) / a_kepler;
+    if !(0.0..1.0).contains(&eccentricity) {
+        return Err(invalid_failure(format!(
+            "RO({resonance_p}:{resonance_q}) 试探点超出偏心种子域：x={x_try:.6}"
+        )));
+    }
+    let (state, period, _) =
+        ro_eccentric_seed(context, resonance_p, resonance_q, eccentricity, false);
+    let fresh = PeriodicOrbit {
+        state,
+        period,
+        closure_error: f64::INFINITY,
+    };
+    correct_ro_fixed_x(context, x_try, &fresh)
 }
 
 fn pin_ro_period_secant(
@@ -349,7 +450,7 @@ fn pin_ro_period_secant(
         context,
         resonance_p,
         resonance_q,
-        correct_ro_fixed_x(context, x_left + dx, &left)?,
+        correct_ro_trial(context, resonance_p, resonance_q, x_left + dx, &left)?,
         a_kepler,
     )?;
     let mut x_right = x_left + dx;
@@ -368,7 +469,7 @@ fn pin_ro_period_secant(
             context,
             resonance_p,
             resonance_q,
-            correct_ro_fixed_x(context, x_try, guess)?,
+            correct_ro_trial(context, resonance_p, resonance_q, x_try, guess)?,
             a_kepler,
         )?;
         if (candidate.period - target).abs() <= tolerance {
@@ -524,9 +625,36 @@ fn walk_ro_period(
     )))
 }
 
-/// RO 精确共振种子：p:q 为航天器惯性圈数:月球圈数，闭合周期为
-/// ``T = 2πq/(p-q)``。3:1/4:1 使用近圆种子；2:1/3:2/4:3 使用
-/// 偏心近心/远心点种子，沿固定 x0 族行走把周期钉到目标值。
+/// 3:1/4:1 的偏心 Kepler 种子入口：偏心率取值使近心点 x0 落在目录
+/// 精确成员穿越点邻域（3:1 x0≈0.021、4:1 x0≈0.280），固定 x0 修正
+/// 直接落在目标偏心支，再割线钉定 ``T = 2πq``。
+fn correct_ro_plain_seed(
+    context: Context,
+    resonance_p: u32,
+    resonance_q: u32,
+    eccentricity: f64,
+) -> Result<PeriodicOrbit, Failure> {
+    let (state, period, a_kepler) =
+        ro_eccentric_seed(context, resonance_p, resonance_q, eccentricity, false);
+    let initial = PeriodicOrbit {
+        state,
+        period,
+        closure_error: f64::INFINITY,
+    };
+    let seed = check_ro_member(
+        context,
+        resonance_p,
+        resonance_q,
+        correct_ro_fixed_x(context, state[0], &initial)?,
+        a_kepler,
+    )?;
+    pin_ro_period_secant(context, resonance_p, resonance_q, seed, a_kepler, -0.0025)
+}
+
+/// RO 精确共振种子：p:q 为航天器惯性圈数:月球圈数，闭合条件为 q 个
+/// 恒星月内绕地 p 圈（``T = 2πq``、净卷绕 ``w = p−q``）。五档均从
+/// 偏心族入口上族并把周期钉到目标值；2:1 的入口在数值折返区需局部
+/// 扫描，3:2/4:3 沿固定 x0 行走加周期二分。
 pub(crate) fn correct_ro_seed(
     context: Context,
     resonance_p: u32,
@@ -538,32 +666,32 @@ pub(crate) fn correct_ro_seed(
         )));
     }
     let orbit = match (resonance_p, resonance_q) {
-        (3, 1) | (4, 1) => {
-            let (state, period) = ro_circle_seed(context, resonance_p, resonance_q);
-            correct(
-                context,
-                state,
-                period / 2.0,
-                &[1, 3],
-                &[0, 4],
-                false,
-                false,
-                1e-12,
-                50,
-            )?
-        }
+        (3, 1) => correct_ro_plain_seed(context, resonance_p, resonance_q, 0.93)?,
+        (4, 1) => correct_ro_plain_seed(context, resonance_p, resonance_q, 0.26)?,
         (2, 1) => correct_ro_fast_21_seed(context, resonance_p, resonance_q)?,
         (3, 2) => correct_ro_eccentric_seed(context, resonance_p, resonance_q, 0.5, false)?,
         (4, 3) => correct_ro_eccentric_seed(context, resonance_p, resonance_q, 0.6, true)?,
         _ => unreachable!(),
     };
-    check_ro_member(
+    let member = check_ro_member(
         context,
         resonance_p,
         resonance_q,
         orbit,
         ro_kepler_a(context.mu, resonance_p, resonance_q),
-    )
+    )?;
+    // 最终成员验收闭合契约（中间试探不设此门，见 check_ro_member）。
+    if member.closure_error >= 1e-6 {
+        return Err(Failure {
+            status: "failed",
+            cause: "closure_error",
+            message: format!(
+                "RO({resonance_p}:{resonance_q}) 精确成员闭合误差超限：{:.3e}",
+                member.closure_error
+            ),
+        });
+    }
+    Ok(member)
 }
 
 /// RO 族成员修正：固定 +x 穿越点 x0，自由 vy0 与半周期。周期跳变超
@@ -677,7 +805,11 @@ pub(crate) fn triangular_seed(
     Ok((state, std::f64::consts::TAU / omega))
 }
 
-pub(crate) fn closure_error(context: Context, state: [f64; 6], period: f64) -> Result<f64, String> {
+pub(crate) fn closure_diff(
+    context: Context,
+    state: [f64; 6],
+    period: f64,
+) -> Result<[f64; 6], String> {
     let result = propagate_cr3bp(
         context.mu,
         (0.0, period),
@@ -690,11 +822,16 @@ pub(crate) fn closure_error(context: Context, state: [f64; 6], period: f64) -> R
     )
     .map_err(|error| error.to_string())?;
     let final_state = result.states.last().ok_or("周期传播未返回末态")?;
-    Ok(final_state
-        .iter()
-        .zip(state)
-        .map(|(final_value, initial_value)| (final_value - initial_value).abs())
-        .fold(0.0, f64::max))
+    let mut diff = [0.0; 6];
+    for index in 0..6 {
+        diff[index] = final_state[index] - state[index];
+    }
+    Ok(diff)
+}
+
+pub(crate) fn closure_error(context: Context, state: [f64; 6], period: f64) -> Result<f64, String> {
+    let diff = closure_diff(context, state, period)?;
+    Ok(diff.iter().map(|value| value.abs()).fold(0.0, f64::max))
 }
 
 /// CR3BP Jacobi 常数（Parker 约定，不含 ½μ(1−μ) 常数项）：C = 2U − v²。

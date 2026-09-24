@@ -114,7 +114,13 @@ ADR 0044 注册，准入依据 ADR 0043 决策 6（内容被响应字段引用�
 （修订注 2026-09-24，#646：旧共振判据只比较旋转系周期 ``T/T_moon``，
 把 2:1/3:1/4:1 文献偏心族压成 `resonant_1_1`。现按质心带符号净卷绕
 推导惯性圈数比，并与 RO 的恒星约定统一；月心/L4/L5 多标签保留旧辅助
-语义。）*
+语义。）
+
+（修订注 2026-09-24，#646 续：RO 精确成员的锚定周期原写作
+``T = 2πq/(p-q)``（隐含会合系净卷绕 w=1）；按 V&H 的 ``p`` 圈/``q``
+恒星月定义应为 ``T = 2πq``、``w = p−q``，两者仅在 |p−q|=1 时重合。
+3:1/4:1 已改锚 w=2/w=3 的文献偏心支（与外部 resonant.csv 目录 31/41
+族逐位吻合），分类判据本身不变。）*
 
 - **Ingest stamps measured labels**: `classification.taxonomy_labels`
   (record-level deduplicated set) and `members[].taxonomy_label` (member
@@ -137,12 +143,12 @@ ADR 0044 注册，准入依据 ADR 0043 决策 6（内容被响应字段引用�
 ### 6. Conventions
 
 p:q counts satellite inertial revolutions per lunar revolution
-(``n_sc/n_moon = p/q``; equivalently ``T/T_moon = 1/(p/q - 1)`` for
-the barycentric closed period; 2:1 is interior). Northern/southern = sign
-of z at the vy < 0 crossing (the same geometry the design side encodes as
-`halo_class`). Eastern/western = perilune half-plane in the moon-centered
-synodic frame. NRHO folds into halo (same family, high-amplitude
-near-rectilinear arc).
+(``n_sc/n_moon = p/q``; the pattern closes after q lunar periods:
+``T/T_moon = q`` with barycentric winding ``w = p - q``; 2:1 is
+interior). Northern/southern = sign of z at the vy < 0 crossing (the
+same geometry the design side encodes as `halo_class`). Eastern/western =
+perilune half-plane in the moon-centered synodic frame. NRHO folds into
+halo (same family, high-amplitude near-rectilinear arc).
 
 ## Reproduction notes
 

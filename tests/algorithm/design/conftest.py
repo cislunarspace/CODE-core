@@ -230,12 +230,14 @@ def _corrected_triangular_l4_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbi
 
 @pytest.fixture(scope="session")
 def _corrected_ro_31_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
-    """RO 3:1（共振轨道）：固定半周期（精确通约 T = T_moon/2），自由 x0/vy0；
-    恒星共振约定的 Kepler 圆轨道初猜（与 design_ro 种子同一路径）。"""
-    from e2m2e.algorithm.family.cr3bp_orbits import _ro_kepler_guess
-
+    """RO 3:1 比值的 w=1 近圆支代表解（固定半周期对称修正的机制样本；
+    design_ro 的 3:1 锚定 resonant.csv 31 族的 w=2 偏心支）。"""
     dynamics = earth_moon_dynamics
-    state, period = _ro_kepler_guess(dynamics, 3, 1)
+    mu = float(dynamics.system.mu)
+    a = ((1.0 - mu) * (1.0 / 3.0) ** 2) ** (1.0 / 3.0)
+    x0 = a - mu
+    state = np.array([x0, 0.0, 0.0, 0.0, float(np.sqrt((1.0 - mu) / a)) - x0, 0.0])
+    period = np.pi  # w=1 近圆支的闭合周期 T = 2πq/(p−q)
     seed = _seed_orbit(dynamics, state, period)
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_2D_symmetric_x_fixed_t(period / 2.0)
