@@ -16,6 +16,7 @@ class TestCatalogTerminology:
         assert response.taxonomy_labels == label_legend()
         assert len(response.taxonomy_labels) == 42
         assert response.orbit_families == list(RECORD_ORBIT_FAMILIES)
+        assert "lyapunov" in response.orbit_families
         assert response.transfer_types == list(TRANSFER_TYPES)
 
     def test_record_families_cover_every_ingestable_family(self):

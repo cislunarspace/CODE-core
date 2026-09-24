@@ -189,7 +189,9 @@ _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 #: 2.7e-4 km（18 s）。
 #: Lyapunov 平面轨道同属此病态：面内周期轨道时间平移与沿轨相位旋转简并，
 #: 自由时间打靶雅可比病态；固定时间打靶收敛稳健。
-_FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "DPO", "LYAPUNOV", "LISSAJOUS", "L4", "L5", "AXIAL", "RO"})
+_FIXED_TIME_ORBIT_TYPES = frozenset(
+    {"HALO", "NRHO", "DPO", "LYAPUNOV", "LISSAJOUS", "L4", "L5", "AXIAL", "RO"}
+)
 
 #: body-fixed 帧（ITRF93 / MOON_PA）所需内核文件名，与 tests/kernel_helpers.py 一致。
 #: 预测 PCK 必须先于历史 PCK 加载：SPICE 对重叠覆盖段取后加载者，历史

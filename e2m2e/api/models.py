@@ -220,7 +220,9 @@ class DesignOrbitRequest(_ApiModel):
     duration 统一用秒。
     """
 
-    orbit_type: str = Field(description="DRO/DPO/NRHO/HALO/LYAPUNOV/LISSAJOUS/L4/L5/AXIAL/RO/.../ELFO")
+    orbit_type: str = Field(
+        description="DRO/DPO/NRHO/HALO/LYAPUNOV/LISSAJOUS/L4/L5/AXIAL/RO/.../ELFO"
+    )
     # CR3BP 形状参数（字段约束为跨类型全局上下限；model_validator 内按类型收紧）
     amplitude: float | None = Field(default=None, ge=-110000.0, le=350000.0)
     resonance_p: int | None = Field(
