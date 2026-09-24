@@ -155,32 +155,32 @@ def _closed_curve(components, period: float, n: int = 2880) -> tuple[np.ndarray,
 
 
 def test_synthetic_resonant_interior_and_exterior():
-    """判据级：绕地环绕闭合曲线按 T/T☾ 命中共振比（p:q = 卫星:月球）。"""
-    # 内共振 2:1：T = T☾/2 = π，半径 0.55 的绕地圆（不触月心/平动点分支）
+    """判据级：绕地环绕曲线按惯性圈数比命中共振标签。"""
+    # 内共振 2:1：T = T_moon，w=+1 → n=2，半径 0.55 的绕地圆。
     states, t = _closed_curve(
         (
-            lambda t: 0.55 * np.cos(2 * t),
-            lambda t: 0.55 * np.sin(2 * t),
+            lambda t: 0.55 * np.cos(t),
+            lambda t: 0.55 * np.sin(t),
             lambda t: np.zeros_like(t),
-            lambda t: -1.1 * np.sin(2 * t),
-            lambda t: 1.1 * np.cos(2 * t),
+            lambda t: -0.55 * np.sin(t),
+            lambda t: 0.55 * np.cos(t),
             lambda t: np.zeros_like(t),
         ),
-        period=np.pi,
+        period=2 * np.pi,
     )
     result = classify_orbit(states, t)
     assert result.primary is not None and result.primary.canonical == "resonant_2_1", (
         result.diagnostics
     )
 
-    # 外共振 1:2：T = 2·T☾ = 4π，远距绕地圆（把月与平动点圈在内但均不局域）
+    # 外共振 1:2：T = 2·T_moon，w=-1 → n=1/2；远距绕地圆。
     states, t = _closed_curve(
         (
-            lambda t: 1.6 * np.cos(0.5 * t),
-            lambda t: 1.6 * np.sin(0.5 * t),
+            lambda t: 1.6 * np.cos(-0.5 * t),
+            lambda t: 1.6 * np.sin(-0.5 * t),
             lambda t: np.zeros_like(t),
-            lambda t: -0.8 * np.sin(0.5 * t),
-            lambda t: 0.8 * np.cos(0.5 * t),
+            lambda t: -1.6 * (-0.5) * np.sin(-0.5 * t),
+            lambda t: 1.6 * (-0.5) * np.cos(-0.5 * t),
             lambda t: np.zeros_like(t),
         ),
         period=4 * np.pi,
@@ -195,7 +195,7 @@ def test_synthetic_moon_centered_multilabel_with_resonance():
     """判据级：绕月闭合曲线周期通约时多标签（月心族 + resonant）。"""
     mu = 0.012150585350562453
     moon_x = 1 - mu
-    # 逆行绕月圆，角速率 0.75 → T = (4/3)·T☾，一周期恰绕月 2π
+    # 逆行绕月圆，角速率 0.75 → T = (4/3)·T_moon，一周期恰绕月 2π
     r = 0.05
     w = -0.75
     states, t = _closed_curve(

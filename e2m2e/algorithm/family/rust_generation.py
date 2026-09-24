@@ -134,8 +134,8 @@ def _member_parameters(
     item: dict[str, Any],
     request: dict[str, Any],
 ) -> dict[str, Any]:
-    if family_type == "dro":
-        result: dict[str, Any] = {}  # 月心族，不绑定平动点
+    if family_type in ("dro", "ro"):
+        result: dict[str, Any] = {}  # 月心族/地心族，不绑定平动点
     else:
         result = {"libration_point": libration_point}
     if family_type == "halo":
@@ -161,6 +161,11 @@ def _member_parameters(
         )
     else:
         result["amplitude_km"] = float(item["amplitude_km"])
+        if family_type == "ro":
+            result.update(
+                resonance_p=request["resonance_p"],
+                resonance_q=request["resonance_q"],
+            )
         for key in (
             "jacobi_drift",
             "newton_iterations",
@@ -200,6 +205,15 @@ def _family_metadata(
             request["min_amplitude_km"],
             request["max_amplitude_km"],
         ]
+    elif family_type == "ro":
+        metadata.update(
+            amplitude_range_km=[
+                request["min_amplitude_km"],
+                request["max_amplitude_km"],
+            ],
+            resonance_p=request["resonance_p"],
+            resonance_q=request["resonance_q"],
+        )
     else:
         metadata.update(
             amplitude_range_km=[

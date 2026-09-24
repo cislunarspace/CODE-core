@@ -229,10 +229,11 @@ pub fn propagate_cr3bp(
         eval_idx = 1;
     }
 
-    while n_steps < s_max
-        && ((direction > 0.0 && t < t_eval[t_eval.len() - 1] - 1e-12)
-            || (direction < 0.0 && t > t_eval[t_eval.len() - 1] + 1e-12))
-    {
+    // 循环推进到全部输出点发射完毕（发射判据含 1e-9 容差，末点容许
+    // 微欠）。不能只看时间界：退化弧段（span < 1e-12，如周期轨道相位
+    // 取模绕回 ~0）下时间判据直接为假、末点永不发射（少点报错）。
+    // 终止性由步长塌缩检查保证（h 跌破 MIN_STEP·span 即报错）。
+    while n_steps < s_max && eval_idx < t_eval.len() {
         n_steps += 1;
 
         // 步长不超过下一输出点（向前 t+h>t_next 或向后 t+h<t_next 时截断到该点）

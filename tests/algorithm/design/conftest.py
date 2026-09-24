@@ -57,6 +57,8 @@ def make_design_request(orbit_type: str, **overrides) -> SimpleNamespace:
         "phase_in": None,
         "phase_out": None,
         "perilune_height": None,
+        "resonance_p": None,
+        "resonance_q": None,
         "inclination": None,
         "arg_of_pericenter": None,
         "semi_major_axis": None,
@@ -226,6 +228,25 @@ def _corrected_triangular_l4_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbi
     return orbit, result
 
 
+@pytest.fixture(scope="session")
+def _corrected_ro_31_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
+    """RO 3:1 比值的 w=1 近圆支代表解（固定半周期对称修正的机制样本；
+    design_ro 的 3:1 锚定 resonant.csv 31 族的 w=2 偏心支）。"""
+    dynamics = earth_moon_dynamics
+    mu = float(dynamics.system.mu)
+    a = ((1.0 - mu) * (1.0 / 3.0) ** 2) ** (1.0 / 3.0)
+    x0 = a - mu
+    state = np.array([x0, 0.0, 0.0, 0.0, float(np.sqrt((1.0 - mu) / a)) - x0, 0.0])
+    period = np.pi  # w=1 近圆支的闭合周期 T = 2πq/(p−q)
+    seed = _seed_orbit(dynamics, state, period)
+    corrector = DifferentialCorrection(dynamics)
+    corrector.setup_2D_symmetric_x_fixed_t(period / 2.0)
+    result = corrector.iterate_correction(seed, verbose=False)
+    orbit = result.orbit
+    assert orbit is not None, "RO 3:1 修正未收敛"
+    return orbit, result
+
+
 # ---- 函数级 deepcopy 包装：单测可安全改写，session 缓存不受影响 ----
 
 
@@ -262,4 +283,10 @@ def corrected_dpo(_corrected_dpo_cached):
 @pytest.fixture
 def corrected_triangular_l4(_corrected_triangular_l4_cached):
     orbit, result = _corrected_triangular_l4_cached
+    return copy.deepcopy(orbit), result
+
+
+@pytest.fixture
+def corrected_ro_31(_corrected_ro_31_cached):
+    orbit, result = _corrected_ro_31_cached
     return copy.deepcopy(orbit), result

@@ -32,6 +32,28 @@ def test_rust_ffi_translates_step_collapse_to_propagation_failure():
         )
 
 
+def test_degenerate_span_returns_all_requested_points():
+    """退化弧段（span < 1e-12）也必须返回全部请求点（#627 周期相位绕回）。
+
+    DRO→RO 转移 NLP 把插入时间推到 RO 周期边界时，轨道相位重传播弧段
+    宽 ~1e-13：传播器的时间界判据一步不走、末点不发射，报
+    "output length mismatch"。修复后首末两点都应返回。
+    """
+    result = propagate_cr3bp_py(
+        mu=Datum.DE421.mu,
+        t_span=(0.0, 2.6e-13),
+        t_eval=[0.0, 2.6e-13],
+        initial_state=[0.8, 0.0, 0.0, 0.0, 0.5, 0.0],
+        rtol=1e-12,
+        atol=1e-12,
+    )
+    assert len(result["time"]) == 2
+    assert len(result["states"]) == 2
+    # 末态与初态的差距在弧段宽度量级内（轨道未实际推进）
+    delta = np.asarray(result["states"][1]) - np.asarray(result["states"][0])
+    assert np.linalg.norm(delta) < 1e-9
+
+
 def test_bcr4bp_rust_ffi_translates_step_collapse_to_propagation_failure():
     system = BCR4BPSystem.earth_moon()
     with pytest.raises(PropagationFailure):

@@ -20,7 +20,8 @@ from e2m2e.algorithm.family.cr3bp_orbits import (
 pytestmark = pytest.mark.orchestration
 
 
-#: 直绑 design_* 的条目（registry[key] is func）
+#: 直绑 design_* 的条目（registry[key] is func）；RO 走 lambda 适配请求
+#: 参数形状（resonance_p/q + amplitude），列下方 _LAMBDA_KEYS。
 _DIRECT_CASES = [
     ("AXIAL", design_axial),
     ("DPO", design_dpo),
@@ -30,6 +31,7 @@ _DIRECT_CASES = [
 #: 绑定平动点的 lambda 包装条目（只验存在与可调用；各族
 #: 端到端行为验证不在 pytest 展开，见文件 docstring）
 _LAMBDA_KEYS = [
+    "RO",
     "L4_SPO",
     "L5_SPO",
     "L4_LPO",

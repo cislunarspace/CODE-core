@@ -551,7 +551,7 @@ class Catalog:
         """轨道族生成（二档）。
 
         Pydantic 模型校验 → 按 orbit_type 分派到算法层族生成入口 →
-        结构化错误。八族均已实现，成功返回统一容器
+        结构化错误。九族均已实现，成功返回统一容器
         ``FamilyGenerationResponse``（兼容 ``OrbitFamily`` 读取接口）；
         Lissajous 是拟周期参数采样，族上显式标注
         ``periodicity=quasi-periodic``。软失败使用同一响应保留部分族。
@@ -624,6 +624,21 @@ class Catalog:
                 assert request.min_amplitude_km is not None
                 assert request.max_amplitude_km is not None
                 result = design_dro_family(
+                    request.min_amplitude_km,
+                    request.max_amplitude_km,
+                    n_orbits=request.n_orbits,
+                )
+                response = _family_generation_payload(result)
+            elif sel == "RO":
+                from e2m2e.algorithm.family import design_ro_family
+
+                assert request.resonance_p is not None
+                assert request.resonance_q is not None
+                assert request.min_amplitude_km is not None
+                assert request.max_amplitude_km is not None
+                result = design_ro_family(
+                    request.resonance_p,
+                    request.resonance_q,
                     request.min_amplitude_km,
                     request.max_amplitude_km,
                     n_orbits=request.n_orbits,

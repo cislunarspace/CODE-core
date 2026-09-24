@@ -51,6 +51,13 @@ pub(crate) enum Spec {
         max_amplitude_km: f64,
         member_limit: usize,
     },
+    Ro {
+        resonance_p: u32,
+        resonance_q: u32,
+        min_amplitude_km: f64,
+        max_amplitude_km: f64,
+        member_limit: usize,
+    },
 }
 
 #[derive(Clone, Debug)]
