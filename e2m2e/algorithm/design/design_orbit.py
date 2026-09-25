@@ -60,6 +60,7 @@ from ..family.cr3bp_orbits import (
     design_lissajous,
     design_lpo,
     design_nrho,
+    design_ro,
     design_spo,
     design_triangular,
     earth_moon_system,
@@ -90,6 +91,8 @@ if TYPE_CHECKING:
         phase_in: float | None
         phase_out: float | None
         perilune_height: float | None
+        resonance_p: int | None
+        resonance_q: int | None
         inclination: float | None
         arg_of_pericenter: float | None
         semi_major_axis: float | None
@@ -178,7 +181,12 @@ _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 #: 时间打靶雅可比列病态——实测 L2/L1 默认参数 LM 停滞（
 #: STAGNATION_DETECTED，15/17 次迭代后位置残差停在 1.5e-01 / 1.1e+01 km）；
 #: 固定时间后两种修正方法均在约 10 s 内收敛到容差内。
-_FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "DPO", "LISSAJOUS", "L4", "L5", "AXIAL"})
+#:
+#: RO（共振轨道）同属此病态：近圆轨道时间平移 ≈ 沿轨相位旋转，自由
+#: 时间打靶雅可比近似简并——实测 3:1 RO var_time 打靶 10 次迭代后
+#: 停滞在位置残差 4.0 km（STAGNATED，554 s）；固定时间 5 次迭代收敛到
+#: 2.7e-4 km（18 s）。
+_FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "DPO", "LISSAJOUS", "L4", "L5", "AXIAL", "RO"})
 
 #: body-fixed 帧（ITRF93 / MOON_PA）所需内核文件名，与 tests/kernel_helpers.py 一致。
 #: 预测 PCK 必须先于历史 PCK 加载：SPICE 对重叠覆盖段取后加载者，历史
@@ -522,6 +530,13 @@ def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_D
         return design_dro(params["amplitude"], dynamics=dynamics)
     if sel == "DPO":
         return design_dpo(params["amplitude"], dynamics=dynamics)
+    if sel == "RO":
+        return design_ro(
+            int(params["resonance_p"]),
+            int(params["resonance_q"]),
+            params.get("amplitude"),
+            dynamics=dynamics,
+        )
     if sel == "HALO":
         return design_halo(int(params["collinear_point"]), params["amplitude"], dynamics=dynamics)
     if sel == "NRHO":
@@ -945,7 +960,7 @@ def design_orbit(
     kernel_dir: str | None = None,
     verbose: bool = False,
 ) -> OrbitDesignResult:
-    """端到端设计标称轨道（DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial/.../ELFO）。
+    """端到端设计标称轨道（DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial/RO/.../ELFO）。
 
     通过 ``request.orbit_type`` 在内部分派管线：
 
@@ -991,6 +1006,8 @@ def design_orbit(
         "amplitude_out",
         "phase_in",
         "phase_out",
+        "resonance_p",
+        "resonance_q",
     )
     params: dict[str, float | int] = {}
     for attr in _params_attrs:

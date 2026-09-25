@@ -50,6 +50,9 @@ exclude_patterns = [
     # ADR 不是面向用户的文档，不收录进站点
     "adr",
     "adr/*",
+    # agents/ 是 AI 工作文档（如 issue-tracker.md），不面向用户，避免 toctree 告警
+    "agents",
+    "agents/*",
 ]
 
 # ---- sphinx-autoapi：静态解析源码生成 API 参考，构建机无需可运行的扩展 ----

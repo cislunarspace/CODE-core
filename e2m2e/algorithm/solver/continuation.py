@@ -704,6 +704,11 @@ class Continuation:
                     logger.warning("  PAL迭代 %d: 雅可比矩阵奇异", step["iterations"])
             Xnew = np.asarray(step["x_new"], dtype=float)
             Xdot_new = np.asarray(step["tangent"], dtype=float)
+            # 切向量是雅可比零空间基向量，数值符号任意；必须与上一步同向，
+            # 否则预测步沿切线倒走（实测表现为振幅 ±step_size 回摆、跨 z=0
+            # 镜像跳支）。折叠点处切向连续转动，同向化不影响过折。
+            if float(np.dot(Xdot_new, Xdot)) < 0.0:
+                Xdot_new = -Xdot_new
 
             Xdot = Xdot_new
             X = Xnew.copy()
@@ -737,6 +742,11 @@ class Continuation:
                 # 实际不重新求,因为下面会通过差分修正收敛,这里不动 Xdot
 
             SV0_corr = SV0i.copy()
+            # CR3BP 有 z→−z 镜像对称：目标半球（td·z>0）延拓中 PAL 牛顿
+            # 可能收敛到镜像解，按对称性把 z 镜像回目标半球，保持支连续
+            # （镜像解与原解同为精确解，周期不变）。
+            if directional_increment and td * X[1] < 0.0:
+                X[1] = -X[1]
             SV0_corr[0] = X[0]
             SV0_corr[2] = X[1]
             SV0_corr[4] = X[2]

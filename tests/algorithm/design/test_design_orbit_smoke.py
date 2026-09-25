@@ -44,3 +44,8 @@ def test_design_orbit_elfo_minimal_real_call():
     assert len(result.ephemeris) > 0
     assert result.drift_e is not None
     assert result.moon_centric_elements is not None
+
+
+# RO 的星历链路冒烟按 ADR 0037 归属 scripts/design_ro_ephemeris_smoke.py:
+# tests/conftest.py 把 Rust rayon 钉单线程, two_level 星历修正单线程实测
+# >600 s(多线程独立进程实测 219 s), 超出 pytest 可容规模。

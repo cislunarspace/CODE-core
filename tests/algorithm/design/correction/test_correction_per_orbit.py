@@ -26,6 +26,7 @@ CORRECTION_CASES = [
     ("lyapunov_l1", "corrected_lyapunov_l1"),
     ("dpo", "corrected_dpo"),
     ("triangular_l4", "corrected_triangular_l4"),
+    ("ro_31", "corrected_ro_31"),
 ]
 
 

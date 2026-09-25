@@ -66,6 +66,7 @@ _DESIGN_FAMILY_POINT: dict[str, tuple[str, int | None]] = {
     "L4_HORSESHOE": ("horseshoe", 4),
     "L5_HORSESHOE": ("horseshoe", 5),
     "ELFO": ("elfo", None),
+    "RO": ("ro", None),
 }
 
 #: 设计侧 orbit_family → 分类学期望标签（ADR 0042 映射表）。NRHO 折叠
@@ -90,6 +91,22 @@ _DESIGN_TAXONOMY_EXPECTATIONS: dict[str, set[str]] = {
     },
     "axial": {"axial_l1", "axial_l2", "axial_l3", "axial_l4", "axial_l5"},
     "dro": {"distant_retrograde"},
+    # RO 的期望标签随请求的共振比走（resonant_p_q），静态表取 11 个
+    # 共振标签的全集；成员周期随振幅漂移出通约容差时实测与期望不符，
+    # 走冲突告警路径，不失败。
+    "ro": {
+        "resonant_1_1",
+        "resonant_1_2",
+        "resonant_1_3",
+        "resonant_1_4",
+        "resonant_2_1",
+        "resonant_3_1",
+        "resonant_3_2",
+        "resonant_3_4",
+        "resonant_2_3",
+        "resonant_4_1",
+        "resonant_4_3",
+    },
     "dpo": {"distant_prograde", "low_prograde_eastern", "low_prograde_western"},
     "spo": {"shortperiod_l4", "shortperiod_l5"},
     "lpo": {"longperiod_l4", "longperiod_l5"},
