@@ -178,6 +178,9 @@ _ORBIT_TYPE_RANGES: Mapping[str, Mapping[str, NumericRange]] = MappingProxyType(
         "NRHO": _with_global_amplitude_out(
             _range_map(perilune_height=NumericRange(100.0, 40000.0))
         ),
+        "LYAPUNOV": _with_global_amplitude_out(
+            _range_map(amplitude=NumericRange(5000.0, 60000.0))
+        ),
         "RO": _RO_RANGES,
         "L4": _GLOBAL_AMPLITUDE_OUT_RANGES,
         "L5": _GLOBAL_AMPLITUDE_OUT_RANGES,
@@ -379,6 +382,17 @@ class DesignOrbitRequest(_ApiModel):
                 self.phase = 0.5
             if self.collinear_point not in (1, 2):
                 raise ValueError(f"NRHO collinear_point 必须为 1 或 2，当前 {self.collinear_point}")
+        elif sel == "LYAPUNOV":
+            if self.collinear_point is None:
+                self.collinear_point = 2
+            if self.amplitude is None:
+                self.amplitude = 12000.0
+            if self.phase is None:
+                self.phase = 0.0
+            if self.collinear_point not in (1, 2):
+                raise ValueError(
+                    f"LYAPUNOV collinear_point 必须为 1 或 2，当前 {self.collinear_point}"
+                )
         elif sel == "LISSAJOUS":
             if self.collinear_point is None:
                 self.collinear_point = 2

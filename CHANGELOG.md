@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Lyapunov 轨道设计入口**：`DesignOrbitRequest` 支持 `orbit_type="LYAPUNOV"`，为 L1/L2 设计平面轨道并完成分段星历修正；振幅为一个周期内 `max|y|`（km），范围 5 000–60 000 km。(#628)
+
 发布条目面向调用方：写变化、用法与数值细节，issue 引用置段尾括号；内部实现路径与决策沿革不进本文件（住 ADR 与 issue）。已发布条目是不可变历史，保持写成时的语言。
 
 

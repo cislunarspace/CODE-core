@@ -57,6 +57,7 @@ _LOGGER = logging.getLogger(__name__)
 _DESIGN_FAMILY_POINT: dict[str, tuple[str, int | None]] = {
     "DRO": ("dro", None),
     "DPO": ("dpo", None),
+    "LYAPUNOV": ("lyapunov", None),
     "L4": ("lissajous", 4),
     "L5": ("lissajous", 5),
     "L4_SPO": ("spo", 4),

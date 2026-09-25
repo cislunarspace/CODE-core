@@ -34,6 +34,13 @@ class TestDesignOrbitRequest:
         assert dro.output_step == 3600.0
         assert dro.correction_method == "two_level"
 
+        lyapunov = DesignOrbitRequest(orbit_type="LYAPUNOV")
+        assert (lyapunov.collinear_point, lyapunov.amplitude, lyapunov.phase) == (
+            2,
+            12000.0,
+            0.0,
+        )
+
         elfo = DesignOrbitRequest(orbit_type="ELFO", semi_major_axis=3000.0)
         assert elfo.duration == 5184000.0
         assert elfo.inclination == 75.0
@@ -58,6 +65,7 @@ class TestDesignOrbitRequest:
                 {"orbit_type": "ELFO", "semi_major_axis": 3000.0, "amplitude_out": 80000.0},
                 "amplitude_out",
             ),
+            ({"orbit_type": "LYAPUNOV", "collinear_point": 3}, "collinear_point"),
         ],
     )
     def test_rejects_invalid_input(self, kwargs, field):

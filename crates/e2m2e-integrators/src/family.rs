@@ -156,8 +156,8 @@ fn linspace(end: f64, count: usize) -> Vec<f64> {
 
 /// 传播周期轨道并在 Rust 内测量族几何量。
 ///
-/// metric 可取 moon-distance、earth-distance、l45-distance 或 z-amplitude；
-/// 返回对应绝对距离或振幅的 (minimum, maximum)（无量纲）。
+/// metric 可取 moon-distance、earth-distance、l45-distance、z-amplitude 或
+/// y-amplitude；返回对应绝对距离或振幅的 (minimum, maximum)（无量纲）。
 #[pyfunction]
 #[pyo3(signature = (mu, metric, point, initial_state, period, rtol=1e-12, atol=1e-12, max_step=None, sample_count=1000))]
 #[allow(clippy::too_many_arguments)]
@@ -221,6 +221,7 @@ pub fn orbit_family_metric_py(
                 (dx * dx + dy * dy).sqrt()
             }
             "z-amplitude" => state[2].abs(),
+            "y-amplitude" => state[1].abs(),
             _ => return Err(PyValueError::new_err(format!("未知族度量 {metric:?}"))),
         };
         minimum = minimum.min(value);

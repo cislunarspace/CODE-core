@@ -59,6 +59,7 @@ from ..family.cr3bp_orbits import (
     design_horseshoe,
     design_lissajous,
     design_lpo,
+    design_lyapunov,
     design_nrho,
     design_ro,
     design_spo,
@@ -186,7 +187,9 @@ _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 #: 时间打靶雅可比近似简并——实测 3:1 RO var_time 打靶 10 次迭代后
 #: 停滞在位置残差 4.0 km（STAGNATED，554 s）；固定时间 5 次迭代收敛到
 #: 2.7e-4 km（18 s）。
-_FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "DPO", "LISSAJOUS", "L4", "L5", "AXIAL", "RO"})
+_FIXED_TIME_ORBIT_TYPES = frozenset(
+    {"HALO", "NRHO", "DPO", "LYAPUNOV", "LISSAJOUS", "L4", "L5", "AXIAL", "RO"}
+)
 
 #: body-fixed 帧（ITRF93 / MOON_PA）所需内核文件名，与 tests/kernel_helpers.py 一致。
 #: 预测 PCK 必须先于历史 PCK 加载：SPICE 对重叠覆盖段取后加载者，历史
@@ -416,6 +419,21 @@ def _validate_params(
             "phase": phase,
         }
 
+    if sel == "LYAPUNOV":
+        collinear_point = 2 if collinear_point is None else int(collinear_point)
+        amplitude = 12000.0 if amplitude is None else float(amplitude)
+        phase = 0.0 if phase is None else float(phase)
+        if collinear_point not in (1, 2):
+            raise ValueError(f"Lyapunov collinear_point 必须为 1 或 2，当前 {collinear_point}")
+        if not 5000.0 <= amplitude <= 60000.0:
+            raise ValueError(
+                f"Lyapunov L{collinear_point} amplitude 应在 5000~60000 km 之间，"
+                f"实际为 {amplitude:.0f} km"
+            )
+        if not 0.0 <= phase <= 1.0:
+            raise ValueError(f"Lyapunov phase 应在 0~1 之间，实际为 {phase}")
+        return {"collinear_point": collinear_point, "amplitude": amplitude, "phase": phase}
+
     if sel == "LISSAJOUS":
         collinear_point = 2 if collinear_point is None else int(collinear_point)
         amplitude_in = 2500.0 if amplitude_in is None else float(amplitude_in)
@@ -539,6 +557,10 @@ def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_D
         )
     if sel == "HALO":
         return design_halo(int(params["collinear_point"]), params["amplitude"], dynamics=dynamics)
+    if sel == "LYAPUNOV":
+        return design_lyapunov(
+            int(params["collinear_point"]), params["amplitude"], dynamics=dynamics
+        )
     if sel == "NRHO":
         return design_nrho(
             int(params["collinear_point"]),

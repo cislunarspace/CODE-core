@@ -42,7 +42,7 @@ def make_design_request(orbit_type: str, **overrides) -> SimpleNamespace:
     的字段集与公共默认值：字段或默认值语义变动时，本目录的集成测试会
     立即暴露。形状参数默认 None，由调用方按场景显式给定。
 
-    ``correction_method`` 默认镜像请求校验层的族级分派（HALO/NRHO/DPO →
+    ``correction_method`` 默认镜像请求校验层的族级分派（HALO/NRHO/DPO/LYAPUNOV →
     segmented，其余 → two_level）：算法入口要求请求已按族规范化，未规范
     化的不稳定族请求会被入口防御检查拒绝（test_correction_method_contract）。
     """

@@ -183,6 +183,8 @@ RECORD_ORBIT_FAMILIES: tuple[str, ...] = (
     "elfo",
     "halo",
     "horseshoe",
+    "lyapunov",
+
     "lissajous",
     "lpo",
     "nrho",
