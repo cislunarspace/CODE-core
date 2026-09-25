@@ -6,14 +6,14 @@
 //! 割线钉定精确周期。族行走以 +x 轴穿越点 x0 为参数，振幅 = 一个
 //! 周期内距地心距离 min/max 均值（km），离开精确成员后周期随振幅漂移。
 
-use super::common::{correct_ro_fixed_x, correct_ro_seed, ro_amplitude_km, Failure};
+use super::common::{correct_ro_seed, correct_ro_trial, ro_amplitude_km, Failure};
 use super::types::{Context, Member, Outcome, PeriodicOrbit};
 
 /// 名义延拓步长（x0 方向）。修正失败时步长减半重试，成功后恢复名义
 /// 步长（与 DRO 行走同一策略）。
 const STEP_X0: f64 = 0.004;
 const MIN_STEP_X0: f64 = 1e-4;
-/// 单方向行走的步数预算（兜底；正常在成员满额或越过窗口边界处停止）。
+/// 行走的步数总预算（兜底；正常在成员满额或越过窗口边界处停止）。
 const STEP_BUDGET: usize = 600;
 
 pub(crate) fn generate(
@@ -58,13 +58,30 @@ pub(crate) fn generate(
         members.push(member(&seed, seed_amplitude));
     }
     let mut failure: Option<Failure> = None;
-    'walk: for &direction in directions {
-        let mut current = seed;
-        for _ in 0..STEP_BUDGET {
-            if members.len() >= member_limit {
+    // 跨种子窗口双向交替行走：单向按顺序填配额会把小配额全填在一侧，
+    // 种子另一侧没有成员；交替分配使窗口跨种子时两侧都有代表成员，
+    // 且排序后相邻成员仍是名义步长的连续链。
+    let mut currents: Vec<PeriodicOrbit> = directions.iter().map(|_| seed).collect();
+    let mut exhausted = vec![false; directions.len()];
+    let mut steps = 0usize;
+    'walk: loop {
+        let mut progressed = false;
+        for (index, &direction) in directions.iter().enumerate() {
+            if exhausted[index] {
+                continue;
+            }
+            if members.len() >= member_limit || steps >= STEP_BUDGET {
                 break 'walk;
             }
-            match step_once(context, direction, current) {
+            steps += 1;
+            progressed = true;
+            match step_once(
+                context,
+                resonance_p,
+                resonance_q,
+                direction,
+                currents[index],
+            ) {
                 Step::Orbit(orbit, amplitude) => {
                     covered_lower |= amplitude <= min_amplitude_km;
                     covered_upper |= amplitude >= max_amplitude_km;
@@ -72,19 +89,22 @@ pub(crate) fn generate(
                         members.push(member(&orbit, amplitude));
                     }
                     // 越过该方向上的窗口边界后不再有命中成员
-                    if direction < 0.0 && amplitude < min_amplitude_km {
-                        break;
+                    if (direction < 0.0 && amplitude < min_amplitude_km)
+                        || (direction > 0.0 && amplitude > max_amplitude_km)
+                    {
+                        exhausted[index] = true;
+                    } else {
+                        currents[index] = orbit;
                     }
-                    if direction > 0.0 && amplitude > max_amplitude_km {
-                        break;
-                    }
-                    current = orbit;
                 }
                 Step::Failed(walk_failure) => {
                     failure = Some(walk_failure);
-                    break;
+                    exhausted[index] = true;
                 }
             }
+        }
+        if !progressed {
+            break;
         }
     }
     members.sort_by(|left, right| {
@@ -130,11 +150,21 @@ enum Step {
     Failed(Failure),
 }
 
-fn step_once(context: Context, direction: f64, current: PeriodicOrbit) -> Step {
+fn step_once(
+    context: Context,
+    resonance_p: u32,
+    resonance_q: u32,
+    direction: f64,
+    current: PeriodicOrbit,
+) -> Step {
     let mut step = STEP_X0;
     loop {
         let x_try = current.state[0] + direction * step;
-        match correct_ro_fixed_x(context, x_try, &current) {
+        // 走 ``correct_ro_trial`` 而非邻点续猜：3:1/4:1 的 x0–vy0 映射
+        // 在族上很陡，邻点续猜会跳到同周期量级的伪支（±20% 周期守卫
+        // 拦不住），逐点重建近心点 Kepler 种子可稳定落在目标支上
+        // （与 Python ``design_ro`` 振幅行走同一策略）。
+        match correct_ro_trial(context, resonance_p, resonance_q, x_try, &current) {
             Ok(orbit) => match ro_amplitude_km(context, &orbit) {
                 Ok(amplitude) => return Step::Orbit(orbit, amplitude),
                 Err(failure) => return Step::Failed(failure),

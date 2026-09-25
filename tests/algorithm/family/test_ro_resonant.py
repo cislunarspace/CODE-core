@@ -103,10 +103,6 @@ def test_registry_dispatches_ro() -> None:
     assert abs(orbit.period - 2.0 * np.pi) / (2.0 * np.pi) < 1e-9
 
 
-@pytest.mark.time_budget(120)  # 族延拓链无可缩轴：Rust 族生成对 4 成员
-# 逐个 Newton 修正（9.1 天多环 STM 弧，实测 92 s），成员数是验收要求
-# （窗口内多成员）；连同本文件锚测试整体超 ADR 0037 的 60 s 文件纪律
-# 线，属已记录的例外（依据即实测）
 def test_design_ro_family_continuation_chain() -> None:
     """RO 族延拓链：窗口内多成员、按振幅升序、相邻成员自然延拓连续。
 
