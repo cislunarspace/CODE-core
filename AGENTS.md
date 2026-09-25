@@ -1,134 +1,136 @@
-# AGENTS.md
+# Repository Guidelines
 
-e2m2e（Earth to Moon, Moon to Earth）仓库的开发导则。给 AI 助手与贡献者：先看 “Architecture & Data Flow” 与 “Development Commands”，改动前遵守 “Code Conventions” 与 “Testing & QA”。
+本指南面向 AI 助手与贡献者，记录当前代码、构建和验证契约。先读本文件、`CONTEXT.md` 与相关 ADR，再改动；以源码和配置为准，不以旧文档中的工具数量或版本示例为准。
 
 ## Project Overview
 
-地月空间算法工具集：CR3BP 转移轨道设计、任务轨道设计与保持、轨道预报、时空坐标转换、轨道库与地月空间分区分析。Python 包 `e2m2e`（v5.9.5，Apache-2.0）+ Rust 数值内核（PyO3/maturin 单扩展 `e2m2e._integrators`）。对外三条调用链：进程内 import、MCP（`e2m2e mcp-serve`）、CLI（`e2m2e`），GUI 经 sidecar stdio 协议（`e2m2e serve-stdio`）。
+`e2m2e`（Earth to Moon, Moon to Earth）是地月空间算法工具集，覆盖 CR3BP 任务轨道与轨道族、星历传播、转移设计、轨道保持、时空坐标转换、轨道库和地月空间分区分析。Python API 编排领域逻辑，Rust/PyO3 扩展 `e2m2e._integrators` 承担数值密集路径。
+
+调用方入口：
+
+- 进程内：`from e2m2e.api import Facade`，并通过 `Facade().catalog`、`Facade().spatiography` 使用轨道库和分区能力。
+- CLI：`e2m2e <工具名>`；部署命令为 `e2m2e mcp-serve` 和 `e2m2e serve-stdio`。
+- MCP 与 GUI sidecar 的工具面、请求模型和描述均从同一接口元数据派生。
 
 ## Architecture & Data Flow
 
-五层架构（ADR 0011/0012/0039），自底向上严格单向依赖，由 `scripts/check_layer_imports.py`（`make check` 一步）硬门禁：
+### 分层与依赖方向
 
-1. `e2m2e/data/`：常数、星历、坐标系数据、类型与模板、轨道库存储
-2. `crates/`（Rust）：数值层——积分器、力模型、SPICE FFI、水平集/HJB
-3. `e2m2e/algorithm/`：动力学与力模型编排、轨道族、微分修正、转移、spatiography
-4. `e2m2e/api/`：Facade / Catalog / Spatiography 暴露类 + MCP/CLI/sidecar
-5. `e2m2e/tools/`：日志等辅助
+源码由底至顶为：
 
-`e2m2e/mbse/` 是独立顶层子系统（系统工程模型与需求追溯），在依赖链之外。包根 `exceptions.py` / `status.py` / `spice_ext.py` / `integrators.py` 是共享内核叶，不得 import 任何层。
+1. `e2m2e/data/`：常数、SPICE 内核、帧数据、模板、通用类型和轨道库。
+2. `crates/` 数值层：传播、力模型、SPICE FFI、水平集/HJB，以及 `e2m2e._integrators` 的 PyO3 绑定。
+3. `e2m2e/algorithm/`：构造领域问题、选择轨道族和约束、调用数值后端、解释结果。
+4. `e2m2e/api/`：Facade、Catalog、Spatiography、Pydantic 边界和传输适配器。
+5. `e2m2e/tools/`：日志等辅助能力。
 
-接口面（ADR 0043）：三个暴露类承载 `@mcp_exposed` 元数据——`Facade`（任务级：design_orbit / control_orbit / transfer_design / orbit_propagation / spacetime_transform / valid_ranges）、`Catalog`（轨道库 + 族生成）、`Spatiography`（分区分析）。`tool_inventory(Facade())` 是工具面唯一清单，MCP（`api/mcp/tools.py`）、CLI（`api/cli/main.py`）、sidecar 全部纯派生自它，无生成文件。工具 description 取 docstring 首行。
+`e2m2e/mbse/` 是独立的系统工程模型子系统，不属于上述调用链。包根的 `exceptions.py`、`status.py`、`spice_ext.py`、`integrators.py` 是共享叶模块，不得导入任何业务层。
+
+硬门禁在 `scripts/check_layer_imports.py`：`data` 不得依赖 `algorithm/api/tools/integrators/mbse`，`algorithm` 不得依赖 `api/tools/mbse`，`api` 不得依赖 `tools/mbse`。新增 import 前先检查这一边界。
+
+算法层通常由 Python 构造和编排问题，积分、力模型、族生成、打靶和搜索等性能敏感路径下沉 Rust；仓库仍保留显式选择的 SciPy 路径，不要把“Rust 快速路径”误改成无条件替换。Rust 扩展要求在使用处校验 ABI 和符号，缺失时抛错，不得静默回退到 Python/scipy。
+
+### 工具执行链
 
 ```mermaid
-flowchart TD
-    CLI[cli/main.py] --> EX[execution.execute_tool]
-    MCP[mcp/server.py] --> EX
-    SC[sidecar run_loop] --> EX
-    EX --> EN[envelope.dispatch_tool<br/>Pydantic 校验 + 异常翻译]
-    EN --> F[Facade / Catalog / Spatiography]
-    F --> A[algorithm/ 编排器]
-    A --> I[e2m2e.integrators 门面 / spice_ext]
-    I --> R[e2m2e._integrators pyo3<br/>allow_threads + rayon]
+flowchart LR
+    Caller[进程内调用方] --> F[Facade / Catalog / Spatiography]
+    Transport[CLI / MCP / sidecar] --> E[execution.execute_tool]
+    E --> V[mcp.envelope 参数校验与异常翻译]
+    V --> F
+    F --> A[algorithm 编排]
+    D[data] --> A
+    A --> I[integrators / spice_ext]
+    I --> R[e2m2e._integrators PyO3]
 ```
 
-- 执行核心 `e2m2e/api/execution.py::execute_tool` 是唯一执行入口（#601），传输层只是薄适配器。长任务（`transfer_design`、`orbit_family_generation`）走 `python -m e2m2e.api.mcp.worker` 子进程，取消 = kill。
-- 跨模块契约集中在：统一信封 `{status,data,error,meta}`（`api/mcp/envelope.py`）、每工具一对 `*Request/*Response`（`api/models.py`，`extra="forbid"` 全手写）、状态三元组 `(ConvergenceState, FailureCause, message)`（`e2m2e/status.py`）、二进制帧（`api/frames.py` 唯一实现，magic `E2M2`）、跨进程 `Config.to_payload/from_payload`、Python↔Rust ABI（`crates/e2m2e-integrators/abi-version.txt` ↔ `_py_abi_version()`）。
-- SPICE 双实例桥（ADR 0016）：Python spiceypy 与 Rust cspice 各持内核池，桥接只经 `e2m2e/spice_ext.py`。
+- `e2m2e/api/facade.py` 的 `mcp_exposed`、`tool_inventory` 和 `resolve_tool_method` 是工具元数据唯一来源。MCP、CLI、sidecar 不得维护第二份工具清单或手写工具数量；描述取方法 docstring 首行。
+- `e2m2e/api/execution.py::execute_tool` 是传输层工具调用的共享执行核心：规格查找、Pydantic 校验、调用、错误翻译和可选二进制帧抽取都在这里统一。进程内 API 仍可直接调用暴露类方法。
+- `transfer_design`、`orbit_family_generation` 属于长任务，MCP/CLI/sidecar 经 `e2m2e.api.mcp.worker` 子进程执行；取消通过 kill 子进程，不要试图在线程中强行终止 Rust 计算。
+- 统一文本信封为 `{status, data, error, meta}`。sidecar 的大数组使用 `e2m2e/api/frames.py` 唯一实现的 `E2M2` 帧，支持 `f32`/`f64`；不要在传输适配器中复制帧编码逻辑。
 
 ## Key Directories
 
 | 路径 | 用途 |
 |---|---|
-| `e2m2e/data/` | constants（`constants.toml` 单一来源）、kernels、frames、types、templates、catalog |
-| `e2m2e/algorithm/` | 编排层：design、family、transfer、station_keeping、dynamics、forces、solver、spatiography、normal_form、coordinate 等 |
-| `e2m2e/api/` | 接口层：facade、catalog、spatiography、models、execution、config、frames、mcp/、cli/、sidecar/ |
-| `crates/` | Rust workspace：e2m2e-integrators（绑定）、-propagation、-forces、-spice、-levelset、-hjb-dynamics；`crates/cspice` 为 vendor patch（非 member） |
-| `tests/` | 镜像源码分层：data / numerical / algorithm / api / tools / mbse / `_meta`（架构守门） |
-| `scripts/` | 开发辅助：数据下载、门禁检查、数据集生成、基准、Colab 搬运 |
-| `docs/adr/` | 架构决策记录 0001–0047（0043 起中文） |
-| `kernels/`、`e2m2e/data/catalog_baseline/` | 数据资产：SPICE 内核（`make kernels` 拉取）、CR3BP 基线数据集（不随包分发，ADR 0047） |
+| `e2m2e/data/` | 常数、内核、帧、模板、类型、catalog；`constants/constants.toml` 是物理常量源文件 |
+| `e2m2e/algorithm/` | design、family、dynamics、forces、solver、transfer、coordinate、manifold、station_keeping、spatiography 等编排 |
+| `e2m2e/api/` | `facade.py`、`models.py`、`execution.py`、MCP、CLI、sidecar 和配置 |
+| `e2m2e/tools/` | 日志等辅助工具 |
+| `e2m2e/mbse/` | 独立的需求、架构、数据和图表模型 |
+| `crates/` | Rust workspace；`crates/cspice/` 是 `[patch.crates-io]` vendor crate，不是 workspace member |
+| `tests/` | 按 data、numerical、algorithm、api、tools、mbse、`_meta` 镜像分层 |
+| `scripts/` | 构建资源下载、架构检查、基线生成、benchmark 和手工诊断 |
+| `docs/adr/` | 不可静默覆盖的架构决策记录；`CONTEXT.md` 是唯一领域术语表 |
+| `kernels/` | 运行期 SPICE 内核；大型 `.bsp` 由 Git LFS 或 `download_kernels.py` 管理 |
+| `e2m2e/data/catalog_baseline/` | 回归夹具和 Release 资产源，不随 wheel 分发，须显式导入 |
 
 ## Development Commands
 
+源码开发使用 Makefile，不要手工拼接 editable 构建：
+
 ```bash
-make dev            # 唯一开发入口：setup + uv sync + maturin develop（debug）
-make test           # 全量：Rust 工作区 + Python
-make test-python    # pytest tests/ -n auto --dist loadscope
-make test-rust      # cargo test --workspace -- --test-threads=1
-make check          # 格式 + lint + 类型/层级检查（与 ci.yml 逐条对齐）
-make fmt            # 就地格式化（cargo fmt + ruff format + ruff check --fix）
-make setup          # 首次拉取 CSPICE 编译包 + SPICE 内核
+make dev            # setup + uv sync --group dev --no-install-project + maturin develop
+make dev-release    # 同上，Rust 扩展以 --release 构建
+make setup          # 下载 CSPICE 编译包和 SPICE 内核
+make cspice         # 只准备 CSPICE_DIR
+make kernels        # 只准备 kernels/
+make test           # Rust workspace + Python 全量测试
+make test-python    # pytest，默认 -n auto --dist loadscope
+make test-rust      # cargo test --workspace，串行运行
+make check          # fmt、clippy、ruff、层级/旧路径检查、mypy
+make fmt            # Rust/Python 就地格式化
+make docs           # Sphinx 零告警构建到 docs/_build/html
+make catalog-baseline
+make clean-tests
 ```
 
-- **切勿裸跑 `uv sync`**（editable 触发扩展构建、与 make dev 重复，#478）；`uv run` 一律带 `--no-sync`。
-- 单跑示例：`uv run --no-sync python -m pytest tests/api/test_cli.py::TestWorker::test_cancel`、`uv run --no-sync python -m pytest tests/algorithm -m "not spice"`、`cargo test -p e2m2e-forces srp_jacobian -- --test-threads=1`。
-- `scripts/generate_catalog_baseline.py` / `backfill_baseline_taxonomy.py` 用 `.venv/bin/python` 直跑，不用 `uv run`（docstring 明示）。
-- `make check` 与 `.github/workflows/ci.yml` 命令须保持对齐：CI 不调 make，改任一边同步另一边。
+重要约束：
+
+- 禁止裸跑 `uv sync`；它会触发 editable Rust 扩展构建并与 `make dev` 重复。`uv run` 一律带 `--no-sync`，例如 `uv run --no-sync python -m pytest ...`。
+- 定向验证示例：`uv run --no-sync python -m pytest tests/api/test_cli.py::TestWorker::test_cancel`、`uv run --no-sync python -m pytest tests/algorithm -m "not spice"`、`cargo test -p e2m2e-forces srp_jacobian -- --test-threads=1`。
+- 基线生成和回填脚本的 docstring 要求直接使用 `.venv/bin/python`，不要用会触发项目重建的 `uv run`：`.venv/bin/python scripts/generate_catalog_baseline.py`。
+- 文档工具未随 dev group 安装时，先在虚拟环境安装 `sphinx myst-parser sphinx-autoapi shibuya`，再运行 `make docs`。文档构建不需要安装项目本体、Rust 或 SPICE。
+- `make check` 是本地静态总门禁；PR CI 分为 `lint` 与 `typecheck`，不代替本地 Python 全量测试。修改 Makefile 或 CI 命令时同步检查两者。
 
 ## Code Conventions & Common Patterns
 
-- **格式**：ruff（`line-length = 100`，`target-version = "py310"`，select `E,F,W,I,UP,B,SIM`）+ `cargo fmt`（默认风格）+ `cargo clippy -D warnings` + `mypy e2m2e/ --ignore-missing-imports`。别引入它们之外的格式化风格。
-- **命名**：Python 模块/函数 `snake_case`、类 PascalCase（`CR3BP_System` 为例外保留名）、模块显式 `__all__`、私有 `_` 前缀；每工具 `*Request`/`*Response` 成对；错误码 SCREAMING_SNAKE 字符串（`INVALID_PARAMS` / `TOOL_NOT_FOUND` / `WORKER_CRASHED` / `INTERNAL_ERROR`）。Rust FFI 入口 `*_py` 后缀（`propagate_cr3bp_py`）、SPICE 包装 `spice_*` 前缀、结果 pyclass `*Result`（`#[pyclass(frozen, get_all)]`）。
-- **错误处理**（ADR 0020/0024）：确定性失败抛异常（`E2M2EError` 层次，`exceptions.py`）；不可行搜索不抛异常，返回状态三元组（`status.py`）；禁止隐式降级——Rust 扩展缺失抛 `RustExtensionUnavailableError`，绝不静默回退 Python/scipy。api 边界统一翻译：`OrbitError` → 原 code，Pydantic `ValidationError` → `INVALID_PARAMS`，其余 → `INTERNAL_ERROR` 且不泄 traceback。
-- **异步**：核心全同步；async 只在 MCP 传输层（anyio，短任务 `to_thread.run_sync`，长任务 `open_process`）。Rust 长计算 `py.allow_threads` 释放 GIL + rayon 并行，环境开关 `E2M2E_*_PARALLEL`。进度回调形状 `cb(fraction, message)`，回调异常吞掉不中断计算。
-- **依赖注入 / 状态**：`Config`（`api/config.py`）构造注入 Facade，环境变量取默认（`SPICE_KERNEL_DIR`、`E2M2E_CATALOG_DIR`、`E2M2E_CATALOG_ENABLED` 等）；无全局单例。轨道库 `records/*.json+*.npz` 为事实来源、`catalog.db` SQLite 为派生索引，逐记录原子写；catalog 默认关，入库是调用方显式决定（ADR 0045/0047）。
-- **Pydantic 边界**：Pydantic 只出现在 `e2m2e/api/`；算法层用 numpy/dataclass，保留细粒度 API。
-- **新增 MCP 工具**：algorithm 层实现 → 暴露类方法加 `@mcp_exposed(request_model=…)` → 工具清单自动派生（MCP/CLI/sidecar 同步）→ 钉工具数的 `tests/api/test_facade.py` 更新 → `make check`。工具面数量以跑 `tool_inventory()` 报告为准，不从文档引用（ADR 0043）。
-- **物理常量**：单一来源 `e2m2e/data/constants/constants.toml`（build.rs 生成 Rust const，`constant_value_py` 同源核对）。容差分两档：研究级 `1e-12`（动力学基准）vs 筛选级 `1e-9~1e-10`（网格筛选、测试套件）。
-- 注释、docstring、commit message、issue/PR 一律中文（详见下文 “交流语言”）。
+- Python 用 ruff：100 列、`target-version = "py310"`，规则集为 `E F W I UP B SIM`；Rust 用 `cargo fmt` 和 `cargo clippy --workspace -- -D warnings`；类型检查为 `mypy e2m2e/ --ignore-missing-imports`。
+- Python 模块、函数和变量用 `snake_case`，类用 PascalCase；公共模块维护显式 `__all__`。请求/响应成对命名为 `*Request`/`*Response`；错误码用大写下划线。Rust FFI 函数通常以 `*_py` 命名，SPICE 包装以 `spice_*` 命名，但以实际导出表为准，不要强行重命名所有非 `*_py` 符号。
+- 新的公开输入输出模型放 `e2m2e/api/models.py`，继承公共 API 模型并保持 `extra="forbid"`；算法层使用 numpy、dataclass 和领域类型，不把 Pydantic 边界下沉到算法/data。字段描述是 CLI `--help` 和 MCP schema 的权威来源。
+- 确定性错误使用 `E2M2EError` 层次；不可行搜索或部分成功使用 `(ConvergenceState, FailureCause, message)` 状态三元组，不用异常伪装软失败。API 信封将参数校验映射为 `INVALID_PARAMS`，保留领域 `OrbitError`，其余异常映射为 `INTERNAL_ERROR` 且不泄露 traceback。
+- 核心同步；异步只放传输层。MCP 短任务用 `anyio.to_thread`，长任务用 worker 进程；进度回调形状为 `cb(fraction, message)`，进度回调失败不得中断计算。Rust 长计算用 `py.allow_threads`，可用 Rayon 并行。
+- 通过 `Config` 注入运行环境，不新增全局单例。`Config.to_payload/from_payload` 是 worker 跨进程契约，未知字段必须拒绝。catalog 的 `records/*.json + *.npz` 是事实来源，`catalog.db` 是可重建索引；目录配置和自动入库都必须由调用方显式开启。
+- 物理常量只改 `e2m2e/data/constants/constants.toml`，让 Python loader 和 Rust build script 同步生成；动力学基准使用研究级容差，筛选和测试使用筛选级容差，不把长弧/密网格塞入默认 pytest。
+- 新增工具的顺序是：算法实现 → `Facade`/`Catalog`/`Spatiography` 方法加 `@mcp_exposed(request_model=...)` → 检查 `tool_inventory()` 派生面 → 补接口行为测试。不要在 MCP、CLI、sidecar 中复制业务逻辑。
+- 注释、docstring、commit、Issue、PR 和 Agent brief 用中文；面向调用方的行为变化更新 `CHANGELOG.md`。ADR 是决策快照，后续变化追加修订或新开递增 ADR，不改写历史结论。
 
 ## Important Files
 
-- 入口：`e2m2e/api/cli/main.py`（CLI，console script `e2m2e`）、`e2m2e/api/mcp/server.py::create_server`、`e2m2e/api/mcp/worker.py`（长任务子进程）、`e2m2e/api/sidecar/__init__.py::run_loop`、`crates/e2m2e-integrators/src/lib.rs` 的 `#[pymodule] _integrators`
-- 配置：`pyproject.toml`（构建/lint/pytest/coverage/依赖全在此）、`Cargo.toml`（workspace）、`Makefile`、`rust-toolchain.toml`（Rust 1.98.0）、`.python-version`（3.13）、`uv.lock`
-- 契约与关键模块：`e2m2e/api/facade.py`（`mcp_exposed`、`tool_inventory`、组合根）、`e2m2e/api/execution.py`、`e2m2e/api/models.py`、`e2m2e/api/frames.py`、`e2m2e/status.py`、`e2m2e/exceptions.py`、`e2m2e/spice_ext.py`、`e2m2e/integrators.py`（数值层门面）
-- 流程文档：`CONTEXT.md`（术语表，唯一 glossary）、`CONTRIBUTING.md`、`docs/adr/`（架构决策记录）、`CHANGELOG.md`（面向调用方，已发布条目不可变）
+- 组合根与入口：`e2m2e/__init__.py`、`e2m2e/api/facade.py`、`e2m2e/api/cli/main.py`、`e2m2e/api/mcp/server.py`、`e2m2e/api/sidecar/__init__.py`。
+- API 契约：`e2m2e/api/models.py`、`e2m2e/api/config.py`、`e2m2e/api/execution.py`、`e2m2e/api/mcp/envelope.py`、`e2m2e/api/frames.py`、`e2m2e/api/mcp/worker.py`。
+- 共享内核：`e2m2e/exceptions.py`、`e2m2e/status.py`、`e2m2e/integrators.py`、`e2m2e/spice_ext.py`。
+- 领域实现：`e2m2e/algorithm/design/design_orbit.py`、`algorithm/family/__init__.py`、`algorithm/dynamics/`、`algorithm/forces/`、`algorithm/transfer/`；数据和 catalog 在 `e2m2e/data/`。
+- Python↔Rust 边界：`crates/e2m2e-integrators/src/lib.rs`、`crates/e2m2e-integrators/build.rs`、`crates/e2m2e-integrators/abi-version.txt`、各 crate 的 `Cargo.toml`。
+- 构建与版本：`pyproject.toml`、`Cargo.toml`、`Makefile`、`rust-toolchain.toml`、`.python-version`、`uv.lock`、`Cargo.lock`（若存在，仅以配置和版本锁为准）。
+- 门禁与测试基础设施：`scripts/check_layer_imports.py`、`scripts/check_deleted_dir_refs.py`、`tests/conftest.py`、`tests/time_budget.py`、`tests/kernel_helpers.py`、`tests/_meta/`。
+- 维护规则：`README.md`、`CONTRIBUTING.md`、`CONTEXT.md`、`CHANGELOG.md`、`docs/adr/README.md`、`docs/agents/issue-tracker.md`。
 
-## Runtime & Tooling Preferences
+## Runtime/Tooling Preferences
 
-- **运行时**：Python `>=3.10`（开发/CI 用 3.13）；Rust 钉死 1.98.0（`rust-toolchain.toml`）。无 Node/Bun/Docker。
-- **包管理**：uv（`uv.lock` 入库为锁真理；`Cargo.lock` 不入库）。Python-Rust 构建用 maturin（`features = ["spice", "extension-module"]`，后者仅 cdylib 构建启用、`cargo test` 不启用）。
-- **构建前置**：`CSPICE_DIR`（`scripts/download_cspice.py` 供预编译包，禁走 NAIF 官网下载）、`LIBCLANG_PATH`（bindgen）。Makefile 自动导出。
-- **Windows 一等公民**：`make PYTHON=python` 覆盖解释器；mypy/pytest 一律 `python -m` 调用（uv 垫片 trampoline 问题）；`cargo test` 需 `python3.dll` 在 PATH（Makefile 内置处理）。
-- **加依赖**：先问现有库/标准库能否做；Python 运行时依赖进 `[project].dependencies`，可重依赖拆 optional 组惰性导入（`normal-form`/`mcp` 模式）；Rust 依赖版本统一进 `[workspace.dependencies]`；变更须说明理由。
-- **CI**：`ci.yml` = lint + typecheck（PR 门禁）；测试不进 CI——`release.yml`（tag `v*`）跑 `cargo test`，Python 全量套件本地跑、发布前人工全量回归（ADR 0021/0037）。
+- 运行时最低 Python `>=3.10`，开发环境由 `.python-version` 固定为 3.13；Rust 由 `rust-toolchain.toml` 固定为 1.98.0，并要求 rustfmt/clippy。包管理使用 uv，锁文件为 `uv.lock`；Python↔Rust 构建使用 maturin。
+- 本地不需要 Node、Bun 或 Docker。CI 的 manylinux wheel job 使用容器是发布实现细节，不改变本地 `make dev` 流程。
+- 普通构建的 CSPICE 来自 GitHub Release `cspice-v1`，SPICE 内核来自 `kernels-v1`；不要启用 `cspice-sys` 的官网下载路径。`make` 自动准备 `CSPICE_DIR`，bindgen 需要 `LIBCLANG_PATH`。支持的平台和资产规则以 `scripts/download_cspice.py` 为准。
+- Rust 扩展缺失、ABI 过期或符号缺失时应明确报错并提示 `make dev`，不得静默降级。`crates/e2m2e-integrators/abi-version.txt`、生成的 `e2m2e/_rust_abi.py` 与 Rust `_py_abi_version()` 必须保持一致。
+- 运行时常用配置为 `SPICE_KERNEL_DIR`、`E2M2E_CATALOG_DIR`、`E2M2E_CATALOG_ENABLED`；并行度和测试线程环境变量应遵循 Makefile、Rust 入口及 `tests/conftest.py` 的现有命名，不自行引入同义开关。
+- 可选依赖按功能安装：`[mcp]` 提供 MCP/anyio，`[normal-form]` 提供 SymPy，`[docs]` 提供 Sphinx 文档工具。新增依赖前先复用标准库或现有依赖，并同步 `pyproject.toml` 与 `uv.lock`；Rust 依赖统一放 workspace。
 
 ## Testing & QA
 
-- **框架**：pytest 9 + pytest-xdist + pytest-cov（无 pytest-timeout/hypothesis/pytest-mock；mock 用内置 `monkeypatch`）；Rust 用 `cargo test`（内联 `#[cfg(test)]` + `crates/*/tests/`）。
-- **组织**：`tests/` 镜像源码分层；每个用例**恰好一个**功能类主标记（`theory`/`integrator`/`force`/`data`/`orchestration`/`interface`/`aux`），`spice`/`low_thrust` 正交叠加；`tests/_meta/test_functional_marker_conservation.py` 守门。不按速度快慢分层（无 slow/e2e）。
-- **时间预算**（ADR 0037）：单用例 ≤10s（call 阶段，`tests/time_budget.py` 机器强制，`@pytest.mark.time_budget(<秒>)` 豁免须注释依据）、单文件 ≤60s（人工纪律）。超预算压规模（小振幅/短弧/粗网格/筛选用容差），不可压的移出 pytest 到 `scripts/`。
-- **断言口径**（ADR 0013）：按物理定义验收（解析解、守恒量、对称性、文献公式）；禁 golden-file 对比、禁与外部软件运行时输出对拍。mock 只用于批边界胶水、失败语义钉子（如 Rust 符号缺失须上抛不回退）、进程生命周期（fake worker）。
-- **惯例**：环境能力缺失 → skip（`requires_spice`、`requires_native_symbols`），代码错误 → fail；昂贵计算用 module-scope fixture / `functools.cache` 共享，禁止测试体内重复生成；临时文件用 `tmp_path`；容差用筛选级。
-- **覆盖**：`coverage fail_under=55`（branch coverage）；无 make/CI 入口，手动 `uv run --no-sync python -m pytest --cov`。
-- **验证分层**：先跑受影响模块测试 + `make check`；跨模块、共享契约、影响不明 → `make test` 全量。修 bug 先写复现测试（红→修→绿）并保留为回归测试。
-
----
-
-以下为写作与编码的存量约定，全部适用。
-
-## 写作要求
-
-所有面向人读的文本（注释、CONTEXT.md、ADR、issue 评论、PR 描述、agent brief、triage notes、Sphinx 文档、Agent 回复）应当：
-
-- 准确、清楚、简洁；先理解材料，再提炼结论。
-- 按逻辑组织，区分相近概念；不用空泛、夸大的修饰语。
-- 面向实际读者，从已知事实推到陌生结论；用分析说服，不装腔或堆砌。
-- 全仓库文档不得使用直角引号「」，引号用弯引号（“”）。
-
-## 编码准则
-
-- **先理解再改动**：完整阅读目标文件、相似实现和相关测试；不确定 API 或惯例时查源码或文档，不猜。
-- **明确目标与决策**：需求或验收条件不明确时先澄清；架构选择、假设和关键取舍要说明。
-- **保持简单**：只实现当前需求。复用已有模式；不为单一用例过早抽象、配置化或引入依赖。
-- **精准修改**：只改与任务直接相关的代码，贴合既有风格；删掉本次修改产生的废弃代码，不重格式化无关内容。
-- **完整迁移**：变更接口或行为时更新所有调用方、测试和文档；不保留无需求的兼容层。
-- **按根因修复**：先复现并读完整错误信息；一次处理一个原因，不用吞异常或特判掩盖问题。
-- **验证行为**：按影响范围运行相关检查；测试可观察行为、边界和错误路径，不测试实现细节。无法测试时说明原因并做可行的烟雾验证。
-- **审慎依赖**：优先现有依赖和标准库；新增依赖前确认必要性、维护状态和成本，并说明理由。
-- **清楚沟通**：说明做了什么、为什么、验证结果和已知风险；对不确定性给出具体事实，提交信息描述实际改动。
-
-## 交流语言
-
-始终使用中文与用户交流。代码、commit message、PR 描述等技术输出也用中文。
+- Python 使用 pytest、pytest-xdist、pytest-cov；Rust 使用 `cargo test`，测试既有 crate 内 `#[cfg(test)]` 也有 `crates/*/tests/` 集成测试。Rust 全量测试必须 `--test-threads=1`，因为 CSPICE 有进程级全局状态。
+- 每个 pytest 用例恰好一个主功能标记：`theory`、`integrator`、`force`、`data`、`orchestration`、`interface`、`aux`；`spice`、`low_thrust` 是正交标记。不要新增 `slow`、`e2e` 等速度层标记，也不要让一个用例承担多个主类。
+- 缺少外部能力才 skip：使用 `requires_spice`、`requires_native_symbols`、`pytest.importorskip` 或现有 fixture；代码错误必须 fail。SPICE fixture 用完卸载内核，catalog 测试用 `tmp_path` 隔离目录，昂贵轨道用 session/module 缓存并在函数级返回副本。
+- 时间门禁机器强制 call 阶段默认每用例 10 秒；确实无法压缩时才用 `@pytest.mark.time_budget(seconds)` 并写明原因。单文件 60 秒是人工纪律，不是当前插件的机器门禁；长弧、密网格和生产图移到 `scripts/`。
+- 按物理定义、解析解、守恒量、对称性和文献公式验收；不把外部软件运行时输出当 oracle。协议字节、闭式公式等固定值可以验证，但不要用脆弱的实现细节或复制同一实现的断言替代行为测试。
+- Python 覆盖率配置为 branch coverage、`fail_under = 55`，需显式运行 `uv run --no-sync python -m pytest --cov` 才启用；`make test` 本身不带 `--cov`。修改行为时先补最小真实调用或回归测试，并运行受影响测试、`make check`；跨层契约变化再扩大到 `make test`。
+- `_meta` 测试守护主标记、层级相关契约、常量来源、Rust ABI、共享叶 re-export、原生符号门和测试残留。`make check` 不会自动运行 `_meta`，完整 pytest 收集时才会覆盖这些门禁。
