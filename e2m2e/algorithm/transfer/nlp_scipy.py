@@ -95,8 +95,12 @@ def solve_with_scipy(
         cos_theta_max = np.cos(velocity_angle_constraint)
         constraints.append(
             {
+                # scipy ineq 语义为 fun >= 0：松弛约束是速度夹角不超过
+                # 容差，即 cos_angle >= cos(tol)。此前写反（cos_tol -
+                # cos_angle），SLSQP 会把夹角推离平行且照样“收敛”，
+                # 事后按正确语义报告的违反量可达 ~2。
                 "type": "ineq",
-                "fun": lambda y: cos_theta_max - optimizer._compute_cos_angle(y),
+                "fun": lambda y: optimizer._compute_cos_angle(y) - cos_theta_max,
             }
         )
     else:

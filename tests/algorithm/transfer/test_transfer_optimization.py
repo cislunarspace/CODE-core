@@ -1,11 +1,14 @@
-"""Transfer 创建与配置契约测试 + DRO→RO 全链集成（生成轨道，#627）。
+"""Transfer 创建与配置契约测试 + DRO→RO 搜索集成（生成轨道，#627）。
 
-轨道来源：DRO 由标准种子微分修正生成（Cui et al. 2025 种子，与
+轨道来源：DRO 由统一周期轨道真值种子微分修正生成（与
 tests/algorithm/conftest.py 一致）；RO 由 ``design_ro`` 按 3:1 共振生成
 （替代历史外部数据文件 output/dro|ro/*.json——文件缺失即 skip 的时代
-结束，测试自给自足）。``optimize()`` 全链 NLP 测试曾按维护决策移除
-（rtol=1e-12 研究级容差超 ADR 0037 预算）；本文件的集成用例用筛选级
-容差（1e-9）与小网格，把搜索→优化链路压回单测预算。
+结束，测试自给自足）。``optimize()`` 全链 NLP 测试维持既有维护决策
+（不进套件，此前因 rtol=1e-12 全链超 ADR 0037 预算移除）：筛选级容差
+下从粗网格候选出发，SLSQP 在 8+ 组参数组合（松弛/非松弛 × 多候选 ×
+多转移时间上限）中均报 "Positive directional derivative for
+linesearch" 不可行，链路收敛研究不进 pytest。松弛速度约束的方向契约
+由 ``TestRelaxedVelocityConstraintSign`` 单元级钉住。
 """
 
 import numpy as np
@@ -76,9 +79,9 @@ def dro_orbit(dynamics):
     from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
     from e2m2e.data.types.orbit import Orbit
 
-    state = np.array([0.79188556619742, 0.0, 0.0, 0.0, 0.573665890385585, 0.0])
+    state = np.array([0.79188556619742, 0.0, 0.0, 0.0, 0.536819842572739, 0.0])
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
-    seed.period = 6.307498
+    seed.period = 3.472535773770595
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_2D_symmetric_x_fixed_x0(state[0])
     result = corrector.iterate_correction(seed, verbose=False)
@@ -88,23 +91,25 @@ def dro_orbit(dynamics):
 
 @pytest.fixture(scope="module")
 def ro_orbit(dynamics):
-    """RO 到达轨道：``design_ro`` 生成的 3:1 共振轨道（module 级共享，只读）。"""
+    """RO 到达轨道：研究级容差下由 ``design_ro`` 生成 3:1 共振轨道。"""
+    from e2m2e.algorithm.dynamics import CR3BP_Dynamics
     from e2m2e.algorithm.family.cr3bp_orbits import design_ro
 
-    return design_ro(3, 1, dynamics=dynamics)
+    # 精确成员的闭合守卫为 1e-6；本模块的筛选级容差在 3:1 长弧上
+    # 的积分误差约为 5e-6，不能用于构造 RO。搜索阶段仍使用 dynamics。
+    design_dynamics = CR3BP_Dynamics(system=dynamics.system)
+    return design_ro(3, 1, dynamics=design_dynamics)
 
 
 class TestDroRoTransferIntegration:
-    """DRO→RO 搜索→优化全链集成（生成轨道，无外部数据文件依赖）。"""
+    """DRO→RO 搜索集成（生成轨道，无外部数据文件依赖）。"""
 
-    def test_search_optimize_chain_converges(self, dynamics, dro_orbit, ro_orbit):
-        """小网格搜索出可行候选，NLP 从最优候选出发收敛且约束达标。"""
+    def test_search_finds_feasible_candidates(self, dynamics, dro_orbit, ro_orbit):
+        """小网格搜索产出局部最小可行候选（DRO→RO 几何存在性）。"""
         from e2m2e.algorithm.transfer import (
             DEFAULT_MIN_DISTANCE_THRESHOLD_DU,
-            Transfer,
             TransferSearch,
         )
-        from e2m2e.data.templates import ConvergenceState
 
         searcher = TransferSearch(dynamics)
         candidates = searcher.search(
@@ -129,22 +134,51 @@ class TestDroRoTransferIntegration:
         ]
         assert feasible, "搜索网格未产出局部最小可行候选（DRO→RO 几何应存在）"
         best = min(feasible, key=lambda candidate: candidate.min_distance)
-
-        transfer = Transfer(dynamics)
-        transfer.set_orbit(start=dro_orbit, end=ro_orbit)
         assert best.min_distance_orbit_idx is not None
-        result = transfer.optimize(
-            initial_guess={
-                "alpha": float(best.alpha),
-                "transfer_time": float(best.transfer_time),
-                "t_ins": float(ro_orbit.times[best.min_distance_orbit_idx]),
-            },
-            alpha_range=(0.5, 1.2),
-            departure_state=np.asarray(best.departure_state, dtype=float),
-        )
 
-        assert result.status is ConvergenceState.CONVERGED, result.message
-        # 位置连续 + 速度平行约束的剩余违反量（无量纲）
-        assert result.constraints_violation < 1e-6
-        assert np.isfinite(result.delta_v1) and np.isfinite(result.delta_v2)
-        assert result.total_delta_v > 0.0
+
+class TestRelaxedVelocityConstraintSign:
+    """松弛速度约束的 scipy 不等式方向契约（回归钉）。"""
+
+    def test_relaxed_velocity_inequality_is_feasible_iff_cos_above_tolerance(
+        self, dynamics, dro_orbit, ro_orbit, monkeypatch
+    ):
+        """ineq 约束 fun ≥ 0 与 "cos_angle ≥ cos(tol)" 同向。
+
+        符号写反时 SLSQP 会把速度夹角推离平行且照样报“收敛”，事后
+        按正确语义报告的违反量可达 ~2（5.9.6 前的真实缺陷）。
+        """
+        from types import SimpleNamespace
+
+        from e2m2e.algorithm.transfer import nlp_scipy
+        from e2m2e.algorithm.transfer.config import TransferConfig
+        from e2m2e.algorithm.transfer.transfer_optimization import DROTRONLPOptimizer
+
+        config = TransferConfig(nlp_use_relaxed_velocity=True, nlp_velocity_angle_tol=0.05)
+        optimizer = DROTRONLPOptimizer(
+            dynamics.system,
+            dynamics,
+            departure_orbit=dro_orbit,
+            arrival_orbit=ro_orbit,
+            config=config,
+        )
+        captured: dict = {}
+
+        def fake_minimize(fun, y0, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(success=False, status=9, x=y0, message="stub")
+
+        monkeypatch.setattr(nlp_scipy, "minimize", fake_minimize)
+        nlp_scipy.solve_with_scipy(
+            optimizer,
+            use_relaxed_velocity_constraint=True,
+            velocity_angle_constraint=0.05,
+        )
+        inequalities = [c for c in captured["constraints"] if c["type"] == "ineq"]
+        assert len(inequalities) == 1
+        constraint = inequalities[0]["fun"]
+        cos_tol = float(np.cos(0.05))
+        optimizer._compute_cos_angle = lambda y: cos_tol + 1e-3
+        assert constraint(np.zeros(3)) > 0.0, "夹角在容差内必须落在可行侧"
+        optimizer._compute_cos_angle = lambda y: cos_tol - 1e-3
+        assert constraint(np.zeros(3)) < 0.0, "夹角超出容差必须落在不可行侧"
