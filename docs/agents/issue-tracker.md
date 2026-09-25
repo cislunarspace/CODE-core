@@ -52,11 +52,11 @@ GitHub 的 issue 和 PR 共享编号空间，所以 `#42` 可能是其中任一�
 
 ### Project 配置
 
-ID 于 2026-09-23 经 `gh project field-list 1 --owner ouyangjiahong26 --format json` 实测核对。
+ID 于 2026-09-25 经 `gh project field-list 4 --owner cislunarspace --format json` 实测核对。
 
-- Project：`cislunarspace Issue Management`（https://github.com/users/ouyangjiahong26/projects/1），owner `ouyangjiahong26`、number `1`；与 transfer-orbit-design 共用，Repository 字段区分来源。
-- Project ID：`PVT_kwHOCpw4xM4BiZm4`
-- Status 字段 ID：`PVTSSF_lAHOCpw4xM4BiZm4zhhRz-U`
+- Project：`cislunarspace Issue Management`（https://github.com/orgs/cislunarspace/projects/4），owner `cislunarspace`、number `4`；CODE-core、cislunarspace、transfer-orbit-design 共用，Repository 字段区分来源。
+- Project ID：`PVT_kwDOE3ZAg84BkgBr`
+- Status 字段 ID：`PVTSSF_lADOE3ZAg84BkgBrzhjQaF8`
 
   | 选项 | option ID |
   | --- | --- |
@@ -68,7 +68,7 @@ ID 于 2026-09-23 经 `gh project field-list 1 --owner ouyangjiahong26 --format 
   | Done | `98236657` |
   | No action | `58b611df` |
 
-- Priority 字段 ID：`PVTSSF_lAHOCpw4xM4BiZm4zhhR0V8`
+- Priority 字段 ID：`PVTSSF_lADOE3ZAg84BkgBrzhjQaGs`
 
   | 选项 | option ID |
   | --- | --- |
@@ -77,7 +77,7 @@ ID 于 2026-09-23 经 `gh project field-list 1 --owner ouyangjiahong26 --format 
   | P2 | `380c4288` |
   | P3 | `826b89d3` |
 
-- Start Date 字段 ID：`PVTF_lAHOCpw4xM4BiZm4zhhR0WA`
+- Start Date 字段 ID：`PVTF_lADOE3ZAg84BkgBrzhjQaGw`
 
 ## Wayfinding 操作
 
