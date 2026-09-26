@@ -197,3 +197,31 @@ parenthetical "(no design capability yet)" no longer applies to
 `lyapunov_l1/l2`; the labels' *verification* there stays synthetic until the
 baseline-anchored tests are extended with designer-generated members, per
 the Consequences paragraph above. `lyapunov_l3` remains design-less.
+
+## Revision (2026-09-26, #707)
+
+Decision 3 item 2's `planar` qualifier is void for the moon-centered branch:
+the branch accepts spatial input and shares one label selection with the
+planar case, with the precondition extended by "moon-centered prograde/
+retrograde is determinate" (perilune h_z non-degenerate). Rationale for the
+precedence: within the SOI ball the supremum of the orbit-to-collinear-point
+minimum distance is 0.2335 < the 0.25 gate, so the collinear gate cannot
+separate by distance, and the moon-centered branch must therefore precede
+the collinear fallback. Previously, spatial (z ≠ 0) moon-winding orbits
+entirely inside the SOI were swallowed by the collinear fallback and
+mislabeled `halo_l*` / `axial_l*` / `vertical_l*`.
+
+Decision 2's `unclassified_reason` list gains `moon_centered_indeterminate`:
+spatial, inside the SOI, winding no collinear point, but moon-centered
+criteria indeterminate (perilune h_z ≈ 0, e.g. polar/near-polar, or
+degenerate in-plane projected winding). Such input never receives a
+libration-point label. Spatial orbits that do wind a collinear point —
+including small halos lying wholly inside the SOI — still take the
+collinear branch.
+
+Verification status: criteria-level synthetic coverage only (§4 precedent).
+The repository has no spatial moon-centered periodic-orbit generation
+capability (the #689 DRO vertical critical-scan attempt disproved it; #690
+closed wontfix), so real-trajectory regression is not obtainable. The
+packaged baseline's 392 members across 11 periodic families keep byte-identical
+labels under this revision.

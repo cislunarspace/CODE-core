@@ -15,12 +15,15 @@ ADR 0042，测试以随包 baseline 数据集为回归锚点。
 判据级联（顺序即优先序，ADR 0042 决策 3）：
 
 1. ``periodicity="quasi-periodic"`` → unclassified（合法输出非失败）。
-2. **月心分支**：平面轨道（z 恒为零）、绕月净卷绕 ≈ ±2π、月心最大
-   半径 ≤ ρ_SOI = μ^(2/5)（Chebotarev 口径，Primer §5.4.2）。SOI
-   展布闸把深近月 NRHO 端成员（绕月但展布超 SOI）留给平动点分支。
-   逆行 → distant_retrograde；顺行按 ρ_max 分 distant_prograde /
-   low_prograde（东西 = 月心会合系近月点方向半平面，+y 朝月球公转
-   方向为东）。
+2. **月心分支**（平面或空间）：绕月净卷绕 ≈ ±2π、月心最大半径 ≤
+   ρ_SOI = μ^(2/5)（Chebotarev 口径，Primer §5.4.2）、且月心顺逆可判
+   （近月点 h_z 非退化）。SOI 展布闸把深近月 NRHO 端成员（绕月但展布
+   超 SOI）留给平动点分支。逆行 → distant_retrograde；顺行按 ρ_max 分
+   distant_prograde / low_prograde（东西 = 月心会合系近月点方向半平面，
+   +y 朝月球公转方向为东）。空间且 SOI 内但月心判据不可判（近月点
+   h_z≈0，如极轨/近极地，或面内投影卷绕退化）的输入不进入任何平动点
+   分支，显式 unclassified("moon_centered_indeterminate")；卷绕共线 L
+   点的空间轨道仍走共线分支。
 3. **L4/L5 分支**：平面轨道绕 L4 或 L5 净卷绕 ≈ ±2π：T/T_moon > 2 →
    longperiod_l{4,5}，否则 shortperiod_l{4,5}。
 4. **共线平动点分支**：绕某共线 L 净卷绕，或（深近月端成员不卷绕
@@ -318,9 +321,11 @@ def _classify_features(f: _Features, mu: float) -> TaxonomyResult:
     soi = mu**_SOI_EXPONENT
     wind_moon = abs(f.winding_moon) >= _WINDING_GATE
 
-    # 2. 月心分支：平面、绕月、展布在 SOI 内；顺逆不可判（近月点 h_z≈0
-    #    的退化轨迹）时不强贴月心标签，落到后续分支。
-    if planar and wind_moon and f.rho_max <= soi and f.moon_prograde is not None:
+    moon_local = f.rho_max <= soi
+    # 2. 月心分支（平面或空间，#707）：绕月、展布在 SOI 内、顺逆可判
+    #    （近月点 h_z 非退化）时不强贴；SOI 展布闸把深近月 NRHO 端成员
+    #    （绕月但展布超 SOI）留给平动点分支。
+    if wind_moon and moon_local and f.moon_prograde is not None:
         labels: list[TaxonomyLabel] = []
         if f.moon_prograde is False:
             labels.append(TAXONOMY_BY_CANONICAL["distant_retrograde"])
@@ -338,6 +343,17 @@ def _classify_features(f: _Features, mu: float) -> TaxonomyResult:
         if resonance is not None:
             labels.append(resonance)
         return _ok(labels, f, mu)
+
+    # 2b. 空间且 SOI 内但月心判据不可判（#707）：近月点 h_z≈0（极轨/
+    #     近极地）或面内投影卷绕退化的输入显式 unclassified，不得落入
+    #     共线分支误标；卷绕共线 L 的空间轨道（如完全在 SOI 内的小型
+    #     halo）不在此拦截，留给共线分支。
+    if (
+        not planar
+        and moon_local
+        and not any(abs(f.windings_l[point]) >= _WINDING_GATE for point in (1, 2, 3))
+    ):
+        return _unclassified("moon_centered_indeterminate", f, mu)
 
     # 3. L4/L5 分支：平面、绕三角平动点一周且局域在其邻域内。
     if planar:
