@@ -89,29 +89,6 @@ class OrbitFamilyType(enum.Enum):
     LYO = "lyo"  # Lissajous Orbit
 
 
-class StabilityLabel(enum.Enum):
-    """轨道稳定性标签"""
-
-    STABLE = "stable"
-    UNSTABLE = "unstable"
-    MARGINALLY_STABLE = "marginally_stable"
-    HYPERBOLIC = "hyperbolic"
-    ELLIPTIC = "elliptic"
-    PARABOLIC = "parabolic"
-
-
-class BifurcationLabel(enum.Enum):
-    """分岔类型标签"""
-
-    NONE = "none"
-    PERIOD_DOUBLING = "period_doubling"
-    SADDLE_NODE = "saddle_node"
-    TORUS = "torus"
-    PITCHFORK = "pitchfork"
-    TRANSCRITICAL = "transcritical"
-    SECONDARY_HOPF = "secondary_hopf"
-
-
 class TransferPhase(enum.Enum):
     """转移设计阶段（用于状态机图）"""
 

@@ -63,3 +63,17 @@ ephemerides) belongs to the data layer.
   methods, single-point + batch.
 - `data/frames/` keeps only data; conversion algorithms in
   `algorithm/coordinate/`.
+
+## Revision (2026-09-26, issue #629)
+
+Decision 1's "Floquet bases and projection factors are precomputed by FR1"
+lapses: that is not part of the contract. `NominalOrbit` guarantees only the
+equally-spaced epoch state table; `floquet_basis`, `projection_factors` and
+`interpolator` remain **optional extension points with no producer in this
+repository** — callers that need them precompute upstream and inject them
+through those fields. Projection factors are defined per control law and
+cannot be defined control-law-agnostically at the contract layer. The
+rationale and the rejected path are recorded in
+`.out-of-scope/nominal-orbit-floquet-precompute.md`; the empty
+`e2m2e/algorithm/nominal_orbit/` placeholder module and its empty test
+directory were removed as dead weight.

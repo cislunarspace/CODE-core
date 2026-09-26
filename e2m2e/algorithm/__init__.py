@@ -20,7 +20,6 @@ solver/）：①构造问题（选轨道族、定约束、选流形方向）②�
 - ``spatiography/``：地月空间分区（Laplace 半径、影响球族、共振梯、区域分类；ADR 0041）。
 - ``stability.py``：稳定性。
 - ``normal_form/``：正规化（可选依赖）。
-- ``nominal_orbit/``：名义轨道。
 
 实现状态：骨架。模块逐个实现/迁入中，未实现能力占位函数抛 ``NotImplementedError``。
 

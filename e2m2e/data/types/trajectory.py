@@ -60,13 +60,18 @@ class EphemerisTable:
 class NominalOrbit:
     """名义轨道：FR1（设计）→ FR2（保持）数据契约。
 
+    契约只保证 ``epochs``/``states`` 等间距状态表；``floquet_basis``、
+    ``projection_factors``、``interpolator`` 是**无生产者的可选扩展点**，
+    需要它们的调用方在上游生成后注入（见
+    ``.out-of-scope/nominal-orbit-floquet-precompute.md``）。
+
     Attributes:
         epochs: 等间距历元（UTC）。
         states: 等间距历元状态表（GCRS，km, km/s，形状 (n, 6)）。
         synodic_positions: 会合系位置（可选，绘图/特征点用）。
-        floquet_basis: Floquet 基向量表（可选，特征点控制用）。
-        projection_factors: 投影因子表（可选，开/关控制用）。
-        interpolator: 高次插值器（Lagrange r=5~6）。
+        floquet_basis: Floquet 基向量表（可选扩展点；本仓库无生产者）。
+        projection_factors: 投影因子表（可选扩展点；定义依赖具体控制律，本仓库不预计算）。
+        interpolator: 高次插值器（可选扩展点；Lagrange r=5~6，本仓库未实现）。
     """
 
     epochs: np.ndarray
