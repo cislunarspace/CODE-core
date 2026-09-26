@@ -59,6 +59,12 @@ _避免_：缝、seam
 调用方调起本仓库的路径：进程内 import、MCP、CLI、stdio sidecar 协议。
 _避免_：通道、channel、消费、consume
 
+## 力模型
+
+### RTN 常值加速度力模型（UniformAcceleration，匀加速度）
+与航天器质量无关的 RTN 三轴常值加速度：每个 RHS 求值处以当前状态的 RTN 基把 ``(aR, aT, aN)`` 旋转到传播坐标系。RTN 轴约定即 ADR 0007 的 LVLH/RSW（R = r̂，N = ĥ，T = N×R），与 ``direction_frame="LVLH"`` 的推力方向共用同一条基实现，公开帧标签为 ``"RTN"``。三分量全零等价于无该力；退化状态（|r|≈0、|v|≈0，或 r∥v 使 |r×v|≈0）在传播中显式报错，不静默丢弃分量（ADR 0020）——此处与 LVLH 推力方向帧不同，后者共线时丢弃 N 分量。对应 CE-5 精密定轨策略（孔静等 2022）的姿轨控匀加速度项。
+_避免_：常值推力、constant thrust（本力与质量无关，不是推力）
+
 ## 轨道库数据模型
 
 ### 轨道记录（Orbit record）

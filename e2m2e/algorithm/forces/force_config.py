@@ -27,6 +27,7 @@ from .shadow import ConicalShadowModel
 from .srp import SolarRadiationPressure
 from .third_body_gravity import ThirdBodyGravity
 from .thrust import FiniteBurn
+from .uniform_acceleration import UniformAcceleration
 
 # --- 嵌套依赖：大气模型 ---
 
@@ -211,6 +212,14 @@ def _serialize_relativistic_correction(force: RelativisticCorrection) -> dict[st
     }
 
 
+def _serialize_uniform_acceleration(force: UniformAcceleration) -> dict[str, Any]:
+    """把 RTN 常值加速度力模型序列化为参数字典。"""
+    return {
+        "acceleration_rtn": force.acceleration_rtn.tolist(),
+        "direction_frame": force.direction_frame,
+    }
+
+
 def _serialize_point_mass_gravity(force: PointMassGravity) -> dict[str, Any]:
     """把点质量引力力模型序列化为参数字典。"""
     return {"body": force.body, "mu": force.mu}
@@ -242,6 +251,7 @@ _SERIALIZERS: dict[type, Any] = {
     FiniteBurn: _serialize_finite_burn,
     RelativisticCorrection: _serialize_relativistic_correction,
     PointMassGravity: _serialize_point_mass_gravity,
+    UniformAcceleration: _serialize_uniform_acceleration,
     ThirdBodyGravity: _serialize_third_body_gravity,
     IndirectTerm: _serialize_indirect_term,
 }
@@ -314,6 +324,11 @@ def _build_ecom(params: dict[str, Any]) -> EcomSolarRadiationPressure:
     return EcomSolarRadiationPressure(**built)
 
 
+def _build_uniform_acceleration(params: dict[str, Any]) -> UniformAcceleration:
+    """从参数字典构造 RTN 常值加速度力模型。"""
+    return UniformAcceleration(**params)
+
+
 _BUILDERS: dict[str, Any] = {
     "GravityField": _build_gravity_field,
     "DragModel": _build_drag_model,
@@ -322,6 +337,7 @@ _BUILDERS: dict[str, Any] = {
     "FiniteBurn": _build_finite_burn,
     "RelativisticCorrection": _build_relativistic_correction,
     "PointMassGravity": _build_point_mass_gravity,
+    "UniformAcceleration": _build_uniform_acceleration,
     "ThirdBodyGravity": _build_third_body_gravity,
     "IndirectTerm": _build_indirect_term,
 }

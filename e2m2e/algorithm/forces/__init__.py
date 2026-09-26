@@ -29,6 +29,7 @@ from .shadow import ConicalShadowModel
 from .srp import SolarRadiationPressure, VariableMassSolarRadiationPressure
 from .third_body_gravity import ThirdBodyGravity
 from .thrust import BurnApplication, FiniteBurn, ImpulsiveBurn, VariableMassFiniteBurn
+from .uniform_acceleration import UniformAcceleration
 
 __all__ = [
     "PhysicalModel",
@@ -46,6 +47,7 @@ __all__ = [
     "ImpulsiveBurn",
     "FiniteBurn",
     "VariableMassFiniteBurn",
+    "UniformAcceleration",
     "BurnApplication",
     "RelativisticCorrection",
     "RelativisticCorrectionError",

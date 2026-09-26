@@ -1226,6 +1226,7 @@ fn srp_acceleration(
 /// - `("third_body", body, mu)`
 /// - `("indirect", body, mu)`
 /// - `("srp", area, mass, cr, shadow_bodies_list)`
+/// - `("uniform_accel", [aR, aT, aN], direction_frame)`，direction_frame 固定为 `"RTN"`
 #[cfg(feature = "spice")]
 pub(crate) fn parse_force_tuple(
     item: &Bound<'_, PyAny>,
@@ -1462,6 +1463,29 @@ pub(crate) fn parse_force_tuple(
                 t_start,
                 t_end,
                 direction: [direction[0], direction[1], direction[2]],
+                direction_frame,
+            })
+        }
+        "uniform_accel" => {
+            // 元组格式：("uniform_accel", [aR, aT, aN], direction_frame)。
+            let acceleration: Vec<f64> = tuple.get_item(1)?.extract().map_err(|_| {
+                pyo3::exceptions::PyTypeError::new_err(
+                    "uniform_accel acceleration must be a list of floats",
+                )
+            })?;
+            let direction_frame: String = tuple.get_item(2)?.extract()?;
+            if acceleration.len() != 3 {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "uniform_accel acceleration must have 3 elements",
+                ));
+            }
+            if direction_frame != "RTN" {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "uniform_accel direction_frame must be 'RTN'",
+                ));
+            }
+            Ok(CompiledForce::UniformAcceleration {
+                acceleration_rtn: [acceleration[0], acceleration[1], acceleration[2]],
                 direction_frame,
             })
         }
