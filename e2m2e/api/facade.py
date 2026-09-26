@@ -646,6 +646,7 @@ class Facade:
                 duration=request.duration,
                 force_config=request.force_config,
                 output_step=request.output_step,
+                direction=request.direction,
                 kernel_dir=self._config.kernel_dir,
             )
             ephemeris = result.ephemeris
@@ -659,6 +660,7 @@ class Facade:
                 message=message,
                 epoch_utc=str(request.epoch) if isinstance(request.epoch, str) else "",
                 duration_sec=float(request.duration),
+                direction=request.direction,
                 output_step=float(request.output_step),
                 n_points=len(ephemeris.year),
                 time_sec=((times_jd - times_jd[0]) * SECONDS_PER_DAY).tolist(),

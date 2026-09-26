@@ -43,12 +43,27 @@ def test_propagate_zero_span_with_rust_force_returns_initial_state():
     np.testing.assert_array_equal(result["states"][0], y0)
 
 
-def test_propagate_rejects_backward_integration():
-    """反向传播抛 NotImplementedError。"""
+def test_propagate_backward_free_particle():
+    """反向积分自由质点：自 t=1 倒退 1 秒精确回到原点。"""
     system = FakeSystem()
     fm = ForceModel(system)
-    with pytest.raises(NotImplementedError, match="forward integration"):
-        fm.propagate(np.zeros(6), (1.0, 0.0))
+    y0 = np.array([1.0, 1.0, 0.0, 0.0, 1.0, 0.0])
+
+    result = fm.propagate(y0, (1.0, 0.0))
+
+    time = result["time"]
+    assert np.all(np.diff(time) < 0)
+    assert time[0] == pytest.approx(1.0)
+    assert time[-1] == pytest.approx(0.0)
+    np.testing.assert_allclose(result["states"][-1], [1.0, 0.0, 0.0, 0.0, 1.0, 0.0], atol=1e-9)
+
+
+def test_propagate_backward_rejects_t_eval_out_of_bounds():
+    """反向积分时 t_eval 超出 t_span 抛 ValueError。"""
+    system = FakeSystem()
+    fm = ForceModel(system)
+    with pytest.raises(ValueError, match="within t_span"):
+        fm.propagate(np.zeros(6), (1.0, 0.0), t_eval=np.array([1.1]))
 
 
 def test_propagate_with_stm_returns_kinematic_stm():

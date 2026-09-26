@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from kernel_helpers import requires_spice
 
 from api.conftest import control_orbit_business_parameters
 from e2m2e.algorithm.results import FamilyGenerationResult
@@ -601,3 +602,34 @@ class TestFacadeTransferTopN:
         # MCP/JSON 序列化下新字段完整可读（模型往返逐字段相等）
         revived = TransferDesignResponse.model_validate_json(response.model_dump_json())
         assert revived.candidates == response.candidates
+
+
+@pytest.mark.spice
+@requires_spice
+class TestOrbitPropagationDirection:
+    """反向传播接口契约（#640）：direction 回显、带符号时间轴与末态。"""
+
+    def test_backward_contract(self):
+        resp = Facade().orbit_propagation(
+            initial_state=[7000.0, 0.0, 0.0, 0.0, 7.7, 0.0],
+            epoch="2025-06-21T11:00:06",
+            duration=21600.0,
+            direction="backward",
+        )
+        assert resp.direction == "backward"
+        assert resp.duration_sec == 21600.0
+        assert resp.time_sec[0] == 0.0
+        assert resp.time_sec[-1] == pytest.approx(-21600.0)
+        assert all(d > 0 for d in -np.diff(resp.time_sec))
+        assert resp.n_points == 7
+        assert resp.final_state == resp.position_km[-1] + resp.velocity_km_s[-1]
+
+    def test_forward_default_unchanged(self):
+        resp = Facade().orbit_propagation(
+            initial_state=[7000.0, 0.0, 0.0, 0.0, 7.7, 0.0],
+            epoch="2025-06-21T11:00:06",
+            duration=21600.0,
+        )
+        assert resp.direction == "forward"
+        assert all(d > 0 for d in np.diff(resp.time_sec))
+        assert resp.time_sec[-1] == pytest.approx(21600.0)

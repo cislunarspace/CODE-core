@@ -315,6 +315,7 @@ class TestOtherRequests:
         )
         assert request.output_step == 3600.0
         assert request.force_config is None
+        assert request.direction == "forward"
         with pytest.raises(ValidationError, match="initial_state"):
             PropagationRequest(
                 initial_state=[0.0] * 5,
@@ -326,6 +327,13 @@ class TestOtherRequests:
                 initial_state=[0.0] * 6,
                 epoch="2025-06-21T11:00:00",
                 duration=0.0,
+            )
+        with pytest.raises(ValidationError, match="direction"):
+            PropagationRequest(
+                initial_state=[0.0] * 6,
+                epoch="2025-06-21T11:00:00",
+                duration=3600.0,
+                direction="sideways",
             )
 
     def test_spacetime_transform_defaults(self):
