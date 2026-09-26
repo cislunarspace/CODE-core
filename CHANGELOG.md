@@ -7,6 +7,9 @@
 ### Added
 - **Lyapunov 轨道设计入口**：`DesignOrbitRequest` 支持 `orbit_type="LYAPUNOV"`，为 L1/L2 设计平面轨道并完成分段星历修正与预报；振幅为一个周期内 `max|y|`（km），范围 5 000–60 000 km。(#628)
 
+### Fixed
+- **反向多重/分段打靶收敛**：`multiple_shooting_correct`/`segmented_shooting_correct` 接受单调递减的 `t_patch`（反向传播工作流）。此前 compiled 传播路径（PD45/PD78）写死正向，递减 `t_patch` 立即报 "output length mismatch: got 1 time points, expected 2"；现传播方向由时间跨度/输出网格的单调方向决定，反向段积分与 STM 变分方程正确工作，正向行为逐位不变。(#640)
+
 ## [5.9.6] - 2026-09-24
 
 ### Added

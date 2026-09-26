@@ -1503,7 +1503,8 @@ type CompiledPropResult = (Vec<f64>, Vec<Vec<f64>>, usize, usize, usize);
 /// 无 Python 对象交互（力模型序列已解析为 [`CompiledForce`]），可安全置于
 /// `allow_threads` 区并 rayon 并发。输出语义：``t_eval`` 逐点对应输出
 /// （``t_eval[0]≈t0`` 时含初值；不追加 t_span 终点，追加是 Python 侧
-/// ``ForceModel._prepare_t_eval`` 的行为）。
+/// ``ForceModel._prepare_t_eval`` 的行为）。传播方向由 ``t_eval`` 单调
+/// 方向决定（末点早于 ``t0`` 即反向积分，``t_eval`` 单调递减）。
 #[cfg(feature = "spice")]
 #[allow(clippy::too_many_arguments)]
 fn propagate_compiled_core(
@@ -1517,11 +1518,15 @@ fn propagate_compiled_core(
     forces: &[e2m2e_forces::forces::compiled::CompiledForce],
     max_steps: usize,
 ) -> Result<CompiledPropResult, String> {
-    use e2m2e_forces::forces::compiled::{compute_total_acceleration, next_force_discontinuity};
+    use e2m2e_forces::forces::compiled::{
+        compute_total_acceleration, next_force_discontinuity, prev_force_discontinuity,
+    };
+    // 传播方向由 t_eval 单调方向决定（末点 < t0 即反向积分）。
+    let dir = (t_eval[t_eval.len() - 1] - t0).signum();
     let table = method.table();
     let mut y = y0.to_vec();
     let mut t = t0;
-    let mut h = h_init;
+    let mut h = dir * h_init;
     // 输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初始状态、eval_idx 从 1 起步；
     // 当 t_eval[0]>t0（逐段积分常态：patch point 时刻非整数小时，et_grid 整数
     // 小时点严格大于 t0）时不预设 t0 到输出，eval_idx 从 0 起步由循环匹配。
@@ -1541,7 +1546,7 @@ fn propagate_compiled_core(
     use std::cell::RefCell;
     let last_error: RefCell<Option<String>> = RefCell::new(None);
 
-    while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
+    while dir * (t_eval[t_eval.len() - 1] - t) > 0.0 && n_steps < max_steps {
         n_steps += 1;
         // 限制步长不超过下一个评估点（提高 t_eval 命中率），且不超过
         // h_init（作为最大步长：稀疏 t_eval 下自适应步长失控）
@@ -1551,15 +1556,21 @@ fn propagate_compiled_core(
         } else {
             t_final
         };
-        if let Some(boundary) = next_force_discontinuity(forces, t, t_final) {
-            t_next = t_next.min(boundary);
+        // 推力开关边界作为步长终点：正向取 (t, t_final] 内最早者，
+        // 反向取 [t_final, t) 内最晚者，保证 RK 步不跨越不连续面。
+        if dir > 0.0 {
+            if let Some(boundary) = next_force_discontinuity(forces, t, t_final) {
+                t_next = t_next.min(boundary);
+            }
+        } else if let Some(boundary) = prev_force_discontinuity(forces, t, t_final) {
+            t_next = t_next.max(boundary);
         }
-        if t + h > t_next {
+        if dir * (t + h - t_next) > 0.0 {
             h = t_next - t;
         }
-        if h > h_init {
+        if h.abs() > h_init {
             n_steps_capped += 1;
-            h = h_init;
+            h = dir * h_init;
         }
 
         // RK 单步：用 Rust 闭包调 compute_total_acceleration
@@ -1584,7 +1595,7 @@ fn propagate_compiled_core(
             t += h;
             y = y_new;
             // 输出落在 t_eval 的点
-            while eval_idx < t_eval.len() && t >= t_eval[eval_idx] - 1e-9 {
+            while eval_idx < t_eval.len() && dir * (t - t_eval[eval_idx]) >= -1e-9 {
                 times.push(t_eval[eval_idx]);
                 states.push(y.clone());
                 eval_idx += 1;
@@ -1595,7 +1606,7 @@ fn propagate_compiled_core(
             n_rejected += 1;
             let h_next = suggest_next_step(h, error, tol, method.embedded_order());
             h = h_next;
-            if h < 1e-12 * (t_eval[t_eval.len() - 1] - t0).abs() {
+            if h.abs() < 1e-12 * (t_eval[t_eval.len() - 1] - t0).abs() {
                 return Err("step size collapsed below minimum".to_string());
             }
         }

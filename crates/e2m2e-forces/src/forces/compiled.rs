@@ -418,6 +418,25 @@ pub fn next_force_discontinuity(forces: &[CompiledForce], t: f64, tf: f64) -> Op
         .min_by(|left, right| left.total_cmp(right))
 }
 
+/// 返回 `[tf, t)` 内最晚的编译力不连续时刻（`next_force_discontinuity` 的反向镜像）。
+///
+/// 反向积分（tf < t）时用作步长终点，保证 RK 步不跨越推力开关边界。
+pub fn prev_force_discontinuity(forces: &[CompiledForce], t: f64, tf: f64) -> Option<f64> {
+    forces
+        .iter()
+        .filter_map(|force| match force {
+            CompiledForce::LowThrust {
+                t_start: Some(start),
+                t_end: Some(end),
+                ..
+            } => Some([*start, *end]),
+            _ => None,
+        })
+        .flatten()
+        .filter(|boundary| *boundary < t && *boundary >= tf)
+        .max_by(|left, right| left.total_cmp(right))
+}
+
 /// 计算所有 force 的总加速度。
 pub fn compute_total_acceleration(
     forces: &[CompiledForce],

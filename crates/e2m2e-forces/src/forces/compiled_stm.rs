@@ -12,7 +12,7 @@
 
 use super::compiled::{
     compute_total_acceleration_and_jacobian, next_force_discontinuity, param_accel_derivative,
-    CompiledForce, SensParam,
+    prev_force_discontinuity, CompiledForce, SensParam,
 };
 use super::nbody_stm;
 use e2m2e_propagation::butcher::{explicit_rk_step, suggest_next_step};
@@ -99,6 +99,9 @@ pub fn precheck(
 /// 与 `nbody_stm::propagate_with_stm` 物理等价，但用 PD45 循环
 /// （与 `propagate_compiled` 同一 RK 表/控制器），
 /// 保证 with_stm=True/False 的 states 逐位一致。
+///
+/// `t_span` 方向即传播方向；反向（`t_span.1 < t_span.0`）时 `t_eval` 须
+/// 同向单调递减。
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_compiled_stm(
     forces: &[CompiledForce],
@@ -133,6 +136,9 @@ pub fn propagate_compiled_stm(
 /// `forces` 切片中的下标，`SensParam` 指定对哪个参数求偏导。每条参数在
 /// 增广状态尾部追加 6 维敏感列（初值零），维度 `42 + 6·sens.len()`。
 /// `sens` 为空时与 [`propagate_compiled_stm`] 逐位一致。
+///
+/// `t_span` 方向即传播方向；反向（`t_span.1 < t_span.0`）时 `t_eval` 须
+/// 同向单调递减。
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_compiled_stm_sens(
     forces: &[CompiledForce],
@@ -161,6 +167,8 @@ pub fn propagate_compiled_stm_sens(
 
     precheck(forces, observer, t_span.0, initial_state)?;
 
+    // 传播方向：t_span.1 < t_span.0 时反向积分（h 取负、t_eval 单调递减）。
+    let dir = (t_span.1 - t_span.0).signum();
     let tol = rtol;
     let h_max = max_step.unwrap_or(f64::INFINITY);
     let s_max = max_steps.unwrap_or(500_000);
@@ -175,7 +183,7 @@ pub fn propagate_compiled_stm_sens(
 
     let mut y = augmented0;
     let mut t = t_span.0;
-    let mut h = (t_span.1 - t_span.0).min(h_max);
+    let mut h = dir * (t_span.1 - t_span.0).abs().min(h_max);
     // 输出起点跟随 t_eval：当 t_eval[0]==t_span.0 时记录初始状态/STM、eval_idx
     // 从 1 起步；否则（如逐段积分 patch point 时刻非整数小时、t_eval 整数小时
     // 点严格大于 t0）不预设 t_span.0 到输出、eval_idx 从 0 起步由循环匹配。
@@ -208,7 +216,7 @@ pub fn propagate_compiled_stm_sens(
         eval_idx = 1;
     }
 
-    while t < t_eval[t_eval.len() - 1] && n_steps < s_max {
+    while dir * (t_eval[t_eval.len() - 1] - t) > 0.0 && n_steps < s_max {
         n_steps += 1;
 
         let mut t_next = if eval_idx < t_eval.len() {
@@ -216,14 +224,22 @@ pub fn propagate_compiled_stm_sens(
         } else {
             t_span.1
         };
-        if let Some(boundary) = next_force_discontinuity(forces, t, t_span.1) {
-            t_next = t_next.min(boundary);
+        // 推力开关边界作为步长终点：正向取 (t, t_span.1] 内最早者，
+        // 反向取 [t_span.1, t) 内最晚者，保证 RK 步不跨越不连续面。
+        if dir > 0.0 {
+            if let Some(boundary) = next_force_discontinuity(forces, t, t_span.1) {
+                t_next = t_next.min(boundary);
+            }
+        } else if let Some(boundary) = prev_force_discontinuity(forces, t, t_span.1) {
+            t_next = t_next.max(boundary);
         }
-        if t + h > t_next {
+        if dir * (t + h - t_next) > 0.0 {
             h = t_next - t;
         }
-        h = h.min(h_max);
-        if h < MIN_STEP * (t_span.1 - t_span.0).abs() {
+        if h.abs() > h_max {
+            h = dir * h_max;
+        }
+        if h.abs() < MIN_STEP * (t_span.1 - t_span.0).abs() {
             return Err(format!(
                 "step size collapsed below minimum after {} steps",
                 n_steps
@@ -243,7 +259,7 @@ pub fn propagate_compiled_stm_sens(
             t += h;
             y = y_new;
 
-            while eval_idx < t_eval.len() && t >= t_eval[eval_idx] - 1e-9 {
+            while eval_idx < t_eval.len() && dir * (t - t_eval[eval_idx]) >= -1e-9 {
                 times.push(t_eval[eval_idx]);
                 let mut s = [0.0_f64; 6];
                 s.copy_from_slice(&y[..6]);
@@ -280,4 +296,86 @@ pub fn propagate_compiled_stm_sens(
         n_steps,
         n_rejected,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// GEO 量级圆轨道初值（km, km/s），PointMass 力下近圆。
+    fn geo_y0() -> [f64; 6] {
+        [42164.0, 0.0, 0.0, 0.0, 3.0747, 0.0]
+    }
+
+    /// 反向传播回归（#640）：以正向末态为初值反向积分应还原初值，
+    /// 且 STM_bwd ⊠ STM_fwd ≈ I₆（反向变分方程正确性不变量）。
+    #[test]
+    fn backward_propagation_roundtrip_point_mass() {
+        let forces = vec![CompiledForce::PointMass { mu: 398600.4418 }];
+        let y0 = geo_y0();
+        let observer = "EARTH";
+
+        // 正向 0 -> 3600 s，三点采样。
+        let fwd = propagate_compiled_stm(
+            &forces,
+            observer,
+            (0.0, 3600.0),
+            &[0.0, 1800.0, 3600.0],
+            &y0,
+            1e-12,
+            1e-14,
+            None,
+            None,
+            RkMethod::Pd78,
+        )
+        .unwrap();
+        let state1 = fwd.states[2];
+        let stm_fwd = fwd.stms[2];
+
+        // 反向 3600 -> 0：t_eval 单调递减。修复前此处报
+        // "output length mismatch: got 1 time points, expected 2"。
+        let bwd = propagate_compiled_stm(
+            &forces,
+            observer,
+            (3600.0, 0.0),
+            &[3600.0, 0.0],
+            &state1,
+            1e-12,
+            1e-14,
+            None,
+            None,
+            RkMethod::Pd78,
+        )
+        .unwrap();
+
+        assert_eq!(
+            bwd.times.len(),
+            2,
+            "反向传播输出长度不符（#640 回归）：got {}",
+            bwd.times.len()
+        );
+        assert!((bwd.times[0] - 3600.0).abs() < 1e-9);
+        assert!(bwd.times[1].abs() < 1e-9);
+        for (i, (got, &want)) in bwd.states[1].iter().zip(y0.iter()).enumerate() {
+            assert!(
+                (got - want).abs() < 1e-6,
+                "backward roundtrip state[{i}] = {got} vs {want}"
+            );
+        }
+        // 反向 STM ⊠ 正向 STM ≈ I₆。
+        let stm_bwd = bwd.stms[1];
+        for i in 0..6 {
+            for j in 0..6 {
+                let mut acc = 0.0_f64;
+                for k in 0..6 {
+                    acc += stm_bwd[i * 6 + k] * stm_fwd[k * 6 + j];
+                }
+                let expect = if i == j { 1.0 } else { 0.0 };
+                assert!(
+                    (acc - expect).abs() < 1e-6,
+                    "stm_bwd*stm_fwd[{i}][{j}] = {acc} vs {expect}"
+                );
+            }
+        }
+    }
 }
