@@ -45,3 +45,20 @@ def test_itrf93_orientation_available_at_future_epoch() -> None:
     assert any(p.endswith(_PREDICT) for p in loaded)
     matrix = spice.pxform("J2000", "ITRF93", spice.utc_to_et(_FUTURE_EPOCH_UTC))
     assert matrix.shape == (3, 3)
+
+
+def test_default_datum_unaffected_by_de421_presence() -> None:
+    """``kernels/`` 里存在 de421.bsp 不改变缺省口径（ADR 0048）。
+
+    缺省路径只认 de440s > de430：可选内核的出现不得让未显式声明口径的
+    调用方静默换口径，否则历史数值结果会随环境漂移。
+    """
+    spice = SPICEManager()
+    loaded = load_design_kernels(spice, kernel_dir=SPICE_KERNEL_DIR)
+    try:
+        assert any(p.endswith("de440s.bsp") for p in loaded)
+        assert not any(p.endswith("de421.bsp") for p in loaded)
+        assert spice.ephemeris_datum == "DE440"
+    finally:
+        for path in reversed(loaded):
+            spice.unload_kernel(path)

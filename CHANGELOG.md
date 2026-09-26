@@ -7,6 +7,10 @@
 ### Added
 - **PCN patched-conic 目标参数化（B-plane / 双曲渐近线）**：`transfer_design(transfer_type="PCN")` 新增地月圆锥曲线拼接路径，把月心 B 平面（Vallado 定义：B·R、B·T、近月点高度）与双曲渐近线（RHA/DHA/C3）作为目标/决策变量。请求侧新增 `bplane_target`（到达模式：给定近月点高度与 B·T/B·R，打靶求解出发渐近线命中）与 `departure_asymptote`（出发模式：给定出发渐近线，解算月心 B 平面与 LOI 脉冲），二者互斥、恰给一个；响应侧新增 `bplane`/`departure_asymptote` 回显达成值。近月点圆化 LOI 为单脉冲，机动事件为 departure/arrival 两条。月球几何取 CR3BP 圆型理想化（θ₀=0），不消费 `target_ephemeris`；出发按共面圆停泊轨道理想化、仅支持 C3>0。新增内核 `algorithm/transfer/bplane.py`（正逆映射、解析雅可比、闭式近心距）与 `algorithm/transfer/pcn.py`（打靶编排）。(#635)
 - **Lyapunov 轨道设计入口**：`DesignOrbitRequest` 支持 `orbit_type="LYAPUNOV"`，为 L1/L2 设计平面轨道并完成分段星历修正与预报；振幅为一个周期内 `max|y|`（km），范围 5 000–60 000 km。(#628)
+- **DE421 行星星历口径**：加载 `de421.bsp` 后第三体位置与 GM **同为 DE421 口径**（此前只能混合口径：de440s 位置 + 写死的 DE440 GM）。`SPICEManager.get_gm(body, datum=None)` 默认跟随已加载星历内核，`ephemeris_datum` 暴露当前口径；`load_design_kernels(..., datum="DE421")` 与 `find_ephemeris_kernel(..., preferred="DE421")` 可显式选择。`constants.toml` 补 `SUN/MERCURY/VENUS/MARS` 的 DE421 GM 行（`EARTH/MOON/EMB` 原有）。`de421.bsp`（16.8 MB）随 `kernels-v1` release 分发，`make kernels` 自动获取。(#665)
+
+### Changed
+- **GM 基准改为跟随星历内核**：`de421.bsp` 被显式加载时，同一套代码的 GM 由 DE440 切到 DE421（月球 GM 4902.800118 → 4902.8005821478）。未加载 `de421.bsp` 的环境行为逐位不变——缺省星历选择仍是 `de440s > de430`，`kernels/` 里存在可选内核不会改变未声明口径的调用方。显式请求的口径内核缺失时抛 `FileNotFoundError` 而非静默降级；某基准下无该天体 GM 时回退 DE440 并发一次告警（木星及以外暂无 DE421 权威 GM）。(#665)
 
 ### Fixed
 - **星历传播失败原因透传**：`EphemerisDynamics.propagate`（Rust N 体快速路径）失败时的 `RuntimeError` 不再一律写 "likely cause: SPICE kernels not loaded or step size collapsed"，改为按实际原因给出可机读的 `cause:` 段——内核未加载 / 内核覆盖不足（保留底层 SPICE 解释文本）/ 星历缓存窗口外（保留请求 et 与缓存区间）/ 缓存键未注册 / strict 区缓存未启用；力模型未报错时归为步长塌缩或步数上限；失败语义不变（覆盖外仍硬失败）。(#677)
