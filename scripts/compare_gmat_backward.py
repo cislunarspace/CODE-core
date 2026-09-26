@@ -152,10 +152,11 @@ def _propagate_e2m2e_backward(output_dir: Path) -> dict[str, Any]:
     kernel_dir = _find_kernel_dir(output_dir)
     spice = SPICEManager()
     ephem_kernel = spice.find_ephemeris_kernel(str(kernel_dir))
-    tls_kernel = next((p for p in kernel_dir.glob("*.tls") if p.is_file()), None)
+    # load_kernel 内部 _ensure_leapseconds 会把闰秒内核 furnsh 进进程级内核池
+    # （类级 _leapseconds_loaded 标志守门，此后再不会重新 furnsh）。utc_to_et 依赖
+    # 该池，故不显式 load/unload .tls——卸载后池与标志不一致，本函数返回的
+    # manager 再做 UTC→ET 会失败。
     spice.load_kernel(ephem_kernel)
-    if tls_kernel is not None:
-        spice.load_kernel(str(tls_kernel))
 
     try:
         y0 = _keplerian_to_cartesian(6778.0, 0.001, 51.6, 0.0, 0.0, 0.0, _MU_EARTH)
@@ -174,8 +175,6 @@ def _propagate_e2m2e_backward(output_dir: Path) -> dict[str, Any]:
         return {"time": time, "states": states, "spice": spice}
     finally:
         spice.unload_kernel(ephem_kernel)
-        if tls_kernel is not None:
-            spice.unload_kernel(str(tls_kernel))
 
 
 def _write_report(
@@ -245,7 +244,8 @@ def main() -> None:
     print("Aligning time and computing errors...")
     gmat_et = _utc_to_et(gmat_data["utc"], e2m2e_data["spice"])
     gmat_at_e2m2e = _interpolate_states(gmat_et, gmat_data["states"], e2m2e_data["time"])
-    pos_err_m = np.linalg.norm(gmat_at_e2m2e[:, :3] - e2m2e_data["states"][:, :3], axis=1)
+    # 两侧状态均为 km/km·s⁻¹，np.linalg.norm 得 km；报告与打印口径为 m，故 ×1000。
+    pos_err_m = np.linalg.norm(gmat_at_e2m2e[:, :3] - e2m2e_data["states"][:, :3], axis=1) * 1000.0
 
     print("Writing report...")
     report_path = _write_report(e2m2e_data["time"], pos_err_m, output_dir)
