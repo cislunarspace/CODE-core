@@ -171,3 +171,21 @@ warning set was a module global, coupling test modules.
   (`test_de421_datum.py::test_gm_follows_loaded_kernel`) now assert the shared
   datum; the DE440 contrast is taken via an explicit `datum=` query.
 - No error code, failure semantics, or GM value changes.
+
+## Revision (2026-09-26, b): SUN DE421 row withdrawn; datum candidates; bookkeeping lock (#683 re-review)
+
+- **`[body.SUN.gm].DE421` row withdrawn.** The DE421 solar GM has no authoritative
+  source in this repository (the two candidate values differ by ~9e-8 relative, and
+  the JPL definition is set by the IAU Gaussian constant with the defining AU rather
+  than by a per-generation fit), so the row is removed instead of silently returning
+  a guessed value: querying SUN under DE421 now falls back to DE440 and warns once —
+  the same treatment as the outer planets, tracked in #670. Revision (a) documented
+  the gap but still let the value surface silently through the new body row.
+- **Datum → kernel *candidates*, not a single file.** `_DATUM_KERNEL_PREFERENCE` maps
+  to an ordered tuple (`DE440 → (de440.bsp, de440s.bsp)`) exposed by
+  `SPICEManager.datum_kernel_names`, so a directory holding only `de440.bsp` satisfies
+  `preferred="DE440"` instead of reporting the datum as missing (which contradicted the
+  manager's own default priority).
+- **Bookkeeping lock.** The class-level list is mutated under `_bookkeeping_lock`
+  (matching the module's `_leapseconds_lock` convention); dedup-by-absolute-path
+  semantics documented.

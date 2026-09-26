@@ -299,13 +299,17 @@ class TestEphemerisDatumGM:
         mgr = SPICEManager()
         de421 = de421_kernel_file()
         mgr.load_kernel(de421)
-        mgr.load_kernel(de440s)
-        assert mgr.ephemeris_datum == "DE440"
-        assert mgr.get_gm("MOON") == Datum.DE440.moon_gm
-        # 卸载后加载者 → 回落到仍在加载的 de421
-        mgr.unload_kernel(de440s)
-        assert mgr.ephemeris_datum == "DE421"
-        assert mgr.get_gm("MOON") == Datum.DE421.moon_gm
+        try:
+            mgr.load_kernel(de440s)
+            assert mgr.ephemeris_datum == "DE440"
+            assert mgr.get_gm("MOON") == Datum.DE440.moon_gm
+            # 卸载后加载者 → 回落到仍在加载的 de421
+            mgr.unload_kernel(de440s)
+            assert mgr.ephemeris_datum == "DE421"
+            assert mgr.get_gm("MOON") == Datum.DE421.moon_gm
+        finally:
+            # 簿记类级/进程级（ADR 0048）：不卸载会泄漏到同 worker 的后续用例
+            mgr.unload_kernel(de421)
 
 
 class TestDatumBookkeepingScope:
@@ -329,19 +333,27 @@ class TestDatumBookkeepingScope:
         warnings = [r for r in caplog.records if "JUPITER" in r.getMessage()]
         assert len(warnings) == 2
 
-    def test_datum_kernel_name_single_source(self):
-        """基准→内核映射由 manager 单源导出（design 链路同引用，无第二份副本）。"""
-        assert SPICEManager.datum_kernel_name("de421") == "de421.bsp"
-        assert SPICEManager.datum_kernel_name("DE440") == "de440s.bsp"
-        assert SPICEManager.datum_kernel_name("DE999") is None
+    def test_datum_kernel_names_single_source(self):
+        """基准→内核候选由 manager 单源导出（design 链路同引用，无第二份副本）。"""
+        assert SPICEManager.datum_kernel_names("de421") == ("de421.bsp",)
+        assert SPICEManager.datum_kernel_names("DE440") == ("de440.bsp", "de440s.bsp")
+        assert SPICEManager.datum_kernel_names("DE999") == ()
 
     def test_find_kernel_preferred_de440_matches_design_contract(
         self, bare_spice_manager, tmp_path
     ):
-        """``preferred="DE440"`` 与 ``load_design_kernels(datum="DE440")`` 同契约。"""
+        """``preferred="DE440"`` 与 ``load_design_kernels(datum="DE440")`` 同契约。
+
+        同基准的多个内核等价：目录只有 ``de440.bsp`` 时也必须接受（否则与
+        manager 默认优先级 de440.bsp 优先自相矛盾）。
+        """
         (tmp_path / "de440s.bsp").write_bytes(b"fake")
         path = bare_spice_manager.find_ephemeris_kernel(str(tmp_path), preferred="DE440")
         assert path.endswith("de440s.bsp")
+        (tmp_path / "de440s.bsp").unlink()
+        (tmp_path / "de440.bsp").write_bytes(b"fake")
+        path = bare_spice_manager.find_ephemeris_kernel(str(tmp_path), preferred="DE440")
+        assert path.endswith("de440.bsp")
 
 
 class TestKernelDatumWarnings:

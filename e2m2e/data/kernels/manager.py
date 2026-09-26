@@ -235,7 +235,9 @@ class SPICEManager(EphemerisProvider):
     #: **类级共享**——CSPICE 内核池是进程级全局的（ADR 0048）：任一实例的
     #: load/unload 都会改变"重叠覆盖段取后加载者"的实际口径，故簿记必须与池同域。
     #: 实例级簿记会在同进程另一 manager 加载内核时静默错配（de440s 位置 + DE421 GM）。
+    #: 按绝对路径去重（同一文件重复加载只留一条）；改列表一律持 ``_bookkeeping_lock``。
     _loaded_ephemeris: list[tuple[str, str]] = []
+    _bookkeeping_lock = threading.Lock()
 
     def __init__(self) -> None:
         """初始化 SPICE 管理器。"""
@@ -354,9 +356,10 @@ class SPICEManager(EphemerisProvider):
                 self._warn_unregistered_kernel(kernel_name)
             return
         abspath = os.path.abspath(path)
-        loaded = SPICEManager._loaded_ephemeris
-        loaded[:] = [entry for entry in loaded if entry[0] != abspath]
-        loaded.append((abspath, datum))
+        with SPICEManager._bookkeeping_lock:
+            loaded = SPICEManager._loaded_ephemeris
+            loaded[:] = [entry for entry in loaded if entry[0] != abspath]
+            loaded.append((abspath, datum))
         self._warn_approximated_kernel(kernel_name, datum)
 
     def unload_kernel(self, path: str) -> None:
@@ -376,8 +379,9 @@ class SPICEManager(EphemerisProvider):
         if spice_unload is not None:
             spice_unload(path)
         abspath = os.path.abspath(path)
-        loaded = SPICEManager._loaded_ephemeris
-        loaded[:] = [entry for entry in loaded if entry[0] != abspath]
+        with SPICEManager._bookkeeping_lock:
+            loaded = SPICEManager._loaded_ephemeris
+            loaded[:] = [entry for entry in loaded if entry[0] != abspath]
 
     @property
     def ephemeris_datum(self) -> str:
@@ -387,9 +391,11 @@ class SPICEManager(EphemerisProvider):
         的星历内核都改变"重叠覆盖段取后加载者"的实际口径，故这里读的是进程内
         真实生效的末位内核，位置与 GM 天然同口径、不需调用方手工配对。
         """
-        if SPICEManager._loaded_ephemeris:
-            return SPICEManager._loaded_ephemeris[-1][1]
-        return _DEFAULT_EPHEMERIS_DATUM
+        with SPICEManager._bookkeeping_lock:
+            entries = SPICEManager._loaded_ephemeris
+            if entries:
+                return entries[-1][1]
+            return _DEFAULT_EPHEMERIS_DATUM
 
     def enable_ephem_cache(
         self,
@@ -545,25 +551,29 @@ class SPICEManager(EphemerisProvider):
 
     _EPHEMERIS_KERNEL_PRIORITY = ["de440.bsp", "de440s.bsp", "de435.bsp", "de438.bsp"]
 
-    #: 各 GM 基准偏好的星历内核文件名（ADR 0048）。唯一来源：design 链路同引用本表。
-    _DATUM_KERNEL_PREFERENCE: dict[str, str] = {"DE421": "de421.bsp", "DE440": "de440s.bsp"}
+    #: 各 GM 基准的星历内核候选（按偏好排序）。唯一来源：design 链路同引用本表。
+    #: 同一基准可有多个等价内核（如 de440/de440s 的 GM 表相同）。
+    _DATUM_KERNEL_PREFERENCE: dict[str, tuple[str, ...]] = {
+        "DE421": ("de421.bsp",),
+        "DE440": ("de440.bsp", "de440s.bsp"),
+    }
 
     @classmethod
-    def datum_kernel_name(cls, datum: str) -> str | None:
-        """GM 基准偏好的星历内核文件名；未知基准返回 ``None``（ADR 0048 单一来源）。"""
-        return cls._DATUM_KERNEL_PREFERENCE.get(datum.upper())
+    def datum_kernel_names(cls, datum: str) -> tuple[str, ...]:
+        """GM 基准的星历内核候选名；未知基准返回空元组（ADR 0048 单一来源）。"""
+        return cls._DATUM_KERNEL_PREFERENCE.get(datum.upper(), ())
 
     def find_ephemeris_kernel(self, search_dir: str, preferred: str | None = None) -> str:
         """在指定目录中按优先级搜索星历内核文件（.bsp）。
 
         默认优先级：de440.bsp > de440s.bsp > de435.bsp > de438.bsp。
-        ``preferred`` 指定 GM 基准（如 ``"DE421"``）时，该基准偏好的内核
-        （de421.bsp）置于候选首位；**显式请求而文件缺失即报错**，不静默
-        降级到其它 DE 系列——降级会让「请求 DE421 口径」变成「悄悄用
-        DE440 口径」，比失败更糟。
+        ``preferred`` 指定 GM 基准（如 ``"DE421"``）时，该基准的候选内核
+        （同一 datum 的多个内核等价）置于候选首位；**显式请求而全部缺失即
+        报错**，不静默降级到其它 DE 系列——降级会让「请求 DE421 口径」变成
+        「悄悄用 DE440 口径」，比失败更糟。
 
         Raises:
-            FileNotFoundError: 目录不存在、显式 preferred 内核缺失，或其中无匹配的内核文件。
+            FileNotFoundError: 目录不存在、显式 preferred 的内核全缺失，或其中无匹配的内核文件。
         """
         if not os.path.isdir(search_dir):
             raise FileNotFoundError(
@@ -571,16 +581,18 @@ class SPICEManager(EphemerisProvider):
             )
         candidates = list(self._EPHEMERIS_KERNEL_PRIORITY)
         if preferred is not None:
-            name = self._DATUM_KERNEL_PREFERENCE.get(preferred.upper())
-            if name is None:
+            names = self.datum_kernel_names(preferred)
+            if not names:
                 raise ValueError(f"未知的星历基准（无偏好内核）: {preferred}")
-            preferred_path = os.path.join(search_dir, name)
-            if not os.path.isfile(preferred_path):
+            present = [name for name in names if os.path.isfile(os.path.join(search_dir, name))]
+            if not present:
+                wanted = " 或 ".join(names)
                 raise FileNotFoundError(
-                    f"请求 {preferred.upper()} 口径但内核缺失：{preferred_path}"
-                    "（该内核由 kernels-v1 release 分发，跑 make kernels 获取）"
+                    f"请求 {preferred.upper()} 口径但内核全缺失（{wanted}）：{search_dir}"
+                    "（内核由 kernels-v1 release 分发，跑 make kernels 获取）"
                 )
-            candidates.insert(0, name)
+            # 该口径的全部可用内核置于候选首位（声明顺序即偏好顺序）。
+            candidates = present + candidates
         for candidate in candidates:
             path = os.path.join(search_dir, candidate)
             if os.path.isfile(path):

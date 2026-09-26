@@ -159,11 +159,10 @@ class TestDatumBodyGmAlignment:
     与「按天体取 GM」的调用方得到不同数值。
     """
 
-    def test_earth_moon_emb_sun_de421_agree(self):
+    def test_earth_moon_emb_de421_agree(self):
         assert EARTH.gm_by_datum["DE421"] == Datum.DE421.earth_gm
         assert MOON.gm_by_datum["DE421"] == Datum.DE421.moon_gm
         assert EMB.gm_by_datum["DE421"] == Datum.DE421.emb_gm
-        assert SUN.gm_by_datum["DE421"] == Datum.DE421.sun_gm
 
     def test_planetary_gm_de421_rows_exist(self):
         """设计链路 perturbation.planets 会查询这些天体，缺行会触发回退告警。"""
@@ -173,15 +172,17 @@ class TestDatumBodyGmAlignment:
             assert "DE421" in body.gm_by_datum, f"{body.name} 缺 DE421 GM 行"
             assert "DE440" in body.gm_by_datum
 
-    def test_outer_planets_intentionally_lack_de421(self):
-        """外行星 DE421 GM 的权威出处不在仓库证据内，故有意留空（ADR 0048）。
+    def test_unsourced_bodies_intentionally_lack_de421(self):
+        """无权威出处的天体 DE421 GM 有意留空：外行星与 SUN（ADR 0048）。
 
-        这条断言把「留空」从疏忽变成有意的决定：补齐权威来源后应连同本测试
-        与 ADR 0048 一并更新（见 #670）。
+        这条断言把「留空」从疏忽变成有意的决定：按 DE421 口径查询这些天体时
+        回退 DE440 并告警一次（不静默混用）；补齐权威来源后应连同本测试与
+        ADR 0048 一并更新（见 #670）。
         """
         from e2m2e.data.constants.bodies import JUPITER
 
         assert "DE421" not in JUPITER.gm_by_datum
+        assert "DE421" not in SUN.gm_by_datum
 
 
 class TestBodies:
