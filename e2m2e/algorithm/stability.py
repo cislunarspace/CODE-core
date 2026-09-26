@@ -72,7 +72,8 @@ class OrbitStability:
 _PAIR_PRODUCT_TOL = 0.01
 
 #: 平凡乘子对判据：自治 Hamilton 流的单值矩阵恒有 λ=1（时间平移/能量
-#: 方向），其 ν = λ + 1/λ = 2 不随族参数变化，整条轨迹须排除。
+#: 方向），其 ν = λ + 1/λ = 2 不随族参数变化；数值噪声量级 ~1e-11（λ 数值
+#: 劈裂 ~1e-5 时 ν−2 ~1e-10）。该阈值用于逐成员识别平凡对。
 _TRIVIAL_NU_TOL = 1e-6
 
 
@@ -130,6 +131,22 @@ def _member_nus(eigenvalues: np.ndarray) -> list[complex]:
     if len(pairs) != 3:
         raise ValueError(f"Floquet 乘子未组成 3 个倒数对（得到 {len(pairs)} 对）")
     return [_pair_stability_index(pair) for pair in pairs]
+
+
+def _drop_trivial_pair(nus: Sequence[complex]) -> list[complex]:
+    """剔除平凡乘子对（自治 Hamilton 流的时间平移/能量对，ν ≡ 2）。
+
+    平凡对的 ν 恒为 2（数值噪声 ~1e-11），而真实分岔对**穿过** ν = 2：按值
+    跟踪时两者在临界成员上互换次序，逐成员剔除平凡对才不会让跟踪在临界处
+    交换身份而吞掉穿越（L2 Lyapunov 实测：面外 ν 1.9859 → 2.0056 与平凡对
+    2.000000000000 在临界成员上分配退化）。
+    """
+    if len(nus) < 2:
+        return list(nus)
+    nearest = min(range(len(nus)), key=lambda index: abs(nus[index] - 2.0))
+    if abs(nus[nearest] - 2.0) > _TRIVIAL_NU_TOL:
+        return list(nus)
+    return [nu for index, nu in enumerate(nus) if index != nearest]
 
 
 def _bifurcation_indicator(kind: BifurcationType, nu: complex, ns_imag_tol: float) -> float:
@@ -190,7 +207,8 @@ def _refine_family_point(
             try:
                 orbit_try = member_at(p_try)
                 eigenvalues = np.asarray(analyze(orbit_try), dtype=complex)
-                nu_try = _nearest_nu(_member_nus(eigenvalues), 0.5 * (nu_lo + nu_hi))
+                candidates = _drop_trivial_pair(_member_nus(eigenvalues))
+                nu_try = _nearest_nu(candidates, 0.5 * (nu_lo + nu_hi))
             except Exception:
                 continue
             sampled = True
@@ -622,10 +640,14 @@ class StabilityAnalysis:
         - ``Re ν + 2`` 变号且两端 |Im ν| 均在容差内 → PERIOD_DOUBLING；
         - |Im ν| 由容差内升到容差外（复四元组离开单位圆）→ TORUS。
 
-        恒满足 ν=2 的轨迹（自治 Hamilton 流的时间平移/能量平凡乘子对）整条
-        排除，不参与判据——否则真实族会把平凡对误报为穿越。区间内跟踪对的
-        乘子位移超过 ``jump_threshold`` 判为跳支，记入 ``branch_jumps``，且不在
-        该区间报穿越。
+        平凡乘子对（自治 Hamilton 流的时间平移/能量对，ν ≡ 2）逐成员剔除，
+        不参与跟踪与判据——分岔对会**穿过** ν = 2，两者在临界成员上按值不可
+        区分，逐成员剔除才不会让跟踪在临界处交换身份而吞掉穿越。区间内跟踪对的
+        乘子位移超过 ``jump_threshold`` 的**量级缩放阈值**
+        （``|Δν| > jump_threshold · max(1, |ν|)``）判为跳支，记入
+        ``branch_jumps``，且不在该区间报穿越。缩放是必需的：共线 Lyapunov
+        族的面内稳定性指数量级达 10³ 且逐步变化数十，属平滑延拓，绝对阈值
+        会把每个区间都误判为跳支，连真实穿越一并屏蔽。
 
         两种模式：
 
@@ -650,7 +672,7 @@ class StabilityAnalysis:
             parameter_tol: 精化结束的族参数区间宽阈值。
             indicator_tol: 精化结束的 |判据| 阈值。
             ns_imag_tol: 判据的 |Im ν| 容差（区分实对与离圆复四元组）。
-            jump_threshold: 跳支判据的单区间 |Δν| 阈值。
+            jump_threshold: 跳支判据的 |Δν| 阈值（按 ν 量级缩放，见上）。
             max_refine_iter: 二分精化迭代上限。
 
         Returns:
@@ -681,7 +703,7 @@ class StabilityAnalysis:
         for parameter, orbit in zip(params, orbits, strict=True):
             try:
                 eigenvalues = np.asarray(analyze(orbit), dtype=complex)
-                nus = _member_nus(eigenvalues)
+                nus = _drop_trivial_pair(_member_nus(eigenvalues))
             except Exception as exc:
                 failures.append(MemberAnalysisFailure(parameter=parameter, message=str(exc)))
                 member_nus.append(None)
@@ -721,12 +743,6 @@ class StabilityAnalysis:
             track_of.append(slots)
             previous_slots = slots
 
-        trivial = {
-            index
-            for index, series in enumerate(tracks)
-            if all(abs(nu - 2.0) < _TRIVIAL_NU_TOL for nu in series.values())
-        }
-
         detections: list[tuple[int, BifurcationType, complex, complex]] = []
         branch_jumps: list[BranchJump] = []
         for index in range(len(params) - 1):
@@ -735,21 +751,33 @@ class StabilityAnalysis:
             if slots_lo is None or slots_hi is None:
                 continue
             shared = [slot for slot in slots_lo if slot in set(slots_hi)]
-            displacement = max(
-                abs(tracks[slot][index + 1] - tracks[slot][index]) for slot in shared
-            )
-            if displacement > jump_threshold:
+            # 跳支判据按 ν 量级缩放（|Δν| > jump_threshold·max(1, |ν|)）：共线
+            # Lyapunov 族的面内稳定性指数量级达 1e3 且逐步变化数十，本身是平滑
+            # 延拓，绝对阈值会把每个区间误判为跳支、连真实穿越一并屏蔽。
+            displacements = [
+                (slot, abs(tracks[slot][index + 1] - tracks[slot][index])) for slot in shared
+            ]
+            jumps = [
+                (slot, displacement)
+                for slot, displacement in displacements
+                if displacement
+                > jump_threshold
+                * max(
+                    1.0,
+                    abs(tracks[slot][index]),
+                    abs(tracks[slot][index + 1]),
+                )
+            ]
+            if jumps:
                 branch_jumps.append(
                     BranchJump(
                         parameter_lo=params[index],
                         parameter_hi=params[index + 1],
-                        max_displacement=float(displacement),
+                        max_displacement=float(max(displacement for _, displacement in jumps)),
                     )
                 )
                 continue
             for slot in shared:
-                if slot in trivial:
-                    continue
                 nu_lo = tracks[slot][index]
                 nu_hi = tracks[slot][index + 1]
                 kind = _crossing_type(nu_lo, nu_hi, ns_imag_tol)

@@ -69,12 +69,14 @@ def _on_circle_pair(nu: float) -> tuple[complex, complex]:
     return (complex(np.exp(1j * theta)), complex(np.exp(-1j * theta)))
 
 
-def _multipliers(tested: tuple[complex, complex]) -> np.ndarray:
-    """6 乘子：平凡对 + 被测对 + 固定单位圆对 e^{±1.1i}。"""
+def _multipliers(
+    tested: tuple[complex, complex], tail: tuple[complex, complex] | None = None
+) -> np.ndarray:
+    """6 乘子：平凡对 + 被测对 + 第三对（缺省为固定单位圆对 e^{±1.1i}）。"""
     trivial = _trivial_pair()
-    fixed = _on_circle_pair(2.0 * np.cos(1.1))
+    third = _on_circle_pair(2.0 * np.cos(1.1)) if tail is None else tail
     return np.array(
-        [trivial[0], trivial[1], tested[0], tested[1], fixed[0], fixed[1]], dtype=complex
+        [trivial[0], trivial[1], tested[0], tested[1], third[0], third[1]], dtype=complex
     )
 
 
@@ -91,6 +93,11 @@ def _scripted_multiplier_fn(mode: str):
             theta = 0.7
             radius = 1.0 + 0.2 * (parameter - 0.5)
             tested = (complex(radius * np.exp(1j * theta)), complex(np.exp(-1j * theta) / radius))
+        elif mode == "drifting_in_plane":
+            # 面内强不稳定模态（ν ≈ 1e3、随族参数平滑漂移 Δν ≈ 8/区间）＋面外穿越；
+            # 口径来自 L2 Lyapunov 族实测（面内 ν ≈ 1448 → 789）
+            tested = _quadratic_pair(1.0 + 0.5 * (parameter - 0.5))
+            return _multipliers(tested, tail=_quadratic_pair(0.5 * (1000.0 + 40.0 * parameter)))
         elif mode == "trivial":
             tested = _trivial_pair()
         elif mode == "jump":
@@ -187,6 +194,15 @@ class TestTrivialAndJumpHandling:
         assert scan.points == ()
         assert scan.branch_jumps == ()
         assert scan.failures == ()
+
+    def test_drifting_large_index_track_does_not_mask_crossing(self, earth_moon_system):
+        """量级 1e3 的平滑漂移轨迹不得被判为跳支而屏蔽同区间内的真实穿越。"""
+        scan = _scan("drifting_in_plane", earth_moon_system)
+
+        assert scan.branch_jumps == ()
+        assert len(scan.points) == 1
+        assert scan.points[0].type is BifurcationType.SADDLE_NODE
+        assert scan.points[0].parameter == pytest.approx(0.5, abs=1e-5)
 
     def test_branch_jump_is_reported_instead_of_crossing(self, earth_moon_system):
         scan = _scan("jump", earth_moon_system, refine=False)
