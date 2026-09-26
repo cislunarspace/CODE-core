@@ -175,9 +175,12 @@ def test_orbit_propagation_failure_details_carry_cause(facade, monkeypatch):
     )
     assert env["status"] == "error"
     assert env["error"]["code"] == "PROPAGATION_FAILED"
-    assert env["error"]["details"]["diagnostic"] == diagnostic
-    assert "insufficient kernel coverage" in env["error"]["details"]["diagnostic"]
-    assert "Traceback" not in json.dumps(env)
+    assert env["error"]["details"] == {
+        "status": "failed",
+        "cause": "unknown",
+        "diagnostic": diagnostic,
+    }
+    json.dumps(env)  # details 全为枚举取值，信封必须可直接 JSON 序列化
     assert frames == []
 
 

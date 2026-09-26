@@ -30,6 +30,7 @@ from e2m2e.data.types.orbit import Orbit, OrbitFamily
 
 __all__ = [
     "OrbitError",
+    "propagation_failure_details",
     "NumericRange",
     "ResultResponse",
     "DesignOrbitRequest",
@@ -109,7 +110,8 @@ def propagation_failure_details(
     """传播失败的 ``error.details`` 载荷（#677 验收：传输层翻译零丢失）。
 
     诊断文本即算法/Rust 侧给出的 ``cause:`` 段（含星历缓存窗口的 et 与区间等
-    定位字段），原样携带、不解析、不改写（ADR 0020：不以错误文本做翻译决策）。
+    定位字段），原样携带、不解析、不改写（ADR 0014 决策 8：传输层不以错误文本做
+    翻译决策）。
     状态三元组缺省时按 ``FAILED`` / ``UNKNOWN`` 兜底。
 
     Args:

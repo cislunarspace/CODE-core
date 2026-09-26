@@ -226,8 +226,8 @@ the machine-readable type name rather than the mutable Rust wording. `OrbitError
 keeps its own `code`; generic non-domain exceptions keep the opaque
 `INTERNAL_ERROR` + type-name form, so unrelated internals are not leaked. The
 diagnostic text is carried verbatim — never parsed, matched, or rewritten
-(ADR 0020: error text is not a translation input); the structured fields it
-already contains (cache window et/range) ride along inside it.
+(ADR 0014 decision 8: transport layers must not parse error text); the structured
+fields it already contains (cache window et/range) ride along inside it.
 
 **The Facade propagation path additionally fills `error.details`.** The
 `orbit_propagation` `PROPAGATION_FAILED` (`OrbitError`) path — which the
@@ -248,11 +248,17 @@ nothing is extrapolated, softened, or reclassified (ADR 0020).
 
 ### Consequences
 
-- Propagation failures surface `error.code = "E2M2E_ERROR"` with the Rust `cause:`
-  segment in `error.message` and `PropagationFailure` in `error.details.exception`;
-  the Facade `orbit_propagation` path additionally reports
-  `{status, cause, diagnostic}` in `details`. MCP / CLI / sidecar consumers read
-  these machine-side instead of matching message text.
+- A bare `PropagationFailure` reaching `dispatch_tool` unwrapped surfaces as
+  `error.code = "E2M2E_ERROR"`, with the verbatim `cause:` text in `error.message`
+  and `{"exception": "PropagationFailure"}` in `error.details`. Every Facade tool
+  method wraps its failures in `OrbitError` before the envelope sees them, so MCP /
+  CLI / sidecar callers meet this exit only through the synthetic stub in the
+  tests, never through a real tool call.
+- Through the `orbit_propagation` tool the wire carries
+  `error.code = "PROPAGATION_FAILED"` (the `OrbitError` branch, which the
+  hierarchy branch never reaches), the same verbatim `cause:` text in
+  `error.message`, and `details = {status, cause, diagnostic}` — no `exception`
+  key. Consumers read these machine-side instead of matching message text.
 - No new error code and no new Facade method: the contract change is the `details`
   payload shape, which is additive (`details` was `{}` on the Facade path).
 - Tests: the raw `PropagationFailure` branch is covered in `tests/api/test_mcp.py`,
