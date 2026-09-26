@@ -9,8 +9,11 @@ from pydantic import ValidationError
 
 from api.conftest import control_orbit_business_parameters
 from e2m2e.api.models import (
+    BplaneInfo,
+    BplaneTarget,
     ControlOrbitRequest,
     ControlOrbitResponse,
+    DepartureAsymptote,
     DesignOrbitRequest,
     DesignOrbitResponse,
     FamilyGenerationRequest,
@@ -340,6 +343,58 @@ class TestOtherRequests:
                 transform_type=123,
                 et0_jd=2459000.0,
             )
+
+
+class TestPcnRequestModels:
+    """PCN 请求/响应嵌套模型约束（#635）。"""
+
+    def test_bplane_target_defaults_and_constraints(self):
+        target = BplaneTarget(perilune_alt_km=200.0, bdot_t_km=1500.0)
+        assert target.bdot_r_km == 0.0
+        with pytest.raises(ValidationError, match="perilune_alt_km"):
+            BplaneTarget(perilune_alt_km=0.0, bdot_t_km=1500.0)
+        with pytest.raises(ValidationError):
+            BplaneTarget(perilune_alt_km=200.0, bdot_t_km=1500.0, extra=1.0)
+
+    @pytest.mark.parametrize(
+        ("kwargs", "field"),
+        [
+            ({"rha_deg": 10.0, "dha_deg": 0.0, "c3_km2_s2": 0.0}, "c3_km2_s2"),
+            ({"rha_deg": 360.0, "dha_deg": 0.0, "c3_km2_s2": 1.0}, "rha_deg"),
+            ({"rha_deg": 10.0, "dha_deg": 91.0, "c3_km2_s2": 1.0}, "dha_deg"),
+        ],
+    )
+    def test_departure_asymptote_constraints(self, kwargs, field):
+        with pytest.raises(ValidationError, match=field):
+            DepartureAsymptote(**kwargs)
+
+    def test_nested_models_forbid_unknown_fields(self):
+        with pytest.raises(ValidationError):
+            DepartureAsymptote(rha_deg=10.0, dha_deg=0.0, c3_km2_s2=1.0, bogus=1)
+
+    def test_transfer_request_accepts_pcn_fields(self):
+        request = TransferDesignRequest(
+            transfer_type="PCN",
+            tli_epoch=0.0,
+            departure_asymptote=DepartureAsymptote(rha_deg=32.0, dha_deg=0.0, c3_km2_s2=1.0),
+        )
+        assert request.bplane_target is None
+        assert request.departure_asymptote is not None
+        assert request.departure_asymptote.c3_km2_s2 == 1.0
+
+    def test_bplane_info_schema(self):
+        info = BplaneInfo(
+            v_inf_km_s=1.8,
+            c3_km2_s2=3.24,
+            rha_deg=40.0,
+            dha_deg=2.0,
+            bdot_r_km=0.0,
+            bdot_t_km=-3000.0,
+            b_mag_km=3000.0,
+            theta_deg=180.0,
+            perilune_alt_km=182.0,
+        )
+        assert info.perilune_alt_km == 182.0
 
 
 class TestFamilyGenerationRequest:

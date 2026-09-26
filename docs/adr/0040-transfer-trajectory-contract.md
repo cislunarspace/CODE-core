@@ -339,3 +339,67 @@ tod #430.
 - The candidate vocabulary (`TransferCandidate` + provenance markers) is
   the reuse seam for future multi-solution surfaces (e.g. porkchop-style
   scans) — they extend the vocabulary instead of inventing response shapes.
+
+
+## Amendment (2026-09-26): PCN patched-conic target parameterization (#635)
+
+### Context
+
+`transfer_design` had no way to *target* a lunar encounter geometry: HMN/LGA/WSB
+pick a search grid and report what comes out; none accepts a B-plane target or a
+departure hyperbola asymptote. #635 adds the `PCN` backend (patched-conic) whose
+decision/target variables are the Vallado B-plane (B·R, B·T, perilune radius) at
+the Moon and the hyperbolic asymptote (RHA/DHA/C3) at Earth.
+
+### Decision
+
+**New backend.** `transfer_type="PCN"` coexists with HMN/LGA/WSB/low_thrust and
+does not alter their paths. Moon geometry uses the CR3BP circular idealization
+with the θ₀=0 convention (§#584); `target_ephemeris` is **not** consumed.
+
+**Contract fields.** `TransferDesignResult` / `TransferDesignResponse` gain two
+optional fields filled only by PCN: `bplane` (`BplaneInfo`: v∞/C3/RHA/DHA/
+B·R/B·T/|B|/θ/perilune_alt) and `departure_asymptote` (the achieved launch
+asymptote, same shape as the request's). `TransferDesignRequest` /
+`transfer_orbit` gain `bplane_target` and `departure_asymptote`, mutually
+exclusive (XOR); exactly one is required for `transfer_type="PCN"` and either
+is rejected for other types (`INVALID_PARAMS`).
+
+**Trajectory.** Assembled as two two-body legs (§#584 style): the Earth leg is a
+geocentric hyperbola from the parking orbit to the handoff time; the Moon leg is
+a Moon-centered hyperbola from the handoff state to the closed-form perilune
+(endpoint appended exactly). Rows are translated to geocentric GCRS by adding the
+Moon's inertial position and then rotated to the synodic frame via the exact
+inverse of §#584's converter (`_gcrs_to_synodic`); `trajectory` is synodic,
+`trajectory_gcrs_km` is the native GCRS leg join, `trajectory_times` monotonic,
+TLI-based.
+
+**Events.** Exactly two: `departure` (t=0, Δv_TLI, note "TLI") and `arrival`
+(t=tof_total, Δv_LOI, note "LOI（近月点圆化）"). LOI is a single circularization
+pulse at perilune; a multi-burn LOI decomposition is scenario-layer and out of
+this contract.
+
+**Idealizations (recorded, not papered over).**
+
+- Coplanar TLI: the launch hyperbola plane is the one containing Ŝ and closest
+  to the reference z axis (`ĥ = normalize(ẑ − (ẑ·Ŝ)Ŝ)`); `incl_deg` /
+  `flight_path_deg` do not participate in the PCN construction. Δv_TLI is the
+  speed difference from a circular parking orbit in that plane.
+- C3 > 0 only: the asymptote parameterization is defined for hyperbolic
+  departure; slightly-bound (C3 ≤ 0) TLI is out of scope.
+- Departure mode hands off at the inbound (pre-perilune) closest-approach tof
+  from the search grid, so the Moon leg has a non-negative duration; the
+  osculating B-plane evaluated there approximates the at-perilune value.
+
+**Failure paths.** Infeasible targets, non-hyperbolic arrivals and non-converged
+shooting return the status triplet (`INFEASIBLE`/`NO_INTERSECTION`,
+`MAX_ITERATIONS`, `STAGNATED`, …), never an exception (ADR 0020); `top_n` is not
+supported (`NOT_IMPLEMENTED`).
+
+### Consequences
+
+- Callers can target a lunar B-plane (arrival mode) or evaluate a launch
+  asymptote (departure mode); both derive from the single request model, so
+  MCP/CLI surface the fields with no second tool list.
+- The B-plane / analytic-Jacobian kernel (`algorithm/transfer/bplane.py`) is the
+  reuse seam for future targeting (e.g. C3-constrained launch windows).
