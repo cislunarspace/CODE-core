@@ -502,7 +502,8 @@ class PcnTransferDetails:
         parking_alt_km: 地球停泊轨道高度 (km)。
         dv_tli_km_s: TLI 出发脉冲 (km/s)。
         dv_loi_km_s: 近月点圆化脉冲 (km/s)。
-        perilune_alt_km: 达成近月点高度 (km，月面以上)。
+        perilune_alt_km: 近月点高度 (km；近月点半径 − 月平均半径)。交会解为月面以上
+            正值；撞月等非交会解为诊断值（可为负）。
         v_inf_moon_km_s: 月心到达剩余速度 v∞ (km/s)。
         c3_departure_km2_s2: 出发 C3 能量 (km²/s²)。
         rha_deg: 出发渐近线赤经 (deg)。

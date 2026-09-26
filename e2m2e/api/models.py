@@ -966,7 +966,11 @@ class TransferCandidate(_ApiModel):
 
 
 class BplaneInfo(_ApiModel):
-    """达成的月心 B-plane 参数（PCN 响应出口字段，#635）。"""
+    """达成的月心 B-plane 参数（PCN 响应出口字段，#635）。
+
+    ``perilune_alt_km`` 为近月点半径 − 月球平均半径；交会解（``CONVERGED``）为月面
+    以上正值，撞月解（``COLLISION``，失败路径同样回显几何）为负值。
+    """
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
@@ -978,17 +982,19 @@ class BplaneInfo(_ApiModel):
     bdot_t_km: float = Field(description="达成 B·T (km)")
     b_mag_km: float = Field(description="瞄准距离 |B| (km)")
     theta_deg: float = Field(description="B 矢量角 atan2(B·R, B·T) (deg)")
-    perilune_alt_km: float = Field(description="达成近月点高度 (km，月面以上)")
+    perilune_alt_km: float = Field(
+        description="近月点高度 = 近月点半径 − 月球平均半径 (km)：交会解为月面以上正值，撞月解为负"
+    )
 
 
 def _sanitize_nonfinite(value: Any) -> Any:
     """递归把非有限浮点（``nan``/``inf``）替换为 ``None``（#698）。
 
     ``details`` 是自由字段，后端在缺几何/零结果时用 ``nan``/``inf`` 占位；
-    ``model_dump(mode="json")`` 会写出非法 JSON 记号（``NaN``/``Infinity``），
-    故响应构造期统一清洗。口径与 catalog 写侧 ``catalog_ingest._sanitize_value``
-    一致：``None`` 表示缺位。递归覆盖 dict/list/tuple（与 ``Any`` 字段的
-    常见嵌套形态一致）。
+    ``model_dump(mode="json")`` 仍保留它们，信封的 ``json.dumps`` 于是写出非法
+    JSON 记号（``NaN``/``Infinity``），故响应构造期统一清洗。口径与 catalog 写侧
+    ``catalog_ingest._sanitize_value`` 一致：``None`` 表示缺位。递归覆盖
+    dict/list/tuple（与 ``Any`` 字段的常见嵌套形态一致）。
     """
     if isinstance(value, float):
         return value if math.isfinite(value) else None
@@ -1076,8 +1082,9 @@ class TransferDesignResponse(ResultResponse):
         """``details`` 出口统一清洗非有限值（#698）。
 
         PCN 等后端在缺几何/零结果时以 ``nan``/``inf`` 占位；不清洗会让
-        ``model_dump(mode="json")`` 产出 ``NaN``/``Infinity`` 记号。清洗只作用于
-        这个自由字段，显式定型的顶层字段（如零结果的 ``delta_v=inf``）保持契约不变。
+        ``model_dump(mode="json")`` 保留它们，信封的 ``json.dumps`` 写出
+        ``NaN``/``Infinity`` 记号。清洗只作用于这个自由字段，显式定型的顶层字段
+        （如零结果的 ``delta_v=inf``）保持契约不变。
         """
         self.details = _sanitize_nonfinite(self.details)
         return self

@@ -21,8 +21,8 @@
 - **星历传播失败原因透传**：`EphemerisDynamics.propagate`（Rust N 体快速路径）失败时的 `RuntimeError` 不再一律写 "likely cause: SPICE kernels not loaded or step size collapsed"，改为按实际原因给出可机读的 `cause:` 段——内核未加载 / 内核覆盖不足（保留底层 SPICE 解释文本）/ 星历缓存窗口外（保留请求 et 与缓存区间）/ 缓存键未注册 / strict 区缓存未启用；力模型未报错时归为步长塌缩或步数上限；失败语义不变（覆盖外仍硬失败）。(#677)
 - **反向多重/分段打靶收敛**：`multiple_shooting_correct`/`segmented_shooting_correct` 接受单调递减的 `t_patch`（反向传播工作流）。此前 compiled 传播路径（PD45/PD78）写死正向，递减 `t_patch` 立即报 "output length mismatch: got 1 time points, expected 2"；现传播方向由时间跨度/输出网格的单调方向决定，反向段积分与 STM 变分方程正确工作，正向行为逐位不变。(#640)
 - **PCN 出发模式增加月交会可行域门禁**：出发模式此前在 tof 网格上取「最近月心距离」后一律报 `CONVERGED`，远距离飞越（最近点落在月球影响球外）甚至撞月（近月点半径 ≤ 月球半径）都会把飞越/撞月几何当成「达成的月心 B 平面 + 近月点 + LOI 脉冲」写出。现在要求近月点在月面以上且最近月心距离落在月球影响球（Laplace–Tisserand 代理 66 010 km）以内：撞月报 `COLLISION`/`BODY_COLLISION`，飞越报 `INFEASIBLE`/`CONSTRAINT_VIOLATION`，诊断文案给出实际距离与门限。失败解也回显实际使用的 `departure_asymptote` 与达成的 `bplane`（此前失败路径两字段为 null）。(#698)
-- **`transfer_design` 响应的 `details` 不再携带非有限值**：PCN 等后端在缺几何/零结果时以 `nan`/`inf` 占位，经 `details` 进入信封后 `model_dump(mode="json")` 会写出非法 JSON 记号（`NaN`/`Infinity`）；现在响应构造期统一递归清洗为 `null`（与 catalog 写入侧同口径）。顶层 `delta_v`（零结果为 `inf`）是既有零结果契约，不变。(#698)
-- **SPICEManager 加载/卸载内核失败时不再留下半加载状态**：Rust 侧 `furnsh` 失败会撤销本次已生效的 Python 侧加载（且不改变 GM 口径簿记），Rust 侧 `unload` 失败会恢复 Python 侧卸载并保留簿记，随后按原异常上抛——此前失败可能留下「两池不一致而簿记不动」的状态，或把该次加载静默记入口径。并发加载不同内核时，GM 基准簿记与内核池的实际生效顺序保持一致（口径与池不再可能失配）。(#697)
+- **`transfer_design` 响应的 `details` 不再携带非有限值**：PCN 等后端在缺几何/零结果时以 `nan`/`inf` 占位，`model_dump(mode="json")` 仍会保留它们、信封的 `json.dumps` 于是写出非法 JSON 记号（`NaN`/`Infinity`）；现在响应构造期统一递归清洗为 `null`（与 catalog 写入侧同口径）。顶层 `delta_v`（零结果为 `inf`）是既有零结果契约，不变。(#698)
+- **SPICEManager 加载/卸载内核失败时不再留下半加载状态**：Rust 侧 `furnsh` 失败会撤销本次已生效的 Python 侧加载（且不改变 GM 口径簿记）；Rust 侧 `unload` 失败会撤销已生效的 Python 侧卸载（重新加载同一内核）并把该内核的簿记条目移到末位——恢复即重新加载，GM 口径跟随 Python 池实际生效的末位（Rust 池因卸载失败保持原次序，两池次序此时无法兼顾）。两种情况都按原异常上抛。并发加载不同内核时，GM 基准簿记与 Python 池的实际生效顺序保持一致。(#697)
 
 ## [5.9.6] - 2026-09-24
 
