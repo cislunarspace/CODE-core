@@ -372,6 +372,17 @@ class TestPcnRequestModels:
         with pytest.raises(ValidationError):
             DepartureAsymptote(rha_deg=10.0, dha_deg=0.0, c3_km2_s2=1.0, bogus=1)
 
+    def test_nested_models_reject_non_finite(self):
+        """非有限值（inf/nan）不得穿过 gt/ge 边界（评审修复）。"""
+        with pytest.raises(ValidationError):
+            BplaneTarget(perilune_alt_km=float("inf"), bdot_t_km=0.0)
+        with pytest.raises(ValidationError):
+            BplaneTarget(perilune_alt_km=200.0, bdot_t_km=float("nan"))
+        with pytest.raises(ValidationError):
+            DepartureAsymptote(rha_deg=10.0, dha_deg=0.0, c3_km2_s2=float("nan"))
+        with pytest.raises(ValidationError):
+            DepartureAsymptote(rha_deg=10.0, dha_deg=0.0, c3_km2_s2=float("inf"))
+
     def test_transfer_request_accepts_pcn_fields(self):
         request = TransferDesignRequest(
             transfer_type="PCN",

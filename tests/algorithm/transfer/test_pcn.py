@@ -218,3 +218,97 @@ class TestPcnFailurePaths:
     def test_top_n_not_supported(self):
         with pytest.raises(NotImplementedError, match="top_n"):
             transfer_orbit("PCN", tli_params=_TLI, departure_asymptote=_DEP_ASYM, top_n=3)
+
+
+class TestPcnCanonicalization:
+    """到达模式回显角归一（评审修复）：成功解不因 0/360 接缝被误判非法。"""
+
+    def test_canonical_ranges_and_direction(self):
+        from e2m2e.algorithm.transfer.bplane import _unit_from_rha_dha
+        from e2m2e.algorithm.transfer.pcn import _canonical_rha_dha
+
+        cases = ((370.0, 10.0), (-10.0, 10.0), (40.0, 100.0), (40.0, -100.0), (500.0, 120.0))
+        for rha, dha in cases:
+            r2, d2 = _canonical_rha_dha(rha, dha)
+            assert 0.0 <= r2 < 360.0
+            assert -90.0 <= d2 <= 90.0
+            np.testing.assert_allclose(
+                _unit_from_rha_dha(r2, d2), _unit_from_rha_dha(rha, dha), atol=1e-12
+            )
+
+    def test_arrival_echo_within_response_domain(self):
+        """到达模式回显的出发渐近线落在响应模型域内（RHA∈[0,360), DHA∈[-90,90]）。"""
+        from e2m2e.api.models import DepartureAsymptote
+
+        dep = _solve_departure()
+        bp = dep.bplane
+        assert bp is not None
+        system = _system()
+        arr = solve_pcn(
+            _TLI,
+            bplane_target=PcnBplaneTarget(
+                perilune_alt_km=bp.perilune_radius_km - 1737.4,
+                bdot_t_km=bp.bdot_t_km,
+                bdot_r_km=bp.bdot_r_km,
+            ),
+            departure_asymptote=None,
+            moon_state_fn=_moon_fn(system),
+            system=system,
+            params=_SMALL,
+        )
+        assert arr.departure_asymptote is not None
+        # 响应模型约束同源校验：越界即 ValidationError
+        echo = DepartureAsymptote(
+            rha_deg=arr.departure_asymptote.rha_deg,
+            dha_deg=arr.departure_asymptote.dha_deg,
+            c3_km2_s2=arr.departure_asymptote.c3_km2_s2,
+        )
+        assert 0.0 <= echo.rha_deg < 360.0
+
+
+class TestPcnTofRange:
+    def test_tof_range_overrides_search_window(self):
+        """请求侧 tof_range 覆盖 PCN 搜索窗口（不再静默忽略默认网格）。"""
+        result = transfer_orbit(
+            "PCN", tli_params=_TLI, departure_asymptote=_DEP_ASYM, tof_range=(1.7, 1.7)
+        )
+        assert result.status is ConvergenceState.CONVERGED
+        assert result.details.earth_leg_tof_sec / 86400.0 == pytest.approx(1.7, abs=1e-6)
+
+
+class TestPcnStages:
+    def test_departure_grid_stage_applicable(self):
+        from e2m2e.algorithm.transfer import _pcn_stages
+
+        sol = _solve_departure()
+        stages = {s.name: s for s in _pcn_stages(sol, "departure")}
+        assert stages["grid_search"].applicable and stages["grid_search"].executed
+        assert stages["grid_search"].result_status is ConvergenceState.CONVERGED
+        assert not stages["newton"].applicable
+
+    def test_infeasible_arrival_grid_stage_reflects_status(self):
+        from e2m2e.algorithm.transfer import _pcn_stages
+
+        bad = PcnSearchParams(
+            tof_range_days=(1.5, 2.0),
+            n_tof=2,
+            rha_grid_deg=(0.0, 20.0),
+            n_rha=2,
+            dha_grid_deg=(0.0, 0.0),
+            n_dha=1,
+            c3_grid_km2_s2=(0.0, 0.0),
+            n_c3=1,
+        )
+        system = _system()
+        sol = solve_pcn(
+            _TLI,
+            bplane_target=PcnBplaneTarget(perilune_alt_km=200.0, bdot_t_km=0.0),
+            departure_asymptote=None,
+            moon_state_fn=_moon_fn(system),
+            system=system,
+            params=bad,
+        )
+        assert sol.status is ConvergenceState.INFEASIBLE
+        stages = {s.name: s for s in _pcn_stages(sol, "arrival")}
+        assert stages["grid_search"].result_status is ConvergenceState.INFEASIBLE
+        assert not stages["newton"].executed

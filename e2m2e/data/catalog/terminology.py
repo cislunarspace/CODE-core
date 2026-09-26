@@ -194,4 +194,4 @@ RECORD_ORBIT_FAMILIES: tuple[str, ...] = (
 
 #: 转移类型闭值集：算法层 state_frame 派生键的同源镜像
 #:（同步同样由测试锁定）。
-TRANSFER_TYPES: tuple[str, ...] = ("HMN", "LGA", "WSB", "low_thrust")
+TRANSFER_TYPES: tuple[str, ...] = ("HMN", "LGA", "WSB", "low_thrust", "PCN")

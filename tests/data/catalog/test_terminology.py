@@ -65,4 +65,4 @@ class TestClosedValueSets:
         assert "halo" in RECORD_ORBIT_FAMILIES and "dro" in RECORD_ORBIT_FAMILIES
 
     def test_transfer_types(self):
-        assert set(TRANSFER_TYPES) == {"HMN", "LGA", "WSB", "low_thrust"}
+        assert set(TRANSFER_TYPES) == {"HMN", "LGA", "WSB", "low_thrust", "PCN"}

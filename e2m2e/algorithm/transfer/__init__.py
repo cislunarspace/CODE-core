@@ -4,9 +4,10 @@
 three_body_lambert/multi_impulse）、自然动力学路径（low_energy/manifold，
 覆盖引力辅助数学内核）、低推力路径（low_thrust/）、任务层（search/
 optimize/porkchop）。``transfer_orbit.py`` 是编排器：接收 transfer_type
-（HMN/LGA/WSB/low_thrust），按枚举选路径组合底层数学模块。
+（HMN/LGA/WSB/low_thrust/PCN），按枚举选路径组合底层数学模块。
 
-已实现：HMN 霍曼转移、LGA 月球引力辅助、WSB 太阳引力辅助、小推力转移。
+已实现：HMN 霍曼转移、LGA 月球引力辅助、WSB 太阳引力辅助、小推力转移、
+PCN patched-conic 目标参数化（月心 B 平面 / 双曲渐近线）。
 """
 
 from __future__ import annotations
@@ -277,7 +278,7 @@ class TransferDesignResult:
     """转移轨道设计结果。
 
     Attributes:
-        transfer_type: 转移类型（"HMN"/"LGA"/"WSB"/"low_thrust"）。
+        transfer_type: 转移类型（"HMN"/"LGA"/"WSB"/"low_thrust"/"PCN"）。
         delta_v: 总 Δv（km/s）。
         trajectory: 转移轨迹 (n, 6)，地月会合旋转系、质心原点、物理单位
             km / km/s（ADR 0040；HMN 为两体几何的相位对齐显示约定，
@@ -581,7 +582,9 @@ def transfer_orbit(
             惯性星历须先经 ``j2000_to_synodic`` 转换；HMN/low_thrust 按地心
             惯性系 km/km/s 状态解释（与 construct_departure_state 出发态同系）。
         tli_params: 地球停泊轨道参数（TLI 高度/倾角/航迹角）。
-        tof_range: 飞行时间范围（天）。
+        tof_range: 飞行时间范围（天）。HMN 作 Lambert 扫描窗口、WSB/PCN 作
+            搜索窗口（PCN 覆盖 ``PcnSearchParams.tof_range_days``）；LGA/
+            low_thrust 不使用。
         target_orbit_radius_km: 目标轨道半径 (km)，HMN 转移必需。
         dynamics: 动力学对象（可选），用于 ephemeris 打靶修正。
         lga_search_params: LGA 搜索参数（可选）。
@@ -669,6 +672,7 @@ def transfer_orbit(
             tli_params=tli_params,
             bplane_target=bplane_target,
             departure_asymptote=departure_asymptote,
+            tof_range=tof_range,
             top_n=top_n,
         )
     raise NotImplementedError(f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）")
@@ -856,10 +860,31 @@ def _moon_state_gcrs(system: Any, t_sec: float) -> NDArray[np.float64]:
     return _synodic_to_gcrs(state_syn[None, :], np.array([t_sec]), system)[0]
 
 
+def _propagate_two_body_checked(state0: np.ndarray, t_eval: np.ndarray, mu: float) -> np.ndarray:
+    """二体传播并按时刻网格校验完整性（未完整覆盖即 ``PropagationFailure``）。
+
+    ``propagate_two_body`` 在积分提前终止时会少返行；直接按行索引消费会取到
+    错时刻状态或抛 ``IndexError``，故统一经此校验入口。
+    """
+    times_in = np.asarray(t_eval, dtype=float)
+    out = propagate_two_body(state0, times_in, mu)
+    times = np.asarray(out["time"], dtype=float)
+    states = np.asarray(out["states"], dtype=float)
+    n = times_in.shape[0]
+    if times.shape[0] != n or states.shape[0] != n:
+        raise PropagationFailure("二体传播未完整覆盖请求时刻网格")
+    if abs(float(times[-1]) - float(times_in[-1])) > 1e-6 * max(1.0, abs(float(times_in[-1]))):
+        raise PropagationFailure("二体传播未到达请求末点")
+    if not np.all(np.isfinite(states)):
+        raise PropagationFailure("二体传播状态含非有限值")
+    return states
+
+
 def _transfer_orbit_pcn(
     tli_params: TliParams | None,
     bplane_target: PcnBplaneTarget | None,
     departure_asymptote: AsymptoteParams | None,
+    tof_range: tuple[float, float] | None = None,
     top_n: int | None = None,
 ) -> TransferDesignResult:
     """PCN patched-conic 目标参数化转移编排（#635）。
@@ -871,7 +896,8 @@ def _transfer_orbit_pcn(
        惯性位置回地心 GCRS；主段经 ``_gcrs_to_synodic`` 旋回会合系；
     4. 机动事件 departure/arrival 两条（LOI 为近月点单脉冲圆化）。
 
-    ``target_ephemeris`` 不参与（月球取圆型理想化）；``progress_callback``
+    ``target_ephemeris`` 不参与（月球取圆型理想化）；``tof_range``（天）作
+    搜索窗口覆盖 ``PcnSearchParams.tof_range_days``；``progress_callback``
     与 HMN/LGA 一致忽略（无搜索进度通道）。``top_n`` 暂不支持。
     """
     if top_n is not None:
@@ -884,7 +910,11 @@ def _transfer_orbit_pcn(
     from ..dynamics import CR3BP_System
 
     system = CR3BP_System(mu=_MU_EM, primary="Earth", secondary="Moon")._with_default_scales()
-    params = PcnSearchParams()
+    params = (
+        PcnSearchParams(tof_range_days=(float(tof_range[0]), float(tof_range[1])))
+        if tof_range is not None
+        else PcnSearchParams()
+    )
 
     def moon_state_fn(t_sec: float) -> NDArray[np.float64]:
         return _moon_state_gcrs(system, t_sec)
@@ -915,37 +945,44 @@ def _transfer_orbit_pcn(
             stages=stages,
         )
 
-    # 轨迹组装（ADR 0040）：地球段地心二体弧 + 月心段月心二体弧
-    dep_state0 = sol.departure_state_gcrs
-    enc_state0 = sol.encounter_state_moon
-    peri_state0 = sol.perilune_state_moon
-    if dep_state0 is None or enc_state0 is None or peri_state0 is None:
-        raise ValueError("PCN 收敛解缺少几何字段")  # 不应发生（CONVERGED 必带几何）
+    # 轨迹组装（ADR 0040）：地球段地心二体弧 + 月心段月心二体弧。组装失败
+    # （传播未完整覆盖时刻网格）降级为无轨迹结果（镜像 LGA），数值结果仍返回。
     earth_tof = sol.earth_leg_tof_sec
     moon_tof = sol.moon_leg_tof_sec
-    dep_times = np.linspace(0.0, earth_tof, params.n_trajectory_samples)
-    dep_states = propagate_two_body(dep_state0, dep_times, MU_EARTH)["states"]
-
-    if moon_tof > 0.0:
-        moon_rel_times = np.linspace(0.0, moon_tof, 50, endpoint=False)
-        moon_rel = propagate_two_body(enc_state0, moon_rel_times, Datum.DE421.moon_gm)["states"]
-        # 追加精确近月点末行（闭式）；endpoint=False 避免与近月点重复时刻
-        moon_rel = np.vstack([moon_rel, peri_state0])
-        moon_rel_times = np.append(moon_rel_times, moon_tof)
-        # 逐行加月球惯性位置回地心 GCRS
-        moon_gcrs = np.array(
-            [
-                moon_rel[i] + moon_state_fn(earth_tof + moon_rel_times[i])
-                for i in range(len(moon_rel_times))
-            ]
-        )
-        trajectory_gcrs, trajectory_times = _join_transfer_legs(
-            dep_states, dep_times, moon_gcrs, moon_rel_times
-        )
-    else:
-        # 退化：交接点即近月点（月心段时长为零），仅地心段
-        trajectory_gcrs, trajectory_times = dep_states, dep_times
-    trajectory = _gcrs_to_synodic(trajectory_gcrs, trajectory_times, system)
+    trajectory: Any = None
+    trajectory_times: Any = None
+    trajectory_gcrs: Any = None
+    try:
+        dep_state0 = sol.departure_state_gcrs
+        enc_state0 = sol.encounter_state_moon
+        peri_state0 = sol.perilune_state_moon
+        if dep_state0 is None or enc_state0 is None or peri_state0 is None:
+            raise PropagationFailure("PCN 收敛解缺少几何字段")
+        dep_times = np.linspace(0.0, earth_tof, params.n_trajectory_samples)
+        dep_states = _propagate_two_body_checked(dep_state0, dep_times, MU_EARTH)
+        if moon_tof > 0.0:
+            moon_rel_times = np.linspace(0.0, moon_tof, 50, endpoint=False)
+            moon_rel = _propagate_two_body_checked(enc_state0, moon_rel_times, Datum.DE421.moon_gm)
+            # 追加精确近月点末行（闭式）；endpoint=False 避免与近月点重复时刻
+            moon_rel = np.vstack([moon_rel, peri_state0])
+            moon_rel_times = np.append(moon_rel_times, moon_tof)
+            # 逐行加月球惯性位置回地心 GCRS
+            moon_gcrs = np.array(
+                [
+                    moon_rel[i] + moon_state_fn(earth_tof + moon_rel_times[i])
+                    for i in range(len(moon_rel_times))
+                ]
+            )
+            trajectory_gcrs, trajectory_times = _join_transfer_legs(
+                dep_states, dep_times, moon_gcrs, moon_rel_times
+            )
+        else:
+            # 退化：交接点即近月点（月心段时长为零），仅地心段
+            trajectory_gcrs, trajectory_times = dep_states, dep_times
+        trajectory = _gcrs_to_synodic(trajectory_gcrs, trajectory_times, system)
+    except (PropagationFailure, ValueError, IndexError):
+        warnings.warn("PCN 轨迹组装传播失败，返回无轨迹结果", stacklevel=2)
+        trajectory = trajectory_times = trajectory_gcrs = None
 
     total_tof = earth_tof + max(moon_tof, 0.0)
     maneuver_events = (
@@ -1005,29 +1042,42 @@ def _pcn_details(tli_params: TliParams, sol: PcnSolution, mode: str) -> PcnTrans
 
 
 def _pcn_stages(sol: PcnSolution, mode: str) -> tuple[StageRecord, ...]:
-    """PCN 阶段记录：到达模式含 grid_search/newton，出发模式均不适用。"""
-    if mode != "arrival":
-        return (
-            StageRecord("grid_search", applicable=False, executed=False, result_status=None),
-            StageRecord("newton", applicable=False, executed=False, result_status=None),
-        )
+    """PCN 阶段记录。
+
+    到达模式：``grid_search``（渐近线网格初猜）+ ``newton``；出发模式：仅
+    ``grid_search``（tof 网格最近月心距离扫描），``newton`` 不适用。阶段结果
+    状态反映实际结局（搜索无可行点即报实际失败状态，与整体 status 一致）。
+    """
     grid_executed = sol.n_grid_evals > 0
-    newton_executed = sol.n_newton_iter > 0
+    if mode == "arrival":
+        # 网格找到可行点才会进入 Newton（n_newton_iter > 0）
+        grid_status = ConvergenceState.CONVERGED if sol.n_newton_iter > 0 else sol.status
+        newton_executed = sol.n_newton_iter > 0
+        return (
+            StageRecord(
+                "grid_search",
+                applicable=True,
+                executed=grid_executed,
+                result_status=grid_status if grid_executed else None,
+                message="渐近线网格初猜",
+            ),
+            StageRecord(
+                "newton",
+                applicable=True,
+                executed=newton_executed,
+                result_status=sol.status if newton_executed else None,
+                message=sol.message if newton_executed else "",
+            ),
+        )
     return (
         StageRecord(
             "grid_search",
             applicable=True,
             executed=grid_executed,
-            result_status=ConvergenceState.CONVERGED if grid_executed else None,
-            message="渐近线网格初猜",
+            result_status=sol.status if grid_executed else None,
+            message="tof 网格最近月心距离扫描",
         ),
-        StageRecord(
-            "newton",
-            applicable=True,
-            executed=newton_executed,
-            result_status=sol.status if newton_executed else None,
-            message=sol.message if newton_executed else "",
-        ),
+        StageRecord("newton", applicable=False, executed=False, result_status=None),
     )
 
 
