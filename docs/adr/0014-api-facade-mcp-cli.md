@@ -199,3 +199,61 @@ the caller's constructor-injected Config on long-running tools.
   serializes it).
 - `_finite_or_none` is public (`finite_or_none` in `api/catalog_ingest.py`);
   three consumers no longer import a private name across modules.
+
+## Amendment (2026-09-26): propagation cause carried into the error envelope (#677)
+
+### Context
+
+Issue #677 required propagation failures to hand their real cause to callers. The
+Rust fast path now emits classified `cause:` text (kernel not loaded / kernel
+coverage exhausted / ephemeris-cache window exceeded with et and window / cache
+key unregistered / strict region without cache / step collapse), but the transport
+lost it: `api/mcp/envelope.py::dispatch_tool` preserved `code/message/details`
+only for `OrbitError`, collapsing every other exception (including
+`PropagationFailure`) to `INTERNAL_ERROR` plus the exception type name. MCP / CLI /
+sidecar callers therefore saw no cause at all — the issue's remaining acceptance
+item.
+
+### Decision
+
+**`E2M2EError`-hierarchy failures carry their cause text in `error.message`.**
+The two N-body FFI entry points raise `PropagationFailure` (an `E2M2EError`
+subclass) instead of a bare `RuntimeError`, and `dispatch_tool` gains an
+`E2M2EError` branch mapping the whole hierarchy to code `E2M2E_ERROR`, with
+`message = str(exc)` (the full Rust `cause:` segment) and a `details` payload of
+the exception's own `details` plus `{"exception": <type name>}`. Callers key off
+the machine-readable type name rather than the mutable Rust wording. `OrbitError`
+keeps its own `code`; generic non-domain exceptions keep the opaque
+`INTERNAL_ERROR` + type-name form, so unrelated internals are not leaked. The
+diagnostic text is carried verbatim — never parsed, matched, or rewritten
+(ADR 0020: error text is not a translation input); the structured fields it
+already contains (cache window et/range) ride along inside it.
+
+**The Facade propagation path additionally fills `error.details`.** The
+`orbit_propagation` `PROPAGATION_FAILED` (`OrbitError`) path — which the
+exception-hierarchy branch never reaches — now populates `details` with
+`{"status", "cause", "diagnostic"}` from the shared
+`api.models.propagation_failure_details`, so that re-encoding the status triplet
+at this one site cannot drift from its documented shape.
+
+**Rejected alternative.** An earlier revision of this change gave bare
+`PropagationFailure` its own envelope branch with code `PROPAGATION_FAILED` and
+`details = {"status", "cause", "diagnostic"}`. It was dropped: the `E2M2EError`
+branch already covers that path, and splitting the envelope code per exception
+type makes it drift away from the documented `E2M2EError → E2M2E_ERROR` rule
+(AGENTS.md) as new exception types appear.
+
+**Failure semantics unchanged.** Out-of-coverage propagation still hard-fails;
+nothing is extrapolated, softened, or reclassified (ADR 0020).
+
+### Consequences
+
+- Propagation failures surface `error.code = "E2M2E_ERROR"` with the Rust `cause:`
+  segment in `error.message` and `PropagationFailure` in `error.details.exception`;
+  the Facade `orbit_propagation` path additionally reports
+  `{status, cause, diagnostic}` in `details`. MCP / CLI / sidecar consumers read
+  these machine-side instead of matching message text.
+- No new error code and no new Facade method: the contract change is the `details`
+  payload shape, which is additive (`details` was `{}` on the Facade path).
+- Tests: the raw `PropagationFailure` branch is covered in `tests/api/test_mcp.py`,
+  the `orbit_propagation` real path in `tests/api/test_execution.py`.
