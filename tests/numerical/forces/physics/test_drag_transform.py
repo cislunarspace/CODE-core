@@ -15,7 +15,7 @@ import pytest
 from e2m2e.algorithm.forces import ForceModel, PointMassGravity
 from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere, NRLMSISE00Atmosphere
 from e2m2e.algorithm.forces.drag import DragModel
-from tests.numerical.forces.conftest import EARTH_MU, EARTH_RE
+from tests.numerical.forces.conftest import EARTH_MU, EARTH_RE, semi_major_axis
 
 pytestmark = [pytest.mark.force, pytest.mark.spice]
 
@@ -25,12 +25,6 @@ def _leo_400km_state():
     r = EARTH_RE + 400.0
     v = np.sqrt(EARTH_MU / r)
     return np.array([r, 0.0, 0.0, 0.0, v, 0.0])
-
-
-def _semi_major_axis(state):
-    r_norm = np.linalg.norm(state[:3])
-    v_norm = np.linalg.norm(state[3:6])
-    return -EARTH_MU / (2.0 * (0.5 * v_norm**2 - EARTH_MU / r_norm))
 
 
 def test_nrlmsise00_drag_zero_cspice_with_ephem_cache(earth_icrf_system):
@@ -77,7 +71,7 @@ def test_nrlmsise00_drag_zero_cspice_with_ephem_cache(earth_icrf_system):
         disable_ephem_cache()
 
     assert np.all(np.isfinite(states))
-    assert _semi_major_axis(states[-1]) < _semi_major_axis(states[0])
+    assert semi_major_axis(states[-1], EARTH_MU) < semi_major_axis(states[0], EARTH_MU)
     assert ffi_calls == 0, f"NRLMSISE-00 阻力在缓存启用后不应调 cspice，实测 {ffi_calls} 次"
 
 
@@ -110,8 +104,8 @@ def test_drag_propagation_decreases_orbital_energy(earth_icrf_system):
     energies = np.array([energy(s) for s in states])
     assert energies[-1] < energies[0], "阻力应使比机械能下降"
 
-    a0 = _semi_major_axis(states[0])
-    a1 = _semi_major_axis(states[-1])
+    a0 = semi_major_axis(states[0], EARTH_MU)
+    a1 = semi_major_axis(states[-1], EARTH_MU)
     assert a1 < a0, "阻力应使半长轴下降"
 
 
@@ -139,7 +133,9 @@ def test_nrlmsise00_drag_propagation_decreases_semi_major_axis(earth_icrf_system
     assert states.shape[1] == 6
     assert np.all(np.isfinite(states))
 
-    assert _semi_major_axis(states[-1]) < _semi_major_axis(states[0]), "阻力应使半长轴下降"
+    assert semi_major_axis(states[-1], EARTH_MU) < semi_major_axis(states[0], EARTH_MU), (
+        "阻力应使半长轴下降"
+    )
 
     exp_states = propagate(ExponentialAtmosphere())
     assert not np.allclose(states[-1], exp_states[-1], rtol=1e-9, atol=1e-9), (

@@ -1255,8 +1255,8 @@ fn nrlmsise00_density_py(
         .map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("nrlmsise00 et2utc failed: {e}"))
         })?;
-    // Ap 史非平坦才启用暴时先验（与 Rust drag 路径同一规则）。
-    let storm_time = ap[1..].iter().any(|a| a != &ap[0]);
+    // Ap 史非平坦才启用暴时先验（与 Rust drag 路径同一实现）。
+    let storm_time = e2m2e_forces::nrlmsise00::storm_time_from_ap(&ap);
     let input = e2m2e_forces::nrlmsise00::Nrlmsise00Input {
         day_of_year,
         ut_seconds,

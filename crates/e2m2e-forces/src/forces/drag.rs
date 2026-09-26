@@ -71,7 +71,7 @@ impl DragAtmosphere {
                 let (lat_deg, lon_deg, alt_km) = geodesy::ecef_to_geodetic(r_itrf);
                 let (_year, doy, ut_seconds) = nrlmsise00::et_to_utc_doy(et)?;
                 // Ap 史非平坦才启用 3 小时分辨率先验（暴时项）。
-                let storm_time = ap[1..].iter().any(|a| a != &ap[0]);
+                let storm_time = nrlmsise00::storm_time_from_ap(ap);
                 let input = Nrlmsise00Input {
                     day_of_year: doy,
                     ut_seconds,

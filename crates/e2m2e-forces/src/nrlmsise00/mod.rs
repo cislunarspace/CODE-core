@@ -124,6 +124,16 @@ pub fn density(input: &Nrlmsise00Input, storm_time: bool) -> Nrlmsise00Output {
     }
 }
 
+/// Ap 史是否应启用暴时先验（3 小时分辨率）。
+///
+/// 判定：7 元中只要有元素与 `ap[0]` 不同，即视为暴时历史；全等（含标量广播）
+/// 即静态空间天气，只用当日 Ap。这是模型的**输入语义**而非调用方选项，因此
+/// drag 力解析与直接查询绑定共用同一实现——两处各自演进会让同一个 `ap` 数组
+/// 在两条路径上给出不同密度（见 ADR 0049 决策 4）。
+pub fn storm_time_from_ap(ap: &[f64; 7]) -> bool {
+    ap[1..].iter().any(|a| a != &ap[0])
+}
+
 /// 局地太阳时（秒，折入 `[0, 86400)`）。
 ///
 /// 模型要求的是**平局地太阳时**：`ut_seconds + lon_deg·240`（经度每度 4 分钟），
@@ -1355,6 +1365,20 @@ mod tests {
             (active / quiet - 1.0).abs() > 1e-3,
             "Ap 史驱动的密度差应可分辨: quiet={quiet:e} storm={active:e}"
         );
+    }
+
+    /// 暴时判定：全等（含标量广播）为静态，任一元素不同即暴时。
+    #[test]
+    fn storm_time_rule_is_flatness_of_ap_history() {
+        assert!(!storm_time_from_ap(&[15.0; 7]));
+        assert!(!storm_time_from_ap(&[4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0]));
+        assert!(storm_time_from_ap(&[
+            15.0, 130.0, 150.0, 50.0, 20.0, 15.0, 15.0
+        ]));
+        // 只有末位不同也算暴时（不依赖具体位置）。
+        assert!(storm_time_from_ap(&[
+            15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 16.0
+        ]));
     }
 
     /// 局地太阳时：加入经度偏移并折入 [0, 86400)。
