@@ -19,6 +19,8 @@ pub struct EventSpec<G> {
     /// 触发后是否终止积分。
     pub terminal: bool,
     /// 方向过滤：`> 0` 只记上行穿越（g 由负到正），`< 0` 只记下行，`0` 双向。
+    /// 方向相对积分方向定义（scipy 语义，与 ADR 0023 一致）：反向传播时，
+    /// 物理时间上"正在接近"的事件以相反 direction 值触发，调用方按积分方向理解。
     pub direction: f64,
 }
 

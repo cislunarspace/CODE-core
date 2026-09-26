@@ -426,6 +426,7 @@ pub fn segmented_shooting_correct_py(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm;
 
     #[test]
     fn test_segment_trajectory_by_revs() {
@@ -459,5 +460,49 @@ mod tests {
         assert_eq!(segments[1].0.len(), 7);
         assert_eq!(segments[1].0[0], 13.0);
         assert_eq!(segments[1].0[6], 19.0);
+    }
+
+    /// 反向分段打靶（#640 清单第 ⑦ 项）：5 节点递减 t_patch，
+    /// 切段/合并全程经反向段积分，应整体收敛。
+    #[test]
+    fn decreasing_t_patch_smoke() {
+        let forces = vec![CompiledForce::PointMass { mu: 398600.4418 }];
+        let y0 = [42164.0, 0.0, 0.0, 0.0, 3.0747, 0.0];
+        let r = propagate_compiled_stm(
+            &forces,
+            "EARTH",
+            (0.0, 3600.0),
+            &[0.0, 900.0, 1800.0, 2700.0, 3600.0],
+            &y0,
+            1e-12,
+            1e-14,
+            None,
+            None,
+            RkMethod::Pd78,
+        )
+        .unwrap();
+        let mut t_patch = r.times.clone();
+        let mut state_patch = r.states.clone();
+        t_patch.reverse();
+        state_patch.reverse();
+
+        let result = segmented_shooting_correct(
+            &forces,
+            "EARTH",
+            &t_patch,
+            &state_patch,
+            1, // revs_per_group
+            2, // per_rev
+            false,
+            20,
+            1e-8,
+            1e-10,
+            1.0,
+            false,
+            RkMethod::Pd78,
+        )
+        .unwrap();
+        assert_eq!(result.status, "converged");
+        assert!(result.max_residual < 1e-8);
     }
 }

@@ -968,4 +968,121 @@ mod tests {
         assert_eq!(result.cause, "stagnation_detected");
         assert_eq!(result.message, "多重打靶迭代停滞");
     }
+
+    /// GEO 圆轨道正向采样（PointMass，t_eval=[0,1800,3600]），
+    /// 返回各采样点状态。反向打靶用例的节点初值来源。
+    fn sample_geo_states() -> Vec<[f64; 6]> {
+        let forces = vec![CompiledForce::PointMass { mu: 398600.4418 }];
+        let y0 = [42164.0, 0.0, 0.0, 0.0, 3.0747, 0.0];
+        let r = propagate_compiled_stm(
+            &forces,
+            "EARTH",
+            (0.0, 3600.0),
+            &[0.0, 1800.0, 3600.0],
+            &y0,
+            1e-12,
+            1e-14,
+            None,
+            None,
+            RkMethod::Pd78,
+        )
+        .unwrap();
+        assert_eq!(r.states.len(), 3);
+        r.states
+    }
+
+    /// 反向多重打靶：t_patch 单调递减 + 精确初猜应一步收敛。
+    /// 回归 #640（修复前段积分报 "output length mismatch"）。
+    #[test]
+    fn decreasing_t_patch_converges_exact_guess() {
+        let forces = vec![CompiledForce::PointMass { mu: 398600.4418 }];
+        let s = sample_geo_states();
+        let t_patch = [3600.0, 1800.0, 0.0];
+        let state_patch = [s[2], s[1], s[0]];
+        let result = multiple_shooting_correct(
+            &forces,
+            "EARTH",
+            &t_patch,
+            &state_patch,
+            false, // var_time
+            true,  // fix_first_node
+            None,
+            20,
+            1e-8,
+            1e-10,
+            None,
+            1.0,
+            false,
+            RkMethod::Pd78,
+        )
+        .unwrap();
+        assert_eq!(result.outcome(), SolverTermination::Converged);
+        assert!(result.max_residual < 1e-8);
+    }
+
+    /// 反向多重打靶：中间节点位置 +1 km 扰动，验证 STM 雅可比的反向修正能力。
+    #[test]
+    fn decreasing_t_patch_converges_perturbed() {
+        let forces = vec![CompiledForce::PointMass { mu: 398600.4418 }];
+        let s = sample_geo_states();
+        let t_patch = [3600.0, 1800.0, 0.0];
+        let mut middle = s[1];
+        middle[0] += 1.0;
+        let state_patch = [s[2], middle, s[0]];
+        let result = multiple_shooting_correct(
+            &forces,
+            "EARTH",
+            &t_patch,
+            &state_patch,
+            false,
+            true,
+            None,
+            20,
+            1e-8,
+            1e-10,
+            None,
+            1.0,
+            false,
+            RkMethod::Pd78,
+        )
+        .unwrap();
+        assert_eq!(result.outcome(), SolverTermination::Converged);
+        assert!(result.max_residual < 1e-8);
+    }
+
+    /// 反向多重打靶（自由时间）：中间节点位置 +1 km、时刻 +10 s 扰动，
+    /// 数值验证变时间雅可比在反向段的正确性。
+    ///
+    /// max_iter=30（而非固定时间用例的 20）：收敛尾部（残差 ~1e-3 → 1e-8）
+    /// 由积分容差 rtol=1e-10 与 vel_weight=1.0 的 LM 尾部速度决定，与方向
+    /// 无关——同规模扰动的正向序列需 16 迭代、反向 24 迭代（减半扰动测得
+    /// 正/反向 15/26，迭代数由容差尾部主导而非扰动规模），非反向缺陷。
+    #[test]
+    fn decreasing_t_patch_var_time_converges() {
+        let forces = vec![CompiledForce::PointMass { mu: 398600.4418 }];
+        let s = sample_geo_states();
+        let t_patch = [3600.0, 1810.0, 0.0];
+        let mut middle = s[1];
+        middle[0] += 1.0;
+        let state_patch = [s[2], middle, s[0]];
+        let result = multiple_shooting_correct(
+            &forces,
+            "EARTH",
+            &t_patch,
+            &state_patch,
+            true, // var_time
+            true,
+            None,
+            30,
+            1e-8,
+            1e-10,
+            None,
+            1.0,
+            false,
+            RkMethod::Pd78,
+        )
+        .unwrap();
+        assert_eq!(result.outcome(), SolverTermination::Converged);
+        assert!(result.max_residual < 1e-8);
+    }
 }
