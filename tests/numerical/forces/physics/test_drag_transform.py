@@ -13,11 +13,66 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import ForceModel, PointMassGravity
-from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
+from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere, NRLMSISE00Atmosphere
 from e2m2e.algorithm.forces.drag import DragModel
-from tests.numerical.forces.conftest import EARTH_MU, EARTH_RE
+from tests.numerical.forces.conftest import EARTH_MU, EARTH_RE, semi_major_axis
 
 pytestmark = [pytest.mark.force, pytest.mark.spice]
+
+
+def _leo_400km_state():
+    """400 km 圆轨道状态（ITRF 系内阻力显著）。"""
+    r = EARTH_RE + 400.0
+    v = np.sqrt(EARTH_MU / r)
+    return np.array([r, 0.0, 0.0, 0.0, v, 0.0])
+
+
+def test_nrlmsise00_drag_zero_cspice_with_ephem_cache(earth_icrf_system):
+    """启用星历预采样缓存后，NRLMSISE-00 阻力传播全程零 cspice FFI。
+
+    打靶/分段积分的并行区（ADR 0016 的 ``StrictGuard``）内并发调 cspice 会损坏
+    内核池（``SPICE(DAFFRNOTFOUND)`` 或 panic），故历元→日历量必须走缓存插值而
+    非逐次 ``et2utc``；用 FFI 计数钉住该保证，防止回退。
+    """
+    from e2m2e.integrators import (
+        disable_ephem_cache,
+        enable_ephem_cache,
+        ephem_ffi_call_count,
+        reset_ephem_ffi_call_count,
+    )
+
+    system = earth_icrf_system
+    spice = system.spice
+    et0 = spice.utc_to_et("2025-06-21T11:00:06")
+
+    # 只注册阻力需要的 ITRF93→J2000 帧对：天体列表为空（点质量引力无星历需求）。
+    enable_ephem_cache(
+        targets=[],
+        frame_pairs=[("ITRF93", "J2000")],
+        et_start=et0 - 1800.0,
+        et_end=et0 + 5400.0,
+        dt=3600.0,
+    )
+    try:
+        y0 = _leo_400km_state()
+        fm = ForceModel(
+            system,
+            forces=[
+                PointMassGravity("EARTH", mu=EARTH_MU),
+                DragModel(atmosphere=NRLMSISE00Atmosphere(), area=10.0, mass=1000.0, cd=2.2),
+            ],
+        )
+        fm.rtol = 1e-10
+        fm.atol = 1e-10
+        reset_ephem_ffi_call_count()
+        states = fm.propagate(y0, (et0, et0 + 3600.0), max_steps=200_000)["states"]
+        ffi_calls = ephem_ffi_call_count()
+    finally:
+        disable_ephem_cache()
+
+    assert np.all(np.isfinite(states))
+    assert semi_major_axis(states[-1], EARTH_MU) < semi_major_axis(states[0], EARTH_MU)
+    assert ffi_calls == 0, f"NRLMSISE-00 阻力在缓存启用后不应调 cspice，实测 {ffi_calls} 次"
 
 
 def test_drag_propagation_decreases_orbital_energy(earth_icrf_system):
@@ -26,10 +81,7 @@ def test_drag_propagation_decreases_orbital_energy(earth_icrf_system):
     spice = system.spice
     et0 = spice.utc_to_et("2025-06-21T11:00:06")
 
-    # 400 km 圆轨道（ITRF 系内阻力显著）
-    r = EARTH_RE + 400.0
-    v = np.sqrt(EARTH_MU / r)
-    y0 = np.array([r, 0.0, 0.0, 0.0, v, 0.0])
+    y0 = _leo_400km_state()
 
     atm = ExponentialAtmosphere()
     drag = DragModel(atmosphere=atm, area=10.0, mass=1000.0, cd=2.2)
@@ -52,9 +104,40 @@ def test_drag_propagation_decreases_orbital_energy(earth_icrf_system):
     energies = np.array([energy(s) for s in states])
     assert energies[-1] < energies[0], "阻力应使比机械能下降"
 
-    def semi_major_axis(state):
-        return -EARTH_MU / (2.0 * energy(state))
-
-    a0 = semi_major_axis(states[0])
-    a1 = semi_major_axis(states[-1])
+    a0 = semi_major_axis(states[0], EARTH_MU)
+    a1 = semi_major_axis(states[-1], EARTH_MU)
     assert a1 < a0, "阻力应使半长轴下降"
+
+
+def test_nrlmsise00_drag_propagation_decreases_semi_major_axis(earth_icrf_system):
+    """NRLMSISE-00 大气经 Rust ``drag_nrlmsise00`` 分支驱动传播并降轨。
+
+    同一轨道与相同时长下与指数大气的结果应有可分辨差异（两个模型在 400 km
+    的密度不同），否则说明力元组未真正切换到 NRLMSISE-00。
+    """
+    system = earth_icrf_system
+    spice = system.spice
+    et0 = spice.utc_to_et("2025-06-21T11:00:06")
+
+    y0 = _leo_400km_state()
+    gravity = PointMassGravity(body="EARTH", mu=EARTH_MU)
+
+    def propagate(atmosphere):
+        drag = DragModel(atmosphere=atmosphere, area=10.0, mass=1000.0, cd=2.2)
+        fm = ForceModel(system, forces=[gravity, drag])
+        fm.rtol = 1e-10
+        fm.atol = 1e-10
+        return fm.propagate(y0, (et0, et0 + 3600.0), max_steps=200_000)["states"]
+
+    states = propagate(NRLMSISE00Atmosphere())
+    assert states.shape[1] == 6
+    assert np.all(np.isfinite(states))
+
+    assert semi_major_axis(states[-1], EARTH_MU) < semi_major_axis(states[0], EARTH_MU), (
+        "阻力应使半长轴下降"
+    )
+
+    exp_states = propagate(ExponentialAtmosphere())
+    assert not np.allclose(states[-1], exp_states[-1], rtol=1e-9, atol=1e-9), (
+        "NRLMSISE-00 与指数大气的终态应可分辨（否则力元组未切换大气模型）"
+    )

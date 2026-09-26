@@ -381,6 +381,91 @@ pub fn et2utc(et: f64, prec: i32) -> Result<String, SpiceFfiError> {
     Ok(c_chars_to_string(&buf))
 }
 
+/// 民用日期 → 1970-01-01 起的天数（Howard Hinnant 算法，含负数年/日）。
+fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
+    let y = if month <= 2 {
+        i64::from(year) - 1
+    } else {
+        i64::from(year)
+    };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400; // [0, 399]
+    let mp = i64::from((month + 9) % 12); // 3 月 = 0
+    let doy = (153 * mp + 2) / 5 + i64::from(day) - 1; // [0, 365]
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy; // [0, 146096]
+    era * 146097 + doe - 719468
+}
+
+/// [`days_from_civil`] 的逆变换。
+fn civil_from_days(days: i64) -> (i32, u32, u32) {
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = z - era * 146097; // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365; // [0, 399]
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153; // [0, 11]，3 月 = 0
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { y + 1 } else { y };
+    (year as i32, month as u32, day as u32)
+}
+
+/// UTC 时标原点：2000-01-01T00:00:00Z 的「1970 起的天数」。
+const UTC_EPOCH_DAYS: i64 = 10957;
+
+/// 公历闰年判定。
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+/// 公历年月日 → 年积日（1 基；月份越界钳到 [1, 12]，结果钳到 [1, 366]）。
+pub fn day_of_year(year: i32, month: u32, day: u32) -> u16 {
+    const CUM_DAYS: [u32; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+    let m = month.clamp(1, 12) as usize;
+    let mut doy = CUM_DAYS[m - 1] + day;
+    if is_leap_year(year) && month > 2 {
+        doy += 1;
+    }
+    doy.min(366) as u16
+}
+
+/// 解析 `et2utc(.., "ISOC", 3)` 输出 `"YYYY-MM-DDTHH:MM:SS.sss"`。
+pub fn parse_isoc(isoc: &str) -> Result<(i32, u32, u32, f64), SpiceFfiError> {
+    let bad = || SpiceFfiError::Failed(format!("et2utc 输出格式异常: {isoc:?}"));
+    let (date, time) = isoc.split_once('T').ok_or_else(bad)?;
+    let date: Vec<&str> = date.split('-').collect();
+    let time: Vec<&str> = time.split(':').collect();
+    if date.len() != 3 || time.len() != 3 {
+        return Err(bad());
+    }
+    let year: i32 = date[0].parse().map_err(|_| bad())?;
+    let month: u32 = date[1].parse().map_err(|_| bad())?;
+    let day: u32 = date[2].parse().map_err(|_| bad())?;
+    let hour: f64 = time[0].parse().map_err(|_| bad())?;
+    let minute: f64 = time[1].parse().map_err(|_| bad())?;
+    let second: f64 = time[2].parse().map_err(|_| bad())?;
+    Ok((year, month, day, hour * 3600.0 + minute * 60.0 + second))
+}
+
+/// ET → UTC 自 2000-01-01T00:00:00Z 起的秒数（连续单调，含闰秒偏移）。
+///
+/// 选这条**单调连续**曲线而非 (年积日, 日内秒) 作为缓存量与插值对象：后者在
+/// 年/日边界回绕、无法插值。毫秒分辨率（`et2utc` prec=3）对本用途足够。
+pub fn et_to_utc_seconds(et: f64) -> Result<f64, SpiceFfiError> {
+    let isoc = et2utc(et, 3)?;
+    let (year, month, day, seconds_of_day) = parse_isoc(&isoc)?;
+    Ok((days_from_civil(year, month, day) - UTC_EPOCH_DAYS) as f64 * 86400.0 + seconds_of_day)
+}
+
+/// [`et_to_utc_seconds`] 的逆：UTC 秒 → `(年, 年积日, 日内秒)`。
+pub fn utc_seconds_to_calendar(utc_seconds: f64) -> (i32, u16, f64) {
+    let days = (utc_seconds / 86400.0).floor();
+    let seconds_of_day = utc_seconds - days * 86400.0;
+    let (year, month, day) = civil_from_days(days as i64 + UTC_EPOCH_DAYS);
+    (year, day_of_year(year, month, day), seconds_of_day)
+}
+
 /// 矩阵向量乘：3×3 矩阵 × 3 向量。
 pub fn mat3_mul_vec(m: &[[f64; 3]; 3], v: &[f64; 3]) -> [f64; 3] {
     [
@@ -424,6 +509,76 @@ mod tests {
                 let _ = cspice::data::furnish(path.to_string_lossy().to_string());
             }
         }
+    }
+
+    /// 民用日期 ↔ 天数往返；原点与闰日、跨世纪边界。
+    #[test]
+    fn civil_days_round_trip() {
+        assert_eq!(days_from_civil(1970, 1, 1), 0);
+        assert_eq!(days_from_civil(2000, 1, 1), UTC_EPOCH_DAYS);
+        for &(y, m, d) in &[
+            (1970, 1, 1),
+            (1999, 12, 31),
+            (2000, 1, 1),
+            (2000, 2, 29),
+            (2024, 12, 31),
+            (2100, 3, 1),
+            (1900, 1, 1),
+        ] {
+            let z = days_from_civil(y, m, d);
+            assert_eq!(civil_from_days(z), (y, m, d), "往返 {y}-{m}-{d}");
+        }
+    }
+
+    /// 年积日：闰年 2 月之后 +1，世纪年按 400 年规则。
+    #[test]
+    fn day_of_year_handles_leap_years() {
+        assert_eq!(day_of_year(2000, 1, 1), 1);
+        assert_eq!(day_of_year(2000, 3, 1), 61); // 闰年
+        assert_eq!(day_of_year(2001, 3, 1), 60); // 平年
+        assert_eq!(day_of_year(2000, 12, 31), 366);
+        assert_eq!(day_of_year(2001, 12, 31), 365);
+        assert_eq!(day_of_year(2100, 12, 31), 365); // 2100 非闰年
+        assert_eq!(day_of_year(2000, 2, 29), 60);
+    }
+
+    /// ISOC 解析：正常输入取分量，畸形输入报错。
+    #[test]
+    fn parse_isoc_parses_and_rejects() {
+        let (y, m, d, s) = parse_isoc("2000-01-01T06:00:00.000").expect("解析");
+        assert_eq!((y, m, d), (2000, 1, 1));
+        assert_eq!(s, 21600.0);
+        let (y, m, d, s) = parse_isoc("2024-12-31T23:59:59.500").expect("解析");
+        assert_eq!((y, m, d), (2024, 12, 31));
+        assert!((s - 86399.5).abs() < 1e-9);
+        assert!(parse_isoc("2000-01-01").is_err());
+        assert!(parse_isoc("garbage").is_err());
+    }
+
+    /// UTC 秒 → 日历量的锚点：原点、跨年。
+    #[test]
+    fn utc_seconds_to_calendar_anchors() {
+        assert_eq!(utc_seconds_to_calendar(0.0), (2000, 1, 0.0));
+        assert_eq!(utc_seconds_to_calendar(21600.0), (2000, 1, 21600.0));
+        // 2000 是闰年（366 天）：第 366 天之后进入 2001-01-01。
+        let (y, doy, s) = utc_seconds_to_calendar(366.5 * 86400.0);
+        assert_eq!((y, doy), (2001, 1));
+        assert!((s - 43200.0).abs() < 1e-6, "s={s}");
+    }
+
+    /// ET → UTC 秒与 `et2utc` 自洽（需内核）。
+    #[test]
+    fn et_to_utc_seconds_matches_known_epoch() {
+        let _g = crate::lock_spice_for_test();
+        load_kernels();
+        // 2000-01-01T06:00:00Z 的 ET（Python SPICEManager.utc_to_et 实测值）。
+        let et = -21535.816079952438;
+        assert!(et2utc(et, 3).unwrap().starts_with("2000-01-01T06:00:00"));
+        let s = et_to_utc_seconds(et).expect("et2utc");
+        assert!((s - 21600.0).abs() < 1e-3, "s={s}");
+        let (year, doy, secs) = utc_seconds_to_calendar(s);
+        assert_eq!((year, doy), (2000, 1));
+        assert!((secs - 21600.0).abs() < 1e-3, "secs={secs}");
     }
 
     /// pxform 在 et=0 的 ITRF93→J2000 应该是有限旋转矩阵。

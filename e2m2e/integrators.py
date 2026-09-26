@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     lissajous_bounded_trajectory_py: Any
     manifold_propagate_py: Any
     manifold_seeds_py: Any
+    nrlmsise00_density_py: Any
     nsga2_environmental_selection_py: Any
     nsga2_sort_py: Any
     nsga2_tournament_selection_py: Any
@@ -153,6 +154,7 @@ _RUST_SYMBOLS = (
     "manifold_propagate_py",
     "manifold_seeds_py",
     "multiple_shooting_correct_py",
+    "nrlmsise00_density_py",
     "nsga2_environmental_selection_py",
     "nsga2_sort_py",
     "nsga2_tournament_selection_py",
@@ -342,6 +344,7 @@ __all__ = [
     "MultistepResult",
     "multistep_step",
     "multiple_shooting_correct_py",
+    "nrlmsise00_density_py",
     "nsga2_environmental_selection_py",
     "nsga2_sort_py",
     "nsga2_tournament_selection_py",

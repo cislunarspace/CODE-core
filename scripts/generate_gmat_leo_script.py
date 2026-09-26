@@ -54,6 +54,9 @@ DEFAULT_MISSION = {
     "report_interval_sec": 60.0,
 }
 
+# GMAT 支持的阻力大气模型（``None`` 表示关闭阻力）。
+_DRAG_MODELS = ("Exponential", "MSISE90", "None")
+
 
 def generate_gmat_script(
     output_dir: str | Path,
@@ -85,6 +88,9 @@ def generate_gmat_script(
     fm = {**DEFAULT_FORCEMODEL, **(forcemodel or {})}
     prop = {**DEFAULT_PROPAGATOR, **(propagator or {})}
     mission_cfg = {**DEFAULT_MISSION, **(mission or {})}
+
+    if fm["drag_model"] not in _DRAG_MODELS:
+        raise ValueError(f"unknown drag_model {fm['drag_model']!r}; known: {sorted(_DRAG_MODELS)}")
 
     script_path = output_dir / "leo_reference_gmat.script"
     report_file = output_dir / "leo_reference_gmat_report.txt"
@@ -154,6 +160,13 @@ def generate_gmat_script(
         lines.append(f"{fm_name}.AtmosphereModel                        = Exponential;")
         lines.append(f"% {fm_name}.AtmosphereModel.F107 = {fm['f107']};")
         lines.append(f"% {fm_name}.AtmosphereModel.MagneticIndex = {fm['ap']};")
+    elif fm["drag_model"] == "MSISE90":
+        # GMAT 的 MSISE90 是 MSISE-1990（非 NRLMSISE-00）；与 e2m2e 侧的对拍
+        # 差异主要来自模型版本与 F10.7/Ap 预处理，见 ADR 0049。
+        lines.append(f"{fm_name}.Drag                                   = MSISE90;")
+        lines.append(f"{fm_name}.AtmosphereModel                        = MSISE90;")
+        lines.append(f"{fm_name}.AtmosphereModel.F107                   = {fm['f107']};")
+        lines.append(f"{fm_name}.AtmosphereModel.MagneticIndex          = {fm['ap']};")
     else:
         lines.append(f"{fm_name}.Drag                                   = None;")
 
@@ -241,9 +254,17 @@ def main() -> None:
         default=None,
         help="Path to GMAT executable. If omitted, prints a generic command.",
     )
+    parser.add_argument(
+        "--drag-model",
+        type=str,
+        choices=list(_DRAG_MODELS),
+        default=None,
+        help="Drag atmosphere model written into the GMAT script (default: Exponential).",
+    )
     args = parser.parse_args()
 
-    script_path = generate_gmat_script(args.output_dir)
+    forcemodel = {"drag_model": args.drag_model} if args.drag_model is not None else None
+    script_path = generate_gmat_script(args.output_dir, forcemodel=forcemodel)
     command = build_gmat_command(script_path, args.gmat_exe)
 
     print(f"Generated GMAT script: {script_path}")

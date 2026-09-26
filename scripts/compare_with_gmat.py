@@ -8,11 +8,16 @@
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+
+# 空间天气输入的单一来源：GMAT 脚本由 generate_gmat_leo_script.py 生成，这里
+# 读同一组默认值构造 e2m2e 侧大气，避免两侧对拍不同配置（ADR 0049）。
+from generate_gmat_leo_script import DEFAULT_FORCEMODEL
 
 
 def _keplerian_to_cartesian(
@@ -130,14 +135,20 @@ def _propagate_e2m2e(
     include_srp: bool = True,
     degree: int = 10,
     order: int = 10,
+    atmosphere: str = "exponential",
 ) -> dict[str, Any]:
-    """用 e2m2e 传播与 GMAT 脚本对应的 LEO 场景。"""
+    """用 e2m2e 传播与 GMAT 脚本对应的 LEO 场景。
+
+    ``atmosphere`` 选 ``"exponential"``（USSA76 分段指数，对应 GMAT
+    ``Exponential``）或 ``"nrlmsise00"``（NRLMSISE-00；GMAT 侧最近的对应物是
+    ``MSISE90``，两者模型版本与空间天气预处理不同，见 ADR 0049）。
+    """
     from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
     from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
     from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
     from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
     from e2m2e.algorithm.forces import DragModel, ForceModel, GravityField, SolarRadiationPressure
-    from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
+    from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere, NRLMSISE00Atmosphere
     from e2m2e.data.kernels.manager import SPICEManager
 
     project_root = output_dir
@@ -175,10 +186,31 @@ def _propagate_e2m2e(
 
         fm = ForceModel(system)
         fm.add_force(GravityField("EARTH", degree=degree, order=order), name="gravity")
+        space_weather = "n/a（已关闭阻力）"
         if include_drag:
+            if atmosphere == "nrlmsise00":
+                # 与生成脚本的 MSISE90 分支同源：F10.7 与 Ap 都取
+                # DEFAULT_FORCEMODEL 的默认值（脚本会把它写进
+                # AtmosphereModel.F107 / .MagneticIndex）。
+                drag_atmosphere = NRLMSISE00Atmosphere(
+                    f107_daily=DEFAULT_FORCEMODEL["f107"],
+                    f107_avg=DEFAULT_FORCEMODEL["f107"],
+                    ap=DEFAULT_FORCEMODEL["ap"],
+                )
+                space_weather = (
+                    f"f107_daily=f107_avg={drag_atmosphere.f107_daily:g} sfu、"
+                    f"ap={drag_atmosphere.ap[0]:g}"
+                )
+            elif atmosphere == "exponential":
+                drag_atmosphere = ExponentialAtmosphere()
+                space_weather = f"f107={drag_atmosphere.f107:g} sfu、ap={drag_atmosphere.ap:g}"
+            else:
+                raise ValueError(
+                    f"unknown atmosphere {atmosphere!r}; known: 'exponential', 'nrlmsise00'"
+                )
             fm.add_force(
                 DragModel(
-                    atmosphere=ExponentialAtmosphere(),
+                    atmosphere=drag_atmosphere,
                     area=10.0,
                     mass=1000.0,
                     cd=2.2,
@@ -208,6 +240,7 @@ def _propagate_e2m2e(
             "states": result["states"],
             "system": system,
             "spice": spice,
+            "space_weather": space_weather,
         }
     finally:
         for bpc in reversed(bpc_loaded):
@@ -306,6 +339,10 @@ def _write_report(
     errors: dict[str, npt.NDArray[np.floating]],
     figure_paths: list[Path],
     output_dir: Path,
+    atmosphere: str = "exponential",
+    space_weather_e2m2e: str = "n/a",
+    gmat_script_cfg: dict[str, str | None] | None = None,
+    include_drag: bool = True,
 ) -> Path:
     """写 Markdown 报告。"""
     report_path = output_dir / "comparison_report.md"
@@ -328,7 +365,20 @@ def _write_report(
     lines.append("- 轨道：400 km 高度圆轨道，倾角 51.6°")
     lines.append("- 历元：2025-06-21T11:00:06 UTC")
     lines.append("- 坐标系：EarthICRF")
-    lines.append("- 力模型：J2(10,10) + Exponential 阻力 + SRP（无阴影）")
+    drag_text = f"{atmosphere} 阻力" if include_drag else "无阻力"
+    lines.append(f"- 力模型：J2(10,10) + {drag_text} + SRP（无阴影）")
+    lines.append(f"- 空间天气（e2m2e 侧）：{space_weather_e2m2e}")
+    cfg = gmat_script_cfg or {}
+    if cfg.get("drag") is None:
+        lines.append("- GMAT 脚本侧：未找到 `leo_reference_gmat.script`，无法核对实际配置。")
+    else:
+        if cfg["f107"] is not None:
+            sw = f"F107={cfg['f107']}、MagneticIndex={cfg['ap']}"
+        elif cfg["drag"] == "None":
+            sw = "无 AtmosphereModel 行（脚本未启用大气阻力）"
+        else:
+            sw = "F107/MagneticIndex 由 GMAT 内置默认（脚本内被注释）"
+        lines.append(f"- GMAT 脚本侧（读回脚本核对）：Drag={cfg['drag']}、{sw}")
     lines.append("- 积分器：RK89，MaxStep=60 s，Accuracy=1e-13")
     lines.append("")
     lines.append("## 图表")
@@ -346,6 +396,80 @@ def _write_report(
 
     report_path.write_text("\n".join(lines), encoding="utf-8")
     return report_path
+
+
+def _arc_semi_major_axes(data: dict[str, Any]) -> tuple[float, float]:
+    """弧段首/末的 osculating 半长轴（km）。
+
+    注意：J2(10,10) 的短周期项会让 osculating SMA 在单圈内起伏数 km（400 km LEO
+    上 ~3.5 km），与 24 h 的阻力衰减（~0.36 km）同量级甚至更大。故本量**不能**
+    直接当阻力衰减，必须与同弧段无阻力基线对比（见 `_print_e2m2e_summary`）。
+    """
+    states = np.asarray(data["states"], dtype=float)
+    mu = data["system"].gravitational_parameter("EARTH")
+
+    def sma(state: npt.NDArray[np.floating]) -> float:
+        r = float(np.linalg.norm(state[:3]))
+        v = float(np.linalg.norm(state[3:6]))
+        return -mu / (2.0 * (0.5 * v * v - mu / r))
+
+    return sma(states[0]), sma(states[-1])
+
+
+def _print_e2m2e_summary(
+    data: dict[str, Any], atmosphere: str, baseline: dict[str, Any] | None = None
+) -> None:
+    """打印 e2m2e 侧弧段摘要（GMAT 报告缺失时用于记录本方输出）。
+
+    `baseline` 为同弧段、同 SRP、**关闭阻力**的传播结果：阻力衰减取两者 osculating
+    SMA 差之差，扣掉重力场短周期项——否则打印值会被 J2 起伏主导（约 10 倍）。
+    """
+    time = np.asarray(data["time"], dtype=float)
+    states = np.asarray(data["states"], dtype=float)
+    a0, a1 = _arc_semi_major_axes(data)
+
+    print(f"  atmosphere    : {atmosphere}")
+    print(f"  space weather : {data.get('space_weather', 'n/a')}")
+    print(f"  arc           : {(time[-1] - time[0]) / 3600.0:.3f} h, {states.shape[0]} samples")
+    print(f"  SMA initial   : {a0:.6f} km")
+    print(f"  SMA final     : {a1:.6f} km")
+    if baseline is None:
+        print(f"  SMA delta     : {a0 - a1:.6f} km（含重力场短周期项，勿作阻力衰减）")
+    else:
+        b0, b1 = _arc_semi_major_axes(baseline)
+        print(f"  SMA delta     : {a0 - a1:.6f} km（含重力场短周期项）")
+        print(f"  SMA delta 基线: {b0 - b1:.6f} km（同弧段无阻力）")
+        print(f"  → 阻力衰减     : {(a0 - a1) - (b0 - b1):.6f} km")
+    print(f"  all finite    : {bool(np.all(np.isfinite(states)))}")
+
+
+def _read_gmat_script_config(script_path: Path) -> dict[str, str | None]:
+    """从生成的 GMAT 脚本读回力模型侧配置（Drag 模型与空间天气）。
+
+    报告里"GMAT 脚本侧"的输入必须取自**实际要跑的脚本**，而不是生成器的默认值：
+    生成（`--drag-model`）与对拍（`--atmosphere`）分属两个工具的两个开关，脱钩时
+    会静默把"输入不齐"记成"模型差异"（验收条件二要求同配置）。
+    注释行（以 ``%`` 开头）跳过——Exponential 分支的 F107/MagneticIndex 即被注释，
+    GMAT 用其内置默认。
+    """
+    cfg: dict[str, str | None] = {"drag": None, "f107": None, "ap": None}
+    if not script_path.exists():
+        return cfg
+    patterns = {
+        "drag": r"\.Drag\s*=\s*(\w+)\s*;",
+        "f107": r"\.AtmosphereModel\.F107\s*=\s*(\S+?)\s*;",
+        "ap": r"\.AtmosphereModel\.MagneticIndex\s*=\s*(\S+?)\s*;",
+    }
+    for raw in script_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("%"):
+            continue
+        for key, pattern in patterns.items():
+            if cfg[key] is None:
+                match = re.search(pattern, line)
+                if match:
+                    cfg[key] = match.group(1)
+    return cfg
 
 
 def main() -> None:
@@ -374,19 +498,73 @@ def main() -> None:
         action="store_true",
         help="Run e2m2e comparison without SRP (for incremental analysis).",
     )
+    parser.add_argument(
+        "--atmosphere",
+        type=str,
+        choices=["exponential", "nrlmsise00"],
+        default="exponential",
+        help="Atmosphere model used on the e2m2e side (default: exponential).",
+    )
+    parser.add_argument(
+        "--e2m2e-only",
+        action="store_true",
+        help=(
+            "Only run the e2m2e side and print its summary, skipping the GMAT "
+            "comparison (use when no GMAT binary/report is available)."
+        ),
+    )
     args = parser.parse_args()
 
     gmat_report = Path(args.gmat_report).expanduser().resolve()
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    script_path = output_dir / "leo_reference_gmat.script"
+
+    if args.e2m2e_only:
+        print(f"Running e2m2e propagation (atmosphere={args.atmosphere})...")
+        e2m2e_data = _propagate_e2m2e(
+            output_dir,
+            include_drag=not args.no_drag,
+            include_srp=not args.no_srp,
+            atmosphere=args.atmosphere,
+        )
+        baseline = None
+        if not args.no_drag:
+            # 同弧段、同 SRP、关闭阻力：扣掉重力场短周期项才是阻力衰减量。
+            print("Running no-drag baseline for the SMA-decay metric...")
+            baseline = _propagate_e2m2e(
+                output_dir,
+                include_drag=False,
+                include_srp=not args.no_srp,
+                atmosphere=args.atmosphere,
+            )
+        _print_e2m2e_summary(e2m2e_data, args.atmosphere, baseline=baseline)
+        return
 
     if not gmat_report.exists():
         print(f"GMAT report not found: {gmat_report}")
         print("Please run the generated GMAT script first:")
-        script_path = output_dir / "leo_reference_gmat.script"
         print(f"  gmat -s {script_path}")
         print("Then rerun this script.")
+        print("To record only the e2m2e side, rerun with --e2m2e-only.")
         return
+
+    # 对拍两侧必须同配置：核对实际要跑的 GMAT 脚本与 e2m2e 侧选择。`--no-drag`
+    # 时两侧都应为无阻力，故期望值同样由该开关决定。放在这里而非更早：`--e2m2e-only`
+    # 不消费 GMAT 脚本，目录里放着别的模型生成的脚本不应让该模式失败。
+    script_cfg = _read_gmat_script_config(script_path)
+    if args.no_drag:
+        expected_drag = "None"
+    elif args.atmosphere == "nrlmsise00":
+        expected_drag = "MSISE90"
+    else:
+        expected_drag = "Exponential"
+    if script_cfg["drag"] is not None and script_cfg["drag"] != expected_drag:
+        raise SystemExit(
+            f"GMAT 脚本 {script_path.name} 的 Drag = {script_cfg['drag']}，而 e2m2e 侧选择 "
+            f"{args.atmosphere}（期望 GMAT 侧 {expected_drag}）。请先执行 "
+            f"generate_gmat_leo_script.py --drag-model {expected_drag} 重新生成脚本。"
+        )
 
     print("Parsing GMAT report...")
     gmat_data = _parse_gmat_report(gmat_report)
@@ -396,6 +574,7 @@ def main() -> None:
         output_dir,
         include_drag=not args.no_drag,
         include_srp=not args.no_srp,
+        atmosphere=args.atmosphere,
     )
 
     print("Computing errors...")
@@ -406,7 +585,15 @@ def main() -> None:
     figures = _plot_errors(errors, output_dir)
 
     print("Writing report...")
-    report_path = _write_report(errors, figures, output_dir)
+    report_path = _write_report(
+        errors,
+        figures,
+        output_dir,
+        atmosphere=args.atmosphere,
+        space_weather_e2m2e=e2m2e_data.get("space_weather", "n/a"),
+        gmat_script_cfg=script_cfg,
+        include_drag=not args.no_drag,
+    )
 
     print(f"Done. Report: {report_path}")
     print(f"Max position error: {float(np.max(errors['position_error_km'])) * 1000.0:.3f} m")

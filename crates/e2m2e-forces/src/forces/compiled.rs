@@ -5,7 +5,7 @@
 //!
 //! 与 `rk_step + Python callback` 模式相比，本模块消除 30 万次 GIL 跨界。
 
-use crate::forces::drag;
+use crate::forces::drag::{self, DragAtmosphere};
 use crate::forces::ecom;
 use crate::forces::gravity_field::{self, GravityFieldContext, TideConfig, TideMode};
 use crate::forces::relativistic;
@@ -113,15 +113,14 @@ pub enum CompiledForce {
     },
     /// 大气阻力力模型。
     ///
-    /// ITRF93 系内计算阻力加速度，含帧旋转变换。
+    /// ITRF93 系内计算阻力加速度，含帧旋转变换。密度来源由 `atmosphere`
+    /// 选定（USSA76 分段指数或 NRLMSISE-00）。
     Drag {
         area: f64,
         mass: f64,
         cd: f64,
-        /// F10.7 太阳射电通量（sfu），来自 `ExponentialAtmosphere.f107`。
-        f107: f64,
-        /// Ap 地磁指数，来自 `ExponentialAtmosphere.ap`。
-        ap: f64,
+        /// 大气密度模型配置（含空间天气参数）。
+        atmosphere: DragAtmosphere,
         /// 传播系 frame（通常 "J2000"）
         propagation_frame: String,
     },
@@ -407,10 +406,9 @@ impl CompiledForce {
                 area,
                 mass,
                 cd,
-                f107,
-                ap,
+                atmosphere,
                 propagation_frame,
-            } => drag::drag_accel(et, state, *area, *mass, *cd, *f107, *ap, propagation_frame)
+            } => drag::drag_accel(et, state, *area, *mass, *cd, atmosphere, propagation_frame)
                 .map_err(|e| format!("{:?}", e)),
         }
     }
@@ -799,8 +797,7 @@ fn acceleration_and_jacobian_with_optional_mass(
             area,
             mass,
             cd,
-            f107,
-            ap,
+            atmosphere,
             propagation_frame,
         } => {
             let result = drag::drag_accel_and_jacobian(
@@ -809,8 +806,7 @@ fn acceleration_and_jacobian_with_optional_mass(
                 *area,
                 *mass,
                 *cd,
-                *f107,
-                *ap,
+                atmosphere,
                 propagation_frame,
             )
             .map_err(|e| format!("{:?}", e))?;
@@ -906,8 +902,7 @@ pub fn param_accel_derivative(
                 area,
                 mass,
                 cd,
-                f107,
-                ap,
+                atmosphere,
                 propagation_frame,
             },
             SensParam::Cd,
@@ -920,8 +915,7 @@ pub fn param_accel_derivative(
                     area: *area,
                     mass: *mass,
                     cd: 1.0,
-                    f107: *f107,
-                    ap: *ap,
+                    atmosphere: atmosphere.clone(),
                     propagation_frame: propagation_frame.clone(),
                 }
                 .acceleration(et, state, observer)

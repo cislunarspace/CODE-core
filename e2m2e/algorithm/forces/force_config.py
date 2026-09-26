@@ -14,7 +14,7 @@ from typing import Any, cast
 
 import numpy as np
 
-from .atmosphere import ExponentialAtmosphere
+from .atmosphere import ExponentialAtmosphere, NRLMSISE00Atmosphere
 from .drag import DragModel
 from .ecom_srp import EcomSolarRadiationPressure
 from .exceptions import NotSerializableError
@@ -32,18 +32,36 @@ from .uniform_acceleration import UniformAcceleration
 # --- 嵌套依赖：大气模型 ---
 
 
-def _serialize_atmosphere(atm: ExponentialAtmosphere) -> dict[str, Any]:
+def _serialize_atmosphere(atm: ExponentialAtmosphere | NRLMSISE00Atmosphere) -> dict[str, Any]:
     """把大气模型序列化为 ``{type, params}`` 字典。"""
-    if not isinstance(atm, ExponentialAtmosphere):
-        raise NotSerializableError(f"atmosphere type {type(atm).__name__} has no config serializer")
-    return {"type": "ExponentialAtmosphere", "params": {"f107": atm.f107, "ap": atm.ap}}
+    if isinstance(atm, ExponentialAtmosphere):
+        return {"type": "ExponentialAtmosphere", "params": {"f107": atm.f107, "ap": atm.ap}}
+    if isinstance(atm, NRLMSISE00Atmosphere):
+        ap = atm.ap
+        # 7 元全等（静态空间天气）压成标量，与标量输入的配置保持同形。
+        flat = all(v == ap[0] for v in ap)
+        return {
+            "type": "NRLMSISE00Atmosphere",
+            "params": {
+                "f107_daily": atm.f107_daily,
+                "f107_avg": atm.f107_avg,
+                "ap": ap[0] if flat else list(ap),
+            },
+        }
+    raise NotSerializableError(f"atmosphere type {type(atm).__name__} has no config serializer")
 
 
-def _build_atmosphere(config: dict[str, Any]) -> ExponentialAtmosphere:
-    """按配置字典构造大气模型。"""
-    if config["type"] != "ExponentialAtmosphere":
-        raise ValueError(f"unknown atmosphere type {config['type']!r}")
-    return ExponentialAtmosphere(**config.get("params", {}))
+def _build_atmosphere(config: dict[str, Any]) -> ExponentialAtmosphere | NRLMSISE00Atmosphere:
+    """按配置字典的 ``type`` 字段构造大气模型。"""
+    kind = config["type"]
+    if kind == "ExponentialAtmosphere":
+        return ExponentialAtmosphere(**config.get("params", {}))
+    if kind == "NRLMSISE00Atmosphere":
+        return NRLMSISE00Atmosphere(**config.get("params", {}))
+    raise ValueError(
+        f"unknown atmosphere type {kind!r}; "
+        "known types: 'ExponentialAtmosphere', 'NRLMSISE00Atmosphere'"
+    )
 
 
 # --- 嵌套依赖：阴影模型 ---
