@@ -12,6 +12,8 @@ period-doubling / torus）、平凡乘子对排除、跳支区间、成员分析
 
 from __future__ import annotations
 
+from itertools import pairwise
+
 import numpy as np
 import pytest
 from kernel_helpers import requires_native_symbols
@@ -118,6 +120,30 @@ def _failing_multiplier_fn(mode: str, fail_at: float):
         if _read_parameter(orbit) == fail_at:
             raise RuntimeError("注入的乘子分析失败")
         return base(orbit)
+
+    return multiplier_fn
+
+
+def _pair_for_nu(nu: float) -> tuple[complex, complex]:
+    """按稳定性指数构造一个倒数对：|ν| > 2 用实倒数对（vt = ν/2），否则用圆上共轭对。"""
+    if abs(nu) > 2.0:
+        return _quadratic_pair(nu / 2.0)
+    return _on_circle_pair(nu)
+
+
+def _triplet_multiplier_fn(values: dict[float, tuple[float, float, float]]):
+    """按族参数脚本化三条 ν（ν≈2 用平凡对）的 ``multiplier_fn``。
+
+    显式给出三条 ν 才能构造「缺平凡对」的成员：三条 ν 都不落在 2±1e-6 内时
+    ``_drop_trivial_pair`` 不剔除任何一对，该成员留给跟踪 3 条 ν。
+    """
+
+    def multiplier_fn(orbit: Orbit) -> np.ndarray:
+        pairs = [
+            (1.0 + 1e-10, 1.0 - 1e-10) if abs(nu - 2.0) < 1e-12 else _pair_for_nu(nu)
+            for nu in values[_read_parameter(orbit)]
+        ]
+        return np.array([value for pair in pairs for value in pair], dtype=complex)
 
     return multiplier_fn
 
@@ -232,6 +258,93 @@ class TestMemberFailures:
         assert len(scan.points) == 1
         assert scan.points[0].type is BifurcationType.SADDLE_NODE
         assert scan.points[0].parameter == pytest.approx(0.5, abs=1e-5)
+
+
+class TestDegenerateMembers:
+    """退化成员：判据恰为零的节点、缺平凡对的成员、多穿越排序、精化失败原因。"""
+
+    def test_crossing_at_grid_node_is_located_once(self, earth_moon_system):
+        """判据恰为零的网格节点（ν = 2）须被认领一次：既不漏报也不重复报。"""
+        scan = _scan("saddle_node", earth_moon_system, grid=(0.2, 0.4, 0.5, 0.6, 0.8))
+
+        assert len(scan.points) == 1
+        assert scan.points[0].type is BifurcationType.SADDLE_NODE
+        assert scan.points[0].parameter == pytest.approx(0.5, abs=1e-3)
+        assert scan.failures == ()
+
+    def test_member_without_trivial_pair_keeps_one_point_per_crossing(self, earth_moon_system):
+        """成员无平凡对（逐成员剔除后剩 3 条 ν）不得使同一穿越重复报点或丢点。"""
+        grid = (0.0, 0.5, 1.0)
+        # 轨迹 A：1.90 → 2.10 跨 +2；mid 成员三条 ν 都不在 2±1e-6 内 → 不剔除任何一对
+        flipping = {
+            0.0: (2.0, 1.90, 1.50),
+            0.5: (2.10, 1.55, 1.60),
+            1.0: (2.20, 1.60, 1.65),
+        }
+        control = {
+            0.0: (2.0, 1.90, 1.50),
+            0.5: (2.0, 2.10, 1.55),
+            1.0: (2.20, 1.60, 1.65),
+        }
+
+        for name, values in (("含缺平凡对成员", flipping), ("对照", control)):
+            scan = _scan(
+                "saddle_node",
+                earth_moon_system,
+                grid=grid,
+                refine=False,
+                multiplier_fn=_triplet_multiplier_fn(values),
+            )
+            parameters = [point.parameter for point in scan.points]
+
+            assert len(scan.points) == 1, name
+            assert scan.points[0].type is BifurcationType.SADDLE_NODE, name
+            assert scan.branch_jumps == (), name
+            assert len(set(parameters)) == len(parameters), name
+
+    def test_multiple_crossings_are_strictly_ascending(self, earth_moon_system):
+        """同一族报两个穿越（+2 与 −2）：族参数严格升序，每个穿越各一条。"""
+        grid = (0.2, 0.4, 0.6, 0.8)
+        values = {
+            0.2: (2.0, 1.90, -1.90),
+            0.4: (2.0, 2.10, -1.95),  # 轨迹 A 跨 +2 → saddle_node
+            0.6: (2.0, 2.20, -2.10),  # 轨迹 C 跨 −2 → period_doubling
+            0.8: (2.0, 2.30, -2.20),
+        }
+        scan = _scan(
+            "saddle_node",
+            earth_moon_system,
+            grid=grid,
+            refine=False,
+            multiplier_fn=_triplet_multiplier_fn(values),
+        )
+
+        assert [point.type for point in scan.points] == [
+            BifurcationType.SADDLE_NODE,
+            BifurcationType.PERIOD_DOUBLING,
+        ]
+        parameters = [point.parameter for point in scan.points]
+        assert parameters == sorted(parameters)
+        assert all(later > earlier for earlier, later in pairwise(parameters))
+
+    def test_refinement_failure_keeps_underlying_cause(self, earth_moon_system):
+        """精化采样全失败时失败记录须带底层原因（与成员循环同口径）。"""
+
+        def member_at(parameter: float) -> Orbit:
+            raise RuntimeError("注入的精化修正失败")
+
+        orbits = [_fake_orbit(parameter, earth_moon_system) for parameter in _GRID]
+        scan = StabilityAnalysis.detect_bifurcation_in_family(
+            orbits,
+            _GRID,
+            parameter_name="x0",
+            member_at=member_at,
+            multiplier_fn=_scripted_multiplier_fn("saddle_node"),
+        )
+
+        assert len(scan.failures) == 1
+        assert "注入的精化修正失败" in scan.failures[0].message
+        assert scan.points == ()
 
 
 class TestCoarseScanMode:

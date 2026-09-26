@@ -20,6 +20,17 @@ from .dynamics import CR3BP_Dynamics
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "BifurcationType",
+    "BranchJump",
+    "FamilyBifurcationPoint",
+    "FamilyBifurcationScan",
+    "MemberAnalysisFailure",
+    "OrbitStability",
+    "StabilityAnalysis",
+    "StabilityType",
+]
+
 
 class StabilityType(Enum):
     """稳定性类型枚举"""
@@ -75,6 +86,14 @@ _PAIR_PRODUCT_TOL = 0.01
 #: 方向），其 ν = λ + 1/λ = 2 不随族参数变化；数值噪声量级 ~1e-11（λ 数值
 #: 劈裂 ~1e-5 时 ν−2 ~1e-10）。该阈值用于逐成员识别平凡对。
 _TRIVIAL_NU_TOL = 1e-6
+
+#: 逐类型的实轴分岔判据零点偏移：判据 = Re ν + offset，过零即分岔。
+#: 检测（`_crossing_type`）与精化（`_bifurcation_indicator`）共用同一映射，
+#: 防止两侧漂移导致「检测到的类型」与「精化用的判据」不一致。
+_CRITERION_OFFSETS: dict[BifurcationType, float] = {
+    BifurcationType.SADDLE_NODE: -2.0,
+    BifurcationType.PERIOD_DOUBLING: 2.0,
+}
 
 
 def _reciprocal_pairs(eigenvalues: np.ndarray) -> list[tuple[complex, complex]]:
@@ -151,23 +170,26 @@ def _drop_trivial_pair(nus: Sequence[complex]) -> list[complex]:
 
 def _bifurcation_indicator(kind: BifurcationType, nu: complex, ns_imag_tol: float) -> float:
     """分岔判据函数：穿越判据的标量形式（过零即分岔）。"""
-    if kind is BifurcationType.SADDLE_NODE:
-        return nu.real - 2.0
-    if kind is BifurcationType.PERIOD_DOUBLING:
-        return nu.real + 2.0
+    offset = _CRITERION_OFFSETS.get(kind)
+    if offset is not None:
+        return nu.real + offset
     return abs(nu.imag) - ns_imag_tol
 
 
 def _crossing_type(nu_lo: complex, nu_hi: complex, ns_imag_tol: float) -> BifurcationType | None:
-    """单区间、单条 ν 轨迹上的穿越判据（变号或离圆 onset）。"""
+    """单区间、单条 ν 轨迹上的穿越判据（变号或离圆 onset）。
+
+    实轴穿越用「零判据端点归入一侧」的变号判据：判据恰为零的成员（例如网格节点
+    恰好落在临界参数上）算已跨过，且只由一侧区间认领——上升穿越归其右侧区间、
+    下降穿越归其左侧区间——故同一次穿越只报一个候选点，不会静默漏报也不会重复。
+    代价是族参数域端点上的零判据成员（首/末成员恰在临界值上）没有可归属的区间，
+    不被认领；此时判据端点值本身即为零，调用方可从原始成员表读到。
+    """
     if abs(nu_lo.imag) <= ns_imag_tol and abs(nu_hi.imag) <= ns_imag_tol:
-        for kind, offset in (
-            (BifurcationType.SADDLE_NODE, -2.0),
-            (BifurcationType.PERIOD_DOUBLING, 2.0),
-        ):
+        for kind, offset in _CRITERION_OFFSETS.items():
             lower = nu_lo.real + offset
             upper = nu_hi.real + offset
-            if (lower < 0.0 < upper) or (upper < 0.0 < lower):
+            if (lower < 0.0 <= upper) or (upper < 0.0 <= lower):
                 return kind
     if abs(nu_lo.imag) <= ns_imag_tol < abs(nu_hi.imag):
         return BifurcationType.TORUS
@@ -190,11 +212,17 @@ def _refine_family_point(
     parameter_tol: float,
     indicator_tol: float,
     max_refine_iter: int,
+    causes: list[str],
 ) -> tuple[float, Orbit, np.ndarray, float] | None:
     """对分岔穿越区间二分精化，返回 (族参数, 轨道, 乘子, |判据|)。
 
     分点修正失败时依次试 1/4、3/4 分点（``_walk_family`` 先例，绕开共振
     缝隙）；三点全失败返回 None，由调用方记入失败清单并放弃该点。
+
+    Args:
+        causes: 失败原因收集器（出参）：逐个分点试算的异常按出现次序、去重后
+            追加，供调用方写进 ``MemberAnalysisFailure.message``，与成员循环
+            保留 ``str(exc)`` 的口径一致。
     """
     lo, hi = interval
     nu_lo, nu_hi = nus
@@ -209,7 +237,10 @@ def _refine_family_point(
                 eigenvalues = np.asarray(analyze(orbit_try), dtype=complex)
                 candidates = _drop_trivial_pair(_member_nus(eigenvalues))
                 nu_try = _nearest_nu(candidates, 0.5 * (nu_lo + nu_hi))
-            except Exception:
+            except Exception as exc:
+                cause = f"{type(exc).__name__}: {exc}"
+                if cause not in causes:
+                    causes.append(cause)
                 continue
             sampled = True
             ind_try = _bifurcation_indicator(kind, nu_try, ns_imag_tol)
@@ -242,6 +273,8 @@ class FamilyBifurcationPoint:
         residual: 分岔判据的绝对值 ``|判据|``。
     """
 
+    # 跳支不产生分岔点：伴随跳支的区间记入 ``FamilyBifurcationScan.branch_jumps``
+    # （区间级、带两端族参数与最大位移），因此本类型不带逐点 ``branch_jump`` 标记。
     parameter: float
     parameter_name: str
     type: BifurcationType
@@ -272,8 +305,10 @@ class FamilyBifurcationScan:
     """沿族参数的分岔扫描结果。
 
     Attributes:
-        points: 分岔点，按 ``parameter`` 升序。
-        branch_jumps: 跳支区间（乘子位移超阈）。
+        points: 分岔点，按 ``parameter`` 严格升序；同一族参数上不同类型的穿越各
+            保留一条（同参数同类型的重复检测只留残差最小者）。
+        branch_jumps: 跳支区间（乘子位移超阈）；区间内不报穿越，故分岔点上不再
+            逐点标注是否伴随跳支。
         failures: 成员分析失败记录。
     """
 
@@ -735,11 +770,19 @@ class StabilityAnalysis:
                     ]
                 )
                 rows, columns = linear_sum_assignment(cost)
-                slots = [0] * len(slot_nus)
+                # 逐成员剔除平凡对后 ν 条数可为 2 或 3（成员缺平凡对时不会被剔除），
+                # 此时 cost 是矩形矩阵，linear_sum_assignment 只给出 min(行,列) 个分配：
+                # 未分配的列用 -1 占位并另起一条新轨迹，绝不复用 0 这类合法 track id
+                # （否则会与既有轨迹撞号——同一 track 被写两次、且该区间比较出现重复槽位）。
+                slots = [-1] * len(slot_nus)
                 for row, column in zip(rows, columns, strict=True):
                     slot = previous_slots[row]
                     tracks[slot][index] = slot_nus[column]
                     slots[column] = slot
+                for column, slot in enumerate(slots):
+                    if slot < 0:
+                        tracks.append({index: slot_nus[column]})
+                        slots[column] = len(tracks) - 1
             track_of.append(slots)
             previous_slots = slots
 
@@ -750,7 +793,8 @@ class StabilityAnalysis:
             slots_hi = track_of[index + 1]
             if slots_lo is None or slots_hi is None:
                 continue
-            shared = [slot for slot in slots_lo if slot in set(slots_hi)]
+            # dict.fromkeys：同一区间两侧共有的槽位去重（保序），避免重复报点。
+            shared = [slot for slot in dict.fromkeys(slots_lo) if slot in set(slots_hi)]
             # 跳支判据按 ν 量级缩放（|Δν| > jump_threshold·max(1, |ν|)）：共线
             # Lyapunov 族的面内稳定性指数量级达 1e3 且逐步变化数十，本身是平滑
             # 延拓，绝对阈值会把每个区间误判为跳支、连真实穿越一并屏蔽。
@@ -806,6 +850,7 @@ class StabilityAnalysis:
                     )
                 )
                 continue
+            causes: list[str] = []
             refined = _refine_family_point(
                 kind=kind,
                 interval=(p_lo, p_hi),
@@ -816,12 +861,14 @@ class StabilityAnalysis:
                 parameter_tol=parameter_tol,
                 indicator_tol=indicator_tol,
                 max_refine_iter=max_refine_iter,
+                causes=causes,
             )
             if refined is None:
+                reason = f"；样本失败原因：{'；'.join(causes[:2])}" if causes else ""
                 failures.append(
                     MemberAnalysisFailure(
                         parameter=0.5 * (p_lo + p_hi),
-                        message=f"分岔精化区间 [{p_lo}, {p_hi}] 内成员修正均失败",
+                        message=f"分岔精化区间 [{p_lo}, {p_hi}] 内成员修正均失败{reason}",
                     )
                 )
                 continue
@@ -837,7 +884,22 @@ class StabilityAnalysis:
                 )
             )
 
+        # 同参数、同类型的重复检测（同一条穿越被两次认领）只保留残差最小的一条，
+        # 保证 ``points`` 的族参数严格递增；参数相同但类型不同者各留一条。
         points.sort(key=lambda point: point.parameter)
+        deduped: list[FamilyBifurcationPoint] = []
+        for point in points:
+            previous = deduped[-1] if deduped else None
+            if (
+                previous is not None
+                and previous.parameter == point.parameter
+                and previous.type is point.type
+            ):
+                if point.residual < previous.residual:
+                    deduped[-1] = point
+                continue
+            deduped.append(point)
+        points = deduped
         if failures:
             logger.warning("族分岔扫描中 %d/%d 个成员或精化点分析失败", len(failures), len(params))
 

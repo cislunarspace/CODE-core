@@ -213,6 +213,9 @@ class TestDetectBifurcationInFamily:
         )
         assert isinstance(scan, FamilyBifurcationScan)
         assert scan.points == ()
+        # 空结果只能来自「成功分析且无穿越」：成员分析失败同样产出空 points，
+        # 不钉 failures 会让缺原生链路时该用例静默变绿。
+        assert scan.failures == ()
 
     def test_handles_exception_gracefully(self):
         system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
