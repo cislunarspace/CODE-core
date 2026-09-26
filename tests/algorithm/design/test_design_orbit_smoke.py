@@ -4,6 +4,8 @@
 → 月心漂移分析"一段链路，是 ``design_orbit`` 最便宜的端到端真实路径；最短
 弧段（约一个轨道周期）证明链路连通与返回类型契约，不重复物理可行性穷举。
 长弧/多候选的冻结轨道集成覆盖已随端到端清理移除（见 ADR 0037 增补）。
+
+本文件同时覆盖 LYAPUNOV CR3BP 初猜到 segmented 星历修正的真实路径。
 """
 
 from __future__ import annotations
@@ -13,6 +15,8 @@ import pytest
 from kernel_helpers import requires_spice
 
 from e2m2e.algorithm.design import design_orbit
+from e2m2e.algorithm.design.design_orbit import CORRECTION_TOL_KM
+from e2m2e.data.templates import ConvergenceState
 from tests.algorithm.design.conftest import make_design_request
 
 pytestmark = [
@@ -49,3 +53,23 @@ def test_design_orbit_elfo_minimal_real_call():
 # RO 的星历链路冒烟按 ADR 0037 归属 scripts/design_ro_ephemeris_smoke.py:
 # tests/conftest.py 把 Rust rayon 钉单线程, two_level 星历修正单线程实测
 # >600 s(多线程独立进程实测 219 s), 超出 pytest 可容规模。
+# Lyapunov 的星历链路冒烟：实测 46.23 s（debug 扩展、完整 CR3BP + segmented 链路）；
+# 60 s 预算留约 30% 余量。
+@pytest.mark.time_budget(60)
+def test_design_orbit_lyapunov_ephemeris_correction_smoke():
+    result = design_orbit(
+        make_design_request(
+            orbit_type="LYAPUNOV",
+            collinear_point=2,
+            amplitude=12000.0,
+            duration=1_270_000.0,
+            output_step=7200.0,
+        )
+    )
+    assert result.orbit_type == "LYAPUNOV"
+    assert result.cr3bp_orbit is not None
+    assert result.correction is not None
+    assert result.correction.status is ConvergenceState.CONVERGED
+    assert result.correction.max_residual < CORRECTION_TOL_KM
+    assert result.correction_method == "segmented"
+    assert len(result.ephemeris) > 0

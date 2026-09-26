@@ -34,6 +34,13 @@ class TestDesignOrbitRequest:
         assert dro.output_step == 3600.0
         assert dro.correction_method == "two_level"
 
+        lyapunov = DesignOrbitRequest(orbit_type="LYAPUNOV")
+        assert (lyapunov.collinear_point, lyapunov.amplitude, lyapunov.phase) == (
+            2,
+            12000.0,
+            0.0,
+        )
+
         elfo = DesignOrbitRequest(orbit_type="ELFO", semi_major_axis=3000.0)
         assert elfo.duration == 5184000.0
         assert elfo.inclination == 75.0
@@ -58,6 +65,7 @@ class TestDesignOrbitRequest:
                 {"orbit_type": "ELFO", "semi_major_axis": 3000.0, "amplitude_out": 80000.0},
                 "amplitude_out",
             ),
+            ({"orbit_type": "LYAPUNOV", "collinear_point": 3}, "collinear_point"),
         ],
     )
     def test_rejects_invalid_input(self, kwargs, field):
@@ -75,6 +83,7 @@ class TestDesignOrbitRequest:
             ("L4", "amplitude_out", 0.0, 76000.0, False),
             ("L5", "amplitude_out", 0.0, 76000.0, False),
             ("AXIAL", "amplitude", -60000.0, 60000.0, True),
+            ("LYAPUNOV", "amplitude", 5000.0, 60000.0, True),
             ("L4_SPO", "amplitude", 1737.0, 200000.0, True),
             ("L5_SPO", "amplitude", 1737.0, 200000.0, True),
             ("L4_LPO", "amplitude", 1000.0, 110000.0, True),
@@ -118,7 +127,7 @@ class TestDesignOrbitRequest:
         with pytest.raises(ValidationError, match="amplitude"):
             DesignOrbitRequest(orbit_type="HALO", collinear_point=1, amplitude=26908.0 + 1.0)
 
-    @pytest.mark.parametrize("orbit_type", ["HALO", "NRHO", "DPO"])
+    @pytest.mark.parametrize("orbit_type", ["HALO", "NRHO", "DPO", "LYAPUNOV"])
     def test_unstable_family_defaults_to_segmented_silently(self, orbit_type):
         with warnings.catch_warnings():
             warnings.simplefilter("error")
@@ -157,7 +166,7 @@ class TestDesignOrbitRequest:
         assert ranges["resonance_p"].format_interval() == "[2, 4]"
         assert ranges["resonance_q"].format_interval() == "[1, 3]"
 
-    @pytest.mark.parametrize("orbit_type", ["HALO", "NRHO", "DPO"])
+    @pytest.mark.parametrize("orbit_type", ["HALO", "NRHO", "DPO", "LYAPUNOV"])
     @pytest.mark.parametrize("method", ["two_level", "standard", "rust"])
     def test_unstable_family_conflicting_method_warns_and_rewrites(self, orbit_type, method):
         with pytest.warns(UserWarning, match=orbit_type):

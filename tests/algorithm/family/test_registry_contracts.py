@@ -14,6 +14,7 @@ from e2m2e.algorithm.family import registry
 from e2m2e.algorithm.family.cr3bp_orbits import (
     design_axial,
     design_dpo,
+    design_lyapunov,
     design_nrho,
 )
 
@@ -25,6 +26,7 @@ pytestmark = pytest.mark.orchestration
 _DIRECT_CASES = [
     ("AXIAL", design_axial),
     ("DPO", design_dpo),
+    ("LYAPUNOV", design_lyapunov),
     ("NRHO", design_nrho),
 ]
 

@@ -894,6 +894,7 @@ pub(crate) fn metric_minmax(
                 ((sample[0] - x_l).powi(2) + (sample[1] - y_l).powi(2)).sqrt()
             }
             "z-amplitude" => sample[2].abs(),
+            "y-amplitude" => sample[1].abs(),
             _ => return Err(invalid_failure(format!("未知轨道族度量 {metric}"))),
         };
         minimum = minimum.min(value);

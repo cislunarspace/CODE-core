@@ -59,6 +59,7 @@ from ..family.cr3bp_orbits import (
     design_horseshoe,
     design_lissajous,
     design_lpo,
+    design_lyapunov,
     design_nrho,
     design_ro,
     design_spo,
@@ -164,7 +165,7 @@ _PATCH_SAMPLING_UNIFORM = "uniform"
 _PATCH_SAMPLING_PERILUNE_CLUSTERED = "perilune_clustered"
 _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 
-#: 星历修正用固定时间打靶（var_time=False）的轨道族：Halo/NRHO/DPO（不稳定，
+#: 星历修正用固定时间打靶（var_time=False）的轨道族：Halo/NRHO/DPO/Lyapunov（不稳定，
 #: 分段打靶全程固定时刻，对齐杨洪伟 2015）、拟周期/无周期闭合族
 #: （Lissajous / 三角平动点 L4/L5）与 Axial。
 #:
@@ -186,7 +187,11 @@ _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 #: 时间打靶雅可比近似简并——实测 3:1 RO var_time 打靶 10 次迭代后
 #: 停滞在位置残差 4.0 km（STAGNATED，554 s）；固定时间 5 次迭代收敛到
 #: 2.7e-4 km（18 s）。
-_FIXED_TIME_ORBIT_TYPES = frozenset({"HALO", "NRHO", "DPO", "LISSAJOUS", "L4", "L5", "AXIAL", "RO"})
+#: Lyapunov 平面轨道同属此病态：面内周期轨道时间平移与沿轨相位旋转简并，
+#: 自由时间打靶雅可比病态；固定时间打靶收敛稳健。
+_FIXED_TIME_ORBIT_TYPES = frozenset(
+    {"HALO", "NRHO", "DPO", "LYAPUNOV", "LISSAJOUS", "L4", "L5", "AXIAL", "RO"}
+)
 
 #: body-fixed 帧（ITRF93 / MOON_PA）所需内核文件名，与 tests/kernel_helpers.py 一致。
 #: 预测 PCK 必须先于历史 PCK 加载：SPICE 对重叠覆盖段取后加载者，历史
@@ -393,6 +398,25 @@ def _validate_params(
             "phase": phase,
         }
 
+    if sel == "LYAPUNOV":
+        collinear_point = 2 if collinear_point is None else int(collinear_point)
+        amplitude = 12000.0 if amplitude is None else float(amplitude)
+        phase = 0.0 if phase is None else float(phase)
+        if collinear_point not in (1, 2):
+            raise ValueError(f"Lyapunov collinear_point 必须为 1 或 2，当前 {collinear_point}")
+        if not 5000.0 <= amplitude <= 60000.0:
+            raise ValueError(
+                f"Lyapunov L{collinear_point} amplitude 应在 5000~60000 km 之间，"
+                f"实际为 {amplitude:.0f} km"
+            )
+        if not 0.0 <= phase <= 1.0:
+            raise ValueError(f"Lyapunov phase 应在 0~1 之间，实际为 {phase}")
+        return {
+            "collinear_point": collinear_point,
+            "amplitude": amplitude,
+            "phase": phase,
+        }
+
     if sel == "NRHO":
         collinear_point = 2 if collinear_point is None else int(collinear_point)
         north_south = 2 if north_south is None else int(north_south)
@@ -519,7 +543,7 @@ def _validate_params(
         return {"amplitude": amplitude, "phase": phase}
 
     raise ValueError(
-        f"orbit_type 必须为 DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial/L4_SPO/L5_SPO"
+        f"orbit_type 必须为 DRO/DPO/NRHO/Halo/Lyapunov/Lissajous/L4/L5/Axial/L4_SPO/L5_SPO"
         f"/L4_LPO/L5_LPO/L4_HORSESHOE/L5_HORSESHOE，当前 {sel!r}"
     )
 
@@ -539,6 +563,10 @@ def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_D
         )
     if sel == "HALO":
         return design_halo(int(params["collinear_point"]), params["amplitude"], dynamics=dynamics)
+    if sel == "LYAPUNOV":
+        return design_lyapunov(
+            int(params["collinear_point"]), params["amplitude"], dynamics=dynamics
+        )
     if sel == "NRHO":
         return design_nrho(
             int(params["collinear_point"]),
@@ -960,7 +988,7 @@ def design_orbit(
     kernel_dir: str | None = None,
     verbose: bool = False,
 ) -> OrbitDesignResult:
-    """端到端设计标称轨道（DRO/DPO/NRHO/Halo/Lissajous/L4/L5/Axial/RO/.../ELFO）。
+    """端到端设计标称轨道（DRO/DPO/NRHO/Halo/Lyapunov/Lissajous/L4/L5/Axial/RO/.../ELFO）。
 
     通过 ``request.orbit_type`` 在内部分派管线：
 

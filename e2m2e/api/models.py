@@ -182,6 +182,7 @@ _ORBIT_TYPE_RANGES: Mapping[str, Mapping[str, NumericRange]] = MappingProxyType(
         "L4": _GLOBAL_AMPLITUDE_OUT_RANGES,
         "L5": _GLOBAL_AMPLITUDE_OUT_RANGES,
         "AXIAL": _with_global_amplitude_out(_range_map(amplitude=NumericRange(-60000.0, 60000.0))),
+        "LYAPUNOV": _with_global_amplitude_out(_range_map(amplitude=NumericRange(5000.0, 60000.0))),
         "L4_SPO": _SPO_RANGES,
         "L5_SPO": _SPO_RANGES,
         "L4_LPO": _LPO_RANGES,
@@ -219,7 +220,9 @@ class DesignOrbitRequest(_ApiModel):
     duration 统一用秒。
     """
 
-    orbit_type: str = Field(description="DRO/DPO/NRHO/HALO/LISSAJOUS/L4/L5/AXIAL/RO/.../ELFO")
+    orbit_type: str = Field(
+        description="DRO/DPO/NRHO/HALO/LYAPUNOV/LISSAJOUS/L4/L5/AXIAL/RO/.../ELFO"
+    )
     # CR3BP 形状参数（字段约束为跨类型全局上下限；model_validator 内按类型收紧）
     amplitude: float | None = Field(default=None, ge=-110000.0, le=350000.0)
     resonance_p: int | None = Field(
@@ -260,7 +263,7 @@ class DesignOrbitRequest(_ApiModel):
         default="two_level",
         description="星历修正方法：standard/two_level（稳定轨道，如 DRO）/segmented（"
         "不稳定轨道，全程分段打靶）。未显式指定时按族分派默认"
-        "（HALO/NRHO/DPO → segmented，其余 CR3BP 族 → two_level）；"
+        "（HALO/NRHO/DPO/LYAPUNOV → segmented，其余 CR3BP 族 → two_level）；"
         "显式传入与族冲突的值时告警并改写为 segmented",
     )
     correction_revolutions: int = Field(default=1, ge=1)
@@ -399,6 +402,17 @@ class DesignOrbitRequest(_ApiModel):
                 self.phase_in = 0.0
             if self.phase_out is None:
                 self.phase_out = 0.0
+        elif sel == "LYAPUNOV":
+            if self.collinear_point is None:
+                self.collinear_point = 2
+            if self.amplitude is None:
+                self.amplitude = 12000.0
+            if self.phase is None:
+                self.phase = 0.0
+            if self.collinear_point not in (1, 2):
+                raise ValueError(
+                    f"LYAPUNOV collinear_point 必须为 1 或 2，当前 {self.collinear_point}"
+                )
         elif sel == "AXIAL":
             if self.collinear_point is None:
                 self.collinear_point = 2
@@ -438,7 +452,7 @@ class DesignOrbitRequest(_ApiModel):
                 self.phase = 0.0
         else:
             raise ValueError(
-                f"orbit_type 必须为 DRO/DPO/NRHO/HALO/LISSAJOUS/L4/L5/AXIAL/RO"
+                f"orbit_type 必须为 DRO/DPO/NRHO/HALO/LYAPUNOV/LISSAJOUS/L4/L5/AXIAL/RO"
                 f"/L4_SPO/L5_SPO/L4_LPO/L5_LPO/L4_HORSESHOE/L5_HORSESHOE/ELFO，当前 {sel!r}"
             )
         self._dispatch_correction_method(sel)
