@@ -213,19 +213,22 @@ Revision (b) 只记录了「类级列表在 `_bookkeeping_lock` 下变更」，#
 3. **失败路径回滚，并保留原异常。** Rust `furnsh` 失败 → 撤销本次 Python 侧
    `furnsh`（CSPICE 对同一文件按实例计数：重复 `furnsh` 使池内多一条，`unload`
    移除最后一条，故一次 `unload` 恰为本次 `furnsh` 的逆操作，不会卸掉此前已加载
-   的实例）且不登记簿记；Rust `unload` 失败 → 恢复 Python 侧 `furnsh`（两池重新
-   一致）并**保留**簿记条目（内核仍在池中）。回滚/恢复本身失败只记 warning，不
-   掩盖原异常。
+   的实例）且不登记簿记；Rust `unload` 失败 → 恢复 Python 侧 `furnsh`（成员回到
+   两池）并把该内核的簿记条目移到末位——恢复即重新加载，Python 池内它重新成为
+   「后加载者」，簿记须跟着走，否则「位置按该内核、GM 按旧末位」再次失配。回滚/
+   恢复本身失败只记 warning，不掩盖原异常。
 4. **`spice_furnsh`/`spice_unload` 为 `None`（扩展未含 spice feature）时沿用
    #382 的既有接缝：只喂 Python 池。** 本修订不改变该取舍，也不把它上升为本 ADR
    的口径契约。
 
 ### Consequences
 
-- 并发或异常注入下，簿记末位与池的实际生效口径一致：要么两侧同时登记成功，要么
-  回滚为调用前状态（簿记不动）。
+- 并发或异常注入下，簿记末位与**Python 池**的实际生效口径一致：登记成功即两侧
+  同步；`furnsh` 失败回滚为调用前状态（簿记不动）；`unload` 失败恢复 Python 侧
+  并把该条目移到末位（恢复即重新加载）。此时 Rust 池因 `unload` 失败保持原次序，
+  两池次序本就无法兼顾，以 Python 池 + 簿记对齐为准。
 - 守卫：`tests/data/kernels/test_spice_manager.py::TestKernelBookkeepingAtomicity`
-  （Python `furnsh` 观察到簿记锁已持有；加载/卸载失败时回滚；告警在锁外；重载失败
-  不丢先前加载）。
+  （Python `furnsh` 观察到簿记锁已持有；加载失败回滚；卸载失败恢复并重排簿记；
+  重载失败不丢先前加载；告警在锁外）。
 - 测试隔离随之收紧：会真实 `furnsh` 的用例改在 `try/finally` 中卸载，`de421.bsp`
   不再从断言失败路径泄漏到同 worker 的后续用例。

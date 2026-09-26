@@ -497,6 +497,36 @@ class TestKernelBookkeepingAtomicity:
         assert SPICEManager._loaded_ephemeris == [(abspath, "DE421")]
 
     @requires_de421
+    def test_unload_failure_moves_restored_kernel_to_last(self, monkeypatch):
+        """被卸载者不是末位内核时，恢复（重新 furnsh）要把它在簿记中挪到末位。
+
+        Python 池内重新 furnsh 使该内核重成「后加载者」（重叠段生效者），若簿记仍
+        留在原位置，就会「位置按该内核、GM 按旧末位」地失配（ADR 0048 Revision (c)）。
+        """
+        import e2m2e.data.kernels.manager as manager_module
+        import e2m2e.spice_ext as spice_ext
+
+        path = de421_kernel_file()
+        abspath = os.path.abspath(path)
+        other = (os.path.join(os.path.dirname(abspath), "de440s.bsp"), "DE440")
+        stub = _RecordingSpicePy()
+        monkeypatch.setattr(manager_module, "get_spiceypy", lambda: stub)
+        monkeypatch.setattr(SPICEManager, "_loaded_ephemeris", [(abspath, "DE421"), other])
+
+        def failing_unload(path: str) -> None:
+            raise RuntimeError("rust unload failed")
+
+        monkeypatch.setattr(spice_ext, "spice_unload", failing_unload, raising=False)
+
+        with pytest.raises(RuntimeError, match="rust unload failed"):
+            SPICEManager().unload_kernel(path)
+
+        assert stub.calls == [("unload", abspath, True), ("furnsh", abspath, True)]
+        # 恢复即重新加载：de421 移到末位，GM 口径回到 DE421（与 Python 池生效末位一致）
+        assert SPICEManager._loaded_ephemeris == [other, (abspath, "DE421")]
+        assert SPICEManager().ephemeris_datum == "DE421"
+
+    @requires_de421
     def test_reload_failure_does_not_drop_previous_load(self, monkeypatch):
         """重载同一内核时 Rust 失败：回滚恰为本次 furnsh 的逆操作，先前加载与簿记保留。
 

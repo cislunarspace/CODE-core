@@ -408,8 +408,11 @@ class SPICEManager(EphemerisProvider):
         池内部状态的线程安全（ADR 0048）。
 
         失败回滚：Python ``unload`` 成功后若 Rust ``unload`` 抛错，则用
-        Python ``furnsh`` 把 Python 侧恢复（两池重新一致）、**保留**簿记条目
-        （内核仍在池中），然后按原异常上抛；恢复失败只告警，仍上抛原异常。
+        Python ``furnsh`` 把 Python 侧恢复（成员回到两池）、把该内核的簿记条目
+        移到末位（恢复即重新加载，Python 池内它重新成为「后加载者」），然后按
+        原异常上抛；恢复失败只告警，仍上抛原异常。Rust 池因 unload 失败保持原
+        次序，两池次序此时无法兼顾，以 Python 池与簿记对齐为准（ADR 0048
+        Revision (c)）。
 
         Raises:
             Exception: ``unload`` 失败时按原异常上抛（先恢复已生效的一侧；
@@ -420,13 +423,14 @@ class SPICEManager(EphemerisProvider):
         from e2m2e.spice_ext import spice_unload
 
         abspath = os.path.abspath(path)
+        datum = _datum_for_kernel(path)
         with SPICEManager._bookkeeping_lock:
             get_spiceypy().unload(path)
             if spice_unload is not None:
                 try:
                     spice_unload(path)
                 except Exception:
-                    # Rust 侧失败时 Python 侧已 unload：恢复 Python 侧使两池一致；
+                    # Rust 侧失败时 Python 侧已 unload：恢复 Python 侧（成员回到两池），
                     # 内核仍在池中，故簿记条目保留，原异常上抛。
                     try:
                         get_spiceypy().furnsh(path)
@@ -437,6 +441,16 @@ class SPICEManager(EphemerisProvider):
                             path,
                             exc_info=True,
                         )
+                    else:
+                        # 恢复即「重新加载」：Python 池里该内核回到末位（重叠段后加载者
+                        # 生效），故把簿记条目也移到末位，使 GM 口径跟随 Python 池实际
+                        # 生效的末位。Rust 池因 unload 失败保持原次序，两池次序此时本就
+                        # 无法兼顾，以 Python 池 + 簿记对齐为准（ADR 0048 Revision (c)）。
+                        if datum is not None:
+                            loaded = SPICEManager._loaded_ephemeris
+                            if any(entry[0] == abspath for entry in loaded):
+                                loaded[:] = [entry for entry in loaded if entry[0] != abspath]
+                                loaded.append((abspath, datum))
                     raise
             loaded = SPICEManager._loaded_ephemeris
             loaded[:] = [entry for entry in loaded if entry[0] != abspath]
