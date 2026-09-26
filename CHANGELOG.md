@@ -20,6 +20,9 @@
 - **`transfer_design` 的 `tof_range` 校验收紧**：请求侧现在要求恰好 2 个有限数且 `min < max`（与 WSB 搜索参数同口径），非法输入映射 `INVALID_PARAMS`。此前单元素列表会以 `IndexError` 被译成 `TRANSFER_FAILED`，反向或非有限窗口则被静默降级为求解结果（如 `NO_INTERSECTION`）。(#698)
 - **NominalOrbit 契约声称收窄**：`NominalOrbit` 只保证等间距历元状态表；`floquet_basis`／`projection_factors`／`interpolator` 明确为**无生产者的可选扩展点**（此前 README、ADR 0015 与类 docstring 声称由设计侧预计算并"供轨道保持直接消费"，从未落地）。空占位模块 `e2m2e/algorithm/nominal_orbit/` 与空测试目录作为死重移除。需要预计算的调用方在上游生成后经这些字段注入；投影因子按控制律定义，不在契约层通用定义。(#629)
 
+### Removed
+- **`data/templates` 的两个无消费者枚举**：`StabilityLabel`、`BifurcationLabel` 从 `e2m2e.data.templates` 的导出面移除。二者与 `e2m2e.algorithm.stability` 的 `StabilityType`／`BifurcationType` 是同一概念的平行第二份定义，除本包 `__init__` 的 re-export 外全仓库零引用；分岔与稳定性的对外口径以算法层枚举为准。(#687)
+
 ### Fixed
 - **星历传播失败原因透传**：`EphemerisDynamics.propagate`（Rust N 体快速路径）失败时的 `RuntimeError` 不再一律写 "likely cause: SPICE kernels not loaded or step size collapsed"，改为按实际原因给出可机读的 `cause:` 段——内核未加载 / 内核覆盖不足（保留底层 SPICE 解释文本）/ 星历缓存窗口外（保留请求 et 与缓存区间）/ 缓存键未注册 / strict 区缓存未启用；力模型未报错时归为步长塌缩或步数上限；失败语义不变（覆盖外仍硬失败）。FFI 失败类型统一为 `PropagationFailure`（`E2M2EError` 子类，替代裸 `RuntimeError`）；MCP/CLI/sidecar 信封对 `E2M2EError` 层次新增 `E2M2E_ERROR` 翻译分支，信封 message 保留完整 cause 文本、details 给出异常类型名（传输层零丢失）；`orbit_propagation` 的 `PROPAGATION_FAILED` 路径 `error.details` 同步携带 `{status, cause, diagnostic}`（诊断为原样文本，不解析、不改写）。(#677)
 - **反向多重/分段打靶收敛**：`multiple_shooting_correct`/`segmented_shooting_correct` 接受单调递减的 `t_patch`（反向传播工作流）。此前 compiled 传播路径（PD45/PD78）写死正向，递减 `t_patch` 立即报 "output length mismatch: got 1 time points, expected 2"；现传播方向由时间跨度/输出网格的单调方向决定，反向段积分与 STM 变分方程正确工作，正向行为逐位不变。(#640)

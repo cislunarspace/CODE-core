@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from .design import RO_SUPPORTED_RESONANCES, SEGMENTED_CORRECTION_ORBIT_TYPES
 from .enums import (
-    BifurcationLabel,
     BoundaryMode,
     ConvergenceState,
     FailureCause,
@@ -20,7 +19,6 @@ from .enums import (
     OrbitFamilyType,
     ProjectionPlane,
     ReferenceFrame,
-    StabilityLabel,
     TransferPhase,
     TransferType,
     UnitSystem,
@@ -51,7 +49,5 @@ __all__ = [
     "FailureCause",
     "LibrationPoint",
     "OrbitFamilyType",
-    "StabilityLabel",
-    "BifurcationLabel",
     "TransferPhase",
 ]
