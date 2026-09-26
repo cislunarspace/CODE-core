@@ -151,6 +151,39 @@ def test_invalid_params_yields_error_envelope(facade):
     assert frames == []
 
 
+def test_orbit_propagation_failure_details_carry_cause(facade, monkeypatch):
+    """#677 验收（真实调用链）：orbit_propagation 传播失败的 cause 进信封 details。"""
+    from e2m2e.exceptions import PropagationFailure
+
+    diagnostic = (
+        "propagation truncated: got 1 of 5 time points (t_span=(0.000, 3600.000)); "
+        "cause: SPICE ephemeris query failed (insufficient kernel coverage or missing data)"
+    )
+
+    def boom(**kwargs):
+        raise PropagationFailure(diagnostic)
+
+    monkeypatch.setattr("e2m2e.algorithm.propagation.propagate_orbit", boom)
+    env, frames = execution.execute_tool(
+        facade,
+        "orbit_propagation",
+        {
+            "initial_state": [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0],
+            "epoch": "2025-06-21T11:00:00",
+            "duration": 3600.0,
+        },
+    )
+    assert env["status"] == "error"
+    assert env["error"]["code"] == "PROPAGATION_FAILED"
+    assert env["error"]["details"] == {
+        "status": "failed",
+        "cause": "unknown",
+        "diagnostic": diagnostic,
+    }
+    json.dumps(env)  # details 全为枚举取值，信封必须可直接 JSON 序列化
+    assert frames == []
+
+
 def test_progress_callback_forwarded_only_when_accepted(facade):
     """回调按方法签名过滤：未声明 progress_callback 形参的工具不注入。"""
     seen: list[float] = []
