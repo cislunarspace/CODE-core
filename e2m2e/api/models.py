@@ -827,8 +827,9 @@ class TransferDesignRequest(_ApiModel):
         max_length=2,
         description=(
             "飞行时间范围 [min, max]（天；须为有限数对且 min < max）：HMN 作 "
-            "Lambert 扫描窗口、LGA/WSB 作搜索窗口、PCN 覆盖 "
-            "PcnSearchParams.tof_range_days（到达与出发两种模式共用的 tof 搜索网格）"
+            "Lambert 扫描窗口、WSB 作搜索窗口、PCN 覆盖 "
+            "PcnSearchParams.tof_range_days（到达与出发两种模式共用的 tof 搜索网格）；"
+            "LGA/low_thrust 不使用"
         ),
     )
     lga_search_params: Any = Field(default=None, description="LGA 搜索参数（LgaSearchParams 实例）")
