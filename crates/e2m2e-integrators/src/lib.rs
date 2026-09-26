@@ -389,6 +389,8 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   ``generate_cr3bp_family_windows_py`` 的族分派（两入口各增可选关键字
 ///   参数 ``resonance_p`` / ``resonance_q``），``orbit_family_metric_py``
 ///   增 ``earth-distance`` 度量（issue #627）。
+/// - **v25**：新增 ``nrlmsise00_density_py``（NRLMSISE-00 密度/温度查询绑定，
+///   供 ``NRLMSISE00Atmosphere.density`` 调用；issue #637）。
 ///
 /// 1→3 跳号实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。

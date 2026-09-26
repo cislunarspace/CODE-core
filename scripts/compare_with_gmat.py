@@ -342,6 +342,7 @@ def _write_report(
     atmosphere: str = "exponential",
     space_weather_e2m2e: str = "n/a",
     gmat_script_cfg: dict[str, str | None] | None = None,
+    include_drag: bool = True,
 ) -> Path:
     """写 Markdown 报告。"""
     report_path = output_dir / "comparison_report.md"
@@ -364,7 +365,8 @@ def _write_report(
     lines.append("- 轨道：400 km 高度圆轨道，倾角 51.6°")
     lines.append("- 历元：2025-06-21T11:00:06 UTC")
     lines.append("- 坐标系：EarthICRF")
-    lines.append(f"- 力模型：J2(10,10) + {atmosphere} 阻力 + SRP（无阴影）")
+    drag_text = f"{atmosphere} 阻力" if include_drag else "无阻力"
+    lines.append(f"- 力模型：J2(10,10) + {drag_text} + SRP（无阴影）")
     lines.append(f"- 空间天气（e2m2e 侧）：{space_weather_e2m2e}")
     cfg = gmat_script_cfg or {}
     if cfg.get("drag") is None:
@@ -518,8 +520,15 @@ def main() -> None:
     script_path = output_dir / "leo_reference_gmat.script"
 
     # 对拍两侧必须同配置：核对实际要跑的 GMAT 脚本的大气模型与 e2m2e 侧选择。
+    # `--no-drag` 时两侧都应为无阻力，故期望值同样由该开关决定（否则 --no-drag
+    # 配 `Drag = None` 脚本这种"两侧一致"的组合会被误拒）。
     script_cfg = _read_gmat_script_config(script_path)
-    expected_drag = "MSISE90" if args.atmosphere == "nrlmsise00" else "Exponential"
+    if args.no_drag:
+        expected_drag = "None"
+    elif args.atmosphere == "nrlmsise00":
+        expected_drag = "MSISE90"
+    else:
+        expected_drag = "Exponential"
     if script_cfg["drag"] is not None and script_cfg["drag"] != expected_drag:
         raise SystemExit(
             f"GMAT 脚本 {script_path.name} 的 Drag = {script_cfg['drag']}，而 e2m2e 侧选择 "
@@ -582,6 +591,7 @@ def main() -> None:
         atmosphere=args.atmosphere,
         space_weather_e2m2e=e2m2e_data.get("space_weather", "n/a"),
         gmat_script_cfg=script_cfg,
+        include_drag=not args.no_drag,
     )
 
     print(f"Done. Report: {report_path}")
