@@ -9,6 +9,7 @@ import pytest
 
 from e2m2e.api.facade import Facade
 from e2m2e.data.constants import Datum
+from e2m2e.data.constants.bodies import MOON
 from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.maneuver import ManeuverTable
 from e2m2e.data.types.sk_statistic import SKStatistic
@@ -205,6 +206,54 @@ class TestTransferResponse:
         )
         assert response.details["mjd_tdb"] == [60000.0]
 
+    def test_maps_pcn_bplane_and_asymptote(self, monkeypatch):
+        """PCN 出口字段逐字段映射（#635）；perilune_alt = r_p − R_moon。"""
+        import e2m2e.algorithm.transfer as transfer
+
+        r_moon = MOON.require_mean_radius_km()
+        fake_result = self._fake_transfer_result(
+            transfer_type="PCN",
+            bplane=SimpleNamespace(
+                v_inf_km_s=1.79,
+                c3_km2_s2=3.2,
+                rha_deg=54.9,
+                dha_deg=12.2,
+                bdot_r_km=0.0,
+                bdot_t_km=-3087.4,
+                b_mag_km=3087.4,
+                theta_deg=180.0,
+                perilune_radius_km=r_moon + 182.0,
+            ),
+            departure_asymptote=SimpleNamespace(rha_deg=32.0, dha_deg=0.0, c3_km2_s2=1.0),
+        )
+        monkeypatch.setattr(transfer, "transfer_orbit", lambda *args, **kwargs: fake_result)
+        response = Facade().transfer_design(
+            transfer_type="PCN",
+            tli_epoch=0.0,
+            departure_asymptote={"rha_deg": 32.0, "dha_deg": 0.0, "c3_km2_s2": 1.0},
+        )
+
+        assert response.bplane is not None
+        assert response.bplane.v_inf_km_s == 1.79
+        assert response.bplane.perilune_alt_km == pytest.approx(182.0)
+        assert response.departure_asymptote is not None
+        assert response.departure_asymptote.rha_deg == 32.0
+
+    def test_pcn_fields_absent_maps_to_none(self, monkeypatch):
+        """算法层结果无 PCN 字段（HMN/LGA）时响应两字段为 None。"""
+        import e2m2e.algorithm.transfer as transfer
+
+        fake_result = self._fake_transfer_result()
+        monkeypatch.setattr(transfer, "transfer_orbit", lambda *args, **kwargs: fake_result)
+        response = Facade().transfer_design(
+            transfer_type="LGA",
+            tli_epoch="2025-06-21T11:00:00",
+            target_ephemeris=[[1.0] * 6],
+        )
+
+        assert response.bplane is None
+        assert response.departure_asymptote is None
+
 
 class TestDesignResponse:
     def test_translates_geometry_and_ephemeris(self, monkeypatch):
@@ -303,3 +352,39 @@ class TestControlResponse:
 
         assert response.sk_statistic == {"rows": [[0.0] * 3] * 2, "num_failed": 1}
         assert response.maneuvers == {"mjd_tdb": [60000.0], "delta_v_mps": [1.0]}
+
+
+class TestPcnFacadeValidation:
+    """PCN 目标参数 XOR 校验（#635）：facade 边界映射 INVALID_PARAMS。"""
+
+    def test_missing_target_rejected(self):
+        from e2m2e.api.models import OrbitError
+
+        with pytest.raises(OrbitError) as exc:
+            Facade().transfer_design(transfer_type="PCN", tli_epoch=0.0, parking_alt_km=200.0)
+        assert exc.value.code == "INVALID_PARAMS"
+
+    def test_both_targets_rejected(self):
+        from e2m2e.api.models import OrbitError
+
+        with pytest.raises(OrbitError) as exc:
+            Facade().transfer_design(
+                transfer_type="PCN",
+                tli_epoch=0.0,
+                parking_alt_km=200.0,
+                bplane_target={"perilune_alt_km": 200.0, "bdot_t_km": 0.0},
+                departure_asymptote={"rha_deg": 32.0, "dha_deg": 0.0, "c3_km2_s2": 1.0},
+            )
+        assert exc.value.code == "INVALID_PARAMS"
+
+    def test_non_pcn_type_with_target_rejected(self):
+        from e2m2e.api.models import OrbitError
+
+        with pytest.raises(OrbitError) as exc:
+            Facade().transfer_design(
+                transfer_type="HMN",
+                tli_epoch=0.0,
+                target_orbit_radius_km=384400.0,
+                bplane_target={"perilune_alt_km": 200.0, "bdot_t_km": 0.0},
+            )
+        assert exc.value.code == "INVALID_PARAMS"

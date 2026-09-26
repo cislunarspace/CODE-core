@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- **PCN patched-conic 目标参数化（B-plane / 双曲渐近线）**：`transfer_design(transfer_type="PCN")` 新增地月圆锥曲线拼接路径，把月心 B 平面（Vallado 定义：B·R、B·T、近月点高度）与双曲渐近线（RHA/DHA/C3）作为目标/决策变量。请求侧新增 `bplane_target`（到达模式：给定近月点高度与 B·T/B·R，打靶求解出发渐近线命中）与 `departure_asymptote`（出发模式：给定出发渐近线，解算月心 B 平面与 LOI 脉冲），二者互斥、恰给一个；响应侧新增 `bplane`/`departure_asymptote` 回显达成值。近月点圆化 LOI 为单脉冲，机动事件为 departure/arrival 两条。月球几何取 CR3BP 圆型理想化（θ₀=0），不消费 `target_ephemeris`；出发按共面圆停泊轨道理想化、仅支持 C3>0。新增内核 `algorithm/transfer/bplane.py`（正逆映射、解析雅可比、闭式近心距）与 `algorithm/transfer/pcn.py`（打靶编排）。(#635)
 - **Lyapunov 轨道设计入口**：`DesignOrbitRequest` 支持 `orbit_type="LYAPUNOV"`，为 L1/L2 设计平面轨道并完成分段星历修正与预报；振幅为一个周期内 `max|y|`（km），范围 5 000–60 000 km。(#628)
 
 ### Fixed

@@ -764,10 +764,31 @@ class ControlOrbitResponse(ResultResponse):
     )
 
 
+class BplaneTarget(_ApiModel):
+    """PCN 到达模式目标：月心 B-plane（Vallado 定义，#635）。
+
+    B 平面坐标：``bdot_t_km`` 沿 T̂ = normalize(ẑ×Ŝ)、``bdot_r_km`` 沿
+    R̂ = Ŝ×T̂（Ŝ 为入射渐近线速度方向）；``perilune_alt_km`` 为月面以上
+    近月点高度。
+    """
+
+    perilune_alt_km: float = Field(gt=0.0, description="目标近月点高度 (km，月面以上)")
+    bdot_t_km: float = Field(description="目标 B·T (km)")
+    bdot_r_km: float = Field(default=0.0, description="目标 B·R (km)，默认 0")
+
+
+class DepartureAsymptote(_ApiModel):
+    """地球出发双曲渐近线参数化（TLI 设计入口，#635）。"""
+
+    rha_deg: float = Field(ge=0.0, lt=360.0, description="渐近线赤经 (deg)")
+    dha_deg: float = Field(ge=-90.0, le=90.0, description="渐近线赤纬 (deg)")
+    c3_km2_s2: float = Field(gt=0.0, description="C3 能量 (km²/s²)，双曲出发须 >0")
+
+
 class TransferDesignRequest(_ApiModel):
     """转移轨道设计输入（对齐 algorithm/transfer 的 transfer_orbit 参数）。"""
 
-    transfer_type: str = Field(description="HMN/LGA/WSB/low_thrust")
+    transfer_type: str = Field(description="HMN/LGA/WSB/low_thrust/PCN（patched-conic 目标参数化）")
     tli_epoch: Any = Field(description="TLI 历元（UTC ISO 字符串或 JD_TDB 浮点数）")
     parking_alt_km: float = Field(default=200.0, gt=0.0, description="地球停泊轨道高度 (km)")
     incl_deg: float = Field(default=28.5, ge=0.0, le=180.0, description="轨道倾角 (度)")
@@ -780,7 +801,8 @@ class TransferDesignRequest(_ApiModel):
             "（km, km/s）状态，编排器直接无量纲化，不做惯性系→旋转系转换，"
             "orbit_propagation/design_orbit 产出的惯性星历必须先经 "
             "spacetime_transform(j2000_to_synodic) 转换后再传入，否则目标态几何全错；"
-            "HMN/low_thrust 按地心惯性系 km/km/s 状态解释。"
+            "HMN/low_thrust 按地心惯性系 km/km/s 状态解释；PCN 不使用（月球取 CR3BP"
+            "圆型理想化几何）。"
         ),
     )
     target_orbit_radius_km: float | None = Field(
@@ -834,6 +856,20 @@ class TransferDesignRequest(_ApiModel):
             "top-N 可行解契约（#583，ADR 0040 增补；可选）：返回至多 N 个"
             "可行候选（按上报 Δv 升序，选中解标记），推荐值 DEFAULT_TOP_N"
             "=5。缺省 None 不开启，行为与单解契约逐字段一致"
+        ),
+    )
+    bplane_target: BplaneTarget | None = Field(
+        default=None,
+        description=(
+            "PCN 到达模式目标：月心 B-plane（#635；与 departure_asymptote 二选一）。"
+            "给定近月点高度与 B·T/B·R，打靶求解出发渐近线使其命中"
+        ),
+    )
+    departure_asymptote: DepartureAsymptote | None = Field(
+        default=None,
+        description=(
+            "PCN 出发模式渐近线（#635；与 bplane_target 二选一）。"
+            "给定出发双曲渐近线，无迭代解算月心 B-plane 与 LOI 脉冲"
         ),
     )
 
@@ -895,6 +931,20 @@ class TransferCandidate(_ApiModel):
     )
 
 
+class BplaneInfo(_ApiModel):
+    """达成的月心 B-plane 参数（PCN 响应出口字段，#635）。"""
+
+    v_inf_km_s: float = Field(description="月心到达剩余速度 v∞ (km/s)")
+    c3_km2_s2: float = Field(description="月心到达 C3 = v∞² (km²/s²)")
+    rha_deg: float = Field(description="月心到达渐近线赤经 (deg)")
+    dha_deg: float = Field(description="月心到达渐近线赤纬 (deg)")
+    bdot_r_km: float = Field(description="达成 B·R (km)")
+    bdot_t_km: float = Field(description="达成 B·T (km)")
+    b_mag_km: float = Field(description="瞄准距离 |B| (km)")
+    theta_deg: float = Field(description="B 矢量角 atan2(B·R, B·T) (deg)")
+    perilune_alt_km: float = Field(description="达成近月点高度 (km，月面以上)")
+
+
 class TransferDesignResponse(ResultResponse):
     """转移轨道设计输出。"""
 
@@ -950,6 +1000,14 @@ class TransferDesignResponse(ResultResponse):
             "口径；未精化候选的 Δv 为网格估计（refined=False）。默认（不开）"
             "为 None；搜索零结果不携带"
         ),
+    )
+    bplane: BplaneInfo | None = Field(
+        default=None,
+        description=("达成的月心 B-plane 参数（#635；仅 PCN 路径填充，其余为 None）"),
+    )
+    departure_asymptote: DepartureAsymptote | None = Field(
+        default=None,
+        description=("实际使用的出发双曲渐近线（#635；仅 PCN 填充，与请求同 schema 回显实际值）"),
     )
     details: dict[str, Any]
     record_id: str | None = Field(
