@@ -106,7 +106,7 @@ uv pip install "e2m2e[mcp]"
 
 - 周期轨道族：DRO、Halo、Lyapunov、Lissajous、共振轨道（RO）、DPO、Axial、三角平动点 SPO / LPO、Horseshoe。
 - 数值算法：微分修正、多重打靶、延拓；全链路 CR3BP 初猜 → 星历修正 → 高精度预报。
-- 名义轨道契约（NominalOrbit）：等间距状态表 + Floquet 基 + 投影因子，供轨道保持直接消费。
+- 名义轨道契约（NominalOrbit）：等间距状态表，供轨道保持消费；Floquet 基、投影因子与高次插值器为可选扩展点，本仓库不预计算（见 `.out-of-scope/nominal-orbit-floquet-precompute.md`）。
 
 ### 转移轨道设计
 
