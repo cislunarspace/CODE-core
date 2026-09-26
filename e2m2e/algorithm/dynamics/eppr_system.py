@@ -23,7 +23,13 @@ from .system import System
 
 
 class EPPRSystem(System):
-    """Earth-Moon EPPR 系统（星历脉动旋转系，无量纲）。"""
+    """Earth-Moon EPPR 系统（星历脉动旋转系，无量纲）。
+
+    不暴露 ``primary_radius_km`` / ``secondary_radius_km``：EPPR 的长度单位是瞬时
+    地月距离 d(t)，静态 km 半径没有固定的无量纲对应，``Dynamics`` 的碰撞终止
+    （按特征尺度静态归一）在此帧下不成立；``propagate(collision_detection=True)``
+    会以"须先注入 body-radius"明确报错，而不是给出尺度错误的碰撞面。
+    """
 
     def __init__(
         self,
@@ -68,7 +74,7 @@ class EPPRSystem(System):
         """无量纲引力参数（委托 ``cr3bp_system``）。"""
         return self.cr3bp_system.gravitational_parameter(body)
 
-    # ---- 委托属性（碰撞检测等按 CR3BP 口径消费） ----
+    # ---- 委托属性 ----
 
     @property
     def mu(self) -> float:
@@ -84,16 +90,6 @@ class EPPRSystem(System):
     def secondary_body(self) -> str:
         """次天体名称。"""
         return self.cr3bp_system.secondary_body
-
-    @property
-    def primary_radius_km(self) -> float | None:
-        """主天体半径（km），供碰撞终止。"""
-        return self.cr3bp_system.primary_radius_km
-
-    @property
-    def secondary_radius_km(self) -> float | None:
-        """次天体半径（km），供碰撞终止。"""
-        return self.cr3bp_system.secondary_radius_km
 
     @property
     def characteristic_time(self) -> float:
