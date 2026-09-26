@@ -2,7 +2,7 @@
 
 发布条目面向调用方：写变化、用法与数值细节，issue 引用置段尾括号；内部实现路径与决策沿革不进本文件（住 ADR 与 issue）。已发布条目是不可变历史，保持写成时的语言。
 
-## [Unreleased]
+## [5.9.7] - 2026-09-26
 
 ### Added
 - **轨道预报方向选择 `direction`**：`orbit_propagation` 请求新增 `direction`（`"forward"`/`"backward"`，默认 `"forward"`），`duration` 恒为正的时长幅值——反向请求自 `epoch` 倒退积分 `duration`、轨迹终止于 `epoch − duration`；响应按积分次序给出带符号（反向时递减）时间轴并回显 `direction`，正向输出逐位不变。底层 `ForceModel.propagate` 相应放行递减 `t_span`（`t_eval` 须沿积分方向单调），可变质量低推力 7D 路径暂不支持反向。星历缓存窗口须覆盖反向段到达的最早时刻（调用契约见 `SPICemanager.enable_ephem_cache` 文档）。(#640)
