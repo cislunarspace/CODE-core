@@ -8,7 +8,12 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
-from e2m2e.algorithm.stability import BifurcationType, StabilityAnalysis, StabilityType
+from e2m2e.algorithm.stability import (
+    BifurcationType,
+    FamilyBifurcationScan,
+    StabilityAnalysis,
+    StabilityType,
+)
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.theory
@@ -202,23 +207,31 @@ class TestDetectBifurcationInFamily:
         dynamics = CR3BP_Dynamics(system)
         orbit = _make_orbit(n=5, period=2.0, system=system)
 
-        results = StabilityAnalysis.detect_bifurcation_in_family([orbit], dynamics, tolerance=1e-8)
-        assert isinstance(results, list)
+        # 同一轨道两成员：ν 恒定，任何穿越报告都是误报
+        scan = StabilityAnalysis.detect_bifurcation_in_family(
+            [orbit, orbit], (0.0, 1.0), dynamics=dynamics
+        )
+        assert isinstance(scan, FamilyBifurcationScan)
+        assert scan.points == ()
+        # 空结果只能来自「成功分析且无穿越」：成员分析失败同样产出空 points，
+        # 不钉 failures 会让缺原生链路时该用例静默变绿。
+        assert scan.failures == ()
 
     def test_handles_exception_gracefully(self):
         system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
         dynamics = CR3BP_Dynamics(system)
         orbit = _make_orbit(n=5, period=None, system=system)
 
-        results = StabilityAnalysis.detect_bifurcation_in_family([orbit], dynamics, tolerance=1e-8)
-        assert isinstance(results, list)
+        scan = StabilityAnalysis.detect_bifurcation_in_family(
+            [orbit, orbit], (0.0, 1.0), dynamics=dynamics
+        )
+        assert scan.points == ()
+        assert [failure.parameter for failure in scan.failures] == [0.0, 1.0]
 
 
 class TestFindNearestBifurcation:
     def test_returns_none_when_no_bifurcation(self):
-        system = CR3BP_System(mu=0.01215, primary="Earth", secondary="Moon")
-        dynamics = CR3BP_Dynamics(system)
-        orbit = _make_orbit(n=5, period=2.0, system=system)
+        scan = FamilyBifurcationScan(points=(), branch_jumps=(), failures=())
 
-        result = StabilityAnalysis.find_nearest_bifurcation([orbit], dynamics, tolerance=1e-8)
+        result = StabilityAnalysis.find_nearest_bifurcation(scan, target=0.5)
         assert result is None
