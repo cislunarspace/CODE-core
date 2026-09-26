@@ -188,3 +188,12 @@ tests should be extended to replace the synthetic ones. The expectation map
 in `catalog_ingest` is the single place design-side vocabulary and taxonomy
 meet; a future vocabulary change (e.g. STK CODE publishing its semantics)
 is a one-map edit plus an ADR amendment.
+
+## Revision (2026-09-26, PR #663)
+
+Lyapunov L1/L2 gained design capability: `design_lyapunov` + the family
+registry entry (amplitude = per-period max|y|, 5 000–60 000 km). Section 4's
+parenthetical "(no design capability yet)" no longer applies to
+`lyapunov_l1/l2`; the labels' *verification* there stays synthetic until the
+baseline-anchored tests are extended with designer-generated members, per
+the Consequences paragraph above. `lyapunov_l3` remains design-less.
