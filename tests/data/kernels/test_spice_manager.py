@@ -8,8 +8,10 @@ import datetime
 import os
 
 import pytest
-from kernel_helpers import SPICE_KERNEL_DIR
+from kernel_helpers import SPICE_KERNEL_DIR, de421_kernel_file, requires_de421
 
+from e2m2e.data.constants import Datum
+from e2m2e.data.constants.bodies import JUPITER, MOON
 from e2m2e.data.kernels.manager import SPICEManager
 
 pytestmark = [
@@ -209,6 +211,175 @@ class TestSPICEManagerFindEphemerisKernel:
         """目录不存在时应抛出 FileNotFoundError"""
         with pytest.raises(FileNotFoundError):
             bare_spice_manager.find_ephemeris_kernel("/nonexistent/path/to/kernels")
+
+    @requires_de421
+    def test_find_kernel_preferred_de421(self, bare_spice_manager, tmp_path):
+        """显式请求 DE421 口径时，de421.bsp 优先于其它 DE 系列（ADR 0048）。"""
+        import shutil
+
+        shutil.copy(de421_kernel_file(), tmp_path / "de421.bsp")
+        (tmp_path / "de440s.bsp").write_bytes(b"fake")
+        path = bare_spice_manager.find_ephemeris_kernel(str(tmp_path), preferred="DE421")
+        assert path.endswith("de421.bsp")
+
+    def test_find_kernel_preferred_missing_raises(self, bare_spice_manager, tmp_path):
+        """显式请求的口径内核缺失时报错，不静默降级到其它 DE 系列。"""
+        (tmp_path / "de435.bsp").write_bytes(b"fake")
+        with pytest.raises(FileNotFoundError, match="de421.bsp"):
+            bare_spice_manager.find_ephemeris_kernel(str(tmp_path), preferred="DE421")
+
+    def test_find_kernel_unknown_preferred_raises(self, bare_spice_manager, tmp_path):
+        """未知基准没有偏好内核，显式请求应报错而非回落到默认优先级。"""
+        (tmp_path / "de440s.bsp").write_bytes(b"fake")
+        with pytest.raises(ValueError, match="未知的星历基准"):
+            bare_spice_manager.find_ephemeris_kernel(str(tmp_path), preferred="DE999")
+
+
+# =============================================================================
+# Test GM 基准与星历内核配对（ADR 0048）
+# =============================================================================
+class TestEphemerisDatumGM:
+    """GM 口径跟随已加载星历内核；缺该基准记录时回退 DE440 并告警。
+
+    背景：SPK 内核本身不携带 GM（``bodvrd(..., "GM")`` 报 KERNELVARNOTFOUND），
+    GM 只能来自 constants.toml 的声明式 body 表，故 datum 由内核**文件名**推断。
+    """
+
+    def test_default_datum_is_de440(self, bare_spice_manager):
+        """未加载任何星历内核时，口径为 ADR 0022 的星历动力学默认 DE440。"""
+        assert bare_spice_manager.ephemeris_datum == "DE440"
+        assert bare_spice_manager.get_gm("MOON") == MOON.gm_by_datum["DE440"]
+
+    def test_explicit_datum_overrides_active(self, bare_spice_manager):
+        """显式 datum 覆盖当前口径；天体名大小写不敏感。"""
+        assert bare_spice_manager.get_gm("moon", datum="DE421") == Datum.DE421.moon_gm
+        assert bare_spice_manager.get_gm("MOON", datum="de421") == Datum.DE421.moon_gm
+
+    def test_missing_datum_falls_back_to_de440_with_warning(self, bare_spice_manager, caplog):
+        """请求基准下无该天体记录时回退 DE440 并告警一次（不静默混用）。"""
+        with caplog.at_level("WARNING"):
+            gm = bare_spice_manager.get_gm("JUPITER", datum="DE421")
+            bare_spice_manager.get_gm("JUPITER", datum="DE421")
+        assert gm == JUPITER.gm_by_datum["DE440"]
+        warnings = [r for r in caplog.records if "JUPITER" in r.getMessage()]
+        assert len(warnings) == 1, "同一 (天体, 基准) 组合只应告警一次"
+
+    @requires_de421
+    def test_loading_de421_switches_gm_datum(self, monkeypatch):
+        """加载 de421.bsp 后 GM 切到 DE421；卸载后回落默认口径。
+
+        furnsh 被替换为 no-op：只验证 manager 的 datum 簿记，不触碰内核池
+        （真实加载路径由 test_de421_datum.py 端到端覆盖）。
+        """
+        import e2m2e.spice_ext as spice_ext
+
+        monkeypatch.setattr(spice_ext, "spice_furnsh", None, raising=False)
+        monkeypatch.setattr(spice_ext, "spice_unload", None, raising=False)
+        path = de421_kernel_file()
+        mgr = SPICEManager()
+        start = mgr.get_gm("MOON")
+        mgr.load_kernel(path)
+        assert mgr.ephemeris_datum == "DE421"
+        assert mgr.get_gm("MOON") == Datum.DE421.moon_gm
+        assert mgr.get_gm("MOON") != start
+        mgr.unload_kernel(path)
+        assert mgr.ephemeris_datum == "DE440"
+        assert mgr.get_gm("MOON") == start
+
+    @requires_de421
+    def test_last_loaded_ephemeris_wins(self, monkeypatch):
+        """同时加载两个星历内核时，口径取后加载者（与 SPICE 优先级规则一致）。"""
+        import e2m2e.spice_ext as spice_ext
+
+        monkeypatch.setattr(spice_ext, "spice_furnsh", None, raising=False)
+        monkeypatch.setattr(spice_ext, "spice_unload", None, raising=False)
+        de440s = os.path.join(SPICE_KERNEL_DIR, "de440s.bsp")
+        if not os.path.isfile(de440s):
+            pytest.skip("de440s.bsp not available")
+        mgr = SPICEManager()
+        de421 = de421_kernel_file()
+        mgr.load_kernel(de421)
+        try:
+            mgr.load_kernel(de440s)
+            assert mgr.ephemeris_datum == "DE440"
+            assert mgr.get_gm("MOON") == Datum.DE440.moon_gm
+            # 卸载后加载者 → 回落到仍在加载的 de421
+            mgr.unload_kernel(de440s)
+            assert mgr.ephemeris_datum == "DE421"
+            assert mgr.get_gm("MOON") == Datum.DE421.moon_gm
+        finally:
+            # 簿记类级/进程级（ADR 0048）：不卸载会泄漏到同 worker 的后续用例
+            mgr.unload_kernel(de421)
+
+
+class TestDatumBookkeepingScope:
+    """口径簿记与告警的作用域（#683 评审修复，ADR 0048）。
+
+    内核池是 CSPICE 进程级全局的，故 datum 簿记必须**类级共享**；告警去重则按
+    **manager 实例**，避免跨测试/跨调用方耦合。
+    """
+
+    def test_bookkeeping_is_class_level(self, monkeypatch):
+        """任一实例加载的星历内核，对同进程其它实例同样生效（与池同域）。"""
+        monkeypatch.setattr(SPICEManager, "_loaded_ephemeris", [("/tmp/de421.bsp", "DE421")])
+        assert SPICEManager().ephemeris_datum == "DE421"
+
+    def test_fallback_warning_is_per_instance(self, monkeypatch, caplog):
+        """同一回退组合在两个实例上各告警一次（去重按实例，非进程全局）。"""
+        monkeypatch.setattr(SPICEManager, "_loaded_ephemeris", [("/tmp/de421.bsp", "DE421")])
+        with caplog.at_level("WARNING"):
+            SPICEManager().get_gm("JUPITER")
+            SPICEManager().get_gm("JUPITER")
+        warnings = [r for r in caplog.records if "JUPITER" in r.getMessage()]
+        assert len(warnings) == 2
+
+    def test_datum_kernel_names_single_source(self):
+        """基准→内核候选由 manager 单源导出（design 链路同引用，无第二份副本）。"""
+        assert SPICEManager.datum_kernel_names("de421") == ("de421.bsp",)
+        assert SPICEManager.datum_kernel_names("DE440") == ("de440.bsp", "de440s.bsp")
+        assert SPICEManager.datum_kernel_names("DE999") == ()
+
+    def test_find_kernel_preferred_de440_matches_design_contract(
+        self, bare_spice_manager, tmp_path
+    ):
+        """``preferred="DE440"`` 与 ``load_design_kernels(datum="DE440")`` 同契约。
+
+        同基准的多个内核等价：目录只有 ``de440.bsp`` 时也必须接受（否则与
+        manager 默认优先级 de440.bsp 优先自相矛盾）。
+        """
+        (tmp_path / "de440s.bsp").write_bytes(b"fake")
+        path = bare_spice_manager.find_ephemeris_kernel(str(tmp_path), preferred="DE440")
+        assert path.endswith("de440s.bsp")
+        (tmp_path / "de440s.bsp").unlink()
+        (tmp_path / "de440.bsp").write_bytes(b"fake")
+        path = bare_spice_manager.find_ephemeris_kernel(str(tmp_path), preferred="DE440")
+        assert path.endswith("de440.bsp")
+
+
+class TestKernelDatumWarnings:
+    """未收录 / 近似口径内核在加载时告警（落实 ADR 0048「绝不静默混用」）。"""
+
+    def test_approximated_kernel_warns_once(self, bare_spice_manager, caplog):
+        """de441 等按 DE440 近似的内核：按内核名告警一次。"""
+        with caplog.at_level("WARNING"):
+            bare_spice_manager._warn_approximated_kernel("de441", "DE440")
+            bare_spice_manager._warn_approximated_kernel("de441", "DE440")
+        warnings = [r for r in caplog.records if "de441" in r.getMessage()]
+        assert len(warnings) == 1
+
+    def test_authoritative_kernel_does_not_warn(self, bare_spice_manager, caplog):
+        """自有权威 GM 表的内核（de421/de440s）不告警。"""
+        with caplog.at_level("WARNING"):
+            bare_spice_manager._warn_approximated_kernel("de421", "DE421")
+            bare_spice_manager._warn_approximated_kernel("de440s", "DE440")
+        assert caplog.records == []
+
+    def test_unregistered_kernel_warns(self, bare_spice_manager, caplog):
+        """匹配 DE 命名但未收录的内核：不改变口径但必须告警。"""
+        with caplog.at_level("WARNING"):
+            bare_spice_manager._warn_unregistered_kernel("de423")
+        warnings = [r for r in caplog.records if "de423" in r.getMessage()]
+        assert len(warnings) == 1
 
 
 if __name__ == "__main__":

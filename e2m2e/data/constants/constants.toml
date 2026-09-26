@@ -49,6 +49,15 @@ earth_flattening = { value = 0.0033528106647474805, source = "WGS84" }
 
 # -----------------------------------------------------------------------------
 # 天体参数目录
+#
+# GM 按基准分列。``DE421`` 行的覆盖范围（ADR 0048）：
+# - 有卫星、两代星历 GM 确实不同的天体（EARTH/MOON/EMB）给出各自的 DE421 值；
+# - MERCURY/VENUS/MARS 的 GM 在 DE421 与 DE440 间是不变量，故两行同值，
+#   source 仍标真实的 "DE440"（值不错，出处不冒充）；
+# - SUN 与 JUPITER 及以外**未列 DE421**：其 DE421 GM 的权威出处不在本仓库现有
+#   证据内，留空比抄近邻值诚实（太阳 GM 由 IAU 高斯常数与定义 AU 确定，各代差异
+#   远小于仓库现有候选值之间的分歧，故不臆造）。按 DE421 口径查询这些天体时会
+#   回退到 DE440 并告警一次，需补权威来源后再填（见 #670）。
 # -----------------------------------------------------------------------------
 [body.SUN]
 mean_radius_km = { value = 696000.0, source = "Vallado" }
@@ -91,6 +100,7 @@ mean_radius_km = { value = 2440.53, source = "IAU2015" }
 naif_id = { value = 199, source = "NAIF" }
 
 [body.MERCURY.gm]
+DE421 = { value = 22031.868551, source = "DE440" }
 DE440 = { value = 22031.868551, source = "DE440" }
 
 [body.VENUS]
@@ -98,6 +108,7 @@ mean_radius_km = { value = 6051.8, source = "IAU2015" }
 naif_id = { value = 299, source = "NAIF" }
 
 [body.VENUS.gm]
+DE421 = { value = 324858.592000, source = "DE440" }
 DE440 = { value = 324858.592000, source = "DE440" }
 
 [body.MARS]
@@ -105,6 +116,7 @@ mean_radius_km = { value = 3396.19, source = "IAU2015" }
 naif_id = { value = 499, source = "NAIF" }
 
 [body.MARS.gm]
+DE421 = { value = 42828.375816, source = "DE440" }
 DE440 = { value = 42828.375816, source = "DE440" }
 
 [body.JUPITER]

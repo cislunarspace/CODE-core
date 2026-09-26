@@ -33,6 +33,24 @@ requires_spice = pytest.mark.skipif(
 )
 
 
+def de421_kernel_file() -> str | None:
+    """``kernels/de421.bsp`` 的绝对路径；不存在时返回 ``None``。
+
+    DE421 是可选口径（ADR 0048）：仓库不提交该内核，由 ``kernels-v1``
+    release 经 ``make kernels`` 分发。它是**特定资源**，故本探测独立于
+    :func:`spice_kernels_available`（后者只管通用 .tls/.bsp 齐备性）。
+    """
+    path = os.path.join(SPICE_KERNEL_DIR, "de421.bsp")
+    return os.path.abspath(path) if os.path.isfile(path) else None
+
+
+#: DE421 口径专项 skip 标记：内核缺失时跳过（附获取指引），不硬失败。
+requires_de421 = pytest.mark.skipif(
+    de421_kernel_file() is None,
+    reason="DE421 kernel (de421.bsp) not available; run make kernels to fetch it from kernels-v1",
+)
+
+
 # 定义 body-fixed 帧所需的 SPICE 内核文件名：
 # 地球 ITRF93 需要二进制 PCK（earth_latest_high_prec.bpc），未来历元段由
 # 预测 PCK（SPICEEarthPredictedKernel.bpc，须先加载，使重叠段取历史高精度

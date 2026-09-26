@@ -14,6 +14,7 @@ from e2m2e.algorithm.forces import (
     GravityField,
     RelativisticCorrection,
     SolarRadiationPressure,
+    UniformAcceleration,
 )
 from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 from e2m2e.algorithm.forces.force_config import (
@@ -371,6 +372,43 @@ def test_finite_burn_invalid_direction_frame_from_config_raises():
 
     with pytest.raises(ValueError, match="direction_frame"):
         ForceModel.from_config(config_dict, system)
+
+
+def test_uniform_acceleration_round_trip():
+    """UniformAcceleration 的 from_config → to_config round-trip 与传播一致。"""
+    system = FakeSystem()
+    config_dict = {
+        "version": 1,
+        "forces": [
+            {
+                "name": "aoc",
+                "type": "UniformAcceleration",
+                "enabled": True,
+                "params": {
+                    "acceleration_rtn": [1e-6, 2e-6, 3e-6],
+                    "direction_frame": "RTN",
+                },
+            }
+        ],
+    }
+
+    fm = ForceModel.from_config(config_dict, system)
+
+    assert isinstance(fm.forces[0], UniformAcceleration)
+    assert ForceModel.to_config(fm) == config_dict
+
+    result = fm.propagate(
+        np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]),
+        (0.0, 1.0),
+        t_eval=np.array([0.0, 1.0]),
+    )
+    # atol=2e-9：1 s 内 RTN 基旋转 θ≈1.07e-3 rad 给 a_T 项的一阶偏差 ~1.07e-9；
+    # 此处校验配置往返与传播连通性，轴映射精度由 contract 用例专门校验。
+    np.testing.assert_allclose(
+        result["states"][-1, 3:6] - np.array([0.0, 7.5, 0.0]),
+        np.array([1e-6, 2e-6, 3e-6]),
+        atol=2e-9,
+    )
 
 
 def test_relativistic_correction_round_trip():

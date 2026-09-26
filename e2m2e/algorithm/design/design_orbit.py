@@ -205,6 +205,9 @@ _BODY_FIXED_KERNELS = [
     "SPICELunaFrameKernel.tf",
 ]
 
+#: 缺省行星历内核候选（按优先级）。None 口径下行为与历史一致。
+_DEFAULT_EPHEMERIS_KERNELS = ["de440s.bsp", "de430.bsp"]
+
 
 class DesignNotConvergedError(RuntimeError):
     """任务轨道设计未生成可用标称轨道。"""
@@ -307,24 +310,51 @@ def default_kernel_dir() -> str:
     return str(Path(__file__).resolve().parent.parent.parent.parent / "kernels")
 
 
-def load_design_kernels(spice: SPICEManager, kernel_dir: str | None = None) -> list[str]:
+def load_design_kernels(
+    spice: SPICEManager, kernel_dir: str | None = None, *, datum: str | None = None
+) -> list[str]:
     """加载设计链路所需内核：行星历 + body-fixed 帧内核。
 
     行星名→质心/本体 NAIF ID 别名由 :meth:`SPICEManager.load_kernel` 首次
     调用时统一注册（双侧同步，见 ``_BODY_ID_ALIASES``）。
 
-    返回实际加载的内核路径列表（调用方管理卸载）。
+    Args:
+        spice: 目标 SPICE 管理器。
+        kernel_dir: 内核目录；缺省用仓库自带 ``kernels/``。
+        datum: 行星历口径（``"DE421"``/``"DE440"``）。指定 ``"DE421"`` 时优先
+            加载 de421.bsp，使第三体位置与 GM 同为 DE421 口径（ADR 0048）；
+            **该内核缺失即报错，不静默降级**。None（默认）保持原有
+            de440s > de430 选择顺序，行为不变。
+
+    Returns:
+        实际加载的内核路径列表（调用方管理卸载）。
+
+    Raises:
+        FileNotFoundError: 目录内无可用行星历内核；或显式请求的口径内核缺失。
     """
     kernel_dir = kernel_dir or default_kernel_dir()
+    if datum is None:
+        ephemeris_candidates = _DEFAULT_EPHEMERIS_KERNELS
+    else:
+        names = SPICEManager.datum_kernel_names(datum)
+        if not names:
+            raise ValueError(f"未知的星历基准（无偏好内核）: {datum}")
+        # 显式口径：只用该口径内核（同一 datum 的多个内核等价，如 de440/de440s）；
+        # 不再追加其它 DE 系列，避免「请求 DE421 却因文件缺失静默用 de440s」的谎报。
+        ephemeris_candidates = list(names)
     loaded: list[str] = []
-    for name in ["de440s.bsp", "de430.bsp"]:
+    for name in ephemeris_candidates:
         path = os.path.join(kernel_dir, name)
         if os.path.exists(path):
             spice.load_kernel(path)
             loaded.append(path)
             break
     else:
-        raise FileNotFoundError(f"行星历内核不存在（de440s/de430）: {kernel_dir}")
+        wanted = " 或 ".join(ephemeris_candidates)
+        raise FileNotFoundError(
+            f"行星历内核不存在（{wanted}）: {kernel_dir}"
+            "（内核由 kernels-v1 release 分发，跑 make kernels 获取）"
+        )
     for name in _BODY_FIXED_KERNELS:
         path = os.path.join(kernel_dir, name)
         if os.path.exists(path):
