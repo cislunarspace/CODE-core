@@ -184,5 +184,7 @@ def test_legacy_propagation_outside_cache_window_reports_window(
     message = str(excinfo.value)
     assert "EPHEM_CACHE_MISS" in message
     assert "outside cached window" in message
-    # 查询时刻与缓存窗口都来自进程状态，不是照抄底层文本：两者须以数值出现。
-    assert re.search(r"et -?\d+\.\d+, window \[-?\d+\.\d+, -?\d+\.\d+\]", message)
+    # 窗口数值来自进程状态（`EphemCache::build` 两端各留 5·dt = 3000 s margin），
+    # 不是照抄底层文本——故钉住确切区间；et 是积分器步时刻，用通配。
+    window = f"window [{reference_et - 3000.0:.3f}, {reference_et + 6600.0:.3f}]"
+    assert re.search(rf"et -?\d+\.\d+, {re.escape(window)}", message)

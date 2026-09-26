@@ -513,8 +513,8 @@ struct EomFailure {
 /// 三个字段各对应一类可区分的失败来源；参数化成结构（而非散参数）以便纯测试，
 /// 见 `truncation_cause`。
 struct FailureContext {
-    /// SPK 内核池非空。
-    spk_loaded: bool,
+    /// SPK 内核池非空；`None` 表示未查询（strict 区禁止 cspice，不查内核池）。
+    spk_loaded: Option<bool>,
     /// 已启用星历缓存的覆盖区间；未启用为 `None`。
     cache_window: Option<(f64, f64)>,
     /// 处于 `StrictGuard` 区（并行打靶区内禁止回退 cspice）。
@@ -523,11 +523,20 @@ struct FailureContext {
 
 impl FailureContext {
     /// 取当前进程状态。
+    ///
+    /// strict 区不查内核池：该区禁止回退 cspice（并行区内的 cspice 调用是内核池
+    /// 损坏/panic 的根源），分类器在 strict 分支短路，本就不会读该字段。
     fn current() -> Self {
+        let cache_window = e2m2e_spice::ephem_cache::enabled_span();
+        let cache_strict = e2m2e_spice::ephem_cache::strict_enabled();
         Self {
-            spk_loaded: spk_kernels_loaded(),
-            cache_window: e2m2e_spice::ephem_cache::enabled_span(),
-            cache_strict: e2m2e_spice::ephem_cache::strict_enabled(),
+            spk_loaded: if cache_strict {
+                None
+            } else {
+                Some(spk_kernels_loaded())
+            },
+            cache_window,
+            cache_strict,
         }
     }
 }
@@ -536,7 +545,7 @@ impl FailureContext {
 ///
 /// 分类**只看进程状态查询**，不匹配错误文本（ADR 0020：不用错误码字符串
 /// 做翻译；同型的 `ktotal` 预检即该决策的先例）。底层错误文本仅作为证据拼在
-/// 末尾。四类：缓存窗口外（附查询时刻与窗口区间）/ 缓存键未注册 / strict 区
+/// 末尾。五类：缓存窗口外（附查询时刻与窗口区间）/ 缓存键未注册 / strict 区
 /// 缓存未启用 / 内核未加载 / 内核覆盖不足；`None` 表示积分器提前退出时力模型
 /// 从未报错（步长塌缩或步数上限）。
 fn truncation_cause(failure: Option<&EomFailure>, ctx: &FailureContext) -> String {
@@ -545,25 +554,25 @@ fn truncation_cause(failure: Option<&EomFailure>, ctx: &FailureContext) -> Strin
                 (integrator exited early, force model reported no error)"
             .to_string();
     };
-    let cause = match ctx.cache_window {
+    let cause = match (ctx.cache_window, ctx.cache_strict) {
         // 缓存已启用：窗口内的查询不会越界，只可能是键未注册；窗口外一律越界
         // （`lookup_*` 先判区间后判键，见 `ephem_cache.rs`）。
-        Some((start, end)) if !(start..=end).contains(&failure.et) => {
+        (Some((start, end)), _) if !(start..=end).contains(&failure.et) => {
             return format!(
                 "ephem cache query outside cached window \
                  (et {:.3}, window [{:.3}, {:.3}]): {}",
                 failure.et, start, end, failure.message
             );
         }
-        Some(_) => "ephem cache lookup failed (key not registered)",
+        (Some(_), _) => "ephem cache lookup failed (key not registered)",
         // strict 区未启用缓存：`lookup_*` 硬失败，与内核缺失/覆盖不足无关。
-        None if ctx.cache_strict => {
-            "ephem cache not enabled (strict region forbids cspice fallback)"
-        }
-        None if ctx.spk_loaded => {
-            "SPICE ephemeris query failed (insufficient kernel coverage or missing data)"
-        }
-        None => "SPICE kernels not loaded (SPK kernel pool is empty)",
+        (None, true) => "ephem cache not enabled (strict region forbids cspice fallback)",
+        (None, false) => match ctx.spk_loaded {
+            Some(false) => "SPICE kernels not loaded (SPK kernel pool is empty)",
+            // 非 strict 的 `current()` 必已查询内核池；纯测试可传 `None`，兜底到
+            // 覆盖类（内核缺失由 `Some(false)` 判，不会被此兜底掩盖）。
+            _ => "SPICE ephemeris query failed (insufficient kernel coverage or missing data)",
+        },
     };
     format!("{cause}: {}", failure.message)
 }
@@ -1144,14 +1153,14 @@ mod tests {
         }
     }
 
-    /// 构造分类用的进程状态快照。
+    /// 构造分类用的进程状态快照（`spk_loaded` 按"已查询"注入）。
     fn context(
         spk_loaded: bool,
         cache_window: Option<(f64, f64)>,
         cache_strict: bool,
     ) -> FailureContext {
         FailureContext {
-            spk_loaded,
+            spk_loaded: Some(spk_loaded),
             cache_window,
             cache_strict,
         }
@@ -1353,7 +1362,11 @@ mod tests {
             Err(e) => e,
         };
         assert!(err.contains("outside cached window"), "实际: {err}");
-        assert!(err.contains("window ["), "应带缓存窗口区间，实际: {err}");
+        // build 两端各留 5·dt = 3000 s margin ⇒ 窗口恰为 [-3000, 6600]。
+        assert!(
+            err.contains("window [-3000.000, 6600.000]"),
+            "窗口数值应来自进程状态，实际: {err}"
+        );
         assert!(err.contains("EPHEM_CACHE_MISS"), "实际: {err}");
     }
 
@@ -1410,6 +1423,10 @@ mod tests {
 
     /// strict 区（并行打靶区内禁止回退 cspice）且未启用缓存：lookup 硬失败，
     /// cause 应报"缓存未启用"，不误报内核覆盖不足。
+    ///
+    /// strict 区里每个力模型查询都硬失败，故失败必在初值预检出口（截断出口在
+    /// strict 下不可达）。正向断言用分类器独有的整句——底层 `Display` 文案
+    /// （`ephem cache not enabled`）会出现在证据文本里，不足以鉴别分类。
     #[test]
     fn propagate_in_strict_region_without_cache_reports_not_enabled() {
         let _g = test_lock();
@@ -1435,7 +1452,10 @@ mod tests {
             Err(e) => e,
         };
 
-        assert!(err.contains("ephem cache not enabled"), "实际: {err}");
+        assert!(
+            err.contains("ephem cache not enabled (strict region forbids cspice fallback)"),
+            "实际: {err}"
+        );
         assert!(!err.contains("insufficient kernel coverage"), "实际: {err}");
     }
 }
