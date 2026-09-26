@@ -268,8 +268,11 @@ class TestEphemerisDatumGM:
     def test_loading_de421_switches_gm_datum(self, monkeypatch):
         """加载 de421.bsp 后 GM 切到 DE421；卸载后回落默认口径。
 
-        furnsh 被替换为 no-op：只验证 manager 的 datum 簿记，不触碰内核池
-        （真实加载路径由 test_de421_datum.py 端到端覆盖）。
+        只把 Rust 桥（``e2m2e.spice_ext.spice_furnsh``/``spice_unload``）置为
+        None，Python 侧 ``spiceypy.furnsh``/``unload`` 仍**真实执行**：本用例验证
+        manager 的 datum 簿记与口径切换，故必须保证 de421 一定被卸载（try/finally），
+        否则泄漏到同 worker 的后续用例。真实双池加载路径由 test_de421_datum.py
+        端到端覆盖。
         """
         import e2m2e.spice_ext as spice_ext
 
@@ -278,17 +281,24 @@ class TestEphemerisDatumGM:
         path = de421_kernel_file()
         mgr = SPICEManager()
         start = mgr.get_gm("MOON")
-        mgr.load_kernel(path)
-        assert mgr.ephemeris_datum == "DE421"
-        assert mgr.get_gm("MOON") == Datum.DE421.moon_gm
-        assert mgr.get_gm("MOON") != start
-        mgr.unload_kernel(path)
+        try:
+            mgr.load_kernel(path)
+            assert mgr.ephemeris_datum == "DE421"
+            assert mgr.get_gm("MOON") == Datum.DE421.moon_gm
+            assert mgr.get_gm("MOON") != start
+        finally:
+            mgr.unload_kernel(path)
         assert mgr.ephemeris_datum == "DE440"
         assert mgr.get_gm("MOON") == start
 
     @requires_de421
     def test_last_loaded_ephemeris_wins(self, monkeypatch):
-        """同时加载两个星历内核时，口径取后加载者（与 SPICE 优先级规则一致）。"""
+        """同时加载两个星历内核时，口径取后加载者（与 SPICE 优先级规则一致）。
+
+        同 ``test_loading_de421_switches_gm_datum``：Rust 桥置 None，Python 侧
+        ``spiceypy.furnsh``/``unload`` 真实执行，故两个内核都必须在 try/finally
+        中卸载（de440s 在 finally 里重复卸载是幂等 no-op）。
+        """
         import e2m2e.spice_ext as spice_ext
 
         monkeypatch.setattr(spice_ext, "spice_furnsh", None, raising=False)
@@ -298,8 +308,8 @@ class TestEphemerisDatumGM:
             pytest.skip("de440s.bsp not available")
         mgr = SPICEManager()
         de421 = de421_kernel_file()
-        mgr.load_kernel(de421)
         try:
+            mgr.load_kernel(de421)
             mgr.load_kernel(de440s)
             assert mgr.ephemeris_datum == "DE440"
             assert mgr.get_gm("MOON") == Datum.DE440.moon_gm
@@ -308,7 +318,8 @@ class TestEphemerisDatumGM:
             assert mgr.ephemeris_datum == "DE421"
             assert mgr.get_gm("MOON") == Datum.DE421.moon_gm
         finally:
-            # 簿记类级/进程级（ADR 0048）：不卸载会泄漏到同 worker 的后续用例
+            # 簿记类级/进程级（ADR 0048）：不卸载会泄漏到同 worker 的后续用例。
+            mgr.unload_kernel(de440s)
             mgr.unload_kernel(de421)
 
 
@@ -354,6 +365,167 @@ class TestDatumBookkeepingScope:
         (tmp_path / "de440.bsp").write_bytes(b"fake")
         path = bare_spice_manager.find_ephemeris_kernel(str(tmp_path), preferred="DE440")
         assert path.endswith("de440.bsp")
+
+
+class _RecordingSpicePy:
+    """spiceypy 桩：记录 furnsh/unload 调用，并记录调用时簿记锁是否已被持有。"""
+
+    def __init__(self) -> None:
+        #: (方法名, 绝对路径, 调用时 ``_bookkeeping_lock.locked()``)
+        self.calls: list[tuple[str, str, bool]] = []
+
+    def _record(self, method: str, path: str) -> None:
+        self.calls.append((method, os.path.abspath(path), SPICEManager._bookkeeping_lock.locked()))
+
+    def furnsh(self, path: str) -> None:
+        """记录一次 furnsh。"""
+        self._record("furnsh", path)
+
+    def unload(self, path: str) -> None:
+        """记录一次 unload。"""
+        self._record("unload", path)
+
+
+class TestKernelBookkeepingAtomicity:
+    """furnsh 与簿记同一临界区 + 失败路径回滚（#697，ADR 0048 Revision (c)）。
+
+    全部用例用 monkeypatch 桩替掉 spiceypy 与 Rust 桥，不触碰真实 CSPICE 池，
+    故不依赖线程/sleep，也不依赖执行顺序。
+    """
+
+    @requires_de421
+    def test_python_furnsh_runs_inside_bookkeeping_lock(self, monkeypatch):
+        """Python furnsh 与簿记在同一临界区：furnsh 时簿记锁已被持有。
+
+        否则并发加载不同内核时，簿记末位可能晚于池里实际生效的末位，出现
+        「位置按新内核、GM 按旧簿记」的静默错配。
+        """
+        import e2m2e.data.kernels.manager as manager_module
+        import e2m2e.spice_ext as spice_ext
+
+        monkeypatch.setattr(SPICEManager, "_leapseconds_loaded", True)
+        monkeypatch.setattr(SPICEManager, "_bodies_registered", True)
+        monkeypatch.setattr(SPICEManager, "_loaded_ephemeris", [])
+        stub = _RecordingSpicePy()
+        monkeypatch.setattr(manager_module, "get_spiceypy", lambda: stub)
+        monkeypatch.setattr(spice_ext, "spice_furnsh", None, raising=False)
+        path = de421_kernel_file()
+
+        SPICEManager().load_kernel(path)
+
+        abspath = os.path.abspath(path)
+        assert stub.calls == [("furnsh", abspath, True)]
+        assert SPICEManager._loaded_ephemeris == [(abspath, "DE421")]
+
+    def test_load_warning_runs_outside_bookkeeping_lock(self, monkeypatch, tmp_path):
+        """加载期告警在临界区之外调用（``_warn_unregistered_kernel`` 读
+        ``ephemeris_datum``，会重入同一把非可重入锁 → 放进锁内即死锁）。
+
+        用 spy 替换告警方法：真发生回归时观察到 ``locked() is True`` 即 fail
+        fast，而不是把 CI 挂死。
+        """
+        import e2m2e.data.kernels.manager as manager_module
+        import e2m2e.spice_ext as spice_ext
+
+        monkeypatch.setattr(SPICEManager, "_leapseconds_loaded", True)
+        monkeypatch.setattr(SPICEManager, "_bodies_registered", True)
+        monkeypatch.setattr(SPICEManager, "_loaded_ephemeris", [])
+        stub = _RecordingSpicePy()
+        monkeypatch.setattr(manager_module, "get_spiceypy", lambda: stub)
+        monkeypatch.setattr(spice_ext, "spice_furnsh", None, raising=False)
+        observed: list[tuple[str, bool]] = []
+        monkeypatch.setattr(
+            SPICEManager,
+            "_warn_unregistered_kernel",
+            lambda _self, name: observed.append((name, SPICEManager._bookkeeping_lock.locked())),
+        )
+        unregistered = tmp_path / "de423.bsp"
+        unregistered.write_bytes(b"")
+
+        SPICEManager().load_kernel(str(unregistered))
+
+        # 未收录内核不登记簿记，告警也必须发生在临界区之外。
+        assert observed == [("de423", False)]
+        assert SPICEManager._loaded_ephemeris == []
+
+    @requires_de421
+    def test_load_rolls_back_python_furnsh_when_rust_fails(self, monkeypatch):
+        """Rust furnsh 失败 → 撤销 Python 侧、不登记簿记、原异常上抛。"""
+        import e2m2e.data.kernels.manager as manager_module
+        import e2m2e.spice_ext as spice_ext
+
+        monkeypatch.setattr(SPICEManager, "_leapseconds_loaded", True)
+        monkeypatch.setattr(SPICEManager, "_bodies_registered", True)
+        monkeypatch.setattr(SPICEManager, "_loaded_ephemeris", [])
+        stub = _RecordingSpicePy()
+        monkeypatch.setattr(manager_module, "get_spiceypy", lambda: stub)
+
+        def failing_furnsh(path: str) -> None:
+            raise RuntimeError("rust furnsh failed")
+
+        monkeypatch.setattr(spice_ext, "spice_furnsh", failing_furnsh, raising=False)
+        path = de421_kernel_file()
+
+        with pytest.raises(RuntimeError, match="rust furnsh failed"):
+            SPICEManager().load_kernel(path)
+
+        abspath = os.path.abspath(path)
+        assert stub.calls == [("furnsh", abspath, True), ("unload", abspath, True)]
+        assert SPICEManager._loaded_ephemeris == []
+
+    @requires_de421
+    def test_unload_restores_python_kernel_when_rust_fails(self, monkeypatch):
+        """Rust unload 失败 → Python 侧 re-furnsh 恢复、保留簿记、原异常上抛。"""
+        import e2m2e.data.kernels.manager as manager_module
+        import e2m2e.spice_ext as spice_ext
+
+        path = de421_kernel_file()
+        abspath = os.path.abspath(path)
+        stub = _RecordingSpicePy()
+        monkeypatch.setattr(manager_module, "get_spiceypy", lambda: stub)
+        monkeypatch.setattr(SPICEManager, "_loaded_ephemeris", [(abspath, "DE421")])
+
+        def failing_unload(path: str) -> None:
+            raise RuntimeError("rust unload failed")
+
+        monkeypatch.setattr(spice_ext, "spice_unload", failing_unload, raising=False)
+
+        with pytest.raises(RuntimeError, match="rust unload failed"):
+            SPICEManager().unload_kernel(path)
+
+        assert stub.calls == [("unload", abspath, True), ("furnsh", abspath, True)]
+        assert SPICEManager._loaded_ephemeris == [(abspath, "DE421")]
+
+    @requires_de421
+    def test_reload_failure_does_not_drop_previous_load(self, monkeypatch):
+        """重载同一内核时 Rust 失败：回滚恰为本次 furnsh 的逆操作，先前加载与簿记保留。
+
+        生产链路（``load_design_kernels`` 等）会对同一内核重复 ``load_kernel`` 且
+        从不卸载；若回滚多卸一条，就会丢掉先前那次加载。桩按 CSPICE 的实例语义
+        （``furnsh`` 记一条、``unload`` 撤销一条）记录调用次数，故这里断言本次
+        调用只产生一次 furnsh 与一次 unload。
+        """
+        import e2m2e.data.kernels.manager as manager_module
+        import e2m2e.spice_ext as spice_ext
+
+        path = de421_kernel_file()
+        abspath = os.path.abspath(path)
+        monkeypatch.setattr(SPICEManager, "_leapseconds_loaded", True)
+        monkeypatch.setattr(SPICEManager, "_bodies_registered", True)
+        monkeypatch.setattr(SPICEManager, "_loaded_ephemeris", [(abspath, "DE421")])
+        stub = _RecordingSpicePy()
+        monkeypatch.setattr(manager_module, "get_spiceypy", lambda: stub)
+
+        def failing_furnsh(path: str) -> None:
+            raise RuntimeError("rust furnsh failed")
+
+        monkeypatch.setattr(spice_ext, "spice_furnsh", failing_furnsh, raising=False)
+
+        with pytest.raises(RuntimeError, match="rust furnsh failed"):
+            SPICEManager().load_kernel(path)
+
+        assert stub.calls == [("furnsh", abspath, True), ("unload", abspath, True)]
+        assert SPICEManager._loaded_ephemeris == [(abspath, "DE421")]
 
 
 class TestKernelDatumWarnings:

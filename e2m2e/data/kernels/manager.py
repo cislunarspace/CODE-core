@@ -323,8 +323,21 @@ class SPICEManager(EphemerisProvider):
         GM 口径（:attr:`ephemeris_datum`），配对规则见模块级
         ``_KERNEL_DATUM_BY_SPK``。
 
+        并发契约：Python ``furnsh``（spiceypy）、Rust ``furnsh``（spice_ext）
+        与 ``_loaded_ephemeris`` 更新在**同一个** ``_bookkeeping_lock`` 临界区
+        内，故簿记顺序与内核池的实际生效顺序一致——并发加载不同内核时，簿记
+        末位不会晚于池里实际生效的末位（否则会出现「位置按新内核、GM 按旧簿记」
+        的静默错配）。本锁只界定这三步的相对顺序，既不串行化 CSPICE 池的其它
+        操作，也不承担池内部状态的线程安全（池是进程级全局的，见 ADR 0048）。
+
+        失败回滚：Python ``furnsh`` 成功后若 Rust ``furnsh`` 抛错，则撤销
+        Python 侧（``unload``）且不登记簿记，然后按原异常上抛（不换异常类型）；
+        撤销本身失败时只告警，仍上抛原异常。
+
         Raises:
             FileNotFoundError: 当指定路径的文件不存在时。
+            Exception: ``furnsh`` 失败时按原异常上抛（先撤销已生效的一侧；
+                撤销失败只告警，不掩盖原异常）。
         """
         if not os.path.exists(path):
             raise FileNotFoundError(f"Kernel file not found: {path}")
@@ -338,48 +351,93 @@ class SPICEManager(EphemerisProvider):
             for name, naif_id in _BODY_ID_ALIASES:
                 get_spiceypy().boddef(name, naif_id)
             SPICEManager._bodies_registered = True
-        get_spiceypy().furnsh(path)
         # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（静态链接，
         # 内核池不共享）。spice feature 启用时双 furnsh，让下沉到 Rust
         # 的力（ThirdBody/Indirect/...）也能查到。桥接经共享内核叶
         # spice_ext 直达 Rust 扩展（ADR 0039）。
         from e2m2e.spice_ext import spice_furnsh
 
-        if spice_furnsh is not None:
-            spice_furnsh(path)
-        # 星历内核簿记：仅在 furnsh 成功后登记，失败不污染当前口径。列表类级共享
-        # （与进程级 CSPICE 池同域，ADR 0048），就地改类列表，避免实例阴影。
+        # 纯计算放锁外；下面的临界区只包「双 furnsh + 簿记」三步。
         kernel_name = _spk_kernel_name(path)
         datum = _datum_for_kernel(path)
+        abspath = os.path.abspath(path)
+        # 星历内核簿记与两侧 furnsh 同临界区：簿记末位必须等于池里实际生效的
+        # 末位，否则并发加载不同内核会出现位置/ GM 口径错配（ADR 0048）。
+        # 列表类级共享（与进程级 CSPICE 池同域），就地改类列表，避免实例阴影。
+        with SPICEManager._bookkeeping_lock:
+            get_spiceypy().furnsh(path)
+            if spice_furnsh is not None:
+                try:
+                    spice_furnsh(path)
+                except Exception:
+                    # Rust 侧失败时 Python 侧已 furnsh：两池将不一致，故撤销
+                    # Python 侧再上抛原异常，且不登记簿记（该内核并未在池中生效）。
+                    # CSPICE 对同一文件按实例计数（实测：重复 furnsh 后 ktotal 增一，
+                    # unload 移除最后一条），故这次 unload 恰为本次 furnsh 的逆操作：
+                    # 重载路径下此前已加载的实例（及其优先级次序）原样保留。
+                    try:
+                        get_spiceypy().unload(path)
+                    except Exception:
+                        _logger.warning(
+                            "内核 %s 的 Python 侧回滚失败：Rust 池未加载而 Python 池已加载，"
+                            "两池可能不一致（簿记未登记）。",
+                            path,
+                            exc_info=True,
+                        )
+                    raise
+            if datum is not None:
+                loaded = SPICEManager._loaded_ephemeris
+                loaded[:] = [entry for entry in loaded if entry[0] != abspath]
+                loaded.append((abspath, datum))
+        # 告警读 ephemeris_datum（同一把非可重入锁），必须在临界区之外。
         if datum is None:
             if kernel_name is not None:
                 self._warn_unregistered_kernel(kernel_name)
-            return
-        abspath = os.path.abspath(path)
-        with SPICEManager._bookkeeping_lock:
-            loaded = SPICEManager._loaded_ephemeris
-            loaded[:] = [entry for entry in loaded if entry[0] != abspath]
-            loaded.append((abspath, datum))
-        self._warn_approximated_kernel(kernel_name, datum)
+        else:
+            self._warn_approximated_kernel(kernel_name, datum)
 
     def unload_kernel(self, path: str) -> None:
         """卸载一个已加载的 SPICE 内核文件，释放相关资源。
 
         卸载星历内核后，当前 GM 口径回落到仍加载的最后一个星历内核；
         无星历内核时回到默认 DE440。
+
+        并发契约：与 :meth:`load_kernel` 对称——Python ``unload``、
+        Rust ``unload`` 与簿记条目移除在**同一个** ``_bookkeeping_lock``
+        临界区内，故簿记顺序与池的生效顺序一致；本锁不串行化也不承担 CSPICE
+        池内部状态的线程安全（ADR 0048）。
+
+        失败回滚：Python ``unload`` 成功后若 Rust ``unload`` 抛错，则用
+        Python ``furnsh`` 把 Python 侧恢复（两池重新一致）、**保留**簿记条目
+        （内核仍在池中），然后按原异常上抛；恢复失败只告警，仍上抛原异常。
+
+        Raises:
+            Exception: ``unload`` 失败时按原异常上抛（先恢复已生效的一侧；
+                恢复失败只告警，不掩盖原异常）。
         """
-        get_spiceypy().unload(path)
-        # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（静态链接，
-        # 内核池不共享）。load_kernel 双 furnsh，此处对称卸载 Rust 侧，
-        # 避免 Rust 内核池残留导致测试结果依赖执行顺序。
         # Rust 侧只卸载确经 spice_furnsh 加载过的文件，未加载时静默跳过
         # （保持重复 unload 幂等）。
         from e2m2e.spice_ext import spice_unload
 
-        if spice_unload is not None:
-            spice_unload(path)
         abspath = os.path.abspath(path)
         with SPICEManager._bookkeeping_lock:
+            get_spiceypy().unload(path)
+            if spice_unload is not None:
+                try:
+                    spice_unload(path)
+                except Exception:
+                    # Rust 侧失败时 Python 侧已 unload：恢复 Python 侧使两池一致；
+                    # 内核仍在池中，故簿记条目保留，原异常上抛。
+                    try:
+                        get_spiceypy().furnsh(path)
+                    except Exception:
+                        _logger.warning(
+                            "内核 %s 的 Python 侧恢复失败：Rust 池仍加载而 Python 池已卸载，"
+                            "两池可能不一致（簿记保留）。",
+                            path,
+                            exc_info=True,
+                        )
+                    raise
             loaded = SPICEManager._loaded_ephemeris
             loaded[:] = [entry for entry in loaded if entry[0] != abspath]
 

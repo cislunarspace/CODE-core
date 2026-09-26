@@ -189,3 +189,43 @@ warning set was a module global, coupling test modules.
 - **Bookkeeping lock.** The class-level list is mutated under `_bookkeeping_lock`
   (matching the module's `_leapseconds_lock` convention); dedup-by-absolute-path
   semantics documented.
+
+## Revision (2026-09-26, c): furnsh 与簿记的临界区、失败回滚（#697）
+
+### Context
+
+Revision (b) 只记录了「类级列表在 `_bookkeeping_lock` 下变更」，#683 之后仍有三处
+边界未闭合：Python 侧 `furnsh` 发生在持锁记账**之前**（并发加载不同内核时，簿记末位
+可能晚于池里实际生效的末位，重新落回本 ADR §1 要消除的「位置按新内核、GM 按旧簿记」
+错配）；双 `furnsh` 的异常路径无回滚（Python 侧已生效而 Rust 侧失败时，池已变更而
+簿记未变更；卸载则反之），注释「仅在 furnsh 成功后登记，失败不污染当前口径」在双
+`furnsh` 下不成立。
+
+### Decisions
+
+1. **临界区覆盖「双侧 furnsh/unload + 簿记」三步。** `load_kernel` 的 Python
+   `furnsh`、Rust `spice_furnsh` 与 `_loaded_ephemeris` 更新在同一个
+   `_bookkeeping_lock` 内完成，`unload_kernel` 对称。故簿记顺序 == 池的实际生效
+   顺序。该锁只界定这三步的相对顺序，不串行化、也不承担 CSPICE 池内部状态的线程
+   安全（池仍是进程级全局的，见 §2）。
+2. **加载期告警在临界区之外。** `_warn_unregistered_kernel` 读 `ephemeris_datum`，
+   而后者取同一把非可重入锁——放进临界区内即死锁；告警一律在锁外调用。
+3. **失败路径回滚，并保留原异常。** Rust `furnsh` 失败 → 撤销本次 Python 侧
+   `furnsh`（CSPICE 对同一文件按实例计数：重复 `furnsh` 使池内多一条，`unload`
+   移除最后一条，故一次 `unload` 恰为本次 `furnsh` 的逆操作，不会卸掉此前已加载
+   的实例）且不登记簿记；Rust `unload` 失败 → 恢复 Python 侧 `furnsh`（两池重新
+   一致）并**保留**簿记条目（内核仍在池中）。回滚/恢复本身失败只记 warning，不
+   掩盖原异常。
+4. **`spice_furnsh`/`spice_unload` 为 `None`（扩展未含 spice feature）时沿用
+   #382 的既有接缝：只喂 Python 池。** 本修订不改变该取舍，也不把它上升为本 ADR
+   的口径契约。
+
+### Consequences
+
+- 并发或异常注入下，簿记末位与池的实际生效口径一致：要么两侧同时登记成功，要么
+  回滚为调用前状态（簿记不动）。
+- 守卫：`tests/data/kernels/test_spice_manager.py::TestKernelBookkeepingAtomicity`
+  （Python `furnsh` 观察到簿记锁已持有；加载/卸载失败时回滚；告警在锁外；重载失败
+  不丢先前加载）。
+- 测试隔离随之收紧：会真实 `furnsh` 的用例改在 `try/finally` 中卸载，`de421.bsp`
+  不再从断言失败路径泄漏到同 worker 的后续用例。
