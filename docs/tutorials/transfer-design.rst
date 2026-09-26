@@ -4,9 +4,10 @@
 目标
 ----
 
-用 ``Facade.transfer_design`` 设计一条地月脉冲转移。支持四种
+用 ``Facade.transfer_design`` 设计一条地月脉冲转移。支持五种
 ``transfer_type``：``HMN``（霍曼直接转移）、``LGA``（月球引力辅助）、
-``WSB``（弱稳定边界弹道捕获）、``low_thrust``（低推力）。本篇以 ``HMN``
+``WSB``（弱稳定边界弹道捕获）、``low_thrust``（低推力）、``PCN``
+（patched-conic 目标参数化：月心 B 平面 / 双曲渐近线）。本篇以 ``HMN``
 最小调用入门。
 
 前置

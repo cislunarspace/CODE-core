@@ -21,13 +21,16 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import numpy as np
 
 from e2m2e.data.constants import SECONDS_PER_DAY
+from e2m2e.data.constants.bodies import MOON
 from e2m2e.data.templates import ConvergenceState, FailureCause
 
 from . import catalog_ingest
 from .config import Config
 from .models import (
+    BplaneInfo,
     ControlOrbitRequest,
     ControlOrbitResponse,
+    DepartureAsymptote,
     DesignOrbitRequest,
     DesignOrbitResponse,
     FamilyGenerationRequest,
@@ -440,7 +443,13 @@ class Facade:
         """
         try:
             request = TransferDesignRequest(**params)
-            from e2m2e.algorithm.transfer import EngineConfig, TliParams, transfer_orbit
+            from e2m2e.algorithm.transfer import (
+                AsymptoteParams,
+                EngineConfig,
+                PcnBplaneTarget,
+                TliParams,
+                transfer_orbit,
+            )
 
             tli_params = TliParams(
                 epoch=request.tli_epoch,
@@ -456,6 +465,22 @@ class Facade:
             engine_config = (
                 EngineConfig(**request.engine_config) if request.engine_config is not None else None
             )
+            pcn_bplane_target = (
+                PcnBplaneTarget(**request.bplane_target.model_dump())
+                if request.bplane_target is not None
+                else None
+            )
+            pcn_departure_asymptote = (
+                AsymptoteParams(**request.departure_asymptote.model_dump())
+                if request.departure_asymptote is not None
+                else None
+            )
+            # PCN 目标参数恰一（XOR）；非 PCN 类型传了则拒绝（避免静默忽略）
+            if request.transfer_type == "PCN":
+                if (pcn_bplane_target is None) == (pcn_departure_asymptote is None):
+                    raise ValueError("PCN 转移须在 bplane_target 与 departure_asymptote 中恰给一个")
+            elif pcn_bplane_target is not None or pcn_departure_asymptote is not None:
+                raise ValueError("bplane_target/departure_asymptote 仅适用于 transfer_type='PCN'")
             _emit_progress(progress_callback, 0.0, f"转移设计开始：{request.transfer_type}")
             result = transfer_orbit(
                 request.transfer_type,
@@ -487,6 +512,8 @@ class Facade:
                 ),
                 progress_callback=_wsb_search_progress(progress_callback, request),
                 top_n=request.top_n,
+                bplane_target=pcn_bplane_target,
+                departure_asymptote=pcn_departure_asymptote,
             )
             trajectory = (
                 result.trajectory.tolist()
@@ -505,6 +532,33 @@ class Facade:
                 gcrs_segment.tolist() if isinstance(gcrs_segment, np.ndarray) else gcrs_segment
             )
             status, cause, message = _result_triplet(result)
+            # PCN 出口字段（#635）：旧结果对象（含测试替身）无该字段时为缺位
+            bplane_block = getattr(result, "bplane", None)
+            departure_asym_block = getattr(result, "departure_asymptote", None)
+            bplane_info = (
+                BplaneInfo(
+                    v_inf_km_s=bplane_block.v_inf_km_s,
+                    c3_km2_s2=bplane_block.c3_km2_s2,
+                    rha_deg=bplane_block.rha_deg,
+                    dha_deg=bplane_block.dha_deg,
+                    bdot_r_km=bplane_block.bdot_r_km,
+                    bdot_t_km=bplane_block.bdot_t_km,
+                    b_mag_km=bplane_block.b_mag_km,
+                    theta_deg=bplane_block.theta_deg,
+                    perilune_alt_km=bplane_block.perilune_radius_km - MOON.require_mean_radius_km(),
+                )
+                if bplane_block is not None
+                else None
+            )
+            departure_asym_info = (
+                DepartureAsymptote(
+                    rha_deg=departure_asym_block.rha_deg,
+                    dha_deg=departure_asym_block.dha_deg,
+                    c3_km2_s2=departure_asym_block.c3_km2_s2,
+                )
+                if departure_asym_block is not None
+                else None
+            )
             response = TransferDesignResponse(
                 status=status,
                 cause=cause,
@@ -551,6 +605,8 @@ class Facade:
                     for cand in (getattr(result, "candidates", ()) or ())
                 ]
                 or None,
+                bplane=bplane_info,
+                departure_asymptote=departure_asym_info,
                 details=_details_to_dict(result.details),
             )
         except OrbitError:

@@ -23,5 +23,5 @@
   为零圈解。
 - ``mu_earth = 398600.4415`` km³/s²（地心引力常数）为脚本内字面值。
 
-对照：完整转移设计（HMN/LGA/WSB/低推力）见
+对照：完整转移设计（HMN/LGA/WSB/PCN/低推力）见
 :doc:`/tutorials/transfer-design`。
