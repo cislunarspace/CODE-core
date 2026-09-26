@@ -4,7 +4,8 @@
 ``status="ok"``、``data`` 为 Response 模型的 JSON 序列化；失败时
 ``status="error"``、``error`` 为结构化错误（错误码 + message + details）。
 异常在 api/ 边界翻译，不向 Agent 泄漏原始 traceback。``E2M2EError`` 层次
-映射为 ``E2M2E_ERROR`` 并保留 message；其余异常归为 ``INTERNAL_ERROR``。
+映射为 ``E2M2E_ERROR``，保留 message 并在 details 给出异常类型名；其余异常
+归为 ``INTERNAL_ERROR``。
 """
 
 from __future__ import annotations
@@ -160,8 +161,10 @@ def dispatch_tool(
         return None, error_envelope("INVALID_PARAMS", f"参数与工具签名不匹配：{exc}")
     except E2M2EError as exc:
         # 确定性领域错误（PropagationFailure、RustExtensionUnavailableError 等）：
-        # message 保留完整 cause 文本（#677 验收：传输层翻译零丢失）。
-        return None, error_envelope("E2M2E_ERROR", str(exc), getattr(exc, "details", None) or {})
+        # message 保留完整 cause 文本，details 至少给异常类型名——Rust 侧措辞可
+        # 自由改写，调用方按类型机读即可（#677 验收：传输层翻译零丢失）。
+        details = {**(getattr(exc, "details", None) or {}), "exception": type(exc).__name__}
+        return None, error_envelope("E2M2E_ERROR", str(exc), details)
     except Exception as exc:
         return None, error_envelope("INTERNAL_ERROR", f"未预期的内部错误（{type(exc).__name__}）")
     return result, None
@@ -174,8 +177,8 @@ def invoke_tool(
 
     入参经 ``request_model`` 校验（ValidationError → ``INVALID_PARAMS``），
     ``OrbitError`` 原样翻译，``E2M2EError`` 层次归为 ``E2M2E_ERROR``（保留
-    message），其余异常归为 ``INTERNAL_ERROR``（只保留异常类型名，不泄漏
-    traceback）。校验与错误翻译见 :func:`dispatch_tool`。
+    message，details 给出异常类型名），其余异常归为 ``INTERNAL_ERROR``（只保留
+    异常类型名，不泄漏 traceback）。校验与错误翻译见 :func:`dispatch_tool`。
     """
     result, err = dispatch_tool(method, arguments, extra_kwargs=extra_kwargs)
     if err is not None:
