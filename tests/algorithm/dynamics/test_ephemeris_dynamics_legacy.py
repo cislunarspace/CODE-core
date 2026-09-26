@@ -1,5 +1,7 @@
 """EphemerisDynamics 遗留消费者所需的最小接口契约。"""
 
+import re
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -136,6 +138,24 @@ def test_legacy_propagation_beyond_kernel_coverage_reports_real_cause(
     assert "step size collapsed" not in message
 
 
+def test_legacy_initial_rhs_failure_reports_real_cause(
+    spice_eph_dynamics, spice_manager, leo_state
+):
+    """初值时刻已在覆盖外时走预检出口，消息须同样带 cause 段（#677）。"""
+    wall = _kernel_coverage_end_et(spice_manager)
+    t0 = wall + 1.0e5  # 初值已在覆盖外，积分不启动
+    t_span = (t0, t0 + 1.0e3)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        spice_eph_dynamics.propagate(leo_state, t_span, t_eval=np.array(t_span))
+
+    message = str(excinfo.value)
+    assert "initial RHS evaluation failed at t=" in message
+    assert "cause:" in message
+    assert "insufficient kernel coverage" in message
+    assert "likely cause" not in message
+
+
 @pytest.fixture
 def narrow_rust_ephem_cache(reference_et):
     """启用只覆盖 ``[reference_et, reference_et + 3600]`` 的 Rust 星历缓存。"""
@@ -155,7 +175,7 @@ def narrow_rust_ephem_cache(reference_et):
 def test_legacy_propagation_outside_cache_window_reports_window(
     spice_eph_dynamics, reference_et, leo_state, narrow_rust_ephem_cache
 ):
-    """越出星历缓存窗口时 cause 须携带 et 与窗口区间（#677）。"""
+    """越出星历缓存窗口时 cause 须区分窗口外并携带窗口与查询时刻（#677）。"""
     t_span = (reference_et, reference_et + 7200.0)
 
     with pytest.raises(RuntimeError) as excinfo:
@@ -164,3 +184,7 @@ def test_legacy_propagation_outside_cache_window_reports_window(
     message = str(excinfo.value)
     assert "EPHEM_CACHE_MISS" in message
     assert "outside cached window" in message
+    # 窗口数值来自进程状态（`EphemCache::build` 两端各留 5·dt = 3000 s margin），
+    # 不是照抄底层文本——故钉住确切区间；et 是积分器步时刻，用通配。
+    window = f"window [{reference_et - 3000.0:.3f}, {reference_et + 6600.0:.3f}]"
+    assert re.search(rf"et -?\d+\.\d+, {re.escape(window)}", message)

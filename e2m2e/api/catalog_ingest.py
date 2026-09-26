@@ -547,7 +547,7 @@ def _details_block(result: Any) -> dict[str, Any]:
 
 
 def _details_tof_sec(details: Any) -> float | None:
-    """details 里的飞行时间秒；HMN/LGA/WSB 有、low_thrust 无 → None。"""
+    """details 里的飞行时间秒；HMN/LGA/WSB/PCN 有、low_thrust 无 → None。"""
     if dataclasses.is_dataclass(details) and not isinstance(details, type):
         return numeric_or_none(getattr(details, "tof_sec", None))
     if isinstance(details, dict):

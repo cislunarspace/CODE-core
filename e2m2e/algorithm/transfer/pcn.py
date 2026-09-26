@@ -34,6 +34,7 @@ from ...data.constants import SECONDS_PER_DAY
 from ...data.constants.bodies import MOON
 from ...data.constants.datums import Datum
 from ...data.templates import ConvergenceState, FailureCause
+from ...exceptions import PropagationFailure
 from ..results import ResultStatus
 from .bplane import (
     AsymptoteParams,
@@ -171,6 +172,25 @@ class PcnSolution:
 # ---------------------------------------------------------------------------
 
 
+def _canonical_rha_dha(rha_deg: float, dha_deg: float) -> tuple[float, float]:
+    """把渐近线角归一到规范域 RHA ∈ [0°360)、DHA ∈ [−90°, 90°]。
+
+    Newton 决策变量按连续分支步进，可能落到区间外的等价角；回显/入库前
+    归一，避免响应模型（``ge``/``lt`` 约束）把成功解误判为非法入参。
+    ``|DHA| > 90°`` 的等价方向为 ``(±180° − DHA, RHA + 180°)``。
+    """
+    rha = math.fmod(float(rha_deg), 360.0)
+    if rha < 0.0:
+        rha += 360.0
+    dha = float(dha_deg)
+    if dha > 90.0 or dha < -90.0:
+        rha = math.fmod(rha + 180.0, 360.0)
+        if rha < 0.0:
+            rha += 360.0
+        dha = (180.0 - dha) if dha > 90.0 else (-180.0 - dha)
+    return rha, dha
+
+
 def _departure_state_from_asymptote(
     asym: AsymptoteParams,
     tli_params: TliParams,
@@ -186,8 +206,10 @@ def _departure_state_from_asymptote(
         (地心惯性出发态 (6,)，Δv_TLI (km/s))。
     """
     c3 = asym.c3_km2_s2
-    if c3 <= 0.0:
-        raise ValueError(f"出发 C3 须 > 0（双曲），得到 {c3}")
+    if not math.isfinite(c3) or c3 <= 0.0:
+        raise ValueError(f"出发 C3 须为有限正数（双曲），得到 {c3}")
+    if not math.isfinite(tli_params.parking_alt_km) or tli_params.parking_alt_km < 0.0:
+        raise ValueError(f"停泊轨道高度须为有限非负数，得到 {tli_params.parking_alt_km}")
     r_park = R_EARTH + tli_params.parking_alt_km
     v_inf_e = math.sqrt(c3)
     s_hat = vinf_vector_from_asymptote(asym) / v_inf_e
@@ -219,10 +241,25 @@ def _moon_encounter_state(
     tof_sec: float,
     moon_state_fn: Callable[[float], np.ndarray],
 ) -> np.ndarray:
-    """地心出发态传播 tof → 月心相对态 (6,)。"""
-    out = propagate_two_body(departure_state, np.array([0.0, tof_sec]), _MU_EARTH)
-    sc = np.asarray(out["states"][-1], dtype=float)
-    return sc - np.asarray(moon_state_fn(tof_sec), dtype=float)
+    """地心出发态传播 tof → 月心相对态 (6,)。
+
+    校验二体传播确实到达请求时刻且末态有限；否则抛
+    :class:`PropagationFailure`（由调用方按软失败处理，避免用错时刻的
+    月心态算出静默错误的几何）。
+    """
+    tof = float(tof_sec)
+    if not math.isfinite(tof) or tof <= 0.0:
+        raise PropagationFailure(f"地球段 tof 须为有限正数，得到 {tof_sec}")
+    out = propagate_two_body(departure_state, np.array([0.0, tof]), _MU_EARTH)
+    states = np.asarray(out["states"], dtype=float)
+    times = np.asarray(out["time"], dtype=float)
+    if states.shape[0] != 2 or abs(float(times[-1]) - tof) > 1e-6 * max(1.0, abs(tof)):
+        raise PropagationFailure(f"二体传播未到达请求时刻 tof={tof}")
+    sc = states[-1]
+    moon = np.asarray(moon_state_fn(tof), dtype=float)
+    if not np.all(np.isfinite(sc)) or not np.all(np.isfinite(moon)):
+        raise PropagationFailure("月心相对态的传播末态或月球态非有限")
+    return sc - moon
 
 
 def _dv_loi(bplane: BPlaneParams) -> float:
@@ -303,7 +340,7 @@ def _solve_departure_mode(
             enc = _moon_encounter_state(dep_state, float(tof), moon_state_fn)
             bplane = bplane_from_state(enc, _MU_MOON)
             moon_leg = hyperbolic_time_to_periapsis(enc, _MU_MOON)
-        except (ValueError, RuntimeError, FloatingPointError):
+        except (ValueError, RuntimeError, PropagationFailure, FloatingPointError):
             continue
         if moon_leg < 0.0:  # 出射分支（已过近月点），跳过
             continue
@@ -379,7 +416,7 @@ def _solve_arrival_mode(
             if hyperbolic_time_to_periapsis(enc, _MU_MOON) < 0.0:
                 return None
             return enc, bplane
-        except (ValueError, RuntimeError, FloatingPointError):
+        except (ValueError, RuntimeError, PropagationFailure, FloatingPointError):
             return None
 
     # 1. 网格初猜：逐点最小残差 max-范数。
@@ -509,10 +546,9 @@ def _solve_arrival_mode(
             n_evals,
             n_newton,
         )
-    dep_final, dv_tli = _departure_state_from_asymptote(
-        AsymptoteParams(float(x_cur[0]), float(x_cur[1]), float(x_cur[2])),
-        tli_params,
-    )
+    rha_c, dha_c = _canonical_rha_dha(float(x_cur[0]), float(x_cur[1]))
+    asym_final = AsymptoteParams(rha_deg=rha_c, dha_deg=dha_c, c3_km2_s2=float(x_cur[2]))
+    dep_final, dv_tli = _departure_state_from_asymptote(asym_final, tli_params)
     return PcnSolution(
         mode="arrival",
         status=ConvergenceState.CONVERGED,
@@ -520,9 +556,7 @@ def _solve_arrival_mode(
         message=f"PCN 到达模式打靶收敛，残差 {res_final:.3e} km",
         departure_state_gcrs=dep_final,
         dv_tli_km_s=dv_tli,
-        departure_asymptote=AsymptoteParams(
-            rha_deg=float(x_cur[0]), dha_deg=float(x_cur[1]), c3_km2_s2=float(x_cur[2])
-        ),
+        departure_asymptote=asym_final,
         encounter_state_moon=enc_final,
         bplane=bplane_final,
         perilune_state_moon=_perilune_state_from_bplane(bplane_final),
@@ -545,16 +579,16 @@ def _arrival_failure(
     tof: float = 0.0,
 ) -> PcnSolution:
     """构造到达模式失败解（附残差已知的达成 B-plane，便于诊断）。"""
+    asym = None
+    if x is not None:
+        rha_c, dha_c = _canonical_rha_dha(float(x[0]), float(x[1]))
+        asym = AsymptoteParams(rha_deg=rha_c, dha_deg=dha_c, c3_km2_s2=float(x[2]))
     return PcnSolution(
         mode="arrival",
         status=status,
         cause=cause,
         message=message,
-        departure_asymptote=(
-            AsymptoteParams(rha_deg=float(x[0]), dha_deg=float(x[1]), c3_km2_s2=float(x[2]))
-            if x is not None
-            else None
-        ),
+        departure_asymptote=asym,
         bplane=bplane,
         earth_leg_tof_sec=tof,
         n_grid_evals=n_evals,

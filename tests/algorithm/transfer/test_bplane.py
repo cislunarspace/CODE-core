@@ -153,6 +153,14 @@ class TestBplaneDegenerate:
         with pytest.raises(ValueError, match="非双曲"):
             bplane_from_state(st, _MU)
 
+    def test_non_finite_state_rejected(self):
+        """非有限状态（NaN/Inf）→ ValueError（不静默产出 NaN 几何）。"""
+        st = state_from_bplane(AsymptoteParams(30.0, 0.0, 1.0), 1000.0, 1000.0, _MU, 9000.0)
+        bad = st.copy()
+        bad[0] = float("nan")
+        with pytest.raises(ValueError, match="非有限"):
+            bplane_from_state(bad, _MU)
+
     def test_asymptote_parallel_to_z_rejected(self):
         """Ŝ∥ẑ 时 T 矢量退化 → ValueError。"""
         with pytest.raises(ValueError, match="退化"):

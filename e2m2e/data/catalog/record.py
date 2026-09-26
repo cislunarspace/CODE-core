@@ -207,7 +207,7 @@ def transfer_segment_arrays(
 ) -> dict[str, np.ndarray]:
     """转移轨迹段数组（#574；#584 增 gcrs_km 惯性段）。
 
-    ``states`` 为 ADR 0040 契约下的轨迹数据：HMN/LGA/WSB 为会合系物理
+    ``states`` 为 ADR 0040 契约下的轨迹数据：HMN/LGA/WSB/PCN 为会合系物理
     km/km/s (n, 6)，low_thrust 暂为力模型状态 (M, 7)（state_frame 标量
     注明数据系）；``times`` 为 TLI 起算秒 (n,)，与 states 逐行对齐。
     ``gcrs_trajectory`` 非空时另存 ``states_gcrs_km``——地心惯性（GCRS

@@ -206,6 +206,8 @@ def bplane_from_state(state: ArrayLike, mu: float) -> BPlaneParams:
         ValueError: 到达轨道非双曲（v∞² ≤ 0 或 e ≤ 1）或 Ŝ∥ẑ 退化。
     """
     x = np.asarray(state, dtype=np.float64).reshape(6)
+    if not np.all(np.isfinite(x)):
+        raise ValueError("状态含非有限值，无法构造 B-plane")
     r_vec = x[:3]
     v_vec = x[3:]
     r = float(np.linalg.norm(r_vec))

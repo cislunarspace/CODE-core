@@ -772,6 +772,8 @@ class BplaneTarget(_ApiModel):
     近月点高度。
     """
 
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     perilune_alt_km: float = Field(gt=0.0, description="目标近月点高度 (km，月面以上)")
     bdot_t_km: float = Field(description="目标 B·T (km)")
     bdot_r_km: float = Field(default=0.0, description="目标 B·R (km)，默认 0")
@@ -779,6 +781,8 @@ class BplaneTarget(_ApiModel):
 
 class DepartureAsymptote(_ApiModel):
     """地球出发双曲渐近线参数化（TLI 设计入口，#635）。"""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     rha_deg: float = Field(ge=0.0, lt=360.0, description="渐近线赤经 (deg)")
     dha_deg: float = Field(ge=-90.0, le=90.0, description="渐近线赤纬 (deg)")
@@ -791,8 +795,12 @@ class TransferDesignRequest(_ApiModel):
     transfer_type: str = Field(description="HMN/LGA/WSB/low_thrust/PCN（patched-conic 目标参数化）")
     tli_epoch: Any = Field(description="TLI 历元（UTC ISO 字符串或 JD_TDB 浮点数）")
     parking_alt_km: float = Field(default=200.0, gt=0.0, description="地球停泊轨道高度 (km)")
-    incl_deg: float = Field(default=28.5, ge=0.0, le=180.0, description="轨道倾角 (度)")
-    flight_path_deg: float = Field(default=0.0, ge=0.0, le=0.0, description="航迹角 (度，仅支持 0)")
+    incl_deg: float = Field(
+        default=28.5, ge=0.0, le=180.0, description="轨道倾角 (度；PCN 路径不参与构造)"
+    )
+    flight_path_deg: float = Field(
+        default=0.0, ge=0.0, le=0.0, description="航迹角 (度，仅支持 0；PCN 路径不参与构造)"
+    )
     target_ephemeris: Any = Field(
         default=None,
         description=(
@@ -934,6 +942,8 @@ class TransferCandidate(_ApiModel):
 class BplaneInfo(_ApiModel):
     """达成的月心 B-plane 参数（PCN 响应出口字段，#635）。"""
 
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     v_inf_km_s: float = Field(description="月心到达剩余速度 v∞ (km/s)")
     c3_km2_s2: float = Field(description="月心到达 C3 = v∞² (km²/s²)")
     rha_deg: float = Field(description="月心到达渐近线赤经 (deg)")
@@ -969,6 +979,7 @@ class TransferDesignResponse(ResultResponse):
             "（GCRS 约定）物理 km / km/s，与 trajectory 逐行对齐、共享"
             " trajectory_times（时刻不双份）；HMN 为两体弧构造系原样，"
             "LGA/WSB 为会合几何旋回惯性（θ₀=0 理想化方位，无星历语义），"
+            "PCN 为原生 GCRS 两段弧拼接（月亮段逐行加月球惯性位置），"
             "low_thrust 与零结果为 None。段的数据系即词汇值 gcrs_km"
         ),
     )
@@ -977,7 +988,7 @@ class TransferDesignResponse(ResultResponse):
     state_frame: Literal["synodic_barycentric_km", "force_model_state"] = Field(
         description=(
             "trajectory 的数据系标签（ADR 0040 增补）：synodic_barycentric_km"
-            " = 地月会合旋转系质心原点物理 km/km/s（HMN/LGA/WSB）；"
+            " = 地月会合旋转系质心原点物理 km/km/s（HMN/LGA/WSB/PCN）；"
             "force_model_state = 力模型状态系（low_thrust，已知不一致）。"
             "词汇 gcrs_km 已由并行惯性段 trajectory_gcrs_km 启用（#584），"
             "synodic_barycentric_nd 待后续批次接入"
@@ -988,7 +999,8 @@ class TransferDesignResponse(ResultResponse):
         description=(
             "结构化机动事件列表（#575，按 t_sec 升序）：HMN 为 departure/"
             "arrival 两条（到达点即近月点）；LGA/WSB 含 perilune 旗标"
-            "（dv_km_s=0）；low_thrust 连续推进恒为空；搜索零结果恒为空。"
+            "（dv_km_s=0）；PCN 为 departure/arrival 两条（arrival 即近月点"
+            "圆化 LOI 单脉冲）；low_thrust 连续推进恒为空；搜索零结果恒为空。"
             "旧 details Δv 字段保留一个版本后废弃"
         ),
     )
@@ -1546,7 +1558,7 @@ class CatalogQueryRequest(_ApiModel):
     tags: list[str] | None = Field(default=None, description="按标签筛，命中任一即匹配")
     transfer_type: str | None = Field(
         default=None,
-        description="转移类型等值过滤（HMN/LGA/WSB/low_thrust；#574 transfer record）",
+        description="转移类型等值过滤（HMN/LGA/WSB/low_thrust/PCN；#574 transfer record）",
     )
     delta_v_min_km_s: float | None = Field(
         default=None, ge=0.0, description="转移总 Δv 区间下界（km/s）"
@@ -1626,7 +1638,7 @@ class CatalogRecordSummary(_ApiModel):
         description="分类学标签（ADR 0042，多标签规范字符串）；未打标为 None",
     )
     transfer_type: str | None = Field(
-        default=None, description="转移类型（HMN/LGA/WSB/low_thrust）；非 transfer 记录为 None"
+        default=None, description="转移类型（HMN/LGA/WSB/low_thrust/PCN）；非 transfer 记录为 None"
     )
     delta_v_km_s: float | None = Field(
         default=None, description="转移总 Δv（km/s）；非 transfer 记录为 None"
@@ -1736,7 +1748,7 @@ class CatalogTerminologyResponse(ResultResponse):
         "（category/family/libration_point/hemisphere/resonance_p/resonance_q，ADR 0042）"
     )
     orbit_families: list[str] = Field(description="记录侧 orbit_family 闭值集（族名清单）")
-    transfer_types: list[str] = Field(description="转移类型闭值集（HMN/LGA/WSB/low_thrust）")
+    transfer_types: list[str] = Field(description="转移类型闭值集（HMN/LGA/WSB/low_thrust/PCN）")
 
 
 class RangeSpec(_ApiModel):
