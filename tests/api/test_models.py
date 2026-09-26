@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import warnings
 
 import pytest
@@ -22,6 +23,7 @@ from e2m2e.api.models import (
     PropagationRequest,
     SpacetimeTransformRequest,
     TransferDesignRequest,
+    TransferDesignResponse,
 )
 from e2m2e.data.constants import Datum
 from e2m2e.data.templates import ConvergenceState, FailureCause
@@ -414,6 +416,74 @@ class TestPcnRequestModels:
             perilune_alt_km=182.0,
         )
         assert info.perilune_alt_km == 182.0
+
+    def test_tof_range_accepts_finite_increasing_pair(self):
+        request = TransferDesignRequest(
+            transfer_type="PCN",
+            tli_epoch=0.0,
+            tof_range=[1.5, 2.0],
+            departure_asymptote=DepartureAsymptote(rha_deg=32.0, dha_deg=0.0, c3_km2_s2=1.0),
+        )
+        assert request.tof_range == [1.5, 2.0]
+        assert TransferDesignRequest(transfer_type="HMN", tli_epoch=0.0).tof_range is None
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            [1.5],  # 单元素：编排器 tof_range[1] 会 IndexError（旧路径译成 TRANSFER_FAILED）
+            [1.5, 2.0, 3.0],  # 三元素
+            [2.0, 1.5],  # 反向
+            [1.5, 1.5],  # 退化窗口（与 WSB 搜索参数 min < max 同口径）
+            [1.5, float("inf")],  # 非有限
+            [float("nan"), 2.0],  # 非有限
+        ],
+    )
+    def test_tof_range_rejects_shape_order_and_non_finite(self, bad):
+        """tof_range 形状/有限性/序在请求边界拒绝（#698）。"""
+        with pytest.raises(ValidationError, match="tof_range"):
+            TransferDesignRequest(transfer_type="PCN", tli_epoch=0.0, tof_range=bad)
+
+
+class TestTransferDetailsSanitization:
+    """``details`` 自由字段在响应出口清洗非有限值（#698）。
+
+    PCN 等后端在缺几何/零结果时以 ``nan``/``inf`` 占位；响应构造期统一替换为
+    ``None``，避免 ``model_dump(mode="json")`` 产出非法 JSON 记号。
+    """
+
+    @staticmethod
+    def _response(details: dict) -> TransferDesignResponse:
+        return TransferDesignResponse(
+            status=ConvergenceState.INFEASIBLE,
+            cause=FailureCause.CONSTRAINT_VIOLATION,
+            message="非月交会",
+            transfer_type="PCN",
+            delta_v=float("inf"),
+            state_frame="synodic_barycentric_km",
+            details=details,
+        )
+
+    def test_non_finite_details_become_none(self):
+        response = self._response(
+            {
+                "dv_loi_km_s": float("inf"),
+                "perilune_alt_km": float("nan"),
+                "nested": [float("-inf"), 1.0, {"deep": float("nan")}],
+                "n_grid_evals": 3,
+            }
+        )
+        assert response.details["dv_loi_km_s"] is None
+        assert response.details["perilune_alt_km"] is None
+        assert response.details["nested"] == [None, 1.0, {"deep": None}]
+        assert response.details["n_grid_evals"] == 3
+
+    def test_json_dump_has_no_non_finite_tokens_in_details(self):
+        """细节字段的 JSON 序列化不含非法记号（据报症状；顶层 Δv 契约见下）。"""
+        response = self._response({"a": float("inf"), "b": [float("nan")]})
+        details = response.model_dump(mode="json")["details"]
+        assert details == {"a": None, "b": [None]}
+        payload = json.dumps(details)
+        assert "Infinity" not in payload and "NaN" not in payload
 
 
 class TestFamilyGenerationRequest:

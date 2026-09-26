@@ -36,6 +36,7 @@ from ...data.constants.datums import Datum
 from ...data.templates import ConvergenceState, FailureCause
 from ...exceptions import PropagationFailure
 from ..results import ResultStatus
+from ..spatiography.scales import soi_laplace_moon
 from .bplane import (
     AsymptoteParams,
     BPlaneParams,
@@ -61,6 +62,10 @@ __all__ = [
 _MU_MOON: float = Datum.DE421.moon_gm
 #: 月球平均半径 (km)。
 _R_MOON_KM: float = MOON.require_mean_radius_km()
+#: 月球影响球半径 (km)：Laplace–Tisserand 代理 rho_SOI（单一来源为 spatiography 的
+#: ``soi_laplace_moon``，与 atlas 的 "Moon SOI (Laplace-Tisserand)" 同口径；
+#: 黄金值 66010 km）。出发模式用它判定交接点是否落在月交会可行域内（#698）。
+_R_SOI_MOON_KM: float = soi_laplace_moon()
 #: 地球引力参数 GM⊕ (km³/s²)。
 _MU_EARTH: float = Datum.WGS84.earth_gm
 
@@ -268,6 +273,38 @@ def _dv_loi(bplane: BPlaneParams) -> float:
     return math.sqrt(bplane.v_inf_km_s**2 + 2.0 * _MU_MOON / rp) - math.sqrt(_MU_MOON / rp)
 
 
+def _departure_feasibility(
+    closest_km: float, bplane: BPlaneParams
+) -> tuple[ConvergenceState, FailureCause, str] | None:
+    """出发模式的月交会可行域判定（#698）：不可行返回状态三元组，可行返回 ``None``。
+
+    Patched-conic 口径下，出发模式只有落在月交会可行域内才是解：
+
+    - 近月点半径 ``r_p ≤ R_moon``：可达近月点在地面以下，轨迹撞月，
+      报 ``COLLISION``/``BODY_COLLISION``；
+    - 网格最近月心距离超过月球影响球 ``_R_SOI_MOON_KM``：只是远距离飞越，
+      月心段交接不成立，报 ``INFEASIBLE``/``CONSTRAINT_VIOLATION``。
+
+    判据只用解自身的几何（近月点半径与最近月心距离），不依赖网格分辨率以外的
+    外部状态；不可行解仍回显 B-plane / 渐近线，供调用方诊断。
+    """
+    if bplane.perilune_radius_km <= _R_MOON_KM:
+        return (
+            ConvergenceState.COLLISION,
+            FailureCause.BODY_COLLISION,
+            f"出发模式最近月心距离处近月点半径 {bplane.perilune_radius_km:.1f} km "
+            f"≤ 月球半径 {_R_MOON_KM:.1f} km：轨迹撞月，非月交会",
+        )
+    if closest_km > _R_SOI_MOON_KM:
+        return (
+            ConvergenceState.INFEASIBLE,
+            FailureCause.CONSTRAINT_VIOLATION,
+            f"出发模式最近月心距离 {closest_km:.1f} km 超出月球影响球 "
+            f"{_R_SOI_MOON_KM:.1f} km：远距离飞越，非月交会",
+        )
+    return None
+
+
 def _perilune_state_from_bplane(bplane: BPlaneParams) -> np.ndarray:
     """由达成的月心 B-plane 闭式给出月心近月点态。"""
     asym = AsymptoteParams(
@@ -328,7 +365,11 @@ def _solve_departure_mode(
     moon_state_fn: Callable[[float], np.ndarray],
     p: PcnSearchParams,
 ) -> PcnSolution:
-    """出发模式：给定渐近线，在 tof 网格上取入射分支最近月心距离（真实交会），无迭代。"""
+    """出发模式：给定渐近线，在 tof 网格上取入射分支最近月心距离（真实交会），无迭代。
+
+    选定网格点后过 ``_departure_feasibility`` 可行域门禁：撞月或落在月球
+    影响球外的最近点不是月交会，报实际失败状态（并回显几何），不冒报 ``CONVERGED``。
+    """
     dep_state, dv_tli = _departure_state_from_asymptote(departure_asymptote, tli_params)
 
     tof_grid = np.linspace(p.tof_range_days[0], p.tof_range_days[1], p.n_tof) * SECONDS_PER_DAY
@@ -360,7 +401,25 @@ def _solve_departure_mode(
             n_grid_evals=len(tof_grid),
         )
 
-    _, tof, enc, bplane, moon_leg = best
+    dist, tof, enc, bplane, moon_leg = best
+    infeasible = _departure_feasibility(dist, bplane)
+    if infeasible is not None:
+        status, cause, message = infeasible
+        return PcnSolution(
+            mode="departure",
+            status=status,
+            cause=cause,
+            message=message,
+            departure_state_gcrs=dep_state,
+            dv_tli_km_s=dv_tli,
+            departure_asymptote=departure_asymptote,
+            encounter_state_moon=enc,
+            bplane=bplane,
+            earth_leg_tof_sec=tof,
+            moon_leg_tof_sec=moon_leg,
+            n_grid_evals=len(tof_grid),
+        )
+
     perilune = _perilune_state_from_bplane(bplane)
     return PcnSolution(
         mode="departure",

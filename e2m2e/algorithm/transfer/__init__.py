@@ -502,7 +502,8 @@ class PcnTransferDetails:
         parking_alt_km: 地球停泊轨道高度 (km)。
         dv_tli_km_s: TLI 出发脉冲 (km/s)。
         dv_loi_km_s: 近月点圆化脉冲 (km/s)。
-        perilune_alt_km: 达成近月点高度 (km，月面以上)。
+        perilune_alt_km: 近月点高度 (km；近月点半径 − 月平均半径)。交会解为月面以上
+            正值；撞月等非交会解为诊断值（可为负）。
         v_inf_moon_km_s: 月心到达剩余速度 v∞ (km/s)。
         c3_departure_km2_s2: 出发 C3 能量 (km²/s²)。
         rha_deg: 出发渐近线赤经 (deg)。
@@ -931,7 +932,8 @@ def _transfer_orbit_pcn(
     details = _pcn_details(tli_params, sol, mode)
     stages = _pcn_stages(sol, mode)
 
-    # 失败/非收敛：镜像 LGA 零结果契约（无轨迹、无事件、Δv=inf）
+    # 失败/非收敛：镜像 LGA 零结果契约（无轨迹、无事件、Δv=inf），但回显
+    # 实际使用的渐近线与达成的 B-plane（诊断需要，字段描述承诺「回显实际值」）。
     if sol.status is not ConvergenceState.CONVERGED or sol.bplane is None:
         warnings.warn(f"PCN 转移未收敛：{sol.message}", stacklevel=2)
         return TransferDesignResult(
@@ -943,6 +945,8 @@ def _transfer_orbit_pcn(
             cause=sol.cause,
             message=sol.message,
             stages=stages,
+            bplane=sol.bplane,
+            departure_asymptote=sol.departure_asymptote,
         )
 
     # 轨迹组装（ADR 0040）：地球段地心二体弧 + 月心段月心二体弧。组装失败

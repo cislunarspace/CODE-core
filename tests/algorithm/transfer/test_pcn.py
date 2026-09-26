@@ -54,12 +54,14 @@ def _moon_fn(system: CR3BP_System):
     return lambda t_sec: _moon_state_gcrs(system, t_sec)
 
 
-def _solve_departure(params: PcnSearchParams = _SMALL) -> PcnSolution:
+def _solve_departure(
+    asym: AsymptoteParams = _DEP_ASYM, params: PcnSearchParams = _SMALL
+) -> PcnSolution:
     system = _system()
     return solve_pcn(
         _TLI,
         bplane_target=None,
-        departure_asymptote=_DEP_ASYM,
+        departure_asymptote=asym,
         moon_state_fn=_moon_fn(system),
         system=system,
         params=params,
@@ -85,9 +87,9 @@ class TestPcnDeparture:
         assert sol.moon_leg_tof_sec >= 0.0
         assert sol.perilune_state_moon is not None
         assert sol.dv_loi_km_s > 0.0
-        # 近月点应在月面附近量级（真实交会而非远距离飞越）
+        # 近月点应在月面以上且量级合理（CONVERGED 蕴含通过可行域门禁，见 #698）
         alt = sol.bplane.perilune_radius_km - 1737.4
-        assert -100.0 < alt < 50000.0
+        assert 0.0 < alt < 50000.0
 
     def test_orchestrator_departure_anchors(self):
         """transfer_orbit('PCN', departure) 物理锚点：Δv_TLI 量级与回显。"""
@@ -97,6 +99,54 @@ class TestPcnDeparture:
         assert result.details.dv_loi_km_s > 0.0
         assert result.departure_asymptote == _DEP_ASYM
         assert result.bplane is not None and result.bplane.v_inf_km_s > 0.0
+
+
+class TestPcnDepartureFeasibility:
+    """出发模式月交会可行域门禁（#698）：撞月/远距离飞越不得冒报 CONVERGED。
+
+    门禁口径（Patched-conic）：近月点半径须在月面以上，且网格最近月心距离须落在
+    月球影响球（Laplace–Tisserand 代理，spatiography 黄金值 66010 km）以内；
+    不可行解仍回显 B-plane / 渐近线，供调用方诊断。
+    """
+
+    def test_far_flyby_is_not_a_rendezvous(self):
+        """最近月心距离超影响球 → INFEASIBLE/CONSTRAINT_VIOLATION，几何仍回显。"""
+        asym = AsymptoteParams(rha_deg=20.0, dha_deg=0.0, c3_km2_s2=1.0)
+        sol = _solve_departure(asym)
+        assert sol.status is ConvergenceState.INFEASIBLE
+        assert sol.cause is FailureCause.CONSTRAINT_VIOLATION
+        assert sol.encounter_state_moon is not None
+        closest = float(np.linalg.norm(sol.encounter_state_moon[:3]))
+        assert closest > 66010.0, "最近月心距离须确认落在影响球外（黄金值 66010 km）"
+        assert sol.bplane is not None, "失败解仍须回显达成的 B-plane"
+        assert sol.departure_asymptote == asym
+
+    def test_collision_asymptote_reports_body_collision(self):
+        """近月点落在月面以下（撞月）→ COLLISION/BODY_COLLISION。"""
+        sol = _solve_departure(AsymptoteParams(rha_deg=28.6, dha_deg=0.0, c3_km2_s2=2.0))
+        assert sol.status is ConvergenceState.COLLISION
+        assert sol.cause is FailureCause.BODY_COLLISION
+        assert sol.bplane is not None
+        assert sol.bplane.perilune_radius_km <= 1737.4, "该渐近线的近月点须在月面以下"
+
+    def test_feasible_departure_stays_converged(self):
+        """可行域内的出发模式仍 CONVERGED，近月点在月面以上。"""
+        sol = _solve_departure()
+        assert sol.status is ConvergenceState.CONVERGED
+        assert sol.bplane is not None
+        assert sol.bplane.perilune_radius_km > 1737.4
+
+    def test_orchestrator_echoes_geometry_on_failure(self):
+        """编排器失败路径同样回显渐近线与 B-plane（#698）。"""
+        asym = AsymptoteParams(rha_deg=20.0, dha_deg=0.0, c3_km2_s2=1.0)
+        with pytest.warns(UserWarning, match="未收敛"):
+            result = transfer_orbit(
+                "PCN", tli_params=_TLI, departure_asymptote=asym, tof_range=(1.5, 2.0)
+            )
+        assert result.status is ConvergenceState.INFEASIBLE
+        assert result.departure_asymptote == asym
+        assert result.bplane is not None
+        assert result.trajectory is None
 
 
 class TestPcnArrivalRoundTrip:
