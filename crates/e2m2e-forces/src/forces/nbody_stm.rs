@@ -526,13 +526,14 @@ struct FailureContext {
 impl FailureContext {
     /// 取当前进程状态。
     ///
-    /// strict 区不查内核池：该区禁止回退 cspice（并行区内的 cspice 调用是内核池
-    /// 损坏/panic 的根源），分类器在 strict 分支短路，本就不会读该字段。
+    /// 只在分类真会读 `spk_loaded` 时查询内核池：strict 区禁止 cspice（并行区内
+    /// 的 cspice 调用是内核池损坏/panic 的根源），缓存启用时分类走缓存分支、也
+    /// 读不到该字段——两种情形都省掉这次 FFI。
     fn current() -> Self {
         let cache_window = e2m2e_spice::ephem_cache::enabled_span();
         let cache_strict = e2m2e_spice::ephem_cache::strict_enabled();
         Self {
-            spk_loaded: if cache_strict {
+            spk_loaded: if cache_strict || cache_window.is_some() {
                 None
             } else {
                 Some(spk_kernels_loaded())
