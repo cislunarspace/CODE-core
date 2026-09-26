@@ -176,21 +176,32 @@ def _bifurcation_indicator(kind: BifurcationType, nu: complex, ns_imag_tol: floa
     return abs(nu.imag) - ns_imag_tol
 
 
-def _crossing_type(nu_lo: complex, nu_hi: complex, ns_imag_tol: float) -> BifurcationType | None:
+def _crossing_type(
+    nu_lo: complex,
+    nu_hi: complex,
+    ns_imag_tol: float,
+    *,
+    nu_before: complex | None = None,
+) -> BifurcationType | None:
     """单区间、单条 ν 轨迹上的穿越判据（变号或离圆 onset）。
 
-    实轴穿越用「零判据端点归入一侧」的变号判据：判据恰为零的成员（例如网格节点
-    恰好落在临界参数上）算已跨过，且只由一侧区间认领——上升穿越归其右侧区间、
-    下降穿越归其左侧区间——故同一次穿越只报一个候选点，不会静默漏报也不会重复。
-    代价是族参数域端点上的零判据成员（首/末成员恰在临界值上）没有可归属的区间，
-    不被认领；此时判据端点值本身即为零，调用方可从原始成员表读到。
+    实轴穿越分两种：判据在区间两端**严格异号**；或判据恰为零的**左端点**成员
+    （网格节点恰好落在临界参数上）——后者只在该节点确为符号变化点时报出，即前一个
+    成员（``nu_before``）与右端点的判据异号；``nu_before`` 缺省或也为零时不报。
+    因此零判据节点若只是被触及而未穿过（前后同号）不报点，真穿越也只有一个区间
+    认领。族参数域首端的零判据成员没有前一个成员可比，不被认领（其判据端点值为
+    零，调用方可从原始成员表读到）。
     """
     if abs(nu_lo.imag) <= ns_imag_tol and abs(nu_hi.imag) <= ns_imag_tol:
         for kind, offset in _CRITERION_OFFSETS.items():
             lower = nu_lo.real + offset
             upper = nu_hi.real + offset
-            if (lower < 0.0 <= upper) or (upper < 0.0 <= lower):
+            if (lower < 0.0 < upper) or (upper < 0.0 < lower):
                 return kind
+            if lower == 0.0 and upper != 0.0 and nu_before is not None:
+                before = nu_before.real + offset
+                if before != 0.0 and (before < 0.0) != (upper < 0.0):
+                    return kind
     if abs(nu_lo.imag) <= ns_imag_tol < abs(nu_hi.imag):
         return BifurcationType.TORUS
     return None
@@ -222,7 +233,7 @@ def _refine_family_point(
     Args:
         causes: 失败原因收集器（出参）：逐个分点试算的异常按出现次序、去重后
             追加，供调用方写进 ``MemberAnalysisFailure.message``，与成员循环
-            保留 ``str(exc)`` 的口径一致。
+            同为「``类名: 消息``」口径。
     """
     lo, hi = interval
     nu_lo, nu_hi = nus
@@ -740,7 +751,11 @@ class StabilityAnalysis:
                 eigenvalues = np.asarray(analyze(orbit), dtype=complex)
                 nus = _drop_trivial_pair(_member_nus(eigenvalues))
             except Exception as exc:
-                failures.append(MemberAnalysisFailure(parameter=parameter, message=str(exc)))
+                failures.append(
+                    MemberAnalysisFailure(
+                        parameter=parameter, message=f"{type(exc).__name__}: {exc}"
+                    )
+                )
                 member_nus.append(None)
                 member_multipliers.append(None)
                 continue
@@ -824,7 +839,10 @@ class StabilityAnalysis:
             for slot in shared:
                 nu_lo = tracks[slot][index]
                 nu_hi = tracks[slot][index + 1]
-                kind = _crossing_type(nu_lo, nu_hi, ns_imag_tol)
+                # nu_before：判据恰为零的左端点成员需要它确认符号确实变化
+                kind = _crossing_type(
+                    nu_lo, nu_hi, ns_imag_tol, nu_before=tracks[slot].get(index - 1)
+                )
                 if kind is not None:
                     detections.append((index, kind, nu_lo, nu_hi))
 

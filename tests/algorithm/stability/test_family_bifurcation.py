@@ -300,7 +300,30 @@ class TestDegenerateMembers:
             assert len(scan.points) == 1, name
             assert scan.points[0].type is BifurcationType.SADDLE_NODE, name
             assert scan.branch_jumps == (), name
-            assert len(set(parameters)) == len(parameters), name
+            # 唯一候选须是区间 [0.0, 0.5] 的过零插值点：原先的矩形分配会额外伪造
+            # 出 0.6111 处的重复点，计数与位置断言都能钉住它。
+            assert parameters == [pytest.approx(0.25, abs=1e-9)], name
+
+    def test_touch_without_crossing_reports_nothing(self, earth_moon_system):
+        """判据在某成员上恰为零但两侧同号（触及未穿越）不得报点或重复报点。"""
+        grid = (0.2, 0.4, 0.6, 0.8)
+        values = {
+            0.2: (2.0, -2.10, 0.40),
+            0.4: (2.0, -2.00, 0.50),  # 判据 ν+2 由 −0.10 触及 0 后回落
+            0.6: (2.0, -2.05, 0.60),
+            0.8: (2.0, -2.10, 0.70),
+        }
+        scan = _scan(
+            "saddle_node",
+            earth_moon_system,
+            grid=grid,
+            refine=False,
+            multiplier_fn=_triplet_multiplier_fn(values),
+        )
+
+        assert scan.points == ()
+        assert scan.branch_jumps == ()
+        assert scan.failures == ()
 
     def test_multiple_crossings_are_strictly_ascending(self, earth_moon_system):
         """同一族报两个穿越（+2 与 −2）：族参数严格升序，每个穿越各一条。"""

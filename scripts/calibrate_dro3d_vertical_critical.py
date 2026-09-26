@@ -20,10 +20,11 @@
 
 单方向延拓在修正失败时退回上一成功成员并把步长减半重试（下限与生产族行走
 ``_walk_family`` 同为 1e-4），并记录该方向的停止原因（域边界 / 修正失败 / 成员
-预算耗尽）。域内无垂直临界穿越时以退出码 1 结束：仅当两侧延拓均走到族参数域
-边界、扫描无失败点且无跳支区间时才判为物理阻塞；否则说明延拓被中断、结论不可
-得出，并列出停止原因与失败/跳支计数。任一种情况都须把证据发到 #689 请求裁决，
-不得静默改用其他分岔点。
+预算耗尽）。域内无垂直临界穿越时以退出码 1 结束，结论按停止原因与扫描是否干净
+分三档——两侧都走到族参数域边界且无失败点、无跳支区间判为物理阻塞；至少一侧在
+到达域端点前停止但扫描干净时，结论是「已覆盖域内无穿越」（覆盖未及域端点，逐侧
+停止原因见输出）；存在失败点或跳支区间时结论不可得出。三档都列出停止原因与失败/
+跳支计数，且都须把证据发到 #689 请求裁决，不得静默改用其他分岔点。
 """
 
 from __future__ import annotations
@@ -259,6 +260,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     vertical: list[tuple[FamilyBifurcationPoint, float, float]] = []  # (点, 振幅, vt)
+    gated_out = 0
     for point in scan.points:
         amplitude = _moon_amplitude_km(dynamics, point.orbit)
         vt = float(_vertical_trace(dynamics, point.orbit))
@@ -274,42 +276,44 @@ def main(argv: list[str] | None = None) -> int:
             vertical.append((point, amplitude, vt))
         else:
             # ν 跨 +2 但 vt 不过 1：疑似面内对（非垂直临界），不得计入结论
+            gated_out += 1
             print(
                 f"#   ↑ ν=+2 候选（疑似面内对，非垂直临界）："
                 f"|vt-1|={abs(vt - 1.0):.3e} > {_VT_TOL:.1e}"
             )
 
+    if gated_out:
+        print(f"# 另有 {gated_out} 个 ν=+2 候选未通过 |vt-1| ≤ {_VT_TOL:.1e} 门控（疑似面内对）")
+
     if not vertical:
-        print("# 未在可行走的平面 DRO 族参数域内发现 ν 跨 +2（垂直临界）穿越。", file=sys.stderr)
-        if (
-            decreasing.at_domain_edge
-            and increasing.at_domain_edge
-            and not scan.failures
-            and not scan.branch_jumps
-        ):
+        clean = not scan.failures and not scan.branch_jumps
+        print("# 未在已覆盖的平面 DRO 族参数域内发现 ν 跨 +2（垂直临界）穿越。", file=sys.stderr)
+        if decreasing.at_domain_edge and increasing.at_domain_edge and clean:
             print(
                 "# 两侧延拓均走到族参数域边界、扫描无失败点与跳支区间：属物理阻塞，"
                 "须把本输出发到 #689 请求裁决。",
                 file=sys.stderr,
             )
+        elif clean:
+            print(
+                "# 延拓在到达族参数域端点前停止（逐侧原因见下：可能成员预算耗尽，"
+                "也可能修正失败退到步长下限），扫描无失败点与跳支区间：结论是"
+                "「已覆盖域内无穿越」，覆盖未及族参数域端点；须把本输出发到 #689"
+                " 请求裁决。",
+                file=sys.stderr,
+            )
         else:
             print(
-                "# 延拓被中断，结论不可得出；须把本输出发到 #689 请求裁决。",
+                "# 延拓停止原因或扫描结果不满足上述两档（失败点/跳支区间见下），"
+                "结论不可得出；须把本输出发到 #689 请求裁决。",
                 file=sys.stderr,
             )
-            print(f"#   x0 减小侧停止原因：{decreasing.stop_reason}", file=sys.stderr)
-            print(f"#   x0 增大侧停止原因：{increasing.stop_reason}", file=sys.stderr)
-            print(
-                f"#   扫描失败点 {len(scan.failures)} 个、跳支区间 {len(scan.branch_jumps)} 个",
-                file=sys.stderr,
-            )
-        gated_out = sum(1 for point in scan.points if point.type is BifurcationType.SADDLE_NODE)
-        if gated_out:
-            print(
-                f"#   另有 {gated_out} 个 ν=+2 候选未通过 |vt-1| ≤ {_VT_TOL:.1e} 门控"
-                "（疑似面内对）",
-                file=sys.stderr,
-            )
+        print(f"#   x0 减小侧停止原因：{decreasing.stop_reason}", file=sys.stderr)
+        print(f"#   x0 增大侧停止原因：{increasing.stop_reason}", file=sys.stderr)
+        print(
+            f"#   扫描失败点 {len(scan.failures)} 个、跳支区间 {len(scan.branch_jumps)} 个",
+            file=sys.stderr,
+        )
         return 1
 
     # 距种子最近者即"从种子出发沿族曲线遇到的第一个垂直临界点"
