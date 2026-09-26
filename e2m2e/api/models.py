@@ -821,7 +821,16 @@ class TransferDesignRequest(_ApiModel):
             "非月心高度（环月取 ≈384400）"
         ),
     )
-    tof_range: list[float] | None = Field(default=None, description="飞行时间范围 [min, max]（天）")
+    tof_range: list[float] | None = Field(
+        default=None,
+        min_length=2,
+        max_length=2,
+        description=(
+            "飞行时间范围 [min, max]（天；须为有限数对且 min < max）：HMN 作 "
+            "Lambert 扫描窗口、LGA/WSB 作搜索窗口、PCN 覆盖 "
+            "PcnSearchParams.tof_range_days（到达与出发两种模式共用的 tof 搜索网格）"
+        ),
+    )
     lga_search_params: Any = Field(default=None, description="LGA 搜索参数（LgaSearchParams 实例）")
     wsb_search_params: Any = Field(default=None, description="WSB 搜索参数（WsbSearchParams 实例）")
     engine_config: dict[str, Any] | None = Field(
@@ -880,6 +889,22 @@ class TransferDesignRequest(_ApiModel):
             "给定出发双曲渐近线，无迭代解算月心 B-plane 与 LOI 脉冲"
         ),
     )
+
+    @field_validator("tof_range")
+    @classmethod
+    def _validate_tof_range(cls, value: list[float] | None) -> list[float] | None:
+        """``tof_range`` 须为有限数对 ``[min, max]`` 且 ``min < max``（#698）。
+
+        形状、有限性与序在请求边界拒绝（映射 ``INVALID_PARAMS``），不把单元素
+        列表留给编排器的 ``tof_range[1]`` 索引（``IndexError`` → ``TRANSFER_FAILED``），
+        也不让反向/非有限窗口退化成「无交集」的求解结果。
+        """
+        if value is None:
+            return None
+        finite = all(math.isfinite(item) for item in value)
+        if len(value) != 2 or not finite or not value[0] < value[1]:
+            raise ValueError(f"tof_range 须为有限数对 [min, max] 且 min < max，当前 {value!r}")
+        return value
 
 
 class ManeuverEvent(_ApiModel):
@@ -955,6 +980,24 @@ class BplaneInfo(_ApiModel):
     perilune_alt_km: float = Field(description="达成近月点高度 (km，月面以上)")
 
 
+def _sanitize_nonfinite(value: Any) -> Any:
+    """递归把非有限浮点（``nan``/``inf``）替换为 ``None``（#698）。
+
+    ``details`` 是自由字段，后端在缺几何/零结果时用 ``nan``/``inf`` 占位；
+    ``model_dump(mode="json")`` 会写出非法 JSON 记号（``NaN``/``Infinity``），
+    故响应构造期统一清洗。口径与 catalog 写侧 ``catalog_ingest._sanitize_value``
+    一致：``None`` 表示缺位。递归覆盖 dict/list/tuple（与 ``Any`` 字段的
+    常见嵌套形态一致）。
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: _sanitize_nonfinite(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_nonfinite(item) for item in value]
+    return value
+
+
 class TransferDesignResponse(ResultResponse):
     """转移轨道设计输出。"""
 
@@ -1026,6 +1069,17 @@ class TransferDesignResponse(ResultResponse):
         default=None,
         description="产物自动入库的记录 id（ADR 0031，#574）；库关闭或无轨迹产物时为 None",
     )
+
+    @model_validator(mode="after")
+    def _sanitize_details(self) -> TransferDesignResponse:
+        """``details`` 出口统一清洗非有限值（#698）。
+
+        PCN 等后端在缺几何/零结果时以 ``nan``/``inf`` 占位；不清洗会让
+        ``model_dump(mode="json")`` 产出 ``NaN``/``Infinity`` 记号。清洗只作用于
+        这个自由字段，显式定型的顶层字段（如零结果的 ``delta_v=inf``）保持契约不变。
+        """
+        self.details = _sanitize_nonfinite(self.details)
+        return self
 
 
 class PropagationRequest(_ApiModel):

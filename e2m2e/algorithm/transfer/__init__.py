@@ -931,7 +931,8 @@ def _transfer_orbit_pcn(
     details = _pcn_details(tli_params, sol, mode)
     stages = _pcn_stages(sol, mode)
 
-    # 失败/非收敛：镜像 LGA 零结果契约（无轨迹、无事件、Δv=inf）
+    # 失败/非收敛：镜像 LGA 零结果契约（无轨迹、无事件、Δv=inf），但回显
+    # 实际使用的渐近线与达成的 B-plane（诊断需要，字段描述承诺「回显实际值」）。
     if sol.status is not ConvergenceState.CONVERGED or sol.bplane is None:
         warnings.warn(f"PCN 转移未收敛：{sol.message}", stacklevel=2)
         return TransferDesignResult(
@@ -943,6 +944,8 @@ def _transfer_orbit_pcn(
             cause=sol.cause,
             message=sol.message,
             stages=stages,
+            bplane=sol.bplane,
+            departure_asymptote=sol.departure_asymptote,
         )
 
     # 轨迹组装（ADR 0040）：地球段地心二体弧 + 月心段月心二体弧。组装失败

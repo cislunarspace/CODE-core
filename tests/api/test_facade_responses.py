@@ -388,3 +388,41 @@ class TestPcnFacadeValidation:
                 bplane_target={"perilune_alt_km": 200.0, "bdot_t_km": 0.0},
             )
         assert exc.value.code == "INVALID_PARAMS"
+
+    def test_bad_tof_range_rejected_as_invalid_params(self):
+        """tof_range 形状/序非法 → INVALID_PARAMS（#698），不再是 TRANSFER_FAILED。"""
+        from e2m2e.api.models import OrbitError
+
+        for bad in ([1.5], [2.0, 1.5], [1.5, float("inf")]):
+            with pytest.raises(OrbitError) as exc:
+                Facade().transfer_design(
+                    transfer_type="PCN",
+                    tli_epoch=0.0,
+                    tof_range=bad,
+                    departure_asymptote={"rha_deg": 32.0, "dha_deg": 0.0, "c3_km2_s2": 1.0},
+                )
+            assert exc.value.code == "INVALID_PARAMS"
+
+
+class TestPcnFailureResponse:
+    """PCN 非交会解的真实调用出口（#698）：回显几何 + 清洗非有限 details。"""
+
+    def test_far_flyby_echoes_geometry_and_sanitizes_details(self):
+        asym = {"rha_deg": 20.0, "dha_deg": 0.0, "c3_km2_s2": 1.0}
+        with pytest.warns(UserWarning, match="未收敛"):
+            response = Facade().transfer_design(
+                transfer_type="PCN",
+                tli_epoch=0.0,
+                tof_range=[1.5, 2.0],
+                departure_asymptote=asym,
+            )
+        assert response.status is ConvergenceState.INFEASIBLE
+        assert response.cause is FailureCause.CONSTRAINT_VIOLATION
+        # 失败解仍回显实际使用的渐近线与达成的 B-plane（字段描述承诺）
+        assert response.departure_asymptote is not None
+        assert response.departure_asymptote.rha_deg == 20.0
+        assert response.bplane is not None
+        # 未达成的 LOI 脉冲不写成 inf：细节出口统一清洗为 None
+        assert response.details["dv_loi_km_s"] is None
+        dumped_details = response.model_dump(mode="json")["details"]
+        assert "Infinity" not in repr(dumped_details) and "NaN" not in repr(dumped_details)
