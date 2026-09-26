@@ -280,9 +280,10 @@ pub struct PropagationResult {
 /// - 初值处右端项求值失败（如 SPICE 内核缺失导致第三体位置查询失败）；
 /// - 积分提前退出导致输出点数少于 `t_eval.len()`（如步长塌缩、中途力模型失败）。
 ///
-/// 两类错误的消息都带 `cause:` 段，按状态查询分类（内核未加载 / 内核覆盖
-/// 不足 / 星历缓存窗口外 / 步长塌缩或步数上限），覆盖与缓存类附带底层定位
-/// 信息（见 `truncation_cause`）。
+/// 两类错误的消息都带 `cause:` 段，分类由状态查询得出（缓存窗口外 / 缓存键
+/// 未注册 / strict 区缓存未启用 / 内核未加载 / 内核覆盖不足；力模型未报错时归
+/// 为步长塌缩或步数上限），覆盖与缓存类附带底层定位信息（见
+/// `truncation_cause`）。
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_with_stm(
     config: &NBodyConfig,
@@ -417,9 +418,10 @@ pub struct StatePropagationResult {
 /// - 初值处右端项求值失败（如 SPICE 内核缺失）；
 /// - 积分提前退出导致输出点数少于 `t_eval.len()`（不允许静默截断）。
 ///
-/// 两类错误的消息都带 `cause:` 段，按状态查询分类（内核未加载 / 内核覆盖
-/// 不足 / 星历缓存窗口外 / 步长塌缩或步数上限），覆盖与缓存类附带底层定位
-/// 信息（见 `truncation_cause`）。
+/// 两类错误的消息都带 `cause:` 段，分类由状态查询得出（缓存窗口外 / 缓存键
+/// 未注册 / strict 区缓存未启用 / 内核未加载 / 内核覆盖不足；力模型未报错时归
+/// 为步长塌缩或步数上限），覆盖与缓存类附带底层定位信息（见
+/// `truncation_cause`）。
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_with_state(
     config: &NBodyConfig,
