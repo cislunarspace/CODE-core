@@ -426,6 +426,7 @@ pub fn segmented_shooting_correct_py(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm;
 
     #[test]
     fn test_segment_trajectory_by_revs() {
@@ -467,7 +468,7 @@ mod tests {
     fn decreasing_t_patch_smoke() {
         let forces = vec![CompiledForce::PointMass { mu: 398600.4418 }];
         let y0 = [42164.0, 0.0, 0.0, 0.0, 3.0747, 0.0];
-        let r = e2m2e_forces::forces::compiled_stm::propagate_compiled_stm(
+        let r = propagate_compiled_stm(
             &forces,
             "EARTH",
             (0.0, 3600.0),
