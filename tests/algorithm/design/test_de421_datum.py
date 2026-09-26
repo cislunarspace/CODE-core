@@ -39,11 +39,11 @@ _MAX_SUN_DIFF_KM = 5.0
 def de421_datum_env():
     """DE421 与 DE440s 两套口径的 SPICEManager + EphemerisSystem，模块级复用。
 
-    两个 manager 各自独立（datum 簿记在实例上），但**内核池是 CSPICE 进程级
-    全局的**：若同时加载 de421 与 de440s，后加载者对重叠覆盖段全局生效，
-    两个 manager 会查到同一个内核。因此本 fixture 只保持**一个**星历内核
-    处于加载态，位置差的对照在 :class:`TestDe421PositionDifference` 里用
-    "换内核再查一次"的顺序方式完成。
+    datum 簿记是**类级**的（ADR 0048）：CSPICE 内核池进程级全局，任一实例加载的
+    星历内核都改变"重叠覆盖段取后加载者"的实际口径，故本 fixture 期间两个 system
+    看到的是同一个 GM 口径（DE421）；DE440s 的对照值用显式 ``datum`` 查询取得，
+    位置差的对照在 :class:`TestDe421PositionDifference` 里用"换内核再查一次"的
+    顺序方式完成。
 
     卸载一律走 ``SPICEManager.unload_kernel``，保证 Python/Rust 双实例对称卸载
     （见 manager.unload_kernel 注释）。
@@ -112,8 +112,11 @@ class TestDe421GmConsistency:
         assert system_421.gravitational_parameter("MOON") == Datum.DE421.moon_gm
         assert system_421.gravitational_parameter("SUN") == Datum.DE421.sun_gm
         assert system_421.gravitational_parameter("EMB") == Datum.DE421.emb_gm
-        # 对照：de440s 口径必须给出不同的值（否则"切换"是假的）
-        assert system_440.gravitational_parameter("MOON") == Datum.DE440.moon_gm
+        # 簿记类级共享（内核池进程级全局，ADR 0048）：同进程另一 system 也看到
+        # DE421 口径，避免「de440s 位置 + DE421 GM」的静默错配。
+        assert system_440.gravitational_parameter("MOON") == Datum.DE421.moon_gm
+        # 对照：DE440 口径必须给出不同的值（否则"切换"是假的），显式 datum 取。
+        assert de421.get_gm("MOON", datum="DE440") == Datum.DE440.moon_gm
         assert Datum.DE421.moon_gm != Datum.DE440.moon_gm
 
     def test_body_table_matches_datum_table(self):

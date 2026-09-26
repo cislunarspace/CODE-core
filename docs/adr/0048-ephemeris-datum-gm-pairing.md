@@ -130,3 +130,44 @@ DE421 GM 仍只写在 `constants.toml`：`[datum.DE421]` 是聚合视图，
 Decision 4 的「ephemeris dynamics defaults to `DE440`」细化为：星历动力学的 GM
 基准**跟随已加载星历内核**（本 ADR 决策 1），仅在无星历内核时仍默认 `DE440`。
 决策 3「多基准并存、按场景选」与决策 5「单一来源 + 生成期对齐」不变。
+
+## Revision (2026-09-26): pairing bookkeeping scope and kernel-load warnings (#683 review)
+
+### Context
+
+Review of PR #683 found three gaps against this ADR's own claims: (a) the datum
+bookkeeping (`_loaded_ephemeris`) was **instance**-level while the CSPICE kernel
+pool is **process-global** (this ADR §2), so a second manager loading
+`de440s.bsp` in the same process silently re-pointed positions to de440s while the
+first manager still reported the DE421 datum — the "de440s position + DE421 GM"
+mix this ADR set out to remove; (b) the promised "de441/de442 fall back to DE440
+**with a warning**" was not implemented (`get_gm`'s warning branch can never fire
+because the whitelist maps those kernels straight to DE440); (c) the one-shot
+warning set was a module global, coupling test modules.
+
+### Decisions
+
+1. **Bookkeeping is class-level.** `SPICEManager._loaded_ephemeris` is shared by
+   all instances: it mirrors the process-global pool, so `ephemeris_datum` (and
+   hence `get_gm`'s default) always reflects the last kernel loaded *anywhere in
+   the process*. Instance-level bookkeeping cannot model a global pool.
+2. **Load-time warnings implement the "never silently mix" contract.** Loading a
+   kernel whose GM is only approximated (de430/de435/de438/de441/de442/de442s →
+   DE440) warns once per kernel name; loading a DE-named kernel outside the
+   whitelist (e.g. `de423.bsp`, renamed copies) also warns once and leaves the
+   current datum unchanged. `de421`/`de440(s)` carry authoritative GM tables and
+   do not warn.
+3. **Warning dedup is per manager instance** (not module-global), removing the
+   cross-test / cross-caller coupling.
+4. **One source for the datum→kernel mapping.** `SPICEManager.datum_kernel_name`
+   (backed by `_DATUM_KERNEL_PREFERENCE`, now including `DE440 → de440s.bsp`) is
+   the single map; `design_orbit.load_design_kernels` consumes it instead of a
+   second copy, so `find_ephemeris_kernel(preferred="DE440")` and
+   `load_design_kernels(datum="DE440")` agree.
+
+### Consequences
+
+- Tests that assumed two same-process systems could hold different datums
+  (`test_de421_datum.py::test_gm_follows_loaded_kernel`) now assert the shared
+  datum; the DE440 contrast is taken via an explicit `datum=` query.
+- No error code, failure semantics, or GM value changes.

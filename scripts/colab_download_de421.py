@@ -66,8 +66,24 @@ def download_file(filename, save_dir, urls, expect_size=None, magic=None):
         try:
             response = requests.get(url, stream=True, timeout=60)
             response.raise_for_status()
+            # 大小自限：先按 Content-Length 预检，再按 expect_size 截断读取，
+            # 避免异常/恶意来源在 _verify 之前把任意字节数写入磁盘（配额耗尽）。
+            declared = response.headers.get("Content-Length")
+            if declared is not None and expect_size is not None:
+                try:
+                    declared_size = int(declared)
+                except (TypeError, ValueError):
+                    declared_size = None
+                if declared_size is not None and declared_size != expect_size:
+                    raise ValueError(f"Content-Length {declared} 与期望 {expect_size} 不符")
+            written = 0
             with open(tmp_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if not chunk:
+                        continue
+                    written += len(chunk)
+                    if expect_size is not None and written > expect_size:
+                        raise ValueError(f"下载字节数超过期望 {expect_size}，中止")
                     f.write(chunk)
             ok, why = _verify(tmp_path)
             if not ok:

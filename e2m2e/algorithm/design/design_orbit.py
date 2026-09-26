@@ -208,13 +208,6 @@ _BODY_FIXED_KERNELS = [
 #: 缺省行星历内核候选（按优先级）。None 口径下行为与历史一致。
 _DEFAULT_EPHEMERIS_KERNELS = ["de440s.bsp", "de430.bsp"]
 
-#: GM 基准 → 该口径的行星历内核（ADR 0048）。当前只有 DE421 与 DE440s 口径不同，
-#: 故只有 DE421 需要单独的内核；显式请求时缺失即报错，不做降级。
-_DATUM_EPHEMERIS_KERNEL = {
-    "DE421": "de421.bsp",
-    "DE440": "de440s.bsp",
-}
-
 
 class DesignNotConvergedError(RuntimeError):
     """任务轨道设计未生成可用标称轨道。"""
@@ -343,7 +336,7 @@ def load_design_kernels(
     if datum is None:
         ephemeris_candidates = _DEFAULT_EPHEMERIS_KERNELS
     else:
-        preferred = _DATUM_EPHEMERIS_KERNEL.get(datum.upper())
+        preferred = SPICEManager.datum_kernel_name(datum)
         if preferred is None:
             raise ValueError(f"未知的星历基准（无偏好内核）: {datum}")
         # 显式口径：只用该口径内核；不再追加其它 DE 系列，避免
