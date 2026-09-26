@@ -45,8 +45,9 @@
 - ``states`` 是与输入逐行对应的转换后状态：``j2000_to_synodic``／``j2000_to_eppr``
   输出质心原点、以地月距离为长度单位的无量纲状态，``synodic_to_j2000``／
   ``eppr_to_j2000`` 输出地心 J2000 的 km／km·s⁻¹。
-- ``times`` 的语义按 ``transform_type`` 区分：GCRS↔EBCRS 用 JD_TDB 绝对时刻；
-  会合系与 EPPR 转换用无量纲时间（``0`` 即参考历元 ``et0_jd``）。
+- ``times`` 的语义按 ``transform_type`` 区分：synodic/EPPR 转换（输入）用相对
+  ``et0_jd`` 的无量纲时间（``0`` 即参考历元）；GCRS↔EBCRS 用绝对儒略日。响应里的
+  ``times`` 是该转换回传的时刻（synodic/EPPR 换算为 JD_TDB）。
 - ``details`` 回显变换的辅助量（如参考历元下的会合角速度）。
 - ``valid_ranges`` 无参数，返回 ``design_orbit``（逐 ``orbit_type`` 的字段
   区间）、``family_generation_ranges`` 与 ``family_generation_options``
