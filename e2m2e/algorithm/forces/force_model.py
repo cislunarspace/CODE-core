@@ -604,8 +604,11 @@ class ForceModel:
 
         Args:
             initial_state: 初始状态向量，形状 (6,)。
-            t_span: 时间区间 [t0, tf]，单位为 SPICE et 秒。
-            t_eval: 评估时间点数组，默认 linspace(t0, tf, 100)。
+            t_span: 时间区间 [t0, tf]，单位为 SPICE et 秒。允许 ``tf < t0``
+                表示反向积分（自 t0 倒退至 tf）；Rust 核心已方向感知。
+            t_eval: 评估时间点数组，默认 linspace(t0, tf, 100)。须沿积分方向
+                单调（正向递增、反向递减）。可变质量低推力 7D 路径
+                （``VariableMassFiniteBurn``）暂不支持反向传播。
             with_stm: 是否同时积分状态转移矩阵。返回字典额外含 ``stm`` 键，
                 形状 (n_points, 6, 6)。STM 不参与步长误差控制（对齐 GMAT）。
             with_jacobi: 不支持，传 True 抛 NotImplementedError。
@@ -646,10 +649,6 @@ class ForceModel:
             raise ValueError("t_span must be a tuple of (t0, tf)")
 
         t0, tf = float(t_span[0]), float(t_span[1])
-        if tf < t0:
-            raise NotImplementedError(
-                "ForceModel propagation only supports forward integration (tf >= t0)."
-            )
 
         if events is not None:
             raise NotImplementedError(
@@ -663,6 +662,11 @@ class ForceModel:
         # 随推力消耗，走 Rust propagate_compiled_lowthrust。与 6D 主路径隔离，
         # 不参与 STM/事件分派。详见 docs/plans/lowthrust-foundation-prd.md。
         if self._has_variable_mass_thrust():
+            if tf < t0:
+                raise NotImplementedError(
+                    "VariableMassFiniteBurn 7D 路径暂不支持反向传播"
+                    "（propagate_compiled_lowthrust 正向写死）"
+                )
             if integrator == "ias15" or resolved_sens:
                 raise NotImplementedError(
                     "VariableMassFiniteBurn 7D 路径不支持 integrator='ias15' 或 sens_params"
@@ -809,7 +813,11 @@ class ForceModel:
     def _prepare_t_eval(
         t0: float, tf: float, t_eval: npt.ArrayLike | None
     ) -> npt.NDArray[np.floating]:
-        """准备并校验 t_eval 数组。"""
+        """准备并校验 t_eval 数组。
+
+        支持反向积分（``tf < t0``）：此时 ``t_eval`` 须沿积分方向单调递减。
+        """
+        backward = tf < t0
         if t_eval is None:
             return np.linspace(t0, tf, 100)
 
@@ -820,17 +828,26 @@ class ForceModel:
         if t_eval.ndim != 1:
             raise ValueError("t_eval must be one-dimensional")
 
-        if np.any(t_eval < t0 - 1e-14) or np.any(t_eval > tf + 1e-14):
+        lo, hi = (tf, t0) if backward else (t0, tf)
+        if np.any(t_eval < lo - 1e-14) or np.any(t_eval > hi + 1e-14):
             raise ValueError("t_eval must be within t_span")
 
-        if not np.all(np.diff(t_eval) >= -1e-14):
+        if backward:
+            if not np.all(np.diff(t_eval) <= 1e-14):
+                raise ValueError("t_eval must be monotonically decreasing")
+        elif not np.all(np.diff(t_eval) >= -1e-14):
             raise ValueError("t_eval must be monotonically increasing")
 
-        # Append tf if not present, then unique
-        combined = np.concatenate([t_eval, [tf]])
-        t_eval = np.unique(np.round(combined / 1e-14) * 1e-14)
-        # Ensure monotonic and within bounds after rounding
-        t_eval = np.clip(t_eval, t0, tf)
+        # Append tf if not present, then unique（反向时对时间取负数去重，保持降序）
+        if backward:
+            combined = np.concatenate([-t_eval, [-tf]])
+            t_eval = -np.unique(np.round(combined / 1e-14) * 1e-14)
+            t_eval = np.clip(t_eval, tf, t0)
+        else:
+            combined = np.concatenate([t_eval, [tf]])
+            t_eval = np.unique(np.round(combined / 1e-14) * 1e-14)
+            # Ensure monotonic and within bounds after rounding
+            t_eval = np.clip(t_eval, t0, tf)
         return np.asarray(t_eval, dtype=float)
 
     @staticmethod

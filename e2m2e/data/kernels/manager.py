@@ -416,9 +416,18 @@ class SPICEManager(EphemerisProvider):
         积分内循环的三次样条查表。两套缓存独立构建但同源（同网格采样），
         保证 Rust 积分不逐次调 cspice（消除 DAFFRNOTFOUND 与每步 FFI 开销）。
 
+        反向传播契约：反向段（``direction="backward"`` 预报、递减 t_patch 的
+        多重/分段打靶）要求缓存窗口 ``[et_start, et_end]`` 覆盖反向段到达的最早
+        时刻。Rust 积分内循环的窗口外查询是确定性硬失败
+        （``CacheMissError::OutOfRange``，信封短码 ``EPHEM_CACHE_MISS``，见
+        ``e2m2e-spice`` ``ephem_cache.rs``），不静默外推；Python 层
+        ``get_body_state/position`` 在缓存未覆盖时回退直接 SPICE 查询，成败
+        取决于内核覆盖。
+
         Args:
             bodies: 需缓存的天体名列表（EARTH/MOON/SUN/行星）。
-            et_start/et_end: 缓存覆盖的 ET 秒范围。
+            et_start/et_end: 缓存覆盖的 ET 秒范围；调用方负责让窗口覆盖全部
+                查询时刻（含反向段）。
             dt: 预采样网格步长（秒），默认 3600。
             frame: Python 层缓存采样坐标系（J2000）。
             observer: Python 层缓存采样原点（EARTH）。

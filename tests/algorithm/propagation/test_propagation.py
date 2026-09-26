@@ -156,3 +156,52 @@ class TestPropagateOrbit:
             output_step=3600.0,
         )
         assert len(result.ephemeris) == 25
+
+    def test_backward_roundtrip(self, spice_manager, reference_epoch):
+        # 反向 6h 得到 prev 态，再用 prev 态正向 6h 应闭合回初值。
+        s0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.7, 0.0])
+        bwd = propagate_orbit(
+            initial_state=s0,
+            epoch=reference_epoch,
+            duration=21600.0,
+            direction="backward",
+            output_step=3600.0,
+        )
+        s_prev = np.concatenate(
+            [bwd.ephemeris.position_km[-1], bwd.ephemeris.velocity_mps[-1] / 1000.0]
+        )
+        et0 = spice_manager.utc_to_et(reference_epoch)
+        utc_prev = spice_manager.et_to_utc(et0 - 21600.0)
+        fwd = propagate_orbit(
+            initial_state=s_prev,
+            epoch=utc_prev,
+            duration=21600.0,
+            output_step=3600.0,
+        )
+        assert np.linalg.norm(fwd.ephemeris.position_km[-1] - s0[:3]) < 1e-2
+        assert np.linalg.norm(fwd.ephemeris.velocity_mps[-1] / 1000.0 - s0[3:]) < 1e-6
+
+    def test_backward_time_axis(self, spice_manager, reference_epoch):
+        s0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.7, 0.0])
+        result = propagate_orbit(
+            initial_state=s0,
+            epoch=reference_epoch,
+            duration=21600.0,
+            direction="backward",
+            output_step=3600.0,
+        )
+        assert len(result.ephemeris) == 7
+        jd = result.ephemeris.times_jd_tdb
+        assert np.all(np.diff(jd) < 0)
+        et0 = spice_manager.utc_to_et(reference_epoch)
+        assert jd[0] == pytest.approx(2451545.0 + et0 / 86400.0)
+        assert jd[-1] == pytest.approx(2451545.0 + (et0 - 21600.0) / 86400.0)
+
+    def test_invalid_direction(self):
+        with pytest.raises(ValueError, match="direction"):
+            propagate_orbit(
+                initial_state=np.zeros(6),
+                epoch="2025-06-21T11:00:00",
+                duration=3600.0,
+                direction="sideways",
+            )

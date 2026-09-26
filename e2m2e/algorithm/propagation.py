@@ -71,6 +71,7 @@ def propagate_orbit(
     duration: float,
     force_config: dict[str, Any] | None = None,
     output_step: float = 3600.0,
+    direction: str = "forward",
     **kwargs,
 ) -> PropagationResult:
     """高精度轨道预报。
@@ -80,22 +81,27 @@ def propagate_orbit(
     Args:
         initial_state: 初值（GCRS，km, km/s，形状 (6,)）。
         epoch: 起始历元 UTC（ISO 字符串或 ``[年,月,日,时,分,秒]``）。
-        duration: 预报时长（秒）。
+        duration: 预报时长（秒），恒为正的幅值。
         force_config: 力模型配置（缺省用默认三体力模型）。
         output_step: 输出间隔（秒）。
+        direction: 传播方向：``"forward"`` 自 epoch 正向预报，``"backward"``
+            自 epoch 反向回溯 ``duration``，轨迹终止于 ``epoch − duration``。
+            星历表按积分次序排列，反向时时刻递减。
         kwargs: 传给 ForceModel 的额外配置（如 system/spice 等）。
 
     Returns:
         含星历与最终状态三元组的预报结果。
 
     Raises:
-        ValueError: 初值形状或时长非法。
+        ValueError: 初值形状、时长或方向非法。
     """
     state = np.asarray(initial_state, dtype=float)
     if state.shape != (6,):
         raise ValueError(f"initial_state 应为 (6,)，实际 {state.shape}")
     if float(duration) <= 0:
         raise ValueError(f"duration 必须为正数，当前 {duration}")
+    if direction not in ("forward", "backward"):
+        raise ValueError(f"direction 必须为 'forward' 或 'backward'，当前 {direction!r}")
 
     from ..data.kernels.manager import SPICEManager
     from .coordinate.coordinate_system import CoordinateSystem
@@ -135,8 +141,9 @@ def propagate_orbit(
         else:
             raise ValueError(f"不支持的 epoch 格式: {epoch}")
 
-    etf = et0 + float(duration)
-    t_eval = np.arange(et0, etf + 0.5 * float(output_step), float(output_step))
+    sign = -1.0 if direction == "backward" else 1.0
+    etf = et0 + sign * float(duration)
+    t_eval = np.arange(et0, etf + 0.5 * sign * float(output_step), sign * float(output_step))
 
     result = fm.propagate(state, t_span=(et0, etf), t_eval=t_eval)
 

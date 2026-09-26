@@ -1040,6 +1040,11 @@ class PropagationRequest(_ApiModel):
         default=None, description="力模型配置（缺省用默认三体力模型）"
     )
     output_step: float = Field(default=3600.0, gt=0.0, description="输出间隔（秒）")
+    direction: Literal["forward", "backward"] = Field(
+        default="forward",
+        description="传播方向：forward 自 epoch 正向预报，backward 自 epoch 反向"
+        "回溯；duration 恒为正的时长幅值",
+    )
 
 
 class PropagationResponse(ResultResponse):
@@ -1047,6 +1052,7 @@ class PropagationResponse(ResultResponse):
 
     epoch_utc: str
     duration_sec: float
+    direction: str = Field(description="实际传播方向回显（forward/backward）")
     output_step: float
     n_points: int
     time_sec: list[float]
