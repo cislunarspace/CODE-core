@@ -353,7 +353,7 @@ def load_design_kernels(
         wanted = " 或 ".join(ephemeris_candidates)
         raise FileNotFoundError(
             f"行星历内核不存在（{wanted}）: {kernel_dir}"
-            "（内核由 kernels-v1 release 分发，跑 make kernels 获取）"
+            "（内核随仓库 git-lfs 入库，缺失时跑 make kernels 从 kernels-v1 获取）"
         )
     for name in _BODY_FIXED_KERNELS:
         path = os.path.join(kernel_dir, name)

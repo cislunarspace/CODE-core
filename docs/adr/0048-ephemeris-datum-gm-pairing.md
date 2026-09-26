@@ -232,3 +232,35 @@ Revision (b) 只记录了「类级列表在 `_bookkeeping_lock` 下变更」，#
   重载失败不丢先前加载；告警在锁外）。
 - 测试隔离随之收紧：会真实 `furnsh` 的用例改在 `try/finally` 中卸载，`de421.bsp`
   不再从断言失败路径泄漏到同 worker 的后续用例。
+
+## Revision (2026-09-26, d)：`de421.bsp` 纳入 git-lfs，不再只作 release 资产
+
+### Context
+
+背景 §1 把「拿不到 DE421 内核」列为本 ADR 的动机之一，并注明补法是从 NAIF 经
+Colab 取回后上传 `kernels-v1`。那是**分发**手段而非入库：clone 得到的 `kernels/`
+不含 de421，要按 ADR 口径复算必须先联网跑 `make kernels`。而 de430/de440s 自
+#517 起就在 git-lfs 里（`.gitattributes` 的 `kernels/*.bsp` 规则），de421 是该
+规则下唯一的例外。
+
+### Decisions
+
+1. **`kernels/de421.bsp` 按同一条 LFS 规则入库**（16 790 528 字节，sha256
+   `08b20db2ae22…`，与 `kernels-v1` 的 `de421.bsp` 资产逐字节相同）。
+   `.gitattributes` 无需改动——`kernels/*.bsp` 已覆盖。
+2. **release 路径保留且不是「备用降级」**：CI 的 `actions/checkout` 未开
+   `lfs: true`（检出的是 LFS 指针文件），任何未拉 LFS 的 clone 也如此，二者
+   仍由 `make kernels` → `scripts/download_kernels.py` 供给，既有指针判据
+   `_is_lfs_pointer` 已覆盖本文件。两条路径的同名资产须保持同源。
+3. **口径语义与守卫不动**：决策 1（GM 跟随仍加载的末位内核）、决策 3（显式
+   请求 DE421 而内核缺失时 `FileNotFoundError`）以及缺省顺序 `de440s > de430`
+   逐位不变。本修订只改「de421.bsp 从哪来」，不改「加载后查到什么」。
+4. **`de421.cmt` 不入库**：仓库没有 `.cmt` 消费者；该注释文本的 NAIF 取法仍
+   记在 `scripts/colab_download_de421.py`。
+
+### Consequences
+
+- 拉过 LFS 的本地环境无需联网即有 de421，`requires_de421_kernel` 守卫的用例
+  （`tests/algorithm/design/test_de421_datum.py` 等）由 skip 转为实跑。
+- 仓库 LFS 侧 +16.8 MB；未拉 LFS 的 clone 只多一个指针文件，行为不变。
+
