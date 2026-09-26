@@ -8,6 +8,7 @@ from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.dynamics import Dynamics, EphemerisDynamics
 from e2m2e.data.constants import Datum
+from e2m2e.exceptions import E2M2EError, PropagationFailure
 
 pytestmark = [pytest.mark.interface, pytest.mark.spice]
 
@@ -128,10 +129,11 @@ def test_legacy_propagation_beyond_kernel_coverage_reports_real_cause(
     t0 = wall - 1.0e5
     t_end = wall + 1.0e5
 
-    with pytest.raises(RuntimeError) as excinfo:
+    with pytest.raises(PropagationFailure) as excinfo:
         spice_eph_dynamics.propagate(leo_state, (t0, t_end), t_eval=np.array([t0, t_end]))
 
     message = str(excinfo.value)
+    assert isinstance(excinfo.value, E2M2EError)
     assert "cause:" in message
     assert "insufficient kernel coverage" in message
     assert "likely cause" not in message
@@ -146,10 +148,11 @@ def test_legacy_initial_rhs_failure_reports_real_cause(
     t0 = wall + 1.0e5  # 初值已在覆盖外，积分不启动
     t_span = (t0, t0 + 1.0e3)
 
-    with pytest.raises(RuntimeError) as excinfo:
+    with pytest.raises(PropagationFailure) as excinfo:
         spice_eph_dynamics.propagate(leo_state, t_span, t_eval=np.array(t_span))
 
     message = str(excinfo.value)
+    assert isinstance(excinfo.value, E2M2EError)
     assert "initial RHS evaluation failed at t=" in message
     assert "cause:" in message
     assert "insufficient kernel coverage" in message
@@ -178,10 +181,11 @@ def test_legacy_propagation_outside_cache_window_reports_window(
     """越出星历缓存窗口时 cause 须区分窗口外并携带窗口与查询时刻（#677）。"""
     t_span = (reference_et, reference_et + 7200.0)
 
-    with pytest.raises(RuntimeError) as excinfo:
+    with pytest.raises(PropagationFailure) as excinfo:
         spice_eph_dynamics.propagate(leo_state, t_span, t_eval=np.array(t_span))
 
     message = str(excinfo.value)
+    assert isinstance(excinfo.value, E2M2EError)
     assert "EPHEM_CACHE_MISS" in message
     assert "outside cached window" in message
     # 窗口数值来自进程状态（`EphemCache::build` 两端各留 5·dt = 3000 s margin），

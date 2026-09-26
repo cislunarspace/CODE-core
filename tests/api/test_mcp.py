@@ -186,6 +186,27 @@ def test_invoke_tool_internal_error():
     assert "RuntimeError" in env["error"]["message"]
 
 
+def test_invoke_tool_e2m2e_error_preserves_cause_message():
+    """E2M2EError 领域错误：信封 message 保留完整 cause 文本（#677）。"""
+    from e2m2e.exceptions import PropagationFailure
+
+    class PropBoom:
+        request_model = None
+
+        def __call__(self, **kwargs):
+            raise PropagationFailure(
+                "propagation truncated: cause: SPICE kernel coverage insufficient "
+                "(et=1000, cover=[-1, 1])"
+            )
+
+    env = envelope.invoke_tool(PropBoom(), {})
+    assert env["status"] == "error"
+    assert env["error"]["code"] == "E2M2E_ERROR"
+    assert "coverage insufficient" in env["error"]["message"]
+    assert "et=1000" in env["error"]["message"]
+    json.dumps(env)  # 信封必须可直接 JSON 序列化
+
+
 def test_family_response_serializes_orbit_members():
     """族生成响应（Orbit 成员）序列化为 JSON 数据，而非 INTERNAL_ERROR。
 

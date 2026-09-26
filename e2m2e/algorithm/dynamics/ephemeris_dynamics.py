@@ -38,6 +38,7 @@ from typing import Any, Literal
 import numpy as np
 import numpy.typing as npt
 
+from e2m2e.exceptions import PropagationFailure
 from e2m2e.integrators import propagate_with_state_py, propagate_with_stm_py, require_rust_extension
 
 from .dynamics import Dynamics
@@ -149,7 +150,7 @@ class EphemerisDynamics(Dynamics):
         # 防御性校验：Rust 侧任何提前退出都必须在这里暴露，
         # 不允许把截断结果当完整轨迹返回。
         if len(time) != len(t_eval_list):
-            raise RuntimeError(
+            raise PropagationFailure(
                 f"Rust STM propagation returned {len(time)} of {len(t_eval_list)} "
                 f"requested time points; the trajectory is truncated"
             )
@@ -223,7 +224,7 @@ class EphemerisDynamics(Dynamics):
 
         # 防御性校验（与 _propagate_with_stm_rust 一致）。
         if len(time) != len(t_eval_list):
-            raise RuntimeError(
+            raise PropagationFailure(
                 f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
                 f"requested time points; the trajectory is truncated"
             )
