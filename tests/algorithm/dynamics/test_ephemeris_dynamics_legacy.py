@@ -87,3 +87,80 @@ def test_legacy_dynamics_rejects_events_explicitly(spice_eph_dynamics, reference
             events=event,
             backend="scipy",
         )
+
+
+def _kernel_coverage_end_et(mgr, target: str = "MOON", observer: str = "EARTH") -> float:
+    """二分定位 ``(target, observer)`` 的 SPK 覆盖末端 et（秒）。
+
+    不硬编码日历日期：不同环境加载的 DE 内核（de440 / de440s / de430）覆盖
+    区间不同，硬编码要么让用例退化成初值预检失败，要么根本触发不了越界。
+    J2000 必在覆盖内，1e11 秒（约 5138 年）必在任何 DE 内核覆盖外。
+    """
+
+    def queryable(et: float) -> bool:
+        try:
+            mgr.get_body_state(target, et, "J2000", observer)
+        except Exception:  # noqa: BLE001 - 任何 SPICE 失败都视为覆盖外
+            return False
+        return True
+
+    assert queryable(0.0), "J2000 处必须能查到月星历"
+    assert not queryable(1.0e11), "1e11 秒处不应有月星历"
+    lo, hi = 0.0, 1.0e11
+    for _ in range(80):
+        mid = 0.5 * (lo + hi)
+        if mid <= lo or mid >= hi:
+            break
+        if queryable(mid):
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+def test_legacy_propagation_beyond_kernel_coverage_reports_real_cause(
+    spice_eph_dynamics, spice_manager, leo_state
+):
+    """越出内核覆盖时错误消息须给出真实 cause，而非通用截断文案（#677）。"""
+    wall = _kernel_coverage_end_et(spice_manager)
+    t0 = wall - 1.0e5
+    t_end = wall + 1.0e5
+
+    with pytest.raises(RuntimeError) as excinfo:
+        spice_eph_dynamics.propagate(leo_state, (t0, t_end), t_eval=np.array([t0, t_end]))
+
+    message = str(excinfo.value)
+    assert "cause:" in message
+    assert "insufficient kernel coverage" in message
+    assert "likely cause" not in message
+    assert "step size collapsed" not in message
+
+
+@pytest.fixture
+def narrow_rust_ephem_cache(reference_et):
+    """启用只覆盖 ``[reference_et, reference_et + 3600]`` 的 Rust 星历缓存。"""
+    from e2m2e.integrators import disable_ephem_cache, enable_ephem_cache
+
+    enable_ephem_cache(
+        targets=[("MOON", "EARTH"), ("SUN", "EARTH")],
+        frame_pairs=[],
+        et_start=reference_et,
+        et_end=reference_et + 3600.0,
+        dt=600.0,
+    )
+    yield
+    disable_ephem_cache()
+
+
+def test_legacy_propagation_outside_cache_window_reports_window(
+    spice_eph_dynamics, reference_et, leo_state, narrow_rust_ephem_cache
+):
+    """越出星历缓存窗口时 cause 须携带 et 与窗口区间（#677）。"""
+    t_span = (reference_et, reference_et + 7200.0)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        spice_eph_dynamics.propagate(leo_state, t_span, t_eval=np.array(t_span))
+
+    message = str(excinfo.value)
+    assert "EPHEM_CACHE_MISS" in message
+    assert "outside cached window" in message
