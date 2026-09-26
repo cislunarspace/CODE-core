@@ -12,9 +12,6 @@ CR3BP 同为无量纲（时间单位 t_c、长度单位 lstar、总质量 1）�
 
 from __future__ import annotations
 
-import numpy as np
-import numpy.typing as npt
-
 from ...data.constants import Datum
 from ...data.templates.enums import ReferenceFrame, UnitSystem
 from ..coordinate.eppr_frame import EPPRFrameModel
@@ -24,6 +21,11 @@ from .system import System
 
 class EPPRSystem(System):
     """Earth-Moon EPPR 系统（星历脉动旋转系，无量纲）。
+
+    不实现 ``get_body_position``（基类契约：非星历系统不提供，调用抛
+    ``NotImplementedError``）：EPPR 状态下主／次天体固定于无量纲 (−μ,0,0) 与
+    (1−μ,0,0)，且返回值会是 EPPR 无量纲量而非 ``EphemerisSystem`` 的 km 口径，
+    仓内亦无消费者。
 
     不暴露 ``primary_radius_km`` / ``secondary_radius_km``：EPPR 的长度单位是瞬时
     地月距离 d(t)，静态 km 半径没有固定的无量纲对应，``Dynamics`` 的碰撞终止
@@ -106,17 +108,3 @@ class EPPRSystem(System):
         if characteristic_length is None:
             return float(Datum.DE421.char_length_km)
         return float(characteristic_length)
-
-    def get_body_position(self, body: str, t: float) -> npt.NDArray[np.floating]:
-        """返回主／次天体在 EPPR 无量纲坐标中的位置（固定，与 t 无关）。
-
-        Args:
-            body: ``"primary"`` 或 ``"secondary"``。
-            t: 无量纲时间（EPPR 中主星位置不随时间变化，仅为接口兼容保留）。
-        """
-        mu = self.mu
-        if body == "primary":
-            return np.array([-mu, 0.0, 0.0])
-        if body == "secondary":
-            return np.array([1.0 - mu, 0.0, 0.0])
-        raise ValueError(f"EPPR 系统的 body 须为 'primary' 或 'secondary'，得到 {body!r}")
