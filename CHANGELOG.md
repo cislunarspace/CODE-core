@@ -16,6 +16,7 @@
 ### Changed
 - **Rust 扩展 ABI 版本 25**：新增 NRLMSISE-00 查询绑定（`nrlmsise00_density_py`）后 ABI 版本从 24 升到 25。旧扩展与新版 Python 侧并存时按下述现有 ABI 门**显式报错并提示 `make dev`**，不静默降级。
 - **GM 基准改为跟随星历内核**：`de421.bsp` 被显式加载时，同一套代码的 GM 由 DE440 切到 DE421（月球 GM 4902.800118 → 4902.8005821478）。未加载 `de421.bsp` 的环境行为逐位不变——缺省星历选择仍是 `de440s > de430`，`kernels/` 里存在可选内核不会改变未声明口径的调用方。显式请求的口径内核缺失时抛 `FileNotFoundError` 而非静默降级；某基准下无该天体 GM 时回退 DE440 并发一次告警（木星及以外暂无 DE421 权威 GM）。(#665)
+- **`de421.bsp` 纳入 git-lfs 跟踪**：DE421 行星星历内核（16 790 528 字节）不再只随 `kernels-v1` release 分发——`kernels/de421.bsp` 现按 de430/de440s 同一 LFS 规则入库，clone 并拉取 LFS 后 `kernels/` 直接具备三套星历，无网环境也能加载 DE421 口径。无 LFS 的环境（含 CI）行为不变：检出的 LFS 指针文件由 `make kernels` 按既有指针判据识别并从 release 重下；显式请求口径而内核缺失时的 `FileNotFoundError` 提示同步改为先给这条获取路径（拉 LFS，或 `make kernels`）。未显式加载 `de421.bsp` 的调用方口径逐位不变。(#665, #705)
 - **`transfer_design` 的 `tof_range` 校验收紧**：请求侧现在要求恰好 2 个有限数且 `min < max`（与 WSB 搜索参数同口径），非法输入映射 `INVALID_PARAMS`。此前单元素列表会以 `IndexError` 被译成 `TRANSFER_FAILED`，反向或非有限窗口则被静默降级为求解结果（如 `NO_INTERSECTION`）。(#698)
 
 ### Fixed

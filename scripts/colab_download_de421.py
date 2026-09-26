@@ -7,6 +7,10 @@
 # 体星历。仓库 kernels/ 只有 de440s/de430，kernels-v1 release 也没有 de421，
 # download_kernels.py（无差别拉取 release 全部资产）因此拿不到它，需从 NAIF 源补。
 #
+# 现状（ADR 0048 修订 d）：de421.bsp 已随 git-lfs 入库（kernels/de421.bsp），
+# kernels-v1 亦已是其分发资产——本脚本不再是取到 DE421 的必经路径，只在需要
+# 从 NAIF 重新核对来源、或取未入库的 de421.cmt 时使用。
+#
 # 下载内容（DE421 位于 NAIF 的 a_old_versions/ 历史目录）：
 #   1. de421.bsp  JPL 行星星历内核本体，16,790,528 字节（大小来源：naif_files_sized.csv）
 #      主: https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/a_old_versions/de421.bsp

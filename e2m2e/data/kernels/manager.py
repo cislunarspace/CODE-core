@@ -670,7 +670,7 @@ class SPICEManager(EphemerisProvider):
                 wanted = " 或 ".join(names)
                 raise FileNotFoundError(
                     f"请求 {preferred.upper()} 口径但内核全缺失（{wanted}）：{search_dir}"
-                    "（内核由 kernels-v1 release 分发，跑 make kernels 获取）"
+                    "（内核随仓库 git-lfs 入库，缺失时跑 make kernels 从 kernels-v1 获取）"
                 )
             # 该口径的全部可用内核置于候选首位（声明顺序即偏好顺序）。
             candidates = present + candidates
