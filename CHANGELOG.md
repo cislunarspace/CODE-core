@@ -8,6 +8,7 @@
 - **Lyapunov 轨道设计入口**：`DesignOrbitRequest` 支持 `orbit_type="LYAPUNOV"`，为 L1/L2 设计平面轨道并完成分段星历修正与预报；振幅为一个周期内 `max|y|`（km），范围 5 000–60 000 km。(#628)
 
 ### Fixed
+- **星历传播失败原因透传**：`EphemerisDynamics.propagate`（Rust N 体快速路径）失败时的 `RuntimeError` 不再一律写 "likely cause: SPICE kernels not loaded or step size collapsed"，改为按实际原因给出可机读的 `cause:` 段——内核未加载 / 内核覆盖不足（保留底层 SPICE 解释文本）/ 星历缓存窗口外（保留请求 et 与缓存区间）/ 缓存键未注册 / strict 区缓存未启用；力模型未报错时归为步长塌缩或步数上限；失败语义不变（覆盖外仍硬失败）。(#677)
 - **反向多重/分段打靶收敛**：`multiple_shooting_correct`/`segmented_shooting_correct` 接受单调递减的 `t_patch`（反向传播工作流）。此前 compiled 传播路径（PD45/PD78）写死正向，递减 `t_patch` 立即报 "output length mismatch: got 1 time points, expected 2"；现传播方向由时间跨度/输出网格的单调方向决定，反向段积分与 STM 变分方程正确工作，正向行为逐位不变。(#640)
 
 ## [5.9.6] - 2026-09-24

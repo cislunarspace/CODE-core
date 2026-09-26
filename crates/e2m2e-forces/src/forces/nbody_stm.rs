@@ -20,6 +20,8 @@
 //! dΦ/dt = A · Φ,  A = [0₃ₓ₃  I₃ₓ₃; ∂a/∂r  0₃ₓ₃]
 //! ```
 
+use std::cell::RefCell;
+
 use super::compiled::AccelJacobiResult;
 use e2m2e_spice::spk_accel;
 
@@ -277,6 +279,11 @@ pub struct PropagationResult {
 /// # 错误
 /// - 初值处右端项求值失败（如 SPICE 内核缺失导致第三体位置查询失败）；
 /// - 积分提前退出导致输出点数少于 `t_eval.len()`（如步长塌缩、中途力模型失败）。
+///
+/// 两类错误的消息都带 `cause:` 段，分类由状态查询得出（缓存窗口外 / 缓存键
+/// 未注册 / strict 区缓存未启用 / 内核未加载 / 内核覆盖不足；力模型未报错时归
+/// 为步长塌缩或步数上限），覆盖与缓存类附带底层定位信息（见
+/// `truncation_cause`）。
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_with_stm(
     config: &NBodyConfig,
@@ -301,18 +308,31 @@ pub fn propagate_with_stm(
     // 预检：初值处右端项必须可求值。SPICE 内核缺失时第三体位置查询
     // 在此处确定性失败，避免积分静默返回截断结果。
     augmented_eom(config, t_span.0, &augmented0)
-        .map_err(|e| format!("initial RHS evaluation failed at t={}: {}", t_span.0, e))?;
+        .map_err(|e| initial_failure_message(t_span.0, e))?;
 
     let h_max = max_step.unwrap_or(f64::INFINITY);
     let s_max = max_steps.unwrap_or(500_000);
+
+    // 力模型回调错误经 `RefCell` 捕获：`solve_ivp_capped` 在回调 `Err` 时
+    // `break` 并丢弃原始错误（见 `solve_ivp.rs`），只有在此处留底才能在
+    // 完整性校验失败时给出真实 cause，而不是笼统的"likely cause"。
+    let eom_error: RefCell<Option<EomFailure>> = RefCell::new(None);
 
     // 积分
     let sol = solve_ivp_capped(
         |t: f64, y: &[f64]| -> Result<Vec<f64>, String> {
             let mut arr = [0.0_f64; 42];
             arr.copy_from_slice(y);
-            let result = augmented_eom(config, t, &arr)?;
-            Ok(result.to_vec())
+            match augmented_eom(config, t, &arr) {
+                Ok(result) => Ok(result.to_vec()),
+                Err(e) => {
+                    *eom_error.borrow_mut() = Some(EomFailure {
+                        et: t,
+                        message: e.clone(),
+                    });
+                    Err(e)
+                }
+            }
         },
         t_span,
         &augmented0,
@@ -325,15 +345,14 @@ pub fn propagate_with_stm(
     );
 
     // 完整性校验：solve_ivp_capped 在力模型失败/步长塌缩时会提前退出，
-    // 输出点数不足即视为传播失败，不允许静默截断。
+    // 输出点数不足即视为传播失败，不允许静默截断。cause 由回调留底的
+    // 力模型错误与当前进程状态共同分类（见 `truncation_cause`）。
     if sol.len() != t_eval.len() {
-        return Err(format!(
-            "propagation truncated: got {} of {} time points (t_span=({:.3}, {:.3})); \
-             likely cause: SPICE kernels not loaded or step size collapsed",
+        return Err(truncation_failure_message(
             sol.len(),
             t_eval.len(),
-            t_span.0,
-            t_span.1,
+            t_span,
+            eom_error.borrow().as_ref(),
         ));
     }
 
@@ -398,6 +417,11 @@ pub struct StatePropagationResult {
 /// # 错误
 /// - 初值处右端项求值失败（如 SPICE 内核缺失）；
 /// - 积分提前退出导致输出点数少于 `t_eval.len()`（不允许静默截断）。
+///
+/// 两类错误的消息都带 `cause:` 段，分类由状态查询得出（缓存窗口外 / 缓存键
+/// 未注册 / strict 区缓存未启用 / 内核未加载 / 内核覆盖不足；力模型未报错时归
+/// 为步长塌缩或步数上限），覆盖与缓存类附带底层定位信息（见
+/// `truncation_cause`）。
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_with_state(
     config: &NBodyConfig,
@@ -412,17 +436,28 @@ pub fn propagate_with_state(
     use e2m2e_propagation::solve_ivp::solve_ivp_capped;
 
     // 预检：初值处右端项必须可求值（与 propagate_with_stm 一致）。
-    state_eom(config, t_span.0, initial_state)?;
+    state_eom(config, t_span.0, initial_state).map_err(|e| initial_failure_message(t_span.0, e))?;
 
     let h_max = max_step.unwrap_or(f64::INFINITY);
     let s_max = max_steps.unwrap_or(500_000);
+
+    // 力模型回调错误经 `RefCell` 捕获（与 propagate_with_stm 一致）。
+    let eom_error: RefCell<Option<EomFailure>> = RefCell::new(None);
 
     let sol = solve_ivp_capped(
         |t: f64, y: &[f64]| -> Result<Vec<f64>, String> {
             let mut s = [0.0_f64; 6];
             s.copy_from_slice(&y[..6]);
-            let result = state_eom(config, t, &s)?;
-            Ok(result.to_vec())
+            match state_eom(config, t, &s) {
+                Ok(result) => Ok(result.to_vec()),
+                Err(e) => {
+                    *eom_error.borrow_mut() = Some(EomFailure {
+                        et: t,
+                        message: e.clone(),
+                    });
+                    Err(e)
+                }
+            }
         },
         t_span,
         initial_state,
@@ -436,13 +471,11 @@ pub fn propagate_with_state(
 
     // 完整性校验（与 propagate_with_stm 一致）。
     if sol.len() != t_eval.len() {
-        return Err(format!(
-            "propagation truncated: got {} of {} time points (t_span=({:.3}, {:.3})); \
-             likely cause: SPICE kernels not loaded or step size collapsed",
+        return Err(truncation_failure_message(
             sol.len(),
             t_eval.len(),
-            t_span.0,
-            t_span.1,
+            t_span,
+            eom_error.borrow().as_ref(),
         ));
     }
 
@@ -458,9 +491,138 @@ pub fn propagate_with_state(
     Ok(StatePropagationResult { states, times })
 }
 
+/// 判断 SPK 内核池是否为空：区分"内核未加载"与"内核覆盖不足"。
+///
+/// `ktotal` 查询失败时按"已加载"处理——查询本身异常不该被翻译成
+/// "内核未加载"的误导性 cause。
+fn spk_kernels_loaded() -> bool {
+    e2m2e_spice::spice_ffi::ktotal("SPK")
+        .map(|n| n > 0)
+        .unwrap_or(true)
+}
+
+/// 一次力模型回调失败：失败时刻 + 底层错误文本。
+///
+/// `et` 用于按状态判定失败是否落在星历缓存窗口外；`message` 只是证据文本，
+/// 分类不读它（见 `truncation_cause`）。
+struct EomFailure {
+    et: f64,
+    message: String,
+}
+
+/// 分类一次传播失败所依据的进程状态快照。
+///
+/// 三个字段各对应一类可区分的失败来源；参数化成结构（而非散参数）以便纯测试，
+/// 见 `truncation_cause`。
+struct FailureContext {
+    /// SPK 内核池非空；`None` 表示未查询（strict 区禁止 cspice，不查内核池）。
+    spk_loaded: Option<bool>,
+    /// 已启用星历缓存的覆盖区间；未启用为 `None`。
+    cache_window: Option<(f64, f64)>,
+    /// 处于 `StrictGuard` 区（并行打靶区内禁止回退 cspice）。
+    cache_strict: bool,
+}
+
+impl FailureContext {
+    /// 取当前进程状态。
+    ///
+    /// 只在分类真会读 `spk_loaded` 时查询内核池：strict 区禁止 cspice（并行区内
+    /// 的 cspice 调用是内核池损坏/panic 的根源），缓存启用时分类走缓存分支、也
+    /// 读不到该字段——两种情形都省掉这次 FFI。
+    fn current() -> Self {
+        let cache_window = e2m2e_spice::ephem_cache::enabled_span();
+        let cache_strict = e2m2e_spice::ephem_cache::strict_enabled();
+        Self {
+            spk_loaded: if cache_strict || cache_window.is_some() {
+                None
+            } else {
+                Some(spk_kernels_loaded())
+            },
+            cache_window,
+            cache_strict,
+        }
+    }
+}
+
+/// 把一次传播提前退出分类成带定位信息的 cause 文本。
+///
+/// 分类**只看进程状态查询**，不匹配错误文本（ADR 0020：不用错误码字符串
+/// 做翻译；同型的 `ktotal` 预检即该决策的先例）。底层错误文本仅作为证据拼在
+/// 末尾。五类：缓存窗口外（附查询时刻与窗口区间）/ 缓存键未注册 / strict 区
+/// 缓存未启用 / 内核未加载 / 内核覆盖不足；`None` 表示积分器提前退出时力模型
+/// 从未报错（步长塌缩或步数上限）。
+fn truncation_cause(failure: Option<&EomFailure>, ctx: &FailureContext) -> String {
+    let Some(failure) = failure else {
+        return "step size collapsed or max steps reached \
+                (integrator exited early, force model reported no error)"
+            .to_string();
+    };
+    let cause = match (ctx.cache_window, ctx.cache_strict) {
+        // 缓存已启用：窗口内的查询不会越界，只可能是键未注册；窗口外一律越界
+        // （`lookup_*` 先判区间后判键，见 `ephem_cache.rs`）。
+        (Some((start, end)), _) if !(start..=end).contains(&failure.et) => {
+            return format!(
+                "ephem cache query outside cached window \
+                 (et {:.3}, window [{:.3}, {:.3}]): {}",
+                failure.et, start, end, failure.message
+            );
+        }
+        (Some(_), _) => "ephem cache lookup failed (key not registered)",
+        // strict 区未启用缓存：`lookup_*` 硬失败，与内核缺失/覆盖不足无关。
+        (None, true) => "ephem cache not enabled (strict region forbids cspice fallback)",
+        (None, false) => match ctx.spk_loaded {
+            Some(false) => "SPICE kernels not loaded (SPK kernel pool is empty)",
+            // 非 strict 的 `current()` 必已查询内核池；纯测试可传 `None`，兜底到
+            // 覆盖类（内核缺失由 `Some(false)` 判，不会被此兜底掩盖）。
+            _ => "SPICE ephemeris query failed (insufficient kernel coverage or missing data)",
+        },
+    };
+    format!("{cause}: {}", failure.message)
+}
+
+/// 取当前进程状态后分类。
+fn classify_failure(failure: Option<&EomFailure>) -> String {
+    truncation_cause(failure, &FailureContext::current())
+}
+
+/// 初值预检失败的完整消息（两个 propagate 函数共用，保证口径一致）。
+fn initial_failure_message(et: f64, message: String) -> String {
+    format!(
+        "initial RHS evaluation failed at t={et}; cause: {}",
+        classify_failure(Some(&EomFailure { et, message }))
+    )
+}
+
+/// 完整性校验失败的完整消息（两个 propagate 函数共用，保证口径一致）。
+fn truncation_failure_message(
+    got: usize,
+    expected: usize,
+    t_span: (f64, f64),
+    failure: Option<&EomFailure>,
+) -> String {
+    format!(
+        "propagation truncated: got {got} of {expected} time points \
+         (t_span=({:.3}, {:.3})); cause: {}",
+        t_span.0,
+        t_span.1,
+        classify_failure(failure)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 文件局部测试锁：本模块用例都会 furnish 内核或启用/禁用进程级星历缓存，
+    /// 并行执行会互相污染（裸跑时 CSPICE 全局状态也不安全）。`make test-rust` 用
+    /// `--test-threads=1`；此锁保证裸跑 `cargo test -p e2m2e-forces` 时本模块同样
+    /// 安全。先例见 `crates/e2m2e-spice/tests/ephem_cache_correctness.rs`。
+    static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+        // 某个用例 panic 不应连坐其余用例：中毒锁按内层值继续用。
+        TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
 
     /// 加载仓库 kernels/ 下可用的内核。返回是否加载到了 SPK 星历（.bsp）。
     ///
@@ -513,6 +675,7 @@ mod tests {
     /// 纯中心引力测试：只用 EARTH，验证对称性。
     #[test]
     fn central_body_acceleration_basic() {
+        let _g = test_lock();
         load_kernels();
         // 只用 EARTH 作为中心天体（无摄动体），验证纯中心引力的对称性
         let config = NBodyConfig {
@@ -569,6 +732,7 @@ mod tests {
     /// 第三体摄动雅可比数值验证（含 EARTH+MOON+SUN）。
     #[test]
     fn third_body_jacobian_numerical() {
+        let _g = test_lock();
         if !load_kernels() {
             eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
             return;
@@ -675,6 +839,7 @@ mod tests {
 
     #[test]
     fn augmented_eom_basic() {
+        let _g = test_lock();
         if !load_kernels() {
             eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
             return;
@@ -717,6 +882,7 @@ mod tests {
     /// 然后用有限差分验证 STM 的 ∂r(T)/∂r(0) 和 ∂r(T)/∂v(0)。
     #[test]
     fn stm_propagation_vs_finite_difference() {
+        let _g = test_lock();
         if !load_kernels() {
             eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
             return;
@@ -829,6 +995,7 @@ mod tests {
     /// propagate_with_stm 端到端测试：传播 LEO 一个周期，验证 STM 与有限差分一致。
     #[test]
     fn propagate_with_stm_leo_one_period() {
+        let _g = test_lock();
         if !load_kernels() {
             eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
             return;
@@ -942,6 +1109,7 @@ mod tests {
     /// 而不是静默返回只有 t0 的截断结果。
     #[test]
     fn propagate_with_stm_unknown_body_returns_err() {
+        let _g = test_lock();
         load_kernels();
         let config = NBodyConfig {
             bodies: vec!["EARTH".to_string(), "FAKEBODY".to_string()],
@@ -972,5 +1140,325 @@ mod tests {
             "错误信息应指名失败的天体或 SPICE 查询，实际: {}",
             err
         );
+    }
+
+    // =========================================================
+    // 测试 8：truncation_cause 分类（纯逻辑，不碰内核池/缓存）
+    // =========================================================
+
+    /// 构造一次失败的力模型回调留底（`message` 只作证据文本）。
+    fn failure_at(et: f64) -> EomFailure {
+        EomFailure {
+            et,
+            message: "SPICE query failed for MOON: Error { short_message: \"EPHEM_CACHE_MISS\", \
+                      explanation: \"ephem cache et 7200 out of range [-3000, 6600]\" }"
+                .to_string(),
+        }
+    }
+
+    /// 构造分类用的进程状态快照（`spk_loaded` 按"已查询"注入）。
+    fn context(
+        spk_loaded: bool,
+        cache_window: Option<(f64, f64)>,
+        cache_strict: bool,
+    ) -> FailureContext {
+        FailureContext {
+            spk_loaded: Some(spk_loaded),
+            cache_window,
+            cache_strict,
+        }
+    }
+
+    /// 缓存已启用且失败时刻越界：cause 带查询时刻与缓存窗口。
+    #[test]
+    fn truncation_cause_cache_out_of_range() {
+        let cause = truncation_cause(
+            Some(&failure_at(7200.0)),
+            &context(true, Some((-3000.0, 6600.0)), false),
+        );
+        assert!(cause.contains("outside cached window"), "实际: {cause}");
+        assert!(cause.contains("7200.000"), "应带查询时刻，实际: {cause}");
+        assert!(cause.contains("-3000.000"), "应带窗口下界，实际: {cause}");
+        assert!(cause.contains("6600.000"), "应带窗口上界，实际: {cause}");
+        assert!(!cause.contains("step size collapsed"), "实际: {cause}");
+    }
+
+    /// 缓存已启用且失败时刻在窗口内：归为键未注册，与越界区分开。
+    #[test]
+    fn truncation_cause_cache_key_miss() {
+        let cause = truncation_cause(
+            Some(&failure_at(0.0)),
+            &context(true, Some((-3000.0, 6600.0)), false),
+        );
+        assert!(cause.contains("lookup failed"), "实际: {cause}");
+        assert!(!cause.contains("outside cached window"), "实际: {cause}");
+    }
+
+    /// 无缓存 + 内核池为空：报"未加载"，不报覆盖不足。
+    #[test]
+    fn truncation_cause_kernels_not_loaded() {
+        let cause = truncation_cause(Some(&failure_at(0.0)), &context(false, None, false));
+        assert!(cause.contains("kernels not loaded"), "实际: {cause}");
+        assert!(
+            !cause.contains("insufficient kernel coverage"),
+            "实际: {cause}"
+        );
+    }
+
+    /// 无缓存 + 内核已加载但覆盖不足：报星历查询失败并保留底层证据文本。
+    #[test]
+    fn truncation_cause_insufficient_coverage() {
+        let cause = truncation_cause(Some(&failure_at(0.0)), &context(true, None, false));
+        assert!(
+            cause.contains("insufficient kernel coverage"),
+            "实际: {cause}"
+        );
+        assert!(
+            cause.contains("EPHEM_CACHE_MISS"),
+            "应保留底层证据文本，实际: {cause}"
+        );
+    }
+
+    /// 无缓存 + strict 区：归为"缓存未启用"，不误报内核覆盖不足。
+    #[test]
+    fn truncation_cause_strict_without_cache() {
+        let cause = truncation_cause(Some(&failure_at(0.0)), &context(true, None, true));
+        assert!(cause.contains("ephem cache not enabled"), "实际: {cause}");
+        assert!(
+            !cause.contains("insufficient kernel coverage"),
+            "实际: {cause}"
+        );
+    }
+
+    /// 力模型未报错：归类为步长塌缩/步数上限。
+    #[test]
+    fn truncation_cause_no_eom_error() {
+        let cause = truncation_cause(None, &context(true, None, false));
+        assert!(cause.contains("step size collapsed"), "实际: {cause}");
+    }
+
+    // =========================================================
+    // 测试 9：覆盖外传播给出真实 cause（#677）
+    // =========================================================
+
+    /// 二分定位 (MOON, EARTH) 的 SPK 覆盖末端 et。
+    ///
+    /// 不硬编码日历日期：本地与 CI 的 DE 内核（de430 / de440 / de440s）覆盖
+    /// 区间不同，硬编码要么让用例退化成初值预检失败，要么根本不触发越界。
+    /// J2000 必在覆盖内，1e11 秒（约 5138 年）必在任何 DE 内核覆盖外。
+    fn kernel_coverage_end_et() -> f64 {
+        let ok = |et: f64| {
+            e2m2e_spice::spk_accel::third_body_acceleration(
+                et,
+                "MOON",
+                "EARTH",
+                &[6678.0, 0.0, 0.0],
+                4902.800066,
+                1e-6,
+            )
+            .is_ok()
+        };
+        let mut lo = 0.0;
+        let mut hi = 1.0e11;
+        assert!(ok(lo), "J2000 处必须能查到 MOON 星历（内核未加载？）");
+        assert!(!ok(hi), "1e11 秒处不应有 MOON 星历（内核覆盖超出预期？）");
+        for _ in 0..80 {
+            let mid = 0.5 * (lo + hi);
+            if mid <= lo || mid >= hi {
+                break;
+            }
+            if ok(mid) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    }
+
+    /// 越出内核覆盖时，错误消息须指名"覆盖不足"且携带底层 SPICE 文本，
+    /// 不再是笼统的 "likely cause: SPICE kernels not loaded or step size collapsed"。
+    #[test]
+    fn propagate_beyond_kernel_coverage_reports_real_cause() {
+        let _g = test_lock();
+        if !load_kernels() {
+            eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
+            return;
+        }
+        let config = earth_moon_sun_config();
+        let wall = kernel_coverage_end_et();
+        // 覆盖墙两侧各 1e5 秒：t0 在覆盖内，t_end 越界（步长被自适应控制器
+        // 定在百秒量级，约千步即撞墙，不依赖 50 万步上限）。
+        let t0 = wall - 1.0e5;
+        let t_end = wall + 1.0e5;
+        let t_eval = vec![t0, t_end];
+        let state0 = [6678.0, 0.0, 0.0, 0.0, 7.725, 0.0];
+
+        let err = match propagate_with_state(
+            &config,
+            (t0, t_end),
+            &t_eval,
+            &state0,
+            1e-9,
+            1e-12,
+            None,
+            None,
+        ) {
+            Ok(_) => panic!("越出内核覆盖必须硬失败（ADR 0020）"),
+            Err(e) => e,
+        };
+
+        assert!(err.contains("cause:"), "错误应带 cause 段，实际: {err}");
+        assert!(
+            err.contains("insufficient kernel coverage"),
+            "应归类为内核覆盖不足，实际: {err}"
+        );
+        assert!(
+            !err.contains("likely cause"),
+            "不应再出现通用截断文案，实际: {err}"
+        );
+        assert!(
+            !err.contains("step size collapsed"),
+            "不应误报步长塌缩，实际: {err}"
+        );
+    }
+
+    // =========================================================
+    // 测试 10：缓存窗口外传播给出 et 与窗口区间（#677）
+    // =========================================================
+
+    /// 启用窄窗星历缓存后，越出缓存窗口的查询须在 cause 中携带 et 与区间。
+    #[test]
+    fn propagate_outside_cache_window_reports_window() {
+        let _g = test_lock();
+        if !load_kernels() {
+            eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
+            return;
+        }
+        let config = earth_moon_sun_config();
+        let bodies = vec![
+            ("MOON".to_string(), "EARTH".to_string()),
+            ("SUN".to_string(), "EARTH".to_string()),
+        ];
+        // build 两端各留 5·dt margin ⇒ 覆盖 [-3000, 6600]。
+        let cache =
+            e2m2e_spice::ephem_cache::EphemCache::build(&bodies, &[], &[], 0.0, 3600.0, 600.0)
+                .expect("缓存构建应成功");
+        e2m2e_spice::ephem_cache::enable(cache);
+
+        let state0 = [6678.0, 0.0, 0.0, 0.0, 7.725, 0.0];
+        let result = propagate_with_state(
+            &config,
+            (0.0, 7200.0),
+            &[0.0, 7200.0],
+            &state0,
+            1e-9,
+            1e-12,
+            None,
+            None,
+        );
+        // 先还原全局态再断言，避免污染同进程后续测试（串行执行）。
+        e2m2e_spice::ephem_cache::disable();
+
+        let err = match result {
+            Ok(_) => panic!("缓存窗口外必须硬失败（ADR 0020 决策 4）"),
+            Err(e) => e,
+        };
+        assert!(err.contains("outside cached window"), "实际: {err}");
+        // build 两端各留 5·dt = 3000 s margin ⇒ 窗口恰为 [-3000, 6600]。
+        assert!(
+            err.contains("window [-3000.000, 6600.000]"),
+            "窗口数值应来自进程状态，实际: {err}"
+        );
+        assert!(err.contains("EPHEM_CACHE_MISS"), "实际: {err}");
+    }
+
+    // =========================================================
+    // 测试 11：初值预检出口同样带 cause
+    // =========================================================
+
+    /// 初值时刻已在覆盖外时走预检出口，消息须同样带 `cause:` 段与分类结果。
+    #[test]
+    fn initial_rhs_failure_reports_real_cause() {
+        let _g = test_lock();
+        if !load_kernels() {
+            eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
+            return;
+        }
+        let config = earth_moon_sun_config();
+        let wall = kernel_coverage_end_et();
+        let t0 = wall + 1.0e5; // 初值已在覆盖外，积分不启动
+        let t_end = t0 + 1.0e3;
+        let state0 = [6678.0, 0.0, 0.0, 0.0, 7.725, 0.0];
+
+        let err = match propagate_with_state(
+            &config,
+            (t0, t_end),
+            &[t0, t_end],
+            &state0,
+            1e-9,
+            1e-12,
+            None,
+            None,
+        ) {
+            Ok(_) => panic!("初值覆盖外必须硬失败"),
+            Err(e) => e,
+        };
+
+        assert!(
+            err.contains("initial RHS evaluation failed at t="),
+            "应走初值预检出口，实际: {err}"
+        );
+        assert!(
+            err.contains("cause:"),
+            "预检出口也应带 cause 段，实际: {err}"
+        );
+        assert!(
+            err.contains("insufficient kernel coverage"),
+            "应归类为内核覆盖不足，实际: {err}"
+        );
+        assert!(!err.contains("likely cause"), "实际: {err}");
+    }
+
+    // =========================================================
+    // 测试 12：strict 区未启用缓存时归为"缓存未启用"
+    // =========================================================
+
+    /// strict 区（并行打靶区内禁止回退 cspice）且未启用缓存：lookup 硬失败，
+    /// cause 应报"缓存未启用"，不误报内核覆盖不足。
+    ///
+    /// strict 区里每个力模型查询都硬失败，故失败必在初值预检出口（截断出口在
+    /// strict 下不可达）。正向断言用分类器独有的整句——底层 `Display` 文案
+    /// （`ephem cache not enabled`）会出现在证据文本里，不足以鉴别分类。
+    #[test]
+    fn propagate_in_strict_region_without_cache_reports_not_enabled() {
+        let _g = test_lock();
+        if !load_kernels() {
+            eprintln!("跳过：无 SPK 星历内核（de430/de440s.bsp 未被 git 跟踪）");
+            return;
+        }
+        let config = earth_moon_sun_config();
+        let state0 = [6678.0, 0.0, 0.0, 0.0, 7.725, 0.0];
+        let _strict = e2m2e_spice::ephem_cache::StrictGuard::new();
+
+        let err = match propagate_with_state(
+            &config,
+            (0.0, 600.0),
+            &[0.0, 600.0],
+            &state0,
+            1e-9,
+            1e-12,
+            None,
+            None,
+        ) {
+            Ok(_) => panic!("strict 区未启用缓存必须硬失败（ADR 0020 决策 4）"),
+            Err(e) => e,
+        };
+
+        assert!(
+            err.contains("ephem cache not enabled (strict region forbids cspice fallback)"),
+            "实际: {err}"
+        );
+        assert!(!err.contains("insufficient kernel coverage"), "实际: {err}");
     }
 }

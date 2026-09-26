@@ -563,6 +563,14 @@ pub fn disable() {
     *g = None;
 }
 
+/// 当前是否处于 strict 缓存模式（`StrictGuard` 作用域内）。
+///
+/// 供力模型上层区分「缓存未启用且禁止回退 cspice」（strict 区硬失败）与普通
+/// SPICE 失败——两者都不带缓存窗口，只能靠本状态分辨（ADR 0020 决策 4）。
+pub fn strict_enabled() -> bool {
+    strict()
+}
+
 /// 当前已启用缓存的覆盖区间（et 秒）。未启用返回 None。
 ///
 /// 供构造方（如 HJB 星历 Hamiltonian 绑定层）在求解前校验求解窗被
