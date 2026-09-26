@@ -1217,6 +1217,58 @@ fn srp_acceleration(
     Ok(vec![a[0], a[1], a[2]])
 }
 
+/// NRLMSISE-00 大气密度与温度查询。
+///
+/// 供 Python `NRLMSISE00Atmosphere.density` 调用（ADR 0030：数值只在 Rust）。
+/// `epoch_et` 经 `et2utc` 折算成年积日与 UTC 日内秒（需装载 leapsecond 内核）。
+/// `ap` 长度必须为 7：平坦（7 个元素全等）时按静态空间天气处理，否则启用
+/// 3 小时分辨率的 Ap 史先验。
+///
+/// # 参数
+/// - `epoch_et` ：SPICE et 秒
+/// - `altitude_km`/`geodetic_lat_deg`/`geodetic_lon_deg` ：WGS84 大地坐标
+/// - `f107_daily`/`f107_avg` ：前一日 F10.7 与 81 日滑动平均（sfu）
+/// - `ap` ：3 小时分辨率地磁 Ap 指数史（7 元）
+///
+/// # 返回
+/// `(密度 kg/m³, 温度 K)`。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn nrlmsise00_density_py(
+    epoch_et: f64,
+    altitude_km: f64,
+    geodetic_lat_deg: f64,
+    geodetic_lon_deg: f64,
+    f107_daily: f64,
+    f107_avg: f64,
+    ap: Vec<f64>,
+) -> PyResult<(f64, f64)> {
+    let ap: [f64; 7] = ap.as_slice().try_into().map_err(|_| {
+        pyo3::exceptions::PyValueError::new_err(format!(
+            "nrlmsise00 ap must have 7 elements, got {}",
+            ap.len()
+        ))
+    })?;
+    let (_year, day_of_year, ut_seconds) = e2m2e_forces::nrlmsise00::et_to_utc_doy(epoch_et)
+        .map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("nrlmsise00 et2utc failed: {e}"))
+        })?;
+    // Ap 史非平坦才启用暴时先验（与 Rust drag 路径同一规则）。
+    let storm_time = ap[1..].iter().any(|a| a != &ap[0]);
+    let input = e2m2e_forces::nrlmsise00::Nrlmsise00Input {
+        day_of_year,
+        ut_seconds,
+        altitude_km,
+        geodetic_lat_deg,
+        geodetic_lon_deg,
+        f107_daily,
+        f107_avg,
+        ap,
+    };
+    let out = e2m2e_forces::nrlmsise00::density(&input, storm_time);
+    Ok((out.density_kg_m3, out.temperature_k))
+}
+
 /// 解析单个 Python force 元组为 CompiledForce。
 ///
 /// 元组格式（首元素是 type 标签）：
@@ -1232,6 +1284,7 @@ pub(crate) fn parse_force_tuple(
     item: &Bound<'_, PyAny>,
 ) -> PyResult<e2m2e_forces::forces::compiled::CompiledForce> {
     use e2m2e_forces::forces::compiled::CompiledForce;
+    use e2m2e_forces::forces::drag::DragAtmosphere;
     use e2m2e_forces::forces::gravity_field::TideMode;
 
     let tuple = item
@@ -1501,8 +1554,35 @@ pub(crate) fn parse_force_tuple(
                 area,
                 mass,
                 cd,
-                f107,
-                ap,
+                atmosphere: DragAtmosphere::Exponential { f107, ap },
+                propagation_frame,
+            })
+        }
+        "drag_nrlmsise00" => {
+            // 元组格式：
+            // ("drag_nrlmsise00", area, mass, cd, propagation_frame, f107_daily, f107_avg, ap[7])
+            let area: f64 = tuple.get_item(1)?.extract()?;
+            let mass: f64 = tuple.get_item(2)?.extract()?;
+            let cd: f64 = tuple.get_item(3)?.extract()?;
+            let propagation_frame: String = tuple.get_item(4)?.extract()?;
+            let f107_daily: f64 = tuple.get_item(5)?.extract()?;
+            let f107_avg: f64 = tuple.get_item(6)?.extract()?;
+            let ap_list: Vec<f64> = tuple.get_item(7)?.extract()?;
+            let ap: [f64; 7] = ap_list.as_slice().try_into().map_err(|_| {
+                pyo3::exceptions::PyValueError::new_err(format!(
+                    "drag_nrlmsise00 atmosphere ap must have 7 elements, got {}",
+                    ap_list.len()
+                ))
+            })?;
+            Ok(CompiledForce::Drag {
+                area,
+                mass,
+                cd,
+                atmosphere: DragAtmosphere::Nrlmsise00 {
+                    f107_daily,
+                    f107_avg,
+                    ap,
+                },
                 propagation_frame,
             })
         }
@@ -4828,6 +4908,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_ias15_py, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(nrlmsise00_density_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(
         differential_correction::differential_correction_cr3bp_py,

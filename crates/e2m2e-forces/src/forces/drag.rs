@@ -8,6 +8,8 @@
 //!   （drag 依赖速度，∂a/∂v ≠ 0，接口扩三元组见 ADR 0018）
 
 use crate::atmosphere;
+use crate::geodesy;
+use crate::nrlmsise00::{self, Nrlmsise00Input};
 use e2m2e_propagation::constants::{EARTH_GRAVITY_REF_RADIUS_KM, KM_TO_M};
 use e2m2e_spice::spice_ffi::{mat3_mul_vec, mat3_t_mul_vec, pxform, SpiceFfiError};
 
@@ -21,40 +23,83 @@ pub struct AccelDrag {
     pub jac_da_dv: [[f64; 3]; 3],
 }
 
+/// 阻力力模型使用的大气密度模型配置。
+///
+/// 与 Python `atmosphere.py` 的大气模型一一对应：
+///
+/// - [`DragAtmosphere::Exponential`] ↔ `ExponentialAtmosphere`（USSA76 分段指数，
+///   纯高度 + F10.7/Ap 一阶修正）；
+/// - [`DragAtmosphere::Nrlmsise00`] ↔ `NRLMSISE00Atmosphere`（NRLMSISE-00，
+///   依赖历元、大地经纬度与空间天气）。
+#[derive(Debug, Clone)]
+pub enum DragAtmosphere {
+    /// USSA76 分段指数模型：F10.7 通量与 Ap 指数（均为标量）。
+    Exponential { f107: f64, ap: f64 },
+    /// NRLMSISE-00 模型：前一日 F10.7、81 日平均 F10.7 与 3 小时分辨率 Ap 史。
+    ///
+    /// `ap` 平坦（7 个元素全等）时按静态空间天气处理（标量日 Ap）；非平坦时启用
+    /// Ap 史（3 小时分辨率先验），两种口径都对应参考实现的 `gtd7d` 有效总质量密度。
+    ///
+    /// # 注意
+    /// 本分支每次求值都要把 `et` 折算成年积日/UT（`et2utc`），即**直接调用
+    /// cspice、不经星历预采样缓存**（与 ITRF93 帧旋转的 `lookup_frame_matrix`
+    /// 不同）。故阻力+NRLMSISE-00 的传播路径不满足"并行区零 cspice"的前提，
+    /// 不要放进 `StrictGuard` 作用域。
+    Nrlmsise00 {
+        f107_daily: f64,
+        f107_avg: f64,
+        ap: [f64; 7],
+    },
+}
+
+impl DragAtmosphere {
+    /// 该高度域内的大气密度（kg/m³），在 ITRF 系位置/历元上求值。
+    fn density(&self, et: f64, r_itrf: &[f64; 3]) -> Result<f64, SpiceFfiError> {
+        match self {
+            // 指数模型只看球面高度（|r| − R_EARTH），逐位与 Python 路径一致。
+            DragAtmosphere::Exponential { f107, ap } => {
+                let r_norm =
+                    (r_itrf[0] * r_itrf[0] + r_itrf[1] * r_itrf[1] + r_itrf[2] * r_itrf[2]).sqrt();
+                Ok(atmosphere::density(r_norm - EARTH_RADIUS_KM, *f107, *ap))
+            }
+            DragAtmosphere::Nrlmsise00 {
+                f107_daily,
+                f107_avg,
+                ap,
+            } => {
+                let (lat_deg, lon_deg, alt_km) = geodesy::ecef_to_geodetic(r_itrf);
+                let (_year, doy, ut_seconds) = nrlmsise00::et_to_utc_doy(et)?;
+                // Ap 史非平坦才启用 3 小时分辨率先验（暴时项）。
+                let storm_time = ap[1..].iter().any(|a| a != &ap[0]);
+                let input = Nrlmsise00Input {
+                    day_of_year: doy,
+                    ut_seconds,
+                    altitude_km: alt_km,
+                    geodetic_lat_deg: lat_deg,
+                    geodetic_lon_deg: lon_deg,
+                    f107_daily: *f107_daily,
+                    f107_avg: *f107_avg,
+                    ap: *ap,
+                };
+                Ok(nrlmsise00::density(&input, storm_time).density_kg_m3)
+            }
+        }
+    }
+}
+
 // ── 纯物理（无 SPICE 依赖，可独立单元测试）─────────────────────────────────
 
-/// 在 body-fixed 系中计算阻力加速度（纯物理公式，不含坐标变换）。
+/// body-fixed 系内由密度与相对速度算阻力加速度（纯物理公式，无坐标变换）。
 ///
 /// 公式（与 Python `_compute_drag_in_itrf` 逐位一致）：
 /// ```text
-/// altitude = |r| - R_EARTH
-/// ρ = atmosphere::density(altitude, f107, ap)
 /// v_si = v * 1000
 /// a_km = [-1/2 * ρ * BC * |v_si| * v_si] / 1000
 ///      = -1/2 * ρ * BC * 1000 * |v| * v
 /// ```
-///
-/// `f107`/`ap` 为太阳活动参数（对应 Python `ExponentialAtmosphere.f107`/`.ap`），
-/// 由调用方从 `DragModel` 注入的大气模型透传，避免在此硬编码默认值导致与
-/// Python 路径静默分歧。
-///
-/// # 注意
-/// 本函数假设输入已在 ITRF（或等价 body-fixed 系）中，不做 pxform 旋转。
-/// 供 `drag_accel` 管线内部调用，也供单元测试直接使用（不依赖 SPICE 内核）。
-#[allow(clippy::too_many_arguments)]
-pub fn drag_accel_in_body_fixed(
-    r_bf: &[f64; 3],
-    v_bf: &[f64; 3],
-    area: f64,
-    mass: f64,
-    cd: f64,
-    f107: f64,
-    ap: f64,
-) -> [f64; 3] {
-    let r_norm = (r_bf[0] * r_bf[0] + r_bf[1] * r_bf[1] + r_bf[2] * r_bf[2]).sqrt();
-    let altitude_km = r_norm - EARTH_RADIUS_KM;
-    let rho = atmosphere::density(altitude_km, f107, ap); // kg/m³
-
+/// 运算顺序原样保留（`factor` 一次乘出后逐分量相乘），供指数模型与
+/// NRLMSISE-00 两条密度来源共用。
+pub fn drag_from_density(rho: f64, v_bf: &[f64; 3], area: f64, mass: f64, cd: f64) -> [f64; 3] {
     let v_mag = (v_bf[0] * v_bf[0] + v_bf[1] * v_bf[1] + v_bf[2] * v_bf[2]).sqrt();
     if rho == 0.0 || v_mag == 0.0 {
         return [0.0; 3];
@@ -71,14 +116,38 @@ pub fn drag_accel_in_body_fixed(
     [factor * v_bf[0], factor * v_bf[1], factor * v_bf[2]]
 }
 
-// ── 完整管线（依赖 SPICE pxform，需 spicespice feature + 内核已加载）─────
+/// 在 body-fixed 系中计算阻力加速度（USSA76 指数密度 + 纯物理公式）。
+///
+/// 高度取球面高度 `|r| − R_EARTH`（指数模型口径），`f107`/`ap` 为太阳活动参数
+/// （对应 Python `ExponentialAtmosphere.f107`/`.ap`），由调用方从 `DragModel`
+/// 注入的大气模型透传，避免在此硬编码默认值导致与 Python 路径静默分歧。
+///
+/// # 注意
+/// 本函数假设输入已在 ITRF（或等价 body-fixed 系）中，不做 pxform 旋转。
+/// 供单元测试直接使用（不依赖 SPICE 内核）。
+pub fn drag_accel_in_body_fixed(
+    r_bf: &[f64; 3],
+    v_bf: &[f64; 3],
+    area: f64,
+    mass: f64,
+    cd: f64,
+    f107: f64,
+    ap: f64,
+) -> [f64; 3] {
+    let r_norm = (r_bf[0] * r_bf[0] + r_bf[1] * r_bf[1] + r_bf[2] * r_bf[2]).sqrt();
+    let altitude_km = r_norm - EARTH_RADIUS_KM;
+    let rho = atmosphere::density(altitude_km, f107, ap); // kg/m³
+    drag_from_density(rho, v_bf, area, mass, cd)
+}
+
+// ── 完整管线（依赖 SPICE pxform/sxform，需 spice feature + 内核已加载）─────
 
 /// 计算 drag 加速度（J2000 propagation frame → ITRF 旋转 → 阻力公式 → 旋转回 J2000）。
 ///
 /// 物理流程：
 /// 1. 查 ITRF93 → propagation_frame 帧旋转矩阵（优先走星历预采样缓存）
 /// 2. state_J2000 → state_ITRF（R^T rotation，与 GravityField pxform 模式一致）
-/// 3. `drag_accel_in_body_fixed` 算 ITRF 系内阻力
+/// 3. 按 `atmosphere` 变体求密度并算 ITRF 系内阻力
 /// 4. a_ITRF → a_J2000（正向 R rotation）
 #[allow(clippy::too_many_arguments)]
 pub fn drag_accel(
@@ -87,8 +156,7 @@ pub fn drag_accel(
     area: f64,
     mass: f64,
     cd: f64,
-    f107: f64,
-    ap: f64,
+    atmosphere: &DragAtmosphere,
     propagation_frame: &str,
 ) -> Result<[f64; 3], SpiceFfiError> {
     // Step 1: 查 ITRF93 → propagation_frame（"J2000"）。
@@ -105,8 +173,9 @@ pub fn drag_accel(
     let r_itrf = mat3_t_mul_vec(&r_itrf_to_prop, &r_j2000);
     let v_itrf = mat3_t_mul_vec(&r_itrf_to_prop, &v_j2000);
 
-    // Step 3: ITRF 系内阻力（纯物理公式，见 drag_accel_in_body_fixed）。
-    let a_itrf = drag_accel_in_body_fixed(&r_itrf, &v_itrf, area, mass, cd, f107, ap);
+    // Step 3: ITRF 系内密度与阻力（见 drag_from_density）。
+    let rho = atmosphere.density(et, &r_itrf)?;
+    let a_itrf = drag_from_density(rho, &v_itrf, area, mass, cd);
 
     // Step 4: 旋转回 propagation frame。
     let a_prop = mat3_mul_vec(&r_itrf_to_prop, &a_itrf);
@@ -123,11 +192,10 @@ pub fn drag_accel_and_jacobian(
     area: f64,
     mass: f64,
     cd: f64,
-    f107: f64,
-    ap: f64,
+    atmosphere: &DragAtmosphere,
     propagation_frame: &str,
 ) -> Result<AccelDrag, SpiceFfiError> {
-    let acc0 = drag_accel(et, state, area, mass, cd, f107, ap, propagation_frame)?;
+    let acc0 = drag_accel(et, state, area, mass, cd, atmosphere, propagation_frame)?;
 
     // 中心差分步长：√ε · max(1, |component|)，与 GravityField/SRP 统一
     let h_step = |val: f64| -> f64 { (f64::EPSILON.sqrt() * val.abs().max(1.0)).max(1e-6) };
@@ -140,8 +208,8 @@ pub fn drag_accel_and_jacobian(
         let mut s_minus = *state;
         s_plus[dim] += h;
         s_minus[dim] -= h;
-        let a_plus = drag_accel(et, &s_plus, area, mass, cd, f107, ap, propagation_frame)?;
-        let a_minus = drag_accel(et, &s_minus, area, mass, cd, f107, ap, propagation_frame)?;
+        let a_plus = drag_accel(et, &s_plus, area, mass, cd, atmosphere, propagation_frame)?;
+        let a_minus = drag_accel(et, &s_minus, area, mass, cd, atmosphere, propagation_frame)?;
         for i in 0..3 {
             jac_da_dr[i][dim] = (a_plus[i] - a_minus[i]) / (2.0 * h);
         }
@@ -155,8 +223,8 @@ pub fn drag_accel_and_jacobian(
         let mut s_minus = *state;
         s_plus[3 + dim] += h;
         s_minus[3 + dim] -= h;
-        let a_plus = drag_accel(et, &s_plus, area, mass, cd, f107, ap, propagation_frame)?;
-        let a_minus = drag_accel(et, &s_minus, area, mass, cd, f107, ap, propagation_frame)?;
+        let a_plus = drag_accel(et, &s_plus, area, mass, cd, atmosphere, propagation_frame)?;
+        let a_minus = drag_accel(et, &s_minus, area, mass, cd, atmosphere, propagation_frame)?;
         for i in 0..3 {
             jac_da_dv[i][dim] = (a_plus[i] - a_minus[i]) / (2.0 * h);
         }

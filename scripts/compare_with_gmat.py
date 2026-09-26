@@ -130,14 +130,20 @@ def _propagate_e2m2e(
     include_srp: bool = True,
     degree: int = 10,
     order: int = 10,
+    atmosphere: str = "exponential",
 ) -> dict[str, Any]:
-    """用 e2m2e 传播与 GMAT 脚本对应的 LEO 场景。"""
+    """用 e2m2e 传播与 GMAT 脚本对应的 LEO 场景。
+
+    ``atmosphere`` 选 ``"exponential"``（USSA76 分段指数，对应 GMAT
+    ``Exponential``）或 ``"nrlmsise00"``（NRLMSISE-00；GMAT 侧最近的对应物是
+    ``MSISE90``，两者模型版本与空间天气预处理不同，见 ADR 0049）。
+    """
     from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
     from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
     from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
     from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
     from e2m2e.algorithm.forces import DragModel, ForceModel, GravityField, SolarRadiationPressure
-    from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
+    from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere, NRLMSISE00Atmosphere
     from e2m2e.data.kernels.manager import SPICEManager
 
     project_root = output_dir
@@ -176,9 +182,17 @@ def _propagate_e2m2e(
         fm = ForceModel(system)
         fm.add_force(GravityField("EARTH", degree=degree, order=order), name="gravity")
         if include_drag:
+            if atmosphere == "nrlmsise00":
+                drag_atmosphere = NRLMSISE00Atmosphere()
+            elif atmosphere == "exponential":
+                drag_atmosphere = ExponentialAtmosphere()
+            else:
+                raise ValueError(
+                    f"unknown atmosphere {atmosphere!r}; known: 'exponential', 'nrlmsise00'"
+                )
             fm.add_force(
                 DragModel(
-                    atmosphere=ExponentialAtmosphere(),
+                    atmosphere=drag_atmosphere,
                     area=10.0,
                     mass=1000.0,
                     cd=2.2,
@@ -306,6 +320,7 @@ def _write_report(
     errors: dict[str, npt.NDArray[np.floating]],
     figure_paths: list[Path],
     output_dir: Path,
+    atmosphere: str = "exponential",
 ) -> Path:
     """写 Markdown 报告。"""
     report_path = output_dir / "comparison_report.md"
@@ -328,7 +343,7 @@ def _write_report(
     lines.append("- 轨道：400 km 高度圆轨道，倾角 51.6°")
     lines.append("- 历元：2025-06-21T11:00:06 UTC")
     lines.append("- 坐标系：EarthICRF")
-    lines.append("- 力模型：J2(10,10) + Exponential 阻力 + SRP（无阴影）")
+    lines.append(f"- 力模型：J2(10,10) + {atmosphere} 阻力 + SRP（无阴影）")
     lines.append("- 积分器：RK89，MaxStep=60 s，Accuracy=1e-13")
     lines.append("")
     lines.append("## 图表")
@@ -346,6 +361,26 @@ def _write_report(
 
     report_path.write_text("\n".join(lines), encoding="utf-8")
     return report_path
+
+
+def _print_e2m2e_summary(data: dict[str, Any], atmosphere: str) -> None:
+    """打印 e2m2e 侧弧段摘要（GMAT 报告缺失时用于记录本方输出）。"""
+    time = np.asarray(data["time"], dtype=float)
+    states = np.asarray(data["states"], dtype=float)
+    mu = data["system"].gravitational_parameter("EARTH")
+
+    def sma(state: npt.NDArray[np.floating]) -> float:
+        r = float(np.linalg.norm(state[:3]))
+        v = float(np.linalg.norm(state[3:6]))
+        return -mu / (2.0 * (0.5 * v * v - mu / r))
+
+    a0, a1 = sma(states[0]), sma(states[-1])
+    print(f"  atmosphere    : {atmosphere}")
+    print(f"  arc           : {(time[-1] - time[0]) / 3600.0:.3f} h, {states.shape[0]} samples")
+    print(f"  SMA initial   : {a0:.6f} km")
+    print(f"  SMA final     : {a1:.6f} km")
+    print(f"  SMA decay     : {a0 - a1:.6f} km")
+    print(f"  all finite    : {bool(np.all(np.isfinite(states)))}")
 
 
 def main() -> None:
@@ -374,11 +409,37 @@ def main() -> None:
         action="store_true",
         help="Run e2m2e comparison without SRP (for incremental analysis).",
     )
+    parser.add_argument(
+        "--atmosphere",
+        type=str,
+        choices=["exponential", "nrlmsise00"],
+        default="exponential",
+        help="Atmosphere model used on the e2m2e side (default: exponential).",
+    )
+    parser.add_argument(
+        "--e2m2e-only",
+        action="store_true",
+        help=(
+            "Only run the e2m2e side and print its summary, skipping the GMAT "
+            "comparison (use when no GMAT binary/report is available)."
+        ),
+    )
     args = parser.parse_args()
 
     gmat_report = Path(args.gmat_report).expanduser().resolve()
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.e2m2e_only:
+        print(f"Running e2m2e propagation (atmosphere={args.atmosphere})...")
+        e2m2e_data = _propagate_e2m2e(
+            output_dir,
+            include_drag=not args.no_drag,
+            include_srp=not args.no_srp,
+            atmosphere=args.atmosphere,
+        )
+        _print_e2m2e_summary(e2m2e_data, args.atmosphere)
+        return
 
     if not gmat_report.exists():
         print(f"GMAT report not found: {gmat_report}")
@@ -386,6 +447,7 @@ def main() -> None:
         script_path = output_dir / "leo_reference_gmat.script"
         print(f"  gmat -s {script_path}")
         print("Then rerun this script.")
+        print("To record only the e2m2e side, rerun with --e2m2e-only.")
         return
 
     print("Parsing GMAT report...")
@@ -396,6 +458,7 @@ def main() -> None:
         output_dir,
         include_drag=not args.no_drag,
         include_srp=not args.no_srp,
+        atmosphere=args.atmosphere,
     )
 
     print("Computing errors...")
@@ -406,7 +469,7 @@ def main() -> None:
     figures = _plot_errors(errors, output_dir)
 
     print("Writing report...")
-    report_path = _write_report(errors, figures, output_dir)
+    report_path = _write_report(errors, figures, output_dir, atmosphere=args.atmosphere)
 
     print(f"Done. Report: {report_path}")
     print(f"Max position error: {float(np.max(errors['position_error_km'])) * 1000.0:.3f} m")
