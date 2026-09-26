@@ -21,6 +21,8 @@ from .cr3bp_system import CR3BP_System
 from .dynamics import CR3BP_Dynamics, Dynamics, propagate_state_at_orbit_time
 from .ephemeris_dynamics import EphemerisDynamics
 from .ephemeris_system import EphemerisSystem
+from .eppr_dynamics import EPPR_Dynamics
+from .eppr_system import EPPRSystem
 from .potential import pseudo_potential_hessian
 from .system import System
 
@@ -32,6 +34,8 @@ __all__ = [
     "CR3BP_Dynamics",
     "EphemerisSystem",
     "EphemerisDynamics",
+    "EPPRSystem",
+    "EPPR_Dynamics",
     "BCR4BPSystem",
     "BCR4BP_Dynamics",
     "propagate_state_at_orbit_time",

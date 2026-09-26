@@ -25,6 +25,7 @@ class ReferenceFrame(enum.Enum):
     SECONDARY_CENTERED = "secondary_centered"  # 次天体中心坐标系
     SYNODIC = "synodic"  # 会合坐标系
     J2000 = "J2000"  # J2000 惯性系
+    EPPR = "eppr"  # 星历脉动旋转坐标系（Earth-Moon EPPR）
 
 
 class UnitSystem(enum.Enum):
