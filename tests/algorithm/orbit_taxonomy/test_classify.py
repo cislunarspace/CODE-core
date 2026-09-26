@@ -297,6 +297,124 @@ def test_synthetic_butterfly_dragonfly_vertical_crossing_patterns():
     )
 
 
+def test_synthetic_spatial_moon_centered_labels():
+    """判据级：空间（z≠0）月心曲线与平面月心分支共用同一标签选择（#707）。"""
+    mu = 0.012150585350562453
+    moon_x = 1 - mu
+    w = 2 * np.pi / 2.2
+
+    # 空间顺行大圆：ρ_max ≈0.07 < SOI；修复前落入共线回退误标 halo_l2_southern
+    states, t = _closed_curve(
+        (
+            lambda t: moon_x + 0.05 * np.cos(w * t),
+            lambda t: 0.04 * np.sin(w * t),
+            lambda t: 0.03 * np.cos(w * t),
+            lambda t: -0.05 * w * np.sin(w * t),
+            lambda t: 0.04 * w * np.cos(w * t),
+            lambda t: -0.03 * w * np.sin(w * t),
+        ),
+        period=2.2,
+    )
+    result = classify_orbit(states, t)
+    assert result.canonical_labels == ("distant_prograde",), result.diagnostics
+
+    # 同形逆行（y、vy 取负）
+    states, t = _closed_curve(
+        (
+            lambda t: moon_x + 0.05 * np.cos(w * t),
+            lambda t: -0.04 * np.sin(w * t),
+            lambda t: 0.03 * np.cos(w * t),
+            lambda t: -0.05 * w * np.sin(w * t),
+            lambda t: -0.04 * w * np.cos(w * t),
+            lambda t: -0.03 * w * np.sin(w * t),
+        ),
+        period=2.2,
+    )
+    result = classify_orbit(states, t)
+    assert result.canonical_labels == ("distant_retrograde",), result.diagnostics
+
+    # 低月小圆（ρ_max ≈0.02 < low/distant 分界），圆心 ∓y 偏置 → 东西半平面
+    for offset_y, expected in ((-0.006, "low_prograde_eastern"), (0.006, "low_prograde_western")):
+        r = 0.012
+        states, t = _closed_curve(
+            (
+                lambda t, cx=moon_x, rr=r, ww=w: cx + rr * np.cos(ww * t),
+                lambda t, oy=offset_y, rr=r, ww=w: oy + rr * np.sin(ww * t),
+                lambda t, ww=w: 0.008 * np.cos(ww * t),
+                lambda t, rr=r, ww=w: -rr * ww * np.sin(ww * t),
+                lambda t, rr=r, ww=w: rr * ww * np.cos(ww * t),
+                lambda t, ww=w: -0.008 * ww * np.sin(ww * t),
+            ),
+            period=2.2,
+        )
+        result = classify_orbit(states, t)
+        assert result.canonical_labels == (expected,), (expected, result.diagnostics)
+
+
+def test_synthetic_spatial_moon_centered_multilabel():
+    """判据级：空间月心逆行曲线周期通约时多标签（#707）。"""
+    mu = 0.012150585350562453
+    moon_x = 1 - mu
+    r = 0.05
+    w = -0.75
+    states, t = _closed_curve(
+        (
+            lambda t: moon_x + r * np.cos(w * t),
+            lambda t: r * np.sin(w * t),
+            lambda t: 0.02 * np.cos(w * t),
+            lambda t: -r * w * np.sin(w * t),
+            lambda t: r * w * np.cos(w * t),
+            lambda t: -0.02 * w * np.sin(w * t),
+        ),
+        period=(4.0 / 3.0) * 2 * np.pi,
+    )
+    result = classify_orbit(states, t)
+    assert result.canonical_labels == ("distant_retrograde", "resonant_3_4"), result.diagnostics
+
+
+def test_synthetic_polar_moon_orbit_indeterminate():
+    """判据级：极轨月心轨道判据不可判，显式 moon_centered_indeterminate（#707）。
+
+    修复前该输入落入共线回退被误标 halo_l1_northern。
+    """
+    mu = 0.012150585350562453
+    moon_x = 1 - mu
+    # 极轨：x 恒为 moon_x，近月点（y 极值处）h_z 退化，月心顺逆不可判
+    states, t = _closed_curve(
+        (
+            lambda t: moon_x + np.zeros_like(t),
+            lambda t: 0.05 * np.cos(t),
+            lambda t: 0.05 * np.sin(t),
+            lambda t: np.zeros_like(t),
+            lambda t: -0.05 * np.sin(t),
+            lambda t: 0.05 * np.cos(t),
+        ),
+        period=2 * np.pi,
+    )
+    result = classify_orbit(states, t)
+    assert result.labels == ()
+    assert result.unclassified_reason == "moon_centered_indeterminate", result.diagnostics
+
+
+def test_synthetic_small_halo_inside_soi_stays_collinear():
+    """判据级：完全在 SOI 内、绕共线点的空间轨道不被不可判分支拦截（#707）。"""
+    l2 = 1.1557
+    w = 2.0
+    states, t = _closed_curve(
+        (
+            lambda t: l2 + 0.0015 * np.cos(w * t),
+            lambda t: 0.001 * np.sin(w * t),
+            lambda t: 0.0008 * np.cos(w * t),
+            lambda t: -0.0015 * w * np.sin(w * t),
+            lambda t: 0.001 * w * np.cos(w * t),
+            lambda t: -0.0008 * w * np.sin(w * t),
+        ),
+        period=np.pi,
+    )
+    result = classify_orbit(states, t)
+    assert result.canonical_labels == ("halo_l2_southern",), result.diagnostics
+
+
 def test_invalid_inputs():
     """非法输入走 FAILED/INVALID_INPUT。"""
     bad_shape = classify_orbit(np.zeros((3, 5)))
