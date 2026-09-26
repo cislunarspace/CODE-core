@@ -101,6 +101,10 @@ pub enum CompiledForce {
     /// 与航天器质量无关：每个 RHS 求值处以当前状态的 RTN（RSW）基把
     /// `acceleration_rtn` 旋转到传播坐标系；与 LVLH 方向帧共用同一套基
     /// （`rtn_lvlh_basis`）。方向帧标签当前仅 "RTN"。
+    ///
+    /// 退化策略对调用方可见（与 LVLH 推力方向分支不同）：三分量全零合法，
+    /// 等价于无该力、不报错；任一非零分量遇退化状态（|r|≈0、|v|≈0，或 r∥v
+    /// 使 |r×v|≈0）显式报错，不静默丢弃分量（ADR 0020）。
     UniformAcceleration {
         /// RTN 三轴常值加速度分量 (aR, aT, aN)（km/s²）
         acceleration_rtn: [f64; 3],
@@ -147,7 +151,8 @@ fn vec_cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
 ///
 /// 退化语义与既有 LVLH 推力方向分支逐位一致：|r| < 1e-12 或 |v| < 1e-12
 /// 报错（消息以 `frame` 为标签）；共线（|r×v| < 1e-12）时 T 退化为 v̂、
-/// N 返回 None（调用方丢弃 N 分量）。
+/// N 返回 None。调用方对 None 的处理各不相同：LVLH 推力方向丢弃 N 分量，
+/// `UniformAcceleration` 显式报错（加速度分量无法如实交付）。
 fn rtn_lvlh_basis(r: [f64; 3], v: [f64; 3], frame: &str) -> Result<RtnBasis, String> {
     let r_norm = vec_norm(r);
     let v_norm = vec_norm(v);
@@ -373,7 +378,7 @@ impl CompiledForce {
                 direction_frame,
             } => {
                 // 三分量全零等价于无该力：跳过基求值（与 LowThrust 零推力跳过方向
-                // 解析同策略），退化状态下也恒为零。
+                // 解析同策略），退化状态下也恒为零、不报错。
                 if acceleration_rtn.iter().all(|a| *a == 0.0) {
                     return Ok([0.0; 3]);
                 }
@@ -382,12 +387,19 @@ impl CompiledForce {
                     [state[3], state[4], state[5]],
                     direction_frame,
                 )?;
+                // 共线（|r×v|≈0）时 N 轴与沿迹轴均无定义（轨道面无定义），任何
+                // 非零分量都无法如实交付，故显式报错而非静默丢分量（与 LVLH 推力
+                // 方向分支的区别：那里只解释单位方向向量，丢弃 N 仍有确定语义）。
+                let Some(n_hat) = n_hat else {
+                    return Err(format!(
+                        "{direction_frame} frame requires non-zero angular momentum"
+                    ));
+                };
                 let mut acc = [0.0; 3];
                 for i in 0..3 {
-                    acc[i] = acceleration_rtn[0] * r_hat[i] + acceleration_rtn[1] * t_hat[i];
-                    if let Some(n) = n_hat {
-                        acc[i] += acceleration_rtn[2] * n[i];
-                    }
+                    acc[i] = acceleration_rtn[0] * r_hat[i]
+                        + acceleration_rtn[1] * t_hat[i]
+                        + acceleration_rtn[2] * n_hat[i];
                 }
                 Ok(acc)
             }
@@ -997,12 +1009,16 @@ mod tests {
 
     #[test]
     fn uniform_acceleration_zero_skips_degenerate_state() {
-        // 全零加速度在退化状态（v=0）下也返回零，不触发基求值错误。
-        let state = [7000.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        let acc = uniform_acceleration([0.0, 0.0, 0.0])
-            .acceleration(0.0, &state, "EARTH")
-            .unwrap();
-        assert_eq!(acc, [0.0; 3]);
+        // 全零加速度在退化状态（|v|=0 与 r∥v 共线）下也返回零，不触发退化报错。
+        for state in [
+            [7000.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [7000.0, 0.0, 0.0, 7.5, 0.0, 0.0],
+        ] {
+            let acc = uniform_acceleration([0.0, 0.0, 0.0])
+                .acceleration(0.0, &state, "EARTH")
+                .unwrap();
+            assert_eq!(acc, [0.0; 3]);
+        }
     }
 
     #[test]
@@ -1024,13 +1040,19 @@ mod tests {
     }
 
     #[test]
-    fn uniform_acceleration_collinear_drops_normal_component() {
-        // r∥v 共线退化：T̂ 退化为 v̂，N 分量静默丢弃（与 LVLH 语义一致）。
+    fn uniform_acceleration_collinear_state_errors() {
+        // r∥v 共线退化（|r×v|≈0）：N 轴与沿迹轴都无定义，任一非零分量显式报错，
+        // 不得静默丢弃（措辞与 VNB 的角动量退化同风格）。
         let state = [7000.0, 0.0, 0.0, 7.5, 0.0, 0.0];
-        let acc = uniform_acceleration([1e-6, 2e-6, 3e-6])
-            .acceleration(0.0, &state, "EARTH")
-            .unwrap();
-        assert_close(acc, [3e-6, 0.0, 0.0]);
+        for components in [[1e-6, 2e-6, 3e-6], [1e-6, 0.0, 0.0], [0.0, 0.0, 1e-6]] {
+            let err = uniform_acceleration(components)
+                .acceleration(0.0, &state, "EARTH")
+                .unwrap_err();
+            assert!(
+                err.contains("RTN frame requires non-zero angular momentum"),
+                "components {components:?}, unexpected: {err}"
+            );
+        }
     }
 
     #[test]

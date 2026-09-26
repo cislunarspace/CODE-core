@@ -1,8 +1,8 @@
 """UniformAcceleration（RTN 常值加速度）编译传播契约。
 
-覆盖：RTN 三分量到惯性轴的映射、沿迹轴垂直径向、退化状态的报错与零加速度
-豁免、共线态丢弃法向分量、常值横向加速度下的半长轴闭式漂移、法向加速度的
-面外运动闭式解、STM 与初态中心差分一致性、构造校验。
+覆盖：RTN 三分量到惯性轴的映射、沿迹轴垂直径向、径向分量无长期漂移、退化状态
+（|r|≈0、|v|≈0、r∥v）显式报错与全零豁免、常值横向加速度下的半长轴闭式漂移、
+法向加速度的面外运动闭式解、STM 与初态中心差分一致性、构造校验。
 """
 
 import numpy as np
@@ -69,23 +69,55 @@ def test_zero_acceleration_on_degenerate_state():
 
 
 @pytest.mark.parametrize(
-    ("state", "error"),
+    ("accel_rtn", "state", "error"),
     [
-        ([0.0, 0.0, 0.0, 0.0, 7.5, 0.0], "non-zero position"),
-        ([7000.0, 0.0, 0.0, 0.0, 0.0, 0.0], "non-zero velocity"),
+        ([1e-6, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 7.5, 0.0], "non-zero position"),
+        ([1e-6, 0.0, 0.0], [7000.0, 0.0, 0.0, 0.0, 0.0, 0.0], "non-zero velocity"),
+        (
+            [1e-6, 2e-6, 3e-6],
+            [7000.0, 0.0, 0.0, 7.5, 0.0, 0.0],
+            "non-zero angular momentum",
+        ),
+        (
+            [1e-6, 0.0, 0.0],
+            [7000.0, 0.0, 0.0, 7.5, 0.0, 0.0],
+            "non-zero angular momentum",
+        ),
     ],
 )
-def test_degenerate_state_raises(state, error):
-    """非零加速度在退化状态（|r|≈0 或 |v|≈0）下明确失败。"""
+def test_degenerate_state_raises(accel_rtn, state, error):
+    """任一非零分量在退化状态（|r|≈0、|v|≈0 或 r∥v）下明确失败、不丢分量。
+
+    措辞与既有 VNB/LVLH 退化报错同风格；共线时 N 轴与沿迹轴均无定义，故连
+    仅有径向分量的加速度也报错。
+    """
     with pytest.raises(RuntimeError, match=error):
-        _propagate([1e-6, 0.0, 0.0], state, (0.0, 1.0))
+        _propagate(accel_rtn, state, (0.0, 1.0))
 
 
-def test_collinear_state_drops_normal_component():
-    """r∥v 共线退化时，T 退化为 v̂、N 分量静默丢弃（与 LVLH 语义一致）。"""
-    state = [7000.0, 0.0, 0.0, 7.5, 0.0, 0.0]
-    delta_v = _delta_v([1e-6, 2e-6, 3e-6], state, (0.0, 1.0))
-    np.testing.assert_allclose(delta_v, [3e-6, 0.0, 0.0], atol=1e-11)
+def test_zero_acceleration_on_collinear_state():
+    """三分量全零在共线状态（|r×v|≈0）下仍等价于无该力、不报错。"""
+    delta_v = _delta_v([0.0, 0.0, 0.0], [7000.0, 0.0, 0.0, 7.5, 0.0, 0.0], (0.0, 1.0))
+    np.testing.assert_allclose(delta_v, np.zeros(3), atol=1e-15)
+
+
+def test_radial_component_no_secular_semimajor_axis_drift():
+    """径向（R）分量在一个圆轨道周期上不产生半长轴长期漂移。
+
+    径向分量对能量的一个周期平均贡献为零，半长轴只有周期振荡而无长期项：
+    实测一个周期（5828.5 s）末漂移 +6.5e-11 km，而同幅值横向分量同弧段为
+    +1.08 km。阈值 1e-6 km 距实测 4 个量级以上、距横向信号 6 个量级以下。
+    """
+    a_r = 1e-7
+    n = np.sqrt(EARTH_MU / _R0**3)
+    result = _propagate(
+        [a_r, 0.0, 0.0],
+        _CIRCULAR_Y0,
+        (0.0, 2.0 * np.pi / n),
+        forces_extra=[PointMassGravity("EARTH", mu=EARTH_MU)],
+    )
+    drift = abs(semi_major_axis(result["states"][-1], EARTH_MU) - _R0)
+    assert drift < 1e-6
 
 
 def test_transverse_semimajor_axis_drift_matches_closed_form():

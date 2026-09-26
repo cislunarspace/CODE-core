@@ -16,8 +16,9 @@ class UniformAcceleration(PhysicalModel):
     加速度与航天器质量无关：每个 RHS 求值处以当前状态的 RTN 基把
     ``(aR, aT, aN)`` 旋转到传播坐标系。RTN 定义与 LVLH 方向帧同基
     （ADR 0007 的 RSW 约定）：R = r/|r|，N = (r×v)/|r×v|，T = N×R。
-    三分量全零合法（等价于无该力）；退化状态（|r|≈0 或 |v|≈0）在传播中
-    显式报错。对应 CE-5 精密定轨策略的姿轨控匀加速度项。
+    三分量全零合法（等价于无该力）；退化状态（|r|≈0、|v|≈0，或 r∥v 使
+    |r×v|≈0）在传播中显式报错，不静默丢弃分量（ADR 0020）。对应 CE-5
+    精密定轨策略的姿轨控匀加速度项。
 
     加速度计算全部由 Rust 编译路径承载（``("uniform_accel", ...)`` 力元组，
     ``crates/e2m2e-forces/src/forces/compiled.rs``），Python 侧不保留参考实现。
