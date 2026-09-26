@@ -40,6 +40,13 @@ pub enum TideMode {
 ///
 /// DE430 bsp 不带 GM 数据，cspice bodvrd 会 KERNELVARNOTFOUND。
 /// 与 Python 一致用本地字典。
+///
+/// 口径取舍（ADR 0048）：这里固定用 DE440 常数，**不跟随** Python 侧
+/// ``SPICEManager.ephemeris_datum``。本函数的唯一消费者是固潮 Step1 的扰动体
+/// GM，而第三体引力（直接项+间接项）的 GM 由 Python 经 ``to_rust_spec`` /
+/// ``gm_values`` 传入，故切换星历口径时无需在此加分枝——加了也是无消费者的
+/// 死分支。若日后固潮也要支持 DE421 口径，应改为由调用方传入 GM 数组，而不是
+/// 在此复制一张按 datum 分派的表。
 fn gm_for_body(body: &str) -> Option<f64> {
     match body {
         "SUN" => Some(SUN_GM_DE440),

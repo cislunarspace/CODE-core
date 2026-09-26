@@ -24,6 +24,7 @@ from __future__ import annotations
 import inspect
 import logging
 import os
+import re
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -37,6 +38,8 @@ from .provider import EphemerisProvider
 
 if TYPE_CHECKING:
     from .ephem_cache import EphemCache
+
+_logger = logging.getLogger(__name__)
 
 # 常用天体的 NAIF ID 映射表，用于将天体名称转换为 SPICE 所需的整数 ID。
 _NAIF_IDS: dict[str, int] = {
@@ -53,6 +56,47 @@ _NAIF_IDS: dict[str, int] = {
     "EMB": 3,
     "PLUTO": 999,
 }
+
+# 星历（SPK）内核 → 物理常数基准（datum）映射白名单。
+#
+# 依据（ADR 0048）：
+# - **SPK 内核本身不携带 GM**（实测：de421.bsp + pck00010.tpc 下对所有天体
+#   ``bodvrd(..., "GM")`` 均报 KERNELVARNOTFOUND），GM 只能来自
+#   ``constants.toml`` 的声明式 body 表；故 datum 由内核**文件名**推断，
+#   不是从内核内容读取。
+# - 只有 ``de421.bsp`` 会改变 GM 口径：仓库只为 DE421/DE440 维护 GM 表。
+#   de441/de442 的 GM 与 DE440 确有差异，但补全它们需要的权威来源不在本仓库
+#   现有证据内，因此一律按 DE440 处理并告警一次，绝不静默混用。
+# - 配对取"最后一个成功加载的星历内核"：与 SPICE 对重叠覆盖段"后加载者生效"
+#   的优先级规则一致，避免出现"位置按 de440s、GM 按 de421"的静默错配。
+_SPK_DATUM_PATTERN = re.compile(r"(?i)^(de\d+s?)\.bsp$")
+
+_KERNEL_DATUM_BY_SPK: dict[str, str] = {
+    "de421": "DE421",
+    "de430": "DE440",
+    "de435": "DE440",
+    "de438": "DE440",
+    "de440": "DE440",
+    "de440s": "DE440",
+    "de441": "DE440",
+    "de442": "DE440",
+    "de442s": "DE440",
+}
+
+#: 无星历内核（或内核未收录）时的 GM 基准，与 ADR 0022 决策 4 的星历动力学默认一致。
+_DEFAULT_EPHEMERIS_DATUM = "DE440"
+
+#: 已告警过的 (body, 请求 datum, 实际 datum) 组合，保证每组合只抱怨一次。
+_gm_fallback_warned: set[tuple[str, str, str]] = set()
+
+
+def _datum_for_kernel(path: str) -> str | None:
+    """由星历内核文件名推断 GM 基准；非星历内核或未收录者返回 ``None``。"""
+    match = _SPK_DATUM_PATTERN.match(os.path.basename(path))
+    if match is None:
+        return None
+    return _KERNEL_DATUM_BY_SPK.get(match.group(1).lower())
+
 
 # 闰秒内核（.tls 文件）的搜索路径列表。
 # 按优先级依次搜索：项目内置 kernels 目录 → 环境变量 SPICE_KERNEL_DIR。
@@ -185,6 +229,9 @@ class SPICEManager(EphemerisProvider):
         # 预插值星历缓存（enable_ephem_cache 后生效；get_body_position/state
         # 优先走 cache，避免逐步跨 Python↔C 边界查 SPICE）。见 ephem_cache.py。
         self._ephem_cache: EphemCache | None = None
+        # 已加载的星历内核 (绝对路径, datum)，按加载顺序。末项的 datum 即当前
+        # GM 口径（配对规则见模块级 _KERNEL_DATUM_BY_SPK 注释）。
+        self._loaded_ephemeris: list[tuple[str, str]] = []
 
     def _ensure_leapseconds(self, search_dir: str | None = None):
         """确保闰秒内核已加载（线程安全）。
@@ -217,7 +264,7 @@ class SPICEManager(EphemerisProvider):
                     spice_furnsh(path)
                 SPICEManager._leapseconds_loaded = True
             else:
-                logging.getLogger(__name__).warning(
+                _logger.warning(
                     "未找到闰秒内核（.tls）：UTC↔ET 时间转换将失败"
                     "（SPICE NOLEAPSECONDS）。请设置 SPICE_KERNEL_DIR 环境变量，"
                     "或将 naif0012.tls 放入内核目录。"
@@ -226,7 +273,9 @@ class SPICEManager(EphemerisProvider):
     def load_kernel(self, path: str) -> None:
         """加载一个 SPICE 内核文件（.bsp / .bpc / .tf 等）。
 
-        加载前会自动确保闰秒内核已就绪。
+        加载前会自动确保闰秒内核已就绪。星历（SPK）内核加载后即成为当前
+        GM 口径（:attr:`ephemeris_datum`），配对规则见模块级
+        ``_KERNEL_DATUM_BY_SPK``。
 
         Raises:
             FileNotFoundError: 当指定路径的文件不存在时。
@@ -252,9 +301,21 @@ class SPICEManager(EphemerisProvider):
 
         if spice_furnsh is not None:
             spice_furnsh(path)
+        # 星历内核簿记：仅在 furnsh 成功后登记，失败不污染当前口径。
+        datum = _datum_for_kernel(path)
+        if datum is not None:
+            abspath = os.path.abspath(path)
+            self._loaded_ephemeris = [
+                entry for entry in self._loaded_ephemeris if entry[0] != abspath
+            ]
+            self._loaded_ephemeris.append((abspath, datum))
 
     def unload_kernel(self, path: str) -> None:
-        """卸载一个已加载的 SPICE 内核文件，释放相关资源。"""
+        """卸载一个已加载的 SPICE 内核文件，释放相关资源。
+
+        卸载星历内核后，当前 GM 口径回落到仍加载的最后一个星历内核；
+        无星历内核时回到默认 DE440。
+        """
         get_spiceypy().unload(path)
         # Rust cspice 与 Python spiceypy 是独立 CSPICE 实例（静态链接，
         # 内核池不共享）。load_kernel 双 furnsh，此处对称卸载 Rust 侧，
@@ -265,6 +326,19 @@ class SPICEManager(EphemerisProvider):
 
         if spice_unload is not None:
             spice_unload(path)
+        abspath = os.path.abspath(path)
+        self._loaded_ephemeris = [entry for entry in self._loaded_ephemeris if entry[0] != abspath]
+
+    @property
+    def ephemeris_datum(self) -> str:
+        """当前 GM 基准：最后一个已加载星历内核的 datum，无则 DE440（ADR 0048）。
+
+        与 SPICE「重叠覆盖段取后加载者」的优先级规则一致，故位置与 GM
+        天然同口径，不需调用方手工配对。
+        """
+        if self._loaded_ephemeris:
+            return self._loaded_ephemeris[-1][1]
+        return _DEFAULT_EPHEMERIS_DATUM
 
     def enable_ephem_cache(
         self,
@@ -420,34 +494,76 @@ class SPICEManager(EphemerisProvider):
 
     _EPHEMERIS_KERNEL_PRIORITY = ["de440.bsp", "de440s.bsp", "de435.bsp", "de438.bsp"]
 
-    def find_ephemeris_kernel(self, search_dir: str) -> str:
+    #: 各 GM 基准偏好的星历内核文件名（ADR 0048）。只有被显式请求时才前置。
+    _DATUM_KERNEL_PREFERENCE: dict[str, str] = {"DE421": "de421.bsp"}
+
+    def find_ephemeris_kernel(self, search_dir: str, preferred: str | None = None) -> str:
         """在指定目录中按优先级搜索星历内核文件（.bsp）。
 
-        优先级：de440.bsp > de440s.bsp > de435.bsp > de438.bsp。
+        默认优先级：de440.bsp > de440s.bsp > de435.bsp > de438.bsp。
+        ``preferred`` 指定 GM 基准（如 ``"DE421"``）时，该基准偏好的内核
+        （de421.bsp）置于候选首位；**显式请求而文件缺失即报错**，不静默
+        降级到其它 DE 系列——降级会让「请求 DE421 口径」变成「悄悄用
+        DE440 口径」，比失败更糟。
 
         Raises:
-            FileNotFoundError: 目录不存在或其中无匹配的内核文件。
+            FileNotFoundError: 目录不存在、显式 preferred 内核缺失，或其中无匹配的内核文件。
         """
         if not os.path.isdir(search_dir):
             raise FileNotFoundError(
                 f"Ephemeris kernel search directory does not exist: {search_dir}"
             )
-        for candidate in self._EPHEMERIS_KERNEL_PRIORITY:
+        candidates = list(self._EPHEMERIS_KERNEL_PRIORITY)
+        if preferred is not None:
+            name = self._DATUM_KERNEL_PREFERENCE.get(preferred.upper())
+            if name is None:
+                raise ValueError(f"未知的星历基准（无偏好内核）: {preferred}")
+            preferred_path = os.path.join(search_dir, name)
+            if not os.path.isfile(preferred_path):
+                raise FileNotFoundError(
+                    f"请求 {preferred.upper()} 口径但内核缺失：{preferred_path}"
+                    "（该内核由 kernels-v1 release 分发，跑 make kernels 获取）"
+                )
+            candidates.insert(0, name)
+        for candidate in candidates:
             path = os.path.join(search_dir, candidate)
             if os.path.isfile(path):
                 return os.path.abspath(path)
         raise FileNotFoundError(f"No ephemeris kernel found in {search_dir}")
 
-    def get_gm(self, body: str) -> float:
+    def get_gm(self, body: str, datum: str | None = None) -> float:
         """获取天体的引力参数 GM（km³/s²）。
 
-        优先从 ``data.constants.bodies`` 的 DE440 GM 表中取；若该天体没有
-        DE440 记录，则通过 SPICE 内核实时读取。
+        GM 基准默认取 :attr:`ephemeris_datum`（跟随已加载星历内核，ADR 0048）；
+        可用 ``datum`` 显式覆盖。该基准下无记录时回退 DE440 并按
+        (天体, 基准) 组合告警一次——不静默混用口径。
+
+        若天体不在 ``data.constants.bodies`` 的 GM 表中（如未收录的小天体），
+        则通过 SPICE 内核实时读取（原始行为不变）。
+
+        Args:
+            body: 天体名称（大小写不敏感）。
+            datum: 显式 GM 基准（如 ``"DE421"``/``"DE440"``）；None 用当前口径。
         """
+        requested = datum.upper() if datum is not None else self.ephemeris_datum
         name_upper = body.upper()
         body_obj = _BODIES_BY_NAME.get(name_upper)
-        if body_obj is not None and "DE440" in body_obj.gm_by_datum:
-            return body_obj.gm_by_datum["DE440"]
+        if body_obj is not None:
+            if requested in body_obj.gm_by_datum:
+                return body_obj.gm_by_datum[requested]
+            if _DEFAULT_EPHEMERIS_DATUM in body_obj.gm_by_datum:
+                key = (name_upper, requested, _DEFAULT_EPHEMERIS_DATUM)
+                if key not in _gm_fallback_warned:
+                    _gm_fallback_warned.add(key)
+                    _logger.warning(
+                        "天体 %s 无 %s 基准 GM，回退 %s 值：位置与 GM 口径不一致。"
+                        "需按 %s 口径复算时请先补齐该基准的权威 GM（见 ADR 0048）。",
+                        name_upper,
+                        requested,
+                        _DEFAULT_EPHEMERIS_DATUM,
+                        requested,
+                    )
+                return body_obj.gm_by_datum[_DEFAULT_EPHEMERIS_DATUM]
         body_id = _NAIF_IDS.get(name_upper, body)
         vals = get_spiceypy().bodvrd(str(body_id), "GM", 1)
         return float(vals[1][0])

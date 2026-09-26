@@ -262,3 +262,22 @@ e2m2e/data/constants/
 3. **μ switch compatibility**: retain an explicit `datum="legacy1965"` option
    on CR3BP_System to reproduce old results, or clean cut? Leaning clean cut +
    CHANGELOG note; old value unsupported.
+
+## Revision 2026-09-26 (#665)
+
+Decision 4's "ephemeris dynamics defaults to `DE440`" is refined: the **GM
+baseline for ephemeris dynamics follows the loaded ephemeris kernel** instead of
+being hardwired to DE440. `SPICEManager.get_gm` now defaults to the datum of the
+last loaded SPK kernel (`ephemeris_datum`) and accepts an explicit `datum`
+override; with no SPK loaded it still defaults to `DE440`. Consequently
+`de421.bsp` becomes loadable and selectable (`load_design_kernels(..., datum=...)`,
+`find_ephemeris_kernel(..., preferred=...)`), and an explicitly requested datum
+whose kernel is absent fails loudly rather than degrading silently.
+
+Decisions 3 (coexisting baselines, chosen per scenario) and 5 (single source +
+build-time/generated alignment, no hand-copying) are unchanged: DE421 GM values
+still live only in `constants.toml`, with `[body.X.gm].DE421` and `[datum.DE421]`
+held equal by test. Out-of-scope bodies (Jupiter and beyond) still have no DE421
+GM row because no authoritative source is on file — they fall back to DE440 with
+a one-shot warning rather than being silently mixed (tracked by #670). Rationale,
+rejected alternatives, and verification are in ADR 0048.
