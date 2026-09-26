@@ -186,6 +186,47 @@ def test_invoke_tool_internal_error():
     assert "RuntimeError" in env["error"]["message"]
 
 
+def test_invoke_tool_e2m2e_error_preserves_cause_message():
+    """E2M2EError 领域错误：信封 message 保留完整 cause 文本（#677）。"""
+    from e2m2e.exceptions import PropagationFailure
+
+    class PropBoom:
+        request_model = None
+
+        def __call__(self, **kwargs):
+            raise PropagationFailure(
+                "propagation truncated: cause: SPICE kernel coverage insufficient "
+                "(et=1000, cover=[-1, 1])"
+            )
+
+    env = envelope.invoke_tool(PropBoom(), {})
+    assert env["status"] == "error"
+    assert env["error"]["code"] == "E2M2E_ERROR"
+    assert "coverage insufficient" in env["error"]["message"]
+    assert "et=1000" in env["error"]["message"]
+    # details 至少给出机读的类型标识，调用方无需解析可变的 cause 措辞
+    assert env["error"]["details"] == {"exception": "PropagationFailure"}
+    json.dumps(env)  # 信封必须可直接 JSON 序列化
+
+
+def test_invoke_tool_e2m2e_error_passes_through_own_details():
+    """异常自带 details 时原样透传，只额外补异常类型名。"""
+    from e2m2e.exceptions import E2M2EError
+
+    class DetailBoom(E2M2EError):
+        details = {"target": "MOON", "et": 1000.0}
+
+    class Tool:
+        request_model = None
+
+        def __call__(self, **kwargs):
+            raise DetailBoom("查询越界")
+
+    env = envelope.invoke_tool(Tool(), {})
+    assert env["error"]["code"] == "E2M2E_ERROR"
+    assert env["error"]["details"] == {"target": "MOON", "et": 1000.0, "exception": "DetailBoom"}
+
+
 def test_family_response_serializes_orbit_members():
     """族生成响应（Orbit 成员）序列化为 JSON 数据，而非 INTERNAL_ERROR。
 

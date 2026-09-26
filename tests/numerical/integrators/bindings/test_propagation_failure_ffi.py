@@ -87,7 +87,7 @@ def test_public_cr3bp_propagation_does_not_hide_step_collapse_as_empty_states():
 def test_ffi_unknown_body_does_not_return_a_truncated_trajectory(spice_manager, reference_epoch):
     reference_et = spice_manager.utc_to_et(reference_epoch)
     state = [Datum.WGS84.earth_radius_km + 400.0, 0.0, 0.0, 0.0, 7.0, 0.0]
-    with pytest.raises(RuntimeError, match="STM propagation failed"):
+    with pytest.raises(PropagationFailure, match="NBody STM propagation failed"):
         propagate_with_stm_py(
             bodies=["EARTH", "FAKEBODY"],
             origin="EARTH",
