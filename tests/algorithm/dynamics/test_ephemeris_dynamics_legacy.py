@@ -1,5 +1,7 @@
 """EphemerisDynamics 遗留消费者所需的最小接口契约。"""
 
+import re
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -182,4 +184,5 @@ def test_legacy_propagation_outside_cache_window_reports_window(
     message = str(excinfo.value)
     assert "EPHEM_CACHE_MISS" in message
     assert "outside cached window" in message
-    assert "window [" in message
+    # 查询时刻与缓存窗口都来自进程状态，不是照抄底层文本：两者须以数值出现。
+    assert re.search(r"et -?\d+\.\d+, window \[-?\d+\.\d+, -?\d+\.\d+\]", message)
