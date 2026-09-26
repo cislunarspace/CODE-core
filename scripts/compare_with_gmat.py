@@ -372,11 +372,12 @@ def _write_report(
     if cfg.get("drag") is None:
         lines.append("- GMAT 脚本侧：未找到 `leo_reference_gmat.script`，无法核对实际配置。")
     else:
-        sw = (
-            f"F107={cfg['f107']}、MagneticIndex={cfg['ap']}"
-            if cfg["f107"] is not None
-            else "F107/MagneticIndex 由 GMAT 内置默认（脚本内被注释）"
-        )
+        if cfg["f107"] is not None:
+            sw = f"F107={cfg['f107']}、MagneticIndex={cfg['ap']}"
+        elif cfg["drag"] == "None":
+            sw = "无 AtmosphereModel 行（脚本未启用大气阻力）"
+        else:
+            sw = "F107/MagneticIndex 由 GMAT 内置默认（脚本内被注释）"
         lines.append(f"- GMAT 脚本侧（读回脚本核对）：Drag={cfg['drag']}、{sw}")
     lines.append("- 积分器：RK89，MaxStep=60 s，Accuracy=1e-13")
     lines.append("")
@@ -519,23 +520,6 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     script_path = output_dir / "leo_reference_gmat.script"
 
-    # 对拍两侧必须同配置：核对实际要跑的 GMAT 脚本的大气模型与 e2m2e 侧选择。
-    # `--no-drag` 时两侧都应为无阻力，故期望值同样由该开关决定（否则 --no-drag
-    # 配 `Drag = None` 脚本这种"两侧一致"的组合会被误拒）。
-    script_cfg = _read_gmat_script_config(script_path)
-    if args.no_drag:
-        expected_drag = "None"
-    elif args.atmosphere == "nrlmsise00":
-        expected_drag = "MSISE90"
-    else:
-        expected_drag = "Exponential"
-    if script_cfg["drag"] is not None and script_cfg["drag"] != expected_drag:
-        raise SystemExit(
-            f"GMAT 脚本 {script_path.name} 的 Drag = {script_cfg['drag']}，而 e2m2e 侧选择 "
-            f"{args.atmosphere}（期望 GMAT 侧 {expected_drag}）。请先执行 "
-            f"generate_gmat_leo_script.py --drag-model {expected_drag} 重新生成脚本。"
-        )
-
     if args.e2m2e_only:
         print(f"Running e2m2e propagation (atmosphere={args.atmosphere})...")
         e2m2e_data = _propagate_e2m2e(
@@ -564,6 +548,23 @@ def main() -> None:
         print("Then rerun this script.")
         print("To record only the e2m2e side, rerun with --e2m2e-only.")
         return
+
+    # 对拍两侧必须同配置：核对实际要跑的 GMAT 脚本与 e2m2e 侧选择。`--no-drag`
+    # 时两侧都应为无阻力，故期望值同样由该开关决定。放在这里而非更早：`--e2m2e-only`
+    # 不消费 GMAT 脚本，目录里放着别的模型生成的脚本不应让该模式失败。
+    script_cfg = _read_gmat_script_config(script_path)
+    if args.no_drag:
+        expected_drag = "None"
+    elif args.atmosphere == "nrlmsise00":
+        expected_drag = "MSISE90"
+    else:
+        expected_drag = "Exponential"
+    if script_cfg["drag"] is not None and script_cfg["drag"] != expected_drag:
+        raise SystemExit(
+            f"GMAT 脚本 {script_path.name} 的 Drag = {script_cfg['drag']}，而 e2m2e 侧选择 "
+            f"{args.atmosphere}（期望 GMAT 侧 {expected_drag}）。请先执行 "
+            f"generate_gmat_leo_script.py --drag-model {expected_drag} 重新生成脚本。"
+        )
 
     print("Parsing GMAT report...")
     gmat_data = _parse_gmat_report(gmat_report)
