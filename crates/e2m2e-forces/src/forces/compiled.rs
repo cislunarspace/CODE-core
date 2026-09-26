@@ -15,6 +15,9 @@ use e2m2e_spice::spk_accel;
 /// 加速度 + 雅可比（∂a/∂r + ∂a/∂v）三元组的返回类型：纯状态/STM 传播共用。
 pub type AccelJacobiResult = Result<([f64; 3], [[f64; 3]; 3], [[f64; 3]; 3]), String>;
 
+/// RTN/LVLH（RSW）基返回类型：(R̂, T̂, N̂)。共线退化（|r×v|≈0）时 N̂ 为 None。
+type RtnBasis = ([f64; 3], [f64; 3], Option<[f64; 3]>);
+
 /// 编译后的 force（enum，dispatch 用 match）。
 ///
 /// 每个 variant 持有该 force 的全部配置。Python 侧用元组序列化（见
@@ -93,6 +96,17 @@ pub enum CompiledForce {
         /// None / "VNB" / "LVLH"
         direction_frame: Option<String>,
     },
+    /// RTN 三轴常值加速度（匀加速度）力模型。
+    ///
+    /// 与航天器质量无关：每个 RHS 求值处以当前状态的 RTN（RSW）基把
+    /// `acceleration_rtn` 旋转到传播坐标系；与 LVLH 方向帧共用同一套基
+    /// （`rtn_lvlh_basis`）。方向帧标签当前仅 "RTN"。
+    UniformAcceleration {
+        /// RTN 三轴常值加速度分量 (aR, aT, aN)（km/s²）
+        acceleration_rtn: [f64; 3],
+        /// 方向解释坐标系标签（当前仅 "RTN"）
+        direction_frame: String,
+    },
     /// 大气阻力力模型。
     ///
     /// ITRF93 系内计算阻力加速度，含帧旋转变换。
@@ -109,38 +123,77 @@ pub enum CompiledForce {
     },
 }
 
+/// 三维向量欧氏范数。
+fn vec_norm(v: [f64; 3]) -> f64 {
+    (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
+}
+
+/// 三维向量数乘。
+fn vec_scale(v: [f64; 3], factor: f64) -> [f64; 3] {
+    [v[0] * factor, v[1] * factor, v[2] * factor]
+}
+
+/// 三维向量叉乘。
+fn vec_cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+/// RTN/LVLH（RSW）基：R = r̂，N = ĥ，T = N×R（沿迹轴垂直于径向，不取速度
+/// 方向，与 LVLHAxes / ADR 0007 决策 5 一致）。
+///
+/// 退化语义与既有 LVLH 推力方向分支逐位一致：|r| < 1e-12 或 |v| < 1e-12
+/// 报错（消息以 `frame` 为标签）；共线（|r×v| < 1e-12）时 T 退化为 v̂、
+/// N 返回 None（调用方丢弃 N 分量）。
+fn rtn_lvlh_basis(r: [f64; 3], v: [f64; 3], frame: &str) -> Result<RtnBasis, String> {
+    let r_norm = vec_norm(r);
+    let v_norm = vec_norm(v);
+    let h = vec_cross(r, v);
+    let h_norm = vec_norm(h);
+    if r_norm < 1e-12 {
+        return Err(format!("{frame} frame requires non-zero position"));
+    }
+    if v_norm < 1e-12 {
+        return Err(format!("{frame} frame requires non-zero velocity"));
+    }
+    let r_hat = vec_scale(r, 1.0 / r_norm);
+    let v_hat = vec_scale(v, 1.0 / v_norm);
+    if h_norm < 1e-12 {
+        Ok((r_hat, v_hat, None))
+    } else {
+        let n_hat = vec_scale(h, 1.0 / h_norm);
+        // 与 LVLHAxes 对齐：沿迹轴垂直于径向轴，而非一般椭圆轨道
+        // 中含径向分量的速度单位向量。
+        let along_track = vec_cross(n_hat, r_hat);
+        Ok((r_hat, along_track, Some(n_hat)))
+    }
+}
+
 fn resolve_thrust_direction(
     direction: &[f64; 3],
     direction_frame: Option<&str>,
     state: &[f64; 6],
 ) -> Result<[f64; 3], String> {
-    let norm = |v: [f64; 3]| -> f64 { (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() };
-    let scale =
-        |v: [f64; 3], factor: f64| -> [f64; 3] { [v[0] * factor, v[1] * factor, v[2] * factor] };
-    let cross = |a: [f64; 3], b: [f64; 3]| -> [f64; 3] {
-        [
-            a[1] * b[2] - a[2] * b[1],
-            a[2] * b[0] - a[0] * b[2],
-            a[0] * b[1] - a[1] * b[0],
-        ]
-    };
     let r = [state[0], state[1], state[2]];
     let v = [state[3], state[4], state[5]];
     let local_to_inertial = match direction_frame {
         None => *direction,
         Some("VNB") => {
-            let v_norm = norm(v);
-            let h = cross(r, v);
-            let h_norm = norm(h);
+            let v_norm = vec_norm(v);
+            let h = vec_cross(r, v);
+            let h_norm = vec_norm(h);
             if v_norm < 1e-12 {
                 return Err("VNB frame requires non-zero velocity".to_string());
             }
             if h_norm < 1e-12 {
                 return Err("VNB frame requires non-zero angular momentum".to_string());
             }
-            let v_hat = scale(v, 1.0 / v_norm);
-            let n_hat = scale(h, 1.0 / h_norm);
-            let b_hat = cross(v_hat, n_hat);
+            let v_hat = vec_scale(v, 1.0 / v_norm);
+            let n_hat = vec_scale(h, 1.0 / h_norm);
+            let b_hat = vec_cross(v_hat, n_hat);
             [
                 direction[0] * v_hat[0] + direction[1] * n_hat[0] + direction[2] * b_hat[0],
                 direction[0] * v_hat[1] + direction[1] * n_hat[1] + direction[2] * b_hat[1],
@@ -148,49 +201,28 @@ fn resolve_thrust_direction(
             ]
         }
         Some("LVLH") => {
-            let r_norm = norm(r);
-            let v_norm = norm(v);
-            let h = cross(r, v);
-            let h_norm = norm(h);
-            if r_norm < 1e-12 {
-                return Err("LVLH frame requires non-zero position".to_string());
-            }
-            if v_norm < 1e-12 {
-                return Err("LVLH frame requires non-zero velocity".to_string());
-            }
-            let r_hat = scale(r, 1.0 / r_norm);
-            let v_hat = scale(v, 1.0 / v_norm);
-            if h_norm < 1e-12 {
+            let (r_hat, t_hat, n_hat) = rtn_lvlh_basis(r, v, "LVLH")?;
+            if let Some(n_hat) = n_hat {
                 [
-                    direction[0] * r_hat[0] + direction[1] * v_hat[0],
-                    direction[0] * r_hat[1] + direction[1] * v_hat[1],
-                    direction[0] * r_hat[2] + direction[1] * v_hat[2],
+                    direction[0] * r_hat[0] + direction[1] * t_hat[0] + direction[2] * n_hat[0],
+                    direction[0] * r_hat[1] + direction[1] * t_hat[1] + direction[2] * n_hat[1],
+                    direction[0] * r_hat[2] + direction[1] * t_hat[2] + direction[2] * n_hat[2],
                 ]
             } else {
-                let n_hat = scale(h, 1.0 / h_norm);
-                // 与 LVLHAxes 对齐：沿迹轴垂直于径向轴，而非一般椭圆轨道
-                // 中含径向分量的速度单位向量。
-                let along_track = cross(n_hat, r_hat);
                 [
-                    direction[0] * r_hat[0]
-                        + direction[1] * along_track[0]
-                        + direction[2] * n_hat[0],
-                    direction[0] * r_hat[1]
-                        + direction[1] * along_track[1]
-                        + direction[2] * n_hat[1],
-                    direction[0] * r_hat[2]
-                        + direction[1] * along_track[2]
-                        + direction[2] * n_hat[2],
+                    direction[0] * r_hat[0] + direction[1] * t_hat[0],
+                    direction[0] * r_hat[1] + direction[1] * t_hat[1],
+                    direction[0] * r_hat[2] + direction[1] * t_hat[2],
                 ]
             }
         }
         Some(frame) => return Err(format!("unsupported thrust direction frame {frame:?}")),
     };
-    let direction_norm = norm(local_to_inertial);
+    let direction_norm = vec_norm(local_to_inertial);
     if direction_norm < 1e-15 {
         return Err("thrust direction must be non-zero".to_string());
     }
-    Ok(scale(local_to_inertial, 1.0 / direction_norm))
+    Ok(vec_scale(local_to_inertial, 1.0 / direction_norm))
 }
 
 impl CompiledForce {
@@ -335,6 +367,29 @@ impl CompiledForce {
                     accel_mag_km_s2 * direction[1],
                     accel_mag_km_s2 * direction[2],
                 ])
+            }
+            Self::UniformAcceleration {
+                acceleration_rtn,
+                direction_frame,
+            } => {
+                // 三分量全零等价于无该力：跳过基求值（与 LowThrust 零推力跳过方向
+                // 解析同策略），退化状态下也恒为零。
+                if acceleration_rtn.iter().all(|a| *a == 0.0) {
+                    return Ok([0.0; 3]);
+                }
+                let (r_hat, t_hat, n_hat) = rtn_lvlh_basis(
+                    [state[0], state[1], state[2]],
+                    [state[3], state[4], state[5]],
+                    direction_frame,
+                )?;
+                let mut acc = [0.0; 3];
+                for i in 0..3 {
+                    acc[i] = acceleration_rtn[0] * r_hat[i] + acceleration_rtn[1] * t_hat[i];
+                    if let Some(n) = n_hat {
+                        acc[i] += acceleration_rtn[2] * n[i];
+                    }
+                }
+                Ok(acc)
             }
             Self::Drag {
                 area,
@@ -502,6 +557,7 @@ pub fn supports_jacobian(force: &CompiledForce) -> bool {
             | CompiledForce::SRPVariableMass { .. }
             | CompiledForce::EcomSrp { .. }
             | CompiledForce::LowThrust { .. }
+            | CompiledForce::UniformAcceleration { .. }
             | CompiledForce::Drag { .. }
     )
 }
@@ -695,9 +751,9 @@ fn acceleration_and_jacobian_with_optional_mass(
             let dadv = [[0.0_f64; 3]; 3];
             Ok((acc0, jac, dadv))
         }
-        CompiledForce::LowThrust { .. } => {
-            // VNB/LVLH 方向取决于状态，统一在 Rust 内中心差分，避免 Python
-            // 回调并使 STM 与普通 RHS 使用同一方向定义。
+        CompiledForce::LowThrust { .. } | CompiledForce::UniformAcceleration { .. } => {
+            // VNB/LVLH 方向与 RTN 基取决于状态，统一在 Rust 内中心差分，避免
+            // Python 回调并使 STM 与普通 RHS 使用同一方向定义。
             let r_norm = (state[0] * state[0] + state[1] * state[1] + state[2] * state[2]).sqrt();
             let v_norm = (state[3] * state[3] + state[4] * state[4] + state[5] * state[5]).sqrt();
             let h_r = (f64::EPSILON.sqrt() * r_norm).max(1e-6);
@@ -904,6 +960,95 @@ mod tests {
             cr: 1.3,
             shadow_bodies: vec![],
         }
+    }
+
+    fn uniform_acceleration(acceleration_rtn: [f64; 3]) -> CompiledForce {
+        CompiledForce::UniformAcceleration {
+            acceleration_rtn,
+            direction_frame: "RTN".to_string(),
+        }
+    }
+
+    /// 逐分量绝对容差比对（R̂/T̂/N̂ 归一化含浮点舍入，不能要求逐位相等）。
+    fn assert_close(got: [f64; 3], expected: [f64; 3]) {
+        for (g, e) in got.iter().zip(expected) {
+            assert!((g - e).abs() < 1e-18, "got {got:?}, expected {expected:?}");
+        }
+    }
+
+    #[test]
+    fn uniform_acceleration_rtn_basis_mapping() {
+        // sample_state 的 R̂=x̂、T̂=ŷ、N̂=ẑ，三分量应逐一映射到惯性轴。
+        let acc = uniform_acceleration([1e-6, 2e-6, 3e-6])
+            .acceleration(0.0, &sample_state(), "EARTH")
+            .unwrap();
+        assert_close(acc, [1e-6, 2e-6, 3e-6]);
+    }
+
+    #[test]
+    fn uniform_acceleration_along_track_perpendicular_to_radial() {
+        // 速度含径向分量时，沿迹轴仍取 N×R（垂直于径向），不随速度偏斜。
+        let state = [7000.0, 0.0, 0.0, 1.0, 7.5, 0.0];
+        let acc = uniform_acceleration([0.0, 1e-6, 0.0])
+            .acceleration(0.0, &state, "EARTH")
+            .unwrap();
+        assert_close(acc, [0.0, 1e-6, 0.0]);
+    }
+
+    #[test]
+    fn uniform_acceleration_zero_skips_degenerate_state() {
+        // 全零加速度在退化状态（v=0）下也返回零，不触发基求值错误。
+        let state = [7000.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let acc = uniform_acceleration([0.0, 0.0, 0.0])
+            .acceleration(0.0, &state, "EARTH")
+            .unwrap();
+        assert_eq!(acc, [0.0; 3]);
+    }
+
+    #[test]
+    fn uniform_acceleration_degenerate_state_errors() {
+        let err = uniform_acceleration([1e-6, 0.0, 0.0])
+            .acceleration(0.0, &[0.0; 6], "EARTH")
+            .unwrap_err();
+        assert!(
+            err.contains("RTN frame requires non-zero position"),
+            "unexpected: {err}"
+        );
+        let err = uniform_acceleration([1e-6, 0.0, 0.0])
+            .acceleration(0.0, &[7000.0, 0.0, 0.0, 0.0, 0.0, 0.0], "EARTH")
+            .unwrap_err();
+        assert!(
+            err.contains("RTN frame requires non-zero velocity"),
+            "unexpected: {err}"
+        );
+    }
+
+    #[test]
+    fn uniform_acceleration_collinear_drops_normal_component() {
+        // r∥v 共线退化：T̂ 退化为 v̂，N 分量静默丢弃（与 LVLH 语义一致）。
+        let state = [7000.0, 0.0, 0.0, 7.5, 0.0, 0.0];
+        let acc = uniform_acceleration([1e-6, 2e-6, 3e-6])
+            .acceleration(0.0, &state, "EARTH")
+            .unwrap();
+        assert_close(acc, [3e-6, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn uniform_acceleration_jacobian_is_state_dependent() {
+        // 沿迹加速度方向随 r、v 转动：∂a/∂r 与 ∂a/∂v 均非零。
+        let force = uniform_acceleration([0.0, 1e-6, 0.0]);
+        let (acc, jac, dadv) = acceleration_and_jacobian(&force, 0.0, &sample_state(), "EARTH")
+            .expect("UniformAcceleration supports jacobian");
+        assert!((acc[1] - 1e-6).abs() < 1e-18, "acc {acc:?}");
+        assert!(
+            jac.iter().flatten().any(|v| v.abs() > 0.0),
+            "jac all zero: {jac:?}"
+        );
+        assert!(
+            dadv.iter().flatten().any(|v| v.abs() > 0.0),
+            "dadv all zero: {dadv:?}"
+        );
+        assert!(supports_jacobian(&force));
     }
 
     #[test]
