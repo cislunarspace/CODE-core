@@ -1,4 +1,4 @@
-"""坐标转换算法：IAU2006/synodic↔J2000/GCRS↔EBCRS。
+"""坐标转换算法：IAU2006/synodic↔J2000/EPPR↔J2000/GCRS↔EBCRS。
 
 转换**算法** 归这里（ADR 0011 迁移，源：``core/coordinate/``），
 ``data/frames/`` 只留数据（EOP/闰秒/历表句柄，ADR 0015）。强化现有
@@ -18,6 +18,9 @@ from ...data.templates import ConvergenceState, FailureCause
 from .axes import Axes
 from .coordinate_system import CoordinateSystem
 from .dynamic_axes import DynamicAxes
+from .eppr_axes import EPPRAxes
+from .eppr_frame import EPPRFrameModel, EPPRFrameState
+from .eppr_j2000 import EPPRJ2000System
 from .gcrs_ebcrs import GCRSEBCRSSystem
 from .gmat_itrf import GmatItrfReduction
 from .gmat_time import TimeSystemConverter
@@ -59,6 +62,10 @@ __all__ = [
     "InertialOrigin",
     "SynodicAxes",
     "SynodicJ2000System",
+    "EPPRAxes",
+    "EPPRFrameModel",
+    "EPPRFrameState",
+    "EPPRJ2000System",
     "GCRSEBCRSSystem",
     "GmatItrfReduction",
     "TimeSystemConverter",
@@ -83,14 +90,15 @@ def spacetime_convert(
 ) -> dict[str, Any]:
     """时空坐标转换统一入口。
 
-    按 transform_type 分发到 SynodicJ2000System 或 GCRSEBCRSSystem。
-    不缓存转换器实例（每次调用新建）。
+    按 transform_type 分发到 SynodicJ2000System / EPPRJ2000System 或
+    GCRSEBCRSSystem。不缓存转换器实例（每次调用新建）。
 
     Args:
         transform_type: ``synodic_to_j2000`` / ``j2000_to_synodic`` /
-            ``gcrs_to_ebcrs`` / ``ebcrs_to_gcrs``。
+            ``j2000_to_eppr`` / ``eppr_to_j2000`` / ``gcrs_to_ebcrs`` /
+            ``ebcrs_to_gcrs``。
         state: 单条状态向量。
-        epoch: 时间值（JD_TDB，synodic 转换时为无量纲时间 t_syn）。
+        epoch: 时间值（JD_TDB，synodic/EPPR 转换时为无量纲时间 t_nd）。
         kwargs: 额外参数（``et0_jd`` 参考历元 JD_TDB；``ephemeris_path``
             GCRS↔EBCRS 必需）。
 
@@ -104,7 +112,12 @@ def spacetime_convert(
     et0_jd = float(kwargs.get("et0_jd", _JD_TDB_AT_ET0))
     et0 = (et0_jd - _JD_TDB_AT_ET0) * SECONDS_PER_DAY
 
-    if transform_type in ("synodic_to_j2000", "j2000_to_synodic"):
+    if transform_type in (
+        "synodic_to_j2000",
+        "j2000_to_synodic",
+        "j2000_to_eppr",
+        "eppr_to_j2000",
+    ):
         from ...data.kernels.manager import SPICEManager
         from ..design.design_orbit import load_design_kernels
         from ..dynamics.cr3bp_system import CR3BP_System
@@ -117,7 +130,10 @@ def spacetime_convert(
         cr3bp_system = CR3BP_System(
             mu=MU_EM, primary="Earth", secondary="Moon"
         )._with_default_scales()
-        conv = SynodicJ2000System(cr3bp_system=cr3bp_system, spice=spice)
+        if transform_type in ("synodic_to_j2000", "j2000_to_synodic"):
+            conv = SynodicJ2000System(cr3bp_system=cr3bp_system, spice=spice)
+        else:
+            conv = EPPRJ2000System(cr3bp_system=cr3bp_system, spice=spice)
     elif transform_type in ("gcrs_to_ebcrs", "ebcrs_to_gcrs"):
         ephemeris_path = kwargs.get("ephemeris_path")
         if not ephemeris_path:
@@ -134,6 +150,14 @@ def spacetime_convert(
         t_syn = float(epoch)
         result = conv.j2000_to_synodic(state_arr, t_syn, et0)
         out_time = et0_jd + t_syn * conv._get_time_unit() / SECONDS_PER_DAY
+    elif transform_type == "j2000_to_eppr":
+        t_nd = float(epoch)
+        result = conv.j2000_to_eppr(state_arr, t_nd, et0)
+        out_time = et0_jd + t_nd * conv._get_time_unit() / SECONDS_PER_DAY
+    elif transform_type == "eppr_to_j2000":
+        t_nd = float(epoch)
+        result = conv.eppr_to_j2000(state_arr, t_nd, et0)
+        out_time = et0_jd + t_nd * conv._get_time_unit() / SECONDS_PER_DAY
     elif transform_type == "gcrs_to_ebcrs":
         if state_arr.shape[0] != 3:
             raise ValueError(f"GCRS→EBCRS 输入应为 3 维位置，实际 {state_arr.shape[0]} 维")

@@ -275,6 +275,24 @@ class TestFacadeCallChains:
                 et0_jd=2459000.0,
             )
 
+    @pytest.mark.spice
+    @requires_spice
+    def test_eppr_transform_returns_converged_response(self):
+        """#650：j2000_to_eppr 经 Facade 端到端可用（Pydantic 校验 + 统一信封）。"""
+        response = Facade().spacetime_transform(
+            states=[[380000.0, 0.0, 0.0, 0.0, 1.0, 0.0]],
+            times=[0.0],
+            transform_type="j2000_to_eppr",
+            et0_jd=2459000.0,
+        )
+        assert response.status is ConvergenceState.CONVERGED
+        assert response.cause is FailureCause.NONE
+        assert response.transform_type == "j2000_to_eppr"
+        assert len(response.states) == 1
+        assert len(response.states[0]) == 6
+        assert len(response.times) == 1
+        assert response.details["n_states"] == 1
+
     def test_halo_family_delegates_to_algorithm(self):
         family = Facade().catalog.orbit_family_generation(
             orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=2

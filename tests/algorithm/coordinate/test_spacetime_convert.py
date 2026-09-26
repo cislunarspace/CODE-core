@@ -79,6 +79,45 @@ _time_ephemeris_available_mark = pytest.mark.skipif(
 
 
 @pytest.mark.spice
+@requires_spice
+class TestSpacetimeConvertEPPR:
+    def test_j2000_to_eppr_and_back(self, spice_manager, earth_moon_system):
+        et0_jd = 2459000.0
+        j2000_state = np.array([380000.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+
+        for epoch in (0.0, 0.05):
+            result_eppr = spacetime_convert(
+                "j2000_to_eppr",
+                j2000_state,
+                epoch=epoch,
+                et0_jd=et0_jd,
+            )
+            assert result_eppr["state"].shape == (6,)
+            assert result_eppr["transform_type"] == "j2000_to_eppr"
+            assert result_eppr["status"] is ConvergenceState.CONVERGED
+            assert result_eppr["cause"] is FailureCause.NONE
+            assert result_eppr["message"] == "任务完成"
+
+            result_back = spacetime_convert(
+                "eppr_to_j2000",
+                result_eppr["state"],
+                epoch=epoch,
+                et0_jd=et0_jd,
+            )
+            assert result_back["transform_type"] == "eppr_to_j2000"
+            np.testing.assert_allclose(result_back["state"], j2000_state, rtol=1e-9)
+
+    def test_eppr_state_must_be_1d(self):
+        with pytest.raises(ValueError, match="state"):
+            spacetime_convert(
+                "j2000_to_eppr",
+                np.zeros((2, 6)),
+                epoch=0.0,
+                et0_jd=2459000.0,
+            )
+
+
+@pytest.mark.spice
 @_time_ephemeris_available_mark
 class TestSpacetimeConvertGcrsEbcrs:
     def test_gcrs_to_ebcrs_round_trip(self):
