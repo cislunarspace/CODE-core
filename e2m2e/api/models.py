@@ -101,6 +101,33 @@ class OrbitError(Exception):
         return f"[{self.code}] {self.message}"
 
 
+def propagation_failure_details(
+    message: str,
+    status: ConvergenceState | None = None,
+    cause: FailureCause | None = None,
+) -> dict[str, Any]:
+    """传播失败的 ``error.details`` 载荷（#677 验收：传输层翻译零丢失）。
+
+    诊断文本即算法/Rust 侧给出的 ``cause:`` 段（含星历缓存窗口的 et 与区间等
+    定位字段），原样携带、不解析、不改写（ADR 0020：不以错误文本做翻译决策）。
+    状态三元组缺省时按 ``FAILED`` / ``UNKNOWN`` 兜底。
+
+    Args:
+        message: 诊断文本（含 ``cause:`` 段）。
+        status: 收敛状态；None 兜底 ``ConvergenceState.FAILED``。
+        cause: 失败原因码；None 兜底 ``FailureCause.UNKNOWN``。
+
+    Returns:
+        ``{"status": <ConvergenceState 值>, "cause": <FailureCause 值>,
+        "diagnostic": <message>}``。
+    """
+    return {
+        "status": (status or ConvergenceState.FAILED).value,
+        "cause": (cause or FailureCause.UNKNOWN).value,
+        "diagnostic": message,
+    }
+
+
 class _ApiModel(BaseModel):
     """api 模型公共配置：允许任意内部字段，输出按声明序列化。"""
 

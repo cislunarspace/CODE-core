@@ -10,6 +10,7 @@
 
 ### Fixed
 - **星历传播失败原因透传**：`EphemerisDynamics.propagate`（Rust N 体快速路径）失败时的 `RuntimeError` 不再一律写 "likely cause: SPICE kernels not loaded or step size collapsed"，改为按实际原因给出可机读的 `cause:` 段——内核未加载 / 内核覆盖不足（保留底层 SPICE 解释文本）/ 星历缓存窗口外（保留请求 et 与缓存区间）/ 缓存键未注册 / strict 区缓存未启用；力模型未报错时归为步长塌缩或步数上限；失败语义不变（覆盖外仍硬失败）。(#677)
+- **传播失败 cause 进 MCP 信封 details**：`PropagationFailure` 原先在传输层被压成 `INTERNAL_ERROR` + 异常类型名，Rust 侧给出的 `cause:` 段（含星历缓存窗口的查询时刻与区间）对 MCP/CLI/sidecar 调用方不可见；现按 `PROPAGATION_FAILED` 返回，`error.details` 携带 `status`/`cause`/`diagnostic`（诊断为原样文本，不解析、不改写），`orbit_propagation` 失败路径同样填充。失败语义不变（覆盖外仍硬失败）。(#677)
 - **反向多重/分段打靶收敛**：`multiple_shooting_correct`/`segmented_shooting_correct` 接受单调递减的 `t_patch`（反向传播工作流）。此前 compiled 传播路径（PD45/PD78）写死正向，递减 `t_patch` 立即报 "output length mismatch: got 1 time points, expected 2"；现传播方向由时间跨度/输出网格的单调方向决定，反向段积分与 STM 变分方程正确工作，正向行为逐位不变。(#640)
 
 ## [5.9.6] - 2026-09-24

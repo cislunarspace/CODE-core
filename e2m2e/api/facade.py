@@ -45,6 +45,7 @@ from .models import (
     TransferDesignRequest,
     TransferDesignResponse,
     ValidRangesResponse,
+    propagation_failure_details,
 )
 
 __all__ = ["Facade", "ToolInfo", "mcp_tools", "tool_inventory"]
@@ -680,7 +681,13 @@ class Facade:
             ) from exc
         except Exception as exc:
             status, cause, message = _exception_triplet(exc)
-            raise OrbitError("PROPAGATION_FAILED", message, status=status, cause=cause) from exc
+            raise OrbitError(
+                "PROPAGATION_FAILED",
+                message,
+                details=propagation_failure_details(message, status, cause),
+                status=status,
+                cause=cause,
+            ) from exc
 
     @mcp_exposed(request_model=SpacetimeTransformRequest)
     def spacetime_transform(self, **params) -> SpacetimeTransformResponse:

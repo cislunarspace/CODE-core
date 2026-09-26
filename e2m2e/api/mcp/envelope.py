@@ -17,9 +17,10 @@ import numpy as np
 from pydantic import BaseModel, ValidationError
 
 from e2m2e.data.types.orbit import Orbit
+from e2m2e.exceptions import PropagationFailure
 
 from ..catalog_ingest import finite_or_none
-from ..models import OrbitError
+from ..models import OrbitError, propagation_failure_details
 
 __all__ = [
     "Envelope",
@@ -146,6 +147,19 @@ def dispatch_tool(
             result = method(**arguments, **accepted)
     except OrbitError as exc:
         return None, error_envelope(exc.code, exc.message, exc.details)
+    except PropagationFailure as exc:
+        # 传播失败（含 Rust 侧 cause: 段）：诊断原样进 details，不压成
+        # INTERNAL_ERROR + 异常类型名（#677 验收：传输层翻译零丢失）。
+        diagnostic = getattr(exc, "message", None) or str(exc)
+        return None, error_envelope(
+            "PROPAGATION_FAILED",
+            diagnostic,
+            propagation_failure_details(
+                diagnostic,
+                getattr(exc, "status", None),
+                getattr(exc, "cause", None),
+            ),
+        )
     except ValidationError as exc:
         # exc.json() 走 Pydantic 自己的序列化，避免 details 里残留不可 JSON 化对象。
         return None, error_envelope(

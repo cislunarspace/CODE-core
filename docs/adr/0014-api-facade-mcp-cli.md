@@ -199,3 +199,47 @@ the caller's constructor-injected Config on long-running tools.
   serializes it).
 - `_finite_or_none` is public (`finite_or_none` in `api/catalog_ingest.py`);
   three consumers no longer import a private name across modules.
+
+## Amendment (2026-09-26): propagation cause carried into the error envelope (#677)
+
+### Context
+
+Issue #677 required propagation failures to hand their real cause to callers. The
+Rust fast path now emits classified `cause:` text (kernel not loaded / kernel
+coverage exhausted / ephemeris-cache window exceeded with et and window / cache
+key unregistered / strict region without cache / step collapse), but the transport
+lost it: `api/mcp/envelope.py::dispatch_tool` preserved `code/message/details`
+only for `OrbitError`, collapsing every other exception (including
+`PropagationFailure`) to `INTERNAL_ERROR` plus the exception type name. MCP / CLI /
+sidecar callers therefore saw no cause at all — the issue's remaining acceptance
+item.
+
+### Decision
+
+**Domain propagation failures keep their diagnosis in `error.details`.**
+`dispatch_tool` gains a `PropagationFailure` branch: the envelope reports code
+`PROPAGATION_FAILED` (the code the Facade already uses for this domain) with the
+diagnostic as `message` and a `details` payload `{"status", "cause",
+"diagnostic"}`. The Facade's `orbit_propagation` `PROPAGATION_FAILED` path fills
+the same payload through the shared `api.models.propagation_failure_details`, so
+the transport translation loses nothing. The diagnostic text is carried verbatim —
+never parsed, matched, or rewritten (ADR 0020: error text is not a translation
+input); the structured fields it already contains (cache window et/range) ride
+along inside it.
+
+**Failure semantics unchanged.** Out-of-coverage propagation still hard-fails;
+nothing is extrapolated, softened, or reclassified (ADR 0020). Generic
+non-domain exceptions keep the opaque `INTERNAL_ERROR` + type-name form — the
+diagnostic is exposed only for the propagation domain, so unrelated internals are
+not leaked.
+
+### Consequences
+
+- `PropagationFailure` (and the Facade propagation path) surface
+  `error.code = "PROPAGATION_FAILED"` with `error.details.diagnostic` carrying the
+  Rust `cause:` segment; MCP / CLI / sidecar consumers read it machine-side
+  instead of matching message text.
+- No new error code and no new Facade method: the contract change is the `details`
+  payload shape, which is additive (`details` was `{}` on this path).
+- Tests: `tests/api/test_execution.py` covers both the raw `PropagationFailure`
+  branch and the `orbit_propagation` real path.

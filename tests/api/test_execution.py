@@ -151,6 +151,65 @@ def test_invalid_params_yields_error_envelope(facade):
     assert frames == []
 
 
+def test_propagation_failure_carries_cause_in_details():
+    """#677 验收：传播失败的 cause 进信封 details（传输层翻译零丢失）。
+
+    ``PropagationFailure`` 不得落入 ``INTERNAL_ERROR`` + 异常类型名分支；
+    诊断文本（含星历缓存窗口 et/区间等定位字段）原样进入 ``details``。
+    """
+    from e2m2e.api.mcp import envelope
+    from e2m2e.exceptions import PropagationFailure
+
+    diagnostic = (
+        "propagation truncated: got 1 of 2 time points (t_span=(0.000, 1.000)); "
+        "cause: ephem cache query outside cached window (et 50.000, window [0.000, 10.000])"
+    )
+
+    class Boom:
+        request_model = None
+
+        def __call__(self, **kwargs):
+            raise PropagationFailure(diagnostic)
+
+    env = envelope.invoke_tool(Boom(), {})
+    assert env["status"] == "error"
+    assert env["error"]["code"] == "PROPAGATION_FAILED"
+    assert env["error"]["details"]["diagnostic"] == diagnostic
+    assert env["error"]["details"]["status"] == "failed"
+    assert env["error"]["details"]["cause"] == "unknown"
+    assert "ephem cache query outside cached window" in env["error"]["details"]["diagnostic"]
+
+
+def test_orbit_propagation_failure_details_carry_cause(facade, monkeypatch):
+    """#677 验收（真实调用链）：orbit_propagation 传播失败的 cause 进信封 details。"""
+    from e2m2e.exceptions import PropagationFailure
+
+    diagnostic = (
+        "propagation truncated: got 1 of 5 time points (t_span=(0.000, 3600.000)); "
+        "cause: SPICE ephemeris query failed (insufficient kernel coverage or missing data)"
+    )
+
+    def boom(**kwargs):
+        raise PropagationFailure(diagnostic)
+
+    monkeypatch.setattr("e2m2e.algorithm.propagation.propagate_orbit", boom)
+    env, frames = execution.execute_tool(
+        facade,
+        "orbit_propagation",
+        {
+            "initial_state": [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0],
+            "epoch": "2025-06-21T11:00:00",
+            "duration": 3600.0,
+        },
+    )
+    assert env["status"] == "error"
+    assert env["error"]["code"] == "PROPAGATION_FAILED"
+    assert env["error"]["details"]["diagnostic"] == diagnostic
+    assert "insufficient kernel coverage" in env["error"]["details"]["diagnostic"]
+    assert "Traceback" not in json.dumps(env)
+    assert frames == []
+
+
 def test_progress_callback_forwarded_only_when_accepted(facade):
     """回调按方法签名过滤：未声明 progress_callback 形参的工具不注入。"""
     seen: list[float] = []
