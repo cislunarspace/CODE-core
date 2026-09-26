@@ -1220,7 +1220,9 @@ fn srp_acceleration(
 /// NRLMSISE-00 大气密度与温度查询。
 ///
 /// 供 Python `NRLMSISE00Atmosphere.density` 调用（ADR 0030：数值只在 Rust）。
-/// `epoch_et` 经 `et2utc` 折算成年积日与 UTC 日内秒（需装载 leapsecond 内核）。
+/// `epoch_et` 优先经星历预采样缓存（`ephem_cache::lookup_utc_calendar`）折成年积日
+/// 与 UTC 日内秒，缓存未启用时回退 `et2utc`（需装载 leapsecond 内核）——因此在
+/// 打靶/分段积分的并行区（`StrictGuard`）内不触发 cspice。
 /// `ap` 长度必须为 7：平坦（7 个元素全等）时按静态空间天气处理，否则启用
 /// 3 小时分辨率的 Ap 史先验。
 ///

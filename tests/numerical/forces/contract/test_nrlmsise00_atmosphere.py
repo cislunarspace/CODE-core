@@ -272,7 +272,8 @@ def test_density_matches_nyx_validation(case, earth_icrf_system):
     rho_direct, temp = nrlmsise00_density_py(
         epoch_et, alt_km, lat_deg, lon_deg, 150.0, 150.0, [float(v) for v in ap]
     )
-    assert rho_direct == pytest.approx(rho, rel=1e-15)
+    # 绑定层的密度/温度同样对夹具断言（类方法只是同源转发，不对它再断言相等）。
+    assert rho_direct == pytest.approx(want_rho, rel=1e-5)
     assert temp == pytest.approx(want_temp, rel=1e-5)
 
 

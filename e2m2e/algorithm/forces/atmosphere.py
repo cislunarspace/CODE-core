@@ -163,9 +163,10 @@ class NRLMSISE00Atmosphere:
     异常氧贡献）。
 
     Note:
-        查询需要已装载 SPICE 内核：历元 → 年积日/UTC 的换算走 ``et2utc``，
-        依赖 leap second 内核（``spice_furnsh`` 装载 LSK）；内核池为空时抛出
-        明确错误，不静默回退。
+        查询需要已装载 SPICE 内核。历元 → 年积日/UTC 的换算优先走星历预采样
+        缓存（传播打靶/分段积分的并行区因此不跨 cspice，见 ADR 0016/0049）；缓存
+        未启用时回退 ``et2utc``，依赖 leap second 内核（``spice_furnsh`` 装载
+        LSK）。内核池为空时抛出明确错误，不静默回退。
 
     Note:
         与 GMAT/参考实现的对拍差异主要来自模型版本与输入映射：GMAT 的
