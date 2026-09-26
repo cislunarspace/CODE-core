@@ -41,10 +41,11 @@ pub enum DragAtmosphere {
     /// Ap 史（3 小时分辨率先验），两种口径都对应参考实现的 `gtd7d` 有效总质量密度。
     ///
     /// # 注意
-    /// 本分支每次求值都要把 `et` 折算成年积日/UT（`et2utc`），即**直接调用
-    /// cspice、不经星历预采样缓存**（与 ITRF93 帧旋转的 `lookup_frame_matrix`
-    /// 不同）。故阻力+NRLMSISE-00 的传播路径不满足"并行区零 cspice"的前提，
-    /// 不要放进 `StrictGuard` 作用域。
+    /// 本分支每次求值都要把 `et` 折算成年积日/UT。该换算优先查星历预采样缓存
+    /// （`ephem_cache::lookup_utc_calendar`），因此并行传播区（ADR 0016 的
+    /// `StrictGuard`：多重打靶 / 分段打靶 / 分段积分）内零 cspice、可安全使用；
+    /// 缓存未启用时回退 `et2utc`，strict 模式下该回退被拦为硬错误（
+    /// `CacheMissError::NotEnabled`）而非并发调 cspice。
     Nrlmsise00 {
         f107_daily: f64,
         f107_avg: f64,

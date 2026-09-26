@@ -95,8 +95,9 @@ NRLMSISE-00 走独立力元组 `("drag_nrlmsise00", area, mass, cd, frame, f107_
 由配置里的 `{"type": "NRLMSISE00Atmosphere", "params": {...}}` 触发。既有 drag
 golden 测试（Rust 单元测试与 Python 契约测试）未改动且全绿，即逐位证据。
 
-`epoch_et → (年积日, UT 秒)` 走 SPICE `et2utc`（依赖 leap second 内核），因此
-NRLMSISE-00 路径**需要已装载 SPICE 内核**；内核池为空时 `et2utc` 返回明确错误并
+`epoch_et → (年积日, UT 秒)` 的换算优先走星历预采样缓存（见决策 7），缓存未启用
+时回退 SPICE `et2utc`（依赖 leap second 内核）。因此 NRLMSISE-00 路径**需要已装载
+SPICE 内核**（至少含 LSK 与 ITRF93 帧内核）；内核池为空时 `et2utc` 返回明确错误并
 透传，不静默回退。
 
 ### 6. 大地坐标转换用 WGS84 + Bowring，独立成模块
@@ -106,6 +107,25 @@ WGS84 椭球（a = 6378.137 km、1/f = 298.257223563），Bowring (1985) 单步�
 近地空间（0–1000 km）往返残差 ≤ 1e-7 deg 与 ≤ 1e-4 km，远小于大气密度标高，
 对阻力流场无可见影响。
 
+### 7. ET→UTC 走星历预采样缓存，保住并行区零 cspice
+
+`EphemCache::build` 在原有天体/帧/`sxform` 采样之外，再按同一时间网格采样
+「UTC 自 2000-01-01T00:00:00Z 起的秒数」这条**连续单调**曲线；查询经
+`ephem_cache::lookup_utc_calendar(et)`，语义与既有的 `lookup_body_position` 一致：
+未启用缓存时 `Ok(None)`（调用方回退 `et2utc`，合法路径）、`StrictGuard` 下未启用即
+硬失败、启用后越界一律 `Err`。
+
+为什么必须进缓存：NRLMSISE-00 是仓库里第一个需要**日历量**的力模型，若每次求值直接
+调 `et2utc`，它就绕过了 ADR 0016 用 `StrictGuard` 建立的"并行区零 cspice"保证，而
+多重打靶 / 分段打靶 / 分段积分的并行段积分正是靠该保证避免并发 cspice 损坏内核池
+（`SPICE(DAFFRNOTFOUND)` 或 panic）；且 `design_orbit` 会把用户力模型原样传进这些
+入口，调用方无法自己规避。
+
+精度口径：缓存内 UTC 相对 ET 是斜率为 1 的分段线性函数，插值误差只来自 TDB−UTC
+周期项（< 2 ms）；仅当某采样区间内含闰秒跳变时误差可达 1 s（该秒被摊到整个采样
+区间）。1 s 的 UT 差对应日侧隆起 0.004°，对阻力无可见影响；插值是纯数值且确定性，
+满足打靶路径"串行与并行逐位一致"的要求。
+
 ## 影响
 
 - 大气密度能力面从"纯高度"扩为"历元 + 大地坐标 + 空间天气"，Python/Rust 接口同步；
@@ -114,9 +134,15 @@ WGS84 椭球（a = 6378.137 km、1/f = 298.257223563），Bowring (1985) 单步�
   形态变化（内部 API，非调用方契约）。
 - 与 GMAT 的对拍口径：GMAT 侧最近的大气模型是 `MSISE90`（MSISE-1990），与
   NRLMSISE-00 不是同一版本；且 GMAT 对空间天气做连续样条平滑，而本模型按其原始
-  标定使用离散 3 小时台阶。这两点是**模型口径差异**，不是实现缺陷——`scripts/generate_gmat_leo_script.py
-  --drag-model MSISE90` 与 `scripts/compare_with_gmat.py --atmosphere nrlmsise00`
-  用于生成对照脚本与记录本方输出，但两者不可期待亚米级一致。
+  标定使用离散 3 小时台阶。这两点是**模型口径差异**，不是实现缺陷。
+  `scripts/generate_gmat_leo_script.py --drag-model MSISE90` 与
+  `scripts/compare_with_gmat.py --atmosphere nrlmsise00` 用于生成对照脚本与记录
+  本方输出，两者不可期待亚米级一致。
+- 对拍工具两侧使用**同一组空间天气**：GMAT 脚本写入的 `AtmosphereModel.F107` /
+  `.MagneticIndex` 与 e2m2e 侧构造大气所用的值同源于
+  `generate_gmat_leo_script.DEFAULT_FORCEMODEL`（`compare_with_gmat.py` 直接 import
+  该常量，不再各写一份），且 Markdown 报告逐值回显两侧实际输入——否则"差异来源"
+  会把输入不齐误记成模型差异。
 - 未引入新的 Python 依赖；Rust 侧未新增 crate 依赖（系数表是常量数据）。
 
 ## 备选方案

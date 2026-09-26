@@ -134,47 +134,18 @@ pub fn local_solar_time_seconds(ut_seconds: f64, lon_deg: f64) -> f64 {
 
 /// ET → `(年, 年积日, UTC 日内秒)`。
 ///
-/// 经 `et2utc("ISOC", 3)` 取 UTC 日历时刻（毫秒分辨率足够：1 ms 对应的密度变化
-/// 远低于模型自身 15–20% 的不确定度），再折算年积日。内核池为空时由 `et2utc`
-/// 返回明确错误，此处直接透传。
+/// 先查星历预采样缓存（[`e2m2e_spice::ephem_cache::lookup_utc_calendar`]）：传播
+/// 打靶的并行区（ADR 0016 的 `StrictGuard`）内不走 cspice，改为查内存表插值。
+/// 缓存未启用时回退 `et2utc`("ISOC", 3)——毫秒分辨率足够：1 ms 对应的密度变化
+/// 远低于模型自身 15–20% 的不确定度。内核池为空时由 `et2utc` 返回明确错误，
+/// 此处直接透传。
 #[cfg(feature = "spice")]
 pub fn et_to_utc_doy(et: f64) -> Result<(i32, u16, f64), e2m2e_spice::spice_ffi::SpiceFfiError> {
-    let isoc = e2m2e_spice::spice_ffi::et2utc(et, 3)?;
-    let (year, month, day, ut_seconds) = parse_isoc(&isoc)?;
-    Ok((year, day_of_year(year, month, day), ut_seconds))
-}
-
-/// 解析 `et2utc("ISOC", 3)` 输出 `"YYYY-MM-DDTHH:MM:SS.sss"`。
-#[cfg(feature = "spice")]
-fn parse_isoc(isoc: &str) -> Result<(i32, u32, u32, f64), e2m2e_spice::spice_ffi::SpiceFfiError> {
-    use e2m2e_spice::spice_ffi::SpiceFfiError;
-
-    let bad = || SpiceFfiError::Failed(format!("et2utc 输出格式异常: {isoc:?}"));
-    let (date, time) = isoc.split_once('T').ok_or_else(bad)?;
-    let date: Vec<&str> = date.split('-').collect();
-    let time: Vec<&str> = time.split(':').collect();
-    if date.len() != 3 || time.len() != 3 {
-        return Err(bad());
+    if let Some(calendar) = e2m2e_spice::ephem_cache::lookup_utc_calendar(et)? {
+        return Ok(calendar);
     }
-    let year: i32 = date[0].parse().map_err(|_| bad())?;
-    let month: u32 = date[1].parse().map_err(|_| bad())?;
-    let day: u32 = date[2].parse().map_err(|_| bad())?;
-    let hour: f64 = time[0].parse().map_err(|_| bad())?;
-    let minute: f64 = time[1].parse().map_err(|_| bad())?;
-    let second: f64 = time[2].parse().map_err(|_| bad())?;
-    Ok((year, month, day, hour * 3600.0 + minute * 60.0 + second))
-}
-
-/// 公历年月日 → 年积日（1 基）。
-fn day_of_year(year: i32, month: u32, day: u32) -> u16 {
-    const CUM_DAYS: [u32; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-    let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-    let m = month.clamp(1, 12) as usize;
-    let mut doy = CUM_DAYS[m - 1] + day;
-    if leap && month > 2 {
-        doy += 1;
-    }
-    doy.min(366) as u16
+    let utc_seconds = e2m2e_spice::spice_ffi::et_to_utc_seconds(et)?;
+    Ok(e2m2e_spice::spice_ffi::utc_seconds_to_calendar(utc_seconds))
 }
 
 // ── 模型内部状态 ──────────────────────────────────────────────────────────
@@ -1394,32 +1365,5 @@ mod tests {
         assert_eq!(local_solar_time_seconds(0.0, -15.0), 86400.0 - 3600.0);
         assert_eq!(local_solar_time_seconds(86000.0, 0.0), 86000.0);
         assert_eq!(local_solar_time_seconds(86400.0 + 10.0, 0.0), 10.0);
-    }
-
-    /// 年积日换算覆盖闰年 2 月之后。
-    #[test]
-    fn day_of_year_handles_leap_years() {
-        assert_eq!(day_of_year(2000, 1, 1), 1);
-        assert_eq!(day_of_year(2000, 3, 1), 61); // 闰年
-        assert_eq!(day_of_year(2001, 3, 1), 60); // 平年
-        assert_eq!(day_of_year(2000, 12, 31), 366);
-        assert_eq!(day_of_year(2001, 12, 31), 365);
-    }
-
-    #[cfg(feature = "spice")]
-    #[test]
-    fn parse_isoc_round_trip() {
-        let (y, m, d, s) = parse_isoc("2000-01-01T06:00:00.000").expect("解析");
-        assert_eq!((y, m, d), (2000, 1, 1));
-        assert_eq!(s, 21600.0);
-        assert_eq!(day_of_year(y, m, d), 1);
-
-        let (y, m, d, s) = parse_isoc("2024-12-31T23:59:59.500").expect("解析");
-        assert_eq!((y, m, d), (2024, 12, 31));
-        assert!((s - 86399.5).abs() < 1e-9);
-        assert_eq!(day_of_year(y, m, d), 366);
-
-        assert!(parse_isoc("2000-01-01").is_err());
-        assert!(parse_isoc("garbage").is_err());
     }
 }

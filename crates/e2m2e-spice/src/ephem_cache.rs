@@ -233,11 +233,54 @@ struct SxformSpline {
     comps: [CubicSpline; 36],
 }
 
+/// ET → UTC 日历量的预采样表。
+///
+/// 与星历共用同一时间网格（[`EphemCache::build`] 的 `t_grid`），存的是
+/// 「UTC 自 2000-01-01T00:00:00Z 起的秒数」这条**连续单调**曲线；查询时在相邻
+/// 采样点间线性插值。若改存 (年积日, 日内秒)，年/日边界会回绕而无法插值。
+///
+/// 精度：区间内 UTC 相对 ET 是斜率为 1 的分段线性函数，插值误差只来自
+/// TDB−UTC 周期项（< 2 ms）；仅当某区间内含闰秒跳变时误差可达 1 s（该秒被摊到
+/// 整个采样区间）。对阻力应用无可见影响（1 s 的 UT 差对应日侧隆起 0.004°），
+/// 且插值是纯数值、确定性——串行与并行逐位一致。
+struct UtcTable {
+    et: Vec<f64>,
+    utc_seconds: Vec<f64>,
+}
+
+impl UtcTable {
+    /// 由同一时间网格的 UTC 秒采样构造。
+    fn new(et: Vec<f64>, utc_seconds: Vec<f64>) -> Self {
+        debug_assert_eq!(et.len(), utc_seconds.len());
+        Self { et, utc_seconds }
+    }
+
+    /// 查 `(年, 年积日, 日内秒)`；越出覆盖区间返回 `None`。
+    fn calendar_at(&self, et: f64) -> Option<(i32, u16, f64)> {
+        let n = self.et.len();
+        if n == 0 || et < self.et[0] || et > self.et[n - 1] {
+            return None;
+        }
+        let i0 = self.et.partition_point(|&t| t <= et).saturating_sub(1);
+        let i1 = (i0 + 1).min(n - 1);
+        let utc_seconds = if i1 == i0 {
+            self.utc_seconds[i0]
+        } else {
+            let frac = (et - self.et[i0]) / (self.et[i1] - self.et[i0]);
+            self.utc_seconds[i0] + frac * (self.utc_seconds[i1] - self.utc_seconds[i0])
+        };
+        Some(crate::spice_ffi::utc_seconds_to_calendar(utc_seconds))
+    }
+}
+
 /// 星历预采样缓存。
 pub struct EphemCache {
     bodies: HashMap<(String, String), BodySpline>,
     frames: HashMap<(String, String), FrameSpline>,
     sxforms: HashMap<(String, String), SxformSpline>,
+    /// ET → UTC 日历量（[`EphemCache::build`] 采样；[`EphemCache::from_raw_grids`]
+    /// 构造的缓存无此项）。
+    utc: Option<UtcTable>,
     et_start: f64,
     et_end: f64,
 }
@@ -320,7 +363,18 @@ impl EphemCache {
             sx_grids.push(((from.clone(), to.clone()), mats));
         }
 
-        Self::from_raw_grids(&t_grid, &body_grids, &frame_grids, &sx_grids)
+        // ── 采集 ET→UTC 原始网格 ──
+        // 供需要日历量的力模型（NRLMSISE-00）在并行传播区零 cspice 取值：
+        // 采样在 enable 时单线程完成，热循环只查内存表（ADR 0016 的并行区
+        // 零 cspice 保证因此对这类力模型同样成立）。
+        let mut utc_seconds = Vec::with_capacity(n);
+        for &et in &t_grid {
+            utc_seconds.push(crate::spice_ffi::et_to_utc_seconds(et)?);
+        }
+
+        let mut cache = Self::from_raw_grids(&t_grid, &body_grids, &frame_grids, &sx_grids)?;
+        cache.utc = Some(UtcTable::new(t_grid, utc_seconds));
+        Ok(cache)
     }
 
     /// 由预采样原始网格直接构造缓存，不经 cspice / 内核。
@@ -436,6 +490,7 @@ impl EphemCache {
             bodies: body_map,
             frames: frame_map,
             sxforms: sxform_map,
+            utc: None,
             et_start: t_grid[0],
             et_end: t_grid[n - 1],
         })
@@ -593,6 +648,34 @@ fn normalize_body_name(name: &str) -> &str {
     name
 }
 
+/// strict-aware 查 ET → UTC 日历量 `(年, 年积日, 日内秒)`。
+///
+/// 语义同 [`lookup_body_position`]：缓存未启用时 `Ok(None)`（调用方回退 cspice，
+/// 合法路径）；strict 模式下未启用即 `Err`；缓存已启用后越界一律 `Err`。
+/// 需要日历量的力模型（NRLMSISE-00）靠这条路径在并行传播区零 cspice。
+pub fn lookup_utc_calendar(et: f64) -> Result<Option<(i32, u16, f64)>, CacheMissError> {
+    let g = CACHE.read().expect("ephem cache rwlock poisoned");
+    let Some(cache) = g.as_ref() else {
+        return if strict() {
+            Err(CacheMissError::NotEnabled)
+        } else {
+            Ok(None)
+        };
+    };
+    // `from_raw_grids` 构造的缓存（无 cspice 采样的测试/外部星历源）没有该项。
+    let Some(utc) = cache.utc.as_ref() else {
+        return Err(CacheMissError::KeyMiss("utc calendar".into()));
+    };
+    if let Some(calendar) = utc.calendar_at(et) {
+        return Ok(Some(calendar));
+    }
+    Err(CacheMissError::OutOfRange {
+        et,
+        start: cache.et_start,
+        end: cache.et_end,
+    })
+}
+
 /// 查天体位置。缓存未启用（``enable_ephem_cache`` 未调用）时返回 `Ok(None)`
 /// （调用方回退 cspice，合法路径）；**启用后** miss（区间外 / 目标不在预采样
 /// 列表）一律返回 `Err`（ADR 0020 决策 4：enable 是用户要求缓存的信号，
@@ -745,6 +828,81 @@ pub fn lookup_body_acceleration(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 跨年边界的插值不得回绕：存 (年积日, 日内秒) 会在年界出错，存连续 UTC 秒则正确。
+    #[test]
+    fn utc_table_interpolates_across_year_boundary() {
+        // 2000-12-29 .. 2001-01-03（2000 为闰年，doy 366 = 12-31）。
+        let et: Vec<f64> = (362..368).map(|i| f64::from(i) * 86400.0).collect();
+        let table = UtcTable::new(et.clone(), et.clone());
+
+        // 节点：+364 天是 2000 年 doy 365，+365 天是 doy 366（12-31），
+        // +366 天进入 2001 年 doy 1。
+        assert_eq!(table.calendar_at(364.0 * 86400.0), Some((2000, 365, 0.0)));
+        assert_eq!(table.calendar_at(365.0 * 86400.0), Some((2000, 366, 0.0)));
+        assert_eq!(table.calendar_at(366.0 * 86400.0), Some((2001, 1, 0.0)));
+        // 年界中点：插值出 2000-12-31T12:00，而非把年积日当连续量回绕。
+        assert_eq!(
+            table.calendar_at(365.5 * 86400.0),
+            Some((2000, 366, 43200.0))
+        );
+        // 覆盖区间外返回 None。
+        assert!(table.calendar_at(361.0 * 86400.0).is_none());
+        assert!(table.calendar_at(368.0 * 86400.0).is_none());
+    }
+
+    /// UTC 秒原点在 2000-01-01T00:00:00Z：3×86400 落在第 4 天（年积日 4）。
+    #[test]
+    fn utc_table_maps_days_to_day_of_year() {
+        let et: Vec<f64> = (0..5).map(|i| i as f64 * 86400.0).collect();
+        let table = UtcTable::new(et.clone(), et);
+        let (y, doy, s) = table.calendar_at(3.0 * 86400.0).unwrap();
+        assert_eq!((y, doy, s), (2000, 4, 0.0));
+    }
+
+    /// `lookup_utc_calendar` 的三态语义：未启用（strict / 非 strict）、无 UTC 表、
+    /// 越界。ADR 0016 的并行区零 cspice 就靠"strict 下未启用即硬失败"这一条。
+    ///
+    /// 本用例读写进程级缓存，故把三种情形合并为一个用例，并依赖同模块其余用例
+    /// 都是纯数值（不碰全局）。
+    #[test]
+    fn lookup_utc_calendar_semantics() {
+        disable();
+        // 未启用 + 非 strict：Ok(None) —— 调用方回退 cspice（合法路径）。
+        assert_eq!(lookup_utc_calendar(0.0).unwrap(), None);
+        {
+            // 未启用 + strict：硬失败，杜绝并行区静默回退 cspice。
+            let _strict = StrictGuard::new();
+            assert!(matches!(
+                lookup_utc_calendar(0.0),
+                Err(CacheMissError::NotEnabled)
+            ));
+        }
+        assert_eq!(lookup_utc_calendar(0.0).unwrap(), None);
+
+        // 由原始网格构造（无 cspice 采样）的缓存没有 UTC 表。
+        let t_grid: Vec<f64> = (0..4).map(|i| i as f64 * 10.0).collect();
+        let cache = EphemCache::from_raw_grids(&t_grid, &[], &[], &[]).expect("构造缓存");
+        enable(cache);
+        assert!(matches!(
+            lookup_utc_calendar(5.0),
+            Err(CacheMissError::KeyMiss(_))
+        ));
+
+        // 带 UTC 表：区间内按秒查得日历量，区间外 OutOfRange。
+        let mut cache = EphemCache::from_raw_grids(&t_grid, &[], &[], &[]).expect("构造缓存");
+        cache.utc = Some(UtcTable::new(
+            t_grid,
+            (0..4).map(|i| i as f64 * 10.0).collect(),
+        ));
+        enable(cache);
+        assert_eq!(lookup_utc_calendar(15.0).unwrap(), Some((2000, 1, 15.0)));
+        assert!(matches!(
+            lookup_utc_calendar(100.0),
+            Err(CacheMissError::OutOfRange { .. })
+        ));
+        disable();
+    }
 
     #[test]
     fn test_cubic_spline_reproduces_samples() {

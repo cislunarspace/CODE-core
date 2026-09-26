@@ -33,6 +33,54 @@ def _semi_major_axis(state):
     return -EARTH_MU / (2.0 * (0.5 * v_norm**2 - EARTH_MU / r_norm))
 
 
+def test_nrlmsise00_drag_zero_cspice_with_ephem_cache(earth_icrf_system):
+    """启用星历预采样缓存后，NRLMSISE-00 阻力传播全程零 cspice FFI。
+
+    打靶/分段积分的并行区（ADR 0016 的 ``StrictGuard``）内并发调 cspice 会损坏
+    内核池（``SPICE(DAFFRNOTFOUND)`` 或 panic），故历元→日历量必须走缓存插值而
+    非逐次 ``et2utc``；用 FFI 计数钉住该保证，防止回退。
+    """
+    from e2m2e.integrators import (
+        disable_ephem_cache,
+        enable_ephem_cache,
+        ephem_ffi_call_count,
+        reset_ephem_ffi_call_count,
+    )
+
+    system = earth_icrf_system
+    spice = system.spice
+    et0 = spice.utc_to_et("2025-06-21T11:00:06")
+
+    # 只注册阻力需要的 ITRF93→J2000 帧对：天体列表为空（点质量引力无星历需求）。
+    enable_ephem_cache(
+        targets=[],
+        frame_pairs=[("ITRF93", "J2000")],
+        et_start=et0 - 1800.0,
+        et_end=et0 + 5400.0,
+        dt=3600.0,
+    )
+    try:
+        y0 = _leo_400km_state()
+        fm = ForceModel(
+            system,
+            forces=[
+                PointMassGravity("EARTH", mu=EARTH_MU),
+                DragModel(atmosphere=NRLMSISE00Atmosphere(), area=10.0, mass=1000.0, cd=2.2),
+            ],
+        )
+        fm.rtol = 1e-10
+        fm.atol = 1e-10
+        reset_ephem_ffi_call_count()
+        states = fm.propagate(y0, (et0, et0 + 3600.0), max_steps=200_000)["states"]
+        ffi_calls = ephem_ffi_call_count()
+    finally:
+        disable_ephem_cache()
+
+    assert np.all(np.isfinite(states))
+    assert _semi_major_axis(states[-1]) < _semi_major_axis(states[0])
+    assert ffi_calls == 0, f"NRLMSISE-00 阻力在缓存启用后不应调 cspice，实测 {ffi_calls} 次"
+
+
 def test_drag_propagation_decreases_orbital_energy(earth_icrf_system):
     """Rust 传播的 drag 使 LEO 轨道能量与半长轴下降。"""
     system = earth_icrf_system

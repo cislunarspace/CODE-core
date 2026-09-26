@@ -14,6 +14,10 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+# 空间天气输入的单一来源：GMAT 脚本由 generate_gmat_leo_script.py 生成，这里
+# 读同一组默认值构造 e2m2e 侧大气，避免两侧对拍不同配置（ADR 0049）。
+from generate_gmat_leo_script import DEFAULT_FORCEMODEL
+
 
 def _keplerian_to_cartesian(
     a: float,
@@ -181,11 +185,24 @@ def _propagate_e2m2e(
 
         fm = ForceModel(system)
         fm.add_force(GravityField("EARTH", degree=degree, order=order), name="gravity")
+        space_weather = "n/a（已关闭阻力）"
         if include_drag:
             if atmosphere == "nrlmsise00":
-                drag_atmosphere = NRLMSISE00Atmosphere()
+                # 与生成脚本的 MSISE90 分支同源：F10.7 与 Ap 都取
+                # DEFAULT_FORCEMODEL 的默认值（脚本会把它写进
+                # AtmosphereModel.F107 / .MagneticIndex）。
+                drag_atmosphere = NRLMSISE00Atmosphere(
+                    f107_daily=DEFAULT_FORCEMODEL["f107"],
+                    f107_avg=DEFAULT_FORCEMODEL["f107"],
+                    ap=DEFAULT_FORCEMODEL["ap"],
+                )
+                space_weather = (
+                    f"f107_daily=f107_avg={drag_atmosphere.f107_daily:g} sfu、"
+                    f"ap={drag_atmosphere.ap[0]:g}"
+                )
             elif atmosphere == "exponential":
                 drag_atmosphere = ExponentialAtmosphere()
+                space_weather = f"f107={drag_atmosphere.f107:g} sfu、ap={drag_atmosphere.ap:g}"
             else:
                 raise ValueError(
                     f"unknown atmosphere {atmosphere!r}; known: 'exponential', 'nrlmsise00'"
@@ -222,6 +239,7 @@ def _propagate_e2m2e(
             "states": result["states"],
             "system": system,
             "spice": spice,
+            "space_weather": space_weather,
         }
     finally:
         for bpc in reversed(bpc_loaded):
@@ -321,6 +339,7 @@ def _write_report(
     figure_paths: list[Path],
     output_dir: Path,
     atmosphere: str = "exponential",
+    space_weather_e2m2e: str = "n/a",
 ) -> Path:
     """写 Markdown 报告。"""
     report_path = output_dir / "comparison_report.md"
@@ -344,6 +363,13 @@ def _write_report(
     lines.append("- 历元：2025-06-21T11:00:06 UTC")
     lines.append("- 坐标系：EarthICRF")
     lines.append(f"- 力模型：J2(10,10) + {atmosphere} 阻力 + SRP（无阴影）")
+    lines.append(f"- 空间天气（e2m2e 侧）：{space_weather_e2m2e}")
+    lines.append(
+        f"- 空间天气（GMAT 脚本侧）：f107={DEFAULT_FORCEMODEL['f107']:g} sfu、"
+        f"Ap={DEFAULT_FORCEMODEL['ap']:g}（`generate_gmat_leo_script.py` 写入 "
+        "`AtmosphereModel.F107` / `.MagneticIndex`；Exponential 分支这两行被注释，"
+        "GMAT 用其内置默认）"
+    )
     lines.append("- 积分器：RK89，MaxStep=60 s，Accuracy=1e-13")
     lines.append("")
     lines.append("## 图表")
@@ -376,6 +402,7 @@ def _print_e2m2e_summary(data: dict[str, Any], atmosphere: str) -> None:
 
     a0, a1 = sma(states[0]), sma(states[-1])
     print(f"  atmosphere    : {atmosphere}")
+    print(f"  space weather : {data.get('space_weather', 'n/a')}")
     print(f"  arc           : {(time[-1] - time[0]) / 3600.0:.3f} h, {states.shape[0]} samples")
     print(f"  SMA initial   : {a0:.6f} km")
     print(f"  SMA final     : {a1:.6f} km")
@@ -469,7 +496,13 @@ def main() -> None:
     figures = _plot_errors(errors, output_dir)
 
     print("Writing report...")
-    report_path = _write_report(errors, figures, output_dir, atmosphere=args.atmosphere)
+    report_path = _write_report(
+        errors,
+        figures,
+        output_dir,
+        atmosphere=args.atmosphere,
+        space_weather_e2m2e=e2m2e_data.get("space_weather", "n/a"),
+    )
 
     print(f"Done. Report: {report_path}")
     print(f"Max position error: {float(np.max(errors['position_error_km'])) * 1000.0:.3f} m")
