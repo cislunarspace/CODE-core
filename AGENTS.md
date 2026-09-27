@@ -104,6 +104,7 @@ make clean-tests
 - 物理常量只改 `e2m2e/data/constants/constants.toml`，让 Python loader 和 Rust build script 同步生成；动力学基准使用研究级容差，筛选和测试使用筛选级容差，不把长弧/密网格塞入默认 pytest。
 - 新增工具的顺序是：算法实现 → `Facade`/`Catalog`/`Spatiography` 方法加 `@mcp_exposed(request_model=...)` → 检查 `tool_inventory()` 派生面 → 补接口行为测试。不要在 MCP、CLI、sidecar 中复制业务逻辑。
 - 注释、docstring、commit、Issue、PR 和 Agent brief 用中文；面向调用方的行为变化更新 `CHANGELOG.md`。ADR 是决策快照，后续变化追加修订或新开递增 ADR，不改写历史结论。
+- 文档（README、NOTICE、CHANGELOG、CONTEXT、ADR、`docs/` 下所有页面，以及代码内中文注释与 docstring）不得使用直角引号「」，引用词语统一用弯引号 ""。历史 ADR 不回改。
 
 ## Important Files
 
