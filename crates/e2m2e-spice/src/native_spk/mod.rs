@@ -111,6 +111,30 @@ pub fn is_loaded(path: &Path) -> bool {
     store().iter().any(|k| k.path == path)
 }
 
+/// 已登记 DAF 文件总数（ktotal "ALL" 的 DAF 部分）。
+pub fn daf_file_count() -> usize {
+    store().len()
+}
+
+/// (含 ≥1 个 SPK 段的 DAF 文件数, 含 ≥1 个 BPC 段的 DAF 文件数)
+/// （ktotal "SPK"/"PCK" 语义：SPK 段 `center: Some`，BPC 段 `center: None`）。
+pub fn daf_file_segment_counts() -> (usize, usize) {
+    let store = store();
+    let mut spk = 0usize;
+    let mut pck = 0usize;
+    for k in store.iter() {
+        let has_spk = k.file.segments.iter().any(|s| s.center.is_some());
+        let has_pck = k.file.segments.iter().any(|s| s.center.is_none());
+        if has_spk {
+            spk += 1;
+        }
+        if has_pck {
+            pck += 1;
+        }
+    }
+    (spk, pck)
+}
+
 /// 全部已注册段的只读快照（测试与对拍用）。
 pub fn segments() -> Vec<(PathBuf, daf::DafSegment)> {
     store()
@@ -121,6 +145,21 @@ pub fn segments() -> Vec<(PathBuf, daf::DafSegment)> {
                 .iter()
                 .cloned()
                 .map(move |s| (k.path.clone(), s))
+        })
+        .collect()
+}
+
+/// 全部已注册段的只读快照，携带所属文件字节（供 `native_frame` 的 PCK
+/// 类帧选段用：tisbod/pckmat 语义需要字节求值 BPC 段）。与 [`segments`]
+/// 同一快照语义：读锁下克隆 `Arc`，随即释放，求值不持锁。
+pub fn bpc_segments() -> Vec<(Arc<Vec<u8>>, daf::DafSegment)> {
+    store()
+        .iter()
+        .flat_map(|k| {
+            k.file.segments.iter().cloned().map({
+                let bytes = Arc::clone(&k.bytes);
+                move |s| (Arc::clone(&bytes), s)
+            })
         })
         .collect()
 }

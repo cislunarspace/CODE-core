@@ -1,11 +1,14 @@
-//! cspice-sys 直接 FFI 的 safe 包装（仅 `spice` feature 下编译）。
+//! cspice-sys FFI 的 safe 包装（仅 `spice` feature 下编译）。
 //!
-//! cspice 0.1 高层 API 只覆盖 spk/data/time 等基础功能，缺 pxform/sxform
-//! 等坐标变换查询。本模块直接通过 cspice-sys 的 unsafe FFI 调用这些函数，
-//! 提供 safe Rust 接口。星历几何查询（spkezr）自 ADR 0051 起改走纯 Rust
-//! 后端，不再跨 FFI。
+//! 自 ADR 0051/#685 Phase A 起，星历几何查询（spkezr）走纯 Rust 后端
+//! （`native_spk`），不跨 FFI；自 ADR 0052/#685 Phase B 起，
+//! `pxform`/`sxform`（BPC Type 2 帧旋转 + FK 帧图 + 文本 PCK）与
+//! `et2utc`（LSK 时间）也改走纯 Rust 后端（`native_frame`/
+//! `native_time`），`ktotal` 改为 native 登记计数。生产入口零 FFI；
+//! 原 FFI 包装保留在 [`ffi_oracle`]（`#[doc(hidden)]`），仅供对拍测试
+//! 当 oracle（先例：`daf::parse_with`）。
 //!
-//! # CSPICE 错误处理
+//! # CSPICE 错误处理（oracle 与残余 FFI 面）
 //!
 //! CSPICE C 库的错误模型是"set failure flag + 长跳"——出错时设置 `failed_c()`
 //! 返回 true，后续调用都短路返回。`reset_c()` 清除错误状态。
@@ -22,8 +25,7 @@
 #[cfg(test)]
 use cspice_sys::bodn2c_c;
 use cspice_sys::{
-    boddef_c, erract_c, errdev_c, et2utc_c, failed_c, getmsg_c, ktotal_c, pxform_c, qcktrc_c,
-    reset_c, sxform_c, ConstSpiceChar, SpiceInt,
+    boddef_c, erract_c, errdev_c, failed_c, getmsg_c, qcktrc_c, reset_c, ConstSpiceChar, SpiceInt,
 };
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -31,12 +33,16 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 /// cspice FFI 调用计数。验证"零 cspice"用：打靶前后读该计数，应为 0
 /// （前提：星历预采样缓存已启用 + strict 模式，力模型查内存样条）。
+///
+/// 自 ADR 0052 起 pxform/sxform/et2utc/ktotal 生产入口不再跨 FFI，
+/// 该计数在生产路径恒为 0；oracle（[`ffi_oracle`]）不入计数——
+/// 计数语义只剩「生产面旁路诊断」。
 pub static FFI_CALLS: AtomicU64 = AtomicU64::new(0);
 
-/// 返回累计 cspice FFI 调用次数（pxform/sxform/et2utc 入口）。
+/// 返回累计 cspice FFI 调用次数。
 ///
-/// ADR 0051 后 spkezr 走纯 Rust 后端、不再计数，故「零 cspice」断言比此前
-/// 更容易成立（断言方向不受影响）。
+/// ADR 0051 后 spkezr、ADR 0052 后 pxform/sxform/et2utc/ktotal 均走纯
+/// Rust 后端、不再计数，生产路径恒 0（「零 cspice」断言方向不受影响）。
 pub fn ffi_call_count() -> u64 {
     FFI_CALLS.load(Ordering::Relaxed)
 }
@@ -44,10 +50,6 @@ pub fn ffi_call_count() -> u64 {
 /// 清零 cspice FFI 调用计数。
 pub fn reset_ffi_call_count() {
     FFI_CALLS.store(0, Ordering::Relaxed);
-}
-
-fn bump_ffi_calls() {
-    FFI_CALLS.fetch_add(1, Ordering::Relaxed);
 }
 
 /// 取 CSPICE 指定类别消息（调用前后状态不限）。`option` 为 "SHORT"/"LONG"/
@@ -258,68 +260,80 @@ pub(crate) fn name_to_id(name: &str) -> Option<SpiceInt> {
     upper.parse::<SpiceInt>().ok()
 }
 
-/// ktotal_c 包装：返回当前已加载的指定类型内核数。`kind` 通常为 "ALL"。
+/// 当前已加载内核的 native 计数（`ktotal_c` 语义的纯 Rust 版）。
 ///
-/// 供 pxform/et2utc 入口预检 CSPICE 内核池是否为空（见 ADR 0020：用状态查询
-/// 预检，不用 CSPICE 错误码字符串匹配翻译）。spkezr 的预检自 ADR 0051 起改判
-/// native 注册表（见 `spkezr`）。
+/// 自 ADR 0052 起不再跨 FFI：`"ALL"` = native 登记的文件总数（DAF + 文本
+/// 池 + LSK）；`"SPK"` = 含 ≥1 个 SPK 段（`center: Some`）的 DAF 文件数；
+/// `"PCK"` = 含 ≥1 个 BPC 段的 DAF 文件数；`"FK"`/`"LSK"`/`"TEXT"` =
+/// 对应文本池计数（TEXT = FK + 文本 PCK + LSK）。其他 kind → `Err`
+/// （`NATIVE_KTOTAL_UNSUPPORTED_KIND`）。生产唯一调用点
+/// `nbody_stm.rs::spk_kernels_loaded` 用 `"SPK"`，语义保持。
 pub fn ktotal(kind: &str) -> Result<i32, SpiceFfiError> {
-    let kind_c = to_cstring(kind);
-    let mut count: SpiceInt = 0;
-    unsafe {
-        ktotal_c(kind_c.as_ptr() as *mut ConstSpiceChar, &mut count);
-        check_spice_error()?;
-    }
-    Ok(count as i32)
+    let count = match kind.to_ascii_uppercase().as_str() {
+        "ALL" => {
+            (crate::native_spk::daf_file_count()
+                + crate::native_frame::fk_count()
+                + crate::native_frame::tpck_count()
+                + crate::native_time::count()) as i32
+        }
+        "SPK" => {
+            let (spk, _) = crate::native_spk::daf_file_segment_counts();
+            spk as i32
+        }
+        "PCK" => {
+            let (_, pck) = crate::native_spk::daf_file_segment_counts();
+            pck as i32
+        }
+        "FK" => crate::native_frame::fk_count() as i32,
+        "LSK" => crate::native_time::count() as i32,
+        "TEXT" => {
+            (crate::native_frame::fk_count()
+                + crate::native_frame::tpck_count()
+                + crate::native_time::count()) as i32
+        }
+        other => {
+            return Err(SpiceFfiError::Failed(format!(
+                "NATIVE_KTOTAL_UNSUPPORTED_KIND: ktotal 类别 {other:?} 不受支持（仅 ALL/SPK/PCK/FK/LSK/TEXT）"
+            )));
+        }
+    };
+    Ok(count)
 }
 
-/// 无内核可用时的项目语境错误信息。pxform/et2utc 判 CSPICE 内核池为空、
-/// spkezr 判 native 注册表为空（文本内核不产生 native 段）时复用。
+/// 无内核可用时的项目语境错误信息。pxform 判「native 三池全空」、
+/// et2utc 判 LSK 池空、spkezr 判 native 注册表空时复用。
 const NO_KERNEL_MSG: &str = "Rust CSPICE 实例无内核加载——请经 SPICEManager.load_kernel 加载";
 
-/// pxform_c 包装：返回 from→to 在 et 时刻的 3×3 旋转矩阵（行优先）。
+/// `from → to` 在 `et` 时刻的 3×3 旋转矩阵（行主序）。
 ///
-/// 等价于 Python spiceypy.pxform(from, to, et)。
+/// 等价于 Python spiceypy.pxform(from, to, et)。自 ADR 0052/#685 Phase B
+/// 起走纯 Rust 后端 [`crate::native_frame::pxform`]（BPC Type 2 + FK 帧
+/// 图 + 文本 PCK + 内置帧），与 CSPICE 逐位一致；内核须经理
+/// [`crate::furnish_kernel`] 登记（native 注册表 / 文本池）。
 pub fn pxform(from: &str, to: &str, et: f64) -> Result<[[f64; 3]; 3], SpiceFfiError> {
-    // 入口预检：内核池为空时直接报项目语境错误，不走 FFI（避免 CSPICE 内部
-    // 错误码上冒或 erract 兜底杀进程）。
-    if ktotal("ALL")? == 0 {
+    // 入口预检：三池全空说明没有任何内核经 furnish_kernel 登记，直接报
+    // 项目语境错误（仅装 LSK 也能查 J2000↔ECLIPJ2000 的现行行为保持）。
+    if crate::native_spk::is_empty()
+        && crate::native_frame::pools_empty()
+        && crate::native_time::is_empty()
+    {
         return Err(SpiceFfiError::Failed(NO_KERNEL_MSG.into()));
     }
-    bump_ffi_calls();
-    let from_c = to_cstring(from);
-    let to_c = to_cstring(to);
-    let mut rotate = [[0.0_f64; 3]; 3];
-    unsafe {
-        pxform_c(
-            from_c.as_ptr() as *mut ConstSpiceChar,
-            to_c.as_ptr() as *mut ConstSpiceChar,
-            et,
-            rotate.as_mut_ptr(),
-        );
-        check_spice_error()?;
-    }
-    Ok(rotate)
+    crate::native_frame::pxform(from, to, et).map_err(|e| SpiceFfiError::Failed(e.to_string()))
 }
 
-/// sxform_c 包装：返回 from→to 在 et 时刻的 6×6 状态变换矩阵。
+/// `from → to` 在 `et` 时刻的 6×6 状态变换矩阵（行主序）。
 ///
-/// 等价于 Python spiceypy.sxform(from, to, et)。返回 6×6 行优先矩阵。
+/// 等价于 Python spiceypy.sxform(from, to, et)。自 ADR 0052 起走纯 Rust
+/// 后端 [`crate::native_frame::sxform`]（组合语义照搬 frmchg.c）。
 pub fn sxform(from: &str, to: &str, et: f64) -> Result<[[f64; 6]; 6], SpiceFfiError> {
-    bump_ffi_calls();
-    let from_c = to_cstring(from);
-    let to_c = to_cstring(to);
-    let mut xform = [[0.0_f64; 6]; 6];
-    unsafe {
-        sxform_c(
-            from_c.as_ptr() as *mut ConstSpiceChar,
-            to_c.as_ptr() as *mut ConstSpiceChar,
-            et,
-            xform.as_mut_ptr(),
-        );
-        check_spice_error()?;
+    if crate::native_spk::is_empty()
+        && crate::native_frame::pools_empty()
+        && crate::native_time::is_empty()
+    {
+        return Err(SpiceFfiError::Failed(NO_KERNEL_MSG.into()));
     }
-    Ok(xform)
+    crate::native_frame::sxform(from, to, et).map_err(|e| SpiceFfiError::Failed(e.to_string()))
 }
 
 /// spkezr 包装：返回 target 相对 observer 在 frame 系下的状态 [x,y,z,vx,vy,vz] + 光时 lt。
@@ -368,33 +382,24 @@ pub fn spkezr(
     Ok((state, 0.0))
 }
 
-/// et2utc_c 包装：ET → UTC ISO 字符串（"ISOC" 格式，prec 位小数秒）。
+/// ET → UTC ISO 字符串（"ISOC" 格式，prec 位小数秒）。
 ///
 /// 等价于 Python spiceypy.et2utc(et, "ISOC", prec)。供批量 ET→UTC 转换
-/// （星历表组装）下沉 Rust 用。
+/// （星历表组装）下沉 Rust 用。自 ADR 0052 起走纯 Rust 后端
+/// [`crate::native_time::et2utc_isoc`]（deltet/tunitim/ttrans 语义移植）；
+/// 只支持 ISOC（仓库两个调用点均为 ISOC），`prec` ∈ 0..=9。
 pub fn et2utc(et: f64, prec: i32) -> Result<String, SpiceFfiError> {
-    // 入口预检同 spkezr：内核池为空（leapsecond 缺失）时直接报项目语境错误。
-    if ktotal("ALL")? == 0 {
+    // 入口预检同 spkezr：LSK 池空（leapsecond 缺失）时直接报项目语境错误。
+    if crate::native_time::is_empty() {
         return Err(SpiceFfiError::Failed(NO_KERNEL_MSG.into()));
     }
-    bump_ffi_calls();
-    let fmt_c = to_cstring("ISOC");
-    let mut buf = vec![0i8; 64];
-    unsafe {
-        et2utc_c(
-            et,
-            fmt_c.as_ptr() as *mut ConstSpiceChar,
-            prec as SpiceInt,
-            buf.len() as SpiceInt,
-            buf.as_mut_ptr() as *mut c_char,
-        );
-        check_spice_error()?;
-    }
-    Ok(c_chars_to_string(&buf))
+    crate::native_time::et2utc_isoc(et, prec).map_err(|e| SpiceFfiError::Failed(e.to_string()))
 }
 
 /// 民用日期 → 1970-01-01 起的天数（Howard Hinnant 算法，含负数年/日）。
-fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
+/// `pub(crate)`：`@date` 记号（native_frame::text）与 LSK 的
+/// daynum→日历（native_time）复用同一口径。
+pub(crate) fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
     let y = if month <= 2 {
         i64::from(year) - 1
     } else {
@@ -408,8 +413,8 @@ fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
     era * 146097 + doe - 719468
 }
 
-/// [`days_from_civil`] 的逆变换。
-fn civil_from_days(days: i64) -> (i32, u32, u32) {
+/// [`days_from_civil`] 的逆变换。`pub(crate)`：native_time 复用。
+pub(crate) fn civil_from_days(days: i64) -> (i32, u32, u32) {
     let z = days + 719468;
     let era = if z >= 0 { z } else { z - 146096 } / 146097;
     let doe = z - era * 146097; // [0, 146096]
@@ -494,6 +499,86 @@ pub fn mat3_t_mul_vec(m: &[[f64; 3]; 3], v: &[f64; 3]) -> [f64; 3] {
         m[0][1] * v[0] + m[1][1] * v[1] + m[2][1] * v[2],
         m[0][2] * v[0] + m[1][2] * v[1] + m[2][2] * v[2],
     ]
+}
+
+/// 原 FFI 包装的对拍 oracle（`#[doc(hidden)]`，仅供测试）。
+///
+/// 先例：`daf::parse_with`（ADR 0051）。`pxform`/`sxform`/`et2utc`/`ktotal`
+/// 的生产入口自 ADR 0052 起走纯 Rust 后端，但 cspice crate 的高层 API 没有
+/// 这些函数的包装，对拍测试无处复用——保留直连 `*_c` 的薄包装当 oracle。
+/// oracle 不入 [`FFI_CALLS`] 计数（计数语义 = 生产面旁路诊断，oracle 使用
+/// 不得破坏「生产路径恒 0」断言）。
+///
+/// 前置：内核已经理 [`crate::furnish_kernel`] 双登记（oracle 走 cspice 池，
+/// 被测走 native 池）；CSPICE erract 须为 RETURN/NULL（见
+/// `init_error_handling`，`register_bodies` 触发）。
+#[doc(hidden)]
+#[cfg(feature = "spice")]
+pub mod ffi_oracle {
+    use super::{c_chars_to_string, check_spice_error, to_cstring, SpiceFfiError};
+    use cspice_sys::{et2utc_c, ktotal_c, pxform_c, sxform_c, ConstSpiceChar, SpiceInt};
+
+    /// oracle：CSPICE `pxform_c` 直连，返回 3×3 行主序旋转矩阵。
+    pub fn pxform(from: &str, to: &str, et: f64) -> Result<[[f64; 3]; 3], SpiceFfiError> {
+        let from_c = to_cstring(from);
+        let to_c = to_cstring(to);
+        let mut rotate = [[0.0_f64; 3]; 3];
+        unsafe {
+            pxform_c(
+                from_c.as_ptr() as *mut ConstSpiceChar,
+                to_c.as_ptr() as *mut ConstSpiceChar,
+                et,
+                rotate.as_mut_ptr(),
+            );
+            check_spice_error()?;
+        }
+        Ok(rotate)
+    }
+
+    /// oracle：CSPICE `sxform_c` 直连，返回 6×6 行主序状态变换。
+    pub fn sxform(from: &str, to: &str, et: f64) -> Result<[[f64; 6]; 6], SpiceFfiError> {
+        let from_c = to_cstring(from);
+        let to_c = to_cstring(to);
+        let mut xform = [[0.0_f64; 6]; 6];
+        unsafe {
+            sxform_c(
+                from_c.as_ptr() as *mut ConstSpiceChar,
+                to_c.as_ptr() as *mut ConstSpiceChar,
+                et,
+                xform.as_mut_ptr(),
+            );
+            check_spice_error()?;
+        }
+        Ok(xform)
+    }
+
+    /// oracle：CSPICE `et2utc_c` 直连（"ISOC"，prec 位小数秒）。
+    pub fn et2utc(et: f64, prec: i32) -> Result<String, SpiceFfiError> {
+        let fmt_c = to_cstring("ISOC");
+        let mut buf = vec![0i8; 64];
+        unsafe {
+            et2utc_c(
+                et,
+                fmt_c.as_ptr() as *mut ConstSpiceChar,
+                prec as SpiceInt,
+                buf.len() as SpiceInt,
+                buf.as_mut_ptr() as *mut std::os::raw::c_char,
+            );
+            check_spice_error()?;
+        }
+        Ok(c_chars_to_string(&buf))
+    }
+
+    /// oracle：CSPICE `ktotal_c` 直连。
+    pub fn ktotal(kind: &str) -> Result<i32, SpiceFfiError> {
+        let kind_c = to_cstring(kind);
+        let mut count: SpiceInt = 0;
+        unsafe {
+            ktotal_c(kind_c.as_ptr() as *mut ConstSpiceChar, &mut count);
+            check_spice_error()?;
+        }
+        Ok(count as i32)
+    }
 }
 
 #[cfg(test)]

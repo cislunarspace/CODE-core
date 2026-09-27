@@ -22,7 +22,9 @@ use super::DafSpkError;
 ///
 /// `cp[0..ncof]` 为系数（`degp = ncof - 1` 次多项式），`x2s = [MID, RADIUS]`
 /// 为域变换参数，`x` 为求值时刻（ET 秒）。返回 `(p, dp/dx)`。
-fn chbint(cp: &[f64], degp: usize, x2s: [f64; 2], x: f64) -> (f64, f64) {
+/// `pub(crate)`：BPC Type 2（`native_frame::bpc2`）与 SPK Type 2 共用同一
+/// Chebyshev–Clenshaw 核（pcke02.c 与 spke02.c 同构，ADR 0052）。
+pub(crate) fn chbint(cp: &[f64], degp: usize, x2s: [f64; 2], x: f64) -> (f64, f64) {
     let s = (x - x2s[0]) / x2s[1];
     let s2 = s * 2.;
     let mut w = [0.0f64; 3];
