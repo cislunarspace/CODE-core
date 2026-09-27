@@ -1,9 +1,9 @@
 """Facade 门面：任务级入口与暴露类组合根（ADR 0043）。
 
-接口层暴露三个类（ADR 0043）：``Facade`` 只留五个任务级能力
-（design_orbit/control_orbit/transfer_design/orbit_propagation/
-spacetime_transform）；``e2m2e.api.catalog.Catalog`` 承担轨道库数据管理与
-族生成；``e2m2e.api.spatiography.Spatiography`` 承担分区分析。
+接口层暴露三个类（ADR 0043）：``Facade`` 留六个任务级能力
+（design_orbit/control_orbit/transfer_design/mission_architecture_search/
+orbit_propagation/spacetime_transform）；``e2m2e.api.catalog.Catalog`` 承担轨道库
+数据管理与族生成；``e2m2e.api.spatiography.Spatiography`` 承担分区分析。
 ``Facade`` 是组合根：``Facade().catalog`` / ``Facade().spatiography``
 向进程内调用方交出另外两类；唯一工具清单扫描 ``Facade().exposed_apis``
 ——MCP/CLI/sidecar 都从这一份清单派生（ADR 0014 决策 2，扫描根由
@@ -153,7 +153,7 @@ def _serialize_value(value: Any) -> Any:
 #: 长任务 Facade 进度回调形状：``cb(fraction, message=None)``，fraction ∈
 #: [0, 1] 单调不减（0.0 = 开始，1.0 = 完成）。MCP 层经 progressToken 把
 #: 它桥接到 ``notifications/progress``；进度语义按任务定义：转移搜索按
-#: 网格任务（仅 WSB 后端当前暴露 delta 回调），族生成为阶段级（单次
+#: 网格任务（WSB 与 MGA 两条搜索暴露 delta 回调），族生成为阶段级（单次
 #: Rust 调用，逐成员进度待 Rust 侧通道，见 #576 Phase 2 记录）。
 ProgressCallback = Callable[[float, str | None], None]
 

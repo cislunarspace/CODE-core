@@ -15,7 +15,7 @@
 ``(总 ΔV, 到达 v∞)`` 升序取 top-N。
 
 ⑦ 类人工对照（ADR 0055 决策 3/5）：ARM 任务链（Strange 2013 §III）报告的行星际段
-ΔV 为数 km/s 量级——此处只记量级，不写精确表值、不入断言。
+ΔV 为数 km/s 量级——非断言人工对照（ADR 0055 决策 3：⑦ 类结果性数值禁入断言）。
 
 星历边界只要求 ``ephemeris.get_body_state(target, et, frame, observer)`` 与
 ``ephemeris.get_gm(body)`` 两个方法，故闭式与网格组装可由合成星历注入测试；

@@ -465,7 +465,7 @@ class TestFacadeToolInventory:
         from e2m2e.api.spatiography import Spatiography
 
         facade = Facade()
-        # Facade 留任务级五方法 + 请求侧值域清单（ADR 0043 决策 1；valid_ranges
+        # Facade 留任务级六方法 + 请求侧值域清单（ADR 0043 决策 1；valid_ranges
         # 是无任务副作用的查询出口，挂组合根，#620）
         assert set(mcp_tools(facade)) == {
             "design_orbit",
