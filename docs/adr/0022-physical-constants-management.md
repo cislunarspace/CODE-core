@@ -281,3 +281,10 @@ held equal by test. Out-of-scope bodies (Jupiter and beyond) still have no DE421
 GM row because no authoritative source is on file — they fall back to DE440 with
 a one-shot warning rather than being silently mixed (tracked by #670). Rationale,
 rejected alternatives, and verification are in ADR 0048.
+
+## Revision (2026-09-27, #713)
+
+`[body.SUN.gm]` gains its DE421 row (equal to `[datum.DE421].sun_gm`, held equal
+by test), closing the two-view gap noted in ADR 0048 §4; the repository-internal
+source evidence gap remains tracked by #670. Decision 5 (single source in
+`constants.toml`) is unchanged.
