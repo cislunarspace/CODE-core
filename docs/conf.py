@@ -53,6 +53,9 @@ exclude_patterns = [
     # agents/ 是 AI 工作文档（如 issue-tracker.md），不面向用户，避免 toctree 告警
     "agents",
     "agents/*",
+    # plans/ 是内部评估留档（如 ADR 0052 的基准证据），不面向用户，避免 toctree 告警
+    "plans",
+    "plans/*",
 ]
 
 # ---- sphinx-autoapi：静态解析源码生成 API 参考，构建机无需可运行的扩展 ----
