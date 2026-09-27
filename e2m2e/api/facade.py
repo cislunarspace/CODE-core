@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import math
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -35,6 +36,10 @@ from .models import (
     DesignOrbitResponse,
     FamilyGenerationRequest,
     ManeuverEvent,
+    MgaChainCandidate,
+    MgaFlybyInfo,
+    MissionArchitectureSearchRequest,
+    MissionArchitectureSearchResponse,
     OrbitError,
     PropagationRequest,
     PropagationResponse,
@@ -192,6 +197,54 @@ def _wsb_search_progress(
         )
 
     return on_delta
+
+
+def _mga_search_progress(
+    callback: ProgressCallback | None, total: int
+) -> Callable[[int], None] | None:
+    """MGA 网格搜索 delta 回调 → fraction 适配器（#576）。
+
+    ``algorithm/transfer/mga.search_mga_chains`` 每完成一个 (发射历元, leg)
+    批量求解发一次 ``delta=1``；映射到 (0.1, 0.9) 区间，起止两端由调用方上报。
+    无回调返回 None（零开销直通）。
+    """
+    if callback is None:
+        return None
+    total = max(total, 1)
+    seen = [0]
+
+    def on_delta(delta: int) -> None:
+        seen[0] += delta
+        done = min(seen[0], total)
+        _emit_progress(
+            callback,
+            0.1 + 0.8 * done / total,
+            f"MGA 网格搜索 {done}/{total}",
+        )
+
+    return on_delta
+
+
+#: J2000 历元（2000-01-01 12:00:00 TDB）的 JD_TDB。ET 秒 = (JD_TDB − 该值)·86400
+#: （ADR 0015：ET 即 TDB 秒；与 algorithm/propagation 的 JD 口径同源）。
+#: ``SPICEManager`` 未实现 ``EphemerisProvider.jd_tdb_to_et``，故此处纯算术换算，
+#: 不依赖已加载内核。
+_JD_TDB_AT_J2000: float = 2451545.0
+
+
+def _jd_tdb_to_et(jd_tdb: float) -> float:
+    """JD_TDB → SPICE ET 秒（纯算术）。"""
+    return (float(jd_tdb) - _JD_TDB_AT_J2000) * SECONDS_PER_DAY
+
+
+def _inclusive_step_grid(start: float, end: float, step: float) -> list[float]:
+    """``[start, end]`` 上含 start、按 ``step`` 进给、不超过 end 的等差网格。
+
+    调用方保证 ``end > start`` 且 ``step > 0``（请求模型已校验步长正、端点序）。
+    末点因浮点误差略小于 end 属预期：网格只保证落在窗口内。
+    """
+    n_points = int(math.floor((end - start) / step)) + 1
+    return [start + k * step for k in range(n_points)]
 
 
 def _ephemeris_to_dict(ephemeris: EphemerisTable | None) -> dict[str, Any] | None:
@@ -628,6 +681,115 @@ class Facade:
         response.record_id = self.catalog.auto_ingest(
             lambda: catalog_ingest.build_transfer_record(request, result)
         )
+        return response
+
+    @mcp_exposed(request_model=MissionArchitectureSearchRequest)
+    def mission_architecture_search(
+        self, progress_callback: ProgressCallback | None = None, **params
+    ) -> MissionArchitectureSearchResponse:
+        """Interplanetary MGA chain grid search (tier 1). / 行星际多借力链网格搜索（一档）。
+
+        薄封装 ``algorithm/transfer/mga.search_mga_chains``：Pydantic 校验 →
+        展开发射窗口与逐 leg TOF 网格 → 纯网格搜索（Lambert leg + 无动力 flyby
+        等模/近心点剔除 + 日心 Tisserand 诊断）→ top-N 翻译为 Response。
+        ``progress_callback(fraction, message)`` 上报网格进度（#576）。
+        结果不入 catalog（ADR 0054 决策 4）。
+        """
+        try:
+            request = MissionArchitectureSearchRequest(**params)
+            from e2m2e.algorithm.transfer import search_mga_chains
+
+            # 仅字符串窗口端点需要 SPICE 解析；纯 JD_TDB 窗口走算术换算，
+            # 不加载内核（迟加载星历由算法层缺省路径负责）。
+            spice = None
+            if any(isinstance(endpoint, str) for endpoint in request.launch_window):
+                from e2m2e.algorithm.design.design_orbit import load_design_kernels
+                from e2m2e.data.kernels.manager import SPICEManager
+
+                spice = SPICEManager()
+                load_design_kernels(spice, self._config.kernel_dir)
+
+            def endpoint_to_et(endpoint: str | float) -> float:
+                if isinstance(endpoint, str):
+                    if spice is None:  # pragma: no cover - 上面的加载分支已保证
+                        raise OrbitError(
+                            "INVALID_PARAMS",
+                            "字符串历元端点需要 SPICE 时间解析，但未加载内核",
+                            status=ConvergenceState.FAILED,
+                            cause=FailureCause.INVALID_INPUT,
+                        )
+                    return float(spice.utc_to_et(endpoint))
+                return _jd_tdb_to_et(endpoint)
+
+            window_start = endpoint_to_et(request.launch_window[0])
+            window_end = endpoint_to_et(request.launch_window[1])
+            if window_end <= window_start:
+                raise ValueError(f"launch_window 的终点须晚于起点，得到 {request.launch_window}")
+            launch_epochs = _inclusive_step_grid(
+                window_start, window_end, request.launch_window_step_days * SECONDS_PER_DAY
+            )
+            leg_tof_grids = [
+                _inclusive_step_grid(lower, upper, request.leg_tof_step_days)
+                for lower, upper in request.leg_tof_ranges
+            ]
+            total_batches = len(launch_epochs) * len(leg_tof_grids)
+            _emit_progress(progress_callback, 0.0, "MGA 链搜索开始")
+            result = search_mga_chains(
+                request.body_sequence,
+                launch_epochs,
+                leg_tof_grids,
+                request.min_flyby_pericenter_km,
+                ephemeris=spice,
+                kernel_dir=self._config.kernel_dir,
+                v_inf_match_tol_km_s=request.v_inf_match_tol_km_s,
+                top_n=request.top_n,
+                progress_callback=_mga_search_progress(progress_callback, total_batches),
+            )
+            response = MissionArchitectureSearchResponse(
+                status=result.status,
+                cause=result.cause,
+                message=result.message,
+                candidates=[
+                    MgaChainCandidate(
+                        launch_epoch_jd_tdb=(
+                            _JD_TDB_AT_J2000 + candidate.launch_epoch_et / SECONDS_PER_DAY
+                        ),
+                        leg_tofs_days=list(candidate.leg_tofs_days),
+                        departure_v_inf_km_s=candidate.departure_v_inf_km_s,
+                        arrival_v_inf_km_s=candidate.arrival_v_inf_km_s,
+                        total_delta_v_km_s=candidate.total_delta_v_km_s,
+                        flybys=[
+                            MgaFlybyInfo(
+                                body=flyby.body,
+                                v_inf_km_s=flyby.v_inf_km_s,
+                                turn_angle_deg=math.degrees(flyby.turn_angle_rad),
+                                pericenter_radius_km=(
+                                    None
+                                    if math.isinf(flyby.pericenter_radius_km)
+                                    else flyby.pericenter_radius_km
+                                ),
+                                tisserand_before=flyby.tisserand_before,
+                                tisserand_after=flyby.tisserand_after,
+                            )
+                            for flyby in candidate.flybys
+                        ],
+                    )
+                    for candidate in result.candidates
+                ],
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        except Exception as exc:
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError("MISSION_SEARCH_FAILED", message, status=status, cause=cause) from exc
+        _emit_progress(progress_callback, 1.0, "MGA 链搜索完成")
         return response
 
     @mcp_exposed(request_model=PropagationRequest)

@@ -455,9 +455,9 @@ class TestFacadeCallChains:
 class TestFacadeToolInventory:
     """接口类分家后的工具清单（ADR 0043）：Facade 组合根扫多个暴露类。"""
 
-    def test_inventory_counts_nineteen_implemented_tools(self):
+    def test_inventory_counts_twenty_implemented_tools(self):
         inventory = tool_inventory(Facade())
-        assert len(inventory) == 19
+        assert len(inventory) == 20
         assert all(tool.status == "implemented" for tool in inventory)
 
     def test_each_class_keeps_its_domain(self):
@@ -471,6 +471,7 @@ class TestFacadeToolInventory:
             "design_orbit",
             "control_orbit",
             "transfer_design",
+            "mission_architecture_search",
             "orbit_propagation",
             "spacetime_transform",
             "valid_ranges",

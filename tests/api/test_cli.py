@@ -191,6 +191,28 @@ def test_long_tool_routes_via_worker(fake_worker, facade, capsys):
     assert "half" in captured.err, "worker 进度行应转发到 stderr"
 
 
+def test_mission_architecture_routes_via_worker(fake_worker, facade, capsys):
+    """#723：mission_architecture_search 属长任务，CLI 经 worker 子进程执行。"""
+    fake_worker.use("ok")
+    rc = main(
+        [
+            "mission-architecture-search",
+            "--body-sequence",
+            '["EARTH", "VENUS"]',
+            "--launch-window",
+            "[2461041.5, 2461049.5]",
+            "--leg-tof-ranges",
+            "[[100.0, 110.0]]",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert rc == 0
+    env = json.loads(captured.out.strip().splitlines()[-1])
+    assert env["status"] == "ok"
+    assert env["data"]["mode"] == "ok"
+    assert "half" in captured.err, "worker 进度行应转发到 stderr"
+
+
 def test_worker_crash_yields_error_exit(fake_worker, capsys):
     fake_worker.use("crash")
     rc = main(["transfer-design", "--transfer-type", "HMN", "--tli-epoch", "2460800.5"])

@@ -37,7 +37,9 @@ __all__ = [
 # 长任务工具（#588 / #576 Phase 2，子进程隔离架构）：分钟级计算改跑 worker
 # 子进程，使取消（对端 cancel / 断连 EOF）可靠传播为进程 kill。执行策略是
 # 两个传输层共同消费的关注点，单一清单在此（#601）；何时 spawn 归各适配器。
-LONG_RUNNING_TOOLS = frozenset({"transfer_design", "orbit_family_generation"})
+LONG_RUNNING_TOOLS = frozenset(
+    {"transfer_design", "orbit_family_generation", "mission_architecture_search"}
+)
 
 # 请求方可声明的二进制 dtype（ADR 0035 决策 1：渲染 f32，复算量 f64）。
 BINARY_DTYPES = ("f32", "f64")
