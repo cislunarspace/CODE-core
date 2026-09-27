@@ -28,7 +28,7 @@
 1. **先开 Issue**：修复与功能类 PR 必须关联一个同仓库 Issue，在描述中写 `Fixes #NN`（合并即自动关闭对应 Issue），仅关联不关闭写 `Related to #NN`；纯文档小修可不挂。
 2. **Fork 并建分支**，分支名建议 `fix/<简述>` 或 `feat/<简述>`。
 3. **本地验证**：`make test` 与 `make check` 通过；新增或改变行为要有对应测试。
-4. **开 PR 指向 `master`**，标题带意图标签（见上方标题约定），按模板填写。一个 PR 只做一件事；commit message 用中文 conventional commits（如 `fix(catalog): 修正……`）。
+4. **开 PR 指向 `master`**，标题带意图标签（见上方标题约定），按模板填写。一个 PR 只做一件事；commit message 用中文 conventional commits（如 `fix(catalog): 修正……`），标题不使用破折号（——）。
 5. **CI 必须绿**：lint 与 test 是必过检查。评审通过后由维护者合并。
 
 ## 标签体系
