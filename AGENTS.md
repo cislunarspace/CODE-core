@@ -2,6 +2,15 @@
 
 本指南面向 AI 助手与贡献者，记录当前代码、构建和验证契约。先读本文件、`CONTEXT.md` 与相关 ADR，再改动；以源码和配置为准，不以旧文档中的工具数量或版本示例为准。
 
+## Agent skills
+
+工程技能在会话中读取 `docs/agents/` 下的仓库级配置；改动这些文件即改变技能行为，需同步本文件。配置本身用中文书写，遵循本文件的语言约定。
+
+- `docs/agents/issue-tracker.md`：issue 与规格的存放位置、`gh` 操作约定、AI 贡献标记、PR 是否作为请求渠道，以及 GitHub Project 的工作状态配置（Project ID、Status / Priority / Start Date 字段与选项 ID）。由 `/code-review`、`/github-project`、`/merge-pr`、`/open-pr` 按路径读取，`/triage` 读取其中的渠道标记与 Project 配置。
+- `docs/agents/triage-labels.md`：五个分诊角色到本仓库标签字符串的映射，供分诊流程按角色取用；映射缺失时 `/triage` 会要求运行 `/setup-ouyangjiahong-skills`。
+- `docs/agents/domain.md`：探索代码库时如何读 `CONTEXT.md` 与 `docs/adr/`、如何按术语表用词、如何标注 ADR 冲突。供探索代码库的技能使用；术语与决策落定时由 `/domain-modeling` 更新 `CONTEXT.md` 与 ADR。
+- `docs/agents/multi-session-concurrency.md`：多会话并发约定。
+
 ## Project Overview
 
 `e2m2e`（Earth to Moon, Moon to Earth）是地月空间算法工具集，覆盖 CR3BP 任务轨道与轨道族、星历传播、转移设计、轨道保持、时空坐标转换、轨道库和地月空间分区分析。Python API 编排领域逻辑，Rust/PyO3 扩展 `e2m2e._integrators` 承担数值密集路径。
@@ -116,7 +125,7 @@ make clean-tests
 - Python↔Rust 边界：`crates/e2m2e-integrators/src/lib.rs`、`crates/e2m2e-integrators/build.rs`、`crates/e2m2e-integrators/abi-version.txt`、各 crate 的 `Cargo.toml`。
 - 构建与版本：`pyproject.toml`、`Cargo.toml`、`Makefile`、`rust-toolchain.toml`、`.python-version`、`uv.lock`、`Cargo.lock`（若存在，仅以配置和版本锁为准）。
 - 门禁与测试基础设施：`scripts/check_layer_imports.py`、`scripts/check_deleted_dir_refs.py`、`tests/conftest.py`、`tests/time_budget.py`、`tests/kernel_helpers.py`、`tests/_meta/`。
-- 维护规则：`README.md`、`CONTRIBUTING.md`、`CONTEXT.md`、`CHANGELOG.md`、`docs/adr/README.md`、`docs/agents/issue-tracker.md`、`docs/agents/multi-session-concurrency.md`。
+- 维护规则：`README.md`、`CONTRIBUTING.md`、`CONTEXT.md`、`CHANGELOG.md`、`docs/adr/README.md`；`docs/agents/` 下的配置见上文“Agent skills”节。
 
 ## Runtime/Tooling Preferences
 
