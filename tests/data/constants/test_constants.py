@@ -67,6 +67,8 @@ class TestRustPythonConsistency:
     def test_body_constants_match_rust(self, rust):
         assert rust("body.SUN.mean_radius_km") == SUN.mean_radius_km
         assert rust("body.SUN.naif_id") == SUN.naif_id
+        assert rust("body.SUN.gm.DE421") == SUN.gm_by_datum["DE421"]
+        assert rust("body.SUN.gm.DE440") == SUN.gm_by_datum["DE440"]
 
         assert rust("body.EARTH.mean_radius_km") == EARTH.mean_radius_km
         assert rust("body.EARTH.gravity_ref_radius_km") == EARTH.gravity_ref_radius_km
@@ -163,6 +165,7 @@ class TestDatumBodyGmAlignment:
         assert EARTH.gm_by_datum["DE421"] == Datum.DE421.earth_gm
         assert MOON.gm_by_datum["DE421"] == Datum.DE421.moon_gm
         assert EMB.gm_by_datum["DE421"] == Datum.DE421.emb_gm
+        assert SUN.gm_by_datum["DE421"] == Datum.DE421.sun_gm
 
     def test_planetary_gm_de421_rows_exist(self):
         """设计链路 perturbation.planets 会查询这些天体，缺行会触发回退告警。"""
@@ -173,16 +176,15 @@ class TestDatumBodyGmAlignment:
             assert "DE440" in body.gm_by_datum
 
     def test_unsourced_bodies_intentionally_lack_de421(self):
-        """无权威出处的天体 DE421 GM 有意留空：外行星与 SUN（ADR 0048）。
+        """无权威出处的天体 DE421 GM 有意留空：JUPITER 及以外（ADR 0048）。
 
         这条断言把「留空」从疏忽变成有意的决定：按 DE421 口径查询这些天体时
         回退 DE440 并告警一次（不静默混用）；补齐权威来源后应连同本测试与
-        ADR 0048 一并更新（见 #670）。
+        ADR 0048 一并更新（见 #670）。SUN 已补 DE421 行（#713），不再属于本组。
         """
         from e2m2e.data.constants.bodies import JUPITER
 
         assert "DE421" not in JUPITER.gm_by_datum
-        assert "DE421" not in SUN.gm_by_datum
 
 
 class TestBodies:

@@ -110,8 +110,8 @@ class TestDe421GmConsistency:
 
         assert de421.ephemeris_datum == "DE421"
         assert system_421.gravitational_parameter("MOON") == Datum.DE421.moon_gm
-        # SUN 无 DE421 权威 GM（有意留空，#670）：回退 DE440 并告警一次，不静默混用。
-        assert system_421.gravitational_parameter("SUN") == Datum.DE440.sun_gm
+        # SUN 已补 DE421 GM 行（#713，与 Datum.DE421.sun_gm 同值）：DE421 口径不再回退。
+        assert system_421.gravitational_parameter("SUN") == Datum.DE421.sun_gm
         assert system_421.gravitational_parameter("EMB") == Datum.DE421.emb_gm
         # 簿记类级共享（内核池进程级全局，ADR 0048）：同进程另一 system 也看到
         # DE421 口径，避免「de440s 位置 + DE421 GM」的静默错配。
@@ -125,6 +125,7 @@ class TestDe421GmConsistency:
         assert EARTH.gm_by_datum["DE421"] == Datum.DE421.earth_gm
         assert MOON.gm_by_datum["DE421"] == Datum.DE421.moon_gm
         assert EMB.gm_by_datum["DE421"] == Datum.DE421.emb_gm
+        assert SUN.gm_by_datum["DE421"] == Datum.DE421.sun_gm
 
     def test_third_body_spec_carries_de421_gm(self, de421_datum_env):
         """GM 必须真的进入 Rust spec，而非只在查询层正确。"""
@@ -141,15 +142,14 @@ class TestDe421GmConsistency:
             gm = de421_datum_env["de421"].get_gm("JUPITER")
         assert gm == JUPITER.gm_by_datum["DE440"]
 
-    def test_sun_has_no_de421_gm_and_falls_back(self, de421_datum_env):
-        """SUN 亦无 DE421 权威 GM（有意留空，#670）：按 DE421 查询回退 DE440。
+    def test_sun_de421_gm_no_longer_falls_back(self, de421_datum_env):
+        """SUN 已补 DE421 GM 行（#713，与 Datum.DE421.sun_gm 同值）：按 DE421 查询不回退。
 
-        回退告警按 (天体, 基准) 每 manager 一次，由
-        :meth:`test_out_of_scope_body_falls_back_with_warning` 覆盖，故此处不应
-        断言告警条数（依赖用例顺序）。
+        此前 SUN 留空时按 DE421 查询回退 DE440（#670）；回退告警的通用行为仍由
+        :meth:`test_out_of_scope_body_falls_back_with_warning` 以外行星覆盖。
         """
-        assert "DE421" not in SUN.gm_by_datum
-        assert de421_datum_env["de421"].get_gm("SUN") == SUN.gm_by_datum["DE440"]
+        assert SUN.gm_by_datum["DE421"] == Datum.DE421.sun_gm
+        assert de421_datum_env["de421"].get_gm("SUN") == SUN.gm_by_datum["DE421"]
 
 
 class TestDe421PositionDifference:

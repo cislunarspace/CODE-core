@@ -264,3 +264,29 @@ Colab 取回后上传 `kernels-v1`。那是**分发**手段而非入库：clone 
   （`tests/algorithm/design/test_de421_datum.py` 等）由 skip 转为实跑。
 - 仓库 LFS 侧 +16.8 MB；未拉 LFS 的 clone 只多一个指针文件，行为不变。
 
+## Revision (2026-09-27, #713)：SUN 的 DE421 GM 两视图配对恢复
+
+### Context
+
+§4 要求 body 与 datum 两视图同值。SUN 的 `[datum.DE421].sun_gm` 一直有值
+（1.32712428e11），但 `[body.SUN.gm]` 从未有过 DE421 行——聚合视图与逐天体
+视图矛盾；`tests/data/constants/test_constants.py` 的一致性测试把 SUN 归入
+「无出处、有意留空」一组而静默跳过，两视图漂移无守卫。
+
+### Decisions
+
+1. **补 `[body.SUN.gm].DE421 = 1.32712428e11`，与 `[datum.DE421].sun_gm`
+   逐位同值，`source = "DE421"`**。该值的仓库内权威文献出处不在现有证据内，
+   出处缺口归 #670；`source = "DE421"` 表示「DE421 口径」的标注而非文献出处，
+   诚实性由本段文字承担。
+2. **测试恢复 SUN 覆盖**：两视图同值断言纳入
+   `TestDatumBodyGmAlignment.test_earth_moon_emb_de421_agree`，Rust 对拍补
+   `body.SUN.gm.DE421/DE440`；「有意留空」断言收窄为 JUPITER 及以外。
+
+### Consequences
+
+- 数值影响：DE421 口径下第三体太阳 GM 由 DE440 回退值 `1.32712440018e11` 切到
+  `1.32712428e11`（相对差 ~9e-8），属 §4 自动配对的预期行为——两视图同值后，
+  按口径查询与按天体查询不再分歧。
+- 出处证据缺口（#670）不变：补到权威出处时按 #670 更新 `source` 标注与本 ADR。
+
