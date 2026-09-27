@@ -391,6 +391,8 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   增 ``earth-distance`` 度量（issue #627）。
 /// - **v25**：新增 ``nrlmsise00_density_py``（NRLMSISE-00 密度/温度查询绑定，
 ///   供 ``NRLMSISE00Atmosphere.density`` 调用；issue #637）。
+/// - **v26**：新增 ``propagate_kepler_py``（conic 档二体 Kepler 封闭解传播
+///   + 解析 STM，issue #739）。
 ///
 /// 1→3 跳号实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -3011,6 +3013,64 @@ fn lambert_izzo_py(
     Ok(dict.into())
 }
 
+/// universal-variable 二体 Kepler 封闭解传播（可选解析 STM）。
+///
+/// 算法为 Vallado 2013 §2-5（Algorithm 8）的 universal Kepler 方程
+/// Newton 解 + f & g 闭式（定义性公式，ADR 0055 决策 5 ①）；解析 STM 由
+/// f & g 表达式的隐函数定理链式求导得到。
+///
+/// # 参数
+/// - `state0`：初始状态 [x, y, z, vx, vy, vz]（km, km/s）
+/// - `t_eval`：采样时刻（s）；各元素为相对 state0 历元的流逝秒，可为负
+/// - `mu`：中心天体 GM（km³/s²）
+/// - `with_stm`：True 时返回逐点 6×6 行主序解析 STM
+///
+/// # 返回
+/// Python dict：`{"time": [n], "states": [n][6]}`；`with_stm=True` 时额外
+/// 含 `"stm": [n][36]`。迭代不收敛或参数非法抛 ValueError。
+#[pyfunction]
+#[pyo3(signature = (state0, t_eval, mu, *, with_stm = false))]
+fn propagate_kepler_py(
+    state0: Vec<f64>,
+    t_eval: Vec<f64>,
+    mu: f64,
+    with_stm: bool,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    if state0.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "state0 必须为 6 维 [x, y, z, vx, vy, vz]，得到 {} 维",
+            state0.len()
+        )));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err("t_eval 不能为空"));
+    }
+    if !mu.is_finite() || mu <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "mu 必须为正的有限值",
+        ));
+    }
+    let r0_sq = state0[0] * state0[0] + state0[1] * state0[1] + state0[2] * state0[2];
+    if r0_sq == 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err("r0 不能为零向量"));
+    }
+    let mut s0 = [0.0f64; 6];
+    s0.copy_from_slice(&state0);
+    let result = e2m2e_propagation::kepler::propagate_kepler(&s0, &t_eval, mu, with_stm)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+
+    let dict = PyDict::new(py);
+    dict.set_item("time", result.times)?;
+    let states: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
+    dict.set_item("states", states)?;
+    if with_stm {
+        let stms: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();
+        dict.set_item("stm", stms)?;
+    }
+    Ok(dict.into())
+}
+
 /// 解析 porkchop 串/并开关：显式参数优先，否则读取环境变量。
 fn porkchop_parallel_enabled(parallel: Option<bool>) -> bool {
     parallel.unwrap_or_else(|| std::env::var("E2M2E_PORKCHOP_PARALLEL").map_or(true, |v| v != "0"))
@@ -4804,6 +4864,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(cowell_step, m)?)?;
     m.add_function(wrap_pyfunction!(lambert_izzo_py, m)?)?;
     m.add_function(wrap_pyfunction!(lambert_batch_py, m)?)?;
+    m.add_function(wrap_pyfunction!(propagate_kepler_py, m)?)?;
     m.add_function(wrap_pyfunction!(porkchop_grid_py, m)?)?;
     m.add_function(wrap_pyfunction!(porkchop_grid_states_py, m)?)?;
     m.add_function(wrap_pyfunction!(spherical_harmonic_accel, m)?)?;
