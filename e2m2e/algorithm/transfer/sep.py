@@ -18,9 +18,10 @@
   Isp=3100 s 的 NSTAR 级推力器只得约 1e-5 N（光子火箭量级），而量级正确的
   NSTAR 推力约 0.09 N。本模块因此只出现 ``c_e``，不出现光速。
 
-⑦ 类人工对照（非断言，ADR 0055 决策 3）：ARM 螺旋 ΔV ≈ 4.6 km/s——#722 裁决
-与 ADR 0055 决策 2 引用的 ARM 任务分析量级；编写时未能定位论文原文出处，
-待补“作者 年份 §节”。
+⑦ 类人工对照（**非断言**，ADR 0055 决策 3；该类数值一律禁入 CI 断言）：
+ARM 螺旋 ΔV ≈ 4.6 km/s。仓内出处为 #722 裁决与 ADR 0055 决策 2 的 ⑦ 类举例
+（ARM 任务分析的螺旋 ΔV 量级）；**论文原文出处待补**，补注位置即本段，格式
+“作者 年份 §节”。
 """
 
 from __future__ import annotations
@@ -157,7 +158,7 @@ def mass_flow_rate(thrust_n: float, isp_s: float) -> float:
 def edelbaum_delta_v(v1_km_s: float, v2_km_s: float) -> float:
     """Edelbaum 共面圆-圆低推力螺旋 ΔV 闭式：``ΔV = |v₁ − v₂|``（ADR 0055 ①）。
 
-    Edelbaum (1961), "Propulsion Requirements for Controllable Satellites",
+    Edelbaum (1961), “Propulsion Requirements for Controllable Satellites”,
     *ARS Journal* 31(8)。共面圆轨道间多圈螺旋的速度增量只取决于两端圆速度
     之差，与推力大小和转移圈数无关。
 
@@ -176,9 +177,16 @@ def edelbaum_delta_v(v1_km_s: float, v2_km_s: float) -> float:
 def edelbaum_delta_v_inclined(v1_km_s: float, v2_km_s: float, inc_change_deg: float) -> float:
     """Edelbaum 含倾角变化的低推力螺旋 ΔV 闭式（ADR 0055 ①）。
 
-    ``ΔV = sqrt(v₁² + v₂² − 2·v₁·v₂·cos(Δi))``：把倾角变化折算为两端速度矢量
-    的夹角。``Δi = 0`` 退化回共面形式 :func:`edelbaum_delta_v`；正负倾角变化
-    对称（仅经余弦依赖 ``Δi``）。Edelbaum (1961)。
+    ``ΔV = sqrt(v₁² + v₂² − 2·v₁·v₂·cos(π·Δi/2))``，``Δi`` 转弧度后乘 ``π/2``
+    再进余弦。出处：Edelbaum (1961), “Propulsion Requirements for Controllable
+    Satellites”, *ARS Journal* 31(8)：对平均化方程 ``dV/dt = f·cosβ``、
+    ``di/dt = (2/π)·(f/V)·sinβ`` 积分，得测地线长度即上式——面外推力在一个
+    周期内的平均效率是面内的 ``2/π``，故倾角项带 ``π/2`` 因子。
+
+    与冲量单次机动的余弦定理 ``sqrt(v₁²+v₂²−2·v₁·v₂·cos Δi)`` **不同**：后者
+    无 ``π/2`` 因子，用它估算含面变的小推力螺旋会系统性低估（LEO→GEO 含 28.5°
+    面变：本式 ≈ 5.95 km/s，冲量式 ≈ 5.23 km/s）。``Δi = 0`` 退化回共面形式
+    :func:`edelbaum_delta_v`；正负倾角变化对称（仅经余弦依赖 ``Δi``）。
 
     Args:
         v1_km_s: 初始圆轨道速度（km/s）。
@@ -191,7 +199,10 @@ def edelbaum_delta_v_inclined(v1_km_s: float, v2_km_s: float, inc_change_deg: fl
     v1 = _finite_positive(v1_km_s, "v1_km_s")
     v2 = _finite_positive(v2_km_s, "v2_km_s")
     inc = _finite(inc_change_deg, "inc_change_deg")
-    return math.sqrt(v1 * v1 + v2 * v2 - 2.0 * v1 * v2 * math.cos(math.radians(inc)))
+    squared = v1 * v1 + v2 * v2 - 2.0 * v1 * v2 * math.cos(0.5 * math.pi * math.radians(inc))
+    # 近退化输入（Δi≈0 且两端速度近乎相等）时上式的浮点消去可给出极小负值，
+    # 钳到 0 以免抛 math domain error 与参数校验错误混淆（仓内先例：bplane、shadow）。
+    return math.sqrt(max(0.0, squared))
 
 
 def constant_thrust_transfer_time(
@@ -283,8 +294,10 @@ def spiral_arc_guess(
     近似，真实螺旋中 ``v̂`` 缓慢转动；该语义与
     ``e2m2e.algorithm.forces`` 的 ``direction_frame="VNB"`` 速度方向定义对齐。
 
-    消费方：低推力打靶取 ``tf = t0 + duration_s``、初值控制默认满油门沿初速
-    （与本弧方向一致）；Sims-Flanagan 预设计（#725）直接消费 ``arcs``。
+    消费方：低推力打靶取 ``tf = t0 + duration_s``，初值方向须与本弧一致——
+    ``LowThrustShooting._default_x0`` 恒取 +v̂，故抬升分支（+v̂）可直接沿用默认
+    初值，降低分支（−v̂）必须显式取反；Sims-Flanagan 预设计（#725）直接消费
+    ``arcs``。
 
     Args:
         initial_state: 初始状态 ``(6,)``（位置 km + 速度 km/s）。

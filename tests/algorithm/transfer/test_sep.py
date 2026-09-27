@@ -3,8 +3,9 @@
 oracle 口径：① 闭式公式与 ② 守恒量/不变量用研究级紧容差（实现内复算 rel=1e-12
 与交叉恒等式 rel=1e-9）；⑤ 功率模型为论文模型定义；⑥ 定义性数值仅 NSTAR 公开
 工况点（NASA Glenn 公布的 2.3 kW / 3100 s / 92 mN），逐值给带宽与陷阱注记；
-⑦ 结果性数值（ARM 螺旋 ΔV ≈ 4.6 km/s）不进断言，登记在
-``e2m2e.algorithm.transfer.sep`` 模块 docstring。本模块纯解析，无星历/SPICE 依赖。
+⑦ 结果性数值（ARM 螺旋）不进断言，登记形式为 ``e2m2e.algorithm.transfer.sep``
+模块 docstring 的“非断言人工对照”段（出处与待补项见该处，本模块不复述该数值）。
+本模块纯解析，无星历/SPICE 依赖。
 """
 
 from __future__ import annotations
@@ -209,17 +210,26 @@ class TestEdelbaum:
         assert abs(delta_v - 4.651) < 0.02
 
     def test_inclined_form(self):
-        """含倾角形式复算、量级带、零倾角退化与正负对称。"""
+        """含倾角闭式带 π/2 因子：实现内复算、零倾角退化、正负对称、序关系。"""
+        half_pi = 0.5 * math.pi
         inc_deg = 28.5
-        expected = math.sqrt(
+        impulse_form = math.sqrt(
             V_LEO_KM_S**2
             + V_GEO_KM_S**2
             - 2.0 * V_LEO_KM_S * V_GEO_KM_S * math.cos(math.radians(inc_deg))
         )
+        expected = math.sqrt(
+            V_LEO_KM_S**2
+            + V_GEO_KM_S**2
+            - 2.0 * V_LEO_KM_S * V_GEO_KM_S * math.cos(half_pi * math.radians(inc_deg))
+        )
         delta_v = edelbaum_delta_v_inclined(V_LEO_KM_S, V_GEO_KM_S, inc_deg)
         assert delta_v == pytest.approx(expected, rel=1e-12)
-        # LEO→GEO 含 28.5° 倾角变化的低推力文献量级约 5.2–5.3 km/s
-        assert abs(delta_v - 5.233) < 0.1
+        # 序关系（独立于公式实现的物理约束）：面变只能给连续推力螺旋额外加代价，
+        # 故含面变值必须高于共面值，也高于冲量单次机动的余弦定理合成值
+        # （后者无 π/2 因子，用它估算含面变小推力螺旋会系统性低估）
+        assert delta_v > edelbaum_delta_v(V_LEO_KM_S, V_GEO_KM_S)
+        assert delta_v > impulse_form
         # Δi = 0 退化为共面形式
         assert edelbaum_delta_v_inclined(V_LEO_KM_S, V_GEO_KM_S, 0.0) == pytest.approx(
             edelbaum_delta_v(V_LEO_KM_S, V_GEO_KM_S), rel=1e-12
@@ -228,6 +238,22 @@ class TestEdelbaum:
         assert edelbaum_delta_v_inclined(V_LEO_KM_S, V_GEO_KM_S, -inc_deg) == pytest.approx(
             delta_v, rel=1e-12
         )
+
+    @pytest.mark.parametrize(
+        ("v1_km_s", "v2_km_s"),
+        [
+            (9.04347394678445, 9.043473946784461),
+            (14.235255042270383, 14.235255042270381),
+        ],
+    )
+    def test_inclined_near_degenerate_cancellation(self, v1_km_s, v2_km_s):
+        """近等速 + Δi = 0 的浮点消去给出极小负值时钳到 0，不抛 math domain error。
+
+        两个输入对是经搜索得到的确定值：朴素式 v₁² + v₂² − 2v₁v₂ 分别为
+        −2.84e-14 与 −5.68e-14（无钳位即抛 ValueError，与参数校验错误同型）。
+        """
+        assert edelbaum_delta_v_inclined(v1_km_s, v2_km_s, 0.0) == 0.0
+        assert edelbaum_delta_v(v1_km_s, v2_km_s) < 1e-12
 
     @pytest.mark.parametrize(
         "args",
