@@ -101,19 +101,26 @@ def heliocentric_tisserand(
     v_km_s: npt.ArrayLike,
     mu_sun_km3_s2: float,
     a_ref_km: float,
+    ref_normal: npt.ArrayLike | None = None,
 ) -> float:
-    """以参考行星半长轴 ``a_ref`` 归一的日心 Tisserand 参数。
+    """以参考行星**轨道面与半长轴**归一化的日心 Tisserand 参数。
 
-    ``T = a_ref/a + 2·(h_z/|h|)·|h|/sqrt(μ☉·a_ref)``，其中 ``r``/``v`` 为日心
-    J2000 状态、``a`` 为该状态的密切半长轴、``cos i = h_z/|h|``。第二项的 ``p``
-    因子写成 ``|h|/sqrt(μ·a_ref)``（对双曲日心弧仍为实值，不依赖 e）。圆共面
-    理想化下恒等 ``T = 3 − v∞²/v_c²``，故无动力借力前后 T 不变。
+    ``T = a_ref/a + 2·(ĥ·n̂_ref)·|h|/sqrt(μ☉·a_ref)``，其中 ``r``/``v`` 为日心
+    J2000 状态、``a`` 为该状态的密切半长轴、``n̂_ref`` 为**参考行星的轨道面法向**
+    （``ref_normal``；``None`` 时退化为 J2000 赤道极点 ẑ）。第二项的 ``p`` 因子写成
+    ``|h|/sqrt(μ·a_ref)``（对双曲日心弧仍为实值，不依赖 e）。
+
+    参考面必须取参考行星的轨道面：经典 Tisserand 参数的 ``cos i`` 是相对该行星轨道
+    面的倾角——黄道面内侧向转移若误用赤道极点，本项被 ``cos 23.44°`` 系统性压低
+    （约低 0.17，T ≈ 2.9 时相对偏差 ~6%）。当 ``|r| = a_ref`` 且 ``n̂_ref`` 即该天体
+    轨道法向时恒等 ``T = 3 − v∞²/v_c²``，故无动力借力前后 T 名义不变。
 
     ``a_ref`` 由参考行星自身的日心态密切根数给出（不建常数表）。
 
     Raises:
         ValueError: ``mu_sun_km3_s2``/``a_ref_km`` 非正，状态形状非 ``(3,)``，
-            或日心角动量为零（退化状态，T 无定义）。
+            ``ref_normal`` 形状非 ``(3,)`` 或为零向量，或日心角动量为零
+            （退化状态，T 无定义）。
     """
     for name, value in (("mu_sun_km3_s2", mu_sun_km3_s2), ("a_ref_km", a_ref_km)):
         if not math.isfinite(value) or value <= 0.0:
@@ -126,8 +133,18 @@ def heliocentric_tisserand(
     h_norm = float(np.linalg.norm(h_vec))
     if h_norm == 0.0:
         raise ValueError("日心角动量为零（退化状态）：Tisserand 参数无定义")
+    if ref_normal is None:
+        h_projected = float(h_vec[2])
+    else:
+        normal = np.asarray(ref_normal, dtype=float)
+        if normal.shape != (3,):
+            raise ValueError(f"ref_normal 须为长度 3 的向量，得到 {normal.shape}")
+        normal_norm = float(np.linalg.norm(normal))
+        if normal_norm == 0.0:
+            raise ValueError("ref_normal 为零向量：参考轨道面未定义")
+        h_projected = float(np.dot(h_vec, normal)) / normal_norm
     semi_major, *_ = rv_to_keplerian(r_vec, v_vec, mu_sun_km3_s2)
-    return float(a_ref_km / semi_major + 2.0 * h_vec[2] / math.sqrt(mu_sun_km3_s2 * a_ref_km))
+    return float(a_ref_km / semi_major + 2.0 * h_projected / math.sqrt(mu_sun_km3_s2 * a_ref_km))
 
 
 @dataclass(frozen=True)
@@ -208,6 +225,12 @@ def evaluate_flyby(
     剔除面：等模超差、``r_p`` 低于下限、V∞ 为零向量（与天体同速，转角与近心点
     半径无定义）。``δ == 0`` 时 ``r_p`` 为 ``inf``，恒通过下限。
 
+    ``tisserand_before``/``tisserand_after`` 的参考为**该飞越天体日心态的轨道面与
+    密切半长轴**。无动力飞越下 T 不变由等模约束承担（``|ΔT|`` 只由 ``Δ|v∞|`` 驱动，
+    ``T = 3 − v∞²/v_c²``），故本函数不另设基于 T 的剔除条件——报告值供调用方自筛与
+    审计（若改为独立剔除项，与等模容差等价，且在 ``|r| ≠ a_ref`` 处 T 只是名义不变，
+    反而会剔掉合法格）。
+
     Args:
         v_inf_in: 进入速度矢量（3,），km/s。
         v_inf_out: 离开速度矢量（3,），km/s。
@@ -241,8 +264,18 @@ def evaluate_flyby(
         raise ValueError(f"body_state 须为长度 6 的日心状态，得到 {state.shape}")
     position = state[:3]
     velocity = state[3:]
-    tisserand_before = heliocentric_tisserand(position, velocity + v_in, mu_sun_km3_s2, a_ref_km)
-    tisserand_after = heliocentric_tisserand(position, velocity + v_out, mu_sun_km3_s2, a_ref_km)
+    # Tisserand 参考面 = 该天体自身的轨道面（经典定义相对参考行星轨道面，而非赤道面）。
+    body_momentum = np.cross(position, velocity)
+    body_momentum_norm = float(np.linalg.norm(body_momentum))
+    if body_momentum_norm == 0.0:
+        raise ValueError(f"{body} 的日心态角动量为零：Tisserand 参考轨道面未定义")
+    ref_normal = body_momentum / body_momentum_norm
+    tisserand_before = heliocentric_tisserand(
+        position, velocity + v_in, mu_sun_km3_s2, a_ref_km, ref_normal
+    )
+    tisserand_after = heliocentric_tisserand(
+        position, velocity + v_out, mu_sun_km3_s2, a_ref_km, ref_normal
+    )
     return FlybyEvaluation(
         body=body,
         v_inf_km_s=v_inf_eff,
@@ -277,7 +310,9 @@ def search_mga_chains(
     候选定义：每个 leg 取 short-way/零圈 Lambert 解；出发 v∞ = ``|v0₀ − v_出发体|``，
     到达 v∞ = ``|vf_末 − v_到达体|``，总 ΔV = 两者之和；每个中间天体在相应历元做
     无动力 flyby 评估（:func:`evaluate_flyby`），任一 leg 无解或任一 flyby 不可行
-    即弃格。
+    即弃格。借力前后日心 Tisserand 随候选同报（参考面与半长轴取该飞越天体日心态）：
+    “T 不变”即无动力飞越的等模约束本身（``|ΔT|`` 只由 ``Δ|v∞|`` 驱动），故不作
+    独立剔除条件，值供调用方自筛与审计。
 
     Args:
         body_sequence: 天体序列（SPICE 天体名）：首项出发体、末项到达体、中间项为

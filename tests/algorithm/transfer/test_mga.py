@@ -23,6 +23,7 @@ from e2m2e.algorithm.transfer.mga import (
     flyby_turn_angle,
     heliocentric_tisserand,
 )
+from e2m2e.algorithm.transfer.qlaw import rv_to_keplerian
 
 pytestmark = pytest.mark.theory
 
@@ -154,6 +155,34 @@ class TestHeliocentricTisserand:
             pytest.approx(3.0, rel=1e-14)
         )
 
+    def test_reference_plane_must_be_body_orbit_plane(self):
+        """参考面取天体轨道面：倾斜参考轨道下赤道极点口径系统性偏低（回归守卫）。
+
+        合成行星轨道面绕 x 轴倾斜 23.44°（类黄道面对赤道面）。用赤道极点作参考面
+        时第二项被 cos(23.44°) 压低，恒等式 ``T = 3 − v∞²/v_c²`` 不成立；取天体
+        轨道法向后恒等式恢复。
+        """
+        tilt = math.radians(23.44)
+        rot_x = np.array(
+            [
+                [1.0, 0.0, 0.0],
+                [0.0, math.cos(tilt), -math.sin(tilt)],
+                [0.0, math.sin(tilt), math.cos(tilt)],
+            ]
+        )
+        body_state = np.concatenate([rot_x @ BODY_STATE[:3], rot_x @ BODY_STATE[3:]])
+        velocity = body_state[3:]
+        normal = np.cross(body_state[:3], velocity)
+        normal = normal / np.linalg.norm(normal)
+        v_inf = rot_x @ np.array([0.0, 2.0, 0.0])
+        a_ref, *_ = rv_to_keplerian(body_state[:3], velocity, MU_SUN)
+        expected = 3.0 - float(np.dot(v_inf, v_inf)) / V_CIRC**2
+        on_plane = heliocentric_tisserand(body_state[:3], velocity + v_inf, MU_SUN, a_ref, normal)
+        assert on_plane == pytest.approx(expected, rel=1e-12)
+        # 赤道极点口径（默认）在同一状态上偏离恒等式：本次修复的病灶正是这一系统性偏差
+        equatorial = heliocentric_tisserand(body_state[:3], velocity + v_inf, MU_SUN, a_ref)
+        assert abs(equatorial - on_plane) > 0.1
+
     @pytest.mark.parametrize("bad", [0.0, -1.0, math.inf])
     def test_non_positive_reference_rejected(self, bad):
         with pytest.raises(ValueError, match="a_ref_km"):
@@ -195,11 +224,11 @@ class TestEvaluateFlyby:
             float(np.dot(v_inf_in, v_inf_out)) / (norm_in * float(np.linalg.norm(v_inf_out)))
         )
         assert evaluation.turn_angle_rad == pytest.approx(expected_angle, abs=1e-12)
-        # 日心比能量差恒等于 v_body·(v∞out − v∞in)（|v∞| 相等时）
+        # 日心比能量差恒等于 v_body·(v∞out − v∞in)（|v∞| 相等时）；双边比较才是否掉符号错
         delta_energy = _specific_energy(
             BODY_STATE[:3], BODY_VELOCITY + v_inf_out
         ) - _specific_energy(BODY_STATE[:3], BODY_VELOCITY + v_inf_in)
-        assert delta_energy - float(np.dot(BODY_VELOCITY, v_inf_out - v_inf_in)) < 1e-12
+        assert abs(delta_energy - float(np.dot(BODY_VELOCITY, v_inf_out - v_inf_in))) < 1e-12
         # Tisserand：无动力飞越前后名义不变（诊断量，容差 1e-12）
         assert evaluation.tisserand_before == pytest.approx(evaluation.tisserand_after, abs=1e-12)
 

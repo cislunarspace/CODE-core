@@ -168,45 +168,14 @@ def _emit_progress(
         callback(fraction, message)
 
 
-def _wsb_search_progress(
-    callback: ProgressCallback | None, request: TransferDesignRequest
+def _grid_progress(
+    callback: ProgressCallback | None, total: int, label: str
 ) -> Callable[[int], None] | None:
-    """WSB 网格搜索 delta 回调 → fraction 适配器（#576）。
+    """网格搜索 delta 回调 → fraction 适配器（#576）。
 
-    WSB 是当前唯一暴露搜索进度回调的转移路径（Rust 侧每完成一个
-    ``(sun_phase, tof)`` 网格任务发一次 delta）；映射到 (0.1, 0.9) 区间，
-    起止两端由调用方上报。非 WSB 或无回调返回 None（零开销直通）。
-    """
-    if callback is None or request.transfer_type != "WSB":
-        return None
-    params = request.wsb_search_params
-    if params is None:
-        from e2m2e.algorithm.transfer import WsbSearchParams
-
-        params = WsbSearchParams()
-    total = max(params.n_sun_phase * params.n_tof, 1)
-    seen = [0]
-
-    def on_delta(delta: int) -> None:
-        seen[0] += delta
-        done = min(seen[0], total)
-        _emit_progress(
-            callback,
-            0.1 + 0.8 * done / total,
-            f"WSB 网格搜索 {done}/{total}",
-        )
-
-    return on_delta
-
-
-def _mga_search_progress(
-    callback: ProgressCallback | None, total: int
-) -> Callable[[int], None] | None:
-    """MGA 网格搜索 delta 回调 → fraction 适配器（#576）。
-
-    ``algorithm/transfer/mga.search_mga_chains`` 每完成一个 (发射历元, leg)
-    批量求解发一次 ``delta=1``；映射到 (0.1, 0.9) 区间，起止两端由调用方上报。
-    无回调返回 None（零开销直通）。
+    搜索内核每完成一个网格任务发一次 ``delta``；映射到 (0.1, 0.9) 区间，起止两端
+    由调用方上报。无回调返回 None（零开销直通）。两条网格搜索路径（WSB、MGA）共用
+    此实现，避免进度区间/钳位/措辞各自漂移。
     """
     if callback is None:
         return None
@@ -216,13 +185,39 @@ def _mga_search_progress(
     def on_delta(delta: int) -> None:
         seen[0] += delta
         done = min(seen[0], total)
-        _emit_progress(
-            callback,
-            0.1 + 0.8 * done / total,
-            f"MGA 网格搜索 {done}/{total}",
-        )
+        _emit_progress(callback, 0.1 + 0.8 * done / total, f"{label} {done}/{total}")
 
     return on_delta
+
+
+def _wsb_search_progress(
+    callback: ProgressCallback | None, request: TransferDesignRequest
+) -> Callable[[int], None] | None:
+    """WSB 网格搜索 delta 回调 → fraction 适配器（#576）。
+
+    WSB 是首个暴露搜索进度回调的转移路径（Rust 侧每完成一个
+    ``(sun_phase, tof)`` 网格任务发一次 delta）；非 WSB 或无回调返回 None
+    （零开销直通）。
+    """
+    if callback is None or request.transfer_type != "WSB":
+        return None
+    params = request.wsb_search_params
+    if params is None:
+        from e2m2e.algorithm.transfer import WsbSearchParams
+
+        params = WsbSearchParams()
+    return _grid_progress(callback, params.n_sun_phase * params.n_tof, "WSB 网格搜索")
+
+
+def _mga_search_progress(
+    callback: ProgressCallback | None, total: int
+) -> Callable[[int], None] | None:
+    """MGA 网格搜索 delta 回调 → fraction 适配器（#576）。
+
+    ``algorithm/transfer/mga.search_mga_chains`` 每完成一个 (发射历元, leg)
+    批量求解发一次 ``delta=1``；无回调返回 None（零开销直通）。
+    """
+    return _grid_progress(callback, total, "MGA 网格搜索")
 
 
 #: J2000 历元（2000-01-01 12:00:00 TDB）的 JD_TDB。ET 秒 = (JD_TDB − 该值)·86400

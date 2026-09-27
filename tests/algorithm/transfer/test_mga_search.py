@@ -238,16 +238,23 @@ class TestFlybyAssemblyOracle:
                 expected_angle = math.acos(float(np.dot(v_in, v_out)) / (norm_in * norm_out))
                 assert flyby.turn_angle_rad == pytest.approx(expected_angle, rel=1e-12)
                 a_ref, *_ = rv_to_keplerian(state[:3], state[3:], MU_SUN)
+                # Tisserand 参考面 = 飞越天体轨道面（此处合成天体在 x-y 面内，n̂ = ẑ）
+                ref_normal = np.cross(state[:3], state[3:])
+                ref_normal = ref_normal / np.linalg.norm(ref_normal)
                 expected_radius = flyby_pericenter_radius(
                     expected_angle, flyby.v_inf_km_s, _GM[bodies[index]]
                 )
                 assert flyby.pericenter_radius_km == pytest.approx(expected_radius, rel=1e-9)
                 assert flyby.tisserand_before == pytest.approx(
-                    heliocentric_tisserand(state[:3], state[3:] + v_in, MU_SUN, float(a_ref)),
+                    heliocentric_tisserand(
+                        state[:3], state[3:] + v_in, MU_SUN, float(a_ref), ref_normal
+                    ),
                     rel=1e-12,
                 )
                 assert flyby.tisserand_after == pytest.approx(
-                    heliocentric_tisserand(state[:3], state[3:] + v_out, MU_SUN, float(a_ref)),
+                    heliocentric_tisserand(
+                        state[:3], state[3:] + v_out, MU_SUN, float(a_ref), ref_normal
+                    ),
                     rel=1e-12,
                 )
 
