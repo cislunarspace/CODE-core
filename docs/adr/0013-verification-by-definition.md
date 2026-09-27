@@ -69,3 +69,13 @@ This does not affect e2m2e's own definition-level verification. Checks relying
 only on e2m2e, physical definitions, and project-shipped SPICE kernels remain
 by their behavioral value; they are not recast as external cross-checks merely
 because external implementations used similar methods.
+
+## Revision (2026-09-27, #722 oracle taxonomy)
+
+Decision 2's boundary between admissible literature values and prohibited
+external outputs is refined by ADR 0055: definitional values (adopted
+constant sets, formula coefficients, formula-recomputable table values) may
+be asserted with documented tolerances and reproduction traps; result values
+(third-party simulation/optimization outputs) are docstring-only manual
+references. ADR 0055 also names degenerate-limit anchoring and mechanism
+tests as oracle classes already in repo practice.

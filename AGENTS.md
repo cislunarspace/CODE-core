@@ -133,6 +133,6 @@ make clean-tests
 - 每个 pytest 用例恰好一个主功能标记：`theory`、`integrator`、`force`、`data`、`orchestration`、`interface`、`aux`；`spice`、`low_thrust` 是正交标记。不要新增 `slow`、`e2e` 等速度层标记，也不要让一个用例承担多个主类。
 - 缺少外部能力才 skip：使用 `requires_spice`、`requires_native_symbols`、`pytest.importorskip` 或现有 fixture；代码错误必须 fail。SPICE fixture 用完卸载内核，catalog 测试用 `tmp_path` 隔离目录，昂贵轨道用 session/module 缓存并在函数级返回副本。
 - 时间门禁机器强制 call 阶段默认每用例 10 秒；确实无法压缩时才用 `@pytest.mark.time_budget(seconds)` 并写明原因。单文件 60 秒是人工纪律，不是当前插件的机器门禁；长弧、密网格和生产图移到 `scripts/`。
-- 按物理定义、解析解、守恒量、对称性和文献公式验收；不把外部软件运行时输出当 oracle。协议字节、闭式公式等固定值可以验证，但不要用脆弱的实现细节或复制同一实现的断言替代行为测试。
+- 按物理定义、解析解、守恒量、对称性和文献公式验收；不把外部软件运行时输出当 oracle。文献数值区分定义性（论文采用的常数、系数、可复算表值，可断言并记录复现陷阱）与结果性（他人仿真输出，仅 docstring 人工对照，禁入断言）；oracle 类别词汇见 ADR 0055。协议字节、闭式公式等固定值可以验证，但不要用脆弱的实现细节或复制同一实现的断言替代行为测试。
 - Python 覆盖率配置为 branch coverage、`fail_under = 55`，需显式运行 `uv run --no-sync python -m pytest --cov` 才启用；`make test` 本身不带 `--cov`。修改行为时先补最小真实调用或回归测试，并运行受影响测试、`make check`；跨层契约变化再扩大到 `make test`。
 - `_meta` 测试守护主标记、层级相关契约、常量来源、Rust ABI、共享叶 re-export、原生符号门和测试残留。`make check` 不会自动运行 `_meta`，完整 pytest 收集时才会覆盖这些门禁。
