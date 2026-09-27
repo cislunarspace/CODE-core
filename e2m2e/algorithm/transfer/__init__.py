@@ -91,6 +91,18 @@ from .pcn import PcnBplaneTarget, PcnSearchParams, PcnSolution, solve_pcn
 from .porkchop import ParetoFront, PorkchopData, pareto_front, porkchop
 from .propulsion import ImpulsivePropulsion
 from .qlaw import qlaw_guess, rv_to_keplerian
+from .sep import (
+    SpiralGuess,
+    constant_thrust_final_mass,
+    constant_thrust_transfer_time,
+    edelbaum_delta_v,
+    edelbaum_delta_v_inclined,
+    mass_flow_rate,
+    nep_available_power,
+    sep_available_power,
+    spiral_arc_guess,
+    thrust_from_power,
+)
 from .solution_database import SolutionDatabase
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 from .three_body_lambert import ThreeBodyLambert
@@ -172,6 +184,16 @@ __all__ = [
     "controls_from_sequence",
     "qlaw_guess",
     "rv_to_keplerian",
+    "SpiralGuess",
+    "constant_thrust_final_mass",
+    "constant_thrust_transfer_time",
+    "edelbaum_delta_v",
+    "edelbaum_delta_v_inclined",
+    "mass_flow_rate",
+    "nep_available_power",
+    "sep_available_power",
+    "spiral_arc_guess",
+    "thrust_from_power",
     "TliParams",
     "construct_departure_state",
     "hohmann_delta_v",
