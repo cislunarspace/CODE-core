@@ -135,6 +135,8 @@ pub fn gravity_field_acceleration(
             et,
         ) {
             Ok(Some(p)) => p,
+            // 非 strict miss 回退走纯 Rust SPK 后端（ADR 0051）：仅支持
+            // J2000 与 abcorr=NONE；propagation_frame 配成其他帧会在此硬报错。
             Ok(None) => {
                 let (st, _) = e2m2e_spice::spice_ffi::spkezr(
                     propagation_origin,

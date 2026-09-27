@@ -912,32 +912,21 @@ fn pole_tide(et: f64, xp: f64, yp: f64) -> PyResult<Vec<f64>> {
     Ok(e2m2e_forces::solid_tide::pole_tide(et, xp, yp))
 }
 
-/// PoC：通过 cspice 查询 `target` 相对 `observer` 在 J2000 系下的位置（km）。
+/// PoC：查询 `target` 相对 `observer` 在 J2000 系下的位置（km）。
 ///
-/// 用于验证：
-/// 1. maturin + cspice 链路是否正常
-/// 2. Python spiceypy 已 furnsh 的内核池是否对 Rust cspice 可见（共享内核池）
+/// 走 ADR 0051 的纯 Rust SPK 后端（`spice_ffi::spkezr` → `native_spk`），
+/// 零 cspice FFI；内核须经 `spice_furnsh`（`furnish_kernel`）双登记。
 ///
-/// 仅在 `spice` feature 下编译。返回长度 3 的 `Vec<f64>` 。
+/// 用于验证：maturin 链路是否正常、native 注册表与 Python spiceypy 的
+/// 查询是否一致。仅在 `spice` feature 下编译。返回长度 3 的 `Vec<f64>` 。
 #[cfg(feature = "spice")]
 #[pyfunction]
 fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Vec<f64>> {
-    use cspice::common::AberrationCorrection;
-    use cspice::spk::easier_reader;
-    use cspice::time::Et;
-
-    let et_tdb = Et::from(et);
-    let (state, _lt) = easier_reader(
-        target,
-        et_tdb,
-        "J2000",
-        AberrationCorrection::NONE,
-        observer,
-    )
-    .map_err(|e| {
-        pyo3::exceptions::PyRuntimeError::new_err(format!("cspice spkezr failed: {:?}", e))
-    })?;
-    Ok(vec![state.position.x, state.position.y, state.position.z])
+    let (state, _lt) = e2m2e_spice::spice_ffi::spkezr(target, et, "J2000", "NONE", observer)
+        .map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("native spkezr failed: {e}"))
+        })?;
+    Ok(state[..3].to_vec())
 }
 
 /// 首次调用时经 Once 触发 Rust CSPICE 实例的行星名别名注册（对称 Python
@@ -948,11 +937,15 @@ pub(crate) fn ensure_bodies_registered() {
     REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
 }
 
-/// 在 Rust cspice 内核池加载一个内核文件。
+/// 在 Rust 侧加载一个内核文件（ADR 0051 双登记：native SPK 注册表 +
+/// cspice 内核池）。
 ///
 /// Rust cspice 与 Python spiceypy 是**独立的 CSPICE 实例** （静态链接，全局状态
 /// 不共享）。Python 侧 furnsh 的内核，Rust 看不见；反之亦然。要让 Rust 查询
 /// 可用，必须用本函数在 Rust 侧再 furnsh 一次（同一份文件，两边独立加载）。
+/// native SPK 注册表与 CSPICE 池由 [`e2m2e_spice::furnish_kernel`] 一次性
+/// 双登记：二进制 DAF 内核进 native 注册表（`spkezr` 求值路径），文本内核
+/// 只进 CSPICE 池；任一真实错误上抛。
 ///
 /// 同时在首次加载时把行星名注册到质心/本体 ID（`register_bodies` ），使本
 /// 实例对 "MARS"/"JUPITER" 等的解析与 Python spiceypy 实例（那边在
@@ -962,9 +955,8 @@ pub(crate) fn ensure_bodies_registered() {
 #[pyfunction]
 fn spice_furnsh(path: &str) -> PyResult<()> {
     ensure_bodies_registered();
-    cspice::data::furnish(path).map_err(|e| {
-        pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {:?}", e))
-    })?;
+    e2m2e_spice::furnish_kernel(path)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {e}")))?;
     LOADED_KERNELS.lock().unwrap().push(path.to_string());
     Ok(())
 }
@@ -991,6 +983,8 @@ fn spice_unload(path: &str) -> PyResult<()> {
     if !loaded.iter().any(|p| p == path) {
         return Ok(());
     }
+    // 双卸载（ADR 0051）：native 注册表幂等移除 + cspice 池卸载。
+    e2m2e_spice::native_spk::unload(std::path::Path::new(path));
     cspice::data::unload(path).map_err(|e| {
         pyo3::exceptions::PyRuntimeError::new_err(format!("unload failed: {:?}", e))
     })?;

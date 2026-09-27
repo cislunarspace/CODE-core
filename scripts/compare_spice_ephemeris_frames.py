@@ -517,9 +517,13 @@ def check_spline(manager: SPICEManager, smoke: bool) -> tuple[list[dict], list[d
 
     本节预期**非**机器精度:产出即 ADR 0016 / ephem_cache.py 记载的样条 dt
     精度退化的量化。Rust 侧样条缓存无 Python 查询入口(``spice_poc_body_position``
-    直连 easier_reader 不过缓存;缓存只供 Rust 力模型内循环),仅经
+    走纯 Rust SPK 后端不过缓存,ADR 0051;缓存只供 Rust 力模型内循环),仅经
     enable/disable 构建路径覆盖;量化 Rust 样条需新增 FFI 导出,超出本 issue
     「不改实现」约束。
+
+    已知限制(ADR 0051 Phase A):Rust 侧 ``spice_spkezr`` 只支持 ``abcorr="NONE"``,
+    本节对拍面里的 ``"LT"`` 分支每样本都会被拒绝并计入 skips(异常列表会出现
+    ``skip_ratio=1.0``)。LT 半边在 Phase B 前不可比,读数时只看 ``"NONE"`` 列。
     """
     sp = get_spiceypy()
     rows: list[dict] = []

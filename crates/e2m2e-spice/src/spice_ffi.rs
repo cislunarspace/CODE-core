@@ -1,8 +1,9 @@
 //! cspice-sys 直接 FFI 的 safe 包装（仅 `spice` feature 下编译）。
 //!
-//! cspice 0.1 高层 API 只覆盖 spk/data/time 等基础功能，缺 pxform/sxform/bodvrd
-//! 等坐标变换和物理参数查询。本模块直接通过 cspice-sys 的 unsafe FFI 调用
-//! 这些函数，提供 safe Rust 接口。
+//! cspice 0.1 高层 API 只覆盖 spk/data/time 等基础功能，缺 pxform/sxform
+//! 等坐标变换查询。本模块直接通过 cspice-sys 的 unsafe FFI 调用这些函数，
+//! 提供 safe Rust 接口。星历几何查询（spkezr）自 ADR 0051 起改走纯 Rust
+//! 后端，不再跨 FFI。
 //!
 //! # CSPICE 错误处理
 //!
@@ -21,8 +22,8 @@
 #[cfg(test)]
 use cspice_sys::bodn2c_c;
 use cspice_sys::{
-    boddef_c, bodvrd_c, erract_c, errdev_c, et2utc_c, failed_c, getmsg_c, ktotal_c, pxform_c,
-    qcktrc_c, reset_c, spkezr_c, sxform_c, ConstSpiceChar, SpiceInt,
+    boddef_c, erract_c, errdev_c, et2utc_c, failed_c, getmsg_c, ktotal_c, pxform_c, qcktrc_c,
+    reset_c, sxform_c, ConstSpiceChar, SpiceInt,
 };
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -32,7 +33,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// （前提：星历预采样缓存已启用 + strict 模式，力模型查内存样条）。
 pub static FFI_CALLS: AtomicU64 = AtomicU64::new(0);
 
-/// 返回累计 cspice FFI 调用次数（pxform/sxform/spkezr 入口）。
+/// 返回累计 cspice FFI 调用次数（pxform/sxform/et2utc 入口）。
+///
+/// ADR 0051 后 spkezr 走纯 Rust 后端、不再计数，故「零 cspice」断言比此前
+/// 更容易成立（断言方向不受影响）。
 pub fn ffi_call_count() -> u64 {
     FFI_CALLS.load(Ordering::Relaxed)
 }
@@ -205,7 +209,7 @@ pub fn id_to_name(id: SpiceInt) -> Option<&'static str> {
 /// 对同一 (name, id) 重复调用幂等。
 ///
 /// 同时显式设置 CSPICE 错误动作（见 [`init_error_handling`]），消除对上游
-/// crate 初始化顺序的依赖。应在任何 `spkezr`/`bodvrd` 之前调用一次（见
+/// crate 初始化顺序的依赖。应在任何 `spkezr`/`pxform` 之前调用一次（见
 /// `spice_furnsh` 里的 `Once` 触发）。
 pub fn register_bodies() {
     init_error_handling();
@@ -233,10 +237,32 @@ fn bodn2c(name: &str) -> Option<SpiceInt> {
     }
 }
 
+/// 名字→NAIF ID（本地解析，不跨 FFI）。供 [`spkezr`] 走纯 Rust 后端前把
+/// 天体名归一成 ID。与 CSPICE `bodn2c` 的可用面保持一致：
+///
+/// 1. [`BODY_ALIASES`] 别名表（大小写不敏感）；
+/// 2. CSPICE 内置天体名中本项目实际会用到的 "SOLAR SYSTEM BARYCENTER"（ID 0）；
+/// 3. 纯数字串直接按 NAIF ID 解析（spkezr("399", …) 语义）。
+///
+/// 覆盖面窄于 CSPICE `bodn2c` 内置表："PLUTO"、"LUNA"、"MARS BARYCENTER" 一类
+/// 未收录名会硬报「未知天体名」（ADR 0051 Phase A 边界，不静默回退）。仓库内
+/// 全部 Rust 调用方传名均在覆盖内（见 R/naif_id_str 侧的数字串路径）。
+pub(crate) fn name_to_id(name: &str) -> Option<SpiceInt> {
+    let upper = name.trim().to_ascii_uppercase();
+    if upper == "SOLAR SYSTEM BARYCENTER" {
+        return Some(0);
+    }
+    if let Some((_, id)) = BODY_ALIASES.iter().find(|(n, _)| *n == upper) {
+        return Some(*id);
+    }
+    upper.parse::<SpiceInt>().ok()
+}
+
 /// ktotal_c 包装：返回当前已加载的指定类型内核数。`kind` 通常为 "ALL"。
 ///
-/// 供 spkezr/pxform 入口预检内核池是否为空（见 ADR 0020：用状态查询预检，
-/// 不用 CSPICE 错误码字符串匹配翻译）。
+/// 供 pxform/et2utc 入口预检 CSPICE 内核池是否为空（见 ADR 0020：用状态查询
+/// 预检，不用 CSPICE 错误码字符串匹配翻译）。spkezr 的预检自 ADR 0051 起改判
+/// native 注册表（见 `spkezr`）。
 pub fn ktotal(kind: &str) -> Result<i32, SpiceFfiError> {
     let kind_c = to_cstring(kind);
     let mut count: SpiceInt = 0;
@@ -247,7 +273,8 @@ pub fn ktotal(kind: &str) -> Result<i32, SpiceFfiError> {
     Ok(count as i32)
 }
 
-/// 内核池为空时的项目语境错误信息。spkezr/pxform 入口预检复用。
+/// 无内核可用时的项目语境错误信息。pxform/et2utc 判 CSPICE 内核池为空、
+/// spkezr 判 native 注册表为空（文本内核不产生 native 段）时复用。
 const NO_KERNEL_MSG: &str = "Rust CSPICE 实例无内核加载——请经 SPICEManager.load_kernel 加载";
 
 /// pxform_c 包装：返回 from→to 在 et 时刻的 3×3 旋转矩阵（行优先）。
@@ -295,10 +322,20 @@ pub fn sxform(from: &str, to: &str, et: f64) -> Result<[[f64; 6]; 6], SpiceFfiEr
     Ok(xform)
 }
 
-/// spkezr_c 包装：返回 target 相对 observer 在 frame 系下的状态 [x,y,z,vx,vy,vz] + 光时 lt。
+/// spkezr 包装：返回 target 相对 observer 在 frame 系下的状态 [x,y,z,vx,vy,vz] + 光时 lt。
 ///
 /// 等价于 Python spiceypy.spkezr(target, et, frame, abcorr, observer)。
-/// `abcorr` 通常为 "NONE"。
+///
+/// # 纯 Rust 后端（ADR 0051，#639 Phase A）
+///
+/// 星历几何求值不再跨 CSPICE FFI：走 [`crate::native_spk`] 的纯 Rust DAF +
+/// SPK Type 2 读取器，与 CSPICE 逐位一致。Phase A 边界：`frame == "J2000"`
+/// 且 `abcorr == "NONE"` 才继续，否则硬报错（消息含
+/// `SPK_NATIVE_UNSUPPORTED_FRAME/ABCORR`），不回退 CSPICE。abcorr=NONE 下
+/// `lt` 恒返回 0.0（几何链式状态不含光行时；`abcorr=NONE` 下 CSPICE 的 lt 为
+/// 几何单向光时，本后端不计算它——仓库内无 lt 消费者，Python 诊断口
+/// `spice_spkezr` 会观察到该差异）。内核须经 [`crate::furnish_kernel`] 双登记
+/// （native 注册表 + CSPICE 池）。
 pub fn spkezr(
     target: &str,
     et: f64,
@@ -306,54 +343,29 @@ pub fn spkezr(
     abcorr: &str,
     observer: &str,
 ) -> Result<([f64; 6], f64), SpiceFfiError> {
-    // 入口预检：内核池为空时直接报项目语境错误，不走 FFI（避免 CSPICE 内部
-    // 错误码上冒或 erract 兜底杀进程）。
-    if ktotal("ALL")? == 0 {
+    // 入口预检：native 注册表为空说明没有任何内核经 furnish_kernel 登记
+    // （文本内核不产生 native 段），直接报项目语境错误。
+    if crate::native_spk::is_empty() {
         return Err(SpiceFfiError::Failed(NO_KERNEL_MSG.into()));
     }
-    bump_ffi_calls();
-    let target_c = to_cstring(target);
-    let frame_c = to_cstring(frame);
-    let abcorr_c = to_cstring(abcorr);
-    let observer_c = to_cstring(observer);
-    let mut state = [0.0_f64; 6];
-    let mut lt = 0.0_f64;
-    unsafe {
-        spkezr_c(
-            target_c.as_ptr() as *mut ConstSpiceChar,
-            et,
-            frame_c.as_ptr() as *mut ConstSpiceChar,
-            abcorr_c.as_ptr() as *mut ConstSpiceChar,
-            observer_c.as_ptr() as *mut ConstSpiceChar,
-            state.as_mut_ptr(),
-            &mut lt,
-        );
-        check_spice_error()?;
+    if !frame.eq_ignore_ascii_case("J2000") {
+        return Err(SpiceFfiError::Failed(format!(
+            "SPK_NATIVE_UNSUPPORTED_FRAME: 本地 SPK 后端仅支持 J2000，收到 frame={frame:?}"
+        )));
     }
-    Ok((state, lt))
-}
-
-/// bodvrd_c 包装：读取天体属性（如 GM、RADII）。
-///
-/// 等价于 Python spiceypy.bodvrd(body, item, maxn)。
-/// 返回 values 数组（长度 maxn）+ 实际 dim。
-pub fn bodvrd(body: &str, item: &str, maxn: usize) -> Result<(Vec<f64>, i32), SpiceFfiError> {
-    let body_c = to_cstring(body);
-    let item_c = to_cstring(item);
-    let mut values = vec![0.0_f64; maxn];
-    let mut dim: SpiceInt = 0;
-    unsafe {
-        bodvrd_c(
-            body_c.as_ptr() as *mut ConstSpiceChar,
-            item_c.as_ptr() as *mut ConstSpiceChar,
-            maxn as SpiceInt,
-            &mut dim,
-            values.as_mut_ptr(),
-        );
-        check_spice_error()?;
+    if !abcorr.eq_ignore_ascii_case("NONE") {
+        return Err(SpiceFfiError::Failed(format!(
+            "SPK_NATIVE_UNSUPPORTED_ABCORR: 本地 SPK 后端仅支持 abcorr=NONE，收到 abcorr={abcorr:?}"
+        )));
     }
-    values.truncate(dim as usize);
-    Ok((values, dim))
+    let tid = name_to_id(target)
+        .ok_or_else(|| SpiceFfiError::Failed(format!("未知天体名 {target:?}：无法解析 NAIF ID")))?;
+    let oid = name_to_id(observer).ok_or_else(|| {
+        SpiceFfiError::Failed(format!("未知天体名 {observer:?}：无法解析 NAIF ID"))
+    })?;
+    let state =
+        crate::native_spk::state(tid, et, oid).map_err(|e| SpiceFfiError::Failed(e.to_string()))?;
+    Ok((state, 0.0))
 }
 
 /// et2utc_c 包装：ET → UTC ISO 字符串（"ISOC" 格式，prec 位小数秒）。
@@ -506,7 +518,9 @@ mod tests {
         ] {
             let path = kernel_dir.join(name);
             if path.exists() {
-                let _ = cspice::data::furnish(path.to_string_lossy().to_string());
+                // 双登记：native 注册表（spkezr 求值路径）+ CSPICE 内核池
+                //（easier_reader 等 oracle 路径）。文本内核 native 侧自动跳过。
+                let _ = crate::furnish_kernel(&path.to_string_lossy());
             }
         }
     }

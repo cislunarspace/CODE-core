@@ -7,9 +7,21 @@
 //! 设计：Python 侧 ``ThirdBodyGravity`` 在初始化时调 ``spice_furnsh``
 //! 加载内核（与 Python spiceypy 双 furnsh），运行时直接调本模块函数。
 
-use cspice::common::AberrationCorrection;
-use cspice::spk::easier_reader;
-use cspice::time::Et;
+/// 非 strict 缓存 miss 时的星历回退：走 [`crate::spice_ffi::spkezr`]
+/// （ADR 0051 纯 Rust 后端），返回类型保持 `cspice::Error` 以不改动调用方
+/// 签名——错误字段直接构造，详情放 explanation/long_message。
+fn fallback_spkezr(target: &str, et: f64, observer: &str) -> Result<[f64; 3], cspice::Error> {
+    let (state, _lt) =
+        crate::spice_ffi::spkezr(target, et, "J2000", "NONE", observer).map_err(|e| {
+            cspice::Error {
+                short_message: "SPK_NATIVE".to_string(),
+                explanation: e.to_string(),
+                long_message: e.to_string(),
+                traceback: String::new(),
+            }
+        })?;
+    Ok([state[0], state[1], state[2]])
+}
 
 /// 第三体摄动加速度（含直接项 + 间接项）。
 ///
@@ -40,21 +52,12 @@ pub fn third_body_acceleration(
 ) -> Result<[f64; 3], cspice::Error> {
     debug_assert_eq!(sc_pos.len(), 3, "sc_pos must have length 3");
 
-    // 优先查星历缓存（strict 模式下 miss 即硬 Err，杜绝回退 cspice；
-    // 非 strict 时 miss 软回退 easier_reader），消除每步 FFI 跨界。
+    // 优先查星历缓存（strict 模式下 miss 即硬 Err，杜绝回退星历查询；
+    // 非 strict 时 miss 软回退 spice_ffi::spkezr 纯 Rust 后端，ADR 0051），
+    // 消除每步 FFI 跨界。
     let r_ob = match crate::ephem_cache::lookup_body_position(target, observer, et) {
         Ok(Some(pos)) => pos,
-        Ok(None) => {
-            let et_tdb = Et::from(et);
-            let (state, _lt) = easier_reader(
-                target,
-                et_tdb,
-                "J2000",
-                AberrationCorrection::NONE,
-                observer,
-            )?;
-            [state.position.x, state.position.y, state.position.z]
-        }
+        Ok(None) => fallback_spkezr(target, et, observer)?,
         Err(e) => return Err(e.into()),
     };
 
@@ -108,17 +111,7 @@ pub fn third_body_acceleration_and_jacobian(
 ) -> Result<([f64; 3], [[f64; 3]; 3]), cspice::Error> {
     let r_ob = match crate::ephem_cache::lookup_body_position(target, observer, et) {
         Ok(Some(pos)) => pos,
-        Ok(None) => {
-            let et_tdb = Et::from(et);
-            let (state, _lt) = easier_reader(
-                target,
-                et_tdb,
-                "J2000",
-                AberrationCorrection::NONE,
-                observer,
-            )?;
-            [state.position.x, state.position.y, state.position.z]
-        }
+        Ok(None) => fallback_spkezr(target, et, observer)?,
         Err(e) => return Err(e.into()),
     };
 
@@ -179,17 +172,7 @@ pub fn indirect_term_acceleration(
 ) -> Result<[f64; 3], cspice::Error> {
     let r_ob = match crate::ephem_cache::lookup_body_position(target, observer, et) {
         Ok(Some(pos)) => pos,
-        Ok(None) => {
-            let et_tdb = Et::from(et);
-            let (state, _lt) = easier_reader(
-                target,
-                et_tdb,
-                "J2000",
-                AberrationCorrection::NONE,
-                observer,
-            )?;
-            [state.position.x, state.position.y, state.position.z]
-        }
+        Ok(None) => fallback_spkezr(target, et, observer)?,
         Err(e) => return Err(e.into()),
     };
     let r_ob_norm = (r_ob[0] * r_ob[0] + r_ob[1] * r_ob[1] + r_ob[2] * r_ob[2]).sqrt();
@@ -228,7 +211,8 @@ mod tests {
         ] {
             let path = kernel_dir.join(name);
             if path.exists() {
-                let _ = cspice::data::furnish(path.to_string_lossy().to_string());
+                // 双登记：native 注册表 + CSPICE 内核池（见 crate::furnish_kernel）。
+                let _ = crate::furnish_kernel(&path.to_string_lossy());
             }
         }
     }
