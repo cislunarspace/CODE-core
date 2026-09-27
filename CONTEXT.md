@@ -74,6 +74,19 @@ conic 档（单中心体二体圆锥近似，封闭解快筛，用于广泛搜�
 n 体数值传播，用于精化）（ADR 0050）。
 _避免_：能力档、精度档（与容差混淆）
 
+### 段（leg）
+日心多段转移的一 leg：两端由 node 界定的传播弧，conic 档或星历档二选一
+（ADR 0050）。
+_避免_：segment（保留给 LowThrustSegment 等既有专用用途）、分段
+
+### 控制节点（node）
+leg 交接处携带决策变量（推力/速度增量/借力参数）的点。
+_避免_：结点、patch point（保留给 multiple shooting 专用）
+
+### 匹配点（matchpoint）
+相邻 leg 间施加的状态连续性约束及其残差组装。
+_避免_：拼接点、continuity point
+
 ### Lambert 求解器（Lambert solver）
 二体边界值问题求解：给定一对位置（出发/到达）与飞行时间，解出连接两端的
 开普勒弧在两端的速度。porkchop 图与双脉冲 ΔV 估计的数值内核。
