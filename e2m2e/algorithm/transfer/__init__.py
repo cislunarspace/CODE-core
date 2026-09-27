@@ -68,6 +68,16 @@ from .lowthrust_shooting import (
     LowThrustShooting,
     LowThrustShootingSolution,
 )
+from .mga import (
+    FlybyEvaluation,
+    MgaCandidate,
+    MgaSearchResult,
+    evaluate_flyby,
+    flyby_pericenter_radius,
+    flyby_turn_angle,
+    heliocentric_tisserand,
+    search_mga_chains,
+)
 from .mission_assessment import MissionAssessment
 from .multi_impulse import (
     CoastArc,
@@ -124,6 +134,14 @@ __all__ = [
     "LambertSolution",
     "solve_lambert",
     "solve_lambert_batch",
+    "FlybyEvaluation",
+    "MgaCandidate",
+    "MgaSearchResult",
+    "evaluate_flyby",
+    "flyby_pericenter_radius",
+    "flyby_turn_angle",
+    "heliocentric_tisserand",
+    "search_mga_chains",
     "PorkchopData",
     "porkchop",
     "ParetoFront",

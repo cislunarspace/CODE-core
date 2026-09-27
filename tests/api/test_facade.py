@@ -455,9 +455,9 @@ class TestFacadeCallChains:
 class TestFacadeToolInventory:
     """接口类分家后的工具清单（ADR 0043）：Facade 组合根扫多个暴露类。"""
 
-    def test_inventory_counts_nineteen_implemented_tools(self):
+    def test_inventory_counts_twenty_implemented_tools(self):
         inventory = tool_inventory(Facade())
-        assert len(inventory) == 19
+        assert len(inventory) == 20
         assert all(tool.status == "implemented" for tool in inventory)
 
     def test_each_class_keeps_its_domain(self):
@@ -465,12 +465,13 @@ class TestFacadeToolInventory:
         from e2m2e.api.spatiography import Spatiography
 
         facade = Facade()
-        # Facade 留任务级五方法 + 请求侧值域清单（ADR 0043 决策 1；valid_ranges
+        # Facade 留任务级六方法 + 请求侧值域清单（ADR 0043 决策 1；valid_ranges
         # 是无任务副作用的查询出口，挂组合根，#620）
         assert set(mcp_tools(facade)) == {
             "design_orbit",
             "control_orbit",
             "transfer_design",
+            "mission_architecture_search",
             "orbit_propagation",
             "spacetime_transform",
             "valid_ranges",
