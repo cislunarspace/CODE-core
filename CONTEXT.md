@@ -131,6 +131,17 @@ _避免_：把左/右分支与短弧/长弧混用；"高解/低解"
 值）；tof 低于它则该圈数无解，本仓库显式报"最小时间"错误。
 _避免_：周期下界（它是转移弧时间下界，不是轨道周期）
 
+### SEP 功率模型（SEP power model）
+P₀（1AU 处阵列功率，W）与 P_bus（载荷常耗，W）之差为可用推进功率；SEP 档按 (1AU/r)² 衰减、NEP 档为常数；负值截 0（ADR 0055）。
+_避免_：光速推力映射（推力映射中的 c 为有效排气速度 c_e=Isp·g₀，非真空光速）
+
+### Edelbaum ΔV（Edelbaum delta-V）
+低推力多圈螺旋的解析 ΔV 近似——共面圆-圆 |v₁−v₂|，含倾角 sqrt(v₁²+v₂²−2v₁v₂cosΔi)（Edelbaum 1961；ADR 0055 ①/⑤ 类 oracle）。
+
+### 螺旋初猜（spiral guess）
+MALTO spiral-guess 同款常推力弧初猜，方向 ∥ ±v̂（抬升 +v̂、降低 −v̂），供 LowThrustShooting 与 Sims-Flanagan 预设计消费（ADR 0055，#724）。
+_避免_：与配点/打靶求解器内点初猜混淆
+
 ## 轨道库数据模型
 
 ### 轨道记录（Orbit record）
