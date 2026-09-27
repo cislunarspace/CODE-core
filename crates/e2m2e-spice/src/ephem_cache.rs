@@ -19,10 +19,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 
-use cspice::common::AberrationCorrection;
-use cspice::spk::easier_reader;
-use cspice::time::Et;
-
 use crate::spice_ffi::{pxform, SpiceFfiError};
 
 /// 缓存查询失败原因（strict 模式下的硬错误）。
@@ -320,23 +316,10 @@ impl EphemCache {
         for (target, observer) in bodies {
             let mut states = Vec::with_capacity(n);
             for &et in &t_grid {
-                let et_tdb = Et::from(et);
-                let (state, _lt) = easier_reader(
-                    target,
-                    et_tdb,
-                    "J2000",
-                    AberrationCorrection::NONE,
-                    observer,
-                )
-                .map_err(|e| SpiceFfiError::Failed(format!("cspice read: {e:?}")))?;
-                states.push([
-                    state.position.x,
-                    state.position.y,
-                    state.position.z,
-                    state.velocity.0[0],
-                    state.velocity.0[1],
-                    state.velocity.0[2],
-                ]);
+                // 纯 Rust 后端（ADR 0051）：spkezr 内部走 native_spk，零 FFI。
+                let (state, _lt) = crate::spice_ffi::spkezr(target, et, "J2000", "NONE", observer)
+                    .map_err(|e| SpiceFfiError::Failed(format!("native spkezr: {e}")))?;
+                states.push(state);
             }
             body_grids.push(((target.clone(), observer.clone()), states));
         }
@@ -636,8 +619,8 @@ pub fn enabled_span() -> Option<(f64, f64)> {
 }
 
 /// 缓存 key 归一化：NAIF ID 字符串（如 "301"）转名字（"MOON"）。
-/// ``to_rust_spec`` 把天体名转成 ID 字符串传给 ``easier_reader``，而
-/// ``enable_ephem_cache`` 侧用名字作 key——enable 后 miss 即硬失败
+/// ``to_rust_spec`` 把天体名转成 ID 字符串传给 ``spkezr``（本地解析名字→ID），
+/// 而 ``enable_ephem_cache`` 侧用名字作 key——enable 后 miss 即硬失败
 /// （ADR 0020 决策 4），key 不一致必须在查询侧收敛而非静默回退。
 fn normalize_body_name(name: &str) -> &str {
     if let Ok(id) = name.parse::<i32>() {

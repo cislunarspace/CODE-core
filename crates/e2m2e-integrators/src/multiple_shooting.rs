@@ -470,8 +470,9 @@ pub fn multiple_shooting_correct(
         // 第一步：逐段积分，收集 STM、终端状态。
         // 段间相互独立（只依赖本段起始状态），rayon 并行段积分线性加速。
         // 并行安全前提：星历预采样缓存已启用 + strict 模式，段积分内力
-        // 模型查内存三次样条，零 cspice FFI（cspice 并发会让多线程同时调
-        // easier_reader 触发全局锁损坏，报 SPICE(DAFFRNOTFOUND) 或 panic）。
+        // 模型查内存三次样条，零 cspice FFI（CSPICE 内核池进程级全局，多线程
+        // 直接跨池查星历会触发全局锁损坏，报 SPICE(DAFFRNOTFOUND) 或 panic；
+        // ADR 0051 后星历求值已走纯 Rust 后端，缓存仍是并行区零锁查询路径）。
         // par_iter 保序 + 各段积分确定 → 并行与串行位级一致。
         // 顺带求段两端点的状态导数 [v, a]（自由时间模式雅可比需要）。
         let integrate_seg = |i: usize| -> Result<SegmentInfo, String> {

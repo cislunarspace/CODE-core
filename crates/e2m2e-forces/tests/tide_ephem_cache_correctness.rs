@@ -36,7 +36,8 @@ fn load_kernels() {
     ] {
         let path = kernel_dir.join(name);
         if path.exists() {
-            let _ = cspice::data::furnish(path.to_string_lossy().to_string());
+            // 双登记：native SPK 注册表 + CSPICE 内核池（ADR 0051）。
+            let _ = e2m2e_spice::furnish_kernel(&path.to_string_lossy());
         }
     }
     e2m2e_spice::spice_ffi::register_bodies();

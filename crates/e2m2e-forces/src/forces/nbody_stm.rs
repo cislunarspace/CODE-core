@@ -653,7 +653,8 @@ mod tests {
                 if name.ends_with(".bsp") {
                     has_spk = true;
                 }
-                let _ = cspice::data::furnish(path.to_string_lossy().to_string());
+                // 双登记：native SPK 注册表 + CSPICE 内核池（ADR 0051）。
+                let _ = e2m2e_spice::furnish_kernel(&path.to_string_lossy());
             }
         }
         has_spk
