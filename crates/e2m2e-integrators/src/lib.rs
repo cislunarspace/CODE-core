@@ -983,8 +983,12 @@ fn spice_unload(path: &str) -> PyResult<()> {
     if !loaded.iter().any(|p| p == path) {
         return Ok(());
     }
-    // 双卸载（ADR 0051）：native 注册表幂等移除 + cspice 池卸载。
-    e2m2e_spice::native_spk::unload(std::path::Path::new(path));
+    // 三池卸载（ADR 0051/0052）：native SPK 注册表 + 文本池（FK/TPCK/LSK）
+    // 幂等移除 + cspice 池卸载。
+    let p = std::path::Path::new(path);
+    e2m2e_spice::native_spk::unload(p);
+    e2m2e_spice::native_frame::unload(p);
+    e2m2e_spice::native_time::unload(p);
     cspice::data::unload(path).map_err(|e| {
         pyo3::exceptions::PyRuntimeError::new_err(format!("unload failed: {:?}", e))
     })?;
