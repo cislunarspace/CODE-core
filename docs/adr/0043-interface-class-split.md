@@ -124,3 +124,25 @@ MCP worker、测试）都传单个根对象；execution/sidecar 的测试桩注�
 条件值域全量导出，ADR 0014 决策 8 请求侧）。它无任务副作用、不属任何
 领域类——横跨 design_orbit 与族生成的请求面元数据，挂组合根；其余
 决策不变。
+
+## 修订（2026-09-27，#721）：`low_thrust_design` 占位归属落定为 `low_thrust_preliminary`
+
+### 背景
+
+决策 4 把六个二档占位从 Facade 移除并声明"落地时直接进领域类，不回
+Facade"，其中转移能力的 `low_thrust_design` 最终归属留待实现时决定。
+Issue #721 裁决行星际 MGA 与 Sims-Flanagan 预设计的接口暴露方式时，该
+占位的归属随之落定。
+
+### 决策
+
+`low_thrust_design` 占位由 ADR 0054 落定为独立 Facade 任务级工具
+`low_thrust_preliminary`（Sims-Flanagan 预设计，下辖 ADR 0050 的
+conic/星历双档）：不扩 `transfer_type` 术语清单，不改 ADR 0040 契约；
+接口类归属仍按决策 4 在实现时落位，不回 Facade 占位。
+
+### 后果
+
+决策 4 其余结论不变；其余占位（`transfer_search`、`low_energy_transfer`、
+`orbit_stability`、`manifold_analysis`、`relative_motion`）的归属继续
+留待各自实现时决定。
