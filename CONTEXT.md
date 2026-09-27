@@ -137,7 +137,7 @@ _避免_：光速推力映射（推力映射中的 c 为有效排气速度 c_e=I
 
 ### Edelbaum ΔV（Edelbaum delta-V）
 低推力多圈螺旋的解析 ΔV 近似——共面圆-圆 |v₁−v₂|，含倾角 sqrt(v₁²+v₂²−2v₁v₂cos(πΔi/2))（Edelbaum 1961；ADR 0055 ①/⑤ 类 oracle）。
-_避免_：冲量单次机动的余弦定理形式（无 π/2 因子，会把含面变小推力螺旋低估到低于冲量下界）
+_避免_：冲量余弦定理形式（无 π/2 因子，低估低推力含面变代价）
 
 ### 螺旋初猜（spiral guess）
 MALTO spiral-guess 同款常推力弧初猜，方向 ∥ ±v̂（抬升 +v̂、降低 −v̂），供 LowThrustShooting 与 Sims-Flanagan 预设计消费（ADR 0055，#724）。
