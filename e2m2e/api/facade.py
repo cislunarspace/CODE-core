@@ -1,8 +1,8 @@
 """Facade 门面：任务级入口与暴露类组合根（ADR 0043）。
 
-接口层暴露三个类（ADR 0043）：``Facade`` 留六个任务级能力
-（design_orbit/control_orbit/transfer_design/mission_architecture_search/
-orbit_propagation/spacetime_transform）；``e2m2e.api.catalog.Catalog`` 承担轨道库
+``Facade`` 留七个任务级能力（design_orbit/control_orbit/transfer_design/
+mission_architecture_search/low_thrust_preliminary/orbit_propagation/
+spacetime_transform）；``e2m2e.api.catalog.Catalog`` 承担轨道库
 数据管理与族生成；``e2m2e.api.spatiography.Spatiography`` 承担分区分析。
 ``Facade`` 是组合根：``Facade().catalog`` / ``Facade().spatiography``
 向进程内调用方交出另外两类；唯一工具清单扫描 ``Facade().exposed_apis``
@@ -35,6 +35,10 @@ from .models import (
     DesignOrbitRequest,
     DesignOrbitResponse,
     FamilyGenerationRequest,
+    LowThrustFlybyInfo,
+    LowThrustLegInfo,
+    LowThrustPreliminaryRequest,
+    LowThrustPreliminaryResponse,
     ManeuverEvent,
     MgaChainCandidate,
     MgaFlybyInfo,
@@ -757,6 +761,120 @@ class Facade:
             status, cause, message = exception_triplet(exc)
             raise OrbitError("MISSION_SEARCH_FAILED", message, status=status, cause=cause) from exc
         _emit_progress(progress_callback, 1.0, "MGA 链搜索完成")
+        return response
+
+    @mcp_exposed(request_model=LowThrustPreliminaryRequest)
+    def low_thrust_preliminary(
+        self, progress_callback: ProgressCallback | None = None, **params
+    ) -> LowThrustPreliminaryResponse:
+        """Low-thrust transfer preliminary design (tier 1). / 低推力转移预设计（一档）。
+
+        薄封装 ``algorithm/transfer/sims_flanagan.SimsFlanaganMultiLegProblem``：
+        Pydantic 校验 → 多 leg 链（rendezvous/flyby 节点）段中冲量 NLP（SLSQP，
+        全解析雅可比）→ 解翻译为 Response。单 leg = 一个 rendezvous 节点。
+        ``backend`` 仅支持 conic 档（ADR 0050）；ephemeris 档未实现，显式报错。
+        结果不入 catalog（ADR 0054 决策 4）。
+        """
+        try:
+            request = LowThrustPreliminaryRequest(**params)
+            from e2m2e.algorithm.transfer import (
+                SimsFlanaganMultiLegProblem,
+                SimsFlanaganNode,
+                SimsFlanaganPropulsion,
+            )
+
+            propulsion = SimsFlanaganPropulsion(
+                isp_s=request.propulsion.isp_s,
+                t_max_n=request.propulsion.t_max_n,
+                p0_w=request.propulsion.p0_w,
+                p_bus_w=request.propulsion.p_bus_w,
+                efficiency=request.propulsion.efficiency,
+                r_helio_km=request.propulsion.r_helio_km,
+            )
+            nodes = [
+                SimsFlanaganNode(
+                    kind=node.kind,
+                    state=np.asarray(node.state, dtype=float),
+                    mu_km3_s2=node.mu_km3_s2,
+                    r_p_min_km=node.r_p_min_km,
+                )
+                for node in request.nodes
+            ]
+            _emit_progress(progress_callback, 0.0, "Sims-Flanagan 预设计开始")
+            problem = SimsFlanaganMultiLegProblem(
+                np.asarray(request.departure_state, dtype=float),
+                nodes,
+                request.leg_tofs_s,
+                propulsion,
+                request.initial_mass_kg,
+                request.mu_km3_s2,
+                backend=request.backend,
+            )
+            solution = problem.solve(
+                request.n_segments,
+                cost=request.cost,
+                cost_weights=(
+                    tuple(request.cost_weights) if request.cost_weights is not None else None
+                ),
+                tof_bounds_s=request.tof_bounds_s,
+                guess=request.guess,
+                ftol=request.ftol,
+                maxiter=request.maxiter,
+                use_analytic_jac=request.use_analytic_jac,
+            )
+            response = LowThrustPreliminaryResponse(
+                status=solution.status,
+                cause=solution.cause,
+                message=solution.message,
+                legs=[
+                    LowThrustLegInfo(
+                        impulses_km_s=leg.impulses_km_s.tolist(),
+                        impulse_times_s=leg.impulse_times_s.tolist(),
+                        node_times_s=leg.node_times_s.tolist(),
+                        forward_states=leg.forward_states.tolist(),
+                        backward_states=leg.backward_states.tolist(),
+                        matchpoint_residual=leg.matchpoint_residual.tolist(),
+                    )
+                    for leg in solution.legs
+                ],
+                flybys=[
+                    LowThrustFlybyInfo(
+                        v_inf_in_km_s=fb.v_inf_in_km_s.tolist(),
+                        v_inf_out_km_s=fb.v_inf_out_km_s.tolist(),
+                        v_inf_km_s=fb.v_inf_km_s,
+                        turn_angle_deg=math.degrees(fb.turn_angle_rad),
+                        pericenter_radius_km=(
+                            None if math.isinf(fb.pericenter_radius_km) else fb.pericenter_radius_km
+                        ),
+                    )
+                    for fb in solution.flybys
+                ],
+                leg_tofs_s=[float(tof) for tof in solution.leg_tofs_s],
+                delta_v_total_km_s=solution.delta_v_total_km_s,
+                final_mass_kg=solution.final_mass_kg,
+                fuel_kg=solution.fuel_kg,
+                objective_value=solution.objective_value,
+                cost=solution.cost,
+                n_iter=solution.n_iter,
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError(
+                "INVALID_PARAMS",
+                str(exc),
+                status=ConvergenceState.FAILED,
+                cause=FailureCause.INVALID_INPUT,
+            ) from exc
+        except Exception as exc:
+            status, cause, message = exception_triplet(exc)
+            raise OrbitError(
+                "LOW_THRUST_PRELIMINARY_FAILED",
+                message,
+                status=status,
+                cause=cause,
+            ) from exc
+        _emit_progress(progress_callback, 1.0, "Sims-Flanagan 预设计完成")
         return response
 
     @mcp_exposed(request_model=PropagationRequest)
