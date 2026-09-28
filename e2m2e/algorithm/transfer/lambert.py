@@ -11,10 +11,9 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.integrators import lambert_batch_py, lambert_izzo_py
 
-from ..results import ResultStatus
+from ...status import ConvergenceState, FailureCause, ResultStatus
 
 
 @dataclass(frozen=True)

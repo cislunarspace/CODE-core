@@ -7,8 +7,8 @@ import pytest
 
 from e2m2e.algorithm.station_keeping.controller import ControlOrbitResult
 from e2m2e.algorithm.station_keeping.monte_carlo import MonteCarloResult
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types import ManeuverTable, SKStatistic
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 

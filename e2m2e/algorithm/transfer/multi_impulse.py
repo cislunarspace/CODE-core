@@ -31,8 +31,8 @@ import numpy.typing as npt
 from scipy.integrate import solve_ivp
 from scipy.optimize import Bounds, OptimizeResult, minimize
 
-from ...data.templates import ConvergenceState, FailureCause
 from ...exceptions import PropagationFailure
+from ...status import ConvergenceState, FailureCause
 from ..results import scipy_slsqp_status
 from .config import TransferArc, TransferSolution
 from .lambert import solve_lambert

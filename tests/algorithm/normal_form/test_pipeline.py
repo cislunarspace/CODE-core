@@ -25,8 +25,8 @@ from e2m2e.algorithm.normal_form.dynamical_substitution import (
     DynamicalSubstituteResult,
 )
 from e2m2e.algorithm.normal_form.quasi_floquet import QuasiFloquetResult
-from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.templates.enums import LibrationPoint
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.theory
 

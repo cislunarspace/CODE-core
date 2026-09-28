@@ -107,7 +107,7 @@ def _full_period_continuation_5(seed, dynamics, setup_at, step, n_steps=N_STEPS,
     轨道的 x0 推进 ``step``，全周期闭合修正；``tolerance`` 非空时放宽修正器
     收敛判据。返回 ``n_steps`` 条新轨道。
     """
-    from e2m2e.data.templates import ConvergenceState
+    from e2m2e.status import ConvergenceState
 
     corrector = _make_corrector(dynamics, tolerance)
     current = seed.copy()

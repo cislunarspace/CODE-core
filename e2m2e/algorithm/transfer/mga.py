@@ -34,9 +34,8 @@ import numpy as np
 import numpy.typing as npt
 
 from e2m2e.data.constants import SECONDS_PER_DAY
-from e2m2e.data.templates import ConvergenceState, FailureCause
 
-from ..results import ResultStatus
+from ...status import ConvergenceState, FailureCause, ResultStatus
 from .lambert import solve_lambert_batch
 from .qlaw import rv_to_keplerian
 

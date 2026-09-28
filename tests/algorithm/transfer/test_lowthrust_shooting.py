@@ -15,7 +15,7 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import GravityField
 from e2m2e.algorithm.transfer import EngineConfig, LowThrustShooting
 from e2m2e.data.kernels.manager import SPICEManager
-from e2m2e.data.templates import ConvergenceState
+from e2m2e.status import ConvergenceState
 
 pytestmark = [pytest.mark.orchestration, pytest.mark.low_thrust]
 

@@ -51,9 +51,9 @@ from e2m2e.algorithm.results import FamilyGenerationResult
 from e2m2e.api.catalog_ingest import build_family_bundle
 from e2m2e.api.models import FamilyGenerationRequest
 from e2m2e.data.catalog import CatalogStore
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
 from e2m2e.integrators import orbit_family_metric_py
+from e2m2e.status import ConvergenceState, FailureCause
 
 #: 基线输出目录（仓库回归夹具与 Release 资产源；不随包分发，ADR 0047）
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "datasets" / "catalog_baseline"

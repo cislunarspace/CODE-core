@@ -16,7 +16,7 @@ from kernel_helpers import requires_spice
 
 from e2m2e.algorithm.design import design_orbit
 from e2m2e.algorithm.design.design_orbit import CORRECTION_TOL_KM
-from e2m2e.data.templates import ConvergenceState
+from e2m2e.status import ConvergenceState
 from tests.algorithm.design.conftest import make_design_request
 
 pytestmark = [

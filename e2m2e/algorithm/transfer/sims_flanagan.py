@@ -91,8 +91,8 @@ from scipy.optimize import Bounds, minimize
 from e2m2e.data.constants import AU_KM
 from e2m2e.integrators import propagate_kepler_py, require_rust_extension
 
-from ...data.templates import ConvergenceState, FailureCause
-from ..results import ResultStatus, scipy_slsqp_status
+from ...status import ConvergenceState, FailureCause, ResultStatus
+from ..results import scipy_slsqp_status
 from .mga import flyby_pericenter_radius, flyby_turn_angle
 from .sep import (
     edelbaum_delta_v,

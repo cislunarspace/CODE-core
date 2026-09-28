@@ -16,8 +16,8 @@ import numpy as np
 
 from e2m2e.integrators import pal_f_df_tangent_py, pal_newton_step_py, require_rust_extension
 
-from ...data.templates import ConvergenceState, FailureCause
 from ...data.types.orbit import Orbit, OrbitFamily
+from ...status import ConvergenceState, FailureCause
 from ..dynamics import CR3BP_Dynamics
 from ..family.halo_family import (
     generate_halo_family,

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy.optimize import Bounds, minimize
 
-from ...data.templates import ConvergenceState, FailureCause
+from ...status import ConvergenceState, FailureCause
 from ..results import scipy_slsqp_status
 from .config import TransferOptimizationResult
 from .nlp_core import NLPOptimizationVariables

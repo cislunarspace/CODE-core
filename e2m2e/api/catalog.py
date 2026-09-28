@@ -24,8 +24,8 @@ from e2m2e.data.catalog import (
     ephemeris_from_arrays,
     numeric_or_none,
 )
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import OrbitFamily
+from e2m2e.status import ConvergenceState, FailureCause
 
 from . import catalog_ingest
 from .config import Config

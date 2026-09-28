@@ -7,10 +7,10 @@ from typing import Any
 
 import numpy as np
 
-from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.seed import MOON_RADIUS_KM
 from ...data.types.orbit import Orbit, OrbitFamily
 from ...integrators import generate_cr3bp_family_py, generate_cr3bp_family_windows_py
+from ...status import ConvergenceState, FailureCause
 from ..dynamics import CR3BP_Dynamics
 from ..results import FamilyGenerationResult
 

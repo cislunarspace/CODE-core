@@ -35,8 +35,8 @@ from e2m2e.algorithm.normal_form.substitute_shooting import (
     multiple_shooting_newton,
     solve_block_tridiagonal,
 )
-from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.templates.enums import LibrationPoint
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.theory
 

@@ -21,8 +21,8 @@ import pytest
 pytest.importorskip("e2m2e._integrators")
 
 from e2m2e.data.constants import Datum
-from e2m2e.data.templates import ConvergenceState
 from e2m2e.integrators import grid_search_rust  # noqa: E402
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 

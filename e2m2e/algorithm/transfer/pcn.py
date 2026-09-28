@@ -33,9 +33,8 @@ import numpy as np
 from ...data.constants import SECONDS_PER_DAY
 from ...data.constants.bodies import MOON
 from ...data.constants.datums import Datum
-from ...data.templates import ConvergenceState, FailureCause
 from ...exceptions import PropagationFailure
-from ..results import ResultStatus
+from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..spatiography.scales import soi_laplace_moon
 from .bplane import (
     AsymptoteParams,

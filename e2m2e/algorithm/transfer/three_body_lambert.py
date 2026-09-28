@@ -16,7 +16,7 @@ from typing import Literal
 
 import numpy as np
 
-from ...data.templates import ConvergenceState, FailureCause
+from ...status import ConvergenceState, FailureCause
 from ..dynamics import CR3BP_Dynamics
 from .config import TransferArc, TransferSolution
 from .lambert import solve_lambert

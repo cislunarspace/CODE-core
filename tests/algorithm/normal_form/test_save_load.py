@@ -25,8 +25,8 @@ from e2m2e.algorithm.normal_form.center_manifold import CenterManifoldReducer
 from e2m2e.algorithm.normal_form.dynamical_substitution import DynamicalSubstituteResult
 from e2m2e.algorithm.normal_form.quasi_floquet import QuasiFloquetResult, real_normal_form_matrix
 from e2m2e.algorithm.normal_form.types import NormalFormResult
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.templates.enums import LibrationPoint
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.theory
 

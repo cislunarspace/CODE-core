@@ -11,7 +11,7 @@ from e2m2e.api.models import (
     FamilyGenerationRequest,
     RangeSpec,
 )
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.interface
 

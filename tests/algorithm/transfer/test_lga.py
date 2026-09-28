@@ -28,8 +28,8 @@ from e2m2e.algorithm.transfer.lga import (
     search_lga_trajectories,
 )
 from e2m2e.data.constants import Datum
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.exceptions import PropagationFailure
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 

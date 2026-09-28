@@ -15,8 +15,8 @@ from e2m2e.algorithm.solver.multiple_shooting import (
     sample_patch_points_drop_near_perilune,
 )
 from e2m2e.data.constants import Datum
-from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
+from e2m2e.status import ConvergenceState
 
 pytestmark = [
     pytest.mark.orchestration,

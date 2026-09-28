@@ -9,8 +9,8 @@ import numpy as np
 
 from e2m2e.integrators import differential_correction_cr3bp_py
 
-from ...data.templates import ConvergenceState, FailureCause
 from ...data.types.orbit import Orbit
+from ...status import ConvergenceState, FailureCause
 from ..dynamics import CR3BP_Dynamics
 
 # Richardson 初猜函数在 v4.3 移至 halo_initial_guess；从此处重导出以兼容旧导入。

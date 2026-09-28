@@ -119,3 +119,15 @@ CI enforcement was effectively zero over exactly these seams.
   planned or wanted.
 - A new architecture meta-test pins re-export identity, facade/leaf symbol
   identity, and gate/ABI-core identity (`tests/_meta/test_shared_kernel_leaves.py`).
+
+## Revision (2026-09-28, issue #745)
+
+Decision 2's "permanent stable aliases" and the Consequences clause "Old
+import paths remain permanently valid aliases; no migration is planned or
+wanted" are revoked by maintainer decision (#745): every call site now
+imports `ConvergenceState`, `FailureCause`, `ResultStatus` and
+`CAUSE_STATUS` from `e2m2e.status` directly, the `data.templates` and
+`algorithm.results` re-exports are removed (the old paths raise
+`ImportError`), and the alias-identity meta-test
+`test_status_reexports_preserve_identity` is deleted with them. All other
+clauses of this ADR stand.

@@ -236,8 +236,8 @@ def test_family_response_serializes_orbit_members():
     import numpy as np
 
     from e2m2e.api.models import FamilyGenerationResponse
-    from e2m2e.data.templates import ConvergenceState, FailureCause
     from e2m2e.data.types.orbit import Orbit
+    from e2m2e.status import ConvergenceState, FailureCause
 
     orbit = Orbit(states=np.eye(6, 6), times=np.linspace(0.0, 1.0, 6))
 
@@ -276,7 +276,7 @@ def test_catalog_record_response_serializes_arrays():
     import numpy as np
 
     from e2m2e.api.models import CatalogRecordResponse
-    from e2m2e.data.templates import ConvergenceState, FailureCause
+    from e2m2e.status import ConvergenceState, FailureCause
 
     record = CatalogRecordResponse(
         record_id="r1",

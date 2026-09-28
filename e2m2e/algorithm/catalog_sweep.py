@@ -15,8 +15,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..data.templates import ConvergenceState, FailureCause
 from ..data.types.orbit import OrbitFamily
+from ..status import ConvergenceState, FailureCause
 from .family import (
     design_axial_family,
     design_halo_family,

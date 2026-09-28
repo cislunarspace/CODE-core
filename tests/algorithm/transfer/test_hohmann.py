@@ -28,7 +28,7 @@ from e2m2e.algorithm.transfer.hohmann import (
     keplerian_to_cartesian,
     scan_lambert_delta_v,
 )
-from e2m2e.data.templates import ConvergenceState
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 

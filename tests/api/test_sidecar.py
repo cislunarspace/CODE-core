@@ -34,8 +34,8 @@ from e2m2e.api.models import (  # noqa: E402
     FamilyGenerationResponse,
 )
 from e2m2e.api.sidecar import handle_request, run_loop  # noqa: E402
-from e2m2e.data.templates import ConvergenceState, FailureCause  # noqa: E402
 from e2m2e.data.types.orbit import Orbit  # noqa: E402
+from e2m2e.status import ConvergenceState, FailureCause  # noqa: E402
 
 _ARGS = {"orbit_type": "HALO", "libration_point": 1}  # 能过 FamilyGenerationRequest 校验的最小参数
 
@@ -301,7 +301,7 @@ def test_invoke_tool_serializes_ndarray_inline():
     （sidecar 大数组仍首选二进制帧，见帧映射）。
     """
     from e2m2e.api.models import CatalogRecordResponse
-    from e2m2e.data.templates import ConvergenceState, FailureCause
+    from e2m2e.status import ConvergenceState, FailureCause
 
     record = CatalogRecordResponse(
         record_id="r",

@@ -20,7 +20,8 @@ from e2m2e.algorithm.family.cr3bp_orbits import (
     design_ro_family,
     earth_moon_system,
 )
-from e2m2e.data.templates import RO_SUPPORTED_RESONANCES, ConvergenceState
+from e2m2e.data.templates import RO_SUPPORTED_RESONANCES
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 

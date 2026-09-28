@@ -13,8 +13,9 @@ from e2m2e.algorithm.transfer.transfer_optimization import (
     DROTRONLPOptimizer,
     NLPOptimizationVariables,
 )
-from e2m2e.data.templates import ConvergenceState, FailureCause, TransferType
+from e2m2e.data.templates import TransferType
 from e2m2e.data.types.orbit import Orbit
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 

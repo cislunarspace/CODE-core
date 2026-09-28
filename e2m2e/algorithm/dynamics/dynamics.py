@@ -31,7 +31,7 @@ from scipy.integrate import solve_ivp
 from e2m2e.exceptions import PropagationFailure
 from e2m2e.integrators import require_rust_extension
 
-from ...data.templates import ConvergenceState, FailureCause
+from ...status import ConvergenceState, FailureCause
 from .cr3bp_system import CR3BP_System
 from .potential import pseudo_potential_hessian
 from .system import System

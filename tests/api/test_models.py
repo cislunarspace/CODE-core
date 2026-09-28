@@ -26,8 +26,8 @@ from e2m2e.api.models import (
     TransferDesignResponse,
 )
 from e2m2e.data.constants import Datum
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import OrbitFamily
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.interface
 

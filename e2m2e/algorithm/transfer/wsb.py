@@ -32,11 +32,11 @@ import numpy as np
 
 from ...data.constants import SECONDS_PER_DAY
 from ...data.constants.bodies import MOON
-from ...data.templates import ConvergenceState, FailureCause
 from ...exceptions import PropagationFailure
+from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
-from ..results import CandidateSearchResult, ResultStatus
+from ..results import CandidateSearchResult
 from .arrival_refine import refine_arrival_leg
 from .config import TransferArc
 

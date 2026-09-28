@@ -15,8 +15,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ...data.templates import ConvergenceState, FailureCause
-from ..results import ResultStatus
+from ...status import ConvergenceState, FailureCause, ResultStatus
 
 if TYPE_CHECKING:
     from .catalog import LibrationCatalogTransformer

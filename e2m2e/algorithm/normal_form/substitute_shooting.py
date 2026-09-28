@@ -40,8 +40,7 @@ from typing import Protocol, runtime_checkable
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates import ConvergenceState, FailureCause
-from ..results import ResultStatus
+from ...status import ConvergenceState, FailureCause, ResultStatus
 
 #: ``(N, 6)`` 节点状态数组；每行 ``[q1, q2, q3, p1, p2, p3]`` （rho 坐标）。
 PatchStates = npt.NDArray[np.floating]

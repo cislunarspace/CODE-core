@@ -28,7 +28,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import Bounds, minimize
 
-from ...data.templates import ConvergenceState, FailureCause
+from ...status import ConvergenceState, FailureCause
 from ..forces import PhysicalModel
 from ..results import scipy_slsqp_status
 from .lowthrust_shooting import EngineConfig, LowThrustSegment, LowThrustShootingSolution

@@ -17,8 +17,8 @@ from e2m2e.algorithm.family.halo_initial_guess import _compute_gamma, compute_ha
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.algorithm.transfer import StateTerminal, ThreeBodyLambert, TransferSolution
 from e2m2e.data.constants import Datum
-from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 

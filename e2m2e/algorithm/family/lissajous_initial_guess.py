@@ -19,9 +19,9 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates import ConvergenceState
 from ...data.templates.enums import LibrationPoint
 from ...integrators import lissajous_bounded_trajectory_py
+from ...status import ConvergenceState
 from ..dynamics import CR3BP_System
 
 

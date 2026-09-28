@@ -13,7 +13,7 @@ import pytest
 
 # DifferentialCorrection 默认最大迭代次数，用作迭代次数合理性上界。
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
-from e2m2e.data.templates import ConvergenceState
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 

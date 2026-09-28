@@ -23,8 +23,8 @@ from e2m2e.api.models import (
     FamilyGenerationRequest,
     FamilyGenerationResponse,
 )
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.interface
 

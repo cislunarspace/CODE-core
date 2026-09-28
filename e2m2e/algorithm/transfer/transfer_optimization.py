@@ -19,10 +19,10 @@ from typing import Any
 
 import numpy as np
 
-from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.enums import TransferType
 from ...data.types.orbit import Orbit
 from ...exceptions import PropagationFailure
+from ...status import ConvergenceState, FailureCause
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from .config import TransferConfig, TransferOptimizationResult
 
