@@ -1,0 +1,24 @@
+[package]
+name = "e2m2e-dyn"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "Mission-design dynamics for e2m2e (transfer search, manifolds, MEGNO, Q-law, PAL continuation)"
+
+[lib]
+name = "e2m2e_dyn"
+crate-type = ["rlib"]
+
+[dependencies]
+e2m2e-propagation = { path = "../e2m2e-propagation" }
+# cr3bp/bcr4bp 纯数学内核与 PropagateError 仍在 e2m2e-forces 顶层（非 spice
+# 门控）；default-features=false 保持本 crate 无 CSPICE 构建链（ADR 0058）。
+e2m2e-forces = { path = "../e2m2e-forces", default-features = false }
+# 转移搜索（porkchop/wsb/transfer_grid_search）rayon 并行。
+rayon = { workspace = true }
+# transfer_grid_search 进度回调：Option<&crossbeam_channel::Sender<usize>>。
+crossbeam-channel = { workspace = true }
+# 不变流形单值矩阵幂法（manifold）。
+nalgebra = { workspace = true }

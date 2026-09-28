@@ -22,7 +22,7 @@
 use e2m2e_propagation::lambert::{lambert_izzo, TransferDirection};
 use rayon::prelude::*;
 
-use crate::cr3bp::propagate_cr3bp;
+use e2m2e_forces::cr3bp::propagate_cr3bp;
 
 /// 终端条件规格（对照 Python `TerminalCondition` 的两个内置实现）。
 #[derive(Clone, Copy, Debug)]

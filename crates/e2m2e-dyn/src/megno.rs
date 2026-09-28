@@ -22,8 +22,8 @@
 use e2m2e_propagation::butcher::{explicit_rk_step, suggest_next_step};
 use e2m2e_propagation::rk_methods::RkMethod;
 
-use crate::bcr4bp::{bcr4bp_eom, bcr4bp_jacobian_6x6};
-use crate::cr3bp::{cr3bp_eom, cr3bp_jacobian_6x6};
+use e2m2e_forces::bcr4bp::{bcr4bp_eom, bcr4bp_jacobian_6x6};
+use e2m2e_forces::cr3bp::{cr3bp_eom, cr3bp_jacobian_6x6};
 
 /// 最小步长（相对于积分区间），与 `cr3bp.rs` 一致。
 const MIN_STEP: f64 = 1e-12;

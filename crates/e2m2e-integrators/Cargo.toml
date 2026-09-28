@@ -28,6 +28,9 @@ spice = ["dep:cspice-rs", "dep:cspice-rs-sys", "e2m2e-forces/spice", "e2m2e-spic
 pyo3 = { workspace = true }
 rayon = { workspace = true }
 e2m2e-forces = { path = "../e2m2e-forces" }
+# 非力任务设计模块（porkchop/wsb/流形等）自 e2m2e-forces 拆入 e2m2e-dyn
+# （ADR 0058），PyO3 绑定仍在本 crate。
+e2m2e-dyn = { path = "../e2m2e-dyn" }
 e2m2e-levelset = { path = "../e2m2e-levelset" }
 e2m2e-hjb-dynamics = { path = "../e2m2e-hjb-dynamics", default-features = false }
 ndarray = { workspace = true }
@@ -36,7 +39,7 @@ e2m2e-spice = { path = "../e2m2e-spice" }
 cspice-rs = { workspace = true, optional = true }
 cspice-rs-sys = { workspace = true, optional = true }
 # 进度回调 drainer：FFI 创建 (tx, rx) 对，rx 由独立 OS 线程排空，
-# reacquire GIL 调 Python callable；tx 传给 e2m2e-forces 的并行内核。
+# reacquire GIL 调 Python callable；tx 传给 e2m2e-dyn 的并行内核。
 crossbeam-channel = { workspace = true }
 nalgebra = { workspace = true }
 # 中心流形频域 W 求解器（#466）：与 numpy.fft 同语义的特解 FFT。

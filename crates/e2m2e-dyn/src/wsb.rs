@@ -6,7 +6,7 @@
 
 use std::cmp::Ordering;
 
-use crate::bcr4bp::propagate_bcr4bp;
+use e2m2e_forces::bcr4bp::propagate_bcr4bp;
 
 const MIN_BISECT_XTOL: f64 = 1e-14;
 const MAX_BISECT_ITER: usize = 50;

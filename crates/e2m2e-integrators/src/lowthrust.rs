@@ -12,7 +12,7 @@ use e2m2e_propagation::rk_methods::RkMethod;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use crate::parse_force_tuple;
+use crate::force_parse::parse_force_tuple;
 
 const MAX_STEPS_PER_SEGMENT: usize = 500_000;
 

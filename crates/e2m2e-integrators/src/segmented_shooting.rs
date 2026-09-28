@@ -387,7 +387,9 @@ pub fn segmented_shooting_correct_py(
     }
     let mut compiled_forces: Vec<CompiledForce> = Vec::with_capacity(forces.len());
     for item in &forces {
-        compiled_forces.push(crate::parse_force_tuple(&item.bind(py).as_borrowed())?);
+        compiled_forces.push(crate::force_parse::parse_force_tuple(
+            &item.bind(py).as_borrowed(),
+        )?);
     }
 
     // 转换 state_patch: Vec<Vec<f64>> -> Vec<[f64; 6]>
