@@ -103,6 +103,11 @@ from .sep import (
     spiral_arc_guess,
     thrust_from_power,
 )
+from .sims_flanagan import (
+    SimsFlanaganProblem,
+    SimsFlanaganPropulsion,
+    SimsFlanaganSolution,
+)
 from .solution_database import SolutionDatabase
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 from .three_body_lambert import ThreeBodyLambert
@@ -194,6 +199,9 @@ __all__ = [
     "sep_available_power",
     "spiral_arc_guess",
     "thrust_from_power",
+    "SimsFlanaganProblem",
+    "SimsFlanaganPropulsion",
+    "SimsFlanaganSolution",
     "TliParams",
     "construct_departure_state",
     "hohmann_delta_v",
