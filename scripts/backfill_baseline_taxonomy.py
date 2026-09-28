@@ -1,6 +1,6 @@
-"""给随包 baseline 数据集回填分类学标签（issue #581 / ADR 0042）。
+"""给仓库内 baseline 数据集回填分类学标签（issue #581 / ADR 0042）。
 
-对 ``e2m2e/data/catalog_baseline/`` 每个族记录：按成员初值 + 周期实测
+对 ``datasets/catalog_baseline/`` 每个族记录：按成员初值 + 周期实测
 分类（与生产 ingest 同一条打标路径 ``stamp_taxonomy_labels``），把
 ``classification.taxonomy_labels``（记录级去重集合）与
 ``members[].taxonomy_label``（成员级 primary）写回 JSON。NPZ 数组不动。
@@ -27,7 +27,7 @@ from e2m2e.api.catalog_ingest import stamp_taxonomy_labels
 from e2m2e.data.types.orbit import Orbit
 
 #: 基线数据目录（与 generate_catalog_baseline.py 同源）
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "e2m2e" / "data" / "catalog_baseline"
+OUTPUT_DIR = Path(__file__).resolve().parents[1] / "datasets" / "catalog_baseline"
 
 
 def backfill_family(json_path: Path) -> tuple[str, list[str]]:

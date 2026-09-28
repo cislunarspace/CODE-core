@@ -104,3 +104,29 @@ wheel 不再携带 `catalog_baseline/`。数据集以 GitHub Release 资产（�
   未设目录的库操作报错；迁移步骤进 CHANGELOG 升级注意。
 - 基线查询多一步（下载 Release 资产 + 显式导入），换来库不再替用户
   决定磁盘上有什么。
+
+## Revision (2026-09-28): 基线数据集迁至仓库根 datasets/catalog_baseline/（#751）
+
+### Context
+
+决策 4 把数据集移出 wheel 时沿用了 ADR 0036 的包内位置
+`e2m2e/data/catalog_baseline/`（含 0 字节 `__init__.py` 包标记）。data 层
+整理（#751）时它是包树内唯一的非代码数据目录：出包数据留在 Python
+包树里，每次打包都要靠 `[tool.maturin]` include 的缺席来排除。
+
+### Decisions
+
+1. 位置变为仓库根 `datasets/catalog_baseline/`（`git mv` 保历史），删除
+   `__init__.py` 与生成脚本的 touch 行——它不再是 Python 包。
+2. 所有权与 Release 分发语义不变：仍是仓库内回归夹具与 Release 资产
+   源，`make catalog-baseline` / Release zip / `import_baseline` 显式导入
+   照旧；wheel 排除从 include 缺席升级为包树外的结构性保证。
+3. 引用同步：两个脚本的 `OUTPUT_DIR`、两个测试的 `BASELINE_DIR`、
+   `.gitignore` 的 NPZ 豁免、AGENTS.md 目录表、check_deleted_dir_refs
+   的 DELETED_DIRS 登记旧路径。ADR 0036 的旧路径表述是历史，不回改。
+
+### Consequences
+
+- 调用方无感知：数据集本就不随 wheel 分发，且全仓无
+  `import e2m2e.data.catalog_baseline`（两处测试均按文件路径读）。
+- `e2m2e/data/` 包树自此只含代码与 wheel 内数据（gmat fixtures 等）。

@@ -24,7 +24,7 @@ from e2m2e.data.types.orbit import Orbit, OrbitFamily
 
 pytestmark = pytest.mark.interface
 
-BASELINE_DIR = Path(__file__).resolve().parents[2] / "e2m2e" / "data" / "catalog_baseline"
+BASELINE_DIR = Path(__file__).resolve().parents[2] / "datasets" / "catalog_baseline"
 
 
 def _family_from_baseline(

@@ -2,7 +2,7 @@
 
 九族（HALO/NRHO/AXIAL/LISSAJOUS/DRO/DPO/SPO/HORSESHOE/LPO）× 地月
 DE421，用各族规格的默认参数整族生成，产出 ADR 0031 格式的 catalog
-记录（一族一条）写入 ``e2m2e/data/catalog_baseline/``：``tags=["baseline"]``、
+记录（一族一条）写入 ``datasets/catalog_baseline/``：``tags=["baseline"]``、
 ``scalars.baseline_version`` 取包版本、record_id 确定性命名
 （如 ``baseline-halo-l2``），供显式导入按 id 对位。
 
@@ -56,7 +56,7 @@ from e2m2e.data.types.orbit import Orbit, OrbitFamily
 from e2m2e.integrators import orbit_family_metric_py
 
 #: 基线输出目录（仓库回归夹具与 Release 资产源；不随包分发，ADR 0047）
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "e2m2e" / "data" / "catalog_baseline"
+OUTPUT_DIR = Path(__file__).resolve().parents[1] / "datasets" / "catalog_baseline"
 
 #: 族成员数上限（ADR 0036 实测口径 n_orbits=100）
 N_ORBITS = 100
@@ -339,7 +339,6 @@ def validate_baseline_record(meta: dict[str, Any]) -> None:
 
 def main() -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUTPUT_DIR / "__init__.py").touch()
     with tempfile.TemporaryDirectory() as tmp:
         store = CatalogStore(tmp)
         rows = []
@@ -357,7 +356,7 @@ def main() -> int:
             validate_baseline_record(meta)
             store.put(meta, arrays)
             rows.append(meta)
-        # 校验全部通过才落包：清掉旧基线文件（保留 __init__.py），复制新记录
+        # 校验全部通过才落包：清掉旧基线文件，复制新记录
         for old in OUTPUT_DIR.glob("*.json"):
             old.unlink()
         for old in OUTPUT_DIR.glob("*.npz"):
