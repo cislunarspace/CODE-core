@@ -3,6 +3,10 @@
 从 ``continuation.py`` 拆出的 Halo 专用编排：种子生成、自然参数族延拓、
 伪弧长（PAL）延拓。``Continuation`` 实例上同名方法仍可用 — 在
 ``continuation.py`` 文件末尾以方法重绑定的形式保留调用语法。
+
+延拓实现共三处：``solver/continuation.py``（通用自然参数 + 伪弧长延拓）、
+本模块（Halo 族专用编排）、``family/planar_continuation.py``（平面平动点
+全周期 PAL 适配器）；分工保留不合并（#747）。
 """
 
 from __future__ import annotations

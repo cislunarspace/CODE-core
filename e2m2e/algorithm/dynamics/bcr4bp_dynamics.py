@@ -36,7 +36,7 @@ from e2m2e.integrators import (
 )
 
 from .bcr4bp_system import BCR4BPSystem
-from .dynamics import Dynamics
+from .dynamics import Dynamics, finalize_rust_propagation
 from .potential import pseudo_potential_hessian
 
 
@@ -315,24 +315,16 @@ class BCR4BP_Dynamics(Dynamics):
             max_step=float(max_step),
         )
 
-        states = np.array(result["states"])
-        stm = np.array(result["stm"]).reshape(-1, 6, 6)
-        time = np.array(result["time"])
-
-        # 防御性校验：Rust 侧任何提前退出都必须在这里暴露，不允许把截断
-        # 结果当完整轨迹返回（照抄 cr3bp 的 _propagate_with_stm_rust）。
-        if len(time) != len(t_eval_list):
-            raise RuntimeError(
-                f"Rust STM propagation returned {len(time)} of {len(t_eval_list)} "
-                f"requested time points; the trajectory is truncated"
-            )
-
-        self.last_trajectory = (time, states)
-        self.last_stm = stm
-
-        out: dict[str, Any] = {"time": time, "states": states, "stm": stm}
+        out = finalize_rust_propagation(
+            self,
+            result,
+            t_eval_list,
+            with_stm=True,
+            error=RuntimeError,
+            label="Rust STM propagation",
+        )
         if with_jacobi:
-            out = self._handle_jacobi(states, out)
+            out = self._handle_jacobi(out["states"], out)
         return out
 
     def _propagate_state_only(
@@ -381,20 +373,16 @@ class BCR4BP_Dynamics(Dynamics):
             max_step=float(max_step),
         )
 
-        states = np.array(result["states"])
-        time = np.array(result["time"])
-
-        if len(time) != len(t_eval_list):
-            raise RuntimeError(
-                f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
-                f"requested time points; the trajectory is truncated"
-            )
-
-        self.last_trajectory = (time, states)
-
-        out: dict[str, Any] = {"time": time, "states": states}
+        out = finalize_rust_propagation(
+            self,
+            result,
+            t_eval_list,
+            with_stm=False,
+            error=RuntimeError,
+            label="Rust propagation",
+        )
         if with_jacobi:
-            out = self._handle_jacobi(states, out)
+            out = self._handle_jacobi(out["states"], out)
         return out
 
     def _propagate_state_only_rust_events(

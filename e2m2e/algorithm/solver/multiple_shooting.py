@@ -5,6 +5,9 @@
 雅可比矩阵进行最小二乘迭代修正。
 
 支持串行、多线程和多进程（SPICE 内核独立加载）三种并行模式。
+
+与 :mod:`e2m2e.algorithm.normal_form.substitute_shooting`（动力学替代打靶，
+块三对角）同名不同义，互不复用。
 """
 
 from __future__ import annotations

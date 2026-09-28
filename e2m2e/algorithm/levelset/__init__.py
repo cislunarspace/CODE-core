@@ -2,6 +2,8 @@
 
 当前仅含值函数网格的高阶查询接口；产品 IO 与 catalog 入库属求解端，
 落地后归入本包。
+
+已交付未接线：尚未经 Facade/MCP/CLI 暴露（#747）。
 """
 
 from e2m2e.algorithm.levelset.value_function import (

@@ -8,15 +8,20 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.results import CandidateSearchResult
-from e2m2e.algorithm.transfer import WsbSearchParams, transfer_orbit
+from e2m2e.algorithm.transfer import WsbCandidate, WsbSearchParams, transfer_orbit
 from e2m2e.algorithm.transfer.hohmann import TliParams
-from e2m2e.algorithm.transfer.wsb import compute_kepler_energy_moon, search_wsb_trajectories
+from e2m2e.algorithm.transfer.wsb import (
+    _refine_wsb_candidate,
+    compute_kepler_energy_moon,
+    search_wsb_trajectories,
+)
 from e2m2e.data.constants import Datum
 from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.exceptions import PropagationFailure
@@ -531,3 +536,65 @@ class TestWsbDvUnits:
         assert result.delta_v == pytest.approx(
             details.dv_departure_km_s + details.dv_arrival_km_s, rel=1e-12
         )
+
+
+class _StubShooter:
+    """ThreeBodyLambert 替身：恒返回以 ``arrival_velocity`` 收尾的收敛解。"""
+
+    arrival_velocity = np.array([100.0, 0.0, 0.0])  # km/s
+
+    def __init__(self, dynamics):
+        self.dynamics = dynamics
+
+    def solve(self, departure, arrival, tof, guess=None):
+        state = np.concatenate([np.zeros(3), self.arrival_velocity])
+        arc = SimpleNamespace(states=state.reshape(1, 6))
+        return SimpleNamespace(status=ConvergenceState.CONVERGED, arcs=[arc])
+
+
+class TestWsbRefineAdoption:
+    """#747 守卫差异回归：WSB 无“未改进保留网格候选”守卫，打靶收敛即采纳。
+
+    与 LGA（test_lga.TestLgaRefineGuard）对照：同样打靶到达 Δv 巨大的
+    场景，LGA 返回原候选对象，WSB 无条件重建采纳。用替身替换数值打靶器，
+    采纳分支本身是被测真实代码。
+    """
+
+    @staticmethod
+    def _candidate():
+        """手造候选（几何数值只为通过流程，无物理意义）；dv 无量纲 0.1/0.3。"""
+        return WsbCandidate(
+            sun_phase0=0.0,
+            departure_phase=0.0,
+            tof_sec=1.0e6,
+            departure_state=np.zeros(6),
+            perilune_state=np.zeros(6),
+            perilune_alt_km=100.0,
+            perilune_time_dim=0.5,
+            arrival_state=np.zeros(6),
+            h2_kepler=-1.0,
+            dv_departure=0.1,
+            dv_arrival=0.2,
+            total_dv=0.3,
+            arrival_time_dim=1.0,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="synthetic",
+        )
+
+    def test_refine_adopts_the_shooting_solution_even_without_improvement(self, monkeypatch):
+        """打靶到达 Δv 劣于网格解（100 km/s → Δv 巨大）时仍无条件采纳。"""
+        monkeypatch.setattr(
+            "e2m2e.algorithm.transfer.three_body_lambert.ThreeBodyLambert", _StubShooter
+        )
+        system, dynamics = _make_cr3bp_system()
+        candidate = self._candidate()
+
+        refined, arc = _refine_wsb_candidate(candidate, system, dynamics, np.zeros(6))
+
+        expected_dv_arr = 100.0 / system.characteristic_velocity
+        assert refined is not candidate
+        assert refined.status is ConvergenceState.CONVERGED
+        assert refined.dv_arrival == pytest.approx(expected_dv_arr)
+        assert refined.total_dv == pytest.approx(candidate.dv_departure + expected_dv_arr)
+        assert arc is not None

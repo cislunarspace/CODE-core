@@ -27,7 +27,7 @@ import numpy.typing as npt
 from e2m2e import integrators
 
 from ..dynamics import CR3BP_Dynamics
-from .lambert import _parse_direction
+from .lambert import validate_direction
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 
 if TYPE_CHECKING:
@@ -515,7 +515,7 @@ def porkchop(
 
     spec = _builtin_grid_spec(dep, arr, dynamics)
     if spec is not None:
-        long_way = _parse_direction(direction)
+        long_way = validate_direction(direction)
         dv1_flat, dv2_flat = integrators.porkchop_grid_py(
             t_dep.tolist(),
             tof.tolist(),
@@ -539,7 +539,7 @@ def porkchop(
         # 错误优先级：无效轨道/终端先在状态提取时上抛，
         # direction 仅在即将调用 Lambert 前校验。
         dep_states, arr_states = _extract_state_grids(dep, arr, t_dep, tof, dynamics)
-        long_way = _parse_direction(direction)
+        long_way = validate_direction(direction)
         dv1_flat, dv2_flat = integrators.porkchop_grid_states_py(
             dep_states.ravel().tolist(),
             arr_states.ravel().tolist(),

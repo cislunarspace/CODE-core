@@ -1,4 +1,9 @@
-"""平面三角平动点周期族的 Rust 全周期 PAL 适配器。"""
+"""平面三角平动点周期族的 Rust 全周期 PAL 适配器。
+
+延拓实现共三处：``solver/continuation.py``（通用自然参数 + 伪弧长延拓）、
+``family/halo_family.py``（Halo 族专用编排）、本模块（平面平动点全周期
+PAL 适配器）；分工保留不合并（#747）。
+"""
 
 from __future__ import annotations
 

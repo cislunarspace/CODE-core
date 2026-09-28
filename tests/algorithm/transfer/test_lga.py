@@ -11,6 +11,7 @@ CR3BP 纯数值测试不需要 SPICE，用 CR3BP_System(mu=MU)._with_default_sca
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
@@ -20,7 +21,12 @@ from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.results import CandidateSearchResult
 from e2m2e.algorithm.transfer import LgaSearchParams, transfer_orbit
 from e2m2e.algorithm.transfer.hohmann import TliParams
-from e2m2e.algorithm.transfer.lga import _compute_jacobi, search_lga_trajectories
+from e2m2e.algorithm.transfer.lga import (
+    LgaCandidate,
+    _compute_jacobi,
+    _refine_lga_candidate,
+    search_lga_trajectories,
+)
 from e2m2e.data.constants import Datum
 from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.exceptions import PropagationFailure
@@ -300,3 +306,82 @@ class TestTransferLegHelpers:
         # 同一状态（出发段 t_eval 采样 vs dense 输出重传播），差在容差内
         seam_km = float(np.linalg.norm(dep_states[-1, :3] - arr_states[0, :3]))
         assert seam_km < 10.0, f"拼接位置跳变 {seam_km:.3f} km 超过 10 km"
+
+
+class _StubShooter:
+    """ThreeBodyLambert 替身：恒返回以 ``arrival_velocity`` 收尾的收敛解。"""
+
+    arrival_velocity = np.array([100.0, 0.0, 0.0])  # km/s
+    last_arc = None
+
+    def __init__(self, dynamics):
+        self.dynamics = dynamics
+
+    def solve(self, departure, arrival, tof, guess=None):
+        state = np.concatenate([np.zeros(3), self.arrival_velocity])
+        arc = SimpleNamespace(states=state.reshape(1, 6))
+        type(self).last_arc = arc
+        return SimpleNamespace(status=ConvergenceState.CONVERGED, arcs=[arc])
+
+
+class TestLgaRefineGuard:
+    """#747 守卫差异回归：精化未改进时 LGA 保留原网格候选对象。
+
+    用替身替换数值打靶器，守卫与采纳分支本身是被测真实代码。
+    """
+
+    @staticmethod
+    def _candidate():
+        """手造候选（几何数值只为通过流程，无物理意义）；dv 无量纲 0.1/0.3。"""
+        return LgaCandidate(
+            departure_phase=0.0,
+            out_of_plane_angle=0.0,
+            tof_sec=1.0e6,
+            departure_state=np.zeros(6),
+            perilune_state=np.zeros(6),
+            perilune_alt_km=100.0,
+            perilune_time_dim=0.5,
+            arrival_state=np.zeros(6),
+            dv_departure=0.1,
+            dv_arrival=0.2,
+            total_dv=0.3,
+            jacobi_departure=3.0,
+            jacobi_arrival=3.0,
+            arrival_time_dim=1.0,
+            status=ConvergenceState.CONVERGED,
+            cause=FailureCause.NONE,
+            message="synthetic",
+        )
+
+    def test_refine_keeps_the_grid_candidate_when_shooting_does_not_improve(self, monkeypatch):
+        """打靶到达 Δv 劣于网格解（100 km/s → Δv 巨大）时，原候选对象
+        原样返回且弧为 None——守卫路径不重建、不改状态。"""
+        monkeypatch.setattr(
+            "e2m2e.algorithm.transfer.three_body_lambert.ThreeBodyLambert", _StubShooter
+        )
+        system, dynamics = _make_cr3bp_system()
+        candidate = self._candidate()
+
+        refined, arc = _refine_lga_candidate(candidate, system, dynamics, np.zeros(6))
+
+        assert refined is candidate
+        assert refined.status is ConvergenceState.CONVERGED
+        assert refined.total_dv == pytest.approx(0.3)
+        assert arc is None
+
+    def test_refine_adopts_the_shooting_solution_when_it_improves(self, monkeypatch):
+        """打靶到达速度与目标一致（dv_arr≈0）时采纳打靶解并返回打靶弧。"""
+        monkeypatch.setattr(
+            "e2m2e.algorithm.transfer.three_body_lambert.ThreeBodyLambert", _StubShooter
+        )
+        monkeypatch.setattr(_StubShooter, "arrival_velocity", np.zeros(3))
+        system, dynamics = _make_cr3bp_system()
+        candidate = self._candidate()
+
+        refined, arc = _refine_lga_candidate(candidate, system, dynamics, np.zeros(6))
+
+        assert refined is not candidate
+        assert refined.status is ConvergenceState.CONVERGED
+        assert refined.dv_arrival == pytest.approx(0.0)
+        assert refined.total_dv == pytest.approx(candidate.dv_departure)
+        assert arc is _StubShooter.last_arc

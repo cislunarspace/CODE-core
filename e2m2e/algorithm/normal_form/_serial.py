@@ -169,7 +169,7 @@ def _ds_to_dict(ds: Any) -> dict[str, Any]:
 def _ds_from_dict(d: dict[str, Any], ctx: Any) -> Any:
     from .dynamical_substitution import DynamicalSubstituteResult
     from .fft import FFTComponent
-    from .multiple_shooting import MultipleShootingResult
+    from .substitute_shooting import MultipleShootingResult
 
     order = int(d["_ds_order"])
     tlist = d["_ds_tlist"]

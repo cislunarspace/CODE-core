@@ -23,6 +23,7 @@ from ...exceptions import PropagationFailure
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
 from ..results import CandidateSearchResult, ResultStatus
+from .arrival_refine import refine_arrival_leg
 from .config import TransferArc
 
 logger = logging.getLogger(__name__)
@@ -342,6 +343,8 @@ def _refine_lga_candidate(
 ) -> tuple[LgaCandidate, TransferArc | None]:
     """用 ThreeBodyLambert 打靶精化 LGA 候选。
 
+    打靶段见 arrival_refine.refine_arrival_leg。
+
     分两段打靶：
     1. 到达段：perilune → target（ThreeBodyLambert 打靶修正到达速度）
     2. 打靶后的到达速度更新 Δv 计算。
@@ -352,79 +355,53 @@ def _refine_lga_candidate(
         打靶未收敛或未带来改进时弧为 None（此时轨迹应由网格候选
         的自由飞行解整段重传播得到）。
     """
-    from .terminal import StateTerminal
-    from .three_body_lambert import ThreeBodyLambert
+    refined = refine_arrival_leg(
+        system,
+        dynamics,
+        candidate.perilune_state,
+        candidate.perilune_time_dim,
+        candidate.arrival_time_dim,
+        target_state,
+    )
 
-    char_time = system.characteristic_time
-    if char_time is None:
-        raise ValueError("system.characteristic_time must be set")
+    if refined is not None:
+        arc, dv_arr = refined
 
-    try:
-        shooter = ThreeBodyLambert(dynamics)
-
-        peri_phys = system.dimensionless_to_physical(candidate.perilune_state)
-        # 到达段的 tof：近月点 → 目标的剩余时间（非出发→到达的总时间）
-        tof_arrival = (candidate.arrival_time_dim - candidate.perilune_time_dim) * char_time
-        if tof_arrival <= 0.0:
-            raise ValueError(
-                f"到达段剩余时间非正：arrival_time_dim={candidate.arrival_time_dim}, "
-                f"perilune_time_dim={candidate.perilune_time_dim}, tof_arrival={tof_arrival}"
+        # 精化未带来改进时保留网格候选（打靶解可能劣于网格解，
+        # 此时采纳会让结果超出 max_total_dv）。此守卫仅 LGA 有：
+        # WSB 侧无守卫、打靶收敛即无条件采纳，差异见 #747。
+        if candidate.dv_departure + dv_arr > candidate.total_dv:
+            logger.debug(
+                "ThreeBodyLambert 精化未改进 Δv（%.4f → %.4f），保留网格候选",
+                candidate.total_dv,
+                candidate.dv_departure + dv_arr,
             )
+            # 返回原候选对象（状态不变）——与下方 MAX_ITERATIONS 重建
+            # 是两条不同失败路径，不可合并。
+            return candidate, None
 
-        target_phys = system.dimensionless_to_physical(target_state)
-
-        arrival_leg = shooter.solve(
-            StateTerminal(peri_phys, 0.0),
-            StateTerminal(target_phys, tof_arrival),
-            tof_arrival,
-            guess="lambert",
+        return (
+            LgaCandidate(
+                departure_phase=candidate.departure_phase,
+                out_of_plane_angle=candidate.out_of_plane_angle,
+                tof_sec=candidate.tof_sec,
+                departure_state=candidate.departure_state,
+                perilune_state=candidate.perilune_state,
+                perilune_alt_km=candidate.perilune_alt_km,
+                perilune_time_dim=candidate.perilune_time_dim,
+                arrival_state=candidate.arrival_state,
+                dv_departure=candidate.dv_departure,
+                dv_arrival=dv_arr,
+                total_dv=candidate.dv_departure + dv_arr,
+                jacobi_departure=candidate.jacobi_departure,
+                jacobi_arrival=candidate.jacobi_arrival,
+                arrival_time_dim=candidate.arrival_time_dim,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="找到 LGA 候选",
+            ),
+            arc,
         )
-
-        if arrival_leg.status is ConvergenceState.CONVERGED:
-            # 更新 Δv：ThreeBodyLambert 解为物理单位 (km/s)，换算回无量纲
-            v_arrival_shot = arrival_leg.arcs[-1].states[-1][3:]
-            v_target_phys = target_phys[3:]
-            vu_km_s = system.characteristic_velocity
-            if vu_km_s is None or vu_km_s <= 0.0:
-                raise ValueError("system.characteristic_velocity must be set")
-            dv_arr = float(np.linalg.norm(v_arrival_shot - v_target_phys)) / vu_km_s
-
-            # 精化未带来改进时保留网格候选（打靶解可能劣于网格解，
-            # 此时采纳会让结果超出 max_total_dv）
-            if candidate.dv_departure + dv_arr > candidate.total_dv:
-                logger.debug(
-                    "ThreeBodyLambert 精化未改进 Δv（%.4f → %.4f），保留网格候选",
-                    candidate.total_dv,
-                    candidate.dv_departure + dv_arr,
-                )
-                return candidate, None
-
-            return (
-                LgaCandidate(
-                    departure_phase=candidate.departure_phase,
-                    out_of_plane_angle=candidate.out_of_plane_angle,
-                    tof_sec=candidate.tof_sec,
-                    departure_state=candidate.departure_state,
-                    perilune_state=candidate.perilune_state,
-                    perilune_alt_km=candidate.perilune_alt_km,
-                    perilune_time_dim=candidate.perilune_time_dim,
-                    arrival_state=candidate.arrival_state,
-                    dv_departure=candidate.dv_departure,
-                    dv_arrival=dv_arr,
-                    total_dv=candidate.dv_departure + dv_arr,
-                    jacobi_departure=candidate.jacobi_departure,
-                    jacobi_arrival=candidate.jacobi_arrival,
-                    arrival_time_dim=candidate.arrival_time_dim,
-                    status=ConvergenceState.CONVERGED,
-                    cause=FailureCause.NONE,
-                    message="找到 LGA 候选",
-                ),
-                arrival_leg.arcs[0],
-            )
-    except (RuntimeError, ValueError, np.linalg.LinAlgError, PropagationFailure):
-        # PropagationFailure：打靶内部传播失败（退化候选几何可触发），
-        # 与其他打靶失败同义——保留原始候选，不让编排器崩（#566）。
-        logger.debug("ThreeBodyLambert 打靶失败，保留原始候选", exc_info=True)
 
     # 打靶失败，返回原始候选
     return (

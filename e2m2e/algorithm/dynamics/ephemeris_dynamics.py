@@ -41,7 +41,7 @@ import numpy.typing as npt
 from e2m2e.exceptions import PropagationFailure
 from e2m2e.integrators import propagate_with_state_py, propagate_with_stm_py, require_rust_extension
 
-from .dynamics import Dynamics
+from .dynamics import Dynamics, finalize_rust_propagation
 from .ephemeris_system import EphemerisSystem
 
 
@@ -143,22 +143,14 @@ class EphemerisDynamics(Dynamics):
             max_step=float(max_step),
         )
 
-        states = np.array(result["states"])
-        stm = np.array(result["stm"]).reshape(-1, 6, 6)
-        time = np.array(result["time"])
-
-        # 防御性校验：Rust 侧任何提前退出都必须在这里暴露，
-        # 不允许把截断结果当完整轨迹返回。
-        if len(time) != len(t_eval_list):
-            raise PropagationFailure(
-                f"Rust STM propagation returned {len(time)} of {len(t_eval_list)} "
-                f"requested time points; the trajectory is truncated"
-            )
-
-        self.last_trajectory = (time, states)
-        self.last_stm = stm
-
-        return {"time": time, "states": states, "stm": stm}
+        return finalize_rust_propagation(
+            self,
+            result,
+            t_eval_list,
+            with_stm=True,
+            error=PropagationFailure,
+            label="Rust STM propagation",
+        )
 
     def _propagate_state_only(
         self,
@@ -219,19 +211,14 @@ class EphemerisDynamics(Dynamics):
             max_step=float(max_step),
         )
 
-        states = np.array(result["states"])
-        time = np.array(result["time"])
-
-        # 防御性校验（与 _propagate_with_stm_rust 一致）。
-        if len(time) != len(t_eval_list):
-            raise PropagationFailure(
-                f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
-                f"requested time points; the trajectory is truncated"
-            )
-
-        self.last_trajectory = (time, states)
-
-        return {"time": time, "states": states}
+        return finalize_rust_propagation(
+            self,
+            result,
+            t_eval_list,
+            with_stm=False,
+            error=PropagationFailure,
+            label="Rust propagation",
+        )
 
     def _compute_acc_and_jacobian(
         self,

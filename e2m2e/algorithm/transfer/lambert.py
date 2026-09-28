@@ -43,7 +43,7 @@ class LambertSolution:
         ResultStatus(self.status, self.cause, self.message)
 
 
-def _parse_direction(direction: str) -> bool:
+def validate_direction(direction: str) -> bool:
     """把方向字符串转为 Rust 侧的 long_way 标志。"""
     if direction == "short":
         return False
@@ -85,7 +85,7 @@ def solve_lambert(
         rf_arr.tolist(),
         float(tof),
         float(mu),
-        _parse_direction(direction),
+        validate_direction(direction),
         int(revs),
     )
     return LambertSolution(
@@ -134,7 +134,7 @@ def solve_lambert_batch(
         geometries,
         tofs.tolist(),
         float(mu),
-        _parse_direction(direction),
+        validate_direction(direction),
         int(revs),
     )
 
