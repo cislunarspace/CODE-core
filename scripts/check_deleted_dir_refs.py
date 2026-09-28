@@ -18,7 +18,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-# ADR 0021 删除的目录前缀（未来再删别的目录，只改此处）
+# 已删/已迁目录前缀（未来再删别的目录，只改此处）
 DELETED_DIRS: tuple[str, ...] = (
     "tests/core",
     "tests/algorithms",
@@ -27,6 +27,7 @@ DELETED_DIRS: tuple[str, ...] = (
     "tests/data/atmosphere",
     "tests/algorithm/correction",
     "tests/algorithm/forces",
+    "e2m2e/data/catalog_baseline",
 )
 
 # 匹配 "tests/<dir>" 后跟 /、引号、空白或行尾；不匹配 tests/core_xxx 之类的延续
@@ -50,7 +51,7 @@ def main() -> int:
             violations.extend(check_file(path))
     if violations:
         names = "、".join(DELETED_DIRS)
-        print(f"已删目录引用残留（{names} 已被 ADR 0021 删除）：")
+        print(f"已删目录引用残留（{names} 为已删目录）：")
         for v in violations:
             print(f"  {v}")
         print("迁移后不得再引用；改写为不引用旧路径的表述，或更新为新路径。")

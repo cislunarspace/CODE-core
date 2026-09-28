@@ -20,8 +20,8 @@ from e2m2e.algorithm.orbit_taxonomy import classify_orbit
 
 pytestmark = pytest.mark.theory
 
-#: 随包 baseline 目录。
-BASELINE_DIR = Path(__file__).resolve().parents[3] / "e2m2e" / "data" / "catalog_baseline"
+#: 仓库内 baseline 目录（datasets/，不随包分发，ADR 0047 修订）。
+BASELINE_DIR = Path(__file__).resolve().parents[3] / "datasets" / "catalog_baseline"
 
 #: baseline 族 → 预期标签集合（成员 primary 必须落在集合内）。
 #: lissajous 是拟周期采样（成员不闭合）；horseshoe 不在分类学内

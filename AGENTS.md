@@ -72,7 +72,7 @@ flowchart LR
 | `scripts/` | 构建资源下载、架构检查、基线生成、benchmark 和手工诊断 |
 | `docs/adr/` | 不可静默覆盖的架构决策记录；`CONTEXT.md` 是唯一领域术语表 |
 | `kernels/` | 运行期 SPICE 内核；大型 `.bsp` 由 Git LFS 或 `download_kernels.py` 管理 |
-| `e2m2e/data/catalog_baseline/` | 回归夹具和 Release 资产源，不随 wheel 分发，须显式导入 |
+| `datasets/catalog_baseline/` | 回归夹具和 Release 资产源，不随 wheel 分发，须显式导入 |
 
 ## Development Commands
 
