@@ -104,6 +104,11 @@ from .sep import (
     thrust_from_power,
 )
 from .sims_flanagan import (
+    SimsFlanaganFlybyResult,
+    SimsFlanaganLegSolution,
+    SimsFlanaganMultiLegProblem,
+    SimsFlanaganMultiLegSolution,
+    SimsFlanaganNode,
     SimsFlanaganProblem,
     SimsFlanaganPropulsion,
     SimsFlanaganSolution,
@@ -199,6 +204,11 @@ __all__ = [
     "sep_available_power",
     "spiral_arc_guess",
     "thrust_from_power",
+    "SimsFlanaganFlybyResult",
+    "SimsFlanaganLegSolution",
+    "SimsFlanaganMultiLegProblem",
+    "SimsFlanaganMultiLegSolution",
+    "SimsFlanaganNode",
     "SimsFlanaganProblem",
     "SimsFlanaganPropulsion",
     "SimsFlanaganSolution",
