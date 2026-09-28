@@ -16,8 +16,8 @@ crate-type = ["rlib"]
 # 与 workspace 其余 crate 的 default=["spice"] 对齐。CSPICE 由
 # scripts/download_cspice.py 提供（CSPICE_DIR）。
 default = ["spice"]
-spice = ["dep:cspice", "dep:cspice-sys"]
+spice = ["dep:cspice-rs", "dep:cspice-rs-sys"]
 
 [dependencies]
-cspice = { workspace = true, optional = true }
-cspice-sys = { workspace = true, optional = true }
+cspice-rs = { workspace = true, optional = true }
+cspice-rs-sys = { workspace = true, optional = true }

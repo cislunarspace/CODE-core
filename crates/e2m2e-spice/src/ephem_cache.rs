@@ -51,9 +51,9 @@ impl From<CacheMissError> for SpiceFfiError {
     }
 }
 
-impl From<CacheMissError> for cspice::Error {
+impl From<CacheMissError> for cspice_rs::Error {
     fn from(e: CacheMissError) -> Self {
-        cspice::Error {
+        cspice_rs::Error {
             short_message: "EPHEM_CACHE_MISS".to_string(),
             explanation: e.to_string(),
             long_message: String::new(),

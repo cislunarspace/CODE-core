@@ -22,11 +22,14 @@ repository = "https://github.com/cislunarspace/CODE-core"
 # undefined symbol。由 e2m2e-integrators 的 "extension-module" feature
 # 按目标启用（pyproject [tool.maturin] features 显式传入，仅 cdylib 构建）。
 pyo3 = { version = "0.24", features = ["abi3-py310"] }
-cspice = "0.1"
+# cspice 绑定来自本组织独立维护的 hard fork（上游 jacob-pro 失修三年；
+# 含 aarch64 E0606 修复与 LP64 SpiceInt 修复，见 ADR 0057）。三平台 CI 与
+# aarch64 交叉检查：https://github.com/cislunarspace/cspice-rs
+cspice-rs = { git = "https://github.com/cislunarspace/cspice-rs", tag = "v0.1.1" }
 # CSPICE 一律经 scripts/download_cspice.py 提供（CSPICE_DIR，GitHub cspice-v1 release
-# 预编译包）。不启用 cspice-sys 的 downloadcspice feature：无 CSPICE_DIR 时构建直接
+# 预编译包）。不启用 cspice-rs-sys 的 downloadcspice feature：无 CSPICE_DIR 时构建直接
 # 报错并提示设 CSPICE_DIR，而非静默走 NAIF 官网源码下载（国内常不可达、构建超时）。
-cspice-sys = "1.0"
+cspice-rs-sys = { git = "https://github.com/cislunarspace/cspice-rs", tag = "v0.1.1" }
 # 多重打靶段积分并行（段间相互独立，rayon par_iter 线性加速）
 rayon = "1.10"
 # 转移网格搜索进度回调：Rust worker 跨线程发送完成信号给 FFI drainer 线程，
@@ -42,8 +45,3 @@ num-complex = "0.4"
 # 无 BLAS 后端即可满足有限差分模板运算）。
 ndarray = "0.16"
 
-# cspice 0.1.0 上游在 aarch64 上编译失败（E0606，string.rs 的 &[u8] as *const [i8]
-# 非法 cast，aarch64 的 C char 是 unsigned）；上游至今未修，仓库内 vendor 并修复，
-# 见 crates/cspice/（LGPL-3.0，LICENSE 与署名随目录分发）。
-[patch.crates-io]
-cspice = { path = "crates/cspice" }

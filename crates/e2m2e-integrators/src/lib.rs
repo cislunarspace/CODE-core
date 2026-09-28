@@ -991,7 +991,7 @@ fn spice_unload(path: &str) -> PyResult<()> {
     e2m2e_spice::native_spk::unload(p);
     e2m2e_spice::native_frame::unload(p);
     e2m2e_spice::native_time::unload(p);
-    cspice::data::unload(path).map_err(|e| {
+    cspice_rs::data::unload(path).map_err(|e| {
         pyo3::exceptions::PyRuntimeError::new_err(format!("unload failed: {:?}", e))
     })?;
     loaded.retain(|p| p != path);

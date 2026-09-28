@@ -8,12 +8,12 @@
 //! 加载内核（与 Python spiceypy 双 furnsh），运行时直接调本模块函数。
 
 /// 非 strict 缓存 miss 时的星历回退：走 [`crate::spice_ffi::spkezr`]
-/// （ADR 0051 纯 Rust 后端），返回类型保持 `cspice::Error` 以不改动调用方
+/// （ADR 0051 纯 Rust 后端），返回类型保持 `cspice_rs::Error` 以不改动调用方
 /// 签名——错误字段直接构造，详情放 explanation/long_message。
-fn fallback_spkezr(target: &str, et: f64, observer: &str) -> Result<[f64; 3], cspice::Error> {
+fn fallback_spkezr(target: &str, et: f64, observer: &str) -> Result<[f64; 3], cspice_rs::Error> {
     let (state, _lt) =
         crate::spice_ffi::spkezr(target, et, "J2000", "NONE", observer).map_err(|e| {
-            cspice::Error {
+            cspice_rs::Error {
                 short_message: "SPK_NATIVE".to_string(),
                 explanation: e.to_string(),
                 long_message: e.to_string(),
@@ -49,7 +49,7 @@ pub fn third_body_acceleration(
     sc_pos: &[f64],
     mu: f64,
     min_distance: f64,
-) -> Result<[f64; 3], cspice::Error> {
+) -> Result<[f64; 3], cspice_rs::Error> {
     debug_assert_eq!(sc_pos.len(), 3, "sc_pos must have length 3");
 
     // 优先查星历缓存（strict 模式下 miss 即硬 Err，杜绝回退星历查询；
@@ -108,7 +108,7 @@ pub fn third_body_acceleration_and_jacobian(
     sc_pos: &[f64; 3],
     mu: f64,
     min_distance: f64,
-) -> Result<([f64; 3], [[f64; 3]; 3]), cspice::Error> {
+) -> Result<([f64; 3], [[f64; 3]; 3]), cspice_rs::Error> {
     let r_ob = match crate::ephem_cache::lookup_body_position(target, observer, et) {
         Ok(Some(pos)) => pos,
         Ok(None) => fallback_spkezr(target, et, observer)?,
@@ -169,7 +169,7 @@ pub fn indirect_term_acceleration(
     observer: &str,
     mu: f64,
     min_distance: f64,
-) -> Result<[f64; 3], cspice::Error> {
+) -> Result<[f64; 3], cspice_rs::Error> {
     let r_ob = match crate::ephem_cache::lookup_body_position(target, observer, et) {
         Ok(Some(pos)) => pos,
         Ok(None) => fallback_spkezr(target, et, observer)?,

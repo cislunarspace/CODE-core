@@ -23,8 +23,8 @@
 //! 主循环是单线程 Python，OK）。
 
 #[cfg(test)]
-use cspice_sys::bodn2c_c;
-use cspice_sys::{
+use cspice_rs_sys::bodn2c_c;
+use cspice_rs_sys::{
     boddef_c, erract_c, errdev_c, failed_c, getmsg_c, qcktrc_c, reset_c, ConstSpiceChar, SpiceInt,
 };
 use std::ffi::CString;
@@ -516,7 +516,7 @@ pub fn mat3_t_mul_vec(m: &[[f64; 3]; 3], v: &[f64; 3]) -> [f64; 3] {
 #[cfg(feature = "spice")]
 pub mod ffi_oracle {
     use super::{c_chars_to_string, check_spice_error, to_cstring, SpiceFfiError};
-    use cspice_sys::{et2utc_c, ktotal_c, pxform_c, sxform_c, ConstSpiceChar, SpiceInt};
+    use cspice_rs_sys::{et2utc_c, ktotal_c, pxform_c, sxform_c, ConstSpiceChar, SpiceInt};
 
     /// oracle：CSPICE `pxform_c` 直连，返回 3×3 行主序旋转矩阵。
     pub fn pxform(from: &str, to: &str, et: f64) -> Result<[[f64; 3]; 3], SpiceFfiError> {
@@ -698,9 +698,9 @@ mod tests {
     fn spkezr_matches_cspice_high_level() {
         let _g = crate::lock_spice_for_test();
         load_kernels();
-        use cspice::common::AberrationCorrection;
-        use cspice::spk::easier_reader;
-        use cspice::time::Et;
+        use cspice_rs::common::AberrationCorrection;
+        use cspice_rs::spk::easier_reader;
+        use cspice_rs::time::Et;
         let et = 0.0_f64;
         let (state, _lt) = easier_reader(
             "MOON",

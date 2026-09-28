@@ -1,7 +1,7 @@
 //! native_spk 与 CSPICE 的对拍测试（ADR 0051，issue #684 验收）。
 //!
 //! 断言全部为 `f64::to_bits` 逐位相等（非容差）。CSPICE 侧 oracle 一律直连
-//! `cspice::spk::easier_reader` / `cspice_sys` DAF 例程（FFI 参照身份），绝不
+//! `cspice_rs::spk::easier_reader` / `cspice_rs_sys` DAF 例程（FFI 参照身份），绝不
 //! 经 `spice_ffi::spkezr`（那已是新后端）。
 //!
 //! 运行约定：`make test-rust` 以 `--test-threads=1` 执行；裸跑（默认多线程）
@@ -11,10 +11,10 @@ use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, Once};
 
-use cspice::common::AberrationCorrection;
-use cspice::spk::easier_reader;
-use cspice::time::Et;
-use cspice_sys::{
+use cspice_rs::common::AberrationCorrection;
+use cspice_rs::spk::easier_reader;
+use cspice_rs::time::Et;
+use cspice_rs_sys::{
     dafcls_c, daffna_c, dafopr_c, dafrfr_c, dafus_c, erract_c, errdev_c, failed_c, reset_c,
     SpiceBoolean, SpiceDouble, SpiceInt,
 };
@@ -115,7 +115,7 @@ struct OracleSegment {
     data_words: (usize, usize),
 }
 
-/// 用 `cspice_sys` 直调 DAF 例程逐段取描述符（FFI oracle，与 native 解析对拍）。
+/// 用 `cspice_rs_sys` 直调 DAF 例程逐段取描述符（FFI oracle，与 native 解析对拍）。
 fn cspice_scan_segments(path: &Path) -> Vec<OracleSegment> {
     ensure_cspice_return_mode();
     unsafe {
@@ -181,12 +181,12 @@ fn cspice_scan_segments(path: &Path) -> Vec<OracleSegment> {
 
 // bindgen 生成的符号按 C 原型导出；这里包一层避免 unsafe 块内书写细节。
 unsafe fn dafbfs_c_impl(handle: SpiceInt) {
-    cspice_sys::dafbfs_c(handle);
+    cspice_rs_sys::dafbfs_c(handle);
     check_cspice("dafbfs_c");
 }
 
 unsafe fn dafgs_c_impl(sum: *mut SpiceDouble) {
-    cspice_sys::dafgs_c(sum);
+    cspice_rs_sys::dafgs_c(sum);
     check_cspice("dafgs_c");
 }
 
