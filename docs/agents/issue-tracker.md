@@ -11,6 +11,7 @@
 - **评论 issue**：`gh issue comment <number> --body "..."`
 - **添加 / 移除标签**：`gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **关闭**：`gh issue close <number> --comment "..."`
+- **正文写作风格**：PR 与 Issue 正文、AI 生成的评论、commit body 和 CHANGELOG 条目的写作约定（完整叙述、平实句子、少特殊符号、细节不进折叠区）见 `CONTRIBUTING.md` 的“正文写作约定”一节；开单模板已内联问题集引导。
 
 从 `git remote -v` 推导仓库，`gh` 在 clone 内运行时自动识别。
 
