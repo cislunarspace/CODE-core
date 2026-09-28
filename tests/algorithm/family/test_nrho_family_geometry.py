@@ -12,7 +12,7 @@ import pytest
 
 from e2m2e.algorithm.family import design_nrho_family
 from e2m2e.algorithm.orbit_taxonomy import classify_orbit
-from e2m2e.data.templates import ConvergenceState
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 

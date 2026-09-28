@@ -14,8 +14,8 @@ import logging
 
 import numpy as np
 
-from ...data.templates import ConvergenceState
 from ...exceptions import PropagationFailure
+from ...status import ConvergenceState
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from .config import TransferArc
 

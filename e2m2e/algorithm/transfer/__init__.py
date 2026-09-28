@@ -24,10 +24,10 @@ from numpy.typing import NDArray
 from ...data.constants import SECONDS_PER_DAY
 from ...data.constants.bodies import MOON
 from ...data.constants.datums import Datum
-from ...data.templates import ConvergenceState, FailureCause
 from ...exceptions import PropagationFailure
+from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..forces import PointMassGravity
-from ..results import CandidateSearchResult, ResultStatus, StageRecord
+from ..results import CandidateSearchResult, StageRecord
 from .bplane import (
     AsymptoteParams,
     BPlaneParams,

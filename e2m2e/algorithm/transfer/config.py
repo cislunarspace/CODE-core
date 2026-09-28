@@ -14,9 +14,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.enums import TransferType
-from ..results import ResultStatus
+from ...status import ConvergenceState, FailureCause, ResultStatus
 
 DU = 3.84405000e5
 

@@ -13,8 +13,6 @@ from __future__ import annotations
 from .design import RO_SUPPORTED_RESONANCES, SEGMENTED_CORRECTION_ORBIT_TYPES
 from .enums import (
     BoundaryMode,
-    ConvergenceState,
-    FailureCause,
     LibrationPoint,
     OrbitFamilyType,
     ProjectionPlane,
@@ -45,8 +43,6 @@ __all__ = [
     "ProjectionPlane",
     "TransferType",
     "BoundaryMode",
-    "ConvergenceState",
-    "FailureCause",
     "LibrationPoint",
     "OrbitFamilyType",
     "TransferPhase",

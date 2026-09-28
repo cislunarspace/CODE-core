@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
-from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.integrators import differential_correction_cr3bp_py
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 

@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.design.design_orbit import OrbitDesignResult
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.trajectory import EphemerisTable
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 

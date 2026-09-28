@@ -35,7 +35,7 @@ from e2m2e.data.catalog import (
     point_interval,
     transfer_segment_arrays,
 )
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 from .serialization import finite_or_none
 

@@ -14,7 +14,7 @@ from typing import Any
 import numpy as np
 
 from ...data.constants import SECONDS_PER_DAY
-from ...data.templates import ConvergenceState, FailureCause
+from ...status import ConvergenceState, FailureCause
 from .axes import Axes
 from .coordinate_system import CoordinateSystem
 from .dynamic_axes import DynamicAxes

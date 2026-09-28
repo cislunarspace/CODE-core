@@ -42,10 +42,10 @@ from e2m2e.data.types.trajectory import EphemerisTable
 
 from ...data.constants import SECONDS_PER_DAY
 from ...data.kernels.manager import SPICEManager
-from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.design import SEGMENTED_CORRECTION_ORBIT_TYPES
 from ...data.templates.perturbations import DEFAULT_PERTURBATION
 from ...data.types.orbit import Orbit
+from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
@@ -66,7 +66,7 @@ from ..family.cr3bp_orbits import (
     design_triangular,
     earth_moon_system,
 )
-from ..results import EphemerisCorrectionResult, ResultStatus, StageRecord
+from ..results import EphemerisCorrectionResult, StageRecord
 from ..solver.multiple_shooting import (
     sample_patch_points_drop_near_perilune,
     sample_patch_points_perilune_clustered,

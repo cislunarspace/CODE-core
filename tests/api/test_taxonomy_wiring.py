@@ -19,8 +19,8 @@ from e2m2e.api.catalog_ingest import build_family_records
 from e2m2e.api.models import FamilyGenerationRequest
 from e2m2e.data.catalog import CatalogFilter, CatalogStore
 from e2m2e.data.constants import Datum
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.interface
 

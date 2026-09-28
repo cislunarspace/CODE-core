@@ -35,8 +35,8 @@ from e2m2e.algorithm.transfer import (
 from e2m2e.algorithm.transfer.hohmann import MU_EARTH, R_EARTH, TliParams
 from e2m2e.algorithm.transfer.lga import LgaCandidate
 from e2m2e.algorithm.transfer.wsb import WsbCandidate
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.exceptions import PropagationFailure
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 

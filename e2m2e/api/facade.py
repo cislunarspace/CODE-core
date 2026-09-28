@@ -23,7 +23,7 @@ import numpy as np
 
 from e2m2e.data.constants import SECONDS_PER_DAY
 from e2m2e.data.constants.bodies import MOON
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 from . import catalog_ingest
 from .config import Config

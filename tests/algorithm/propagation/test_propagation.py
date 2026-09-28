@@ -7,7 +7,7 @@ import pytest
 from kernel_helpers import requires_spice
 
 from e2m2e.algorithm.propagation import _extract_bodies, propagate_orbit
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.integrator
 

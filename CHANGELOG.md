@@ -18,6 +18,9 @@
 - **cspice Rust 绑定依赖切换至 cislunarspace/cspice-rs**：`crates/cspice/` vendor 与 `[patch.crates-io]` 移除，改用 git 依赖（tag `v0.1.0`，crate 名 `cspice-rs`/`cspice-rs-sys`，源码 `use` 路径相应为 `cspice_rs`/`cspice_rs_sys`）。对调用方无 API/行为变化：SPICE 工具面、`CSPICE_DIR` 契约、内核加载语义不变；换源后绑定层新增上游从未可编译平台的修复（aarch64 E0606、LP64 `SpiceInt`），来源与维护记录见独立仓库。(#717, #756)
 - **algorithm 层去重与正名（零行为变化）**：normal_form 打靶模块更名 `multiple_shooting` → `substitute_shooting`（公开符号名不变，旧路径移除，与 `solver.multiple_shooting` 正名区分）；lambert 私有 `_parse_direction` 公开为 `validate_direction`；LGA/WSB 到达段精化的公共打靶段收敛到 `transfer/arrival_refine.refine_arrival_leg`（LGA 的“精化未改进保留网格候选”守卫留在 LGA 包装内，WSB 无条件采纳，差异原样保留并新增回归测试钉住）；cr3bp/bcr4bp/ephemeris 三类动力学的 Rust 传播结果校验/组装收敛到 `dynamics.finalize_rust_propagation`（截断抛错消息逐字不变，ephemeris 仍抛 `PropagationFailure`）。(#747)
 
+### Removed
+- **状态契约四符号的旧导入路径撤销**：`ConvergenceState`/`FailureCause`/`ResultStatus`/`CAUSE_STATUS` 的唯一导入源自此为 `e2m2e.status`；`e2m2e.data.templates` 与 `e2m2e.algorithm.results` 的 re-export 别名（ADR 0039 原定的"永久别名"）撤销，旧路径导入抛 `ImportError`。对象定义与身份不变，仅导入路径收拢。(#745)
+
 ### Fixed
 - **SUN 的 DE421 GM 两视图配对矛盾**：`[body.SUN.gm]` 此前无 DE421 行，与 `[datum.DE421].sun_gm`（1.32712428e11）矛盾——DE421 口径下按天体取太阳 GM 走 DE440 回退 `1.32712440018e11`（相对差 ~9e-8），按口径取则用聚合值。现补齐同值行（`source = "DE421"`），DE421 口径下第三体太阳 GM 自此取 `1.32712428e11`，两视图一致性测试恢复 SUN 覆盖；权威文献出处待补（#670）。(#713)
 

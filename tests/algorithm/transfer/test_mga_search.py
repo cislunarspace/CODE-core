@@ -20,7 +20,7 @@ from e2m2e.algorithm.transfer.mga import (
     search_mga_chains,
 )
 from e2m2e.algorithm.transfer.qlaw import rv_to_keplerian
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 

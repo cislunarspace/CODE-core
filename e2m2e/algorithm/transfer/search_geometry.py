@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ...data.templates import ConvergenceState
 from ...data.types.orbit import Orbit
+from ...status import ConvergenceState
 
 if TYPE_CHECKING:
     from ..results import TransferCandidateResult

@@ -2,17 +2,11 @@
 
 枚举是数据，归 data/templates/（ADR 0011 迁移，源：``core/enums.py`` +
 ``mbse/data/enums.py``）。算法层/接口层引用此处；旧路径已删除。
-
-状态契约两枚举（``ConvergenceState``/``FailureCause``）已上移包根共享内核叶
-``e2m2e.status``（ADR 0039）——数值层门面与数据层都要消费，data 层内已无处安放；
-此处 re-export 保持旧路径与对象身份不变。
 """
 
 from __future__ import annotations
 
 import enum
-
-from e2m2e.status import ConvergenceState, FailureCause  # noqa: F401
 
 
 class ReferenceFrame(enum.Enum):

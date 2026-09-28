@@ -19,9 +19,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates import ConvergenceState, FailureCause
+from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..proximity.relative_dynamics import DynamicsLike, RelativeDynamics, TargetOrbit
-from ..results import ResultStatus
 
 if TYPE_CHECKING:
     from ...data.types.orbit import Orbit

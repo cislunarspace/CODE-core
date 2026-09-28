@@ -11,8 +11,8 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import TransferSearch
 from e2m2e.data.constants import Datum
-from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 

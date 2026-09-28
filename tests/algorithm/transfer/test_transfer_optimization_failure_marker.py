@@ -22,8 +22,8 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import DROTRONLPOptimizer
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.orbit import Orbit
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 

@@ -25,9 +25,9 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import Bounds, minimize
 
-from ...data.templates import ConvergenceState, FailureCause
+from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..forces import PhysicalModel
-from ..results import ResultStatus, scipy_slsqp_status
+from ..results import scipy_slsqp_status
 
 if TYPE_CHECKING:
     from ..dynamics import System

@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 import numpy as np
 
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 from .facade import mcp_exposed
 from .models import (

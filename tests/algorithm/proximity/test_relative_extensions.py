@@ -7,8 +7,8 @@ from e2m2e.algorithm.dynamics import CR3BP_System
 from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.proximity.phasing import phasing_search
 from e2m2e.algorithm.proximity.relative_dynamics import RelativeDynamics, TargetOrbit
-from e2m2e.data.templates import ConvergenceState
 from e2m2e.data.types.orbit import Orbit
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 

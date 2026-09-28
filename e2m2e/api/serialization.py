@@ -12,7 +12,7 @@ from typing import Any
 
 import numpy as np
 
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 __all__ = ["exception_triplet", "finite_or_none", "serialize_value"]
 

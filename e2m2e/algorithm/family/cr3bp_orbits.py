@@ -24,7 +24,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from ...data.templates import RO_SUPPORTED_RESONANCES, ConvergenceState, FailureCause
+from ...data.templates import RO_SUPPORTED_RESONANCES
 from ...data.templates.seed import (  # noqa: F401
     _AXIAL_SEED_VZ0,
     _DPO_SEED_PERIOD,
@@ -47,8 +47,9 @@ from ...data.templates.seed import (  # noqa: F401
 )
 from ...data.types.orbit import Orbit, OrbitFamily
 from ...integrators import collinear_center_modes_py, orbit_family_metric_py
+from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
-from ..results import FamilyGenerationResult, ResultStatus
+from ..results import FamilyGenerationResult
 from ..solver.differential_correction import DifferentialCorrection
 from .axial_initial_guess import (
     _correct_lyapunov_fixed_t,

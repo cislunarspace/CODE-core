@@ -19,7 +19,7 @@ from e2m2e.algorithm.transfer import (
     StateTerminal,
     TransferSolution,
 )
-from e2m2e.data.templates import ConvergenceState
+from e2m2e.status import ConvergenceState
 
 pytestmark = pytest.mark.orchestration
 

@@ -4,8 +4,7 @@ ADR 0024's status vocabulary—``ConvergenceState``, ``FailureCause``,
 ``ResultStatus`` and the ``CAUSE_STATUS`` mapping—is consumed by the data,
 algorithm and numerics layers alike, so its single home is a package-root
 shared-kernel leaf: importable by every layer, importing no layer itself
-(ADR 0039). The historical paths ``e2m2e.data.templates`` and
-``e2m2e.algorithm.results`` re-export these objects with unchanged identity.
+(ADR 0039).
 """
 
 from __future__ import annotations

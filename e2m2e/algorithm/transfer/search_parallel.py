@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from tqdm.auto import tqdm
 
-from ...data.templates import ConvergenceState, FailureCause
 from ...data.types.orbit import Orbit
+from ...status import ConvergenceState, FailureCause
 from ..dynamics import CR3BP_Dynamics, CR3BP_System
 from ..results import TransferCandidateResult
 from .search_progress import (

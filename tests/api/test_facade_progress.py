@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from e2m2e.api.facade import Facade
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.interface
 

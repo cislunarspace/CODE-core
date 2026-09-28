@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates import ConvergenceState, FailureCause
+from ...status import ConvergenceState, FailureCause
 from .center_manifold import CenterManifoldReducer
 from .dynamical_substitution import (
     DEFAULT_DENSE_STEP,

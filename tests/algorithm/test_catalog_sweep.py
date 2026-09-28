@@ -15,7 +15,7 @@ from e2m2e.algorithm.catalog_sweep import (
     FamilySweepPoint,
     run_family_sweep,
 )
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 

@@ -24,17 +24,17 @@ import numpy as np
 
 from ...data.constants import SECONDS_PER_DAY
 from ...data.kernels.manager import SPICEManager
-from ...data.templates import ConvergenceState, FailureCause
 from ...data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
 from ...data.types import EphemerisTable, ManeuverTable, SKStatistic
 from ...data.types.trajectory import read_ephemeris
+from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
 from ..design.design_orbit import default_kernel_dir, load_design_kernels
 from ..dynamics import EphemerisSystem
 from ..forces.force_mapping import perturbation_to_force_config
-from ..results import ResultStatus, StageRecord
+from ..results import StageRecord
 from .monte_carlo import MonteCarloResult, run_monte_carlo
 
 if TYPE_CHECKING:

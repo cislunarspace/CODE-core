@@ -25,7 +25,7 @@ from e2m2e.algorithm.transfer import (
     transfer_orbit,
 )
 from e2m2e.algorithm.transfer.hohmann import MU_EARTH
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 

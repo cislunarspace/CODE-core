@@ -12,9 +12,8 @@ from typing import Any
 import numpy as np
 
 from ..data.constants import SECONDS_PER_DAY, Datum
-from ..data.templates import ConvergenceState, FailureCause
 from ..data.types import EphemerisTable
-from .results import ResultStatus
+from ..status import ConvergenceState, FailureCause, ResultStatus
 
 __all__ = ["PropagationResult", "propagate_orbit"]
 

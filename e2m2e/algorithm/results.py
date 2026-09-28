@@ -1,10 +1,4 @@
-"""算法结果的统一最终状态契约。
-
-状态契约四件套（``ConvergenceState``/``FailureCause``/``ResultStatus``/
-``CAUSE_STATUS``）已上移包根共享内核叶 ``e2m2e.status``（ADR 0039）——数值层
-门面与数据层也要消费，算法层内已无处安放；此处 re-export 保持旧路径与对象
-身份不变。
-"""
+"""算法结果的统一最终状态契约。"""
 
 from __future__ import annotations
 
@@ -14,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 import numpy as np
 
-from ..status import CAUSE_STATUS, ConvergenceState, FailureCause, ResultStatus  # noqa: F401
+from ..status import ConvergenceState, FailureCause, ResultStatus
 
 if TYPE_CHECKING:
     from ..data.types.orbit import Orbit, OrbitFamily

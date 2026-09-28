@@ -16,17 +16,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from e2m2e.algorithm.results import ResultStatus
 from e2m2e.data.constants import SECONDS_PER_DAY
 from e2m2e.data.templates import (
     RO_SUPPORTED_RESONANCES,
     SEGMENTED_CORRECTION_ORBIT_TYPES,
-    ConvergenceState,
-    FailureCause,
 )
 from e2m2e.data.templates.perturbations import DEFAULT_PERTURBATION
 from e2m2e.data.templates.seed import _HALO_FOLD_Z0, CHAR_LENGTH_KM
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
+from e2m2e.status import ConvergenceState, FailureCause, ResultStatus
 
 __all__ = [
     "OrbitError",

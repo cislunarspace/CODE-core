@@ -15,8 +15,8 @@ import logging
 
 import numpy as np
 
-from ...data.templates import ConvergenceState
 from ...data.types.orbit import Orbit, OrbitFamily
+from ...status import ConvergenceState
 
 logger = logging.getLogger(__name__)
 

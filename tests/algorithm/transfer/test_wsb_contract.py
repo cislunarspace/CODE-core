@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.transfer import WsbSearchParams, WsbTransferDetails
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 # 结果容器的数据结构与默认值契约：按验证对象归 data（ADR 0021 理由 5）；
 # 目录镜像源位于 transfer（ADR 0021 决策 2：目录导航、marker 标功能类）。

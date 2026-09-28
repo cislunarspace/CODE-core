@@ -10,10 +10,10 @@ import pytest
 from e2m2e.api.facade import Facade
 from e2m2e.data.constants import Datum
 from e2m2e.data.constants.bodies import MOON
-from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.maneuver import ManeuverTable
 from e2m2e.data.types.sk_statistic import SKStatistic
 from e2m2e.data.types.trajectory import EphemerisTable
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.interface
 

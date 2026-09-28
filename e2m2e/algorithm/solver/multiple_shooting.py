@@ -21,8 +21,8 @@ import numpy.typing as npt
 from tqdm.auto import tqdm
 
 from ...data.constants import SECONDS_PER_DAY
-from ...data.templates import ConvergenceState, FailureCause, ReferenceFrame
-from ..results import ResultStatus
+from ...data.templates import ReferenceFrame
+from ...status import ConvergenceState, FailureCause, ResultStatus
 
 if TYPE_CHECKING:
     from ...data.kernels.manager import SPICEManager

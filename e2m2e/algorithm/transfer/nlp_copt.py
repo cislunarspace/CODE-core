@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ...data.templates import ConvergenceState, FailureCause
+from ...status import ConvergenceState, FailureCause
 from .config import TransferOptimizationResult
 from .nlp_core import NLPOptimizationVariables
 

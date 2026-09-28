@@ -5,7 +5,7 @@ import pytest
 from scipy.integrate import solve_ivp
 
 from e2m2e.algorithm.transfer import LambertSolution, solve_lambert, solve_lambert_batch
-from e2m2e.data.templates import ConvergenceState, FailureCause
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 
