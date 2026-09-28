@@ -21,8 +21,8 @@ from pydantic import BaseModel, ValidationError
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.exceptions import E2M2EError
 
-from ..catalog_ingest import finite_or_none
 from ..models import OrbitError
+from ..serialization import finite_or_none
 
 __all__ = [
     "Envelope",

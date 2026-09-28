@@ -16,10 +16,10 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .catalog_ingest import finite_or_none
 from .config import Config
 from .frames import FrameError, encode_frame
 from .mcp import envelope, tools
+from .serialization import finite_or_none
 
 if TYPE_CHECKING:
     from ..facade import Facade

@@ -52,6 +52,7 @@ from .models import (
     ValidRangesResponse,
     propagation_failure_details,
 )
+from .serialization import exception_triplet, serialize_value
 
 __all__ = ["Facade", "ToolInfo", "mcp_tools", "tool_inventory"]
 
@@ -106,46 +107,17 @@ def _result_triplet(result: Any) -> tuple[ConvergenceState, FailureCause, str]:
     return triplet
 
 
-def _exception_triplet(exc: Exception) -> tuple[ConvergenceState, FailureCause, str]:
-    """读取算法异常携带的最终状态三元组。
-
-    异常自身携带三元组时原样返回；否则按算法层普通失败处理（保留原始
-    诊断信息），不让 Facade 吞掉 message 或误报契约错误。
-    """
-    status = getattr(exc, "status", None)
-    cause = getattr(exc, "cause", None)
-    message = getattr(exc, "message", None)
-    if status is not None and cause is not None:
-        return status, cause, message or str(exc)
-    return (
-        ConvergenceState.FAILED,
-        FailureCause.UNKNOWN,
-        str(exc),
-    )
-
-
 def _details_to_dict(details: Any) -> dict[str, Any]:
     """把 details dataclass 转为 JSON 兼容 dict（ndarray → list）。"""
     if details is None:
         return {}
     if isinstance(details, dict):
-        return {k: _serialize_value(v) for k, v in details.items()}
+        return {k: serialize_value(v) for k, v in details.items()}
     if dataclasses.is_dataclass(details) and not isinstance(details, type):
         return {
-            f.name: _serialize_value(getattr(details, f.name)) for f in dataclasses.fields(details)
+            f.name: serialize_value(getattr(details, f.name)) for f in dataclasses.fields(details)
         }
-    return {"value": _serialize_value(details)}
-
-
-def _serialize_value(value: Any) -> Any:
-    """递归序列化 numpy 值为 JSON 兼容类型。"""
-    if isinstance(value, np.ndarray):
-        return value.tolist()
-    if isinstance(value, (list, tuple)):
-        return [_serialize_value(v) for v in value]
-    if isinstance(value, dict):
-        return {k: _serialize_value(v) for k, v in value.items()}
-    return value
+    return {"value": serialize_value(details)}
 
 
 # ---- 长任务进度（#576 Phase 1）----
@@ -254,7 +226,7 @@ def _ephemeris_to_dict(ephemeris: EphemerisTable | None) -> dict[str, Any] | Non
     if ephemeris is None:
         return None
     return {
-        f.name: _serialize_value(getattr(ephemeris, f.name))
+        f.name: serialize_value(getattr(ephemeris, f.name))
         for f in dataclasses.fields(ephemeris)
         if f.name != "raw_text"
     }
@@ -399,7 +371,7 @@ class Facade:
                 cause=FailureCause.INVALID_INPUT,
             ) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError("DESIGN_FAILED", message, status=status, cause=cause) from exc
         response.record_id = self.catalog.auto_ingest(
             lambda: catalog_ingest.build_design_record(request, result)
@@ -473,7 +445,7 @@ class Facade:
                 cause=FailureCause.INVALID_INPUT,
             ) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError("CONTROL_FAILED", message, status=status, cause=cause) from exc
         response.record_id = self.catalog.auto_ingest(
             lambda: catalog_ingest.build_control_record(request, result, source_meta=source_meta)
@@ -670,7 +642,7 @@ class Facade:
                 cause=FailureCause.BACKEND_FAILURE,
             ) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError("TRANSFER_FAILED", message, status=status, cause=cause) from exc
         _emit_progress(progress_callback, 1.0, "转移设计完成")
         response.record_id = self.catalog.auto_ingest(
@@ -782,7 +754,7 @@ class Facade:
                 cause=FailureCause.INVALID_INPUT,
             ) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError("MISSION_SEARCH_FAILED", message, status=status, cause=cause) from exc
         _emit_progress(progress_callback, 1.0, "MGA 链搜索完成")
         return response
@@ -839,7 +811,7 @@ class Facade:
                 cause=FailureCause.BACKEND_FAILURE,
             ) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError(
                 "PROPAGATION_FAILED",
                 message,
@@ -901,7 +873,7 @@ class Facade:
                 cause=FailureCause.BACKEND_FAILURE,
             ) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError("TRANSFORM_FAILED", message, status=status, cause=cause) from exc
 
     @mcp_exposed
