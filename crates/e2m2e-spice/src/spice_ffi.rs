@@ -145,7 +145,7 @@ fn to_cstring(s: &str) -> CString {
 }
 
 /// 行星名→NAIF ID 别名表，与 Python 侧
-/// `e2m2e/data/kernels/manager.py:_BODY_ID_ALIASES` 保持一致。
+/// `e2m2e/data/kernels/registry.py:_BODY_ID_ALIASES` 保持一致。
 ///
 /// 背景：de440s/de430/de440 全本只含行星**质心**段（水~海王 ID 1~8）+
 /// 地球族本体（199/299/399）+ 月球（301）+ 太阳（10），**不含**行星本体段

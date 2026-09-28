@@ -316,7 +316,8 @@ def load_design_kernels(
     """加载设计链路所需内核：行星历 + body-fixed 帧内核。
 
     行星名→质心/本体 NAIF ID 别名由 :meth:`SPICEManager.load_kernel` 首次
-    调用时统一注册（双侧同步，见 ``_BODY_ID_ALIASES``）。
+    调用时统一注册（双侧同步，见 ``data/kernels/registry.py`` 的
+    ``_BODY_ID_ALIASES``）。
 
     Args:
         spice: 目标 SPICE 管理器。

@@ -1,9 +1,16 @@
-"""SPICE 内核管理器：加载/缓存/校验。
+"""SPICE 内核管理器：加载/卸载/簿记/缓存开关与内核搜索。
 
-数据层 SPICE 实现（ADR 0011 迁移，源：``core/spice.py``）。职责：内核
-加载/卸载/缓存、UTC↔ET 时间转换、天体状态/位置查询、引力参数查询，
-并实现 :class:`EphemerisProvider` 接口（时间/状态/帧三类，见
-``provider.py``）。
+数据层 SPICE 实现的编排壳（ADR 0011 迁移，源：``core/spice.py``）。
+``class SPICEManager`` 组合两个协作模块（#751 拆分）：
+
+- ``registry.py``：纯数据表与纯函数（NAIF ID、SPK→datum 白名单、
+  行星名别名表、搜索偏好），无 IO 无状态；
+- ``queries.py``：``KernelQueryMixin`` 查询面（UTC↔ET、天体状态/位置、
+  pxform、GM），实现 :class:`EphemerisProvider` 的对应方法。
+
+本模块保留：闰秒自动加载、双侧 furnsh/unload 与 datum 簿记（ADR 0048
+的锁、失败回滚与告警契约）、预插值缓存开关、星历内核搜索，以及
+``ephemeris_datum`` 口径 property。
 
 SPICE 内核文件说明：
 
@@ -24,86 +31,27 @@ from __future__ import annotations
 import inspect
 import logging
 import os
-import re
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import numpy as np
-import numpy.typing as npt
-
-from ...data.constants.bodies import _BODIES_BY_NAME
 from ._spice_loader import get_spiceypy
 from .provider import EphemerisProvider
+from .queries import KernelQueryMixin
+from .registry import (
+    _APPROXIMATED_KERNELS,
+    _BODY_ID_ALIASES,
+    _DATUM_KERNEL_PREFERENCE,
+    _DEFAULT_EPHEMERIS_DATUM,
+    _EPHEMERIS_KERNEL_PRIORITY,
+    _datum_for_kernel,
+    _spk_kernel_name,
+)
 
 if TYPE_CHECKING:
     from .ephem_cache import EphemCache
 
 _logger = logging.getLogger(__name__)
-
-# 常用天体的 NAIF ID 映射表，用于将天体名称转换为 SPICE 所需的整数 ID。
-_NAIF_IDS: dict[str, int] = {
-    "SUN": 10,
-    "MERCURY": 199,
-    "VENUS": 299,
-    "EARTH": 399,
-    "MOON": 301,
-    "MARS": 499,
-    "JUPITER": 599,
-    "SATURN": 699,
-    "URANUS": 799,
-    "NEPTUNE": 899,
-    "EMB": 3,
-    "PLUTO": 999,
-}
-
-# 星历（SPK）内核 → 物理常数基准（datum）映射白名单。
-#
-# 依据（ADR 0048）：
-# - **SPK 内核本身不携带 GM**（实测：de421.bsp + pck00010.tpc 下对所有天体
-#   ``bodvrd(..., "GM")`` 均报 KERNELVARNOTFOUND），GM 只能来自
-#   ``constants.toml`` 的声明式 body 表；故 datum 由内核**文件名**推断，
-#   不是从内核内容读取。
-# - 只有 ``de421.bsp`` 会改变 GM 口径：仓库只为 DE421/DE440 维护 GM 表。
-#   de441/de442 的 GM 与 DE440 确有差异，但补全它们需要的权威来源不在本仓库
-#   现有证据内，因此一律按 DE440 处理并告警一次，绝不静默混用。
-# - 配对取"最后一个成功加载的星历内核"：与 SPICE 对重叠覆盖段"后加载者生效"
-#   的优先级规则一致，避免出现"位置按 de440s、GM 按 de421"的静默错配。
-_SPK_DATUM_PATTERN = re.compile(r"(?i)^(de\d+s?)\.bsp$")
-
-_KERNEL_DATUM_BY_SPK: dict[str, str] = {
-    "de421": "DE421",
-    "de430": "DE440",
-    "de435": "DE440",
-    "de438": "DE440",
-    "de440": "DE440",
-    "de440s": "DE440",
-    "de441": "DE440",
-    "de442": "DE440",
-    "de442s": "DE440",
-}
-
-#: 无星历内核（或内核未收录）时的 GM 基准，与 ADR 0022 决策 4 的星历动力学默认一致。
-_DEFAULT_EPHEMERIS_DATUM = "DE440"
-
-#: 白名单中 GM 被近似到其它基准的内核（ADR 0048 承认其 DE440 差异但无权威表）：
-#: 加载时按内核名告警一次，落实「绝不静默混用」。
-_APPROXIMATED_KERNELS: frozenset[str] = frozenset(
-    {"de430", "de435", "de438", "de441", "de442", "de442s"}
-)
-
-
-def _spk_kernel_name(path: str) -> str | None:
-    """星历内核名（小写、去扩展名）；非 DE 系列命名返回 ``None``。"""
-    match = _SPK_DATUM_PATTERN.match(os.path.basename(path))
-    return match.group(1).lower() if match is not None else None
-
-
-def _datum_for_kernel(path: str) -> str | None:
-    """由星历内核文件名推断 GM 基准；非星历内核或未收录者返回 ``None``。"""
-    name = _spk_kernel_name(path)
-    return _KERNEL_DATUM_BY_SPK.get(name) if name is not None else None
-
 
 # 闰秒内核（.tls 文件）的搜索路径列表。
 # 按优先级依次搜索：项目内置 kernels 目录 → 环境变量 SPICE_KERNEL_DIR。
@@ -112,27 +60,6 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _LEAPSECOND_SEARCH_PATHS: list[str] = [
     str(_REPO_ROOT / "kernels"),
     os.environ.get("SPICE_KERNEL_DIR", ""),
-]
-
-#: 行星名→质心/本体 NAIF ID 别名表。de440s/de430/de440 全本只含行星**质心**
-#: 段 + 地球族本体 + 月球 + 太阳，不含行星本体段（499/599/…）；CSPICE 默认表
-#: 把 "MARS" 解析成本体 499（de440s 不含）而非质心 4。本表把这些名字注册到
-#: 质心/本体 ID，使 Python spiceypy 实例与 Rust cspice 实例（那边在
-#: ``spice_ffi::register_bodies`` 注册同一份表）解析一致。
-#:
-#: 单一归属 SPICEManager 模块。两份表（Python 这里 +
-#: Rust ``BODY_ALIASES``）保持一致，不做跨语言单源。
-_BODY_ID_ALIASES: list[tuple[str, int]] = [
-    ("MERCURY", 1),
-    ("VENUS", 2),
-    ("EARTH", 399),
-    ("MARS", 4),
-    ("JUPITER", 5),
-    ("SATURN", 6),
-    ("URANUS", 7),
-    ("NEPTUNE", 8),
-    ("MOON", 301),
-    ("SUN", 10),
 ]
 
 
@@ -203,7 +130,7 @@ def _call_rust_or_compat_error(
         raise  # 与漂移无关的 TypeError：原样上抛，不掩盖
 
 
-class SPICEManager(EphemerisProvider):
+class SPICEManager(KernelQueryMixin, EphemerisProvider):
     """Wrapper around the NASA SPICE toolkit
     (ephemeris queries, time conversion, kernel management).
 
@@ -320,7 +247,7 @@ class SPICEManager(EphemerisProvider):
         """加载一个 SPICE 内核文件（.bsp / .bpc / .tf 等）。
 
         加载前会自动确保闰秒内核已就绪。星历（SPK）内核加载后即成为当前
-        GM 口径（:attr:`ephemeris_datum`），配对规则见模块级
+        GM 口径（:attr:`ephemeris_datum`），配对规则见 registry 模块的
         ``_KERNEL_DATUM_BY_SPK``。
 
         并发契约：Python ``furnsh``（spiceypy）、Rust ``furnsh``（spice_ext）
@@ -577,72 +504,10 @@ class SPICEManager(EphemerisProvider):
         require_rust_extension("disable_ephem_cache")
         _rust_disable()
 
-    # ---- EphemerisProvider 时间方法 ----
-
-    def utc_to_et(self, utc_str: str) -> float:
-        """将 UTC 时间字符串转换为 Ephemeris Time（TDB 秒）。
-
-        SPICE 的 ET 即 TDB 时间尺度（ADR 0015：TDB 作动力学统一时间）。
-        """
-        return float(get_spiceypy().str2et(utc_str))
-
-    def utc_to_tdb(self, utc: str) -> float:
-        """UTC → TDB（ET 秒）。同 :meth:`utc_to_et`。"""
-        return self.utc_to_et(utc)
-
-    def et_to_utc(self, et: float) -> str:
-        """将 Ephemeris Time（TDB 秒）转换为 UTC 时间字符串。"""
-        return str(get_spiceypy().et2utc(et, "ISOC", 0))
-
-    # ---- EphemerisProvider 状态方法 ----
-
-    def get_body_state(
-        self, target: str, et: float, frame: str, observer: str
-    ) -> npt.NDArray[np.floating]:
-        """查询目标天体相对于观察者的状态向量（位置 + 速度）。"""
-        if self._ephem_cache is not None and self._ephem_cache.covers(target, et, frame, observer):
-            return self._ephem_cache.get_body_state(target, et)
-        state, _lt = get_spiceypy().spkezr(target, et, frame, "NONE", observer)
-        return np.array(state)
-
-    def body_state(
-        self, body: str, et: float, frame: str = "J2000", observer: str = "EARTH"
-    ) -> npt.NDArray[np.floating]:
-        """EphemerisProvider 接口：天体状态（6,）。同 :meth:`get_body_state`。"""
-        return self.get_body_state(body, et, frame, observer)
-
-    def get_body_position(
-        self, target: str, et: float, frame: str, observer: str
-    ) -> npt.NDArray[np.floating]:
-        """查询目标天体相对于观察者的位置向量。"""
-        if self._ephem_cache is not None and self._ephem_cache.covers(target, et, frame, observer):
-            return self._ephem_cache.get_body_position(target, et)
-        position, _lt = get_spiceypy().spkpos(target, et, frame, "NONE", observer)
-        return np.array(position)
-
-    def body_position(
-        self, body: str, et: float, frame: str = "J2000", observer: str = "EARTH"
-    ) -> npt.NDArray[np.floating]:
-        """EphemerisProvider 接口：天体位置（3,）。同 :meth:`get_body_position`。"""
-        return self.get_body_position(body, et, frame, observer)
-
-    def pxform(self, frame_from: str, frame_to: str, et: float) -> npt.NDArray[np.floating]:
-        """SPICE 帧旋转矩阵（EphemerisProvider 帧方法）。"""
-        return np.array(get_spiceypy().pxform(frame_from, frame_to, et))
-
-    _EPHEMERIS_KERNEL_PRIORITY = ["de440.bsp", "de440s.bsp", "de435.bsp", "de438.bsp"]
-
-    #: 各 GM 基准的星历内核候选（按偏好排序）。唯一来源：design 链路同引用本表。
-    #: 同一基准可有多个等价内核（如 de440/de440s 的 GM 表相同）。
-    _DATUM_KERNEL_PREFERENCE: dict[str, tuple[str, ...]] = {
-        "DE421": ("de421.bsp",),
-        "DE440": ("de440.bsp", "de440s.bsp"),
-    }
-
     @classmethod
     def datum_kernel_names(cls, datum: str) -> tuple[str, ...]:
         """GM 基准的星历内核候选名；未知基准返回空元组（ADR 0048 单一来源）。"""
-        return cls._DATUM_KERNEL_PREFERENCE.get(datum.upper(), ())
+        return _DATUM_KERNEL_PREFERENCE.get(datum.upper(), ())
 
     def find_ephemeris_kernel(self, search_dir: str, preferred: str | None = None) -> str:
         """在指定目录中按优先级搜索星历内核文件（.bsp）。
@@ -660,7 +525,7 @@ class SPICEManager(EphemerisProvider):
             raise FileNotFoundError(
                 f"Ephemeris kernel search directory does not exist: {search_dir}"
             )
-        candidates = list(self._EPHEMERIS_KERNEL_PRIORITY)
+        candidates = list(_EPHEMERIS_KERNEL_PRIORITY)
         if preferred is not None:
             names = self.datum_kernel_names(preferred)
             if not names:
@@ -679,40 +544,3 @@ class SPICEManager(EphemerisProvider):
             if os.path.isfile(path):
                 return os.path.abspath(path)
         raise FileNotFoundError(f"No ephemeris kernel found in {search_dir}")
-
-    def get_gm(self, body: str, datum: str | None = None) -> float:
-        """获取天体的引力参数 GM（km³/s²）。
-
-        GM 基准默认取 :attr:`ephemeris_datum`（跟随已加载星历内核，ADR 0048）；
-        可用 ``datum`` 显式覆盖。该基准下无记录时回退 DE440 并按
-        (天体, 基准) 组合告警一次——不静默混用口径。
-
-        若天体不在 ``data.constants.bodies`` 的 GM 表中（如未收录的小天体），
-        则通过 SPICE 内核实时读取（原始行为不变）。
-
-        Args:
-            body: 天体名称（大小写不敏感）。
-            datum: 显式 GM 基准（如 ``"DE421"``/``"DE440"``）；None 用当前口径。
-        """
-        requested = datum.upper() if datum is not None else self.ephemeris_datum
-        name_upper = body.upper()
-        body_obj = _BODIES_BY_NAME.get(name_upper)
-        if body_obj is not None:
-            if requested in body_obj.gm_by_datum:
-                return body_obj.gm_by_datum[requested]
-            if _DEFAULT_EPHEMERIS_DATUM in body_obj.gm_by_datum:
-                key = (name_upper, requested, _DEFAULT_EPHEMERIS_DATUM)
-                if key not in self._gm_fallback_warned:
-                    self._gm_fallback_warned.add(key)
-                    _logger.warning(
-                        "天体 %s 无 %s 基准 GM，回退 %s 值：位置与 GM 口径不一致。"
-                        "需按 %s 口径复算时请先补齐该基准的权威 GM（见 ADR 0048）。",
-                        name_upper,
-                        requested,
-                        _DEFAULT_EPHEMERIS_DATUM,
-                        requested,
-                    )
-                return body_obj.gm_by_datum[_DEFAULT_EPHEMERIS_DATUM]
-        body_id = _NAIF_IDS.get(name_upper, body)
-        vals = get_spiceypy().bodvrd(str(body_id), "GM", 1)
-        return float(vals[1][0])
