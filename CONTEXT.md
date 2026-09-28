@@ -84,6 +84,22 @@ _避免_：segment（保留给 LowThrustSegment 等既有专用用途）、分�
 leg 交接处携带决策变量（推力/速度增量/借力参数）的点。
 _避免_：结点、patch point（保留给 multiple shooting 专用）
 
+### 节点类型（node kind）
+多 leg Sims-Flanagan 链中 leg 交接节点的约束语义，二值：rendezvous（位置+
+速度匹配）与 flyby（位置匹配 + V∞ 旋转：等模 |v∞in| = |v∞out| 等式约束、
+转角 δ ≤ δ_max(r_p_min, v_eff, μ) 不等式约束，转角闭式复用 mga 的
+flyby_turn_angle / flyby_pericenter_radius）。flyby 只用于中间节点，末节点
+必须 rendezvous（#741）。
+_避免_：停泊点、waypoint
+
+### Sims-Flanagan 成本函数集（min_fuel / min_time / weighted / gtoc）
+多 leg 预设计 NLP 的目标函数族（c = Isp·g₀/1000，t_ref = Σ 名义 TOF）：
+min_fuel = 平滑 L1 Σ‖ΔVᵢ‖（≡ max 末态质量 ≡ min 初始质量）；min_time =
+Σ TOF/t_ref；weighted = w_dv·Σ‖ΔVᵢ‖/c + w_t·ΣTOF/t_ref；gtoc =
+−Σ_{交会节点含终点} exp(−p_j/c)（p_j 为节点 j 前全段 Σ‖ΔV‖，GTOC4 多交会
+口径，本仓定义性公式）。
+_避免_：MALTO 目标函数（原文口径未复核，仅作人工对照出处）
+
 ### 匹配点（matchpoint）
 相邻 leg 间施加的状态连续性约束及其残差组装。
 _避免_：拼接点、continuity point
