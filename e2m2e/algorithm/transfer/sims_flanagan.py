@@ -187,9 +187,10 @@ class SimsFlanaganPropulsion:
         """``dT/dr``（N/km）：SEP 功率衰减正分支的解析梯度；常推力或截 0 分支为 0。
 
         正分支 ``T(r) = 2η/(Isp·g₀)·(P₀·AU²/r² − P_bus)`` 对 r 求导得
-        ``−4η·P₀·AU²/(Isp·g₀·r³)``（P_bus 项导数为零）。
+        ``−4η·P₀·AU²/(Isp·g₀·r³)``（P_bus 项导数为零）。``r_helio_km`` 显式
+        固定时功率评估点不随决策变量变化（∂r_eff/∂ΔV ≡ 0），梯度恒为 0。
         """
-        if self.t_max_n is not None:
+        if self.t_max_n is not None or self.r_helio_km is not None:
             return 0.0
         p0, p_bus = self._sep_inputs()
         r_eff = self._sep_radius_km(r_km)
@@ -567,7 +568,9 @@ class SimsFlanaganProblem:
 
         返回 ``(节点状态 (n-m+1,6) [匹配节点..到达], 段中点位置 (n-m,3),
         段中点半径 (n-m,), ∂匹配节点/∂ΔV (6,3n), 段中点位置灵敏度 (n-m,3,3n))``。
-        冲量在后向路径上取 ``v_pre = v_post − ΔV_k``，灵敏度带负号。
+        段序数组（中点位置/半径/灵敏度）按**段升序** k = m..n-1 排列，与前向
+        pass 拼接语义一致；冲量在后向路径上取 ``v_pre = v_post − ΔV_k``，
+        灵敏度带负号。
         """
         half = -0.5 * dt
         x = self._arrival
@@ -596,7 +599,14 @@ class SimsFlanaganProblem:
                 phi2 = np.asarray(out["stm"][0], dtype=float).reshape(6, 6)
                 sens = phi2 @ s_mid
             nodes.append(x.copy())
-        return np.asarray(nodes[::-1]), mid_pos, r_mid, sens, s_mid_pos
+        # 遍历按 k 降序；段序数组翻转为升序（与索引 k-m 的消费方语义对齐）。
+        return (
+            np.asarray(nodes[::-1]),
+            mid_pos[::-1],
+            r_mid[::-1],
+            sens,
+            s_mid_pos[::-1],
+        )
 
     def _penalty_evaluation(
         self,
@@ -730,10 +740,12 @@ class SimsFlanaganProblem:
                                    + T(r̄ₖ)·û_j·[j<k]/(c·m̄ₖ) ]
             ∂g_k/∂ΔV_j   = 2·cap_k·∂cap_k/∂ΔV_j − 2·ΔV_k·δ_{kj}
 
-        ``Spos_k`` 是该段**中点**位置灵敏度（段 k < m 取前向 pass、否则取后向
-        pass），支集分别为 j < k / j > k；``m̄ₖ`` 对 ``ΔV_j``（j < k）的导数为
-        ``−m̄ₖ·û_j/c``，两 pass 同式（后向锚定推导中 j ≥ k 项相消），j ≥ k 的
-        两支全为零，故内层只需遍历 j < k。
+        两支的支集不同，统一全 j 循环、由零支集自然截断：``m̄ₖ`` 链只在
+        ``j < k`` 非零（``m̄ₖ = m₀·exp(−Σ_{j<k}‖ΔVⱼ‖/c)``，两 pass 同式）；
+        ``T'`` 链的支集由 ``Spos_k``（该段**中点**位置灵敏度，段 k < m 取
+        前向 pass、否则取后向 pass）决定——前向段支集 j < k、后向段支集
+        j > k（后向中点跟随更晚段冲量的反向传播）。``û_j = ΔV_j/|ΔV_j|``
+        在 |ΔV_j| ≤ 阈值时取零向量（雅可比连续化）。
         """
         n = dv.shape[0]
         jac = np.zeros((n, 3 * n))
@@ -746,11 +758,11 @@ class SimsFlanaganProblem:
             spos_k = spos_fwd[k] if k < m else spos_bwd[k - m]
             rhat_k = mid_pos[k] / r_mid[k]
             dcap = np.zeros(3 * n)
-            for j in range(k):
+            for j in range(n):
                 block = slice(3 * j, 3 * j + 3)
                 if grad_t != 0.0:
                     dcap[block] += scale * grad_t * (rhat_k @ spos_k[:, block]) / m_bar_k
-                if dv_norm[j] > _UHAT_EPS_KM_S:
+                if j < k and dv_norm[j] > _UHAT_EPS_KM_S:
                     dcap[block] += scale * thrust_k * (dv[j] / dv_norm[j]) / (c_kms * m_bar_k)
             jac[k] = 2.0 * cap_k * dcap
             jac[k, 3 * k : 3 * k + 3] -= 2.0 * dv[k]

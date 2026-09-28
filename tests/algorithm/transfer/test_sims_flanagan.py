@@ -264,7 +264,9 @@ def test_delta_v_sanity_band():
     离散解不超过 Edelbaum 螺旋闭式的 1.02 倍。推力取 5 N（段界远不激活、
     近脉冲品质）：0.5 N 档在 Hohmann tof 内属推力饥饿工况（离散可达域
     收缩，总 ΔV 收敛到 ~2×Edelbaum，见 n=64/128 实测趋势），带宽断言
-    不成立于该参数化，故本用例取近脉冲推力档。细化不减质（n=32 对照）。
+    不成立于该参数化，故本用例取近脉冲推力档。细化对照取 n=16→32：n=8
+    解（5.9182）已超上界带宽（近脉冲档下 n=16 才进入带宽），依计划
+    contingency 记录离散化理由；细化不减质断言（n=32 对照）保持。
     """
     r1, r2 = AU_KM, 1.5 * AU_KM
     v1 = float(np.sqrt(MU_SUN / r1))
@@ -288,9 +290,10 @@ def test_analytic_jacobian_matches_finite_difference():
     """解析雅可比对中心差分（④ 机制：守 f & g STM → 约束雅可比推导链）。
 
     等式约束（6 维，位置/速度混合量纲已按问题尺度归一）逐元素对照
-    atol 1e-5；段界不等式约束（n 维，原始量纲）atol 1e-4。常推力模式
-    验证质量链与 δ 项；SEP 模式（固定日心距，非日心问题显式传常数）
-    额外覆盖 dT/dr 功率衰减梯度链。
+    atol 1e-5；段界不等式约束（n 维，原始量纲）atol 1e-4。三种参数化：
+    常推力（质量链 + δ 项）；SEP 固定 ``r_helio_km``（非日心问题显式传
+    常数，``dT/dr`` 恒为零——验证零链不引入伪导数）；SEP 日心语义
+    （瞬时 |r|，真覆盖 ``dT/dr`` 功率衰减梯度链）。
     """
     departure = np.array([8000.0, 0.0, 0.0, 0.0, 6.0, 1.0])
     tof = 4000.0
@@ -301,17 +304,53 @@ def test_analytic_jacobian_matches_finite_difference():
     x_test = np.tile(np.array([1.5e-3, -1.0e-3, 0.5e-3]), n)
     h = 1e-6
 
-    for prop in (
-        SimsFlanaganPropulsion.constant(5.0, 3000.0),
-        SimsFlanaganPropulsion.sep(1.0e5, 3000.0, r_helio_km=AU_KM),
-    ):
-        problem = SimsFlanaganProblem(departure, arrival, tof, prop, 1000.0, MU, backend="conic")
-        ev = problem._evaluate(x_test, n_segments=n, with_sens=True)
+    # 日心 SEP 场景（1AU→1.5AU Hohmann 定相）：dT/dr 链的宿主工况。
+    r1, r2 = AU_KM, 1.5 * AU_KM
+    v1, v2 = float(np.sqrt(MU_SUN / r1)), float(np.sqrt(MU_SUN / r2))
+    helio_problem = SimsFlanaganProblem(
+        np.array([r1, 0.0, 0.0, 0.0, v1, 0.0]),
+        np.array([-r2, 0.0, 0.0, 0.0, -v2, 0.0]),
+        hohmann_tof(r1, r2, MU_SUN),
+        SimsFlanaganPropulsion.sep(7.4e4, 3000.0),
+        1000.0,
+        MU_SUN,
+        backend="conic",
+    )
+
+    cases = [
+        (
+            SimsFlanaganProblem(
+                departure,
+                arrival,
+                tof,
+                SimsFlanaganPropulsion.constant(5.0, 3000.0),
+                1000.0,
+                MU,
+                backend="conic",
+            ),
+            x_test,
+        ),
+        (
+            SimsFlanaganProblem(
+                departure,
+                arrival,
+                tof,
+                SimsFlanaganPropulsion.sep(1.0e5, 3000.0, r_helio_km=AU_KM),
+                1000.0,
+                MU,
+                backend="conic",
+            ),
+            x_test,
+        ),
+        (helio_problem, x_test),
+    ]
+    for problem, x_case in cases:
+        ev = problem._evaluate(x_case, n_segments=n, with_sens=True)
         assert ev.eq_jac is not None and ev.ineq_jac is not None
         for i in range(3 * n):
-            x_plus = x_test.copy()
+            x_plus = x_case.copy()
             x_plus[i] += h
-            x_minus = x_test.copy()
+            x_minus = x_case.copy()
             x_minus[i] -= h
             ev_plus = problem._evaluate(x_plus, n_segments=n, with_sens=False)
             ev_minus = problem._evaluate(x_minus, n_segments=n, with_sens=False)
