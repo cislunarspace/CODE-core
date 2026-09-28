@@ -28,9 +28,9 @@ type Mat3 = [[f64; 3]; 3];
 /// 批量 ET→UTC 的输出：年/月/日/时/分/秒六分量数组。
 type UtcFields = (Vec<i32>, Vec<i32>, Vec<i32>, Vec<i32>, Vec<i32>, Vec<f64>);
 
-/// Rust cspice 实例的行星名注册（Once 保护，见 lib.rs::ensure_bodies_registered）。
+/// Rust cspice 实例的行星名注册（Once 保护，见 bindings/spice.rs::ensure_bodies_registered）。
 fn spkezr_or_err(target: &str, et: f64, observer: &str) -> PyResult<[f64; 6]> {
-    crate::ensure_bodies_registered();
+    crate::bindings::spice::ensure_bodies_registered();
     spkezr(target, et, "J2000", "NONE", observer)
         .map(|(s, _lt)| s)
         .map_err(spice_err)
@@ -230,7 +230,7 @@ pub fn batch_body_states_py(target: &str, observer: &str, ets: Vec<f64>) -> PyRe
 /// 秒为浮点（ISOC prec=0 下为整数秒）。
 #[pyfunction]
 pub fn batch_et_to_utc_py(et: Vec<f64>) -> PyResult<UtcFields> {
-    crate::ensure_bodies_registered();
+    crate::bindings::spice::ensure_bodies_registered();
     let n = et.len();
     let mut year = Vec::with_capacity(n);
     let mut month = Vec::with_capacity(n);

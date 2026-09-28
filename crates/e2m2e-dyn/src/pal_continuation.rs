@@ -16,7 +16,7 @@
 //! - 传播走 `propagate_cr3bp_stm`，与 Python 路径底层是同一个 Rust
 //!   积分器，states/STM 逐位一致。
 
-use crate::cr3bp::{cr3bp_eom, propagate_cr3bp_stm};
+use e2m2e_forces::cr3bp::{cr3bp_eom, propagate_cr3bp_stm};
 
 /// 牛顿步分量裁剪上限（对应 Python `max_step = [0.04, 0.12, 0.12, 0.08]`，
 /// 防止 PAL 收敛到 rx 极大的非物理解）。

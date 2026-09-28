@@ -10,8 +10,8 @@
 
 use nalgebra::{Matrix6, Vector6};
 
-use crate::cr3bp::{propagate_cr3bp, propagate_cr3bp_stm};
-use crate::PropagateError;
+use e2m2e_forces::cr3bp::{propagate_cr3bp, propagate_cr3bp_stm};
+use e2m2e_forces::PropagateError;
 
 /// 与 Python `InvariantManifold._REAL_TOL` / `_UNIT_MARGIN` 对齐。
 const REAL_TOL: f64 = 1e-8;

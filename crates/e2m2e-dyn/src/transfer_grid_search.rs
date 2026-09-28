@@ -5,7 +5,7 @@
 //! [`evaluate_point`] + 串行网格分发 [`transfer_grid_search_serial`]。
 //!
 //! 复用阶段 A 的 [`crate::transfer_geometry`] 与
-//! [`crate::cr3bp::propagate_cr3bp`]（直接调纯 Rust，不绕道持 GIL 的
+//! [`e2m2e_forces::cr3bp::propagate_cr3bp`]（直接调纯 Rust，不绕道持 GIL 的
 //! `propagate_cr3bp_py`）。逐行对照 Python 实现，保证数值与索引约定一致
 //! （阶段 B Rust vs Python 等价性测试基准）。
 //!
@@ -28,8 +28,8 @@
 //! argmin / 首次命中均取首个（与阶段 A 一致），详见
 //! [`crate::transfer_geometry`] 模块文档。
 
-use crate::cr3bp::propagate_cr3bp;
 use crate::transfer_geometry;
+use e2m2e_forces::cr3bp::propagate_cr3bp;
 
 /// 积分发散时的 dv 惩罚（与设计文档 transfer-grid-search-rust.md:88 一致）。
 ///
@@ -372,7 +372,7 @@ pub fn transfer_grid_search_serial(
 /// 与 [`transfer_grid_search_serial`] 同样的 `idx → (i_dep, i_alpha)` 映射与
 /// [`evaluate_point`] 调用，唯一差别是 `into_par_iter` 并行求值。Rayon
 /// `par_iter` + `collect` 保序：各候选求值是纯函数（直接调纯 Rust
-/// [`crate::cr3bp::propagate_cr3bp`]，CR3BP 纯数学无 SPICE FFI、无线程
+/// [`e2m2e_forces::cr3bp::propagate_cr3bp`]，CR3BP 纯数学无 SPICE FFI、无线程
 /// 不安全状态），故并行与串行结果逐位相同。
 ///
 /// `progress_tx` 传入时，用 per-departure 原子计数实现某 departure 的
@@ -381,7 +381,7 @@ pub fn transfer_grid_search_serial(
 ///
 /// # 并行安全前提
 ///
-/// [`evaluate_point`] 调 [`crate::cr3bp::propagate_cr3bp`]（纯数学积分器，
+/// [`evaluate_point`] 调 [`e2m2e_forces::cr3bp::propagate_cr3bp`]（纯数学积分器，
 /// 无全局可变状态、无 SPICE FFI）与 [`crate::transfer_geometry`]（纯函数
 /// 几何核），均 `Send + Sync`。这与多重打靶段积分的 rayon 路径不同，后者
 /// 段积分内调 cspice 需 `StrictGuard` + 星历预采样；本函数零 cspice，rayon

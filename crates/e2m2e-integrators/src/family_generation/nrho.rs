@@ -1,6 +1,6 @@
 //! NRHO 族的单次 Rust 生成。
 
-use e2m2e_forces::pal_continuation::{f_df_tangent, pal_newton_step};
+use e2m2e_dyn::pal_continuation::{f_df_tangent, pal_newton_step};
 
 use super::common::{
     closure_error, correct_halo_fixed_x, correct_halo_fixed_z, metric_minmax, Failure,
