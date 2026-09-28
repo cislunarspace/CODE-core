@@ -78,7 +78,7 @@ pub fn furnish_kernel(path: &str) -> Result<(), String> {
     // furnish 时，CSPICE 池里仍是上次成功加载的那份）。
     let existed_daf = native_spk::is_loaded(p);
     let existed_text = native_frame::is_loaded(p) || native_time::is_loaded(p);
-    cspice::data::furnish(path).map_err(|e| {
+    cspice_rs::data::furnish(path).map_err(|e| {
         if existed_daf {
             let _ = native_spk::load(p);
         } else {

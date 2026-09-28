@@ -313,10 +313,10 @@ mod tests {
         assert_eq!(pos_mod(2.0, 2.0), 0.0);
     }
 
-    /// eul2xf 与 cspice_sys::eul2xf_c 逐位一致（BPC 派生角，tisbod
+    /// eul2xf 与 cspice_rs_sys::eul2xf_c 逐位一致（BPC 派生角，tisbod
     /// 实测场景钉死；sin/cos 实现差异在本仓角度域内不出现）。
     #[test]
-    fn eul2xf_bitwise_vs_cspice_sys() {
+    fn eul2xf_bitwise_vs_cspice_rs_sys() {
         let _g = crate::lock_spice_for_test();
         let e = [
             -0.06429580721124545_f64,
@@ -330,7 +330,7 @@ mod tests {
         let mut theirs = [[0.0_f64; 6]; 6];
         let mut e_in = e;
         unsafe {
-            cspice_sys::eul2xf_c(e_in.as_mut_ptr(), 3, 1, 3, theirs.as_mut_ptr());
+            cspice_rs_sys::eul2xf_c(e_in.as_mut_ptr(), 3, 1, 3, theirs.as_mut_ptr());
         }
         for i in 0..6 {
             for j in 0..6 {

@@ -67,7 +67,7 @@ flowchart LR
 | `e2m2e/api/` | `facade.py`、`models.py`、`execution.py`、MCP、CLI、sidecar 和配置 |
 | `e2m2e/tools/` | 日志等辅助工具 |
 | `e2m2e/mbse/` | 独立的需求、架构、数据和图表模型 |
-| `crates/` | Rust workspace；`crates/cspice/` 是 `[patch.crates-io]` vendor crate，不是 workspace member |
+| `crates/` | Rust workspace；`cspice`/`cspice-sys` 绑定来自 git 依赖 cislunarspace/cspice-rs（ADR 0057），无本地 vendor |
 | `tests/` | 按 data、numerical、algorithm、api、tools、mbse、`_meta` 镜像分层 |
 | `scripts/` | 构建资源下载、架构检查、基线生成、benchmark 和手工诊断 |
 | `docs/adr/` | 不可静默覆盖的架构决策记录；`CONTEXT.md` 是唯一领域术语表 |

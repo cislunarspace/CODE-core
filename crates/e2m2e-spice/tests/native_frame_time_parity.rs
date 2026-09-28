@@ -14,7 +14,7 @@ use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, Once};
 
-use cspice_sys::{erract_c, errdev_c, failed_c, reset_c};
+use cspice_rs_sys::{erract_c, errdev_c, failed_c, reset_c};
 use e2m2e_spice::native_frame::{self, NativeFrameError};
 use e2m2e_spice::native_spk;
 use e2m2e_spice::native_time;
@@ -402,7 +402,7 @@ fn itrf93_load_order_later_wins() {
 
     // oracle 侧卸掉预测 BPC（cspice 池），native 侧不动 → oracle = 只装历史。
     // native == 「只装历史 BPC 的 oracle」证明后加载者生效，而非逐文件混合。
-    cspice::data::unload(&predicted.to_string_lossy()).unwrap();
+    cspice_rs::data::unload(&predicted.to_string_lossy()).unwrap();
     let oracle_history = ffi_oracle::pxform("ITRF93", "J2000", et).unwrap();
     check_cspice("pxform ITRF93 history only");
     assert!(

@@ -17,7 +17,7 @@ crate-type = ["rlib"]
 # 也带 spice。CSPICE 由 scripts/download_cspice.py 提供（CSPICE_DIR）。
 default = ["spice"]
 spice = [
-    "dep:cspice",
+    "dep:cspice-rs",
     "dep:e2m2e-spice",
     "e2m2e-spice/spice",
 ]
@@ -27,7 +27,7 @@ e2m2e-spice = { path = "../e2m2e-spice", optional = true }
 # 无条件依赖：cr3bp 模块（顶层非门控）复用其 explicit_rk_step / RkMethod。
 # e2m2e-propagation 纯数学，不引入 spice 链路。
 e2m2e-propagation = { path = "../e2m2e-propagation" }
-cspice = { workspace = true, optional = true }
+cspice-rs = { workspace = true, optional = true }
 # 转移网格搜索并行：transfer_grid_search_parallel 用 par_iter，CR3BP 纯数学
 # 无 SPICE FFI，rayon 安全（不需 multiple_shooting 的 StrictGuard/ephem_cache）。
 rayon = { workspace = true }
