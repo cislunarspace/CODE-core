@@ -1,4 +1,4 @@
-# ADR 0052: 纯 Rust BPC Type 2 帧旋转 + FK/文本 PCK/LSK 内核后端（#685 Phase B）
+# ADR 0056: 纯 Rust BPC Type 2 帧旋转 + FK/文本 PCK/LSK 内核后端（#685 Phase B）
 
 **状态**：已采纳（已实现）
 **日期**：2026-09-27

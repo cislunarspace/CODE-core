@@ -4,7 +4,7 @@
 //! （求值 + 第三角 mod 2π）与 `pckmat.c`（角度重排 + `eul2xf`）。
 //! `pckr02.c` 与 `spkr02.c` 同构，记录定位/钳位逻辑直接照搬
 //! [`crate::native_spk::spk2::evaluate`]；Chebyshev–Clenshaw 核复用
-//! [`crate::native_spk::spk2::chbint`]（ADR 0052）。
+//! [`crate::native_spk::spk2::chbint`]（ADR 0056）。
 //!
 //! Type 2 BPC 记录布局与 SPK Type 2 完全一致：每条逻辑记录
 //! `[MID, RADIUS, 角1系数, 角2系数, 角3系数]`，3 个分量是 Euler 角

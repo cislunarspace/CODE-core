@@ -1,10 +1,10 @@
-//! native_frame / native_time 与 CSPICE 的对拍测试（ADR 0052，#685 Phase B）。
+//! native_frame / native_time 与 CSPICE 的对拍测试（ADR 0056，#685 Phase B）。
 //!
 //! 断言口径：`pxform`/`sxform` 目标**逐位一致**（`f64::to_bits` 相等）；
 //! `et2utc` 字符串全等；`deltet` 可逆性逐位相等。IAU_* 文本 PCK 帧实测在
 //! IAU_MOON 的 9/1186 网格点存在 1–2 ULP 残差（元素级 ≤8.9e-16 ≈
 //! 2e-10 角秒，其余帧逐位一致）——残差阈值 1e-14 元素 / 1e-6 角秒并在
-//! ADR 0052 记录。CSPICE 侧 oracle 一律直连
+//! ADR 0056 记录。CSPICE 侧 oracle 一律直连
 //! [`e2m2e_spice::spice_ffi::ffi_oracle`]（`*_c` 薄包装），绝不经生产入口。
 //!
 //! 运行约定：`make test-rust` 以 `--test-threads=1` 执行；裸跑（默认多线程）

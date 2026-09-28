@@ -1,4 +1,4 @@
-//! 纯 Rust LSK 时间后端（`deltet`/`et2utc` 的 ISOC 路径，ADR 0052）。
+//! 纯 Rust LSK 时间后端（`deltet`/`et2utc` 的 ISOC 路径，ADR 0056）。
 //!
 //! 行为地面真值：vendored CSPICE 的 `deltet.c`、`unitim.c`（TDB→TAI 的
 //! 三次不动点迭代）与 `et2utc.c`（ISOC 路径，含 `ttrans.c` 的 TAI→YMD

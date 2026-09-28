@@ -1,7 +1,7 @@
 //! cspice-sys FFI 的 safe 包装（仅 `spice` feature 下编译）。
 //!
 //! 自 ADR 0051/#685 Phase A 起，星历几何查询（spkezr）走纯 Rust 后端
-//! （`native_spk`），不跨 FFI；自 ADR 0052/#685 Phase B 起，
+//! （`native_spk`），不跨 FFI；自 ADR 0056/#685 Phase B 起，
 //! `pxform`/`sxform`（BPC Type 2 帧旋转 + FK 帧图 + 文本 PCK）与
 //! `et2utc`（LSK 时间）也改走纯 Rust 后端（`native_frame`/
 //! `native_time`），`ktotal` 改为 native 登记计数。生产入口零 FFI；
@@ -34,14 +34,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// cspice FFI 调用计数。验证"零 cspice"用：打靶前后读该计数，应为 0
 /// （前提：星历预采样缓存已启用 + strict 模式，力模型查内存样条）。
 ///
-/// 自 ADR 0052 起 pxform/sxform/et2utc/ktotal 生产入口不再跨 FFI，
+/// 自 ADR 0056 起 pxform/sxform/et2utc/ktotal 生产入口不再跨 FFI，
 /// 该计数在生产路径恒为 0；oracle（[`ffi_oracle`]）不入计数——
 /// 计数语义只剩「生产面旁路诊断」。
 pub static FFI_CALLS: AtomicU64 = AtomicU64::new(0);
 
 /// 返回累计 cspice FFI 调用次数。
 ///
-/// ADR 0051 后 spkezr、ADR 0052 后 pxform/sxform/et2utc/ktotal 均走纯
+/// ADR 0051 后 spkezr、ADR 0056 后 pxform/sxform/et2utc/ktotal 均走纯
 /// Rust 后端、不再计数，生产路径恒 0（「零 cspice」断言方向不受影响）。
 pub fn ffi_call_count() -> u64 {
     FFI_CALLS.load(Ordering::Relaxed)
@@ -262,7 +262,7 @@ pub(crate) fn name_to_id(name: &str) -> Option<SpiceInt> {
 
 /// 当前已加载内核的 native 计数（`ktotal_c` 语义的纯 Rust 版）。
 ///
-/// 自 ADR 0052 起不再跨 FFI：`"ALL"` = native 登记的文件总数（DAF + 文本
+/// 自 ADR 0056 起不再跨 FFI：`"ALL"` = native 登记的文件总数（DAF + 文本
 /// 池 + LSK）；`"SPK"` = 含 ≥1 个 SPK 段（`center: Some`）的 DAF 文件数；
 /// `"PCK"` = 含 ≥1 个 BPC 段的 DAF 文件数；`"FK"`/`"LSK"`/`"TEXT"` =
 /// 对应文本池计数（TEXT = FK + 文本 PCK + LSK）。其他 kind → `Err`
@@ -306,7 +306,7 @@ const NO_KERNEL_MSG: &str = "Rust CSPICE 实例无内核加载——请经 SPICE
 
 /// `from → to` 在 `et` 时刻的 3×3 旋转矩阵（行主序）。
 ///
-/// 等价于 Python spiceypy.pxform(from, to, et)。自 ADR 0052/#685 Phase B
+/// 等价于 Python spiceypy.pxform(from, to, et)。自 ADR 0056/#685 Phase B
 /// 起走纯 Rust 后端 [`crate::native_frame::pxform`]（BPC Type 2 + FK 帧
 /// 图 + 文本 PCK + 内置帧），与 CSPICE 逐位一致；内核须经理
 /// [`crate::furnish_kernel`] 登记（native 注册表 / 文本池）。
@@ -324,7 +324,7 @@ pub fn pxform(from: &str, to: &str, et: f64) -> Result<[[f64; 3]; 3], SpiceFfiEr
 
 /// `from → to` 在 `et` 时刻的 6×6 状态变换矩阵（行主序）。
 ///
-/// 等价于 Python spiceypy.sxform(from, to, et)。自 ADR 0052 起走纯 Rust
+/// 等价于 Python spiceypy.sxform(from, to, et)。自 ADR 0056 起走纯 Rust
 /// 后端 [`crate::native_frame::sxform`]（组合语义照搬 frmchg.c）。
 pub fn sxform(from: &str, to: &str, et: f64) -> Result<[[f64; 6]; 6], SpiceFfiError> {
     if crate::native_spk::is_empty()
@@ -385,7 +385,7 @@ pub fn spkezr(
 /// ET → UTC ISO 字符串（"ISOC" 格式，prec 位小数秒）。
 ///
 /// 等价于 Python spiceypy.et2utc(et, "ISOC", prec)。供批量 ET→UTC 转换
-/// （星历表组装）下沉 Rust 用。自 ADR 0052 起走纯 Rust 后端
+/// （星历表组装）下沉 Rust 用。自 ADR 0056 起走纯 Rust 后端
 /// [`crate::native_time::et2utc_isoc`]（deltet/tunitim/ttrans 语义移植）；
 /// 只支持 ISOC（仓库两个调用点均为 ISOC），`prec` ∈ 0..=9。
 pub fn et2utc(et: f64, prec: i32) -> Result<String, SpiceFfiError> {
@@ -504,7 +504,7 @@ pub fn mat3_t_mul_vec(m: &[[f64; 3]; 3], v: &[f64; 3]) -> [f64; 3] {
 /// 原 FFI 包装的对拍 oracle（`#[doc(hidden)]`，仅供测试）。
 ///
 /// 先例：`daf::parse_with`（ADR 0051）。`pxform`/`sxform`/`et2utc`/`ktotal`
-/// 的生产入口自 ADR 0052 起走纯 Rust 后端，但 cspice crate 的高层 API 没有
+/// 的生产入口自 ADR 0056 起走纯 Rust 后端，但 cspice crate 的高层 API 没有
 /// 这些函数的包装，对拍测试无处复用——保留直连 `*_c` 的薄包装当 oracle。
 /// oracle 不入 [`FFI_CALLS`] 计数（计数语义 = 生产面旁路诊断，oracle 使用
 /// 不得破坏「生产路径恒 0」断言）。
