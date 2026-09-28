@@ -37,12 +37,13 @@ from e2m2e.data.catalog import (
 )
 from e2m2e.data.templates import ConvergenceState, FailureCause
 
+from .serialization import finite_or_none
+
 if TYPE_CHECKING:
     from e2m2e.data.types.trajectory import EphemerisTable
 
 __all__ = [
     "build_control_record",
-    "finite_or_none",
     "build_design_record",
     "build_family_bundle",
     "build_family_records",
@@ -618,13 +619,6 @@ def _member_jacobi(system: Any, orbit: Any) -> float | None:
     if system is None or not hasattr(system, "get_jacobi_constant"):
         return None
     return finite_or_none(system.get_jacobi_constant(orbit.states[0]))
-
-
-def finite_or_none(value: Any) -> float | None:
-    if value is None:
-        return None
-    value = float(value)
-    return value if math.isfinite(value) else None
 
 
 def _envelope(values: list[float]) -> list[float] | None:

@@ -29,7 +29,7 @@ from e2m2e.data.types.orbit import OrbitFamily
 
 from . import catalog_ingest
 from .config import Config
-from .facade import ProgressCallback, _emit_progress, _exception_triplet, mcp_exposed
+from .facade import ProgressCallback, _emit_progress, mcp_exposed
 from .models import (
     _FAMILY_DEFAULT_LIBRATION_POINT,
     _FAMILY_LIBRATION_POINT_RANGES,
@@ -52,6 +52,7 @@ from .models import (
     FamilyGenerationResponse,
     OrbitError,
 )
+from .serialization import exception_triplet
 
 __all__ = ["Catalog"]
 
@@ -679,7 +680,7 @@ class Catalog:
                 cause=FailureCause.INVALID_INPUT,
             ) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError(
                 "FAMILY_GENERATION_FAILED", message, status=status, cause=cause
             ) from exc

@@ -17,7 +17,7 @@ import numpy as np
 
 from e2m2e.data.templates import ConvergenceState, FailureCause
 
-from .facade import _exception_triplet, _serialize_value, mcp_exposed
+from .facade import mcp_exposed
 from .models import (
     OrbitError,
     SpatiographyAtlasRequest,
@@ -31,6 +31,7 @@ from .models import (
     SpatiographyScalesRequest,
     SpatiographyScalesResponse,
 )
+from .serialization import exception_triplet, serialize_value
 
 __all__ = ["Spatiography"]
 
@@ -107,7 +108,7 @@ class Spatiography:
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
 
     @mcp_exposed(request_model=SpatiographyClassifyRequest)
@@ -135,7 +136,7 @@ class Spatiography:
                     system=system,
                 )
                 zone_ids.append(list(diag.zone_ids))
-                diagnostics.append(_serialize_value(dataclasses.asdict(diag)))
+                diagnostics.append(serialize_value(dataclasses.asdict(diag)))
             return SpatiographyClassifyResponse(
                 status=ConvergenceState.CONVERGED,
                 cause=FailureCause.NONE,
@@ -150,7 +151,7 @@ class Spatiography:
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
 
     @mcp_exposed(request_model=SpatiographyBoundariesRequest)
@@ -176,7 +177,7 @@ class Spatiography:
                     n_points=request.resolution, boundary_set=request.boundary_set
                 )
                 state_frame = "element_space_ae"
-            elements = [_serialize_value(dataclasses.asdict(e)) for e in result.elements]
+            elements = [serialize_value(dataclasses.asdict(e)) for e in result.elements]
             return SpatiographyBoundariesResponse(
                 status=ConvergenceState.CONVERGED,
                 cause=FailureCause.NONE,
@@ -190,7 +191,7 @@ class Spatiography:
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
 
     @mcp_exposed(request_model=SpatiographyAtlasRequest)
@@ -243,7 +244,7 @@ class Spatiography:
                             "kind": "envelope_ae",
                             "label": f"{env.label} lower",
                             "formula_id": "Eq.100-104",
-                            "points": _serialize_value(
+                            "points": serialize_value(
                                 np.stack([env.lower_a_km, env.eccentricities], axis=1)
                             ),
                             "note": caveat + note_extra,
@@ -254,7 +255,7 @@ class Spatiography:
                             "kind": "envelope_ae",
                             "label": f"{env.label} upper",
                             "formula_id": "Eq.100-104",
-                            "points": _serialize_value(
+                            "points": serialize_value(
                                 np.stack([env.upper_a_km, env.eccentricities], axis=1)
                             ),
                             "note": caveat + note_extra,
@@ -288,7 +289,7 @@ class Spatiography:
                             "kind": "locus_ai",
                             "label": f"apsidal-stationary {curve.branch} e={curve.eccentricity:g}",
                             "formula_id": curve.formula_id,
-                            "points": _serialize_value(
+                            "points": serialize_value(
                                 np.stack([curve.a_km, np.degrees(curve.inclination_rad)], axis=1)
                             ),
                             "note": "最低阶 spatiographic 骨架（式 75–78），非月距附近"
@@ -306,7 +307,7 @@ class Spatiography:
                             "label": f"c2={level:g}",
                             "formula_id": "Eq.68",
                             "c2": float(level),
-                            "points": _serialize_value(pts),
+                            "points": serialize_value(pts),
                             "note": "vZLK 相图 c2 等值线（式 65–68）；c1 < 0.6 时 c2=0 为分离线",
                         }
                     )
@@ -355,7 +356,7 @@ class Spatiography:
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
 
     @mcp_exposed(request_model=SpatiographyMapRequest)
@@ -450,5 +451,5 @@ class Spatiography:
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
         except Exception as exc:
-            status, cause, message = _exception_triplet(exc)
+            status, cause, message = exception_triplet(exc)
             raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc

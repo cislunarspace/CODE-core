@@ -4,7 +4,7 @@
 （``Facade(config=Config(...))``），内部默认从环境变量读。SPICEManager 全局句柄、
 r2s2 进程单例作为已知限制用 Config 显式管理。
 
-实现状态：骨架。字段待定稿。
+字段集是对外契约：to_payload/from_payload 跨进程往返（#601），增删字段即协议变更。
 """
 
 from __future__ import annotations
@@ -24,7 +24,8 @@ class Config:
     Attributes:
         kernel_dir: SPICE 内核目录（默认 $SPICE_KERNEL_DIR 或仓库 kernels/）。
         log_level: 日志级别。
-        tolerance: 默认数值容差（积分 rtol/atol）。
+        rtol: 积分相对容差。
+        atol: 积分绝对容差。
         catalog_dir: 轨道库目录；默认 $E2M2E_CATALOG_DIR，未设为 None——
             此时库操作报 CATALOG_NOT_CONFIGURED，不建目录（ADR 0047）。
         catalog_enabled: 产物型方法成功后是否自动入库；默认 $E2M2E_CATALOG_ENABLED
