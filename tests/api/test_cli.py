@@ -213,6 +213,36 @@ def test_mission_architecture_routes_via_worker(fake_worker, facade, capsys):
     assert "half" in captured.err, "worker 进度行应转发到 stderr"
 
 
+def test_low_thrust_preliminary_routes_via_worker(fake_worker, facade, capsys):
+    """#725：low_thrust_preliminary 属长任务，CLI 经 worker 子进程执行。"""
+    fake_worker.use("ok")
+    rc = main(
+        [
+            "low-thrust-preliminary",
+            "--backend",
+            '"conic"',
+            "--departure-state",
+            "[149597870.7, 0.0, 0.0, 0.0, 29.7847, 0.0]",
+            "--nodes",
+            '[{"kind": "rendezvous", "state": [-224396806.05, 0.0, 0.0, 0.0, -24.3193, 0.0]}]',
+            "--leg-tofs-s",
+            "[22064000.0]",
+            "--mu-km3-s2",
+            "1.32712440018e11",
+            "--initial-mass-kg",
+            "1000.0",
+            "--propulsion",
+            '{"isp_s": 3000.0, "t_max_n": 5.0}',
+        ]
+    )
+    captured = capsys.readouterr()
+    assert rc == 0
+    env = json.loads(captured.out.strip().splitlines()[-1])
+    assert env["status"] == "ok"
+    assert env["data"]["mode"] == "ok"
+    assert "half" in captured.err, "worker 进度行应转发到 stderr"
+
+
 def test_worker_crash_yields_error_exit(fake_worker, capsys):
     fake_worker.use("crash")
     rc = main(["transfer-design", "--transfer-type", "HMN", "--tli-epoch", "2460800.5"])
