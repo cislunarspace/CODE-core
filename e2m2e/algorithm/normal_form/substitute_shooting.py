@@ -1,5 +1,8 @@
 """块三对角多重打靶法（Block-Tridiagonal Multiple Shooting）。
 
+模块名 ``substitute_shooting`` 表“动力学替代打靶”，与
+``e2m2e.algorithm.solver.multiple_shooting``（轨道多重打靶修正器）同名不同义。
+
 对应 qiao ``Code05_DynSubs_Gfunc.py`` 的多重打靶 Newton 迭代部分：
 
 - 在 ``t_Q`` 节点上每段独立积分并组装状态转移矩阵 ``Φ_i``；

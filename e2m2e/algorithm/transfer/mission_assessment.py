@@ -12,6 +12,8 @@
     # 在 NSGA-II 前沿上评估
     scores = ma.evaluate(result.f, weights={"dv": 0.7, "tof": 0.3})
     best_idx = int(np.argmin(scores))
+
+已交付未接线：尚未经 Facade/MCP/CLI 暴露（#747）。
 """
 
 from __future__ import annotations

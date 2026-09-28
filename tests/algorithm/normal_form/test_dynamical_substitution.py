@@ -28,7 +28,7 @@ from e2m2e.algorithm.normal_form.dynamical_substitution import (
     DynamicalSubstituteResult,
     _second_derivative,
 )
-from e2m2e.algorithm.normal_form.multiple_shooting import (
+from e2m2e.algorithm.normal_form.substitute_shooting import (
     MultipleShootingResult,
     ODESubstituteSolver,
     ShootingPatch,

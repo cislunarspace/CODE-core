@@ -20,7 +20,7 @@ Public API：
 
 实现策略：
 
-- 复用 :mod:`~e2m2e.algorithm.normal_form.multiple_shooting` 的块三对角消元；
+- 复用 :mod:`~e2m2e.algorithm.normal_form.substitute_shooting` 的块三对角消元；
 - 复用 :mod:`.fft` 的 NAFF/FFT 后端显式选择；
 - 复用 :func:`.hamiltonian.evaluate_hamiltonian` / 星历参数（与其
   接口保持一致）；
@@ -44,7 +44,7 @@ from .fft import (
     FFTComponent,
     extract_frequencies,
 )
-from .multiple_shooting import (
+from .substitute_shooting import (
     MultipleShootingResult,
     ODESubstituteSolver,
     ShootingPatch,
@@ -112,7 +112,7 @@ class DynamicalSubstituteResult:
     W_poly: dict[tuple[int, ...], npt.NDArray[np.floating]]
     Wdot_poly: dict[tuple[int, ...], npt.NDArray[np.floating]]
     fft_components: dict[str, list[FFTComponent]] = field(default_factory=dict)
-    shooting_result: normal_form.multiple_shooting.MultipleShootingResult | None = None
+    shooting_result: normal_form.substitute_shooting.MultipleShootingResult | None = None
     backend: str = "fft"
     spice_available: bool = False
     metadata: dict[str, object] = field(default_factory=dict)

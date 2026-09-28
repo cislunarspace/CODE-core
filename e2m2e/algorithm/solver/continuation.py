@@ -1,6 +1,11 @@
 """轨道族延拓算法模块
 
 提供自然参数延拓和伪弧长延拓方法，用于沿轨道族参数方向逐步生成相邻轨道。
+
+延拓实现共三处：本模块（通用自然参数 + 伪弧长延拓）、
+``family/halo_family.py``（Halo 族专用编排）、
+``family/planar_continuation.py``（平面平动点全周期 PAL 适配器）；
+分工保留不合并（#747）。
 """
 
 from __future__ import annotations

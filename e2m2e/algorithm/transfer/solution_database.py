@@ -13,6 +13,8 @@
     db.add_scan(data, orbit_pair="LEO->GEO", direction="short")
     dv = db.query(scan_id=1, t_dep=1000.0, tof=3600.0)
     front = db.pareto_front(scan_id=1)
+
+已交付未接线：尚未经 Facade/MCP/CLI 暴露（#747）。
 """
 
 from __future__ import annotations

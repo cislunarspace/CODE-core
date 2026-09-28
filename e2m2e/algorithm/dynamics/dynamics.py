@@ -520,6 +520,57 @@ class Dynamics:
         )
 
 
+def finalize_rust_propagation(
+    owner: Dynamics,
+    result: dict[str, Any],
+    t_eval_list: list[float],
+    *,
+    with_stm: bool,
+    error: type[Exception],
+    label: str,
+) -> dict[str, Any]:
+    """校验并组装 Rust 传播结果，更新 ``owner`` 的轨迹缓存。
+
+    cr3bp/bcr4bp/ephemeris 三类动力学的 Rust 传播共用此收尾：数组转换、
+    长度防御校验、``last_trajectory``/``last_stm`` 赋值。
+
+    Args:
+        owner: 发起传播的动力学对象，校验通过后更新其缓存。
+        result: Rust 扩展返回的原始 dict（``time``/``states``，含 STM 时另含 ``stm``）。
+        t_eval_list: 请求的输出时刻列表。
+        with_stm: 是否组装并缓存 STM（``result["stm"]`` 重排为 ``(n, 6, 6)``，
+            转换发生在长度校验之前，与既有各实现一致）。
+        error: 截断时抛出的异常类型（cr3bp/bcr4bp 为 ``RuntimeError``，
+            ephemeris 为 ``PropagationFailure``）。
+        label: 错误消息中的路径标识（如 ``"Rust STM propagation"``）。
+
+    Returns:
+        含 ``time``/``states``（含 STM 时另含 ``stm``）的输出 dict。
+
+    Raises:
+        error: 返回点数与请求数不符。Rust 侧任何提前退出必须在此暴露，
+            不允许把截断结果当完整轨迹返回；校验失败时不更新
+            ``last_trajectory``/``last_stm``。
+    """
+    states = np.array(result["states"])
+    time = np.array(result["time"])
+    out: dict[str, Any] = {"time": time, "states": states}
+    if with_stm:
+        stm = np.array(result["stm"]).reshape(-1, 6, 6)
+        out["stm"] = stm
+
+    if len(time) != len(t_eval_list):
+        raise error(
+            f"{label} returned {len(time)} of {len(t_eval_list)} "
+            f"requested time points; the trajectory is truncated"
+        )
+
+    owner.last_trajectory = (time, states)
+    if with_stm:
+        owner.last_stm = stm
+    return out
+
+
 class CR3BP_Dynamics(Dynamics):
     """CR3BP dynamics (propagation orchestrator). / CR3BP动力学方程
 
@@ -791,24 +842,16 @@ class CR3BP_Dynamics(Dynamics):
             max_step=float(max_step),
         )
 
-        states = np.array(result["states"])
-        stm = np.array(result["stm"]).reshape(-1, 6, 6)
-        time = np.array(result["time"])
-
-        # 防御性校验：Rust 侧任何提前退出都必须在这里暴露，不允许把截断
-        # 结果当完整轨迹返回（照抄 ephemeris_dynamics.py）。
-        if len(time) != len(t_eval_list):
-            raise RuntimeError(
-                f"Rust STM propagation returned {len(time)} of {len(t_eval_list)} "
-                f"requested time points; the trajectory is truncated"
-            )
-
-        self.last_trajectory = (time, states)
-        self.last_stm = stm
-
-        out: dict[str, Any] = {"time": time, "states": states, "stm": stm}
+        out = finalize_rust_propagation(
+            self,
+            result,
+            t_eval_list,
+            with_stm=True,
+            error=RuntimeError,
+            label="Rust STM propagation",
+        )
         if with_jacobi:
-            out = self._handle_jacobi(states, out)
+            out = self._handle_jacobi(out["states"], out)
         return out
 
     def _propagate_state_only(
@@ -860,25 +903,18 @@ class CR3BP_Dynamics(Dynamics):
             max_step=float(max_step),
         )
 
-        states = np.array(result["states"])
-        time = np.array(result["time"])
-
-        if len(time) != len(t_eval_list):
-            raise RuntimeError(
-                f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
-                f"requested time points; the trajectory is truncated"
-            )
-
-        self.last_trajectory = (time, states)
-
-        out: dict[str, Any] = {
-            "time": time,
-            "states": states,
-            "status": ConvergenceState.CONVERGED,
-            "cause": FailureCause.NONE,
-        }
+        out = finalize_rust_propagation(
+            self,
+            result,
+            t_eval_list,
+            with_stm=False,
+            error=RuntimeError,
+            label="Rust propagation",
+        )
+        out["status"] = ConvergenceState.CONVERGED
+        out["cause"] = FailureCause.NONE
         if with_jacobi:
-            out = self._handle_jacobi(states, out)
+            out = self._handle_jacobi(out["states"], out)
         return out
 
     def _propagate_state_only_rust_events(

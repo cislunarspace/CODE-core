@@ -37,6 +37,7 @@ from ...exceptions import PropagationFailure
 from ..dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
 from ..results import CandidateSearchResult, ResultStatus
+from .arrival_refine import refine_arrival_leg
 from .config import TransferArc
 
 logger = logging.getLogger(__name__)
@@ -604,6 +605,9 @@ def _refine_wsb_candidate(
 ) -> tuple[WsbCandidate, TransferArc | None]:
     """用 ThreeBodyLambert 打靶精化 WSB 候选。
 
+    打靶段见 arrival_refine.refine_arrival_leg。与 LGA 不同，本包装无
+    “精化未改进保留网格候选”守卫：打靶收敛即无条件采纳（差异见 #747）。
+
     到达段（perilune → target）用 ThreeBodyLambert 修正到达速度。
 
     Returns:
@@ -611,68 +615,38 @@ def _refine_wsb_candidate(
         (200, 6) 会合系物理 km / km/s + 秒（ADR 0040 轨迹契约）；
         打靶未收敛时弧为 None。
     """
-    from .terminal import StateTerminal
-    from .three_body_lambert import ThreeBodyLambert
+    refined = refine_arrival_leg(
+        system,
+        dynamics,
+        candidate.perilune_state,
+        candidate.perilune_time_dim,
+        candidate.arrival_time_dim,
+        target_state,
+    )
 
-    char_time = system.characteristic_time
-    if char_time is None:
-        raise ValueError("system.characteristic_time must be set")
-
-    try:
-        shooter = ThreeBodyLambert(dynamics)
-
-        peri_phys = system.dimensionless_to_physical(candidate.perilune_state)
-        tof_arrival = (candidate.arrival_time_dim - candidate.perilune_time_dim) * char_time
-        if tof_arrival <= 0.0:
-            raise ValueError(
-                f"到达段剩余时间非正：arrival_time_dim={candidate.arrival_time_dim}, "
-                f"perilune_time_dim={candidate.perilune_time_dim}"
-            )
-
-        target_phys = system.dimensionless_to_physical(target_state)
-
-        arrival_leg = shooter.solve(
-            StateTerminal(peri_phys, 0.0),
-            StateTerminal(target_phys, tof_arrival),
-            tof_arrival,
-            guess="lambert",
+    if refined is not None:
+        arc, dv_arr = refined
+        return (
+            WsbCandidate(
+                sun_phase0=candidate.sun_phase0,
+                departure_phase=candidate.departure_phase,
+                tof_sec=candidate.tof_sec,
+                departure_state=candidate.departure_state,
+                perilune_state=candidate.perilune_state,
+                perilune_alt_km=candidate.perilune_alt_km,
+                perilune_time_dim=candidate.perilune_time_dim,
+                arrival_state=candidate.arrival_state,
+                h2_kepler=candidate.h2_kepler,
+                dv_departure=candidate.dv_departure,
+                dv_arrival=dv_arr,
+                total_dv=candidate.dv_departure + dv_arr,
+                arrival_time_dim=candidate.arrival_time_dim,
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="找到 WSB 候选",
+            ),
+            arc,
         )
-
-        if arrival_leg.status is ConvergenceState.CONVERGED:
-            v_arrival_shot = arrival_leg.arcs[-1].states[-1][3:]
-            v_target_phys = target_phys[3:]
-            # ThreeBodyLambert 解为物理单位 (km/s)：换算回无量纲，
-            # 保持 WsbCandidate dv 字段全无量纲语义（对齐 LGA 精化）。
-            vu_km_s = system.characteristic_velocity
-            if vu_km_s is None or vu_km_s <= 0.0:
-                raise ValueError("system.characteristic_velocity must be set")
-            dv_arr = float(np.linalg.norm(v_arrival_shot - v_target_phys)) / vu_km_s
-
-            return (
-                WsbCandidate(
-                    sun_phase0=candidate.sun_phase0,
-                    departure_phase=candidate.departure_phase,
-                    tof_sec=candidate.tof_sec,
-                    departure_state=candidate.departure_state,
-                    perilune_state=candidate.perilune_state,
-                    perilune_alt_km=candidate.perilune_alt_km,
-                    perilune_time_dim=candidate.perilune_time_dim,
-                    arrival_state=candidate.arrival_state,
-                    h2_kepler=candidate.h2_kepler,
-                    dv_departure=candidate.dv_departure,
-                    dv_arrival=dv_arr,
-                    total_dv=candidate.dv_departure + dv_arr,
-                    arrival_time_dim=candidate.arrival_time_dim,
-                    status=ConvergenceState.CONVERGED,
-                    cause=FailureCause.NONE,
-                    message="找到 WSB 候选",
-                ),
-                arrival_leg.arcs[0],
-            )
-    except (RuntimeError, ValueError, np.linalg.LinAlgError, PropagationFailure):
-        # PropagationFailure：打靶内部传播失败（退化候选几何可触发），
-        # 与其他打靶失败同义——保留原始候选，不让编排器崩（#566）。
-        logger.debug("ThreeBodyLambert 打靶失败，保留原始候选", exc_info=True)
 
     return (
         WsbCandidate(

@@ -5,7 +5,9 @@ import pytest
 from numpy.testing import assert_allclose
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.dynamics.dynamics import Dynamics, finalize_rust_propagation
 from e2m2e.data.constants import MOON, Datum
+from e2m2e.exceptions import PropagationFailure
 
 pytestmark = pytest.mark.interface
 
@@ -72,3 +74,53 @@ def test_collision_detection_requires_an_explicit_backend(dynamics, sample_state
 def test_collision_detection_is_disabled_by_default(dynamics, sample_state):
     result = dynamics.propagate(sample_state, (0.0, 1.0))
     assert "collision" not in result
+
+
+def test_finalize_rust_propagation_raises_on_truncated_output_without_caching():
+    owner = Dynamics.__new__(Dynamics)
+    owner.last_trajectory = None
+    owner.last_stm = None
+    with pytest.raises(RuntimeError, match="returned 1 of 3 requested time points"):
+        finalize_rust_propagation(
+            owner,
+            {"states": [[0.0] * 6], "time": [0.0]},
+            [0.0, 1.0, 2.0],
+            with_stm=False,
+            error=RuntimeError,
+            label="Rust propagation",
+        )
+    assert owner.last_trajectory is None
+
+
+def test_finalize_rust_propagation_raises_with_the_injected_error_type():
+    owner = Dynamics.__new__(Dynamics)
+    with pytest.raises(PropagationFailure, match="Rust STM propagation returned"):
+        finalize_rust_propagation(
+            owner,
+            {"states": [[0.0] * 6], "time": [0.0]},
+            [0.0, 1.0, 2.0],
+            with_stm=False,
+            error=PropagationFailure,
+            label="Rust STM propagation",
+        )
+
+
+def test_finalize_rust_propagation_assembles_outputs_and_caches_trajectory():
+    owner = Dynamics.__new__(Dynamics)
+    stm = np.eye(6).reshape(1, 6, 6).repeat(2, axis=0)
+    out = finalize_rust_propagation(
+        owner,
+        {
+            "states": [[0.0] * 6, [1.0] * 6],
+            "time": [0.0, 1.0],
+            "stm": stm.reshape(-1).tolist(),
+        },
+        [0.0, 1.0],
+        with_stm=True,
+        error=RuntimeError,
+        label="Rust STM propagation",
+    )
+    assert out["states"].shape == (2, 6)
+    assert out["stm"].shape == (2, 6, 6)
+    assert owner.last_trajectory[0].tolist() == [0.0, 1.0]
+    assert owner.last_stm.shape == (2, 6, 6)
