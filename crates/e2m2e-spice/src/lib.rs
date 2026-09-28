@@ -16,7 +16,7 @@ pub mod spice_ffi;
 #[cfg(feature = "spice")]
 pub mod spk_accel;
 
-/// 文本内核分派到对应池（ADR 0052）。无法识别的文本返回 `Ok(false)`
+/// 文本内核分派到对应池（ADR 0056）。无法识别的文本返回 `Ok(false)`
 /// （native 侧跳过，CSPICE 侧照常校验）；解析/装载错误上抛。
 #[cfg(feature = "spice")]
 fn furnish_text_kernel(path: &std::path::Path, content: &str) -> Result<bool, String> {
@@ -41,7 +41,7 @@ fn furnish_text_kernel(path: &std::path::Path, content: &str) -> Result<bool, St
 }
 
 /// 双登记一个内核文件：先入 native 注册表（[`native_spk`]，纯 Rust DAF/SPK
-/// 读取器）或文本池（[`native_frame`] / [`native_time`]，ADR 0052），再
+/// 读取器）或文本池（[`native_frame`] / [`native_time`]，ADR 0056），再
 /// furnsh 到 CSPICE 内核池。
 ///
 /// 分类按内容：前 8 字节 `DAF/` → 二进制（native 注册表）；否则按首个非空

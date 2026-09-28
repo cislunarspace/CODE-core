@@ -1,4 +1,4 @@
-//! 纯 Rust 帧旋转与文本内核后端（ADR 0052，#685 Phase B）。
+//! 纯 Rust 帧旋转与文本内核后端（ADR 0056，#685 Phase B）。
 //!
 //! 把 `pxform`/`sxform` 的剩余 FFI 路径换成纯 Rust：
 //!
