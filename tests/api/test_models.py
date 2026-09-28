@@ -1,4 +1,4 @@
-"""api/models.py 的公开输入、输出与状态契约测试。"""
+"""api/models/ 子包的公开输入、输出与状态契约测试。"""
 
 from __future__ import annotations
 

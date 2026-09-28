@@ -8,7 +8,7 @@
 - ``catalog.py``：Catalog 轨道库类（数据管理 + 族生成，ADR 0043 决策 2）。
 - ``spatiography.py``：Spatiography 分区分析类（ADR 0043 决策 3）。
 - ``config.py``：配置（只管运行环境：内核路径/精度阈值/日志）。
-- ``models.py``：公开数据模型（Pydantic，全手写）。
+- ``models/``：公开数据模型子包（Pydantic，全手写；按主题分模块，经 ``__init__`` re-export）。
 - ``mcp/``：MCP 服务（create_server(facade) 进程内 + CLI mcp-serve 薄包装）。
 - ``cli/``：命令行（子命令 = 工具清单 implemented 条目）。
 

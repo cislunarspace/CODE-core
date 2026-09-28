@@ -64,7 +64,7 @@ flowchart LR
 |---|---|
 | `e2m2e/data/` | 常数、内核、帧、模板、类型、catalog；`constants/constants.toml` 是物理常量源文件 |
 | `e2m2e/algorithm/` | design、family、dynamics、forces、solver、transfer、coordinate、manifold、station_keeping、spatiography 等编排 |
-| `e2m2e/api/` | `facade.py`、`models.py`、`execution.py`、MCP、CLI、sidecar 和配置 |
+| `e2m2e/api/` | `facade.py`、`models/`、`execution.py`、MCP、CLI、sidecar 和配置 |
 | `e2m2e/tools/` | 日志等辅助工具 |
 | `e2m2e/mbse/` | 独立的需求、架构、数据和图表模型 |
 | `crates/` | Rust workspace；`cspice`/`cspice-sys` 绑定来自 git 依赖 cislunarspace/cspice-rs（ADR 0057），无本地 vendor |
@@ -106,7 +106,7 @@ make clean-tests
 
 - Python 用 ruff：100 列、`target-version = "py310"`，规则集为 `E F W I UP B SIM`；Rust 用 `cargo fmt` 和 `cargo clippy --workspace -- -D warnings`；类型检查为 `mypy e2m2e/ --ignore-missing-imports`。
 - Python 模块、函数和变量用 `snake_case`，类用 PascalCase；公共模块维护显式 `__all__`。请求/响应成对命名为 `*Request`/`*Response`；错误码用大写下划线。Rust FFI 函数通常以 `*_py` 命名，SPICE 包装以 `spice_*` 命名，但以实际导出表为准，不要强行重命名所有非 `*_py` 符号。
-- 新的公开输入输出模型放 `e2m2e/api/models.py`，继承公共 API 模型并保持 `extra="forbid"`；算法层使用 numpy、dataclass 和领域类型，不把 Pydantic 边界下沉到算法/data。字段描述是 CLI `--help` 和 MCP schema 的权威来源。
+- 新的公开输入输出模型放 `e2m2e/api/models/` 对应主题子模块，并在 `models/__init__.py` re-export（公开导入路径 `e2m2e.api.models` 不变），继承公共 API 模型并保持 `extra="forbid"`；算法层使用 numpy、dataclass 和领域类型，不把 Pydantic 边界下沉到算法/data。字段描述是 CLI `--help` 和 MCP schema 的权威来源。
 - 确定性错误使用 `E2M2EError` 层次；不可行搜索或部分成功使用 `(ConvergenceState, FailureCause, message)` 状态三元组，不用异常伪装软失败。API 信封将参数校验映射为 `INVALID_PARAMS`，保留领域 `OrbitError`，`E2M2EError` 层次映射为 `E2M2E_ERROR`，保留 message 并在 details 给出异常类型名（确定性领域错误的 cause 不丢），其余异常映射为 `INTERNAL_ERROR` 且不泄露 traceback。
 - 核心同步；异步只放传输层。MCP 短任务用 `anyio.to_thread`，长任务用 worker 进程；进度回调形状为 `cb(fraction, message)`，进度回调失败不得中断计算。Rust 长计算用 `py.allow_threads`，可用 Rayon 并行。
 - 通过 `Config` 注入运行环境，不新增全局单例。`Config.to_payload/from_payload` 是 worker 跨进程契约，未知字段必须拒绝。catalog 的 `records/*.json + *.npz` 是事实来源，`catalog.db` 是可重建索引；目录配置和自动入库都必须由调用方显式开启。
@@ -119,7 +119,7 @@ make clean-tests
 ## Important Files
 
 - 组合根与入口：`e2m2e/__init__.py`、`e2m2e/api/facade.py`、`e2m2e/api/cli/main.py`、`e2m2e/api/mcp/server.py`、`e2m2e/api/sidecar/__init__.py`。
-- API 契约：`e2m2e/api/models.py`、`e2m2e/api/config.py`、`e2m2e/api/execution.py`、`e2m2e/api/mcp/envelope.py`、`e2m2e/api/frames.py`、`e2m2e/api/mcp/worker.py`。
+- API 契约：`e2m2e/api/models/`、`e2m2e/api/config.py`、`e2m2e/api/execution.py`、`e2m2e/api/mcp/envelope.py`、`e2m2e/api/frames.py`、`e2m2e/api/mcp/worker.py`。
 - 共享内核：`e2m2e/exceptions.py`、`e2m2e/status.py`、`e2m2e/integrators.py`、`e2m2e/spice_ext.py`。
 - 领域实现：`e2m2e/algorithm/design/design_orbit.py`、`algorithm/family/__init__.py`、`algorithm/dynamics/`、`algorithm/forces/`、`algorithm/transfer/`；数据和 catalog 在 `e2m2e/data/`。
 - Python↔Rust 边界：`crates/e2m2e-integrators/src/lib.rs`、`crates/e2m2e-integrators/build.rs`、`crates/e2m2e-integrators/abi-version.txt`、各 crate 的 `Cargo.toml`。

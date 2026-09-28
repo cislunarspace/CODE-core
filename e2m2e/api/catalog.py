@@ -31,8 +31,6 @@ from . import catalog_ingest
 from .config import Config
 from .facade import ProgressCallback, _emit_progress, mcp_exposed
 from .models import (
-    _FAMILY_DEFAULT_LIBRATION_POINT,
-    _FAMILY_LIBRATION_POINT_RANGES,
     CatalogDeleteRequest,
     CatalogDeleteResponse,
     CatalogExportRequest,
@@ -52,6 +50,7 @@ from .models import (
     FamilyGenerationResponse,
     OrbitError,
 )
+from .models.family import _FAMILY_DEFAULT_LIBRATION_POINT, _FAMILY_LIBRATION_POINT_RANGES
 from .serialization import exception_triplet
 
 __all__ = ["Catalog"]

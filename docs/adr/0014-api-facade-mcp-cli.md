@@ -263,3 +263,38 @@ nothing is extrapolated, softened, or reclassified (ADR 0020).
   payload shape, which is additive (`details` was `{}` on the Facade path).
 - Tests: the raw `PropagationFailure` branch is covered in `tests/api/test_mcp.py`,
   the `orbit_propagation` real path in `tests/api/test_execution.py`.
+
+## 修订（2026-09-28，#750）：`models.py` 拆分为 `models/` 子包
+
+### 背景
+
+`e2m2e/api/models.py` 增长到 2400+ 行、40 余个 Pydantic 模型与范围基础设施
+同处一文件，主题混杂、导航成本高；拆分前无任何调用方可观察行为问题。
+
+### 决策
+
+**`models.py` 拆为 `e2m2e/api/models/` 子包，按主题分模块。** 模块划分：
+`shared`（`OrbitError`、`propagation_failure_details`、`_ApiModel`、
+`ResultResponse`）、`ranges`（`NumericRange` 与 design/family 共用的区间
+基础设施、`RangeSpec`、`ValidRangesResponse`）、`design`、`control`、
+`transfer`、`mga`、`propagation`、`spacetime`、`family`、`catalog`、
+`spatiography` 各承载成对请求/响应模型及其主题专属取值域表。纯结构重构：
+字段、默认值、校验器、docstring、`extra="forbid"` 逐字搬移，不改写。
+
+**公开导入路径 `e2m2e.api.models` 不变。** `models/__init__.py` 从各子模块
+显式逐名 re-export，`__all__` 与拆分前列表逐名相等（禁 `import *`）；
+`from e2m2e.api.models import X` 与 `from e2m2e.api import ...` 两个导入面
+零破坏。仓库内私有名消费方（`api/catalog.py` 的
+`_FAMILY_LIBRATION_POINT_RANGES`、`_FAMILY_DEFAULT_LIBRATION_POINT`）改为
+从 `e2m2e.api.models.family` 导入；私有名不进 `models/__init__.py`。
+
+**继承链全部真实导入，不留字符串注解/ForwardRef。** 跨模块基类
+（`ResultResponse`、`_ApiModel`、`NumericRange`）在子模块间显式 import。
+
+### 影响
+
+- MCP schema、CLI `--help`、sidecar 描述派生自模型字段描述，拆分不动字段
+  描述，故派生面不变；无兼容别名、无 CHANGELOG 条目（无调用方可观察
+  行为变化）。
+- 新的公开输入输出模型按 AGENTS.md 约定放对应主题子模块并在
+  `models/__init__.py` re-export。
