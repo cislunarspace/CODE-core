@@ -27,6 +27,14 @@ from .catalog import (
 from .control import ControlOrbitRequest, ControlOrbitResponse
 from .design import DesignOrbitRequest, DesignOrbitResponse
 from .family import FamilyGenerationRequest, FamilyGenerationResponse
+from .low_thrust import (
+    LowThrustFlybyInfo,
+    LowThrustLegInfo,
+    LowThrustNodeSpec,
+    LowThrustPreliminaryRequest,
+    LowThrustPreliminaryResponse,
+    LowThrustPropulsionSpec,
+)
 from .mga import (
     MgaChainCandidate,
     MgaFlybyInfo,
@@ -86,6 +94,12 @@ __all__ = [
     "MissionArchitectureSearchResponse",
     "MgaChainCandidate",
     "MgaFlybyInfo",
+    "LowThrustFlybyInfo",
+    "LowThrustLegInfo",
+    "LowThrustNodeSpec",
+    "LowThrustPreliminaryRequest",
+    "LowThrustPreliminaryResponse",
+    "LowThrustPropulsionSpec",
     "PropagationRequest",
     "PropagationResponse",
     "SpacetimeTransformRequest",
