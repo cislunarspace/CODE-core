@@ -62,9 +62,11 @@ print(result.initial_state)
 
 ## 功能介绍
 
+e2m2e 的调用面共 21 个工具，由三个暴露类承载：任务级入口 Facade、轨道库 Catalog、分区分析 Spatiography。进程内 API、CLI 与 MCP 共用这一工具面，清单由 `Facade().tool_inventory()` 派生，是唯一来源。
+
 ### MCP
 
-e2m2e 为 20 个工具设计了 MCP 接口。
+e2m2e 为上述全部工具设计了 MCP 接口。
 
 安装 MCP：
 
@@ -90,35 +92,38 @@ uv pip install "e2m2e[mcp]"
 
 > 设计一条 L2 南族 NRHO，近月点高度 3000 km。
 
-### 时空系统
+### 任务级工具（Facade，8 个）
 
-- 坐标系转换：J2000 / ITRF93（SPICE 高精度）/ IAU 2006，GMAT 兼容的原生 ITRF，动态坐标轴 VNB / LVLH。
-- 时空联合转换：TDT+GCRS ↔ TDB+EBCRS（r2s2 后端，含相对论项）。
-- SPICE 星历与时间管理：内核加载、UTC / TDB / TAI 时间尺度、天体状态与帧旋转查询。
+- `design_orbit`：任务轨道设计，`orbit_type` 共 17 种——DRO、DPO、NRHO、HALO、LYAPUNOV、LISSAJOUS、AXIAL、RO、ELFO 冻结轨道，以及 L4 / L5 三角平动点的 SPO / LPO / HORSESHOE 细分；微分修正、多重打靶与延拓，全链路 CR3BP 初猜 → 星历修正 → 高精度预报。
+- `control_orbit`：轨道保持蒙特卡洛仿真。三种控制律（特征点、目标点严格、目标点宽松）、蒙特卡洛测定轨与推力误差仿真、角动量管理（姿态发动机联合控制）；消费名义轨道契约（NominalOrbit 等间距状态表，Floquet 预计算不在本仓库范围，见 `.out-of-scope/nominal-orbit-floquet-precompute.md`）。
+- `transfer_design`：转移轨道设计。脉冲（Lambert 求解与 porkchop 扫描、Lawden 主矢量多脉冲优化、霍曼直接转移 HMN）、低能量（月球引力辅助 LGA、WSB 太阳引力辅助弹道捕获、不变流形与庞加莱截面拼接）、低推力（Q-law 初猜 + 打靶 / 配点）、网格搜索 + 非线性规划两步法（Rust Rayon 并行）。
+- `mission_architecture_search`：行星际多借力（MGA）链网格搜索（Lambert leg + 无动力 flyby 等模 / 近心点剔除 + 日心 Tisserand 诊断，返回 top-N）。
+- `low_thrust_preliminary`：低推力转移预设计。Sims-Flanagan 多 leg 段中冲量直接法 NLP（SLSQP，全解析雅可比），二体 conic 与星历 n 体双档后端。
+- `orbit_propagation`：轨道预报（Rust 积分内核，含 STM 传播与事件检测）。
+- `spacetime_transform`：时空坐标转换。坐标系 J2000 / ITRF93（SPICE 高精度）/ IAU 2006、GMAT 兼容的原生 ITRF、动态坐标轴 VNB / LVLH；时空联合转换 TDT+GCRS ↔ TDB+EBCRS（r2s2 后端，含相对论项）。
+- `valid_ranges`：请求侧条件值域清单。design_orbit 与族生成的合法参数区间及离散选项，包版本即值域版本。
 
-### 积分器与动力学
+### 轨道库（Catalog，8 个）
+
+- `orbit_family_generation`：轨道族生成，九族（HALO / NRHO / AXIAL / LISSAJOUS / SPO / LPO / HORSESHOE / DRO / RO）；库开启时逐成员入库，可按 `family_id` 整族取回。
+- `catalog_query` / `catalog_get`：多维过滤查询与完整记录取回；`records/*.json + *.npz` 是事实来源，`catalog.db` 只是可重建索引。
+- `catalog_tag` / `catalog_export` / `catalog_terminology` / `catalog_delete`：教学标签写入、查询子集打包导出（导出包可直接作为库打开）、术语图例与闭值集、按 record_id 删除（不可撤销）。
+- `catalog_sweep`：参数空间批量扫描入库（jacobi 能量窗口、振幅 / 近月点高度网格）。
+
+### 分区分析（Spatiography，5 个）
+
+- `spatiography_scales`：分区解析尺度计算。
+- `spatiography_classify`：分区区域分类。
+- `spatiography_boundaries`：分区边界几何。
+- `spatiography_resonance_atlas`：共振图集。
+- `spatiography_dynamical_map`：六域两层天图。
+
+### 数值内核与 SPICE（Rust 底座，供全部工具共用）
 
 - Rust 积分器内核：单步 RK（PD45 / PD78 / RK89）、Adams 多步、Störmer–Cowell 二阶积分；状态转移矩阵（STM）传播；事件检测（terminal / direction 语义）。
 - 动力学模型：CR3BP（快速设计）、星历 N 体（SPICE，精确外推）、含太阳解析摄动的 BCR4BP，以及三者之间的转换。
 - 高精度力模型：点质量与第三体引力、球谐重力场（含固体潮）、ECOM 9 系数光压、大气阻力、太阳光压、连续推力。
-
-### 任务轨道设计
-
-- 周期轨道族：DRO、Halo、Lyapunov、Lissajous、共振轨道（RO）、DPO、Axial、三角平动点 SPO / LPO、Horseshoe。
-- 数值算法：微分修正、多重打靶、延拓；全链路 CR3BP 初猜 → 星历修正 → 高精度预报。
-- 名义轨道契约（NominalOrbit）：等间距状态表，供轨道保持消费；Floquet 基、投影因子与高次插值器为可选扩展点，本仓库不预计算（见 `.out-of-scope/nominal-orbit-floquet-precompute.md`）。
-
-### 转移轨道设计
-
-- 脉冲转移：Lambert 求解与 porkchop 扫描、多脉冲优化（Lawden 主矢量检验）、霍曼直接转移（HMN）。
-- 低能量转移：月球引力辅助（LGA）、WSB 太阳引力辅助弹道捕获、不变流形与庞加莱截面拼接。
-- 低推力转移：Q-law 初猜 + 打靶 / 配点。
-- 网格搜索 + 非线性规划两步法（Rust Rayon 并行）。
-
-### 轨道控制
-
-- 三种控制律：特征点、目标点严格、目标点宽松；蒙特卡洛测定轨与推力误差仿真。
-- 角动量管理：姿态发动机联合控制。
+- SPICE 星历与时间管理：内核加载、UTC / TDB / TAI 时间尺度、天体状态与帧旋转查询。
 
 ## 文档
 
@@ -150,7 +155,7 @@ make check
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/CODE-core},
-  version = {5.9.4},
+  version = {5.9.7},
   year = {2026},
 }
 ```

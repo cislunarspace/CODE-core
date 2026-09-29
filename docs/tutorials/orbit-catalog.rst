@@ -51,10 +51,12 @@
 --------
 
 - ``orbit_family_generation`` 支持
-  ``HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO`` 八族；字段按族适用
+  ``HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO/RO`` 九族；字段按族适用
   （如 NRHO 用 ``north_south``／``perilune_height_max_km``，LISSAJOUS 用
   ``amplitude_in_km``／``amplitude_out_km``）。缺省值由 model_validator 按
-  族填充，DRO 不得携带 ``libration_point``（月心族不绑定平动点）。
+  族填充，DRO（月心族）与 RO（地心族）不绑定平动点，不得携带
+  ``libration_point``；各族参数区间与离散选项经 ``valid_ranges`` 查询
+  （包版本即值域版本）。
 - 库开时族产物 **逐成员** 入库（一轨一记录），返回批次标识 ``family_id``；
   经 ``catalog_query(family_id=…)`` 可整族取回。
 - ``catalog_query`` 全字段可选、逻辑与；``catalog_get`` 取完整记录（含

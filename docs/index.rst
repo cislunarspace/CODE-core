@@ -36,7 +36,7 @@ GUI 经 sidecar stdio 协议（``e2m2e serve-stdio``）使用同一执行入口�
      author = {ouyangjiahong},
      email = {ouyangjiahong22@nudt.edu.cn},
      url = {https://github.com/cislunarspace/CODE-core},
-     version = {5.9.4},
+     version = {5.9.7},
      year = {2026},
    }
 
