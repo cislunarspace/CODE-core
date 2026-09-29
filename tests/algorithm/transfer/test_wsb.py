@@ -342,7 +342,7 @@ class TestWsbTransferOrbit:
         stub 返回空候选，使编排走 "无候选" 分支，details.search_params
         即为编排实际使用的合并后搜索参数。
         """
-        import e2m2e.algorithm.transfer as transfer_module
+        import e2m2e.algorithm.transfer.orchestrator as transfer_module
 
         def _stub_search(departure, target, system, params, **kw):
             if capture is not None:
@@ -499,7 +499,7 @@ class TestWsbDvUnits:
         """编排器汇总一致性：delta_v ≈ dv_departure_km_s + dv_arrival_km_s。
         dv_departure 恒 ×BCR4BP 特征速度；dv_arrival 按精化来源取 CR3BP
         （成功）或 BCR4BP（回退）特征速度。修复前是无量纲混合值。"""
-        import e2m2e.algorithm.transfer as transfer_pkg
+        import e2m2e.algorithm.transfer.orchestrator as transfer_pkg
 
         system = _make_bcr4bp_system()
         cr3bp_system, _ = _make_cr3bp_system()

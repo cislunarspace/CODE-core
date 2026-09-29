@@ -102,7 +102,7 @@ def main() -> None:
 
     # 3. 绘制标称 vs 受控轨迹（会合系 x-z）
     print("\n3. 绘制标称与受控轨迹对比")
-    from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
+    from e2m2e.algorithm.family import earth_moon_system
 
     system = earth_moon_system()
 

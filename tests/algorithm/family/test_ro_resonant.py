@@ -13,13 +13,8 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
-from e2m2e.algorithm.family import registry
-from e2m2e.algorithm.family.cr3bp_orbits import (
-    _earth_distance_minmax,
-    design_ro,
-    design_ro_family,
-    earth_moon_system,
-)
+from e2m2e.algorithm.family import design_ro, design_ro_family, earth_moon_system, registry
+from e2m2e.algorithm.family.orbits.walk import _earth_distance_minmax
 from e2m2e.data.templates import RO_SUPPORTED_RESONANCES
 from e2m2e.status import ConvergenceState
 

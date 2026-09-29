@@ -1,0 +1,1483 @@
+"""转移轨道编排器：``transfer_orbit`` 及各转移类型的编排实现。
+
+接收 transfer_type（HMN/LGA/WSB/low_thrust/PCN），按类型组合底层数学
+模块（hohmann/lga/wsb/pcn/lowthrust_*），组装 ADR 0040 轨迹契约与
+结果 dataclass（``contracts.py``）。会合系↔惯性换算（``_synodic_to_gcrs``
+/``_gcrs_to_synodic``）与轨迹拼接助手供各类型编排共用。
+"""
+
+from __future__ import annotations
+
+import math
+import warnings
+from types import SimpleNamespace
+from typing import Any
+
+import numpy as np
+from numpy.typing import NDArray
+
+from ...data.constants import SECONDS_PER_DAY
+from ...data.constants.bodies import MOON
+from ...data.constants.datums import Datum
+from ...exceptions import PropagationFailure
+from ...status import ConvergenceState, FailureCause
+from ..forces import PointMassGravity
+from ..results import StageRecord
+from .bplane import AsymptoteParams
+from .contracts import (
+    STATE_FRAME_FORCE_MODEL_STATE,
+    STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+    HmnTransferDetails,
+    LgaTransferDetails,
+    LowThrustTransferDetails,
+    ManeuverEvent,
+    PcnTransferDetails,
+    TransferCandidate,
+    TransferDesignResult,
+    WsbTransferDetails,
+)
+from .hohmann import (
+    MU_EARTH,
+    R_EARTH,
+    TliParams,
+    construct_departure_state,
+    eci_to_synodic_display,
+    ephemeris_shoot_transfer,
+    hohmann_delta_v,
+    hohmann_tof,
+    hohmann_transfer_states,
+    scan_lambert_delta_v,
+)
+from .lga import LgaSearchParams, search_lga_trajectories
+from .lowthrust_collocation import LowThrustCollocation
+from .lowthrust_shooting import EngineConfig, LowThrustShooting, LowThrustShootingSolution
+from .multi_impulse import propagate_two_body
+from .pcn import PcnBplaneTarget, PcnSearchParams, PcnSolution, solve_pcn
+from .thrust_arcs import G0_MPS2
+from .wsb import WsbSearchParams, search_wsb_trajectories
+
+_DEFAULT_TOF_GRID_POINTS: int = 50
+_G0: float = G0_MPS2  # m/s²，标准重力；以 thrust_arcs.G0_MPS2 为准
+
+#: 地月 CR3BP 质量参数 μ = m_moon/(m_earth+m_moon)（LGA/WSB/PCN 共用理想化值）。
+_MU_EM: float = 1.21506683e-2
+
+
+def _equivalent_delta_v(m0: float, mf: float, isp: float) -> float:
+    """Tsiolkovsky 方程：Δv = Isp·g₀·ln(m0/mf)，单位 km/s。
+
+    Args:
+        m0: 初始质量 (kg)。
+        mf: 末态质量 (kg)。
+        isp: 比冲 (s)。
+
+    Returns:
+        等效 Δv (km/s)。
+    """
+    return isp * _G0 * math.log(m0 / mf) / 1000.0
+
+
+def transfer_orbit(
+    transfer_type: str,
+    *,
+    target_ephemeris: Any = None,
+    tli_params: TliParams | None = None,
+    tof_range: tuple[float, float] | None = None,
+    target_orbit_radius_km: float | None = None,
+    dynamics: Any = None,
+    lga_search_params: LgaSearchParams | None = None,
+    wsb_search_params: WsbSearchParams | None = None,
+    engine_config: EngineConfig | None = None,
+    initial_mass: float | None = None,
+    n_segments: int = 10,
+    target_oe: tuple[float, float, float] | None = None,
+    solver_method: str = "shooting",
+    duration_days: float = 30.0,
+    departure_state: NDArray[np.float64] | None = None,
+    target_state: NDArray[np.float64] | None = None,
+    system: Any = None,
+    forces: Any = None,
+    progress_callback: Any = None,
+    top_n: int | None = None,
+    bplane_target: PcnBplaneTarget | None = None,
+    departure_asymptote: AsymptoteParams | None = None,
+    **kwargs,
+) -> TransferDesignResult:
+    """端到端转移轨道设计（编排器）。
+
+    Args:
+        transfer_type: "HMN"（直接）/ "LGA"（月球引力辅助）/ "WSB"（太阳引力辅助）/
+            "low_thrust"（小推力）/ "PCN"（patched-conic 目标参数化，B-plane /
+            双曲渐近线）。
+        target_ephemeris: 目标轨道星历（FR1 产物）。坐标系契约按转移类型
+            区分：LGA/WSB 要求会合旋转系（synodic）物理单位
+            （km, km/s）状态，编排器直接无量纲化，不做惯性系→旋转系转换，
+            惯性星历须先经 ``j2000_to_synodic`` 转换；HMN/low_thrust 按地心
+            惯性系 km/km/s 状态解释（与 construct_departure_state 出发态同系）。
+        tli_params: 地球停泊轨道参数（TLI 高度/倾角/航迹角）。
+        tof_range: 飞行时间范围（天）。HMN 作 Lambert 扫描窗口、WSB/PCN 作
+            搜索窗口（PCN 覆盖 ``PcnSearchParams.tof_range_days``）；LGA/
+            low_thrust 不使用。
+        target_orbit_radius_km: 目标轨道半径 (km)，HMN 转移必需。
+        dynamics: 动力学对象（可选），用于 ephemeris 打靶修正。
+        lga_search_params: LGA 搜索参数（可选）。
+        wsb_search_params: WSB 搜索参数（可选）。
+        engine_config: 推进配置（小推力转移必需）。
+        initial_mass: 初始质量 kg（小推力转移必需）。
+        n_segments: 求解器段数（小推力，默认 10）。
+        target_oe: Q-law 目标 ``(a_T, e_T, i_T)`` （小推力可选）。
+        solver_method: 求解方法 ``"shooting"`` / ``"collocation"`` （小推力，默认 ``"shooting"``）。
+        duration_days: 飞行时间（天）（小推力，默认 30.0）。
+        departure_state: 小推力出发状态 ``[r, v]`` (6,)，km / km/s（小推力可选）。
+        target_state: 小推力目标末态 ``[r, v]`` (6,)，km / km/s（小推力可选）。
+        system: 动力学系统（小推力可选，默认纯二体）。
+        forces: 非推力力模型列表（小推力可选）。
+        progress_callback: 搜索进度回调（#576 Phase 1，可选）。形状
+            ``cb(delta: int)``——当前仅 WSB 后端消费：每完成一个
+            ``(sun_phase, tof)`` 网格任务发一次 delta；其余后端无搜索
+            进度通道，传值被忽略。
+        top_n: top-N 可行解契约（#583，ADR 0040 增补，可选）。None
+            （默认）行为与单解契约逐字段一致，结果不带候选；传正整数
+            N 时收敛结果携带至多 N 个可行候选（按上报 Δv 升序，选中解
+            标记），推荐值 ``DEFAULT_TOP_N``。搜索零结果时不携带候选。
+        bplane_target: PCN 到达模式目标（月心 B-plane，#635，可选；与
+            ``departure_asymptote`` 二选一）。
+        departure_asymptote: PCN 出发模式渐近线（地球出发双曲，#635，可选；
+            与 ``bplane_target`` 二选一）。
+
+    Returns:
+        TransferDesignResult: 转移轨道设计结果。
+
+    Raises:
+        NotImplementedError: 编排器实现未完成（未知的 transfer_type）。
+        ValueError: 转移类型缺少必要参数，或 top_n 非正。
+    """
+    if top_n is not None and top_n < 1:
+        raise ValueError(f"top_n 须为正整数，收到 {top_n}")
+    if transfer_type == "HMN":
+        return _transfer_orbit_hmn(
+            tli_params,
+            target_orbit_radius_km,
+            tof_range,
+            dynamics=dynamics,
+            target_ephemeris=target_ephemeris,
+            top_n=top_n,
+        )
+    if transfer_type == "LGA":
+        return _transfer_orbit_lga(
+            tli_params=tli_params,
+            target_ephemeris=target_ephemeris,
+            search_params=lga_search_params,
+            dynamics=dynamics,
+            top_n=top_n,
+        )
+    if transfer_type == "WSB":
+        return _transfer_orbit_wsb(
+            tli_params=tli_params,
+            target_ephemeris=target_ephemeris,
+            search_params=wsb_search_params,
+            tof_range=tof_range,
+            progress_callback=progress_callback,
+            top_n=top_n,
+        )
+    if transfer_type == "low_thrust":
+        if engine_config is None:
+            raise ValueError("low_thrust 转移需要 engine_config")
+        if initial_mass is None:
+            raise ValueError("low_thrust 转移需要 initial_mass")
+        return _transfer_orbit_low_thrust(
+            tli_params=tli_params,
+            target_ephemeris=target_ephemeris,
+            engine_config=engine_config,
+            initial_mass=initial_mass,
+            n_segments=n_segments,
+            target_oe=target_oe,
+            solver_method=solver_method,
+            duration_days=duration_days,
+            departure_state=departure_state,
+            target_state=target_state,
+            system=system,
+            forces=forces,
+            top_n=top_n,
+        )
+    if transfer_type == "PCN":
+        return _transfer_orbit_pcn(
+            tli_params=tli_params,
+            bplane_target=bplane_target,
+            departure_asymptote=departure_asymptote,
+            tof_range=tof_range,
+            top_n=top_n,
+        )
+    raise NotImplementedError(f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）")
+
+
+def _extract_target_state(target_ephemeris: Any) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """从 target_ephemeris 提取目标位置和速度。
+
+    本函数只做格式提取，不解释坐标系；坐标系契约在调用方：
+    LGA/WSB 要求会合旋转系（synodic）物理单位，惯性星历须先经
+    ``spacetime_transform`` 的 ``j2000_to_synodic`` 转换；HMN/low_thrust
+    按地心惯性系 km/km/s 状态解释。
+
+    支持三种输入格式：
+
+    - numpy ndarray (n, 6)：取最后一行。
+    - NominalOrbit（有 .states 属性，形状 (n, 6)）：取最后一行。
+    - EphemerisTable（有 position_km (n, 3) 和 velocity_mps (n, 3)）：
+      取最后一行，速度从 m/s 转换为 km/s。
+
+    Returns:
+        (r_target, v_target)，单位 km 和 km/s。
+    """
+    if isinstance(target_ephemeris, np.ndarray):
+        last_state = target_ephemeris[-1]
+        return last_state[:3].copy(), last_state[3:6].copy()
+    # NominalOrbit: .states 形状 (n, 6)
+    if hasattr(target_ephemeris, "states"):
+        last_state = np.asarray(target_ephemeris.states[-1])
+        return last_state[:3].copy(), last_state[3:6].copy()
+    # EphemerisTable: .position_km (n, 3), .velocity_mps (n, 3)
+    if hasattr(target_ephemeris, "position_km") and hasattr(target_ephemeris, "velocity_mps"):
+        r_target = np.asarray(target_ephemeris.position_km[-1], dtype=np.float64)
+        v_target = np.asarray(target_ephemeris.velocity_mps[-1], dtype=np.float64) / 1000.0
+        return r_target.copy(), v_target.copy()
+    raise TypeError(
+        f"不支持的 target_ephemeris 类型：{type(target_ephemeris).__name__}，"
+        "期望 ndarray (n,6)、NominalOrbit 或 EphemerisTable"
+    )
+
+
+def _propagate_synodic_leg(
+    dynamics: Any,
+    system: Any,
+    x0_dim: np.ndarray,
+    t_end_dim: float,
+    n_samples: int = 200,
+) -> tuple[np.ndarray, np.ndarray]:
+    """会合系无量纲传播一段弧 → 物理单位 + 秒（ADR 0040 轨迹契约）。
+
+    LGA/WSB 拼接轨迹的出发段采样：``dynamics.propagate`` 在无量纲会合
+    系积分，输出经特征量换算（位置 ×DU、速度 ×VU、时间 ×TU），时刻
+    从 0 起算。
+
+    Args:
+        dynamics: 会合系动力学（CR3BP 或 BCR4BP）。
+        system: 对应系统（提供特征尺度）。
+        x0_dim: 出发状态 (6,)，无量纲会合系。
+        t_end_dim: 弧段时长（无量纲时间）。
+        n_samples: 采样点数。
+
+    Returns:
+        ((n, 6) 状态 km / km/s，(n,) 时刻秒)。
+    """
+    du = system.characteristic_length
+    tu = system.characteristic_time
+    vu = system.characteristic_velocity
+    if du is None or tu is None or vu is None:
+        raise ValueError("system 必须设置特征尺度（长度/时间/速度）")
+    t_end = float(t_end_dim)
+    t_eval = np.linspace(0.0, t_end, int(n_samples))
+    result = dynamics.propagate(np.asarray(x0_dim, dtype=float), (0.0, t_end), t_eval=t_eval)
+    states = np.asarray(result["states"], dtype=float)
+    times = np.asarray(result["time"], dtype=float)
+    states_km = np.column_stack([states[:, :3] * du, states[:, 3:] * vu])
+    return states_km, times * tu
+
+
+def _join_transfer_legs(
+    dep_states: np.ndarray,
+    dep_times: np.ndarray,
+    arr_states: np.ndarray,
+    arr_times: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """拼接出发段与到达段（去重衔接点），到达段时刻偏移到出发段时间轴。"""
+    dep_states = np.asarray(dep_states, dtype=float)
+    arr_states = np.asarray(arr_states, dtype=float)
+    dep_times = np.asarray(dep_times, dtype=float)
+    arr_times = np.asarray(arr_times, dtype=float)
+    states = np.vstack([dep_states, arr_states[1:]])
+    times = np.concatenate([dep_times, arr_times[1:] + dep_times[-1]])
+    return states, times
+
+
+def _synodic_to_gcrs(states_syn: np.ndarray, times_sec: np.ndarray, system: Any) -> np.ndarray:
+    """会合系质心物理 km → 地心惯性（GCRS 约定）km（#584，ADR 0040 增补）。
+
+    LGA/WSB 惯性段的换算内核：位置先平移 +[μ·DU, 0, 0]（地月质心 →
+    地心，会合系中地球位于 [−μ, 0, 0]），随后按 θ(t) = ω·t 绕 z 旋回
+    惯性（ω = 会合平均角速度；θ₀=0 约定 TLI 时刻地月连线与惯性 x 轴
+    重合）；速度同旋转并加 ω×r 牵连项——真实系间变换，区别于 HMN 显示
+    约定（``eci_to_synodic_display``）的无牵连旋转。
+
+    Args:
+        states_syn: (n, 6) 会合系质心物理 km / km/s（ADR 0040 §1 契约）。
+        times_sec: (n,) 秒，TLI 起算（θ 的时轴）。
+        system: 会合系统（需 mu / characteristic_length / mean_motion）。
+
+    Returns:
+        (n, 6) 地心惯性 km / km/s，与输入逐行对齐。
+    """
+    arr = np.asarray(states_syn, dtype=float)
+    times = np.asarray(times_sec, dtype=float)
+    mu = getattr(system, "mu", None)
+    du = getattr(system, "characteristic_length", None)
+    omega = getattr(system, "mean_motion", None)
+    if mu is None or du is None or omega is None:
+        raise ValueError("system 必须提供 mu / characteristic_length / mean_motion（特征尺度）")
+    theta = omega * times
+    c, s = np.cos(theta), np.sin(theta)
+    r_geo = arr[:, :3].copy()
+    r_geo[:, 0] += mu * du  # 质心原点 → 地心
+    v_syn = arr[:, 3:]
+    # Rz(+θ) 旋回惯性；ω×r = (−ω·r_y, ω·r_x, 0) 在惯性分量上叠加
+    r_x = c * r_geo[:, 0] - s * r_geo[:, 1]
+    r_y = s * r_geo[:, 0] + c * r_geo[:, 1]
+    r_z = r_geo[:, 2]
+    v_x = c * v_syn[:, 0] - s * v_syn[:, 1] - omega * r_y
+    v_y = s * v_syn[:, 0] + c * v_syn[:, 1] + omega * r_x
+    v_z = v_syn[:, 2]
+    return np.column_stack([r_x, r_y, r_z, v_x, v_y, v_z])
+
+
+def _gcrs_to_synodic(states_gcrs: np.ndarray, times_sec: np.ndarray, system: Any) -> np.ndarray:
+    """地心惯性（GCRS 约定）km → 会合系质心物理 km（#635，ADR 0040 增补）。
+
+    :func:`_synodic_to_gcrs` 的精确逆变换：位置先 Rz(−θ) 旋回会合系，
+    再平移 −[μ·DU, 0, 0]（地心 → 地月质心）；速度先减去 ω×r 牵连项，
+    再 Rz(−θ) 旋回。
+
+    Args:
+        states_gcrs: (n, 6) 地心惯性 km / km/s。
+        times_sec: (n,) 秒，TLI 起算（θ 的时轴）。
+        system: 会合系统（需 mu / characteristic_length / mean_motion）。
+
+    Returns:
+        (n, 6) 会合系质心物理 km / km/s，与输入逐行对齐。
+    """
+    arr = np.asarray(states_gcrs, dtype=float)
+    times = np.asarray(times_sec, dtype=float)
+    mu = getattr(system, "mu", None)
+    du = getattr(system, "characteristic_length", None)
+    omega = getattr(system, "mean_motion", None)
+    if mu is None or du is None or omega is None:
+        raise ValueError("system 必须提供 mu / characteristic_length / mean_motion（特征尺度）")
+    theta = omega * times
+    c, s = np.cos(theta), np.sin(theta)
+    r_gcrs = arr[:, :3]
+    v_gcrs = arr[:, 3:]
+    # Rz(−θ) 旋回会合系
+    r_geo_x = c * r_gcrs[:, 0] + s * r_gcrs[:, 1]
+    r_geo_y = -s * r_gcrs[:, 0] + c * r_gcrs[:, 1]
+    r_geo_z = r_gcrs[:, 2]
+    r_syn_x = r_geo_x - mu * du  # 地心 → 质心原点
+    # 速度先减 ω×r（ω×r = (−ω·r_y, ω·r_x, 0)），再 Rz(−θ)
+    w_x = v_gcrs[:, 0] + omega * r_gcrs[:, 1]
+    w_y = v_gcrs[:, 1] - omega * r_gcrs[:, 0]
+    w_z = v_gcrs[:, 2]
+    v_syn_x = c * w_x + s * w_y
+    v_syn_y = -s * w_x + c * w_y
+    v_syn_z = w_z
+    return np.column_stack([r_syn_x, r_geo_y, r_geo_z, v_syn_x, v_syn_y, v_syn_z])
+
+
+def _moon_state_gcrs(system: Any, t_sec: float) -> NDArray[np.float64]:
+    """月球 GCRS 状态 (6,)（θ₀=0 约定）。
+
+    月球在 CR3BP 会合系中固定于 ``[1−μ, 0, 0]·DU``、速度为零；经
+    :func:`_synodic_to_gcrs` 旋回惯性，与 LGA/WSB/PCN 的会合系→惯性换算
+    约定单一来源。
+    """
+    mu = system.mu
+    du = system.characteristic_length
+    state_syn = np.array([(1.0 - mu) * du, 0.0, 0.0, 0.0, 0.0, 0.0])
+    return _synodic_to_gcrs(state_syn[None, :], np.array([t_sec]), system)[0]
+
+
+def _propagate_two_body_checked(state0: np.ndarray, t_eval: np.ndarray, mu: float) -> np.ndarray:
+    """二体传播并按时刻网格校验完整性（未完整覆盖即 ``PropagationFailure``）。
+
+    ``propagate_two_body`` 在积分提前终止时会少返行；直接按行索引消费会取到
+    错时刻状态或抛 ``IndexError``，故统一经此校验入口。
+    """
+    times_in = np.asarray(t_eval, dtype=float)
+    out = propagate_two_body(state0, times_in, mu)
+    times = np.asarray(out["time"], dtype=float)
+    states = np.asarray(out["states"], dtype=float)
+    n = times_in.shape[0]
+    if times.shape[0] != n or states.shape[0] != n:
+        raise PropagationFailure("二体传播未完整覆盖请求时刻网格")
+    if abs(float(times[-1]) - float(times_in[-1])) > 1e-6 * max(1.0, abs(float(times_in[-1]))):
+        raise PropagationFailure("二体传播未到达请求末点")
+    if not np.all(np.isfinite(states)):
+        raise PropagationFailure("二体传播状态含非有限值")
+    return states
+
+
+def _transfer_orbit_pcn(
+    tli_params: TliParams | None,
+    bplane_target: PcnBplaneTarget | None,
+    departure_asymptote: AsymptoteParams | None,
+    tof_range: tuple[float, float] | None = None,
+    top_n: int | None = None,
+) -> TransferDesignResult:
+    """PCN patched-conic 目标参数化转移编排（#635）。
+
+    流程：
+    1. CR3BP 圆型月球几何（θ₀=0 约定）：``_moon_state_gcrs`` 注入 ``solve_pcn``；
+    2. ``solve_pcn`` 打靶（到达模式网格初猜+Newton / 出发模式无迭代）；
+    3. 轨迹组装（ADR 0040）：地球段地心二体弧 + 月心段二体弧，逐行加月球
+       惯性位置回地心 GCRS；主段经 ``_gcrs_to_synodic`` 旋回会合系；
+    4. 机动事件 departure/arrival 两条（LOI 为近月点单脉冲圆化）。
+
+    ``target_ephemeris`` 不参与（月球取圆型理想化）；``tof_range``（天）作
+    搜索窗口覆盖 ``PcnSearchParams.tof_range_days``；``progress_callback``
+    与 HMN/LGA 一致忽略（无搜索进度通道）。``top_n`` 暂不支持。
+    """
+    if top_n is not None:
+        raise NotImplementedError("PCN 暂不支持 top_n 候选契约")
+    if tli_params is None:
+        raise ValueError("PCN 转移需要 tli_params")
+    if (bplane_target is None) == (departure_asymptote is None):
+        raise ValueError("bplane_target 与 departure_asymptote 必须恰给一个")
+
+    from ..dynamics import CR3BP_System
+
+    system = CR3BP_System(mu=_MU_EM, primary="Earth", secondary="Moon")._with_default_scales()
+    params = (
+        PcnSearchParams(tof_range_days=(float(tof_range[0]), float(tof_range[1])))
+        if tof_range is not None
+        else PcnSearchParams()
+    )
+
+    def moon_state_fn(t_sec: float) -> NDArray[np.float64]:
+        return _moon_state_gcrs(system, t_sec)
+
+    sol = solve_pcn(
+        tli_params,
+        bplane_target=bplane_target,
+        departure_asymptote=departure_asymptote,
+        moon_state_fn=moon_state_fn,
+        system=system,
+        params=params,
+    )
+    mode = "arrival" if bplane_target is not None else "departure"
+    details = _pcn_details(tli_params, sol, mode)
+    stages = _pcn_stages(sol, mode)
+
+    # 失败/非收敛：镜像 LGA 零结果契约（无轨迹、无事件、Δv=inf），但回显
+    # 实际使用的渐近线与达成的 B-plane（诊断需要，字段描述承诺“回显实际值”）。
+    if sol.status is not ConvergenceState.CONVERGED or sol.bplane is None:
+        warnings.warn(f"PCN 转移未收敛：{sol.message}", stacklevel=2)
+        return TransferDesignResult(
+            transfer_type="PCN",
+            delta_v=float("inf"),
+            trajectory=None,
+            details=details,
+            status=sol.status,
+            cause=sol.cause,
+            message=sol.message,
+            stages=stages,
+            bplane=sol.bplane,
+            departure_asymptote=sol.departure_asymptote,
+        )
+
+    # 轨迹组装（ADR 0040）：地球段地心二体弧 + 月心段月心二体弧。组装失败
+    # （传播未完整覆盖时刻网格）降级为无轨迹结果（镜像 LGA），数值结果仍返回。
+    earth_tof = sol.earth_leg_tof_sec
+    moon_tof = sol.moon_leg_tof_sec
+    trajectory: Any = None
+    trajectory_times: Any = None
+    trajectory_gcrs: Any = None
+    try:
+        dep_state0 = sol.departure_state_gcrs
+        enc_state0 = sol.encounter_state_moon
+        peri_state0 = sol.perilune_state_moon
+        if dep_state0 is None or enc_state0 is None or peri_state0 is None:
+            raise PropagationFailure("PCN 收敛解缺少几何字段")
+        dep_times = np.linspace(0.0, earth_tof, params.n_trajectory_samples)
+        dep_states = _propagate_two_body_checked(dep_state0, dep_times, MU_EARTH)
+        if moon_tof > 0.0:
+            moon_rel_times = np.linspace(0.0, moon_tof, 50, endpoint=False)
+            moon_rel = _propagate_two_body_checked(enc_state0, moon_rel_times, Datum.DE421.moon_gm)
+            # 追加精确近月点末行（闭式）；endpoint=False 避免与近月点重复时刻
+            moon_rel = np.vstack([moon_rel, peri_state0])
+            moon_rel_times = np.append(moon_rel_times, moon_tof)
+            # 逐行加月球惯性位置回地心 GCRS
+            moon_gcrs = np.array(
+                [
+                    moon_rel[i] + moon_state_fn(earth_tof + moon_rel_times[i])
+                    for i in range(len(moon_rel_times))
+                ]
+            )
+            trajectory_gcrs, trajectory_times = _join_transfer_legs(
+                dep_states, dep_times, moon_gcrs, moon_rel_times
+            )
+        else:
+            # 退化：交接点即近月点（月心段时长为零），仅地心段
+            trajectory_gcrs, trajectory_times = dep_states, dep_times
+        trajectory = _gcrs_to_synodic(trajectory_gcrs, trajectory_times, system)
+    except (PropagationFailure, ValueError, IndexError):
+        warnings.warn("PCN 轨迹组装传播失败，返回无轨迹结果", stacklevel=2)
+        trajectory = trajectory_times = trajectory_gcrs = None
+
+    total_tof = earth_tof + max(moon_tof, 0.0)
+    maneuver_events = (
+        ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=sol.dv_tli_km_s, note="TLI"),
+        ManeuverEvent(
+            kind="arrival",
+            t_sec=total_tof,
+            dv_km_s=sol.dv_loi_km_s,
+            note="LOI（近月点圆化）",
+        ),
+    )
+    return TransferDesignResult(
+        transfer_type="PCN",
+        delta_v=sol.dv_tli_km_s + sol.dv_loi_km_s,
+        trajectory=trajectory,
+        trajectory_times=trajectory_times,
+        trajectory_gcrs_km=trajectory_gcrs,
+        maneuver_events=maneuver_events,
+        details=details,
+        status=sol.status,
+        cause=sol.cause,
+        message=sol.message,
+        stages=stages,
+        bplane=sol.bplane,
+        departure_asymptote=sol.departure_asymptote,
+    )
+
+
+def _pcn_details(tli_params: TliParams, sol: PcnSolution, mode: str) -> PcnTransferDetails:
+    """由 PCN 解构造 details（缺失几何以 NaN 占位，catalog 安全）。"""
+    bp = sol.bplane
+    asym = sol.departure_asymptote
+    r_moon = MOON.require_mean_radius_km()
+    return PcnTransferDetails(
+        tli_epoch=tli_params.epoch,
+        tof_sec=sol.earth_leg_tof_sec + sol.moon_leg_tof_sec,
+        earth_leg_tof_sec=sol.earth_leg_tof_sec,
+        moon_leg_tof_sec=sol.moon_leg_tof_sec,
+        parking_alt_km=tli_params.parking_alt_km,
+        dv_tli_km_s=sol.dv_tli_km_s,
+        dv_loi_km_s=sol.dv_loi_km_s,
+        perilune_alt_km=(bp.perilune_radius_km - r_moon) if bp is not None else float("nan"),
+        v_inf_moon_km_s=bp.v_inf_km_s if bp is not None else float("nan"),
+        c3_departure_km2_s2=asym.c3_km2_s2 if asym is not None else float("nan"),
+        rha_deg=asym.rha_deg if asym is not None else float("nan"),
+        dha_deg=asym.dha_deg if asym is not None else float("nan"),
+        bdot_r_km=bp.bdot_r_km if bp is not None else float("nan"),
+        bdot_t_km=bp.bdot_t_km if bp is not None else float("nan"),
+        b_mag_km=bp.b_mag_km if bp is not None else float("nan"),
+        mode=mode,
+        n_grid_evals=sol.n_grid_evals,
+        n_newton_iter=sol.n_newton_iter,
+        status=sol.status,
+        cause=sol.cause,
+        message=sol.message,
+    )
+
+
+def _pcn_stages(sol: PcnSolution, mode: str) -> tuple[StageRecord, ...]:
+    """PCN 阶段记录。
+
+    到达模式：``grid_search``（渐近线网格初猜）+ ``newton``；出发模式：仅
+    ``grid_search``（tof 网格最近月心距离扫描），``newton`` 不适用。阶段结果
+    状态反映实际结局（搜索无可行点即报实际失败状态，与整体 status 一致）。
+    """
+    grid_executed = sol.n_grid_evals > 0
+    if mode == "arrival":
+        # 网格找到可行点才会进入 Newton（n_newton_iter > 0）
+        grid_status = ConvergenceState.CONVERGED if sol.n_newton_iter > 0 else sol.status
+        newton_executed = sol.n_newton_iter > 0
+        return (
+            StageRecord(
+                "grid_search",
+                applicable=True,
+                executed=grid_executed,
+                result_status=grid_status if grid_executed else None,
+                message="渐近线网格初猜",
+            ),
+            StageRecord(
+                "newton",
+                applicable=True,
+                executed=newton_executed,
+                result_status=sol.status if newton_executed else None,
+                message=sol.message if newton_executed else "",
+            ),
+        )
+    return (
+        StageRecord(
+            "grid_search",
+            applicable=True,
+            executed=grid_executed,
+            result_status=sol.status if grid_executed else None,
+            message="tof 网格最近月心距离扫描",
+        ),
+        StageRecord("newton", applicable=False, executed=False, result_status=None),
+    )
+
+
+def _transfer_orbit_lga(
+    tli_params: TliParams | None,
+    target_ephemeris: Any,
+    search_params: LgaSearchParams | None,
+    dynamics: Any = None,
+    top_n: int | None = None,
+) -> TransferDesignResult:
+    """LGA 月球引力辅助转移编排。
+
+    流程：
+    1. TliParams → ECI 出发态
+    2. 目标星历 → 目标态
+    3. ECI → CR3BP 无量纲
+    4. search_lga_trajectories() 网格搜索
+    5. 取最优候选
+    6. _refine_lga_candidate() ThreeBodyLambert 打靶精化
+    7. 物理单位换算 + 结果汇总
+    """
+    if tli_params is None:
+        raise ValueError("LGA 转移需要 tli_params")
+    if target_ephemeris is None:
+        raise ValueError("LGA 转移需要 target_ephemeris")
+
+    from ..dynamics import CR3BP_Dynamics, CR3BP_System
+
+    # 地月 CR3BP 系统
+    system = CR3BP_System(mu=_MU_EM, primary="Earth", secondary="Moon")._with_default_scales()
+    cr3bp_dynamics = CR3BP_Dynamics(system)
+
+    # 1. ECI 出发态
+    r0, v0 = construct_departure_state(tli_params)
+    departure_phys = np.concatenate([r0, v0])
+    departure_dim = system.physical_to_dimensionless(departure_phys)
+
+    # 2. 目标态
+    r_target, v_target = _extract_target_state(target_ephemeris)
+    target_phys = np.concatenate([r_target, v_target])
+    target_dim = system.physical_to_dimensionless(target_phys)
+
+    # 3. LGA 搜索
+    candidates = search_lga_trajectories(
+        departure_dim, target_dim, system, cr3bp_dynamics, search_params
+    )
+
+    params = search_params if search_params is not None else LgaSearchParams()
+    vu_km_s = system.characteristic_velocity
+    if vu_km_s is None or vu_km_s <= 0.0:
+        raise ValueError("system.characteristic_velocity must be set")
+
+    n_searched = params.n_departure_phase * params.n_tof * params.n_out_of_plane
+    n_feasible = len(candidates)
+
+    if not candidates:
+        warnings.warn("LGA 搜索未找到可行候选，返回零结果", stacklevel=2)
+        details = LgaTransferDetails(
+            tli_epoch=tli_params.epoch,
+            tof_sec=0.0,
+            perilune_alt_km=0.0,
+            perilune_vel_km_s=0.0,
+            perilune_state=np.zeros(6),
+            dv_departure_km_s=0.0,
+            dv_arrival_km_s=float("inf"),
+            jacobi_departure=0.0,
+            jacobi_arrival=0.0,
+            n_candidates_searched=n_searched,
+            n_candidates_feasible=0,
+            status=candidates.status,
+            cause=candidates.cause,
+            message=candidates.message,
+            search_params=params,
+        )
+        return TransferDesignResult(
+            transfer_type="LGA",
+            delta_v=float("inf"),
+            trajectory=None,
+            details=details,
+            status=details.status,
+            cause=details.cause,
+            message=details.message,
+            stages=(
+                StageRecord(
+                    "search",
+                    applicable=True,
+                    executed=True,
+                    result_status=candidates.status,
+                    message=candidates.message,
+                ),
+                StageRecord("refinement", applicable=True, executed=False, result_status=None),
+                StageRecord("shooting", applicable=True, executed=False, result_status=None),
+            ),
+        )
+
+    # 4. 取最优候选
+    best = candidates[0]
+
+    # 5. ThreeBodyLambert 打靶精化
+    from .lga import _refine_lga_candidate
+
+    refined, arrival_arc = _refine_lga_candidate(best, system, cr3bp_dynamics, target_dim)
+
+    # 轨迹组装（ADR 0040）：出发段（LEO→perilune）CR3BP 重传播 + 精化
+    # 到达弧拼接（近月点速度折点是精化的隐式修正脉冲，位置连续由测试
+    # 守护）；精化回退时网格候选是单条自由飞行解，整段重传播即可。
+    trajectory: Any = None
+    trajectory_times: Any = None
+    try:
+        if arrival_arc is not None:
+            dep_states, dep_times = _propagate_synodic_leg(
+                cr3bp_dynamics, system, refined.departure_state, refined.perilune_time_dim
+            )
+            trajectory, trajectory_times = _join_transfer_legs(
+                dep_states, dep_times, arrival_arc.states, arrival_arc.times
+            )
+        else:
+            trajectory, trajectory_times = _propagate_synodic_leg(
+                cr3bp_dynamics, system, refined.departure_state, refined.arrival_time_dim
+            )
+    except PropagationFailure:
+        warnings.warn("LGA 轨迹组装传播失败，返回无轨迹结果", stacklevel=2)
+        trajectory, trajectory_times = None, None
+
+    # 惯性段（#584，ADR 0040 增补）：会合弧旋回地心惯性，与主几何共享
+    # 时刻数组；组装失败（无轨迹）时同样缺位。
+    trajectory_gcrs: Any = None
+    if trajectory is not None and trajectory_times is not None:
+        trajectory_gcrs = _synodic_to_gcrs(trajectory, trajectory_times, system)
+
+    # 6. 物理单位换算
+    perilune_phys = system.dimensionless_to_physical(refined.perilune_state)
+    perilune_vel = float(np.linalg.norm(perilune_phys[3:]))
+
+    details = LgaTransferDetails(
+        tli_epoch=tli_params.epoch,
+        tof_sec=refined.tof_sec,
+        perilune_alt_km=refined.perilune_alt_km,
+        perilune_vel_km_s=perilune_vel,
+        perilune_state=perilune_phys,
+        dv_departure_km_s=refined.dv_departure * vu_km_s,
+        dv_arrival_km_s=refined.dv_arrival * vu_km_s,
+        jacobi_departure=refined.jacobi_departure,
+        jacobi_arrival=refined.jacobi_arrival,
+        n_candidates_searched=n_searched,
+        n_candidates_feasible=n_feasible,
+        status=refined.status,
+        cause=refined.cause,
+        message=refined.message,
+        search_params=params,
+    )
+
+    # 机动事件（#575）：perilune 时刻取候选已有字段 × 特征时间（与轨迹
+    # 拼接点同源）；飞越段无脉冲，dv_km_s=0（速度折点是精化的隐式修正，
+    # ADR 0040 不计入 Δv 收账）。
+    tu_sec = system.characteristic_time
+    if tu_sec is None or tu_sec <= 0.0:
+        raise ValueError("system.characteristic_time must be set")
+    maneuver_events = (
+        ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=refined.dv_departure * vu_km_s),
+        ManeuverEvent(
+            kind="perilune",
+            t_sec=refined.perilune_time_dim * tu_sec,
+            dv_km_s=0.0,
+        ),
+        ManeuverEvent(kind="arrival", t_sec=refined.tof_sec, dv_km_s=refined.dv_arrival * vu_km_s),
+    )
+
+    # top-N 候选（#583，ADR 0040 增补）：选中解 = 精化后的顶层结果
+    # （同 Δv、同轨迹）；其余候选 = 网格解原样——Δv 为精化前估计，
+    # 快照为候选自由飞行弧（组装失败降级为无轨迹，不影响其余）。
+    # 发射按上报 Δv 升序：精化会改变选中解的 Δv，网格序不保证上报序，
+    # 选中靠标记不靠位置。
+    top_n_candidates: tuple[TransferCandidate, ...] = ()
+    if top_n is not None:
+        entries: list[TransferCandidate] = [
+            TransferCandidate(
+                delta_v_km_s=refined.total_dv * vu_km_s,
+                tli_epoch=tli_params.epoch,
+                tof_sec=refined.tof_sec,
+                trajectory=trajectory,
+                trajectory_times=trajectory_times,
+                state_frame=STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+                selected=True,
+                refined=arrival_arc is not None,
+            )
+        ]
+        for cand in candidates:
+            if len(entries) >= top_n:
+                break
+            if cand is best:
+                continue
+            try:
+                snap_states, snap_times = _propagate_synodic_leg(
+                    cr3bp_dynamics, system, cand.departure_state, cand.arrival_time_dim
+                )
+            except PropagationFailure:
+                warnings.warn("top-N 候选快照组装传播失败，该候选无轨迹", stacklevel=2)
+                snap_states, snap_times = None, None
+            entries.append(
+                TransferCandidate(
+                    delta_v_km_s=cand.total_dv * vu_km_s,
+                    tli_epoch=tli_params.epoch,
+                    tof_sec=cand.tof_sec,
+                    trajectory=snap_states,
+                    trajectory_times=snap_times,
+                    state_frame=STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+                    selected=False,
+                    refined=False,
+                )
+            )
+        entries.sort(key=lambda entry: entry.delta_v_km_s)
+        top_n_candidates = tuple(entries)
+
+    return TransferDesignResult(
+        transfer_type="LGA",
+        delta_v=refined.total_dv * vu_km_s,
+        trajectory=trajectory,
+        trajectory_times=trajectory_times,
+        trajectory_gcrs_km=trajectory_gcrs,
+        maneuver_events=maneuver_events,
+        candidates=top_n_candidates,
+        details=details,
+        status=refined.status,
+        cause=refined.cause,
+        message=refined.message,
+        stages=(
+            StageRecord(
+                "search",
+                applicable=True,
+                executed=True,
+                result_status=ConvergenceState.CONVERGED,
+                message="找到可行候选",
+            ),
+            StageRecord("refinement", applicable=True, executed=True, result_status=refined.status),
+            StageRecord(
+                "shooting",
+                applicable=True,
+                executed=True,
+                result_status=refined.status,
+                message=refined.message,
+            ),
+        ),
+    )
+
+
+def _transfer_orbit_wsb(
+    tli_params: TliParams | None,
+    target_ephemeris: Any,
+    search_params: WsbSearchParams | None,
+    tof_range: tuple[float, float] | None = None,
+    progress_callback: Any = None,
+    top_n: int | None = None,
+) -> TransferDesignResult:
+    """WSB 太阳引力辅助转移编排。
+
+    流程：
+    1. TliParams → ECI 出发态
+    2. 目标星历 → 目标态
+    3. ECI → BCR4BP 无量纲（特征尺度与 CR3BP 共用）
+    4. search_wsb_trajectories() 并行网格搜索
+    5. 取最优候选
+    6. _refine_wsb_candidate() ThreeBodyLambert 打靶精化
+    7. 物理单位换算 + 结果汇总
+    """
+    if tli_params is None:
+        raise ValueError("WSB 转移需要 tli_params")
+    if target_ephemeris is None:
+        raise ValueError("WSB 转移需要 target_ephemeris")
+
+    from ..dynamics import BCR4BP_Dynamics, CR3BP_Dynamics, CR3BP_System
+    from ..dynamics.bcr4bp_system import BCR4BPSystem
+    from .wsb import _refine_wsb_candidate
+
+    # tof_range 合并：facade 的 tof_range 覆盖 WsbSearchParams 默认
+    # tof 网格；显式传入 wsb_search_params 时其（专门的）tof 网格优先。
+    if tof_range is not None and search_params is None:
+        search_params = WsbSearchParams(tof_range=tof_range)
+
+    # BCR4BP 系统（搜索用，sun_phase0 在 worker 中逐个构造）
+    MU_EM = 1.21506683e-2
+    bcr4bp_system = BCR4BPSystem.earth_moon()
+
+    # 1. ECI 出发态
+    r0, v0 = construct_departure_state(tli_params)
+    departure_phys = np.concatenate([r0, v0])
+    departure_dim = bcr4bp_system.physical_to_dimensionless(departure_phys)
+
+    # 2. 目标态
+    r_target, v_target = _extract_target_state(target_ephemeris)
+    target_phys = np.concatenate([r_target, v_target])
+    target_dim = bcr4bp_system.physical_to_dimensionless(target_phys)
+
+    # 3. WSB 搜索（并行；每完成一个 (sun_phase, tof) 网格任务回调一次
+    # delta，#576 Phase 1）
+    candidates = search_wsb_trajectories(
+        departure_dim,
+        target_dim,
+        bcr4bp_system,
+        search_params,
+        progress_callback=progress_callback,
+    )
+
+    params = search_params if search_params is not None else WsbSearchParams()
+    n_searched = params.n_sun_phase * params.n_departure_phase * params.n_tof
+    n_feasible = len(candidates)
+
+    if not candidates:
+        warnings.warn("WSB 搜索未找到可行候选，返回零结果", stacklevel=2)
+        details = WsbTransferDetails(
+            tli_epoch=tli_params.epoch,
+            tof_sec=0.0,
+            perilune_alt_km=0.0,
+            perilune_vel_km_s=0.0,
+            perilune_state=np.zeros(6),
+            h2_kepler=0.0,
+            dv_departure_km_s=0.0,
+            dv_arrival_km_s=float("inf"),
+            n_candidates_searched=n_searched,
+            n_candidates_feasible=0,
+            status=candidates.status,
+            cause=candidates.cause,
+            message=candidates.message,
+            search_params=params,
+        )
+        return TransferDesignResult(
+            transfer_type="WSB",
+            delta_v=float("inf"),
+            trajectory=None,
+            details=details,
+            status=details.status,
+            cause=details.cause,
+            message=details.message,
+            stages=(
+                StageRecord(
+                    "search",
+                    applicable=True,
+                    executed=True,
+                    result_status=candidates.status,
+                    message=candidates.message,
+                ),
+                StageRecord("refinement", applicable=True, executed=False, result_status=None),
+                StageRecord("shooting", applicable=True, executed=False, result_status=None),
+            ),
+        )
+
+    # 4. 取最优候选
+    best = candidates[0]
+
+    # 5. ThreeBodyLambert 打靶精化（CR3BP 到达段）
+    cr3bp_system = CR3BP_System(mu=MU_EM, primary="Earth", secondary="Moon")._with_default_scales()
+    cr3bp_dynamics = CR3BP_Dynamics(cr3bp_system)
+    refined, arrival_arc = _refine_wsb_candidate(best, cr3bp_system, cr3bp_dynamics, target_dim)
+
+    # 轨迹组装（ADR 0040）：出发段必须用 BCR4BP 重传播（太阳摄动是 WSB
+    # 本体，sun_phase0 对齐候选；研究级默认容差，只为取轨迹），到达段用
+    # CR3BP 精化弧拼接；精化回退时候选整段都是 BCR4BP 搜索解，整段重传播。
+    # 两段特征尺度分属 BCR4BP（DU=384405 km）与 CR3BP（DU=384400 km），
+    # 差 1.3e-5 DU 在画布不可见，不修。
+    trajectory: Any = None
+    trajectory_times: Any = None
+    try:
+        dep_system = BCR4BPSystem.earth_moon(sun_phase0=refined.sun_phase0)
+        dep_dynamics = BCR4BP_Dynamics(dep_system)
+        if arrival_arc is not None:
+            dep_states, dep_times = _propagate_synodic_leg(
+                dep_dynamics, dep_system, refined.departure_state, refined.perilune_time_dim
+            )
+            trajectory, trajectory_times = _join_transfer_legs(
+                dep_states, dep_times, arrival_arc.states, arrival_arc.times
+            )
+        else:
+            trajectory, trajectory_times = _propagate_synodic_leg(
+                dep_dynamics, dep_system, refined.departure_state, refined.arrival_time_dim
+            )
+    except PropagationFailure:
+        warnings.warn("WSB 轨迹组装传播失败，返回无轨迹结果", stacklevel=2)
+        trajectory, trajectory_times = None, None
+
+    # 惯性段（#584）：拼接后的会合弧统一用 CR3BP 特征尺度旋回惯性——
+    # BCR4BP 出发段与 CR3BP 到达段的 DU/TU 相差 ~1e-5（ADR 0040 §4 既有
+    # 尺度差），惯性方位本身是 θ₀=0 理想化，该差不另立双系换算。
+    trajectory_gcrs: Any = None
+    if trajectory is not None and trajectory_times is not None:
+        trajectory_gcrs = _synodic_to_gcrs(trajectory, trajectory_times, cr3bp_system)
+
+    # 6. 物理单位换算
+    # WsbCandidate dv 字段全无量纲（#566）：dv_departure 恒产自 BCR4BP 搜索，
+    # dv_arrival 在精化成功时产自 CR3BP 打靶、回退时产自 BCR4BP 搜索——按
+    # 来源乘各自特征速度（两 vu 相差约 0.13%）。精化回退分支的 status 不是
+    # CONVERGED（见 _refine_wsb_candidate）。
+    vu_bcr4 = bcr4bp_system.characteristic_velocity
+    vu_cr3 = cr3bp_system.characteristic_velocity
+    if vu_bcr4 is None or vu_cr3 is None:
+        raise ValueError("两个系统都必须设置 characteristic_velocity")
+    dv_departure_km_s = refined.dv_departure * vu_bcr4
+    dv_arrival_km_s = refined.dv_arrival * (
+        vu_cr3 if refined.status is ConvergenceState.CONVERGED else vu_bcr4
+    )
+    perilune_phys = bcr4bp_system.dimensionless_to_physical(refined.perilune_state)
+    perilune_vel = float(np.linalg.norm(perilune_phys[3:]))
+
+    details = WsbTransferDetails(
+        tli_epoch=tli_params.epoch,
+        tof_sec=refined.tof_sec,
+        perilune_alt_km=refined.perilune_alt_km,
+        perilune_vel_km_s=perilune_vel,
+        perilune_state=perilune_phys,
+        h2_kepler=refined.h2_kepler,
+        dv_departure_km_s=dv_departure_km_s,
+        dv_arrival_km_s=dv_arrival_km_s,
+        n_candidates_searched=n_searched,
+        n_candidates_feasible=n_feasible,
+        status=refined.status,
+        cause=refined.cause,
+        message=refined.message,
+        search_params=params,
+    )
+
+    # 机动事件（#575）：候选与出发段均产自 BCR4BP（乘 BCR4BP 特征时间，
+    # 与轨迹拼接点同源）；到达 Δv 按 #566 收账约定；perilune 无脉冲。
+    tu_bcr4 = bcr4bp_system.characteristic_time
+    if tu_bcr4 is None or tu_bcr4 <= 0.0:
+        raise ValueError("BCR4BP system 必须设置特征时间")
+    maneuver_events = (
+        ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=dv_departure_km_s),
+        ManeuverEvent(kind="perilune", t_sec=refined.perilune_time_dim * tu_bcr4, dv_km_s=0.0),
+        ManeuverEvent(kind="arrival", t_sec=refined.tof_sec, dv_km_s=dv_arrival_km_s),
+    )
+
+    # top-N 候选（#583，ADR 0040 增补）：与 LGA 同契约——选中解 = 顶层
+    # 精化结果；其余候选 = 网格解原样（Δv 为 BCR4BP 网格估计，#566 口径），
+    # 快照为候选 sun_phase0 下的 BCR4BP 自由飞行弧（组装失败降级无轨迹）。
+    # 发射按上报 Δv 升序，选中靠标记不靠位置。
+    top_n_candidates: tuple[TransferCandidate, ...] = ()
+    if top_n is not None:
+        entries: list[TransferCandidate] = [
+            TransferCandidate(
+                delta_v_km_s=dv_departure_km_s + dv_arrival_km_s,
+                tli_epoch=tli_params.epoch,
+                tof_sec=refined.tof_sec,
+                trajectory=trajectory,
+                trajectory_times=trajectory_times,
+                state_frame=STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+                selected=True,
+                refined=arrival_arc is not None,
+            )
+        ]
+        for cand in candidates:
+            if len(entries) >= top_n:
+                break
+            if cand is best:
+                continue
+            try:
+                snap_system = BCR4BPSystem.earth_moon(sun_phase0=cand.sun_phase0)
+                snap_states, snap_times = _propagate_synodic_leg(
+                    BCR4BP_Dynamics(snap_system),
+                    snap_system,
+                    cand.departure_state,
+                    cand.arrival_time_dim,
+                )
+            except PropagationFailure:
+                warnings.warn("top-N 候选快照组装传播失败，该候选无轨迹", stacklevel=2)
+                snap_states, snap_times = None, None
+            entries.append(
+                TransferCandidate(
+                    delta_v_km_s=cand.total_dv * vu_bcr4,
+                    tli_epoch=tli_params.epoch,
+                    tof_sec=cand.tof_sec,
+                    trajectory=snap_states,
+                    trajectory_times=snap_times,
+                    state_frame=STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+                    selected=False,
+                    refined=False,
+                )
+            )
+        entries.sort(key=lambda entry: entry.delta_v_km_s)
+        top_n_candidates = tuple(entries)
+
+    return TransferDesignResult(
+        transfer_type="WSB",
+        delta_v=dv_departure_km_s + dv_arrival_km_s,
+        trajectory=trajectory,
+        trajectory_times=trajectory_times,
+        trajectory_gcrs_km=trajectory_gcrs,
+        maneuver_events=maneuver_events,
+        candidates=top_n_candidates,
+        details=details,
+        status=refined.status,
+        cause=refined.cause,
+        message=refined.message,
+        stages=(
+            StageRecord(
+                "search",
+                applicable=True,
+                executed=True,
+                result_status=ConvergenceState.CONVERGED,
+                message="找到可行候选",
+            ),
+            StageRecord("refinement", applicable=True, executed=True, result_status=refined.status),
+            StageRecord(
+                "shooting",
+                applicable=True,
+                executed=True,
+                result_status=refined.status,
+                message=refined.message,
+            ),
+        ),
+    )
+
+
+def _transfer_orbit_low_thrust(
+    tli_params: TliParams | None,
+    target_ephemeris: Any,
+    engine_config: EngineConfig,
+    initial_mass: float,
+    n_segments: int = 10,
+    *,
+    target_oe: tuple[float, float, float] | None = None,
+    solver_method: str = "shooting",
+    duration_days: float = 30.0,
+    departure_state: np.ndarray | None = None,
+    target_state: np.ndarray | None = None,
+    system: Any = None,
+    forces: Any = None,
+    top_n: int | None = None,
+) -> TransferDesignResult:
+    """小推力转移编排。
+
+    流程：
+    1. 出发状态：优先 ``departure_state``，否则 ``construct_departure_state(tli_params)``。
+    2. 目标状态：优先 ``target_state``，否则 ``_extract_target_state(target_ephemeris)``。
+    3. 动力学系统/力模型：优先传入参数，否则构造纯二体。
+    4. 构造 ``LowThrustShooting`` 或 ``LowThrustCollocation`` 求解器。
+    5. ``solve_from_qlaw()`` Q-law 初猜 + 求解。
+    6. 计算终端残差、等效 Δv，返回 ``TransferDesignResult``。
+
+    Args:
+        tli_params: 地球停泊轨道参数（TLI 高度/倾角/航迹角）。当 ``departure_state``
+            未提供时用于构造出发状态。
+        target_ephemeris: 目标轨道星历（地心惯性系 km/km/s 状态）。
+            当 ``target_state`` 未提供时用于提取目标状态。
+        engine_config: 推进配置（最大推力、比冲）。
+        initial_mass: 初始质量 (kg)。
+        n_segments: 求解器段数。
+        target_oe: Q-law 目标 ``(a_T, e_T, i_T)``。默认从目标状态反推圆轨道。
+        solver_method: 求解方法 ``"shooting"`` 或 ``"collocation"``。
+        duration_days: 飞行时间 (天)。
+        departure_state: 出发状态 ``[r, v]`` (6,)，地心惯性系 km / km/s。
+            优先于 tli_params。
+        target_state: 目标末态 ``[r, v]`` (6,)，地心惯性系 km / km/s。
+            优先于 target_ephemeris。
+        system: 动力学系统。默认纯二体 ``SimpleNamespace(origin="EARTH")``。
+        forces: 非推力力模型列表。默认 ``[PointMassGravity("EARTH", mu=MU_EARTH)]``。
+
+    Returns:
+        TransferDesignResult: 转移轨道设计结果，携带 ``LowThrustTransferDetails``。
+    """
+    # 1. 出发状态
+    if departure_state is not None:
+        r0 = departure_state[:3]
+        v0 = departure_state[3:6]
+    else:
+        if tli_params is None:
+            raise ValueError("low_thrust 转移需要 tli_params 或 departure_state 之一")
+        r0, v0 = construct_departure_state(tli_params)
+
+    # 2. 目标状态
+    if target_state is not None:
+        r_target = target_state[:3]
+        v_target = target_state[3:6]
+    else:
+        if target_ephemeris is None:
+            raise ValueError("low_thrust 转移需要 target_ephemeris 或 target_state 之一")
+        r_target, v_target = _extract_target_state(target_ephemeris)
+
+    # 3. 动力学系统和力模型
+    if system is None:
+        system = SimpleNamespace(origin="EARTH")
+    if forces is None:
+        forces = [PointMassGravity("EARTH", mu=MU_EARTH)]
+
+    # 4. 时间基准
+    has_spice = hasattr(system, "spice") and system.spice is not None
+    t0 = system.spice.utc_to_et(tli_params.epoch) if has_spice and tli_params is not None else 0.0
+    tf = t0 + duration_days * SECONDS_PER_DAY
+
+    # 5. 目标轨道根数（默认圆轨道，从目标状态反推半长轴）
+    if target_oe is None:
+        r_target_norm = float(np.linalg.norm(r_target))
+        v_target_norm = float(np.linalg.norm(v_target))
+        energy = v_target_norm**2 / 2.0 - MU_EARTH / r_target_norm
+        a_target = -MU_EARTH / (2.0 * energy)
+        target_oe = (a_target, 0.0, 0.0)
+
+    # 6. 构造求解器
+    initial_state_6 = np.concatenate([r0, v0])
+    target_state_6 = np.concatenate([r_target, v_target])
+
+    solver: LowThrustShooting | LowThrustCollocation
+    if solver_method == "shooting":
+        solver = LowThrustShooting(
+            system=system,
+            forces=forces,
+            engine=engine_config,
+            initial_state=initial_state_6,
+            initial_mass=initial_mass,
+            target_state=target_state_6,
+            t0=t0,
+            tf=tf,
+        )
+    elif solver_method == "collocation":
+        solver = LowThrustCollocation(
+            system=system,
+            forces=forces,
+            engine=engine_config,
+            initial_state=initial_state_6,
+            initial_mass=initial_mass,
+            target_state=target_state_6,
+            t0=t0,
+            tf=tf,
+        )
+    else:
+        raise ValueError(
+            f"不支持的 solver_method: {solver_method!r}，期望 'shooting' 或 'collocation'"
+        )
+
+    # 7. Q-law 初猜 + 求解
+    sol: LowThrustShootingSolution = solver.solve_from_qlaw(n_segments, target_oe, forces)
+
+    # 8. 终端残差
+    r_final = sol.states[-1, :3]
+    v_final = sol.states[-1, 3:6]
+    terminal_residual_r = float(np.linalg.norm(r_final - r_target))
+    terminal_residual_v = float(np.linalg.norm(v_final - v_target))
+
+    # 9. 等效 Δv
+    final_mass = sol.final_mass
+    equiv_dv = _equivalent_delta_v(initial_mass, final_mass, engine_config.isp)
+
+    # 10. Q-law Q 值历史（solve_from_qlaw 不返回 q_history，设为 None）
+    qlaw_q_history = None
+
+    # 11. 汇总
+    details = LowThrustTransferDetails(
+        engine=engine_config,
+        initial_mass=initial_mass,
+        final_mass=final_mass,
+        fuel_consumed=sol.fuel_consumed,
+        equivalent_delta_v=equiv_dv,
+        n_segments=n_segments,
+        solver_method=solver_method,
+        status=sol.status,
+        cause=sol.cause,
+        message=sol.message,
+        n_iter=sol.n_iter,
+        terminal_residual_r=terminal_residual_r,
+        terminal_residual_v=terminal_residual_v,
+        time=sol.time.astype(np.float64),
+        states_7d=sol.states.astype(np.float64),
+        segments=sol.segments,
+        qlaw_q_history=qlaw_q_history,
+    )
+
+    return TransferDesignResult(
+        transfer_type="low_thrust",
+        delta_v=equiv_dv,
+        trajectory=sol.states,
+        candidates=(
+            (
+                TransferCandidate(
+                    delta_v_km_s=equiv_dv,
+                    tli_epoch=tli_params.epoch if tli_params is not None else None,
+                    tof_sec=duration_days * SECONDS_PER_DAY,
+                    trajectory=sol.states,
+                    trajectory_times=None,
+                    state_frame=STATE_FRAME_FORCE_MODEL_STATE,
+                    selected=True,
+                    refined=True,
+                ),
+            )
+            if top_n is not None
+            else ()
+        ),
+        details=details,
+        status=sol.status,
+        cause=sol.cause,
+        message=sol.message,
+        stages=(
+            StageRecord("search", applicable=False, executed=False, result_status=None),
+            StageRecord("refinement", applicable=False, executed=False, result_status=None),
+            StageRecord(
+                "shooting",
+                applicable=True,
+                executed=True,
+                result_status=sol.status,
+                message=sol.message,
+            ),
+        ),
+    )
+
+
+def _transfer_orbit_hmn(
+    tli_params: TliParams | None,
+    target_orbit_radius_km: float | None,
+    tof_range: tuple[float, float] | None = None,
+    dynamics: Any = None,
+    target_ephemeris: Any = None,
+    top_n: int | None = None,
+) -> TransferDesignResult:
+    """HMN 霍曼转移编排：解析解 + 出发状态构造。
+
+    当 ``tof_range`` 提供时，用 Lambert 批量扫描最优 tof；
+    否则用霍曼公式计算固定 tof。
+
+    当 ``dynamics`` 提供时，调用 ``ephemeris_shoot_transfer`` 在给定动力学
+    模型下修正 Lambert 初猜（多重打靶收敛）。
+    """
+    if tli_params is None:
+        raise ValueError("HMN 转移需要 tli_params")
+    if target_orbit_radius_km is None:
+        raise ValueError("HMN 转移需要 target_orbit_radius_km")
+
+    r1 = R_EARTH + tli_params.parking_alt_km
+    r2 = target_orbit_radius_km
+
+    dv1, dv2 = hohmann_delta_v(r1, r2)
+    tof = hohmann_tof(r1, r2)
+
+    r0, v0 = construct_departure_state(tli_params)
+
+    if tof_range is not None:
+        tof_min_sec = tof_range[0] * SECONDS_PER_DAY
+        tof_max_sec = tof_range[1] * SECONDS_PER_DAY
+        tof_grid = np.linspace(tof_min_sec, tof_max_sec, _DEFAULT_TOF_GRID_POINTS)
+
+        # 优先从 target_ephemeris 提取目标状态（RED-2）
+        if target_ephemeris is not None:
+            r_target, v_target = _extract_target_state(target_ephemeris)
+        else:
+            # 目标位置：负 x 轴（180° 转移角，与霍曼转移几何一致）
+            r_target = np.array([-r2, 0.0, 0.0])
+            # 目标速度：圆轨道近似，沿 y 轴切向
+            v_target = np.array([0.0, -np.sqrt(MU_EARTH / r2), 0.0])
+
+        optimal_tof, v0_lambert, vf_lambert = scan_lambert_delta_v(
+            r0, v0, r_target, v_target, tof_grid
+        )
+        tof = optimal_tof
+        dv1 = float(np.linalg.norm(v0_lambert - v0))
+        dv2 = float(np.linalg.norm(vf_lambert - v_target))
+
+    # 当 dynamics 提供时，用 ephemeris 打靶修正 Lambert 初猜
+    trajectory: Any = None
+    trajectory_times: Any = None
+    if dynamics is not None:
+        t0 = 0.0  # 动力学模型的时间基准（秒）
+        shoot_result = ephemeris_shoot_transfer(
+            dynamics=dynamics,
+            t0=t0,
+            r0=r0,
+            v0=v0 + np.array([0.0, dv1, 0.0]) if tof_range is None else v0_lambert,
+            tof=tof,
+        )
+        if shoot_result.status is ConvergenceState.CONVERGED:
+            # 用打靶收敛的出发状态更新 delta_v 和 departure_state
+            v0_shot = shoot_result.state_patch[0, 3:6]
+            dv1 = float(np.linalg.norm(v0_shot - v0))
+            departure_state = shoot_result.state_patch[0].copy()
+            trajectory = shoot_result.state_patch
+            trajectory_times = np.linspace(0.0, float(tof), int(shoot_result.state_patch.shape[0]))
+        else:
+            warnings.warn(
+                "ephemeris_shoot_transfer 未收敛，回退到 Lambert 解",
+                stacklevel=2,
+            )
+            departure_state = np.concatenate([r0, v0])
+    else:
+        departure_state = np.concatenate([r0, v0])
+
+    if trajectory is None:
+        # 两体弧采样（dynamics 缺省，或打靶未收敛回退到 Lambert/霍曼解，
+        # ADR 0040）：出发速度取 Lambert 解（tof_range 路径）或停泊速度的
+        # 霍曼切向缩放（纯霍曼路径），方向不变。
+        v_dep = v0_lambert if tof_range is not None else v0 * np.sqrt(2.0 * r2 / (r1 + r2))
+        trajectory, trajectory_times = hohmann_transfer_states(r0, v_dep, tof)
+
+    # 统一显示契约（ADR 0040）：ECI 两体几何 → 会合系相位对齐显示坐标；
+    # 参考方向取转移弧末行位置（到达点落入 +x 半平面，即画布月球方向）。
+    # 惯性段（#584）：显示变换前的地心两体弧原样入契约（ECI 构造系与
+    # GCRS 同为地心不旋转轴系；无星历方位语义，同显示约定的理想化）。
+    trajectory_gcrs: Any = np.asarray(trajectory, dtype=float).copy()
+    trajectory = eci_to_synodic_display(trajectory_gcrs, trajectory_gcrs[-1, :3])
+
+    details = HmnTransferDetails(
+        tli_epoch=tli_params.epoch,
+        tof_sec=tof,
+        r1_km=r1,
+        r2_km=r2,
+        dv1_km_s=dv1,
+        dv2_km_s=dv2,
+        departure_state=departure_state,
+        delta_v_theory=(dv1, dv2),
+    )
+
+    # 机动事件（#575）：HMN 到达点即近月点，不另发 perilune 事件
+    maneuver_events = (
+        ManeuverEvent(kind="departure", t_sec=0.0, dv_km_s=dv1),
+        ManeuverEvent(kind="arrival", t_sec=float(tof), dv_km_s=dv2),
+    )
+
+    if dynamics is None:
+        status = ConvergenceState.CONVERGED
+        cause = FailureCause.NONE
+        message = "霍曼转移完成"
+    else:
+        status = shoot_result.status
+        cause = shoot_result.cause
+        message = shoot_result.message
+
+    # top-N 候选（#583，ADR 0040 增补）：HMN 无搜索-精化两级——单候选，
+    # 即权威解数值（refined=True 口径）。tof 扫描的多解浮出另行推迟
+    # （见 ADR 增补）。
+    top_n_candidates: tuple[TransferCandidate, ...] = ()
+    if top_n is not None:
+        top_n_candidates = (
+            TransferCandidate(
+                delta_v_km_s=dv1 + dv2,
+                tli_epoch=tli_params.epoch,
+                tof_sec=tof,
+                trajectory=trajectory,
+                trajectory_times=trajectory_times,
+                state_frame=STATE_FRAME_SYNODIC_BARYCENTRIC_KM,
+                selected=True,
+                refined=True,
+            ),
+        )
+
+    return TransferDesignResult(
+        transfer_type="HMN",
+        delta_v=dv1 + dv2,
+        trajectory=trajectory,
+        trajectory_times=trajectory_times,
+        trajectory_gcrs_km=trajectory_gcrs,
+        maneuver_events=maneuver_events,
+        candidates=top_n_candidates,
+        details=details,
+        status=status,
+        cause=cause,
+        message=message,
+        stages=(
+            StageRecord(
+                "search",
+                applicable=tof_range is not None,
+                executed=tof_range is not None,
+                result_status=ConvergenceState.CONVERGED if tof_range is not None else None,
+            ),
+            StageRecord("refinement", applicable=False, executed=False, result_status=None),
+            StageRecord(
+                "shooting",
+                applicable=dynamics is not None,
+                executed=dynamics is not None,
+                result_status=shoot_result.status if dynamics is not None else None,
+                message=shoot_result.message if dynamics is not None else "",
+            ),
+        ),
+    )

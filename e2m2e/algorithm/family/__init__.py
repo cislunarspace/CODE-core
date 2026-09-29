@@ -9,7 +9,7 @@
 设计函数 ``design_xxx(params) -> Orbit``；``algorithm/design`` 的
 ``design_orbit`` 查注册表按族分发（新族 = 写一个设计函数 + 注册）。
 
-``cr3bp_orbits``（六类初猜）依赖 ``algorithm/solver``；solver 已不再依赖
+``orbits/`` 子包（六类初猜）依赖 ``algorithm/solver``；solver 已不再依赖
 本包（#748 消除分层倒置）。初猜函数经 PEP 562 ``__getattr__`` 惰性导出，
 保持包初始化轻量。
 
@@ -24,7 +24,7 @@ from collections.abc import Callable
 
 from ...data.types import Orbit
 
-# 惰性导出 cr3bp_orbits（依赖 solver），包初始化保持轻量。
+# 惰性导出 orbits/ 子包（依赖 solver），包初始化保持轻量。
 from .axial_initial_guess import compute_axial_initial_guess
 from .halo_family import (
     generate_halo_family,
@@ -103,7 +103,7 @@ __all__ = [
     "registry",
 ]
 
-#: 惰性导出：cr3bp_orbits（六类初猜 + earth_moon_system + Cr3bpOrbitError）
+#: 惰性导出：orbits/ 子包（六类初猜 + earth_moon_system + Cr3bpOrbitError）
 #: 依赖 ``algorithm/solver``，经 PEP 562 在首次访问时加载。
 _LAZY_EXPORTS = {
     "design_axial": "design_axial",
@@ -136,7 +136,7 @@ def __getattr__(name: str):  # PEP 562
     if name in _LAZY_EXPORTS:
         from importlib import import_module
 
-        module = import_module(f"{__name__}.cr3bp_orbits")
+        module = import_module(f"{__name__}.orbits")
         value = getattr(module, _LAZY_EXPORTS[name])
         globals()[name] = value
         return value
@@ -149,7 +149,7 @@ def __getattr__(name: str):  # PEP 562
 
 def _build_registry() -> dict[str, Callable[..., Orbit]]:
     """构建轨道族注册表（函数形态）：orbit_type → design_xxx(params) -> Orbit。"""
-    from .cr3bp_orbits import (
+    from .orbits import (
         design_axial,
         design_dpo,
         design_dro,
