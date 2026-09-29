@@ -78,6 +78,7 @@ from .mga import (
     heliocentric_tisserand,
     search_mga_chains,
 )
+from .mga_refine import MgaRefinementResult, refine_mga_chain
 from .mission_assessment import MissionAssessment
 from .multi_impulse import (
     CoastArc,
@@ -85,6 +86,19 @@ from .multi_impulse import (
     MultiImpulseTransfer,
     PrimerVectorReport,
     propagate_two_body,
+)
+from .multisegment import (
+    ChainLegEval,
+    ChainLegRequest,
+    FlybyConstraintEval,
+    LegKernel,
+    MinimaxSolveResult,
+    SquareSolveResult,
+    VariableLayout,
+    evaluate_chain,
+    flyby_node_constraints,
+    solve_minimax,
+    solve_square,
 )
 from .nsga2 import NSGA2Result, nsga2
 from .pcn import PcnBplaneTarget, PcnSearchParams, PcnSolution, solve_pcn
@@ -164,6 +178,19 @@ __all__ = [
     "flyby_turn_angle",
     "heliocentric_tisserand",
     "search_mga_chains",
+    "MgaRefinementResult",
+    "refine_mga_chain",
+    "ChainLegEval",
+    "ChainLegRequest",
+    "FlybyConstraintEval",
+    "LegKernel",
+    "MinimaxSolveResult",
+    "SquareSolveResult",
+    "VariableLayout",
+    "evaluate_chain",
+    "flyby_node_constraints",
+    "solve_minimax",
+    "solve_square",
     "PorkchopData",
     "porkchop",
     "ParetoFront",
