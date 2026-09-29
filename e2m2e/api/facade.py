@@ -772,7 +772,9 @@ class Facade:
         薄封装 ``algorithm/transfer/sims_flanagan.SimsFlanaganMultiLegProblem``：
         Pydantic 校验 → 多 leg 链（rendezvous/flyby 节点）段中冲量 NLP（SLSQP，
         全解析雅可比）→ 解翻译为 Response。单 leg = 一个 rendezvous 节点。
-        ``backend`` 仅支持 conic 档（ADR 0050）；ephemeris 档未实现，显式报错。
+        ``backend`` 双档（ADR 0050）：``"conic"`` 二体封闭解；``"ephemeris"``
+        星历 N 体数值传播（#727，经 ``EphemerisDynamics``/``propagate_with_stm_py``，
+        需 epoch/bodies/origin 星历上下文，内核经 ``load_design_kernels`` 加载）。
         结果不入 catalog（ADR 0054 决策 4）。
         """
         try:
@@ -800,6 +802,25 @@ class Facade:
                 )
                 for node in request.nodes
             ]
+
+            epoch_et_s: float | None = None
+            ephemeris_system = None
+            if request.backend == "ephemeris":
+                bodies = request.bodies
+                origin = request.origin
+                assert bodies is not None and origin is not None  # 模型层已校验在场
+                from e2m2e.algorithm.design.design_orbit import load_design_kernels
+                from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
+                from e2m2e.algorithm.propagation import epoch_to_et
+                from e2m2e.data.kernels.manager import SPICEManager
+
+                # 与 orbit_propagation/propagate_orbit 同惯例：内核加载后不卸载
+                # （SPICEManager 对重复加载去重；长任务 worker 子进程内调用时内核
+                # 在调用内加载，无跨进程问题）。
+                spice = SPICEManager()
+                load_design_kernels(spice, self._config.kernel_dir)
+                epoch_et_s = epoch_to_et(spice, request.epoch)
+                ephemeris_system = EphemerisSystem(bodies=list(bodies), spice=spice, origin=origin)
             _emit_progress(progress_callback, 0.0, "Sims-Flanagan 预设计开始")
             problem = SimsFlanaganMultiLegProblem(
                 np.asarray(request.departure_state, dtype=float),
@@ -809,6 +830,8 @@ class Facade:
                 request.initial_mass_kg,
                 request.mu_km3_s2,
                 backend=request.backend,
+                epoch_et_s=epoch_et_s,
+                ephemeris_system=ephemeris_system,
             )
             solution = problem.solve(
                 request.n_segments,

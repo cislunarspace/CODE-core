@@ -1,9 +1,10 @@
-"""低推力转移预设计（low_thrust_preliminary）请求/响应模型（#725，ADR 0054）。"""
+"""低推力转移预设计（low_thrust_preliminary）请求/响应模型（#725，ADR 0054；
+ephemeris 星历档上下文字段见 #727）。"""
 
 from __future__ import annotations
 
 import math
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -86,7 +87,29 @@ class LowThrustPreliminaryRequest(_ApiModel):
     """
 
     backend: Literal["conic", "ephemeris"] = Field(
-        description="保真度档（ADR 0050）；ephemeris 档未实现，传入显式报错不静默回退"
+        description="保真度档（ADR 0050）：conic 二体封闭解 / ephemeris 星历 N 体数值传播"
+    )
+    epoch: Any | None = Field(
+        default=None,
+        description=(
+            "出发历元 UTC（ISO 字符串或 [年,月,日,时,分,秒]）；"
+            "backend=ephemeris 必填，conic 档须为 None"
+        ),
+    )
+    bodies: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            '星历档天体集（SPICE 天体名，须含 origin，如 ["EARTH","MOON","SUN"]）；'
+            "backend=ephemeris 必填，conic 档须为 None"
+        ),
+    )
+    origin: str | None = Field(
+        default=None,
+        description=(
+            "星历档坐标原点天体（SPICE 天体名，中心引力由其提供）；"
+            "backend=ephemeris 必填，conic 档须为 None"
+        ),
     )
     departure_state: list[float] = Field(
         min_length=6,
@@ -176,6 +199,22 @@ class LowThrustPreliminaryRequest(_ApiModel):
             raise ValueError(
                 f"tof_bounds_s 仅在 cost='min_time'/'weighted' 时接受，"
                 f"cost={self.cost!r} 下须为 None"
+            )
+        # 星历档上下文在场性（类型/有限性由算法层校验；模型只管档位一致性）。
+        eph_ctx: dict[str, Any | None] = {
+            "epoch": self.epoch,
+            "bodies": self.bodies,
+            "origin": self.origin,
+        }
+        if self.backend == "ephemeris":
+            missing = [name for name, value in eph_ctx.items() if value is None]
+            if missing:
+                raise ValueError(
+                    f"backend='ephemeris' 必须提供 {'、'.join(missing)}（星历档上下文）"
+                )
+        elif any(value is not None for value in eph_ctx.values()):
+            raise ValueError(
+                "backend='conic' 须 epoch/bodies/origin 均为 None（星历上下文仅 ephemeris 档使用）"
             )
         return self
 

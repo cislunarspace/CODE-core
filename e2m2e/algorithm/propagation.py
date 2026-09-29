@@ -7,7 +7,7 @@ EphemerisTable。单文件模块（不是目录）。
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -15,7 +15,10 @@ from ..data.constants import SECONDS_PER_DAY, Datum
 from ..data.types import EphemerisTable
 from ..status import ConvergenceState, FailureCause, ResultStatus
 
-__all__ = ["PropagationResult", "propagate_orbit"]
+if TYPE_CHECKING:
+    from ..data.kernels.manager import SPICEManager
+
+__all__ = ["PropagationResult", "epoch_to_et", "propagate_orbit"]
 
 
 @dataclass(frozen=True)
@@ -62,6 +65,30 @@ _DEFAULT_FORCE_CONFIG: dict[str, Any] = {
         },
     ],
 }
+
+
+def epoch_to_et(spice: SPICEManager, epoch: Any) -> float:
+    """UTC 历元 → SPICE et 秒（TDB past J2000）。
+
+    接受 UTC ISO 字符串或 ``[年, 月, 日, 时, 分, 秒]`` 6 元组；不支持的格式
+    抛 ``ValueError``。实现唯一（原 ``propagate_orbit`` 内联块抽出，供
+    facade 等调用方复用）。
+
+    Args:
+        spice: 已加载闰秒内核的 SPICE 管理器。
+        epoch: UTC ISO 字符串或 6 元组历元。
+
+    Returns:
+        SPICE et 秒。
+    """
+    if isinstance(epoch, str):
+        return float(spice.utc_to_et(epoch))
+    epoch_parts = list(epoch)
+    if len(epoch_parts) == 6:
+        y, mo, d, h, mi, s = epoch_parts
+        epoch_iso = f"{int(y):04d}-{int(mo):02d}-{int(d):02d}T{int(h):02d}:{int(mi):02d}:{s:06.3f}"
+        return float(spice.utc_to_et(epoch_iso))
+    raise ValueError(f"不支持的 epoch 格式: {epoch}")
 
 
 def propagate_orbit(
@@ -127,18 +154,7 @@ def propagate_orbit(
     )
     fm = ForceModel.from_config(force_config, system)
 
-    if isinstance(epoch, str):
-        et0 = spice.utc_to_et(epoch)
-    else:
-        epoch_parts = list(epoch)
-        if len(epoch_parts) == 6:
-            y, mo, d, h, mi, s = epoch_parts
-            epoch_iso = (
-                f"{int(y):04d}-{int(mo):02d}-{int(d):02d}T{int(h):02d}:{int(mi):02d}:{s:06.3f}"
-            )
-            et0 = spice.utc_to_et(epoch_iso)
-        else:
-            raise ValueError(f"不支持的 epoch 格式: {epoch}")
+    et0 = epoch_to_et(spice, epoch)
 
     sign = -1.0 if direction == "backward" else 1.0
     etf = et0 + sign * float(duration)
