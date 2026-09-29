@@ -37,10 +37,13 @@ ephemeris 档必填 ``epoch_et_s``（出发历元 SPICE et 秒，TDB past J2000�
 ``bodies`` 须含 ``origin``——中心引力项由 origin 提供）；段中冲量、匹配点约束、
 成本函数、SLSQP 求解与软失败三元组结构两档共用，仅半段传播内核与 TOF 灵敏度
 链 RHS 换为 ``EphemerisDynamics``（Rust ``propagate_with_stm_py``，含 STM、
-支持后向）。星历档节点状态仍是约束数据、锚定在名义历元（出发历元 + 名义 TOF
-前缀和）；``min_time``/``weighted`` 下 TOF 决策变量移动 leg 时序时，节点状态
-**不**随历元重查星历（保持 conic 档"节点状态是数据"语义；逐 leg 重定目标归
-#726 裁决）。
+支持后向）。星历档节点状态仍是约束数据；leg 的起始绝对历元取出发历元加
+**前序 leg 的决策 TOF 前缀和**（``min_time``/``weighted`` 下 TOF 决策变量
+移动 leg 时序时保证 leg 时序连续：leg j 的时间窗自 leg j−1 实际末端开始），
+节点状态本身**不**随历元重查星历（保持 conic 档"节点状态是数据"语义；逐
+leg 重定目标归 #726 裁决）。注意解析 ∂/∂TOF 链只覆盖本 leg 时长项；前序
+leg TOF 平移本 leg 时间窗的星历灵敏度项不在链内——时间不变的退化系下
+精确，真实 N 体下为近似（跨 leg 耦合归 #726）。
 
 ## 多 leg 链与节点（#741）
 
@@ -1150,9 +1153,9 @@ class SimsFlanaganMultiLegProblem:
 
     质量 ``m̄ₖ = m₀·exp(−Σ_{j<k}‖ΔVⱼ‖/c)`` 按全部 leg 段的**全局时序**递推
     （flyby 不改质量）。两档语义下节点状态都是数据，不随 TOF 决策变量变化；
-    ephemeris 档的节点锚定在名义历元（出发历元 + 名义 TOF 前缀和），
-    ``min_time``/``weighted`` 下 TOF 决策变量移动 leg 时序时节点状态**不**随
-    历元重查星历（逐 leg 重定目标归 #726 裁决）。
+    ephemeris 档 leg 的起始绝对历元取出发历元加前序 leg 的决策 TOF
+    前缀和（保证 leg 时序连续），``min_time``/``weighted`` 下 TOF 决策变量
+    移动 leg 时序时节点状态**不**随历元重查星历（逐 leg 重定目标归 #726 裁决）。
 
     Args:
         departure_state: 出发状态 ``[r, v]`` ``(6,)``，km / km/s。
@@ -1666,6 +1669,7 @@ class SimsFlanaganMultiLegProblem:
                 spos[idx] = s_mid[:3, :]
                 s_mid[:, imp_offset + 3 * k : imp_offset + 3 * k + 3] += sign * _B_IMPULSE
             x_mid = x_mid + sign * (_B_IMPULSE @ dv[k])
+            t_out = None if t_mid is None else t_mid + half  # 传播输出时刻（与 x 同步）
             x, phi2 = _propagate_half(
                 x_mid, t_mid, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
             )
@@ -1675,11 +1679,11 @@ class SimsFlanaganMultiLegProblem:
                 if tof_col is not None:
                     sens[:, tof_col] += (
                         sign
-                        * _tier_rhs(t_mid, x, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn)
+                        * _tier_rhs(t_out, x, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn)
                         / (2.0 * n)
                     )
             states.append(x.copy())
-            t = None if t_mid is None else t_mid + half
+            t = t_out
         if forward:
             return np.asarray(states), mid_pos, r_mid, sens, spos
         return np.asarray(states[::-1]), mid_pos[::-1], r_mid[::-1], sens, spos[::-1]
@@ -1934,8 +1938,8 @@ class SimsFlanaganMultiLegProblem:
             else self._tof_nominal.copy()
         )
 
-        # ephemeris 档的逐 leg 起始绝对历元（出发历元 + 名义 TOF 前缀和；
-        # conic 档为 None，逐 leg 传 None 即可）。
+        # ephemeris 档的逐 leg 起始绝对历元（出发历元 + 前序 leg 决策 TOF
+        # 前缀和，保证 leg 时序连续；conic 档为 None，逐 leg 传 None 即可）。
         leg_t0 = (
             self._epoch_et_s + np.concatenate([[0.0], np.cumsum(tofs)[:-1]])
             if self._backend == "ephemeris"
