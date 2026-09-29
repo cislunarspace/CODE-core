@@ -1,25 +1,76 @@
 """SciPy SLSQP 后端。
 
-把原先嵌入 :class:`~e2m2e.algorithm.transfer.transfer_optimization.DROTRONLPOptimizer`
-的 SciPy SLSQP 求解循环抽出为顶层函数 :func:`solve_with_scipy`，由
-``DROTRONLPOptimizer.optimize`` 调用。SLSQP 是 DRO→RO 转移优化的默认求解器，
-无需额外依赖，仅依赖 ``scipy>=1.10``。
+:func:`solve_slsqp` 是仓库唯一的 SLSQP 驱动入口（#726）：输入
+:class:`~e2m2e.algorithm.transfer.nlp_core.NLPSpec` 问题描述，组装
+``minimize(..., method="SLSQP")``，不捕获异常。:func:`solve_with_scipy`
+在此之上承担 DRO→RO 转移 NLP 的编排（约束选择、进度回调与软失败翻译），
+由 ``DROTRONLPOptimizer.optimize`` 调用。SLSQP 是 DRO→RO 转移优化的默认
+求解器，无需额外依赖，仅依赖 ``scipy>=1.10``。
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy.optimize import Bounds, minimize
+from scipy.optimize import Bounds, OptimizeResult, minimize
 
 from ...status import ConvergenceState, FailureCause
 from ..results import scipy_slsqp_status
 from .config import TransferOptimizationResult
-from .nlp_core import NLPOptimizationVariables
+from .nlp_core import NLPOptimizationVariables, NLPSpec
 
 if TYPE_CHECKING:
     from .transfer_optimization import DROTRONLPOptimizer
+
+
+def solve_slsqp(
+    spec: NLPSpec,
+    x0: np.ndarray,
+    *,
+    ftol: float = 1e-9,
+    maxiter: int = 200,
+    disp: bool = False,
+) -> OptimizeResult:
+    """仓库唯一的 SciPy SLSQP 驱动入口（#726：问题组装与求解分发分离）。
+
+    按 :class:`NLPSpec` 组装 ``minimize(..., method="SLSQP")`` 的约束字典
+    （有值才挂 ``fun``/``jac``），不捕获异常——结束码翻译与软失败语义由
+    调用方负责（DRO 路径用 :func:`~e2m2e.algorithm.results.scipy_slsqp_status`）。
+
+    Args:
+        spec: NLP 问题描述（目标/约束/雅可比/盒/回调）。
+        x0: 初猜决策向量。
+        ftol: 目标容差（透传 SLSQP ``ftol``）。
+        maxiter: 最大迭代次数（透传 SLSQP ``maxiter``）。
+        disp: 是否打印迭代信息（透传 SLSQP ``disp``）。
+
+    Returns:
+        SciPy :class:`~scipy.optimize.OptimizeResult`（``success``/``status``/
+        ``x``/``nit`` 等原样透传）。
+    """
+    constraints: list[dict[str, object]] = []
+    if spec.eq is not None:
+        eq_dict: dict[str, object] = {"type": "eq", "fun": spec.eq}
+        if spec.eq_jac is not None:
+            eq_dict["jac"] = spec.eq_jac
+        constraints.append(eq_dict)
+    if spec.ineq is not None:
+        ineq_dict: dict[str, object] = {"type": "ineq", "fun": spec.ineq}
+        if spec.ineq_jac is not None:
+            ineq_dict["jac"] = spec.ineq_jac
+        constraints.append(ineq_dict)
+    return minimize(
+        spec.objective,
+        x0,
+        method="SLSQP",
+        jac=spec.objective_grad,
+        bounds=spec.bounds,
+        constraints=constraints,
+        callback=spec.callback,
+        options={"ftol": ftol, "maxiter": maxiter, "disp": disp},
+    )
 
 
 def solve_with_scipy(
@@ -89,22 +140,35 @@ def solve_with_scipy(
         print(f"  T范围: [{optimizer.transfer_time_range[0]}, {optimizer.transfer_time_range[1]}]")
         print(f"  t_ins范围: [{optimizer.t_ins_range[0]}, {optimizer.t_ins_range[1]}]")
 
-    # 6. 构造约束
-    constraints = [{"type": "eq", "fun": optimizer.constraint_position}]
+    # 6. 构造约束（NLPSpec：有值才挂约束，无解析雅可比保持数值差分）
+    eq_fn: Callable[[np.ndarray], np.ndarray]
+    ineq_fn: Callable[[np.ndarray], np.ndarray] | None
     if use_relaxed_velocity_constraint:
         cos_theta_max = np.cos(velocity_angle_constraint)
-        constraints.append(
-            {
-                # scipy ineq 语义为 fun >= 0：松弛约束是速度夹角不超过
-                # 容差，即 cos_angle >= cos(tol)。此前写反（cos_tol -
-                # cos_angle），SLSQP 会把夹角推离平行且照样“收敛”，
-                # 事后按正确语义报告的违反量可达 ~2。
-                "type": "ineq",
-                "fun": lambda y: optimizer._compute_cos_angle(y) - cos_theta_max,
-            }
-        )
+
+        def ineq_fn(y: np.ndarray) -> np.ndarray:
+            # scipy ineq 语义为 fun >= 0：松弛约束是速度夹角不超过
+            # 容差，即 cos_angle >= cos(tol)。此前写反（cos_tol -
+            # cos_angle），SLSQP 会把夹角推离平行且照样“收敛”，
+            # 事后按正确语义报告的违反量可达 ~2。
+            return np.atleast_1d(optimizer._compute_cos_angle(y) - cos_theta_max)
+
+        def eq_fn(y: np.ndarray) -> np.ndarray:
+            return np.atleast_1d(optimizer.constraint_position(y))
+
     else:
-        constraints.append({"type": "eq", "fun": optimizer.constraint_velocity_parallel})
+
+        def eq_fn(y: np.ndarray) -> np.ndarray:
+            # 两个标量等式约束堆叠为同一向量：与逐约束字典拼接后交给
+            # SLSQP 的约束向量逐分量一致（数值差分亦逐分量一致）。
+            return np.concatenate(
+                [
+                    np.atleast_1d(optimizer.constraint_position(y)),
+                    np.atleast_1d(optimizer.constraint_velocity_parallel(y)),
+                ]
+            )
+
+        ineq_fn = None
 
     bounds = Bounds(
         lb=[
@@ -129,17 +193,16 @@ def solve_with_scipy(
             obj_k = float(optimizer.objective_function(xk))
             optimizer._progress_callback(iteration_counter[0], obj_k, alpha_k, T_k, tins_k)
 
-    # 8. 求解
+    # 8. 求解（solve_slsqp：仓库唯一 SLSQP 驱动入口）
+    spec = NLPSpec(
+        objective=optimizer.objective_function,
+        eq=eq_fn,
+        ineq=ineq_fn,
+        bounds=bounds,
+        callback=_scipy_callback,
+    )
     try:
-        result = minimize(
-            optimizer.objective_function,
-            y0,
-            method="SLSQP",
-            bounds=bounds,
-            constraints=constraints,
-            options={"ftol": 1e-10, "maxiter": 1000, "disp": verbose},
-            callback=_scipy_callback,
-        )
+        result = solve_slsqp(spec, y0, ftol=1e-10, maxiter=1000, disp=verbose)
 
         status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
         message = result.message

@@ -41,15 +41,20 @@ ephemeris 档必填 ``epoch_et_s``（出发历元 SPICE et 秒，TDB past J2000�
 **前序 leg 的决策 TOF 前缀和**（``min_time``/``weighted`` 下 TOF 决策变量
 移动 leg 时序时保证 leg 时序连续：leg j 的时间窗自 leg j−1 实际末端开始），
 节点状态本身**不**随历元重查星历（保持 conic 档"节点状态是数据"语义；逐
-leg 重定目标归 #726 裁决）。注意解析 ∂/∂TOF 链只覆盖本 leg 时长项；前序
-leg TOF 平移本 leg 时间窗的星历灵敏度项不在链内——时间不变的退化系下
-精确，真实 N 体下为近似（跨 leg 耦合归 #726）。
+leg 重定目标归 #726 裁决）。解析 ∂/∂TOF 链覆盖本 leg 时长项与前序 leg
+TOF 平移本 leg 时间窗的星历灵敏度项（后者由 ``multisegment`` 框架的窗口
+平移链补齐，#726；时间不变的退化系下恒为零，真实 N 体下为精确一阶项）；
+半段传播内核与逐 leg 混档能力亦由 ``multisegment`` 子包承担
+（:class:`.multisegment.LegKernel`，SF 公开 API 保持全问题统一档）。
 
 ## 多 leg 链与节点（#741）
 
 :class:`SimsFlanaganMultiLegProblem` 把上述转录推广到多 leg 链：每 leg 独立
 前向/后向 pass 至**本 leg 匹配点**（leg 间经节点锚定解耦，位置匹配由锚定
-结构性满足）。节点（:class:`SimsFlanaganNode`）分两类：
+结构性满足）——pass 与 matchpoint 组装来自 ``multisegment`` 框架
+（:func:`.multisegment.evaluate_chain`，#726 回迁），SF 只保留成本函数、
+段可行域与 flyby 决策变量的转录语义。节点（:class:`SimsFlanaganNode`）
+分两类：
 
 - **rendezvous**：位置+速度匹配，锚定到固定节点状态（conic 档语义：节点
   状态是数据，不随 TOF 决策变量变化）；
@@ -57,7 +62,8 @@ leg TOF 平移本 leg 时间窗的星历灵敏度项不在链内——时间不�
   ``[r_B; v_B + v∞_out]``、之前的 leg 后向锚定 ``[r_B; v_B + v∞_in]``（v∞
   是决策变量），等模 ``|v∞_in| = |v∞_out|`` 为等式约束、转角
   ``δ ≤ δ_max(r_p_min, v_eff, μ_B)`` 为不等式约束；转角与近心点闭式复用
-  :func:`.mga.flyby_turn_angle` / :func:`.mga.flyby_pericenter_radius`。
+  :func:`.mga.flyby_turn_angle` / :func:`.mga.flyby_pericenter_radius`，
+  约束组装走 :func:`.multisegment.flyby_node_constraints`。
 
 质量链 ``m̄ₖ = m₀·exp(−Σ_{j<k}‖ΔVⱼ‖/c)`` 按**全部 leg 段的全局时序**递推
 （flyby 不改质量）。逐 leg TOF 可选入决策变量（``tof_bounds_s`` 给定时），
@@ -98,15 +104,25 @@ from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
-from scipy.optimize import Bounds, minimize
+from scipy.optimize import Bounds
 
 from e2m2e.data.constants import AU_KM
-from e2m2e.integrators import propagate_kepler_py, require_rust_extension
+from e2m2e.integrators import require_rust_extension
 
 from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..dynamics import EphemerisDynamics, EphemerisSystem
 from ..results import scipy_slsqp_status
-from .mga import flyby_pericenter_radius, flyby_turn_angle
+from .mga import flyby_pericenter_radius
+from .multisegment import (
+    ChainLegRequest,
+    FlybyConstraintEval,
+    LegKernel,
+    VariableLayout,
+    evaluate_chain,
+    flyby_node_constraints,
+)
+from .nlp_core import NLPSpec
+from .nlp_scipy import solve_slsqp
 from .sep import (
     edelbaum_delta_v,
     edelbaum_delta_v_inclined,
@@ -151,52 +167,6 @@ _CAP_BOX_FACTOR = 3.0
 _PENALTY_OBJECTIVE = 1e9
 _PENALTY_EQ = 1e3
 _PENALTY_INEQ = -1e3
-
-
-def _propagate_half(
-    x: npt.NDArray[np.floating],
-    t_start: float | None,
-    half: float,
-    *,
-    mu_km3_s2: float,
-    dyn: EphemerisDynamics | None,
-    with_stm: bool,
-) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
-    """半段传播内核：conic 封闭解 / 星历 N 体数值传播（#727 双档）。
-
-    conic 档忽略 ``t_start``（二体时间不变）；星历档在绝对历元
-    ``[t_start, t_start + half]`` 上数值传播（``half < 0`` 即后向）。
-    返回 ``(x_out, Φ(6,6) 或 None)``。
-    """
-    if dyn is None:
-        out = propagate_kepler_py(x.tolist(), [half], mu_km3_s2, with_stm=with_stm)
-        x_out = np.asarray(out["states"][0], dtype=float)
-        phi = np.asarray(out["stm"][0], dtype=float).reshape(6, 6) if with_stm else None
-    else:
-        if t_start is None:
-            raise ValueError("ephemeris 档传播必须提供绝对历元 t_start")
-        out = dyn.propagate(
-            x, (t_start, t_start + half), t_eval=[t_start + half], with_stm=with_stm
-        )
-        x_out = np.asarray(out["states"][-1], dtype=float)
-        phi = np.asarray(out["stm"][-1], dtype=float) if with_stm else None
-    return x_out, phi
-
-
-def _tier_rhs(
-    t: float | None,
-    x: npt.NDArray[np.floating],
-    *,
-    mu_km3_s2: float,
-    dyn: EphemerisDynamics | None,
-) -> npt.NDArray[np.floating]:
-    """TOF 灵敏度链 RHS：conic 二体 ``[v; −μr/|r|³]`` / 星历 ``equations_of_motion(t, x)``。"""
-    if dyn is None:
-        r = x[:3]
-        return np.concatenate([x[3:], -mu_km3_s2 * r / float(np.linalg.norm(r)) ** 3])
-    if t is None:
-        raise ValueError("ephemeris 档 RHS 必须提供绝对历元 t")
-    return np.asarray(dyn.equations_of_motion(t, x), dtype=float)
 
 
 def _plane_change_deg(
@@ -584,30 +554,40 @@ class SimsFlanaganProblem:
                 cache[key] = hit
             return hit
 
-        eq_dict: dict[str, object] = {
-            "type": "eq",
-            "fun": lambda x: evaluated(x).eq,
-        }
-        ineq_dict: dict[str, object] = {
-            "type": "ineq",
-            "fun": lambda x: evaluated(x).ineq,
-        }
-        if want_sens:
-            eq_dict["jac"] = lambda x: evaluated(x).eq_jac
-            ineq_dict["jac"] = lambda x: evaluated(x).ineq_jac
+        def _grad(x: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+            grad = evaluated(x).obj_grad
+            assert grad is not None  # want_sens=True 时 _evaluate 恒产出
+            return grad
 
-        result = minimize(
-            lambda x: evaluated(x).objective,
+        def _eq_jac(x: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+            jac = evaluated(x).eq_jac
+            assert jac is not None
+            return jac
+
+        def _ineq_jac(x: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+            jac = evaluated(x).ineq_jac
+            assert jac is not None
+            return jac
+
+        result = solve_slsqp(
+            NLPSpec(
+                objective=lambda x: evaluated(x).objective,
+                objective_grad=_grad if want_sens else None,
+                eq=lambda x: evaluated(x).eq,
+                eq_jac=_eq_jac if want_sens else None,
+                ineq=lambda x: evaluated(x).ineq,
+                ineq_jac=_ineq_jac if want_sens else None,
+                bounds=bounds,
+            ),
             x_start,
-            method="SLSQP",
-            jac=(lambda x: evaluated(x).obj_grad) if want_sens else None,
-            bounds=bounds,
-            constraints=[eq_dict, ineq_dict],
-            options={"ftol": ftol, "maxiter": maxiter, "disp": verbose},
+            ftol=ftol,
+            maxiter=maxiter,
+            disp=verbose,
         )
 
         status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
         message = str(result.message)
+
         final = evaluated(result.x)
 
         # 后验闸门（成功也要过）：归一化匹配点残差 / 段界相对越界超限即改判
@@ -668,130 +648,7 @@ class SimsFlanaganProblem:
         """Edelbaum 闭式初猜（委托模块级 :func:`_edelbaum_leg_guess`）。"""
         return _edelbaum_leg_guess(self._departure, self._arrival, n)
 
-    # ---- 内部：段传播与灵敏度 ----
-
-    def _forward_pass(
-        self,
-        dv: npt.NDArray[np.floating],
-        n: int,
-        m: int,
-        dt: float,
-        *,
-        with_sens: bool,
-        t_start: float | None = None,
-    ) -> tuple[
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-    ]:
-        """前向 pass：出发态经段 0..m-1 接龙（段中冲量）到匹配节点。
-
-        ``t_start`` 为本 leg 起始绝对历元（ephemeris 档必填，conic 档忽略）。
-
-        返回 ``(节点状态 (m+1,6), 段中点位置 (m,3), 段中点半径 (m,),
-        ∂匹配节点/∂ΔV (6,3n), 段中点位置灵敏度 (m,3,3n))``。
-        """
-        half = 0.5 * dt
-        x = self._departure
-        states = [x.copy()]
-        mid_pos = np.zeros((m, 3))
-        r_mid = np.zeros(m)
-        sens = np.zeros((6, 3 * n))
-        s_mid_pos = np.zeros((m, 3, 3 * n))
-        t = t_start
-        for k in range(m):
-            t_mid = None if t is None else t + half
-            x_mid, phi1 = _propagate_half(
-                x, t, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
-            )
-            mid_pos[k] = x_mid[:3]
-            r_mid[k] = float(np.linalg.norm(x_mid[:3]))
-            if with_sens:
-                assert phi1 is not None  # with_stm=True 时 _propagate_half 恒返回 STM
-                s_mid = phi1 @ sens
-                s_mid_pos[k] = s_mid[:3, :]
-                # 冲量是段中点的状态跳变：∂x_mid⁺/∂ΔV_k = s_mid[:,k] + B（无 Φ1）。
-                s_mid[:, 3 * k : 3 * k + 3] += _B_IMPULSE
-            x_mid = x_mid + _B_IMPULSE @ dv[k]
-            x, phi2 = _propagate_half(
-                x_mid, t_mid, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
-            )
-            if with_sens:
-                assert phi2 is not None
-                sens = phi2 @ s_mid
-            states.append(x.copy())
-            t = None if t_mid is None else t_mid + half
-        return np.asarray(states), mid_pos, r_mid, sens, s_mid_pos
-
-    def _backward_pass(
-        self,
-        dv: npt.NDArray[np.floating],
-        n: int,
-        m: int,
-        dt: float,
-        *,
-        with_sens: bool,
-        t_start: float | None = None,
-    ) -> tuple[
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-    ]:
-        """后向 pass：到达态经段 n-1..m 反向接龙（内核支持负 dt）到匹配节点。
-
-        ``t_start`` 为本 leg 末端绝对历元（ephemeris 档必填，游标自它反向
-        递减；conic 档忽略）。
-
-        返回 ``(节点状态 (n-m+1,6) [匹配节点..到达], 段中点位置 (n-m,3),
-        段中点半径 (n-m,), ∂匹配节点/∂ΔV (6,3n), 段中点位置灵敏度 (n-m,3,3n))``。
-        段序数组（中点位置/半径/灵敏度）按**段升序** k = m..n-1 排列，与前向
-        pass 拼接语义一致；冲量在后向路径上取 ``v_pre = v_post − ΔV_k``，
-        灵敏度带负号。
-        """
-        half = -0.5 * dt
-        x = self._arrival
-        nodes = [x.copy()]
-        nb = n - m
-        mid_pos = np.zeros((nb, 3))
-        r_mid = np.zeros(nb)
-        sens = np.zeros((6, 3 * n))
-        s_mid_pos = np.zeros((nb, 3, 3 * n))
-        t = t_start
-        for idx in range(nb):
-            k = n - 1 - idx
-            t_mid = None if t is None else t + half
-            x_mid, phi1 = _propagate_half(
-                x, t, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
-            )
-            mid_pos[idx] = x_mid[:3]
-            r_mid[idx] = float(np.linalg.norm(x_mid[:3]))
-            if with_sens:
-                assert phi1 is not None  # with_stm=True 时 _propagate_half 恒返回 STM
-                s_mid = phi1 @ sens
-                s_mid_pos[idx] = s_mid[:3, :]
-                # 后向冲量是段中点的反向状态跳变：v_pre = v_post − ΔV_k（无 Φ1）。
-                s_mid[:, 3 * k : 3 * k + 3] -= _B_IMPULSE
-            x_mid = x_mid - _B_IMPULSE @ dv[k]
-            x, phi2 = _propagate_half(
-                x_mid, t_mid, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
-            )
-            if with_sens:
-                assert phi2 is not None
-                sens = phi2 @ s_mid
-            nodes.append(x.copy())
-            t = None if t_mid is None else t_mid + half
-        # 遍历按 k 降序；段序数组翻转为升序（与索引 k-m 的消费方语义对齐）。
-        return (
-            np.asarray(nodes[::-1]),
-            mid_pos[::-1],
-            r_mid[::-1],
-            sens,
-            s_mid_pos[::-1],
-        )
+    # ---- 内部：评估（pass 与 matchpoint 组装走 multisegment.evaluate_chain）----
 
     def _penalty_evaluation(
         self,
@@ -828,7 +685,9 @@ class SimsFlanaganProblem:
         等式约束按 ``(位置/长度尺度, 速度/速度尺度)`` 归一后交给 SLSQP（同一
         可行集，日心公里量纲下良态）；不等式约束保持原始量纲
         ``g_k = cap_k² − ‖ΔV_k‖²``（每条约束自洽，避免对依赖 ΔV 的 ``cap²``
-        归一化引入商法则项）。
+        归一化引入商法则项）。pass 与 matchpoint 组装来自 multisegment 框架
+        （:func:`.multisegment.evaluate_chain`，单 leg 即一条请求；单 leg TOF
+        固定，无 shift 列）。
         """
         n = n_segments
         m = n // 2
@@ -838,17 +697,25 @@ class SimsFlanaganProblem:
         dv_norm = np.linalg.norm(dv, axis=1)
 
         try:
-            fwd_states, fwd_mid_pos, r_fwd, s_fwd, spos_fwd = self._forward_pass(
-                dv, n, m, dt, with_sens=with_sens, t_start=self._epoch_et_s
-            )
-            bwd_states, bwd_mid_pos, r_bwd, s_bwd, spos_bwd = self._backward_pass(
-                dv,
-                n,
-                m,
-                dt,
+            (leg,) = evaluate_chain(
+                [
+                    ChainLegRequest(
+                        kernel=LegKernel(self._mu_km3_s2, dyn=self._eph_dyn),
+                        n_segments=n,
+                        imp_offset=0,
+                        dv=dv,
+                        dt=dt,
+                        t_start=self._epoch_et_s,
+                        anchor_f=self._departure,
+                        anchor_b=self._arrival,
+                        anchor_sens_f=np.zeros((6, 3 * n)),
+                        anchor_sens_b=np.zeros((6, 3 * n)),
+                    )
+                ],
+                n_var=3 * n,
+                len_scale=self._len_scale,
+                vel_scale=self._vel_scale,
                 with_sens=with_sens,
-                # 后向自 leg 末端历元出发（ephemeris 档；conic 档为 None）。
-                t_start=None if self._epoch_et_s is None else self._epoch_et_s + self._tof_s,
             )
         except ValueError:
             # 线搜索试探点落在闭式 Kepler 的病态能量带（近抛物线 Newton 发散）：
@@ -858,11 +725,11 @@ class SimsFlanaganProblem:
         # 冲量前质量 m̄ₖ = m₀·exp(−Σ_{j<k}‖ΔVⱼ‖/c)：两 pass 同式（恒等式，见模块 docstring）。
         prefix = np.concatenate([[0.0], np.cumsum(dv_norm)[:-1]])
         m_bar = self._m0_kg * np.exp(-prefix / c_kms)
-        r_mid = np.concatenate([r_fwd, r_bwd])
+        r_mid = leg.r_mid
         thrust = np.array([self._propulsion.max_thrust_n(r) for r in r_mid])
         cap = thrust / m_bar * dt / 1000.0
 
-        eq_raw = fwd_states[-1] - bwd_states[0]
+        eq_raw = leg.residual_raw
         eq = np.concatenate([eq_raw[:3] / self._len_scale, eq_raw[3:] / self._vel_scale])
         ineq = cap**2 - dv_norm**2
 
@@ -876,21 +743,17 @@ class SimsFlanaganProblem:
         if with_sens:
             denom = np.sqrt(dv_norm**2 + _EPS_KM_S**2)
             obj_grad = (dv / denom[:, None]).reshape(3 * n)
-            eq_jac = np.vstack([s_fwd[:3] / self._len_scale, s_fwd[3:] / self._vel_scale]) - (
-                np.vstack([s_bwd[:3] / self._len_scale, s_bwd[3:] / self._vel_scale])
-            )
+            eq_jac = leg.eq_jac
             ineq_jac = self._ineq_jacobian(
                 dv,
                 dv_norm,
                 cap,
                 r_mid,
-                np.concatenate([fwd_mid_pos, bwd_mid_pos]),
+                leg.mid_pos,
                 m_bar,
                 dt,
                 c_kms,
-                m,
-                spos_fwd,
-                spos_bwd,
+                leg.spos,
             )
 
         return _Evaluation(
@@ -902,8 +765,8 @@ class SimsFlanaganProblem:
             eq_jac=eq_jac,
             ineq=ineq,
             ineq_jac=ineq_jac,
-            forward_states=fwd_states,
-            backward_states=bwd_states,
+            forward_states=leg.fwd_states,
+            backward_states=leg.bwd_states,
             cap_km_s=cap,
             total_dv_km_s=total_dv,
             final_mass_kg=final_mass,
@@ -919,9 +782,7 @@ class SimsFlanaganProblem:
         m_bar: npt.NDArray[np.floating],
         dt: float,
         c_kms: float,
-        m: int,
-        spos_fwd: npt.NDArray[np.floating],
-        spos_bwd: npt.NDArray[np.floating],
+        spos: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
         """段界约束 ``g_k = cap_k² − ‖ΔV_k‖²`` 的解析雅可比（原始量纲，(n, 3n)）。
 
@@ -933,8 +794,8 @@ class SimsFlanaganProblem:
 
         两支的支集不同，统一全 j 循环、由零支集自然截断：``m̄ₖ`` 链只在
         ``j < k`` 非零（``m̄ₖ = m₀·exp(−Σ_{j<k}‖ΔVⱼ‖/c)``，两 pass 同式）；
-        ``T'`` 链的支集由 ``Spos_k``（该段**中点**位置灵敏度，段 k < m 取
-        前向 pass、否则取后向 pass）决定——前向段支集 j < k、后向段支集
+        ``T'`` 链的支集由 ``Spos_k``（该段**中点**位置灵敏度，前向段升序
+        接后向段升序拼接）决定——前向段支集 j < k、后向段支集
         j > k（后向中点跟随更晚段冲量的反向传播）。``û_j = ΔV_j/|ΔV_j|``
         在 |ΔV_j| ≤ 阈值时取零向量（雅可比连续化）。
         """
@@ -946,7 +807,7 @@ class SimsFlanaganProblem:
             m_bar_k = m_bar[k]
             thrust_k = self._propulsion.max_thrust_n(r_mid[k])
             grad_t = self._propulsion._thrust_gradient_n_per_km(r_mid[k])
-            spos_k = spos_fwd[k] if k < m else spos_bwd[k - m]
+            spos_k = spos[k]
             rhat_k = mid_pos[k] / r_mid[k]
             dcap = np.zeros(3 * n)
             for j in range(n):
@@ -1083,23 +944,6 @@ class SimsFlanaganMultiLegSolution:
 
 
 @dataclass(frozen=True)
-class _FlybyEval:
-    """单 flyby 节点约束的全部评估产物（值 + 相对 [v_in; v_out] 的局部梯度）。"""
-
-    v_in: npt.NDArray[np.floating]
-    v_out: npt.NDArray[np.floating]
-    n_in: float
-    n_out: float
-    delta: float
-    delta_max: float
-    v_eff: float
-    eq_val: float
-    eq_grad: npt.NDArray[np.floating]
-    ineq_val: float
-    ineq_grad: npt.NDArray[np.floating]
-
-
-@dataclass(frozen=True)
 class _MultiLegLayout:
     """一次 ``solve`` 调用的决策变量布局与成本配置。"""
 
@@ -1130,7 +974,7 @@ class _MultiLegEvaluation:
     fwd_states: list[npt.NDArray[np.floating]]
     bwd_states: list[npt.NDArray[np.floating]]
     eq_raw: list[npt.NDArray[np.floating]]
-    flybys: list[_FlybyEval]
+    flybys: list[FlybyConstraintEval]
     cap_km_s: npt.NDArray[np.floating]
     dv_norms: npt.NDArray[np.floating]
     total_dv_km_s: float
@@ -1398,23 +1242,35 @@ class SimsFlanaganMultiLegProblem:
                 cache[key] = hit
             return hit
 
-        eq_dict: dict[str, object] = {"type": "eq", "fun": lambda x: evaluated(x).eq}
-        ineq_dict: dict[str, object] = {
-            "type": "ineq",
-            "fun": lambda x: evaluated(x).ineq,
-        }
-        if want_sens:
-            eq_dict["jac"] = lambda x: evaluated(x).eq_jac
-            ineq_dict["jac"] = lambda x: evaluated(x).ineq_jac
+        def _grad(x: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+            grad = evaluated(x).obj_grad
+            assert grad is not None  # want_sens=True 时 _evaluate 恒产出
+            return grad
 
-        result = minimize(
-            lambda x: evaluated(x).objective,
+        def _eq_jac(x: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+            jac = evaluated(x).eq_jac
+            assert jac is not None
+            return jac
+
+        def _ineq_jac(x: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+            jac = evaluated(x).ineq_jac
+            assert jac is not None
+            return jac
+
+        result = solve_slsqp(
+            NLPSpec(
+                objective=lambda x: evaluated(x).objective,
+                objective_grad=_grad if want_sens else None,
+                eq=lambda x: evaluated(x).eq,
+                eq_jac=_eq_jac if want_sens else None,
+                ineq=lambda x: evaluated(x).ineq,
+                ineq_jac=_ineq_jac if want_sens else None,
+                bounds=bounds,
+            ),
             x_start,
-            method="SLSQP",
-            jac=(lambda x: evaluated(x).obj_grad) if want_sens else None,
-            bounds=bounds,
-            constraints=[eq_dict, ineq_dict],
-            options={"ftol": ftol, "maxiter": maxiter, "disp": verbose},
+            ftol=ftol,
+            maxiter=maxiter,
+            disp=verbose,
         )
 
         status, cause = scipy_slsqp_status(bool(result.success), int(result.status))
@@ -1509,25 +1365,27 @@ class SimsFlanaganMultiLegProblem:
         *,
         tof_free: bool,
     ) -> _MultiLegLayout:
-        """由（已校验的）段数、成本与 TOF 模式构建决策变量布局。"""
+        """由（已校验的）段数、成本与 TOF 模式构建决策变量布局。
+
+        变量块偏移经 :class:`.multisegment.VariableLayout` 顺序登记（冲量
+        逐 leg 块 → v∞ 块 → TOF 块）；成本/权重语义留在 SF 本层。
+        """
         n_list_t = tuple(int(n) for n in n_list)
-        imp_offsets_list = [0]
-        for n in n_list_t[:-1]:
-            imp_offsets_list.append(imp_offsets_list[-1] + 3 * n)
         flyby_nodes = tuple(i for i, nd in enumerate(self._nodes) if nd.kind == "flyby")
-        n_imp = 3 * sum(n_list_t)
-        vinf_off = n_imp
-        tof_off = n_imp + 6 * len(flyby_nodes)
         n_legs = len(n_list_t)
+        variables = VariableLayout()
+        imp_blocks = [variables.register(f"imp_leg{leg}", 3 * n) for leg, n in enumerate(n_list_t)]
+        vinf_block = variables.register("vinf", 6 * len(flyby_nodes))
+        tof_block = variables.register("tof", n_legs if tof_free else 0)
         return _MultiLegLayout(
             n_list=n_list_t,
-            imp_offsets=tuple(imp_offsets_list),
-            n_imp=n_imp,
+            imp_offsets=tuple(block.start for block in imp_blocks),
+            n_imp=vinf_block.start,
             flyby_nodes=flyby_nodes,
-            vinf_off=vinf_off,
-            tof_off=tof_off,
+            vinf_off=vinf_block.start,
+            tof_off=tof_block.start,
             tof_free=tof_free,
-            n_var=tof_off + (n_legs if tof_free else 0),
+            n_var=variables.n_var,
             cost=cost,
             weights=weights,
         )
@@ -1601,160 +1459,7 @@ class SimsFlanaganMultiLegProblem:
             x[layout.tof_off :] = self._tof_nominal
         return x
 
-    # ---- 内部：评估 ----
-
-    def _leg_pass(
-        self,
-        anchor_state: npt.NDArray[np.floating],
-        anchor_sens: npt.NDArray[np.floating],
-        dv: npt.NDArray[np.floating],
-        dt: float,
-        *,
-        forward: bool,
-        imp_offset: int,
-        tof_col: int | None,
-        n_var: int,
-        with_sens: bool,
-        t_start: float | None = None,
-    ) -> tuple[
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-        npt.NDArray[np.floating],
-    ]:
-        """单 leg 的前向/后向 pass（MVP pass 的推广：锚速度可含 v∞ 决策变量、
-        段长 dt 可为 TOF 决策变量的函数）。
-
-        ``forward=True`` 自前向锚接龙段 ``0..m−1``，否则自后向锚反向接龙段
-        ``m..n−1``（内核支持负 dt）。``t_start`` 为本 leg **起始端**绝对历元
-        （ephemeris 档必填：前向游标自它出发，后向游标自 ``t_start + n·dt``
-        反向递减；conic 档忽略）。返回 ``(节点状态, 段中点位置, 段中点半径,
-        匹配节点灵敏度 (6, n_var), 段中点位置灵敏度 (count, 3, n_var))``；后向
-        的节点状态按 ``[匹配节点..锚]`` 排列、段序数组按段升序翻转（MVP 同语义）。
-        锚速度灵敏度经 ``anchor_sens`` 进入链式递推；TOF 灵敏度在每次半段传播
-        后累加 ``RHS(x_out)·(±1/(2n))``（后向带负号；RHS 按 backend 取二体
-        闭式或星历 ``equations_of_motion``，在传播**输出**时刻/态取值）。
-        """
-        n = dv.shape[0]
-        m = n // 2
-        sign = 1.0 if forward else -1.0
-        half = sign * 0.5 * dt
-        x = anchor_state.copy()
-        sens = anchor_sens.copy()
-        seg_ids = range(m) if forward else range(n - 1, m - 1, -1)
-        count = m if forward else n - m
-        states = [x.copy()]
-        mid_pos = np.zeros((count, 3))
-        r_mid = np.zeros(count)
-        spos = np.zeros((count, 3, n_var))
-        t = None if t_start is None else (t_start if forward else t_start + n * dt)
-        for idx, k in enumerate(seg_ids):
-            t_mid = None if t is None else t + half
-            x_mid, phi1 = _propagate_half(
-                x, t, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
-            )
-            mid_pos[idx] = x_mid[:3]
-            r_mid[idx] = float(np.linalg.norm(x_mid[:3]))
-            if with_sens:
-                assert phi1 is not None  # with_stm=True 时 _propagate_half 恒返回 STM
-                s_mid = phi1 @ sens
-                if tof_col is not None:
-                    # 半段时长 h = ±TOF/(2n)：∂x_out/∂TOF += RHS(x_out)·∂h/∂TOF。
-                    s_mid[:, tof_col] += (
-                        sign
-                        * _tier_rhs(t_mid, x_mid, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn)
-                        / (2.0 * n)
-                    )
-                spos[idx] = s_mid[:3, :]
-                s_mid[:, imp_offset + 3 * k : imp_offset + 3 * k + 3] += sign * _B_IMPULSE
-            x_mid = x_mid + sign * (_B_IMPULSE @ dv[k])
-            t_out = None if t_mid is None else t_mid + half  # 传播输出时刻（与 x 同步）
-            x, phi2 = _propagate_half(
-                x_mid, t_mid, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
-            )
-            if with_sens:
-                assert phi2 is not None
-                sens = phi2 @ s_mid
-                if tof_col is not None:
-                    sens[:, tof_col] += (
-                        sign
-                        * _tier_rhs(t_out, x, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn)
-                        / (2.0 * n)
-                    )
-            states.append(x.copy())
-            t = t_out
-        if forward:
-            return np.asarray(states), mid_pos, r_mid, sens, spos
-        return np.asarray(states[::-1]), mid_pos[::-1], r_mid[::-1], sens, spos[::-1]
-
-    def _flyby_constraints(
-        self,
-        v_in: npt.NDArray[np.floating],
-        v_out: npt.NDArray[np.floating],
-        node: SimsFlanaganNode,
-    ) -> _FlybyEval:
-        """flyby 节点的等模等式与转角不等式（值 + 相对 ``[v_in; v_out]`` 的梯度）。
-
-        等模 ``(|v_in|² − |v_out|²)/vel_scale²``；转角 ``g = δ_max − δ``，
-        ``δ = acos(clip(v̂_in·v̂_out))``，``δ_max`` 复用 :func:`.mga.flyby_turn_angle`
-        在 ``v_eff = (|v_in|+|v_out|)/2`` 处闭式。退化守卫：任一模低于
-        ``_UHAT_EPS_KM_S`` 时 δ 及其梯度取 0；``v_eff`` 低于阈值时 ``g ≡ 1.0``
-        （常数可行、梯度 0）。``∂δ/∂v_in = −(v̂_out − cosδ·v̂_in)/(n_in·sinδ)``
-        （``sinδ`` 低于阈值取 0）；``dδ_max/dv_eff = −4√k/((1+k·v²)·√(2+k·v²))``
-        （``k = r_p_min/μ``，``1−w²`` 的稳定重排，``k → 0`` 时无 catastrophic
-        cancellation），再链 ``∂v_eff/∂v_in = ½·v̂_in``。
-        """
-        eps = _UHAT_EPS_KM_S
-        vel2 = self._vel_scale**2
-        n_in = float(np.linalg.norm(v_in))
-        n_out = float(np.linalg.norm(v_out))
-        eq_val = (n_in**2 - n_out**2) / vel2
-        eq_grad = np.concatenate([2.0 * v_in, -2.0 * v_out]) / vel2
-
-        u_in: npt.NDArray[np.floating] = np.zeros(3)
-        u_out: npt.NDArray[np.floating] = np.zeros(3)
-        dd_in: npt.NDArray[np.floating] = np.zeros(3)
-        dd_out: npt.NDArray[np.floating] = np.zeros(3)
-        delta = 0.0
-        if n_in >= eps and n_out >= eps:
-            u_in = v_in / n_in
-            u_out = v_out / n_out
-            cos_d = float(np.clip(np.dot(u_in, u_out), -1.0, 1.0))
-            delta = float(np.arccos(cos_d))
-            sin_d = float(np.sin(delta))
-            if sin_d >= eps:
-                dd_in = -(u_out - cos_d * u_in) / (n_in * sin_d)
-                dd_out = -(u_in - cos_d * u_out) / (n_out * sin_d)
-
-        v_eff = 0.5 * (n_in + n_out)
-        ineq_grad = np.zeros(6)
-        delta_max = 0.0
-        if v_eff <= eps:
-            ineq_val = 1.0  # 常数可行（零退化极限），梯度 0
-        else:
-            assert node.r_p_min_km is not None and node.mu_km3_s2 is not None
-            delta_max = flyby_turn_angle(node.r_p_min_km, v_eff, node.mu_km3_s2)
-            ineq_val = delta_max - delta
-            k = node.r_p_min_km / node.mu_km3_s2
-            kv2 = k * v_eff**2
-            dd_max = -4.0 * np.sqrt(k) / ((1.0 + kv2) * np.sqrt(2.0 + kv2))
-            ineq_grad = np.concatenate(
-                [0.5 * dd_max * u_in, 0.5 * dd_max * u_out]
-            ) - np.concatenate([dd_in, dd_out])
-        return _FlybyEval(
-            v_in=np.asarray(v_in, dtype=float),
-            v_out=np.asarray(v_out, dtype=float),
-            n_in=n_in,
-            n_out=n_out,
-            delta=delta,
-            delta_max=delta_max,
-            v_eff=v_eff,
-            eq_val=float(eq_val),
-            eq_grad=eq_grad,
-            ineq_val=float(ineq_val),
-            ineq_grad=ineq_grad,
-        )
+    # ---- 内部：评估（pass/matchpoint 与 flyby 节点约束走 multisegment）----
 
     def _ml_objective(
         self,
@@ -1817,7 +1522,7 @@ class SimsFlanaganMultiLegProblem:
         spos: npt.NDArray[np.floating],
         uhat: npt.NDArray[np.floating],
         c_kms: float,
-        flyby_evals: list[_FlybyEval],
+        flyby_evals: list[FlybyConstraintEval],
     ) -> npt.NDArray[np.floating]:
         """段界 + flyby 转角不等式约束的解析雅可比（原始量纲，(Σn+n_fly, n_var)）。
 
@@ -1877,7 +1582,7 @@ class SimsFlanaganMultiLegProblem:
             v_in = np.asarray(x[base : base + 3], dtype=float)
             v_out = np.asarray(x[base + 3 : base + 6], dtype=float)
             flybys.append(
-                _FlybyEval(
+                FlybyConstraintEval(
                     v_in=v_in,
                     v_out=v_out,
                     n_in=float(np.linalg.norm(v_in)),
@@ -1921,13 +1626,18 @@ class SimsFlanaganMultiLegProblem:
 
         等式约束 = 每 leg 6 维归一化匹配点残差 + 每 flyby 1 维等模；不等式 =
         全部段（全局时序）``g_s = cap_s² − ‖ΔV_s‖²`` + 每 flyby 1 维转角裕度。
+        pass 与 matchpoint 组装来自 multisegment 框架
+        （:func:`.multisegment.evaluate_chain`），flyby 节点约束复用
+        :func:`.multisegment.flyby_node_constraints`；ephemeris 档 + tof_free
+        时逐 leg 接跨 leg 窗口平移列（前序 leg TOF 平移本 leg 时间窗的星历
+        灵敏度，conic 档时间不变恒不接）。
         """
         n_list = layout.n_list
         n_var = layout.n_var
         n_legs = len(n_list)
         c_kms = self._propulsion.isp_s * G0_MPS2 / 1000.0
 
-        # -- 解包决策向量 --
+        # -- 解包决策变量 --
         dv_list: list[npt.NDArray[np.floating]] = []
         for leg, n in enumerate(n_list):
             off = layout.imp_offsets[leg]
@@ -1962,16 +1672,11 @@ class SimsFlanaganMultiLegProblem:
         prefix = np.concatenate([[0.0], np.cumsum(dv_norms)[:-1]])
         m_bar = self._m0_kg * np.exp(-prefix / c_kms)
 
-        # -- 逐 leg pass（锚定解耦：位置匹配由锚定结构性满足）--
-        fwd_states: list[npt.NDArray[np.floating]] = []
-        bwd_states: list[npt.NDArray[np.floating]] = []
-        eq_raw: list[npt.NDArray[np.floating]] = []
-        r_mid_parts: list[npt.NDArray[np.floating]] = []
-        mid_pos_parts: list[npt.NDArray[np.floating]] = []
-        sens_f: list[npt.NDArray[np.floating]] = []
-        sens_b: list[npt.NDArray[np.floating]] = []
-        spos_parts: list[npt.NDArray[np.floating]] = []
+        # -- 逐 leg 组装（锚定解耦：位置匹配由锚定结构性满足）--
+        kernel = LegKernel(self._mu_km3_s2, dyn=self._eph_dyn)
+        shift_active = layout.tof_free and self._backend == "ephemeris"
         try:
+            requests: list[ChainLegRequest] = []
             for leg in range(n_legs):
                 n = n_list[leg]
                 dt = float(tofs[leg]) / n
@@ -1987,47 +1692,49 @@ class SimsFlanaganMultiLegProblem:
                     sens_f0 = np.zeros((6, n_var))
                     if node_prev.kind == "flyby":
                         anchor_f[3:] += vinf[leg - 1][1]
-                        sens_f0[:, vinf_cols[leg - 1][1] : vinf_cols[leg - 1][1] + 3] = _B_IMPULSE
+                        col = vinf_cols[leg - 1][1]
+                        sens_f0[:, col : col + 3] = _B_IMPULSE
                 # 后向锚：末节点/rendezvous 固定状态；flyby 速度含 v∞_in。
                 node_end = self._nodes[leg]
                 anchor_b = np.asarray(node_end.state, dtype=float).copy()
                 sens_b0 = np.zeros((6, n_var))
                 if node_end.kind == "flyby":
                     anchor_b[3:] += vinf[leg][0]
-                    sens_b0[:, vinf_cols[leg][0] : vinf_cols[leg][0] + 3] = _B_IMPULSE
-
-                f_out = self._leg_pass(
-                    anchor_f,
-                    sens_f0,
-                    dv_list[leg],
-                    dt,
-                    forward=True,
-                    imp_offset=layout.imp_offsets[leg],
-                    tof_col=tof_col,
-                    n_var=n_var,
-                    with_sens=with_sens,
-                    t_start=None if leg_t0 is None else leg_t0[leg],
+                    col = vinf_cols[leg][0]
+                    sens_b0[:, col : col + 3] = _B_IMPULSE
+                # 跨 leg 窗口平移列：前序 leg TOF 平移本 leg 整窗（前向锚窗随
+                # 前缀和平移；后向锚窗还含本 leg TOF——leg 末端历元随二者）。
+                shift_cols_f = None
+                shift_cols_b = None
+                if shift_active:
+                    prev = np.arange(layout.tof_off, layout.tof_off + leg)
+                    shift_cols_f = prev if prev.size else None
+                    assert tof_col is not None
+                    shift_cols_b = np.concatenate([prev, [tof_col]])
+                requests.append(
+                    ChainLegRequest(
+                        kernel=kernel,
+                        n_segments=n,
+                        imp_offset=layout.imp_offsets[leg],
+                        dv=dv_list[leg],
+                        dt=dt,
+                        t_start=None if leg_t0 is None else leg_t0[leg],
+                        tof_col=tof_col,
+                        anchor_f=anchor_f,
+                        anchor_b=anchor_b,
+                        anchor_sens_f=sens_f0,
+                        anchor_sens_b=sens_b0,
+                        shift_cols_f=shift_cols_f,
+                        shift_cols_b=shift_cols_b,
+                    )
                 )
-                b_out = self._leg_pass(
-                    anchor_b,
-                    sens_b0,
-                    dv_list[leg],
-                    dt,
-                    forward=False,
-                    imp_offset=layout.imp_offsets[leg],
-                    tof_col=tof_col,
-                    n_var=n_var,
-                    with_sens=with_sens,
-                    t_start=None if leg_t0 is None else leg_t0[leg],
-                )
-                fwd_states.append(f_out[0])
-                bwd_states.append(b_out[0])
-                eq_raw.append(f_out[0][-1] - b_out[0][0])
-                r_mid_parts.append(np.concatenate([f_out[2], b_out[2]]))
-                mid_pos_parts.append(np.concatenate([f_out[1], b_out[1]]))
-                sens_f.append(f_out[3])
-                sens_b.append(b_out[3])
-                spos_parts.append(np.concatenate([f_out[4], b_out[4]], axis=0))
+            leg_evals = evaluate_chain(
+                requests,
+                n_var=n_var,
+                len_scale=self._len_scale,
+                vel_scale=self._vel_scale,
+                with_sens=with_sens,
+            )
         except ValueError:
             # 线搜索试探点落在闭式 Kepler 病态能量带（近抛物线 Newton 发散）：
             # 深罚评估让 SLSQP 的 L1 罚函数回退步长，而不是让整个求解崩溃。
@@ -2040,9 +1747,13 @@ class SimsFlanaganMultiLegProblem:
                 with_sens=with_sens,
             )
 
+        fwd_states = [e.fwd_states for e in leg_evals]
+        bwd_states = [e.bwd_states for e in leg_evals]
+        eq_raw = [e.residual_raw for e in leg_evals]
+
         # -- 段可行域（全局时序质量链）--
-        r_mid = np.concatenate(r_mid_parts)
-        mid_pos = np.concatenate(mid_pos_parts)
+        r_mid = np.concatenate([e.r_mid for e in leg_evals])
+        mid_pos = np.concatenate([e.mid_pos for e in leg_evals])
         leg_of_seg = np.repeat(np.arange(n_legs), n_list)
         n_arr = np.asarray(n_list, dtype=float)
         dt_seg = tofs[leg_of_seg] / n_arr[leg_of_seg]
@@ -2050,11 +1761,20 @@ class SimsFlanaganMultiLegProblem:
         cap = thrust / m_bar * dt_seg / 1000.0
         ineq_seg = cap**2 - dv_norms**2
 
-        # -- flyby 约束（值 + 局部梯度）--
-        flyby_evals = [
-            self._flyby_constraints(vinf[j][0], vinf[j][1], self._nodes[j])
-            for j in layout.flyby_nodes
-        ]
+        # -- flyby 约束（值 + 局部梯度；节点参数逐 flyby 显式给出）--
+        flyby_evals: list[FlybyConstraintEval] = []
+        for j in layout.flyby_nodes:
+            node = self._nodes[j]
+            assert node.r_p_min_km is not None and node.mu_km3_s2 is not None
+            flyby_evals.append(
+                flyby_node_constraints(
+                    vinf[j][0],
+                    vinf[j][1],
+                    r_p_min_km=node.r_p_min_km,
+                    mu_km3_s2=node.mu_km3_s2,
+                    vel_scale=self._vel_scale,
+                )
+            )
 
         # -- 等式/不等式约束 --
         eq = np.concatenate(
@@ -2085,13 +1805,10 @@ class SimsFlanaganMultiLegProblem:
         eq_jac = None
         ineq_jac = None
         if with_sens:
-            eq_rows = []
-            for leg in range(n_legs):
-                sf, sb = sens_f[leg], sens_b[leg]
-                eq_rows.append(
-                    np.vstack([sf[:3] / self._len_scale, sf[3:] / self._vel_scale])
-                    - np.vstack([sb[:3] / self._len_scale, sb[3:] / self._vel_scale])
-                )
+            eq_rows: list[npt.NDArray[np.floating]] = []
+            for e in leg_evals:
+                assert e.eq_jac is not None  # with_sens=True 时 evaluate_chain 恒产出
+                eq_rows.append(e.eq_jac)
             for f, fe in enumerate(flyby_evals):
                 row = np.zeros(n_var)
                 base = layout.vinf_off + 6 * f
@@ -2108,7 +1825,7 @@ class SimsFlanaganMultiLegProblem:
                 m_bar,
                 dt_seg,
                 leg_of_seg,
-                np.concatenate(spos_parts, axis=0),
+                np.concatenate([e.spos for e in leg_evals], axis=0),
                 uhat,
                 c_kms,
                 flyby_evals,
