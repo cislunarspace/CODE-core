@@ -92,6 +92,12 @@ def _targets(node: ast.AST, rel: pathlib.Path) -> list[str]:
     return resolved
 
 
+def _file_module(rel: pathlib.Path) -> str:
+    """文件的完整模块路径；``__init__.py`` 解析为包自身。"""
+    stem = rel.with_suffix("").parts
+    return "e2m2e." + ".".join(stem[:-1] if stem[-1] == "__init__" else stem)
+
+
 def _forbidden_for(rel: pathlib.Path) -> set[str] | None:
     """该文件适用的禁入层集合；None 表示不受检。"""
     if len(rel.parts) == 1:  # 包根模块
@@ -107,8 +113,14 @@ def _forbidden_for(rel: pathlib.Path) -> set[str] | None:
 def check_file(path: pathlib.Path) -> list[str]:
     """检查单个文件的 import 方向，返回违规列表。"""
     rel = path.relative_to(ROOT)
-    forbidden = _forbidden_for(rel)
-    if not forbidden:
+    forbidden = _forbidden_for(rel) or set()
+    file_module = _file_module(rel)
+    package_rules = [
+        (src, dst)
+        for src, dst in PACKAGE_FORBIDDEN
+        if file_module == src or file_module.startswith(src + ".")
+    ]
+    if not forbidden and not package_rules:
         return []
     try:
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
@@ -126,21 +138,17 @@ def check_file(path: pathlib.Path) -> list[str]:
                     seen.add(key)
                     violations.append(f"{rel}:{line}: 越层 import {mod} (违反依赖方向)")
     # 包内方向规则（如 #748：solver 数值层不反向依赖 family 领域层）。
-    # ``__init__.py`` 解析为包自身，普通模块为 e2m2e.<pkg>.<module>。
-    stem = rel.with_suffix("").parts
-    file_module = "e2m2e." + ".".join(stem[:-1] if stem[-1] == "__init__" else stem)
-    for src, dst in PACKAGE_FORBIDDEN:
-        if file_module == src or file_module.startswith(src + "."):
-            for node in ast.walk(tree):
-                for mod in _targets(node, rel):
-                    if mod == dst or mod.startswith(dst + "."):
-                        line = getattr(node, "lineno", 0)
-                        key = (str(rel), line, mod)
-                        if key not in seen:
-                            seen.add(key)
-                            violations.append(
-                                f"{rel}:{line}: 包内反向依赖 import {mod} ({src} 不得依赖 {dst})"
-                            )
+    for src, dst in package_rules:
+        for node in ast.walk(tree):
+            for mod in _targets(node, rel):
+                if mod == dst or mod.startswith(dst + "."):
+                    line = getattr(node, "lineno", 0)
+                    key = (str(rel), line, mod)
+                    if key not in seen:
+                        seen.add(key)
+                        violations.append(
+                            f"{rel}:{line}: 包内反向依赖 import {mod} ({src} 不得依赖 {dst})"
+                        )
     return violations
 
 

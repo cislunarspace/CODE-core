@@ -539,8 +539,8 @@ class Continuation:
                 或改用 halo_pseudo_arclength_continuation(direction='both')。
             dc_config_selector: PAL 每步微分修正配置选择器，闭包契约
                 ``(sv0_corr, x0_last, z0_last, retry=False) -> CorrectionConfig | None``
-                （首试返回 None 表示不修正；retry=True 返回 None 表示无重试）；
-                选支逻辑由调用方家族模块提供，
+                （首试返回 None 表示沿用当前修正配置；retry=True 返回 None
+                表示无重试）；选支逻辑由调用方家族模块提供，
                 见 ``family.halo_family.halo_dc_config_selector``。
             target_vector: 与 MATLAB TargetVector 对应的 0 基下标
                 （0=rx, 1=rz, 2=vy, 3=T/2）。
