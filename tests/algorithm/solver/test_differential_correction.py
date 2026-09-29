@@ -7,6 +7,14 @@
 import numpy as np
 import pytest
 
+from e2m2e.algorithm.family.strategies import (
+    symmetric_2d_fixed_t,
+    symmetric_2d_fixed_x0,
+    symmetric_2d_fixed_y0,
+    symmetric_3d_fixed_x0,
+    symmetric_xz_fixed_x0,
+    symmetric_xz_fixed_z0,
+)
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.types.orbit import Orbit
 
@@ -24,10 +32,10 @@ pytestmark = pytest.mark.orchestration
 class TestSetup:
     """测试各种对称性配置的正确性"""
 
-    def test_setup_2d_symmetric_x_fixed_x0(self, dro_dynamics):
+    def test_configure_symmetric_2d_fixed_x0(self, dro_dynamics):
         """2D对称x轴、固定x0配置"""
         corrector = DifferentialCorrection(dro_dynamics)
-        result = corrector.setup_2D_symmetric_x_fixed_x0(x0=0.8)
+        result = corrector.configure(symmetric_2d_fixed_x0(0.8))
 
         assert result is corrector
         assert corrector.setup_type == "2D_symmetric_x_fixed_x0"
@@ -37,10 +45,10 @@ class TestSetup:
         assert corrector.target_conditions == {"y": 0.0, "x_dot": 0.0}
         assert corrector.fixed_parameters["x0"] == 0.8
 
-    def test_setup_2d_symmetric_x_fixed_t(self, dro_dynamics):
+    def test_configure_symmetric_2d_fixed_t(self, dro_dynamics):
         """2D对称x轴、固定T配置"""
         corrector = DifferentialCorrection(dro_dynamics)
-        result = corrector.setup_2D_symmetric_x_fixed_t(t_half=3.0)
+        result = corrector.configure(symmetric_2d_fixed_t(3.0))
 
         assert result is corrector
         assert corrector.setup_type == "2D_symmetric_x_fixed_t"
@@ -53,7 +61,7 @@ class TestSetup:
         # 配置修正器
         t_half = 2.5
         corrector = DifferentialCorrection(dro_dynamics)
-        corrector.setup_2D_symmetric_x_fixed_t(t_half=t_half)
+        corrector.configure(symmetric_2d_fixed_t(t_half))
 
         # DRO 的初始猜测
         x0_guess = 0.6
@@ -79,10 +87,10 @@ class TestSetup:
             assert result.status.value == "converged"
         # 如果 result_orbit 为 None，可能是初始猜测导致发散，不强制失败
 
-    def test_setup_3d_symmetric_x_fixed_x0(self, dro_dynamics):
+    def test_configure_symmetric_3d_fixed_x0(self, dro_dynamics):
         """3D对称x轴、固定x0配置（Halo轨道）"""
         corrector = DifferentialCorrection(dro_dynamics)
-        result = corrector.setup_3D_symmetric_x_fixed_x0(x0=0.8)
+        result = corrector.configure(symmetric_3d_fixed_x0(0.8))
 
         assert result is corrector
         assert corrector.setup_type == "3D_symmetric_x_fixed_x0"
@@ -91,28 +99,28 @@ class TestSetup:
         assert corrector.constraint_indices == [1, 3, 5]
         assert corrector.target_conditions == {"y": 0.0, "x_dot": 0.0, "z_dot": 0.0}
 
-    def test_setup_3d_symmetric_xz_fixed_x0(self, dro_dynamics):
+    def test_configure_symmetric_xz_fixed_x0(self, dro_dynamics):
         """3D XZ对称、固定x0配置"""
         corrector = DifferentialCorrection(dro_dynamics)
-        corrector.setup_3D_symmetric_xz_fixed_x0(x0=0.8)
+        corrector.configure(symmetric_xz_fixed_x0(0.8))
 
         assert corrector.setup_type == "3D_symmetric_xz_fixed_x0"
         assert corrector.free_variable_indices == [2, 4, 6]
         assert corrector.constraint_indices == [1, 3, 5]
 
-    def test_setup_3d_symmetric_xz_fixed_z0(self, dro_dynamics):
+    def test_configure_symmetric_xz_fixed_z0(self, dro_dynamics):
         """3D XZ对称、固定z0配置"""
         corrector = DifferentialCorrection(dro_dynamics)
-        corrector.setup_3D_symmetric_xz_fixed_z0(z0=0.1)
+        corrector.configure(symmetric_xz_fixed_z0(0.1))
 
         assert corrector.setup_type == "3D_symmetric_xz_fixed_z0"
         assert corrector.free_variable_indices == [0, 4, 6]
         assert corrector.fixed_parameters["z0"] == 0.1
 
-    def test_setup_2d_symmetric_y_fixed_y0(self, dro_dynamics):
+    def test_configure_symmetric_2d_fixed_y0(self, dro_dynamics):
         """2D对称y轴、固定y0配置（RO轨道）"""
         corrector = DifferentialCorrection(dro_dynamics)
-        result = corrector.setup_2D_symmetric_y_fixed_y0(y0=0.4633)
+        result = corrector.configure(symmetric_2d_fixed_y0(0.4633))
 
         assert result is corrector
         assert corrector.setup_type == "2D_symmetric_y_fixed_y0"
@@ -123,20 +131,20 @@ class TestSetup:
         assert corrector.target_conditions == {"x": 0.0, "x_dot": 0.0}
         assert corrector.fixed_parameters["y0"] == 0.4633
 
-    def test_setup_2d_symmetric_y_fixed_y0_default(self, dro_dynamics):
+    def test_configure_symmetric_2d_fixed_y0_default(self, dro_dynamics):
         """2D对称y轴配置默认y0=0"""
         corrector = DifferentialCorrection(dro_dynamics)
-        corrector.setup_2D_symmetric_y_fixed_y0()
+        corrector.configure(symmetric_2d_fixed_y0())
 
         assert corrector.fixed_parameters["y0"] == 0.0
 
-    def test_setup_resets_history(self, dro_dynamics):
+    def test_configure_resets_history(self, dro_dynamics):
         """配置时应重置收敛历史"""
         corrector = DifferentialCorrection(dro_dynamics)
         corrector.error_history = [1.0, 0.5]
         corrector._converged = True
 
-        corrector.setup_2D_symmetric_x_fixed_x0(x0=0.8)
+        corrector.configure(symmetric_2d_fixed_x0(0.8))
 
         assert corrector.error_history == []
         assert corrector._converged is False
@@ -185,7 +193,7 @@ class TestIntegrationTolerance:
 
         monkeypatch.setattr(dc_module, "differential_correction_cr3bp_py", fake_kernel)
         corrector = DifferentialCorrection(dro_dynamics, integration_rtol=1e-9)
-        corrector.setup_2D_symmetric_x_fixed_t(t_half=2.5)
+        corrector.configure(symmetric_2d_fixed_t(2.5))
         seed = np.zeros(6)
         seed[0] = 0.8
         corrector._iterate_rust(seed, 2.5, full_period=False, verbose=False, callback=None)
@@ -353,7 +361,7 @@ class TestFailureCases:
     def test_bad_initial_guess_returns_none(self, dro_dynamics):
         """极差的初始猜测应返回None或发散"""
         corrector = DifferentialCorrection(dro_dynamics)
-        corrector.setup_2D_symmetric_x_fixed_x0(x0=0.5)
+        corrector.configure(symmetric_2d_fixed_x0(0.5))
         corrector.max_iterations = 5
 
         bad_guess = Orbit(states=[[0.5, 0.0, 0.0, 0.0, 10.0, 0.0]], times=[0])

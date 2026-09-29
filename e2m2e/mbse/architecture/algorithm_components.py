@@ -45,7 +45,7 @@ ALGORITHM_COMPONENTS = [
     ),
     Component(
         name="CorrectionConfig",
-        module_path="e2m2e.algorithm.family.strategies.base",
+        module_path="e2m2e.algorithm.solver.differential_correction",
         layer="algorithm",
         description="Immutable correction strategy configuration",
     ),

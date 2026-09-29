@@ -64,6 +64,14 @@ from .lissajous_initial_guess import (
 )
 from .lpo_initial_guess import compute_lpo_initial_guess
 from .spo_initial_guess import compute_spo_initial_guess
+from .strategies import (
+    axial_fixed_vz0,
+    halo_fixed_x0,
+    halo_fixed_z0,
+    lpo_fixed_x0,
+    spo_fixed_x0,
+    symmetric_2d_fixed_x0,
+)
 from .triangular_initial_guess import compute_triangular_initial_guess
 
 _LYAPUNOV_SEED_DX = 0.01
@@ -236,7 +244,7 @@ def _correct_dro(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
         assert guess.period is not None
         period = guess.period
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(x0=x0)
+    corrector.configure(symmetric_2d_fixed_x0(x0=x0))
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = period
     orbit = _correct_or_raise(corrector, seed, f"DRO(x0={x0:.6f})")
@@ -253,7 +261,7 @@ def _correct_dro(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
 def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Orbit:
     """在近侧 x 轴穿越点 ``x0`` 处修正 DPO（固定 x0，自由 vy0 与半周期）。
 
-    DPO 与 DRO 使用相同修正策略（``setup_2D_symmetric_x_fixed_x0``），
+    DPO 与 DRO 使用相同修正策略（``symmetric_2d_fixed_x0``），
     但 vy0 < 0（顺行）。种子从反转 DRO vy0 的微分修正收敛获得。
 
     DPO 族不稳定，族行走时 vy0 与 x0 的映射关系比 DRO 更非线性。
@@ -274,7 +282,7 @@ def _correct_dpo(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit | None) -> Or
         assert guess.period is not None
         period = guess.period
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(x0=x0)
+    corrector.configure(symmetric_2d_fixed_x0(x0=x0))
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = period
     orbit = _correct_or_raise(corrector, seed, f"DPO(x0={x0:.6f})")
@@ -553,7 +561,7 @@ def _correct_ro(dynamics: CR3BP_Dynamics, x0: float, guess: Orbit) -> Orbit:
     assert guess.period is not None
     period = guess.period
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(x0=x0)
+    corrector.configure(symmetric_2d_fixed_x0(x0=x0))
     # 族折返点附近的 STM 修正量可小于默认停滞阈值，但残差仍能继续
     # 降到收敛容差；过早判停会把真实共振支误报为不可达。
     corrector.stagnation_limit = 1e-16
@@ -608,7 +616,7 @@ def _correct_halo(
         assert guess.period is not None
         period = guess.period
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_halo_orbit_fixed_z0(z0=z0, libration_point=libration_point)
+    corrector.configure(halo_fixed_z0(z0=z0, libration_point=libration_point))
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = period
     orbit = _correct_or_raise(corrector, seed, f"Halo(L{libration_point}, z0={z0:.6f})")
@@ -634,7 +642,7 @@ def _correct_halo_x0(
     state = guess.states[0].copy()
     state[0] = x0
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_halo_orbit_fixed_x0(x0=x0, libration_point=libration_point)
+    corrector.configure(halo_fixed_x0(x0=x0, libration_point=libration_point))
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = guess.period
     return _correct_or_raise(corrector, seed, f"Halo(L{libration_point}, x0={x0:.6f})")
@@ -662,7 +670,7 @@ def _correct_axial(
         assert guess.period is not None
         period = guess.period
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_axial_orbit_fixed_vz0(vz0=vz0, libration_point=libration_point)
+    corrector.configure(axial_fixed_vz0(vz0=vz0, libration_point=libration_point))
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = period
     orbit = _correct_or_raise(corrector, seed, f"Axial(L{libration_point}, vz0={vz0:.6f})")
@@ -1351,7 +1359,7 @@ def _correct_spo(
         period = guess.period
 
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_spo_fixed_x0(x0=x0, libration_point=libration_point)
+    corrector.configure(spo_fixed_x0(x0=x0, libration_point=libration_point))
     seed = Orbit(
         states=state.reshape(1, -1),
         times=np.array([0.0]),
@@ -1544,7 +1552,7 @@ def _correct_lpo(
     dynamics.max_step = max(dynamics.max_step, 0.1)
     try:
         corrector = DifferentialCorrection(dynamics)
-        corrector.setup_lpo_fixed_x0(x0=x0, libration_point=libration_point)
+        corrector.configure(lpo_fixed_x0(x0=x0, libration_point=libration_point))
         seed = Orbit(
             states=state.reshape(1, -1),
             times=np.array([0.0]),

@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
+from e2m2e.algorithm.family.strategies import symmetric_2d_fixed_x0
 from e2m2e.algorithm.solver.continuation import Continuation
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.constants import Datum
@@ -68,7 +69,7 @@ def _corrected_dro_cached(dro_seed_orbit) -> Orbit:
     system = _make_earth_moon_system()
     dynamics = CR3BP_Dynamics(system)
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(DRO_X0)
+    corrector.configure(symmetric_2d_fixed_x0(DRO_X0))
     return corrector.iterate_correction(dro_seed_orbit, verbose=False).orbit
 
 
@@ -84,7 +85,7 @@ def dro_corrector() -> DifferentialCorrection:
     system = _make_earth_moon_system()
     dynamics = CR3BP_Dynamics(system)
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(DRO_X0)
+    corrector.configure(symmetric_2d_fixed_x0(DRO_X0))
     return corrector
 
 

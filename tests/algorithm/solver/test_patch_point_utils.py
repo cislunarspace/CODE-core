@@ -47,6 +47,7 @@ DRO_31_PERIOD = 2.095
 
 @pytest.fixture
 def dro_orbit(cr3bp_dynamics):
+    from e2m2e.algorithm.family.strategies import symmetric_2d_fixed_x0
     from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 
     seed_state = np.array([DRO_31_X0, 0.0, 0.0, 0.0, DRO_31_VY0, 0.0])
@@ -54,7 +55,7 @@ def dro_orbit(cr3bp_dynamics):
     seed_orbit.period = DRO_31_PERIOD
 
     corrector = DifferentialCorrection(cr3bp_dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(DRO_31_X0)
+    corrector.configure(symmetric_2d_fixed_x0(DRO_31_X0))
     result = corrector.iterate_correction(seed_orbit, verbose=False)
 
     assert result.status is ConvergenceState.CONVERGED

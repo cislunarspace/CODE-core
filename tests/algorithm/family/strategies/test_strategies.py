@@ -122,7 +122,7 @@ class TestHaloStrategies:
 class TestStrategyIntegration:
     """策略与 DifferentialCorrection 集成"""
 
-    def test_setup_delegates_to_strategy(self):
+    def test_configure_applies_strategy(self):
         from e2m2e.algorithm.dynamics import CR3BP_System
         from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
         from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
@@ -133,13 +133,13 @@ class TestStrategyIntegration:
         dynamics = CR3BP_Dynamics(system)
         dc = DifferentialCorrection(dynamics)
 
-        dc.setup_2D_symmetric_x_fixed_x0(x0=0.5)
+        dc.configure(symmetric_2d_fixed_x0(x0=0.5))
         assert dc.setup_type == "2D_symmetric_x_fixed_x0"
         assert dc.free_variable_indices == [4, 6]
         assert dc.constraint_indices == [1, 3]
         assert dc.fixed_parameters.get("x0") == 0.5
 
-    def test_setup_halo_delegates(self):
+    def test_configure_halo(self):
         from e2m2e.algorithm.dynamics import CR3BP_System
         from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
         from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
@@ -150,6 +150,6 @@ class TestStrategyIntegration:
         dynamics = CR3BP_Dynamics(system)
         dc = DifferentialCorrection(dynamics)
 
-        dc.setup_halo_orbit_fixed_z0(z0=0.1, libration_point=1)
+        dc.configure(halo_fixed_z0(z0=0.1, libration_point=1))
         assert dc.setup_type == "halo_orbit_fixed_z0"
         assert dc.free_variable_indices == [0, 4, 6]

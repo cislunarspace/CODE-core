@@ -7,6 +7,7 @@
 import numpy as np
 import pytest
 
+from e2m2e.algorithm.family.strategies import symmetric_2d_fixed_x0, symmetric_3d_fixed_x0
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.types.orbit import Orbit
 
@@ -68,7 +69,7 @@ class TestPeriodicFlag:
         """closure_error 较大时，轨道不应被标记为周期轨道"""
         # 创建一个 closure_error 会很大的情况
         corrector = DifferentialCorrection(dro_dynamics)
-        corrector.setup_2D_symmetric_x_fixed_x0(x0=0.5)
+        corrector.configure(symmetric_2d_fixed_x0(0.5))
         corrector.max_iterations = 1  # 限制迭代次数
 
         # 使用一个不太好的初始猜测
@@ -148,7 +149,7 @@ class TestFamilyTypeInference:
     def test_3d_orbit_family_type_halo(self, dro_dynamics):
         """3D 对称轨道应该被识别为 halo 类型"""
         corrector = DifferentialCorrection(dro_dynamics)
-        corrector.setup_3D_symmetric_x_fixed_x0(x0=0.8)
+        corrector.configure(symmetric_3d_fixed_x0(0.8))
 
         # 创建 3D 初始猜测
         z0 = 0.01
@@ -181,7 +182,7 @@ class TestBoundaryCases:
     def test_none_result_handling(self, dro_dynamics):
         """测试修正失败返回 None 的情况"""
         corrector = DifferentialCorrection(dro_dynamics)
-        corrector.setup_2D_symmetric_x_fixed_x0(x0=0.3)
+        corrector.configure(symmetric_2d_fixed_x0(0.3))
         corrector.max_iterations = 1
 
         # 使用一个会失败的初始猜测

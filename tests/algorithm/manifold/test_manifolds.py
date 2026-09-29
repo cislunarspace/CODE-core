@@ -12,6 +12,7 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.family.halo_initial_guess import _compute_gamma
+from e2m2e.algorithm.family.strategies import symmetric_2d_fixed_x0
 from e2m2e.algorithm.manifold import InvariantManifold, ManifoldKind, PoincareSection
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.constants import Datum
@@ -54,7 +55,7 @@ def _make_l1_lyapunov_orbit() -> Orbit:
     period_guess = 2 * np.pi / eigenvalues[idx].imag
 
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(x0)
+    corrector.configure(symmetric_2d_fixed_x0(x0))
     seed = Orbit(states=[[x0, 0, 0, 0, vy0, 0]], times=[0], system=system)
     seed.period = period_guess
     result = corrector.iterate_correction(seed, verbose=False)

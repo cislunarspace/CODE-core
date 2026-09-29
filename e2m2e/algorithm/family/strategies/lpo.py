@@ -12,7 +12,7 @@ References:
 
 from __future__ import annotations
 
-from .base import CorrectionConfig
+from ...solver.differential_correction import CorrectionConfig
 
 
 def lpo_fixed_x0(x0: float, libration_point: int = 5) -> CorrectionConfig:

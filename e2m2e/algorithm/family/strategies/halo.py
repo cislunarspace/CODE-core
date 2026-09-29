@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .base import CorrectionConfig
+from ...solver.differential_correction import CorrectionConfig
 
 
 def halo_fixed_z0(z0: float, libration_point: int = 1) -> CorrectionConfig:

@@ -5,8 +5,8 @@
 使配置逻辑与迭代求解器分离。
 """
 
+from ...solver.differential_correction import CorrectionConfig
 from .axial import axial_fixed_vz0
-from .base import CorrectionConfig
 from .halo import halo_fixed_x0, halo_fixed_z0
 from .lpo import lpo_fixed_x0
 from .spo import spo_fixed_x0
