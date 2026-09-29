@@ -56,7 +56,7 @@ def generate_rust_family_windows(
     零成员时该窗口结果为零成员的结构化软失败（状态可查）。
     """
     if dynamics is None:
-        from .cr3bp_orbits import earth_moon_system
+        from .orbits.walk import earth_moon_system
 
         dynamics = CR3BP_Dynamics(earth_moon_system())
     characteristic_length = dynamics.system.characteristic_length

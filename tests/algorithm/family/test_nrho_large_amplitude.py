@@ -13,7 +13,7 @@ import pytest
 
 from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.family import design_nrho
-from e2m2e.algorithm.family.cr3bp_orbits import MOON_RADIUS_KM
+from e2m2e.data.templates import MOON_RADIUS_KM
 
 pytestmark = pytest.mark.orchestration
 

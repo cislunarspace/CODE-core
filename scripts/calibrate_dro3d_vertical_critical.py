@@ -37,11 +37,8 @@ import numpy as np
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.family.axial_initial_guess import _vertical_trace
-from e2m2e.algorithm.family.cr3bp_orbits import (
-    _correct_dro,
-    _moon_distance_minmax,
-    _z_amplitude_max,
-)
+from e2m2e.algorithm.family.orbits.dro import _correct_dro
+from e2m2e.algorithm.family.orbits.walk import _moon_distance_minmax, _z_amplitude_max
 from e2m2e.algorithm.stability import (
     BifurcationType,
     FamilyBifurcationPoint,
@@ -57,7 +54,7 @@ from e2m2e.data.types.orbit import Orbit
 #: ``abs(vt_mid - 1.0) < 1e-4`` 同口径
 _VT_TOL = 1e-4
 
-#: 延拓步长下限；与 ``e2m2e/algorithm/family/cr3bp_orbits.py::_walk_family``
+#: 延拓步长下限；与 ``e2m2e/algorithm/family/orbits/walk.py::_walk_family``
 #: 的 ``step *= 0.5; if step < 1e-4`` 退半步重试下限一致
 _MIN_WALK_STEP = 1e-4
 

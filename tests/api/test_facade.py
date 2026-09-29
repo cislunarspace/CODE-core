@@ -95,7 +95,7 @@ class TestFacadeDelegation:
         """RO：校验层放行并把共振比传给算法层；响应对参考轨道实测打标（#627）。"""
         import e2m2e.algorithm.design as design_module
         from e2m2e.algorithm.design.design_orbit import OrbitDesignResult
-        from e2m2e.algorithm.family.cr3bp_orbits import design_ro
+        from e2m2e.algorithm.family import design_ro
         from e2m2e.data.types.trajectory import EphemerisTable
 
         ro_orbit = design_ro(3, 1)

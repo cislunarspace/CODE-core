@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from e2m2e.algorithm.family.cr3bp_orbits import design_lyapunov
+from e2m2e.algorithm.family import design_lyapunov
 from e2m2e.integrators import orbit_family_metric_py
 
 pytestmark = pytest.mark.orchestration

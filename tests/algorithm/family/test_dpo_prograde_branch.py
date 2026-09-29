@@ -13,12 +13,8 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
-from e2m2e.algorithm.family.cr3bp_orbits import (
-    Cr3bpOrbitError,
-    _correct_dpo,
-    design_dpo,
-    earth_moon_system,
-)
+from e2m2e.algorithm.family import Cr3bpOrbitError, design_dpo, earth_moon_system
+from e2m2e.algorithm.family.orbits.dro import _correct_dpo
 from e2m2e.data.types.orbit import Orbit
 
 pytestmark = pytest.mark.orchestration
