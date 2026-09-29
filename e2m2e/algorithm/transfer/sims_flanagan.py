@@ -30,8 +30,17 @@ SLSQP 数值差分。约束按问题尺度归一（位置除以边界距离尺�
 
 ## 双档结构（ADR 0050）
 
-``backend`` 为必填关键字参数：``"conic"``（本期实现）或 ``"ephemeris"``（未
-实现，显式报错不静默回退，ADR 0050 理由 6）；其余取值 ``ValueError``。
+``backend`` 为必填关键字参数：``"conic"``（二体封闭解，:func:`propagate_kepler_py`）
+或 ``"ephemeris"``（星历 N 体数值传播，#727）均已实现；其余取值 ``ValueError``。
+ephemeris 档必填 ``epoch_et_s``（出发历元 SPICE et 秒，TDB past J2000）与
+``ephemeris_system``（:class:`~e2m2e.algorithm.dynamics.EphemerisSystem` 实例，
+``bodies`` 须含 ``origin``——中心引力项由 origin 提供）；段中冲量、匹配点约束、
+成本函数、SLSQP 求解与软失败三元组结构两档共用，仅半段传播内核与 TOF 灵敏度
+链 RHS 换为 ``EphemerisDynamics``（Rust ``propagate_with_stm_py``，含 STM、
+支持后向）。星历档节点状态仍是约束数据、锚定在名义历元（出发历元 + 名义 TOF
+前缀和）；``min_time``/``weighted`` 下 TOF 决策变量移动 leg 时序时，节点状态
+**不**随历元重查星历（保持 conic 档"节点状态是数据"语义；逐 leg 重定目标归
+#726 裁决）。
 
 ## 多 leg 链与节点（#741）
 
@@ -92,6 +101,7 @@ from e2m2e.data.constants import AU_KM
 from e2m2e.integrators import propagate_kepler_py, require_rust_extension
 
 from ...status import ConvergenceState, FailureCause, ResultStatus
+from ..dynamics import EphemerisDynamics, EphemerisSystem
 from ..results import scipy_slsqp_status
 from .mga import flyby_pericenter_radius, flyby_turn_angle
 from .sep import (
@@ -138,6 +148,52 @@ _CAP_BOX_FACTOR = 3.0
 _PENALTY_OBJECTIVE = 1e9
 _PENALTY_EQ = 1e3
 _PENALTY_INEQ = -1e3
+
+
+def _propagate_half(
+    x: npt.NDArray[np.floating],
+    t_start: float | None,
+    half: float,
+    *,
+    mu_km3_s2: float,
+    dyn: EphemerisDynamics | None,
+    with_stm: bool,
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating] | None]:
+    """半段传播内核：conic 封闭解 / 星历 N 体数值传播（#727 双档）。
+
+    conic 档忽略 ``t_start``（二体时间不变）；星历档在绝对历元
+    ``[t_start, t_start + half]`` 上数值传播（``half < 0`` 即后向）。
+    返回 ``(x_out, Φ(6,6) 或 None)``。
+    """
+    if dyn is None:
+        out = propagate_kepler_py(x.tolist(), [half], mu_km3_s2, with_stm=with_stm)
+        x_out = np.asarray(out["states"][0], dtype=float)
+        phi = np.asarray(out["stm"][0], dtype=float).reshape(6, 6) if with_stm else None
+    else:
+        if t_start is None:
+            raise ValueError("ephemeris 档传播必须提供绝对历元 t_start")
+        out = dyn.propagate(
+            x, (t_start, t_start + half), t_eval=[t_start + half], with_stm=with_stm
+        )
+        x_out = np.asarray(out["states"][-1], dtype=float)
+        phi = np.asarray(out["stm"][-1], dtype=float) if with_stm else None
+    return x_out, phi
+
+
+def _tier_rhs(
+    t: float | None,
+    x: npt.NDArray[np.floating],
+    *,
+    mu_km3_s2: float,
+    dyn: EphemerisDynamics | None,
+) -> npt.NDArray[np.floating]:
+    """TOF 灵敏度链 RHS：conic 二体 ``[v; −μr/|r|³]`` / 星历 ``equations_of_motion(t, x)``。"""
+    if dyn is None:
+        r = x[:3]
+        return np.concatenate([x[3:], -mu_km3_s2 * r / float(np.linalg.norm(r)) ** 3])
+    if t is None:
+        raise ValueError("ephemeris 档 RHS 必须提供绝对历元 t")
+    return np.asarray(dyn.equations_of_motion(t, x), dtype=float)
 
 
 def _plane_change_deg(
@@ -356,7 +412,7 @@ class _Evaluation:
 
 
 class SimsFlanaganProblem:
-    """单 leg 出发→到达交会的 Sims-Flanagan 预设计问题（conic 档）。
+    """单 leg 出发→到达交会的 Sims-Flanagan 预设计问题（conic / ephemeris 双档）。
 
     Args:
         departure_state: 出发状态 ``[r, v]``，``(6,)``，km / km/s。
@@ -365,8 +421,13 @@ class SimsFlanaganProblem:
         propulsion: 推进配置（:class:`SimsFlanaganPropulsion`）。
         initial_mass_kg: 出发质量（kg），必须为正。
         mu_km3_s2: 中心天体引力常数（km³/s²），必须为正。
-        backend: 保真度档位，必填关键字：``"conic"`` 或 ``"ephemeris"``；
-            ``"ephemeris"`` 本期未实现，显式报错（ADR 0050 理由 6）。
+        backend: 保真度档位，必填关键字：``"conic"``（二体封闭解）或
+            ``"ephemeris"``（星历 N 体数值传播，#727）；其余取值报错。
+        epoch_et_s: ephemeris 档必填：出发历元 SPICE et 秒（TDB past
+            J2000）；conic 档必须为 None。
+        ephemeris_system: ephemeris 档必填：``EphemerisSystem`` 实例
+            （``bodies`` 须含 ``origin``，中心引力项由 origin 提供）；conic
+            档必须为 None。
     """
 
     def __init__(
@@ -379,6 +440,8 @@ class SimsFlanaganProblem:
         mu_km3_s2: float,
         *,
         backend: str,
+        epoch_et_s: float | None = None,
+        ephemeris_system: EphemerisSystem | None = None,
     ) -> None:
         departure = np.asarray(departure_state, dtype=float)
         arrival = np.asarray(arrival_state, dtype=float)
@@ -402,8 +465,40 @@ class SimsFlanaganProblem:
         propulsion.validate()
         if backend not in ("conic", "ephemeris"):
             raise ValueError(f"backend 必须为 'conic' 或 'ephemeris'，得到 {backend!r}")
+        self._backend = backend
+        self._epoch_et_s: float | None = None
+        self._eph_dyn: EphemerisDynamics | None = None
         if backend == "ephemeris":
-            raise ValueError("ephemeris 档未实现（当前仅支持 conic 档）")
+            if epoch_et_s is None:
+                raise ValueError(
+                    "backend='ephemeris' 必须提供 epoch_et_s（SPICE et 秒，TDB past J2000）"
+                )
+            if ephemeris_system is None:
+                raise ValueError(
+                    "backend='ephemeris' 必须提供 ephemeris_system（EphemerisSystem 实例）"
+                )
+            if not isinstance(ephemeris_system, EphemerisSystem):
+                raise ValueError(
+                    "ephemeris_system 必须为 EphemerisSystem 实例，得到 "
+                    f"{type(ephemeris_system).__name__}"
+                )
+            if not np.isfinite(float(epoch_et_s)):
+                raise ValueError(f"epoch_et_s 必须为有限数，得到 {epoch_et_s!r}")
+            if ephemeris_system.origin not in ephemeris_system.bodies:
+                raise ValueError(
+                    f"ephemeris_system.bodies 须包含 origin 天体 {ephemeris_system.origin!r}"
+                    "（中心引力项由 origin 提供）"
+                )
+            self._epoch_et_s = float(epoch_et_s)
+            self._eph_dyn = EphemerisDynamics(system=ephemeris_system)
+            # 60 s 上限是 LEO 短弧调优值；置 inf 后经 _get_max_step 变为逐半段
+            # span/10，避免日量级段被强加 60 s 步长（性能）。容差保持默认 1e-12。
+            self._eph_dyn.max_step = float("inf")
+        elif epoch_et_s is not None or ephemeris_system is not None:
+            raise ValueError(
+                "backend='conic' 不接受 epoch_et_s/ephemeris_system"
+                "（星历上下文仅 ephemeris 档使用）"
+            )
 
         self._departure = departure.copy()
         self._arrival = arrival.copy()
@@ -573,7 +668,14 @@ class SimsFlanaganProblem:
     # ---- 内部：段传播与灵敏度 ----
 
     def _forward_pass(
-        self, dv: npt.NDArray[np.floating], n: int, m: int, dt: float, *, with_sens: bool
+        self,
+        dv: npt.NDArray[np.floating],
+        n: int,
+        m: int,
+        dt: float,
+        *,
+        with_sens: bool,
+        t_start: float | None = None,
     ) -> tuple[
         npt.NDArray[np.floating],
         npt.NDArray[np.floating],
@@ -582,6 +684,8 @@ class SimsFlanaganProblem:
         npt.NDArray[np.floating],
     ]:
         """前向 pass：出发态经段 0..m-1 接龙（段中冲量）到匹配节点。
+
+        ``t_start`` 为本 leg 起始绝对历元（ephemeris 档必填，conic 档忽略）。
 
         返回 ``(节点状态 (m+1,6), 段中点位置 (m,3), 段中点半径 (m,),
         ∂匹配节点/∂ΔV (6,3n), 段中点位置灵敏度 (m,3,3n))``。
@@ -593,28 +697,40 @@ class SimsFlanaganProblem:
         r_mid = np.zeros(m)
         sens = np.zeros((6, 3 * n))
         s_mid_pos = np.zeros((m, 3, 3 * n))
+        t = t_start
         for k in range(m):
-            out = propagate_kepler_py(x.tolist(), [half], self._mu_km3_s2, with_stm=with_sens)
-            x_mid = np.asarray(out["states"][0], dtype=float)
+            t_mid = None if t is None else t + half
+            x_mid, phi1 = _propagate_half(
+                x, t, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
+            )
             mid_pos[k] = x_mid[:3]
             r_mid[k] = float(np.linalg.norm(x_mid[:3]))
             if with_sens:
-                phi1 = np.asarray(out["stm"][0], dtype=float).reshape(6, 6)
+                assert phi1 is not None  # with_stm=True 时 _propagate_half 恒返回 STM
                 s_mid = phi1 @ sens
                 s_mid_pos[k] = s_mid[:3, :]
                 # 冲量是段中点的状态跳变：∂x_mid⁺/∂ΔV_k = s_mid[:,k] + B（无 Φ1）。
                 s_mid[:, 3 * k : 3 * k + 3] += _B_IMPULSE
             x_mid = x_mid + _B_IMPULSE @ dv[k]
-            out = propagate_kepler_py(x_mid.tolist(), [half], self._mu_km3_s2, with_stm=with_sens)
-            x = np.asarray(out["states"][0], dtype=float)
+            x, phi2 = _propagate_half(
+                x_mid, t_mid, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
+            )
             if with_sens:
-                phi2 = np.asarray(out["stm"][0], dtype=float).reshape(6, 6)
+                assert phi2 is not None
                 sens = phi2 @ s_mid
             states.append(x.copy())
+            t = None if t_mid is None else t_mid + half
         return np.asarray(states), mid_pos, r_mid, sens, s_mid_pos
 
     def _backward_pass(
-        self, dv: npt.NDArray[np.floating], n: int, m: int, dt: float, *, with_sens: bool
+        self,
+        dv: npt.NDArray[np.floating],
+        n: int,
+        m: int,
+        dt: float,
+        *,
+        with_sens: bool,
+        t_start: float | None = None,
     ) -> tuple[
         npt.NDArray[np.floating],
         npt.NDArray[np.floating],
@@ -623,6 +739,9 @@ class SimsFlanaganProblem:
         npt.NDArray[np.floating],
     ]:
         """后向 pass：到达态经段 n-1..m 反向接龙（内核支持负 dt）到匹配节点。
+
+        ``t_start`` 为本 leg 末端绝对历元（ephemeris 档必填，游标自它反向
+        递减；conic 档忽略）。
 
         返回 ``(节点状态 (n-m+1,6) [匹配节点..到达], 段中点位置 (n-m,3),
         段中点半径 (n-m,), ∂匹配节点/∂ΔV (6,3n), 段中点位置灵敏度 (n-m,3,3n))``。
@@ -638,25 +757,30 @@ class SimsFlanaganProblem:
         r_mid = np.zeros(nb)
         sens = np.zeros((6, 3 * n))
         s_mid_pos = np.zeros((nb, 3, 3 * n))
+        t = t_start
         for idx in range(nb):
             k = n - 1 - idx
-            out = propagate_kepler_py(x.tolist(), [half], self._mu_km3_s2, with_stm=with_sens)
-            x_mid = np.asarray(out["states"][0], dtype=float)
+            t_mid = None if t is None else t + half
+            x_mid, phi1 = _propagate_half(
+                x, t, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
+            )
             mid_pos[idx] = x_mid[:3]
             r_mid[idx] = float(np.linalg.norm(x_mid[:3]))
             if with_sens:
-                phi1 = np.asarray(out["stm"][0], dtype=float).reshape(6, 6)
+                assert phi1 is not None  # with_stm=True 时 _propagate_half 恒返回 STM
                 s_mid = phi1 @ sens
                 s_mid_pos[idx] = s_mid[:3, :]
                 # 后向冲量是段中点的反向状态跳变：v_pre = v_post − ΔV_k（无 Φ1）。
                 s_mid[:, 3 * k : 3 * k + 3] -= _B_IMPULSE
             x_mid = x_mid - _B_IMPULSE @ dv[k]
-            out = propagate_kepler_py(x_mid.tolist(), [half], self._mu_km3_s2, with_stm=with_sens)
-            x = np.asarray(out["states"][0], dtype=float)
+            x, phi2 = _propagate_half(
+                x_mid, t_mid, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
+            )
             if with_sens:
-                phi2 = np.asarray(out["stm"][0], dtype=float).reshape(6, 6)
+                assert phi2 is not None
                 sens = phi2 @ s_mid
             nodes.append(x.copy())
+            t = None if t_mid is None else t_mid + half
         # 遍历按 k 降序；段序数组翻转为升序（与索引 k-m 的消费方语义对齐）。
         return (
             np.asarray(nodes[::-1]),
@@ -712,10 +836,16 @@ class SimsFlanaganProblem:
 
         try:
             fwd_states, fwd_mid_pos, r_fwd, s_fwd, spos_fwd = self._forward_pass(
-                dv, n, m, dt, with_sens=with_sens
+                dv, n, m, dt, with_sens=with_sens, t_start=self._epoch_et_s
             )
             bwd_states, bwd_mid_pos, r_bwd, s_bwd, spos_bwd = self._backward_pass(
-                dv, n, m, dt, with_sens=with_sens
+                dv,
+                n,
+                m,
+                dt,
+                with_sens=with_sens,
+                # 后向自 leg 末端历元出发（ephemeris 档；conic 档为 None）。
+                t_start=None if self._epoch_et_s is None else self._epoch_et_s + self._tof_s,
             )
         except ValueError:
             # 线搜索试探点落在闭式 Kepler 的病态能量带（近抛物线 Newton 发散）：
@@ -1005,7 +1135,7 @@ class _MultiLegEvaluation:
 
 
 class SimsFlanaganMultiLegProblem:
-    """多 leg 链（rendezvous / flyby 节点）的 Sims-Flanagan 预设计问题（conic 档）。
+    """多 leg 链（rendezvous / flyby 节点）的 Sims-Flanagan 预设计问题（双档）。
 
     链结构：固定出发状态 → ``nodes[0]`` → … → ``nodes[-1]``，共 ``L = len(nodes)``
     个 leg。节点分两类（:class:`SimsFlanaganNode`）：
@@ -1019,7 +1149,10 @@ class SimsFlanaganMultiLegProblem:
       :func:`.mga.flyby_turn_angle` / :func:`.mga.flyby_pericenter_radius`）。
 
     质量 ``m̄ₖ = m₀·exp(−Σ_{j<k}‖ΔVⱼ‖/c)`` 按全部 leg 段的**全局时序**递推
-    （flyby 不改质量）。conic 档语义下节点状态是数据，不随 TOF 决策变量变化。
+    （flyby 不改质量）。两档语义下节点状态都是数据，不随 TOF 决策变量变化；
+    ephemeris 档的节点锚定在名义历元（出发历元 + 名义 TOF 前缀和），
+    ``min_time``/``weighted`` 下 TOF 决策变量移动 leg 时序时节点状态**不**随
+    历元重查星历（逐 leg 重定目标归 #726 裁决）。
 
     Args:
         departure_state: 出发状态 ``[r, v]`` ``(6,)``，km / km/s。
@@ -1028,8 +1161,13 @@ class SimsFlanaganMultiLegProblem:
         propulsion: 推进配置（:class:`SimsFlanaganPropulsion`）。
         initial_mass_kg: 出发质量（kg），必须为正。
         mu_km3_s2: 中心天体引力常数（km³/s²），必须为正。
-        backend: 保真度档位，必填关键字：``"conic"`` 或 ``"ephemeris"``；
-            ``"ephemeris"`` 未实现，显式报错（ADR 0050 理由 6）。
+        backend: 保真度档位，必填关键字：``"conic"``（二体封闭解）或
+            ``"ephemeris"``（星历 N 体数值传播，#727）；其余取值报错。
+        epoch_et_s: ephemeris 档必填：出发历元 SPICE et 秒（TDB past
+            J2000）；conic 档必须为 None。
+        ephemeris_system: ephemeris 档必填：``EphemerisSystem`` 实例
+            （``bodies`` 须含 ``origin``，中心引力项由 origin 提供）；conic
+            档必须为 None。
     """
 
     def __init__(
@@ -1042,6 +1180,8 @@ class SimsFlanaganMultiLegProblem:
         mu_km3_s2: float,
         *,
         backend: str,
+        epoch_et_s: float | None = None,
+        ephemeris_system: EphemerisSystem | None = None,
     ) -> None:
         departure = np.asarray(departure_state, dtype=float)
         if departure.shape != (6,):
@@ -1072,8 +1212,40 @@ class SimsFlanaganMultiLegProblem:
         propulsion.validate()
         if backend not in ("conic", "ephemeris"):
             raise ValueError(f"backend 必须为 'conic' 或 'ephemeris'，得到 {backend!r}")
+        self._backend = backend
+        self._epoch_et_s: float | None = None
+        self._eph_dyn: EphemerisDynamics | None = None
         if backend == "ephemeris":
-            raise ValueError("ephemeris 档未实现（当前仅支持 conic 档）")
+            if epoch_et_s is None:
+                raise ValueError(
+                    "backend='ephemeris' 必须提供 epoch_et_s（SPICE et 秒，TDB past J2000）"
+                )
+            if ephemeris_system is None:
+                raise ValueError(
+                    "backend='ephemeris' 必须提供 ephemeris_system（EphemerisSystem 实例）"
+                )
+            if not isinstance(ephemeris_system, EphemerisSystem):
+                raise ValueError(
+                    "ephemeris_system 必须为 EphemerisSystem 实例，得到 "
+                    f"{type(ephemeris_system).__name__}"
+                )
+            if not np.isfinite(float(epoch_et_s)):
+                raise ValueError(f"epoch_et_s 必须为有限数，得到 {epoch_et_s!r}")
+            if ephemeris_system.origin not in ephemeris_system.bodies:
+                raise ValueError(
+                    f"ephemeris_system.bodies 须包含 origin 天体 {ephemeris_system.origin!r}"
+                    "（中心引力项由 origin 提供）"
+                )
+            self._epoch_et_s = float(epoch_et_s)
+            self._eph_dyn = EphemerisDynamics(system=ephemeris_system)
+            # 60 s 上限是 LEO 短弧调优值；置 inf 后经 _get_max_step 变为逐半段
+            # span/10，避免日量级段被强加 60 s 步长（性能）。容差保持默认 1e-12。
+            self._eph_dyn.max_step = float("inf")
+        elif epoch_et_s is not None or ephemeris_system is not None:
+            raise ValueError(
+                "backend='conic' 不接受 epoch_et_s/ephemeris_system"
+                "（星历上下文仅 ephemeris 档使用）"
+            )
 
         self._departure = departure.copy()
         self._nodes = tuple(node_list)
@@ -1428,11 +1600,6 @@ class SimsFlanaganMultiLegProblem:
 
     # ---- 内部：评估 ----
 
-    def _kepler_rhs(self, x: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
-        """二体 RHS ``[v; −μr/|r|³]``（TOF 灵敏度链在传播**输出**态取值）。"""
-        r = x[:3]
-        return np.concatenate([x[3:], -self._mu_km3_s2 * r / float(np.linalg.norm(r)) ** 3])
-
     def _leg_pass(
         self,
         anchor_state: npt.NDArray[np.floating],
@@ -1445,6 +1612,7 @@ class SimsFlanaganMultiLegProblem:
         tof_col: int | None,
         n_var: int,
         with_sens: bool,
+        t_start: float | None = None,
     ) -> tuple[
         npt.NDArray[np.floating],
         npt.NDArray[np.floating],
@@ -1456,11 +1624,14 @@ class SimsFlanaganMultiLegProblem:
         段长 dt 可为 TOF 决策变量的函数）。
 
         ``forward=True`` 自前向锚接龙段 ``0..m−1``，否则自后向锚反向接龙段
-        ``m..n−1``（内核支持负 dt）。返回 ``(节点状态, 段中点位置, 段中点半径,
+        ``m..n−1``（内核支持负 dt）。``t_start`` 为本 leg **起始端**绝对历元
+        （ephemeris 档必填：前向游标自它出发，后向游标自 ``t_start + n·dt``
+        反向递减；conic 档忽略）。返回 ``(节点状态, 段中点位置, 段中点半径,
         匹配节点灵敏度 (6, n_var), 段中点位置灵敏度 (count, 3, n_var))``；后向
         的节点状态按 ``[匹配节点..锚]`` 排列、段序数组按段升序翻转（MVP 同语义）。
         锚速度灵敏度经 ``anchor_sens`` 进入链式递推；TOF 灵敏度在每次半段传播
-        后累加 ``RHS(x_out)·(±1/(2n))``（后向带负号）。
+        后累加 ``RHS(x_out)·(±1/(2n))``（后向带负号；RHS 按 backend 取二体
+        闭式或星历 ``equations_of_motion``，在传播**输出**时刻/态取值）。
         """
         n = dv.shape[0]
         m = n // 2
@@ -1474,28 +1645,41 @@ class SimsFlanaganMultiLegProblem:
         mid_pos = np.zeros((count, 3))
         r_mid = np.zeros(count)
         spos = np.zeros((count, 3, n_var))
+        t = None if t_start is None else (t_start if forward else t_start + n * dt)
         for idx, k in enumerate(seg_ids):
-            out = propagate_kepler_py(x.tolist(), [half], self._mu_km3_s2, with_stm=with_sens)
-            x_mid = np.asarray(out["states"][0], dtype=float)
+            t_mid = None if t is None else t + half
+            x_mid, phi1 = _propagate_half(
+                x, t, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
+            )
             mid_pos[idx] = x_mid[:3]
             r_mid[idx] = float(np.linalg.norm(x_mid[:3]))
             if with_sens:
-                phi1 = np.asarray(out["stm"][0], dtype=float).reshape(6, 6)
+                assert phi1 is not None  # with_stm=True 时 _propagate_half 恒返回 STM
                 s_mid = phi1 @ sens
                 if tof_col is not None:
                     # 半段时长 h = ±TOF/(2n)：∂x_out/∂TOF += RHS(x_out)·∂h/∂TOF。
-                    s_mid[:, tof_col] += sign * self._kepler_rhs(x_mid) / (2.0 * n)
+                    s_mid[:, tof_col] += (
+                        sign
+                        * _tier_rhs(t_mid, x_mid, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn)
+                        / (2.0 * n)
+                    )
                 spos[idx] = s_mid[:3, :]
                 s_mid[:, imp_offset + 3 * k : imp_offset + 3 * k + 3] += sign * _B_IMPULSE
             x_mid = x_mid + sign * (_B_IMPULSE @ dv[k])
-            out = propagate_kepler_py(x_mid.tolist(), [half], self._mu_km3_s2, with_stm=with_sens)
-            x = np.asarray(out["states"][0], dtype=float)
+            x, phi2 = _propagate_half(
+                x_mid, t_mid, half, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn, with_stm=with_sens
+            )
             if with_sens:
-                phi2 = np.asarray(out["stm"][0], dtype=float).reshape(6, 6)
+                assert phi2 is not None
                 sens = phi2 @ s_mid
                 if tof_col is not None:
-                    sens[:, tof_col] += sign * self._kepler_rhs(x) / (2.0 * n)
+                    sens[:, tof_col] += (
+                        sign
+                        * _tier_rhs(t_mid, x, mu_km3_s2=self._mu_km3_s2, dyn=self._eph_dyn)
+                        / (2.0 * n)
+                    )
             states.append(x.copy())
+            t = None if t_mid is None else t_mid + half
         if forward:
             return np.asarray(states), mid_pos, r_mid, sens, spos
         return np.asarray(states[::-1]), mid_pos[::-1], r_mid[::-1], sens, spos[::-1]
@@ -1749,6 +1933,14 @@ class SimsFlanaganMultiLegProblem:
             if layout.tof_free
             else self._tof_nominal.copy()
         )
+
+        # ephemeris 档的逐 leg 起始绝对历元（出发历元 + 名义 TOF 前缀和；
+        # conic 档为 None，逐 leg 传 None 即可）。
+        leg_t0 = (
+            self._epoch_et_s + np.concatenate([[0.0], np.cumsum(tofs)[:-1]])
+            if self._backend == "ephemeris"
+            else None
+        )
         vinf_cols = {
             node_idx: (layout.vinf_off + 6 * f, layout.vinf_off + 6 * f + 3)
             for f, node_idx in enumerate(layout.flyby_nodes)
@@ -1810,6 +2002,7 @@ class SimsFlanaganMultiLegProblem:
                     tof_col=tof_col,
                     n_var=n_var,
                     with_sens=with_sens,
+                    t_start=None if leg_t0 is None else leg_t0[leg],
                 )
                 b_out = self._leg_pass(
                     anchor_b,
@@ -1821,6 +2014,7 @@ class SimsFlanaganMultiLegProblem:
                     tof_col=tof_col,
                     n_var=n_var,
                     with_sens=with_sens,
+                    t_start=None if leg_t0 is None else leg_t0[leg],
                 )
                 fwd_states.append(f_out[0])
                 bwd_states.append(b_out[0])

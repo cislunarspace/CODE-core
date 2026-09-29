@@ -158,11 +158,15 @@ def test_multileg_input_validation():
     node = SimsFlanaganNode("rendezvous", state)
     args = (DEP, [node], [6000.0], prop, 1000.0, MU)
 
-    # backend 必填关键字：缺失即 Python 原生 TypeError；ephemeris 显式报错。
+    # backend 必填关键字：缺失即 Python 原生 TypeError；ephemeris 档上下文校验。
     with pytest.raises(TypeError):
         SimsFlanaganMultiLegProblem(*args)
-    with pytest.raises(ValueError, match="未实现"):
+    with pytest.raises(ValueError, match="必须提供 epoch_et_s"):
         SimsFlanaganMultiLegProblem(*args, backend="ephemeris")
+    with pytest.raises(ValueError, match="必须提供 ephemeris_system"):
+        SimsFlanaganMultiLegProblem(*args, backend="ephemeris", epoch_et_s=0.0)
+    with pytest.raises(ValueError, match="不接受"):
+        SimsFlanaganMultiLegProblem(*args, backend="conic", epoch_et_s=0.0)
     with pytest.raises(ValueError, match="必须为"):
         SimsFlanaganMultiLegProblem(*args, backend="bogus")
     # 节点类型。

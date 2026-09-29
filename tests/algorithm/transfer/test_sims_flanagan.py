@@ -95,9 +95,18 @@ def test_backend_and_input_validation():
     # backend 为必填关键字：缺失即 Python 原生 TypeError（缺失显式报错）。
     with pytest.raises(TypeError):
         SimsFlanaganProblem(departure, arrival, 6000.0, prop, 1000.0, MU)
-    # ephemeris 档未实现：显式报错，不静默回退（ADR 0050 理由 6）。
-    with pytest.raises(ValueError, match="未实现"):
+    # ephemeris 档上下文校验（#727）：缺 epoch_et_s / 缺 ephemeris_system /
+    # conic 档拒收星历上下文。
+    with pytest.raises(ValueError, match="必须提供 epoch_et_s"):
         SimsFlanaganProblem(departure, arrival, 6000.0, prop, 1000.0, MU, backend="ephemeris")
+    with pytest.raises(ValueError, match="必须提供 ephemeris_system"):
+        SimsFlanaganProblem(
+            departure, arrival, 6000.0, prop, 1000.0, MU, backend="ephemeris", epoch_et_s=0.0
+        )
+    with pytest.raises(ValueError, match="不接受"):
+        SimsFlanaganProblem(
+            departure, arrival, 6000.0, prop, 1000.0, MU, backend="conic", epoch_et_s=0.0
+        )
     # 非法档位名。
     with pytest.raises(ValueError, match="必须为"):
         SimsFlanaganProblem(departure, arrival, 6000.0, prop, 1000.0, MU, backend="bogus")

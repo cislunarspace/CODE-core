@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from kernel_helpers import requires_native_symbols
+from kernel_helpers import requires_native_symbols, requires_spice
 
 from e2m2e.algorithm.transfer import (
     SimsFlanaganFlybyResult,
@@ -30,6 +30,7 @@ from e2m2e.api.models import (
     LowThrustPreliminaryResponse,
     OrbitError,
 )
+from e2m2e.integrators import propagate_kepler_py
 from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.interface
@@ -67,7 +68,6 @@ class TestRequestValidation:
         "overrides",
         [
             {"backend": _MISSING},
-            {"backend": "ephemeris"},
             {"propulsion": {"isp_s": 3000.0, "t_max_n": 5.0, "p0_w": 40000.0}},
             {"propulsion": {"isp_s": 3000.0}},
             {"nodes": [{"kind": "rendezvous", "state": [1.0] * 5}]},
@@ -89,11 +89,20 @@ class TestRequestValidation:
             Facade().low_thrust_preliminary(**_valid_params(**overrides))
         assert excinfo.value.code == "INVALID_PARAMS"
 
-    def test_ephemeris_backend_reports_not_implemented(self):
-        with pytest.raises(OrbitError, match="ephemeris") as excinfo:
-            Facade().low_thrust_preliminary(**_valid_params(backend="ephemeris"))
+    @pytest.mark.parametrize("missing", ["epoch", "bodies", "origin"])
+    def test_ephemeris_missing_context_reports_invalid_params(self, missing):
+        """ephemeris 档缺任一星历上下文字段 → INVALID_PARAMS（#727）。"""
+        ctx = {"epoch": "2025-06-21T11:00:06", "bodies": ["EARTH"], "origin": "EARTH"}
+        params = _valid_params(backend="ephemeris", **{**ctx, missing: _MISSING})
+        with pytest.raises(OrbitError, match="必须提供") as excinfo:
+            Facade().low_thrust_preliminary(**params)
         assert excinfo.value.code == "INVALID_PARAMS"
-        assert "ephemeris 档未实现" in str(excinfo.value)
+
+    def test_conic_rejects_ephemeris_context(self):
+        """conic 档带星历上下文 → INVALID_PARAMS（星历上下文仅 ephemeris 档使用）。"""
+        with pytest.raises(OrbitError, match="均为 None") as excinfo:
+            Facade().low_thrust_preliminary(**_valid_params(epoch="2025-06-21T11:00:06"))
+        assert excinfo.value.code == "INVALID_PARAMS"
 
 
 class TestToolDerivation:
@@ -151,7 +160,19 @@ class TestResponseMapping:
         captured: dict[str, Any] = {}
 
         class FakeProblem:
-            def __init__(self, departure, nodes, tofs, propulsion, m0, mu, *, backend):
+            def __init__(
+                self,
+                departure,
+                nodes,
+                tofs,
+                propulsion,
+                m0,
+                mu,
+                *,
+                backend,
+                epoch_et_s=None,
+                ephemeris_system=None,
+            ):
                 captured["init"] = {
                     "departure": departure,
                     "nodes": nodes,
@@ -160,6 +181,8 @@ class TestResponseMapping:
                     "m0": m0,
                     "mu": mu,
                     "backend": backend,
+                    "epoch_et_s": epoch_et_s,
+                    "ephemeris_system": ephemeris_system,
                 }
 
             def solve(self, n_segments, **kwargs):
@@ -189,6 +212,9 @@ class TestResponseMapping:
         assert captured["init"]["mu"] == MU_SUN
         assert isinstance(captured["init"]["propulsion"], SimsFlanaganPropulsion)
         assert captured["init"]["propulsion"].t_max_n == 5.0
+        # conic 档下星历上下文为 None 透传（#727）
+        assert captured["init"]["epoch_et_s"] is None
+        assert captured["init"]["ephemeris_system"] is None
         # solve 透传求解配置（cost_weights None 而非空元组）
         assert captured["solve"] == {
             "n_segments": 6,
@@ -233,3 +259,37 @@ class TestConicSmoke:
         assert len(response.legs[0].impulses_km_s) == 6
         assert response.flybys == []
         assert response.fuel_kg == pytest.approx(1000.0 - response.final_mass_kg)
+
+
+@requires_spice
+@requires_native_symbols("propagate_kepler_py", "propagate_with_stm_py")
+class TestEphemerisSmoke:
+    """API 面上 backend=ephemeris 的端到端冒烟（#727）。
+
+    退化单天体系（bodies=["EARTH"]，纯二体）+ 闭式 Kepler 生成的到达态：
+    弹道可达、零冲量可行，SLSQP 应以极少迭代收敛且匹配点残差为积分噪声级。
+    """
+
+    def test_single_leg_rendezvous_end_to_end(self, spice_manager):
+        mu = float(spice_manager.get_gm("EARTH"))
+        r0 = 7000.0
+        departure = [r0, 0.0, 0.0, 0.0, float(np.sqrt(mu / r0)), 0.0]
+        arrival = np.asarray(
+            propagate_kepler_py(departure, [10800.0], mu)["states"][0], dtype=float
+        ).tolist()
+        response = Facade().low_thrust_preliminary(
+            **_valid_params(
+                backend="ephemeris",
+                epoch="2025-06-21T11:00:06",
+                bodies=["EARTH"],
+                origin="EARTH",
+                mu_km3_s2=mu,
+                departure_state=departure,
+                nodes=[{"kind": "rendezvous", "state": arrival}],
+                leg_tofs_s=[10800.0],
+                n_segments=6,
+            )
+        )
+        assert response.status is ConvergenceState.CONVERGED
+        assert response.n_iter <= 3
+        assert float(np.max(np.abs(response.legs[0].matchpoint_residual))) < 1e-6
