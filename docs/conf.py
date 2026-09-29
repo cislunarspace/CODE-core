@@ -31,6 +31,9 @@ extensions = [
 ]
 
 language = "zh_CN"
+# CONTRIBUTING/CONTEXT 经 include 以 myst 引入站点，文内同文档锚点
+# （如 #正文写作约定）依赖标题自动锚点，否则报 cross-reference 告警。
+myst_heading_anchors = 3
 
 # 主题：shibuya（明暗双模式、中文排版友好）。构建机只装文档工具链，
 # 不 import 包本体。

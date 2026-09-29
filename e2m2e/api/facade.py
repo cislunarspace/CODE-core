@@ -314,7 +314,7 @@ def _control_result_to_response(
 class Facade:
     """任务级入口与暴露类组合根（ADR 0043 决策 1）。
 
-    ``Facade(config=Config(...))`` 构造注入配置（ADR 0014），只承载五个
+    ``Facade(config=Config(...))`` 构造注入配置（ADR 0014），只承载
     任务级方法；轨道库与分区分析分别经 ``self.catalog`` /
     ``self.spatiography`` 暴露（决策 2/3），工具清单经 ``exposed_apis``
     跨类扫描（决策 5）。
