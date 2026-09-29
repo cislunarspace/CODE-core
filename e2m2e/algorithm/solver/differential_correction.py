@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 
@@ -12,17 +13,7 @@ from e2m2e.integrators import differential_correction_cr3bp_py
 from ...data.types.orbit import Orbit
 from ...status import ConvergenceState, FailureCause
 from ..dynamics import CR3BP_Dynamics
-
-# Richardson 初猜函数在 v4.3 移至 halo_initial_guess；从此处重导出以兼容旧导入。
-from ..family.halo_initial_guess import (  # noqa: F401
-    compute_halo_coefficients,
-    compute_halo_initial_guess,
-    halo_third_order_approximation,
-)
 from ..results import DifferentialCorrectionResult
-
-if TYPE_CHECKING:
-    from ..family.strategies.base import CorrectionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +30,37 @@ _HALO_TIME_RECOVERY_SETUPS = {
     "halo_orbit_fixed_z0",
     "axial_orbit_fixed_vz0",
 }
+
+
+@dataclass(frozen=True)
+class CorrectionConfig:
+    """微分修正的不可变配置。
+
+    对称性、固定参数、自由变量与约束的单一数据对象：由
+    ``family.strategies`` 工厂函数构造、``DifferentialCorrection.configure``
+    消费。
+
+    Attributes:
+        setup_type: 修正配置类型标识符。
+        symmetry_condition: 修正所利用的对称性（如 'x_axis'）。
+        fixed_parameters: 修正过程中保持不变的参数值。
+        free_variables: 牛顿求解器可调整的变量名列表。
+        free_variable_indices: 自由变量在状态向量中对应的索引。
+        target_conditions: 约束名称到目标值的映射。
+        constraint_indices: 约束在状态向量中的求值索引。
+        constraint_weights: 各约束的雅可比加权因子。
+        constraint_types: 各约束的分类（如 'equality'）。
+    """
+
+    setup_type: str
+    symmetry_condition: str
+    fixed_parameters: dict[str, float] = field(default_factory=dict)
+    free_variables: list[str] = field(default_factory=list)
+    free_variable_indices: list[int] = field(default_factory=list)
+    target_conditions: dict[str, float] = field(default_factory=dict)
+    constraint_indices: list[int] = field(default_factory=list)
+    constraint_weights: dict[str, float] = field(default_factory=dict)
+    constraint_types: dict[str, str] = field(default_factory=dict)
 
 
 class DifferentialCorrection:
@@ -124,73 +146,8 @@ class DifferentialCorrection:
         self._outcome_cause: FailureCause | None = None
         self._outcome_message = ""
 
-    def setup_2D_symmetric_x_fixed_x0(self, x0=0.0):
-        """配置固定初始 x 坐标的平面 x 轴对称周期轨道。"""
-        from ..family.strategies import symmetric_2d_fixed_x0
-
-        return self._configure(symmetric_2d_fixed_x0(x0))
-
-    def setup_2D_symmetric_x_fixed_t(self, t_half):
-        """配置固定半周期的平面 x 轴对称周期轨道。"""
-        from ..family.strategies import symmetric_2d_fixed_t
-
-        return self._configure(symmetric_2d_fixed_t(t_half))
-
-    def setup_2D_symmetric_y_fixed_y0(self, y0=0.0):
-        """配置固定初始 y 坐标的平面 y 轴对称周期轨道。"""
-        from ..family.strategies import symmetric_2d_fixed_y0
-
-        return self._configure(symmetric_2d_fixed_y0(y0))
-
-    def setup_3D_symmetric_x_fixed_x0(self, x0):
-        """配置固定初始 x 坐标的三维 x 轴对称周期轨道。"""
-        from ..family.strategies import symmetric_3d_fixed_x0
-
-        return self._configure(symmetric_3d_fixed_x0(x0))
-
-    def setup_3D_symmetric_xz_fixed_x0(self, x0):
-        """配置固定初始 x 坐标的三维 XZ 对称周期轨道。"""
-        from ..family.strategies import symmetric_xz_fixed_x0
-
-        return self._configure(symmetric_xz_fixed_x0(x0))
-
-    def setup_3D_symmetric_xz_fixed_z0(self, z0):
-        """配置固定初始 z 坐标的三维 XZ 对称周期轨道。"""
-        from ..family.strategies import symmetric_xz_fixed_z0
-
-        return self._configure(symmetric_xz_fixed_z0(z0))
-
-    def setup_halo_orbit_fixed_z0(self, z0, libration_point=1):
-        """配置固定 z0 的 Halo 轨道修正。"""
-        from ..family.strategies import halo_fixed_z0
-
-        return self._configure(halo_fixed_z0(z0, libration_point))
-
-    def setup_halo_orbit_fixed_x0(self, x0, libration_point=1):
-        """配置固定 x0 的 Halo 轨道修正。"""
-        from ..family.strategies import halo_fixed_x0
-
-        return self._configure(halo_fixed_x0(x0, libration_point))
-
-    def setup_axial_orbit_fixed_vz0(self, vz0, libration_point=1):
-        """配置固定初始 z 方向速度的 Axial 轨道修正。"""
-        from ..family.strategies import axial_fixed_vz0
-
-        return self._configure(axial_fixed_vz0(vz0, libration_point))
-
-    def setup_spo_fixed_x0(self, x0, libration_point=5):
-        """配置固定 x0 的短周期全周期闭合修正。"""
-        from ..family.strategies import spo_fixed_x0
-
-        return self._configure(spo_fixed_x0(x0, libration_point))
-
-    def setup_lpo_fixed_x0(self, x0, libration_point=5):
-        """配置固定 x0 的长周期全周期闭合修正。"""
-        from ..family.strategies import lpo_fixed_x0
-
-        return self._configure(lpo_fixed_x0(x0, libration_point))
-
-    def _configure(self, config: CorrectionConfig):
+    def configure(self, config: CorrectionConfig) -> DifferentialCorrection:
+        """应用修正配置并重置迭代历史，返回 ``self`` 支持链式调用。"""
         self._apply_config(config)
         self._reset_history()
         return self

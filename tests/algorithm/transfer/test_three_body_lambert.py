@@ -14,6 +14,7 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.family.halo_initial_guess import _compute_gamma, compute_halo_initial_guess
+from e2m2e.algorithm.family.strategies import halo_fixed_z0, symmetric_2d_fixed_x0
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.algorithm.transfer import StateTerminal, ThreeBodyLambert, TransferSolution
 from e2m2e.data.constants import Datum
@@ -51,7 +52,7 @@ def _make_l1_lyapunov_orbit(system) -> Orbit:
 
     x0 = x_l1 + _LYAP_AX
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(x0)
+    corrector.configure(symmetric_2d_fixed_x0(x0))
     seed = Orbit(states=[[x0, 0, 0, 0, mode[4] * _LYAP_AX, 0]], times=[0], system=system)
     seed.period = 2 * np.pi / eigenvalues[idx].imag
     result = corrector.iterate_correction(seed, verbose=False)
@@ -66,7 +67,7 @@ def _make_l1_halo_orbit(system) -> Orbit:
     dynamics = CR3BP_Dynamics(system)
     guess = compute_halo_initial_guess(MU, _HALO_Z0, L=1, halo_class=0)
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_halo_orbit_fixed_z0(z0=_HALO_Z0, libration_point=1)
+    corrector.configure(halo_fixed_z0(z0=_HALO_Z0, libration_point=1))
     seed = Orbit(
         states=[[guess["x0"], 0.0, _HALO_Z0, 0.0, guess["vy0"], 0.0]],
         times=[0.0],

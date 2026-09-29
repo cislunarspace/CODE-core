@@ -8,6 +8,8 @@
 - 包根共享内核叶（``exceptions``/``status``/``spice_ext``）与数值层门面
   ``integrators`` 自身不 import 任何层（``__init__`` 组合根与构建产物
   ``_rust_abi`` 豁免；新增包根模块必须在此登记）
+- 包内方向：``algorithm.solver`` 不 import ``algorithm.family``（数值层不
+  反向依赖领域层，#748）
 
 相对 import（``from ..x import y``、``from . import z``）按文件所在包
 解析为绝对路径后检查；``from e2m2e import <层>`` 的别名形态同样检查。
@@ -27,6 +29,11 @@ FORBIDDEN: dict[str, set[str]] = {
     "algorithm": {"api", "tools", "mbse"},
     "api": {"tools", "mbse"},
 }
+
+# 包内方向规则：(源包前缀, 禁入目标包前缀)，源包含子模块均受检。
+PACKAGE_FORBIDDEN: list[tuple[str, str]] = [
+    ("e2m2e.algorithm.solver", "e2m2e.algorithm.family"),
+]
 
 # 全部层名（含不作为受检源、但作为禁入目标的层）
 _ALL_LAYERS = frozenset({"data", "algorithm", "api", "tools", "mbse", "integrators"})
@@ -118,6 +125,22 @@ def check_file(path: pathlib.Path) -> list[str]:
                 if key not in seen:
                     seen.add(key)
                     violations.append(f"{rel}:{line}: 越层 import {mod} (违反依赖方向)")
+    # 包内方向规则（如 #748：solver 数值层不反向依赖 family 领域层）。
+    # ``__init__.py`` 解析为包自身，普通模块为 e2m2e.<pkg>.<module>。
+    stem = rel.with_suffix("").parts
+    file_module = "e2m2e." + ".".join(stem[:-1] if stem[-1] == "__init__" else stem)
+    for src, dst in PACKAGE_FORBIDDEN:
+        if file_module == src or file_module.startswith(src + "."):
+            for node in ast.walk(tree):
+                for mod in _targets(node, rel):
+                    if mod == dst or mod.startswith(dst + "."):
+                        line = getattr(node, "lineno", 0)
+                        key = (str(rel), line, mod)
+                        if key not in seen:
+                            seen.add(key)
+                            violations.append(
+                                f"{rel}:{line}: 包内反向依赖 import {mod} ({src} 不得依赖 {dst})"
+                            )
     return violations
 
 

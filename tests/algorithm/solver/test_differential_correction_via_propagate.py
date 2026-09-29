@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from e2m2e.algorithm.family.strategies import symmetric_2d_fixed_x0
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.status import ConvergenceState, FailureCause
@@ -35,7 +36,7 @@ def test_non_cr3bp_correction_has_no_python_fallback():
         system = object()
 
     corrector = DifferentialCorrection(NonCr3bpDynamics())
-    corrector.setup_2D_symmetric_x_fixed_x0()
+    corrector.configure(symmetric_2d_fixed_x0(0.0))
     guess = Orbit(states=np.zeros((1, 6)), times=[0.0])
     guess.period = 2.0
 

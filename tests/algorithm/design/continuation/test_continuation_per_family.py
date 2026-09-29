@@ -31,6 +31,12 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.family.lpo_initial_guess import compute_lpo_initial_guess
+from e2m2e.algorithm.family.strategies import (
+    halo_fixed_z0,
+    lpo_fixed_x0,
+    spo_fixed_x0,
+    symmetric_2d_fixed_x0,
+)
 from e2m2e.algorithm.solver.continuation import Continuation
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from tests.algorithm.design import seeds
@@ -140,21 +146,21 @@ def _inferred_param(corrector: DifferentialCorrection) -> str:
 
 def run_dpo(seed, dynamics):
     def setup(c):
-        c.setup_2D_symmetric_x_fixed_x0(seeds.DPO_X0)
+        c.configure(symmetric_2d_fixed_x0(seeds.DPO_X0))
 
     return _natural_continuation_5(seed, dynamics, setup, None, step=0.003), 0
 
 
 def run_halo_l1(seed, dynamics):
     def setup(c):
-        c.setup_halo_orbit_fixed_z0(seeds.HALO_SEED_Z0, 1)
+        c.configure(halo_fixed_z0(seeds.HALO_SEED_Z0, 1))
 
     return _natural_continuation_5(seed, dynamics, setup, None, step=0.003), 2
 
 
 def run_spo_l4(seed, dynamics):
     def setup_at(c, x0):
-        c.setup_spo_fixed_x0(x0, seeds.SPO_SEED_POINT)
+        c.configure(spo_fixed_x0(x0, seeds.SPO_SEED_POINT))
 
     return _full_period_continuation_5(seed, dynamics, setup_at, step=0.005), 0
 
@@ -169,11 +175,11 @@ def run_lpo_l4(seed, dynamics):
     )
     seed_orbit = _make_seed(dynamics, state, period)
     corrector = _make_corrector(dynamics, SCREENING_TOLERANCE)
-    corrector.setup_lpo_fixed_x0(float(state[0]), seeds.SPO_SEED_POINT)
+    corrector.configure(lpo_fixed_x0(float(state[0]), seeds.SPO_SEED_POINT))
     lpo_seed = corrector.iterate_full_period_correction(seed_orbit, verbose=False)
 
     def setup_at(c, x0):
-        c.setup_lpo_fixed_x0(x0, seeds.SPO_SEED_POINT)
+        c.configure(lpo_fixed_x0(x0, seeds.SPO_SEED_POINT))
 
     assert lpo_seed.orbit is not None, "LPO 种子修正未产出轨道"
     return (

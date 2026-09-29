@@ -1,22 +1,26 @@
 """Halo 轨道族编排模块
 
 从 ``continuation.py`` 拆出的 Halo 专用编排：种子生成、自然参数族延拓、
-伪弧长（PAL）延拓。``Continuation`` 实例上同名方法仍可用 — 在
-``continuation.py`` 文件末尾以方法重绑定的形式保留调用语法。
+伪弧长（PAL）延拓与 PAL 每步微分修正配置选择器
+（``halo_dc_config_selector``，经 ``dc_config_selector`` 注入
+``Continuation.pseudo_arclength_continuation``）。
 
 延拓实现共三处：``solver/continuation.py``（通用自然参数 + 伪弧长延拓）、
 本模块（Halo 族专用编排）、``family/planar_continuation.py``（平面平动点
-全周期 PAL 适配器）；分工保留不合并（#747）。
+全周期 PAL 适配器）；分工保留不合并（#747、#748）。
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 import numpy as np
 
 from ...data.types.orbit import Orbit, OrbitFamily
 from ...status import ConvergenceState
+from ..solver.differential_correction import CorrectionConfig
+from .strategies import halo_fixed_x0, halo_fixed_z0, symmetric_3d_fixed_x0, symmetric_xz_fixed_z0
 
 logger = logging.getLogger(__name__)
 
@@ -75,14 +79,12 @@ def generate_halo_seed_orbit(
     )
 
     if halo_class == 0:
-        continuation.correction.setup_halo_orbit_fixed_z0(
-            z0=amplitude_z,
-            libration_point=libration_point,
+        continuation.correction.configure(
+            halo_fixed_z0(z0=amplitude_z, libration_point=libration_point)
         )
     else:
-        continuation.correction.setup_halo_orbit_fixed_z0(
-            z0=-amplitude_z,
-            libration_point=libration_point,
+        continuation.correction.configure(
+            halo_fixed_z0(z0=-amplitude_z, libration_point=libration_point)
         )
 
     initial_orbit = Orbit(
@@ -210,9 +212,8 @@ def generate_halo_family(
                         logger.info("  达到z边界 %.4f, 终止", z_limit)
                     break
 
-            continuation.correction.setup_halo_orbit_fixed_z0(
-                z0=target_z,
-                libration_point=libration_point,
+            continuation.correction.configure(
+                halo_fixed_z0(z0=target_z, libration_point=libration_point)
             )
             continuation.correction.max_iterations = 150
             continuation.correction.tolerance = 1e-6
@@ -268,6 +269,38 @@ def generate_halo_family(
 
     logger.info("[ok] 轨道族生成完成: 共%d条轨道", len(family))
     return family
+
+
+def halo_dc_config_selector(
+    dc_scheme: str, libration_point: int
+) -> Callable[[np.ndarray, float, float, bool], CorrectionConfig | None]:
+    """构造 PAL 每步微分修正配置选择器（dc_scheme 选支逻辑住 family）。
+
+    返回闭包 ``(sv0_corr, x0_last, z0_last, retry=False) -> CorrectionConfig | None``：
+    - ``matlab_halo_type1``：首试固定 x0（halo_fixed_x0）；首试失败重试固定 z0。
+    - ``matlab_halo_type2``：按 |Δx0| 与 |Δz0| 较大者切 halo_fixed_x0 / halo_fixed_z0；无重试。
+    - 其余（含 ``adaptive``，未知 scheme 同此）：切 symmetric_3d_fixed_x0 /
+      symmetric_xz_fixed_z0；无重试。
+    """
+
+    def select(
+        sv0_corr: np.ndarray, x0_last: float, z0_last: float, retry: bool = False
+    ) -> CorrectionConfig | None:
+        if dc_scheme == "matlab_halo_type1":
+            if retry:
+                return halo_fixed_z0(sv0_corr[2], libration_point)
+            return halo_fixed_x0(sv0_corr[0], libration_point)
+        if retry:
+            return None
+        if abs(sv0_corr[0] - x0_last) > abs(sv0_corr[2] - z0_last):
+            if dc_scheme == "matlab_halo_type2":
+                return halo_fixed_x0(sv0_corr[0], libration_point)
+            return symmetric_3d_fixed_x0(sv0_corr[0])
+        if dc_scheme == "matlab_halo_type2":
+            return halo_fixed_z0(sv0_corr[2], libration_point)
+        return symmetric_xz_fixed_z0(sv0_corr[2])
+
+    return select
 
 
 def halo_pseudo_arclength_continuation(
@@ -342,8 +375,7 @@ def halo_pseudo_arclength_continuation(
             TolPAL=TolPAL,
             TolDiffCorr=TolDiffCorr,
             IterMax=IterMax,
-            dc_scheme=dc_scheme,
-            libration_point=libration_point,
+            dc_config_selector=halo_dc_config_selector(dc_scheme, libration_point),
             directional_increment=directional_increment,
             target_vector=tv,
             target_direction=td,

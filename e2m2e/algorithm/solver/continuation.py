@@ -2,15 +2,17 @@
 
 提供自然参数延拓和伪弧长延拓方法，用于沿轨道族参数方向逐步生成相邻轨道。
 
-延拓实现共三处：本模块（通用自然参数 + 伪弧长延拓）、
+延拓实现共三处：本模块（通用自然参数延拓 + 通用 PAL 数值内核与预测-
+修正循环；每步微分修正配置经 ``dc_config_selector`` 由调用方注入）、
 ``family/halo_family.py``（Halo 族专用编排）、
-``family/planar_continuation.py``（平面平动点全周期 PAL 适配器）；
-分工保留不合并（#747）。
+``family/planar_continuation.py``（平面全周期 PAL 适配器）；
+分工保留不合并（#747、#748）。
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 import numpy as np
 
@@ -19,13 +21,8 @@ from e2m2e.integrators import pal_f_df_tangent_py, pal_newton_step_py, require_r
 from ...data.types.orbit import Orbit, OrbitFamily
 from ...status import ConvergenceState, FailureCause
 from ..dynamics import CR3BP_Dynamics
-from ..family.halo_family import (
-    generate_halo_family,
-    generate_halo_seed_orbit,
-    halo_pseudo_arclength_continuation,
-)
 from ..results import ContinuationResult
-from .differential_correction import DifferentialCorrection
+from .differential_correction import CorrectionConfig, DifferentialCorrection
 
 logger = logging.getLogger(__name__)
 
@@ -520,8 +517,8 @@ class Continuation:
         TolPAL: float = 1e-6,
         TolDiffCorr: float = 1e-6,
         IterMax: int = 100,
-        dc_scheme: str = "adaptive",
-        libration_point: int = 1,
+        dc_config_selector: Callable[[np.ndarray, float, float, bool], CorrectionConfig | None]
+        | None = None,
         directional_increment: bool = False,
         target_vector: int = 0,
         target_direction: int = 1,
@@ -540,7 +537,11 @@ class Continuation:
             step_size: 伪弧长步长 ΔS 的模长（正数；direction 决定符号）。
             direction: 延拓方向，取 positive 或 negative；双侧延拓请调用两次，
                 或改用 halo_pseudo_arclength_continuation(direction='both')。
-            dc_scheme: 微分修正方案，见 Continuation 类文档字符串。
+            dc_config_selector: PAL 每步微分修正配置选择器，闭包契约
+                ``(sv0_corr, x0_last, z0_last, retry=False) -> CorrectionConfig | None``
+                （首试返回 None 表示不修正；retry=True 返回 None 表示无重试）；
+                选支逻辑由调用方家族模块提供，
+                见 ``family.halo_family.halo_dc_config_selector``。
             target_vector: 与 MATLAB TargetVector 对应的 0 基下标
                 （0=rx, 1=rz, 2=vy, 3=T/2）。
             backend: 数值内核后端。``"rust"``（默认）走 Rust PAL 内核
@@ -563,6 +564,11 @@ class Continuation:
             raise ValueError(f"backend 须为 rust 或 python，当前为 {backend!r}")
         if backend == "rust":
             require_rust_extension("pal_newton_step_py", "pal_f_df_tangent_py")
+        if dc_config_selector is None:
+            raise ValueError(
+                "dc_config_selector 必须提供：dc 选支逻辑在 family 侧，"
+                "见 halo_family.halo_dc_config_selector"
+            )
 
         step_sign = 1.0 if direction == "positive" else -1.0
 
@@ -574,7 +580,6 @@ class Continuation:
             logger.info("  本支新轨道数 N = %d", n_orbits)
             logger.info("  步长 |DeltaS| = %s", step_size)
             logger.info("  延拓方向 = %s", direction)
-            logger.info("  dc_scheme = %s", dc_scheme)
 
         orbit_family = OrbitFamily([seed_orbit])
         self.correction.tolerance = TolDiffCorr
@@ -760,24 +765,9 @@ class Continuation:
             x0_last = family_states[-1][0]
             z0_last = family_states[-1][2]
 
-            if dc_scheme == "matlab_halo_type1":
-                self.correction.setup_halo_orbit_fixed_x0(
-                    x0=SV0_corr[0], libration_point=libration_point
-                )
-            elif dc_scheme == "matlab_halo_type2":
-                if abs(SV0_corr[0] - x0_last) > abs(SV0_corr[2] - z0_last):
-                    self.correction.setup_halo_orbit_fixed_x0(
-                        x0=SV0_corr[0], libration_point=libration_point
-                    )
-                else:
-                    self.correction.setup_halo_orbit_fixed_z0(
-                        z0=SV0_corr[2], libration_point=libration_point
-                    )
-            else:
-                if abs(SV0_corr[0] - x0_last) > abs(SV0_corr[2] - z0_last):
-                    self.correction.setup_3D_symmetric_x_fixed_x0(x0=SV0_corr[0])
-                else:
-                    self.correction.setup_3D_symmetric_xz_fixed_z0(z0=SV0_corr[2])
+            config = dc_config_selector(SV0_corr, x0_last, z0_last, False)
+            if config is not None:
+                self.correction.configure(config)
 
             guess_orbit = Orbit(
                 states=SV0_corr.reshape(1, -1),
@@ -789,14 +779,12 @@ class Continuation:
             result = self.correction.iterate_correction(guess_orbit, verbose=False)
             orbit = result.orbit
 
-            # PAL 初值在固定 x0 下常落入寄生根或与 STM 牛顿不兼容；与种子生成一致改用固定 z0 再试
-            if (
-                orbit is None or result.status is not ConvergenceState.CONVERGED
-            ) and dc_scheme == "matlab_halo_type1":
-                self.correction.setup_halo_orbit_fixed_z0(
-                    z0=SV0_corr[2], libration_point=libration_point
-                )
-                result = self.correction.iterate_correction(guess_orbit, verbose=False)
+            # 首试失败时由选择器决定重试配置（retry 位置传参，True；返回 None 即无重试）。
+            if orbit is None or result.status is not ConvergenceState.CONVERGED:
+                retry_config = dc_config_selector(SV0_corr, x0_last, z0_last, True)
+                if retry_config is not None:
+                    self.correction.configure(retry_config)
+                    result = self.correction.iterate_correction(guess_orbit, verbose=False)
             orbit = result.orbit
 
             if orbit is not None and result.status is ConvergenceState.CONVERGED:
@@ -936,20 +924,8 @@ class Continuation:
             "message": self._outcome_message,
         }
 
-    # Halo 专用编排（generate_halo_seed_orbit / generate_halo_family /
-    # halo_pseudo_arclength_continuation）已迁出到 ``halo_family`` 模块；
-    # 本文件末尾以方法重绑定的形式对外保留同名 API。
-
     def __repr__(self):
         return (
             f"Continuation(corrector={self.correction}, "
             f"param={self.continuation_parameter}, step={self.step_size})"
         )
-
-
-# Halo 专用方法在 ``halo_family`` 中以 ``(continuation, ...)`` 函数定义。
-# 把它们以方法形式重绑到 ``Continuation`` 类，等价于调用方写
-# ``continuation.halo_xxx(...)``（第一个参数由 Python 自动注入 ``self``）。
-Continuation.generate_halo_seed_orbit = generate_halo_seed_orbit  # type: ignore[attr-defined]
-Continuation.generate_halo_family = generate_halo_family  # type: ignore[attr-defined]
-Continuation.halo_pseudo_arclength_continuation = halo_pseudo_arclength_continuation  # type: ignore[attr-defined]

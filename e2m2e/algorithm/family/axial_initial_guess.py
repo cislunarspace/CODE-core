@@ -31,6 +31,7 @@ from ...data.types.orbit import Orbit
 from ...integrators import collinear_center_modes_py
 from ..dynamics import CR3BP_Dynamics
 from ..solver.differential_correction import DifferentialCorrection
+from .strategies import symmetric_2d_fixed_t, symmetric_2d_fixed_x0
 
 #: Haapala & Howell (2016) Axial Jacobi 区间（用于筛选正确的分岔点）
 _AXIAL_C_RANGES: dict[int, tuple[float, float]] = {
@@ -72,7 +73,7 @@ def _correct_lyapunov_fixed_x0(
         period = guess.period
 
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(x0=x0)
+    corrector.configure(symmetric_2d_fixed_x0(x0=x0))
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = period
     return corrector.iterate_correction(initial_guess=seed, verbose=False).orbit
@@ -92,7 +93,7 @@ def _correct_lyapunov_fixed_t(
     state[2] = 0.0
     state[5] = 0.0
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_t(t_half=t_half)
+    corrector.configure(symmetric_2d_fixed_t(t_half=t_half))
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = 2.0 * t_half
     return corrector.iterate_correction(initial_guess=seed, verbose=False).orbit

@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from e2m2e.algorithm.family.strategies import halo_fixed_z0, symmetric_2d_fixed_x0
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.integrators import differential_correction_cr3bp_py
@@ -16,7 +17,7 @@ pytestmark = pytest.mark.orchestration
 def test_default_correction_converges_with_rust_core(dro_dynamics, dro_seed_orbit):
     """公开入口应以 Rust 内核收敛到确定的 DRO 初态。"""
     corrector = DifferentialCorrection(dro_dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(x0=float(dro_seed_orbit.states[0, 0]))
+    corrector.configure(symmetric_2d_fixed_x0(float(dro_seed_orbit.states[0, 0])))
 
     result = corrector.iterate_correction(dro_seed_orbit)
 
@@ -42,7 +43,7 @@ def test_xz_symmetric_halo_converges_with_rust_core(cr3bp_dynamics):
     seed.period = 2.0 * guess["T_half"]
 
     corrector = DifferentialCorrection(cr3bp_dynamics)
-    corrector.setup_halo_orbit_fixed_z0(z0, 1)
+    corrector.configure(halo_fixed_z0(z0, 1))
 
     result = corrector.iterate_correction(seed)
 
@@ -76,7 +77,7 @@ def test_rust_ffi_rejects_out_of_range_free_variable():
 def test_python_backend_parameter_is_not_available(dro_dynamics, dro_seed_orbit):
     """Python 数值后端已移除，公开迭代接口不接受 backend 参数。"""
     corrector = DifferentialCorrection(dro_dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(x0=float(dro_seed_orbit.states[0, 0]))
+    corrector.configure(symmetric_2d_fixed_x0(float(dro_seed_orbit.states[0, 0])))
 
     with pytest.raises(TypeError, match="backend"):
         corrector.iterate_correction(dro_seed_orbit, backend="python")

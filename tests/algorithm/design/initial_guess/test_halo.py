@@ -1,6 +1,6 @@
 """Halo 初始猜测模块测试。
 
-覆盖 Richardson 三阶近似系数、解析近似、初始猜测生成与向后兼容。
+覆盖 Richardson 三阶近似系数、解析近似与初始猜测生成。
 """
 
 import numpy as np
@@ -353,38 +353,3 @@ class TestHaloInitialGuess:
         guess_default = compute_halo_initial_guess(mu=MU, z_amplitude=0.1, L=1)
         guess_explicit = compute_halo_initial_guess(mu=MU, z_amplitude=0.1, L=1, halo_class=0)
         assert guess_default["x0"] == guess_explicit["x0"]
-
-
-# =============================================================================
-# Backward compatibility: differential_correction / family 的 re-export 保持可用
-# =============================================================================
-
-
-class TestBackwardCompatibility:
-    """验证 differential_correction.py 的 re-export 不破坏现有功能。"""
-
-    def test_reexport_preserves_public_api(self):
-        """通过 differential_correction 导入应返回相同函数。"""
-        from e2m2e.algorithm.solver.differential_correction import (
-            compute_halo_coefficients as from_dc,
-        )
-        from e2m2e.algorithm.solver.differential_correction import (
-            compute_halo_initial_guess as from_dc_guess,
-        )
-        from e2m2e.algorithm.solver.differential_correction import (
-            halo_third_order_approximation as from_dc_approx,
-        )
-
-        # 应指向同一个函数对象
-        assert from_dc is compute_halo_coefficients
-        assert from_dc_guess is compute_halo_initial_guess
-        assert from_dc_approx is halo_third_order_approximation
-
-    def test_family_init_reexport(self):
-        """e2m2e.algorithm.family 的导入应保持可用。"""
-        from e2m2e.algorithm.family import compute_halo_coefficients
-
-        # 结果应与直接导入一致
-        coeffs1 = compute_halo_coefficients(MU, 1)
-        coeffs2 = compute_halo_coefficients(MU, 1)
-        assert coeffs1 == coeffs2

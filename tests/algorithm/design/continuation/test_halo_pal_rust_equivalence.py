@@ -24,6 +24,7 @@ from numpy.testing import assert_allclose
 # 扩展未构建时（doc build 等合法场景）整模块跳过。
 pytest.importorskip("e2m2e._integrators")
 
+from e2m2e.algorithm.family.halo_family import halo_dc_config_selector
 from e2m2e.algorithm.solver.continuation import (
     Continuation,
     _pal_newton_step_python,
@@ -154,6 +155,7 @@ class TestPalFamilyEquivalence:
             verbose=False,
             TolPAL=TOL_PAL,
             directional_increment=True,
+            dc_config_selector=halo_dc_config_selector("adaptive", 1),
             target_vector=1,
             target_direction=1,
             backend=backend,

@@ -76,6 +76,7 @@ def dynamics():
 @pytest.fixture(scope="module")
 def dro_orbit(dynamics):
     """DRO 出发轨道：标准种子微分修正生成（module 级共享，只读）。"""
+    from e2m2e.algorithm.family.strategies import symmetric_2d_fixed_x0
     from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
     from e2m2e.data.types.orbit import Orbit
 
@@ -83,7 +84,7 @@ def dro_orbit(dynamics):
     seed = Orbit(states=state.reshape(1, -1), times=np.array([0.0]), system=dynamics.system)
     seed.period = 3.472535773770595
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(state[0])
+    corrector.configure(symmetric_2d_fixed_x0(state[0]))
     result = corrector.iterate_correction(seed, verbose=False)
     assert result.orbit is not None, "DRO 种子修正未收敛"
     return result.orbit

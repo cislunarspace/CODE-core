@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .base import CorrectionConfig
+from ...solver.differential_correction import CorrectionConfig
 
 
 def axial_fixed_vz0(vz0: float, libration_point: int = 1) -> CorrectionConfig:

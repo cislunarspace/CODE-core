@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .base import CorrectionConfig
+from ...solver.differential_correction import CorrectionConfig
 
 
 def symmetric_2d_fixed_x0(x0: float = 0.0) -> CorrectionConfig:

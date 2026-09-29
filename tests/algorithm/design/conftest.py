@@ -24,6 +24,12 @@ import pytest
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.family.halo_initial_guess import compute_halo_initial_guess
 from e2m2e.algorithm.family.spo_initial_guess import compute_spo_initial_guess
+from e2m2e.algorithm.family.strategies import (
+    halo_fixed_z0,
+    spo_fixed_x0,
+    symmetric_2d_fixed_t,
+    symmetric_2d_fixed_x0,
+)
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.templates import SEGMENTED_CORRECTION_ORBIT_TYPES
 from e2m2e.data.types.orbit import Orbit
@@ -133,7 +139,7 @@ def _corrected_dro_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     state = np.array([seeds.DRO_X0, 0.0, 0.0, 0.0, seeds.DRO_VY0, 0.0])
     seed = _seed_orbit(dynamics, state, seeds.DRO_PERIOD)
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(seeds.DRO_X0)
+    corrector.configure(symmetric_2d_fixed_x0(seeds.DRO_X0))
     result = corrector.iterate_correction(seed, verbose=False)
     orbit = result.orbit
     assert orbit is not None, "DRO 修正未收敛"
@@ -153,7 +159,7 @@ def _corrected_halo_l1_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     state = np.array([g["x0"], 0.0, seeds.HALO_SEED_Z0, 0.0, g["vy0"], 0.0])
     seed = _seed_orbit(dynamics, state, 2.0 * g["T_half"])
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_halo_orbit_fixed_z0(seeds.HALO_SEED_Z0, 1)
+    corrector.configure(halo_fixed_z0(seeds.HALO_SEED_Z0, 1))
     result = corrector.iterate_correction(seed, verbose=False)
     orbit = result.orbit
     assert orbit is not None, "Halo L1 修正未收敛"
@@ -173,7 +179,7 @@ def _corrected_halo_l2_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     state = np.array([g["x0"], 0.0, seeds.HALO_SEED_Z0, 0.0, g["vy0"], 0.0])
     seed = _seed_orbit(dynamics, state, 2.0 * g["T_half"])
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_halo_orbit_fixed_z0(seeds.HALO_SEED_Z0, 2)
+    corrector.configure(halo_fixed_z0(seeds.HALO_SEED_Z0, 2))
     result = corrector.iterate_correction(seed, verbose=False)
     orbit = result.orbit
     assert orbit is not None, "Halo L2 修正未收敛"
@@ -187,7 +193,7 @@ def _corrected_lyapunov_l1_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     state, period = _lyapunov_l1_seed(dynamics)
     seed = _seed_orbit(dynamics, state, period)
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(float(state[0]))
+    corrector.configure(symmetric_2d_fixed_x0(float(state[0])))
     result = corrector.iterate_correction(seed, verbose=False)
     orbit = result.orbit
     assert orbit is not None, "Lyapunov L1 修正未收敛"
@@ -201,7 +207,7 @@ def _corrected_dpo_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     state = np.array([seeds.DPO_X0, 0.0, 0.0, 0.0, seeds.DPO_VY0, 0.0])
     seed = _seed_orbit(dynamics, state, seeds.DPO_PERIOD)
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_x0(seeds.DPO_X0)
+    corrector.configure(symmetric_2d_fixed_x0(seeds.DPO_X0))
     result = corrector.iterate_correction(seed, verbose=False)
     orbit = result.orbit
     assert orbit is not None, "DPO 修正未收敛"
@@ -221,7 +227,7 @@ def _corrected_triangular_l4_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbi
     )
     seed = _seed_orbit(dynamics, state, period)
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_spo_fixed_x0(float(state[0]), seeds.SPO_SEED_POINT)
+    corrector.configure(spo_fixed_x0(float(state[0]), seeds.SPO_SEED_POINT))
     result = corrector.iterate_full_period_correction(seed, verbose=False)
     orbit = result.orbit
     assert orbit is not None, "SPO L4 修正未收敛"
@@ -240,7 +246,7 @@ def _corrected_ro_31_cached(earth_moon_dynamics: CR3BP_Dynamics) -> Orbit:
     period = np.pi  # w=1 近圆支的闭合周期 T = 2πq/(p−q)
     seed = _seed_orbit(dynamics, state, period)
     corrector = DifferentialCorrection(dynamics)
-    corrector.setup_2D_symmetric_x_fixed_t(period / 2.0)
+    corrector.configure(symmetric_2d_fixed_t(period / 2.0))
     result = corrector.iterate_correction(seed, verbose=False)
     orbit = result.orbit
     assert orbit is not None, "RO 3:1 修正未收敛"

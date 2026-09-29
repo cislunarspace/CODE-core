@@ -9,9 +9,9 @@
 设计函数 ``design_xxx(params) -> Orbit``；``algorithm/design`` 的
 ``design_orbit`` 查注册表按族分发（新族 = 写一个设计函数 + 注册）。
 
-``cr3bp_orbits`` （六类初猜）依赖 ``algorithm/solver``，而 solver 依赖本包
-的 ``halo_initial_guess``——为打破包级循环，初猜函数经 PEP 562
-``__getattr__`` 惰性导出。
+``cr3bp_orbits``（六类初猜）依赖 ``algorithm/solver``；solver 已不再依赖
+本包（#748 消除分层倒置）。初猜函数经 PEP 562 ``__getattr__`` 惰性导出，
+保持包初始化轻量。
 
 ``design_*_family`` 是面向 Facade 的多成员生成入口，返回带状态三元组的
 ``FamilyGenerationResult``；成功结果中的 ``family`` 是 ``OrbitFamily``。
@@ -24,8 +24,7 @@ from collections.abc import Callable
 
 from ...data.types import Orbit
 
-# 先加载 solver 依赖的叶子模块（halo_initial_guess 等），再经惰性导出
-# cr3bp_orbits（依赖 solver）。
+# 惰性导出 cr3bp_orbits（依赖 solver），包初始化保持轻量。
 from .axial_initial_guess import compute_axial_initial_guess
 from .halo_family import (
     generate_halo_family,

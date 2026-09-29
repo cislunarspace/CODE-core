@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from e2m2e.algorithm.family.strategies import spo_fixed_x0, symmetric_2d_fixed_x0
 from e2m2e.algorithm.solver.differential_correction import DifferentialCorrection
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.status import ConvergenceState, FailureCause
@@ -42,7 +43,7 @@ def _initial_orbit() -> Orbit:
 
 def test_iteration_requires_cr3bp_dynamics():
     corrector = DifferentialCorrection(NonCr3bpDynamics())
-    corrector.setup_2D_symmetric_x_fixed_x0(x0=0.0)
+    corrector.configure(symmetric_2d_fixed_x0(0.0))
 
     with pytest.raises(TypeError, match="CR3BP_Dynamics"):
         corrector.iterate_correction(_initial_orbit())
@@ -67,7 +68,7 @@ def test_symmetric_correction_reports_stagnation_when_update_is_too_small(
 def test_full_period_correction_reports_stagnation_when_update_is_too_small(
     dro_corrector, dro_seed_orbit
 ):
-    dro_corrector.setup_spo_fixed_x0(float(dro_seed_orbit.states[0, 0]))
+    dro_corrector.configure(spo_fixed_x0(float(dro_seed_orbit.states[0, 0])))
     dro_corrector.stagnation_limit = np.finfo(float).max
 
     # 种子即周期解（1 次迭代直接收敛，不触发修正量判断）；扰动 vy0 5%
