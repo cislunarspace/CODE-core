@@ -227,7 +227,7 @@ class TestLgaTransferOrbit:
         """搜索无候选时，精化和打靶不以失败原因占位。"""
         tli_params = TliParams(parking_alt_km=200.0, inclination_deg=0.0)
         with patch(
-            "e2m2e.algorithm.transfer.search_lga_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_lga_trajectories",
             return_value=CandidateSearchResult(
                 (),
                 ConvergenceState.INFEASIBLE,

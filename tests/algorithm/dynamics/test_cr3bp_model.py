@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from e2m2e.algorithm.family.cr3bp_orbits import design_dpo
+from e2m2e.algorithm.family import design_dpo
 
 pytestmark = pytest.mark.theory
 

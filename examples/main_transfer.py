@@ -71,7 +71,7 @@ def main() -> None:
 
     # 3. 绘图：转移轨迹 3D
     print("\n3. 绘制转移轨迹 3D")
-    from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
+    from e2m2e.algorithm.family import earth_moon_system
 
     system = earth_moon_system()
 

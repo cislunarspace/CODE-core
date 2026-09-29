@@ -147,7 +147,7 @@ class TestLgaManeuverEvents:
         system = CR3BP_System(mu=MU, primary="Earth", secondary="Moon")._with_default_scales()
         candidate = _synthetic_lga_candidate(system)
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_lga_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_lga_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 (candidate,), ConvergenceState.CONVERGED, FailureCause.NONE, "synthetic"
             ),
@@ -238,7 +238,7 @@ class TestWsbManeuverEvents:
         system = BCR4BPSystem.earth_moon()
         candidate = _synthetic_wsb_candidate(system)
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_wsb_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_wsb_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 (candidate,), ConvergenceState.CONVERGED, FailureCause.NONE, "synthetic"
             ),
@@ -297,7 +297,7 @@ class TestEmptyManeuverEvents:
     def test_lga_zero_result_has_no_events(self, monkeypatch):
         """LGA 搜索零结果：事件列表为空（不伪造出发/到达脉冲）。"""
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_lga_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_lga_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 (), ConvergenceState.INFEASIBLE, FailureCause.NO_INTERSECTION, "无候选"
             ),

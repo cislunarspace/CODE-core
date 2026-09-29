@@ -10,13 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from e2m2e.algorithm.family import registry
-from e2m2e.algorithm.family.cr3bp_orbits import (
-    design_axial,
-    design_dpo,
-    design_lyapunov,
-    design_nrho,
-)
+from e2m2e.algorithm.family import design_axial, design_dpo, design_lyapunov, design_nrho, registry
 
 pytestmark = pytest.mark.orchestration
 

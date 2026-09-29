@@ -94,7 +94,7 @@ def dro_orbit(dynamics):
 def ro_orbit(dynamics):
     """RO 到达轨道：研究级容差下由 ``design_ro`` 生成 3:1 共振轨道。"""
     from e2m2e.algorithm.dynamics import CR3BP_Dynamics
-    from e2m2e.algorithm.family.cr3bp_orbits import design_ro
+    from e2m2e.algorithm.family import design_ro
 
     # 精确成员的闭合守卫为 1e-6；本模块的筛选级容差在 3:1 长弧上
     # 的积分误差约为 5e-6，不能用于构造 RO。搜索阶段仍使用 dynamics。

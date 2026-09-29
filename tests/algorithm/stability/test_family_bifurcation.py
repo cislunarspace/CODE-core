@@ -19,7 +19,7 @@ import pytest
 from kernel_helpers import requires_native_symbols
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
-from e2m2e.algorithm.family.cr3bp_orbits import _correct_dro
+from e2m2e.algorithm.family.orbits.dro import _correct_dro
 from e2m2e.algorithm.stability import (
     BifurcationType,
     FamilyBifurcationPoint,

@@ -48,7 +48,7 @@ def main() -> None:
     setup_cjk_font()
 
     from e2m2e.algorithm.design import design_orbit
-    from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
+    from e2m2e.algorithm.family import earth_moon_system
     from e2m2e.api.models import DesignOrbitRequest
 
     # 1. 设计一条短弧 Halo 作为预报起点（duration=0.02 年 ≈ 7.3 天）

@@ -21,14 +21,13 @@ from kernel_helpers import requires_native_symbols
 
 from e2m2e.algorithm.transfer import (
     ChainLegRequest,
-    ConvergenceState,
-    FailureCause,
     LegKernel,
     evaluate_chain,
     solve_minimax,
     solve_square,
 )
 from e2m2e.integrators import propagate_kepler_py
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.theory
 

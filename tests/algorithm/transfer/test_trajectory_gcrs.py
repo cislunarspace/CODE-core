@@ -258,7 +258,7 @@ class TestLgaGcrsArc:
         system = _canonical_system()
         candidate = _synthetic_lga_candidate(system)
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_lga_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_lga_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 (candidate,), ConvergenceState.CONVERGED, FailureCause.NONE, "synthetic"
             ),
@@ -337,7 +337,7 @@ class TestWsbGcrsArc:
         system = BCR4BPSystem.earth_moon()
         candidate = _synthetic_wsb_candidate(system)
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_wsb_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_wsb_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 (candidate,), ConvergenceState.CONVERGED, FailureCause.NONE, "synthetic"
             ),
@@ -406,7 +406,7 @@ class TestNoGcrsSegments:
     def test_lga_zero_result_has_no_gcrs_segment(self, monkeypatch):
         """LGA 搜索零结果：无轨迹亦无惯性段。"""
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_lga_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_lga_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 (), ConvergenceState.INFEASIBLE, FailureCause.NO_INTERSECTION, "无候选"
             ),

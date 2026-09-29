@@ -120,7 +120,7 @@ class TestLgaTopNCandidates:
         system = _canonical_system()
         candidates = tuple(_synthetic_lga_candidate(system, dv) for dv in GRID_TOTAL_DVS)
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_lga_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_lga_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 candidates, ConvergenceState.CONVERGED, FailureCause.NONE, "synthetic"
             ),
@@ -193,7 +193,7 @@ class TestTopNContractInvariants:
     ):
         system = _canonical_system()
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_lga_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_lga_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 candidates, status, FailureCause.NONE, "synthetic"
             ),
@@ -240,7 +240,7 @@ class TestTopNContractInvariants:
         """搜索零结果：状态三元组不变，不开候选，即使 top_n 已传。"""
         system = _canonical_system()
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_lga_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_lga_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 (),
                 ConvergenceState.INFEASIBLE,
@@ -298,7 +298,7 @@ class TestWsbTopNCandidates:
         system = BCR4BPSystem.earth_moon()
         candidates = tuple(_synthetic_wsb_candidate(system, dv) for dv in (4.06, 4.60))
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_wsb_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_wsb_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 candidates, ConvergenceState.CONVERGED, FailureCause.NONE, "synthetic"
             ),
@@ -373,7 +373,7 @@ class TestSnapshotFailureDegradation:
             return real_propagate(dynamics, sys_, x0_dim, t_end_dim, n_samples)
 
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer.search_lga_trajectories",
+            "e2m2e.algorithm.transfer.orchestrator.search_lga_trajectories",
             lambda *args, **kwargs: CandidateSearchResult(
                 candidates, ConvergenceState.CONVERGED, FailureCause.NONE, "synthetic"
             ),
@@ -383,7 +383,7 @@ class TestSnapshotFailureDegradation:
             lambda *args, **kwargs: (candidates[0], _fake_arrival_arc(system)),
         )
         monkeypatch.setattr(
-            "e2m2e.algorithm.transfer._propagate_synodic_leg",
+            "e2m2e.algorithm.transfer.orchestrator._propagate_synodic_leg",
             flaky,
         )
         target_phys = system.dimensionless_to_physical(np.array([0.5, 0.5, 0.0, 0.0, 1.0, 0.0]))

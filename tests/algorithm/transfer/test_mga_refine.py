@@ -18,8 +18,6 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.transfer import (
-    ConvergenceState,
-    FailureCause,
     MgaRefinementResult,
     refine_mga_chain,
     search_mga_chains,
@@ -27,6 +25,7 @@ from e2m2e.algorithm.transfer import (
 from e2m2e.algorithm.transfer.lambert import solve_lambert
 from e2m2e.algorithm.transfer.mga import flyby_pericenter_radius
 from e2m2e.data.constants import SECONDS_PER_DAY
+from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
 

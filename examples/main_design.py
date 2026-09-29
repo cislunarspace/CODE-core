@@ -98,7 +98,7 @@ def main() -> None:
     # 3. 绘图：会合系 3D 轨道（加摄动后的 2 年拟周期预报轨迹）
     print("\n3. 绘制会合系 3D 轨道（加摄动后 30 天拟周期轨迹，观察点对准 L2）")
     from e2m2e.algorithm.dynamics import LibrationPoint
-    from e2m2e.algorithm.family.cr3bp_orbits import earth_moon_system
+    from e2m2e.algorithm.family import earth_moon_system
 
     system = earth_moon_system()
 

@@ -18,7 +18,7 @@ def test_algorithm_defaults_are_sourced_from_data_constants():
     """算法默认值必须从 data.constants 取值，不能在算法层重新定义。"""
     from e2m2e.algorithm.dynamics.bcr4bp_system import BCR4BPSystem
     from e2m2e.algorithm.dynamics.cr3bp_system import CR3BP_System
-    from e2m2e.algorithm.family.cr3bp_orbits import CHAR_LENGTH_KM as family_char_length
+    from e2m2e.algorithm.family.orbits.walk import CHAR_LENGTH_KM as family_char_length
     from e2m2e.algorithm.forces.force_mapping import perturbation_to_force_config
     from e2m2e.algorithm.forces.gravity_file import _DEFAULT_MU
     from e2m2e.algorithm.propagation import _DEFAULT_FORCE_CONFIG
