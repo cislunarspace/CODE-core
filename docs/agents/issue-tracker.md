@@ -5,7 +5,7 @@
 ## 约定
 
 - **创建 issue**：`gh issue create --title "..." --body "..."`。多行正文用 heredoc。
-- **AI 贡献标记**：AI 提交的 issue 与 PR 标题以 `[AI Generated][<类型>]` 开头；类型标签见 `CONTRIBUTING.md`（PR 用 `[FEAT]` / `[FIX]` / `[DOC]` / `[TEST]` / `[CLEANUP]` / `[DEP]`，Issue 用 `[FEAT]` / `[BUG]` / `[IDEA]` / `[RESEARCH]` / `[TASK]`）。AI 写的评论首行用 `> **[AI Generated]** 本评论由 AI 完成。` 或 `> **[AI Assisted]** 本评论由 AI 辅助完成。`
+- **AI 贡献标记**：AI 提交的 issue 与 PR 标题以 `[AI Generated][<类型>]` 开头；类型标签、`[BREAKING]` 的加法与各处的分类口径见 `CONTRIBUTING.md` 的标签体系统一表，本文件不重复枚举。AI 写的评论首行用 `> **[AI Generated]** 本评论由 AI 完成。` 或 `> **[AI Assisted]** 本评论由 AI 辅助完成。`
 - **读取 issue**：`gh issue view <number> --comments`，用 `jq` 过滤评论，同时获取标签。
 - **列出 issue**：`gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`，按需加 `--label` 和 `--state` 过滤。
 - **评论 issue**：`gh issue comment <number> --body "..."`
@@ -86,14 +86,8 @@ ID 于 2026-09-24 经 `gh project field-list 4 --owner cislunarspace --format js
 
 打 tag 触发 release workflow 后，GitHub Release 由 workflow 以自动生成的 notes（PR 列表格式）创建，这不是可交付格式。Agent 在确认 workflow 全绿后必须重写发布说明，写法遵循 `CONTRIBUTING.md` 的正文写作约定：
 
-1. **受众是升级到本版本的调用方**。他们最关心三件事：有什么新能力、升级会不会破坏现有代码、坏了改哪里。开头一段交代版本主题并指路；小标题用英文，从下列集合中选用，用到的才出现，次序固定：
-   - `New Tools`：进入 MCP、CLI 与 sidecar 统一工具面的新增任务级工具；
-   - `Algorithm Layer`：算法层新增、不直接进工具面的能力；
-   - `Performance`：性能、实现方式与依赖变化中调用方可感知的部分（提速、换源、错误码前缀等）；
-   - `Changed`：不属于破坏的行为变化（契约收窄、报错文案或错误码变化等，Performance 放不下的）；
-   - `Breaking Changes`：破坏性变更，逐条给出旧路径到新路径的迁移写法；
-   - `Fixed`：修复，一条一行。
-2. **发布说明是 CHANGELOG 对应节的提炼稿，不是逐字照搬**。CHANGELOG 条目为留底而写、允许长；发布说明去粗取精，把同一主题的多条归并叙述。事实以 CHANGELOG 为准，不虚构、不改数值。
+1. **受众是升级到本版本的调用方**。他们最关心三件事：有什么新能力、升级会不会破坏现有代码、坏了改哪里。开头一段交代版本主题并指路；小标题用英文，取 `CONTRIBUTING.md` 标签体系统一表的发布说明小标题列，`BREAKING` 置最前，其后依次 `FEAT`、`FIX`、`CLEANUP`、`DEP`、`DOC`、`TEST`，用到的才出现。各节的取舍：`FEAT` 收新增与有意改变行为，`FIX` 收修复，`CLEANUP` 收不改行为的整理，`DEP` 收依赖与构建更新，`DOC`、`TEST` 各收文档与测试；破坏性变更只进 `BREAKING`，不在 `FEAT` 或 `CLEANUP` 里重复。
+2. **发布说明是 CHANGELOG 对应节的提炼稿，不是逐字照搬**。CHANGELOG 条目为留底而写、允许长；发布说明去粗取精，把同一主题的多条归并叙述，`BREAKING` 节逐条给出旧路径到新路径的迁移写法。事实以 CHANGELOG 为准，不虚构、不改数值。
 3. 节尾追加空行、`---`、空行与 `**Full Changelog**: https://github.com/cislunarspace/CODE-core/compare/<上一版本>...<本版本>`。
 4. 经 `gh release edit <tag> --notes-file <file>` 写回，并核验远端 body 与稿件一致。
 
