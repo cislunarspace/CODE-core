@@ -96,3 +96,22 @@ def test_only_agents_rule_text_is_exempt():
 
 def test_repo_tree_passes_gate():
     assert _GATE.main() == 0
+
+
+def test_scan_surface_matches_policy():
+    """扫描面须覆盖条款点名的文档与代码注释：漏登记会让条款静默失效。"""
+    rels = {p.relative_to(_REPO_ROOT).as_posix() for p in _GATE.scan_paths()}
+    for required in (
+        "AGENTS.md",
+        "NOTICE",
+        ".out-of-scope/stability-bifurcation-analysis.md",
+        "docs/adr/0048-ephemeris-datum-gm-pairing.md",
+        "docs/tutorials/orbit-catalog.rst",
+        "e2m2e/data/kernels/manager.py",
+        "tests/data/kernels/test_spice_manager.py",
+        "scripts/check_deleted_dir_refs.py",
+        "crates/e2m2e-spice/src/lib.rs",
+        "crates/e2m2e-spice/README.md",
+        "examples/main_propagate.py",
+    ):
+        assert required in rels, f"门禁扫描面缺 {required}"
