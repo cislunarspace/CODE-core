@@ -156,8 +156,10 @@ class DesignOrbitRequest(_ApiModel):
             if selection == "LISSAJOUS":
                 ranges = _LISSAJOUS_L3_RANGES if point == 3 else _LISSAJOUS_L1_L2_RANGES
             else:
-                # L1 设计域止于族折叠常量 26 908 km（设计路径上限，与族生成折叠点
-                # 一致，#643 探测确认）；L2 放宽到 z0 折叠顶 ≈77 787 km 内的 77 000 km
+                # L1 设计域止于固定 z0 延拓安全上界 26 908 km（0.07×特征长度，
+                # 与族生成侧上限同源，#643 探测确认；族折叠点约 32674 km 在其后，
+                # 折叠点后经 NRHO 路径可达）；L2 放宽到 z0 折叠顶 ≈77 787 km 内
+                # 的 77 000 km
                 limit = 26_908.0 if point == 1 else 77_000.0
                 ranges = _with_global_amplitude_out(
                     _range_map(amplitude=NumericRange(-limit, limit))

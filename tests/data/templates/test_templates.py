@@ -57,7 +57,7 @@ class TestSeedConstants:
         assert MOON_RADIUS_KM == 1737.4
         assert seed._DRO_SEED_X0 == 0.79188556619742
         assert seed._HALO_SEED_Z0 == 0.001
-        assert seed._HALO_FOLD_Z0 == {1: 0.07, 2: 0.15}
+        assert seed._HALO_FIXED_Z0_LIMIT == {1: 0.07, 2: 0.15}
 
 
 class TestPerturbationDefaults:

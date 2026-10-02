@@ -123,8 +123,8 @@ class TestDesignOrbitRequest:
             accepted = DesignOrbitRequest(orbit_type=orbit_type, **{field: minimum + 1.0})
             assert getattr(accepted, field) == minimum + 1.0
 
-    def test_halo_l1_domain_tightened_to_family_fold(self):
-        """#643：HALO 振幅域逐平动点分档——L1 止于族折叠常量 26 908 km。"""
+    def test_halo_l1_domain_tightened_to_fixed_z0_limit(self):
+        """#643：HALO 振幅域逐平动点分档——L1 止于固定 z0 延拓安全上界 26 908 km。"""
         numeric_range = DesignOrbitRequest.valid_ranges("HALO", collinear_point=1)["amplitude"]
         assert (numeric_range.minimum, numeric_range.maximum) == (-26908.0, 26908.0)
         accepted = DesignOrbitRequest(orbit_type="HALO", collinear_point=1, amplitude=26908.0)
