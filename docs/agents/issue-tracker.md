@@ -86,8 +86,14 @@ ID 于 2026-09-24 经 `gh project field-list 4 --owner cislunarspace --format js
 
 打 tag 触发 release workflow 后，GitHub Release 由 workflow 以自动生成的 notes（PR 列表格式）创建，这不是可交付格式。Agent 在确认 workflow 全绿后必须重写发布说明，写法遵循 `CONTRIBUTING.md` 的正文写作约定：
 
-1. **受众是升级到本版本的调用方**。他们最关心三件事：有什么新能力、升级会不会破坏现有代码、坏了改哪里。行文按这个次序组织：版本主题一段 → 新工具 → 算法层新增 → 性能与实现 → 破坏性变更 → 修复。
-2. **发布说明是 CHANGELOG 对应节的提炼稿，不是逐字照搬**。CHANGELOG 条目为留底而写、允许长；发布说明去粗取精，把同一主题的多条归并叙述，破坏性变更逐条给出旧路径到新路径的迁移写法。事实以 CHANGELOG 为准，不虚构、不改数值。
+1. **受众是升级到本版本的调用方**。他们最关心三件事：有什么新能力、升级会不会破坏现有代码、坏了改哪里。开头一段交代版本主题并指路；小标题用英文，从下列集合中选用，用到的才出现，次序固定：
+   - `New Tools`：进入 MCP、CLI 与 sidecar 统一工具面的新增任务级工具；
+   - `Algorithm Layer`：算法层新增、不直接进工具面的能力；
+   - `Performance`：性能、实现方式与依赖变化中调用方可感知的部分（提速、换源、错误码前缀等）；
+   - `Changed`：不属于破坏的行为变化（契约收窄、报错文案或错误码变化等，Performance 放不下的）；
+   - `Breaking Changes`：破坏性变更，逐条给出旧路径到新路径的迁移写法；
+   - `Fixed`：修复，一条一行。
+2. **发布说明是 CHANGELOG 对应节的提炼稿，不是逐字照搬**。CHANGELOG 条目为留底而写、允许长；发布说明去粗取精，把同一主题的多条归并叙述。事实以 CHANGELOG 为准，不虚构、不改数值。
 3. 节尾追加空行、`---`、空行与 `**Full Changelog**: https://github.com/cislunarspace/CODE-core/compare/<上一版本>...<本版本>`。
 4. 经 `gh release edit <tag> --notes-file <file>` 写回，并核验远端 body 与稿件一致。
 
