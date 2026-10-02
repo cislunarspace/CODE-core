@@ -32,6 +32,7 @@
 - **稳定性与分岔能力的测试与追溯元数据删除**：`tests/algorithm/stability/` 三份测试（`test_stability.py`、`test_stability_branches.py`、`test_family_bifurcation.py`）移除；MBSE 追溯面同步删净——架构组件的 `StabilityAnalysis` 与需求 `REQ-110`（Floquet 乘子乘积的辛条件）。诊断脚本 `scripts/calibrate_dro3d_vertical_critical.py` 保留并改为自含：稳定性指数不再经被删模块的乘子配对得到，改由 monodromy 的辛块直接给出——面外 `ν_out = M[2,2] + M[5,5]`，面内由 x/y/vx/vy 的 4×4 辛块解 `ν² − tr(A_in)·ν + (m_in − 2) = 0`（`m_in` 为该块特征多项式的中间系数 `(tr² − tr A_in²)/2`）；扫描保留 #688 的量级缩放跳支判据（`|Δν| > 0.3·max(1, |ν|)`）与二分精化，并补 `--step > 0`、`--max-members ≥ 2` 校验与族参数域端点零判据成员的认领。(#687)
 
 ### Fixed
+- **L1 NRHO 单轨设计可达（近月高参数化）**：`design_nrho(1, north_south, perilune_height_km)` 此前在 Python 伪弧长延拓（PAL）路径上抛 `Cr3bpOrbitError`——600 条轨道仍未到达目标近月距。两处缺陷叠加：PAL 的方向定向（`directional_increment`）只缩放欧拉预测步、未同步缩放牛顿迭代的弧长约束，牛顿解被拉向族的另一侧落到 z 镜像支；逐步方向反馈又把正常上行步误判为越过折叠点并锁存翻转。二者使步进陷入近月距双能级 2 周期振荡（z0 在约 1400/3100 km 交替）。南半球的 L1 还误走 `negative` 支（以 x0 为目标、走向平面分岔端，到不了近月段），现与北半球同走 `positive` 振幅增长支，单次 PAL 越过折叠点后以 z0 二分细化。现在 `design_nrho(1, 1, 5000.0)` 与 `design_nrho(1, 2, 5000.0)` 都返回近月点高 5000 km（±10 km 内）、一个周期传播闭合的周期轨道，两半球 z0 近似等值反号；未达目标时抛出的 `Cr3bpOrbitError` 消息区分族已到尽头、步进停滞与提前中断三种原因。L2 单轨与 Rust 族生成路径行为不变。(#772)
 - **SUN 的 DE421 GM 两视图配对矛盾**：`[body.SUN.gm]` 此前无 DE421 行，与 `[datum.DE421].sun_gm` 的 1.32712428e11 矛盾——DE421 口径下按天体取太阳 GM 走 DE440 回退值 1.32712440018e11，相对差约 9e-8，按口径取则用聚合值，两条路径给出不同的数。现补齐同值行并标 `source = "DE421"`，DE421 口径下第三体太阳 GM 自此取 1.32712428e11，两视图一致性测试恢复 SUN 覆盖；权威文献出处待补，见 #670。(#713)
 
 ## [5.9.7] - 2026-09-26

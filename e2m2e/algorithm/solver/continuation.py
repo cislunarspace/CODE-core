@@ -528,8 +528,10 @@ class Continuation:
         """伪弧长延拓（对应 MATLAB ``continuation_PAL_CR3BP``，plane=13 / XZ 对称）
 
         自由变量 ``X = [rx, rz, vy, T/2]``，``Xdot = null(dF)``，PAL 约束
-        ``G = [F; (Xnew-X)·Xdot - ΔS]``；内层用 ``Xnew`` 计算 ``F`` （与 MATLAB
-        中仅用固定 ``X`` 相比更一致）。每步后用微分修正闭合。
+        ``G = [F; (Xnew-X)·Xdot - ΔS]``，其中 ``ΔS`` 是带符号步长
+        ``dir_sign * step_size``（方向契约见 ``directional_increment`` 参数）；
+        内层用 ``Xnew`` 计算 ``F`` （与 MATLAB 中仅用固定 ``X`` 相比更一致）。
+        每步后用微分修正闭合。
 
         Args:
             seed_orbit: 种子轨道（Orbit 对象）。
@@ -544,6 +546,12 @@ class Continuation:
                 见 ``family.halo_family.halo_dc_config_selector``。
             target_vector: 与 MATLAB TargetVector 对应的 0 基下标
                 （0=rx, 1=rz, 2=vy, 3=T/2）。
+            target_direction: 目标变量 tv 的期望符号方向（+1/−1），仅在
+                ``directional_increment`` 为真时用于定首步方向。
+            directional_increment: 为真时在延拓起点按种子切向量与
+                ``(target_vector, target_direction)`` 定一次符号 ``dir_sign``，
+                该符号同时缩放欧拉预测步与 PAL 弧长约束 ΔS（两者必须一致，
+                见函数内方向契约注释）；此后不再重判。为假时恒为 +1。
             backend: 数值内核后端。``"rust"``（默认）走 Rust PAL 内核
                 （``pal_newton_step_py`` / ``pal_f_df_tangent_py``）；
                 ``"python"`` 走 numpy 参照路径（对照与降级）。初始切向量
@@ -607,29 +615,20 @@ class Continuation:
         tv = target_vector
         td = target_direction
 
-        # [FIX] 每步根据 Xdot 重新判定方向的做法在族流形折叠点(fold)处
-        # 不稳定:Xdot 渐近过零变号,形成 2-周期环振荡(steps 65+
-        # 退回 z≈0.085,详见 PAL 折叠点停滞回归测试)。
-        #
-        # 修复方案:directional_increment 在 PAL 折叠点本质上不稳定。PAL 的
-        # 核心优势就是能沿弧长穿过折叠,此时目标变量(tv)会自然反转。
-        # 修复:让 directional_increment 仅在**延拓**的初始方向起作用,穿过
-        # 折叠点后**不再强制方向**。具体:初始用 Xdot 决定 dir_sign 起点,
-        # 一旦检测到“目标变量穿越期望方向”则不再翻转 — 信任 PAL 的自然
-        # 行为。滞回参数保证噪声不触发反向。
+        # [FIX #772] 方向契约：directional_increment 的方向判定只在延拓起点
+        # 做一次，由种子处切向量与目标方向 (tv, td) 定 dir_sign；此后
+        # dir_sign 同时缩放欧拉预测步与 PAL 弧长约束。两处必须一致：只缩放
+        # 预测时，牛顿迭代被弧长约束拉向族的另一侧，解落在 z 镜像支再被
+        # 镜像回正，叠加方向反馈的误翻转形成双能级 2-周期振荡（L1 北族
+        # 600 步停滞在 z0≈1400/3100 km）。折叠点不靠方向翻转穿越：切向量
+        # 逐步同向化保持定向连续，恒定符号步长沿弧长单调推进，PAL 天然
+        # 越过折叠（目标变量 tv 过折后自然反向，不再强制方向）。
         def _initial_dir_sign() -> float:
             if not directional_increment:
                 return 1.0
             return 1.0 if td * (ds * Xdot)[tv] > 0 else -1.0
 
         dir_sign = _initial_dir_sign()
-        prev_X_for_dir: np.ndarray | None = None
-        # 滞回:翻转 dir_sign 后至少保持 K 步不再翻,防止噪声来回触发
-        _hysteresis_steps_remaining = 0
-        _HYSTERESIS_K = 5
-        # 是否已经“穿越折叠点”:穿越后不再使用 dir_sign 翻折,
-        # 避免 dir_sign 在噪声中反复切换
-        _crossed_fold = False
 
         # 用于停滞检测:上一条已收敛轨道的状态
         prev_orbit_state: np.ndarray | None = None
@@ -646,24 +645,7 @@ class Continuation:
             if verbose and (n + 1) % 5 == 0:
                 logger.info("--- 延拓第 %d/%d 条轨道 ---", n + 1, n_orbits)
 
-            # [FIX] 反馈式 dir_sign + 滞回 + 单次穿越:
-            # 1. 滞回 5 步内不重判(防噪声)
-            # 2. 仅在"_crossed_fold=False"时检测翻转
-            # 3. 一旦翻转一次,就标记为已穿越,不再翻转(避免来回)
-            # 这让 PAL 在穿过折叠点后沿流形自然反向,不再振荡。
-            if directional_increment and prev_X_for_dir is not None and not _crossed_fold:
-                if _hysteresis_steps_remaining > 0:
-                    _hysteresis_steps_remaining -= 1
-                else:
-                    _delta_tv_actual = X[tv] - prev_X_for_dir[tv]
-                    # 当前 dir_sign 让目标变量沿 td 方向增大,若上一步 X[tv] 反向
-                    # 说明已越过折叠点,翻转 dir_sign 让 PAL 沿流形继续走
-                    if dir_sign * (td * _delta_tv_actual) < 0:
-                        dir_sign = -dir_sign
-                        _hysteresis_steps_remaining = _HYSTERESIS_K
-                        _crossed_fold = True
-
-            # [FIX] 使用 dir_sign 缩放预测(不每步重判 Xdot)
+            # dir_sign 同时缩放预测步与下方传入内核的弧长约束 ds（见上方方向契约注释）
             Xnew = X + dir_sign * ds * Xdot
 
             if verbose:
@@ -685,7 +667,7 @@ class Continuation:
                     x_ref=[float(v) for v in X],
                     sv0=[float(v) for v in SV0i],
                     tangent_ref=[float(v) for v in Xdot],
-                    ds=ds,
+                    ds=dir_sign * ds,
                     tol=TolPAL,
                     iter_max=IterMax,
                     rtol=dynamics.rtol,
@@ -698,7 +680,7 @@ class Continuation:
                     x_ref=X,
                     sv0=SV0i,
                     tangent_ref=Xdot,
-                    ds=ds,
+                    ds=dir_sign * ds,
                     tol=TolPAL,
                     iter_max=IterMax,
                     dynamics=dynamics,
@@ -847,8 +829,6 @@ class Continuation:
                 if np.dot(Xdot_new, Xdot) < 0:
                     Xdot_new = -Xdot_new
                 Xdot = Xdot_new
-                # [FIX] 记录这一步收敛后的 X,供下一步反馈式方向调整
-                prev_X_for_dir = X.copy()
 
                 if progress_callback is not None:
                     progress_callback(n + 1, n_orbits, orbit, direction)
