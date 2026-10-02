@@ -82,6 +82,16 @@ ID 于 2026-09-24 经 `gh project field-list 4 --owner cislunarspace --format js
 
 - Start Date 字段 ID：`PVTF_lADOE3ZAg84BkgBrzhjQaGw`
 
+## 发布说明
+
+打 tag 触发 release workflow 后，GitHub Release 由 workflow 以自动生成的 notes（PR 列表格式）创建，这不是可交付格式。Agent 在确认 workflow 全绿后必须重写发布说明，格式与既有版本一致：
+
+1. 从 `CHANGELOG.md` 提取本次版本的完整节：自 `## [<version>] - <date>` 节头起，到下一个 `## [` 节头前为止，内容逐字取自 CHANGELOG，不新增、不改写条目。
+2. 节尾追加空行、`---`、空行与 `**Full Changelog**: https://github.com/cislunarspace/CODE-core/compare/<上一版本>...<本版本>`。
+3. 经 `gh release edit <tag> --notes-file <file>` 写回，并核验远端 body 与生成文件一致。
+
+发布说明面向调用方，来源是 CHANGELOG 对应节；两者格式差异只在节头与 compare 链接。禁止把 PR 列表、commit 列表或自动生成 notes 当作最终发布说明。
+
 ## Wayfinding 操作
 
 被 `/wayfinder` 使用。**地图**是一个 issue，其下挂**子** issue 作为工单。
