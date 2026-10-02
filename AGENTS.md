@@ -6,7 +6,7 @@
 
 工程技能在会话中读取 `docs/agents/` 下的仓库级配置；改动这些文件即改变技能行为，需同步本文件。配置本身用中文书写，遵循本文件的语言约定。
 
-- `docs/agents/issue-tracker.md`：issue 与规格的存放位置、`gh` 操作约定、AI 贡献标记、PR 是否作为请求渠道、发布说明的起草格式（CHANGELOG 对应节转正 + compare 链接，禁止自动生成 notes 直接交付），以及 GitHub Project 的工作状态配置（Project ID、Status / Priority / Start Date 字段与选项 ID）。由 `/code-review`、`/github-project`、`/merge-pr`、`/open-pr` 按路径读取，`/triage` 读取其中的渠道标记与 Project 配置。
+- `docs/agents/issue-tracker.md`：issue 与规格的存放位置、`gh` 操作约定、AI 贡献标记、PR 是否作为请求渠道、发布说明的起草要求（以调用方为受众，把 CHANGELOG 对应节提炼成稿；禁止自动生成 notes 直接交付），以及 GitHub Project 的工作状态配置（Project ID、Status / Priority / Start Date 字段与选项 ID）。由 `/code-review`、`/github-project`、`/merge-pr`、`/open-pr` 按路径读取，`/triage` 读取其中的渠道标记与 Project 配置。
 - `docs/agents/triage-labels.md`：五个分诊角色到本仓库标签字符串的映射，供分诊流程按角色取用；映射缺失时 `/triage` 会要求运行 `/setup-ouyangjiahong-skills`。
 - `docs/agents/domain.md`：探索代码库时如何读 `CONTEXT.md` 与 `docs/adr/`、如何按术语表用词、如何标注 ADR 冲突。供探索代码库的技能使用；术语与决策落定时由 `/domain-modeling` 更新 `CONTEXT.md` 与 ADR。
 - `docs/agents/multi-session-concurrency.md`：多会话并发约定。
