@@ -87,9 +87,10 @@ ID 于 2026-09-24 经 `gh project field-list 4 --owner cislunarspace --format js
 打 tag 触发 release workflow 后，GitHub Release 由 workflow 以自动生成的 notes（PR 列表格式）创建，这不是可交付格式。Agent 在确认 workflow 全绿后必须重写发布说明，写法遵循 `CONTRIBUTING.md` 的正文写作约定：
 
 1. **受众是升级到本版本的调用方**。他们最关心三件事：有什么新能力、升级会不会破坏现有代码、坏了改哪里。开头一段交代版本主题并指路；小标题用英文，取 `CONTRIBUTING.md` 标签体系统一表的发布说明小标题列，`BREAKING` 置最前，其后依次 `FEAT`、`FIX`、`CLEANUP`、`DEP`、`DOC`、`TEST`，用到的才出现。各节的取舍：`FEAT` 收新增与有意改变行为，`FIX` 收修复，`CLEANUP` 收不改行为的整理，`DEP` 收依赖与构建更新，`DOC`、`TEST` 各收文档与测试；破坏性变更只进 `BREAKING`，不在 `FEAT` 或 `CLEANUP` 里重复。
-2. **发布说明是 CHANGELOG 对应节的提炼稿，不是逐字照搬**。CHANGELOG 条目为留底而写、允许长；发布说明去粗取精，把同一主题的多条归并叙述，`BREAKING` 节逐条给出旧路径到新路径的迁移写法。事实以 CHANGELOG 为准，不虚构、不改数值。
-3. 节尾追加空行、`---`、空行与 `**Full Changelog**: https://github.com/cislunarspace/CODE-core/compare/<上一版本>...<本版本>`。
-4. 经 `gh release edit <tag> --notes-file <file>` 写回，并核验远端 body 与稿件一致。
+2. **中英双语，一个正文里两块**。版本节头之后先写中文块，以粗体行 `**中文**` 起始；空行后 `---`，再空行，以粗体行 `**English**` 起始写英文块。kind 小标题在两个语言块内各写一次，语言名用粗体行而不是标题，小标题只留给 kind。两块覆盖同一组事实与条目，一一对应，数值、符号名与引用完全一致；英文用简明书面英语，术语照抄 CHANGELOG 的英文写法，不是逐字直译但不得增删事实。
+3. **发布说明是 CHANGELOG 对应节的提炼稿，不是逐字照搬**。CHANGELOG 条目为留底而写、允许长；发布说明去粗取精，把同一主题的多条归并叙述，`BREAKING` 节逐条给出旧路径到新路径的迁移写法。事实以 CHANGELOG 为准，不虚构、不改数值。
+4. 节尾追加空行、`---`、空行与 `**Full Changelog**: https://github.com/cislunarspace/CODE-core/compare/<上一版本>...<本版本>`。
+5. 经 `gh release edit <tag> --notes-file <file>` 写回，并核验远端 body 与稿件一致。
 
 禁止把 PR 列表、commit 列表或自动生成 notes 当作最终发布说明；发布说明过长（读者读不完）与遗漏破坏性变更（升级者踩坑）同为不合格。
 
