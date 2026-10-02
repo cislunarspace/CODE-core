@@ -3,7 +3,7 @@
 **状态**：已采纳（已实现）
 **日期**：2026-09-26
 **相关 issue**：#665（本决策的直接动机）、#670（DE421 外行星 GM 权威来源的缺口）、#377/ADR 0022（基准集来源，本 ADR 修订其决策 4）
-**相关**：ADR 0022（决策 3「多基准并存」与决策 4「星历动力学默认 DE440」在此细化）、ADR 0013（按定义验证）、ADR 0039（共享内核叶）
+**相关**：ADR 0022（决策 3“多基准并存”与决策 4“星历动力学默认 DE440”在此细化）、ADR 0013（按定义验证）、ADR 0039（共享内核叶）
 **修订**：ADR 0022 决策 4（见文末）
 
 ## 背景
@@ -22,15 +22,15 @@ JPL **DE421** 星历。e2m2e 无法按该口径复算算例，因为存在两处
 
 动笔前先核实了一个决定性事实：**SPK 内核本身不携带 GM**。在
 `de421.bsp` + `pck00010.tpc` 下对所有天体调用 `bodvrd(..., "GM")` 一律报
-`KERNELVARNOTFOUND`（与仓库既有注释「DE430 bsp 不带 GM 数据」一致）。因此：
+`KERNELVARNOTFOUND`（与仓库既有注释“DE430 bsp 不带 GM 数据”一致）。因此：
 
-- "GM 从内核读" 在 SPICE 层面不成立，**GM 只能来自 `constants.toml` 的声明式
+- “GM 从内核读” 在 SPICE 层面不成立，**GM 只能来自 `constants.toml` 的声明式
   body 表**；
 - datum 只能由内核**文件名**推断，不可能从内核内容推断。
 
 另一个实测约束：**CSPICE 内核池是进程级全局的**。两个 `SPICEManager` 实例
 同时加载 de421 与 de440s 时，后加载者对重叠覆盖段全局生效，两者会查到同一个
-内核——"同一进程内并存两套口径"是不成立的前提。这反过来强化了自动配对的价值：
+内核——“同一进程内并存两套口径”是不成立的前提。这反过来强化了自动配对的价值：
 调用方几乎不可能手工维持一致。
 
 ## 决策
@@ -41,8 +41,8 @@ JPL **DE421** 星历。e2m2e 无法按该口径复算算例，因为存在两处
 取**最后一个仍加载**的内核的 datum，无星历内核时为 `DE440`（ADR 0022 决策 4 的
 默认值）。`get_gm(body, datum=None)` 默认用该口径，`datum` 可显式覆盖。
 
-取"最后加载者"而非"首个"：与 SPICE 对重叠覆盖段「后加载者生效」的优先级规则
-一致，避免出现"位置按 de440s、GM 按 de421"的静默错配。
+取“最后加载者”而非“首个”：与 SPICE 对重叠覆盖段“后加载者生效”的优先级规则
+一致，避免出现“位置按 de440s、GM 按 de421”的静默错配。
 
 ### 2. 内核 → datum 是显式白名单，未收录者回退并告警
 
@@ -62,8 +62,8 @@ de441/de442 的 GM 与 DE440 **确有差异**，但补全它们需要的权威�
 
 `find_ephemeris_kernel(search_dir, preferred=...)` 与
 `load_design_kernels(..., datum=...)` 在显式请求 DE421 而 `de421.bsp` 不存在时
-抛 `FileNotFoundError`，不悄悄退回 de440s/de435——降级会把"按 DE421 口径复算"
-变成"以为在复算、其实不是"，比失败更糟（ADR 0020 的失败显式化）。
+抛 `FileNotFoundError`，不悄悄退回 de440s/de435——降级会把“按 DE421 口径复算”
+变成“以为在复算、其实不是”，比失败更糟（ADR 0020 的失败显式化）。
 
 缺省路径（不传 `datum`）保持 `de440s > de430` 的历史顺序**逐位不变**：
 `kernels/` 里出现可选内核不得让未声明口径的调用方静默换口径。
@@ -94,8 +94,8 @@ DE421 GM 仍只写在 `constants.toml`：`[datum.DE421]` 是聚合视图，
 - **行为变化**：`kernels/` 里存在 de421 且显式加载时，同一套代码的 GM 会从
   DE440 切到 DE421（例：月球 GM 4902.800118 → 4902.8005821478，相对差
   9.5e-8）。未加载 de421 的环境行为逐位不变。
-- GM 现在**依赖运行环境里存在哪个内核**。这是自动配对的固有代价，用"缺省不
-  降级 + 未收录内核告警 + 测试守卫缺省路径"三重约束把意外面收窄。
+- GM 现在**依赖运行环境里存在哪个内核**。这是自动配对的固有代价，用“缺省不
+  降级 + 未收录内核告警 + 测试守卫缺省路径”三重约束把意外面收窄。
 - 口径差异可量化并固化在测试中（`tests/algorithm/design/test_de421_datum.py`）：
   2020–2026 弧段上 de421 与 de440s 的月球位置差米级（实测均值 3 m / 最大
   4 m）、太阳百米级（均值 150 m / 最大 220 m），与两代星历的精度声明相符。
@@ -104,14 +104,14 @@ DE421 GM 仍只写在 `constants.toml`：`[datum.DE421]` 是聚合视图，
 
 ## 被否方案
 
-1. **强制调用方传 `datum`**（不给默认配对）。否：最需要口径一致的正是"加载
-   de421 就想复算论文"的调用方，多一个必填参数只是把出错的义务转给他们；且
+1. **强制调用方传 `datum`**（不给默认配对）。否：最需要口径一致的正是“加载
+   de421 就想复算论文”的调用方，多一个必填参数只是把出错的义务转给他们；且
    ADR 0022 已确立基准是显式一等对象，配对规则可以是它的自动默认。
 2. **从内核内容读 GM**。否：本 ADR 背景部分的实测已证伪——SPK 不含 GM。
 3. **给 Rust 侧也加 datum 分支**。否：第三体 GM 不经过 Rust 常数表，加了是
    无消费者的死分支；固潮继续用 DE440 并已在注释中声明。
 4. **同一进程内并存两套口径供对拍**。否：CSPICE 内核池进程级全局，后加载者
-   覆盖；对拍只能按"换内核再查一遍"的顺序方式做（实现即如此）。
+   覆盖；对拍只能按“换内核再查一遍”的顺序方式做（实现即如此）。
 
 ## 验证
 
@@ -119,17 +119,17 @@ DE421 GM 仍只写在 `constants.toml`：`[datum.DE421]` 是聚合视图，
   未知基准报错/缺省顺序不变）、GM 一致性（DE421 已发布值）、body↔datum 表同值、
   `ThirdBodyGravity.to_rust_spec` 真的携带 DE421 GM、位置差量级守卫。
 - `tests/data/kernels/test_spice_manager.py`：GM 默认口径、显式覆盖、缺失回退
-  告警一次、加载/卸载切换口径、多内核"后加载者胜"。
+  告警一次、加载/卸载切换口径、多内核“后加载者胜”。
 - `tests/data/constants/test_constants.py`：body 表与 datum 表 DE421 GM 同值；
-  外行星**有意**无 DE421 行（把"留空"钉成决定而非疏忽）。
+  外行星**有意**无 DE421 行（把“留空”钉成决定而非疏忽）。
 - `tests/algorithm/design/test_kernel_future_coverage.py`：
   `kernels/` 存在 de421 时缺省口径仍为 de440s。
 
 ## Revision to ADR 0022
 
-Decision 4 的「ephemeris dynamics defaults to `DE440`」细化为：星历动力学的 GM
+Decision 4 的“ephemeris dynamics defaults to `DE440`”细化为：星历动力学的 GM
 基准**跟随已加载星历内核**（本 ADR 决策 1），仅在无星历内核时仍默认 `DE440`。
-决策 3「多基准并存、按场景选」与决策 5「单一来源 + 生成期对齐」不变。
+决策 3“多基准并存、按场景选”与决策 5“单一来源 + 生成期对齐”不变。
 
 ## Revision (2026-09-26): pairing bookkeeping scope and kernel-load warnings (#683 review)
 
@@ -194,16 +194,16 @@ warning set was a module global, coupling test modules.
 
 ### Context
 
-Revision (b) 只记录了「类级列表在 `_bookkeeping_lock` 下变更」，#683 之后仍有三处
+Revision (b) 只记录了“类级列表在 `_bookkeeping_lock` 下变更”，#683 之后仍有三处
 边界未闭合：Python 侧 `furnsh` 发生在持锁记账**之前**（并发加载不同内核时，簿记末位
-可能晚于池里实际生效的末位，重新落回本 ADR §1 要消除的「位置按新内核、GM 按旧簿记」
+可能晚于池里实际生效的末位，重新落回本 ADR §1 要消除的“位置按新内核、GM 按旧簿记”
 错配）；双 `furnsh` 的异常路径无回滚（Python 侧已生效而 Rust 侧失败时，池已变更而
-簿记未变更；卸载则反之），注释「仅在 furnsh 成功后登记，失败不污染当前口径」在双
+簿记未变更；卸载则反之），注释“仅在 furnsh 成功后登记，失败不污染当前口径”在双
 `furnsh` 下不成立。
 
 ### Decisions
 
-1. **临界区覆盖「双侧 furnsh/unload + 簿记」三步。** `load_kernel` 的 Python
+1. **临界区覆盖“双侧 furnsh/unload + 簿记”三步。** `load_kernel` 的 Python
    `furnsh`、Rust `spice_furnsh` 与 `_loaded_ephemeris` 更新在同一个
    `_bookkeeping_lock` 内完成，`unload_kernel` 对称。故簿记顺序 == 池的实际生效
    顺序。该锁只界定这三步的相对顺序，不串行化、也不承担 CSPICE 池内部状态的线程
@@ -215,7 +215,7 @@ Revision (b) 只记录了「类级列表在 `_bookkeeping_lock` 下变更」，#
    移除最后一条，故一次 `unload` 恰为本次 `furnsh` 的逆操作，不会卸掉此前已加载
    的实例）且不登记簿记；Rust `unload` 失败 → 恢复 Python 侧 `furnsh`（成员回到
    两池）并把该内核的簿记条目移到末位——恢复即重新加载，Python 池内它重新成为
-   「后加载者」，簿记须跟着走，否则「位置按该内核、GM 按旧末位」再次失配。回滚/
+   “后加载者”，簿记须跟着走，否则“位置按该内核、GM 按旧末位”再次失配。回滚/
    恢复本身失败只记 warning，不掩盖原异常。
 4. **`spice_furnsh`/`spice_unload` 为 `None`（扩展未含 spice feature）时沿用
    #382 的既有接缝：只喂 Python 池。** 本修订不改变该取舍，也不把它上升为本 ADR
@@ -237,7 +237,7 @@ Revision (b) 只记录了「类级列表在 `_bookkeeping_lock` 下变更」，#
 
 ### Context
 
-背景 §1 把「拿不到 DE421 内核」列为本 ADR 的动机之一，并注明补法是从 NAIF 经
+背景 §1 把“拿不到 DE421 内核”列为本 ADR 的动机之一，并注明补法是从 NAIF 经
 Colab 取回后上传 `kernels-v1`。那是**分发**手段而非入库：clone 得到的 `kernels/`
 不含 de421，要按 ADR 口径复算必须先联网跑 `make kernels`。而 de430/de440s 自
 #517 起就在 git-lfs 里（`.gitattributes` 的 `kernels/*.bsp` 规则），de421 是该
@@ -248,13 +248,13 @@ Colab 取回后上传 `kernels-v1`。那是**分发**手段而非入库：clone 
 1. **`kernels/de421.bsp` 按同一条 LFS 规则入库**（16 790 528 字节，sha256
    `08b20db2ae22…`，与 `kernels-v1` 的 `de421.bsp` 资产逐字节相同）。
    `.gitattributes` 无需改动——`kernels/*.bsp` 已覆盖。
-2. **release 路径保留且不是「备用降级」**：CI 的 `actions/checkout` 未开
+2. **release 路径保留且不是“备用降级”**：CI 的 `actions/checkout` 未开
    `lfs: true`（检出的是 LFS 指针文件），任何未拉 LFS 的 clone 也如此，二者
    仍由 `make kernels` → `scripts/download_kernels.py` 供给，既有指针判据
    `_is_lfs_pointer` 已覆盖本文件。两条路径的同名资产须保持同源。
 3. **口径语义与守卫不动**：决策 1（GM 跟随仍加载的末位内核）、决策 3（显式
    请求 DE421 而内核缺失时 `FileNotFoundError`）以及缺省顺序 `de440s > de430`
-   逐位不变。本修订只改「de421.bsp 从哪来」，不改「加载后查到什么」。
+   逐位不变。本修订只改“de421.bsp 从哪来”，不改“加载后查到什么”。
 4. **`de421.cmt` 不入库**：仓库没有 `.cmt` 消费者；该注释文本的 NAIF 取法仍
    记在 `scripts/colab_download_de421.py`。
 
@@ -271,17 +271,17 @@ Colab 取回后上传 `kernels-v1`。那是**分发**手段而非入库：clone 
 §4 要求 body 与 datum 两视图同值。SUN 的 `[datum.DE421].sun_gm` 一直有值
 （1.32712428e11），但 `[body.SUN.gm]` 从未有过 DE421 行——聚合视图与逐天体
 视图矛盾；`tests/data/constants/test_constants.py` 的一致性测试把 SUN 归入
-「无出处、有意留空」一组而静默跳过，两视图漂移无守卫。
+“无出处、有意留空”一组而静默跳过，两视图漂移无守卫。
 
 ### Decisions
 
 1. **补 `[body.SUN.gm].DE421 = 1.32712428e11`，与 `[datum.DE421].sun_gm`
    逐位同值，`source = "DE421"`**。该值的仓库内权威文献出处不在现有证据内，
-   出处缺口归 #670；`source = "DE421"` 表示「DE421 口径」的标注而非文献出处，
+   出处缺口归 #670；`source = "DE421"` 表示“DE421 口径”的标注而非文献出处，
    诚实性由本段文字承担。
 2. **测试恢复 SUN 覆盖**：两视图同值断言纳入
    `TestDatumBodyGmAlignment.test_earth_moon_emb_de421_agree`，Rust 对拍补
-   `body.SUN.gm.DE421/DE440`；「有意留空」断言收窄为 JUPITER 及以外。
+   `body.SUN.gm.DE421/DE440`；“有意留空”断言收窄为 JUPITER 及以外。
 
 ### Consequences
 

@@ -1,9 +1,9 @@
 """摄动开关 → e2m2e 力模型配置映射表。
 
-inputs-dac.txt（第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月球质点
-引力常开 + 一组摄动开关"；e2m2e 侧是 ``ForceModel`` 聚合若干
+inputs-dac.txt（第 9~17 行 + 阶次/DYB 行）的力模型是“地球+月球质点
+引力常开 + 一组摄动开关”；e2m2e 侧是 ``ForceModel`` 聚合若干
 ``PhysicalModel`` （ADR 0004 配置驱动）。本模块给出两者的逐项对应，产出
-``ForceModel.from_config`` 可直接消费的配置字典，保证"同款力模型"两侧
+``ForceModel.from_config`` 可直接消费的配置字典，保证同款力模型两侧
 可复现。
 
 对应关系（地心 GCRS 传播）如下：
@@ -22,7 +22,7 @@ inputs-dac.txt（第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月球�
 - ``sun_body=1``：``ThirdBodyGravity(SUN)``。
 - ``planets=1``：七大行星（水星~海王星）各一个 ``ThirdBodyGravity``。
 - ``solar_radiation=1`` （炮弹模型）：``SolarRadiationPressure``，
-  ``area=等效面质比, mass=1, cr=1``——输入侧"等效面质比"（dyb[0]）已把
+  ``area=等效面质比, mass=1, cr=1``——输入侧等效面质比（dyb[0]）已把
   Cr 折进去，故 cr 取 1；无阴影模型（阴影行为未确认）。
 - ``solar_radiation=2`` （ECOM）：未实现，``NotImplementedError``。
 - ``atmosphere=1``：``DragModel`` （ExponentialAtmosphere 默认 f107/ap，
@@ -31,7 +31,7 @@ inputs-dac.txt（第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月球�
   主项（修正项构成未确认，待 P0 对齐实验核实）。
 - ``tide=1``：地球固体潮，挂在地球 ``GravityField`` 的
   ``tide_mode="solid"`` 上——因此要求 ``earth_nonspherical=1``，
-  否则抛 ``ValueError``。月球引力场不带潮（开关写明"地球的潮汐"）。
+  否则抛 ``ValueError``。月球引力场不带潮（开关写明地球的潮汐）。
 - ``coupling=1`` （地球非球形×大天体耦合项）：强制启用固体潮
   ``tide_mode="solid"`` （与 ``tide=1`` 共用 IERS TN32 固体潮公式）。
 
@@ -49,7 +49,7 @@ from ...data.templates.perturbations import DEFAULT_DYB, DEFAULT_PERTURBATION
 
 __all__ = ["PLANET_BODIES", "perturbation_to_force_config"]
 
-#: "大行星的第三体引力"对应的摄动天体（地球除外，月球有独立开关）
+#: “大行星的第三体引力”对应的摄动天体（地球除外，月球有独立开关）
 PLANET_BODIES: tuple[str, ...] = (
     "MERCURY",
     "VENUS",

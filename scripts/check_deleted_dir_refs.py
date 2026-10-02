@@ -7,7 +7,7 @@ docstring 一律不得残留。本脚本扫描 ``e2m2e/`` 与 ``tests/`` 下所�
 
 误报处理：ADR / 迁移计划等文档中描述迁移历史的"tests/core"是事实陈述，本脚本
 不扫 ``docs/``，自然排除；代码中确属必要的历史标注请改写为不引用旧路径的表述
-（如"迁移前位于旧 core 包"）。
+（如“迁移前位于旧 core 包”）。
 """
 
 from __future__ import annotations

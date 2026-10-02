@@ -53,10 +53,10 @@ def searcher(system: CR3BP_System, dynamics: CR3BP_Dynamics) -> TransferSearch:
 
 
 def _make_orbit_at(point: np.ndarray, n: int = 8) -> Orbit:
-    """构造一条"几乎是单点"的目标轨道，便于精确控制距离序列。
+    """构造一条“几乎是单点”的目标轨道，便于精确控制距离序列。
 
     所有采样点都在 ``point`` 附近 ``1e-12`` 抖动内，距离计算等价于
-    "每步轨迹点到 point 的欧氏距离"。
+    “每步轨迹点到 point 的欧氏距离”。
     """
     rng = np.random.default_rng(0)
     states = np.zeros((n, 6))

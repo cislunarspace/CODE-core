@@ -53,7 +53,7 @@ class SynodicJ2000System:
         t_c = self._get_time_unit()
         et = et0 + t_syn * t_c
         l_c = self.synodic_axes.characteristic_length(et)
-        # 把无量纲"质心系"位置先平移到"地心 + moon-earth 轴"位置描述
+        # 把无量纲“质心系”位置先平移到“地心 + moon-earth 轴”位置描述
         offset = self._bary_to_earth_offset(mu)
         position_in = (state_syn[:3] + offset) * l_c
         velocity_in = state_syn[3:] * l_c / t_c

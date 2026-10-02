@@ -96,7 +96,7 @@ def _ref_nutation_matrix(t: float) -> np.ndarray:
 
 
 class TestIcrsAxes:
-    """ICRSAxes 锚点测试:作为框架入口,确认"恒等旋转"语义可被 pyerfa 风格对比。"""
+    """ICRSAxes 锚点测试:作为框架入口,确认“恒等旋转”语义可被 pyerfa 风格对比。"""
 
     def test_rotation_matrix_is_identity_for_any_et(self):
         """ICRSAxes.rotation_matrix(et) 对任意 et 返回 np.eye(3)(恒等矩阵,1e-14 容差)。"""

@@ -3,13 +3,13 @@
 //! 对 e2m2e-propagation 的所有嵌入 RK 方法（PD45、PD78、RK89）
 //! 做一致性校验：行和下三角、c = Σa₍ᵢⱼ₎、Σb = Σb* = 1、阶数元数据。
 //!
-//! 依据：这些是 Runge-Kutta 方法"按定义"必须满足的基本性质；
+//! 依据：这些是 Runge-Kutta 方法“按定义”必须满足的基本性质；
 //! 不满足则表系数有误。
 //!
 //! # 参考
 //! - Hairner & Wanner, *Solving Ordinary Differential Equations I* (2nd ed.)
 //! - Butcher, *Numerical Methods for Ordinary Differential Equations* (3rd ed.)
-//! - ADR 0013 "验证策略——按定义完成任务"
+//! - ADR 0013 “验证策略——按定义完成任务”
 
 use e2m2e_propagation::butcher::ButcherTable;
 use e2m2e_propagation::rk_methods::RkMethod;

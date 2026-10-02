@@ -35,7 +35,7 @@ class NormalFormResult:
 
     - **通用化简诊断** （``substitute_residual``、``success``、``message``、
       ``metadata``）：跨阶段稳定，描述整条流水线的收敛情况。保留给仅关心
-      "是否收敛、残差多大"的诊断调用方。
+      是否收敛、残差多大的诊断调用方。
     - **子结果句柄** （``ds_result`` / ``qf_result`` / ``cm_result`` /
       ``catalog_transformer``）：指向四个子 reducer 的产物；
       ``catalog_transformer`` 一等公民字段使外部用户能直接

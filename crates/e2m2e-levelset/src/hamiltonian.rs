@@ -11,7 +11,7 @@
 //! MATLAB 中这两个回调配合弱类型 `schemeData` 使用（用户把动力学参数
 //! 塞进自由字段，`hamFunc` 还可借助 `nargout` 探测返回修改后的
 //! `schemeData`）。Rust 里的对应做法：把动力学参数放进实现本 trait 的
-//! 结构体字段，`hamFunc` 的"原位修改 schemeData"能力不再需要——需要
+//! 结构体字段，`hamFunc` 的“原位修改 schemeData”能力不再需要——需要
 //! 随时间演化的状态本就属于哈密顿量的实现方，用普通字段表达。
 
 use crate::grid::Grid;

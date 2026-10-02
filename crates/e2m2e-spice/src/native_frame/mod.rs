@@ -135,13 +135,13 @@ fn tpck_store() -> std::sync::RwLockReadGuard<'static, Vec<(PathBuf, Arc<text::T
 }
 
 /// 解析并加载 FK 到池。重复 load 同一路径幂等（先移除旧条目再追加，
-/// 保持「后加载者生效」）。解析/语义错误 → `BadKernel` 系硬错误。
+/// 保持“后加载者生效”）。解析/语义错误 → `BadKernel` 系硬错误。
 pub fn load_fk(path: &Path, content: &str) -> Result<(), NativeFrameError> {
     let pool = text::parse_pool(content).map_err(|e| NativeFrameError::BadKernel(e.to_string()))?;
     let fk =
         text::FkFile::from_pool(&pool).map_err(|e| NativeFrameError::BadKernel(e.to_string()))?;
     // FK 重定义内置名 → 硬报错（内置表优先级高于 FK，重定义只会造成
-    // 「装了不生效」的错觉，直接拒绝）。
+    // “装了不生效”的错觉，直接拒绝）。
     for name in fk.name_to_id.keys() {
         if is_builtin_name(name) {
             return Err(NativeFrameError::BadKernel(format!(
@@ -178,7 +178,7 @@ pub fn unload(path: &Path) {
         .retain(|(p, _)| p != path);
 }
 
-/// 指定路径是否已在任一文本池（furnish 回滚区分「本次新增」用）。
+/// 指定路径是否已在任一文本池（furnish 回滚区分“本次新增”用）。
 pub fn is_loaded(path: &Path) -> bool {
     fk_store().iter().any(|(p, _)| p == path) || tpck_store().iter().any(|(p, _)| p == path)
 }
@@ -352,7 +352,7 @@ fn node_leg(node: &Node, et: f64) -> Result<(Leg, String), NativeFrameError> {
             "J2000 是惯性根，无上行腿".into(),
         )),
         Node::EclipJ2000 => {
-            // chgirf：trans(17) = R(1, +ε)（「J2000 → 帧」）；irfrot(17, 1)
+            // chgirf：trans(17) = R(1, +ε)（“J2000 → 帧”）；irfrot(17, 1)
             // = trans(17)ᵀ = X(ECLIPJ2000 → J2000)（et=0 oracle 实测钉死）。
             let eps = OBLIQUITY_ARCSEC * ARCSEC_TO_RAD;
             Ok((Leg::constant(xpose(&rotate(1, eps))), "J2000".into()))
@@ -629,7 +629,7 @@ fn walk_chain(
     }
 }
 
-/// 折叠腿链（右折叠，等价 `zzrxr`/`zzmsxf` 的「后项·前项」链乘）：
+/// 折叠腿链（右折叠，等价 `zzrxr`/`zzmsxf` 的“后项·前项”链乘）：
 /// acc = L1；acc = Lk·acc；空链 = 单位阵。
 fn fold3(legs: &[[[f64; 3]; 3]]) -> [[f64; 3]; 3] {
     let mut acc = match legs.first() {

@@ -27,11 +27,11 @@
 
 GitHub 的 issue 和 PR 共享编号空间，所以 `#42` 可能是其中任一，用 `gh pr view 42` 确认，回退到 `gh issue view 42`。
 
-## 当技能说"发布到 issue tracker"时
+## 当技能说“发布到 issue tracker”时
 
 创建一个 GitHub issue。
 
-## 当技能说"获取相关工单"时
+## 当技能说“获取相关工单”时
 
 运行 `gh issue view <number> --comments`。
 

@@ -25,7 +25,7 @@ VELOCITY_TOL_KMS = 1e-5
 
 #: 多重打靶速度残差加权 = 位置容差 / 速度容差。Rust 打靶残差向量把位置（km）与
 #: 速度（km/s）混在一起取 ‖F‖²，cislunar 下位置项（几百 km）单边主导，速度项被
-#: 忽略，求解器停在"位置连续 / 速度跳变数十 m/s"的局部极小。乘以 vel_weight 后
+#: 忽略，求解器停在“位置连续 / 速度跳变数十 m/s”的局部极小。乘以 vel_weight 后
 #: 两者在容差尺度可比，LM 真正压速度连续（见 Rust ``build_residual`` 注释）。
 CORRECTION_VEL_WEIGHT = CORRECTION_TOL_KM / VELOCITY_TOL_KMS
 

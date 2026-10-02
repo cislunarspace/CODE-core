@@ -103,8 +103,8 @@ consumption such as station keeping.
 一条轨迹，族成为可过滤查询的标签（`orbit_family` + `family_id` +
 `member_index`）。`member_count` 与 `members[]` 随 schema 版本 2 删除，
 本决策催生的成员提升方法 `catalog_promote` 一并移除。此处记录的两条
-理由——查询结果泛滥与族级量无处安放——在那里分别由索引过滤与"溯源
-随成员"回答。）*
+理由——查询结果泛滥与族级量无处安放——在那里分别由索引过滤与“溯源
+随成员”回答。）*
 
 ### 5. Storage layout: flat record files + SQLite derived index
 

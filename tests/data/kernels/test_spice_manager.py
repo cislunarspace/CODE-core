@@ -398,7 +398,7 @@ class TestKernelBookkeepingAtomicity:
         """Python furnsh 与簿记在同一临界区：furnsh 时簿记锁已被持有。
 
         否则并发加载不同内核时，簿记末位可能晚于池里实际生效的末位，出现
-        「位置按新内核、GM 按旧簿记」的静默错配。
+        “位置按新内核、GM 按旧簿记”的静默错配。
         """
         import e2m2e.data.kernels.manager as manager_module
         import e2m2e.spice_ext as spice_ext
@@ -500,8 +500,8 @@ class TestKernelBookkeepingAtomicity:
     def test_unload_failure_moves_restored_kernel_to_last(self, monkeypatch):
         """被卸载者不是末位内核时，恢复（重新 furnsh）要把它在簿记中挪到末位。
 
-        Python 池内重新 furnsh 使该内核重成「后加载者」（重叠段生效者），若簿记仍
-        留在原位置，就会「位置按该内核、GM 按旧末位」地失配（ADR 0048 Revision (c)）。
+        Python 池内重新 furnsh 使该内核重成“后加载者”（重叠段生效者），若簿记仍
+        留在原位置，就会“位置按该内核、GM 按旧末位”地失配（ADR 0048 Revision (c)）。
         """
         import e2m2e.data.kernels.manager as manager_module
         import e2m2e.spice_ext as spice_ext
@@ -559,7 +559,7 @@ class TestKernelBookkeepingAtomicity:
 
 
 class TestKernelDatumWarnings:
-    """未收录 / 近似口径内核在加载时告警（落实 ADR 0048「绝不静默混用」）。"""
+    """未收录 / 近似口径内核在加载时告警（落实 ADR 0048“绝不静默混用”）。"""
 
     def test_approximated_kernel_warns_once(self, bare_spice_manager, caplog):
         """de441 等按 DE440 近似的内核：按内核名告警一次。"""

@@ -1,6 +1,6 @@
 """DRO→RO 转移轨道 NLP 优化的高层编排。
 
-实现论文 Cui et al. (2025) "搜索-优化"两步法中的优化阶段：
+实现论文 Cui et al. (2025) 搜索-优化两步法中的优化阶段：
 
 - 优化变量：``y = (α, T, t_ins)``
 - 目标函数：``J(y) = Δv1 + Δv2``
@@ -287,7 +287,7 @@ class DROTRONLPOptimizer:
             # cos_angle 接近 1 表示两速度几乎同向（理想情况）
             cos_angle = np.dot(v_f, v_ins) / (v_f_norm * v_ins_norm)
         else:
-            # cos_angle = -1.0 标记"反向"惩罚，优化器会避开此区域
+            # cos_angle = -1.0 标记反向惩罚，优化器会避开此区域
             cos_angle = -1.0
 
         cache = {

@@ -412,7 +412,7 @@ class Continuation:
             target: 参数目标值；正向时延拓至 ``current >= target`` 终止，
                 反向时延拓至 ``current <= target`` 终止。
             direction_sign: ``+1`` 或 ``-1``。
-            direction_label: 仅用于日志（"正向"/"反向"）。
+            direction_label: 仅用于日志（“正向”/“反向”）。
             step_size: 初始步长（函数内部按 ``step_size_adaptation`` 策略调整）。
             param_index: 0–5 对应 ``states[0, i]``，6 对应 ``orbit.period``。
             verbose: 是否打印详细进度日志。
@@ -615,7 +615,7 @@ class Continuation:
         # 核心优势就是能沿弧长穿过折叠,此时目标变量(tv)会自然反转。
         # 修复:让 directional_increment 仅在**延拓**的初始方向起作用,穿过
         # 折叠点后**不再强制方向**。具体:初始用 Xdot 决定 dir_sign 起点,
-        # 一旦检测到"目标变量穿越期望方向"则不再翻转 — 信任 PAL 的自然
+        # 一旦检测到“目标变量穿越期望方向”则不再翻转 — 信任 PAL 的自然
         # 行为。滞回参数保证噪声不触发反向。
         def _initial_dir_sign() -> float:
             if not directional_increment:
@@ -627,7 +627,7 @@ class Continuation:
         # 滞回:翻转 dir_sign 后至少保持 K 步不再翻,防止噪声来回触发
         _hysteresis_steps_remaining = 0
         _HYSTERESIS_K = 5
-        # 是否已经"穿越折叠点":穿越后不再使用 dir_sign 翻折,
+        # 是否已经“穿越折叠点”:穿越后不再使用 dir_sign 翻折,
         # 避免 dir_sign 在噪声中反复切换
         _crossed_fold = False
 
@@ -731,7 +731,7 @@ class Continuation:
             #    π ≈ 3.14 即 T/2 < π/2 ≈ 1.57(物理上 2:1 共振周期,实际
             #    L1 halo T/2 ≤ 1.38)
             # 过紧的 T/2 上界（如 1.35）会把折叠点附近的合法轨道误判触发
-            # 回退，表现为"延拓到某范围不再继续"。
+            # 回退，表现为“延拓到某范围不再继续”。
             # **不要**再检查与欧拉预测的距离:PAL Newton 解是物理正解,
             # 欧拉预测只是切线一步,不能用作回退判据。
             _x, _z, _tf2 = X[0], X[1], X[3]

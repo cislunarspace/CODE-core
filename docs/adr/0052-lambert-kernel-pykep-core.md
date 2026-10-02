@@ -31,7 +31,7 @@ Householder 迭代次数逐格相同；tof 不足时两侧错误文案逐字一�
 ### 许可（通过）
 
 MPL-2.0 为文件级 copyleft，以未修改的 crates.io 依赖（库引用）方式使用，适用
-MPL §3.3「Larger Work」，与 Apache-2.0 主项目共存可行；署名落 NOTICE 即可。
+MPL §3.3“Larger Work”，与 Apache-2.0 主项目共存可行；署名落 NOTICE 即可。
 
 ### 性能（未过门，否决主因）
 
@@ -80,7 +80,7 @@ NOTICE、CHANGELOG 全部回退；保留的产出：
   180° 转移会显式报错）不生效，旧内核行为（任选法向 / 空转）保持。
 - HMN 霍曼编排扫描几何与 `tests/algorithm/transfer/test_hohmann.py` 的精确
   对径构造保持原样（旧内核任选法向可解）。
-- CONTEXT.md「转移设计」节新增四条术语（Lambert 求解器、转移方向、多圈
+- CONTEXT.md“转移设计”节新增四条术语（Lambert 求解器、转移方向、多圈
   分支、最小时间）——描述领域概念，与内核实现无关，保留。
 
 ## 备选方案

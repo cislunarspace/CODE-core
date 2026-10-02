@@ -116,6 +116,7 @@ check:  ## 格式 + lint + 类型/层级检查（Rust + Python，与 ci.yml 对�
 	$(UV) ruff format --check .
 	$(UV) python scripts/check_layer_imports.py
 	$(UV) python scripts/check_deleted_dir_refs.py
+	$(UV) python scripts/check_doc_quotes.py
 	$(UV) python -m mypy e2m2e/ --ignore-missing-imports
 
 fmt:  ## 就地格式化（Rust + Python）

@@ -191,7 +191,7 @@ class DynamicalSubstituteCorrector:
         spice_available = provider is not None
 
         # ``force_cr3bp=True`` 是调用方显式声明的 CR3BP 模型（不需要 SPICE），
-        # 不属"SPICE 缺失降级"，跳过检查；否则默认（``spice_optional=False``）
+        # 不属“SPICE 缺失降级”，跳过检查；否则默认（``spice_optional=False``）
         # SPICE 不可用即抛（ADR 0020 决策 4，不隐式降级）。
         if not spice_available and not self.spice_optional and not self.context.force_cr3bp:
             raise RuntimeError(

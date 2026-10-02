@@ -279,7 +279,7 @@ fn state_parity_for_kernel(name: &str) -> usize {
     };
     native_reset();
     // 双登记：native 注册表（求值路径）+ CSPICE 池（easier_reader oracle）。
-    // 若池中残留早前 furnsh 的其他 bsp，本内核最后 furnsh、按「后加载者生效」
+    // 若池中残留早前 furnsh 的其他 bsp，本内核最后 furnsh、按“后加载者生效”
     // 恰为 oracle 实际使用的内核，与 native 注册表只含本内核一致。
     furnish_kernel_checked(&path);
 
@@ -434,7 +434,7 @@ fn chain_topologies_bit_identical() {
     }
     native_reset();
     // 生产装载面：全部内核（含文本与 BPC），验证 BPC 段不混入选段、
-    // 「后加载者生效」下 native 与 CSPICE 选到同一段。
+    // “后加载者生效”下 native 与 CSPICE 选到同一段。
     for name in [
         "naif0012.tls",
         "pck00010.tpc",
@@ -496,7 +496,7 @@ fn chain_topologies_bit_identical() {
 // 4. 负控回归：把记录号当字地址必须被发现
 // ═════════════════════════════════════════════════════════════════════════
 
-/// 断言「错误解释」的结果必不等于正确结果：Err 或段数 != 14。
+/// 断言“错误解释”的结果必不等于正确结果：Err 或段数 != 14。
 fn assert_misparse_detected(result: Result<daf::DafFile, native_spk::DafSpkError>, label: &str) {
     match result {
         Err(e) => println!("{label}: 解析报错（负控生效）: {e}"),

@@ -30,7 +30,7 @@ class EPPRSystem(System):
     不暴露 ``primary_radius_km`` / ``secondary_radius_km``：EPPR 的长度单位是瞬时
     地月距离 d(t)，静态 km 半径没有固定的无量纲对应，``Dynamics`` 的碰撞终止
     （按特征尺度静态归一）在此帧下不成立；``propagate(collision_detection=True)``
-    会以"须先注入 body-radius"明确报错，而不是给出尺度错误的碰撞面。
+    会以“须先注入 body-radius”明确报错，而不是给出尺度错误的碰撞面。
     """
 
     def __init__(

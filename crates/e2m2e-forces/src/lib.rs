@@ -19,7 +19,7 @@ pub mod spherical_harmonic;
 
 /// 传播失败错误类型。
 ///
-/// 区分"步长塌缩到机器精度地板"与"其他传播错误"，让 Rust→Python FFI 边界
+/// 区分“步长塌缩到机器精度地板”与“其他传播错误”，让 Rust→Python FFI 边界
 /// 按错误**类型**而非消息字符串决定抛哪种 Python 异常（ADR 0020 决策 2）：
 /// [`PropagateError::StepCollapsed`] 在边界表现为
 /// ``e2m2e.exceptions.PropagationFailure``，[`PropagateError::Other`] 表现为

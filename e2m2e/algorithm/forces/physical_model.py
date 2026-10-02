@@ -12,7 +12,7 @@ from ..dynamics import System
 class PhysicalModel:
     """物理力模型基类。
 
-    力模型在 Python 侧只承担"配置定义"职责：参数验证、``to_rust_spec``
+    力模型在 Python 侧只承担配置定义职责：参数验证、``to_rust_spec``
     序列化、``to_config``/``from_config``。加速度与雅可比计算全部由 Rust
     编译路径（``ForceModel.propagate`` → ``propagate_compiled``/
     ``propagate_compiled_stm_py``）承载，不保留 Python 参考实现：

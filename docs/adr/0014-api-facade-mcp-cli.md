@@ -179,7 +179,7 @@ the caller's constructor-injected Config on long-running tools.
    fields and non-object payloads with `INVALID_PARAMS` — no silent
    fallback to environment defaults when a config was supplied.
    **The `Config` field set is now a cross-process contract** (the
-   docstring's "骨架，字段待定稿" caveat ends here): adding or removing a
+   docstring's “骨架，字段待定稿” caveat ends here): adding or removing a
    field is a protocol change and must update `to_payload`/`from_payload`
    together.
 4. **Error codes unified**: unknown tool is `TOOL_NOT_FOUND` everywhere

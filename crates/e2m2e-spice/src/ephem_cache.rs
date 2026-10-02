@@ -232,7 +232,7 @@ struct SxformSpline {
 /// ET → UTC 日历量的预采样表。
 ///
 /// 与星历共用同一时间网格（[`EphemCache::build`] 的 `t_grid`），存的是
-/// 「UTC 自 2000-01-01T00:00:00Z 起的秒数」这条**连续单调**曲线；查询时在相邻
+/// “UTC 自 2000-01-01T00:00:00Z 起的秒数”这条**连续单调**曲线；查询时在相邻
 /// 采样点间线性插值。若改存 (年积日, 日内秒)，年/日边界会回绕而无法插值。
 ///
 /// 精度：区间内 UTC 相对 ET 是斜率为 1 的分段线性函数，插值误差只来自
@@ -554,12 +554,12 @@ static CACHE: RwLock<Option<EphemCache>> = RwLock::new(None);
 /// strict 模式标记（`StrictGuard` RAII 管理，打靶并行区开启）：并行区内即使
 /// 缓存未启用也硬失败，保证零 cspice（并行区 cspice 是内核池损坏/panic 的
 /// 根源）。缓存已启用后的 miss（区间外/缺 target）不受本标记控制——一律
-/// 返回 `Err`（ADR 0020 决策 4）；本标记只额外兜住"未启用缓存"场景。
+/// 返回 `Err`（ADR 0020 决策 4）；本标记只额外兜住“未启用缓存”场景。
 static STRICT: AtomicBool = AtomicBool::new(false);
 
 /// RAII：作用域内开启 strict 缓存模式，Drop 时恢复原值。
 ///
-/// 语义：strict 下 "未启用缓存" 的 `lookup_*` 查询返回 `Err`（硬失败），
+/// 语义：strict 下 “未启用缓存” 的 `lookup_*` 查询返回 `Err`（硬失败），
 /// 由调用方 `?` 向上传播——杜绝并行区力模型静默回退 cspice。非 strict 下
 /// 未启用缓存返回 `Ok(None)`，调用方按既有模式回退 cspice（合法路径）。
 pub struct StrictGuard {
@@ -603,7 +603,7 @@ pub fn disable() {
 
 /// 当前是否处于 strict 缓存模式（`StrictGuard` 作用域内）。
 ///
-/// 供力模型上层区分「缓存未启用且禁止回退 cspice」（strict 区硬失败）与普通
+/// 供力模型上层区分“缓存未启用且禁止回退 cspice”（strict 区硬失败）与普通
 /// SPICE 失败——两者都不带缓存窗口，只能靠本状态分辨（ADR 0020 决策 4）。
 pub fn strict_enabled() -> bool {
     strict()
@@ -663,7 +663,7 @@ pub fn lookup_utc_calendar(et: f64) -> Result<Option<(i32, u16, f64)>, CacheMiss
 /// （调用方回退 cspice，合法路径）；**启用后** miss（区间外 / 目标不在预采样
 /// 列表）一律返回 `Err`（ADR 0020 决策 4：enable 是用户要求缓存的信号，
 /// enable 后 miss 就是错误，不静默回退 cspice）。``StrictGuard`` 仅对
-/// "未启用缓存" 场景额外生效（并行区零 cspice 保险）。
+/// “未启用缓存” 场景额外生效（并行区零 cspice 保险）。
 pub fn lookup_body_position(
     target: &str,
     observer: &str,
@@ -844,7 +844,7 @@ mod tests {
     }
 
     /// `lookup_utc_calendar` 的三态语义：未启用（strict / 非 strict）、无 UTC 表、
-    /// 越界。ADR 0016 的并行区零 cspice 就靠"strict 下未启用即硬失败"这一条。
+    /// 越界。ADR 0016 的并行区零 cspice 就靠“strict 下未启用即硬失败”这一条。
     ///
     /// 本用例读写进程级缓存，故把三种情形合并为一个用例，并依赖同模块其余用例
     /// 都是纯数值（不碰全局）。

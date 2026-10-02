@@ -329,7 +329,7 @@ class MultipleShooting:
                 f_ends = []  # 各段终止点处的状态导数 f(t_{i+1}, x_{i+1})
 
                 # 逐段积分，收集每段的 (终端状态, 终端 STM)。三路后端差异仅在
-                # "如何提交/收集任务"，统一产出 segment_pairs，公共的 4 列表
+                # “如何提交/收集任务”，统一产出 segment_pairs，公共的 4 列表
                 # append 在下面只写一次。
                 segment_pairs: list[tuple[np.ndarray, np.ndarray]] = []
 

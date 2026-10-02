@@ -2,7 +2,7 @@
 
 把原先分散在 ``config.py`` （优化阶段）与 ``search_config.py`` （搜索阶段）的
 两个 dataclass 合并为单一 :class:`TransferConfig`，用 ``search_*`` / ``nlp_*``
-前缀区分子域字段，消除"两个 dataclass 描述同一件事"的碎片化。
+前缀区分子域字段，消除“两个 dataclass 描述同一件事”的碎片化。
 
 同时保留 :class:`TransferOptimizationResult` 于本模块，避免 ``transfer.py`` 与
 ``transfer_optimization.py`` 之间的循环导入。

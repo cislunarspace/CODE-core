@@ -77,7 +77,7 @@ def _budget_of(entry: DurationEntry) -> float:
 def find_budget_violations(entries: Iterable[DurationEntry]) -> list[Violation]:
     """纯审计判定：超过自身预算的用例按超额降序返回。
 
-    预算语义是"超过即违规"（严格大于）：恰好压线不判违规。
+    预算语义是“超过即违规”（严格大于）：恰好压线不判违规。
     """
     violations = [
         Violation(e.nodeid, e.call_s, _budget_of(e)) for e in entries if e.call_s > _budget_of(e)

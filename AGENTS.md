@@ -115,7 +115,7 @@ make clean-tests
 - 注释、docstring、commit、Issue、PR 和 Agent brief 用中文；面向调用方的行为变化更新 `CHANGELOG.md`。ADR 是决策快照，后续变化追加修订或新开递增 ADR，不改写历史结论。
 - Issue/PR 正文、AI 生成的评论、commit body 与 CHANGELOG 条目按 `CONTRIBUTING.md` 的“正文写作约定”写：完整叙述回答固定问题集、平实句子、少特殊符号、细节不进折叠区；开单模板已内联问题集引导。
 - AI 标记的形式照仓库约定（issue/PR 标题 `[AI Generated][<类型>]` 前缀、评论首行 `> **[AI Generated]** 本评论由 AI 完成。`，见 `docs/agents/issue-tracker.md`）；标记里的执行者身份按**当前**工作环境如实写（如 `omp agent 会话`），不照抄既有 issue / PR / 评论里他次的身份，也不编造工具名。
-- 文档（README、NOTICE、CHANGELOG、CONTEXT、ADR、`docs/` 下所有页面，以及代码内中文注释与 docstring）不得使用直角引号「」，引用词语统一用弯引号 ""。历史 ADR 不回改。
+- 文档（README、NOTICE、CHANGELOG、CONTEXT、ADR、`docs/` 与 `.out-of-scope/` 下所有页面，以及代码内中文注释与 docstring）不得使用直角引号「」『』（U+300C/U+300D/U+300E/U+300F），引用词语统一用弯引号“”（U+201C/U+201D），嵌套用弯单引号‘’（U+2018/U+2019），同一文件内保持一致；引号只在确为引用时使用，能直接叙述的就不要加引号；代码示例、行内代码与英文原文引述里的 ASCII 引号属代码语法或原样引述，保持不动。机器门禁为 `scripts/check_doc_quotes.py`，随 `make check` 运行。
 
 ## Important Files
 
@@ -125,7 +125,7 @@ make clean-tests
 - 领域实现：`e2m2e/algorithm/design/design_orbit.py`、`algorithm/family/__init__.py`、`algorithm/dynamics/`、`algorithm/forces/`、`algorithm/transfer/`；数据和 catalog 在 `e2m2e/data/`。
 - Python↔Rust 边界：`crates/e2m2e-integrators/src/lib.rs`、`crates/e2m2e-integrators/build.rs`、`crates/e2m2e-integrators/abi-version.txt`、各 crate 的 `Cargo.toml`。
 - 构建与版本：`pyproject.toml`、`Cargo.toml`、`Makefile`、`rust-toolchain.toml`、`.python-version`、`uv.lock`、`Cargo.lock`（若存在，仅以配置和版本锁为准）。
-- 门禁与测试基础设施：`scripts/check_layer_imports.py`、`scripts/check_deleted_dir_refs.py`、`tests/conftest.py`、`tests/time_budget.py`、`tests/kernel_helpers.py`、`tests/_meta/`。
+- 门禁与测试基础设施：`scripts/check_layer_imports.py`、`scripts/check_deleted_dir_refs.py`、`scripts/check_doc_quotes.py`、`tests/conftest.py`、`tests/time_budget.py`、`tests/kernel_helpers.py`、`tests/_meta/`。
 - 维护规则：`README.md`、`CONTRIBUTING.md`、`CONTEXT.md`、`CHANGELOG.md`、`docs/adr/README.md`；`docs/agents/` 下的配置见上文“Agent skills”节。
 
 ## Runtime/Tooling Preferences

@@ -1,7 +1,7 @@
 //! 基于 cspice 的第三体引力加速度（仅 `spice` feature 下编译）。
 //!
 //! 1:1 移植自 Python ``third_body_gravity.py`` / ``indirect_term.py``，把
-//! "SPICE 查扰动体位置 + 第三体摄动加速度公式" 合并为一次 Rust 调用，
+//! “SPICE 查扰动体位置 + 第三体摄动加速度公式” 合并为一次 Rust 调用，
 //! 消除每步 Python↔cspice 跨界 + numpy 数组分配开销。
 //!
 //! 设计：Python 侧 ``ThirdBodyGravity`` 在初始化时调 ``spice_furnsh``

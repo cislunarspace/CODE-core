@@ -184,7 +184,7 @@ class TestPhysicalPlausibility:
         assert 0.1 < v_mag < 5.0, f"速度 {v_mag:.3f} km/s 超出合理范围"
 
     def test_stationary_at_libration_point_has_v_lp_velocity(self, system, context):
-        """rho=0、rhodot=0（航天器"停在"平动点）时，ECI 速度应等于平动点的
+        """rho=0、rhodot=0（航天器“停在”平动点）时，ECI 速度应等于平动点的
         J2000 速度 v_LP，而非 v_LP 经旋转后的 C@v_LP。
         """
         from e2m2e.algorithm.coordinate.rho_bridge import (

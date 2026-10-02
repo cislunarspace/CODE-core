@@ -209,8 +209,8 @@ class TestWindowShiftSensitivity:
     def test_shift_columns_match_finite_difference(self):
         """④ 窗口平移列对非自治解析 stub 的窗口平移中心差分（atol 1e-6）。
 
-        雅可比第 6 列（shift 列）应等于"整个 leg 窗口统一平移 δ（锚态固定
-        为数据）"时归一化匹配点残差对 δ 的导数——FD 直接平移 t_start 复算。
+        雅可比第 6 列（shift 列）应等于“整个 leg 窗口统一平移 δ（锚态固定
+        为数据）”时归一化匹配点残差对 δ 的导数——FD 直接平移 t_start 复算。
         """
         dyn = _SineDynamics(a_vec=np.array([2.0, -1.0, 0.5]), omega=0.05)
         kernel = LegKernel(MU, dyn=dyn)

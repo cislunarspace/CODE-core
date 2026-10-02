@@ -14,7 +14,7 @@
 
 另一处参照是 deepseek-harness 的贡献管理体系（Issue 五类模板、
 kind/area 两轴标签、七态 Project 流水线、policy 自动化）。结构经过实战
-检验，但有两点不适配：该体系「暂不接受外部 PR」的立场与本仓库相反；
+检验，但有两点不适配：该体系“暂不接受外部 PR”的立场与本仓库相反；
 其硬校验依赖组织仓库才有的原生 Issue Type，以及 GitHub App 与策略脚本
 ——本仓库是个人账号仓库，当前体量也撑不起这套维护成本。
 
@@ -40,7 +40,7 @@ dependency），记录主导意图；`area/*` 至少一个（开放集，命名�
 记录实质影响。两轴独立，不混用；无命名空间的同义标签一律不保留。
 打标是维护者职责。
 
-### 4. Project「e2m2e Issue Management」七态流水线
+### 4. Project“e2m2e Issue Management”七态流水线
 
 Inbox → Backlog → Ready → In progress → In review → Done / No action。
 终态与 Issue 关闭原因一一对应：Done↔Completed，No action↔Not planned；
@@ -92,11 +92,11 @@ deepseek-harness 用策略脚本与 workflow 硬校验上述规则，另配专�
 
 ## 修订
 
-- 2026-09-04：决策 4 的 Project「e2m2e Issue Management」更名为
-  「cislunarspace Issue Management」，并与 transfer-orbit-design 共用
+- 2026-09-04：决策 4 的 Project“e2m2e Issue Management”更名为
+  “cislunarspace Issue Management”，并与 transfer-orbit-design 共用
   （七态、字段与自动化沿用，Repository 字段区分来源）。决策背景与取舍
   见 transfer-orbit-design ADR 0029。
-- 2026-09-04：决策 2 的「元信息不进标题」废止——Issue/PR 标题改回带
+- 2026-09-04：决策 2 的“元信息不进标题”废止——Issue/PR 标题改回带
   标签前缀：Issue 用 [FEAT]/[BUG]/[IDEA]/[RESEARCH]/[TASK]（模板预填），
   PR 用 [FEAT]/[FIX]/[DOC]/[TEST]/[CLEANUP]/[DEP]；type/* 标签与两轴
   体系不变。另立新规：AI 生成的 issue 与 PR 标题最前面加 [AI Generated]

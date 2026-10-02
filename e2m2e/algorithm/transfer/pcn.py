@@ -201,8 +201,8 @@ def _departure_state_from_asymptote(
 ) -> tuple[np.ndarray, float]:
     """地心出发双曲态（出射分支）与 TLI 脉冲。
 
-    停泊轨道按圆轨道理想化（γ=0），双曲轨道面法向取「含 Ŝ 且最接近参考
-    z 轴的平面」——``ĥ = normalize(ẑ − (ẑ·Ŝ)Ŝ)``（Ŝ∥ẑ 时回退 x̂ 投影）。
+    停泊轨道按圆轨道理想化（γ=0），双曲轨道面法向取“含 Ŝ 且最接近参考
+    z 轴的平面”——``ĥ = normalize(ẑ − (ẑ·Ŝ)Ŝ)``（Ŝ∥ẑ 时回退 x̂ 投影）。
     该构造不依赖月球相位（稳定），且严格满足出射渐近线 = Ŝ 的近心点方向
     ``ê = −(Ŝ + √(e²−1)·(ĥ×Ŝ))/e``。
 
@@ -479,7 +479,7 @@ def _solve_arrival_mode(
 
     # 1. 网格初猜：逐点最小残差 max-范数。
     # 触发交会的出发渐近线赤经应接近交会时刻月球位置方向（理想化下月球恒在 xy 面），
-    # 故 rha 网格按「相对月球方向偏移」采样（绝对 rha = 月球 RHA + 偏移）。
+    # 故 rha 网格按“相对月球方向偏移”采样（绝对 rha = 月球 RHA + 偏移）。
     tof_grid = np.linspace(p.tof_range_days[0], p.tof_range_days[1], p.n_tof) * SECONDS_PER_DAY
     rha_offset_grid = np.linspace(p.rha_grid_deg[0], p.rha_grid_deg[1], p.n_rha)
     dha_grid = np.linspace(p.dha_grid_deg[0], p.dha_grid_deg[1], p.n_dha)

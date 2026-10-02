@@ -6,7 +6,7 @@
 //! `f64::to_bits` 相等）依赖浮点运算的精确顺序。
 //!
 //! 约定（SPICE 口径）：旋转矩阵作用于坐标（frame rotation），`rotate(axis,
-//! angle)` 的矩阵把向量从「旋转后坐标系」表出到「原坐标系」；`eul2xf` 的
+//! angle)` 的矩阵把向量从“旋转后坐标系”表出到“原坐标系”；`eul2xf` 的
 //! 输入角序为 `[角1, 角2, 角3, d1, d2, d3]`，矩阵
 //! `r = [角1]_axis1 · [角2]_axis2 · [角3]_axis3`（角 1 最先施加、位于最右）。
 
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn pos_mod_matches_fortran() {
         let two_pi = std::f64::consts::TAU;
-        // 大角：与「商舍入 + 乘回」的 C 序逐位一致（不是精确 fmod！）。
+        // 大角：与“商舍入 + 乘回”的 C 序逐位一致（不是精确 fmod！）。
         let w = 2830.4382262844674_f64; // tisbod 实测场景
         let q = (w / two_pi).trunc();
         assert_eq!(pos_mod(w, two_pi).to_bits(), (w - two_pi * q).to_bits());

@@ -193,8 +193,8 @@ class TestJacobiWindows:
 
         calls: list[tuple[str, int, list]] = []
 
-        # ADR 0037 预算内：批量生成打桩为合成结果。本测试只验证"同组窗口点共享
-        # 一次批量调用"的编排契约，与真实生成内容无关；真实窗口筛选行为由
+        # ADR 0037 预算内：批量生成打桩为合成结果。本测试只验证“同组窗口点共享
+        # 一次批量调用”的编排契约，与真实生成内容无关；真实窗口筛选行为由
         # test_windowed_points_keep_members_inside_window 等承担。
         def stub(family_type, libration_point, n_orbits, windows, **kwargs):
             calls.append((family_type, libration_point, list(windows)))

@@ -74,7 +74,7 @@ pub fn furnish_kernel(path: &str) -> Result<(), String> {
     }
     // 双登记非原子：CSPICE 侧失败时把 native 侧恢复到调用前状态，避免两侧分叉
     // （native 有内核而 CSPICE 池无 —— spkezr 可用而 pxform 报无内核）。区分
-    // 「本次新增」与「此前已登记」：后者重装回去，不能一卸了之（同一路径重复
+    // “本次新增”与“此前已登记”：后者重装回去，不能一卸了之（同一路径重复
     // furnish 时，CSPICE 池里仍是上次成功加载的那份）。
     let existed_daf = native_spk::is_loaded(p);
     let existed_text = native_frame::is_loaded(p) || native_time::is_loaded(p);

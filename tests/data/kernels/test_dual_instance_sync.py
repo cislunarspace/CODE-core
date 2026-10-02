@@ -8,7 +8,7 @@
 - ``test_spkezr_dual_consistency_by_name``：用名字查询，守 **boddef** 同步
   （两侧都须把 "MARS" 解析成质心 ID 4，否则 de440 不含本体段会报错）。
 - ``test_rust_query_no_kernel_clear_error``：Rust 实例无内核时，诊断 API 应抛
-  项目语境错误（含"无内核加载"、不含裸 CSPICE 码）。用子进程隔离 Rust 全局
+  项目语境错误（含“无内核加载”、不含裸 CSPICE 码）。用子进程隔离 Rust 全局
   状态——主进程的其他测试可能已 furnsh 过 Rust 侧且无法 unload。
 """
 
@@ -31,7 +31,7 @@ pytestmark = [
 
 @pytest.fixture(autouse=True)
 def _reset_ffi_count():
-    """每个测试前后清零 Rust FFI 调用计数，避免污染其他"零 cspice"测试。"""
+    """每个测试前后清零 Rust FFI 调用计数，避免污染其他“零 cspice”测试。"""
     reset_ephem_ffi_call_count()
     yield
     reset_ephem_ffi_call_count()
@@ -84,7 +84,7 @@ def test_unload_kernel_removes_rust_kernel(spice_kernel_path):
     双侧卸载：否则 Rust cspice 内核池残留已卸载文件，测试结果依赖同进程
     执行顺序（先跑过加载内核的测试会让后续测试的 Rust 查询侥幸成功）。
     用子进程隔离 Rust 全局状态，验证 unload 后 Rust 侧 spkezr 报项目语境错误
-    （native 注册表为空时的"无内核加载"消息，ADR 0051 决策 2；闰秒内核常驻
+    （native 注册表为空时的“无内核加载”消息，ADR 0051 决策 2；闰秒内核常驻
     两侧实例，与 Python 侧 ``_ensure_leapseconds`` 对称，不参与 unload——
     详见 manager.load_kernel 注释）。
     """

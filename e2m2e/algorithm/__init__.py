@@ -3,7 +3,7 @@
 第 3 层，依赖方向：data/ + _integrators（Rust）。不 import api/、不 import
 tools/（ADR 0012）。
 
-Python 算法层 = 一切"需要领域知识构造问题"的编排，不做数值迭代（迭代在 Rust
+Python 算法层 = 一切需要领域知识构造问题的编排，不做数值迭代（迭代在 Rust
 solver/）：①构造问题（选轨道族、定约束、选流形方向）②调 Rust 迭代器 ③解释结果。
 
 子模块：

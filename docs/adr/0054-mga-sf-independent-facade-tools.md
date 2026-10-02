@@ -29,7 +29,7 @@ Issue #721 提出行星际多借力（MGA）与 Sims-Flanagan（SF）预设计�
   `maneuver_events` 的 kind 枚举为 departure/perilune/arrival。日心多
   leg 任务没有 TLI 时刻，语义不兼容。
 - ADR 0043 决策 4 把 `low_thrust_design` 等二档占位从 Facade 移除，最终
-  归属"在实现时决定"。
+  归属“在实现时决定”。
 - ADR 0050 已决 SF 工具链双档保真度（conic 快筛档/星历 n 体档），conic
   档随 #725 交付；ADR 0053 把通用段框架后置到 #726 一次性归纳。
 - 长任务路由是单一清单：`LONG_RUNNING_TOOLS = frozenset({"transfer_design",
@@ -66,7 +66,7 @@ Issue #721 提出行星际多借力（MGA）与 Sims-Flanagan（SF）预设计�
    该契约，要么伪造 TLI 时刻，要么逐字段重开语义——扩值省下的接口设计
    会以契约腐蚀的形式偿还。
 2. **冻结清单否决 A 的词表部分**：`transfer_type` 属 ADR 0044 术语
-   清单，扩值即破坏"只随包发布变更"的版本冻结保证，且所有按值分支的
+   清单，扩值即破坏“只随包发布变更”的版本冻结保证，且所有按值分支的
    调用方行为面同时受影响。
 3. **粒度一致**：ADR 0043 把接口整理为任务级能力；MGA 链搜索与 SF
    预设计各是一个完整任务（输入任务参数、输出候选方案），符合该粒度，

@@ -26,7 +26,7 @@ class EphemerisProvider:
 
     单点 + 批量两类方法；时间（utc_to_tdb/et_to_utc/utc_to_tai/tai_to_tt/
     tt_to_tdb/jd_tdb_to_et）、状态（body_position/body_state/body_rotation）、
-    帧（pxform）三类。SPICE 和 r2s2 分别实现；Rust 侧"注入数据"（星历缓存
+    帧（pxform）三类。SPICE 和 r2s2 分别实现；Rust 侧注入数据（星历缓存
     样条表）从批量查询构建。
     """
 

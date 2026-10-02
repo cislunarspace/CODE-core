@@ -9,7 +9,7 @@
   diagnostics 而非物理面**（论文 Fig. 11 caption 原话），输出 docstring
   与响应 schema 均须传达这一定性。
 
-"界面不碰算法"：前端只做 km→DU 归一与绘制，全部几何在此离散化。
+界面不碰算法：前端只做 km→DU 归一与绘制，全部几何在此离散化。
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """轨道族生成：种子/初猜/族行走/注册表。
 
-回答"一条轨道/一族轨道怎么收敛出来"（ADR 0011 迁移，源：
+回答一条轨道/一族轨道怎么收敛出来（ADR 0011 迁移，源：
 ``dfh/cr3bp_orbits.py`` 六类初猜 + ``algorithms/halo_family.py`` +
 ``algorithms/halo_initial_guess.py`` + ``algorithms/lissajous_initial_guess.py`` +
 ``algorithms/triangular_initial_guess.py`` + ``algorithms/strategies/``）。

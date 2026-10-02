@@ -9,7 +9,7 @@
 //! 结合 x_{n+1} = 2x_n − x_{n-1} + h²a 精确满足匀加速运动的封闭解。
 //!
 //! # ADR 0013
-//! 匀加速运动的封闭解是二次多项式的"定义"——不依赖任何外部软件或 golden 文件。
+//! 匀加速运动的封闭解是二次多项式的“定义”——不依赖任何外部软件或 golden 文件。
 
 use e2m2e_propagation::cowell::{cowell_step, COWELL_HISTORY_LEN};
 

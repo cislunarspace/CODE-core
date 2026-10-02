@@ -111,7 +111,7 @@ matching Primer §6.1) come from `2U` at the exact points.
   value `element_space_ae` (a in km, e dimensionless) registered here.
 
 The frontend consumes geometry as data and only normalizes units
-("界面不碰算法，算法不进界面"); boundary/region products are not cataloged
+(“界面不碰算法，算法不进界面”); boundary/region products are not cataloged
 (ADR 0031 scope discipline).
 
 ### 6. Phase 1 scope boundary

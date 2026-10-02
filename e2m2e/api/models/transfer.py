@@ -154,7 +154,7 @@ class TransferDesignRequest(_ApiModel):
 
         形状、有限性与序在请求边界拒绝（映射 ``INVALID_PARAMS``），不把单元素
         列表留给编排器的 ``tof_range[1]`` 索引（``IndexError`` → ``TRANSFER_FAILED``），
-        也不让反向/非有限窗口退化成「无交集」的求解结果。
+        也不让反向/非有限窗口退化成“无交集”的求解结果。
         """
         if value is None:
             return None

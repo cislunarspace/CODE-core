@@ -375,7 +375,7 @@ inverse of §#584's converter (`_gcrs_to_synodic`); `trajectory` is synodic,
 TLI-based.
 
 **Events.** Exactly two: `departure` (t=0, Δv_TLI, note "TLI") and `arrival`
-(t=tof_total, Δv_LOI, note "LOI（近月点圆化）"). LOI is a single circularization
+(t=tof_total, Δv_LOI, note “LOI（近月点圆化）”). LOI is a single circularization
 pulse at perilune; a multi-burn LOI decomposition is scenario-layer and out of
 this contract.
 

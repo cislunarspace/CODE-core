@@ -97,7 +97,7 @@ class NormalFormContext:
                 的场景（如 ``design_lissajous`` 生成有界 Lissajous）：即便进程
                 已全局加载 SPICE 内核也走 CR3BP，避免星历几何进入约化、使
                 quasi-Floquet↔中心流形 Lie 级数 ODE 失稳。是 CR3BP 约化的
-                正路声明，不是"SPICE 不可用→降级"。
+                正路声明，不是 SPICE 不可用→降级。
 
         Raises:
             ValueError: ``order`` 非正整数；``libration_point`` 非法。

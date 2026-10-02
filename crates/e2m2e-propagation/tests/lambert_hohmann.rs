@@ -132,7 +132,7 @@ fn test_hohmann_transfer_matches_analytic() {
 // ── 测试 2：同一点往返（椭圆型快转移） ────────────────────────────────
 
 /// Lambert 解出 v₀ 经二体传播后应回到 r_f。
-/// 这是 Lambert 求解器"按定义"必须满足的性质。
+/// 这是 Lambert 求解器“按定义”必须满足的性质。
 #[test]
 fn test_round_trip_for_various_geometries() {
     let cases = [

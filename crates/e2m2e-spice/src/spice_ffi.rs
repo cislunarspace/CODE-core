@@ -10,7 +10,7 @@
 //!
 //! # CSPICE 错误处理（oracle 与残余 FFI 面）
 //!
-//! CSPICE C 库的错误模型是"set failure flag + 长跳"——出错时设置 `failed_c()`
+//! CSPICE C 库的错误模型是“set failure flag + 长跳”——出错时设置 `failed_c()`
 //! 返回 true，后续调用都短路返回。`reset_c()` 清除错误状态。
 //!
 //! 本模块的包装在每次调用后检查 `failed_c()`，如果出错就 `reset_c()` 并返回
@@ -31,18 +31,18 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-/// cspice FFI 调用计数。验证"零 cspice"用：打靶前后读该计数，应为 0
+/// cspice FFI 调用计数。验证“零 cspice”用：打靶前后读该计数，应为 0
 /// （前提：星历预采样缓存已启用 + strict 模式，力模型查内存样条）。
 ///
 /// 自 ADR 0056 起 pxform/sxform/et2utc/ktotal 生产入口不再跨 FFI，
 /// 该计数在生产路径恒为 0；oracle（[`ffi_oracle`]）不入计数——
-/// 计数语义只剩「生产面旁路诊断」。
+/// 计数语义只剩“生产面旁路诊断”。
 pub static FFI_CALLS: AtomicU64 = AtomicU64::new(0);
 
 /// 返回累计 cspice FFI 调用次数。
 ///
 /// ADR 0051 后 spkezr、ADR 0056 后 pxform/sxform/et2utc/ktotal 均走纯
-/// Rust 后端、不再计数，生产路径恒 0（「零 cspice」断言方向不受影响）。
+/// Rust 后端、不再计数，生产路径恒 0（“零 cspice”断言方向不受影响）。
 pub fn ffi_call_count() -> u64 {
     FFI_CALLS.load(Ordering::Relaxed)
 }
@@ -177,7 +177,7 @@ const BODY_ALIASES: &[(&str, SpiceInt)] = &[
 /// 触发过，CSPICE 就以默认 ABORT 运行——spkezr/pxform 出错会直接终止
 /// Python 进程而非抛异常。本函数把动作显式设为 RETURN（出错置 `failed_c()`
 /// 后返回）、设备设为 NULL（错误信息经 `getmsg_c` 取回，不污染 stderr），
-/// 保证本实例首次被使用前已进入"出错返回"模式。幂等，重复调用无害。
+/// 保证本实例首次被使用前已进入“出错返回”模式。幂等，重复调用无害。
 fn init_error_handling() {
     let set_c = CString::new("SET").unwrap();
     let return_c = CString::new("RETURN").unwrap();
@@ -247,7 +247,7 @@ fn bodn2c(name: &str) -> Option<SpiceInt> {
 /// 3. 纯数字串直接按 NAIF ID 解析（spkezr("399", …) 语义）。
 ///
 /// 覆盖面窄于 CSPICE `bodn2c` 内置表："PLUTO"、"LUNA"、"MARS BARYCENTER" 一类
-/// 未收录名会硬报「未知天体名」（ADR 0051 Phase A 边界，不静默回退）。仓库内
+/// 未收录名会硬报“未知天体名”（ADR 0051 Phase A 边界，不静默回退）。仓库内
 /// 全部 Rust 调用方传名均在覆盖内（见 R/naif_id_str 侧的数字串路径）。
 pub(crate) fn name_to_id(name: &str) -> Option<SpiceInt> {
     let upper = name.trim().to_ascii_uppercase();
@@ -300,7 +300,7 @@ pub fn ktotal(kind: &str) -> Result<i32, SpiceFfiError> {
     Ok(count)
 }
 
-/// 无内核可用时的项目语境错误信息。pxform 判「native 三池全空」、
+/// 无内核可用时的项目语境错误信息。pxform 判“native 三池全空”、
 /// et2utc 判 LSK 池空、spkezr 判 native 注册表空时复用。
 const NO_KERNEL_MSG: &str = "Rust CSPICE 实例无内核加载——请经 SPICEManager.load_kernel 加载";
 
@@ -428,7 +428,7 @@ pub(crate) fn civil_from_days(days: i64) -> (i32, u32, u32) {
     (year as i32, month as u32, day as u32)
 }
 
-/// UTC 时标原点：2000-01-01T00:00:00Z 的「1970 起的天数」。
+/// UTC 时标原点：2000-01-01T00:00:00Z 的“1970 起的天数”。
 const UTC_EPOCH_DAYS: i64 = 10957;
 
 /// 公历闰年判定。
@@ -507,7 +507,7 @@ pub fn mat3_t_mul_vec(m: &[[f64; 3]; 3], v: &[f64; 3]) -> [f64; 3] {
 /// 的生产入口自 ADR 0056 起走纯 Rust 后端，但 cspice crate 的高层 API 没有
 /// 这些函数的包装，对拍测试无处复用——保留直连 `*_c` 的薄包装当 oracle。
 /// oracle 不入 [`FFI_CALLS`] 计数（计数语义 = 生产面旁路诊断，oracle 使用
-/// 不得破坏「生产路径恒 0」断言）。
+/// 不得破坏“生产路径恒 0”断言）。
 ///
 /// 前置：内核已经理 [`crate::furnish_kernel`] 双登记（oracle 走 cspice 池，
 /// 被测走 native 池）；CSPICE erract 须为 RETURN/NULL（见

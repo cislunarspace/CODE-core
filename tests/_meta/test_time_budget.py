@@ -29,7 +29,7 @@ class TestFindBudgetViolations:
         assert find_budget_violations([entry("t::a", 9.9)]) == []
 
     def test_exactly_at_budget_not_flagged(self):
-        # 上限语义是"超过即违规"：恰好压线不判违规。
+        # 上限语义是“超过即违规”：恰好压线不判违规。
         assert find_budget_violations([entry("t::a", DEFAULT_BUDGET_S)]) == []
 
     def test_just_over_default_budget_flagged(self):
