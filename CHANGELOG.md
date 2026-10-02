@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [5.9.8] - 2026-10-02
+
 ### Added
 - **文档与代码注释的引号口径落定并补机器门禁**：口径写进 `AGENTS.md`——文档与代码内中文注释、docstring 不得使用直角引号（U+300C/U+300D）与直角单引号（U+300E/U+300F），引用词语统一用弯引号（U+201C/U+201D），嵌套用弯单引号（U+2018/U+2019），同一文件内保持一致。按此清理仓库根文档、`docs/` 下页面（含 ADR）、`.out-of-scope/` 的 md、`e2m2e`/`tests`/`scripts` 的 Python 注释与 `crates` 的 Rust 注释里的直角引号残留，并把中文散文里原有的 ASCII 直引号一并归一为弯引号，能去掉引号的地方改写为无引号表述（代码示例、行内代码与英文原文引述里的 ASCII 引号保持不动）；`AGENTS.md` 规则正文引用被禁字符本身的元引用保留。新增门禁 `scripts/check_doc_quotes.py` 随 `make check` 与 CI 的 lint job 运行，扫描面含根 md 与 `NOTICE`、`docs/`（含 ADR）、`.out-of-scope/`、`e2m2e`/`tests`/`scripts`/`examples` 的 Python、`crates` 的 Rust 与 README，自测住 `tests/_meta/test_check_doc_quotes.py`。(#777)
 - **通用多段参数优化框架 `e2m2e.algorithm.transfer.multisegment` 与 MGA 链精化（算法层）**：新增 multisegment 子包，把 Sims-Flanagan 与 MGA 沉淀的共性收拢为通用框架，框架只做问题组装，NLP 求解复用既有后端。组装面为 `evaluate_chain`：逐 leg 前向与后向 pass 到本 leg 匹配点，拼装 6 维连续性残差与归一化雅可比。传播内核 `LegKernel` 逐 leg 独立选档，conic 档只给 mu，星历档再给 EphemerisDynamics；`VariableLayout` 登记决策变量块；`flyby_node_constraints` 承担 flyby 节点的 V∞ 等模等式与转角不等式。跨 leg TOF 的窗口平移灵敏度链补齐星历档下前序 leg TOF 平移本 leg 时间窗的一阶精确项，时间不变动力学下该项恒为零，conic 档跳过该分支。三档解法中的 p=q 档由新增 `solve_square` 承担，Newton 步长回溯加 Broyden 秩一更新，雅可比奇异时报 SINGULAR_JACOBIAN 而非崩溃；minimax 档 `solve_minimax` 以松弛形式经 SLSQP 求解。Sims-Flanagan 单 leg 与多 leg 回迁为框架实例，`_evaluate` 与 `_make_layout` 白盒钩子签名不变，成本函数、段可行域与 flyby 决策变量的转录语义留在原层，对外行为不变；两个 solve() 改走仓库唯一 SLSQP 驱动入口 `nlp_scipy.solve_slsqp`，输入为 `nlp_core.NLPSpec` 问题描述，DRO 的 `solve_with_scipy` 同步重构为委托该入口，行为不变。新增 `refine_mga_chain` 对 MGA 网格候选做连续精化：决策变量为发射历元与逐 leg TOF，节点天体态随历元重查星历，逐 leg 解 short-way Lambert，成功解过后验闸门后重建 MgaCandidate，软失败以状态三元组随 `MgaRefinementResult` 携带。无 api 与 MCP 工具面变化。(ADR 0053, #726)
