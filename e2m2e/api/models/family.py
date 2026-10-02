@@ -9,7 +9,7 @@ from typing import Any
 from pydantic import ConfigDict, Field, model_validator
 
 from e2m2e.data.templates import RO_SUPPORTED_RESONANCES
-from e2m2e.data.templates.seed import _HALO_FOLD_Z0, CHAR_LENGTH_KM
+from e2m2e.data.templates.seed import _HALO_FIXED_Z0_LIMIT, CHAR_LENGTH_KM
 from e2m2e.data.types.orbit import Orbit, OrbitFamily
 from e2m2e.status import ConvergenceState, FailureCause, ResultStatus
 
@@ -24,7 +24,8 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # 轨道族生成：公开平动点统一术语 libration_point（1=L1 … 5=L5）。
 # 各族允许的平动点取值域与默认值；Halo 族振幅上限为固定 z0 延拓的
-# 折叠点（同 seed._HALO_FOLD_Z0，按平动点区分）。
+# 安全上界（同 seed._HALO_FIXED_Z0_LIMIT，按平动点区分，折叠点前的
+# 保守截断）。
 # ---------------------------------------------------------------------------
 
 #: orbit_type → 允许的平动点取值域。DRO（月心族）与 RO（地心族）不绑定
@@ -68,12 +69,13 @@ _FAMILY_DEFAULT_LIBRATION_POINT: Mapping[str, int] = MappingProxyType(
     }
 )
 
-#: Halo 固定 z0 延拓的折叠点（km），按平动点：L1≈26908、L2≈57660。
-_HALO_FOLD_KM: Mapping[int, float] = MappingProxyType(
-    {lp: _HALO_FOLD_Z0[lp] * CHAR_LENGTH_KM for lp in (1, 2)}
+#: Halo 固定 z0 延拓的安全上界（km），按平动点：L1≈26908、L2≈57660
+#: （折叠点前的保守截断，不是折叠点本身）。
+_HALO_FIXED_Z0_LIMIT_KM: Mapping[int, float] = MappingProxyType(
+    {lp: _HALO_FIXED_Z0_LIMIT[lp] * CHAR_LENGTH_KM for lp in (1, 2)}
 )
 
-#: Halo 族振幅上限默认值（km），按平动点取折叠点内的标定值。
+#: Halo 族振幅上限默认值（km），按平动点取安全上界内的标定值。
 _HALO_DEFAULT_MAX_AMPLITUDE_KM: Mapping[int, float] = MappingProxyType({1: 25000.0, 2: 30000.0})
 
 _FAMILY_COMMON_FIELDS = frozenset({"orbit_type", "libration_point", "n_orbits"})
@@ -289,7 +291,7 @@ class FamilyGenerationRequest(_ApiModel):
             raise ValueError(f"{selection} 不绑定平动点，请求不得携带 libration_point")
         if selection == "HALO":
             assert point is not None  # HALO 必有平动点
-            fold_km = _HALO_FOLD_KM[point]
+            fold_km = _HALO_FIXED_Z0_LIMIT_KM[point]
             ranges["max_amplitude_km"] = NumericRange(-fold_km, fold_km, excluded_values=(0.0,))
         elif selection == "NRHO":
             ranges["north_south"] = NumericRange(1, 2)

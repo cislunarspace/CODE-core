@@ -56,14 +56,14 @@ class TestValidRangesResponse:
     def test_nrho_perilune_and_halo_amplitude_domains(self):
         response = Facade().valid_ranges()
         # design_orbit 侧：NRHO 近月高上限对齐族生成 40000 km；HALO 振幅逐平动点
-        # 分档——L1 止于族折叠常量 26908 km、L2 放宽到 ±77000 km（#643 探测边界）
+        # 分档——L1 止于固定 z0 延拓安全上界 26908 km、L2 放宽到 ±77000 km（#643 探测边界）
         nrho = response.design_orbit["NRHO"]["perilune_height"]
         assert (nrho.minimum, nrho.maximum) == (100.0, 40000.0)
         halo_l1 = response.design_orbit["HALO_L1"]["amplitude"]
         assert (halo_l1.minimum, halo_l1.maximum) == (-26908.0, 26908.0)
         halo_l2 = response.design_orbit["HALO_L2"]["amplitude"]
         assert (halo_l2.minimum, halo_l2.maximum) == (-77000.0, 77000.0)
-        # 族生成侧能力边界不动：HALO 按平动点折叠点收紧（L2=57660），NRHO 上限 40000
+        # 族生成侧能力边界不动：HALO 按平动点固定 z0 延拓安全上界收紧（L2=57660），NRHO 上限 40000
         family_halo = response.family_generation_ranges["HALO_L2"]["max_amplitude_km"]
         assert (family_halo.minimum, family_halo.maximum) == (-57660.0, 57660.0)
         family_nrho = response.family_generation_ranges["NRHO_L2"]["perilune_height_max_km"]
@@ -94,7 +94,7 @@ class TestValidRangesResponse:
         spo_point = response.family_generation_ranges["SPO_L5"]["libration_point"]
         assert (spo_point.minimum, spo_point.maximum) == (4, 5)
         assert "libration_point" not in response.family_generation_ranges["DRO"]
-        # HALO 振幅上界按平动点折叠点收紧，且排除 0
+        # HALO 振幅上界按平动点固定 z0 延拓安全上界收紧，且排除 0
         halo_l1 = response.family_generation_ranges["HALO_L1"]["max_amplitude_km"]
         assert halo_l1.excluded_values == [0.0]
         assert halo_l1.minimum == -halo_l1.maximum

@@ -1,14 +1,16 @@
 """Halo 族：共线平动点面外周期轨道。
 
 Richardson 三阶近似种子 + 定 ``z0`` 微分修正，沿族把 ``z0`` 走到
-目标面外振幅（km，符号区分北/南）；折叠点后改用固定 ``x0`` 行走。
+目标面外振幅（km，符号区分北/南）。``|z0|`` 在固定 z0 延拓安全上界内
+直接行走；L2 超界改用固定 ``x0`` 行走，L1 超界报错（族越过折叠点后
+转入近月 NRHO 段，经 ``design_nrho`` / ``design_nrho_family`` 获取）。
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from ....data.templates.seed import _HALO_FOLD_Z0, _HALO_SEED_Z0
+from ....data.templates.seed import _HALO_FIXED_Z0_LIMIT, _HALO_SEED_Z0
 from ....data.types.orbit import Orbit, OrbitFamily
 from ....status import ConvergenceState
 from ...dynamics import CR3BP_Dynamics
@@ -24,6 +26,11 @@ from .walk import (
     _walk_family,
     earth_moon_system,
 )
+
+#: L1 Halo 族折叠点实测无量纲 |z0|（PAL 越折测试，×特征长度 ≈32674 km）；
+#: 固定 z0 延拓安全上界 ``_HALO_FIXED_Z0_LIMIT[1]``（0.07）是其前的保守
+#: 截断，二者不是一回事（#773）
+_L1_FOLD_Z0 = 0.085
 
 
 def _correct_halo(
@@ -66,8 +73,10 @@ def _correct_halo_x0(
 ) -> Orbit:
     """固定 x 穿越点 ``x0`` 修正 Halo 族轨道（折叠点附近的族参数）。
 
-    固定 ``z0`` 的修正在 Halo 族折叠点（L2 约 ``|z0|≈0.17``）前失效；
-    折叠前后 ``x0`` 单调，改用它作族参数可一路走到 NRHO。
+    固定 ``z0`` 的修正在 Halo 族折叠点前失效（实测折叠点 L1 约
+    ``|z0|≈0.085``、L2 约 ``|z0|≈0.20``；固定 z0 行走的安全上界
+    ``_HALO_FIXED_Z0_LIMIT`` 取其前的保守截断值）；折叠前后 ``x0``
+    单调，改用它作族参数可一路走到 NRHO。
     """
     state = guess.states[0].copy()
     state[0] = x0
@@ -83,12 +92,12 @@ def _halo_seed_walk(
     libration_point: int,
     z_sign: float,
 ) -> Orbit:
-    """固定 ``z0`` 从 Richardson 种子走到 ``_HALO_FOLD_Z0``，作为固定
-    ``x0`` 行走的出发成员。"""
+    """固定 ``z0`` 从 Richardson 种子走到安全上界 ``_HALO_FIXED_Z0_LIMIT``，
+    作为固定 ``x0`` 行走的出发成员。"""
     return _walk_family(
         correct_at=lambda z0, guess: _correct_halo(dynamics, z0, libration_point, guess),
         measure=lambda orbit: float(orbit.states[0, 2]),
-        target=float(np.copysign(_HALO_FOLD_Z0[libration_point], z_sign)),
+        target=float(np.copysign(_HALO_FIXED_Z0_LIMIT[libration_point], z_sign)),
         p_seed=float(np.copysign(_HALO_SEED_Z0, z_sign)),
         dp_init=float(np.copysign(0.01, z_sign)),
         max_step=0.02,
@@ -106,8 +115,11 @@ def design_halo(
 
     ``amplitude_km`` 带符号：正为北族、负为南族（与 DFH ±73000 km 的
     约定一致）。振幅对应 Halo 参考状态（y=0 穿越点）的 z 坐标。
-    ``|z0|`` 不超过 ``_HALO_FOLD_Z0`` 时直接固定 z0 行走；更大振幅先走到
-    折叠点前的族成员，再改用固定 x0 行走逼近目标。
+    ``|z0|`` 不超过固定 z0 延拓安全上界 ``_HALO_FIXED_Z0_LIMIT``（折叠点
+    前的保守截断）时直接固定 z0 行走；L2 更大振幅先走到安全上界处的族
+    成员，再改用固定 x0 行走逼近目标；L1 超界抛 ``Cr3bpOrbitError``
+    （族越过折叠点后转入近月 NRHO 段，改经 ``design_nrho`` /
+    ``design_nrho_family`` 获取）。
     """
     if dynamics is None:
         dynamics = CR3BP_Dynamics(earth_moon_system())
@@ -115,7 +127,7 @@ def design_halo(
     assert du is not None
     z_target = amplitude_km / du
 
-    if abs(z_target) <= _HALO_FOLD_Z0[collinear_point]:
+    if abs(z_target) <= _HALO_FIXED_Z0_LIMIT[collinear_point]:
         return _walk_family(
             correct_at=lambda z0, guess: _correct_halo(dynamics, z0, collinear_point, guess),
             measure=lambda orbit: float(orbit.states[0, 2]),
@@ -127,12 +139,17 @@ def design_halo(
         )
 
     if collinear_point == 1:
-        # L1 Halo 族在折叠点（|z0|≈0.085）后 z0 回落（转入 NRHO 分支），
-        # 更大面外振幅的 L1 Halo 不存在；固定 x0 行走在 L1 会误入
-        # 平面/垂直 Lyapunov 族，明确报错而不是返回错误的族
+        # L1 族越过折叠点（|z0|≈_L1_FOLD_Z0）后 z0 回落、族转入近月 NRHO 段
+        # 继续延伸：目标振幅的成员存在，只是固定 z0 / 固定 x0 延拓都到不了
+        # （固定 x0 在 L1 会误入平面/垂直 Lyapunov 族）；明确报错并指向
+        # NRHO 设计路径，而不是返回错误的族
         raise Cr3bpOrbitError(
-            f"L1 Halo 族面外振幅上限约 {_HALO_FOLD_Z0[1] * du:.0f} km（折叠点），"
-            f"目标 {amplitude_km:.0f} km 不可达"
+            f"L1 Halo 固定 z0 延拓的安全上界约 {_HALO_FIXED_Z0_LIMIT[1] * du:.0f} km"
+            f"（无量纲 |z0|≤{_HALO_FIXED_Z0_LIMIT[1]}，折叠点前的保守截断），"
+            f"目标 {amplitude_km:.0f} km 超出本路径能力；族折叠点约 "
+            f"{_L1_FOLD_Z0 * du:.0f} km（|z0|≈{_L1_FOLD_Z0}），越过折叠点后族转入"
+            f"近月 NRHO 段继续延伸，更大面外振幅的成员可经 design_nrho / "
+            f"design_nrho_family 获得"
         )
 
     seed = _halo_seed_walk(dynamics, collinear_point, z_target)
@@ -161,8 +178,10 @@ def design_halo_family(
 
     族从 Richardson 小振幅种子（``_HALO_SEED_Z0``）出发，自然参数
     延拓（固定 ``z0`` 微分修正）覆盖 ``[0, |max_amplitude_km|]``，
-    至多 ``n_orbits`` 条（含种子）。振幅上限不得超过该平动点的族
-    折叠点（``seed._HALO_FOLD_Z0``），折叠点后固定 z0 延拓失效。
+    至多 ``n_orbits`` 条（含种子）。振幅上限不得超过该平动点固定 z0 延拓
+    的安全上界（``seed._HALO_FIXED_Z0_LIMIT``，族折叠点前的保守截断）：
+    安全上界之后固定 z0 延拓失效，族越过折叠点后转入近月 NRHO 段（经
+    ``design_nrho_family`` 获取）。
 
     ``max_amplitude_km`` 带符号：正为北族、负为南族（与 ``design_halo``
     约定一致）；符号只决定延拓方向，振幅上限取绝对值。

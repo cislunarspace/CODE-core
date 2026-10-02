@@ -354,7 +354,9 @@ def _validate_params(
         phase = 0.0 if phase is None else float(phase)
         if collinear_point not in (1, 2):
             raise ValueError(f"Halo collinear_point 必须为 1 或 2，当前 {collinear_point}")
-        # L1 设计域止于族折叠常量 26 908 km（#643 探测确认）；L2 放宽到 77 000 km
+        # L1 设计域止于固定 z0 延拓安全上界 26 908 km（0.07×特征长度，#643 探测
+        # 确认；族折叠点约 32674 km 在其后，折叠点后经 NRHO 路径可达）；
+        # L2 放宽到 77 000 km
         limit = 26_908.0 if collinear_point == 1 else 77_000.0
         if not abs(amplitude) <= limit:
             raise ValueError(
