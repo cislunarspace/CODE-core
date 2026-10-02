@@ -76,7 +76,7 @@ ROT_TOL_ARCSEC = 1e-3
 # 是否复现该特例由本脚本实测;阈值单列以便区分。
 ROT_TOL_IAU_MOON_ARCSEC = 36.0
 # 样条查表为**筛选级**精度(本节产出即 ADR 0016 / ephem_cache.py 注释记载的
-# dt 精度退化的量化):ephem_cache.py 注释「月球 1 h 间隔三次样条位置误差 < 1 km」。
+# dt 精度退化的量化):ephem_cache.py 注释“月球 1 h 间隔三次样条位置误差 < 1 km”。
 SPLINE_POS_TOL_KM = 1.0
 SPLINE_VEL_TOL_KMS = 1e-4
 # 单对/单帧跳过率超此值 → 覆盖不足异常(内核缺段等)。
@@ -519,7 +519,7 @@ def check_spline(manager: SPICEManager, smoke: bool) -> tuple[list[dict], list[d
     精度退化的量化。Rust 侧样条缓存无 Python 查询入口(``spice_poc_body_position``
     走纯 Rust SPK 后端不过缓存,ADR 0051;缓存只供 Rust 力模型内循环),仅经
     enable/disable 构建路径覆盖;量化 Rust 样条需新增 FFI 导出,超出本 issue
-    「不改实现」约束。
+    “不改实现”约束。
 
     已知限制(ADR 0051 Phase A):Rust 侧 ``spice_spkezr`` 只支持 ``abcorr="NONE"``,
     本节对拍面里的 ``"LT"`` 分支每样本都会被拒绝并计入 skips(异常列表会出现
@@ -762,7 +762,7 @@ def render_report(
     )
     out.append(
         f"| SPLINE_POS_TOL_KM | {SPLINE_POS_TOL_KM:g} | "
-        "筛选级;ephem_cache.py『月球 1 h 样条 < 1 km』 |"
+        "筛选级;ephem_cache.py“月球 1 h 样条 < 1 km” |"
     )
     out.append(f"| SPLINE_VEL_TOL_KMS | {SPLINE_VEL_TOL_KMS:g} | 同上 |")
     out.append(f"| SKIP_RATIO_TOL | {SKIP_RATIO_TOL:g} | 单对/单帧跳过率超此值 → 覆盖不足异常 |")

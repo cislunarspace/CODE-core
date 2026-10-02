@@ -160,7 +160,7 @@ class SPICEManager(KernelQueryMixin, EphemerisProvider):
 
     #: 已加载的星历内核 (绝对路径, datum)，按加载顺序；末项 datum 即当前 GM 口径。
     #: **类级共享**——CSPICE 内核池是进程级全局的（ADR 0048）：任一实例的
-    #: load/unload 都会改变"重叠覆盖段取后加载者"的实际口径，故簿记必须与池同域。
+    #: load/unload 都会改变“重叠覆盖段取后加载者”的实际口径，故簿记必须与池同域。
     #: 实例级簿记会在同进程另一 manager 加载内核时静默错配（de440s 位置 + DE421 GM）。
     #: 按绝对路径去重（同一文件重复加载只留一条）；改列表一律持 ``_bookkeeping_lock``。
     _loaded_ephemeris: list[tuple[str, str]] = []
@@ -174,7 +174,7 @@ class SPICEManager(KernelQueryMixin, EphemerisProvider):
         # 本实例已就 (body, 请求 datum, 实际 datum) 回退告警过的组合：每组合一次。
         # 实例级（非模块全局），避免跨测试/跨 manager 的状态耦合。
         self._gm_fallback_warned: set[tuple[str, str, str]] = set()
-        # 本实例已就"按 DE440 近似"或"未收录"告警过的星历内核名。
+        # 本实例已就“按 DE440 近似”或“未收录”告警过的星历内核名。
         self._kernel_datum_warned: set[str] = set()
 
     def _ensure_leapseconds(self, search_dir: str | None = None):
@@ -215,7 +215,7 @@ class SPICEManager(KernelQueryMixin, EphemerisProvider):
                 )
 
     def _warn_approximated_kernel(self, name: str | None, datum: str) -> None:
-        """对「GM 按其它基准近似」的内核按内核名告警一次（落实 ADR 0048 契约）。"""
+        """对“GM 按其它基准近似”的内核按内核名告警一次（落实 ADR 0048 契约）。"""
         if name is None or name not in _APPROXIMATED_KERNELS:
             return
         if name in self._kernel_datum_warned:
@@ -253,7 +253,7 @@ class SPICEManager(KernelQueryMixin, EphemerisProvider):
         并发契约：Python ``furnsh``（spiceypy）、Rust ``furnsh``（spice_ext）
         与 ``_loaded_ephemeris`` 更新在**同一个** ``_bookkeeping_lock`` 临界区
         内，故簿记顺序与内核池的实际生效顺序一致——并发加载不同内核时，簿记
-        末位不会晚于池里实际生效的末位（否则会出现「位置按新内核、GM 按旧簿记」
+        末位不会晚于池里实际生效的末位（否则会出现“位置按新内核、GM 按旧簿记”
         的静默错配）。本锁只界定这三步的相对顺序，既不串行化 CSPICE 池的其它
         操作，也不承担池内部状态的线程安全（池是进程级全局的，见 ADR 0048）。
 
@@ -284,7 +284,7 @@ class SPICEManager(KernelQueryMixin, EphemerisProvider):
         # spice_ext 直达 Rust 扩展（ADR 0039）。
         from e2m2e.spice_ext import spice_furnsh
 
-        # 纯计算放锁外；下面的临界区只包「双 furnsh + 簿记」三步。
+        # 纯计算放锁外；下面的临界区只包“双 furnsh + 簿记”三步。
         kernel_name = _spk_kernel_name(path)
         datum = _datum_for_kernel(path)
         abspath = os.path.abspath(path)
@@ -336,7 +336,7 @@ class SPICEManager(KernelQueryMixin, EphemerisProvider):
 
         失败回滚：Python ``unload`` 成功后若 Rust ``unload`` 抛错，则用
         Python ``furnsh`` 把 Python 侧恢复（成员回到两池）、把该内核的簿记条目
-        移到末位（恢复即重新加载，Python 池内它重新成为「后加载者」），然后按
+        移到末位（恢复即重新加载，Python 池内它重新成为“后加载者”），然后按
         原异常上抛；恢复失败只告警，仍上抛原异常。Rust 池因 unload 失败保持原
         次序，两池次序此时无法兼顾，以 Python 池与簿记对齐为准（ADR 0048
         Revision (c)）。
@@ -369,7 +369,7 @@ class SPICEManager(KernelQueryMixin, EphemerisProvider):
                             exc_info=True,
                         )
                     else:
-                        # 恢复即「重新加载」：Python 池里该内核回到末位（重叠段后加载者
+                        # 恢复即“重新加载”：Python 池里该内核回到末位（重叠段后加载者
                         # 生效），故把簿记条目也移到末位，使 GM 口径跟随 Python 池实际
                         # 生效的末位。Rust 池因 unload 失败保持原次序，两池次序此时本就
                         # 无法兼顾，以 Python 池 + 簿记对齐为准（ADR 0048 Revision (c)）。
@@ -387,7 +387,7 @@ class SPICEManager(KernelQueryMixin, EphemerisProvider):
         """当前 GM 基准：最后一个已加载星历内核的 datum，无则 DE440（ADR 0048）。
 
         簿记是**类级**的（ADR 0048）：CSPICE 内核池进程级全局，任一实例加载/卸载
-        的星历内核都改变"重叠覆盖段取后加载者"的实际口径，故这里读的是进程内
+        的星历内核都改变“重叠覆盖段取后加载者”的实际口径，故这里读的是进程内
         真实生效的末位内核，位置与 GM 天然同口径、不需调用方手工配对。
         """
         with SPICEManager._bookkeeping_lock:
@@ -515,8 +515,8 @@ class SPICEManager(KernelQueryMixin, EphemerisProvider):
         默认优先级：de440.bsp > de440s.bsp > de435.bsp > de438.bsp。
         ``preferred`` 指定 GM 基准（如 ``"DE421"``）时，该基准的候选内核
         （同一 datum 的多个内核等价）置于候选首位；**显式请求而全部缺失即
-        报错**，不静默降级到其它 DE 系列——降级会让「请求 DE421 口径」变成
-        「悄悄用 DE440 口径」，比失败更糟。
+        报错**，不静默降级到其它 DE 系列——降级会让“请求 DE421 口径”变成
+        “悄悄用 DE440 口径”，比失败更糟。
 
         Raises:
             FileNotFoundError: 目录不存在、显式 preferred 的内核全缺失，或其中无匹配的内核文件。

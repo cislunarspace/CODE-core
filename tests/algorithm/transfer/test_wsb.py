@@ -339,7 +339,7 @@ class TestWsbTransferOrbit:
     def _run_wsb_with_stubbed_search(monkeypatch, capture, **kwargs):
         """以 stub 替掉 WSB 网格搜索，调用 facade 并返回 details。
 
-        stub 返回空候选，使编排走 "无候选" 分支，details.search_params
+        stub 返回空候选，使编排走 “无候选” 分支，details.search_params
         即为编排实际使用的合并后搜索参数。
         """
         import e2m2e.algorithm.transfer.orchestrator as transfer_module

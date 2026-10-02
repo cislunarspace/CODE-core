@@ -230,7 +230,7 @@ fn consume_values(
 pub fn parse_pool(content: &str) -> Result<KernelPool, ParseError> {
     let mut pool = KernelPool::default();
     let mut in_data = false;
-    // 待续语句：Some(关键字) 表示「= 之后已见」；`in_list` 表示在带括号
+    // 待续语句：Some(关键字) 表示“= 之后已见”；`in_list` 表示在带括号
     // 列表内（可能跨行）。
     let mut pending_key: Option<String> = None;
     let mut pending_vals: Vec<Value> = Vec::new();

@@ -82,7 +82,7 @@ fn pad_dirichlet(
     out
 }
 
-/// `addGhostNeumann.m`：法向导数为 `value`（按"每节点数据增量"理解，
+/// `addGhostNeumann.m`：法向导数为 `value`（按“每节点数据增量”理解，
 /// 与 MATLAB 一致地不除以 dx），即鬼单元 = 边缘节点 + gap * value。
 fn pad_neumann(
     grid: &Grid,

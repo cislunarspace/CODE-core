@@ -7,8 +7,8 @@
 ``MgaCandidate.total_delta_v_km_s`` 同口径（出发 v∞ + 到达 v∞）。求解走
 :func:`.nlp_scipy.solve_slsqp`（SLSQP 数值差分，与 DRO 路径同策略）；
 成功解过后验闸门（ADR 0020 红线）再经 :func:`.mga.evaluate_flyby` 重建
-精化候选。节点天体态随历元由星历重查（变量即历元，与 SF"节点状态是
-数据"的口径不同——这是 MGA 精化的本职）。
+精化候选。节点天体态随历元由星历重查（变量即历元，与 SF“节点状态是
+数据”的口径不同——这是 MGA 精化的本职）。
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """NLP 优化公共抽象。
 
 提供 :class:`NLPOptimizationVariables` 与 :class:`NLPSpec` 两个数据结构，
-作为 SciPy / COPT 后端与通用问题描述层之间的共享"问题"层：前者是 DRO→RO
+作为 SciPy / COPT 后端与通用问题描述层之间的共享问题层：前者是 DRO→RO
 专用变量元组，后者是求解器无关的 NLP 输入契约（#726）。
 """
 

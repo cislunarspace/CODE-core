@@ -1,6 +1,6 @@
 # 传播中心天体的一等配置（月心传播）
 
-e2m2e 不给轨道预报的传输层提供「中心天体 / 传播原点」一等配置：`PropagationRequest` 及其
+e2m2e 不给轨道预报的传输层提供“中心天体 / 传播原点”一等配置：`PropagationRequest` 及其
 CLI/MCP/sidecar 请求模型不加 `central_body` 字段，`propagate_orbit` 也不按中心天体自动生成
 对称力配置（中心天体球谐 + 其余天体第三体 + 对应间接项）。传输层的传播原点固定地心。
 
@@ -32,7 +32,7 @@ fm = ForceModel.from_config(force_config, system)
 - 同一物理初值换地心等价配置（`PointMassGravity(EARTH)` + `GravityField(MOON, 10×10)` +
   `IndirectTerm(MOON)` + `ThirdBodyGravity(SUN)`）外推后逐点减月地状态，1 天弧上
   `max|Δr| = 5.9e-4 km`、`max|Δv| = 4.0e-7 km/s`。两条路径是同一物理，差异只在积分容差量级
-  —— 说明手工链路不只是「跑得通」，而是算得对。
+  —— 说明手工链路不只是“跑得通”，而是算得对。
 
 **自动化本身是风险项。** 传输层默认力模型是地心模型（`PointMassGravity(EARTH)` +
 `ThirdBodyGravity(MOON/SUN)`）。只加一个 `central_body` 字段而不重排力模型，等于把地心模型
@@ -49,7 +49,7 @@ fm = ForceModel.from_config(force_config, system)
 这是范围决定，不是失效修复：能力（月心原点 + 手工力配置）在算法层齐备，被拒的只是把它提到
 传输层一等配置。若将来 CLI/MCP 成为月心任务的主入口，按以下路径复议：
 
-- 重开 #666，或另开 issue 明确「传输层中心天体」的口径：字段命名（`central_body` 还是沿用
+- 重开 #666，或另开 issue 明确“传输层中心天体”的口径：字段命名（`central_body` 还是沿用
   领域词 `origin`）、默认力模型归属、以及原点与力配置不一致时的守卫策略；
 - 届时需先决定是否接受第二套默认力模型，否则只能提供字段 + 显式拒绝不匹配配置的组合。
 

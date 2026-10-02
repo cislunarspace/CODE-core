@@ -157,8 +157,8 @@ class TestDatumBodyGmAlignment:
     """body 表与 datum 表的 DE421 GM 必须同值（ADR 0048）。
 
     两处都描述同一颗天体的同一基准 GM：``Datum.DE421`` 的聚合视图与
-    ``[body.X.gm].DE421`` 的逐天体视图。漂移会让「按口径取 GM」的调用方
-    与「按天体取 GM」的调用方得到不同数值。
+    ``[body.X.gm].DE421`` 的逐天体视图。漂移会让“按口径取 GM”的调用方
+    与“按天体取 GM”的调用方得到不同数值。
     """
 
     def test_earth_moon_emb_de421_agree(self):
@@ -178,7 +178,7 @@ class TestDatumBodyGmAlignment:
     def test_unsourced_bodies_intentionally_lack_de421(self):
         """无权威出处的天体 DE421 GM 有意留空：JUPITER 及以外（ADR 0048）。
 
-        这条断言把「留空」从疏忽变成有意的决定：按 DE421 口径查询这些天体时
+        这条断言把“留空”从疏忽变成有意的决定：按 DE421 口径查询这些天体时
         回退 DE440 并告警一次（不静默混用）；补齐权威来源后应连同本测试与
         ADR 0048 一并更新（见 #670）。SUN 已补 DE421 行（#713），不再属于本组。
         """

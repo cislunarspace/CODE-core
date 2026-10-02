@@ -281,7 +281,7 @@ def load_design_kernels(
         if not names:
             raise ValueError(f"未知的星历基准（无偏好内核）: {datum}")
         # 显式口径：只用该口径内核（同一 datum 的多个内核等价，如 de440/de440s）；
-        # 不再追加其它 DE 系列，避免「请求 DE421 却因文件缺失静默用 de440s」的谎报。
+        # 不再追加其它 DE 系列，避免“请求 DE421 却因文件缺失静默用 de440s”的谎报。
         ephemeris_candidates = list(names)
     loaded: list[str] = []
     for name in ephemeris_candidates:

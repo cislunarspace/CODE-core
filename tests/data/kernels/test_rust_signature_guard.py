@@ -3,10 +3,10 @@
 当 ``e2m2e._integrators`` 的编译产物（.pyd/.so）落后于源码时，PyO3
 在参数绑定阶段抛出毫无指向的 ``TypeError``（如 "got an unexpected keyword
 argument 'sxform_pairs'"），栈顶远离调用点，用户无从得知只需重建。``SPICEManager``
-经 ``_call_rust_or_compat_error`` 把这类签名漂移转成带"请重建"提示的
+经 ``_call_rust_or_compat_error`` 把这类签名漂移转成带“请重建”提示的
 ``RuntimeError``。
 
-本文件**不**依赖编译扩展或 SPICE 内核——通过注入伪造的"过期"函数覆盖守卫
+本文件**不**依赖编译扩展或 SPICE 内核——通过注入伪造的“过期”函数覆盖守卫
 逻辑，因此不带 ``pytest.mark.spice``，可在无 spice 构建的环境跑。
 """
 
@@ -95,7 +95,7 @@ class TestCallRustOrCompatError:
                 sxform_pairs=[],
             )
         msg = str(excinfo.value)
-        # 必须指向"重建"并点名缺失参数
+        # 必须指向“重建”并点名缺失参数
         assert "maturin" in msg
         assert "sxform_pairs" in msg
 
@@ -121,7 +121,7 @@ class TestCallRustOrCompatError:
         assert type(excinfo.value) is TypeError
 
     def test_legitimate_dt_typeerror_is_not_remapped(self):
-        """【M1 回归】dt 参数类型错误（非漂移）不得被误判为"编译产物过期"。"""
+        """【M1 回归】dt 参数类型错误（非漂移）不得被误判为“编译产物过期”。"""
 
         def fn(targets, frame_pairs, et_start, et_end, *, dt=3600.0, sxform_pairs=None):
             # PyO3 对 dt="3600"（str→f64）的真实错误模板

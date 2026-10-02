@@ -4,7 +4,7 @@ r"""tests/ 目录卫生门禁：不存在只剩 __pycache__ 的幽灵目录。
 __pycache__）不进 git，只在本地可见，误导导航。本门禁断言 tests/ 下
 不存在这种目录；发现残渣时运行 \`make clean-tests\` 清理。
 
-判据是"递归无非 __pycache__ 文件"而非"无测试文件"：tests/data/types/
+判据是“递归无非 __pycache__ 文件”而非“无测试文件”：tests/data/types/
 fixtures 等夹具目录合法地不含测试文件，不是幽灵。
 """
 

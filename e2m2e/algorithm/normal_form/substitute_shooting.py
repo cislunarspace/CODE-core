@@ -16,8 +16,8 @@
 - 不引入可变时间节点；
 - 不使用工作池并行（qiao 流水线单进程即可，下游 ``fft``/``w_func``
   也是单线程串行）；
-- 暴露 :class:`SubstituteSolver` 协议，把"如何积分一段弧并给出
-  ``(Xf, Φ)``"留给调用方注入，便于：
+- 暴露 :class:`SubstituteSolver` 协议，把“如何积分一段弧并给出
+  ``(Xf, Φ)``”留给调用方注入，便于：
 
   1. 单元测试注入假动力学；
   2. 未来把现有 :class:`MultipleShooting` 适配到本接口

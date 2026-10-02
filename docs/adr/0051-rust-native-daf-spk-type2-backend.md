@@ -33,7 +33,7 @@ Rust 侧星历几何查询目前全部跨 CSPICE FFI：`spice_ffi::spkezr` 直�
 
 新模块 `crates/e2m2e-spice/src/native_spk/`（`daf.rs` 容器解析、`spk2.rs` 求值、
 `mod.rs` 注册表与链式求值），纯 std、无条件编译、零新依赖。`crates/cspice` 保持
-「只做 FFI 包装」的 vendor 定位，**不改动**。
+“只做 FFI 包装”的 vendor 定位，**不改动**。
 
 行为地面真值是 vendored CSPICE 的 C 源（`chbint.c`/`spke02.c`/`spkr02.c`/
 `dafrfr_c.c`/`spkgeo.c`）：Chebyshev–Clenshaw 递推**逐操作移植**，操作顺序不得重排，
@@ -52,7 +52,7 @@ Rust 侧星历几何查询目前全部跨 CSPICE FFI：`spice_ffi::spkezr` 直�
 - 链式求值复刻 `spkgeo.c` 的**首个公共节点**语义：target 与 observer 各自沿段图
   `center` 向上累加状态到首个公共节点后相减——不是各自归算 SSB 再相减（浮点加法
   顺序不同即逐位不同）。
-- 选段优先级复刻 `spksfs` 的「后加载者生效」：注册表按**逆加载序**、段按**逆文件内
+- 选段优先级复刻 `spksfs` 的“后加载者生效”：注册表按**逆加载序**、段按**逆文件内
   顺序**扫描，首个命中段胜出。
 
 ### 2. 替换面与调用契约
@@ -71,13 +71,13 @@ Rust 侧星历几何查询目前全部跨 CSPICE FFI：`spice_ffi::spkezr` 直�
 - 新增 `e2m2e_spice::furnish_kernel`：先 `native_spk::load`（`NotDaf` = 文本内核，跳过
   native 登记但不算错误），再 `cspice::data::furnish`——Rust 注册表与 CSPICE 内核池
   **双登记**，任一真实错误上抛，不静默丢内核。`spice_unload` 对称双卸载（native 侧
-  幂等）。六入口与 `spice_ext` 四符号签名不变；ABI 戳与「不静默降级」契约不变。
+  幂等）。六入口与 `spice_ext` 四符号签名不变；ABI 戳与“不静默降级”契约不变。
 
 ### 3. 硬报错，不回退（沿用 ADR 0020）
 
 遇到不支持的 data type、frame、abcorr、走不到公共节点或无覆盖段：返回携带上下文
-（target/observer/et 等）的显式错误。**任何情况不得回退 CSPICE**——回退会把「不支持」
-变成「静默换了另一套语义」。
+（target/observer/et 等）的显式错误。**任何情况不得回退 CSPICE**——回退会把“不支持”
+变成“静默换了另一套语义”。
 
 ### 4. Phase A 边界
 
@@ -111,7 +111,7 @@ Rust 侧星历几何查询目前全部跨 CSPICE FFI：`spice_ffi::spkezr` 直�
   `ephem_cache`/`spk_accel`/`nbody_stm` 回归）：91 段描述符逐位一致（含地球预测
   BPC 跨摘要记录链 2 记录 37 段）；de440s/de430 全 ID 对 × 2143 点状态逐位一致
   零跳过；四链拓扑显式用例（(199,1)/(10,0) 直连、(301,399) 2 跳、(10,399) 3 跳）；
-  「FWARD 当字地址」负控回归；`UnsupportedType/Frame/Abcorr` 硬报错；残缺链
+  “FWARD 当字地址”负控回归；`UnsupportedType/Frame/Abcorr` 硬报错；残缺链
   拓扑（target 链断裂、observer 链命中公共节点，钉住 spkgeo 的 `found` 重置）；
   native ≥ 3× FFI 性能（断言仅优化构建生效：CSPICE 为预编译 -O2 静态库，debug
   比值失真，验收证据取 release 运行日志）。

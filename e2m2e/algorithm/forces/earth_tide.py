@@ -302,7 +302,7 @@ def solid_tide_step1(
         ΔC[4][m] += KPlus[m]/5 · ... ; ΔS[4][m] += KPlus[m]/5 · ...
 
     与 GMAT ``HarmonicGravity::IncrementEarthTide`` 对齐:其内部对 Sun、Moon
-    各调一次 ``IncrementSolidTide`` 并累加;本函数把"逐体累加"内化,调用方
+    各调一次 ``IncrementSolidTide`` 并累加;本函数把逐体累加内化,调用方
     一次性传完整扰动体列表。
 
     Args:

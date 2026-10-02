@@ -52,7 +52,7 @@ class TestNameOrIdNarrowedExcept:
     """``_name_or_id`` 异常收窄。
 
     若对 ``bods2c`` 用宽泛的 ``except Exception``，编程错误（TypeError 等）会
-    被一并吞掉并静默返回原名，真正的 bug 被藏进"名字未注册"的合理路径。
+    被一并吞掉并静默返回原名，真正的 bug 被藏进“名字未注册”的合理路径。
     收窄为只 catch spiceypy 错误（``SpiceyError``），编程错误上抛。
     """
 

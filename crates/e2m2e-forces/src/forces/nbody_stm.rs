@@ -491,10 +491,10 @@ pub fn propagate_with_state(
     Ok(StatePropagationResult { states, times })
 }
 
-/// 判断 SPK 内核池是否为空：区分"内核未加载"与"内核覆盖不足"。
+/// 判断 SPK 内核池是否为空：区分“内核未加载”与“内核覆盖不足”。
 ///
-/// `ktotal` 查询失败时按"已加载"处理——查询本身异常不该被翻译成
-/// "内核未加载"的误导性 cause。
+/// `ktotal` 查询失败时按“已加载”处理——查询本身异常不该被翻译成
+/// “内核未加载”的误导性 cause。
 fn spk_kernels_loaded() -> bool {
     e2m2e_spice::spice_ffi::ktotal("SPK")
         .map(|n| n > 0)
@@ -1157,7 +1157,7 @@ mod tests {
         }
     }
 
-    /// 构造分类用的进程状态快照（`spk_loaded` 按"已查询"注入）。
+    /// 构造分类用的进程状态快照（`spk_loaded` 按“已查询”注入）。
     fn context(
         spk_loaded: bool,
         cache_window: Option<(f64, f64)>,
@@ -1195,7 +1195,7 @@ mod tests {
         assert!(!cause.contains("outside cached window"), "实际: {cause}");
     }
 
-    /// 无缓存 + 内核池为空：报"未加载"，不报覆盖不足。
+    /// 无缓存 + 内核池为空：报“未加载”，不报覆盖不足。
     #[test]
     fn truncation_cause_kernels_not_loaded() {
         let cause = truncation_cause(Some(&failure_at(0.0)), &context(false, None, false));
@@ -1220,7 +1220,7 @@ mod tests {
         );
     }
 
-    /// 无缓存 + strict 区：归为"缓存未启用"，不误报内核覆盖不足。
+    /// 无缓存 + strict 区：归为“缓存未启用”，不误报内核覆盖不足。
     #[test]
     fn truncation_cause_strict_without_cache() {
         let cause = truncation_cause(Some(&failure_at(0.0)), &context(true, None, true));
@@ -1277,7 +1277,7 @@ mod tests {
         lo
     }
 
-    /// 越出内核覆盖时，错误消息须指名"覆盖不足"且携带底层 SPICE 文本，
+    /// 越出内核覆盖时，错误消息须指名“覆盖不足”且携带底层 SPICE 文本，
     /// 不再是笼统的 "likely cause: SPICE kernels not loaded or step size collapsed"。
     #[test]
     fn propagate_beyond_kernel_coverage_reports_real_cause() {
@@ -1422,11 +1422,11 @@ mod tests {
     }
 
     // =========================================================
-    // 测试 12：strict 区未启用缓存时归为"缓存未启用"
+    // 测试 12：strict 区未启用缓存时归为“缓存未启用”
     // =========================================================
 
     /// strict 区（并行打靶区内禁止回退 cspice）且未启用缓存：lookup 硬失败，
-    /// cause 应报"缓存未启用"，不误报内核覆盖不足。
+    /// cause 应报“缓存未启用”，不误报内核覆盖不足。
     ///
     /// strict 区里每个力模型查询都硬失败，故失败必在初值预检出口（截断出口在
     /// strict 下不可达）。正向断言用分类器独有的整句——底层 `Display` 文案

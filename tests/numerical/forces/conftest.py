@@ -26,7 +26,7 @@ EARTH_RE = Datum.WGS84.earth_radius_km  # km
 # 月球引力参数：DE421 基准（地月系统默认基准）。
 MOON_MU = Datum.DE421.moon_gm  # km³/s²
 
-# 哨兵：区分"未传 spice"（默认有 SPICE）与"显式传 None"（模拟资源缺失）。
+# 哨兵：区分“未传 spice”（默认有 SPICE）与“显式传 None”（模拟资源缺失）。
 _SPICE_UNSET = object()
 
 

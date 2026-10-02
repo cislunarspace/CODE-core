@@ -3,7 +3,7 @@
 碰撞格必须标记 ``status == COLLISION`` 并进失败侧：不进可行候选、
 不回传轨迹。碰撞格若被下游按 success 过滤当作有效解会混入可行集。
 当前基线已用类型化 ``TransferCandidateResult``（status/cause 枚举），
-本测试锁定该语义，防止回归到"碰撞格当成功"。
+本测试锁定该语义，防止回归到“碰撞格当成功”。
 """
 
 from __future__ import annotations

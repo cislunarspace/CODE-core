@@ -446,9 +446,9 @@ def _print_e2m2e_summary(
 def _read_gmat_script_config(script_path: Path) -> dict[str, str | None]:
     """从生成的 GMAT 脚本读回力模型侧配置（Drag 模型与空间天气）。
 
-    报告里"GMAT 脚本侧"的输入必须取自**实际要跑的脚本**，而不是生成器的默认值：
+    报告里“GMAT 脚本侧”的输入必须取自**实际要跑的脚本**，而不是生成器的默认值：
     生成（`--drag-model`）与对拍（`--atmosphere`）分属两个工具的两个开关，脱钩时
-    会静默把"输入不齐"记成"模型差异"（验收条件二要求同配置）。
+    会静默把“输入不齐”记成“模型差异”（验收条件二要求同配置）。
     注释行（以 ``%`` 开头）跳过——Exponential 分支的 F107/MagneticIndex 即被注释，
     GMAT 用其内置默认。
     """

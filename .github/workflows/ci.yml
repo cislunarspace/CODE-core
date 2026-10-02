@@ -60,6 +60,8 @@ jobs:
       - run: uv run --no-sync python scripts/check_layer_imports.py
       # 已删目录无引用检查（ADR 0021 迁移防漏，#372）
       - run: uv run --no-sync python scripts/check_deleted_dir_refs.py
+      # 文档与代码注释的引号口径检查（AGENTS.md 引号条款，#777）
+      - run: uv run --no-sync python scripts/check_doc_quotes.py
 
 
   typecheck:

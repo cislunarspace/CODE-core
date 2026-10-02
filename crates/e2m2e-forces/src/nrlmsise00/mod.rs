@@ -12,7 +12,7 @@
 //!   逐句对应，含运算顺序；差异仅在浮点舍入量级（相对 < 1e-12）。
 //! - 官方实现用文件级静态变量（FORTRAN COMMON）保存跨调用的中间状态（`plg`、
 //!   `dfa`、`apdf`、`apt`、局地时三角量）。本实现把这份状态收进每次调用新建的
-//!   [`Ctx`]，等价于参考实现的"首次调用"行为；参考实现在 72.5 km 以下依赖上一次
+//!   [`Ctx`]，等价于参考实现的“首次调用”行为；参考实现在 72.5 km 以下依赖上一次
 //!   调用的残留值，本实现不复制这处未定义行为（对阻力应用的高度域无影响）。
 //! - 只支持标准开关集：switch 0 = 0（内部用 cgs 密度，[`density`] 换算为 kg/m³），
 //!   switch 1–23 全开；switch 9 取 `+1`（标量 Ap）或 `−1`（Ap 史）由
@@ -105,7 +105,7 @@ pub struct Nrlmsise00Output {
 /// `storm_time` 只决定地磁 Ap 的输入形态：`false` 用标量日 Ap（`ap[0]`），
 /// `true` 用 3 小时分辨率的 Ap 史（`ap[1..]`）。
 ///
-/// 总质量密度始终取 `gtd7d` 的"drag 有效总质量密度"口径（含 500 km 以上不可
+/// 总质量密度始终取 `gtd7d` 的“drag 有效总质量密度”口径（含 500 km 以上不可
 /// 忽略的异常氧贡献）。这与 nyx 的公开对拍夹具一致；`gtd7` 的不含异常氧口径
 /// 不对外暴露（阻力建模只关心前者）。
 pub fn density(input: &Nrlmsise00Input, storm_time: bool) -> Nrlmsise00Output {
@@ -632,7 +632,7 @@ impl Ctx {
                 + 14.0 * d[7]);
     }
 
-    /// cgs "drag 有效总质量密度"（`gtd7d` 口径，含异常氧）。
+    /// cgs “drag 有效总质量密度”（`gtd7d` 口径，含异常氧）。
     fn mass_density_drag(&self) -> f64 {
         let d = &self.d;
         AMU_G
@@ -855,7 +855,7 @@ impl Ctx {
     /// 下层大气球谐展开（参考实现 `glob7s`）。
     ///
     /// 参数集标记 `p[99]` 在全部使用到的行上为 0 或 2（等价于参考实现里
-    /// "为 0 → 置 2" 的原地写入），故此处只读不写。
+    /// “为 0 → 置 2” 的原地写入），故此处只读不写。
     fn glob7s(&self, p: &[f64], input: &Nrlmsise00Input) -> f64 {
         let mut t = [0.0_f64; 14];
         let doy = f64::from(input.day_of_year);

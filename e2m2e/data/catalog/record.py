@@ -157,7 +157,7 @@ def validate_meta(meta: dict[str, Any]) -> None:
     """校验记录元数据的 schema 版本与必备键；不合格抛 :class:`CatalogError`。
 
     schema 版本先于必备键检查：旧版本产物优先按版本废弃报错，让
-    "删除后重算"的处置指引（ADR 0045 实现注）先于裸缺键清单到达用户。
+    “删除后重算”的处置指引（ADR 0045 实现注）先于裸缺键清单到达用户。
     """
     version = meta.get("schema_version")
     if version != SCHEMA_VERSION:

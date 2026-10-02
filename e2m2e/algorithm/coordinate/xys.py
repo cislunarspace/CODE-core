@@ -15,7 +15,7 @@ class XysProvider(abc.ABC):
 
     保留为 ABC（而非折叠为唯一实现 ErfaXysProvider）：ADR 0003 明确记录了
     日后用 GMAT 表格支撑的 ``GMATXysProvider`` 替换 pyerfa 来源以实现与 GMAT
-    XYS 插值精确一致的需求——erfa 可替换性是真实设计意图，非"万一"式死灵活性。
+    XYS 插值精确一致的需求——erfa 可替换性是真实设计意图，非万一式死灵活性。
     """
 
     @abc.abstractmethod

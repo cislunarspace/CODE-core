@@ -37,10 +37,10 @@ def _anti_sun_sc_near_moon(system, et: float, alt_km: float = 100.0) -> np.ndarr
 def test_lunar_umbra_shadow_comes_from_moon_not_earth(earth_icrf_system) -> None:
     """月球反日侧低轨 SC 应被月球本影遮挡，且该处地球不遮挡。
 
-    三联断言用真实星历几何证明"月影"：
+    三联断言用真实星历几何证明“月影”：
     1. ``bodies=["MOON"]`` → flux ≈ 0（月球投下本影）；
     2. ``bodies=["EARTH"]`` → flux ≈ 1（该处地球不在 SC-太阳线上，不遮挡——
-       从而排除"阴影其实来自地球"的可能）；
+       从而排除“阴影其实来自地球”的可能）；
     3. ``bodies=["EARTH", "MOON"]`` → flux ≈ 0（GMT-6543 合成：任一本影→0，
        多遮挡体循环 + 合成在真实双体几何下端到端运行）。
 

@@ -15,8 +15,8 @@
 //! # argmin 约定
 //!
 //! 重复最小值取**首个**（与 numpy `argmin` 一致），统一用严格 `<` 比较：
-//! 遇相等候选不更新，保留更早出现的索引。这是测试能断言"整数索引精确
-//! 相等"的前提（见 transfer-grid-search-rust.md 第 2.3 节）。
+//! 遇相等候选不更新，保留更早出现的索引。这是测试能断言“整数索引精确
+//! 相等”的前提（见 transfer-grid-search-rust.md 第 2.3 节）。
 //!
 //! # 输入约定
 //!
@@ -341,7 +341,7 @@ mod tests {
     fn check_collision_earth_priority_over_moon() {
         // 对抗用例：moon 在 idx=0 命中、earth 在 idx=1 命中——索引更早的是 moon，
         // 但 earth 优先级高于 moon（实现先完整扫 earth 命中即返回），故返回 earth@idx=1。
-        // 钉死"earth 优先于 moon（索引无关）"这一非显然不变量。
+        // 钉死“earth 优先于 moon（索引无关）”这一非显然不变量。
         let mu = 0.1;
         let earth_r = 1e-4;
         let moon_r = 1e-4;

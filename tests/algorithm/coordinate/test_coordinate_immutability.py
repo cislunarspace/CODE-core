@@ -25,7 +25,7 @@ def test_no_axes_or_origin_attribute_mutation_in_coordinate():
     assert coord_root.is_dir(), f"coordinate 目录不存在:{coord_root}"
 
     # 匹配 cs.axes = ...  system.axes = ...  coord.axes = ... 这类
-    # "明确标识符前缀" 的属性赋值;排除 cs = ... axes = ... (普通变量赋值)
+    # “明确标识符前缀” 的属性赋值;排除 cs = ... axes = ... (普通变量赋值)
     pattern = re.compile(
         r"\b(?:cs|coord|system|target|source|itrf|icrf|to_cs|from_cs)"
         r"\.(?:axes|origin)\s*="

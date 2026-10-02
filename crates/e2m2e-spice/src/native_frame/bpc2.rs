@@ -94,8 +94,8 @@ pub(crate) fn evaluate(bytes: &[u8], seg: &DafSegment, et: f64) -> Result<[f64; 
 
 /// [`evaluate`] 的负控钩子：以调用方给定的轴序做 `eul2xf` 并返回旋转块。
 ///
-/// 与 `daf::parse_with` 同例（ADR 0051）：仅供对拍测试证明「错误输入可被
-/// 检出」——axes 固定 (3,1,3) 之外**不做任何语义承诺**（数据是按 3-1-3
+/// 与 `daf::parse_with` 同例（ADR 0051）：仅供对拍测试证明“错误输入可被
+/// 检出”——axes 固定 (3,1,3) 之外**不做任何语义承诺**（数据是按 3-1-3
 /// 装段 Chebyshev 系数，换轴序只是数学上错误的读法），
 /// 供 `euler_313_negative_control` 用 1-2-3 序列证明对拍能报错。
 ///

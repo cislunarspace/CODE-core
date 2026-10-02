@@ -401,7 +401,7 @@ fn itrf93_load_order_later_wins() {
     );
 
     // oracle 侧卸掉预测 BPC（cspice 池），native 侧不动 → oracle = 只装历史。
-    // native == 「只装历史 BPC 的 oracle」证明后加载者生效，而非逐文件混合。
+    // native == “只装历史 BPC 的 oracle”证明后加载者生效，而非逐文件混合。
     cspice_rs::data::unload(&predicted.to_string_lossy()).unwrap();
     let oracle_history = ffi_oracle::pxform("ITRF93", "J2000", et).unwrap();
     check_cspice("pxform ITRF93 history only");
@@ -582,7 +582,7 @@ fn deltet_reversibility() {
 
 /// `scripts/compare_spice_ephemeris_frames.py` 的 9 组 (UTC, ET) 常量
 /// （naif0012 语义；本用例 naif0011 先装、naif0012 最后装，钉死
-/// 「后加载者生效」下 naif0012 的 37@2017 生效）。
+/// “后加载者生效”下 naif0012 的 37@2017 生效）。
 const HIFITIME_POINTS: [(&str, f64); 9] = [
     ("1900-01-09T00:17:15", -3155024523.8157988),
     ("1920-07-23T14:39:29", -2506972789.816543),

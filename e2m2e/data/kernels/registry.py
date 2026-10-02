@@ -40,8 +40,8 @@ _NAIF_IDS: dict[str, int] = {
 # - 只有 ``de421.bsp`` 会改变 GM 口径：仓库只为 DE421/DE440 维护 GM 表。
 #   de441/de442 的 GM 与 DE440 确有差异，但补全它们需要的权威来源不在本仓库
 #   现有证据内，因此一律按 DE440 处理并告警一次，绝不静默混用。
-# - 配对取"最后一个成功加载的星历内核"：与 SPICE 对重叠覆盖段"后加载者生效"
-#   的优先级规则一致，避免出现"位置按 de440s、GM 按 de421"的静默错配。
+# - 配对取“最后一个成功加载的星历内核”：与 SPICE 对重叠覆盖段“后加载者生效”
+#   的优先级规则一致，避免出现“位置按 de440s、GM 按 de421”的静默错配。
 _SPK_DATUM_PATTERN = re.compile(r"(?i)^(de\d+s?)\.bsp$")
 
 _KERNEL_DATUM_BY_SPK: dict[str, str] = {
@@ -60,7 +60,7 @@ _KERNEL_DATUM_BY_SPK: dict[str, str] = {
 _DEFAULT_EPHEMERIS_DATUM = "DE440"
 
 #: 白名单中 GM 被近似到其它基准的内核（ADR 0048 承认其 DE440 差异但无权威表）：
-#: 加载时按内核名告警一次，落实"绝不静默混用"。
+#: 加载时按内核名告警一次，落实“绝不静默混用”。
 _APPROXIMATED_KERNELS: frozenset[str] = frozenset(
     {"de430", "de435", "de438", "de441", "de442", "de442s"}
 )

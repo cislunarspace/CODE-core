@@ -4,7 +4,7 @@
 ``qpQF2qpDS.py``。对应变换链第三段：DS 坐标与 quasi-Floquet 坐标
 之间的**矩阵变换**。
 
-数学关系（qiao ``CONTEXT.md`` §三"quasi-Floquet 变换"）：
+数学关系（qiao ``CONTEXT.md`` §三“quasi-Floquet 变换”）：
 
     X_QF = B(t)⁻¹ · X_DS        （正向 DS → QF）
     X_DS = B(t) · X_QF           （反向 QF → DS）
@@ -17,7 +17,7 @@
 
 - qiao 通过 ``get_QFmat(t, QFtrans_mat)`` 在 ``globalparam.data_array``
   上插值 ``B(t)``；本仓库的 :class:`QuasiFloquetResult.B_at` 已提供线性
-  插值访问器，本模块直接接收插值后的 ``B_at_t``，把"何时插值"的决策
+  插值访问器，本模块直接接收插值后的 ``B_at_t``，把何时插值的决策
   上浮到 :class:`LibrationCatalogTransformer` （与 EM/CM 段保持一致）。
 """
 

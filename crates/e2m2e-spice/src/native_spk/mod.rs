@@ -2,7 +2,7 @@
 //!
 //! - 注册表：进程级 `RwLock<Vec<Arc<LoadedKernel>>>`，按**加载顺序**存放；
 //!   查询路径在读锁下克隆 `Arc` 快照，求值期间不持锁（Rayon 并行安全）。
-//! - 选段优先级复刻 CSPICE `spksfs` 的「后加载者生效」：内核按逆加载序、
+//! - 选段优先级复刻 CSPICE `spksfs` 的“后加载者生效”：内核按逆加载序、
 //!   段按逆文件内顺序扫描，首个 `body == 节点 && dc0 <= et <= dc1` 的段胜出。
 //! - 链式求值复刻 `spkgeo.c` 的**首个公共节点**语义：target 与 observer 各自
 //!   沿段图 `center` 向上累加状态到首个公共节点后相减。加法折叠顺序与
@@ -77,7 +77,7 @@ fn store() -> std::sync::RwLockReadGuard<'static, Vec<Arc<LoadedKernel>>> {
 }
 
 /// 加载一个 DAF 内核到 native 注册表。重复 load 同一路径幂等（先移除旧条目
-/// 再追加，保持「后加载者生效」优先级）。文本内核返回
+/// 再追加，保持“后加载者生效”优先级）。文本内核返回
 /// [`DafSpkError::NotDaf`]，由 `furnish_kernel` 决定是否视为跳过。
 pub fn load(path: &Path) -> Result<(), DafSpkError> {
     let bytes =
@@ -105,8 +105,8 @@ pub fn is_empty() -> bool {
     store().is_empty()
 }
 
-/// 指定路径是否已在注册表中（`furnish_kernel` 回滚时区分「本次新增」与
-/// 「此前已登记」用）。
+/// 指定路径是否已在注册表中（`furnish_kernel` 回滚时区分“本次新增”与
+/// “此前已登记”用）。
 pub fn is_loaded(path: &Path) -> bool {
     store().iter().any(|k| k.path == path)
 }

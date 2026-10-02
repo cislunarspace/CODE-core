@@ -337,7 +337,7 @@ class TestCheckCollision:
     def test_earth_priority_over_moon_when_both_hit(self):
         # 对抗用例：moon 在 idx=0 命中、earth 在 idx=1 命中——索引更早的是 moon，
         # 但 earth 优先级高于 moon（两侧实现都先完整扫 earth 命中即返回）。
-        # 钉死"earth 优先于 moon（索引无关）"这一非显然不变量。
+        # 钉死“earth 优先于 moon（索引无关）”这一非显然不变量。
         traj = np.zeros((3, 6))
         traj[0, 0] = 1.0 - self.MU + 1e-5  # moon 附近（距 moon 1e-5 < 1e-4）
         traj[1, 0] = -self.MU + 1e-5  # earth 附近（距 earth 1e-5 < 1e-4）
