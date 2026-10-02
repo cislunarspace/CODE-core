@@ -83,17 +83,6 @@ ALGORITHMS_REQUIREMENTS = [
         linked_code=["e2m2e.algorithm.solver.differential_correction"],
         linked_tests=["tests/algorithm/solver/test_differential_correction.py"],
     ),
-    # ---- 稳定性分析 ----
-    Requirement(
-        id="REQ-110",
-        title="Stability indices satisfy v1*v2 = 1",
-        category=RequirementCategory.PERFORMANCE,
-        description="对于保守系统 CR3BP，单周期轨道的 Floquet 乘子乘积 v1*v2 = 1（辛条件）。",
-        priority=RequirementPriority.SHOULD,
-        verification_method="test",
-        linked_code=["e2m2e.algorithm.stability"],
-        linked_tests=["tests/algorithm/stability/test_stability.py"],
-    ),
     # ---- 多点射击 ----
     Requirement(
         id="REQ-111",

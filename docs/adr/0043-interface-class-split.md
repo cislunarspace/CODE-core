@@ -146,3 +146,45 @@ conic/星历双档）：不扩 `transfer_type` 术语清单，不改 ADR 0040 �
 决策 4 其余结论不变；其余占位（`transfer_search`、`low_energy_transfer`、
 `orbit_stability`、`manifold_analysis`、`relative_motion`）的归属继续
 留待各自实现时决定。
+
+## 修订（2026-09-26，#687）：稳定性/分岔分析能力整体删除，不登记为算法层内部能力
+
+### 背景
+
+决策 4 把 `orbit_stability` 一类分析能力的最终归属留给"实现时决定"，
+决策 6 给出工具面准入判据（任务级能力，或其内容被既有响应字段引用且
+没有既有工具能供给）。#687 就 `e2m2e.algorithm.stability`（单轨
+`StabilityAnalysis`、族级 `detect_bifurcation_in_family`，随 #688 的
+穿越判据升级）的归属拍板，选项为 (a) 入接口、(b) 登记为算法层内部能力
+并写明将来触发暴露的条件。
+
+### 决策
+
+两者都不取：该能力整体删除，接口层与算法层都不留。
+
+### 依据
+
+- **零生产消费者**：`e2m2e/api/` 对 stability 与 bifurcation 零引用，
+  进程内 import、MCP、CLI 与 stdio sidecar 的任何调用链都取不到它；全仓
+  引用只有 `tests/algorithm/stability/`、`scripts/calibrate_dro3d_vertical_critical.py`
+  与 `e2m2e/mbse/` 两处追溯元数据。
+- **决策 6 两款皆不成立**：它不是任务级能力；其内容也未被任何既有响应
+  字段引用——`compute_state_transition_matrix` 在 `e2m2e/` 内只被该模块
+  与 `family/axial_initial_guess.py` 调用，`design_orbit` 路径不产单值
+  矩阵，把单轨稳定性挂进设计响应须为每次设计多算一次整周期 STM 积分。
+- **闭值集成本**：`StabilityType`／`BifurcationType` 一旦跨边界即触发
+  ADR 0044 的术语清单与双向锁定测试的长期维护面，无消费者时不值。
+
+### 后果
+
+- 决策 4 其余结论不变；其余占位（`transfer_search`、`low_energy_transfer`、
+  `manifold_analysis`、`relative_motion`）的归属继续留待各自实现时决定。
+- `orbit_stability` 自此没有既有能力可暴露；将来出现具体消费场景时，按
+  决策 2/3 的分家先例定类归属、按决策 6 定工具面准入，重新实现而非恢复
+  历史代码。
+- 拒绝理由、复议条件与触发条件记在
+  `.out-of-scope/stability-bifurcation-analysis.md`；诊断脚本
+  `scripts/calibrate_dro3d_vertical_critical.py` 保留并改为自含——稳定性
+  指数由 monodromy 的辛块直接给出（面外 `ν_out = M[2,2] + M[5,5]`，面内
+  由 x/y/vx/vy 的 4×4 辛块解 `ν² − tr(A_in)·ν + (m_in − 2) = 0`），不做
+  特征值配对。

@@ -71,13 +71,6 @@ ALGORITHM_COMPONENTS = [
         description="Orbit family continuation",
     ),
     Component(
-        name="StabilityAnalysis",
-        module_path="e2m2e.algorithm.stability",
-        dependencies=["CR3BP_Dynamics"],
-        layer="algorithm",
-        description="Floquet stability analysis",
-    ),
-    Component(
         name="MultipleShooting",
         module_path="e2m2e.algorithm.solver.multiple_shooting",
         dependencies=["CR3BP_Dynamics"],

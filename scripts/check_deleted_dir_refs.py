@@ -27,6 +27,7 @@ DELETED_DIRS: tuple[str, ...] = (
     "tests/data/atmosphere",
     "tests/algorithm/correction",
     "tests/algorithm/forces",
+    "tests/algorithm/stability",
     "e2m2e/data/catalog_baseline",
 )
 
