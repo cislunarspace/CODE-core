@@ -26,6 +26,47 @@ from .walk import (
 )
 
 
+def _pal_termination_reason(perilunes: list[float], max_orbits: int, target_du: float) -> str:
+    """PAL 未达目标即耗尽时的终止原因消息。
+
+    区分三种失败：族已到尽头（成员近月距单调演化，家族在步数内未提供
+    更低近月段）、步进停滞（尾部成员近月距往复振荡，延拓没有沿族推进，
+    即 #772 修复前的双能级 2-周期振荡形态）与提前中断（成员数少于请求
+    条数，内层微分修正失败 break）。停滞判据取尾部至多 50 条成员近月距
+    序列的方向反转次数：单调演化反转 ≤1 次，2-周期振荡约每两步反转一次，
+    阈值 8 居中。
+    """
+    if not perilunes:
+        return f"PAL 延拓未产生任何收敛成员，未能到达目标近月距 {target_du:.6f} DU"
+    tail = perilunes[-50:]
+    reversals = 0
+    prev_dir = 0
+    for cur, nxt in zip(tail, tail[1:], strict=False):
+        delta = nxt - cur
+        if abs(delta) < 1e-12:
+            continue
+        cur_dir = 1 if delta > 0 else -1
+        if prev_dir and cur_dir != prev_dir:
+            reversals += 1
+        prev_dir = cur_dir
+    if len(tail) >= 8 and reversals >= 8:
+        return (
+            f"PAL 延拓步进停滞：尾部 {len(tail)} 条成员近月距往复振荡 "
+            f"（{reversals} 次方向反转），未能到达目标近月距 {target_du:.6f} DU"
+        )
+    if len(perilunes) < max_orbits:
+        # PAL 未跑满请求条数即中断（内层微分修正失败 break），此时既不是
+        # 族已到尽头，也不该按请求条数报账
+        return (
+            f"PAL 延拓在 {len(perilunes)} 条成员后提前中断（未达请求的 {max_orbits} 条），"
+            f"最小近月距 {min(perilunes):.6f} DU 仍未到达目标近月距 {target_du:.6f} DU"
+        )
+    return (
+        f"PAL 延拓 {max_orbits} 条轨道后族已到尽头，最小近月距 "
+        f"{min(perilunes):.6f} DU 仍未到达目标近月距 {target_du:.6f} DU"
+    )
+
+
 def _walk_pal_to_perilune(
     dynamics: CR3BP_Dynamics,
     libration_point: int,
@@ -41,7 +82,9 @@ def _walk_pal_to_perilune(
     伪解（已由 ``_correct_halo`` 的伪解拒绝兜住，供二分细化退半步重试）。
     PAL 必须一次调用走全程：中途以新种子重启会重判延拓方向，在折叠点
     后方向来回翻转，实测分块重启在 z0≈∓0.13（近月距 ≈0.138 DU）处停滞，
-    单次调用则可一路走到近月距 0.003 DU 以下。
+    单次调用则可一路走到近月距 0.003 DU 以下。北/南半球都走 positive
+    振幅增长支（``halo_class`` 决定目标方向 td），未达目标抛出的
+    ``Cr3bpOrbitError`` 区分族已到尽头、步进停滞与提前中断三种原因。
     """
     from ...solver.continuation import Continuation
 
@@ -53,19 +96,23 @@ def _walk_pal_to_perilune(
         "amplitude_z": _HALO_SEED_Z0,
     }
     continuation = Continuation(corrector=DifferentialCorrection(dynamics))
-    direction = "positive" if z_sign > 0 else "negative"
 
+    # 北/南半球都走振幅增长支：positive 支按 halo_class 取目标方向（北
+    # td=+1、南 td=-1），两半球都从种子向折叠点爬升；negative 支以 x 为
+    # 目标、走向平面分岔端，到不了近月段（#772：南族此前误走 negative 支）。
     family = halo_pseudo_arclength_continuation(
         continuation,
         seed_orbit=seed,
         n_orbits=max_orbits,
-        direction=direction,
+        direction="positive",
         step_size=0.0045,
         verbose=False,
     )
     prev_orbit = seed
+    perilunes: list[float] = []
     for orb in list(family.orbits)[1:]:
         perilune = _moon_distance_minmax(dynamics, orb)[0]
+        perilunes.append(perilune)
         if perilune <= target_du:
             # 跨过目标：以 z0 为参数在 NRHO 分支上二分细化
             return _walk_family(
@@ -80,7 +127,7 @@ def _walk_pal_to_perilune(
             )
         prev_orbit = orb
 
-    raise Cr3bpOrbitError(f"PAL 延拓 {max_orbits} 条轨道仍未到达目标近月距 {target_du:.6f} DU")
+    raise Cr3bpOrbitError(_pal_termination_reason(perilunes, max_orbits, target_du))
 
 
 def design_nrho(
