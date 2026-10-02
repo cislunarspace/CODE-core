@@ -291,8 +291,8 @@ class FamilyGenerationRequest(_ApiModel):
             raise ValueError(f"{selection} 不绑定平动点，请求不得携带 libration_point")
         if selection == "HALO":
             assert point is not None  # HALO 必有平动点
-            fold_km = _HALO_FIXED_Z0_LIMIT_KM[point]
-            ranges["max_amplitude_km"] = NumericRange(-fold_km, fold_km, excluded_values=(0.0,))
+            limit_km = _HALO_FIXED_Z0_LIMIT_KM[point]
+            ranges["max_amplitude_km"] = NumericRange(-limit_km, limit_km, excluded_values=(0.0,))
         elif selection == "NRHO":
             ranges["north_south"] = NumericRange(1, 2)
             ranges["perilune_height_max_km"] = NumericRange(1000.0, 40000.0)
