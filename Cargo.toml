@@ -38,6 +38,9 @@ rayon = "1.10"
 # drainer reacquire GIL 调 Python callable（Sender 为 Send+Sync，可被 rayon
 # 多 worker 共享引用；std::sync::mpsc::Sender 是 !Sync，做不到）。
 crossbeam-channel = "0.5"
+# ADS 回调异常暂存（e2m2e-integrators bindings::da）：lock 不产毒化错误，
+# 直接返回 guard；与 dace-rs 0.2 的内部锁同一实现。
+parking_lot = "0.12"
 # 平面全周期 PAL 的秩揭示 SVD 与最小二乘；避免对秩亏问题使用正规方程。
 nalgebra = "0.35"
 # 中心流形频域 W 求解（#466）
@@ -47,7 +50,8 @@ num-complex = "0.4"
 # 无 BLAS 后端即可满足有限差分模板运算）。
 ndarray = "0.16"
 # 微分代数（DACE 截断 Taylor 多项式算术、初等函数、映射求逆、范数包围、
-# 编译求值）纯 Rust 实现，cislunarspace/dace-rs，issue #784。
+# 编译求值、自动域分裂 ADS 驱动器）纯 Rust 实现，cislunarspace/dace-rs，
+# crates.io 0.2.0；原语面见 issue #784，ADS 驱动器随 0.2.0 引入（issue #787）。
 # 本地对照检出见 ../dace-rs；API 文档 https://docs.rs/dace-rs。
-dace-rs = "0.1.0"
+dace-rs = "0.2"
 

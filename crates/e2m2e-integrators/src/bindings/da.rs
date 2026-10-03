@@ -4,11 +4,21 @@
 //! 本模块（PyO3 绑定）→ Python。原语面刻意最小：上下文管理、多项式
 //! 算术与初等函数、系数读写、求值与编译求值、范数/包围、映射求逆；
 //! 领域编排留在 algorithm 层，不进 Facade 工具面。
+//!
+//! 例外是 ``da_ads_split``：上游 0.2.0 的 ADS（自动域分裂）驱动器薄封装
+//! （issue #787）。调用方给变量盒、映射回调与分裂配置，递归分裂全部在
+//! Rust 内完成；分裂判据与驱动本体住上游 ``dace_rs::ads``，本模块只做
+//! 参数校验、GIL 边界与回调异常透传，不重实现判据。
 
+use e2m2e_da::ads::{
+    split as ads_split, AdsConfig as AdsConfigCore, AdsLeaf as AdsLeafCore,
+    AdsResult as AdsResultCore, ToleranceKind,
+};
 use e2m2e_da::{
     catch_da_panic, cos, exp, log, sin, sqrt, tan, CompiledDa as CompiledDaCore, Da as DaCore,
-    DaVector, DaceError, NormType,
+    DaVector, DaceError, Interval, NormType,
 };
+use parking_lot::Mutex;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
@@ -43,6 +53,7 @@ impl<'py> pyo3::FromPyObject<'py> for DaOperand {
 /// 禁止裸构造：只能经 ``Da.constant`` / ``Da.variable`` 工厂创建，且必须
 /// 先 ``da_init_py`` 初始化上下文。不要跨 ``da_init_py`` 代次混用对象
 /// （新旧代次对象混算报 code 1003，见 e2m2e-da crate 文档）。
+#[derive(Clone)]
 #[pyclass(name = "Da")]
 pub struct Da {
     inner: DaCore,
@@ -324,4 +335,211 @@ pub fn da_vector_invert_py(py: Python<'_>, das: Vec<pyo3::Py<Da>>) -> PyResult<V
     let cores: Vec<DaCore> = das.iter().map(|d| d.borrow(py).inner.clone()).collect();
     let inverted = catch_da_panic(|| cores.invert()).map_err(da_err)?;
     Ok(inverted.into_iter().map(Da::from_core).collect())
+}
+
+/// ADS 分裂的一片叶子：子盒几何、子盒上的重展开多项式、逐分量包围与达标标记。
+///
+/// 由 [`da_ads_split`] 返回，禁止裸构造。``values`` 是映射在该子盒单位变量
+/// 上的重展开多项式（``x_i = c_i + h_i * variable(i+1)``）；``bounds`` 逐
+/// 输出分量给出子盒上的保守包围 ``(lo, hi)``，口径同 ``Da.bound``。
+#[derive(Clone)]
+#[pyclass(name = "AdsLeaf", frozen)]
+pub struct AdsLeaf {
+    /// 子盒中心，每变量一项。
+    #[pyo3(get)]
+    pub center: Vec<f64>,
+    /// 子盒半宽，每变量一项。
+    #[pyo3(get)]
+    pub half_width: Vec<f64>,
+    /// 映射在该子盒上的重展开多项式。
+    #[pyo3(get)]
+    pub values: Vec<Da>,
+    /// 逐输出分量的保守包围 ``(lo, hi)``。
+    #[pyo3(get)]
+    pub bounds: Vec<(f64, f64)>,
+    /// 目标分量是否全部满足容差（预算或方向上限触顶的叶子为 False，显式可见）。
+    #[pyo3(get)]
+    pub met: bool,
+}
+
+impl AdsLeaf {
+    fn from_core(core: AdsLeafCore) -> Self {
+        Self {
+            center: core.center,
+            half_width: core.half_width,
+            values: core.values.into_iter().map(Da::from_core).collect(),
+            bounds: core.bounds.into_iter().map(|iv| (iv.lo, iv.hi)).collect(),
+            met: core.met,
+        }
+    }
+}
+
+/// 一次 ADS 分裂的结果：确定性叶序的叶子列表、每变量二分次数与达标叶数。
+#[pyclass(name = "AdsResult", frozen)]
+pub struct AdsResult {
+    /// 叶子列表，下半盒优先的深度优先确定性顺序。
+    #[pyo3(get)]
+    pub leaves: Vec<AdsLeaf>,
+    /// 每个变量被二分的次数。
+    #[pyo3(get)]
+    pub splits_per_var: Vec<u32>,
+    /// 目标分量全部满足容差的叶子数。
+    #[pyo3(get)]
+    pub met_leaves: usize,
+}
+
+impl AdsResult {
+    fn from_core(core: AdsResultCore) -> Self {
+        Self {
+            leaves: core.leaves.into_iter().map(AdsLeaf::from_core).collect(),
+            splits_per_var: core.splits_per_var,
+            met_leaves: core.met_leaves,
+        }
+    }
+}
+
+/// 在 GIL 内调用 Python 映射回调并取回多项式向量。
+///
+/// 回调异常（非 callable、返回类型错等）原样上抛，由调用方暂存、待驱动器
+/// 返回后重抛；异常类别不在此翻译。
+fn call_map(py: Python<'_>, cb: &Py<PyAny>, inputs: &[DaCore]) -> PyResult<Vec<DaCore>> {
+    let py_inputs: Vec<Py<Da>> = inputs
+        .iter()
+        .map(|d| Py::new(py, Da::from_core(d.clone())))
+        .collect::<PyResult<Vec<Py<Da>>>>()?;
+    let out = cb.call(py, (py_inputs,), None)?;
+    let das: Vec<Py<Da>> = out.extract(py)?;
+    Ok(das.iter().map(|d| d.borrow(py).inner.clone()).collect())
+}
+
+/// 自动域分裂（ADS）：把 ``func`` 在 ``domain`` 上递归二分并逐子盒重展开，
+/// 直到目标分量的多项式包围宽度满足容差（dace-rs 0.2.0 的 ``ads::split``
+/// 驱动器薄封装，issue #787）。
+///
+/// # 参数
+///
+/// - ``func``：映射回调。收到已代换到当前子盒的 ``Da`` 列表
+///   （``x_i = c_i + h_i * variable(i+1)``），必须由这些输入构造输出并返回
+///   ``Da`` 列表；返回空列表报 ``RuntimeError``（code 650）。
+/// - ``domain``：每变量一个 ``(lo, hi)`` 区间，须非空且 ``lo <= hi``。
+/// - ``tolerances``：逐目标分量的容差，正有限，必填。
+/// - ``tolerance_kind``：``absolute``（缺省）判据 ``hi - lo <= tol``；
+///   ``relative`` 判据 ``hi - lo <= tol * max(|lo|, |hi|)``。
+/// - ``targets``：容差作用的输出分量下标；``None`` 或空列表为全部分量，
+///   非空给定时长度须与 ``tolerances`` 一致（空列表的逐分量对齐由上游
+///   按实际输出数校验）。
+/// - ``max_splits_per_var``：每方向二分上限（缺省 32），``0`` 禁止分裂。
+/// - ``max_leaves``：总叶子预算（缺省 1024），含未达标叶子。
+///
+/// 缺省值与上游 ``AdsConfig::default()`` 一致（1e-8 绝对容差只是上游缺省的
+/// 起点，本封装仍要求显式给 ``tolerances``）。
+///
+/// # 回调契约与并发
+///
+/// 回调收到的 ``Da`` 是子盒单位变量上的多项式，不是原始域变量；输出须由
+/// 这些输入构造，驱动器据其包围宽度决定继续分裂或收叶。驱动期间释放 GIL
+/// （``allow_threads``），每次子盒重展开回调时重新获取；回调抛出的 Python
+/// 异常原样透传（暂存并在分裂结束后重抛，类别不吞），出错时驱动器内部以
+/// 输入克隆作哑结果走完递归，最终结果随后丢弃。
+///
+/// # 返回保证
+///
+/// 叶子顺序确定性：下半盒优先的深度优先遍历，方向平局取最小变量下标，
+/// 相同输入给相同结果。预算或方向上限触顶的叶子 ``met=False`` 显式可见，
+/// 不谎报达标。上游运算期错误（code 650 等）经 panic 边界映射为
+/// ``RuntimeError``，与 ``da_vector_invert_py`` 同口径。
+// Python 可见参数 7 个（py token 由 pyo3 注入），沿用仓库既有 allow。
+#[allow(clippy::too_many_arguments)]
+#[pyfunction]
+#[pyo3(signature = (func, domain, tolerances, tolerance_kind = "absolute", targets = None, max_splits_per_var = 32, max_leaves = 1024))]
+pub fn da_ads_split(
+    py: Python<'_>,
+    func: Py<PyAny>,
+    domain: Vec<(f64, f64)>,
+    tolerances: Vec<f64>,
+    tolerance_kind: &str,
+    targets: Option<Vec<usize>>,
+    max_splits_per_var: u32,
+    max_leaves: usize,
+) -> PyResult<AdsResult> {
+    if domain.is_empty() {
+        return Err(PyValueError::new_err(
+            "da_ads_split: domain 至少需要一个 (lo, hi) 区间",
+        ));
+    }
+    for (i, &(lo, hi)) in domain.iter().enumerate() {
+        if lo.is_nan() || hi.is_nan() || lo > hi {
+            return Err(PyValueError::new_err(format!(
+                "da_ads_split: 第 {i} 个区间无效（lo > hi 或 NaN 端点），收到 ({lo}, {hi})"
+            )));
+        }
+    }
+    if tolerances.is_empty() {
+        return Err(PyValueError::new_err(
+            "da_ads_split: tolerances 至少需要一个正的有限容差",
+        ));
+    }
+    for (i, &tol) in tolerances.iter().enumerate() {
+        if !tol.is_finite() || tol <= 0.0 {
+            return Err(PyValueError::new_err(format!(
+                "da_ads_split: 第 {i} 个容差无效，收到 {tol}，须为正的有限值"
+            )));
+        }
+    }
+    let kind = match tolerance_kind {
+        "absolute" => ToleranceKind::Absolute,
+        "relative" => ToleranceKind::Relative,
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "da_ads_split: tolerance_kind 只接受 absolute 或 relative，收到 {other}"
+            )))
+        }
+    };
+    if let Some(t) = &targets {
+        if !t.is_empty() && t.len() != tolerances.len() {
+            return Err(PyValueError::new_err(format!(
+                "da_ads_split: targets 长度 {} 与 tolerances 长度 {} 不一致",
+                t.len(),
+                tolerances.len()
+            )));
+        }
+    }
+    if max_leaves == 0 {
+        return Err(PyValueError::new_err("da_ads_split: max_leaves 必须为正"));
+    }
+
+    let config = AdsConfigCore {
+        tolerances,
+        tolerance_kind: kind,
+        targets: targets.unwrap_or_default(),
+        max_splits_per_var,
+        max_leaves,
+    };
+    let domain_iv: Vec<Interval> = domain.iter().map(|&(lo, hi)| Interval { lo, hi }).collect();
+    // 回调异常暂存：出错时给驱动器返回输入克隆作哑结果（分量数与输入一致，
+    // 不会 panic），驱动器照常走完递归；结果随后丢弃、异常原样重抛。
+    let err: Mutex<Option<PyErr>> = Mutex::new(None);
+    let cb = func.clone_ref(py);
+    let core = catch_da_panic(|| {
+        py.allow_threads(|| {
+            ads_split(
+                |inputs: &[DaCore]| {
+                    Python::with_gil(|py| match call_map(py, &cb, inputs) {
+                        Ok(cores) => cores,
+                        Err(e) => {
+                            *err.lock() = Some(e);
+                            inputs.to_vec()
+                        }
+                    })
+                },
+                &domain_iv,
+                &config,
+            )
+        })
+    })
+    .map_err(da_err)?;
+    if let Some(e) = err.into_inner() {
+        return Err(e);
+    }
+    Ok(AdsResult::from_core(core))
 }

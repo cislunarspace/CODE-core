@@ -102,6 +102,8 @@ if TYPE_CHECKING:
     transfer_grid_search_py: Any
     transfer_grid_search_serial_py: Any
     wsb_search_py: Any
+    AdsLeaf: Any
+    AdsResult: Any
     CompiledDa: Any
     Da: Any
     CowellResult: Any
@@ -117,6 +119,8 @@ if TYPE_CHECKING:
     _rk_step: Any
 
 _RUST_SYMBOLS = (
+    "AdsLeaf",
+    "AdsResult",
     "CompiledDa",
     "Da",
     "CowellResult",
@@ -142,6 +146,7 @@ _RUST_SYMBOLS = (
     "collinear_center_modes_py",
     "compute_distance_series_py",
     "compute_min_distance_py",
+    "da_ads_split",
     "da_init_py",
     "da_initialized_py",
     "da_set_truncation_order_py",
@@ -327,12 +332,15 @@ __all__ = [
     "check_collision_py",
     "cm_to_qf_py",
     "collinear_center_modes_py",
+    "AdsLeaf",
+    "AdsResult",
     "CompiledDa",
     "CowellResult",
     "cowell_step",
     "compute_distance_series_py",
     "compute_min_distance_py",
     "Da",
+    "da_ads_split",
     "da_init_py",
     "da_initialized_py",
     "da_set_truncation_order_py",
