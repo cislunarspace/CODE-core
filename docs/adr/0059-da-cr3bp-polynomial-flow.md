@@ -1,7 +1,7 @@
 # ADR 0059：CR3BP 多项式流——DA 算术传播内核
 
 - 状态：已采纳（已实现）
-- 日期：2026-10-04
+- 日期：2026-10-03
 - 关联 issue：#786
 - 相关：ADR 0058（forces/dyn 拆分）、ADR 0002（Rust 数值内核）、ADR 0055（验收 oracle 类别）
 
@@ -45,7 +45,9 @@ issue #784 落地了 dace-rs（DACE 2.1 截断 Taylor 多项式的纯 Rust 实�
   返回契约与错误路径的行为测试。
 - 正面：NRHO 短弧的一致半径-阶数曲线（`scripts/da_uniform_radius_curve.py`
   → `datasets/da_flow/uniform_radius_nrho_l2.csv`）给出阶数选择的量化依据，
-  曲线随阶数单调不降；研究脚本不进默认 pytest。
+  曲线随阶数单调不降；研究脚本不进默认 pytest。issue 验收原文写脚本与数据
+  落 scripts/，数据实际按仓库 datasets/ 数据留档惯例改放 datasets/da_flow/
+  并提交入库，脚本仍在 scripts/。
 - 负面：固定步长 RK4 在长弧上步数开销线性于弧长×精度要求；阶数 8 的单次
   传播在 debug 构建下明显偏慢，脚本引导 `make dev-release`。
 - 风险控制：截断阶 save/restore 保证内核不污染调用方的线程局部设置；
@@ -53,4 +55,4 @@ issue #784 落地了 dace-rs（DACE 2.1 截断 Taylor 多项式的纯 Rust 实�
 
 ## 修订记录
 
-- 2026-10-04：首次记录。
+- 2026-10-03：首次记录。

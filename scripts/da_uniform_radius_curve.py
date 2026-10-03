@@ -11,7 +11,9 @@ Taylor 映射编译为 CompiledDa，在 16 个固定伪随机 R⁶ 单位方向�
     error(ρ, dir) = max | compiled.eval(ρ·dir)
                             − propagate_cr3bp(SEED + ρ·dir).states[-1] |
 
-半径区间 [1e-8, 1e-1]，二分 36 次（区间收敛到 ~1e-18 相对宽度）。
+半径区间 [1e-8, 1e-1]，二分 36 次（区间收敛到 ~1e-18 相对宽度）。二分假设
+误差随 ρ 单调增长（Taylor 余项随偏差增大）：先探测区间上界，满足则直接取
+上界，否则二分收敛到满足偏差 ≤ TOL 的最大半径 ρ*。
 重积分容差 1e-13，远低于 TOL=1e-8，不构成瓶颈。
 
 数据集随仓库留档（曲线数据不进默认 pytest；与
@@ -50,7 +52,7 @@ RHO_HI = 1e-1
 BISECTIONS = 36
 N_DIRECTIONS = 16
 
-OUTPUT = "datasets/da_flow/uniform_radius_nrho_l2.csv"
+OUTPUT = Path(__file__).resolve().parents[1] / "datasets" / "da_flow" / "uniform_radius_nrho_l2.csv"
 
 
 def re_integrated_final(deviation: np.ndarray) -> np.ndarray:
