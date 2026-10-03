@@ -44,6 +44,8 @@ cspice-rs-sys = { workspace = true, optional = true }
 # 进度回调 drainer：FFI 创建 (tx, rx) 对，rx 由独立 OS 线程排空，
 # reacquire GIL 调 Python callable；tx 传给 e2m2e-dyn 的并行内核。
 crossbeam-channel = { workspace = true }
+# ADS 回调异常暂存（issue #787）：std Mutex 的 lock().unwrap() 换无毒化路径。
+parking_lot = { workspace = true }
 nalgebra = { workspace = true }
 # 中心流形频域 W 求解器（#466）：与 numpy.fft 同语义的特解 FFT。
 rustfft = "6.4"
