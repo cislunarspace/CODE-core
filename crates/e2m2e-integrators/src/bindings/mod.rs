@@ -2,6 +2,7 @@
 
 #[cfg(feature = "spice")]
 pub mod compiled;
+pub mod da;
 pub mod force_models;
 pub mod geometry;
 pub mod lambert;

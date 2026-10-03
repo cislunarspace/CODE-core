@@ -1,0 +1,15 @@
+[package]
+name = "e2m2e-da"
+description = "微分代数（DACE 截断 Taylor 多项式）薄封装：上下文生命周期约定与 panic 边界"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lib]
+name = "e2m2e_da"
+crate-type = ["rlib"]
+
+[dependencies]
+dace-rs = { workspace = true }

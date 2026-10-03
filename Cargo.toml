@@ -8,6 +8,7 @@ members = [
     "crates/e2m2e-levelset",
     "crates/e2m2e-dyn",
     "crates/e2m2e-hjb-dynamics",
+    "crates/e2m2e-da",
 ]
 
 [workspace.package]
@@ -45,4 +46,8 @@ num-complex = "0.4"
 # 水平集网格数据（e2m2e-levelset，任意维 n-d 数组是 ToolboxLS 移植的核心容器；
 # 无 BLAS 后端即可满足有限差分模板运算）。
 ndarray = "0.16"
+# 微分代数（DACE 截断 Taylor 多项式算术、初等函数、映射求逆、范数包围、
+# 编译求值）纯 Rust 实现，cislunarspace/dace-rs，issue #784。
+# 本地对照检出见 ../dace-rs；API 文档 https://docs.rs/dace-rs。
+dace-rs = "0.1.0"
 

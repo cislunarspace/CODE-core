@@ -114,6 +114,9 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   供 ``NRLMSISE00Atmosphere.density`` 调用；issue #637）。
 /// - **v26**：新增 ``propagate_kepler_py``（conic 档二体 Kepler 封闭解传播
 ///   + 解析 STM，issue #739）。
+/// - **v27**：新增 ``da_init_py`` / ``da_initialized_py`` / ``da_truncation_order_py`` /
+///   ``da_set_truncation_order_py`` / ``da_vector_invert_py`` 与 ``Da`` / ``CompiledDa``
+///   pyclass（dace-rs 微分代数原语面，issue #784）。
 ///
 /// 1→3 跳号实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -454,6 +457,16 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     )?)?;
     m.add_function(wrap_pyfunction!(hjb::solve_hjb_py, m)?)?;
     m.add_function(wrap_pyfunction!(hjb::solve_planar_lowthrust_hjb_py, m)?)?;
+    m.add_function(wrap_pyfunction!(bindings::da::da_init_py, m)?)?;
+    m.add_function(wrap_pyfunction!(bindings::da::da_initialized_py, m)?)?;
+    m.add_function(wrap_pyfunction!(bindings::da::da_truncation_order_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        bindings::da::da_set_truncation_order_py,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(bindings::da::da_vector_invert_py, m)?)?;
+    m.add_class::<bindings::da::Da>()?;
+    m.add_class::<bindings::da::CompiledDa>()?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<bindings::steppers::StepResult>()?;

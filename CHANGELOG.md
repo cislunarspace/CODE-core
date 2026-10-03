@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### Added
+- **微分代数原语面：`Da`/`CompiledDa` 与五个 `da_*` 入口**：引入 dace-rs（DACE 2.1 截断 Taylor 多项式的纯 Rust 实现，crates.io 0.1.0）作为 workspace 依赖，经 `e2m2e.integrators` 暴露最小原语面。`da_init_py(order, nvars)` 初始化进程级 DA 上下文，可重复调用；旧 `Da` 对象按代次隔离，跨代次混用会报错，调用方不应跨 `init` 混用对象。`Da.constant`/`Da.variable` 工厂构造多项式，支持与标量双向的四则运算、sin/cos/tan/exp/log/sqrt、powi/powf、系数读写（`cons`/`linear`/`coefficient`/`set_coefficient`/`monomials`/`term_count`）、点求值 `eval`、范数（`norm_inf`/`norm_one`/`norm_power`，p 向量范数要求 p >= 2）与域 `[-1,1]^nv` 上的保守包围 `bound`；`da_vector_invert_py` 做多项式映射求逆（线性部分须非奇异）；`CompiledDa.from_das` 编译共享 Horner 求值树供重复批量求值；`da_truncation_order_py`/`da_set_truncation_order_py` 读写线程截断阶。运算期错误（除零 641、log 非正 647、奇异求逆 642、未初始化 1003 等）映射为 RuntimeError，初始化失败（911）映射为 ValueError。该面是分区判据区间化、CR3BP 多项式流与自动域分裂等后续工单的公共底座，为底层原语，不进 Facade 工具面。Rust 扩展 ABI 版本升至 27。(#784)
+
 ## [5.9.8] - 2026-10-02
 
 ### Added

@@ -33,6 +33,9 @@ e2m2e-forces = { path = "../e2m2e-forces" }
 e2m2e-dyn = { path = "../e2m2e-dyn" }
 e2m2e-levelset = { path = "../e2m2e-levelset" }
 e2m2e-hjb-dynamics = { path = "../e2m2e-hjb-dynamics", default-features = false }
+# 微分代数原语（dace-rs 薄封装，issue #784）：本 crate 只做 PyO3 绑定，
+# 生命周期与 panic 边界约定在 e2m2e-da。
+e2m2e-da = { path = "../e2m2e-da" }
 ndarray = { workspace = true }
 e2m2e-propagation = { path = "../e2m2e-propagation", features = ["pyo3"] }
 e2m2e-spice = { path = "../e2m2e-spice" }
