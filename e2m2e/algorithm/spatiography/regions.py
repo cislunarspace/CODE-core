@@ -30,14 +30,18 @@ from .constants import PRIMER_DEFAULTS, PrimerConstants
 from .scales import hill_radius_earth, laplace_radius_geolunar
 
 __all__ = [
+    "IntervalStateDiagnostics",
     "REGION_LEGEND",
     "RegionId",
     "StateDiagnostics",
     "Table4Bands",
     "classify_by_semi_major_axis",
+    "classify_by_semi_major_axis_interval",
     "classify_state",
+    "classify_state_interval",
     "jacobi_critical_values",
     "jacobi_topology_case",
+    "jacobi_topology_case_interval",
     "primer_cr3bp_system",
     "table4_bands",
 ]
@@ -375,4 +379,314 @@ def classify_state(
         topology_case=case,
         open_necks=necks,
         zone_ids=zones,
+    )
+
+
+@dataclass(frozen=True)
+class IntervalStateDiagnostics:
+    """状态盒分区诊断（classify_state_interval 的返回值，区间界输出）。
+
+    各诊断量为 ``(lo, hi)`` 区间：判据链（地心距、月心距、osculating 半长
+    轴、Jacobi 常数）在截断阶 Taylor 多项式下的保守包围。``zone_ids_possible``
+    为区间可能触及的全部分区（含跨界歧义），``zone_ids_certain`` 为区间整体
+    落入的分区（possible 子集）；``topology_case_min``/``topology_case_max``
+    为 Hill 拓扑 Case 区间界，``ambiguous_critical_values`` 显式列出被区间
+    严格跨越的临界 Jacobi 值。
+    """
+
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+    r_geocentric_km: tuple[float, float]
+    rho_selenocentric_km: tuple[float, float]
+    a_geocentric_km: tuple[float, float]
+    a_over_a_moon: tuple[float, float]
+    jacobi_constant: tuple[float, float]
+    topology_case_min: int
+    topology_case_max: int
+    ambiguous_critical_values: tuple[str, ...] = field(default_factory=tuple)
+    open_necks: tuple[str, ...] = field(default_factory=tuple)
+    zone_ids_possible: tuple[int, ...] = field(default_factory=tuple)
+    zone_ids_certain: tuple[int, ...] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        ResultStatus(self.status, self.cause, self.message)
+
+
+def classify_by_semi_major_axis_interval(
+    a_bounds: tuple[float, float],
+    *,
+    reference: str = "table1",
+    constants: PrimerConstants = PRIMER_DEFAULTS,
+    system: CR3BP_System | None = None,
+) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """按 osculating 半长轴区间（a/a☾ 口径）判定分区的 possible/certain 双标签。
+
+    点版判据（:func:`classify_by_semi_major_axis`）逐条区间化：possible 为
+    区间与带相交，certain 为区间整体含于带；阈值与点版同式重算（L1/L2 由
+    平动点求根派生，不做硬编码）。
+
+    Args:
+        a_bounds: ``(lo, hi)`` 半长轴区间；hi 可为 inf（盒内含逃逸态）。
+        reference: 同 :func:`classify_by_semi_major_axis`。
+        constants: Primer 常数集（r_L、r_H 由其解析派生）。
+        system: 复用已构造的 Primer CR3BP 系统（缺省自建，用于 L1/L2）。
+
+    Returns:
+        ``(possible, certain)``：各为升序区域 id 元组（:data:`REGION_LEGEND`
+        的键）；certain 必为 possible 子集。
+
+    Raises:
+        ValueError: reference 不受支持。
+    """
+    if reference not in ("table1", "table4"):
+        raise ValueError(f"未知的 reference={reference!r}，支持 table1/table4")
+
+    x_lo, x_hi = a_bounds
+    possible: set[RegionId] = set()
+    certain: set[RegionId] = set()
+
+    def _add(region: RegionId, hits: bool, inside: bool) -> None:
+        if hits:
+            possible.add(region)
+        if inside:
+            certain.add(region)
+
+    if reference == "table4":
+        bands = table4_bands(constants)
+        for lo_k, hi_k, region in zip(bands.lower, bands.upper, _TABLE4_TO_REGION, strict=True):
+            _add(region, x_lo <= hi_k and x_hi >= lo_k, x_lo >= lo_k and x_hi <= hi_k)
+        r_h = hill_radius_earth(constants) / constants.moon_a_km
+        _add(RegionId.HELIOCENTRIC, x_hi > r_h, x_lo > r_h)
+    else:
+        r_l = laplace_radius_geolunar(constants) / constants.moon_a_km
+        r_h = hill_radius_earth(constants) / constants.moon_a_km
+        five_to_one = (1.0 / 5.0) ** (2.0 / 3.0)
+        five_to_four = (4.0 / 5.0) ** (2.0 / 3.0)
+        sys = system if system is not None else primer_cr3bp_system(constants)
+        sys.compute_libration_points()
+        l1 = float(
+            np.linalg.norm(
+                sys.get_libration_point(LibrationPoint.L1) + sys.mu * np.array([1.0, 0.0, 0.0])
+            )
+        )
+        l2 = float(
+            np.linalg.norm(
+                sys.get_libration_point(LibrationPoint.L2) + sys.mu * np.array([1.0, 0.0, 0.0])
+            )
+        )
+        # 点版各判据的区间化：hits = 区间与带相交（possible），inside =
+        # 区间整体含于带（certain）；含等号口径与点版边界一致。
+        _add(RegionId.TERRESTRIAL, x_lo < r_l, x_hi < r_l)
+        _add(
+            RegionId.CISLUNAR_INNER_SECULAR,
+            x_lo < five_to_one and x_hi >= r_l,
+            x_lo >= r_l and x_hi < five_to_one,
+        )
+        _add(
+            RegionId.CISLUNAR_OUTER_RESONANT,
+            x_lo <= five_to_four and x_hi >= five_to_one,
+            x_lo >= five_to_one and x_hi <= five_to_four,
+        )
+        _add(
+            RegionId.CIRCUMLUNAR,
+            x_lo <= l2 and x_hi >= l1,
+            x_lo >= l1 and x_hi <= l2,
+        )
+        _add(RegionId.TRANSLUNAR, x_hi > l2, x_lo > l2)
+        _add(RegionId.HELIOCENTRIC, x_hi > r_h, x_lo > r_h)
+        if not possible:
+            possible.add(RegionId.CISLUNAR_OUTER_RESONANT)
+
+    return (
+        tuple(int(r) for r in sorted(possible, key=lambda r: r.value)),
+        tuple(int(r) for r in sorted(certain, key=lambda r: r.value)),
+    )
+
+
+def jacobi_topology_case_interval(
+    c_bounds: tuple[float, float], critical_values: dict[str, float]
+) -> tuple[int, int, tuple[str, ...]]:
+    """Jacobi 常数区间上的 Hill 拓扑 Case 界与跨界歧义（论文 §3.2）。
+
+    Args:
+        c_bounds: ``(lo, hi)`` Jacobi 常数区间。
+        critical_values: :func:`jacobi_critical_values` 的输出。
+
+    Returns:
+        ``(case_min, case_max, ambiguous)``：C 上界给最小 Case、下界给最大
+        Case（C 越大零速面越闭合）；ambiguous 为被区间严格内部跨越的临界值
+        名（只查 C1..C4，与点版 :func:`jacobi_topology_case` 口径一致）。
+    """
+    c_lo, c_hi = c_bounds
+    case_min, _ = jacobi_topology_case(c_hi, critical_values)
+    case_max, _ = jacobi_topology_case(c_lo, critical_values)
+    ambiguous = tuple(k for k in ("C1", "C2", "C3", "C4") if c_lo < critical_values[k] < c_hi)
+    return case_min, case_max, ambiguous
+
+
+def classify_state_interval(
+    state: list[float] | np.ndarray,
+    half_widths: list[float] | np.ndarray,
+    *,
+    frame: str = "synodic_barycentric_km",
+    reference: str = "table1",
+    truncation_order: int = 3,
+    constants: PrimerConstants = PRIMER_DEFAULTS,
+    system: CR3BP_System | None = None,
+) -> IntervalStateDiagnostics:
+    """对标称会合系状态加对角不确定度盒做区间化分区诊断（issue #785）。
+
+    判据链（瞬时地心/月心距、osculating 半长轴、Jacobi 常数）在标称点按
+    ``truncation_order`` 阶截断 Taylor 多项式展开（#784 DA 原语），经保守
+    包围得区间后与分带阈值、C1–C5 临界值比较，输出带界的 possible/certain
+    多标签与显式跨界歧义。
+
+    口径注意：区间包围的是判据的 **k 阶截断 Taylor 多项式**（``Da.bound()``
+    对自变量域 [-1,1]^6 的保守包围），不是解析函数的验证性包围；截断余项
+    O(|h|^{k+1})，半宽越小包围越紧。``half_widths`` 全零时退化为点判定，
+    逐位复用 :func:`classify_state`（DA 路径的浮点求和序不保证与点版逐位
+    相同，零宽锚点由委托实现保证一致）。
+
+    Args:
+        state: 标称 6 维状态 [x, y, z, vx, vy, vz]，frame 语义同
+            :func:`classify_state`（synodic_barycentric_km / _nd）。
+        half_widths: 对角盒各分量半宽 [hx, hy, hz, hvx, hvy, hvz]，与
+            state 同 frame 同单位，各分量 ≥ 0。
+        reference: 同 :func:`classify_by_semi_major_axis`。
+        truncation_order: DA 截断阶，≥ 1；每次调用重建进程级 DA 上下文
+            （当前 Python 侧无跨调用持有 Da 对象的其他路径）。
+        constants: Primer 常数集。
+        system: 复用 Primer CR3BP 系统（缺省自建）。
+
+    Returns:
+        :class:`IntervalStateDiagnostics`：各诊断量的区间界、Case 区间、
+        跨越的临界值与 possible/certain 分区多标签。
+
+    Raises:
+        ValueError: frame 不受支持、维数不对、半宽为负、截断阶 < 1，或
+            标称状态位于主天体奇点（地心/月心距 < 1e-12，判据不可微）。
+        RustExtensionUnavailableError: Rust 扩展缺失或 DA 符号不可用。
+    """
+    if frame not in ("synodic_barycentric_km", "synodic_barycentric_nd"):
+        raise ValueError(
+            f"不支持的 frame={frame!r}；当前支持 synodic_barycentric_km/"
+            "synodic_barycentric_nd（gcrs_km 待星历批次接入，见 ADR 0041）"
+        )
+    arr = np.asarray(state, dtype=float)
+    if arr.shape != (6,):
+        raise ValueError(f"状态须为 6 维 [x,y,z,vx,vy,vz]，得到 shape={arr.shape}")
+    widths = np.asarray(half_widths, dtype=float)
+    if widths.shape != (6,):
+        raise ValueError(f"half_widths 须为 6 维各分量半宽，得到 shape={widths.shape}")
+    if bool(np.any(widths < 0.0)):
+        raise ValueError("half_widths 各分量须 ≥ 0（对角盒半宽）")
+    if truncation_order < 1:
+        raise ValueError(f"truncation_order 须 ≥ 1，得到 {truncation_order}")
+
+    c = constants
+    sys = system if system is not None else primer_cr3bp_system(constants)
+
+    # 零宽锚：半宽全零退化为点判定（include_overlaps=True 口径），各标量
+    # 复制为退化区间，状态三元组照抄。
+    if not bool(np.any(widths > 0.0)):
+        diag = classify_state(
+            arr,
+            frame=frame,
+            reference=reference,
+            include_overlaps=True,
+            constants=constants,
+            system=sys,
+        )
+        return IntervalStateDiagnostics(
+            status=diag.status,
+            cause=diag.cause,
+            message=diag.message,
+            r_geocentric_km=(diag.r_geocentric_km, diag.r_geocentric_km),
+            rho_selenocentric_km=(diag.rho_selenocentric_km, diag.rho_selenocentric_km),
+            a_geocentric_km=(diag.a_geocentric_km, diag.a_geocentric_km),
+            a_over_a_moon=(diag.a_over_a_moon, diag.a_over_a_moon),
+            jacobi_constant=(diag.jacobi_constant, diag.jacobi_constant),
+            topology_case_min=diag.topology_case,
+            topology_case_max=diag.topology_case,
+            ambiguous_critical_values=(),
+            open_necks=diag.open_necks,
+            zone_ids_possible=diag.zone_ids,
+            zone_ids_certain=diag.zone_ids,
+        )
+
+    from e2m2e.integrators import Da, da_init_py, require_rust_extension
+
+    require_rust_extension("da_init_py", "da_initialized_py", "da_truncation_order_py", "Da")
+
+    n_rad_s = c.cr3bp_mean_motion_rad_s
+    if frame == "synodic_barycentric_km":
+        state_nd = np.concatenate([arr[:3] / c.moon_a_km, arr[3:] / (c.moon_a_km * n_rad_s)])
+        h_nd = np.concatenate([widths[:3] / c.moon_a_km, widths[3:] / (c.moon_a_km * n_rad_s)])
+    else:
+        state_nd = arr.copy()
+        h_nd = widths.copy()
+
+    # 进程级 DA 上下文按需重建（阶 truncation_order、6 变量）。
+    da_init_py(truncation_order, 6)
+
+    mu = float(sys.mu)
+    gamma = 1.0 - mu
+    q = [Da.constant(float(state_nd[i])) + float(h_nd[i]) * Da.variable(i + 1) for i in range(6)]
+    x, y, z, vx, vy, vz = q
+
+    # 地心距 r1（地球位于 (-mu,0,0)）与月心距 r2（月球位于 (1-mu,0,0)）。
+    r1_sq = (x + mu) * (x + mu) + y * y + z * z
+    r2_sq = (x - 1.0 + mu) * (x - 1.0 + mu) + y * y + z * z
+    if r1_sq.cons() < 1.0e-24 or r2_sq.cons() < 1.0e-24:
+        raise ValueError(
+            "标称状态位于主天体奇点（地心距或月心距 < 1e-12 无量纲），"
+            "判据在此不可微，区间判定不可用"
+        )
+    r1 = r1_sq.sqrt()
+    r2 = r2_sq.sqrt()
+    v2 = vx * vx + vy * vy + vz * vz
+    # Jacobi（Parker 约定，同 sys.get_jacobi_constant）与无量纲半长轴分母
+    # （a/a☾ = 1/(2/r1 − v²/γ)，γ = 1−μ）。
+    cj_da = x * x + y * y + 2.0 * (1.0 - mu) / r1 + 2.0 * mu / r2 - v2
+    denom = 2.0 / r1 - v2 / gamma
+
+    r1_lo, r1_hi = r1.bound()
+    r2_lo, r2_hi = r2.bound()
+    cj_lo, cj_hi = cj_da.bound()
+    d_lo, d_hi = denom.bound()
+
+    # a(D) = 1/D 在 D > 0 单调递减：整盒非正 → 全逃逸（a = inf，镜像点版对
+    # 非有限 a 跳过分带的语义，zones 置空）；区间跨 0 → 上界无界；整盒为正
+    # → 双侧有界（端点取对侧倒数）。
+    possible_zones: tuple[int, ...] = ()
+    certain_zones: tuple[int, ...] = ()
+    if d_hi <= 0.0:
+        a_nd: tuple[float, float] = (float("inf"), float("inf"))
+    else:
+        a_hi = float("inf") if d_lo <= 0.0 else 1.0 / d_lo
+        a_nd = (1.0 / d_hi, a_hi)
+        possible_zones, certain_zones = classify_by_semi_major_axis_interval(
+            a_nd, reference=reference, constants=constants, system=sys
+        )
+
+    crits = jacobi_critical_values(sys, c)
+    case_min, case_max, ambiguous = jacobi_topology_case_interval((cj_lo, cj_hi), crits)
+    open_necks = jacobi_topology_case(cj_lo, crits)[1]
+
+    return IntervalStateDiagnostics(
+        status=ConvergenceState.CONVERGED,
+        cause=FailureCause.NONE,
+        message="ok",
+        r_geocentric_km=(r1_lo * c.moon_a_km, r1_hi * c.moon_a_km),
+        rho_selenocentric_km=(r2_lo * c.moon_a_km, r2_hi * c.moon_a_km),
+        a_geocentric_km=(a_nd[0] * c.moon_a_km, a_nd[1] * c.moon_a_km),
+        a_over_a_moon=a_nd,
+        jacobi_constant=(cj_lo, cj_hi),
+        topology_case_min=case_min,
+        topology_case_max=case_max,
+        ambiguous_critical_values=ambiguous,
+        open_necks=open_necks,
+        zone_ids_possible=possible_zones,
+        zone_ids_certain=certain_zones,
     )
