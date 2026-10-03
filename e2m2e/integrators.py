@@ -28,6 +28,11 @@ if TYPE_CHECKING:
     collinear_center_modes_py: Any
     compute_distance_series_py: Any
     compute_min_distance_py: Any
+    da_init_py: Any
+    da_initialized_py: Any
+    da_set_truncation_order_py: Any
+    da_truncation_order_py: Any
+    da_vector_invert_py: Any
     detect_intersection_py: Any
     generate_cr3bp_family_py: Any
     generate_cr3bp_family_windows_py: Any
@@ -97,6 +102,8 @@ if TYPE_CHECKING:
     transfer_grid_search_py: Any
     transfer_grid_search_serial_py: Any
     wsb_search_py: Any
+    CompiledDa: Any
+    Da: Any
     CowellResult: Any
     MultistepMethod: Any
     MultistepResult: Any
@@ -110,6 +117,8 @@ if TYPE_CHECKING:
     _rk_step: Any
 
 _RUST_SYMBOLS = (
+    "CompiledDa",
+    "Da",
     "CowellResult",
     "MultistepMethod",
     "MultistepResult",
@@ -133,6 +142,11 @@ _RUST_SYMBOLS = (
     "collinear_center_modes_py",
     "compute_distance_series_py",
     "compute_min_distance_py",
+    "da_init_py",
+    "da_initialized_py",
+    "da_set_truncation_order_py",
+    "da_truncation_order_py",
+    "da_vector_invert_py",
     "differential_correction_cr3bp_py",
     "generate_cr3bp_family_py",
     "generate_cr3bp_family_windows_py",
@@ -313,10 +327,17 @@ __all__ = [
     "check_collision_py",
     "cm_to_qf_py",
     "collinear_center_modes_py",
+    "CompiledDa",
     "CowellResult",
     "cowell_step",
     "compute_distance_series_py",
     "compute_min_distance_py",
+    "Da",
+    "da_init_py",
+    "da_initialized_py",
+    "da_set_truncation_order_py",
+    "da_truncation_order_py",
+    "da_vector_invert_py",
     "differential_correction_cr3bp_py",
     "generate_cr3bp_family_py",
     "generate_cr3bp_family_windows_py",
