@@ -79,6 +79,7 @@ if TYPE_CHECKING:
     propagate_compiled_lowthrust_sensitivity: Any
     propagate_compiled_stm_py: Any
     propagate_cr3bp_py: Any
+    propagate_cr3bp_da_py: Any
     propagate_cr3bp_stm_py: Any
     propagate_cr3bp_megno_py: Any
     propagate_bcr4bp_megno_py: Any
@@ -202,6 +203,7 @@ _RUST_SYMBOLS = (
     "propagate_compiled_lowthrust_sensitivity",
     "propagate_compiled_stm_py",
     "propagate_cr3bp_py",
+    "propagate_cr3bp_da_py",
     "propagate_cr3bp_stm_py",
     "propagate_cr3bp_megno_py",
     "propagate_bcr4bp_megno_py",
@@ -403,6 +405,7 @@ __all__ = [
     "propagate_bcr4bp_py",
     "propagate_bcr4bp_stm_py",
     "propagate_cr3bp_py",
+    "propagate_cr3bp_da_py",
     "propagate_cr3bp_stm_py",
     "propagate_cr3bp_megno_py",
     "propagate_bcr4bp_megno_py",

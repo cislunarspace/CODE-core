@@ -16,6 +16,8 @@ e2m2e-propagation = { path = "../e2m2e-propagation" }
 # cr3bp/bcr4bp 纯数学内核与 PropagateError 仍在 e2m2e-forces 顶层（非 spice
 # 门控）；default-features=false 保持本 crate 无 CSPICE 构建链（ADR 0058）。
 e2m2e-forces = { path = "../e2m2e-forces", default-features = false }
+# CR3BP 多项式流（polynomial_flow）的 DA 算术底座（issue #786）。
+e2m2e-da = { path = "../e2m2e-da" }
 # 转移搜索（porkchop/wsb/transfer_grid_search）rayon 并行。
 rayon = { workspace = true }
 # transfer_grid_search 进度回调：Option<&crossbeam_channel::Sender<usize>>。

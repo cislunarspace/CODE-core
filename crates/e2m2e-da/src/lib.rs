@@ -6,6 +6,9 @@
 //! Python 边界必须依赖的约定，经 `e2m2e._integrators` 的 `bindings::da` 暴露为
 //! 最小原语面（issue #784），作为分区判据区间化、CR3BP 多项式流等后续工单的
 //! 公共底座。PyO3 绑定仍在 e2m2e-integrators（同 e2m2e-dyn 的既有模式）。
+//! CR3BP 多项式流内核（`e2m2e-dyn::polynomial_flow`，issue #786）经本 crate
+//! 的 [`initialized`] / [`max_order`] / [`max_variables`] 校验调用方上下文，
+//! 不自行 re-init。
 //!
 //! # ADS 驱动器
 //!
@@ -47,7 +50,8 @@ pub use dace_rs::monomial::Monomial;
 pub use dace_rs::norm::{Interval, NormType};
 pub use dace_rs::vector::DaVector;
 pub use dace_rs::{
-    init, initialized, set_truncation_order, truncation_order, CompiledDa, Da, DaceError,
+    init, initialized, max_order, max_variables, set_truncation_order, truncation_order,
+    CompiledDa, Da, DaceError,
 };
 
 /// 把 dace-rs 的 `panic_any(DaceError)` 转为 `Err(DaceError)`。

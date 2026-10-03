@@ -543,3 +543,77 @@ pub fn da_ads_split(
     }
     Ok(AdsResult::from_core(core))
 }
+
+/// Python 接口：CR3BP 多项式流传播（issue #786；ADR 0059）。
+///
+/// 初值六分量偏差作为 DA 变量（变量 1..=6），固定步长 RK4 在 DA 算术下
+/// 积分；各求值时刻的状态为初值偏差的 ``order`` 阶截断 Taylor 多项式。
+/// DA 上下文由调用方先 ``da_init_py(order, 6)`` 初始化（阶数上限 ≥
+/// ``order``、变量数 ≥ 6），内核临时切换截断阶并在返回前恢复旧值。
+///
+/// # 参数
+/// - ``mu``：质量参数 μ（无量纲，正有限值）。
+/// - ``t_span``：传播区间 ``(t0, t_end)``，两端为不同有限值。
+/// - ``t_eval``：求值时刻，沿 t_span 方向严格单调且落在闭区间内。
+/// - ``initial_state``：名义初值 6 维。
+/// - ``order``：截断阶，取 1..=当前上下文阶数。
+/// - ``step``：RK4 步长模长，正有限值。
+///
+/// # 返回
+/// Python dict：``{"times": [...], "states": [[6], ...],
+/// "flows": [[Da × 6], ...], "n_steps": int}``。
+///
+/// # 错误
+/// 前置条件/参数错误抛 ``ValueError``；传播期 DA 运算失败抛
+/// ``RuntimeError``。DA 版 EOM 不设最小距离钳制，近碰撞轨迹表现为
+/// DA 域错误（口径差异见 ``e2m2e-dyn::polynomial_flow`` 模块文档）。
+#[pyfunction]
+#[pyo3(signature = (mu, t_span, t_eval, initial_state, order, step))]
+#[allow(clippy::too_many_arguments)]
+pub fn propagate_cr3bp_da_py(
+    mu: f64,
+    t_span: (f64, f64),
+    t_eval: Vec<f64>,
+    initial_state: Vec<f64>,
+    order: u32,
+    step: f64,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_dyn::polynomial_flow::{propagate_cr3bp_da, DaFlowError};
+    use pyo3::types::PyDict;
+
+    if initial_state.len() != 6 {
+        return Err(PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    if t_eval.is_empty() {
+        return Err(PyValueError::new_err("t_eval must not be empty"));
+    }
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    // 释 GIL 段 = DA 传播主循环；DA 上下文是进程级、截断阶线程局部，
+    // allow_threads 不换线程，闭包内无 Python 对象。
+    let result = py
+        .allow_threads(|| propagate_cr3bp_da(mu, t_span, &t_eval, &state0, order, step))
+        .map_err(|e| match e {
+            DaFlowError::Context(msg) => PyValueError::new_err(msg),
+            DaFlowError::Runtime(msg) => {
+                PyRuntimeError::new_err(format!("CR3BP DA propagation failed: {msg}"))
+            }
+        })?;
+
+    let flows: Vec<Vec<Da>> = result
+        .flows
+        .into_iter()
+        .map(|v| v.into_iter().map(Da::from_core).collect())
+        .collect();
+    let dict = PyDict::new(py);
+    dict.set_item("times", result.times)?;
+    dict.set_item("states", result.states)?;
+    dict.set_item("flows", flows)?;
+    dict.set_item("n_steps", result.n_steps)?;
+    Ok(dict.into())
+}
