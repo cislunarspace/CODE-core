@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
@@ -13,6 +13,8 @@ __all__ = [
     "SpatiographyScalesResponse",
     "SpatiographyClassifyRequest",
     "SpatiographyClassifyResponse",
+    "SpatiographyIntervalClassifyRequest",
+    "SpatiographyIntervalClassifyResponse",
     "SpatiographyBoundariesRequest",
     "SpatiographyBoundariesResponse",
     "SpatiographyAtlasRequest",
@@ -95,6 +97,69 @@ class SpatiographyClassifyResponse(ResultResponse):
         description="逐状态诊断：r_geocentric_km / rho_selenocentric_km /"
         " a_geocentric_km / a_over_a_moon / jacobi_constant / topology_case /"
         " open_necks"
+    )
+    details: dict[str, Any]
+
+
+class SpatiographyIntervalClassifyRequest(_ApiModel):
+    """带不确定度的分区区域分类输入（状态盒，issue #785）。"""
+
+    state: list[float] = Field(
+        min_length=6,
+        max_length=6,
+        description="标称 6 维状态 [x,y,z,vx,vy,vz]；坐标系与单位由 frame 声明",
+    )
+    half_widths: list[Annotated[float, Field(ge=0.0)]] = Field(
+        min_length=6,
+        max_length=6,
+        description="对角盒各分量半宽 [hx,hy,hz,hvx,hvy,hvz]，与 state 同 frame"
+        " 同单位；各分量 ≥ 0，全零时退化为点判定（与 spatiography_classify"
+        " 逐位一致）",
+    )
+    frame: Literal["synodic_barycentric_km", "synodic_barycentric_nd"] = Field(
+        description="状态的数据系标签（ADR 0040 state_frame 词汇，本工具首批启用"
+        " synodic_barycentric_nd）：synodic_barycentric_km = 地月会合旋转系、质心原点、"
+        "物理单位 km/km/s；synodic_barycentric_nd = 同系无量纲（长度 a☾、速度 a☾·n，"
+        "Primer 常数口径）"
+    )
+    reference: Literal["table1", "table4"] = Field(
+        default="table1",
+        description="分区口径：table1 = 论文 Table 1 五省语义；table4 = 附录 B 六"
+        "制图带（deliberate-overlap，相邻区端部有意重叠）",
+    )
+    truncation_order: int = Field(
+        default=3,
+        ge=1,
+        le=12,
+        description="微分代数截断阶（issue #784 DA 原语）：判据链按该阶 Taylor"
+        " 多项式展开后保守包围，截断余项 O(|h|^(k+1))；1–12",
+    )
+
+
+class SpatiographyIntervalClassifyResponse(ResultResponse):
+    """带不确定度的分区区域分类输出（区间界 + possible/certain 双标签）。"""
+
+    r_geocentric_km: list[float] = Field(description="地心距区间 [lo, hi]（km）")
+    rho_selenocentric_km: list[float] = Field(description="月心距区间 [lo, hi]（km）")
+    a_geocentric_km: list[float] = Field(
+        description="地心 osculating 半长轴区间 [lo, hi]（km）；inf 表示含逃逸态"
+    )
+    a_over_a_moon: list[float] = Field(description="a/a☾ 区间 [lo, hi]；inf 表示含逃逸态")
+    jacobi_constant: list[float] = Field(description="Jacobi 常数区间 [lo, hi]")
+    topology_case_min: int = Field(description="Hill 拓扑 Case 区间下界（1..5）")
+    topology_case_max: int = Field(description="Hill 拓扑 Case 区间上界（1..5）")
+    ambiguous_critical_values: list[str] = Field(
+        description="被区间严格跨越的临界 Jacobi 值（C1..C4 子集；跨界歧义显式列出）"
+    )
+    open_necks: list[str] = Field(
+        description="已开启颈口（取 Jacobi 下界的最开情形，possible 口径）"
+    )
+    zone_ids_possible: list[int] = Field(description="区间可能触及的分区 id（升序），名称见 legend")
+    zone_ids_certain: list[int] = Field(
+        description="区间整体落入的分区 id（升序；zone_ids_possible 的子集）"
+    )
+    legend: dict[str, str] = Field(
+        description="区域 id → 名称（同 spatiography_classify；cislunar 为狭义带级名，非伞式）"
     )
     details: dict[str, Any]
 

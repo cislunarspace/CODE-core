@@ -455,9 +455,9 @@ class TestFacadeCallChains:
 class TestFacadeToolInventory:
     """接口类分家后的工具清单（ADR 0043）：Facade 组合根扫多个暴露类。"""
 
-    def test_inventory_counts_twenty_one_implemented_tools(self):
+    def test_inventory_counts_twenty_two_implemented_tools(self):
         inventory = tool_inventory(Facade())
-        assert len(inventory) == 21
+        assert len(inventory) == 22
         assert all(tool.status == "implemented" for tool in inventory)
 
     def test_each_class_keeps_its_domain(self):
@@ -490,6 +490,7 @@ class TestFacadeToolInventory:
         assert set(mcp_tools(Spatiography())) == {
             "spatiography_scales",
             "spatiography_classify",
+            "spatiography_interval_classify",
             "spatiography_boundaries",
             "spatiography_resonance_atlas",
             "spatiography_dynamical_map",

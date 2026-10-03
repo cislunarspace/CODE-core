@@ -26,6 +26,8 @@ from .models import (
     SpatiographyBoundariesResponse,
     SpatiographyClassifyRequest,
     SpatiographyClassifyResponse,
+    SpatiographyIntervalClassifyRequest,
+    SpatiographyIntervalClassifyResponse,
     SpatiographyMapRequest,
     SpatiographyMapResponse,
     SpatiographyScalesRequest,
@@ -145,6 +147,56 @@ class Spatiography:
                 legend={str(k): v for k, v in sp.REGION_LEGEND.items()},
                 diagnostics=diagnostics,
                 details={"n_states": len(request.states), "reference": request.reference},
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except Exception as exc:
+            status, cause, message = exception_triplet(exc)
+            raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
+
+    @mcp_exposed(request_model=SpatiographyIntervalClassifyRequest)
+    def spatiography_interval_classify(self, **params) -> SpatiographyIntervalClassifyResponse:
+        """区间化分区区域分类（spatiography，二档）。/ Interval-valued classification (tier 2).
+
+        对标称会合系状态加各分量半宽的对角盒做区间化分区诊断（issue #785）：
+        判据链（osculating 半长轴、Jacobi 常数）按截断阶 Taylor 多项式展开
+        并保守包围，输出 possible/certain 双标签分区、Hill 拓扑 Case 区间与
+        显式跨界歧义；半宽全零时与 spatiography_classify 逐位一致。
+        """
+        try:
+            request = SpatiographyIntervalClassifyRequest(**params)
+            from e2m2e.algorithm import spatiography as sp
+
+            result = sp.classify_state_interval(
+                request.state,
+                request.half_widths,
+                frame=request.frame,
+                reference=request.reference,
+                truncation_order=request.truncation_order,
+            )
+            payload = serialize_value(dataclasses.asdict(result))
+            return SpatiographyIntervalClassifyResponse(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="ok",
+                r_geocentric_km=payload["r_geocentric_km"],
+                rho_selenocentric_km=payload["rho_selenocentric_km"],
+                a_geocentric_km=payload["a_geocentric_km"],
+                a_over_a_moon=payload["a_over_a_moon"],
+                jacobi_constant=payload["jacobi_constant"],
+                topology_case_min=payload["topology_case_min"],
+                topology_case_max=payload["topology_case_max"],
+                ambiguous_critical_values=payload["ambiguous_critical_values"],
+                open_necks=payload["open_necks"],
+                zone_ids_possible=payload["zone_ids_possible"],
+                zone_ids_certain=payload["zone_ids_certain"],
+                legend={str(k): v for k, v in sp.REGION_LEGEND.items()},
+                details={
+                    "reference": request.reference,
+                    "truncation_order": request.truncation_order,
+                },
             )
         except OrbitError:
             raise

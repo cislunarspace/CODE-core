@@ -11,6 +11,7 @@ from e2m2e.api.models import (
     SpatiographyBoundariesRequest,
     SpatiographyBoundariesResponse,
     SpatiographyClassifyRequest,
+    SpatiographyIntervalClassifyRequest,
     SpatiographyScalesRequest,
 )
 
@@ -163,3 +164,71 @@ class TestSpatiographyDynamicalMap:
             zone="CG", n_a=2, n_e=2, model="ems", span_years=0.2
         )
         assert response.model == "ems"
+
+
+class TestSpatiographyIntervalClassify:
+    # 区间化路径依赖 #784 DA 原语：缺符号时跳过而非硬失败（#603）。
+    pytestmark = [requires_native_symbols("da_init_py", "Da")]
+
+    def test_interval_classify_ok_path(self):
+        response = Facade().spatiography.spatiography_interval_classify(
+            state=[0.5, 0.1, 0.0, 0.0, 1.0, 0.0],
+            half_widths=[0.01] * 6,
+            frame="synodic_barycentric_nd",
+            truncation_order=2,
+        )
+        assert response.status.value == "converged"
+        for lo_hi in (
+            response.r_geocentric_km,
+            response.rho_selenocentric_km,
+            response.a_geocentric_km,
+            response.a_over_a_moon,
+            response.jacobi_constant,
+        ):
+            assert lo_hi[0] <= lo_hi[1]
+        assert response.legend["2"] == "cislunar_outer_resonant"
+        assert set(response.zone_ids_certain) <= set(response.zone_ids_possible)
+        assert 1 <= response.topology_case_min <= response.topology_case_max <= 5
+        assert response.details["truncation_order"] == 2
+
+    def test_zero_width_matches_point_classify(self):
+        """零宽调用与 spatiography_classify 逐位一致（委托锚直达点判定）。"""
+        spatiography = Facade().spatiography
+        point = spatiography.spatiography_classify(
+            states=[[0.5, 0.1, 0.0, 0.0, 1.0, 0.0]], frame="synodic_barycentric_nd"
+        )
+        interval = spatiography.spatiography_interval_classify(
+            state=[0.5, 0.1, 0.0, 0.0, 1.0, 0.0],
+            half_widths=[0.0] * 6,
+            frame="synodic_barycentric_nd",
+        )
+        diag = point.diagnostics[0]
+        assert interval.zone_ids_possible == diag["zone_ids"]
+        assert interval.zone_ids_certain == diag["zone_ids"]
+        assert interval.a_over_a_moon == [diag["a_over_a_moon"]] * 2
+        assert interval.jacobi_constant == [diag["jacobi_constant"]] * 2
+        assert interval.topology_case_min == interval.topology_case_max
+        assert interval.topology_case_min == diag["topology_case"]
+
+    def test_invalid_params_translated(self):
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().spatiography.spatiography_interval_classify(
+                state=[0.5, 0.1, 0.0, 0.0, 1.0, 0.0],
+                half_widths=[-0.01] * 6,
+                frame="synodic_barycentric_nd",
+            )
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().spatiography.spatiography_interval_classify(
+                state=[0.5, 0.1, 0.0, 0.0, 1.0],
+                half_widths=[0.0] * 6,
+                frame="synodic_barycentric_nd",
+            )
+
+    def test_half_widths_description_locks_box_semantics(self):
+        """half_widths 字段 description 须声明半宽语义与零宽退化口径。"""
+        desc = SpatiographyIntervalClassifyRequest.model_json_schema()["properties"]["half_widths"][
+            "description"
+        ]
+        assert desc
+        assert "半宽" in desc
+        assert "spatiography_classify" in desc
