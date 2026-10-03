@@ -155,7 +155,7 @@ make check
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/CODE-core},
-  version = {5.9.8},
+  version = {5.9.9},
   year = {2026},
 }
 ```
