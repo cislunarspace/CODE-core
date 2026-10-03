@@ -10,6 +10,7 @@ pub mod low_energy_patch;
 pub mod manifold;
 pub mod megno;
 pub mod pal_continuation;
+pub mod polynomial_flow;
 pub mod porkchop;
 pub mod qlaw;
 pub mod transfer_geometry;

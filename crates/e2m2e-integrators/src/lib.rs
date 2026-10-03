@@ -119,6 +119,7 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   pyclass（dace-rs 微分代数原语面，issue #784）。
 /// - **v28**：新增 ``da_ads_split`` 与 ``AdsLeaf`` / ``AdsResult`` pyclass（dace-rs
 ///   ADS 自动域分裂驱动器薄封装，dace-rs 升 0.2.0，issue #787）。
+/// - **v29**：新增 ``propagate_cr3bp_da_py``（CR3BP 多项式流 DA 传播内核，issue #786）。
 ///
 /// 1→3 跳号实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -468,6 +469,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     )?)?;
     m.add_function(wrap_pyfunction!(bindings::da::da_vector_invert_py, m)?)?;
     m.add_function(wrap_pyfunction!(bindings::da::da_ads_split, m)?)?;
+    m.add_function(wrap_pyfunction!(bindings::da::propagate_cr3bp_da_py, m)?)?;
     m.add_class::<bindings::da::Da>()?;
     m.add_class::<bindings::da::CompiledDa>()?;
     m.add_class::<bindings::da::AdsLeaf>()?;

@@ -89,3 +89,4 @@ ADR 0008 否决运行时冻结），状态仍是已采纳，括注被否决的�
 | 0056 | 纯 Rust BPC Type 2 帧旋转 + FK/文本 PCK/LSK 内核后端（#685 Phase B） | 已采纳（已实现） |
 | 0057 | cspice 依赖从本地 vendor 切换至 cislunarspace/cspice-rs | 已采纳（已实现） |
 | 0058 | e2m2e-forces 拆出 e2m2e-dyn——非力任务设计模块迁出 | 已采纳（已实现） |
+| 0059 | CR3BP 多项式流——DA 算术传播内核 | 已采纳（已实现） |
