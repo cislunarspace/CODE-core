@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import functools
 import math
 
@@ -114,9 +115,13 @@ def test_wsb_rust_serial_matches_explicit_python_reference() -> None:
     _assert_results_equal(_python_reference_result(), rust_result)
 
 
-@functools.cache
 def _python_reference_result():
-    """标准太阳参数下的 Python 参照结果（module 级缓存，消除重复计算）。"""
+    """标准太阳参数下的 Python 参照结果（缓存命中后返回副本，调用方拿不到缓存对象）。"""
+    return copy.deepcopy(_cached_python_reference_result())
+
+
+@functools.cache
+def _cached_python_reference_result():
     system = BCR4BPSystem.earth_moon(mu=Datum.DE421.mu)
     return search_wsb_trajectories(
         _departure_state(system),

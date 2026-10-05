@@ -544,7 +544,7 @@ class Catalog:
 
     # ---- 族生成与轨道库工具（ADR 0043 决策 2，mcp_exposed=True）----
 
-    @mcp_exposed(request_model=FamilyGenerationRequest)
+    @mcp_exposed(request_model=FamilyGenerationRequest, long_running=True)
     def orbit_family_generation(
         self, progress_callback: ProgressCallback | None = None, **params
     ) -> FamilyGenerationResponse:

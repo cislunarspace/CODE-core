@@ -14,6 +14,7 @@
 ### CLEANUP
 - **Axial 分岔种子备忘改为可失效的纯函数备忘**：`axial_initial_guess` 的模块级 `_bifurcation_cache` 原命中即返回缓存内数组且无失效手段，测试间互相污染；现拆出 `_scan_axial_bifurcation_seed` 承担真实扫描，备忘层在命中与写入两侧都复制状态数组，调用方改不到缓存，并新增 `clear_axial_bifurcation_cache` 供测试隔离强制重算。键 (mu, 平动点) 完备（CR3BP 动力学只由 mu 决定），命中结果与重算逐位等价，语义由 `tests/algorithm/family/test_axial_bifurcation_cache.py` 四项行为测试钉住：不重算、返副本、按键分隔、清空后重算。(#801)
 - **normal_form 的 qiao 迁移常量裁决为对齐锚点并收敛重复表**：`normal_form/constants.py` 的整组 qiao 常量（`LU_KM`、`MU`、基频与中心流形参数等）与 constants.toml 的 DE421 口径有意不同（`MU` 1.215058560962404e-2 对 DE421 的 1.2150585350562453e-2），是 qiao 流水线 fixture 逐位校验的对齐锚点，裁决为不接入 loader 并在模块头注释写明理由与改值须同步的断言。`_ephemeris.py` 复制的共线平动点 γ 表（原注释称避免循环导入，实际 `constants.py` 无反向依赖）收敛为调用 `libration_gamma`，`tests/algorithm/normal_form/test_context.py` 新增两条守护断言：`_lp_state` 与登记 γ 的逐位一致性，以及 BASE_FREQUENCIES 与 L3/L5 中心频率的字面量钉值。(#800)
+- **工具子集清单补派生校验与 wsb 缓存返副本**：`mcp_exposed` 元数据新增 `long_running` 标记（`transfer_design`、`orbit_family_generation`、`mission_architecture_search`、`low_thrust_preliminary` 四个分钟级任务标 True），`ToolInfo` 随之暴露该字段。新增 `tests/_meta/test_tool_subset_manifests.py` 断言 `LONG_RUNNING_TOOLS` 与该标记双向一致、`BINARY_FRAME_TOOLS` 名字都是真实工具，facade 面变化时测试先报。`test_wsb_rust_backend.py` 的 Python 参照结果缓存命中后返回 `copy.deepcopy` 副本，调用方拿不到缓存对象，满足昂贵数据函数级返副本的约定。(#805)
 
 ### DOC
 - **两个 benchmark 脚本的用法示例改用虚拟环境解释器**：`benchmark_lowthrust_analytic_jacobian.py` 与 `benchmark_transfer_search.py` 的 docstring 原建议照抄 `uv run python` 会触发 editable 重建（缺 CSPICE_DIR 时直接构建失败），改为与同目录脚本一致的口径：直接用 `.venv/bin/python`，Windows 为 `.venv\Scripts\python.exe`，并写明勿用 `uv run`。(#803)

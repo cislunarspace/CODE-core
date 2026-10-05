@@ -75,6 +75,7 @@ class ToolInfo:
     mcp_exposed: bool
     status: Literal["implemented", "placeholder"]
     request_model: type[Any] | None = None
+    long_running: bool = False
 
 
 def mcp_exposed(
@@ -82,13 +83,19 @@ def mcp_exposed(
     *,
     status: Literal["implemented", "placeholder"] = "implemented",
     request_model: type[Any] | None = None,
+    long_running: bool = False,
 ) -> Callable[..., Any]:
-    """标记 Facade 方法对 MCP 暴露并记录其实现状态和请求模型。"""
+    """标记 Facade 方法对 MCP 暴露并记录其实现状态和请求模型。
+
+    ``long_running`` 标记分钟级任务（worker 子进程执行策略，与
+    ``execution.LONG_RUNNING_TOOLS`` 对账见 ``tests/_meta``）。
+    """
 
     def decorate(function: Callable[..., Any]) -> Callable[..., Any]:
         function.mcp_exposed = True  # type: ignore[attr-defined]
         function.tool_status = status  # type: ignore[attr-defined]
         function.request_model = request_model  # type: ignore[attr-defined]
+        function.long_running = long_running  # type: ignore[attr-defined]
         return function
 
     return decorate(func) if func is not None else decorate
@@ -456,7 +463,7 @@ class Facade:
         )
         return response
 
-    @mcp_exposed(request_model=TransferDesignRequest)
+    @mcp_exposed(request_model=TransferDesignRequest, long_running=True)
     def transfer_design(
         self, progress_callback: ProgressCallback | None = None, **params
     ) -> TransferDesignResponse:
@@ -654,7 +661,7 @@ class Facade:
         )
         return response
 
-    @mcp_exposed(request_model=MissionArchitectureSearchRequest)
+    @mcp_exposed(request_model=MissionArchitectureSearchRequest, long_running=True)
     def mission_architecture_search(
         self, progress_callback: ProgressCallback | None = None, **params
     ) -> MissionArchitectureSearchResponse:
@@ -763,7 +770,7 @@ class Facade:
         _emit_progress(progress_callback, 1.0, "MGA 链搜索完成")
         return response
 
-    @mcp_exposed(request_model=LowThrustPreliminaryRequest)
+    @mcp_exposed(request_model=LowThrustPreliminaryRequest, long_running=True)
     def low_thrust_preliminary(
         self, progress_callback: ProgressCallback | None = None, **params
     ) -> LowThrustPreliminaryResponse:
@@ -1101,6 +1108,7 @@ def tool_inventory(facade: Any) -> list[ToolInfo]:
                     mcp_exposed=True,
                     status=method.tool_status,
                     request_model=method.request_model,
+                    long_running=getattr(method, "long_running", False),
                 )
             )
     return inventory
