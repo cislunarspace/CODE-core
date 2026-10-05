@@ -9,6 +9,7 @@
 ### FIX
 - **导出契约补齐 `models.__all__` 与 `exceptions` 导出声明**：`e2m2e.api.models` 包级 `__all__` 补上 7 个已 re-export 的公开模型（`RangeSpec`、`ValidRangesResponse`、`BplaneInfo`、`BplaneTarget`、`DepartureAsymptote`、`ManeuverEvent`、`TransferCandidate`），星号导入不再漏这七个名字。`e2m2e/exceptions.py` 补显式 `__all__` 列出三个公共异常类，与共享内核叶其余模块一致。新增 `tests/_meta/test_export_declarations.py` 钉住共享内核叶的导出声明，以及 models re-export 与 `__all__` 的一致性，漏列会由测试报出。(#797)
 - **`geodesy.rs` 的 WGS84 常量接入 constants.toml 生成链**：`crates/e2m2e-forces/src/geodesy.rs` 的 `WGS84_A_KM` 与 `WGS84_F` 原为手写常量（6378.137 与 1/298.257223563），改从 `e2m2e_propagation::constants` 的 `DATUM_WGS84_EARTH_RADIUS_KM` 与 `DATUM_WGS84_EARTH_FLATTENING` 取值，与 `drag.rs` 复用生成常量的既有模式一致。数值逐位不变（toml 存的扁率 0.0033528106647474805 与 1/298.257223563 浮点相等），改 constants.toml 从此能传导到 Rust 测地坐标转换。(#798)
+- **转移优化碰撞半径改从 constants.toml 推导**：`DROTRONLPOptimizer` 的 `EARTH_RADIUS_ND` 与 `MOON_RADIUS_ND` 原为手写常数，分母混用 389703 与 384400 两种地月距离口径且月球半径 1738.1 与 toml 口径不一致；现按 `data.constants.bodies` 的天体平均半径除以 `data.templates.CHAR_LENGTH_KM`（DE421 特征长度 384400 km）统一推导。地球半径归一化值由 0.016367 变为 0.016592、月球由 0.004522 变为 0.004520，碰撞判定边界随口径修正有 1.4% 以内的移动，仍属量级守门精度。`tests/_meta/test_data_constant_dependencies.py` 增加两条断言钉住推导来源。(#799)
 
 ## [5.9.9] - 2026-10-03
 
