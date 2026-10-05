@@ -12,6 +12,7 @@
 - **转移优化碰撞半径改从 constants.toml 推导**：`DROTRONLPOptimizer` 的 `EARTH_RADIUS_ND` 与 `MOON_RADIUS_ND` 原为手写常数，分母混用 389703 与 384400 两种地月距离口径且月球半径 1738.1 与 toml 口径不一致；现按 `data.constants.bodies` 的天体平均半径除以 `data.templates.CHAR_LENGTH_KM`（DE421 特征长度 384400 km）统一推导。地球半径归一化值由 0.016367 变为 0.016592、月球由 0.004522 变为 0.004520，碰撞判定边界随口径修正有 1.4% 以内的移动，仍属量级守门精度。`tests/_meta/test_data_constant_dependencies.py` 增加两条断言钉住推导来源。(#799)
 
 ### CLEANUP
+- **Axial 分岔种子备忘改为可失效的纯函数备忘**：`axial_initial_guess` 的模块级 `_bifurcation_cache` 原命中即返回缓存内数组且无失效手段，测试间互相污染；现拆出 `_scan_axial_bifurcation_seed` 承担真实扫描，备忘层在命中与写入两侧都复制状态数组，调用方改不到缓存，并新增 `clear_axial_bifurcation_cache` 供测试隔离强制重算。键 (mu, 平动点) 完备（CR3BP 动力学只由 mu 决定），命中结果与重算逐位等价，语义由 `tests/algorithm/family/test_axial_bifurcation_cache.py` 四项行为测试钉住：不重算、返副本、按键分隔、清空后重算。(#801)
 - **normal_form 的 qiao 迁移常量裁决为对齐锚点并收敛重复表**：`normal_form/constants.py` 的整组 qiao 常量（`LU_KM`、`MU`、基频与中心流形参数等）与 constants.toml 的 DE421 口径有意不同（`MU` 1.215058560962404e-2 对 DE421 的 1.2150585350562453e-2），是 qiao 流水线 fixture 逐位校验的对齐锚点，裁决为不接入 loader 并在模块头注释写明理由与改值须同步的断言。`_ephemeris.py` 复制的共线平动点 γ 表（原注释称避免循环导入，实际 `constants.py` 无反向依赖）收敛为调用 `libration_gamma`，`tests/algorithm/normal_form/test_context.py` 新增两条守护断言：`_lp_state` 与登记 γ 的逐位一致性，以及 BASE_FREQUENCIES 与 L3/L5 中心频率的字面量钉值。(#800)
 
 ## [5.9.9] - 2026-10-03
