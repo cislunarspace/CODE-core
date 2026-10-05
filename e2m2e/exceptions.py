@@ -16,6 +16,12 @@ top level for data/algorithm/api/tools to share (ADR 0011).
 结构）。
 """
 
+__all__ = [
+    "E2M2EError",
+    "RustExtensionUnavailableError",
+    "PropagationFailure",
+]
+
 
 class E2M2EError(Exception):
     """所有 e2m2e 异常的共同基类。/ Common base of all e2m2e exceptions."""

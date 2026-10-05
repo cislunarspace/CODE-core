@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### FIX
+- **导出契约补齐 `models.__all__` 与 `exceptions` 导出声明**：`e2m2e.api.models` 包级 `__all__` 补上 7 个已 re-export 的公开模型（`RangeSpec`、`ValidRangesResponse`、`BplaneInfo`、`BplaneTarget`、`DepartureAsymptote`、`ManeuverEvent`、`TransferCandidate`），星号导入不再漏这七个名字。`e2m2e/exceptions.py` 补显式 `__all__` 列出三个公共异常类，与共享内核叶其余模块一致。新增 `tests/_meta/test_export_declarations.py` 钉住共享内核叶的导出声明，以及 models re-export 与 `__all__` 的一致性，漏列会由测试报出。(#797)
+
 ## [5.9.9] - 2026-10-03
 
 ### FEAT
