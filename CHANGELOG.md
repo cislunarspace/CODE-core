@@ -11,6 +11,9 @@
 - **`geodesy.rs` 的 WGS84 常量接入 constants.toml 生成链**：`crates/e2m2e-forces/src/geodesy.rs` 的 `WGS84_A_KM` 与 `WGS84_F` 原为手写常量（6378.137 与 1/298.257223563），改从 `e2m2e_propagation::constants` 的 `DATUM_WGS84_EARTH_RADIUS_KM` 与 `DATUM_WGS84_EARTH_FLATTENING` 取值，与 `drag.rs` 复用生成常量的既有模式一致。数值逐位不变（toml 存的扁率 0.0033528106647474805 与 1/298.257223563 浮点相等），改 constants.toml 从此能传导到 Rust 测地坐标转换。(#798)
 - **转移优化碰撞半径改从 constants.toml 推导**：`DROTRONLPOptimizer` 的 `EARTH_RADIUS_ND` 与 `MOON_RADIUS_ND` 原为手写常数，分母混用 389703 与 384400 两种地月距离口径且月球半径 1738.1 与 toml 口径不一致；现按 `data.constants.bodies` 的天体平均半径除以 `data.templates.CHAR_LENGTH_KM`（DE421 特征长度 384400 km）统一推导。地球半径归一化值由 0.016367 变为 0.016592、月球由 0.004522 变为 0.004520，碰撞判定边界随口径修正有 1.4% 以内的移动，仍属量级守门精度。`tests/_meta/test_data_constant_dependencies.py` 增加两条断言钉住推导来源。(#799)
 
+### CLEANUP
+- **normal_form 的 qiao 迁移常量裁决为对齐锚点并收敛重复表**：`normal_form/constants.py` 的整组 qiao 常量（`LU_KM`、`MU`、基频与中心流形参数等）与 constants.toml 的 DE421 口径有意不同（`MU` 1.215058560962404e-2 对 DE421 的 1.2150585350562453e-2），是 qiao 流水线 fixture 逐位校验的对齐锚点，裁决为不接入 loader 并在模块头注释写明理由与改值须同步的断言。`_ephemeris.py` 复制的共线平动点 γ 表（原注释称避免循环导入，实际 `constants.py` 无反向依赖）收敛为调用 `libration_gamma`，`tests/algorithm/normal_form/test_context.py` 新增两条守护断言：`_lp_state` 与登记 γ 的逐位一致性，以及 BASE_FREQUENCIES 与 L3/L5 中心频率的字面量钉值。(#800)
+
 ## [5.9.9] - 2026-10-03
 
 ### FEAT
