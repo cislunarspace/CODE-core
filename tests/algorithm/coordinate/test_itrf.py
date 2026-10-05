@@ -114,16 +114,20 @@ class TestITRFSpiceAxes:
         assert isinstance(ITRFAxes(), ITRFSpiceAxes)
         assert ITRFAxes().frame == "ITRF93"
 
-    def test_missing_itrf93_does_not_fallback_to_iau_earth(self, spice_manager, requires_iau_earth):
-        axes = ITRFSpiceAxes("ITRF93")
+    def test_unresolvable_frame_does_not_fallback_to_iau_earth(
+        self, spice_manager, requires_iau_earth
+    ):
+        """请求帧无法解析时必须报错，即使 IAU_EARTH 可用也不回退。
+
+        用恒不存在的帧名构造缺失场景，任何内核环境都执行这条负路径断言
+        （不依赖 ITRF93 内核恰好缺失）。
+        """
+        axes = ITRFSpiceAxes("ITRF93_NOT_DEFINED")
         et = spice_manager.utc_to_et("2024-01-01T00:00:00")
 
-        try:
+        with pytest.raises(CoordinateDataError) as excinfo:
             axes.rotation_matrix(et)
-        except CoordinateDataError as exc:
-            assert "no fallback to IAU_EARTH" in str(exc)
-        else:
-            pytest.skip("ITRF93 is available in this environment")
+        assert "no fallback to IAU_EARTH" in str(excinfo.value)
 
     @pytest.mark.parametrize(
         "utc_epoch",

@@ -18,6 +18,8 @@ from e2m2e.data.templates import MOON_RADIUS_KM
 pytestmark = pytest.mark.orchestration
 
 
+# ADR 0037 增补：debug 构建实测 ~29.8s，耗时大头是 9:2 大振幅单轨的设计侧
+# 近月高二分搜索与单周期传播，判定不可再压；70s 为最坏实测的 ≥2 倍余量。
 @pytest.mark.time_budget(70)
 def test_design_nrho_9_2_magnitude_north() -> None:
     """L2 北族近月高 14 870 km：命中 ±10 km、周期为正、闭合残差 ≤ 0.1 m。"""
