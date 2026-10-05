@@ -1,6 +1,8 @@
 # Changelog
 
-发布条目面向调用方：写变化、用法与数值细节，issue 引用置段尾括号；内部实现路径与决策沿革不进本文件（住 ADR 与 issue）。已发布条目是不可变历史，保持写成时的语言。
+本项目的所有重要变更都记录在此文件中。
+
+条目格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
 
