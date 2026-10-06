@@ -14,18 +14,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ...data.templates.enums import LibrationPoint
+from .constants import libration_gamma
+
 if TYPE_CHECKING:
     from .context import NormalFormContext
-
-
-# 共线平动点 γ 值——与 ``constants._COLLINEAR_GAMMAS`` 保持一致；
-# 在内部模块复制一份避免与顶层常量循环导入（常量子模块可被本文件
-# 反过来引用，故独立定义）。
-_COLLINEAR_GAMMAS: dict[int, float] = {
-    1: 0.150934288618019,
-    2: 0.167832751054508,
-    3: 0.992912060200654,
-}
 
 
 def _cross3(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -145,7 +138,7 @@ def _lp_state(
     与 qiao ``Calc_LPstate`` 等价。``c/cdot/cdotdot`` 仅 L4/L5 使用。
     """
     if libr in (1, 2, 3):
-        gamma = _COLLINEAR_GAMMAS[libr]
+        gamma = libration_gamma(LibrationPoint(libr))
         if libr == 1:
             return (1 - gamma) * r_em, (1 - gamma) * v_em, (1 - gamma) * a_em
         if libr == 2:

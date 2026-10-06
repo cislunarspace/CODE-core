@@ -10,7 +10,7 @@
 前置
 ----
 
-- 装好 e2m2e；SPICE 内核可用（默认力模型含太阳／月球第三体引力，读星历）。
+- 装好 e2m2e。SPICE 内核可用（默认力模型含太阳／月球第三体引力，读星历）。
 
 代码
 ----
@@ -37,12 +37,12 @@
 
 ``result`` 是 ``PropagationResponse``：
 
-- ``initial_state`` 是 GCRS 地心惯性系 [x, y, z, vx, vy, vz]，单位 km、km/s；
+- ``initial_state`` 是 GCRS 地心惯性系 [x, y, z, vx, vy, vz]，单位 km、km/s。
   ``epoch`` 接受 ISO 字符串或 ``[年, 月, 日, 时, 分, 秒]`` 列表。
 - ``time_sec`` / ``times_jd_tdb`` 是输出时刻（秒、JD_TDB 双份），
   ``position_km`` / ``velocity_km_s`` 是 (n, 3) 轨迹，``final_state`` 是
-  (6,) 末态——画图、插值、交接下游都用它们。
-- ``force_config`` 缺省用默认三体力模型；要自定义（球谐、光压、大气），
+  (6,) 末态，画图、插值、交接下游都用它们。
+- ``force_config`` 缺省用默认三体力模型。要自定义（球谐、光压、大气）
   传 ``force_config`` 字典，键值语义同 ``examples/main_propagate.py`` 里的
   ``perturbation`` 开关。
 
@@ -51,5 +51,5 @@
 延伸
 ----
 
-- CLI：``e2m2e orbit-propagation --help``；MCP：工具名 ``orbit_propagation``；
+- CLI：``e2m2e orbit-propagation --help``。MCP：工具名 ``orbit_propagation``。
 - 60 天高精度外推示例：:doc:`/examples/propagate`。

@@ -7,11 +7,13 @@
 //! 纬度/高度用 Bowring (1985) 闭式解：单次求值在近地空间（0–1000 km）内往返
 //! 残差 ≤ 1e-7 deg（纬度）与 ≤ 1e-4 km（高度），远小于大气密度标高。
 
-/// WGS84 椭球长半轴（km）。
-pub const WGS84_A_KM: f64 = 6378.137;
+use e2m2e_propagation::constants::{DATUM_WGS84_EARTH_FLATTENING, DATUM_WGS84_EARTH_RADIUS_KM};
 
-/// WGS84 椭球扁率。
-pub const WGS84_F: f64 = 1.0 / 298.257223563;
+/// WGS84 椭球长半轴（km），取自 constants.toml 的 `[datum.WGS84]` 生成链。
+pub const WGS84_A_KM: f64 = DATUM_WGS84_EARTH_RADIUS_KM;
+
+/// WGS84 椭球扁率，取自 constants.toml 的 `[datum.WGS84]` 生成链。
+pub const WGS84_F: f64 = DATUM_WGS84_EARTH_FLATTENING;
 
 /// WGS84 椭球短半轴（km）。
 const WGS84_B_KM: f64 = WGS84_A_KM * (1.0 - WGS84_F);

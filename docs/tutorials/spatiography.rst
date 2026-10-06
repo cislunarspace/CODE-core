@@ -48,21 +48,21 @@
   （物理单位 km），同时给出 L1–L5 精确位置、临界 Jacobi 值 C1–C5 与共振
   名义中心阶梯（Table 1/2 全表）。``elements`` 空表 = 全部。
 - ``spatiography_classify``：逐状态给区域 id（重叠带多值、升序），
-  ``legend`` 是 id → 名称（terrestrial / cislunar_inner_secular /
-  cislunar_outer_resonant / circumlunar / translunar / heliocentric）；
+  ``legend`` 是 id 到名称的映射（terrestrial / cislunar_inner_secular /
+  cislunar_outer_resonant / circumlunar / translunar / heliocentric）。
   ``diagnostics`` 逐状态给地心距、月心距、Jacobi 常数等诊断量。
   ``frame`` 必须声明（物理 km 或无量纲）。
 - ``spatiography_boundaries``：输出可绘制的边界元素（圆、折线、点、根数
-  平面曲线），``state_frame`` 标注数据系——前端只做归一与绘制。
-- ``spatiography_resonance_atlas``：三种产品——Gallardo 共振半宽包络
+  平面曲线），``state_frame`` 标注数据系，前端只做归一与绘制。
+- ``spatiography_resonance_atlas``：三种产品，Gallardo 共振半宽包络
   ``gallardo_widths``、拱线驻定 loci ``secular_loci``、vZLK 相图
-  ``vzlk_portrait``；``vzlk`` 携带临界倾角与 vZLK 时间尺度。
+  ``vzlk_portrait``。``vzlk`` 携带临界倾角与 vZLK 时间尺度。
 - ``spatiography_dynamical_map``：按六域（SC/CR/CG/IT/OT/TF）在 (a/a☾, e)
   网格上传播 EM／EMS 点质量模型，输出 MEGNO Ȳ 场与八类命运场。分辨率与
-  积分窗按需收缩——本例取最小网格演示；全量制图走 ``scripts/``。
+  积分窗按需收缩（本例取最小网格演示），全量制图走 ``scripts/``。
 
 延伸
 ----
 
-- CLI：``e2m2e spatiography-classify --help`` 等（下划线转连字符）；
+- CLI：``e2m2e spatiography-classify --help`` 等（下划线转连字符）。
 - MCP：五个 ``spatiography_*`` 工具。

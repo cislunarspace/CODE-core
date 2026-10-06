@@ -11,10 +11,10 @@
 前置
 ----
 
-- 装好 e2m2e；SPICE 内核可用；
-- 一条标称轨道：先用 ``design_orbit`` 设计。design→control 的星历交接走
+- 装好 e2m2e。SPICE 内核可用。
+- 一条标称轨道：先用 ``design_orbit`` 设计。design 到 control 的星历交接走
   轨道库记录（``input_record_id``，ADR 0031 的谱系接缝），因此给 ``Config``
-  配 ``catalog_dir`` 并开 ``catalog_enabled``；也可以直接给 ``input_ephemeris``
+  配 ``catalog_dir`` 并开 ``catalog_enabled``，也可以直接给 ``input_ephemeris``
   （星历文件路径或 ``EphemerisTable`` 对象），本篇取记录接缝。
 
 代码
@@ -57,14 +57,14 @@
 输出解读
 --------
 
-- ``design_orbit`` 在库开启时把产物自动入库，``record_id`` 即记录 id；
+- ``design_orbit`` 在库开启时把产物自动入库，``record_id`` 即记录 id。
   ``control_orbit`` 经 ``input_record_id`` 取其星历段作标称轨道，站保产物
   记录自动以 ``source_record_id`` 指回设计记录（谱系跨进程不断）。
-- ``num_failed`` 是蒙特卡洛失败样本数；``sk_statistic["rows"]`` 逐样本统计，
-  首行前两列是总 Δv 与最大单次 Δv（m/s）；``maneuvers`` 含逐次机动的
+- ``num_failed`` 是蒙特卡洛失败样本数。``sk_statistic["rows"]`` 逐样本统计，
+  首行前两列是总 Δv 与最大单次 Δv（m/s）。``maneuvers`` 含逐次机动的
   时刻与脉冲（``mjd_tdb`` / ``delta_v_mps``）。
 - ``controlled_ephemeris`` 是受控真实轨道星历（全部样本失败时为 ``None``）。
-- 惯例参数：工程评估把 ``num_monte_carlo`` 提到 100；测定轨与推力误差、
+- 惯例参数：工程评估把 ``num_monte_carlo`` 提到 100。测定轨与推力误差、
   推力上下限等都有缺省值（见 API 参考 ``ControlOrbitRequest``）。
   控制模式 1–6 对应目标点宽松／严格、特征点及其角动量管理组合。
 
@@ -74,5 +74,5 @@
 延伸
 ----
 
-- CLI：``e2m2e control-orbit --help``；MCP：工具名 ``control_orbit``；
+- CLI：``e2m2e control-orbit --help``。MCP：工具名 ``control_orbit``。
 - 出图示例：:doc:`/examples/control`。

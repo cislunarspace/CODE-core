@@ -97,5 +97,5 @@ sidecar          GUI 应用                    二进制帧传大数组
 延伸
 ----
 
-- 工具权威清单：``tool_inventory(Facade())``；
+- 工具权威清单：``tool_inventory(Facade())``。
 - MCP 部署细节见 README“快速开始”一节。

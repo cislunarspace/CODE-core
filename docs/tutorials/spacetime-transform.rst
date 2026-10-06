@@ -14,7 +14,7 @@
 前置
 ----
 
-- 装好 e2m2e；会合系变换按参考历元读星历（SPICE 内核可用）；
+- 装好 e2m2e。会合系变换按参考历元读星历（SPICE 内核可用）。
   GCRS↔EBCRS 需 ``ephemeris_path`` 指向历表。
 
 代码
@@ -46,7 +46,7 @@
   输出质心原点、以地月距离为长度单位的无量纲状态，``synodic_to_j2000``／
   ``eppr_to_j2000`` 输出地心 J2000 的 km／km·s⁻¹。
 - ``times`` 的语义按 ``transform_type`` 区分：synodic/EPPR 转换（输入）用相对
-  ``et0_jd`` 的无量纲时间（``0`` 即参考历元）；GCRS↔EBCRS 用绝对儒略日。响应里的
+  ``et0_jd`` 的无量纲时间（``0`` 即参考历元）。GCRS↔EBCRS 用绝对儒略日。响应里的
   ``times`` 是该转换回传的时刻（synodic/EPPR 换算为 JD_TDB）。
 - ``details`` 回显变换的辅助量（如参考历元下的会合角速度）。
 - ``valid_ranges`` 无参数，返回 ``design_orbit``（逐 ``orbit_type`` 的字段
@@ -60,5 +60,5 @@
 延伸
 ----
 
-- CLI：``e2m2e spacetime-transform --help``、``e2m2e valid-ranges --help``；
+- CLI：``e2m2e spacetime-transform --help``、``e2m2e valid-ranges --help``。
 - MCP：工具名 ``spacetime_transform``、``valid_ranges``。

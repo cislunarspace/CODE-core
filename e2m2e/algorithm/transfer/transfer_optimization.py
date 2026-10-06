@@ -19,6 +19,8 @@ from typing import Any
 
 import numpy as np
 
+from ...data.constants.bodies import EARTH, MOON
+from ...data.templates import CHAR_LENGTH_KM
 from ...data.templates.enums import TransferType
 from ...data.types.orbit import Orbit
 from ...exceptions import PropagationFailure
@@ -58,9 +60,11 @@ class DROTRONLPOptimizer:
     DEFAULT_TRANSFER_TIME_RANGE = (1.0, 30.0)
     DEFAULT_T_INS_RANGE = (0.0, 10.0)
 
-    # 地月天体碰撞检测半径（无量纲单位）
-    EARTH_RADIUS_ND = 1.0 / 389703.0 * 6378.137  # 地球半径 / 地月距离
-    MOON_RADIUS_ND = 1738.1 / 384400.0  # 月球半径 / 地月距离
+    # 地月天体碰撞检测半径（无量纲单位）：天体平均半径按 DE421 特征长度
+    # 归一，值取自 constants.toml（`data.constants.bodies` 与
+    # `data.templates.CHAR_LENGTH_KM`），不在算法层重定义物理常量。
+    EARTH_RADIUS_ND = EARTH.require_mean_radius_km() / CHAR_LENGTH_KM
+    MOON_RADIUS_ND = MOON.require_mean_radius_km() / CHAR_LENGTH_KM
 
     DEFAULT_VELOCITY_ANGLE_TOL = 1e-6
 

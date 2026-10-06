@@ -13,10 +13,11 @@
 - 中（n_dep=8, n_alpha=10, max_transfer_time=1.0）→ 80 评估
 - 大（n_dep=16, n_alpha=20, max_transfer_time=2.0）→ 320 评估
 
-运行::
+运行（勿用 ``uv run``，直接虚拟环境解释器，Windows 为
+``.venv\\Scripts\\python.exe``，Linux 为 ``.venv/bin/python``）::
 
     CSPICE_DIR=/tmp/cspice-linux/mice_linux LIBCLANG_PATH=/usr/lib/llvm-21/lib \\
-        uv run python scripts/benchmark_transfer_search.py [--reps N] [--workers N]
+        .venv/bin/python scripts/benchmark_transfer_search.py [--reps N] [--workers N]
 
 ``--workers``（默认 4，三档统一，保证对照公平）；``--reps``（默认 3，取中位数避免抖动）。
 结果打印到 stdout，并写入 ``docs/plans/transfer-grid-search-rust-benchmark.md``。

@@ -8,7 +8,7 @@ from e2m2e.data.constants import (
     SPEED_OF_LIGHT_KMS,
     Datum,
 )
-from e2m2e.data.constants.bodies import EARTH, SUN
+from e2m2e.data.constants.bodies import EARTH, MOON, SUN
 from e2m2e.data.templates import CHAR_LENGTH_KM
 
 pytestmark = pytest.mark.aux
@@ -28,6 +28,11 @@ def test_algorithm_defaults_are_sourced_from_data_constants():
     assert CR3BP_System.YEAR == SECONDS_PER_JULIAN_YEAR
     assert EARTH.gm_by_datum["DE421"] == _DEFAULT_MU
     assert family_char_length == CHAR_LENGTH_KM
+
+    from e2m2e.algorithm.transfer.transfer_optimization import DROTRONLPOptimizer
+
+    assert EARTH.mean_radius_km / CHAR_LENGTH_KM == DROTRONLPOptimizer.EARTH_RADIUS_ND
+    assert MOON.mean_radius_km / CHAR_LENGTH_KM == DROTRONLPOptimizer.MOON_RADIUS_ND
     assert _DEFAULT_FORCE_CONFIG["forces"][0]["params"]["mu"] == Datum.DE440.earth_gm
 
     relativity_cfg = perturbation_to_force_config({"relativity": 1})

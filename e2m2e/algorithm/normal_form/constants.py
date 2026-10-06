@@ -16,6 +16,12 @@ from ...data.templates.enums import LibrationPoint
 
 # ---------------------------------------------------------------------------
 # qiao 全局归一化常量（见 qiao Python/crtbp/Subfunction/Global_File.py）
+#
+# 本节是有意保留的对齐锚点，不接入 constants.toml 生成链（#800 裁决）：
+# qiao 流水线的 fixture 与中间量按这些逐位值校验，换成 DE421 口径会破坏
+# 对齐测试。与 toml 的差异是口径差异而非笔误，例如 MU 1.215058560962404e-2
+# 对 DE421 的 1.2150585350562453e-2、LU_KM 384747.981 对 char_length_km
+# 384400。改本节数值须同步 qiao 对齐断言（tests/algorithm/normal_form/）。
 # ---------------------------------------------------------------------------
 
 #: 归一化长度单位 LU（km）。qiao 约定；与 e2m2e 默认地月距离 (384405 km) 略有差异。

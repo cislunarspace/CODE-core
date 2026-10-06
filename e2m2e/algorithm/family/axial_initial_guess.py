@@ -39,8 +39,16 @@ _AXIAL_C_RANGES: dict[int, tuple[float, float]] = {
     2: (2.967, 3.014),
 }
 
-#: 模块级缓存：(mu, L) → (lyapunov_state0, lyapunov_period)
+#: 纯函数备忘：键 (mu, 平动点) 映射到 (lyapunov_state0, lyapunov_period)。键
+#: 完备决定 CR3BP 问题（动力学只由 mu 决定），命中返回与重算逐位等价。
+#: 命中与写入都复制状态数组，调用方拿不到缓存内数组。测试隔离需要强制
+#: 重算时调用 ``clear_axial_bifurcation_cache``。
 _bifurcation_cache: dict[tuple[float, int], tuple[np.ndarray, float]] = {}
+
+
+def clear_axial_bifurcation_cache() -> None:
+    """清空 Axial 分岔种子备忘，强制下次重算（测试隔离用）。"""
+    _bifurcation_cache.clear()
 
 
 def _correct_lyapunov_fixed_x0(
@@ -110,6 +118,25 @@ def _find_axial_bifurcation_seed(
     dynamics: CR3BP_Dynamics,
     libration_point: int,
 ) -> tuple[npt.NDArray[np.floating], float]:
+    """Axial 分岔种子，按 (mu, 平动点) 备忘。
+
+    CR3BP 动力学只由 mu 决定，同一键的重算结果与命中结果逐位等价；命中
+    返回状态数组的副本，调用方改不到缓存。
+    """
+    key = (dynamics.system.mu, libration_point)
+    cached = _bifurcation_cache.get(key)
+    if cached is not None:
+        return cached[0].copy(), cached[1]
+
+    result = _scan_axial_bifurcation_seed(dynamics, libration_point)
+    _bifurcation_cache[key] = (result[0].copy(), result[1])
+    return result
+
+
+def _scan_axial_bifurcation_seed(
+    dynamics: CR3BP_Dynamics,
+    libration_point: int,
+) -> tuple[npt.NDArray[np.floating], float]:
     """沿 planar Lyapunov 族扫描垂直临界轨道，返回 Axial 分岔种子。
 
     扫描策略：
@@ -127,10 +154,6 @@ def _find_axial_bifurcation_seed(
         (state0, period)：分岔点处 Lyapunov 轨道的初始状态
         (x₀, 0, 0, 0, ẏ₀, 0) 与周期。
     """
-    key = (dynamics.system.mu, libration_point)
-    if key in _bifurcation_cache:
-        return _bifurcation_cache[key]
-
     system = dynamics.system
     if not system.has_L_points:
         system.compute_libration_points()
@@ -248,9 +271,7 @@ def _find_axial_bifurcation_seed(
             T_hi, orbit_hi = T_mid, orbit_mid
 
     assert orbit_lo.period is not None
-    result = (orbit_lo.states[0].copy(), float(orbit_lo.period))
-    _bifurcation_cache[key] = result
-    return result
+    return orbit_lo.states[0].copy(), float(orbit_lo.period)
 
 
 def compute_axial_initial_guess(

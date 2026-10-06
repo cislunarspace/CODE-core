@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """测量低推力解析雅可比相对数值差分的求解耗时。
 
-用法:
-    uv run python scripts/benchmark_lowthrust_analytic_jacobian.py
+用法（勿用 ``uv run``，直接虚拟环境解释器，Windows 为
+``.venv\\Scripts\\python.exe``，Linux 为 ``.venv/bin/python``）::
+
+    .venv/bin/python scripts/benchmark_lowthrust_analytic_jacobian.py
 """
 
 from __future__ import annotations

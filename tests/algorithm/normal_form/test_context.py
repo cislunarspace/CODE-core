@@ -178,6 +178,48 @@ def test_triangular_libration_positions(earth_moon_system, point, expected_y):
     assert ctx.gamma is None
 
 
+def test_lp_state_uses_registered_gamma_values(earth_moon_system):
+    """`_ephemeris._lp_state` 的共线点位置与 constants 登记的 γ 同源（#800）。
+
+    `_ephemeris` 曾复制一份 γ 表，收敛为 `libration_gamma` 后由本断言钉住
+    两条路径逐位一致。
+    """
+    from e2m2e.algorithm.normal_form._ephemeris import _lp_state
+    from e2m2e.algorithm.normal_form.constants import libration_gamma
+
+    r_em = np.array([384400.0, 0.0, 0.0])
+    v_em = np.array([1.024, 0.0, 0.0])
+    a_em = np.array([0.0, 0.0, 0.0])
+    zeros = np.zeros((3, 3))
+    for libr, sign in ((1, -1.0), (2, 1.0)):
+        gamma = libration_gamma(LibrationPoint(libr))
+        r_lp, v_lp, _ = _lp_state(r_em, v_em, a_em, libr, zeros, zeros, zeros)
+        np.testing.assert_allclose(r_lp, (1.0 + sign * gamma) * r_em, rtol=1e-12)
+        np.testing.assert_allclose(v_lp, (1.0 + sign * gamma) * v_em, rtol=1e-12)
+    gamma_l3 = libration_gamma(LibrationPoint.L3)
+    r_lp, _, _ = _lp_state(r_em, v_em, a_em, 3, zeros, zeros, zeros)
+    np.testing.assert_allclose(r_lp, -gamma_l3 * r_em, rtol=1e-12)
+
+
+def test_qiao_anchor_values_pinned(earth_moon_system):
+    """qiao 对齐锚点的字面量逐位钉住（#800：有意固化，改值须同步对齐断言）。"""
+    np.testing.assert_array_equal(
+        BASE_FREQUENCIES,
+        (0.99154828857, 0.07480066375, 0.92519871658, 1.00402177967),
+    )
+    for point, expected in (
+        (LibrationPoint.L3, (1.00308425804420, 1.00934753444748)),
+        (LibrationPoint.L5, (0.30251624161526, 1.00403245203481)),
+    ):
+        ctx = NormalFormContext(
+            system=earth_moon_system,
+            libration_point=point,
+            epoch=JD0_J2000,
+            order=2,
+        )
+        assert ctx.central_frequencies == pytest.approx(expected)
+
+
 # ---------------------------------------------------------------------------
 # 历元与构造变体
 # ---------------------------------------------------------------------------
