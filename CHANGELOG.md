@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [5.9.10] - 2026-10-06
+
 ### FIX
 - **导出契约补齐 `models.__all__` 与 `exceptions` 导出声明**：`e2m2e.api.models` 包级 `__all__` 补上 7 个已 re-export 的公开模型（`RangeSpec`、`ValidRangesResponse`、`BplaneInfo`、`BplaneTarget`、`DepartureAsymptote`、`ManeuverEvent`、`TransferCandidate`），星号导入不再漏这七个名字。`e2m2e/exceptions.py` 补显式 `__all__` 列出三个公共异常类，与共享内核叶其余模块一致。新增 `tests/_meta/test_export_declarations.py` 钉住共享内核叶的导出声明，以及 models re-export 与 `__all__` 的一致性，漏列会由测试报出。(#797)
 - **`geodesy.rs` 的 WGS84 常量接入 constants.toml 生成链**：`crates/e2m2e-forces/src/geodesy.rs` 的 `WGS84_A_KM` 与 `WGS84_F` 原为手写常量（6378.137 与 1/298.257223563），改从 `e2m2e_propagation::constants` 的 `DATUM_WGS84_EARTH_RADIUS_KM` 与 `DATUM_WGS84_EARTH_FLATTENING` 取值，与 `drag.rs` 复用生成常量的既有模式一致。数值逐位不变（toml 存的扁率 0.0033528106647474805 与 1/298.257223563 浮点相等），改 constants.toml 从此能传导到 Rust 测地坐标转换。(#798)
