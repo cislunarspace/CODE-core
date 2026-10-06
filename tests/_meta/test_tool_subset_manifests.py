@@ -26,8 +26,6 @@ def test_long_running_subset_matches_metadata(inventory):
     """LONG_RUNNING_TOOLS 与 mcp_exposed(long_running=True) 标记双向一致。"""
     marked = {name for name, info in inventory.items() if info.long_running}
     assert marked == LONG_RUNNING_TOOLS
-    for name in LONG_RUNNING_TOOLS:
-        assert name in inventory, f"LONG_RUNNING_TOOLS 含不存在的工具 {name}"
 
 
 def test_binary_frame_subset_matches_inventory(inventory):

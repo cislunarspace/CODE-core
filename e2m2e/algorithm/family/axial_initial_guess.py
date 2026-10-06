@@ -39,8 +39,8 @@ _AXIAL_C_RANGES: dict[int, tuple[float, float]] = {
     2: (2.967, 3.014),
 }
 
-#: 纯函数备忘：(mu, L) → (lyapunov_state0, lyapunov_period)。键 (mu, 平动点)
-#: 完备决定 CR3BP 问题（动力学只由 mu 决定），命中返回与重算逐位等价；
+#: 纯函数备忘：键 (mu, 平动点) 映射到 (lyapunov_state0, lyapunov_period)。键
+#: 完备决定 CR3BP 问题（动力学只由 mu 决定），命中返回与重算逐位等价。
 #: 命中与写入都复制状态数组，调用方拿不到缓存内数组。测试隔离需要强制
 #: 重算时调用 ``clear_axial_bifurcation_cache``。
 _bifurcation_cache: dict[tuple[float, int], tuple[np.ndarray, float]] = {}

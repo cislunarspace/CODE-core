@@ -18,7 +18,7 @@
 
 ### DOC
 - **两个 benchmark 脚本的用法示例改用虚拟环境解释器**：`benchmark_lowthrust_analytic_jacobian.py` 与 `benchmark_transfer_search.py` 的 docstring 原建议照抄 `uv run python` 会触发 editable 重建（缺 CSPICE_DIR 时直接构建失败），改为与同目录脚本一致的口径：直接用 `.venv/bin/python`，Windows 为 `.venv\Scripts\python.exe`，并写明勿用 `uv run`。(#803)
-- **存量文档按写作要求清理四类标点**：README、CONTEXT、CONTRIBUTING、SECURITY 与 docs 下的教程、示例、安装、首页及 API 索引页按写作要求回改：中文破折号改括号补充或从句，流程箭头改文字表达（数学极限记号保留），中文分号拆为独立句子或改逗号，叙述性加粗去标记改写句子。只动标点与配合标点的措辞，技术事实、数值、命令、代码示例与 rst 结构不变。CHANGELOG 已发布条目、docs/adr 与 docs/plans 的历史基准记录按不可变留档不回溯，docs/agents 配置不在本次范围。目标文件四类标点已清零，`make docs` 零告警构建通过。(#804)
+- **存量文档按写作要求清理四类标点**：README、CONTEXT、CONTRIBUTING、SECURITY 与 docs 下的教程、示例、安装、首页及 API 索引页按写作要求回改：中文破折号改括号补充或从句，流程箭头（含 CONTEXT 的数学极限记号）改文字表达，中文分号拆为独立句子或改逗号，叙述性加粗去标记改写句子。只动标点与配合标点的措辞，技术事实、数值、命令、代码示例与 rst 结构不变。CHANGELOG 已发布条目、docs/adr 与 docs/plans 的历史基准记录按不可变留档不回溯，docs/agents 配置不在本次范围。目标文件四类标点已清零，`make docs` 零告警构建通过。(#804)
 
 ### TEST
 - **三处测试纪律修正**：`test_nrho_large_amplitude.py` 的 `time_budget(70)` 补 ADR 0037 理由注释（debug 实测约 29.8 秒，耗时大头是 9:2 大振幅单轨的设计侧近月高二分搜索与单周期传播，70 秒为两倍余量），与其余三处 time_budget 的写法一致。`test_itrf.py` 的无回退负路径用例改为用恒不存在的帧名构造缺失场景，断言改成强制执行（原来在 ITRF93 内核可用时跳过，装齐内核的环境里断言永不执行）。`test_nsga2.py` 删除恒为假的 dummy skipif 装饰器。(#802)

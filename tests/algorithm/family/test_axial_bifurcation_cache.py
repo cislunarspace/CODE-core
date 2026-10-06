@@ -47,10 +47,14 @@ def scan_calls(monkeypatch):
 
 
 def test_memo_skips_recompute_and_returns_copy(dynamics, scan_calls):
-    """同键第二次调用不重算，且返回的是副本而非缓存内数组。"""
-    state1, period1 = compute_axial_initial_guess(dynamics, 1, 0.05)
+    """同键第二次调用不重算，且备忘层返回的是副本而非缓存内数组。
+
+    直接调 ``_find_axial_bifurcation_seed``：公共入口 ``compute_axial_initial_guess``
+    自身还会复制一次，经它会掩蔽备忘层的副本语义。
+    """
+    state1, period1 = mod._find_axial_bifurcation_seed(dynamics, 1)
     state1[0] = -99.0  # 调用方就地改写
-    state2, period2 = compute_axial_initial_guess(dynamics, 1, 0.05)
+    state2, period2 = mod._find_axial_bifurcation_seed(dynamics, 1)
 
     assert scan_calls == [1]
     assert state2[0] == pytest.approx(0.8)  # 缓存值未被污染
