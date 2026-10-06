@@ -11,10 +11,10 @@
 前置
 ----
 
-- 装好 e2m2e；
-- 轨道库 **默认关闭** ：必须显式给 ``Config`` 配 ``catalog_dir``，库操作才可用
-  （否则抛 ``OrbitError``，错误码 ``CATALOG_NOT_CONFIGURED``）；
-  ``catalog_enabled=True`` 才会把任务产物自动入库；
+- 装好 e2m2e。
+- 轨道库默认关闭。必须显式给 ``Config`` 配 ``catalog_dir``，库操作才可用
+  （否则抛 ``OrbitError``，错误码 ``CATALOG_NOT_CONFIGURED``）。
+  ``catalog_enabled=True`` 才会把任务产物自动入库。
 - 族生成是纯 CR3BP 计算，不需要 SPICE 内核。
 
 代码
@@ -51,15 +51,15 @@
 --------
 
 - ``orbit_family_generation`` 支持
-  ``HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO/RO`` 九族；字段按族适用
+  ``HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO/RO`` 九族，字段按族适用
   （如 NRHO 用 ``north_south``／``perilune_height_max_km``，LISSAJOUS 用
   ``amplitude_in_km``／``amplitude_out_km``）。缺省值由 model_validator 按
   族填充，DRO（月心族）与 RO（地心族）不绑定平动点，不得携带
-  ``libration_point``；各族参数区间与离散选项经 ``valid_ranges`` 查询
+  ``libration_point``。各族参数区间与离散选项经 ``valid_ranges`` 查询
   （包版本即值域版本）。
-- 库开时族产物 **逐成员** 入库（一轨一记录），返回批次标识 ``family_id``；
+- 库开时族产物逐成员入库（一轨一记录），返回批次标识 ``family_id``。
   经 ``catalog_query(family_id=…)`` 可整族取回。
-- ``catalog_query`` 全字段可选、逻辑与；``catalog_get`` 取完整记录（含
+- ``catalog_query`` 全字段可选、逻辑与。``catalog_get`` 取完整记录（含
   ``request`` 请求快照、``arrays`` 数组段，``cr3bp/`` 前缀是 CR3BP 参考
   轨道），并有 ``to_ephemeris_table()``／``to_orbit()`` 便捷方法。
 - 其余工具：``catalog_tag``（写教学标签，整体替换）、``catalog_export``
@@ -72,6 +72,6 @@
 延伸
 ----
 
-- CLI：``e2m2e orbit-family-generation --help`` 等；MCP：``orbit_family_generation``
-  与 7 个 ``catalog_*`` 工具；族生成同为长任务（worker 子进程执行，见
+- CLI：``e2m2e orbit-family-generation --help`` 等。MCP：``orbit_family_generation``
+  与 7 个 ``catalog_*`` 工具。族生成同为长任务（worker 子进程执行，见
   :doc:`transfer-design`）。

@@ -4,13 +4,13 @@
 目标
 ----
 
-用 ``Facade.design_orbit`` 设计一条地月 L2 Halo 轨道：CR3BP 初猜 → 星历修正 →
+用 ``Facade.design_orbit`` 设计一条地月 L2 Halo 轨道，从 CR3BP 初猜经星历修正
 输出标称轨道。这是 e2m2e 最核心的一档任务。
 
 前置
 ----
 
-- 装好 e2m2e（:doc:`/install`）；
+- 装好 e2m2e（:doc:`/install`）。
 - SPICE 内核在仓库根 ``kernels/`` 或 ``$SPICE_KERNEL_DIR``（星历修正需要）。
 
 代码
@@ -40,7 +40,7 @@
 
 ``result`` 是 ``DesignOrbitResponse``，按三类信息读：
 
-- 状态三元组：``status == ConvergenceState.CONVERGED`` 表示修正收敛；
+- 状态三元组：``status == ConvergenceState.CONVERGED`` 表示修正收敛。
   未收敛时 ``cause`` 给稳定原因码（如 ``MAX_ITERATIONS_REACHED``），
   ``message`` 是人读说明。
 - 轨道几何：``initial_state`` 是修正后的初始状态（无量纲会合系），
@@ -53,12 +53,12 @@
   ``halo_l2_northern``）。
 
 参数约束（振幅上下限、各 ``orbit_type`` 的必填组合）可用
-``facade.valid_ranges().design_orbit`` 查询；完整字段表见 API 参考的
+``facade.valid_ranges().design_orbit`` 查询。完整字段表见 API 参考的
 ``DesignOrbitRequest`` / ``DesignOrbitResponse``。
 
 延伸
 ----
 
-- CLI：``e2m2e design-orbit --help``；MCP：工具名 ``design_orbit``；
-- 逐族参数示例：:doc:`/tutorials/orbit-catalog` 的族生成参数表；
+- CLI：``e2m2e design-orbit --help``。MCP：工具名 ``design_orbit``。
+- 逐族参数示例：:doc:`/tutorials/orbit-catalog` 的族生成参数表。
 - 端到端示例脚本：:doc:`/examples/design`。
