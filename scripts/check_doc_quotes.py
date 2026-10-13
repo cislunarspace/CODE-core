@@ -4,9 +4,10 @@
 （U+300C/U+300D）与直角单引号（U+300E/U+300F）；中文引用词语统一用弯引号
 （U+201C/U+201D），嵌套用弯单引号（U+2018/U+2019），同一文件内保持一致。本脚本
 扫描仓库根 ``*.md`` 与 ``NOTICE``、``docs/`` 下的 md/rst/py（含 ADR）、
-``.out-of-scope/`` 下的 md、``e2m2e``/``tests``/``scripts``/``examples`` 下的 py
-与 ``crates`` 下的 rs 及 README，命中直角引号即失败；`.github/`、`datasets/`、
-`kernels/` 与构建产物 ``_build/`` 不在扫描范围内。
+``.out-of-scope/`` 下的 md、``e2m2e``/``tests``/``scripts``/``examples`` 下的 py、
+``tools`` 下的 md 与 mjs，以及 ``crates`` 下的 rs 及 README，命中直角引号即失败。
+`.github/`、`datasets/`、`kernels/` 不在扫描范围内，构建产物 ``_build/`` 与依赖目录
+``node_modules/`` 按目录名跳过。
 
 豁免：仅 ``AGENTS.md`` 的规则正文需要引用被禁字符本身，放行四个直角引号字符；
 其余文件（含历史 ADR）一律按口径归一。
@@ -53,10 +54,12 @@ SCAN_GLOBS: tuple[str, ...] = (
     "crates/**/*.rs",
     "crates/**/README.md",
     "examples/**/*.py",
+    "tools/**/*.md",
+    "tools/**/*.mjs",
 )
 
-# 构建产物目录名，逐段比对。
-SKIP_DIRS: frozenset[str] = frozenset({"_build"})
+# 不参与扫描的目录名（构建产物与依赖安装目录），逐段比对。
+SKIP_DIRS: frozenset[str] = frozenset({"_build", "node_modules"})
 
 
 def violations_for(rel: str, text: str) -> list[str]:

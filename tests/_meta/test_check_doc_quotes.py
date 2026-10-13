@@ -113,5 +113,15 @@ def test_scan_surface_matches_policy():
         "crates/e2m2e-spice/src/lib.rs",
         "crates/e2m2e-spice/README.md",
         "examples/main_propagate.py",
+        "tools/assets/README.md",
+        "tools/assets/build-assets.mjs",
     ):
         assert required in rels, f"门禁扫描面缺 {required}"
+
+    # tools/assets 装依赖后会出现 node_modules，第三方文件的引号不该击穿本仓库门禁。
+    polluted = sorted(
+        p.relative_to(_REPO_ROOT).as_posix()
+        for p in _GATE.scan_paths()
+        if "node_modules" in p.parts
+    )
+    assert polluted == [], f"门禁扫描面混入依赖目录：{polluted[:3]}"

@@ -70,6 +70,7 @@ flowchart LR
 | `crates/` | Rust workspace；`cspice`/`cspice-sys` 绑定来自 git 依赖 cislunarspace/cspice-rs（ADR 0057），无本地 vendor |
 | `tests/` | 按 data、numerical、algorithm、api、tools、mbse、`_meta` 镜像分层 |
 | `scripts/` | 构建资源下载、架构检查、基线生成、benchmark 和手工诊断 |
+| `tools/assets/` | README 品牌资产的矢量母版与位图生成工具链，需要 Node 与 npm，用法见该目录 README |
 | `docs/adr/` | 不可静默覆盖的架构决策记录；`CONTEXT.md` 是唯一领域术语表 |
 | `kernels/` | 运行期 SPICE 内核；大型 `.bsp` 由 Git LFS 或 `download_kernels.py` 管理 |
 | `datasets/catalog_baseline/` | 回归夹具和 Release 资产源，不随 wheel 分发，须显式导入 |
@@ -131,7 +132,7 @@ make clean-tests
 ## Runtime/Tooling Preferences
 
 - 运行时最低 Python `>=3.10`，开发环境由 `.python-version` 固定为 3.13；Rust 由 `rust-toolchain.toml` 固定为 1.98.0，并要求 rustfmt/clippy。包管理使用 uv，锁文件为 `uv.lock`；Python↔Rust 构建使用 maturin。
-- 本地不需要 Node、Bun 或 Docker。CI 的 manylinux wheel job 使用容器是发布实现细节，不改变本地 `make dev` 流程。
+- 普通开发不需要 Node、Bun 或 Docker，只有重新生成 README 品牌位图时才用 `tools/assets/` 下的 Node 与 npm 工具链。CI 的 manylinux wheel job 使用容器是发布实现细节，不改变本地 `make dev` 流程。
 - 普通构建的 CSPICE 来自 GitHub Release `cspice-v1`，SPICE 内核来自 `kernels-v1`；不要启用 `cspice-sys` 的官网下载路径。`make` 自动准备 `CSPICE_DIR`，bindgen 需要 `LIBCLANG_PATH`。支持的平台和资产规则以 `scripts/download_cspice.py` 为准。
 - Rust 扩展缺失、ABI 过期或符号缺失时应明确报错并提示 `make dev`，不得静默降级。`crates/e2m2e-integrators/abi-version.txt`、生成的 `e2m2e/_rust_abi.py` 与 Rust `_py_abi_version()` 必须保持一致。
 - 运行时常用配置为 `SPICE_KERNEL_DIR`、`E2M2E_CATALOG_DIR`、`E2M2E_CATALOG_ENABLED`；并行度和测试线程环境变量应遵循 Makefile、Rust 入口及 `tests/conftest.py` 的现有命名，不自行引入同义开关。
