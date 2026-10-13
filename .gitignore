@@ -31,6 +31,9 @@ conda-env/
 conda-meta/
 *.conda
 
+# Node 依赖（品牌资产生成工具：tools/assets）
+node_modules/
+
 # 测试与覆盖率报告
 .coverage
 .coverage.*
