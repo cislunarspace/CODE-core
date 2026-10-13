@@ -1,0 +1,14 @@
+{
+  "name": "code-core-assets",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "e2m2e 品牌资产生成工具：由矢量母版光栅化 README 横幅",
+  "scripts": {
+    "banner": "node build-assets.mjs"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}
