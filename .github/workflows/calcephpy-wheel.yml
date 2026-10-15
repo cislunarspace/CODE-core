@@ -1,6 +1,6 @@
 # 构建 calcephpy 的 Windows + Linux 预编译 wheel，发布到 calcephpy-v1 release。
 #
-# 背景：PyPI 上 calcephpy==5.0.0 只有 sdist，Windows 安装须现场编译
+# 背景：PyPI 上 calcephpy==5.0.1 只有 sdist，Windows 安装须现场编译
 # （cmake + MSVC）、Linux 安装须现场编译（cmake + gcc），开发者 clone
 # e2m2e / transfer-orbit-design 后 uv sync 常因缺编译器失败。e2m2e 经 r2s2
 # 传递依赖 calcephpy，故 wheel 发到本仓库，两个下游仓库的 [tool.uv] find-links
@@ -29,7 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         # 覆盖 e2m2e 声明支持的 Python 3.10–3.13；下游 transfer-orbit-design
-        # 要求 >=3.13，亦在此范围内。calcephpy 5.0.0 的 Cython 扩展每个
+        # 要求 >=3.13，亦在此范围内。calcephpy 5.0.1 的 Cython 扩展每个
         # CPython 次版本 ABI 不同，须逐版本编译。
         python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
@@ -46,7 +46,7 @@ jobs:
       # （setuptools + cython）。setup.py 把 PYTHON=sys.executable 传给 cmake
       # 的 find_package(Python)，故 matrix 里 setup-python 装的版本即编译版本。
       - name: Build wheel
-        run: pip wheel calcephpy==5.0.0 --no-deps -w wheelhouse/
+        run: pip wheel calcephpy==5.0.1 --no-deps -w wheelhouse/
       - name: Smoke test（安装并 import）
         shell: pwsh
         run: |
@@ -97,7 +97,7 @@ jobs:
           # include/libpython（stripped 的 /opt/python 找不到）。
           export Python_EXECUTABLE=$PY
           export Python_ROOT_DIR=$PYROOT
-          /tmp/v/bin/pip wheel calcephpy==5.0.0 --no-deps --no-build-isolation -w /tmp/wheelhouse/
+          /tmp/v/bin/pip wheel calcephpy==5.0.1 --no-deps --no-build-isolation -w /tmp/wheelhouse/
       - name: auditwheel repair（打 manylinux 标签并校验合规性）
         run: |
           set -eux
@@ -150,7 +150,7 @@ jobs:
           # include/libpython（stripped 的 /opt/python 找不到）。
           export Python_EXECUTABLE=$PY
           export Python_ROOT_DIR=$PYROOT
-          /tmp/v/bin/pip wheel calcephpy==5.0.0 --no-deps --no-build-isolation -w /tmp/wheelhouse/
+          /tmp/v/bin/pip wheel calcephpy==5.0.1 --no-deps --no-build-isolation -w /tmp/wheelhouse/
       - name: auditwheel repair（打 manylinux 标签并校验合规性）
         run: |
           set -eux
@@ -187,7 +187,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target master \
             --title "calcephpy 预编译 wheel（Windows + Linux x86_64 + Linux aarch64）" \
-            --notes "calcephpy 5.0.0 的预编译 wheel：Windows（cp310–cp313，win_amd64）+ Linux x86_64（cp310–cp313，manylinux_2_28_x86_64）+ Linux aarch64（cp310–cp313，manylinux_2_28_aarch64）。PyPI 仅有 sdist，Windows 需 MSVC、Linux 需 gcc 现场编译；此处提供预编译产物，供 e2m2e / transfer-orbit-design 的 uv sync 经 find-links 直接拉取。calcephpy 归 IMCCE/CNRS，CeCILL-C/B 或 CeCILL v2.1 许可。" \
+            --notes "calcephpy 5.0.1 的预编译 wheel：Windows（cp310–cp313，win_amd64）+ Linux x86_64（cp310–cp313，manylinux_2_28_x86_64）+ Linux aarch64（cp310–cp313，manylinux_2_28_aarch64）。PyPI 仅有 sdist，Windows 需 MSVC、Linux 需 gcc 现场编译；此处提供预编译产物，供 e2m2e / transfer-orbit-design 的 uv sync 经 find-links 直接拉取。calcephpy 归 IMCCE/CNRS，CeCILL-C/B 或 CeCILL v2.1 许可。" \
             || true
           gh release upload calcephpy-v1 dist/*.whl --repo "$GITHUB_REPOSITORY" --clobber
 
