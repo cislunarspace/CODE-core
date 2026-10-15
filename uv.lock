@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -127,7 +127,7 @@ wheels = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
+version = "5.0.1"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -146,12 +146,12 @@ dependencies = [
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "(python_full_version >= '3.11' and platform_machine != 'aarch64' and platform_machine != 'x86_64') or (python_full_version >= '3.11' and sys_platform != 'linux') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'win32'" },
     { name = "setuptools" },
 ]
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c0/83/a3e830fd0ea6e1427fd172b5a4d4f0704cfae5e86471920581ca8e22c0c9/calcephpy-5.0.0.tar.gz", hash = "sha256:abf52b8d2898299ff837f90ed9824cc40d70745700b440374d6f375a86a5e831", size = 8633564, upload-time = "2026-07-06T11:48:01.49Z" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/ae/20/3b7866a13265630e8881485f03d145716def63a47b7305e4c322dad11126/calcephpy-5.0.1.tar.gz", hash = "sha256:30e880c2559c4e555dec42a707555c613e5dab455c339041960785529cdb1448", size = 8675687, upload-time = "2026-09-21T11:43:42.666Z" }
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }
 resolution-markers = [
     "python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux'",
 ]
@@ -161,7 +161,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:599d5ace76c1598a612587bf2c0c865b1fdb6445a4508efbaa9ba016347e3578" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:287e3aaa1dbf6a168c1503ea20e6c4f08632ede22bf7e23a9950ec04994d34a5" },
 ]
 
 [package.metadata]
@@ -173,8 +173,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }
 resolution-markers = [
     "python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
@@ -184,7 +184,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1f5ba5f677a0049be75fb6623ace964054832f931e0befac0268d72d8d693362" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0faf38443536af7231859e661f065c4c67921e041ad2224df7d8fcde789e1c46" },
 ]
 
 [package.metadata]
@@ -196,8 +196,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-win_amd64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-win_amd64.whl" }
 resolution-markers = [
     "python_full_version < '3.11' and sys_platform == 'win32'",
 ]
@@ -207,7 +207,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-win_amd64.whl", hash = "sha256:4c5ae27be75c6ab5daaeafa7a521026f687460cad24a667a5adee3aa3cffe10f" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-win_amd64.whl", hash = "sha256:6affda6c0a01c54290afe57b565d3066278a55c7251d2566319d05bb4c8ab2d5" },
 ]
 
 [package.metadata]
@@ -219,8 +219,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }
 resolution-markers = [
     "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
 ]
@@ -230,7 +230,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:f944d5bf56bb223c292a167e91ec39ed847c81271d0d85c84fed0455fe789ae3" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b8cafec13143fa02be87bfc2185a4659deac2d2d6c6a7ffef73e5a35fd1462df" },
 ]
 
 [package.metadata]
@@ -242,8 +242,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }
 resolution-markers = [
     "python_full_version == '3.11.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
@@ -253,7 +253,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:cc8a43788ef332d4da15b612d066253982f0e744849c66fc5d7bcb42634be32a" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:46990d5e84676a61df10d3be9432f77d199d0baeaf6143c94e14581f35f22e26" },
 ]
 
 [package.metadata]
@@ -265,8 +265,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-win_amd64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-win_amd64.whl" }
 resolution-markers = [
     "python_full_version == '3.11.*' and sys_platform == 'win32'",
 ]
@@ -276,7 +276,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:54066ebd25cd5a311f478b931f7386d718db5dffcef9816bc0d65d5ebcc5565c" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:3acf73c5914ea6214ec378fefbb6bae13fb784fe58b62d37e1952134ae4c92af" },
 ]
 
 [package.metadata]
@@ -288,8 +288,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }
 resolution-markers = [
     "python_full_version == '3.12.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
 ]
@@ -299,7 +299,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ac076e6568a733156c1958be4f26597a09b4c6b11de299ce8b388f9bd0ee469b" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:4047ad8595ac0b56326c08d082b534e0709243853f46bed9886dcecaa2479871" },
 ]
 
 [package.metadata]
@@ -311,8 +311,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }
 resolution-markers = [
     "python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
@@ -322,7 +322,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:efe187a7ff82229002499ba2f6295cb7da23fffed14c1e9d7ba3e63592098337" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6c906f229bfe8d708c795d63519575526dc95008b85b4b9d88f7a695ab37f2db" },
 ]
 
 [package.metadata]
@@ -334,8 +334,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-win_amd64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-win_amd64.whl" }
 resolution-markers = [
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
 ]
@@ -345,7 +345,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-win_amd64.whl", hash = "sha256:1850ed1478689fbc2e31ddba7122686eb73504c95f54b66901da79850c7a7d5b" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-win_amd64.whl", hash = "sha256:20a1f0bfdd0111344aafd849f006bdac475ff35cca45c393b154ff034dcc1e6e" },
 ]
 
 [package.metadata]
@@ -357,8 +357,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }
 resolution-markers = [
     "python_full_version == '3.13.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
 ]
@@ -368,7 +368,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:e27339ab84b0157edc839f447c079ab4f695c5b290afbff8290537854f3a0ae5" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1f27d69533896453731916ea8682d105c6547baaa9b67a21de4d11c21588abef" },
 ]
 
 [package.metadata]
@@ -380,8 +380,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }
 resolution-markers = [
     "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
@@ -391,7 +391,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:11281c50c8cd3cd785dc08e59cafc5daefa4d8181b849bd738bdae343f2c97c4" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3d0e8b27723c1dfbb15e8cc18ec1e7067933b4c03b640ce298a644aa890eecab" },
 ]
 
 [package.metadata]
@@ -403,8 +403,8 @@ requires-dist = [
 
 [[package]]
 name = "calcephpy"
-version = "5.0.0"
-source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-win_amd64.whl" }
+version = "5.0.1"
+source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-win_amd64.whl" }
 resolution-markers = [
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
 ]
@@ -414,7 +414,7 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-win_amd64.whl", hash = "sha256:b8098bc44ccd1b94921cf84ba9460220da1dd56131461f920445452c111fac69" },
+    { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-win_amd64.whl", hash = "sha256:c6627cfa31939a010f46f70e1af971b5df9f7c5e259109e17d8b32e53186f5bf" },
 ]
 
 [package.metadata]
@@ -954,19 +954,19 @@ name = "e2m2e"
 version = "5.9.10"
 source = { editable = "." }
 dependencies = [
-    { name = "calcephpy", version = "5.0.0", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform == 'win32') or (platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (sys_platform != 'linux' and sys_platform != 'win32')" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-win_amd64.whl" }, marker = "python_full_version < '3.11' and sys_platform == 'win32'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.11.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-win_amd64.whl" }, marker = "python_full_version == '3.11.*' and sys_platform == 'win32'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.12.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-win_amd64.whl" }, marker = "python_full_version == '3.12.*' and sys_platform == 'win32'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.13.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-win_amd64.whl" }, marker = "python_full_version == '3.13.*' and sys_platform == 'win32'" },
+    { name = "calcephpy", version = "5.0.1", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform == 'win32') or (platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (sys_platform != 'linux' and sys_platform != 'win32')" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-win_amd64.whl" }, marker = "python_full_version < '3.11' and sys_platform == 'win32'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.11.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-win_amd64.whl" }, marker = "python_full_version == '3.11.*' and sys_platform == 'win32'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.12.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-win_amd64.whl" }, marker = "python_full_version == '3.12.*' and sys_platform == 'win32'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.13.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-win_amd64.whl" }, marker = "python_full_version == '3.13.*' and sys_platform == 'win32'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pydantic" },
@@ -1007,19 +1007,19 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anyio", marker = "extra == 'mcp'", specifier = ">=4.14.2" },
-    { name = "calcephpy", marker = "(python_full_version < '3.10' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.10' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform == 'win32') or (platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (sys_platform != 'linux' and sys_platform != 'win32')", specifier = "==5.0.0" },
-    { name = "calcephpy", marker = "python_full_version == '3.10.*' and platform_machine == 'aarch64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.12.*' and platform_machine == 'aarch64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.13.*' and platform_machine == 'aarch64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.10.*' and platform_machine == 'x86_64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.11.*' and platform_machine == 'x86_64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.10.*' and sys_platform == 'win32'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-win_amd64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.11.*' and sys_platform == 'win32'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-win_amd64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.12.*' and sys_platform == 'win32'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-win_amd64.whl" },
-    { name = "calcephpy", marker = "python_full_version == '3.13.*' and sys_platform == 'win32'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-win_amd64.whl" },
+    { name = "calcephpy", marker = "(python_full_version < '3.10' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.10' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform == 'win32') or (platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (sys_platform != 'linux' and sys_platform != 'win32')", specifier = "==5.0.1" },
+    { name = "calcephpy", marker = "python_full_version == '3.10.*' and platform_machine == 'aarch64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.12.*' and platform_machine == 'aarch64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.13.*' and platform_machine == 'aarch64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.10.*' and platform_machine == 'x86_64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.11.*' and platform_machine == 'x86_64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.10.*' and sys_platform == 'win32'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-win_amd64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.11.*' and sys_platform == 'win32'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-win_amd64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.12.*' and sys_platform == 'win32'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-win_amd64.whl" },
+    { name = "calcephpy", marker = "python_full_version == '3.13.*' and sys_platform == 'win32'", url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-win_amd64.whl" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.1.1" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=4" },
     { name = "numpy", specifier = ">=1.24" },
@@ -2161,19 +2161,19 @@ name = "r2s2"
 version = "0.1.0"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
 dependencies = [
-    { name = "calcephpy", version = "5.0.0", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform == 'win32') or (platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (sys_platform != 'linux' and sys_platform != 'win32')" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp310-cp310-win_amd64.whl" }, marker = "python_full_version < '3.11' and sys_platform == 'win32'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.11.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp311-cp311-win_amd64.whl" }, marker = "python_full_version == '3.11.*' and sys_platform == 'win32'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.12.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp312-cp312-win_amd64.whl" }, marker = "python_full_version == '3.12.*' and sys_platform == 'win32'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.13.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "calcephpy", version = "5.0.0", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.0-cp313-cp313-win_amd64.whl" }, marker = "python_full_version == '3.13.*' and sys_platform == 'win32'" },
+    { name = "calcephpy", version = "5.0.1", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform == 'win32') or (platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (sys_platform != 'linux' and sys_platform != 'win32')" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp310-cp310-win_amd64.whl" }, marker = "python_full_version < '3.11' and sys_platform == 'win32'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.11.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp311-cp311-win_amd64.whl" }, marker = "python_full_version == '3.11.*' and sys_platform == 'win32'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.12.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp312-cp312-win_amd64.whl" }, marker = "python_full_version == '3.12.*' and sys_platform == 'win32'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl" }, marker = "python_full_version == '3.13.*' and platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" }, marker = "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "calcephpy", version = "5.0.1", source = { url = "https://github.com/cislunarspace/CODE-core/releases/download/calcephpy-v1/calcephpy-5.0.1-cp313-cp313-win_amd64.whl" }, marker = "python_full_version == '3.13.*' and sys_platform == 'win32'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "python_full_version >= '3.11'" },
 ]
