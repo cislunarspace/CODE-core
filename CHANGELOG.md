@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### DEP
+- **calcephpy 升至 5.0.1 并补齐预编译 wheel**：`pyproject.toml` 的声明与 `[tool.uv.sources]` 的 12 条 URL、`uv.lock` 一并从 5.0.0 升到 5.0.1，Windows 与 Linux（x86_64、aarch64）的 Python 3.10 至 3.13 用户继续直拉 `calcephpy-v1` release 的预编译 wheel，不触发现场编译。上游 5.0.1 在 PyPI 只发布 sdist，其包装层 API 与 C 库导出面相对 5.0.0 未变，唯一行为变化是 SPK 段类型 1 与 21 的最大求导阶数由 1 提到 3，本仓只用到段类型 2 与 C 侧固定 order 1 的 `compute_unit`，不受影响。wheel 由 `.github/workflows/calcephpy-wheel.yml` 在改版本号后重新构建发布。(#810)
+
 ## [5.9.10] - 2026-10-06
 
 ### FIX
