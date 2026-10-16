@@ -6,8 +6,14 @@
 
 ## [Unreleased]
 
+## [5.9.11] - 2026-10-16
+
 ### DEP
 - **calcephpy 升至 5.0.1 并补齐预编译 wheel**：`pyproject.toml` 的声明与 `[tool.uv.sources]` 的 12 条 URL、`uv.lock` 一并从 5.0.0 升到 5.0.1，Windows 与 Linux（x86_64、aarch64）的 Python 3.10 至 3.13 用户继续直拉 `calcephpy-v1` release 的预编译 wheel，不触发现场编译。上游 5.0.1 在 PyPI 只发布 sdist，其包装层 API 与 C 库导出面相对 5.0.0 未变，唯一行为变化是 SPK 段类型 1 与 21 的最大求导阶数由 1 提到 3，本仓只用到段类型 2 与 C 侧固定 order 1 的 `compute_unit`，不受影响。wheel 由 `.github/workflows/calcephpy-wheel.yml` 在改版本号后重新构建发布。(#810)
+
+### CLEANUP
+- **README 品牌资产与工具链补齐**：README 新增 `assets/banner.png`，`tools/assets/banner.svg`、`build-assets.mjs`、`package.json`、`package-lock.json`、`README.md`、`logo.png` 构成可复现的品牌位图生成链，同时把 `tools` 接入 `scripts/check_doc_quotes.py` 与其元测试，并登记到 `AGENTS.md`。(#808)
+- **LLNL 地月轨迹数据集按需读取探针**：新增 `scripts/probe_llnl_cislunar_orbit.py`，按 `orb_id` 用 HTTP Range 分块读取远端 HDF5，只提取元数据与序列切片，不下载约 8.7 TB 全量数据，并校验帧位、序列名、切片与 `.npz` 输出路径。(#807)
 
 ## [5.9.10] - 2026-10-06
 
