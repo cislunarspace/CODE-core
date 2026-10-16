@@ -18,10 +18,10 @@
   与全周期闭合不兼容；故这两族用最小化的预测-修正循环（与源码
   ``cr3bp_orbits._correct_spo/_correct_lpo`` 同构）直接驱动。
 
-预算缩参（ADR 0037）：
+为控制耗时缩参（ADR 0037）：
 
-- axial_l1 延拓链超预算移出默认套件：axial 族周期随 vz0 急剧增长，
-  减步/缩步长/放宽到筛查级容差均无法压回单测预算（实测 >120s）。
+- axial_l1 延拓链耗时过长，移出默认套件：axial 族周期随 vz0 急剧增长，
+  减步/缩步长/放宽到筛查级容差均无法把耗时压下来（实测 >120s）。
 - lpo_l4 长弧（T≈21）全周期传播成本高，缩为 3 步 + 修正容差放宽到
   筛查级 1e-9（散度筛查判据 ``DIVERGENCE_LIMIT`` 对此有充分余量）。
 - dpo/halo/spo 链维持 5 步与默认 1e-12 研究级容差不动。
@@ -46,8 +46,8 @@ pytestmark = pytest.mark.orchestration
 
 #: 每族默认要走的延拓步数
 N_STEPS = 5
-#: lpo_l4 链的缩参步数：长弧（T≈21）全周期传播 × 多步迭代实测接近单测
-#: 预算，减步 + 筛查级容差（1e-9）压回预算内；链不断/单调/不发散三点
+#: lpo_l4 链的缩参步数：长弧（T≈21）全周期传播 × 多步迭代耗时可观，
+#: 减步 + 筛查级容差（1e-9）把耗时压下来；链不断/单调/不发散三点
 #: 验证语义不变。
 N_STEPS_SLOW = 3
 #: 筛查级修正容差（相对研究级默认 1e-12 放宽，减 Newton 迭代次数）
@@ -169,7 +169,7 @@ def run_lpo_l4(seed, dynamics):
     # LPO 不在 7 类修正组合内，无 session 缓存代表轨道；在此用线性化长周期
     # 模态种子修正一次作为延拓起点（同 cr3bp_orbits._correct_lpo 的 guess=None 分支）。
     # 缩参（ADR 0037）：3 步 + 筛查级容差（种子修正同容差，仅作延拓起点），
-    # 长弧（T≈21）全周期传播压回单测预算。
+    # 长弧（T≈21）全周期传播的耗时随之下降。
     state, period = compute_lpo_initial_guess(
         dynamics.system, seeds.SPO_SEED_POINT, seeds.SPO_SEED_AMPLITUDE_KM
     )
@@ -208,7 +208,7 @@ def _make_seed(dynamics, state, period):
 
 
 # ---- parametrize：family_id → (种子 fixture 名, 运行器) ----
-# axial_l1 链超预算移出默认套件，见模块 docstring。
+# axial_l1 链耗时过长，移出默认套件，见模块 docstring。
 CONTINUATION_CASES = [
     ("dpo", "corrected_dpo", run_dpo),
     ("halo_l1", "corrected_halo_l1", run_halo_l1),

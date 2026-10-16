@@ -208,7 +208,7 @@ class SpatiographyMapRequest(_ApiModel):
     网格初值按命名场景（2027-08-02 日全食历元、(Ω,ω,M) 固定角、
     i = 月轨面、反 aligned 拱线）生成；逐格传播 EM/EMS 点质量模型
     （MEGNO + 命运两层）。网格分辨率与积分窗按需收缩——CI 走抽查
-    小网格，全量制图走 scripts/ 手动（ADR 0037 预算口径）。
+    小网格，全量制图走 scripts/ 手动（ADR 0037 的端到端边界）。
     """
 
     zone: Literal["SC", "CR", "CG", "IT", "OT", "TF"] = Field(

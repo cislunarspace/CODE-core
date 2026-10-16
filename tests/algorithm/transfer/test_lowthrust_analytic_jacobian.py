@@ -260,7 +260,7 @@ def test_terminal_jacobian_matches_constraint_derivative():
 def test_analytic_jacobian_matches_numeric_solution():
     """解析与数值雅可比求得近似相同的燃料消耗。
 
-    ADR 0037 预算内：二体点质量 + 自会合二次收敛，maxiter 30→12 足够；
+    按 ADR 0037 决策 2 缩参：二体点质量 + 自会合二次收敛，maxiter 30→12 足够；
     n_seg 4→3 使数值差分决策变量 12→9，每次牛顿迭代的 FD 传播更少。
     """
 

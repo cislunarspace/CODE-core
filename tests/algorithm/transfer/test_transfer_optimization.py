@@ -4,7 +4,7 @@
 tests/algorithm/conftest.py 一致）；RO 由 ``design_ro`` 按 3:1 共振生成
 （替代历史外部数据文件 output/dro|ro/*.json——文件缺失即 skip 的时代
 结束，测试自给自足）。``optimize()`` 全链 NLP 测试维持既有维护决策
-（不进套件，此前因 rtol=1e-12 全链超 ADR 0037 预算移除）：筛选级容差
+（不进套件，此前因 rtol=1e-12 全链耗时远超套件可容规模移除）：筛选级容差
 下从粗网格候选出发，SLSQP 在 8+ 组参数组合（松弛/非松弛 × 多候选 ×
 多转移时间上限）中均报 "Positive directional derivative for
 linesearch" 不可行，链路收敛研究不进 pytest。松弛速度约束的方向契约

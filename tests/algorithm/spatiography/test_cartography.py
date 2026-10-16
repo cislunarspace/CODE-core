@@ -5,7 +5,7 @@
 - 黄金对照：SC 区低倾切片近全 Ȳ ≈ 2（line 1419）；共振竖线位置 =
   #578 名义中心（Table 4 区带与 Table 1 梯的一致性）；CG 区开放
   gateway 拓扑（共面 T☾ = 3 低于第一颈口阈值 C1，精确求根口径）；
-- 网格规模抽查在 CI 时间预算内（ADR 0037：单文件 60 s）。
+- 网格规模抽查取小网格，全量制图归 `scripts/`（ADR 0037 端到端边界）。
 """
 
 from __future__ import annotations

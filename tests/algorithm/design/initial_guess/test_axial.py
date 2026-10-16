@@ -3,8 +3,8 @@
 compute_axial_initial_guess 的正确性测试（返回结构、x 轴对称初始条件、
 面外速度非零、分岔振幅等）已按 ADR 0037 移出默认套件：其底层 Lyapunov
 垂直临界分岔扫描固有 ~1 min（多条真实修正，见模块内
-``_bifurcation_cache``），超出单测预算；同族修正/延拓测试因同一根因
-同步移出（见 continuation/test_continuation_per_family.py docstring）。
+``_bifurcation_cache``），耗时超出默认套件可容范围；同族修正/延拓测试因
+同一根因同步移出（见 continuation/test_continuation_per_family.py docstring）。
 """
 
 import pytest

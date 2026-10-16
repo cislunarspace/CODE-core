@@ -11,11 +11,6 @@
 ### 真调用最小覆盖（Minimal Real-Call Coverage）
 编排器与接口层（`orchestration`/`interface`）的 API 正确性天然需要一次不 mock 的真实调用（ADR 0013 反 mock 决策）。最小覆盖要求每个编排入口恰好对应一条小规模、确定性、耗时有界的冒烟用例。超出最小覆盖的遍历性网格与大振幅长弧验证不进入默认 pytest，归属 benchmark 或手工诊断脚本（ADR 0037）。
 
-### 测试套件时间预算（Test Suite Time Budget）
-- 单测试用例墙钟时间上限：10 秒
-- 单测试文件墙钟时间上限：60 秒
-超出预算的测试不得进入默认 pytest 集（ADR 0037）。
-
 ### 研究级容差 vs 筛选级容差（Research vs Screening Tolerance）
 - 研究级容差：动力学链路默认 `DEFAULT_TOLERANCE = 1e-12`（dynamics、force_model、differential_correction 三处同名常量），用于动力学基准积分、辛结构保真与高精度轨线精化。库内其他模块另有各自容差常量，不以本条为准。
 - 筛选级容差：`rtol/atol ≈ 1e-9 ~ 1e-10`，用于初猜网格搜索、多初值筛选与测试套件。测试套件不得对全网格使用研究级容差（ADR 0021 修订 #420、issue #536）。
