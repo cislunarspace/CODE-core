@@ -53,9 +53,7 @@ def test_design_orbit_elfo_minimal_real_call():
 # RO 的星历链路冒烟按 ADR 0037 归属 scripts/design_ro_ephemeris_smoke.py:
 # tests/conftest.py 把 Rust rayon 钉单线程, two_level 星历修正单线程实测
 # >600 s(多线程独立进程实测 219 s), 超出 pytest 可容规模。
-# Lyapunov 的星历链路冒烟：实测 46.23 s（debug 扩展、完整 CR3BP + segmented 链路）；
-# 60 s 预算留约 30% 余量。
-@pytest.mark.time_budget(60)
+# Lyapunov 的星历链路冒烟：实测 46.23 s（debug 扩展、完整 CR3BP + segmented 链路）。
 def test_design_orbit_lyapunov_ephemeris_correction_smoke():
     result = design_orbit(
         make_design_request(

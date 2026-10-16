@@ -22,9 +22,7 @@ pytestmark = pytest.mark.orchestration
 
 
 @pytest.mark.parametrize("north_south", [1, 2], ids=["north", "south"])
-@pytest.mark.time_budget(120)
-# 原因：L1 单次 PAL 需越过折叠点再二分细化，release 扩展实测约 4.4 s、本机 debug
-# 扩展约 73 s；标记留 120 s 覆盖 debug 构建与慢机
+# L1 单次 PAL 需越过折叠点再二分细化：release 扩展实测约 4.4 s，debug 扩展约 73 s。
 def test_design_nrho_l1_hits_perilune(north_south: int) -> None:
     """L1 北/南族近月高 5000 km：命中 ±10 km、周期为正、闭合残差 ≤ 0.1 m。"""
     orbit = design_nrho(1, north_south, 5000.0)

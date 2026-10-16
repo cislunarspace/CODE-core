@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### TEST
+- **移除机器强制的测试时间预算门禁**：ADR 0037 决策 1 的单用例 10 秒与单文件 60 秒墙钟预算及其机器实施整体移除，涉及 `tests/time_budget.py` 的会话末审计、`pyproject.toml` 的 `time_budget` 标记、`tests/conftest.py` 的钩子再导出与四处显式覆盖。阈值标定自高性能工作站，慢机上不改动用例内容也会被判超预算，本机 `make test` 因此不能充当发布前门禁。ADR 0037 追加修订记录该废止，决策 2 至 4（真调用最小覆盖、筛选级容差、计算共享）保留，重负载验证仍归 `scripts/` 手工诊断与 benchmark。`CONTEXT.md` 的时间预算术语节与 `AGENTS.md` 的相关条款同步更新，`tests/conftest.py` 的线程池单线程 pin 保留，理由改为避免 xdist 下的超订。(#815)
+
 ## [5.9.11] - 2026-10-16
 
 ### DEP

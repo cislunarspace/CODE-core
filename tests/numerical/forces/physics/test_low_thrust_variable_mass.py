@@ -1,7 +1,7 @@
-"""VariableMassFiniteBurn 变质量低推力的数值/解析对标（ADR 0037 预算内）。
+"""VariableMassFiniteBurn 变质量低推力的数值/解析对标（ADR 0037 决策 2 的最省路径）。
 
 保留快速解析对标（质量消耗、半长轴变化率、Rust 7D 路径、零推力守卫）与拒绝
-契约；两个 SRP 耦合用例（17.2s/10.5s）超 10s 单测预算，随端到端清理移除。
+契约；两个 SRP 耦合用例（17.2s/10.5s）耗时过长，随端到端清理移除。
 """
 
 import numpy as np

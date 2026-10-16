@@ -67,7 +67,7 @@ ADR 0008 否决运行时冻结），状态仍是已采纳，括注被否决的�
 | 0034 | Scope of the ephemeris force-model Hamiltonian | Adopted |
 | 0035 | GUI sidecar stdio protocol: shared Facade envelope, large arrays over binary frames | Adopted |
 | 0036 | CR3BP baseline orbit-family dataset: precomputed full-family data shipped with the package | Adopted |
-| 0037 | Test suite time budget, minimal real-call coverage, and e2e test boundaries | Adopted |
+| 0037 | Test suite time budget, minimal real-call coverage, and e2e test boundaries | Adopted (per-test and per-file time ceilings and their machine gate withdrawn 2026-10-16, decisions 2 to 4 stand) |
 | 0038 | IAS15 integrator and force-model parametric variational equations (ASSIST-derived); MERCURIUS not adopted | Adopted |
 | 0039 | Shared-kernel leaf modules at the package root | Adopted (implemented) |
 | 0040 | transfer_design converged trajectory: unified synodic-frame contract with trajectory_times | Adopted (implemented) |

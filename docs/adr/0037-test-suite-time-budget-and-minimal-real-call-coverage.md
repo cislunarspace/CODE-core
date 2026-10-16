@@ -185,3 +185,28 @@ scheduling noise. Reference invocation for budget calibration is a modest
 worker count (green at `-n 4`: 2213 passed / 34 skipped / ~31 s). Whether the
 gate should gain a contention allowance for high-worker runs is flagged for a
 future decision, not decided here.
+
+## Amendment (2026-10-16): time-budget ceilings and the machine gate withdrawn
+
+Decision 1's per-test 10 s and per-file 60 s ceilings, and the machine-enforced
+gate added by the #548 amendment (`tests/time_budget.py`, the `time_budget`
+marker, the conftest hook re-export), are withdrawn. The ceilings were
+calibrated on a high-performance workstation and are not portable. On a machine
+several times slower, one `make test-python` run reports dozens of over-budget
+tests whose content is unchanged, the largest at 252.94 s against a 120 s
+override and most merely 0.02 s to 7 s past the 10 s default. The suite
+therefore no longer imposes any machine-enforced per-test or per-file duration
+ceiling, and `make test` on a slow machine no longer fails for reasons
+unrelated to the code under test.
+
+Decisions 2 to 4 stand. Minimal real-call coverage, screening tolerances, and
+the computation-sharing invariant remain the guidance, and heavy validation
+(long arcs, dense grids, production maps) still belongs in `scripts/`
+diagnostics and benchmarks rather than the default pytest set, now as
+discipline instead of a numeric ceiling. The tests-root conftest keeps pinning
+worker thread pools to 1, for the oversubscription reason above rather than for
+budget fidelity.
+
+References to the withdrawn ceilings in later records are void with them: ADR
+0041 decision 3's probe grids sized "within ADR 0037 budget", and ADR 0045's
+instruction to keep baseline tests within the 10 s and 60 s budgets.

@@ -2,7 +2,7 @@
 
 只保留不驱动真实 CR3BP 修正+延拓的轻量覆盖：延拓参数自动推断、步长
 配置契约、参数索引推断与统计初始化。真实延拓行为（双向延拓、步长控制、
-端到端 pipeline）已按 ADR 0037 预算决策移出默认套件，由
+端到端 pipeline）已按 ADR 0037 决策 2 移出默认套件，由
 tests/algorithm/design/continuation/test_continuation_per_family.py 的
 5 族延拓链承担最小覆盖。
 """

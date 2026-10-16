@@ -4,9 +4,9 @@
 本文件只验证收敛行为——闭合误差、周期性、成功标志、迭代次数合理；
 不测类型/属性（那是阶段 1 已清掉的废话）。
 
-axial_l1 修正超预算移出默认套件（ADR 0037）：axial 族单次微分修正
-固有 ~2 min（长周期 × 多次 STM 传播，缩参/放宽容差均无法压回单测
-预算，见 continuation/test_continuation_per_family.py docstring）。
+axial_l1 修正耗时过长，移出默认套件（ADR 0037）：axial 族单次微分修正
+固有 ~2 min（长周期 × 多次 STM 传播，缩参/放宽容差均无法把耗时压下来，
+见 continuation/test_continuation_per_family.py docstring）。
 """
 
 import pytest

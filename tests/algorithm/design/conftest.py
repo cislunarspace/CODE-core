@@ -12,7 +12,7 @@ continuation/multiple_shooting/ephemeris）测试复用。
 内只修正一次）+ 函数级 deepcopy 包装（``corrected_*``，供单测安全改写）。
 
 axial_l1 代表轨道已按 ADR 0037 移出默认套件：单次微分修正固有
-~2 min，超出单测预算（见 continuation/test_continuation_per_family.py）。
+~2 min，超出默认套件可容的耗时（见 continuation/test_continuation_per_family.py）。
 """
 
 import copy

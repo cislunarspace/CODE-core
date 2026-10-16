@@ -1,4 +1,4 @@
-"""六域两层天图的全量生产入口（手动运行，ADR 0037 时间预算口径）。
+"""六域两层天图的全量生产入口（手动运行，ADR 0037 端到端边界）。
 
 CI 只跑抽查小网格（tests/algorithm/spatiography/test_cartography.py）；
 全量制图（Table 4 缺省窗 + 生产分辨率）走本脚本手动/发版前执行：
