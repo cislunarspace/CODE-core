@@ -6,6 +6,8 @@ oracle 口径（ADR 0055）：
   （等模残差、总 ΔV、近心点半径），与精化候选逐项对照；
 - ② 不变量：精化后总 ΔV 不增（可行流形上的局部最优 ≤ 近可行起点）；
 - 接口：不可行以软失败三元组表达（不抛异常），入参非法抛 ``ValueError``。
+- 状态口径：末点过不了 flyby 后验闸门即 ``INFEASIBLE``，与求解器是否耗尽
+  预算无关，``MAX_ITERATIONS`` 只留给末点已满足约束、仅目标容差未达的情形。
 
 合成圆共面星历（模式抄 ``test_mga_search.py``），无 SPICE。
 """
@@ -19,6 +21,7 @@ import pytest
 
 from e2m2e.algorithm.transfer import (
     MgaRefinementResult,
+    mga_refine,
     refine_mga_chain,
     search_mga_chains,
 )
@@ -170,6 +173,47 @@ class TestInfeasibleSemantics:
         assert result.cause is FailureCause.CONSTRAINT_VIOLATION
         assert result.candidate is None
         assert result.initial_total_delta_v_km_s == pytest.approx(candidate.total_delta_v_km_s)
+
+    def test_infeasible_semantics_survive_larger_budget(self, candidate):
+        """同一不可达约束下给足迭代预算，结论不翻转，钉住状态不依赖预算大小。
+
+        默认 maxiter 下 SLSQP 先用完迭代次数，加大预算后它才走到停滞判据。两种
+        结束方式下末点都严重违反 flyby 约束，状态都应是不可行。
+        """
+        result = _refine(candidate, min_rp=[1e12], maxiter=2000)
+        assert result.status is ConvergenceState.INFEASIBLE
+        assert result.cause is FailureCause.CONSTRAINT_VIOLATION
+        assert result.candidate is None
+
+    def test_lambert_failure_in_penalty_evaluation_reports_infeasible(self, candidate, monkeypatch):
+        """末点 Lambert 无解取惩罚评估时判不可行，不落到 MAX_ITERATIONS 或 CONVERGED。"""
+
+        def boom(*args: object, **kwargs: object) -> object:
+            raise ValueError("注入：末点 Lambert 无解")
+
+        monkeypatch.setattr(mga_refine, "solve_lambert", boom)
+        result = _refine(candidate, maxiter=2)
+        assert result.status is ConvergenceState.INFEASIBLE
+        assert result.cause is FailureCause.CONSTRAINT_VIOLATION
+        assert result.candidate is None
+        assert "后验闸门" in result.message
+
+
+class TestBudgetExhaustionSemantics:
+    def test_feasible_final_point_keeps_max_iterations(self, candidate):
+        """末点已满足 flyby 约束、仅目标容差未达 → 保留 MAX_ITERATIONS。
+
+        先正常精化到收敛点，再把目标容差压到可实现的极限并只给 2 次迭代重解，
+        让 SLSQP 在已可行的最优点附近以迭代耗尽结束。末点仍过后验闸门，故不判
+        不可行，状态沿用求解器的预算耗尽结论。
+        """
+        refined = _refine(candidate)
+        assert refined.status is ConvergenceState.CONVERGED
+        assert refined.candidate is not None
+        result = _refine(refined.candidate, maxiter=2, ftol=1e-30)
+        assert result.status is ConvergenceState.MAX_ITERATIONS
+        assert result.cause is FailureCause.MAX_ITERATIONS_REACHED
+        assert result.candidate is None
 
 
 class TestInputValidation:
