@@ -6,9 +6,10 @@
 + 转角不等式）复用 :func:`.multisegment.flyby_node_constraints`，目标与
 ``MgaCandidate.total_delta_v_km_s`` 同口径（出发 v∞ + 到达 v∞）。求解走
 :func:`.nlp_scipy.solve_slsqp`（SLSQP 数值差分，与 DRO 路径同策略）；
-成功解过后验闸门（ADR 0020 红线）再经 :func:`.mga.evaluate_flyby` 重建
-精化候选。节点天体态随历元由星历重查（变量即历元，与 SF“节点状态是
-数据”的口径不同——这是 MGA 精化的本职）。
+求解结束后不论退出码都过后验闸门（ADR 0020 红线），末点过闸门且求解器
+报成功再经 :func:`.mga.evaluate_flyby` 重建精化候选。节点天体态随历元
+由星历重查（变量即历元，与 SF“节点状态是数据”的口径不同——这是 MGA
+精化的本职）。
 """
 
 from __future__ import annotations
@@ -95,9 +96,11 @@ def refine_mga_chain(
     :func:`.multisegment.flyby_node_constraints`（``vel_scale`` 取候选各
     flyby V∞ 模的最大值与 1.0 的较大者，固定归一尺度）。目标 = 出发 v∞ +
     到达 v∞（同 ``MgaCandidate.total_delta_v_km_s`` 口径）。求解：SLSQP
-    数值差分；评估内 Lambert 抛 ``ValueError`` 时返回惩罚值。成功解过
-    后验闸门（等模 ≤ 1e-6 km/s、转角越限 ≥ −1e-6 rad）后用
-    :func:`.mga.evaluate_flyby`（等模容差 1e-6 km/s）重建精化候选。
+    数值差分；评估内 Lambert 抛 ``ValueError`` 时返回惩罚值。求解结束后不论
+    退出码都过后验闸门（等模 ≤ 1e-6 km/s、转角越限 ≥ −1e-6 rad），末点过
+    闸门且求解器报成功才用 :func:`.mga.evaluate_flyby`（等模容差 1e-6 km/s）
+    重建精化候选。末点过不了闸门（含 Lambert 无解的惩罚评估）一律判不可行，
+    求解器的预算告罄不单独构成结论。
 
     Args:
         body_sequence: 天体序列（SPICE 天体名），与候选同链：首项出发体、
@@ -114,11 +117,20 @@ def refine_mga_chain(
         kernel_dir: 缺省星历路径的内核目录；``None`` 用仓库缺省。
         mu_sun_km3_s2: 太阳 GM（km³/s²）；``None`` 取 ``ephemeris.get_gm("SUN")``。
         ftol: SLSQP 目标容差。
-        maxiter: SLSQP 最大迭代次数。
+        maxiter: SLSQP 最大迭代次数。预算耗尽本身不判不可行，只有末点也过不了
+            后验闸门时才改判不可行。
 
     Returns:
-        :class:`MgaRefinementResult`；不可行（闸门未过或 SLSQP 判不可行）
-        以 ``(INFEASIBLE, CONSTRAINT_VIOLATION)`` 三元组表达，不抛异常。
+        :class:`MgaRefinementResult`，不抛异常。状态分三种口径：
+
+        - ``(CONVERGED, NONE)`` 且 ``candidate`` 非空：SLSQP 报成功且末点过
+          后验闸门。
+        - ``(INFEASIBLE, CONSTRAINT_VIOLATION)`` 且 ``candidate`` 为 ``None``：
+          末点 flyby 等模原始差超过 1e-6 km/s 或转角越限超过 1e-6 rad，或末点
+          Lambert 无解取惩罚评估。与求解器退出码无关。
+        - ``(MAX_ITERATIONS, MAX_ITERATIONS_REACHED)`` 且 ``candidate`` 为
+          ``None``：末点已满足 flyby 约束，仅因 ``maxiter`` 耗尽未达目标容差。
+          其余求解器失败（``FAILED`` 等）保持退出码翻译。
 
     Raises:
         ValueError: 入参长度/取值非法（bounds 形状、TOF 下界非正、界序
@@ -213,6 +225,7 @@ def refine_mga_chain(
         eq: npt.NDArray[np.floating]
         ineq: npt.NDArray[np.floating]
         flybys: list[FlybyConstraintEval]
+        lambert_failed: bool
 
         def __init__(self, z: npt.NDArray[np.floating]) -> None:
             epoch = float(z[0])
@@ -234,6 +247,7 @@ def refine_mga_chain(
                 self.eq = np.full(n_fly, _PENALTY_EQ)
                 self.ineq = np.full(n_fly, _PENALTY_INEQ)
                 self.flybys = []
+                self.lambert_failed = True
                 return
             dep_vinf = float(np.linalg.norm(v0_by_leg[0] - body_state(bodies[0], t_nodes[0])[3:]))
             arr_vinf = float(
@@ -259,6 +273,7 @@ def refine_mga_chain(
             self.eq = np.asarray(eq_vals, dtype=float)
             self.ineq = np.asarray(ineq_vals, dtype=float)
             self.flybys = flyby_evals
+            self.lambert_failed = False
 
     cache: dict[bytes, _ChainEval] = {}
 
@@ -285,19 +300,23 @@ def refine_mga_chain(
     n_iter = int(result.nit)
     initial_dv = float(candidate.total_delta_v_km_s)
 
-    if status is ConvergenceState.CONVERGED:
-        # 后验闸门（ADR 0020 红线）：等模原始差与转角越限任一超限即改判
-        # 不可行，不谎报 success。
+    # 后验闸门（ADR 0020 红线）：任何结束状态都按末点复核，末点过不了闸门即改判
+    # 不可行。求解器的预算告罄不是结论，只有末点本身满足 flyby 约束时它才成立。
+    gate_failure: str | None = None
+    if final.lambert_failed:
+        gate_failure = "末点 Lambert 无解，取惩罚评估，没有可用的 flyby 观测量"
+    else:
         eq_max = max((abs(fe.n_in - fe.n_out) for fe in final.flybys), default=0.0)
         ineq_min = min((fe.ineq_val for fe in final.flybys), default=0.0)
         if eq_max > _POST_EQ_TOL_KM_S or ineq_min < -_POST_INEQ_TOL_RAD:
-            status = ConvergenceState.INFEASIBLE
-            cause = FailureCause.CONSTRAINT_VIOLATION
-            message = (
-                f"{message}；后验闸门未过：flyby 等模 max‖Δ|v∞|‖ = {eq_max:.3e}"
-                f"（阈值 {_POST_EQ_TOL_KM_S} km/s），转角裕度 min(δ_max−δ) = "
-                f"{ineq_min:.3e}（阈值 −{_POST_INEQ_TOL_RAD} rad）"
+            gate_failure = (
+                f"flyby 等模 max‖Δ|v∞|‖ = {eq_max:.3e}（阈值 {_POST_EQ_TOL_KM_S} km/s），"
+                f"转角裕度 min(δ_max−δ) = {ineq_min:.3e}（阈值 −{_POST_INEQ_TOL_RAD} rad）"
             )
+    if gate_failure is not None:
+        status = ConvergenceState.INFEASIBLE
+        cause = FailureCause.CONSTRAINT_VIOLATION
+        message = f"{message}（SLSQP 退出码 {int(result.status)}）。后验闸门未过：{gate_failure}"
 
     if status is not ConvergenceState.CONVERGED:
         return MgaRefinementResult(status, cause, message, None, n_iter, initial_dv)
