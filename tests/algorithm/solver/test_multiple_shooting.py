@@ -2,7 +2,7 @@
 
 只保留不驱动真实 SPICE 多重打靶计算的轻量覆盖：初始化配置、patch
 points 输入校验（fail fast）与 verbose 参数签名契约。真实修正、Jacobian、
-固定/可变时间选项等重度 SPICE 计算测试已按 ADR 0037 预算决策移出
+固定/可变时间选项等重度 SPICE 计算测试已按 ADR 0037 决策 2 移出
 默认套件。
 """
 

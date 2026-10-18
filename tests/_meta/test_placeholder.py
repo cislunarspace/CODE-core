@@ -63,7 +63,7 @@ def test_family_design_implemented():
     """五类初猜已实现：源码级断言无 NotImplementedError 占位（零计算）。
 
     原实现用 design_dro(1.0) 的真实族行走报 Cr3bpOrbitError 作行为证明，
-    单次 ~55s 超 ADR 0037 预算；与下方四族同款源码级断言替代，族行走
+    单次 ~55s，耗时过长；与下方四族同款源码级断言替代，族行走
     行为覆盖由 design/continuation 的最小延拓链承担。
     """
     import inspect

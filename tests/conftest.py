@@ -2,9 +2,8 @@
 
 # xdist worker 内的线程池钉死为单线程：并行度已由 -n 决定，Rust rayon 全局池
 # 与 BLAS 各自再开满核会相互踩踏（16 worker × 16 线程实测把隔离时 6.5s 的
-# 用例拉到 19s，ADR 0037 门禁的 wall-clock 随之失真）。OpenBLAS 与 rayon 在
-# 池首用时读环境，必须赶在下方 e2m2e/numpy 导入之前；setdefault 保留显式
-# 覆盖入口（此时门禁读数反映真实线程争用）。
+# 用例拉到 19s）。OpenBLAS 与 rayon 在池首用时读环境，必须赶在下方
+# e2m2e/numpy 导入之前；setdefault 保留显式覆盖入口。
 import os
 
 for _var in (
@@ -15,17 +14,8 @@ for _var in (
 ):
     os.environ.setdefault(_var, "1")
 
-# ADR 0037 时间预算门禁（tests/time_budget.py）：钩子在该模块中定义，此处
-# 再导出注册。不能用 pytest_plugins 声明——本文件不是 rootdir 层 conftest。
 import pytest  # noqa: E402
 from kernel_helpers import SPICE_KERNEL_DIR  # noqa: E402
-from time_budget import (  # noqa: F401,E402
-    pytest_collection_modifyitems,
-    pytest_configure,
-    pytest_runtest_logreport,
-    pytest_runtest_makereport,
-    pytest_sessionfinish,
-)
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System  # noqa: E402
 from e2m2e.data.constants import Datum  # noqa: E402
