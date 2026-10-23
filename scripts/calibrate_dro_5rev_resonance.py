@@ -70,10 +70,7 @@ def main() -> None:
         initial_direction="decrease-x0",
         dynamics=dynamics,
     )
-    print(
-        f"反方向（{reverse.status}）：{reverse.message}，"
-        f"成员 {len(reverse.family.orbits)} 条"
-    )
+    print(f"反方向（{reverse.status}）：{reverse.message}，成员 {len(reverse.family.orbits)} 条")
 
 
 if __name__ == "__main__":

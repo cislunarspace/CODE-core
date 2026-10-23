@@ -186,9 +186,7 @@ def locate_dro_revolution_resonance(
             low_x0, low_phase = mid_x0, phase
         else:
             high_x0, high_phase = mid_x0, phase
-    final_x0 = (
-        low_x0 if abs(low_phase - target_deg) <= abs(high_phase - target_deg) else high_x0
-    )
+    final_x0 = low_x0 if abs(low_phase - target_deg) <= abs(high_phase - target_deg) else high_x0
     orbit = _correct_dro(dynamics, final_x0, guess)
 
     state = orbit.states[0].copy()
@@ -209,9 +207,7 @@ def locate_dro_revolution_resonance(
     )
 
 
-def per_revolution_closure(
-    dynamics: CR3BP_Dynamics, orbit: Orbit, revolutions: int
-) -> float:
+def per_revolution_closure(dynamics: CR3BP_Dynamics, orbit: Orbit, revolutions: int) -> float:
     """成员在不足 n 圈处闭合强度的度量：单圈末端状态与初态的最大偏差。
 
     分岔支成员是真正的 n 圈闭合轨道（单圈末端不回到初态）；平凡族成员
@@ -332,9 +328,7 @@ def generate_resonant_branch_family(
         for epsilon in _DEFLECTION_LADDER:
             for sign in (1.0, -1.0):
                 state = np.asarray(resonance.state, dtype=float) + sign * epsilon * unit
-                refined = _refine_branch_seed(
-                    dynamics, resonance, state, closure_period, spatial
-                )
+                refined = _refine_branch_seed(dynamics, resonance, state, closure_period, spatial)
                 if refined.status is not ConvergenceState.CONVERGED:
                     continue
                 member = Orbit(

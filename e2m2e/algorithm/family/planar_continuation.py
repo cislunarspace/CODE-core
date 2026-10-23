@@ -50,9 +50,7 @@ def generate_planar_periodic_family(
     if step_size <= 0.0:
         raise ValueError(f"step_size 必须为正数，当前为 {step_size}")
     if closure_revolutions < 1:
-        raise ValueError(
-            f"closure_revolutions 必须为正整数，当前为 {closure_revolutions}"
-        )
+        raise ValueError(f"closure_revolutions 必须为正整数，当前为 {closure_revolutions}")
     if initial_direction not in _VALID_DIRECTIONS:
         raise ValueError(
             f"initial_direction 必须为 {sorted(_VALID_DIRECTIONS)}，当前为 {initial_direction!r}"
