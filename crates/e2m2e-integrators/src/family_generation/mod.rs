@@ -563,6 +563,7 @@ fn outcome_to_python(py: Python<'_>, outcome: Outcome) -> PyResult<PyObject> {
 
 #[cfg(test)]
 mod tests {
+    use super::common::ro_correction_tolerance;
     use super::*;
 
     fn context() -> Context {
@@ -578,6 +579,10 @@ mod tests {
             // 是本测试的主导成本，而非 rtol）。
             max_step: Some(0.05),
         }
+    }
+
+    fn context_with_rtol(rtol: f64) -> Context {
+        Context { rtol, ..context() }
     }
 
     fn halo_spec(max_amplitude_km: f64, member_limit: usize) -> Spec {
@@ -844,6 +849,17 @@ mod tests {
         for member in &result.members {
             assert!(member.closure_error.is_some_and(|closure| closure <= 1e-6));
         }
+    }
+
+    #[test]
+    fn ro_correction_tolerance_is_capped_at_member_closure_limit() {
+        // 未触顶时按 100 倍间隔规则随迭代内积分容差派生
+        let slack = 1e-12;
+        assert!((ro_correction_tolerance(context_with_rtol(1e-12)) - 1e-10).abs() <= 1e-10 * slack);
+        assert!((ro_correction_tolerance(context_with_rtol(1e-9)) - 1e-7).abs() <= 1e-7 * slack);
+        // 派生值到达成员闭合契约 1e-6 后封顶，调用方放宽 rtol 不再使其变松
+        assert_eq!(ro_correction_tolerance(context_with_rtol(1e-8)), 1e-6);
+        assert_eq!(ro_correction_tolerance(context_with_rtol(1e-7)), 1e-6);
     }
 
     #[test]
