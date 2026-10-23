@@ -9,6 +9,25 @@ use super::types::{Context, PeriodicOrbit};
 
 const SAMPLE_COUNT: usize = 1000;
 
+/// 修正迭代收敛判据相对迭代内积分容差（`Context.rtol`）的间隔倍数。
+/// Python `DifferentialCorrection` 的初始化注释记录了同一条噪声间隔规则：
+/// 收敛判据低于 100 倍迭代内积分 rtol 时，Newton 会因积分噪声停滞。族生成
+/// 把 `Context.rtol` 直接用作修正迭代内积分容差，RO 修正链的收敛容差因此
+/// 取它的 100 倍，生产默认组合（rtol 1e-12）为 1e-10。
+const RO_CORRECTION_TOLERANCE_FACTOR: f64 = 100.0;
+
+/// RO 修正链的停滞阈值，对齐 Python RO 族行走 `_correct_ro` 的
+/// `corrector.stagnation_limit = 1e-16`：族折返点附近的修正量可小于默认
+/// 阈值 1e-14，但残差仍能继续下降到收敛容差，过早判停会把真实共振支误报
+/// 为不可达。
+const RO_STAGNATION_LIMIT: f64 = 1e-16;
+
+/// 其余族修正链的收敛容差与停滞阈值。这些族的成员闭合契约是 1e-8，而按
+/// `Context.rtol` 派生出的容差（测试上下文 rtol 1e-9 对应 1e-7）与该契约
+/// 同量级，无法保证达标，故派生只用于闭合契约是 1e-6 的 RO 修正链。
+const OTHER_FAMILY_CORRECTION_TOLERANCE: f64 = 1e-12;
+const OTHER_FAMILY_STAGNATION_LIMIT: f64 = 1e-14;
+
 /// DRO 族标准种子（与 Python ``data/templates/seed.py`` 的 ``_DRO_SEED_*``
 /// 同源）：近侧 x 轴穿越点 x0、vy0 与周期，振幅约 90,786 km。
 pub(crate) const SEED_DRO_X0: f64 = 0.791_885_566_197_42;
@@ -78,6 +97,13 @@ fn finish_correction(
     })
 }
 
+/// RO 修正链的收敛容差：按迭代内积分容差 `Context.rtol` 的 100 倍派生，
+/// 不再硬编码；默认 rtol 1e-12 得到 1e-10，比积分噪声高一个量级。派生的
+/// 宽松程度由 `correct_ro_seed` 的最终成员闭合验收（1e-6）兜住。
+fn ro_correction_tolerance(context: Context) -> f64 {
+    RO_CORRECTION_TOLERANCE_FACTOR * context.rtol
+}
+
 #[allow(clippy::too_many_arguments)]
 fn correct(
     context: Context,
@@ -88,6 +114,7 @@ fn correct(
     full_period: bool,
     recover_halo_time: bool,
     tolerance: f64,
+    stagnation_limit: f64,
     max_iterations: usize,
 ) -> Result<PeriodicOrbit, Failure> {
     let targets = vec![0.0; constraint_indices.len()];
@@ -102,7 +129,7 @@ fn correct(
         recover_halo_time,
         max_iterations,
         tolerance,
-        1e-14,
+        stagnation_limit,
         1e10,
         context.rtol,
         context.atol,
@@ -135,7 +162,8 @@ pub(crate) fn correct_halo_fixed_z(
         &[0, 4, 6],
         false,
         true,
-        1e-12,
+        OTHER_FAMILY_CORRECTION_TOLERANCE,
+        OTHER_FAMILY_STAGNATION_LIMIT,
         150,
     )?;
     if let Some(previous) = guess {
@@ -168,7 +196,8 @@ pub(crate) fn correct_halo_fixed_x(
         &[2, 4, 6],
         false,
         true,
-        1e-12,
+        OTHER_FAMILY_CORRECTION_TOLERANCE,
+        OTHER_FAMILY_STAGNATION_LIMIT,
         150,
     )
 }
@@ -191,7 +220,8 @@ pub(crate) fn correct_axial_fixed_vz(
         &[0, 4, 6],
         false,
         false,
-        1e-12,
+        OTHER_FAMILY_CORRECTION_TOLERANCE,
+        OTHER_FAMILY_STAGNATION_LIMIT,
         150,
     )?;
     if orbit.period > 1.2 * guess.period {
@@ -231,7 +261,8 @@ pub(crate) fn correct_dro_fixed_x(
         &[4, 6],
         false,
         false,
-        1e-12,
+        OTHER_FAMILY_CORRECTION_TOLERANCE,
+        OTHER_FAMILY_STAGNATION_LIMIT,
         50,
     )?;
     if orbit.period > 1.2 * period {
@@ -267,7 +298,8 @@ pub(crate) fn correct_planar_fixed_x(
         &[1, 3, 4, 6],
         true,
         false,
-        1e-12,
+        OTHER_FAMILY_CORRECTION_TOLERANCE,
+        OTHER_FAMILY_STAGNATION_LIMIT,
         150,
     )
 }
@@ -715,7 +747,8 @@ pub(crate) fn correct_ro_fixed_x(
         &[4, 6],
         false,
         false,
-        1e-12,
+        ro_correction_tolerance(context),
+        RO_STAGNATION_LIMIT,
         50,
     )?;
     if (orbit.period - guess.period).abs() > 0.2 * guess.period {
