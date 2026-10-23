@@ -29,7 +29,7 @@
 2. Fork 并建分支，分支名建议 `fix/<简述>` 或 `feat/<简述>`。
 3. 本地验证 `make test` 与 `make check` 通过。新增或改变行为要有对应测试。
 4. 开 PR 指向 `master`。标题带意图标签（见上方标题约定），正文按模板内联的问题集与[正文写作约定](#正文写作约定)完整填写。一个 PR 只做一件事。commit message 用中文 conventional commits（如 `fix(catalog): 修正……`），标题不使用破折号（中文长横线）。
-5. CI 必须绿。lint 与 test 是必过检查，评审通过后由维护者合并。
+5. CI 必须绿：`lint`、`typecheck` 与 `rust-test-windows` 三个作业都要通过，评审通过后由维护者合并。
 6. 正文过关再等合并。评审按写作约定核对正文是否回答完整、行文是否可读，缺项的 PR 由作者在合并前补正。
 
 

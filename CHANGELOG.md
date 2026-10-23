@@ -15,6 +15,7 @@
 
 ### TEST
 - **移除机器强制的测试时间预算门禁**：ADR 0037 决策 1 的单用例 10 秒与单文件 60 秒墙钟预算及其机器实施整体移除，涉及 `tests/time_budget.py` 的会话末审计、`pyproject.toml` 的 `time_budget` 标记、`tests/conftest.py` 的钩子再导出与四处显式覆盖。阈值标定自高性能工作站，慢机上不改动用例内容也会被判超预算，本机 `make test` 因此不能充当发布前门禁。ADR 0037 追加修订记录该废止，决策 2 至 4（真调用最小覆盖、筛选级容差、计算共享）保留，重负载验证仍归 `scripts/` 手工诊断与 benchmark。`CONTEXT.md` 的时间预算术语节与 `AGENTS.md` 的相关条款同步更新，`tests/conftest.py` 的线程池单线程 pin 保留，理由改为避免 xdist 下的超订。(#815)
+- **CI 增补 Windows runner 上的 Rust 工作区测试**：`ci.yml` 新增 `rust-test-windows` 作业，在 `windows-2025` 上按本地 `make test-rust` 的 Windows 分支装配环境，串行执行 `cargo test --workspace -- --test-threads=1`，随 push 到 master 与 pull_request 触发。此前唯一的 Rust 测试作业住在只在推 tag 时触发的 release 工作流里，且固定 ubuntu-24.04，平台相关的数值差异在 PR 阶段拦不住（#816 的失败在 Windows 本机稳定复现，同一代码在 ubuntu release run 上却是 success）。装配沿用 Makefile 的口径：`CSPICE_DIR` 由 `scripts/download_cspice.py` 从 `cspice-v1` release 取得并缓存 `.cspice`，`LIBCLANG_PATH` 固定 `C:/Program Files/LLVM/bin`，`scripts/python_dll_dir.py` 给出的目录注入 `PATH` 供测试 EXE 加载 python DLL。相对 Makefile 有两处必要差异。一是用 `actions/setup-python` 装 3.13 并显式设 `PYO3_PYTHON`，只注入 DLL 目录不解决 pyo3 构建脚本的解释器探测，runner 上的 MS Store python3 存根还会抢先解析。二是装配与执行都用 pwsh，runner 上没有 GNU make，且 PATH 需要 Windows 原生的分号语义。检出里没有真实星历内核，作业另跑 `scripts/download_kernels.py` 作为对 Makefile 分支的补充，否则 spice 门控用例静默跳过，作业覆盖变窄。(#822)
 
 ## [5.9.11] - 2026-10-16
 

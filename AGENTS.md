@@ -101,7 +101,7 @@ make clean-tests
 - 定向验证示例：`uv run --no-sync python -m pytest tests/api/test_cli.py::TestWorker::test_cancel`、`uv run --no-sync python -m pytest tests/algorithm -m "not spice"`、`cargo test -p e2m2e-forces srp_jacobian -- --test-threads=1`。
 - 基线生成和回填脚本的 docstring 要求直接使用 `.venv/bin/python`，不要用会触发项目重建的 `uv run`：`.venv/bin/python scripts/generate_catalog_baseline.py`。
 - 文档工具未随 dev group 安装时，先在虚拟环境安装 `sphinx myst-parser sphinx-autoapi shibuya`，再运行 `make docs`。文档构建不需要安装项目本体、Rust 或 SPICE。
-- `make check` 是本地静态总门禁；PR CI 分为 `lint` 与 `typecheck`，不代替本地 Python 全量测试。修改 Makefile 或 CI 命令时同步检查两者。
+- `make check` 是本地静态总门禁。PR CI 分三块：`lint` 与 `typecheck` 在 ubuntu-24.04 上做静态检查，`rust-test-windows` 在 windows-2025 上按 `make test-rust` 的 Windows 分支装配环境并串行跑 `cargo test --workspace -- --test-threads=1`。三者都不代替本地 Python 全量测试。修改 Makefile 或 CI 命令时同步检查两边。
 
 ## Code Conventions & Common Patterns
 
