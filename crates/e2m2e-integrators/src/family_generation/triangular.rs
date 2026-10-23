@@ -1,6 +1,6 @@
 //! SPO、LPO 与 Horseshoe 的单次 Rust 族生成。
 
-use crate::planar_pal::{run_planar_pal, Options};
+use crate::pal_core::{run_full_period_pal, Options, PalShape};
 
 use super::common::{correct_planar_fixed_x, metric_minmax, triangular_seed, Failure};
 use super::types::{Context, Member, Outcome};
@@ -65,7 +65,7 @@ pub(crate) fn generate(
     let estimated_steps =
         ((max_amplitude_km + match_tolerance_km) / family_step_amplitude).ceil() as usize + 8;
     let walk_steps = STEP_BUDGET.min((2 * member_limit).max(estimated_steps).max(10));
-    let pal = run_planar_pal(
+    let pal = run_full_period_pal(
         context.mu,
         seed.state,
         seed.period,
@@ -79,6 +79,7 @@ pub(crate) fn generate(
             atol: context.atol,
             max_step: context.max_step,
         },
+        &PalShape::planar(1),
     );
 
     let lower_bound = min_amplitude_km;
