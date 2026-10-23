@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### FEAT
+- **伪弧长延拓抽取共享数值内核，补上多圈闭合与三维非对称两类问题形状**：Rust 侧把平面全周期 PAL 中与维数无关的机器（传播与残差求值、相位规范、SVD 切向量、阻尼最小二乘牛顿、线搜索、步长收缩、秩诊断）抽成 `pal_core` 共享内核，问题形状由分量选择、缩放与闭合圈数参数化（ADR 0060）。`planar_full_period_pal_py` 增可选 `n_revolutions`（默认 1，既有调用与数值行为不变），闭合残差在 n·T 上求值、成员周期报告闭合周期 n·T；算法层平面适配器 `generate_planar_periodic_family` 对应增 `closure_revolutions`。新增 `spatial_full_period_pal_py` 与 `SpatialPalRustResult` 承载六分量闭合的三维非对称全周期形态（ABI 升 v30）。新增 `algorithm/family/resonant_branch` 分岔起链能力：沿平凡族二分定位 n 圈共振成员（非平凡复数乘子对辐角命中 360/n 度），沿共振平面 deflection 精化取振幅最大种子后交 PAL 行走，非平凡性与临界偏差显式校验；库内标定月心 DRO 族五周期共振点为 x0=0.900664、T=1.263943 TU，起链分岔支成员闭合残差不超过 1.1e-9 且单圈不闭合，`scripts/calibrate_dro_5rev_resonance.py` 可复算。接口层零改动，butterfly 不进工具面（#820）
+
 ### FIX
 - **MGA 链精化的后验闸门对非收敛结束同样生效**：`refine_mga_chain` 此前只在 SLSQP 报成功时复核 flyby 等模原始差与转角越限，非收敛结束直接透传求解器退出码，于是把 `min_flyby_pericenter_km` 抬到不可达时，默认 `maxiter=200` 先用完迭代次数，结果报 `MAX_ITERATIONS`，而末点等模原始差约 0.61 km/s、转角越限约 0.95 rad，实际已远离可行解。现在闸门对任何结束状态都按末点复核，末点过不了闸门一律判 `(INFEASIBLE, CONSTRAINT_VIOLATION)`，消息附求解器退出码与实测残差，与同框架的 Sims-Flanagan 实例口径一致。Lambert 无解的惩罚评估由评估对象上的显式标记识别，同样归入不可行，不再可能落到 `MAX_ITERATIONS` 或 `CONVERGED`。`MAX_ITERATIONS` 只留给末点已满足 flyby 约束、仅因迭代预算耗尽未达目标容差的情形，默认 `maxiter` 与闸门阈值都不变。(#814)
 

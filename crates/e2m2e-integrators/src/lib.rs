@@ -25,10 +25,12 @@ pub mod lowthrust;
 pub mod multiple_shooting;
 pub mod normal_form;
 pub mod nsga2;
+mod pal_core;
 pub mod planar_pal;
 pub mod qf_cm;
 #[cfg(feature = "spice")]
 pub mod segmented_shooting;
+pub mod spatial_pal;
 
 use e2m2e_propagation::multistep_methods::MultistepMethod;
 use e2m2e_propagation::rk_methods::RkMethod;
@@ -120,6 +122,10 @@ const fn parse_abi_version(s: &str) -> u32 {
 /// - **v28**：新增 ``da_ads_split`` 与 ``AdsLeaf`` / ``AdsResult`` pyclass（dace-rs
 ///   ADS 自动域分裂驱动器薄封装，dace-rs 升 0.2.0，issue #787）。
 /// - **v29**：新增 ``propagate_cr3bp_da_py``（CR3BP 多项式流 DA 传播内核，issue #786）。
+/// - **v30**：PAL 数值机器抽取为共享内核（``pal_core``），
+///   ``planar_full_period_pal_py`` 增可选 ``n_revolutions``（闭合圈数，
+///   默认 1 行为不变），新增 ``spatial_full_period_pal_py`` 与
+///   ``SpatialPalRustResult``（三维非对称全周期形态，issue #820）。
 ///
 /// 1→3 跳号实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -444,6 +450,11 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(frame_convert::batch_et_to_utc_py, m)?)?;
     m.add_function(wrap_pyfunction!(planar_pal::planar_full_period_pal_py, m)?)?;
     m.add_class::<planar_pal::PlanarPalRustResult>()?;
+    m.add_function(wrap_pyfunction!(
+        spatial_pal::spatial_full_period_pal_py,
+        m
+    )?)?;
+    m.add_class::<spatial_pal::SpatialPalRustResult>()?;
     m.add_function(wrap_pyfunction!(family::collinear_center_modes_py, m)?)?;
     m.add_function(wrap_pyfunction!(
         family::lissajous_bounded_trajectory_py,

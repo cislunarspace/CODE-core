@@ -220,6 +220,7 @@ _RUST_SYMBOLS = (
     "solve_ivp_events_kernel_py",
     "solve_hjb_py",
     "solve_planar_lowthrust_hjb_py",
+    "spatial_full_period_pal_py",
     "spice_furnsh",
     "spice_pxform",
     "spice_spkezr",
@@ -260,6 +261,7 @@ _differential_correction_cr3bp_py_raw: Any = globals()["differential_correction_
 _multiple_shooting_correct_py_raw: Any = globals()["multiple_shooting_correct_py"]
 _planar_full_period_pal_py_raw: Any = globals()["planar_full_period_pal_py"]
 _segmented_shooting_correct_py_raw: Any = globals()["segmented_shooting_correct_py"]
+_spatial_full_period_pal_py_raw: Any = globals()["spatial_full_period_pal_py"]
 
 
 def differential_correction_cr3bp_py(*args: Any, **kwargs: Any) -> dict[str, Any]:
@@ -290,6 +292,16 @@ def planar_full_period_pal_py(*args: Any, **kwargs: Any) -> _ShootingResult:
             "e2m2e._integrators 缺少所需符号：planar_full_period_pal_py。请先重建：make dev"
         )
     return _ShootingResult(_planar_full_period_pal_py_raw(*args, **kwargs))
+
+
+def spatial_full_period_pal_py(*args: Any, **kwargs: Any) -> _ShootingResult:
+    """调用 Rust 三维非对称全周期 PAL，并立即校验最终状态三元组。"""
+    require_rust_extension("spatial_full_period_pal_py")
+    if _spatial_full_period_pal_py_raw is None:
+        raise RustExtensionUnavailableError(
+            "e2m2e._integrators 缺少所需符号：spatial_full_period_pal_py。请先重建：make dev"
+        )
+    return _ShootingResult(_spatial_full_period_pal_py_raw(*args, **kwargs))
 
 
 def segmented_shooting_correct_py(*args: Any, **kwargs: Any) -> _ShootingResult:
@@ -427,6 +439,7 @@ __all__ = [
     "solve_ivp_events_kernel_py",
     "solve_hjb_py",
     "solve_planar_lowthrust_hjb_py",
+    "spatial_full_period_pal_py",
     "spice_furnsh",
     "spice_pxform",
     "spice_spkezr",
