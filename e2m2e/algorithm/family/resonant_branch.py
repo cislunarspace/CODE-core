@@ -324,7 +324,11 @@ def generate_resonant_branch_family(
     }
     best: tuple[float, np.ndarray] | None = None
     for vector in parts.values():
-        unit = vector / float(np.linalg.norm(vector))
+        norm = float(np.linalg.norm(vector))
+        if norm < 1e-12:
+            # 退化方向（如实特征向量的虚部为零）：无扰动可用，跳过。
+            continue
+        unit = vector / norm
         for epsilon in _DEFLECTION_LADDER:
             for sign in (1.0, -1.0):
                 state = np.asarray(resonance.state, dtype=float) + sign * epsilon * unit

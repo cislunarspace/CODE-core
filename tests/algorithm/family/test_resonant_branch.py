@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
+from e2m2e.algorithm.family.orbits.halo import design_halo
 from e2m2e.algorithm.family.orbits.walk import earth_moon_system
 from e2m2e.algorithm.family.resonant_branch import (
     CRITICAL_MULTIPLIER_TOLERANCE,
@@ -111,3 +112,27 @@ def test_per_revolution_closure_distinguishes_branch_from_trivial(dynamics, reso
     )
     branch_seed = result.family.orbits[0]
     assert per_revolution_closure(dynamics, branch_seed, 5) > 1e-6
+
+
+def test_spatial_entry_reports_miss_when_deflection_collapses(dynamics):
+    """三维起链入口走真实 spatial 内核：非分岔点处 deflection 精化后收
+    敛回平凡族（对称破缺分量为零）时显式报失败，不静默返回平凡成员。"""
+    halo = design_halo(1, 8000.0, dynamics=dynamics)
+    point = ResonancePoint(
+        state=np.asarray(halo.states[0], dtype=float),
+        period=float(halo.period),
+        x0=float(halo.states[0][0]),
+        phase_deg=0.0,
+        multiplier_gap=1e-3,
+        eigenvector=np.array([0.0, 1.0, 0.0, 0.0, 0.0, 0.0], dtype=complex),
+        revolutions=1,
+    )
+    with pytest.raises(Exception, match="分岔支未被命中"):
+        generate_resonant_branch_family(
+            point,
+            n_orbits=1,
+            step_size=0.005,
+            initial_direction="increase-x0",
+            dynamics=dynamics,
+            spatial=True,
+        )
