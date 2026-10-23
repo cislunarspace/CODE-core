@@ -76,3 +76,88 @@ jobs:
       # （此前每次白编约 50s），连带无需下载 CSPICE 编译包。
       - run: uv sync --group dev --no-install-project
       - run: uv run --no-sync mypy e2m2e/ --ignore-missing-imports
+
+
+  # Windows 上的 Rust 工作区测试：全仓此前只有 release.yml 的 test 作业跑 cargo
+  # test，它在推 tag 时才触发且固定 ubuntu-24.04，平台相关的数值差异在 PR 阶段
+  # 拦不住（#816 在 Windows 本机稳定复现，同一代码在 ubuntu release run 上却是
+  # success）。装配与本地 make test-rust 的 Windows 分支同口径，差异点逐条写在
+  # 对应步骤的注释里。
+  rust-test-windows:
+    # 作业名单独写死以保持稳定：这个 check 后续要加进 branch protection 的
+    # required check，名字一改，既有保护规则就指向不存在的检查。
+    name: rust-test-windows
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      # bindgen 需要 libclang。取 LLVM 官方安装器在 runner 上的默认路径，与
+      # Makefile 的 Windows 默认值一致，不依赖 runner 的 PATH 顺序。
+      LIBCLANG_PATH: C:/Program Files/LLVM/bin
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.98.0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      # 编译期解释器：pyo3 的构建脚本要探到一个真实 Python 才肯编，只把含
+      # python*.dll 的目录塞进 PATH 解决不了这一步（#495 的 PATH 注入管的是测试
+      # EXE 运行时加载，与构建期探测是两件事）。runner 上 Microsoft Store 的
+      # python3 存根会抢先解析（release.yml 的 wheel 构建为它写过前置 PATH 的
+      # 绕行），这里用 PYO3_PYTHON 显式钉住 setup-python 装到的解释器。
+      - name: 钉住 pyo3 构建期解释器
+        shell: pwsh
+        run: |
+          $realPy = (python -c "import sys; print(sys.executable)")
+          if ($LASTEXITCODE -ne 0 -or $realPy -like "*WindowsApps*") {
+            Write-Error "未解析到 setup-python 的真实解释器：$realPy"
+            exit 1
+          }
+          Write-Host "PYO3_PYTHON=$realPy"
+          "PYO3_PYTHON=$realPy" | Out-File -Append $env:GITHUB_ENV
+      - name: 恢复 SPICE 编译包缓存
+        id: cache-cspice
+        uses: actions/cache@v6
+        with:
+          path: .cspice
+          # key 含 runner.os：Windows 与 Linux 的编译包不同，缓存不能串味。
+          key: cspice-${{ runner.os }}-v1
+      - name: 下载 SPICE 编译包（cspice-v1 release，缓存命中则跳过）
+        # 直接取 setup-python 的解释器，不经 uv：这两个下载脚本只用标准库，
+        # 而本作业没有其他 uv 用途，uv run 在未同步的检出上会自建项目虚拟环境，
+        # 多一层与测试无关的失败面。release.yml 的 Windows wheel 构建同样直接
+        # 用 python 调这个脚本。资产规则以 scripts/download_cspice.py 为准，
+        # 不启用 cspice-sys 的官网下载路径。
+        # shell 显式取 bash：windows runner 默认是 pwsh，脚本输出的 NAME=VALUE
+        # 要按 POSIX 语义重定向进 $GITHUB_ENV 变量文件。
+        shell: bash
+        run: python scripts/download_cspice.py >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 检出里的 kernels/ 只有体积小的内核文件与 LFS 指针，星历 .bsp 要从
+      # kernels-v1 release 取。这是相对 Makefile 分支的必要补充：本地 make
+      # test-rust 默认已由 make setup 拉过内核，CI 不拉则 spice 门控用例静默
+      # 跳过，作业覆盖面比本地窄。shell 与上一个下载步骤一致取 bash。
+      - name: 下载 SPICE 内核（kernels-v1 release）
+        shell: bash
+        run: python scripts/download_kernels.py
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          env-vars: CSPICE_DIR
+      # 与 Makefile test-rust 的 Windows 分支同口径：PATH 前置含 python*.dll 的
+      # 目录，供不带 extension-module 的测试 EXE 运行时加载（#495）。
+      # 用 pwsh 而非 Makefile 的 POSIX sh 装配与执行：runner 上没有 GNU make
+      # 可用，且 PATH 必须是 Windows 原生语义（分号分隔），Git Bash 会把分号
+      # 当命令分隔符处理，写进 PATH 的值到不了 cargo。
+      # --test-threads=1：CSPICE 有进程级全局状态，spice-gated 用例串行避免竞争。
+      - name: Rust 工作区测试（串行）
+        shell: pwsh
+        run: |
+          $dllDir = (python scripts/python_dll_dir.py)
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host "Python DLL 目录：$dllDir"
+          $env:Path = "$dllDir;$env:Path"
+          cargo test --workspace -- --test-threads=1
