@@ -9,6 +9,11 @@ use super::types::{Context, PeriodicOrbit};
 
 const SAMPLE_COUNT: usize = 1000;
 
+/// RO 族成员的闭合误差契约 `1e-6`：`correct_ro_seed` 用它作为精确种子
+/// 成员的最终验收门，`ro_correction_tolerance` 用它作为派生收敛容差的
+/// 上限，使修正判据不至于松到放行闭合误差越过契约的成员。
+const RO_MEMBER_CLOSURE_LIMIT: f64 = 1e-6;
+
 /// 修正迭代收敛判据相对迭代内积分容差（`Context.rtol`）的间隔倍数。
 /// Python `DifferentialCorrection` 的初始化注释记录了同一条噪声间隔规则：
 /// 收敛判据低于 100 倍迭代内积分 rtol 时，Newton 会因积分噪声停滞。族生成
@@ -98,10 +103,13 @@ fn finish_correction(
 }
 
 /// RO 修正链的收敛容差：按迭代内积分容差 `Context.rtol` 的 100 倍派生，
-/// 不再硬编码；默认 rtol 1e-12 得到 1e-10，比积分噪声高一个量级。派生的
-/// 宽松程度由 `correct_ro_seed` 的最终成员闭合验收（1e-6）兜住。
-fn ro_correction_tolerance(context: Context) -> f64 {
-    RO_CORRECTION_TOLERANCE_FACTOR * context.rtol
+/// 不再硬编码；默认 rtol 1e-12 得到 1e-10，比积分噪声高一个量级。派生值
+/// 以 RO 成员闭合契约 `RO_MEMBER_CLOSURE_LIMIT` 封顶：`Context.rtol` 是
+/// 公开可改属性，调用方放宽到 1e-8 及以上时 100 倍派生值会触及或越过
+/// 1e-6，封顶后宁可在修正阶段停滞或失败，也不放行闭合误差越过契约的
+/// 成员。
+pub(super) fn ro_correction_tolerance(context: Context) -> f64 {
+    (RO_CORRECTION_TOLERANCE_FACTOR * context.rtol).min(RO_MEMBER_CLOSURE_LIMIT)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -713,7 +721,7 @@ pub(crate) fn correct_ro_seed(
         ro_kepler_a(context.mu, resonance_p, resonance_q),
     )?;
     // 最终成员验收闭合契约（中间试探不设此门，见 check_ro_member）。
-    if member.closure_error >= 1e-6 {
+    if member.closure_error >= RO_MEMBER_CLOSURE_LIMIT {
         return Err(Failure {
             status: "failed",
             cause: "closure_error",
