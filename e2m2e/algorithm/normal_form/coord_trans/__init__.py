@@ -35,7 +35,13 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from .cm_param import cm_to_param, param_to_cm
+from .cm_param import (
+    action_angle_to_canonical,
+    canonical_to_action_angle,
+    cm_to_param,
+    param_to_cm,
+    shortest_angle_error,
+)
 from .ds_qf import ds_to_qf, qf_to_ds
 from .em_ds import _interp_W_at, ds_to_em, em_to_ds
 from .qf_cm import cm_to_qf, qf_to_cm
@@ -62,6 +68,9 @@ __all__ = [
     "cm_to_qf",
     "cm_to_param",
     "param_to_cm",
+    "canonical_to_action_angle",
+    "action_angle_to_canonical",
+    "shortest_angle_error",
 ]
 
 
