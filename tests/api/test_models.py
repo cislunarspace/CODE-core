@@ -642,6 +642,28 @@ class TestFamilyGenerationRequest:
         assert options["continuation_direction"] == ("decrease-x0", "increase-x0")
         assert options["sampling_mode"] == ("full-period-pal",)
 
+    def test_period_doubling_defaults_and_ranges(self):
+        """#821：两族仅 L2，族参数窗口默认取包络全域，南北默认北族。"""
+        figure_eight = FamilyGenerationRequest(orbit_type="figure_eight")
+        assert figure_eight.libration_point == 2
+        assert figure_eight.north_south == 1
+        assert (figure_eight.min_x0_km, figure_eight.max_x0_km) == (388900.0, 411600.0)
+        assert figure_eight.continuation_direction == "increase-x0"
+        assert figure_eight.sampling_mode == "bifurcation-pal"
+        ring = FamilyGenerationRequest(orbit_type="RING", north_south=2)
+        assert ring.libration_point == 2
+        assert (ring.min_x0_km, ring.max_x0_km) == (426400.0, 453500.0)
+
+        fe = FamilyGenerationRequest.valid_ranges("FIGURE_EIGHT")
+        assert fe["libration_point"].format_interval() == "[2, 2]"
+        assert fe["north_south"].format_interval() == "[1, 2]"
+        assert fe["min_x0_km"].format_interval() == "[388900.0, 411600.0]"
+        ring_range = FamilyGenerationRequest.valid_ranges("RING")
+        assert ring_range["max_x0_km"].format_interval() == "[426400.0, 453500.0]"
+        options = FamilyGenerationRequest.valid_options("RING")
+        assert options["continuation_direction"] == ("increase-x0", "decrease-x0")
+        assert options["sampling_mode"] == ("bifurcation-pal",)
+
     def test_rejects_invalid_family_specific_fields(self):
         with pytest.raises(ValidationError, match="perilune_height_max_km"):
             FamilyGenerationRequest(orbit_type="NRHO", perilune_height_max_km=500.0)
@@ -701,6 +723,16 @@ class TestFamilyGenerationRequest:
             )
         with pytest.raises(ValidationError, match="sampling_mode"):
             FamilyGenerationRequest(orbit_type="RO", sampling_mode="grid")
+        with pytest.raises(ValidationError, match="libration_point"):
+            FamilyGenerationRequest(orbit_type="FIGURE_EIGHT", libration_point=1)
+        with pytest.raises(ValidationError, match="不适用字段"):
+            FamilyGenerationRequest(orbit_type="RING", max_amplitude_km=1000.0)
+        with pytest.raises(ValidationError, match="max_x0_km"):
+            FamilyGenerationRequest(orbit_type="figure_eight", max_x0_km=500000.0)
+        with pytest.raises(ValidationError, match="min_x0_km 必须小于"):
+            FamilyGenerationRequest(orbit_type="RING", min_x0_km=450000.0, max_x0_km=445000.0)
+        with pytest.raises(ValidationError, match="sampling_mode"):
+            FamilyGenerationRequest(orbit_type="RING", sampling_mode="full-period-pal")
 
 
 class TestResponses:

@@ -112,6 +112,11 @@ _DESIGN_TAXONOMY_EXPECTATIONS: dict[str, set[str]] = {
     "dpo": {"distant_prograde", "low_prograde_eastern", "low_prograde_western"},
     "spo": {"shortperiod_l4", "shortperiod_l5"},
     "lpo": {"longperiod_l4", "longperiod_l5"},
+    # 周期倍化两族（#821）：族名闭值与几何标签并存（裁定不改穿越判据）。
+    # 成员每周期只有 2 次垂直 y=0 穿越，分类器判 halo 南北；0 形族段内
+    # 混有 axial_l2 实测（4 次穿越中 2 次斜穿越的成员形态）。
+    "figure_eight": {"halo_l2_northern", "halo_l2_southern"},
+    "ring": {"halo_l2_northern", "halo_l2_southern", "axial_l2"},
     "lissajous": set(),
     "horseshoe": set(),
     "elfo": set(),

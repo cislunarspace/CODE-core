@@ -18,7 +18,7 @@ Python 模块。
   （教程与示例用到时才需要）。
 - 数据层：``e2m2e.data`` 是常数、内核、坐标系、轨道库存储。
 
-对 MCP / CLI 而言，工具面的权威清单是
+对 MCP、CLI 与 sidecar 而言，工具面的权威清单是
 ``tool_inventory(Facade())``，本站页面与它同源派生，以它为准。
 
 .. toctree::

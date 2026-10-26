@@ -50,11 +50,12 @@
 输出解读
 --------
 
-- ``orbit_family_generation`` 支持
-  ``HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO/RO`` 九族，字段按族适用
+- ``orbit_family_generation`` 支持 HALO、NRHO、AXIAL、LISSAJOUS、SPO、LPO、
+  HORSESHOE、DRO、RO 以及周期倍化的 FIGURE_EIGHT、RING，字段按族适用
   （如 NRHO 用 ``north_south``／``perilune_height_max_km``，LISSAJOUS 用
-  ``amplitude_in_km``／``amplitude_out_km``）。缺省值由 model_validator 按
-  族填充，DRO（月心族）与 RO（地心族）不绑定平动点，不得携带
+  ``amplitude_in_km``／``amplitude_out_km``，FIGURE_EIGHT 与 RING 用
+  ``min_x0_km``／``max_x0_km`` 且仅限 L2）。缺省值由 model_validator 按族
+  填充，DRO（月心族）与 RO（地心族）不绑定平动点，不得携带
   ``libration_point``。各族参数区间与离散选项经 ``valid_ranges`` 查询
   （包版本即值域版本）。
 - 库开时族产物逐成员入库（一轨一记录），返回批次标识 ``family_id``。

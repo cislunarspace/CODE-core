@@ -551,12 +551,13 @@ class Catalog:
         """轨道族生成（二档）。
 
         Pydantic 模型校验 → 按 orbit_type 分派到算法层族生成入口 →
-        结构化错误。九族均已实现，成功返回统一容器
+        结构化错误。十一族均已实现，成功返回统一容器
         ``FamilyGenerationResponse``（兼容 ``OrbitFamily`` 读取接口）；
         Lissajous 是拟周期参数采样，族上显式标注
         ``periodicity=quasi-periodic``。软失败使用同一响应保留部分族。
-        ``progress_callback(fraction, message)`` 上报阶段级进度（族生成
-        是单次 Rust 调用，仅起止两端；逐成员进度待 Rust 侧通道）。
+        ``progress_callback(fraction, message)`` 上报阶段级进度。多数族
+        是单次 Rust 调用，周期倍化两族由 Python 分岔定位、起链加多次
+        PAL 调用组成，两类都只报起止两端；逐成员进度待 Rust 侧通道。
         """
         try:
             request = FamilyGenerationRequest(**params)
@@ -642,6 +643,29 @@ class Catalog:
                     request.min_amplitude_km,
                     request.max_amplitude_km,
                     n_orbits=request.n_orbits,
+                )
+                response = _family_generation_payload(result)
+            elif sel in ("FIGURE_EIGHT", "RING"):
+                from e2m2e.algorithm.family import (
+                    design_figure_eight_family,
+                    design_ring_family,
+                )
+
+                assert request.north_south is not None
+                assert request.min_x0_km is not None
+                assert request.max_x0_km is not None
+                assert request.continuation_direction is not None
+                period_doubled_entry = {
+                    "FIGURE_EIGHT": design_figure_eight_family,
+                    "RING": design_ring_family,
+                }[sel]
+                result = period_doubled_entry(
+                    request.libration_point,
+                    request.north_south,
+                    request.min_x0_km,
+                    request.max_x0_km,
+                    n_orbits=request.n_orbits,
+                    continuation_direction=request.continuation_direction,
                 )
                 response = _family_generation_payload(result)
             else:

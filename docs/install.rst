@@ -10,15 +10,11 @@
 
    uv pip install e2m2e
 
-MCP 接口与 CLI 随主包装好。如需 MCP 协议层：
+CLI 随主包安装。MCP 服务端依赖在可选依赖组 ``mcp`` 里：
 
 .. code-block:: bash
 
    uv pip install "e2m2e[mcp]"
-
-SPICE 星历内核不随包分发：``make dev``（源码开发）会自动从仓库 GitHub Release
-的 ``kernels-v1`` 下载到仓库根 ``kernels/``。也可以手动下载解压到该目录，或用
-环境变量 ``SPICE_KERNEL_DIR`` 指向任意位置。
 
 从源码开发
 ----------
@@ -58,6 +54,16 @@ Windows 默认没有 ``make``，可用
 
 - ``make PYTHON=python`` 覆盖解释器（Windows 官方 Python 只装 ``python.exe``）。
 - mypy / pytest 一律经 ``python -m`` 调用，避免 uv 垫片路径问题。
+
+SPICE 内核
+----------
+
+SPICE 星历内核不随包分发。默认内核在仓库 GitHub Release 的 `kernels-v1
+<https://github.com/cislunarspace/CODE-core/releases/tag/kernels-v1>`_ 中。
+从源码开发时，``make dev`` 会自动下载到仓库根 ``kernels/``。从 PyPI 安装时，
+从该 Release 下载所需内核文件到任意目录，再用 ``SPICE_KERNEL_DIR`` 指向该
+目录。纯 CR3BP 的族生成与分区分析不需要内核，涉及星历的设计、传播与坐标
+转换需要。
 
 运行配置环境变量
 ----------------
