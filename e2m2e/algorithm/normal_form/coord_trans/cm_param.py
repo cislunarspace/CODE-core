@@ -86,4 +86,73 @@ def param_to_cm(X_param: npt.ArrayLike) -> npt.NDArray[np.floating]:
     return np.array([q1, q2, q3, p1, p2, p3], dtype=float)
 
 
-__all__ = ["cm_to_param", "param_to_cm"]
+def canonical_to_action_angle(X_cm: npt.ArrayLike) -> npt.NDArray[np.floating]:
+    """将完整正则坐标转为 qiao 约定的六个作用量角度根数。
+
+    输入顺序为 ``(q1, q2, q3, p1, p2, p3)``，输出顺序为
+    ``(I1, theta1, I2, theta2, I3, theta3)``。双曲定义为
+    ``I1=q1*p1``、``theta1=0.5*ln(|q1|/|p1|)``，中心角定义为
+    ``atan2(q, p)``，与 qiao ``param2_action_angle`` 一致。
+
+    双曲坐标任一分量为零时 ``theta1`` 没有有限实值，此处显式报错。
+    中心作用量为零的角度未定义由 ``numpy.arctan2`` 给主值零，使用者
+    在末端约束中应改用非奇异正则坐标，不应将该主值解释为物理相位。
+    """
+    X = np.asarray(X_cm, dtype=float).ravel()
+    if X.shape != (6,):
+        raise ValueError(f"X_cm 必须是 (6,)，得到 {X.shape}")
+    q1, q2, q3, p1, p2, p3 = X
+    if p1 <= 0.0:
+        raise ValueError("该分支逆变换要求 p1>0；p1<0 的状态缺少分支符号，不能双射还原")
+    if q1 == 0.0 or p1 == 0.0:
+        raise ValueError("双曲坐标 q1 或 p1 为零时 theta1 没有有限实值")
+    return np.array(
+        [
+            q1 * p1,
+            0.5 * np.log(abs(q1) / abs(p1)),
+            0.5 * (q2 * q2 + p2 * p2),
+            np.arctan2(q2, p2) % (2.0 * np.pi),
+            0.5 * (q3 * q3 + p3 * p3),
+            np.arctan2(q3, p3) % (2.0 * np.pi),
+        ]
+    )
+
+
+def action_angle_to_canonical(X_elements: npt.ArrayLike) -> npt.NDArray[np.floating]:
+    """将作用量角度根数还原到 ``p1>0`` 的正则坐标分支。
+
+    双曲作用量角度丢失 ``(q1,p1)`` 的共同符号。此逆变换固定选取
+    ``p1>0`` 的分支，不声称在其他符号分支上双射。中心作用量必须为正，
+    零作用量处极角不唯一，不能还原为唯一正则状态。
+    """
+    X = np.asarray(X_elements, dtype=float).ravel()
+    if X.shape != (6,):
+        raise ValueError(f"X_elements 必须是 (6,)，得到 {X.shape}")
+    I1, theta1, I2, theta2, I3, theta3 = X
+    if I1 == 0.0:
+        raise ValueError("I1 为零时双曲作用量角度表示不唯一，不能唯一还原")
+    if I2 <= 0.0 or I3 <= 0.0:
+        raise ValueError("中心作用量 I2 与 I3 必须为正")
+    # 由 theta1=ln(sqrt(|q1|)/sqrt(|p1|)) 和 I1=q1*p1 反解。
+    saddle_sign = 1.0 if I1 > 0.0 else -1.0
+    q1 = saddle_sign * np.sqrt(abs(I1)) * np.exp(theta1)
+    p1 = np.sqrt(abs(I1)) * np.exp(-theta1)
+    q2 = np.sqrt(2.0 * I2) * np.sin(theta2)
+    p2 = np.sqrt(2.0 * I2) * np.cos(theta2)
+    q3 = np.sqrt(2.0 * I3) * np.sin(theta3)
+    p3 = np.sqrt(2.0 * I3) * np.cos(theta3)
+    return np.array([q1, q2, q3, p1, p2, p3])
+
+
+def shortest_angle_error(actual: float, target: float) -> float:
+    """返回 ``actual-target`` 在 ``[-pi, pi)`` 内的最短角差。"""
+    return (actual - target + np.pi) % (2.0 * np.pi) - np.pi
+
+
+__all__ = [
+    "action_angle_to_canonical",
+    "canonical_to_action_angle",
+    "cm_to_param",
+    "param_to_cm",
+    "shortest_angle_error",
+]

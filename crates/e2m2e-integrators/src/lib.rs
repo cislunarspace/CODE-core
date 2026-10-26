@@ -19,6 +19,7 @@ pub mod force_parse;
 pub mod frame_convert;
 
 pub mod hjb;
+pub mod indirect;
 #[cfg(feature = "spice")]
 pub mod lowthrust;
 #[cfg(feature = "spice")]
@@ -126,6 +127,7 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   ``planar_full_period_pal_py`` 增可选 ``n_revolutions``（闭合圈数，
 ///   默认 1 行为不变），新增 ``spatial_full_period_pal_py`` 与
 ///   ``SpatialPalRustResult``（三维非对称全周期形态，issue #820）。
+/// - **v31**：新增间接低推力状态协态传播、CR3BP 特化与末端雅可比输出。
 ///
 /// 1→3 跳号实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -179,6 +181,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
         m
     )?)?;
     m.add_function(wrap_pyfunction!(normal_form::poly_poisson_py, m)?)?;
+    m.add_function(wrap_pyfunction!(indirect::propagate_indirect_py, m)?)?;
+    m.add_function(wrap_pyfunction!(indirect::propagate_cr3bp_indirect_py, m)?)?;
     m.add_function(wrap_pyfunction!(normal_form::poly_simplify_py, m)?)?;
     m.add_function(wrap_pyfunction!(normal_form::polylist_simplify_py, m)?)?;
     m.add_function(wrap_pyfunction!(normal_form::keys_by_order_py, m)?)?;
