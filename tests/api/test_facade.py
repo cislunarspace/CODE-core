@@ -17,6 +17,7 @@ from e2m2e.api.models import (
     OrbitError,
     TransferDesignResponse,
 )
+from e2m2e.data.templates.seed import CHAR_LENGTH_KM
 from e2m2e.data.types.orbit import OrbitFamily
 from e2m2e.status import ConvergenceState, FailureCause
 
@@ -314,8 +315,13 @@ class TestFacadeCallChains:
         )
         assert response.family_type == "figure_eight"
         assert response.status is ConvergenceState.CONVERGED
+        assert response.requested_members == 2
         assert 1 <= response.generated_members <= response.requested_members
         assert all(orbit.closure_error < 1e-9 for orbit in response.orbits)
+        assert all(
+            388900.0 <= float(orbit.states[0, 0]) * CHAR_LENGTH_KM <= 393000.0
+            for orbit in response.orbits
+        )
         assert set(response.taxonomy_labels) <= {"halo_l2_northern", "halo_l2_southern"}
 
     @pytest.mark.parametrize(

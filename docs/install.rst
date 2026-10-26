@@ -38,15 +38,6 @@ SPICE 内核（幂等）、用 maturin 以 debug 模式构建并安装 Rust 扩�
 
 性能基准或长期预报场景用 ``make dev-release`` 以 ``--release`` 构建扩展。
 
-SPICE 内核
-----------
-
-SPICE 星历内核不随包分发。默认内核在仓库 GitHub Release 的 `kernels-v1
-<https://github.com/cislunarspace/CODE-core/releases>`_ 资产中。从源码开发时，
-``make dev`` 会自动下载到仓库根 ``kernels/``。从 PyPI 安装时，手动下载同一
-资产并解压到任意目录，再用 ``SPICE_KERNEL_DIR`` 指向该目录。纯 CR3BP 的族
-生成与分区分析不需要内核，涉及星历的设计、传播与坐标转换需要。
-
 Windows
 -------
 
@@ -63,6 +54,16 @@ Windows 默认没有 ``make``，可用
 
 - ``make PYTHON=python`` 覆盖解释器（Windows 官方 Python 只装 ``python.exe``）。
 - mypy / pytest 一律经 ``python -m`` 调用，避免 uv 垫片路径问题。
+
+SPICE 内核
+----------
+
+SPICE 星历内核不随包分发。默认内核在仓库 GitHub Release 的 `kernels-v1
+<https://github.com/cislunarspace/CODE-core/releases/tag/kernels-v1>`_ 中。
+从源码开发时，``make dev`` 会自动下载到仓库根 ``kernels/``。从 PyPI 安装时，
+从该 Release 下载所需内核文件到任意目录，再用 ``SPICE_KERNEL_DIR`` 指向该
+目录。纯 CR3BP 的族生成与分区分析不需要内核，涉及星历的设计、传播与坐标
+转换需要。
 
 运行配置环境变量
 ----------------

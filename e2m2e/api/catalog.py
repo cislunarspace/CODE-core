@@ -555,8 +555,9 @@ class Catalog:
         ``FamilyGenerationResponse``（兼容 ``OrbitFamily`` 读取接口）；
         Lissajous 是拟周期参数采样，族上显式标注
         ``periodicity=quasi-periodic``。软失败使用同一响应保留部分族。
-        ``progress_callback(fraction, message)`` 上报阶段级进度（族生成
-        是单次 Rust 调用，仅起止两端；逐成员进度待 Rust 侧通道）。
+        ``progress_callback(fraction, message)`` 上报阶段级进度。多数族
+        是单次 Rust 调用，周期倍化两族由 Python 分岔定位、起链加多次
+        PAL 调用组成，两类都只报起止两端；逐成员进度待 Rust 侧通道。
         """
         try:
             request = FamilyGenerationRequest(**params)

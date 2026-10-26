@@ -12,7 +12,7 @@
 
 e2m2e 是地月空间算法工具集，覆盖 CR3BP 任务轨道与轨道族、星历传播、转移设计、轨道保持、时空坐标转换、轨道库和地月空间分区分析。数值密集路径由 Rust 与 PyO3 扩展 `e2m2e._integrators` 承担，Python 侧负责问题构造、算法编排和接口边界。
 
-调用方可以在进程内用 `from e2m2e.api import Facade` 直接调用，也可以用 `e2m2e <工具名>` 走 CLI，或经 `e2m2e mcp-serve` 在 MCP 客户端里使用同一套工具。GUI 通过 `e2m2e serve-stdio` 的 sidecar 协议接入。四条路径共用同一份工具清单。工具名与参数模型以 `tool_inventory(Facade())` 为准，MCP schema 和 CLI 参数都从请求模型生成。各路径的配置见[调用方式](#调用方式)。
+调用方可以在进程内用 `from e2m2e.api import Facade` 直接调用，也可以用 `e2m2e <工具名>` 走 CLI，或经 `e2m2e mcp-serve` 在 MCP 客户端里使用同一套工具。GUI 通过 `e2m2e serve-stdio` 的 sidecar 协议接入。四条调用链共用同一份工具清单。工具名与参数模型以 `tool_inventory(Facade())` 为准，MCP schema 和 CLI 参数都从请求模型生成。各调用链的配置见[调用方式](#调用方式)。
 
 ## 安装
 
@@ -43,7 +43,7 @@ make dev
   ```
 </details>
 
-SPICE 星历内核不随包分发，默认内核在 [GitHub Release](https://github.com/cislunarspace/CODE-core/releases) 的 `kernels-v1` 资产中。`make dev` 会自动下载到 `kernels/`。从 PyPI 安装时，手动下载 `kernels-v1` 资产并解压到任意目录，再用 `SPICE_KERNEL_DIR` 指向该目录。纯 CR3BP 的族生成与分区分析不需要内核，涉及星历的设计、传播与坐标转换需要。
+SPICE 星历内核不随包分发，默认内核在 [GitHub Release](https://github.com/cislunarspace/CODE-core/releases/tag/kernels-v1) 的 `kernels-v1` 中。`make dev` 会自动下载到 `kernels/`。从 PyPI 安装时，从该 Release 下载所需内核文件到任意目录，再用 `SPICE_KERNEL_DIR` 指向该目录。纯 CR3BP 的族生成与分区分析不需要内核，涉及星历的设计、传播与坐标转换需要。
 
 ## 快速开始
 
@@ -66,7 +66,7 @@ print(result.status, result.orbit_type)
 print(result.initial_state)
 ```
 
-`design_orbit` 返回 `DesignOrbitResponse`。`status` 是收敛状态，`initial_state` 是修正后的无量纲会合系状态，`ephemeris` 是标称星历数据，含 GCRS 位置、速度与会合系字段。需要更长弧段时增大 `duration`。这个例子需要 SPICE 内核，获取方式见安装一节。
+`design_orbit` 返回 `DesignOrbitResponse`。`status` 是收敛状态，`initial_state` 是历元 GCRS 惯性系状态，单位 km、km/s，取星历修正后的首节点。`states` 与 `times` 才是无量纲会合系参考轨道。`ephemeris` 是标称星历数据，含 GCRS 位置、速度与会合系字段。需要更长弧段时增大 `duration`。这个例子需要 SPICE 内核，获取方式见安装一节。
 
 ## 能力范围
 
@@ -74,7 +74,7 @@ e2m2e 对外提供一套工具，按职责分给三个类：任务级入口 `Fac
 
 ### 任务级工具（Facade）
 
-- `design_orbit`：任务轨道设计。`orbit_type` 共 17 种：DRO、DPO、NRHO、HALO、LYAPUNOV、LISSAJOUS、AXIAL、RO、ELFO 冻结轨道，以及 L4、L5 三角平动点的 SPO、LPO、HORSESHOE 细分。含微分修正、多重打靶与延拓，全链路从 CR3BP 初猜经星历修正到高精度预报。
+- `design_orbit`：任务轨道设计。`orbit_type` 覆盖 DRO、DPO、NRHO、HALO、LYAPUNOV、LISSAJOUS、AXIAL、RO、ELFO 冻结轨道，以及 L4、L5 三角平动点的 SPO、LPO、HORSESHOE 细分。含微分修正、多重打靶与延拓，全链路从 CR3BP 初猜经星历修正到高精度预报。
 - `control_orbit`：轨道保持蒙特卡洛仿真。支持特征点、目标点严格、目标点宽松三种控制律，以及测定轨与推力误差仿真、角动量管理（姿态发动机联合控制）。名义轨道可由轨道库记录或星历对象接入，契约只保证 `NominalOrbit` 等间距状态表。Floquet 基与投影因子预计算不在本仓库范围内，原因见 [.out-of-scope/nominal-orbit-floquet-precompute.md](.out-of-scope/nominal-orbit-floquet-precompute.md)。
 - `transfer_design`：转移轨道设计，覆盖脉冲、低能量、低推力和网格搜索四类方法。脉冲类含 Lambert 求解与 porkchop 扫描、Lawden 主矢量多脉冲优化、霍曼直接转移 HMN。低能量类含月球引力辅助 LGA、WSB 太阳引力辅助弹道捕获、不变流形与庞加莱截面拼接。低推力类用 Q-law 初猜加打靶或配点。网格搜索加非线性规划的两步法在 Rust 侧用 Rayon 并行。
 - `mission_architecture_search`：行星际多借力链（MGA）网格搜索。每个转移段（leg）用 Lambert 求解，借力点按无动力飞越等模与近心点约束筛选，再用日心 Tisserand 参数诊断，返回前 N 个候选。
@@ -87,7 +87,7 @@ e2m2e 对外提供一套工具，按职责分给三个类：任务级入口 `Fac
 
 轨道库以 `records/*.json + *.npz` 为事实来源，`catalog.db` 只是可重建索引。
 
-- `orbit_family_generation`：轨道族生成，覆盖 HALO、NRHO、AXIAL、LISSAJOUS、SPO、LPO、HORSESHOE、DRO、RO 以及周期倍化的 FIGURE_EIGHT、RING 共十一族。库开启时逐成员入库，可按 `family_id` 整族取回。
+- `orbit_family_generation`：轨道族生成，覆盖 HALO、NRHO、AXIAL、LISSAJOUS、SPO、LPO、HORSESHOE、DRO、RO 以及周期倍化的 FIGURE_EIGHT、RING。库开启时逐成员入库，可按 `family_id` 整族取回。
 - `catalog_query`：多维过滤查询，返回摘要列表。
 - `catalog_get`：按 `record_id` 取完整记录，含数组段与请求快照。
 - `catalog_tag`：写入教学标签，整体替换原有标签。

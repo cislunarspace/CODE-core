@@ -22,7 +22,7 @@ from e2m2e.algorithm.family.orbits.period_doubling import (
 )
 from e2m2e.algorithm.family.orbits.walk import earth_moon_system
 from e2m2e.algorithm.orbit_taxonomy import classify_orbit
-from e2m2e.data.constants import EARTH_MOON_DISTANCE_KM
+from e2m2e.data.templates.seed import CHAR_LENGTH_KM
 
 pytestmark = pytest.mark.orchestration
 
@@ -79,8 +79,8 @@ def test_figure_eight_family_members_close_and_cap(dynamics):
     result = design_figure_eight_family(
         2,
         1,
-        1.019 * EARTH_MOON_DISTANCE_KM,
-        1.025 * EARTH_MOON_DISTANCE_KM,
+        1.019 * CHAR_LENGTH_KM,
+        1.025 * CHAR_LENGTH_KM,
         n_orbits=3,
         dynamics=dynamics,
     )
@@ -92,6 +92,14 @@ def test_figure_eight_family_members_close_and_cap(dynamics):
     assert result.requested_members == 3
     for orbit in family.orbits:
         assert orbit.closure_error < 1e-9
+        propagated = dynamics.propagate(
+            orbit.states[0],
+            (0.0, float(orbit.period)),
+            t_eval=[float(orbit.period)],
+        )
+        final = propagated["states"][-1]
+        recomputed = max(abs(float(final[index] - orbit.states[0, index])) for index in range(6))
+        assert orbit.closure_error == pytest.approx(recomputed, abs=1e-12)
         assert orbit.family_type == "figure_eight"
         assert orbit.parameters["libration_point"] == 2
         assert orbit.parameters["north_south"] == 1
@@ -110,8 +118,8 @@ def test_ring_family_members_close_and_classify_as_geometry_labels(dynamics):
     result = design_ring_family(
         2,
         2,
-        1.110 * EARTH_MOON_DISTANCE_KM,
-        1.113 * EARTH_MOON_DISTANCE_KM,
+        1.110 * CHAR_LENGTH_KM,
+        1.113 * CHAR_LENGTH_KM,
         n_orbits=2,
         dynamics=dynamics,
     )
@@ -140,6 +148,6 @@ def test_window_above_seed_collects_only_in_range_members(dynamics):
         dynamics=dynamics,
     )
     assert result.status.value == "converged", result.message
-    xs = [float(o.states[0, 0]) * EARTH_MOON_DISTANCE_KM for o in result.family.orbits]
+    xs = [float(o.states[0, 0]) * CHAR_LENGTH_KM for o in result.family.orbits]
     assert len(xs) > 2  # 只有种子说明链没穿过窗口（旧缺陷症状）
     assert all(400000.0 <= x <= 405000.0 for x in xs[1:])

@@ -43,7 +43,8 @@
 - 状态三元组：``status == ConvergenceState.CONVERGED`` 表示修正收敛。
   未收敛时 ``cause`` 给稳定原因码（如 ``MAX_ITERATIONS_REACHED``），
   ``message`` 是人读说明。
-- 轨道几何：``initial_state`` 是修正后的初始状态（无量纲会合系），
+- 轨道几何：``initial_state`` 是历元 GCRS 惯性系状态（km、km/s，修正后
+  首节点），``states`` 与 ``times`` 才是无量纲会合系参考轨道，
   ``cr3bp_jacobi`` 是 CR3BP Jacobi 常数，``correction_iterations`` 记录
   微分修正迭代次数，``correction_method`` 回显实际执行的修正方法
   （Halo 未显式指定时分派为 ``segmented`` 全程分段打靶）。

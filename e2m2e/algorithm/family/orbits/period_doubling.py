@@ -88,9 +88,10 @@ RING_BIFURCATION_X0 = 1.109352298816
 
 #: 三判据在定位成员处的门限（二分把 f 收敛到宽度 1e-10 后的实测：f 在
 #: 4e-10 到 2e-9、约化奇异值在 3e-11 到 5e-9、乘子距离在 4e-6 到 4e-5；
-#: 正则成员处 f 与约化奇异值为 O(0.1) 以上、乘子距离为 O(0.1) 以上，
-#: 门限各留两个量级以上余量。乘子距离的平方根下限：乘子以 sqrt(参数
-#: 距离) 的速率趋近负一，残余距离受 x0 定位精度的平方根下限约束）。
+#: 正则成员处 f 与约化奇异值为 O(0.1) 以上、乘子距离为 O(0.1) 以上。
+#: 门限按实测留有余量，f 与约化奇异值约两个量级，乘子距离约 12 倍。
+#: 乘子距离的平方根下限：乘子以 sqrt(参数距离) 的速率趋近负一，残余
+#: 距离受 x0 定位精度的平方根下限约束）。
 BROUCKE_F_TOLERANCE = 1e-6
 REDUCED_SIGMA_TOLERANCE = 1e-6
 MULTIPLIER_GAP_TOLERANCE = 5e-4
@@ -155,7 +156,8 @@ def reduced_jacobian_sigma(dynamics: CR3BP_Dynamics, state: np.ndarray, period: 
     子块取 ``M(2T) − I`` 的行列 (x, z, vy) 槽位（XZ 对称形态的自由变
     量）。母族在对称扇区内演化，族切向恒为该子块零向量，最小奇异值恒
     近零；返回三个奇异值的第二小者，分岔成员处因子族起链方向并入核而
-    归零（正则成员 O(0.1) 以上）。
+    归零（正则成员 O(0.1) 以上）。``period`` 为成员单圈周期，内部由
+    单圈单值矩阵平方得到 2T。
     """
     matrix = monodromy(dynamics, np.asarray(state, dtype=float), float(period))
     squared = matrix @ matrix
@@ -201,7 +203,7 @@ def _walk_mother_family(
 ) -> Iterator[Orbit]:
     """母 halo 族固定 x0 向低 x0 方向行走，逐成员产出。
 
-    修正失败（含伪解拒绝）时步长减半重试（下限 1e-5，与
+    修正失败（含伪解拒绝）时步长减半重试（下限 1e-4，与
     ``_walk_family`` 一致）。``start`` 给出时从该成员继续（局部加密用）。
     """
     guess = start if start is not None else _halo_seed_walk(dynamics, libration_point, z_sign)
@@ -338,7 +340,7 @@ def locate_period_doubling_bifurcations(
     """沿 L2 halo 族定位周期倍化分岔成员（算法层内部能力，不进接口面）。
 
     从固定 z0 安全校验上界成员（x0 约 1.148）出发固定 x0 向低 x0 行走到
-    ``x0_floor``，逐成员算 Broucke f；变号区间二分到 1e-9 宽，粗步长分
+    ``x0_floor``，逐成员算 Broucke f；变号区间二分到 1e-10 宽，粗步长分
     辨不了的窄负区间（0 形族分岔的实负乘子区间宽约 6e-4）按 |f| 局部极
     小触发加密重扫。返回按 x0 降序的全部定位点（该段上有四处过零，见
     模块 docstring；两条族的定义分岔由族入口按参考值就近选用）。
@@ -504,6 +506,25 @@ def _perpendicular_crossing(
     return np.asarray(pool[index], dtype=float).copy()
 
 
+def _stored_state_closure_error(
+    dynamics: CR3BP_Dynamics, state: np.ndarray, period: float
+) -> float:
+    """按存储状态复算一个闭合周期的最大分量偏差。
+
+    与 PAL 内核的 ``closure_error`` 同口径（状态分量最大绝对偏差），
+    用于换相后精化失败的回退分支，避免报告行走器成员而非存储状态的
+    残差。
+    """
+    initial = np.asarray(state, dtype=float)
+    out = dynamics.propagate(
+        initial,
+        (0.0, float(period)),
+        t_eval=[float(period)],
+    )
+    final = np.asarray(out["states"], dtype=float)[-1]
+    return float(np.max(np.abs(final - initial)))
+
+
 def _generate_period_doubled_family(
     dynamics: CR3BP_Dynamics,
     libration_point: int,
@@ -549,12 +570,14 @@ def _generate_period_doubled_family(
         # 事件积分换相给状态带入约 1e-8 量级的离轨误差（0 形族长周期
         # 成员上闭合约 5e-8，超 1e-9 契约），换相后在同一 x0 重做固定
         # x0 的 2T 闭合精化把成员拉回内核精度；精化失败时软回退保留
-        # 事件穿越点，闭合误差如实报告换相状态。
+        # 事件穿越点，并按该存储状态复算闭合残差。
         refined = _refine_child_seed(dynamics, crossing, float(period))
         if refined.status is ConvergenceState.CONVERGED:
             crossing = np.asarray(refined.states[0], dtype=float)
             period = float(refined.periods[0])
             closure_error = float(refined.closure_errors[0])
+        else:
+            closure_error = _stored_state_closure_error(dynamics, crossing, period)
         # 窗口语义：链走出窗口远端即停；尚未进入窗口的近端成员跳过不
         # 收集（链仍要经过它们才能到达窗口）；种子成员无条件保留（与
         # n_orbits 字段“包含种子或首个命中范围的成员”口径一致）。

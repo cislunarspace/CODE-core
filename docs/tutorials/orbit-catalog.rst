@@ -51,8 +51,8 @@
 --------
 
 - ``orbit_family_generation`` 支持 HALO、NRHO、AXIAL、LISSAJOUS、SPO、LPO、
-  HORSESHOE、DRO、RO 以及周期倍化的 FIGURE_EIGHT、RING 共十一族，字段按族
-  适用（如 NRHO 用 ``north_south``／``perilune_height_max_km``，LISSAJOUS 用
+  HORSESHOE、DRO、RO 以及周期倍化的 FIGURE_EIGHT、RING，字段按族适用
+  （如 NRHO 用 ``north_south``／``perilune_height_max_km``，LISSAJOUS 用
   ``amplitude_in_km``／``amplitude_out_km``，FIGURE_EIGHT 与 RING 用
   ``min_x0_km``／``max_x0_km`` 且仅限 L2）。缺省值由 model_validator 按族
   填充，DRO（月心族）与 RO（地心族）不绑定平动点，不得携带

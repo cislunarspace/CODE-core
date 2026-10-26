@@ -6,7 +6,7 @@ e2m2e（Earth to Moon, Moon to Earth）是地月空间算法工具集，覆盖 C
 地月空间分区分析。数值内核用 Rust 实现（PyO3 扩展），Python 侧负责算法
 编排与接口层。
 
-调用方通过四条路径使用同一套能力：
+调用方通过四条调用链使用同一套能力：
 
 - 进程内 import：``from e2m2e.api import Facade``，Python 直接调用。
 - CLI：``e2m2e <工具名>``，命令行调用。
@@ -14,7 +14,7 @@ e2m2e（Earth to Moon, Moon to Earth）是地月空间算法工具集，覆盖 C
 - GUI sidecar：``e2m2e serve-stdio``，按 stdio JSON 行与二进制帧协议接入
   同一执行入口。
 
-四条路径共用同一份工具清单。工具名与参数模型以
+四条调用链共用同一份工具清单。工具名与参数模型以
 ``tool_inventory(Facade())`` 为准，MCP schema 与 CLI 参数都从请求模型生成。
 
 .. toctree::

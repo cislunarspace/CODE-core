@@ -52,7 +52,10 @@ f = 2 + β − 2α 归零、约化雅可比对称扇区最小奇异值归零、�
 FIGURE_EIGHT/RING 与族参数窗口字段，不新增工具）。准入按 ADR 0043
 决策 6 第一款判定：族生成本就是任务级能力，此处只是既有任务级工具的
 orbit_type 闭值集扩展；族名闭值经 ADR 0044 的 `RECORD_ORBIT_FAMILIES`
-登记出库。`OrbitFamilyType.BUTTERFLY` 占位维持不动。
+登记出库。`OrbitFamilyType.BUTTERFLY` 占位维持不动。决策 5 的“接口层
+零改动”就本次扩请求字段作废：`FamilyGenerationRequest` 新增
+FIGURE_EIGHT/RING 分支与族参数窗口，属于既有任务级工具的闭值集扩展，
+不新增工具。
 
 ### 后果
 
