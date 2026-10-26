@@ -546,10 +546,25 @@ def _generate_period_doubled_family(
         crossing = _perpendicular_crossing(
             dynamics, np.asarray(member_state, dtype=float), float(period)
         )
-        # 族参数（规范化穿越 x）单调走出 [x0_min, x0_max] 即停；种子成员
-        # 无条件保留。
-        if orbits and not x0_min <= float(crossing[0]) <= x0_max:
-            break
+        # 事件积分换相给状态带入约 1e-8 量级的离轨误差（0 形族长周期
+        # 成员上闭合约 5e-8，超 1e-9 契约），换相后在同一 x0 重做固定
+        # x0 的 2T 闭合精化把成员拉回内核精度；精化失败时软回退保留
+        # 事件穿越点，闭合误差如实报告换相状态。
+        refined = _refine_child_seed(dynamics, crossing, float(period))
+        if refined.status is ConvergenceState.CONVERGED:
+            crossing = np.asarray(refined.states[0], dtype=float)
+            period = float(refined.periods[0])
+            closure_error = float(refined.closure_errors[0])
+        # 窗口语义：链走出窗口远端即停；尚未进入窗口的近端成员跳过不
+        # 收集（链仍要经过它们才能到达窗口）；种子成员无条件保留（与
+        # n_orbits 字段“包含种子或首个命中范围的成员”口径一致）。
+        x0 = float(crossing[0])
+        if orbits:
+            past_far_side = x0 > x0_max if initial_direction == "increase-x0" else x0 < x0_min
+            if past_far_side:
+                break
+            if not x0_min <= x0 <= x0_max:
+                continue
         orbit = Orbit(
             states=crossing.reshape(1, -1),
             times=np.array([0.0]),

@@ -48,12 +48,13 @@ def test_locator_finds_four_crossings_with_consistent_criteria(points):
 
 
 def test_defined_bifurcations_match_reference_positions(points):
-    """0 形族分岔与高精度复算值 1e-6 内一致；8 字形族分岔与库内定位
-    复现值 1e-6 内一致，与文献四位小数值一致到其舍入量级。"""
+    """0 形族分岔与 issue 复算值、8 字形族分岔与库内定位复现值均在
+    1e-6 内一致（定位复现性锚点）。文献四位小数值 1.0118 的一致性
+    对照在 scripts/compare_grebow_table_3_13.py（ADR 0055：结果性
+    文献值不进断言）。"""
     ring = min(points, key=lambda p: abs(p.x0 - 1.109352298816))
     assert abs(ring.x0 - 1.109352298816) < 1e-6
     figure_eight = min(points, key=lambda p: abs(p.x0 - 1.0118))
-    assert abs(figure_eight.x0 - 1.0118) < 5e-5
     assert abs(figure_eight.x0 - 1.011828910724) < 1e-6
 
 
@@ -125,3 +126,20 @@ def test_ring_family_members_close_and_classify_as_geometry_labels(dynamics):
         ).primary
         assert primary is None or primary.canonical in {"halo_l2_southern", "axial_l2"}
     assert abs(family.metadata["bifurcation_x0"] - 1.109352298816) < 1e-6
+
+
+def test_window_above_seed_collects_only_in_range_members(dynamics):
+    """窗口下界高于种子 x0 时（评审修复回归）：链穿过窗口，收集落入
+    窗口的成员，种子保留、窗口外成员不收集。"""
+    result = design_figure_eight_family(
+        2,
+        1,
+        400000.0,
+        405000.0,
+        n_orbits=8,
+        dynamics=dynamics,
+    )
+    assert result.status.value == "converged", result.message
+    xs = [float(o.states[0, 0]) * EARTH_MOON_DISTANCE_KM for o in result.family.orbits]
+    assert len(xs) > 2  # 只有种子说明链没穿过窗口（旧缺陷症状）
+    assert all(400000.0 <= x <= 405000.0 for x in xs[1:])

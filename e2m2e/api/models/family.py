@@ -279,11 +279,12 @@ class FamilyGenerationRequest(_ApiModel):
     min_x0_km: float | None = Field(
         default=None,
         description="族参数窗口下界（km），仅 FIGURE_EIGHT/RING 用；族参数为成员"
-        "最大 x 垂直 y=0 穿越点的 x 坐标，延拓自分岔种子连续填充",
+        "最大 x 垂直 y=0 穿越点的 x 坐标，延拓自分岔种子连续行走，链上"
+        "早于窗口的成员不收集、种子成员保留",
     )
     max_x0_km: float | None = Field(
         default=None,
-        description="族参数窗口上界（km），仅 FIGURE_EIGHT/RING 用；成员走出窗口即停",
+        description="族参数窗口上界（km），仅 FIGURE_EIGHT/RING 用；链走出窗口远端即停",
     )
     perilune_height_max_km: float | None = Field(
         default=None,
