@@ -32,3 +32,32 @@ ADR 0028 立案平面全周期 PAL 时预留了条款：仅有一个非对称平
 - 平面内核从静态维度改为动态维度，代数层分配开销相对传播成本可忽略；行为由既有回归与 crate 单元测试钉住。
 - butterfly 分支生成需要 halo 族乘子扫描的精化（平凡对分裂判别、更深 NRHO 段行走），共享内核与起链入口已就绪，后续工单只补定位侧。
 - `make check` 与受影响测试全绿；Rust 全量串行测试中 `family_generation::tests::ro_seed_period_is_exactly_commensurate` 在本机为预先存在的失败（master 同样失败），与本决策无关。
+
+## 修订（2026-10-26，#821）：周期倍化两族进 `orbit_family_generation` 工具面
+
+### 背景
+
+决策 5 写作时（#820）只有共享内核与起链入口，halo 族乘子扫描定位未
+完成，butterfly 类分支没有接口面可言。#821 落地了定位侧（Broucke 图
+f = 2 + β − 2α 归零、约化雅可比对称扇区最小奇异值归零、单值矩阵乘子
+负一三条判据在同一成员上一致）与两条子族的生成入口，工具面问题重新
+提出。
+
+### 决策
+
+决策 5 的“butterfly 不进 `orbit_family_generation` 工具面”就两条已
+实现子族修订：`figure_eight`（8 字形族，分岔 x0 约 1.0118）与
+`ring`（0 形族，分岔 x0 约 1.1094）作为既有 `orbit_family_generation`
+工具的两个新 `orbit_type` 进入工具面（`FamilyGenerationRequest` 扩
+FIGURE_EIGHT/RING 与族参数窗口字段，不新增工具）。准入按 ADR 0043
+决策 6 第一款判定：族生成本就是任务级能力，此处只是既有任务级工具的
+orbit_type 闭值集扩展；族名闭值经 ADR 0044 的 `RECORD_ORBIT_FAMILIES`
+登记出库。`OrbitFamilyType.BUTTERFLY` 占位维持不动。
+
+### 后果
+
+- 分岔定位与三判据仍是族生成的内部起链能力，不构成稳定性或分岔分析
+  的接口面或算法层模块（#687 边界不变）。
+- 0 形族成员每周期 2 次垂直加 2 次斜 y=0 穿越，实测分类为 halo/axial
+  标签而非 butterfly；分类学穿越判据不改，族名闭值与几何标签并存，
+  期望集按实测口径登记，冲突只告警不失败（ADR 0042 决策 4）。

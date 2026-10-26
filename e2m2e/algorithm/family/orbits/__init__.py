@@ -12,6 +12,7 @@ from .halo import design_halo, design_halo_family
 from .lissajous import design_lissajous, design_lissajous_family
 from .lyapunov import design_lyapunov
 from .nrho import design_nrho, design_nrho_family
+from .period_doubling import design_figure_eight_family, design_ring_family
 from .ro import design_ro, design_ro_family
 from .triangular import (
     design_horseshoe,
@@ -42,6 +43,8 @@ __all__ = [
     "design_lyapunov",
     "design_nrho",
     "design_nrho_family",
+    "design_figure_eight_family",
+    "design_ring_family",
     "design_ro",
     "design_ro_family",
     "design_spo",

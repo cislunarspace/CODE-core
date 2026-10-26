@@ -41,7 +41,18 @@ _FAMILY_LIBRATION_POINT_RANGES: Mapping[str, tuple[int, ...]] = MappingProxyType
         "HORSESHOE": (4, 5),
         "DRO": (),
         "RO": (),
+        "FIGURE_EIGHT": (2,),
+        "RING": (2,),
     }
+)
+
+#: 周期倍化两族（#821）的族参数包络（km）。族参数是成员最大 x 垂直
+#: y=0 穿越点的 x 坐标：下界贴各自分岔（8 字形 1.011829 DU、0 形
+#: 1.109352 DU × 384405 km），上界为已验证段末端（8 字形 T=3.42 TU 于
+#: x0≈1.0704 DU、0 形 T=6.37 TU 于 x0≈1.1791 DU；再往外族参数折返或
+#: 标签漂出已验证口径）。
+_PERIOD_DOUBLING_X0_ENVELOPE_KM: Mapping[str, tuple[float, float]] = MappingProxyType(
+    {"FIGURE_EIGHT": (388900.0, 411600.0), "RING": (426400.0, 453500.0)}
 )
 
 #: 族生成条件字段的单位（与范围表同住；未列出的字段为无量纲或计数值）。
@@ -53,6 +64,8 @@ _FAMILY_FIELD_UNITS: Mapping[str, str] = MappingProxyType(
         "match_tolerance_km": "km",
         "amplitude_in_km": "km",
         "amplitude_out_km": "km",
+        "min_x0_km": "km",
+        "max_x0_km": "km",
     }
 )
 
@@ -66,6 +79,8 @@ _FAMILY_DEFAULT_LIBRATION_POINT: Mapping[str, int] = MappingProxyType(
         "SPO": 4,
         "LPO": 4,
         "HORSESHOE": 4,
+        "FIGURE_EIGHT": 2,
+        "RING": 2,
     }
 )
 
@@ -137,6 +152,24 @@ _FAMILY_SPECIFIC_FIELDS: Mapping[str, frozenset[str]] = MappingProxyType(
                 "sampling_mode",
             }
         ),
+        "FIGURE_EIGHT": frozenset(
+            {
+                "north_south",
+                "min_x0_km",
+                "max_x0_km",
+                "continuation_direction",
+                "sampling_mode",
+            }
+        ),
+        "RING": frozenset(
+            {
+                "north_south",
+                "min_x0_km",
+                "max_x0_km",
+                "continuation_direction",
+                "sampling_mode",
+            }
+        ),
     }
 )
 _FAMILY_OPTION_VALUES: Mapping[str, Mapping[str, tuple[str, ...]]] = MappingProxyType(
@@ -175,6 +208,18 @@ _FAMILY_OPTION_VALUES: Mapping[str, Mapping[str, tuple[str, ...]]] = MappingProx
         ),
         "DRO": MappingProxyType({"sampling_mode": ("natural-x0",)}),
         "RO": MappingProxyType({"sampling_mode": ("natural-x0",)}),
+        "FIGURE_EIGHT": MappingProxyType(
+            {
+                "continuation_direction": ("increase-x0", "decrease-x0"),
+                "sampling_mode": ("bifurcation-pal",),
+            }
+        ),
+        "RING": MappingProxyType(
+            {
+                "continuation_direction": ("increase-x0", "decrease-x0"),
+                "sampling_mode": ("bifurcation-pal",),
+            }
+        ),
     }
 )
 
@@ -187,8 +232,10 @@ class FamilyGenerationRequest(_ApiModel):
     （与 ``DesignOrbitRequest`` 同构）：共线族（Halo/NRHO/Axial）仅
     L1/L2，Lissajous 支持 L1/L2/L3，三角族（SPO/LPO/Horseshoe）仅
     L4/L5，DRO 是月心族、RO 是地心族，均不绑定平动点（请求不得携带
-    ``libration_point``）。九族均已实现：周期族返回严格周期成员，
-    Lissajous 返回拟周期有界轨迹的参数采样（族上显式标注 quasi-periodic）。
+    ``libration_point``）。周期倍化两族（FIGURE_EIGHT/RING）仅 L2，族参数
+    是成员最大 x 垂直 y=0 穿越点的 x 坐标。十一族均已实现：周期族返回
+    严格周期成员，Lissajous 返回拟周期有界轨迹的参数采样（族上显式标注
+    quasi-periodic）。
 
     按族适用的字段：
 
@@ -199,12 +246,16 @@ class FamilyGenerationRequest(_ApiModel):
     - DRO：振幅上下限（距月心距离 min/max 均值，km）
     - RO：``resonance_p``/``resonance_q`` + 振幅上下限（距地心距离
       min/max 均值，km）
+    - FIGURE_EIGHT/RING：``north_south``、``min_x0_km``/``max_x0_km``
+      （族参数即最大 x 垂直穿越的 x 坐标窗口，km）与 ``continuation_direction``
 
     ``sampling_mode`` 显式登记各族固定的首版采样规则；传入其他规则会
     结构化拒绝，而不是静默改用默认算法。
     """
 
-    orbit_type: str = Field(description="HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO/RO")
+    orbit_type: str = Field(
+        description="HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO/RO/FIGURE_EIGHT/RING"
+    )
     libration_point: int | None = Field(
         default=None, ge=1, le=5, description="平动点编号：1=L1 … 5=L5；缺省按族填默认；DRO/RO 不用"
     )
@@ -223,7 +274,16 @@ class FamilyGenerationRequest(_ApiModel):
     )
     resonance_q: int | None = Field(default=None, ge=1, description="共振比月球侧整数，仅 RO 用")
     north_south: int | None = Field(
-        default=None, ge=1, le=2, description="北/南族：1=北，2=南；仅 NRHO 用"
+        default=None, ge=1, le=2, description="北/南族：1=北，2=南；仅 NRHO/FIGURE_EIGHT/RING 用"
+    )
+    min_x0_km: float | None = Field(
+        default=None,
+        description="族参数窗口下界（km），仅 FIGURE_EIGHT/RING 用；族参数为成员"
+        "最大 x 垂直 y=0 穿越点的 x 坐标，延拓自分岔种子连续填充",
+    )
+    max_x0_km: float | None = Field(
+        default=None,
+        description="族参数窗口上界（km），仅 FIGURE_EIGHT/RING 用；成员走出窗口即停",
     )
     perilune_height_max_km: float | None = Field(
         default=None,
@@ -244,12 +304,12 @@ class FamilyGenerationRequest(_ApiModel):
     continuation_direction: str | None = Field(
         default=None,
         description="延拓方向：NRHO=toward-moon、AXIAL=increase-amplitude、"
-        "SPO/LPO/HORSESHOE=decrease-x0 或 increase-x0",
+        "SPO/LPO/HORSESHOE/FIGURE_EIGHT/RING=decrease-x0 或 increase-x0",
     )
     sampling_mode: str | None = Field(
         default=None,
         description="采样规则：natural-z0/halo-segment/fixed-vz0/"
-        "linear-amplitudes/full-period-pal；按族固定",
+        "linear-amplitudes/full-period-pal/bifurcation-pal；按族固定",
     )
     match_tolerance_km: float | None = Field(
         default=None,
@@ -322,6 +382,12 @@ class FamilyGenerationRequest(_ApiModel):
             ranges["max_amplitude_km"] = amp_range
             ranges["resonance_p"] = NumericRange(2, 4)
             ranges["resonance_q"] = NumericRange(1, 3)
+        elif selection in ("FIGURE_EIGHT", "RING"):
+            # 族参数包络贴各自分岔与已验证段末端（#821，见包络常量注释）
+            envelope = _PERIOD_DOUBLING_X0_ENVELOPE_KM[selection]
+            ranges["north_south"] = NumericRange(1, 2)
+            ranges["min_x0_km"] = NumericRange(*envelope)
+            ranges["max_x0_km"] = NumericRange(*envelope)
         else:  # SPO/LPO/HORSESHOE：声明范围不得超出可达包络
             if selection == "SPO":
                 amp_range = NumericRange(1737.0, 75000.0)
@@ -445,6 +511,14 @@ class FamilyGenerationRequest(_ApiModel):
                 self.min_amplitude_km = 145000.0
             if self.max_amplitude_km is None:
                 self.max_amplitude_km = 340000.0
+        elif sel in ("FIGURE_EIGHT", "RING"):
+            if self.north_south is None:
+                self.north_south = 1
+            envelope = _PERIOD_DOUBLING_X0_ENVELOPE_KM[sel]
+            if self.min_x0_km is None:
+                self.min_x0_km = envelope[0]
+            if self.max_x0_km is None:
+                self.max_x0_km = envelope[1]
         else:  # SPO/LPO/HORSESHOE
             if self.min_amplitude_km is None:
                 self.min_amplitude_km = 50000.0 if sel == "HORSESHOE" else 2000.0
@@ -466,6 +540,13 @@ class FamilyGenerationRequest(_ApiModel):
                 raise ValueError(
                     f"{sel} min_amplitude_km 必须小于 max_amplitude_km，"
                     f"当前 {self.min_amplitude_km} >= {self.max_amplitude_km}"
+                )
+        if sel in ("FIGURE_EIGHT", "RING"):
+            assert self.min_x0_km is not None
+            assert self.max_x0_km is not None
+            if self.min_x0_km >= self.max_x0_km:
+                raise ValueError(
+                    f"{sel} min_x0_km 必须小于 max_x0_km，当前 {self.min_x0_km} >= {self.max_x0_km}"
                 )
         return self
 

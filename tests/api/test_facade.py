@@ -303,6 +303,21 @@ class TestFacadeCallChains:
         assert len(family) >= 1
         assert all(orbit.parameters.get("libration_point") == 1 for orbit in family)
 
+    def test_period_doubled_family_returns_converged_response(self):
+        """#821：周期倍化两族经 orbit_family_generation 端到端可用。"""
+        response = Facade().catalog.orbit_family_generation(
+            orbit_type="figure_eight",
+            north_south=1,
+            min_x0_km=388900.0,
+            max_x0_km=393000.0,
+            n_orbits=2,
+        )
+        assert response.family_type == "figure_eight"
+        assert response.status is ConvergenceState.CONVERGED
+        assert 1 <= response.generated_members <= response.requested_members
+        assert all(orbit.closure_error < 1e-9 for orbit in response.orbits)
+        assert set(response.taxonomy_labels) <= {"halo_l2_northern", "halo_l2_southern"}
+
     @pytest.mark.parametrize(
         ("orbit_type", "entry_name", "params", "expected_args"),
         [
@@ -365,6 +380,18 @@ class TestFacadeCallChains:
                 },
                 (3, 1, 148000.0, 156000.0),
             ),
+            (
+                "FIGURE_EIGHT",
+                "design_figure_eight_family",
+                {"north_south": 1, "min_x0_km": 389000.0, "max_x0_km": 392000.0},
+                (2, 1, 389000.0, 392000.0),
+            ),
+            (
+                "RING",
+                "design_ring_family",
+                {"north_south": 2, "min_x0_km": 427000.0, "max_x0_km": 430000.0},
+                (2, 2, 427000.0, 430000.0),
+            ),
         ],
     )
     def test_non_halo_family_dispatches_to_algorithm(
@@ -403,6 +430,8 @@ class TestFacadeCallChains:
                 continuation_direction="decrease-x0",
                 match_tolerance_km=50.0 if orbit_type == "HORSESHOE" else 20.0,
             )
+        elif orbit_type in ("FIGURE_EIGHT", "RING"):
+            expected_kwargs["continuation_direction"] = "increase-x0"
         assert isinstance(result, OrbitFamily)
         assert result.family_type == sentinel.family_type
         assert result.status is ConvergenceState.CONVERGED
@@ -441,7 +470,12 @@ class TestFacadeCallChains:
 
     @pytest.mark.parametrize(
         "params",
-        [{"orbit_type": "NOPE"}, {"orbit_type": "HALO", "libration_point": 4}],
+        [
+            {"orbit_type": "NOPE"},
+            {"orbit_type": "HALO", "libration_point": 4},
+            {"orbit_type": "RING", "libration_point": 1},
+            {"orbit_type": "FIGURE_EIGHT", "min_x0_km": 450000.0, "max_x0_km": 452000.0},
+        ],
     )
     def test_invalid_family_input_is_translated_to_orbit_error(self, params):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):

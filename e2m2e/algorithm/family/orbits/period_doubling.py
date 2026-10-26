@@ -221,6 +221,12 @@ def _walk_mother_family(
         yield nxt
 
 
+def _closed_period(orbit: Orbit) -> float:
+    """取成员闭合周期；本模块族链路上的成员必已填周期（None 属契约破坏）。"""
+    assert orbit.period is not None
+    return float(orbit.period)
+
+
 def _bisect_crossing(
     dynamics: CR3BP_Dynamics,
     libration_point: int,
@@ -233,7 +239,7 @@ def _bisect_crossing(
     """在 ``[low_x0, high_x0]`` 上二分 Broucke f 的变号区间，返回定位成员。"""
     low_orbit = _correct_mother_member(dynamics, low_x0, libration_point, guess)
     low_f = broucke_period_doubling_f(
-        monodromy(dynamics, low_orbit.states[0], float(low_orbit.period))
+        monodromy(dynamics, low_orbit.states[0], _closed_period(low_orbit))
     )
     current = low_orbit
     for _ in range(60):
@@ -241,9 +247,7 @@ def _bisect_crossing(
             break
         mid = 0.5 * (low_x0 + high_x0)
         orbit = _correct_mother_member(dynamics, mid, libration_point, current)
-        f = broucke_period_doubling_f(
-            monodromy(dynamics, orbit.states[0], float(orbit.period))
-        )
+        f = broucke_period_doubling_f(monodromy(dynamics, orbit.states[0], _closed_period(orbit)))
         current = orbit
         if (f > 0.0) == (low_f > 0.0):
             low_x0, low_f = mid, f
@@ -270,14 +274,12 @@ def _locate_crossing_brackets(
 ) -> list[tuple[float, float, Orbit]]:
     """扫描母族收集 f 的变号区间 (low, high, 暖启动成员)，按 x0 降序。"""
     members = list(
-        _walk_mother_family(
-            dynamics, libration_point, z_sign, x0_floor=x0_floor, dx0=dx0
-        )
+        _walk_mother_family(dynamics, libration_point, z_sign, x0_floor=x0_floor, dx0=dx0)
     )
     values = [
         (
             float(o.states[0, 0]),
-            broucke_period_doubling_f(monodromy(dynamics, o.states[0], float(o.period))),
+            broucke_period_doubling_f(monodromy(dynamics, o.states[0], _closed_period(o))),
         )
         for o in members
     ]
@@ -313,13 +315,11 @@ def _locate_crossing_brackets(
         fine_values = [
             (
                 float(o.states[0, 0]),
-                broucke_period_doubling_f(monodromy(dynamics, o.states[0], float(o.period))),
+                broucke_period_doubling_f(monodromy(dynamics, o.states[0], _closed_period(o))),
             )
             for o in fine_members
         ]
-        for j, ((ya, fya), (yb, fyb)) in enumerate(
-            zip(fine_values, fine_values[1:], strict=False)
-        ):
+        for j, ((ya, fya), (yb, fyb)) in enumerate(zip(fine_values, fine_values[1:], strict=False)):
             if (fya > 0.0) != (fyb > 0.0):
                 brackets.append((yb, ya, fine_members[j + 1]))
     brackets.sort(key=lambda b: -b[0])
@@ -363,8 +363,7 @@ def locate_period_doubling_bifurcations(
     )
     if not brackets:
         raise Cr3bpOrbitError(
-            f"沿 L2 halo 族扫描到 x0={x0_floor} 未发现 Broucke f 过零，"
-            "周期倍化分岔不在该参数区间内"
+            f"沿 L2 halo 族扫描到 x0={x0_floor} 未发现 Broucke f 过零，周期倍化分岔不在该参数区间内"
         )
     points: list[PeriodDoublingPoint] = []
     for low, high, warm in brackets:
@@ -380,7 +379,7 @@ def locate_period_doubling_bifurcations(
         points.append(
             PeriodDoublingPoint(
                 state=np.asarray(bisected.states[0], dtype=float).copy(),
-                period=float(bisected.period),
+                period=_closed_period(bisected),
                 x0=float(bisected.states[0, 0]),
                 broucke_f=float(f),
                 broucke_alpha=float(alpha),
@@ -393,16 +392,12 @@ def locate_period_doubling_bifurcations(
     return points
 
 
-def _nearest_point(
-    points: list[PeriodDoublingPoint], reference_x0: float
-) -> PeriodDoublingPoint:
+def _nearest_point(points: list[PeriodDoublingPoint], reference_x0: float) -> PeriodDoublingPoint:
     """按参考 x0 就近选用定义分岔点。"""
     return min(points, key=lambda p: abs(p.x0 - reference_x0))
 
 
-def _refine_child_seed(
-    dynamics: CR3BP_Dynamics, state: np.ndarray, closure_period: float
-):
+def _refine_child_seed(dynamics: CR3BP_Dynamics, state: np.ndarray, closure_period: float):
     """固定 x0 的 2T 闭合阻尼最小二乘精化（仅精化不行走）。"""
     from ....integrators import spatial_full_period_pal_py
 
@@ -530,11 +525,13 @@ def _generate_period_doubled_family(
     )
     point = _nearest_point(points, reference_x0)
     seed_state, seed_period = _seed_child_branch(dynamics, point)
+    # PAL 行走器返回种子加 n 条新成员；n_orbits 是含种子的总数上限
+    # （与响应契约 generated ≤ requested 一致），故行走请求 n−1 条。
     raw = spatial_full_period_pal_py(
         float(dynamics.system.mu),
         seed_state.tolist(),
         seed_period,
-        n_orbits,
+        max(n_orbits - 1, 0),
         step_size,
         initial_direction,
         rtol=dynamics.rtol,
@@ -714,9 +711,7 @@ def _design_period_doubled_family(
     x0_min = float(min_x0_km) / float(length)
     x0_max = float(max_x0_km) / float(length)
     if not x0_min < x0_max:
-        raise ValueError(
-            f"min_x0_km 必须小于 max_x0_km，当前 {min_x0_km} >= {max_x0_km}"
-        )
+        raise ValueError(f"min_x0_km 必须小于 max_x0_km，当前 {min_x0_km} >= {max_x0_km}")
     return _generate_period_doubled_family(
         dynamics,
         libration_point,

@@ -72,6 +72,8 @@ class OrbitFamilyType(enum.Enum):
     AXIAL = "axial"
     BUTTERFLY = "butterfly"  # 待实现
     DRAGONFLY = "dragonfly"  # 待实现
+    FIGURE_EIGHT = "figure_eight"  # L2 halo 周期倍化 8 字形族（#821）
+    RING = "ring"  # L2 halo 周期倍化 0 形族（#821）
     DRO = "dro"  # Distant Retrograde Orbit
     DPO = "dpo"  # Direct Prograde Orbit
     SPO = "spo"  # Short Period Orbit
