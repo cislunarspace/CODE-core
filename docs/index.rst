@@ -1,17 +1,21 @@
 e2m2e 文档
 ==========
 
-e2m2e（Earth to Moon, Moon to Earth）是地月空间算法工具集：圆型限制性三体问题
-（CR3BP）转移轨道设计、任务轨道设计与保持、轨道预报、时空坐标转换、轨道库与地月
-空间分区分析。数值内核用 Rust 实现（PyO3 扩展），Python 侧提供算法编排与接口层。
+e2m2e（Earth to Moon, Moon to Earth）是地月空间算法工具集，覆盖 CR3BP
+任务轨道与轨道族、星历传播、转移设计、轨道保持、时空坐标转换、轨道库与
+地月空间分区分析。数值内核用 Rust 实现（PyO3 扩展），Python 侧负责算法
+编排与接口层。
 
-同一套能力有三条调用链：
+调用方通过四条路径使用同一套能力：
 
 - 进程内 import：``from e2m2e.api import Facade``，Python 直接调用。
-- MCP：``e2m2e mcp-serve``，在 MCP 客户端里用自然语言驱动。
 - CLI：``e2m2e <工具名>``，命令行调用。
+- MCP：``e2m2e mcp-serve``，把工具注册到 MCP 客户端。
+- GUI sidecar：``e2m2e serve-stdio``，按 stdio JSON 行与二进制帧协议接入
+  同一执行入口。
 
-GUI 经 sidecar stdio 协议（``e2m2e serve-stdio``）使用同一执行入口。
+四条路径共用同一份工具清单。工具名与参数模型以
+``tool_inventory(Facade())`` 为准，MCP schema 与 CLI 参数都从请求模型生成。
 
 .. toctree::
    :maxdepth: 2
@@ -50,8 +54,8 @@ e2m2e 以 `Apache-2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_ 发布。
 - CSPICE Toolkit，NASA JPL／NAIF 开发并提供。
 - Lambert 求解器，移植自 Fortran-Astrodynamics-Toolkit（BSD-3-Clause）。
 
-Indices and tables
-==================
+索引与表格
+==========
 
 * :ref:`genindex`
 * :ref:`modindex`

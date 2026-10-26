@@ -4,8 +4,9 @@
 目标
 ----
 
-用 ``Spatiography`` 的五个工具做地月空间分区分析：解析尺度、区域分类、边界
-几何、共振图集、天图。全部为无状态计算，输入状态、输出几何与场数据。
+用 ``Spatiography`` 的六个工具做地月空间分区分析：解析尺度、区域分类、带
+不确定度的区间分类、边界几何、共振图集、天图。全部为无状态计算，输入状态、
+输出几何与场数据。
 
 前置
 ----
@@ -32,6 +33,13 @@
    )
    print(zones.zone_ids, [zones.legend[str(z)] for z in zones.zone_ids[0]])
 
+   interval = sp.spatiography_interval_classify(
+       state=[80000.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+       half_widths=[1000.0, 1000.0, 1000.0, 0.0, 0.0, 0.0],
+       frame="synodic_barycentric_km",
+   )
+   print(interval.status, interval.zone_ids_possible, interval.zone_ids_certain)
+
    boundaries = sp.spatiography_boundaries(kind="synodic_planar", resolution=360)
    print(boundaries.state_frame, len(boundaries.elements), "个边界元素")
 
@@ -52,6 +60,10 @@
   cislunar_outer_resonant / circumlunar / translunar / heliocentric）。
   ``diagnostics`` 逐状态给地心距、月心距、Jacobi 常数等诊断量。
   ``frame`` 必须声明（物理 km 或无量纲）。
+- ``spatiography_interval_classify``：对标称状态加各分量半宽的对角盒做区间
+  分类，返回 ``zone_ids_possible`` 与 ``zone_ids_certain`` 双标签、Hill 拓扑
+  区间和被跨越的临界 Jacobi 值。半宽全零时与 ``spatiography_classify``
+  逐位一致。
 - ``spatiography_boundaries``：输出可绘制的边界元素（圆、折线、点、根数
   平面曲线），``state_frame`` 标注数据系，前端只做归一与绘制。
 - ``spatiography_resonance_atlas``：三种产品，Gallardo 共振半宽包络
@@ -65,4 +77,4 @@
 ----
 
 - CLI：``e2m2e spatiography-classify --help`` 等（下划线转连字符）。
-- MCP：五个 ``spatiography_*`` 工具。
+- MCP：六个 ``spatiography_*`` 工具。
