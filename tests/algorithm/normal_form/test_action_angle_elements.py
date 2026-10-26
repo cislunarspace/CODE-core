@@ -55,3 +55,11 @@ def test_angle_difference_takes_shortest_periodic_branch():
     """跨零的角度误差不产生接近 2π 的伪大残差。"""
     assert shortest_angle_error(0.01, 2 * np.pi - 0.01) == pytest.approx(0.02)
     assert shortest_angle_error(2 * np.pi - 0.01, 0.01) == pytest.approx(-0.02)
+
+
+def test_zero_center_action_rejects_undefined_angle():
+    """零中心作用量处极角不唯一，逆变换必须显式拒绝。"""
+    with pytest.raises(ValueError, match="必须为正"):
+        action_angle_to_canonical(np.array([0.01, 0.2, 0.0, 0.0, 0.02, 0.3]))
+    with pytest.raises(ValueError, match="必须为正"):
+        action_angle_to_canonical(np.array([0.01, 0.2, 0.02, 0.3, 0.0, 0.0]))

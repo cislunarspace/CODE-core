@@ -122,7 +122,8 @@ def action_angle_to_canonical(X_elements: npt.ArrayLike) -> npt.NDArray[np.float
     """将作用量角度根数还原到 ``p1>0`` 的正则坐标分支。
 
     双曲作用量角度丢失 ``(q1,p1)`` 的共同符号。此逆变换固定选取
-    ``p1>0`` 的分支，不声称在其他符号分支上双射。中心作用量必须非负。
+    ``p1>0`` 的分支，不声称在其他符号分支上双射。中心作用量必须为正，
+    零作用量处极角不唯一，不能还原为唯一正则状态。
     """
     X = np.asarray(X_elements, dtype=float).ravel()
     if X.shape != (6,):
@@ -130,8 +131,8 @@ def action_angle_to_canonical(X_elements: npt.ArrayLike) -> npt.NDArray[np.float
     I1, theta1, I2, theta2, I3, theta3 = X
     if I1 == 0.0:
         raise ValueError("I1 为零时双曲作用量角度表示不唯一，不能唯一还原")
-    if I2 < 0.0 or I3 < 0.0:
-        raise ValueError("中心作用量 I2 与 I3 必须非负")
+    if I2 <= 0.0 or I3 <= 0.0:
+        raise ValueError("中心作用量 I2 与 I3 必须为正")
     # 由 theta1=ln(sqrt(|q1|)/sqrt(|p1|)) 和 I1=q1*p1 反解。
     saddle_sign = 1.0 if I1 > 0.0 else -1.0
     q1 = saddle_sign * np.sqrt(abs(I1)) * np.exp(theta1)
