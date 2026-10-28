@@ -147,6 +147,7 @@ class TestBasis:
         rel = RelativeDynamics(target, dynamics)
         _, rhos_tangent = rel.propagate(modes21.tangent, (0.0, period), max_step=0.01)
         times_r, rhos_center = rel.propagate(modes21.in_plane.a, (0.0, period), max_step=0.01)
+        _, rhos_center_b = rel.propagate(modes21.in_plane.b, (0.0, period), max_step=0.01)
         _, rhos_drift = rel.propagate(modes21.drift, (0.0, period), max_step=0.01)
 
         modes = floquet_modes(orbit, dynamics, times=times_r)
@@ -154,11 +155,16 @@ class TestBasis:
         np.testing.assert_allclose(rhos_drift, modes.basis[:, :, 5], rtol=2e-4, atol=2e-5)
 
         theta = modes.in_plane.alpha * times_r / period
-        predicted = (
+        predicted_a = (
             np.cos(theta)[:, None] * modes.basis[:, :, 1]
             - np.sin(theta)[:, None] * modes.basis[:, :, 2]
         )
-        np.testing.assert_allclose(rhos_center, predicted, rtol=2e-4, atol=2e-5)
+        np.testing.assert_allclose(rhos_center, predicted_a, rtol=2e-4, atol=2e-5)
+        predicted_b = (
+            np.sin(theta)[:, None] * modes.basis[:, :, 1]
+            + np.cos(theta)[:, None] * modes.basis[:, :, 2]
+        )
+        np.testing.assert_allclose(rhos_center_b, predicted_b, rtol=2e-4, atol=2e-5)
 
 
 class TestBoundedNormal:
