@@ -125,8 +125,9 @@ class TestBasis:
 
         目标轨迹密网格线性插值后经 RelativeDynamics 逐点线性化积分，
         与单值矩阵路径的差异在登记容差（rtol 2e-4，目标插值主导）内。
-        中心模态的物理解按模态旋转组合复原：Φ(t)a = cos(αt/T)u(t) −
-        sin(αt/T)v(t)。
+        切向与漂移直接对拍，两对中心模态按 a、b 两支复原式覆盖六列中的
+        其余四列：初值 a 对应 cos θ u − sin θ v，初值 b 对应
+        sin θ u + cos θ v。
         """
         orbit, dynamics = dro21
         state0 = orbit.states[0]
@@ -148,23 +149,36 @@ class TestBasis:
         _, rhos_tangent = rel.propagate(modes21.tangent, (0.0, period), max_step=0.01)
         times_r, rhos_center = rel.propagate(modes21.in_plane.a, (0.0, period), max_step=0.01)
         _, rhos_center_b = rel.propagate(modes21.in_plane.b, (0.0, period), max_step=0.01)
+        _, rhos_normal = rel.propagate(modes21.out_of_plane.a, (0.0, period), max_step=0.01)
+        _, rhos_normal_b = rel.propagate(modes21.out_of_plane.b, (0.0, period), max_step=0.01)
         _, rhos_drift = rel.propagate(modes21.drift, (0.0, period), max_step=0.01)
 
         modes = floquet_modes(orbit, dynamics, times=times_r)
         np.testing.assert_allclose(rhos_tangent, modes.basis[:, :, 0], rtol=2e-4, atol=2e-5)
         np.testing.assert_allclose(rhos_drift, modes.basis[:, :, 5], rtol=2e-4, atol=2e-5)
 
-        theta = modes.in_plane.alpha * times_r / period
-        predicted_a = (
-            np.cos(theta)[:, None] * modes.basis[:, :, 1]
-            - np.sin(theta)[:, None] * modes.basis[:, :, 2]
-        )
-        np.testing.assert_allclose(rhos_center, predicted_a, rtol=2e-4, atol=2e-5)
-        predicted_b = (
-            np.sin(theta)[:, None] * modes.basis[:, :, 1]
-            + np.cos(theta)[:, None] * modes.basis[:, :, 2]
-        )
-        np.testing.assert_allclose(rhos_center_b, predicted_b, rtol=2e-4, atol=2e-5)
+        def expanded(theta, u, v, c1, c2):
+            """子空间内初值 c1 a + c2 b 的物理解按两支线性组合复原。"""
+            return c1 * (np.cos(theta)[:, None] * u - np.sin(theta)[:, None] * v) + c2 * (
+                np.sin(theta)[:, None] * u + np.cos(theta)[:, None] * v
+            )
+
+        theta_in = modes.in_plane.alpha * times_r / period
+        theta_out = modes.out_of_plane.alpha * times_r / period
+        for rhos, theta, columns, c1, c2 in (
+            (rhos_center, theta_in, (1, 2), 1.0, 0.0),
+            (rhos_center_b, theta_in, (1, 2), 0.0, 1.0),
+            (rhos_normal, theta_out, (3, 4), 1.0, 0.0),
+            (rhos_normal_b, theta_out, (3, 4), 0.0, 1.0),
+        ):
+            predicted = expanded(
+                theta,
+                modes.basis[:, :, columns[0]],
+                modes.basis[:, :, columns[1]],
+                c1,
+                c2,
+            )
+            np.testing.assert_allclose(rhos, predicted, rtol=2e-4, atol=2e-5)
 
 
 class TestBoundedNormal:
