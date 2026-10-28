@@ -8,6 +8,13 @@
 //! 偏差处快速求值。骨架同 Losacco 等人 2022 年的 DA 多项式流做法：
 //! 一条名义轨迹加高阶偏差映射，不做步长自适应、不做域分裂。
 //!
+//! # 段常值连续推力
+//!
+//! [`propagate_cr3bp_da_with_thrust`] 支持在传播区间内叠加会合系段常值连续
+//! 推力（issue #831）：三个加速度分量各叠加一个常值多项式，事件循环与 RK4
+//! 步进不变。推力分量为零时右端项不做任何 DA 加法，[`propagate_cr3bp_da`]
+//! 与显式零推力入口逐位一致（含 -0.0 系数的位模式）。
+//!
 //! # 与 f64 版 CR3BP 的口径差异
 //!
 //! `e2m2e_forces::cr3bp::cr3bp_eom` 对 r1/r2 设 `MIN_DISTANCE` 钳制防近碰撞
@@ -50,12 +57,13 @@ pub enum DaFlowError {
     Runtime(String),
 }
 
-/// CR3BP 运动方程的 DA 版右端项，逐项转写自 `cr3bp_eom`。
+/// CR3BP 运动方程的 DA 版右端项，逐项转写自 `cr3bp_eom`，并叠加段常值推力。
 ///
-/// 公式：x″ = 2vy + x − (1−μ)(x+μ)/r1³ − μ(x−1+μ)/r2³，y″ = −2vx + y −
-/// (1−μ)y/r1³ − μy/r2³，z″ = −(1−μ)z/r1³ − μz/r2³；r1、r2 为到较大/较小
-/// 天体的距离。**不设 MIN_DISTANCE 钳制**（见模块文档的口径差异说明）。
-fn cr3bp_eom_da(mu: f64, y: [Da; 6]) -> [Da; 6] {
+/// 公式：x″ = 2vy + x − (1−μ)(x+μ)/r1³ − μ(x−1+μ)/r2³ + thrust[0]，y″ 与 z″
+/// 依此类推（y 方程含 −2vx，z 方程无旋转项），推力的三分量依次作用于 x、y、z
+/// 加速度，单位为 CR3BP 无量纲加速度；r1、r2 为到较大/较小天体的距离。
+/// **不设 MIN_DISTANCE 钳制**（见模块文档的口径差异说明）。
+fn cr3bp_eom_da(mu: f64, y: [Da; 6], thrust: &[f64; 3]) -> [Da; 6] {
     let [x, py, pz, vx, vy, vz] = y;
     let xm = 1.0 - mu; // 较大天体质量
     let dx1 = x.clone() + mu; // 航天器 - 较大天体（x=-μ）
@@ -73,18 +81,38 @@ fn cr3bp_eom_da(mu: f64, y: [Da; 6]) -> [Da; 6] {
     let ax = 2.0 * vy.clone() + x - gx1 - gx2;
     let ay = -2.0 * vx.clone() + py - gy1 - gy2;
     let az = -(gz1 + gz2);
-    [vx, vy, vz, ax, ay, az]
+    [
+        vx,
+        vy,
+        vz,
+        add_thrust_component(ax, thrust[0]),
+        add_thrust_component(ay, thrust[1]),
+        add_thrust_component(az, thrust[2]),
+    ]
 }
+
+/// 给加速度分量叠加段常值推力。
+///
+/// 推力分量为零（含 -0.0）时原样返回：`Da + 0.0` 会把常数项的 -0.0 变成
+/// +0.0，破坏零推力路径与无推力入口的逐位一致性。
+fn add_thrust_component(acceleration: Da, thrust: f64) -> Da {
+    if thrust == 0.0 {
+        acceleration
+    } else {
+        acceleration + thrust
+    }
+}
+
 /// `y + h/2·k1` 等中间量按 DA↔f64 双向算术逐分量构造（dace-rs 的二元
-/// 运算按值消费 `Da`，中间量需克隆）。
-fn rk4_step_da(mu: f64, h: f64, y: &[Da; 6]) -> [Da; 6] {
-    let k1 = cr3bp_eom_da(mu, y.clone());
+/// 运算按值消费 `Da`，中间量需克隆）；`thrust` 原样传给每级右端项。
+fn rk4_step_da(mu: f64, h: f64, y: &[Da; 6], thrust: &[f64; 3]) -> [Da; 6] {
+    let k1 = cr3bp_eom_da(mu, y.clone(), thrust);
     let y2 = std::array::from_fn(|i| y[i].clone() + k1[i].clone() * (0.5 * h));
-    let k2 = cr3bp_eom_da(mu, y2);
+    let k2 = cr3bp_eom_da(mu, y2, thrust);
     let y3 = std::array::from_fn(|i| y[i].clone() + k2[i].clone() * (0.5 * h));
-    let k3 = cr3bp_eom_da(mu, y3);
+    let k3 = cr3bp_eom_da(mu, y3, thrust);
     let y4 = std::array::from_fn(|i| y[i].clone() + k3[i].clone() * h);
-    let k4 = cr3bp_eom_da(mu, y4);
+    let k4 = cr3bp_eom_da(mu, y4, thrust);
     std::array::from_fn(|i| {
         y[i].clone()
             + (k1[i].clone() + k2[i].clone() * 2.0 + k3[i].clone() * 2.0 + k4[i].clone())
@@ -92,26 +120,31 @@ fn rk4_step_da(mu: f64, h: f64, y: &[Da; 6]) -> [Da; 6] {
     })
 }
 
-/// CR3BP 多项式流传播（固定步长 RK4 + DA 算术）。
+/// CR3BP 多项式流传播（固定步长 RK4 + DA 算术，可叠加段常值推力）。
 ///
 /// 初值多项式为恒等映射 `constant(y₀ᵢ) + variable(i+1)`；事件序列为
 /// `t_eval` 逐点 + `t_end`：对每个事件按 `h_eff = min(step, |event−t|)·方向`
 /// 步进到事件时刻（含对齐用的截短步），属 `t_eval` 的时刻记录名义状态与
 /// 多项式映射。传播中临时把线程截断阶切到 `order`，返回前恢复旧值。
 ///
+/// `thrust` 为传播区间内会合系段常值连续推力，三分量依次作用于 x、y、z
+/// 加速度（CR3BP 无量纲加速度单位）。分量全为零时右端项不做任何 DA 加法，
+/// 结果与 [`propagate_cr3bp_da`] 逐位一致。
+///
 /// # 错误
 /// - [`DaFlowError::Context`]：DA 上下文未初始化 / 变量数 < 6 / 截断阶越界
 ///   （`set_truncation_order` 会静默钳制、超界变量静默给零多项式，故必须
-///   先挡）、mu 或 step 非正或非有限、t_span 两端相等、t_eval 为空、
-///   非严格单调或落在 t_span 闭区间外。
+///   先挡）、mu 或 step 非正或非有限、thrust 分量非有限、t_span 两端相等、
+///   t_eval 为空、非严格单调或落在 t_span 闭区间外。
 /// - [`DaFlowError::Runtime`]：传播期 DA 运算 panic（如近碰撞除零）。
-pub fn propagate_cr3bp_da(
+pub fn propagate_cr3bp_da_with_thrust(
     mu: f64,
     t_span: (f64, f64),
     t_eval: &[f64],
     initial_state: &[f64; 6],
     order: u32,
     step: f64,
+    thrust: &[f64; 3],
 ) -> Result<DaFlowResult, DaFlowError> {
     // ---- 前置校验（须在触碰 max_order/max_variables 等会 panic 的内省前
     // ---- 先确认已初始化）----
@@ -143,6 +176,13 @@ pub fn propagate_cr3bp_da(
         return Err(DaFlowError::Context(format!(
             "step 必须为正的有限值（步长模长），得到 {step}"
         )));
+    }
+    for (i, &t) in thrust.iter().enumerate() {
+        if !t.is_finite() {
+            return Err(DaFlowError::Context(format!(
+                "thrust 分量 {i} 必须为有限值，得到 {t}"
+            )));
+        }
     }
     let (t0, t_end) = t_span;
     if !t0.is_finite() || !t_end.is_finite() || t0 == t_end {
@@ -198,7 +238,7 @@ pub fn propagate_cr3bp_da(
         for &event in &events {
             while (event - t).abs() > tol_t {
                 let h_eff = step.min((event - t).abs()) * direction;
-                y = rk4_step_da(mu, h_eff, &y);
+                y = rk4_step_da(mu, h_eff, &y, thrust);
                 t += h_eff;
                 n_steps += 1;
             }
@@ -227,6 +267,21 @@ pub fn propagate_cr3bp_da(
     e2m2e_da::set_truncation_order(prev);
 
     run.map_err(|e| DaFlowError::Runtime(format!("DA 运算失败: {e}")))?
+}
+
+/// CR3BP 多项式流传播（零推力入口）。
+///
+/// 以 `thrust = [0.0; 3]` 调用 [`propagate_cr3bp_da_with_thrust`]，结果与
+/// 显式零推力入口逐位一致。
+pub fn propagate_cr3bp_da(
+    mu: f64,
+    t_span: (f64, f64),
+    t_eval: &[f64],
+    initial_state: &[f64; 6],
+    order: u32,
+    step: f64,
+) -> Result<DaFlowResult, DaFlowError> {
+    propagate_cr3bp_da_with_thrust(mu, t_span, t_eval, initial_state, order, step, &[0.0; 3])
 }
 
 #[cfg(test)]
@@ -430,6 +485,230 @@ mod tests {
             Err(DaFlowError::Context(msg)) => assert!(msg.contains("变量数"), "得到 {msg}"),
             Err(other) => panic!("nvars<6 应报 Context 错误，得到 {other:?}"),
             Ok(_) => panic!("nvars<6 应报 Context 错误，却成功返回"),
+        }
+    }
+
+    /// 段常值推力算例：会合系三分量，CR3BP 无量纲加速度单位。
+    const THRUST: [f64; 3] = [1e-4, -2e-4, 5e-5];
+
+    /// 测试内 f64 参考运动方程：CR3BP 右端项叠加会合系常值推力。
+    fn cr3bp_eom_f64(mu: f64, y: &[f64; 6], thrust: &[f64; 3]) -> [f64; 6] {
+        let [x, py, pz, vx, vy, vz] = *y;
+        let xm = 1.0 - mu;
+        let dx1 = x + mu;
+        let dx2 = x + (mu - 1.0);
+        let r1 = (dx1 * dx1 + py * py + pz * pz).sqrt();
+        let r2 = (dx2 * dx2 + py * py + pz * pz).sqrt();
+        let inv_r1_3 = r1.powi(-3);
+        let inv_r2_3 = r2.powi(-3);
+        let gx1 = xm * dx1 * inv_r1_3;
+        let gx2 = mu * dx2 * inv_r2_3;
+        let gy1 = xm * py * inv_r1_3;
+        let gy2 = mu * py * inv_r2_3;
+        let gz1 = xm * pz * inv_r1_3;
+        let gz2 = mu * pz * inv_r2_3;
+        let ax = 2.0 * vy + x - gx1 - gx2 + thrust[0];
+        let ay = -2.0 * vx + py - gy1 - gy2 + thrust[1];
+        let az = -(gz1 + gz2) + thrust[2];
+        [vx, vy, vz, ax, ay, az]
+    }
+
+    /// 测试内 f64 参考 RK4 单步，运算次序同 DA 版。
+    fn rk4_step_f64(mu: f64, h: f64, y: &[f64; 6], thrust: &[f64; 3]) -> [f64; 6] {
+        let k1 = cr3bp_eom_f64(mu, y, thrust);
+        let y2 = std::array::from_fn(|i| y[i] + k1[i] * (0.5 * h));
+        let k2 = cr3bp_eom_f64(mu, &y2, thrust);
+        let y3 = std::array::from_fn(|i| y[i] + k2[i] * (0.5 * h));
+        let k3 = cr3bp_eom_f64(mu, &y3, thrust);
+        let y4 = std::array::from_fn(|i| y[i] + k3[i] * h);
+        let k4 = cr3bp_eom_f64(mu, &y4, thrust);
+        std::array::from_fn(|i| y[i] + (k1[i] + k2[i] * 2.0 + k3[i] * 2.0 + k4[i]) * (h / 6.0))
+    }
+
+    /// 测试内 f64 参考传播：事件截短步逻辑同内核（从 0 单向积分到 t_end）。
+    fn propagate_f64_with_thrust(
+        mu: f64,
+        t_end: f64,
+        initial_state: &[f64; 6],
+        step: f64,
+        thrust: &[f64; 3],
+    ) -> [f64; 6] {
+        let tol_t = 1e-12 * (1.0 + t_end.abs());
+        let mut y = *initial_state;
+        let mut t = 0.0;
+        while (t_end - t).abs() > tol_t {
+            let h = step.min((t_end - t).abs());
+            y = rk4_step_f64(mu, h, &y, thrust);
+            t += h;
+        }
+        y
+    }
+
+    /// 在种子状态上叠加分量偏差后，用 f64 参考传播到 t_end。
+    fn perturbed_f64(
+        mu: f64,
+        t_end: f64,
+        step: f64,
+        thrust: &[f64; 3],
+        deltas: &[(usize, f64)],
+    ) -> [f64; 6] {
+        let mut seed = SEED;
+        for &(j, d) in deltas {
+            seed[j] += d;
+        }
+        propagate_f64_with_thrust(mu, t_end, &seed, step, thrust)
+    }
+
+    /// 零推力入口与显式零推力入口逐位一致：时刻、名义状态、步数与多项式
+    /// 全部系数（含 -0.0 的位模式）相同。
+    #[test]
+    fn test_zero_thrust_bitwise_identical() {
+        ensure_context(2);
+        let t_span = (0.0, 0.25);
+        let t_eval = [0.0, 0.1, 0.25];
+        let base = propagate_cr3bp_da(MU, t_span, &t_eval, &SEED, 2, 1e-2).unwrap();
+        let zero =
+            propagate_cr3bp_da_with_thrust(MU, t_span, &t_eval, &SEED, 2, 1e-2, &[0.0; 3]).unwrap();
+        assert_eq!(base.n_steps, zero.n_steps, "零推力步数应一致");
+        assert_eq!(base.times.len(), zero.times.len(), "零推力输出点数应一致");
+        for k in 0..base.times.len() {
+            assert_eq!(
+                base.times[k].to_bits(),
+                zero.times[k].to_bits(),
+                "times[{k}] 位模式不一致"
+            );
+            for i in 0..6 {
+                assert_eq!(
+                    base.states[k][i].to_bits(),
+                    zero.states[k][i].to_bits(),
+                    "states[{k}][{i}] 位模式不一致"
+                );
+                let base_terms: Vec<(Vec<u32>, u64)> = base.flows[k][i]
+                    .iter_monomials()
+                    .map(|m| (m.jj, m.c.to_bits()))
+                    .collect();
+                let zero_terms: Vec<(Vec<u32>, u64)> = zero.flows[k][i]
+                    .iter_monomials()
+                    .map(|m| (m.jj, m.c.to_bits()))
+                    .collect();
+                assert_eq!(
+                    base_terms, zero_terms,
+                    "flows[{k}][{i}] 单项式系数位模式不一致"
+                );
+            }
+        }
+    }
+
+    /// 常推力下终端名义状态与相同步长 f64 RK4 一致（容差 1e-11）。
+    #[test]
+    fn test_nominal_state_matches_f64_rk4_with_thrust() {
+        ensure_context(2);
+        let arc = 1.0;
+        let step = 1e-3;
+        let da = propagate_cr3bp_da_with_thrust(MU, (0.0, arc), &[arc], &SEED, 2, step, &THRUST)
+            .unwrap();
+        let expect = propagate_f64_with_thrust(MU, arc, &SEED, step, &THRUST);
+        for i in 0..6 {
+            let got = da.states[0][i];
+            let diff = (got - expect[i]).abs();
+            let tol = 1e-11 * expect[i].abs().max(1.0);
+            assert!(
+                diff <= tol,
+                "分量 {i}：DA 名义状态 {got} 对 f64 RK4 {}，差 {diff} 超过容差 {tol}（1e-11 相对/绝对）",
+                expect[i]
+            );
+        }
+    }
+
+    /// 一阶系数与相同步长 f64 RK4 的中心差分一致（相对误差 1e-7）。
+    #[test]
+    fn test_linear_coefficients_match_finite_difference_with_thrust() {
+        ensure_context(1);
+        let arc = 1.0;
+        let step = 1e-3;
+        let h_fd = 1e-5;
+        let da = propagate_cr3bp_da_with_thrust(MU, (0.0, arc), &[arc], &SEED, 1, step, &THRUST)
+            .unwrap();
+        for i in 0..6 {
+            let lin = da.flows[0][i].linear();
+            assert_eq!(lin.len(), 6, "线性系数应有 6 个");
+            for j in 0..6 {
+                let fp = perturbed_f64(MU, arc, step, &THRUST, &[(j, h_fd)]);
+                let fm = perturbed_f64(MU, arc, step, &THRUST, &[(j, -h_fd)]);
+                let fd = (fp[i] - fm[i]) / (2.0 * h_fd);
+                let err = (lin[j] - fd).abs() / fd.abs().max(1.0);
+                assert!(
+                    err <= 1e-7,
+                    "L[{i}][{j}] = {} 对中心差分 {fd}，相对误差 {err} 超过 1e-7",
+                    lin[j]
+                );
+            }
+        }
+    }
+
+    /// 常推力下二阶系数与相同步长 f64 RK4 的中心差分 Hessian 抽查一致
+    /// （容差 1e-6，由 FD 噪声决定）。
+    #[test]
+    fn test_second_order_matches_finite_difference_hessian_with_thrust() {
+        ensure_context(2);
+        let arc = 0.5;
+        let step = 1e-3;
+        let h = 1e-4;
+        let da = propagate_cr3bp_da_with_thrust(MU, (0.0, arc), &[arc], &SEED, 2, step, &THRUST)
+            .unwrap();
+        let f0 = propagate_f64_with_thrust(MU, arc, &SEED, step, &THRUST);
+
+        // x_f 对 δx²：j=k 时多项式系数 = H_jj/2（Taylor 展开含 1/2!）
+        let fpp = perturbed_f64(MU, arc, step, &THRUST, &[(0, 2.0 * h)]);
+        let fmm = perturbed_f64(MU, arc, step, &THRUST, &[(0, -2.0 * h)]);
+        let h_xx = (fpp[0] - 2.0 * f0[0] + fmm[0]) / (4.0 * h * h);
+        let coef_xx = da.flows[0][0].get_coefficient(&[2, 0, 0, 0, 0, 0]);
+        let err = (coef_xx - h_xx / 2.0).abs() / (h_xx / 2.0).abs().max(1.0);
+        assert!(
+            err < 1e-6,
+            "H_xx/2 系数 {coef_xx} 对 FD {}/2，误差 {err} 超过 1e-6",
+            h_xx
+        );
+
+        // y_f 对 δxδy：j≠k 时多项式系数 = H_jk（混合项展开无因子）
+        let mixed = |deltas: &[(usize, f64)]| perturbed_f64(MU, arc, step, &THRUST, deltas)[1];
+        let h_xy =
+            (mixed(&[(0, h), (1, h)]) - mixed(&[(0, h), (1, -h)]) - mixed(&[(0, -h), (1, h)])
+                + mixed(&[(0, -h), (1, -h)]))
+                / (4.0 * h * h);
+        let coef_xy = da.flows[0][1].get_coefficient(&[1, 1, 0, 0, 0, 0]);
+        let err = (coef_xy - h_xy).abs() / h_xy.abs().max(1.0);
+        assert!(
+            err < 1e-6,
+            "H_xy 系数 {coef_xy} 对 FD {h_xy}，误差 {err} 超过 1e-6"
+        );
+    }
+
+    /// 非有限推力分量返回 Context 错误，消息含 thrust。
+    #[test]
+    fn test_nonfinite_thrust_rejected() {
+        ensure_context(1);
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            for idx in 0..3 {
+                let mut thrust = [0.0; 3];
+                thrust[idx] = bad;
+                match propagate_cr3bp_da_with_thrust(
+                    MU,
+                    (0.0, 0.5),
+                    &[0.5],
+                    &SEED,
+                    1,
+                    1e-2,
+                    &thrust,
+                ) {
+                    Err(DaFlowError::Context(msg)) => assert!(
+                        msg.contains("thrust"),
+                        "分量 {idx} = {bad} 的错误消息应含 thrust，得到 {msg}"
+                    ),
+                    Err(other) => panic!("非有限推力应报 Context 错误，得到 {other:?}"),
+                    Ok(_) => panic!("非有限推力应报 Context 错误，却成功返回"),
+                }
+            }
         }
     }
 }
