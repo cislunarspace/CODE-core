@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
-from e2m2e.algorithm.family import design_lyapunov
+from e2m2e.algorithm.family import design_halo, design_lyapunov
 from e2m2e.algorithm.family.orbits.dro import _correct_dro
 from e2m2e.algorithm.family.orbits.walk import earth_moon_system
 from e2m2e.algorithm.proximity import FloquetModeError, floquet_modes
@@ -218,6 +218,17 @@ class TestErrors:
         orbit = design_lyapunov(2, 5000.0)
         dynamics = CR3BP_Dynamics(earth_moon_system())
         with pytest.raises(FloquetModeError, match="双曲"):
+            floquet_modes(orbit, dynamics)
+
+    def test_three_dimensional_orbit_rejected(self) -> None:
+        """三维周期轨道（L2 halo）不在本模块形态内，按平面限制确定性报错。
+
+        三维轨道的单值矩阵面内块与法向块耦合，两对特征向量的 z、vz 支撑
+        互相混杂，按支撑排序贴面内与法向标签会静默出错，因此直接拒绝。
+        """
+        orbit = design_halo(2, 5000.0)
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+        with pytest.raises(FloquetModeError, match="平面"):
             floquet_modes(orbit, dynamics)
 
     def test_grid_must_span_exactly_one_period(self, dro21) -> None:
