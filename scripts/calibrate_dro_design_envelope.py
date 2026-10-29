@@ -64,7 +64,7 @@ def _request(amplitude_km: float) -> DesignOrbitRequest:
 
 
 def _moon_dist_km(ephemeris: Any) -> np.ndarray:
-    """会合系为地心归一，月球在 x=1。"""
+    """会合系为地心归一，月球在 x=1。换算乘平均特征长度，与真实月心距最多差约 5%。"""
     synodic = np.asarray(ephemeris.synodic_position, dtype=float)
     return np.linalg.norm(synodic - np.array([1.0, 0.0, 0.0]), axis=1) * CHAR_LENGTH_KM
 
