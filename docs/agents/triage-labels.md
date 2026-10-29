@@ -6,7 +6,7 @@
 | ------------------ | -------------------- | ------------------------------- |
 | `needs-triage`     | `needs-triage`       | 维护者需要评估此 issue          |
 | `needs-info`       | `needs-info`         | 等待报告者补充更多信息          |
-| `ready-for-agent`  | `ready-for-agent`    | 规格完整，AFK agent 可直接开始  |
+| `ready-for-agent`  | `ready-for-agent`    | 任务要求完整，AFK agent 可直接开始 |
 | `ready-for-human`  | `ready-for-human`    | 需要人工实现                    |
 | `wontfix`          | `wontfix`            | 不予处理                        |
 

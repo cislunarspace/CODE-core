@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-本仓库的 issue 和规格存放在 GitHub Issues 中。所有操作使用 `gh` CLI。
+本仓库的 issue 和任务要求存放在 GitHub Issues 中。所有操作使用 `gh` CLI。
 
 ## 约定
 
