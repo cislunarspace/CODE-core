@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import math
 import os
+import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -78,7 +79,14 @@ from .segmented import (
     _sample_patch_points,
     _sample_patch_points_from_trajectory,
 )
-from .tuning import _FIXED_TIME_ORBIT_TYPES, CORRECTION_TOL_KM, CORRECTION_VEL_WEIGHT
+from .tuning import (
+    _FIXED_TIME_ORBIT_TYPES,
+    CORRECTION_TOL_KM,
+    CORRECTION_VEL_WEIGHT,
+    DRO_EPHEMERIS_ESCAPE_FACTOR,
+    TWO_LEVEL_MAX_ITER,
+    TWO_LEVEL_MAX_ITER_BY_ORBIT_TYPE,
+)
 
 if TYPE_CHECKING:
 
@@ -384,6 +392,79 @@ def _cr3bp_orbit_for(sel: str, params: dict[str, float | int], dynamics: CR3BP_D
     )
 
 
+def _build_design_force_model(
+    spice: SPICEManager,
+    perturbation: dict[str, int],
+    *,
+    earth_degree: int,
+    moon_degree: int,
+    dyb: list[float] | None,
+) -> tuple[Any, EphemerisSystem, dict[str, Any], list[str]]:
+    """构建设计链路的星历力模型，修正与长期预报共用同一份配置。
+
+    返回 ``(ForceModel, EphemerisSystem, force_config, bodies)``。``bodies``
+    是星历预采样缓存需要注册的天体名单，含摄动体。
+    """
+    from ..forces import ForceModel
+    from ..forces.force_mapping import perturbation_to_force_config
+
+    sw = dict(perturbation)
+    bodies = ["EARTH", "MOON"]
+    if sw["sun_body"]:
+        bodies.append("SUN")
+    if sw["planets"]:
+        bodies += ["MERCURY", "VENUS", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE"]
+
+    full_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
+    full_system.coordinate_system = CoordinateSystem(
+        axes=ICRSAxes(),
+        origin=CelestialBodyOrigin(body="EARTH", spice=spice),
+    )
+    force_config = perturbation_to_force_config(
+        perturbation, earth_degree=earth_degree, moon_degree=moon_degree, dyb=dyb
+    )
+    fm = ForceModel.from_config(force_config, full_system)
+    fm.rtol = 1e-12
+    fm.atol = 1e-12
+    fm.max_step = 600.0
+    return fm, full_system, force_config, bodies
+
+
+def _warn_if_dro_ephemeris_unbounded(
+    orbit_type: str,
+    amplitude_km: float | None,
+    ephemeris: EphemerisTable,
+    characteristic_length_km: float,
+    duration_day: float,
+) -> None:
+    """DRO 长期星历有界性告警。
+
+    星历修正的收敛判据只约束修正弧段内的拼接残差，不约束修正后首状态
+    自由外推的长期行为。实测 150000 km 默认设计一年外推后逃逸到
+    1.6e7 km，修正残差仍在容差内；200000 km 在 109 次迭代后一年月距
+    保持在 313100 km 以内。月距最大值超过设计振幅的告警阈值时发出
+    ``UserWarning``，提示该振幅的长期星历不可用。
+    """
+    if orbit_type != "DRO" or amplitude_km is None or amplitude_km <= 0.0:
+        return
+    synodic = np.asarray(ephemeris.synodic_position, dtype=float)
+    if synodic.size == 0:
+        return
+    moon_dist_km = (
+        np.linalg.norm(synodic - np.array([1.0, 0.0, 0.0]), axis=1)
+        * float(characteristic_length_km)
+    )
+    max_dist_km = float(moon_dist_km.max())
+    if max_dist_km > DRO_EPHEMERIS_ESCAPE_FACTOR * float(amplitude_km):
+        warnings.warn(
+            f"DRO 星历外推 {duration_day:.1f} 天后与月心距离最大 {max_dist_km:.0f} km，"
+            f"超过设计振幅 {amplitude_km:.0f} km 的 {DRO_EPHEMERIS_ESCAPE_FACTOR:.0f} 倍。"
+            "修正残差达标只说明修正弧段连续，不代表长期星历有界。",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
 def _build_ephemeris_table(
     spice: SPICEManager,
     syn_j2000: SynodicJ2000System,
@@ -648,8 +729,11 @@ def design_orbit(
 
     system = earth_moon_system()
     dynamics = CR3BP_Dynamics(system)
+    characteristic_length_km = system.characteristic_length
+    assert characteristic_length_km is not None
     cr3bp_orbit = _cr3bp_orbit_for(sel, params, dynamics)
     phase = float(params.get("phase", 0.0))
+    amplitude_km = float(params["amplitude"]) if params.get("amplitude") is not None else None
     jacobi = float(system.get_jacobi_constant(cr3bp_orbit.states[0]))
 
     # --- 相位 → 历元状态，采样 patch points，转 J2000 ---
@@ -702,30 +786,15 @@ def design_orbit(
     t_patch_j2000 = et0 + t_patch_syn * t_c
 
     # --- 力模型构建（修正 + 长期预报共用） ---
-    from ..forces import ForceModel
-    from ..forces.force_mapping import perturbation_to_force_config
-
     if perturbation is None:
         perturbation = DEFAULT_DESIGN_PERTURBATION
-    sw = dict(perturbation)
-    bodies = ["EARTH", "MOON"]
-    if sw["sun_body"]:
-        bodies.append("SUN")
-    if sw["planets"]:
-        bodies += ["MERCURY", "VENUS", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE"]
-
-    full_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
-    full_system.coordinate_system = CoordinateSystem(
-        axes=ICRSAxes(),
-        origin=CelestialBodyOrigin(body="EARTH", spice=spice),
+    fm, full_system, force_config, bodies = _build_design_force_model(
+        spice,
+        perturbation,
+        earth_degree=earth_degree,
+        moon_degree=moon_degree,
+        dyb=dyb,
     )
-    force_config = perturbation_to_force_config(
-        perturbation, earth_degree=earth_degree, moon_degree=moon_degree, dyb=dyb
-    )
-    fm = ForceModel.from_config(force_config, full_system)
-    fm.rtol = 1e-12
-    fm.atol = 1e-12
-    fm.max_step = 600.0
 
     assert request.duration is not None  # model_validator 已填默认值
     duration_sec = float(request.duration)
@@ -913,6 +982,9 @@ def design_orbit(
             state_patch=s_patch_long,
         )
         ephemeris = _build_ephemeris_table(spice, syn_j2000, et0, et_grid, states_dense)
+        _warn_if_dro_ephemeris_unbounded(
+            sel, amplitude_km, ephemeris, float(characteristic_length_km), duration_day
+        )
 
         return OrbitDesignResult(
             orbit_type=sel,
@@ -968,10 +1040,9 @@ def design_orbit(
         frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
     )
     try:
-        # 不稳定轨道（Halo/NRHO，STM 谱半径 ~1e7/圈）单弧打靶每轮线搜索代价高、
-        # 收敛慢；正路是延拓计算 + 缓存初值复用（独立工作）。在此之前给低 max_iter
-        # 使其快速判定不收敛（抛 DesignNotConvergedError 供上层 skip），避免长时挂起。
-        _ms_max_iter = 25 if sel in ("HALO", "NRHO") else 80
+        # 上限按族取：Halo/NRHO 给低值快速判定不收敛；DRO 需容纳
+        # 200000 km 的 109 次慢收敛尾部。见 tuning.TWO_LEVEL_MAX_ITER_BY_ORBIT_TYPE。
+        _ms_max_iter = TWO_LEVEL_MAX_ITER_BY_ORBIT_TYPE.get(sel, TWO_LEVEL_MAX_ITER)
         result = _msc(
             forces_py,
             "EARTH",
@@ -994,12 +1065,20 @@ def design_orbit(
                 cause=result.cause,
             )
         t0_corr = float(result.t_patch[0])
-        out = fm.propagate(
-            np.asarray(result.state_patch[0], dtype=float),
-            (min(t0_corr, et0), float(et_grid[-1])),
-            t_eval=et_grid,
-            max_steps=2_000_000,
-        )
+        try:
+            out = fm.propagate(
+                np.asarray(result.state_patch[0], dtype=float),
+                (min(t0_corr, et0), float(et_grid[-1])),
+                t_eval=et_grid,
+                max_steps=2_000_000,
+            )
+        except RuntimeError as exc:
+            # 大振幅 DRO 的长期传播可能在积分器里步长崩溃（实测 160000 km）。
+            # 转成领域软失败，避免原生 RuntimeError 泄漏成 INTERNAL_ERROR。
+            raise DesignNotConvergedError(
+                f"{sel} 星历长期传播失败：{exc}",
+                cause=FailureCause.INTEGRATION_FAILED,
+            ) from exc
     finally:
         spice.disable_ephem_cache()
 
@@ -1017,6 +1096,9 @@ def design_orbit(
     )
     ephemeris = _build_ephemeris_table(
         spice, syn_j2000, et0, et_grid, np.asarray(out["states"], dtype=float)
+    )
+    _warn_if_dro_ephemeris_unbounded(
+        sel, amplitude_km, ephemeris, float(characteristic_length_km), duration_day
     )
 
     return OrbitDesignResult(

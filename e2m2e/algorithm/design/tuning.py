@@ -74,3 +74,21 @@ _PATCH_SAMPLING_DROP_NEAR_PERILUNE = "drop_near_perilune"
 _FIXED_TIME_ORBIT_TYPES = frozenset(
     {"HALO", "NRHO", "DPO", "LYAPUNOV", "LISSAJOUS", "L4", "L5", "AXIAL", "RO"}
 )
+
+#: two_level 多重打靶的默认最大迭代数。不稳定轨道（Halo/NRHO，STM 谱半径
+#: ~1e7/圈）单弧打靶每轮线搜索代价高、收敛慢，正路是延拓计算与缓存初值
+#: 复用（独立工作）；在此之前给低上限使其快速判定不收敛。其余族沿用 80。
+TWO_LEVEL_MAX_ITER = 80
+
+#: 按族覆盖的 two_level 最大迭代数。DRO 在 200000 km、默认一年 duration
+#: 下实测 109 次收敛（位置残差 1.795e-2 km），80 次上限把慢收敛尾部截断，
+#: 误报不收敛；150000 km 只需 53 次，300000/400000 km 在停滞判据处提前
+#: 停止，不受上限影响。留出约 40% 余量取 150。
+TWO_LEVEL_MAX_ITER_BY_ORBIT_TYPE = {"HALO": 25, "NRHO": 25, "DRO": 150}
+
+#: DRO 星历有界性告警阈值：整段外推中月距最大值超过设计振幅的倍数。
+#: 星历修正残差只约束修正弧段，不约束修正后首状态的长期行为。实测
+#: 150000 km 默认设计一年外推后地心距 1.644e7 km，而修正残差仍在容差内；
+#: 200000 km 在 109 次迭代后一年月距保持在 313100 km 以内。3 倍给正常
+#: DRO 的远月点留出余量，只拦明显逃逸。
+DRO_EPHEMERIS_ESCAPE_FACTOR = 3.0

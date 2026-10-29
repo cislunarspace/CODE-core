@@ -4,10 +4,12 @@
     .venv/bin/python scripts/verify_dro_amplitude_envelope.py
     .venv/bin/python scripts/verify_dro_amplitude_envelope.py --probe-failures
 
-默认运行 150000 km 的 design_orbit（请求模型默认一年 duration），预期
-CONVERGED 且星历修正收敛。--probe-failures 追加 200000、300000、400000 km
-的算法层探测，记录不收敛证据；这些振幅超出 150000 km 的公开包络，脚本
-绕过请求模型校验直接调用算法层。带 --probe-failures 的完整运行约十分钟。
+默认运行 150000 km 的 design_orbit（请求模型默认一年 duration），检查
+星历修正收敛。150000 km 的一年星历会逃逸，长期有界性改由
+scripts/calibrate_dro_design_envelope.py 检查，本脚本不重复。
+--probe-failures 追加 250000、300000、400000 km 的算法层探测，记录不收敛
+证据；这些振幅超出 200000 km 的公开包络，脚本绕过请求模型校验直接调用
+算法层。带 --probe-failures 的完整运行约十分钟。
 
 不要在 scripts/ 里用 uv run，它会触发 editable 重建。
 """
@@ -66,7 +68,7 @@ def main() -> int:
 
     unexpected_convergence = False
     if args.probe_failures:
-        for amplitude_km in (200000.0, 300000.0, 400000.0):
+        for amplitude_km in (250000.0, 300000.0, 400000.0):
             start = time.perf_counter()
             try:
                 probe, elapsed = _run(amplitude_km, bypass_validation=True)
