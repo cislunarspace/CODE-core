@@ -4,8 +4,8 @@
     .venv/bin/python scripts/verify_dro_amplitude_envelope.py
     .venv/bin/python scripts/verify_dro_amplitude_envelope.py --probe-failures
 
-默认运行 150000 km 的 design_orbit（请求模型默认一年 duration），检查
-星历修正收敛。150000 km 的一年星历会逃逸，长期有界性改由
+默认运行 200000 km 的 design_orbit（请求模型默认一年 duration），检查
+结果状态与星历修正均收敛。150000 km 的一年星历会逃逸，长期有界性改由
 scripts/calibrate_dro_design_envelope.py 检查，本脚本不重复。
 --probe-failures 追加 250000、300000、400000 km 的算法层探测，记录不收敛
 证据；这些振幅超出 200000 km 的公开包络，脚本绕过请求模型校验直接调用
@@ -51,20 +51,20 @@ def main() -> int:
     parser.add_argument(
         "--probe-failures",
         action="store_true",
-        help="追加 200000、300000、400000 km 的算法层不收敛探测",
+        help="追加 250000、300000、400000 km 的算法层不收敛探测",
     )
     args = parser.parse_args()
 
-    result, elapsed = _run(150000.0, bypass_validation=False)
+    result, elapsed = _run(200000.0, bypass_validation=False)
     correction_status = result.correction.status if result.correction is not None else None
-    print(f"150000 km: status={result.status} correction={correction_status} {elapsed:.1f}s")
+    print(f"200000 km: status={result.status} correction={correction_status} {elapsed:.1f}s")
     if (
         result.status is not ConvergenceState.CONVERGED
         or correction_status is not ConvergenceState.CONVERGED
     ):
-        print("150000 km 未达到预期，DRO 轨道设计包络需要重新标定")
+        print("200000 km 未达到预期，DRO 轨道设计包络需要重新标定")
         return 1
-    print("150000 km 通过")
+    print("200000 km 通过")
 
     unexpected_convergence = False
     if args.probe_failures:

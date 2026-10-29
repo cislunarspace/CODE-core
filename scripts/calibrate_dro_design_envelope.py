@@ -118,6 +118,9 @@ def _design(amplitude_km: float) -> tuple[dict[str, Any], float]:
         "moon_degree": int(request.moon_degree),
         "correction_method": result.correction_method,
         "correction_revolutions": int(request.correction_revolutions),
+        "result_status": getattr(result.status, "name", str(result.status)),
+        "cause": getattr(result.cause, "name", str(result.cause)),
+        "message": result.message,
         "cr3bp": {
             "x0": float(orbit.states[0, 0]),
             "vy0": float(orbit.states[0, 4]),
@@ -203,6 +206,10 @@ def _verify(record: dict[str, Any]) -> tuple[bool, str]:
             old_max <= DRO_EPHEMERIS_ESCAPE_FACTOR * float(record["amplitude_km"]),
         )
     )
+    expected_status = "CONVERGED" if bounded else "DIVERGED"
+    recorded_status = record.get("result_status")
+    if recorded_status is not None and recorded_status != expected_status:
+        return False, f"记录状态 {recorded_status} 与一年星历有界性 {expected_status} 不符"
     if bounded:
         if abs(new_max - old_max) > 1e-6 * max(1.0, abs(old_max)):
             return False, f"一年星历最大月距 {new_max:.1f} km 与记录 {old_max:.1f} km 不符"
@@ -273,8 +280,9 @@ def main() -> int:
             )
             if not bounded:
                 failures += 1
+            status = record.get("result_status", record["correction"]["status"])
             print(
-                f"{amplitude:9.0f} {mode:>6} {record['correction']['status']:>10} "
+                f"{amplitude:9.0f} {mode:>6} {status:>10} "
                 f"{record['correction']['iterations']:4d} "
                 f"{record['correction']['position_residual_km']:10.3e} "
                 f"{year['moon_dist_max_km']:10.1f} {str(bounded):>4} "
@@ -295,8 +303,9 @@ def main() -> int:
         if not record["bounded"]:
             failures += 1
         warn = " 告警" if record["warnings"] else ""
+        status = record.get("result_status", record["correction"]["status"])
         print(
-            f"{amplitude:9.0f} {'设计':>6} {record['correction']['status']:>10} "
+            f"{amplitude:9.0f} {'设计':>6} {status:>10} "
             f"{record['correction']['iterations']:4d} "
             f"{record['correction']['position_residual_km']:10.3e} "
             f"{record['year']['moon_dist_max_km']:10.1f} "

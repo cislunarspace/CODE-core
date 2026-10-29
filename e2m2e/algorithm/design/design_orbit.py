@@ -232,8 +232,10 @@ class OrbitDesignResult:
         write_ephemeris(self.ephemeris, path)
 
 
-def _design_stages() -> tuple[StageRecord, ...]:
-    """返回成功设计链路的阶段记录。"""
+def _design_stages(
+    *, propagation_status: ConvergenceState = ConvergenceState.CONVERGED
+) -> tuple[StageRecord, ...]:
+    """返回设计链路的阶段记录。传播阶段可因长期星历发散而报 DIVERGED。"""
     return (
         StageRecord(
             "initial_guess",
@@ -248,7 +250,7 @@ def _design_stages() -> tuple[StageRecord, ...]:
             result_status=ConvergenceState.CONVERGED,
         ),
         StageRecord(
-            "propagation", applicable=True, executed=True, result_status=ConvergenceState.CONVERGED
+            "propagation", applicable=True, executed=True, result_status=propagation_status
         ),
     )
 
@@ -430,39 +432,70 @@ def _build_design_force_model(
     return fm, full_system, force_config, bodies
 
 
-def _warn_if_dro_ephemeris_unbounded(
+def _dro_ephemeris_divergence_km(
     orbit_type: str,
     amplitude_km: float | None,
     ephemeris: EphemerisTable,
     characteristic_length_km: float,
-    duration_day: float,
-) -> None:
-    """DRO 长期星历有界性告警。
-
-    星历修正的收敛判据只约束修正弧段内的拼接残差，不约束修正后首状态
-    自由外推的长期行为。实测 150000 km 默认设计一年外推后逃逸到
-    1.6e7 km，修正残差仍在容差内；200000 km 在 109 次迭代后一年月距
-    保持在 313100 km 以内。月距最大值超过设计振幅的告警阈值时发出
-    ``UserWarning``，提示该振幅的长期星历不可用。
-    """
+) -> float | None:
+    """返回 DRO 长期星历超过有界性阈值的最大月距，未超过或非 DRO 返回 None。"""
     if orbit_type != "DRO" or amplitude_km is None or amplitude_km <= 0.0:
-        return
+        return None
     synodic = np.asarray(ephemeris.synodic_position, dtype=float)
     if synodic.size == 0:
-        return
+        return None
     moon_dist_km = (
         np.linalg.norm(synodic - np.array([1.0, 0.0, 0.0]), axis=1)
         * float(characteristic_length_km)
     )
     max_dist_km = float(moon_dist_km.max())
     if max_dist_km > DRO_EPHEMERIS_ESCAPE_FACTOR * float(amplitude_km):
-        warnings.warn(
-            f"DRO 星历外推 {duration_day:.1f} 天后与月心距离最大 {max_dist_km:.0f} km，"
-            f"超过设计振幅 {amplitude_km:.0f} km 的 {DRO_EPHEMERIS_ESCAPE_FACTOR:.0f} 倍。"
-            "修正残差达标只说明修正弧段连续，不代表长期星历有界。",
-            UserWarning,
-            stacklevel=3,
+        return max_dist_km
+    return None
+
+
+def _ephemeris_result_status(
+    orbit_type: str,
+    amplitude_km: float | None,
+    ephemeris: EphemerisTable,
+    characteristic_length_km: float,
+    duration_day: float,
+) -> tuple[ConvergenceState, FailureCause, str, ConvergenceState]:
+    """判定 DRO 长期星历有界性，返回结果三元组与传播阶段状态。
+
+    星历修正的收敛判据只约束修正弧段内的拼接残差，不约束修正后首状态
+    自由外推的长期行为。实测 150000 km 默认设计一年外推后逃逸到
+    1.6e7 km，修正残差仍在容差内；200000 km 在 109 次迭代后一年月距
+    保持在 313100 km 以内。月距最大值超过设计振幅的阈值时把结果置
+    ``DIVERGED``/``DIVERGENCE_DETECTED``，让工具面响应携带失败状态，
+    同时保留 ``UserWarning`` 供进程内调用方即时发现。
+    """
+    divergence_km = _dro_ephemeris_divergence_km(
+        orbit_type, amplitude_km, ephemeris, characteristic_length_km
+    )
+    if divergence_km is None:
+        return (
+            ConvergenceState.CONVERGED,
+            FailureCause.NONE,
+            "任务完成",
+            ConvergenceState.CONVERGED,
         )
+    assert amplitude_km is not None
+    message = (
+        f"标称星历长期发散：外推 {duration_day:.1f} 天后与月心距离最大 {divergence_km:.0f} km，"
+        f"超过设计振幅 {amplitude_km:.0f} km 的 {DRO_EPHEMERIS_ESCAPE_FACTOR:.0f} 倍"
+    )
+    warnings.warn(
+        message + "。修正残差达标只说明修正弧段连续，不代表长期星历有界。",
+        UserWarning,
+        stacklevel=3,
+    )
+    return (
+        ConvergenceState.DIVERGED,
+        FailureCause.DIVERGENCE_DETECTED,
+        message,
+        ConvergenceState.DIVERGED,
+    )
 
 
 def _build_ephemeris_table(
@@ -982,7 +1015,7 @@ def design_orbit(
             state_patch=s_patch_long,
         )
         ephemeris = _build_ephemeris_table(spice, syn_j2000, et0, et_grid, states_dense)
-        _warn_if_dro_ephemeris_unbounded(
+        status, cause, message, propagation_status = _ephemeris_result_status(
             sel, amplitude_km, ephemeris, float(characteristic_length_km), duration_day
         )
 
@@ -998,7 +1031,10 @@ def design_orbit(
             correction=correction,
             correction_method=correction_method,
             force_config=force_config,
-            stages=_design_stages(),
+            status=status,
+            cause=cause,
+            message=message,
+            stages=_design_stages(propagation_status=propagation_status),
         )
 
     # --- 稳定轨道路径（DRO 等）：Rust 多重打靶（速度加权）+ 长期预报 ---
@@ -1097,7 +1133,7 @@ def design_orbit(
     ephemeris = _build_ephemeris_table(
         spice, syn_j2000, et0, et_grid, np.asarray(out["states"], dtype=float)
     )
-    _warn_if_dro_ephemeris_unbounded(
+    status, cause, message, propagation_status = _ephemeris_result_status(
         sel, amplitude_km, ephemeris, float(characteristic_length_km), duration_day
     )
 
@@ -1113,4 +1149,8 @@ def design_orbit(
         correction=correction,
         correction_method=correction_method,
         force_config=force_config,
+        status=status,
+        cause=cause,
+        message=message,
+        stages=_design_stages(propagation_status=propagation_status),
     )

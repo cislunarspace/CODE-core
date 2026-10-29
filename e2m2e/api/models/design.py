@@ -25,8 +25,9 @@ __all__ = [
 _GLOBAL_AMPLITUDE_OUT_RANGES = _with_global_amplitude_out(_range_map())
 #: DRO 与 DPO 的轨道设计振幅包络分别标定（ADR 0061）：DRO 的 200000 km
 #: 上界来自 150000 到 200000 km、5000 km 步长的标定。175000 km 到
-#: 200000 km 的一年星历有界，150000 km 到 170000 km 属于逃逸带，设计时
-#: 会发长期有界性告警。150000 km 以下未逐点复核。DPO 维持原包络。
+#: 200000 km 的一年星历有界，150000 km 到 170000 km 属于逃逸带，这些
+#: 振幅的设计结果状态为 DIVERGED 并发长期有界性告警。150000 km 以下
+#: 未逐点复核。DPO 维持原包络。
 #: 族生成侧另有独立包络。
 _DRO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
 _DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 110000.0)))
