@@ -5,7 +5,7 @@
 ## 约定
 
 - **创建 issue**：`gh issue create --title "..." --body "..."`。多行正文用 heredoc。
-- **AI 贡献标记**：AI 提交的 issue 与 PR 标题以 `[AI Generated][<类型>]` 开头；类型标签、`[BREAKING]` 的加法与各处的分类口径见 `CONTRIBUTING.md` 的标签体系统一表，本文件不重复枚举。AI 写的评论首行用 `> **[AI Generated]** 本评论由 AI 完成。` 或 `> **[AI Assisted]** 本评论由 AI 辅助完成。`
+- **AI 贡献标记**：AI 提交的 issue 与 PR 标题以 `[AI Generated][<类型>]` 开头；类型标签、`[BREAKING]` 的加法与各处的分类口径见 `CONTRIBUTING.md` 的标签体系统一表，本文件不重复枚举。AI 写的评论在最后一行加标记，语言跟正文一致，写明 harness 与模型：中文用 `> 本评论由 <Harness> 的 <模型> 完成。` 或 `> 本评论由 <Harness> 的 <模型> 辅助完成。`，英文用 `> Written by <Harness> using <model>.` 或 `> Drafted by <Harness> using <model>, edited by a human.`
 - **读取 issue**：`gh issue view <number> --comments`，用 `jq` 过滤评论，同时获取标签。
 - **列出 issue**：`gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`，按需加 `--label` 和 `--state` 过滤。
 - **评论 issue**：`gh issue comment <number> --body "..."`
