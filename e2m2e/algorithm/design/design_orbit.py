@@ -441,7 +441,8 @@ def _dro_ephemeris_divergence_km(
     """返回 DRO 长期星历超过有界性阈值的最大月距，未超过或非 DRO 返回 None。
 
     会合系位置按逐点瞬时地月距离归一，这里乘固定的平均特征长度换算成 km，
-    数值与真实月心距最多差约 5%，只用于与留有余量的阈值比较和结果叙述。"""
+    数值相对真实月心距的偏差在偏低约 5% 到偏高约 8% 之间，只用于与留有余量
+    的阈值比较和结果叙述。"""
     if orbit_type != "DRO" or amplitude_km is None or amplitude_km <= 0.0:
         return None
     synodic = np.asarray(ephemeris.synodic_position, dtype=float)
