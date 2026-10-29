@@ -558,6 +558,9 @@ pub fn da_ads_split(
 /// - ``initial_state``：名义初值 6 维。
 /// - ``order``：截断阶，取 1..=当前上下文阶数。
 /// - ``step``：RK4 步长模长，正有限值。
+/// - ``thrust``：会合系段常值连续推力加速度三分量，CR3BP 无量纲加速度单位，
+///   缺省 ``None`` 等价于零向量。给定时长度必须为 3 且各分量有限。零推力
+///   调用的结果与无推力内核逐位一致。
 ///
 /// # 返回
 /// Python dict：``{"times": [...], "states": [[6], ...],
@@ -568,7 +571,7 @@ pub fn da_ads_split(
 /// ``RuntimeError``。DA 版 EOM 不设最小距离钳制，近碰撞轨迹表现为
 /// DA 域错误（口径差异见 ``e2m2e-dyn::polynomial_flow`` 模块文档）。
 #[pyfunction]
-#[pyo3(signature = (mu, t_span, t_eval, initial_state, order, step))]
+#[pyo3(signature = (mu, t_span, t_eval, initial_state, order, step, thrust = None))]
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_cr3bp_da_py(
     mu: f64,
@@ -577,9 +580,10 @@ pub fn propagate_cr3bp_da_py(
     initial_state: Vec<f64>,
     order: u32,
     step: f64,
+    thrust: Option<Vec<f64>>,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
-    use e2m2e_dyn::polynomial_flow::{propagate_cr3bp_da, DaFlowError};
+    use e2m2e_dyn::polynomial_flow::{propagate_cr3bp_da_with_thrust, DaFlowError};
     use pyo3::types::PyDict;
 
     if initial_state.len() != 6 {
@@ -593,11 +597,30 @@ pub fn propagate_cr3bp_da_py(
     }
     let mut state0 = [0.0_f64; 6];
     state0.copy_from_slice(&initial_state);
+    let thrust_accel: [f64; 3] = match thrust {
+        None => [0.0; 3],
+        Some(components) => {
+            if components.len() != 3 {
+                return Err(PyValueError::new_err(format!(
+                    "thrust must have length 3, got {}",
+                    components.len()
+                )));
+            }
+            if !components.iter().all(|c| c.is_finite()) {
+                return Err(PyValueError::new_err(format!(
+                    "thrust components must be finite, got {components:?}"
+                )));
+            }
+            [components[0], components[1], components[2]]
+        }
+    };
 
     // 释 GIL 段 = DA 传播主循环；DA 上下文是进程级、截断阶线程局部，
     // allow_threads 不换线程，闭包内无 Python 对象。
     let result = py
-        .allow_threads(|| propagate_cr3bp_da(mu, t_span, &t_eval, &state0, order, step))
+        .allow_threads(|| {
+            propagate_cr3bp_da_with_thrust(mu, t_span, &t_eval, &state0, order, step, &thrust_accel)
+        })
         .map_err(|e| match e {
             DaFlowError::Context(msg) => PyValueError::new_err(msg),
             DaFlowError::Runtime(msg) => {
