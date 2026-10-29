@@ -6,7 +6,7 @@
 
 工程技能在会话中读取 `docs/agents/` 下的仓库级配置；改动这些文件即改变技能行为，需同步本文件。配置本身用中文书写，遵循本文件的语言约定。
 
-- `docs/agents/issue-tracker.md`：issue 与规格的存放位置、`gh` 操作约定、AI 贡献标记、PR 是否作为请求渠道、发布说明的起草要求（以调用方为受众，把 CHANGELOG 对应节提炼成稿，中英双语单正文，条目末尾附 PR 与 issue 编号，小标题取 `CONTRIBUTING.md` 的分类统一表；禁止自动生成 notes 直接交付），以及 GitHub Project 的工作状态配置（Project ID、Status / Priority / Start Date 字段与选项 ID）。由 `/code-review`、`/github-project`、`/merge-pr`、`/open-pr` 按路径读取，`/triage` 读取其中的渠道标记与 Project 配置。
+- `docs/agents/issue-tracker.md`：issue 与任务要求的存放位置、`gh` 操作约定、AI 贡献标记、PR 是否作为请求渠道、发布说明的起草要求（以调用方为受众，把 CHANGELOG 对应节提炼成稿，中英双语单正文，条目末尾附 PR 与 issue 编号，小标题取 `CONTRIBUTING.md` 的分类统一表；禁止自动生成 notes 直接交付），以及 GitHub Project 的工作状态配置（Project ID、Status / Priority / Start Date 字段与选项 ID）。由 `/code-review`、`/github-project`、`/merge-pr`、`/open-pr` 按路径读取，`/triage` 读取其中的渠道标记与 Project 配置。
 - `docs/agents/triage-labels.md`：五个分诊角色到本仓库标签字符串的映射，供分诊流程按角色取用；映射缺失时 `/triage` 会要求运行 `/setup-ouyangjiahong-skills`。
 - `docs/agents/domain.md`：探索代码库时如何读 `CONTEXT.md` 与 `docs/adr/`、如何按术语表用词、如何标注 ADR 冲突。供探索代码库的技能使用；术语与决策落定时由 `/domain-modeling` 更新 `CONTEXT.md` 与 ADR。
 - `docs/agents/multi-session-concurrency.md`：多会话并发约定。
@@ -115,7 +115,7 @@ make clean-tests
 - 新增工具的顺序是：算法实现 → `Facade`/`Catalog`/`Spatiography` 方法加 `@mcp_exposed(request_model=...)` → 检查 `tool_inventory()` 派生面 → 补接口行为测试。不要在 MCP、CLI、sidecar 中复制业务逻辑。
 - 注释、docstring、commit、Issue、PR 和 Agent brief 用中文；面向调用方的行为变化更新 `CHANGELOG.md`。ADR 是决策快照，后续变化追加修订或新开递增 ADR，不改写历史结论。
 - Issue/PR 正文、AI 生成的评论、commit body 与 CHANGELOG 条目按 `CONTRIBUTING.md` 的“正文写作约定”写：完整叙述回答固定问题集、平实句子、少特殊符号、细节不进折叠区；开单模板已内联问题集引导。
-- AI 标记的形式照仓库约定（issue/PR 标题 `[AI Generated][<类型>]` 前缀、评论首行 `> **[AI Generated]** 本评论由 AI 完成。`，见 `docs/agents/issue-tracker.md`）；标记里的执行者身份按**当前**工作环境如实写（如 `omp agent 会话`），不照抄既有 issue / PR / 评论里他次的身份，也不编造工具名。
+- AI 标记的形式照仓库约定（issue/PR 标题 `[AI Generated][<类型>]` 前缀、评论末行 `> 本评论由 <Harness> 的 <模型> 完成。`，见 `docs/agents/issue-tracker.md`）；标记里的执行者身份按**当前**工作环境如实写（如 `omp agent 会话`），不照抄既有 issue / PR / 评论里他次的身份，也不编造工具名。
 - 文档（README、NOTICE、CHANGELOG、CONTEXT、ADR、`docs/` 与 `.out-of-scope/` 下所有页面，以及代码内中文注释与 docstring）不得使用直角引号「」『』（U+300C/U+300D/U+300E/U+300F），引用词语统一用弯引号“”（U+201C/U+201D），嵌套用弯单引号‘’（U+2018/U+2019），同一文件内保持一致；引号只在确为引用时使用，能直接叙述的就不要加引号；代码示例、行内代码与英文原文引述里的 ASCII 引号属代码语法或原样引述，保持不动。机器门禁为 `scripts/check_doc_quotes.py`，随 `make check` 运行。
 
 ## Important Files
@@ -150,11 +150,11 @@ make clean-tests
 
 ## 写作要求
 
-所有面向人读的文本（注释、CONTEXT.md、ADR、issue 评论、PR 描述、agent brief、分诊记录、文档、Agent 回复）应当：
+所有供人阅读的文本（注释、CONTEXT.md、ADR、issue 评论、PR 描述、agent brief、分诊记录、文档、Agent 回复）应当：
 
 - 准确、清楚、简洁。先理解材料，再提炼结论。
 - 按逻辑组织，区分相近概念。不用空泛、夸大的修饰语。
-- 面向实际读者，从已知事实推到陌生结论。用分析说服，不装腔或堆砌。
+- 面向实际读者，从已知事实推到陌生结论。用分析说服，不装腔作势，不堆砌辞藻。
 - 语言统一中文，不中英混用。命令、代码、路径、专有名词保留原文。
 - 概念不直译。没有通行译名的概念用功能描述，不生造译名。同一概念全文只用一个词：用“标准”不用“规范”，用“任务要求”不用“规格”，测试结果用“通过、失败”不用“红、绿”。
 - 标点符号：中文语境用全角中文标点（句号“。”、逗号“，”、顿号“、”）。纯英文句子用英文标点。行内代码、文件名、命令后的标点根据所在句子语境选择。引号：中文用弯引号“”，英文用直引号""。列举用顿号（“、”）分隔，最后一项前不加“和”或“与”。
@@ -166,10 +166,10 @@ make clean-tests
 - 先理解再改动：完整阅读目标文件、相似实现和相关测试。不确定 API 或惯例时查源码或文档，不猜。
 - 明确目标与决策：需求或验收条件不明确时先澄清。架构选择、假设和关键取舍要说明。
 - 保持简单：只实现当前需求。复用已有模式。不为单一用例过早抽象、配置化或引入依赖。
-- 精准修改：只改与任务直接相关的代码，贴合既有风格。删掉本次修改产生的废弃代码，不重格式化无关内容。
+- 精准修改：只改与任务直接相关的代码，贴合既有风格。删掉本次修改产生的废弃代码，不重新格式化无关内容。
 - 注释不留历史：删掉只对读过旧版本的人有意义的注释（“原来是 X”“改成 Y 是为了修 Z”）。注释解释当前代码为什么这样写，变更过程由 git 记录。
 - 完整迁移：变更接口或行为时更新所有调用方、测试和文档。不保留无需求的兼容层。
-- 按根因修复：先复现并读完整错误信息。一次处理一个原因，不用吞异常或特判掩盖问题。
+- 按根因修复：先复现并读完整错误信息。一次处理一个原因，不靠吞异常或特判掩盖问题。
 - 验证行为：按影响范围运行相关检查。测试可观察行为、边界和错误路径，不测试实现细节。无法测试时说明原因并做可行的烟雾验证。
 - 审慎依赖：优先现有依赖和标准库。新增依赖前确认必要性、维护状态和成本，并说明理由。
 - 清楚沟通：说明做了什么、为什么、验证结果和已知风险。对不确定性给出具体事实，提交信息描述实际改动。
