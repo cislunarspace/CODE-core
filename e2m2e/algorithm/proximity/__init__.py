@@ -3,9 +3,9 @@
 领域算法与 station_keeping/family 同类（ADR 0011 迁移，源：``proximity/``）：
 relative_dynamics（RLM/Encke/LVLH）、floquet_modes（Floquet 模态基础解集
 与有界性判据）、phasing（调相）、safety（保持点安全）。
-属二档三档扩展位（relative_motion 标二档、safety 标三档，ADR 0014）。
 
-已交付未接线：尚未经 Facade/MCP/CLI 暴露（#747）。
+算法层能力，不设任务级工具。进程内调用方直接 import 使用，CLI、MCP、
+GUI sidecar 不设对应工具（#835，见 ``.out-of-scope/relative-motion-tool-face.md``）。
 """
 
 from __future__ import annotations
