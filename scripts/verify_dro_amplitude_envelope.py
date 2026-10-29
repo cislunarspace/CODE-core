@@ -64,16 +64,23 @@ def main() -> int:
         return 1
     print("150000 km 通过")
 
+    unexpected_convergence = False
     if args.probe_failures:
         for amplitude_km in (200000.0, 300000.0, 400000.0):
             start = time.perf_counter()
             try:
                 probe, elapsed = _run(amplitude_km, bypass_validation=True)
-                print(f"{amplitude_km:.0f} km: 意外收敛 status={probe.status} {elapsed:.1f}s")
+                if probe.status is ConvergenceState.CONVERGED:
+                    print(f"{amplitude_km:.0f} km: 意外收敛 status={probe.status} {elapsed:.1f}s")
+                    unexpected_convergence = True
+                else:
+                    print(
+                        f"{amplitude_km:.0f} km: 按预期未收敛 status={probe.status} {elapsed:.1f}s"
+                    )
             except Exception as exc:  # 诊断脚本要如实打印任意失败
                 elapsed = time.perf_counter() - start
                 print(f"{amplitude_km:.0f} km: {type(exc).__name__} {exc} {elapsed:.1f}s")
-    return 0
+    return 1 if unexpected_convergence else 0
 
 
 if __name__ == "__main__":

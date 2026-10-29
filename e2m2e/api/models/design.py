@@ -23,8 +23,9 @@ __all__ = [
 ]
 
 _GLOBAL_AMPLITUDE_OUT_RANGES = _with_global_amplitude_out(_range_map())
-#: DRO 与 DPO 的轨道设计振幅包络分别标定（ADR 0061）：DRO 的星历修正在
-#: 150000 km 已验证，DPO 维持原包络。族生成侧另有独立包络。
+#: DRO 与 DPO 的轨道设计振幅包络分别标定（ADR 0061）：DRO 的
+#: 150000 km 上界来自单点实证，110000 到 150000 km 之间未逐点标定，
+#: 调用方需自验；DPO 维持原包络。族生成侧另有独立包络。
 _DRO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 150000.0)))
 _DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 110000.0)))
 _SPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))

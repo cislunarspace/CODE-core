@@ -17,6 +17,9 @@ from e2m2e.status import ConvergenceState
 pytestmark = pytest.mark.orchestration
 
 
+# debug 构建实测约 43.1 s（n_orbits=2、单窗口族行走）。ADR 0037 的单测时间
+# 门禁已于 2026-10-16 撤回，用例保留在默认套件以锁住 #838 的族生成可达性
+# 与闭合误差，不是遍历性网格。
 def test_dro_family_reaches_480000_km() -> None:
     dynamics = CR3BP_Dynamics(earth_moon_system())
     system = dynamics.system
@@ -27,8 +30,7 @@ def test_dro_family_reaches_480000_km() -> None:
 
     result = design_dro_family(475000.0, 485000.0, n_orbits=2, dynamics=dynamics)
     assert result.status is ConvergenceState.CONVERGED
-    assert len(result.family) >= 1
-    assert result.generated_members == len(result.family)
+    assert result.generated_members == result.requested_members == 2
 
     for orbit in result.family.orbits:
         d_min, d_max = _moon_distance_minmax(dynamics, orbit)
