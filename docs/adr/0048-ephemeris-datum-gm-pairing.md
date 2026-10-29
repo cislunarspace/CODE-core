@@ -87,7 +87,7 @@ DE421 GM 仍只写在 `constants.toml`：`[datum.DE421]` 是聚合视图，`[bod
 
 ### 背景
 
-PR #683 评审发现三处与本 ADR 自身声明不符的缺口。一是 datum 簿记（`_loaded_ephemeris`）是实例级的，而 CSPICE 内核池是进程级全局的（本 ADR 第 2 节），于是同一进程内第二个 manager 加载 `de440s.bsp` 后，位置被静默改成 de440s 口径，第一个 manager 仍报告 DE421 datum，正是本 ADR 要消除的“de440s 位置加 DE421 GM”混合口径。二是承诺的“de441/de442 回退 DE440 并告警”没有实现，`get_gm` 的告警分支永远不会触发，因为白名单把那些内核直接映射到 DE440。三是一次性告警集合是模块级全局变量，使测试模块之间相互耦合。
+PR #683 评审发现三处与本 ADR 自身声明不符的缺口。一是 datum 簿记（`_loaded_ephemeris`）是实例级的，而 CSPICE 内核池是进程级全局的（见本 ADR 背景），于是同一进程内第二个 manager 加载 `de440s.bsp` 后，位置被静默改成 de440s 口径，第一个 manager 仍报告 DE421 datum，正是本 ADR 要消除的“de440s 位置加 DE421 GM”混合口径。二是承诺的“de441/de442 回退 DE440 并告警”没有实现，`get_gm` 的告警分支永远不会触发，因为白名单把那些内核直接映射到 DE440。三是一次性告警集合是模块级全局变量，使测试模块之间相互耦合。
 
 ### 决策
 
@@ -103,7 +103,7 @@ PR #683 评审发现三处与本 ADR 自身声明不符的缺口。一是 datum 
 
 ## 修订（2026-09-26，b）：撤回 SUN 的 DE421 行、datum 候选集与簿记锁（#683 复审）
 
-- **撤回 `[body.SUN.gm].DE421` 行。** DE421 的太阳 GM 在本仓库没有权威出处（两个候选值相对差约 9e-8，且 JPL 的定义由 IAU 高斯常数与定义性 AU 决定，不是按代拟合），故删除该行，而不是静默返回猜测值：DE421 口径下查询 SUN 现在回退 DE440 并告警一次，与外行星同样处理，归 #670 跟踪。修订 (a) 记录了该缺口，却仍让这个值经由新增的 body 行静默露面。
+- **撤回 `[body.SUN.gm].DE421` 行。** DE421 的太阳 GM 在本仓库没有权威出处（两个候选值相对差约 9e-8，且 JPL 的定义由 IAU 高斯常数与定义性 AU 决定，不是按代拟合），故删除该行，而不是静默返回猜测值：DE421 口径下查询 SUN 现在回退 DE440 并告警一次，与外行星同样处理，归 #670 跟踪。修订（a）记录了该缺口，却仍让这个值经由新增的 body 行静默露面。
 - **datum 对应的是内核候选集，不是单个文件。** `_DATUM_KERNEL_PREFERENCE` 映射到有序元组（`DE440` 对应 `(de440.bsp, de440s.bsp)`），由 `SPICEManager.datum_kernel_names` 暴露，于是只含 `de440.bsp` 的目录也能满足 `preferred="DE440"`，不会报告 datum 缺失（那与管理器自身的默认优先级矛盾）。
 - **簿记锁。** 类级列表在 `_bookkeeping_lock` 下变更（与模块的 `_leapseconds_lock` 约定一致），并按绝对路径去重，该语义已写明。
 
@@ -111,11 +111,11 @@ PR #683 评审发现三处与本 ADR 自身声明不符的缺口。一是 datum 
 
 ### 背景
 
-修订 (b) 只记录了“类级列表在 `_bookkeeping_lock` 下变更”，#683 之后仍有三处边界未闭合。其一，Python 侧 `furnsh` 发生在持锁记账之前，并发加载不同内核时，簿记末位可能晚于池里实际生效的末位，重新落回本 ADR 第 1 节要消除的“位置按新内核、GM 按旧簿记”错配。其二，双 `furnsh` 的异常路径没有回滚：Python 侧已生效而 Rust 侧失败时，池已变更而簿记未变更，卸载则反之，注释“仅在 furnsh 成功后登记，失败不污染当前口径”在双 `furnsh` 下不成立。
+修订（b）只记录了“类级列表在 `_bookkeeping_lock` 下变更”，#683 之后仍有三处边界未闭合。其一，Python 侧 `furnsh` 发生在持锁记账之前，并发加载不同内核时，簿记末位可能晚于池里实际生效的末位，重新落回本 ADR 第 1 节要消除的“位置按新内核、GM 按旧簿记”错配。其二，双 `furnsh` 的异常路径没有回滚：Python 侧已生效而 Rust 侧失败时，池已变更而簿记未变更，卸载则反之，注释“仅在 furnsh 成功后登记，失败不污染当前口径”在双 `furnsh` 下不成立。
 
 ### 决策
 
-1. **临界区覆盖双侧 furnsh/unload 与簿记三步。** `load_kernel` 的 Python `furnsh`、Rust `spice_furnsh` 与 `_loaded_ephemeris` 更新在同一个 `_bookkeeping_lock` 内完成，`unload_kernel` 对称。故簿记顺序与池的实际生效顺序一致。该锁只界定这三步的相对顺序，不串行化、也不承担 CSPICE 池内部状态的线程安全（池仍是进程级全局的，见第 2 节）。
+1. **临界区覆盖双侧 furnsh/unload 与簿记三步。** `load_kernel` 的 Python `furnsh`、Rust `spice_furnsh` 与 `_loaded_ephemeris` 更新在同一个 `_bookkeeping_lock` 内完成，`unload_kernel` 对称。故簿记顺序与池的实际生效顺序一致。该锁只界定这三步的相对顺序，不串行化、也不承担 CSPICE 池内部状态的线程安全（池仍是进程级全局的，见背景）。
 2. **加载期告警在临界区之外。** `_warn_unregistered_kernel` 读 `ephemeris_datum`，而后者取同一把非可重入锁，放进临界区内即死锁。告警一律在锁外调用。
 3. **失败路径回滚，并保留原异常。** Rust `furnsh` 失败时，撤销本次 Python 侧 `furnsh`（CSPICE 对同一文件按实例计数：重复 `furnsh` 使池内多一条，`unload` 移除最后一条，故一次 `unload` 恰为本次 `furnsh` 的逆操作，不会卸掉此前已加载的实例）且不登记簿记。Rust `unload` 失败时，恢复 Python 侧 `furnsh`（成员回到两池）并把该内核的簿记条目移到末位。恢复即重新加载，Python 池内它重新成为“后加载者”，簿记须跟着走，否则“位置按该内核、GM 按旧末位”再次失配。回滚与恢复本身失败只记 warning，不掩盖原异常。
 4. **`spice_furnsh`/`spice_unload` 为 `None`（扩展未含 spice feature）时沿用 #382 的既有接缝：只喂 Python 池。** 本修订不改变该取舍，也不把它上升为本 ADR 的口径契约。

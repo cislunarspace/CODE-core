@@ -28,4 +28,3 @@ issue #784 落地了 dace-rs（DACE 2.1 截断 Taylor 多项式的纯 Rust 实�
 ## 修订记录
 
 - 2026-10-03：首次记录。
-- 2026-10-27：追加可选会合系常值推力项（issue #831）。`cr3bp_eom_da` 增加三轴推力加速度输入，新增 `propagate_cr3bp_da_with_thrust`，旧 `propagate_cr3bp_da` 以零推力委托，Python 入口增加可选关键字 `thrust`。推力不随状态变化，不进入 DA 变量，截断阶与一致半径口径不变。
