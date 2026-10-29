@@ -1,7 +1,8 @@
 """相对运动（交会对接，主题 3）。
 
 领域算法与 station_keeping/family 同类（ADR 0011 迁移，源：``proximity/``）：
-relative_dynamics（RLM/Encke/LVLH）、phasing（调相）、safety（保持点安全）。
+relative_dynamics（RLM/Encke/LVLH）、floquet_modes（Floquet 模态基础解集
+与有界性判据）、phasing（调相）、safety（保持点安全）。
 属二档三档扩展位（relative_motion 标二档、safety 标三档，ADR 0014）。
 
 已交付未接线：尚未经 Facade/MCP/CLI 暴露（#747）。
@@ -9,6 +10,13 @@ relative_dynamics（RLM/Encke/LVLH）、phasing（调相）、safety（保持点
 
 from __future__ import annotations
 
+from .floquet_modes import (
+    FloquetModeError,
+    FloquetModeSet,
+    FloquetPair,
+    FloquetPairKind,
+    floquet_modes,
+)
 from .phasing import PhasingManeuver, PhasingSolution, phasing_search
 from .relative_dynamics import RelativeDynamics, RelativeState, TargetOrbit
 from .safety import (
@@ -20,15 +28,20 @@ from .safety import (
 )
 
 __all__ = [
+    "FloquetModeError",
+    "FloquetModeSet",
+    "FloquetPair",
+    "FloquetPairKind",
     "RelativeDynamics",
     "RelativeState",
     "TargetOrbit",
     "KeepingPoint",
     "PhasingManeuver",
     "PhasingSolution",
-    "phasing_search",
     "SafetyRegion",
     "SafetyReport",
     "check_passive_safety",
+    "floquet_modes",
     "max_collision_probability",
+    "phasing_search",
 ]
