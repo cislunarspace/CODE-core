@@ -20,7 +20,8 @@
 - **RO 族生成在 Windows 上恢复收敛**：族生成修正链原先把修正容差硬编码为 `1e-12`、停滞阈值硬编码为 `1e-14`，修正迭代内积分直接沿用调用方的研究级 `Context.rtol`（生产默认 `1e-12`），判据因此落在积分噪声末位。2:1 RO 种子修正的第 3 轮残差约 `1.9e-12` 仍高于容差，而修正量约 `3e-15` 已低于停滞阈值，内核在残差还能继续下降时判停，生产默认参数下 `design_ro_family(2, 1, ...)` 在 Windows 上返回 `STAGNATED` 且零成员。现在 RO 修正链按 Python `DifferentialCorrection` 已记录的噪声间隔规则把收敛容差取迭代内积分容差的 100 倍，默认参数下迭代内积分容差 `1e-12`、收敛容差 `1e-10`，停滞阈值对齐 Python RO 族行走先例的 `1e-16`，族折返点附近仍在产生有效残差下降的小修正不再被提前判停。其余族的修正容差与停滞阈值保持原口径，族内成员 `1e-6` 与统一结果契约 `1e-8` 的闭合误差口径不变。(#816)
 
 ### DOC
-- **写作标准同步与 docs/agents 术语统一**：AGENTS.md 的写作要求与编码准则两节按标准原文重新同步，更新四处较旧的措辞。docs/agents/issue-tracker.md、docs/agents/triage-labels.md 与 AGENTS.md 的 Agent skills 节把任务要求义的“规格”改为“任务要求”，与标准中同一概念全文只用一个词的口径一致。(#855)
+- **写作要求与编码准则同步为标准原文**：`AGENTS.md` 的写作要求与编码准则两节按标准原文重新同步，更新四处较旧的措辞。(#855)
+- **`docs/agents` 配置的术语统一为“任务要求”**：`docs/agents/issue-tracker.md`、`docs/agents/triage-labels.md`、`AGENTS.md` 的 Agent skills 节把任务要求义的“规格”改为“任务要求”，与标准中同一概念全文只用一个词的口径一致。(#855)
 
 ### TEST
 - **移除机器强制的测试时间预算门禁**：ADR 0037 决策 1 的单用例 10 秒与单文件 60 秒墙钟预算及其机器实施整体移除，涉及 `tests/time_budget.py` 的会话末审计、`pyproject.toml` 的 `time_budget` 标记、`tests/conftest.py` 的钩子再导出与四处显式覆盖。阈值标定自高性能工作站，慢机上不改动用例内容也会被判超预算，本机 `make test` 因此不能充当发布前门禁。ADR 0037 追加修订记录该废止，决策 2 至 4（真调用最小覆盖、筛选级容差、计算共享）保留，重负载验证仍归 `scripts/` 手工诊断与 benchmark。`CONTEXT.md` 的时间预算术语节与 `AGENTS.md` 的相关条款同步更新，`tests/conftest.py` 的线程池单线程 pin 保留，理由改为避免 xdist 下的超订。(#815)
