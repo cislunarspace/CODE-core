@@ -36,6 +36,7 @@ import numpy as np
 from e2m2e.algorithm.coordinate.synodic_j2000 import SynodicJ2000System
 from e2m2e.algorithm.design.design_orbit import (
     DEFAULT_DESIGN_PERTURBATION,
+    DesignNotConvergedError,
     _build_design_force_model,
     _build_ephemeris_table,
     design_orbit,
@@ -94,7 +95,10 @@ def _design(amplitude_km: float) -> tuple[dict[str, Any], float]:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             result = design_orbit(request)
-    except Exception as exc:  # noqa: BLE001 - 诊断脚本记录任意失败
+    except DesignNotConvergedError as exc:
+        # 只有领域内的设计失败（实测 160000 km 长期传播步长崩溃）记为标定
+        # 结果。扩展缺失、内核缺失等环境异常按原类型抛出，退出码非零且不写
+        # 记录，避免坏记录被后续运行当成已知设计失败。
         elapsed = time.perf_counter() - start
         return {
             "amplitude_km": float(amplitude_km),
