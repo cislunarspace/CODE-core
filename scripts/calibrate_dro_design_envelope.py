@@ -215,7 +215,9 @@ def _verify(record: dict[str, Any]) -> tuple[bool, str]:
     if recorded_status is not None and recorded_status != expected_status:
         return False, f"记录状态 {recorded_status} 与一年星历有界性 {expected_status} 不符"
     if bounded:
-        if abs(new_max - old_max) > 1e-6 * max(1.0, abs(old_max)):
+        # ADR 0061 修订记录的复现精度为 1 km 量级，星历缓存网格取法不同即可
+        # 带来同量级差异，按该精度判定记录一致，更细的偏差不代表记录失效。
+        if abs(new_max - old_max) > 1.0:
             return False, f"一年星历最大月距 {new_max:.1f} km 与记录 {old_max:.1f} km 不符"
         return True, f"核验通过，最大月距 {new_max:.1f} km"
     # 发散轨道整年指标对初值敏感，无法逐位复现。核验前 3 圈幅值，

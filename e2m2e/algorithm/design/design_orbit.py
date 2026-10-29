@@ -503,6 +503,36 @@ def _ephemeris_result_status(
     )
 
 
+def _propagate_design_ephemeris(
+    fm: Any,
+    initial_state: np.ndarray,
+    t_span: tuple[float, float],
+    t_eval: np.ndarray,
+    sel: str,
+) -> dict[str, Any]:
+    """修正后首状态的长期传播，积分失败转成确定性领域错误。
+
+    扩展缺失与符号缺失按 RustExtensionUnavailableError 原类型放行，保留
+    make dev 指引，不降级成积分失败。步长崩溃等原生 RuntimeError（实测
+    160000 km 的大振幅 DRO）转成带 INTEGRATION_FAILED 的
+    DesignNotConvergedError，进程内调用方拿到确定性领域错误。
+    """
+    try:
+        return fm.propagate(
+            initial_state,
+            t_span,
+            t_eval=t_eval,
+            max_steps=2_000_000,
+        )
+    except RustExtensionUnavailableError:
+        raise
+    except RuntimeError as exc:
+        raise DesignNotConvergedError(
+            f"{sel} 星历长期传播失败：{exc}",
+            cause=FailureCause.INTEGRATION_FAILED,
+        ) from exc
+
+
 def _build_ephemeris_table(
     spice: SPICEManager,
     syn_j2000: SynodicJ2000System,
@@ -1107,23 +1137,13 @@ def design_orbit(
                 cause=result.cause,
             )
         t0_corr = float(result.t_patch[0])
-        try:
-            out = fm.propagate(
-                np.asarray(result.state_patch[0], dtype=float),
-                (min(t0_corr, et0), float(et_grid[-1])),
-                t_eval=et_grid,
-                max_steps=2_000_000,
-            )
-        except RustExtensionUnavailableError:
-            # 扩展缺失或符号缺失按原类型报错并保留 make dev 指引，不降级成积分失败
-            raise
-        except RuntimeError as exc:
-            # 大振幅 DRO 的长期传播可能在积分器里步长崩溃（实测 160000 km）。
-            # 转成领域软失败，避免原生 RuntimeError 泄漏成 INTERNAL_ERROR。
-            raise DesignNotConvergedError(
-                f"{sel} 星历长期传播失败：{exc}",
-                cause=FailureCause.INTEGRATION_FAILED,
-            ) from exc
+        out = _propagate_design_ephemeris(
+            fm,
+            np.asarray(result.state_patch[0], dtype=float),
+            (min(t0_corr, et0), float(et_grid[-1])),
+            et_grid,
+            sel,
+        )
     finally:
         spice.disable_ephem_cache()
 

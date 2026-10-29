@@ -8,12 +8,15 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.design.design_orbit import (
+    DesignNotConvergedError,
     _design_stages,
     _dro_ephemeris_divergence_km,
     _ephemeris_result_status,
+    _propagate_design_ephemeris,
 )
 from e2m2e.data.templates import CHAR_LENGTH_KM
 from e2m2e.data.types.trajectory import EphemerisTable
+from e2m2e.exceptions import RustExtensionUnavailableError
 from e2m2e.status import ConvergenceState, FailureCause
 
 pytestmark = pytest.mark.orchestration
@@ -91,3 +94,28 @@ def test_divergence_threshold_uses_design_amplitude():
     assert _dro_ephemeris_divergence_km(
         "DRO", 200000.0, _table(650000.0), CHAR_LENGTH_KM
     ) == pytest.approx(650000.0)
+
+
+class _FailingForceModel:
+    """propagate 按给定异常失败的替身。"""
+
+    def __init__(self, error: BaseException):
+        self._error = error
+
+    def propagate(self, state, t_span, t_eval=None, max_steps=None):
+        raise self._error
+
+
+def test_long_propagation_error_translation():
+    missing = RustExtensionUnavailableError("propagate_compiled 符号缺失")
+    with pytest.raises(RustExtensionUnavailableError):
+        _propagate_design_ephemeris(
+            _FailingForceModel(missing), np.zeros(6), (0.0, 1.0), np.array([1.0]), "DRO"
+        )
+
+    collapsed = RuntimeError("积分器步长崩溃")
+    with pytest.raises(DesignNotConvergedError) as caught:
+        _propagate_design_ephemeris(
+            _FailingForceModel(collapsed), np.zeros(6), (0.0, 1.0), np.array([1.0]), "DRO"
+        )
+    assert "星历长期传播失败" in str(caught.value)
