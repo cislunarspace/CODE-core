@@ -1,162 +1,100 @@
-# ADR 0043: 接口类分家——Facade 只留任务级方法，轨道库与 spatiography 各自成类
+# ADR 0043: 接口类分家，Facade 只留任务级方法，轨道库与 spatiography 各自成类
 
-**状态**：已采纳（已实现——类已分家、清单扫暴露类全集；`catalog_terminology`
-随 ADR 0044 落地，`catalog_promote` 的移除随 ADR 0045 落地）
+**状态**：已采纳（已实现：类已分家、清单扫暴露类全集。`catalog_terminology` 随 ADR 0044 落地，`catalog_promote` 的移除随 ADR 0045 落地）
 **日期**：2026-09-01
 **相关 issue**：#610
-**相关**：ADR 0011（五层架构）、ADR 0012（依赖方向）、ADR 0014（接口层——
-决策 2 与决策 5 在此修订）、ADR 0031（决策 7 在此修订）、ADR 0035（sidecar
-协议）、ADR 0041、ADR 0042（决策 5 的工具数措辞在此修订）、ADR 0044
-（术语清单）、ADR 0045（记录粒度）。
+**相关**：ADR 0011（五层架构）、ADR 0012（依赖方向）、ADR 0014（接口层，决策 2 与决策 5 在此修订）、ADR 0031（决策 7 在此修订）、ADR 0035（sidecar 协议）、ADR 0041、ADR 0042（决策 5 的工具数措辞在此修订）、ADR 0044（术语清单）、ADR 0045（记录粒度）。
 
 ## 背景
 
-`Facade` 已经长到 31 个方法：6 个私有辅助、`config`、24 个
-`@mcp_exposed` 方法（18 个已实现、6 个占位）。一个类混了三件不相干的事——
-任务设计、轨道库数据管理、空间分区分析——共用一个名字。想设计一条轨道
-的读者，必须翻过轨道库和分区方法才能找到那五个要紧的。
+`Facade` 已经长到 31 个方法：6 个私有辅助、`config`、24 个 `@mcp_exposed` 方法（18 个已实现、6 个占位）。它把三件不相干的事共用一个名字：任务设计、轨道库数据管理、空间分区分析。想设计一条轨道的读者必须翻过轨道库和分区方法，才能找到那五个要紧的。
 
-两条已记录的决策造就了这个形状。ADR 0014 决策 2 把 MCP 工具定义为
-Facade 方法的全集，于是每个新能力要成为可调用，都得落在 `Facade` 上。
-ADR 0031 决策 7 出于同样的理由把轨道库的查询与扫描方法放进了 Facade。
-两条决策都没有预料到：这个类本身是要被人读的，如今它成了接口层最大的
-理解成本。
+两条已记录的决策造就了这个形状。ADR 0014 决策 2 把 MCP 工具定义为 Facade 方法的全集，于是每个新能力想变得可调用，都得落在 `Facade` 上。ADR 0031 决策 7 出于同样的理由，把轨道库的查询与扫描方法放进了 Facade。两条决策都没有预料到：这个类本身是要被人读的，如今它成了接口层最大的理解成本。
 
-相关症状：工具数在 ADR 0042 决策 5 和 issue 文本里被引作 22，而
-`tool_specs(Facade())` 实测 18。靠数字守数字必然漂移；只有规则活得下来。
+相关症状：工具数在 ADR 0042 决策 5 和 issue 文本里被引作 22，而 `tool_specs(Facade())` 实测 18。靠数字守数字必然漂移。只有规则活得下来。
 
 ## 决策
 
 ### 1. Facade 只留任务级方法
 
-`Facade` 恰好保留五个任务级能力：`design_orbit`、`control_orbit`、
-`transfer_design`、`orbit_propagation`、`spacetime_transform`。私有辅助
-与 `config` 留下。
+`Facade` 恰好保留五个任务级能力：`design_orbit`、`control_orbit`、`transfer_design`、`orbit_propagation`、`spacetime_transform`。私有辅助方法与 `config` 保留。
 
 ### 2. 轨道库类
 
-新的接口层类承接轨道库数据管理与族生成：`catalog_query`、
-`catalog_get`、`catalog_delete`、`catalog_tag`、`catalog_export`、
-`catalog_sweep`、`catalog_promote`（移除由 ADR 0045 决策 5 排期）、
-`orbit_family_generation`，以及 ADR 0044 引入的术语清单方法。族生成放
-这里，因为 `catalog_sweep` 就是它的批量编排——两者调用同一个
-`run_family_sweep` 内核，且都产出轨道库记录。
+新的接口层类承接轨道库数据管理与族生成：`catalog_query`、`catalog_get`、`catalog_delete`、`catalog_tag`、`catalog_export`、`catalog_sweep`、`catalog_promote`（移除由 ADR 0045 决策 5 排期）、`orbit_family_generation`，以及 ADR 0044 引入的术语清单方法。族生成本身也归这一类，因为 `catalog_sweep` 就是它的批量编排：两者调用同一个 `run_family_sweep` 内核，都产出轨道库记录。
 
 ### 3. spatiography 类
 
-新的接口层类承接 `spatiography_scales`、`spatiography_classify`、
-`spatiography_boundaries`、`spatiography_resonance_atlas`、
-`spatiography_dynamical_map`。
+新的接口层类承接 `spatiography_scales`、`spatiography_classify`、`spatiography_boundaries`、`spatiography_resonance_atlas`、`spatiography_dynamical_map`。
 
 ### 4. 占位方法随领域归位
 
-六个二档占位声明从 Facade 移除；它们落地时直接进领域类，不回 Facade。
-`orbit_stability`、`manifold_analysis`、`relative_motion` 是分析能力；
-`transfer_search`、`low_thrust_design`、`low_energy_transfer` 是转移
-能力。各自的最终归属在实现时决定，不在本条决定。
+六个二档占位声明从 Facade 移除。它们落地时直接进领域类，不回 Facade。`orbit_stability`、`manifold_analysis`、`relative_motion` 是分析能力，`transfer_search`、`low_thrust_design`、`low_energy_transfer` 是转移能力。各自的最终归属在实现时决定，不在本条决定。
 
-### 5. 工具清单扫暴露类全集；清单仍单一来源
+### 5. 工具清单扫暴露类全集，清单仍单一来源
 
-`tool_inventory()` 以暴露类实例全集为扫描根，返回一份扁平的
-`ToolInfo` 列表。MCP 注册、CLI 子命令派生、sidecar preflight 照旧只消费
-这一份清单——ADR 0014 决策 2 的机制保留，只是扫描根变宽。工具名、
-schema、行为不变，MCP 与 CLI 调用方看不到任何差别。
+`tool_inventory()` 以暴露类实例全集为扫描根，返回一份扁平的 `ToolInfo` 列表。MCP 注册、CLI 子命令派生、sidecar preflight 照旧只消费这一份清单。ADR 0014 决策 2 的机制保留，只是扫描根变宽。工具名、schema、行为不变，MCP 与 CLI 调用方看不到任何差别。
 
 ### 6. 工具面准入判据取代工具数
 
-ADR 0042 决策 5 的“工具数守 22”作为判据作废。新注册工具的准入条件：
-要么它是任务级能力，要么它的内容被既有响应的字段引用、且没有既有工具
-能供给（术语清单一例，ADR 0044）。工具数靠跑清单报告，不从文档里引用。
+ADR 0042 决策 5 的“工具数守 22”作为判据作废。新注册工具的准入条件：要么它是任务级能力，要么它的内容被既有响应的字段引用，且没有既有工具能供给（术语清单一例，ADR 0044）。工具数靠跑清单报告，不从文档里引用。
 
 ## 理由
 
-1. **类分家而非缩面。** 曾考虑把 MCP 面缩到五个任务工具，否决：Agent
-   会保留 ADR 0031 决策 8 的自动入库行为，却失去一切读回入库产物的
-   途径；GUI 也会失去它的轨道库调用链。分家要治的理解成本落在“读类的
-   人”身上，分家即可消除它，不必裁剪能力。
-2. **族生成与轨道库同住，不与任务同住。** 它一次产出多条记录，且与
-   `catalog_sweep` 共用内核；放在 `design_orbit` 旁边会把一个机制拆到
-   两个类里。
-3. **一份清单、多个扫描根。** 任何按类登记的注册表都会造出第二份清单，
-   而 ADR 0014 决策 2 存在的意义就是防止第二份清单。
-4. **规则，不是数字。** 22 对 18 的漂移证明散文里的数字会腐坏；准入
-   判据在评审时可以核对。
+1. **类分家而非缩面。** 曾考虑把 MCP 面缩到五个任务工具，否决：Agent 会保留 ADR 0031 决策 8 的自动入库行为，却失去一切读回入库产物的途径，GUI 也会失去它的轨道库调用链。分家针对的理解成本落在读类的人身上，分家即可消除它，不必裁剪能力。
+2. **族生成与轨道库同住，不与任务同住。** 它一次产出多条记录，且与 `catalog_sweep` 共用内核。放在 `design_orbit` 旁边会把一个机制拆到两个类里。
+3. **一份清单、多个扫描根。** 任何按类登记的注册表都会造出第二份清单，而 ADR 0014 决策 2 存在的意义就是防止第二份清单。
+4. **规则，不是数字。** 22 对 18 的漂移证明散文里的数字会腐坏，准入判据在评审时可以核对。
 
 ## 后果
 
 ### 新增
 
-- 两个接口层类（轨道库、spatiography）与放宽的 `tool_inventory()`
-  扫描根。
+- 两个接口层类（轨道库、spatiography）与放宽的 `tool_inventory()` 扫描根。
 
 ### 变更
 
-- ADR 0014 决策 2：MCP 工具 = 各暴露类 `mcp_exposed` 方法的并集。
-  决策 5（CLI 对称）跟随同一并集。
+- ADR 0014 决策 2：MCP 工具 = 各暴露类 `mcp_exposed` 方法的并集。决策 5（CLI 对称）跟随同一并集。
 - ADR 0031 决策 7：轨道库方法住轨道库类。
 - ADR 0042 决策 5：工具数条款由本 ADR 决策 6 取代。
-- 为轨道库或 spatiography 持有 `Facade` 的进程内调用方改用新类。
-  transfer-orbit-design 的 `facade_bridge` 是已知唯一此类调用方。
+- 为轨道库或 spatiography 持有 `Facade` 的进程内调用方改用新类。transfer-orbit-design 的 `facade_bridge` 是已知唯一此类调用方。
 
 ### 不变
 
-- 工具名、请求模型、信封、二进制帧契约、sidecar 协议、CLI 子命令名，
-  以及写作当时的 18 工具面。
-- 五层依赖方向；三个类都留在 `api/`。
+- 工具名、请求模型、信封、二进制帧契约、sidecar 协议、CLI 子命令名，以及写作当时的 18 工具面。
+- 五层依赖方向。三个类都留在 `api/`。
 
 ### 代价
 
-- 对进程内调用方是一次破坏性变更，他们得不到任何行为收益——收益属于
-  接口层的读者。
+- 对进程内调用方是一次破坏性变更，他们得不到任何行为收益，收益属于接口层的读者。
 
 ## 实现注（2026-09-01，#610）
 
-决策 5 的字面是清单“取暴露类实例全集”；实现取组合根再派生全集
-（`Facade.exposed_apis`），理由有二：既有的构造与分发缝（CLI、sidecar、
-MCP worker、测试）都传单个根对象；execution/sidecar 的测试桩注入的是
-不带 `exposed_apis` 的单对象——解析器对无该属性的对象按自身扫描
-（`e2m2e.api.facade.resolve_tool_method` 是属主解析的唯一入口）。扫描根
-仍是暴露类实例全集，只是获取方式不同。
+决策 5 的字面是清单“取暴露类实例全集”，实现取组合根再派生全集（`Facade.exposed_apis`），理由有二。既有的构造与分发缝（CLI、sidecar、MCP worker、测试）都传单个根对象。execution/sidecar 的测试桩注入的是不带 `exposed_apis` 的单对象，解析器对无该属性的对象按自身扫描（`e2m2e.api.facade.resolve_tool_method` 是属主解析的唯一入口）。扫描根仍是暴露类实例全集，只是获取方式不同。
 
 ## 修订（2026-09-04，#620）
 
-决策 1 的五方法清单扩为六：新增无参查询出口 `valid_ranges`（请求侧
-条件值域全量导出，ADR 0014 决策 8 请求侧）。它无任务副作用、不属任何
-领域类——横跨 design_orbit 与族生成的请求面元数据，挂组合根；其余
-决策不变。
+决策 1 的五方法清单扩为六：新增无参查询出口 `valid_ranges`（请求侧条件值域全量导出，ADR 0014 决策 8 请求侧）。它无任务副作用，不属任何领域类，是横跨 design_orbit 与族生成的请求面元数据，挂组合根。其余决策不变。
 
 ## 修订（2026-09-27，#721）：`low_thrust_design` 占位归属落定为 `low_thrust_preliminary`
 
 ### 背景
 
-决策 4 把六个二档占位从 Facade 移除并声明“落地时直接进领域类，不回
-Facade”，其中转移能力的 `low_thrust_design` 最终归属留待实现时决定。
-Issue #721 裁决行星际 MGA 与 Sims-Flanagan 预设计的接口暴露方式时，该
-占位的归属随之落定。
+决策 4 把六个二档占位从 Facade 移除并声明“落地时直接进领域类，不回 Facade”，其中转移能力的 `low_thrust_design` 最终归属留待实现时决定。Issue #721 裁决行星际 MGA 与 Sims-Flanagan 预设计的接口暴露方式时，该占位的归属随之落定。
 
 ### 决策
 
-`low_thrust_design` 占位由 ADR 0054 落定为独立 Facade 任务级工具
-`low_thrust_preliminary`（Sims-Flanagan 预设计，下辖 ADR 0050 的
-conic/星历双档）：不扩 `transfer_type` 术语清单，不改 ADR 0040 契约；
-接口类归属仍按决策 4 在实现时落位，不回 Facade 占位。
+`low_thrust_design` 占位由 ADR 0054 落定为独立 Facade 任务级工具 `low_thrust_preliminary`（Sims-Flanagan 预设计，下辖 ADR 0050 的 conic/星历双档）：不扩 `transfer_type` 术语清单，不改 ADR 0040 契约。接口类归属仍按决策 4 在实现时落位，不回 Facade 占位。
 
 ### 后果
 
-决策 4 其余结论不变；其余占位（`transfer_search`、`low_energy_transfer`、
-`orbit_stability`、`manifold_analysis`、`relative_motion`）的归属继续
-留待各自实现时决定。
+决策 4 其余结论不变。其余占位（`transfer_search`、`low_energy_transfer`、`orbit_stability`、`manifold_analysis`、`relative_motion`）的归属继续留待各自实现时决定。
 
 ## 修订（2026-09-26，#687）：稳定性/分岔分析能力整体删除，不登记为算法层内部能力
 
 ### 背景
 
-决策 4 把 `orbit_stability` 一类分析能力的最终归属留给“实现时决定”，
-决策 6 给出工具面准入判据（任务级能力，或其内容被既有响应字段引用且
-没有既有工具能供给）。#687 就 `e2m2e.algorithm.stability`（单轨
-`StabilityAnalysis`、族级 `detect_bifurcation_in_family`，随 #688 的
-穿越判据升级）的归属拍板，选项为 (a) 入接口、(b) 登记为算法层内部能力
-并写明将来触发暴露的条件。
+决策 4 把 `orbit_stability` 一类分析能力的最终归属留给“实现时决定”，决策 6 给出工具面准入判据（任务级能力，或其内容被既有响应字段引用且没有既有工具能供给）。#687 就 `e2m2e.algorithm.stability`（单轨 `StabilityAnalysis`、族级 `detect_bifurcation_in_family`，随 #688 的穿越判据升级）的归属拍板，选项为 (a) 入接口、(b) 登记为算法层内部能力并写明将来触发暴露的条件。
 
 ### 决策
 
@@ -164,27 +102,12 @@ conic/星历双档）：不扩 `transfer_type` 术语清单，不改 ADR 0040 �
 
 ### 依据
 
-- **零生产消费者**：`e2m2e/api/` 对 stability 与 bifurcation 零引用，
-  进程内 import、MCP、CLI 与 stdio sidecar 的任何调用链都取不到它；全仓
-  引用只有 `tests/algorithm/stability/`、`scripts/calibrate_dro3d_vertical_critical.py`
-  与 `e2m2e/mbse/` 两处追溯元数据。
-- **决策 6 两款皆不成立**：它不是任务级能力；其内容也未被任何既有响应
-  字段引用——`compute_state_transition_matrix` 在 `e2m2e/` 内只被该模块
-  与 `family/axial_initial_guess.py` 调用，`design_orbit` 路径不产单值
-  矩阵，把单轨稳定性挂进设计响应须为每次设计多算一次整周期 STM 积分。
-- **闭值集成本**：`StabilityType`／`BifurcationType` 一旦跨边界即触发
-  ADR 0044 的术语清单与双向锁定测试的长期维护面，无消费者时不值。
+- **零生产消费者**：`e2m2e/api/` 对 stability 与 bifurcation 零引用，进程内 import、MCP、CLI 与 stdio sidecar 的任何调用链都取不到它。全仓引用只有 `tests/algorithm/stability/`、`scripts/calibrate_dro3d_vertical_critical.py` 与 `e2m2e/mbse/` 两处追溯元数据。
+- **决策 6 两款皆不成立**：它不是任务级能力，其内容也未被任何既有响应字段引用。`compute_state_transition_matrix` 在 `e2m2e/` 内只被该模块与 `family/axial_initial_guess.py` 调用，`design_orbit` 路径不产单值矩阵，把单轨稳定性挂进设计响应须为每次设计多算一次整周期 STM 积分。
+- **闭值集成本**：`StabilityType`／`BifurcationType` 一旦跨边界即触发 ADR 0044 的术语清单与双向锁定测试的长期维护面，无消费者时不值。
 
 ### 后果
 
-- 决策 4 其余结论不变；其余占位（`transfer_search`、`low_energy_transfer`、
-  `manifold_analysis`、`relative_motion`）的归属继续留待各自实现时决定。
-- `orbit_stability` 自此没有既有能力可暴露；将来出现具体消费场景时，按
-  决策 2/3 的分家先例定类归属、按决策 6 定工具面准入，重新实现而非恢复
-  历史代码。
-- 拒绝理由、复议条件与触发条件记在
-  `.out-of-scope/stability-bifurcation-analysis.md`；诊断脚本
-  `scripts/calibrate_dro3d_vertical_critical.py` 保留并改为自含——稳定性
-  指数由 monodromy 的辛块直接给出（面外 `ν_out = M[2,2] + M[5,5]`，面内
-  由 x/y/vx/vy 的 4×4 辛块解 `ν² − tr(A_in)·ν + (m_in − 2) = 0`），不做
-  特征值配对。
+- 决策 4 其余结论不变。其余占位（`transfer_search`、`low_energy_transfer`、`manifold_analysis`、`relative_motion`）的归属继续留待各自实现时决定。
+- `orbit_stability` 自此没有既有能力可暴露。将来出现具体消费场景时，按决策 2/3 的分家先例定类归属，按决策 6 定工具面准入，重新实现而非恢复历史代码。
+- 拒绝理由、复议条件与触发条件记在 `.out-of-scope/stability-bifurcation-analysis.md`。诊断脚本 `scripts/calibrate_dro3d_vertical_critical.py` 保留并改为自含：稳定性指数由 monodromy 的辛块直接给出（面外 `ν_out = M[2,2] + M[5,5]`，面内由 x/y/vx/vy 的 4×4 辛块解 `ν² − tr(A_in)·ν + (m_in − 2) = 0`），不做特征值配对。
