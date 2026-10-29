@@ -23,6 +23,7 @@
 - **写作要求与编码准则同步为标准原文**：`AGENTS.md` 的写作要求与编码准则两节按标准原文重新同步，更新四处较旧的措辞。(#855)
 - **`docs/agents` 配置的术语统一为“任务要求”**：`docs/agents/issue-tracker.md`、`docs/agents/triage-labels.md`、`AGENTS.md` 的 Agent skills 节把任务要求义的“规格”改为“任务要求”，与标准中同一概念全文只用一个词的口径一致。(#855)
 - **评论 AI 标记移到末行并写明 harness 与模型**：`docs/agents/issue-tracker.md` 与 `AGENTS.md` 的 AI 标记规则从评论首行的 `[AI Generated]` 标签改为末行注明 harness 与模型，issue 与 PR 的标题前缀不变，与技能仓库的统一约定一致。(#855)
+- **决策记录：相对运动不设任务级工具，`relative_motion` 占位归属落定为算法层能力**：`e2m2e.algorithm.proximity` 保持算法层定位，进程内调用方直接 import 使用，CLI、MCP、GUI sidecar 不设对应工具。拒绝理由、复议条件与触发条件记在 `.out-of-scope/relative-motion-tool-face.md`，ADR 0043 追加修订小节同步决策 4 留待的占位归属。本版无行为变化，接口面与工具清单不变。(ADR 0043, #835)
 
 ### TEST
 - **移除机器强制的测试时间预算门禁**：ADR 0037 决策 1 的单用例 10 秒与单文件 60 秒墙钟预算及其机器实施整体移除，涉及 `tests/time_budget.py` 的会话末审计、`pyproject.toml` 的 `time_budget` 标记、`tests/conftest.py` 的钩子再导出与四处显式覆盖。阈值标定自高性能工作站，慢机上不改动用例内容也会被判超预算，本机 `make test` 因此不能充当发布前门禁。ADR 0037 追加修订记录该废止，决策 2 至 4（真调用最小覆盖、筛选级容差、计算共享）保留，重负载验证仍归 `scripts/` 手工诊断与 benchmark。`CONTEXT.md` 的时间预算术语节与 `AGENTS.md` 的相关条款同步更新，`tests/conftest.py` 的线程池单线程 pin 保留，理由改为避免 xdist 下的超订。(#815)

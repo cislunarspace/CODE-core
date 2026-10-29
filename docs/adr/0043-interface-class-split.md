@@ -111,3 +111,19 @@ ADR 0042 决策 5 的“工具数守 22”作为判据作废。新注册工具�
 - 决策 4 其余结论不变。其余占位（`transfer_search`、`low_energy_transfer`、`manifold_analysis`、`relative_motion`）的归属继续留待各自实现时决定。
 - `orbit_stability` 自此没有既有能力可暴露。将来出现具体消费场景时，按决策 2/3 的分家先例定类归属，按决策 6 定工具面准入，重新实现而非恢复历史代码。
 - 拒绝理由、复议条件与触发条件记在 `.out-of-scope/stability-bifurcation-analysis.md`。诊断脚本 `scripts/calibrate_dro3d_vertical_critical.py` 保留并改为自含：稳定性指数由 monodromy 的辛块直接给出（面外 `ν_out = M[2,2] + M[5,5]`，面内由 x/y/vx/vy 的 4×4 辛块解 `ν² − tr(A_in)·ν + (m_in − 2) = 0`），不做特征值配对。
+
+## 修订（2026-10-29，#835）：`relative_motion` 占位归属落定为算法层能力，不设任务级工具
+
+### 背景
+
+决策 4 把六个二档占位从 Facade 移除并声明“落地时直接进领域类，不回 Facade”，其中分析能力的 `relative_motion` 最终归属留待实现时决定。Issue #835 要求把 `e2m2e.algorithm.proximity` 的相对运动能力接入 Facade 工具面，维护者裁定该请求没有任务级消费场景，以 `Not planned` 关闭。
+
+### 决策
+
+`relative_motion` 的归属落定为算法层能力：`e2m2e.algorithm.proximity` 已交付，进程内调用方直接 import 使用，CLI、MCP、GUI sidecar 不设对应工具，也不新开接口层类。
+
+### 后果
+
+- 决策 4 其余结论不变。其余占位（`transfer_search`、`low_energy_transfer`、`manifold_analysis`）的归属继续留待各自实现时决定。
+- 将来出现具体任务级消费场景时，按决策 6 的准入判据复议，先写任务描述再定归属，不恢复 #835 的能力清单写法。
+- 拒绝理由、复议条件与触发条件记在 `.out-of-scope/relative-motion-tool-face.md`。
