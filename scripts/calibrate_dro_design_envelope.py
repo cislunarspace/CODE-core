@@ -279,6 +279,10 @@ def main() -> int:
                 failures += 1
                 print(f"{amplitude:9.0f} {mode:>6} 失败 {message}")
                 continue
+            if record.get("error"):
+                # 已知设计失败没有 year 与 correction 字段，按标定结果打印后跳过
+                print(f"{amplitude:9.0f} {mode:>6} 失败 {record['error']}")
+                continue
             year = record["year"]
             bounded = record.get(
                 "bounded",
