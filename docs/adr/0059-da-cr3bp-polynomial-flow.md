@@ -28,3 +28,4 @@ issue #784 落地了 dace-rs（DACE 2.1 截断 Taylor 多项式的纯 Rust 实�
 ## 修订记录
 
 - 2026-10-03：首次记录。
+- 2026-10-28：加入段常值连续推力（issue #831）。DA 版 EOM 的加速度三分量各加一个会合系下的常值分量，单位与 CR3BP 无量纲加速度一致，RK4 与事件循环不变。新入口 `propagate_cr3bp_da_with_thrust` 承担带推力的传播，原 `propagate_cr3bp_da` 保留签名并以零推力委托，零推力结果逐位一致。Python 绑定 `propagate_cr3bp_da_py` 增可选关键字 `thrust`，缺省零向量，给定时校验长度 3 与分量有限，违者抛 `ValueError`，ABI 升至 v32。验收口径：常值项与同推力 f64 固定步长 RK4 一致，一阶系数对中心差分一致，二阶系数对有限差分 Hessian 抽查一致，零推力与既有结果逐位一致，无推力路径的既有断言不变。星历力模型的 DA 化不在本次范围。
