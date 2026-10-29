@@ -444,9 +444,8 @@ def _dro_ephemeris_divergence_km(
     synodic = np.asarray(ephemeris.synodic_position, dtype=float)
     if synodic.size == 0:
         return None
-    moon_dist_km = (
-        np.linalg.norm(synodic - np.array([1.0, 0.0, 0.0]), axis=1)
-        * float(characteristic_length_km)
+    moon_dist_km = np.linalg.norm(synodic - np.array([1.0, 0.0, 0.0]), axis=1) * float(
+        characteristic_length_km
     )
     max_dist_km = float(moon_dist_km.max())
     if max_dist_km > DRO_EPHEMERIS_ESCAPE_FACTOR * float(amplitude_km):

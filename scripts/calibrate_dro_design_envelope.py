@@ -3,8 +3,11 @@
 用法：
     .venv/bin/python scripts/calibrate_dro_design_envelope.py
     .venv/bin/python scripts/calibrate_dro_design_envelope.py \
-        --amplitudes 150000 160000 170000 180000 190000 200000
+        --amplitudes 175000 200000
     .venv/bin/python scripts/calibrate_dro_design_envelope.py --verify-only
+
+默认按 5000 km 步长标定 150000 到 200000 km 的 11 个采样点，与 ADR 0061
+修订记录的网格一致。
 
 每个振幅首次运行 ``design_orbit``，把 CR3BP 初值、修正后首状态与一年星历指标
 写进 ``scripts/.cache/dro_design_envelope.json``。重复运行时读取记录，用记录
@@ -12,7 +15,7 @@
 
 CR3BP 轨道由振幅唯一确定，记录值按一周期闭合核验。星历初值依赖历元与力模型，
 记录里保存完整配置，核验时按同一配置重建力模型。星历修正的收敛残差只约束
-修正弧段，不约束长期外推；本脚本同时报告一年月距有界性，并按设计振幅的
+修正弧段，不约束长期外推。本脚本同时报告一年月距有界性，并按设计振幅的
 三倍判为逃逸。
 
 不要在 scripts/ 里用 uv run，它会触发 editable 重建。
@@ -45,7 +48,7 @@ from e2m2e.data.kernels.manager import SPICEManager
 from e2m2e.data.templates import CHAR_LENGTH_KM, CHAR_PERIOD_SEC
 
 _RECORD_PATH = Path(__file__).resolve().parent / ".cache" / "dro_design_envelope.json"
-_DEFAULT_AMPLITUDES = (150000.0, 200000.0)
+_DEFAULT_AMPLITUDES = tuple(150000.0 + 5000.0 * step for step in range(11))
 
 
 def _request(amplitude_km: float) -> DesignOrbitRequest:
@@ -54,7 +57,7 @@ def _request(amplitude_km: float) -> DesignOrbitRequest:
         amplitude=150000.0,
         epoch=(2024, 1, 1, 0, 0, 0.0),
     )
-    # 150000 km 以上的标定点超出公开包络，只在本诊断脚本里绕过条件校验
+    # 200000 km 以上的标定点超出公开包络，只在本诊断脚本里绕过条件校验
     object.__setattr__(request, "amplitude", float(amplitude_km))
     return request
 
@@ -104,9 +107,7 @@ def _design(amplitude_km: float) -> tuple[dict[str, Any], float]:
     assert orbit is not None and orbit.period is not None
     assert result.correction is not None
     perturbation = dict(
-        DEFAULT_DESIGN_PERTURBATION
-        if request.perturbation is None
-        else request.perturbation
+        DEFAULT_DESIGN_PERTURBATION if request.perturbation is None else request.perturbation
     )
     record = {
         "amplitude_km": float(amplitude_km),
@@ -261,8 +262,10 @@ def main() -> int:
 
     records = _load(args.records)
     failures = 0
-    print(f"{'振幅':>9} {'模式':>6} {'状态':>10} {'迭代':>4} {'残差 km':>10} "
-          f"{'月距最大':>10} {'有界':>4} {'耗时 s':>7}")
+    print(
+        f"{'振幅':>9} {'模式':>6} {'状态':>10} {'迭代':>4} {'残差 km':>10} "
+        f"{'月距最大':>10} {'有界':>4} {'耗时 s':>7}"
+    )
     for amplitude in args.amplitudes:
         key = f"{amplitude:.3f}"
         record = records.get(key)

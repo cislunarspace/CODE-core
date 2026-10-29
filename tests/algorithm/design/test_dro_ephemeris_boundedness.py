@@ -58,6 +58,7 @@ def test_dro_escape_sets_diverged_status():
     assert "月心距离最大" in result[2]
     assert result[3] is ConvergenceState.DIVERGED
     assert len(caught) == 1
+    assert caught[0].category is UserWarning
 
 
 def test_dro_bounded_keeps_converged_status():
@@ -81,9 +82,12 @@ def test_diverged_propagation_stage():
 
 
 def test_divergence_threshold_uses_design_amplitude():
-    assert _dro_ephemeris_divergence_km(
-        "DRO", 150000.0, _table(400000.0), CHAR_LENGTH_KM
-    ) is None
+    assert _dro_ephemeris_divergence_km("DRO", 150000.0, _table(400000.0), CHAR_LENGTH_KM) is None
     assert _dro_ephemeris_divergence_km(
         "DRO", 150000.0, _table(500000.0), CHAR_LENGTH_KM
     ) == pytest.approx(500000.0)
+    # 阈值随设计振幅缩放：200000 km 的界是 600000 km，冻结常数阈值过不了这两个断言
+    assert _dro_ephemeris_divergence_km("DRO", 200000.0, _table(550000.0), CHAR_LENGTH_KM) is None
+    assert _dro_ephemeris_divergence_km(
+        "DRO", 200000.0, _table(650000.0), CHAR_LENGTH_KM
+    ) == pytest.approx(650000.0)

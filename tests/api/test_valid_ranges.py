@@ -83,6 +83,10 @@ class TestValidRangesResponse:
         assert (family_max.minimum, family_max.maximum) == (1737.0, 480000.0)
         # 与请求校验器同源，边界之外仍被拒绝
         assert DesignOrbitRequest.valid_ranges("DRO")["amplitude"].maximum == 200000.0
+        design = DesignOrbitRequest(orbit_type="DRO", amplitude=200000.0)
+        assert design.amplitude == 200000.0
+        with pytest.raises(ValidationError, match="amplitude"):
+            DesignOrbitRequest(orbit_type="DRO", amplitude=200000.1)
         assert FamilyGenerationRequest.valid_ranges("DRO")["max_amplitude_km"].maximum == 480000.0
         family = FamilyGenerationRequest(
             orbit_type="DRO", min_amplitude_km=150000.0, max_amplitude_km=480000.0
