@@ -1,9 +1,9 @@
-# ADR 0058：e2m2e-forces 拆出 e2m2e-dyn——非力任务设计模块迁出
+# ADR 0058: e2m2e-forces 拆出 e2m2e-dyn，非力任务设计模块迁出
 
-- 状态：已采纳（已实现）
-- 日期：2026-09-28
-- 关联 issue：#752
-- 相关：ADR 0020（PropagateError 语义）
+**状态**：已采纳（已实现）
+**日期**：2026-09-28
+**相关 issue**：#752
+**相关**：ADR 0020（PropagateError 语义）
 
 ## 背景
 
@@ -26,16 +26,16 @@
 
 ## 决策
 
-1. 新建 crate `e2m2e-dyn`，上述 10 个模块**纯搬家**迁入：算法、签名与测试零改动，仅 `use crate::cr3bp/bcr4bp/PropagateError` 改为 `use e2m2e_forces::...`。
+1. 新建 crate `e2m2e-dyn`，上述 10 个模块纯搬家迁入：算法、签名与测试零改动，仅 `use crate::cr3bp/bcr4bp/PropagateError` 改为 `use e2m2e_forces::...`。
 2. `geodesy` 留守 forces：`forces/drag.rs` 的 ITRF93 大气阻力依赖 `ecef_to_geodetic`。
-3. `cr3bp`/`bcr4bp` 内核与 `PropagateError` 留守 forces；dyn 以 `default-features = false` 依赖 forces 取用，自身无 CSPICE 构建链，可独立测试。rayon/crossbeam-channel/nalgebra 三依赖随之从 forces 移入 dyn。
+3. `cr3bp`/`bcr4bp` 内核与 `PropagateError` 留守 forces。dyn 以 `default-features = false` 依赖 forces 取用，自身无 CSPICE 构建链，可独立测试。rayon/crossbeam-channel/nalgebra 三依赖随之从 forces 移入 dyn。
 4. pyo3 绑定与 Python 符号面全部留在 e2m2e-integrators（绑定改指 `e2m2e_dyn::`），`abi-version.txt` 与 `_py_abi_version()` 不动，无 ABI 变化。
 5. `e2m2e-hjb-dynamics` 不动：其 `e2m2e_forces` 引用（`forces::compiled::CompiledForce` 与 dev-dep `cr3bp`）均为留守符号。
 
 ## 后果
 
-- 正面：forces 职责纯化（只剩力模型 + 动力学内核）；dyn 无 CSPICE 构建链、可独立快速测试；依赖方向与命名一致（dyn→forces 单向）。
-- 负面：workspace +1 crate、+2 依赖边（dyn→forces、integrators→dyn），跨 crate 跳转增加。
+- 正面：forces 职责纯化（只剩力模型与动力学内核）。dyn 无 CSPICE 构建链、可独立快速测试。依赖方向与命名一致（dyn 依赖 forces，单向）。
+- 负面：workspace 多 1 个 crate、多 2 条依赖边（dyn 依赖 forces、integrators 依赖 dyn），跨 crate 跳转增加。
 - 风险控制：纯搬家迁移（数值行为不变）、`git mv` 保留文件历史、逐 crate 测试门禁（dyn/forces/integrators 分别 `--test-threads=1` 后再跑全 workspace）。
 
 ## 修订记录
