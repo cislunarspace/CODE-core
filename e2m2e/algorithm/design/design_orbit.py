@@ -49,6 +49,7 @@ from ...data.kernels.manager import SPICEManager
 from ...data.templates.design import SEGMENTED_CORRECTION_ORBIT_TYPES
 from ...data.templates.perturbations import DEFAULT_PERTURBATION
 from ...data.types.orbit import Orbit
+from ...exceptions import RustExtensionUnavailableError
 from ...status import ConvergenceState, FailureCause, ResultStatus
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes
@@ -1113,6 +1114,9 @@ def design_orbit(
                 t_eval=et_grid,
                 max_steps=2_000_000,
             )
+        except RustExtensionUnavailableError:
+            # 扩展缺失或符号缺失按原类型报错并保留 make dev 指引，不降级成积分失败
+            raise
         except RuntimeError as exc:
             # 大振幅 DRO 的长期传播可能在积分器里步长崩溃（实测 160000 km）。
             # 转成领域软失败，避免原生 RuntimeError 泄漏成 INTERNAL_ERROR。
