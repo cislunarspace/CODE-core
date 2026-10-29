@@ -710,7 +710,8 @@ def design_orbit(
     Raises:
         ValueError: 形状参数/任务参数超界。
         NotImplementedError: 摄动开关含 ECOM 光压或耦合项。
-        DesignNotConvergedError: 星历修正未收敛。
+        DesignNotConvergedError: 星历修正未收敛，或修正收敛后长期传播积分失败
+            （cause 为 INTEGRATION_FAILED）。
     """
     sel = request.orbit_type.upper()
 

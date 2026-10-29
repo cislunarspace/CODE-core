@@ -16,7 +16,8 @@
 CR3BP 轨道由振幅唯一确定，记录值按一周期闭合核验。星历初值依赖历元与力模型，
 记录里保存完整配置，核验时按同一配置重建力模型。星历修正的收敛残差只约束
 修正弧段，不约束长期外推。本脚本同时报告一年月距有界性，并按设计振幅的
-三倍判为逃逸。
+三倍判为逃逸。发散样本是标定结果，打印在有界列里。退出码只把记录与实测
+不符、设计失败与缺记录计为失败。
 
 不要在 scripts/ 里用 uv run，它会触发 editable 重建。
 """
@@ -281,8 +282,6 @@ def main() -> int:
                 "bounded",
                 year["moon_dist_max_km"] <= DRO_EPHEMERIS_ESCAPE_FACTOR * amplitude,
             )
-            if not bounded:
-                failures += 1
             status = record.get("result_status", record["correction"]["status"])
             print(
                 f"{amplitude:9.0f} {mode:>6} {status:>10} "
@@ -303,8 +302,6 @@ def main() -> int:
             failures += 1
             print(f"{amplitude:9.0f} {'设计':>6} 失败 {record['error']}")
             continue
-        if not record["bounded"]:
-            failures += 1
         warn = " 告警" if record["warnings"] else ""
         status = record.get("result_status", record["correction"]["status"])
         print(
