@@ -23,10 +23,14 @@ __all__ = [
 ]
 
 _GLOBAL_AMPLITUDE_OUT_RANGES = _with_global_amplitude_out(_range_map())
-#: DRO 与 DPO 的轨道设计振幅包络分别标定（ADR 0061）：DRO 的
-#: 150000 km 上界来自单点实证，110000 到 150000 km 之间未逐点标定，
-#: 调用方需自验；DPO 维持原包络。族生成侧另有独立包络。
-_DRO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 150000.0)))
+#: DRO 与 DPO 的轨道设计振幅包络分别标定（ADR 0061）：DRO 的 200000 km
+#: 上界来自 150000 到 200000 km、5000 km 步长的标定。175000 km 到
+#: 200000 km 的一年星历有界，150000 km 到 170000 km 属于逃逸带，其中
+#: 160000 km 的长期传播失败直接抛 DesignNotConvergedError，其余点返回
+#: DIVERGED 并发长期有界性告警。150000 km 以下未逐点复核。DPO 维持
+#: 原包络。
+#: 族生成侧另有独立包络。
+_DRO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
 _DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 110000.0)))
 _SPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
 _LPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1000.0, 110000.0)))
