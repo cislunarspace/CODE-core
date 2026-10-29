@@ -1081,8 +1081,8 @@ def design_orbit(
         frame_pairs=[("ITRF93", "J2000"), ("MOON_PA", "J2000")],
     )
     try:
-        # 上限按族取：Halo/NRHO 给低值快速判定不收敛；DRO 需容纳
-        # 200000 km 的 109 次慢收敛尾部。见 tuning.TWO_LEVEL_MAX_ITER_BY_ORBIT_TYPE。
+        # 上限按族取：DRO 需容纳 200000 km 的 109 次慢收敛尾部，未覆盖的
+        # 族用通用上限。见 tuning.TWO_LEVEL_MAX_ITER_BY_ORBIT_TYPE。
         _ms_max_iter = TWO_LEVEL_MAX_ITER_BY_ORBIT_TYPE.get(sel, TWO_LEVEL_MAX_ITER)
         result = _msc(
             forces_py,
