@@ -23,7 +23,10 @@ __all__ = [
 ]
 
 _GLOBAL_AMPLITUDE_OUT_RANGES = _with_global_amplitude_out(_range_map())
-_DRO_DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 110000.0)))
+#: DRO 与 DPO 的轨道设计振幅包络分别标定（ADR 0061）：DRO 的星历修正在
+#: 150000 km 已验证，DPO 维持原包络。族生成侧另有独立包络。
+_DRO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 150000.0)))
+_DPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 110000.0)))
 _SPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1737.0, 200000.0)))
 _LPO_RANGES = _with_global_amplitude_out(_range_map(amplitude=NumericRange(1000.0, 110000.0)))
 #: RO（共振轨道）：五档精确成员分布在不同偏心族上，不能再用全比例
@@ -43,8 +46,8 @@ _HORSESHOE_RANGES = _with_global_amplitude_out(
 
 _ORBIT_TYPE_RANGES: Mapping[str, Mapping[str, NumericRange]] = MappingProxyType(
     {
-        "DRO": _DRO_DPO_RANGES,
-        "DPO": _DRO_DPO_RANGES,
+        "DRO": _DRO_RANGES,
+        "DPO": _DPO_RANGES,
         "NRHO": _with_global_amplitude_out(
             _range_map(perilune_height=NumericRange(100.0, 40000.0))
         ),

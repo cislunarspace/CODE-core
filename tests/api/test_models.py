@@ -81,7 +81,7 @@ class TestDesignOrbitRequest:
     @pytest.mark.parametrize(
         ("orbit_type", "field", "minimum", "maximum", "minimum_inclusive"),
         [
-            ("DRO", "amplitude", 1737.0, 110000.0, True),
+            ("DRO", "amplitude", 1737.0, 150000.0, True),
             ("DPO", "amplitude", 1737.0, 110000.0, True),
             ("HALO", "amplitude", -77000.0, 77000.0, True),  # 无点默认 L2
             ("NRHO", "perilune_height", 100.0, 40000.0, True),
@@ -621,10 +621,10 @@ class TestFamilyGenerationRequest:
         assert horseshoe["min_amplitude_km"].minimum == 50000.0
         assert horseshoe["match_tolerance_km"].minimum_inclusive is False
 
-        # DRO 是月心族：无平动点范围，振幅包络与单轨 DRO 一致
+        # DRO 是月心族：无平动点范围，振幅包络按族生成与轨道设计分别标定
         dro = FamilyGenerationRequest.valid_ranges("DRO")
         assert "libration_point" not in dro
-        assert dro["min_amplitude_km"].format_interval() == "[1737.0, 110000.0]"
+        assert dro["min_amplitude_km"].format_interval() == "[1737.0, 480000.0]"
         with pytest.raises(ValueError, match="不绑定平动点"):
             FamilyGenerationRequest.valid_ranges("DRO", libration_point=2)
         assert FamilyGenerationRequest.valid_options("DRO")["sampling_mode"] == ("natural-x0",)
@@ -702,7 +702,7 @@ class TestFamilyGenerationRequest:
         with pytest.raises(ValidationError, match="min_amplitude_km"):
             FamilyGenerationRequest(orbit_type="DRO", min_amplitude_km=1700.0)
         with pytest.raises(ValidationError, match="max_amplitude_km"):
-            FamilyGenerationRequest(orbit_type="DRO", max_amplitude_km=120000.0)
+            FamilyGenerationRequest(orbit_type="DRO", max_amplitude_km=480000.1)
         with pytest.raises(ValidationError, match="min_amplitude_km 必须小于"):
             FamilyGenerationRequest(
                 orbit_type="DRO", min_amplitude_km=30000.0, max_amplitude_km=20000.0

@@ -371,8 +371,9 @@ class FamilyGenerationRequest(_ApiModel):
             ranges["phase_in"] = NumericRange(0.0, 1.0)
             ranges["phase_out"] = NumericRange(0.0, 1.0)
         elif selection == "DRO":
-            # 与 DesignOrbitRequest 的 DRO 振幅包络一致（月面以上）
-            amp_range = NumericRange(1737.0, 110000.0)
+            # 族生成按 CR3BP 族覆盖标定（ADR 0061）；轨道设计的振幅包络
+            # 另按星历修正可达域标定，两者不共用同一个上限。
+            amp_range = NumericRange(1737.0, 480000.0)
             ranges["min_amplitude_km"] = amp_range
             ranges["max_amplitude_km"] = amp_range
         elif selection == "RO":

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from e2m2e.api.facade import Facade, mcp_tools, tool_inventory
 from e2m2e.api.models import (
@@ -68,6 +69,27 @@ class TestValidRangesResponse:
         assert (family_halo.minimum, family_halo.maximum) == (-57660.0, 57660.0)
         family_nrho = response.family_generation_ranges["NRHO_L2"]["perilune_height_max_km"]
         assert (family_nrho.minimum, family_nrho.maximum) == (1000.0, 40000.0)
+
+    def test_dro_envelopes_split_between_design_and_family(self):
+        """#838：DRO 族生成与轨道设计的振幅包络分别标定，不共用一个常量。"""
+        response = Facade().valid_ranges()
+        design_dro = response.design_orbit["DRO"]["amplitude"]
+        assert (design_dro.minimum, design_dro.maximum) == (1737.0, 150000.0)
+        design_dpo = response.design_orbit["DPO"]["amplitude"]
+        assert (design_dpo.minimum, design_dpo.maximum) == (1737.0, 110000.0)
+        family_min = response.family_generation_ranges["DRO"]["min_amplitude_km"]
+        family_max = response.family_generation_ranges["DRO"]["max_amplitude_km"]
+        assert (family_min.minimum, family_min.maximum) == (1737.0, 480000.0)
+        assert (family_max.minimum, family_max.maximum) == (1737.0, 480000.0)
+        # 与请求校验器同源，边界之外仍被拒绝
+        assert DesignOrbitRequest.valid_ranges("DRO")["amplitude"].maximum == 150000.0
+        assert FamilyGenerationRequest.valid_ranges("DRO")["max_amplitude_km"].maximum == 480000.0
+        family = FamilyGenerationRequest(
+            orbit_type="DRO", min_amplitude_km=150000.0, max_amplitude_km=480000.0
+        )
+        assert (family.min_amplitude_km, family.max_amplitude_km) == (150000.0, 480000.0)
+        with pytest.raises(ValidationError, match="max_amplitude_km"):
+            FamilyGenerationRequest(orbit_type="DRO", max_amplitude_km=480000.1)
 
     def test_units_are_attached_per_field(self):
         response = Facade().valid_ranges()
