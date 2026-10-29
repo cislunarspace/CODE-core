@@ -16,7 +16,7 @@ from e2m2e.data.templates import CHAR_LENGTH_KM
 from e2m2e.data.types.trajectory import EphemerisTable
 from e2m2e.status import ConvergenceState, FailureCause
 
-pytestmark = pytest.mark.interface
+pytestmark = pytest.mark.orchestration
 
 
 def _table(max_moon_dist_km: float) -> EphemerisTable:

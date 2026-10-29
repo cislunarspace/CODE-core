@@ -16,8 +16,8 @@
 CR3BP 轨道由振幅唯一确定，记录值按一周期闭合核验。星历初值依赖历元与力模型，
 记录里保存完整配置，核验时按同一配置重建力模型。星历修正的收敛残差只约束
 修正弧段，不约束长期外推。本脚本同时报告一年月距有界性，并按设计振幅的
-三倍判为逃逸。发散样本是标定结果，打印在有界列里。退出码只把记录与实测
-不符、设计失败与缺记录计为失败。
+三倍判为逃逸。发散样本与设计失败是标定结果，打印在表格里。退出码只把
+记录与实测不符、缺 cr3bp 字段的记录与缺记录计为失败。
 
 不要在 scripts/ 里用 uv run，它会触发 editable 重建。
 """
@@ -147,8 +147,10 @@ def _design(amplitude_km: float) -> tuple[dict[str, Any], float]:
 
 
 def _verify(record: dict[str, Any]) -> tuple[bool, str]:
-    if record.get("error") or "cr3bp" not in record:
-        return False, f"记录为失败设计：{record.get('error', '缺 cr3bp 字段')}"
+    if record.get("error"):
+        return True, f"记录为已知设计失败，不重跑核验：{record['error']}"
+    if "cr3bp" not in record:
+        return False, "记录缺 cr3bp 字段"
     system = earth_moon_system()
     dynamics = CR3BP_Dynamics(system)
     cr3bp = record["cr3bp"]
@@ -246,7 +248,7 @@ def main() -> int:
         nargs="+",
         type=float,
         default=list(_DEFAULT_AMPLITUDES),
-        help="标定振幅，km，默认 150000 与 200000",
+        help="标定振幅，km，默认 150000 到 200000、步长 5000 的 11 个采样点",
     )
     parser.add_argument("--records", type=Path, default=_RECORD_PATH)
     parser.add_argument(
@@ -299,7 +301,6 @@ def main() -> int:
         records[key] = record
         _save(args.records, records)
         if record.get("error"):
-            failures += 1
             print(f"{amplitude:9.0f} {'设计':>6} 失败 {record['error']}")
             continue
         warn = " 告警" if record["warnings"] else ""
