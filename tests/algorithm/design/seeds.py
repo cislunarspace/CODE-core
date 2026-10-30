@@ -58,10 +58,11 @@ HALO_SEED_POINTS = (1, 2)  # L1、L2
 AXIAL_SEED_VZ0 = 0.001
 AXIAL_SEED_POINT = 1  # L1
 
-# DPO 族标准种子（data/templates/seed._DPO_SEED_*；顺行 vy0<0）
-DPO_X0 = 0.90
-DPO_VY0 = -0.247645
-DPO_PERIOD = 2.5022
+# DPO 族标准种子（data/templates/seed._DPO_SEED_*；顺行 vy0<0，主族单圈成员。
+# 双圈种子会让族行走落到多圈分支，见 #841）
+DPO_X0 = 0.96181641
+DPO_VY0 = -0.6578695709297038
+DPO_PERIOD = 0.24919405111373913
 
 # Lyapunov L1 平面族：种子由共线点面内线性模态构造（x0 = x_L1 − 偏移，
 # vy0 由特征向量相位定出使 y(0)=ẋ(0)=0；构造方式与

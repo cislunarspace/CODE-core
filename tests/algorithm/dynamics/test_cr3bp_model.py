@@ -53,9 +53,8 @@ def test_equations_remain_finite_at_machine_scale_singularity(dynamics):
 def test_jacobi_constant_is_conserved_over_a_periodic_orbit_period(dynamics):
     """REQ-003：周期 DPO 在完整周期内的 Jacobi 最大漂移不超过 1e-10。
 
-    缩参到 25000 km 振幅（ADR 0037 决策 2 的最省路径）：_walk_family 的种子点
-    附近，design_dpo 一次修正即命中（20000 km 需远离种子行走 ~10s，为生产侧
-    下限）；tol_km 放宽至 1000 只控振幅命中精度，每个 correct_at 仍返回完全收敛
+    缩参到 25000 km 振幅并放宽命中精度（ADR 0037 决策 2 的最省路径）：
+    tol_km 放宽至 1000 只控振幅命中精度，每个 correct_at 仍返回完全收敛
     的周期轨道，守恒语义不变。省下的耗时把 t_eval 采样密度恢复为 1000。
     """
     orbit = design_dpo(25_000.0, tol_km=1000.0)

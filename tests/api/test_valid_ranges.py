@@ -76,7 +76,12 @@ class TestValidRangesResponse:
         design_dro = response.design_orbit["DRO"]["amplitude"]
         assert (design_dro.minimum, design_dro.maximum) == (1737.0, 200000.0)
         design_dpo = response.design_orbit["DPO"]["amplitude"]
-        assert (design_dpo.minimum, design_dpo.maximum) == (1737.0, 110000.0)
+        assert (design_dpo.minimum, design_dpo.maximum) == (1737.0, 27500.0)
+        # DPO 上界来自主族单圈分支延拓的折叠标定（#841），超出即确定性地拒绝
+        assert DesignOrbitRequest.valid_ranges("DPO")["amplitude"].maximum == 27500.0
+        assert DesignOrbitRequest(orbit_type="DPO", amplitude=27500.0).amplitude == 27500.0
+        with pytest.raises(ValidationError, match="amplitude"):
+            DesignOrbitRequest(orbit_type="DPO", amplitude=27500.1)
         family_min = response.family_generation_ranges["DRO"]["min_amplitude_km"]
         family_max = response.family_generation_ranges["DRO"]["max_amplitude_km"]
         assert (family_min.minimum, family_min.maximum) == (1737.0, 480000.0)

@@ -140,13 +140,15 @@ def _walk_family(
     tol: float,
     seed_orbit: Orbit | None = None,
     max_iter: int = 60,
+    step_growth: float = 1.0,
 ) -> Orbit:
     """沿轨道族行走，使 ``measure(orbit(p))`` 命中 ``target`` （±tol）。
 
     ``correct_at(p, guess)`` 在族参数 ``p`` 处修正出周期轨道；``measure``
     提取该轨道用于匹配目标的标量（振幅/近月距等）。假定 measure 随 p
     单调。先用一步试探出增减方向，定步行走跨过目标后用二分法收敛；
-    修正发散时步长减半重试。``seed_orbit`` 给出时作为 ``p_seed`` 处
+    修正发散时步长减半重试，每步成功后步长按 ``step_growth`` 增长
+    （默认 1.0 即固定步长）。``seed_orbit`` 给出时作为 ``p_seed`` 处
     已修正的轨道，跳过首次修正。
     """
     orbit = seed_orbit if seed_orbit is not None else correct_at(p_seed, None)
@@ -154,10 +156,19 @@ def _walk_family(
     if abs(m - target) <= tol:
         return orbit
 
-    # 一步试探确定 measure 随 p 的增减方向
-    probe = correct_at(p_seed + dp_init, orbit)
+    # 一步试探确定 measure 随 p 的增减方向；大步长在族参数陡峭段
+    # （如 DPO 小振幅端）会修正失败，与行走同样对半缩减后再试
+    probe_step = dp_init
+    while True:
+        try:
+            probe = correct_at(p_seed + probe_step, orbit)
+            break
+        except Cr3bpOrbitError:
+            probe_step *= 0.5
+            if probe_step < 1e-4:
+                raise Cr3bpOrbitError("试探步长已减至最小仍修正失败，无法确定行走方向") from None
     m_probe = measure(probe)
-    slope = (m_probe - m) / dp_init
+    slope = (m_probe - m) / probe_step
     if slope == 0.0:
         raise Cr3bpOrbitError("族参数行走停滞：measure 不随参数变化")
     direction = 1.0 if (target - m) / slope > 0 else -1.0
@@ -186,6 +197,7 @@ def _walk_family(
             bracket = (p_prev, p_try, orbit_prev, orbit_new)
             break
         p_prev, m_prev, orbit_prev = p_try, m_new, orbit_new
+        step = min(step * step_growth, max_step)
 
     if bracket is None:
         raise Cr3bpOrbitError(f"族参数行走 {max_iter} 步内未跨过目标 {target}")

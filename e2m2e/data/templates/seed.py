@@ -36,12 +36,13 @@ _HALO_FIXED_Z0_LIMIT = {1: 0.07, 2: 0.15}
 #: Axial 族种子面外速度（无量纲 DU/TU，小振幅下线性化初猜精度高）
 _AXIAL_SEED_VZ0 = 0.001
 
-#: DPO 族标准种子（从 DRO seed 反转 vy0 微分修正收敛所得）
+#: DPO 族标准种子（主族单圈成员，x0=0.96181641 处修正收敛，闭合 4e-14）
 #: DPO 为顺行（prograde），xy 平面内围绕月球的周期轨道，与 DRO 对称。
-#: 种子 x0=0.90 处：vy0 < 0（顺行），period≈2.50。
-_DPO_SEED_X0 = 0.90
-_DPO_SEED_VY0 = -0.247645
-_DPO_SEED_PERIOD = 2.5022
+#: 振幅约 10007 km。种子必须取主族单圈成员：从多圈解出发的族行走会沿
+#: 多圈分支收敛，返回圈数成倍的伪解（#841）。
+_DPO_SEED_X0 = 0.96181641
+_DPO_SEED_VY0 = -0.6578695709297038
+_DPO_SEED_PERIOD = 0.24919405111373913
 
 #: SPO（Short-Period Orbit）族标准种子
 #: 来源：Capdevila & Howell (2018), JGCD, Table 1

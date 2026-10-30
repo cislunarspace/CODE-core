@@ -910,7 +910,7 @@ def design_orbit(
         else:
             # 按 n_rev 圈重采样整条 tile（初猜）。采样策略按族覆盖
             # （见 _patch_sampling_for）：Halo 近月点加密；NRHO 与其余族等时间。
-            # DPO 周期长且不稳定，使用 64 点/圈缩短单弧。
+            # DPO 不稳定，使用 64 点/圈缩短单弧。
             t_patch_syn_n, state_patch_syn_n = _sample_patch_points(
                 dynamics,
                 state0_syn,
