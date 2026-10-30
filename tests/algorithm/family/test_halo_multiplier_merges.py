@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics
-from e2m2e.algorithm.family import resonant_branch
 from e2m2e.algorithm.family.orbits.walk import earth_moon_system
 from e2m2e.algorithm.family.resonant_branch import (
     TRIVIAL_PROJECTION_TOLERANCE,
@@ -112,8 +111,10 @@ def test_scan_reports_walk_without_pairs(
     def seed_only(continuation, seed_orbit, **kwargs):
         return OrbitFamily([seed_orbit])
 
-    monkeypatch.setattr(resonant_branch, "halo_pseudo_arclength_continuation", seed_only)
-    scan = resonant_branch.locate_halo_multiplier_merges(dynamics, max_members=2)
+    monkeypatch.setattr(
+        "e2m2e.algorithm.family.resonant_branch.halo_pseudo_arclength_continuation", seed_only
+    )
+    scan = locate_halo_multiplier_merges(dynamics, max_members=2)
     assert scan.status is ConvergenceState.INFEASIBLE
     assert scan.cause is FailureCause.NO_INTERSECTION
     assert scan.events == ()
