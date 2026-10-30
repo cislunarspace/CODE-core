@@ -694,3 +694,35 @@ class TestOrbitPropagationDirection:
         assert resp.direction == "forward"
         assert all(d > 0 for d in np.diff(resp.time_sec))
         assert resp.time_sec[-1] == pytest.approx(21600.0)
+
+
+@pytest.mark.spice
+@requires_spice
+class TestOrbitPropagationForceConfig:
+    """力配置与原点不一致时，工具面返回参数错误而不是收敛结果。"""
+
+    def test_inconsistent_force_config_is_invalid_params(self):
+        force_config = {
+            "version": 1,
+            "forces": [
+                {
+                    "name": "earth",
+                    "type": "PointMassGravity",
+                    "enabled": True,
+                    "params": {"body": "EARTH"},
+                },
+                {
+                    "name": "moon",
+                    "type": "PointMassGravity",
+                    "enabled": True,
+                    "params": {"body": "MOON"},
+                },
+            ],
+        }
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().orbit_propagation(
+                initial_state=[7000.0, 0.0, 0.0, 0.0, 7.7, 0.0],
+                epoch="2025-06-21T11:00:06",
+                duration=3600.0,
+                force_config=force_config,
+            )

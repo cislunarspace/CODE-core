@@ -142,7 +142,7 @@ class TestPropagateOrbit:
                 },
                 {
                     "name": "moon",
-                    "type": "PointMassGravity",
+                    "type": "ThirdBodyGravity",
                     "enabled": True,
                     "params": {"body": "MOON", "mu": 4902.800118},
                 },
@@ -156,6 +156,35 @@ class TestPropagateOrbit:
             output_step=3600.0,
         )
         assert len(result.ephemeris) == 25
+
+    def test_inconsistent_force_config_rejected(self, reference_epoch):
+        # 地心传播里用 PointMassGravity(MOON) 会把月球引力常数作用在地心
+        # 相对位置上，守卫必须在构建力模型时拒绝，不得返回收敛状态。
+        force_config = {
+            "version": 1,
+            "forces": [
+                {
+                    "name": "earth",
+                    "type": "PointMassGravity",
+                    "enabled": True,
+                    "params": {"body": "EARTH"},
+                },
+                {
+                    "name": "moon",
+                    "type": "PointMassGravity",
+                    "enabled": True,
+                    "params": {"body": "MOON"},
+                },
+            ],
+        }
+        with pytest.raises(ValueError, match="PointMassGravity"):
+            propagate_orbit(
+                initial_state=np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0]),
+                epoch=reference_epoch,
+                duration=86400.0,
+                force_config=force_config,
+                output_step=3600.0,
+            )
 
     def test_backward_roundtrip(self, spice_manager, reference_epoch):
         # 反向 6h 得到 prev 态，再用 prev 态正向 6h 应闭合回初值。
