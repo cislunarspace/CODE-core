@@ -580,7 +580,7 @@ def _match_eigenvalues(eigenvalues: np.ndarray, aligned: list[bool]) -> tuple[tu
     if len(rest) == 2:
         pairs.append((rest[0], rest[1]))
     elif rest:
-        best: tuple[int, int] | None = None
+        best: tuple[tuple[int, int], ...] | None = None
         best_cost = math.inf
         for matching in _matchings(tuple(rest)):
             cost = 0.0
@@ -937,6 +937,7 @@ def locate_halo_multiplier_merges(
     members = list(family.orbits)[:max_members]
     if len(members) < 2:
         seed_state = np.asarray(members[0].states[0], dtype=float)
+        assert members[0].period is not None
         seed_period = float(members[0].period)
         message = (
             f"沿 L2 南 Halo 族行走在 {len(members)} 条成员后提前中断（请求 {max_members} 条），"
