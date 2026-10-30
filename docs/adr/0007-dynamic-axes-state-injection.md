@@ -1,6 +1,6 @@
 # ADR 0007: Dynamic-axes state injection scheme
 
-**Status**: Adopted
+**Status**: Adopted (decisions 5 and 6 revised by ADR 0062)
 **Date**: 2026-06-15
 **Related Issue**: Slice 12 (dynamic axes and VNB/LVLH maneuver support)
 
@@ -108,12 +108,24 @@ untouched.
    `-r`, Earth-pointing); e2m2e adopts this entry — the RSW convention:
    radially outward, in-track, orbit-normal.
 
+   Revision (2026-10-30, ADR 0062): the radial and normal definitions above
+   are generalized to a reference body. With `LVLHAxes(reference=SECONDARY)`
+   the radial is `(r - r_body) / |r - r_body|` and the normal is along
+   `(r - r_body) × v`. The default BARYCENTER reference keeps the definitions
+   above unchanged.
+
 6. **`ObjectReferencedAxes` deferred.** `ObjectReferencedAxes` (relative axes
    centered on a celestial body, e.g. Moon-centered VNB) requires body state
    queries via `System`'s ephemeris interfaces. Slice 12 only supports VNB/
    LVLH based on spacecraft's own state; `ObjectReferencedAxes` awaits a later
    slice, which will extend the `DynamicAxes.update` signature to accept body
    states.
+
+   Revision (2026-10-30, ADR 0062): the LVLH reference-body option is
+   implemented as a constructor parameter of `LVLHAxes` (reference body and
+   μ), not as a separate `ObjectReferencedAxes` class or an extended `update`
+   signature. CR3BP body positions are fixed and the proximity layer has no
+   body-state object. See ADR 0062 for the convention and the sign boundary.
 
 ## Rationale
 

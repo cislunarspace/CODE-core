@@ -7,6 +7,7 @@ from e2m2e.algorithm.dynamics import CR3BP_System
 from e2m2e.algorithm.dynamics.dynamics import CR3BP_Dynamics
 from e2m2e.algorithm.proximity.phasing import phasing_search
 from e2m2e.algorithm.proximity.relative_dynamics import RelativeDynamics, TargetOrbit
+from e2m2e.data.templates.enums import LVLHReference
 from e2m2e.data.types.orbit import Orbit
 from e2m2e.status import ConvergenceState
 
@@ -45,6 +46,17 @@ def circular_orbit(earth_moon_dynamics):
         ]
     orbit = Orbit(states=states, times=times)
     return orbit, dynamics
+
+
+class _EphemerisLikeSystem:
+    """星历系统没有 mu 属性。"""
+
+
+class _EphemerisLikeDynamics:
+    """只提供 system 的动力学替身，用于钉住默认路径不读取 mu。"""
+
+    def __init__(self) -> None:
+        self.system = _EphemerisLikeSystem()
 
 
 class TestEncke:
@@ -116,6 +128,74 @@ class TestLVLH:
         # LVLH 位置应主要在 R 分量（第 0 个）
         assert abs(rho_lvlh[0]) > abs(rho_lvlh[1])
         assert abs(rho_lvlh[0]) > abs(rho_lvlh[2])
+
+    @pytest.mark.parametrize(
+        "reference",
+        [LVLHReference.BARYCENTER, LVLHReference.PRIMARY, LVLHReference.SECONDARY],
+    )
+    def test_roundtrip_reference(self, circular_orbit, reference):
+        """三种参考体的往返转换一致。"""
+        orbit, dynamics = circular_orbit
+        target = TargetOrbit(orbit)
+        rd = RelativeDynamics(target, dynamics)
+
+        t = 1.5
+        rho_syn = np.array([1e-4, 2e-4, 1e-5, 1e-5, -1e-5, 0.0])
+        rho_lvlh, rho_dot_lvlh = rd.to_lvlh(rho_syn, t, reference=reference)
+        rho_syn_back = rd.from_lvlh(rho_lvlh, rho_dot_lvlh, t, reference=reference)
+        np.testing.assert_allclose(rho_syn, rho_syn_back, rtol=1e-10, atol=1e-15)
+
+    def test_moon_radial_along_x(self, circular_orbit):
+        """月心参考体下，月心径向扰动落在 LVLH x 分量。"""
+        orbit, dynamics = circular_orbit
+        target = TargetOrbit(orbit)
+        rd = RelativeDynamics(target, dynamics)
+
+        t = 1.5
+        state = target.state_at(t)
+        r_rel = state[:3] - np.array([1.0 - dynamics.system.mu, 0.0, 0.0])
+        r_hat = r_rel / np.linalg.norm(r_rel)
+        rho_syn = np.concatenate([1e-4 * r_hat, np.zeros(3)])
+        rho_lvlh, _ = rd.to_lvlh(rho_syn, t, reference=LVLHReference.SECONDARY)
+        assert abs(rho_lvlh[0]) > abs(rho_lvlh[1])
+        assert abs(rho_lvlh[0]) > abs(rho_lvlh[2])
+
+    def test_default_matches_barycenter(self, circular_orbit):
+        """默认参考体与显式双质心逐位一致。"""
+        orbit, dynamics = circular_orbit
+        target = TargetOrbit(orbit)
+        rd = RelativeDynamics(target, dynamics)
+
+        t = 1.5
+        rho_syn = np.array([1e-4, 2e-4, 1e-5, 1e-5, -1e-5, 0.0])
+        default_lvlh, default_dot = rd.to_lvlh(rho_syn, t)
+        explicit_lvlh, explicit_dot = rd.to_lvlh(rho_syn, t, reference=LVLHReference.BARYCENTER)
+        np.testing.assert_array_equal(default_lvlh, explicit_lvlh)
+        np.testing.assert_array_equal(default_dot, explicit_dot)
+
+    def test_default_reference_does_not_require_mu(self, circular_orbit):
+        """星历目标没有 system.mu 时，默认双质心转换仍可用。"""
+        orbit, _ = circular_orbit
+        target = TargetOrbit(orbit)
+        rd = RelativeDynamics(target, _EphemerisLikeDynamics())
+
+        t = 1.5
+        rho_syn = np.array([1e-4, 2e-4, 1e-5, 1e-5, -1e-5, 0.0])
+        rho_lvlh, rho_dot_lvlh = rd.to_lvlh(rho_syn, t)
+        rho_syn_back = rd.from_lvlh(rho_lvlh, rho_dot_lvlh, t)
+        np.testing.assert_allclose(rho_syn, rho_syn_back, rtol=1e-10, atol=1e-15)
+
+    def test_non_barycenter_reference_requires_mu(self, circular_orbit):
+        """星历目标没有 system.mu 时，非双质心参考体报 ValueError。"""
+        orbit, _ = circular_orbit
+        target = TargetOrbit(orbit)
+        rd = RelativeDynamics(target, _EphemerisLikeDynamics())
+
+        rho_syn = np.array([1e-4, 2e-4, 1e-5, 1e-5, -1e-5, 0.0])
+        with pytest.raises(ValueError, match="mu"):
+            rd.to_lvlh(rho_syn, 1.5, reference=LVLHReference.SECONDARY)
+        with pytest.raises(ValueError, match="mu"):
+            rd.from_lvlh(np.zeros(3), np.zeros(3), 1.5, reference=LVLHReference.SECONDARY)
 
 
 class TestPhasing:
