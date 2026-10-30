@@ -845,6 +845,15 @@ def design_orbit(
     # --- 相位 → 历元状态，采样 patch points，转 J2000 ---
     assert cr3bp_orbit.period is not None
     period = float(cr3bp_orbit.period)
+    t_c = system.characteristic_time
+    assert t_c is not None
+    # 传播时长在族行走返回后立即解析：DPO 的圈数预算依赖修正后的单圈周期，
+    # 超限请求先于 SynodicJ2000 转换、力模型构建与打靶被拒绝。
+    if sel == "DPO":
+        duration_sec = _resolve_dpo_duration(period, float(t_c), request.duration)
+    else:
+        assert request.duration is not None  # model_validator 已填默认值
+        duration_sec = float(request.duration)
     if sel in ("LISSAJOUS", "L4", "L5"):
         t0_syn = 0.0
     else:
@@ -883,8 +892,6 @@ def design_orbit(
 
     epoch_iso = _epoch_to_iso(request.epoch)
     et0 = spice.utc_to_et(epoch_iso)
-    t_c = system.characteristic_time
-    assert t_c is not None
     syn_j2000 = SynodicJ2000System(cr3bp_system=system, spice=spice)
     state_patch_j2000 = syn_j2000.batch_synodic_to_j2000(
         states_syn=state_patch_syn, t_syn_arr=t_patch_syn, et0=et0
@@ -902,11 +909,6 @@ def design_orbit(
         dyb=dyb,
     )
 
-    if sel == "DPO":
-        duration_sec = _resolve_dpo_duration(period, float(t_c), request.duration)
-    else:
-        assert request.duration is not None  # model_validator 已填默认值
-        duration_sec = float(request.duration)
     duration_day = duration_sec / SECONDS_PER_DAY
     et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * output_step, output_step)
 

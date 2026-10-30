@@ -130,7 +130,12 @@ class DesignOrbitRequest(_ApiModel):
     # 传播参数
     epoch: Any = Field(default=(2024, 1, 1, 0, 0, 0.0), description="[年,月,日,时,分,秒] 或 ISO")
     duration: float | None = Field(
-        default=None, gt=0.0, description="传播时长（秒）；None 时按 orbit_type 填默认"
+        default=None,
+        gt=0.0,
+        description=(
+            "传播时长（秒）；None 时按 orbit_type 填默认。DPO 按修正后的单圈周期"
+            "取两圈，最多两圈，超过的请求被拒绝"
+        ),
     )
     output_step: float = Field(default=3600.0, gt=0.0)
     perturbation: dict[str, int] | None = Field(default=None)

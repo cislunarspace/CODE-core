@@ -128,6 +128,6 @@ issue #838 报告 `design_orbit` 与 `orbit_family_generation` 的 DRO 振幅域
 决策更新：
 
 1. DPO 的默认时长从一年改为两圈，由算法层按修正后的单圈周期折算（`_resolve_dpo_duration`），请求模型的 `duration` 对 DPO 保持 `None`。折算依赖振幅决定的周期，模型层拿不到。
-2. DPO 的时长上限取两圈，超过时在参数层抛 `ValueError`，报出该成员的单圈周期、时长上限与当前请求。原先一年默认在默认振幅下对应 110 圈，实测无法完成，声明与可实现能力不符。
-3. 新增端到端测试 `tests/algorithm/design/test_design_orbit_smoke.py::test_design_orbit_dpo_default_rev_budget_smoke` 与时长边界测试 `tests/algorithm/design/test_dpo_duration_budget.py`，钉住默认请求的收敛、时长为两圈以及超限拒绝。
+2. DPO 的时长上限取两圈，超过时在参数层抛 `ValueError`，报出该成员的单圈周期、时长上限、当前请求。原先一年默认在默认振幅下对应 110 圈，实测无法完成，声明与可实现能力不符。
+3. 新增端到端测试 `tests/algorithm/design/test_design_orbit_smoke.py::test_design_orbit_dpo_default_rev_budget_smoke`、时长边界测试 `tests/algorithm/design/test_dpo_duration_budget.py` 与 Facade 层的 `tests/api/test_facade.py` 拒绝用例，钉住默认请求的收敛、时长为两圈以及超限请求的 INVALID_PARAMS 翻译。
 4. 长弧 DPO 星历要求 segmented 修正改用规模随圈数线性增长的求解方式，属独立数值工作，不在本 PR 内完成。
