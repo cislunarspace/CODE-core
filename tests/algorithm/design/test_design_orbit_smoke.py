@@ -71,3 +71,17 @@ def test_design_orbit_lyapunov_ephemeris_correction_smoke():
     assert result.correction.max_residual < CORRECTION_TOL_KM
     assert result.correction_method == "segmented"
     assert len(result.ephemeris) > 0
+
+
+def test_design_orbit_dpo_default_rev_budget_smoke():
+    """#841：DPO 默认请求按两圈折算时长，segmented 星历修正收敛。
+
+    主族单圈成员周期约 3.33 天，默认两圈约 6.7 天。固定一年会把圈数推到
+    110 圈，实测一小时未完成，见 ADR 0061 的复审修订。
+    """
+    result = design_orbit(make_design_request(orbit_type="DPO", amplitude=20000.0))
+    assert result.correction is not None
+    assert result.correction.status is ConvergenceState.CONVERGED
+    assert result.correction.max_residual < CORRECTION_TOL_KM
+    assert 6.0 < result.duration_day < 7.0
+    assert len(result.ephemeris) > 0

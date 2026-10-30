@@ -216,8 +216,10 @@ class DesignOrbitRequest(_ApiModel):
     @model_validator(mode="after")
     def _validate_orbit_type(self) -> DesignOrbitRequest:
         sel = self.orbit_type.upper()
-        # duration 默认：CR3BP 1 年，ELFO 60 天
-        if self.duration is None:
+        # duration 默认：CR3BP 1 年，ELFO 60 天。DPO 由算法层按修正后的
+        # 单圈周期折算默认圈数（见 _resolve_dpo_duration），因为折算依赖
+        # 振幅决定的周期，模型层拿不到。
+        if self.duration is None and sel != "DPO":
             self.duration = 5184000.0 if sel == "ELFO" else 31557600.0
 
         if sel == "ELFO":

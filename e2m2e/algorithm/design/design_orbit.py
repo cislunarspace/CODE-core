@@ -81,6 +81,8 @@ from .segmented import (
     _sample_patch_points_from_trajectory,
 )
 from .tuning import (
+    _DPO_DEFAULT_REVS,
+    _DPO_MAX_REVS,
     _FIXED_TIME_ORBIT_TYPES,
     CORRECTION_TOL_KM,
     CORRECTION_VEL_WEIGHT,
@@ -718,6 +720,41 @@ def _design_elfo(
     )
 
 
+def _resolve_dpo_duration(period: float, t_c: float, requested: float | None) -> float:
+    """把 DPO 的传播时长换算到圈数预算内（#841）。
+
+    DPO 的 segmented 修正把整条 tile 的节点全部作为自由变量组装正规方程，
+    规模随圈数立方增长。主族单圈成员的周期随振幅从约 1.8 小时变到约 8 天
+    量级，固定一年的时长在短周期成员上会展开成上百圈，实测无法完成。
+    默认时长取 ``_DPO_DEFAULT_REVS`` 圈，显式请求超过 ``_DPO_MAX_REVS`` 圈
+    时在参数层确定性拒绝，不进入打靶。边界与实测代价见 ``tuning`` 的常量
+    注释。
+
+    Args:
+        period: 修正后的单圈周期（无量纲时间单位 TU）。
+        t_c: 特征时间（秒）。
+        requested: 调用方给出的时长（秒）；``None`` 表示用默认圈数。
+
+    Returns:
+        解析后的传播时长（秒）。
+
+    Raises:
+        ValueError: 请求时长超过当前圈数上限。
+    """
+    period_sec = period * t_c
+    max_sec = _DPO_MAX_REVS * period_sec
+    if requested is None:
+        return _DPO_DEFAULT_REVS * period_sec
+    if requested > max_sec:
+        raise ValueError(
+            f"DPO 星历修正最多覆盖 {_DPO_MAX_REVS} 圈：单圈周期 "
+            f"{period_sec / SECONDS_PER_DAY:.3f} 天，duration 上限 "
+            f"{max_sec / SECONDS_PER_DAY:.2f} 天，当前请求 "
+            f"{requested / SECONDS_PER_DAY:.2f} 天"
+        )
+    return float(requested)
+
+
 def design_orbit(
     request: _DesignRequest,
     *,
@@ -865,8 +902,11 @@ def design_orbit(
         dyb=dyb,
     )
 
-    assert request.duration is not None  # model_validator 已填默认值
-    duration_sec = float(request.duration)
+    if sel == "DPO":
+        duration_sec = _resolve_dpo_duration(period, float(t_c), request.duration)
+    else:
+        assert request.duration is not None  # model_validator 已填默认值
+        duration_sec = float(request.duration)
     duration_day = duration_sec / SECONDS_PER_DAY
     et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * output_step, output_step)
 
